@@ -67,10 +67,10 @@
 #include <time.h>
 #include <sys/ioctl.h>
 
-#ifdef HAVE_STDINT_H
-#  include <stdint.h>
+#ifdef HAVE_INTTYPES_H
+#  include <inttypes.h>
 #else
-#  error "Can't find stdint.h - you need to replace this"
+#  error "Can't find inttypes.h - this needs to be fixed"
 #endif 
 
 #ifdef HAVE_STDDEF_H
