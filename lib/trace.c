@@ -175,8 +175,14 @@ static int init_trace(struct libtrace_t **libtrace, char *uri) {
                 (*libtrace)->format=PCAPINT;
         } else if (!strncasecmp(scan,"pcap",4)) {
                 (*libtrace)->format=PCAP;
-        } else if (!strncasecmp(scan,"dag",3)) {
+#ifdef DAGDEVICE
+	} else if (!strncasecmp(scan,"dag",3)) {
                 (*libtrace)->format=DAG;
+#else 
+	} else if (!strncasecmp(scan,"dag",3)) {
+		fprintf(stderr,"This version of libtrace has been compiled without DAG support\n");
+		return 0;
+#endif
         } else if (!strncasecmp(scan,"rtclient",7)) {
                 (*libtrace)->format=RTCLIENT;
 	} else if (!strncasecmp(scan,"wagint",6)) {
@@ -234,6 +240,7 @@ static int init_trace(struct libtrace_t **libtrace, char *uri) {
                         }
                         break;
                 case DAG:
+#ifdef DAGDEVICE
 			/* 
 			 * Can have uridata of the following format:
 			 * /dev/device
@@ -249,7 +256,7 @@ static int init_trace(struct libtrace_t **libtrace, char *uri) {
 				exit(1);
 			}
 			(*libtrace)->conn_info.path = strdup(uridata);
-
+#endif
 			break;
 
                 case RTCLIENT:
@@ -483,6 +490,7 @@ static int trace_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
 				break;
 			case DEVICE:
 				switch(libtrace->format) {
+#ifdef DAGDEVICE
 					case DAG:
 
 						libtrace->dag.bottom = libtrace->dag.top;
@@ -497,6 +505,7 @@ static int trace_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
 						libtrace->dag.offset = 0;
 						
 						break;
+#endif
 					default:
 						if ((numbytes=read(libtrace->input.fd, 
 								buffer, 
@@ -594,6 +603,7 @@ int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *pac
 		return sizeof(dag_record_t) + numbytes;
 	}
 
+#ifdef DAGDEVICE
 	if (libtrace->format == DAG) {
 		if (libtrace->dag.diff == 0) {
 			if ((numbytes = trace_read(libtrace,buf,RP_BUFSIZE)) <= 0) 
@@ -619,8 +629,9 @@ int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *pac
 		assert(libtrace->dag.diff >= 0);
 		//assert(libtrace->dag.offset <= libtrace->dag.top);
 		return (size);
-			
+		
 	}
+#endif
 	do {
 		if (fifo_out_available(libtrace->fifo) == 0 || read_required) {
 			if ((numbytes = trace_read(libtrace,buf,RP_BUFSIZE))<=0){
