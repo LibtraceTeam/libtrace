@@ -357,13 +357,13 @@ typedef enum {
 	TRACE_EVENT_IOWAIT,
 	TRACE_EVENT_SLEEP,
 	TRACE_EVENT_PACKET
-} libtrace_event_t;
+} libtrace_eventtype_t;
 
-typedef struct libtrace_eventobj {
-	libtrace_event_t type;
+struct libtrace_event_t {
+	libtrace_eventtype_t type;
 	int fd;
 	double seconds;
-} libtrace_eventobj_t;
+};
 
 /** process a libtrace event
  * @param trace the libtrace opaque pointer
@@ -378,7 +378,7 @@ typedef struct libtrace_eventobj {
  *  TRACE_EVENT_SLEEP	Next event in <seconds>
  *  TRACE_EVENT_PACKET	Packet arrived in <buffer> with size <size>
  */
-libtrace_eventobj_t trace_event(struct libtrace_t *trace,
+struct libtrace_event_t trace_event(struct libtrace_t *trace,
 		struct libtrace_packet_t *packet);
 
 /** setup a BPF filter

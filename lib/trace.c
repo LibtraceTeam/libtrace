@@ -1044,9 +1044,9 @@ uint8_t *trace_get_destination_mac(struct libtrace_packet_t *packet) {
  * which in turn is stored inside the new packet object...
  * @author Perry Lorier
  */
-libtrace_eventobj_t libtrace_event(struct libtrace_t *trace, 
+struct libtrace_event_t libtrace_event(struct libtrace_t *trace, 
 		struct libtrace_packet_t *packet) {
-	libtrace_eventobj_t event;
+	struct libtrace_event_t event;
 	/* Is there a packet ready? */
 	switch (trace->sourcetype) {
 		case INTERFACE:
