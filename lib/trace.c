@@ -398,15 +398,15 @@ struct libtrace_t *trace_create(char *uri) {
 #ifdef DAGDEVICE
 				case DAG:
 					if((libtrace->input.fd = dag_open(libtrace->conn_info.path)) < 0) {
-						fprintf(stderr,"Cannot open DAG %s: %m", libtrace->conn_info.path,errno);
+						fprintf(stderr,"Cannot open DAG %s: %m\n", libtrace->conn_info.path,errno);
 						exit(0);
 					}
 					if((libtrace->buf = dag_mmap(libtrace->input.fd)) == MAP_FAILED) {
-						fprintf(stderr,"Cannot mmap DAG %s: %m", libtrace->conn_info.path,errno);
+						fprintf(stderr,"Cannot mmap DAG %s: %m\n", libtrace->conn_info.path,errno);
 						exit(0);
 					}
 					if(dag_start(libtrace->input.fd) < 0) {
-						fprintf(stderr,"Cannot start DAG %s: %m", libtrace->conn_info.path,errno);
+						fprintf(stderr,"Cannot start DAG %s: %m\n", libtrace->conn_info.path,errno);
 						exit(0);
 					}
 					break;
@@ -431,6 +431,9 @@ void trace_destroy(struct libtrace_t *libtrace) {
                 pcap_close(libtrace->input.pcap);
         } else if (libtrace->sourcetype == SOCKET || libtrace->sourcetype == RT) {
                 close(libtrace->input.fd);
+	} else if (libtrace->format == DAG) {
+		dag_stop(libtrace->input.fd);
+		
         } else {
                 gzclose(libtrace->input.file);
         }       
@@ -480,8 +483,10 @@ static int trace_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
 						curr = 0;
 						
 						recptr = (dag_record_t *) ((void *)libtrace->buf + (bottom + curr));
+
+						memcpy(buffer,libtrace->buf + (bottom + curr),diff);
 						
-						buffer=libtrace->buf + (bottom + curr);
+						//buffer=libtrace->buf + (bottom + curr);
 
 						numbytes=diff;
 						
