@@ -36,6 +36,7 @@
 #include "libtrace.h"
 
 struct libtrace_t *trace;
+struct libtrace_filter_t *filter;
 
 char *buffer[4096];
 
@@ -58,7 +59,7 @@ int main(int argc, char *argv[]) {
         // create an rtclient to hostname, on the default port
         trace = create_trace(hostname);
 	if (filterstring) {
-		libtrace_bpf_setfilter(trace,filterstring);
+		filter = libtrace_bpf_setfilter(filterstring);
 	}
 
         for (;;) {
@@ -66,8 +67,10 @@ int main(int argc, char *argv[]) {
                         // terminate
                         break;
                 }
-		if (!libtrace_bpf_filter(trace, buffer, 4096)) {
+		if (filter) {
+			if (!libtrace_bpf_filter(trace, filter, buffer, 4096)) {
 			continue;
+			}
 		}
 	 	ipptr = get_ip(trace,buffer,4096);
 		if (ipptr) {
