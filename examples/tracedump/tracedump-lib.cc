@@ -7,7 +7,10 @@
 #include <string>
 #include <ctype.h>
 #include "tracedump.h"
+
+#ifndef DIRNAME
 #define DIRNAME "./"
+#endif
 
 typedef void (*decode_t)(uint16_t type,char *packet,int len);
 
