@@ -247,12 +247,34 @@ struct libtrace_ip *trace_get_ip(struct libtrace_packet_t *packet);
  */
 struct libtrace_tcp *trace_get_tcp(struct libtrace_packet_t *packet);
 
+/** get a pointer to the TCP header (if any) given a pointer to the IP header
+ * @param ip		The IP header
+ * @param[out] skipped	An output variable of the number of bytes skipped
+ *
+ * @returns a pointer to the TCP header, or NULL if this is not a TCP packet
+ *
+ * Skipped can be NULL, in which case it will be ignored by the program.
+ *
+ * @author Perry Lorier
+ */
+struct libtrace_tcp *trace_get_tcp_from_ip(struct libtrace_ip *ip,int *skipped);
+
 /** get a pointer to the UDP header (if any)
  * @param packet  	the packet opaque pointer
  *
  * @returns a pointer to the UDP header, or NULL if this is not a UDP packet
  */
 struct libtrace_udp *trace_get_udp(struct libtrace_packet_t *packet);
+
+/** get a pointer to the UDP header (if any) given a pointer to the IP header
+ * @param 	ip	The IP header
+ * @param[out] 	skipped	An output variable of the number of bytes skipped
+ *
+ * @returns a pointer to the UDP header, or NULL if this is not an UDP packet
+ *
+ * Skipped may be NULL, in which case it will be ignored by this function.
+ */
+struct libtrace_udp *trace_get_udp_from_ip(struct libtrace_ip *ip,int *skipped);
 
 /** get a pointer to the ICMP header (if any)
  * @param packet  	the packet opaque pointer
@@ -261,6 +283,39 @@ struct libtrace_udp *trace_get_udp(struct libtrace_packet_t *packet);
  */
 struct libtrace_icmp *trace_get_icmp(struct libtrace_packet_t *packet);
 
+/** get a pointer to the ICMP header (if any) given a pointer to the IP header
+ * @param ip		The IP header
+ * @param[out] skipped	An output variable of the number of bytes skipped
+ *
+ * @returns a pointer to the ICMP header, or NULL if this is not an ICMP packet
+ *
+ * Skipped may be NULL, in which case it will be ignored by this function
+ */
+struct libtrace_icmp *trace_get_icmp_from_ip(struct libtrace_ip *ip,int *skipped);
+
+/** parse an ip or tcp option
+ * @param[in,out] ptr	the pointer to the current option
+ * @param[in,out] len	the length of the remaining buffer
+ * @param[out] type	the type of the option
+ * @param[out] optlen 	the length of the option
+ * @param[out] data	the data of the option
+ *
+ * @returns bool true if there is another option (and the fields are filled in)
+ *               or false if this was the last option.
+ *
+ * This updates ptr to point to the next option after this one, and updates
+ * len to be the number of bytes remaining in the options area.  Type is updated
+ * to be the code of this option, and data points to the data of this option,
+ * with optlen saying how many bytes there are.
+ *
+ * @note Beware of fragmented packets.
+ */
+int trace_get_next_option(unsigned char **ptr,int *len,
+			unsigned char *type,
+			unsigned char *optlen,
+			unsigned char **data);
+
+
 /** Get the current time in DAG time format 
  * @param packet  	the packet opaque pointer
  *
@@ -268,7 +323,7 @@ struct libtrace_icmp *trace_get_icmp(struct libtrace_packet_t *packet);
  * past 1970-01-01, the lower 32bits are partial seconds)
  * @author Daniel Lawson
  */
-uint64_t trace_get_erf_timestamp(struct libtrace_packet_t *packet);
+uint64_t trace_get_erf_timestamp(const struct libtrace_packet_t *packet);
 
 /** Get the current time in struct timeval
  * @param packet  	the packet opaque pointer
@@ -277,7 +332,7 @@ uint64_t trace_get_erf_timestamp(struct libtrace_packet_t *packet);
  * @author Daniel Lawson
  * @author Perry Lorier
  */ 
-struct timeval trace_get_timeval(struct libtrace_packet_t *packet);
+struct timeval trace_get_timeval(const struct libtrace_packet_t *packet);
 
 /** Get the current time in floating point seconds
  * @param packet  	the packet opaque pointer
@@ -285,7 +340,7 @@ struct timeval trace_get_timeval(struct libtrace_packet_t *packet);
  * @returns time that this packet was seen in 64bit floating point seconds
  * @author Perry Lorier
  */
-double trace_get_seconds(struct libtrace_packet_t *packet);
+double trace_get_seconds(const struct libtrace_packet_t *packet);
 
 /** Get the size of the packet in the trace
  * @param packet  	the packet opaque pointer
@@ -299,7 +354,7 @@ double trace_get_seconds(struct libtrace_packet_t *packet);
  *  This is sometimes called the "snaplen".
  */
 
-int trace_get_capture_length(struct libtrace_packet_t *packet);
+int trace_get_capture_length(const struct libtrace_packet_t *packet);
 
 /** Get the size of the packet as it was seen on the wire.
  * @param packet  	the packet opaque pointer
@@ -310,7 +365,7 @@ int trace_get_capture_length(struct libtrace_packet_t *packet);
  * not be the same as the Capture Len.
  */ 
 
-int trace_get_wire_length(struct libtrace_packet_t *packet);
+int trace_get_wire_length(const struct libtrace_packet_t *packet);
 
 /** Link layer types
  */
@@ -329,7 +384,7 @@ typedef enum {
  * @author Daniel Lawson
  */
 
-inline libtrace_linktype_t trace_get_link_type(struct libtrace_packet_t *packet);
+inline libtrace_linktype_t trace_get_link_type(const struct libtrace_packet_t *packet);
 
 /** Get the destination MAC addres
  * @param packet  	the packet opaque pointer
@@ -337,14 +392,14 @@ inline libtrace_linktype_t trace_get_link_type(struct libtrace_packet_t *packet)
  * destination MAC)
  * @author Perry Lorier
  */
-uint8_t *trace_get_destination_mac(struct libtrace_packet_t *packet);
+uint8_t *trace_get_destination_mac(const struct libtrace_packet_t *packet);
 
 /** Get the source MAC addres
  * @param packet  	the packet opaque pointer
  * @returns a pointer to the source mac, (or NULL if there is no source MAC)
  * @author Perry Lorier
  */
-uint8_t *trace_get_source_mac(struct libtrace_packet_t *packet);
+uint8_t *trace_get_source_mac(const, struct libtrace_packet_t *packet);
 
 /** Truncate the packet at the suggested length
  * @param packet	the packet opaque pointer
@@ -368,7 +423,7 @@ int8_t trace_set_direction(struct libtrace_packet_t *packet, int8_t direction);
  * @returns a signed value containing the direction flag, or -1 if this is not supported
  * @author Daniel Lawson
  */
-int8_t trace_get_direction(struct libtrace_packet_t *packet);
+int8_t trace_get_direction(const struct libtrace_packet_t *packet);
 
 /** Event types */
 typedef enum {
@@ -377,10 +432,11 @@ typedef enum {
 	TRACE_EVENT_PACKET
 } libtrace_event_t;
 
+/** structure returned by libtrace_event explaining what the current event is */
 struct libtrace_eventobj_t {
-	libtrace_event_t type;
-	int fd;
-	double seconds;
+	libtrace_event_t type; /**< event type (iowait,sleep,packet */
+	int fd;		       /**< if IOWAIT, the fd to sleep on */
+	double seconds;	       /**< if SLEEP, the amount of time to sleep for */
 };
 
 /** process a libtrace event

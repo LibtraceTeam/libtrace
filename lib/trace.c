@@ -36,6 +36,7 @@
  * @author Daniel Lawson
  * @author Perry Lorier
  *
+ * @internal
  */
 #define _GNU_SOURCE
 #include "common.h"
@@ -128,23 +129,34 @@ typedef enum {SOCKET, TRACE, STDIN, DEVICE, INTERFACE, RT } source_t;
 typedef enum {ERF, PCAP, PCAPINT, DAG, RTCLIENT, WAG, WAGINT } format_t;
 
 #if HAVE_BPF
+/** A type encapsulating a bpf filter
+ * This type covers the compiled bpf filter, as well as the original filter
+ * string
+ *
+ */
 struct libtrace_filter_t {
 	struct bpf_insn *filter;
 	char * filterstring;
 };
 #endif
 
+/** The information about traces that are open 
+ * @internal
+ */
 struct libtrace_t {
-        format_t format;
-        source_t sourcetype;
+        format_t format; 	/**< The format that this trace is in */
+        source_t sourcetype;	/**< The type (device,file, etc */
         union {
+		/** Information about rtclients */
                 struct {
                         char *hostname;
                         short port;
                 } rt;
-                char *path;
-                char *interface;
+                char *path;		/**< information for local sockets */
+                char *interface;	/**< intormation for reading of network
+					     interfaces */
         } conn_info;
+	/** Information about the current state of the input device */
         union {
                 int fd;
 #if HAVE_ZLIB
@@ -924,6 +936,29 @@ struct libtrace_tcp *trace_get_tcp(struct libtrace_packet_t *packet) {
         return tcpptr;
 }
 
+/** get a pointer to the TCP header (if any) given a pointer to the IP header
+ * @param ip		The IP header
+ * @param[out] skipped	An output variable of the number of bytes skipped
+ *
+ * @returns a pointer to the TCP header, or NULL if this is not a TCP packet
+ *
+ * Skipped can be NULL, in which case it will be ignored by the program.
+ */
+struct libtrace_tcp *get_tcp_from_ip(struct libtrace_ip *ip, int *skipped)
+{
+#define SW_IP_OFFMASK 0xff1f
+	struct libtrace_tcp *tcpptr = 0;
+
+	if ((ip->ip_p == 6) && ((ip->ip_off & SW_IP_OFFMASK) == 0))  {
+		tcpptr = (struct libtrace_tcp *)((ptrdiff_t)ip+ (ip->ip_hl * 4));
+	}
+
+	if (skipped)
+		*skipped=(ip->ip_hl*4);
+
+	return tcpptr;
+}
+
 /** get a pointer to the UDP header (if any)
  * @param packet	a pointer to a libtrace_packet structure
  *
@@ -939,8 +974,32 @@ struct libtrace_udp *trace_get_udp(struct libtrace_packet_t *packet) {
         if ((ipptr->ip_p == 17) && ((ipptr->ip_off & SW_IP_OFFMASK) == 0)) {
                 udpptr = (struct libtrace_udp *)((ptrdiff_t)ipptr + (ipptr->ip_hl * 4));
         }
+
         return udpptr;
 }
+
+/** get a pointer to the UDP header (if any) given a pointer to the IP header
+ * @param ip		The IP header
+ * @param[out] skipped	An output variable of the number of bytes skipped
+ *
+ * @returns a pointer to the UDP header, or NULL if this is not a UDP packet
+ *
+ * Skipped can be NULL, in which case it will be ignored by the program.
+ */
+struct libtrace_udp *get_udp_from_ip(struct libtrace_ip *ip, int *skipped)
+{
+	struct libtrace_udp *udpptr = 0;
+
+	if ((ip->ip_p == 6) && ((ip->ip_off & SW_IP_OFFMASK) == 0))  {
+		udpptr = (struct libtrace_udp *)((ptrdiff_t)ip+ (ip->ip_hl * 4));
+	}
+
+	if (skipped)
+		*skipped=(ip->ip_hl*4);
+
+	return udpptr;
+}
+
 
 /** get a pointer to the ICMP header (if any)
  * @param packet	a pointer to a libtrace_packet structure
@@ -959,6 +1018,76 @@ struct libtrace_icmp *trace_get_icmp(struct libtrace_packet_t *packet) {
         }
         return icmpptr;
 }
+
+/** get a pointer to the ICMP header (if any) given a pointer to the IP header
+ * @param ip		The IP header
+ * @param[out] skipped	An output variable of the number of bytes skipped
+ *
+ * @returns a pointer to the ICMP header, or NULL if this is not a ICMP packet
+ *
+ * Skipped can be NULL, in which case it will be ignored by the program.
+ */
+struct libtrace_icmp *get_icmp_from_ip(struct libtrace_ip *ip, int *skipped)
+{
+	struct libtrace_icmp *icmpptr = 0;
+
+	if ((ip->ip_p == 6) && ((ip->ip_off & SW_IP_OFFMASK) == 0))  {
+		icmpptr = (struct libtrace_icmp *)((ptrdiff_t)ip+ (ip->ip_hl * 4));
+	}
+
+	if (skipped)
+		*skipped=(ip->ip_hl*4);
+
+	return icmpptr;
+}
+/** parse an ip or tcp option
+ * @param[in,out] ptr	the pointer to the current option
+ * @param[in,out] len	the length of the remaining buffer
+ * @param[out] type	the type of the option
+ * @param[out] optlen 	the length of the option
+ * @param[out] data	the data of the option
+ *
+ * @returns bool true if there is another option (and the fields are filled in)
+ *               or false if this was the last option.
+ *
+ * This updates ptr to point to the next option after this one, and updates
+ * len to be the number of bytes remaining in the options area.  Type is updated
+ * to be the code of this option, and data points to the data of this option,
+ * with optlen saying how many bytes there are.
+ *
+ * @note Beware of fragmented packets.
+ * @author Perry Lorier
+ */
+int trace_get_next_option(unsigned char **ptr,int *len,
+			unsigned char *type,
+			unsigned char *optlen,
+			unsigned char **data)
+{
+	if (*len<=0)
+		return 0;
+	*type=**ptr;
+	switch(*type) {
+		case 0: /* End of options */
+			return 0;
+		case 1: /* Pad */
+			(*ptr)++;
+			(*len)--;
+			return 1;
+		default:
+			*optlen = *(*ptr+1);
+			if (*optlen<2)
+				return 0; // I have no idea wtf is going on
+					  // with these packets
+			(*len)-=*optlen;
+			(*data)=(*ptr+2);
+			(*ptr)+=*optlen;
+			if (*len<0)
+				return 0;
+			return 1;
+	}
+	assert(0);
+}
+
 
 /** Get the current time in DAG time format 
  * @param packet 	a pointer to a libtrace_packet structure
@@ -1243,9 +1372,9 @@ uint8_t *trace_get_destination_mac(struct libtrace_packet_t *packet) {
  * @param trace the libtrace opaque pointer
  * @param packet the libtrace_packet opaque pointer
  * @returns
- *  TRACE_EVENT_IOWAIT	Waiting on I/O on <fd>
- *  TRACE_EVENT_SLEEP	Next event in <seconds>
- *  TRACE_EVENT_PACKET	Packet arrived in <buffer> with size <size>
+ *  TRACE_EVENT_IOWAIT	Waiting on I/O on fd
+ *  TRACE_EVENT_SLEEP	Next event in seconds
+ *  TRACE_EVENT_PACKET	Packet arrived in buffer with size size
  * FIXME currently keeps a copy of the packet inside the trace pointer,
  * which in turn is stored inside the new packet object...
  * @author Perry Lorier
