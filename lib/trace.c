@@ -170,6 +170,14 @@ struct libtrace_t {
 	double start_ts;
 };
 
+struct trace_sll_header_t {
+	uint16_t pkttype;          	/* packet type */
+	uint16_t hatype;           	/* link-layer address type */
+	uint16_t halen;            	/* link-layer address length */
+	char addr[8];	 		/* link-layer address */
+	uint16_t protocol;         	/* protocol */
+};
+
 #define RP_BUFSIZE 65536
 
 #define URI_PROTO_LINE 16
@@ -800,7 +808,7 @@ int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *pac
  * you should call trace_get_link_type() to find out what type of link layer this is
  */
 void *trace_get_link(const struct libtrace_packet_t *packet) {
-        void *ethptr = 0;
+        const void *ethptr = 0;
 	dag_record_t *erfptr = 0;
 	struct wag_event_t *event = (struct wag_event_t *)packet->buffer;
 	struct wag_data_event_t *data_event;
@@ -824,7 +832,7 @@ void *trace_get_link(const struct libtrace_packet_t *packet) {
 #if HAVE_PCAP
 		case PCAPINT:
 		case PCAP:
-                        ethptr = (struct ether_header *)(packet->buffer + sizeof(struct pcap_pkthdr));
+                        ethptr = (packet->buffer + sizeof(struct pcap_pkthdr));
                         break;
 #endif
 		case WAGINT:
@@ -885,6 +893,22 @@ struct libtrace_ip *trace_get_ip(struct libtrace_packet_t *packet) {
 				}
 				break;
 			}
+		case TRACE_TYPE_NONE:
+			ipptr = trace_get_link(packet);
+			break;
+		case TRACE_TYPE_LINUX_SLL:
+			{
+				struct trace_sll_header_t *sll;
+
+				sll = trace_get_link(packet);
+				if (ntohs(sll->protocol)!=0x0800) {
+					ipptr = NULL;
+				}
+				else {
+					ipptr = ((void*)sll)+sizeof(*sll);
+				}
+			}
+			break;
 		case TRACE_TYPE_ATM:
 			{
 				struct atm_rec *atm = 
@@ -1295,12 +1319,18 @@ libtrace_linktype_t trace_get_link_type(const struct libtrace_packet_t *packet )
 			pcapptr = (struct pcap_pkthdr *)packet->buffer;
 			linktype = pcap_datalink(packet->trace->input.pcap);
 			switch (linktype) {
-				case 1:
+				case DLT_NULL:
+					return TRACE_TYPE_NONE;
+				case DLT_EN10MB:
 					return TRACE_TYPE_ETH; 
-				case 11:
+				case DLT_ATM_RFC1483:
 					return TRACE_TYPE_ATM;
 				case DLT_IEEE802_11:
 					return TRACE_TYPE_80211;
+#ifdef DLT_LINUX_SLL
+				case DLT_LINUX_SLL:
+					return TRACE_TYPE_LINUX_SLL;
+#endif
 			}
 		 	break;
 #endif
@@ -1559,6 +1589,7 @@ int8_t trace_get_direction(const struct libtrace_packet_t *packet) {
 	int8_t direction;
 	dag_record_t *erfptr = 0;
 	assert(packet);
+	direction = -1;
 
 	switch(packet->trace->format) {
 		case DAG:
@@ -1567,8 +1598,26 @@ int8_t trace_get_direction(const struct libtrace_packet_t *packet) {
 			erfptr = (dag_record_t *)packet->buffer;
 			direction = erfptr->flags.iface;
 			break;
+		case PCAP:
+			switch (trace_get_link_type(packet)) {
+				case TRACE_TYPE_LINUX_SLL:
+					{
+						struct trace_sll_header_t *sll;
+						sll = trace_get_link(packet);
+						/* 0 == LINUX_SLL_HOST */
+						if (sll->pkttype==0) {
+							direction = 0;
+						}
+						else {
+							direction = 1;
+						}
+						break;
+					}
+				default:
+					/* pass */
+			}
 		default:
-			direction = -1;
+			/* pass */
 	}
 	
 	return direction;
