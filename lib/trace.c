@@ -908,6 +908,7 @@ struct libtrace_ip *trace_get_ip(struct libtrace_packet_t *packet) {
         return ipptr;
 }
 
+#define SW_IP_OFFMASK 0xff1f
 
 /** get a pointer to the TCP header (if any)
  * @param libtrace	a pointer to the trace object returned from gettrace
@@ -916,8 +917,6 @@ struct libtrace_ip *trace_get_ip(struct libtrace_packet_t *packet) {
  *
  * @returns a pointer to the TCP header, or NULL if there is not a TCP packet
  */
-
-#define SW_IP_OFFMASK 0xff1f
 struct libtrace_tcp *trace_get_tcp(struct libtrace_packet_t *packet) {
         struct libtrace_tcp *tcpptr = 0;
         struct libtrace_ip *ipptr = 0;
@@ -1487,14 +1486,6 @@ int8_t trace_get_direction(struct libtrace_packet_t *packet) {
 	
 }
 
-
-/** Attempt to deduce the 'server' port
- * @param protocol the IP protocol (eg, 6 or 17 for TCP or UDP)
- * @param source the TCP or UDP source port
- * @param dest the TCP or UDP destination port
- * @returns a hint as to which port is the server port
- * @author Daniel Lawson
- */
 #define ROOT_SERVER(x) ((x) < 512)
 #define ROOT_CLIENT(x) ((512 <= (x)) && ((x) < 1024))
 #define NONROOT_SERVER(x) ((x) >= 5000)
@@ -1503,6 +1494,14 @@ int8_t trace_get_direction(struct libtrace_packet_t *packet) {
 #define SERVER(x) ROOT_SERVER(x) || NONROOT_SERVER(x)
 #define CLIENT(x) ROOT_CLIENT(x) || NONROOT_CLIENT(x) 
 
+
+/** Attempt to deduce the 'server' port
+ * @param protocol the IP protocol (eg, 6 or 17 for TCP or UDP)
+ * @param source the TCP or UDP source port
+ * @param dest the TCP or UDP destination port
+ * @returns a hint as to which port is the server port
+ * @author Daniel Lawson
+ */
 int8_t trace_get_server_port(uint8_t protocol, uint16_t source, uint16_t dest) {
 	/*
 	 * * If the ports are equal, return DEST
