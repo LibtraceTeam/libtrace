@@ -14,7 +14,7 @@
 #define HAVE_INTTYPES_H 1
 
 /* Define to 1 if you have the <libxml2/libxml/parser.h> header file. */
-/* #undef HAVE_LIBXML2_LIBXML_PARSER_H */
+#define HAVE_LIBXML2_LIBXML_PARSER_H 1
 
 /* Define to 1 if you have the <libxml/parser.h> header file. */
 /* #undef HAVE_LIBXML_PARSER_H */
@@ -58,8 +58,11 @@
 /* Define to 1 if you have the <string.h> header file. */
 #define HAVE_STRING_H 1
 
+/* Define to 1 if you have the `strndup' function. */
+#define HAVE_STRNDUP 1
+
 /* Define to 1 if you have the <sys/limits.h> header file. */
-#define HAVE_SYS_LIMITS_H 1
+/* #undef HAVE_SYS_LIMITS_H */
 
 /* Define to 1 if you have the <sys/stat.h> header file. */
 #define HAVE_SYS_STAT_H 1
@@ -105,7 +108,7 @@
 /* #undef WORDS_BIGENDIAN */
 
 /* Number of bits in a file offset, on hosts where this is settable. */
-/* #undef _FILE_OFFSET_BITS */
+#define _FILE_OFFSET_BITS 64
 
 /* Define for large files, on AIX-style hosts. */
 /* #undef _LARGE_FILES */

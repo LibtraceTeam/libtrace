@@ -86,10 +86,10 @@ install_sh = @install_sh@
 
 INCLUDES = -I$(top_builddir) -I$(top_srcdir)
 
+noinst_LIBRARIES = libreplace.a
+libreplace_a_SOURCES = 
+libreplace_a_LIBADD = @LIBOBJS@
 
-#noinst_LIBRARIES = libreplace.a
-#libreplace_a_SOURCES = 
-#libreplace_a_LIBADD = @LIBOBJS@
 lib_LTLIBRARIES = libtrace.la
 include_HEADERS = libtrace.h dagformat.h wag.h
 @HAVE_DAG_TRUE@libtrace_la_SOURCES = trace.c fifo.c fifo.h common.h dagapi.c dagopts.c
@@ -101,6 +101,12 @@ subdir = lib
 mkinstalldirs = $(SHELL) $(top_srcdir)/mkinstalldirs
 CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
+LIBRARIES = $(noinst_LIBRARIES)
+
+libreplace_a_AR = $(AR) cru
+libreplace_a_DEPENDENCIES = @LIBOBJS@
+am_libreplace_a_OBJECTS =
+libreplace_a_OBJECTS = $(am_libreplace_a_OBJECTS)
 LTLIBRARIES = $(lib_LTLIBRARIES)
 
 libtrace_la_DEPENDENCIES =
@@ -120,7 +126,8 @@ depcomp = $(SHELL) $(top_srcdir)/depcomp
 @AMDEP_TRUE@DEP_FILES = $(DEPDIR)/libtrace_la-dagapi.Plo \
 @AMDEP_TRUE@	$(DEPDIR)/libtrace_la-dagopts.Plo \
 @AMDEP_TRUE@	$(DEPDIR)/libtrace_la-fifo.Plo \
-@AMDEP_TRUE@	$(DEPDIR)/libtrace_la-trace.Plo
+@AMDEP_TRUE@	$(DEPDIR)/libtrace_la-trace.Plo \
+@AMDEP_TRUE@	$(DEPDIR)/strndup.Po
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
 LTCOMPILE = $(LIBTOOL) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) \
@@ -129,11 +136,11 @@ CCLD = $(CC)
 LINK = $(LIBTOOL) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(AM_LDFLAGS) $(LDFLAGS) -o $@
 CFLAGS = @CFLAGS@
-DIST_SOURCES = $(libtrace_la_SOURCES)
+DIST_SOURCES = $(libreplace_a_SOURCES) $(libtrace_la_SOURCES)
 HEADERS = $(include_HEADERS)
 
-DIST_COMMON = $(include_HEADERS) Makefile.am Makefile.in
-SOURCES = $(libtrace_la_SOURCES)
+DIST_COMMON = $(include_HEADERS) Makefile.am Makefile.in strndup.c
+SOURCES = $(libreplace_a_SOURCES) $(libtrace_la_SOURCES)
 
 all: all-am
 
@@ -155,6 +162,15 @@ Makefile:  $(srcdir)/Makefile.in  $(top_builddir)/config.status
 	cd $(top_builddir) && \
 	  CONFIG_HEADERS= CONFIG_LINKS= \
 	  CONFIG_FILES=$(subdir)/$@ $(SHELL) ./config.status
+
+AR = ar
+
+clean-noinstLIBRARIES:
+	-test -z "$(noinst_LIBRARIES)" || rm -f $(noinst_LIBRARIES)
+libreplace.a: $(libreplace_a_OBJECTS) $(libreplace_a_DEPENDENCIES) 
+	-rm -f libreplace.a
+	$(libreplace_a_AR) libreplace.a $(libreplace_a_OBJECTS) $(libreplace_a_LIBADD)
+	$(RANLIB) libreplace.a
 install-libLTLIBRARIES: $(lib_LTLIBRARIES)
 	@$(NORMAL_INSTALL)
 	$(mkinstalldirs) $(DESTDIR)$(libdir)
@@ -191,6 +207,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@$(DEPDIR)/libtrace_la-dagopts.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@$(DEPDIR)/libtrace_la-fifo.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@$(DEPDIR)/libtrace_la-trace.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@$(DEPDIR)/strndup.Po@am__quote@
 
 distclean-depend:
 	-rm -rf $(DEPDIR)
@@ -359,7 +376,7 @@ distdir: $(DISTFILES)
 	done
 check-am: all-am
 check: check-am
-all-am: Makefile $(LTLIBRARIES) $(HEADERS)
+all-am: Makefile $(LIBRARIES) $(LTLIBRARIES) $(HEADERS)
 
 installdirs:
 	$(mkinstalldirs) $(DESTDIR)$(libdir) $(DESTDIR)$(includedir)
@@ -390,7 +407,7 @@ maintainer-clean-generic:
 clean: clean-am
 
 clean-am: clean-generic clean-libLTLIBRARIES clean-libtool \
-	mostlyclean-am
+	clean-noinstLIBRARIES mostlyclean-am
 
 distclean: distclean-am
 
@@ -428,12 +445,12 @@ uninstall-am: uninstall-includeHEADERS uninstall-info-am \
 	uninstall-libLTLIBRARIES
 
 .PHONY: GTAGS all all-am check check-am clean clean-generic \
-	clean-libLTLIBRARIES clean-libtool distclean distclean-compile \
-	distclean-depend distclean-generic distclean-libtool \
-	distclean-tags distdir dvi dvi-am info info-am install \
-	install-am install-data install-data-am install-exec \
-	install-exec-am install-includeHEADERS install-info \
-	install-info-am install-libLTLIBRARIES install-man \
+	clean-libLTLIBRARIES clean-libtool clean-noinstLIBRARIES \
+	distclean distclean-compile distclean-depend distclean-generic \
+	distclean-libtool distclean-tags distdir dvi dvi-am info \
+	info-am install install-am install-data install-data-am \
+	install-exec install-exec-am install-includeHEADERS \
+	install-info install-info-am install-libLTLIBRARIES install-man \
 	install-strip installcheck installcheck-am installdirs \
 	maintainer-clean maintainer-clean-generic mostlyclean \
 	mostlyclean-compile mostlyclean-generic mostlyclean-libtool \
