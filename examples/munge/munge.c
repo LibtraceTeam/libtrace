@@ -9,6 +9,7 @@
 #include <stddef.h>
 #include <string.h>
 #include <pcap.h>
+#include <time.h>
 
 static int trace_link_type_to_dlt(libtrace_linktype_t t)
 {
@@ -35,6 +36,8 @@ void usage(char *argv0)
 	"			prefix preserving\n"
 	"-p --prefix=C.I.D.R/bits Substitute the prefix of the address\n"
 	"-f --filter=expr	Apply a tcpdump filter\n"
+	"-b --start-time=date	Show only packets after this time\n"
+	"-f --end-time=date	Show only packets before this time\n"
 	,argv0);
 	exit(0);
 }
@@ -115,7 +118,6 @@ void encrypt_ips(struct libtrace_ip *ip,bool enc_source,bool enc_dest)
 		if (tcp) update_in_cksum(&tcp->check,old_ip,new_ip);
 		if (udp) update_in_cksum(&udp->check,old_ip,new_ip);
 		ip->ip_src.s_addr = new_ip;
-		fprintf(stderr,"enc'd source\n");
 	}
 
 	if (enc_dest) {
@@ -127,7 +129,6 @@ void encrypt_ips(struct libtrace_ip *ip,bool enc_source,bool enc_dest)
 		if (tcp) update_in_cksum(&tcp->check,old_ip,new_ip);
 		if (udp) update_in_cksum(&udp->check,old_ip,new_ip);
 		ip->ip_dst.s_addr = new_ip;
-		fprintf(stderr,"enc'ing dest %08x->%08x\n",old_ip,new_ip);
 	}
 
 	if (icmp) {
@@ -157,6 +158,47 @@ void trace_write(struct libtrace_write_t *hdl,struct libtrace_packet_t *pkt)
 	pcap_dump((u_char*)hdl->pcap, &pcap_pkt_hdr, link);
 }
 
+double parse_date(const char *date)
+{
+	struct tm *parsed_time;
+
+	parsed_time=getdate(date);
+
+	if (parsed_time) {
+		return (double)mktime(parsed_time);
+	}
+
+	switch(getdate_err) {
+		case 1:
+			fprintf(stderr,"Cannot parse date: The DATEMSK environmental variable is null or undefined\n");
+			break;
+		case 2:
+			fprintf(stderr,"The date template file '%s' cannot be opened for reading\n",getenv("DATEMSK"));
+			break;
+		case 3:
+			fprintf(stderr,"Failed to get file status information for '%s'\n",getenv("DATEMSK"));
+			break;
+		case 4:
+			fprintf(stderr,"%s: Not a regular file\n",getenv("DATEMSK"));
+			break;
+		case 5:
+			fprintf(stderr,"An error occured reading '%s'\n",getenv("DATEMSK"));
+			break;
+		case 6:
+			fprintf(stderr,"Out of memory reading '%s'\n",getenv("DATEMSK"));
+			break;
+		case 7:
+			fprintf(stderr,"Could not parse '%s'\n",date);
+			break;
+		case 8:
+			fprintf(stderr,"Invalid specification in '%s'\n",getenv("DATEMSK"));
+			break;
+		default:
+			fprintf(stderr,"Unable to parse date '%s': Unknown error\n",date);
+	}
+	exit(1);
+}
+
 int main(int argc, char *argv[]) 
 {
 	enum enc_type_t enc_type = ENC_NONE;
@@ -167,6 +209,8 @@ int main(int argc, char *argv[])
 	struct libtrace_write_t writer;
 	bool enc_source = false;
 	bool enc_dest 	= false;
+	double start_time = 0;
+	double end_time = 1e100;
 	pcap_t *p = NULL;
 
 	if (argc<2)
@@ -180,10 +224,12 @@ int main(int argc, char *argv[])
 			{ "cryptopan",		1, 0, 'c' },
 			{ "prefix",		1, 0, 'p' },
 			{ "filter",		1, 0, 'f' },
+			{ "start-time",		1, 0, 'b' },
+			{ "end-time",		1, 0, 'e' },
 			{ NULL,			0, 0, 0 },
 		};
 
-		int c=getopt_long(argc, argv, "sdc:p:f:",
+		int c=getopt_long(argc, argv, "sb:c:de:p:f:",
 				long_options, &option_index);
 
 		if (c==-1)
@@ -215,8 +261,14 @@ int main(int argc, char *argv[])
 				  }
 				  filter=trace_bpf_setfilter(optarg);
 				  break;
+			case 'b': /* "begin" time */
+				  start_time = parse_date(optarg);
+				  break;
+			case 'e': /* "end" time */
+				  start_time = parse_date(optarg);
+				  break;
 			default:
-				printf("unknown option: %c\n",c);
+				fprintf(stderr,"unknown option: %c\n",c);
 				usage(argv[0]);
 
 		}
@@ -225,6 +277,8 @@ int main(int argc, char *argv[])
 
 	trace_enc_init(enc_type,key);
 
+	fprintf(stderr,"From %f to %f\n",start_time,end_time);
+	
 	/* Do the actual processing */
 	trace = trace_create(argv[optind]);
 	if (!trace) {
@@ -235,6 +289,7 @@ int main(int argc, char *argv[])
 	for(;;) {
 		struct libtrace_ip *ipptr;
 		int psize;
+		double ts;
 		if ((psize = trace_read_packet(trace, &packet)) <= 0) {
 			break;
 		}
@@ -252,12 +307,17 @@ int main(int argc, char *argv[])
 			continue;
 		}
 
+		ts = trace_get_seconds(&packet);
+
+		/* skip packets before/after the time */
+		if (ts < start_time || ts > end_time) {
+			continue;
+		}
+
 		ipptr = trace_get_ip(&packet);
 
 		if (ipptr && (enc_source || enc_dest))
 			encrypt_ips(ipptr,enc_source,enc_dest);
-		else
-			fprintf(stderr,"No enc\n");
 
 		/* TODO: Encrypt IP's in ARP packets */
 
