@@ -277,51 +277,53 @@ int main(int argc, char *argv[])
 
 	trace_enc_init(enc_type,key);
 
-	fprintf(stderr,"From %f to %f\n",start_time,end_time);
-	
-	/* Do the actual processing */
-	trace = trace_create(argv[optind]);
-	if (!trace) {
-		fprintf(stderr,"Cannot open %s\n",argv[optind]);
-		return 1;
-	}
 	p = NULL;
-	for(;;) {
-		struct libtrace_ip *ipptr;
-		int psize;
-		double ts;
-		if ((psize = trace_read_packet(trace, &packet)) <= 0) {
-			break;
+
+	while(optind<argc) {
+		/* Do the actual processing */
+		trace = trace_create(argv[optind]);
+		if (!trace) {
+			fprintf(stderr,"Cannot open %s\n",argv[optind]);
+			return 1;
 		}
-		if (!p) {
-			p=pcap_open_dead(
-				trace_link_type_to_dlt(
-					trace_get_link_type(&packet)),
-				65536);
-			writer.pcap = pcap_dump_open(p,"-");
-			fflush((FILE *)writer.pcap);
+		for(;;) {
+			struct libtrace_ip *ipptr;
+			int psize;
+			double ts;
+			if ((psize = trace_read_packet(trace, &packet)) <= 0) {
+				break;
+			}
+			if (!p) {
+				p=pcap_open_dead(
+					trace_link_type_to_dlt(
+						trace_get_link_type(&packet)),
+					65536);
+				writer.pcap = pcap_dump_open(p,"-");
+				fflush((FILE *)writer.pcap);
+			}
+
+			/* Skip packets that don't match the filter */
+			if (filter && !trace_bpf_filter(filter,&packet)) {
+				continue;
+			}
+
+			ts = trace_get_seconds(&packet);
+
+			/* skip packets before/after the time */
+			if (ts < start_time || ts > end_time) {
+				continue;
+			}
+
+			ipptr = trace_get_ip(&packet);
+
+			if (ipptr && (enc_source || enc_dest))
+				encrypt_ips(ipptr,enc_source,enc_dest);
+
+			/* TODO: Encrypt IP's in ARP packets */
+
+			trace_write(&writer,&packet);
 		}
-
-		/* Skip packets that don't match the filter */
-		if (filter && !trace_bpf_filter(filter,&packet)) {
-			continue;
-		}
-
-		ts = trace_get_seconds(&packet);
-
-		/* skip packets before/after the time */
-		if (ts < start_time || ts > end_time) {
-			continue;
-		}
-
-		ipptr = trace_get_ip(&packet);
-
-		if (ipptr && (enc_source || enc_dest))
-			encrypt_ips(ipptr,enc_source,enc_dest);
-
-		/* TODO: Encrypt IP's in ARP packets */
-
-		trace_write(&writer,&packet);
+		optind++;
 	}
 	return 0;
 }
