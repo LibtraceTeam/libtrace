@@ -1259,10 +1259,18 @@ int8_t trace_get_server_port(uint8_t protocol, uint16_t source, uint16_t dest) {
 			return USE_SOURCE;
 		return USE_DEST;
 	}
-	if (ROOT_CLIENT(source) && !ROOT_CLIENT(dest))
+	if (ROOT_CLIENT(source) && !ROOT_CLIENT(dest)) {
+		/* prefer root-client over nonroot-client */
+		if (NONROOT_CLIENT(dest))
+			return USE_SOURCE;
 		return USE_DEST;
-	if (!ROOT_CLIENT(source) && ROOT_CLIENT(dest))
+	}
+	if (!ROOT_CLIENT(source) && ROOT_CLIENT(dest)) {
+		/* prefer root-client over nonroot-client */
+		if (NONROOT_CLIENT(source))
+			return USE_DEST;
 		return USE_SOURCE;
+	}
 	
 	/* nonroot client */
 	if (NONROOT_CLIENT(source) && NONROOT_CLIENT(dest)) {
