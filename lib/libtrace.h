@@ -362,6 +362,17 @@ uint8_t *get_source_mac(struct libtrace_t *libtrace,
 			void *buffer,
 			int buflen);
 
+/** Get the direction flag, if it has one
+ * @param libtrace the libtrace opaque pointer
+ * @param buffer a point to a fille in buffer
+ * @param buflen the length of the buffer
+ * @returns a signed value containing the direction flag, or -1 if this is not supported
+ * @author Daniel Lawson
+ */
+int8_t get_direction(struct libtrace_t *libtrace,
+		      void *buffer,
+		      int buflen);
+
 /** Event types */
 typedef enum {
 	TRACE_EVENT_IOWAIT,
