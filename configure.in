@@ -17,7 +17,7 @@ AC_PROG_LIBTOOL
 dnl Checks for header files.
 AC_HEADER_STDC
 dnl AC_CHECK_HEADERS(errno.h stdlib.h stdio.h assert.h string.h netinet/in.h assert.h errno.h fcntl.h net/ethernet.h netdb.h pcap.h stdio.h stdlib.h string.h sys/stat.h sys/types.h sys/socket.h sys/un.h unistd.h time.h sys/ioctl.h net/bpf.h pcap.h zlib.h pcap-bpf.h)
-AC_CHECK_HEADERS(pcap.h pcap-bpf.h net/bpf.h zlib.h sys/limits.h stddef.h stdint.h limits.h dagapi.h)
+AC_CHECK_HEADERS(pcap.h pcap-bpf.h net/bpf.h zlib.h sys/limits.h stddef.h stdint.h limits.h dagapi.h parser.h libxml/parser.h libxml2/libxml/parser.h)
 	
 dnl Checking for the right bpf header to include
 AC_MSG_CHECKING([where the bpf headers are kept])
@@ -34,6 +34,27 @@ if test $bpfh = no; then
   AC_MSG_RESULT([No BPF headers, compiling without support for BPF filters])
 else
   AC_MSG_RESULT([Using $bpfh])
+fi
+
+
+AC_MSG_CHECKING([where the libxml parser header is kept])
+echo ""
+xmlparser=no
+AC_CHECK_FILE(/usr/include/parser.h,
+	[AC_DEFINE([HAVE_PARSER_H]) xmlparser=parser.h])
+if test $xmlparser = no; then
+AC_CHECK_FILE(/usr/include/libxml/parser.h,
+	[AC_DEFINE([HAVE_LIBXML_PARSER_H]) xmlparser=libxml/parser.h])
+if test $xmlparser = no; then
+AC_CHECK_FILE(/usr/include/libxml2/libxml/parser.h,
+	[AC_DEFINE([HAVE_LIBXML2_LIBXML_PARSER_H]) xmlparser=libxml2/libxml/parser.h])
+fi
+fi
+
+if test $xmlparser = no; then
+	AC_MSG_RESULT([No libxml parser headers, compiling without XML support])
+else
+	AC_MSG_RESULT([Using $xmlparser])
 fi
 
 dnl Checks for typedefs, structures, and compiler characteristics.

@@ -13,6 +13,12 @@
 /* Define to 1 if you have the <inttypes.h> header file. */
 #define HAVE_INTTYPES_H 1
 
+/* Define to 1 if you have the <libxml2/libxml/parser.h> header file. */
+#define HAVE_LIBXML2_LIBXML_PARSER_H 1
+
+/* Define to 1 if you have the <libxml/parser.h> header file. */
+/* #undef HAVE_LIBXML_PARSER_H */
+
 /* Define to 1 if you have the <limits.h> header file. */
 #define HAVE_LIMITS_H 1
 
@@ -20,10 +26,13 @@
 #define HAVE_MEMORY_H 1
 
 /* Define to 1 if you have the <net/bpf.h> header file. */
-/* #undef HAVE_NET_BPF_H */
+#define HAVE_NET_BPF_H 1
+
+/* Define to 1 if you have the <parser.h> header file. */
+/* #undef HAVE_PARSER_H */
 
 /* Define to 1 if you have the <pcap-bpf.h> header file. */
-#define HAVE_PCAP_BPF_H 1
+/* #undef HAVE_PCAP_BPF_H */
 
 /* Define to 1 if you have the <pcap.h> header file. */
 #define HAVE_PCAP_H 1
