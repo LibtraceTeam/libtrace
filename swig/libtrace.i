@@ -152,14 +152,22 @@ struct libtrace_icmp
 }
 
 %rename (Packet) libtrace_packet_t;
-struct libtrace_packet_t {};
+struct libtrace_packet_t 
+{
+	struct libtrace_t *trace;
+	char *buffer;
+	size_t size;
+	uint8_t status;
+};
 
 %extend libtrace_packet_t {
 	libtrace_packet_t() { 
-		struct libtrace_packet_t *packet = malloc(sizeof(struct libtrace_packet_t));
+		struct libtrace_packet_t *packet = 0;
+		packet = malloc(sizeof(struct libtrace_packet_t));
+		packet->buffer = malloc(sizeof(char) * 65536);
 		return packet;
 		}
-	~libtrace_packet_t() {free(self);}
+	~libtrace_packet_t() { free(self->buffer); free(self);}
 	struct libtrace_ip *trace_get_ip() {
 		return trace_get_ip(self);
 	}

@@ -13,3 +13,6 @@ libtrace_wrap.c: libtrace.i
 
 clean:
 	rm -f libtrace_wrap.c libtrace_wrap.o _libtrace.so
+
+veryclean: clean
+	rm -f core libtrace.pyc libtrace.py

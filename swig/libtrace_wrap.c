@@ -690,10 +690,11 @@ SWIG_Python_InstallConstants(PyObject *d, swig_const_info constants[]) {
 #define  SWIGTYPE_p_libtrace_ip swig_types[4] 
 #define  SWIGTYPE_p_libtrace_icmp_un_frag swig_types[5] 
 #define  SWIGTYPE_p_libtrace_t swig_types[6] 
-#define  SWIGTYPE_p_libtrace_udp swig_types[7] 
-#define  SWIGTYPE_p_libtrace_tcp swig_types[8] 
-#define  SWIGTYPE_p_libtrace_icmp_un swig_types[9] 
-static swig_type_info *swig_types[11];
+#define  SWIGTYPE_p_size_t swig_types[7] 
+#define  SWIGTYPE_p_libtrace_udp swig_types[8] 
+#define  SWIGTYPE_p_libtrace_tcp swig_types[9] 
+#define  SWIGTYPE_p_libtrace_icmp_un swig_types[10] 
+static swig_type_info *swig_types[12];
 
 /* -------- TYPES TABLE (END) -------- */
 
@@ -779,10 +780,12 @@ typedef struct {
 
 
 struct libtrace_packet_t *new_libtrace_packet_t(){ 
-		struct libtrace_packet_t *packet = malloc(sizeof(struct libtrace_packet_t));
+		struct libtrace_packet_t *packet = 0;
+		packet = malloc(sizeof(struct libtrace_packet_t));
+		packet->buffer = malloc(sizeof(char) * 65536);
 		return packet;
 		}
-void delete_libtrace_packet_t(struct libtrace_packet_t *self){free(self);}
+void delete_libtrace_packet_t(struct libtrace_packet_t *self){ free(self->buffer); free(self);}
 struct libtrace_ip *libtrace_packet_t_trace_get_ip(struct libtrace_packet_t *self){
 		return trace_get_ip(self);
 	}
@@ -2114,6 +2117,157 @@ static PyObject * libtrace_icmp_un_echo_swigregister(PyObject *self, PyObject *a
     Py_INCREF(obj);
     return Py_BuildValue((char *)"");
 }
+static PyObject *_wrap_Packet_trace_set(PyObject *self, PyObject *args) {
+    PyObject *resultobj;
+    struct libtrace_packet_t *arg1 = (struct libtrace_packet_t *) 0 ;
+    struct libtrace_t *arg2 = (struct libtrace_t *) 0 ;
+    PyObject * obj0 = 0 ;
+    PyObject * obj1 = 0 ;
+    
+    if(!PyArg_ParseTuple(args,(char *)"OO:Packet_trace_set",&obj0,&obj1)) goto fail;
+    if ((SWIG_ConvertPtr(obj0,(void **) &arg1, SWIGTYPE_p_libtrace_packet_t,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    if ((SWIG_ConvertPtr(obj1,(void **) &arg2, SWIGTYPE_p_libtrace_t,SWIG_POINTER_EXCEPTION | SWIG_POINTER_DISOWN )) == -1) SWIG_fail;
+    if (arg1) (arg1)->trace = arg2;
+    
+    Py_INCREF(Py_None); resultobj = Py_None;
+    return resultobj;
+    fail:
+    return NULL;
+}
+
+
+static PyObject *_wrap_Packet_trace_get(PyObject *self, PyObject *args) {
+    PyObject *resultobj;
+    struct libtrace_packet_t *arg1 = (struct libtrace_packet_t *) 0 ;
+    struct libtrace_t *result;
+    PyObject * obj0 = 0 ;
+    
+    if(!PyArg_ParseTuple(args,(char *)"O:Packet_trace_get",&obj0)) goto fail;
+    if ((SWIG_ConvertPtr(obj0,(void **) &arg1, SWIGTYPE_p_libtrace_packet_t,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    result = (struct libtrace_t *) ((arg1)->trace);
+    
+    resultobj = SWIG_NewPointerObj((void *) result, SWIGTYPE_p_libtrace_t, 0);
+    return resultobj;
+    fail:
+    return NULL;
+}
+
+
+static PyObject *_wrap_Packet_buffer_set(PyObject *self, PyObject *args) {
+    PyObject *resultobj;
+    struct libtrace_packet_t *arg1 = (struct libtrace_packet_t *) 0 ;
+    char *arg2 ;
+    PyObject * obj0 = 0 ;
+    
+    if(!PyArg_ParseTuple(args,(char *)"Os:Packet_buffer_set",&obj0,&arg2)) goto fail;
+    if ((SWIG_ConvertPtr(obj0,(void **) &arg1, SWIGTYPE_p_libtrace_packet_t,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    {
+        if (arg1->buffer) free((char*)arg1->buffer);
+        if (arg2) {
+            arg1->buffer = (char *) malloc(strlen(arg2)+1);
+            strcpy((char*)arg1->buffer,arg2);
+        } else {
+            arg1->buffer = 0;
+        }
+    }
+    Py_INCREF(Py_None); resultobj = Py_None;
+    return resultobj;
+    fail:
+    return NULL;
+}
+
+
+static PyObject *_wrap_Packet_buffer_get(PyObject *self, PyObject *args) {
+    PyObject *resultobj;
+    struct libtrace_packet_t *arg1 = (struct libtrace_packet_t *) 0 ;
+    char *result;
+    PyObject * obj0 = 0 ;
+    
+    if(!PyArg_ParseTuple(args,(char *)"O:Packet_buffer_get",&obj0)) goto fail;
+    if ((SWIG_ConvertPtr(obj0,(void **) &arg1, SWIGTYPE_p_libtrace_packet_t,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    result = (char *) ((arg1)->buffer);
+    
+    resultobj = result ? PyString_FromString(result) : Py_BuildValue((char*)"");
+    return resultobj;
+    fail:
+    return NULL;
+}
+
+
+static PyObject *_wrap_Packet_size_set(PyObject *self, PyObject *args) {
+    PyObject *resultobj;
+    struct libtrace_packet_t *arg1 = (struct libtrace_packet_t *) 0 ;
+    size_t arg2 ;
+    PyObject * obj0 = 0 ;
+    PyObject * obj1 = 0 ;
+    
+    if(!PyArg_ParseTuple(args,(char *)"OO:Packet_size_set",&obj0,&obj1)) goto fail;
+    if ((SWIG_ConvertPtr(obj0,(void **) &arg1, SWIGTYPE_p_libtrace_packet_t,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    arg2 = (size_t) PyInt_AsLong(obj1);
+    if (PyErr_Occurred()) SWIG_fail;
+    if (arg1) (arg1)->size = arg2;
+    
+    Py_INCREF(Py_None); resultobj = Py_None;
+    return resultobj;
+    fail:
+    return NULL;
+}
+
+
+static PyObject *_wrap_Packet_size_get(PyObject *self, PyObject *args) {
+    PyObject *resultobj;
+    struct libtrace_packet_t *arg1 = (struct libtrace_packet_t *) 0 ;
+    size_t result;
+    PyObject * obj0 = 0 ;
+    
+    if(!PyArg_ParseTuple(args,(char *)"O:Packet_size_get",&obj0)) goto fail;
+    if ((SWIG_ConvertPtr(obj0,(void **) &arg1, SWIGTYPE_p_libtrace_packet_t,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    result =  ((arg1)->size);
+    
+    resultobj = PyInt_FromLong((long)result);
+    return resultobj;
+    fail:
+    return NULL;
+}
+
+
+static PyObject *_wrap_Packet_status_set(PyObject *self, PyObject *args) {
+    PyObject *resultobj;
+    struct libtrace_packet_t *arg1 = (struct libtrace_packet_t *) 0 ;
+    uint8_t arg2 ;
+    PyObject * obj0 = 0 ;
+    PyObject * obj1 = 0 ;
+    
+    if(!PyArg_ParseTuple(args,(char *)"OO:Packet_status_set",&obj0,&obj1)) goto fail;
+    if ((SWIG_ConvertPtr(obj0,(void **) &arg1, SWIGTYPE_p_libtrace_packet_t,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    arg2 = (uint8_t) PyInt_AsLong(obj1);
+    if (PyErr_Occurred()) SWIG_fail;
+    if (arg1) (arg1)->status = arg2;
+    
+    Py_INCREF(Py_None); resultobj = Py_None;
+    return resultobj;
+    fail:
+    return NULL;
+}
+
+
+static PyObject *_wrap_Packet_status_get(PyObject *self, PyObject *args) {
+    PyObject *resultobj;
+    struct libtrace_packet_t *arg1 = (struct libtrace_packet_t *) 0 ;
+    uint8_t result;
+    PyObject * obj0 = 0 ;
+    
+    if(!PyArg_ParseTuple(args,(char *)"O:Packet_status_get",&obj0)) goto fail;
+    if ((SWIG_ConvertPtr(obj0,(void **) &arg1, SWIGTYPE_p_libtrace_packet_t,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    result = (uint8_t) ((arg1)->status);
+    
+    resultobj = PyInt_FromLong((long)result);
+    return resultobj;
+    fail:
+    return NULL;
+}
+
+
 static PyObject *_wrap_new_Packet(PyObject *self, PyObject *args) {
     PyObject *resultobj;
     struct libtrace_packet_t *result;
@@ -2373,6 +2527,14 @@ static PyMethodDef SwigMethods[] = {
 	 { (char *)"libtrace_icmp_un_echo_sequence_set", _wrap_libtrace_icmp_un_echo_sequence_set, METH_VARARGS },
 	 { (char *)"libtrace_icmp_un_echo_sequence_get", _wrap_libtrace_icmp_un_echo_sequence_get, METH_VARARGS },
 	 { (char *)"libtrace_icmp_un_echo_swigregister", libtrace_icmp_un_echo_swigregister, METH_VARARGS },
+	 { (char *)"Packet_trace_set", _wrap_Packet_trace_set, METH_VARARGS },
+	 { (char *)"Packet_trace_get", _wrap_Packet_trace_get, METH_VARARGS },
+	 { (char *)"Packet_buffer_set", _wrap_Packet_buffer_set, METH_VARARGS },
+	 { (char *)"Packet_buffer_get", _wrap_Packet_buffer_get, METH_VARARGS },
+	 { (char *)"Packet_size_set", _wrap_Packet_size_set, METH_VARARGS },
+	 { (char *)"Packet_size_get", _wrap_Packet_size_get, METH_VARARGS },
+	 { (char *)"Packet_status_set", _wrap_Packet_status_set, METH_VARARGS },
+	 { (char *)"Packet_status_get", _wrap_Packet_status_get, METH_VARARGS },
 	 { (char *)"new_Packet", _wrap_new_Packet, METH_VARARGS },
 	 { (char *)"delete_Packet", _wrap_delete_Packet, METH_VARARGS },
 	 { (char *)"Packet_trace_get_ip", _wrap_Packet_trace_get_ip, METH_VARARGS },
@@ -2398,6 +2560,7 @@ static swig_type_info _swigt__p_libtrace_packet_t[] = {{"_p_libtrace_packet_t", 
 static swig_type_info _swigt__p_libtrace_ip[] = {{"_p_libtrace_ip", 0, "struct libtrace_ip *", 0},{"_p_libtrace_ip"},{0}};
 static swig_type_info _swigt__p_libtrace_icmp_un_frag[] = {{"_p_libtrace_icmp_un_frag", 0, "libtrace_icmp_un_frag *", 0},{"_p_libtrace_icmp_un_frag"},{0}};
 static swig_type_info _swigt__p_libtrace_t[] = {{"_p_libtrace_t", 0, "libtrace_t *", 0},{"_p_libtrace_t"},{0}};
+static swig_type_info _swigt__p_size_t[] = {{"_p_size_t", 0, "size_t *", 0},{"_p_size_t"},{0}};
 static swig_type_info _swigt__p_libtrace_udp[] = {{"_p_libtrace_udp", 0, "struct libtrace_udp *", 0},{"_p_libtrace_udp"},{0}};
 static swig_type_info _swigt__p_libtrace_tcp[] = {{"_p_libtrace_tcp", 0, "struct libtrace_tcp *", 0},{"_p_libtrace_tcp"},{0}};
 static swig_type_info _swigt__p_libtrace_icmp_un[] = {{"_p_libtrace_icmp_un", 0, "libtrace_icmp_un *", 0},{"_p_libtrace_icmp_un"},{0}};
@@ -2410,6 +2573,7 @@ _swigt__p_libtrace_packet_t,
 _swigt__p_libtrace_ip, 
 _swigt__p_libtrace_icmp_un_frag, 
 _swigt__p_libtrace_t, 
+_swigt__p_size_t, 
 _swigt__p_libtrace_udp, 
 _swigt__p_libtrace_tcp, 
 _swigt__p_libtrace_icmp_un, 

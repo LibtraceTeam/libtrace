@@ -294,6 +294,18 @@ class Packet(_object):
     __getattr__ = lambda self, name: _swig_getattr(self, Packet, name)
     def __repr__(self):
         return "<C libtrace_packet_t instance at %s>" % (self.this,)
+    __swig_setmethods__["trace"] = _libtrace.Packet_trace_set
+    __swig_getmethods__["trace"] = _libtrace.Packet_trace_get
+    if _newclass:trace = property(_libtrace.Packet_trace_get, _libtrace.Packet_trace_set)
+    __swig_setmethods__["buffer"] = _libtrace.Packet_buffer_set
+    __swig_getmethods__["buffer"] = _libtrace.Packet_buffer_get
+    if _newclass:buffer = property(_libtrace.Packet_buffer_get, _libtrace.Packet_buffer_set)
+    __swig_setmethods__["size"] = _libtrace.Packet_size_set
+    __swig_getmethods__["size"] = _libtrace.Packet_size_get
+    if _newclass:size = property(_libtrace.Packet_size_get, _libtrace.Packet_size_set)
+    __swig_setmethods__["status"] = _libtrace.Packet_status_set
+    __swig_getmethods__["status"] = _libtrace.Packet_status_get
+    if _newclass:status = property(_libtrace.Packet_status_get, _libtrace.Packet_status_set)
     def __init__(self, *args):
         _swig_setattr(self, Packet, 'this', _libtrace.new_Packet(*args))
         _swig_setattr(self, Packet, 'thisown', 1)
