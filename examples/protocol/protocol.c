@@ -40,10 +40,42 @@
 #include <errno.h>
 
 #include <linux/types.h>
-#include <linux/linkage.h>
-#define  access_ok(type,addr,size) 1
-#include <asm/checksum.h>
+//#include <linux/linkage.h>
+//#define  access_ok(type,addr,size) 1
+
+static inline unsigned short ip_fast_csum(unsigned char * iph,
+					  unsigned int ihl) {
+	unsigned int sum;
+
+	__asm__ __volatile__("
+	    movl (%1), %0
+	    subl $4, %2
+	    jbe 2f
+	    addl 4(%1), %0
+	    adcl 8(%1), %0
+	    adcl 12(%1), %0
+1:	    adcl 16(%1), %0
+	    lea 4(%1), %1
+	    decl %2
+	    jne	1b
+	    adcl $0, %0
+	    movl %0, %2
+	    shrl $16, %0
+	    addw %w2, %w0
+	    adcl $0, %0
+	    notl %0
+2:
+	    "
+	/* Since the input registers which are loaded with iph and ipl
+	   are modified, we must also specify them as outputs, or gcc
+	   will assume they contain their original values. */
+	: "=r" (sum), "=r" (iph), "=r" (ihl)
+	: "1" (iph), "2" (ihl));
+	return(sum);
+}
+
 #define  IN_CHKSUM(IP)  ip_fast_csum((unsigned char *)(IP), 5)
+
 
 #include "libtrace.h"
 
@@ -87,12 +119,12 @@ int main(int argc, char **argv) {
 		}
 	 	ipptr = get_ip(trace,buffer,4096);
 
-		if(do_cksum && IN_CHKSUM(ipptr)) {
-			badchksum ++;
-		} else if (do_w_cksum && ipptr->ip_sum) {
-			badchksum ++;
-		} else {
-			if (ipptr) {
+		if (ipptr) {
+			if(do_cksum && IN_CHKSUM(ipptr)) {
+				badchksum ++;
+			} else if (do_w_cksum && ipptr->ip_sum) {
+				badchksum ++;
+			} else {
 				printf("%d:%d\n",ipptr->ip_p,get_link_type(trace,buffer,4096));
 			}
 		}
