@@ -1,0 +1,33 @@
+$Header$
+
+libtrace 1.0.5
+
+---------------------------------------------------------------------------
+Copyright (c) 2004 The University of Waikato, Hamilton, New Zealand.
+All rights reserved.
+
+This code has been developed by the University of Waikato WAND
+research group. For further information please see http://www.wand.net.nz/.
+---------------------------------------------------------------------------
+
+
+This directory contains source code for libtrace, a userspace library for 
+processing of network traffic capture from live interfaces or from offline
+traces.
+
+libtrace was primarily designed for use with the real-time interface to the 
+Waikato DAG Capture Point software running at The University of Waikato, 
+and has been since extended to a range of other trace and interface formats.
+
+
+It is licensed under the GNU General Public License (GPL) version 2. Please
+see the included file GPL for details of this license.
+
+The files CHANGES and TODO contain more information regarding the current 
+release.
+
+Please read the included INSTALL.txt file for information regarding the
+installation of libtrace, including required dependencies.
+
+For further information, please contact the WAND group. See 
+http://www.wand.net.nz/ for details.
