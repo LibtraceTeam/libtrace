@@ -473,7 +473,7 @@ int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *pac
                 memcpy(buffer + sizeof(struct pcap_pkthdr),pcappkt,pcaphdr.len);
                 numbytes = pcaphdr.len;
 	
-		packet->size = numbytes;
+		packet->size = numbytes + sizeof(struct pcap_pkthdr);
 		return numbytes;
         } 
 
