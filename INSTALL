@@ -4,8 +4,9 @@ Installing libtrace:
 ----------------------------------
 To make and install libtrace:
 
-libtrace requires the dev versions of libpcap and libz to compile
-(on Debian Woody these are libpcap-dev and zlib1g-dev)
+libtrace requires the development libraries for libpcap and libz to compile
+eg, on Debian Woody these are called libpcap-dev and zlib1g-dev.
+
 
 tar zxvf libtrace-x.y.z.tar.gz
 cd libtrace-x.y.z
