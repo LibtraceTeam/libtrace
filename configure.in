@@ -204,4 +204,4 @@ AC_SUBST([ADD_LDFLAGS])
 AC_SUBST([ADD_INCLS])
 
 dnl and finally, output our Makefiles
-AC_OUTPUT(Makefile lib/Makefile)
+AC_OUTPUT(Makefile lib/Makefile replace/Makefile)

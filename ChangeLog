@@ -28,6 +28,11 @@
 ##
 ##
 
+- Version 2.0.11 (unreleased)
+
+ 	* Added in a fallback function for strndup under freebsd. 
+	  Thanks to mjl for this code.
+
 - Version 2.0.10
  	* Removed some badly licensed code.
 

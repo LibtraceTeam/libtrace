@@ -1,2 +1,2 @@
-SUBDIRS=lib
+SUBDIRS=lib replace
 EXTRA_DIST=examples docs
