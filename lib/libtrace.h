@@ -89,13 +89,14 @@ struct libtrace_packet_t {
 /** Structure for dealing with IP packets */
 struct libtrace_ip
   {
-#if BYTE_ORDER == __LITTLE_ENDIAN
+#if BYTE_ORDER == LITTLE_ENDIAN
     unsigned int ip_hl:4;		/**< header length */
     unsigned int ip_v:4;		/**< version */
-#endif
-#if BYTE_ORDER == __BIG_ENDIAN
+#elif BYTE_ORDER == BIG_ENDIAN
     unsigned int ip_v:4;		/**< version */
     unsigned int ip_hl:4;		/**< header length */
+#else
+#   error "Adjust your <bits/endian.h> defines"
 #endif
     u_int8_t ip_tos;			/**< type of service */
     u_short ip_len;			/**< total length */
@@ -118,7 +119,7 @@ struct libtrace_tcp
     u_int16_t dest;		/**< Destination port */
     u_int32_t seq;		/**< Sequence number */
     u_int32_t ack_seq;		/**< Acknowledgement Number */
-#  if BYTE_ORDER == __LITTLE_ENDIAN
+#  if BYTE_ORDER == LITTLE_ENDIAN
     u_int16_t res1:4;		/**< Reserved bits */
     u_int16_t doff:4;		
     u_int16_t fin:1;		/**< FIN */
@@ -128,7 +129,7 @@ struct libtrace_tcp
     u_int16_t ack:1;		/**< ACK flag */
     u_int16_t urg:1;		/**< URG flag */
     u_int16_t res2:2;		/**< Reserved */
-#  elif BYTE_ORDER == __BIG_ENDIAN
+#  elif BYTE_ORDER == BIG_ENDIAN
     u_int16_t doff:4;		
     u_int16_t res1:4;
     u_int16_t res2:2;
