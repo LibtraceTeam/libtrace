@@ -10,19 +10,19 @@ AC_PROG_CC
 AC_PROG_INSTALL
 AC_PROG_LIBTOOL
 
-dnl Checks for libraries.
-dnl Replace `main' with a function in -lpcap:
-dnl AC_CHECK_LIB(pcap, pcap_open_dead)
-dnl Replace `main' with a function in -lz:
-dnl AC_CHECK_LIB(z, gzread)
+
+dnl GNU C library
+AC_GNU_SOURCE
 
 dnl Checks for header files.
 AC_HEADER_STDC
-AC_CHECK_HEADERS(errno.h stdlib.h stdio.h assert.h string.h netinet/in.h assert.h errno.h fcntl.h net/ethernet.h netdb.h pcap.h stdio.h stdlib.h string.h sys/stat.h sys/types.h sys/socket.h sys/un.h unistd.h time.h sys/ioctl.h net/bpf.h pcap.h zlib.h pcap-bpf.h)
+dnl AC_CHECK_HEADERS(errno.h stdlib.h stdio.h assert.h string.h netinet/in.h assert.h errno.h fcntl.h net/ethernet.h netdb.h pcap.h stdio.h stdlib.h string.h sys/stat.h sys/types.h sys/socket.h sys/un.h unistd.h time.h sys/ioctl.h net/bpf.h pcap.h zlib.h pcap-bpf.h)
+AC_CHECK_HEADERS(pcap.h zlib.h pcap-bpf.h net/bpf.h)
 
 dnl Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
 AC_C_INLINE
+AC_C_BIGENDIAN
 AC_TYPE_SIZE_T
 AC_HEADER_TIME
 
@@ -30,8 +30,12 @@ dnl Checks for library functions.
 AC_PROG_GCC_TRADITIONAL
 AC_CHECK_FUNCS(socket strdup)
 
+
 dnl we need large files
 AC_SYS_LARGEFILE
+
+dnl check to make sure we have 64 bit file support
+
 
 dnl configure time options for selecting which libpcap and libz to use
 dnl this is provided to allow for systems whose default libraries don't support
