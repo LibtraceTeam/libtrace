@@ -5,7 +5,7 @@
 /* #undef HAVE_DAGAPI_H */
 
 /* define if you have a DAG API */
-/* #undef HAVE_DAG_API */
+#define HAVE_DAG_API 1
 
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #define HAVE_DLFCN_H 1
@@ -23,10 +23,10 @@
 /* #undef HAVE_NET_BPF_H */
 
 /* Define to 1 if you have the <pcap-bpf.h> header file. */
-#define HAVE_PCAP_BPF_H 1
+/* #undef HAVE_PCAP_BPF_H */
 
 /* Define to 1 if you have the <pcap.h> header file. */
-#define HAVE_PCAP_H 1
+/* #undef HAVE_PCAP_H */
 
 /* Define to 1 if you have the `socket' function. */
 #define HAVE_SOCKET 1
@@ -104,11 +104,9 @@
 /* Define to empty if `const' does not conform to ANSI C. */
 /* #undef const */
 
-/* Define to `__inline__' or `__inline' if that's what the C compiler
-   calls it, or to nothing if 'inline' is not supported under any name.  */
-#ifndef __cplusplus
+/* Define as `__inline' if that's what the C compiler calls it, or to nothing
+   if it is not supported. */
 /* #undef inline */
-#endif
 
 /* Define to `unsigned' if <sys/types.h> does not define. */
 /* #undef size_t */

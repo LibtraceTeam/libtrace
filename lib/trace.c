@@ -81,6 +81,11 @@
 #include "libtrace.h"
 #include "fifo.h"
 
+#define HAVE_BPF 0
+#define HAVE_PCAP 0
+#define HAVE_ZLIB 0
+#define DAGDEVICE 0
+
 #if HAVE_PCAP_BPF_H
 #  include <pcap-bpf.h>
 #  ifndef HAVE_BPF 
@@ -367,7 +372,9 @@ struct libtrace_t *trace_create(char *uri) {
         struct hostent *he;
         struct sockaddr_in remote;
         struct sockaddr_un unix_sock;
+#if HAVE_PCAP
         char errbuf[PCAP_ERRBUF_SIZE];
+#endif
 
         if(init_trace(&libtrace,uri) == 0) {
                 return 0;
@@ -619,9 +626,11 @@ int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *pac
         int numbytes;
         int size;
         char buf[RP_BUFSIZE];
+#if HAVE_PCAP
         struct pcap_pkthdr pcaphdr;
-	dag_record_t *erfptr;
         const u_char *pcappkt;
+#endif
+	dag_record_t *erfptr;
 	int read_required = 0;
 
 	void *buffer = 0;
@@ -975,12 +984,14 @@ uint64_t trace_get_erf_timestamp(struct libtrace_packet_t *packet) {
                         erfptr = (dag_record_t *)packet->buffer;
 			timestamp = erfptr->ts;
                         break;
+#if HAVE_PCAP
 		case PCAPINT:
                 case PCAP:
                         pcapptr = (struct pcap_pkthdr *)packet->buffer;
 			timestamp = ((((uint64_t)pcapptr->ts.tv_sec) << 32) + \
 				(pcapptr->ts.tv_usec*UINT_MAX/1000000));
                         break;
+#endif
 		case WAGINT:
 		case WAG:
 			wagptr = (struct wag_event_t *)packet->buffer;

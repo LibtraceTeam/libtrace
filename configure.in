@@ -31,10 +31,10 @@ AC_CHECK_HEADER(net/bpf.h,
 fi
 
 if test $bpfh = no; then
-  AC_MSG_ERROR([Missing BPF header file])
+  AC_MSG_RESULT([No BPF headers, compiling without support for BPF filters])
+else
+  AC_MSG_RESULT([Using $bpfh])
 fi
-AC_MSG_RESULT([Using $bpfh])
-
 
 dnl Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
