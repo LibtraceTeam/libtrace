@@ -2,7 +2,7 @@
 wand_include = /usr/local/wand/include
 wand_libs = /usr/local/wand/lib
 
-CC=gcc-3.0
+CC=gcc
 
 INCLUDE = -I../include -I$(wand_include)
 CFLAGS = -Wall -Wimplicit -Wformat -pipe -g -O2

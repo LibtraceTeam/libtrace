@@ -2,7 +2,7 @@
 libtrace_include = /usr/local/wand/include
 libtrace_libs = /usr/local/wand/lib
 
-CC=gcc-3.0
+CC=gcc
 
 INCLUDE =  -I$(libtrace_include)
 CFLAGS = -Wall -Wimplicit -Wformat -pipe -g -O2

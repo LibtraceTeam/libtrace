@@ -1,9 +1,9 @@
 include= /usr/local/dag/include
 dagcdir= /usr/local/dag/utils/
 
-CC=g++-3.0
-CXX=g++-3.0
-LD=g++-3.0
+CC=g++
+CXX=g++
+LD=g++
 INCLUDE = -I$(include) -I/usr/local/wand/include -I$(dagcdir)
 CFLAGS = -Wall -Wimplicit -Wformat -pipe -g
 CFLAGS += $(INCLUDE)

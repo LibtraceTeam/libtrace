@@ -1,12 +1,14 @@
 
-PREFIX=/usr/local/wand
+PREFIX=/usr/local/
 
-CC=gcc-3.0
-CFLAGS= -Wall -Wimplicit -Wpedantic -Wformat -pipe -g -O3
+#if using debian Woody, you probably want to use gcc-3.0 here
+#CC=gcc-3.0
+CC=gcc
+CFLAGS= -Wall -Wimplicit -Wformat -pipe -g -O3
 
 CFLAGS += -I../include -I$(PREFIX)/include
 CFLAGS += -D_FILE_OFFSET_BITS=64
-LDFLAGS = -L$(PREFIX)/lib/ -lpcapl -lzl
+LDFLAGS = -L$(PREFIX)/lib/ -lpcap -lz
 
 
 CURRENT=2
@@ -26,7 +28,7 @@ libtrace.lo: 	trace.c
 
 libtrace.la:	libtrace.lo libfifo.lo
 	libtool --mode=link $(CC) $(CFLAGS) -o libtrace.la \
-	libtrace.lo libfifo.lo -rpath $(PREFIX)/lib $(LDLIBS) \
+	libtrace.lo libfifo.lo -rpath $(PREFIX)/lib $(LDFLAGS) \
 	-version-info $(CURRENT):$(REVISION):$(AGE)
 
 
