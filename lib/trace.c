@@ -478,7 +478,7 @@ static int trace_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
 						errno = 0;
 						curr = 0;
 						
-						recptr = (dag_record_t *) (libtrace->buf + (bottom + curr));
+						recptr = (dag_record_t *) ((void *)libtrace->buf + (bottom + curr));
 						
 						buffer=libtrace->buf + (bottom + curr);
 
