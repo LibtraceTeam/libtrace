@@ -11,10 +11,10 @@
 #define HAVE_MEMORY_H 1
 
 /* Define to 1 if you have the <net/bpf.h> header file. */
-/* #undef HAVE_NET_BPF_H */
+#define HAVE_NET_BPF_H 1
 
 /* Define to 1 if you have the <pcap-bpf.h> header file. */
-#define HAVE_PCAP_BPF_H 1
+/* #undef HAVE_PCAP_BPF_H */
 
 /* Define to 1 if you have the <pcap.h> header file. */
 #define HAVE_PCAP_H 1
@@ -87,7 +87,7 @@
 /* #undef WORDS_BIGENDIAN */
 
 /* Number of bits in a file offset, on hosts where this is settable. */
-/* #undef _FILE_OFFSET_BITS */
+#define _FILE_OFFSET_BITS 64
 
 /* Enable GNU extensions on systems that have them.  */
 #ifndef _GNU_SOURCE
