@@ -11,13 +11,13 @@ IP_LAYERS=$(addsuffix .so,$(basename $(wildcard ip_*.cc)))
 TCP_LAYERS=$(addsuffix .so,$(basename $(wildcard tcp_*.cc)))
 PLUGINS=$(LINK_LAYERS) $(ETH_LAYERS) $(IP_LAYERS) $(TCP_LAYERS)
 
-all: tracedump $(PLUGINS) asn1-test links
+all: tracedump $(PLUGINS) links
 
 tracedump: tracedump.cc tracedump-libtrace.o tracedump-lib.o
 
 tracedump-lib.o: CXXFLAGS+=-DLIBDIR=$(LIBDIR)
 
-tcp_1720.so: tcp_1720.cc asn1.o
+tcp_1720.so: 
 
 %.so:%.cc
 	$(CXX) $(CXXFLAGS) -fpic -shared $^ -o $@

@@ -84,30 +84,18 @@
 
 #if HAVE_PCAP_BPF_H
 #  include <pcap-bpf.h>
-#  ifndef HAVE_BPF 
-#    define HAVE_BPF 1
-#  endif
 #else
 #  ifdef HAVE_NET_BPF_H
 #    include <net/bpf.h>
-#    ifndef HAVE_BPF
-#      define HAVE_BPF 1
-#    endif
 #  endif
 #endif
 
 #if HAVE_PCAP_H
 #  include <pcap.h>
-#  ifndef HAVE_PCAP
-#    define HAVE_PCAP 1
-#  endif
 #endif 
 
 #ifdef HAVE_ZLIB_H
 #  include <zlib.h>
-#  ifndef HAVE_ZLIB
-#    define HAVE_ZLIB 1
-#  endif 
 #endif
 
 
@@ -116,9 +104,6 @@
 #ifdef HAVE_DAG_API
 #  include "dagnew.h"
 #  include "dagapi.h"
-#  ifndef DAGDEVICE
-#    define DAGDEVICE 1
-#  endif
 #else
 #  include "dagformat.h"
 #endif
@@ -221,7 +206,7 @@ static int init_trace(struct libtrace_t **libtrace, char *uri) {
 		return 0;
 #endif
 	
-#ifdef DAGDEVICE
+#if HAVE_DAG
 	} else if (!strncasecmp(scan,"dag",3)) {
                 (*libtrace)->format=DAG;
 #else 
@@ -290,7 +275,7 @@ static int init_trace(struct libtrace_t **libtrace, char *uri) {
                         }
                         break;
                 case DAG:
-#ifdef DAGDEVICE
+#if HAVE_DAG
 			/* 
 			 * Can have uridata of the following format:
 			 * /dev/device
@@ -480,7 +465,7 @@ struct libtrace_t *trace_create(char *uri) {
 						libtrace->conn_info.path,
 						O_RDONLY);
 					break;
-#ifdef DAGDEVICE
+#if HAVE_DAG
 				case DAG:
 					if((libtrace->input.fd = dag_open(libtrace->conn_info.path)) < 0) {
 						fprintf(stderr,"Cannot open DAG %s: %m\n", libtrace->conn_info.path,errno);
@@ -523,7 +508,7 @@ void trace_destroy(struct libtrace_t *libtrace) {
 #endif
         } else if (libtrace->sourcetype == SOCKET || libtrace->sourcetype == RT) {
                 close(libtrace->input.fd);
-#ifdef DAGDEVICE
+#if HAVE_DAG
 	} else if (libtrace->format == DAG) {
 		dag_stop(libtrace->input.fd);
 #endif
@@ -574,7 +559,7 @@ static int trace_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
 				break;
 			case DEVICE:
 				switch(libtrace->format) {
-#ifdef DAGDEVICE
+#if HAVE_DAG
 					case DAG:
 
 						libtrace->dag.bottom = libtrace->dag.top;
@@ -705,7 +690,7 @@ int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *pac
 		return rlen;
 	}
 
-#ifdef DAGDEVICE
+#if HAVE_DAG
 	if (libtrace->format == DAG) {
 		if (libtrace->dag.diff == 0) {
 			if ((numbytes = trace_read(libtrace,buf,RP_BUFSIZE)) <= 0) 
