@@ -423,6 +423,10 @@ int8_t trace_set_direction(struct libtrace_packet_t *packet, int8_t direction);
 /** Get the direction flag, if it has one
  * @param packet  	the packet opaque pointer
  * @returns a signed value containing the direction flag, or -1 if this is not supported
+ * The direction is defined as 0 for packets originating locally (ie, outbound)
+ * and 1 for packets originating remotely (ie, inbound).
+ * Other values are possible, which might be overloaded to mean special things
+ * for a special trace.
  * @author Daniel Lawson
  */
 int8_t trace_get_direction(const struct libtrace_packet_t *packet);

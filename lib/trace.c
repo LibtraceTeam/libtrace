@@ -1529,8 +1529,11 @@ int trace_bpf_filter(struct libtrace_filter_t *filter,
 			case TRACE_TYPE_ETH:
 				pcap = pcap_open_dead(DLT_EN10MB, 1500);
 				break;
+			case TRACE_TYPE_LINUX_SLL:
+				pcap = pcap_open_dead(DLT_LINUX_SLL, 1500);
+				break;
 			default:
-				printf("only works for ETH at the moment\n");
+				printf("only works for ETH and LINUX_SLL (ppp) at the moment\n");
 				assert(0);
 		}		
 
@@ -1582,6 +1585,10 @@ int8_t trace_set_direction(struct libtrace_packet_t *packet, int8_t direction) {
 /** Get the direction flag, if it has one
  * @param packet a pointer to a libtrace_packet structure
  * @returns a signed value containing the direction flag, or -1 if this is not supported
+ * The direction is defined as 0 for packets originating locally (ie, outbound)
+ * and 1 for packets originating remotely (ie, inbound).
+ * Other values are possible, which might be overloaded to mean special things
+ * for a special trace.
  * @author Daniel Lawson
  */
 int8_t trace_get_direction(const struct libtrace_packet_t *packet) {
@@ -1599,17 +1606,29 @@ int8_t trace_get_direction(const struct libtrace_packet_t *packet) {
 			direction = erfptr->flags.iface;
 			break;
 		case PCAP:
+		case PCAPINT:
 			switch (trace_get_link_type(packet)) {
 				case TRACE_TYPE_LINUX_SLL:
 					{
 						struct trace_sll_header_t *sll;
 						sll = trace_get_link(packet);
 						/* 0 == LINUX_SLL_HOST */
-						if (sll->pkttype==0) {
-							direction = 0;
+						/* the Waikato Capture point defines "packets
+						 * originating locally" (ie, outbound), with a
+						 * direction of 0, and "packets destined locally"
+						 * (ie, inbound), with a direction of 1.
+						 * This is kind-of-opposite to LINUX_SLL.
+						 * We return consistent values here, however
+						 *
+						 * Note that in recent versions of pcap, you can
+						 * use "inbound" and "outbound" on ppp in linux
+						 */
+						if (ntohs(sll->pkttype==0)) {
+
+							direction = 1;
 						}
 						else {
-							direction = 1;
+							direction = 0;
 						}
 						break;
 					}
