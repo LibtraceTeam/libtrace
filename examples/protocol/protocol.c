@@ -32,6 +32,18 @@
 #include <netinet/in.h> /* ntohs */
 #include <netdb.h>
 #include "dagformat.h"
+#include <getopt.h>
+
+#include <stdlib.h>
+#include <string.h>
+
+#include <errno.h>
+
+#include <linux/types.h>
+#include <linux/linkage.h>
+#define  access_ok(type,addr,size) 1
+#include <asm/checksum.h>
+#define  IN_CHKSUM(IP)  ip_fast_csum((unsigned char *)(IP), 5)
 
 #include "libtrace.h"
 
@@ -39,25 +51,26 @@ struct libtrace_t *trace;
 struct libtrace_filter_t *filter;
 
 char *buffer[4096];
+uint64_t badchksum = 0;
+char *uri = 0;
+char *filterstring = 0;
 
-int main(int argc, char *argv[]) {
+int do_cksum = 0;
+int do_w_cksum = 0;
+static void usage();
+static void parse_cmdline(int argc, char **argv);
 
-        char *hostname = "rtclient:chasm.cs.waikato.ac.nz";
-	char *filterstring = 0;
+int main(int argc, char **argv) {
+
 	struct libtrace_ip *ipptr = 0;
 	
         int status; // need to pass to rtclient_read_packet
         int psize;
-        if (argc == 2) {
-                hostname = argv[1];
-        }
-	if (argc == 3) {
-		hostname = argv[1];
-		filterstring = argv[2];
-	}
+
+	parse_cmdline(argc,argv);
 
         // create an rtclient to hostname, on the default port
-        trace = create_trace(hostname);
+        trace = create_trace(uri);
 	if (filterstring) {
 		filter = libtrace_bpf_setfilter(filterstring);
 	}
@@ -73,10 +86,70 @@ int main(int argc, char *argv[]) {
 			}
 		}
 	 	ipptr = get_ip(trace,buffer,4096);
-		if (ipptr) {
-			printf("%d:%d\n",ipptr->ip_p,get_link_type(trace,buffer,4096));
+
+		if(do_cksum && IN_CHKSUM(ipptr)) {
+			badchksum ++;
+		} else if (do_w_cksum && ipptr->ip_sum) {
+			badchksum ++;
+		} else {
+			if (ipptr) {
+				printf("%d:%d\n",ipptr->ip_p,get_link_type(trace,buffer,4096));
+			}
 		}
         }
+	if (do_cksum || do_w_cksum) {
+		printf("Bad checksums seen: %llu\n",badchksum);
+	}
         destroy_trace(trace);
         return 0;
+}
+
+
+static void usage(char *prog) {
+	printf("usage: %s [-h] [-c | -w] [-u <uri>] [-f <filterstring>]\n",prog);
+	printf("        -h		this help message\n");
+	printf("        -c		perform ip checksum test\n");
+	printf("        -w 		check WDCAPd ip checksum value\n");
+	printf("        -u uri		uri to connect to\n");
+	printf("	-f filterstring BPF filterstring to apply\n");
+	printf("\n");
+	printf(" The use of -c and -w are exclusive: -c is used for normal traces, while -w applies to traces taken from the Waikato Capture point\n");
+}
+
+static void parse_cmdline(int argc, char **argv){
+	int opt;
+	if (argc == 1) {
+		usage(argv[0]);
+		exit(0);
+	}
+	
+	while ((opt = getopt(argc,argv, "hcwu:f:")) != EOF) {
+		switch(opt) {
+			case 'h':
+				usage(argv[0]);
+				exit(0);
+			case 'c':
+				do_cksum = 1;
+				break;
+			case 'w':
+				do_w_cksum = 1;
+				break;
+			case 'u':
+				uri = strdup(optarg);
+				break;
+			case 'f':
+				filterstring = strdup(optarg);
+				break;
+			default:
+				usage(argv[0]);
+				exit(0);
+		}
+
+	}
+
+	if (do_cksum && do_w_cksum) {
+		usage(argv[0]);
+		exit(0);
+	}
+
 }
