@@ -74,13 +74,13 @@
 #define PACKAGE_NAME "libtrace"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "libtrace 2.0.7"
+#define PACKAGE_STRING "libtrace 2.0.8"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "libtrace"
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "2.0.7"
+#define PACKAGE_VERSION "2.0.8"
 
 /* Define to 1 if you have the ANSI C header files. */
 #define STDC_HEADERS 1
@@ -89,7 +89,7 @@
 #define TIME_WITH_SYS_TIME 1
 
 /* Version number of package */
-#define VERSION "2.0.7"
+#define VERSION "2.0.8"
 
 /* Define to 1 if your processor stores words with the most significant byte
    first (like Motorola and SPARC, unlike Intel and VAX). */

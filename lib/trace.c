@@ -1475,6 +1475,9 @@ int8_t trace_get_server_port(uint8_t protocol, uint16_t source, uint16_t dest) {
  * @param len		the new length of the packet
  * @returns the new length of the packet, or the original length of the 
  * packet if unchanged
+ * NOTE: len refers to the network-level payload of the packet, and not
+ * any capture headers included as well. For example, to truncate a packet
+ * after the IP header, set scan to sizeof(ethernet_header) + sizeof(ip_header)
  * @author Daniel Lawson
  */
 size_t trace_truncate_packet(struct libtrace_packet_t *packet, size_t size) {
@@ -1491,15 +1494,15 @@ size_t trace_truncate_packet(struct libtrace_packet_t *packet, size_t size) {
 		case PCAPINT:
 		case PCAP:
 			pcaphdr = (struct pcap_pkthdr *)packet->buffer;
-			pcaphdr->caplen = size;
-			packet->size = size;
+			pcaphdr->caplen = size + sizeof(struct pcap_pkthdr);
+			packet->size = pcaphdr->caplen;
 			break;
 		case ERF:
 		case DAG:
 		case RTCLIENT:
 			erfptr = (dag_record_t *)packet->buffer;
-			erfptr->rlen = ntohs(size);
-			packet->size = size;
+			erfptr->rlen = ntohs(size + sizeof(dag_record_t));
+			packet->size = size + sizeof(dag_record_t);
 			break;
 		case WAGINT:
 		case WAG:
