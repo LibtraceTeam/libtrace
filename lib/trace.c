@@ -1298,6 +1298,33 @@ int trace_bpf_filter(struct libtrace_filter_t *filter,
 	
 }
 
+/** Set the direction flag, if it has one
+ * @param packet the packet opaque pointer
+ * @param direction the new direction (0,1,2,3)
+ * @returns a signed value containing the direction flag, or -1 if this is not supported
+ * @author Daniel Lawson
+ */
+int8_t trace_set_direction(struct libtrace_packet_t *packet, int8_t direction) {
+	
+	dag_record_t *erfptr = 0;
+	assert(packet);
+
+	switch(packet->trace->format) {
+		case DAG:
+		case ERF:
+		case RTCLIENT:
+			erfptr = (dag_record_t *)packet->buffer;
+			erfptr->flags.iface = direction;
+			break;
+		default:
+			direction = -1;
+	}
+	
+	return direction;
+	
+	
+}
+
 /** Get the direction flag, if it has one
  * @param libtrace the libtrace opaque pointer
  * @param buffer a point to a fille in buffer
@@ -1442,3 +1469,43 @@ int8_t trace_get_server_port(uint8_t protocol, uint16_t source, uint16_t dest) {
 	return USE_DEST;
 	
 }
+
+/** Truncate the packet at the suggested length
+ * @param packet	the packet opaque pointer
+ * @param len		the new length of the packet
+ * @returns the new length of the packet, or the original length of the 
+ * packet if unchanged
+ * @author Daniel Lawson
+ */
+size_t trace_truncate_packet(struct libtrace_packet_t *packet, size_t size) {
+	dag_record_t *erfptr;
+	struct pcap_pkthdr *pcaphdr;
+
+	assert(packet);
+
+	if (size > packet->size) {
+		// can't make a packet larger
+		return packet->size;
+	}
+	switch (packet->trace->format) {
+		case PCAPINT:
+		case PCAP:
+			pcaphdr = (struct pcap_pkthdr *)packet->buffer;
+			pcaphdr->caplen = size;
+			packet->size = size;
+			break;
+		case ERF:
+		case DAG:
+		case RTCLIENT:
+			erfptr = (dag_record_t *)packet->buffer;
+			erfptr->rlen = ntohs(size);
+			packet->size = size;
+			break;
+		case WAGINT:
+		case WAG:
+			// don't know how to do this?
+			break;
+	}
+	return packet->size;
+}
+

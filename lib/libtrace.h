@@ -346,6 +346,23 @@ uint8_t *trace_get_destination_mac(struct libtrace_packet_t *packet);
  */
 uint8_t *trace_get_source_mac(struct libtrace_packet_t *packet);
 
+/** Truncate the packet at the suggested length
+ * @param packet	the packet opaque pointer
+ * @param len		the new length of the packet
+ * @returns the new length of the packet, or the original length of the 
+ * packet if unchanged
+ * @author Daniel Lawson
+ */
+size_t trace_truncate_packet(struct libtrace_packet_t *packet, size_t size);
+
+/** Set the direction flag, if it has one
+ * @param packet  	the packet opaque pointer
+ * @param direction	the new direction (0,1,2,3)
+ * @returns a signed value containing the direction flag, or -1 if this is not supported
+ * @author Daniel Lawson
+ */
+int8_t trace_set_direction(struct libtrace_packet_t *packet, int8_t direction);
+
 /** Get the direction flag, if it has one
  * @param packet  	the packet opaque pointer
  * @returns a signed value containing the direction flag, or -1 if this is not supported
