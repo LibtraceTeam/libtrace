@@ -45,8 +45,7 @@
  *
  * @par Usage
  * <ol>
- * <li> include "libtrace.h" (found in /usr/local/wand/include
- * on voodoo and chasm).
+ * <li> include "libtrace.h" 
  * <li> call create_trace with the uri of the trace you're interested in.<br>
  * This is usually passed in as argv[1] to your program.
  * <li> call libtrace_read_packet(), passing in the libtrace_t returned from
@@ -55,10 +54,11 @@
  * <li> loop back to step 3, until libtrace_read_packet() returns -1
  * </ol>
  * @par Linking
- * To use this library you need to link against -ltrace, -lpcapl and -lzl
- * which are the versions of these libraries that support >2G files.  (grr!)
- * These can be found in /usr/local/wand/lib on voodoo and chasm.
- *
+ * To use this library you need to link against libtrace by passing -ltrace
+ * to your linker. You may also need to link against a version of libpcap 
+ * and of zlib which are compiled for largefile support (if you wish to access
+ * traces larger than 2 GB). This is left as an exercise for the reader. Debian
+ * Woody, at least, does not support large files offsets.
  *
  */
 
