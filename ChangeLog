@@ -28,6 +28,17 @@
 ##
 ##
 
+- Version 2.0.13
+	* Improved source docs / doxygen
+	* Added functions to retrieve TCP, UDP and ICMP headers encapsulated
+	  within the IP sublayer
+	  * get_tcp_from_ip()
+	  * get_udp_from_ip()
+	  * get_icmp_from_ip()
+	* Added trace_get_next_option to parse TCP/IP options within a
+	  libtrace_packet object
+	
+
 - Version 2.0.12
 	* check for IP Fragmentation - if so, don't return TCP header on a
 	  fragmented packet
