@@ -1,6 +1,6 @@
 dnl Process this file with autoconf to produce a configure script.
 AC_INIT(lib/trace.c)
-AM_INIT_AUTOMAKE(libtrace,[1.1.0],[libtrace@wand.net.nz])
+AM_INIT_AUTOMAKE(libtrace,[2.0.0],[libtrace@wand.net.nz])
 
 AC_PREREQ(2.5)
 
@@ -12,9 +12,9 @@ AC_PROG_LIBTOOL
 
 dnl Checks for libraries.
 dnl Replace `main' with a function in -lpcap:
-AC_CHECK_LIB(pcap, pcap_open_dead)
+dnl AC_CHECK_LIB(pcap, pcap_open_dead)
 dnl Replace `main' with a function in -lz:
-AC_CHECK_LIB(z, gzread)
+dnl AC_CHECK_LIB(z, gzread)
 
 dnl Checks for header files.
 AC_HEADER_STDC
@@ -29,5 +29,30 @@ AC_HEADER_TIME
 dnl Checks for library functions.
 AC_PROG_GCC_TRADITIONAL
 AC_CHECK_FUNCS(socket strdup)
+
+AC_DEFUN([CHECK_LIBPCAP],
+	 [AC_ARG_WITH([pcap],
+		      AC_HELP_STRING([--with-pcap],
+				     [name of pcap library (default is pcap)]),
+		      [ac_cv_use_pcap=$withval], [ac_cv_use_pcap=pcap])
+AC_CACHE_CHECK([which pcap library to use],
+	       [ac_cv_use_pcap], [ac_cv_use_pcap=pcap])])
+
+AC_DEFUN([CHECK_LIBZ],
+	 [AC_ARG_WITH([zlib],
+		      AC_HELP_STRING([--with-zlib],
+				     [name of zlib library (default is z)]),
+		      [ac_cv_use_zlib=$withval], [ac_cv_use_zlib=z])
+AC_CACHE_CHECK([which zlib library to use],
+	       [ac_cv_use_zlib], [ac_cv_use_zlib=z])])
+
+CHECK_LIBPCAP
+CHECK_LIBZ
+
+LIBPCAP=-l$ac_cv_use_pcap
+AC_SUBST([LIBPCAP])
+
+LIBZ=-l$ac_cv_use_zlib
+AC_SUBST([LIBZ])
 
 AC_OUTPUT(Makefile lib/Makefile)
