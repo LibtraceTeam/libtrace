@@ -8,7 +8,7 @@ CFLAGS += $(INCLUDE)
 libdir = -L$(PREFIX)/lib
 LDLIBS = $(libdir) -ltrace
 
-BINS = rate
+BINS = rate rate-dir
 .PHONY: all clean distclean install depend
 
 all: $(BINS) 
