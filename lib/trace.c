@@ -43,7 +43,6 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <netdb.h>
-#include <pcap.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -67,7 +66,9 @@
 
 #ifdef HAVE_STDINT_H
 #  include <stdint.h>
-#endif
+#else
+#  error "Can't find stdint.h - you need to replace this"
+#endif 
 
 #ifdef HAVE_STDDEF_H
 #include <stddef.h>
@@ -86,13 +87,13 @@
 #  endif
 #endif
 
+#include <zlib.h>
 #include <pcap.h>
 
 #include "dagformat.h"
 
 #include "wag.h"
 
-#include <zlib.h>
 
 
 typedef enum {SOCKET, TRACE, STDIN, DEVICE, INTERFACE, RT } source_t;

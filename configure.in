@@ -17,7 +17,24 @@ AC_PROG_LIBTOOL
 dnl Checks for header files.
 AC_HEADER_STDC
 dnl AC_CHECK_HEADERS(errno.h stdlib.h stdio.h assert.h string.h netinet/in.h assert.h errno.h fcntl.h net/ethernet.h netdb.h pcap.h stdio.h stdlib.h string.h sys/stat.h sys/types.h sys/socket.h sys/un.h unistd.h time.h sys/ioctl.h net/bpf.h pcap.h zlib.h pcap-bpf.h)
-AC_CHECK_HEADERS(pcap.h zlib.h pcap-bpf.h net/bpf.h sys/limits.h stddef.h stdint.h limits.h)
+AC_CHECK_HEADERS(pcap.h pcap-bpf.h net/bpf.h zlib.h sys/limits.h stddef.h stdint.h limits.h)
+	
+dnl Checking for the right bpf header to include
+AC_MSG_CHECKING([where the bpf headers are kept])
+echo ""
+bpfh=no
+AC_CHECK_HEADER(pcap-bpf.h,
+	[AC_DEFINE([HAVE_PCAP_BPF_H]) bpfh=pcap-bpf.h])
+if test $bpfh = no; then
+AC_CHECK_HEADER(net/bpf.h,
+	[AC_DEFINE([HAVE_NET_BPF_H]) bpfh=net/bpf.h])
+fi
+
+if test $bpfh = no; then
+  AC_MSG_ERROR([Missing BPF header file])
+fi
+AC_MSG_RESULT([Using $bpfh])
+
 
 dnl Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
@@ -85,4 +102,6 @@ LIBZ_PATH=-L$ac_cv_use_zlib_path
 AC_SUBST([LIBZ])
 AC_SUBST([LIBZ_PATH])
 
+
+dnl and finally, output our Makefiles
 AC_OUTPUT(Makefile lib/Makefile)
