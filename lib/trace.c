@@ -1209,7 +1209,7 @@ int8_t trace_get_direction(struct libtrace_packet_t *packet) {
 #define NONROOT_CLIENT(x) (1024 <= x < 5000)
 #define DYNAMIC(x) (49152 < x < 65535)
 #define SERVER(x) ROOT_SERVER(x) || NONROOT_SERVER(x)
-#define CLIENT(x) ROOT_CLIENT(x) || NONROOT_CLIENT(x) || DYNAMIC(x)
+#define CLIENT(x) ROOT_CLIENT(x) || NONROOT_CLIENT(x) 
 
 int8_t trace_get_server_port(uint8_t protocol, uint16_t source, uint16_t dest) {
 	/*
@@ -1226,16 +1226,61 @@ int8_t trace_get_server_port(uint8_t protocol, uint16_t source, uint16_t dest) {
 
 	int8_t server, client;
 
-	if (SERVER(source) && CLIENT(dest)) {
-		return USE_SOURCE;
-	} else if (SERVER(dest) && CLIENT(source)) {
+	/* equal */
+	if (source == client)
 		return USE_DEST;
-	} else if (ROOT_SERVER(source) && !ROOT_SERVER(dest)) {
-		return USE_SOURCE;
-	} else if (ROOT_SERVER(dest) && !ROOT_SERVER(source)) {
+
+	/* root server port, 0 - 511 */
+	if (ROOT_SERVER(source) && ROOT_SERVER(dest))
 		return USE_DEST;
-	}
+
+	if (ROOT_SERVER(source) && !ROOT_SERVER(dest))
+		return USE_SOURCE;
+
+	if (!ROOT_SERVER(source) && ROOT_SERVER(dest))
+		return USE_DEST;
+
+	/* non-root server */
+	if (NONROOT_SERVER(source) && NONROOT_SERVER(dest))
+		return USE_DEST;
+	if (NONROOT_SERVER(source) && !NONROOT_SERVER(dest))
+		return USE_SOURCE;
+	if (!NONROOT_SERVER(source) && NONROOT_SERVER(dest))
+		return USE_DEST;
+
+	/* root client */
+	if (ROOT_CLIENT(source) && ROOT_CLIENT(dest))
+		return USE_DEST;
+	if (ROOT_CLIENT(source) && !ROOT_CLIENT(dest))
+		return USE_DEST;
+	if (!ROOT_CLIENT(source) && ROOT_CLIENT(dest))
+		return USE_SOURCE;
 	
+	/* nonroot client */
+	if (NONROOT_CLIENT(source) && NONROOT_CLIENT(dest))
+		return USE_DEST;
+	if (NONROOT_CLIENT(source) && !NONROOT_CLIENT(dest))
+		return USE_DEST;
+	if (!NONROOT_CLIENT(source) && NONROOT_CLIENT(dest))
+		return USE_SOURCE;
+
+	if (DYNAMIC(source) && DYNAMIC(dest))
+		return USE_DEST;
+	if (DYNAMIC(source) && !DYNAMIC(dest))
+		return USE_DEST;
+	if (!DYNAMIC(source) && DYNAMIC(dest))
+		return USE_SOURCE;
+	/*
+	if (SERVER(source) && CLIENT(dest)) 
+		return USE_SOURCE;
+	
+	if (SERVER(dest) && CLIENT(source)) 
+		return USE_DEST;
+	if (ROOT_SERVER(source) && !ROOT_SERVER(dest)) 
+		return USE_SOURCE;
+	if (ROOT_SERVER(dest) && !ROOT_SERVER(source)) 
+		return USE_DEST;
+	*/
 	// failing that test...
 	if (source < dest) {
 		return USE_SOURCE;
