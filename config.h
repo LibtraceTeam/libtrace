@@ -20,13 +20,13 @@
 #define HAVE_MEMORY_H 1
 
 /* Define to 1 if you have the <net/bpf.h> header file. */
-/* #undef HAVE_NET_BPF_H */
+#define HAVE_NET_BPF_H 1
 
 /* Define to 1 if you have the <pcap-bpf.h> header file. */
 /* #undef HAVE_PCAP_BPF_H */
 
 /* Define to 1 if you have the <pcap.h> header file. */
-/* #undef HAVE_PCAP_H */
+#define HAVE_PCAP_H 1
 
 /* Define to 1 if you have the `socket' function. */
 #define HAVE_SOCKET 1
