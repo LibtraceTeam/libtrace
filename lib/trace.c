@@ -407,6 +407,7 @@ struct libtrace_t *trace_create(char *uri) {
 					}
 					if(dag_start(libtrace->input.fd) < 0) {
 						fprintf(stderr,"Cannot start DAG %s: %m", libtrace->conn_info.path,errno);
+						exit(0);
 					}
 					break;
 #endif
