@@ -88,6 +88,7 @@ char *uri = 0;
 char *filterstring = 0;
 
 int do_cksum = 0;
+int loop = 0;
 int do_w_cksum = 0;
 uint64_t rxerr = 0;
 static void usage();
@@ -102,39 +103,45 @@ int main(int argc, char **argv) {
 
 	parse_cmdline(argc,argv);
 
-        trace = trace_create(uri);
-	if (filterstring) {
-		filter = trace_bpf_setfilter(filterstring);
+	if (!uri) {
+		printf("Incorrect usage: need a URI\n");
+		usage(argv[0]);
 	}
+	do {
+		trace = trace_create(uri);
+		if (filterstring) {
+			filter = trace_bpf_setfilter(filterstring);
+		}
 
-        for (;;) {
-                if ((psize = trace_read_packet(trace, &packet)) <= 0) {
-                        // terminate
-                        break;
-                }
+		for (;;) {
+			if ((psize = trace_read_packet(trace, &packet)) <= 0) {
+				// terminate
+				break;
+			}
 
-		if (filter) {
-			if (!trace_bpf_filter(filter,&packet)) {
-			continue;
+			if (filter) {
+				if (!trace_bpf_filter(filter,&packet)) {
+					continue;
+				}
+			}
+			ipptr = trace_get_ip(&packet);
+
+			if (ipptr) {
+				if(do_cksum && IN_CHKSUM(ipptr)) {
+					badchksum ++;
+				} else if (do_w_cksum && ipptr->ip_sum) {
+					badchksum ++;
+				} else {
+					printf("%d:%d\n",ipptr->ip_p,trace_get_link_type(&packet));
+				}
 			}
 		}
-	 	ipptr = trace_get_ip(&packet);
-
-		if (ipptr) {
-			if(do_cksum && IN_CHKSUM(ipptr)) {
-				badchksum ++;
-			} else if (do_w_cksum && ipptr->ip_sum) {
-				badchksum ++;
-			} else {
-				printf("%d:%d\n",ipptr->ip_p,trace_get_link_type(&packet));
-			}
+		if (do_cksum || do_w_cksum) {
+			printf("Bad checksums seen: %llu\n",badchksum);
+			printf("RX Errors seen: %llu\n",rxerr);
 		}
-        }
-	if (do_cksum || do_w_cksum) {
-		printf("Bad checksums seen: %llu\n",badchksum);
-		printf("RX Errors seen: %llu\n",rxerr);
-	}
-        trace_destroy(trace);
+		trace_destroy(trace);
+	} while (loop);
         return 0;
 }
 
@@ -146,6 +153,7 @@ static void usage(char *prog) {
 	printf("        -w 		check WDCAPd ip checksum value\n");
 	printf("        -u uri		uri to connect to\n");
 	printf("	-f filterstring BPF filterstring to apply\n");
+	printf("	-l 		loop the input\n");
 	printf("\n");
 	printf(" The use of -c and -w are exclusive: -c is used for normal traces, while -w applies to traces taken from the Waikato Capture point\n");
 }
@@ -157,7 +165,7 @@ static void parse_cmdline(int argc, char **argv){
 		exit(0);
 	}
 	
-	while ((opt = getopt(argc,argv, "hcwu:f:")) != EOF) {
+	while ((opt = getopt(argc,argv, "hcwu:f:l")) != EOF) {
 		switch(opt) {
 			case 'h':
 				usage(argv[0]);
@@ -173,6 +181,9 @@ static void parse_cmdline(int argc, char **argv){
 				break;
 			case 'f':
 				filterstring = strdup(optarg);
+				break;
+			case 'l':
+				loop = 1;
 				break;
 			default:
 				usage(argv[0]);
