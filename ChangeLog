@@ -29,6 +29,9 @@
 ##
 
 - Version 2.0.14
+	* Added support for pcap decoding of PPP interfaces (DLT_LINUX_SLL)
+	  This DLT provides a direction bit, which we make use of in 
+	  trace_get_direction(). Check the docs for the specifics
 	* Fixed a bug where ERF traces weren't being checked for rxerrors.
 	  If the ERF record indicates an rxerror, then get_link() returns 
 	  NULL.
