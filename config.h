@@ -26,13 +26,13 @@
 #define HAVE_MEMORY_H 1
 
 /* Define to 1 if you have the <net/bpf.h> header file. */
-#define HAVE_NET_BPF_H 1
+/* #undef HAVE_NET_BPF_H */
 
 /* Define to 1 if you have the <parser.h> header file. */
 /* #undef HAVE_PARSER_H */
 
 /* Define to 1 if you have the <pcap-bpf.h> header file. */
-/* #undef HAVE_PCAP_BPF_H */
+#define HAVE_PCAP_BPF_H 1
 
 /* Define to 1 if you have the <pcap.h> header file. */
 #define HAVE_PCAP_H 1
@@ -116,9 +116,11 @@
 /* Define to empty if `const' does not conform to ANSI C. */
 /* #undef const */
 
-/* Define as `__inline' if that's what the C compiler calls it, or to nothing
-   if it is not supported. */
+/* Define to `__inline__' or `__inline' if that's what the C compiler
+   calls it, or to nothing if 'inline' is not supported under any name.  */
+#ifndef __cplusplus
 /* #undef inline */
+#endif
 
 /* Define to `unsigned' if <sys/types.h> does not define. */
 /* #undef size_t */
