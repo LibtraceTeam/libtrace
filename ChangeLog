@@ -28,7 +28,7 @@
 ##
 ##
 
-- Version 2.0.12 (unreleased)
+- Version 2.0.12
 	* check for IP Fragmentation - if so, don't return TCP header on a
 	  fragmented packet
 
