@@ -109,7 +109,8 @@ struct libtrace_ip
     u_int8_t ip_ttl;			/**< time to live */
     u_int8_t ip_p;			/**< protocol */
     u_short ip_sum;			/**< checksum */
-    struct in_addr ip_src, ip_dst;	/**< source and dest address */
+    struct in_addr ip_src;		/**< source address */
+    struct in_addr ip_dst;		/**< dest address */
   };
 
 /** Structure for dealing with TCP packets */
