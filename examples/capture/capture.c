@@ -39,6 +39,7 @@
 #include <unistd.h>
 #include <sys/time.h>
 #include <stdint.h>
+#include "zlib.h"
 #include "libtrace.h"
 #include "dagformat.h"
 
@@ -65,16 +66,19 @@ void alarmsig(int sig) {
         docalc++;
 }
 
+#define BUFSIZE 65536
+
+
 void secondreport() {
 
         static int hdrcount = 10;
 
         if (hdrcount >= 10) {
-                printf("Byte count: 	Packet count: 		Loss count\n");
+                fprintf(stderr,"Byte count: 	Packet count: 		Loss count\n");
                 hdrcount = 0;
         }
         hdrcount++;
-        printf("\t\t%d\t\t%d\t\t%d \n", 
+        fprintf(stderr,"\t\t%d\t\t%d\t\t%d \n", 
                         counter[BYTES],
                         counter[PACKETS],
 			counter[LOSS]);
@@ -87,13 +91,19 @@ int main(int argc, char *argv[]) {
 
         char *uri = 0;
 	char *filename = 0;
-	FILE *fout = 0;
+	gzFile *fout = 0;
         int psize = 0;
+	int offset = 0;
         struct sigaction sigact;
 	dag_record_t *erfptr = 0;
 	struct libtrace_packet_t packet;
 
         struct itimerval itv;
+	void *buffer, *buffer2;
+
+
+	buffer = malloc(BUFSIZE);
+	buffer2 = buffer;
 
         /* 
          * Set up a timer to expire every second, for reporting
@@ -121,7 +131,7 @@ int main(int argc, char *argv[]) {
         if (argc == 3) {
                 uri = strdup(argv[1]);
 		filename = strdup(argv[2]);
-		fout = fopen(filename,"w");
+		fout = gzopen(filename,"ab");
         }
 	
         // create an trace to uri
@@ -147,13 +157,24 @@ int main(int argc, char *argv[]) {
                         secondreport();
                 }
 		
-		if (filename) 
-			fwrite(erfptr,psize,1,fout);
+		if (filename) {
+			if (offset + psize > BUFSIZE) {
+				//gzwrite(fout,erfptr,psize);
+				fprintf(stderr,"writing to disk\n");
+				gzwrite(fout,buffer,offset);
+				offset = 0;
+			}
+			
+			memcpy(buffer + offset,erfptr,psize);
+			offset += psize;
+
+
+		}
 
 
         }
 
         trace_destroy(trace);
-	fclose(fout);
+	gzclose(fout);
         return 0;
 }
