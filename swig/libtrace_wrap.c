@@ -683,17 +683,22 @@ SWIG_Python_InstallConstants(PyObject *d, swig_const_info constants[]) {
 
 /* -------- TYPES TABLE (BEGIN) -------- */
 
-#define  SWIGTYPE_p_in_addr swig_types[0] 
-#define  SWIGTYPE_p_libtrace_icmp swig_types[1] 
-#define  SWIGTYPE_p_libtrace_icmp_un_echo swig_types[2] 
-#define  SWIGTYPE_p_libtrace_packet_t swig_types[3] 
-#define  SWIGTYPE_p_libtrace_ip swig_types[4] 
-#define  SWIGTYPE_p_libtrace_icmp_un_frag swig_types[5] 
-#define  SWIGTYPE_p_libtrace_t swig_types[6] 
-#define  SWIGTYPE_p_libtrace_udp swig_types[7] 
-#define  SWIGTYPE_p_libtrace_tcp swig_types[8] 
-#define  SWIGTYPE_p_libtrace_icmp_un swig_types[9] 
-static swig_type_info *swig_types[11];
+#define  SWIGTYPE_p_libtrace_t swig_types[0] 
+#define  SWIGTYPE_p_libtrace_udp swig_types[1] 
+#define  SWIGTYPE_p_libtrace_ip swig_types[2] 
+#define  SWIGTYPE_p_libtrace_icmp_un_echo swig_types[3] 
+#define  SWIGTYPE_p_libtrace_icmp_un swig_types[4] 
+#define  SWIGTYPE_p_uint64_t swig_types[5] 
+#define  SWIGTYPE_p_void swig_types[6] 
+#define  SWIGTYPE_p_libtrace_packet_t swig_types[7] 
+#define  SWIGTYPE_p_libtrace_filter_t swig_types[8] 
+#define  SWIGTYPE_p_libtrace_icmp_un_frag swig_types[9] 
+#define  SWIGTYPE_p_timeval swig_types[10] 
+#define  SWIGTYPE_p_libtrace_icmp swig_types[11] 
+#define  SWIGTYPE_p_in_addr swig_types[12] 
+#define  SWIGTYPE_p_libtrace_tcp swig_types[13] 
+#define  SWIGTYPE_p_libtrace_linktype_t swig_types[14] 
+static swig_type_info *swig_types[16];
 
 /* -------- TYPES TABLE (END) -------- */
 
@@ -794,8 +799,38 @@ struct libtrace_udp *libtrace_packet_t_trace_get_udp(struct libtrace_packet_t *s
 struct libtrace_icmp *libtrace_packet_t_trace_get_icmp(struct libtrace_packet_t *self){
 		return trace_get_icmp(self);
 	}
+void *libtrace_packet_t_trace_get_link(struct libtrace_packet_t *self){
+		return trace_get_link(self);
+	}
 double libtrace_packet_t_trace_get_seconds(struct libtrace_packet_t *self){
 		return trace_get_seconds(self);
+	}
+uint64_t libtrace_packet_t_trace_get_erf_timestamp(struct libtrace_packet_t *self){
+		return trace_get_erf_timestamp(self);
+	}
+struct timeval libtrace_packet_t_trace_get_timeval(struct libtrace_packet_t *self){
+		return trace_get_timeval(self);
+	}
+int libtrace_packet_t_trace_get_capture_length(struct libtrace_packet_t *self){
+		return trace_get_capture_length(self);
+	}
+int libtrace_packet_t_trace_get_wire_lenth(struct libtrace_packet_t *self){
+		return trace_get_wire_length(self);
+	}
+libtrace_linktype_t libtrace_packet_t_trace_get_link_type(struct libtrace_packet_t *self){
+		return trace_get_link_type(self);
+	}
+uint8_t libtrace_packet_t_trace_get_direction(struct libtrace_packet_t *self){
+		return trace_get_direction(self);
+	}
+int libtrace_packet_t_trace_bpf_filter(struct libtrace_packet_t *self,struct libtrace_filter_t *filter){
+		return trace_bpf_filter(filter,self);
+	}
+struct libtrace_filter_t *new_libtrace_filter_t(char *filterstring){ 
+		return trace_bpf_setfilter(filterstring); 
+	}
+int libtrace_filter_t_trace_bpf_filter(struct libtrace_filter_t *self,struct libtrace_packet_t *packet){
+		return trace_bpf_filter(self,packet);
 	}
 struct libtrace_t *new_libtrace_t(char *uri){ return trace_create(uri); }
 void delete_libtrace_t(struct libtrace_t *self){ trace_destroy(self); }
@@ -2149,6 +2184,23 @@ static PyObject *_wrap_Packet_trace_get_icmp(PyObject *self, PyObject *args) {
 }
 
 
+static PyObject *_wrap_Packet_trace_get_link(PyObject *self, PyObject *args) {
+    PyObject *resultobj;
+    struct libtrace_packet_t *arg1 = (struct libtrace_packet_t *) 0 ;
+    void *result;
+    PyObject * obj0 = 0 ;
+    
+    if(!PyArg_ParseTuple(args,(char *)"O:Packet_trace_get_link",&obj0)) goto fail;
+    if ((SWIG_ConvertPtr(obj0,(void **) &arg1, SWIGTYPE_p_libtrace_packet_t,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    result = (void *)libtrace_packet_t_trace_get_link(arg1);
+    
+    resultobj = SWIG_NewPointerObj((void *) result, SWIGTYPE_p_void, 0);
+    return resultobj;
+    fail:
+    return NULL;
+}
+
+
 static PyObject *_wrap_Packet_trace_get_seconds(PyObject *self, PyObject *args) {
     PyObject *resultobj;
     struct libtrace_packet_t *arg1 = (struct libtrace_packet_t *) 0 ;
@@ -2166,10 +2218,189 @@ static PyObject *_wrap_Packet_trace_get_seconds(PyObject *self, PyObject *args) 
 }
 
 
+static PyObject *_wrap_Packet_trace_get_erf_timestamp(PyObject *self, PyObject *args) {
+    PyObject *resultobj;
+    struct libtrace_packet_t *arg1 = (struct libtrace_packet_t *) 0 ;
+    uint64_t result;
+    PyObject * obj0 = 0 ;
+    
+    if(!PyArg_ParseTuple(args,(char *)"O:Packet_trace_get_erf_timestamp",&obj0)) goto fail;
+    if ((SWIG_ConvertPtr(obj0,(void **) &arg1, SWIGTYPE_p_libtrace_packet_t,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    result = libtrace_packet_t_trace_get_erf_timestamp(arg1);
+    
+    {
+        uint64_t * resultptr;
+        resultptr = (uint64_t *) malloc(sizeof(uint64_t));
+        memmove(resultptr, &result, sizeof(uint64_t));
+        resultobj = SWIG_NewPointerObj((void *) resultptr, SWIGTYPE_p_uint64_t, 1);
+    }
+    return resultobj;
+    fail:
+    return NULL;
+}
+
+
+static PyObject *_wrap_Packet_trace_get_timeval(PyObject *self, PyObject *args) {
+    PyObject *resultobj;
+    struct libtrace_packet_t *arg1 = (struct libtrace_packet_t *) 0 ;
+    struct timeval result;
+    PyObject * obj0 = 0 ;
+    
+    if(!PyArg_ParseTuple(args,(char *)"O:Packet_trace_get_timeval",&obj0)) goto fail;
+    if ((SWIG_ConvertPtr(obj0,(void **) &arg1, SWIGTYPE_p_libtrace_packet_t,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    result = libtrace_packet_t_trace_get_timeval(arg1);
+    
+    {
+        struct timeval * resultptr;
+        resultptr = (struct timeval *) malloc(sizeof(struct timeval));
+        memmove(resultptr, &result, sizeof(struct timeval));
+        resultobj = SWIG_NewPointerObj((void *) resultptr, SWIGTYPE_p_timeval, 1);
+    }
+    return resultobj;
+    fail:
+    return NULL;
+}
+
+
+static PyObject *_wrap_Packet_trace_get_capture_length(PyObject *self, PyObject *args) {
+    PyObject *resultobj;
+    struct libtrace_packet_t *arg1 = (struct libtrace_packet_t *) 0 ;
+    int result;
+    PyObject * obj0 = 0 ;
+    
+    if(!PyArg_ParseTuple(args,(char *)"O:Packet_trace_get_capture_length",&obj0)) goto fail;
+    if ((SWIG_ConvertPtr(obj0,(void **) &arg1, SWIGTYPE_p_libtrace_packet_t,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    result = (int)libtrace_packet_t_trace_get_capture_length(arg1);
+    
+    resultobj = PyInt_FromLong((long)result);
+    return resultobj;
+    fail:
+    return NULL;
+}
+
+
+static PyObject *_wrap_Packet_trace_get_wire_lenth(PyObject *self, PyObject *args) {
+    PyObject *resultobj;
+    struct libtrace_packet_t *arg1 = (struct libtrace_packet_t *) 0 ;
+    int result;
+    PyObject * obj0 = 0 ;
+    
+    if(!PyArg_ParseTuple(args,(char *)"O:Packet_trace_get_wire_lenth",&obj0)) goto fail;
+    if ((SWIG_ConvertPtr(obj0,(void **) &arg1, SWIGTYPE_p_libtrace_packet_t,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    result = (int)libtrace_packet_t_trace_get_wire_lenth(arg1);
+    
+    resultobj = PyInt_FromLong((long)result);
+    return resultobj;
+    fail:
+    return NULL;
+}
+
+
+static PyObject *_wrap_Packet_trace_get_link_type(PyObject *self, PyObject *args) {
+    PyObject *resultobj;
+    struct libtrace_packet_t *arg1 = (struct libtrace_packet_t *) 0 ;
+    libtrace_linktype_t result;
+    PyObject * obj0 = 0 ;
+    
+    if(!PyArg_ParseTuple(args,(char *)"O:Packet_trace_get_link_type",&obj0)) goto fail;
+    if ((SWIG_ConvertPtr(obj0,(void **) &arg1, SWIGTYPE_p_libtrace_packet_t,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    result = libtrace_packet_t_trace_get_link_type(arg1);
+    
+    {
+        libtrace_linktype_t * resultptr;
+        resultptr = (libtrace_linktype_t *) malloc(sizeof(libtrace_linktype_t));
+        memmove(resultptr, &result, sizeof(libtrace_linktype_t));
+        resultobj = SWIG_NewPointerObj((void *) resultptr, SWIGTYPE_p_libtrace_linktype_t, 1);
+    }
+    return resultobj;
+    fail:
+    return NULL;
+}
+
+
+static PyObject *_wrap_Packet_trace_get_direction(PyObject *self, PyObject *args) {
+    PyObject *resultobj;
+    struct libtrace_packet_t *arg1 = (struct libtrace_packet_t *) 0 ;
+    uint8_t result;
+    PyObject * obj0 = 0 ;
+    
+    if(!PyArg_ParseTuple(args,(char *)"O:Packet_trace_get_direction",&obj0)) goto fail;
+    if ((SWIG_ConvertPtr(obj0,(void **) &arg1, SWIGTYPE_p_libtrace_packet_t,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    result = (uint8_t)libtrace_packet_t_trace_get_direction(arg1);
+    
+    resultobj = PyInt_FromLong((long)result);
+    return resultobj;
+    fail:
+    return NULL;
+}
+
+
+static PyObject *_wrap_Packet_trace_bpf_filter(PyObject *self, PyObject *args) {
+    PyObject *resultobj;
+    struct libtrace_packet_t *arg1 = (struct libtrace_packet_t *) 0 ;
+    struct libtrace_filter_t *arg2 = (struct libtrace_filter_t *) 0 ;
+    int result;
+    PyObject * obj0 = 0 ;
+    PyObject * obj1 = 0 ;
+    
+    if(!PyArg_ParseTuple(args,(char *)"OO:Packet_trace_bpf_filter",&obj0,&obj1)) goto fail;
+    if ((SWIG_ConvertPtr(obj0,(void **) &arg1, SWIGTYPE_p_libtrace_packet_t,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    if ((SWIG_ConvertPtr(obj1,(void **) &arg2, SWIGTYPE_p_libtrace_filter_t,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    result = (int)libtrace_packet_t_trace_bpf_filter(arg1,arg2);
+    
+    resultobj = PyInt_FromLong((long)result);
+    return resultobj;
+    fail:
+    return NULL;
+}
+
+
 static PyObject * Packet_swigregister(PyObject *self, PyObject *args) {
     PyObject *obj;
     if (!PyArg_ParseTuple(args,(char*)"O", &obj)) return NULL;
     SWIG_TypeClientData(SWIGTYPE_p_libtrace_packet_t, obj);
+    Py_INCREF(obj);
+    return Py_BuildValue((char *)"");
+}
+static PyObject *_wrap_new_Filter(PyObject *self, PyObject *args) {
+    PyObject *resultobj;
+    char *arg1 ;
+    struct libtrace_filter_t *result;
+    
+    if(!PyArg_ParseTuple(args,(char *)"s:new_Filter",&arg1)) goto fail;
+    result = (struct libtrace_filter_t *)new_libtrace_filter_t(arg1);
+    
+    resultobj = SWIG_NewPointerObj((void *) result, SWIGTYPE_p_libtrace_filter_t, 1);
+    return resultobj;
+    fail:
+    return NULL;
+}
+
+
+static PyObject *_wrap_Filter_trace_bpf_filter(PyObject *self, PyObject *args) {
+    PyObject *resultobj;
+    struct libtrace_filter_t *arg1 = (struct libtrace_filter_t *) 0 ;
+    struct libtrace_packet_t *arg2 = (struct libtrace_packet_t *) 0 ;
+    int result;
+    PyObject * obj0 = 0 ;
+    PyObject * obj1 = 0 ;
+    
+    if(!PyArg_ParseTuple(args,(char *)"OO:Filter_trace_bpf_filter",&obj0,&obj1)) goto fail;
+    if ((SWIG_ConvertPtr(obj0,(void **) &arg1, SWIGTYPE_p_libtrace_filter_t,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    if ((SWIG_ConvertPtr(obj1,(void **) &arg2, SWIGTYPE_p_libtrace_packet_t,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    result = (int)libtrace_filter_t_trace_bpf_filter(arg1,arg2);
+    
+    resultobj = PyInt_FromLong((long)result);
+    return resultobj;
+    fail:
+    return NULL;
+}
+
+
+static PyObject * Filter_swigregister(PyObject *self, PyObject *args) {
+    PyObject *obj;
+    if (!PyArg_ParseTuple(args,(char*)"O", &obj)) return NULL;
+    SWIG_TypeClientData(SWIGTYPE_p_libtrace_filter_t, obj);
     Py_INCREF(obj);
     return Py_BuildValue((char *)"");
 }
@@ -2312,8 +2543,19 @@ static PyMethodDef SwigMethods[] = {
 	 { (char *)"Packet_trace_get_tcp", _wrap_Packet_trace_get_tcp, METH_VARARGS },
 	 { (char *)"Packet_trace_get_udp", _wrap_Packet_trace_get_udp, METH_VARARGS },
 	 { (char *)"Packet_trace_get_icmp", _wrap_Packet_trace_get_icmp, METH_VARARGS },
+	 { (char *)"Packet_trace_get_link", _wrap_Packet_trace_get_link, METH_VARARGS },
 	 { (char *)"Packet_trace_get_seconds", _wrap_Packet_trace_get_seconds, METH_VARARGS },
+	 { (char *)"Packet_trace_get_erf_timestamp", _wrap_Packet_trace_get_erf_timestamp, METH_VARARGS },
+	 { (char *)"Packet_trace_get_timeval", _wrap_Packet_trace_get_timeval, METH_VARARGS },
+	 { (char *)"Packet_trace_get_capture_length", _wrap_Packet_trace_get_capture_length, METH_VARARGS },
+	 { (char *)"Packet_trace_get_wire_lenth", _wrap_Packet_trace_get_wire_lenth, METH_VARARGS },
+	 { (char *)"Packet_trace_get_link_type", _wrap_Packet_trace_get_link_type, METH_VARARGS },
+	 { (char *)"Packet_trace_get_direction", _wrap_Packet_trace_get_direction, METH_VARARGS },
+	 { (char *)"Packet_trace_bpf_filter", _wrap_Packet_trace_bpf_filter, METH_VARARGS },
 	 { (char *)"Packet_swigregister", Packet_swigregister, METH_VARARGS },
+	 { (char *)"new_Filter", _wrap_new_Filter, METH_VARARGS },
+	 { (char *)"Filter_trace_bpf_filter", _wrap_Filter_trace_bpf_filter, METH_VARARGS },
+	 { (char *)"Filter_swigregister", Filter_swigregister, METH_VARARGS },
 	 { (char *)"new_Trace", _wrap_new_Trace, METH_VARARGS },
 	 { (char *)"delete_Trace", _wrap_delete_Trace, METH_VARARGS },
 	 { (char *)"Trace_trace_read_packet", _wrap_Trace_trace_read_packet, METH_VARARGS },
@@ -2324,28 +2566,38 @@ static PyMethodDef SwigMethods[] = {
 
 /* -------- TYPE CONVERSION AND EQUIVALENCE RULES (BEGIN) -------- */
 
-static swig_type_info _swigt__p_in_addr[] = {{"_p_in_addr", 0, "in_addr *", 0},{"_p_in_addr"},{0}};
-static swig_type_info _swigt__p_libtrace_icmp[] = {{"_p_libtrace_icmp", 0, "struct libtrace_icmp *", 0},{"_p_libtrace_icmp"},{0}};
-static swig_type_info _swigt__p_libtrace_icmp_un_echo[] = {{"_p_libtrace_icmp_un_echo", 0, "libtrace_icmp_un_echo *", 0},{"_p_libtrace_icmp_un_echo"},{0}};
-static swig_type_info _swigt__p_libtrace_packet_t[] = {{"_p_libtrace_packet_t", 0, "struct libtrace_packet_t *", 0},{"_p_libtrace_packet_t"},{0}};
-static swig_type_info _swigt__p_libtrace_ip[] = {{"_p_libtrace_ip", 0, "struct libtrace_ip *", 0},{"_p_libtrace_ip"},{0}};
-static swig_type_info _swigt__p_libtrace_icmp_un_frag[] = {{"_p_libtrace_icmp_un_frag", 0, "libtrace_icmp_un_frag *", 0},{"_p_libtrace_icmp_un_frag"},{0}};
 static swig_type_info _swigt__p_libtrace_t[] = {{"_p_libtrace_t", 0, "libtrace_t *", 0},{"_p_libtrace_t"},{0}};
 static swig_type_info _swigt__p_libtrace_udp[] = {{"_p_libtrace_udp", 0, "struct libtrace_udp *", 0},{"_p_libtrace_udp"},{0}};
-static swig_type_info _swigt__p_libtrace_tcp[] = {{"_p_libtrace_tcp", 0, "struct libtrace_tcp *", 0},{"_p_libtrace_tcp"},{0}};
+static swig_type_info _swigt__p_libtrace_ip[] = {{"_p_libtrace_ip", 0, "struct libtrace_ip *", 0},{"_p_libtrace_ip"},{0}};
+static swig_type_info _swigt__p_libtrace_icmp_un_echo[] = {{"_p_libtrace_icmp_un_echo", 0, "libtrace_icmp_un_echo *", 0},{"_p_libtrace_icmp_un_echo"},{0}};
 static swig_type_info _swigt__p_libtrace_icmp_un[] = {{"_p_libtrace_icmp_un", 0, "libtrace_icmp_un *", 0},{"_p_libtrace_icmp_un"},{0}};
+static swig_type_info _swigt__p_uint64_t[] = {{"_p_uint64_t", 0, "uint64_t *", 0},{"_p_uint64_t"},{0}};
+static swig_type_info _swigt__p_void[] = {{"_p_void", 0, "void *", 0},{"_p_void"},{0}};
+static swig_type_info _swigt__p_libtrace_packet_t[] = {{"_p_libtrace_packet_t", 0, "struct libtrace_packet_t *", 0},{"_p_libtrace_packet_t"},{0}};
+static swig_type_info _swigt__p_libtrace_filter_t[] = {{"_p_libtrace_filter_t", 0, "libtrace_filter_t *", 0},{"_p_libtrace_filter_t"},{0}};
+static swig_type_info _swigt__p_libtrace_icmp_un_frag[] = {{"_p_libtrace_icmp_un_frag", 0, "libtrace_icmp_un_frag *", 0},{"_p_libtrace_icmp_un_frag"},{0}};
+static swig_type_info _swigt__p_timeval[] = {{"_p_timeval", 0, "struct timeval *", 0},{"_p_timeval"},{0}};
+static swig_type_info _swigt__p_libtrace_icmp[] = {{"_p_libtrace_icmp", 0, "struct libtrace_icmp *", 0},{"_p_libtrace_icmp"},{0}};
+static swig_type_info _swigt__p_in_addr[] = {{"_p_in_addr", 0, "in_addr *", 0},{"_p_in_addr"},{0}};
+static swig_type_info _swigt__p_libtrace_tcp[] = {{"_p_libtrace_tcp", 0, "struct libtrace_tcp *", 0},{"_p_libtrace_tcp"},{0}};
+static swig_type_info _swigt__p_libtrace_linktype_t[] = {{"_p_libtrace_linktype_t", 0, "libtrace_linktype_t *", 0},{"_p_libtrace_linktype_t"},{0}};
 
 static swig_type_info *swig_types_initial[] = {
-_swigt__p_in_addr, 
-_swigt__p_libtrace_icmp, 
-_swigt__p_libtrace_icmp_un_echo, 
-_swigt__p_libtrace_packet_t, 
-_swigt__p_libtrace_ip, 
-_swigt__p_libtrace_icmp_un_frag, 
 _swigt__p_libtrace_t, 
 _swigt__p_libtrace_udp, 
-_swigt__p_libtrace_tcp, 
+_swigt__p_libtrace_ip, 
+_swigt__p_libtrace_icmp_un_echo, 
 _swigt__p_libtrace_icmp_un, 
+_swigt__p_uint64_t, 
+_swigt__p_void, 
+_swigt__p_libtrace_packet_t, 
+_swigt__p_libtrace_filter_t, 
+_swigt__p_libtrace_icmp_un_frag, 
+_swigt__p_timeval, 
+_swigt__p_libtrace_icmp, 
+_swigt__p_in_addr, 
+_swigt__p_libtrace_tcp, 
+_swigt__p_libtrace_linktype_t, 
 0
 };
 

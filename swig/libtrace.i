@@ -162,8 +162,45 @@ struct libtrace_packet_t {};
 	struct libtrace_icmp *trace_get_icmp() {
 		return trace_get_icmp(self);
 	}
+	void *trace_get_link() {
+		return trace_get_link(self);
+	}
 	double trace_get_seconds() {
 		return trace_get_seconds(self);
+	}
+	uint64_t trace_get_erf_timestamp() {
+		return trace_get_erf_timestamp(self);
+	}
+	struct timeval trace_get_timeval() {
+		return trace_get_timeval(self);
+	}
+	int trace_get_capture_length() {
+		return trace_get_capture_length(self);
+	}
+	int trace_get_wire_lenth() {
+		return trace_get_wire_length(self);
+	}
+	libtrace_linktype_t trace_get_link_type() {
+		return trace_get_link_type(self);
+	}
+	uint8_t trace_get_direction() {
+		return trace_get_direction(self);
+	}
+	int trace_bpf_filter(struct libtrace_filter_t *filter) {
+		return trace_bpf_filter(filter,self);
+	}
+	
+};
+
+%rename (Filter) libtrace_filter_t;
+struct libtrace_filter_t {};
+
+%extend libtrace_filter_t {
+	libtrace_filter_t(char *filterstring) { 
+		return trace_bpf_setfilter(filterstring); 
+	};
+	int trace_bpf_filter(struct libtrace_packet_t *packet) {
+		return trace_bpf_filter(self,packet);
 	}
 };
 

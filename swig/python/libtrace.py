@@ -289,7 +289,15 @@ class Packet(_object):
     def trace_get_tcp(*args): return _libtrace.Packet_trace_get_tcp(*args)
     def trace_get_udp(*args): return _libtrace.Packet_trace_get_udp(*args)
     def trace_get_icmp(*args): return _libtrace.Packet_trace_get_icmp(*args)
+    def trace_get_link(*args): return _libtrace.Packet_trace_get_link(*args)
     def trace_get_seconds(*args): return _libtrace.Packet_trace_get_seconds(*args)
+    def trace_get_erf_timestamp(*args): return _libtrace.Packet_trace_get_erf_timestamp(*args)
+    def trace_get_timeval(*args): return _libtrace.Packet_trace_get_timeval(*args)
+    def trace_get_capture_length(*args): return _libtrace.Packet_trace_get_capture_length(*args)
+    def trace_get_wire_lenth(*args): return _libtrace.Packet_trace_get_wire_lenth(*args)
+    def trace_get_link_type(*args): return _libtrace.Packet_trace_get_link_type(*args)
+    def trace_get_direction(*args): return _libtrace.Packet_trace_get_direction(*args)
+    def trace_bpf_filter(*args): return _libtrace.Packet_trace_bpf_filter(*args)
 
 class PacketPtr(Packet):
     def __init__(self, this):
@@ -297,6 +305,25 @@ class PacketPtr(Packet):
         if not hasattr(self,"thisown"): _swig_setattr(self, Packet, 'thisown', 0)
         _swig_setattr(self, Packet,self.__class__,Packet)
 _libtrace.Packet_swigregister(PacketPtr)
+
+class Filter(_object):
+    __swig_setmethods__ = {}
+    __setattr__ = lambda self, name, value: _swig_setattr(self, Filter, name, value)
+    __swig_getmethods__ = {}
+    __getattr__ = lambda self, name: _swig_getattr(self, Filter, name)
+    def __repr__(self):
+        return "<C libtrace_filter_t instance at %s>" % (self.this,)
+    def __init__(self, *args):
+        _swig_setattr(self, Filter, 'this', _libtrace.new_Filter(*args))
+        _swig_setattr(self, Filter, 'thisown', 1)
+    def trace_bpf_filter(*args): return _libtrace.Filter_trace_bpf_filter(*args)
+
+class FilterPtr(Filter):
+    def __init__(self, this):
+        _swig_setattr(self, Filter, 'this', this)
+        if not hasattr(self,"thisown"): _swig_setattr(self, Filter, 'thisown', 0)
+        _swig_setattr(self, Filter,self.__class__,Filter)
+_libtrace.Filter_swigregister(FilterPtr)
 
 class Trace(_object):
     __swig_setmethods__ = {}
