@@ -53,8 +53,6 @@
 struct libtrace_t *trace;
 struct libtrace_filter_t *filter;
 
-#define SCANSIZE 4096
-
 
 static void     parse_cmdline(int argc, char **argv);
 static void     usage();
