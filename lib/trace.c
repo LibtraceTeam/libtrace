@@ -410,7 +410,7 @@ static int trace_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
                 	if ((numbytes=recv(libtrace->input.fd, 
 							buffer, 
 							len, 
-							0)) == -1) {
+							MSG_NOSIGNAL)) == -1) {
                         	perror("recv");
                         	return -1;
                 	}
