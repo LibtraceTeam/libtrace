@@ -4,12 +4,12 @@ dagcdir= /usr/local/dag/utils/
 CC=g++
 CXX=g++
 LD=g++
-INCLUDE = -I$(include) -I/usr/local/wand/include -I$(dagcdir)
+INCLUDE = -I$(include) -I/usr/local/include -I$(dagcdir)
 CFLAGS = -Wall -Wimplicit -Wformat -pipe -g
 CFLAGS += $(INCLUDE)
 CPPFLAGS = -Wall -Wimplicit -Wformat -pipe -g
 CPPFLAGS += $(INCLUDE)
-LDLIBS = -L/usr/local/wand/lib -ltrace
+LDLIBS = -L/usr/local/lib -ltrace
 
 BINS = pcap2erf
 DAGCOBJ = pcapio.o utils.o erfio.o

@@ -1,13 +1,11 @@
 
-wand_include = /usr/local/wand/include
-wand_libs = /usr/local/wand/lib
-
+PREFIX=/usr/local
 CC=gcc
 
-INCLUDE = -I../include -I$(wand_include)
+INCLUDE = -I$(PREFIX)/include
 CFLAGS = -Wall -Wimplicit -Wformat -pipe -g -O2
 CFLAGS += $(INCLUDE)
-libdir = -L$(wand_libs)
+libdir = -L$(PREFIX)/lib
 LDLIBS = $(libdir) -ltrace
 
 BINS = rate
