@@ -32,13 +32,14 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
+#include <sys/types.h>
 #include <netinet/in.h>
+#include <netinet/in_systm.h>
 #include <netinet/ip.h>
 #include <signal.h>
 #include <setjmp.h>
 #include <unistd.h>
 #include <sys/time.h>
-#include <sys/types.h>
 #include <stdint.h>
 #include "libtrace.h"
 #include "dagformat.h"

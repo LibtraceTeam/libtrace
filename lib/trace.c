@@ -542,6 +542,10 @@ static int trace_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
 		switch(libtrace->sourcetype) {
 			case SOCKET:
 			case RT:
+
+#ifndef MSG_NOSIGNAL
+#define MSG_NOSIGNAL 0
+#endif
 				// read from the network
 				if ((numbytes=recv(libtrace->input.fd, 
 								buffer, 
