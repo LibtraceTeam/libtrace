@@ -463,7 +463,7 @@ struct libtrace_t *trace_create(char *uri) {
 						libtrace->conn_info.path,
 						4096,
 						1,
-						0,
+						1,
 						errbuf);
 					break;
 #endif
@@ -631,8 +631,9 @@ int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *pac
         int size;
         char buf[RP_BUFSIZE];
 #if HAVE_PCAP
-        struct pcap_pkthdr pcaphdr;
+        struct pcap_pkthdr *pcaphdr = malloc(sizeof(struct pcap_pkthdr));
         const u_char *pcappkt;
+	int pcapbytes = 0;
 #endif
 	dag_record_t *erfptr;
 	int read_required = 0;
@@ -652,12 +653,22 @@ int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *pac
 #if HAVE_PCAP
 	/* PCAP gives us it's own per-packet interface. Let's use it */
         if (libtrace->format == PCAP || libtrace->format == PCAPINT) {
-                if ((pcappkt = pcap_next(libtrace->input.pcap, &pcaphdr)) == NULL) {
-                        return 0;
+		/* pcap_next doesn't return enough information for us
+		 * newer libpcap has pcap_next_ex, which does, but we'd
+		 * really rather have it all the time. Also, pcap_next
+		 * works differently under freebsd! */
+                //if ((pcappkt = pcap_next(libtrace->input.pcap, &pcaphdr)) == NULL) {
+                if ((pcapbytes = pcap_next_ex(libtrace->input.pcap, 
+						&pcaphdr,
+						&pcappkt)) < 0 ) {
+                        return -1;
                 }
+		if (pcapbytes == 0) {
+			return 0;
+		}
                 memcpy(buffer,&pcaphdr,sizeof(struct pcap_pkthdr));
-                memcpy(buffer + sizeof(struct pcap_pkthdr),pcappkt,pcaphdr.len);
-                numbytes = pcaphdr.len;
+		numbytes = pcaphdr->len;
+                memcpy(buffer + sizeof(struct pcap_pkthdr),pcappkt,numbytes);
 	
 		packet->size = numbytes + sizeof(struct pcap_pkthdr);
 		return numbytes;
@@ -1634,9 +1645,11 @@ int8_t trace_get_direction(const struct libtrace_packet_t *packet) {
 					}
 				default:
 					/* pass */
+					break;
 			}
 		default:
 			/* pass */
+			break;
 	}
 	
 	return direction;

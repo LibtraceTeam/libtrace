@@ -2,7 +2,7 @@
 CC=gcc
 
 CFLAGS = -Wall -Wimplicit -Wformat -pipe -O2 -fPIC -g 
-CFLAGS += -I ../../../ -I/tmp/include
+CFLAGS += -I ../../../ -I/usr/local/include
 LDFLAGS = -L/tmp/lib -L/usr/local/lib -L.
 
 BINS = libtrace_enc.a test-enc

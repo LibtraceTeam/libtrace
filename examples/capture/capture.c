@@ -31,14 +31,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <unistd.h>
 #include <string.h>
+#include <inttypes.h>
+#include <sys/types.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <signal.h>
 #include <setjmp.h>
-#include <unistd.h>
 #include <sys/time.h>
-#include <stdint.h>
 #include "zlib.h"
 #include "libtrace.h"
 #include "dagformat.h"

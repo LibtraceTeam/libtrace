@@ -1,9 +1,9 @@
 
 CFLAGS= -Wall -Wimplicit -Wformat -O2 -pipe -g
 
-INCLUDE = -I/usr/local/wand/include -I/usr/local/dag/include
+INCLUDE = -I/usr/local/include -I/usr/local/dag/include
 CFLAGS += $(INCLUDE)
-LDLIBS =  -L/usr/local/wand/lib -ltrace
+LDLIBS =  -L/usr/local/lib -ltrace
 
 BINS    = erfsplit
 

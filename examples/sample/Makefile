@@ -8,16 +8,16 @@ CFLAGS += $(INCLUDE)
 libdir = -L$(PREFIX)/lib
 LDLIBS = $(libdir) -ltrace
 
-BINS = sample
+BINS = sample printip
 .PHONY: all clean distclean install depend
 
 all: $(BINS) 
 
 clean:
-	$(RM) *~ *.o $(BINS) $(OBJS) core
+	$(RM) $(BINS) $(OBJS) 
 
 distclean:
-	$(RM) *~ *.o $(BINS) $(OBJS) core
+	$(RM) $(BINS) $(OBJS) 
 
 install:
 	@true

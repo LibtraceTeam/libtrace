@@ -1,4 +1,4 @@
-CFLAGS=-W -Wall -g -I/tmp/include
+CFLAGS=-W -Wall -g -I/usr/local/include
 LDLIBS=-ltrace lib/libtrace_enc.a
 LDFLAGS=-L/tmp/lib
 
