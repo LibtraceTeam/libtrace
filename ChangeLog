@@ -28,7 +28,11 @@
 ##
 ##
 
-- Version 2.0.15
+- Version 2.0.15b
+	* Fix a memory leak
+	* Correct calls to trace_get_link to catch a NULL returned
+	  when an RX error is detected, handle this, and pas it up
+	  the chain where appropriate
 	* Use a pcap callback handler when trace_read_packet() reads from
 	  a live pcap source. This gives us better diagnostics, such as 
 	  being able to tell if an error occured. Also fixed a bug under
