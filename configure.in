@@ -1,7 +1,7 @@
 dnl Process this file with autoconf to produce a configure script.
-AC_INIT(libtrace,2.0.9,[libtrace@wand.net.nz],libtrace)
+AC_INIT(libtrace,2.0.10,[libtrace@wand.net.nz],libtrace)
 AC_CONFIG_SRCDIR(lib/trace.c)
-AM_INIT_AUTOMAKE(libtrace,2.0.9)
+AM_INIT_AUTOMAKE(libtrace,2.0.10)
 
 dnl GNU C library
 dnl AC_GNU_SOURCE
