@@ -1,2 +1,2 @@
 SUBDIRS=lib
-DIST_SUBDIRS=lib examples doc
+EXTRA_DIST=examples docs
