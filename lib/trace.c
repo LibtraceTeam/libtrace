@@ -127,10 +127,12 @@ typedef enum {SOCKET, TRACE, STDIN, DEVICE, INTERFACE, RT } source_t;
 
 typedef enum {ERF, PCAP, PCAPINT, DAG, RTCLIENT, WAG, WAGINT } format_t;
 
+#if HAVE_BPF 1
 struct libtrace_filter_t {
 	struct bpf_insn *filter;
 	char * filterstring;
 };
+#endif
 
 struct libtrace_t {
         format_t format;
@@ -1346,7 +1348,7 @@ struct libtrace_eventobj_t trace_event(struct libtrace_t *trace,
  * @author Daniel Lawson
  */
 struct libtrace_filter_t *trace_bpf_setfilter(const char *filterstring) {
-#ifdef HAVE_BPF_H
+#if HAVE_BPF
 	struct libtrace_filter_t *filter = malloc(sizeof(struct libtrace_filter_t));
 	filter->filterstring = strdup(filterstring);
 	filter->filter = 0;
@@ -1367,7 +1369,7 @@ struct libtrace_filter_t *trace_bpf_setfilter(const char *filterstring) {
  */
 int trace_bpf_filter(struct libtrace_filter_t *filter,
 			struct libtrace_packet_t *packet) {
-#ifdef HAVE_BPF_H
+#if HAVE_BPF
 	void *linkptr = 0;
 	int clen = 0;
 	assert(filter);
