@@ -31,6 +31,10 @@
 #ifndef _LIBTRACE_H_
 #define _LIBTRACE_H_
 
+#include <features.h>
+#include <sys/types.h>
+#include <netinet/in.h>
+
 #ifdef __cplusplus 
 extern "C" { 
 #endif
