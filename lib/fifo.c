@@ -37,9 +37,7 @@
 #include <string.h> /* bzero */
 #include "fifo.h"
 
-#ifdef HAVE_LIMITS_H
-# include <limits.h>
-#endif
+#include <sys/types.h>
 
 #ifdef HAVE_STDINT_H
 # include <stdint.h>
