@@ -32,6 +32,8 @@
 	* Fixed a bug where ERF traces weren't being checked for rxerrors.
 	  If the ERF record indicates an rxerror, then get_link() returns 
 	  NULL.
+	* Removed an extra , which was preventing compilation under gcc 3.4
+	  in FreeBSD
 
 - Version 2.0.13
 	* Improved source docs / doxygen

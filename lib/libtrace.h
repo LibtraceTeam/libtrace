@@ -374,7 +374,7 @@ typedef enum {
        TRACE_TYPE_HDLC_POS, 
        TRACE_TYPE_ETH,
        TRACE_TYPE_ATM,
-       TRACE_TYPE_80211,
+       TRACE_TYPE_80211
      } libtrace_linktype_t;
 
 /** Get the type of the link layer
