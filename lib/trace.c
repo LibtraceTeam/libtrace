@@ -127,7 +127,7 @@ typedef enum {SOCKET, TRACE, STDIN, DEVICE, INTERFACE, RT } source_t;
 
 typedef enum {ERF, PCAP, PCAPINT, DAG, RTCLIENT, WAG, WAGINT } format_t;
 
-#if HAVE_BPF 1
+#if HAVE_BPF
 struct libtrace_filter_t {
 	struct bpf_insn *filter;
 	char * filterstring;
