@@ -201,11 +201,11 @@ static int init_trace(struct libtrace_t **libtrace, char *uri) {
  *  - erf:/path/to/erf/file.gz
  *  - erf:/path/to/rtclient/socket
  *  - erf:-  (stdin)
- *  - dag:/dev/dagcard  		(implementd?)
+ *  - dag:/dev/dagcard  		(not implementd)
  *  - pcap:pcapinterface 		(eg: pcap:eth0)
  *  - pcap:/path/to/pcap/file
  *  - pcap:/path/to/pcap/file.gz
- *  - pcap:/path/to/pcap/socket		(implemented?)
+ *  - pcap:/path/to/pcap/socket		(not implemented)
  *  - pcap:-
  *  - rtclient:hostname
  *  - rtclient:hostname:port
@@ -337,24 +337,34 @@ static int libtrace_read(struct libtrace_t *libtrace, void *buffer, size_t len) 
         if (buffer == 0)
                 buffer = malloc(len);
 
-	/* TODO: Make me a switch */
-        if(libtrace->sourcetype == SOCKET || libtrace->sourcetype == RT) {
-                // read from the network
-                if ((numbytes=recv(libtrace->input.fd, buffer, len, 0)) == -1) {
-                        perror("recv");
-                        return -1;
-                }
-	} else if (libtrace->sourcetype == DEVICE) {
-		if ((numbytes=read(libtrace->input.fd, buffer, len)) == -1) {
-			perror("read");
-			return -1;
-		}
-        } else {
-                if ((numbytes=gzread(libtrace->input.file,buffer,len)) == -1) {
-                        perror("gzread");
-                        return -1;
-                }
-        }
+	switch(libtrace->sourcetype) {
+		case SOCKET:
+		case RT:
+                	// read from the network
+                	if ((numbytes=recv(libtrace->input.fd, 
+							buffer, 
+							len, 
+							0)) == -1) {
+                        	perror("recv");
+                        	return -1;
+                	}
+			break;
+		case DEVICE:
+			if ((numbytes=read(libtrace->input.fd, 
+							buffer, 
+							len)) == -1) {
+				perror("read");
+				return -1;
+			}
+			break;
+		default:
+                	if ((numbytes=gzread(libtrace->input.file,
+							buffer,
+							len)) == -1) {
+                        	perror("gzread");
+                        	return -1;
+                	}
+	}
         return numbytes;
 
 }
