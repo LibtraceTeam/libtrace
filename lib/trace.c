@@ -1713,7 +1713,7 @@ int8_t trace_get_direction(const struct libtrace_packet_t *packet) {
 #define CLIENT(x) ROOT_CLIENT(x) || NONROOT_CLIENT(x) 
 
 
-/** Attempt to deduce the 'server' port
+/* Attempt to deduce the 'server' port
  * @param protocol the IP protocol (eg, 6 or 17 for TCP or UDP)
  * @param source the TCP or UDP source port
  * @param dest the TCP or UDP destination port

@@ -485,6 +485,7 @@ typedef enum {USE_DEST, USE_SOURCE} serverport_t;
  * @param source	the source port from the packet
  * @param dest		the destination port from the packet
  * @returns one of USE_SOURCE or USE_DEST depending on which one you should use
+ * @note ports must be in \em host byte order!
  * @author Daniel Lawson
  */
 int8_t trace_get_server_port(uint8_t protocol, uint16_t source, uint16_t dest);
