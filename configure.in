@@ -3,8 +3,6 @@ AC_INIT(libtrace,2.0.2,[libtrace@wand.net.nz],libtrace)
 AC_CONFIG_SRCDIR(lib/trace.c)
 AM_INIT_AUTOMAKE(libtrace,2.0.2)
 
-AC_PREREQ(2.5)
-
 dnl GNU C library
 dnl AC_GNU_SOURCE
 

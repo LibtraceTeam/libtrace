@@ -87,6 +87,7 @@ libtrace_la_SOURCES = trace.c fifo.c fifo.h common.h
 include_HEADERS = libtrace.h dagformat.h wag.h
 libtrace_la_LIBADD = @LIBPCAP@ @LIBZ@
 libtrace_la_LDFLAGS = -version-info 2:2:0 @LIBPCAP_PATH@ @LIBZ_PATH@
+libtrace_la_CFLAGS = -D_FILE_OFFSET_BITS=64
 subdir = lib
 mkinstalldirs = $(SHELL) $(top_srcdir)/mkinstalldirs
 CONFIG_HEADER = $(top_builddir)/config.h
@@ -94,7 +95,7 @@ CONFIG_CLEAN_FILES =
 LTLIBRARIES = $(lib_LTLIBRARIES)
 
 libtrace_la_DEPENDENCIES =
-am_libtrace_la_OBJECTS = trace.lo fifo.lo
+am_libtrace_la_OBJECTS = libtrace_la-trace.lo libtrace_la-fifo.lo
 libtrace_la_OBJECTS = $(am_libtrace_la_OBJECTS)
 
 DEFS = @DEFS@
@@ -103,7 +104,8 @@ CPPFLAGS = @CPPFLAGS@
 LDFLAGS = @LDFLAGS@
 LIBS = @LIBS@
 depcomp = $(SHELL) $(top_srcdir)/depcomp
-@AMDEP_TRUE@DEP_FILES = $(DEPDIR)/fifo.Plo $(DEPDIR)/trace.Plo
+@AMDEP_TRUE@DEP_FILES = $(DEPDIR)/libtrace_la-fifo.Plo \
+@AMDEP_TRUE@	$(DEPDIR)/libtrace_la-trace.Plo
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
 LTCOMPILE = $(LIBTOOL) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) \
@@ -157,6 +159,8 @@ uninstall-libLTLIBRARIES:
 
 clean-libLTLIBRARIES:
 	-test -z "$(lib_LTLIBRARIES)" || rm -f $(lib_LTLIBRARIES)
+libtrace_la-trace.lo: trace.c
+libtrace_la-fifo.lo: fifo.c
 libtrace.la: $(libtrace_la_OBJECTS) $(libtrace_la_DEPENDENCIES) 
 	$(LINK) -rpath $(libdir) $(libtrace_la_LDFLAGS) $(libtrace_la_OBJECTS) $(libtrace_la_LIBADD) $(LIBS)
 
@@ -166,8 +170,8 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-@AMDEP_TRUE@@am__include@ @am__quote@$(DEPDIR)/fifo.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@$(DEPDIR)/trace.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@$(DEPDIR)/libtrace_la-fifo.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@$(DEPDIR)/libtrace_la-trace.Plo@am__quote@
 
 distclean-depend:
 	-rm -rf $(DEPDIR)
@@ -189,6 +193,42 @@ distclean-depend:
 @AMDEP_TRUE@	depfile='$(DEPDIR)/$*.Plo' tmpdepfile='$(DEPDIR)/$*.TPlo' @AMDEPBACKSLASH@
 @AMDEP_TRUE@	$(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 	$(LTCOMPILE) -c -o $@ `test -f $< || echo '$(srcdir)/'`$<
+
+libtrace_la-trace.o: trace.c
+@AMDEP_TRUE@	source='trace.c' object='libtrace_la-trace.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@	depfile='$(DEPDIR)/libtrace_la-trace.Po' tmpdepfile='$(DEPDIR)/libtrace_la-trace.TPo' @AMDEPBACKSLASH@
+@AMDEP_TRUE@	$(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libtrace_la_CFLAGS) $(CFLAGS) -c -o libtrace_la-trace.o `test -f trace.c || echo '$(srcdir)/'`trace.c
+
+libtrace_la-trace.obj: trace.c
+@AMDEP_TRUE@	source='trace.c' object='libtrace_la-trace.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@	depfile='$(DEPDIR)/libtrace_la-trace.Po' tmpdepfile='$(DEPDIR)/libtrace_la-trace.TPo' @AMDEPBACKSLASH@
+@AMDEP_TRUE@	$(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libtrace_la_CFLAGS) $(CFLAGS) -c -o libtrace_la-trace.obj `cygpath -w trace.c`
+
+libtrace_la-trace.lo: trace.c
+@AMDEP_TRUE@	source='trace.c' object='libtrace_la-trace.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@	depfile='$(DEPDIR)/libtrace_la-trace.Plo' tmpdepfile='$(DEPDIR)/libtrace_la-trace.TPlo' @AMDEPBACKSLASH@
+@AMDEP_TRUE@	$(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+	$(LIBTOOL) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libtrace_la_CFLAGS) $(CFLAGS) -c -o libtrace_la-trace.lo `test -f trace.c || echo '$(srcdir)/'`trace.c
+
+libtrace_la-fifo.o: fifo.c
+@AMDEP_TRUE@	source='fifo.c' object='libtrace_la-fifo.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@	depfile='$(DEPDIR)/libtrace_la-fifo.Po' tmpdepfile='$(DEPDIR)/libtrace_la-fifo.TPo' @AMDEPBACKSLASH@
+@AMDEP_TRUE@	$(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libtrace_la_CFLAGS) $(CFLAGS) -c -o libtrace_la-fifo.o `test -f fifo.c || echo '$(srcdir)/'`fifo.c
+
+libtrace_la-fifo.obj: fifo.c
+@AMDEP_TRUE@	source='fifo.c' object='libtrace_la-fifo.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@	depfile='$(DEPDIR)/libtrace_la-fifo.Po' tmpdepfile='$(DEPDIR)/libtrace_la-fifo.TPo' @AMDEPBACKSLASH@
+@AMDEP_TRUE@	$(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libtrace_la_CFLAGS) $(CFLAGS) -c -o libtrace_la-fifo.obj `cygpath -w fifo.c`
+
+libtrace_la-fifo.lo: fifo.c
+@AMDEP_TRUE@	source='fifo.c' object='libtrace_la-fifo.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@	depfile='$(DEPDIR)/libtrace_la-fifo.Plo' tmpdepfile='$(DEPDIR)/libtrace_la-fifo.TPlo' @AMDEPBACKSLASH@
+@AMDEP_TRUE@	$(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+	$(LIBTOOL) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libtrace_la_CFLAGS) $(CFLAGS) -c -o libtrace_la-fifo.lo `test -f fifo.c || echo '$(srcdir)/'`fifo.c
 CCDEPMODE = @CCDEPMODE@
 uninstall-info-am:
 install-includeHEADERS: $(include_HEADERS)
