@@ -28,6 +28,9 @@
 #include "libtrace.h"
 #include "fifo.h"
 
+#include <net/bpf.h>
+#include <pcap.h>
+
 #include "dagformat.h"
 
 #include "wag.h"
@@ -60,6 +63,8 @@ struct libtrace_t {
 		void *buffer;
 		int size;
 	} packet;
+	struct bpf_insn *filter;
+	char * filterstring;
 	double last_ts;
 	double start_ts;
 };
@@ -686,7 +691,7 @@ struct timeval get_timeval(struct libtrace_t *libtrace, void *buffer, int buflen
         struct timeval tv;
         struct pcap_pkthdr *pcapptr = 0;
 	uint64_t ts;
-	uint32_t seconds;
+	//uint32_t seconds;
         switch (libtrace->format) {
 		case PCAPINT:
                 case PCAP:
@@ -993,3 +998,57 @@ libtrace_event_t libtrace_event(struct libtrace_t *trace,
 	/* Shouldn't get here */
 	assert(0);
 }
+
+/** apply a BPF filter
+ * @param libtrace the libtrace opaque pointer
+ * @param filterstring a char * containing the bpf filter string
+ * @returns null
+ * 
+ * @author Daniel Lawson
+ */
+void libtrace_bpf_setfilter(struct libtrace_t *trace, char *filterstring) {
+	trace->filterstring = strdup(filterstring);
+}
+
+/** apply a BPF filter
+ * @param libtrace the libtrace opaque pointer
+ * @param buffer a pointer to a filled buffer
+ * @param buflen the length of the buffer
+ * @returns 0 if the filter fails, 1 if it succeeds
+ * @author Daniel Lawson
+ */
+int libtrace_bpf_filter(struct libtrace_t *trace, 
+			void *buffer, 
+			int buflen) {
+	
+	int linktype = get_link_type(trace,buffer,buflen);
+	void *linkptr = get_link(trace,buffer,buflen);	
+	int clen = get_capture_length(trace,buffer,buflen);
+
+	if (trace->filterstring && ! trace->filter) {
+		pcap_t *pcap;
+		struct bpf_program bpfprog;
+
+		switch (linktype) {
+			case TYPE_ETH:
+				pcap = pcap_open_dead(DLT_EN10MB, 1500);
+				break;
+			default:
+				printf("only works for ETH at the moment\n");
+				assert(0);
+		}		
+
+		// build filter
+		if (pcap_compile( pcap, &bpfprog, trace->filterstring, 1, 0)) {
+			printf("bpf compilation error: %s\n", 
+				pcap_geterr(pcap));
+			assert(0);
+		}
+		pcap_close(pcap);
+		trace->filter = bpfprog.bf_insns;	
+	}
+
+	return bpf_filter(trace->filter, linkptr, clen, clen);
+}
+
+
