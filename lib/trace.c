@@ -501,7 +501,7 @@ int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *pac
 		}
 		size = ntohs(((dag_record_t *)buffer)->rlen) - sizeof(dag_record_t);
 		assert(size < LIBTRACE_PACKET_BUFSIZE);
-		buffer2 = (ptrdiff_t)buffer +  sizeof(dag_record_t);
+		buffer2 = buffer +  sizeof(dag_record_t);
 
 		// read in the rest of the packet
 		if ((numbytes=gzread(libtrace->input.file,
