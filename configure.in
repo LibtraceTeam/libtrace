@@ -30,6 +30,12 @@ dnl Checks for library functions.
 AC_PROG_GCC_TRADITIONAL
 AC_CHECK_FUNCS(socket strdup)
 
+dnl we need large files
+AC_SYS_LARGEFILE
+
+dnl configure time options for selecting which libpcap and libz to use
+dnl this is provided to allow for systems whose default libraries don't support
+dnl large files - you can build your own and link using these options
 AC_DEFUN([CHECK_LIBPCAP],
 	 [AC_ARG_WITH([pcap],
 		      AC_HELP_STRING([--with-pcap],
