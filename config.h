@@ -2,10 +2,10 @@
 /* config.h.in.  Generated from configure.in by autoheader.  */
 
 /* Define to 1 if you have the <dagapi.h> header file. */
-/* #undef HAVE_DAGAPI_H */
+#define HAVE_DAGAPI_H 1
 
 /* define if you have a DAG API */
-/* #undef HAVE_DAG_API */
+#define HAVE_DAG_API 1
 
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #define HAVE_DLFCN_H 1
@@ -14,7 +14,7 @@
 #define HAVE_INTTYPES_H 1
 
 /* Define to 1 if you have the <libxml2/libxml/parser.h> header file. */
-#define HAVE_LIBXML2_LIBXML_PARSER_H 1
+/* #undef HAVE_LIBXML2_LIBXML_PARSER_H */
 
 /* Define to 1 if you have the <libxml/parser.h> header file. */
 /* #undef HAVE_LIBXML_PARSER_H */
