@@ -37,6 +37,8 @@
  *
  */
 #define _GNU_SOURCE
+
+#include "common.h"
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -57,7 +59,13 @@
 #include "libtrace.h"
 #include "fifo.h"
 
-#include <net/bpf.h>
+#ifdef HAVE_PCAP_BPF_H
+#  include <pcap-bpf.h>
+#else
+#  ifdef HAVE_NET_BPF_H
+#    include <net/bpf.h>
+#  endif
+#endif
 
 #include <pcap.h>
 
