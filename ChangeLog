@@ -28,6 +28,13 @@
 ##
 ##
 
+- Version 2.0.15
+	* Use a pcap callback handler when trace_read_packet() reads from
+	  a live pcap source. This gives us better diagnostics, such as 
+	  being able to tell if an error occured. Also fixed a bug under
+	  FreeBSD where pcap would block until a buffer was full, then
+	  would let pcap_next iterate over all of them.
+
 - Version 2.0.14
 	* Added support for pcap decoding of PPP interfaces (DLT_LINUX_SLL)
 	  This DLT provides a direction bit, which we make use of in 
