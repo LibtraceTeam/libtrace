@@ -49,10 +49,15 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+
+#ifdef HAVE_LIMITS_H
+#  include <limits.h>
+#endif
+
 #ifdef HAVE_SYS_LIMITS_H
-// For BSD, apparently
 #  include <sys/limits.h>
 #endif
+
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
@@ -67,7 +72,7 @@
 #ifdef HAVE_STDDEF_H
 #include <stddef.h>
 #else
-# error "Can't find stddef.h - do you define ptrdiff_t elsewhere"
+# error "Can't find stddef.h - do you define ptrdiff_t elsewhere?"
 #endif
 
 #include "libtrace.h"
