@@ -3,6 +3,8 @@
 #include <arpa/inet.h>
 #include "libtrace.h"
 %}
+%include "carrays.i"
+%include "cmalloc.i"
 
 %nodefault;
 typedef unsigned char uint8_t;
@@ -13,7 +15,6 @@ struct in_addr {
 	int s_addr;
 };
 
-%rename (libtrace_ip) IP;
 struct libtrace_ip
   {
     unsigned int ip_hl:4;		/**< header length */
@@ -32,14 +33,15 @@ struct libtrace_ip
     const uint16_t ip_id;		/**< identification */
     const uint16_t ip_off;		/**< fragment offset field */
     // Needs ntoha
+    %newobject ip_src;
+    %newobject ip_dst;
     const char *const ip_src;
     const char *const ip_dst;
     }
   };
 
-%extend libtrace_ip {
-	~libtrace_ip() { free(self); }
-}
+
+
 
 %{
 #define MAKE_NTOHS(class,member) \
@@ -89,10 +91,6 @@ struct libtrace_tcp
 }
 };
 
-%extend libtrace_tcp {
-	~libtrace_tcp() { free(self); }
-}
-
 %{
  MAKE_NTOHS(libtrace_tcp,source)
  MAKE_NTOHS(libtrace_tcp,dest)
@@ -114,10 +112,6 @@ struct libtrace_udp {
   const uint16_t	check;		/**< Checksum */
   }
 };
-
-%extend libtrace_udp {
-	~libtrace_udp() { free(self); }
-}
 
 %{
  MAKE_NTOHS(libtrace_udp,source)
@@ -147,27 +141,15 @@ struct libtrace_icmp
   } un;
 };
 
-%extend libtrace_icmp {
-	~libtrace_icmp() { free(self); }
-}
-
 %rename (Packet) libtrace_packet_t;
-struct libtrace_packet_t 
-{
-	struct libtrace_t *trace;
-	char *buffer;
-	size_t size;
-	uint8_t status;
-};
+struct libtrace_packet_t {};
 
 %extend libtrace_packet_t {
 	libtrace_packet_t() { 
-		struct libtrace_packet_t *packet = 0;
-		packet = malloc(sizeof(struct libtrace_packet_t));
-		packet->buffer = malloc(sizeof(char) * 65536);
+		struct libtrace_packet_t *packet = malloc(sizeof(struct libtrace_packet_t));
 		return packet;
 		}
-	~libtrace_packet_t() { free(self->buffer); free(self);}
+	~libtrace_packet_t() { free(self);}
 	struct libtrace_ip *trace_get_ip() {
 		return trace_get_ip(self);
 	}
