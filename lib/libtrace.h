@@ -231,7 +231,7 @@ int trace_read_packet(struct libtrace_t *trace, struct libtrace_packet_t *packet
  * @note you should call getLinkType() to find out what type of link layer 
  * this is
  */
-void *trace_get_link(struct libtrace_packet_t *packet);
+void *trace_get_link(const struct libtrace_packet_t *packet);
 
 /** get a pointer to the IP header (if any)
  * @param packet  	the packet opaque pointer
@@ -399,7 +399,7 @@ uint8_t *trace_get_destination_mac(const struct libtrace_packet_t *packet);
  * @returns a pointer to the source mac, (or NULL if there is no source MAC)
  * @author Perry Lorier
  */
-uint8_t *trace_get_source_mac(const, struct libtrace_packet_t *packet);
+uint8_t *trace_get_source_mac(const struct libtrace_packet_t *packet);
 
 /** Truncate the packet at the suggested length
  * @param packet	the packet opaque pointer

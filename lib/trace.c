@@ -814,7 +814,7 @@ int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *pac
  * @returns a pointer to the link layer, or NULL if there is no link layer
  * you should call trace_get_link_type() to find out what type of link layer this is
  */
-void *trace_get_link(struct libtrace_packet_t *packet) {
+void *trace_get_link(const struct libtrace_packet_t *packet) {
         void *ethptr = 0;
 	
 	struct wag_event_t *event = (struct wag_event_t *)packet->buffer;
@@ -1095,7 +1095,7 @@ int trace_get_next_option(unsigned char **ptr,int *len,
  * past 1970-01-01, the lower 32bits are partial seconds)
  * @author Daniel Lawson
  */ 
-uint64_t trace_get_erf_timestamp(struct libtrace_packet_t *packet) {
+uint64_t trace_get_erf_timestamp(const struct libtrace_packet_t *packet) {
 	uint64_t timestamp = 0;
         dag_record_t *erfptr = 0;
         struct pcap_pkthdr *pcapptr = 0;
@@ -1137,7 +1137,7 @@ uint64_t trace_get_erf_timestamp(struct libtrace_packet_t *packet) {
  * @author Daniel Lawson
  * @author Perry Lorier
  */ 
-struct timeval trace_get_timeval(struct libtrace_packet_t *packet) {
+struct timeval trace_get_timeval(const struct libtrace_packet_t *packet) {
         struct timeval tv;
 #if HAVE_PCAP
         struct pcap_pkthdr *pcapptr = 0;
@@ -1178,7 +1178,7 @@ struct timeval trace_get_timeval(struct libtrace_packet_t *packet) {
  * @returns time that this packet was seen in 64bit floating point seconds
  * @author Perry Lorier
  */ 
-double trace_get_seconds(struct libtrace_packet_t *packet) {
+double trace_get_seconds(const struct libtrace_packet_t *packet) {
 	uint64_t ts;
 	ts = trace_get_erf_timestamp(packet);
 	return (ts>>32) + ((ts & UINT_MAX)*1.0 / UINT_MAX);
@@ -1195,7 +1195,7 @@ double trace_get_seconds(struct libtrace_packet_t *packet) {
  * @par 
  *  This is sometimes called the "snaplen".
  */ 
-int trace_get_capture_length(struct libtrace_packet_t *packet) {
+int trace_get_capture_length(const struct libtrace_packet_t *packet) {
 	dag_record_t *erfptr = 0;
 #if HAVE_PCAP
 	struct pcap_pkthdr *pcapptr = 0;
@@ -1241,7 +1241,7 @@ int trace_get_capture_length(struct libtrace_packet_t *packet) {
  * @note Due to the trace being a header capture, or anonymisation this may
  * not be the same as the Capture Len.
  */ 
-int trace_get_wire_length(struct libtrace_packet_t *packet){
+int trace_get_wire_length(const struct libtrace_packet_t *packet){
 	dag_record_t *erfptr = 0;
 #if HAVE_PCAP
 	struct pcap_pkthdr *pcapptr = 0;
@@ -1281,7 +1281,7 @@ int trace_get_wire_length(struct libtrace_packet_t *packet){
  * @author Perry Lorier
  * @author Daniel Lawson
  */
-libtrace_linktype_t trace_get_link_type(struct libtrace_packet_t *packet ) {
+libtrace_linktype_t trace_get_link_type(const struct libtrace_packet_t *packet ) {
 	dag_record_t *erfptr = 0;
 #if HAVE_PCAP
 	struct pcap_pkthdr *pcapptr = 0;
@@ -1327,7 +1327,7 @@ libtrace_linktype_t trace_get_link_type(struct libtrace_packet_t *packet ) {
  * @returns a pointer to the source mac, (or NULL if there is no source MAC)
  * @author Perry Lorier
  */
-uint8_t *trace_get_source_mac(struct libtrace_packet_t *packet) {
+uint8_t *trace_get_source_mac(const struct libtrace_packet_t *packet) {
 	void *link = trace_get_link(packet);
 	struct ieee_802_11_header *wifi = link;
         struct ether_header *ethptr = link;
@@ -1350,7 +1350,7 @@ uint8_t *trace_get_source_mac(struct libtrace_packet_t *packet) {
  * destination MAC)
  * @author Perry Lorier
  */
-uint8_t *trace_get_destination_mac(struct libtrace_packet_t *packet) {
+uint8_t *trace_get_destination_mac(const struct libtrace_packet_t *packet) {
 	void *link = trace_get_link(packet);
 	struct ieee_802_11_header *wifi = link;
         struct ether_header *ethptr = link;
@@ -1565,7 +1565,7 @@ int8_t trace_set_direction(struct libtrace_packet_t *packet, int8_t direction) {
  * @returns a signed value containing the direction flag, or -1 if this is not supported
  * @author Daniel Lawson
  */
-int8_t trace_get_direction(struct libtrace_packet_t *packet) {
+int8_t trace_get_direction(const struct libtrace_packet_t *packet) {
 	
 	int8_t direction;
 	dag_record_t *erfptr = 0;
