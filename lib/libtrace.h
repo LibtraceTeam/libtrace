@@ -81,8 +81,8 @@ struct libtrace_filter_t;
 #define LIBTRACE_PACKET_BUFSIZE 65536
 struct libtrace_packet_t {
 	struct libtrace_t *trace;
-	void *buffer;
-	//char buffer[LIBTRACE_PACKET_BUFSIZE];
+	//void *buffer;
+	char buffer[LIBTRACE_PACKET_BUFSIZE];
 	size_t size;
 	uint8_t status;
 };

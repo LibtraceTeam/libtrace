@@ -550,9 +550,9 @@ int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *pac
 	}
         assert(libtrace);
         assert(packet);
-	if(packet->buffer == 0) {
-		packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
-	}
+	//if(packet->buffer == 0) {
+	//	packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
+	//}
 
 	//bzero(buffer,len);
       
@@ -616,7 +616,8 @@ int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *pac
 
 			assert( (size - sizeof(dag_record_t)) < LIBTRACE_PACKET_BUFSIZE);
 
-			packet->buffer = (void *)erfptr;
+			memcpy(packet->buffer, erfptr, size);
+			//packet->buffer = (void *)erfptr;
 			packet->size = size;
 			libtrace->dag.offset += size;
 			libtrace->dag.diff -= size;
