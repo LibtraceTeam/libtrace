@@ -1,0 +1,87 @@
+Installing libtrace:
+
+----------------------------------
+To make and install libtrace:
+
+tar zxvf libtrace-x.y.z.tar.gz
+cd libtrace-x.y.z/lib
+make
+(as root)
+make install
+
+
+You may need to run 'ldconfig' as root.
+
+----------------------------------
+To build the docs:
+
+cd libtrace-x.y.z
+doxygen
+
+
+This will build the docs into libtrace-x.y.z/docs/{html,man}
+There is currently no install candidate for these - sorry about that.
+
+
+----------------------------------
+Using libtrace:
+
+There are a number of example programs which should cover the basics of what you need within libtrace-x.y.z/examples/.
+
+
+
+----------------------------------
+Large trace files:
+
+Note that if you wish to use libtrace to read in large ( > 2/4 GB) files, and
+you wish to use gz-compressed traces or pcap traces, you will need to link
+against a version of libz or libpcap that supports large files.
+
+The versions of libz and libpcap that ship with Debian Woody don't support
+large file offsets.
+
+
+To get around this, you have a number of options:
+
+* Don't use compressed files.
+* Use stdin as the target of the input uri, and use cat or zcat to pipe the 
+  file into stdin, eg:
+  zcat largetrace.erf.gz | program -i erf:-
+* Use process substitution in place of a filename, eg:
+  program -i erf:<(zcat largetrace.erf.gz)
+
+
+----------------------------------
+Currently support input URIs:
+
+ERF (dag card tracefile):
+erf:/path/to/file
+erf:/path/to/file.gz
+erf:/path/to/socket
+erf:-
+
+PCAP (from libpcap)
+pcap:/path/to/file
+pcap:-
+
+PCAP Interface (from libpcap)
+pcapint:eth0
+pcapint:ppp0
+
+WAG tracefile
+wag:/path/to/file
+wag:/path/to/file.gz
+wag:/path/to/socket
+wag:-
+
+WAG card
+wagint:/dev/wag0
+
+Real Time Client interface at Waikato University
+rtclient:hostname
+rtclient:hostname:port
+
+We don't currently support
+DAG (native dag)
+dag:/dev/dag0
+

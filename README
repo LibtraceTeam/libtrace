@@ -1,6 +1,6 @@
 $Header$
 
-libtrace 1.0.5
+libtrace 1.1.0
 
 ---------------------------------------------------------------------------
 Copyright (c) 2004 The University of Waikato, Hamilton, New Zealand.
@@ -26,7 +26,7 @@ see the included file GPL for details of this license.
 The files CHANGES and TODO contain more information regarding the current 
 release.
 
-Please read the included INSTALL.txt file for information regarding the
+Please read the included INSTALL file for information regarding the
 installation of libtrace, including required dependencies.
 
 For further information, please contact the WAND group. See 
