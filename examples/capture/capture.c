@@ -51,10 +51,11 @@ static int docalc = 0;
 
 typedef enum counter_type {
         BYTES = 0,
-        PACKETS = 1
+        PACKETS = 1,
+	LOSS = 2,
 } counter_type_t;
 
-#define MAXCOUNTERTYPE (PACKETS + 1)
+#define MAXCOUNTERTYPE (LOSS + 1)
 
 uint32_t counter[MAXCOUNTERTYPE];
 
@@ -69,15 +70,17 @@ void secondreport() {
         static int hdrcount = 10;
 
         if (hdrcount >= 10) {
-                printf("Byte count: 			Packet count: \n");
+                printf("Byte count: 	Packet count: 		Loss count\n");
                 hdrcount = 0;
         }
         hdrcount++;
-        printf("\t\t%d\t\t\t%d \n", 
+        printf("\t\t%d\t\t%d\t\t%d \n", 
                         counter[BYTES],
-                        counter[PACKETS]);
+                        counter[PACKETS],
+			counter[LOSS]);
         counter[BYTES] = 0;
         counter[PACKETS] = 0;
+	counter[LOSS] = 0;
         docalc=0;
 }
 int main(int argc, char *argv[]) {
@@ -108,15 +111,15 @@ int main(int argc, char *argv[]) {
 
         if (argc == 2) {
                 uri = strdup(argv[1]);
-		filename = "./output";
+		filename = 0;
         }
 
         if (argc == 3) {
                 uri = strdup(argv[1]);
 		filename = strdup(argv[2]);
+		fout = fopen(filename,"w");
         }
-
-	fout = fopen(filename,"w");
+	
         // create an trace to uri
         trace = trace_create(uri);
 
@@ -134,12 +137,14 @@ int main(int argc, char *argv[]) {
 
                 counter[BYTES] += ntohs(erfptr->rlen);
                 counter[PACKETS] ++;
+		counter[LOSS] += ntohs(erfptr->lctr);
 
                 if(docalc) {
                         secondreport();
                 }
-
-		fwrite(erfptr,psize,1,fout);
+		
+		if (filename) 
+			fwrite(erfptr,psize,1,fout);
 
 
         }
