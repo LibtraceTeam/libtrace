@@ -109,6 +109,10 @@ int main(int argc, char *argv[]) {
         if (setitimer(ITIMER_REAL, &itv, NULL) < 0)
                 perror("setitimer");
 
+	if (argc == 1) {
+		printf("usage: capture <uri> [<output filename>]\n");
+		exit(0);
+	}
         if (argc == 2) {
                 uri = strdup(argv[1]);
 		filename = 0;

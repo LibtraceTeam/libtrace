@@ -484,7 +484,8 @@ static int trace_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
 			case DEVICE:
 				switch(libtrace->format) {
 					case DAG:
-						
+
+						libtrace->dag.bottom = libtrace->dag.top;
 						libtrace->dag.top = dag_offset(
 								libtrace->input.fd,
 								&(libtrace->dag.bottom),
@@ -492,16 +493,7 @@ static int trace_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
 						libtrace->dag.diff = libtrace->dag.top -
 							libtrace->dag.bottom;
 						
-						//recptr = (dag_record_t *) ((void *)libtrace->buf + (bottom + curr));
-						//rlen = ntohs(recptr->rlen);
-
-						
-						//memcpy(buffer,(void *)(libtrace->buf + (bottom + curr)),diff);
-						
-						//buffer=libtrace->buf + (bottom + curr);
-
 						numbytes=libtrace->dag.diff;
-						libtrace->dag.bottom = libtrace->dag.top;
 						libtrace->dag.offset = 0;
 						
 						break;
@@ -603,28 +595,31 @@ int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *pac
 	}
 
 	if (libtrace->format == DAG) {
-		// we can do some zero-copy stuff here
-		while(1) {
-			if (libtrace->dag.diff == 0) {
-				if ((numbytes = trace_read(libtrace,buf,RP_BUFSIZE)) <= 0) 
-					return numbytes;
-			}
-			// DAG always gives us whole packets.
-
-			erfptr = (dag_record_t *) (libtrace->dag.buf + libtrace->dag.offset);
-			size = ntohs(erfptr->rlen);
-
-			assert( (size - sizeof(dag_record_t)) < LIBTRACE_PACKET_BUFSIZE);
-
-			memcpy(packet->buffer, erfptr, size);
-			//packet->buffer = (void *)erfptr;
-			packet->size = size;
-			libtrace->dag.offset += size;
-			libtrace->dag.diff -= size;
-
-			return (size);
-			
+		if (libtrace->dag.diff == 0) {
+			if ((numbytes = trace_read(libtrace,buf,RP_BUFSIZE)) <= 0) 
+				return numbytes;
 		}
+		// DAG always gives us whole packets.
+
+		erfptr = (dag_record_t *) ((void *)libtrace->dag.buf + (libtrace->dag.bottom + libtrace->dag.offset));
+		size = ntohs(erfptr->rlen);
+
+		if ( size  > LIBTRACE_PACKET_BUFSIZE) {
+			printf("%d\n",size);
+			assert( size < LIBTRACE_PACKET_BUFSIZE);
+		}
+
+		// have to copy it out of the memory hole at this stage:
+		memcpy(packet->buffer, erfptr, size);
+
+		packet->size = size;
+		libtrace->dag.offset += size;
+		libtrace->dag.diff -= size;
+		
+		assert(libtrace->dag.diff >= 0);
+		//assert(libtrace->dag.offset <= libtrace->dag.top);
+		return (size);
+			
 	}
 	do {
 		if (fifo_out_available(libtrace->fifo) == 0 || read_required) {
@@ -648,8 +643,8 @@ int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *pac
 				fifo_out_update(libtrace->fifo,sizeof(int));
 
 				/* FALL THRU */
-			case ERF:
-			case DAG:
+			//case ERF:
+			//case DAG:
 				// read in the erf header
 				if ((numbytes = fifo_out_read(libtrace->fifo, buffer, sizeof(dag_record_t))) == 0) {
 					fifo_out_reset(libtrace->fifo);

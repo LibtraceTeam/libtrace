@@ -3,7 +3,7 @@ PREFIX=/usr/local
 CC=gcc
 
 INCLUDE = -I$(PREFIX)/include
-CFLAGS = -Wall -Wimplicit -Wformat -pipe -g -O2 -D_FILE_OFFSET_BITES=64
+CFLAGS = -Wall -Wimplicit -Wformat -pipe -g -O2 -D_FILE_OFFSET_BITES=64 -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE
 CFLAGS += $(INCLUDE)
 libdir = -L$(PREFIX)/lib
 LDLIBS = $(libdir) -ltrace
