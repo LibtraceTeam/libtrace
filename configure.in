@@ -30,7 +30,7 @@ dnl Checks for library functions.
 AC_PROG_GCC_TRADITIONAL
 AC_CHECK_FUNCS(socket strdup)
 
-AC_DEFUN([CHECK_LIBPCAP],
+AC_DEFUN([WITH_LIBPCAP],
 	 [AC_ARG_WITH([pcap],
 		      AC_HELP_STRING([--with-pcap],
 				     [name of pcap library (default is pcap)]),
@@ -38,7 +38,15 @@ AC_DEFUN([CHECK_LIBPCAP],
 AC_CACHE_CHECK([which pcap library to use],
 	       [ac_cv_use_pcap], [ac_cv_use_pcap=pcap])])
 
-AC_DEFUN([CHECK_LIBZ],
+AC_DEFUN([WITH_LIBPCAP_PATH],
+	 [AC_ARG_WITH([pcap-path],
+		      AC_HELP_STRING([--with-pcap-path],
+				     [location of pcap library (default is /usr/lib)]),
+		      [ac_cv_use_pcap_path=$withval], [ac_cv_use_pcap_path=/usr/lib])
+AC_CACHE_CHECK([location of pcap library],
+	       [ac_cv_use_pcap_path], [ac_cv_use_pcap_path=/usr/lib])])
+
+AC_DEFUN([WITH_LIBZ],
 	 [AC_ARG_WITH([zlib],
 		      AC_HELP_STRING([--with-zlib],
 				     [name of zlib library (default is z)]),
@@ -46,13 +54,28 @@ AC_DEFUN([CHECK_LIBZ],
 AC_CACHE_CHECK([which zlib library to use],
 	       [ac_cv_use_zlib], [ac_cv_use_zlib=z])])
 
-CHECK_LIBPCAP
-CHECK_LIBZ
+AC_DEFUN([WITH_LIBZ_PATH],
+	 [AC_ARG_WITH([zlib-path],
+		      AC_HELP_STRING([--with-zlib-path],
+				     [location of zlib library (default is /usr/lib)]),
+		      [ac_cv_use_zlib_path=$withval], [ac_cv_use_zlib_path=/usr/lib])
+AC_CACHE_CHECK([location of zlib library],
+	       [ac_cv_use_zlib_path], [ac_cv_use_zlib_path=/usr/lib])])
+
+WITH_LIBPCAP
+WITH_LIBPCAP_PATH
+WITH_LIBZ
+WITH_LIBZ_PATH
 
 LIBPCAP=-l$ac_cv_use_pcap
+LIBPCAP_PATH=-L$ac_cv_use_pcap_path
+
 AC_SUBST([LIBPCAP])
+AC_SUBST([LIBPCAP_PATH)]
 
 LIBZ=-l$ac_cv_use_zlib
+LIBZ_PATH=-L$ac_cv_use_zlib_path
 AC_SUBST([LIBZ])
+AC_SUBST([LIBZ_PATH])
 
 AC_OUTPUT(Makefile lib/Makefile)
