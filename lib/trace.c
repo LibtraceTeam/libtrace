@@ -1228,7 +1228,7 @@ int8_t trace_get_server_port(uint8_t protocol, uint16_t source, uint16_t dest) {
 
 	if (SERVER(source) && CLIENT(dest)) {
 		return USE_SOURCE;
-	} else if (SERVER(dest) && CLIENT(SOURCE)) {
+	} else if (SERVER(dest) && CLIENT(source)) {
 		return USE_DEST;
 	} else if (ROOT_SERVER(source) && !ROOT_SERVER(dest)) {
 		return USE_SOURCE;
