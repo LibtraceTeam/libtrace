@@ -669,14 +669,19 @@ int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *pac
         if (libtrace->format == PCAP || libtrace->format == PCAPINT) {
 		/* pcap_next doesn't return enough information for us
 		 * newer libpcap has pcap_next_ex, which does, but we'd
-		 * really rather have it all the time. Also, pcap_next
-		 * works differently under freebsd! */
+		 * really rather have it all the time. */
+		
                 //if ((pcappkt = pcap_next(libtrace->input.pcap, &pcaphdr)) == NULL) {
 		/*
                 if ((pcapbytes = pcap_next_ex(libtrace->input.pcap, 
 						&pcaphdr,
 						&pcappkt)) < 0 ) {
-						*/
+		*/
+		/* Instead of pcap_next/pcap_next_ex, we do this ourselves
+		 * with a trivial callback function. This lets us 
+		 * catch the same errors as pcap_next_ex, but removes
+		 * the requirement for libpcap >= 0.8.x
+		 */
 		while ((pcapbytes = pcap_dispatch(libtrace->input.pcap,
 						1, /* number of packets */
 						&trace_pcap_handler,
