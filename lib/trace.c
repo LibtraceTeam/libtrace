@@ -448,9 +448,10 @@ void trace_destroy(struct libtrace_t *libtrace) {
                 pcap_close(libtrace->input.pcap);
         } else if (libtrace->sourcetype == SOCKET || libtrace->sourcetype == RT) {
                 close(libtrace->input.fd);
+#ifdef DAGDEVICE
 	} else if (libtrace->format == DAG) {
 		dag_stop(libtrace->input.fd);
-		
+#endif
         } else {
                 gzclose(libtrace->input.file);
         }       
