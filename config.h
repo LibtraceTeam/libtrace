@@ -14,7 +14,7 @@
 #define HAVE_INTTYPES_H 1
 
 /* Define to 1 if you have the <libxml2/libxml/parser.h> header file. */
-/* #undef HAVE_LIBXML2_LIBXML_PARSER_H */
+#define HAVE_LIBXML2_LIBXML_PARSER_H 1
 
 /* Define to 1 if you have the <libxml/parser.h> header file. */
 /* #undef HAVE_LIBXML_PARSER_H */
@@ -59,10 +59,10 @@
 #define HAVE_STRING_H 1
 
 /* Define to 1 if you have the `strndup' function. */
-/* #undef HAVE_STRNDUP */
+#define HAVE_STRNDUP 1
 
 /* Define to 1 if you have the <sys/limits.h> header file. */
-#define HAVE_SYS_LIMITS_H 1
+/* #undef HAVE_SYS_LIMITS_H */
 
 /* Define to 1 if you have the <sys/stat.h> header file. */
 #define HAVE_SYS_STAT_H 1
@@ -86,13 +86,13 @@
 #define PACKAGE_NAME "libtrace"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "libtrace 2.0.11"
+#define PACKAGE_STRING "libtrace 2.0.12"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "libtrace"
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "2.0.11"
+#define PACKAGE_VERSION "2.0.12"
 
 /* Define to 1 if you have the ANSI C header files. */
 #define STDC_HEADERS 1
@@ -101,14 +101,14 @@
 #define TIME_WITH_SYS_TIME 1
 
 /* Version number of package */
-#define VERSION "2.0.11"
+#define VERSION "2.0.12"
 
 /* Define to 1 if your processor stores words with the most significant byte
    first (like Motorola and SPARC, unlike Intel and VAX). */
 /* #undef WORDS_BIGENDIAN */
 
 /* Number of bits in a file offset, on hosts where this is settable. */
-/* #undef _FILE_OFFSET_BITS */
+#define _FILE_OFFSET_BITS 64
 
 /* Define for large files, on AIX-style hosts. */
 /* #undef _LARGE_FILES */
@@ -116,11 +116,9 @@
 /* Define to empty if `const' does not conform to ANSI C. */
 /* #undef const */
 
-/* Define to `__inline__' or `__inline' if that's what the C compiler
-   calls it, or to nothing if 'inline' is not supported under any name.  */
-#ifndef __cplusplus
+/* Define as `__inline' if that's what the C compiler calls it, or to nothing
+   if it is not supported. */
 /* #undef inline */
-#endif
 
 /* Define to `unsigned' if <sys/types.h> does not define. */
 /* #undef size_t */
