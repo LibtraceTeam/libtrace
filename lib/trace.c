@@ -801,7 +801,7 @@ int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *pac
  */
 void *trace_get_link(const struct libtrace_packet_t *packet) {
         void *ethptr = 0;
-	
+	dag_record_t *erfptr = 0;
 	struct wag_event_t *event = (struct wag_event_t *)packet->buffer;
 	struct wag_data_event_t *data_event;
 	
@@ -810,6 +810,10 @@ void *trace_get_link(const struct libtrace_packet_t *packet) {
                 case ERF:
                 case DAG:
                 case RTCLIENT:
+			erfptr = (dag_record_t *)packet->buffer;
+			if (erfptr->flags.rxerror == 1) {
+				return NULL;
+			}
 			if (trace_get_link_type(packet)==TRACE_TYPE_ETH) 
                         	ethptr = ((uint8_t *)packet->buffer + 
 						dag_record_size + 2);
@@ -835,7 +839,7 @@ void *trace_get_link(const struct libtrace_packet_t *packet) {
 			}
 			
 		default:
-			fprintf(stderr,"Dunno this trace format\n");
+			fprintf(stderr,"Don't know this trace format\n");
 			assert(0);
         }
         return ethptr;
