@@ -478,7 +478,7 @@ int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *pac
         } 
 
 	/* If we're reading from an ERF input, it's an offline trace. We can make some assumptions */
-	
+ 	
 	if (libtrace->format == ERF) {
 		void *buffer2 = buffer;
 		// read in the trace header
@@ -493,7 +493,7 @@ int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *pac
 		}
 		size = ntohs(((dag_record_t *)buffer)->rlen) - sizeof(dag_record_t);
 		assert(size < LIBTRACE_PACKET_BUFSIZE);
-		buffer2 += sizeof(dag_record_t);
+		buffer2 = (ptrdiff_t)buffer +  sizeof(dag_record_t);
 
 		// read in the rest of the packet
 		if ((numbytes=gzread(libtrace->input.file,
@@ -505,6 +505,7 @@ int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *pac
 		packet->size = numbytes + sizeof(dag_record_t);
 		return sizeof(dag_record_t) + numbytes;
 	}
+	
 	do {
 		if (fifo_out_available(libtrace->fifo) == 0 || read_required) {
 			if ((numbytes = trace_read(libtrace,buf,4096))<=0){
