@@ -83,7 +83,8 @@ install_sh = @install_sh@
 
 lib_LTLIBRARIES = libtrace.la
 include_HEADERS = libtrace.h dagformat.h wag.h
-libtrace_la_SOURCES = trace.c fifo.c fifo.h common.h dagapi.c dagopts.c
+@HAVE_DAG_TRUE@libtrace_la_SOURCES = trace.c fifo.c fifo.h common.h dagapi.c dagopts.c
+@HAVE_DAG_FALSE@libtrace_la_SOURCES = trace.c fifo.c fifo.h common.h
 libtrace_la_CFLAGS = @ADD_INCLS@
 libtrace_la_LIBADD = @ADD_LIBS@
 libtrace_la_LDFLAGS = -version-info 2:8:0 @ADD_LDFLAGS@
@@ -94,8 +95,11 @@ CONFIG_CLEAN_FILES =
 LTLIBRARIES = $(lib_LTLIBRARIES)
 
 libtrace_la_DEPENDENCIES =
-am_libtrace_la_OBJECTS = libtrace_la-trace.lo libtrace_la-fifo.lo \
-	libtrace_la-dagapi.lo libtrace_la-dagopts.lo
+@HAVE_DAG_TRUE@am_libtrace_la_OBJECTS = libtrace_la-trace.lo \
+@HAVE_DAG_TRUE@	libtrace_la-fifo.lo libtrace_la-dagapi.lo \
+@HAVE_DAG_TRUE@	libtrace_la-dagopts.lo
+@HAVE_DAG_FALSE@am_libtrace_la_OBJECTS = libtrace_la-trace.lo \
+@HAVE_DAG_FALSE@	libtrace_la-fifo.lo
 libtrace_la_OBJECTS = $(am_libtrace_la_OBJECTS)
 
 DEFS = @DEFS@

@@ -5,7 +5,7 @@
 /* #undef HAVE_DAGAPI_H */
 
 /* define if you have a DAG API */
-#define HAVE_DAG_API 1
+/* #undef HAVE_DAG_API */
 
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #define HAVE_DLFCN_H 1
