@@ -58,14 +58,21 @@ char *buffer[SCANSIZE];
 int main(int argc, char *argv[]) {
 
         char *uri = 0;
+	char *filterstring = 0;
         int psize = 0;
-        int status = 0;
         struct libtrace_ip *ipptr = 0;
 	struct libtrace_packet_t packet;
+	struct libtrace_filter_t *filter = 0;
 
         if (argc == 2) {
                 uri = strdup(argv[1]);
-        }
+        } else if (argc == 3) {
+		uri = strdup(argv[1]);
+		filterstring = strdup(argv[2]);
+	}
+
+	if (filterstring) 
+		filter = trace_bpf_setfilter(filterstring);
 
         // open a trace
         trace = trace_create(uri);
@@ -77,6 +84,10 @@ int main(int argc, char *argv[]) {
                 if ((psize = trace_read_packet(trace, &packet)) <1) {
                         break;
                 }
+
+		if(filter && !trace_bpf_filter(filter,&packet)) {
+			continue;
+		}
 
 		printf("TS %f: ",trace_get_seconds(&packet));
 

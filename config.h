@@ -17,7 +17,7 @@
 #define HAVE_NET_BPF_H 1
 
 /* Define to 1 if you have the <pcap-bpf.h> header file. */
-#define HAVE_PCAP_BPF_H 1
+/* #undef HAVE_PCAP_BPF_H */
 
 /* Define to 1 if you have the <pcap.h> header file. */
 #define HAVE_PCAP_H 1
