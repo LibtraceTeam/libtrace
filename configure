@@ -1722,7 +1722,7 @@ INSTALL_STRIP_PROGRAM="\${SHELL} \$(install_sh) -c -s"
 
 
 
-		    		    		    ac_config_headers="$ac_config_headers lib/config.h"
+		    		    		    ac_config_headers="$ac_config_headers config.h"
 
 ac_ext=c
 ac_cpp='$CPP $CPPFLAGS'
@@ -9167,7 +9167,7 @@ do
   "Makefile" ) CONFIG_FILES="$CONFIG_FILES Makefile" ;;
   "lib/Makefile" ) CONFIG_FILES="$CONFIG_FILES lib/Makefile" ;;
   "default-1" ) CONFIG_COMMANDS="$CONFIG_COMMANDS default-1" ;;
-  "lib/config.h" ) CONFIG_HEADERS="$CONFIG_HEADERS lib/config.h" ;;
+  "config.h" ) CONFIG_HEADERS="$CONFIG_HEADERS config.h" ;;
   *) { { echo "$as_me:$LINENO: error: invalid argument: $ac_config_target" >&5
 echo "$as_me: error: invalid argument: $ac_config_target" >&2;}
    { (exit 1); exit 1; }; };;
@@ -9716,8 +9716,8 @@ done; }
   fi
   # Run the commands associated with the file.
   case $ac_file in
-    lib/config.h ) # update the timestamp
-echo timestamp >"lib/stamp-h1"
+    config.h ) # update the timestamp
+echo timestamp >"./stamp-h1"
  ;;
   esac
 done
