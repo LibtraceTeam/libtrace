@@ -69,9 +69,7 @@
    host does not conform to Posix.  */
 #define ISDIGIT(c) ((unsigned) (c) - '0' <= 9)
 
-#if STDC_HEADERS || HAVE_STRING_H
-# include <string.h>
-#endif
+#include <string.h>
 
 #if __GNUC__ < 2 || (__GNUC__ == 2 && __GNUC_MINOR__ < 8) || __STRICT_ANSI__
 # define __attribute__(x)

@@ -30,6 +30,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <assert.h>
 #include <string.h>
 #include <sys/time.h>
@@ -93,7 +94,7 @@ int main(int argc, char *argv[]) {
         if (outputfilename == 0) {
                 outfile = stdout;
         } else {
-                if ((outfile = fopen(outputfilename,"ab")) == 0) {
+                if ((outfile = fopen(outputfilename,"wb")) == 0) {
                         perror("fopen");
                         exit(0);
                 }
@@ -105,6 +106,7 @@ int main(int argc, char *argv[]) {
 	}
         // set up input files
         if ((trace = trace_create(inputuri)) == 0) {
+		printf("trace_create(%s) failed. Bad/nonexistant URI?\n",inputuri);
                 exit(0);
         }
 
@@ -128,7 +130,7 @@ int main(int argc, char *argv[]) {
 
 		if (count > 0) {
 			number ++;
-                        fwrite(buffer,psize,1,outfile);
+                        fwrite(packet.buffer,psize,1,outfile);
 			if (number > count)  {
 				fprintf(stderr,"Maximum number of packets reached\n");
 				break;
@@ -148,6 +150,7 @@ int main(int argc, char *argv[]) {
 
         }
         trace_destroy(trace);
+	fclose(outfile);
         return 0;
 }
 
