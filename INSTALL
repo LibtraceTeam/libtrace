@@ -4,7 +4,8 @@ Installing libtrace:
 To make and install libtrace:
 
 tar zxvf libtrace-x.y.z.tar.gz
-cd libtrace-x.y.z/lib
+cd libtrace-x.y.z
+./configure
 make
 (as root)
 make install
@@ -82,7 +83,6 @@ Real Time Client interface at Waikato University
 rtclient:hostname
 rtclient:hostname:port
 
-We don't currently support
 DAG (native dag)
 dag:/dev/dag0
 
