@@ -1203,11 +1203,11 @@ int8_t trace_get_direction(struct libtrace_packet_t *packet) {
  * @returns a hint as to which port is the server port
  * @author Daniel Lawson
  */
-#define ROOT_SERVER(x) (x < 512)
-#define ROOT_CLIENT(x) (512 <= x < 1024)
-#define NONROOT_SERVER(x) (x >= 5000)
-#define NONROOT_CLIENT(x) (1024 <= x < 5000)
-#define DYNAMIC(x) (49152 < x < 65535)
+#define ROOT_SERVER(x) ((x) < 512)
+#define ROOT_CLIENT(x) ((512 <= (x)) && ((x) < 1024))
+#define NONROOT_SERVER(x) ((x) >= 5000)
+#define NONROOT_CLIENT(x) ((1024 <= (x)) && ((x) < 5000))
+#define DYNAMIC(x) ((49152 < (x)) && ((x) < 65535))
 #define SERVER(x) ROOT_SERVER(x) || NONROOT_SERVER(x)
 #define CLIENT(x) ROOT_CLIENT(x) || NONROOT_CLIENT(x) 
 
@@ -1224,46 +1224,58 @@ int8_t trace_get_server_port(uint8_t protocol, uint16_t source, uint16_t dest) {
 	 * * flip a coin.
 	 */
 
-	int8_t server, client;
+	uint16_t server, client;
 
 	/* equal */
 	if (source == client)
 		return USE_DEST;
 
 	/* root server port, 0 - 511 */
-	if (ROOT_SERVER(source) && ROOT_SERVER(dest))
+	if (ROOT_SERVER(source) && ROOT_SERVER(dest)) {
+		if (source < dest)
+			return USE_SOURCE;
 		return USE_DEST;
+	}
 
 	if (ROOT_SERVER(source) && !ROOT_SERVER(dest))
 		return USE_SOURCE;
-
 	if (!ROOT_SERVER(source) && ROOT_SERVER(dest))
 		return USE_DEST;
 
 	/* non-root server */
-	if (NONROOT_SERVER(source) && NONROOT_SERVER(dest))
+	if (NONROOT_SERVER(source) && NONROOT_SERVER(dest)) {
+		if (source < dest)
+			return USE_SOURCE;
 		return USE_DEST;
+	}
 	if (NONROOT_SERVER(source) && !NONROOT_SERVER(dest))
 		return USE_SOURCE;
 	if (!NONROOT_SERVER(source) && NONROOT_SERVER(dest))
 		return USE_DEST;
 
 	/* root client */
-	if (ROOT_CLIENT(source) && ROOT_CLIENT(dest))
+	if (ROOT_CLIENT(source) && ROOT_CLIENT(dest)) {
+		if (source < dest)
+			return USE_SOURCE;
 		return USE_DEST;
+	}
 	if (ROOT_CLIENT(source) && !ROOT_CLIENT(dest))
 		return USE_DEST;
 	if (!ROOT_CLIENT(source) && ROOT_CLIENT(dest))
 		return USE_SOURCE;
 	
 	/* nonroot client */
-	if (NONROOT_CLIENT(source) && NONROOT_CLIENT(dest))
+	if (NONROOT_CLIENT(source) && NONROOT_CLIENT(dest)) {
+		if (source < dest) 
+			return USE_SOURCE;
 		return USE_DEST;
+	}
 	if (NONROOT_CLIENT(source) && !NONROOT_CLIENT(dest))
 		return USE_DEST;
 	if (!NONROOT_CLIENT(source) && NONROOT_CLIENT(dest))
 		return USE_SOURCE;
 
+	/* dynamic range */
 	if (DYNAMIC(source) && DYNAMIC(dest))
 		return USE_DEST;
 	if (DYNAMIC(source) && !DYNAMIC(dest))
