@@ -1,0 +1,8 @@
+* Wed Aug 11, 2004
+
+ Autoconf has been implemented, and this has been used to help rebuild under 
+FreeBSD. At the same time, a major api change ( relatively small amount of work
+involved, but a fundamental change in the api nonetheless) occured, so we've
+bumped the version to 2 already. 
+
+

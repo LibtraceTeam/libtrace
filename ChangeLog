@@ -28,6 +28,15 @@
 ##
 ##
 
+- Version 2.0.1
+	* Port to FreeBSD. Thanks to Phil Murray for testing this
+
+- Version 2.0.0
+	* Major API change for cleanup purposes.
+		* libtrace_packet_t object used to hold reference to the
+		  trace object, the buffer, and assorted variables
+	* First autoconf release
+	
 - Version 1.1.0
 	* Tagged as REL_1_1_0
 	* First final release tag

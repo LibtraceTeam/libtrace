@@ -37,6 +37,9 @@
 /* Define to 1 if you have the <string.h> header file. */
 #define HAVE_STRING_H 1
 
+/* Define to 1 if you have the <sys/limits.h> header file. */
+/* #undef HAVE_SYS_LIMITS_H */
+
 /* Define to 1 if you have the <sys/stat.h> header file. */
 #define HAVE_SYS_STAT_H 1
 
@@ -83,15 +86,22 @@
 /* Number of bits in a file offset, on hosts where this is settable. */
 #define _FILE_OFFSET_BITS 64
 
+/* Enable GNU extensions on systems that have them.  */
+#ifndef _GNU_SOURCE
+# define _GNU_SOURCE 1
+#endif
+
 /* Define for large files, on AIX-style hosts. */
 /* #undef _LARGE_FILES */
 
 /* Define to empty if `const' does not conform to ANSI C. */
 /* #undef const */
 
-/* Define as `__inline' if that's what the C compiler calls it, or to nothing
-   if it is not supported. */
+/* Define to `__inline__' or `__inline' if that's what the C compiler
+   calls it, or to nothing if 'inline' is not supported under any name.  */
+#ifndef __cplusplus
 /* #undef inline */
+#endif
 
 /* Define to `unsigned' if <sys/types.h> does not define. */
 /* #undef size_t */
