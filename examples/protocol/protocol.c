@@ -89,19 +89,20 @@ char *filterstring = 0;
 
 int do_cksum = 0;
 int do_w_cksum = 0;
+uint64_t rxerr = 0;
 static void usage();
 static void parse_cmdline(int argc, char **argv);
 
 int main(int argc, char **argv) {
 
 	struct libtrace_ip *ipptr = 0;
+	dag_record_t *erfptr = 0;
 	
-        int status; // need to pass to rtclient_read_packet
+        int status; 
         int psize;
 
 	parse_cmdline(argc,argv);
 
-        // create an rtclient to hostname, on the default port
         trace = create_trace(uri);
 	if (filterstring) {
 		filter = libtrace_bpf_setfilter(filterstring);
@@ -112,6 +113,12 @@ int main(int argc, char **argv) {
                         // terminate
                         break;
                 }
+		erfptr = (dag_record_t *)buffer;
+		
+		if (erfptr->flags.rxerror) {
+			rxerr ++;
+			continue;
+		}
 		if (filter) {
 			if (!libtrace_bpf_filter(trace, filter, buffer, 4096)) {
 			continue;
@@ -131,6 +138,7 @@ int main(int argc, char **argv) {
         }
 	if (do_cksum || do_w_cksum) {
 		printf("Bad checksums seen: %llu\n",badchksum);
+		printf("RX Errors seen: %llu\n",rxerr);
 	}
         destroy_trace(trace);
         return 0;
