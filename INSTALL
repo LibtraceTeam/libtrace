@@ -9,7 +9,6 @@ make
 (as root)
 make install
 
-libtrace currently requires gcc 3.0 or later!
 
 
 You may need to run 'ldconfig' as root.
