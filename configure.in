@@ -7,7 +7,7 @@ AC_CONFIG_FILES([Makefile replace/Makefile lib/Makefile])
 dnl GNU C library
 dnl AC_GNU_SOURCE
 
-AC_CONFIG_HEADERS(config.h)
+AM_CONFIG_HEADER(config.h)
 #AC_CONFIG_HEADERS([config.h])
 dnl Checks for programs.
 AC_PROG_CC
