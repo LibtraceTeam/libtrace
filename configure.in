@@ -4,7 +4,8 @@ AM_INIT_AUTOMAKE(libtrace,[2.0.0],[libtrace@wand.net.nz])
 
 AC_PREREQ(2.5)
 
-AC_CONFIG_HEADERS(config.h)
+AC_CONFIG_SRCDIR(lib/trace.c)
+AM_CONFIG_HEADER(lib/config.h)
 dnl Checks for programs.
 AC_PROG_CC
 AC_PROG_INSTALL
@@ -25,16 +26,12 @@ AC_C_INLINE
 AC_C_BIGENDIAN
 AC_TYPE_SIZE_T
 AC_HEADER_TIME
+AC_SYS_LARGEFILE
 
 dnl Checks for library functions.
 AC_PROG_GCC_TRADITIONAL
 AC_CHECK_FUNCS(socket strdup)
 
-
-dnl we need large files
-AC_SYS_LARGEFILE
-
-dnl check to make sure we have 64 bit file support
 
 
 dnl configure time options for selecting which libpcap and libz to use

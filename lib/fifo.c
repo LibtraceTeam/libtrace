@@ -28,6 +28,8 @@
  *
  */
 
+#include "common.h"
+#include "config.h"
 #include <errno.h>
 #include <stdlib.h> /* free */
 #include <stdio.h> /* perror, sprintf, printf */
