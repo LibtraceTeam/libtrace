@@ -229,25 +229,28 @@ static int init_trace(struct libtrace_t **libtrace, char *uri) {
  * @returns opaque pointer to a libtrace_t
  *
  * Valid URI's are:
- *  - erf:/path/to/erf/file
- *  - erf:/path/to/erf/file.gz
- *  - erf:/path/to/rtclient/socket
- *  - erf:-  (stdin)
- *  - dag:/dev/dagcard  		(not implementd)
- *  - pcap:pcapinterface 		(eg: pcap:eth0)
- *  - pcap:/path/to/pcap/file
- *  - pcap:/path/to/pcap/file.gz
- *  - pcap:/path/to/pcap/socket		(not implemented)
- *  - pcap:-
- *  - rtclient:hostname
- *  - rtclient:hostname:port
- *  - wag:/path/to/wag/file
- *  - wag:/path/to/wag/file.gz
- *  - wag:/path/to/wag/socket
- *  - wag:/dev/device
+ *  erf:/path/to/erf/file
+ *  erf:/path/to/erf/file.gz
+ *  erf:/path/to/rtclient/socket
+ *  erf:-  			(stdin)
+ *  pcap:pcapinterface 		(eg: pcap:eth0)
+ *  pcap:/path/to/pcap/file
+ *  pcap:/path/to/pcap/file.gz
+ *  pcap:-
+ *  rtclient:hostname
+ *  rtclient:hostname:port
+ *  wag:-
+ *  wag:/path/to/wag/file
+ *  wag:/path/to/wag/file.gz
+ *  wag:/path/to/wag/socket
+ *  wag:/dev/device
  *
- *  If an error occured why attempting to open the trace file, NULL is returned
- *  and an error is output to stdout.
+ * URIs which have yet to be implemented are:
+ * dag:/dev/dagcard
+ * pcap:/path/to/pcap/socket
+ *
+ * If an error occured when attempting to open a trace, NULL is returned
+ * and an error is output to stdout.
  */
 struct libtrace_t *create_trace(char *uri) {
         struct libtrace_t *libtrace = malloc(sizeof(struct libtrace_t));
@@ -406,6 +409,7 @@ static int libtrace_read(struct libtrace_t *libtrace, void *buffer, size_t len) 
  * @param libtrace 	the trace to read from
  * @param buffer	the buffer to read into
  * @param len		the length of the buffer
+ * @param status	a pointer to the status byte
  * @returns number of bytes copied.
  *
  * @note the buffer must be at least as large as the largest packet (plus
@@ -528,12 +532,12 @@ void *get_link(struct libtrace_t *libtrace, void *buffer, int buflen) {
                 case ERF:
                 case DAG:
                 case RTCLIENT:
-			// DAG people are insane, deal with ethernet having
-			// some extra padding and crap
 			if (get_link_type(libtrace,buffer,buflen)==TRACE_TYPE_ETH) 
-                        	ethptr = ((uint8_t *)buffer + 16 + 2);
+                        	ethptr = ((uint8_t *)buffer + 
+						dag_record_size + 2);
 			else
-				ethptr = ((uint8_t *)buffer + 16 + 2);
+				ethptr = ((uint8_t *)buffer + 
+						dag_record_size + 2);
                         break;
 		case PCAPINT:
 		case PCAP:
@@ -800,7 +804,8 @@ int get_capture_length(struct libtrace_t *libtrace, void *buffer, int buflen) {
 		case PCAPINT:
 		case PCAP:
 			pcapptr = (struct pcap_pkthdr *)buffer;
-			return ntohs(pcapptr->caplen);
+			//return ntohs(pcapptr->caplen);
+			return pcapptr->caplen;
 		case WAGINT:
 		case WAG:
 			wag_event = buffer;
@@ -962,23 +967,30 @@ uint8_t *get_destination_mac(struct libtrace_t *libtrace,
 
 
 /** process a libtrace event
+ * @param libtrace the libtrace opaque pointer
+ * @param fd a pointer to a file descriptor to listen on
+ * @param seconds a pointer the time in seconds since to the next event
+ * @param buffer a pointer to a filled in buffer
+ * @param len the length of the buffer
+ * @param size the size of the event 
  * @returns
  *  TRACE_EVENT_IOWAIT	Waiting on I/O on <fd>
  *  TRACE_EVENT_SLEEP	Next event in <seconds>
  *  TRACE_EVENT_PACKET	Packet arrived in <buffer> with size <size>
+ * @author Perry Lorier
  */
-libtrace_event_t libtrace_event(struct libtrace_t *trace,
+libtrace_event_t libtrace_event(struct libtrace_t *libtrace,
 			int *fd,double *seconds,
-			void *buffer, int *size)
+			void *buffer, size_t len, int *size)
 {
 	*seconds = 0;
 	*fd = 0;
 	/* Is there a packet ready? */
-	switch (trace->sourcetype) {
+	switch (libtrace->sourcetype) {
 		case INTERFACE:
 			{
 				int data;
-				*fd = pcap_fileno(trace->input.pcap);
+				*fd = pcap_fileno(libtrace->input.pcap);
 				if(ioctl(*fd,FIONREAD,&data)==-1){
 					perror("ioctl(FIONREAD)");
 				}
@@ -992,13 +1004,13 @@ libtrace_event_t libtrace_event(struct libtrace_t *trace,
 		case RT:
 			{
 				int data;
-				if(ioctl(trace->input.fd,FIONREAD,&data)==-1){
+				if(ioctl(libtrace->input.fd,FIONREAD,&data)==-1){
 					perror("ioctl(FIONREAD)");
 				}
 				if (data>0) {
 					return TRACE_EVENT_PACKET;
 				}
-				*fd = trace->input.fd;
+				*fd = libtrace->input.fd;
 				return TRACE_EVENT_IOWAIT;
 			}
 		case STDIN:
@@ -1007,31 +1019,32 @@ libtrace_event_t libtrace_event(struct libtrace_t *trace,
 				int status;
 				double ts;
 				/* "Prime" the pump */
-				if (!trace->packet.buffer) {
-					trace->packet.buffer = malloc(4096);
-					trace->packet.size=libtrace_read_packet(trace,
-							trace->packet.buffer,
+				if (!libtrace->packet.buffer) {
+					libtrace->packet.buffer = malloc(4096);
+					libtrace->packet.size=
+						libtrace_read_packet(libtrace,
+							libtrace->packet.buffer,
 							4096,
 							&status);
 				}
-				ts=get_seconds(trace,
-					trace->packet.buffer,
-					trace->packet.size);
-				if (trace->last_ts!=0) {
-					*seconds = ts - trace->last_ts;
-					if (*seconds>time(NULL)-trace->start_ts)
+				ts=get_seconds(libtrace,
+					libtrace->packet.buffer,
+					libtrace->packet.size);
+				if (libtrace->last_ts!=0) {
+					*seconds = ts - libtrace->last_ts;
+					if (*seconds>time(NULL)-libtrace->start_ts)
 						return TRACE_EVENT_SLEEP;
 				}
 				else {
-					trace->start_ts = time(NULL);
-					trace->last_ts = ts;
+					libtrace->start_ts = time(NULL);
+					libtrace->last_ts = ts;
 				}
 
-				*size = trace->packet.size;
-				memcpy(buffer,trace->packet.buffer,*size);
+				*size = libtrace->packet.size;
+				memcpy(buffer,libtrace->packet.buffer,*size);
 
-				free(trace->packet.buffer);
-				trace->packet.buffer = 0;
+				free(libtrace->packet.buffer);
+				libtrace->packet.buffer = 0;
 				return TRACE_EVENT_PACKET;
 			}
 		default:
@@ -1049,6 +1062,7 @@ libtrace_event_t libtrace_event(struct libtrace_t *trace,
 struct libtrace_filter_t *libtrace_bpf_setfilter(const char *filterstring) {
 	struct libtrace_filter_t *filter = malloc(sizeof(struct libtrace_filter_t));
 	filter->filterstring = strdup(filterstring);
+	filter->filter = 0;
 	return filter;
 }
 
@@ -1060,17 +1074,18 @@ struct libtrace_filter_t *libtrace_bpf_setfilter(const char *filterstring) {
  * @returns 0 if the filter fails, 1 if it succeeds
  * @author Daniel Lawson
  */
-int libtrace_bpf_filter(struct libtrace_t *trace, 
+int libtrace_bpf_filter(struct libtrace_t *libtrace, 
 			struct libtrace_filter_t *filter,
 			void *buffer, 
 			int buflen) {
 	
-	int linktype = get_link_type(trace,buffer,buflen);
-	void *linkptr = get_link(trace,buffer,buflen);	
-	int clen = get_capture_length(trace,buffer,buflen);
-	assert(trace);
+	int linktype = get_link_type(libtrace,buffer,buflen);
+	void *linkptr = get_link(libtrace,buffer,buflen);	
+	int clen = get_capture_length(libtrace,buffer,buflen);
+	assert(libtrace);
 	assert(filter);
 	assert(buffer);
+	assert(linkptr);
 	
 
 	if (filter->filterstring && ! filter->filter) {
@@ -1078,7 +1093,7 @@ int libtrace_bpf_filter(struct libtrace_t *trace,
 		struct bpf_program bpfprog;
 
 		switch (linktype) {
-			case TYPE_ETH:
+			case TRACE_TYPE_ETH:
 				pcap = pcap_open_dead(DLT_EN10MB, 1500);
 				break;
 			default:
@@ -1096,7 +1111,10 @@ int libtrace_bpf_filter(struct libtrace_t *trace,
 		filter->filter = bpfprog.bf_insns;	
 	}
 
+	assert(filter->filter);
+	printf("%d %d\n",clen,ntohs(clen));
 	return bpf_filter(filter->filter, linkptr, clen, clen);
+	
 }
 
 /** Get the direction flag, if it has one
