@@ -660,7 +660,7 @@ int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *pac
 	/* PCAP gives us it's own per-packet interface. Let's use it */
         if (libtrace->format == PCAP || libtrace->format == PCAPINT) {
                 if ((pcappkt = pcap_next(libtrace->input.pcap, &pcaphdr)) == NULL) {
-                        return -1;
+                        return 0;
                 }
                 memcpy(buffer,&pcaphdr,sizeof(struct pcap_pkthdr));
                 memcpy(buffer + sizeof(struct pcap_pkthdr),pcappkt,pcaphdr.len);
