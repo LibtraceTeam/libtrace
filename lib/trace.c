@@ -274,6 +274,7 @@ static int init_trace(struct libtrace_t **libtrace, char *uri) {
         
 
         (*libtrace)->fifo = create_fifo(1048576);
+	assert( (*libtrace)->fifo);
 	//(*libtrace)->packet.buffer = 0;
 	//(*libtrace)->packet.size = 0;
 
