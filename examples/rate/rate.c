@@ -108,7 +108,10 @@ int main(int argc, char *argv[]) {
 
                 //erfptr = (dag_record_t *)buffer;
                 //ipptr = (struct ip *)erfptr->rec.eth.pload;
-                ipptr = get_ip(trace,buffer,SCANSIZE);
+                if((ipptr = get_ip(trace,buffer,SCANSIZE)) == 0) {
+			continue;
+		}
+		
                 counter[BYTES][INSTANT] += ntohs(ipptr->ip_len);
                 counter[PACKETS][INSTANT] ++;
 
