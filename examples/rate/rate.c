@@ -38,6 +38,7 @@
 #include <setjmp.h>
 #include <unistd.h>
 #include <sys/time.h>
+#include <sys/types.h>
 #include <stdint.h>
 #include "libtrace.h"
 #include "dagformat.h"
