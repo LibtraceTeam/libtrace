@@ -430,7 +430,7 @@ int libtrace_read_packet(struct libtrace_t *libtrace, void *buffer, size_t len, 
         assert(status);
         assert(len > 200); 
 
-	bzero(buffer,len);
+	//bzero(buffer,len);
         
 	/* PCAP gives us it's own per-packet interface. Let's use it */
         if (libtrace->format == PCAP || libtrace->format == PCAPINT) {
@@ -445,7 +445,7 @@ int libtrace_read_packet(struct libtrace_t *libtrace, void *buffer, size_t len, 
         } 
 
 	/* If we're reading from an ERF input, it's an offline trace. We can make some assumptions */
-	/*
+	
 	if (libtrace->format == ERF) {
 		void *buffer2 = buffer;
 		// read in the trace header
@@ -470,7 +470,7 @@ int libtrace_read_packet(struct libtrace_t *libtrace, void *buffer, size_t len, 
 			return -1;
 		}
 		return sizeof(dag_record_t) + numbytes;
-	}*/
+	}
 	do {
 		if (fifo_out_available(libtrace->fifo) == 0 || read_required) {
 			if ((numbytes = libtrace_read(libtrace,buf,4096))<=0){
