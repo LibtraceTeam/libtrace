@@ -28,7 +28,11 @@
 ##
 ##
 
-- Version 2.0.11 (unreleased)
+- Version 2.0.12 (unreleased)
+	* check for IP Fragmentation - if so, don't return TCP header on a
+	  fragmented packet
+
+- Version 2.0.11 
 
  	* Added in a fallback function for strndup under freebsd. 
 	  Thanks to mjl for this code.
