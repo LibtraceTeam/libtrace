@@ -1,22 +1,39 @@
 CC=gcc-3.0
 CFLAGS= -Wall -Wimplicit -Wformat -pipe -g -O3
+PROFCFLAGS= -Wall -Wimplicit -Wformat -pipe -g -pg -fprofile-arcs -a
 
 INCLUDE = -I../include -I/usr/local/wand/include
 CFLAGS += -D_FILE_OFFSET_BITS=64
 CFLAGS += $(INCLUDE)
+PROFCFLAGS += -D_FILE_OFFSET_BITS=64
+PROFCFLAGS += $(INCLUDE)
 libdir = -L/usr/local/wand/lib/
 LDLIBS = $(libdir) -lpcapl -lzl
 
 
 CURRENT=1
 AGE=0
-REVISION=8
+REVISION=9
 
 INCLIBS=/usr/local/wand/lib/libzl.a /usr/local/wand/lib/libpcapl.a
 
 .PHONY: all clean distclean install depend
 
 all: libtrace.lo libtrace.la
+
+profile: clean libtrace-prof.lo libtrace-prof.la
+
+libfifo-prof.lo: 	fifo.c
+	libtool --mode=compile $(CC) $(PROFCFLAGS) -c $< -o libfifo-prof.lo 
+
+libtrace-prof.lo: 	trace.c
+	libtool --mode=compile $(CC) $(PROFCFLAGS) -c $< -o libtrace-prof.lo
+
+libtrace-prof.la:	libtrace-prof.lo libfifo-prof.lo
+	libtool --mode=link $(CC) $(CFLAGS) -o libtrace-prof.la \
+	libtrace-prof.lo libfifo-prof.lo -rpath /usr/local/wand/lib $(LDLIBS) \
+	-version-info $(CURRENT):$(REVISION):$(AGE)
+
 
 
 libfifo.lo: 	fifo.c
@@ -32,11 +49,15 @@ libtrace.la:	libtrace.lo libfifo.lo
 
 
 clean:
-	$(RM) *~ *.o libtrace.a *.lo *.la libtrace.so.* .libs/*.*
+	$(RM) *~ *.o *.a *.lo *.la *.so .libs/*.*
 
 distclean:
 	$(RM) *~ *.o 
 
+
+install-profile: libtrace-prof.la
+	libtool --mode=install install -c libtrace-prof.la /usr/local/wand/lib/libtrace-prof.la
+	libtool --finish /usr/local/wand/lib/
 
 install: libtrace.la
 	libtool --mode=install install -c libtrace.la /usr/local/wand/lib/libtrace.la

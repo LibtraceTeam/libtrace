@@ -428,10 +428,11 @@ int libtrace_read_packet(struct libtrace_t *libtrace, void *buffer, size_t len, 
         assert(libtrace);
         assert(buffer);
         assert(status);
-        assert(len > 104); // we know we see packets this big anyway. Don't be silly.
+        assert(len > 200); 
 
 	bzero(buffer,len);
         
+	/* PCAP gives us it's own per-packet interface. Let's use it */
         if (libtrace->format == PCAP || libtrace->format == PCAPINT) {
                 if ((pcappkt = pcap_next(libtrace->input.pcap, &pcaphdr)) == NULL) {
                         return -1;
@@ -443,6 +444,32 @@ int libtrace_read_packet(struct libtrace_t *libtrace, void *buffer, size_t len, 
 		return numbytes;
         } 
 
+	/* If we're reading from an ERF input, it's an offline trace. We can make some assumptions */
+	if (libtrace->format == ERF) {
+		void *buffer2 = buffer;
+		// read in the trace header
+		if ((numbytes=gzread(libtrace->input.file,
+						buffer,
+						sizeof(dag_record_t))) == -1) {
+			perror("gzread");
+			return -1;
+		}
+		if (numbytes == 0) {
+			return 0;
+		}
+		size = ntohs(((dag_record_t *)buffer)->rlen) - sizeof(dag_record_t);
+		assert(len > size);
+		buffer2 += sizeof(dag_record_t);
+
+		// read in the rest of the packet
+		if ((numbytes=gzread(libtrace->input.file,
+						buffer2,
+						size)) == -1) {
+			perror("gzread");
+			return -1;
+		}
+		return sizeof(dag_record_t) + numbytes;
+	}
 	do {
 		if (fifo_out_available(libtrace->fifo) == 0 || read_required) {
 			if ((numbytes = libtrace_read(libtrace,buf,4096))<=0){
@@ -1112,7 +1139,6 @@ int libtrace_bpf_filter(struct libtrace_t *libtrace,
 	}
 
 	assert(filter->filter);
-	printf("%d %d\n",clen,ntohs(clen));
 	return bpf_filter(filter->filter, linkptr, clen, clen);
 	
 }
