@@ -12,7 +12,7 @@
 typedef struct pos_rec {
 	unsigned                hdlc;
 	unsigned char           pload[1];
-} pos_rec_t;
+}  pos_rec_t;
 
 /* GPP Type 2 */
 typedef struct eth_rec {
@@ -22,19 +22,19 @@ typedef struct eth_rec {
 	unsigned char           src[6];
 	unsigned short          etype;
 	unsigned char           pload[1];
-} eth_rec_t;
+}  eth_rec_t;
 
 /* GPP Type 3 */
 typedef struct atm_rec {
 	unsigned                header; 
 	unsigned char           pload[1];
-} atm_rec_t;
+}  atm_rec_t;
 
 /* GPP Type 4 */
 typedef struct aal5_rec {
 	unsigned                header; 
 	unsigned char           pload[1];
-} aal5_rec_t;
+}  aal5_rec_t;
 
 typedef struct flags {
 	unsigned char           iface:2;
@@ -43,7 +43,7 @@ typedef struct flags {
 	unsigned char           rxerror:1;
 	unsigned char           dserror:1;
 	unsigned char           pad:2;
-} flags_t;
+} __attribute__((packed)) flags_t;
 
 /* GPP Global type */
 typedef struct dag_record {
@@ -59,7 +59,7 @@ typedef struct dag_record {
 		atm_rec_t       atm;
 		aal5_rec_t      aal5;
 	} rec;
-} dag_record_t;
+} __attribute__((packed)) dag_record_t;
 
 #define dag_record_size         16
 
