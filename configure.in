@@ -101,7 +101,7 @@ then
                 ADD_INCLS="$ADD_INCLS -I $dag_include_dir"
 		ADD_LIBS="$ADD_LIBS -ldag"
 		ADD_LDFLAGS="$ADD_LDFLAGS -L$dag_lib_dir"
-		AM_CONDITIONAL(HAVE_DAG);
+		AM_CONDITIONAL(HAVE_DAG)
                 #ADD_LIBS="$ADD_LIBS $dag_tools_dir/dagapi.o $dag_tools_dir/dagopts.o"
                 #ADD_SOURCEES="$ADD_SOURCES $dag_tools_dir/dagapi.c $dag_tools_dir/dagopts.c"
                 ac_cv_lbl_dag_api=yes
