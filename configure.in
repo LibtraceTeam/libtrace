@@ -6,7 +6,7 @@ AM_INIT_AUTOMAKE
 AC_PREREQ(2.5)
 
 
-AM_CONFIG_HEADER(lib/config.h)
+AM_CONFIG_HEADER(config.h)
 dnl Checks for programs.
 AC_PROG_CC
 AC_PROG_INSTALL
