@@ -409,7 +409,7 @@ struct libtrace_filter_t *trace_bpf_setfilter(const char *filterstring);
 /** apply a BPF filter
  * @param filter 	the filter opaque pointer
  * @param packet	the packet opaque pointer
- * @returns the return value from bpf_filter
+ * @returns 0 if the filter fails, 1 if it succeeds
  * @author Daniel Lawson
  */
 int trace_bpf_filter(struct libtrace_filter_t *filter,
