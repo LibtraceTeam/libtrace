@@ -28,8 +28,10 @@
 ##
 ##
 
-- Version 2.0.8 (unreleased)
+- Version 2.0.8
 	* Added better configure time checking for pcap-bpf.h (ie, actually fail early if it can't find it or an equivalent)
+	* Added trace_set_direction , to set the direction bit in an ERF based trace.
+	* Added trace_truncate_packet, to truncate the packet at a specified length
 
 
 - Version 2.0.7
