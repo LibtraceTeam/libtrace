@@ -1285,6 +1285,8 @@ int8_t trace_get_server_port(uint8_t protocol, uint16_t source, uint16_t dest) {
 
 	/* dynamic range */
 	if (DYNAMIC(source) && DYNAMIC(dest))
+		if (source < dest)
+			return USE_SOURCE;
 		return USE_DEST;
 	if (DYNAMIC(source) && !DYNAMIC(dest))
 		return USE_DEST;
