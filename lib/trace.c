@@ -403,33 +403,41 @@ static int trace_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
         if (buffer == 0)
                 buffer = malloc(len);
 
-	switch(libtrace->sourcetype) {
-		case SOCKET:
-		case RT:
-                	// read from the network
-                	if ((numbytes=recv(libtrace->input.fd, 
-							buffer, 
-							len, 
-							MSG_NOSIGNAL)) == -1) {
-                        	perror("recv");
-                        	return -1;
-                	}
-			break;
-		case DEVICE:
-			if ((numbytes=read(libtrace->input.fd, 
-							buffer, 
-							len)) == -1) {
-				perror("read");
-				return -1;
-			}
-			break;
-		default:
-                	if ((numbytes=gzread(libtrace->input.file,
-							buffer,
-							len)) == -1) {
-                        	perror("gzread");
-                        	return -1;
-                	}
+	while(1) {
+		switch(libtrace->sourcetype) {
+			case SOCKET:
+			case RT:
+				// read from the network
+				if ((numbytes=recv(libtrace->input.fd, 
+								buffer, 
+								len, 
+								MSG_NOSIGNAL)) == -1) {
+					if (errno == EINTR) {
+						// ignore EINTR in case 
+						// a caller is using signals
+						continue;
+					}
+					perror("recv");
+					return -1;
+				}
+				break;
+			case DEVICE:
+				if ((numbytes=read(libtrace->input.fd, 
+								buffer, 
+								len)) == -1) {
+					perror("read");
+					return -1;
+				}
+				break;
+			default:
+				if ((numbytes=gzread(libtrace->input.file,
+								buffer,
+								len)) == -1) {
+					perror("gzread");
+					return -1;
+				}
+		}
+		break;
 	}
         return numbytes;
 
