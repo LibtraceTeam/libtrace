@@ -359,7 +359,7 @@ typedef enum {
 	TRACE_EVENT_PACKET
 } libtrace_event_t;
 
-typedef struct {
+typedef struct libtrace_eventobj {
 	libtrace_event_t type;
 	int fd;
 	double seconds;
