@@ -1,0 +1,4 @@
+#!/bin/sh
+cat links.txt | while read to from; do
+	ln -sf $from $to
+done
