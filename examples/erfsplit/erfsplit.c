@@ -60,7 +60,6 @@ static void     parse_cmdline(int argc, char **argv);
 static void     usage();
 
 
-static char     buffer[SCANSIZE];
 static char     *inputuri = 0;
 static char     *outputfilename = 0;
 static char     *starttime = 0;
@@ -106,7 +105,7 @@ int main(int argc, char *argv[]) {
 	}
         // set up input files
         if ((trace = trace_create(inputuri)) == 0) {
-		printf("trace_create(%s) failed. Bad/nonexistant URI?\n",inputuri);
+		fprintf(stderr,"trace_create(%s) failed. Bad/nonexistant URI?\n",inputuri);
                 exit(0);
         }
 
@@ -140,7 +139,7 @@ int main(int argc, char *argv[]) {
 		}
                 if (stv == 0 || ts > stv) {
                         if (ftv == 0 || ts <= ftv) {
-                                fwrite(buffer,psize,1,outfile);
+                                fwrite(packet.buffer,psize,1,outfile);
                         }
                 }
                 if (ts > ftv && ftv != 0) {
