@@ -964,7 +964,7 @@ struct libtrace_ip *trace_get_ip(struct libtrace_packet_t *packet) {
 				// TODO: Find out what ATM does, and return
 				//       NULL for non IP data
 				//       Presumably it uses the normal stuff
-				if (!acm) {
+				if (!atm) {
 					ipptr = NULL;
 					break;
 				}
