@@ -42,7 +42,6 @@
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <net/ethernet.h>
 #include <netdb.h>
 #include <pcap.h>
 #include <stdio.h>
@@ -50,9 +49,14 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#ifdef HAVE_SYS_LIMITS_H
+// For BSD, apparently
+#  include <sys/limits.h>
+#endif
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
+#include <net/ethernet.h>
 #include <time.h>
 #include <sys/ioctl.h>
 

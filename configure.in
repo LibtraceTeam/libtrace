@@ -5,6 +5,8 @@ AM_INIT_AUTOMAKE(libtrace,2.0.0)
 
 AC_PREREQ(2.5)
 
+dnl GNU C library
+AC_GNU_SOURCE
 
 AM_CONFIG_HEADER(config.h)
 dnl Checks for programs.
@@ -13,13 +15,11 @@ AC_PROG_INSTALL
 AC_PROG_LIBTOOL
 
 
-dnl GNU C library
-AC_GNU_SOURCE
 
 dnl Checks for header files.
 AC_HEADER_STDC
 dnl AC_CHECK_HEADERS(errno.h stdlib.h stdio.h assert.h string.h netinet/in.h assert.h errno.h fcntl.h net/ethernet.h netdb.h pcap.h stdio.h stdlib.h string.h sys/stat.h sys/types.h sys/socket.h sys/un.h unistd.h time.h sys/ioctl.h net/bpf.h pcap.h zlib.h pcap-bpf.h)
-AC_CHECK_HEADERS(pcap.h zlib.h pcap-bpf.h net/bpf.h)
+AC_CHECK_HEADERS(pcap.h zlib.h pcap-bpf.h net/bpf.h sys/limits.h)
 
 dnl Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST

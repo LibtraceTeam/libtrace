@@ -31,7 +31,6 @@
 #ifndef LIBTRACE_H
 #define LIBTRACE_H
 
-#include <features.h>
 #include <sys/types.h>
 #include <netinet/in.h>
 
@@ -90,11 +89,11 @@ struct libtrace_packet_t {
 /** Structure for dealing with IP packets */
 struct libtrace_ip
   {
-#if __BYTE_ORDER == __LITTLE_ENDIAN
+#if BYTE_ORDER == __LITTLE_ENDIAN
     unsigned int ip_hl:4;		/**< header length */
     unsigned int ip_v:4;		/**< version */
 #endif
-#if __BYTE_ORDER == __BIG_ENDIAN
+#if BYTE_ORDER == __BIG_ENDIAN
     unsigned int ip_v:4;		/**< version */
     unsigned int ip_hl:4;		/**< header length */
 #endif
@@ -119,7 +118,7 @@ struct libtrace_tcp
     u_int16_t dest;		/**< Destination port */
     u_int32_t seq;		/**< Sequence number */
     u_int32_t ack_seq;		/**< Acknowledgement Number */
-#  if __BYTE_ORDER == __LITTLE_ENDIAN
+#  if BYTE_ORDER == __LITTLE_ENDIAN
     u_int16_t res1:4;		/**< Reserved bits */
     u_int16_t doff:4;		
     u_int16_t fin:1;		/**< FIN */
@@ -129,7 +128,7 @@ struct libtrace_tcp
     u_int16_t ack:1;		/**< ACK flag */
     u_int16_t urg:1;		/**< URG flag */
     u_int16_t res2:2;		/**< Reserved */
-#  elif __BYTE_ORDER == __BIG_ENDIAN
+#  elif BYTE_ORDER == __BIG_ENDIAN
     u_int16_t doff:4;		
     u_int16_t res1:4;
     u_int16_t res2:2;
