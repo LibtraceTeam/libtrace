@@ -130,7 +130,14 @@ struct libtrace_t {
                 pcap_t *pcap;
         } input;
         struct fifo_t *fifo;   
-	void *buf; 
+	struct {
+		void *buf; 
+		unsigned bottom;
+		unsigned top;
+		unsigned diff;
+		unsigned curr;
+		unsigned offset;
+	} dag;
 	struct {
 		void *buffer;
 		int size;
@@ -404,7 +411,7 @@ struct libtrace_t *trace_create(char *uri) {
 						fprintf(stderr,"Cannot open DAG %s: %m\n", libtrace->conn_info.path,errno);
 						exit(0);
 					}
-					if((libtrace->buf = dag_mmap(libtrace->input.fd)) == MAP_FAILED) {
+					if((libtrace->dag.buf = dag_mmap(libtrace->input.fd)) == MAP_FAILED) {
 						fprintf(stderr,"Cannot mmap DAG %s: %m\n", libtrace->conn_info.path,errno);
 						exit(0);
 					}
@@ -447,7 +454,6 @@ void trace_destroy(struct libtrace_t *libtrace) {
 
 static int trace_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
         int numbytes;
-        static unsigned bottom = 0, top, diff, curr = 0, scan;
         static short lctr = 0;
 	struct dag_record_t *recptr = 0;
         int rlen;
@@ -479,21 +485,24 @@ static int trace_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
 				switch(libtrace->format) {
 					case DAG:
 						
-						top = dag_offset(libtrace->input.fd,
-								&bottom,
+						libtrace->dag.top = dag_offset(
+								libtrace->input.fd,
+								&(libtrace->dag.bottom),
 								0);
-						diff = top - bottom;
+						libtrace->dag.diff = libtrace->dag.top -
+							libtrace->dag.bottom;
 						
 						//recptr = (dag_record_t *) ((void *)libtrace->buf + (bottom + curr));
 						//rlen = ntohs(recptr->rlen);
 
 						
-						memcpy(buffer,(void *)(libtrace->buf + (bottom + curr)),diff);
+						//memcpy(buffer,(void *)(libtrace->buf + (bottom + curr)),diff);
 						
 						//buffer=libtrace->buf + (bottom + curr);
 
-						numbytes=diff;
-						bottom=top;
+						numbytes=libtrace->dag.diff;
+						libtrace->dag.bottom = libtrace->dag.top;
+						libtrace->dag.offset = 0;
 						
 						break;
 					default:
@@ -531,6 +540,7 @@ int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *pac
         int size;
         char buf[RP_BUFSIZE];
         struct pcap_pkthdr pcaphdr;
+	dag_record_t *erfptr;
         const u_char *pcappkt;
 	int read_required = 0;
 
@@ -540,6 +550,9 @@ int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *pac
 	}
         assert(libtrace);
         assert(packet);
+	if(packet->buffer == 0) {
+		packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
+	}
 
 	//bzero(buffer,len);
       
@@ -588,7 +601,30 @@ int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *pac
 		packet->size = numbytes + sizeof(dag_record_t);
 		return sizeof(dag_record_t) + numbytes;
 	}
-	
+
+	if (libtrace->format == DAG) {
+		// we can do some zero-copy stuff here
+		while(1) {
+			if (libtrace->dag.diff == 0) {
+				if ((numbytes = trace_read(libtrace,buf,RP_BUFSIZE)) <= 0) 
+					return numbytes;
+			}
+			// DAG always gives us whole packets.
+
+			erfptr = (dag_record_t *) (libtrace->dag.buf + libtrace->dag.offset);
+			size = ntohs(erfptr->rlen);
+
+			assert( (size - sizeof(dag_record_t)) < LIBTRACE_PACKET_BUFSIZE);
+
+			packet->buffer = (void *)erfptr;
+			packet->size = size;
+			libtrace->dag.offset += size;
+			libtrace->dag.diff -= size;
+
+			return (size);
+			
+		}
+	}
 	do {
 		if (fifo_out_available(libtrace->fifo) == 0 || read_required) {
 			if ((numbytes = trace_read(libtrace,buf,RP_BUFSIZE))<=0){
