@@ -686,6 +686,7 @@ struct timeval get_timeval(struct libtrace_t *libtrace, void *buffer, int buflen
         struct timeval tv;
         struct pcap_pkthdr *pcapptr = 0;
 	uint64_t ts;
+	uint32_t seconds;
         switch (libtrace->format) {
 		case PCAPINT:
                 case PCAP:
@@ -698,9 +699,16 @@ struct timeval get_timeval(struct libtrace_t *libtrace, void *buffer, int buflen
                 case ERF:
                 case RTCLIENT:
 		default:
+			// FIXME: This isn't portable to big-endian machines
 			ts = get_erf_timestamp(libtrace,buffer,buflen);
-                        tv.tv_sec = ts >> 32;
-                        tv.tv_usec = ((long)ts)*1000000/UINT_MAX;
+			tv.tv_sec = ts >> 32;		
+			ts = (1000000 * (ts & 0xffffffffULL));
+        		ts += (ts & 0x80000000ULL) << 1;
+        		tv.tv_usec = ts >> 32;
+        		if (tv.tv_usec >= 1000000) {
+                		tv.tv_usec -= 1000000;
+                		tv.tv_sec += 1;
+        		}
 			break;
         }
         return tv;
