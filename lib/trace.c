@@ -60,7 +60,10 @@
 #include <time.h>
 #include <sys/ioctl.h>
 
-#include <stdint.h>
+#ifdef HAVE_STDINT_H
+#  include <stdint.h>
+#endif
+
 #ifdef HAVE_STDDEF_H
 #include <stddef.h>
 #else

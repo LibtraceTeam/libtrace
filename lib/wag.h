@@ -36,14 +36,14 @@ struct wag_event_t {
 	uint32_t timestamp_lo;
 	uint32_t type;
 	uint32_t seq_num;
-	uint8_t payload[];
+	uint8_t payload[1];
 };
 
 struct wag_data_event_t {
 	uint32_t rx_params;
 	uint32_t rx_rssi;
 	uint32_t frame_length;
-	uint8_t data[];
+	uint8_t data[1];
 };
 
 struct ieee_802_11_header {
@@ -64,12 +64,12 @@ struct ieee_802_11_header {
 	uint8_t      mac3[6];
 	uint16_t     SeqCtl;
 	uint8_t      mac4[6];
-	uint8_t	     data[];
+	uint8_t	     data[1];
 };
 
 struct ieee_802_11_payload {
 	uint16_t     type;
-	uint8_t	     data[];
+	uint8_t	     data[1];
 };
 
 #endif
