@@ -5,7 +5,7 @@
 /* #undef HAVE_DAGAPI_H */
 
 /* define if you have a DAG API */
-#define HAVE_DAG_API 1
+/* #undef HAVE_DAG_API */
 
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #define HAVE_DLFCN_H 1
@@ -20,10 +20,10 @@
 #define HAVE_MEMORY_H 1
 
 /* Define to 1 if you have the <net/bpf.h> header file. */
-#define HAVE_NET_BPF_H 1
+/* #undef HAVE_NET_BPF_H */
 
 /* Define to 1 if you have the <pcap-bpf.h> header file. */
-/* #undef HAVE_PCAP_BPF_H */
+#define HAVE_PCAP_BPF_H 1
 
 /* Define to 1 if you have the <pcap.h> header file. */
 #define HAVE_PCAP_H 1

@@ -28,6 +28,9 @@
 ##
 ##
 
+- Version 2.0.10
+ 	* Removed some badly licensed code.
+
 - Version 2.0.9
 	* Added improved conditional codepaths for
 		* PCAP 
