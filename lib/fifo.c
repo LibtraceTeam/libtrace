@@ -37,6 +37,13 @@
 #include <string.h> /* bzero */
 #include "fifo.h"
 
+#include <stdint.h>
+#ifdef HAVE_STDDEF_H
+#include <stddef.h>
+#else
+# error "Can't find stddef.h - do you define ptrdiff_t elsewhere"
+#endif
+
 #include <netinet/in.h>
 
 
@@ -204,7 +211,7 @@ static int fifo_read_generic(struct fifo_t *fifo, void *buffer, size_t len, enum
         while (lenleft > 0) {
                 size = MIN( ( fifo->length - fifo->datamap[which]), lenleft);
                 memcpy(buffer, 
-                                (char *)((int)fifo->base + fifo->datamap[which]), 
+                                (char *)((ptrdiff_t)fifo->base + fifo->datamap[which]), 
                                 size);
                 increment_pointer(fifo,which,size);
                 buffer += size;
@@ -231,7 +238,7 @@ int fifo_write(struct fifo_t *fifo, void *buffer, size_t len) {
         lenleft = len;
         while (lenleft > 0) {
                 size = MIN((fifo->length - fifo->datamap[IN]), lenleft );
-                memcpy((char *)((int)fifo->base + fifo->datamap[IN]), 
+                memcpy((char *)((ptrdiff_t)fifo->base + fifo->datamap[IN]), 
                                 buffer, 
                                 size);
                 increment_pointer(fifo,IN,size);

@@ -38,6 +38,12 @@
 /* Define if you have the <pcap.h> header file.  */
 #define HAVE_PCAP_H 1
 
+/* Define if you have the <stddef.h> header file.  */
+#define HAVE_STDDEF_H 1
+
+/* Define if you have the <stdint.h> header file.  */
+#define HAVE_STDINT_H 1
+
 /* Define if you have the <sys/limits.h> header file.  */
 /* #undef HAVE_SYS_LIMITS_H */
 

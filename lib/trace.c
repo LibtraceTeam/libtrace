@@ -60,6 +60,13 @@
 #include <time.h>
 #include <sys/ioctl.h>
 
+#include <stdint.h>
+#ifdef HAVE_STDDEF_H
+#include <stddef.h>
+#else
+# error "Can't find stddef.h - do you define ptrdiff_t elsewhere"
+#endif
+
 #include "libtrace.h"
 #include "fifo.h"
 
@@ -689,7 +696,7 @@ struct libtrace_tcp *trace_get_tcp(struct libtrace_packet_t *packet) {
                 return 0;
         }
         if (ipptr->ip_p == 6) {
-                tcpptr = (struct libtrace_tcp *)((int)ipptr + (ipptr->ip_hl * 4));
+                tcpptr = (struct libtrace_tcp *)((ptrdiff_t)ipptr + (ipptr->ip_hl * 4));
         }
         return tcpptr;
 }
@@ -709,7 +716,7 @@ struct libtrace_udp *trace_get_udp(struct libtrace_packet_t *packet) {
                 return 0;
         }
         if (ipptr->ip_p == 17) {
-                udpptr = (struct libtrace_udp *)((int)ipptr + (ipptr->ip_hl * 4));
+                udpptr = (struct libtrace_udp *)((ptrdiff_t)ipptr + (ipptr->ip_hl * 4));
         }
         return udpptr;
 }
@@ -729,7 +736,7 @@ struct libtrace_icmp *trace_get_icmp(struct libtrace_packet_t *packet) {
                 return 0;
         }
         if (ipptr->ip_p == 1) {
-                icmpptr = (struct libtrace_icmp *)((int)ipptr + (ipptr->ip_hl * 4));
+                icmpptr = (struct libtrace_icmp *)((ptrdiff_t)ipptr + (ipptr->ip_hl * 4));
         }
         return icmpptr;
 }
