@@ -11,7 +11,7 @@ packet = libtrace.Packet()
 
 count = 0
 
-filter = libtrace.Filter("tcp and port 80")
+filter = libtrace.Filter("tcp")
 
 while 1:
 	trace.trace_read_packet(packet)
@@ -22,12 +22,16 @@ while 1:
 	if not ippacket:
 		continue
 
-	tcppacket = packet.trace_get_tcp()
-	if not tcppacket:
-		continue
+	count += 1
+	if count % 10000 == 0:
+		print count
 
-	if not packet.trace_bpf_filter(filter):
-		continue
+	#tcppacket = packet.trace_get_tcp()
+	#if not tcppacket:
+	#	continue
 
-	print ippacket.ip_src,':',tcppacket.source,'->',ippacket.ip_dst,':',tcppacket.dest
+	#if not packet.trace_bpf_filter(filter):
+	#	continue
+
+	#print ippacket.ip_src,':',tcppacket.source,'->',ippacket.ip_dst,':',tcppacket.dest
 
