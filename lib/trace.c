@@ -619,6 +619,20 @@ static int trace_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
 
 }
 
+#if HAVE_PCAP
+void trace_pcap_handler(u_char *user, const struct pcap_pkthdr *pcaphdr, const u_char *pcappkt) {
+	struct libtrace_packet_t *packet = (struct libtrace_packet_t *)user;	
+	void *buffer = packet->buffer;
+	int numbytes = 0;
+	
+	memcpy(buffer,pcaphdr,sizeof(struct pcap_pkthdr));
+	numbytes = pcaphdr->len;
+	memcpy(buffer + sizeof(struct pcap_pkthdr),pcappkt,numbytes);
+
+	packet->size = numbytes + sizeof(struct pcap_pkthdr);
+
+}
+#endif
 /** Read one packet from the trace into buffer
  *
  * @param libtrace 	the libtrace opaque pointer
@@ -658,20 +672,26 @@ int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *pac
 		 * really rather have it all the time. Also, pcap_next
 		 * works differently under freebsd! */
                 //if ((pcappkt = pcap_next(libtrace->input.pcap, &pcaphdr)) == NULL) {
+		/*
                 if ((pcapbytes = pcap_next_ex(libtrace->input.pcap, 
 						&pcaphdr,
 						&pcappkt)) < 0 ) {
+						*/
+		while ((pcapbytes = pcap_dispatch(libtrace->input.pcap,
+						1, /* number of packets */
+						&trace_pcap_handler,
+						(u_char *)packet)) == 0);
+			
+		if (pcapbytes < 0 ) {			
                         return -1;
                 }
-		if (pcapbytes == 0) {
-			return 0;
-		}
-                memcpy(buffer,&pcaphdr,sizeof(struct pcap_pkthdr));
-		numbytes = pcaphdr->len;
-                memcpy(buffer + sizeof(struct pcap_pkthdr),pcappkt,numbytes);
+		return (packet->size - sizeof(struct pcap_pkthdr));
+                //memcpy(buffer,&pcaphdr,sizeof(struct pcap_pkthdr));
+		//numbytes = pcaphdr->len;
+                //memcpy(buffer + sizeof(struct pcap_pkthdr),pcappkt,numbytes);
 	
-		packet->size = numbytes + sizeof(struct pcap_pkthdr);
-		return numbytes;
+		//packet->size = numbytes + sizeof(struct pcap_pkthdr);
+		//return numbytes;
         } 
 #endif 
 
