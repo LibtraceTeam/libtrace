@@ -902,6 +902,10 @@ struct libtrace_ip *trace_get_ip(struct libtrace_packet_t *packet) {
 			{ 
 				
 				struct ieee_802_11_header *wifi = trace_get_link(packet);	
+				if (!wifi) {
+					ipptr = NULL;
+					break;
+				}
 
 				// Data packet?
 				if (wifi->type != 2) {
@@ -921,6 +925,10 @@ struct libtrace_ip *trace_get_ip(struct libtrace_packet_t *packet) {
 			{
 				struct ether_header *eth = 
 					trace_get_link(packet);
+				if (!eth) {
+					ipptr = NULL;
+					break;
+				}
 				if (ntohs(eth->ether_type)!=0x0800) {
 					ipptr = NULL;
 				}
@@ -937,6 +945,10 @@ struct libtrace_ip *trace_get_ip(struct libtrace_packet_t *packet) {
 				struct trace_sll_header_t *sll;
 
 				sll = trace_get_link(packet);
+				if (!sll) {
+					ipptr = NULL;
+					break;
+				}
 				if (ntohs(sll->protocol)!=0x0800) {
 					ipptr = NULL;
 				}
@@ -952,6 +964,10 @@ struct libtrace_ip *trace_get_ip(struct libtrace_packet_t *packet) {
 				// TODO: Find out what ATM does, and return
 				//       NULL for non IP data
 				//       Presumably it uses the normal stuff
+				if (!acm) {
+					ipptr = NULL;
+					break;
+				}
 				ipptr =  (void*)&atm->pload;
 				break;
 			}
@@ -1552,8 +1568,11 @@ int trace_bpf_filter(struct libtrace_filter_t *filter,
 	int clen = 0;
 	assert(filter);
 	assert(packet);
-	linkptr = trace_get_link(packet);	
-	assert(linkptr);
+	linkptr = trace_get_link(packet);
+	if (!linkptr) {
+		return 0;
+	}
+	
 	clen = trace_get_capture_length(packet);
 	
 
@@ -1648,6 +1667,9 @@ int8_t trace_get_direction(const struct libtrace_packet_t *packet) {
 					{
 						struct trace_sll_header_t *sll;
 						sll = trace_get_link(packet);
+						if (!sll) {
+							return -1;
+						}
 						/* 0 == LINUX_SLL_HOST */
 						/* the Waikato Capture point defines "packets
 						 * originating locally" (ie, outbound), with a
