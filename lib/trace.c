@@ -1195,3 +1195,52 @@ int8_t trace_get_direction(struct libtrace_packet_t *packet) {
 	
 }
 
+typedef enum {USE_DEST, USE_SOURCE} serverport_t;
+
+/** Attempt to deduce the 'server' port
+ * @param protocol the IP protocol (eg, 6 or 17 for TCP or UDP)
+ * @param source the TCP or UDP source port
+ * @param dest the TCP or UDP destination port
+ * @returns a hint as to which port is the server port
+ * @author Daniel Lawson
+ */
+#define ROOT_SERVER(x) (x < 512)
+#define ROOT_CLIENT(x) (512 <= x < 1024)
+#define NONROOT_SERVER(x) (x >= 5000)
+#define NONROOT_CLIENT(x) (1024 <= x < 5000)
+#define DYNAMIC(x) (49152 < x < 65535)
+#define SERVER(x) ROOT_SERVER(x) || NONROOT_SERVER(x)
+#define CLIENT(x) ROOT_CLIENT(x) || NONROOT_CLIENT(x) || DYNAMIC(x)
+
+int8_t trace_get_server_port(uint8_t protocol, uint16_t source, uint16_t dest) {
+	/*
+	 * * If the ports are equal, return DEST
+	 * * Check for well-known ports in the given protocol
+	 * * Root server ports: 0 - 511
+	 * * Root client ports: 512 - 1023
+	 * * non-root client ports: 1024 - 4999
+	 * * non-root server ports: 5000+
+	 * * Check for static ranges: 1024 - 49151
+	 * * Check for dynamic ranges: 49152 - 65535
+	 * * flip a coin.
+	 */
+
+	int8_t server, client;
+
+	if (SERVER(source) && CLIENT(dest)) {
+		return USE_SOURCE;
+	} else if (SERVER(dest) && CLIENT(SOURCE)) {
+		return USE_DEST;
+	} else if (ROOT_SERVER(source) && !ROOT_SERVER(dest)) {
+		return USE_SOURCE;
+	} else if (ROOT_SERVER(dest) && !ROOT_SERVER(source)) {
+		return USE_DEST;
+	}
+	
+	// failing that test...
+	if (source < dest) {
+		return USE_SOURCE;
+	} 
+	return USE_DEST;
+	
+}

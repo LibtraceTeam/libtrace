@@ -384,6 +384,18 @@ struct libtrace_filter_t *trace_bpf_setfilter(const char *filterstring);
 int trace_bpf_filter(struct libtrace_filter_t *filter,
 		struct libtrace_packet_t *packet);
 
+
+typedef enum {USE_DEST, USE_SOURCE} serverport_t;
+
+/** hint at the server port in specified protocol
+ * @param protocol	the IP layer protocol, eg 6 (tcp), 17 (udp)
+ * @param source	the source port from the packet
+ * @param dest		the destination port from the packet
+ * @returns one of USE_SOURCE or USE_DEST depending on which one you should use
+ * @author Daniel Lawson
+ */
+int8_t trace_get_server_port(uint8_t protocol, uint16_t source, uint16_t dest);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif // #ifdef __cplusplus
