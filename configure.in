@@ -162,13 +162,17 @@ AC_CACHE_CHECK([location of zlib library],
 CHECK_LIBPCAP
 CHECK_LIBPCAP_PATH
 
-ADD_LIBS="$ADD_LIBS  -l$ac_cv_use_pcap"
-ADD_LDFLAGS="$ADD_LDFLAGS -L$ac_cv_use_pcap_path"
-
+if test "$ac_cv_use_pcap" != no; then
+	ADD_LIBS="$ADD_LIBS  -l$ac_cv_use_pcap"
+	ADD_LDFLAGS="$ADD_LDFLAGS -L$ac_cv_use_pcap_path"
+fi
 CHECK_LIBZ
 CHECK_LIBZ_PATH
-ADD_LIBS="$ADD_LIBS -l$ac_cv_use_zlib"
-ADD_LDFLAGS="$ADD_LDFLAGS -L$ac_cv_use_zlib_path"
+
+if test "$ac_cv_use_zlib" != no; then
+	ADD_LIBS="$ADD_LIBS -l$ac_cv_use_zlib"
+	ADD_LDFLAGS="$ADD_LDFLAGS -L$ac_cv_use_zlib_path"
+fi
 
 AC_SUBST([ADD_LIBS])
 AC_SUBST([ADD_LDFLAGS])

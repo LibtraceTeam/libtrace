@@ -594,8 +594,11 @@ static int trace_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
 					if(feof(libtrace->input.file)) {
 						return 0;
 					}
-					perror("fread");
-					return -1;
+					if(ferror(libtrace->input.file)) {
+						perror("fread");
+						return -1;
+					}
+					return 0;
 				}
 #endif
 		}
