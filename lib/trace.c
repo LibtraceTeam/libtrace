@@ -267,7 +267,7 @@ struct libtrace_t *create_trace(char *uri) {
                                         return 0;
                                 }
                                 unix_sock.sun_family = AF_UNIX;
-                                bzero(unix_sock.sun_path);
+                                bzero(unix_sock.sun_path,108);
                                 snprintf(unix_sock.sun_path,108,"%s",libtrace->conn_info.path);
 
                                 if (connect(libtrace->input.fd, (struct sockaddr *)&unix_sock,
@@ -378,6 +378,8 @@ int libtrace_read_packet(struct libtrace_t *libtrace, void *buffer, size_t len, 
         assert(buffer);
         assert(status);
         assert(len > 104); // we know we see packets this big anyway. Don't be silly.
+
+	bzero(buffer,len);
         
         if (libtrace->format == PCAP || libtrace->format == PCAPINT) {
                 if ((pcappkt = pcap_next(libtrace->input.pcap, &pcaphdr)) == NULL) {
