@@ -43,12 +43,12 @@ extern int	dagoptlval;
 # define	ToAM3		(*(volatile unsigned *)(herd[dagfd].iom+0x4c))
 # define	IOM(OFF)	(*(volatile unsigned *)(herd[dagfd].iom+(OFF)))
 # define	ARMOFFSET(FD)	({ int _off = ToHM4 - dag_info(FD)->phy_addr; \
-					(_off == dag_info(FD)->buf_size) ? 0 : _off; })
+					(_off == herd[FD].rx_memsize) ? 0 : _off; })
 
 # define	CUROFFSET(FD)	({ int _off = pbm->curaddr - dag_info(FD)->phy_addr; \
-					(_off == dag_info(FD)->buf_size) ? 0 : _off; })
+					(_off == herd[FD].rx_memsize) ? 0 : _off; })
 # define	SEGOFFSET(FD)	({ int _off = pbm->segaddr - dag_info(FD)->phy_addr; \
-					(_off == dag_info(FD)->buf_size) ? 0 : _off; })
+					(_off == herd[FD].rx_memsize) ? 0 : _off; })
 # define	PBMOFFSET(FD)	(herd[FD].brokencuraddr ? \
 					SEGOFFSET(FD) : CUROFFSET(FD))
 
@@ -60,7 +60,7 @@ extern int	dagoptlval;
  * a users point of view. A number of fixes are possible, this one appears to be
  * the reliable path to address the problem, for the moment.
  */
-# define	WRSAFE(FD,X)	(((X)<8) ? ((X)+dag_info(FD)->buf_size-8) : ((X)-8))
+# define	WRSAFE(FD,X)	(((X)<8) ? ((X)+herd[FD].rx_memsize-8) : ((X)-8))
 
 /*
  * Need to explain the file descriptor associative array.
@@ -72,12 +72,15 @@ typedef struct sheep {
 	u_char		*iom;		/* IO memory pointer */
 	daginf_t	daginf;
 	unsigned	brokencuraddr;	/* fix for ECMs and Dag4.1s */
-	unsigned        byteswap;       /* endinness for 3.4/3.51ecm */
+	unsigned	byteswap;       /* endinness for 3.4/3.51ecm */
+	unsigned	rx_memaddr;	/* cached rx hole base */
+	unsigned	rx_memsize;	/* cached rx hole size */
 } sheep_t;
 
 static sheep_t	*herd;			/* I was going to call this flock, initially */
 
 static void	panic(char *fmt, ...) __attribute__((noreturn, format (printf, 1, 2)));
+static void	dagpbmcheck(int dagfd);
 
 char *dagpath(char *path, char *temp, int tempsize) {
 	
@@ -115,7 +118,7 @@ dag_open(char *dagname)
 	if((herd[dagfd].dagiom = dag_clone(dagfd, DAGMINOR_IOM)) < 0)
 		panic("dag_open dag_clone dagfd for dagiom: %s\n", strerror(errno));
 
-	if((herd[dagfd].iom = mmap(NULL, 2*PAGE_SIZE, PROT_READ | PROT_WRITE,
+	if((herd[dagfd].iom = mmap(NULL, 16*PAGE_SIZE, PROT_READ | PROT_WRITE,
 					MAP_SHARED, herd[dagfd].dagiom, 0)) == MAP_FAILED)
 		return -1;	/* errno set appropriately */
 
@@ -125,7 +128,23 @@ dag_open(char *dagname)
 int
 dag_close(int dagfd)
 {
+	if (herd[dagfd].buf != NULL) {
+		int		buf_size=0;
+
+		if(dag_info(dagfd)->soft_caps.pbm) {
+			buf_size = ((dagpbm_t *)(herd[dagfd].iom +
+					dag_info(dagfd)->pbm_base))->memsize;
+		} else {
+			buf_size = dag_info(dagfd)->buf_size;
+		}
+		munmap(herd[dagfd].buf, 2*buf_size);
+		herd[dagfd].buf = NULL;
+	}
 	(void)close(herd[dagfd].dagiom);
+	if (herd[dagfd].iom != NULL) {
+		munmap(herd[dagfd].iom, 16*PAGE_SIZE);
+		herd[dagfd].iom = NULL;
+	}
 	memset(&herd[dagfd], 0, sizeof(herd[dagfd]));
 	herd[dagfd].dagiom = -1;
 	return close(dagfd);
@@ -170,7 +189,7 @@ static int	spawn(char *cmd, ...);
 int
 dag_configure(int dagfd, char *params)
 {
-	int	lock, tok, setatm;
+	int	lock, tok, setatm, dagarm, val;
 	char    temp1[80], temp2[80];
 	daggpp_t	*gpp = (daggpp_t *)(herd[dagfd].iom +
 					dag_info(dagfd)->gpp_base);
@@ -243,11 +262,25 @@ dag_configure(int dagfd, char *params)
 	switch(dag_info(dagfd)->device_code) {
 	  case 0x3200:
 		if(armcode(dagfd)) {
-			if(spawn(dagpath("tools/dagrun", temp1, 80), "-d",
-					herd[dagfd].dagname,
-					dagpath("arm/dag3atm-hash.b",
-					temp2, 80), NULL) < 0)
-				return -1;				
+			dagarm=dag_clone(dagfd, DAGMINOR_ARM);
+			if(lseek(dagarm, (off_t)(dag_info(dagfd)->phy_base+(0x5c<<2)), SEEK_SET) < 0)
+				panic("dagioread lseek register 0x%x: %s\n", 0x5c, strerror(errno));
+			if(read(dagarm, &val, sizeof(val)) != sizeof(val))
+				panic("read /dev/dagarmN register 0x%x: %s\n", 0x5c, strerror(errno));
+			close(dagarm);
+			if (val & 0x80) {
+				if(spawn(dagpath("tools/dagrun", temp1, 80), "-d",
+					 herd[dagfd].dagname,
+					 dagpath("arm/dag3pos-full.b",
+						 temp2, 80), NULL) < 0)
+					return -1;				
+			} else {
+				if(spawn(dagpath("tools/dagrun", temp1, 80), "-d",
+					 herd[dagfd].dagname,
+					 dagpath("arm/dag3atm-hash.b",
+						 temp2, 80), NULL) < 0)
+					return -1;				
+			}
 		}
 		break;
 	  case 0x3500:
@@ -277,6 +310,8 @@ dag_configure(int dagfd, char *params)
 		/* normal */
 	  case 0x350e:
 	  case 0x360d:
+	  case 0x360e:
+	  case 0x368e:
 		break;
 		/* byteswapped */
 	  case 0x351c:
@@ -298,6 +333,8 @@ dag_configure(int dagfd, char *params)
 	  case 0x422e:
 	  case 0x423e:
 	  case 0x4230:
+          case 0x4300:
+	  case 0x430e:
 	  case 0x6000:
 	  case 0x6100:
 		/*
@@ -370,7 +407,7 @@ dag_start(int dagfd)
 	if(ioctl(dagfd, DAGIOCLOCK, &lock) < 0)
 		return -1;	/* errno set */
 
-	memset(herd[dagfd].buf, 0, dag_info(dagfd)->buf_size);
+	memset(herd[dagfd].buf, 0, herd[dagfd].rx_memsize);
 
 	switch(dag_info(dagfd)->device_code) {
 	  case 0x3200:
@@ -383,6 +420,8 @@ dag_start(int dagfd)
 	  case 0x341e:
 	  case 0x351c:
 	  case 0x350e:
+	  case 0x360e:
+	  case 0x368e:
 	  case 0x3800:
 	  case 0x4100:
 	  case 0x4110:
@@ -390,6 +429,8 @@ dag_start(int dagfd)
 	  case 0x422e:
 	  case 0x423e:
 	  case 0x4230:
+	  case 0x4300:
+	  case 0x430e:
 	  case 0x6000:
 	  case 0x6100:
 		return dag42start(dagfd);
@@ -418,6 +459,8 @@ dag_stop(int dagfd)
 	  case 0x341e:
 	  case 0x351c:
 	  case 0x350e:
+	  case 0x360e:
+	  case 0x368e:
 	  case 0x3800:
 	  case 0x4100:
 	  case 0x4110:
@@ -425,6 +468,8 @@ dag_stop(int dagfd)
 	  case 0x422e:
 	  case 0x423e:
 	  case 0x4230:
+	  case 0x4300:
+	  case 0x430e:
 	  case 0x6000:
 	  case 0x6100:
 		error = dag42stop(dagfd);
@@ -445,8 +490,29 @@ dag_mmap(int dagfd)
 {
 	void		*sp, *p, *ep;
 	daginf_t	*dip;
+	int		buf_size=0;
+
+	dagpbm_t	*pbm = (dagpbm_t *)(herd[dagfd].iom +
+					dag_info(dagfd)->pbm_base);
 
 	dip = dag_info(dagfd);
+
+	/* check pbm space is configured */
+	dagpbmcheck(dagfd);
+
+	/*
+	 * Get the buffer size from the card if possible, since
+	 * if rx/tx is configured only part of the memory space
+	 * is used for rx. 
+	 * XXX There is currently no way to tell dag_mmap which
+	 * half you want, always supplies first rx region.
+	 */
+	if(dag_info(dagfd)->soft_caps.pbm) {
+		buf_size = pbm->memsize;
+	} else {
+		buf_size = dip->buf_size;
+	}
+
 	/*
 	 * Start off with a fake mapping to allocate contiguous virtual
 	 * address space in one lot for twice the size of the memory buffer,
@@ -455,13 +521,13 @@ dag_mmap(int dagfd)
 	 * the device driver, which would be an alternative solution to the
 	 * problem.
 	 */
-	if((sp = mmap(NULL, 2*dip->buf_size, PROT_READ | PROT_WRITE,
+	if((sp = mmap(NULL, 2*buf_size, PROT_READ | PROT_WRITE,
 			MAP_ANON|MAP_SHARED, -1, 0)) == MAP_FAILED)
 		return MAP_FAILED;
 	/*
 	 * Now map the real buffer, 1st round.
 	 */
-	if((p = mmap(sp, dip->buf_size, PROT_READ | PROT_WRITE,
+	if((p = mmap(sp, buf_size, PROT_READ | PROT_WRITE,
 			MAP_FIXED|MAP_SHARED, dagfd, 0)) == MAP_FAILED)
 		return MAP_FAILED;
 	/*
@@ -469,7 +535,7 @@ dag_mmap(int dagfd)
 	 * feature for handling data records crossing the wrap around the
 	 * top of the memory buffer.
 	 */
-	if((ep = mmap(sp+dip->buf_size, dip->buf_size, PROT_READ|PROT_WRITE,
+	if((ep = mmap(sp+buf_size, buf_size, PROT_READ|PROT_WRITE,
 			MAP_FIXED|MAP_SHARED, dagfd, 0)) == MAP_FAILED)
 		return MAP_FAILED;
 	herd[dagfd].buf = p;
@@ -493,8 +559,8 @@ dag_offset(int dagfd, int *oldoffset, int flags)
 	 * hole, exclusive the top address, which is considered
 	 * zero.
 	 */
-	if(*oldoffset >= dag_info(dagfd)->buf_size)
-		*oldoffset -= dag_info(dagfd)->buf_size;
+	if(*oldoffset >= herd[dagfd].rx_memsize)
+		*oldoffset -= herd[dagfd].rx_memsize;
 
 	if(dag_info(dagfd)->soft_caps.pbm) {
 		/*
@@ -526,11 +592,11 @@ dag_offset(int dagfd, int *oldoffset, int flags)
 		}
 	}
 
-	if(offset > dag_info(dagfd)->buf_size)
+	if(offset > herd[dagfd].rx_memsize)
 		panic("dagapi: dag_offset internal error offset=0x%x\n", offset);
 
 	if(offset < *oldoffset)
-		offset += dag_info(dagfd)->buf_size;
+		offset += herd[dagfd].rx_memsize;
 
 	return offset;
 }
@@ -601,10 +667,8 @@ dag35start(int dagfd)
 		IOM(0x88)  |= (1<<31);		/* L2RESET, will auto deassert */
 
 		pbm->bursttmo = 0xffff;
-		pbm->memaddr = dag_info(dagfd)->phy_addr; /* XXX curaddr bugfix */
-		pbm->memsize = dag_info(dagfd)->buf_size;
 		pbm->segsize = (1024*1024);	/* paranoia, not that it matters */
-		pbm->wrsafe = dag_info(dagfd)->phy_addr + WRSAFE(dagfd, dag_info(dagfd)->buf_size);
+		pbm->wrsafe = dag_info(dagfd)->phy_addr + WRSAFE(dagfd, herd[dagfd].rx_memsize);
 		pbm->cs = (DAGPBM_SYNCL2R|DAGPBM_AUTOWRAP|herd[dagfd].byteswap);
 
 		IOM(0x88)  |= (1<<31);		/* L2RESET, will auto deassert */
@@ -612,8 +676,6 @@ dag35start(int dagfd)
 	}
 
 	if(armcode(dagfd)) {
-	        usleep(1); /* seems necessary to let pbm settle? */
-		IOM(0x404) |=  (1<<23);		/* framer now held in reset */
 		IOM(0x88)  |= (1<<31);		/* L2RESET, will auto deassert */
 
 		ToAM2 = 0;			/* clear command register */
@@ -628,7 +690,6 @@ dag35start(int dagfd)
 
 		while(ToHM2 != 2)
 			usleep(1);
-		IOM(0x404) &= ~(1<<23);		/* deassert framer reset */
 	}
 
 	return 0;
@@ -677,10 +738,8 @@ dag42start(int dagfd)
 	IOM(0x88)  |= (1<<31);		/* L2RESET, will auto deassert */
 
 	pbm->bursttmo = 0xffff;
-	pbm->memaddr = dag_info(dagfd)->phy_addr; /* XXX curaddr bugfix */
-	pbm->memsize = dag_info(dagfd)->buf_size;
 	pbm->segsize = (1024*1024);	/* paranoia, not that it matters */
-	pbm->wrsafe = dag_info(dagfd)->phy_addr + WRSAFE(dagfd, dag_info(dagfd)->buf_size);
+	pbm->wrsafe = dag_info(dagfd)->phy_addr + WRSAFE(dagfd, herd[dagfd].rx_memsize);
 	pbm->cs = (DAGPBM_SYNCL2R|DAGPBM_AUTOWRAP|herd[dagfd].byteswap);
 
 	IOM(0x88)  |= (1<<31);		/* L2RESET, will auto deassert */
@@ -704,6 +763,28 @@ dag42stop(int dagfd)
 	}
 
 	return 0;
+}
+
+static void
+dagpbmcheck(int dagfd)
+{
+	dagpbm_t	*pbm = (dagpbm_t *)(herd[dagfd].iom +
+					dag_info(dagfd)->pbm_base);
+	
+	if(dag_info(dagfd)->soft_caps.pbm) {
+		if((pbm->memaddr & 0xfffffff8) == 0xfffffff8) {
+			/* pbm unconfigured*/
+			pbm->memaddr = dag_info(dagfd)->phy_addr; /* XXX curaddr bugfix */
+			pbm->memsize = dag_info(dagfd)->buf_size;
+		}
+		/* XXX cache actual hole location for dag_offset etc*/
+		herd[dagfd].rx_memaddr = pbm->memaddr;
+		herd[dagfd].rx_memsize = pbm->memsize;
+	} else {
+		/* XXX cache actual hole location for dag_offset etc*/
+		herd[dagfd].rx_memaddr = dag_info(dagfd)->phy_addr;
+		herd[dagfd].rx_memsize = dag_info(dagfd)->buf_size;
+	}
 }
 
 /*

@@ -139,6 +139,8 @@ struct libtrace_t {
 	double start_ts;
 };
 
+#define RP_BUFSIZE 65536
+
 #define URI_PROTO_LINE 16
 static int init_trace(struct libtrace_t **libtrace, char *uri) {
         char *scan = calloc(sizeof(char),URI_PROTO_LINE);
@@ -445,7 +447,7 @@ void trace_destroy(struct libtrace_t *libtrace) {
 
 static int trace_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
         int numbytes;
-        static unsigned bottom = 0, top, diff, curr, scan;
+        static unsigned bottom = 0, top, diff, curr = 0, scan;
         static short lctr = 0;
 	struct dag_record_t *recptr = 0;
         int rlen;
@@ -476,21 +478,22 @@ static int trace_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
 			case DEVICE:
 				switch(libtrace->format) {
 					case DAG:
+						
 						top = dag_offset(libtrace->input.fd,
 								&bottom,
 								0);
 						diff = top - bottom;
-						errno = 0;
-						curr = 0;
 						
-						recptr = (dag_record_t *) ((void *)libtrace->buf + (bottom + curr));
+						//recptr = (dag_record_t *) ((void *)libtrace->buf + (bottom + curr));
+						//rlen = ntohs(recptr->rlen);
 
-						memcpy(buffer,libtrace->buf + (bottom + curr),diff);
+						
+						memcpy(buffer,(void *)(libtrace->buf + (bottom + curr)),diff);
 						
 						//buffer=libtrace->buf + (bottom + curr);
 
 						numbytes=diff;
-						
+						bottom=top;
 						
 						break;
 					default:
@@ -523,7 +526,6 @@ static int trace_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
  * @returns false if it failed to read a packet
  *
  */
-#define RP_BUFSIZE 65536
 int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
         int numbytes;
         int size;
@@ -592,6 +594,7 @@ int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *pac
 			if ((numbytes = trace_read(libtrace,buf,RP_BUFSIZE))<=0){
 				return numbytes; 
 			}
+			assert(libtrace->fifo);
 			fifo_write(libtrace->fifo,buf,numbytes);
 
 			read_required = 0;
