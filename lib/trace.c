@@ -59,6 +59,7 @@
 
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <sys/mman.h>
 #include <unistd.h>
 #include <net/ethernet.h>
 #include <time.h>
@@ -71,7 +72,7 @@
 #endif 
 
 #ifdef HAVE_STDDEF_H
-#include <stddef.h>
+#  include <stddef.h>
 #else
 # error "Can't find stddef.h - do you define ptrdiff_t elsewhere?"
 #endif
@@ -89,11 +90,18 @@
 
 #include <zlib.h>
 #include <pcap.h>
+#include <zlib.h>
 
-#include "dagformat.h"
 
 #include "wag.h"
 
+#ifdef HAVE_DAG_API
+#  include "dagnew.h"
+#  include "dagapi.h"
+#  define DAGDEVICE 1
+#else
+#  include "dagformat.h"
+#endif
 
 
 typedef enum {SOCKET, TRACE, STDIN, DEVICE, INTERFACE, RT } source_t;
@@ -122,6 +130,7 @@ struct libtrace_t {
                 pcap_t *pcap;
         } input;
         struct fifo_t *fifo;   
+	void *buf; 
 	struct {
 		void *buffer;
 		int size;
@@ -133,7 +142,8 @@ struct libtrace_t {
 #define URI_PROTO_LINE 16
 static int init_trace(struct libtrace_t **libtrace, char *uri) {
         char *scan = calloc(sizeof(char),URI_PROTO_LINE);
-        char *uridata = 0;
+        char *uridata = 0;                  
+	struct stat buf;
         
         // parse the URI to determine what sort of event we are dealing with
        
@@ -189,7 +199,6 @@ static int init_trace(struct libtrace_t **libtrace, char *uri) {
                 case PCAP:
                 case ERF:
                 case WAG:
-                case DAG:
                         /*
                          * Can have uridata of the following format
                          * /path/to/socket (probably not PCAP)
@@ -201,7 +210,6 @@ static int init_trace(struct libtrace_t **libtrace, char *uri) {
                         if (!strncmp(uridata,"-",1)) {
                                 (*libtrace)->sourcetype = STDIN;
                         } else {
-                                struct stat buf;
                                 if (stat(uridata,&buf) == -1) {
                                         perror("stat");
                                         return 0;
@@ -216,6 +224,24 @@ static int init_trace(struct libtrace_t **libtrace, char *uri) {
                                 (*libtrace)->conn_info.path = strdup(uridata);
                         }
                         break;
+                case DAG:
+			/* 
+			 * Can have uridata of the following format:
+			 * /dev/device
+			 */
+			if (stat(uridata,&buf) == -1) {
+				perror("stat");
+				return 0;
+			}
+			if (S_ISCHR(buf.st_mode)) {
+				(*libtrace)->sourcetype = DEVICE;
+			} else {
+				fprintf(stderr,"%s isn't a valid char device, exiting\n",uridata);
+				exit(1);
+			}
+			(*libtrace)->conn_info.path = strdup(uridata);
+
+			break;
 
                 case RTCLIENT:
                         /* 
@@ -248,8 +274,8 @@ static int init_trace(struct libtrace_t **libtrace, char *uri) {
         
 
         (*libtrace)->fifo = create_fifo(1048576);
-	(*libtrace)->packet.buffer = 0;
-	(*libtrace)->packet.size = 0;
+	//(*libtrace)->packet.buffer = 0;
+	//(*libtrace)->packet.size = 0;
 
         return 1;
 }
@@ -369,6 +395,22 @@ struct libtrace_t *trace_create(char *uri) {
 						libtrace->conn_info.path,
 						O_RDONLY);
 					break;
+#ifdef DAGDEVICE
+				case DAG:
+					if((libtrace->input.fd = dag_open(libtrace->conn_info.path)) < 0) {
+						fprintf(stderr,"Cannot open DAG %s: %m", libtrace->conn_info.path,errno);
+						exit(0);
+					}
+					if((libtrace->buf = dag_mmap(libtrace->input.fd)) == MAP_FAILED) {
+						fprintf(stderr,"Cannot mmap DAG %s: %m", libtrace->conn_info.path,errno);
+						exit(0);
+					}
+					if(dag_start(libtrace->input.fd) < 0) {
+						fprintf(stderr,"Cannot start DAG %s: %m", libtrace->conn_info.path,errno);
+					}
+					break;
+#endif
+					
 			}
 			break;
                 default:
@@ -398,7 +440,11 @@ void trace_destroy(struct libtrace_t *libtrace) {
 
 static int trace_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
         int numbytes;
-        assert(libtrace);
+        static unsigned bottom = 0, top, diff, curr, scan;
+        static short lctr = 0;
+	struct dag_record_t *recptr = 0;
+        int rlen;
+	assert(libtrace);
         assert(len >= 0);
 
         if (buffer == 0)
@@ -423,11 +469,30 @@ static int trace_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
 				}
 				break;
 			case DEVICE:
-				if ((numbytes=read(libtrace->input.fd, 
+				switch(libtrace->format) {
+					case DAG:
+						top = dag_offset(libtrace->input.fd,
+								&bottom,
+								0);
+						diff = top - bottom;
+						errno = 0;
+						curr = 0;
+						
+						recptr = (dag_record_t *) (libtrace->buf + (bottom + curr));
+						
+						buffer=libtrace->buf + (bottom + curr);
+
+						numbytes=diff;
+						
+						
+						break;
+					default:
+						if ((numbytes=read(libtrace->input.fd, 
 								buffer, 
 								len)) == -1) {
-					perror("read");
-					return -1;
+						perror("read");
+						return -1;
+						}
 				}
 				break;
 			default:
@@ -451,10 +516,11 @@ static int trace_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
  * @returns false if it failed to read a packet
  *
  */
+#define RP_BUFSIZE 65536
 int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
         int numbytes;
         int size;
-        char buf[4096];
+        char buf[RP_BUFSIZE];
         struct pcap_pkthdr pcaphdr;
         const u_char *pcappkt;
 	int read_required = 0;
@@ -487,7 +553,6 @@ int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *pac
         } 
 
 	/* If we're reading from an ERF input, it's an offline trace. We can make some assumptions */
- 	
 	if (libtrace->format == ERF) {
 		void *buffer2 = buffer;
 		// read in the trace header
@@ -517,7 +582,7 @@ int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *pac
 	
 	do {
 		if (fifo_out_available(libtrace->fifo) == 0 || read_required) {
-			if ((numbytes = trace_read(libtrace,buf,4096))<=0){
+			if ((numbytes = trace_read(libtrace,buf,RP_BUFSIZE))<=0){
 				return numbytes; 
 			}
 			fifo_write(libtrace->fifo,buf,numbytes);
@@ -1045,9 +1110,20 @@ uint8_t *trace_get_destination_mac(struct libtrace_packet_t *packet) {
  * which in turn is stored inside the new packet object...
  * @author Perry Lorier
  */
-struct libtrace_eventobj_t libtrace_event(struct libtrace_t *trace, 
+struct libtrace_eventobj_t trace_event(struct libtrace_t *trace, 
 		struct libtrace_packet_t *packet) {
 	struct libtrace_eventobj_t event;
+
+	if (!trace) {
+		fprintf(stderr,"You called trace_event() with a NULL trace object!\n");
+	}
+	assert(trace);
+	assert(packet);
+
+	/* Store the trace we are reading from into the packet opaque
+	 * structure */
+	packet->trace = trace;
+
 	/* Is there a packet ready? */
 	switch (trace->sourcetype) {
 		case INTERFACE:
@@ -1058,23 +1134,29 @@ struct libtrace_eventobj_t libtrace_event(struct libtrace_t *trace,
 					perror("ioctl(FIONREAD)");
 				}
 				if (data>0) {
+					trace_read_packet(trace,packet);
 					event.type = TRACE_EVENT_PACKET;
+					return event;
 				}
 				event.type = TRACE_EVENT_IOWAIT;
+				return event;
 			}
 		case SOCKET:
 		case DEVICE:
 		case RT:
 			{
 				int data;
-				if(ioctl(trace->input.fd,FIONREAD,&data)==-1){
+				event.fd = trace->input.fd;
+				if(ioctl(event.fd,FIONREAD,&data)==-1){
 					perror("ioctl(FIONREAD)");
 				}
 				if (data>0) {
+					trace_read_packet(trace,packet);
 					event.type = TRACE_EVENT_PACKET;
+					return event;
 				}
-				event.fd = trace->input.fd;
 				event.type = TRACE_EVENT_IOWAIT;
+				return event;
 			}
 		case STDIN:
 		case TRACE:
@@ -1089,8 +1171,11 @@ struct libtrace_eventobj_t libtrace_event(struct libtrace_t *trace,
 				ts=trace_get_seconds(packet);
 				if (trace->last_ts!=0) {
 					event.seconds = ts - trace->last_ts;
-					if (event.seconds>time(NULL)-trace->start_ts)
+					if (event.seconds>time(NULL)-trace->start_ts) {
 						event.type = TRACE_EVENT_SLEEP;
+						return event;
+					}
+					
 				}
 				else {
 					trace->start_ts = time(NULL);
@@ -1103,11 +1188,12 @@ struct libtrace_eventobj_t libtrace_event(struct libtrace_t *trace,
 				free(trace->packet.buffer);
 				trace->packet.buffer = 0;
 				event.type = TRACE_EVENT_PACKET;
+				return event;
 			}
 		default:
 			assert(0);
 	}
-	return event;
+	assert(0);
 }
 
 /** setup a BPF filter

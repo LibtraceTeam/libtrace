@@ -17,7 +17,7 @@ AC_PROG_LIBTOOL
 dnl Checks for header files.
 AC_HEADER_STDC
 dnl AC_CHECK_HEADERS(errno.h stdlib.h stdio.h assert.h string.h netinet/in.h assert.h errno.h fcntl.h net/ethernet.h netdb.h pcap.h stdio.h stdlib.h string.h sys/stat.h sys/types.h sys/socket.h sys/un.h unistd.h time.h sys/ioctl.h net/bpf.h pcap.h zlib.h pcap-bpf.h)
-AC_CHECK_HEADERS(pcap.h pcap-bpf.h net/bpf.h zlib.h sys/limits.h stddef.h stdint.h limits.h)
+AC_CHECK_HEADERS(pcap.h pcap-bpf.h net/bpf.h zlib.h sys/limits.h stddef.h stdint.h limits.h dagapi.h)
 	
 dnl Checking for the right bpf header to include
 AC_MSG_CHECKING([where the bpf headers are kept])
@@ -47,6 +47,76 @@ AC_SYS_LARGEFILE
 dnl Checks for library functions.
 AC_PROG_GCC_TRADITIONAL
 AC_CHECK_FUNCS(socket strdup)
+
+
+dnl configure time options for use of DAG cards
+dnl borrowed from libpcap!
+AC_ARG_WITH(dag, 
+	    AC_HELP_STRING([--with-dag[=DIR]],
+			   [include DAG support (located in directory DIR, if supplied)]),
+[
+        if test "$withval" = no
+        then
+                want_dag=no
+        elif test "$withval" = yes
+        then
+                want_dag=yes
+                dag_root=
+        else
+                want_dag=yes
+                dag_root=$withval
+        fi
+],[
+        #
+        # Use DAG API if present, otherwise don't
+        #
+        want_dag=ifpresent
+        dag_root=
+])
+
+ac_cv_lbl_dag_api=no
+if test "$with_dag" != no; then
+        AC_MSG_CHECKING(whether we have DAG API)
+
+        if test -z "$dag_root"; then
+                dag_root=$srcdir/../dag
+        fi
+
+	if test -r "$dag_root/lib"; then
+		dag_lib_dir="$dag_root/lib"
+	else
+		dag_lib_dir="$dag_root"
+	fi
+
+        if test -r "$dag_root/tools" -a -r "$dag_root/include"; then
+                dag_tools_dir="$dag_root/tools"
+                dag_include_dir="$dag_root/include"
+        else
+                dag_tools_dir="$dag_root"
+                dag_include_dir="$dag_root"
+        fi
+
+        if test -r "$dag_include_dir/dagapi.h" -a -r "$dag_lib_dir/libdag.a"; 
+then
+                ADD_INCLS="$ADD_INCLS -I $dag_include_dir"
+		ADD_LIBS="$ADD_LIBS -ldag"
+		ADD_LDFLAGS="$ADD_LDFLAGS -L$dag_lib_dir"
+                #ADD_LIBS="$ADD_LIBS $dag_tools_dir/dagapi.o $dag_tools_dir/dagopts.o"
+                #ADD_SOURCEES="$ADD_SOURCES $dag_tools_dir/dagapi.c $dag_tools_dir/dagopts.c"
+                ac_cv_lbl_dag_api=yes
+        else
+                ac_cv_lbl_dag_api=no
+        fi
+        AC_MSG_RESULT($ac_cv_lbl_dag_api)
+        if test $ac_cv_lbl_dag_api = no; then
+                if test "$want_dag" = yes; then
+                        AC_MSG_ERROR(DAG API not found under directory $dag_root
+; use --without-dag)
+                fi
+        else
+                AC_DEFINE(HAVE_DAG_API, 1, [define if you have a DAG API])
+        fi
+fi
 
 
 
@@ -86,22 +156,22 @@ AC_DEFUN([CHECK_LIBZ_PATH],
 AC_CACHE_CHECK([location of zlib library],
 	       [ac_cv_use_zlib_path], [ac_cv_use_zlib_path=/usr/lib])])
 
+
+
 CHECK_LIBPCAP
 CHECK_LIBPCAP_PATH
+
+ADD_LIBS="$ADD_LIBS  -l$ac_cv_use_pcap"
+ADD_LDFLAGS="$ADD_LDFLAGS -L$ac_cv_use_pcap_path"
+
 CHECK_LIBZ
 CHECK_LIBZ_PATH
+ADD_LIBS="$ADD_LIBS -l$ac_cv_use_zlib"
+ADD_LDFLAGS="$ADD_LDFLAGS -L$ac_cv_use_zlib_path"
 
-LIBPCAP=-l$ac_cv_use_pcap
-LIBPCAP_PATH=-L$ac_cv_use_pcap_path
-
-AC_SUBST([LIBPCAP])
-AC_SUBST([LIBPCAP_PATH])
-
-LIBZ=-l$ac_cv_use_zlib
-LIBZ_PATH=-L$ac_cv_use_zlib_path
-AC_SUBST([LIBZ])
-AC_SUBST([LIBZ_PATH])
-
+AC_SUBST([ADD_LIBS])
+AC_SUBST([ADD_LDFLAGS])
+AC_SUBST([ADD_INCLS])
 
 dnl and finally, output our Makefiles
 AC_OUTPUT(Makefile lib/Makefile)
