@@ -30,6 +30,7 @@
 
 - Version 2.0.2
 	* Port to AMD64. Should also work on IA64
+	* Will compile cleanly under gcc-2.95 (Debian Woody)
 
 - Version 2.0.1
 	* Port to FreeBSD. Thanks to Phil Murray for testing this
