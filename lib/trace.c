@@ -1032,12 +1032,10 @@ uint8_t *trace_get_destination_mac(struct libtrace_packet_t *packet) {
 
 
 /** process a libtrace event
- * @param libtrace the libtrace opaque pointer
+ * @param trace the libtrace opaque pointer
+ * @param packet the libtrace_packet opaque pointer
  * @param fd a pointer to a file descriptor to listen on
  * @param seconds a pointer the time in seconds since to the next event
- * @param buffer a pointer to a filled in buffer
- * @param len the length of the buffer
- * @param size the size of the event 
  * @returns
  *  TRACE_EVENT_IOWAIT	Waiting on I/O on <fd>
  *  TRACE_EVENT_SLEEP	Next event in <seconds>
@@ -1047,23 +1045,21 @@ uint8_t *trace_get_destination_mac(struct libtrace_packet_t *packet) {
  * @author Perry Lorier
  */
 libtrace_event_t libtrace_event(struct libtrace_t *trace, 
-		struct libtrace_packet_t *packet,
-			int *fd,double *seconds) {
-	*seconds = 0;
-	*fd = 0;
+		struct libtrace_packet_t *packet) {
+	libtrace_event_t event;
 	/* Is there a packet ready? */
 	switch (trace->sourcetype) {
 		case INTERFACE:
 			{
 				int data;
-				*fd = pcap_fileno(trace->input.pcap);
-				if(ioctl(*fd,FIONREAD,&data)==-1){
+				event.fd = pcap_fileno(trace->input.pcap);
+				if(ioctl(event.fd,FIONREAD,&data)==-1){
 					perror("ioctl(FIONREAD)");
 				}
 				if (data>0) {
-					return TRACE_EVENT_PACKET;
+					event.type = TRACE_EVENT_PACKET;
 				}
-				return TRACE_EVENT_IOWAIT;
+				event.type = TRACE_EVENT_IOWAIT;
 			}
 		case SOCKET:
 		case DEVICE:
@@ -1074,10 +1070,10 @@ libtrace_event_t libtrace_event(struct libtrace_t *trace,
 					perror("ioctl(FIONREAD)");
 				}
 				if (data>0) {
-					return TRACE_EVENT_PACKET;
+					event.type = TRACE_EVENT_PACKET;
 				}
-				*fd = trace->input.fd;
-				return TRACE_EVENT_IOWAIT;
+				event.fd = trace->input.fd;
+				event.type = TRACE_EVENT_IOWAIT;
 			}
 		case STDIN:
 		case TRACE:
@@ -1091,9 +1087,9 @@ libtrace_event_t libtrace_event(struct libtrace_t *trace,
 				}
 				ts=trace_get_seconds(packet);
 				if (trace->last_ts!=0) {
-					*seconds = ts - trace->last_ts;
-					if (*seconds>time(NULL)-trace->start_ts)
-						return TRACE_EVENT_SLEEP;
+					event.seconds = ts - trace->last_ts;
+					if (event.seconds>time(NULL)-trace->start_ts)
+						event.type = TRACE_EVENT_SLEEP;
 				}
 				else {
 					trace->start_ts = time(NULL);
@@ -1105,13 +1101,12 @@ libtrace_event_t libtrace_event(struct libtrace_t *trace,
 
 				free(trace->packet.buffer);
 				trace->packet.buffer = 0;
-				return TRACE_EVENT_PACKET;
+				event.type = TRACE_EVENT_PACKET;
 			}
 		default:
 			assert(0);
 	}
-	/* Shouldn't get here */
-	assert(0);
+	return event;
 }
 
 /** setup a BPF filter

@@ -357,16 +357,29 @@ typedef enum {
 	TRACE_EVENT_IOWAIT,
 	TRACE_EVENT_SLEEP,
 	TRACE_EVENT_PACKET
+} libtrace_eventtype_t;
+
+typedef struct {
+	libtrace_eventtype_t type;
+	int fd;
+	double seconds;
 } libtrace_event_t;
 
 /** process a libtrace event
- * @returns
+ * @param trace the libtrace opaque pointer
+ * @param packet the libtrace_packet opaque pointer
+ * @param fd a pointer to a file descriptor to listen on
+ * @param seconds a pointer the time in seconds since to the next event
+ * @returns libtrace_event struct containing the type, and potential
+ * 	fd or seconds to sleep on
+ *
+ * Type can be:
  *  TRACE_EVENT_IOWAIT	Waiting on I/O on <fd>
  *  TRACE_EVENT_SLEEP	Next event in <seconds>
  *  TRACE_EVENT_PACKET	Packet arrived in <buffer> with size <size>
  */
-libtrace_event_t trace_event(struct libtrace_packet_t *packet,
-		int *fd,double *seconds);
+libtrace_event_t trace_event(struct libtrace_t *trace,
+		struct libtrace_packet_t *packet);
 
 /** setup a BPF filter
  * @param filterstring a char * containing the bpf filter string
