@@ -290,6 +290,7 @@ struct libtrace_t *trace_create(char *uri) {
                 case TRACE:
                         if (libtrace->format == PCAP) {
                                 libtrace->input.pcap = pcap_open_offline(libtrace->conn_info.path, errbuf); 
+				//TODO Check that the open succeeded
                         } else {
                                 libtrace->input.file = gzopen(libtrace->conn_info.path, "r");
                         }
