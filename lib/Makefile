@@ -9,7 +9,7 @@ LDLIBS = $(libdir) -lpcapl -lzl
 
 
 CURRENT=1
-REVISION=1
+REVISION=2
 AGE=0
 
 INCLIBS=/usr/local/wand/lib/libzl.a /usr/local/wand/lib/libpcapl.a

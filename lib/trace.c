@@ -37,7 +37,7 @@
 
 typedef enum {SOCKET, TRACE, STDIN, DEVICE, INTERFACE, RT } source_t;
 
-typedef enum {ERF, PCAP, DAG, RTCLIENT, WAG } format_t;
+typedef enum {ERF, PCAP, PCAPINT, DAG, RTCLIENT, WAG, WAGINT } format_t;
 
 struct libtrace_t {
         format_t format;
@@ -85,12 +85,16 @@ static int init_trace(struct libtrace_t **libtrace, char *uri) {
 
         if (!strncasecmp(scan,"erf",3)) {
                 (*libtrace)->format=ERF;
+        } else if (!strncasecmp(scan,"pcapint",7)) {
+                (*libtrace)->format=PCAPINT;
         } else if (!strncasecmp(scan,"pcap",4)) {
                 (*libtrace)->format=PCAP;
         } else if (!strncasecmp(scan,"dag",3)) {
                 (*libtrace)->format=DAG;
         } else if (!strncasecmp(scan,"rtclient",7)) {
                 (*libtrace)->format=RTCLIENT;
+	} else if (!strncasecmp(scan,"wagint",6)) {
+		(*libtrace)->format=WAGINT;
 	} else if (!strncasecmp(scan,"wag",3)) {
 		(*libtrace)->format=WAG;
         } else {
@@ -105,6 +109,16 @@ static int init_trace(struct libtrace_t **libtrace, char *uri) {
         // libtrace->uridata contains the appropriate data for this
         
         switch((*libtrace)->format) {
+		case PCAPINT:
+		case WAGINT:
+			/* Can have uridata of the following format
+			 * eth0
+			 * etc
+			 */
+			// We basically assume this is correct.
+			(*libtrace)->sourcetype = INTERFACE;	
+			(*libtrace)->conn_info.path = strdup(uridata);
+			break;
                 case PCAP:
                 case ERF:
                 case WAG:
@@ -264,7 +278,9 @@ struct libtrace_t *create_trace(char *uri) {
                         }
                         break;
                 case DEVICE:
+		case INTERFACE:
 			switch (libtrace->format) {
+				case PCAPINT:
 				case PCAP:
 					libtrace->input.pcap = pcap_open_live(
 						libtrace->conn_info.path,
@@ -275,6 +291,7 @@ struct libtrace_t *create_trace(char *uri) {
 					break;
 				default:
 					fprintf(stderr,"Unknown format trace, hoping I can just read\n");
+				case WAGINT:
 				case WAG:
 					libtrace->input.fd = open(
 						libtrace->conn_info.path,
@@ -295,7 +312,7 @@ struct libtrace_t *create_trace(char *uri) {
  */
 void destroy_trace(struct libtrace_t *libtrace) {
         assert(libtrace);
-        if (libtrace->format == PCAP) {
+        if (libtrace->format == PCAP || libtrace->format == PCAPINT) {
                 pcap_close(libtrace->input.pcap);
         } else if (libtrace->sourcetype == SOCKET || libtrace->sourcetype == RT) {
                 close(libtrace->input.fd);
@@ -362,7 +379,7 @@ int libtrace_read_packet(struct libtrace_t *libtrace, void *buffer, size_t len, 
         assert(status);
         assert(len > 104); // we know we see packets this big anyway. Don't be silly.
         
-        if (libtrace->format == PCAP) {
+        if (libtrace->format == PCAP || libtrace->format == PCAPINT) {
                 if ((pcappkt = pcap_next(libtrace->input.pcap, &pcaphdr)) == NULL) {
                         return -1;
                 }
@@ -469,9 +486,11 @@ void *get_link(struct libtrace_t *libtrace, void *buffer, int buflen) {
 			else
 				ethptr = ((uint8_t *)buffer + 16 + 2);
                         break;
-                case PCAP:
+		case PCAPINT:
+		case PCAP:
                         ethptr = (struct ether_header *)(buffer + sizeof(struct pcap_pkthdr));
                         break;
+		case WAGINT:
 		case WAG:
 			switch (event->type) {
 				case 0x0:
@@ -632,11 +651,13 @@ uint64_t get_erf_timestamp(struct libtrace_t *libtrace, void *buffer, int buflen
                         erfptr = (dag_record_t *)buffer;
 			timestamp = erfptr->ts;
                         break;
+		case PCAPINT:
                 case PCAP:
                         pcapptr = (struct pcap_pkthdr *)buffer;
 			timestamp = ((((uint64_t)pcapptr->ts.tv_sec) << 32) + \
 				(pcapptr->ts.tv_usec*UINT_MAX/1000000));
                         break;
+		case WAGINT:
 		case WAG:
 			wagptr = buffer;
 			timestamp = wagptr->timestamp_lo;
@@ -664,10 +685,12 @@ struct timeval get_timeval(struct libtrace_t *libtrace, void *buffer, int buflen
         struct pcap_pkthdr *pcapptr = 0;
 	uint64_t ts;
         switch (libtrace->format) {
+		case PCAPINT:
                 case PCAP:
                         pcapptr = (struct pcap_pkthdr *)buffer;
                         tv = pcapptr->ts;
                         break;
+		case WAGINT:
 		case WAG:
                 case DAG:
                 case ERF:
@@ -717,9 +740,11 @@ int get_capture_length(struct libtrace_t *libtrace, void *buffer, int buflen) {
 		case RTCLIENT:
 			erfptr = (dag_record_t *)buffer;
 			return ntohs(erfptr->rlen);
+		case PCAPINT:
 		case PCAP:
 			pcapptr = (struct pcap_pkthdr *)buffer;
 			return ntohs(pcapptr->caplen);
+		case WAGINT:
 		case WAG:
 			wag_event = buffer;
 			switch(wag_event->type) {
@@ -758,10 +783,12 @@ int get_wire_length(struct libtrace_t *libtrace, void *buffer, int buflen){
 			erfptr = (dag_record_t *)buffer;
 			return ntohs(erfptr->wlen);
 			break;
+		case PCAPINT:
 		case PCAP:
 			pcapptr = (struct pcap_pkthdr *)buffer;
 			return ntohs(pcapptr->len);
 		 	break;
+		case WAGINT:
 		case WAG:
 			wag_event = buffer;
 			switch(wag_event->type) {
@@ -803,6 +830,7 @@ libtrace_linktype_t get_link_type(
 			return erfptr->type;
 			
 			break;
+		case PCAPINT:
 		case PCAP:
 			pcapptr = (struct pcap_pkthdr *)buffer;
 			linktype = pcap_datalink(libtrace->input.pcap);
@@ -815,6 +843,7 @@ libtrace_linktype_t get_link_type(
 					return TRACE_TYPE_80211;
 			}
 		 	break;
+		case WAGINT:
 		case WAG:
 			return TRACE_TYPE_80211;
 	}
