@@ -30,6 +30,10 @@
 
 #ifndef _LIBTRACE_H_
 #define _LIBTRACE_H_
+
+#ifdef __cplusplus 
+extern "C" { 
+#endif
 /** @file
  *
  * @brief Trace file processing library header
@@ -388,7 +392,7 @@ typedef enum {
  */
 libtrace_event_t libtrace_event(struct libtrace_t *trace,
 			int *fd,double *seconds,
-			void *buffer, int *size);
+			void *buffer, size_t len, int *size);
 
 /** setup a BPF filter
  * @param filterstring a char * containing the bpf filter string
@@ -410,5 +414,7 @@ int libtrace_bpf_filter(struct libtrace_t *trace,
 			void *buffer, 
 			int buflen);
 
-
+#ifdef __cplusplus
+} // extern "C"
+#endif // #ifdef _cplusplus
 #endif // _LIBTRACE_H_
