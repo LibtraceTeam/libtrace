@@ -42,6 +42,11 @@ typedef enum {SOCKET, TRACE, STDIN, DEVICE, INTERFACE, RT } source_t;
 
 typedef enum {ERF, PCAP, PCAPINT, DAG, RTCLIENT, WAG, WAGINT } format_t;
 
+struct libtrace_filter_t {
+	struct bpf_insn *filter;
+	char * filterstring;
+};
+
 struct libtrace_t {
         format_t format;
         source_t sourcetype;
@@ -63,8 +68,6 @@ struct libtrace_t {
 		void *buffer;
 		int size;
 	} packet;
-	struct bpf_insn *filter;
-	char * filterstring;
 	double last_ts;
 	double start_ts;
 };
@@ -1009,33 +1012,39 @@ libtrace_event_t libtrace_event(struct libtrace_t *trace,
 	assert(0);
 }
 
-/** apply a BPF filter
- * @param libtrace the libtrace opaque pointer
+/** setup a BPF filter
  * @param filterstring a char * containing the bpf filter string
- * @returns null
- * 
+ * @returns opaque pointer pointer to a libtrace_filter_t object
  * @author Daniel Lawson
  */
-void libtrace_bpf_setfilter(struct libtrace_t *trace, char *filterstring) {
-	trace->filterstring = strdup(filterstring);
+struct libtrace_filter_t *libtrace_bpf_setfilter(const char *filterstring) {
+	struct libtrace_filter_t *filter = malloc(sizeof(struct libtrace_filter_t));
+	filter->filterstring = strdup(filterstring);
+	return filter;
 }
 
 /** apply a BPF filter
  * @param libtrace the libtrace opaque pointer
+ * @param filter the filter opaque pointer
  * @param buffer a pointer to a filled buffer
  * @param buflen the length of the buffer
  * @returns 0 if the filter fails, 1 if it succeeds
  * @author Daniel Lawson
  */
 int libtrace_bpf_filter(struct libtrace_t *trace, 
+			struct libtrace_filter_t *filter,
 			void *buffer, 
 			int buflen) {
 	
 	int linktype = get_link_type(trace,buffer,buflen);
 	void *linkptr = get_link(trace,buffer,buflen);	
 	int clen = get_capture_length(trace,buffer,buflen);
+	assert(trace);
+	assert(filter);
+	assert(buffer);
+	
 
-	if (trace->filterstring && ! trace->filter) {
+	if (filter->filterstring && ! filter->filter) {
 		pcap_t *pcap;
 		struct bpf_program bpfprog;
 
@@ -1049,16 +1058,16 @@ int libtrace_bpf_filter(struct libtrace_t *trace,
 		}		
 
 		// build filter
-		if (pcap_compile( pcap, &bpfprog, trace->filterstring, 1, 0)) {
+		if (pcap_compile( pcap, &bpfprog, filter->filterstring, 1, 0)) {
 			printf("bpf compilation error: %s\n", 
 				pcap_geterr(pcap));
 			assert(0);
 		}
 		pcap_close(pcap);
-		trace->filter = bpfprog.bf_insns;	
+		filter->filter = bpfprog.bf_insns;	
 	}
 
-	return bpf_filter(trace->filter, linkptr, clen, clen);
+	return bpf_filter(filter->filter, linkptr, clen, clen);
 }
 
 

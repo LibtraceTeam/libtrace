@@ -37,6 +37,9 @@
 /** Opaque structure holding information about a trace */
 struct libtrace_t;
         
+/** Opaque structure holding information about a bpf filter */
+
+struct libtrace_filter_t;
 /** Structure for dealing with IP packets */
 struct libtrace_ip
   {
@@ -347,21 +350,22 @@ libtrace_event_t libtrace_event(struct libtrace_t *trace,
 			void *buffer, int *size);
 
 /** setup a BPF filter
- * @param libtrace the libtrace opaque pointer
  * @param filterstring a char * containing the bpf filter string
- * @returns null
+ * @returns opaque pointer pointer to a libtrace_filter_t object
  * @author Daniel Lawson
  */
-void libtrace_bpf_setfilter(struct libtrace_t *trace, char *filterstring);
+struct libtrace_filter_t *libtrace_bpf_setfilter(const char *filterstring);
 
 /** apply a BPF filter
  * @param libtrace the libtrace opaque pointer
+ * @param filter the filter opaque pointer
  * @param buffer a pointer to a filled buffer
  * @param buflen the length of the buffer
  * @returns the return value from bpf_filter
  * @author Daniel Lawson
  */
-int libtrace_bpf_filter(struct libtrace_t *trace, 
+int libtrace_bpf_filter(struct libtrace_t *trace,
+			struct libtrace_filter_t *filter,
 			void *buffer, 
 			int buflen);
 
