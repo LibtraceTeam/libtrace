@@ -183,11 +183,18 @@ struct libtrace_packet_t {};
 	libtrace_linktype_t trace_get_link_type() {
 		return trace_get_link_type(self);
 	}
-	uint8_t trace_get_direction() {
+	int8_t trace_get_direction() {
 		return trace_get_direction(self);
+	}
+	int8_t trace_set_direction(int8_t direction) {
+		return trace_set_direction(self,direction);
 	}
 	int trace_bpf_filter(struct libtrace_filter_t *filter) {
 		return trace_bpf_filter(filter,self);
+	}
+	uint8_t trace_get_server_port(uint8_t protocol, uint16_t source,
+			uint16_t dest) {
+		return trace_get_server_port(protocol,source,dest);
 	}
 	
 };

@@ -662,19 +662,21 @@ int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *pac
 	/* If we're reading from an ERF input, it's an offline trace. We can make some assumptions */
 	if (libtrace->format == ERF) {
 		void *buffer2 = buffer;
+		int rlen;
 		// read in the trace header
 		if ((numbytes=gzread(libtrace->input.file,
 						buffer,
-						sizeof(dag_record_t))) == -1) {
+						dag_record_size)) == -1) {
 			perror("gzread");
 			return -1;
 		}
 		if (numbytes == 0) {
 			return 0;
 		}
-		size = ntohs(((dag_record_t *)buffer)->rlen) - sizeof(dag_record_t);
+		rlen = ntohs(((dag_record_t *)buffer)->rlen);
+		size = rlen - dag_record_size;
 		assert(size < LIBTRACE_PACKET_BUFSIZE);
-		buffer2 = buffer +  sizeof(dag_record_t);
+		buffer2 = buffer +  dag_record_size;
 
 		// read in the rest of the packet
 		if ((numbytes=gzread(libtrace->input.file,
@@ -683,8 +685,12 @@ int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *pac
 			perror("gzread");
 			return -1;
 		}
-		packet->size = numbytes + sizeof(dag_record_t);
-		return sizeof(dag_record_t) + numbytes;
+		if ((numbytes + dag_record_size) != rlen) {
+			printf("read %d wanted %d\n",numbytes +dag_record_size, rlen);
+		}
+		packet->size = rlen;
+			
+		return rlen;
 	}
 
 #ifdef DAGDEVICE
@@ -738,7 +744,7 @@ int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *pac
 				fifo_out_update(libtrace->fifo,sizeof(int));
 
 				/* FALL THRU */
-			//case ERF:
+			case ERF:
 			//case DAG:
 				// read in the erf header
 				if ((numbytes = fifo_out_read(libtrace->fifo, buffer, sizeof(dag_record_t))) == 0) {
@@ -917,7 +923,7 @@ struct libtrace_tcp *trace_get_tcp(struct libtrace_packet_t *packet) {
         if(!(ipptr = trace_get_ip(packet))) {
                 return 0;
         }
-        if (ipptr->ip_p == 6) {
+        if ((ipptr->ip_p == 6) && (ipptr->ip_off == 0 )) {
                 tcpptr = (struct libtrace_tcp *)((ptrdiff_t)ipptr + (ipptr->ip_hl * 4));
         }
         return tcpptr;

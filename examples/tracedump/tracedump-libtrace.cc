@@ -17,7 +17,7 @@ int main(int argc,char **argv)
 	if (argc>2)
 		filter=trace_bpf_setfilter(argv[2]);
 
-	while(trace_read_packet(trace,&packet)!=-1) {
+	while(trace_read_packet(trace,&packet)> 0 ){
 		time_t sec = (time_t)trace_get_seconds(&packet);
 		char *link=(char *)trace_get_link(&packet);
 		if (filter && !trace_bpf_filter(filter,&packet))
