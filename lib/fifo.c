@@ -37,9 +37,12 @@
 #include <string.h> /* bzero */
 #include "fifo.h"
 
-#include <stdint.h>
+#ifdef HAVE_STDINT_H
+# include <stdint.h>
+#endif
+
 #ifdef HAVE_STDDEF_H
-#include <stddef.h>
+# include <stddef.h>
 #else
 # error "Can't find stddef.h - do you define ptrdiff_t elsewhere"
 #endif
