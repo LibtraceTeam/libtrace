@@ -4,6 +4,9 @@ Installing libtrace:
 ----------------------------------
 To make and install libtrace:
 
+libtrace requires the dev versions of libpcap and libz to compile
+(on Debian Woody these are libpcap-dev and zlib1g-dev)
+
 tar zxvf libtrace-x.y.z.tar.gz
 cd libtrace-x.y.z
 ./configure
@@ -13,7 +16,8 @@ make install
 
 
 
-You may need to run 'ldconfig' as root.
+You may need to add the line '/usr/local/lib' to your /etc/ld.so.conf and
+run 'ldconfig' as root.
 
 ----------------------------------
 To build the docs:
