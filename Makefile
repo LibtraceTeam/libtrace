@@ -13,7 +13,7 @@
 
 
 
-SHELL = /bin/sh
+SHELL = /usr/local/bin/bash
 
 srcdir = .
 top_srcdir = .
@@ -38,12 +38,12 @@ pkglibdir = $(libdir)/libtrace
 pkgincludedir = $(includedir)/libtrace
 top_builddir = .
 
-ACLOCAL = ${SHELL} /home/daniel/libtrace/missing --run aclocal
-AUTOCONF = ${SHELL} /home/daniel/libtrace/missing --run autoconf
-AUTOMAKE = ${SHELL} /home/daniel/libtrace/missing --run automake
-AUTOHEADER = ${SHELL} /home/daniel/libtrace/missing --run autoheader
+ACLOCAL = ${SHELL} /home/dlawson/libtrace/missing --run aclocal
+AUTOCONF = ${SHELL} /home/dlawson/libtrace/missing --run autoconf
+AUTOMAKE = ${SHELL} /home/dlawson/libtrace/missing --run automake
+AUTOHEADER = ${SHELL} /home/dlawson/libtrace/missing --run autoheader
 
-INSTALL = /bin/install -c
+INSTALL = /usr/bin/install -c
 INSTALL_PROGRAM = ${INSTALL}
 INSTALL_DATA = ${INSTALL} -m 644
 INSTALL_SCRIPT = ${INSTALL}
@@ -56,14 +56,14 @@ NORMAL_UNINSTALL = :
 PRE_UNINSTALL = :
 POST_UNINSTALL = :
 host_alias = 
-host_triplet = i686-pc-linux-gnu
+host_triplet = i386-unknown-freebsd5.2.1
 ADD_INCLS = 
 ADD_LDFLAGS =  -L/usr/lib -L/usr/lib
 ADD_LIBS =   -lpcap -lz
-AMTAR = ${SHELL} /home/daniel/libtrace/missing --run tar
+AMTAR = ${SHELL} /home/dlawson/libtrace/missing --run tar
 AR = ar
 AS = @AS@
-AWK = gawk
+AWK = nawk
 CC = gcc
 CXX = g++
 CXXCPP = g++ -E
@@ -73,7 +73,7 @@ DLLTOOL = @DLLTOOL@
 ECHO = echo
 EGREP = grep -E
 EXEEXT = 
-F77 = 
+F77 = f77
 GCJ = @GCJ@
 GCJFLAGS = @GCJFLAGS@
 INSTALL_STRIP_PROGRAM = ${SHELL} $(install_sh) -c -s
@@ -88,7 +88,7 @@ STRIP = strip
 VERSION = 2.0.11
 am__include = include
 am__quote = 
-install_sh = /home/daniel/libtrace/install-sh
+install_sh = /home/dlawson/libtrace/install-sh
 
 SUBDIRS = replace lib
 EXTRA_DIST = examples docs

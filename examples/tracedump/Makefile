@@ -1,5 +1,5 @@
 CXX=g++
-INCLUDES=-I/usr/local/wand/include
+INCLUDES=-I/usr/local/include
 # Directory to search for plugins
 LIBDIR="./"
 CXXFLAGS=-g -Wall $(INCLUDES) -rdynamic
