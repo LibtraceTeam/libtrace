@@ -1,39 +1,21 @@
+
+PREFIX=/usr/local/wand
+
 CC=gcc-3.0
 CFLAGS= -Wall -Wimplicit -Wpedantic -Wformat -pipe -g -O3
-PROFCFLAGS= -Wall -Wimplicit -Wformat -pipe -g -pg -fprofile-arcs -a
 
-INCLUDE = -I../include -I/usr/local/wand/include
+CFLAGS += -I../include -I$(PREFIX)/include
 CFLAGS += -D_FILE_OFFSET_BITS=64
-CFLAGS += $(INCLUDE)
-PROFCFLAGS += -D_FILE_OFFSET_BITS=64
-PROFCFLAGS += $(INCLUDE)
-libdir = -L/usr/local/wand/lib/
-LDLIBS = $(libdir) -lpcapl -lzl
+LDFLAGS = -L$(PREFIX)/lib/ -lpcapl -lzl
 
 
 CURRENT=2
 AGE=1
 REVISION=0
 
-INCLIBS=/usr/local/wand/lib/libzl.a /usr/local/wand/lib/libpcapl.a
-
 .PHONY: all clean distclean install depend
 
 all: libtrace.lo libtrace.la
-
-profile: clean libtrace-prof.lo libtrace-prof.la
-
-libfifo-prof.lo: 	fifo.c
-	libtool --mode=compile $(CC) $(PROFCFLAGS) -c $< -o libfifo-prof.lo 
-
-libtrace-prof.lo: 	trace.c
-	libtool --mode=compile $(CC) $(PROFCFLAGS) -c $< -o libtrace-prof.lo
-
-libtrace-prof.la:	libtrace-prof.lo libfifo-prof.lo
-	libtool --mode=link $(CC) $(CFLAGS) -o libtrace-prof.la \
-	libtrace-prof.lo libfifo-prof.lo -rpath /usr/local/wand/lib $(LDLIBS) \
-	-version-info $(CURRENT):$(REVISION):$(AGE)
-
 
 
 libfifo.lo: 	fifo.c
@@ -44,7 +26,7 @@ libtrace.lo: 	trace.c
 
 libtrace.la:	libtrace.lo libfifo.lo
 	libtool --mode=link $(CC) $(CFLAGS) -o libtrace.la \
-	libtrace.lo libfifo.lo -rpath /usr/local/wand/lib $(LDLIBS) \
+	libtrace.lo libfifo.lo -rpath $(PREFIX)/lib $(LDLIBS) \
 	-version-info $(CURRENT):$(REVISION):$(AGE)
 
 
@@ -56,13 +38,19 @@ distclean:
 
 
 install-profile: libtrace-prof.la
-	libtool --mode=install install -c libtrace-prof.la /usr/local/wand/lib/libtrace-prof.la
-	libtool --finish /usr/local/wand/lib/
+	libtool --mode=install install -c libtrace-prof.la $(PREFIX)/lib/libtrace-prof.la
+	libtool --finish $(PREFIX)/lib/
 
 install: libtrace.la
-	libtool --mode=install install -c libtrace.la /usr/local/wand/lib/libtrace.la
-	libtool --finish /usr/local/wand/lib/
-	cp ../include/libtrace.h /usr/local/wand/include/libtrace.h
-	cp ../include/dagformat.h /usr/local/wand/include/dagformat.h
+	mkdir -p $(PREFIX)/lib
+	libtool --mode=install install -c libtrace.la $(PREFIX)/lib/libtrace.la
+	libtool --finish $(PREFIX)/lib/
+	mkdir -p $(PREFIX)/include
+	cp ../include/libtrace.h $(PREFIX)/include/libtrace.h
+	cp ../include/dagformat.h $(PREFIX)/include/dagformat.h
+
+docs:
+	cd ..
+	doxygen
 
 # vim: noet ts=8 sw=8
