@@ -63,5 +63,6 @@ install: libtrace.la
 	libtool --mode=install install -c libtrace.la /usr/local/wand/lib/libtrace.la
 	libtool --finish /usr/local/wand/lib/
 	cp ../include/libtrace.h /usr/local/wand/include/libtrace.h
+	cp ../include/dagformat.h /usr/local/wand/include/dagformat.h
 
 # vim: noet ts=8 sw=8
