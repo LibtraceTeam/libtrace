@@ -95,11 +95,11 @@ void secondreport() {
 }
 int main(int argc, char *argv[]) {
 
-        char *hostname = 0;
+        char *uri = 0;
         int psize = 0;
-        int status = 0;
         struct sigaction sigact;
         struct libtrace_ip *ipptr = 0;
+	struct libtrace_packet_t packet;
 
         struct itimerval itv;
 
@@ -118,15 +118,15 @@ int main(int argc, char *argv[]) {
                 perror("setitimer");
 
         if (argc == 2) {
-                hostname = strdup(argv[1]);
+                uri = strdup(argv[1]);
         }
 
-        // create an trace to hostname, on the default port
-        trace = create_trace(hostname);
+        // create an trace to uri
+        trace = trace_create(uri);
 
 
         for (;;) {
-                if ((psize = libtrace_read_packet(trace, buffer,SCANSIZE, &status)) == -1) {
+                if ((psize = trace_read_packet(trace,&packet)) == -1) {
                         // terminate
                         break;
                 }
@@ -136,7 +136,7 @@ int main(int argc, char *argv[]) {
 
                 //erfptr = (dag_record_t *)buffer;
                 //ipptr = (struct ip *)erfptr->rec.eth.pload;
-                if((ipptr = get_ip(trace,buffer,SCANSIZE)) == 0) {
+                if((ipptr = trace_get_ip(&packet)) == 0) {
 			continue;
 		}
 		
@@ -150,6 +150,6 @@ int main(int argc, char *argv[]) {
 
         }
 
-        destroy_trace(trace);
+        trace_destroy(trace);
         return 0;
 }

@@ -61,24 +61,26 @@ int main(int argc, char *argv[]) {
         int psize = 0;
         int status = 0;
         struct libtrace_ip *ipptr = 0;
+	struct libtrace_packet_t packet;
 
         if (argc == 2) {
                 uri = strdup(argv[1]);
         }
 
         // open a trace
-        trace = create_trace(uri);
+        trace = trace_create(uri);
+	
 
         for (;;) {
 		unsigned char *x;
 		int i;
-                if ((psize = libtrace_read_packet(trace, buffer, SCANSIZE, &status)) <1) {
+                if ((psize = trace_read_packet(trace, &packet)) <1) {
                         break;
                 }
 
-		printf("TS %f: ",get_seconds(trace,buffer,SCANSIZE));
+		printf("TS %f: ",trace_get_seconds(&packet));
 
-                ipptr = get_ip(trace,buffer,SCANSIZE);
+                ipptr = trace_get_ip(&packet);
 		if (!ipptr) {
 			printf("Non IP\n");
 			continue;
@@ -89,7 +91,7 @@ int main(int argc, char *argv[]) {
 					inet_ntoa(ipptr->ip_dst),
 					ipptr->ip_p);
 		x=(void*)ipptr;
-		for(i=0;i<get_capture_length(trace,buffer,SCANSIZE);i++) {
+		for(i=0;i<trace_get_capture_length(&packet);i++) {
 			if (i%4==0 && i!=0)
 				printf("\n");
 			printf("%02x ",x[i]);
@@ -97,6 +99,6 @@ int main(int argc, char *argv[]) {
 		printf("\n\n");
         }
 
-        destroy_trace(trace);
+        trace_destroy(trace);
         return 0;
 }

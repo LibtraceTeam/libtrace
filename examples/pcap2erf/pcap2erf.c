@@ -45,10 +45,10 @@
 #include <unistd.h>
 #include <linux/if_ether.h>
 
-extern "C" {
+//extern "C" {
 #include "dagformat.h"
 #include "libtrace.h"
-}
+//}
 
 struct libtrace_t *trace;
 int                _fcs_bits = 32;
@@ -65,13 +65,13 @@ struct network_id {
 /* one big glorious function */
 int main(int argc, char *argv[]) {
 
-    char *hostname;
+    char *uri;
     int psize = 0;
-    int status = 0;
     char *filename;
     FILE* input;
     
     struct pcap_pkthdr *header;
+    struct libtrace_packet_t packet;
     unsigned long seconds, subseconds;
     unsigned short rlen, lctr, wlen, offset, pad;
     unsigned char type, flags;
@@ -79,15 +79,15 @@ int main(int argc, char *argv[]) {
     uint32_t address = 0;
     uint32_t netmask = 0;
     int data_size;
-    struct tcphdr *tcpptr = 0;
+    struct libtrace_tcp *tcpptr = 0;
     int octets[4];
     int hlen;
-    ip *ipptr;
+    struct libtrace_ip *ipptr;
 
     
     // 2 parameters only, both neccessary
     if (argc == 3) {
-	hostname = strdup(argv[1]);
+	uri = strdup(argv[1]);
 	filename = strdup(argv[2]);
     }
     else
@@ -158,31 +158,32 @@ int main(int argc, char *argv[]) {
     fclose(input);
     //----------------------------------------------------------------------
 
-    // create an trace to hostname, on the default port
-    trace = create_trace(hostname);
+    // create an trace to the given uri
+    trace = trace_create(uri);
 
     for (;;) {
-	if ((psize = libtrace_read_packet(trace, buffer,SCANSIZE, &status)) 
+	if ((psize = trace_read_packet(trace, &packet)) 
 		== -1) {
 	    // terminate
 	    break;
 	}
 	// buffer returned is pcap-->ethernet-->upperlayers
-	header = (struct pcap_pkthdr*) buffer;
+	header = (struct pcap_pkthdr*)packet.buffer;
 
 	// if this isnt an ip packet, ignore it
-	if(! ((buffer + sizeof(struct pcap_pkthdr))[12] == 8 &&
-	    (buffer + sizeof(struct pcap_pkthdr))[13] == 0))
+	if(! ((packet.buffer + sizeof(struct pcap_pkthdr))[12] == 8 &&
+	    (packet.buffer + sizeof(struct pcap_pkthdr))[13] == 0))
 	    continue;
 	
-	ipptr = (ip *)(buffer + (sizeof(uint8_t)*30));// wtf is 30
+
+	ipptr = trace_get_ip(&packet);
 	hlen = ipptr->ip_hl*4;
 
 	// work out how much packet we need...ethernet + ip + whatever
 	switch(ipptr->ip_p)
 	{
 	    case 1: data_size = 14 + hlen; break;
-	    case 6: tcpptr = (struct tcphdr *) ((uint8_t *)ipptr + hlen);
+	    case 6: tcpptr = (struct libtrace_tcp *) ((uint8_t *)ipptr + hlen);
 		    data_size = 14 + hlen + (tcpptr->doff*4); break;
 	    case 17: data_size = 14 + hlen + 8; break;
 	    default: data_size = 14 + (ipptr->ip_hl*4); break;
@@ -243,10 +244,10 @@ int main(int argc, char *argv[]) {
 	// 18 bytes of header so far
 
 	// write as much of the packet as we need (just the headers)
-	fwrite(buffer + sizeof(pcap_pkthdr), 1, data_size, stdout);
+	fwrite(packet.buffer + sizeof(pcap_pkthdr), 1, data_size, stdout);
     }
 
-    destroy_trace(trace);
+    trace_destroy(trace);
     return 0;
 }
 

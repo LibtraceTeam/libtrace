@@ -1,5 +1,5 @@
-include= /usr/local/dag-2.4.11/include
-dagcdir= /usr/local/dag-2.4.11/utils/
+include= /usr/local/dag/include
+dagcdir= /usr/local/dag/utils/
 
 CC=g++-3.0
 CXX=g++-3.0

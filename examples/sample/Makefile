@@ -1,13 +1,13 @@
 
-wand_include = /usr/local/wand/include
-wand_libs = /usr/local/wand/lib
+libtrace_include = /usr/local/wand/include
+libtrace_libs = /usr/local/wand/lib
 
 CC=gcc-3.0
 
-INCLUDE = -I../include -I$(wand_include)
+INCLUDE =  -I$(libtrace_include)
 CFLAGS = -Wall -Wimplicit -Wformat -pipe -g -O2
 CFLAGS += $(INCLUDE)
-libdir = -L$(wand_libs)
+libdir = -L$(libtrace_libs)
 LDLIBS = $(libdir) -ltrace
 
 BINS = sample

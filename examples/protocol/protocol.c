@@ -96,35 +96,29 @@ static void parse_cmdline(int argc, char **argv);
 int main(int argc, char **argv) {
 
 	struct libtrace_ip *ipptr = 0;
-	dag_record_t *erfptr = 0;
+	struct libtrace_packet_t packet;
 	
-        int status; 
         int psize;
 
 	parse_cmdline(argc,argv);
 
-        trace = create_trace(uri);
+        trace = trace_create(uri);
 	if (filterstring) {
-		filter = libtrace_bpf_setfilter(filterstring);
+		filter = trace_bpf_setfilter(filterstring);
 	}
 
         for (;;) {
-                if ((psize = libtrace_read_packet(trace, buffer,4096, &status)) <= 0) {
+                if ((psize = trace_read_packet(trace, &packet)) <= 0) {
                         // terminate
                         break;
                 }
-		erfptr = (dag_record_t *)buffer;
-		
-		if (erfptr->flags.rxerror) {
-			rxerr ++;
-			continue;
-		}
+
 		if (filter) {
-			if (!libtrace_bpf_filter(trace, filter, buffer, 4096)) {
+			if (!trace_bpf_filter(filter,&packet)) {
 			continue;
 			}
 		}
-	 	ipptr = get_ip(trace,buffer,4096);
+	 	ipptr = trace_get_ip(&packet);
 
 		if (ipptr) {
 			if(do_cksum && IN_CHKSUM(ipptr)) {
@@ -132,7 +126,7 @@ int main(int argc, char **argv) {
 			} else if (do_w_cksum && ipptr->ip_sum) {
 				badchksum ++;
 			} else {
-				printf("%d:%d\n",ipptr->ip_p,get_link_type(trace,buffer,4096));
+				printf("%d:%d\n",ipptr->ip_p,trace_get_link_type(&packet));
 			}
 		}
         }
@@ -140,7 +134,7 @@ int main(int argc, char **argv) {
 		printf("Bad checksums seen: %llu\n",badchksum);
 		printf("RX Errors seen: %llu\n",rxerr);
 	}
-        destroy_trace(trace);
+        trace_destroy(trace);
         return 0;
 }
 
