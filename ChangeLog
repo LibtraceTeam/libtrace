@@ -28,6 +28,17 @@
 ##
 ##
 
+- Version 2.0.9
+	* Added improved conditional codepaths for
+		* PCAP 
+		* ZLIB
+		* BPF
+		* DAG
+	  - These sections of code are only compiled in if there is
+	    appropriate support for them in the OS / asked by configure.
+	    In the event of no zlib support, we use a fread interface for 
+	    uncompressed trace files instead.
+
 - Version 2.0.8
 	* Added better configure time checking for pcap-bpf.h (ie, actually fail early if it can't find it or an equivalent)
 	* Added trace_set_direction , to set the direction bit in an ERF based trace.

@@ -1,3 +1,11 @@
+* Fri Nov 12, 2004
+
+ Added native DAG read support.
+ Added conditional code paths for DAG, ZLIB, PCAP, and BPF. If configure doesn't 
+ detect the required components for these paths, it will build without them. Attempting to use libtrace with a non-existant code path will generate a warning on stderr and a 
+ failure in the requested function
+ 
+
 * Wed Aug 11, 2004
 
  Autoconf has been implemented, and this has been used to help rebuild under 
