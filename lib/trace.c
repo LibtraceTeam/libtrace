@@ -58,6 +58,7 @@
 #include "fifo.h"
 
 #include <net/bpf.h>
+
 #include <pcap.h>
 
 #include "dagformat.h"
@@ -101,21 +102,22 @@ struct libtrace_t {
 	double start_ts;
 };
 
+#define URI_PROTO_LINE 16
 static int init_trace(struct libtrace_t **libtrace, char *uri) {
-        char *scan = calloc(sizeof(char),16);
-        char *uridata;
+        char *scan = calloc(sizeof(char),URI_PROTO_LINE);
+        char *uridata = 0;
         
         // parse the URI to determine what sort of event we are dealing with
        
         // want snippet before the : to get the uri base type.
 
         if((uridata = strchr(uri,':')) == NULL) {
-                // badly formed URI
+                // badly formed URI - needs a :
                 return 0;
         }
 
-        if ((*uridata - *uri) > 16) {
-                // badly formed URI
+        if ((*uridata - *uri) > URI_PROTO_LINE) {
+                // badly formed URI - uri type is too long
                 return 0;
         }
         strncpy(scan,uri, (uridata - uri));
@@ -252,7 +254,7 @@ static int init_trace(struct libtrace_t **libtrace, char *uri) {
  * If an error occured when attempting to open a trace, NULL is returned
  * and an error is output to stdout.
  */
-struct libtrace_t *create_trace(char *uri) {
+struct libtrace_t *trace_create(char *uri) {
         struct libtrace_t *libtrace = malloc(sizeof(struct libtrace_t));
         struct hostent *he;
         struct sockaddr_in remote;
@@ -350,7 +352,7 @@ struct libtrace_t *create_trace(char *uri) {
 /** Close a trace file, freeing up any resources it may have been using
  *
  */
-void destroy_trace(struct libtrace_t *libtrace) {
+void trace_destroy(struct libtrace_t *libtrace) {
         assert(libtrace);
         if (libtrace->format == PCAP || libtrace->format == PCAPINT) {
                 pcap_close(libtrace->input.pcap);
@@ -364,7 +366,7 @@ void destroy_trace(struct libtrace_t *libtrace) {
         free(libtrace);
 }
 
-static int libtrace_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
+static int trace_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
         int numbytes;
         assert(libtrace);
         assert(len >= 0);
@@ -406,32 +408,33 @@ static int libtrace_read(struct libtrace_t *libtrace, void *buffer, size_t len) 
 
 /** Read one packet from the trace into buffer
  *
- * @param libtrace 	the trace to read from
- * @param buffer	the buffer to read into
- * @param len		the length of the buffer
- * @param status	a pointer to the status byte
- * @returns number of bytes copied.
+ * @param libtrace 	the libtrace opaque pointer
+ * @param packet  	the packet opaque pointer
+ * @returns false if it failed to read a packet
  *
- * @note the buffer must be at least as large as the largest packet (plus
- * link layer, and trace packet metadata overhead)
  */
-int libtrace_read_packet(struct libtrace_t *libtrace, void *buffer, size_t len, int *status) {
+int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
         int numbytes;
         int size;
         char buf[4096];
         struct pcap_pkthdr pcaphdr;
         const u_char *pcappkt;
 	int read_required = 0;
+
+	void *buffer = 0;
 	if (!libtrace) {
-		fprintf(stderr,"Oi! You called libtrace_read_packet() with a NULL libtrace parameter!\n");
+		fprintf(stderr,"Oi! You called trace_read_packet() with a NULL libtrace parameter!\n");
 	}
         assert(libtrace);
-        assert(buffer);
-        assert(status);
-        assert(len > 200); 
+        assert(packet);
 
 	//bzero(buffer,len);
-        
+      
+	/* Store the trace we are reading from into the packet opaque 
+	 * structure */
+	packet->trace = libtrace;
+
+	buffer = packet->buffer;
 	/* PCAP gives us it's own per-packet interface. Let's use it */
         if (libtrace->format == PCAP || libtrace->format == PCAPINT) {
                 if ((pcappkt = pcap_next(libtrace->input.pcap, &pcaphdr)) == NULL) {
@@ -440,7 +443,8 @@ int libtrace_read_packet(struct libtrace_t *libtrace, void *buffer, size_t len, 
                 memcpy(buffer,&pcaphdr,sizeof(struct pcap_pkthdr));
                 memcpy(buffer + sizeof(struct pcap_pkthdr),pcappkt,pcaphdr.len);
                 numbytes = pcaphdr.len;
-
+	
+		packet->size = numbytes;
 		return numbytes;
         } 
 
@@ -459,7 +463,7 @@ int libtrace_read_packet(struct libtrace_t *libtrace, void *buffer, size_t len, 
 			return 0;
 		}
 		size = ntohs(((dag_record_t *)buffer)->rlen) - sizeof(dag_record_t);
-		assert(len > size);
+		assert(size < LIBTRACE_PACKET_BUFSIZE);
 		buffer2 += sizeof(dag_record_t);
 
 		// read in the rest of the packet
@@ -469,11 +473,12 @@ int libtrace_read_packet(struct libtrace_t *libtrace, void *buffer, size_t len, 
 			perror("gzread");
 			return -1;
 		}
+		packet->size = numbytes + sizeof(dag_record_t);
 		return sizeof(dag_record_t) + numbytes;
 	}
 	do {
 		if (fifo_out_available(libtrace->fifo) == 0 || read_required) {
-			if ((numbytes = libtrace_read(libtrace,buf,4096))<=0){
+			if ((numbytes = trace_read(libtrace,buf,4096))<=0){
 				return numbytes; 
 			}
 			fifo_write(libtrace->fifo,buf,numbytes);
@@ -484,7 +489,7 @@ int libtrace_read_packet(struct libtrace_t *libtrace, void *buffer, size_t len, 
 		switch (libtrace->format) {
 			case RTCLIENT:
 				// only do this if we're reading from the RT interface
-				if (fifo_out_read(libtrace->fifo, status, sizeof(int)) == 0) {
+				if (fifo_out_read(libtrace->fifo, &packet->status, sizeof(int)) == 0) {
 					read_required = 1;
 					continue;
 				}
@@ -519,7 +524,7 @@ int libtrace_read_packet(struct libtrace_t *libtrace, void *buffer, size_t len, 
 				assert(0);
 		}
 
-		assert(len > size);
+		assert(size < LIBTRACE_PACKET_BUFSIZE);
 
 		// read in the full packet
 		if ((numbytes = fifo_out_read(libtrace->fifo, buffer, size)) == 0) {
@@ -537,6 +542,7 @@ int libtrace_read_packet(struct libtrace_t *libtrace, void *buffer, size_t len, 
 			fifo_ack_update(libtrace->fifo,size);
 		}
 		
+		packet->size = numbytes;
         	return numbytes;
 
 	} while (1);
@@ -549,27 +555,29 @@ int libtrace_read_packet(struct libtrace_t *libtrace, void *buffer, size_t len, 
  * @param buflen	a pointer to the size of the buffer
  *
  * @returns a pointer to the link layer, or NULL if there is no link layer
- * you should call get_link_type() to find out what type of link layer this is
+ * you should call trace_get_link_type() to find out what type of link layer this is
  */
-void *get_link(struct libtrace_t *libtrace, void *buffer, int buflen) {
+void *trace_get_link(struct libtrace_packet_t *packet) {
         void *ethptr = 0;
-	struct wag_event_t *event = buffer;
+	
+	struct wag_event_t *event = (struct wag_event_t *)packet->buffer;
 	struct wag_data_event_t *data_event;
+	
         
-        switch(libtrace->format) {
+        switch(packet->trace->format) {
                 case ERF:
                 case DAG:
                 case RTCLIENT:
-			if (get_link_type(libtrace,buffer,buflen)==TRACE_TYPE_ETH) 
-                        	ethptr = ((uint8_t *)buffer + 
+			if (trace_get_link_type(packet)==TRACE_TYPE_ETH) 
+                        	ethptr = ((uint8_t *)packet->buffer + 
 						dag_record_size + 2);
 			else
-				ethptr = ((uint8_t *)buffer + 
+				ethptr = ((uint8_t *)packet->buffer + 
 						dag_record_size + 2);
                         break;
 		case PCAPINT:
 		case PCAP:
-                        ethptr = (struct ether_header *)(buffer + sizeof(struct pcap_pkthdr));
+                        ethptr = (struct ether_header *)(packet->buffer + sizeof(struct pcap_pkthdr));
                         break;
 		case WAGINT:
 		case WAG:
@@ -596,14 +604,14 @@ void *get_link(struct libtrace_t *libtrace, void *buffer, int buflen) {
  *
  * @returns a pointer to the IP header, or NULL if there is not an IP packet
  */
-struct libtrace_ip *get_ip(struct libtrace_t *libtrace, void *buffer, int buflen) {
+struct libtrace_ip *trace_get_ip(struct libtrace_packet_t *packet) {
         struct libtrace_ip *ipptr = 0;
 
-	switch(get_link_type(libtrace,buffer,buflen)) {
+	switch(trace_get_link_type(packet)) {
 		case TRACE_TYPE_80211:
 			{ 
 				
-				struct ieee_802_11_header *wifi = get_link(libtrace, buffer, buflen);	
+				struct ieee_802_11_header *wifi = trace_get_link(packet);	
 
 				// Data packet?
 				if (wifi->type != 2) {
@@ -621,8 +629,8 @@ struct libtrace_ip *get_ip(struct libtrace_t *libtrace, void *buffer, int buflen
 			break;
 		case TRACE_TYPE_ETH:
 			{
-				struct ether_header *eth = get_link(libtrace,
-						buffer, buflen);
+				struct ether_header *eth = 
+					trace_get_link(packet);
 				if (ntohs(eth->ether_type)!=0x0800) {
 					ipptr = NULL;
 				}
@@ -633,8 +641,8 @@ struct libtrace_ip *get_ip(struct libtrace_t *libtrace, void *buffer, int buflen
 			}
 		case TRACE_TYPE_ATM:
 			{
-				struct atm_rec *atm = get_link(libtrace,
-						buffer, buflen);
+				struct atm_rec *atm = 
+					trace_get_link(packet);
 				// TODO: Find out what ATM does, and return
 				//       NULL for non IP data
 				//       Presumably it uses the normal stuff
@@ -642,8 +650,8 @@ struct libtrace_ip *get_ip(struct libtrace_t *libtrace, void *buffer, int buflen
 				break;
 			}
 		default:
-			fprintf(stderr,"Don't understand link layer type %i in get_ip()\n",
-				get_link_type(libtrace,buffer,buflen));
+			fprintf(stderr,"Don't understand link layer type %i in trace_get_ip()\n",
+				trace_get_link_type(packet));
 			ipptr=NULL;
 			break;
 	}
@@ -659,11 +667,11 @@ struct libtrace_ip *get_ip(struct libtrace_t *libtrace, void *buffer, int buflen
  *
  * @returns a pointer to the TCP header, or NULL if there is not a TCP packet
  */
-struct libtrace_tcp *get_tcp(struct libtrace_t *libtrace, void *buffer, int buflen) {
+struct libtrace_tcp *trace_get_tcp(struct libtrace_packet_t *packet) {
         struct libtrace_tcp *tcpptr = 0;
         struct libtrace_ip *ipptr = 0;
 
-        if(!(ipptr = get_ip(libtrace,buffer,buflen))) {
+        if(!(ipptr = trace_get_ip(packet))) {
                 return 0;
         }
         if (ipptr->ip_p == 6) {
@@ -679,11 +687,11 @@ struct libtrace_tcp *get_tcp(struct libtrace_t *libtrace, void *buffer, int bufl
  *
  * @returns a pointer to the UDP header, or NULL if this is not a UDP packet
  */
-struct libtrace_udp *get_udp(struct libtrace_t *libtrace, void *buffer, int buflen) {
+struct libtrace_udp *trace_get_udp(struct libtrace_packet_t *packet) {
         struct libtrace_udp *udpptr = 0;
         struct libtrace_ip *ipptr = 0;
         
-        if(!(ipptr = get_ip(libtrace,buffer,buflen))) {
+        if(!(ipptr = trace_get_ip(packet))) {
                 return 0;
         }
         if (ipptr->ip_p == 17) {
@@ -699,11 +707,11 @@ struct libtrace_udp *get_udp(struct libtrace_t *libtrace, void *buffer, int bufl
  *
  * @returns a pointer to the ICMP header, or NULL if this is not a ICMP packet
  */
-struct libtrace_icmp *get_icmp(struct libtrace_t *libtrace, void *buffer, int buflen) {
+struct libtrace_icmp *trace_get_icmp(struct libtrace_packet_t *packet) {
         struct libtrace_icmp *icmpptr = 0;
         struct libtrace_ip *ipptr = 0;
         
-        if(!(ipptr = get_ip(libtrace,buffer,buflen))) {
+        if(!(ipptr = trace_get_ip(packet))) {
                 return 0;
         }
         if (ipptr->ip_p == 1) {
@@ -720,34 +728,34 @@ struct libtrace_icmp *get_icmp(struct libtrace_t *libtrace, void *buffer, int bu
  * past 1970-01-01, the lower 32bits are partial seconds)
  * @author Daniel Lawson
  */ 
-uint64_t get_erf_timestamp(struct libtrace_t *libtrace, void *buffer, int buflen) {
+uint64_t trace_get_erf_timestamp(struct libtrace_packet_t *packet) {
 	uint64_t timestamp = 0;
         dag_record_t *erfptr = 0;
         struct pcap_pkthdr *pcapptr = 0;
 	struct wag_event_t *wagptr = 0;
-        switch (libtrace->format) {
+        switch (packet->trace->format) {
                 case DAG:
                 case ERF:
                 case RTCLIENT:
-                        erfptr = (dag_record_t *)buffer;
+                        erfptr = (dag_record_t *)packet->buffer;
 			timestamp = erfptr->ts;
                         break;
 		case PCAPINT:
                 case PCAP:
-                        pcapptr = (struct pcap_pkthdr *)buffer;
+                        pcapptr = (struct pcap_pkthdr *)packet->buffer;
 			timestamp = ((((uint64_t)pcapptr->ts.tv_sec) << 32) + \
 				(pcapptr->ts.tv_usec*UINT_MAX/1000000));
                         break;
 		case WAGINT:
 		case WAG:
-			wagptr = buffer;
+			wagptr = (struct wag_event_t *)packet->buffer;
 			timestamp = wagptr->timestamp_lo;
 			timestamp |= (uint64_t)wagptr->timestamp_hi<<32;
 			timestamp = ((timestamp%44000000)*(UINT_MAX/44000000))
 				  | ((timestamp/44000000)<<32);
 			break;
 		default:
-			fprintf(stderr,"Unknown format in get_erf_timestamp\n");
+			fprintf(stderr,"Unknown format in trace_get_erf_timestamp\n");
 			timestamp = 0;
         }
         return timestamp;
@@ -761,15 +769,15 @@ uint64_t get_erf_timestamp(struct libtrace_t *libtrace, void *buffer, int buflen
  * @author Daniel Lawson
  * @author Perry Lorier
  */ 
-struct timeval get_timeval(struct libtrace_t *libtrace, void *buffer, int buflen) {
+struct timeval trace_get_timeval(struct libtrace_packet_t *packet) {
         struct timeval tv;
         struct pcap_pkthdr *pcapptr = 0;
 	uint64_t ts;
 	//uint32_t seconds;
-        switch (libtrace->format) {
+        switch (packet->trace->format) {
 		case PCAPINT:
                 case PCAP:
-                        pcapptr = (struct pcap_pkthdr *)buffer;
+                        pcapptr = (struct pcap_pkthdr *)packet->buffer;
                         tv = pcapptr->ts;
                         break;
 		case WAGINT:
@@ -779,7 +787,7 @@ struct timeval get_timeval(struct libtrace_t *libtrace, void *buffer, int buflen
                 case RTCLIENT:
 		default:
 			// FIXME: This isn't portable to big-endian machines
-			ts = get_erf_timestamp(libtrace,buffer,buflen);
+			ts = trace_get_erf_timestamp(packet);
 			tv.tv_sec = ts >> 32;		
 			ts = (1000000 * (ts & 0xffffffffULL));
         		ts += (ts & 0x80000000ULL) << 1;
@@ -800,43 +808,41 @@ struct timeval get_timeval(struct libtrace_t *libtrace, void *buffer, int buflen
  * @returns time that this packet was seen in 64bit floating point seconds
  * @author Perry Lorier
  */ 
-double get_seconds(struct libtrace_t *libtrace, void *buffer, int buflen) {
+double trace_get_seconds(struct libtrace_packet_t *packet) {
 	uint64_t ts;
-	ts = get_erf_timestamp(libtrace,buffer,buflen);
+	ts = trace_get_erf_timestamp(packet);
 	return (ts>>32) + ((ts & UINT_MAX)*1.0 / UINT_MAX);
 }
 
 /** Get the size of the packet in the trace
- * @param libtrace the libtrace opaque pointer
- * @param buffer a pointer to a filled in buffer
- * @param buflen the length of the buffer
+ * @param packet the packet opaque pointer
  * @returns the size of the packet in the trace
  * @author Perry Lorier
  * @note Due to this being a header capture, or anonymisation, this may not
- * be the same size as the original packet.  See get_wire_length() for the 
+ * be the same size as the original packet.  See trace_get_wire_length() for the 
  * original size of the packet.
  * @note This can (and often is) different for different packets in a trace!
  * @par 
  *  This is sometimes called the "snaplen".
  */ 
-int get_capture_length(struct libtrace_t *libtrace, void *buffer, int buflen) {
+int trace_get_capture_length(struct libtrace_packet_t *packet) {
 	dag_record_t *erfptr = 0;
 	struct pcap_pkthdr *pcapptr = 0;
 	struct wag_event_t *wag_event;
-	switch (libtrace->format) {
+	switch (packet->trace->format) {
 		case DAG:
 		case ERF:
 		case RTCLIENT:
-			erfptr = (dag_record_t *)buffer;
+			erfptr = (dag_record_t *)packet->buffer;
 			return ntohs(erfptr->rlen);
 		case PCAPINT:
 		case PCAP:
-			pcapptr = (struct pcap_pkthdr *)buffer;
+			pcapptr = (struct pcap_pkthdr *)packet->buffer;
 			//return ntohs(pcapptr->caplen);
 			return pcapptr->caplen;
 		case WAGINT:
 		case WAG:
-			wag_event = buffer;
+			wag_event = (struct wag_event_t *)packet->buffer;
 			switch(wag_event->type) {
 				case 0:
 					return wag_event->length*4-(
@@ -862,25 +868,25 @@ int get_capture_length(struct libtrace_t *libtrace, void *buffer, int buflen) {
  * @note Due to the trace being a header capture, or anonymisation this may
  * not be the same as the Capture Len.
  */ 
-int get_wire_length(struct libtrace_t *libtrace, void *buffer, int buflen){
+int trace_get_wire_length(struct libtrace_packet_t *packet){
 	dag_record_t *erfptr = 0;
 	struct pcap_pkthdr *pcapptr = 0;
 	struct wag_event_t *wag_event = 0;
-	switch (libtrace->format) {
+	switch (packet->trace->format) {
 		case DAG:
 		case ERF:
 		case RTCLIENT:
-			erfptr = (dag_record_t *)buffer;
+			erfptr = (dag_record_t *)packet->buffer;
 			return ntohs(erfptr->wlen);
 			break;
 		case PCAPINT:
 		case PCAP:
-			pcapptr = (struct pcap_pkthdr *)buffer;
+			pcapptr = (struct pcap_pkthdr *)packet->buffer;
 			return ntohs(pcapptr->len);
 		 	break;
 		case WAGINT:
 		case WAG:
-			wag_event = buffer;
+			wag_event = (struct wag_event_t *)packet->buffer;
 			switch(wag_event->type) {
 				case 0:
 					return ((struct wag_data_event_t *)(&wag_event->payload))->frame_length;
@@ -900,18 +906,15 @@ int get_wire_length(struct libtrace_t *libtrace, void *buffer, int buflen){
  * @author Perry Lorier
  * @author Daniel Lawson
  */
-libtrace_linktype_t get_link_type(
-		struct libtrace_t *libtrace, 
-		void *buffer, 
-		int buflen) {
+libtrace_linktype_t trace_get_link_type(struct libtrace_packet_t *packet ) {
 	dag_record_t *erfptr = 0;
 	struct pcap_pkthdr *pcapptr = 0;
 	int linktype = 0;
-	switch (libtrace->format) {
+	switch (packet->trace->format) {
 		case DAG:
 		case ERF:
 		case RTCLIENT:
-			erfptr = (dag_record_t *)buffer;
+			erfptr = (dag_record_t *)packet->buffer;
 			switch (erfptr->type) {
 				case TYPE_ETH: return TRACE_TYPE_ETH;
 				case TYPE_ATM: return TRACE_TYPE_ATM;
@@ -922,8 +925,8 @@ libtrace_linktype_t get_link_type(
 			break;
 		case PCAPINT:
 		case PCAP:
-			pcapptr = (struct pcap_pkthdr *)buffer;
-			linktype = pcap_datalink(libtrace->input.pcap);
+			pcapptr = (struct pcap_pkthdr *)packet->buffer;
+			linktype = pcap_datalink(packet->trace->input.pcap);
 			switch (linktype) {
 				case 1:
 					return TRACE_TYPE_ETH; 
@@ -947,15 +950,13 @@ libtrace_linktype_t get_link_type(
  * @returns a pointer to the source mac, (or NULL if there is no source MAC)
  * @author Perry Lorier
  */
-uint8_t *get_source_mac(struct libtrace_t *libtrace,
-		void *buffer,
-		int buflen) {
-	void *link = get_link(libtrace,buffer,buflen);
+uint8_t *trace_get_source_mac(struct libtrace_packet_t *packet) {
+	void *link = trace_get_link(packet);
 	struct ieee_802_11_header *wifi = link;
         struct ether_header *ethptr = link;
 	if (!link)
 		return NULL;
-	switch (get_link_type(libtrace,buffer,buflen)) {
+	switch (trace_get_link_type(packet)) {
 		case TRACE_TYPE_80211:
 			return (uint8_t*)&wifi->mac2;
 		case TRACE_TYPE_ETH:
@@ -974,15 +975,13 @@ uint8_t *get_source_mac(struct libtrace_t *libtrace,
  * destination MAC)
  * @author Perry Lorier
  */
-uint8_t *get_destination_mac(struct libtrace_t *libtrace,
-		void *buffer,
-		int buflen) {
-	void *link = get_link(libtrace,buffer,buflen);
+uint8_t *trace_get_destination_mac(struct libtrace_packet_t *packet) {
+	void *link = trace_get_link(packet);
 	struct ieee_802_11_header *wifi = link;
         struct ether_header *ethptr = link;
 	if (!link)
 		return NULL;
-	switch (get_link_type(libtrace,buffer,buflen)) {
+	switch (trace_get_link_type(packet)) {
 		case TRACE_TYPE_80211:
 			return (uint8_t*)&wifi->mac1;
 		case TRACE_TYPE_ETH:
@@ -1005,20 +1004,21 @@ uint8_t *get_destination_mac(struct libtrace_t *libtrace,
  *  TRACE_EVENT_IOWAIT	Waiting on I/O on <fd>
  *  TRACE_EVENT_SLEEP	Next event in <seconds>
  *  TRACE_EVENT_PACKET	Packet arrived in <buffer> with size <size>
+ * FIXME currently keeps a copy of the packet inside the trace pointer,
+ * which in turn is stored inside the new packet object...
  * @author Perry Lorier
  */
-libtrace_event_t libtrace_event(struct libtrace_t *libtrace,
-			int *fd,double *seconds,
-			void *buffer, size_t len, int *size)
-{
+libtrace_event_t libtrace_event(struct libtrace_t *trace, 
+		struct libtrace_packet_t *packet,
+			int *fd,double *seconds) {
 	*seconds = 0;
 	*fd = 0;
 	/* Is there a packet ready? */
-	switch (libtrace->sourcetype) {
+	switch (trace->sourcetype) {
 		case INTERFACE:
 			{
 				int data;
-				*fd = pcap_fileno(libtrace->input.pcap);
+				*fd = pcap_fileno(trace->input.pcap);
 				if(ioctl(*fd,FIONREAD,&data)==-1){
 					perror("ioctl(FIONREAD)");
 				}
@@ -1032,47 +1032,41 @@ libtrace_event_t libtrace_event(struct libtrace_t *libtrace,
 		case RT:
 			{
 				int data;
-				if(ioctl(libtrace->input.fd,FIONREAD,&data)==-1){
+				if(ioctl(trace->input.fd,FIONREAD,&data)==-1){
 					perror("ioctl(FIONREAD)");
 				}
 				if (data>0) {
 					return TRACE_EVENT_PACKET;
 				}
-				*fd = libtrace->input.fd;
+				*fd = trace->input.fd;
 				return TRACE_EVENT_IOWAIT;
 			}
 		case STDIN:
 		case TRACE:
 			{
-				int status;
 				double ts;
 				/* "Prime" the pump */
-				if (!libtrace->packet.buffer) {
-					libtrace->packet.buffer = malloc(4096);
-					libtrace->packet.size=
-						libtrace_read_packet(libtrace,
-							libtrace->packet.buffer,
-							4096,
-							&status);
+				if (!trace->packet.buffer) {
+					trace->packet.buffer = malloc(4096);
+					trace->packet.size=
+						trace_read_packet(trace,packet);
 				}
-				ts=get_seconds(libtrace,
-					libtrace->packet.buffer,
-					libtrace->packet.size);
-				if (libtrace->last_ts!=0) {
-					*seconds = ts - libtrace->last_ts;
-					if (*seconds>time(NULL)-libtrace->start_ts)
+				ts=trace_get_seconds(packet);
+				if (trace->last_ts!=0) {
+					*seconds = ts - trace->last_ts;
+					if (*seconds>time(NULL)-trace->start_ts)
 						return TRACE_EVENT_SLEEP;
 				}
 				else {
-					libtrace->start_ts = time(NULL);
-					libtrace->last_ts = ts;
+					trace->start_ts = time(NULL);
+					trace->last_ts = ts;
 				}
 
-				*size = libtrace->packet.size;
-				memcpy(buffer,libtrace->packet.buffer,*size);
+				packet->size = trace->packet.size;
+				memcpy(packet->buffer,trace->packet.buffer,trace->packet.size);
 
-				free(libtrace->packet.buffer);
-				libtrace->packet.buffer = 0;
+				free(trace->packet.buffer);
+				trace->packet.buffer = 0;
 				return TRACE_EVENT_PACKET;
 			}
 		default:
@@ -1087,7 +1081,7 @@ libtrace_event_t libtrace_event(struct libtrace_t *libtrace,
  * @returns opaque pointer pointer to a libtrace_filter_t object
  * @author Daniel Lawson
  */
-struct libtrace_filter_t *libtrace_bpf_setfilter(const char *filterstring) {
+struct libtrace_filter_t *trace_bpf_setfilter(const char *filterstring) {
 	struct libtrace_filter_t *filter = malloc(sizeof(struct libtrace_filter_t));
 	filter->filterstring = strdup(filterstring);
 	filter->filter = 0;
@@ -1102,25 +1096,23 @@ struct libtrace_filter_t *libtrace_bpf_setfilter(const char *filterstring) {
  * @returns 0 if the filter fails, 1 if it succeeds
  * @author Daniel Lawson
  */
-int libtrace_bpf_filter(struct libtrace_t *libtrace, 
-			struct libtrace_filter_t *filter,
-			void *buffer, 
-			int buflen) {
+int trace_bpf_filter(struct libtrace_filter_t *filter,
+			struct libtrace_packet_t *packet) {
 	
-	int linktype = get_link_type(libtrace,buffer,buflen);
-	void *linkptr = get_link(libtrace,buffer,buflen);	
-	int clen = get_capture_length(libtrace,buffer,buflen);
-	assert(libtrace);
+	void *linkptr = 0;
+	int clen = 0;
 	assert(filter);
-	assert(buffer);
+	assert(packet);
+	linkptr = trace_get_link(packet);	
 	assert(linkptr);
+	clen = trace_get_capture_length(packet);
 	
 
 	if (filter->filterstring && ! filter->filter) {
 		pcap_t *pcap;
 		struct bpf_program bpfprog;
 
-		switch (linktype) {
+		switch (trace_get_link_type(packet)) {
 			case TRACE_TYPE_ETH:
 				pcap = pcap_open_dead(DLT_EN10MB, 1500);
 				break;
@@ -1151,20 +1143,17 @@ int libtrace_bpf_filter(struct libtrace_t *libtrace,
  * @returns a signed value containing the direction flag, or -1 if this is not supported
  * @author Daniel Lawson
  */
-int8_t get_direction(struct libtrace_t *libtrace,
-		      void *buffer,
-		      int buflen) {
+int8_t trace_get_direction(struct libtrace_packet_t *packet) {
 	
 	int8_t direction;
 	dag_record_t *erfptr = 0;
-	assert(libtrace);
-	assert(buffer);
+	assert(packet);
 
-	switch(libtrace->format) {
+	switch(packet->trace->format) {
 		case DAG:
 		case ERF:
 		case RTCLIENT:
-			erfptr = (dag_record_t *)buffer;
+			erfptr = (dag_record_t *)packet->buffer;
 			direction = erfptr->flags.iface;
 			break;
 		default:

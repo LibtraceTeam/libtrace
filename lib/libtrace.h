@@ -28,8 +28,8 @@
  *
  */
 
-#ifndef _LIBTRACE_H_
-#define _LIBTRACE_H_
+#ifndef LIBTRACE_H
+#define LIBTRACE_H
 
 #include <features.h>
 #include <sys/types.h>
@@ -76,8 +76,17 @@ extern "C" {
 struct libtrace_t;
         
 /** Opaque structure holding information about a bpf filter */
-
 struct libtrace_filter_t;
+
+/** Opaque structure holding information about a packet */
+#define LIBTRACE_PACKET_BUFSIZE 65536
+struct libtrace_packet_t {
+	struct libtrace_t *trace;
+	char buffer[LIBTRACE_PACKET_BUFSIZE];
+	size_t size;
+	uint8_t status;
+};
+
 /** Structure for dealing with IP packets */
 struct libtrace_ip
   {
@@ -196,108 +205,88 @@ struct libtrace_icmp
  *  If an error occured why attempting to open the trace file, NULL is returned
  *  and an error is output to stdout.
  */
-struct libtrace_t *create_trace(char *uri);
+struct libtrace_t *trace_create(char *uri);
 
 /** Close a trace file, freeing up any resources it may have been using
  *
  */
-void destroy_trace(struct libtrace_t *rtclient);
+void trace_destroy(struct libtrace_t *trace);
 
 /** Read one packet from the trace into buffer
  *
- * @param libtrace      the trace to read from
- * @param buffer        the buffer to read into
- * @param len           the length of the buffer
- * @param status	status of the trace (only used for RTClients)
- * @returns number of bytes copied, -1 on error, or 0 at EOF
+ * @param libtrace 	the libtrace opaque pointer
+ * @param packet  	the packet opaque pointer
+ * @returns false if it failed to read a packet
  *
- * @note the buffer must be at least as large as the largest packet (plus
- * link layer, and trace packet metadata overhead)
  */
-int libtrace_read_packet(struct libtrace_t *rtclient, void *buffer, size_t len, int *status);
+int trace_read_packet(struct libtrace_t *trace, struct libtrace_packet_t *packet);
 
 /** get a pointer to the link layer
- * @param libtrace      a pointer to the trace object returned from gettrace
- * @param buffer        a pointer to a filled in buffer
- * @param buflen        a pointer to the size of the buffer
+ * @param packet  	the packet opaque pointer
  *
  * @returns a pointer to the link layer, or NULL if there is no link layer
  *
  * @note you should call getLinkType() to find out what type of link layer 
  * this is
  */
-void *get_link(struct libtrace_t *libtrace, void *buffer, int buflen);
+void *trace_get_link(struct libtrace_packet_t *packet);
 
 /** get a pointer to the IP header (if any)
- * @param libtrace      a pointer to the trace object returned from gettrace
- * @param buffer        a pointer to a filled in buffer
- * @param buflen        a pointer to the size of the buffer
+ * @param packet  	the packet opaque pointer
  *
  * @returns a pointer to the IP header, or NULL if there is not an IP packet
  */
-struct libtrace_ip *get_ip(struct libtrace_t *libtrace, void *buffer, int buflen);
+struct libtrace_ip *trace_get_ip(struct libtrace_packet_t *packet);
 
 /** get a pointer to the TCP header (if any)
- * @param libtrace      a pointer to the trace object returned from gettrace
- * @param buffer        a pointer to a filled in buffer
- * @param buflen        a pointer to the size of the buffer
+ * @param packet  	the packet opaque pointer
  *
  * @returns a pointer to the TCP header, or NULL if there is not a TCP packet
  */
-struct libtrace_tcp *get_tcp(struct libtrace_t *libtrace, void *buffer, int buflen);
+struct libtrace_tcp *trace_get_tcp(struct libtrace_packet_t *packet);
 
 /** get a pointer to the UDP header (if any)
- * @param libtrace      a pointer to the trace object returned from gettrace
- * @param buffer        a pointer to a filled in buffer
- * @param buflen        a pointer to the size of the buffer
+ * @param packet  	the packet opaque pointer
  *
  * @returns a pointer to the UDP header, or NULL if this is not a UDP packet
  */
-struct libtrace_udp *get_udp(struct libtrace_t *libtrace, void *buffer, int buflen);
+struct libtrace_udp *trace_get_udp(struct libtrace_packet_t *packet);
 
 /** get a pointer to the ICMP header (if any)
- * @param libtrace      a pointer to the trace object returned from gettrace
- * @param buffer        a pointer to a filled in buffer
- * @param buflen        a pointer to the size of the buffer
+ * @param packet  	the packet opaque pointer
  *
  * @returns a pointer to the ICMP header, or NULL if this is not a ICMP packet
  */
-struct libtrace_icmp *get_icmp(struct libtrace_t *libtrace, void *buffer, int buflen);
+struct libtrace_icmp *trace_get_icmp(struct libtrace_packet_t *packet);
 
 /** Get the current time in DAG time format 
- * @param libtrace the libtrace opaque pointer
- * @param buffer a pointer to a filled in buffer
- * @param buflen the length of the buffer
+ * @param packet  	the packet opaque pointer
+ *
  * @returns a 64 bit timestamp in DAG ERF format (upper 32 bits are the seconds
  * past 1970-01-01, the lower 32bits are partial seconds)
  * @author Daniel Lawson
  */
-uint64_t get_erf_timestamp(struct libtrace_t *libtrace, void *buffer, int buflen);
+uint64_t trace_get_erf_timestamp(struct libtrace_packet_t *packet);
 
 /** Get the current time in struct timeval
- * @param libtrace the libtrace opaque pointer
- * @param buffer a pointer to a filled in buffer
- * @param buflen the length of the buffer
+ * @param packet  	the packet opaque pointer
+ *
  * @returns time that this packet was seen in a struct timeval
  * @author Daniel Lawson
  * @author Perry Lorier
  */ 
-
-struct timeval get_timeval(struct libtrace_t *libtrace, void *buffer, int buflen);
+struct timeval trace_get_timeval(struct libtrace_packet_t *packet);
 
 /** Get the current time in floating point seconds
- * @param libtrace the libtrace opaque pointer
- * @param buffer a pointer to a filled in buffer
- * @param buflen the length of the buffer
+ * @param packet  	the packet opaque pointer
+ *
  * @returns time that this packet was seen in 64bit floating point seconds
  * @author Perry Lorier
  */
-double get_seconds(struct libtrace_t *libtrace, void *buffer, int buflen);
+double trace_get_seconds(struct libtrace_packet_t *packet);
 
 /** Get the size of the packet in the trace
- * @param libtrace the libtrace opaque pointer
- * @param buffer a pointer to a filled in buffer
- * @param buflen the length of the buffer
+ * @param packet  	the packet opaque pointer
  * @returns the size of the packet in the trace
  * @author Perry Lorier
  * @note Due to this being a header capture, or anonymisation, this may not
@@ -308,12 +297,10 @@ double get_seconds(struct libtrace_t *libtrace, void *buffer, int buflen);
  *  This is sometimes called the "snaplen".
  */
 
-int get_capture_length(struct libtrace_t *libtrace, void *buffer, int buflen);
+int trace_get_capture_length(struct libtrace_packet_t *packet);
 
 /** Get the size of the packet as it was seen on the wire.
- * @param libtrace the libtrace opaque pointer
- * @param buffer a pointer to a filled in buffer
- * @param buflen the length of the buffer
+ * @param packet  	the packet opaque pointer
  * @returns the size of the packet as it was on the wire.
  * @author Perry Lorier
  * @author Daniel Lawson
@@ -321,7 +308,7 @@ int get_capture_length(struct libtrace_t *libtrace, void *buffer, int buflen);
  * not be the same as the Capture Len.
  */ 
 
-int get_wire_length(struct libtrace_t *libtrace, void *buffer, int buflen);
+int trace_get_wire_length(struct libtrace_packet_t *packet);
 
 /** Link layer types
  */
@@ -334,52 +321,35 @@ typedef enum {
      } libtrace_linktype_t;
 
 /** Get the type of the link layer
- * @param libtrace the libtrace opaque pointer
- * @param buffer a pointer to a filled in buffer
- * @param buflen the length of the buffer
+ * @param packet  	the packet opaque pointer
  * @returns libtrace_linktype_t
  * @author Perry Lorier
  * @author Daniel Lawson
  */
 
-inline libtrace_linktype_t get_link_type(
-		struct libtrace_t *libtrace,
-		void *buffer,
-		int buflen);	
+inline libtrace_linktype_t trace_get_link_type(struct libtrace_packet_t *packet);
 
 /** Get the destination MAC addres
- * @param libtrace the libtrace opaque pointer
- * @param buffer a pointer to a filled in buffer
- * @param buflen the length of the buffer
+ * @param packet  	the packet opaque pointer
  * @returns a pointer to the destination mac, (or NULL if there is no 
  * destination MAC)
  * @author Perry Lorier
  */
-uint8_t *get_destination_mac(struct libtrace_t *libtrace,
-			void *buffer,
-			int buflen);
+uint8_t *trace_get_destination_mac(struct libtrace_packet_t *packet);
 
 /** Get the source MAC addres
- * @param libtrace the libtrace opaque pointer
- * @param buffer a pointer to a filled in buffer
- * @param buflen the length of the buffer
+ * @param packet  	the packet opaque pointer
  * @returns a pointer to the source mac, (or NULL if there is no source MAC)
  * @author Perry Lorier
  */
-uint8_t *get_source_mac(struct libtrace_t *libtrace,
-			void *buffer,
-			int buflen);
+uint8_t *trace_get_source_mac(struct libtrace_packet_t *packet);
 
 /** Get the direction flag, if it has one
- * @param libtrace the libtrace opaque pointer
- * @param buffer a point to a fille in buffer
- * @param buflen the length of the buffer
+ * @param packet  	the packet opaque pointer
  * @returns a signed value containing the direction flag, or -1 if this is not supported
  * @author Daniel Lawson
  */
-int8_t get_direction(struct libtrace_t *libtrace,
-		      void *buffer,
-		      int buflen);
+int8_t trace_get_direction(struct libtrace_packet_t *packet);
 
 /** Event types */
 typedef enum {
@@ -394,31 +364,26 @@ typedef enum {
  *  TRACE_EVENT_SLEEP	Next event in <seconds>
  *  TRACE_EVENT_PACKET	Packet arrived in <buffer> with size <size>
  */
-libtrace_event_t libtrace_event(struct libtrace_t *trace,
-			int *fd,double *seconds,
-			void *buffer, size_t len, int *size);
+libtrace_event_t trace_event(struct libtrace_packet_t *packet,
+		int *fd,double *seconds);
 
 /** setup a BPF filter
  * @param filterstring a char * containing the bpf filter string
  * @returns opaque pointer pointer to a libtrace_filter_t object
  * @author Daniel Lawson
  */
-struct libtrace_filter_t *libtrace_bpf_setfilter(const char *filterstring);
+struct libtrace_filter_t *trace_bpf_setfilter(const char *filterstring);
 
 /** apply a BPF filter
- * @param libtrace the libtrace opaque pointer
- * @param filter the filter opaque pointer
- * @param buffer a pointer to a filled buffer
- * @param buflen the length of the buffer
+ * @param filter 	the filter opaque pointer
+ * @param packet	the packet opaque pointer
  * @returns the return value from bpf_filter
  * @author Daniel Lawson
  */
-int libtrace_bpf_filter(struct libtrace_t *trace,
-			struct libtrace_filter_t *filter,
-			void *buffer, 
-			int buflen);
+int trace_bpf_filter(struct libtrace_filter_t *filter,
+		struct libtrace_packet_t *packet);
 
 #ifdef __cplusplus
 } // extern "C"
-#endif // #ifdef _cplusplus
-#endif // _LIBTRACE_H_
+#endif // #ifdef __cplusplus
+#endif // LIBTRACE_H_

@@ -1,5 +1,5 @@
 CC=gcc-3.0
-CFLAGS= -Wall -Wimplicit -Wformat -pipe -g -O3
+CFLAGS= -Wall -Wimplicit -Wpedantic -Wformat -pipe -g -O3
 PROFCFLAGS= -Wall -Wimplicit -Wformat -pipe -g -pg -fprofile-arcs -a
 
 INCLUDE = -I../include -I/usr/local/wand/include
@@ -11,9 +11,9 @@ libdir = -L/usr/local/wand/lib/
 LDLIBS = $(libdir) -lpcapl -lzl
 
 
-CURRENT=1
-AGE=0
-REVISION=10
+CURRENT=2
+AGE=1
+REVISION=0
 
 INCLIBS=/usr/local/wand/lib/libzl.a /usr/local/wand/lib/libpcapl.a
 
