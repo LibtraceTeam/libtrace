@@ -41,6 +41,7 @@
 #include <stdint.h>
 #include "libtrace.h"
 #include "dagformat.h"
+
 struct libtrace_t *trace;
 
 #define SCANSIZE 4096
@@ -134,8 +135,6 @@ int main(int argc, char *argv[]) {
                         continue;
                 }
 
-                //erfptr = (dag_record_t *)buffer;
-                //ipptr = (struct ip *)erfptr->rec.eth.pload;
                 if((ipptr = trace_get_ip(&packet)) == 0) {
 			continue;
 		}
