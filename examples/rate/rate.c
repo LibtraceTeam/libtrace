@@ -95,7 +95,7 @@ void secondreport() {
 }
 int main(int argc, char *argv[]) {
 
-        char *hostname = "rtclient:chasm.cs.waikato.ac.nz";
+        char *hostname = 0;
         int psize = 0;
         int status = 0;
         struct sigaction sigact;

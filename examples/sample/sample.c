@@ -57,7 +57,7 @@ char *buffer[SCANSIZE];
 
 int main(int argc, char *argv[]) {
 
-        char *uri = "rtclient:chasm.cs.waikato.ac.nz";
+        char *uri = 0;
         int psize = 0;
         int status = 0;
         struct libtrace_ip *ipptr = 0;
