@@ -102,7 +102,7 @@ then
 		ADD_LIBS="$ADD_LIBS -ldag"
 		ADD_LDFLAGS="$ADD_LDFLAGS -L$dag_lib_dir"
                 #ADD_LIBS="$ADD_LIBS $dag_tools_dir/dagapi.o $dag_tools_dir/dagopts.o"
-                #ADD_SOURCEES="$ADD_SOURCES $dag_tools_dir/dagapi.c $dag_tools_dir/dagopts.c"
+                #ADD_SOURCES="$ADD_SOURCES $dag_tools_dir/dagapi.c $dag_tools_dir/dagopts.c"
                 ac_cv_lbl_dag_api=yes
         else
                 ac_cv_lbl_dag_api=no

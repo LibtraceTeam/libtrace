@@ -83,7 +83,7 @@ install_sh = @install_sh@
 
 lib_LTLIBRARIES = libtrace.la
 include_HEADERS = libtrace.h dagformat.h wag.h
-@HAVE_DAG_TRUE@libtrace_la_SOURCES = trace.c fifo.c fifo.h common.h dagapi.c dagopts.c
+@HAVE_DAG_TRUE@libtrace_la_SOURCES = trace.c fifo.c fifo.h common.h
 @HAVE_DAG_FALSE@libtrace_la_SOURCES = trace.c fifo.c fifo.h common.h
 libtrace_la_CFLAGS = @ADD_INCLS@
 libtrace_la_LIBADD = @ADD_LIBS@
@@ -96,8 +96,7 @@ LTLIBRARIES = $(lib_LTLIBRARIES)
 
 libtrace_la_DEPENDENCIES =
 @HAVE_DAG_TRUE@am_libtrace_la_OBJECTS = libtrace_la-trace.lo \
-@HAVE_DAG_TRUE@	libtrace_la-fifo.lo libtrace_la-dagapi.lo \
-@HAVE_DAG_TRUE@	libtrace_la-dagopts.lo
+@HAVE_DAG_TRUE@	libtrace_la-fifo.lo
 @HAVE_DAG_FALSE@am_libtrace_la_OBJECTS = libtrace_la-trace.lo \
 @HAVE_DAG_FALSE@	libtrace_la-fifo.lo
 libtrace_la_OBJECTS = $(am_libtrace_la_OBJECTS)
@@ -108,9 +107,7 @@ CPPFLAGS = @CPPFLAGS@
 LDFLAGS = @LDFLAGS@
 LIBS = @LIBS@
 depcomp = $(SHELL) $(top_srcdir)/depcomp
-@AMDEP_TRUE@DEP_FILES = $(DEPDIR)/libtrace_la-dagapi.Plo \
-@AMDEP_TRUE@	$(DEPDIR)/libtrace_la-dagopts.Plo \
-@AMDEP_TRUE@	$(DEPDIR)/libtrace_la-fifo.Plo \
+@AMDEP_TRUE@DEP_FILES = $(DEPDIR)/libtrace_la-fifo.Plo \
 @AMDEP_TRUE@	$(DEPDIR)/libtrace_la-trace.Plo
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
@@ -167,8 +164,6 @@ clean-libLTLIBRARIES:
 	-test -z "$(lib_LTLIBRARIES)" || rm -f $(lib_LTLIBRARIES)
 libtrace_la-trace.lo: trace.c
 libtrace_la-fifo.lo: fifo.c
-libtrace_la-dagapi.lo: dagapi.c
-libtrace_la-dagopts.lo: dagopts.c
 libtrace.la: $(libtrace_la_OBJECTS) $(libtrace_la_DEPENDENCIES) 
 	$(LINK) -rpath $(libdir) $(libtrace_la_LDFLAGS) $(libtrace_la_OBJECTS) $(libtrace_la_LIBADD) $(LIBS)
 
@@ -178,8 +173,6 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-@AMDEP_TRUE@@am__include@ @am__quote@$(DEPDIR)/libtrace_la-dagapi.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@$(DEPDIR)/libtrace_la-dagopts.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@$(DEPDIR)/libtrace_la-fifo.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@$(DEPDIR)/libtrace_la-trace.Plo@am__quote@
 
@@ -239,42 +232,6 @@ libtrace_la-fifo.lo: fifo.c
 @AMDEP_TRUE@	depfile='$(DEPDIR)/libtrace_la-fifo.Plo' tmpdepfile='$(DEPDIR)/libtrace_la-fifo.TPlo' @AMDEPBACKSLASH@
 @AMDEP_TRUE@	$(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 	$(LIBTOOL) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libtrace_la_CFLAGS) $(CFLAGS) -c -o libtrace_la-fifo.lo `test -f fifo.c || echo '$(srcdir)/'`fifo.c
-
-libtrace_la-dagapi.o: dagapi.c
-@AMDEP_TRUE@	source='dagapi.c' object='libtrace_la-dagapi.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@	depfile='$(DEPDIR)/libtrace_la-dagapi.Po' tmpdepfile='$(DEPDIR)/libtrace_la-dagapi.TPo' @AMDEPBACKSLASH@
-@AMDEP_TRUE@	$(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libtrace_la_CFLAGS) $(CFLAGS) -c -o libtrace_la-dagapi.o `test -f dagapi.c || echo '$(srcdir)/'`dagapi.c
-
-libtrace_la-dagapi.obj: dagapi.c
-@AMDEP_TRUE@	source='dagapi.c' object='libtrace_la-dagapi.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@	depfile='$(DEPDIR)/libtrace_la-dagapi.Po' tmpdepfile='$(DEPDIR)/libtrace_la-dagapi.TPo' @AMDEPBACKSLASH@
-@AMDEP_TRUE@	$(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libtrace_la_CFLAGS) $(CFLAGS) -c -o libtrace_la-dagapi.obj `cygpath -w dagapi.c`
-
-libtrace_la-dagapi.lo: dagapi.c
-@AMDEP_TRUE@	source='dagapi.c' object='libtrace_la-dagapi.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@	depfile='$(DEPDIR)/libtrace_la-dagapi.Plo' tmpdepfile='$(DEPDIR)/libtrace_la-dagapi.TPlo' @AMDEPBACKSLASH@
-@AMDEP_TRUE@	$(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-	$(LIBTOOL) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libtrace_la_CFLAGS) $(CFLAGS) -c -o libtrace_la-dagapi.lo `test -f dagapi.c || echo '$(srcdir)/'`dagapi.c
-
-libtrace_la-dagopts.o: dagopts.c
-@AMDEP_TRUE@	source='dagopts.c' object='libtrace_la-dagopts.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@	depfile='$(DEPDIR)/libtrace_la-dagopts.Po' tmpdepfile='$(DEPDIR)/libtrace_la-dagopts.TPo' @AMDEPBACKSLASH@
-@AMDEP_TRUE@	$(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libtrace_la_CFLAGS) $(CFLAGS) -c -o libtrace_la-dagopts.o `test -f dagopts.c || echo '$(srcdir)/'`dagopts.c
-
-libtrace_la-dagopts.obj: dagopts.c
-@AMDEP_TRUE@	source='dagopts.c' object='libtrace_la-dagopts.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@	depfile='$(DEPDIR)/libtrace_la-dagopts.Po' tmpdepfile='$(DEPDIR)/libtrace_la-dagopts.TPo' @AMDEPBACKSLASH@
-@AMDEP_TRUE@	$(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libtrace_la_CFLAGS) $(CFLAGS) -c -o libtrace_la-dagopts.obj `cygpath -w dagopts.c`
-
-libtrace_la-dagopts.lo: dagopts.c
-@AMDEP_TRUE@	source='dagopts.c' object='libtrace_la-dagopts.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@	depfile='$(DEPDIR)/libtrace_la-dagopts.Plo' tmpdepfile='$(DEPDIR)/libtrace_la-dagopts.TPlo' @AMDEPBACKSLASH@
-@AMDEP_TRUE@	$(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-	$(LIBTOOL) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libtrace_la_CFLAGS) $(CFLAGS) -c -o libtrace_la-dagopts.lo `test -f dagopts.c || echo '$(srcdir)/'`dagopts.c
 CCDEPMODE = @CCDEPMODE@
 uninstall-info-am:
 install-includeHEADERS: $(include_HEADERS)

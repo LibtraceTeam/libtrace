@@ -81,11 +81,6 @@
 #include "libtrace.h"
 #include "fifo.h"
 
-#define HAVE_BPF 0
-#define HAVE_PCAP 0
-#define HAVE_ZLIB 0
-#define DAGDEVICE 0
-
 #if HAVE_PCAP_BPF_H
 #  include <pcap-bpf.h>
 #  ifndef HAVE_BPF 
