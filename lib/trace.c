@@ -685,9 +685,9 @@ int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *pac
 			perror("gzread");
 			return -1;
 		}
-		if ((numbytes + dag_record_size) != rlen) {
-			printf("read %d wanted %d\n",numbytes +dag_record_size, rlen);
-		}
+		//if ((numbytes + dag_record_size) != rlen) {
+		//	printf("read %d wanted %d\n",numbytes +dag_record_size, rlen);
+		//}
 		packet->size = rlen;
 			
 		return rlen;
@@ -916,14 +916,16 @@ struct libtrace_ip *trace_get_ip(struct libtrace_packet_t *packet) {
  *
  * @returns a pointer to the TCP header, or NULL if there is not a TCP packet
  */
+
+#define SW_IP_OFFMASK 0xff1f
 struct libtrace_tcp *trace_get_tcp(struct libtrace_packet_t *packet) {
         struct libtrace_tcp *tcpptr = 0;
         struct libtrace_ip *ipptr = 0;
 
         if(!(ipptr = trace_get_ip(packet))) {
                 return 0;
-        }
-        if ((ipptr->ip_p == 6) && (ipptr->ip_off == 0 )) {
+	}
+        if ((ipptr->ip_p == 6) && ((ipptr->ip_off & SW_IP_OFFMASK) == 0))  {
                 tcpptr = (struct libtrace_tcp *)((ptrdiff_t)ipptr + (ipptr->ip_hl * 4));
         }
         return tcpptr;
@@ -943,7 +945,7 @@ struct libtrace_udp *trace_get_udp(struct libtrace_packet_t *packet) {
         if(!(ipptr = trace_get_ip(packet))) {
                 return 0;
         }
-        if (ipptr->ip_p == 17) {
+        if ((ipptr->ip_p == 17) && ((ipptr->ip_off & SW_IP_OFFMASK) == 0)) {
                 udpptr = (struct libtrace_udp *)((ptrdiff_t)ipptr + (ipptr->ip_hl * 4));
         }
         return udpptr;
@@ -963,7 +965,7 @@ struct libtrace_icmp *trace_get_icmp(struct libtrace_packet_t *packet) {
         if(!(ipptr = trace_get_ip(packet))) {
                 return 0;
         }
-        if (ipptr->ip_p == 1) {
+        if ((ipptr->ip_p == 1)&& ((ipptr->ip_off & SW_IP_OFFMASK) == 0 )){
                 icmpptr = (struct libtrace_icmp *)((ptrdiff_t)ipptr + (ipptr->ip_hl * 4));
         }
         return icmpptr;
