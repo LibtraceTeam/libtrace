@@ -645,7 +645,7 @@ int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *pac
         int size;
         char buf[RP_BUFSIZE];
 #if HAVE_PCAP
-        struct pcap_pkthdr *pcaphdr = malloc(sizeof(struct pcap_pkthdr));
+        //struct pcap_pkthdr *pcaphdr = malloc(sizeof(struct pcap_pkthdr));
         const u_char *pcappkt;
 	int pcapbytes = 0;
 #endif
