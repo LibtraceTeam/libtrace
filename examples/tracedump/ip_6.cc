@@ -31,21 +31,17 @@ int get_next_option(unsigned char **ptr,int *len,
 	*type=**ptr;
 	switch(*type) {
 		case 0:
-			printf(" DEBUG: End of options\n");
 			return 0;
 		case 1:
-			printf(" DEBUG: NOP\n");
 			(*ptr)++;
 			(*len)--;
 			return 1;
 		default:
-			printf(" DEBUG: Type %i len %i\n",
-					*type,*(*ptr+1));
 			*optlen = *(*ptr+1);
-			assert(*optlen>0);
+			assert(*optlen>=2);
 			(*len)-=*optlen;
 			(*data)=(*ptr+2);
-			(*ptr)+=*optlen;
+			(*ptr)+=*optlen+2;
 			if (*len<0)
 				return 0;
 			return 1;
@@ -81,7 +77,7 @@ void decode(int link_type,char *packet,int len)
 	DISPLAYS(check," Checksum %i");
 	DISPLAYS(urg_ptr," Urgent %i");
 	unsigned char *pkt = (unsigned char*)packet+sizeof(*tcp);
-	int plen = (len-sizeof *tcp) <? (tcp->doff*4);
+	int plen = (len-sizeof *tcp) <? (tcp->doff*4-sizeof *tcp);
 	unsigned char type,optlen,*data;
 	while(get_next_option(&pkt,&plen,&type,&optlen,&data)) {
 		printf("\n TCP: ");
@@ -93,7 +89,7 @@ void decode(int link_type,char *packet,int len)
 				printf("NOP");
 				break;
 			case 2:
-				printf("MSS %i",htonl(*(uint32_t *)(data)));
+				printf("MSS %i",htons(*(uint32_t *)(data)));
 				break;
 			case 3:
 				printf("Winscale %i",data[0]);

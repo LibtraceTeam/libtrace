@@ -8,6 +8,7 @@
 #include <stdio.h>
 #endif
 #include "asn1.h"
+#include <boost/format.hpp>
 
 
 const char *const ASN_type_class_t_names[] = {
@@ -43,7 +44,7 @@ void ASN_data::parse(void)
 {
 };
 
-void ASN_data::toString(void) {
+void ASN_data::display(void) {
 			printf(" ASN: %s %s 0x%x\n",
 					ASN_type_class_t_names[(int)type.getClass()],
 					type.isPrimative() 
@@ -76,9 +77,13 @@ void ASN_data::toString(void) {
 				}
 				printf("\n");
 			}
-		}; // toString 
+		}; // display 
+
 ASN_data::~ASN_data() {};
 
+std::string ASN_data::toString(void) {
+	return std::string("Unknown");
+};
 
 bool ASN::eof(void) const { 
 	return buffer.size()<=0; 
@@ -92,7 +97,7 @@ class ASN_bool : public ASN_data {
 		bool getValue(void) const {
 			return *buffer.begin()!=0;
 		}
-		void toString(void) const {
+		void display(void) const {
 			printf(" ASN: Bool:\t%s\n",getValue()
 						?"True":
 						"False");
@@ -112,7 +117,7 @@ class ASN_int : public ASN_data {
 			}
 			return val;
 		}
-		void toString(void) {
+		void display(void) {
 			printf(" ASN: Int:\t0x");
 			// Yeah, this is a dirty trick
 			for(buffer_t::const_iterator i=buffer.begin();
@@ -124,6 +129,32 @@ class ASN_int : public ASN_data {
 		}
 };
 
+// Type 3 -- Bitstring
+class ASN_bitstring : public ASN_data {
+	public:
+		ASN_bitstring(ASN_type t,uint64_t l) : ASN_data(t,l) {};
+		void display(void) {
+			printf(" DEBUG: %i bytes\n",buffer.size());
+			printf(" ASN: Bitstring:\t0b");
+			buffer_t::const_iterator i=buffer.begin();
+			//int bits=*i;
+			i++;
+			for( ;
+					i!=buffer.end();
+					i++) {
+				for (int j=0;j<7;j++) {
+					if (*i & (1<<(7-j))) {
+						printf("1");
+					}
+					else {
+						printf("0");
+					}
+				}
+				printf(" ");
+			}
+			printf("\n");
+		}
+};
 // Types - Simple Strings
 class ASN_string : public ASN_data {
 	public:
@@ -137,7 +168,7 @@ class ASN_string : public ASN_data {
 			}
 			return s;
 		}
-		void toString(void) {
+		void display(void) {
 			printf(" ASN: String:\t%s\n",getValue().c_str());
 		}
 };
@@ -145,52 +176,7 @@ class ASN_string : public ASN_data {
 class ASN_null : public ASN_data {
 	public:
 		ASN_null(ASN_type t,uint64_t l) : ASN_data(t,l) {};
-		void toString(void) { printf(" ASN: NULL\n"); }
-};
-
-// Abstract Container for sets and sequences
-class ASN_container : public ASN_data {
-	private:
-		std::vector<ASN_data *> subencodings;
-	public:
-		typedef std::vector<ASN_data *>::const_iterator const_iterator;
-		ASN_container(ASN_type t,uint64_t l) : ASN_data(t,l) {};
-		void parse() {
-			ASN n;
-			n.feed(buffer,len);
-			while (!n.eof()) {
-				subencodings.push_back(n.getEncoding());
-			}
-		};
-		const_iterator begin(void) { return (const_iterator)subencodings.begin(); }
-		const_iterator end(void) { return (const_iterator)subencodings.end(); }
-};
-
-// Type 16 - Sequence 
-class ASN_sequence : public ASN_container {
-	public:
-		ASN_sequence(ASN_type t,uint64_t l) : ASN_container(t,l) {};
-		void toString(void) {
-			printf(" ASN: Sequence begin\n");
-			for(const_iterator i=begin();
-					i!=end();
-					i++)
-				(*i)->toString();
-			printf(" ASN: Sequence end\n");
-		}
-};
-// Type 17 - Set
-class ASN_set : public ASN_container {
-	public:
-		ASN_set(ASN_type t,uint64_t l) : ASN_container(t,l) {};
-		void toString(void) {
-			printf(" ASN: Set begin\n");
-			for(const_iterator i=begin();
-					i!=end();
-					i++)
-				(*i)->toString();
-			printf(" ASN: Set end\n");
-		}
+		void display(void) { printf(" ASN: NULL\n"); }
 };
 
 // Type 6 - Object Identifier
@@ -216,7 +202,7 @@ class ASN_oid : public ASN_data {
 			while(buffer.size()!=0)
 				oid.push_back(decodeInt());
 		};
-		void toString(void) {
+		void display(void) {
 			printf(" ASN: OID");
 			for(std::vector<uint64_t>::const_iterator i=oid.begin();
 					i!=oid.end();
@@ -225,6 +211,73 @@ class ASN_oid : public ASN_data {
 			}
 			printf("\n");
 		};
+		std::string toString(void) {
+			std::string ret;
+			for(std::vector<uint64_t>::const_iterator i=oid.begin();
+					i!=oid.end();
+					i++) {
+				ret+=(boost::format(" %i") % *i).str();
+			}
+			return ret;
+		}
+};
+
+
+// Abstract Container for sets and sequences
+class ASN_container : public ASN_data {
+	protected:
+		std::vector<ASN_data *> subencodings;
+	public:
+		typedef std::vector<ASN_data *>::const_iterator const_iterator;
+		ASN_container(ASN_type t,uint64_t l) : ASN_data(t,l) {};
+		void parse() {
+			ASN n;
+			n.feed(buffer,len);
+			while (!n.eof()) {
+				subencodings.push_back(n.getEncoding());
+			}
+		};
+		const_iterator begin(void) { return (const_iterator)subencodings.begin(); }
+		const_iterator end(void) { return (const_iterator)subencodings.end(); }
+};
+
+// Type 16 - Sequence 
+class ASN_sequence : public ASN_container {
+	public:
+		ASN_sequence(ASN_type t,uint64_t l) : ASN_container(t,l) {};
+		void display(void) {
+			if (subencodings.size()==2 
+			  &&subencodings[0]->type.getTag() == 6) {
+				printf(" ASN: Sequence OID (%s)\n",subencodings[0]->toString().c_str());
+				subencodings[1]->display();
+				return;
+			}
+
+			printf(" ASN: Sequence begin (%i items)\n",subencodings.size());
+			for(const_iterator i=begin();
+					i!=end();
+					i++)
+				(*i)->display();
+			printf(" ASN: Sequence end\n");
+		}
+};
+// Type 17 - Set
+class ASN_set : public ASN_container {
+	public:
+		ASN_set(ASN_type t,uint64_t l) : ASN_container(t,l) {};
+		void display(void) {
+			if (subencodings.size()==1) {
+				printf(" ASN: Single item set\n");
+				subencodings[0]->display();
+				return;
+			}
+			printf(" ASN: Set begin\n");
+			for(const_iterator i=begin();
+					i!=end();
+					i++)
+				(*i)->display();
+			printf(" ASN: Set end\n");
+		}
 };
 
 
@@ -267,34 +320,44 @@ ASN_data *ASN::getEncoding(void)
 	ASN_type t=getType();
 	uint64_t l=getLength();
 	ASN_data *ret;
-	switch(t.getTag()) {
-		case 1:
-			ret=new ASN_bool(t,l);
-			break;
-		case 2:
-			ret=new ASN_int(t,l);
-			break;
-		case 5:
-			ret=new ASN_null(t,l);
-			break;
-		case 6:
-			ret=new ASN_oid(t,l);
-			break;
-		case 16:
-			ret=new ASN_sequence(t,l);
-			break;
-		case 17:
-			ret=new ASN_set(t,l);
-			break;
-		case 18:
-		case 19:
-		case 20:
-		case 21:
-		case 22:
-		case 25:
-		case 26:
-		case 27:
-			ret=new ASN_string(t,l);
+	switch(t.getClass()) {
+		case Universal:
+			switch(t.getTag()) {
+				case 1:
+					ret=new ASN_bool(t,l);
+					break;
+				case 2:
+					ret=new ASN_int(t,l);
+					break;
+				case 3:
+					ret=new ASN_bitstring(t,l);
+					break;
+				case 5:
+					ret=new ASN_null(t,l);
+					break;
+				case 6:
+					ret=new ASN_oid(t,l);
+					break;
+				case 16:
+					ret=new ASN_sequence(t,l);
+					break;
+				case 17:
+					ret=new ASN_set(t,l);
+					break;
+				case 18:
+				case 19:
+				case 20:
+				case 21:
+				case 22:
+				case 25:
+				case 26:
+				case 27:
+					ret=new ASN_string(t,l);
+					break;
+				default:
+					ret=new ASN_data(t,l);
+					break;
+			}
 			break;
 		default:
 			ret=new ASN_data(t,l);
@@ -333,10 +396,11 @@ int main(int argc, char **argv)
 	
 	asn->feed(buffer,size);
 
-	ASN_data *data= asn->getEncoding();
-	
-	data->toString();
-	data->toString();
+	while(!asn->eof()) {
+		ASN_data *data= asn->getEncoding();
+
+		data->display();
+	}
 
 	return 0;
 }

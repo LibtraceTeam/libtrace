@@ -4,14 +4,14 @@ INCLUDES=-I/usr/local/wand/include
 LIBDIR="./"
 CXXFLAGS=-g -Wall $(INCLUDES) -rdynamic
 LDFLAGS=-L/usr/local/wand/lib
-LDLIBS=-ltrace -ldl
+LDLIBS=-ltrace -ldl -lpcap -lz
 LINK_LAYERS=$(addsuffix .so,$(basename $(wildcard link_*.cc)))
 ETH_LAYERS=$(addsuffix .so,$(basename $(wildcard eth_*.cc)))
 IP_LAYERS=$(addsuffix .so,$(basename $(wildcard ip_*.cc)))
 TCP_LAYERS=$(addsuffix .so,$(basename $(wildcard tcp_*.cc)))
 PLUGINS=$(LINK_LAYERS) $(ETH_LAYERS) $(IP_LAYERS) $(TCP_LAYERS)
 
-all: tracedump $(PLUGINS) asn1-test
+all: tracedump $(PLUGINS) asn1-test links
 
 tracedump: tracedump.cc tracedump-libtrace.o tracedump-lib.o
 
@@ -24,6 +24,10 @@ tcp_1720.so: tcp_1720.cc asn1.o
 
 asn1-test: CXXFLAGS+=-DTEST
 asn1-test: asn1.cc
+	$(CXX) $(CXXFLAGS) $^ -o $@
+
+links: links.txt
+	./make_links
 
 clean:
 	rm -f *.o tracedump *.so
@@ -31,5 +35,5 @@ clean:
 install:
 	cp *.so $(LIBDIR)
 
-.PHONY: clean all
+.PHONY: clean all links
 

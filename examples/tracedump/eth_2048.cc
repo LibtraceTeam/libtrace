@@ -30,7 +30,7 @@ void decode(int link_type,char *packet,int len)
 		printf(" Ver %i",ip->version);
 	}
 	DISPLAY(tos," TOS %02x")
-	DISPLAY(tot_len," Total Length %i")
+	DISPLAYS(tot_len," Total Length %i")
 	printf("\n IP:");
 	DISPLAY(id," Id %i");
 	DISPLAY(frag_off," Fragoff %i");

@@ -29,6 +29,7 @@ void decode(int link_type,char *packet,int len)
 	if (len<=0)
 		return;
 	asn.feed(packet,len);
-	asn.getEncoding()->toString();
+	while (!asn.eof())
+		asn.getEncoding()->display();
 	return;
 }

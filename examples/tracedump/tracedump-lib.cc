@@ -16,20 +16,22 @@ typedef void (*decode_t)(uint16_t type,char *packet,int len);
 
 static std::map<std::string,std::map<uint16_t,decode_t> > decoders;
 
+#define WIDTH 16
+
 static void generic_decode(uint16_t type,char *packet, int len) {
 	int i;
 	printf(" Unknown Protocol: %i",type);
 	for(i=0;i<len; /* Nothing */ ) {
 		int j;
 		printf("\n ");
-		for(j=0;j<8;j++) {
+		for(j=0;j<WIDTH;j++) {
 			if (i+j<len)
 				printf(" %02x",(unsigned char)packet[i+j]);
 			else
 				printf("   ");
 		}
 		printf("    ");
-		for(j=0;j<8;j++) {
+		for(j=0;j<WIDTH;j++) {
 			if (i+j<len)
 				if (isprint((unsigned char)packet[i+j]))
 					printf("%c",(unsigned char)packet[i+j]);
@@ -38,10 +40,10 @@ static void generic_decode(uint16_t type,char *packet, int len) {
 			else
 				printf("   ");
 		}
-		if (i+8>len)
+		if (i+WIDTH>len)
 			break;
 		else
-			i+=8;
+			i+=WIDTH;
 	}
 	printf("\n");
 }

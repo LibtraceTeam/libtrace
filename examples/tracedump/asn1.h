@@ -31,7 +31,8 @@ class ASN_data {
 		void feed(std::list<uint8_t> &buffer,uint64_t len);
 		virtual void parse(void);
 
-		virtual void toString(void);
+		virtual void display(void);
+		virtual std::string toString(void);
 		virtual ~ASN_data();
 };
 
