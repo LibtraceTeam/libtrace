@@ -65,7 +65,7 @@ extern "C" {
  * to your linker. You may also need to link against a version of libpcap 
  * and of zlib which are compiled for largefile support (if you wish to access
  * traces larger than 2 GB). This is left as an exercise for the reader. Debian
- * Woody, at least, does not support large files offsets.
+ * Woody, at least, does not support large file offsets.
  *
  */
 
@@ -131,14 +131,14 @@ struct libtrace_tcp
     u_int16_t res2:2;		/**< Reserved */
 #  elif BYTE_ORDER == BIG_ENDIAN
     u_int16_t doff:4;		
-    u_int16_t res1:4;
-    u_int16_t res2:2;
-    u_int16_t urg:1;
-    u_int16_t ack:1;
-    u_int16_t psh:1;
-    u_int16_t rst:1;
-    u_int16_t syn:1;
-    u_int16_t fin:1;
+    u_int16_t res1:4;		/**< Reserved bits */
+    u_int16_t res2:2;		/**< Reserved */
+    u_int16_t urg:1;		/**< URG flag */
+    u_int16_t ack:1;		/**< ACK flag */
+    u_int16_t psh:1;		/**< PuSH flag */
+    u_int16_t rst:1;		/**< RST flag */
+    u_int16_t syn:1;		/**< SYN flag */
+    u_int16_t fin:1;		/**< FIN flag */
 #  else
 #   error "Adjust your <bits/endian.h> defines"
 #  endif
@@ -158,22 +158,22 @@ struct libtrace_udp {
 /** ICMP Header for dealing with icmp packets */
 struct libtrace_icmp
 {
-  u_int8_t type;		/* message type */
-  u_int8_t code;		/* type sub-code */
-  u_int16_t checksum;
+  u_int8_t type;		/**< message type */
+  u_int8_t code;		/**< type sub-code */
+  u_int16_t checksum;		/**< checksum */
   union
   {
     struct
     {
       u_int16_t	id;
       u_int16_t	sequence;
-    } echo;			/* echo datagram */
-    u_int32_t	gateway;	/* gateway address */
+    } echo;			/**< echo datagram */
+    u_int32_t	gateway;	/**< gateway address */
     struct
     {
       u_int16_t	unused;
       u_int16_t	mtu;
-    } frag;			/* path mtu discovery */
+    } frag;			/**< path mtu discovery */
   } un;
 };
 
