@@ -37,6 +37,10 @@ struct libtrace_ip
     }
   };
 
+%extend libtrace_ip {
+	~libtrace_ip() { free(self); }
+}
+
 %{
 #define MAKE_NTOHS(class,member) \
 	    uint16_t class ## _ ## member ## _get (struct class *self) { \
@@ -85,6 +89,10 @@ struct libtrace_tcp
 }
 };
 
+%extend libtrace_tcp {
+	~libtrace_tcp() { free(self); }
+}
+
 %{
  MAKE_NTOHS(libtrace_tcp,source)
  MAKE_NTOHS(libtrace_tcp,dest)
@@ -106,6 +114,10 @@ struct libtrace_udp {
   const uint16_t	check;		/**< Checksum */
   }
 };
+
+%extend libtrace_udp {
+	~libtrace_udp() { free(self); }
+}
 
 %{
  MAKE_NTOHS(libtrace_udp,source)
@@ -135,37 +147,33 @@ struct libtrace_icmp
   } un;
 };
 
-%{
-typedef struct Packet {
-	struct libtrace_t *libtrace;
-	void *buffer;
-	int status;
-	int len;
-} Packet;
-%}
+%extend libtrace_icmp {
+	~libtrace_icmp() { free(self); }
+}
 
-%nodefault;
-typedef struct Packet {
-	void *buffer;
-	int status;
-	int len;
-} Packet;
+%rename (Packet) libtrace_packet_t;
+struct libtrace_packet_t {};
 
-%extend Packet {
-	struct libtrace_ip *get_ip() {
-		return get_ip(self->libtrace,self->buffer,self->len);
+%extend libtrace_packet_t {
+	libtrace_packet_t() { 
+		struct libtrace_packet_t *packet = malloc(sizeof(struct libtrace_packet_t));
+		return packet;
+		}
+	~libtrace_packet_t() {free(self);}
+	struct libtrace_ip *trace_get_ip() {
+		return trace_get_ip(self);
 	}
-	struct libtrace_tcp *get_tcp() {
-		return get_tcp(self->libtrace,self->buffer,self->len);
+	struct libtrace_tcp *trace_get_tcp() {
+		return trace_get_tcp(self);
 	}
-	struct libtrace_udp *get_udp() {
-		return get_udp(self->libtrace,self->buffer,self->len);
+	struct libtrace_udp *trace_get_udp() {
+		return trace_get_udp(self);
 	}
-	struct libtrace_icmp *get_icmp() {
-		return get_icmp(self->libtrace,self->buffer,self->len);
+	struct libtrace_icmp *trace_get_icmp() {
+		return trace_get_icmp(self);
 	}
-	double get_seconds() {
-		return get_seconds(self->libtrace,self->buffer,self->len);
+	double trace_get_seconds() {
+		return trace_get_seconds(self);
 	}
 };
 
@@ -173,32 +181,10 @@ typedef struct Packet {
 struct libtrace_t {};
 
 %extend libtrace_t {
-	libtrace_t(char *uri) { return create_trace(uri); };
-	~libtrace_t() { destroy_trace(self); }
-	Packet *read_packet() { 
-		Packet *buffer = malloc(sizeof(Packet));
-		buffer->buffer = malloc(1600);
-		buffer->len=libtrace_read_packet(self,buffer->buffer,1600,&buffer->status);
-		buffer->libtrace = self;
-		if (buffer->len == 0) {
-			free(buffer);
-			return NULL;
-		}
-		return buffer;
+	libtrace_t(char *uri) { return trace_create(uri); };
+	~libtrace_t() { trace_destroy(self); }
+	int trace_read_packet(struct libtrace_packet_t *packet) { 
+		return trace_read_packet(self,packet);
 	}
 }; 
 
-/*
-void *get_link(struct libtrace_t *libtrace, void *buffer, int buflen);
-int get_capture_length(struct libtrace_t *libtrace, void *buffer, int buflen);
-int get_wire_length(struct libtrace_t *libtrace, void *buffer, int buflen);
-libtrace_linktype_t get_link_type(
-	struct libtrace_t *libtrace, void *buffer, int buflen);
-uint8_t *get_destination_mac(struct libtrace_t *libtrace,
-	 void *buffer, int buflen);
-uint8_t *get_source_mac(struct libtrace_t *libtrace,
- 	void *buffer, int buflen);
-libtrace_event_t libtrace_event(struct libtrace_t *trace,
-			int *fd,double *seconds,
-			void *buffer, int *size);
-*/

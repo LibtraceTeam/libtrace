@@ -6,13 +6,16 @@ trace = libtrace.Trace(sys.argv[1])
 
 print "trace=",trace
 
-packet = trace.read_packet()
 
-print "packet=",packet
 
 while 1:
-	packet = trace.read_packet()
+	packet = libtrace.Packet()
+	trace.trace_read_packet(packet)
 	if not packet:
 		break
-	print packet.get_ip().ip_src,'->',packet.get_ip().ip_dst
+	ippacket = packet.trace_get_ip()
+	if not ippacket:
+		continue
+
+	print ippacket.ip_src,'->',ippacket.ip_dst
 

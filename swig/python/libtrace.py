@@ -84,6 +84,10 @@ class libtrace_ip(_object):
     if _newclass:ip_src = property(_libtrace.libtrace_ip_ip_src_get)
     __swig_getmethods__["ip_dst"] = _libtrace.libtrace_ip_ip_dst_get
     if _newclass:ip_dst = property(_libtrace.libtrace_ip_ip_dst_get)
+    def __del__(self, destroy=_libtrace.delete_libtrace_ip):
+        try:
+            if self.thisown: destroy(self)
+        except: pass
 
 class libtrace_ipPtr(libtrace_ip):
     def __init__(self, this):
@@ -145,6 +149,10 @@ class libtrace_tcp(_object):
     if _newclass:seq = property(_libtrace.libtrace_tcp_seq_get)
     __swig_getmethods__["ack_seq"] = _libtrace.libtrace_tcp_ack_seq_get
     if _newclass:ack_seq = property(_libtrace.libtrace_tcp_ack_seq_get)
+    def __del__(self, destroy=_libtrace.delete_libtrace_tcp):
+        try:
+            if self.thisown: destroy(self)
+        except: pass
 
 class libtrace_tcpPtr(libtrace_tcp):
     def __init__(self, this):
@@ -169,6 +177,10 @@ class libtrace_udp(_object):
     if _newclass:len = property(_libtrace.libtrace_udp_len_get)
     __swig_getmethods__["check"] = _libtrace.libtrace_udp_check_get
     if _newclass:check = property(_libtrace.libtrace_udp_check_get)
+    def __del__(self, destroy=_libtrace.delete_libtrace_udp):
+        try:
+            if self.thisown: destroy(self)
+        except: pass
 
 class libtrace_udpPtr(libtrace_udp):
     def __init__(self, this):
@@ -196,6 +208,10 @@ class libtrace_icmp(_object):
     if _newclass:checksum = property(_libtrace.libtrace_icmp_checksum_get, _libtrace.libtrace_icmp_checksum_set)
     __swig_getmethods__["un"] = _libtrace.libtrace_icmp_un_get
     if _newclass:un = property(_libtrace.libtrace_icmp_un_get)
+    def __del__(self, destroy=_libtrace.delete_libtrace_icmp):
+        try:
+            if self.thisown: destroy(self)
+        except: pass
 
 class libtrace_icmpPtr(libtrace_icmp):
     def __init__(self, this):
@@ -276,23 +292,20 @@ class Packet(_object):
     __setattr__ = lambda self, name, value: _swig_setattr(self, Packet, name, value)
     __swig_getmethods__ = {}
     __getattr__ = lambda self, name: _swig_getattr(self, Packet, name)
-    def __init__(self): raise RuntimeError, "No constructor defined"
     def __repr__(self):
-        return "<C Packet instance at %s>" % (self.this,)
-    __swig_setmethods__["buffer"] = _libtrace.Packet_buffer_set
-    __swig_getmethods__["buffer"] = _libtrace.Packet_buffer_get
-    if _newclass:buffer = property(_libtrace.Packet_buffer_get, _libtrace.Packet_buffer_set)
-    __swig_setmethods__["status"] = _libtrace.Packet_status_set
-    __swig_getmethods__["status"] = _libtrace.Packet_status_get
-    if _newclass:status = property(_libtrace.Packet_status_get, _libtrace.Packet_status_set)
-    __swig_setmethods__["len"] = _libtrace.Packet_len_set
-    __swig_getmethods__["len"] = _libtrace.Packet_len_get
-    if _newclass:len = property(_libtrace.Packet_len_get, _libtrace.Packet_len_set)
-    def get_ip(*args): return _libtrace.Packet_get_ip(*args)
-    def get_tcp(*args): return _libtrace.Packet_get_tcp(*args)
-    def get_udp(*args): return _libtrace.Packet_get_udp(*args)
-    def get_icmp(*args): return _libtrace.Packet_get_icmp(*args)
-    def get_seconds(*args): return _libtrace.Packet_get_seconds(*args)
+        return "<C libtrace_packet_t instance at %s>" % (self.this,)
+    def __init__(self, *args):
+        _swig_setattr(self, Packet, 'this', _libtrace.new_Packet(*args))
+        _swig_setattr(self, Packet, 'thisown', 1)
+    def __del__(self, destroy=_libtrace.delete_Packet):
+        try:
+            if self.thisown: destroy(self)
+        except: pass
+    def trace_get_ip(*args): return _libtrace.Packet_trace_get_ip(*args)
+    def trace_get_tcp(*args): return _libtrace.Packet_trace_get_tcp(*args)
+    def trace_get_udp(*args): return _libtrace.Packet_trace_get_udp(*args)
+    def trace_get_icmp(*args): return _libtrace.Packet_trace_get_icmp(*args)
+    def trace_get_seconds(*args): return _libtrace.Packet_trace_get_seconds(*args)
 
 class PacketPtr(Packet):
     def __init__(self, this):
@@ -315,7 +328,7 @@ class Trace(_object):
         try:
             if self.thisown: destroy(self)
         except: pass
-    def read_packet(*args): return _libtrace.Trace_read_packet(*args)
+    def trace_read_packet(*args): return _libtrace.Trace_trace_read_packet(*args)
 
 class TracePtr(Trace):
     def __init__(self, this):
