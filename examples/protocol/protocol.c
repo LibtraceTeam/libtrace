@@ -32,7 +32,7 @@ int main(int argc, char *argv[]) {
                 }
 	 	ipptr = get_ip(trace,buffer,4096);
 		if (ipptr) {
-			printf("%d\n",ipptr->ip_p);
+			printf("%d:%d\n",ipptr->ip_p,get_link_type(trace,buffer,4096));
 		}
         }
         destroy_trace(trace);
