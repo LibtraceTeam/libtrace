@@ -34,12 +34,12 @@ void decode(int link_type,char *packet,int len)
 	printf("\n IP:");
 	DISPLAY(id," Id %i");
 	DISPLAY(frag_off," Fragoff %i");
-	printf("\n IP:");
+	//printf("\n IP:");
 	DISPLAY(ttl," TTL %i");
 	DISPLAY(protocol," Proto %i");
 	DISPLAYS(check," Checksum %i\n");
-	DISPLAYIP(saddr," IP: Source %s\n");
-	DISPLAYIP(daddr," IP: Destination %s\n");
+	DISPLAYIP(saddr," IP: Source %s ");
+	DISPLAYIP(daddr,"Destination %s\n");
 	decode_next(packet+sizeof(*ip),len-sizeof(*ip),"ip",ip->protocol);
 	return;
 }
