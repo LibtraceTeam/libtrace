@@ -13,6 +13,8 @@
 
 @SET_MAKE@
 
+# Makefile.am -- Process this file with automake to produce Makefile.in
+
 SHELL = @SHELL@
 
 srcdir = @srcdir@
@@ -82,6 +84,12 @@ am__include = @am__include@
 am__quote = @am__quote@
 install_sh = @install_sh@
 
+INCLUDES = -I$(top_builddir) -I$(top_srcdir)
+
+
+#noinst_LIBRARIES = libreplace.a
+#libreplace_a_SOURCES = 
+#libreplace_a_LIBADD = @LIBOBJS@
 lib_LTLIBRARIES = libtrace.la
 include_HEADERS = libtrace.h dagformat.h wag.h
 @HAVE_DAG_TRUE@libtrace_la_SOURCES = trace.c fifo.c fifo.h common.h dagapi.c dagopts.c

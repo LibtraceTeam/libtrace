@@ -426,7 +426,7 @@ struct libtrace_t *trace_create(char *uri) {
 #if HAVE_ZLIB
                                 libtrace->input.file = gzdopen(STDIN, "r");
 #else	
-				libtrace->input.file = fdopen(STDIN, "r");
+				libtrace->input.file = stdin;
 #endif
                         }
                         break;

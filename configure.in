@@ -57,6 +57,8 @@ else
 	AC_MSG_RESULT([Using $xmlparser])
 fi
 
+AC_REPLACE_FUNCS(strndup)
+
 dnl Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
 AC_C_INLINE

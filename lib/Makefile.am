@@ -1,3 +1,11 @@
+# Makefile.am -- Process this file with automake to produce Makefile.in
+
+INCLUDES = -I$(top_builddir) -I$(top_srcdir)
+
+noinst_LIBRARIES = libreplace.a
+libreplace_a_SOURCES = 
+libreplace_a_LIBADD = @LIBOBJS@
+
 lib_LTLIBRARIES = libtrace.la
 include_HEADERS = libtrace.h dagformat.h wag.h
 if HAVE_DAG

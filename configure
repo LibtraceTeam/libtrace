@@ -7922,6 +7922,7 @@ else
 echo "${ECHO_T}Using $xmlparser" >&6
 fi
 
+
 echo "$as_me:$LINENO: checking for $CC option to accept ANSI C" >&5
 echo $ECHO_N "checking for $CC option to accept ANSI C... $ECHO_C" >&6
 if test "${ac_cv_prog_cc_stdc+set}" = set; then
