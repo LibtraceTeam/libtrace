@@ -176,10 +176,10 @@ static int init_trace(struct libtrace_t **libtrace, char *uri) {
                 case DAG:
                         /*
                          * Can have uridata of the following format
-                         * /path/to/socket
+                         * /path/to/socket (probably not PCAP)
                          * /path/to/file
-                         * /path/to/file.gz
-			 * /dev/device
+                         * /path/to/file.gz (not PCAP)
+			 * /dev/device (use PCAPINT)
                          * -
                          */
                         if (!strncmp(uridata,"-",1)) {
@@ -222,7 +222,7 @@ static int init_trace(struct libtrace_t **libtrace, char *uri) {
                                         COLLECTOR_PORT;
                         } else {
                                 (*libtrace)->conn_info.rt.hostname =
-                                        strndup(uridata,(scan - uridata));
+                                        (char *)strndup(uridata,(scan - uridata));
                                         
                                 (*libtrace)->conn_info.rt.port = 
                                         atoi(++scan);                           
@@ -247,9 +247,8 @@ static int init_trace(struct libtrace_t **libtrace, char *uri) {
  *  erf:/path/to/erf/file.gz
  *  erf:/path/to/rtclient/socket
  *  erf:-  			(stdin)
- *  pcap:pcapinterface 		(eg: pcap:eth0)
+ *  pcapint:pcapinterface 		(eg: pcapint:eth0)
  *  pcap:/path/to/pcap/file
- *  pcap:/path/to/pcap/file.gz
  *  pcap:-
  *  rtclient:hostname
  *  rtclient:hostname:port
@@ -257,7 +256,7 @@ static int init_trace(struct libtrace_t **libtrace, char *uri) {
  *  wag:/path/to/wag/file
  *  wag:/path/to/wag/file.gz
  *  wag:/path/to/wag/socket
- *  wag:/dev/device
+ *  wagint:/dev/device
  *
  * URIs which have yet to be implemented are:
  * dag:/dev/dagcard
@@ -301,8 +300,10 @@ struct libtrace_t *trace_create(char *uri) {
                         break;
                 case TRACE:
                         if (libtrace->format == PCAP) {
-                                libtrace->input.pcap = pcap_open_offline(libtrace->conn_info.path, errbuf); 
-				//TODO Check that the open succeeded
+                                if ((libtrace->input.pcap = pcap_open_offline(libtrace->conn_info.path, errbuf)) == NULL) {
+					fprintf(stderr,"%s\n",errbuf);
+					return 0;
+				}
                         } else {
                                 libtrace->input.file = gzopen(libtrace->conn_info.path, "r");
                         }
