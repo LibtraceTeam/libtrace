@@ -1195,7 +1195,6 @@ int8_t trace_get_direction(struct libtrace_packet_t *packet) {
 	
 }
 
-typedef enum {USE_DEST, USE_SOURCE} serverport_t;
 
 /** Attempt to deduce the 'server' port
  * @param protocol the IP protocol (eg, 6 or 17 for TCP or UDP)
