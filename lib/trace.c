@@ -168,6 +168,7 @@ struct libtrace_t {
 	} packet;
 	double last_ts;
 	double start_ts;
+	struct timeval start_tv;
 };
 
 struct trace_sll_header_t {
@@ -1475,7 +1476,11 @@ struct libtrace_eventobj_t trace_event(struct libtrace_t *trace,
 					perror("ioctl(FIONREAD)");
 				}
 				if (data>0) {
-					trace_read_packet(trace,packet);
+					event.size = trace_read_packet(trace,packet);
+					if (event.size < 0) {
+						event.type = TRACE_EVENT_TERMINATE;
+						return event;
+					}
 					event.type = TRACE_EVENT_PACKET;
 					return event;
 				}
@@ -1493,7 +1498,11 @@ struct libtrace_eventobj_t trace_event(struct libtrace_t *trace,
 					perror("ioctl(FIONREAD)");
 				}
 				if (data>0) {
-					trace_read_packet(trace,packet);
+					event.size = trace_read_packet(trace,packet);
+					if (event.size < 0) {
+						event.type = TRACE_EVENT_TERMINATE;
+						return event;
+					}
 					event.type = TRACE_EVENT_PACKET;
 					return event;
 				}
@@ -1504,32 +1513,53 @@ struct libtrace_eventobj_t trace_event(struct libtrace_t *trace,
 		case TRACE:
 			{
 				double ts;
+				double now;
+				struct timeval stv;
 				/* "Prime" the pump */
 				if (!trace->packet.buffer) {
 					trace->packet.buffer = malloc(4096);
 					trace->packet.size=
 						trace_read_packet(trace,packet);
+					if (trace->packet.size > 0 ) {
+						memcpy(trace->packet.buffer,packet->buffer,trace->packet.size);
+					}
 				}
+				event.size = trace->packet.size;
+
+				if (event.size == 0) {
+					event.type = TRACE_EVENT_TERMINATE;
+					return event;
+				}
+
 				ts=trace_get_seconds(packet);
 				if (trace->last_ts!=0) {
 					event.seconds = ts - trace->last_ts;
-					if (event.seconds>time(NULL)-trace->start_ts) {
+					gettimeofday(&stv, NULL);
+					now = stv.tv_sec + ((double)stv.tv_usec / 1000000.0);
+					
+					if (event.seconds > (now - trace->start_ts)) {
 						event.type = TRACE_EVENT_SLEEP;
 						return event;
 					}
 					
 				}
 				else {
-					trace->start_ts = time(NULL);
+					gettimeofday(&stv, NULL);
+					trace->start_ts = stv.tv_sec + ((double)stv.tv_usec / 1000000.0);
 					trace->last_ts = ts;
 				}
-
+				
 				packet->size = trace->packet.size;
 				memcpy(packet->buffer,trace->packet.buffer,trace->packet.size);
 
 				free(trace->packet.buffer);
 				trace->packet.buffer = 0;
 				event.type = TRACE_EVENT_PACKET;
+				
+				gettimeofday(&stv, NULL);
+				trace->start_ts = stv.tv_sec + ((double)stv.tv_usec / 1000000.0);
+				trace->last_ts = ts;
+				
 				return event;
 			}
 		default:
