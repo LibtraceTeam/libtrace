@@ -73,10 +73,6 @@ int32_t event_read_packet(struct libtrace_t *trace, struct libtrace_packet_t *pa
 
 struct timeval current,last,diff,total;
 
-void alarmsig(int sig) {
-        docalc++;
-}
-
 void secondreport() {
 
         static int hdrcount = 10;
@@ -102,25 +98,11 @@ int main(int argc, char *argv[]) {
 
         char *uri = 0;
         int psize = 0;
-        struct sigaction sigact;
         struct libtrace_ip *ipptr = 0;
 	struct libtrace_packet_t packet;
+	uint32_t last_second = 0;
+	double ts = 0.0;
 
-        struct itimerval itv;
-
-        /* 
-         * Set up a timer to expire every second, for reporting
-         */
-        sigact.sa_handler = alarmsig;
-        sigact.sa_flags = SA_RESTART;
-        if(sigaction(SIGALRM, &sigact, NULL) < 0)
-                perror("sigaction");
-        itv.it_interval.tv_sec = 1;
-        itv.it_interval.tv_usec = 0;
-        itv.it_value.tv_sec = 1;
-        itv.it_value.tv_usec = 0;
-        if (setitimer(ITIMER_REAL, &itv, NULL) < 0)
-                perror("setitimer");
 
         if (argc == 2) {
                 uri = strdup(argv[1]);
@@ -150,13 +132,20 @@ int main(int argc, char *argv[]) {
                 counter[BYTES][INSTANT] += ntohs(ipptr->ip_len);
                 counter[PACKETS][INSTANT] ++;
 
+		ts = trace_get_seconds(&packet);
+		if(last_second == 0) {
+			last_second = (int)ts;
+		} else if (last_second < (int)ts) {
+			last_second = (int)ts;
+			docalc++;
+		}
+
                 if(docalc) {
                         secondreport();
                 }
 
 
         }
-
         trace_destroy(trace);
         return 0;
 }
