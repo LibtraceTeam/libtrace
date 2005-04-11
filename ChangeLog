@@ -28,6 +28,10 @@
 ##
 ##
 
+- Version 2.0.16
+        * Fixed a bug in the event api where it would die instantly
+	  for offline traces.
+
 - Version 2.0.15b
 	* Fix a memory leak
 	* Correct calls to trace_get_link to catch a NULL returned
