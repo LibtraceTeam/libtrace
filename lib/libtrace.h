@@ -459,6 +459,7 @@ struct libtrace_eventobj_t {
  *  TRACE_EVENT_IOWAIT	Waiting on I/O on <fd>
  *  TRACE_EVENT_SLEEP	Next event in <seconds>
  *  TRACE_EVENT_PACKET	Packet arrived in <buffer> with size <size>
+ *  TRACE_EVENT_TERMINATE Trace terminated (perhaps with an error condition)
  */
 struct libtrace_eventobj_t trace_event(struct libtrace_t *trace,
 		struct libtrace_packet_t *packet);

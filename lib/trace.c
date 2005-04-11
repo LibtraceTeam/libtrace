@@ -166,9 +166,13 @@ struct libtrace_t {
 		void *buffer;
 		int size;
 	} packet;
+	double tdelta;
+	double trace_start_ts;
+	double real_start_ts;
+	double trace_last_ts;
+
 	double last_ts;
 	double start_ts;
-	struct timeval start_tv;
 };
 
 struct trace_sll_header_t {
@@ -201,6 +205,8 @@ static int init_trace(struct libtrace_t **libtrace, char *uri) {
                 return 0;
         }
         strncpy(scan,uri, (uridata - uri));
+
+	(*libtrace)->tdelta = 0.0;
 
         if (!strncasecmp(scan,"erf",3)) {
                 (*libtrace)->format=ERF;
@@ -1447,6 +1453,7 @@ uint8_t *trace_get_destination_mac(const struct libtrace_packet_t *packet) {
  *  TRACE_EVENT_IOWAIT	Waiting on I/O on fd
  *  TRACE_EVENT_SLEEP	Next event in seconds
  *  TRACE_EVENT_PACKET	Packet arrived in buffer with size size
+ *  TRACE_EVENT_TERMINATE Trace terminated (perhaps with an error condition)
  * FIXME currently keeps a copy of the packet inside the trace pointer,
  * which in turn is stored inside the new packet object...
  * @author Perry Lorier
@@ -1477,10 +1484,6 @@ struct libtrace_eventobj_t trace_event(struct libtrace_t *trace,
 				}
 				if (data>0) {
 					event.size = trace_read_packet(trace,packet);
-					if (event.size < 0) {
-						event.type = TRACE_EVENT_TERMINATE;
-						return event;
-					}
 					event.type = TRACE_EVENT_PACKET;
 					return event;
 				}
@@ -1499,10 +1502,6 @@ struct libtrace_eventobj_t trace_event(struct libtrace_t *trace,
 				}
 				if (data>0) {
 					event.size = trace_read_packet(trace,packet);
-					if (event.size < 0) {
-						event.type = TRACE_EVENT_TERMINATE;
-						return event;
-					}
 					event.type = TRACE_EVENT_PACKET;
 					return event;
 				}
@@ -1520,35 +1519,41 @@ struct libtrace_eventobj_t trace_event(struct libtrace_t *trace,
 					trace->packet.buffer = malloc(4096);
 					trace->packet.size=
 						trace_read_packet(trace,packet);
+					event.size = trace->packet.size;
 					if (trace->packet.size > 0 ) {
 						memcpy(trace->packet.buffer,packet->buffer,trace->packet.size);
+					} else {
+						// return here, the test for event.size will sort out the error
+						event.type = TRACE_EVENT_PACKET;
+						return event;
 					}
-				}
-				event.size = trace->packet.size;
-
-				if (event.size == 0) {
-					event.type = TRACE_EVENT_TERMINATE;
-					return event;
 				}
 
 				ts=trace_get_seconds(packet);
-				if (trace->last_ts!=0) {
-					event.seconds = ts - trace->last_ts;
+				if (trace->tdelta!=0) {
+					// Get the adjusted current time
 					gettimeofday(&stv, NULL);
 					now = stv.tv_sec + ((double)stv.tv_usec / 1000000.0);
+					now -= trace->tdelta; // adjust for trace delta
 					
-					if (event.seconds > (now - trace->start_ts)) {
+					
+					// if the trace timestamp is still in the future, 
+					// return a SLEEP event, otherwise fire the packet
+					if (ts > now) {
+						event.seconds = ts - trace->trace_last_ts;
 						event.type = TRACE_EVENT_SLEEP;
 						return event;
 					}
-					
-				}
-				else {
+				} else {
 					gettimeofday(&stv, NULL);
-					trace->start_ts = stv.tv_sec + ((double)stv.tv_usec / 1000000.0);
-					trace->last_ts = ts;
+					// work out the difference between the start of trace replay,
+					// and the first packet in the trace
+					trace->tdelta = stv.tv_sec + ((double)stv.tv_usec / 1000000.0);
+					trace->tdelta -= ts;
+
 				}
 				
+					// This is the first packet, so just fire away.
 				packet->size = trace->packet.size;
 				memcpy(packet->buffer,trace->packet.buffer,trace->packet.size);
 
@@ -1556,10 +1561,8 @@ struct libtrace_eventobj_t trace_event(struct libtrace_t *trace,
 				trace->packet.buffer = 0;
 				event.type = TRACE_EVENT_PACKET;
 				
-				gettimeofday(&stv, NULL);
-				trace->start_ts = stv.tv_sec + ((double)stv.tv_usec / 1000000.0);
-				trace->last_ts = ts;
-				
+				trace->trace_last_ts = ts;
+
 				return event;
 			}
 		default:
