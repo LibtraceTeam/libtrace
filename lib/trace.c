@@ -63,7 +63,27 @@
 #include <sys/un.h>
 #include <sys/mman.h>
 #include <unistd.h>
-#include <net/ethernet.h>
+
+#ifdef HAVE_NET_IF_ARP_H
+#  include <net/if_arp.h>
+#endif
+
+#ifdef HAVE_NET_IF_H
+#  include <net/if.h>
+#endif
+
+#ifdef HAVE_NETINET_IN_H
+#  include <netinet/in.h>
+#endif
+
+#ifdef HAVE_NET_ETHERNET_H
+#  include <net/ethernet.h>
+#endif
+
+#ifdef HAVE_NETINET_IF_ETHER_H
+#  include <netinet/if_ether.h>
+#endif
+
 #include <time.h>
 #include <sys/ioctl.h>
 
@@ -92,6 +112,9 @@
 
 #if HAVE_PCAP_H
 #  include <pcap.h>
+#  ifdef HAVE_PCAP_INT_H
+#    include <pcap-int.h>
+#  endif
 #endif 
 
 #ifdef HAVE_ZLIB_H
@@ -893,7 +916,7 @@ void *trace_get_link(const struct libtrace_packet_t *packet) {
 			fprintf(stderr,"Don't know this trace format\n");
 			assert(0);
         }
-        return ethptr;
+        return (void *)ethptr;
 }
 
 /** get a pointer to the IP header (if any)
@@ -1221,7 +1244,9 @@ struct timeval trace_get_timeval(const struct libtrace_packet_t *packet) {
 		case PCAPINT:
                 case PCAP:
                         pcapptr = (struct pcap_pkthdr *)packet->buffer;
-                        tv = pcapptr->ts;
+			// ick. FIXME
+                        tv.tv_sec = pcapptr->ts.tv_sec;
+                        tv.tv_usec = pcapptr->ts.tv_usec;
                         break;
 #endif
 		case WAGINT:
@@ -1615,11 +1640,13 @@ int trace_bpf_filter(struct libtrace_filter_t *filter,
 
 		switch (trace_get_link_type(packet)) {
 			case TRACE_TYPE_ETH:
-				pcap = pcap_open_dead(DLT_EN10MB, 1500);
+				pcap = (pcap_t *)pcap_open_dead(DLT_EN10MB, 1500);
 				break;
+#ifdef DLT_LINUX_SLL
 			case TRACE_TYPE_LINUX_SLL:
 				pcap = pcap_open_dead(DLT_LINUX_SLL, 1500);
 				break;
+#endif
 			default:
 				printf("only works for ETH and LINUX_SLL (ppp) at the moment\n");
 				assert(0);

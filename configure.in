@@ -3,7 +3,7 @@ AC_INIT(libtrace,2.0.16,[libtrace@wand.net.nz],libtrace)
 AC_CONFIG_SRCDIR(lib/trace.c)
 AM_INIT_AUTOMAKE(libtrace,2.0.16)
 
-AC_CONFIG_FILES([Makefile replace/Makefile lib/Makefile])
+AC_CONFIG_FILES([Makefile lib/Makefile])
 dnl GNU C library
 dnl AC_GNU_SOURCE
 
@@ -19,7 +19,35 @@ AC_PROG_LIBTOOL
 # Checks for header files.
 AC_HEADER_STDC
 dnl AC_CHECK_HEADERS(errno.h stdlib.h stdio.h assert.h string.h netinet/in.h assert.h errno.h fcntl.h net/ethernet.h netdb.h pcap.h stdio.h stdlib.h string.h sys/stat.h sys/types.h sys/socket.h sys/un.h unistd.h time.h sys/ioctl.h net/bpf.h pcap.h zlib.h pcap-bpf.h)
-AC_CHECK_HEADERS(pcap.h pcap-bpf.h net/bpf.h zlib.h sys/limits.h stddef.h inttypes.h limits.h dagapi.h )
+AC_CHECK_HEADERS(pcap.h pcap-int.h pcap-bpf.h net/bpf.h zlib.h sys/limits.h stddef.h inttypes.h limits.h dagapi.h net/ethernet.h )
+
+AC_CHECK_HEADERS(netinet/in.h)
+
+AC_CHECK_HEADER(net/if.h,
+		AC_DEFINE(HAVE_NET_IF_H,1,[We have net/if.h]), [],
+[#include <sys/types.h>
+ #include <sys/socket.h>
+])
+
+
+AC_CHECK_HEADER(netinet/if_ether.h,
+		AC_DEFINE(HAVE_NETINET_IF_ETHER_H,1,[We have netinet/if_ether.h]), [],
+[
+ #include <sys/types.h>
+ #include <sys/socket.h>
+ #include <netinet/in.h>
+ #include <net/if.h>
+])
+
+AC_CHECK_HEADER(net/if_arp.h, 
+		AC_DEFINE(HAVE_NET_IF_ARP_H,1,[We have net/if_arp.h]), [],
+[
+ #include <sys/types.h>
+ #include <sys/socket.h>
+ #include <netinet/in.h>
+ #include <net/if.h>
+])
+
 	
 # Checking for the right bpf header to include
 AC_MSG_CHECKING([where the bpf headers are kept])
@@ -41,7 +69,13 @@ else
 fi
 
 
+# *BSD doesn't have strndup. Currently provide our own.
 AC_REPLACE_FUNCS(strndup)
+
+# Earlier versions of pcap don't have pcap_open_dead. EG: the one OpenBSD
+# ships with. Even Debian Woody is more up to date.
+AC_CHECK_LIB(pcap,pcap_open_dead,[],[AC_REPLACE_FUNCS([pcap_open_dead])])
+    
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
@@ -148,14 +182,30 @@ AC_ARG_WITH([pcap-path],
     [ac_cv_use_pcap_path=/usr/lib])
 
 if test x"$ac_cv_use_pcap" != xno; then
-	ADD_LIBS="$ADD_LIBS  -l$ac_cv_use_pcap"
-	ADD_LDFLAGS="$ADD_LDFLAGS -L$ac_cv_use_pcap_path"
-
+    ADD_LIBS="$ADD_LIBS  -l$ac_cv_use_pcap"
+    
     pcap_lib_file="${ac_cv_use_pcap_path}/lib${ac_cv_use_pcap}.so"
-    if test ! -r "$ac_cv_use_pcap_path" -o ! -r "$pcap_lib_file"; then
-        AC_MSG_NOTICE([Cannot find pcap library $pcap_lib_file.])
-        AC_MSG_ERROR([Exiting]);
-    fi  
+    
+    # if the library is in /usr/lib, then just use 
+    # AC_CHECK_LIB. 
+    if test x"${ac_cv_use_pcap_path}" != x"/usr/lib"; then
+	    AC_CHECK_LIB(${ac_cv_use_pcap},pcap_open_live,
+			 have_libpcap=yes,
+			 have_libpcap=no)
+
+	    if test x"${have_libpcap}" != xno; then
+        	AC_MSG_NOTICE([Cannot find pcap library $pcap_lib_file.])
+        	AC_MSG_ERROR([Exiting]);
+	    fi
+    else
+    	ADD_LDFLAGS="$ADD_LDFLAGS -L$ac_cv_use_pcap_path"
+    	# if it's not in /usr/lib/, check manually. This isn't nice,
+    	# and will probably break.
+    	if test ! -r "$ac_cv_use_pcap_path" -o ! -r "$pcap_lib_file"; then
+        	AC_MSG_NOTICE([Cannot find pcap library $pcap_lib_file.])
+        	AC_MSG_ERROR([Exiting]);
+    	fi  
+    fi
     AC_DEFINE(HAVE_PCAP,1,[Conditional for building PCAP support])
 else
     AC_DEFINE(HAVE_PCAP,0,[Conditional for building PCAP support])
@@ -175,16 +225,28 @@ AC_ARG_WITH([zlib-path],
     [ac_cv_use_zlib_path=/usr/lib])
 
 if test "$ac_cv_use_zlib" != no; then
-	ADD_LIBS="$ADD_LIBS -l$ac_cv_use_zlib"
-	ADD_LDFLAGS="$ADD_LDFLAGS -L$ac_cv_use_zlib_path"
+    ADD_LIBS="$ADD_LIBS -l$ac_cv_use_zlib"
     
     zlib_lib_file="${ac_cv_use_zlib_path}/lib${ac_cv_use_zlib}.so"
-    
-    if test ! -r "$ac_cv_use_zlib_path" -o ! -r "$zlib_lib_file"; then
-        AC_MSG_NOTICE([Cannot find zlib library $zlib_lib_file.])
-        AC_MSG_ERROR([Exiting]);
+
+    # if the library is in /usr/lib/, then just use AC_CHECK_LIB
+    if test x"${ac_cv_use_zlib_path}" != x"/usr/lib"; then
+	    AC_CHECK_LIB(${ac_cv_use_zlib}, gzopen,
+			 have_libzlib=yes,
+			 have_libzlib=no)
+	    if test x"{have_libzlib}" != xno; then
+        	AC_MSG_NOTICE([Cannot find zlib library $zlib_lib_file.])
+        	AC_MSG_ERROR([Exiting]);
+	    fi
+    else
+	ADD_LDFLAGS="$ADD_LDFLAGS -L$ac_cv_use_zlib_path"
+	# if it's not in /usr/lib/, check manually. This isn't nice
+	# and will probably break.
+    	if test ! -r "$ac_cv_use_zlib_path" -o ! -r "$zlib_lib_file"; then
+        	AC_MSG_NOTICE([Cannot find zlib library $zlib_lib_file.])
+        	AC_MSG_ERROR([Exiting]);
+    	fi
     fi
-    
     AC_DEFINE(HAVE_ZLIB,1,[Conditional for building zlib support])
 else
     AC_DEFINE(HAVE_ZLIB,0,[Conditional for building zlib support])   

@@ -1,4 +1,4 @@
-SUBDIRS=replace lib
+SUBDIRS=lib
 EXTRA_DIST=examples docs
 
 bootstrap-clean:
@@ -8,3 +8,6 @@ bootstrap-clean:
 		lib/Makefile.in replace/libreplace.la  replace/Makefile.in
 	$(RM) -rf autom4te.cache/
 	
+docs:
+	doxygen libtrace.doxygen
+
