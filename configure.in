@@ -7,7 +7,7 @@ AC_CONFIG_FILES([Makefile lib/Makefile])
 dnl GNU C library
 dnl AC_GNU_SOURCE
 
-AM_CONFIG_HEADER([config.h])
+AM_CONFIG_HEADER(config.h)
 #AC_CONFIG_HEADERS([config.h])
 dnl Checks for programs.
 AC_PROG_CC
@@ -74,7 +74,13 @@ AC_REPLACE_FUNCS(strndup)
 
 # Earlier versions of pcap don't have pcap_open_dead. EG: the one OpenBSD
 # ships with. Even Debian Woody is more up to date.
-AC_CHECK_LIB(pcap,pcap_open_dead,[],[AC_REPLACE_FUNCS([pcap_open_dead])])
+AC_CHECK_LIB(pcap,pcap_open_dead,
+	have_pcap_open_dead=true,
+	have_pcap_open_dead=false)
+
+if test "$have_pcap_open_dead" = false; then
+	AC_REPLACE_FUNCS(pcap_open_dead)
+fi
     
 
 # Checks for typedefs, structures, and compiler characteristics.
