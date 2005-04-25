@@ -40,7 +40,7 @@
 #include <setjmp.h>
 #include <unistd.h>
 #include <sys/time.h>
-#include <stdint.h>
+#include <inttypes.h>
 #include "libtrace.h"
 #include "dagformat.h"
 

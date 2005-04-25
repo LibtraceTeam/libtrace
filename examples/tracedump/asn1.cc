@@ -1,6 +1,6 @@
 #include <list>
 #include <vector>
-#include <stdint.h>
+#include <inttypes.h>
 #include <assert.h>
 #include <ctype.h>
 #include <string>

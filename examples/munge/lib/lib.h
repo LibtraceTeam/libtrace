@@ -1,6 +1,6 @@
 #ifndef LIB_H
 #define LIB_H
-#include <stdint.h>
+#include <inttypes.h>
 #include <libtrace.h>
 
 /** The encryption algorithm used

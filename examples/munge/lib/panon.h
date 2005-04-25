@@ -4,7 +4,7 @@
 // $Id$
 
 #include "rijndael.h"
-#include <stdint.h>
+#include <inttypes.h>
 
 uint32_t anonymize( const uint32_t orig_addr );
 uint32_t pp_anonymize( const uint32_t orig_addr );

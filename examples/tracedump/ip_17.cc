@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include <stdint.h>
+#include <inttypes.h>
 #include <dlfcn.h>
 #include <map>
 #include "tracedump.h"
