@@ -8,7 +8,7 @@ CFLAGS += $(INCLUDE)
 libdir = -L$(PREFIX)/lib
 LDLIBS = $(libdir) -ltrace
 
-BINS = sample printip
+BINS = sample
 .PHONY: all clean distclean install depend
 
 all: $(BINS) 
