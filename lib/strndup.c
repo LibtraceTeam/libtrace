@@ -3,7 +3,7 @@
  */
 #include "../config.h"
 
-#ifdef HAVE_STRNDUP
+#ifndef HAVE_STRNDUP
 
 #include <stdlib.h>
 #include <errno.h>

@@ -272,6 +272,7 @@ static int init_trace(struct libtrace_t **libtrace, char *uri) {
         } else if (!strncasecmp(scan,"rtclient",7)) {
                 (*libtrace)->format=RTCLIENT;
 	} else if (!strncasecmp(scan,"wagint",6)) {
+	struct ports_t *port;
 		(*libtrace)->format=WAGINT;
 	} else if (!strncasecmp(scan,"wag",3)) {
 		(*libtrace)->format=WAG;
@@ -1680,12 +1681,12 @@ int trace_bpf_filter(struct libtrace_filter_t *filter,
 				break;
 #ifdef DLT_LINUX_SLL
 			case TRACE_TYPE_LINUX_SLL:
-				pcap = pcap_open_dead(DLT_LINUX_SLL, 1500);
+				pcap = (pcap_t *)pcap_open_dead(DLT_LINUX_SLL, 1500);
 				break;
 #endif
 #ifdef DLT_PFLOG
 			case TRACE_TYPE_PFLOG:
-				pcap = pcap_open_dead(DLT_PFLOG, 1500);
+				pcap = (pcap_t *)pcap_open_dead(DLT_PFLOG, 1500);
 				break;
 #endif
 			default:
@@ -1832,13 +1833,13 @@ struct ports_t {
 uint16_t trace_get_source_port(const struct libtrace_packet_t *packet)
 {
 	struct libtrace_ip *ip = trace_get_ip(packet);
+	struct ports_t *port;
 	if (6 != ip->ip_p
 	  && 17 != ip->ip_p)
 		return 0;
 	if (0 != (ip->ip_off & SW_IP_OFFMASK))
 		return 0;
 
-	struct ports_t *port;
 	port = (struct ports_t *)((ptrdiff_t)ip + (ip->ip_hl * 4));
 
 	return htons(port->src);
@@ -1848,6 +1849,7 @@ uint16_t trace_get_source_port(const struct libtrace_packet_t *packet)
 uint16_t trace_get_destination_port(const struct libtrace_packet_t *packet)
 {
 	struct libtrace_ip *ip = trace_get_ip(packet);
+	struct ports_t *port;
 
 	if (6 != ip->ip_p
 	  && 17 != ip->ip_p)
@@ -1856,7 +1858,6 @@ uint16_t trace_get_destination_port(const struct libtrace_packet_t *packet)
 	if (0 != (ip->ip_off & SW_IP_OFFMASK))
 		return 0;
 
-	struct ports_t *port;
 	port = (struct ports_t *)((ptrdiff_t)ip + (ip->ip_hl * 4));
 
 	return htons(port->dst);
