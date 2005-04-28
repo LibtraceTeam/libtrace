@@ -206,6 +206,23 @@ struct trace_sll_header_t {
 	uint16_t protocol;         	/* protocol */
 };
 
+#ifndef PF_RULESET_NAME_SIZE
+#define PF_RULESET_NAME_SIZE 16
+#endif
+
+struct trace_pflog_header_t {
+	uint8_t	   length;
+	sa_family_t   af;
+	uint8_t	   action;
+	uint8_t	   reason;
+	char 	   ifname[IFNAMSIZ];
+	char 	   ruleset[PF_RULESET_NAME_SIZE];
+	uint32_t   rulenr;
+	uint32_t   subrulenr;
+	uint8_t	   dir;
+	uint8_t	   pad[3];
+};
+
 #define RP_BUFSIZE 65536
 
 #define URI_PROTO_LINE 16
@@ -987,6 +1004,21 @@ struct libtrace_ip *trace_get_ip(const struct libtrace_packet_t *packet) {
 				}
 			}
 			break;
+		case TRACE_TYPE_PFLOG:
+			{
+				struct trace_pflog_header_t *pflog;
+				pflog = trace_get_link(packet);
+				if (!pflog) {
+					ipptr = NULL;
+					break;
+				}
+				if (pflog->af != AF_INET) {
+					ipptr = NULL;
+				} else {
+					ipptr = ((void*)pflog)+sizeof(*pflog);
+				}
+			}
+			break;
 		case TRACE_TYPE_ATM:
 			{
 				struct atm_rec *atm = 
@@ -1415,6 +1447,10 @@ libtrace_linktype_t trace_get_link_type(const struct libtrace_packet_t *packet )
 				case DLT_LINUX_SLL:
 					return TRACE_TYPE_LINUX_SLL;
 #endif
+#ifdef DLT_PFLOG
+				case DLT_PFLOG:
+					return TRACE_TYPE_PFLOG;
+#endif
 			}
 		 	break;
 #endif
@@ -1647,6 +1683,11 @@ int trace_bpf_filter(struct libtrace_filter_t *filter,
 				pcap = pcap_open_dead(DLT_LINUX_SLL, 1500);
 				break;
 #endif
+#ifdef DLT_PFLOG
+			case TRACE_TYPE_PFLOG:
+				pcap = pcap_open_dead(DLT_PFLOG, 1500);
+				break;
+#endif
 			default:
 				printf("only works for ETH and LINUX_SLL (ppp) at the moment\n");
 				assert(0);
@@ -1724,32 +1765,49 @@ int8_t trace_get_direction(const struct libtrace_packet_t *packet) {
 		case PCAPINT:
 			switch (trace_get_link_type(packet)) {
 				case TRACE_TYPE_LINUX_SLL:
-					{
-						struct trace_sll_header_t *sll;
-						sll = trace_get_link(packet);
-						if (!sll) {
-							return -1;
-						}
-						/* 0 == LINUX_SLL_HOST */
-						/* the Waikato Capture point defines "packets
-						 * originating locally" (ie, outbound), with a
-						 * direction of 0, and "packets destined locally"
-						 * (ie, inbound), with a direction of 1.
-						 * This is kind-of-opposite to LINUX_SLL.
-						 * We return consistent values here, however
-						 *
-						 * Note that in recent versions of pcap, you can
-						 * use "inbound" and "outbound" on ppp in linux
-						 */
-						if (ntohs(sll->pkttype==0)) {
-
-							direction = 1;
-						}
-						else {
-							direction = 0;
-						}
-						break;
+				{
+					struct trace_sll_header_t *sll;
+					sll = trace_get_link(packet);
+					if (!sll) {
+						return -1;
 					}
+					/* 0 == LINUX_SLL_HOST */
+					/* the Waikato Capture point defines "packets
+					 * originating locally" (ie, outbound), with a
+					 * direction of 0, and "packets destined locally"
+					 * (ie, inbound), with a direction of 1.
+					 * This is kind-of-opposite to LINUX_SLL.
+					 * We return consistent values here, however
+					 *
+					 * Note that in recent versions of pcap, you can
+					 * use "inbound" and "outbound" on ppp in linux
+					 */
+					if (ntohs(sll->pkttype==0)) {
+
+						direction = 1;
+					}
+					else {
+						direction = 0;
+					}
+					break;
+				}
+				case TRACE_TYPE_PFLOG:
+				{
+					struct trace_pflog_header_t *pflog;
+					pflog = trace_get_link(packet);
+					if (!pflog) {
+						return -1;
+					}
+					/* enum    { PF_IN=0, PF_OUT=1 }; */
+					if (ntohs(pflog->dir==0)) {
+
+						direction = 1;
+					}
+					else {
+						direction = 0;
+					}
+					break;
+				}
 				default:
 					/* pass */
 					break;
