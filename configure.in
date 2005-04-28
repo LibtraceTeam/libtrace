@@ -194,12 +194,12 @@ if test x"$ac_cv_use_pcap" != xno; then
     
     # if the library is in /usr/lib, then just use 
     # AC_CHECK_LIB. 
-    if test x"${ac_cv_use_pcap_path}" != x"/usr/lib"; then
+    if test x"${ac_cv_use_pcap_path}" == x"/usr/lib"; then
 	    AC_CHECK_LIB(${ac_cv_use_pcap},pcap_open_live,
 			 have_libpcap=yes,
 			 have_libpcap=no)
 
-	    if test x"${have_libpcap}" != xno; then
+	    if test x"${have_libpcap}" == xno; then
         	AC_MSG_NOTICE([Cannot find pcap library $pcap_lib_file.])
         	AC_MSG_ERROR([Exiting]);
 	    fi
@@ -236,11 +236,11 @@ if test "$ac_cv_use_zlib" != no; then
     zlib_lib_file="${ac_cv_use_zlib_path}/lib${ac_cv_use_zlib}.so"
 
     # if the library is in /usr/lib/, then just use AC_CHECK_LIB
-    if test x"${ac_cv_use_zlib_path}" != x"/usr/lib"; then
+    if test x"${ac_cv_use_zlib_path}" == x"/usr/lib"; then
 	    AC_CHECK_LIB(${ac_cv_use_zlib}, gzopen,
 			 have_libzlib=yes,
 			 have_libzlib=no)
-	    if test x"{have_libzlib}" != xno; then
+	    if test x"{have_libzlib}" == xno; then
         	AC_MSG_NOTICE([Cannot find zlib library $zlib_lib_file.])
         	AC_MSG_ERROR([Exiting]);
 	    fi
