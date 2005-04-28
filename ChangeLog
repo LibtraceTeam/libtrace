@@ -29,7 +29,7 @@
 ##
 
 - Version 2.0.16
-        * Ported to OpenBSD
+        * Ported to OpenBSD - mad props to meanphil
         * Fixed a bug in the event api where it would die instantly
 	  for offline traces.
 
