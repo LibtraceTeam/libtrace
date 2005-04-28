@@ -924,7 +924,7 @@ void *trace_get_link(const struct libtrace_packet_t *packet) {
  *
  * @returns a pointer to the IP header, or NULL if there is not an IP packet
  */
-struct libtrace_ip *trace_get_ip(struct libtrace_packet_t *packet) {
+struct libtrace_ip *trace_get_ip(const struct libtrace_packet_t *packet) {
         struct libtrace_ip *ipptr = 0;
 
 	switch(trace_get_link_type(packet)) {
@@ -1018,7 +1018,7 @@ struct libtrace_ip *trace_get_ip(struct libtrace_packet_t *packet) {
  *
  * @returns a pointer to the TCP header, or NULL if there is not a TCP packet
  */
-struct libtrace_tcp *trace_get_tcp(struct libtrace_packet_t *packet) {
+struct libtrace_tcp *trace_get_tcp(const struct libtrace_packet_t *packet) {
         struct libtrace_tcp *tcpptr = 0;
         struct libtrace_ip *ipptr = 0;
 
@@ -1039,7 +1039,7 @@ struct libtrace_tcp *trace_get_tcp(struct libtrace_packet_t *packet) {
  *
  * Skipped can be NULL, in which case it will be ignored by the program.
  */
-struct libtrace_tcp *get_tcp_from_ip(struct libtrace_ip *ip, int *skipped)
+struct libtrace_tcp *get_tcp_from_ip(const struct libtrace_ip *ip, int *skipped)
 {
 #define SW_IP_OFFMASK 0xff1f
 	struct libtrace_tcp *tcpptr = 0;
@@ -1059,7 +1059,7 @@ struct libtrace_tcp *get_tcp_from_ip(struct libtrace_ip *ip, int *skipped)
  *
  * @returns a pointer to the UDP header, or NULL if this is not a UDP packet
  */
-struct libtrace_udp *trace_get_udp(struct libtrace_packet_t *packet) {
+struct libtrace_udp *trace_get_udp(const struct libtrace_packet_t *packet) {
         struct libtrace_udp *udpptr = 0;
         struct libtrace_ip *ipptr = 0;
         
@@ -1081,7 +1081,7 @@ struct libtrace_udp *trace_get_udp(struct libtrace_packet_t *packet) {
  *
  * Skipped can be NULL, in which case it will be ignored by the program.
  */
-struct libtrace_udp *get_udp_from_ip(struct libtrace_ip *ip, int *skipped)
+struct libtrace_udp *get_udp_from_ip(const struct libtrace_ip *ip, int *skipped)
 {
 	struct libtrace_udp *udpptr = 0;
 
@@ -1101,7 +1101,7 @@ struct libtrace_udp *get_udp_from_ip(struct libtrace_ip *ip, int *skipped)
  *
  * @returns a pointer to the ICMP header, or NULL if this is not a ICMP packet
  */
-struct libtrace_icmp *trace_get_icmp(struct libtrace_packet_t *packet) {
+struct libtrace_icmp *trace_get_icmp(const struct libtrace_packet_t *packet) {
         struct libtrace_icmp *icmpptr = 0;
         struct libtrace_ip *ipptr = 0;
         
@@ -1620,7 +1620,7 @@ struct libtrace_filter_t *trace_bpf_setfilter(const char *filterstring) {
  * @author Daniel Lawson
  */
 int trace_bpf_filter(struct libtrace_filter_t *filter,
-			struct libtrace_packet_t *packet) {
+			const struct libtrace_packet_t *packet) {
 #if HAVE_BPF
 	void *linkptr = 0;
 	int clen = 0;
@@ -1764,6 +1764,46 @@ int8_t trace_get_direction(const struct libtrace_packet_t *packet) {
 	
 }
 
+struct ports_t {
+	uint16_t src;
+	uint16_t dst;
+};
+
+/* Return the client port
+ */
+uint16_t trace_get_source_port(const struct libtrace_packet_t *packet)
+{
+	struct libtrace_ip *ip = trace_get_ip(packet);
+	if (6 != ip->ip_p
+	  && 17 != ip->ip_p)
+		return 0;
+	if (0 != (ip->ip_off & SW_IP_OFFMASK))
+		return 0;
+
+	struct ports_t *port;
+	port = (struct ports_t *)((ptrdiff_t)ip + (ip->ip_hl * 4));
+
+	return htons(port->src);
+}
+
+/* Same as get_source_port except use the destination port */
+uint16_t trace_get_destination_port(const struct libtrace_packet_t *packet)
+{
+	struct libtrace_ip *ip = trace_get_ip(packet);
+
+	if (6 != ip->ip_p
+	  && 17 != ip->ip_p)
+		return 0;
+
+	if (0 != (ip->ip_off & SW_IP_OFFMASK))
+		return 0;
+
+	struct ports_t *port;
+	port = (struct ports_t *)((ptrdiff_t)ip + (ip->ip_hl * 4));
+
+	return htons(port->dst);
+}
+
 #define ROOT_SERVER(x) ((x) < 512)
 #define ROOT_CLIENT(x) ((512 <= (x)) && ((x) < 1024))
 #define NONROOT_SERVER(x) ((x) >= 5000)
@@ -1771,7 +1811,6 @@ int8_t trace_get_direction(const struct libtrace_packet_t *packet) {
 #define DYNAMIC(x) ((49152 < (x)) && ((x) < 65535))
 #define SERVER(x) ROOT_SERVER(x) || NONROOT_SERVER(x)
 #define CLIENT(x) ROOT_CLIENT(x) || NONROOT_CLIENT(x) 
-
 
 /* Attempt to deduce the 'server' port
  * @param protocol the IP protocol (eg, 6 or 17 for TCP or UDP)

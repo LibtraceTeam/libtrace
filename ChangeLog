@@ -32,6 +32,8 @@
         * Ported to OpenBSD - mad props to meanphil
         * Fixed a bug in the event api where it would die instantly
 	  for offline traces.
+	* Added trace_get_{source,destination}_port
+	* Added some constification fixes
 
 - Version 2.0.15b
 	* Fix a memory leak

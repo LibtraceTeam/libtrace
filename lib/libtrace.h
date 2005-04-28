@@ -34,6 +34,9 @@
 #include <sys/types.h>
 #include <netinet/in.h>
 
+/** API version as 3 byte hex digits */
+#define LIBTRACE_API_VERSION 0x010010
+
 #ifdef __cplusplus 
 extern "C" { 
 #endif
@@ -238,14 +241,14 @@ void *trace_get_link(const struct libtrace_packet_t *packet);
  *
  * @returns a pointer to the IP header, or NULL if there is not an IP packet
  */
-struct libtrace_ip *trace_get_ip(struct libtrace_packet_t *packet);
+struct libtrace_ip *trace_get_ip(const struct libtrace_packet_t *packet);
 
 /** get a pointer to the TCP header (if any)
  * @param packet  	the packet opaque pointer
  *
  * @returns a pointer to the TCP header, or NULL if there is not a TCP packet
  */
-struct libtrace_tcp *trace_get_tcp(struct libtrace_packet_t *packet);
+struct libtrace_tcp *trace_get_tcp(const struct libtrace_packet_t *packet);
 
 /** get a pointer to the TCP header (if any) given a pointer to the IP header
  * @param ip		The IP header
@@ -264,7 +267,7 @@ struct libtrace_tcp *trace_get_tcp_from_ip(struct libtrace_ip *ip,int *skipped);
  *
  * @returns a pointer to the UDP header, or NULL if this is not a UDP packet
  */
-struct libtrace_udp *trace_get_udp(struct libtrace_packet_t *packet);
+struct libtrace_udp *trace_get_udp(const struct libtrace_packet_t *packet);
 
 /** get a pointer to the UDP header (if any) given a pointer to the IP header
  * @param 	ip	The IP header
@@ -281,7 +284,7 @@ struct libtrace_udp *trace_get_udp_from_ip(struct libtrace_ip *ip,int *skipped);
  *
  * @returns a pointer to the ICMP header, or NULL if this is not a ICMP packet
  */
-struct libtrace_icmp *trace_get_icmp(struct libtrace_packet_t *packet);
+struct libtrace_icmp *trace_get_icmp(const struct libtrace_packet_t *packet);
 
 /** get a pointer to the ICMP header (if any) given a pointer to the IP header
  * @param ip		The IP header
@@ -478,10 +481,26 @@ struct libtrace_filter_t *trace_bpf_setfilter(const char *filterstring);
  * @author Daniel Lawson
  */
 int trace_bpf_filter(struct libtrace_filter_t *filter,
-		struct libtrace_packet_t *packet);
+		const struct libtrace_packet_t *packet);
 
 
 typedef enum {USE_DEST, USE_SOURCE} serverport_t;
+
+/** Get the source port
+ * @param packet	the packet to read from
+ * @returns a port in \em HOST byte order, or equivilent to ports for this
+ * protocol, or 0 if this protocol has no ports.
+ * @author Perry Lorier
+ */
+uint16_t trace_get_source_port(const struct libtrace_packet_t *);
+
+/** Get the destination port
+ * @param packet	the packet to read from
+ * @returns a port in \em HOST byte order, or equivilent to ports for this
+ * protocol, or 0 if this protocol has no ports.
+ * @author Perry Lorier
+ */
+uint16_t trace_get_destination_port(const struct libtrace_packet_t *);
 
 /** hint at the server port in specified protocol
  * @param protocol	the IP layer protocol, eg 6 (tcp), 17 (udp)
