@@ -1696,8 +1696,8 @@ int trace_bpf_filter(struct libtrace_filter_t *filter,
 
 		// build filter
 		if (pcap_compile( pcap, &bpfprog, filter->filterstring, 1, 0)) {
-			printf("bpf compilation error: %s\n", 
-				pcap_geterr(pcap));
+			printf("bpf compilation error: %s: %s\n", 
+				pcap_geterr(pcap),filter->filterstring);
 			assert(0);
 		}
 		pcap_close(pcap);
