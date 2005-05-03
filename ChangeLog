@@ -28,6 +28,11 @@
 ##
 ##
 
+- Version 2.0.17 (unreleased)
+	* If bpf_setfilter() fails, output the filterstring it failed on
+	* Fixed compilation bug under older distributions (woody), where
+	  the LTLIBOBJS auto* macro wasn't being expanded correctly
+
 - Version 2.0.16
         * Ported to OpenBSD - mad props to meanphil
         * Fixed a bug in the event api where it would die instantly

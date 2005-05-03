@@ -1,7 +1,7 @@
 # Process this file with autoconf to produce a configure script.
-AC_INIT(libtrace,2.0.16,[libtrace@wand.net.nz],libtrace)
+AC_INIT(libtrace,2.0.17,[libtrace@wand.net.nz],libtrace)
 AC_CONFIG_SRCDIR(lib/trace.c)
-AM_INIT_AUTOMAKE(libtrace,2.0.16)
+AM_INIT_AUTOMAKE(libtrace,2.0.17)
 
 AC_CONFIG_FILES([Makefile lib/Makefile])
 dnl GNU C library
@@ -263,6 +263,7 @@ fi
 AC_SUBST([ADD_LIBS])
 AC_SUBST([ADD_LDFLAGS])
 AC_SUBST([ADD_INCLS])
+AC_SUBST([LTLIBOBJS])
 
 dnl and finally, output our Makefiles
 AC_OUTPUT
