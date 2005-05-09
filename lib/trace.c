@@ -210,6 +210,10 @@ struct trace_sll_header_t {
 #define PF_RULESET_NAME_SIZE 16
 #endif
 
+#ifndef IFNAMSIZ
+#define IFNAMSIZ 16
+#endif
+
 struct trace_pflog_header_t {
 	uint8_t	   length;
 	sa_family_t   af;
@@ -1278,8 +1282,7 @@ struct timeval trace_get_timeval(const struct libtrace_packet_t *packet) {
                 case PCAP:
                         pcapptr = (struct pcap_pkthdr *)packet->buffer;
 			// ick. FIXME
-                        tv.tv_sec = pcapptr->ts.tv_sec;
-                        tv.tv_usec = pcapptr->ts.tv_usec;
+                        tv = pcapptr->ts;
                         break;
 #endif
 		case WAGINT:
@@ -1290,7 +1293,13 @@ struct timeval trace_get_timeval(const struct libtrace_packet_t *packet) {
 		default:
 			// FIXME: This isn't portable to big-endian machines
 			ts = trace_get_erf_timestamp(packet);
-			tv.tv_sec = ts >> 32;		
+#if __BYTE_ORDER == __BIG_ENDIAN
+			tv.tv_sec = ts & 0xFFFFFFFF;
+#elif __BYTE_ORDER == __LITTLE_ENDIAN
+			tv.tv_sec = ts >> 32;
+#else
+#error "What on earth are you running this on?"
+#endif
 			ts = (1000000 * (ts & 0xffffffffULL));
         		ts += (ts & 0x80000000ULL) << 1;
         		tv.tv_usec = ts >> 32;
