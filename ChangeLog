@@ -28,7 +28,11 @@
 ##
 ##
 
-- Version 2.0.17 (unreleased)
+- Version 2.0.17
+	* Fixed a bug in trace_get_erf_timestamp for the pcap path. 
+	  Timestamps were not being fabricated correctly. This also
+	  effected trace_get_seconds, as that calls trace_get_erf_timestamp
+	  internally.
 	* If bpf_setfilter() fails, output the filterstring it failed on
 	* Fixed compilation bug under older distributions (woody), where
 	  the LTLIBOBJS auto* macro wasn't being expanded correctly
