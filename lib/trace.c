@@ -1244,7 +1244,7 @@ uint64_t trace_get_erf_timestamp(const struct libtrace_packet_t *packet) {
                 case PCAP:
                         pcapptr = (struct pcap_pkthdr *)packet->buffer;
 			timestamp = ((((uint64_t)pcapptr->ts.tv_sec) << 32) + \
-				(pcapptr->ts.tv_usec*UINT_MAX/1000000));
+				(((uint64_t)pcapptr->ts.tv_usec*UINT_MAX)/1000000));
                         break;
 #endif
 		case WAGINT:
