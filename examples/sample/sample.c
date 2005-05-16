@@ -84,6 +84,7 @@ int main(int argc, char *argv[]) {
 		unsigned char *x;
 		int i;
                 if ((psize = trace_read_packet(trace, &packet)) <1) {
+			printf("Error or EOF in trace_read_packet\n");
                         break;
                 }
 
