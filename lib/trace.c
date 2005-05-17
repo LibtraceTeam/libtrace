@@ -167,7 +167,11 @@ struct libtrace_t {
 	/** Information about the current state of the input device */
         union {
                 int fd;
+#if HAVE_ZLIB
+                gzFile *file;
+#else	
 		FILE *file;
+#endif
 #if HAVE_PCAP 
                 pcap_t *pcap;
 #endif 
@@ -192,16 +196,6 @@ struct libtrace_t {
 
 	double last_ts;
 	double start_ts;
-	struct {
-#define COMP_IBUF_SIZE 65536
-		void *ibuf;
-		void *cbuf;
-		
-		uint64_t ibuf_pos;
-		uint64_t cbuf_max;
-		uint64_t cbuf_pos;
-        	struct fifo_t *cfifo;   
-	} comp;
 };
 
 struct trace_sll_header_t {
@@ -232,13 +226,6 @@ struct trace_pflog_header_t {
 	uint8_t	   dir;
 	uint8_t	   pad[3];
 };
-
-
-/* forward declarations for local functions */
-
-int trace_uncompress(void * dest, size_t destLen, const void *source, size_t sourceLen);
-int trace_comp_read(struct libtrace_t *trace, void *buffer, size_t len);
-
 
 #define RP_BUFSIZE 65536
 
@@ -401,10 +388,6 @@ static int init_trace(struct libtrace_t **libtrace, char *uri) {
 	assert( (*libtrace)->fifo);
 	//(*libtrace)->packet.buffer = 0;
 	//(*libtrace)->packet.size = 0;
-	
-	(*libtrace)->comp.ibuf = 0;
-	(*libtrace)->comp.cbuf = 0;
-	(*libtrace)->comp.cfifo = create_fifo(1048576);
 
         return 1;
 }
@@ -482,9 +465,11 @@ struct libtrace_t *trace_create(char *uri) {
 #else
 			{
 #endif
-				// We just open files now, because we 
-				// do the decompression internally
+#if HAVE_ZLIB
+                                libtrace->input.file = gzopen(libtrace->conn_info.path, "r");
+#else
 				libtrace->input.file = fopen(libtrace->conn_info.path, "r");
+#endif
 			}
                         break;
                 case STDIN:
@@ -588,17 +573,14 @@ void trace_destroy(struct libtrace_t *libtrace) {
 		dag_stop(libtrace->input.fd);
 #endif
         } else {
+#if HAVE_ZLIB
+                gzclose(libtrace->input.file);
+#else	
 		fclose(libtrace->input.file);	
+#endif
         }       
         // need to free things!
         destroy_fifo(libtrace->fifo);
-	destroy_fifo(libtrace->comp.cfifo);
-
-	if (libtrace->comp.ibuf) {
-		free(libtrace->comp.ibuf);
-		free(libtrace->comp.cbuf);
-	}
-	
         free(libtrace);
 }
 
@@ -664,11 +646,10 @@ static int trace_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
 				break;
 			default:
 #if HAVE_ZLIB
-				if ((numbytes=trace_comp_read(libtrace,
-				//if ((numbytes=gzread(libtrace->input.file,
+				if ((numbytes=gzread(libtrace->input.file,
 								buffer,
 								len)) == -1) {
-					//perror("gzread");
+					perror("gzread");
 					return -1;
 				}
 #else
@@ -776,11 +757,10 @@ int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *pac
 		void *buffer2 = buffer;
 		int rlen;
 		// read in the trace header
-		if ((numbytes=trace_comp_read(libtrace,
-		//if ((numbytes=gzread(libtrace->input.file,
+		if ((numbytes=gzread(libtrace->input.file,
 						buffer,
 						dag_record_size)) == -1) {
-			//perror("gzread");
+			perror("gzread");
 			return -1;
 		}
 		if (numbytes == 0) {
@@ -792,11 +772,10 @@ int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *pac
 		buffer2 = buffer +  dag_record_size;
 
 		// read in the rest of the packet
-		if ((numbytes=trace_comp_read(libtrace,
-		//if ((numbytes=gzread(libtrace->input.file,
+		if ((numbytes=gzread(libtrace->input.file,
 						buffer2,
 						size)) == -1) {
-			//perror("gzread");
+			perror("gzread");
 			return -1;
 		}
 		//if ((numbytes + dag_record_size) != rlen) {
@@ -2054,120 +2033,3 @@ size_t trace_truncate_packet(struct libtrace_packet_t *packet, size_t size) {
 	return packet->size;
 }
 
-//#ifdef HAVE_ZLIB
-/* uncompr.c -- decompress a memory buffer
- * Copyright (C) 1995-2003 Jean-loup Gailly.
- * For conditions of distribution and use, see copyright notice in zlib.h
- */
-
-
-/* ===========================================================================
-     Decompresses the source buffer into the destination buffer.  sourceLen is
-   the byte length of the source buffer. Upon entry, destLen is the total
-   size of the destination buffer, which must be large enough to hold the
-   entire uncompressed data. (The size of the uncompressed data must have
-   been saved previously by the compressor and transmitted to the decompressor
-   by some mechanism outside the scope of this compression library.)
-   Upon exit, destLen is the actual size of the compressed buffer.
-     This function can be used to decompress a whole file at once if the
-   input file is mmap'ed.
-
-     uncompress returns Z_OK if success, Z_MEM_ERROR if there was not
-   enough memory, Z_BUF_ERROR if there was not enough room in the output
-   buffer, or Z_DATA_ERROR if the input data was corrupted.
-*/
-int trace_uncompress (void *dest, size_t destLen, const void *source, size_t sourceLen)
-{
-    z_stream stream;
-    int err;
-
-    stream.next_in = (Bytef*)source;
-    stream.avail_in = (uInt)sourceLen;
-    /* Check for source > 64K on 16-bit machine: */
-    if ((uLong)stream.avail_in != sourceLen) return Z_BUF_ERROR;
-
-    stream.next_out = dest;
-    stream.avail_out = destLen;
-    if ((uLong)stream.avail_out != destLen) return Z_BUF_ERROR;
-
-    stream.zalloc = (alloc_func)0;
-    stream.zfree = (free_func)0;
-
-    err = inflateInit(&stream);
-    if (err != Z_OK) return err;
-
-    err = inflate(&stream, Z_FINISH);
-    if (err != Z_STREAM_END) {
-        inflateEnd(&stream);
-        if (err == Z_NEED_DICT || (err == Z_BUF_ERROR && stream.avail_in == 0))
-            return Z_DATA_ERROR;
-        return err;
-    }
-    destLen = stream.total_out;
-
-    err = inflateEnd(&stream);
-    return err;
-}
-
-
-int trace_comp_read(struct libtrace_t *trace, void *buffer, size_t len) {
-	//we want to read len bytes out of the compressed file stored in *fh.
-	//store this in buffer, and return the number of bytes read.
-	
-	size_t numbytes = 0;
-	size_t ret = 0;
-	
-	if (trace->comp.ibuf == 0) {
-		trace->comp.ibuf = malloc(COMP_IBUF_SIZE);
-		trace->comp.cbuf_max = COMP_IBUF_SIZE * 3;
-		trace->comp.cbuf = malloc(trace->comp.cbuf_max);
-	}
-
-	if (fifo_out_available(trace->comp.cfifo) < len) {
-
-		if ((numbytes = fread(trace->comp.ibuf, 
-						COMP_IBUF_SIZE,
-						1,
-						trace->input.file)) == 0 ) {
-			if (feof(trace->input.file)) {
-				return 0;
-			}
-			if (ferror(trace->input.file)) {
-				perror("fread");
-				return -1;
-			}
-		}
-
-		// attempt to uncompress. This is wrapped up so
-		// that if the buffer is too small, it resizes
-		// and loops until it isn't too small
-		do {
-			trace->comp.cbuf_pos = trace->comp.cbuf_max;
-			// trace->comp.cbuf_pos is the size of the compression buffer
-			ret = trace_incompress(trace->comp.cbuf,
-				trace->comp.cbuf_pos,
-				trace->comp.ibuf,
-				COMP_IBUF_SIZE);
-			// trace->comp.cbuf_pos is NOW how much of the compression buffer is used;
-			if (ret == Z_BUF_ERROR) {
-				trace->comp.cbuf_max *= 2;
-				trace->comp.cbuf = realloc(trace->comp.cbuf,trace->comp.cbuf_max);
-			}
-		} while(ret == Z_BUF_ERROR);
-	
-		// bad. Exit.
-		if (ret == Z_DATA_ERROR || ret == Z_MEM_ERROR) {
-			return -1;
-		}
-
-		fifo_write(trace->comp.cfifo,trace->comp.cbuf,trace->comp.cbuf_pos);
-	}
-
-	if ((numbytes = fifo_out_read(trace->comp.cfifo, buffer, len)) == 0 ) {
-		fprintf(stderr,"Couldn't read from compressed file, bailing\n");
-		return -1;
-	}
-
-	return len;	
-}
-//#endif
