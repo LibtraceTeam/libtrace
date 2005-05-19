@@ -28,6 +28,10 @@
 ##
 ##
 
+- Version 2.0.18
+	* When opening a trace file, call open() with O_LARGEFILE set and 
+	  pass the fd into gzdopen/fdopen.
+
 - Version 2.0.17
 	* Fixed a bug in trace_get_erf_timestamp for the pcap path. 
 	  Timestamps were not being fabricated correctly. This also

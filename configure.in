@@ -69,6 +69,10 @@ else
 fi
 
 
+# Check for various broken functions
+AC_FUNC_MALLOC
+AC_FUNC_REALLOC
+
 # *BSD doesn't have strndup. Currently provide our own.
 AC_REPLACE_FUNCS(strndup)
 
