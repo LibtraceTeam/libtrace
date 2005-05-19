@@ -465,13 +465,19 @@ struct libtrace_t *trace_create(char *uri) {
 #else
 			{
 #endif
+
+/* Catch undefined O_LARGEFILE on *BSD etc */
+#ifndef O_LARGEFILE
+#  define O_LARGEFILE 0
+#endif
+				
 #if HAVE_ZLIB
 				// using gzdopen means we can set O_LARGEFILE
 				// ourselves. However, this way is messy and 
 				// we lose any error checking on "open"
                                 libtrace->input.file = gzdopen(open(libtrace->conn_info.path,O_LARGEFILE), "r");
 #else
-				libtrace->input.file = fopen(libtrace->conn_info.path, "r");
+				libtrace->input.file = fdopen(open(libtrace->conn_info.path,O_LARGEFILE), "r");
 #endif
 			}
                         break;
