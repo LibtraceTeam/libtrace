@@ -1,5 +1,5 @@
 SUBDIRS=lib
-man_MANS = libtrace.h.3
+man_MANS = docs/man/man3/[a-zA-Z]*.3
 EXTRA_DIST=examples docs $(man_MANS)
 
 .PHONY: docs
@@ -14,3 +14,4 @@ bootstrap-clean:
 docs:
 	doxygen libtrace.doxygen
 
+install-man-hook: docs
