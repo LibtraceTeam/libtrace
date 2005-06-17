@@ -174,52 +174,55 @@ fi
 
 AM_CONDITIONAL(HAVE_DAG, test x$ac_cv_lbl_dag_api = xyes)
 
-
-# configure time options for selecting which libpcap and libz to use
-# this is provided to allow for systems whose default libraries don't support
-# large files - you can build your own and link using these options
-AC_ARG_WITH([pcap],
-    AC_HELP_STRING([--with-pcap],
-				   [name of pcap library (default is pcap)]),
-	[ac_cv_use_pcap=$withval], 
-    [ac_cv_use_pcap=pcap])
-
-
-AC_ARG_WITH([pcap-path],
-    AC_HELP_STRING([--with-pcap-path],
-				   [location of pcap library (default is /usr/lib)]),
-	[ac_cv_use_pcap_path=$withval],
-    [ac_cv_use_pcap_path=/usr/lib])
-
-if test x"$ac_cv_use_pcap" != xno; then
-    ADD_LIBS="$ADD_LIBS  -l$ac_cv_use_pcap"
-    
-    pcap_lib_file="${ac_cv_use_pcap_path}/lib${ac_cv_use_pcap}.so"
-    
-    # if the library is in /usr/lib, then just use 
-    # AC_CHECK_LIB. 
-    if test x"${ac_cv_use_pcap_path}" == x"/usr/lib"; then
-	    AC_CHECK_LIB(${ac_cv_use_pcap},pcap_open_live,
-			 have_libpcap=yes,
-			 have_libpcap=no)
-
-	    if test x"${have_libpcap}" == xno; then
-        	AC_MSG_NOTICE([Cannot find pcap library $pcap_lib_file.])
-        	AC_MSG_ERROR([Exiting]);
-	    fi
-    else
-    	ADD_LDFLAGS="$ADD_LDFLAGS -L$ac_cv_use_pcap_path"
-    	# if it's not in /usr/lib/, check manually. This isn't nice,
-    	# and will probably break.
-    	if test ! -r "$ac_cv_use_pcap_path" -o ! -r "$pcap_lib_file"; then
-        	AC_MSG_NOTICE([Cannot find pcap library $pcap_lib_file.])
-        	AC_MSG_ERROR([Exiting]);
-    	fi  
-    fi
-    AC_DEFINE(HAVE_PCAP,1,[Conditional for building PCAP support])
-else
-    AC_DEFINE(HAVE_PCAP,0,[Conditional for building PCAP support])
-fi
+# The following is commented out because it seems you don't actually
+# need it. libpcap 'just works' with large files, even under woody,
+# although you probably need _FILE_OFFSET_BITS and LARGEFILE etc set 
+# properly - libtrace handles this however.
+## configure time options for selecting which libpcap and libz to use
+## this is provided to allow for systems whose default libraries don't support
+## large files - you can build your own and link using these options
+#AC_ARG_WITH([pcap],
+#    AC_HELP_STRING([--with-pcap],
+#				   [name of pcap library (default is pcap)]),
+#	[ac_cv_use_pcap=$withval], 
+#    [ac_cv_use_pcap=pcap])
+#
+#
+#AC_ARG_WITH([pcap-path],
+#    AC_HELP_STRING([--with-pcap-path],
+#				   [location of pcap library (default is /usr/lib)]),
+#	[ac_cv_use_pcap_path=$withval],
+#    [ac_cv_use_pcap_path=/usr/lib])
+#
+#if test x"$ac_cv_use_pcap" != xno; then
+#    ADD_LIBS="$ADD_LIBS  -l$ac_cv_use_pcap"
+#    
+#    pcap_lib_file="${ac_cv_use_pcap_path}/lib${ac_cv_use_pcap}.so"
+#    
+#    # if the library is in /usr/lib, then just use 
+#    # AC_CHECK_LIB. 
+#    if test x"${ac_cv_use_pcap_path}" == x"/usr/lib"; then
+#	    AC_CHECK_LIB(${ac_cv_use_pcap},pcap_open_live,
+#			 have_libpcap=yes,
+#			 have_libpcap=no)
+#
+#	    if test x"${have_libpcap}" == xno; then
+#        	AC_MSG_NOTICE([Cannot find pcap library $pcap_lib_file.])
+#        	AC_MSG_ERROR([Exiting]);
+#	    fi
+#    else
+#    	ADD_LDFLAGS="$ADD_LDFLAGS -L$ac_cv_use_pcap_path"
+#    	# if it's not in /usr/lib/, check manually. This isn't nice,
+#    	# and will probably break.
+#    	if test ! -r "$ac_cv_use_pcap_path" -o ! -r "$pcap_lib_file"; then
+#        	AC_MSG_NOTICE([Cannot find pcap library $pcap_lib_file.])
+#        	AC_MSG_ERROR([Exiting]);
+#    	fi  
+#    fi
+#    AC_DEFINE(HAVE_PCAP,1,[Conditional for building PCAP support])
+#else
+#    AC_DEFINE(HAVE_PCAP,0,[Conditional for building PCAP support])
+#fi
 
 
 AC_ARG_WITH([zlib],
