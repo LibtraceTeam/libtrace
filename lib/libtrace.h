@@ -493,7 +493,7 @@ typedef enum {USE_DEST, USE_SOURCE} serverport_t;
  * protocol, or 0 if this protocol has no ports.
  * @author Perry Lorier
  */
-uint16_t trace_get_source_port(const struct libtrace_packet_t *);
+uint16_t trace_get_source_port(const struct libtrace_packet_t *packet);
 
 /** Get the destination port
  * @param packet	the packet to read from
@@ -501,7 +501,7 @@ uint16_t trace_get_source_port(const struct libtrace_packet_t *);
  * protocol, or 0 if this protocol has no ports.
  * @author Perry Lorier
  */
-uint16_t trace_get_destination_port(const struct libtrace_packet_t *);
+uint16_t trace_get_destination_port(const struct libtrace_packet_t *packet);
 
 /** hint at the server port in specified protocol
  * @param protocol	the IP layer protocol, eg 6 (tcp), 17 (udp)
