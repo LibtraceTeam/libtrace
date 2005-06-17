@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <assert.h>
 #include "libtrace.h"
 #include <map>
 #include <sys/socket.h>
