@@ -74,6 +74,9 @@ extern "C" {
 
 #define COLLECTOR_PORT 3435
 
+/** Opaque structure holding information about an output trace */
+struct libtrace_out_t;
+	
 /** Opaque structure holding information about a trace */
 struct libtrace_t;
         
@@ -207,24 +210,52 @@ struct libtrace_icmp
  *  - wag:/path/to/wag/socket
  *  - wag:/dev/device
  *
- *  If an error occured why attempting to open the trace file, NULL is returned
+ *  If an error occured when attempting to open the trace file, NULL is returned
  *  and an error is output to stdout.
  */
 struct libtrace_t *trace_create(char *uri);
+
+/** Creates a trace output file from a URI. 
+ *
+ * @returns opaque pointer to a libtrace_output_t
+ *
+ * Valid URI's are:
+ *  - gzerf:/path/to/erf/file.gz
+ *  - gzerf:/path/to/erf/file
+ *  - rtserver:hostname
+ *  - rtserver:hostname:port
+ *
+ *  If an error occured when attempting to open the output trace, NULL is returned and
+ *  an error is output to stdout.
+ */
+struct libtrace_out_t *trace_output_create(char *uri);
 
 /** Close a trace file, freeing up any resources it may have been using
  *
  */
 void trace_destroy(struct libtrace_t *trace);
 
+/** Close a trace output file, freeing up any resources it may have been using
+ *
+ */
+void trace_output_destroy(struct libtrace_out_t *trace);
+
 /** Read one packet from the trace into buffer
  *
- * @param libtrace 	the libtrace opaque pointer
+ * @param trace 	the libtrace opaque pointer
  * @param packet  	the packet opaque pointer
  * @returns false if it failed to read a packet
  *
  */
 int trace_read_packet(struct libtrace_t *trace, struct libtrace_packet_t *packet);
+
+/** Write one packet out to the output trace
+ *
+ * @param trace		the libtrace_out opaque pointer
+ * @param packet	the packet opaque pointer
+ * @returns the number of bytes written out, if zero or negative then an error has occured.
+ */
+int trace_write_packet(struct libtrace_out_t *trace, struct libtrace_packet_t *packet);
 
 /** get a pointer to the link layer
  * @param packet  	the packet opaque pointer

@@ -131,11 +131,13 @@
 #  include "dagformat.h"
 #endif
 
+#include <err.h>
 
 typedef enum {SOCKET, TRACE, STDIN, DEVICE, INTERFACE, RT } source_t;
 
 typedef enum {ERF, PCAP, PCAPINT, DAG, RTCLIENT, WAG, WAGINT } format_t;
 
+typedef enum {RTSERVER, GZERF } output_t;
 #if HAVE_BPF
 /** A type encapsulating a bpf filter
  * This type covers the compiled bpf filter, as well as the original filter
@@ -148,12 +150,40 @@ struct libtrace_filter_t {
 };
 #endif
 
+struct libtrace_out_t {
+	output_t outputformat;
+
+	union {
+		struct {
+			char *hostname;
+			short port;
+		} rt;
+		char *path;
+		char *interface;
+	} conn_info;
+
+        union {
+                int fd;
+#if HAVE_ZLIB
+                gzFile *file;
+#else
+                FILE *file;
+#endif
+#if HAVE_PCAP
+                pcap_t *pcap;
+#endif
+        } output;
+
+	struct fifo_t *fifo;
+};
+
 /** The information about traces that are open 
  * @internal
  */
 struct libtrace_t {
         format_t format; 	/**< The format that this trace is in */
         source_t sourcetype;	/**< The type (device,file, etc */
+
         union {
 		/** Information about rtclients */
                 struct {
@@ -176,7 +206,8 @@ struct libtrace_t {
                 pcap_t *pcap;
 #endif 
         } input;
-        struct fifo_t *fifo;   
+
+	struct fifo_t *fifo;   
 	struct {
 		void *buf; 
 		unsigned bottom;
@@ -392,6 +423,84 @@ static int init_trace(struct libtrace_t **libtrace, char *uri) {
         return 1;
 }
 
+/** Initialises the data contained within the libtrace_out_t structure, based on the provided uri.
+ *
+ * @param libtrace	the libtrace_out_t structure to initialise
+ * @param uri		the uri defining the output type and destination
+ * @returns		1 if initialised successfully, 0 otherwise
+ *
+ * @author Shane Alcock
+ * */
+static int init_output(struct libtrace_out_t **libtrace, char *uri) {
+        char *scan = calloc(sizeof(char),URI_PROTO_LINE);
+        char *uridata = 0;
+
+        // parse the URI to determine what sort of event we are dealing with
+
+        // want snippet before the : to get the uri base type.
+
+        if((uridata = strchr(uri,':')) == NULL) {
+                // badly formed URI - needs a :
+                return 0;
+        }
+
+        if ((*uridata - *uri) > URI_PROTO_LINE) {
+                // badly formed URI - uri type is too long
+                return 0;
+        }
+        strncpy(scan,uri, (uridata - uri));
+
+        if (!strncasecmp(scan,"gzerf",5)) {
+		(*libtrace)->outputformat = GZERF;
+	} else if (!strncasecmp(scan, "rt", 2)) {
+		(*libtrace)->outputformat = RTSERVER;
+	} else {
+		return 0;
+	}
+
+	uridata ++;
+	switch((*libtrace)->outputformat) {
+		case GZERF:
+			/* 
+			 * Acceptable uridata takes the form:
+			 * /path/to/file.gz
+			 */
+			(*libtrace)->conn_info.path = strdup(uridata);
+			break;
+		case RTSERVER:
+			/* 
+			 * Possible uridata formats:
+			 * hostname
+			 * hostname:port
+			 */
+			if (strlen(uridata) == 0) {
+                                (*libtrace)->conn_info.rt.hostname =
+                                        strdup("localhost");
+                                (*libtrace)->conn_info.rt.port =
+                                        COLLECTOR_PORT;
+                                break;
+                        }
+                        if ((scan = strchr(uridata,':')) == NULL) {
+                                (*libtrace)->conn_info.rt.hostname =
+                                        strdup(uridata);
+                                (*libtrace)->conn_info.rt.port =
+                                        COLLECTOR_PORT;
+                        } else {
+                                (*libtrace)->conn_info.rt.hostname =
+                                        (char *)strndup(uridata,(scan - uridata));
+
+                                (*libtrace)->conn_info.rt.port =
+                                        atoi(++scan);
+                        }
+                        break;
+		default:
+			fprintf(stderr, "How did you get here??\n");
+	}
+	(*libtrace)->fifo = create_fifo(1048576);
+	assert( (*libtrace)->fifo);
+	return 1;
+} 
+
 /** Create a trace file from a URI
  * 
  * @returns opaque pointer to a libtrace_t
@@ -564,6 +673,81 @@ struct libtrace_t *trace_create(char *uri) {
         return libtrace;
 }
 
+/** Creates a libtrace_out_t structure and the socket / file through which output will be directed.
+ *
+ * @param uri	the uri string describing the output format and the destination
+ * @returns the newly created libtrace_out_t structure
+ * 
+ * @author Shane Alcock
+ * */
+struct libtrace_out_t *trace_output_create(char *uri) {
+	struct libtrace_out_t *libtrace = malloc(sizeof(struct libtrace_out_t));
+	struct sockaddr_in remote, client;
+	int client_fd, clilen;
+	struct hostent *he;
+	
+	if (init_output(&libtrace, uri) == 0)
+		return 0;
+
+	switch(libtrace->outputformat) {
+		case RTSERVER:
+                        if ((he=gethostbyname(libtrace->conn_info.rt.hostname)) == NULL) {
+                                perror("gethostbyname");
+                                return 0;
+                        }
+                        if ((libtrace->output.fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+                                perror("socket");
+                                return 0;
+                        }
+			// Need to set up a listening server here
+			bzero((char *) &remote, sizeof(remote)); 
+			remote.sin_family = AF_INET;
+			remote.sin_addr.s_addr = INADDR_ANY;
+			remote.sin_port = htons(libtrace->conn_info.rt.port);
+
+			if (bind(libtrace->output.fd, (struct sockaddr *) &remote, sizeof(remote)) < 0) {
+				perror("bind");
+				return 0;
+			}
+                       	fprintf(stderr, "Waiting for client to connect\n");
+
+			listen(libtrace->output.fd, 5);
+			clilen = sizeof(client);
+			if ((client_fd = accept(libtrace->output.fd, (struct sockaddr *) &client, &clilen)) < 0) {
+				perror("accept");
+				return 0;
+			}
+			libtrace->output.fd = client_fd;
+			fprintf(stderr, "Client connected\n");                       
+			break;
+
+
+		case GZERF:
+/* Catch undefined O_LARGEFILE on *BSD etc */
+#ifndef O_LARGEFILE
+#  define O_LARGEFILE 0
+#endif
+
+#if HAVE_ZLIB
+                        // using gzdopen means we can set O_LARGEFILE
+                        // ourselves. However, this way is messy and
+                        // we lose any error checking on "open"
+			libtrace->output.file = gzdopen(open(libtrace->conn_info.path, O_CREAT | O_LARGEFILE | O_WRONLY, S_IRUSR | S_IWUSR), "w");
+#else
+	               	libtrace->output.file = fdopen(open(libtrace->conn_info.path,O_CREAT | O_LARGEFILE | O_WRONLY, S_IRUSR | S_IWUSR), "w");
+#endif			
+			if (!libtrace->output.file) {
+				perror("gzdopen (or fdopen)");
+				return 0;
+			}
+			break;
+		default:
+			fprintf(stderr, "Unrecognised output type - failure to create output instance \n");
+			exit(0);
+	}
+	return libtrace;
+}
+
 /** Close a trace file, freeing up any resources it may have been using
  *
  */
@@ -591,6 +775,29 @@ void trace_destroy(struct libtrace_t *libtrace) {
         // need to free things!
         destroy_fifo(libtrace->fifo);
         free(libtrace);
+}
+
+/** Close an output trace file, freeing up any resources it may have been using
+ *
+ * @param libtrace	the output trace file to be destroyed
+ *
+ * @author Shane Alcock
+ * */
+void trace_output_destroy(struct libtrace_out_t *libtrace) {
+	assert(libtrace);
+
+	if (libtrace->outputformat == RTSERVER) {
+		close(libtrace->output.fd);
+	}
+	else {
+#if HAVE_ZLIB
+                gzclose(libtrace->output.file);
+#else
+                fclose(libtrace->output.file);
+#endif
+	}
+	destroy_fifo(libtrace->fifo);
+	free(libtrace);
 }
 
 static int trace_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
@@ -874,7 +1081,6 @@ int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *pac
 		}
 
 		assert(size < LIBTRACE_PACKET_BUFSIZE);
-
 		// read in the full packet
 		if ((numbytes = fifo_out_read(libtrace->fifo, buffer, size)) == 0) {
 			fifo_out_reset(libtrace->fifo);
@@ -897,6 +1103,144 @@ int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *pac
 	} while (1);
 }
 
+static int trace_write(struct libtrace_out_t *libtrace, void *buffer, size_t len) {
+	int numbytes = 0;
+
+	assert(libtrace);
+	assert(len >= 0);
+
+	if (buffer == NULL) {
+		return 0;
+	}
+
+	while (1) {
+		switch(libtrace->outputformat) {
+			case RTSERVER:
+#ifndef MSG_NOSIGNAL
+#define MSG_NOSIGNAL 0
+#endif
+				// Write to the network
+				if ((numbytes = send(libtrace->output.fd, 
+							buffer,
+							len,
+							MSG_NOSIGNAL)) == -1) {
+					if (errno == EINTR) {
+						continue;
+					}
+					perror("send");
+					return -1;
+				}
+				break;
+			case GZERF:			
+#if HAVE_ZLIB
+				if ((numbytes = gzwrite(libtrace->output.file,
+							buffer,
+							len)) == -1) {
+					perror("gzwrite");
+					return -1;
+				}
+				break;
+#else
+				// Do binary write instead
+				if ((numbytes = fwrite(buffer, len, 1, libtrace->output.file)) == 0) {
+					perror("fwrite");
+					return -1;
+				}
+				break;
+#endif
+			default:
+				fprintf(stderr, "Bad output type\n");
+				break;
+		}
+		break;
+	}	
+	return numbytes;
+}		
+
+/** Writes a packet to the specified output
+ *
+ * @param libtrace	describes the output format, destination, etc.
+ * @param packet	the packet to be written out
+ * @returns the number of bytes written, -1 if write failed
+ *
+ * @author Shane Alcock
+ * */
+int trace_write_packet(struct libtrace_out_t *libtrace, struct libtrace_packet_t *packet) {
+	// initialise stuff
+	int numbytes, size;
+	char buf[RP_BUFSIZE];
+	int intsize = sizeof(int);
+	void *buffer = &buf[intsize];
+	int write_required = 0;
+
+	assert(libtrace);
+	assert(packet);	
+
+	if (libtrace->outputformat == GZERF) {
+		// do gzwrite
+		if ((numbytes = gzwrite(libtrace->output.file, packet->buffer, packet->size)) == 0) {
+			perror("gzwrite");
+			return -1;
+		}
+		return numbytes;
+	}
+	
+	// do fifo stuff for RT output instead
+	if (libtrace->outputformat == RTSERVER) {
+		do {
+			assert(libtrace->fifo);
+
+			if (fifo_out_available(libtrace->fifo) == 0 || write_required) {
+				// Packet added to fifo
+				if ((numbytes = fifo_write(libtrace->fifo, packet->buffer, packet->size)) == 0) {
+					// some error with the fifo
+					perror("fifo_write");
+					return -1;
+				}
+				write_required = 0;
+			}
+			
+			// Read from fifo and add protocol header
+			if ((numbytes = fifo_out_read(libtrace->fifo, buffer, sizeof(dag_record_t))) == 0) {
+				// failure reading in from fifo
+				fifo_out_reset(libtrace->fifo);
+				write_required = 1;
+				continue;
+			}
+			size = ntohs(((dag_record_t *)buffer)->rlen);		
+			assert(size < LIBTRACE_PACKET_BUFSIZE);
+	
+			if ((numbytes = fifo_out_read(libtrace->fifo, buffer, size)) == 0) {
+				// failure reading in from fifo
+				fifo_out_reset(libtrace->fifo);
+				write_required = 1;
+				continue;
+			}
+			fifo_out_update(libtrace->fifo, size);	
+			// Sort out the protocol header
+			memcpy(buf, &packet->status, intsize);
+						
+
+			// Send the buffer out on the wire
+			if ((numbytes = trace_write(libtrace, buf, size + sizeof(int))) <=0 ) {
+				return numbytes;
+			}
+
+			// Need an ack to come back
+			// TODO: Obviously this is a little unfinished
+			if ("ACK_ARRIVES") {
+				fifo_ack_update(libtrace->fifo, size);
+				return numbytes;
+			} else {
+				fifo_out_reset(libtrace->fifo);
+			}
+		} while(1);
+	}
+
+	// Unacceptable output format
+	fprintf(stderr, "Unknown Output format \n");
+	assert(0);
+}
 
 /** get a pointer to the link layer
  * @param packet	a pointer to a libtrace_packet structure
