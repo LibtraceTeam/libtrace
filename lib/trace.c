@@ -41,6 +41,7 @@
 #define _GNU_SOURCE
 #include "common.h"
 #include "config.h"
+#include "format.h"
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -131,11 +132,13 @@
 #  include "dagformat.h"
 #endif
 
+#include "format.h"
+//#include "format/format_list.h"
 #include <err.h>
 
-typedef enum {SOCKET, TRACE, STDIN, DEVICE, INTERFACE, RT } source_t;
+//typedef enum {SOCKET, TRACE, STDIN, DEVICE, INTERFACE, RT } source_t;
 
-typedef enum {ERF, PCAP, PCAPINT, DAG, RTCLIENT, WAG, WAGINT } format_t;
+//typedef enum {ERF, PCAP, PCAPINT, DAG, RTCLIENT, WAG, WAGINT } format_e_t;
 
 typedef enum {RTSERVER, GZERF } output_t;
 #if HAVE_BPF
@@ -175,100 +178,28 @@ struct libtrace_out_t {
         } output;
 
 	struct fifo_t *fifo;
-
-	// rtserver stuff
-	
-	/** fd that watches for incoming connections */
-	int connect_fd;
-	/** fds that represent connected clients */
-	fd_set rt_fds;
-	/** fds that are listening for connections (this should only contain connect_fd) */
-	fd_set listen;
-	int max_rtfds;
-	/** Used for creating new fds as required */
-	struct sockaddr_in * remote;
 };
 
-/** The information about traces that are open 
- * @internal
- */
-struct libtrace_t {
-        format_t format; 	/**< The format that this trace is in */
-        source_t sourcetype;	/**< The type (device,file, etc */
 
-        union {
-		/** Information about rtclients */
-                struct {
-                        char *hostname;
-                        short port;
-                } rt;
-                char *path;		/**< information for local sockets */
-                char *interface;	/**< intormation for reading of network
-					     interfaces */
-        } conn_info;
-	/** Information about the current state of the input device */
-        union {
-                int fd;
-#if HAVE_ZLIB
-                gzFile *file;
-#else	
-		FILE *file;
-#endif
-#if HAVE_PCAP 
-                pcap_t *pcap;
-#endif 
-        } input;
 
-	struct fifo_t *fifo;   
-	struct {
-		void *buf; 
-		unsigned bottom;
-		unsigned top;
-		unsigned diff;
-		unsigned curr;
-		unsigned offset;
-	} dag;
-	struct {
-		void *buffer;
-		int size;
-	} packet;
-	double tdelta;
-	double trace_start_ts;
-	double real_start_ts;
-	double trace_last_ts;
+struct format_t **format_list = 0;
+int format_size = 0;
+int nformats = 0;
 
-	double last_ts;
-	double start_ts;
-};
+void register_format(struct format_t *f) {
+	fprintf(stderr,"Registering input format %s\n",f->name);
+	if (format_list == 0) {
+		format_size = 10;
+		format_list = malloc(sizeof(struct format_t *) * format_size);
+	} else if (format_size == nformats) {
+		format_size = format_size + 10;
+		format_list = realloc(format_list,
+				sizeof(struct format_t *) * format_size);
+	}
+	format_list[nformats] = f;
+	nformats++;
+}
 
-struct trace_sll_header_t {
-	uint16_t pkttype;          	/* packet type */
-	uint16_t hatype;           	/* link-layer address type */
-	uint16_t halen;            	/* link-layer address length */
-	char addr[8];	 		/* link-layer address */
-	uint16_t protocol;         	/* protocol */
-};
-
-#ifndef PF_RULESET_NAME_SIZE
-#define PF_RULESET_NAME_SIZE 16
-#endif
-
-#ifndef IFNAMSIZ
-#define IFNAMSIZ 16
-#endif
-
-struct trace_pflog_header_t {
-	uint8_t	   length;
-	sa_family_t   af;
-	uint8_t	   action;
-	uint8_t	   reason;
-	char 	   ifname[IFNAMSIZ];
-	char 	   ruleset[PF_RULESET_NAME_SIZE];
-	uint32_t   rulenr;
-	uint32_t   subrulenr;
-	uint8_t	   dir;
-	uint8_t	   pad[3];
-};
 
 #define RP_BUFSIZE 65536
 
@@ -276,6 +207,7 @@ struct trace_pflog_header_t {
 static int init_trace(struct libtrace_t **libtrace, char *uri) {
         char *scan = calloc(sizeof(char),URI_PROTO_LINE);
         char *uridata = 0;                  
+	int i = 0;
 	struct stat buf;
         
         // parse the URI to determine what sort of event we are dealing with
@@ -295,137 +227,38 @@ static int init_trace(struct libtrace_t **libtrace, char *uri) {
 
 	(*libtrace)->tdelta = 0.0;
 
-        if (!strncasecmp(scan,"erf",3)) {
-                (*libtrace)->format=ERF;
-#if HAVE_PCAP
-        } else if (!strncasecmp(scan,"pcapint",7)) {
-                (*libtrace)->format=PCAPINT;
-        } else if (!strncasecmp(scan,"pcap",4)) {
-                (*libtrace)->format=PCAP;
-#else
-        } else if (!strncasecmp(scan,"pcap",4)) { // also catches pcapint
-		fprintf(stderr,"This version of libtrace has been compiled without PCAP support\n");
+
+	(*libtrace)->format = 0;
+	for (i = 0; i < nformats; i++) {
+		if (strlen(scan) == strlen(format_list[i]->name) &&
+				!strncasecmp(scan,
+					format_list[i]->name,
+					strlen(scan))) {
+				(*libtrace)->format=format_list[i];
+				break;
+				}
+	}
+	if ((*libtrace)->format == 0) {
+		fprintf(stderr,
+			"libtrace has no support for this format (%s)\n",scan);
 		return 0;
-#endif
-	
-#if HAVE_DAG
-	} else if (!strncasecmp(scan,"dag",3)) {
-                (*libtrace)->format=DAG;
-#else 
-	} else if (!strncasecmp(scan,"dag",3)) {
-		fprintf(stderr,"This version of libtrace has been compiled without DAG support\n");
-		return 0;
-#endif
-        } else if (!strncasecmp(scan,"rtclient",7)) {
-                (*libtrace)->format=RTCLIENT;
-	} else if (!strncasecmp(scan,"wagint",6)) {
-	struct ports_t *port;
-		(*libtrace)->format=WAGINT;
-	} else if (!strncasecmp(scan,"wag",3)) {
-		(*libtrace)->format=WAG;
-        } else {
-                //badly formed URI
-                return 0;
-        }
-        
+	}
+
         // push uridata past the delimiter
         uridata++;
-        
+        (*libtrace)->conn_info.path = strdup(uridata);
+
         // libtrace->format now contains the type of uri
         // libtrace->uridata contains the appropriate data for this
         
-        switch((*libtrace)->format) {
-#if HAVE_PCAP
-		case PCAPINT:
-#endif
-		case WAGINT:
-			/* Can have uridata of the following format
-			 * eth0
-			 * etc
-			 */
-			// We basically assume this is correct.
-			(*libtrace)->sourcetype = INTERFACE;	
-			(*libtrace)->conn_info.path = strdup(uridata);
-			break;
-#if HAVE_PCAP
-                case PCAP:
-#endif
-                case ERF:
-                case WAG:
-                        /*
-                         * Can have uridata of the following format
-                         * /path/to/socket (probably not PCAP)
-                         * /path/to/file
-                         * /path/to/file.gz (not PCAP)
-			 * /dev/device (use PCAPINT)
-                         * -
-                         */
-                        if (!strncmp(uridata,"-",1)) {
-                                (*libtrace)->sourcetype = STDIN;
-                        } else {
-                                if (stat(uridata,&buf) == -1) {
-                                        perror("stat");
-                                        return 0;
-                                }
-                                if (S_ISSOCK(buf.st_mode)) {
-                                        (*libtrace)->sourcetype = SOCKET;
-				} else if (S_ISCHR(buf.st_mode)) {
-					(*libtrace)->sourcetype = DEVICE;
-                                } else {
-                                        (*libtrace)->sourcetype = TRACE;
-				}
-                                (*libtrace)->conn_info.path = strdup(uridata);
-                        }
-                        break;
-                case DAG:
-#if HAVE_DAG
-			/* 
-			 * Can have uridata of the following format:
-			 * /dev/device
-			 */
-			if (stat(uridata,&buf) == -1) {
-				perror("stat");
-				return 0;
-			}
-			if (S_ISCHR(buf.st_mode)) {
-				(*libtrace)->sourcetype = DEVICE;
-			} else {
-				fprintf(stderr,"%s isn't a valid char device, exiting\n",uridata);
-				exit(1);
-			}
-			(*libtrace)->conn_info.path = strdup(uridata);
-#endif
-			break;
-
-                case RTCLIENT:
-                        /* 
-                         * Can have the uridata in the format
-                         * hostname
-                         * hostname:port
-                         */
-                        (*libtrace)->sourcetype = RT;
-                        if (strlen(uridata) == 0) {
-                                (*libtrace)->conn_info.rt.hostname = 
-                                        strdup("localhost");
-                                (*libtrace)->conn_info.rt.port = 
-                                        COLLECTOR_PORT;
-                                break;
-                        }
-                        if ((scan = strchr(uridata,':')) == NULL) {
-                                (*libtrace)->conn_info.rt.hostname = 
-                                        strdup(uridata);
-                                (*libtrace)->conn_info.rt.port = 
-                                        COLLECTOR_PORT;
-                        } else {
-                                (*libtrace)->conn_info.rt.hostname =
-                                        (char *)strndup(uridata,(scan - uridata));
-                                        
-                                (*libtrace)->conn_info.rt.port = 
-                                        atoi(++scan);                           
-                        }
-                        break;
-        }
-        
+	if ((*libtrace)->format->init_input) {
+		(*libtrace)->format->init_input( (*libtrace));
+	} else {
+		fprintf(stderr,
+			"No init function for format %s\n",scan);
+		return 0;
+	}
+	
 
         (*libtrace)->fifo = create_fifo(1048576);
 	assert( (*libtrace)->fifo);
@@ -553,192 +386,48 @@ struct libtrace_t *trace_create(char *uri) {
                 return 0;
         }
        
-        switch(libtrace->sourcetype) {
-                case RT: 
-                        if ((he=gethostbyname(libtrace->conn_info.rt.hostname)) == NULL) {  
-                                perror("gethostbyname");
-                                return 0;
-                        } 
-                        if ((libtrace->input.fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-                                perror("socket");
-                                return 0;
-                        }
-
-                        remote.sin_family = AF_INET;   
-                        remote.sin_port = htons(libtrace->conn_info.rt.port);
-                        remote.sin_addr = *((struct in_addr *)he->h_addr);
-                        bzero(&(remote.sin_zero), 8);
-
-                        if (connect(libtrace->input.fd, (struct sockaddr *)&remote,
-                                                sizeof(struct sockaddr)) == -1) {
-                                perror("connect (inet)");
-                                return 0;
-                        }
-                        break;
-                case TRACE:
-#if HAVE_PCAP
-                        if (libtrace->format == PCAP) {
-                                if ((libtrace->input.pcap = pcap_open_offline(libtrace->conn_info.path, errbuf)) == NULL) {
-					fprintf(stderr,"%s\n",errbuf);
-					return 0;
-				}
-                        } else {
-#else
-			{
-#endif
-
-/* Catch undefined O_LARGEFILE on *BSD etc */
-#ifndef O_LARGEFILE
-#  define O_LARGEFILE 0
-#endif
-				
-#if HAVE_ZLIB
-				// using gzdopen means we can set O_LARGEFILE
-				// ourselves. However, this way is messy and 
-				// we lose any error checking on "open"
-                                libtrace->input.file = gzdopen(open(libtrace->conn_info.path,O_LARGEFILE), "r");
-#else
-				libtrace->input.file = fdopen(open(libtrace->conn_info.path,O_LARGEFILE), "r");
-#endif
-			}
-                        break;
-                case STDIN:
-#if HAVE_PCAP
-                        if (libtrace->format == PCAP) {
-                                libtrace->input.pcap = pcap_open_offline("-",errbuf); 
-                        } else {
-#else
-			{
-#endif
-#if HAVE_ZLIB
-                                libtrace->input.file = gzdopen(STDIN, "r");
-#else	
-				libtrace->input.file = stdin;
-#endif
-                        }
-                        break;
-                case SOCKET:
-                	/* Pcap doesn't work */
-                        if (libtrace->format != PCAP) {
-                                if ((libtrace->input.fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
-                                        perror("socket");
-                                        return 0;
-                                }
-                                unix_sock.sun_family = AF_UNIX;
-                                bzero(unix_sock.sun_path,108);
-                                snprintf(unix_sock.sun_path,108,"%s",libtrace->conn_info.path);
-
-                                if (connect(libtrace->input.fd, (struct sockaddr *)&unix_sock,
-                                                        sizeof(struct sockaddr)) == -1) {
-                                        perror("connect (unix)");
-                                        return 0;
-                                }
-                        }
-                        break;
-                case DEVICE:
-		case INTERFACE:
-			switch (libtrace->format) {
-#if HAVE_PCAP
-				case PCAPINT:
-				case PCAP:
-					libtrace->input.pcap = pcap_open_live(
-						libtrace->conn_info.path,
-						4096,
-						1,
-						1,
-						errbuf);
-					break;
-#endif
-				case WAGINT:
-				case WAG:
-					libtrace->input.fd = open(
-						libtrace->conn_info.path,
-						O_RDONLY);
-					break;
-#if HAVE_DAG
-				case DAG:
-					if((libtrace->input.fd = dag_open(libtrace->conn_info.path)) < 0) {
-						fprintf(stderr,"Cannot open DAG %s: %m\n", libtrace->conn_info.path,errno);
-						exit(0);
-					}
-					if((libtrace->dag.buf = dag_mmap(libtrace->input.fd)) == MAP_FAILED) {
-						fprintf(stderr,"Cannot mmap DAG %s: %m\n", libtrace->conn_info.path,errno);
-						exit(0);
-					}
-					if(dag_start(libtrace->input.fd) < 0) {
-						fprintf(stderr,"Cannot start DAG %s: %m\n", libtrace->conn_info.path,errno);
-						exit(0);
-					}
-					break;
-#endif
-				default:
-					fprintf(stderr,"Unknown format trace, hoping I can just read\n");
-					break;
-					
-			}
-			break;
-                default:
-                        fprintf(stderr,"Unsupported source type for libtrace, terminating (%i)\n",libtrace->sourcetype);
-                        exit(0);
-                
-        }
         return libtrace;
 }
 
 /** Creates a libtrace_out_t structure and the socket / file through which output will be directed.
  *
  * @param uri	the uri string describing the output format and the destination
- * @returns the newly created libtrace_out_t structure, or NULL if an error occurs
+ * @returns the newly created libtrace_out_t structure
  * 
  * @author Shane Alcock
  * */
 struct libtrace_out_t *trace_output_create(char *uri) {
 	struct libtrace_out_t *libtrace = malloc(sizeof(struct libtrace_out_t));
-	struct sockaddr_in listener;
+	struct sockaddr_in remote, client;
+	int client_fd, clilen;
 	struct hostent *he;
-	int yes = 1;
 	
 	if (init_output(&libtrace, uri) == 0)
 		return 0;
 
 	switch(libtrace->outputformat) {
 		case RTSERVER:
-			FD_ZERO(&libtrace->listen);
-			FD_ZERO(&libtrace->rt_fds);
-			
                         if ((he=gethostbyname(libtrace->conn_info.rt.hostname)) == NULL) {
                                 perror("gethostbyname");
                                 return 0;
                         }
-                        if ((libtrace->connect_fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+                        if ((libtrace->output.fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
                                 perror("socket");
                                 return 0;
                         }
-			if (setsockopt(libtrace->connect_fd,SOL_SOCKET,SO_REUSEADDR,&yes,sizeof(int)) == -1) {
-		                perror("setsockopt");
-		                return 0;
-		        }
-			libtrace->remote = calloc(1,sizeof(struct sockaddr_in));
 			// Need to set up a listening server here
-			bzero((char *) libtrace->remote, sizeof(libtrace->remote)); 
-			libtrace->remote->sin_family = AF_INET;
-			libtrace->remote->sin_addr.s_addr = INADDR_ANY;
-			libtrace->remote->sin_port = htons(libtrace->conn_info.rt.port);
-			
-			if (bind(libtrace->connect_fd, (struct sockaddr *) libtrace->remote, sizeof(struct sockaddr_in)) < 0) {
+			bzero((char *) &remote, sizeof(remote)); 
+			remote.sin_family = AF_INET;
+			remote.sin_addr.s_addr = INADDR_ANY;
+			remote.sin_port = htons(libtrace->conn_info.rt.port);
+
+			if (bind(libtrace->output.fd, (struct sockaddr *) &remote, sizeof(remote)) < 0) {
 				perror("bind");
 				return 0;
 			}
-                       	// fprintf(stderr, "Waiting for client to connect\n");
+                       	fprintf(stderr, "Waiting for client to connect\n");
 
-			if (listen(libtrace->connect_fd, 10) == -1) {
-				perror("listen");
-				return 0;
-			}
-				
-			FD_SET(libtrace->connect_fd, &libtrace->listen);
-			libtrace->max_rtfds = libtrace->connect_fd;
-			/*
+			listen(libtrace->output.fd, 5);
 			clilen = sizeof(client);
 			if ((client_fd = accept(libtrace->output.fd, (struct sockaddr *) &client, &clilen)) < 0) {
 				perror("accept");
@@ -746,7 +435,6 @@ struct libtrace_out_t *trace_output_create(char *uri) {
 			}
 			libtrace->output.fd = client_fd;
 			fprintf(stderr, "Client connected\n");                       
-			*/
 			break;
 
 
@@ -781,25 +469,7 @@ struct libtrace_out_t *trace_output_create(char *uri) {
  */
 void trace_destroy(struct libtrace_t *libtrace) {
         assert(libtrace);
-#if HAVE_PCAP
-        if (libtrace->format == PCAP || libtrace->format == PCAPINT) {
-                pcap_close(libtrace->input.pcap);
-#else 
-	if (0) {
-#endif
-        } else if (libtrace->sourcetype == SOCKET || libtrace->sourcetype == RT) {
-                close(libtrace->input.fd);
-#if HAVE_DAG
-	} else if (libtrace->format == DAG) {
-		dag_stop(libtrace->input.fd);
-#endif
-        } else {
-#if HAVE_ZLIB
-                gzclose(libtrace->input.file);
-#else	
-		fclose(libtrace->input.file);	
-#endif
-        }       
+	libtrace->format->fin_input(libtrace);
         // need to free things!
         destroy_fifo(libtrace->fifo);
         free(libtrace);
@@ -825,7 +495,6 @@ void trace_output_destroy(struct libtrace_out_t *libtrace) {
 #endif
 	}
 	destroy_fifo(libtrace->fifo);
-	free(libtrace->remote);
 	free(libtrace);
 }
 
@@ -863,30 +532,15 @@ static int trace_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
 				}
 				break;
 			case DEVICE:
-				switch(libtrace->format) {
-#if HAVE_DAG
-					case DAG:
-
-						libtrace->dag.bottom = libtrace->dag.top;
-						libtrace->dag.top = dag_offset(
-								libtrace->input.fd,
-								&(libtrace->dag.bottom),
-								0);
-						libtrace->dag.diff = libtrace->dag.top -
-							libtrace->dag.bottom;
-						
-						numbytes=libtrace->dag.diff;
-						libtrace->dag.offset = 0;
-						
-						break;
-#endif
-					default:
-						if ((numbytes=read(libtrace->input.fd, 
+				if (libtrace->format->read) {
+					libtrace->format->read(libtrace,buffer,len);
+				} else {
+					if ((numbytes=read(libtrace->input.fd, 
 								buffer, 
 								len)) == -1) {
 						perror("read");
 						return -1;
-						}
+					}
 				}
 				break;
 			default:
@@ -938,18 +592,7 @@ void trace_pcap_handler(u_char *user, const struct pcap_pkthdr *pcaphdr, const u
  *
  */
 int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
-        int numbytes;
-        int size;
-        char buf[RP_BUFSIZE];
-#if HAVE_PCAP
-        //struct pcap_pkthdr *pcaphdr = malloc(sizeof(struct pcap_pkthdr));
-        const u_char *pcappkt;
-	int pcapbytes = 0;
-#endif
-	dag_record_t *erfptr;
-	int read_required = 0;
 
-	void *buffer = 0;
 	if (!libtrace) {
 		fprintf(stderr,"Oi! You called trace_read_packet() with a NULL libtrace parameter!\n");
 	}
@@ -960,176 +603,9 @@ int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *pac
 	 * structure */
 	packet->trace = libtrace;
 
-	buffer = packet->buffer;
-#if HAVE_PCAP
-	/* PCAP gives us it's own per-packet interface. Let's use it */
-        if (libtrace->format == PCAP || libtrace->format == PCAPINT) {
-		/* pcap_next doesn't return enough information for us
-		 * newer libpcap has pcap_next_ex, which does, but we'd
-		 * really rather have it all the time. */
-		
-                //if ((pcappkt = pcap_next(libtrace->input.pcap, &pcaphdr)) == NULL) {
-		/*
-                if ((pcapbytes = pcap_next_ex(libtrace->input.pcap, 
-						&pcaphdr,
-						&pcappkt)) < 0 ) {
-		*/
-		/* Instead of pcap_next/pcap_next_ex, we do this ourselves
-		 * with a trivial callback function. This lets us 
-		 * catch the same errors as pcap_next_ex, but removes
-		 * the requirement for libpcap >= 0.8.x
-		 */
-		while ((pcapbytes = pcap_dispatch(libtrace->input.pcap,
-						1, /* number of packets */
-						&trace_pcap_handler,
-						(u_char *)packet)) == 0);
-			
-		if (pcapbytes < 0 ) {			
-                        return -1;
-                }
-		return (packet->size - sizeof(struct pcap_pkthdr));
-                //memcpy(buffer,&pcaphdr,sizeof(struct pcap_pkthdr));
-		//numbytes = pcaphdr->len;
-                //memcpy(buffer + sizeof(struct pcap_pkthdr),pcappkt,numbytes);
-	
-		//packet->size = numbytes + sizeof(struct pcap_pkthdr);
-		//return numbytes;
-        } 
-#endif 
-
-	/* If we're reading from an ERF input, it's an offline trace. We can make some assumptions */
-	if (libtrace->format == ERF) {
-		void *buffer2 = buffer;
-		int rlen;
-		// read in the trace header
-		if ((numbytes=gzread(libtrace->input.file,
-						buffer,
-						dag_record_size)) == -1) {
-			perror("gzread");
-			return -1;
-		}
-		if (numbytes == 0) {
-			return 0;
-		}
-		rlen = ntohs(((dag_record_t *)buffer)->rlen);
-		size = rlen - dag_record_size;
-		assert(size < LIBTRACE_PACKET_BUFSIZE);
-		buffer2 = buffer +  dag_record_size;
-
-		// read in the rest of the packet
-		if ((numbytes=gzread(libtrace->input.file,
-						buffer2,
-						size)) == -1) {
-			perror("gzread");
-			return -1;
-		}
-		//if ((numbytes + dag_record_size) != rlen) {
-		//	printf("read %d wanted %d\n",numbytes +dag_record_size, rlen);
-		//}
-		packet->size = rlen;
-			
-		return rlen;
+	if (libtrace->format->read_packet) {
+		return libtrace->format->read_packet(libtrace,packet);
 	}
-
-#if HAVE_DAG
-	if (libtrace->format == DAG) {
-		if (libtrace->dag.diff == 0) {
-			if ((numbytes = trace_read(libtrace,buf,RP_BUFSIZE)) <= 0) 
-				return numbytes;
-		}
-		// DAG always gives us whole packets.
-
-		erfptr = (dag_record_t *) ((void *)libtrace->dag.buf + (libtrace->dag.bottom + libtrace->dag.offset));
-		size = ntohs(erfptr->rlen);
-
-		if ( size  > LIBTRACE_PACKET_BUFSIZE) {
-			printf("%d\n",size);
-			assert( size < LIBTRACE_PACKET_BUFSIZE);
-		}
-
-		// have to copy it out of the memory hole at this stage:
-		memcpy(packet->buffer, erfptr, size);
-
-		packet->size = size;
-		libtrace->dag.offset += size;
-		libtrace->dag.diff -= size;
-		
-		assert(libtrace->dag.diff >= 0);
-		//assert(libtrace->dag.offset <= libtrace->dag.top);
-		return (size);
-		
-	}
-#endif
-	do {
-		if (fifo_out_available(libtrace->fifo) == 0 || read_required) {
-			if ((numbytes = trace_read(libtrace,buf,RP_BUFSIZE))<=0){
-				return numbytes; 
-			}
-			assert(libtrace->fifo);
-			fifo_write(libtrace->fifo,buf,numbytes);
-
-			read_required = 0;
-		}
-
-		switch (libtrace->format) {
-			case RTCLIENT:
-				// only do this if we're reading from the RT interface
-				if (fifo_out_read(libtrace->fifo, &packet->status, sizeof(int)) == 0) {
-					read_required = 1;
-					continue;
-				}
-
-				fifo_out_update(libtrace->fifo,sizeof(int));
-
-				/* FALL THRU */
-			case ERF:
-			//case DAG:
-				// read in the erf header
-				if ((numbytes = fifo_out_read(libtrace->fifo, buffer, sizeof(dag_record_t))) == 0) {
-					fifo_out_reset(libtrace->fifo);
-					read_required = 1;
-					continue;
-				}
-
-				size = ntohs(((dag_record_t *)buffer)->rlen);
-				break;
-			case WAG:
-				if ((numbytes = fifo_out_read(libtrace->fifo,
-								&size,
-								sizeof(size))) 
-								== 0) {
-					fifo_out_reset(libtrace->fifo);
-					read_required = 1;
-					continue;
-				}
-				size*=4;
-				break;
-			default:
-				fprintf(stderr,"Unknown type in _read()\n");
-				assert(0);
-		}
-
-		assert(size < LIBTRACE_PACKET_BUFSIZE);
-		// read in the full packet
-		if ((numbytes = fifo_out_read(libtrace->fifo, buffer, size)) == 0) {
-			fifo_out_reset(libtrace->fifo);
-			read_required = 1;
-			continue;
-		}
-
-		// got in our whole packet, so...
-		fifo_out_update(libtrace->fifo,size);
-
-		if (libtrace->sourcetype == SOCKET || libtrace->sourcetype == RT) {
-			fifo_ack_update(libtrace->fifo,size + sizeof(int));
-		} else {
-			fifo_ack_update(libtrace->fifo,size);
-		}
-		
-		packet->size = numbytes;
-        	return numbytes;
-
-	} while (1);
 }
 
 static int trace_write(struct libtrace_out_t *libtrace, void *buffer, size_t len) {
@@ -1201,13 +677,7 @@ int trace_write_packet(struct libtrace_out_t *libtrace, struct libtrace_packet_t
 	int intsize = sizeof(int);
 	void *buffer = &buf[intsize];
 	int write_required = 0;
-	struct timeval tv;
-	int i;
-	int rt_fd;
-	int sin_size = sizeof(struct sockaddr_in);
-	
-	fd_set current;
-	
+
 	assert(libtrace);
 	assert(packet);	
 
@@ -1223,33 +693,6 @@ int trace_write_packet(struct libtrace_out_t *libtrace, struct libtrace_packet_t
 	// do fifo stuff for RT output instead
 	if (libtrace->outputformat == RTSERVER) {
 		do {
-			// check for incoming connections  NOTE: Should this be inside the do { }
-			tv.tv_sec = 0;
-			tv.tv_usec = 10;
-			current = libtrace->listen;
-			do {
-				if (select(libtrace->max_rtfds + 1, &current, NULL, NULL,&tv) >=0 ) {
-					break;
-				}
-			}
-			while (errno == EINTR);
-			for (i = 0; i <= libtrace->max_rtfds; i++) {
-				if (FD_ISSET(i, &current)) {
-					// Got something on the listening socket
-					if (i == libtrace->connect_fd) {
-						if ((rt_fd = accept(i, (struct sockaddr *) libtrace->remote, 
-										&sin_size)) == -1) {
-							perror("accept");
-						} else {
-							printf("Client connected\n");
-							FD_SET(rt_fd, &libtrace->rt_fds);
-							if (rt_fd > libtrace->max_rtfds)
-								libtrace->max_rtfds = rt_fd;
-						}
-					}
-				}
-			}
-			
 			assert(libtrace->fifo);
 
 			if (fifo_out_available(libtrace->fifo) == 0 || write_required) {
@@ -1278,30 +721,16 @@ int trace_write_packet(struct libtrace_out_t *libtrace, struct libtrace_packet_t
 				write_required = 1;
 				continue;
 			}
-			current = libtrace->rt_fds;
+			fifo_out_update(libtrace->fifo, size);	
 			// Sort out the protocol header
 			memcpy(buf, &packet->status, intsize);
-			if (select(libtrace->max_rtfds + 1, NULL, &current, NULL, &tv) == -1 ) {
-				perror("select");
-				write_required = 0;
-				continue;
-			}
-			
-			// Send the data to each ready client
-			for (i = 0; i <= libtrace->max_rtfds; i++) {
-				if (FD_ISSET(i, &current)) {
-					libtrace->output.fd = i;
-					if ((numbytes = trace_write(libtrace, buf, size + sizeof(int))) <=0 ) {
-						// close rt_client
-						FD_CLR(i, &libtrace->rt_fds);
-						close(i);
-						numbytes = 0;
-						continue;
-					}
-				}
+						
+
+			// Send the buffer out on the wire
+			if ((numbytes = trace_write(libtrace, buf, size + sizeof(int))) <=0 ) {
+				return numbytes;
 			}
 
-			fifo_out_update(libtrace->fifo, size);
 			// Need an ack to come back
 			// TODO: Obviously this is a little unfinished
 			if ("ACK_ARRIVES") {
@@ -1326,47 +755,10 @@ int trace_write_packet(struct libtrace_out_t *libtrace, struct libtrace_packet_t
  */
 void *trace_get_link(const struct libtrace_packet_t *packet) {
         const void *ethptr = 0;
-	dag_record_t *erfptr = 0;
-	struct wag_event_t *event = (struct wag_event_t *)packet->buffer;
-	struct wag_data_event_t *data_event;
 	
-        
-        switch(packet->trace->format) {
-                case ERF:
-                case DAG:
-                case RTCLIENT:
-			erfptr = (dag_record_t *)packet->buffer;
-			if (erfptr->flags.rxerror == 1) {
-				return NULL;
-			}
-			if (trace_get_link_type(packet)==TRACE_TYPE_ETH) 
-                        	ethptr = ((uint8_t *)packet->buffer + 
-						dag_record_size + 2);
-			else
-				ethptr = ((uint8_t *)packet->buffer + 
-						dag_record_size + 2);
-                        break;
-#if HAVE_PCAP
-		case PCAPINT:
-		case PCAP:
-                        ethptr = (packet->buffer + sizeof(struct pcap_pkthdr));
-                        break;
-#endif
-		case WAGINT:
-		case WAG:
-			switch (event->type) {
-				case 0x0:
-					data_event = (void*)&(event->payload);
-					return data_event->data;
-				default:
-					fprintf(stderr,"Unknown WAG Event (0x%08x)\n",event->type);
-					return NULL;
-			}
-			
-		default:
-			fprintf(stderr,"Don't know this trace format\n");
-			assert(0);
-        }
+      	if (packet->trace->format->get_link) {
+		ethptr = packet->trace->format->get_link(packet);
+	}
         return (void *)ethptr;
 }
 
@@ -1658,37 +1050,16 @@ int trace_get_next_option(unsigned char **ptr,int *len,
  */ 
 uint64_t trace_get_erf_timestamp(const struct libtrace_packet_t *packet) {
 	uint64_t timestamp = 0;
-        dag_record_t *erfptr = 0;
-        struct pcap_pkthdr *pcapptr = 0;
-	struct wag_event_t *wagptr = 0;
-        switch (packet->trace->format) {
-                case DAG:
-                case ERF:
-                case RTCLIENT:
-                        erfptr = (dag_record_t *)packet->buffer;
-			timestamp = erfptr->ts;
-                        break;
-#if HAVE_PCAP
-		case PCAPINT:
-                case PCAP:
-                        pcapptr = (struct pcap_pkthdr *)packet->buffer;
-			timestamp = ((((uint64_t)pcapptr->ts.tv_sec) << 32) + \
-				(((uint64_t)pcapptr->ts.tv_usec*UINT_MAX)/1000000));
-                        break;
-#endif
-		case WAGINT:
-		case WAG:
-			wagptr = (struct wag_event_t *)packet->buffer;
-			timestamp = wagptr->timestamp_lo;
-			timestamp |= (uint64_t)wagptr->timestamp_hi<<32;
-			timestamp = ((timestamp%44000000)*(UINT_MAX/44000000))
-				  | ((timestamp/44000000)<<32);
-			break;
-		default:
-			fprintf(stderr,"Unknown format in trace_get_erf_timestamp\n");
-			timestamp = 0;
-        }
-        return timestamp;
+	struct timeval ts;
+
+	if (packet->trace->format->get_erf_timestamp) {
+		timestamp = packet->trace->format->get_erf_timestamp(packet);
+	} else if (packet->trace->format->get_timeval) {
+		ts = packet->trace->format->get_timeval(packet);
+		timestamp = ((((uint64_t)ts.tv_sec) << 32) + \
+				(((uint64_t)ts.tv_usec * UINT_MAX)/1000000));
+	}
+	return timestamp;
 }
 
 /** Get the current time in struct timeval
@@ -1700,44 +1071,28 @@ uint64_t trace_get_erf_timestamp(const struct libtrace_packet_t *packet) {
  */ 
 struct timeval trace_get_timeval(const struct libtrace_packet_t *packet) {
         struct timeval tv;
-#if HAVE_PCAP
-        struct pcap_pkthdr *pcapptr = 0;
-#endif
-	uint64_t ts;
-	//uint32_t seconds;
-        switch (packet->trace->format) {
-#if HAVE_PCAP
-		case PCAPINT:
-                case PCAP:
-                        pcapptr = (struct pcap_pkthdr *)packet->buffer;
-			// ick. FIXME
-                        tv = pcapptr->ts;
-                        break;
-#endif
-		case WAGINT:
-		case WAG:
-                case DAG:
-                case ERF:
-                case RTCLIENT:
-		default:
-			// FIXME: This isn't portable to big-endian machines
-			ts = trace_get_erf_timestamp(packet);
+	uint64_t ts = 0;
+
+	if (packet->trace->format->get_timeval) {
+		tv = packet->trace->format->get_timeval(packet);
+	} else if (packet->trace->format->get_erf_timestamp) {
+		ts = packet->trace->format->get_erf_timestamp(packet);
 #if __BYTE_ORDER == __BIG_ENDIAN
-			tv.tv_sec = ts & 0xFFFFFFFF;
+		tv.tv_sec = ts & 0xFFFFFFFF;
 #elif __BYTE_ORDER == __LITTLE_ENDIAN
-			tv.tv_sec = ts >> 32;
+		tv.tv_sec = ts >> 32;
 #else
 #error "What on earth are you running this on?"
 #endif
-			ts = (1000000 * (ts & 0xffffffffULL));
-        		ts += (ts & 0x80000000ULL) << 1;
-        		tv.tv_usec = ts >> 32;
-        		if (tv.tv_usec >= 1000000) {
-                		tv.tv_usec -= 1000000;
-                		tv.tv_sec += 1;
-        		}
-			break;
-        }
+		ts = (1000000 * (ts & 0xffffffffULL));
+       		ts += (ts & 0x80000000ULL) << 1;
+       		tv.tv_usec = ts >> 32;
+       		if (tv.tv_usec >= 1000000) {
+               		tv.tv_usec -= 1000000;
+               		tv.tv_sec += 1;
+       		}
+	}
+
         return tv;
 }
 
@@ -1747,9 +1102,16 @@ struct timeval trace_get_timeval(const struct libtrace_packet_t *packet) {
  * @author Perry Lorier
  */ 
 double trace_get_seconds(const struct libtrace_packet_t *packet) {
+	double seconds;
 	uint64_t ts;
-	ts = trace_get_erf_timestamp(packet);
-	return (ts>>32) + ((ts & UINT_MAX)*1.0 / UINT_MAX);
+	
+	if (packet->trace->format->get_seconds) {
+		seconds = packet->trace->format->get_seconds(packet);
+	} else if (packet->trace->format->get_erf_timestamp) {
+		ts = packet->trace->format->get_erf_timestamp(packet);
+		seconds =  (ts>>32) + ((ts & UINT_MAX)*1.0 / UINT_MAX);
+	} 
+	return seconds;
 }
 
 /** Get the size of the packet in the trace
@@ -1764,38 +1126,9 @@ double trace_get_seconds(const struct libtrace_packet_t *packet) {
  *  This is sometimes called the "snaplen".
  */ 
 int trace_get_capture_length(const struct libtrace_packet_t *packet) {
-	dag_record_t *erfptr = 0;
-#if HAVE_PCAP
-	struct pcap_pkthdr *pcapptr = 0;
-#endif
-	struct wag_event_t *wag_event;
-	switch (packet->trace->format) {
-		case DAG:
-		case ERF:
-		case RTCLIENT:
-			erfptr = (dag_record_t *)packet->buffer;
-			return ntohs(erfptr->rlen);
-#if HAVE_PCAP
-		case PCAPINT:
-		case PCAP:
-			pcapptr = (struct pcap_pkthdr *)packet->buffer;
-			//return ntohs(pcapptr->caplen);
-			return pcapptr->caplen;
-#endif
-		case WAGINT:
-		case WAG:
-			wag_event = (struct wag_event_t *)packet->buffer;
-			switch(wag_event->type) {
-				case 0:
-					return wag_event->length*4-(
-						sizeof(struct wag_event_t)+
-						sizeof(struct wag_data_event_t)
-						);
-				default:
-					assert(0);
-			}
-		default:
-			assert(0);
+
+	if (packet->trace->format->get_capture_length) {
+		return packet->trace->format->get_capture_length(packet);
 	}
 	return -1;
 }
@@ -1810,34 +1143,8 @@ int trace_get_capture_length(const struct libtrace_packet_t *packet) {
  * not be the same as the Capture Len.
  */ 
 int trace_get_wire_length(const struct libtrace_packet_t *packet){
-	dag_record_t *erfptr = 0;
-#if HAVE_PCAP
-	struct pcap_pkthdr *pcapptr = 0;
-#endif
-	struct wag_event_t *wag_event = 0;
-	switch (packet->trace->format) {
-		case DAG:
-		case ERF:
-		case RTCLIENT:
-			erfptr = (dag_record_t *)packet->buffer;
-			return ntohs(erfptr->wlen);
-			break;
-#if HAVE_PCAP
-		case PCAPINT:
-		case PCAP:
-			pcapptr = (struct pcap_pkthdr *)packet->buffer;
-			return ntohs(pcapptr->len);
-		 	break;
-#endif
-		case WAGINT:
-		case WAG:
-			wag_event = (struct wag_event_t *)packet->buffer;
-			switch(wag_event->type) {
-				case 0:
-					return ((struct wag_data_event_t *)(&wag_event->payload))->frame_length;
-				default:
-					assert(0);
-			}
+	if (packet->trace->format->get_wire_length) {
+		return packet->trace->format->get_wire_length(packet);
 	}
 	return -1;
 
@@ -1850,52 +1157,8 @@ int trace_get_wire_length(const struct libtrace_packet_t *packet){
  * @author Daniel Lawson
  */
 libtrace_linktype_t trace_get_link_type(const struct libtrace_packet_t *packet ) {
-	dag_record_t *erfptr = 0;
-#if HAVE_PCAP
-	struct pcap_pkthdr *pcapptr = 0;
-#endif
-	int linktype = 0;
-	switch (packet->trace->format) {
-		case DAG:
-		case ERF:
-		case RTCLIENT:
-			erfptr = (dag_record_t *)packet->buffer;
-			switch (erfptr->type) {
-				case TYPE_ETH: return TRACE_TYPE_ETH;
-				case TYPE_ATM: return TRACE_TYPE_ATM;
-				default: assert(0);
-			}
-			return erfptr->type;
-			
-			break;
-#if HAVE_PCAP
-		case PCAPINT:
-		case PCAP:
-			pcapptr = (struct pcap_pkthdr *)packet->buffer;
-			linktype = pcap_datalink(packet->trace->input.pcap);
-			switch (linktype) {
-				case DLT_NULL:
-					return TRACE_TYPE_NONE;
-				case DLT_EN10MB:
-					return TRACE_TYPE_ETH; 
-				case DLT_ATM_RFC1483:
-					return TRACE_TYPE_ATM;
-				case DLT_IEEE802_11:
-					return TRACE_TYPE_80211;
-#ifdef DLT_LINUX_SLL
-				case DLT_LINUX_SLL:
-					return TRACE_TYPE_LINUX_SLL;
-#endif
-#ifdef DLT_PFLOG
-				case DLT_PFLOG:
-					return TRACE_TYPE_PFLOG;
-#endif
-			}
-		 	break;
-#endif
-		case WAGINT:
-		case WAG:
-			return TRACE_TYPE_80211;
+	if (packet->trace->format->get_link_type) {
+		return packet->trace->format->get_link_type(packet);
 	}
 	return -1;
 }
@@ -2157,24 +1420,12 @@ int trace_bpf_filter(struct libtrace_filter_t *filter,
  * @author Daniel Lawson
  */
 int8_t trace_set_direction(struct libtrace_packet_t *packet, int8_t direction) {
-	
-	dag_record_t *erfptr = 0;
-	assert(packet);
 
-	switch(packet->trace->format) {
-		case DAG:
-		case ERF:
-		case RTCLIENT:
-			erfptr = (dag_record_t *)packet->buffer;
-			erfptr->flags.iface = direction;
-			break;
-		default:
-			direction = -1;
+
+	if (packet->trace->format->set_direction) {
+		return packet->trace->format->set_direction(packet,direction);
 	}
-	
-	return direction;
-	
-	
+	return -1;
 }
 
 /** Get the direction flag, if it has one
@@ -2188,76 +1439,12 @@ int8_t trace_set_direction(struct libtrace_packet_t *packet, int8_t direction) {
  */
 int8_t trace_get_direction(const struct libtrace_packet_t *packet) {
 	
-	int8_t direction;
-	dag_record_t *erfptr = 0;
 	assert(packet);
-	direction = -1;
 
-	switch(packet->trace->format) {
-		case DAG:
-		case ERF:
-		case RTCLIENT:
-			erfptr = (dag_record_t *)packet->buffer;
-			direction = erfptr->flags.iface;
-			break;
-		case PCAP:
-		case PCAPINT:
-			switch (trace_get_link_type(packet)) {
-				case TRACE_TYPE_LINUX_SLL:
-				{
-					struct trace_sll_header_t *sll;
-					sll = trace_get_link(packet);
-					if (!sll) {
-						return -1;
-					}
-					/* 0 == LINUX_SLL_HOST */
-					/* the Waikato Capture point defines "packets
-					 * originating locally" (ie, outbound), with a
-					 * direction of 0, and "packets destined locally"
-					 * (ie, inbound), with a direction of 1.
-					 * This is kind-of-opposite to LINUX_SLL.
-					 * We return consistent values here, however
-					 *
-					 * Note that in recent versions of pcap, you can
-					 * use "inbound" and "outbound" on ppp in linux
-					 */
-					if (ntohs(sll->pkttype==0)) {
-
-						direction = 1;
-					}
-					else {
-						direction = 0;
-					}
-					break;
-				}
-				case TRACE_TYPE_PFLOG:
-				{
-					struct trace_pflog_header_t *pflog;
-					pflog = trace_get_link(packet);
-					if (!pflog) {
-						return -1;
-					}
-					/* enum    { PF_IN=0, PF_OUT=1 }; */
-					if (ntohs(pflog->dir==0)) {
-
-						direction = 1;
-					}
-					else {
-						direction = 0;
-					}
-					break;
-				}
-				default:
-					/* pass */
-					break;
-			}
-		default:
-			/* pass */
-			break;
+	if (packet->trace->format->get_direction) {
+		return packet->trace->format->get_direction(packet);
 	}
-	
-	return direction;
-	
+	return -1;
 	
 }
 
@@ -2438,27 +1625,9 @@ size_t trace_truncate_packet(struct libtrace_packet_t *packet, size_t size) {
 		// can't make a packet larger
 		return packet->size;
 	}
-	switch (packet->trace->format) {
-#if HAVE_PCAP
-		case PCAPINT:
-		case PCAP:
-			pcaphdr = (struct pcap_pkthdr *)packet->buffer;
-			pcaphdr->caplen = size + sizeof(struct pcap_pkthdr);
-			packet->size = pcaphdr->caplen;
-			break;
-#endif
-		case ERF:
-		case DAG:
-		case RTCLIENT:
-			erfptr = (dag_record_t *)packet->buffer;
-			erfptr->rlen = ntohs(size + sizeof(dag_record_t));
-			packet->size = size + sizeof(dag_record_t);
-			break;
-		case WAGINT:
-		case WAG:
-			// don't know how to do this?
-			break;
+	if (packet->trace->format->truncate_packet) {
+		return packet->trace->format->truncate_packet(packet,size);
 	}
-	return packet->size;
+	return -1;
 }
 
