@@ -44,6 +44,10 @@ static int template_fin_input(struct libtrace_t *libtrace) {
 	return -1;
 }
 
+static int template_fin_output(struct libtrace_out_t *libtrace) {
+	return -1;
+}
+
 static int template_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
 	return -1;
 }
@@ -92,29 +96,30 @@ static int template_get_wire_length(const struct libtrace_packet_t *packet) {
 	return -1;
 }
 
-static size_t template_truncate_packet(const struct libtrace_packet_t *packet,size_t size) {
+static size_t template_set_capture_length(const struct libtrace_packet_t *packet,size_t size) {
 	return -1;
 }
 
 static struct format_t template = {
 	"template",
 	"$Id$",
-	template_init_input,
-	template_init_output,
-	template_fin_input,
-	template_read,
-	template_read_packet,
-	template_write_packet,
-	template_get_link,
-	template_get_link_type,
-	template_get_direction,
-	template_set_direction,
-	template_get_erf_timestamp,
-	template_get_timeval,
-	template_get_seconds,
-	template_get_capture_length,
-	template_get_wire_length,
-	template_truncate_packet
+	template_init_input,	 	/* init_input */
+	template_init_output,		/* init_output */
+	template_fin_input,		/* fin_input */
+	template_fin_output,		/* fin_output */
+	template_read,			/* read */
+	template_read_packet,		/* read_packet */
+	template_write_packet,		/* write_packet */
+	template_get_link,		/* get_link */
+	template_get_link_type,		/* get_link_type */
+	template_get_direction,		/* get_direction */
+	template_set_direction,		/* set_direction */
+	template_get_erf_timestamp,	/* get_erf_timestamp */
+	template_get_timeval,		/* get_timeval */
+	template_get_seconds,		/* get_seconds */
+	template_get_capture_length,	/* get_capture_length */
+	template_get_wire_length,	/* get_wire_length */
+	template_set_capture_length	/* set_capture_length */
 };
 
 void __attribute__((constructor)) template_constructor() {

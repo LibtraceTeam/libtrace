@@ -57,6 +57,7 @@
 #  define O_LARGEFILE 0
 #endif 
 static int dag_init_input(struct libtrace_t *libtrace) {
+#ifdef HAVE_DAG
 	struct stat buf;
 	if (stat(libtrace->conn_info.path,&buf) == -1) {
 		perror("stat");
@@ -86,6 +87,7 @@ static int dag_init_input(struct libtrace_t *libtrace) {
 				libtrace->conn_info.path);
 		return 0;
 	}
+#endif
 }
 
 static int erf_init_input(struct libtrace_t *libtrace) {
@@ -194,7 +196,9 @@ static int rtclient_init_input(struct libtrace_t *libtrace) {
 }
 
 static int dag_fin_input(struct libtrace_t *libtrace) {
+#ifdef HAVE_DAG
 	dag_stop(libtrace->input.fd);
+#endif
 }
 
 static int erf_fin_input(struct libtrace_t *libtrace) {
@@ -209,11 +213,34 @@ static int rtclient_fin_input(struct libtrace_t *libtrace) {
 	close(libtrace->input.fd);
 }
 
-static int erf_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
+static int dag_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
+#if HAVE_DAG
+	int numbytes;
+	static short lctr = 0;
+	struct dag_record_t *erfptr = 0;
+	int rlen;
+
+	if (buffer == 0)
+		buffer = malloc(len);
+	
+	libtrace->dag.bottom = libtrace->dag.top;
+	libtrace->dag.top = dag_offset(
+			libtrace->input.fd,
+			&(libtrace->dag.bottom),
+			0);
+	libtrace->dag.diff = libtrace->dag.top -
+		libtrace->dag.bottom;
+
+	numbytes=libtrace->dag.diff;
+	libtrace->dag.offset = 0;
+	return numbytes;
+#else 
 	return -1;
+#endif
 }
 
 static int dag_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
+#if HAVE_DAG
 	int numbytes;
 	int size;
 	char buf[RP_BUFSIZE];
@@ -223,7 +250,7 @@ static int dag_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 	int rlen;
 	
 	if (libtrace->dag.diff == 0) {
-		if ((numbytes = trace_read(libtrace,buf,RP_BUFSIZE)) <= 0) 
+		if ((numbytes = dag_read(libtrace,buf,RP_BUFSIZE)) <= 0) 
 			return numbytes;
 	}
 
@@ -247,7 +274,9 @@ static int dag_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 	assert(libtrace->dag.diff >= 0);
 
 	return (size);
-
+#else
+	return -1;
+#endif
 }
 
 static int erf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
@@ -326,7 +355,7 @@ static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_pac
 
 	do {
 		if (fifo_out_available(libtrace->fifo) == 0 || read_required) {
-			if ((numbytes = trace_read(
+			if ((numbytes = rtclient_read(
 						libtrace,buf,RP_BUFSIZE))<=0) {
 				return numbytes;
 			}
@@ -334,6 +363,7 @@ static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_pac
 			fifo_write(libtrace->fifo,buf,numbytes);
 			read_required = 0;
 		}
+		// Read status byte
 		if (fifo_out_read(libtrace->fifo,
 				&packet->status, sizeof(int)) == 0) {
 			read_required = 1;
@@ -341,6 +371,7 @@ static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_pac
 		}
 		fifo_out_update(libtrace->fifo,sizeof(int));
 
+		// read in the ERF header
 		if ((numbytes = fifo_out_read(libtrace->fifo, buffer,
 						sizeof(dag_record_t))) == 0) {
 			fifo_out_reset(libtrace->fifo);
@@ -357,7 +388,7 @@ static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_pac
 			continue;
 		}
 
-		// got in our howle packet, so...
+		// got in our whole packet, so...
 		fifo_out_update(libtrace->fifo,size);
 
 		fifo_ack_update(libtrace->fifo,size + sizeof(int));
@@ -377,6 +408,7 @@ static void *erf_get_link(const struct libtrace_packet_t *packet) {
 	}
 	ethptr = ((uint8_t *)packet->buffer +
 			dag_record_size + 2);
+	return ethptr;
 }
 
 static libtrace_linktype_t erf_get_link_type(const struct libtrace_packet_t *packet) {
@@ -387,6 +419,7 @@ static libtrace_linktype_t erf_get_link_type(const struct libtrace_packet_t *pac
 		case TYPE_ATM: return TRACE_TYPE_ATM;
 		default: assert(0);
 	}
+	return erfptr->type;
 }
 
 static int8_t erf_get_direction(const struct libtrace_packet_t *packet) {
@@ -420,7 +453,7 @@ static int erf_get_wire_length(const struct libtrace_packet_t *packet) {
 	return ntohs(erfptr->wlen);
 }
 
-static size_t erf_truncate_packet(struct libtrace_packet_t *packet, const size_t size) {
+static size_t erf_set_capture_length(struct libtrace_packet_t *packet, const size_t size) {
 	dag_record_t *erfptr = 0;
 	assert(packet);
 	if(size > packet->size) {
@@ -436,67 +469,71 @@ static size_t erf_truncate_packet(struct libtrace_packet_t *packet, const size_t
 static struct format_t erf = {
 	"erf",
 	"$Id$",
-	erf_init_input,
-	NULL,
-	erf_fin_input,
-	NULL,
-	erf_read_packet,
-	NULL,
-	erf_get_link,
-	erf_get_link_type,
-	erf_get_direction,
-	erf_set_direction,
-	erf_get_erf_timestamp,
-	NULL,
-	NULL,
-	erf_get_capture_length,
-	erf_get_wire_length,
-	erf_truncate_packet
+	erf_init_input,			/* init_input */	
+	NULL,				/* init_output */
+	erf_fin_input,			/* fin_input */
+	NULL,				/* fin_output */
+	NULL,				/* read */
+	erf_read_packet,		/* read_packet */
+	NULL,				/* write_packet */
+	erf_get_link,			/* get_link */
+	erf_get_link_type,		/* get_link_type */
+	erf_get_direction,		/* get_direction */
+	erf_set_direction,		/* set_direction */
+	erf_get_erf_timestamp,		/* get_erf_timestamp */
+	NULL,				/* get_timeval */
+	NULL,				/* get_seconds */
+	erf_get_capture_length,		/* get_capture_length */
+	erf_get_wire_length,		/* get_wire_length */
+	erf_set_capture_length		/* set_capture_length */
 };
 
 static struct format_t dag = {
 	"dag",
 	"$Id$",
-	dag_init_input,
-	NULL,
-	dag_fin_input,
-	NULL,
-	dag_read_packet,
-	NULL,
-	erf_get_link,
-	erf_get_link_type,
-	erf_get_direction,
-	erf_set_direction,
-	erf_get_erf_timestamp,
-	NULL,
-	NULL,
-	erf_get_capture_length,
-	erf_get_wire_length,
-	erf_truncate_packet
+	dag_init_input,			/* init_input */	
+	NULL,				/* init_output */
+	dag_fin_input,			/* fin_input */
+	NULL,				/* fin_output */
+	dag_read,			/* read */
+	dag_read_packet,		/* read_packet */
+	NULL,				/* write_packet */
+	erf_get_link,			/* get_link */
+	erf_get_link_type,		/* get_link_type */
+	erf_get_direction,		/* get_direction */
+	erf_set_direction,		/* set_direction */
+	erf_get_erf_timestamp,		/* get_erf_timestamp */
+	NULL,				/* get_timeval */
+	NULL,				/* get_seconds */
+	erf_get_capture_length,		/* get_capture_length */
+	erf_get_wire_length,		/* get_wire_length */
+	erf_set_capture_length		/* set_capture_length */
 };
 
 static struct format_t rtclient = {
 	"rtclient",
 	"$Id$",
-	rtclient_init_input,
-	NULL,
-	rtclient_fin_input,
-	rtclient_read,
-	rtclient_read_packet,
-	NULL,
-	erf_get_link,
-	erf_get_link_type,
-	erf_get_direction,
-	erf_set_direction,
-	erf_get_erf_timestamp,
-	NULL,
-	NULL,
-	erf_get_capture_length,
-	erf_get_wire_length,
-	erf_truncate_packet
+	rtclient_init_input,		/* init_input */	
+	NULL,				/* init_output */
+	rtclient_fin_input,		/* fin_input */
+	NULL,				/* fin_output */
+	rtclient_read,			/* read */
+	rtclient_read_packet,		/* read_packet */
+	NULL,				/* write_packet */
+	erf_get_link,			/* get_link */
+	erf_get_link_type,		/* get_link_type */
+	erf_get_direction,		/* get_direction */
+	erf_set_direction,		/* set_direction */
+	erf_get_erf_timestamp,		/* get_erf_timestamp */
+	NULL,				/* get_timeval */
+	NULL,				/* get_seconds */
+	erf_get_capture_length,		/* get_capture_length */
+	erf_get_wire_length,		/* get_wire_length */
+	erf_set_capture_length		/* set_capture_length */
 };
 
 void __attribute__((constructor)) erf_constructor() {
 	register_format(&erf);
 	register_format(&dag);
+	register_format(&rtclient);
 }

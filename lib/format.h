@@ -160,6 +160,7 @@ struct format_t {
 	int (*init_input)(struct libtrace_t *libtrace);
 	int (*init_output)(struct libtrace_out_t *libtrace);
 	int (*fin_input)(struct libtrace_t *libtrace);
+	int (*fin_output)(struct libtrace_out_t *libtrace);
 	int (*read)(struct libtrace_t *libtrace, void *buffer, size_t len);
 	int (*read_packet)(struct libtrace_t *libtrace, struct libtrace_packet_t *packet);
 	int (*write_packet)(struct libtrace_out_t *libtrace, struct libtrace_packet_t *packet);

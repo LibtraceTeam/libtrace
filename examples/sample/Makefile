@@ -1,5 +1,5 @@
 
-PREFIX=/usr/local
+PREFIX=/home/dlawson/install
 CC=gcc
 
 INCLUDE = -I$(PREFIX)/include

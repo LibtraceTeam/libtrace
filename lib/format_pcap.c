@@ -241,7 +241,7 @@ static int pcap_get_wire_length(const struct libtrace_packet_t *packet) {
 	return ntohs(pcapptr->len);
 }
 
-static size_t pcap_truncate_packet(struct libtrace_packet_t *packet,size_t size) {
+static size_t pcap_set_capture_length(struct libtrace_packet_t *packet,size_t size) {
 	struct pcap_pkthdr *pcapptr = 0;
 	assert(packet);
 	if (size > packet->size) {
@@ -257,43 +257,45 @@ static size_t pcap_truncate_packet(struct libtrace_packet_t *packet,size_t size)
 static struct format_t pcap = {
 	"pcap",
 	"$Id$",
-	pcap_init_input,
-	NULL,
-	pcap_fin_input,
-	NULL,
-	pcap_read_packet,
-	NULL,
-	pcap_get_link,
-	pcap_get_link_type,
-	pcap_get_direction,
-	NULL,
-	NULL,
-	pcap_get_timeval,
-	NULL,
-	pcap_get_capture_length,
-	pcap_get_wire_length,
-	pcap_truncate_packet
+	pcap_init_input,		/* init_input */
+	NULL,				/* init_output */
+	pcap_fin_input,			/* fin_input */
+	NULL,				/* fin_output */
+	NULL,				/* read */
+	pcap_read_packet,		/* read_packet */
+	NULL,				/* write_packet */
+	pcap_get_link,			/* get_link */
+	pcap_get_link_type,		/* get_link_type */
+	pcap_get_direction,		/* get_direction */
+	NULL,				/* set_direction */
+	NULL,				/* get_erf_timestamp */
+	pcap_get_timeval,		/* get_timeval */
+	NULL,				/* get_seconds */
+	pcap_get_capture_length,	/* get_capture_length */
+	pcap_get_wire_length,		/* get_wire_length */
+	pcap_set_capture_length		/* set_capture_length */
 };
 
 static struct format_t pcapint = {
 	"pcapint",
 	"$Id$",
-	pcapint_init_input,
-	NULL,
-	pcap_fin_input,
-	NULL,
-	pcap_read_packet,
-	NULL,
-	pcap_get_link,
-	pcap_get_link_type,
-	pcap_get_direction,
-	NULL,
-	NULL,
-	pcap_get_timeval,
-	NULL,
-	pcap_get_capture_length,
-	pcap_get_wire_length,
-	pcap_truncate_packet
+	pcapint_init_input,		/* init_input */
+	NULL,				/* init_output */
+	pcap_fin_input,			/* fin_input */
+	NULL,				/* fin_output */
+	NULL,				/* read */
+	pcap_read_packet,		/* read_packet */
+	NULL,				/* write_packet */
+	pcap_get_link,			/* get_link */
+	pcap_get_link_type,		/* get_link_type */
+	pcap_get_direction,		/* get_direction */
+	NULL,				/* set_direction */
+	NULL,				/* get_erf_timestamp */
+	pcap_get_timeval,		/* get_timeval */
+	NULL,				/* get_seconds */
+	pcap_get_capture_length,	/* get_capture_length */
+	pcap_get_wire_length,		/* get_wire_length */
+	pcap_set_capture_length		/* set_capture_length */
 };
 
 void __attribute__((constructor)) pcap_constructor() {

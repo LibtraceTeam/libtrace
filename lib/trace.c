@@ -1603,6 +1603,10 @@ int8_t trace_get_server_port(uint8_t protocol, uint16_t source, uint16_t dest) {
 	
 }
 
+size_t trace_truncate_packet(struct libtrace_packet_t *packet, size_t size) {
+	return trace_set_capture_length(packet,size);
+}
+
 /** Truncate the packet at the suggested length
  * @param packet	the packet opaque pointer
  * @param size		the new length of the packet
@@ -1613,7 +1617,7 @@ int8_t trace_get_server_port(uint8_t protocol, uint16_t source, uint16_t dest) {
  * after the IP header, set scan to sizeof(ethernet_header) + sizeof(ip_header)
  * @author Daniel Lawson
  */
-size_t trace_truncate_packet(struct libtrace_packet_t *packet, size_t size) {
+size_t trace_set_capture_length(struct libtrace_packet_t *packet, size_t size) {
 	dag_record_t *erfptr;
 #if HAVE_PCAP
 	struct pcap_pkthdr *pcaphdr;
