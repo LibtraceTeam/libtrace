@@ -1603,10 +1603,6 @@ int8_t trace_get_server_port(uint8_t protocol, uint16_t source, uint16_t dest) {
 	
 }
 
-size_t trace_truncate_packet(struct libtrace_packet_t *packet, size_t size) {
-	return trace_set_capture_length(packet,size);
-}
-
 /** Truncate the packet at the suggested length
  * @param packet	the packet opaque pointer
  * @param size		the new length of the packet

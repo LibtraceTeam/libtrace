@@ -445,7 +445,7 @@ uint8_t *trace_get_source_mac(const struct libtrace_packet_t *packet);
  * packet if unchanged
  * @author Daniel Lawson
  */
-size_t trace_truncate_packet(struct libtrace_packet_t *packet, size_t size);
+size_t trace_set_capture_length(struct libtrace_packet_t *packet, size_t size);
 
 /** Set the direction flag, if it has one
  * @param packet  	the packet opaque pointer
