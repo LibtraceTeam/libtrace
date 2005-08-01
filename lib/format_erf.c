@@ -554,7 +554,7 @@ static void *erf_get_link(const struct libtrace_packet_t *packet) {
 	}
 	ethptr = ((uint8_t *)packet->buffer +
 			dag_record_size + 2);
-	return ethptr;
+	return (void *)ethptr;
 }
 
 static libtrace_linktype_t erf_get_link_type(const struct libtrace_packet_t *packet) {

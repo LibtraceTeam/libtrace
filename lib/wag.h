@@ -30,20 +30,62 @@
 #ifndef _WAG_H_
 #define _WAG_H_
 
-struct wag_event_t {
-	uint32_t length;
-	uint32_t timestamp_hi;
-	uint32_t timestamp_lo;
-	uint32_t type;
-	uint32_t seq_num;
-	uint8_t payload[1];
+// Generic field breakdowns
+struct wag_frame_hdr {
+  uint16_t magic;
+  uint16_t size;
+  uint16_t type;
+  uint16_t subtype;
 };
 
-struct wag_data_event_t {
-	uint32_t rx_params;
-	uint32_t rx_rssi;
-	uint32_t frame_length;
-	uint8_t data[1];
+struct wag_timestamp {
+  uint32_t secs;
+  uint32_t subsecs;
+};
+
+// Received packet frame fields
+struct wag_stream_info {
+  uint16_t unused_1;
+  uint16_t unused_2;
+  uint16_t unused_3;
+  uint16_t packets_lost;
+};
+
+struct wag_plcp_hdr {
+  uint8_t  signal;
+  uint8_t  service;
+  uint16_t length;
+};
+
+struct wag_rxparams {
+  uint8_t         rssi;
+  uint8_t         rxstatus;
+  uint16_t        length;
+  struct wag_plcp_hdr plcp;
+};
+
+struct wag_data_frame {
+  struct wag_frame_hdr hdr;
+  struct wag_stream_info strinfo;
+  struct wag_timestamp ts;
+  struct wag_rxparams rxinfo;
+  char data[1];
+};
+
+// Transmit packet frame fields
+struct wag_txparams {
+  uint8_t         gain;
+  uint8_t         mode;
+  uint16_t        length;
+  uint32_t        unused_1;
+};
+
+struct wag_tx_data_frame {
+  struct wag_frame_hdr hdr;
+  uint32_t         unused_1;
+  uint32_t         unused_2;
+  struct wag_txparams  txinfo;
+  char data[1];
 };
 
 struct ieee_802_11_header {

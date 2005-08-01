@@ -333,12 +333,6 @@ static int init_output(struct libtrace_out_t **libtrace, char *uri) {
  */
 struct libtrace_t *trace_create(char *uri) {
         struct libtrace_t *libtrace = malloc(sizeof(struct libtrace_t));
-        struct hostent *he;
-        struct sockaddr_in remote;
-        struct sockaddr_un unix_sock;
-#if HAVE_PCAP
-        char errbuf[PCAP_ERRBUF_SIZE];
-#endif
 
         if(init_trace(&libtrace,uri) == 0) {
                 return 0;
@@ -444,92 +438,6 @@ void trace_output_destroy(struct libtrace_out_t *libtrace) {
 	free(libtrace);
 }
 
-static int trace_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
-        int numbytes;
-        static short lctr = 0;
-	struct dag_record_t *recptr = 0;
-        int rlen;
-	assert(libtrace);
-        assert(len >= 0);
-
-        if (buffer == 0)
-                buffer = malloc(len);
-
-	while(1) {
-		switch(libtrace->sourcetype) {
-			case SOCKET:
-			case RT:
-
-#ifndef MSG_NOSIGNAL
-#define MSG_NOSIGNAL 0
-#endif
-				// read from the network
-				if ((numbytes=recv(libtrace->input.fd, 
-								buffer, 
-								len, 
-								MSG_NOSIGNAL)) == -1) {
-					if (errno == EINTR) {
-						// ignore EINTR in case 
-						// a caller is using signals
-						continue;
-					}
-					perror("recv");
-					return -1;
-				}
-				break;
-			case DEVICE:
-				if (libtrace->format->read) {
-					libtrace->format->read(libtrace,buffer,len);
-				} else {
-					if ((numbytes=read(libtrace->input.fd, 
-								buffer, 
-								len)) == -1) {
-						perror("read");
-						return -1;
-					}
-				}
-				break;
-			default:
-#if HAVE_ZLIB
-				if ((numbytes=gzread(libtrace->input.file,
-								buffer,
-								len)) == -1) {
-					perror("gzread");
-					return -1;
-				}
-#else
-				if ((numbytes=fread(buffer,len,1,libtrace->input.file)) == 0 ) {
-					if(feof(libtrace->input.file)) {
-						return 0;
-					}
-					if(ferror(libtrace->input.file)) {
-						perror("fread");
-						return -1;
-					}
-					return 0;
-				}
-#endif
-		}
-		break;
-	}
-        return numbytes;
-
-}
-
-#if HAVE_PCAP
-void trace_pcap_handler(u_char *user, const struct pcap_pkthdr *pcaphdr, const u_char *pcappkt) {
-	struct libtrace_packet_t *packet = (struct libtrace_packet_t *)user;	
-	void *buffer = packet->buffer;
-	int numbytes = 0;
-	
-	memcpy(buffer,pcaphdr,sizeof(struct pcap_pkthdr));
-	numbytes = pcaphdr->len;
-	memcpy(buffer + sizeof(struct pcap_pkthdr),pcappkt,numbytes);
-
-	packet->size = numbytes + sizeof(struct pcap_pkthdr);
-
-}
-#endif
 /** Read one packet from the trace into buffer
  *
  * @param libtrace 	the libtrace opaque pointer
@@ -883,7 +791,7 @@ uint64_t trace_get_erf_timestamp(const struct libtrace_packet_t *packet) {
 		ts = packet->trace->format->get_timeval(packet);
 		timestamp = ((((uint64_t)ts.tv_sec) << 32) + \
 				(((uint64_t)ts.tv_usec * UINT_MAX)/1000000));
-	}
+	} 
 	return timestamp;
 }
 
@@ -1245,8 +1153,7 @@ int trace_bpf_filter(struct libtrace_filter_t *filter,
  * @author Daniel Lawson
  */
 int8_t trace_set_direction(struct libtrace_packet_t *packet, int8_t direction) {
-
-
+	assert(packet);
 	if (packet->trace->format->set_direction) {
 		return packet->trace->format->set_direction(packet,direction);
 	}
@@ -1263,14 +1170,11 @@ int8_t trace_set_direction(struct libtrace_packet_t *packet, int8_t direction) {
  * @author Daniel Lawson
  */
 int8_t trace_get_direction(const struct libtrace_packet_t *packet) {
-	
 	assert(packet);
-
 	if (packet->trace->format->get_direction) {
 		return packet->trace->format->get_direction(packet);
 	}
 	return -1;
-	
 }
 
 struct ports_t {
@@ -1439,11 +1343,6 @@ int8_t trace_get_server_port(uint8_t protocol, uint16_t source, uint16_t dest) {
  * @author Daniel Lawson
  */
 size_t trace_set_capture_length(struct libtrace_packet_t *packet, size_t size) {
-	dag_record_t *erfptr;
-#if HAVE_PCAP
-	struct pcap_pkthdr *pcaphdr;
-#endif
-
 	assert(packet);
 
 	if (size > packet->size) {
