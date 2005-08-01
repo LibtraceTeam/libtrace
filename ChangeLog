@@ -28,6 +28,13 @@
 ##
 ##
 
+- Version 2.0.19 (unreleased)
+	* Move code for different input formats (erf, pcap, wag) into
+	  separate modules, load and initialise on library load.
+	* Add support for primitive trace writing
+	  See trace_output_create(), trace_output_destroy(), and
+	  trace_write_packet()
+
 - Version 2.0.18
 	* When opening a trace file, call open() with O_LARGEFILE set and 
 	  pass the fd into gzdopen/fdopen.
