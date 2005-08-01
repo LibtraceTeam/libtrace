@@ -30,6 +30,7 @@
 
 #include "libtrace.h"
 #include "format.h"
+#include "rtserver.h"
 
 #ifdef HAVE_INTTYPES_H
 #  include <inttypes.h>
@@ -51,6 +52,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <netdb.h>
+#include <fcntl.h>
 
 /* Catch undefined O_LARGEFILE on *BSD etc */
 #ifndef O_LARGEFILE
@@ -195,6 +197,68 @@ static int rtclient_init_input(struct libtrace_t *libtrace) {
 	}
 }
 
+static int erf_init_output(struct libtrace_out_t *libtrace) {
+	struct stat buf;
+
+        if (!strncmp(libtrace->conn_info.path,"-",1)) {
+                // STDOUT
+#if HAVE_ZLIB
+                libtrace->output.file = gzdopen(dup(1), "w");
+#else
+                libtrace->output.file = stdout;
+#endif
+	}
+	else {
+	        // TRACE
+#if HAVE_ZLIB
+                // using gzdopen means we can set O_LARGEFILE
+                // ourselves. However, this way is messy and
+                // we lose any error checking on "open"
+                libtrace->output.file =  gzdopen(open(
+                                        libtrace->conn_info.path,
+                                        O_CREAT | O_LARGEFILE | O_WRONLY, 
+					S_IRUSR | S_IWUSR), "w");
+#else
+                libtrace->output.file =  fdopen(open(
+                                        libtrace->conn_info.path,
+                                        O_CREAT | O_LARGEFILE | O_WRONLY, 
+					S_IRUSR | S_IWUSR), "w");
+#endif
+	}
+
+}
+
+static int rtclient_init_output(struct libtrace_out_t *libtrace) {
+	char * uridata = libtrace->conn_info.path;
+	char * scan;
+	// extract conn_info from uridata
+	if (strlen(uridata) == 0) {
+		libtrace->conn_info.rt.hostname = strdup("localhost");
+		libtrace->conn_info.rt.port = COLLECTOR_PORT;
+	}
+	else {
+		if ((scan = strchr(uridata,':')) == NULL) {
+                        libtrace->conn_info.rt.hostname =
+                                strdup(uridata);
+                        libtrace->conn_info.rt.port =
+                                COLLECTOR_PORT;
+                } else {
+                        libtrace->conn_info.rt.hostname =
+                                (char *)strndup(uridata,
+                                                (scan - uridata));
+                        libtrace->conn_info.rt.port =
+                                atoi(++scan);
+                }
+        }
+	
+	
+	libtrace->output.rtserver = rtserver_create(libtrace->conn_info.rt.hostname,
+				libtrace->conn_info.rt.port);
+	if (!libtrace->output.rtserver)
+		return 0;
+	
+}
+
 static int dag_fin_input(struct libtrace_t *libtrace) {
 #ifdef HAVE_DAG
 	dag_stop(libtrace->input.fd);
@@ -211,6 +275,19 @@ static int erf_fin_input(struct libtrace_t *libtrace) {
 
 static int rtclient_fin_input(struct libtrace_t *libtrace) {
 	close(libtrace->input.fd);
+}
+
+static int erf_fin_output(struct libtrace_out_t *libtrace) {
+#if HAVE_ZLIB
+        gzclose(libtrace->output.file);
+#else
+        fclose(libtrace->output.file);
+#endif
+}
+ 
+
+static int rtclient_fin_output(struct libtrace_out_t *libtrace) {
+	rtserver_destroy(libtrace->output.rtserver);
 }
 
 static int dag_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
@@ -398,11 +475,80 @@ static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_pac
 	} while(1);
 }
 
+static int erf_write_packet(struct libtrace_out_t *libtrace, struct libtrace_packet_t *packet) {
+	int numbytes = 0;
+
+	if ((numbytes = gzwrite(libtrace->output.file, packet->buffer, packet->size)) == 0) {
+		perror("gzwrite");
+		return -1;
+	}
+	return numbytes;
+}
+
+static int rtclient_write_packet(struct libtrace_out_t *libtrace, struct libtrace_packet_t *packet) {
+	int numbytes = 0;
+	int size;
+	int intsize = sizeof(int);
+	char buf[RP_BUFSIZE];
+	void *buffer = &buf[intsize];
+	int write_required = 0;
+	
+	do {
+		if (rtserver_checklisten(libtrace->output.rtserver) < 0)
+			return -1;
+
+		assert(libtrace->fifo);
+		if (fifo_out_available(libtrace->fifo) == 0 || write_required) {
+	                // Packet added to fifo
+                        if ((numbytes = fifo_write(libtrace->fifo, packet->buffer, packet->size)) == 0) {
+	                        // some error with the fifo
+                                perror("fifo_write");
+                                return -1;
+                        }
+                        write_required = 0;
+                }
+
+                // Read from fifo and add protocol header
+                if ((numbytes = fifo_out_read(libtrace->fifo, buffer, sizeof(dag_record_t))) == 0) {
+	                // failure reading in from fifo
+                        fifo_out_reset(libtrace->fifo);
+                        write_required = 1;
+                        continue;
+                }
+                size = ntohs(((dag_record_t *)buffer)->rlen);
+                assert(size < LIBTRACE_PACKET_BUFSIZE);
+                if ((numbytes = fifo_out_read(libtrace->fifo, buffer, size)) == 0) {
+ 	               // failure reading in from fifo
+                       fifo_out_reset(libtrace->fifo);
+                       write_required = 1;
+                       continue;
+                }
+                // Sort out the protocol header
+                memcpy(buf, &packet->status, intsize);
+
+		if ((numbytes = rtserver_sendclients(libtrace->output.rtserver, buf, size + sizeof(int))) < 0) {
+                	write_required = 0;
+                        continue;
+                }
+
+
+                fifo_out_update(libtrace->fifo, size);
+                // Need an ack to come back
+                // TODO: Obviously this is a little unfinished
+                if ("ACK_ARRIVES") {
+	                fifo_ack_update(libtrace->fifo, size);
+                        return numbytes;
+                } else {
+                        fifo_out_reset(libtrace->fifo);
+                }
+	} while(1);
+}
+
 static void *erf_get_link(const struct libtrace_packet_t *packet) {
+        const void *ethptr = 0;
 	dag_record_t *erfptr = 0;
 	erfptr = (dag_record_t *)packet->buffer;
-	const void *ethptr = 0;
-
+	
 	if (erfptr->flags.rxerror == 1) {
 		return NULL;
 	}
@@ -470,12 +616,12 @@ static struct format_t erf = {
 	"erf",
 	"$Id$",
 	erf_init_input,			/* init_input */	
-	NULL,				/* init_output */
+	erf_init_output,		/* init_output */
 	erf_fin_input,			/* fin_input */
-	NULL,				/* fin_output */
+	erf_fin_output,			/* fin_output */
 	NULL,				/* read */
 	erf_read_packet,		/* read_packet */
-	NULL,				/* write_packet */
+	erf_write_packet,		/* write_packet */
 	erf_get_link,			/* get_link */
 	erf_get_link_type,		/* get_link_type */
 	erf_get_direction,		/* get_direction */
@@ -514,12 +660,12 @@ static struct format_t rtclient = {
 	"rtclient",
 	"$Id$",
 	rtclient_init_input,		/* init_input */	
-	NULL,				/* init_output */
+	rtclient_init_output,		/* init_output */
 	rtclient_fin_input,		/* fin_input */
-	NULL,				/* fin_output */
+	rtclient_fin_output,		/* fin_output */
 	rtclient_read,			/* read */
 	rtclient_read_packet,		/* read_packet */
-	NULL,				/* write_packet */
+	rtclient_write_packet,		/* write_packet */
 	erf_get_link,			/* get_link */
 	erf_get_link_type,		/* get_link_type */
 	erf_get_direction,		/* get_direction */

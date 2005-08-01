@@ -39,6 +39,7 @@ extern "C" {
 #include "config.h"
 #include "libtrace.h"
 #include "fifo.h"
+#include "rtserver.h"
 
 #if HAVE_PCAP_BPF_H
 #  include <pcap-bpf.h>
@@ -124,6 +125,37 @@ struct libtrace_t {
 	double last_ts;
 	double start_ts;
 };
+
+struct libtrace_out_t {
+        struct format_t * format;
+
+        union {
+                struct {
+                        char *hostname;
+                        short port;
+                } rt;
+                char *path;
+                char *interface;
+        } conn_info;
+
+        union {
+                int fd;
+                struct rtserver_t * rtserver;
+#if HAVE_ZLIB
+                gzFile *file;
+#else
+                FILE *file;
+#endif
+#if HAVE_PCAP
+                pcap_t *pcap;
+#endif
+        } output;
+
+        struct fifo_t *fifo;
+
+
+};
+
 
 struct trace_sll_header_t {
 	uint16_t pkttype;          	/* packet type */
