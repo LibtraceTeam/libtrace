@@ -123,6 +123,55 @@ static int wag_fin_input(struct libtrace_t *libtrace) {
 #endif
 }
 
+static int wag_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
+        int numbytes;
+        static short lctr = 0;
+        int rlen;
+	assert(libtrace);
+        assert(len >= 0);
+
+        if (buffer == 0)
+                buffer = malloc(len);
+
+	while(1) {
+		switch(libtrace->sourcetype) {
+			case DEVICE:
+				if ((numbytes=read(libtrace->input.fd, 
+								buffer, 
+								len)) == -1) {
+					perror("read");
+					return -1;
+				}
+				break;
+			default:
+#if HAVE_ZLIB
+				if ((numbytes=gzread(libtrace->input.file,
+								buffer,
+								len)) == -1) {
+					perror("gzread");
+					return -1;
+				}
+#else
+				if ((numbytes=fread(buffer,len,1,
+					libtrace->input.file)) == 0 ) {
+					if(feof(libtrace->input.file)) {
+						return 0;
+					}
+					if(ferror(libtrace->input.file)) {
+						perror("fread");
+						return -1;
+					}
+					return 0;
+				}
+#endif
+		}
+		break;
+	}
+        return numbytes;
+
+}
+
+
 static int wag_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
 	int numbytes;
 	int size;
@@ -154,10 +203,15 @@ static int wag_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 			read_required = 1;
 			continue;
 		}
+		
 		size = ntohs(((struct wag_frame_hdr *)buffer)->size);
 
+		// wag isn't in network byte order yet
+		size = htons(size);
+		//printf("%d %d\n",size,htons(size));
+
 		// read in full packet
-		if((numbytes = fifo_out_reaD(libtrace->fifo,buffer,size)) == 0) {
+		if((numbytes = fifo_out_read(libtrace->fifo,buffer,size)) == 0) {
 			fifo_out_reset(libtrace->fifo);
 			read_required = 1;
 			continue;
@@ -202,12 +256,14 @@ static uint64_t wag_get_erf_timestamp(const struct libtrace_packet_t *packet) {
 
 static int wag_get_capture_length(const struct libtrace_packet_t *packet) {
 	struct wag_data_frame *wagptr = (struct wag_data_frame *)packet->buffer;
-	return ntohs(wagptr->hdr.size);
+	return (wagptr->hdr.size);
+	//return ntohs(wagptr->hdr.size);
 }
 
 static int wag_get_wire_length(const struct libtrace_packet_t *packet) {
 	struct wag_data_frame *wagptr = (struct wag_data_frame *)packet->buffer;
-	return ntohs(wagptr->hdr.size);
+	return (wagptr->hdr.size);
+	//return ntohs(wagptr->hdr.size);
 }
 
 static struct format_t wag = {
