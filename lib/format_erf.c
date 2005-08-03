@@ -645,6 +645,19 @@ static size_t erf_set_capture_length(struct libtrace_packet_t *packet, const siz
 	return packet->size;
 }
 
+static void dag_help() {
+
+}
+
+static void erf_help() {
+
+}
+
+static void rtclient_help() {
+
+}
+
+	
 static struct format_t erf = {
 	"erf",
 	"$Id$",
@@ -665,7 +678,8 @@ static struct format_t erf = {
 	NULL,				/* get_seconds */
 	erf_get_capture_length,		/* get_capture_length */
 	erf_get_wire_length,		/* get_wire_length */
-	erf_set_capture_length		/* set_capture_length */
+	erf_set_capture_length,		/* set_capture_length */
+	erf_help			/* help */
 };
 
 static struct format_t dag = {
@@ -688,7 +702,8 @@ static struct format_t dag = {
 	NULL,				/* get_seconds */
 	erf_get_capture_length,		/* get_capture_length */
 	erf_get_wire_length,		/* get_wire_length */
-	erf_set_capture_length		/* set_capture_length */
+	erf_set_capture_length,		/* set_capture_length */
+	dag_help			/* help */
 };
 
 static struct format_t rtclient = {
@@ -711,7 +726,8 @@ static struct format_t rtclient = {
 	NULL,				/* get_seconds */
 	erf_get_capture_length,		/* get_capture_length */
 	erf_get_wire_length,		/* get_wire_length */
-	erf_set_capture_length		/* set_capture_length */
+	erf_set_capture_length,		/* set_capture_length */
+	rtclient_help			/* help */
 };
 
 void __attribute__((constructor)) erf_constructor() {

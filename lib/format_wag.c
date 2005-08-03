@@ -266,6 +266,10 @@ static int wag_get_wire_length(const struct libtrace_packet_t *packet) {
 	//return ntohs(wagptr->hdr.size);
 }
 
+static int wag_help() {
+
+}
+
 static struct format_t wag = {
 	"wag",
 	"$Id$",
@@ -286,7 +290,8 @@ static struct format_t wag = {
 	NULL,				/* get_seconds */
 	wag_get_capture_length,		/* get_capture_length */
 	wag_get_wire_length,		/* get_wire_length */
-	NULL				/* set_capture_length */
+	NULL,				/* set_capture_length */
+	wag_help			/* help */
 };
 
 void __attribute__((constructor)) wag_constructor() {

@@ -104,6 +104,9 @@ static size_t template_set_capture_length(const struct libtrace_packet_t *packet
 	return -1;
 }
 
+static void template_help() {
+	return;
+}
 static struct format_t template = {
 	"template",
 	"$Id$",
@@ -124,7 +127,8 @@ static struct format_t template = {
 	template_get_seconds,		/* get_seconds */
 	template_get_capture_length,	/* get_capture_length */
 	template_get_wire_length,	/* get_wire_length */
-	template_set_capture_length	/* set_capture_length */
+	template_set_capture_length,	/* set_capture_length */
+	template_help			/* help */
 };
 
 void __attribute__((constructor)) template_constructor() {

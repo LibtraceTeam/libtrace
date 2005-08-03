@@ -215,6 +215,7 @@ struct format_t {
 	int (*get_capture_length)(const struct libtrace_packet_t *packet);
 	int (*get_wire_length)(const struct libtrace_packet_t *packet);
 	size_t (*truncate_packet)(const struct libtrace_packet_t *packet,size_t size);
+	void (*help)();
 };
 
 extern struct format_t *form;

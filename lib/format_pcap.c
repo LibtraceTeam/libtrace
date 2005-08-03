@@ -256,6 +256,10 @@ static size_t pcap_set_capture_length(struct libtrace_packet_t *packet,size_t si
 	return packet->size;
 }
 
+static void pcap_help() {
+}
+static void pcapint_help() {
+}
 static struct format_t pcap = {
 	"pcap",
 	"$Id$",
@@ -276,7 +280,8 @@ static struct format_t pcap = {
 	NULL,				/* get_seconds */
 	pcap_get_capture_length,	/* get_capture_length */
 	pcap_get_wire_length,		/* get_wire_length */
-	pcap_set_capture_length		/* set_capture_length */
+	pcap_set_capture_length,	/* set_capture_length */
+	pcap_help			/* help */
 };
 
 static struct format_t pcapint = {
@@ -299,7 +304,8 @@ static struct format_t pcapint = {
 	NULL,				/* get_seconds */
 	pcap_get_capture_length,	/* get_capture_length */
 	pcap_get_wire_length,		/* get_wire_length */
-	pcap_set_capture_length		/* set_capture_length */
+	pcap_set_capture_length,	/* set_capture_length */
+	pcapint_help			/* help */
 };
 
 void __attribute__((constructor)) pcap_constructor() {
