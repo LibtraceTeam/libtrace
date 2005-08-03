@@ -271,6 +271,7 @@ static struct format_t wag = {
 	"$Id$",
 	wag_init_input,			/* init_input */	
 	NULL,				/* init_output */
+	NULL,				/* config_output */
 	wag_fin_input,			/* fin_input */
 	NULL,				/* fin_output */
 	NULL,				/* read */

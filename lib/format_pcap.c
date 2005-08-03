@@ -54,6 +54,8 @@
 #  endif
 #endif
 
+#if HAVE_PCAP
+
 static int pcap_init_input(struct libtrace_t *libtrace) {
 	char errbuf[PCAP_ERRBUF_SIZE];
 	struct stat buf;
@@ -259,6 +261,7 @@ static struct format_t pcap = {
 	"$Id$",
 	pcap_init_input,		/* init_input */
 	NULL,				/* init_output */
+	NULL,				/* config_output */
 	pcap_fin_input,			/* fin_input */
 	NULL,				/* fin_output */
 	NULL,				/* read */
@@ -281,6 +284,7 @@ static struct format_t pcapint = {
 	"$Id$",
 	pcapint_init_input,		/* init_input */
 	NULL,				/* init_output */
+	NULL,				/* config_output */
 	pcap_fin_input,			/* fin_input */
 	NULL,				/* fin_output */
 	NULL,				/* read */
@@ -302,3 +306,6 @@ void __attribute__((constructor)) pcap_constructor() {
 	register_format(&pcap);
 	register_format(&pcapint);
 }
+
+
+#endif

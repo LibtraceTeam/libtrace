@@ -31,6 +31,7 @@
 #include "libtrace.h"
 #include "format.h"
 #include "rtserver.h"
+#include "parse_cmd.h"
 
 #ifdef HAVE_INTTYPES_H
 #  include <inttypes.h>
@@ -53,6 +54,7 @@
 #include <errno.h>
 #include <netdb.h>
 #include <fcntl.h>
+#include <getopt.h>
 
 /* Catch undefined O_LARGEFILE on *BSD etc */
 #ifndef O_LARGEFILE
@@ -198,12 +200,15 @@ static int rtclient_init_input(struct libtrace_t *libtrace) {
 }
 
 static int erf_init_output(struct libtrace_out_t *libtrace) {
-	struct stat buf;
+	char *filemode = 0;
 
-        if (!strncmp(libtrace->conn_info.path,"-",1)) {
+	libtrace->options.erf.level = 1;
+	asprintf(&filemode,"wb%d",libtrace->options.erf.level);
+
+        if (!strncmp(libtrace->uridata,"-",1)) {
                 // STDOUT
 #if HAVE_ZLIB
-                libtrace->output.file = gzdopen(dup(1), "w");
+                libtrace->output.file = gzdopen(dup(1), filemode);
 #else
                 libtrace->output.file = stdout;
 #endif
@@ -215,21 +220,22 @@ static int erf_init_output(struct libtrace_out_t *libtrace) {
                 // ourselves. However, this way is messy and
                 // we lose any error checking on "open"
                 libtrace->output.file =  gzdopen(open(
-                                        libtrace->conn_info.path,
+                                        libtrace->uridata,
                                         O_CREAT | O_LARGEFILE | O_WRONLY, 
-					S_IRUSR | S_IWUSR), "w");
+					S_IRUSR | S_IWUSR), filemode);
 #else
                 libtrace->output.file =  fdopen(open(
-                                        libtrace->conn_info.path,
+                                        libtrace->uridata,
                                         O_CREAT | O_LARGEFILE | O_WRONLY, 
 					S_IRUSR | S_IWUSR), "w");
 #endif
 	}
+	
 
 }
 
 static int rtclient_init_output(struct libtrace_out_t *libtrace) {
-	char * uridata = libtrace->conn_info.path;
+	char * uridata = libtrace->uridata;
 	char * scan;
 	// extract conn_info from uridata
 	if (strlen(uridata) == 0) {
@@ -257,6 +263,40 @@ static int rtclient_init_output(struct libtrace_out_t *libtrace) {
 	if (!libtrace->output.rtserver)
 		return 0;
 	
+}
+
+static int erf_config_output(struct libtrace_out_t *libtrace, int argc, char *argv[]) {
+	int opt;
+	int level = libtrace->options.erf.level;
+	optind = 1;
+
+	while ((opt = getopt(argc, argv, "z:")) != EOF) {
+		switch (opt) {
+			case 'z':
+				level = atoi(optarg);
+				break;
+			default:
+				printf("Bad argument to erf: %s\n", opt);
+				// maybe spit out some help here
+				return -1;
+		}
+	}
+	if (level != libtrace->options.erf.level) {
+		if (level > 9 || level < 0) {
+			// retarded level choice
+			printf("Compression level must be between 0 and 9 inclusive - you selected %i \n", level);
+			
+		} else {
+			libtrace->options.erf.level = level;
+			return gzsetparams(libtrace->output.file, level, Z_DEFAULT_STRATEGY);
+		}
+	}
+	return 0;
+
+}
+
+static int rtclient_config_output(struct libtrace_out_t *libtrace, int argc, char *argv[]) {
+	return 0;
 }
 
 static int dag_fin_input(struct libtrace_t *libtrace) {
@@ -533,14 +573,7 @@ static int rtclient_write_packet(struct libtrace_out_t *libtrace, struct libtrac
 
 
                 fifo_out_update(libtrace->fifo, size);
-                // Need an ack to come back
-                // TODO: Obviously this is a little unfinished
-                if ("ACK_ARRIVES") {
-	                fifo_ack_update(libtrace->fifo, size);
-                        return numbytes;
-                } else {
-                        fifo_out_reset(libtrace->fifo);
-                }
+	        fifo_ack_update(libtrace->fifo, size);
 	} while(1);
 }
 
@@ -617,6 +650,7 @@ static struct format_t erf = {
 	"$Id$",
 	erf_init_input,			/* init_input */	
 	erf_init_output,		/* init_output */
+	erf_config_output,		/* config_output */
 	erf_fin_input,			/* fin_input */
 	erf_fin_output,			/* fin_output */
 	NULL,				/* read */
@@ -639,6 +673,7 @@ static struct format_t dag = {
 	"$Id$",
 	dag_init_input,			/* init_input */	
 	NULL,				/* init_output */
+	NULL,				/* config_output */
 	dag_fin_input,			/* fin_input */
 	NULL,				/* fin_output */
 	dag_read,			/* read */
@@ -661,6 +696,7 @@ static struct format_t rtclient = {
 	"$Id$",
 	rtclient_init_input,		/* init_input */	
 	rtclient_init_output,		/* init_output */
+	rtclient_config_output,		/* config_output */
 	rtclient_fin_input,		/* fin_input */
 	rtclient_fin_output,		/* fin_output */
 	rtclient_read,			/* read */

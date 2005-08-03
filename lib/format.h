@@ -129,6 +129,7 @@ struct libtrace_t {
 struct libtrace_out_t {
         struct format_t * format;
 
+	char *uridata;
         union {
                 struct {
                         char *hostname;
@@ -138,6 +139,13 @@ struct libtrace_out_t {
                 char *interface;
         } conn_info;
 
+	union {
+		struct {
+			int level;
+		} erf;
+		
+	} options;
+	
         union {
                 int fd;
                 struct rtserver_t * rtserver;
@@ -191,6 +199,7 @@ struct format_t {
 	char *version;
 	int (*init_input)(struct libtrace_t *libtrace);
 	int (*init_output)(struct libtrace_out_t *libtrace);
+	int (*config_output)(struct libtrace_out_t *libtrace, int argc, char *argv[]);
 	int (*fin_input)(struct libtrace_t *libtrace);
 	int (*fin_output)(struct libtrace_out_t *libtrace);
 	int (*read)(struct libtrace_t *libtrace, void *buffer, size_t len);

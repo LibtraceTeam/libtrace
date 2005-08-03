@@ -230,6 +230,8 @@ struct libtrace_t *trace_create(char *uri);
  */
 struct libtrace_out_t *trace_output_create(char *uri);
 
+int trace_output_config(struct libtrace_out_t *libtrace, char *options);
+
 /** Close a trace file, freeing up any resources it may have been using
  *
  */

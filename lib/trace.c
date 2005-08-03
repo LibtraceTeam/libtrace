@@ -102,6 +102,7 @@
 #include "libtrace.h"
 #include "fifo.h"
 #include "format.h"
+#include "parse_cmd.h"
 
 #if HAVE_PCAP_BPF_H
 #  include <pcap-bpf.h>
@@ -135,6 +136,8 @@
 #include "format.h"
 //#include "format/format_list.h"
 #include <err.h>
+
+#define MAXOPTS 1024
 
 //typedef enum {SOCKET, TRACE, STDIN, DEVICE, INTERFACE, RT } source_t;
 
@@ -251,11 +254,11 @@ static int init_output(struct libtrace_out_t **libtrace, char *uri) {
         char *scan = calloc(sizeof(char),URI_PROTO_LINE);
         char *uridata = 0;
 	int i;
-
+	
         // parse the URI to determine what sort of event we are dealing with
 
         // want snippet before the : to get the uri base type.
-
+	
         if((uridata = strchr(uri,':')) == NULL) {
                 // badly formed URI - needs a :
                 return 0;
@@ -265,8 +268,9 @@ static int init_output(struct libtrace_out_t **libtrace, char *uri) {
                 // badly formed URI - uri type is too long
                 return 0;
         }
-        strncpy(scan,uri, (uridata - uri));
-
+	
+ 	strncpy(scan,uri, (uridata - uri));
+	
 	(*libtrace)->format = 0;
         for (i = 0; i < nformats; i++) {
                 if (strlen(scan) == strlen(format_list[i]->name) &&
@@ -282,11 +286,12 @@ static int init_output(struct libtrace_out_t **libtrace, char *uri) {
                         "libtrace has no support for this format (%s)\n",scan);
                 return 0;
         }
-
+	
         // push uridata past the delimiter
         uridata++;
-        (*libtrace)->conn_info.path = strdup(uridata);
-
+        (*libtrace)->uridata = strdup(uridata);
+	
+	
         // libtrace->format now contains the type of uri
         // libtrace->uridata contains the appropriate data for this
 
@@ -298,7 +303,7 @@ static int init_output(struct libtrace_out_t **libtrace, char *uri) {
                 return 0;
         }
 
-
+	
 	(*libtrace)->fifo = create_fifo(1048576);
 	assert( (*libtrace)->fifo);
 	return 1;
@@ -354,64 +359,27 @@ struct libtrace_out_t *trace_output_create(char *uri) {
 	if (init_output(&libtrace, uri) == 0)
 		return 0;
 
-	/*
-	 * switch(libtrace->outputformat) {
-		case RTSERVER:
-                        if ((he=gethostbyname(libtrace->conn_info.rt.hostname)) == NULL) {
-                                perror("gethostbyname");
-                                return 0;
-                        }
-                        if ((libtrace->output.fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-                                perror("socket");
-                                return 0;
-                        }
-			// Need to set up a listening server here
-			bzero((char *) &remote, sizeof(remote)); 
-			remote.sin_family = AF_INET;
-			remote.sin_addr.s_addr = INADDR_ANY;
-			remote.sin_port = htons(libtrace->conn_info.rt.port);
-
-			if (bind(libtrace->output.fd, (struct sockaddr *) &remote, sizeof(remote)) < 0) {
-				perror("bind");
-				return 0;
-			}
-                       	fprintf(stderr, "Waiting for client to connect\n");
-
-			listen(libtrace->output.fd, 5);
-			clilen = sizeof(client);
-			if ((client_fd = accept(libtrace->output.fd, (struct sockaddr *) &client, &clilen)) < 0) {
-				perror("accept");
-				return 0;
-			}
-			libtrace->output.fd = client_fd;
-			fprintf(stderr, "Client connected\n");                       
-			break;
-
-
-		case GZERF:
-#ifndef O_LARGEFILE
-#  define O_LARGEFILE 0
-#endif
-
-#if HAVE_ZLIB
-                        // using gzdopen means we can set O_LARGEFILE
-                        // ourselves. However, this way is messy and
-                        // we lose any error checking on "open"
-			libtrace->output.file = gzdopen(open(libtrace->conn_info.path, O_CREAT | O_LARGEFILE | O_WRONLY, S_IRUSR | S_IWUSR), "w");
-#else
-	               	libtrace->output.file = fdopen(open(libtrace->conn_info.path,O_CREAT | O_LARGEFILE | O_WRONLY, S_IRUSR | S_IWUSR), "w");
-#endif			
-			if (!libtrace->output.file) {
-				perror("gzdopen (or fdopen)");
-				return 0;
-			}
-			break;
-		default:
-			fprintf(stderr, "Unrecognised output type - failure to create output instance \n");
-			exit(0);
-	}
-*/
 	return libtrace;
+}
+
+int trace_output_config(struct libtrace_out_t *libtrace, char *options) {
+	char *opt_string = 0;
+	char *opt_argv[MAXOPTS];
+	int opt_argc = 0;
+	
+	assert(libtrace);
+	
+	if (!options) {
+		printf("No options specified\n");
+		return 0;
+	}
+	
+	asprintf(&opt_string, "%s %s", libtrace->format->name, options);
+	parse_cmd(opt_string, &opt_argc, opt_argv, MAXOPTS);
+	
+	if (libtrace->format->config_output)
+		return libtrace->format->config_output(libtrace, opt_argc, opt_argv);
+
 }
 
 /** Close a trace file, freeing up any resources it may have been using

@@ -40,6 +40,10 @@ static int template_init_output(struct libtrace_out_t *libtrace) {
 	return -1;
 }
 
+static int template_config_output(struct libtrace_out_t *libtrace, int argc, char *argv[]) {
+	return -1;
+}
+
 static int template_fin_input(struct libtrace_t *libtrace) {
 	return -1;
 }
@@ -105,6 +109,7 @@ static struct format_t template = {
 	"$Id$",
 	template_init_input,	 	/* init_input */
 	template_init_output,		/* init_output */
+	template_config_output,		/* config_output */
 	template_fin_input,		/* fin_input */
 	template_fin_output,		/* fin_output */
 	template_read,			/* read */
