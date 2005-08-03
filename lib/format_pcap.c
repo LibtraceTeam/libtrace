@@ -257,8 +257,22 @@ static size_t pcap_set_capture_length(struct libtrace_packet_t *packet,size_t si
 }
 
 static void pcap_help() {
+	printf("pcap format module: $Id$\n");
+	printf("Supported input URIs:\n");
+	printf("\tpcap:/path/to/file\n");
+	printf("\n");
+	printf("\te.g.: pcap:/tmp/trace.pcap\n");
+	printf("Supported output URIs:\n");
+	printf("\tnone\n");
 }
 static void pcapint_help() {
+	printf("pcapint format module: $Id$\n");
+	printf("Supported input URIs:\n");
+	printf("\tpcapint:interface\n");
+	printf("\n");
+	printf("\te.g.: pcapint:eth0\n");
+	printf("Supported output URIs:\n");
+	printf("\tnone\n");
 }
 static struct format_t pcap = {
 	"pcap",

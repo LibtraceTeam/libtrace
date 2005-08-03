@@ -174,6 +174,21 @@ void register_format(struct format_t *f) {
 	nformats++;
 }
 
+/** Prints help information for libtrace 
+ *
+ * Function prints out some basic help information regarding libtrace,
+ * and then prints out the help() function registered with each input module
+ */
+void trace_help() {
+	int i = 0;
+	printf("libtrace .... \n");
+	for (i = 0; i < nformats; i++) {
+		if (format_list[i]->help) {
+			format_list[i]->help();
+		}
+	}
+}
+
 
 #define RP_BUFSIZE 65536
 

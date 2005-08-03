@@ -186,6 +186,12 @@ struct libtrace_icmp
 };
 
 
+/** Prints help information for libtrace 
+ *
+ * Function prints out some basic help information regarding libtrace,
+ * and then prints out the help() function registered with each input module
+ */
+void trace_help();
 
 
 /** Create a trace file from a URI
