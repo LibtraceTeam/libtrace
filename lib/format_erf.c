@@ -60,8 +60,9 @@
 #ifndef O_LARGEFILE
 #  define O_LARGEFILE 0
 #endif 
-static int dag_init_input(struct libtrace_t *libtrace) {
+
 #ifdef HAVE_DAG
+static int dag_init_input(struct libtrace_t *libtrace) {
 	struct stat buf;
 	if (stat(libtrace->conn_info.path,&buf) == -1) {
 		perror("stat");
@@ -91,8 +92,8 @@ static int dag_init_input(struct libtrace_t *libtrace) {
 				libtrace->conn_info.path);
 		return 0;
 	}
-#endif
 }
+#endif
 
 static int erf_init_input(struct libtrace_t *libtrace) {
 	struct stat buf;
@@ -299,11 +300,11 @@ static int rtclient_config_output(struct libtrace_out_t *libtrace, int argc, cha
 	return 0;
 }
 
-static int dag_fin_input(struct libtrace_t *libtrace) {
 #ifdef HAVE_DAG
+static int dag_fin_input(struct libtrace_t *libtrace) {
 	dag_stop(libtrace->input.fd);
-#endif
 }
+#endif
 
 static int erf_fin_input(struct libtrace_t *libtrace) {
 #if HAVE_ZLIB
@@ -330,8 +331,8 @@ static int rtclient_fin_output(struct libtrace_out_t *libtrace) {
 	rtserver_destroy(libtrace->output.rtserver);
 }
 
-static int dag_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
 #if HAVE_DAG
+static int dag_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
 	int numbytes;
 	static short lctr = 0;
 	struct dag_record_t *erfptr = 0;
@@ -351,13 +352,11 @@ static int dag_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
 	numbytes=libtrace->dag.diff;
 	libtrace->dag.offset = 0;
 	return numbytes;
-#else 
-	return -1;
-#endif
 }
+#endif
 
-static int dag_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
 #if HAVE_DAG
+static int dag_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
 	int numbytes;
 	int size;
 	char buf[RP_BUFSIZE];
@@ -391,10 +390,8 @@ static int dag_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 	assert(libtrace->dag.diff >= 0);
 
 	return (size);
-#else
-	return -1;
-#endif
 }
+#endif
 
 static int erf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
 	int numbytes;
@@ -646,14 +643,48 @@ static size_t erf_set_capture_length(struct libtrace_packet_t *packet, const siz
 }
 
 static void dag_help() {
+	printf("dag format module: $Revision$\n");
+	printf("Supported input URIs:\n");
+	printf("\tdag:/dev/dagn\n");
+	printf("\n");
+	printf("\te.g.: dag:/dev/dag0\n");
+	printf("\n");
+	printf("Supported output URIs:\n");
+	printf("\tnone\n");
+	printf("\n");
 
 }
 
 static void erf_help() {
+	printf("erf format module: $Revision$\n");
+	printf("Supported input URIs:\n");
+	printf("\terf:/path/to/file\t(uncompressed)\n");
+	printf("\terf:/path/to/file.gz\t(gzip-compressed)\n");
+	printf("\terf:-\t(stdin, either compressed or not)\n")/
+	printf("\terf:/path/to/socket\n");
+	printf("\n");
+	printf("\te.g.: erf:/tmp/trace\n");
+	printf("\n");
+	printf("Supported output URIs:\n");
+	printf("\tnone\n");
+	printf("\n");
 
 }
 
 static void rtclient_help() {
+	printf("rtclient format module\n");
+	printf("Supported input URIs:\n");
+	printf("\trtclient:hostname:port\n");
+	printf("\trtclient:port\n");
+	printf("\n");
+	printf("\te.g.: rtclient:localhost\n");
+	printf("\te.g.: rtclient:localhost:32500\n");
+	printf("\n");
+	printf("Supported output URIs:\n");
+	printf("\trtclient:port\n");
+	printf("\n");
+	printf("\te.g.: rtclient:32500\n");
+	printf("\n");
 
 }
 
@@ -682,6 +713,7 @@ static struct format_t erf = {
 	erf_help			/* help */
 };
 
+#ifdef HAVE_DAG
 static struct format_t dag = {
 	"dag",
 	"$Id$",
@@ -705,6 +737,7 @@ static struct format_t dag = {
 	erf_set_capture_length,		/* set_capture_length */
 	dag_help			/* help */
 };
+#endif
 
 static struct format_t rtclient = {
 	"rtclient",
@@ -732,6 +765,8 @@ static struct format_t rtclient = {
 
 void __attribute__((constructor)) erf_constructor() {
 	register_format(&erf);
+#ifdef HAVE_DAG
 	register_format(&dag);
+#endif
 	register_format(&rtclient);
 }

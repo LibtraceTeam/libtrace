@@ -204,7 +204,7 @@ void trace_help();
  *  - erf:/path/to/rtclient/socket
  *  - erf:-  (stdin)
  *  - dag:/dev/dagcard                  (implementd?)
- *  - pcap:pcapinterface                (eg: pcap:eth0)
+ *  - pcapint:pcapinterface                (eg: pcap:eth0)
  *  - pcap:/path/to/pcap/file
  *  - pcap:/path/to/pcap/file.gz
  *  - pcap:/path/to/pcap/socket         (implemented?)

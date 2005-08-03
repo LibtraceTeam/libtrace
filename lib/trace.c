@@ -181,7 +181,7 @@ void register_format(struct format_t *f) {
  */
 void trace_help() {
 	int i = 0;
-	printf("libtrace .... \n");
+	printf("libtrace %s\n",PACKAGE_VERSION);
 	for (i = 0; i < nformats; i++) {
 		if (format_list[i]->help) {
 			format_list[i]->help();

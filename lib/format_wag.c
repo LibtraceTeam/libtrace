@@ -267,6 +267,18 @@ static int wag_get_wire_length(const struct libtrace_packet_t *packet) {
 }
 
 static int wag_help() {
+	printf("wag format module: $Revision$\n");
+	printf("Supported input URIs:\n");
+	printf("\twag:/dev/wagn\n");
+	printf("\twag:/path/to/trace.wag\n");
+	printf("\twag:/path/to/trace.wag.gz\n");
+	printf("\n");
+	printf("\te.g.: wag:/dev/wag0\n");
+	printf("\te.g.: wag:/tmp/trace.wag.gz\n");
+	printf("\n");
+	printf("Supported output URIs:\n");
+	printf("\tnone\n");
+	printf("\n");
 
 }
 
