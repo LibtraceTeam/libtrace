@@ -76,6 +76,8 @@ int main(int argc, char *argv[]) {
 	if (filterstring) 
 		filter = trace_bpf_setfilter(filterstring);
 
+	trace_help();
+	exit(0);
         // open a trace
         trace = trace_create(uri);
 	
