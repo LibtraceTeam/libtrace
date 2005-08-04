@@ -477,13 +477,19 @@ static int erf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 	void *buffer = packet->buffer;
 	void *buffer2 = buffer;
 	int rlen;
-	
+#if HAVE_ZLIB
 	if ((numbytes=gzread(INPUT.file,
 					buffer,
 					dag_record_size)) == -1) {
 		perror("gzread");
 		return -1;
 	}
+#else
+	if ((numbytes = read(INPUT.file, buffer, dag_record_size)) == -1) {
+		perror("read");
+		return -1;
+	}
+#endif
 	if (numbytes == 0) {
 		return 0;
 	}
@@ -591,11 +597,17 @@ static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_pac
 
 static int erf_write_packet(struct libtrace_out_t *libtrace, struct libtrace_packet_t *packet) {
 	int numbytes = 0;
-
-	if ((numbytes = gzwrite(libtrace->format_data->output.file, packet->buffer, packet->size)) == 0) {
+#if HAVE_ZLIB
+	if ((numbytes = gzwrite(OUTPUT.file, packet->buffer, packet->size)) == 0) {
 		perror("gzwrite");
 		return -1;
 	}
+#else
+	if ((numbytes = write(OUTPUT.file, packet->buffer, packet->size)) == 0) {
+		perror("write");
+		return -1;
+	}
+#endif
 	return numbytes;
 }
 

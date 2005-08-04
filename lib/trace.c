@@ -360,8 +360,61 @@ struct libtrace_t *trace_create(char *uri) {
 struct libtrace_out_t *trace_output_create(char *uri) {
 	struct libtrace_out_t *libtrace = malloc(sizeof(struct libtrace_out_t));
 	
-	if (init_output(&libtrace, uri) == 0)
-		return 0;
+	char *scan = calloc(sizeof(char),URI_PROTO_LINE);
+        char *uridata = 0;
+        int i;
+
+        // parse the URI to determine what sort of event we are dealing with
+
+        // want snippet before the : to get the uri base type.
+
+        if((uridata = strchr(uri,':')) == NULL) {
+                // badly formed URI - needs a :
+                return 0;
+        }
+
+        if ((*uridata - *uri) > URI_PROTO_LINE) {
+                // badly formed URI - uri type is too long
+                return 0;
+        }
+
+        strncpy(scan,uri, (uridata - uri));
+
+        libtrace->format = 0;
+        for (i = 0; i < nformats; i++) {
+                if (strlen(scan) == strlen(format_list[i]->name) &&
+                                !strncasecmp(scan,
+                                        format_list[i]->name,
+                                        strlen(scan))) {
+                                libtrace->format=format_list[i];
+                                break;
+                                }
+        }
+        if (libtrace->format == 0) {
+                fprintf(stderr,
+                        "libtrace has no support for this format (%s)\n",scan);
+                return 0;
+        }
+
+        // push uridata past the delimiter
+        uridata++;
+        libtrace->uridata = strdup(uridata);
+
+
+        // libtrace->format now contains the type of uri
+        // libtrace->uridata contains the appropriate data for this
+
+        if (libtrace->format->init_output) {
+                libtrace->format->init_output( libtrace);
+	} else {
+                fprintf(stderr,
+                        "No init_output function for format %s\n",scan);
+                return 0;
+        }
+
+
+        libtrace->fifo = create_fifo(1048576);
+        assert( libtrace->fifo);
 
 	return libtrace;
 }
