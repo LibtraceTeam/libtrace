@@ -29,7 +29,7 @@
  */
 
 #include "libtrace.h"
-#include "format.h"
+#include "libtrace_int.h"
 #include "wag.h"
 
 #ifdef HAVE_INTTYPES_H
@@ -57,27 +57,51 @@
 #ifndef O_LARGEFILE
 #define O_LARGEFILE 0
 #endif
+
+struct libtrace_format_data_t {
+	union {
+		/** Information about rtclients */
+                struct {
+                        char *hostname;
+                        short port;
+                } rt;
+                char *path;		/**< information for local sockets */
+        } conn_info;
+	/** Information about the current state of the input device */
+        union {
+                int fd;
+#if HAVE_ZLIB
+                gzFile *file;
+#else	
+		FILE *file;
+#endif
+        } input;	
+};
+
 static int wag_init_input(struct libtrace_t *libtrace) {
 	struct stat buf;
 	struct hostent *he;
 	struct sockaddr_in remote;
 	struct sockaddr_un unix_sock;
-	if (!strncmp(libtrace->conn_info.path,"-",1)) {
+	libtrace->format_data = (struct libtrace_format_data_t *) 
+		calloc(1,sizeof(struct libtrace_format_data_t));
+	libtrace->format_data->conn_info.path = libtrace->uridata;
+	if (!strncmp(libtrace->format_data->conn_info.path,"-",1)) {
 		// STDIN
 #if HAVE_ZLIB
-		libtrace->input.file = gzdopen(STDIN, "r");
+		libtrace->format_data->input.file = gzdopen(STDIN, "r");
 #else	
-		libtrace->input.file = stdin;
+		libtrace->format_data->input.file = stdin;
 #endif
 
 	} else {
-		if (stat(libtrace->conn_info.path,&buf) == -1 ) {
+		if (stat(libtrace->format_data->conn_info.path,&buf) == -1 ) {
 			perror("stat");
 			return 0;
 		}
 		if (S_ISSOCK(buf.st_mode)) {
 			// SOCKET
-			if ((libtrace->input.fd = socket(
+			if ((libtrace->format_data->input.fd = socket(
 					AF_UNIX, SOCK_STREAM, 0)) == -1) {
 				perror("socket");
 				return 0;
@@ -86,9 +110,9 @@ static int wag_init_input(struct libtrace_t *libtrace) {
 			bzero(unix_sock.sun_path,108);
 			snprintf(unix_sock.sun_path,
 					108,"%s"
-					,libtrace->conn_info.path);
+					,libtrace->format_data->conn_info.path);
 
-			if (connect(libtrace->input.fd, 
+			if (connect(libtrace->format_data->input.fd, 
 					(struct sockaddr *)&unix_sock,
 					sizeof(struct sockaddr)) == -1) {
 				perror("connect (unix)");
@@ -100,14 +124,14 @@ static int wag_init_input(struct libtrace_t *libtrace) {
 			// using gzdopen means we can set O_LARGEFILE
 			// ourselves. However, this way is messy and 
 			// we lose any error checking on "open"
-			libtrace->input.file = 
+			libtrace->format_data->input.file = 
 				gzdopen(open(
-					libtrace->conn_info.path,
+					libtrace->format_data->conn_info.path,
 					O_LARGEFILE), "r");
 #else
-			libtrace->input.file = 
+			libtrace->format_data->input.file = 
 				fdopen(open(
-					libtrace->conn_info.path,
+					libtrace->format_data->conn_info.path,
 					O_LARGEFILE), "r");
 #endif
 
@@ -117,9 +141,9 @@ static int wag_init_input(struct libtrace_t *libtrace) {
 
 static int wag_fin_input(struct libtrace_t *libtrace) {
 #if HAVE_ZLIB
-	gzclose(libtrace->input.file);
+	gzclose(libtrace->format_data->input.file);
 #else	
-	fclose(libtrace->input.file);	
+	fclose(libtrace->format_data->input.file);	
 #endif
 }
 
@@ -136,7 +160,7 @@ static int wag_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
 	while(1) {
 		switch(libtrace->sourcetype) {
 			case DEVICE:
-				if ((numbytes=read(libtrace->input.fd, 
+				if ((numbytes=read(libtrace->format_data->input.fd, 
 								buffer, 
 								len)) == -1) {
 					perror("read");
@@ -145,7 +169,7 @@ static int wag_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
 				break;
 			default:
 #if HAVE_ZLIB
-				if ((numbytes=gzread(libtrace->input.file,
+				if ((numbytes=gzread(libtrace->format_data->input.file,
 								buffer,
 								len)) == -1) {
 					perror("gzread");
@@ -153,11 +177,11 @@ static int wag_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
 				}
 #else
 				if ((numbytes=fread(buffer,len,1,
-					libtrace->input.file)) == 0 ) {
-					if(feof(libtrace->input.file)) {
+					libtrace->format_data->input.file)) == 0 ) {
+					if(feof(libtrace->format_data->input.file)) {
 						return 0;
 					}
-					if(ferror(libtrace->input.file)) {
+					if(ferror(libtrace->format_data->input.file)) {
 						perror("fread");
 						return -1;
 					}
@@ -282,7 +306,7 @@ static int wag_help() {
 
 }
 
-static struct format_t wag = {
+static struct libtrace_format_t wag = {
 	"wag",
 	"$Id$",
 	wag_init_input,			/* init_input */	

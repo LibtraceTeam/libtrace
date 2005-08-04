@@ -101,7 +101,7 @@
 
 #include "libtrace.h"
 #include "fifo.h"
-#include "format.h"
+#include "libtrace_int.h"
 #include "parse_cmd.h"
 
 #if HAVE_PCAP_BPF_H
@@ -133,7 +133,7 @@
 #  include "dagformat.h"
 #endif
 
-#include "format.h"
+#include "libtrace_int.h"
 //#include "format/format_list.h"
 #include <err.h>
 
@@ -156,19 +156,19 @@ struct libtrace_filter_t {
 };
 #endif
 
-struct format_t **format_list = 0;
+struct libtrace_format_t **format_list = 0;
 int format_size = 0;
 int nformats = 0;
 
-void register_format(struct format_t *f) {
+void register_format(struct libtrace_format_t *f) {
 	fprintf(stderr,"Registering input format %s\n",f->name);
 	if (format_list == 0) {
 		format_size = 10;
-		format_list = malloc(sizeof(struct format_t *) * format_size);
+		format_list = malloc(sizeof(struct libtrace_format_t *) * format_size);
 	} else if (format_size == nformats) {
 		format_size = format_size + 10;
 		format_list = realloc(format_list,
-				sizeof(struct format_t *) * format_size);
+				sizeof(struct libtrace_format_t *) * format_size);
 	}
 	format_list[nformats] = f;
 	nformats++;
@@ -191,71 +191,7 @@ void trace_help() {
 
 
 #define RP_BUFSIZE 65536
-
 #define URI_PROTO_LINE 16
-static int init_trace(struct libtrace_t **libtrace, char *uri) {
-        char *scan = calloc(sizeof(char),URI_PROTO_LINE);
-        char *uridata = 0;                  
-	int i = 0;
-	struct stat buf;
-        
-        // parse the URI to determine what sort of event we are dealing with
-       
-        // want snippet before the : to get the uri base type.
-
-        if((uridata = strchr(uri,':')) == NULL) {
-                // badly formed URI - needs a :
-                return 0;
-        }
-
-        if ((*uridata - *uri) > URI_PROTO_LINE) {
-                // badly formed URI - uri type is too long
-                return 0;
-        }
-        strncpy(scan,uri, (uridata - uri));
-
-	(*libtrace)->tdelta = 0.0;
-
-
-	(*libtrace)->format = 0;
-	for (i = 0; i < nformats; i++) {
-		if (strlen(scan) == strlen(format_list[i]->name) &&
-				!strncasecmp(scan,
-					format_list[i]->name,
-					strlen(scan))) {
-				(*libtrace)->format=format_list[i];
-				break;
-				}
-	}
-	if ((*libtrace)->format == 0) {
-		fprintf(stderr,
-			"libtrace has no support for this format (%s)\n",scan);
-		return 0;
-	}
-
-        // push uridata past the delimiter
-        uridata++;
-        (*libtrace)->conn_info.path = strdup(uridata);
-
-        // libtrace->format now contains the type of uri
-        // libtrace->uridata contains the appropriate data for this
-        
-	if ((*libtrace)->format->init_input) {
-		(*libtrace)->format->init_input( (*libtrace));
-	} else {
-		fprintf(stderr,
-			"No init function for format %s\n",scan);
-		return 0;
-	}
-	
-
-        (*libtrace)->fifo = create_fifo(1048576);
-	assert( (*libtrace)->fifo);
-	//(*libtrace)->packet.buffer = 0;
-	//(*libtrace)->packet.size = 0;
-
-        return 1;
-}
 
 /** Initialises the data contained within the libtrace_out_t structure, based on the provided uri.
  *
@@ -353,11 +289,64 @@ static int init_output(struct libtrace_out_t **libtrace, char *uri) {
  */
 struct libtrace_t *trace_create(char *uri) {
         struct libtrace_t *libtrace = malloc(sizeof(struct libtrace_t));
+        char *scan = calloc(sizeof(char),URI_PROTO_LINE);
+        char *uridata = 0;                  
+	int i = 0;
+	struct stat buf;
+        
+        // parse the URI to determine what sort of event we are dealing with
+       
+        // want snippet before the : to get the uri base type.
 
-        if(init_trace(&libtrace,uri) == 0) {
+        if((uridata = strchr(uri,':')) == NULL) {
+                // badly formed URI - needs a :
                 return 0;
         }
-       
+
+        if ((*uridata - *uri) > URI_PROTO_LINE) {
+                // badly formed URI - uri type is too long
+                return 0;
+        }
+        strncpy(scan,uri, (uridata - uri));
+
+	libtrace->event.tdelta = 0.0;
+
+
+	libtrace->format = 0;
+	for (i = 0; i < nformats; i++) {
+		if (strlen(scan) == strlen(format_list[i]->name) &&
+				!strncasecmp(scan,
+					format_list[i]->name,
+					strlen(scan))) {
+				libtrace->format=format_list[i];
+				break;
+				}
+	}
+	if (libtrace->format == 0) {
+		fprintf(stderr,
+			"libtrace has no support for this format (%s)\n",scan);
+		return 0;
+	}
+
+        // push uridata past the delimiter
+        uridata++;
+        libtrace->uridata = strdup(uridata);
+
+        // libtrace->format now contains the type of uri
+        // libtrace->uridata contains the appropriate data for this
+        
+	if (libtrace->format->init_input) {
+		libtrace->format->init_input( libtrace);
+	} else {
+		fprintf(stderr,
+			"No init function for format %s\n",scan);
+		return 0;
+	}
+	
+
+        libtrace->fifo = create_fifo(1048576);
+	assert( libtrace->fifo);
+
         return libtrace;
 }
 
@@ -957,7 +946,8 @@ struct libtrace_eventobj_t trace_event(struct libtrace_t *trace,
 		case INTERFACE:
 			{
 				int data;
-				event.fd = pcap_fileno(trace->input.pcap);
+				// XXX FIXME
+				//event.fd = pcap_fileno(trace->input.pcap);
 				if(ioctl(event.fd,FIONREAD,&data)==-1){
 					perror("ioctl(FIONREAD)");
 				}
@@ -975,7 +965,8 @@ struct libtrace_eventobj_t trace_event(struct libtrace_t *trace,
 		case RT:
 			{
 				int data;
-				event.fd = trace->input.fd;
+				// XXX FIXME
+				//event.fd = trace->input.fd;
 				if(ioctl(event.fd,FIONREAD,&data)==-1){
 					perror("ioctl(FIONREAD)");
 				}
@@ -994,13 +985,13 @@ struct libtrace_eventobj_t trace_event(struct libtrace_t *trace,
 				double now;
 				struct timeval stv;
 				/* "Prime" the pump */
-				if (!trace->packet.buffer) {
-					trace->packet.buffer = malloc(4096);
-					trace->packet.size=
+				if (!trace->event.packet.buffer) {
+					trace->event.packet.buffer = malloc(4096);
+					trace->event.packet.size=
 						trace_read_packet(trace,packet);
-					event.size = trace->packet.size;
-					if (trace->packet.size > 0 ) {
-						memcpy(trace->packet.buffer,packet->buffer,trace->packet.size);
+					event.size = trace->event.packet.size;
+					if (trace->event.packet.size > 0 ) {
+						memcpy(trace->event.packet.buffer,packet->buffer,trace->event.packet.size);
 					} else {
 						// return here, the test for event.size will sort out the error
 						event.type = TRACE_EVENT_PACKET;
@@ -1009,17 +1000,17 @@ struct libtrace_eventobj_t trace_event(struct libtrace_t *trace,
 				}
 
 				ts=trace_get_seconds(packet);
-				if (trace->tdelta!=0) {
+				if (trace->event.tdelta!=0) {
 					// Get the adjusted current time
 					gettimeofday(&stv, NULL);
 					now = stv.tv_sec + ((double)stv.tv_usec / 1000000.0);
-					now -= trace->tdelta; // adjust for trace delta
+					now -= trace->event.tdelta; // adjust for trace delta
 					
 					
 					// if the trace timestamp is still in the future, 
 					// return a SLEEP event, otherwise fire the packet
 					if (ts > now) {
-						event.seconds = ts - trace->trace_last_ts;
+						event.seconds = ts - trace->event.trace_last_ts;
 						event.type = TRACE_EVENT_SLEEP;
 						return event;
 					}
@@ -1027,20 +1018,20 @@ struct libtrace_eventobj_t trace_event(struct libtrace_t *trace,
 					gettimeofday(&stv, NULL);
 					// work out the difference between the start of trace replay,
 					// and the first packet in the trace
-					trace->tdelta = stv.tv_sec + ((double)stv.tv_usec / 1000000.0);
-					trace->tdelta -= ts;
+					trace->event.tdelta = stv.tv_sec + ((double)stv.tv_usec / 1000000.0);
+					trace->event.tdelta -= ts;
 
 				}
 				
 					// This is the first packet, so just fire away.
-				packet->size = trace->packet.size;
-				memcpy(packet->buffer,trace->packet.buffer,trace->packet.size);
+				packet->size = trace->event.packet.size;
+				memcpy(packet->buffer,trace->event.packet.buffer,trace->event.packet.size);
 
-				free(trace->packet.buffer);
-				trace->packet.buffer = 0;
+				free(trace->event.packet.buffer);
+				trace->event.packet.buffer = 0;
 				event.type = TRACE_EVENT_PACKET;
 				
-				trace->trace_last_ts = ts;
+				trace->event.trace_last_ts = ts;
 
 				return event;
 			}

@@ -31,7 +31,7 @@
 #include "common.h"
 #include "config.h"
 #include "libtrace.h"
-#include "format.h"
+#include "libtrace_int.h"
 #include <inttypes.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -56,24 +56,41 @@
 
 #if HAVE_PCAP
 
+struct libtrace_format_data_t {
+	union {
+                char *path;		/**< information for local sockets */
+                char *interface;	/**< intormation for reading of network
+					     interfaces */
+        } conn_info;
+	/** Information about the current state of the input device */
+        union {
+                int fd;
+		FILE *file;
+                pcap_t *pcap;
+        } input;
+};
+
 static int pcap_init_input(struct libtrace_t *libtrace) {
 	char errbuf[PCAP_ERRBUF_SIZE];
 	struct stat buf;
-	if (!strncmp(libtrace->conn_info.path,"-",1)) {
-		if ((libtrace->input.pcap = 
-			pcap_open_offline(libtrace->conn_info.path,
+	libtrace->format_data = (struct libtrace_format_data_t *) 
+		malloc(sizeof(struct libtrace_format_data_t));
+	libtrace->format_data->conn_info.path = libtrace->uridata;
+	if (!strncmp(libtrace->format_data->conn_info.path,"-",1)) {
+		if ((libtrace->format_data->input.pcap = 
+			pcap_open_offline(libtrace->format_data->conn_info.path,
 						errbuf)) == NULL) {
 			fprintf(stderr,"%s\n",errbuf);
 			return 0;
 		}		
 	} else {
-		if (stat(libtrace->conn_info.path,&buf) == -1) {
+		if (stat(libtrace->format_data->conn_info.path,&buf) == -1) {
 			perror("stat");
 			return 0;
 		}
 		if (S_ISCHR(buf.st_mode)) {
-			if ((libtrace->input.pcap = 
-				pcap_open_live(libtrace->conn_info.path,
+			if ((libtrace->format_data->input.pcap = 
+				pcap_open_live(libtrace->format_data->conn_info.path,
 					4096,
 					1,
 					1,
@@ -82,8 +99,8 @@ static int pcap_init_input(struct libtrace_t *libtrace) {
 				return 0;
 			}
 		} else { 
-			if ((libtrace->input.pcap = 
-				pcap_open_offline(libtrace->conn_info.path,
+			if ((libtrace->format_data->input.pcap = 
+				pcap_open_offline(libtrace->format_data->conn_info.path,
 				       	errbuf)) == NULL) {
 				fprintf(stderr,"%s\n",errbuf);
 				return 0;
@@ -92,15 +109,15 @@ static int pcap_init_input(struct libtrace_t *libtrace) {
 	}
 	fprintf(stderr,
 			"Unsupported scheme (%s) for format pcap\n",
-			libtrace->conn_info.path);
+			libtrace->format_data->conn_info.path);
 	return 0;
 	
 }
 
 static int pcapint_init_input(struct libtrace_t *libtrace) {
 	char errbuf[PCAP_ERRBUF_SIZE];
-	if ((libtrace->input.pcap = 
-			pcap_open_live(libtrace->conn_info.path,
+	if ((libtrace->format_data->input.pcap = 
+			pcap_open_live(libtrace->format_data->conn_info.path,
 			4096,
 			1,
 			1,
@@ -131,7 +148,7 @@ static int pcap_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_
 	const u_char *pcappkt;
 	int pcapbytes = 0;
 
-	while ((pcapbytes = pcap_dispatch(libtrace->input.pcap,
+	while ((pcapbytes = pcap_dispatch(libtrace->format_data->input.pcap,
 					1, /* number of packets */
 					&trace_pcap_handler,
 					(u_char *)packet)) == 0);
@@ -150,7 +167,7 @@ static libtrace_linktype_t pcap_get_link_type(const struct libtrace_packet_t *pa
 	struct pcap_pkthdr *pcapptr = 0;
 	int linktype = 0;
 	pcapptr = (struct pcap_pkthdr *)packet->buffer;
-	linktype = pcap_datalink(packet->trace->input.pcap);
+	linktype = pcap_datalink(packet->trace->format_data->input.pcap);
 	switch(linktype) {
 		case DLT_NULL:
 			return TRACE_TYPE_NONE;
@@ -279,7 +296,9 @@ static void pcapint_help() {
 	printf("\tnone\n");
 	printf("\n");
 }
-static struct format_t pcap = {
+
+
+static struct libtrace_format_t pcap = {
 	"pcap",
 	"$Id$",
 	pcap_init_input,		/* init_input */
@@ -303,7 +322,7 @@ static struct format_t pcap = {
 	pcap_help			/* help */
 };
 
-static struct format_t pcapint = {
+static struct libtrace_format_t pcapint = {
 	"pcapint",
 	"$Id$",
 	pcapint_init_input,		/* init_input */

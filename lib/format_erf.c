@@ -29,7 +29,7 @@
  */
 
 #include "libtrace.h"
-#include "format.h"
+#include "libtrace_int.h"
 #include "rtserver.h"
 #include "parse_cmd.h"
 
@@ -61,35 +61,98 @@
 #  define O_LARGEFILE 0
 #endif 
 
+#define CONNINFO libtrace->format_data->conn_info
+#define INPUT libtrace->format_data->input
+#define DAG libtrace->format_data->dag
+struct libtrace_format_data_t {
+	union {
+		/** Information about rtclients */
+                struct {
+                        char *hostname;
+                        short port;
+                } rt;
+                char *path;		/**< information for local sockets */
+        } conn_info;
+	/** Information about the current state of the input device */
+        union {
+                int fd;
+#if HAVE_ZLIB
+                gzFile *file;
+#else	
+		FILE *file;
+#endif
+        } input;
+
+	struct {
+		void *buf; 
+		unsigned bottom;
+		unsigned top;
+		unsigned diff;
+		unsigned curr;
+		unsigned offset;
+	} dag;
+};
+
+struct libtrace_format_data_out_t {
+        union {
+                struct {
+                        char *hostname;
+                        short port;
+                } rt;
+                char *path;
+        } conn_info;
+
+	union {
+		struct {
+			int level;
+		} erf;
+		
+	} options;
+	
+        union {
+                int fd;
+                struct rtserver_t * rtserver;
+#if HAVE_ZLIB
+                gzFile *file;
+#else
+                FILE *file;
+#endif
+        } output;
+};
+
 #ifdef HAVE_DAG
 static int dag_init_input(struct libtrace_t *libtrace) {
 	struct stat buf;
-	if (stat(libtrace->conn_info.path,&buf) == -1) {
+	libtrace->format_data = (struct libtrace_format_data_t *)
+		malloc(sizeof(struct libtrace_format_data_t));
+
+	CONNINFO.path = libtrace->uridata;
+	if (stat(CONNINFO.path,&buf) == -1) {
 		perror("stat");
 		return 0;
 	} 
 	if (S_ISCHR(buf.st_mode)) {
 		// DEVICE
-		if((libtrace->input.fd = 
-				dag_open(libtrace->conn_info.path)) < 0) {
+		if((INPUT.fd = 
+				dag_open(CONNINFO.path)) < 0) {
 			fprintf(stderr,"Cannot open DAG %s: %m\n", 
-					libtrace->conn_info.path,errno);
+					CONNINFO.path,errno);
 			exit(0);
 		}
-		if((libtrace->dag.buf = (void *)
-				dag_mmap(libtrace->input.fd)) == MAP_FAILED) {
+		if((DAG.buf = (void *)
+				dag_mmap(INPUT.fd)) == MAP_FAILED) {
 			fprintf(stderr,"Cannot mmap DAG %s: %m\n", 
-					libtrace->conn_info.path,errno);
+					CONNINFO.path,errno);
 			exit(0);
 		}
-		if(dag_start(libtrace->input.fd) < 0) {
+		if(dag_start(INPUT.fd) < 0) {
 			fprintf(stderr,"Cannot start DAG %s: %m\n", 
-					libtrace->conn_info.path,errno);
+					CONNINFO.path,errno);
 			exit(0);
 		}
 	} else {
 		fprintf(stderr,"%s isn't a valid char device, exiting\n",
-				libtrace->conn_info.path);
+				CONNINFO.path);
 		return 0;
 	}
 }
@@ -100,22 +163,26 @@ static int erf_init_input(struct libtrace_t *libtrace) {
 	struct hostent *he;
 	struct sockaddr_in remote;
 	struct sockaddr_un unix_sock;
-	if (!strncmp(libtrace->conn_info.path,"-",1)) {
+	libtrace->format_data = (struct libtrace_format_data_t *)
+		malloc(sizeof(struct libtrace_format_data_t));
+
+	CONNINFO.path = libtrace->uridata;
+	if (!strncmp(CONNINFO.path,"-",1)) {
 		// STDIN
 #if HAVE_ZLIB
-		libtrace->input.file = gzdopen(STDIN, "r");
+		INPUT.file = gzdopen(STDIN, "r");
 #else	
-		libtrace->input.file = stdin;
+		INPUT.file = stdin;
 #endif
 
 	} else {
-		if (stat(libtrace->conn_info.path,&buf) == -1 ) {
+		if (stat(CONNINFO.path,&buf) == -1 ) {
 			perror("stat");
 			return 0;
 		}
 		if (S_ISSOCK(buf.st_mode)) {
 			// SOCKET
-			if ((libtrace->input.fd = socket(
+			if ((INPUT.fd = socket(
 					AF_UNIX, SOCK_STREAM, 0)) == -1) {
 				perror("socket");
 				return 0;
@@ -124,9 +191,9 @@ static int erf_init_input(struct libtrace_t *libtrace) {
 			bzero(unix_sock.sun_path,108);
 			snprintf(unix_sock.sun_path,
 					108,"%s"
-					,libtrace->conn_info.path);
+					,CONNINFO.path);
 
-			if (connect(libtrace->input.fd, 
+			if (connect(INPUT.fd, 
 					(struct sockaddr *)&unix_sock,
 					sizeof(struct sockaddr)) == -1) {
 				perror("connect (unix)");
@@ -138,14 +205,14 @@ static int erf_init_input(struct libtrace_t *libtrace) {
 			// using gzdopen means we can set O_LARGEFILE
 			// ourselves. However, this way is messy and 
 			// we lose any error checking on "open"
-			libtrace->input.file = 
+			INPUT.file = 
 				gzdopen(open(
-					libtrace->conn_info.path,
+					CONNINFO.path,
 					O_LARGEFILE), "r");
 #else
-			libtrace->input.file = 
+			INPUT.file = 
 				fdopen(open(
-					libtrace->conn_info.path,
+					CONNINFO.path,
 					O_LARGEFILE), "r");
 #endif
 
@@ -155,45 +222,47 @@ static int erf_init_input(struct libtrace_t *libtrace) {
 
 static int rtclient_init_input(struct libtrace_t *libtrace) {
 	char *scan;
-	char *uridata = libtrace->conn_info.path;
+	char *uridata = libtrace->uridata;
 	struct hostent *he;
 	struct sockaddr_in remote;
+	libtrace->format_data = (struct libtrace_format_data_t *)
+		malloc(sizeof(struct libtrace_format_data_t));
 
 	if (strlen(uridata) == 0) {
-		libtrace->conn_info.rt.hostname = 
+		CONNINFO.rt.hostname = 
 			strdup("localhost");
-		libtrace->conn_info.rt.port = 
+		CONNINFO.rt.port = 
 			COLLECTOR_PORT;
 	} else {
 		if ((scan = strchr(uridata,':')) == NULL) {
-			libtrace->conn_info.rt.hostname = 
+			CONNINFO.rt.hostname = 
 				strdup(uridata);
-			libtrace->conn_info.rt.port =
+			CONNINFO.rt.port =
 				COLLECTOR_PORT;
 		} else {
-			libtrace->conn_info.rt.hostname = 
+			CONNINFO.rt.hostname = 
 				(char *)strndup(uridata,
 						(scan - uridata));
-			libtrace->conn_info.rt.port = 
+			CONNINFO.rt.port = 
 				atoi(++scan);
 		}
 	}
 	
-	if ((he=gethostbyname(libtrace->conn_info.rt.hostname)) == NULL) {  
+	if ((he=gethostbyname(CONNINFO.rt.hostname)) == NULL) {  
 		perror("gethostbyname");
 		return 0;
 	} 
-	if ((libtrace->input.fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+	if ((INPUT.fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
 		perror("socket");
 		return 0;
 	}
 
 	remote.sin_family = AF_INET;   
-	remote.sin_port = htons(libtrace->conn_info.rt.port);
+	remote.sin_port = htons(CONNINFO.rt.port);
 	remote.sin_addr = *((struct in_addr *)he->h_addr);
 	bzero(&(remote.sin_zero), 8);
 
-	if (connect(libtrace->input.fd, (struct sockaddr *)&remote,
+	if (connect(INPUT.fd, (struct sockaddr *)&remote,
 				sizeof(struct sockaddr)) == -1) {
 		perror("connect (inet)");
 		return 0;
@@ -202,16 +271,18 @@ static int rtclient_init_input(struct libtrace_t *libtrace) {
 
 static int erf_init_output(struct libtrace_out_t *libtrace) {
 	char *filemode = 0;
+	libtrace->format_data = (struct libtrace_format_data_out_t *)
+		calloc(1,sizeof(struct libtrace_format_data_out_t));
 
-	libtrace->options.erf.level = 1;
-	asprintf(&filemode,"wb%d",libtrace->options.erf.level);
+	libtrace->format_data->options.erf.level = 1;
+	asprintf(&filemode,"wb%d",libtrace->format_data->options.erf.level);
 
         if (!strncmp(libtrace->uridata,"-",1)) {
                 // STDOUT
 #if HAVE_ZLIB
-                libtrace->output.file = gzdopen(dup(1), filemode);
+                libtrace->format_data->output.file = gzdopen(dup(1), filemode);
 #else
-                libtrace->output.file = stdout;
+                libtrace->format_data->output.file = stdout;
 #endif
 	}
 	else {
@@ -220,12 +291,12 @@ static int erf_init_output(struct libtrace_out_t *libtrace) {
                 // using gzdopen means we can set O_LARGEFILE
                 // ourselves. However, this way is messy and
                 // we lose any error checking on "open"
-                libtrace->output.file =  gzdopen(open(
+                libtrace->format_data->output.file =  gzdopen(open(
                                         libtrace->uridata,
                                         O_CREAT | O_LARGEFILE | O_WRONLY, 
 					S_IRUSR | S_IWUSR), filemode);
 #else
-                libtrace->output.file =  fdopen(open(
+                libtrace->format_data->output.file =  fdopen(open(
                                         libtrace->uridata,
                                         O_CREAT | O_LARGEFILE | O_WRONLY, 
 					S_IRUSR | S_IWUSR), "w");
@@ -238,37 +309,41 @@ static int erf_init_output(struct libtrace_out_t *libtrace) {
 static int rtclient_init_output(struct libtrace_out_t *libtrace) {
 	char * uridata = libtrace->uridata;
 	char * scan;
+	libtrace->format_data = (struct libtrace_format_data_out_t *)
+		calloc(1,sizeof(struct libtrace_format_data_out_t));
 	// extract conn_info from uridata
 	if (strlen(uridata) == 0) {
-		libtrace->conn_info.rt.hostname = strdup("localhost");
-		libtrace->conn_info.rt.port = COLLECTOR_PORT;
+		libtrace->format_data->conn_info.rt.hostname = 
+			strdup("localhost");
+		libtrace->format_data->conn_info.rt.port = COLLECTOR_PORT;
 	}
 	else {
 		if ((scan = strchr(uridata,':')) == NULL) {
-                        libtrace->conn_info.rt.hostname =
+                        libtrace->format_data->conn_info.rt.hostname =
                                 strdup(uridata);
-                        libtrace->conn_info.rt.port =
+                        libtrace->format_data->conn_info.rt.port =
                                 COLLECTOR_PORT;
                 } else {
-                        libtrace->conn_info.rt.hostname =
+                        libtrace->format_data->conn_info.rt.hostname =
                                 (char *)strndup(uridata,
                                                 (scan - uridata));
-                        libtrace->conn_info.rt.port =
+                        libtrace->format_data->conn_info.rt.port =
                                 atoi(++scan);
                 }
         }
 	
 	
-	libtrace->output.rtserver = rtserver_create(libtrace->conn_info.rt.hostname,
-				libtrace->conn_info.rt.port);
-	if (!libtrace->output.rtserver)
+	libtrace->format_data->output.rtserver = 
+		rtserver_create(libtrace->format_data->conn_info.rt.hostname,
+				libtrace->format_data->conn_info.rt.port);
+	if (!libtrace->format_data->output.rtserver)
 		return 0;
 	
 }
 
 static int erf_config_output(struct libtrace_out_t *libtrace, int argc, char *argv[]) {
 	int opt;
-	int level = libtrace->options.erf.level;
+	int level = libtrace->format_data->options.erf.level;
 	optind = 1;
 
 	while ((opt = getopt(argc, argv, "z:")) != EOF) {
@@ -282,14 +357,14 @@ static int erf_config_output(struct libtrace_out_t *libtrace, int argc, char *ar
 				return -1;
 		}
 	}
-	if (level != libtrace->options.erf.level) {
+	if (level != libtrace->format_data->options.erf.level) {
 		if (level > 9 || level < 0) {
 			// retarded level choice
 			printf("Compression level must be between 0 and 9 inclusive - you selected %i \n", level);
 			
 		} else {
-			libtrace->options.erf.level = level;
-			return gzsetparams(libtrace->output.file, level, Z_DEFAULT_STRATEGY);
+			libtrace->format_data->options.erf.level = level;
+			return gzsetparams(libtrace->format_data->output.file, level, Z_DEFAULT_STRATEGY);
 		}
 	}
 	return 0;
@@ -302,33 +377,33 @@ static int rtclient_config_output(struct libtrace_out_t *libtrace, int argc, cha
 
 #ifdef HAVE_DAG
 static int dag_fin_input(struct libtrace_t *libtrace) {
-	dag_stop(libtrace->input.fd);
+	dag_stop(INPUT.fd);
 }
 #endif
 
 static int erf_fin_input(struct libtrace_t *libtrace) {
 #if HAVE_ZLIB
-	gzclose(libtrace->input.file);
+	gzclose(INPUT.file);
 #else	
-	fclose(libtrace->input.file);	
+	fclose(INPUT.file);	
 #endif
 }
 
 static int rtclient_fin_input(struct libtrace_t *libtrace) {
-	close(libtrace->input.fd);
+	close(INPUT.fd);
 }
 
 static int erf_fin_output(struct libtrace_out_t *libtrace) {
 #if HAVE_ZLIB
-        gzclose(libtrace->output.file);
+        gzclose(libtrace->format_data->output.file);
 #else
-        fclose(libtrace->output.file);
+        fclose(libtrace->format_data->output.file);
 #endif
 }
  
 
 static int rtclient_fin_output(struct libtrace_out_t *libtrace) {
-	rtserver_destroy(libtrace->output.rtserver);
+	rtserver_destroy(libtrace->format_data->output.rtserver);
 }
 
 #if HAVE_DAG
@@ -341,16 +416,16 @@ static int dag_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
 	if (buffer == 0)
 		buffer = malloc(len);
 	
-	libtrace->dag.bottom = libtrace->dag.top;
-	libtrace->dag.top = dag_offset(
-			libtrace->input.fd,
-			&(libtrace->dag.bottom),
+	DAG.bottom = DAG.top;
+	DAG.top = dag_offset(
+			INPUT.fd,
+			&(DAG.bottom),
 			0);
-	libtrace->dag.diff = libtrace->dag.top -
-		libtrace->dag.bottom;
+	DAG.diff = DAG.top -
+		DAG.bottom;
 
-	numbytes=libtrace->dag.diff;
-	libtrace->dag.offset = 0;
+	numbytes=DAG.diff;
+	DAG.offset = 0;
 	return numbytes;
 }
 #endif
@@ -402,7 +477,7 @@ static int erf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 	void *buffer2 = buffer;
 	int rlen;
 	
-	if ((numbytes=gzread(libtrace->input.file,
+	if ((numbytes=gzread(INPUT.file,
 					buffer,
 					dag_record_size)) == -1) {
 		perror("gzread");
@@ -417,7 +492,7 @@ static int erf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 	buffer2 = buffer + dag_record_size;
 	
 	// read in the rest of the packet
-	if ((numbytes=gzread(libtrace->input.file,
+	if ((numbytes=gzread(INPUT.file,
 					buffer2,
 					size)) == -1) {
 		perror("gzread");
@@ -439,7 +514,7 @@ static int rtclient_read(struct libtrace_t *libtrace, void *buffer, size_t len) 
 #ifndef MSG_NOSIGNAL
 #  define MSG_NOSIGNAL 0
 #endif
-		if ((numbytes = recv(libtrace->input.fd,
+		if ((numbytes = recv(INPUT.fd,
 						buffer,
 						len,
 						MSG_NOSIGNAL)) == -1) {
@@ -470,7 +545,7 @@ static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_pac
 	do {
 		if (fifo_out_available(libtrace->fifo) == 0 || read_required) {
 			if ((numbytes = rtclient_read(
-						libtrace,buf,RP_BUFSIZE))<=0) {
+					libtrace,buf,RP_BUFSIZE))<=0) {
 				return numbytes;
 			}
 			assert(libtrace->fifo);
@@ -515,7 +590,7 @@ static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_pac
 static int erf_write_packet(struct libtrace_out_t *libtrace, struct libtrace_packet_t *packet) {
 	int numbytes = 0;
 
-	if ((numbytes = gzwrite(libtrace->output.file, packet->buffer, packet->size)) == 0) {
+	if ((numbytes = gzwrite(libtrace->format_data->output.file, packet->buffer, packet->size)) == 0) {
 		perror("gzwrite");
 		return -1;
 	}
@@ -531,7 +606,7 @@ static int rtclient_write_packet(struct libtrace_out_t *libtrace, struct libtrac
 	int write_required = 0;
 	
 	do {
-		if (rtserver_checklisten(libtrace->output.rtserver) < 0)
+		if (rtserver_checklisten(libtrace->format_data->output.rtserver) < 0)
 			return -1;
 
 		assert(libtrace->fifo);
@@ -563,7 +638,7 @@ static int rtclient_write_packet(struct libtrace_out_t *libtrace, struct libtrac
                 // Sort out the protocol header
                 memcpy(buf, &packet->status, intsize);
 
-		if ((numbytes = rtserver_sendclients(libtrace->output.rtserver, buf, size + sizeof(int))) < 0) {
+		if ((numbytes = rtserver_sendclients(libtrace->format_data->output.rtserver, buf, size + sizeof(int))) < 0) {
                 	write_required = 0;
                         continue;
                 }
@@ -590,6 +665,7 @@ static void *erf_get_link(const struct libtrace_packet_t *packet) {
 static libtrace_linktype_t erf_get_link_type(const struct libtrace_packet_t *packet) {
 	dag_record_t *erfptr = 0;
 	erfptr = (dag_record_t *)packet->buffer;
+	printf("%d\n",erfptr->type);
 	switch (erfptr->type) {
 		case TYPE_ETH: return TRACE_TYPE_ETH;
 		case TYPE_ATM: return TRACE_TYPE_ATM;
@@ -689,7 +765,7 @@ static void rtclient_help() {
 }
 
 	
-static struct format_t erf = {
+static struct libtrace_format_t erf = {
 	"erf",
 	"$Id$",
 	erf_init_input,			/* init_input */	
@@ -714,7 +790,7 @@ static struct format_t erf = {
 };
 
 #ifdef HAVE_DAG
-static struct format_t dag = {
+static struct libtrace_format_t dag = {
 	"dag",
 	"$Id$",
 	dag_init_input,			/* init_input */	
@@ -739,7 +815,7 @@ static struct format_t dag = {
 };
 #endif
 
-static struct format_t rtclient = {
+static struct libtrace_format_t rtclient = {
 	"rtclient",
 	"$Id$",
 	rtclient_init_input,		/* init_input */	

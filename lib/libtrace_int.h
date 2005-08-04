@@ -28,8 +28,8 @@
  *
  */
 
-#ifndef FORMAT_H
-#define FORMAT_H
+#ifndef LIBTRACE_INT_H
+#define LIBTRACE_INT_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -74,45 +74,9 @@ typedef enum {SOCKET, TRACE, STDIN, DEVICE, INTERFACE, RT } source_t;
 
 #define RP_BUFSIZE 65536
 
-/** The information about traces that are open 
- * @internal
- */
-struct libtrace_t {
-	struct format_t *format; /**< format driver pointer */
-        source_t sourcetype;	/**< The type (device,file, etc */
+struct libtrace_format_data_t;
 
-        union {
-		/** Information about rtclients */
-                struct {
-                        char *hostname;
-                        short port;
-                } rt;
-                char *path;		/**< information for local sockets */
-                char *interface;	/**< intormation for reading of network
-					     interfaces */
-        } conn_info;
-	/** Information about the current state of the input device */
-        union {
-                int fd;
-#if HAVE_ZLIB
-                gzFile *file;
-#else	
-		FILE *file;
-#endif
-#if HAVE_PCAP 
-                pcap_t *pcap;
-#endif 
-        } input;
-
-	struct fifo_t *fifo;   
-	struct {
-		void *buf; 
-		unsigned bottom;
-		unsigned top;
-		unsigned diff;
-		unsigned curr;
-		unsigned offset;
-	} dag;
+struct libtrace_event_t {
 	struct {
 		void *buffer;
 		int size;
@@ -126,42 +90,26 @@ struct libtrace_t {
 	double start_ts;
 };
 
+/** The information about traces that are open 
+ * @internal
+ */
+struct libtrace_t {
+	struct libtrace_format_t *format; /**< format driver pointer */
+	struct libtrace_format_data_t *format_data; /**<format data pointer */
+        source_t sourcetype;	/**< The type (device,file, etc */
+
+	struct libtrace_event_t event;
+	char *uridata;
+	struct fifo_t *fifo;   
+
+};
+
 struct libtrace_out_t {
-        struct format_t * format;
+        struct libtrace_format_t *format;
+	struct libtrace_format_data_out_t *format_data;
 
 	char *uridata;
-        union {
-                struct {
-                        char *hostname;
-                        short port;
-                } rt;
-                char *path;
-                char *interface;
-        } conn_info;
-
-	union {
-		struct {
-			int level;
-		} erf;
-		
-	} options;
-	
-        union {
-                int fd;
-                struct rtserver_t * rtserver;
-#if HAVE_ZLIB
-                gzFile *file;
-#else
-                FILE *file;
-#endif
-#if HAVE_PCAP
-                pcap_t *pcap;
-#endif
-        } output;
-
         struct fifo_t *fifo;
-
-
 };
 
 
@@ -194,7 +142,7 @@ struct trace_pflog_header_t {
 	uint8_t	   pad[3];
 };
 
-struct format_t {
+struct libtrace_format_t {
 	char *name;
 	char *version;
 	int (*init_input)(struct libtrace_t *libtrace);
@@ -218,12 +166,12 @@ struct format_t {
 	void (*help)();
 };
 
-extern struct format_t *form;
+extern struct libtrace_format_t *form;
 
-void register_format(struct format_t *format);
+void register_format(struct libtrace_format_t *format);
 	
 #ifdef __cplusplus
 }
 #endif
 
-#endif // FORMAT_H
+#endif // LIBTRACE_INT_H

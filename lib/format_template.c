@@ -29,10 +29,15 @@
  */
 
 #include "libtrace.h"
-#include "format.h"
+#include "libtrace_int.h"
 #include <inttypes.h>
 
+struct libtrace_format_data_t {
+	int fd;
+};
 static int template_init_input(struct libtrace_t *libtrace) {
+	libtrace->format_data = (struct libtrace_format_data_t *)
+		malloc(sizeof(struct libtrace_format_data_t));
 	return -1;
 }
 
@@ -107,7 +112,7 @@ static size_t template_set_capture_length(const struct libtrace_packet_t *packet
 static void template_help() {
 	return;
 }
-static struct format_t template = {
+static struct libtrace_format_t template = {
 	"template",
 	"$Id$",
 	template_init_input,	 	/* init_input */
