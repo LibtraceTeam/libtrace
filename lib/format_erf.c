@@ -313,16 +313,15 @@ static int rtclient_init_output(struct libtrace_out_t *libtrace) {
 		calloc(1,sizeof(struct libtrace_format_data_out_t));
 	// extract conn_info from uridata
 	if (strlen(uridata) == 0) {
-		libtrace->format_data->conn_info.rt.hostname = 
-			strdup("localhost");
-		libtrace->format_data->conn_info.rt.port = COLLECTOR_PORT;
+		libtrace->conn_info.rt.hostname = NULL;
+		libtrace->conn_info.rt.port = COLLECTOR_PORT;
 	}
 	else {
 		if ((scan = strchr(uridata,':')) == NULL) {
-                        libtrace->format_data->conn_info.rt.hostname =
-                                strdup(uridata);
-                        libtrace->format_data->conn_info.rt.port =
-                                COLLECTOR_PORT;
+                        libtrace->conn_info.rt.hostname =
+                                NULL;
+                        libtrace->conn_info.rt.port =
+                                atoi(uridata);
                 } else {
                         libtrace->format_data->conn_info.rt.hostname =
                                 (char *)strndup(uridata,
@@ -646,6 +645,7 @@ static int rtclient_write_packet(struct libtrace_out_t *libtrace, struct libtrac
 
                 fifo_out_update(libtrace->fifo, size);
 	        fifo_ack_update(libtrace->fifo, size);
+		return numbytes;
 	} while(1);
 }
 
@@ -705,7 +705,7 @@ static int erf_get_wire_length(const struct libtrace_packet_t *packet) {
 	return ntohs(erfptr->wlen);
 }
 
-static size_t erf_set_capture_length(struct libtrace_packet_t *packet, const size_t size) {
+static size_t erf_set_capture_length(struct libtrace_packet_t *packet, size_t size) {
 	dag_record_t *erfptr = 0;
 	assert(packet);
 	if(size > packet->size) {
@@ -736,30 +736,41 @@ static void erf_help() {
 	printf("Supported input URIs:\n");
 	printf("\terf:/path/to/file\t(uncompressed)\n");
 	printf("\terf:/path/to/file.gz\t(gzip-compressed)\n");
-	printf("\terf:-\t(stdin, either compressed or not)\n")/
+	printf("\terf:-\t(stdin, either compressed or not)\n");
 	printf("\terf:/path/to/socket\n");
 	printf("\n");
 	printf("\te.g.: erf:/tmp/trace\n");
 	printf("\n");
 	printf("Supported output URIs:\n");
-	printf("\tnone\n");
+	printf("\terf:path/to/file\t(uncompressed)\n");
+	printf("\terf:/path/to/file.gz\t(gzip-compressed)\n");
+	printf("\terf:-\t(stdout, either compressed or not)\n");
+	printf("\n");
+	printf("\te.g.: erf:/tmp/trace\n");
+	printf("\n");
+	printf("Supported output options:\n");
+	printf("\t-z\tSpecify the gzip compression, ranging from 0 (uncompressed) to 9 - defaults to 1\n");
 	printf("\n");
 
+	
 }
 
 static void rtclient_help() {
 	printf("rtclient format module\n");
 	printf("Supported input URIs:\n");
 	printf("\trtclient:hostname:port\n");
-	printf("\trtclient:port\n");
+	printf("\trtclient:hostname (connects on default port)\n");
 	printf("\n");
 	printf("\te.g.: rtclient:localhost\n");
 	printf("\te.g.: rtclient:localhost:32500\n");
 	printf("\n");
 	printf("Supported output URIs:\n");
+	printf("\trtclient: \t(will output on default port on all available IP addresses) \n");
+	printf("\trtclient:hostname:port\n");
 	printf("\trtclient:port\n");
 	printf("\n");
 	printf("\te.g.: rtclient:32500\n");
+	printf("\te.g.: rtclient:\n");
 	printf("\n");
 
 }

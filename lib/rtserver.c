@@ -27,10 +27,13 @@ struct rtserver_t * rtserver_create (char * hostname, short port) {
 	
         FD_ZERO(&rtserver->rt_fds);
 
-        if ((he=gethostbyname(hostname)) == NULL) {
-	        perror("gethostbyname");
-                return 0;
-        }
+	if (hostname) {
+        	if ((he=gethostbyname(hostname)) == NULL) {
+		        perror("gethostbyname");
+        	        return 0;
+		}
+	}
+	
         if ((rtserver->connect_fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
                 perror("socket");
                 return 0;
@@ -43,7 +46,10 @@ struct rtserver_t * rtserver_create (char * hostname, short port) {
         // Need to set up a listening server here
         bzero((char *) rtserver->remote, sizeof(rtserver->remote));
 	rtserver->remote->sin_family = AF_INET;
-        rtserver->remote->sin_addr.s_addr = INADDR_ANY;
+	if (hostname)
+		rtserver->remote->sin_addr = *((struct in_addr *)he->h_addr);
+	else 
+		rtserver->remote->sin_addr.s_addr = INADDR_ANY;
         rtserver->remote->sin_port = htons(port);
 
 	if (bind(rtserver->connect_fd, (struct sockaddr *) rtserver->remote, sizeof(struct sockaddr_in)) < 0) {
@@ -55,7 +61,7 @@ struct rtserver_t * rtserver_create (char * hostname, short port) {
         	perror("listen");
                 return 0;
 	}
-
+	
         rtserver->max_rtfds = rtserver->connect_fd;
 
 	return rtserver;

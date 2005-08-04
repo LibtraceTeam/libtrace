@@ -366,6 +366,14 @@ struct libtrace_out_t *trace_output_create(char *uri) {
 	return libtrace;
 }
 
+/** Parses an output options string and calls the appropriate function to deal with output options.
+ *
+ * @param libtrace	the output trace object to apply the options to
+ * @param options	the options string
+ * @returns -1 if option configuration failed, 0 otherwise
+ *
+ * @author Shane Alcock
+ */
 int trace_output_config(struct libtrace_out_t *libtrace, char *options) {
 	char *opt_string = 0;
 	char *opt_argv[MAXOPTS];
