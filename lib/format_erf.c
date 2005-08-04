@@ -63,7 +63,9 @@
 
 #define CONNINFO libtrace->format_data->conn_info
 #define INPUT libtrace->format_data->input
+#define OUTPUT libtrace->format_data->output
 #define DAG libtrace->format_data->dag
+#define OPTIONS libtrace->format_data->options
 struct libtrace_format_data_t {
 	union {
 		/** Information about rtclients */
@@ -274,8 +276,8 @@ static int erf_init_output(struct libtrace_out_t *libtrace) {
 	libtrace->format_data = (struct libtrace_format_data_out_t *)
 		calloc(1,sizeof(struct libtrace_format_data_out_t));
 
-	libtrace->format_data->options.erf.level = 1;
-	asprintf(&filemode,"wb%d",libtrace->format_data->options.erf.level);
+	OPTIONS.erf.level = 1;
+	asprintf(&filemode,"wb%d",OPTIONS.erf.level);
 
         if (!strncmp(libtrace->uridata,"-",1)) {
                 // STDOUT
@@ -313,36 +315,36 @@ static int rtclient_init_output(struct libtrace_out_t *libtrace) {
 		calloc(1,sizeof(struct libtrace_format_data_out_t));
 	// extract conn_info from uridata
 	if (strlen(uridata) == 0) {
-		libtrace->conn_info.rt.hostname = NULL;
-		libtrace->conn_info.rt.port = COLLECTOR_PORT;
+		CONNINFO.rt.hostname = NULL;
+		CONNINFO.rt.port = COLLECTOR_PORT;
 	}
 	else {
 		if ((scan = strchr(uridata,':')) == NULL) {
-                        libtrace->conn_info.rt.hostname =
+                        CONNINFO.rt.hostname =
                                 NULL;
-                        libtrace->conn_info.rt.port =
+                        CONNINFO.rt.port =
                                 atoi(uridata);
                 } else {
-                        libtrace->format_data->conn_info.rt.hostname =
+                        CONNINFO.rt.hostname =
                                 (char *)strndup(uridata,
                                                 (scan - uridata));
-                        libtrace->format_data->conn_info.rt.port =
+                        CONNINFO.rt.port =
                                 atoi(++scan);
                 }
         }
 	
 	
-	libtrace->format_data->output.rtserver = 
-		rtserver_create(libtrace->format_data->conn_info.rt.hostname,
-				libtrace->format_data->conn_info.rt.port);
-	if (!libtrace->format_data->output.rtserver)
+	OUTPUT.rtserver = 
+		rtserver_create(CONNINFO.rt.hostname,
+				CONNINFO.rt.port);
+	if (!OUTPUT.rtserver)
 		return 0;
 	
 }
 
 static int erf_config_output(struct libtrace_out_t *libtrace, int argc, char *argv[]) {
 	int opt;
-	int level = libtrace->format_data->options.erf.level;
+	int level = OPTIONS.erf.level;
 	optind = 1;
 
 	while ((opt = getopt(argc, argv, "z:")) != EOF) {
@@ -356,13 +358,13 @@ static int erf_config_output(struct libtrace_out_t *libtrace, int argc, char *ar
 				return -1;
 		}
 	}
-	if (level != libtrace->format_data->options.erf.level) {
+	if (level != OPTIONS.erf.level) {
 		if (level > 9 || level < 0) {
 			// retarded level choice
 			printf("Compression level must be between 0 and 9 inclusive - you selected %i \n", level);
 			
 		} else {
-			libtrace->format_data->options.erf.level = level;
+			OPTIONS.erf.level = level;
 			return gzsetparams(libtrace->format_data->output.file, level, Z_DEFAULT_STRATEGY);
 		}
 	}
@@ -532,13 +534,15 @@ static int rtclient_read(struct libtrace_t *libtrace, void *buffer, size_t len) 
 }
 
 static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
-	int numbytes;
-	int size;
+	int numbytes = 0;
+	int size = 0;
 	char buf[RP_BUFSIZE];
-	dag_record_t *erfptr;
+	dag_record_t *erfptr = 0;
 	int read_required = 0;
 	
 	void *buffer = 0;
+
+	packet->trace = libtrace;
 	buffer = packet->buffer;
 
 	do {
@@ -547,7 +551,6 @@ static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_pac
 					libtrace,buf,RP_BUFSIZE))<=0) {
 				return numbytes;
 			}
-			assert(libtrace->fifo);
 			fifo_write(libtrace->fifo,buf,numbytes);
 			read_required = 0;
 		}
@@ -567,7 +570,7 @@ static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_pac
 			continue;
 		}
 		size = ntohs(((dag_record_t *)buffer)->rlen);
-
+		
 		// read in the full packet
 		if ((numbytes = fifo_out_read(libtrace->fifo, 
 						buffer, size)) == 0) {
@@ -665,7 +668,6 @@ static void *erf_get_link(const struct libtrace_packet_t *packet) {
 static libtrace_linktype_t erf_get_link_type(const struct libtrace_packet_t *packet) {
 	dag_record_t *erfptr = 0;
 	erfptr = (dag_record_t *)packet->buffer;
-	printf("%d\n",erfptr->type);
 	switch (erfptr->type) {
 		case TYPE_ETH: return TRACE_TYPE_ETH;
 		case TYPE_ATM: return TRACE_TYPE_ATM;
