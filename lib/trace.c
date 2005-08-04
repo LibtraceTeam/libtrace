@@ -161,7 +161,7 @@ int format_size = 0;
 int nformats = 0;
 
 void register_format(struct libtrace_format_t *f) {
-	fprintf(stderr,"Registering input format %s\n",f->name);
+//	fprintf(stderr,"Registering input format %s\n",f->name);
 	if (format_list == 0) {
 		format_size = 10;
 		format_list = malloc(sizeof(struct libtrace_format_t *) * format_size);
