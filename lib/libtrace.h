@@ -236,6 +236,12 @@ struct libtrace_t *trace_create(char *uri);
  */
 struct libtrace_out_t *trace_output_create(char *uri);
 
+/** Configures a trace output file as specified by an option string in getopt() format 
+ *
+ * @param libtrace	the output trace file to be configured
+ * @param options	the string containing the configuration options
+ * @returns -1 if configuration fails, 0 if successful
+ */
 int trace_output_config(struct libtrace_out_t *libtrace, char *options);
 
 /** Close a trace file, freeing up any resources it may have been using
