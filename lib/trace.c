@@ -216,7 +216,8 @@ void trace_perror(char *caller) {
 			fprintf(stderr, "%s: A uri must contain at least one colon e.g. format:destination\n", caller);
 			break;
 		default:
-			
+			fprintf(stderr, "Unkown errcode %d\n",trace_err.err_num);
+			break;	
 	}
 	trace_err.err_num = E_NOERROR;
 }
