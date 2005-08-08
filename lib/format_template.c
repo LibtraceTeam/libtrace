@@ -30,6 +30,7 @@
 
 #include "libtrace.h"
 #include "libtrace_int.h"
+#include "format_helper.h"
 #include <inttypes.h>
 
 struct libtrace_format_data_t {
@@ -57,9 +58,6 @@ static int template_fin_output(struct libtrace_out_t *libtrace) {
 	return -1;
 }
 
-static int template_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
-	return -1;
-}
 static int template_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
 	return -1;
 }
@@ -109,6 +107,10 @@ static size_t template_set_capture_length(const struct libtrace_packet_t *packet
 	return -1;
 }
 
+static int template_get_fd(const struct libtrace_packet_t *packet) {
+	return -1;
+}
+
 static void template_help() {
 	return;
 }
@@ -120,7 +122,6 @@ static struct libtrace_format_t template = {
 	template_config_output,		/* config_output */
 	template_fin_input,		/* fin_input */
 	template_fin_output,		/* fin_output */
-	template_read,			/* read */
 	template_read_packet,		/* read_packet */
 	template_write_packet,		/* write_packet */
 	template_get_link,		/* get_link */
@@ -133,6 +134,8 @@ static struct libtrace_format_t template = {
 	template_get_capture_length,	/* get_capture_length */
 	template_get_wire_length,	/* get_wire_length */
 	template_set_capture_length,	/* set_capture_length */
+	template_get_fd,		/* get_fd */
+	trace_event_trace,		/* trace_event */
 	template_help			/* help */
 };
 

@@ -82,12 +82,12 @@ struct libtrace_event_t {
 		int size;
 	} packet;
 	double tdelta;
-	double trace_start_ts;
-	double real_start_ts;
+//	double trace_start_ts;
+//	double real_start_ts;
 	double trace_last_ts;
 
-	double last_ts;
-	double start_ts;
+//	double last_ts;
+//	double start_ts;
 };
 
 /** The information about traces that are open 
@@ -150,7 +150,7 @@ struct libtrace_format_t {
 	int (*config_output)(struct libtrace_out_t *libtrace, int argc, char *argv[]);
 	int (*fin_input)(struct libtrace_t *libtrace);
 	int (*fin_output)(struct libtrace_out_t *libtrace);
-	int (*read)(struct libtrace_t *libtrace, void *buffer, size_t len);
+//	int (*read)(struct libtrace_t *libtrace, void *buffer, size_t len);
 	int (*read_packet)(struct libtrace_t *libtrace, struct libtrace_packet_t *packet);
 	int (*write_packet)(struct libtrace_out_t *libtrace, struct libtrace_packet_t *packet);
 	void* (*get_link)(const struct libtrace_packet_t *packet);
@@ -163,6 +163,8 @@ struct libtrace_format_t {
 	int (*get_capture_length)(const struct libtrace_packet_t *packet);
 	int (*get_wire_length)(const struct libtrace_packet_t *packet);
 	size_t (*truncate_packet)(const struct libtrace_packet_t *packet,size_t size);
+	int (*get_fd)(struct libtrace_packet_t *packet);
+	struct libtrace_eventobj_t (*trace_event)(struct libtrace_t *trace, struct libtrace_packet_t *packet);	
 	void (*help)();
 };
 

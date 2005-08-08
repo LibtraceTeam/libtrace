@@ -112,28 +112,29 @@
 #  endif
 #endif
 
-#if HAVE_PCAP_H
-#  include <pcap.h>
-#  ifdef HAVE_PCAP_INT_H
-#    include <pcap-int.h>
-#  endif
-#endif 
+//#if HAVE_PCAP_H
+//#  include <pcap.h>
+//#  ifdef HAVE_PCAP_INT_H
+//#    include <pcap-int.h>
+//#  endif
+//#endif 
 
-#ifdef HAVE_ZLIB_H
-#  include <zlib.h>
-#endif
+//#ifdef HAVE_ZLIB_H
+//#  include <zlib.h>
+//#endif
 
 
-#include "wag.h"
+//#include "wag.h"
 
-#ifdef HAVE_DAG_API
-#  include "dagnew.h"
-#  include "dagapi.h"
-#else
-#  include "dagformat.h"
-#endif
+//#ifdef HAVE_DAG_API
+//#  include "dagnew.h"
+//#  include "dagapi.h"
+//#else
+//#  include "dagformat.h"
+//#endif
 
 #include "libtrace_int.h"
+#include "format_helper.h"
 //#include "format/format_list.h"
 #include <err.h>
 
@@ -976,105 +977,12 @@ struct libtrace_eventobj_t trace_event(struct libtrace_t *trace,
 	 * structure */
 	packet->trace = trace;
 
-	/* Is there a packet ready? */
-	switch (trace->sourcetype) {
-#if HAVE_PCAP
-		case INTERFACE:
-			{
-				int data;
-				// XXX FIXME
-				//event.fd = pcap_fileno(trace->input.pcap);
-				if(ioctl(event.fd,FIONREAD,&data)==-1){
-					perror("ioctl(FIONREAD)");
-				}
-				if (data>0) {
-					event.size = trace_read_packet(trace,packet);
-					event.type = TRACE_EVENT_PACKET;
-					return event;
-				}
-				event.type = TRACE_EVENT_IOWAIT;
-				return event;
-			}
-#endif
-		case SOCKET:
-		case DEVICE:
-		case RT:
-			{
-				int data;
-				// XXX FIXME
-				//event.fd = trace->input.fd;
-				if(ioctl(event.fd,FIONREAD,&data)==-1){
-					perror("ioctl(FIONREAD)");
-				}
-				if (data>0) {
-					event.size = trace_read_packet(trace,packet);
-					event.type = TRACE_EVENT_PACKET;
-					return event;
-				}
-				event.type = TRACE_EVENT_IOWAIT;
-				return event;
-			}
-		case STDIN:
-		case TRACE:
-			{
-				double ts;
-				double now;
-				struct timeval stv;
-				/* "Prime" the pump */
-				if (!trace->event.packet.buffer) {
-					trace->event.packet.buffer = malloc(4096);
-					trace->event.packet.size=
-						trace_read_packet(trace,packet);
-					event.size = trace->event.packet.size;
-					if (trace->event.packet.size > 0 ) {
-						memcpy(trace->event.packet.buffer,packet->buffer,trace->event.packet.size);
-					} else {
-						// return here, the test for event.size will sort out the error
-						event.type = TRACE_EVENT_PACKET;
-						return event;
-					}
-				}
-
-				ts=trace_get_seconds(packet);
-				if (trace->event.tdelta!=0) {
-					// Get the adjusted current time
-					gettimeofday(&stv, NULL);
-					now = stv.tv_sec + ((double)stv.tv_usec / 1000000.0);
-					now -= trace->event.tdelta; // adjust for trace delta
-					
-					
-					// if the trace timestamp is still in the future, 
-					// return a SLEEP event, otherwise fire the packet
-					if (ts > now) {
-						event.seconds = ts - trace->event.trace_last_ts;
-						event.type = TRACE_EVENT_SLEEP;
-						return event;
-					}
-				} else {
-					gettimeofday(&stv, NULL);
-					// work out the difference between the start of trace replay,
-					// and the first packet in the trace
-					trace->event.tdelta = stv.tv_sec + ((double)stv.tv_usec / 1000000.0);
-					trace->event.tdelta -= ts;
-
-				}
-				
-					// This is the first packet, so just fire away.
-				packet->size = trace->event.packet.size;
-				memcpy(packet->buffer,trace->event.packet.buffer,trace->event.packet.size);
-
-				free(trace->event.packet.buffer);
-				trace->event.packet.buffer = 0;
-				event.type = TRACE_EVENT_PACKET;
-				
-				trace->event.trace_last_ts = ts;
-
-				return event;
-			}
-		default:
-			assert(0);
+	if (packet->trace->format->trace_event) {
+		return packet->trace->format->trace_event(trace,packet);
+	} else {
+		return event;
 	}
-	assert(0);
+
 }
 
 /** setup a BPF filter

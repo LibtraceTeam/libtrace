@@ -32,6 +32,7 @@
 #include "config.h"
 #include "libtrace.h"
 #include "libtrace_int.h"
+#include "format_helper.h"
 #include <inttypes.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -56,6 +57,9 @@
 
 #if HAVE_PCAP
 
+#define CONNINFO libtrace->format_data->conn_info
+#define INPUT libtrace->format_data->input
+
 struct libtrace_format_data_t {
 	union {
                 char *path;		/**< information for local sockets */
@@ -75,22 +79,24 @@ static int pcap_init_input(struct libtrace_t *libtrace) {
 	struct stat buf;
 	libtrace->format_data = (struct libtrace_format_data_t *) 
 		malloc(sizeof(struct libtrace_format_data_t));
-	libtrace->format_data->conn_info.path = libtrace->uridata;
-	if (!strncmp(libtrace->format_data->conn_info.path,"-",1)) {
-		if ((libtrace->format_data->input.pcap = 
-			pcap_open_offline(libtrace->format_data->conn_info.path,
+	CONNINFO.path = libtrace->uridata;
+
+	libtrace->sourcetype = TRACE;
+	if (!strncmp(CONNINFO.path,"-",1)) {
+		if ((INPUT.pcap = 
+			pcap_open_offline(CONNINFO.path,
 						errbuf)) == NULL) {
 			fprintf(stderr,"%s\n",errbuf);
 			return 0;
 		}		
 	} else {
-		if (stat(libtrace->format_data->conn_info.path,&buf) == -1) {
+		if (stat(CONNINFO.path,&buf) == -1) {
 			perror("stat");
 			return 0;
 		}
 		if (S_ISCHR(buf.st_mode)) {
-			if ((libtrace->format_data->input.pcap = 
-				pcap_open_live(libtrace->format_data->conn_info.path,
+			if ((INPUT.pcap = 
+				pcap_open_live(CONNINFO.path,
 					4096,
 					1,
 					1,
@@ -99,8 +105,8 @@ static int pcap_init_input(struct libtrace_t *libtrace) {
 				return 0;
 			}
 		} else { 
-			if ((libtrace->format_data->input.pcap = 
-				pcap_open_offline(libtrace->format_data->conn_info.path,
+			if ((INPUT.pcap = 
+				pcap_open_offline(CONNINFO.path,
 				       	errbuf)) == NULL) {
 				fprintf(stderr,"%s\n",errbuf);
 				return 0;
@@ -109,15 +115,19 @@ static int pcap_init_input(struct libtrace_t *libtrace) {
 	}
 	fprintf(stderr,
 			"Unsupported scheme (%s) for format pcap\n",
-			libtrace->format_data->conn_info.path);
+			CONNINFO.path);
 	return 0;
 	
 }
 
 static int pcapint_init_input(struct libtrace_t *libtrace) {
 	char errbuf[PCAP_ERRBUF_SIZE];
-	if ((libtrace->format_data->input.pcap = 
-			pcap_open_live(libtrace->format_data->conn_info.path,
+	libtrace->format_data = (struct libtrace_format_data_t *) 
+		malloc(sizeof(struct libtrace_format_data_t));
+	CONNINFO.path = libtrace->uridata;
+	libtrace->sourcetype = INTERFACE;
+	if ((INPUT.pcap = 
+			pcap_open_live(CONNINFO.path,
 			4096,
 			1,
 			1,
@@ -148,7 +158,7 @@ static int pcap_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_
 	const u_char *pcappkt;
 	int pcapbytes = 0;
 
-	while ((pcapbytes = pcap_dispatch(libtrace->format_data->input.pcap,
+	while ((pcapbytes = pcap_dispatch(INPUT.pcap,
 					1, /* number of packets */
 					&trace_pcap_handler,
 					(u_char *)packet)) == 0);
@@ -273,6 +283,10 @@ static size_t pcap_set_capture_length(struct libtrace_packet_t *packet,size_t si
 	return packet->size;
 }
 
+static int pcap_get_fd(struct libtrace_packet_t *packet) {
+	return pcap_fileno(packet->trace->format_data->input.pcap);
+}
+
 static void pcap_help() {
 	printf("pcap format module: $Revision$\n");
 	printf("Supported input URIs:\n");
@@ -306,7 +320,6 @@ static struct libtrace_format_t pcap = {
 	NULL,				/* config_output */
 	pcap_fin_input,			/* fin_input */
 	NULL,				/* fin_output */
-	NULL,				/* read */
 	pcap_read_packet,		/* read_packet */
 	NULL,				/* write_packet */
 	pcap_get_link,			/* get_link */
@@ -319,6 +332,8 @@ static struct libtrace_format_t pcap = {
 	pcap_get_capture_length,	/* get_capture_length */
 	pcap_get_wire_length,		/* get_wire_length */
 	pcap_set_capture_length,	/* set_capture_length */
+	NULL,				/* get_fd */
+	trace_event_trace,		/* trace_event */
 	pcap_help			/* help */
 };
 
@@ -330,7 +345,6 @@ static struct libtrace_format_t pcapint = {
 	NULL,				/* config_output */
 	pcap_fin_input,			/* fin_input */
 	NULL,				/* fin_output */
-	NULL,				/* read */
 	pcap_read_packet,		/* read_packet */
 	NULL,				/* write_packet */
 	pcap_get_link,			/* get_link */
@@ -343,6 +357,8 @@ static struct libtrace_format_t pcapint = {
 	pcap_get_capture_length,	/* get_capture_length */
 	pcap_get_wire_length,		/* get_wire_length */
 	pcap_set_capture_length,	/* set_capture_length */
+	pcap_get_fd,			/* get_fd */
+	trace_event_device,		/* trace_event */
 	pcapint_help			/* help */
 };
 

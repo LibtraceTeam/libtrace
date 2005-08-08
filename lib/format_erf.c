@@ -30,6 +30,7 @@
 
 #include "libtrace.h"
 #include "libtrace_int.h"
+#include "format_helper.h"
 #include "rtserver.h"
 #include "parse_cmd.h"
 
@@ -135,6 +136,7 @@ static int dag_init_input(struct libtrace_t *libtrace) {
 	} 
 	if (S_ISCHR(buf.st_mode)) {
 		// DEVICE
+		libtrace->sourcetype = DEVICE;
 		if((INPUT.fd = 
 				dag_open(CONNINFO.path)) < 0) {
 			fprintf(stderr,"Cannot open DAG %s: %m\n", 
@@ -171,6 +173,7 @@ static int erf_init_input(struct libtrace_t *libtrace) {
 	CONNINFO.path = libtrace->uridata;
 	if (!strncmp(CONNINFO.path,"-",1)) {
 		// STDIN
+		libtrace->sourcetype = STDIN;
 #if HAVE_ZLIB
 		INPUT.file = gzdopen(STDIN, "r");
 #else	
@@ -183,7 +186,7 @@ static int erf_init_input(struct libtrace_t *libtrace) {
 			return 0;
 		}
 		if (S_ISSOCK(buf.st_mode)) {
-			// SOCKET
+			libtrace->sourcetype = SOCKET;
 			if ((INPUT.fd = socket(
 					AF_UNIX, SOCK_STREAM, 0)) == -1) {
 				perror("socket");
@@ -202,7 +205,7 @@ static int erf_init_input(struct libtrace_t *libtrace) {
 				return 0;
 			}
 		} else { 
-			// TRACE
+			libtrace->sourcetype = TRACE;
 #if HAVE_ZLIB
 			// using gzdopen means we can set O_LARGEFILE
 			// ourselves. However, this way is messy and 
@@ -229,6 +232,8 @@ static int rtclient_init_input(struct libtrace_t *libtrace) {
 	struct sockaddr_in remote;
 	libtrace->format_data = (struct libtrace_format_data_t *)
 		malloc(sizeof(struct libtrace_format_data_t));
+
+	libtrace->sourcetype = RT;
 
 	if (strlen(uridata) == 0) {
 		CONNINFO.rt.hostname = 
@@ -732,6 +737,14 @@ static size_t erf_set_capture_length(struct libtrace_packet_t *packet, size_t si
 	return packet->size;
 }
 
+static int rtclient_get_fd(struct libtrace_packet_t *packet) {
+	return packet->trace->format_data->input.fd;
+}
+
+static int erf_get_fd(struct libtrace_packet_t *packet) {
+	return packet->trace->format_data->input.fd;
+}
+
 static void dag_help() {
 	printf("dag format module: $Revision$\n");
 	printf("Supported input URIs:\n");
@@ -798,7 +811,6 @@ static struct libtrace_format_t erf = {
 	erf_config_output,		/* config_output */
 	erf_fin_input,			/* fin_input */
 	erf_fin_output,			/* fin_output */
-	NULL,				/* read */
 	erf_read_packet,		/* read_packet */
 	erf_write_packet,		/* write_packet */
 	erf_get_link,			/* get_link */
@@ -811,6 +823,8 @@ static struct libtrace_format_t erf = {
 	erf_get_capture_length,		/* get_capture_length */
 	erf_get_wire_length,		/* get_wire_length */
 	erf_set_capture_length,		/* set_capture_length */
+	erf_get_fd,			/* get_fd */
+	trace_event_trace,		/* trace_event */
 	erf_help			/* help */
 };
 
@@ -823,7 +837,6 @@ static struct libtrace_format_t dag = {
 	NULL,				/* config_output */
 	dag_fin_input,			/* fin_input */
 	NULL,				/* fin_output */
-	dag_read,			/* read */
 	dag_read_packet,		/* read_packet */
 	NULL,				/* write_packet */
 	erf_get_link,			/* get_link */
@@ -836,6 +849,8 @@ static struct libtrace_format_t dag = {
 	erf_get_capture_length,		/* get_capture_length */
 	erf_get_wire_length,		/* get_wire_length */
 	erf_set_capture_length,		/* set_capture_length */
+	NULL,				/* get_fd */
+	trace_event_trace,		/* trace_event */
 	dag_help			/* help */
 };
 #endif
@@ -848,7 +863,6 @@ static struct libtrace_format_t rtclient = {
 	rtclient_config_output,		/* config_output */
 	rtclient_fin_input,		/* fin_input */
 	rtclient_fin_output,		/* fin_output */
-	rtclient_read,			/* read */
 	rtclient_read_packet,		/* read_packet */
 	rtclient_write_packet,		/* write_packet */
 	erf_get_link,			/* get_link */
@@ -861,6 +875,8 @@ static struct libtrace_format_t rtclient = {
 	erf_get_capture_length,		/* get_capture_length */
 	erf_get_wire_length,		/* get_wire_length */
 	erf_set_capture_length,		/* set_capture_length */
+	rtclient_get_fd,		/* get_fd */
+	trace_event_device,		/* trace_event */
 	rtclient_help			/* help */
 };
 
