@@ -273,7 +273,8 @@ struct libtrace_t *trace_create(char *uri) {
                 return 0;
         }
 
-        if ((*uridata - *uri) > URI_PROTO_LINE) {
+
+        if ((uridata - uri) > URI_PROTO_LINE) {
                 // badly formed URI - uri type is too long
 		trace_err.err_num = E_URI_LONG;
                 return 0;
@@ -346,7 +347,7 @@ struct libtrace_out_t *trace_output_create(char *uri) {
                 return 0;
         }
 
-        if ((*uridata - *uri) > URI_PROTO_LINE) {
+        if ((uridata - uri) > URI_PROTO_LINE) {
                 // badly formed URI - uri type is too long
 		trace_err.err_num = E_URI_LONG;
                 return 0;
