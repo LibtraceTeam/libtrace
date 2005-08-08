@@ -30,6 +30,7 @@
 
 #include "libtrace.h"
 #include "libtrace_int.h"
+#include "config.h"
 
 #ifdef HAVE_INTTYPES_H
 #  include <inttypes.h>

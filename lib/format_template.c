@@ -31,6 +31,8 @@
 #include "libtrace.h"
 #include "libtrace_int.h"
 #include "format_helper.h"
+#include "config.h"
+
 #include <inttypes.h>
 
 struct libtrace_format_data_t {

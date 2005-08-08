@@ -28,6 +28,7 @@
  *
  */
 
+#include "config.h"
 #include "libtrace.h"
 #include "libtrace_int.h"
 #include "format_helper.h"

@@ -32,6 +32,7 @@
 #include "libtrace_int.h"
 #include "format_helper.h"
 #include "wag.h"
+#include "config.h"
 
 #ifdef HAVE_INTTYPES_H
 #  include <inttypes.h>
