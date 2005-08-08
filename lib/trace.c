@@ -156,6 +156,14 @@ struct libtrace_filter_t {
 };
 #endif
 
+// Error codes
+enum {E_NOERROR, E_BAD_FORMAT, E_NO_INIT, E_NO_INIT_OUT, E_URI_LONG, E_URI_NOCOLON };
+
+static struct {
+	int err_num; 	// error code
+	char *problem;	// the format, uri etc that caused the error for reporting purposes
+} trace_err;
+
 struct libtrace_format_t **format_list = 0;
 int format_size = 0;
 int nformats = 0;
@@ -189,9 +197,32 @@ void trace_help() {
 	}
 }
 
+void trace_perror(char *caller) {
+	switch (trace_err.err_num) {
+		case E_BAD_FORMAT:
+			fprintf(stderr, "%s: No support for format (%s)\n", caller, trace_err.problem);
+			break;
+		case E_NO_INIT:
+			fprintf(stderr, "%s: Format (%s) does not have an init_trace function defined\n", caller, trace_err.problem);
+			break;
+		case E_NO_INIT_OUT:
+			fprintf(stderr, "%s: Format (%s) does not have an init_output function defined\n", caller, trace_err.problem);
+			break;
+		case E_URI_LONG:
+			fprintf(stderr, "%s: uri is too long\n", caller);
+			break;
+		case E_URI_NOCOLON:
+			fprintf(stderr, "%s: A uri must contain at least one colon e.g. format:destination\n", caller);
+			break;
+		default:
+			
+	}
+	trace_err.err_num = E_NOERROR;
+}
 
 #define RP_BUFSIZE 65536
 #define URI_PROTO_LINE 16
+
 
 
 /** Create a trace file from a URI
@@ -227,18 +258,23 @@ struct libtrace_t *trace_create(char *uri) {
         char *uridata = 0;                  
 	int i = 0;
 	struct stat buf;
+	
+	trace_err.err_num = E_NOERROR;
         
+	
         // parse the URI to determine what sort of event we are dealing with
        
         // want snippet before the : to get the uri base type.
 
         if((uridata = strchr(uri,':')) == NULL) {
                 // badly formed URI - needs a :
+		trace_err.err_num = E_URI_NOCOLON;
                 return 0;
         }
 
         if ((*uridata - *uri) > URI_PROTO_LINE) {
                 // badly formed URI - uri type is too long
+		trace_err.err_num = E_URI_LONG;
                 return 0;
         }
         strncpy(scan,uri, (uridata - uri));
@@ -257,8 +293,8 @@ struct libtrace_t *trace_create(char *uri) {
 				}
 	}
 	if (libtrace->format == 0) {
-		fprintf(stderr,
-			"libtrace has no support for this format (%s)\n",scan);
+		trace_err.err_num = E_BAD_FORMAT;
+		trace_err.problem = scan;
 		return 0;
 	}
 
@@ -272,8 +308,8 @@ struct libtrace_t *trace_create(char *uri) {
 	if (libtrace->format->init_input) {
 		libtrace->format->init_input( libtrace);
 	} else {
-		fprintf(stderr,
-			"No init function for format %s\n",scan);
+		trace_err.err_num = E_NO_INIT;
+		trace_err.problem = scan;
 		return 0;
 	}
 	
@@ -298,17 +334,20 @@ struct libtrace_out_t *trace_output_create(char *uri) {
         char *uridata = 0;
         int i;
 
+	trace_err.err_num = E_NOERROR;
         // parse the URI to determine what sort of event we are dealing with
 
         // want snippet before the : to get the uri base type.
 
         if((uridata = strchr(uri,':')) == NULL) {
                 // badly formed URI - needs a :
+		trace_err.err_num = E_URI_NOCOLON;
                 return 0;
         }
 
         if ((*uridata - *uri) > URI_PROTO_LINE) {
                 // badly formed URI - uri type is too long
+		trace_err.err_num = E_URI_LONG;
                 return 0;
         }
 
@@ -325,8 +364,8 @@ struct libtrace_out_t *trace_output_create(char *uri) {
                                 }
         }
         if (libtrace->format == 0) {
-                fprintf(stderr,
-                        "libtrace has no support for this format (%s)\n",scan);
+		trace_err.err_num = E_BAD_FORMAT;
+		trace_err.problem = scan;	
                 return 0;
         }
 
@@ -341,8 +380,8 @@ struct libtrace_out_t *trace_output_create(char *uri) {
         if (libtrace->format->init_output) {
                 libtrace->format->init_output( libtrace);
 	} else {
-                fprintf(stderr,
-                        "No init_output function for format %s\n",scan);
+		trace_err.err_num = E_NO_INIT_OUT;
+		trace_err.problem = scan;
                 return 0;
         }
 
@@ -388,7 +427,8 @@ void trace_destroy(struct libtrace_t *libtrace) {
         assert(libtrace);
 	libtrace->format->fin_input(libtrace);
         // need to free things!
-        destroy_fifo(libtrace->fifo);
+        free(libtrace->uridata);
+	destroy_fifo(libtrace->fifo);
         free(libtrace);
 }
 
@@ -401,6 +441,7 @@ void trace_destroy(struct libtrace_t *libtrace) {
 void trace_output_destroy(struct libtrace_out_t *libtrace) {
 	assert(libtrace);
 	libtrace->format->fin_output(libtrace);
+	free(libtrace->uridata);
 	destroy_fifo(libtrace->fifo);
 	free(libtrace);
 }

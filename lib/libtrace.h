@@ -74,6 +74,7 @@ extern "C" {
 
 #define COLLECTOR_PORT 3435
 
+	
 /** Opaque structure holding information about an output trace */
 struct libtrace_out_t;
 	
@@ -193,6 +194,7 @@ struct libtrace_icmp
  */
 void trace_help();
 
+void trace_perror();
 
 /** Create a trace file from a URI
  * 
