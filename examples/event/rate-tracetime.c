@@ -112,7 +112,8 @@ int main(int argc, char *argv[]) {
         trace = trace_create(uri);
 
 	if(!trace) {
-		fprintf(stderr,"Bad trace, check your input uri (%s)\n",uri);
+		trace_perror("trace_create");
+		//fprintf(stderr,"Bad trace, check your input uri (%s)\n",uri);
 		exit(0);
 	}
 
