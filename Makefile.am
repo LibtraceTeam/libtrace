@@ -15,6 +15,9 @@ dist-hook:
 	for i in `\ls examples | grep -v CVS`; do make -C examples/$$i clean; done
 	rm -rf `find $(distdir)/examples -name CVS`
 
+docs/man/man3/[a-zA-Z]*.3:
+	doxygen libtrace.doxygen
+
 docs:
 	doxygen libtrace.doxygen
 
