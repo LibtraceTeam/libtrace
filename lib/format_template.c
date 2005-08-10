@@ -33,7 +33,11 @@
 #include "format_helper.h"
 #include "config.h"
 
-#include <inttypes.h>
+#ifdef HAVE_INTTYPES_H
+#  include <inttypes.h>
+#else
+# error "Can't find inttypes.h"
+#endif 
 
 struct libtrace_format_data_t {
 	int fd;

@@ -138,14 +138,12 @@ static int dag_init_input(struct libtrace_t *libtrace) {
 	if (S_ISCHR(buf.st_mode)) {
 		// DEVICE
 		libtrace->sourcetype = DEVICE;
-		if((INPUT.fd = 
-				dag_open(CONNINFO.path)) < 0) {
+		if((INPUT.fd = dag_open(CONNINFO.path)) < 0) {
 			fprintf(stderr,"Cannot open DAG %s: %m\n", 
 					CONNINFO.path,errno);
 			exit(0);
 		}
-		if((DAG.buf = (void *)
-				dag_mmap(INPUT.fd)) == MAP_FAILED) {
+		if((DAG.buf = (void *)dag_mmap(INPUT.fd)) == MAP_FAILED) {
 			fprintf(stderr,"Cannot mmap DAG %s: %m\n", 
 					CONNINFO.path,errno);
 			exit(0);
@@ -160,6 +158,7 @@ static int dag_init_input(struct libtrace_t *libtrace) {
 				CONNINFO.path);
 		return 0;
 	}
+	return 1;
 }
 #endif
 
@@ -224,6 +223,7 @@ static int erf_init_input(struct libtrace_t *libtrace) {
 
 		}
 	}
+	return 1;
 }
 
 static int rtclient_init_input(struct libtrace_t *libtrace) {
@@ -275,6 +275,7 @@ static int rtclient_init_input(struct libtrace_t *libtrace) {
 		perror("connect (inet)");
 		return 0;
 	}
+	return 1;
 }
 
 static int erf_init_output(struct libtrace_out_t *libtrace) {
@@ -311,7 +312,7 @@ static int erf_init_output(struct libtrace_out_t *libtrace) {
 #endif
 	}
 	
-
+	return 1;
 }
 
 static int rtclient_init_output(struct libtrace_out_t *libtrace) {
@@ -345,7 +346,8 @@ static int rtclient_init_output(struct libtrace_out_t *libtrace) {
 				CONNINFO.rt.port);
 	if (!OUTPUT.rtserver)
 		return 0;
-	
+
+	return 1;
 }
 
 static int erf_config_output(struct libtrace_out_t *libtrace, int argc, char *argv[]) {

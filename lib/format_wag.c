@@ -46,6 +46,8 @@
 # error "Can't find stddef.h - do you define ptrdiff_t elsewhere?"
 #endif
 #include <sys/types.h>
+#include <sys/time.h>
+#include <time.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/mman.h>
@@ -144,6 +146,7 @@ static int wag_init_input(struct libtrace_t *libtrace) {
 
 		}
 	}
+	return 1;
 }
 
 static int wag_fin_input(struct libtrace_t *libtrace) {
@@ -238,7 +241,7 @@ static int wag_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 		size = ntohs(((struct wag_frame_hdr *)buffer)->size);
 
 		// wag isn't in network byte order yet
-		size = htons(size);
+		//size = htons(size);
 		//printf("%d %d\n",size,htons(size));
 
 		// read in full packet
@@ -279,7 +282,7 @@ static uint64_t wag_get_erf_timestamp(const struct libtrace_packet_t *packet) {
 	struct wag_data_frame *wagptr = (struct wag_data_frame *)packet->buffer;
 	uint64_t timestamp = 0;
 	timestamp = wagptr->ts.subsecs;
-	timestamp |= (uint64_t)wagptr->ts.secs<<32;
+	//timestamp |= (uint64_t)wagptr->ts.secs<<32;
 	timestamp = ((timestamp%44000000)*(UINT_MAX/44000000)) 
 		| ((timestamp/44000000)<<32);
 	return timestamp;
@@ -287,14 +290,14 @@ static uint64_t wag_get_erf_timestamp(const struct libtrace_packet_t *packet) {
 
 static int wag_get_capture_length(const struct libtrace_packet_t *packet) {
 	struct wag_data_frame *wagptr = (struct wag_data_frame *)packet->buffer;
-	return (wagptr->hdr.size);
-	//return ntohs(wagptr->hdr.size);
+	//return (wagptr->hdr.size);
+	return ntohs(wagptr->hdr.size);
 }
 
 static int wag_get_wire_length(const struct libtrace_packet_t *packet) {
 	struct wag_data_frame *wagptr = (struct wag_data_frame *)packet->buffer;
-	return (wagptr->hdr.size);
-	//return ntohs(wagptr->hdr.size);
+	//return (wagptr->hdr.size);
+	return ntohs(wagptr->hdr.size);
 }
 
 static int wag_get_fd(const struct libtrace_packet_t *packet) {
@@ -339,7 +342,7 @@ static struct libtrace_format_t wag = {
 	wag_get_link_type,		/* get_link_type */
 	wag_get_direction,		/* get_direction */
 	NULL,				/* set_direction */
-	wag_get_erf_timestamp,		/* get_wag_timestamp */
+	wag_get_erf_timestamp,		/* get_erf_timestamp */
 	NULL,				/* get_timeval */
 	NULL,				/* get_seconds */
 	wag_get_capture_length,		/* get_capture_length */

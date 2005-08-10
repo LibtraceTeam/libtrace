@@ -112,39 +112,12 @@
 #  endif
 #endif
 
-//#if HAVE_PCAP_H
-//#  include <pcap.h>
-//#  ifdef HAVE_PCAP_INT_H
-//#    include <pcap-int.h>
-//#  endif
-//#endif 
-
-//#ifdef HAVE_ZLIB_H
-//#  include <zlib.h>
-//#endif
-
-
-//#include "wag.h"
-
-//#ifdef HAVE_DAG_API
-//#  include "dagnew.h"
-//#  include "dagapi.h"
-//#else
-//#  include "dagformat.h"
-//#endif
-
 #include "libtrace_int.h"
 #include "format_helper.h"
-//#include "format/format_list.h"
 #include <err.h>
 
 #define MAXOPTS 1024
 
-//typedef enum {SOCKET, TRACE, STDIN, DEVICE, INTERFACE, RT } source_t;
-
-//typedef enum {ERF, PCAP, PCAPINT, DAG, RTCLIENT, WAG, WAGINT } format_e_t;
-
-//typedef enum {RTSERVER, GZERF } output_t;
 #if HAVE_BPF
 /** A type encapsulating a bpf filter
  * This type covers the compiled bpf filter, as well as the original filter
@@ -157,13 +130,7 @@ struct libtrace_filter_t {
 };
 #endif
 
-// Error codes
-enum {E_NOERROR, E_BAD_FORMAT, E_NO_INIT, E_NO_INIT_OUT, E_URI_LONG, E_URI_NOCOLON };
 
-static struct {
-	int err_num; 	// error code
-	char *problem;	// the format, uri etc that caused the error for reporting purposes
-} trace_err;
 
 struct libtrace_format_t **format_list = 0;
 int format_size = 0;
@@ -215,6 +182,9 @@ void trace_perror(char *caller) {
 		case E_URI_NOCOLON:
 			fprintf(stderr, "%s: A uri must contain at least one colon e.g. format:destination\n", caller);
 			break;
+		case E_INIT_FAILED:
+			fprintf(stderr, "%s: libtrace failed to initialise (%s)\n",caller,trace_err.problem);
+			
 		default:
 			fprintf(stderr, "Unkown errcode %d\n",trace_err.err_num);
 			break;	
@@ -309,7 +279,11 @@ struct libtrace_t *trace_create(char *uri) {
         // libtrace->uridata contains the appropriate data for this
         
 	if (libtrace->format->init_input) {
-		libtrace->format->init_input( libtrace);
+		if (!libtrace->format->init_input( libtrace)) {
+			trace_err.err_num = E_INIT_FAILED;
+			trace_err.problem = scan;
+			return 0;
+		}
 	} else {
 		trace_err.err_num = E_NO_INIT;
 		trace_err.problem = scan;
@@ -381,7 +355,9 @@ struct libtrace_out_t *trace_output_create(char *uri) {
         // libtrace->uridata contains the appropriate data for this
 
         if (libtrace->format->init_output) {
-                libtrace->format->init_output( libtrace);
+                if(!libtrace->format->init_output( libtrace)) {
+			return 0;
+		}
 	} else {
 		trace_err.err_num = E_NO_INIT_OUT;
 		trace_err.problem = scan;
@@ -459,7 +435,7 @@ void trace_output_destroy(struct libtrace_out_t *libtrace) {
 int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
 
 	if (!libtrace) {
-		fprintf(stderr,"Oi! You called trace_read_packet() with a NULL libtrace parameter!\n");
+		fprintf(stderr,"You called trace_read_packet() with a NULL libtrace parameter!\n");
 	}
         assert(libtrace);
         assert(packet);

@@ -35,7 +35,7 @@
 #include <netinet/in.h>
 
 /** API version as 3 byte hex digits */
-#define LIBTRACE_API_VERSION 0x010010
+#define LIBTRACE_API_VERSION 0x010014
 
 #ifdef __cplusplus 
 extern "C" { 
@@ -93,6 +93,9 @@ struct libtrace_packet_t {
 	size_t size;
 	uint8_t status;
 };
+
+/** Enumeration of error codes */
+enum {E_NOERROR, E_BAD_FORMAT, E_NO_INIT, E_NO_INIT_OUT, E_URI_LONG, E_URI_NOCOLON, E_INIT_FAILED };
 
 /** Structure for dealing with IP packets */
 struct libtrace_ip
@@ -194,7 +197,11 @@ struct libtrace_icmp
  */
 void trace_help();
 
-void trace_perror();
+/** Prints error information
+ *
+ * Prints out a descriptive error message for the currently set trace_err value
+ */
+void trace_perror(char *caller);
 
 /** Create a trace file from a URI
  * 

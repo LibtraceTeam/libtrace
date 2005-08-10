@@ -33,7 +33,13 @@
 #include "libtrace.h"
 #include "libtrace_int.h"
 #include "format_helper.h"
-#include <inttypes.h>
+
+#ifdef HAVE_INTTYPES_H
+#  include <inttypes.h>
+#else
+#  error "Can't find inttypes.h - this needs to be fixed"
+#endif 
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -113,10 +119,9 @@ static int pcap_init_input(struct libtrace_t *libtrace) {
 			}
 		}	
 	}
-	fprintf(stderr,
-			"Unsupported scheme (%s) for format pcap\n",
-			CONNINFO.path);
-	return 0;
+	//fprintf(stderr,	"Unsupported scheme (%s) for format pcap\n",
+	//		CONNINFO.path);
+	return 1;
 	
 }
 
@@ -135,7 +140,7 @@ static int pcapint_init_input(struct libtrace_t *libtrace) {
 		fprintf(stderr,"%s\n",errbuf);
 		return 0;
 	}
-
+	return 1;
 }
 
 static int pcap_fin_input(struct libtrace_t *libtrace) {
@@ -152,19 +157,19 @@ static void trace_pcap_handler(u_char *user, const struct pcap_pkthdr *pcaphdr, 
 	memcpy(buffer + sizeof(struct pcap_pkthdr),pcappkt,numbytes);
 
 	packet->size = numbytes + sizeof(struct pcap_pkthdr);
-
 }
+
 static int pcap_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
 	const u_char *pcappkt;
 	int pcapbytes = 0;
 
-	while ((pcapbytes = pcap_dispatch(INPUT.pcap,
+	pcapbytes = pcap_dispatch(INPUT.pcap,
 					1, /* number of packets */
 					&trace_pcap_handler,
-					(u_char *)packet)) == 0);
+					(u_char *)packet);
 
-	if (pcapbytes < 0) {
-		return -1;
+	if (pcapbytes <= 0) {
+		return pcapbytes;
 	}
 	return (packet->size - sizeof(struct pcap_pkthdr));
 }
