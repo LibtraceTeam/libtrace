@@ -76,8 +76,6 @@ int main(int argc, char *argv[]) {
 	if (filterstring) 
 		filter = trace_bpf_setfilter(filterstring);
 
-	trace_help();
-	exit(0);
         // open a trace
         trace = trace_create(uri);
 	
@@ -85,10 +83,13 @@ int main(int argc, char *argv[]) {
         for (;;) {
 		unsigned char *x;
 		int i;
-                if ((psize = trace_read_packet(trace, &packet)) <1) {
-			printf("Error or EOF in trace_read_packet\n");
+                if ((psize = trace_read_packet(trace, &packet)) <0) {
+			printf("Error in trace_read_packet\n");
                         break;
                 }
+		if (psize == 0) {
+			break;
+		}
 
 		if(filter && !trace_bpf_filter(filter,&packet)) {
 			continue;
