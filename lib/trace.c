@@ -186,7 +186,7 @@ void trace_perror(char *caller) {
 			fprintf(stderr, "%s: libtrace failed to initialise (%s)\n",caller,trace_err.problem);
 			
 		default:
-			fprintf(stderr, "Unkown errcode %d\n",trace_err.err_num);
+			fprintf(stderr, "Unknown errcode %d\n",trace_err.err_num);
 			break;	
 	}
 	trace_err.err_num = E_NOERROR;
@@ -195,7 +195,17 @@ void trace_perror(char *caller) {
 #define RP_BUFSIZE 65536
 #define URI_PROTO_LINE 16
 
+/** Gets the name of the output format for a given output trace. 
+ *
+ * @params libtrace	the output trace to get the name of the format for
+ * @returns the output format
+ *
+ */
+char *trace_get_output_format(struct libtrace_out_t *libtrace) {
+	char * format = libtrace->format->name;
 
+	return format;
+}
 
 /** Create a trace file from a URI
  * 
@@ -387,7 +397,6 @@ int trace_output_config(struct libtrace_out_t *libtrace, char *options) {
 	assert(libtrace);
 	
 	if (!options) {
-		printf("No options specified\n");
 		return 0;
 	}
 	

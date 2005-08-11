@@ -197,6 +197,11 @@ struct libtrace_icmp
  */
 void trace_help();
 
+/** Gets the output format for a given output trace
+ *
+ */
+char *trace_get_output_format(struct libtrace_out_t *libtrace);
+
 /** Prints error information
  *
  * Prints out a descriptive error message for the currently set trace_err value
