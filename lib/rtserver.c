@@ -89,7 +89,7 @@ int rtserver_checklisten (struct rtserver_t * rtserver) {
 	int sin_size = sizeof(struct sockaddr_in);
 	
         tv.tv_sec = 0;
-        tv.tv_usec = 10;
+        tv.tv_usec = 0;
 	
 	FD_ZERO(&current);
 	FD_SET(rtserver->connect_fd, &current);
@@ -127,7 +127,7 @@ int rtserver_sendclients (struct rtserver_t * rtserver, char * buffer, size_t le
 	struct timeval tv;
 	
 	tv.tv_sec = 0;
-	tv.tv_usec = 10;
+	tv.tv_usec = 0;
 	current = rtserver->rt_fds;
 
 	if (select(rtserver->max_rtfds + 1, NULL, &current, NULL, &tv) == -1 ) {
