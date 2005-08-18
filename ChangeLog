@@ -28,7 +28,10 @@
 ##
 ##
 
-- Version 2.0.19 (unreleased)
+- Version 2.0.20
+	* byte-ordering fixups for WAG
+
+- Version 2.0.19 
 	* Move code for different input formats (erf, pcap, wag) into
 	  separate modules, load and initialise on library load.
 	* Add support for primitive trace writing
