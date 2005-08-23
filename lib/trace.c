@@ -809,7 +809,7 @@ uint64_t trace_get_erf_timestamp(const struct libtrace_packet_t *packet) {
 struct timeval trace_get_timeval(const struct libtrace_packet_t *packet) {
         struct timeval tv;
 	uint64_t ts = 0;
-	double seconds = 0.0
+	double seconds = 0.0;
 	if (packet->trace->format->get_timeval) {
 		// timeval -> timeval
 		tv = packet->trace->format->get_timeval(packet);
