@@ -779,15 +779,23 @@ int trace_get_next_option(unsigned char **ptr,int *len,
  */ 
 uint64_t trace_get_erf_timestamp(const struct libtrace_packet_t *packet) {
 	uint64_t timestamp = 0;
+	double seconds = 0.0;
 	struct timeval ts;
 
 	if (packet->trace->format->get_erf_timestamp) {
+		// timestamp -> timestamp
 		timestamp = packet->trace->format->get_erf_timestamp(packet);
 	} else if (packet->trace->format->get_timeval) {
+		// timeval -> timestamp
 		ts = packet->trace->format->get_timeval(packet);
 		timestamp = ((((uint64_t)ts.tv_sec) << 32) + \
 				(((uint64_t)ts.tv_usec * UINT_MAX)/1000000));
-	} 
+	} else if (packet->trace->format->get_seconds) {
+		// seconds -> timestamp
+		seconds = packet->trace->format->get_seconds(packet);
+		timestamp = (((uint32_t)seconds) << 32) + \
+			    (( seconds - (uint32_t)seconds   ) * UINT_MAX);
+	}
 	return timestamp;
 }
 
@@ -801,10 +809,12 @@ uint64_t trace_get_erf_timestamp(const struct libtrace_packet_t *packet) {
 struct timeval trace_get_timeval(const struct libtrace_packet_t *packet) {
         struct timeval tv;
 	uint64_t ts = 0;
-
+	double seconds = 0.0
 	if (packet->trace->format->get_timeval) {
+		// timeval -> timeval
 		tv = packet->trace->format->get_timeval(packet);
 	} else if (packet->trace->format->get_erf_timestamp) {
+		// timestamp -> timeval
 		ts = packet->trace->format->get_erf_timestamp(packet);
 #if __BYTE_ORDER == __BIG_ENDIAN
 		tv.tv_sec = ts & 0xFFFFFFFF;
@@ -820,6 +830,11 @@ struct timeval trace_get_timeval(const struct libtrace_packet_t *packet) {
                		tv.tv_usec -= 1000000;
                		tv.tv_sec += 1;
        		}
+	} else if (packet->trace->format->get_seconds) {
+		// seconds -> timeval
+		seconds = packet->trace->format->get_seconds(packet);
+		tv.tv_sec = (uint32_t)seconds;
+		tv.tv_usec = (uint32_t)(((seconds - tv.tv_sec) * 1000000)/UINT_MAX);
 	}
 
         return tv;
@@ -833,13 +848,21 @@ struct timeval trace_get_timeval(const struct libtrace_packet_t *packet) {
 double trace_get_seconds(const struct libtrace_packet_t *packet) {
 	double seconds;
 	uint64_t ts;
+	struct timeval tv;
 	
 	if (packet->trace->format->get_seconds) {
+		// seconds->seconds
 		seconds = packet->trace->format->get_seconds(packet);
 	} else if (packet->trace->format->get_erf_timestamp) {
+		// timestamp -> seconds
 		ts = packet->trace->format->get_erf_timestamp(packet);
 		seconds =  (ts>>32) + ((ts & UINT_MAX)*1.0 / UINT_MAX);
-	} 
+	} else if (packet->trace->format->get_timeval) {
+		// timeval -> seconds
+		tv = packet->trace->format->get_timeval(packet);
+		seconds = tv.tv_sec + ((tv.tv_usec * UINT_MAX * 1.0)/1000000);
+	}
+
 	return seconds;
 }
 
