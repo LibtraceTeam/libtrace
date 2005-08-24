@@ -62,8 +62,13 @@
 #define O_LARGEFILE 0
 #endif
 
+static struct libtrace_format_t *wag_ptr = 0;
+
 #define CONNINFO libtrace->format_data->conn_info
 #define INPUT libtrace->format_data->input
+#define OUTPUT libtrace->format_data->output
+#define OPTIONS libtrace->format_data->options
+
 struct libtrace_format_data_t {
 	union {
 		/** Information about rtclients */
@@ -82,6 +87,25 @@ struct libtrace_format_data_t {
 		FILE *file;
 #endif
         } input;	
+};
+
+struct libtrace_format_data_out_t {
+	union {
+		char *path;
+	} conn_info;
+	union {
+		struct {
+			int level;
+		} zlib;
+	} options;
+	union {
+		int fd;
+#if HAVE_ZLIB
+		gzFile *file;
+#else
+		FILE *file;
+#endif
+	} output;
 };
 
 static int wag_init_input(struct libtrace_t *libtrace) {
@@ -149,11 +173,78 @@ static int wag_init_input(struct libtrace_t *libtrace) {
 	return 1;
 }
 
+static int wag_init_output(struct libtrace_out_t *libtrace) {
+	char *filemode = 0;
+	libtrace->format_data = (struct libtrace_format_data_out_t *)
+		calloc(1,sizeof(struct libtrace_format_data_out_t));
+
+	OPTIONS.zlib.level = 0;
+	asprintf(&filemode,"wb%d",OPTIONS.zlib.level);
+	if (!strncmp(libtrace->uridata,"-",1)) {
+		// STDOUT				
+#if HAVE_ZLIB
+		OUTPUT.file = gzdopen(dup(1), filemode);
+#else
+		OUTPUT.file = stdout;
+#endif
+	} else {
+		// TRACE
+#if HAVE_ZLIB
+		OUTPUT.file = gzdopen(open(
+					libtrace->uridata,
+					O_CREAT | O_LARGEFILE | O_WRONLY,
+					S_IRUSR | S_IWUSR), filemode);
+#else
+		OUTPUT.file = fdopen(open(
+					O_CREAT | O_LARGEFILE | O_WRONLY,
+					S_IRUSR | S_IWUSR), "w");
+#endif
+	}
+
+	return 1;
+}
+
+static int wag_config_output(struct libtrace_out_t *libtrace, int argc, char *argv[]) {
+#if HAVE_ZLIB
+	int opt;
+	int level = OPTIONS.zlib.level;
+	optind = 1;
+	while ((opt = getopt(argc, argv, "z:")) != EOF) {
+		switch (opt) {
+			case 'z':
+				level = atoi(optarg);
+				break;
+			default:
+				printf("Bad argument to wag: %s\n", opt);
+				return -1;
+		}
+	}
+	if (level != OPTIONS.zlib.level) {
+		if (level > 9 || level < 0) {
+			// retarded level choice
+			printf("Compression level must be between 0 and 9 inclusive - you selected %i \n", level);
+		} else {
+			OPTIONS.zlib.level = level;
+			return gzsetparams(OUTPUT.file, level, Z_DEFAULT_STRATEGY);
+		}
+	}
+#endif
+	return 0;
+}
+
 static int wag_fin_input(struct libtrace_t *libtrace) {
 #if HAVE_ZLIB
 	gzclose(INPUT.file);
 #else	
 	fclose(INPUT.file);	
+#endif
+}
+
+static int wag_fin_output(struct libtrace_out_t *libtrace) {
+#if HAVE_ZLIB
+	gzclose(OUTPUT.file);
+#else
+	fclose(OUTPUT.file);
 #endif
 }
 
@@ -260,6 +351,27 @@ static int wag_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 	} while(1);
 }
 
+static int wag_write_packet(struct libtrace_out_t *libtrace, struct libtrace_packet_t *packet) {
+	int numbytes =0 ;
+	if (packet->trace->format != wag_ptr) {
+		fprintf(stderr,"Cannot convert from wag to %s format yet\n",
+				packet->trace->format->name);
+		return -1;
+	}
+#if HAVE_ZLIB
+	if ((numbytes = gzwrite(OUTPUT.file, packet->buffer, packet->size)) == 0) {
+		perror("gzwrite");
+		return -1;
+	}
+#else
+	if ((numbytes = write(OUTPUT.file, packet->buffer, packet->size)) == 0) {
+		perror("write");
+		return -1;
+	}
+#endif
+	return numbytes;
+}
+
 static void *wag_get_link(const struct libtrace_packet_t *packet) {
 	struct wag_data_frame *wagptr = (struct wag_data_frame *)packet->buffer;
 	void *payload = wagptr->data;
@@ -332,12 +444,12 @@ static struct libtrace_format_t wag = {
 	"wag",
 	"$Id$",
 	wag_init_input,			/* init_input */	
-	NULL,				/* init_output */
-	NULL,				/* config_output */
+	wag_init_output,		/* init_output */
+	wag_config_output,		/* config_output */
 	wag_fin_input,			/* fin_input */
-	NULL,				/* fin_output */
+	wag_fin_output,			/* fin_output */
 	wag_read_packet,		/* read_packet */
-	NULL,				/* write_packet */
+	wag_write_packet,		/* write_packet */
 	wag_get_link,			/* get_link */
 	wag_get_link_type,		/* get_link_type */
 	wag_get_direction,		/* get_direction */
@@ -354,5 +466,6 @@ static struct libtrace_format_t wag = {
 };
 
 void __attribute__((constructor)) wag_constructor() {
-	register_format(&wag);
+	wag_ptr = &wag;
+	register_format(wag_ptr);
 }

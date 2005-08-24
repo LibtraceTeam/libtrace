@@ -63,9 +63,12 @@
 
 #if HAVE_PCAP
 
+static struct libtrace_format_t *pcap_ptr = 0;
+static struct libtrace_format_t *pcapint_ptr = 0;
+
 #define CONNINFO libtrace->format_data->conn_info
 #define INPUT libtrace->format_data->input
-
+#define OUTPUT libtrace->format_data->output
 struct libtrace_format_data_t {
 	union {
                 char *path;		/**< information for local sockets */
@@ -74,11 +77,35 @@ struct libtrace_format_data_t {
         } conn_info;
 	/** Information about the current state of the input device */
         union {
-                int fd;
-		FILE *file;
                 pcap_t *pcap;
         } input;
 };
+
+struct libtrace_format_data_out_t {
+	union {
+		char *path;
+		char *interface;
+	} conn_info;
+	struct {
+		pcap_t *pcap;
+		pcap_dumper_t *dump;
+	} output;
+};
+
+static int linktype_to_dlt(libtrace_linktype_t t) {
+	static int table[] = {
+		-1, /* LEGACY */
+		-1, /* HDLC over POS */
+		DLT_EN10MB, /* Ethernet */
+		-1, /* ATM */
+		DLT_IEEE802_11, /* 802.11 */
+		-1 /* END OF TABLE */
+	};
+	if (t>sizeof(table)/sizeof(*table)) {
+		return -1;
+	}
+	return table[t];
+}
 
 static int pcap_init_input(struct libtrace_t *libtrace) {
 	char errbuf[PCAP_ERRBUF_SIZE];
@@ -125,6 +152,16 @@ static int pcap_init_input(struct libtrace_t *libtrace) {
 	
 }
 
+static int pcap_init_output(struct libtrace_out_t *libtrace) {
+	char errbuf[PCAP_ERRBUF_SIZE];
+	struct stat buf;
+	libtrace->format_data = (struct libtrace_format_data_out_t *)
+		malloc(sizeof(struct libtrace_format_data_out_t));
+	CONNINFO.path = libtrace->uridata;
+	OUTPUT.pcap = NULL;
+	OUTPUT.dump = NULL;
+}
+
 static int pcapint_init_input(struct libtrace_t *libtrace) {
 	char errbuf[PCAP_ERRBUF_SIZE];
 	libtrace->format_data = (struct libtrace_format_data_t *) 
@@ -144,7 +181,15 @@ static int pcapint_init_input(struct libtrace_t *libtrace) {
 }
 
 static int pcap_fin_input(struct libtrace_t *libtrace) {
-	return -1;
+	pcap_close(INPUT.pcap);
+	free(libtrace->format_data);
+	return 0;
+}
+
+static int pcap_fin_output(struct libtrace_out_t *libtrace) {
+	pcap_dump_flush(OUTPUT.dump);
+	pcap_dump_close(OUTPUT.dump);
+	return 0;
 }
 
 static void trace_pcap_handler(u_char *user, const struct pcap_pkthdr *pcaphdr, const u_char *pcappkt) {
@@ -172,6 +217,33 @@ static int pcap_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_
 		return pcapbytes;
 	}
 	return (packet->size - sizeof(struct pcap_pkthdr));
+}
+
+static int pcap_write_packet(struct libtrace_out_t *libtrace, struct libtrace_packet_t *packet) {
+	struct pcap_pkthdr pcap_pkt_hdr;
+	void *link = trace_get_link(packet);
+
+	if (!OUTPUT.pcap) {
+		OUTPUT.pcap = pcap_open_dead(
+				linktype_to_dlt(trace_get_link_type(packet)),
+				65536);
+		OUTPUT.dump = pcap_dump_open(OUTPUT.pcap,CONNINFO.path);
+		fflush((FILE *)OUTPUT.dump);
+	}
+	if (packet->trace->format == pcap_ptr || 
+			packet->trace->format == pcapint_ptr) {
+	//if (!strncasecmp(packet->trace->format->name,"pcap",4)) {
+		// this is a pcap trace anyway
+		
+		pcap_dump((u_char*)OUTPUT.dump,(struct pcap_pkthdr *)packet->buffer,link);
+	} else {
+		pcap_pkt_hdr.ts = trace_get_timeval(packet);
+		pcap_pkt_hdr.caplen = trace_get_capture_length(packet);
+		pcap_pkt_hdr.len = trace_get_wire_length(packet);
+
+		pcap_dump((u_char*)OUTPUT.pcap, &pcap_pkt_hdr, link);
+	}
+	return 0;
 }
 
 static void *pcap_get_link(const struct libtrace_packet_t *packet) {
@@ -321,12 +393,12 @@ static struct libtrace_format_t pcap = {
 	"pcap",
 	"$Id$",
 	pcap_init_input,		/* init_input */
-	NULL,				/* init_output */
+	pcap_init_output,		/* init_output */
 	NULL,				/* config_output */
 	pcap_fin_input,			/* fin_input */
-	NULL,				/* fin_output */
+	pcap_fin_output,		/* fin_output */
 	pcap_read_packet,		/* read_packet */
-	NULL,				/* write_packet */
+	pcap_write_packet,		/* write_packet */
 	pcap_get_link,			/* get_link */
 	pcap_get_link_type,		/* get_link_type */
 	pcap_get_direction,		/* get_direction */
@@ -367,9 +439,14 @@ static struct libtrace_format_t pcapint = {
 	pcapint_help			/* help */
 };
 
+//pcap_ptr = &pcap;
+//pcapint_ptr = &pcapint;
+
 void __attribute__((constructor)) pcap_constructor() {
-	register_format(&pcap);
-	register_format(&pcapint);
+	pcap_ptr = &pcap;
+	pcapint_ptr = &pcapint;
+	register_format(pcap_ptr);
+	register_format(pcapint_ptr);
 }
 
 

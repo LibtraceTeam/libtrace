@@ -283,15 +283,15 @@ static int erf_init_output(struct libtrace_out_t *libtrace) {
 	libtrace->format_data = (struct libtrace_format_data_out_t *)
 		calloc(1,sizeof(struct libtrace_format_data_out_t));
 
-	OPTIONS.erf.level = 1;
+	OPTIONS.erf.level = 0;
 	asprintf(&filemode,"wb%d",OPTIONS.erf.level);
 
         if (!strncmp(libtrace->uridata,"-",1)) {
                 // STDOUT
 #if HAVE_ZLIB
-                libtrace->format_data->output.file = gzdopen(dup(1), filemode);
+                OUTPUT.file = gzdopen(dup(1), filemode);
 #else
-                libtrace->format_data->output.file = stdout;
+                OUTPUT.file = stdout;
 #endif
 	}
 	else {
@@ -300,15 +300,15 @@ static int erf_init_output(struct libtrace_out_t *libtrace) {
                 // using gzdopen means we can set O_LARGEFILE
                 // ourselves. However, this way is messy and
                 // we lose any error checking on "open"
-                libtrace->format_data->output.file =  gzdopen(open(
-                                        libtrace->uridata,
-                                        O_CREAT | O_LARGEFILE | O_WRONLY, 
-					S_IRUSR | S_IWUSR), filemode);
+                OUTPUT.file =  gzdopen(open(
+				libtrace->uridata,
+				O_CREAT | O_LARGEFILE | O_WRONLY, 
+				S_IRUSR | S_IWUSR), filemode);
 #else
-                libtrace->format_data->output.file =  fdopen(open(
-                                        libtrace->uridata,
-                                        O_CREAT | O_LARGEFILE | O_WRONLY, 
-					S_IRUSR | S_IWUSR), "w");
+		OUTPUT.file =  fdopen(open(
+				libtrace->uridata,
+				O_CREAT | O_LARGEFILE | O_WRONLY, 
+				S_IRUSR | S_IWUSR), "w");
 #endif
 	}
 	
@@ -351,6 +351,7 @@ static int rtclient_init_output(struct libtrace_out_t *libtrace) {
 }
 
 static int erf_config_output(struct libtrace_out_t *libtrace, int argc, char *argv[]) {
+#if HAVE_ZLIB
 	int opt;
 	int level = OPTIONS.erf.level;
 	optind = 1;
@@ -373,9 +374,10 @@ static int erf_config_output(struct libtrace_out_t *libtrace, int argc, char *ar
 			
 		} else {
 			OPTIONS.erf.level = level;
-			return gzsetparams(libtrace->format_data->output.file, level, Z_DEFAULT_STRATEGY);
+			return gzsetparams(OUTPUT.file, level, Z_DEFAULT_STRATEGY);
 		}
 	}
+#endif
 	return 0;
 
 }
@@ -404,15 +406,15 @@ static int rtclient_fin_input(struct libtrace_t *libtrace) {
 
 static int erf_fin_output(struct libtrace_out_t *libtrace) {
 #if HAVE_ZLIB
-        gzclose(libtrace->format_data->output.file);
+        gzclose(OUTPUT.file);
 #else
-        fclose(libtrace->format_data->output.file);
+        fclose(OUTPUT.file);
 #endif
 }
  
 
 static int rtclient_fin_output(struct libtrace_out_t *libtrace) {
-	rtserver_destroy(libtrace->format_data->output.rtserver);
+	rtserver_destroy(OUTPUT.rtserver);
 }
 
 #if HAVE_DAG
