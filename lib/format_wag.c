@@ -443,6 +443,7 @@ static int wag_help() {
 static struct libtrace_format_t wag = {
 	"wag",
 	"$Id$",
+	"wag",
 	wag_init_input,			/* init_input */	
 	wag_init_output,		/* init_output */
 	wag_config_output,		/* config_output */

@@ -152,12 +152,12 @@ struct trace_pflog_header_t {
 struct libtrace_format_t {
 	char *name;
 	char *version;
+	char *type;
 	int (*init_input)(struct libtrace_t *libtrace);
 	int (*init_output)(struct libtrace_out_t *libtrace);
 	int (*config_output)(struct libtrace_out_t *libtrace, int argc, char *argv[]);
 	int (*fin_input)(struct libtrace_t *libtrace);
 	int (*fin_output)(struct libtrace_out_t *libtrace);
-//	int (*read)(struct libtrace_t *libtrace, void *buffer, size_t len);
 	int (*read_packet)(struct libtrace_t *libtrace, struct libtrace_packet_t *packet);
 	int (*write_packet)(struct libtrace_out_t *libtrace, struct libtrace_packet_t *packet);
 	void* (*get_link)(const struct libtrace_packet_t *packet);
@@ -169,7 +169,7 @@ struct libtrace_format_t {
 	double (*get_seconds)(const struct libtrace_packet_t *packet);
 	int (*get_capture_length)(const struct libtrace_packet_t *packet);
 	int (*get_wire_length)(const struct libtrace_packet_t *packet);
-	size_t (*truncate_packet)(const struct libtrace_packet_t *packet,size_t size);
+	size_t (*truncate_packet)(struct libtrace_packet_t *packet,size_t size);
 	int (*get_fd)(struct libtrace_packet_t *packet);
 	struct libtrace_eventobj_t (*trace_event)(struct libtrace_t *trace, struct libtrace_packet_t *packet);	
 	void (*help)();

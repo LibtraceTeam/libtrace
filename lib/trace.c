@@ -793,7 +793,7 @@ uint64_t trace_get_erf_timestamp(const struct libtrace_packet_t *packet) {
 	} else if (packet->trace->format->get_seconds) {
 		// seconds -> timestamp
 		seconds = packet->trace->format->get_seconds(packet);
-		timestamp = (((uint32_t)seconds) << 32) + \
+		timestamp = ((uint64_t)((uint32_t)seconds) << 32) + \
 			    (( seconds - (uint32_t)seconds   ) * UINT_MAX);
 	}
 	return timestamp;

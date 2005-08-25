@@ -11,25 +11,11 @@
 #include <pcap.h>
 #include <time.h>
 
-static int trace_link_type_to_dlt(libtrace_linktype_t t)
-{
-	static int table[] = {
-		-1, /* LEGACY */
-		-1, /* HDLC over POS */
-		DLT_EN10MB, /* Ethernet */
-		-1, /* ATM */
-		DLT_IEEE802_11, /* 802.11 */
-	};
-	if (t>sizeof(table)/sizeof(*table)) {
-		return -1;
-	}
-	return table[t];
-}
 
 void usage(char *argv0)
 {
 	fprintf(stderr,"Usage:\n"
-	"%s flags inputfile >outputfile\n"
+	"%s flags inputfile outputfile\n"
 	"-s --encrypt-source	Encrypt the source addresses\n"
 	"-d --encrypt-dest	Encrypt the destination addresses\n"
 	"-c --cryptopan=key	Encrypt the addresses with the cryptopan\n"
@@ -143,21 +129,6 @@ void encrypt_ips(struct libtrace_ip *ip,bool enc_source,bool enc_dest)
 	}
 }
 
-struct libtrace_write_t {
-	pcap_dumper_t *pcap;
-};
-
-void trace_write(struct libtrace_write_t *hdl,struct libtrace_packet_t *pkt)
-{
-	struct pcap_pkthdr pcap_pkt_hdr;
-	void *link = trace_get_link(pkt);
-
-	pcap_pkt_hdr.ts=trace_get_timeval(pkt);
-	pcap_pkt_hdr.caplen = trace_get_capture_length(pkt);
-	pcap_pkt_hdr.len = trace_get_wire_length(pkt);
-	pcap_dump((u_char*)hdl->pcap, &pcap_pkt_hdr, link);
-}
-
 double parse_date(const char *date)
 {
 	struct tm *parsed_time;
@@ -204,14 +175,14 @@ int main(int argc, char *argv[])
 	enum enc_type_t enc_type = ENC_NONE;
 	char *key = NULL;
 	struct libtrace_filter_t *filter = NULL;
-	struct libtrace_t *trace;
+	struct libtrace_t *trace = 0;
 	struct libtrace_packet_t packet;
-	struct libtrace_write_t writer;
+	struct libtrace_out_t *writer = 0;
 	bool enc_source = false;
 	bool enc_dest 	= false;
 	double start_time = 0;
 	double end_time = 1e100;
-	pcap_t *p = NULL;
+	char *output = 0;
 
 	if (argc<2)
 		usage(argv[0]);
@@ -277,53 +248,55 @@ int main(int argc, char *argv[])
 
 	trace_enc_init(enc_type,key);
 
-	p = NULL;
-
-	while(optind<argc) {
-		/* Do the actual processing */
-		trace = trace_create(argv[optind]);
-		if (!trace) {
-			fprintf(stderr,"Cannot open %s\n",argv[optind]);
-			return 1;
+	// open input uri
+	trace = trace_create(argv[optind]);
+	if (!trace) {
+		fprintf(stderr,"Cannot open %s\n",argv[optind]);
+		trace_perror(argv[optind]);
+		return 1;
+	}
+	
+	if (optind == argc) {
+		// no output specified, output in same format to stdout
+		asprintf(&output,"%s:-","erf");
+		writer = trace_output_create(output);
+	} else {
+		writer = trace_output_create(argv[optind +1]);
+	}
+	if (!writer) {
+		trace_perror("trace_output_create");
+		return 1;
+	}
+	
+	
+	for(;;) {
+		struct libtrace_ip *ipptr;
+		int psize;
+		double ts;
+		if ((psize = trace_read_packet(trace, &packet)) <= 0) {
+			break;
 		}
-		for(;;) {
-			struct libtrace_ip *ipptr;
-			int psize;
-			double ts;
-			if ((psize = trace_read_packet(trace, &packet)) <= 0) {
-				break;
-			}
-			if (!p) {
-				p=pcap_open_dead(
-					trace_link_type_to_dlt(
-						trace_get_link_type(&packet)),
-					65536);
-				writer.pcap = pcap_dump_open(p,"-");
-				fflush((FILE *)writer.pcap);
-			}
 
-			/* Skip packets that don't match the filter */
-			if (filter && !trace_bpf_filter(filter,&packet)) {
-				continue;
-			}
-
-			ts = trace_get_seconds(&packet);
-
-			/* skip packets before/after the time */
-			if (ts < start_time || ts > end_time) {
-				continue;
-			}
-
-			ipptr = trace_get_ip(&packet);
-
-			if (ipptr && (enc_source || enc_dest))
-				encrypt_ips(ipptr,enc_source,enc_dest);
-
-			/* TODO: Encrypt IP's in ARP packets */
-
-			trace_write(&writer,&packet);
+		/* Skip packets that don't match the filter */
+		if (filter && !trace_bpf_filter(filter,&packet)) {
+			continue;
 		}
-		optind++;
+
+		ts = trace_get_seconds(&packet);
+
+		/* skip packets before/after the time */
+		if (ts < start_time || ts > end_time) {
+			continue;
+		}
+
+		ipptr = trace_get_ip(&packet);
+
+		if (ipptr && (enc_source || enc_dest))
+			encrypt_ips(ipptr,enc_source,enc_dest);
+
+		/* TODO: Encrypt IP's in ARP packets */
+
+		trace_write_packet(writer,&packet);
 	}
 	return 0;
 }

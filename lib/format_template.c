@@ -123,6 +123,7 @@ static void template_help() {
 static struct libtrace_format_t template = {
 	"template",
 	"$Id$",
+	"template",
 	template_init_input,	 	/* init_input */
 	template_init_output,		/* init_output */
 	template_config_output,		/* config_output */

@@ -86,9 +86,12 @@ struct libtrace_format_data_out_t {
 		char *path;
 		char *interface;
 	} conn_info;
-	struct {
-		pcap_t *pcap;
-		pcap_dumper_t *dump;
+	union {
+		struct {
+			pcap_t *pcap;
+			pcap_dumper_t *dump;
+		} trace;
+
 	} output;
 };
 
@@ -158,8 +161,9 @@ static int pcap_init_output(struct libtrace_out_t *libtrace) {
 	libtrace->format_data = (struct libtrace_format_data_out_t *)
 		malloc(sizeof(struct libtrace_format_data_out_t));
 	CONNINFO.path = libtrace->uridata;
-	OUTPUT.pcap = NULL;
-	OUTPUT.dump = NULL;
+	OUTPUT.trace.pcap = NULL;
+	OUTPUT.trace.dump = NULL;
+	return 1;
 }
 
 static int pcapint_init_input(struct libtrace_t *libtrace) {
@@ -180,6 +184,10 @@ static int pcapint_init_input(struct libtrace_t *libtrace) {
 	return 1;
 }
 
+static int pcapint_init_output(struct libtrace_out_t *libtrace) {
+	return -1;
+}
+
 static int pcap_fin_input(struct libtrace_t *libtrace) {
 	pcap_close(INPUT.pcap);
 	free(libtrace->format_data);
@@ -187,9 +195,13 @@ static int pcap_fin_input(struct libtrace_t *libtrace) {
 }
 
 static int pcap_fin_output(struct libtrace_out_t *libtrace) {
-	pcap_dump_flush(OUTPUT.dump);
-	pcap_dump_close(OUTPUT.dump);
+	pcap_dump_flush(OUTPUT.trace.dump);
+	pcap_dump_close(OUTPUT.trace.dump);
 	return 0;
+}
+
+static int pcapint_fin_output(struct libtrace_out_t *libtrace) {
+	return -1;
 }
 
 static void trace_pcap_handler(u_char *user, const struct pcap_pkthdr *pcaphdr, const u_char *pcappkt) {
@@ -223,27 +235,32 @@ static int pcap_write_packet(struct libtrace_out_t *libtrace, struct libtrace_pa
 	struct pcap_pkthdr pcap_pkt_hdr;
 	void *link = trace_get_link(packet);
 
-	if (!OUTPUT.pcap) {
-		OUTPUT.pcap = pcap_open_dead(
+	if (!OUTPUT.trace.pcap) {
+		OUTPUT.trace.pcap = pcap_open_dead(
 				linktype_to_dlt(trace_get_link_type(packet)),
 				65536);
-		OUTPUT.dump = pcap_dump_open(OUTPUT.pcap,CONNINFO.path);
-		fflush((FILE *)OUTPUT.dump);
+		OUTPUT.trace.dump = pcap_dump_open(OUTPUT.trace.pcap,CONNINFO.path);
+		fflush((FILE *)OUTPUT.trace.dump);
 	}
 	if (packet->trace->format == pcap_ptr || 
 			packet->trace->format == pcapint_ptr) {
 	//if (!strncasecmp(packet->trace->format->name,"pcap",4)) {
 		// this is a pcap trace anyway
 		
-		pcap_dump((u_char*)OUTPUT.dump,(struct pcap_pkthdr *)packet->buffer,link);
+		pcap_dump((u_char*)OUTPUT.trace.dump,(struct pcap_pkthdr *)packet->buffer,link);
 	} else {
 		pcap_pkt_hdr.ts = trace_get_timeval(packet);
 		pcap_pkt_hdr.caplen = trace_get_capture_length(packet);
 		pcap_pkt_hdr.len = trace_get_wire_length(packet);
 
-		pcap_dump((u_char*)OUTPUT.pcap, &pcap_pkt_hdr, link);
+		pcap_dump((u_char*)OUTPUT.trace.dump, &pcap_pkt_hdr, link);
 	}
 	return 0;
+}
+
+static int pcapint_write_packet(struct libtrace_out_t *libtrace, struct libtrace_packet_t *packet) {
+	void *link = trace_get_link(packet);
+
 }
 
 static void *pcap_get_link(const struct libtrace_packet_t *packet) {
@@ -392,6 +409,7 @@ static void pcapint_help() {
 static struct libtrace_format_t pcap = {
 	"pcap",
 	"$Id$",
+	"pcap",
 	pcap_init_input,		/* init_input */
 	pcap_init_output,		/* init_output */
 	NULL,				/* config_output */
@@ -417,13 +435,14 @@ static struct libtrace_format_t pcap = {
 static struct libtrace_format_t pcapint = {
 	"pcapint",
 	"$Id$",
+	"pcap",
 	pcapint_init_input,		/* init_input */
-	NULL,				/* init_output */
+	pcapint_init_output,		/* init_output */
 	NULL,				/* config_output */
 	pcap_fin_input,			/* fin_input */
-	NULL,				/* fin_output */
+	pcapint_fin_output,		/* fin_output */
 	pcap_read_packet,		/* read_packet */
-	NULL,				/* write_packet */
+	pcapint_write_packet,		/* write_packet */
 	pcap_get_link,			/* get_link */
 	pcap_get_link_type,		/* get_link_type */
 	pcap_get_direction,		/* get_direction */

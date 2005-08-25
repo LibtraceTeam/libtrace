@@ -31,6 +31,10 @@
 - Version 2.0.20
 	* byte-ordering fixups for WAG
 	* writer functions for pcap and wag
+	* fix of writer functions for erf
+	* format conversion into pcap and erf formats
+	* format conversion only applies if input not already in the right
+	  format
 
 - Version 2.0.19 
 	* Move code for different input formats (erf, pcap, wag) into
