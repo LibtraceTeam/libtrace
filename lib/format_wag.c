@@ -311,20 +311,20 @@ static int wag_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 	
 
 	do {
-		if (fifo_out_available(libtrace->fifo) == 0 || read_required) {
+		if (tracefifo_out_available(libtrace->fifo) == 0 || read_required) {
 			if ((numbytes = wag_read(libtrace,buf,RP_BUFSIZE)) <= 0) {
 				return numbytes;
 			}
 			assert(libtrace->fifo);
-			fifo_write(libtrace->fifo,buf,numbytes);
+			tracefifo_write(libtrace->fifo,buf,numbytes);
 			read_required = 0;
 		}
 		// read in wag_frame_hdr
-		if ((numbytes = fifo_out_read(libtrace->fifo, 
+		if ((numbytes = tracefifo_out_read(libtrace->fifo, 
 						buffer,
 						sizeof(struct wag_frame_hdr)))
 				== 0 ) {
-			fifo_out_reset(libtrace->fifo);
+			tracefifo_out_reset(libtrace->fifo);
 			read_required = 1;
 			continue;
 		}
@@ -336,15 +336,15 @@ static int wag_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 		//printf("%d %d\n",size,htons(size));
 
 		// read in full packet
-		if((numbytes = fifo_out_read(libtrace->fifo,buffer,size)) == 0) {
-			fifo_out_reset(libtrace->fifo);
+		if((numbytes = tracefifo_out_read(libtrace->fifo,buffer,size)) == 0) {
+			tracefifo_out_reset(libtrace->fifo);
 			read_required = 1;
 			continue;
 		}
 
 		// have the whole packet
-		fifo_out_update(libtrace->fifo,size);
-		fifo_ack_update(libtrace->fifo,size);
+		tracefifo_out_update(libtrace->fifo,size);
+		tracefifo_ack_update(libtrace->fifo,size);
 
 		packet->size = numbytes;
 		return numbytes;

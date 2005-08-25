@@ -107,7 +107,7 @@ struct libtrace_t {
 
 	struct libtrace_event_t event;
 	char *uridata;
-	struct fifo_t *fifo;   
+	struct tracefifo_t *fifo;   
 
 };
 
@@ -116,7 +116,7 @@ struct libtrace_out_t {
 	struct libtrace_format_data_out_t *format_data;
 
 	char *uridata;
-        struct fifo_t *fifo;
+        struct tracefifo_t *fifo;
 };
 
 

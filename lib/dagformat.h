@@ -61,6 +61,24 @@ typedef struct dag_record {
 	} rec;
 } __attribute__((packed)) dag_record_t;
 
+
+typedef struct duck_inf
+{
+        unsigned long   Command, Config, Clock_Inc, Clock_Wrap, DDS_Rate;
+        unsigned long   Crystal_Freq;
+        unsigned long   Synth_Freq, Sync_Rate;
+        unsigned long   long Last_Ticks;
+        unsigned long   Resyncs;
+        unsigned long   Bad_Diffs, Bad_Offs, Bad_Pulses;
+        unsigned long   Worst_Error, Worst_Off;
+        unsigned long   Off_Limit, Off_Damp;
+        unsigned long   Pulses, Single_Pulses_Missing, Longest_Pulse_Missing;
+        unsigned long   Health, Sickness;
+        long            Error, Offset;
+        long            Stat_Start, Stat_End;   /* these are really time_t's */
+        unsigned long   Set_Duck_Field;
+} duck_inf;
+
 #define dag_record_size         16
 
 

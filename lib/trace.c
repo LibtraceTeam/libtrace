@@ -301,7 +301,7 @@ struct libtrace_t *trace_create(char *uri) {
 	}
 	
 
-        libtrace->fifo = create_fifo(1048576);
+        libtrace->fifo = create_tracefifo(1048576);
 	assert( libtrace->fifo);
 
         return libtrace;
@@ -375,7 +375,7 @@ struct libtrace_out_t *trace_output_create(char *uri) {
         }
 
 
-        libtrace->fifo = create_fifo(1048576);
+        libtrace->fifo = create_tracefifo(1048576);
         assert( libtrace->fifo);
 
 	return libtrace;
@@ -416,7 +416,7 @@ void trace_destroy(struct libtrace_t *libtrace) {
 	libtrace->format->fin_input(libtrace);
         // need to free things!
         free(libtrace->uridata);
-	destroy_fifo(libtrace->fifo);
+	destroy_tracefifo(libtrace->fifo);
         free(libtrace);
 }
 
@@ -430,7 +430,7 @@ void trace_output_destroy(struct libtrace_out_t *libtrace) {
 	assert(libtrace);
 	libtrace->format->fin_output(libtrace);
 	free(libtrace->uridata);
-	destroy_fifo(libtrace->fifo);
+	destroy_tracefifo(libtrace->fifo);
 	free(libtrace);
 }
 

@@ -571,43 +571,43 @@ static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_pac
 	buffer = packet->buffer;
 
 	do {
-		if (fifo_out_available(libtrace->fifo) == 0 || read_required) {
+		if (tracefifo_out_available(libtrace->fifo) == 0 || read_required) {
 			if ((numbytes = rtclient_read(
 					libtrace,buf,RP_BUFSIZE))<=0) {
 				return numbytes;
 			}
-			fifo_write(libtrace->fifo,buf,numbytes);
+			tracefifo_write(libtrace->fifo,buf,numbytes);
 			read_required = 0;
 		}
 		// Read status byte
-		if (fifo_out_read(libtrace->fifo,
+		if (tracefifo_out_read(libtrace->fifo,
 				&packet->status, sizeof(int)) == 0) {
 			read_required = 1;
 			continue;
 		}
-		fifo_out_update(libtrace->fifo,sizeof(int));
+		tracefifo_out_update(libtrace->fifo,sizeof(int));
 
 		// read in the ERF header
-		if ((numbytes = fifo_out_read(libtrace->fifo, buffer,
+		if ((numbytes = tracefifo_out_read(libtrace->fifo, buffer,
 						sizeof(dag_record_t))) == 0) {
-			fifo_out_reset(libtrace->fifo);
+			tracefifo_out_reset(libtrace->fifo);
 			read_required = 1;
 			continue;
 		}
 		size = ntohs(((dag_record_t *)buffer)->rlen);
 		
 		// read in the full packet
-		if ((numbytes = fifo_out_read(libtrace->fifo, 
+		if ((numbytes = tracefifo_out_read(libtrace->fifo, 
 						buffer, size)) == 0) {
-			fifo_out_reset(libtrace->fifo);
+			tracefifo_out_reset(libtrace->fifo);
 			read_required = 1;
 			continue;
 		}
 
 		// got in our whole packet, so...
-		fifo_out_update(libtrace->fifo,size);
+		tracefifo_out_update(libtrace->fifo,size);
 
-		fifo_ack_update(libtrace->fifo,size + sizeof(int));
+		tracefifo_ack_update(libtrace->fifo,size + sizeof(int));
 
 		packet->size = numbytes;
 		return numbytes;
@@ -698,28 +698,28 @@ static int rtclient_write_packet(struct libtrace_out_t *libtrace, struct libtrac
 			return -1;
 
 		assert(libtrace->fifo);
-		if (fifo_out_available(libtrace->fifo) == 0 || write_required) {
+		if (tracefifo_out_available(libtrace->fifo) == 0 || write_required) {
 	                // Packet added to fifo
-                        if ((numbytes = fifo_write(libtrace->fifo, packet->buffer, packet->size)) == 0) {
+                        if ((numbytes = tracefifo_write(libtrace->fifo, packet->buffer, packet->size)) == 0) {
 	                        // some error with the fifo
-                                perror("fifo_write");
+                                perror("tracefifo_write");
                                 return -1;
                         }
                         write_required = 0;
                 }
 
                 // Read from fifo and add protocol header
-                if ((numbytes = fifo_out_read(libtrace->fifo, buffer, sizeof(dag_record_t))) == 0) {
+                if ((numbytes = tracefifo_out_read(libtrace->fifo, buffer, sizeof(dag_record_t))) == 0) {
 	                // failure reading in from fifo
-                        fifo_out_reset(libtrace->fifo);
+                        tracefifo_out_reset(libtrace->fifo);
                         write_required = 1;
                         continue;
                 }
                 size = ntohs(((dag_record_t *)buffer)->rlen);
                 assert(size < LIBTRACE_PACKET_BUFSIZE);
-                if ((numbytes = fifo_out_read(libtrace->fifo, buffer, size)) == 0) {
+                if ((numbytes = tracefifo_out_read(libtrace->fifo, buffer, size)) == 0) {
  	               // failure reading in from fifo
-                       fifo_out_reset(libtrace->fifo);
+                       tracefifo_out_reset(libtrace->fifo);
                        write_required = 1;
                        continue;
                 }
@@ -732,8 +732,8 @@ static int rtclient_write_packet(struct libtrace_out_t *libtrace, struct libtrac
                 }
 
 
-                fifo_out_update(libtrace->fifo, size);
-	        fifo_ack_update(libtrace->fifo, size);
+                tracefifo_out_update(libtrace->fifo, size);
+	        tracefifo_ack_update(libtrace->fifo, size);
 		return numbytes;
 	} while(1);
 }
