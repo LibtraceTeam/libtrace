@@ -1,7 +1,9 @@
 #include "rtserver.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/select.h>
 #include <time.h>
 #include <netdb.h>
 #include <netinet/in.h>

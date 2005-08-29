@@ -58,6 +58,14 @@
 #include <errno.h>
 #include <netdb.h>
 
+#ifdef HAVE_LIMITS_H
+#  include <limits.h>
+#endif
+
+#ifdef HAVE_SYS_LIMITS_H
+#  include <sys/limits.h>
+#endif
+
 #ifndef O_LARGEFILE
 #define O_LARGEFILE 0
 #endif
