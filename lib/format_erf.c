@@ -644,11 +644,11 @@ static int erf_write_packet(struct libtrace_out_t *libtrace, struct libtrace_pac
 	dag_record_t erfhdr;
 	void *payload = (void *)trace_get_link(packet);
 
-	if (packet->trace->format == erf_ptr 
+	if (packet->trace->format == erf_ptr || 
 #if HAVE_DAG
-			|| packet->trace->format == dag_ptr
+			packet->trace->format == dag_ptr ||
 #endif
-			) {
+			packet->trace->format == rtclient_ptr ) {
 		numbytes = erf_dump_packet(libtrace,
 				(dag_record_t *)packet->buffer,
 				payload,
