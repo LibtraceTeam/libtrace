@@ -1,5 +1,6 @@
 SUBDIRS=lib
-man_MANS = docs/man/man3/[a-zA-Z]*.3
+man_MANS = docs/man/man3/trace*.3 docs/man/man3/libtrace*.3 docs/man/man3/get*.3 
+#man_MANS = @MANPAGES@
 EXTRA_DIST=examples docs/html docs/latex docs/man $(man_MANS)
 
 .PHONY: docs
@@ -15,7 +16,7 @@ dist-hook:
 	for i in `\ls examples | grep -v CVS`; do make -C examples/$$i clean; done
 	rm -rf `find $(distdir)/examples -name CVS`
 
-docs/man/man3/[a-zA-Z]*.3:
+docs/man/man3/*.3:
 	doxygen libtrace.doxygen
 
 docs:

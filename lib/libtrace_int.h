@@ -89,12 +89,7 @@ struct libtrace_event_t {
 		int size;
 	} packet;
 	double tdelta;
-//	double trace_start_ts;
-//	double real_start_ts;
 	double trace_last_ts;
-
-//	double last_ts;
-//	double start_ts;
 };
 
 /** The information about traces that are open 

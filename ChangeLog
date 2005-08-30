@@ -35,6 +35,8 @@
 	* format conversion into pcap and erf formats
 	* format conversion only applies if input not already in the right
 	  format
+	* move internal fifo* symbols to tracefifo* to prevent collision
+	  with libfifo
 
 - Version 2.0.19 
 	* Move code for different input formats (erf, pcap, wag) into
