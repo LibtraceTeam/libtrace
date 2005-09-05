@@ -617,7 +617,7 @@ static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_pac
 static int erf_dump_packet(struct libtrace_out_t *libtrace, dag_record_t *erfptr, void *buffer, size_t size) {
 	int numbytes = 0;
 #if HAVE_ZLIB
-	if ((numbytes = gzwrite(OUTPUT.file, erfptr, sizeof(dag_record_t))) == 0) {
+	if ((numbytes = gzwrite(OUTPUT.file, erfptr, dag_record_size + 2)) == 0) {
 		perror("gzwrite");
 		return -1;
 	}
@@ -626,7 +626,7 @@ static int erf_dump_packet(struct libtrace_out_t *libtrace, dag_record_t *erfptr
 		return -1;
 	}
 #else
-	if ((numbytes = write(OUTPUT.file, erfptr, sizeof(dag_record_t))) == 0) {
+	if ((numbytes = write(OUTPUT.file, erfptr, dag_record_size + 2)) == 0) {
 		perror("write");
 		return -1;
 	}
