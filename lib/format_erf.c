@@ -653,7 +653,7 @@ static int erf_write_packet(struct libtrace_out_t *libtrace, struct libtrace_pac
 				(dag_record_t *)packet->buffer,
 				payload,
 				packet->size - 
-					sizeof(dag_record_t)); 
+					(dag_record_size + 2)); 
 	} else {
 		// convert format - build up a new erf header
 		// Timestamp

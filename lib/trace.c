@@ -307,6 +307,41 @@ struct libtrace_t *trace_create(char *uri) {
         return libtrace;
 }
 
+struct libtrace_t * trace_create_dead (char *uri) {
+	struct libtrace_t *libtrace = malloc(sizeof(struct libtrace_t));
+	char *scan = calloc(sizeof(char),URI_PROTO_LINE);
+	char *uridata;
+	int i;
+	
+	trace_err.err_num = E_NOERROR;
+
+	if((uridata = strchr(uri,':')) == NULL) {
+		strncpy(scan, uri, strlen(uri));
+	} else {
+		strncpy(scan,uri, (uridata - uri));
+	}
+	
+	libtrace->format = 0;	
+	
+	for (i = 0; i < nformats; i++) {
+                if (strlen(scan) == strlen(format_list[i]->name) &&
+                                !strncasecmp(scan,
+                                        format_list[i]->name,
+                                        strlen(scan))) {
+                                libtrace->format=format_list[i];
+                                break;
+                                }
+        }
+        if (libtrace->format == 0) {
+                trace_err.err_num = E_BAD_FORMAT;
+                trace_err.problem = scan;
+                return 0;
+        }
+
+	return libtrace;
+
+}
+	
 /** Creates a libtrace_out_t structure and the socket / file through which output will be directed.
  *
  * @param uri	the uri string describing the output format and the destination
@@ -420,6 +455,11 @@ void trace_destroy(struct libtrace_t *libtrace) {
         free(libtrace);
 }
 
+
+void trace_destroy_dead(struct libtrace_t *libtrace) {
+	assert(libtrace);
+	free(libtrace);
+}
 /** Close an output trace file, freeing up any resources it may have been using
  *
  * @param libtrace	the output trace file to be destroyed

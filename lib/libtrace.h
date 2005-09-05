@@ -235,6 +235,16 @@ void trace_perror(char *caller);
  */
 struct libtrace_t *trace_create(char *uri);
 
+/** Creates a "dummy" trace file that has only the format type set.
+ *
+ * @returns opaque pointer to a (sparsely initialised) libtrace_t
+ *
+ * IMPORTANT: Do not attempt to call trace_read_packet or other such functions with
+ * the dummy trace. Its intended purpose is to act as a packet->trace for libtrace_packet_t's
+ * that are not associated with a libtrace_t structure.
+ */
+struct libtrace_t *trace_create_dead(char *uri);
+
 /** Creates a trace output file from a URI. 
  *
  * @returns opaque pointer to a libtrace_output_t
@@ -262,6 +272,8 @@ int trace_output_config(struct libtrace_out_t *libtrace, char *options);
  *
  */
 void trace_destroy(struct libtrace_t *trace);
+
+void trace_destroy_dead(struct libtrace_t *trace);
 
 /** Close a trace output file, freeing up any resources it may have been using
  *
