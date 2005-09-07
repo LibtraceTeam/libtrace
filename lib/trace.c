@@ -236,34 +236,21 @@ char *trace_get_output_format(struct libtrace_out_t *libtrace) {
  */
 struct libtrace_t *trace_create(char *uri) {
         struct libtrace_t *libtrace = malloc(sizeof(struct libtrace_t));
-        char *scan = calloc(sizeof(char),URI_PROTO_LINE);
+        char *scan = 0;
         char *uridata = 0;                  
 	int i = 0;
 	struct stat buf;
 	
 	trace_err.err_num = E_NOERROR;
         
-	
+	//scan = calloc(sizeof(char),URI_PROTO_LINE);	
         // parse the URI to determine what sort of event we are dealing with
        
-        // want snippet before the : to get the uri base type.
-
-        if((uridata = strchr(uri,':')) == NULL) {
-                // badly formed URI - needs a :
-		trace_err.err_num = E_URI_NOCOLON;
-                return 0;
-        }
-
-
-        if ((uridata - uri) > URI_PROTO_LINE) {
-                // badly formed URI - uri type is too long
-		trace_err.err_num = E_URI_LONG;
-                return 0;
-        }
-        strncpy(scan,uri, (uridata - uri));
-
+	if ((uridata = trace_parse_uri(uri, &scan)) == 0) {
+		return 0;
+	}
+	
 	libtrace->event.tdelta = 0.0;
-
 
 	libtrace->format = 0;
 	for (i = 0; i < nformats; i++) {
@@ -281,8 +268,6 @@ struct libtrace_t *trace_create(char *uri) {
 		return 0;
 	}
 
-        // push uridata past the delimiter
-        uridata++;
         libtrace->uridata = strdup(uridata);
 
         // libtrace->format now contains the type of uri
@@ -352,29 +337,18 @@ struct libtrace_t * trace_create_dead (char *uri) {
 struct libtrace_out_t *trace_output_create(char *uri) {
 	struct libtrace_out_t *libtrace = malloc(sizeof(struct libtrace_out_t));
 	
-	char *scan = calloc(sizeof(char),URI_PROTO_LINE);
+	char *scan = 0;
         char *uridata = 0;
         int i;
 
 	trace_err.err_num = E_NOERROR;
         // parse the URI to determine what sort of event we are dealing with
 
-        // want snippet before the : to get the uri base type.
-
-        if((uridata = strchr(uri,':')) == NULL) {
-                // badly formed URI - needs a :
-		trace_err.err_num = E_URI_NOCOLON;
-                return 0;
-        }
-
-        if ((uridata - uri) > URI_PROTO_LINE) {
-                // badly formed URI - uri type is too long
-		trace_err.err_num = E_URI_LONG;
-                return 0;
-        }
-
-        strncpy(scan,uri, (uridata - uri));
-
+	if ((uridata = trace_parse_uri(uri, &scan)) == 0) {
+		return 0;
+	}
+	
+	
         libtrace->format = 0;
         for (i = 0; i < nformats; i++) {
                 if (strlen(scan) == strlen(format_list[i]->name) &&
@@ -390,9 +364,6 @@ struct libtrace_out_t *trace_output_create(char *uri) {
 		trace_err.problem = scan;	
                 return 0;
         }
-
-        // push uridata past the delimiter
-        uridata++;
         libtrace->uridata = strdup(uridata);
 
 
@@ -1323,3 +1294,26 @@ size_t trace_set_capture_length(struct libtrace_packet_t *packet, size_t size) {
 	return -1;
 }
 
+char * trace_parse_uri(char *uri, char **format) {
+	char *uridata = 0;
+	
+	*format = calloc(sizeof(char), URI_PROTO_LINE);
+	
+	if((uridata = strchr(uri,':')) == NULL) {
+                // badly formed URI - needs a :
+                trace_err.err_num = E_URI_NOCOLON;
+                return 0;
+        }
+
+        if ((uridata - uri) > URI_PROTO_LINE) {
+                // badly formed URI - uri type is too long
+                trace_err.err_num = E_URI_LONG;
+                return 0;
+        }
+
+        strncpy(*format ,uri, (uridata - uri));
+	// push uridata past the delimiter
+        uridata++;
+	return uridata;
+}
+	

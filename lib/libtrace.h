@@ -584,6 +584,14 @@ uint16_t trace_get_destination_port(const struct libtrace_packet_t *packet);
  */
 int8_t trace_get_server_port(uint8_t protocol, uint16_t source, uint16_t dest);
 
+/** Takes a uri and splits it into a format and uridata component. 
+ * Primarily for internal use but made available for external use.
+ * @param uri		the uri to be parsed
+ * @param format	destination location for the format component of the uri 
+ * @returns 0 if an error occured, otherwise returns the uridata component
+ * @author Shane Alcock
+ */
+char *trace_parse_uri(char *uri, char **format);
 #ifdef __cplusplus
 } // extern "C"
 #endif // #ifdef __cplusplus
