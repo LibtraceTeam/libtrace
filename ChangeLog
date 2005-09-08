@@ -28,6 +28,11 @@
 ##
 ##
 
+- Version 2.0.21
+	* fixed error in output erf code, where we were missing 2 bytes
+	* will skip vlan headers
+	* added trace_decode_uri() function
+
 - Version 2.0.20
 	* byte-ordering fixups for WAG
 	* writer functions for pcap and wag
