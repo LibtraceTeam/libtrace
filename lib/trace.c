@@ -526,10 +526,15 @@ struct libtrace_ip *trace_get_ip(const struct libtrace_packet_t *packet) {
 				}
 				else {
 					struct ieee_802_11_payload *eth = (void*)wifi->data;
-					if (eth->type != 0x0008) {
-						ipptr=NULL;
-					} else {
+					ipptr = NULL;
+
+					if (eth->type == 0x0008) {
 						ipptr=(void*)eth->data;
+					} else if (eth->type = 0x0081) {
+						// VLAN
+						if ((*(uint16_t *)(eth + 16)) == 0x0008) {
+							ipptr = (void*)eth->data + 4;
+						}
 					}
 				}
 			}
@@ -542,11 +547,16 @@ struct libtrace_ip *trace_get_ip(const struct libtrace_packet_t *packet) {
 					ipptr = NULL;
 					break;
 				}
-				if (ntohs(eth->ether_type)!=0x0800) {
-					ipptr = NULL;
-				}
-				else {
+				ipptr = NULL;
+				
+				if (eth->ether_type==0x0008) {
 					ipptr = ((void *)eth) + 14;
+				} else if (eth->ether_type == 0x0081) {
+					struct libtrace_8021q *vlanhdr = 
+						(struct libtrace_8021q *)eth;
+					if (vlanhdr->vlan_ether_type == 0x0008) {
+						ipptr = ((void *)eth) + 18;
+					}
 				}
 				break;
 			}

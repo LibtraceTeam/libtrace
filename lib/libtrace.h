@@ -189,6 +189,17 @@ struct libtrace_icmp
   } un;
 };
 
+/** 802.1Q frame */
+struct libtrace_8021q 
+{
+  u_int8_t  ether_dhost[6];      /* destination eth addr */
+  u_int8_t  ether_shost[6];      /* source ether addr    */
+  u_int16_t ether_type;                 /* packet type ID field , 0x8100 for VLAN */
+  u_int16_t vlan_pri:3;			/* vlan user priority */
+  u_int16_t vlan_cfi:1;			/* vlan format indicator, 0 for ethernet, 1 for token ring */
+  u_int16_t vlan_id:12;			/* vlan id */
+  u_int16_t vlan_ether_type;		/* vlan sub-packet type ID field (next-header)*/
+} __attribute__ ((__packed__));
 
 /** Prints help information for libtrace 
  *
