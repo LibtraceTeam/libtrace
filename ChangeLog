@@ -28,6 +28,10 @@
 ##
 ##
 
+- Version 2.0.22
+	* Documentation updates
+	* Minor bugfixes
+
 - Version 2.0.21
 	* fixed error in output erf code, where we were missing 2 bytes
 	* will skip vlan headers
