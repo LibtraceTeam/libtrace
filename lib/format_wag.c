@@ -354,6 +354,7 @@ static int wag_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 		tracefifo_out_update(libtrace->fifo,size);
 		tracefifo_ack_update(libtrace->fifo,size);
 
+		packet->status = 0;
 		packet->size = numbytes;
 		return numbytes;
 	} while(1);

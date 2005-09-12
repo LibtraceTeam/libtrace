@@ -477,7 +477,8 @@ static int dag_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 
 	// have to copy it out of the memory hole at this stage:
 	memcpy(packet->buffer, erfptr, size);
-
+	
+	packet->status = 0;
 	packet->size = size;
 	DAG.offset += size;
 	DAG.diff -= size;
@@ -524,6 +525,7 @@ static int erf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 		perror("gzread");
 		return -1;
 	}
+	packet->status = 0;
 	packet->size = rlen;
 	return rlen;
 }
