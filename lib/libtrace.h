@@ -35,7 +35,7 @@
 #include <netinet/in.h>
 
 /** API version as 3 byte hex digits, eg 0xXXYYZZ */
-#define LIBTRACE_API_VERSION 0x100014 
+#define LIBTRACE_API_VERSION 0x100015 
 
 #ifdef __cplusplus 
 extern "C" { 
@@ -54,15 +54,7 @@ extern "C" {
  * pcap etc.
  *
  * @par Usage
- * <ol>
- * <li> include "libtrace.h" 
- * <li> call create_trace with the uri of the trace you're interested in.<br>
- * This is usually passed in as argv[1] to your program.
- * <li> call libtrace_read_packet(), passing in the libtrace_t returned from
- * create trace and a buffer (and the buffer length)
- * <li> call getIP() on the buffer, and do whatever you need
- * <li> loop back to step 3, until libtrace_read_packet() returns -1
- * </ol>
+ * See the example/ directory in the source distribution for some simple examples
  * @par Linking
  * To use this library you need to link against libtrace by passing -ltrace
  * to your linker. You may also need to link against a version of libpcap 
@@ -85,21 +77,14 @@ struct libtrace_t;
 struct libtrace_filter_t;
 
 /** Opaque structure holding information about a packet */
-#define LIBTRACE_PACKET_BUFSIZE 65536
-struct libtrace_packet_t {
-	struct libtrace_t *trace;
-	//void *buffer;
-	char buffer[LIBTRACE_PACKET_BUFSIZE];
-	size_t size;
-	uint8_t status;
-};
+struct libtrace_packet_t;
 
 /** Enumeration of error codes */
 enum {E_NOERROR, E_BAD_FORMAT, E_NO_INIT, E_NO_INIT_OUT, E_URI_LONG, E_URI_NOCOLON, E_INIT_FAILED };
 
 /** Structure for dealing with IP packets */
 struct libtrace_ip
-  {
+{
 #if BYTE_ORDER == LITTLE_ENDIAN
     unsigned int ip_hl:4;		/**< header length */
     unsigned int ip_v:4;		/**< version */
@@ -122,7 +107,7 @@ struct libtrace_ip
     u_short ip_sum;			/**< checksum */
     struct in_addr ip_src;		/**< source address */
     struct in_addr ip_dst;		/**< dest address */
-  };
+} __attribute__ ((__packed__));
 
 /** Structure for dealing with TCP packets */
 struct libtrace_tcp
@@ -157,7 +142,7 @@ struct libtrace_tcp
     u_int16_t window;		/**< Window Size */
     u_int16_t check;		/**< Checksum */
     u_int16_t urg_ptr;		/**< Urgent Pointer */
-};
+} __attribute__ ((__packed__));
 
 /** UDP Header for dealing with UDP packets */
 struct libtrace_udp {
@@ -165,7 +150,7 @@ struct libtrace_udp {
   u_int16_t	dest;		/**< Destination port */
   u_int16_t	len;		/**< Length */
   u_int16_t	check;		/**< Checksum */
-};
+} __attribute__ ((__packed__));
 
 /** ICMP Header for dealing with icmp packets */
 struct libtrace_icmp
@@ -187,18 +172,26 @@ struct libtrace_icmp
       u_int16_t	mtu;
     } frag;			/**< path mtu discovery */
   } un;
-};
+} __attribute__ ((__packed__));
+
+/** 802.3 frame */
+struct libtrace_ether
+{
+  u_int8_t ether_dhost[6];	/* destination ether addr */
+  u_int8_t ether_shost[6];	/* source ether addr */
+  u_int16_t ether_type;		/* packet type ID field (next-header) */
+} __attribute__ ((__packed__));
 
 /** 802.1Q frame */
 struct libtrace_8021q 
 {
   u_int8_t  ether_dhost[6];      /* destination eth addr */
   u_int8_t  ether_shost[6];      /* source ether addr    */
-  u_int16_t ether_type;                 /* packet type ID field , 0x8100 for VLAN */
-  u_int16_t vlan_pri:3;			/* vlan user priority */
-  u_int16_t vlan_cfi:1;			/* vlan format indicator, 0 for ethernet, 1 for token ring */
-  u_int16_t vlan_id:12;			/* vlan id */
-  u_int16_t vlan_ether_type;		/* vlan sub-packet type ID field (next-header)*/
+  u_int16_t ether_type;          /* packet type ID field , 0x8100 for VLAN */
+  u_int16_t vlan_pri:3;		 /* vlan user priority */
+  u_int16_t vlan_cfi:1;	 	 /* vlan format indicator, 0 for ethernet, 1 for token ring */
+  u_int16_t vlan_id:12;	 	 /* vlan id */
+  u_int16_t vlan_ether_type;	 /* vlan sub-packet type ID field (next-header)*/
 } __attribute__ ((__packed__));
 
 /** Prints help information for libtrace 
@@ -209,6 +202,9 @@ struct libtrace_8021q
 void trace_help();
 
 /** Gets the output format for a given output trace
+ *
+ * @params libtrace	the output trace to get the name of the format fo
+ * @returns callee-owned null-terminated char* containing the output format
  *
  */
 char *trace_get_output_format(struct libtrace_out_t *libtrace);
@@ -221,6 +217,7 @@ void trace_perror(char *caller);
 
 /** Create a trace file from a URI
  * 
+ * @params char * containing a valid libtrace URI
  * @returns opaque pointer to a libtrace_t
  *
  * Valid URI's are:
@@ -228,21 +225,19 @@ void trace_perror(char *caller);
  *  - erf:/path/to/erf/file.gz
  *  - erf:/path/to/rtclient/socket
  *  - erf:-  (stdin)
- *  - dag:/dev/dagcard                  (implementd?)
+ *  - dag:/dev/dagcard                  
  *  - pcapint:pcapinterface                (eg: pcap:eth0)
  *  - pcap:/path/to/pcap/file
- *  - pcap:/path/to/pcap/file.gz
- *  - pcap:/path/to/pcap/socket         (implemented?)
  *  - pcap:-
  *  - rtclient:hostname
  *  - rtclient:hostname:port
+ *  - wag:-
  *  - wag:/path/to/wag/file
  *  - wag:/path/to/wag/file.gz
  *  - wag:/path/to/wag/socket
- *  - wag:/dev/device
  *
  *  If an error occured when attempting to open the trace file, NULL is returned
- *  and an error is output to stdout.
+ *  and trace_errno is set. Use trace_perror() to get more information 
  */
 struct libtrace_t *trace_create(char *uri);
 
@@ -258,7 +253,9 @@ struct libtrace_t *trace_create_dead(char *uri);
 
 /** Creates a trace output file from a URI. 
  *
+ * @param uri	the uri string describing the output format and destination
  * @returns opaque pointer to a libtrace_output_t
+ * @author Shane Alcock
  *
  * Valid URI's are:
  *  - gzerf:/path/to/erf/file.gz
@@ -266,16 +263,18 @@ struct libtrace_t *trace_create_dead(char *uri);
  *  - rtserver:hostname
  *  - rtserver:hostname:port
  *
- *  If an error occured when attempting to open the output trace, NULL is returned and
- *  an error is output to stdout.
+ *  If an error occured when attempting to open the output trace, NULL is returned 
+ *  and trace_errno is set. Use trace_perror() to get more information
  */
 struct libtrace_out_t *trace_output_create(char *uri);
 
-/** Configures a trace output file as specified by an option string in getopt() format 
+/* Parses an output options string and calls the appropriate function to deal with output options.
  *
- * @param libtrace	the output trace file to be configured
- * @param options	the string containing the configuration options
- * @returns -1 if configuration fails, 0 if successful
+ * @param libtrace	the output trace object to apply the options to
+ * @param options	the options string
+ * @returns -1 if option configuration failed, 0 otherwise
+ *
+ * @author Shane Alcock
  */
 int trace_output_config(struct libtrace_out_t *libtrace, char *options);
 
@@ -288,6 +287,9 @@ void trace_destroy_dead(struct libtrace_t *trace);
 
 /** Close a trace output file, freeing up any resources it may have been using
  *
+ * @param libtrace	the output trace file to be destroyed
+ *
+ * @author Shane Alcock
  */
 void trace_output_destroy(struct libtrace_out_t *trace);
 
@@ -295,7 +297,7 @@ void trace_output_destroy(struct libtrace_out_t *trace);
  *
  * @param trace 	the libtrace opaque pointer
  * @param packet  	the packet opaque pointer
- * @returns false if it failed to read a packet
+ * @returns 0 on EOF, negative value on error
  *
  */
 int trace_read_packet(struct libtrace_t *trace, struct libtrace_packet_t *packet);
@@ -423,6 +425,7 @@ struct timeval trace_get_timeval(const struct libtrace_packet_t *packet);
  * @param packet  	the packet opaque pointer
  *
  * @returns time that this packet was seen in 64bit floating point seconds
+ * @author Daniel Lawson
  * @author Perry Lorier
  */
 double trace_get_seconds(const struct libtrace_packet_t *packet);
@@ -536,8 +539,6 @@ struct libtrace_eventobj_t {
 /** process a libtrace event
  * @param trace the libtrace opaque pointer
  * @param packet the libtrace_packet opaque pointer
- * @param fd a pointer to a file descriptor to listen on
- * @param seconds a pointer the time in seconds since to the next event
  * @returns libtrace_event struct containing the type, and potential
  * 	fd or seconds to sleep on
  *
@@ -554,6 +555,10 @@ struct libtrace_eventobj_t trace_event(struct libtrace_t *trace,
  * @param filterstring a char * containing the bpf filter string
  * @returns opaque pointer pointer to a libtrace_filter_t object
  * @author Daniel Lawson
+ * @note The filter is not actually compiled at this point, so no correctness
+ * tests are performed here. trace_bpf_setfilter will always return ok, but
+ * if the filter is poorly constructed an error will be generated when the 
+ * filter is actually used
  */
 struct libtrace_filter_t *trace_bpf_setfilter(const char *filterstring);
 
@@ -562,6 +567,8 @@ struct libtrace_filter_t *trace_bpf_setfilter(const char *filterstring);
  * @param packet	the packet opaque pointer
  * @returns 0 if the filter fails, 1 if it succeeds
  * @author Daniel Lawson
+ * @note Due to the way BPF filters are built, the filter is not actually compiled
+ * until the first time trace_bpf_filter is called. If your filter is incorrect, it will generate an error message and assert, exiting the program. This behaviour may change to more graceful handling of this error in the future.
  */
 int trace_bpf_filter(struct libtrace_filter_t *filter,
 		const struct libtrace_packet_t *packet);
@@ -590,7 +597,7 @@ uint16_t trace_get_destination_port(const struct libtrace_packet_t *packet);
  * @param source	the source port from the packet
  * @param dest		the destination port from the packet
  * @returns one of USE_SOURCE or USE_DEST depending on which one you should use
- * @note ports must be in \em host byte order!
+ * @note ports must be in \em HOST byte order!
  * @author Daniel Lawson
  */
 int8_t trace_get_server_port(uint8_t protocol, uint16_t source, uint16_t dest);
