@@ -77,15 +77,6 @@ static struct {
 	char *problem;	// the format, uri etc that caused the error for reporting purposes
 } trace_err;
 
-/** Opaque structure holding information about a packet */
-#define LIBTRACE_PACKET_BUFSIZE 65536
-struct libtrace_packet_t {
-	struct libtrace_t *trace;
-	//void *buffer;
-	char buffer[LIBTRACE_PACKET_BUFSIZE];
-	size_t size;
-	uint8_t status;
-};
 
 #define RP_BUFSIZE 65536
 

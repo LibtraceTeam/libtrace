@@ -76,8 +76,16 @@ struct libtrace_t;
 /** Opaque structure holding information about a bpf filter */
 struct libtrace_filter_t;
 
-/** Opaque structure holding information about a packet */
-struct libtrace_packet_t;
+/** Structure holding information about a packet */
+#define LIBTRACE_PACKET_BUFSIZE 65536
+struct libtrace_packet_t {
+    	struct libtrace_t *trace;
+	//void *buffer;
+	char buffer[LIBTRACE_PACKET_BUFSIZE];
+	size_t size;
+	uint8_t status;
+};
+                     
 
 /** Enumeration of error codes */
 enum {E_NOERROR, E_BAD_FORMAT, E_NO_INIT, E_NO_INIT_OUT, E_URI_LONG, E_URI_NOCOLON, E_INIT_FAILED };
