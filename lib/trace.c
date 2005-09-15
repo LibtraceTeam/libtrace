@@ -336,7 +336,7 @@ struct libtrace_t * trace_create_dead (char *uri) {
 
 }
 
-/** Creates a trace output file from a URI. 
+/* Creates a trace output file from a URI. 
  *
  * @param uri	the uri string describing the output format and destination
  * @returns opaque pointer to a libtrace_output_t

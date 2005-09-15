@@ -39,7 +39,6 @@ extern "C" {
 #include "config.h"
 #include "libtrace.h"
 #include "fifo.h"
-#include "rtserver.h"
 
 #if HAVE_PCAP_BPF_H
 #  include <pcap-bpf.h>

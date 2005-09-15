@@ -57,6 +57,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <netdb.h>
+#include <stdio.h>
 
 #ifdef HAVE_LIMITS_H
 #  include <limits.h>

@@ -44,7 +44,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <assert.h>
-
+#include <stdio.h>
 
 #if HAVE_PCAP_BPF_H
 #  include <pcap-bpf.h>
