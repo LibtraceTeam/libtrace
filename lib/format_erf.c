@@ -320,7 +320,7 @@ static int erf_init_output(struct libtrace_out_t *libtrace) {
 				S_IRUSR | S_IWUSR), "w");
 #endif
 	}
-	
+	free(filemode);	
 	return 1;
 }
 
@@ -329,6 +329,7 @@ static int erf_config_output(struct libtrace_out_t *libtrace, int argc, char *ar
 	int opt;
 	int level = OPTIONS.erf.level;
 	optind = 1;
+
 
 	while ((opt = getopt(argc, argv, "z:")) != EOF) {
 		switch (opt) {
@@ -369,6 +370,7 @@ static int erf_fin_input(struct libtrace_t *libtrace) {
 #else	
 	fclose(INPUT.file);	
 #endif
+	free(libtrace->format_data);
 }
 
 static int rtclient_fin_input(struct libtrace_t *libtrace) {
@@ -381,6 +383,7 @@ static int erf_fin_output(struct libtrace_out_t *libtrace) {
 #else
         fclose(OUTPUT.file);
 #endif
+	free(libtrace->format_data);
 }
  
 

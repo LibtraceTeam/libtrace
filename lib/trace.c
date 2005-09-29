@@ -265,7 +265,8 @@ struct libtrace_t *trace_create(char *uri) {
 	}
 	if (libtrace->format == 0) {
 		trace_err.err_num = E_BAD_FORMAT;
-		trace_err.problem = scan;
+		strcpy(trace_err.problem, scan);
+		//trace_err.problem = scan;
 		return 0;
 	}
 
@@ -277,19 +278,21 @@ struct libtrace_t *trace_create(char *uri) {
 	if (libtrace->format->init_input) {
 		if (!libtrace->format->init_input( libtrace)) {
 			trace_err.err_num = E_INIT_FAILED;
-			trace_err.problem = scan;
+			strcpy(trace_err.problem, scan);
+			//trace_err.problem = scan;
 			return 0;
 		}
 	} else {
 		trace_err.err_num = E_NO_INIT;
-		trace_err.problem = scan;
+		strcpy(trace_err.problem, scan);
+		//trace_err.problem = scan;
 		return 0;
 	}
 	
 
         libtrace->fifo = create_tracefifo(1048576);
 	assert( libtrace->fifo);
-
+	free(scan);
         return libtrace;
 }
 
@@ -328,10 +331,12 @@ struct libtrace_t * trace_create_dead (char *uri) {
         }
         if (libtrace->format == 0) {
                 trace_err.err_num = E_BAD_FORMAT;
-                trace_err.problem = scan;
+                strcpy(trace_err.problem, scan);
+		//trace_err.problem = scan;
                 return 0;
         }
-
+	
+	free(scan);
 	return libtrace;
 
 }
@@ -379,7 +384,8 @@ struct libtrace_out_t *trace_output_create(char *uri) {
         }
         if (libtrace->format == 0) {
 		trace_err.err_num = E_BAD_FORMAT;
-		trace_err.problem = scan;	
+		strcpy(trace_err.problem, scan);
+		//trace_err.problem = scan;	
                 return 0;
         }
         libtrace->uridata = strdup(uridata);
@@ -394,14 +400,15 @@ struct libtrace_out_t *trace_output_create(char *uri) {
 		}
 	} else {
 		trace_err.err_num = E_NO_INIT_OUT;
-		trace_err.problem = scan;
+		strcpy(trace_err.problem, scan);
+		//trace_err.problem = scan;
                 return 0;
         }
 
 
         libtrace->fifo = create_tracefifo(1048576);
         assert( libtrace->fifo);
-
+	free(scan);
 	return libtrace;
 }
 
@@ -423,7 +430,6 @@ int trace_output_config(struct libtrace_out_t *libtrace, char *options) {
 	if (!options) {
 		return 0;
 	}
-	
 	asprintf(&opt_string, "%s %s", libtrace->format->name, options);
 	parse_cmd(opt_string, &opt_argc, opt_argv, MAXOPTS);
 	
@@ -1343,6 +1349,7 @@ char * trace_parse_uri(char *uri, char **format) {
         strncpy(*format ,uri, (uridata - uri));
 	// push uridata past the delimiter
         uridata++;
+	
 	return uridata;
 }
 	

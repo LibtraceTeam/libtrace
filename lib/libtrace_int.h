@@ -74,7 +74,7 @@ typedef enum {SOCKET, TRACE, STDIN, DEVICE, INTERFACE, RT } source_t;
 
 static struct {
 	int err_num; 	// error code
-	char *problem;	// the format, uri etc that caused the error for reporting purposes
+	char problem[255];	// the format, uri etc that caused the error for reporting purposes
 } trace_err;
 
 
