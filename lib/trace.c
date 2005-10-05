@@ -271,7 +271,6 @@ struct libtrace_t *trace_create(char *uri) {
 	}
 
         libtrace->uridata = strdup(uridata);
-
         // libtrace->format now contains the type of uri
         // libtrace->uridata contains the appropriate data for this
         
