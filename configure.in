@@ -150,6 +150,7 @@ AC_ARG_WITH(dag,
 ])
 
 ac_cv_lbl_dag_api=no
+dag2_4=false
 if test "$with_dag" != no; then
         AC_MSG_CHECKING(whether we have DAG API)
 
@@ -186,7 +187,6 @@ if test "$with_dag" != no; then
 			cp $dag_root/tools/dagapi.c lib/dagapi.c
 			dag2_4=true
 		fi
-		AM_CONDITIONAL(DAG2_4, test x$dag2_4=xtrue)
         else
                 ac_cv_lbl_dag_api=no
         fi
@@ -205,6 +205,7 @@ else
 fi
 
 AM_CONDITIONAL(HAVE_DAG, test x$ac_cv_lbl_dag_api = xyes)
+AM_CONDITIONAL(DAG2_4, test x$dag2_4 = xtrue)
 
 # The following is commented out because it seems you don't actually
 # need it. libpcap 'just works' with large files, even under woody,
