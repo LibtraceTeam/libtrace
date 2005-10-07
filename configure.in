@@ -19,7 +19,7 @@ AC_PROG_LIBTOOL
 # Checks for header files.
 AC_HEADER_STDC
 dnl AC_CHECK_HEADERS(errno.h stdlib.h stdio.h assert.h string.h netinet/in.h assert.h errno.h fcntl.h net/ethernet.h netdb.h pcap.h stdio.h stdlib.h string.h sys/stat.h sys/types.h sys/socket.h sys/un.h unistd.h time.h sys/ioctl.h net/bpf.h pcap.h zlib.h pcap-bpf.h)
-AC_CHECK_HEADERS(pcap.h pcap-int.h pcap-bpf.h net/bpf.h zlib.h sys/limits.h stddef.h inttypes.h limits.h dagapi.h net/ethernet.h )
+AC_CHECK_HEADERS(pcap.h pcap-int.h pcap-bpf.h net/bpf.h zlib.h sys/limits.h stddef.h inttypes.h limits.h net/ethernet.h )
 
 AC_CHECK_HEADERS(netinet/in.h)
 
@@ -165,7 +165,7 @@ if test "$with_dag" != no; then
 	fi
 
         if test -r "$dag_root/tools" -a -r "$dag_root/include"; then
-                dag_tools_dir="$dag_root/tools"
+		dag_tools_dir="$dag_root/tools"
                 dag_include_dir="$dag_root/include"
         else
                 dag_tools_dir="$dag_root"

@@ -289,6 +289,7 @@ static int rtclient_init_input(struct libtrace_t *libtrace) {
 
 static int erf_init_output(struct libtrace_out_t *libtrace) {
 	char *filemode = 0;
+	int fd;
 	libtrace->format_data = (struct libtrace_format_data_out_t *)
 		calloc(1,sizeof(struct libtrace_format_data_out_t));
 
@@ -305,20 +306,19 @@ static int erf_init_output(struct libtrace_out_t *libtrace) {
 	}
 	else {
 	        // TRACE
+		fd = open(libtrace->uridata, O_CREAT | O_LARGEFILE | O_WRONLY, S_IRUSR | S_IWUSR);
+		if (fd <= 0) {
+			return 0;
+		}
 #if HAVE_ZLIB
                 // using gzdopen means we can set O_LARGEFILE
                 // ourselves. However, this way is messy and
                 // we lose any error checking on "open"
-                OUTPUT.file =  gzdopen(open(
-				libtrace->uridata,
-				O_CREAT | O_LARGEFILE | O_WRONLY, 
-				S_IRUSR | S_IWUSR), filemode);
+                OUTPUT.file =  gzdopen(fd, filemode);
 #else
-		OUTPUT.file =  fdopen(open(
-				libtrace->uridata,
-				O_CREAT | O_LARGEFILE | O_WRONLY, 
-				S_IRUSR | S_IWUSR), "w");
+		OUTPUT.file =  fdopen(fd, "w");
 #endif
+		 
 	}
 	free(filemode);	
 	return 1;
