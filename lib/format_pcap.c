@@ -45,6 +45,8 @@
 #include <unistd.h>
 #include <assert.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #if HAVE_PCAP_BPF_H
 #  include <pcap-bpf.h>
@@ -156,8 +158,6 @@ static int pcap_init_input(struct libtrace_t *libtrace) {
 }
 
 static int pcap_init_output(struct libtrace_out_t *libtrace) {
-	char errbuf[PCAP_ERRBUF_SIZE];
-	struct stat buf;
 	libtrace->format_data = (struct libtrace_format_data_out_t *)
 		malloc(sizeof(struct libtrace_format_data_out_t));
 	CONNINFO.path = libtrace->uridata;
@@ -184,7 +184,7 @@ static int pcapint_init_input(struct libtrace_t *libtrace) {
 	return 1;
 }
 
-static int pcapint_init_output(struct libtrace_out_t *libtrace) {
+static int pcapint_init_output(struct libtrace_out_t *libtrace __attribute__((unused))) {
 	return -1;
 }
 
@@ -200,7 +200,7 @@ static int pcap_fin_output(struct libtrace_out_t *libtrace) {
 	return 0;
 }
 
-static int pcapint_fin_output(struct libtrace_out_t *libtrace) {
+static int pcapint_fin_output(struct libtrace_out_t *libtrace __attribute__((unused))) {
 	return -1;
 }
 
@@ -217,7 +217,6 @@ static void trace_pcap_handler(u_char *user, const struct pcap_pkthdr *pcaphdr, 
 }
 
 static int pcap_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
-	const u_char *pcappkt;
 	int pcapbytes = 0;
 
 	pcapbytes = pcap_dispatch(INPUT.pcap,
@@ -259,9 +258,10 @@ static int pcap_write_packet(struct libtrace_out_t *libtrace, struct libtrace_pa
 	return 0;
 }
 
-static int pcapint_write_packet(struct libtrace_out_t *libtrace, struct libtrace_packet_t *packet) {
-	void *link = trace_get_link(packet);
+static int pcapint_write_packet(struct libtrace_out_t *libtrace __attribute__((unused)), struct libtrace_packet_t *packet __attribute__((unused))) {
+//	void *link = trace_get_link(packet);
 
+	return 0;
 }
 
 static void *pcap_get_link(const struct libtrace_packet_t *packet) {
@@ -378,7 +378,7 @@ static size_t pcap_set_capture_length(struct libtrace_packet_t *packet,size_t si
 	return packet->size;
 }
 
-static int pcap_get_fd(struct libtrace_packet_t *packet) {
+static int pcap_get_fd(const struct libtrace_packet_t *packet) {
 	return pcap_fileno(packet->trace->format_data->input.pcap);
 }
 

@@ -28,6 +28,7 @@
  *
  */
 
+#define _GNU_SOURCE
 #include "libtrace.h"
 #include "libtrace_int.h"
 #include "format_helper.h"
@@ -58,6 +59,8 @@
 #include <errno.h>
 #include <netdb.h>
 #include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 
 #ifdef HAVE_LIMITS_H
 #  include <limits.h>
@@ -119,8 +122,6 @@ struct libtrace_format_data_out_t {
 
 static int wag_init_input(struct libtrace_t *libtrace) {
 	struct stat buf;
-	struct hostent *he;
-	struct sockaddr_in remote;
 	struct sockaddr_un unix_sock;
 	libtrace->format_data = (struct libtrace_format_data_t *) 
 		calloc(1,sizeof(struct libtrace_format_data_t));
@@ -224,7 +225,7 @@ static int wag_config_output(struct libtrace_out_t *libtrace, int argc, char *ar
 				level = atoi(optarg);
 				break;
 			default:
-				printf("Bad argument to wag: %s\n", opt);
+				printf("Bad argument to wag: %s\n", optarg);
 				return -1;
 		}
 	}
@@ -247,6 +248,7 @@ static int wag_fin_input(struct libtrace_t *libtrace) {
 #else	
 	fclose(INPUT.file);	
 #endif
+	return 0;
 }
 
 static int wag_fin_output(struct libtrace_out_t *libtrace) {
@@ -255,14 +257,12 @@ static int wag_fin_output(struct libtrace_out_t *libtrace) {
 #else
 	fclose(OUTPUT.file);
 #endif
+	return 0;
 }
 
 static int wag_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
         int numbytes;
-        static short lctr = 0;
-        int rlen;
 	assert(libtrace);
-        assert(len >= 0);
 
         if (buffer == 0)
                 buffer = malloc(len);
@@ -311,7 +311,6 @@ static int wag_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 	int size;
 	char buf[RP_BUFSIZE];
 	int read_required = 0;
-	struct wag_frame_hdr *waghdr = 0;
 
 	void *buffer = 0;
 
@@ -388,7 +387,7 @@ static void *wag_get_link(const struct libtrace_packet_t *packet) {
 	return (void*)payload;
 }
 
-static libtrace_linktype_t wag_get_link_type(const struct libtrace_packet_t *packet) {
+static libtrace_linktype_t wag_get_link_type(const struct libtrace_packet_t *packet __attribute__((unused))) {
 	return TRACE_TYPE_80211;
 }
 
@@ -434,7 +433,7 @@ static struct libtrace_eventobj_t wag_event_trace(struct libtrace_t *trace, stru
 			return trace_event_trace(trace,packet);
 	}
 }
-static int wag_help() {
+static void wag_help() {
 	printf("wag format module: $Revision$\n");
 	printf("Supported input URIs:\n");
 	printf("\twag:/dev/wagn\n");
@@ -447,7 +446,6 @@ static int wag_help() {
 	printf("Supported output URIs:\n");
 	printf("\tnone\n");
 	printf("\n");
-
 }
 
 static struct libtrace_format_t wag = {

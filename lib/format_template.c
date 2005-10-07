@@ -32,6 +32,7 @@
 #include "libtrace_int.h"
 #include "format_helper.h"
 #include "config.h"
+#include "stdlib.h"
 
 #ifdef HAVE_INTTYPES_H
 #  include <inttypes.h>
@@ -109,7 +110,7 @@ static int template_get_wire_length(const struct libtrace_packet_t *packet) {
 	return -1;
 }
 
-static size_t template_set_capture_length(const struct libtrace_packet_t *packet,size_t size) {
+static size_t template_set_capture_length(struct libtrace_packet_t *packet,size_t size) {
 	return -1;
 }
 

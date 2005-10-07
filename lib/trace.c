@@ -240,7 +240,7 @@ struct libtrace_t *trace_create(char *uri) {
         char *scan = 0;
         char *uridata = 0;                  
 	int i = 0;
-	struct stat buf;
+	//struct stat buf;
 	
 	trace_err.err_num = E_NOERROR;
         
@@ -432,9 +432,10 @@ int trace_output_config(struct libtrace_out_t *libtrace, char *options) {
 	asprintf(&opt_string, "%s %s", libtrace->format->name, options);
 	parse_cmd(opt_string, &opt_argc, opt_argv, MAXOPTS);
 	
-	if (libtrace->format->config_output)
+	if (libtrace->format->config_output) {
 		return libtrace->format->config_output(libtrace, opt_argc, opt_argv);
-
+	}
+	return -1;
 }
 
 /* Close a trace file, freeing up any resources it may have been using
@@ -490,6 +491,7 @@ int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *pac
 	if (libtrace->format->read_packet) {
 		return libtrace->format->read_packet(libtrace,packet);
 	}
+	return -1;
 }
 
 /* Writes a packet to the specified output
@@ -507,7 +509,7 @@ int trace_write_packet(struct libtrace_out_t *libtrace, struct libtrace_packet_t
 	if (libtrace->format->write_packet) {
 		return libtrace->format->write_packet(libtrace, packet);
 	}
-
+	return -1;
 }
 
 /* get a pointer to the link layer
@@ -554,7 +556,7 @@ struct libtrace_ip *trace_get_ip(const struct libtrace_packet_t *packet) {
 
 					if (eth->type == 0x0008) {
 						ipptr=(void*)eth->data;
-					} else if (eth->type = 0x0081) {
+					} else if (eth->type == 0x0081) {
 						// VLAN
 						if ((*(uint16_t *)(eth + 16)) == 0x0008) {
 							ipptr = (void*)eth->data + 4;
@@ -891,8 +893,8 @@ struct timeval trace_get_timeval(const struct libtrace_packet_t *packet) {
  * @author Perry Lorier
  */ 
 double trace_get_seconds(const struct libtrace_packet_t *packet) {
-	double seconds;
-	uint64_t ts;
+	double seconds = 0.0;
+	uint64_t ts = 0;
 	struct timeval tv;
 	
 	if (packet->trace->format->get_seconds) {
@@ -1205,7 +1207,7 @@ uint16_t trace_get_destination_port(const struct libtrace_packet_t *packet)
  * @returns a hint as to which port is the server port
  * @author Daniel Lawson
  */
-int8_t trace_get_server_port(uint8_t protocol, uint16_t source, uint16_t dest) {
+int8_t trace_get_server_port(uint8_t protocol __attribute__((unused)), uint16_t source, uint16_t dest) {
 	/*
 	 * * If the ports are equal, return DEST
 	 * * Check for well-known ports in the given protocol
@@ -1217,11 +1219,9 @@ int8_t trace_get_server_port(uint8_t protocol, uint16_t source, uint16_t dest) {
 	 * * Check for dynamic ranges: 49152 - 65535
 	 * * flip a coin.
 	 */
-
-	uint16_t server, client;
-
+	
 	/* equal */
-	if (source == client)
+	if (source == dest)
 		return USE_DEST;
 
 	/* root server port, 0 - 511 */

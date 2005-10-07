@@ -68,7 +68,7 @@ struct tracefifo_t {
 static char *tracefifo_stat_buffer = 0;
 
 static void increment_pointer(struct tracefifo_t *fifo, enum which_t which, int amount);
-static void set_pointer(struct tracefifo_t *fifo, enum which_t which, int location);
+static void set_pointer(struct tracefifo_t *fifo, enum which_t which, unsigned int location);
 static size_t tracefifo_compare(struct tracefifo_t *fifo, enum which_t first, enum which_t second);
 static int tracefifo_read_generic(struct tracefifo_t *fifo, void *buffer, size_t len, enum which_t which, char update);
 
@@ -114,15 +114,14 @@ static void increment_pointer(struct tracefifo_t *fifo, enum which_t which, int 
         }
 }
 
-void tracefifo_flush(struct tracefifo_t *fifo) {
+void tracefifo_flush(struct tracefifo_t *fifo __attribute__((unused))) {
         // do nothing
         return;
 }
 
-static void set_pointer(struct tracefifo_t *fifo, enum which_t which, int location) {
+static void set_pointer(struct tracefifo_t *fifo, enum which_t which, unsigned int location) {
         assert(fifo);
         assert(which == IN || which == OUT || which == ACK);
-        assert(location >= 0);
 
         assert(location <= fifo->length);
 
@@ -211,7 +210,6 @@ static int tracefifo_read_generic(struct tracefifo_t *fifo, void *buffer, size_t
         int size;
         assert(fifo);
         assert(buffer);
-        assert(len >= 0);
 
         oldptr = fifo->datamap[which];
         lenleft = len;
@@ -236,7 +234,6 @@ int tracefifo_write(struct tracefifo_t *fifo, void *buffer, size_t len) {
         int size;
         assert(fifo);
         assert(buffer);
-        assert(len >= 0);
 
         if (tracefifo_free(fifo) < len) {
                 return 0;
@@ -259,7 +256,6 @@ int tracefifo_write(struct tracefifo_t *fifo, void *buffer, size_t len) {
 int tracefifo_out_read(struct tracefifo_t *fifo, void *buffer, size_t len) {
         assert(fifo);
         assert(buffer);
-        assert(len >= 0);
         if (tracefifo_compare(fifo,IN,OUT) < len) {
                 return 0;
         }
@@ -269,7 +265,6 @@ int tracefifo_out_read(struct tracefifo_t *fifo, void *buffer, size_t len) {
 int tracefifo_ack_read(struct tracefifo_t *fifo, void *buffer, size_t len) {
         assert(fifo);
         assert(buffer);
-        assert(len >= 0);
         if (tracefifo_compare(fifo,OUT,ACK) < len) {
                 return 0;
         }
@@ -278,7 +273,6 @@ int tracefifo_ack_read(struct tracefifo_t *fifo, void *buffer, size_t len) {
 
 int tracefifo_out_update(struct tracefifo_t *fifo, size_t len){
         assert(fifo);
-        assert(len >= 0);
         if (tracefifo_compare(fifo,IN,OUT) < len) {
                 return 0;
         }
@@ -288,7 +282,6 @@ int tracefifo_out_update(struct tracefifo_t *fifo, size_t len){
 
 int tracefifo_ack_update(struct tracefifo_t *fifo, size_t len){
         assert(fifo);
-        assert(len >= 0);
         if (tracefifo_compare(fifo,OUT,ACK) < len) {
                 return 0;
         }

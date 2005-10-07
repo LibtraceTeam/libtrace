@@ -32,6 +32,9 @@
 #include "libtrace_int.h"
 #include "config.h"
 
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
 #ifdef HAVE_INTTYPES_H
 #  include <inttypes.h>
 #else
@@ -118,7 +121,7 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 	struct timeval stv;
 
 	if (!trace->event.packet.buffer) {
-		trace->event.packet.buffer = malloc(4096);
+		trace->event.packet.buffer = (void *)malloc(4096);
 		trace->event.packet.size=
 			trace_read_packet(trace,packet);
 		event.size = trace->event.packet.size;

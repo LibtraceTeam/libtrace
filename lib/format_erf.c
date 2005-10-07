@@ -27,6 +27,7 @@
  * $Id$
  *
  */
+#define _GNU_SOURCE
 
 #include "config.h"
 #include "libtrace.h"
@@ -57,6 +58,8 @@
 #include <fcntl.h>
 #include <getopt.h>
 #include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 
 /* Catch undefined O_LARGEFILE on *BSD etc */
 #ifndef O_LARGEFILE
@@ -173,8 +176,6 @@ static int dag_init_input(struct libtrace_t *libtrace) {
 
 static int erf_init_input(struct libtrace_t *libtrace) {
 	struct stat buf;
-	struct hostent *he;
-	struct sockaddr_in remote;
 	struct sockaddr_un unix_sock;
 	libtrace->format_data = (struct libtrace_format_data_t *)
 		malloc(sizeof(struct libtrace_format_data_t));
@@ -337,7 +338,7 @@ static int erf_config_output(struct libtrace_out_t *libtrace, int argc, char *ar
 				level = atoi(optarg);
 				break;
 			default:
-				printf("Bad argument to erf: %s\n", opt);
+				printf("Bad argument to erf: %s\n", optarg);
 				// maybe spit out some help here
 				return -1;
 		}
@@ -371,10 +372,12 @@ static int erf_fin_input(struct libtrace_t *libtrace) {
 	fclose(INPUT.file);	
 #endif
 	free(libtrace->format_data);
+	return 0;
 }
 
 static int rtclient_fin_input(struct libtrace_t *libtrace) {
 	close(INPUT.fd);
+	return 0;
 }
 
 static int erf_fin_output(struct libtrace_out_t *libtrace) {
@@ -384,6 +387,8 @@ static int erf_fin_output(struct libtrace_out_t *libtrace) {
         fclose(OUTPUT.file);
 #endif
 	free(libtrace->format_data);
+
+	return 0;
 }
  
 
@@ -454,8 +459,6 @@ static int dag_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 static int erf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
 	int numbytes;
 	int size;
-	char buf[RP_BUFSIZE];
-	dag_record_t *erfptr;
 	void *buffer = packet->buffer;
 	void *buffer2 = buffer;
 	int rlen;
@@ -494,9 +497,6 @@ static int erf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 
 static int rtclient_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
 	int numbytes;
-	static short lctr = 0;
-	struct dag_record_t *erfptr = 0;
-	int rlen;
 
 	if (buffer == 0)
 		buffer = malloc(len);
@@ -526,7 +526,6 @@ static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_pac
 	int numbytes = 0;
 	int size = 0;
 	char buf[RP_BUFSIZE];
-	dag_record_t *erfptr = 0;
 	int read_required = 0;
 	
 	void *buffer = 0;
@@ -718,11 +717,11 @@ static size_t erf_set_capture_length(struct libtrace_packet_t *packet, size_t si
 	return packet->size;
 }
 
-static int rtclient_get_fd(struct libtrace_packet_t *packet) {
+static int rtclient_get_fd(const struct libtrace_packet_t *packet) {
 	return packet->trace->format_data->input.fd;
 }
 
-static int erf_get_fd(struct libtrace_packet_t *packet) {
+static int erf_get_fd(const struct libtrace_packet_t *packet) {
 	return packet->trace->format_data->input.fd;
 }
 
