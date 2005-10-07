@@ -92,7 +92,7 @@ void secondreport() {
 
         if (hdrcount >= 10) {
                 printf("\tOUT\t\t\tIN\t\t\tOTHER\n");
-                printf("Bps\tpps\t\tBps\tpps\t\tBps\tpps\n");
+                printf("bps\tpps\t\tbps\tpps\t\tbps\tpps\n");
                 hdrcount = 0;
         }
         hdrcount++;
@@ -103,13 +103,13 @@ void secondreport() {
         }
         for (i = 0; i < 2; i++) {
                 printf("%d\t%d\t\t",
-                                counter[i][BYTES][SMOOTHED], 
+                                counter[i][BYTES][SMOOTHED]*8, 
                                 counter[i][PACKETS][SMOOTHED]);
                 counter[i][BYTES][INSTANT] = 0;
                 counter[i][PACKETS][INSTANT] = 0;
         }
         printf("%d\t%d\t\t",
-                        counter[2][BYTES][INSTANT],
+                        counter[2][BYTES][INSTANT]*8,
                         counter[2][PACKETS][INSTANT]);
         counter[2][BYTES][INSTANT] = 0;
         counter[2][PACKETS][INSTANT] = 0;
