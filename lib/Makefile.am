@@ -13,8 +13,8 @@ libtrace_la_LIBADD = @ADD_LIBS@ @LTLIBOBJS@
 libtrace_la_LDFLAGS=-version-info 2:22:0 @ADD_LDFLAGS@
 #libtrace_la_DEPENDENCIES = @DAGSOURCES@
 
-#dagapi.c:
-#	cp @DAG_TOOLS_DIR@/dagapi.c .
+dagapi.c:
+	cp @DAG_TOOLS_DIR@/dagapi.c .
 
-#dagopts.c:
-#	cp @DAG_TOOLS_DIR@/dagopts.c .
+dagopts.c:
+	cp @DAG_TOOLS_DIR@/dagopts.c .

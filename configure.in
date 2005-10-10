@@ -191,8 +191,6 @@ if test "$with_dag" != no; then
 		if test -r "$dag_lib_dir/libdag.so"; then
 			dag2_4=false
 		else
-			cp $dag_root/tools/dagopts.c lib/dagopts.c
-			cp $dag_root/tools/dagapi.c lib/dagapi.c
 			dag2_4=true
 		fi
         else
