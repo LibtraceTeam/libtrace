@@ -167,6 +167,13 @@ if test "$with_dag" != no; then
 	else
 		dag_lib_dir="$dag_root"
 	fi
+	
+	AC_MSG_CHECKING(if we are using DAG 2.4)
+	if grep '2.4.' /root/dag/VERSION > /dev/null; then
+		dag2_4=true
+	else
+		dag2_4=false
+	fi
 
         if test -r "$dag_root/tools" -a -r "$dag_root/include"; then
 		dag_tools_dir="$dag_root/tools"
@@ -184,11 +191,6 @@ if test "$with_dag" != no; then
 		DAG_TOOLS_DIR=$dag_tools_dir
 		AC_SUBST([DAG_TOOLS_DIR])
                 ac_cv_lbl_dag_api=yes
-		if test -r "$dag_lib_dir/libdag.so"; then
-			dag2_4=false
-		else
-			dag2_4=true
-		fi
                 
 		AC_DEFINE(HAVE_DAG_API, 1, [define if you have a DAG API])
 		AC_DEFINE(HAVE_DAG,1,[conditional for building with DAG support])
