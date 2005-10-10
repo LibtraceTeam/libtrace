@@ -1,5 +1,5 @@
 DOXYGEN_CONF = libtrace.doxygen
-DOXYGEN_FOLDERS = doxygen/html doxygen/latex
+DOXYGEN_FOLDERS = doxygen/html doxygen/man
 
 if HAS_DOXYGEN
 EXTRA_DIST = $(DOXYGEN_FOLDERS)
