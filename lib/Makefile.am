@@ -2,7 +2,7 @@ lib_LTLIBRARIES = libtrace.la
 include_HEADERS = libtrace.h dagformat.h wag.h 
 
 if DAG2_4
-libtrace_la_SOURCES = trace.c fifo.c fifo.h common.h format_template.c format_erf.c format_pcap.c format_wag.c format_helper.c format_helper.h parse_cmd.c parse_cmd.h libtrace_int.h dagopts.c dagapi.c
+libtrace_la_SOURCES = trace.c fifo.c fifo.h common.h format_template.c format_erf.c format_pcap.c format_wag.c format_helper.c format_helper.h parse_cmd.c parse_cmd.h libtrace_int.h
 nodist_libtrace_la_SOURCES = dagopts.c dagapi.c
 else
 libtrace_la_SOURCES = trace.c fifo.c fifo.h common.h format_template.c format_erf.c format_pcap.c format_wag.c format_helper.c format_helper.h parse_cmd.c parse_cmd.h libtrace_int.h

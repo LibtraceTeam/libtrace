@@ -30,7 +30,8 @@
 
 - Version 2.0.22
 	* Documentation updates
-	* Minor bugfixes
+	* Added pcap_dump_flush() replacement function
+	* Better doxygen detection
 
 - Version 2.0.21
 	* fixed error in output erf code, where we were missing 2 bytes

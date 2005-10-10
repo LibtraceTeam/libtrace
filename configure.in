@@ -3,7 +3,7 @@ AC_INIT(libtrace,2.0.22,[libtrace@wand.net.nz],libtrace)
 AC_CONFIG_SRCDIR(lib/trace.c)
 AM_INIT_AUTOMAKE
 
-AC_CONFIG_FILES([Makefile lib/Makefile])
+AC_CONFIG_FILES([Makefile lib/Makefile docs/Makefile])
 dnl GNU C library
 dnl AC_GNU_SOURCE
 
@@ -144,7 +144,7 @@ AC_ARG_WITH(dag,
         elif test "$withval" = yes
         then
                 want_dag=yes
-                dag_root=
+                dag_root=/root/dag
         else
                 want_dag=yes
                 dag_root=$withval
@@ -154,17 +154,13 @@ AC_ARG_WITH(dag,
         # Use DAG API if present, otherwise don't
         #
         want_dag=ifpresent
-        dag_root=
+        dag_root=/root/dag/
 ])
 
 ac_cv_lbl_dag_api=no
 dag2_4=false
 if test "$with_dag" != no; then
         AC_MSG_CHECKING(whether we have DAG API)
-
-        if test -z "$dag_root"; then
-                dag_root=$srcdir/../dag
-        fi
 
 	if test -r "$dag_root/lib"; then
 		dag_lib_dir="$dag_root/lib"
@@ -193,25 +189,31 @@ if test "$with_dag" != no; then
 		else
 			dag2_4=true
 		fi
+                
+		AC_DEFINE(HAVE_DAG_API, 1, [define if you have a DAG API])
+		AC_DEFINE(HAVE_DAG,1,[conditional for building with DAG support])
         else
-                ac_cv_lbl_dag_api=no
-        fi
-        AC_MSG_RESULT($ac_cv_lbl_dag_api)
-        if test $ac_cv_lbl_dag_api = no; then
                 if test "$want_dag" = yes; then
                         AC_MSG_ERROR(DAG API not found under directory $dag_root
 ; use --without-dag)
                 fi
-        else
-                AC_DEFINE(HAVE_DAG_API, 1, [define if you have a DAG API])
-		AC_DEFINE(HAVE_DAG,1,[conditional for building with DAG support])
+                ac_cv_lbl_dag_api=no
         fi
+        AC_MSG_RESULT($ac_cv_lbl_dag_api)
 else
 	AC_DEFINE(HAVE_DAG,0,[conditional for building with DAG support])
 fi
 
 AM_CONDITIONAL(HAVE_DAG, test x$ac_cv_lbl_dag_api = xyes)
 AM_CONDITIONAL(DAG2_4, test x$dag2_4 = xtrue)
+
+
+# Check for miscellaneous programs
+AC_CHECK_PROG([has_doxygen], [doxygen], [true], [false])
+
+AM_CONDITIONAL(HAS_DOXYGEN, [test x"$has_doxygen" = xtrue])
+
+
 
 # The following is commented out because it seems you don't actually
 # need it. libpcap 'just works' with large files, even under woody,
