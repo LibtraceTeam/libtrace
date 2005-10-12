@@ -1,0 +1,16 @@
+.TH TRACECONVERT "1" "October 2005" "traceconvert (libtrace)" "User Commands"
+.SH NAME
+traceconvert \- convert a trace from one format to another
+.SH SYNOPSIS
+.B traceconvert 
+inputuri outputuri ...
+.SH DESCRPTION
+traceconvert copies all packets from an inputuri to an output uri converting
+the trace as necessary.
+
+traceconvert is a shellscript wrapper around tracesplit(1)
+
+.SH SEE ALSO
+libtrace(3), tracemerge(1), tracesplit(1), tracefilter(1)
+.SH AUTHORS
+Perry Lorier <perry@cs.waikato.ac.nz>

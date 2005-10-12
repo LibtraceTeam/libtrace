@@ -1,0 +1,8 @@
+#!/bin/sh
+
+if [ $# -lt 2 ]; then
+	echo usage: $0 inputuri outputuri
+	exit 1
+fi
+
+exec tracesplit "$1" "$2"
