@@ -7,9 +7,12 @@ else
 EXTRA_DIST = 
 endif
 
-doxygen/html: 
+doxygen/html: doxy
 
-doxygen/latex: 
+doxygen/latex: doxy
+
+doxygen/man: doxy
+
 
 documentation: latex
 

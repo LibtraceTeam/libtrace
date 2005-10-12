@@ -3,7 +3,7 @@ SUBDIRS=lib docs
 AUTOMAKE_OPTIONS = 1.5
 
 
-#man_MANS = docs/man/man3/trace*.3 docs/man/man3/libtrace*.3 docs/man/man3/get*.3 
+man_MANS = docs/doxygen/man/man3/trace*.3 docs/doxygen/man/man3/libtrace*.3 
 #man_MANS = @MANPAGES@
 EXTRA_DIST=examples 
 #docs/html docs/latex docs/man $(man_MANS)
@@ -21,8 +21,7 @@ dist-hook:
 	for i in `\ls examples | grep -v CVS`; do make -C examples/$$i clean; done
 	rm -rf `find $(distdir)/examples -name CVS`
 
-#docs/man/man3/*.3:
-#	doxygen libtrace.doxygen
+docs/doxygen/man/man3/*.3: docs
 
 #docs:
 #	doxygen libtrace.doxygen
