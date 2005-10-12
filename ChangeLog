@@ -32,6 +32,7 @@
 	* Documentation updates
 	* Added pcap_dump_flush() replacement function
 	* Better doxygen detection
+	* Support for legacy DAG POS, ATM and Ethernet formats
 
 - Version 2.0.21
 	* fixed error in output erf code, where we were missing 2 bytes
