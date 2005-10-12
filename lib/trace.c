@@ -528,6 +528,13 @@ void *trace_get_link(const struct libtrace_packet_t *packet) {
         return (void *)ethptr;
 }
 
+typedef struct legacy_framing {
+	uint64_t 	ts;
+	uint32_t	crc;
+	uint32_t	header;
+	uint32_t	data[12]; /* pad to 64 bytes */
+} legacy_framing_t;
+
 /* get a pointer to the IP header (if any)
  * @param packet	a pointer to a libtrace_packet structure
  *
@@ -634,6 +641,35 @@ struct libtrace_ip *trace_get_ip(const struct libtrace_packet_t *packet) {
 				}
 				ipptr =  (void*)&atm->pload;
 				break;
+			}
+		case TRACE_TYPE_LEGACY_POS:
+			{
+				// 64 byte capture. 
+				legacy_framing_t *cell = 
+					trace_get_link(packet);
+				// check ethertype
+				uint16_t *etype = (uint16_t *)cell->data + 1;
+				if (*etype == 0x0008) {
+					ipptr = (void *)&cell->data[1];
+				} else {
+					ipptr = NULL;
+				}
+				break;
+				
+			}
+		case TRACE_TYPE_LEGACY_ATM:
+		case TRACE_TYPE_LEGACY_ETH:
+		case TRACE_TYPE_LEGACY:
+			{
+				// 64 byte capture.
+				legacy_framing_t *cell =
+					trace_get_link(packet);
+				uint16_t *etype = (uint16_t *)cell->data + 3;
+				if (*etype == 0x0008) {
+					ipptr = (void *)&cell->data[2];
+				} else {
+					ipptr = NULL;
+				}
 			}
 		default:
 			fprintf(stderr,"Don't understand link layer type %i in trace_get_ip()\n",

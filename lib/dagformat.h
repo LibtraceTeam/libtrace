@@ -10,49 +10,49 @@
 
 /* GPP Type 1 */
 typedef struct pos_rec {
-	unsigned                hdlc;
-	unsigned char           pload[1];
+	uint32_t  hdlc;
+	uint8_t	  pload[1];
 }  pos_rec_t;
 
 /* GPP Type 2 */
 typedef struct eth_rec {
-	unsigned char           offset;
-	unsigned char           pad;
-	unsigned char           dst[6];
-	unsigned char           src[6];
-	unsigned short          etype;
-	unsigned char           pload[1];
+	uint8_t   offset;
+	uint8_t   pad;
+	uint8_t   dst[6];
+	uint8_t   src[6];
+	uint16_t  etype;
+	uint8_t   pload[1];
 }  eth_rec_t;
 
 /* GPP Type 3 */
 typedef struct atm_rec {
-	unsigned                header; 
-	unsigned char           pload[1];
+	uint32_t  header; 
+	uint8_t   pload[1];
 }  atm_rec_t;
 
 /* GPP Type 4 */
 typedef struct aal5_rec {
-	unsigned                header; 
-	unsigned char           pload[1];
+	uint32_t  header; 
+	uint8_t   pload[1];
 }  aal5_rec_t;
 
 typedef struct flags {
-	unsigned char           iface:2;
-	unsigned char           vlen:1;
-	unsigned char           trunc:1;
-	unsigned char           rxerror:1;
-	unsigned char           dserror:1;
-	unsigned char           pad:2;
+	uint8_t   iface:2;
+	uint8_t   vlen:1;
+	uint8_t   trunc:1;
+	uint8_t   rxerror:1;
+	uint8_t   dserror:1;
+	uint8_t   pad:2;
 } __attribute__((packed)) flags_t;
 
 /* GPP Global type */
 typedef struct dag_record {
-	unsigned long long      ts;
-	unsigned char           type;
-	flags_t                 flags;
-	unsigned short          rlen;
-	unsigned short          lctr;
-	unsigned short          wlen;
+	uint64_t  ts;
+	uint8_t   type;
+	flags_t   flags;
+	uint16_t  rlen;
+	uint16_t  lctr;
+	uint16_t  wlen;
 	union {
 		pos_rec_t       pos;
 		eth_rec_t       eth;
@@ -64,22 +64,39 @@ typedef struct dag_record {
 
 typedef struct duck_inf
 {
-        unsigned long   Command, Config, Clock_Inc, Clock_Wrap, DDS_Rate;
-        unsigned long   Crystal_Freq;
-        unsigned long   Synth_Freq, Sync_Rate;
-        unsigned long   long Last_Ticks;
-        unsigned long   Resyncs;
-        unsigned long   Bad_Diffs, Bad_Offs, Bad_Pulses;
-        unsigned long   Worst_Error, Worst_Off;
-        unsigned long   Off_Limit, Off_Damp;
-        unsigned long   Pulses, Single_Pulses_Missing, Longest_Pulse_Missing;
-        unsigned long   Health, Sickness;
-        long            Error, Offset;
-        long            Stat_Start, Stat_End;   /* these are really time_t's */
-        unsigned long   Set_Duck_Field;
+        uint32_t  Command, Config, Clock_Inc, Clock_Wrap, DDS_Rate;
+        uint32_t  Crystal_Freq;
+        uint32_t  Synth_Freq, Sync_Rate;
+        uint64_t  Last_Ticks;
+        uint32_t  Resyncs;
+        uint32_t  Bad_Diffs, Bad_Offs, Bad_Pulses;
+        uint32_t  Worst_Error, Worst_Off;
+        uint32_t  Off_Limit, Off_Damp;
+        uint32_t  Pulses, Single_Pulses_Missing, Longest_Pulse_Missing;
+        uint32_t  Health, Sickness;
+        int32_t   Error, Offset;
+        int32_t   Stat_Start, Stat_End;   /* these are really time_t's */
+        uint32_t  Set_Duck_Field;
 } duck_inf;
 
 #define dag_record_size         16
 
+/*
+typedef struct legacy_cell {
+	uint64_t  ts;
+	uint32_t  crc;
+} legacy_cell_t;
+
+typedef struct legacy_ether {
+	uint64_t  ts;
+	uint16_t  wlen;
+} legacy_ether_t;
+
+typedef struct legacy_pos {
+	uint64_t  ts;
+	uint32_t  slen;
+	uint32_t  wlen;
+} legacy_pos_t;
+*/	
 
 #endif // _DAGFORMAT_H_
