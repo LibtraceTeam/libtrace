@@ -1,0 +1,43 @@
+.TH TRACESPLIT "1" "October 2005" "tracesplit (libtrace)" "User Commands"
+.SH NAME
+tracesplit \- split traces
+.SH SYNOPSIS
+.B tracemerge 
+outputuri inputuri ...
+.SH DESCRPTION
+tracesplit splits one trace into multiple tracefiles
+.TP
+\fB\-f\fR bpf filter
+output only packets that match tcpdump style bpf filter
+
+.TP
+\fB\-c\fR count
+output count packets per output file
+
+.TP
+\fB\-b\fR bytes
+output bytes bytes per file
+
+.TP
+\fB\-i\fR seconds
+start a new tracefile after "seconds" seconds
+
+.TP
+\fB\-s\fR unixtime
+don't output any packets before unixtime
+
+.TP
+\fB\-e\fR unixtime
+don't output any packets after unixtime
+
+.SH EXAMPLES
+create a 1MB erf trace of port 80 traffic.
+.nf
+tracemerge erf:/traces/bigtrace.gz \-f 'port 80' \-b $[ 1024 * 1024 ] 
+erf:/traces/port80.gz 
+.fi
+
+.SH SEE ALSO
+libtrace(3), tracemerge(3)
+.SH AUTHORS
+Perry Lorier <perry@cs.waikato.ac.nz>
