@@ -1,0 +1,15 @@
+.TH TRACESPLIT "1" "October 2005" "tracefilter (libtrace)" "User Commands"
+.SH NAME
+tracefilter \- apply a bpf filter to a trace
+.SH SYNOPSIS
+.B tracefilter 
+inputuri bpf outputuri ...
+.SH DESCRPTION
+tracefilter copies all packets that match a bpf expression to an output file.
+
+tracefilter is a shellscript wrapper around tracesplit(1)
+
+.SH SEE ALSO
+libtrace(1), tracemerge(1), tracesplit(1)
+.SH AUTHORS
+Perry Lorier <perry@cs.waikato.ac.nz>
