@@ -532,6 +532,13 @@ static int erf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 	size = rlen - dag_record_size;
 	assert(size < LIBTRACE_PACKET_BUFSIZE);
 	buffer2 = buffer + dag_record_size;
+	/* If your trace is legacy, or corrupt, then this assert may fire. */
+	assert(((dag_record_t *)buffer)->rlen <= 
+			((dag_record_t*)buffer)->wlen+sizeof(dag_record_t));
+	/* If it's an unknown type, your trace is legacy */
+	assert(((dag_record_t *)buffer)->type != 0);
+	/* Unknown/corrupt */
+	assert(((dag_record_t *)buffer)->type < 10);
 	
 	// read in the rest of the packet
 #ifdef HAVE_ZLIB
