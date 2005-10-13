@@ -157,6 +157,8 @@ AC_ARG_WITH(dag,
         dag_root=/root/dag/
 ])
 
+# turn the test part of the next block into a function, so it can be 
+# called multiple times for $dag_root, /root/dag, /usr/local/lib
 ac_cv_lbl_dag_api=no
 dag2_4=false
 if test "$with_dag" != no; then
@@ -169,7 +171,7 @@ if test "$with_dag" != no; then
 	fi
 	
 	AC_MSG_CHECKING(if we are using DAG 2.4)
-	if grep '2.4.' /root/dag/VERSION > /dev/null; then
+	if grep '2.4.' $dag_root/VERSION > /dev/null; then
 		dag2_4=true
 	else
 		dag2_4=false

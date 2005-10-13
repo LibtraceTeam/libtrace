@@ -43,55 +43,6 @@
 #include  "format_helper.h"
 
 #include <sys/ioctl.h>
-/*
-int trace_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
-        int numbytes;
-        static short lctr = 0;
-        int rlen;
-	assert(libtrace);
-        assert(len >= 0);
-
-        if (buffer == 0)
-                buffer = malloc(len);
-
-	while(1) {
-		switch(libtrace->sourcetype) {
-			case DEVICE:
-				if ((numbytes=read(INPUT.fd, 
-								buffer, 
-								len)) == -1) {
-					perror("read");
-					return -1;
-				}
-				break;
-			default:
-#if HAVE_ZLIB
-				if ((numbytes=gzread(INPUT.file,
-								buffer,
-								len)) == -1) {
-					perror("gzread");
-					return -1;
-				}
-#else
-				if ((numbytes=fread(buffer,len,1,
-					INPUT.file)) == 0 ) {
-					if(feof(INPUT.file)) {
-						return 0;
-					}
-					if(ferror(INPUT.file)) {
-						perror("fread");
-						return -1;
-					}
-					return 0;
-				}
-#endif
-		}
-		break;
-	}
-        return numbytes;
-
-}
-*/
 
 struct libtrace_eventobj_t trace_event_device(struct libtrace_t *trace, struct libtrace_packet_t *packet) {
 	struct libtrace_eventobj_t event;

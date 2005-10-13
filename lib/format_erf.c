@@ -30,6 +30,7 @@
 #define _GNU_SOURCE
 
 #include "config.h"
+#include "common.h"
 #include "libtrace.h"
 #include "libtrace_int.h"
 #include "format_helper.h"
@@ -60,6 +61,19 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+
+#if HAVE_ZLIB
+#  include <zlib.h>
+#  define LIBTRACE_READ gzread
+#  define LIBTRACE_FDOPEN gzdopen
+#  define LIBTRACE_CLOSE gzclose
+#  define LIBTRACE_WRITE gzwrite
+#else
+#  define LIBTRACE_READ read
+#  define LIBTRACE_FDOPEN open
+#  define LIBTRACE_CLOSE close
+#  define LIBTRACE_WRITE write
+#endif
 
 /* Catch undefined O_LARGEFILE on *BSD etc */
 #ifndef O_LARGEFILE
@@ -187,11 +201,7 @@ static int erf_init_input(struct libtrace_t *libtrace) {
 	if (!strncmp(CONNINFO.path,"-",1)) {
 		// STDIN
 		libtrace->sourcetype = STDIN;
-#if HAVE_ZLIB
-		INPUT.file = gzdopen(STDIN, "r");
-#else	
-		INPUT.file = stdin;
-#endif
+		INPUT.file = LIBTRACE_FDOPEN(STDIN, "r");
 
 	} else {
 		if (stat(CONNINFO.path,&buf) == -1 ) {
@@ -218,22 +228,16 @@ static int erf_init_input(struct libtrace_t *libtrace) {
 				return 0;
 			}
 		} else { 
-			libtrace->sourcetype = TRACE;
-#if HAVE_ZLIB
-			// using gzdopen means we can set O_LARGEFILE
-			// ourselves. However, this way is messy and 
-			// we lose any error checking on "open"
-			INPUT.file = 
-				gzdopen(open(
-					CONNINFO.path,
-					O_LARGEFILE), "r");
-#else
-			INPUT.file = 
-				fdopen(open(
-					CONNINFO.path,
-					O_LARGEFILE), "r");
-#endif
 
+			libtrace->sourcetype = TRACE;
+
+			// we use an FDOPEN call to reopen an FD
+			// returned from open(), so that we can set
+			// O_LARGEFILE. This gets around gzopen not
+			// letting you do this...
+			INPUT.file = LIBTRACE_FDOPEN(open(
+						CONNINFO.path,
+						O_LARGEFILE),"r");
 		}
 	}
 	return 1;
@@ -298,15 +302,15 @@ static int erf_init_output(struct libtrace_out_t *libtrace) {
 		calloc(1,sizeof(struct libtrace_format_data_out_t));
 
 	OPTIONS.erf.level = 0;
+#if HAVE_ZLIB
 	asprintf(&filemode,"wb%d",OPTIONS.erf.level);
+#else
+	asprintf(&filemode,"w");
+#endif
 
         if (!strncmp(libtrace->uridata,"-",1)) {
                 // STDOUT
-#if HAVE_ZLIB
-                OUTPUT.file = gzdopen(dup(1), filemode);
-#else
-                OUTPUT.file = stdout;
-#endif
+		OUTPUT.file = LIBTRACE_FDOPEN(dup(1),filemode);
 	}
 	else {
 	        // TRACE
@@ -314,14 +318,7 @@ static int erf_init_output(struct libtrace_out_t *libtrace) {
 		if (fd <= 0) {
 			return 0;
 		}
-#if HAVE_ZLIB
-                // using gzdopen means we can set O_LARGEFILE
-                // ourselves. However, this way is messy and
-                // we lose any error checking on "open"
-                OUTPUT.file =  gzdopen(fd, filemode);
-#else
-		OUTPUT.file =  fdopen(fd, "w");
-#endif
+		OUTPUT.file = LIBTRACE_FDOPEN(fd,filemode);
 		 
 	}
 	free(filemode);	
@@ -369,11 +366,7 @@ static int dag_fin_input(struct libtrace_t *libtrace) {
 #endif
 
 static int erf_fin_input(struct libtrace_t *libtrace) {
-#if HAVE_ZLIB
-	gzclose(INPUT.file);
-#else	
-	fclose(INPUT.file);	
-#endif
+	LIBTRACE_CLOSE(INPUT.file);
 	free(libtrace->format_data);
 	return 0;
 }
@@ -384,11 +377,7 @@ static int rtclient_fin_input(struct libtrace_t *libtrace) {
 }
 
 static int erf_fin_output(struct libtrace_out_t *libtrace) {
-#if HAVE_ZLIB
-        gzclose(OUTPUT.file);
-#else
-        fclose(OUTPUT.file);
-#endif
+	LIBTRACE_CLOSE(OUTPUT.file);
 	free(libtrace->format_data);
 
 	return 0;
@@ -466,19 +455,12 @@ static int legacy_read_packet(struct libtrace_t *libtrace, struct libtrace_packe
 	dag_record_t *erfptr = (dag_record_t *)buffer;
 	int rlen;
 
-#if HAVE_ZLIB
-	if ((numbytes=gzread(INPUT.file,
+	if ((numbytes=LIBTRACE_READ(INPUT.file,
 					buffer,
 					dag_record_size)) == -1) {
-		perror("gzread");
+		perror("libtrace_read");
 		return -1;
 	}
-#else
-	if ((numbytes = read(INPUT.file, buffer, dag_record_size)) == -1) {
-		perror("read");
-		return -1;
-	}
-#endif
 	if (numbytes == 0) {
 		return 0;
 	}
@@ -489,19 +471,12 @@ static int legacy_read_packet(struct libtrace_t *libtrace, struct libtrace_packe
 	size = rlen - dag_record_size;
 	buffer2 = buffer + dag_record_size;
 	
-#ifdef HAVE_ZLIB
-	if ((numbytes=gzread(INPUT.file,
+	if ((numbytes=LIBTRACE_READ(INPUT.file,
 					buffer2,
 					size)) == -1) {
-		perror("gzread");
+		perror("libtrace_read");
 		return -1;
 	}
-#else
-	if ((numbytes = read(INPUT.file,buffer2,size)) == -1) {
-		perror("gzread");
-		return -1;
-	}
-#endif
 	packet->status = 0;
 	packet->size = rlen;
 	return rlen;
@@ -512,19 +487,12 @@ static int erf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 	void *buffer = packet->buffer;
 	void *buffer2 = buffer;
 	int rlen;
-#if HAVE_ZLIB
-	if ((numbytes=gzread(INPUT.file,
+	if ((numbytes=LIBTRACE_READ(INPUT.file,
 					buffer,
 					dag_record_size)) == -1) {
-		perror("gzread");
+		perror("libtrace_read");
 		return -1;
 	}
-#else
-	if ((numbytes = read(INPUT.file, buffer, dag_record_size)) == -1) {
-		perror("read");
-		return -1;
-	}
-#endif
 	if (numbytes == 0) {
 		return 0;
 	}
@@ -541,19 +509,12 @@ static int erf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 	assert(((dag_record_t *)buffer)->type < 10);
 	
 	// read in the rest of the packet
-#ifdef HAVE_ZLIB
-	if ((numbytes=gzread(INPUT.file,
+	if ((numbytes=LIBTRACE_READ(INPUT.file,
 					buffer2,
 					size)) == -1) {
-		perror("gzread");
+		perror("libtrace_read");
 		return -1;
 	}
-#else
-	if ((numbytes = read(INPUT.file,buffer2,size)) == -1) {
-		perror("gzread");
-		return -1;
-	}
-#endif
 	packet->status = 0;
 	packet->size = rlen;
 	return rlen;
@@ -643,25 +604,14 @@ static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_pac
 
 static int erf_dump_packet(struct libtrace_out_t *libtrace, dag_record_t *erfptr, void *buffer, size_t size) {
 	int numbytes = 0;
-#if HAVE_ZLIB
-	if ((numbytes = gzwrite(OUTPUT.file, erfptr, dag_record_size + 2)) == 0) {
-		perror("gzwrite");
+	if ((numbytes = LIBTRACE_WRITE(OUTPUT.file, erfptr, dag_record_size + 2)) == 0) {
+		perror("libtrace_write");
 		return -1;
 	}
-	if ((numbytes = gzwrite(OUTPUT.file, buffer, size)) == 0) {
-		perror("gzwrite");
+	if ((numbytes = LIBTRACE_WRITE(OUTPUT.file, buffer, size)) == 0) {
+		perror("libtrace_write");
 		return -1;
 	}
-#else
-	if ((numbytes = write(OUTPUT.file, erfptr, dag_record_size + 2)) == 0) {
-		perror("write");
-		return -1;
-	}
-	if ((numbytes = write(OUTPUT.file, buffer, size)) == 0) {
-		perror("write");
-		return -1;
-	}
-#endif
 	return numbytes + sizeof(dag_record_t);
 
 }
@@ -714,9 +664,7 @@ static int erf_write_packet(struct libtrace_out_t *libtrace, struct libtrace_pac
 
 
 static void *legacy_get_link(const struct libtrace_packet_t *packet) {
-	const void *posptr = 0;
-	posptr = ((uint8_t *)packet->buffer);
-	return (void *)posptr;
+	return (void *)packet->buffer;
 }
 
 static libtrace_linktype_t legacy_get_link_type(const struct libtrace_packet_t *packet) {
@@ -783,7 +731,17 @@ static int legacy_get_capture_length(const struct libtrace_packet_t *packet __at
 }
 
 static int legacypos_get_wire_length(const struct libtrace_packet_t *packet) {
-	
+	legacy_pos_t *lpos = (legacy_pos_t *)packet->buffer;
+	return ntohs(lpos->wlen);
+}
+
+static int legacyatm_get_wire_length(const struct libtrace_packet_t *packet) {
+	return 53;
+}
+
+static int legacyeth_get_wire_length(const struct libtrace_packet_t *packet) {
+	legacy_ether_t *leth = (legacy_ether_t *)packet->buffer;
+	return ntohs(leth->wlen);
 }
 static int erf_get_capture_length(const struct libtrace_packet_t *packet) {
 	dag_record_t *erfptr = 0;
@@ -928,7 +886,7 @@ static struct libtrace_format_t legacyatm = {
 	NULL,				/* get_timeval */
 	NULL,				/* get_seconds */
 	legacy_get_capture_length,	/* get_capture_length */
-	NULL,				/* get_wire_length */
+	legacyatm_get_wire_length,	/* get_wire_length */
 	NULL,				/* set_capture_length */
 	NULL,				/* get_fd */
 	trace_event_trace,		/* trace_event */
@@ -954,11 +912,11 @@ static struct libtrace_format_t legacyeth = {
 	NULL,				/* get_timeval */
 	NULL,				/* get_seconds */
 	legacy_get_capture_length,	/* get_capture_length */
-	NULL,				/* get_wire_length */
+	legacyeth_get_wire_length,	/* get_wire_length */
 	NULL,				/* set_capture_length */
 	NULL,				/* get_fd */
 	trace_event_trace,		/* trace_event */
-	legacyatm_help			/* help */
+	legacyeth_help			/* help */
 };
 
 static struct libtrace_format_t legacypos = {
@@ -980,7 +938,7 @@ static struct libtrace_format_t legacypos = {
 	NULL,				/* get_timeval */
 	NULL,				/* get_seconds */
 	legacy_get_capture_length,	/* get_capture_length */
-	NULL,				/* get_wire_length */
+	legacypos_get_wire_length,	/* get_wire_length */
 	NULL,				/* set_capture_length */
 	NULL,				/* get_fd */
 	trace_event_trace,		/* trace_event */

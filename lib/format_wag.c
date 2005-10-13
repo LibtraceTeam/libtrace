@@ -62,6 +62,19 @@
 #include <string.h>
 #include <stdlib.h>
 
+#if HAVE_ZLIB
+#  include <zlib.h>
+#  define LIBTRACE_READ gzread
+#  define LIBTRACE_FDOPEN gzdopen
+#  define LIBTRACE_CLOSE gzclose
+#  define LIBTRACE_WRITE gzwrite
+#else
+#  define LIBTRACE_READ read
+#  define LIBTRACE_FDOPEN open
+#  define LIBTRACE_CLOSE close
+#  define LIBTRACE_WRITE write
+#endif
+
 #ifdef HAVE_LIMITS_H
 #  include <limits.h>
 #endif
@@ -127,13 +140,9 @@ static int wag_init_input(struct libtrace_t *libtrace) {
 		calloc(1,sizeof(struct libtrace_format_data_t));
 	CONNINFO.path = libtrace->uridata;
 	if (!strncmp(CONNINFO.path,"-",1)) {
-		libtrace->sourcetype = STDIN;
 		// STDIN
-#if HAVE_ZLIB
-		INPUT.file = gzdopen(STDIN, "r");
-#else	
-		INPUT.file = stdin;
-#endif
+		libtrace->sourcetype = STDIN;
+		INPUT.file = LIBTRACE_FDOPEN(STDIN,"r");
 
 	} else {
 		if (stat(CONNINFO.path,&buf) == -1 ) {
@@ -163,20 +172,14 @@ static int wag_init_input(struct libtrace_t *libtrace) {
 		} else { 
 			// TRACE
 			libtrace->sourcetype = TRACE;
-#if HAVE_ZLIB
-			// using gzdopen means we can set O_LARGEFILE
-			// ourselves. However, this way is messy and 
-			// we lose any error checking on "open"
-			INPUT.file = 
-				gzdopen(open(
+			
+			// we use an FDOPEN call to reopen an FD
+			// returned from open(), so that we can set
+			// O_LARGEFILE. This gets around gzopen not
+			// letting you do this...
+			INPUT.file = LIBTRACE_FDOPEN(open(
 					CONNINFO.path,
 					O_LARGEFILE), "r");
-#else
-			INPUT.file = 
-				fdopen(open(
-					CONNINFO.path,
-					O_LARGEFILE), "r");
-#endif
 
 		}
 	}
@@ -192,23 +195,13 @@ static int wag_init_output(struct libtrace_out_t *libtrace) {
 	asprintf(&filemode,"wb%d",OPTIONS.zlib.level);
 	if (!strncmp(libtrace->uridata,"-",1)) {
 		// STDOUT				
-#if HAVE_ZLIB
-		OUTPUT.file = gzdopen(dup(1), filemode);
-#else
-		OUTPUT.file = stdout;
-#endif
+		OUTPUT.file = LIBTRACE_FDOPEN(dup(1), filemode);
 	} else {
 		// TRACE
-#if HAVE_ZLIB
-		OUTPUT.file = gzdopen(open(
+		OUTPUT.file = LIBTRACE_FDOPEN(open(
 					libtrace->uridata,
 					O_CREAT | O_LARGEFILE | O_WRONLY,
 					S_IRUSR | S_IWUSR), filemode);
-#else
-		OUTPUT.file = fdopen(open(
-					O_CREAT | O_LARGEFILE | O_WRONLY,
-					S_IRUSR | S_IWUSR), "w");
-#endif
 	}
 
 	return 1;
@@ -243,20 +236,12 @@ static int wag_config_output(struct libtrace_out_t *libtrace, int argc, char *ar
 }
 
 static int wag_fin_input(struct libtrace_t *libtrace) {
-#if HAVE_ZLIB
-	gzclose(INPUT.file);
-#else	
-	fclose(INPUT.file);	
-#endif
+	LIBTRACE_CLOSE(INPUT.file);
 	return 0;
 }
 
 static int wag_fin_output(struct libtrace_out_t *libtrace) {
-#if HAVE_ZLIB
-	gzclose(OUTPUT.file);
-#else
-	fclose(OUTPUT.file);
-#endif
+	LIBTRACE_CLOSE(OUTPUT.file);
 	return 0;
 }
 
@@ -278,26 +263,12 @@ static int wag_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
 				}
 				break;
 			default:
-#if HAVE_ZLIB
-				if ((numbytes=gzread(INPUT.file,
+				if ((numbytes=LIBTRACE_READ(INPUT.file,
 								buffer,
 								len)) == -1) {
-					perror("gzread");
+					perror("libtrace_read");
 					return -1;
 				}
-#else
-				if ((numbytes=fread(buffer,len,1,
-					INPUT.file)) == 0 ) {
-					if(feof(INPUT.file)) {
-						return 0;
-					}
-					if(ferror(INPUT.file)) {
-						perror("fread");
-						return -1;
-					}
-					return 0;
-				}
-#endif
 		}
 		break;
 	}
@@ -367,17 +338,10 @@ static int wag_write_packet(struct libtrace_out_t *libtrace, struct libtrace_pac
 				packet->trace->format->name);
 		return -1;
 	}
-#if HAVE_ZLIB
-	if ((numbytes = gzwrite(OUTPUT.file, packet->buffer, packet->size)) == 0) {
-		perror("gzwrite");
+	if ((numbytes = LIBTRACE_WRITE(OUTPUT.file, packet->buffer, packet->size)) == 0) {
+		perror("libtrace_write");
 		return -1;
 	}
-#else
-	if ((numbytes = write(OUTPUT.file, packet->buffer, packet->size)) == 0) {
-		perror("write");
-		return -1;
-	}
-#endif
 	return numbytes;
 }
 
