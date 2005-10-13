@@ -1,0 +1,70 @@
+.TH TRACEANON "1" "October 2005" "traceanon (libtrace)" "User Commands"
+.SH NAME
+traceanon \- anonymise ip addresses of traces
+.SH SYNOPSIS
+.B traceanon 
+[ \-s | \-\^\-encrypt-source ]
+[ \-d | \-\^\-encrypt-dest ]
+[ \-p prefix | \-\^\-prefix=prefix ]
+[ \-c key | \-\^\-cryptopan=key ]
+.SH DESCRPTION
+traceanon anonymises a trace by replacing IP addresses found in the IP header,
+and any embedded packets inside an ICMP packet.  It also fixes the checksums
+inside TCP and UDP headers.
+
+Two anonymisation schemes are supported, the first replaces a prefix with
+another prefix.  This can be used for instance to replace a /16 with the
+equivilent prefix from RFC1918.  The other scheme is cryptopan which is a
+prefix preserving encryption scheme based on AES.
+.TP
+.PD 0
+.BI \-s 
+.TP
+.PD
+.BI \-\^\-encrypt-source
+encrypt only source ip addresses.
+
+.TP
+.PD 0
+.BI \-d 
+.TP
+.PD
+.BI \-\^\-encrypt-dest
+encrypt only destination ip addresses.
+
+.TP
+.PD 0
+.BI \-p 
+.TP
+.PD
+.BI \-\^\-prefix=prefix
+substitute the high bits of the IP addresses with the provided prefix.
+
+.TP
+.PD 0
+.BI \-c 
+.TP
+.PD
+.BI \-\^\-cryptopan=key
+encrypt the IP addresses using the prefix-preserving cryptopan method using
+the key "key".  The key can be up to 32 bytes long, and will be padded with
+NUL charactors.
+
+
+.SH EXAMPLES
+.nf
+traceanon \-\^\-cryptopan="fish go moo, oh yes they do" \\
+	\-\^\-encrypt-source \\
+	erf:/traces/unenc.gz \\
+	erf:/traces/enc.gz \\
+.fi
+
+.SH BUGS
+This software should support encrypting based on the direction/interface flag.
+
+.SH SEE ALSO
+libtrace(3), tracemerge(1), tracefilter(1), traceconvert(1), tracestats(1),
+tracesummary(1)
+
+.SH AUTHORS
+Perry Lorier <perry@cs.waikato.ac.nz>
