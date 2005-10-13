@@ -55,12 +55,15 @@ NUL charactors.
 .nf
 traceanon \-\^\-cryptopan="fish go moo, oh yes they do" \\
 	\-\^\-encrypt-source \\
+	\-\^\-encrypt-dest \\
 	erf:/traces/unenc.gz \\
 	erf:/traces/enc.gz \\
 .fi
 
 .SH BUGS
 This software should support encrypting based on the direction/interface flag.
+
+IP addresses inside ARP's are not encrypted.
 
 .SH SEE ALSO
 libtrace(3), tracemerge(1), tracefilter(1), traceconvert(1), tracestats(1),

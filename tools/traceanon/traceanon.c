@@ -95,59 +95,15 @@ void encrypt_ips(struct libtrace_ip *ip,bool enc_source,bool enc_dest)
 	}
 }
 
-double parse_date(const char *date)
-{
-	struct tm *parsed_time;
-
-	parsed_time=getdate(date);
-
-	if (parsed_time) {
-		return (double)mktime(parsed_time);
-	}
-
-	switch(getdate_err) {
-		case 1:
-			fprintf(stderr,"Cannot parse date: The DATEMSK environmental variable is null or undefined\n");
-			break;
-		case 2:
-			fprintf(stderr,"The date template file '%s' cannot be opened for reading\n",getenv("DATEMSK"));
-			break;
-		case 3:
-			fprintf(stderr,"Failed to get file status information for '%s'\n",getenv("DATEMSK"));
-			break;
-		case 4:
-			fprintf(stderr,"%s: Not a regular file\n",getenv("DATEMSK"));
-			break;
-		case 5:
-			fprintf(stderr,"An error occured reading '%s'\n",getenv("DATEMSK"));
-			break;
-		case 6:
-			fprintf(stderr,"Out of memory reading '%s'\n",getenv("DATEMSK"));
-			break;
-		case 7:
-			fprintf(stderr,"Could not parse '%s'\n",date);
-			break;
-		case 8:
-			fprintf(stderr,"Invalid specification in '%s'\n",getenv("DATEMSK"));
-			break;
-		default:
-			fprintf(stderr,"Unable to parse date '%s': Unknown error\n",date);
-	}
-	exit(1);
-}
-
 int main(int argc, char *argv[]) 
 {
 	enum enc_type_t enc_type = ENC_NONE;
 	char *key = NULL;
-	struct libtrace_filter_t *filter = NULL;
 	struct libtrace_t *trace = 0;
 	struct libtrace_packet_t packet;
 	struct libtrace_out_t *writer = 0;
 	bool enc_source = false;
 	bool enc_dest 	= false;
-	double start_time = 0;
-	double end_time = 1e100;
 	char *output = 0;
 
 	if (argc<2)
@@ -160,13 +116,10 @@ int main(int argc, char *argv[])
 			{ "encrypt-dest",	0, 0, 'd' },
 			{ "cryptopan",		1, 0, 'c' },
 			{ "prefix",		1, 0, 'p' },
-			{ "filter",		1, 0, 'f' },
-			{ "start-time",		1, 0, 'b' },
-			{ "end-time",		1, 0, 'e' },
 			{ NULL,			0, 0, 0 },
 		};
 
-		int c=getopt_long(argc, argv, "sb:c:de:p:f:",
+		int c=getopt_long(argc, argv, "sc:dp:",
 				long_options, &option_index);
 
 		if (c==-1)
@@ -190,19 +143,6 @@ int main(int argc, char *argv[])
 				  }
 				  key=strdup(optarg);
 				  enc_type = ENC_PREFIX_SUBSTITUTION;
-				  break;
-			case 'f':
-				  if (filter!=NULL) {
-					  fprintf(stderr,"You can only have one filter (use and!)\n");
-					  usage(argv[0]);
-				  }
-				  filter=trace_bpf_setfilter(optarg);
-				  break;
-			case 'b': /* "begin" time */
-				  start_time = parse_date(optarg);
-				  break;
-			case 'e': /* "end" time */
-				  start_time = parse_date(optarg);
 				  break;
 			default:
 				fprintf(stderr,"unknown option: %c\n",c);
@@ -238,21 +178,8 @@ int main(int argc, char *argv[])
 	for(;;) {
 		struct libtrace_ip *ipptr;
 		int psize;
-		double ts;
 		if ((psize = trace_read_packet(trace, &packet)) <= 0) {
 			break;
-		}
-
-		/* Skip packets that don't match the filter */
-		if (filter && !trace_bpf_filter(filter,&packet)) {
-			continue;
-		}
-
-		ts = trace_get_seconds(&packet);
-
-		/* skip packets before/after the time */
-		if (ts < start_time || ts > end_time) {
-			continue;
 		}
 
 		ipptr = trace_get_ip(&packet);
