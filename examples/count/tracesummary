@@ -4,7 +4,8 @@ if [ $# -lt 1 ]; then
 	echo usage: $0 inputuri...
 fi
 
-exec tracestats --filter 'not ip' \
+exec tracestats --filter 'not ip and not ip6' \
+		--filter 'ip6' \
 		--filter 'ip' \
 		--filter tcp \
 		--filter udp \
