@@ -8,7 +8,7 @@ CFLAGS += $(INCLUDE)
 libdir = -L$(PREFIX)/lib
 LDLIBS = $(libdir) -ltrace
 
-BINS = count 
+BINS = tracestats
 .PHONY: all clean distclean install depend
 
 all: $(BINS) 

@@ -29,9 +29,8 @@
  */
 
 // 
-// This program takes a trace and outputs every packet that it sees to standard
-// out, decoding source/dest IP's, protocol type, and the timestamp of this
-// packet.
+// This program takes a series of traces and bpf filters and outputs how many
+// bytes/packets
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -62,14 +61,16 @@ struct filter_t {
 	uint64_t bytes;
 } *filters = NULL;
 int filter_count=0;
-uint64_t count;
-uint64_t bytes;
+uint64_t totcount;
+uint64_t totbytes;
 
 /* Process a trace, counting packets that match filter(s) */
 void run_trace(char *uri) 
 {
 	struct libtrace_packet_t packet;
 	int i;
+	uint64_t count = 0;
+	uint64_t bytes = 0;
 
 	fprintf(stderr,"%s:\n",uri);
 
@@ -93,13 +94,13 @@ void run_trace(char *uri)
         }
 
 	for(i=0;i<filter_count;++i) {
-		printf("%s\t%8"PRIu64"\t%8"PRIu64"\t%5.02f\n",filters[i].expr,filters[i].count,filters[i].bytes,filters[i].count*100.0/count);
+		printf("%30s:\t%12"PRIu64"\t%12"PRIu64"\t%7.03f\n",filters[i].expr,filters[i].count,filters[i].bytes,filters[i].count*100.0/count);
 		filters[i].bytes=0;
 		filters[i].count=0;
 	}
-	printf("Total:\t%8"PRIu64"\t%8" PRIu64 "\n",count,bytes);
-	count=0;
-	bytes=0;
+	printf("%30s:\t%12"PRIu64"\t%12" PRIu64 "\n","Total",count,bytes);
+	totcount+=count;
+	totbytes+=bytes;
 
         trace_destroy(trace);
 }
@@ -142,9 +143,13 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
-	printf("filter\tcount    \tbytes   \t%%\n");
+	printf("%-30s\t%12s\t%12s\t%7s\n","filter","count","bytes","%");
 	for(i=optind;i<argc;++i) {
 		run_trace(argv[i]);
+	}
+	if (optind+1<argc) {
+		printf("Grand total:\n");
+		printf("%30s:\t%12"PRIu64"\t%12" PRIu64 "\n","Total",totcount,totbytes);
 	}
 
 

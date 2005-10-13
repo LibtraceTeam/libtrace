@@ -1,0 +1,34 @@
+.TH TRACESTATS "1" "October 2005" "tracestats (libtrace)" "User Commands"
+.SH NAME
+tracestats \- perform simple analysis on a trace
+.SH SYNOPSIS
+.B tracestats 
+[ -f | --filter bpf ]... inputuri...
+.SH DESCRPTION
+tracestats reads one or more traces and outputs summaries for each trace of
+how many packets/bytes match each bpf filter, as well as totals
+.TP
+.PD 0
+.BI \-f " bpf-filter"
+.TP
+.PD
+.BI \-\^\-filter " bpf-filter"
+Add another bpf filter
+
+.SH EXAMPLES
+.nf
+tracestats \-\^\-filter 'host sundown' \\
+	\-\^\-filter 'port http' \\
+	\-\^\-filter 'port ftp or ftp-data' \\
+	\-\^\-filter 'port smtp' \\
+	\-\^\-filter 'tcp[tcpflags] & tcp-syn!=0' \\
+	\-\^\-filter 'not ip' \\
+	\-\^\-filter 'ether[0] & 1 == 1' \\
+	\-\^\-filter 'icmp[icmptype] == icmp-unreach' \\
+	/traces/*
+.fi
+
+.SH SEE ALSO
+libtrace(3), tracemerge(1), tracefilter(1), traceconvert(1)
+.SH AUTHORS
+Perry Lorier <perry@cs.waikato.ac.nz>
