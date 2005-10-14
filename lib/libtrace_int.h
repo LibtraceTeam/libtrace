@@ -153,7 +153,7 @@ struct libtrace_format_t {
 	int (*fin_input)(struct libtrace_t *libtrace);
 	int (*fin_output)(struct libtrace_out_t *libtrace);
 	int (*read_packet)(struct libtrace_t *libtrace, struct libtrace_packet_t *packet);
-	int (*write_packet)(struct libtrace_out_t *libtrace, struct libtrace_packet_t *packet);
+	int (*write_packet)(struct libtrace_out_t *libtrace, const struct libtrace_packet_t *packet);
 	void* (*get_link)(const struct libtrace_packet_t *packet);
 	libtrace_linktype_t (*get_link_type)(const struct libtrace_packet_t *packet);
 	int8_t (*get_direction)(const struct libtrace_packet_t *packet);

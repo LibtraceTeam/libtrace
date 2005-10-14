@@ -169,7 +169,7 @@ void trace_help() {
  *
  * Prints out a descriptive error message for the currently set trace_err value
  */
-void trace_perror(char *caller) {
+void trace_perror(const char *caller) {
 	switch (trace_err.err_num) {
 		case E_BAD_FORMAT:
 			fprintf(stderr, "%s: No support for format (%s)\n", caller, trace_err.problem);
@@ -205,7 +205,8 @@ void trace_perror(char *caller) {
  * @returns callee-owned null-terminated char* containing the output format
  *
  */
-char *trace_get_output_format(struct libtrace_out_t *libtrace) {
+SIMPLE_FUNCTION
+char *trace_get_output_format(const struct libtrace_out_t *libtrace) {
 	char * format = libtrace->format->name;
 
 	return format;
@@ -235,7 +236,7 @@ char *trace_get_output_format(struct libtrace_out_t *libtrace) {
  * If an error occured when attempting to open a trace, NULL is returned
  * and an error is output to stdout.
  */
-struct libtrace_t *trace_create(char *uri) {
+struct libtrace_t *trace_create(const char *uri) {
         struct libtrace_t *libtrace = malloc(sizeof(struct libtrace_t));
         char *scan = 0;
         char *uridata = 0;                  
@@ -303,7 +304,7 @@ struct libtrace_t *trace_create(char *uri) {
  * the dummy trace. Its intended purpose is to act as a packet->trace for libtrace_packet_t's
  * that are not associated with a libtrace_t structure.
  */
-struct libtrace_t * trace_create_dead (char *uri) {
+struct libtrace_t * trace_create_dead (const char *uri) {
 	struct libtrace_t *libtrace = malloc(sizeof(struct libtrace_t));
 	char *scan = calloc(sizeof(char),URI_PROTO_LINE);
 	char *uridata;
@@ -356,7 +357,7 @@ struct libtrace_t * trace_create_dead (char *uri) {
  *  and trace_errno is set. Use trace_perror() to get more information
  */
 	
-struct libtrace_out_t *trace_output_create(char *uri) {
+struct libtrace_out_t *trace_output_create(const char *uri) {
 	struct libtrace_out_t *libtrace = malloc(sizeof(struct libtrace_out_t));
 	
 	char *scan = 0;
@@ -502,7 +503,7 @@ int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *pac
  *
  * @author Shane Alcock
  * */
-int trace_write_packet(struct libtrace_out_t *libtrace, struct libtrace_packet_t *packet) {
+int trace_write_packet(struct libtrace_out_t *libtrace, const struct libtrace_packet_t *packet) {
 	assert(libtrace);
 	assert(packet);	
 
@@ -1364,7 +1365,7 @@ size_t trace_set_capture_length(struct libtrace_packet_t *packet, size_t size) {
 	return -1;
 }
 
-char * trace_parse_uri(char *uri, char **format) {
+char * trace_parse_uri(const char *uri, char **format) {
 	char *uridata = 0;
 	
 	*format = calloc(sizeof(char), URI_PROTO_LINE);
