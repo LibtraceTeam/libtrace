@@ -352,7 +352,7 @@ struct libtrace_tcp *trace_get_tcp(const struct libtrace_packet_t *packet);
  *
  * @author Perry Lorier
  */
-struct libtrace_tcp *trace_get_tcp_from_ip(struct libtrace_ip *ip,int *skipped);
+struct libtrace_tcp *trace_get_tcp_from_ip(const struct libtrace_ip *ip,int *skipped);
 
 /** get a pointer to the UDP header (if any)
  * @param packet  	the packet opaque pointer
@@ -369,7 +369,7 @@ struct libtrace_udp *trace_get_udp(const struct libtrace_packet_t *packet);
  *
  * Skipped may be NULL, in which case it will be ignored by this function.
  */
-struct libtrace_udp *trace_get_udp_from_ip(struct libtrace_ip *ip,int *skipped);
+struct libtrace_udp *trace_get_udp_from_ip(const struct libtrace_ip *ip,int *skipped);
 
 /** get a pointer to the ICMP header (if any)
  * @param packet  	the packet opaque pointer
@@ -386,7 +386,7 @@ struct libtrace_icmp *trace_get_icmp(const struct libtrace_packet_t *packet);
  *
  * Skipped may be NULL, in which case it will be ignored by this function
  */
-struct libtrace_icmp *trace_get_icmp_from_ip(struct libtrace_ip *ip,int *skipped);
+struct libtrace_icmp *trace_get_icmp_from_ip(const struct libtrace_ip *ip,int *skipped);
 
 /** parse an ip or tcp option
  * @param[in,out] ptr	the pointer to the current option
@@ -464,16 +464,17 @@ int trace_get_capture_length(const struct libtrace_packet_t *packet);
 int trace_get_wire_length(const struct libtrace_packet_t *packet);
 
 /** Link layer types
+ * This enumates the various different link types that libtrace understands
  */
 typedef enum { 
-       TRACE_TYPE_LEGACY, 
+       TRACE_TYPE_LEGACY, 	
        TRACE_TYPE_HDLC_POS, 
-       TRACE_TYPE_ETH,
+       TRACE_TYPE_ETH,			/**< 802.3 style Ethernet */
        TRACE_TYPE_ATM,
-       TRACE_TYPE_80211,
+       TRACE_TYPE_80211,		/**< 802.11 frames */
        TRACE_TYPE_NONE,
-       TRACE_TYPE_LINUX_SLL,
-       TRACE_TYPE_PFLOG,
+       TRACE_TYPE_LINUX_SLL,		/**< Linux "null" framing */
+       TRACE_TYPE_PFLOG,		/**< FreeBSD's PFlug */
        TRACE_TYPE_LEGACY_DEFAULT,
        TRACE_TYPE_LEGACY_POS,
        TRACE_TYPE_LEGACY_ATM,
@@ -532,17 +533,19 @@ int8_t trace_set_direction(struct libtrace_packet_t *packet, int8_t direction);
  */
 int8_t trace_get_direction(const struct libtrace_packet_t *packet);
 
-/** Event types */
+/** Event types 
+ * see \ref libtrace_eventobj_t
+ */
 typedef enum {
-	TRACE_EVENT_IOWAIT,
-	TRACE_EVENT_SLEEP,
-	TRACE_EVENT_PACKET,
-	TRACE_EVENT_TERMINATE
+	TRACE_EVENT_IOWAIT,	/**< Need to block on fd */
+	TRACE_EVENT_SLEEP,	/**< Sleep for some time */
+	TRACE_EVENT_PACKET,	/**< packet has arrived */
+	TRACE_EVENT_TERMINATE	/**< End of trace */
 } libtrace_event_t;
 
 /** structure returned by libtrace_event explaining what the current event is */
 struct libtrace_eventobj_t {
-	libtrace_event_t type; /**< event type (iowait,sleep,packet */
+	libtrace_event_t type; /**< event type (iowait,sleep,packet) */
 	int fd;		       /**< if IOWAIT, the fd to sleep on */
 	double seconds;	       /**< if SLEEP, the amount of time to sleep for */
 	int size; 	       /**< if PACKET, the value returned from trace_read_packet */

@@ -709,7 +709,7 @@ struct libtrace_tcp *trace_get_tcp(const struct libtrace_packet_t *packet) {
  *
  * Skipped can be NULL, in which case it will be ignored by the program.
  */
-struct libtrace_tcp *get_tcp_from_ip(const struct libtrace_ip *ip, int *skipped)
+struct libtrace_tcp *trace_get_tcp_from_ip(const struct libtrace_ip *ip, int *skipped)
 {
 #define SW_IP_OFFMASK 0xff1f
 	struct libtrace_tcp *tcpptr = 0;
@@ -751,7 +751,7 @@ struct libtrace_udp *trace_get_udp(const struct libtrace_packet_t *packet) {
  *
  * Skipped can be NULL, in which case it will be ignored by the program.
  */
-struct libtrace_udp *get_udp_from_ip(const struct libtrace_ip *ip, int *skipped)
+struct libtrace_udp *trace_get_udp_from_ip(const struct libtrace_ip *ip, int *skipped)
 {
 	struct libtrace_udp *udpptr = 0;
 
@@ -792,7 +792,7 @@ struct libtrace_icmp *trace_get_icmp(const struct libtrace_packet_t *packet) {
  *
  * Skipped can be NULL, in which case it will be ignored by the program.
  */
-struct libtrace_icmp *get_icmp_from_ip(struct libtrace_ip *ip, int *skipped)
+struct libtrace_icmp *trace_get_icmp_from_ip(const struct libtrace_ip *ip, int *skipped)
 {
 	struct libtrace_icmp *icmpptr = 0;
 
