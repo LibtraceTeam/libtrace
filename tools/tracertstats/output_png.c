@@ -1,4 +1,5 @@
 #define HAVE_LIBFREETYPE
+#define _GNU_SOURCE
 #include "output.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -65,8 +66,8 @@ static void output_png_destroy(struct output_data_t *out)
 			prv->rows,
 			labels,	
 			(out->columns-1)/2,
-			data1,
-			data2);
+			(float*)data1,
+			(float*)data2);
 	free(prv->data);
 	free(prv);
 }
