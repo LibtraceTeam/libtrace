@@ -89,7 +89,7 @@ struct libtrace_packet_t {
 	//void *buffer;
 	char buffer[LIBTRACE_PACKET_BUFSIZE];
 	size_t size;
-	uint8_t status;
+	uint32_t status;
 };
                      
 
