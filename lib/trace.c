@@ -1346,21 +1346,19 @@ int8_t trace_get_server_port(uint8_t protocol __attribute__((unused)), uint16_t 
  * @param packet	the packet opaque pointer
  * @param size		the new length of the packet
  * @returns the new size of the packet
- * 
- * NOTE: size and the return size refer to the network-level payload of the packet, and not
- * any capture headers included as well. For example, to truncate a packet
- * after the IP header, set size to sizeof(ethernet_header) + sizeof(ip_header)
- *
- * If the original network-level payload is smaller than size, then
- * the original size is returned and the packet is left unchanged.
- * 
+ * @note size and the return size refer to the network-level payload of the
+ * packet, and do not include any capture headers. For example, to truncate a
+ * packet after the IP header, set size to sizeof(ethernet_header) +
+ * sizeof(ip_header)
+ * @note If the original network-level payload is smaller than size, then the
+ * original size is returned and the packet is left unchanged.
  * @author Daniel Lawson
  */
 size_t trace_set_capture_length(struct libtrace_packet_t *packet, size_t size) {
 	assert(packet);
 
-	if (packet->trace->format->truncate_packet) {
-		return packet->trace->format->truncate_packet(packet,size);
+	if (packet->trace->format->set_capture_length) {
+		return packet->trace->format->set_capture_length(packet,size);
 	}
 
 	return -1;
