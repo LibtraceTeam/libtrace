@@ -646,8 +646,8 @@ static int erf_write_packet(struct libtrace_out_t *libtrace, struct libtrace_pac
 		}
 		// Flags. Can't do this
 		memset(&erfhdr.flags,1,1);
-		// Packet length
-		erfhdr.rlen = trace_get_capture_length(packet);
+		// Packet length (rlen includes format overhead)
+		erfhdr.rlen = trace_get_capture_length(packet) + sizeof(dag_record_t);
 		// loss counter. Can't do this
 		erfhdr.lctr = 0;
 		// Wire length
@@ -746,7 +746,7 @@ static int legacyeth_get_wire_length(const struct libtrace_packet_t *packet) {
 static int erf_get_capture_length(const struct libtrace_packet_t *packet) {
 	dag_record_t *erfptr = 0;
 	erfptr = (dag_record_t *)packet->buffer;
-	return ntohs(erfptr->rlen);
+	return (ntohs(erfptr->rlen) - sizeof(dag_record_t));
 }
 
 static int erf_get_wire_length(const struct libtrace_packet_t *packet) {
