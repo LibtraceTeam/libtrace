@@ -1,5 +1,5 @@
 
-PREFIX=/usr/local
+PREFIX?=/usr/local
 CC=gcc
 
 INCLUDE = -I$(PREFIX)/include

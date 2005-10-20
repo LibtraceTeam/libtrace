@@ -109,7 +109,7 @@ int main(int argc, char *argv[]) {
 
 
         for (;;) {
-                if ((psize = trace_read_packet(trace,&packet)) == -1) {
+                if ((psize = trace_read_packet(trace,&packet)) < 1) {
                         // terminate
                         break;
                 }
