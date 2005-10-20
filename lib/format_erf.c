@@ -501,8 +501,8 @@ static int erf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 	assert(size < LIBTRACE_PACKET_BUFSIZE);
 	buffer2 = buffer + dag_record_size;
 	/* If your trace is legacy, or corrupt, then this assert may fire. */
-	assert(((dag_record_t *)buffer)->rlen <= 
-			((dag_record_t*)buffer)->wlen+sizeof(dag_record_t));
+	assert(ntohs(((dag_record_t *)buffer)->rlen) <= 
+			ntohs(((dag_record_t*)buffer)->wlen)+dag_record_size);
 	/* If it's an unknown type, your trace is legacy */
 	assert(((dag_record_t *)buffer)->type != 0);
 	/* Unknown/corrupt */
