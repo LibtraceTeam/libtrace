@@ -1359,8 +1359,8 @@ size_t trace_set_capture_length(struct libtrace_packet_t *packet, size_t size) {
 		// can't make a packet larger
 		return packet->size;
 	}
-	if (packet->trace->format->truncate_packet) {
-		return packet->trace->format->truncate_packet(packet,size);
+	if (packet->trace->format->set_capture_length) {
+		return packet->trace->format->set_capture_length(packet,size);
 	}
 	return -1;
 }
