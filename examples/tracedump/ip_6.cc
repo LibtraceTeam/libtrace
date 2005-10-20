@@ -38,7 +38,6 @@ int get_next_option(unsigned char **ptr,int *len,
 			return 1;
 		default:
 			*optlen = *(*ptr+1);
-			assert(*optlen>=2);
 			(*len)-=*optlen;
 			(*data)=(*ptr+2);
 			(*ptr)+=*optlen+2;

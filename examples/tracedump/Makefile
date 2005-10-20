@@ -1,9 +1,10 @@
 CXX=g++
-INCLUDES=-I/usr/local/include
+PREFIX?=/usr/local
+INCLUDES=-I$(PREFIX)/include
 # Directory to search for plugins
 LIBDIR="./"
 CXXFLAGS=-g -Wall $(INCLUDES) -rdynamic
-LDFLAGS=-L/usr/local/wand/lib
+LDFLAGS=-L$(PREFIX)/lib
 LDLIBS=-ltrace -ldl 
 LINK_LAYERS=$(addsuffix .so,$(basename $(wildcard link_*.cc)))
 ETH_LAYERS=$(addsuffix .so,$(basename $(wildcard eth_*.cc)))
