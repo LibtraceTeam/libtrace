@@ -69,7 +69,7 @@ static int template_read_packet(struct libtrace_t *libtrace, struct libtrace_pac
 	return -1;
 }
 
-static int template_write_packet(struct libtrace_out_t *libtrace, struct libtrace_packet_t *packet) {
+static int template_write_packet(struct libtrace_out_t *libtrace, const struct libtrace_packet_t *packet) {
 	return -1;
 }
 

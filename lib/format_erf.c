@@ -191,6 +191,23 @@ static int dag_init_input(struct libtrace_t *libtrace) {
 }
 #endif
 
+/* Dag erf ether packets have a 2 byte padding before the packet
+ * so that the ip header is aligned on a 32 bit boundary.
+ */
+static int erf_get_padding(const struct libtrace_packet_t *packet)
+{
+	switch(trace_get_link_type(packet)) {
+		case TRACE_TYPE_ETH: 	return 2;
+		default: 		return 0;
+	}
+}
+
+static int erf_get_erf_headersize(const struct libtrace_packet_t *packet)
+{
+	return dag_record_size + erf_get_padding(packet);
+}
+
+
 static int erf_init_input(struct libtrace_t *libtrace) {
 	struct stat buf;
 	struct sockaddr_un unix_sock;
@@ -497,12 +514,12 @@ static int erf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 		return 0;
 	}
 	rlen = ntohs(((dag_record_t *)buffer)->rlen);
+	buffer2 = buffer + dag_record_size;
 	size = rlen - dag_record_size;
 	assert(size < LIBTRACE_PACKET_BUFSIZE);
-	buffer2 = buffer + dag_record_size;
 	/* If your trace is legacy, or corrupt, then this assert may fire. */
 	assert(ntohs(((dag_record_t *)buffer)->rlen) <= 
-			ntohs(((dag_record_t*)buffer)->wlen)+dag_record_size);
+			ntohs(((dag_record_t*)buffer)->wlen)+erf_get_erf_headersize(packet));
 	/* If it's an unknown type, your trace is legacy */
 	assert(((dag_record_t *)buffer)->type != 0);
 	/* Unknown/corrupt */
@@ -511,7 +528,7 @@ static int erf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 	// read in the rest of the packet
 	if ((numbytes=LIBTRACE_READ(INPUT.file,
 					buffer2,
-					size)) == -1) {
+					size)) != size) {
 		perror("libtrace_read");
 		return -1;
 	}
@@ -577,7 +594,7 @@ static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_pac
 
 		// read in the ERF header
 		if ((numbytes = tracefifo_out_read(libtrace->fifo, buffer,
-						sizeof(dag_record_t))) == 0) {
+						dag_record_size)) == 0) {
 			tracefifo_out_reset(libtrace->fifo);
 			read_required = 1;
 			continue;
@@ -602,9 +619,9 @@ static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_pac
 	} while(1);
 }
 
-static int erf_dump_packet(struct libtrace_out_t *libtrace, dag_record_t *erfptr, void *buffer, size_t size) {
+static int erf_dump_packet(struct libtrace_out_t *libtrace, dag_record_t *erfptr, int pad, void *buffer, size_t size) {
 	int numbytes = 0;
-	if ((numbytes = LIBTRACE_WRITE(OUTPUT.file, erfptr, dag_record_size + 2)) == 0) {
+	if ((numbytes = LIBTRACE_WRITE(OUTPUT.file, erfptr, dag_record_size + pad)) == 0) {
 		perror("libtrace_write");
 		return -1;
 	}
@@ -612,15 +629,16 @@ static int erf_dump_packet(struct libtrace_out_t *libtrace, dag_record_t *erfptr
 		perror("libtrace_write");
 		return -1;
 	}
-	return numbytes + sizeof(dag_record_t);
-
+	return numbytes + pad + dag_record_size;
 }
 		
 static int erf_write_packet(struct libtrace_out_t *libtrace, struct libtrace_packet_t *packet) {
 	int numbytes = 0;
 	dag_record_t erfhdr;
+	int pad = 0;
 	void *payload = (void *)trace_get_link(packet);
 
+	pad = erf_get_padding(packet);
 	if (packet->trace->format == erf_ptr || 
 #if HAVE_DAG
 			packet->trace->format == dag_ptr ||
@@ -628,26 +646,18 @@ static int erf_write_packet(struct libtrace_out_t *libtrace, struct libtrace_pac
 			packet->trace->format == rtclient_ptr ) {
 		numbytes = erf_dump_packet(libtrace,
 				(dag_record_t *)packet->buffer,
+				pad,
 				payload,
 				packet->size - 
-					(dag_record_size + 2)); 
+					(dag_record_size + pad)); 
 	} else {
 		// convert format - build up a new erf header
 		// Timestamp
 		erfhdr.ts = trace_get_erf_timestamp(packet);
-		// Link type
-		switch(trace_get_link_type(packet)) {
-		case TRACE_TYPE_ETH:
-			erfhdr.type=TYPE_ETH; break;
-		case TRACE_TYPE_ATM:
-			erfhdr.type=TYPE_ATM; break;
-		default:
-			erfhdr.type=0; 
-		}
 		// Flags. Can't do this
 		memset(&erfhdr.flags,1,1);
 		// Packet length (rlen includes format overhead)
-		erfhdr.rlen = trace_get_capture_length(packet) + sizeof(dag_record_t);
+		erfhdr.rlen = trace_get_capture_length(packet) + erf_get_erf_headersize(packet);
 		// loss counter. Can't do this
 		erfhdr.lctr = 0;
 		// Wire length
@@ -656,6 +666,7 @@ static int erf_write_packet(struct libtrace_out_t *libtrace, struct libtrace_pac
 		// Write it out
 		numbytes = erf_dump_packet(libtrace,
 				&erfhdr,
+				pad,
 				payload,
 				erfhdr.rlen);
 	}
@@ -692,7 +703,7 @@ static void *erf_get_link(const struct libtrace_packet_t *packet) {
 		return NULL;
 	}
 	ethptr = ((uint8_t *)packet->buffer +
-			dag_record_size + 2);
+			erf_get_erf_headersize(packet));
 	return (void *)ethptr;
 }
 
@@ -746,7 +757,7 @@ static int legacyeth_get_wire_length(const struct libtrace_packet_t *packet) {
 static int erf_get_capture_length(const struct libtrace_packet_t *packet) {
 	dag_record_t *erfptr = 0;
 	erfptr = (dag_record_t *)packet->buffer;
-	return (ntohs(erfptr->rlen) - sizeof(dag_record_t));
+	return (ntohs(erfptr->rlen) - erf_get_erf_headersize(packet));
 }
 
 static int erf_get_wire_length(const struct libtrace_packet_t *packet) {
@@ -758,13 +769,13 @@ static int erf_get_wire_length(const struct libtrace_packet_t *packet) {
 static size_t erf_set_capture_length(struct libtrace_packet_t *packet, size_t size) {
 	dag_record_t *erfptr = 0;
 	assert(packet);
-	if((size + sizeof(dag_record_t)) > packet->size) {
+	if((size + erf_get_erf_headersize(packet)) > packet->size) {
 		// can't make a packet larger
-		return (packet->size - sizeof(dag_record_t));
+		return (packet->size - erf_get_erf_headersize(packet));
 	}
 	erfptr = (dag_record_t *)packet->buffer;
-	erfptr->rlen = htons(size + sizeof(dag_record_t));
-	packet->size = size + sizeof(dag_record_t);
+	erfptr->rlen = htons(size + erf_get_erf_headersize(packet));
+	packet->size = size + erf_get_erf_headersize(packet);
 	return size;
 }
 

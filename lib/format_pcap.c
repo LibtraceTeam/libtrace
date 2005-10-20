@@ -231,7 +231,7 @@ static int pcap_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_
 	return (packet->size - sizeof(struct pcap_pkthdr));
 }
 
-static int pcap_write_packet(struct libtrace_out_t *libtrace, struct libtrace_packet_t *packet) {
+static int pcap_write_packet(struct libtrace_out_t *libtrace, const struct libtrace_packet_t *packet) {
 	struct pcap_pkthdr pcap_pkt_hdr;
 	void *link = trace_get_link(packet);
 
