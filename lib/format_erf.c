@@ -758,14 +758,14 @@ static int erf_get_wire_length(const struct libtrace_packet_t *packet) {
 static size_t erf_set_capture_length(struct libtrace_packet_t *packet, size_t size) {
 	dag_record_t *erfptr = 0;
 	assert(packet);
-	if(size > packet->size) {
+	if((size + sizeof(dag_record_t)) > packet->size) {
 		// can't make a packet larger
-		return packet->size;
+		return (packet->size - sizeof(dag_record_t));
 	}
 	erfptr = (dag_record_t *)packet->buffer;
-	erfptr->rlen = ntohs(size + sizeof(dag_record_t));
+	erfptr->rlen = htons(size + sizeof(dag_record_t));
 	packet->size = size + sizeof(dag_record_t);
-	return packet->size;
+	return size;
 }
 
 static int rtclient_get_fd(const struct libtrace_packet_t *packet) {

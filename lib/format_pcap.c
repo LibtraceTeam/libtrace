@@ -368,14 +368,14 @@ static int pcap_get_wire_length(const struct libtrace_packet_t *packet) {
 static size_t pcap_set_capture_length(struct libtrace_packet_t *packet,size_t size) {
 	struct pcap_pkthdr *pcapptr = 0;
 	assert(packet);
-	if (size > packet->size) {
+	if ((size + sizeof(struct pcap_pkthdr)) > packet->size) {
 		// can't make a packet larger
-		return packet->size;
+		return (packet->size - sizeof(struct pcap_pkthdr));
 	}
 	pcapptr = (struct pcap_pkthdr *)packet->buffer;
 	pcapptr->caplen = size + sizeof(struct pcap_pkthdr);
 	packet->size = pcapptr->caplen;
-	return packet->size;
+	return size;
 }
 
 static int pcap_get_fd(const struct libtrace_packet_t *packet) {
