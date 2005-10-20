@@ -373,8 +373,8 @@ static size_t pcap_set_capture_length(struct libtrace_packet_t *packet,size_t si
 		return (packet->size - sizeof(struct pcap_pkthdr));
 	}
 	pcapptr = (struct pcap_pkthdr *)packet->buffer;
-	pcapptr->caplen = size + sizeof(struct pcap_pkthdr);
-	packet->size = pcapptr->caplen;
+	pcapptr->caplen = size;
+	packet->size = size + sizeof(struct pcap_pkthdr);
 	return size;
 }
 
