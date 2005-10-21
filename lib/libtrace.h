@@ -121,7 +121,7 @@ struct libtrace_ip
     u_short ip_sum;			/**< checksum */
     struct in_addr ip_src;		/**< source address */
     struct in_addr ip_dst;		/**< dest address */
-} __attribute__ ((__packed__));
+} __attribute__ ((packed));
 
 /** Structure for dealing with TCP packets */
 struct libtrace_tcp
@@ -156,7 +156,7 @@ struct libtrace_tcp
     u_int16_t window;		/**< Window Size */
     u_int16_t check;		/**< Checksum */
     u_int16_t urg_ptr;		/**< Urgent Pointer */
-} __attribute__ ((__packed__));
+} __attribute__ ((packed));
 
 /** UDP Header for dealing with UDP packets */
 struct libtrace_udp {
@@ -164,7 +164,7 @@ struct libtrace_udp {
   u_int16_t	dest;		/**< Destination port */
   u_int16_t	len;		/**< Length */
   u_int16_t	check;		/**< Checksum */
-} __attribute__ ((__packed__));
+} __attribute__ ((packed));
 
 /** ICMP Header for dealing with icmp packets */
 struct libtrace_icmp
@@ -186,7 +186,7 @@ struct libtrace_icmp
       u_int16_t	mtu;
     } frag;			/**< path mtu discovery */
   } un;				/**< Union for payloads of various icmp codes */
-} __attribute__ ((__packed__));
+} __attribute__ ((packed));
 
 /** 802.3 frame */
 struct libtrace_ether
@@ -194,7 +194,7 @@ struct libtrace_ether
   u_int8_t ether_dhost[6];	/* destination ether addr */
   u_int8_t ether_shost[6];	/* source ether addr */
   u_int16_t ether_type;		/* packet type ID field (next-header) */
-} __attribute__ ((__packed__));
+} __attribute__ ((packed));
 
 /** 802.1Q frame */
 struct libtrace_8021q 
@@ -206,7 +206,7 @@ struct libtrace_8021q
   u_int16_t vlan_cfi:1;	 	 /* vlan format indicator, 0 for ethernet, 1 for token ring */
   u_int16_t vlan_id:12;	 	 /* vlan id */
   u_int16_t vlan_ether_type;	 /* vlan sub-packet type ID field (next-header)*/
-} __attribute__ ((__packed__));
+} __attribute__ ((packed));
 
 /** Prints help information for libtrace 
  *

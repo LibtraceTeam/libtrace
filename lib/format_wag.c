@@ -331,7 +331,7 @@ static int wag_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 	} while(1);
 }
 
-static int wag_write_packet(struct libtrace_out_t *libtrace, struct libtrace_packet_t *packet) {
+static int wag_write_packet(struct libtrace_out_t *libtrace, const struct libtrace_packet_t *packet) {
 	int numbytes =0 ;
 	if (packet->trace->format != wag_ptr) {
 		fprintf(stderr,"Cannot convert from wag to %s format yet\n",
