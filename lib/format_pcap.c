@@ -258,7 +258,7 @@ static int pcap_write_packet(struct libtrace_out_t *libtrace, const struct libtr
 	return 0;
 }
 
-static int pcapint_write_packet(struct libtrace_out_t *libtrace __attribute__((unused)), struct libtrace_packet_t *packet __attribute__((unused))) {
+static int pcapint_write_packet(struct libtrace_out_t *libtrace __attribute__((unused)), const struct libtrace_packet_t *packet __attribute__((unused))) {
 //	void *link = trace_get_link(packet);
 
 	return 0;

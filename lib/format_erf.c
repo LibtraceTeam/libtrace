@@ -632,7 +632,7 @@ static int erf_dump_packet(struct libtrace_out_t *libtrace, dag_record_t *erfptr
 	return numbytes + pad + dag_record_size;
 }
 		
-static int erf_write_packet(struct libtrace_out_t *libtrace, struct libtrace_packet_t *packet) {
+static int erf_write_packet(struct libtrace_out_t *libtrace, const struct libtrace_packet_t *packet) {
 	int numbytes = 0;
 	dag_record_t erfhdr;
 	int pad = 0;
