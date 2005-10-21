@@ -73,7 +73,7 @@ extern "C" {
 typedef enum {SOCKET, TRACE, STDIN, DEVICE, INTERFACE, RT } source_t;
 
 
-static struct {
+extern struct trace_err_t{
 	int err_num; 	// error code
 	char problem[255];	// the format, uri etc that caused the error for reporting purposes
 } trace_err;

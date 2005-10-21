@@ -130,7 +130,7 @@ struct libtrace_filter_t {
 };
 #endif
 
-
+struct trace_err_t trace_err;
 
 struct libtrace_format_t **format_list = 0;
 int format_size = 0;

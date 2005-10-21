@@ -469,7 +469,6 @@ static int legacy_read_packet(struct libtrace_t *libtrace, struct libtrace_packe
 	int size;
 	void *buffer = packet->buffer;
 	void *buffer2 = buffer;
-	dag_record_t *erfptr = (dag_record_t *)buffer;
 	int rlen;
 
 	if ((numbytes=LIBTRACE_READ(INPUT.file,
@@ -518,10 +517,11 @@ static int erf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 	size = rlen - dag_record_size;
 	assert(size < LIBTRACE_PACKET_BUFSIZE);
 	/* If your trace is legacy, or corrupt, then this assert may fire. */
+	/* turns out some older traces have fixed snaplens, which are padded
+	 * with 00's if the packet is smaller, so this doesn't work.  Sigh.
 	assert(ntohs(((dag_record_t *)buffer)->rlen) <= 
 			ntohs(((dag_record_t*)buffer)->wlen)+erf_get_erf_headersize(packet));
-	/* If it's an unknown type, your trace is legacy */
-	assert(((dag_record_t *)buffer)->type != 0);
+	*/
 	/* Unknown/corrupt */
 	assert(((dag_record_t *)buffer)->type < 10);
 	
@@ -711,9 +711,12 @@ static libtrace_linktype_t erf_get_link_type(const struct libtrace_packet_t *pac
 	dag_record_t *erfptr = 0;
 	erfptr = (dag_record_t *)packet->buffer;
 	switch (erfptr->type) {
-		case TYPE_ETH: return TRACE_TYPE_ETH;
-		case TYPE_ATM: return TRACE_TYPE_ATM;
-		default: assert(0);
+		case TYPE_LEGACY: 	return TRACE_TYPE_LEGACY;
+		case TYPE_ETH: 		return TRACE_TYPE_ETH;
+		case TYPE_ATM: 		return TRACE_TYPE_ATM;
+		default: 
+			       fprintf(stderr,"Unknown erf type %02x\n",erfptr->type);
+			       assert(0);
 	}
 	return erfptr->type;
 }
