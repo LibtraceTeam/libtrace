@@ -61,22 +61,27 @@ typedef struct dag_record {
 	} rec;
 } __attribute__((packed)) dag_record_t;
 
-
-typedef struct duck_inf
-{
-        uint32_t  Command, Config, Clock_Inc, Clock_Wrap, DDS_Rate;
-        uint32_t  Crystal_Freq;
-        uint32_t  Synth_Freq, Sync_Rate;
-        uint64_t  Last_Ticks;
-        uint32_t  Resyncs;
-        uint32_t  Bad_Diffs, Bad_Offs, Bad_Pulses;
-        uint32_t  Worst_Error, Worst_Off;
-        uint32_t  Off_Limit, Off_Damp;
-        uint32_t  Pulses, Single_Pulses_Missing, Longest_Pulse_Missing;
-        uint32_t  Health, Sickness;
-        int32_t   Error, Offset;
-        int32_t   Stat_Start, Stat_End;   /* these are really time_t's */
-        uint32_t  Set_Duck_Field;
+typedef struct duck_inf_pkt {
+        uint32_t  command;
+	uint32_t  config;
+	uint32_t  clock_inc;
+	uint32_t  clock_wrap;
+	uint32_t  DDS_rate;
+        uint32_t  crystal_freq;
+        uint32_t  synth_freq;
+	uint32_t  sync_rate;
+        uint64_t  last_ticks;
+        uint32_t  resyncs;
+        uint32_t  bad_diffs, bad_offs, bad_pulses;
+        uint32_t  worst_error, worst_off;
+        uint32_t  off_limit, off_damp;
+        uint32_t  pulses, single_pulses_missing, longest_pulse_missing;
+        uint32_t  health; 
+	uint32_t  sickness;
+        int32_t   error;
+	int32_t   offset;
+        int32_t   stat_start, stat_end;  
+        uint32_t  set_duck_field;
 } duck_inf;
 
 #define dag_record_size         16
