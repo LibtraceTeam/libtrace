@@ -170,13 +170,6 @@ if test "$with_dag" != no; then
 		dag_lib_dir="$dag_root"
 	fi
 	
-	AC_MSG_CHECKING(if we are using DAG 2.4)
-	if grep '2.4.' $dag_root/VERSION > /dev/null; then
-		dag2_4=true
-	else
-		dag2_4=false
-	fi
-
         if test -r "$dag_root/tools" -a -r "$dag_root/include"; then
 		dag_tools_dir="$dag_root/tools"
                 dag_include_dir="$dag_root/include"
@@ -204,12 +197,20 @@ if test "$with_dag" != no; then
                 ac_cv_lbl_dag_api=no
         fi
         AC_MSG_RESULT($ac_cv_lbl_dag_api)
+	
+	AC_MSG_CHECKING(if we are using DAG 2.4)
+	if grep '2.4.' $dag_root/VERSION > /dev/null 2>&1; then
+		dag2_4=yes
+	else
+		dag2_4=no
+	fi
+	AC_MSG_RESULT($dag2_4)
 else
 	AC_DEFINE(HAVE_DAG,0,[conditional for building with DAG support])
 fi
 
 AM_CONDITIONAL(HAVE_DAG, test x$ac_cv_lbl_dag_api = xyes)
-AM_CONDITIONAL(DAG2_4, test x$dag2_4 = xtrue)
+AM_CONDITIONAL(DAG2_4, test x$dag2_4 = xyes)
 
 
 # Check for miscellaneous programs
