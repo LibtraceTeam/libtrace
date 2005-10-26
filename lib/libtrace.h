@@ -656,8 +656,7 @@ int8_t trace_get_server_port(uint8_t protocol, uint16_t source, uint16_t dest);
  * @returns 0 if an error occured, otherwise returns the uridata component
  * @author Shane Alcock
  */
-SIMPLE_FUNCTION
-char *trace_parse_uri(const char *uri, char **format);
+const char *trace_parse_uri(const char *uri, char **format);
 #ifdef __cplusplus
 } // extern "C"
 #endif // #ifdef __cplusplus
