@@ -6,7 +6,7 @@ if HAS_DOXYGEN
 man_MANS = docs/doxygen/man/man3/trace*.3 docs/doxygen/man/man3/libtrace*.3 
 endif
 #man_MANS = @MANPAGES@
-EXTRA_DIST=examples 
+EXTRA_DIST=examples tools
 #docs/html docs/latex docs/man $(man_MANS)
 
 .PHONY: docs
@@ -19,8 +19,11 @@ bootstrap-clean:
 	$(RM) -rf autom4te.cache/
 
 dist-hook:
-	for i in `\ls examples | grep -v CVS`; do make -C examples/$$i clean; done
-	rm -rf `find $(distdir)/examples -name CVS`
+	for dir in $(EXTRA_DIST); do \
+		rm -rf `find $(distdir)/$$dir -name CVS` ; \
+		for i in `\ls $(distdir)/$$dir `; do make -C $(distdir)/$$dir/$$i clean; done \
+	done
+	exit -1
 
 if HAS_DOXYGEN
 docs/doxygen/man/man3/*.3: docs
