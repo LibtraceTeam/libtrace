@@ -63,9 +63,11 @@ fi
 if test $bpfh = no; then
   AC_MSG_RESULT([No BPF headers, compiling without support for BPF filters])
   AC_DEFINE(HAVE_BPF,0,[Conditional for building bpf support])
+  libtrace_bpf=false
 else
   AC_MSG_RESULT([Using $bpfh])
   AC_DEFINE(HAVE_BPF,1,[Conditional for building bpf support])
+  libtrace_bpf=true
 fi
 
 
@@ -77,11 +79,11 @@ AC_FUNC_REALLOC
 AC_REPLACE_FUNCS(strndup)
 
 # Check to see if we have libpcap
-AC_CHECK_LIB(pcap,pcap_open_live,
-	     have_pcap_open_live=true,
-	     have_pcap_open_live=false)
+AC_CHECK_LIB(pcap,libtrace_pcap,
+	     libtrace_pcap=true,
+	     libtrace_pcap=false)
 
-if test "$have_pcap_open_live" = true; then
+if test "$libtrace_pcap" = true; then
     AC_DEFINE(HAVE_PCAP,1,[Conditional for building PCAP support])
     ADD_LIBS="$ADD_LIBS  -lpcap"
 else
@@ -159,8 +161,8 @@ AC_ARG_WITH(dag,
 
 # turn the test part of the next block into a function, so it can be 
 # called multiple times for $dag_root, /root/dag, /usr/local/lib
-ac_cv_lbl_dag_api=no
-dag2_4=false
+libtrace_dag=false
+libtrace_dag2_4=false
 if test "$with_dag" != no; then
         AC_MSG_CHECKING(whether we have DAG API)
 
@@ -185,7 +187,7 @@ if test "$with_dag" != no; then
 		ADD_LDFLAGS="$ADD_LDFLAGS -L$dag_lib_dir"
 		DAG_TOOLS_DIR=$dag_tools_dir
 		AC_SUBST([DAG_TOOLS_DIR])
-                ac_cv_lbl_dag_api=yes
+                libtrace_dag=true
                 
 		AC_DEFINE(HAVE_DAG_API, 1, [define if you have a DAG API])
 		AC_DEFINE(HAVE_DAG,1,[conditional for building with DAG support])
@@ -194,81 +196,31 @@ if test "$with_dag" != no; then
                         AC_MSG_ERROR(DAG API not found under directory $dag_root
 ; use --without-dag)
                 fi
-                ac_cv_lbl_dag_api=no
+                libtrace_dag=false
         fi
-        AC_MSG_RESULT($ac_cv_lbl_dag_api)
+        AC_MSG_RESULT($libtrace_dag)
 	
 	AC_MSG_CHECKING(if we are using DAG 2.4)
 	if grep '2.4.' $dag_root/VERSION > /dev/null 2>&1; then
-		dag2_4=yes
+		libtrace_dag2_4=true
 	else
-		dag2_4=no
+		libtrace_dag2_4=false
 	fi
-	AC_MSG_RESULT($dag2_4)
+	AC_MSG_RESULT($libtrace_dag2_4)
 else
 	AC_DEFINE(HAVE_DAG,0,[conditional for building with DAG support])
 fi
 
-AM_CONDITIONAL(HAVE_DAG, test x$ac_cv_lbl_dag_api = xyes)
-AM_CONDITIONAL(DAG2_4, test x$dag2_4 = xyes)
+AM_CONDITIONAL(HAVE_DAG, test x$libtrace_dag = xtrue)
+AM_CONDITIONAL(DAG2_4, test x$libtrace_dag2_4 = xtrue)
 
 
 # Check for miscellaneous programs
-AC_CHECK_PROG([has_doxygen], [doxygen], [true], [false])
+AC_CHECK_PROG([libtrace_doxygen], [doxygen], [true], [false])
 
-AM_CONDITIONAL(HAS_DOXYGEN, [test x"$has_doxygen" = xtrue])
+AM_CONDITIONAL(HAS_DOXYGEN, [test x"$libtrace_doxygen" = xtrue])
 
 
-
-# The following is commented out because it seems you don't actually
-# need it. libpcap 'just works' with large files, even under woody,
-# although you probably need _FILE_OFFSET_BITS and LARGEFILE etc set 
-# properly - libtrace handles this however.
-## configure time options for selecting which libpcap and libz to use
-## this is provided to allow for systems whose default libraries don't support
-## large files - you can build your own and link using these options
-#AC_ARG_WITH([pcap],
-#    AC_HELP_STRING([--with-pcap],
-#				   [name of pcap library (default is pcap)]),
-#	[ac_cv_use_pcap=$withval], 
-#    [ac_cv_use_pcap=pcap])
-#
-#
-#AC_ARG_WITH([pcap-path],
-#    AC_HELP_STRING([--with-pcap-path],
-#				   [location of pcap library (default is /usr/lib)]),
-#	[ac_cv_use_pcap_path=$withval],
-#    [ac_cv_use_pcap_path=/usr/lib])
-#
-#if test x"$ac_cv_use_pcap" != xno; then
-#    ADD_LIBS="$ADD_LIBS  -l$ac_cv_use_pcap"
-#    
-#    pcap_lib_file="${ac_cv_use_pcap_path}/lib${ac_cv_use_pcap}.so"
-#    
-#    # if the library is in /usr/lib, then just use 
-#    # AC_CHECK_LIB. 
-#    if test x"${ac_cv_use_pcap_path}" == x"/usr/lib"; then
-#	    AC_CHECK_LIB(${ac_cv_use_pcap},pcap_open_live,
-#			 have_libpcap=yes,
-#			 have_libpcap=no)
-#
-#	    if test x"${have_libpcap}" == xno; then
-#        	AC_MSG_NOTICE([Cannot find pcap library $pcap_lib_file.])
-#        	AC_MSG_ERROR([Exiting]);
-#	    fi
-#    else
-#    	ADD_LDFLAGS="$ADD_LDFLAGS -L$ac_cv_use_pcap_path"
-#    	# if it's not in /usr/lib/, check manually. This isn't nice,
-#    	# and will probably break.
-#    	if test ! -r "$ac_cv_use_pcap_path" -o ! -r "$pcap_lib_file"; then
-#        	AC_MSG_NOTICE([Cannot find pcap library $pcap_lib_file.])
-#        	AC_MSG_ERROR([Exiting]);
-#    	fi  
-#    fi
-#    AC_DEFINE(HAVE_PCAP,1,[Conditional for building PCAP support])
-#else
-#    AC_DEFINE(HAVE_PCAP,0,[Conditional for building PCAP support])
-#fi
 
 
 AC_ARG_WITH([zlib],
@@ -307,8 +259,10 @@ if test "$ac_cv_use_zlib" != no; then
     	fi
     fi
     AC_DEFINE(HAVE_ZLIB,1,[Conditional for building zlib support])
+    libtrace_zlib=true
 else
     AC_DEFINE(HAVE_ZLIB,0,[Conditional for building zlib support])   
+    libtrace_zlib=false
 fi
 
 
@@ -321,3 +275,19 @@ AC_SUBST([MANPAGES])
 
 dnl and finally, output our Makefiles
 AC_OUTPUT
+
+function reportopt() {
+	if test x"$2" = xtrue; then
+		AC_MSG_NOTICE([$1: Yes])
+	else 
+		AC_MSG_NOTICE([$1: No])
+	fi
+}
+
+reportopt "Compiled with BPF filter support" $libtrace_bpf 
+reportopt "Compiled with PCAP support" $libtrace_pcap
+reportopt "Compiled with compressed trace (zlib) support" $libtrace_zlib
+reportopt "Compiled with DAG support (libdag)" $libtrace_dag
+reportopt "Compiled with DAG support (DAG 2.4)" $libtrace_dag2_4
+reportopt "Building man pages/documentation" $libtrace_doxygen
+
