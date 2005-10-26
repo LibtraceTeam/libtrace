@@ -2,8 +2,9 @@ SUBDIRS=lib docs
 
 AUTOMAKE_OPTIONS = 1.5
 
-
+if HAS_DOXYGEN
 man_MANS = docs/doxygen/man/man3/trace*.3 docs/doxygen/man/man3/libtrace*.3 
+endif
 #man_MANS = @MANPAGES@
 EXTRA_DIST=examples 
 #docs/html docs/latex docs/man $(man_MANS)
@@ -23,6 +24,8 @@ dist-hook:
 
 if HAS_DOXYGEN
 docs/doxygen/man/man3/*.3: docs
+else
+docs/doxygen/man/man3/*.3: 
 endif
 
 #docs:
