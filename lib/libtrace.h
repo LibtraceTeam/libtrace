@@ -45,7 +45,7 @@ extern "C" {
 
 #define HAVE_ATTR_PURE 0
 
-/* Function does not depend on anything but it's
+/* Function does not depend on anything but its
  * parameters, used to hint gcc's optimisations
  */
 #if HAVE_ATTR_PURE 
