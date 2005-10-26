@@ -148,6 +148,13 @@ if test "$test_pure" = true; then
 	AC_MSG_RESULT($libtrace_pure)
 fi
 
+if test "$libtrace_pure" = true; then
+	 sed -i 's/#define HAVE_ATTR_PURE.*/#define HAVE_ATTR_PURE 1/' lib/libtrace.h
+else
+	 sed -i 's/#define HAVE_ATTR_PURE.*/#define HAVE_ATTR_PURE 0/' lib/libtrace.h
+fi
+
+
 # configure time options for man pages
 AC_ARG_WITH(man,
 	    AC_HELP_STRING([--with-man],

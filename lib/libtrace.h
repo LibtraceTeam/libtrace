@@ -33,7 +33,6 @@
 
 #include <sys/types.h>
 #include <netinet/in.h>
-#include "config.h"
 
 /** API version as 2 byte hex digits, eg 0xXXYYZZ */
 #define LIBTRACE_API_VERSION 0x020016  /* 2.0.22 */
@@ -42,10 +41,14 @@
 extern "C" { 
 #endif
 
+/* HAVE_ATTR_PURE is replaced by autoconf */
+
+#define HAVE_ATTR_PURE 0
+
 /* Function does not depend on anything but it's
  * parameters, used to hint gcc's optimisations
  */
-#ifdef HAVE_ATTR_PURE
+#if HAVE_ATTR_PURE 
 #  define SIMPLE_FUNCTION __attribute__((pure))
 #else
 #  define SIMPLE_FUNCTION
