@@ -23,7 +23,6 @@ dist-hook:
 		rm -rf `find $(distdir)/$$dir -name CVS` ; \
 		for i in `\ls $(distdir)/$$dir `; do make -C $(distdir)/$$dir/$$i clean; done \
 	done
-	exit -1
 
 if HAS_DOXYGEN
 docs/doxygen/man/man3/*.3: docs
