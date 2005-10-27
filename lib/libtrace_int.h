@@ -164,6 +164,7 @@ struct libtrace_format_t {
 	double (*get_seconds)(const struct libtrace_packet_t *packet);
 	int (*get_capture_length)(const struct libtrace_packet_t *packet);
 	int (*get_wire_length)(const struct libtrace_packet_t *packet);
+	int (*get_framing_length)(const struct libtrace_packet_t *packet);
 	size_t (*set_capture_length)(struct libtrace_packet_t *packet,size_t size);
 	int (*get_fd)(const struct libtrace_packet_t *packet);
 	struct libtrace_eventobj_t (*trace_event)(struct libtrace_t *trace, struct libtrace_packet_t *packet);	

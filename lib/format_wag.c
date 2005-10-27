@@ -87,7 +87,7 @@
 #define O_LARGEFILE 0
 #endif
 
-static struct libtrace_format_t *wag_ptr = 0;
+extern struct libtrace_format_t wag;
 
 #define CONNINFO libtrace->format_data->conn_info
 #define INPUT libtrace->format_data->input
@@ -333,7 +333,7 @@ static int wag_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 
 static int wag_write_packet(struct libtrace_out_t *libtrace, const struct libtrace_packet_t *packet) {
 	int numbytes =0 ;
-	if (packet->trace->format != wag_ptr) {
+	if (packet->trace->format != &wag) {
 		fprintf(stderr,"Cannot convert from wag to %s format yet\n",
 				packet->trace->format->name);
 		return -1;
@@ -385,6 +385,10 @@ static int wag_get_wire_length(const struct libtrace_packet_t *packet) {
 	return ntohs(wagptr->hdr.size);
 }
 
+static int wag_get_framing_length(const struct libtrace_packet_t *packet) {
+	return sizeof(struct wag_data_frame);
+}
+
 static int wag_get_fd(const struct libtrace_packet_t *packet) {
 	return packet->trace->format_data->input.fd;
 }
@@ -432,6 +436,7 @@ static struct libtrace_format_t wag = {
 	NULL,				/* get_seconds */
 	wag_get_capture_length,		/* get_capture_length */
 	wag_get_wire_length,		/* get_wire_length */
+	wag_get_framing_length,		/* get_framing_length */
 	NULL,				/* set_capture_length */
 	wag_get_fd,			/* get_fd */
 	wag_event_trace,		/* trace_event */
@@ -439,6 +444,5 @@ static struct libtrace_format_t wag = {
 };
 
 void __attribute__((constructor)) wag_constructor() {
-	wag_ptr = &wag;
-	register_format(wag_ptr);
+	register_format(&wag);
 }

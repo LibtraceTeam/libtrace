@@ -80,14 +80,14 @@
 #  define O_LARGEFILE 0
 #endif 
 
-static struct libtrace_format_t *erf_ptr = 0;
-static struct libtrace_format_t *rtclient_ptr = 0;
+extern struct libtrace_format_t erf;
+extern struct libtrace_format_t rtclient;
 #if HAVE_DAG
-static struct libtrace_format_t *dag_ptr = 0;
+extern struct libtrace_format_t dag;
 #endif 
-static struct libtrace_format_t *legacypos_ptr = 0;
-static struct libtrace_format_t *legacyeth_ptr = 0;
-static struct libtrace_format_t *legacyatm_ptr = 0;
+extern struct libtrace_format_t legacypos;
+extern struct libtrace_format_t legacyeth;
+extern struct libtrace_format_t legacyatm;
 
 #define CONNINFO libtrace->format_data->conn_info
 #define INPUT libtrace->format_data->input
@@ -202,7 +202,7 @@ static int erf_get_padding(const struct libtrace_packet_t *packet)
 	}
 }
 
-static int erf_get_erf_headersize(const struct libtrace_packet_t *packet)
+static int erf_get_framing_length(const struct libtrace_packet_t *packet)
 {
 	return dag_record_size + erf_get_padding(packet);
 }
@@ -520,7 +520,7 @@ static int erf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 	/* turns out some older traces have fixed snaplens, which are padded
 	 * with 00's if the packet is smaller, so this doesn't work.  Sigh.
 	assert(ntohs(((dag_record_t *)buffer)->rlen) <= 
-			ntohs(((dag_record_t*)buffer)->wlen)+erf_get_erf_headersize(packet));
+			ntohs(((dag_record_t*)buffer)->wlen)+erf_get_framing_length(packet));
 	*/
 	/* Unknown/corrupt */
 	assert(((dag_record_t *)buffer)->type < 10);
@@ -639,11 +639,11 @@ static int erf_write_packet(struct libtrace_out_t *libtrace, const struct libtra
 	void *payload = (void *)trace_get_link(packet);
 
 	pad = erf_get_padding(packet);
-	if (packet->trace->format == erf_ptr || 
+	if (packet->trace->format == &erf || 
 #if HAVE_DAG
-			packet->trace->format == dag_ptr ||
+			packet->trace->format == &dag ||
 #endif
-			packet->trace->format == rtclient_ptr ) {
+			packet->trace->format == &rtclient ) {
 		numbytes = erf_dump_packet(libtrace,
 				(dag_record_t *)packet->buffer,
 				pad,
@@ -657,7 +657,7 @@ static int erf_write_packet(struct libtrace_out_t *libtrace, const struct libtra
 		// Flags. Can't do this
 		memset(&erfhdr.flags,1,1);
 		// Packet length (rlen includes format overhead)
-		erfhdr.rlen = trace_get_capture_length(packet) + erf_get_erf_headersize(packet);
+		erfhdr.rlen = trace_get_capture_length(packet) + erf_get_framing_length(packet);
 		// loss counter. Can't do this
 		erfhdr.lctr = 0;
 		// Wire length
@@ -668,7 +668,7 @@ static int erf_write_packet(struct libtrace_out_t *libtrace, const struct libtra
 				&erfhdr,
 				pad,
 				payload,
-				erfhdr.rlen);
+				trace_get_capture_length(packet));
 	}
 	return numbytes;
 }
@@ -703,7 +703,7 @@ static void *erf_get_link(const struct libtrace_packet_t *packet) {
 		return NULL;
 	}
 	ethptr = ((uint8_t *)packet->buffer +
-			erf_get_erf_headersize(packet));
+			erf_get_framing_length(packet));
 	return (void *)ethptr;
 }
 
@@ -744,6 +744,9 @@ static int legacy_get_capture_length(const struct libtrace_packet_t *packet __at
 	return 64;
 }
 
+static int legacy_get_framing_length(const struct libtrace_packet_t *packet __attribute__((unused))) {
+	
+}
 static int legacypos_get_wire_length(const struct libtrace_packet_t *packet) {
 	legacy_pos_t *lpos = (legacy_pos_t *)packet->buffer;
 	return ntohs(lpos->wlen);
@@ -760,7 +763,7 @@ static int legacyeth_get_wire_length(const struct libtrace_packet_t *packet) {
 static int erf_get_capture_length(const struct libtrace_packet_t *packet) {
 	dag_record_t *erfptr = 0;
 	erfptr = (dag_record_t *)packet->buffer;
-	return (ntohs(erfptr->rlen) - erf_get_erf_headersize(packet));
+	return (ntohs(erfptr->rlen) - erf_get_framing_length(packet));
 }
 
 static int erf_get_wire_length(const struct libtrace_packet_t *packet) {
@@ -772,13 +775,13 @@ static int erf_get_wire_length(const struct libtrace_packet_t *packet) {
 static size_t erf_set_capture_length(struct libtrace_packet_t *packet, size_t size) {
 	dag_record_t *erfptr = 0;
 	assert(packet);
-	if((size + erf_get_erf_headersize(packet)) > packet->size) {
+	if((size + erf_get_framing_length(packet)) > packet->size) {
 		// can't make a packet larger
-		return (packet->size - erf_get_erf_headersize(packet));
+		return (packet->size - erf_get_framing_length(packet));
 	}
 	erfptr = (dag_record_t *)packet->buffer;
-	erfptr->rlen = htons(size + erf_get_erf_headersize(packet));
-	packet->size = size + erf_get_erf_headersize(packet);
+	erfptr->rlen = htons(size + erf_get_framing_length(packet));
+	packet->size = size + erf_get_framing_length(packet);
 	return size;
 }
 
@@ -901,6 +904,7 @@ static struct libtrace_format_t legacyatm = {
 	NULL,				/* get_seconds */
 	legacy_get_capture_length,	/* get_capture_length */
 	legacyatm_get_wire_length,	/* get_wire_length */
+	legacy_get_framing_length,	/* get_framing_length */
 	NULL,				/* set_capture_length */
 	NULL,				/* get_fd */
 	trace_event_trace,		/* trace_event */
@@ -927,6 +931,7 @@ static struct libtrace_format_t legacyeth = {
 	NULL,				/* get_seconds */
 	legacy_get_capture_length,	/* get_capture_length */
 	legacyeth_get_wire_length,	/* get_wire_length */
+	legacy_get_framing_length,	/* get_framing_length */
 	NULL,				/* set_capture_length */
 	NULL,				/* get_fd */
 	trace_event_trace,		/* trace_event */
@@ -953,6 +958,7 @@ static struct libtrace_format_t legacypos = {
 	NULL,				/* get_seconds */
 	legacy_get_capture_length,	/* get_capture_length */
 	legacypos_get_wire_length,	/* get_wire_length */
+	legacy_get_framing_length,	/* get_framing_length */
 	NULL,				/* set_capture_length */
 	NULL,				/* get_fd */
 	trace_event_trace,		/* trace_event */
@@ -980,6 +986,7 @@ static struct libtrace_format_t erf = {
 	NULL,				/* get_seconds */
 	erf_get_capture_length,		/* get_capture_length */
 	erf_get_wire_length,		/* get_wire_length */
+	erf_get_framing_length,		/* get_framing_length */
 	erf_set_capture_length,		/* set_capture_length */
 	erf_get_fd,			/* get_fd */
 	trace_event_trace,		/* trace_event */
@@ -1007,6 +1014,7 @@ static struct libtrace_format_t dag = {
 	NULL,				/* get_seconds */
 	erf_get_capture_length,		/* get_capture_length */
 	erf_get_wire_length,		/* get_wire_length */
+	erf_get_framing_length,		/* get_framing_length */
 	erf_set_capture_length,		/* set_capture_length */
 	NULL,				/* get_fd */
 	trace_event_trace,		/* trace_event */
@@ -1034,6 +1042,7 @@ static struct libtrace_format_t rtclient = {
 	NULL,				/* get_seconds */
 	erf_get_capture_length,		/* get_capture_length */
 	erf_get_wire_length,		/* get_wire_length */
+	erf_get_framing_length,		/* get_framing_length */
 	erf_set_capture_length,		/* set_capture_length */
 	rtclient_get_fd,		/* get_fd */
 	trace_event_device,		/* trace_event */
@@ -1041,22 +1050,12 @@ static struct libtrace_format_t rtclient = {
 };
 
 void __attribute__((constructor)) erf_constructor() {
-	erf_ptr = &erf;
-	register_format(erf_ptr);
+	register_format(&erf);
 #ifdef HAVE_DAG
-	dag_ptr = &dag;
-	register_format(dag_ptr);
+	register_format(&dag);
 #endif
-	rtclient_ptr = &rtclient;
-	register_format(rtclient_ptr);
-
-	legacypos_ptr = &legacypos;
-	register_format(legacypos_ptr);
-
-	legacyeth_ptr = &legacyeth;
-	register_format(legacyeth_ptr);
-
-	legacyatm_ptr = &legacyatm;
-	register_format(legacyatm_ptr);
-
+	register_format(&rtclient);
+	register_format(&legacypos);
+	register_format(&legacyeth);
+	register_format(&legacyatm);
 }

@@ -64,9 +64,9 @@
 #endif
 
 #if HAVE_PCAP
+extern struct libtrace_format_t pcap;
+extern struct libtrace_format_t pcapint;
 
-static struct libtrace_format_t *pcap_ptr = 0;
-static struct libtrace_format_t *pcapint_ptr = 0;
 
 #define CONNINFO libtrace->format_data->conn_info
 #define INPUT libtrace->format_data->input
@@ -242,10 +242,8 @@ static int pcap_write_packet(struct libtrace_out_t *libtrace, const struct libtr
 		OUTPUT.trace.dump = pcap_dump_open(OUTPUT.trace.pcap,CONNINFO.path);
 		fflush((FILE *)OUTPUT.trace.dump);
 	}
-	if (packet->trace->format == pcap_ptr || 
-			packet->trace->format == pcapint_ptr) {
-	//if (!strncasecmp(packet->trace->format->name,"pcap",4)) {
-		// this is a pcap trace anyway
+	if (packet->trace->format == &pcap || 
+			packet->trace->format == &pcapint) {
 		
 		pcap_dump((u_char*)OUTPUT.trace.dump,(struct pcap_pkthdr *)packet->buffer,link);
 	} else {
@@ -365,6 +363,10 @@ static int pcap_get_wire_length(const struct libtrace_packet_t *packet) {
 	return ntohs(pcapptr->len);
 }
 
+static int pcap_get_framing_length(const struct libtrace_packet_t *packet) {
+	return sizeof(struct pcap_pkthdr);
+}
+
 static size_t pcap_set_capture_length(struct libtrace_packet_t *packet,size_t size) {
 	struct pcap_pkthdr *pcapptr = 0;
 	assert(packet);
@@ -427,6 +429,7 @@ static struct libtrace_format_t pcap = {
 	NULL,				/* get_seconds */
 	pcap_get_capture_length,	/* get_capture_length */
 	pcap_get_wire_length,		/* get_wire_length */
+	pcap_get_framing_length,	/* get_framing_length */
 	pcap_set_capture_length,	/* set_capture_length */
 	NULL,				/* get_fd */
 	trace_event_trace,		/* trace_event */
@@ -453,6 +456,7 @@ static struct libtrace_format_t pcapint = {
 	NULL,				/* get_seconds */
 	pcap_get_capture_length,	/* get_capture_length */
 	pcap_get_wire_length,		/* get_wire_length */
+	pcap_get_framing_length,	/* get_framing_length */
 	pcap_set_capture_length,	/* set_capture_length */
 	pcap_get_fd,			/* get_fd */
 	trace_event_device,		/* trace_event */
@@ -463,10 +467,8 @@ static struct libtrace_format_t pcapint = {
 //pcapint_ptr = &pcapint;
 
 void __attribute__((constructor)) pcap_constructor() {
-	pcap_ptr = &pcap;
-	pcapint_ptr = &pcapint;
-	register_format(pcap_ptr);
-	register_format(pcapint_ptr);
+	register_format(&pcap);
+	register_format(&pcapint);
 }
 
 

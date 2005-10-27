@@ -40,6 +40,8 @@
 # error "Can't find inttypes.h"
 #endif 
 
+extern struct libtrace_format_t template;
+
 struct libtrace_format_data_t {
 	int fd;
 };
@@ -110,6 +112,10 @@ static int template_get_wire_length(const struct libtrace_packet_t *packet) {
 	return -1;
 }
 
+static int template_get_framing_length(const struct libtrace_packet_t *packet) {
+	return -1;
+}
+
 static size_t template_set_capture_length(struct libtrace_packet_t *packet,size_t size) {
 	return -1;
 }
@@ -141,6 +147,7 @@ static struct libtrace_format_t template = {
 	template_get_seconds,		/* get_seconds */
 	template_get_capture_length,	/* get_capture_length */
 	template_get_wire_length,	/* get_wire_length */
+	template_get_framing_length,	/* get_framing_length */
 	template_set_capture_length,	/* set_capture_length */
 	template_get_fd,		/* get_fd */
 	trace_event_trace,		/* trace_event */

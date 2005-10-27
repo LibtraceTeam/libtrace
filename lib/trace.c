@@ -1006,6 +1006,23 @@ int trace_get_wire_length(const struct libtrace_packet_t *packet){
 
 }
 
+/* Get the length of the capture framing headers.
+ * @param packet  	the packet opaque pointer
+ * @returns the size of the packet as it was on the wire.
+ * @author Perry Lorier
+ * @author Daniel Lawson
+ * @note this length corresponds to the difference between the size of a 
+ * captured packet in memory, and the captured length of the packet
+ */ 
+SIMPLE_FUNCTION
+int trace_get_framing_length(const struct libtrace_packet_t *packet) {
+	if (packet->trace->format->get_framing_length) {
+		return packet->trace->format->get_framing_length(packet);
+	}
+	return -1;
+}
+
+
 /* Get the type of the link layer
  * @param packet 	a pointer to a libtrace_packet structure
  * @returns libtrace_linktype_t

@@ -31,6 +31,10 @@
 - Version 2.0.23
 	* configure fixes for dag
 	* set attributes on functions to improve compiler caching
+	* include tools/ dir in distributed tar.gz
+	* added get_framing_length format function, to return the length
+	  of any framing headers added by the capture process (eg, pcap or 
+	  ERF headers)
 
 - Version 2.0.22
 	* Documentation updates
