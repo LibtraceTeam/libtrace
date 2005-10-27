@@ -507,8 +507,9 @@ int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *pac
 	packet->trace = libtrace;
 
 	if (libtrace->format->read_packet) {
-		return libtrace->format->read_packet(libtrace,packet);
+		return (packet->size=libtrace->format->read_packet(libtrace,packet));
 	}
+	packet->size=-1;
 	return -1;
 }
 
@@ -523,6 +524,9 @@ int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *pac
 int trace_write_packet(struct libtrace_out_t *libtrace, const struct libtrace_packet_t *packet) {
 	assert(libtrace);
 	assert(packet);	
+	/* Verify the packet is valid */
+	assert(packet->size<65536);
+	assert(packet->size>0);
 
 	if (libtrace->format->write_packet) {
 		return libtrace->format->write_packet(libtrace, packet);
@@ -539,6 +543,8 @@ int trace_write_packet(struct libtrace_out_t *libtrace, const struct libtrace_pa
  */
 void *trace_get_link(const struct libtrace_packet_t *packet) {
         const void *ethptr = 0;
+
+	assert(packet->size>0 && packet->size<65536);
 	
       	if (packet->trace->format->get_link) {
 		ethptr = packet->trace->format->get_link(packet);
@@ -773,7 +779,7 @@ struct libtrace_udp *trace_get_udp_from_ip(const struct libtrace_ip *ip, int *sk
 {
 	struct libtrace_udp *udpptr = 0;
 
-	if ((ip->ip_p == 6) && ((ip->ip_off & SW_IP_OFFMASK) == 0))  {
+	if ((ip->ip_p == 17) && ((ip->ip_off & SW_IP_OFFMASK) == 0))  {
 		udpptr = (struct libtrace_udp *)((ptrdiff_t)ip+ (ip->ip_hl * 4));
 	}
 
@@ -883,6 +889,8 @@ uint64_t trace_get_erf_timestamp(const struct libtrace_packet_t *packet) {
 	double seconds = 0.0;
 	struct timeval ts;
 
+	assert(packet->size>0 && packet->size<65536);
+
 	if (packet->trace->format->get_erf_timestamp) {
 		// timestamp -> timestamp
 		timestamp = packet->trace->format->get_erf_timestamp(packet);
@@ -911,6 +919,7 @@ struct timeval trace_get_timeval(const struct libtrace_packet_t *packet) {
         struct timeval tv;
 	uint64_t ts = 0;
 	double seconds = 0.0;
+	assert(packet->size>0 && packet->size<65536);
 	if (packet->trace->format->get_timeval) {
 		// timeval -> timeval
 		tv = packet->trace->format->get_timeval(packet);
@@ -950,6 +959,8 @@ double trace_get_seconds(const struct libtrace_packet_t *packet) {
 	double seconds = 0.0;
 	uint64_t ts = 0;
 	struct timeval tv;
+
+	assert(packet->size>0 && packet->size<65536);
 	
 	if (packet->trace->format->get_seconds) {
 		// seconds->seconds
@@ -983,6 +994,8 @@ double trace_get_seconds(const struct libtrace_packet_t *packet) {
  */ 
 int trace_get_capture_length(const struct libtrace_packet_t *packet) {
 
+	assert(packet->size>0 && packet->size<65536);
+
 	if (packet->trace->format->get_capture_length) {
 		return packet->trace->format->get_capture_length(packet);
 	}
@@ -999,6 +1012,8 @@ int trace_get_capture_length(const struct libtrace_packet_t *packet) {
  * not be the same as the Capture Len.
  */ 
 int trace_get_wire_length(const struct libtrace_packet_t *packet){
+	assert(packet->size>0 && packet->size<65536);
+
 	if (packet->trace->format->get_wire_length) {
 		return packet->trace->format->get_wire_length(packet);
 	}
@@ -1203,6 +1218,7 @@ int trace_bpf_filter(struct libtrace_filter_t *filter,
  */
 int8_t trace_set_direction(struct libtrace_packet_t *packet, int8_t direction) {
 	assert(packet);
+	assert(packet->size>0 && packet->size<65536);
 	if (packet->trace->format->set_direction) {
 		return packet->trace->format->set_direction(packet,direction);
 	}
@@ -1220,6 +1236,7 @@ int8_t trace_set_direction(struct libtrace_packet_t *packet, int8_t direction) {
  */
 int8_t trace_get_direction(const struct libtrace_packet_t *packet) {
 	assert(packet);
+	assert(packet->size>0 && packet->size<65536);
 	if (packet->trace->format->get_direction) {
 		return packet->trace->format->get_direction(packet);
 	}
@@ -1393,6 +1410,7 @@ int8_t trace_get_server_port(uint8_t protocol __attribute__((unused)), uint16_t 
  */
 size_t trace_set_capture_length(struct libtrace_packet_t *packet, size_t size) {
 	assert(packet);
+	assert(packet->size>0 && packet->size<65536);
 
 	if (packet->trace->format->set_capture_length) {
 		return packet->trace->format->set_capture_length(packet,size);
