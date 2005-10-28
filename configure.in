@@ -140,6 +140,9 @@ AC_ARG_WITH(pure,
 libtrace_pure=false
 if test "$test_pure" = true; then
 	AC_MSG_CHECKING([if compiler supports __attribute__((pure))])
+	OLDCFLAGS="$CFLAGS"
+	CFLAGS="$CFLAGS -Werror"
+	
 	AC_COMPILE_IFELSE([AC_LANG_PROGRAM(
 			   [[
 #define SIMPLE_FUNCTION __attribute__((pure))
@@ -151,6 +154,7 @@ void foo() {
 		[AC_DEFINE(HAVE_ATTR_PURE,0,[define to test for __attribute__((pure)) support]) libtrace_pure=false])
 
 	AC_MSG_RESULT($libtrace_pure)
+	CFLAGS="$OLDCFLAGS"
 
 	if test "$libtrace_pure" = true; then
 	 	perl -pi -e 's/#define HAVE_ATTR_PURE.*/#define HAVE_ATTR_PURE 1/' lib/libtrace.h
