@@ -127,7 +127,7 @@ AC_ARG_WITH(pure,
 	    AC_HELP_STRING([--with-pure],
 			   [use __attribute__((pure)) for optimisation]),
 [
- 	if test "$withval" = no
+ 	if test "$withval" = no -o "$withval" = false
 	then 
 		test_pure=false
 	else
@@ -141,19 +141,24 @@ libtrace_pure=false
 if test "$test_pure" = true; then
 	AC_MSG_CHECKING([if compiler supports __attribute__((pure))])
 	AC_COMPILE_IFELSE([AC_LANG_PROGRAM(
-			   [[#define SIMPLE_FUNCTION __attribute__((pure))]])],
+			   [[
+#define SIMPLE_FUNCTION __attribute__((pure))
+SIMPLE_FUNCTION
+void foo() {
+}
+			   ]])],
 		[AC_DEFINE(HAVE_ATTR_PURE,1,[define to test for __attribute__((pure)) support]) libtrace_pure=true],
 		[AC_DEFINE(HAVE_ATTR_PURE,0,[define to test for __attribute__((pure)) support]) libtrace_pure=false])
 
 	AC_MSG_RESULT($libtrace_pure)
-fi
 
-if test "$libtrace_pure" = true; then
-	 sed -i 's/#define HAVE_ATTR_PURE.*/#define HAVE_ATTR_PURE 1/' lib/libtrace.h
-else
-	 sed -i 's/#define HAVE_ATTR_PURE.*/#define HAVE_ATTR_PURE 0/' lib/libtrace.h
-fi
+	if test "$libtrace_pure" = true; then
+	 	perl -pi -e 's/#define HAVE_ATTR_PURE.*/#define HAVE_ATTR_PURE 1/' lib/libtrace.h
+	else
+		perl -pi -e 's/#define HAVE_ATTR_PURE.*/#define HAVE_ATTR_PURE 0/' lib/libtrace.h
+	fi
 
+fi
 
 # configure time options for man pages
 AC_ARG_WITH(man,
@@ -269,20 +274,16 @@ AC_ARG_WITH([zlib-path],
     [ac_cv_use_zlib_path=$withval], 
     [ac_cv_use_zlib_path=/usr/lib])
 
+libtrace_zlib=false
 if test "$ac_cv_use_zlib" != no; then
-    ADD_LIBS="$ADD_LIBS -l$ac_cv_use_zlib"
     
     zlib_lib_file="${ac_cv_use_zlib_path}/lib${ac_cv_use_zlib}.so"
 
     # if the library is in /usr/lib/, then just use AC_CHECK_LIB
     if test x"${ac_cv_use_zlib_path}" == x"/usr/lib"; then
 	    AC_CHECK_LIB(${ac_cv_use_zlib}, gzopen,
-			 have_libzlib=yes,
-			 have_libzlib=no)
-	    if test x"{have_libzlib}" == xno; then
-        	AC_MSG_NOTICE([Cannot find zlib library $zlib_lib_file.])
-        	AC_MSG_ERROR([Exiting]);
-	    fi
+			 libtrace_zlib=true,
+			 libtrace_zlib=false)
     else
 	ADD_LDFLAGS="$ADD_LDFLAGS -L$ac_cv_use_zlib_path"
 	# if it's not in /usr/lib/, check manually. This isn't nice
@@ -290,13 +291,17 @@ if test "$ac_cv_use_zlib" != no; then
     	if test ! -r "$ac_cv_use_zlib_path" -o ! -r "$zlib_lib_file"; then
         	AC_MSG_NOTICE([Cannot find zlib library $zlib_lib_file.])
         	AC_MSG_ERROR([Exiting]);
-    	fi
+	else
+		libtrace_zlib=true
+	fi
     fi
-    AC_DEFINE(HAVE_ZLIB,1,[Conditional for building zlib support])
-    libtrace_zlib=true
+fi
+
+if test $libtrace_zlib = true; then
+    	ADD_LIBS="$ADD_LIBS -l$ac_cv_use_zlib"
+	AC_DEFINE(HAVE_ZLIB,1,[Conditional for building zlib support])
 else
-    AC_DEFINE(HAVE_ZLIB,0,[Conditional for building zlib support])   
-    libtrace_zlib=false
+	AC_DEFINE(HAVE_ZLIB,0,[Conditional for building zlib support])   
 fi
 
 
@@ -311,7 +316,7 @@ dnl and finally, output our Makefiles
 AC_OUTPUT
 
 function reportopt() {
-	if test x"$2" = xtrue; then
+	if test x"$2" = xtrue -o x"$2" = xyes; then
 		AC_MSG_NOTICE([$1: Yes])
 	else 
 		AC_MSG_NOTICE([$1: No])

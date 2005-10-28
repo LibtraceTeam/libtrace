@@ -42,7 +42,7 @@ extern "C" {
 #endif
 
 /* HAVE_ATTR_PURE is replaced by autoconf */
-#define HAVE_ATTR_PURE 1
+#define HAVE_ATTR_PURE 0
 
 /* Function does not depend on anything but its
  * parameters, used to hint gcc's optimisations
