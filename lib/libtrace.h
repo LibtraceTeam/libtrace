@@ -42,7 +42,7 @@ extern "C" {
 #endif
 
 /* HAVE_ATTR_PURE is replaced by autoconf */
-#define HAVE_ATTR_PURE 0
+#define HAVE_ATTR_PURE 1
 
 /* Function does not depend on anything but its
  * parameters, used to hint gcc's optimisations
@@ -215,6 +215,25 @@ struct libtrace_8021q
   u_int16_t vlan_id:12;	 	 /* vlan id */
   u_int16_t vlan_ether_type;	 /* vlan sub-packet type ID field (next-header)*/
 } __attribute__ ((packed));
+
+/** ATM cell */
+struct libtrace_atm_cell
+{
+  u_int8_t gfc:4;
+  u_int8_t vpi;
+  u_int16_t vci;
+  u_int8_t pt:3;
+  u_int8_t clp:1;
+  u_int8_t hec;
+  u_int16_t ether_type;
+};
+
+/** POS header */
+struct libtrace_pos
+{
+ u_int16_t header;
+ u_int16_t ether_type;
+};
 
 /** Prints help information for libtrace 
  *

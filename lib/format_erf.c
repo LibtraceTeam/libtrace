@@ -61,6 +61,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include "daglegacy.h"
 
 #if HAVE_ZLIB
 #  include <zlib.h>
@@ -207,6 +208,36 @@ static int erf_get_framing_length(const struct libtrace_packet_t *packet)
 	return dag_record_size + erf_get_padding(packet);
 }
 
+static int legacyeth_get_framing_length(const struct libtrace_packet_t *packet) 
+{
+	/* the legacy ethernet format consists of:
+	 * uint64_t ts;
+	 * uint16_t wlen;
+	 * The legacy ethernet framing is therefore five (5) octets;
+	 */
+	return sizeof(legacy_ether_t);
+}
+
+static int legacypos_get_framing_length(const struct libtrace_packet_t *packet) 
+{
+	/* the legacy POS format consists of:
+	 * uint64_t ts;
+	 * uint32_t slen;
+	 * uint32_t wlen;
+	 * The legacy pos framing is therefore eight (8) octets;
+	 */
+	return sizeof(legacy_pos_t);
+}
+
+static int legacyatm_get_framing_length(const struct libtrace_packet_t *packet) 
+{
+	/* the legacy ATM format consists of:
+	 * uint64_t ts;
+	 * uint32_t crc;
+	 * The legacy atm framing is therefore six (6) octets;
+	 */
+	return sizeof(legacy_cell_t);
+}
 
 static int erf_init_input(struct libtrace_t *libtrace) {
 	struct stat buf;
@@ -674,25 +705,40 @@ static int erf_write_packet(struct libtrace_out_t *libtrace, const struct libtra
 }
 
 
-static void *legacy_get_link(const struct libtrace_packet_t *packet) {
-	return (void *)packet->buffer;
+static void *legacypos_get_link(const struct libtrace_packet_t *packet) {
+        const void *posptr = 0;
+	posptr = ((uint8_t *)packet->buffer +
+			legacypos_get_framing_length(packet));
+	return (void *)posptr;
 }
 
-static libtrace_linktype_t legacy_get_link_type(const struct libtrace_packet_t *packet) {
-	return TRACE_TYPE_LEGACY;
+static libtrace_linktype_t legacypos_get_link_type(const struct libtrace_packet_t *packet) {
+	return TRACE_TYPE_LEGACY_POS;
 }
 
-static libtrace_linktype_t legacyeth_get_link_type(const struct libtrace_packet_t *packet) {
-	return TRACE_TYPE_LEGACY_ETH;
+static void *legacyatm_get_link(const struct libtrace_packet_t *packet) {
+        const void *atmptr = 0;
+	atmptr = ((uint8_t *)packet->buffer +
+			legacyatm_get_framing_length(packet));
+	return (void *)atmptr;
 }
 
 static libtrace_linktype_t legacyatm_get_link_type(const struct libtrace_packet_t *packet) {
 	return TRACE_TYPE_LEGACY_ATM;
 }
 
-static libtrace_linktype_t legacypos_get_link_type(const struct libtrace_packet_t *packet) {
-	return TRACE_TYPE_LEGACY_POS;
+static void *legacyeth_get_link(const struct libtrace_packet_t *packet) {
+        const void *ethptr = 0;
+	ethptr = ((uint8_t *)packet->buffer +
+			legacyeth_get_framing_length(packet));
+	return (void *)ethptr;
 }
+
+static libtrace_linktype_t legacyeth_get_link_type(const struct libtrace_packet_t *packet) {
+	return TRACE_TYPE_LEGACY_ETH;
+}
+
+
 
 static void *erf_get_link(const struct libtrace_packet_t *packet) {
         const void *ethptr = 0;
@@ -744,9 +790,6 @@ static int legacy_get_capture_length(const struct libtrace_packet_t *packet __at
 	return 64;
 }
 
-static int legacy_get_framing_length(const struct libtrace_packet_t *packet __attribute__((unused))) {
-	
-}
 static int legacypos_get_wire_length(const struct libtrace_packet_t *packet) {
 	legacy_pos_t *lpos = (legacy_pos_t *)packet->buffer;
 	return ntohs(lpos->wlen);
@@ -895,7 +938,7 @@ static struct libtrace_format_t legacyatm = {
 	NULL,				/* fin_output */
 	legacy_read_packet,		/* read_packet */
 	NULL,				/* write_packet */
-	legacy_get_link,		/* get_link */
+	legacyatm_get_link,		/* get_link */
 	legacyatm_get_link_type,	/* get_link_type */
 	NULL,				/* get_direction */
 	NULL,				/* set_direction */
@@ -904,7 +947,7 @@ static struct libtrace_format_t legacyatm = {
 	NULL,				/* get_seconds */
 	legacy_get_capture_length,	/* get_capture_length */
 	legacyatm_get_wire_length,	/* get_wire_length */
-	legacy_get_framing_length,	/* get_framing_length */
+	legacyatm_get_framing_length,	/* get_framing_length */
 	NULL,				/* set_capture_length */
 	NULL,				/* get_fd */
 	trace_event_trace,		/* trace_event */
@@ -922,7 +965,7 @@ static struct libtrace_format_t legacyeth = {
 	NULL,				/* fin_output */
 	legacy_read_packet,		/* read_packet */
 	NULL,				/* write_packet */
-	legacy_get_link,		/* get_link */
+	legacyeth_get_link,		/* get_link */
 	legacyeth_get_link_type,	/* get_link_type */
 	NULL,				/* get_direction */
 	NULL,				/* set_direction */
@@ -931,7 +974,7 @@ static struct libtrace_format_t legacyeth = {
 	NULL,				/* get_seconds */
 	legacy_get_capture_length,	/* get_capture_length */
 	legacyeth_get_wire_length,	/* get_wire_length */
-	legacy_get_framing_length,	/* get_framing_length */
+	legacyeth_get_framing_length,	/* get_framing_length */
 	NULL,				/* set_capture_length */
 	NULL,				/* get_fd */
 	trace_event_trace,		/* trace_event */
@@ -949,7 +992,7 @@ static struct libtrace_format_t legacypos = {
 	NULL,				/* fin_output */
 	legacy_read_packet,		/* read_packet */
 	NULL,				/* write_packet */
-	legacy_get_link,		/* get_link */
+	legacypos_get_link,		/* get_link */
 	legacypos_get_link_type,	/* get_link_type */
 	NULL,				/* get_direction */
 	NULL,				/* set_direction */
@@ -958,7 +1001,7 @@ static struct libtrace_format_t legacypos = {
 	NULL,				/* get_seconds */
 	legacy_get_capture_length,	/* get_capture_length */
 	legacypos_get_wire_length,	/* get_wire_length */
-	legacy_get_framing_length,	/* get_framing_length */
+	legacypos_get_framing_length,	/* get_framing_length */
 	NULL,				/* set_capture_length */
 	NULL,				/* get_fd */
 	trace_event_trace,		/* trace_event */

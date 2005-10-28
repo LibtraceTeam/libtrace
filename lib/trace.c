@@ -597,6 +597,7 @@ struct libtrace_ip *trace_get_ip(const struct libtrace_packet_t *packet) {
 			}
 			break;
 		case TRACE_TYPE_ETH:
+		case TRACE_TYPE_LEGACY_ETH:
 			{
 				struct libtrace_ether *eth = 
 					trace_get_link(packet);
@@ -652,29 +653,13 @@ struct libtrace_ip *trace_get_ip(const struct libtrace_packet_t *packet) {
 				}
 			}
 			break;
-		case TRACE_TYPE_ATM:
-			{
-				struct atm_rec *atm = 
-					trace_get_link(packet);
-				// TODO: Find out what ATM does, and return
-				//       NULL for non IP data
-				//       Presumably it uses the normal stuff
-				if (!atm) {
-					ipptr = NULL;
-					break;
-				}
-				ipptr =  (void*)&atm->pload;
-				break;
-			}
 		case TRACE_TYPE_LEGACY_POS:
 			{
 				// 64 byte capture. 
-				legacy_framing_t *cell = 
+				struct libtrace_pos *pos = 
 					trace_get_link(packet);
-				// check ethertype
-				uint16_t *etype = (uint16_t *)cell->data + 1;
-				if (*etype == 0x0008) {
-					ipptr = (void *)&cell->data[1];
+				if (ntohs(pos->ether_type) == 0x0800) {
+					ipptr = ((void *)pos) + sizeof(*pos);
 				} else {
 					ipptr = NULL;
 				}
@@ -682,15 +667,13 @@ struct libtrace_ip *trace_get_ip(const struct libtrace_packet_t *packet) {
 				
 			}
 		case TRACE_TYPE_LEGACY_ATM:
-		case TRACE_TYPE_LEGACY_ETH:
-		case TRACE_TYPE_LEGACY:
+		case TRACE_TYPE_ATM:
 			{
 				// 64 byte capture.
-				legacy_framing_t *cell =
+				struct libtrace_atm_cell *cell =
 					trace_get_link(packet);
-				uint16_t *etype = (uint16_t *)cell->data + 3;
-				if (*etype == 0x0008) {
-					ipptr = (void *)&cell->data[2];
+				if (ntohs(cell->ether_type) == 0x0800) {
+					ipptr = ((void *)cell) + sizeof(*cell);
 				} else {
 					ipptr = NULL;
 				}
