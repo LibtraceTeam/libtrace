@@ -47,10 +47,10 @@
 
 // Server status codes
 #define S_KEYCHANGE 1 // Encryption key has changed, flush collection to disk
-#define S_DISKWARN 2 // Disk is > 75% used
-#define S_DISKCRIT 4 // Disk is > 90% used
-#define S_DISKFULL 8 // Disk is > 95% used
-#define S_STATUS 16 // Packet is a wdcap_status packet
+#define S_DISKWARN 2 // Disk-backed fifo is > 75% used
+#define S_DISKCRIT 4 // Disk-backed fifo  is > 90% used
+#define S_DISKFULL 8 // Disk-backed fifo is > 95% used
+#define S_STATUS 16 // Packet is a fifo_status packet
 #define S_LOSTDATA 32 // capture restarted, flush collection to disk
 #define S_LOSTCONN 64 // connection to collector restarted, flush collection to disk
 /* ----------------------*/ 
@@ -63,7 +63,7 @@
 #define S_MESSAGE_ONLY S_ALLCONN
 
 // fifo_state_t is a tricky data type to transmit and receive so
-// it's easier to create a specialised version for wdcap
+// it's easier to create a specialised structure
 typedef struct fifo_info {
 	fifo_offset_t length;
 	fifo_offset_t used;
