@@ -41,13 +41,10 @@
 extern "C" { 
 #endif
 
-/* HAVE_ATTR_PURE is replaced by autoconf */
-#define HAVE_ATTR_PURE 1
-
 /* Function does not depend on anything but its
  * parameters, used to hint gcc's optimisations
  */
-#if HAVE_ATTR_PURE 
+#if __GNUC__ >= 3 
 #  define SIMPLE_FUNCTION __attribute__((pure))
 #else
 #  define SIMPLE_FUNCTION

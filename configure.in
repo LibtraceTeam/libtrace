@@ -3,18 +3,20 @@ AC_INIT(libtrace,2.0.23,[libtrace@wand.net.nz],libtrace)
 AC_CONFIG_SRCDIR(lib/trace.c)
 AM_INIT_AUTOMAKE(libtrace, 2.0.23)
 
-AC_CONFIG_FILES([Makefile lib/Makefile docs/Makefile])
+AC_CONFIG_FILES([Makefile lib/Makefile docs/Makefile libpacketdump/Makefile])
 dnl GNU C library
 dnl AC_GNU_SOURCE
+
 
 AM_CONFIG_HEADER(config.h)
 #AC_CONFIG_HEADERS([config.h])
 dnl Checks for programs.
 AC_PROG_CC
 AC_PROG_INSTALL
+AC_LIBTOOL_DLOPEN
 AC_PROG_LIBTOOL
 
-
+AC_CONFIG_LIBOBJ_DIR(lib)
 
 # Checks for header files.
 AC_HEADER_STDC
@@ -121,49 +123,48 @@ AC_SYS_LARGEFILE
 AC_PROG_GCC_TRADITIONAL
 AC_CHECK_FUNCS(socket strdup)
 
-# configure time option for __attribute__((pure))
-test_pure=true
-AC_ARG_WITH(pure,
-	    AC_HELP_STRING([--with-pure],
-			   [use __attribute__((pure)) for optimisation]),
-[
- 	if test "$withval" = no -o "$withval" = false
-	then 
-		test_pure=false
-	else
-		test_pure=true
-	fi
-],[
-  	test_pure=true 
-]) 
-
-libtrace_pure=false
-if test "$test_pure" = true; then
-	AC_MSG_CHECKING([if compiler supports __attribute__((pure))])
-	OLDCFLAGS="$CFLAGS"
-	CFLAGS="$CFLAGS -Werror"
-	
-	AC_COMPILE_IFELSE([AC_LANG_PROGRAM(
-			   [[
-#define SIMPLE_FUNCTION __attribute__((pure))
-SIMPLE_FUNCTION
-void foo() {
-}
-			   ]])],
-		[AC_DEFINE(HAVE_ATTR_PURE,1,[define to test for __attribute__((pure)) support]) libtrace_pure=true],
-		[AC_DEFINE(HAVE_ATTR_PURE,0,[define to test for __attribute__((pure)) support]) libtrace_pure=false])
-
-	AC_MSG_RESULT($libtrace_pure)
-	CFLAGS="$OLDCFLAGS"
-fi
-
-if test "$libtrace_pure" = true; then
- 	perl -pi -e 's/#define HAVE_ATTR_PURE.*/#define HAVE_ATTR_PURE 1/' lib/libtrace.h
-else
-	perl -pi -e 's/#define HAVE_ATTR_PURE.*/#define HAVE_ATTR_PURE 0/' lib/libtrace.h
-fi
-
-
+## configure time option for __attribute__((pure))
+#test_pure=true
+#AC_ARG_WITH(pure,
+#	    AC_HELP_STRING([--with-pure],
+#			   [use __attribute__((pure)) for optimisation]),
+#[
+# 	if test "$withval" = no -o "$withval" = false
+#	then 
+#		test_pure=false
+#	else
+#		test_pure=true
+#	fi
+#],[
+#  	test_pure=true 
+#]) 
+#
+#libtrace_pure=false
+#if test "$test_pure" = true; then
+#	AC_MSG_CHECKING([if compiler supports __attribute__((pure))])
+#	OLDCFLAGS="$CFLAGS"
+#	CFLAGS="$CFLAGS -Werror"
+#	
+#	AC_COMPILE_IFELSE([AC_LANG_PROGRAM(
+#			   [[
+##define SIMPLE_FUNCTION __attribute__((pure))
+#SIMPLE_FUNCTION
+#void foo() {
+#}
+#			   ]])],
+#		[AC_DEFINE(HAVE_ATTR_PURE,1,[define to test for __attribute__((pure)) support]) libtrace_pure=true],
+#		[AC_DEFINE(HAVE_ATTR_PURE,0,[define to test for __attribute__((pure)) support]) libtrace_pure=false])
+#
+#	AC_MSG_RESULT($libtrace_pure)
+#	CFLAGS="$OLDCFLAGS"
+#
+#	if test "$libtrace_pure" = true; then
+#	 	perl -pi -e 's/#define HAVE_ATTR_PURE.*/#define HAVE_ATTR_PURE 1/' lib/libtrace.h
+#	else
+#		perl -pi -e 's/#define HAVE_ATTR_PURE.*/#define HAVE_ATTR_PURE 0/' lib/libtrace.h
+#	fi
+#
+#fi
 
 # configure time options for man pages
 AC_ARG_WITH(man,

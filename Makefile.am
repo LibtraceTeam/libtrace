@@ -1,4 +1,4 @@
-SUBDIRS=lib docs
+SUBDIRS=lib docs libpacketdump
 
 AUTOMAKE_OPTIONS = 1.5
 
