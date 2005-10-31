@@ -155,14 +155,15 @@ void foo() {
 
 	AC_MSG_RESULT($libtrace_pure)
 	CFLAGS="$OLDCFLAGS"
-
-	if test "$libtrace_pure" = true; then
-	 	perl -pi -e 's/#define HAVE_ATTR_PURE.*/#define HAVE_ATTR_PURE 1/' lib/libtrace.h
-	else
-		perl -pi -e 's/#define HAVE_ATTR_PURE.*/#define HAVE_ATTR_PURE 0/' lib/libtrace.h
-	fi
-
 fi
+
+if test "$libtrace_pure" = true; then
+ 	perl -pi -e 's/#define HAVE_ATTR_PURE.*/#define HAVE_ATTR_PURE 1/' lib/libtrace.h
+else
+	perl -pi -e 's/#define HAVE_ATTR_PURE.*/#define HAVE_ATTR_PURE 0/' lib/libtrace.h
+fi
+
+
 
 # configure time options for man pages
 AC_ARG_WITH(man,
