@@ -11,7 +11,6 @@ endif
 INCLUDES = @ADD_INCLS@
 libtrace_la_LIBADD = @ADD_LIBS@ @LTLIBOBJS@
 libtrace_la_LDFLAGS=-version-info 2:23:0 @ADD_LDFLAGS@
-#libtrace_la_DEPENDENCIES = @DAGSOURCES@
 
 dagapi.c:
 	cp @DAG_TOOLS_DIR@/dagapi.c .
