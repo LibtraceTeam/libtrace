@@ -3,7 +3,7 @@ PREFIX=/usr/local
 CC=gcc
 
 INCLUDE = -I$(PREFIX)/include
-CFLAGS = -Wall -Wimplicit -Wformat -pipe -g -O2
+CFLAGS = -Wall -Wimplicit -W -Wformat -pipe -g -Os
 CFLAGS += $(INCLUDE)
 libdir = -L$(PREFIX)/lib
 LDLIBS = $(libdir) -ltrace

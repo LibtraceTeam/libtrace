@@ -45,6 +45,8 @@
 #include <sys/socket.h>
 #include <getopt.h>
 #include <inttypes.h>
+#include <sys/resource.h>
+#include <unistd.h>
 
 #include "libtrace.h"
 
@@ -85,24 +87,41 @@ void run_trace(char *uri)
         trace_destroy(trace);
 }
 
+#define TIMER_SUB(res,a,b)				\
+	do {						\
+		res.tv_sec = a.tv_sec - b.tv_sec;	\
+		res.tv_usec = a.tv_usec - b.tv_usec;    \
+		if (res.tv_usec < 0) {                	\
+			--res.tv_sec;                   \
+			res.tv_usec += 1000000; 	\
+		}                                       \
+	} while(0)
+
 int main(int argc, char *argv[]) {
 
 	int i;
 	struct timeval start,end;
 	struct timeval interval;
+	struct rusage start_usage,end_usage;
 
+	getrusage(RUSAGE_SELF,&start_usage);
 	gettimeofday(&start,NULL);
 	for(i=optind;i<argc;++i) {
 		run_trace(argv[i]);
 	}
 	gettimeofday(&end,NULL);
-	interval.tv_sec = end.tv_sec - start.tv_sec;                             
-	interval.tv_usec = end.tv_usec - start.tv_usec;      
-	if (interval.tv_usec < 0) {                         
-		--interval.tv_sec;                         
-		interval.tv_usec += 1000000;      
-	}                                                 
+	getrusage(RUSAGE_SELF,&end_usage);
+
+	TIMER_SUB(interval,end,start);
 
 	printf("Tracemarks: %.02f\n",((double)tot)/(interval.tv_sec+interval.tv_usec/100000));
+
+	printf("Real: %i.%05is\n",interval.tv_sec,interval.tv_usec);
+	TIMER_SUB(interval,end_usage.ru_utime,start_usage.ru_utime);
+	printf("User: %i.%05is\n",interval.tv_sec,interval.tv_usec);
+	TIMER_SUB(interval,end_usage.ru_stime,start_usage.ru_stime);
+	printf("System: %i.%06is\n",interval.tv_sec,interval.tv_usec);
+	printf("I/O: %li/%li\n",end_usage.ru_inblock-start_usage.ru_inblock,
+				end_usage.ru_oublock-start_usage.ru_oublock);
         return 0;
 }
