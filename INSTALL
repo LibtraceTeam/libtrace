@@ -68,6 +68,17 @@ erf:/path/to/file.gz
 erf:/path/to/socket
 erf:-
 
+Legacy DAG formats:
+legacyatm:/path/to/file
+legacyatm:/path/to/file.gz
+legacyatm:-
+legacypos:/path/to/file
+legacypos:/path/to/file.gz
+legacypos:-
+legacyeth:/path/to/file
+legacyeth:/path/to/file.gz
+legacyeth:-
+
 PCAP (from libpcap)
 pcap:/path/to/file
 pcap:-
@@ -91,4 +102,5 @@ rtclient:hostname:port
 
 DAG (native dag)
 dag:/dev/dag0
+
 

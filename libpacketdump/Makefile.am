@@ -5,11 +5,11 @@ libpacketdump_la_SOURCES = libpacketdump.cc
 
 PLUGINDIR=$(libdir)/libpacketdump
 
-INCLUDES= @ADD_INCLS@
+INCLUDES= @ADD_INCLS@ -I../lib
 libpacketdump_la_LIBADD = @ADD_LIBS@  
 libpacketdump_la_LDFLAGS=-version-info 2:23:0 @ADD_LDFLAGS@
 
-AM_CXXFLAGS=-g -Wall -DDIRNAME=\"$(PLUGINDIR)\" -rdynamic
+AM_CXXFLAGS=-g -Wall -DDIRNAME=\"$(PLUGINDIR)\" -rdynamic $(INCLUDES)
 
 LINK_LAYERS=$(addsuffix .so,$(basename $(wildcard link_*.cc)))
 ETH_LAYERS=$(addsuffix .so,$(basename $(wildcard eth_*.cc)))
