@@ -35,6 +35,7 @@
 #include "libtrace_int.h"
 #include "format_helper.h"
 #include "parse_cmd.h"
+#include "rt_protocol.h"
 
 #ifdef HAVE_INTTYPES_H
 #  include <inttypes.h>
@@ -617,11 +618,11 @@ static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_pac
 		}
 		// Read status byte
 		if (tracefifo_out_read(libtrace->fifo,
-				&packet->status, sizeof(int)) == 0) {
+				&packet->status, sizeof(uint32_t)) == 0) {
 			read_required = 1;
 			continue;
 		}
-		tracefifo_out_update(libtrace->fifo,sizeof(int));
+		tracefifo_out_update(libtrace->fifo,sizeof(uint32_t));
 
 		// read in the ERF header
 		if ((numbytes = tracefifo_out_read(libtrace->fifo, buffer,
@@ -630,6 +631,14 @@ static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_pac
 			read_required = 1;
 			continue;
 		}
+		
+		if (packet->status >= S_MESSAGE_ONLY) {
+			// Need to skip this packet as it is a message packet
+			tracefifo_out_update(libtrace->fifo, dag_record_size);
+			tracefifo_ack_update(libtrace->fifo, dag_record_size + sizeof(uint32_t));
+			continue;
+		}
+		
 		size = ntohs(((dag_record_t *)buffer)->rlen);
 		
 		// read in the full packet
@@ -643,7 +652,7 @@ static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_pac
 		// got in our whole packet, so...
 		tracefifo_out_update(libtrace->fifo,size);
 
-		tracefifo_ack_update(libtrace->fifo,size + sizeof(int));
+		tracefifo_ack_update(libtrace->fifo,size + sizeof(uint32_t));
 
 		packet->size = numbytes;
 		return numbytes;
