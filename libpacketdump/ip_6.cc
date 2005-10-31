@@ -6,6 +6,7 @@
 #include <netinet/tcp.h>
 #include <netinet/in.h>
 #include <assert.h>
+#include <netdb.h>
 
 #define SAFE(x) \
 	((unsigned int)len>=((char*)&tcp->x-(char*)tcp+sizeof(tcp->x))) 
@@ -52,8 +53,30 @@ void decode(int link_type,char *packet,int len)
 {
 	struct tcphdr *tcp = (struct tcphdr*)packet;
 	printf(" TCP:");
-	DISPLAYS(source," Source %i")
-	DISPLAYS(dest," Dest %i")
+	if (SAFE(source)) {
+		struct servent *ent=getservbyport(tcp->source,"tcp");
+		if(ent) {
+			printf(" Source %i (%s)",htons(tcp->source),ent->s_name);
+		} else {
+			printf(" Source %i",htons(tcp->source));
+		}
+	}
+	else {
+		printf("\n");
+		return;
+	}
+	if (SAFE(dest)) {
+		struct servent *ent=getservbyport(tcp->dest,"tcp");
+		if(ent) {
+			printf(" Dest %i (%s)",htons(tcp->dest),ent->s_name);
+		} else {
+			printf(" Dest %i",htons(tcp->dest));
+		}
+	}
+	else {
+		printf("\n");
+		return;
+	}
 	printf("\n TCP:");
 	DISPLAYL(seq," Seq %u");
 	printf("\n TCP:");

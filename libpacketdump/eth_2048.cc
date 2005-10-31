@@ -9,6 +9,7 @@
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <arpa/inet.h>
+#include <netdb.h>
 
 #define DISPLAY_EXP(x,fmt,exp) \
 	if ((unsigned int)len>=((char*)&ip->x-(char*)ip+sizeof(ip->x))) \
@@ -36,7 +37,18 @@ void decode(int link_type,char *packet,int len)
 	DISPLAY(frag_off," Fragoff %i");
 	//printf("\n IP:");
 	DISPLAY(ttl," TTL %i");
-	DISPLAY(protocol," Proto %i");
+	if ((unsigned int)len>=((char*)&ip->protocol-(char*)ip+sizeof(ip->protocol))) {
+		struct protoent *ent=getprotobynumber(ip->protocol);
+		if (ent) {
+			printf(" Proto %i (%s)",ip->protocol,ent->p_name);
+		}
+		else {
+			printf(" Proto %i",ip->protocol);
+		}
+	} else {
+		printf("\n");
+		return;
+	}
 	DISPLAYS(check," Checksum %i\n");
 	DISPLAYIP(saddr," IP: Source %s ");
 	DISPLAYIP(daddr,"Destination %s\n");

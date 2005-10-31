@@ -5,6 +5,7 @@
 #include "libpacketdump.h"
 #include <netinet/udp.h>
 #include <netinet/in.h>
+#include <netdb.h>
 
 #define STRUCT udp
 
@@ -28,8 +29,30 @@ void decode(int link_type,char *packet,int len)
 {
 	struct udphdr *udp = (struct udphdr*)packet;
 	printf(" UDP:");
-	DISPLAYS(source," Source %i")
-	DISPLAYS(dest," Dest %i")
+	if (SAFE(source)) {
+		struct servent *ent=getservbyport(udp->source,"udp");
+		if(ent) {
+			printf(" Source %i (%s)",htons(udp->source),ent->s_name);
+		} else {
+			printf(" Source %i",htons(udp->source));
+		}
+	}
+	else {
+		printf("\n");
+		return;
+	}
+	if (SAFE(dest)) {
+		struct servent *ent=getservbyport(udp->dest,"udp");
+		if(ent) {
+			printf(" Dest %i (%s)",htons(udp->dest),ent->s_name);
+		} else {
+			printf(" Dest %i",htons(udp->dest));
+		}
+	}
+	else {
+		printf("\n");
+		return;
+	}
 	printf("\n UDP:");
 	DISPLAYS(len," Len %u");
 	DISPLAYS(check," Checksum %u");
