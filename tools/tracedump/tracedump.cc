@@ -66,7 +66,6 @@ int main(int argc,char **argv)
 
 		while(trace_read_packet(trace,&packet)> 0 ){
 			time_t sec = (time_t)trace_get_seconds(&packet);
-			char *link=(char *)trace_get_link(&packet);
 			if (filter && !trace_bpf_filter(filter,&packet))
 				continue;
 
