@@ -19,8 +19,8 @@ libpacketdump_la_SOURCES = libpacketdump.cc $(PLUGINSOURCES)
 PLUGINDIR=$(libdir)/libpacketdump
 
 INCLUDES= @ADD_INCLS@ -I../lib -I../
-libpacketdump_la_LIBADD = @ADD_LIBS@  
-libpacketdump_la_LDFLAGS=-version-info 2:23:0 @ADD_LDFLAGS@
+libpacketdump_la_LIBADD = @ADD_LIBS@  -ldl
+libpacketdump_la_LDFLAGS=-version-info 2:24:0 @ADD_LDFLAGS@
 
 AM_CXXFLAGS=-g -Wall -DDIRNAME=\"$(PLUGINDIR)\" -rdynamic $(INCLUDES)
 
