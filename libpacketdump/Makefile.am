@@ -1,11 +1,6 @@
 lib_LTLIBRARIES = libpacketdump.la
 include_HEADERS = libpacketdump.h 
 
-#LINK_LAYERS=$(addsuffix .so,$(basename $(wildcard link_*.cc)))
-#ETH_LAYERS=$(addsuffix .so,$(basename $(wildcard eth_*.cc)))
-#IP_LAYERS=$(addsuffix .so,$(basename $(wildcard ip_*.cc)))
-#TCP_LAYERS=$(addsuffix .so,$(basename $(wildcard tcp_*.cc)))
-
 LINK_LAYERS=$(wildcard link_*.cc)
 ETH_LAYERS=$(wildcard eth_*.cc)
 IP_LAYERS=$(wildcard ip_*.cc)
@@ -36,3 +31,6 @@ clean-local:
 
 install-exec-local:
 	for plugin in $(PLUGINS); do install -D -m 755 $$plugin $(PLUGINDIR)/$$plugin; done
+
+uninstall-exec-local:
+	for plugin in $(PLUGINS); do rm -f $(PLUGINDIR)/$$plugin; done

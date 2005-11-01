@@ -1,4 +1,12 @@
-SUBDIRS=traceanon tracedump tracemerge tracertstats tracesplit
+if LIBPACKETDUMP
+TRACEDUMP_DIR=tracedump
+endif
+
+if LIBTRACE_TOOLS
+SUBDIRS=traceanon tracemerge tracertstats tracesplit $(TRACEDUMP_DIR)
+else
+SUBDIRS=
+endif
 
 all-hook:
 	for dir in $(SUBDIRS); do make -C $$dir; done

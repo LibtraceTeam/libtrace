@@ -145,6 +145,63 @@ AC_ARG_WITH(man,
 	     fi
 )
 
+# configure time option for building libpacketdump
+# libpacketdump needs a C++ compiler to build, so we should do some tests
+# at this point to see if one is installed
+libtrace_libpacketdump=true
+AC_ARG_ENABLE(libpacketdump,
+	      AC_HELP_STRING([--disable-libpacketdump],
+			     [disable building of libpacketdump (enabled by default). libpacketdump needs a c++ compiler to build] ),
+[
+ 	if test "$enableval" = no -o "$enableval" = false
+	then
+		libtrace_libpacketdump=false
+	else
+		libtrace_libpacketdump=true
+	fi
+],
+[
+	libtrace_libpacketdump=true
+])
+
+if test "$libtrace_libpacketdump" = true; then
+	AC_LANG_PUSH(C++)
+	AC_MSG_CHECKING([if we can compile C++ ])
+	AC_COMPILE_IFELSE([AC_LANG_PROGRAM(
+			   [[
+#include <iostream>
+			   ]])],
+		[AC_DEFINE(HAVE_CXX,1,[define to test for presence of a working C++ compiler]) libtrace_cxx=true],
+		[AC_DEFINE(HAVE_CXX,0,[define to test for presence of a working C++ compiler]) libtrace_cxx=false])
+
+	AC_MSG_RESULT($libtrace_cxx)	
+	AC_LANG_POP(C++)
+
+	if test "$libtrace_cxx" = false; then
+		AC_MSG_ERROR([libpacketdump requested, but no C++ compiler found. Build with --disable-libpacketdump if you wish to continue anyway ])
+	fi
+fi
+
+# configure time option for building the libtrace tools
+# one of the tools requires libpacketdump, so won't build if libpacketdump
+# hasn't also been built
+libtrace_tools=true
+AC_ARG_ENABLE(tools,
+	      AC_HELP_STRING([--disable-tools],
+			     [disable building of the tools contained in the tools/ directory]),
+[
+ 	if test "$enableval" = no -o "$enableval" = false
+	then
+		libtrace_tools=false
+	else
+		libtrace_tools=true
+	fi
+ 	
+],
+[
+ 	libtrace_tools=true
+]) 
+
 # configure time options for use of DAG cards
 # borrowed from libpcap!
 AC_ARG_WITH(dag, 
@@ -222,14 +279,6 @@ else
 	AC_DEFINE(HAVE_DAG,0,[conditional for building with DAG support])
 fi
 
-AM_CONDITIONAL(HAVE_DAG, test x$libtrace_dag = xtrue)
-AM_CONDITIONAL(DAG2_4, test x$libtrace_dag2_4 = xtrue)
-
-
-# Check for miscellaneous programs
-AC_CHECK_PROG([libtrace_doxygen], [doxygen], [true], [false])
-
-AM_CONDITIONAL(HAS_DOXYGEN, [test x"$libtrace_doxygen" = xtrue])
 
 
 
@@ -276,6 +325,16 @@ else
 	AC_DEFINE(HAVE_ZLIB,0,[Conditional for building zlib support])   
 fi
 
+AM_CONDITIONAL([HAVE_DAG], [test "$libtrace_dag" = true])
+AM_CONDITIONAL([DAG2_4], [test "$libtrace_dag2_4" = true])
+AM_CONDITIONAL([HAVE_CXX], [test "$libtrace_cxx" = true])
+AM_CONDITIONAL([LIBPACKETDUMP], [test "$libtrace_libpacketdump" = true])
+AM_CONDITIONAL([LIBTRACE_TOOLS], [test "$libtrace_tools" = true])
+
+# Check for miscellaneous programs
+AC_CHECK_PROG([libtrace_doxygen], [doxygen], [true], [false])
+
+AM_CONDITIONAL(HAS_DOXYGEN, [test x"$libtrace_doxygen" = xtrue])
 
 
 AC_SUBST([ADD_LIBS])
@@ -283,8 +342,6 @@ AC_SUBST([ADD_LDFLAGS])
 AC_SUBST([ADD_INCLS])
 AC_SUBST([LTLIBOBJS])
 AC_SUBST([MANPAGES])
-AC_SUBST([LIBTRACE_VERSION])
-AC_SUBST(LIBTRACE_LT_VERSION)
 
 dnl and finally, output our Makefiles
 AC_OUTPUT
@@ -303,4 +360,6 @@ reportopt "Compiled with compressed trace (zlib) support" $libtrace_zlib
 reportopt "Compiled with DAG support (libdag)" $libtrace_dag
 reportopt "Compiled with DAG support (DAG 2.4)" $libtrace_dag2_4
 reportopt "Building man pages/documentation" $libtrace_doxygen
+reportopt "Building libpacketdump" $libtrace_libpacketdump
+reportopt "Building tools/ directory" $libtrace_tools
 

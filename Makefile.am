@@ -1,4 +1,10 @@
-SUBDIRS=lib docs libpacketdump tools
+if LIBPACKETDUMP
+LIBPACKETDUMP_DIR = libpacketdump
+endif
+if LIBTRACE_TOOLS
+TOOLS_DIR = tools
+endif
+SUBDIRS = lib docs $(LIBPACKETDUMP_DIR) $(TOOLS_DIR)
 
 AUTOMAKE_OPTIONS = 1.5
 
