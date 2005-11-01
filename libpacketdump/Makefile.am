@@ -32,5 +32,5 @@ clean-local:
 install-exec-local:
 	for plugin in $(PLUGINS); do install -D -m 755 $$plugin $(PLUGINDIR)/$$plugin; done
 
-uninstall-exec-local:
+uninstall-local:
 	for plugin in $(PLUGINS); do rm -f $(PLUGINDIR)/$$plugin; done

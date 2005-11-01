@@ -24,6 +24,18 @@ AC_PROG_LIBTOOL
 
 AC_CONFIG_LIBOBJ_DIR(lib)
 
+# Checks for typedefs, structures, and compiler characteristics.
+AC_C_CONST
+AC_C_INLINE
+AC_C_BIGENDIAN
+AC_TYPE_SIZE_T
+AC_HEADER_TIME
+AC_SYS_LARGEFILE
+
+# Checks for library functions.
+AC_PROG_GCC_TRADITIONAL
+AC_CHECK_FUNCS(socket strdup)
+
 # Checks for header files.
 AC_HEADER_STDC
 dnl AC_CHECK_HEADERS(errno.h stdlib.h stdio.h assert.h string.h netinet/in.h assert.h errno.h fcntl.h net/ethernet.h netdb.h pcap.h stdio.h stdlib.h string.h sys/stat.h sys/types.h sys/socket.h sys/un.h unistd.h time.h sys/ioctl.h net/bpf.h pcap.h zlib.h pcap-bpf.h)
@@ -79,6 +91,10 @@ else
 fi
 
 
+AC_CHECK_LIB(gdc,GDC_out_graph,
+	     libtrace_gdc=true,
+	     libtrace_gdc=false)
+
 # Check for various broken functions
 AC_FUNC_MALLOC
 AC_FUNC_REALLOC
@@ -120,17 +136,6 @@ fi
 	fi
 fi
 
-# Checks for typedefs, structures, and compiler characteristics.
-AC_C_CONST
-AC_C_INLINE
-AC_C_BIGENDIAN
-AC_TYPE_SIZE_T
-AC_HEADER_TIME
-AC_SYS_LARGEFILE
-
-# Checks for library functions.
-AC_PROG_GCC_TRADITIONAL
-AC_CHECK_FUNCS(socket strdup)
 
 # configure time options for man pages
 AC_ARG_WITH(man,
@@ -330,6 +335,8 @@ AM_CONDITIONAL([DAG2_4], [test "$libtrace_dag2_4" = true])
 AM_CONDITIONAL([HAVE_CXX], [test "$libtrace_cxx" = true])
 AM_CONDITIONAL([LIBPACKETDUMP], [test "$libtrace_libpacketdump" = true])
 AM_CONDITIONAL([LIBTRACE_TOOLS], [test "$libtrace_tools" = true])
+AM_CONDITIONAL([LIBGDC], [test "$libtrace_gdc" = true])
+
 
 # Check for miscellaneous programs
 AC_CHECK_PROG([libtrace_doxygen], [doxygen], [true], [false])

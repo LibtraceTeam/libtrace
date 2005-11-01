@@ -1,9 +1,15 @@
+# tracedump depends on libpacketdump
 if LIBPACKETDUMP
 TRACEDUMP_DIR=tracedump
 endif
 
+# tracertstats depends on libgdc
+if LIBGDC
+TRACERTSTATS_DIR=tracertstats
+endif
+
 if LIBTRACE_TOOLS
-SUBDIRS=traceanon tracemerge tracertstats tracesplit $(TRACEDUMP_DIR)
+SUBDIRS=traceanon tracemerge tracesplit $(TRACEDUMP_DIR) $(TRACERTSTATS_DIR)
 else
 SUBDIRS=
 endif
