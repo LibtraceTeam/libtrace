@@ -33,7 +33,7 @@
 
 #include <sys/types.h>
 #include <netinet/in.h>
-
+#include "rt_protocol.h"
 /** API version as 2 byte hex digits, eg 0xXXYYZZ */
 #define LIBTRACE_API_VERSION 0x020016  /* 2.0.22 */
 
@@ -94,7 +94,7 @@ struct libtrace_packet_t {
 	//void *buffer;
 	char buffer[LIBTRACE_PACKET_BUFSIZE];
 	size_t size;
-	uint32_t status;
+	rt_status_t status;
 };
                      
 

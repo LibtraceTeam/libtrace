@@ -485,7 +485,8 @@ static int dag_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 	// have to copy it out of the memory hole at this stage:
 	memcpy(packet->buffer, erfptr, size);
 	
-	packet->status = 0;
+	packet->status.type = RT_DATA;
+	packet->status.message = 0;
 	packet->size = size;
 	DAG.offset += size;
 	DAG.diff -= size;
@@ -525,7 +526,8 @@ static int legacy_read_packet(struct libtrace_t *libtrace, struct libtrace_packe
 		perror("libtrace_read");
 		return -1;
 	}
-	packet->status = 0;
+	packet->status.type = RT_DATA;
+	packet->status.message = 0;
 	packet->size = rlen;
 	return rlen;
 }
@@ -564,7 +566,8 @@ static int erf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 		perror("libtrace_read");
 		return -1;
 	}
-	packet->status = 0;
+	packet->status.type = RT_DATA;
+	packet->status.message = 0;
 	packet->size = rlen;
 	return rlen;
 }
@@ -618,11 +621,11 @@ static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_pac
 		}
 		// Read status byte
 		if (tracefifo_out_read(libtrace->fifo,
-				&packet->status, sizeof(uint32_t)) == 0) {
+				&packet->status, sizeof(rt_status_t)) == 0) {
 			read_required = 1;
 			continue;
 		}
-		tracefifo_out_update(libtrace->fifo,sizeof(uint32_t));
+		tracefifo_out_update(libtrace->fifo,sizeof(rt_status_t));
 
 		// read in the ERF header
 		if ((numbytes = tracefifo_out_read(libtrace->fifo, buffer,
@@ -632,10 +635,10 @@ static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_pac
 			continue;
 		}
 		
-		if (packet->status >= S_MESSAGE_ONLY) {
+		if (packet->status.type == RT_MSG) {
 			// Need to skip this packet as it is a message packet
 			tracefifo_out_update(libtrace->fifo, dag_record_size);
-			tracefifo_ack_update(libtrace->fifo, dag_record_size + sizeof(uint32_t));
+			tracefifo_ack_update(libtrace->fifo, dag_record_size + sizeof(rt_status_t));
 			continue;
 		}
 		
@@ -652,7 +655,7 @@ static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_pac
 		// got in our whole packet, so...
 		tracefifo_out_update(libtrace->fifo,size);
 
-		tracefifo_ack_update(libtrace->fifo,size + sizeof(uint32_t));
+		tracefifo_ack_update(libtrace->fifo,size + sizeof(rt_status_t));
 
 		packet->size = numbytes;
 		return numbytes;

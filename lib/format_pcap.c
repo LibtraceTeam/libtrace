@@ -227,7 +227,8 @@ static int pcap_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_
 	if (pcapbytes <= 0) {
 		return pcapbytes;
 	}
-	packet->status = 0;
+	packet->status.type = RT_DATA;
+	packet->status.message = 0;
 	return (packet->size - sizeof(struct pcap_pkthdr));
 }
 
