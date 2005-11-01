@@ -31,26 +31,6 @@
 #ifndef LIBTRACE_H
 #define LIBTRACE_H
 
-#include <sys/types.h>
-#include <netinet/in.h>
-#include "rt_protocol.h"
-/** API version as 2 byte hex digits, eg 0xXXYYZZ */
-#define LIBTRACE_API_VERSION 0x020016  /* 2.0.22 */
-
-#ifdef __cplusplus 
-extern "C" { 
-#endif
-
-/* Function does not depend on anything but its
- * parameters, used to hint gcc's optimisations
- */
-#if __GNUC__ >= 3 
-#  define SIMPLE_FUNCTION __attribute__((pure))
-#else
-#  define SIMPLE_FUNCTION
-#endif
-	
-
 /** @file
  *
  * @brief Trace file processing library header
@@ -75,7 +55,26 @@ extern "C" {
  *
  */
 
-#define COLLECTOR_PORT 3435
+#include <sys/types.h>
+#include <netinet/in.h>
+/** API version as 2 byte hex digits, eg 0xXXYYZZ */
+#define LIBTRACE_API_VERSION 0x020017  /* 2.0.23 */
+
+#ifdef __cplusplus 
+extern "C" { 
+#endif
+
+/* Function does not depend on anything but its
+ * parameters, used to hint gcc's optimisations
+ */
+#if __GNUC__ >= 3 
+#  define SIMPLE_FUNCTION __attribute__((pure))
+#else
+#  define SIMPLE_FUNCTION
+#endif
+	
+#define RT_DATA 1
+#define RT_MSG 2
 
 	
 /** Opaque structure holding information about an output trace */
@@ -94,8 +93,12 @@ struct libtrace_packet_t {
 	//void *buffer;
 	char buffer[LIBTRACE_PACKET_BUFSIZE];
 	size_t size;
-	rt_status_t status;
-};
+	struct {
+		uint8_t type;
+		uint8_t reserved;
+		uint16_t message;
+ 	} status;
+} __attribute__ ((packed));
                      
 
 /** Enumeration of error codes */

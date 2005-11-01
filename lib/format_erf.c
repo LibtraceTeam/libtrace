@@ -77,6 +77,8 @@
 #  define LIBTRACE_WRITE write
 #endif
 
+#define COLLECTOR_PORT 3435
+
 /* Catch undefined O_LARGEFILE on *BSD etc */
 #ifndef O_LARGEFILE
 #  define O_LARGEFILE 0
