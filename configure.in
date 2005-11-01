@@ -98,23 +98,26 @@ else
     AC_DEFINE(HAVE_PCAP,0,[Conditional for building PCAP support])
 fi	
 
-# Earlier versions of pcap don't have pcap_open_dead. EG: the one OpenBSD
-# ships with. Even Debian Woody is more up to date.
-AC_CHECK_LIB(pcap,pcap_open_dead,
-	have_pcap_open_dead=true,
-	have_pcap_open_dead=false)
+# Only test for these functions if we have PCAP installed
+	if test "$libtrace_pcap" = true; then
+	# Earlier versions of pcap don't have pcap_open_dead. EG: the one 
+	# OpenBSD ships with. Even Debian Woody is more up to date.
+	AC_CHECK_LIB(pcap,pcap_open_dead,
+		have_pcap_open_dead=true,
+		have_pcap_open_dead=false)
 
-if test "$have_pcap_open_dead" = false; then
-	AC_REPLACE_FUNCS(pcap_open_dead)
-fi
+	if test "$have_pcap_open_dead" = false; then
+		AC_REPLACE_FUNCS(pcap_open_dead)
+	fi
    
-# Versions of libpcap earlier than 0.8 don't have pcap_dump_flush
-AC_CHECK_LIB(pcap,pcap_dump_flush,
-	     have_pcap_dump_flush=true,
-	     have_pcap_dump_flush=false)
+	# Versions of libpcap earlier than 0.8 don't have pcap_dump_flush
+	AC_CHECK_LIB(pcap,pcap_dump_flush,
+		     have_pcap_dump_flush=true,
+		     have_pcap_dump_flush=false)
 
-if test "$have_pcap_dump_flush" = false; then
-	AC_REPLACE_FUNCS(pcap_dump_flush)
+	if test "$have_pcap_dump_flush" = false; then
+		AC_REPLACE_FUNCS(pcap_dump_flush)
+	fi
 fi
 
 # Checks for typedefs, structures, and compiler characteristics.
