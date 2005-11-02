@@ -58,7 +58,7 @@
 #include <sys/types.h>
 #include <netinet/in.h>
 /** API version as 2 byte hex digits, eg 0xXXYYZZ */
-#define LIBTRACE_API_VERSION 0x020017  /* 2.0.23 */
+#define LIBTRACE_API_VERSION 0x020018  /* 2.0.24 */
 
 #ifdef __cplusplus 
 extern "C" { 

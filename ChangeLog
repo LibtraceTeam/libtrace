@@ -29,6 +29,12 @@
 ##
 
 - Version 2.0.24 (unreleased)
+	* minor bugs in format_erf
+	* applied autoconf to tools/ dir - these are now built and installed
+	  automatically
+	* added --disable-libpacketdump and --disable-tools configure options
+	* improved checking for libpcap
+	* improved checking for g++ (needed for libpacketdump)
 
 - Version 2.0.23
 	* configure fixes for dag
