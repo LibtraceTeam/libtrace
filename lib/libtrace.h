@@ -78,17 +78,17 @@ extern "C" {
 
 	
 /** Opaque structure holding information about an output trace */
-struct libtrace_out_t;
+typedef struct libtrace_out_t libtrace_out_t;
 	
 /** Opaque structure holding information about a trace */
-struct libtrace_t;
+typedef struct libtrace_t libtrace_t;
         
 /** Opaque structure holding information about a bpf filter */
-struct libtrace_filter_t;
+typedef struct libtrace_filter_t libtrace_filter_t;
 
 /** Structure holding information about a packet */
 #define LIBTRACE_PACKET_BUFSIZE 65536
-struct libtrace_packet_t {
+typedef struct libtrace_packet_t {
     	struct libtrace_t *trace;
 	//void *buffer;
 	char buffer[LIBTRACE_PACKET_BUFSIZE];
@@ -98,14 +98,14 @@ struct libtrace_packet_t {
 		uint8_t reserved;
 		uint16_t message;
  	} status;
-} __attribute__ ((packed));
+} __attribute__ ((packed)) libtrace_packet_t;
                      
 
 /** Enumeration of error codes */
 enum {E_NOERROR, E_BAD_FORMAT, E_NO_INIT, E_NO_INIT_OUT, E_URI_LONG, E_URI_NOCOLON, E_INIT_FAILED };
 
 /** Structure for dealing with IP packets */
-struct libtrace_ip
+typedef struct libtrace_ip
 {
 #if BYTE_ORDER == LITTLE_ENDIAN
     unsigned int ip_hl:4;		/**< header length */
@@ -129,10 +129,11 @@ struct libtrace_ip
     u_short ip_sum;			/**< checksum */
     struct in_addr ip_src;		/**< source address */
     struct in_addr ip_dst;		/**< dest address */
-} __attribute__ ((packed));
+} __attribute__ ((packed)) libtrace_ip_t
+;
 
 /** Structure for dealing with TCP packets */
-struct libtrace_tcp
+typedef struct libtrace_tcp
   {
     u_int16_t source;		/**< Source Port */
     u_int16_t dest;		/**< Destination port */
@@ -164,18 +165,18 @@ struct libtrace_tcp
     u_int16_t window;		/**< Window Size */
     u_int16_t check;		/**< Checksum */
     u_int16_t urg_ptr;		/**< Urgent Pointer */
-} __attribute__ ((packed));
+} __attribute__ ((packed)) libtrace_tcp_t;
 
 /** UDP Header for dealing with UDP packets */
-struct libtrace_udp {
+typedef struct libtrace_udp {
   u_int16_t	source;		/**< Source port */
   u_int16_t	dest;		/**< Destination port */
   u_int16_t	len;		/**< Length */
   u_int16_t	check;		/**< Checksum */
-} __attribute__ ((packed));
+} __attribute__ ((packed)) libtrace_udp_t;
 
 /** ICMP Header for dealing with icmp packets */
-struct libtrace_icmp
+typedef struct libtrace_icmp
 {
   u_int8_t type;		/**< message type */
   u_int8_t code;		/**< type sub-code */
@@ -194,7 +195,7 @@ struct libtrace_icmp
       u_int16_t	mtu;
     } frag;			/**< path mtu discovery */
   } un;				/**< Union for payloads of various icmp codes */
-} __attribute__ ((packed));
+} __attribute__ ((packed)) libtrace_icmp_t;
 
 /** 802.3 frame */
 struct libtrace_ether
@@ -202,7 +203,7 @@ struct libtrace_ether
   u_int8_t ether_dhost[6];	/* destination ether addr */
   u_int8_t ether_shost[6];	/* source ether addr */
   u_int16_t ether_type;		/* packet type ID field (next-header) */
-} __attribute__ ((packed));
+} __attribute__ ((packed)) libtrace_ether_t;
 
 /** 802.1Q frame */
 struct libtrace_8021q 
@@ -214,10 +215,10 @@ struct libtrace_8021q
   u_int16_t vlan_cfi:1;	 	 /* vlan format indicator, 0 for ethernet, 1 for token ring */
   u_int16_t vlan_id:12;	 	 /* vlan id */
   u_int16_t vlan_ether_type;	 /* vlan sub-packet type ID field (next-header)*/
-} __attribute__ ((packed));
+} __attribute__ ((packed)) libtrace_8021q_t;
 
 /** ATM cell */
-struct libtrace_atm_cell
+typedef struct libtrace_atm_cell
 {
   u_int8_t gfc:4;
   u_int8_t vpi;
@@ -226,14 +227,14 @@ struct libtrace_atm_cell
   u_int8_t clp:1;
   u_int8_t hec;
   u_int16_t ether_type;
-};
+} __attribute__ ((packed)) libtrace_atm_cell;
 
 /** POS header */
-struct libtrace_pos
+typedef struct libtrace_pos
 {
  u_int16_t header;
  u_int16_t ether_type;
-};
+} __attribute__ ((packed)) libtrace_pos;
 
 /** Prints help information for libtrace 
  *
