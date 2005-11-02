@@ -1,0 +1,3 @@
+AM_CFLAGS=-I$(top_srcdir)/lib
+AM_LDFLAGS=-L$(top_srcdir)/lib
+AM_LDADD=-ltrace
