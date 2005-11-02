@@ -12,7 +12,7 @@ if HAS_DOXYGEN
 man_MANS = docs/doxygen/man/man3/trace*.3 docs/doxygen/man/man3/libtrace*.3 
 endif
 #man_MANS = @MANPAGES@
-EXTRA_DIST=examples tools
+EXTRA_DIST=examples
 #docs/html docs/latex docs/man $(man_MANS)
 
 .PHONY: docs
