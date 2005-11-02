@@ -4,9 +4,8 @@
 #include <stdlib.h>
 #include "libtrace.h"
 #include "tracereport.h"
-#include "tree.h"
+#include "contain.h"
 
-static tree_t *flows=NULL;
 static uint64_t flow_count=0;
 
 struct fivetuple_t {
@@ -17,40 +16,31 @@ struct fivetuple_t {
 	uint8_t prot;
 };
 
-static int fivetuplecmp(const void *a, const void *b)
+static int fivetuplecmp(struct fivetuple_t a, struct fivetuple_t b)
 {
-	const struct fivetuple_t *as=a;
-	const struct fivetuple_t *bs=b;
-	if (as->ipa != bs->ipa) return as->ipa-bs->ipa;
-	if (as->ipb != bs->ipb) return as->ipb-bs->ipb;
-	if (as->porta != bs->porta) return as->porta-bs->porta;
-	if (as->portb != bs->portb) return as->portb-bs->portb;
-	return as->porta - as->portb;
+	if (a.porta != b.porta) return a.porta-b.porta;
+	if (a.portb != b.portb) return a.portb-b.portb;
+	if (a.ipa != b.ipa) return a.ipa-b.ipa;
+	if (a.ipb != b.ipb) return a.ipb-b.ipb;
+	return a.prot - b.prot;
 }
+
+SET_CREATE(flowset,struct fivetuple_t,fivetuplecmp)
 
 void flow_per_packet(struct libtrace_packet_t *packet)
 {
 	struct libtrace_ip *ip = trace_get_ip(packet);
-	struct fivetuple_t *ftp;
+	struct fivetuple_t ft;
 	if (!ip)
 		return;
-	ftp=malloc(sizeof(struct fivetuple_t));
-	ftp->ipa=ip->ip_src.s_addr;
-	ftp->ipb=ip->ip_dst.s_addr;
-	ftp->porta=trace_get_source_port(packet);
-	ftp->portb=trace_get_destination_port(packet);
+	ft.ipa=ip->ip_src.s_addr;
+	ft.ipb=ip->ip_dst.s_addr;
+	ft.porta=trace_get_source_port(packet);
+	ft.portb=trace_get_destination_port(packet);
 
-	stat_t *stat=tree_find(&flows,ftp,fivetuplecmp);
-	if (!stat) {
-		stat=calloc(1,sizeof(stat_t));
-		++flow_count;
-	}
-
-	++stat->count;
-	stat->bytes+=trace_get_wire_length(packet);
-
-	if (tree_replace(&flows,ftp,fivetuplecmp,stat)) {
-		free(ftp);
+	if (!SET_CONTAINS(flowset,ft)) {
+		SET_INSERT(flowset,ft);
+		flow_count++;
 	}
 }
 

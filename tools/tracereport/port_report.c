@@ -5,18 +5,11 @@
 #include <string.h>
 #include "libtrace.h"
 #include "tracereport.h"
-#include "tree.h"
+#include "contain.h"
 
-#define MEMDUP(x) memcpy(malloc(sizeof(x)),&x,sizeof(x))
+CMP(cmp_int,int,a-b)
+MAP(int,MAP(int,stat_t)) protocol_tree = MAP_INIT(cmp_int);
 
-static tree_t *protocol_tree = NULL;
-
-int protocolcmp(const void *a,const void *b) { 
-	return *(uint8_t*)a-*(uint8_t*)b;
-}
-int portcmp(const void *a, const void *b) {
-	return *(uint16_t*)a-*(uint16_t*)b;
-}
 
 void port_per_packet(struct libtrace_packet_t *packet)
 {
@@ -30,61 +23,51 @@ void port_per_packet(struct libtrace_packet_t *packet)
 		? trace_get_source_port(packet)
 		: trace_get_destination_port(packet);
 
-	uint8_t *protocol = MEMDUP(ip->ip_p);
-	uint16_t *portmem = MEMDUP(port);
 
+	if (!MAP_FIND(protocol_tree,ip->ip_p)) {
+		MAP_INSERT(protocol_tree,ip->ip_p,MAP_INIT(cmp_int));
+	}
 
-	tree_t *ports=tree_find(&protocol_tree,protocol,protocolcmp);
+	if (!MAP_FIND(MAP_FIND(protocol_tree,ip->ip_p)->value,port)) {
+		MAP_INSERT(MAP_FIND(protocol_tree,ip->ip_p)->value,port,{0});
+	}
 
-	stat_t *stat =tree_find(&ports,portmem,portcmp);
-	if (!stat) {
-		stat=calloc(1,sizeof(stat_t));
-	}
-	++stat->count;
-	stat->bytes+=trace_get_wire_length(packet);
-	if (tree_replace(&ports,portmem,portcmp,stat)) {
-		free(portmem);
-	}
-	if (tree_replace(&protocol_tree,protocol,protocolcmp,ports)) {
-		free(protocol);
-	}
+	++MAP_FIND(MAP_FIND(protocol_tree,ip->ip_p)->value,port)->value.count;
+	MAP_FIND(MAP_FIND(protocol_tree,ip->ip_p)->value,port)->value.bytes+=trace_get_wire_length(packet);
 }
 
-static void port_visitor(const void *key, void *value, void *data)
+static MAP_VISITOR(port_visitor,int,stat_t)
 {
-	struct servent *ent = getservbyport(htons(*(uint16_t*)key),(char *)data);
+	struct servent *ent = getservbyport(htons(node->key),(char *)userdata);
 	if(ent)
 		printf("%20s:\t%12" PRIu64 "\t%12" PRIu64 "\n",
 				ent->s_name,
-				((stat_t *)value)->bytes,
-				((stat_t *)value)->count
+				node->value.bytes,
+				node->value.count
 		      );
 	else
 		printf("%20i:\t%12" PRIu64 "\t%12" PRIu64 "\n",
-				*(uint16_t*)key,
-				((stat_t *)value)->bytes,
-				((stat_t *)value)->count
+				node->key,
+				node->value.bytes,
+				node->value.count
 		      );
 }
 
-static void protocol_visitor(const void *key, void *value, void *data)
+static MAP_VISITOR(protocol_visitor,int,MAP(int,stat_t))
 {
-	struct protoent *ent = getprotobynumber(*(uint8_t*)key);
-	printf("Protocol: %i %s%s%s\n",*(uint8_t*)key,
+	struct protoent *ent = getprotobynumber(node->key);
+	printf("Protocol: %i %s%s%s\n",node->key,
 			ent?"(":"",ent?ent->p_name:"",ent?")":"");
-	tree_inorder((tree_t**)&value,
-			port_visitor,
-			(void*)(ent?ent->p_name:""));
+	MAP_VISIT(node->value,NULL,port_visitor,NULL,(void*)(ent?ent->p_name:""));
 }
 
 void port_report(void)
 {
-	int i;
 	printf("# Port breakdown:\n");
 	printf("%-20s \t%12s\t%12s\n","Port","Bytes","Packets");
 	setservent(1);
 	setprotoent(1);
-	tree_inorder(&protocol_tree,protocol_visitor,NULL);
+	MAP_VISIT(protocol_tree,NULL,protocol_visitor,NULL,NULL);
 	endprotoent();
 	endservent();
 }

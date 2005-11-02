@@ -77,6 +77,7 @@ void run_trace(char *uri)
 		tos_per_packet(&packet);
 		ttl_per_packet(&packet);
 		flow_per_packet(&packet);
+		dir_per_packet(&packet);
 
         }
 
@@ -103,6 +104,7 @@ int main(int argc, char *argv[]) {
 	protocol_report();
 	port_report();
 	ttl_report();
+	dir_report();
 
 
         return 0;

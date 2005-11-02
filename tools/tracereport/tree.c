@@ -8,6 +8,7 @@ struct tree_t
 	void *value;
 	struct tree_t *left;
 	struct tree_t *right;
+	struct tree_t *up;
 };
 
 
@@ -120,7 +121,6 @@ void tree_inorder(tree_t **tree,visitor_t visitor,void *data)
 	}
 }
 
-#ifdef TEST
 #include <string.h>
 #include <stdio.h>
 
@@ -138,6 +138,7 @@ void dump_tree(tree_t *tree,int level)
 	dump_tree(tree->left,level+1);
 	dump_tree(tree->right,level+1);
 }
+#ifdef TEST
 
 int main(int argc, char *argv[])
 {
