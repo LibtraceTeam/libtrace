@@ -7,7 +7,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <string.h>
-#include <pcap.h>
+//#include <pcap.h>
 #include <time.h>
 #include "ipenc.h"
 
