@@ -8,12 +8,14 @@ if LIBGDC
 TRACERTSTATS_DIR=tracertstats
 endif
 
-extra_DIST=tracereport
+
 if LIBTRACE_TOOLS
 SUBDIRS=traceanon tracemerge tracesplit $(TRACEDUMP_DIR) $(TRACERTSTATS_DIR)
 else
 SUBDIRS=
 endif
+
+EXTRA_DIST=tracereport
 
 all-hook:
 	for dir in $(SUBDIRS); do make -C $$dir; done
