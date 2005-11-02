@@ -34,3 +34,4 @@ install-exec-local:
 
 uninstall-local:
 	for plugin in $(PLUGINS); do rm -f $(PLUGINDIR)/$$plugin; done
+	rmdir $(PLUGINDIR)
