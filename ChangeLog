@@ -35,6 +35,8 @@
 	* added --disable-libpacketdump and --disable-tools configure options
 	* improved checking for libpcap
 	* improved checking for g++ (needed for libpacketdump)
+	* updated rtclient_read_packet to be compatible with new rt protocol
+	* rtclient input now correctly ignores packets with type = RT_MSG
 
 - Version 2.0.23
 	* configure fixes for dag
