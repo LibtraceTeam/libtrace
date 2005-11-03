@@ -5,11 +5,14 @@
 #include <string.h>
 
 #include "output.h"
+#include "config.h"
 
 struct output_type_t *output_formats[] = {
 	&output_csv,
 	&output_html,
+#if HAVE_GDC_H
 	&output_png,
+#endif
 	NULL
 };
 

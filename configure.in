@@ -91,9 +91,9 @@ else
 fi
 
 
-AC_CHECK_LIB(gdc,GDC_out_graph,
-	     libtrace_gdc=true,
-	     libtrace_gdc=false)
+AC_CHECK_HEADER(gdc.h,
+	     [AC_DEFINE(HAVE_GDC_H,1,[Conditional for building with libGDC support]) libtrace_gdc=true],
+	     [AC_DEFINE(HAVE_GDC_H,0,[Conditional for building with libGDC support]) libtrace_gdc=false])
 
 # Check for various broken functions
 AC_FUNC_MALLOC
