@@ -94,6 +94,7 @@ void run_trace(char *uri)
 	uint64_t count = 0;
 	uint64_t bytes = 0;
 	double last_ts = 0;
+	double ts = 0;
 
 	output=output_init(uri,output_format?:"csv");
 	output_add_column(output,"unix_time");
@@ -116,6 +117,7 @@ void run_trace(char *uri)
                 if ((psize = trace_read_packet(trace, &packet)) <1) {
                         break;
                 }
+		ts = trace_get_seconds(&packet);
 
 		for(i=0;i<filter_count;++i) {
 			if(trace_bpf_filter(filters[i].filter,&packet)) {
@@ -128,22 +130,22 @@ void run_trace(char *uri)
 		bytes+=trace_get_wire_length(&packet);
 
 		if (packet_interval!=UINT64_MAX
-		  &&(last_ts==0 || last_ts<trace_get_seconds(&packet))) {
+		  &&(last_ts==0 || last_ts<ts)) {
 			if (last_ts==0)
-				last_ts=trace_get_seconds(&packet);
-			report_results(trace_get_seconds(&packet),count,bytes);
+				last_ts=ts;
+			report_results(ts,count,bytes);
 			count=0;
 			bytes=0;
 			last_ts+=packet_interval;
 		}
 
 		if (count > packet_count) {
-			report_results(trace_get_seconds(&packet),count,bytes);
+			report_results(ts,count,bytes);
 			count=0;
 			bytes=0;
 		}
         }
-	report_results(trace_get_seconds(&packet),count,bytes);
+	report_results(ts,count,bytes);
 
         trace_destroy(trace);
 	output_destroy(output);
