@@ -2,13 +2,42 @@
 #include <err.h>
 #include <time.h>
 #include "libpacketdump.h"
+#include "config.h"
 #include <stdio.h>
+#include <netdb.h>
 #include <stdlib.h>
 #include <getopt.h>
-#include <netinet/ether.h>
+
+#ifdef HAVE_NETINET_ETHER
+#  include <netinet/ether.h>
+#endif
+
+
+#ifdef HAVE_INTTYPES_H
+#  include <inttypes.h>
+#else
+#  error "Can't find inttypes.h"
+#endif
+
+#ifdef HAVE_LIMITS_H
+#  include <limits.h>
+#endif
+
+#ifdef HAVE_SYS_LIMITS_H
+#  include <sys/limits.h>
+#endif
+
+#ifdef HAVE_SYS_TYPES_H
+#  include <sys/types.h>
+#endif
+#include <net/if.h>
 #include <netinet/in.h>
 #include <stdio.h>
-#include <inttypes.h>
+
+#include <net/if_arp.h>
+#ifdef HAVE_NETINET_IF_ETHER_H
+#  include <netinet/if_ether.h>
+#endif 
 #include <dlfcn.h>
 #include <map>
 #include <string>

@@ -1058,7 +1058,7 @@ int blockEncrypt(const UINT8 *input,int inputLen,UINT8 *outBuffer)
                 case ECB: 
                         for(i = numBlocks;i > 0;i--)
                         {
-                                encrypt(input,outBuffer);
+                                r_encrypt(input,outBuffer);
                                 input += 16;
                                 outBuffer += 16;
                         }
@@ -1068,7 +1068,7 @@ int blockEncrypt(const UINT8 *input,int inputLen,UINT8 *outBuffer)
                         ((UINT32*)block)[1] = ((UINT32*)m_initVector)[1] ^ ((UINT32*)input)[1];
                         ((UINT32*)block)[2] = ((UINT32*)m_initVector)[2] ^ ((UINT32*)input)[2];
                         ((UINT32*)block)[3] = ((UINT32*)m_initVector)[3] ^ ((UINT32*)input)[3];
-                        encrypt(block,outBuffer);
+                        r_encrypt(block,outBuffer);
                         input += 16;
                         for(i = numBlocks - 1;i > 0;i--)
                         {
@@ -1077,7 +1077,7 @@ int blockEncrypt(const UINT8 *input,int inputLen,UINT8 *outBuffer)
                                 ((UINT32*)block)[2] = ((UINT32*)outBuffer)[2] ^ ((UINT32*)input)[2];
                                 ((UINT32*)block)[3] = ((UINT32*)outBuffer)[3] ^ ((UINT32*)input)[3];
                                 outBuffer += 16;
-                                encrypt(block,outBuffer);
+                                r_encrypt(block,outBuffer);
                                 input += 16;
                         }
                         break;
@@ -1098,7 +1098,7 @@ int blockEncrypt(const UINT8 *input,int inputLen,UINT8 *outBuffer)
                                         *((UINT32*)(block+ 4)) = *((UINT32*)iv[1]);
                                         *((UINT32*)(block+ 8)) = *((UINT32*)iv[2]);
                                         *((UINT32*)(block+12)) = *((UINT32*)iv[3]);
-                                        encrypt(block,block);
+                                        r_encrypt(block,block);
                                         outBuffer[k/8] ^= (block[0] & 0x80) >> (k & 7);
                                         iv[0][0] = (iv[0][0] << 1) | (iv[0][1] >> 7);
                                         iv[0][1] = (iv[0][1] << 1) | (iv[0][2] >> 7);
@@ -1144,7 +1144,7 @@ int padEncrypt(const UINT8 *input, int inputOctets, UINT8 *outBuffer)
                 case ECB: 
                         for(i = numBlocks; i > 0; i--)
                         {
-                                encrypt(input, outBuffer);
+                                r_encrypt(input, outBuffer);
                                 input += 16;
                                 outBuffer += 16;
                         }
@@ -1152,7 +1152,7 @@ int padEncrypt(const UINT8 *input, int inputOctets, UINT8 *outBuffer)
                         //			assert(padLen > 0 && padLen <= 16);
                         memcpy(block, input, 16 - padLen);
                         memset(block + 16 - padLen, padLen, padLen);
-                        encrypt(block,outBuffer);
+                        r_encrypt(block,outBuffer);
                         break;
                 case CBC:
                         iv = m_initVector;
@@ -1162,7 +1162,7 @@ int padEncrypt(const UINT8 *input, int inputOctets, UINT8 *outBuffer)
                                 ((UINT32*)block)[1] = ((UINT32*)input)[1] ^ ((UINT32*)iv)[1];
                                 ((UINT32*)block)[2] = ((UINT32*)input)[2] ^ ((UINT32*)iv)[2];
                                 ((UINT32*)block)[3] = ((UINT32*)input)[3] ^ ((UINT32*)iv)[3];
-                                encrypt(block, outBuffer);
+                                r_encrypt(block, outBuffer);
                                 iv = outBuffer;
                                 input += 16;
                                 outBuffer += 16;
@@ -1175,7 +1175,7 @@ int padEncrypt(const UINT8 *input, int inputOctets, UINT8 *outBuffer)
                         for (i = 16 - padLen; i < 16; i++) {
                                 block[i] = (UINT8)padLen ^ iv[i];
                         }
-                        encrypt(block,outBuffer);
+                        r_encrypt(block,outBuffer);
                         break;
                 default:
                         return -1;
@@ -1202,7 +1202,7 @@ int blockDecrypt(const UINT8 *input, int inputLen, UINT8 *outBuffer)
                 case ECB: 
                         for (i = numBlocks; i > 0; i--)
                         {
-                                decrypt(input,outBuffer);
+                                r_decrypt(input,outBuffer);
                                 input += 16;
                                 outBuffer += 16;
                         }
@@ -1218,7 +1218,7 @@ int blockDecrypt(const UINT8 *input, int inputLen, UINT8 *outBuffer)
 #endif
                         for (i = numBlocks; i > 0; i--)
                         {
-                                decrypt(input, block);
+                                r_decrypt(input, block);
                                 ((UINT32*)block)[0] ^= *((UINT32*)iv[0]);
                                 ((UINT32*)block)[1] ^= *((UINT32*)iv[1]);
                                 ((UINT32*)block)[2] ^= *((UINT32*)iv[2]);
@@ -1253,7 +1253,7 @@ int blockDecrypt(const UINT8 *input, int inputLen, UINT8 *outBuffer)
                                         *((UINT32*)(block+ 4)) = *((UINT32*)iv[1]);
                                         *((UINT32*)(block+ 8)) = *((UINT32*)iv[2]);
                                         *((UINT32*)(block+12)) = *((UINT32*)iv[3]);
-                                        encrypt(block, block);
+                                        r_encrypt(block, block);
                                         iv[0][0] = (iv[0][0] << 1) | (iv[0][1] >> 7);
                                         iv[0][1] = (iv[0][1] << 1) | (iv[0][2] >> 7);
                                         iv[0][2] = (iv[0][2] << 1) | (iv[0][3] >> 7);
@@ -1301,12 +1301,12 @@ int padDecrypt(const UINT8 *input, int inputOctets, UINT8 *outBuffer)
                 case ECB:
                         for (i = numBlocks - 1; i > 0; i--)
                         {
-                                decrypt(input, outBuffer);
+                                r_decrypt(input, outBuffer);
                                 input += 16;
                                 outBuffer += 16;
                         }
 
-                        decrypt(input, block);
+                        r_decrypt(input, block);
                         padLen = block[15];
                         if (padLen >= 16)return RIJNDAEL_CORRUPTED_DATA;
                         for(i = 16 - padLen; i < 16; i++)
@@ -1320,7 +1320,7 @@ int padDecrypt(const UINT8 *input, int inputOctets, UINT8 *outBuffer)
                         /* all blocks but last */
                         for (i = numBlocks - 1; i > 0; i--)
                         {
-                                decrypt(input, block);
+                                r_decrypt(input, block);
                                 ((UINT32*)block)[0] ^= iv[0];
                                 ((UINT32*)block)[1] ^= iv[1];
                                 ((UINT32*)block)[2] ^= iv[2];
@@ -1331,7 +1331,7 @@ int padDecrypt(const UINT8 *input, int inputOctets, UINT8 *outBuffer)
                                 outBuffer += 16;
                         }
                         /* last block */
-                        decrypt(input, block);
+                        r_decrypt(input, block);
                         ((UINT32*)block)[0] ^= iv[0];
                         ((UINT32*)block)[1] ^= iv[1];
                         ((UINT32*)block)[2] ^= iv[2];
@@ -1455,7 +1455,7 @@ void keyEncToDec()
         }
 }	
 
-void encrypt(const UINT8 a[16], UINT8 b[16])
+void r_encrypt(const UINT8 a[16], UINT8 b[16])
 {
         int r;
         UINT8 temp[4][4];
@@ -1530,7 +1530,7 @@ void encrypt(const UINT8 a[16], UINT8 b[16])
         *((UINT32*)(b+12)) ^= *((UINT32*)m_expandedKey[m_uRounds][3]);
 }
 
-void decrypt(const UINT8 a[16], UINT8 b[16])
+void r_decrypt(const UINT8 a[16], UINT8 b[16])
 {
         int r;
         UINT8 temp[4][4];

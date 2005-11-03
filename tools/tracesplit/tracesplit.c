@@ -1,10 +1,20 @@
 #include <libtrace.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <inttypes.h>
+#ifdef HAVE_INTTYPES_H
+#  include <inttypes.h>
+#endif
 #include <stdbool.h>
 #include <getopt.h>
 #include <string.h>
+
+#ifndef UINT64_MAX
+# if __WORDSIZE == 64
+#  define UINT64_MAX    18446744073709551615UL
+# else
+#  define UINT64_MAX    18446744073709551615ULL
+# endif
+#endif
 
 char *strdupcat(char *str,char *app)
 {

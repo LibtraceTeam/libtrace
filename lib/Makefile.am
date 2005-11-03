@@ -10,7 +10,7 @@ endif
 
 INCLUDES = @ADD_INCLS@
 libtrace_la_LIBADD = @ADD_LIBS@ @LTLIBOBJS@
-libtrace_la_LDFLAGS=-version-info 2:24:0 @ADD_LDFLAGS@
+libtrace_la_LDFLAGS=-version-info 2:25:0 @ADD_LDFLAGS@
 
 dagapi.c:
 	cp @DAG_TOOLS_DIR@/dagapi.c .

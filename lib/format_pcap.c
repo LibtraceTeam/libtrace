@@ -237,7 +237,7 @@ static int pcap_write_packet(struct libtrace_out_t *libtrace, const struct libtr
 	void *link = trace_get_link(packet);
 
 	if (!OUTPUT.trace.pcap) {
-		OUTPUT.trace.pcap = pcap_open_dead(
+		OUTPUT.trace.pcap = (pcap_t *)pcap_open_dead(
 				linktype_to_dlt(trace_get_link_type(packet)),
 				65536);
 		OUTPUT.trace.dump = pcap_dump_open(OUTPUT.trace.pcap,CONNINFO.path);
@@ -248,7 +248,11 @@ static int pcap_write_packet(struct libtrace_out_t *libtrace, const struct libtr
 		
 		pcap_dump((u_char*)OUTPUT.trace.dump,(struct pcap_pkthdr *)packet->buffer,link);
 	} else {
-		pcap_pkt_hdr.ts = trace_get_timeval(packet);
+		// Leave the manual copy as it is, as it gets around 
+		// some OS's having different structures in pcap_pkt_hdr
+		struct timeval ts = trace_get_timeval(packet);
+		pcap_pkt_hdr.ts.tv_sec = ts.tv_sec;
+		pcap_pkt_hdr.ts.tv_usec = ts.tv_usec;
 		pcap_pkt_hdr.caplen = trace_get_capture_length(packet);
 		pcap_pkt_hdr.len = trace_get_wire_length(packet);
 
@@ -346,9 +350,12 @@ static int8_t pcap_get_direction(const struct libtrace_packet_t *packet) {
 }
 
 
-static struct timeval pcap_get_timeval(const struct libtrace_packet_t *packet) { 
+static struct timeval pcap_get_timeval(const struct libtrace_packet_t *packet) {
 	struct pcap_pkthdr *pcapptr = (struct pcap_pkthdr *)packet->buffer;
-	return pcapptr->ts;
+	struct timeval ts;
+	ts.tv_sec = pcapptr->ts.tv_sec;
+	ts.tv_usec = pcapptr->ts.tv_usec;
+	return ts;
 }
 
 

@@ -154,8 +154,8 @@ int padDecrypt(const UINT8 *input, int inputOctets, UINT8 *outBuffer);
 //protected:
 void keySched(UINT8 key[_MAX_KEY_COLUMNS][4]);
 void keyEncToDec();
-void encrypt(const UINT8 a[16], UINT8 b[16]);
-void decrypt(const UINT8 a[16], UINT8 b[16]);
+void r_encrypt(const UINT8 a[16], UINT8 b[16]);
+void r_decrypt(const UINT8 a[16], UINT8 b[16]);
 //};
 	
 #endif // _RIJNDAEL_H_

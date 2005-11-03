@@ -2,11 +2,11 @@
 
 LIBTRACE_MAJOR=2
 LIBTRACE_MID=0
-LIBTRACE_MINOR=24
+LIBTRACE_MINOR=25
 
-AC_INIT(libtrace,2.0.24,[contact@wand.net.nz],libtrace)
+AC_INIT(libtrace,2.0.25,[contact@wand.net.nz],libtrace)
 AC_CONFIG_SRCDIR(lib/trace.c)
-AM_INIT_AUTOMAKE(libtrace,2.0.24)
+AM_INIT_AUTOMAKE(libtrace,2.0.25)
 
 AC_CONFIG_FILES([Makefile lib/Makefile docs/Makefile libpacketdump/Makefile tools/Makefile tools/traceanon/Makefile tools/tracedump/Makefile tools/tracemerge/Makefile tools/tracereport/Makefile tools/tracertstats/Makefile tools/tracesplit/Makefile  ])
 dnl GNU C library
@@ -36,6 +36,15 @@ AC_SYS_LARGEFILE
 AC_PROG_GCC_TRADITIONAL
 AC_CHECK_FUNCS(socket strdup)
 
+AC_CHECK_SIZEOF([long int])
+
+# Check for various broken functions
+AC_FUNC_MALLOC
+AC_FUNC_REALLOC
+
+# *BSD doesn't have strndup. Currently provide our own.
+AC_REPLACE_FUNCS(strndup)
+
 # Checks for header files.
 AC_HEADER_STDC
 dnl AC_CHECK_HEADERS(errno.h stdlib.h stdio.h assert.h string.h netinet/in.h assert.h errno.h fcntl.h net/ethernet.h netdb.h pcap.h stdio.h stdlib.h string.h sys/stat.h sys/types.h sys/socket.h sys/un.h unistd.h time.h sys/ioctl.h net/bpf.h pcap.h zlib.h pcap-bpf.h)
@@ -49,6 +58,16 @@ AC_CHECK_HEADER(net/if.h,
  #include <sys/socket.h>
 ])
 
+
+AC_CHECK_HEADER(netinet/ether.h,
+		AC_DEFINE(HAVE_NETINET_ETHER_H,1,[We have netinet/ether.h]
+), [],
+[
+ #include <sys/types.h>
+ #include <sys/socket.h>
+ #include <netinet/in.h>
+ #include <net/if.h>
+])
 
 AC_CHECK_HEADER(netinet/if_ether.h,
 		AC_DEFINE(HAVE_NETINET_IF_ETHER_H,1,[We have netinet/if_ether.h]), [],
@@ -95,12 +114,6 @@ AC_CHECK_HEADER(gdc.h,
 	     [AC_DEFINE(HAVE_GDC_H,1,[Conditional for building with libGDC support]) libtrace_gdc=true],
 	     [AC_DEFINE(HAVE_GDC_H,0,[Conditional for building with libGDC support]) libtrace_gdc=false])
 
-# Check for various broken functions
-AC_FUNC_MALLOC
-AC_FUNC_REALLOC
-
-# *BSD doesn't have strndup. Currently provide our own.
-AC_REPLACE_FUNCS(strndup)
 
 # Check to see if we have libpcap
 AC_CHECK_LIB(pcap,pcap_open_live,
@@ -353,7 +366,7 @@ AC_SUBST([MANPAGES])
 dnl and finally, output our Makefiles
 AC_OUTPUT
 
-function reportopt() {
+reportopt() {
 	if test x"$2" = xtrue -o x"$2" = xyes; then
 		AC_MSG_NOTICE([$1: Yes])
 	else 
