@@ -38,6 +38,8 @@ AC_CHECK_FUNCS(socket strdup)
 
 AC_CHECK_SIZEOF([long int])
 
+
+
 # Check for various broken functions
 AC_FUNC_MALLOC
 AC_FUNC_REALLOC
