@@ -31,6 +31,7 @@ struct output_type_t {
 	void (*flush)(struct output_data_t *);
 	void (*destroy)(struct output_data_t *);
 };
+extern struct output_type_t output_txt;
 extern struct output_type_t output_csv;
 extern struct output_type_t output_html;
 extern struct output_type_t output_png;

@@ -1,6 +1,6 @@
 bin_PROGRAMS = tracertstats
 
-OUTPUT_MODULES=output_csv.c output_html.c
+OUTPUT_MODULES=output_csv.c output_html.c output_txt.c
 if LIBGDC
 OUTPUT_MODULES+=output_png.c
 OUTPUT_PNG_LD=-lgdc

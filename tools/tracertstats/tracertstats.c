@@ -96,7 +96,7 @@ void run_trace(char *uri)
 	double last_ts = 0;
 	double ts = 0;
 
-	output=output_init(uri,output_format?:"csv");
+	output=output_init(uri,output_format?:"txt");
 	output_add_column(output,"unix_time");
 	output_add_column(output,"packets");
 	output_add_column(output,"bytes");
@@ -153,7 +153,7 @@ void run_trace(char *uri)
 
 void usage(char *argv0)
 {
-	fprintf(stderr,"Usage: %s [--filter|-f bpf ]... libtraceuri...\n",argv0);
+	fprintf(stderr,"Usage: %s [--interval|-i seconds ] [--count|-c packets] [--output-format|-o txt|csv|html|png] [--filter|-f bpf ]... libtraceuri...\n",argv0);
 }
 
 int main(int argc, char *argv[]) {
