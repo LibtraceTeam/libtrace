@@ -628,6 +628,16 @@ static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_pac
 		}
 		tracefifo_out_update(libtrace->fifo,sizeof(uint32_t));
 
+		// Read in packet size
+		if (tracefifo_out_read(libtrace->fifo,
+				&packet->size, sizeof(uint32_t)) == 0) {
+			tracefifo_out_reset(libtrace->fifo);
+			read_required = 1;
+			continue;
+		}
+		tracefifo_out_update(libtrace->fifo, sizeof(uint32_t));
+		
+		/*
 		// read in the ERF header
 		if ((numbytes = tracefifo_out_read(libtrace->fifo, buffer,
 						dag_record_size)) == 0) {
@@ -635,30 +645,30 @@ static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_pac
 			read_required = 1;
 			continue;
 		}
-		
+		*/
 		if (packet->status.type == RT_MSG) {
 			// Need to skip this packet as it is a message packet
-			tracefifo_out_update(libtrace->fifo, dag_record_size);
-			tracefifo_ack_update(libtrace->fifo, dag_record_size + sizeof(uint32_t));
+			tracefifo_out_update(libtrace->fifo, packet->size);
+			tracefifo_ack_update(libtrace->fifo, packet->size + (sizeof(uint32_t) * 2));
 			continue;
 		}
 		
-		size = ntohs(((dag_record_t *)buffer)->rlen);
+		//size = ntohs(((dag_record_t *)buffer)->rlen);
 		
 		// read in the full packet
 		if ((numbytes = tracefifo_out_read(libtrace->fifo, 
-						buffer, size)) == 0) {
+						buffer, packet->size)) == 0) {
 			tracefifo_out_reset(libtrace->fifo);
 			read_required = 1;
 			continue;
 		}
 
 		// got in our whole packet, so...
-		tracefifo_out_update(libtrace->fifo,size);
+		tracefifo_out_update(libtrace->fifo,packet->size);
 
-		tracefifo_ack_update(libtrace->fifo,size + sizeof(uint32_t));
+		tracefifo_ack_update(libtrace->fifo,packet->size + (sizeof(uint32_t) * 2));
 
-		packet->size = numbytes;
+		//packet->size = numbytes;
 		return numbytes;
 	} while(1);
 }
