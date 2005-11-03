@@ -1,0 +1,39 @@
+.TH TRACEDUMP "1" "November 2005" "tracedump (libtrace)" "User Commands"
+.SH NAME
+tracedump \- output packets in human readable format
+.SH SYNOPSIS
+.B tracedump
+[ \fB-f\fR exp | \fB--filter=\fRexp ]
+[ \fB-c\fR num | \fB--count=\fRnum ]
+inputuri ...
+
+.SH DESCRPTION
+tracedump verbosely outputs packets in a human readable form, suitable for
+diagnosing packets.
+
+tracedump uses the libpacketdump library.
+
+.TP
+.PD 0
+.BI \-f " bpf-filter"
+.TP
+.PD
+.BI \-\^\-filter " bpf-filter"
+Output only packets that match the \fIbpf-filter\fR expression.  See 
+tcpdump(1) for the syntax of the bpf-filter expression.
+
+.TP
+.PD 0
+.BI \-c " num"
+.TP
+.PD
+.BI \-\^\-count " num"
+stop after displaying \fInum\fR packets.
+
+
+.SH SEE ALSO
+libtrace(3), tracemerge(1), tracesplit(1), tracefilter(1), tracestats(1),
+tracesummary(1)
+
+.SH AUTHORS
+Perry Lorier <perry@cs.waikato.ac.nz>, Daniel Lawson <dlawson@cs.waikato.ac.nz>
