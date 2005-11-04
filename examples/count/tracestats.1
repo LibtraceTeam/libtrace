@@ -25,7 +25,8 @@ tracestats \-\^\-filter 'host sundown' \\
 	\-\^\-filter 'not ip' \\
 	\-\^\-filter 'ether[0] & 1 == 1' \\
 	\-\^\-filter 'icmp[icmptype] == icmp-unreach' \\
-	/traces/*
+	erf:/traces/trace1.gz \\
+	erf:/traces/trace2.gz \\
 .fi
 
 .SH SEE ALSO
