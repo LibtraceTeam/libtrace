@@ -10,6 +10,11 @@ the trace as necessary.
 
 traceconvert is a shellscript wrapper around tracesplit(1)
 
+.SH EXAMPLES
+.nf
+traceconvert erf:/traces/bigtrace.gz pcap:\- | tcpdump \-r - \-n
+.fi
+
 .SH SEE ALSO
 libtrace(3), tracemerge(1), tracesplit(1), tracefilter(1)
 .SH AUTHORS
