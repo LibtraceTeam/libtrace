@@ -1,5 +1,6 @@
 #include <netdb.h>
 #include <inttypes.h>
+#include <lt_inttypes.h>
 #include <stdio.h>
 #include "libtrace.h"
 #include "tracereport.h"

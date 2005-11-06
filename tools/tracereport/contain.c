@@ -1,6 +1,9 @@
 #include <stdio.h>
+#include <inttypes.h>
+#include <lt_inttypes.h>
 #include <stdlib.h>
 #include "contain.h"
+#include "config.h"
 
 splay *splay_search_tree(splay *tree, splay_cmp_t cmp, splay *node) {
 	splay N, *l, *r, *y;

@@ -3,6 +3,7 @@
 #include <dlfcn.h>
 #include <map>
 #include "libpacketdump.h"
+#include "libtrace.h"
 #include <netinet/udp.h>
 #include <netinet/in.h>
 #include <netdb.h>
@@ -27,7 +28,7 @@
 extern "C"
 void decode(int link_type,char *packet,int len)
 {
-	struct udphdr *udp = (struct udphdr*)packet;
+	struct libtrace_udp *udp = (struct libtrace_udp*)packet;
 	printf(" UDP:");
 	if (SAFE(source)) {
 		struct servent *ent=getservbyport(udp->source,"udp");

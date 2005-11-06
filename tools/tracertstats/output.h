@@ -13,7 +13,7 @@ struct data_t {
 		TYPE__int d_int;
 		TYPE__float d_float;
 		TYPE__time d_time;
-	};
+	} d;
 };
 
 typedef struct output_data_t {

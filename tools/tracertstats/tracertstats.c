@@ -49,6 +49,7 @@
 #include <sys/socket.h>
 #include <getopt.h>
 #include <inttypes.h>
+#include <lt_inttypes.h>
 
 #include "libtrace.h"
 #include "output.h"

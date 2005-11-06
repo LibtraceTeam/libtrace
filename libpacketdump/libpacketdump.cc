@@ -8,6 +8,8 @@
 #include <stdlib.h>
 #include <getopt.h>
 
+#include <sys/socket.h>
+
 #ifdef HAVE_NETINET_ETHER
 #  include <netinet/ether.h>
 #endif

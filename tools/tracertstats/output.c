@@ -1,4 +1,5 @@
 #include <inttypes.h>
+#include <lt_inttypes.h>
 #include <stdio.h>
 #include <assert.h>
 #include <stdlib.h>
@@ -56,7 +57,7 @@ void output_flush_headings(struct output_data_t *out)
 	{	\
 		assert(col>=0 && col<out->columns); \
 		out->data[col].type=TYPE_ ## type_; \
-		out->data[col].d_ ## type_ = data; \
+		out->data[col].d.d_ ## type_ = data; \
 	}
 
 output_set_data(str)

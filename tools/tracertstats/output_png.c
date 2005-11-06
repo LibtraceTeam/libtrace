@@ -6,6 +6,8 @@
 #include "gdc.h"
 #include "gdchart.h"
 #include "gdcpie.h"
+#include <inttypes.h>
+#include <lt_inttypes.h>
 
 struct private_png_t {
 	int rows;
@@ -28,16 +30,16 @@ static void output_png_flush(struct output_data_t *out)
 	for(i=0;i<out->columns;++i) {
 		switch (out->data[i].type) {
 			case TYPE_int: 
-				prv->data[out->columns*(prv->rows-1)+i]=out->data[i].d_int;
+				prv->data[out->columns*(prv->rows-1)+i]=out->data[i].d.d_int;
 				break;
 			case TYPE_str:
-				free(out->data[i].d_str);
+				free(out->data[i].d.d_str);
 				break;
 			case TYPE_float:
-				prv->data[out->columns*(prv->rows-1)+i]=out->data[i].d_float;
+				prv->data[out->columns*(prv->rows-1)+i]=out->data[i].d.d_float;
 				break;
 			case TYPE_time:
-				prv->data[out->columns*(prv->rows-1)+i]=out->data[i].d_time;
+				prv->data[out->columns*(prv->rows-1)+i]=out->data[i].d.d_time;
 				break;
 		}
 	}

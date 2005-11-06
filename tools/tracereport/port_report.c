@@ -1,5 +1,6 @@
 #include <netdb.h>
 #include <inttypes.h>
+#include <lt_inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

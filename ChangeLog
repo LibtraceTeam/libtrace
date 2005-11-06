@@ -28,15 +28,17 @@
 ##
 ##
 
-- Version 2.0.24 (unreleased)
+- Version 2.0.25 (unreleased)
+	* updated rtclient_read_packet to be compatible with new rt protocol
+	* rtclient input now correctly ignores packets with type = RT_MSG
+
+- Version 2.0.24 
 	* minor bugs in format_erf
 	* applied autoconf to tools/ dir - these are now built and installed
 	  automatically
 	* added --disable-libpacketdump and --disable-tools configure options
 	* improved checking for libpcap
 	* improved checking for g++ (needed for libpacketdump)
-	* updated rtclient_read_packet to be compatible with new rt protocol
-	* rtclient input now correctly ignores packets with type = RT_MSG
 
 - Version 2.0.23
 	* configure fixes for dag

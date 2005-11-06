@@ -61,7 +61,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include "daglegacy.h"
 
 #if HAVE_ZLIB
 #  include <zlib.h>

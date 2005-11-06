@@ -1,5 +1,8 @@
 #define _GNU_SOURCE
 #include <stdio.h>
+#include <inttypes.h>
+#include <lt_inttypes.h>
+
 
 enum stats_output_format_t {
 	CSV, TXT, HTML, XML, ODOC
