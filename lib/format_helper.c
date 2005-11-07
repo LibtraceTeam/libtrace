@@ -83,7 +83,7 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 		} else {
 			// return here, the test for
 			// event.size will sort out the error
-			event.type = TRACE_EVENT_PACKET;
+			event.type = TRACE_EVENT_TERMINATE;
 			return event;
 		}
 	}
