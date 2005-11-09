@@ -67,6 +67,7 @@ extern "C" {
 #  include "dagapi.h"
 #else
 #  include "dagformat.h"
+#  include "daglegacy.h"
 #endif
 
 typedef enum {SOCKET, TRACE, STDIN, DEVICE, INTERFACE, RT } source_t;
