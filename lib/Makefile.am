@@ -1,5 +1,5 @@
 lib_LTLIBRARIES = libtrace.la
-include_HEADERS = libtrace.h dagformat.h wag.h lt_inttypes.h
+include_HEADERS = libtrace.h dagformat.h wag.h lt_inttypes.h daglegacy.h
 
 libtrace_la_SOURCES = trace.c fifo.c fifo.h common.h format_template.c format_erf.c format_pcap.c format_wag.c format_helper.c format_helper.h parse_cmd.c parse_cmd.h libtrace_int.h lt_inttypes.h
 if DAG2_4
