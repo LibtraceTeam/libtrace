@@ -65,11 +65,9 @@ int main(int argc,char **argv)
 		}
 
 		while(trace_read_packet(trace,&packet)> 0 ){
-			time_t sec = (time_t)trace_get_seconds(&packet);
 			if (filter && !trace_bpf_filter(filter,&packet))
 				continue;
 
-			printf("%s",ctime(&sec));
 			trace_dump_packet(&packet);
 			if(count) {
 				numpackets++;
@@ -78,6 +76,7 @@ int main(int argc,char **argv)
 			}
 		}
 
+		printf("\n");
 		trace_destroy(trace);
 		optind ++;
 	}
