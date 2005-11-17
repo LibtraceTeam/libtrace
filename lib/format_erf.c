@@ -546,10 +546,12 @@ static int erf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 	if (numbytes == 0) {
 		return 0;
 	}
+
 	rlen = ntohs(((dag_record_t *)buffer)->rlen);
 	buffer2 = buffer + dag_record_size;
 	size = rlen - dag_record_size;
 	assert(size < LIBTRACE_PACKET_BUFSIZE);
+	
 	/* If your trace is legacy, or corrupt, then this assert may fire. */
 	/* turns out some older traces have fixed snaplens, which are padded
 	 * with 00's if the packet is smaller, so this doesn't work.  Sigh.
@@ -610,6 +612,7 @@ static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_pac
 	packet->trace = libtrace;
 	buffer = packet->buffer;
 
+	
 	do {
 		if (tracefifo_out_available(libtrace->fifo) == 0 || read_required) {
 			if ((numbytes = rtclient_read(
@@ -626,7 +629,6 @@ static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_pac
 			continue;
 		}
 		tracefifo_out_update(libtrace->fifo,sizeof(uint32_t));
-
 		// Read in packet size
 		if (tracefifo_out_read(libtrace->fifo,
 				&packet->size, sizeof(uint32_t)) == 0) {
@@ -678,20 +680,33 @@ static int erf_dump_packet(struct libtrace_out_t *libtrace, dag_record_t *erfptr
 		perror("libtrace_write");
 		return -1;
 	}
-	if ((numbytes = LIBTRACE_WRITE(OUTPUT.file, buffer, size)) == 0) {
-		perror("libtrace_write");
-		return -1;
+
+	if (buffer) {
+		if ((numbytes = LIBTRACE_WRITE(OUTPUT.file, buffer, size)) == 0) {
+			perror("libtrace_write");
+			return -1;
+		}
+	
+		return numbytes + pad + dag_record_size;
 	}
-	return numbytes + pad + dag_record_size;
+	return numbytes;
 }
 		
 static int erf_write_packet(struct libtrace_out_t *libtrace, const struct libtrace_packet_t *packet) {
 	int numbytes = 0;
 	dag_record_t erfhdr;
 	int pad = 0;
+	dag_record_t *dag_hdr = (dag_record_t *)packet->buffer;
 	void *payload = (void *)trace_get_link(packet);
 
 	pad = erf_get_padding(packet);
+
+	/* If we've had an rxerror, we have no payload to write - fix rlen to
+	 * be the correct length */
+	if (payload == NULL) {
+		dag_hdr->rlen = htons(dag_record_size + pad);
+	} 
+	
 	if (packet->trace->format == &erf || 
 #if HAVE_DAG
 			packet->trace->format == &dag ||
