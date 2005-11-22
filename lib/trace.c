@@ -1094,7 +1094,7 @@ uint8_t *trace_get_destination_mac(const struct libtrace_packet_t *packet) {
  */
 struct libtrace_eventobj_t trace_event(struct libtrace_t *trace, 
 		struct libtrace_packet_t *packet) {
-	struct libtrace_eventobj_t event;
+	struct libtrace_eventobj_t event = {0,0,0.0,0};
 
 	if (!trace) {
 		fprintf(stderr,"You called trace_event() with a NULL trace object!\n");

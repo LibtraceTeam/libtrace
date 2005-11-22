@@ -87,7 +87,7 @@
 #define O_LARGEFILE 0
 #endif
 
-extern struct libtrace_format_t wag;
+static struct libtrace_format_t wag;
 
 #define CONNINFO libtrace->format_data->conn_info
 #define INPUT libtrace->format_data->input

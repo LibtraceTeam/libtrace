@@ -62,17 +62,30 @@
 #include <string.h>
 #include <stdlib.h>
 
+/*
+ gzread (gzFile, buf, len)
+ gzwrite(gzFile, buf, len)
+ gzdopen(path, mode)
+ gzclose(gzFile)
+
+ fread(ptr, size, num, FILE)
+ fwrite(ptr, size, num, FILE)
+ fopen(path, mode)
+ fdopen(fildes, mode)
+*/ 
 #if HAVE_ZLIB
 #  include <zlib.h>
 #  define LIBTRACE_READ gzread
+#  define LIBTRACE_OPEN gzopen
 #  define LIBTRACE_FDOPEN gzdopen
 #  define LIBTRACE_CLOSE gzclose
 #  define LIBTRACE_WRITE gzwrite
 #else
-#  define LIBTRACE_READ read
-#  define LIBTRACE_FDOPEN open
-#  define LIBTRACE_CLOSE close
-#  define LIBTRACE_WRITE write
+#  define LIBTRACE_READ fread
+#  define LIBTRACE_OPEN fopen
+#  define LIBTRACE_FDOPEN fdopen
+#  define LIBTRACE_CLOSE fclose
+#  define LIBTRACE_WRITE fwrite
 #endif
 
 #define COLLECTOR_PORT 3435
@@ -82,14 +95,14 @@
 #  define O_LARGEFILE 0
 #endif 
 
-extern struct libtrace_format_t erf;
-extern struct libtrace_format_t rtclient;
+static struct libtrace_format_t erf;
+static struct libtrace_format_t rtclient;
 #if HAVE_DAG
-extern struct libtrace_format_t dag;
+static struct libtrace_format_t dag;
 #endif 
-extern struct libtrace_format_t legacypos;
-extern struct libtrace_format_t legacyeth;
-extern struct libtrace_format_t legacyatm;
+static struct libtrace_format_t legacypos;
+static struct libtrace_format_t legacyeth;
+static struct libtrace_format_t legacyatm;
 
 #define CONNINFO libtrace->format_data->conn_info
 #define INPUT libtrace->format_data->input
@@ -112,7 +125,7 @@ struct libtrace_format_data_t {
 #if HAVE_ZLIB
                 gzFile *file;
 #else	
-		FILE *file;
+		FILE  *file;
 #endif
         } input;
 

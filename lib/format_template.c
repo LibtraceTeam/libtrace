@@ -40,7 +40,7 @@
 # error "Can't find inttypes.h"
 #endif 
 
-extern struct libtrace_format_t template;
+static struct libtrace_format_t template;
 
 struct libtrace_format_data_t {
 	int fd;

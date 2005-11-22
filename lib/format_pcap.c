@@ -64,8 +64,8 @@
 #endif
 
 #if HAVE_PCAP
-extern struct libtrace_format_t pcap;
-extern struct libtrace_format_t pcapint;
+static struct libtrace_format_t pcap;
+static struct libtrace_format_t pcapint;
 
 
 #define CONNINFO libtrace->format_data->conn_info
@@ -467,7 +467,7 @@ static struct libtrace_format_t pcapint = {
 	pcap_get_framing_length,	/* get_framing_length */
 	pcap_set_capture_length,	/* set_capture_length */
 	pcap_get_fd,			/* get_fd */
-	trace_event_device,		/* trace_event */
+	trace_event_trace,		/* trace_event */
 	pcapint_help			/* help */
 };
 
