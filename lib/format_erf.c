@@ -363,7 +363,8 @@ static int erf_init_output(struct libtrace_out_t *libtrace) {
 	}
 	else {
 	        // TRACE
-		fd = open(libtrace->uridata, O_CREAT | O_LARGEFILE | O_WRONLY, S_IRUSR | S_IWUSR);
+		fd = open(libtrace->uridata, O_CREAT | O_LARGEFILE | O_WRONLY, S_IRUSR 
+				| S_IWUSR | S_IRGRP | S_IWGRP);
 		if (fd <= 0) {
 			return 0;
 		}
