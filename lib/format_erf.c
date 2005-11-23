@@ -673,7 +673,9 @@ static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_pac
 		if (packet->status.type == RT_MSG) {
 			// Need to skip this packet as it is a message packet
 			tracefifo_out_update(libtrace->fifo, packet->size);
-			tracefifo_ack_update(libtrace->fifo, packet->size + (sizeof(uint32_t) * 2));
+			tracefifo_ack_update(libtrace->fifo, packet->size + 
+					sizeof(uint32_t) + 
+					sizeof(libtrace_packet_status_t));
 			continue;
 		}
 		
@@ -690,7 +692,9 @@ static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_pac
 		// got in our whole packet, so...
 		tracefifo_out_update(libtrace->fifo,packet->size);
 
-		tracefifo_ack_update(libtrace->fifo,packet->size + (sizeof(uint32_t) * 2));
+		tracefifo_ack_update(libtrace->fifo,packet->size + 
+				sizeof(uint32_t) + 
+				sizeof(libtrace_packet_status_t));
 
 		//packet->size = numbytes;
 		return numbytes;

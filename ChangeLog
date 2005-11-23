@@ -28,10 +28,17 @@
 ##
 ##
 
-- Version 2.0.25 (unreleased)
+- Version 2.0.25
 	* updated rtclient_read_packet to be compatible with new rt protocol
 	* rtclient input now correctly ignores packets with type = RT_MSG
 	* erf_write_packet now deals with rxerrors appropriately
+	* building without zlib support should now work properly; stdin 
+	  still doesn't work nicely in this case however
+	* build fixes for openbsd
+	* local lt_inttypes.h generated for PRIu64 macros etc
+	* setting __attribute__((packed)) on all structs
+	* build fixes for tracereport and testing for libgdc
+
 
 - Version 2.0.24 
 	* minor bugs in format_erf

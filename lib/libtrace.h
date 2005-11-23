@@ -86,6 +86,14 @@ typedef struct libtrace_t libtrace_t;
 /** Opaque structure holding information about a bpf filter */
 typedef struct libtrace_filter_t libtrace_filter_t;
 
+/** Structure holding status information for a packet */
+typedef struct libtrace_packet_status {
+	uint8_t type;
+	uint8_t reserved;
+	uint16_t message;
+
+} libtrace_packet_status_t;
+
 /** Structure holding information about a packet */
 #define LIBTRACE_PACKET_BUFSIZE 65536
 typedef struct libtrace_packet_t {
@@ -93,11 +101,7 @@ typedef struct libtrace_packet_t {
 	//void *buffer;
 	char buffer[LIBTRACE_PACKET_BUFSIZE];
 	size_t size;
-	struct {
-		uint8_t type;
-		uint8_t reserved;
-		uint16_t message;
- 	} status;
+	libtrace_packet_status_t status;
 } __attribute__ ((packed)) libtrace_packet_t;
                      
 
