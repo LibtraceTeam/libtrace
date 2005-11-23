@@ -62,6 +62,7 @@
 #include <string.h>
 #include <stdlib.h>
 
+/*
 #if HAVE_ZLIB
 #  include <zlib.h>
 #  define LIBTRACE_READ gzread
@@ -74,7 +75,7 @@
 #  define LIBTRACE_CLOSE close
 #  define LIBTRACE_WRITE write
 #endif
-
+*/
 #ifdef HAVE_LIMITS_H
 #  include <limits.h>
 #endif
@@ -109,7 +110,8 @@ struct libtrace_format_data_t {
 #if HAVE_ZLIB
                 gzFile *file;
 #else	
-		FILE *file;
+		//FILE *file;
+		int file;
 #endif
         } input;	
 };
@@ -128,7 +130,8 @@ struct libtrace_format_data_out_t {
 #if HAVE_ZLIB
 		gzFile *file;
 #else
-		FILE *file;
+		//FILE *file;
+		int file;
 #endif
 	} output;
 };

@@ -64,30 +64,33 @@
 
 /*
  gzread (gzFile, buf, len)
- gzwrite(gzFile, buf, len)
  gzdopen(path, mode)
+ gzopen(path, mode)
  gzclose(gzFile)
+ gzwrite(gzFile, buf, len)
 
  fread(ptr, size, num, FILE)
- fwrite(ptr, size, num, FILE)
+ fdopen(filedes,mode)
  fopen(path, mode)
- fdopen(fildes, mode)
-*/ 
+ fclose(FILE)
+ fwrite(ptr, size, num, FILE)
+*/
+/*
 #if HAVE_ZLIB
 #  include <zlib.h>
-#  define LIBTRACE_READ gzread
-#  define LIBTRACE_OPEN gzopen
-#  define LIBTRACE_FDOPEN gzdopen
-#  define LIBTRACE_CLOSE gzclose
-#  define LIBTRACE_WRITE gzwrite
+#  define LIBTRACE_READ(file,buf,len) gzread(file,buf,len)
+#  define LIBTRACE_FDOPEN(fd,mode) gzdopen(fd,mode)
+#  define LIBTRACE_OPEN(path,mode) gzopen(path,mode)
+#  define LIBTRACE_CLOSE(file) gzclose(file)
+#  define LIBTRACE_WRITE(file,buf,len) gzwrite(file,buf,len)
 #else
-#  define LIBTRACE_READ fread
-#  define LIBTRACE_OPEN fopen
-#  define LIBTRACE_FDOPEN fdopen
-#  define LIBTRACE_CLOSE fclose
-#  define LIBTRACE_WRITE fwrite
+#  define LIBTRACE_READ(file,buf,len) fread(buf,len,1,file)
+#  define LIBTRACE_FDOPEN(fd,mode) fdopen(fd,mode)
+#  define LIBTRACE_OPEN(path,mode) fopen(path,mode)
+#  define LIBTRACE_CLOSE(file) fclose(file)
+#  define LIBTRACE_WRITE(file,buf,len) fwrite(buf,len,1,file)
 #endif
-
+*/
 #define COLLECTOR_PORT 3435
 
 /* Catch undefined O_LARGEFILE on *BSD etc */
@@ -125,7 +128,8 @@ struct libtrace_format_data_t {
 #if HAVE_ZLIB
                 gzFile *file;
 #else	
-		FILE  *file;
+		//FILE  *file;
+		int file;
 #endif
         } input;
 
@@ -163,7 +167,8 @@ struct libtrace_format_data_out_t {
 #if HAVE_ZLIB
                 gzFile *file;
 #else
-                FILE *file;
+                //FILE *file;
+		int file;
 #endif
         } output;
 };
@@ -263,7 +268,11 @@ static int erf_init_input(struct libtrace_t *libtrace) {
 	if (!strncmp(CONNINFO.path,"-",1)) {
 		// STDIN
 		libtrace->sourcetype = STDIN;
-		INPUT.file = LIBTRACE_FDOPEN(STDIN, "r");
+		if ((INPUT.file = LIBTRACE_FDOPEN(stdin, "r")) < 0) {
+			perror("libtrace_fdopen:");
+			return 0;
+		}
+		
 
 	} else {
 		if (stat(CONNINFO.path,&buf) == -1 ) {
@@ -372,7 +381,7 @@ static int erf_init_output(struct libtrace_out_t *libtrace) {
 
         if (!strncmp(libtrace->uridata,"-",1)) {
                 // STDOUT
-		OUTPUT.file = LIBTRACE_FDOPEN(dup(1),filemode);
+		OUTPUT.file = LIBTRACE_FDOPEN(stdout,filemode);
 	}
 	else {
 	        // TRACE
