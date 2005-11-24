@@ -4,7 +4,7 @@ TRACEDUMP_DIR=tracedump
 endif
 
 if LIBTRACE_TOOLS
-SUBDIRS=traceanon tracemerge tracesplit $(TRACEDUMP_DIR) tracertstats
+SUBDIRS=traceanon tracemerge tracesplit $(TRACEDUMP_DIR) tracertstats tracestats
 else
 SUBDIRS=
 endif
