@@ -38,6 +38,7 @@
 	* local lt_inttypes.h generated for PRIu64 macros etc
 	* setting __attribute__((packed)) on all structs
 	* build fixes for tracereport and testing for libgdc
+	* added tools/tracestats
 
 
 - Version 2.0.24 
