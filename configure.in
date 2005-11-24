@@ -8,7 +8,7 @@ AC_INIT(libtrace,2.0.25,[contact@wand.net.nz],libtrace)
 AC_CONFIG_SRCDIR(lib/trace.c)
 AM_INIT_AUTOMAKE(libtrace,2.0.25)
 
-AC_CONFIG_FILES([Makefile lib/Makefile docs/Makefile libpacketdump/Makefile tools/Makefile tools/traceanon/Makefile tools/tracedump/Makefile tools/tracemerge/Makefile tools/tracereport/Makefile tools/tracertstats/Makefile tools/tracesplit/Makefile  ])
+AC_CONFIG_FILES([Makefile lib/Makefile docs/Makefile libpacketdump/Makefile tools/Makefile tools/traceanon/Makefile tools/tracedump/Makefile tools/tracemerge/Makefile tools/tracereport/Makefile tools/tracertstats/Makefile tools/tracesplit/Makefile tools/tracestats/Makefile ])
 dnl GNU C library
 dnl AC_GNU_SOURCE
 
