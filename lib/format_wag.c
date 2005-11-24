@@ -29,11 +29,12 @@
  */
 
 #define _GNU_SOURCE
+#include "config.h"
+#include "common.h"
 #include "libtrace.h"
 #include "libtrace_int.h"
 #include "format_helper.h"
 #include "wag.h"
-#include "config.h"
 
 #ifdef HAVE_INTTYPES_H
 #  include <inttypes.h>
@@ -62,20 +63,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-/*
-#if HAVE_ZLIB
-#  include <zlib.h>
-#  define LIBTRACE_READ gzread
-#  define LIBTRACE_FDOPEN gzdopen
-#  define LIBTRACE_CLOSE gzclose
-#  define LIBTRACE_WRITE gzwrite
-#else
-#  define LIBTRACE_READ read
-#  define LIBTRACE_FDOPEN open
-#  define LIBTRACE_CLOSE close
-#  define LIBTRACE_WRITE write
-#endif
-*/
 #ifdef HAVE_LIMITS_H
 #  include <limits.h>
 #endif
@@ -145,7 +132,7 @@ static int wag_init_input(struct libtrace_t *libtrace) {
 	if (!strncmp(CONNINFO.path,"-",1)) {
 		// STDIN
 		libtrace->sourcetype = STDIN;
-		INPUT.file = LIBTRACE_FDOPEN(STDIN,"r");
+		INPUT.file = LIBTRACE_FDOPEN(fileno(stdin),"r");
 
 	} else {
 		if (stat(CONNINFO.path,&buf) == -1 ) {

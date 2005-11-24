@@ -268,7 +268,7 @@ static int erf_init_input(struct libtrace_t *libtrace) {
 	if (!strncmp(CONNINFO.path,"-",1)) {
 		// STDIN
 		libtrace->sourcetype = STDIN;
-		if ((INPUT.file = LIBTRACE_FDOPEN(stdin, "r")) < 0) {
+		if ((INPUT.file = LIBTRACE_FDOPEN(fileno(stdin), "r")) < 0) {
 			perror("libtrace_fdopen:");
 			return 0;
 		}
@@ -381,7 +381,7 @@ static int erf_init_output(struct libtrace_out_t *libtrace) {
 
         if (!strncmp(libtrace->uridata,"-",1)) {
                 // STDOUT
-		OUTPUT.file = LIBTRACE_FDOPEN(stdout,filemode);
+		OUTPUT.file = LIBTRACE_FDOPEN(fileno(stdout),filemode);
 	}
 	else {
 	        // TRACE
