@@ -202,7 +202,7 @@ typedef struct libtrace_icmp
 } __attribute__ ((packed)) libtrace_icmp_t;
 
 /** 802.3 frame */
-struct libtrace_ether
+typedef struct libtrace_ether
 {
   u_int8_t ether_dhost[6];	/* destination ether addr */
   u_int8_t ether_shost[6];	/* source ether addr */
@@ -210,7 +210,7 @@ struct libtrace_ether
 } __attribute__ ((packed)) libtrace_ether_t;
 
 /** 802.1Q frame */
-struct libtrace_8021q 
+typedef struct libtrace_8021q 
 {
   u_int8_t  ether_dhost[6];      /* destination eth addr */
   u_int8_t  ether_shost[6];      /* source ether addr    */
