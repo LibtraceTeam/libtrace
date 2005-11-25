@@ -28,6 +28,9 @@
 ##
 ##
 
+- Version 3.0.0
+	* Zero-copy
+
 - Version 2.0.25
 	* updated rtclient_read_packet to be compatible with new rt protocol
 	* rtclient input now correctly ignores packets with type = RT_MSG
