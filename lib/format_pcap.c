@@ -209,9 +209,17 @@ static void trace_pcap_handler(u_char *user, const struct pcap_pkthdr *pcaphdr, 
 	void *buffer = packet->buffer;
 	int numbytes = 0;
 	
-	memcpy(buffer,pcaphdr,sizeof(struct pcap_pkthdr));
+	// This is ugly, but seems to be needed. We want both the 
+	// header and the payload in the same block of memory (packet->buffer)
+	//memcpy(buffer,pcaphdr,sizeof(struct pcap_pkthdr));
 	numbytes = pcaphdr->len;
-	memcpy(buffer + sizeof(struct pcap_pkthdr),pcappkt,numbytes);
+	//memcpy(buffer + sizeof(struct pcap_pkthdr),pcappkt,numbytes);
+
+	//packet->header = packet->buffer;
+	//packet->payload = packet->header + sizeof(struct pcap_pkthdr);
+	packet->header = (void *)pcaphdr;
+	packet->payload = (void *)pcappkt;
+
 
 	packet->size = numbytes + sizeof(struct pcap_pkthdr);
 }
@@ -234,7 +242,6 @@ static int pcap_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_
 
 static int pcap_write_packet(struct libtrace_out_t *libtrace, const struct libtrace_packet_t *packet) {
 	struct pcap_pkthdr pcap_pkt_hdr;
-	void *link = trace_get_link(packet);
 
 	if (!OUTPUT.trace.pcap) {
 		OUTPUT.trace.pcap = (pcap_t *)pcap_open_dead(
@@ -246,7 +253,7 @@ static int pcap_write_packet(struct libtrace_out_t *libtrace, const struct libtr
 	if (packet->trace->format == &pcap || 
 			packet->trace->format == &pcapint) {
 		
-		pcap_dump((u_char*)OUTPUT.trace.dump,(struct pcap_pkthdr *)packet->buffer,link);
+		pcap_dump((u_char*)OUTPUT.trace.dump,(struct pcap_pkthdr *)packet->header,packet->payload);
 	} else {
 		// Leave the manual copy as it is, as it gets around 
 		// some OS's having different structures in pcap_pkt_hdr
@@ -256,7 +263,7 @@ static int pcap_write_packet(struct libtrace_out_t *libtrace, const struct libtr
 		pcap_pkt_hdr.caplen = trace_get_capture_length(packet);
 		pcap_pkt_hdr.len = trace_get_wire_length(packet);
 
-		pcap_dump((u_char*)OUTPUT.trace.dump, &pcap_pkt_hdr, link);
+		pcap_dump((u_char*)OUTPUT.trace.dump, &pcap_pkt_hdr, packet->payload);
 	}
 	return 0;
 }
@@ -268,13 +275,13 @@ static int pcapint_write_packet(struct libtrace_out_t *libtrace __attribute__((u
 }
 
 static void *pcap_get_link(const struct libtrace_packet_t *packet) {
-	return (void *) (packet->buffer + sizeof(struct pcap_pkthdr));
+	return (void *) packet->payload;
 }
 
 static libtrace_linktype_t pcap_get_link_type(const struct libtrace_packet_t *packet) {
 	struct pcap_pkthdr *pcapptr = 0;
 	int linktype = 0;
-	pcapptr = (struct pcap_pkthdr *)packet->buffer;
+	pcapptr = (struct pcap_pkthdr *)packet->header;
 	linktype = pcap_datalink(packet->trace->format_data->input.pcap);
 	switch(linktype) {
 		case DLT_NULL:
@@ -351,7 +358,7 @@ static int8_t pcap_get_direction(const struct libtrace_packet_t *packet) {
 
 
 static struct timeval pcap_get_timeval(const struct libtrace_packet_t *packet) {
-	struct pcap_pkthdr *pcapptr = (struct pcap_pkthdr *)packet->buffer;
+	struct pcap_pkthdr *pcapptr = (struct pcap_pkthdr *)packet->header;
 	struct timeval ts;
 	ts.tv_sec = pcapptr->ts.tv_sec;
 	ts.tv_usec = pcapptr->ts.tv_usec;
@@ -361,13 +368,13 @@ static struct timeval pcap_get_timeval(const struct libtrace_packet_t *packet) {
 
 static int pcap_get_capture_length(const struct libtrace_packet_t *packet) {
 	struct pcap_pkthdr *pcapptr = 0;
-	pcapptr = (struct pcap_pkthdr *)packet->buffer;
+	pcapptr = (struct pcap_pkthdr *)packet->header;
 	return pcapptr->caplen;
 }
 
 static int pcap_get_wire_length(const struct libtrace_packet_t *packet) {
 	struct pcap_pkthdr *pcapptr = 0;
-	pcapptr = (struct pcap_pkthdr *)packet->buffer;
+	pcapptr = (struct pcap_pkthdr *)packet->header;
 	return ntohs(pcapptr->len);
 }
 
@@ -382,10 +389,10 @@ static size_t pcap_set_capture_length(struct libtrace_packet_t *packet,size_t si
 		// can't make a packet larger
 		return (packet->size - sizeof(struct pcap_pkthdr));
 	}
-	pcapptr = (struct pcap_pkthdr *)packet->buffer;
+	pcapptr = (struct pcap_pkthdr *)packet->header;
 	pcapptr->caplen = size;
 	packet->size = size + sizeof(struct pcap_pkthdr);
-	return size;
+	return packet->size;
 }
 
 static int pcap_get_fd(const struct libtrace_packet_t *packet) {

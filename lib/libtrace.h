@@ -94,14 +94,17 @@ typedef struct libtrace_packet_status {
 
 } libtrace_packet_status_t;
 
+typedef enum {PACKET, EXTERNAL } buf_control_t;
 /** Structure holding information about a packet */
 #define LIBTRACE_PACKET_BUFSIZE 65536
 typedef struct libtrace_packet_t {
-    	struct libtrace_t *trace;
-	//void *buffer;
-	char buffer[LIBTRACE_PACKET_BUFSIZE];
+	struct libtrace_t *trace;
+	void *header;
+	void *payload;
+	void *buffer;
 	size_t size;
 	libtrace_packet_status_t status;
+	buf_control_t buf_control; 
 } __attribute__ ((packed)) libtrace_packet_t;
                      
 
@@ -342,6 +345,19 @@ void trace_destroy_dead(struct libtrace_t *trace);
  * @author Shane Alcock
  */
 void trace_output_destroy(struct libtrace_out_t *trace);
+
+/** Create a new packet object
+ *
+ * @return a pointer to an initialised libtrace_packet_t object
+ */
+struct libtrace_packet_t *trace_packet_create();
+
+/** Destroy a packet object
+ *
+ * sideeffect: sets packet to NULL
+ */
+void trace_packet_destroy(struct libtrace_packet_t **packet);
+
 
 /** Read one packet from the trace into buffer
  *

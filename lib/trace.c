@@ -487,6 +487,29 @@ void trace_output_destroy(struct libtrace_out_t *libtrace) {
 	free(libtrace);
 }
 
+/** Create a new packet object
+ *
+ * @ return a pointer to an initialised libtrace_packet_t structure
+ */
+struct libtrace_packet_t *trace_packet_create() {
+	struct libtrace_packet_t *packet = calloc(1,sizeof(struct libtrace_packet_t));
+	packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
+	packet->buf_control = PACKET;
+	return packet;
+}
+
+/** Destroy a packet object
+ *
+ * sideeffect: sets packet to NULL
+ */
+void trace_packet_destroy(struct libtrace_packet_t **packet) {
+	if ((*packet)->buf_control) {
+		free((*packet)->buffer);
+	}
+	free((*packet));
+	packet = NULL;
+}	
+
 /* Read one packet from the trace into buffer
  *
  * @param libtrace 	the libtrace opaque pointer
@@ -542,6 +565,8 @@ int trace_write_packet(struct libtrace_out_t *libtrace, const struct libtrace_pa
  * @note you should call trace_get_link_type() to find out what type of link layer this is
  */
 void *trace_get_link(const struct libtrace_packet_t *packet) {
+	return (void *)packet->payload;
+/*
         const void *ethptr = 0;
 
 	assert(packet->size>0 && packet->size<65536);
@@ -550,6 +575,7 @@ void *trace_get_link(const struct libtrace_packet_t *packet) {
 		ethptr = packet->trace->format->get_link(packet);
 	}
         return (void *)ethptr;
+*/
 }
 
 typedef struct legacy_framing {

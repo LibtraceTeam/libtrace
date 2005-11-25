@@ -62,35 +62,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-/*
- gzread (gzFile, buf, len)
- gzdopen(path, mode)
- gzopen(path, mode)
- gzclose(gzFile)
- gzwrite(gzFile, buf, len)
 
- fread(ptr, size, num, FILE)
- fdopen(filedes,mode)
- fopen(path, mode)
- fclose(FILE)
- fwrite(ptr, size, num, FILE)
-*/
-/*
-#if HAVE_ZLIB
-#  include <zlib.h>
-#  define LIBTRACE_READ(file,buf,len) gzread(file,buf,len)
-#  define LIBTRACE_FDOPEN(fd,mode) gzdopen(fd,mode)
-#  define LIBTRACE_OPEN(path,mode) gzopen(path,mode)
-#  define LIBTRACE_CLOSE(file) gzclose(file)
-#  define LIBTRACE_WRITE(file,buf,len) gzwrite(file,buf,len)
-#else
-#  define LIBTRACE_READ(file,buf,len) fread(buf,len,1,file)
-#  define LIBTRACE_FDOPEN(fd,mode) fdopen(fd,mode)
-#  define LIBTRACE_OPEN(path,mode) fopen(path,mode)
-#  define LIBTRACE_CLOSE(file) fclose(file)
-#  define LIBTRACE_WRITE(file,buf,len) fwrite(buf,len,1,file)
-#endif
-*/
 #define COLLECTOR_PORT 3435
 
 /* Catch undefined O_LARGEFILE on *BSD etc */
@@ -490,7 +462,13 @@ static int dag_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 	void *buffer = packet->buffer;
 	void *buffer2 = buffer;
 	int rlen;
-	
+
+	if (packet->buf_control == PACKET) {
+		packet->buf_control = EXTERNAL;
+		free(packet->buffer);
+		packet->buffer = 0;
+	}
+   
 	if (DAG.diff == 0) {
 		if ((numbytes = dag_read(libtrace,buf,RP_BUFSIZE)) <= 0) 
 			return numbytes;
@@ -504,9 +482,15 @@ static int dag_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 	if ( size  > LIBTRACE_PACKET_BUFSIZE) {
 		assert( size < LIBTRACE_PACKET_BUFSIZE);
 	}
+	
+	packet->buffer = erfptr;
+	packet->header = erfptr;
+	if (((dag_record_t *)buffer)->flags.rxerror == 1) {
+		packet->payload = NULL;
+	} else {
+		packet->payload = packet->buffer + erf_get_framing_length(packet);
+	}
 
-	// have to copy it out of the memory hole at this stage:
-	memcpy(packet->buffer, erfptr, size);
 	
 	packet->status.type = RT_DATA;
 	packet->status.message = 0;
@@ -527,6 +511,11 @@ static int legacy_read_packet(struct libtrace_t *libtrace, struct libtrace_packe
 	void *buffer2 = buffer;
 	int rlen;
 
+	if (packet->buf_control == EXTERNAL) {
+		packet->buf_control = PACKET;
+		packet = malloc(LIBTRACE_PACKET_BUFSIZE);
+	}
+	
 	if ((numbytes=LIBTRACE_READ(INPUT.file,
 					buffer,
 					dag_record_size)) == -1) {
@@ -551,8 +540,13 @@ static int legacy_read_packet(struct libtrace_t *libtrace, struct libtrace_packe
 	}
 	packet->status.type = RT_DATA;
 	packet->status.message = 0;
+	
+	packet->header = packet->buffer;
+	packet->payload = packet->trace->format->get_link(packet);
+	
 	packet->size = rlen;
 	return rlen;
+	
 }
 static int erf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
 	int numbytes;
@@ -560,6 +554,14 @@ static int erf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 	void *buffer = packet->buffer;
 	void *buffer2 = buffer;
 	int rlen;
+	if (packet->buf_control == EXTERNAL) {
+		packet->buf_control = PACKET;
+		packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
+	}
+	buffer = packet->buffer;
+	packet->header = packet->buffer;
+
+
 	if ((numbytes=LIBTRACE_READ(INPUT.file,
 					buffer,
 					dag_record_size)) == -1) {
@@ -594,6 +596,11 @@ static int erf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 	packet->status.type = RT_DATA;
 	packet->status.message = 0;
 	packet->size = rlen;
+	if (((dag_record_t *)buffer)->flags.rxerror == 1) {
+		packet->payload = NULL;
+	} else {
+		packet->payload = packet->buffer + erf_get_framing_length(packet);
+	}
 	return rlen;
 }
 
@@ -633,7 +640,14 @@ static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_pac
 	void *buffer = 0;
 
 	packet->trace = libtrace;
+
+	if (packet->buf_control == EXTERNAL) {
+		packet->buf_control = PACKET;
+		packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
+	}
+
 	buffer = packet->buffer;
+	packet->header = packet->buffer;
 
 	
 	do {
@@ -697,6 +711,11 @@ static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_pac
 				sizeof(libtrace_packet_status_t));
 
 		//packet->size = numbytes;
+		if (((dag_record_t *)buffer)->flags.rxerror == 1) {
+			packet->payload = NULL;
+		} else {
+			packet->payload = packet->buffer + erf_get_framing_length(packet);
+		}
 		return numbytes;
 	} while(1);
 }
@@ -723,8 +742,8 @@ static int erf_write_packet(struct libtrace_out_t *libtrace, const struct libtra
 	int numbytes = 0;
 	dag_record_t erfhdr;
 	int pad = 0;
-	dag_record_t *dag_hdr = (dag_record_t *)packet->buffer;
-	void *payload = (void *)trace_get_link(packet);
+	dag_record_t *dag_hdr = (dag_record_t *)packet->header;
+	void *payload = packet->payload;
 
 	pad = erf_get_padding(packet);
 
@@ -768,12 +787,14 @@ static int erf_write_packet(struct libtrace_out_t *libtrace, const struct libtra
 	return numbytes;
 }
 
-
 static void *legacypos_get_link(const struct libtrace_packet_t *packet) {
+	return (void *)packet->payload;
+	/*
         const void *posptr = 0;
-	posptr = ((uint8_t *)packet->buffer +
+	posptr = ((uint8_t *)packet-> +
 			legacypos_get_framing_length(packet));
 	return (void *)posptr;
+	*/
 }
 
 static libtrace_linktype_t legacypos_get_link_type(const struct libtrace_packet_t *packet) {
@@ -781,10 +802,13 @@ static libtrace_linktype_t legacypos_get_link_type(const struct libtrace_packet_
 }
 
 static void *legacyatm_get_link(const struct libtrace_packet_t *packet) {
+	return (void *)packet->payload;
+	/*
         const void *atmptr = 0;
 	atmptr = ((uint8_t *)packet->buffer +
 			legacyatm_get_framing_length(packet));
 	return (void *)atmptr;
+	*/
 }
 
 static libtrace_linktype_t legacyatm_get_link_type(const struct libtrace_packet_t *packet) {
@@ -792,10 +816,13 @@ static libtrace_linktype_t legacyatm_get_link_type(const struct libtrace_packet_
 }
 
 static void *legacyeth_get_link(const struct libtrace_packet_t *packet) {
+	return (void *)packet->payload;
+	/*
         const void *ethptr = 0;
 	ethptr = ((uint8_t *)packet->buffer +
 			legacyeth_get_framing_length(packet));
 	return (void *)ethptr;
+	*/
 }
 
 static libtrace_linktype_t legacyeth_get_link_type(const struct libtrace_packet_t *packet) {
@@ -805,9 +832,10 @@ static libtrace_linktype_t legacyeth_get_link_type(const struct libtrace_packet_
 
 
 static void *erf_get_link(const struct libtrace_packet_t *packet) {
-        const void *ethptr = 0;
+	return (void *)packet->payload;
+/*        const void *ethptr = 0;
 	dag_record_t *erfptr = 0;
-	erfptr = (dag_record_t *)packet->buffer;
+	erfptr = (dag_record_t *)packet->header;
 	
 	if (erfptr->flags.rxerror == 1) {
 		return NULL;
@@ -815,11 +843,13 @@ static void *erf_get_link(const struct libtrace_packet_t *packet) {
 	ethptr = ((uint8_t *)packet->buffer +
 			erf_get_framing_length(packet));
 	return (void *)ethptr;
+*/
+
 }
 
 static libtrace_linktype_t erf_get_link_type(const struct libtrace_packet_t *packet) {
 	dag_record_t *erfptr = 0;
-	erfptr = (dag_record_t *)packet->buffer;
+	erfptr = (dag_record_t *)packet->header;
 	switch (erfptr->type) {
 		case TYPE_LEGACY: 	return TRACE_TYPE_LEGACY;
 		case TYPE_ETH: 		return TRACE_TYPE_ETH;
@@ -833,20 +863,20 @@ static libtrace_linktype_t erf_get_link_type(const struct libtrace_packet_t *pac
 
 static int8_t erf_get_direction(const struct libtrace_packet_t *packet) {
 	dag_record_t *erfptr = 0;
-	erfptr = (dag_record_t *)packet->buffer;
+	erfptr = (dag_record_t *)packet->header;
 	return erfptr->flags.iface;
 }
 
 static int8_t erf_set_direction(const struct libtrace_packet_t *packet, int8_t direction) {
 	dag_record_t *erfptr = 0;
-	erfptr = (dag_record_t *)packet->buffer;
+	erfptr = (dag_record_t *)packet->header;
 	erfptr->flags.iface = direction;
 	return erfptr->flags.iface;
 }
 
 static uint64_t erf_get_erf_timestamp(const struct libtrace_packet_t *packet) {
 	dag_record_t *erfptr = 0;
-	erfptr = (dag_record_t *)packet->buffer;
+	erfptr = (dag_record_t *)packet->header;
 	return erfptr->ts;
 }
 
@@ -855,7 +885,7 @@ static int legacy_get_capture_length(const struct libtrace_packet_t *packet __at
 }
 
 static int legacypos_get_wire_length(const struct libtrace_packet_t *packet) {
-	legacy_pos_t *lpos = (legacy_pos_t *)packet->buffer;
+	legacy_pos_t *lpos = (legacy_pos_t *)packet->header;
 	return ntohs(lpos->wlen);
 }
 
@@ -864,18 +894,18 @@ static int legacyatm_get_wire_length(const struct libtrace_packet_t *packet) {
 }
 
 static int legacyeth_get_wire_length(const struct libtrace_packet_t *packet) {
-	legacy_ether_t *leth = (legacy_ether_t *)packet->buffer;
+	legacy_ether_t *leth = (legacy_ether_t *)packet->header;
 	return ntohs(leth->wlen);
 }
 static int erf_get_capture_length(const struct libtrace_packet_t *packet) {
 	dag_record_t *erfptr = 0;
-	erfptr = (dag_record_t *)packet->buffer;
+	erfptr = (dag_record_t *)packet->header;
 	return (ntohs(erfptr->rlen) - erf_get_framing_length(packet));
 }
 
 static int erf_get_wire_length(const struct libtrace_packet_t *packet) {
 	dag_record_t *erfptr = 0;
-	erfptr = (dag_record_t *)packet->buffer;
+	erfptr = (dag_record_t *)packet->header;
 	return ntohs(erfptr->wlen);
 }
 
@@ -886,10 +916,10 @@ static size_t erf_set_capture_length(struct libtrace_packet_t *packet, size_t si
 		// can't make a packet larger
 		return (packet->size - erf_get_framing_length(packet));
 	}
-	erfptr = (dag_record_t *)packet->buffer;
+	erfptr = (dag_record_t *)packet->header;
 	erfptr->rlen = htons(size + erf_get_framing_length(packet));
 	packet->size = size + erf_get_framing_length(packet);
-	return size;
+	return packet->size;
 }
 
 static int rtclient_get_fd(const struct libtrace_packet_t *packet) {
