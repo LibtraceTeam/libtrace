@@ -99,7 +99,7 @@ int main(int argc, char *argv[]) {
         char *uri = 0;
         int psize = 0;
         struct libtrace_ip *ipptr = 0;
-	struct libtrace_packet_t packet;
+	struct libtrace_packet_t *packet = trace_packet_create();
 	uint32_t last_second = 0;
 	double ts = 0.0;
 

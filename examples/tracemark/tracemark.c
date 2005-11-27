@@ -57,7 +57,7 @@ uint64_t tot=0;
 /* Process a trace, counting packets that match filter(s) */
 void run_trace(char *uri) 
 {
-	struct libtrace_packet_t packet;
+	struct libtrace_packet_t *packet = trace_packet_create();
 	uint64_t count = 0;
 	uint64_t bytes = 0;
 	uint64_t nontcp_count = 0;

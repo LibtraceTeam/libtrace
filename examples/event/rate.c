@@ -104,7 +104,7 @@ int main(int argc, char *argv[]) {
         int psize = 0;
         struct sigaction sigact;
         struct libtrace_ip *ipptr = 0;
-	struct libtrace_packet_t packet;
+	struct libtrace_packet_t *packet = trace_packet_create();
 
         struct itimerval itv;
 

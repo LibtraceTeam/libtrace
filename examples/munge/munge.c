@@ -176,7 +176,7 @@ int main(int argc, char *argv[])
 	char *key = NULL;
 	struct libtrace_filter_t *filter = NULL;
 	struct libtrace_t *trace = 0;
-	struct libtrace_packet_t packet;
+	struct libtrace_packet_t *packet = trace_packet_create();
 	struct libtrace_out_t *writer = 0;
 	bool enc_source = false;
 	bool enc_dest 	= false;

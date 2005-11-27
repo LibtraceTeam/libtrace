@@ -99,7 +99,7 @@ int main(int argc, char *argv[])
 	enum enc_type_t enc_type = ENC_NONE;
 	char *key = NULL;
 	struct libtrace_t *trace = 0;
-	struct libtrace_packet_t packet;
+	struct libtrace_packet_t *packet = trace_packet_create();
 	struct libtrace_out_t *writer = 0;
 	bool enc_source = false;
 	bool enc_dest 	= false;
@@ -177,18 +177,18 @@ int main(int argc, char *argv[])
 	for(;;) {
 		struct libtrace_ip *ipptr;
 		int psize;
-		if ((psize = trace_read_packet(trace, &packet)) <= 0) {
+		if ((psize = trace_read_packet(trace, packet)) <= 0) {
 			break;
 		}
 
-		ipptr = trace_get_ip(&packet);
+		ipptr = trace_get_ip(packet);
 
 		if (ipptr && (enc_source || enc_dest))
 			encrypt_ips(ipptr,enc_source,enc_dest);
 
 		/* TODO: Encrypt IP's in ARP packets */
 
-		trace_write_packet(writer,&packet);
+		trace_write_packet(writer,packet);
 	}
 	return 0;
 }

@@ -19,7 +19,7 @@ void usage(char *argv0)
 int main(int argc,char **argv)
 {
 	struct libtrace_t *trace = NULL;
-	struct libtrace_packet_t packet;
+	struct libtrace_packet_t *packet = trace_packet_create();
 	struct libtrace_filter_t *filter=NULL;
 	uint64_t count=0;
 	uint64_t numpackets=0;
@@ -64,11 +64,11 @@ int main(int argc,char **argv)
 			errx(1,"Failed to open trace");
 		}
 
-		while(trace_read_packet(trace,&packet)> 0 ){
-			if (filter && !trace_bpf_filter(filter,&packet))
+		while(trace_read_packet(trace,packet)> 0 ){
+			if (filter && !trace_bpf_filter(filter,packet))
 				continue;
 
-			trace_dump_packet(&packet);
+			trace_dump_packet(packet);
 			if(count) {
 				numpackets++;
 				if (numpackets == count)

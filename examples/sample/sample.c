@@ -63,7 +63,7 @@ int main(int argc, char *argv[]) {
 	char *filterstring = 0;
         int psize = 0;
         struct libtrace_ip *ipptr = 0;
-	struct libtrace_packet_t packet;
+	struct libtrace_packet_t *packet = trace_packet_create();
 	struct libtrace_filter_t *filter = 0;
 
         if (argc == 2) {

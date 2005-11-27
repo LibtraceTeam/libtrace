@@ -63,7 +63,7 @@ void trace_dump_packet(struct libtrace_packet_t *packet)
 	char *link=(char *)trace_get_link(packet);
 
 	printf("%s",ctime(&sec));
-	decode_next(link,packet->size-(link-packet->buffer),"link",trace_get_link_type(packet));
+	decode_next(link,packet->size - trace_get_framing_length(packet),"link",trace_get_link_type(packet));
 }
 
 static void generic_decode(uint16_t type,char *packet, int len) {

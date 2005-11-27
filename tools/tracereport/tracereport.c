@@ -60,7 +60,7 @@ struct libtrace_t *trace;
 /* Process a trace, counting packets that match filter(s) */
 void run_trace(char *uri) 
 {
-	struct libtrace_packet_t packet;
+	struct libtrace_packet_t *packet = trace_packet_create();
 
 	fprintf(stderr,"%s:\n",uri);
 
@@ -68,17 +68,17 @@ void run_trace(char *uri)
 
         for (;;) {
 		int psize;
-                if ((psize = trace_read_packet(trace, &packet)) <1) {
+                if ((psize = trace_read_packet(trace, packet)) <1) {
                         break;
                 }
 
-		error_per_packet(&packet);
-		port_per_packet(&packet);
-		protocol_per_packet(&packet);
-		tos_per_packet(&packet);
-		ttl_per_packet(&packet);
-		flow_per_packet(&packet);
-		dir_per_packet(&packet);
+		error_per_packet(packet);
+		port_per_packet(packet);
+		protocol_per_packet(packet);
+		tos_per_packet(packet);
+		ttl_per_packet(packet);
+		flow_per_packet(packet);
+		dir_per_packet(packet);
 
         }
 

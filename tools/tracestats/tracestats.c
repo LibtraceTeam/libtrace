@@ -67,7 +67,7 @@ uint64_t totbytes;
 /* Process a trace, counting packets that match filter(s) */
 void run_trace(char *uri) 
 {
-	struct libtrace_packet_t packet;
+	struct libtrace_packet_t *packet = trace_packet_create();
 	int i;
 	uint64_t count = 0;
 	uint64_t bytes = 0;
@@ -78,19 +78,19 @@ void run_trace(char *uri)
 
         for (;;) {
 		int psize;
-                if ((psize = trace_read_packet(trace, &packet)) <1) {
+                if ((psize = trace_read_packet(trace, packet)) <1) {
                         break;
                 }
 
 		for(i=0;i<filter_count;++i) {
-			if(trace_bpf_filter(filters[i].filter,&packet)) {
+			if(trace_bpf_filter(filters[i].filter,packet)) {
 				++filters[i].count;
-				filters[i].bytes+=trace_get_wire_length(&packet);
+				filters[i].bytes+=trace_get_wire_length(packet);
 			}
 		}
 
 		++count;
-		bytes+=trace_get_wire_length(&packet);
+		bytes+=trace_get_wire_length(packet);
         }
 
 	for(i=0;i<filter_count;++i) {

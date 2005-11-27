@@ -322,7 +322,7 @@ static int wag_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 		packet->status.type = RT_DATA;
 		packet->status.message = 0;
 		packet->header = packet->buffer;
-		packet->payload = packet->buffer + pcap_get_framing_length(packet);
+		packet->payload = packet->buffer + trace_get_framing_length(packet);
 		packet->size = numbytes;
 		return numbytes;
 	} while(1);

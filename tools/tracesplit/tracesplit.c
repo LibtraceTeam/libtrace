@@ -43,6 +43,7 @@ int main(int argc, char *argv[])
 	struct libtrace_filter_t *filter=NULL;
 	struct libtrace_out_t *output = NULL;
 	struct libtrace_t *input;
+	struct libtrace_packet_t *packet = trace_packet_create();
 	uint64_t count=UINT64_MAX;
 	uint64_t bytes=UINT64_MAX;
 	uint64_t starttime=0;
@@ -105,29 +106,28 @@ int main(int argc, char *argv[])
 	input=trace_create(argv[optind]);
 
 	while(1) {
-		struct libtrace_packet_t packet;
-		if (trace_read_packet(input,&packet)<1) {
+		if (trace_read_packet(input,packet)<1) {
 			break;
 		}
 
 
-		if (filter && !trace_bpf_filter(filter,&packet)) {
+		if (filter && !trace_bpf_filter(filter,packet)) {
 			continue;
 		}
 
-		if (trace_get_seconds(&packet)<starttime) {
+		if (trace_get_seconds(packet)<starttime) {
 			continue;
 		}
 
-		if (trace_get_seconds(&packet)>endtime) {
+		if (trace_get_seconds(packet)>endtime) {
 			break;
 		}
 
 		if (firsttime==0) {
-			firsttime=trace_get_seconds(&packet);
+			firsttime=trace_get_seconds(packet);
 		}
 
-		if (output && trace_get_seconds(&packet)>firsttime+interval) {
+		if (output && trace_get_seconds(packet)>firsttime+interval) {
 			trace_output_destroy(output);
 			output=NULL;
 			firsttime+=interval;
@@ -139,7 +139,7 @@ int main(int argc, char *argv[])
 			output=NULL;
 		}
 
-		totbytes+=trace_get_capture_length(&packet);
+		totbytes+=trace_get_capture_length(packet);
 		if (output && totbytes-totbyteslast>=bytes) {
 			trace_output_destroy(output);
 			output=NULL;
@@ -166,7 +166,7 @@ int main(int argc, char *argv[])
 			free(buffer);
 		}
 
-		trace_write_packet(output,&packet);
+		trace_write_packet(output,packet);
 	}
 
 	if (!output)
