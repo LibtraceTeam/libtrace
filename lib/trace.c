@@ -703,6 +703,7 @@ struct libtrace_ip *trace_get_ip(const struct libtrace_packet_t *packet) {
 				} else {
 					ipptr = NULL;
 				}
+				break;
 			}
 		default:
 			fprintf(stderr,"Don't understand link layer type %i in trace_get_ip()\n",
