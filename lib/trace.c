@@ -566,24 +566,16 @@ int trace_write_packet(struct libtrace_out_t *libtrace, const struct libtrace_pa
  */
 void *trace_get_link(const struct libtrace_packet_t *packet) {
 	return (void *)packet->payload;
-/*
-        const void *ethptr = 0;
-
-	assert(packet->size>0 && packet->size<65536);
-	
-      	if (packet->trace->format->get_link) {
-		ethptr = packet->trace->format->get_link(packet);
-	}
-        return (void *)ethptr;
-*/
 }
 
+/*
 typedef struct legacy_framing {
 	uint64_t 	ts;
 	uint32_t	crc;
 	uint32_t	header;
-	uint32_t	data[12]; /* pad to 64 bytes */
+	uint32_t	data[12]; // pad to 64 bytes 
 } legacy_framing_t;
+*/
 
 /* get a pointer to the IP header (if any)
  * @param packet	a pointer to a libtrace_packet structure
@@ -611,13 +603,16 @@ struct libtrace_ip *trace_get_ip(const struct libtrace_packet_t *packet) {
 					struct ieee_802_11_payload *eth = (void*)wifi->data;
 					ipptr = NULL;
 
-					if (eth->type == 0x0008) {
-						ipptr=(void*)eth->data;
-					} else if (eth->type == 0x0081) {
-						// VLAN
-						if ((*(uint16_t *)(eth + 16)) == 0x0008) {
-							ipptr = (void*)eth->data + 4;
-						}
+					if (ntohs(eth->type) == 0x0800) {
+					    ipptr=((void*)eth) + sizeof(*eth);
+					} else if (ntohs(eth->type) == 0x8100) {
+					    struct libtrace_8021q *vlanhdr =
+						(struct libtrace_8021q *)eth;
+					    if (ntohs(vlanhdr->vlan_ether_type)
+							    == 0x0800) {
+						ipptr=((void*)eth) + 
+							sizeof(*vlanhdr);
+					    }
 					}
 				}
 			}
@@ -633,13 +628,15 @@ struct libtrace_ip *trace_get_ip(const struct libtrace_packet_t *packet) {
 				}
 				ipptr = NULL;
 				
-				if (eth->ether_type==0x0008) {
-					ipptr = ((void *)eth) + 14;
-				} else if (eth->ether_type == 0x0081) {
+				if (ntohs(eth->ether_type)==0x0800) {
+					ipptr = ((void *)eth) + sizeof(*eth);
+				} else if (ntohs(eth->ether_type) == 0x8100) {
 					struct libtrace_8021q *vlanhdr = 
 						(struct libtrace_8021q *)eth;
-					if (vlanhdr->vlan_ether_type == 0x0008) {
-						ipptr = ((void *)eth) + 18;
+					if (ntohs(vlanhdr->vlan_ether_type) 
+							== 0x0800) {
+						ipptr = ((void *)eth) + 
+							sizeof(*vlanhdr);
 					}
 				}
 				break;
@@ -696,10 +693,15 @@ struct libtrace_ip *trace_get_ip(const struct libtrace_packet_t *packet) {
 		case TRACE_TYPE_ATM:
 			{
 				// 64 byte capture.
-				struct libtrace_atm_cell *cell =
+				struct libtrace_llcsnap *llc = 
 					trace_get_link(packet);
-				if (ntohs(cell->ether_type) == 0x0800) {
-					ipptr = ((void *)cell) + sizeof(*cell);
+
+				// advance the llc ptr +4 into the link layer.
+				// need to check what is in these 4 bytes.
+				// don't have time!
+				llc = (void *)llc + 4;
+				if (ntohs(llc->type) == 0x0800) {
+					ipptr = ((void *)llc) + sizeof(*llc);
 				} else {
 					ipptr = NULL;
 				}

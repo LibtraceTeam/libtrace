@@ -9,25 +9,16 @@
 extern "C"
 void decode(int link_type,char *packet,int len)
 {
-	printf(" Legacy POS:");
-	/*
-	if (len>=6)
-		printf(" %s",ether_ntoa((struct ether_addr*)packet));
-	else {
-		printf("[|Truncated]\n");
-		return;
-	}
-	if (len>=12) 
-		printf(" %s",ether_ntoa((struct ether_addr*)(packet+6)));
-	else {
-		printf("[|Truncated]\n");
-		return;
-	}
-	*/
-	if (len>=20) {
-		uint16_t type = htons(*(uint16_t*)(packet+18));
+	// POS
+	printf(" Legacy Framing:");
+	// take into account llc
+	if (len>=4) {
+		uint16_t type = htons(
+				((libtrace_pos *)packet)->ether_type);
 		printf(" %04x\n",type);
-		decode_next(packet+20,len-20,"eth",type);
+		decode_next(packet+sizeof(libtrace_pos),
+				len-sizeof(libtrace_pos),
+				"eth",type);
 	}
 	else {
 		printf("[|Truncated]\n");

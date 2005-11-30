@@ -10,9 +10,10 @@
 extern "C"
 void decode(int link_type,char *packet,int len)
 {
-	printf(" Legacy Framing: ");
+	// Ethernet - just raw ethernet frames
+	printf(" Legacy: ");
 	if (len>=10) {
-		decode_next(packet+10,len-10,"link",2);
+		decode_next(packet,len,"link",2);
 	}
 	else {
 		printf("[|Truncated]\n");

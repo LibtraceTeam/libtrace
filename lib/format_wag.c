@@ -385,7 +385,7 @@ static int wag_get_wire_length(const struct libtrace_packet_t *packet) {
 	return ntohs(wagptr->hdr.size);
 }
 
-static int wag_get_framing_length(const struct libtrace_packet_t *packet) {
+static int wag_get_framing_length(const struct libtrace_packet_t *packet UNUSED) {
 	return sizeof(struct wag_data_frame);
 }
 

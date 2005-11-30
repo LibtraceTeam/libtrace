@@ -206,17 +206,12 @@ static int pcapint_fin_output(struct libtrace_out_t *libtrace __attribute__((unu
 
 static void trace_pcap_handler(u_char *user, const struct pcap_pkthdr *pcaphdr, const u_char *pcappkt) {
 	struct libtrace_packet_t *packet = (struct libtrace_packet_t *)user;	
-	void *buffer = packet->buffer;
 	int numbytes = 0;
-	
-	// This is ugly, but seems to be needed. We want both the 
-	// header and the payload in the same block of memory (packet->buffer)
-	//memcpy(buffer,pcaphdr,sizeof(struct pcap_pkthdr));
-	numbytes = pcaphdr->len;
-	//memcpy(buffer + sizeof(struct pcap_pkthdr),pcappkt,numbytes);
 
-	//packet->header = packet->buffer;
-	//packet->payload = packet->header + sizeof(struct pcap_pkthdr);
+	// pcap provides us with the right bits, in it's own buffers.
+	// We hijack them.
+	numbytes = pcaphdr->len;
+
 	packet->header = (void *)pcaphdr;
 	packet->payload = (void *)pcappkt;
 
@@ -378,7 +373,7 @@ static int pcap_get_wire_length(const struct libtrace_packet_t *packet) {
 	return ntohs(pcapptr->len);
 }
 
-static int pcap_get_framing_length(const struct libtrace_packet_t *packet) {
+static int pcap_get_framing_length(const struct libtrace_packet_t *packet UNUSED) {
 	return sizeof(struct pcap_pkthdr);
 }
 

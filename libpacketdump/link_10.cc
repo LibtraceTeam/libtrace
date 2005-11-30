@@ -5,29 +5,19 @@
 #include <dlfcn.h>
 #include <map>
 #include "libpacketdump.h"
+#include "libtrace.h"
 
 extern "C"
 void decode(int link_type,char *packet,int len)
 {
-	printf(" Legacy ATM:");
-	/*
-	if (len>=6)
-		printf(" %s",ether_ntoa((struct ether_addr*)packet));
-	else {
-		printf("[|Truncated]\n");
-		return;
-	}
-	if (len>=12) 
-		printf(" %s",ether_ntoa((struct ether_addr*)(packet+6)));
-	else {
-		printf("[|Truncated]\n");
-		return;
-	}
-	*/
-	if (len>=24) {
-		uint16_t type = htons(*(uint16_t*)(packet+22));
+	// ATM
+	printf(" Legacy Framing:");
+	if (len>=12) {
+		uint16_t type = htons(*(uint16_t*)(packet+sizeof(libtrace_atm_cell)+4));
 		printf(" %04x\n",type);
-		decode_next(packet+24,len-24,"eth",type);
+		decode_next(packet+sizeof(libtrace_atm_cell) + 4,
+				len-sizeof(libtrace_atm_cell) -4, 
+				"eth",type);
 	}
 	else {
 		printf("[|Truncated]\n");

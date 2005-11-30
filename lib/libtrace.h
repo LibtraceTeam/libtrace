@@ -58,7 +58,7 @@
 #include <sys/types.h>
 #include <netinet/in.h>
 /** API version as 2 byte hex digits, eg 0xXXYYZZ */
-#define LIBTRACE_API_VERSION 0x020018  /* 2.0.24 */
+#define LIBTRACE_API_VERSION 0x030000  /* 3.0.00 */
 
 #ifdef __cplusplus 
 extern "C" { 
@@ -69,8 +69,10 @@ extern "C" {
  */
 #if __GNUC__ >= 3 
 #  define SIMPLE_FUNCTION __attribute__((pure))
+#  define UNUSED __attribute__((unused))
 #else
 #  define SIMPLE_FUNCTION
+#  define UNUSED
 #endif
 	
 #define RT_DATA 1
@@ -204,6 +206,16 @@ typedef struct libtrace_icmp
   } un;				/**< Union for payloads of various icmp codes */
 } __attribute__ ((packed)) libtrace_icmp_t;
 
+/** LLC/SNAP header */
+typedef struct libtrace_llcsnap
+{
+  u_int8_t dsap;
+  u_int8_t ssap;
+  u_int8_t control;
+  u_int32_t oui:24;
+  u_int16_t type;
+} __attribute__ ((packed)) libtrace_llcsnap_t;
+
 /** 802.3 frame */
 typedef struct libtrace_ether
 {
@@ -233,7 +245,6 @@ typedef struct libtrace_atm_cell
   u_int8_t pt:3;
   u_int8_t clp:1;
   u_int8_t hec;
-  u_int16_t ether_type;
 } __attribute__ ((packed)) libtrace_atm_cell;
 
 /** POS header */
