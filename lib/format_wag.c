@@ -366,10 +366,10 @@ static int8_t wag_get_direction(const struct libtrace_packet_t *packet) {
 static uint64_t wag_get_erf_timestamp(const struct libtrace_packet_t *packet) {
 	struct wag_data_frame *wagptr = (struct wag_data_frame *)packet->header;
 	uint64_t timestamp = 0;
-	timestamp = wagptr->ts.subsecs;
+	timestamp = (wagptr->ts.secs << 32) + wagptr->ts.subsecs;
 	//timestamp |= (uint64_t)wagptr->ts.secs<<32;
-	timestamp = ((timestamp%44000000)*(UINT_MAX/44000000)) 
-		| ((timestamp/44000000)<<32);
+	//timestamp = ((timestamp%44000000)*(UINT_MAX/44000000)) 
+	//	| ((timestamp/44000000)<<32);
 	return timestamp;
 }
 
