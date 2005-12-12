@@ -133,6 +133,8 @@ int main(int argc, char *argv[])
 	struct libtrace_t *trace;
 	double last = 0;
 	struct flow_id_t a,b;
+
+	/* Perform a self test to prove that the comparitor is working fine */
 	a.ip_a = 0x7f000001;
 	a.ip_b = 0x0ac0ffee;
 	a.port_a = 80;
@@ -142,9 +144,9 @@ int main(int argc, char *argv[])
 	b.port_a = 1024;
 	b.port_b = 80;
 
-	printf("%i %u %u\n",cmp(a,b),a.ip_a,b.ip_a);
-
 	assert(cmp(a,b)==1);
+
+	/* Now that the self test has succeeded, try the full program */
 
 	trace = trace_create(argv[1]);
 
