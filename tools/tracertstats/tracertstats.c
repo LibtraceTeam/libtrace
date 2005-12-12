@@ -68,7 +68,7 @@ uint64_t totcount;
 uint64_t totbytes;
 
 uint64_t packet_count=UINT64_MAX;
-uint64_t packet_interval=UINT64_MAX;
+double packet_interval=UINT32_MAX;
 
 
 struct output_data_t *output;
@@ -187,10 +187,10 @@ int main(int argc, char *argv[]) {
 				filters[filter_count-1].bytes=0;
 				break;
 			case 'i':
-				packet_interval=atoi(optarg);
+				packet_interval=atof(optarg);
 				break;
 			case 'c':
-				packet_interval=atoi(optarg);
+				packet_count=atoi(optarg);
 				break;
 			case 'o':
 				if (output_format) free(output_format);
@@ -203,7 +203,7 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
-	if (packet_count == UINT64_MAX && packet_interval == UINT64_MAX) {
+	if (packet_count == UINT64_MAX && packet_interval == UINT32_MAX) {
 		packet_interval = 300; /* every 5 minutes */
 	}
 
