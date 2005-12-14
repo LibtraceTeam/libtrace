@@ -30,6 +30,16 @@
 
 - Version 3.0.0
 	* Zero-copy
+        * Split wag device and wag trace into two separate uris, wag and wtf
+          respectively
+        * Corrected wag_read so that it correctly reads from the wag device
+        * Wag header is now in network byte order so byte order conversion
+          added when reading from the header
+	* Renamed trace_output_create, trace_output_destroy,
+	  trace_packet_create, and trace_packet_destroy as they were 
+	  inconsistent with other functions
+	* Fixed bug in tracertstats where -c option changed packet interval
+	  rather than packet count
 
 - Version 2.0.25
 	* updated rtclient_read_packet to be compatible with new rt protocol
