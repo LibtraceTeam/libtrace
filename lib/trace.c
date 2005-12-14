@@ -374,7 +374,7 @@ struct libtrace_t * trace_create_dead (const char *uri) {
  *  and trace_errno is set. Use trace_perror() to get more information
  */
 	
-struct libtrace_out_t *trace_output_create(const char *uri) {
+struct libtrace_out_t *trace_create_output(const char *uri) {
 	struct libtrace_out_t *libtrace = malloc(sizeof(struct libtrace_out_t));
 	
 	char *scan = 0;
@@ -437,7 +437,7 @@ struct libtrace_out_t *trace_output_create(const char *uri) {
  *
  * @author Shane Alcock
  */
-int trace_output_config(struct libtrace_out_t *libtrace, char *options) {
+int trace_config_output(struct libtrace_out_t *libtrace, char *options) {
 	char *opt_string = 0;
 	char *opt_argv[MAXOPTS];
 	int opt_argc = 0;
@@ -479,7 +479,7 @@ void trace_destroy_dead(struct libtrace_t *libtrace) {
  *
  * @author Shane Alcock
  * */
-void trace_output_destroy(struct libtrace_out_t *libtrace) {
+void trace_destroy_output(struct libtrace_out_t *libtrace) {
 	assert(libtrace);
 	libtrace->format->fin_output(libtrace);
 	free(libtrace->uridata);
@@ -491,7 +491,7 @@ void trace_output_destroy(struct libtrace_out_t *libtrace) {
  *
  * @ return a pointer to an initialised libtrace_packet_t structure
  */
-struct libtrace_packet_t *trace_packet_create() {
+struct libtrace_packet_t *trace_create_packet() {
 	struct libtrace_packet_t *packet = calloc(1,sizeof(struct libtrace_packet_t));
 	packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
 	packet->buf_control = PACKET;
@@ -502,7 +502,7 @@ struct libtrace_packet_t *trace_packet_create() {
  *
  * sideeffect: sets packet to NULL
  */
-void trace_packet_destroy(struct libtrace_packet_t **packet) {
+void trace_destroy_packet(struct libtrace_packet_t **packet) {
 	if ((*packet)->buf_control) {
 		free((*packet)->buffer);
 	}
