@@ -43,7 +43,7 @@ int main(int argc, char *argv[])
 	struct libtrace_filter_t *filter=NULL;
 	struct libtrace_out_t *output = NULL;
 	struct libtrace_t *input;
-	struct libtrace_packet_t *packet = trace_packet_create();
+	struct libtrace_packet_t *packet = trace_create_packet();
 	uint64_t count=UINT64_MAX;
 	uint64_t bytes=UINT64_MAX;
 	uint64_t starttime=0;
@@ -128,20 +128,20 @@ int main(int argc, char *argv[])
 		}
 
 		if (output && trace_get_seconds(packet)>firsttime+interval) {
-			trace_output_destroy(output);
+			trace_destroy_output(output);
 			output=NULL;
 			firsttime+=interval;
 		}
 
 		pktcount++;
 		if (output && pktcount%count==0) {
-			trace_output_destroy(output);
+			trace_destroy_output(output);
 			output=NULL;
 		}
 
 		totbytes+=trace_get_capture_length(packet);
 		if (output && totbytes-totbyteslast>=bytes) {
-			trace_output_destroy(output);
+			trace_destroy_output(output);
 			output=NULL;
 			totbyteslast=totbytes;
 		}
@@ -162,7 +162,7 @@ int main(int argc, char *argv[])
 				buffer=strdupcat(buffer,"-");
 				buffer=strdupcati(buffer,++filenum);
 			}
-			output=trace_output_create(buffer);
+			output=trace_create_output(buffer);
 			free(buffer);
 		}
 
@@ -170,7 +170,7 @@ int main(int argc, char *argv[])
 	}
 
 	if (!output)
-		trace_output_destroy(output);
+		trace_destroy_output(output);
 
 	return 0;
 }

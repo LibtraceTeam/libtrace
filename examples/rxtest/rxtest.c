@@ -52,7 +52,7 @@ static void parse_cmdline(int argc, char **argv);
 
 int main(int argc, char **argv) {
 
-	struct libtrace_packet_t *packet = trace_packet_create();
+	struct libtrace_packet_t *packet = trace_create_packet();
 	dag_record_t *erfptr;
 	
         int psize;

@@ -60,7 +60,7 @@ struct libtrace_t *trace;
 /* Process a trace, counting packets that match filter(s) */
 void run_trace(char *uri) 
 {
-	struct libtrace_packet_t *packet = trace_packet_create();
+	struct libtrace_packet_t *packet = trace_create_packet();
 
 	fprintf(stderr,"%s:\n",uri);
 

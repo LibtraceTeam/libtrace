@@ -71,7 +71,7 @@ int main(int argc, char *argv[]) {
     FILE* input;
     
     struct pcap_pkthdr *header;
-    struct libtrace_packet_t *packet = trace_packet_create();
+    struct libtrace_packet_t *packet = trace_create_packet();
     unsigned long seconds, subseconds;
     unsigned short rlen, lctr, wlen, offset, pad;
     unsigned char type, flags;

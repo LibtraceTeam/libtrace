@@ -176,7 +176,7 @@ int main(int argc, char *argv[])
 	char *key = NULL;
 	struct libtrace_filter_t *filter = NULL;
 	struct libtrace_t *trace = 0;
-	struct libtrace_packet_t *packet = trace_packet_create();
+	struct libtrace_packet_t *packet = trace_create_packet();
 	struct libtrace_out_t *writer = 0;
 	bool enc_source = false;
 	bool enc_dest 	= false;
@@ -259,12 +259,12 @@ int main(int argc, char *argv[])
 	if (optind == argc) {
 		// no output specified, output in same format to stdout
 		asprintf(&output,"%s:-","erf");
-		writer = trace_output_create(output);
+		writer = trace_create_output(output);
 	} else {
-		writer = trace_output_create(argv[optind +1]);
+		writer = trace_create_output(argv[optind +1]);
 	}
 	if (!writer) {
-		trace_perror("trace_output_create");
+		trace_perror("trace_create_output");
 		return 1;
 	}
 	

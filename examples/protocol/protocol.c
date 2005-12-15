@@ -97,7 +97,7 @@ static void parse_cmdline(int argc, char **argv);
 int main(int argc, char **argv) {
 
 	struct libtrace_ip *ipptr = 0;
-	struct libtrace_packet_t *packet = trace_packet_create();
+	struct libtrace_packet_t *packet = trace_create_packet();
 	
         int psize;
 

@@ -74,7 +74,7 @@ int main(int argc, char *argv[]) {
         int psize = 0;
         time_t ts = 0;
         uint64_t number = 0; 
-	struct libtrace_packet_t *packet = trace_packet_create();
+	struct libtrace_packet_t *packet = trace_create_packet();
         parse_cmdline(argc,argv);
 
         // set up times

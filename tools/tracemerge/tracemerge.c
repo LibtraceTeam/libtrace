@@ -49,7 +49,7 @@ int main(int argc, char *argv[])
 	if (optind+2<argc)
 		usage(argv[0]);
 
-	output=trace_output_create(argv[optind]);
+	output=trace_create_output(argv[optind]);
 	if (!output) {
 		fprintf(stderr,"Unable to open output file %s\n",argv[optind]);
 		return 1;
@@ -62,7 +62,7 @@ int main(int argc, char *argv[])
 		struct libtrace_t *f;
 		struct libtrace_packet_t *p;
 		f=trace_create(argv[i+optind]);
-		p=trace_packet_create();
+		p=trace_create_packet();
 		input[i]=f;
 		packet[i]=p;
 		if (!input[i]) {
@@ -110,7 +110,7 @@ int main(int argc, char *argv[])
 		live[oldest]=false;
 		
 	}
-	trace_output_destroy(output);
+	trace_destroy_output(output);
 
 	return 0;
 }

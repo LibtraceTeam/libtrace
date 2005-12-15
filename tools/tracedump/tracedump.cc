@@ -19,7 +19,7 @@ void usage(char *argv0)
 int main(int argc,char **argv)
 {
 	struct libtrace_t *trace = NULL;
-	struct libtrace_packet_t *packet = trace_packet_create();
+	struct libtrace_packet_t *packet = trace_create_packet();
 	struct libtrace_filter_t *filter=NULL;
 	uint64_t count=0;
 	uint64_t numpackets=0;

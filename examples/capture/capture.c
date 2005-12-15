@@ -97,7 +97,7 @@ int main(int argc, char *argv[]) {
 	int offset = 0;
         struct sigaction sigact;
 	dag_record_t *erfptr = 0;
-	struct libtrace_packet_t *packet = trace_packet_create();
+	struct libtrace_packet_t *packet = trace_create_packet();
 
         struct itimerval itv;
 	void *buffer, *buffer2;

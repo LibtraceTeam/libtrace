@@ -90,7 +90,7 @@ void report_results(double ts,uint64_t count,uint64_t bytes)
 /* Process a trace, counting packets that match filter(s) */
 void run_trace(char *uri) 
 {
-	struct libtrace_packet_t *packet = trace_packet_create();
+	struct libtrace_packet_t *packet = trace_create_packet();
 	int i;
 	uint64_t count = 0;
 	uint64_t bytes = 0;

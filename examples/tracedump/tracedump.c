@@ -34,7 +34,7 @@
 
 int main(int argc, char *argv[]) {
 
-	struct libtrace_packet_t *packet = trace_packet_create();
+	struct libtrace_packet_t *packet = trace_create_packet();
 	struct libtrace_t *trace;
 
 	if (argc!=2) {
