@@ -406,6 +406,24 @@ void *trace_get_link(const struct libtrace_packet_t *packet);
 SIMPLE_FUNCTION
 struct libtrace_ip *trace_get_ip(const struct libtrace_packet_t *packet);
 
+/** Gets a pointer to the transport layer header (if any)
+ * @param packet        a pointer to a libtrace_packet structure
+ *
+ * @returns a pointer to the transport layer header, or NULL if there is no header
+ */
+void *trace_get_transport(const struct libtrace_packet_t *packet);
+
+/** Gets a pointer to the transport layer header (if any) given a pointer to the
+ * IP header
+ * @param ip            The IP Header
+ * @param[out] skipped  An output variable of the number of bytes skipped
+ *
+ * @returns a pointer to the transport layer header, or NULL if there is no header
+ *
+ * Skipped can be NULL, in which case it will be ignored
+ */
+void *trace_get_transport_from_ip(const struct libtrace_ip *ip, int *skipped);
+
 /** get a pointer to the TCP header (if any)
  * @param packet  	the packet opaque pointer
  *

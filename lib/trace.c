@@ -719,6 +719,47 @@ struct libtrace_ip *trace_get_ip(const struct libtrace_packet_t *packet) {
 
 #define SW_IP_OFFMASK 0xff1f
 
+/* Gets a pointer to the transport layer header (if any)
+ * @param packet	a pointer to a libtrace_packet structure
+ *
+ * @returns a pointer to the transport layer header, or NULL if there is no header
+ */
+void *trace_get_transport(const struct libtrace_packet_t *packet) {
+        void *trans_ptr = 0;
+        struct libtrace_ip *ipptr = 0;
+
+        if (!(ipptr = trace_get_ip(packet))) {
+                return 0;
+        }
+
+        if ((ipptr->ip_off & SW_IP_OFFMASK) == 0) {
+                trans_ptr = (void *)((ptrdiff_t)ipptr + (ipptr->ip_hl * 4));
+        }
+        return trans_ptr;
+}
+
+/* Gets a pointer to the transport layer header (if any) given a pointer to the
+ * IP header
+ * @param ip		The IP Header
+ * @param[out] skipped	An output variable of the number of bytes skipped
+ *
+ * @returns a pointer to the transport layer header, or NULL if there is no header
+ *
+ * Skipped can be NULL, in which case it will be ignored
+ */
+void *trace_get_transport_from_ip(const struct libtrace_ip *ip, int *skipped) {
+	void *trans_ptr = 0;	
+
+	if ((ip->ip_off & SW_IP_OFFMASK) == 0) {
+		trans_ptr = (void *)((ptrdiff_t)ip + (ip->ip_hl * 4));
+	}
+
+	if (skipped)
+		*skipped = (ip->ip_hl*4);
+
+	return trans_ptr;
+}
+
 /* get a pointer to the TCP header (if any)
  * @param packet	a pointer to a libtrace_packet structure
  *
@@ -731,8 +772,8 @@ struct libtrace_tcp *trace_get_tcp(const struct libtrace_packet_t *packet) {
         if(!(ipptr = trace_get_ip(packet))) {
                 return 0;
 	}
-        if ((ipptr->ip_p == 6) && ((ipptr->ip_off & SW_IP_OFFMASK) == 0))  {
-                tcpptr = (struct libtrace_tcp *)((ptrdiff_t)ipptr + (ipptr->ip_hl * 4));
+        if (ipptr->ip_p == 6) {
+                tcpptr = (struct libtrace_tcp *)trace_get_transport_from_ip(ipptr, 0);
         }
         return tcpptr;
 }
@@ -750,12 +791,9 @@ struct libtrace_tcp *trace_get_tcp_from_ip(const struct libtrace_ip *ip, int *sk
 #define SW_IP_OFFMASK 0xff1f
 	struct libtrace_tcp *tcpptr = 0;
 
-	if ((ip->ip_p == 6) && ((ip->ip_off & SW_IP_OFFMASK) == 0))  {
-		tcpptr = (struct libtrace_tcp *)((ptrdiff_t)ip+ (ip->ip_hl * 4));
+	if (ip->ip_p == 6)  {
+		tcpptr = (struct libtrace_tcp *)trace_get_transport_from_ip(ip, skipped);
 	}
-
-	if (skipped)
-		*skipped=(ip->ip_hl*4);
 
 	return tcpptr;
 }
@@ -772,8 +810,8 @@ struct libtrace_udp *trace_get_udp(const struct libtrace_packet_t *packet) {
         if(!(ipptr = trace_get_ip(packet))) {
                 return 0;
         }
-        if ((ipptr->ip_p == 17) && ((ipptr->ip_off & SW_IP_OFFMASK) == 0)) {
-                udpptr = (struct libtrace_udp *)((ptrdiff_t)ipptr + (ipptr->ip_hl * 4));
+        if (ipptr->ip_p == 17)  {
+                udpptr = (struct libtrace_udp *)trace_get_transport_from_ip(ipptr, 0);
         }
 
         return udpptr;
@@ -791,12 +829,9 @@ struct libtrace_udp *trace_get_udp_from_ip(const struct libtrace_ip *ip, int *sk
 {
 	struct libtrace_udp *udpptr = 0;
 
-	if ((ip->ip_p == 17) && ((ip->ip_off & SW_IP_OFFMASK) == 0))  {
-		udpptr = (struct libtrace_udp *)((ptrdiff_t)ip+ (ip->ip_hl * 4));
+	if (ip->ip_p == 17) {
+		udpptr = (struct libtrace_udp *)trace_get_transport_from_ip(ip, skipped);
 	}
-
-	if (skipped)
-		*skipped=(ip->ip_hl*4);
 
 	return udpptr;
 }
@@ -814,8 +849,8 @@ struct libtrace_icmp *trace_get_icmp(const struct libtrace_packet_t *packet) {
         if(!(ipptr = trace_get_ip(packet))) {
                 return 0;
         }
-        if ((ipptr->ip_p == 1)&& ((ipptr->ip_off & SW_IP_OFFMASK) == 0 )){
-                icmpptr = (struct libtrace_icmp *)((ptrdiff_t)ipptr + (ipptr->ip_hl * 4));
+        if (ipptr->ip_p == 1){
+                icmpptr = (struct libtrace_icmp *)trace_get_transport_from_ip(ipptr, 0);
         }
         return icmpptr;
 }
@@ -832,12 +867,9 @@ struct libtrace_icmp *trace_get_icmp_from_ip(const struct libtrace_ip *ip, int *
 {
 	struct libtrace_icmp *icmpptr = 0;
 
-	if ((ip->ip_p == 6) && ((ip->ip_off & SW_IP_OFFMASK) == 0))  {
-		icmpptr = (struct libtrace_icmp *)((ptrdiff_t)ip+ (ip->ip_hl * 4));
+	if (ip->ip_p == 1)  {
+		icmpptr = (struct libtrace_icmp *)trace_get_transport_from_ip(ip, skipped);
 	}
-
-	if (skipped)
-		*skipped=(ip->ip_hl*4);
 
 	return icmpptr;
 }
