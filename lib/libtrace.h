@@ -327,7 +327,7 @@ struct libtrace_t *trace_create_dead(const char *uri);
  *  If an error occured when attempting to open the output trace, NULL is returned 
  *  and trace_errno is set. Use trace_perror() to get more information
  */
-struct libtrace_out_t *trace_output_create(const char *uri);
+struct libtrace_out_t *trace_create_output(const char *uri);
 
 /** Parses an output options string and calls the appropriate function to deal with output options.
  *
@@ -337,7 +337,7 @@ struct libtrace_out_t *trace_output_create(const char *uri);
  *
  * @author Shane Alcock
  */
-int trace_output_config(struct libtrace_out_t *libtrace, char *options);
+int trace_config_output(struct libtrace_out_t *libtrace, char *options);
 
 /** Close a trace file, freeing up any resources it may have been using
  *
@@ -355,19 +355,19 @@ void trace_destroy_dead(struct libtrace_t *trace);
  *
  * @author Shane Alcock
  */
-void trace_output_destroy(struct libtrace_out_t *trace);
+void trace_destroy_output(struct libtrace_out_t *trace);
 
 /** Create a new packet object
  *
  * @return a pointer to an initialised libtrace_packet_t object
  */
-struct libtrace_packet_t *trace_packet_create();
+struct libtrace_packet_t *trace_create_packet();
 
 /** Destroy a packet object
  *
  * sideeffect: sets packet to NULL
  */
-void trace_packet_destroy(struct libtrace_packet_t **packet);
+void trace_destroy_packet(struct libtrace_packet_t **packet);
 
 
 /** Read one packet from the trace into buffer
