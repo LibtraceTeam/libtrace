@@ -490,59 +490,7 @@ static int dag_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 
 	return (size);
 }
-
-
-// Lots of repeated code in here - could easily be tidied up
-static int dag_read_packet_nb(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
-        int numbytes;
-        int size;
-        char buf[RP_BUFSIZE];
-        dag_record_t *erfptr;
-        void *buffer = packet->buffer;
-        void *buffer2 = buffer;
-        int rlen;
-
-        if (packet->buf_control == PACKET) {
-                packet->buf_control = EXTERNAL;
-                free(packet->buffer);
-                packet->buffer = 0;
-        }
-
-        if (DAG.diff == 0) {
-                if ((numbytes = dag_read(libtrace,buf,RP_BUFSIZE, DAGF_NONBLOCK)) <= 0)
-                        return numbytes;
-        }
-
-        //DAG always gives us whole packets
-        erfptr = (dag_record_t *) ((void *)DAG.buf +
-                        (DAG.bottom + DAG.offset));
-        size = ntohs(erfptr->rlen);
-
-        if ( size  > LIBTRACE_PACKET_BUFSIZE) {
-                assert( size < LIBTRACE_PACKET_BUFSIZE);
-        }
-
-        packet->buffer = erfptr;
-        packet->header = erfptr;
-        if (((dag_record_t *)buffer)->flags.rxerror == 1) {
-                packet->payload = NULL;
-        } else {
-                packet->payload = packet->buffer + erf_get_framing_length(packet);
-        }
-
-
-        packet->status.type = RT_DATA;
-        packet->status.message = 0;
-        packet->size = size;
-        DAG.offset += size;
-        DAG.diff -= size;
-
-        assert(DAG.diff >= 0);
-
-        return (size);
-}
-
-#endif
+#endif 
 
 static int legacy_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
 	int numbytes;
@@ -1149,7 +1097,7 @@ static struct libtrace_format_t dag = {
 	erf_get_framing_length,		/* get_framing_length */
 	erf_set_capture_length,		/* set_capture_length */
 	NULL,				/* get_fd */
-	trace_event_trace,		/* trace_event */
+	trace_event_device,		/* trace_event */
 	dag_help			/* help */
 };
 #endif
