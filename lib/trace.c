@@ -586,6 +586,36 @@ struct libtrace_ip *trace_get_ip(const struct libtrace_packet_t *packet) {
         struct libtrace_ip *ipptr = 0;
 
 	switch(trace_get_link_type(packet)) {
+		case TRACE_TYPE_80211_PRISM:
+			{
+				struct ieee_802_11_header *wifi = trace_get_link(packet)+144;
+				if (!wifi) {
+					ipptr = NULL;
+					break;
+				}
+
+				// Data packet?
+				if (wifi->type != 2) {
+					ipptr = NULL;
+				}
+				else {
+					struct ieee_802_11_payload *eth = (void*)wifi->data;
+					ipptr = NULL;
+
+					if (ntohs(eth->type) == 0x0800) {
+					    ipptr=((void*)eth) + sizeof(*eth);
+					} else if (ntohs(eth->type) == 0x8100) {
+					    struct libtrace_8021q *vlanhdr =
+						(struct libtrace_8021q *)eth;
+					    if (ntohs(vlanhdr->vlan_ether_type)
+							    == 0x0800) {
+						ipptr=((void*)eth) + 
+							sizeof(*vlanhdr);
+					    }
+					}
+				}
+			}
+			break;
 		case TRACE_TYPE_80211:
 			{ 
 				
