@@ -276,6 +276,11 @@ char *trace_get_output_format(const struct libtrace_out_t *libtrace);
  */
 void trace_perror(const char *caller);
 
+/** @name Creation and destruction of traces
+ * These members deal with creating, configuring and cleaning up a trace object
+ */
+//@{
+
 /** Create a trace file from a URI
  * 
  * @param uri containing a valid libtrace URI
@@ -356,6 +361,12 @@ void trace_destroy_dead(struct libtrace_t *trace);
  * @author Shane Alcock
  */
 void trace_destroy_output(struct libtrace_out_t *trace);
+//@}
+
+/** @name Reading/Writing packets
+ * These members deal with creating, reading and writing packets
+ */
+//@{
 
 /** Create a new packet object
  *
@@ -386,6 +397,12 @@ int trace_read_packet(struct libtrace_t *trace, struct libtrace_packet_t *packet
  * @returns the number of bytes written out, if zero or negative then an error has occured.
  */
 int trace_write_packet(struct libtrace_out_t *trace, const struct libtrace_packet_t *packet);
+//@}
+
+/** @name Headers
+ * These functions locate and return a pointer to various headers inside a packet
+ */
+//@{
 
 /** get a pointer to the link layer
  * @param packet  	the packet opaque pointer
@@ -482,6 +499,7 @@ struct libtrace_icmp *trace_get_icmp(const struct libtrace_packet_t *packet);
  */
 SIMPLE_FUNCTION
 struct libtrace_icmp *trace_get_icmp_from_ip(const struct libtrace_ip *ip,int *skipped);
+//@}
 
 /** parse an ip or tcp option
  * @param[in,out] ptr	the pointer to the current option
@@ -506,6 +524,11 @@ int trace_get_next_option(unsigned char **ptr,int *len,
 			unsigned char **data);
 
 
+/** @name Time
+ * These functions deal with time that a packet arrived and return it
+ * in various formats
+ */
+//@{
 /** Get the current time in DAG time format 
  * @param packet  	the packet opaque pointer
  *
@@ -535,7 +558,13 @@ struct timeval trace_get_timeval(const struct libtrace_packet_t *packet);
  */
 SIMPLE_FUNCTION
 double trace_get_seconds(const struct libtrace_packet_t *packet);
+//@}
 
+/** @name Sizes
+ * This section deals with finding or setting the various different lengths
+ * a packet can have
+ */
+//@{
 /** Get the size of the packet in the trace
  * @param packet  	the packet opaque pointer
  * @returns the size of the packet in the trace
@@ -571,6 +600,17 @@ int trace_get_wire_length(const struct libtrace_packet_t *packet);
  */ 
 SIMPLE_FUNCTION
 int trace_get_framing_length(const struct libtrace_packet_t *packet);
+
+/** Truncate the packet at the suggested length
+ * @param packet	the packet opaque pointer
+ * @param size		the new length of the packet
+ * @returns the new length of the packet, or the original length of the 
+ * packet if unchanged
+ * @author Daniel Lawson
+ */
+size_t trace_set_capture_length(struct libtrace_packet_t *packet, size_t size);
+
+//@}
 
 
 /** Link layer types
@@ -617,15 +657,6 @@ uint8_t *trace_get_destination_mac(const struct libtrace_packet_t *packet);
  */
 SIMPLE_FUNCTION
 uint8_t *trace_get_source_mac(const struct libtrace_packet_t *packet);
-
-/** Truncate the packet at the suggested length
- * @param packet	the packet opaque pointer
- * @param size		the new length of the packet
- * @returns the new length of the packet, or the original length of the 
- * packet if unchanged
- * @author Daniel Lawson
- */
-size_t trace_set_capture_length(struct libtrace_packet_t *packet, size_t size);
 
 /** Set the direction flag, if it has one
  * @param packet  	the packet opaque pointer
@@ -680,6 +711,10 @@ struct libtrace_eventobj_t {
 struct libtrace_eventobj_t trace_event(struct libtrace_t *trace,
 		struct libtrace_packet_t *packet);
 
+/** @name BPF
+ * This section deals with using Berkley Packet Filters
+ */
+//@{
 /** setup a BPF filter
  * @param filterstring a char * containing the bpf filter string
  * @returns opaque pointer pointer to a libtrace_filter_t object
@@ -702,7 +737,7 @@ struct libtrace_filter_t *trace_bpf_setfilter(const char *filterstring);
  */
 int trace_bpf_filter(struct libtrace_filter_t *filter,
 		const struct libtrace_packet_t *packet);
-
+//@}
 
 /** Which port is the server port */
 typedef enum {
