@@ -418,15 +418,15 @@ static int erf_fin_output(struct libtrace_out_t *libtrace) {
 }
  
 #if HAVE_DAG
-static int dag_read(struct libtrace_t *libtrace, void *buffer, size_t len, int block_flag) {
+static int dag_read(struct libtrace_t *libtrace, int block_flag) {
 	int numbytes;
 	static short lctr = 0;
 	struct dag_record_t *erfptr = 0;
 	int rlen;
 
-	if (buffer == 0)
-		buffer = malloc(len);
-	
+	if (DAG.diff != 0) 
+		return DAG.diff;
+
 	DAG.bottom = DAG.top;
 	DAG.top = dag_offset(
 			INPUT.fd,
@@ -445,7 +445,6 @@ static int dag_read(struct libtrace_t *libtrace, void *buffer, size_t len, int b
 static int dag_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
 	int numbytes;
 	int size;
-	char buf[RP_BUFSIZE];
 	dag_record_t *erfptr;
 	void *buffer = packet->buffer;
 	void *buffer2 = buffer;
@@ -457,10 +456,8 @@ static int dag_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 		packet->buffer = 0;
 	}
    
-	if (DAG.diff == 0) {
-		if ((numbytes = dag_read(libtrace,buf,RP_BUFSIZE, 0)) <= 0) 
-			return numbytes;
-	}
+	if ((numbytes = dag_read(libtrace,0)) <= 0) 
+		return numbytes;
 
 	//DAG always gives us whole packets
 	erfptr = (dag_record_t *) ((void *)DAG.buf + 
@@ -873,6 +870,31 @@ static int erf_get_fd(const struct libtrace_packet_t *packet) {
 	return packet->trace->format_data->input.fd;
 }
 
+#ifdef HAVE_DAG
+struct libtrace_eventobj_t trace_event_dag(struct libtrace_t *trace, struct libtrace_packet_t *packet) {
+        struct libtrace_eventobj_t event = {0,0,0.0,0};
+        int dag_fd;
+        int data;
+
+        if (packet->trace->format->get_fd) {
+                dag_fd = packet->trace->format->get_fd(packet);
+        } else {
+                dag_fd = 0;
+        }
+	
+	data = dag_read(trace, DAGF_NONBLOCK);
+
+        if (data > 0) {
+                event.size = trace_read_packet(trace,packet);
+                event.type = TRACE_EVENT_PACKET;
+                return event;
+        }
+        event.type = TRACE_EVENT_SLEEP;
+        event.seconds = 0.0001;
+        return event;
+}
+#endif
+
 #if HAVE_DAG
 static void dag_help() {
 	printf("dag format module: $Revision$\n");
@@ -1097,7 +1119,7 @@ static struct libtrace_format_t dag = {
 	erf_get_framing_length,		/* get_framing_length */
 	erf_set_capture_length,		/* set_capture_length */
 	NULL,				/* get_fd */
-	trace_event_device,		/* trace_event */
+	trace_event_dag,		/* trace_event */
 	dag_help			/* help */
 };
 #endif

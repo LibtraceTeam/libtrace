@@ -588,7 +588,8 @@ typedef enum {
        TRACE_TYPE_LEGACY_DEFAULT,
        TRACE_TYPE_LEGACY_POS,
        TRACE_TYPE_LEGACY_ATM,
-       TRACE_TYPE_LEGACY_ETH
+       TRACE_TYPE_LEGACY_ETH,
+       TRACE_TYPE_80211_PRISM
      } libtrace_linktype_t;
 
 /** Get the type of the link layer
