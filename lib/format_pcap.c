@@ -424,13 +424,15 @@ static struct libtrace_format_t pcap = {
 	"$Id$",
 	"pcap",
 	pcap_init_input,		/* init_input */
+	NULL,				/* config_input */
+	NULL,				/* start_input */
 	pcap_init_output,		/* init_output */
 	NULL,				/* config_output */
+	NULL,				/* start_output */
 	pcap_fin_input,			/* fin_input */
 	pcap_fin_output,		/* fin_output */
 	pcap_read_packet,		/* read_packet */
 	pcap_write_packet,		/* write_packet */
-	pcap_get_link,			/* get_link */
 	pcap_get_link_type,		/* get_link_type */
 	pcap_get_direction,		/* get_direction */
 	NULL,				/* set_direction */
@@ -451,13 +453,15 @@ static struct libtrace_format_t pcapint = {
 	"$Id$",
 	"pcap",
 	pcapint_init_input,		/* init_input */
+	NULL,				/* config_input */
+	NULL,				/* start_input */
 	pcapint_init_output,		/* init_output */
 	NULL,				/* config_output */
+	NULL,				/* start_output */
 	pcap_fin_input,			/* fin_input */
 	pcapint_fin_output,		/* fin_output */
 	pcap_read_packet,		/* read_packet */
 	pcapint_write_packet,		/* write_packet */
-	pcap_get_link,			/* get_link */
 	pcap_get_link_type,		/* get_link_type */
 	pcap_get_direction,		/* get_direction */
 	NULL,				/* set_direction */

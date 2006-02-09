@@ -153,7 +153,6 @@ static char *xstrndup(const char *src,size_t n)
 }
 
 void register_format(struct libtrace_format_t *f) {
-//	fprintf(stderr,"Registering input format %s\n",f->name);
 	if (format_list == 0) {
 		format_size = 10;
 		format_list = malloc(
@@ -310,6 +309,7 @@ struct libtrace_t *trace_create(const char *uri) {
         libtrace->fifo = create_tracefifo(1048576);
 	assert( libtrace->fifo);
 	free(scan);
+	libtrace->started=false;
         return libtrace;
 }
 
@@ -429,6 +429,26 @@ struct libtrace_out_t *trace_create_output(const char *uri) {
 	return libtrace;
 }
 
+/* Start a trace
+ * @param libtrace	the input trace to start
+ * @returns 0 on success
+ *
+ * This does the work associated with actually starting up
+ * the trace.  it may fail.
+ */
+int trace_start(struct libtrace_t *libtrace)
+{
+	if (libtrace->format->start_input) {
+		int ret=libtrace->format->start_input(libtrace);
+		if (!ret) {
+			return ret;
+		}
+	}
+
+	libtrace->started=true;
+	return 0;
+}
+
 /* Parses an output options string and calls the appropriate function to deal with output options.
  *
  * @param libtrace	the output trace object to apply the options to
@@ -519,11 +539,9 @@ void trace_destroy_packet(struct libtrace_packet_t **packet) {
  */
 int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
 
-	if (!libtrace) {
-		fprintf(stderr,"You called trace_read_packet() with a NULL libtrace parameter!\n");
-	}
-        assert(libtrace);
-        assert(packet);
+	assert(libtrace && "You called trace_read_packet() with a NULL libtrace parameter!\n");
+	assert(libtrace->started && "BUG: You must call libtrace_start() before trace_read_packet()\n");
+	assert(packet);
       
 	/* Store the trace we are reading from into the packet opaque 
 	 * structure */

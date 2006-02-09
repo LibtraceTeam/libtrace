@@ -70,6 +70,8 @@ extern "C" {
 #  include "dagformat.h"
 #endif
 
+#include <stdbool.h>
+
 typedef enum {SOCKET, TRACE, STDIN, DEVICE, INTERFACE, RT } source_t;
 
 
@@ -99,6 +101,7 @@ struct libtrace_t {
 	struct libtrace_format_t *format; /**< format driver pointer */
 	struct libtrace_format_data_t *format_data; /**<format data pointer */
         source_t sourcetype;	/**< The type (device,file, etc */
+	bool started;
 
 	struct libtrace_event_t event;
 	char *uridata;
@@ -149,13 +152,15 @@ struct libtrace_format_t {
 	char *version;
 	char *type;
 	int (*init_input)(struct libtrace_t *libtrace);
+	int (*config_input)(struct libtrace_t *libtrace,char *option,void *value);
+	int (*start_input)(struct libtrace_t *libtrace);
 	int (*init_output)(struct libtrace_out_t *libtrace);
 	int (*config_output)(struct libtrace_out_t *libtrace, int argc, char *argv[]);
+	int (*start_output)(struct libtrace_out_t *libtrace);
 	int (*fin_input)(struct libtrace_t *libtrace);
 	int (*fin_output)(struct libtrace_out_t *libtrace);
 	int (*read_packet)(struct libtrace_t *libtrace, struct libtrace_packet_t *packet);
 	int (*write_packet)(struct libtrace_out_t *libtrace, const struct libtrace_packet_t *packet);
-	void* (*get_link)(const struct libtrace_packet_t *packet);
 	libtrace_linktype_t (*get_link_type)(const struct libtrace_packet_t *packet);
 	int8_t (*get_direction)(const struct libtrace_packet_t *packet);
 	int8_t (*set_direction)(const struct libtrace_packet_t *packet, int8_t direction);

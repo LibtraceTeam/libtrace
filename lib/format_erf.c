@@ -75,9 +75,6 @@ static struct libtrace_format_t rtclient;
 #if HAVE_DAG
 static struct libtrace_format_t dag;
 #endif 
-static struct libtrace_format_t legacypos;
-static struct libtrace_format_t legacyeth;
-static struct libtrace_format_t legacyatm;
 
 #define CONNINFO libtrace->format_data->conn_info
 #define INPUT libtrace->format_data->input
@@ -202,20 +199,6 @@ static int erf_get_framing_length(const struct libtrace_packet_t *packet)
 	return dag_record_size + erf_get_padding(packet);
 }
 
-static int legacyeth_get_framing_length(const struct libtrace_packet_t *packet UNUSED) 
-{
-	return sizeof(legacy_ether_t);
-}
-
-static int legacypos_get_framing_length(const struct libtrace_packet_t *packet UNUSED) 
-{
-	return sizeof(legacy_pos_t);
-}
-
-static int legacyatm_get_framing_length(const struct libtrace_packet_t *packet UNUSED) 
-{
-	return sizeof(legacy_cell_t);
-}
 
 static int erf_init_input(struct libtrace_t *libtrace) {
 	struct stat buf;
@@ -489,27 +472,6 @@ static int dag_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 }
 #endif 
 
-static int legacy_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
-	int numbytes;
-	void *buffer = packet->buffer;
-	
-	if ((numbytes=LIBTRACE_READ(INPUT.file,
-					buffer,
-					64)) == -1) {
-		perror("libtrace_read");
-		return -1;
-	}
-	packet->status.type = RT_DATA;
-	packet->status.message = 0;
-	packet->size = 64;
-	
-	packet->header = packet->buffer;
-	packet->payload = packet->buffer + 
-		packet->trace->format->get_framing_length(packet);
-	
-	return 64;
-	
-}
 static int erf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
 	int numbytes;
 	int size;
@@ -757,32 +719,6 @@ static int erf_write_packet(struct libtrace_out_t *libtrace, const struct libtra
 	return numbytes;
 }
 
-static void *legacypos_get_link(const struct libtrace_packet_t *packet) {
-	return (void *)packet->payload;
-}
-
-static libtrace_linktype_t legacypos_get_link_type(const struct libtrace_packet_t *packet UNUSED) {
-	return TRACE_TYPE_LEGACY_POS;
-}
-
-static void *legacyatm_get_link(const struct libtrace_packet_t *packet) {
-	return (void *)packet->payload;
-}
-
-static libtrace_linktype_t legacyatm_get_link_type(const struct libtrace_packet_t *packet UNUSED) {
-	return TRACE_TYPE_LEGACY_ATM;
-}
-
-static void *legacyeth_get_link(const struct libtrace_packet_t *packet) {
-	return (void *)packet->payload;
-}
-
-static libtrace_linktype_t legacyeth_get_link_type(const struct libtrace_packet_t *packet UNUSED) {
-	return TRACE_TYPE_LEGACY_ETH;
-}
-
-
-
 static void *erf_get_link(const struct libtrace_packet_t *packet) {
 	return (void *)packet->payload;
 }
@@ -820,23 +756,6 @@ static uint64_t erf_get_erf_timestamp(const struct libtrace_packet_t *packet) {
 	return erfptr->ts;
 }
 
-static int legacy_get_capture_length(const struct libtrace_packet_t *packet __attribute__((unused))) {
-	return 64;
-}
-
-static int legacypos_get_wire_length(const struct libtrace_packet_t *packet) {
-	legacy_pos_t *lpos = (legacy_pos_t *)packet->header;
-	return ntohs(lpos->wlen);
-}
-
-static int legacyatm_get_wire_length(const struct libtrace_packet_t *packet UNUSED) {
-	return 53;
-}
-
-static int legacyeth_get_wire_length(const struct libtrace_packet_t *packet) {
-	legacy_ether_t *leth = (legacy_ether_t *)packet->header;
-	return ntohs(leth->wlen);
-}
 static int erf_get_capture_length(const struct libtrace_packet_t *packet) {
 	dag_record_t *erfptr = 0;
 	erfptr = (dag_record_t *)packet->header;
@@ -909,39 +828,6 @@ static void dag_help() {
 }
 #endif
 
-static void legacypos_help() {
-	printf("legacypos format module: $Revision$\n");
-	printf("Supported input URIs:\n");
-	printf("\tlegacypos:/path/to/file\t(uncompressed)\n");
-	printf("\tlegacypos:/path/to/file.gz\t(gzip-compressed)\n");
-	printf("\tlegacypos:-\t(stdin, either compressed or not)\n");
-	printf("\n");
-	printf("\te.g.: legacypos:/tmp/trace.gz\n");
-	printf("\n");
-}
-
-static void legacyatm_help() {
-	printf("legacyatm format module: $Revision$\n");
-	printf("Supported input URIs:\n");
-	printf("\tlegacyatm:/path/to/file\t(uncompressed)\n");
-	printf("\tlegacyatm:/path/to/file.gz\t(gzip-compressed)\n");
-	printf("\tlegacyatm:-\t(stdin, either compressed or not)\n");
-	printf("\n");
-	printf("\te.g.: legacyatm:/tmp/trace.gz\n");
-	printf("\n");
-}
-
-static void legacyeth_help() {
-	printf("legacyeth format module: $Revision$\n");
-	printf("Supported input URIs:\n");
-	printf("\tlegacyeth:/path/to/file\t(uncompressed)\n");
-	printf("\tlegacyeth:/path/to/file.gz\t(gzip-compressed)\n");
-	printf("\tlegacyeth:-\t(stdin, either compressed or not)\n");
-	printf("\n");
-	printf("\te.g.: legacyeth:/tmp/trace.gz\n");
-	printf("\n");
-}
-
 static void erf_help() {
 	printf("erf format module: $Revision$\n");
 	printf("Supported input URIs:\n");
@@ -986,100 +872,20 @@ static void rtclient_help() {
 
 }
 
-static struct libtrace_format_t legacyatm = {
-	"legacyatm",
-	"$Id$",
-	"legacyatm",
-	erf_init_input,			/* init_input */	
-	NULL,				/* init_output */
-	NULL,				/* config_output */
-	erf_fin_input,			/* fin_input */
-	NULL,				/* fin_output */
-	legacy_read_packet,		/* read_packet */
-	NULL,				/* write_packet */
-	legacyatm_get_link,		/* get_link */
-	legacyatm_get_link_type,	/* get_link_type */
-	NULL,				/* get_direction */
-	NULL,				/* set_direction */
-	erf_get_erf_timestamp,		/* get_erf_timestamp */
-	NULL,				/* get_timeval */
-	NULL,				/* get_seconds */
-	legacy_get_capture_length,	/* get_capture_length */
-	legacyatm_get_wire_length,	/* get_wire_length */
-	legacyatm_get_framing_length,	/* get_framing_length */
-	NULL,				/* set_capture_length */
-	NULL,				/* get_fd */
-	trace_event_trace,		/* trace_event */
-	legacyatm_help			/* help */
-};
-
-static struct libtrace_format_t legacyeth = {
-	"legacyeth",
-	"$Id$",
-	"legacyeth",
-	erf_init_input,			/* init_input */	
-	NULL,				/* init_output */
-	NULL,				/* config_output */
-	erf_fin_input,			/* fin_input */
-	NULL,				/* fin_output */
-	legacy_read_packet,		/* read_packet */
-	NULL,				/* write_packet */
-	legacyeth_get_link,		/* get_link */
-	legacyeth_get_link_type,	/* get_link_type */
-	NULL,				/* get_direction */
-	NULL,				/* set_direction */
-	erf_get_erf_timestamp,		/* get_erf_timestamp */
-	NULL,				/* get_timeval */
-	NULL,				/* get_seconds */
-	legacy_get_capture_length,	/* get_capture_length */
-	legacyeth_get_wire_length,	/* get_wire_length */
-	legacyeth_get_framing_length,	/* get_framing_length */
-	NULL,				/* set_capture_length */
-	NULL,				/* get_fd */
-	trace_event_trace,		/* trace_event */
-	legacyeth_help			/* help */
-};
-
-static struct libtrace_format_t legacypos = {
-	"legacypos",
-	"$Id$",
-	"legacypos",
-	erf_init_input,			/* init_input */	
-	NULL,				/* init_output */
-	NULL,				/* config_output */
-	erf_fin_input,			/* fin_input */
-	NULL,				/* fin_output */
-	legacy_read_packet,		/* read_packet */
-	NULL,				/* write_packet */
-	legacypos_get_link,		/* get_link */
-	legacypos_get_link_type,	/* get_link_type */
-	NULL,				/* get_direction */
-	NULL,				/* set_direction */
-	erf_get_erf_timestamp,		/* get_erf_timestamp */
-	NULL,				/* get_timeval */
-	NULL,				/* get_seconds */
-	legacy_get_capture_length,	/* get_capture_length */
-	legacypos_get_wire_length,	/* get_wire_length */
-	legacypos_get_framing_length,	/* get_framing_length */
-	NULL,				/* set_capture_length */
-	NULL,				/* get_fd */
-	trace_event_trace,		/* trace_event */
-	legacypos_help			/* help */
-};
-
-	
 static struct libtrace_format_t erf = {
 	"erf",
 	"$Id$",
 	"erf",
 	erf_init_input,			/* init_input */	
+	NULL,				/* config_input */
+	NULL,				/* start_input */
 	erf_init_output,		/* init_output */
 	erf_config_output,		/* config_output */
+	NULL,				/* start_output */
 	erf_fin_input,			/* fin_input */
 	erf_fin_output,			/* fin_output */
 	erf_read_packet,		/* read_packet */
 	erf_write_packet,		/* write_packet */
-	erf_get_link,			/* get_link */
 	erf_get_link_type,		/* get_link_type */
 	erf_get_direction,		/* get_direction */
 	erf_set_direction,		/* set_direction */
@@ -1101,13 +907,15 @@ static struct libtrace_format_t dag = {
 	"$Id$",
 	"erf",
 	dag_init_input,			/* init_input */	
+	NULL,				/* config_input */
+	NULL,				/* start_output */
 	NULL,				/* init_output */
 	NULL,				/* config_output */
+	NULL,				/* start_output */
 	dag_fin_input,			/* fin_input */
 	NULL,				/* fin_output */
 	dag_read_packet,		/* read_packet */
 	NULL,				/* write_packet */
-	erf_get_link,			/* get_link */
 	erf_get_link_type,		/* get_link_type */
 	erf_get_direction,		/* get_direction */
 	erf_set_direction,		/* set_direction */
@@ -1129,13 +937,15 @@ static struct libtrace_format_t rtclient = {
 	"$Id$",
 	"erf",
 	rtclient_init_input,		/* init_input */	
+	NULL,				/* config_input */
+	NULL,				/* start_input */
 	NULL,				/* init_output */
 	NULL,				/* config_output */
+	NULL,				/* start_output */
 	rtclient_fin_input,		/* fin_input */
 	NULL,				/* fin_output */
 	rtclient_read_packet,		/* read_packet */
 	NULL,				/* write_packet */
-	erf_get_link,			/* get_link */
 	erf_get_link_type,		/* get_link_type */
 	erf_get_direction,		/* get_direction */
 	erf_set_direction,		/* set_direction */
@@ -1156,8 +966,4 @@ void __attribute__((constructor)) erf_constructor() {
 #ifdef HAVE_DAG
 	register_format(&dag);
 #endif
-	register_format(&rtclient);
-	register_format(&legacypos);
-	register_format(&legacyeth);
-	register_format(&legacyatm);
 }

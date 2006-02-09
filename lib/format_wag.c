@@ -494,13 +494,15 @@ static struct libtrace_format_t wag = {
 	"$Id$",
 	"wtf",
 	wag_init_input,			/* init_input */	
+	NULL,				/* config_input */
+	NULL,				/* start_input */
 	NULL,				/* init_output */
 	NULL,				/* config_output */
+	NULL,				/* start_output */
 	wag_fin_input,			/* fin_input */
 	NULL,				/* fin_output */
 	wag_read_packet,		/* read_packet */
 	NULL,				/* write_packet */
-	wag_get_link,			/* get_link */
 	wag_get_link_type,		/* get_link_type */
 	wag_get_direction,		/* get_direction */
 	NULL,				/* set_direction */
@@ -523,13 +525,15 @@ static struct libtrace_format_t wag_trace = {
         "$Id$",
         "wtf",
         wtf_init_input,                 /* init_input */
+	NULL,				/* config input */
+	NULL,				/* start input */
         wtf_init_output,                /* init_output */
         wtf_config_output,              /* config_output */
+	NULL,				/* start output */
         wtf_fin_input,                  /* fin_input */
         wtf_fin_output,                 /* fin_output */
         wtf_read_packet,                /* read_packet */
         wtf_write_packet,               /* write_packet */
-        wag_get_link,                   /* get_link */
         wag_get_link_type,              /* get_link_type */
         wag_get_direction,              /* get_direction */
         NULL,                           /* set_direction */
