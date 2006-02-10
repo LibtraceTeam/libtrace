@@ -29,6 +29,9 @@
  */
 #define _GNU_SOURCE
 
+#define RT_MSG 2
+#define RT_DATA 1
+
 #include "config.h"
 #include "common.h"
 #include "libtrace.h"
@@ -97,7 +100,6 @@ struct libtrace_format_data_t {
 #if HAVE_ZLIB
                 gzFile *file;
 #else	
-		//FILE  *file;
 		int file;
 #endif
         } input;
@@ -128,7 +130,7 @@ struct libtrace_format_data_out_t {
 	union {
 		struct {
 			int level;
-			int append;
+			int fileflag;
 		} erf;
 		
 	} options;
@@ -139,11 +141,18 @@ struct libtrace_format_data_out_t {
 #if HAVE_ZLIB
                 gzFile *file;
 #else
-                //FILE *file;
 		int file;
 #endif
         } output;
 };
+
+/** Structure holding status information for a packet */
+typedef struct libtrace_packet_status {
+	uint8_t type;
+	uint8_t reserved;
+	uint16_t message;
+} libtrace_packet_status_t;
+
 
 #ifdef HAVE_DAG
 static int dag_init_input(struct libtrace_t *libtrace) {
@@ -157,7 +166,7 @@ static int dag_init_input(struct libtrace_t *libtrace) {
 		return 0;
 	} 
 	if (S_ISCHR(buf.st_mode)) {
-		// DEVICE
+		/* DEVICE */
 		libtrace->sourcetype = DEVICE;
 		if((INPUT.fd = dag_open(CONNINFO.path)) < 0) {
 			fprintf(stderr,"Cannot open DAG %s: %m\n", 
@@ -208,7 +217,7 @@ static int erf_init_input(struct libtrace_t *libtrace) {
 
 	CONNINFO.path = libtrace->uridata;
 	if (!strncmp(CONNINFO.path,"-",1)) {
-		// STDIN
+		/* STDIN */
 		libtrace->sourcetype = STDIN;
 		INPUT.file = LIBTRACE_FDOPEN(fileno(stdin), "r");
 		
@@ -241,10 +250,11 @@ static int erf_init_input(struct libtrace_t *libtrace) {
 
 			libtrace->sourcetype = TRACE;
 
-			// we use an FDOPEN call to reopen an FD
-			// returned from open(), so that we can set
-			// O_LARGEFILE. This gets around gzopen not
-			// letting you do this...
+			/* we use an FDOPEN call to reopen an FD
+			 * returned from open(), so that we can set
+			 * O_LARGEFILE. This gets around gzopen not
+			 * letting you do this...
+			 */
 			INPUT.file = LIBTRACE_FDOPEN(open(
 						CONNINFO.path,
 						O_LARGEFILE),"r");
@@ -306,12 +316,11 @@ static int rtclient_init_input(struct libtrace_t *libtrace) {
 }
 
 static int erf_init_output(struct libtrace_out_t *libtrace) {
-	int fd;
 	libtrace->format_data = (struct libtrace_format_data_out_t *)
 		calloc(1,sizeof(struct libtrace_format_data_out_t));
 
 	OPTIONS.erf.level = 0;
-	OPTIONS.erf.append = 0;
+	OPTIONS.erf.fileflag = O_CREAT | O_LARGEFILE | O_WRONLY;
 	OUTPUT.file = 0;
 
 	return 1;
@@ -319,7 +328,6 @@ static int erf_init_output(struct libtrace_out_t *libtrace) {
 
 static int erf_open_output(struct libtrace_out_t *libtrace) {
 	char *filemode;
-	int trunc_flag = O_TRUNC;
 	int fd;
 
 #if HAVE_ZLIB
@@ -328,17 +336,14 @@ static int erf_open_output(struct libtrace_out_t *libtrace) {
         asprintf(&filemode,"w");
 #endif
 
-        if (OPTIONS.erf.append) {
-		trunc_flag = O_APPEND;
-	}		
-
 	if (!strncmp(libtrace->uridata,"-",1)) {
-                // STDOUT
+                /* STDOUT */
                 OUTPUT.file = LIBTRACE_FDOPEN(fileno(stdout),filemode);
         }
         else {
-                // TRACE
-                fd = open(libtrace->uridata, O_CREAT | O_LARGEFILE | O_WRONLY | trunc_flag, 
+                /* TRACE */
+                fd = open(libtrace->uridata, 
+				OPTIONS.erf.fileflag,
 				S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
                 if (fd <= 0) {
                         return 0;
@@ -350,29 +355,19 @@ static int erf_open_output(struct libtrace_out_t *libtrace) {
 	return 1;
 }
 
-static int erf_config_output(struct libtrace_out_t *libtrace, int argc, char *argv[]) {
-	int opt;
-	int level = OPTIONS.erf.level;
-	optind = 1;
+static int erf_config_output(struct libtrace_out_t *libtrace, trace_option_t option, void *value) {
 
-
-	while ((opt = getopt(argc, argv, "z:a")) != EOF) {
-		switch (opt) {
-			case 'z':
-				level = atoi(optarg);
-				break;
-			case 'a':
-				OPTIONS.erf.append = 1;
-				break;
-			default:
-				printf("Bad argument to erf: %s\n", optarg);
-				// maybe spit out some help here
-				return -1;
-		}
+	switch (option) {
+		case TRACE_OPTION_OUTPUT_COMPRESS:
+			OPTIONS.erf.level = *(int*)value;
+			return 0;
+		case TRACE_OPTION_OUTPUT_FILEFLAGS:
+			OPTIONS.erf.fileflag = *(int*)value;
+			return 0;
+		default:
+			/* Unknown option */
+			return -1;
 	}
-	
-	return 0;
-
 }
 
 
@@ -442,7 +437,7 @@ static int dag_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 	if ((numbytes = dag_read(libtrace,0)) <= 0) 
 		return numbytes;
 
-	//DAG always gives us whole packets
+	/*DAG always gives us whole packets */
 	erfptr = (dag_record_t *) ((void *)DAG.buf + 
 			(DAG.bottom + DAG.offset));
 	size = ntohs(erfptr->rlen);
@@ -459,9 +454,6 @@ static int dag_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 		packet->payload = packet->buffer + erf_get_framing_length(packet);
 	}
 
-	
-	packet->status.type = RT_DATA;
-	packet->status.message = 0;
 	packet->size = size;
 	DAG.offset += size;
 	DAG.diff -= size;
@@ -475,19 +467,22 @@ static int dag_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 static int erf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
 	int numbytes;
 	int size;
-	void *buffer = packet->buffer;
-	void *buffer2 = buffer;
+	void *buffer2 = packet->buffer;
 	int rlen;
 	if (packet->buf_control == EXTERNAL) {
 		packet->buf_control = PACKET;
 		packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
 	}
-	buffer = packet->buffer;
 	packet->header = packet->buffer;
+
+	if (packet->buffer) {
+		packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
+		packet->buf_control = PACKET;
+	}
 
 
 	if ((numbytes=LIBTRACE_READ(INPUT.file,
-					buffer,
+					packet->buffer,
 					dag_record_size)) == -1) {
 		perror("libtrace_read");
 		return -1;
@@ -496,8 +491,8 @@ static int erf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 		return 0;
 	}
 
-	rlen = ntohs(((dag_record_t *)buffer)->rlen);
-	buffer2 = buffer + dag_record_size;
+	rlen = ntohs(((dag_record_t *)packet->buffer)->rlen);
+	buffer2 = (char*)packet->buffer + dag_record_size;
 	size = rlen - dag_record_size;
 	assert(size < LIBTRACE_PACKET_BUFSIZE);
 	
@@ -508,22 +503,20 @@ static int erf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 			ntohs(((dag_record_t*)buffer)->wlen)+erf_get_framing_length(packet));
 	*/
 	/* Unknown/corrupt */
-	assert(((dag_record_t *)buffer)->type < 10);
+	assert(((dag_record_t *)packet->buffer)->type < 10);
 	
-	// read in the rest of the packet
+	/* read in the rest of the packet */
 	if ((numbytes=LIBTRACE_READ(INPUT.file,
 					buffer2,
 					size)) != size) {
 		perror("libtrace_read");
 		return -1;
 	}
-	packet->status.type = RT_DATA;
-	packet->status.message = 0;
 	packet->size = rlen;
-	if (((dag_record_t *)buffer)->flags.rxerror == 1) {
+	if (((dag_record_t *)packet->buffer)->flags.rxerror == 1) {
 		packet->payload = NULL;
 	} else {
-		packet->payload = packet->buffer + erf_get_framing_length(packet);
+		packet->payload = (char*)packet->buffer + erf_get_framing_length(packet);
 	}
 	return rlen;
 }
@@ -542,8 +535,9 @@ static int rtclient_read(struct libtrace_t *libtrace, void *buffer, size_t len) 
 						len,
 						MSG_NOSIGNAL)) == -1) {
 			if (errno == EINTR) {
-				//ignore EINTR in case
-				// a caller is using signals
+				/*ignore EINTR in case
+				 *a caller is using signals
+				 */
 				continue;
 			}
 			perror("recv");
@@ -574,6 +568,7 @@ static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_pac
 
 	
 	do {
+		struct libtrace_packet_status status;
 		if (tracefifo_out_available(libtrace->fifo) == 0 || read_required) {
 			if ((numbytes = rtclient_read(
 					libtrace,buf,RP_BUFSIZE))<=0) {
@@ -582,14 +577,14 @@ static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_pac
 			tracefifo_write(libtrace->fifo,buf,numbytes);
 			read_required = 0;
 		}
-		// Read status byte
+		/* Read status byte */
 		if (tracefifo_out_read(libtrace->fifo,
-				&packet->status, sizeof(uint32_t)) == 0) {
+				&status, sizeof(uint32_t)) == 0) {
 			read_required = 1;
 			continue;
 		}
 		tracefifo_out_update(libtrace->fifo,sizeof(uint32_t));
-		// Read in packet size
+		/* Read in packet size */
 		if (tracefifo_out_read(libtrace->fifo,
 				&packet->size, sizeof(uint32_t)) == 0) {
 			tracefifo_out_reset(libtrace->fifo);
@@ -607,8 +602,8 @@ static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_pac
 			continue;
 		}
 		*/
-		if (packet->status.type == RT_MSG) {
-			// Need to skip this packet as it is a message packet
+		if (status.type == RT_MSG) {
+			/* Need to skip this packet as it is a message packet */
 			tracefifo_out_update(libtrace->fifo, packet->size);
 			tracefifo_ack_update(libtrace->fifo, packet->size + 
 					sizeof(uint32_t) + 
@@ -616,9 +611,7 @@ static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_pac
 			continue;
 		}
 		
-		//size = ntohs(((dag_record_t *)buffer)->rlen);
-		
-		// read in the full packet
+		/* read in the full packet */
 		if ((numbytes = tracefifo_out_read(libtrace->fifo, 
 						buffer, packet->size)) == 0) {
 			tracefifo_out_reset(libtrace->fifo);
@@ -626,18 +619,17 @@ static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_pac
 			continue;
 		}
 
-		// got in our whole packet, so...
+		/* got in our whole packet, so... */
 		tracefifo_out_update(libtrace->fifo,packet->size);
 
 		tracefifo_ack_update(libtrace->fifo,packet->size + 
 				sizeof(uint32_t) + 
 				sizeof(libtrace_packet_status_t));
 
-		//packet->size = numbytes;
 		if (((dag_record_t *)buffer)->flags.rxerror == 1) {
 			packet->payload = NULL;
 		} else {
-			packet->payload = packet->buffer + erf_get_framing_length(packet);
+			packet->payload = (char*)packet->buffer + erf_get_framing_length(packet);
 		}
 		return numbytes;
 	} while(1);
@@ -697,19 +689,20 @@ static int erf_write_packet(struct libtrace_out_t *libtrace, const struct libtra
 				packet->size - 
 					(dag_record_size + pad)); 
 	} else {
-		// convert format - build up a new erf header
-		// Timestamp
+		/* convert format - build up a new erf header */
+		/* Timestamp */
 		erfhdr.ts = trace_get_erf_timestamp(packet);
-		// Flags. Can't do this
+		erfhdr.type = libtrace_to_erf_type(trace_get_link_type(packet));
+		/* Flags. Can't do this */
 		memset(&erfhdr.flags,1,1);
-		// Packet length (rlen includes format overhead)
+		/* Packet length (rlen includes format overhead) */
 		erfhdr.rlen = trace_get_capture_length(packet) + erf_get_framing_length(packet);
-		// loss counter. Can't do this
+		/* loss counter. Can't do this */
 		erfhdr.lctr = 0;
-		// Wire length
+		/* Wire length */
 		erfhdr.wlen = trace_get_wire_length(packet);
 		
-		// Write it out
+		/* Write it out */
 		numbytes = erf_dump_packet(libtrace,
 				&erfhdr,
 				pad,
@@ -719,22 +712,10 @@ static int erf_write_packet(struct libtrace_out_t *libtrace, const struct libtra
 	return numbytes;
 }
 
-static void *erf_get_link(const struct libtrace_packet_t *packet) {
-	return (void *)packet->payload;
-}
-
 static libtrace_linktype_t erf_get_link_type(const struct libtrace_packet_t *packet) {
 	dag_record_t *erfptr = 0;
 	erfptr = (dag_record_t *)packet->header;
-	switch (erfptr->type) {
-		case TYPE_LEGACY: 	return TRACE_TYPE_LEGACY;
-		case TYPE_ETH: 		return TRACE_TYPE_ETH;
-		case TYPE_ATM: 		return TRACE_TYPE_ATM;
-		default: 
-			       fprintf(stderr,"Unknown erf type %02x\n",erfptr->type);
-			       assert(0);
-	}
-	return erfptr->type;
+	return erf_type_to_libtrace(erfptr->type);
 }
 
 static int8_t erf_get_direction(const struct libtrace_packet_t *packet) {
@@ -772,7 +753,7 @@ static size_t erf_set_capture_length(struct libtrace_packet_t *packet, size_t si
 	dag_record_t *erfptr = 0;
 	assert(packet);
 	if((size + erf_get_framing_length(packet)) > packet->size) {
-		// can't make a packet larger
+		/* can't make a packet larger */
 		return (packet->size - erf_get_framing_length(packet));
 	}
 	erfptr = (dag_record_t *)packet->header;

@@ -30,7 +30,7 @@
 #ifndef _WAG_H_
 #define _WAG_H_
 
-// Generic field breakdowns
+/* Generic field breakdowns */
 struct wag_frame_hdr {
   uint16_t magic;
   uint16_t size;
@@ -43,7 +43,7 @@ struct wag_timestamp {
   uint32_t subsecs;
 };
 
-// Received packet frame fields
+/* Received packet frame fields */
 struct wag_stream_info {
   uint16_t unused_1;
   uint16_t unused_2;
@@ -72,7 +72,7 @@ struct wag_data_frame {
   char data[1];
 };
 
-// Transmit packet frame fields
+/* Transmit packet frame fields */
 struct wag_txparams {
   uint8_t         gain;
   uint8_t         mode;
@@ -89,17 +89,17 @@ struct wag_tx_data_frame {
 };
 
 struct ieee_802_11_header {
-	uint8_t      protocol:2;
-	uint8_t	     type:2;
-	uint8_t      subtype:4;
-	uint8_t	     to_ds:1;
-	uint8_t	     from_ds:1;
-	uint8_t	     more_frag:1;
-	uint8_t	     retry:1;
-	uint8_t	     power:1;
-	uint8_t	     more_data:1;
-	uint8_t	     wep:1;
-	uint8_t	     order:1;
+	unsigned int protocol:2;
+	unsigned int type:2;
+	unsigned int subtype:4;
+	unsigned int to_ds:1;
+	unsigned int from_ds:1;
+	unsigned int more_frag:1;
+	unsigned int retry:1;
+	unsigned int power:1;
+	unsigned int more_data:1;
+	unsigned int wep:1;
+	unsigned int order:1;
 	uint16_t     duration;
 	uint8_t      mac1[6];
 	uint8_t      mac2[6];

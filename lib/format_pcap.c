@@ -151,8 +151,6 @@ static int pcap_init_input(struct libtrace_t *libtrace) {
 			}
 		}	
 	}
-	//fprintf(stderr,	"Unsupported scheme (%s) for format pcap\n",
-	//		CONNINFO.path);
 	return 1;
 	
 }
@@ -208,8 +206,10 @@ static void trace_pcap_handler(u_char *user, const struct pcap_pkthdr *pcaphdr, 
 	struct libtrace_packet_t *packet = (struct libtrace_packet_t *)user;	
 	int numbytes = 0;
 
+	/*
 	// pcap provides us with the right bits, in it's own buffers.
 	// We hijack them.
+	*/
 	numbytes = pcaphdr->len;
 
 	packet->header = (void *)pcaphdr;
@@ -230,8 +230,6 @@ static int pcap_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_
 	if (pcapbytes <= 0) {
 		return pcapbytes;
 	}
-	packet->status.type = RT_DATA;
-	packet->status.message = 0;
 	return (packet->size - sizeof(struct pcap_pkthdr));
 }
 
@@ -250,8 +248,9 @@ static int pcap_write_packet(struct libtrace_out_t *libtrace, const struct libtr
 		
 		pcap_dump((u_char*)OUTPUT.trace.dump,(struct pcap_pkthdr *)packet->header,packet->payload);
 	} else {
-		// Leave the manual copy as it is, as it gets around 
-		// some OS's having different structures in pcap_pkt_hdr
+		/* Leave the manual copy as it is, as it gets around 
+		 * some OS's having different structures in pcap_pkt_hdr
+		 */
 		struct timeval ts = trace_get_timeval(packet);
 		pcap_pkt_hdr.ts.tv_sec = ts.tv_sec;
 		pcap_pkt_hdr.ts.tv_usec = ts.tv_usec;
@@ -264,13 +263,8 @@ static int pcap_write_packet(struct libtrace_out_t *libtrace, const struct libtr
 }
 
 static int pcapint_write_packet(struct libtrace_out_t *libtrace __attribute__((unused)), const struct libtrace_packet_t *packet __attribute__((unused))) {
-//	void *link = trace_get_link(packet);
 
 	return 0;
-}
-
-static void *pcap_get_link(const struct libtrace_packet_t *packet) {
-	return (void *) packet->payload;
 }
 
 static libtrace_linktype_t pcap_get_link_type(const struct libtrace_packet_t *packet) {
@@ -381,7 +375,7 @@ static size_t pcap_set_capture_length(struct libtrace_packet_t *packet,size_t si
 	struct pcap_pkthdr *pcapptr = 0;
 	assert(packet);
 	if ((size + sizeof(struct pcap_pkthdr)) > packet->size) {
-		// can't make a packet larger
+		/* can't make a packet larger */
 		return (packet->size - sizeof(struct pcap_pkthdr));
 	}
 	pcapptr = (struct pcap_pkthdr *)packet->header;
@@ -476,9 +470,6 @@ static struct libtrace_format_t pcapint = {
 	trace_event_device,		/* trace_event */
 	pcapint_help			/* help */
 };
-
-//pcap_ptr = &pcap;
-//pcapint_ptr = &pcapint;
 
 void __attribute__((constructor)) pcap_constructor() {
 	register_format(&pcap);

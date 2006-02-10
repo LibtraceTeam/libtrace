@@ -70,14 +70,11 @@ extern "C" {
 #if __GNUC__ >= 3 
 #  define SIMPLE_FUNCTION __attribute__((pure))
 #  define UNUSED __attribute__((unused))
+#  define PACKED __attribute__((packed))
 #else
 #  define SIMPLE_FUNCTION
 #  define UNUSED
 #endif
-	
-#define RT_DATA 1
-#define RT_MSG 2
-
 	
 /** Opaque structure holding information about an output trace */
 typedef struct libtrace_out_t libtrace_out_t;
@@ -88,14 +85,6 @@ typedef struct libtrace_t libtrace_t;
 /** Opaque structure holding information about a bpf filter */
 typedef struct libtrace_filter_t libtrace_filter_t;
 
-/** Structure holding status information for a packet */
-typedef struct libtrace_packet_status {
-	uint8_t type;
-	uint8_t reserved;
-	uint16_t message;
-
-} libtrace_packet_status_t;
-
 typedef enum {PACKET, EXTERNAL } buf_control_t;
 /** Structure holding information about a packet */
 #define LIBTRACE_PACKET_BUFSIZE 65536
@@ -105,16 +94,21 @@ typedef struct libtrace_packet_t {
 	void *payload;
 	void *buffer;
 	size_t size;
-	libtrace_packet_status_t status;
 	buf_control_t buf_control; 
-} __attribute__ ((packed)) libtrace_packet_t;
+} libtrace_packet_t;
                      
 
 /** Enumeration of error codes */
 enum {E_NOERROR, E_BAD_FORMAT, E_NO_INIT, E_NO_INIT_OUT, E_URI_LONG, E_URI_NOCOLON, E_INIT_FAILED };
 
+/** @name Packet structures
+ * These convenience structures are here as they are portable ways of dealing
+ * with various protocols.
+ * @{
+ */
+
 /** Structure for dealing with IP packets */
-typedef struct libtrace_ip
+typedef PACKED struct libtrace_ip
 {
 #if BYTE_ORDER == LITTLE_ENDIAN
     unsigned int ip_hl:4;		/**< header length */
@@ -128,17 +122,25 @@ typedef struct libtrace_ip
     u_int8_t ip_tos;			/**< type of service */
     u_short ip_len;			/**< total length */
     u_short ip_id;			/**< identification */
-    u_short ip_off;			/**< fragment offset field */
-#define	IP_RF 0x8000			/**< reserved fragment flag */
-#define	IP_DF 0x4000			/**< dont fragment flag */
-#define	IP_MF 0x2000			/**< more fragments flag */
-#define	IP_OFFMASK 0x1fff		/**< mask for fragmenting bits */
+#if BYTE_ORDER == LITTLE_ENDIAN
+    unsigned int ip_off:12;		/**< fragment offset */
+    unsigned int ip_mf:1;		/**< more fragments flag */
+    unsigned int ip_df:1;		/**< dont fragment flag */
+    unsigned int ip_rf:1;		/**< reserved fragment flag */
+#elif BYTE_ORDER == BIG_ENDIAN
+    unsigned int ip_rf:1;
+    unsigned int ip_df:1;
+    unsigned int ip_mf:1;
+    unsigned int ip_off:12;
+#else
+#   error "Adjust your <bits/endian.h> defines"
+#endif
     u_int8_t ip_ttl;			/**< time to live */
     u_int8_t ip_p;			/**< protocol */
     u_short ip_sum;			/**< checksum */
     struct in_addr ip_src;		/**< source address */
     struct in_addr ip_dst;		/**< dest address */
-} __attribute__ ((packed)) libtrace_ip_t
+} libtrace_ip_t
 ;
 
 /** Structure for dealing with TCP packets */
@@ -149,25 +151,25 @@ typedef struct libtrace_tcp
     u_int32_t seq;		/**< Sequence number */
     u_int32_t ack_seq;		/**< Acknowledgement Number */
 #  if BYTE_ORDER == LITTLE_ENDIAN
-    u_int16_t res1:4;		/**< Reserved bits */
-    u_int16_t doff:4;		
-    u_int16_t fin:1;		/**< FIN */
-    u_int16_t syn:1;		/**< SYN flag */
-    u_int16_t rst:1;		/**< RST flag */
-    u_int16_t psh:1;		/**< PuSH flag */
-    u_int16_t ack:1;		/**< ACK flag */
-    u_int16_t urg:1;		/**< URG flag */
-    u_int16_t res2:2;		/**< Reserved */
+    unsigned int res1:4;	/**< Reserved bits */
+    unsigned int doff:4;	/**< data offset */	
+    unsigned int fin:1;		/**< FIN */
+    unsigned int syn:1;		/**< SYN flag */
+    unsigned int rst:1;		/**< RST flag */
+    unsigned int psh:1;		/**< PuSH flag */
+    unsigned int ack:1;		/**< ACK flag */
+    unsigned int urg:1;		/**< URG flag */
+    unsigned int res2:2;	/**< Reserved */
 #  elif BYTE_ORDER == BIG_ENDIAN
-    u_int16_t doff:4;		
-    u_int16_t res1:4;		/**< Reserved bits */
-    u_int16_t res2:2;		/**< Reserved */
-    u_int16_t urg:1;		/**< URG flag */
-    u_int16_t ack:1;		/**< ACK flag */
-    u_int16_t psh:1;		/**< PuSH flag */
-    u_int16_t rst:1;		/**< RST flag */
-    u_int16_t syn:1;		/**< SYN flag */
-    u_int16_t fin:1;		/**< FIN flag */
+    unsigned int doff:4;	/**< Data offset */
+    unsigned int res1:4;	/**< Reserved bits */
+    unsigned int res2:2;	/**< Reserved */
+    unsigned int urg:1;		/**< URG flag */
+    unsigned int ack:1;		/**< ACK flag */
+    unsigned int psh:1;		/**< PuSH flag */
+    unsigned int rst:1;		/**< RST flag */
+    unsigned int syn:1;		/**< SYN flag */
+    unsigned int fin:1;		/**< FIN flag */
 #  else
 #   error "Adjust your <bits/endian.h> defines"
 #  endif
@@ -230,21 +232,21 @@ typedef struct libtrace_8021q
   u_int8_t  ether_dhost[6];      /* destination eth addr */
   u_int8_t  ether_shost[6];      /* source ether addr    */
   u_int16_t ether_type;          /* packet type ID field , 0x8100 for VLAN */
-  u_int16_t vlan_pri:3;		 /* vlan user priority */
-  u_int16_t vlan_cfi:1;	 	 /* vlan format indicator, 0 for ethernet, 1 for token ring */
-  u_int16_t vlan_id:12;	 	 /* vlan id */
+  unsigned int vlan_pri:3;	 /* vlan user priority */
+  unsigned int vlan_cfi:1; 	 /* vlan format indicator, 0 for ethernet, 1 for token ring */
+  unsigned int vlan_id:12; 	 /* vlan id */
   u_int16_t vlan_ether_type;	 /* vlan sub-packet type ID field (next-header)*/
 } __attribute__ ((packed)) libtrace_8021q_t;
 
 /** ATM cell */
 typedef struct libtrace_atm_cell
 {
-  u_int8_t gfc:4;
+  unsigned int gfc:4;
   u_int8_t vpi;
   u_int16_t vci;
-  u_int8_t pt:3;
-  u_int8_t clp:1;
-  u_int8_t hec;
+  unsigned int pt:3;
+  unsigned int clp:1;
+  unsigned int hec;
 } __attribute__ ((packed)) libtrace_atm_cell;
 
 /** POS header */
@@ -253,6 +255,7 @@ typedef struct libtrace_pos
  u_int16_t header;
  u_int16_t ether_type;
 } __attribute__ ((packed)) libtrace_pos;
+/*@}*/
 
 /** Prints help information for libtrace 
  *
@@ -264,11 +267,11 @@ void trace_help();
 /** Gets the output format for a given output trace
  *
  * @param libtrace	the output trace to get the name of the format fo
- * @returns callee-owned null-terminated char* containing the output format
+ * @return callee-owned null-terminated char* containing the output format
  *
  */
 SIMPLE_FUNCTION
-char *trace_get_output_format(const struct libtrace_out_t *libtrace);
+char *trace_get_output_format(const libtrace_out_t *libtrace);
 
 /** Prints error information
  *
@@ -278,13 +281,13 @@ void trace_perror(const char *caller);
 
 /** @name Creation and destruction of traces
  * These members deal with creating, configuring and cleaning up a trace object
+ *@{
  */
-//@{
 
 /** Create a trace file from a URI
  * 
  * @param uri containing a valid libtrace URI
- * @returns opaque pointer to a libtrace_t
+ * @return opaque pointer to a libtrace_t
  *
  * Valid URI's are:
  *  - erf:/path/to/erf/file
@@ -309,7 +312,7 @@ struct libtrace_t *trace_create(const char *uri);
 
 /** Creates a "dummy" trace file that has only the format type set.
  *
- * @returns opaque pointer to a (sparsely initialised) libtrace_t
+ * @return opaque pointer to a (sparsely initialised) libtrace_t
  *
  * IMPORTANT: Do not attempt to call trace_read_packet or other such functions with
  * the dummy trace. Its intended purpose is to act as a packet->trace for libtrace_packet_t's
@@ -320,7 +323,7 @@ struct libtrace_t *trace_create_dead(const char *uri);
 /** Creates a trace output file from a URI. 
  *
  * @param uri	the uri string describing the output format and destination
- * @returns opaque pointer to a libtrace_output_t
+ * @return opaque pointer to a libtrace_output_t
  * @author Shane Alcock
  *
  * Valid URI's are:
@@ -332,27 +335,74 @@ struct libtrace_t *trace_create_dead(const char *uri);
  *  If an error occured when attempting to open the output trace, NULL is returned 
  *  and trace_errno is set. Use trace_perror() to get more information
  */
-struct libtrace_out_t *trace_create_output(const char *uri);
+libtrace_out_t *trace_create_output(const char *uri);
 
-/** Parses an output options string and calls the appropriate function to deal with output options.
+/** Start the capture
+ * @param libtrace	The trace to start
+ * @return 0 on success
  *
- * @param libtrace	the output trace object to apply the options to
- * @param options	the options string
- * @returns -1 if option configuration failed, 0 otherwise
- *
- * @author Shane Alcock
+ * This does the actual work with starting the trace capture, and applying
+ * all the config options.  This may fail.
  */
-int trace_config_output(struct libtrace_out_t *libtrace, char *options);
+int trace_start(libtrace_t *libtrace);
+
+/** Start an output trace
+ * @param libtrace	The trace to start
+ * @return 0 on success
+ *
+ * This does the actual work with starting a trace for write.  This generally
+ * creates the file.
+ */
+int trace_start_output(libtrace_out_t *libtrace);
+
+/** Valid trace capture options */
+typedef enum {
+	TRACE_OPTION_SNAPLEN, /**< Number of bytes captured */
+	TRACE_OPTION_PROMISC, /**< Capture packets to other hosts */
+	TRACE_OPTION_FILTER   /**< Apply this filter to all packets recieved */
+} trace_option_t;
+
+/** Sets an input config option
+ * @param libtrace	the trace object to apply the option to
+ * @param option	the option to set
+ * @param value		the value to set the option to
+ * @return -1 if option configuration failed, 0 otherwise
+ * This should be called after trace_create, and before trace_start
+ */
+int trace_config(libtrace_t *libtrace,
+		trace_option_t option,
+		void *value);
+
+typedef enum {
+	TRACE_OPTION_OUTPUT_FILEFLAGS, /**< File flags to open the trace file
+					* with.  eg O_APPEND
+					*/
+	TRACE_OPTION_OUTPUT_COMPRESS   /**< Compression level, eg 6. */
+} trace_option_output_t;
+
+/** Sets an output config option
+ *
+ * @param libtrace	the output trace object to apply the option to
+ * @param option	the option to set
+ * @param value		the value to set the option to
+ * @return -1 if option configuration failed, 0 otherwise
+ * This should be called after trace_create_output, and before 
+ * trace_start_output
+ */
+int trace_config_output(libtrace_out_t *libtrace, 
+		trace_option_output_t option,
+		void *value
+		);
 
 /** Close a trace file, freeing up any resources it may have been using
  *
  */
-void trace_destroy(struct libtrace_t *trace);
+void trace_destroy(libtrace_t *trace);
 
 /** Close a trace file, freeing up any resources it may have been using
  * @param trace		trace file to be destroyed
  */
-void trace_destroy_dead(struct libtrace_t *trace);
+void trace_destroy_dead(libtrace_t *trace);
 
 /** Close a trace output file, freeing up any resources it may have been using
  *
@@ -360,146 +410,183 @@ void trace_destroy_dead(struct libtrace_t *trace);
  *
  * @author Shane Alcock
  */
-void trace_destroy_output(struct libtrace_out_t *trace);
-//@}
+void trace_destroy_output(libtrace_out_t *trace);
+/*@}*/
 
 /** @name Reading/Writing packets
  * These members deal with creating, reading and writing packets
+ *
+ * @{
  */
-//@{
 
 /** Create a new packet object
  *
  * @return a pointer to an initialised libtrace_packet_t object
  */
-struct libtrace_packet_t *trace_create_packet();
+libtrace_packet_t *trace_create_packet();
 
 /** Destroy a packet object
  *
  * sideeffect: sets packet to NULL
  */
-void trace_destroy_packet(struct libtrace_packet_t **packet);
+void trace_destroy_packet(libtrace_packet_t **packet);
 
 
 /** Read one packet from the trace into buffer
  *
  * @param trace 	the libtrace opaque pointer
  * @param packet  	the packet opaque pointer
- * @returns 0 on EOF, negative value on error
+ * @return 0 on EOF, negative value on error
  *
+ * @note the trace must have been started with trace_start before calling
+ * this function
  */
-int trace_read_packet(struct libtrace_t *trace, struct libtrace_packet_t *packet);
+int trace_read_packet(libtrace_t *trace, libtrace_packet_t *packet);
+
+/** Event types 
+ * see \ref libtrace_eventobj_t and \ref trace_event
+ */
+typedef enum {
+	TRACE_EVENT_IOWAIT,	/**< Need to block on fd */
+	TRACE_EVENT_SLEEP,	/**< Sleep for some time */
+	TRACE_EVENT_PACKET,	/**< packet has arrived */
+	TRACE_EVENT_TERMINATE	/**< End of trace */
+} libtrace_event_t;
+
+/** structure returned by libtrace_event explaining what the current event is */
+typedef struct libtrace_eventobj_t {
+	libtrace_event_t type; /**< event type (iowait,sleep,packet) */
+	int fd;		       /**< if IOWAIT, the fd to sleep on */
+	double seconds;	       /**< if SLEEP, the amount of time to sleep for */
+	int size; 	       /**< if PACKET, the value returned from trace_read_packet */
+} libtrace_eventobj_t;
+
+/** process a libtrace event
+ * @param trace the libtrace opaque pointer
+ * @param packet the libtrace_packet opaque pointer
+ * @return libtrace_event struct containing the type, and potential
+ * 	fd or seconds to sleep on
+ *
+ * Type can be:
+ *  TRACE_EVENT_IOWAIT	Waiting on I/O on fd
+ *  TRACE_EVENT_SLEEP	Next event in seconds
+ *  TRACE_EVENT_PACKET	Packet arrived in buffer with size size
+ *  TRACE_EVENT_TERMINATE Trace terminated (perhaps with an error condition)
+ */
+libtrace_eventobj_t trace_event(libtrace_t *trace,
+		libtrace_packet_t *packet);
+
 
 /** Write one packet out to the output trace
  *
  * @param trace		the libtrace_out opaque pointer
  * @param packet	the packet opaque pointer
- * @returns the number of bytes written out, if zero or negative then an error has occured.
+ * @return the number of bytes written out, if zero or negative then an error has occured.
  */
-int trace_write_packet(struct libtrace_out_t *trace, const struct libtrace_packet_t *packet);
-//@}
+int trace_write_packet(libtrace_out_t *trace, const libtrace_packet_t *packet);
+/*@}*/
 
 /** @name Headers
  * These functions locate and return a pointer to various headers inside a packet
+ * @{
  */
-//@{
 
 /** get a pointer to the link layer
  * @param packet  	the packet opaque pointer
  *
- * @returns a pointer to the link layer, or NULL if there is no link layer
+ * @return a pointer to the link layer, or NULL if there is no link layer
  *
  * @note you should call getLinkType() to find out what type of link layer 
  * this is
  */
 SIMPLE_FUNCTION
-void *trace_get_link(const struct libtrace_packet_t *packet);
+void *trace_get_link(const libtrace_packet_t *packet);
 
 /** get a pointer to the IP header (if any)
  * @param packet  	the packet opaque pointer
  *
- * @returns a pointer to the IP header, or NULL if there is not an IP packet
+ * @return a pointer to the IP header, or NULL if there is not an IP packet
  */
 SIMPLE_FUNCTION
-struct libtrace_ip *trace_get_ip(const struct libtrace_packet_t *packet);
+libtrace_ip_t *trace_get_ip(const libtrace_packet_t *packet);
 
 /** Gets a pointer to the transport layer header (if any)
  * @param packet        a pointer to a libtrace_packet structure
  *
- * @returns a pointer to the transport layer header, or NULL if there is no header
+ * @return a pointer to the transport layer header, or NULL if there is no header
  */
-void *trace_get_transport(const struct libtrace_packet_t *packet);
+void *trace_get_transport(const libtrace_packet_t *packet);
 
 /** Gets a pointer to the transport layer header (if any) given a pointer to the
  * IP header
  * @param ip            The IP Header
  * @param[out] skipped  An output variable of the number of bytes skipped
  *
- * @returns a pointer to the transport layer header, or NULL if there is no header
+ * @return a pointer to the transport layer header, or NULL if there is no header
  *
  * Skipped can be NULL, in which case it will be ignored
  */
-void *trace_get_transport_from_ip(const struct libtrace_ip *ip, int *skipped);
+void *trace_get_transport_from_ip(const libtrace_ip_t *ip, int *skipped);
 
 /** get a pointer to the TCP header (if any)
  * @param packet  	the packet opaque pointer
  *
- * @returns a pointer to the TCP header, or NULL if there is not a TCP packet
+ * @return a pointer to the TCP header, or NULL if there is not a TCP packet
  */
 SIMPLE_FUNCTION
-struct libtrace_tcp *trace_get_tcp(const struct libtrace_packet_t *packet);
+libtrace_tcp_t *trace_get_tcp(const libtrace_packet_t *packet);
 
 /** get a pointer to the TCP header (if any) given a pointer to the IP header
  * @param ip		The IP header
  * @param[out] skipped	An output variable of the number of bytes skipped
  *
- * @returns a pointer to the TCP header, or NULL if this is not a TCP packet
+ * @return a pointer to the TCP header, or NULL if this is not a TCP packet
  *
  * Skipped can be NULL, in which case it will be ignored by the program.
  *
  * @author Perry Lorier
  */
 SIMPLE_FUNCTION
-struct libtrace_tcp *trace_get_tcp_from_ip(const struct libtrace_ip *ip,int *skipped);
+libtrace_tcp_t *trace_get_tcp_from_ip(const libtrace_ip_t *ip,int *skipped);
 
 /** get a pointer to the UDP header (if any)
  * @param packet  	the packet opaque pointer
  *
- * @returns a pointer to the UDP header, or NULL if this is not a UDP packet
+ * @return a pointer to the UDP header, or NULL if this is not a UDP packet
  */
 SIMPLE_FUNCTION
-struct libtrace_udp *trace_get_udp(const struct libtrace_packet_t *packet);
+libtrace_udp_t *trace_get_udp(const libtrace_packet_t *packet);
 
 /** get a pointer to the UDP header (if any) given a pointer to the IP header
  * @param 	ip	The IP header
  * @param[out] 	skipped	An output variable of the number of bytes skipped
  *
- * @returns a pointer to the UDP header, or NULL if this is not an UDP packet
+ * @return a pointer to the UDP header, or NULL if this is not an UDP packet
  *
  * Skipped may be NULL, in which case it will be ignored by this function.
  */
 SIMPLE_FUNCTION
-struct libtrace_udp *trace_get_udp_from_ip(const struct libtrace_ip *ip,int *skipped);
+libtrace_udp_t *trace_get_udp_from_ip(const libtrace_ip_t *ip,int *skipped);
 
 /** get a pointer to the ICMP header (if any)
  * @param packet  	the packet opaque pointer
  *
- * @returns a pointer to the ICMP header, or NULL if this is not a ICMP packet
+ * @return a pointer to the ICMP header, or NULL if this is not a ICMP packet
  */
 SIMPLE_FUNCTION
-struct libtrace_icmp *trace_get_icmp(const struct libtrace_packet_t *packet);
+libtrace_icmp_t *trace_get_icmp(const libtrace_packet_t *packet);
 
 /** get a pointer to the ICMP header (if any) given a pointer to the IP header
  * @param ip		The IP header
  * @param[out] skipped	An output variable of the number of bytes skipped
  *
- * @returns a pointer to the ICMP header, or NULL if this is not an ICMP packet
+ * @return a pointer to the ICMP header, or NULL if this is not an ICMP packet
  *
  * Skipped may be NULL, in which case it will be ignored by this function
  */
 SIMPLE_FUNCTION
-struct libtrace_icmp *trace_get_icmp_from_ip(const struct libtrace_ip *ip,int *skipped);
-//@}
+libtrace_icmp_t *trace_get_icmp_from_ip(const libtrace_ip_t *ip,int *skipped);
+/*@}*/
 
 /** parse an ip or tcp option
  * @param[in,out] ptr	the pointer to the current option
@@ -508,7 +595,7 @@ struct libtrace_icmp *trace_get_icmp_from_ip(const struct libtrace_ip *ip,int *s
  * @param[out] optlen 	the length of the option
  * @param[out] data	the data of the option
  *
- * @returns bool true if there is another option (and the fields are filled in)
+ * @return bool true if there is another option (and the fields are filled in)
  *               or false if this was the last option.
  *
  * This updates ptr to point to the next option after this one, and updates
@@ -527,47 +614,47 @@ int trace_get_next_option(unsigned char **ptr,int *len,
 /** @name Time
  * These functions deal with time that a packet arrived and return it
  * in various formats
+ * @{
  */
-//@{
 /** Get the current time in DAG time format 
  * @param packet  	the packet opaque pointer
  *
- * @returns a 64 bit timestamp in DAG ERF format (upper 32 bits are the seconds
+ * @return a 64 bit timestamp in DAG ERF format (upper 32 bits are the seconds
  * past 1970-01-01, the lower 32bits are partial seconds)
  * @author Daniel Lawson
  */
 SIMPLE_FUNCTION
-uint64_t trace_get_erf_timestamp(const struct libtrace_packet_t *packet);
+uint64_t trace_get_erf_timestamp(const libtrace_packet_t *packet);
 
 /** Get the current time in struct timeval
  * @param packet  	the packet opaque pointer
  *
- * @returns time that this packet was seen in a struct timeval
+ * @return time that this packet was seen in a struct timeval
  * @author Daniel Lawson
  * @author Perry Lorier
  */ 
 SIMPLE_FUNCTION
-struct timeval trace_get_timeval(const struct libtrace_packet_t *packet);
+struct timeval trace_get_timeval(const libtrace_packet_t *packet);
 
 /** Get the current time in floating point seconds
  * @param packet  	the packet opaque pointer
  *
- * @returns time that this packet was seen in 64bit floating point seconds
+ * @return time that this packet was seen in 64bit floating point seconds
  * @author Daniel Lawson
  * @author Perry Lorier
  */
 SIMPLE_FUNCTION
-double trace_get_seconds(const struct libtrace_packet_t *packet);
-//@}
+double trace_get_seconds(const libtrace_packet_t *packet);
+/*@}*/
 
 /** @name Sizes
  * This section deals with finding or setting the various different lengths
  * a packet can have
+ * @{
  */
-//@{
 /** Get the size of the packet in the trace
  * @param packet  	the packet opaque pointer
- * @returns the size of the packet in the trace
+ * @return the size of the packet in the trace
  * @author Perry Lorier
  * @note Due to this being a header capture, or anonymisation, this may not
  * be the same size as the original packet.  See get_wire_length() for the original
@@ -577,40 +664,40 @@ double trace_get_seconds(const struct libtrace_packet_t *packet);
  *  This is sometimes called the "snaplen".
  */
 SIMPLE_FUNCTION
-int trace_get_capture_length(const struct libtrace_packet_t *packet);
+int trace_get_capture_length(const libtrace_packet_t *packet);
 
 /** Get the size of the packet as it was seen on the wire.
  * @param packet  	the packet opaque pointer
- * @returns the size of the packet as it was on the wire.
+ * @return the size of the packet as it was on the wire.
  * @author Perry Lorier
  * @author Daniel Lawson
  * @note Due to the trace being a header capture, or anonymisation this may
  * not be the same as the Capture Len.
  */ 
 SIMPLE_FUNCTION
-int trace_get_wire_length(const struct libtrace_packet_t *packet);
+int trace_get_wire_length(const libtrace_packet_t *packet);
 
 /** Get the length of the capture framing headers.
  * @param packet  	the packet opaque pointer
- * @returns the size of the packet as it was on the wire.
+ * @return the size of the packet as it was on the wire.
  * @author Perry Lorier
  * @author Daniel Lawson
  * @note this length corresponds to the difference between the size of a 
  * captured packet in memory, and the captured length of the packet
  */ 
 SIMPLE_FUNCTION
-int trace_get_framing_length(const struct libtrace_packet_t *packet);
+int trace_get_framing_length(const libtrace_packet_t *packet);
 
 /** Truncate the packet at the suggested length
  * @param packet	the packet opaque pointer
  * @param size		the new length of the packet
- * @returns the new length of the packet, or the original length of the 
+ * @return the new length of the packet, or the original length of the 
  * packet if unchanged
  * @author Daniel Lawson
  */
-size_t trace_set_capture_length(struct libtrace_packet_t *packet, size_t size);
+size_t trace_set_capture_length(libtrace_packet_t *packet, size_t size);
 
-//@}
+/*@}*/
 
 
 /** Link layer types
@@ -634,41 +721,41 @@ typedef enum {
 
 /** Get the type of the link layer
  * @param packet  	the packet opaque pointer
- * @returns libtrace_linktype_t
+ * @return libtrace_linktype_t
  * @author Perry Lorier
  * @author Daniel Lawson
  */
 SIMPLE_FUNCTION
-inline libtrace_linktype_t trace_get_link_type(const struct libtrace_packet_t *packet);
+inline libtrace_linktype_t trace_get_link_type(const libtrace_packet_t *packet);
 
 /** Get the destination MAC addres
  * @param packet  	the packet opaque pointer
- * @returns a pointer to the destination mac, (or NULL if there is no 
+ * @return a pointer to the destination mac, (or NULL if there is no 
  * destination MAC)
  * @author Perry Lorier
  */
 SIMPLE_FUNCTION
-uint8_t *trace_get_destination_mac(const struct libtrace_packet_t *packet);
+uint8_t *trace_get_destination_mac(const libtrace_packet_t *packet);
 
 /** Get the source MAC addres
  * @param packet  	the packet opaque pointer
- * @returns a pointer to the source mac, (or NULL if there is no source MAC)
+ * @return a pointer to the source mac, (or NULL if there is no source MAC)
  * @author Perry Lorier
  */
 SIMPLE_FUNCTION
-uint8_t *trace_get_source_mac(const struct libtrace_packet_t *packet);
+uint8_t *trace_get_source_mac(const libtrace_packet_t *packet);
 
 /** Set the direction flag, if it has one
  * @param packet  	the packet opaque pointer
  * @param direction	the new direction (0,1,2,3)
- * @returns a signed value containing the direction flag, or -1 if this is not supported
+ * @return a signed value containing the direction flag, or -1 if this is not supported
  * @author Daniel Lawson
  */
-int8_t trace_set_direction(struct libtrace_packet_t *packet, int8_t direction);
+int8_t trace_set_direction(libtrace_packet_t *packet, int8_t direction);
 
 /** Get the direction flag, if it has one
  * @param packet  	the packet opaque pointer
- * @returns a signed value containing the direction flag, or -1 if this is not supported
+ * @return a signed value containing the direction flag, or -1 if this is not supported
  * The direction is defined as 0 for packets originating locally (ie, outbound)
  * and 1 for packets originating remotely (ie, inbound).
  * Other values are possible, which might be overloaded to mean special things
@@ -676,48 +763,15 @@ int8_t trace_set_direction(struct libtrace_packet_t *packet, int8_t direction);
  * @author Daniel Lawson
  */
 SIMPLE_FUNCTION
-int8_t trace_get_direction(const struct libtrace_packet_t *packet);
-
-/** Event types 
- * see \ref libtrace_eventobj_t and \ref trace_event
- */
-typedef enum {
-	TRACE_EVENT_IOWAIT,	/**< Need to block on fd */
-	TRACE_EVENT_SLEEP,	/**< Sleep for some time */
-	TRACE_EVENT_PACKET,	/**< packet has arrived */
-	TRACE_EVENT_TERMINATE	/**< End of trace */
-} libtrace_event_t;
-
-/** structure returned by libtrace_event explaining what the current event is */
-struct libtrace_eventobj_t {
-	libtrace_event_t type; /**< event type (iowait,sleep,packet) */
-	int fd;		       /**< if IOWAIT, the fd to sleep on */
-	double seconds;	       /**< if SLEEP, the amount of time to sleep for */
-	int size; 	       /**< if PACKET, the value returned from trace_read_packet */
-};
-
-/** process a libtrace event
- * @param trace the libtrace opaque pointer
- * @param packet the libtrace_packet opaque pointer
- * @returns libtrace_event struct containing the type, and potential
- * 	fd or seconds to sleep on
- *
- * Type can be:
- *  TRACE_EVENT_IOWAIT	Waiting on I/O on fd
- *  TRACE_EVENT_SLEEP	Next event in seconds
- *  TRACE_EVENT_PACKET	Packet arrived in buffer with size size
- *  TRACE_EVENT_TERMINATE Trace terminated (perhaps with an error condition)
- */
-struct libtrace_eventobj_t trace_event(struct libtrace_t *trace,
-		struct libtrace_packet_t *packet);
+int8_t trace_get_direction(const libtrace_packet_t *packet);
 
 /** @name BPF
  * This section deals with using Berkley Packet Filters
+ * @{
  */
-//@{
 /** setup a BPF filter
  * @param filterstring a char * containing the bpf filter string
- * @returns opaque pointer pointer to a libtrace_filter_t object
+ * @return opaque pointer pointer to a libtrace_filter_t object
  * @author Daniel Lawson
  * @note The filter is not actually compiled at this point, so no correctness
  * tests are performed here. trace_bpf_setfilter will always return ok, but
@@ -725,19 +779,19 @@ struct libtrace_eventobj_t trace_event(struct libtrace_t *trace,
  * filter is actually used
  */
 SIMPLE_FUNCTION
-struct libtrace_filter_t *trace_bpf_setfilter(const char *filterstring);
+libtrace_filter_t *trace_bpf_setfilter(const char *filterstring);
 
 /** apply a BPF filter
  * @param filter 	the filter opaque pointer
  * @param packet	the packet opaque pointer
- * @returns 0 if the filter fails, 1 if it succeeds
+ * @return 0 if the filter fails, 1 if it succeeds
  * @author Daniel Lawson
  * @note Due to the way BPF filters are built, the filter is not actually compiled
  * until the first time trace_bpf_filter is called. If your filter is incorrect, it will generate an error message and assert, exiting the program. This behaviour may change to more graceful handling of this error in the future.
  */
-int trace_bpf_filter(struct libtrace_filter_t *filter,
-		const struct libtrace_packet_t *packet);
-//@}
+int trace_bpf_filter(libtrace_filter_t *filter,
+		const libtrace_packet_t *packet);
+/*@}*/
 
 /** Which port is the server port */
 typedef enum {
@@ -747,27 +801,27 @@ typedef enum {
 
 /** Get the source port
  * @param packet	the packet to read from
- * @returns a port in \em HOST byte order, or equivilent to ports for this
+ * @return a port in \em HOST byte order, or equivilent to ports for this
  * protocol, or 0 if this protocol has no ports.
  * @author Perry Lorier
  */
 SIMPLE_FUNCTION
-uint16_t trace_get_source_port(const struct libtrace_packet_t *packet);
+uint16_t trace_get_source_port(const libtrace_packet_t *packet);
 
 /** Get the destination port
  * @param packet	the packet to read from
- * @returns a port in \em HOST byte order, or equivilent to ports for this
+ * @return a port in \em HOST byte order, or equivilent to ports for this
  * protocol, or 0 if this protocol has no ports.
  * @author Perry Lorier
  */
 SIMPLE_FUNCTION
-uint16_t trace_get_destination_port(const struct libtrace_packet_t *packet);
+uint16_t trace_get_destination_port(const libtrace_packet_t *packet);
 
 /** hint at the server port in specified protocol
  * @param protocol	the IP layer protocol, eg 6 (tcp), 17 (udp)
  * @param source	the source port from the packet
  * @param dest		the destination port from the packet
- * @returns one of USE_SOURCE or USE_DEST depending on which one you should use
+ * @return one of USE_SOURCE or USE_DEST depending on which one you should use
  * @note ports must be in \em HOST byte order!
  * @author Daniel Lawson
  */
@@ -778,11 +832,11 @@ int8_t trace_get_server_port(uint8_t protocol, uint16_t source, uint16_t dest);
  * Primarily for internal use but made available for external use.
  * @param uri		the uri to be parsed
  * @param format	destination location for the format component of the uri 
- * @returns 0 if an error occured, otherwise returns the uridata component
+ * @return 0 if an error occured, otherwise return the uridata component
  * @author Shane Alcock
  */
 const char *trace_parse_uri(const char *uri, char **format);
 #ifdef __cplusplus
-} // extern "C"
-#endif // #ifdef __cplusplus
-#endif // LIBTRACE_H_
+} /* extern "C" */
+#endif /* #ifdef __cplusplus */
+#endif /* LIBTRACE_H_ */

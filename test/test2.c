@@ -58,6 +58,8 @@ int main(int argc, char *argv[]) {
 	struct libtrace_packet_t packet;
 
 	trace = trace_create(uri);
+
+	trace_start(trace);
 	
         for (;;) {
 		if ((psize = trace_read_packet(trace, &packet)) <0) {

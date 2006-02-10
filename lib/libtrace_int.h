@@ -76,8 +76,8 @@ typedef enum {SOCKET, TRACE, STDIN, DEVICE, INTERFACE, RT } source_t;
 
 
 extern struct trace_err_t{
-	int err_num; 	// error code
-	char problem[255];	// the format, uri etc that caused the error for reporting purposes
+	int err_num; 		/* error code */
+	char problem[255];	/* the format, uri etc that caused the error for reporting purposes */
 } trace_err;
 
 
@@ -152,10 +152,10 @@ struct libtrace_format_t {
 	char *version;
 	char *type;
 	int (*init_input)(struct libtrace_t *libtrace);
-	int (*config_input)(struct libtrace_t *libtrace,char *option,void *value);
+	int (*config_input)(struct libtrace_t *libtrace,trace_option_t option,void *value);
 	int (*start_input)(struct libtrace_t *libtrace);
 	int (*init_output)(struct libtrace_out_t *libtrace);
-	int (*config_output)(struct libtrace_out_t *libtrace, int argc, char *argv[]);
+	int (*config_output)(struct libtrace_out_t *libtrace, trace_option_output_t, void *);
 	int (*start_output)(struct libtrace_out_t *libtrace);
 	int (*fin_input)(struct libtrace_t *libtrace);
 	int (*fin_output)(struct libtrace_out_t *libtrace);
@@ -179,9 +179,15 @@ struct libtrace_format_t {
 extern struct libtrace_format_t *form;
 
 void register_format(struct libtrace_format_t *format);
+
+libtrace_linktype_t pcap_dlt_to_libtrace(int dlt);
+char libtrace_to_pcap_dlt(libtrace_linktype_t type);
+libtrace_linktype_t erf_type_to_libtrace(char erf);
+char libtrace_to_erf_type(libtrace_linktype_t linktype);
+
 	
 #ifdef __cplusplus
 }
 #endif
 
-#endif // LIBTRACE_INT_H
+#endif /* LIBTRACE_INT_H */

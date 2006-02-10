@@ -98,7 +98,6 @@ struct libtrace_format_data_t {
 #if HAVE_ZLIB
                 gzFile *file;
 #else	
-		//FILE *file;
 		int file;
 #endif
         } input;	
@@ -118,7 +117,6 @@ struct libtrace_format_data_out_t {
 #if HAVE_ZLIB
 		gzFile *file;
 #else
-		//FILE *file;
 		int file;
 #endif
 	} output;
@@ -126,7 +124,6 @@ struct libtrace_format_data_out_t {
 
 static int wag_init_input(struct libtrace_t *libtrace) {
 	struct stat buf;
-	//struct sockaddr_un unix_sock;
 	libtrace->format_data = (struct libtrace_format_data_t *) 
 		calloc(1,sizeof(struct libtrace_format_data_t));
 	CONNINFO.path = libtrace->uridata;
@@ -150,24 +147,21 @@ static int wag_init_input(struct libtrace_t *libtrace) {
 }
 
 static int wtf_init_input(struct libtrace_t *libtrace) {
-	struct stat buf;
-	struct sockaddr_un unix_sock;
 
 	libtrace->format_data = (struct libtrace_format_data_t *)
                 calloc(1,sizeof(struct libtrace_format_data_t));
 	CONNINFO.path = libtrace->uridata;
 
 	if (!strncmp(CONNINFO.path,"-",1)) {
-		// STDIN
+		/* STDIN */
 		libtrace->sourcetype = STDIN;
 		INPUT.file = LIBTRACE_FDOPEN(fileno(stdin),"r");
 
 	} else {
-
-
-		// Do we need this socket stuff at all??
-		// If we do, put it into wag_init_input as it uses
-		// INPUT.fd
+		/* Do we need this socket stuff at all??
+		 * If we do, put it into wag_init_input as it uses
+		 * INPUT.fd
+		 */
 
 		/*
 		if (stat(CONNINFO.path,&buf) == -1 ) {
@@ -196,18 +190,18 @@ static int wtf_init_input(struct libtrace_t *libtrace) {
 			}
 		} else { 
 		*/
-			// TRACE
+			/* TRACE */
 			libtrace->sourcetype = TRACE;
 			
-			// we use an FDOPEN call to reopen an FD
-			// returned from open(), so that we can set
-			// O_LARGEFILE. This gets around gzopen not
-			// letting you do this...
+			/* we use an FDOPEN call to reopen an FD
+			 * returned from open(), so that we can set
+			 * O_LARGEFILE. This gets around gzopen not
+			 * letting you do this...
+			 */
 			INPUT.file = LIBTRACE_FDOPEN(open(
 					CONNINFO.path,
 					O_LARGEFILE), "r");
 
-		//}
 	}
 	return 1;
 }
@@ -221,10 +215,10 @@ static int wtf_init_output(struct libtrace_out_t *libtrace) {
 	OPTIONS.zlib.level = 0;
 	asprintf(&filemode,"wb%d",OPTIONS.zlib.level);
 	if (!strncmp(libtrace->uridata,"-",1)) {
-		// STDOUT				
+		/* STDOUT */
 		OUTPUT.file = LIBTRACE_FDOPEN(dup(1), filemode);
 	} else {
-		// TRACE
+		/* TRACE */
 		OUTPUT.file = LIBTRACE_FDOPEN(open(
 					libtrace->uridata,
 					O_CREAT | O_LARGEFILE | O_WRONLY,
@@ -234,32 +228,25 @@ static int wtf_init_output(struct libtrace_out_t *libtrace) {
 	return 1;
 }
 
-static int wtf_config_output(struct libtrace_out_t *libtrace, int argc, char *argv[]) {
+static int wtf_config_output(struct libtrace_out_t *libtrace, 
+		trace_option_output_t option,
+		void *value) {
+	switch(option) {
 #if HAVE_ZLIB
-	int opt;
-	int level = OPTIONS.zlib.level;
-	optind = 1;
-	while ((opt = getopt(argc, argv, "z:")) != EOF) {
-		switch (opt) {
-			case 'z':
-				level = atoi(optarg);
-				break;
-			default:
-				printf("Bad argument to wag: %s\n", optarg);
-				return -1;
-		}
-	}
-	if (level != OPTIONS.zlib.level) {
-		if (level > 9 || level < 0) {
-			// retarded level choice
-			printf("Compression level must be between 0 and 9 inclusive - you selected %i \n", level);
-		} else {
-			OPTIONS.zlib.level = level;
-			return gzsetparams(OUTPUT.file, level, Z_DEFAULT_STRATEGY);
-		}
-	}
+		case TRACE_OPTION_OUTPUT_COMPRESS:
+			OPTIONS.zlib.level = *(int*)value;
+			assert(OPTIONS.zlib.level>=0 
+					&& OPTIONS.zlib.level<=9);
+			break;
+#else
+		case TRACE_OPTION_OUTPUT_COMPRESS:
+			/* E feature unavailable */
+			return -1;
 #endif
-	return 0;
+		default:
+			/* E unknown feature */
+			return -1;
+	}
 }
 
 static int wag_fin_input(struct libtrace_t *libtrace) {
@@ -279,13 +266,13 @@ static int wtf_fin_output(struct libtrace_out_t *libtrace) {
 
 static int wag_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
         int numbytes;
-	int framesize;
+	size_t framesize;
 	assert(libtrace);
 
         if (buffer == 0)
                 buffer = malloc(len);
 
-	// read in wag_frame_hdr
+	/* read in wag_frame_hdr */
 	if ((numbytes = read(INPUT.fd, 
 			buffer,
 			sizeof(struct wag_frame_hdr))) != sizeof(struct wag_frame_hdr)) {
@@ -298,9 +285,9 @@ static int wag_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
 		return -1;
 	}
 
-	// read in remainder of packet
+	/* read in remainder of packet */
 	if((numbytes = read(INPUT.fd,
-	       		buffer + sizeof(struct wag_frame_hdr),
+	       		(char*)buffer + sizeof(struct wag_frame_hdr),
 	       		framesize - sizeof(struct wag_frame_hdr))) != 
 			(framesize - sizeof(struct wag_frame_hdr))) {
 		
@@ -315,7 +302,6 @@ static int wag_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
 static int wag_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
 	int numbytes;
 	
-	char buf[RP_BUFSIZE];
         if (packet->buf_control == EXTERNAL) {
                 packet->buf_control = PACKET;
                 packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
@@ -330,13 +316,9 @@ static int wag_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 	}
 
 	
-//	memcpy(packet->buffer, buf, numbytes);
-	
-	packet->status.type = RT_DATA;
-	packet->status.message = 0;
 	packet->size = numbytes;
 	packet->header = packet->buffer;
-	packet->payload = packet->buffer + trace_get_framing_length(packet);
+	packet->payload=(char*)packet->buffer+trace_get_framing_length(packet);
 	return numbytes;
 }
 
@@ -363,7 +345,7 @@ static int wtf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 	}
 
 	framesize = ntohs(((struct wag_frame_hdr *)buffer)->size);
-	buffer2 = buffer + sizeof(struct wag_frame_hdr);
+	buffer2 = (char*)buffer + sizeof(struct wag_frame_hdr);
 	size = framesize - sizeof(struct wag_frame_hdr);
 	assert(size < LIBTRACE_PACKET_BUFSIZE);
 
@@ -373,11 +355,9 @@ static int wtf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 		return -1;
 	}
 
-	packet->status.type = RT_DATA;
-	packet->status.message = 0;
 	packet->size = framesize;
 	packet->header = packet->buffer;
-	packet->payload = packet->buffer + trace_get_framing_length(packet);
+	packet->payload=(char*)packet->buffer+trace_get_framing_length(packet);
 	return framesize;
 	
 }				
@@ -405,15 +385,6 @@ static int wtf_write_packet(struct libtrace_out_t *libtrace, const struct libtra
 	return numbytes;
 }
 
-static void *wag_get_link(const struct libtrace_packet_t *packet) {
-	/*
-	struct wag_data_frame *wagptr = (struct wag_data_frame *)packet->buffer;
-	void *payload = wagptr->data;
-	return (void*)payload;
-	*/
-	return (void *)packet->payload;
-}
-
 static libtrace_linktype_t wag_get_link_type(const struct libtrace_packet_t *packet __attribute__((unused))) {
 	return TRACE_TYPE_80211;
 }
@@ -435,13 +406,11 @@ static uint64_t wag_get_erf_timestamp(const struct libtrace_packet_t *packet) {
 
 static int wag_get_capture_length(const struct libtrace_packet_t *packet) {
 	struct wag_data_frame *wagptr = (struct wag_data_frame *)packet->buffer;
-	//return (wagptr->hdr.size);
 	return ntohs(wagptr->hdr.size);
 }
 
 static int wag_get_wire_length(const struct libtrace_packet_t *packet) {
 	struct wag_data_frame *wagptr = (struct wag_data_frame *)packet->buffer;
-	//return (wagptr->hdr.size);
 	return ntohs(wagptr->hdr.size);
 }
 

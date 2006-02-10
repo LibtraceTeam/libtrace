@@ -263,7 +263,7 @@ struct libtrace_t *trace_create(const char *uri) {
 	
 	trace_err.err_num = E_NOERROR;
         
-        // parse the URI to determine what sort of event we are dealing with
+        /* parse the URI to determine what sort of event we are dealing with */
 	if ((uridata = trace_parse_uri(uri, &scan)) == 0) {
 		return 0;
 	}
@@ -283,25 +283,23 @@ struct libtrace_t *trace_create(const char *uri) {
 	if (libtrace->format == 0) {
 		trace_err.err_num = E_BAD_FORMAT;
 		strcpy(trace_err.problem, scan);
-		//trace_err.problem = scan;
 		return 0;
 	}
 
         libtrace->uridata = strdup(uridata);
-        // libtrace->format now contains the type of uri
-        // libtrace->uridata contains the appropriate data for this
+        /* libtrace->format now contains the type of uri
+         * libtrace->uridata contains the appropriate data for this
+	 */
         
 	if (libtrace->format->init_input) {
 		if (!libtrace->format->init_input( libtrace)) {
 			trace_err.err_num = E_INIT_FAILED;
 			strcpy(trace_err.problem, scan);
-			//trace_err.problem = scan;
 			return 0;
 		}
 	} else {
 		trace_err.err_num = E_NO_INIT;
 		strcpy(trace_err.problem, scan);
-		//trace_err.problem = scan;
 		return 0;
 	}
 	
@@ -349,7 +347,6 @@ struct libtrace_t * trace_create_dead (const char *uri) {
         if (libtrace->format == 0) {
                 trace_err.err_num = E_BAD_FORMAT;
                 strcpy(trace_err.problem, scan);
-		//trace_err.problem = scan;
                 return 0;
         }
 	
@@ -382,7 +379,7 @@ struct libtrace_out_t *trace_create_output(const char *uri) {
         int i;
 
 	trace_err.err_num = E_NOERROR;
-        // parse the URI to determine what sort of event we are dealing with
+        /* parse the URI to determine what sort of event we are dealing with */
 
 	if ((uridata = trace_parse_uri(uri, &scan)) == 0) {
 		return 0;
@@ -402,14 +399,14 @@ struct libtrace_out_t *trace_create_output(const char *uri) {
         if (libtrace->format == 0) {
 		trace_err.err_num = E_BAD_FORMAT;
 		strcpy(trace_err.problem, scan);
-		//trace_err.problem = scan;	
                 return 0;
         }
         libtrace->uridata = strdup(uridata);
 
 
-        // libtrace->format now contains the type of uri
-        // libtrace->uridata contains the appropriate data for this
+        /* libtrace->format now contains the type of uri
+         * libtrace->uridata contains the appropriate data for this
+	 */
 
         if (libtrace->format->init_output) {
                 if(!libtrace->format->init_output( libtrace)) {
@@ -418,7 +415,6 @@ struct libtrace_out_t *trace_create_output(const char *uri) {
 	} else {
 		trace_err.err_num = E_NO_INIT_OUT;
 		strcpy(trace_err.problem, scan);
-		//trace_err.problem = scan;
                 return 0;
         }
 
@@ -457,21 +453,11 @@ int trace_start(struct libtrace_t *libtrace)
  *
  * @author Shane Alcock
  */
-int trace_config_output(struct libtrace_out_t *libtrace, char *options) {
-	char *opt_string = 0;
-	char *opt_argv[MAXOPTS];
-	int opt_argc = 0;
-	
-	assert(libtrace);
-	
-	if (!options) {
-		return 0;
-	}
-	asprintf(&opt_string, "%s %s", libtrace->format->name, options);
-	parse_cmd(opt_string, &opt_argc, opt_argv, MAXOPTS);
-	
+int trace_config_output(struct libtrace_out_t *libtrace, 
+		trace_option_output_t option,
+		void *value) {
 	if (libtrace->format->config_output) {
-		return libtrace->format->config_output(libtrace, opt_argc, opt_argv);
+		return libtrace->format->config_output(libtrace, option, value);
 	}
 	return -1;
 }
@@ -482,7 +468,7 @@ int trace_config_output(struct libtrace_out_t *libtrace, char *options) {
 void trace_destroy(struct libtrace_t *libtrace) {
         assert(libtrace);
 	libtrace->format->fin_input(libtrace);
-        // need to free things!
+        /* need to free things! */
         free(libtrace->uridata);
 	destroy_tracefifo(libtrace->fifo);
         free(libtrace);
@@ -507,14 +493,11 @@ void trace_destroy_output(struct libtrace_out_t *libtrace) {
 	free(libtrace);
 }
 
-/** Create a new packet object
- *
- * @ return a pointer to an initialised libtrace_packet_t structure
- */
-struct libtrace_packet_t *trace_create_packet() {
-	struct libtrace_packet_t *packet = calloc(1,sizeof(struct libtrace_packet_t));
-	packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
-	packet->buf_control = PACKET;
+libtrace_packet_t *trace_create_packet() {
+	libtrace_packet_t *packet = calloc(1,sizeof(libtrace_packet_t));
+	/* This used to malloc a packet!  Why do we need to malloc a packet
+	 * if we're doing zero copy?
+	 */
 	return packet;
 }
 
@@ -606,13 +589,13 @@ struct libtrace_ip *trace_get_ip(const struct libtrace_packet_t *packet) {
 	switch(trace_get_link_type(packet)) {
 		case TRACE_TYPE_80211_PRISM:
 			{
-				struct ieee_802_11_header *wifi = trace_get_link(packet)+144;
+				struct ieee_802_11_header *wifi = (char*)trace_get_link(packet)+144;
 				if (!wifi) {
 					ipptr = NULL;
 					break;
 				}
 
-				// Data packet?
+				/* Data packet? */
 				if (wifi->type != 2) {
 					ipptr = NULL;
 				}
@@ -643,7 +626,7 @@ struct libtrace_ip *trace_get_ip(const struct libtrace_packet_t *packet) {
 					break;
 				}
 
-				// Data packet?
+				/* Data packet? */
 				if (wifi->type != 2) {
 					ipptr = NULL;
 				}
@@ -726,7 +709,7 @@ struct libtrace_ip *trace_get_ip(const struct libtrace_packet_t *packet) {
 			break;
 		case TRACE_TYPE_LEGACY_POS:
 			{
-				// 64 byte capture. 
+				/* 64 byte capture. */
 				struct libtrace_pos *pos = 
 					trace_get_link(packet);
 				if (ntohs(pos->ether_type) == 0x0800) {
@@ -740,13 +723,14 @@ struct libtrace_ip *trace_get_ip(const struct libtrace_packet_t *packet) {
 		case TRACE_TYPE_LEGACY_ATM:
 		case TRACE_TYPE_ATM:
 			{
-				// 64 byte capture.
+				/* 64 byte capture. */
 				struct libtrace_llcsnap *llc = 
 					trace_get_link(packet);
 
-				// advance the llc ptr +4 into the link layer.
-				// need to check what is in these 4 bytes.
-				// don't have time!
+				/* advance the llc ptr +4 into the link layer.
+				 * need to check what is in these 4 bytes.
+				 * don't have time!
+				 */
 				llc = (void *)llc + 4;
 				if (ntohs(llc->type) == 0x0800) {
 					ipptr = ((void *)llc) + sizeof(*llc);
@@ -795,7 +779,7 @@ void *trace_get_transport(const struct libtrace_packet_t *packet) {
  *
  * Skipped can be NULL, in which case it will be ignored
  */
-void *trace_get_transport_from_ip(const struct libtrace_ip *ip, int *skipped) {
+void *trace_get_transport_from_ip(const libtrace_ip_t *ip, int *skipped) {
 	void *trans_ptr = 0;	
 
 	if ((ip->ip_off & SW_IP_OFFMASK) == 0) {
@@ -813,7 +797,7 @@ void *trace_get_transport_from_ip(const struct libtrace_ip *ip, int *skipped) {
  *
  * @returns a pointer to the TCP header, or NULL if there is not a TCP packet
  */
-struct libtrace_tcp *trace_get_tcp(const struct libtrace_packet_t *packet) {
+libtrace_tcp_t *trace_get_tcp(const libtrace_packet_t *packet) {
         struct libtrace_tcp *tcpptr = 0;
         struct libtrace_ip *ipptr = 0;
 
@@ -834,9 +818,8 @@ struct libtrace_tcp *trace_get_tcp(const struct libtrace_packet_t *packet) {
  *
  * Skipped can be NULL, in which case it will be ignored by the program.
  */
-struct libtrace_tcp *trace_get_tcp_from_ip(const struct libtrace_ip *ip, int *skipped)
+libtrace_tcp_t *trace_get_tcp_from_ip(const libtrace_ip_t *ip, int *skipped)
 {
-#define SW_IP_OFFMASK 0xff1f
 	struct libtrace_tcp *tcpptr = 0;
 
 	if (ip->ip_p == 6)  {
@@ -957,8 +940,9 @@ int trace_get_next_option(unsigned char **ptr,int *len,
 		default:
 			*optlen = *(*ptr+1);
 			if (*optlen<2)
-				return 0; // I have no idea wtf is going on
-					  // with these packets
+				return 0; /* I have no idea wtf is going on
+					   * with these packets
+					   */
 			(*len)-=*optlen;
 			(*data)=(*ptr+2);
 			(*ptr)+=*optlen;
@@ -984,15 +968,15 @@ uint64_t trace_get_erf_timestamp(const struct libtrace_packet_t *packet) {
 	assert(packet->size>0 && packet->size<65536);
 
 	if (packet->trace->format->get_erf_timestamp) {
-		// timestamp -> timestamp
+		/* timestamp -> timestamp */
 		timestamp = packet->trace->format->get_erf_timestamp(packet);
 	} else if (packet->trace->format->get_timeval) {
-		// timeval -> timestamp
+		/* timeval -> timestamp */
 		ts = packet->trace->format->get_timeval(packet);
 		timestamp = ((((uint64_t)ts.tv_sec) << 32) + \
 				(((uint64_t)ts.tv_usec * UINT_MAX)/1000000));
 	} else if (packet->trace->format->get_seconds) {
-		// seconds -> timestamp
+		/* seconds -> timestamp */
 		seconds = packet->trace->format->get_seconds(packet);
 		timestamp = ((uint64_t)((uint32_t)seconds) << 32) + \
 			    (( seconds - (uint32_t)seconds   ) * UINT_MAX);
@@ -1013,10 +997,10 @@ struct timeval trace_get_timeval(const struct libtrace_packet_t *packet) {
 	double seconds = 0.0;
 	assert(packet->size>0 && packet->size<65536);
 	if (packet->trace->format->get_timeval) {
-		// timeval -> timeval
+		/* timeval -> timeval */
 		tv = packet->trace->format->get_timeval(packet);
 	} else if (packet->trace->format->get_erf_timestamp) {
-		// timestamp -> timeval
+		/* timestamp -> timeval */
 		ts = packet->trace->format->get_erf_timestamp(packet);
 #if __BYTE_ORDER == __BIG_ENDIAN
 		tv.tv_sec = ts & 0xFFFFFFFF;
@@ -1033,7 +1017,7 @@ struct timeval trace_get_timeval(const struct libtrace_packet_t *packet) {
                		tv.tv_sec += 1;
        		}
 	} else if (packet->trace->format->get_seconds) {
-		// seconds -> timeval
+		/* seconds -> timeval */
 		seconds = packet->trace->format->get_seconds(packet);
 		tv.tv_sec = (uint32_t)seconds;
 		tv.tv_usec = (uint32_t)(((seconds - tv.tv_sec) * 1000000)/UINT_MAX);
@@ -1055,14 +1039,14 @@ double trace_get_seconds(const struct libtrace_packet_t *packet) {
 	assert(packet->size>0 && packet->size<65536);
 	
 	if (packet->trace->format->get_seconds) {
-		// seconds->seconds
+		/* seconds->seconds */
 		seconds = packet->trace->format->get_seconds(packet);
 	} else if (packet->trace->format->get_erf_timestamp) {
-		// timestamp -> seconds
+		/* timestamp -> seconds */
 		ts = packet->trace->format->get_erf_timestamp(packet);
 		seconds =  (ts>>32) + ((ts & UINT_MAX)*1.0 / UINT_MAX);
 	} else if (packet->trace->format->get_timeval) {
-		// timeval -> seconds
+		/* timeval -> seconds */
 		tv = packet->trace->format->get_timeval(packet);
 		seconds = tv.tv_sec + ((tv.tv_usec * UINT_MAX * 1.0)/1000000);
 	}
@@ -1264,27 +1248,10 @@ int trace_bpf_filter(struct libtrace_filter_t *filter,
 	if (filter->filterstring && ! filter->filter) {
 		pcap_t *pcap;
 		struct bpf_program bpfprog;
-
-		switch (trace_get_link_type(packet)) {
-			case TRACE_TYPE_ETH:
-				pcap = (pcap_t *)pcap_open_dead(DLT_EN10MB, 1500);
-				break;
-#ifdef DLT_LINUX_SLL
-			case TRACE_TYPE_LINUX_SLL:
-				pcap = (pcap_t *)pcap_open_dead(DLT_LINUX_SLL, 1500);
-				break;
-#endif
-#ifdef DLT_PFLOG
-			case TRACE_TYPE_PFLOG:
-				pcap = (pcap_t *)pcap_open_dead(DLT_PFLOG, 1500);
-				break;
-#endif
-			default:
-				printf("only works for ETH and LINUX_SLL (ppp) at the moment\n");
-				assert(0);
-		}		
-
-		// build filter
+		pcap=(pcap_t *)pcap_open_dead(
+				libtrace_to_pcap_dlt(trace_get_link_type(packet)),
+				1500);
+		/* build filter */
 		if (pcap_compile( pcap, &bpfprog, filter->filterstring, 1, 0)) {
 			printf("bpf compilation error: %s: %s\n", 
 				pcap_geterr(pcap),filter->filterstring);
@@ -1480,7 +1447,7 @@ int8_t trace_get_server_port(uint8_t protocol __attribute__((unused)), uint16_t 
 	if (ROOT_SERVER(dest) && !ROOT_SERVER(source)) 
 		return USE_DEST;
 	*/
-	// failing that test...
+	/* failing that test... */
 	if (source < dest) {
 		return USE_SOURCE;
 	} 
@@ -1515,20 +1482,20 @@ const char * trace_parse_uri(const char *uri, char **format) {
 	const char *uridata = 0;
 	
 	if((uridata = strchr(uri,':')) == NULL) {
-                // badly formed URI - needs a :
+                /* badly formed URI - needs a : */
                 trace_err.err_num = E_URI_NOCOLON;
                 return 0;
         }
 
         if ((uridata - uri) > URI_PROTO_LINE) {
-                // badly formed URI - uri type is too long
+                /* badly formed URI - uri type is too long */
                 trace_err.err_num = E_URI_LONG;
                 return 0;
         }
 
         *format=xstrndup(uri, (uridata - uri));
 
-	// push uridata past the delimiter
+	/* push uridata past the delimiter */
         uridata++;
 	
 	return uridata;

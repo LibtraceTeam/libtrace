@@ -97,7 +97,6 @@ struct tracefifo_t *create_tracefifo(size_t size)
 void destroy_tracefifo(struct tracefifo_t *fifo)
 {
         assert(fifo);
-        //free(tracefifo_stat_buffer);
         free(fifo->base);
         free(fifo);
 }
@@ -115,7 +114,7 @@ static void increment_pointer(struct tracefifo_t *fifo, enum which_t which, int 
 }
 
 void tracefifo_flush(struct tracefifo_t *fifo __attribute__((unused))) {
-        // do nothing
+        /* do nothing */
         return;
 }
 
@@ -219,7 +218,7 @@ static int tracefifo_read_generic(struct tracefifo_t *fifo, void *buffer, size_t
                                 (char *)((ptrdiff_t)fifo->base + fifo->datamap[which]), 
                                 size);
                 increment_pointer(fifo,which,size);
-                buffer += size;
+                buffer = (char*)buffer+size;
                 lenleft -= size;
         }
 

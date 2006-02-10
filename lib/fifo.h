@@ -31,15 +31,16 @@
 
 #ifndef _FIFO_H_
 #define _FIFO_H_
+#include <inttypes.h>
 
 struct tracefifo_t;
 
 typedef struct tracefifo_state {
-        long long int in;
-        long long int out;
-        long long int ack;
-        long long int length;
-        long long int used;
+        uint64_t in;
+        uint64_t out;
+        uint64_t ack;
+        uint64_t length;
+        uint64_t used;
 } tracefifo_state_t;
 
 
@@ -69,4 +70,4 @@ void tracefifo_flush(struct tracefifo_t *fifo);
 
 
 
-#endif // _FIFO_H_
+#endif /* _FIFO_H_ */

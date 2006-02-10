@@ -4,4 +4,4 @@
 void parse_cmd(char *buf, int *pargc, char *pargv[], int MAXTOKENS);
 
 
-#endif // PARSE_CMD_H
+#endif /* PARSE_CMD_H */

@@ -37,12 +37,12 @@ typedef struct aal5_rec {
 }  aal5_rec_t;
 
 typedef struct flags {
-	uint8_t   iface:2;
-	uint8_t   vlen:1;
-	uint8_t   trunc:1;
-	uint8_t   rxerror:1;
-	uint8_t   dserror:1;
-	uint8_t   pad:2;
+	unsigned int   iface:2;
+	unsigned int   vlen:1;
+	unsigned int   trunc:1;
+	unsigned int   rxerror:1;
+	unsigned int   dserror:1;
+	unsigned int   pad:2;
 } __attribute__((packed)) flags_t;
 
 /* GPP Global type */
@@ -86,4 +86,4 @@ typedef struct duck_inf_pkt {
 
 #define dag_record_size         16
 
-#endif // _DAGFORMAT_H_
+#endif /* _DAGFORMAT_H_ */

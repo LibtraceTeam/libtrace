@@ -24,4 +24,4 @@
 #  define LIBTRACE_WRITE(file,buf,len) write(file,buf,len)
 #endif
 
-#endif // COMMON_H
+#endif /* COMMON_H */

@@ -35,4 +35,4 @@ int trace_read(struct libtrace_t *libtrace, void *buffer, size_t len);
 
 struct libtrace_eventobj_t trace_event_device(struct libtrace_t *trace, struct libtrace_packet_t *packet);
 struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct libtrace_packet_t *packet);
-#endif // FORMAT_HELPER_H
+#endif /* FORMAT_HELPER_H */

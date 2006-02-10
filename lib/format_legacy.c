@@ -192,8 +192,6 @@ static int legacy_read_packet(struct libtrace_t *libtrace, struct libtrace_packe
 		perror("libtrace_read");
 		return -1;
 	}
-	packet->status.type = RT_DATA;
-	packet->status.message = 0;
 	packet->size = 64;
 	
 	packet->header = packet->buffer;

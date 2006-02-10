@@ -53,6 +53,8 @@ int main(int argc, char *argv[]) {
 	struct libtrace_t *trace;
 	
 	trace = trace_create(uri);
+
+	trace_start(trace);
 	
 	if (trace) {
 		printf("success: can open erf traces\n");	
