@@ -72,7 +72,15 @@ extern "C" {
 
 #include <stdbool.h>
 
-typedef enum {SOCKET, TRACE, STDIN, DEVICE, INTERFACE, RT } source_t;
+typedef enum {
+	TRACE_SOURCE_SOCKET, 
+	TRACE_SOURCE_TRACE, 
+	TRACE_SOURCE_STDIN, 
+	TRACE_SOURCE_DEVICE, 
+	TRACE_SOURCE_INTERFACE, 
+	TRACE_SOURCE_RT 
+} 
+	source_t;
 
 
 extern struct trace_err_t{

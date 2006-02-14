@@ -133,7 +133,7 @@ static int wag_init_input(struct libtrace_t *libtrace) {
 		return 0;
 	}
 	if (S_ISCHR(buf.st_mode)) {
-		libtrace->sourcetype = DEVICE;
+		libtrace->sourcetype = TRACE_SOURCE_DEVICE;
 				
 		INPUT.fd = open(CONNINFO.path, O_RDONLY);
 
@@ -154,7 +154,7 @@ static int wtf_init_input(struct libtrace_t *libtrace) {
 
 	if (!strncmp(CONNINFO.path,"-",1)) {
 		/* STDIN */
-		libtrace->sourcetype = STDIN;
+		libtrace->sourcetype = TRACE_SOURCE_STDIN;
 		INPUT.file = LIBTRACE_FDOPEN(fileno(stdin),"r");
 
 	} else {
@@ -191,7 +191,7 @@ static int wtf_init_input(struct libtrace_t *libtrace) {
 		} else { 
 		*/
 			/* TRACE */
-			libtrace->sourcetype = TRACE;
+			libtrace->sourcetype = TRACE_SOURCE_TRACE;
 			
 			/* we use an FDOPEN call to reopen an FD
 			 * returned from open(), so that we can set
@@ -424,7 +424,7 @@ static int wag_get_fd(const struct libtrace_packet_t *packet) {
 
 static struct libtrace_eventobj_t wag_event_trace(struct libtrace_t *trace, struct libtrace_packet_t *packet) {
 	switch(trace->sourcetype) {
-		case DEVICE:
+		case TRACE_SOURCE_DEVICE:
 			return trace_event_device(trace,packet);
 		default:
 			return trace_event_trace(trace,packet);

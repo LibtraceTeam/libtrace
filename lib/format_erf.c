@@ -218,7 +218,7 @@ static int erf_init_input(struct libtrace_t *libtrace) {
 	CONNINFO.path = libtrace->uridata;
 	if (!strncmp(CONNINFO.path,"-",1)) {
 		/* STDIN */
-		libtrace->sourcetype = STDIN;
+		libtrace->sourcetype = TRACE_SOURCE_STDIN;
 		INPUT.file = LIBTRACE_FDOPEN(fileno(stdin), "r");
 		
 
@@ -228,7 +228,7 @@ static int erf_init_input(struct libtrace_t *libtrace) {
 			return 0;
 		}
 		if (S_ISSOCK(buf.st_mode)) {
-			libtrace->sourcetype = SOCKET;
+			libtrace->sourcetype = TRACE_SOURCE_SOCKET;
 			if ((INPUT.fd = socket(
 					AF_UNIX, SOCK_STREAM, 0)) == -1) {
 				perror("socket");
@@ -248,7 +248,7 @@ static int erf_init_input(struct libtrace_t *libtrace) {
 			}
 		} else { 
 
-			libtrace->sourcetype = TRACE;
+			libtrace->sourcetype = TRACE_SOURCE_TRACE;
 
 			/* we use an FDOPEN call to reopen an FD
 			 * returned from open(), so that we can set
@@ -271,7 +271,7 @@ static int rtclient_init_input(struct libtrace_t *libtrace) {
 	libtrace->format_data = (struct libtrace_format_data_t *)
 		malloc(sizeof(struct libtrace_format_data_t));
 
-	libtrace->sourcetype = RT;
+	libtrace->sourcetype = TRACE_SOURCE_RT;
 
 	if (strlen(uridata) == 0) {
 		CONNINFO.rt.hostname = 
