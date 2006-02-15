@@ -167,7 +167,7 @@ static int dag_init_input(struct libtrace_t *libtrace) {
 	} 
 	if (S_ISCHR(buf.st_mode)) {
 		/* DEVICE */
-		libtrace->sourcetype = DEVICE;
+		libtrace->sourcetype = TRACE_SOURCE_DEVICE;
 		if((INPUT.fd = dag_open(CONNINFO.path)) < 0) {
 			fprintf(stderr,"Cannot open DAG %s: %m\n", 
 					CONNINFO.path,errno);
