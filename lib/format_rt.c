@@ -303,19 +303,19 @@ static int rt_send_ack(struct libtrace_t *libtrace,
 		ack_buffer = malloc(sizeof(rt_header_t) + sizeof(rt_ack_t));
 	}
 	
-	hdr = (rt_header_t) ack_buffer;
-	ack_hdr = (rt_ack_t) (ack_buffer + sizeof(rt_header_t));
+	hdr = (rt_header_t *) ack_buffer;
+	ack_hdr = (rt_ack_t *) (ack_buffer + sizeof(rt_header_t));
 	
 	hdr->type = RT_ACK;
 	hdr->length = sizeof(rt_header_t) + sizeof(rt_ack_t);
 
-	ack_hdr->ts = trace_get_erf_timestamp(packet);
+	ack_hdr->timestamp = trace_get_erf_timestamp(packet);
 	
 	to_write = hdr->length;
 	buf_ptr = ack_buffer;
 	
 	while (to_write > 0) {
-		numbytes = send(RT_INFO.input_fd, buf_ptr, to_write); 
+		numbytes = send(RT_INFO->input_fd, buf_ptr, to_write, 0); 
 		if (numbytes == -1) {
 			if (errno == EINTR || errno == EAGAIN) {
 				continue;
@@ -428,8 +428,7 @@ static int rt_read_packet(struct libtrace_t *libtrace,
 
 			case RT_END_DATA:
 				// need to do something sensible here
-				
-				break;
+				return 0;	
 
 			case RT_PAUSE_ACK:
 				// Check if we asked for a pause
