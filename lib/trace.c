@@ -436,7 +436,7 @@ int trace_start(struct libtrace_t *libtrace)
 {
 	if (libtrace->format->start_input) {
 		int ret=libtrace->format->start_input(libtrace);
-		if (!ret) {
+		if (ret < 0) {
 			return ret;
 		}
 	}

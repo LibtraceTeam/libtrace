@@ -94,6 +94,7 @@ typedef struct libtrace_packet_t {
 	void *payload;
 	void *buffer;
 	size_t size;
+	uint8_t type;		// rt protocol type for the packet
 	buf_control_t buf_control; 
 } libtrace_packet_t;
                      
@@ -679,7 +680,7 @@ int trace_get_wire_length(const libtrace_packet_t *packet);
 
 /** Get the length of the capture framing headers.
  * @param packet  	the packet opaque pointer
- * @return the size of the packet as it was on the wire.
+ * @return the size of the framing header.
  * @author Perry Lorier
  * @author Daniel Lawson
  * @note this length corresponds to the difference between the size of a 

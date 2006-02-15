@@ -1,9 +1,9 @@
 lib_LTLIBRARIES = libtrace.la
-include_HEADERS = libtrace.h dagformat.h wag.h lt_inttypes.h daglegacy.h
+include_HEADERS = libtrace.h dagformat.h wag.h lt_inttypes.h daglegacy.h rt_protocol.h
 
 extra_DIST = format_template.c
 libtrace_la_SOURCES = trace.c fifo.c fifo.h common.h \
-		format_erf.c format_pcap.c format_wag.c format_legacy.c \
+		format_erf.c format_pcap.c format_wag.c format_legacy.c format_rt.c\
 		format_helper.c format_helper.h \
 		parse_cmd.c parse_cmd.h libtrace_int.h lt_inttypes.h \
 		linktypes.c 

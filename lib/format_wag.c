@@ -266,35 +266,63 @@ static int wtf_fin_output(struct libtrace_out_t *libtrace) {
 
 static int wag_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
         int numbytes;
-	size_t framesize;
-	assert(libtrace);
+        int framesize;
+        char *buf_ptr = (char *)buffer;
+        int to_read = 0;
+        uint16_t magic = 0;
+        uint16_t lctr = 0;
 
-        if (buffer == 0)
-                buffer = malloc(len);
+        assert(libtrace);
 
-	/* read in wag_frame_hdr */
-	if ((numbytes = read(INPUT.fd, 
-			buffer,
-			sizeof(struct wag_frame_hdr))) != sizeof(struct wag_frame_hdr)) {
-		return -1;
-	}
-	 
-	framesize = ntohs(((struct wag_frame_hdr *)buffer)->size);
+        to_read = sizeof(struct frame_t);
 
-	if (framesize > len) {
-		return -1;
-	}
+        while (to_read>0) {
+          int ret=read(INPUT.fd,buf_ptr,to_read);
 
-	/* read in remainder of packet */
-	if((numbytes = read(INPUT.fd,
-	       		(char*)buffer + sizeof(struct wag_frame_hdr),
-	       		framesize - sizeof(struct wag_frame_hdr))) != 
-			(framesize - sizeof(struct wag_frame_hdr))) {
-		
-		return -1;
-	  
-	}
+          if (ret == -1) {
+            if (errno == EINTR || errno==EAGAIN)
+              continue;
+            perror("read(frame)");
+            return -1;
+          }
 
+          assert(ret>0);
+
+          to_read = to_read - ret;
+          buf_ptr = buf_ptr + ret;
+        }
+
+        framesize = ntohs(((struct frame_t *)buffer)->size);
+        magic = ntohs(((struct frame_t *)buffer)->magic);
+
+        if (magic != 0xdaa1) {
+          printf("Magic number is BAD!\n");
+          return -1;
+        }
+
+        if (framesize > len) {
+          printf("Framesize > len\n");
+                return -1;
+        }
+
+        buf_ptr = buffer + sizeof (struct frame_t);
+        to_read = framesize - sizeof(struct frame_t);
+        
+	while (to_read>0) {
+          int ret=read(INPUT.fd,buf_ptr,to_read);
+
+          if (ret == -1) {
+            if (errno == EINTR || errno==EAGAIN)
+              continue;
+            perror("read(frame)");
+            return -1;
+          }
+
+          // assert(ret>0);
+
+          to_read = to_read - ret;
+          buf_ptr = buf_ptr + ret;
+        }
         return framesize;
 }
 
@@ -335,7 +363,7 @@ static int wtf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
         }
 
 	
-	if ((numbytes = LIBTRACE_READ(INPUT.file, buffer, sizeof(struct wag_frame_hdr))) == -1) {
+	if ((numbytes = LIBTRACE_READ(INPUT.file, buffer, sizeof(struct frame_t))) == -1) {
 		perror("libtrace_read");
 		return -1;
 	}
@@ -344,9 +372,9 @@ static int wtf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 		return 0;
 	}
 
-	framesize = ntohs(((struct wag_frame_hdr *)buffer)->size);
-	buffer2 = (char*)buffer + sizeof(struct wag_frame_hdr);
-	size = framesize - sizeof(struct wag_frame_hdr);
+	framesize = ntohs(((struct frame_t *)buffer)->size);
+	buffer2 = (char*)buffer + sizeof(struct frame_t);
+	size = framesize - sizeof(struct frame_t);
 	assert(size < LIBTRACE_PACKET_BUFSIZE);
 
 	
@@ -390,7 +418,7 @@ static libtrace_linktype_t wag_get_link_type(const struct libtrace_packet_t *pac
 }
 
 static int8_t wag_get_direction(const struct libtrace_packet_t *packet) {
-	struct wag_data_frame *wagptr = (struct wag_data_frame *)packet->buffer;
+	struct frame_data_rx_t *wagptr = (struct frame_data_rx_t *)packet->buffer;
 	if (wagptr->hdr.type == 0) {
 		return wagptr->hdr.subtype;
 	}
@@ -398,24 +426,24 @@ static int8_t wag_get_direction(const struct libtrace_packet_t *packet) {
 }
 
 static uint64_t wag_get_erf_timestamp(const struct libtrace_packet_t *packet) {
-	struct wag_data_frame *wagptr = (struct wag_data_frame *)packet->buffer;
+	struct frame_data_rx_t *wagptr = (struct frame_data_rx_t *)packet->buffer;
 	uint64_t timestamp = 0;
 	timestamp = ((uint64_t)(ntohl(wagptr->ts.secs)) << 32) | (uint64_t)(ntohl(wagptr->ts.subsecs));
 	return timestamp;
 }
 
 static int wag_get_capture_length(const struct libtrace_packet_t *packet) {
-	struct wag_data_frame *wagptr = (struct wag_data_frame *)packet->buffer;
+	struct frame_data_rx_t *wagptr = (struct frame_data_rx_t *)packet->buffer;
 	return ntohs(wagptr->hdr.size);
 }
 
 static int wag_get_wire_length(const struct libtrace_packet_t *packet) {
-	struct wag_data_frame *wagptr = (struct wag_data_frame *)packet->buffer;
+	struct frame_data_rx_t *wagptr = (struct frame_data_rx_t *)packet->buffer;
 	return ntohs(wagptr->hdr.size);
 }
 
 static int wag_get_framing_length(const struct libtrace_packet_t *packet) {
-	return sizeof(struct wag_data_frame);
+	return sizeof(struct frame_data_rx_t);
 }
 
 static int wag_get_fd(const struct libtrace_packet_t *packet) {
