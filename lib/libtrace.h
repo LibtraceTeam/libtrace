@@ -94,7 +94,7 @@ typedef struct libtrace_packet_t {
 	void *payload;
 	void *buffer;
 	size_t size;
-	uint8_t type;		// rt protocol type for the packet
+	uint8_t type;		/* rt protocol type for the packet */
 	buf_control_t buf_control; 
 } libtrace_packet_t;
                      
@@ -307,7 +307,9 @@ void trace_perror(const char *caller);
  *  - wag:/path/to/wag/socket
  *
  *  If an error occured when attempting to open the trace file, NULL is returned
- *  and trace_errno is set. Use trace_perror() to get more information 
+ *  and trace_errno is set. Use trace_perror() to get more information.  
+ *  The trace is created in the configuration state, you must call trace_start
+ *  to start the capture.
  */
 struct libtrace_t *trace_create(const char *uri);
 
@@ -346,6 +348,16 @@ libtrace_out_t *trace_create_output(const char *uri);
  * all the config options.  This may fail.
  */
 int trace_start(libtrace_t *libtrace);
+
+/** Pause the capture
+ * @param libtrace	The trace to pause
+ * @return 0 on success
+ *
+ * This stops a capture in progress and returns you to the configuration
+ * state.  Any packets that arrive after trace_pause() has been called
+ * will be discarded.  To resume capture, call trace_start().
+ */
+int trace_pause(libtrace_t *libtrace);
 
 /** Start an output trace
  * @param libtrace	The trace to start
@@ -412,6 +424,7 @@ void trace_destroy_dead(libtrace_t *trace);
  * @author Shane Alcock
  */
 void trace_destroy_output(libtrace_out_t *trace);
+
 /*@}*/
 
 /** @name Reading/Writing packets
@@ -680,7 +693,7 @@ int trace_get_wire_length(const libtrace_packet_t *packet);
 
 /** Get the length of the capture framing headers.
  * @param packet  	the packet opaque pointer
- * @return the size of the framing header.
+ * @return the size of the packet as it was on the wire.
  * @author Perry Lorier
  * @author Daniel Lawson
  * @note this length corresponds to the difference between the size of a 
@@ -697,6 +710,28 @@ int trace_get_framing_length(const libtrace_packet_t *packet);
  * @author Daniel Lawson
  */
 size_t trace_set_capture_length(libtrace_packet_t *packet, size_t size);
+
+/** Seek within a trace
+ * @param trace		trace to seek
+ * @param seconds	time to seek to
+ * @return 0 on success.
+ * Make the next packet read to be the first packet to occur at or after the
+ * time searched for.  This must be called in the configuration state (ie,
+ * before trace_start() or after trace_pause().
+ * @note This function may be extremely slow.
+ */
+int trace_seek_seconds(libtrace_t *trace, double seconds);
+
+/** Seek within a trace
+ * @param trace		trace to seek
+ * @param tv		time to seek to
+ * @return 0 on success.
+ * Make the next packet read to be the first packet to occur at or after the
+ * time searched for.  This must be called in the configuration state (ie,
+ * before trace_start() or after trace_pause().
+ * @note This function may be extremely slow.
+ */
+int trace_seek_timeval(libtrace_t *trace, struct timeval tv);
 
 /*@}*/
 

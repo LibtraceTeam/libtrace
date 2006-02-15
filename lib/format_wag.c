@@ -305,7 +305,7 @@ static int wag_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
                 return -1;
         }
 
-        buf_ptr = buffer + sizeof (struct frame_t);
+        buf_ptr = (void*)((char*)buffer + sizeof (struct frame_t));
         to_read = framesize - sizeof(struct frame_t);
         
 	while (to_read>0) {
@@ -317,8 +317,6 @@ static int wag_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
             perror("read(frame)");
             return -1;
           }
-
-          // assert(ret>0);
 
           to_read = to_read - ret;
           buf_ptr = buf_ptr + ret;
@@ -493,6 +491,7 @@ static struct libtrace_format_t wag = {
 	wag_init_input,			/* init_input */	
 	NULL,				/* config_input */
 	NULL,				/* start_input */
+	NULL,				/* pause_input */
 	NULL,				/* init_output */
 	NULL,				/* config_output */
 	NULL,				/* start_output */
@@ -506,6 +505,9 @@ static struct libtrace_format_t wag = {
 	wag_get_erf_timestamp,		/* get_erf_timestamp */
 	NULL,				/* get_timeval */
 	NULL,				/* get_seconds */
+	NULL,				/* seek_erf */
+	NULL,				/* seek_timeval */
+	NULL,				/* seek_seconds */
 	wag_get_capture_length,		/* get_capture_length */
 	wag_get_wire_length,		/* get_wire_length */
 	wag_get_framing_length,		/* get_framing_length */
@@ -524,6 +526,7 @@ static struct libtrace_format_t wag_trace = {
         wtf_init_input,                 /* init_input */
 	NULL,				/* config input */
 	NULL,				/* start input */
+	NULL,				/* pause_input */
         wtf_init_output,                /* init_output */
         wtf_config_output,              /* config_output */
 	NULL,				/* start output */
@@ -537,6 +540,9 @@ static struct libtrace_format_t wag_trace = {
         wag_get_erf_timestamp,          /* get_erf_timestamp */
         NULL,                           /* get_timeval */
         NULL,                           /* get_seconds */
+	NULL,				/* seek_erf */
+	NULL,				/* seek_timeval */
+	NULL,				/* seek_seconds */
         wag_get_capture_length,         /* get_capture_length */
         wag_get_wire_length,            /* get_wire_length */
         wag_get_framing_length,         /* get_framing_length */

@@ -860,6 +860,7 @@ static struct libtrace_format_t erf = {
 	erf_init_input,			/* init_input */	
 	NULL,				/* config_input */
 	NULL,				/* start_input */
+	NULL,				/* pause_input */
 	erf_init_output,		/* init_output */
 	erf_config_output,		/* config_output */
 	NULL,				/* start_output */
@@ -873,6 +874,9 @@ static struct libtrace_format_t erf = {
 	erf_get_erf_timestamp,		/* get_erf_timestamp */
 	NULL,				/* get_timeval */
 	NULL,				/* get_seconds */
+	NULL,				/* seek_erf */
+	NULL,				/* seek_timeval */
+	NULL,				/* seek_seconds */
 	erf_get_capture_length,		/* get_capture_length */
 	erf_get_wire_length,		/* get_wire_length */
 	erf_get_framing_length,		/* get_framing_length */
@@ -920,6 +924,7 @@ static struct libtrace_format_t rtclient = {
 	rtclient_init_input,		/* init_input */	
 	NULL,				/* config_input */
 	NULL,				/* start_input */
+	NULL,				/* pause_input */
 	NULL,				/* init_output */
 	NULL,				/* config_output */
 	NULL,				/* start_output */
@@ -933,6 +938,9 @@ static struct libtrace_format_t rtclient = {
 	erf_get_erf_timestamp,		/* get_erf_timestamp */
 	NULL,				/* get_timeval */
 	NULL,				/* get_seconds */
+	NULL,				/* seek_erf */
+	NULL,				/* seek_timeval */
+	NULL,				/* seek_seconds */
 	erf_get_capture_length,		/* get_capture_length */
 	erf_get_wire_length,		/* get_wire_length */
 	erf_get_framing_length,		/* get_framing_length */

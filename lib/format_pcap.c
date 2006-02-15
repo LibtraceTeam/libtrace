@@ -420,6 +420,7 @@ static struct libtrace_format_t pcap = {
 	pcap_init_input,		/* init_input */
 	NULL,				/* config_input */
 	NULL,				/* start_input */
+	NULL,				/* pause_input */
 	pcap_init_output,		/* init_output */
 	NULL,				/* config_output */
 	NULL,				/* start_output */
@@ -433,6 +434,9 @@ static struct libtrace_format_t pcap = {
 	NULL,				/* get_erf_timestamp */
 	pcap_get_timeval,		/* get_timeval */
 	NULL,				/* get_seconds */
+	NULL,				/* seek_erf */
+	NULL,				/* seek_timeval */
+	NULL,				/* seek_seconds */
 	pcap_get_capture_length,	/* get_capture_length */
 	pcap_get_wire_length,		/* get_wire_length */
 	pcap_get_framing_length,	/* get_framing_length */
@@ -449,6 +453,7 @@ static struct libtrace_format_t pcapint = {
 	pcapint_init_input,		/* init_input */
 	NULL,				/* config_input */
 	NULL,				/* start_input */
+	NULL,				/* pause_input */
 	pcapint_init_output,		/* init_output */
 	NULL,				/* config_output */
 	NULL,				/* start_output */
@@ -462,6 +467,9 @@ static struct libtrace_format_t pcapint = {
 	NULL,				/* get_erf_timestamp */
 	pcap_get_timeval,		/* get_timeval */
 	NULL,				/* get_seconds */
+	NULL,				/* seek_erf */
+	NULL,				/* seek_timeval */
+	NULL,				/* seek_seconds */
 	pcap_get_capture_length,	/* get_capture_length */
 	pcap_get_wire_length,		/* get_wire_length */
 	pcap_get_framing_length,	/* get_framing_length */

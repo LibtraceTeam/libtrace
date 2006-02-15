@@ -445,6 +445,16 @@ int trace_start(struct libtrace_t *libtrace)
 	return 0;
 }
 
+int trace_pause(libtrace_t *libtrace)
+{
+	assert(libtrace);
+	assert(libtrace->started && "BUG: Called trace_pause without calling trace_start first");
+	if (libtrace->format->pause_input)
+		libtrace->format->pause_input(libtrace);
+	libtrace->started=false;
+	return 0;
+}
+
 /* Parses an output options string and calls the appropriate function to deal with output options.
  *
  * @param libtrace	the output trace object to apply the options to
@@ -589,7 +599,9 @@ struct libtrace_ip *trace_get_ip(const struct libtrace_packet_t *packet) {
 	switch(trace_get_link_type(packet)) {
 		case TRACE_TYPE_80211_PRISM:
 			{
-				struct ieee_802_11_header *wifi = (char*)trace_get_link(packet)+144;
+				struct ieee_802_11_header *wifi = 
+					(void*)(
+					 (char*)trace_get_link(packet)+144);
 				if (!wifi) {
 					ipptr = NULL;
 					break;
@@ -604,14 +616,15 @@ struct libtrace_ip *trace_get_ip(const struct libtrace_packet_t *packet) {
 					ipptr = NULL;
 
 					if (ntohs(eth->type) == 0x0800) {
-					    ipptr=((void*)eth) + sizeof(*eth);
+					    ipptr=(void*)
+						    ((char*)eth + sizeof(*eth));
 					} else if (ntohs(eth->type) == 0x8100) {
 					    struct libtrace_8021q *vlanhdr =
 						(struct libtrace_8021q *)eth;
 					    if (ntohs(vlanhdr->vlan_ether_type)
 							    == 0x0800) {
-						ipptr=((void*)eth) + 
-							sizeof(*vlanhdr);
+						ipptr=(void*)(
+						 (char*)eth+sizeof(*vlanhdr));
 					    }
 					}
 				}
@@ -635,14 +648,14 @@ struct libtrace_ip *trace_get_ip(const struct libtrace_packet_t *packet) {
 					ipptr = NULL;
 
 					if (ntohs(eth->type) == 0x0800) {
-					    ipptr=((void*)eth) + sizeof(*eth);
+					    ipptr=(void*)((char*)eth + sizeof(*eth));
 					} else if (ntohs(eth->type) == 0x8100) {
 					    struct libtrace_8021q *vlanhdr =
 						(struct libtrace_8021q *)eth;
 					    if (ntohs(vlanhdr->vlan_ether_type)
 							    == 0x0800) {
-						ipptr=((void*)eth) + 
-							sizeof(*vlanhdr);
+						ipptr=(void*)((char*)eth + 
+							sizeof(*vlanhdr));
 					    }
 					}
 				}
@@ -660,14 +673,14 @@ struct libtrace_ip *trace_get_ip(const struct libtrace_packet_t *packet) {
 				ipptr = NULL;
 				
 				if (ntohs(eth->ether_type)==0x0800) {
-					ipptr = ((void *)eth) + sizeof(*eth);
+					ipptr = (void*)((char *)eth + sizeof(*eth));
 				} else if (ntohs(eth->ether_type) == 0x8100) {
 					struct libtrace_8021q *vlanhdr = 
 						(struct libtrace_8021q *)eth;
 					if (ntohs(vlanhdr->vlan_ether_type) 
 							== 0x0800) {
-						ipptr = ((void *)eth) + 
-							sizeof(*vlanhdr);
+						ipptr = (void*)((char *)eth + 
+							sizeof(*vlanhdr));
 					}
 				}
 				break;
@@ -688,7 +701,8 @@ struct libtrace_ip *trace_get_ip(const struct libtrace_packet_t *packet) {
 					ipptr = NULL;
 				}
 				else {
-					ipptr = ((void*)sll)+sizeof(*sll);
+					ipptr = (void*)((char*)sll+
+							sizeof(*sll));
 				}
 			}
 			break;
@@ -703,7 +717,8 @@ struct libtrace_ip *trace_get_ip(const struct libtrace_packet_t *packet) {
 				if (pflog->af != AF_INET) {
 					ipptr = NULL;
 				} else {
-					ipptr = ((void*)pflog)+sizeof(*pflog);
+					ipptr = (void*)((char*)pflog+
+						sizeof(*pflog));
 				}
 			}
 			break;
@@ -713,9 +728,9 @@ struct libtrace_ip *trace_get_ip(const struct libtrace_packet_t *packet) {
 				struct libtrace_pos *pos = 
 					trace_get_link(packet);
 				if (ntohs(pos->ether_type) == 0x0800) {
-					ipptr = ((void *)pos) + sizeof(*pos);
+					ipptr=(void*)((char *)pos+sizeof(*pos));
 				} else {
-					ipptr = NULL;
+					ipptr=NULL;
 				}
 				break;
 				
@@ -731,9 +746,9 @@ struct libtrace_ip *trace_get_ip(const struct libtrace_packet_t *packet) {
 				 * need to check what is in these 4 bytes.
 				 * don't have time!
 				 */
-				llc = (void *)llc + 4;
+				llc = (void*)((char *)llc + 4);
 				if (ntohs(llc->type) == 0x0800) {
-					ipptr = ((void *)llc) + sizeof(*llc);
+					ipptr=(void*)((char*)llc+sizeof(*llc));
 				} else {
 					ipptr = NULL;
 				}

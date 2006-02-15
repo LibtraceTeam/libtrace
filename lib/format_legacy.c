@@ -278,6 +278,7 @@ static struct libtrace_format_t legacyatm = {
 	erf_init_input,			/* init_input */	
 	NULL,				/* config_input */
 	NULL,				/* start_input */
+	NULL,				/* pause_input */
 	NULL,				/* init_output */
 	NULL,				/* config_output */
 	NULL,				/* start_output */
@@ -291,6 +292,9 @@ static struct libtrace_format_t legacyatm = {
 	legacy_get_erf_timestamp,	/* get_erf_timestamp */
 	NULL,				/* get_timeval */
 	NULL,				/* get_seconds */
+	NULL,				/* seek_erf */
+	NULL,				/* seek_timeval */
+	NULL,				/* seek_seconds */
 	legacy_get_capture_length,	/* get_capture_length */
 	legacyatm_get_wire_length,	/* get_wire_length */
 	legacyatm_get_framing_length,	/* get_framing_length */
@@ -307,6 +311,7 @@ static struct libtrace_format_t legacyeth = {
 	erf_init_input,			/* init_input */	
 	NULL,				/* config_input */
 	NULL,				/* start_input */
+	NULL,				/* pause_input */
 	NULL,				/* init_output */
 	NULL,				/* config_output */
 	NULL,				/* start_output */
@@ -320,6 +325,9 @@ static struct libtrace_format_t legacyeth = {
 	legacy_get_erf_timestamp,	/* get_erf_timestamp */
 	NULL,				/* get_timeval */
 	NULL,				/* get_seconds */
+	NULL,				/* seek_erf */
+	NULL,				/* seek_timeval */
+	NULL,				/* seek_seconds */
 	legacy_get_capture_length,	/* get_capture_length */
 	legacyeth_get_wire_length,	/* get_wire_length */
 	legacyeth_get_framing_length,	/* get_framing_length */
@@ -336,6 +344,7 @@ static struct libtrace_format_t legacypos = {
 	erf_init_input,			/* init_input */	
 	NULL,				/* config_input */
 	NULL,				/* start_input */
+	NULL,				/* pause_input */
 	NULL,				/* init_output */
 	NULL,				/* config_output */
 	NULL,				/* start_output */
@@ -349,6 +358,9 @@ static struct libtrace_format_t legacypos = {
 	legacy_get_erf_timestamp,	/* get_erf_timestamp */
 	NULL,				/* get_timeval */
 	NULL,				/* get_seconds */
+	NULL,				/* seek_erf */
+	NULL,				/* seek_timeval */
+	NULL,				/* seek_seconds */
 	legacy_get_capture_length,	/* get_capture_length */
 	legacypos_get_wire_length,	/* get_wire_length */
 	legacypos_get_framing_length,	/* get_framing_length */

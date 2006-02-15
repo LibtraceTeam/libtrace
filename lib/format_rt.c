@@ -67,6 +67,27 @@
 
 #define RT_INFO libtrace->format_data
 
+char *rt_deny_reason(uint8_t reason) {
+	char *string = 0;
+
+	switch(reason) {
+		case RT_DENY_WRAPPER:
+			string = "Rejected by TCP Wrappers";
+			break;
+		case RT_DENY_FULL:
+			string = "Max connections reached on server";
+			break;
+		case RT_DENY_AUTH:
+			string = "Authentication failed";
+			break;
+		default:
+			string = "Unknown reason";
+	}
+
+	return string;
+}
+
+
 struct libtrace_format_data_t {
 	char *hostname;
 	int port;
@@ -106,7 +127,7 @@ static int rt_connect(struct libtrace_t *libtrace) {
                 return 0;
         }
 	
-	// We are connected, now receive message from server
+	/* We are connected, now receive message from server */
 	
 	if (recv(RT_INFO->input_fd, &connect_msg, sizeof(rt_header_t), 0) != sizeof(rt_header_t) ) {
 		printf("An error occured while connecting to %s\n", RT_INFO->hostname);
@@ -483,15 +504,16 @@ static struct libtrace_format_t rt = {
         "rt",
         "$Id$",
         "rt",
-        rt_init_input,            /* init_input */
+        rt_init_input,            	/* init_input */
         NULL,                           /* config_input */
-        rt_start_input,           /* start_input */
+        rt_start_input,           	/* start_input */
         NULL,                           /* init_output */
         NULL,                           /* config_output */
         NULL,                           /* start_output */
-        rt_fin_input,             /* fin_input */
+	NULL,				/* pause_output */
+        rt_fin_input,             	/* fin_input */
         NULL,                           /* fin_output */
-        rt_read_packet,           /* read_packet */
+        rt_read_packet,           	/* read_packet */
         NULL,                           /* write_packet */
         NULL,		                /* get_link_type */
         NULL,  		            	/* get_direction */
@@ -499,6 +521,9 @@ static struct libtrace_format_t rt = {
         NULL,          			/* get_erf_timestamp */
         NULL,                           /* get_timeval */
         NULL,                           /* get_seconds */
+	NULL,				/* seek_erf */
+	NULL,				/* seek_timeval */
+	NULL,				/* seek_seconds */
         NULL,         			/* get_capture_length */
         NULL,            		/* get_wire_length */
         NULL,         			/* get_framing_length */

@@ -31,41 +31,43 @@
 #ifndef _WAG_H
 #define _WAG_H
 
-// This is the WAG magic number - used to delimit frames
+/* This is the WAG magic number - used to delimit frames */
 #define WAG_MAGIC               (0xdaa1)
 
-// Define frame types
+/* Define frame types */
 #define FRAME_TYPE_DATA         (0x0000)
 #define FRAME_TYPE_UNDEFINED    (0xffff)
 
-// Define frame subtypes
+/* Define frame subtypes */
 #define FRAME_SUBTYPE_DATA_RX   (0x0000)
 #define FRAME_SUBTYPE_DATA_TX   (0x0001)
 
-// This is the common part of the frame header.
-// We synchronise by scanning a stream to look for the magic number (WAG_MAGIC).
-// We can then tell the size and type of this frame, and pass over it if necessary.
+/* This is the common part of the frame header.
+ * We synchronise by scanning a stream to look for the magic number (WAG_MAGIC).
+ * We can then tell the size and type of this frame, and pass over it if necessary.
+ */
 struct frame_t {
-  uint16_t magic;                                   // magic number (0xdaa1)
-  uint16_t size;                                    // total frame size in bytes
-  uint16_t type;                                    // frame type
-  uint16_t subtype;                                 // frame subtype
+  uint16_t magic;                                   /* magic number (0xdaa1) */
+  uint16_t size;                                    /* total frame size in bytes */
+  uint16_t type;                                    /* frame type */
+  uint16_t subtype;                                 /* frame subtype */
 };
 
-///////////////////////////////////////////////////////////////////////////////////
+/*/////////////////////////////////////////////////////////////////////////////////
 //
 // Frames that the radio part of the WAG framework understands
 //
 ///////////////////////////////////////////////////////////////////////////////////
 // Common subfields...
+*/
 
-// timestamp
+/* timestamp */
 struct timestamp_t {
-  uint32_t           secs;                          // seconds since start of 01-01-1970
-  uint32_t           subsecs;                       // (1/(2^32))ths of a second
+  uint32_t           secs;                          /* seconds since start of 01-01-1970 */
+  uint32_t           subsecs;                       /* (1/(2^32))ths of a second */
 };
 
-// frame stream information
+/* frame stream information */
 struct strinfo_t {
   uint16_t unused_1;
   uint16_t unused_2;
@@ -73,48 +75,48 @@ struct strinfo_t {
   uint16_t packets_lost;
 };
 
-// Type: DATA, Subtype: RX
+/* Type: DATA, Subtype: RX */
 struct frame_data_rx_t {
-  struct frame_t                 hdr;               // common frame header
-  struct strinfo_t               strinfo;           // stream status
-  struct timestamp_t             ts;                // timestamp of reception of this frame
+  struct frame_t                 hdr;               /* common frame header */
+  struct strinfo_t               strinfo;           /* stream status */
+  struct timestamp_t             ts;                /* timestamp of reception of this frame */
   struct {
-    uint8_t              rssi;                      // receive signal strength of this frame
-    uint8_t              rxstatus;                  // rx status bits from the modem
-    uint16_t             length;                    // length in bytes of the frame payload
+    uint8_t              rssi;                      /* receive signal strength of this frame */
+    uint8_t              rxstatus;                  /* rx status bits from the modem */
+    uint16_t             length;                    /* length in bytes of the frame payload */
     struct {
-      uint8_t  signal;                              // 802.11PLCP signal field
-      uint8_t  service;                             // 802.11PLCP service field
-      uint16_t length; } plcp; } rxinfo;            // 802.11PLCP length field (uS)
-  char                           data[0];           // placeholder to allow payload access
+      uint8_t  signal;                              /* 802.11PLCP signal field */
+      uint8_t  service;                             /* 802.11PLCP service field */
+      uint16_t length; } plcp; } rxinfo;            /* 802.11PLCP length field (uS) */
+  char                           data[0];           /* placeholder to allow payload access */
 };
 
-// Type: DATA, Subtype: TX
+/* Type: DATA, Subtype: TX */
 struct frame_data_tx_t {
-  struct frame_t                 hdr;               // common frame header
-  uint64_t                       unused_1;          //
-  uint64_t                       unused_2;          //
+  struct frame_t                 hdr;               /* common frame header */
+  uint64_t                       unused_1;         
+  uint64_t                       unused_2;          
   struct {
-    uint8_t  gain;                                  // tx gain with which to send this packet
-    uint8_t  mode;                                  // tx mode with which to send this packet
-    uint16_t length;                                // length in bytes of the frame payload
-    uint32_t unused_1; }         txinfo;            //
-  char                           data[0];           // placeholder to allow payload access
+    uint8_t  gain;                                  /* tx gain with which to send this packet */
+    uint8_t  mode;                                  /* tx mode with which to send this packet */
+    uint16_t length;                                /* length in bytes of the frame payload */
+    uint32_t unused_1; }         txinfo;            
+  char                           data[0];           /* placeholder to allow payload access */
 };
 
 struct ieee_802_11_header {
-        uint8_t      protocol:2;
-        uint8_t      type:2;
-        uint8_t      subtype:4;
-        uint8_t      to_ds:1;
-        uint8_t      from_ds:1;
-        uint8_t      more_frag:1;
-        uint8_t      retry:1;
-        uint8_t      power:1;
-        uint8_t      more_data:1;
-        uint8_t      wep:1;
-        uint8_t      order:1;
-        uint16_t     duration;
+        unsigned int      protocol:2;
+        unsigned int      type:2;
+        unsigned int      subtype:4;
+        unsigned int      to_ds:1;
+        unsigned int      from_ds:1;
+        unsigned int      more_frag:1;
+        unsigned int      retry:1;
+        unsigned int      power:1;
+        unsigned int      more_data:1;
+        unsigned int      wep:1;
+        unsigned int      order:1;
+        unsigned int     duration;
         uint8_t      mac1[6];
         uint8_t      mac2[6];
         uint8_t      mac3[6];
