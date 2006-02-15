@@ -239,6 +239,56 @@ static int rt_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
         return numbytes;
 }
 
+
+static int rt_set_format(struct libtrace_t *libtrace, 
+		struct libtrace_packet_t *packet, uint16_t format) {
+	switch (format) {
+		case RT_FORMAT_ERF:
+			if (!RT_INFO->dummy_erf) {
+				RT_INFO->dummy_erf = trace_create_dead("erf:-");
+			}
+			packet->trace = RT_INFO->dummy_erf;
+			break;
+		case RT_FORMAT_PCAP:
+			if (!RT_INFO->dummy_pcap) {
+				RT_INFO->dummy_pcap = trace_create_dead("pcap:-");
+			}
+			packet->trace = RT_INFO->dummy_pcap;
+			break;
+		case RT_FORMAT_WAG:
+			if (!RT_INFO->dummy_wag) {
+				RT_INFO->dummy_wag = trace_create_dead("wtf:-");
+			}
+			packet->trace = RT_INFO->dummy_wag;
+			break;
+		default:
+			printf("Unrecognised format: %d\n", format);
+			return -1;
+	}
+	return 1;
+}		
+
+static void rt_set_payload(struct libtrace_packet_t *packet, uint16_t format) {
+	dag_record_t *erfptr;
+	
+	switch (format) {
+		case RT_FORMAT_ERF:
+			erfptr = (dag_record_t *)packet->header;
+			
+			if (erfptr->flags.rxerror == 1) {
+				packet->payload = NULL;
+			} else {
+				packet->payload = (char *)packet->buffer
+					+ trace_get_framing_length(packet);
+			}
+			break;
+		default:
+			packet->payload = (char *)packet->buffer +
+				trace_get_framing_length(packet);
+			break;
+	}
+}
+
 static int rt_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
         
 	int numbytes = 0;
@@ -248,7 +298,6 @@ static int rt_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t 
 	uint16_t format;
 	char msg_buf[RP_BUFSIZE];
 
-	dag_record_t *erfptr;
 	
         void *buffer = 0;
 
@@ -302,47 +351,11 @@ static int rt_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t 
 					break;
 				}
 				// set packet->trace
-				switch (format) {
-					case RT_FORMAT_ERF:
-						if (!RT_INFO->dummy_erf) {
-							RT_INFO->dummy_erf = trace_create_dead("erf:-");
-						}
-						packet->trace = RT_INFO->dummy_erf;
-						break;
-					case RT_FORMAT_PCAP:
-						if (!RT_INFO->dummy_pcap) {
-							RT_INFO->dummy_pcap = trace_create_dead("pcap:-");
-						}
-						packet->trace = RT_INFO->dummy_pcap;
-						break;
-					case RT_FORMAT_WAG:
-						if (!RT_INFO->dummy_wag) {
-							RT_INFO->dummy_wag = trace_create_dead("wtf:-");
-						}
-						packet->trace = RT_INFO->dummy_wag;
-						break;
-					default:
-						printf("Unrecognised format: %d\n", format);
-						return -1;
+				if (rt_set_format(libtrace, packet, format) < 0) {
+					return -1;
 				}
-				
 				// set packet->payload
-				switch (format) {
-					case RT_FORMAT_ERF:
-						erfptr = (dag_record_t *)packet->header;
-						
-						if (erfptr->flags.rxerror == 1) {
-							packet->payload = NULL;
-						} else {
-							packet->payload = (char *)packet->buffer
-								+ trace_get_framing_length(packet);
-						}
-						break;
-					default:
-						packet->payload = (char *)packet->buffer +
-							trace_get_framing_length(packet);
-						break;
-				}
+				rt_set_payload(packet, format);
 				// send ack
 				break;
 			case RT_STATUS:
