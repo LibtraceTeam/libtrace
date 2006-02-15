@@ -289,7 +289,52 @@ static void rt_set_payload(struct libtrace_packet_t *packet, uint16_t format) {
 	}
 }
 
-static int rt_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
+static int rt_send_ack(struct libtrace_t *libtrace, 
+		struct libtrace_packet_t *packet)  {
+	
+	static char *ack_buffer = 0;
+	char *buf_ptr;
+	int numbytes = 0;
+	int to_write = 0;
+	rt_header_t *hdr;
+	rt_ack_t *ack_hdr;
+	
+	if (!ack_buffer) {
+		ack_buffer = malloc(sizeof(rt_header_t) + sizeof(rt_ack_t));
+	}
+	
+	hdr = (rt_header_t) ack_buffer;
+	ack_hdr = (rt_ack_t) (ack_buffer + sizeof(rt_header_t));
+	
+	hdr->type = RT_ACK;
+	hdr->length = sizeof(rt_header_t) + sizeof(rt_ack_t);
+
+	ack_hdr->ts = trace_get_erf_timestamp(packet);
+	
+	to_write = hdr->length;
+	buf_ptr = ack_buffer;
+	
+	while (to_write > 0) {
+		numbytes = send(RT_INFO.input_fd, buf_ptr, to_write); 
+		if (numbytes == -1) {
+			if (errno == EINTR || errno == EAGAIN) {
+				continue;
+			}
+			else {
+				printf("Error sending ack\n");
+				return -1;
+			}
+		}
+		to_write = to_write - numbytes;
+		buf_ptr = buf_ptr + to_write;
+		
+	}
+
+	return 1;
+}
+	
+static int rt_read_packet(struct libtrace_t *libtrace, 
+		struct libtrace_packet_t *packet) {
         
 	int numbytes = 0;
         char buf[RP_BUFSIZE];
@@ -343,8 +388,7 @@ static int rt_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t 
 					break;
 				}
 				if (tracefifo_out_read(libtrace->fifo, buffer, 
-							packet->size - 
-							sizeof(uint16_t)) == 0)
+							packet->size - sizeof(uint16_t))== 0)
 				{
 					tracefifo_out_reset(libtrace->fifo);
 					read_required = 1;
@@ -356,7 +400,12 @@ static int rt_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t 
 				}
 				// set packet->payload
 				rt_set_payload(packet, format);
+				
 				// send ack
+				if (rt_send_ack(libtrace, packet) == -1) {
+					return -1;
+				}
+				
 				break;
 			case RT_STATUS:
 				if (tracefifo_out_read(libtrace->fifo, buffer,
@@ -394,7 +443,7 @@ static int rt_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t 
 				break;
 
 			default:
-				printf("Bad rt type: %d\n", packet->type);
+				printf("Bad rt client type: %d\n", packet->type);
 				return -1;
 				
 		}
