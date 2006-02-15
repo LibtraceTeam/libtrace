@@ -25,6 +25,13 @@
 #define RT_FORMAT_PCAP		2
 #define RT_FORMAT_WAG		3
 
+typedef struct fifo_state {
+        uint64_t in;
+        uint64_t out;
+        uint64_t ack;
+        uint64_t length;
+        uint64_t used;
+} fifo_state_t;
 
 // RT packet header
 typedef struct rt_header {
@@ -50,7 +57,7 @@ typedef struct rt_ack {
 } rt_ack_t;
 
 typedef struct rt_status {
-	tracefifo_state_t fifo_status;
+	fifo_state_t fifo_status;
 } rt_status_t;
 
 typedef struct rt_duck {
@@ -108,5 +115,7 @@ char *rt_deny_reason(uint8_t reason) {
 
 	return string;
 }
+
+
 
 #endif
