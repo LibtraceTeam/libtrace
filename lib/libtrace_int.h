@@ -88,6 +88,7 @@ extern struct trace_err_t{
 	char problem[255];	/* the format, uri etc that caused the error for reporting purposes */
 } trace_err;
 
+void trace_set_error(int errcode,const char *msg,...);
 
 #define RP_BUFSIZE 65536
 
@@ -114,7 +115,12 @@ struct libtrace_t {
 	struct libtrace_event_t event;
 	char *uridata;
 	struct tracefifo_t *fifo;   
-
+	struct libtrace_filter_t *filter; /**< used by libtrace if the module
+					    * doesn't support filters natively
+					    */
+	int snaplen;			/**< used by libtrace if the module
+					  * doesn't support snapping natively
+					  */
 };
 
 struct libtrace_out_t {

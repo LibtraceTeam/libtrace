@@ -54,7 +54,8 @@ struct libtrace_eventobj_t trace_event_device(struct libtrace_t *trace, struct l
 		event.fd = 0;
 	}
 	if (ioctl(event.fd,FIONREAD,&data)==-1) {
-		perror("ioctl(FIONREAD)");
+		event.type = TRACE_EVENT_TERMINATE;
+		return event;
 	}
 	if (data>0) {
 		event.size = trace_read_packet(trace,packet);
@@ -81,8 +82,9 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 					packet->buffer,
 					trace->event.packet.size);
 		} else {
-			// return here, the test for
-			// event.size will sort out the error
+			/* return here, the test for
+			 * event.size will sort out the error
+			 */
 			event.type = TRACE_EVENT_TERMINATE;
 			return event;
 		}
@@ -90,16 +92,17 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 
 	ts=trace_get_seconds(packet);
 	if (trace->event.tdelta!=0) {
-		// Get the adjusted current time
+		/* Get the adjusted current time */
 		gettimeofday(&stv, NULL);
 		now = stv.tv_sec + 
 			((double)stv.tv_usec / 1000000.0);
-		// adjust for trace delta
+		/* adjust for trace delta */
 		now -= trace->event.tdelta; 
 
-		//if the trace timestamp is still in the 
+		/*if the trace timestamp is still in the 
 		//future, return a SLEEP event, 
 		//otherwise fire the packet
+		 */
 		if (ts > now) {
 			event.seconds = ts - 
 				trace->event.trace_last_ts;
@@ -108,15 +111,16 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 		}
 	} else {
 		gettimeofday(&stv, NULL);
-		// work out the difference between the 
+		/* work out the difference between the 
 		// start of trace replay, and the first
 		// packet in the trace
+		 */
 		trace->event.tdelta = stv.tv_sec + 
 			((double)stv.tv_usec / 1000000.0);
 		trace->event.tdelta -= ts;
 	}
 
-	// This is the first packet, so just fire away.
+	/* This is the first packet, so just fire away. */
 	packet->size = trace->event.packet.size;
 	memcpy(packet->buffer,
 			trace->event.packet.buffer,

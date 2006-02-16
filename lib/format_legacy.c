@@ -94,7 +94,7 @@ struct libtrace_format_data_t {
 #if HAVE_ZLIB
                 gzFile *file;
 #else	
-		//FILE  *file;
+		/*FILE  *file; */
 		int file;
 #endif
         } input;
@@ -134,19 +134,19 @@ static int erf_init_input(struct libtrace_t *libtrace) {
 
 	CONNINFO.path = libtrace->uridata;
 	if (!strncmp(CONNINFO.path,"-",1)) {
-		// STDIN
+		/* STDIN */
 		libtrace->sourcetype = TRACE_SOURCE_STDIN;
 		INPUT.file = LIBTRACE_FDOPEN(fileno(stdin), "r");
 	} else {
 		if (stat(CONNINFO.path,&buf) == -1 ) {
-			perror("stat");
+			trace_set_err(errno,"stat(%s)",CONNINFO.path);
 			return 0;
 		}
 		if (S_ISSOCK(buf.st_mode)) {
 			libtrace->sourcetype = TRACE_SOURCE_SOCKET;
 			if ((INPUT.fd = socket(
 					AF_UNIX, SOCK_STREAM, 0)) == -1) {
-				perror("socket");
+				trace_set_err("socket(%s)",CONNINFO.path);
 				return 0;
 			}
 			unix_sock.sun_family = AF_UNIX;
@@ -158,19 +158,24 @@ static int erf_init_input(struct libtrace_t *libtrace) {
 			if (connect(INPUT.fd, 
 					(struct sockaddr *)&unix_sock,
 					sizeof(struct sockaddr)) == -1) {
-				perror("connect (unix)");
+				trace_set_err("socket(%s)",CONNINFO.path);
 				return 0;
 			}
 		} else { 
+			int fd;
 			libtrace->sourcetype = TRACE_SOURCE_TRACE;
 
-			// we use an FDOPEN call to reopen an FD
+			/* we use an FDOPEN call to reopen an FD
 			// returned from open(), so that we can set
 			// O_LARGEFILE. This gets around gzopen not
 			// letting you do this...
-			INPUT.file = LIBTRACE_FDOPEN(open(
-						CONNINFO.path,
-						O_LARGEFILE),"r");
+			*/
+			fd=open( CONNINFO.path, O_LARGEFILE);
+			if (fd==-1) {
+				trace_set_err(errno,"open(%s)",CONNINFO.path);
+				return 0;
+			}
+			INPUT.file = LIBTRACE_FDOPEN(fd,"r");
 		}
 	}
 	return 1;
@@ -189,14 +194,14 @@ static int legacy_read_packet(struct libtrace_t *libtrace, struct libtrace_packe
 	if ((numbytes=LIBTRACE_READ(INPUT.file,
 					buffer,
 					64)) == -1) {
-		perror("libtrace_read");
+		trace_set_err(errno,"read(%s)",libtrace->uridata);
 		return -1;
 	}
 	packet->size = 64;
 	
 	packet->header = packet->buffer;
-	packet->payload = packet->buffer + 
-		packet->trace->format->get_framing_length(packet);
+	packet->payload = (void*)((char*)packet->buffer + 
+		packet->trace->format->get_framing_length(packet));
 	
 	return 64;
 	

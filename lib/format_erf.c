@@ -162,29 +162,29 @@ static int dag_init_input(struct libtrace_t *libtrace) {
 
 	CONNINFO.path = libtrace->uridata;
 	if (stat(CONNINFO.path,&buf) == -1) {
-		perror("stat");
+		trace_set_err(errno,"stat(%s)",CONNINFO.path);
 		return 0;
 	} 
 	if (S_ISCHR(buf.st_mode)) {
 		/* DEVICE */
 		libtrace->sourcetype = TRACE_SOURCE_DEVICE;
 		if((INPUT.fd = dag_open(CONNINFO.path)) < 0) {
-			fprintf(stderr,"Cannot open DAG %s: %m\n", 
-					CONNINFO.path,errno);
-			exit(0);
+			trace_set_err(errno,"Cannot open DAG %s",
+					CONNINFO.path);
+			return 0;
 		}
 		if((DAG.buf = (void *)dag_mmap(INPUT.fd)) == MAP_FAILED) {
-			fprintf(stderr,"Cannot mmap DAG %s: %m\n", 
-					CONNINFO.path,errno);
-			exit(0);
+			trace_set_err(errno,"Cannot mmap DAG %s",
+					CONNINFO.path);
+			return 0;
 		}
 		if(dag_start(INPUT.fd) < 0) {
-			fprintf(stderr,"Cannot start DAG %s: %m\n", 
-					CONNINFO.path,errno);
-			exit(0);
+			trace_set_err(errno,"Cannot start DAG %s",
+					CONNINFO.path);
+			return 0;
 		}
 	} else {
-		fprintf(stderr,"%s isn't a valid char device, exiting\n",
+		trace_set_err(errno,"Not a valid dag device: %s",
 				CONNINFO.path);
 		return 0;
 	}
@@ -220,18 +220,18 @@ static int erf_init_input(struct libtrace_t *libtrace) {
 		/* STDIN */
 		libtrace->sourcetype = TRACE_SOURCE_STDIN;
 		INPUT.file = LIBTRACE_FDOPEN(fileno(stdin), "r");
-		
-
 	} else {
 		if (stat(CONNINFO.path,&buf) == -1 ) {
-			perror("stat");
+			trace_set_err(errno,"stat(%s)",
+					CONNINFO.path);
 			return 0;
 		}
 		if (S_ISSOCK(buf.st_mode)) {
 			libtrace->sourcetype = TRACE_SOURCE_SOCKET;
 			if ((INPUT.fd = socket(
 					AF_UNIX, SOCK_STREAM, 0)) == -1) {
-				perror("socket");
+				trace_set_err(errno,
+						"socket(AF_UNIX,SOCK_STREAM)");
 				return 0;
 			}
 			unix_sock.sun_family = AF_UNIX;
@@ -243,10 +243,12 @@ static int erf_init_input(struct libtrace_t *libtrace) {
 			if (connect(INPUT.fd, 
 					(struct sockaddr *)&unix_sock,
 					sizeof(struct sockaddr)) == -1) {
-				perror("connect (unix)");
+				trace_set_err(errno,
+						"connect(%s)", CONNINFO.path);
 				return 0;
 			}
 		} else { 
+			int fd;
 
 			libtrace->sourcetype = TRACE_SOURCE_TRACE;
 
@@ -255,6 +257,11 @@ static int erf_init_input(struct libtrace_t *libtrace) {
 			 * O_LARGEFILE. This gets around gzopen not
 			 * letting you do this...
 			 */
+			fd=open(CONNINFO.path,O_LARGEFILE);
+			if (fd==-1) {
+				trace_set_err(errno,"Unable to open %s",
+						CONNINFO.path);
+			}
 			INPUT.file = LIBTRACE_FDOPEN(open(
 						CONNINFO.path,
 						O_LARGEFILE),"r");
@@ -294,11 +301,12 @@ static int rtclient_init_input(struct libtrace_t *libtrace) {
 	}
 	
 	if ((he=gethostbyname(CONNINFO.rt.hostname)) == NULL) {  
-		perror("gethostbyname");
+		trace_set_err(errno,"failed to resolve %s",
+				CONNINFO.rt.hostname);
 		return 0;
 	} 
 	if ((INPUT.fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-		perror("socket");
+		trace_set_err(errno,"socket(AF_INET,SOCK_STREAM)");
 		return 0;
 	}
 
@@ -309,7 +317,8 @@ static int rtclient_init_input(struct libtrace_t *libtrace) {
 
 	if (connect(INPUT.fd, (struct sockaddr *)&remote,
 				sizeof(struct sockaddr)) == -1) {
-		perror("connect (inet)");
+		trace_set_err(errno,"connect(%s)",
+				CONNINFO.rt.hostname);
 		return 0;
 	}
 	return 1;
@@ -346,6 +355,8 @@ static int erf_open_output(struct libtrace_out_t *libtrace) {
 				OPTIONS.erf.fileflag,
 				S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
                 if (fd <= 0) {
+			trace_set_err(errno,"OPEN(%s,\"w\")",
+					libtrace->uridata);
                         return 0;
                 }
                 OUTPUT.file = LIBTRACE_FDOPEN(fd,filemode);
@@ -366,6 +377,8 @@ static int erf_config_output(struct libtrace_out_t *libtrace, trace_option_t opt
 			return 0;
 		default:
 			/* Unknown option */
+			trace_set_err(TRACE_ERR_UNKNOWN_OPTION,
+					"Unknown option");
 			return -1;
 	}
 }
@@ -484,7 +497,8 @@ static int erf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 	if ((numbytes=LIBTRACE_READ(INPUT.file,
 					packet->buffer,
 					dag_record_size)) == -1) {
-		perror("libtrace_read");
+		trace_set_err(errno,"read(%s)",
+				CONNINFO.path);
 		return -1;
 	}
 	if (numbytes == 0) {
@@ -496,12 +510,6 @@ static int erf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 	size = rlen - dag_record_size;
 	assert(size < LIBTRACE_PACKET_BUFSIZE);
 	
-	/* If your trace is legacy, or corrupt, then this assert may fire. */
-	/* turns out some older traces have fixed snaplens, which are padded
-	 * with 00's if the packet is smaller, so this doesn't work.  Sigh.
-	assert(ntohs(((dag_record_t *)buffer)->rlen) <= 
-			ntohs(((dag_record_t*)buffer)->wlen)+erf_get_framing_length(packet));
-	*/
 	/* Unknown/corrupt */
 	assert(((dag_record_t *)packet->buffer)->type < 10);
 	
@@ -509,7 +517,7 @@ static int erf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 	if ((numbytes=LIBTRACE_READ(INPUT.file,
 					buffer2,
 					size)) != size) {
-		perror("libtrace_read");
+		trace_set_err(errno, "read(%s)", CONNINFO.path);
 		return -1;
 	}
 	packet->size = rlen;
@@ -540,7 +548,8 @@ static int rtclient_read(struct libtrace_t *libtrace, void *buffer, size_t len) 
 				 */
 				continue;
 			}
-			perror("recv");
+			trace_set_err(errno,"recv(%s)",
+					libtrace->uridata);
 			return -1;
 		}
 		break;
@@ -593,15 +602,6 @@ static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_pac
 		}
 		tracefifo_out_update(libtrace->fifo, sizeof(uint32_t));
 		
-		/*
-		// read in the ERF header
-		if ((numbytes = tracefifo_out_read(libtrace->fifo, buffer,
-						dag_record_size)) == 0) {
-			tracefifo_out_reset(libtrace->fifo);
-			read_required = 1;
-			continue;
-		}
-		*/
 		if (status.type == RT_MSG) {
 			/* Need to skip this packet as it is a message packet */
 			tracefifo_out_update(libtrace->fifo, packet->size);
@@ -635,16 +635,17 @@ static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_pac
 	} while(1);
 }
 
-static int erf_dump_packet(struct libtrace_out_t *libtrace, dag_record_t *erfptr, int pad, void *buffer, size_t size) {
+static int erf_dump_packet(struct libtrace_out_t *libtrace,
+		dag_record_t *erfptr, int pad, void *buffer, size_t size) {
 	int numbytes = 0;
 	if ((numbytes = LIBTRACE_WRITE(OUTPUT.file, erfptr, dag_record_size + pad)) == 0) {
-		perror("libtrace_write");
+		trace_set_err(errno,"write(%s)",CONNINFO.path);
 		return -1;
 	}
 
 	if (buffer) {
-		if ((numbytes = LIBTRACE_WRITE(OUTPUT.file, buffer, size)) == 0) {
-			perror("libtrace_write");
+		if ((numbytes=LIBTRACE_WRITE(OUTPUT.file, buffer, size)) == 0) {
+			trace_set_err(errno,"write(%s)",CONNINFO.path);
 			return -1;
 		}
 	
@@ -664,7 +665,7 @@ static int erf_write_packet(struct libtrace_out_t *libtrace, const struct libtra
 	   until we get the first packet. Not ideal, but it'll do for now */
 	if (!OUTPUT.file) {
 		if (erf_open_output(libtrace) <= 0) { 
-			perror("erf_open_output");
+			trace_set_err(errno,"open(%s)",libtrace->uridata);
 			return -1;
 		}
 	}

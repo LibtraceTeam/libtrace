@@ -184,37 +184,6 @@ void trace_help() {
 	}
 }
 
-/* Prints error information
- *
- * Prints out a descriptive error message for the currently set trace_err value
- */
-void trace_perror(const char *caller) {
-	switch (trace_err.err_num) {
-		case E_BAD_FORMAT:
-			fprintf(stderr, "%s: No support for format (%s)\n", caller, trace_err.problem);
-			break;
-		case E_NO_INIT:
-			fprintf(stderr, "%s: Format (%s) does not have an init_trace function defined\n", caller, trace_err.problem);
-			break;
-		case E_NO_INIT_OUT:
-			fprintf(stderr, "%s: Format (%s) does not have an init_output function defined\n", caller, trace_err.problem);
-			break;
-		case E_URI_LONG:
-			fprintf(stderr, "%s: uri is too long\n", caller);
-			break;
-		case E_URI_NOCOLON:
-			fprintf(stderr, "%s: A uri must contain at least one colon e.g. format:destination\n", caller);
-			break;
-		case E_INIT_FAILED:
-			fprintf(stderr, "%s: libtrace failed to initialise (%s)\n",caller,trace_err.problem);
-			
-		default:
-			fprintf(stderr, "Unknown errcode %d\n",trace_err.err_num);
-			break;	
-	}
-	trace_err.err_num = E_NOERROR;
-}
-
 #define RP_BUFSIZE 65536
 #define URI_PROTO_LINE 16
 
@@ -261,7 +230,7 @@ struct libtrace_t *trace_create(const char *uri) {
         const char *uridata = 0;                  
 	int i = 0;
 	
-	trace_err.err_num = E_NOERROR;
+	trace_err.err_num = TRACE_ERR_NOERROR;
         
         /* parse the URI to determine what sort of event we are dealing with */
 	if ((uridata = trace_parse_uri(uri, &scan)) == 0) {
@@ -269,6 +238,8 @@ struct libtrace_t *trace_create(const char *uri) {
 	}
 	
 	libtrace->event.tdelta = 0.0;
+	libtrace->filter = NULL;
+	libtrace->snaplen = 0;
 
 	libtrace->format = 0;
 	for (i = 0; i < nformats; i++) {
@@ -281,8 +252,8 @@ struct libtrace_t *trace_create(const char *uri) {
 		}
 	}
 	if (libtrace->format == 0) {
-		trace_err.err_num = E_BAD_FORMAT;
-		strcpy(trace_err.problem, scan);
+		trace_set_err(TRACE_ERR_BAD_FORMAT,
+				"Unknown format (%s)",scan);
 		return 0;
 	}
 
@@ -293,13 +264,14 @@ struct libtrace_t *trace_create(const char *uri) {
         
 	if (libtrace->format->init_input) {
 		if (!libtrace->format->init_input( libtrace)) {
-			trace_err.err_num = E_INIT_FAILED;
-			strcpy(trace_err.problem, scan);
+			/* init_input should call trace_set_err to set 
+			 * the error message
+			 */
 			return 0;
 		}
 	} else {
-		trace_err.err_num = E_NO_INIT;
-		strcpy(trace_err.problem, scan);
+		trace_set_err(TRACE_ERR_NO_INIT,
+				"Format does not support input (%s)",scan);
 		return 0;
 	}
 	
@@ -315,9 +287,9 @@ struct libtrace_t *trace_create(const char *uri) {
  *
  * @returns opaque pointer to a (sparsely initialised) libtrace_t
  *
- * IMPORTANT: Do not attempt to call trace_read_packet or other such functions with
- * the dummy trace. Its intended purpose is to act as a packet->trace for libtrace_packet_t's
- * that are not associated with a libtrace_t structure.
+ * IMPORTANT: Do not attempt to call trace_read_packet or other such functions
+ * with the dummy trace. Its intended purpose is to act as a packet->trace for
+ * libtrace_packet_t's that are not associated with a libtrace_t structure.
  */
 struct libtrace_t * trace_create_dead (const char *uri) {
 	struct libtrace_t *libtrace = malloc(sizeof(struct libtrace_t));
@@ -325,7 +297,7 @@ struct libtrace_t * trace_create_dead (const char *uri) {
 	char *uridata;
 	int i;
 	
-	trace_err.err_num = E_NOERROR;
+	trace_err.err_num = TRACE_ERR_NOERROR;
 
 	if((uridata = strchr(uri,':')) == NULL) {
 		xstrncpy(scan, uri, strlen(uri));
@@ -345,8 +317,8 @@ struct libtrace_t * trace_create_dead (const char *uri) {
                                 }
         }
         if (libtrace->format == 0) {
-                trace_err.err_num = E_BAD_FORMAT;
-                strcpy(trace_err.problem, scan);
+		trace_set_err(TRACE_ERR_BAD_FORMAT,
+				"Unknown format (%s)",scan);
                 return 0;
         }
 	
@@ -358,17 +330,14 @@ struct libtrace_t * trace_create_dead (const char *uri) {
 /* Creates a trace output file from a URI. 
  *
  * @param uri	the uri string describing the output format and destination
- * @returns opaque pointer to a libtrace_output_t
+ * @returns opaque pointer to a libtrace_output_t 
  * @author Shane Alcock
  *
- * Valid URI's are:
- *  - gzerf:/path/to/erf/file.gz
- *  - gzerf:/path/to/erf/file
- *  - rtserver:hostname
- *  - rtserver:hostname:port
+ * Valid URI's are: - gzerf:/path/to/erf/file.gz - gzerf:/path/to/erf/file -
+ * rtserver:hostname - rtserver:hostname:port
  *
- *  If an error occured when attempting to open the output trace, NULL is returned 
- *  and trace_errno is set. Use trace_perror() to get more information
+ *  If an error occured when attempting to open the output trace, NULL is
+ *  returned and trace_errno is set. 
  */
 	
 struct libtrace_out_t *trace_create_output(const char *uri) {
@@ -378,7 +347,7 @@ struct libtrace_out_t *trace_create_output(const char *uri) {
         const char *uridata = 0;
         int i;
 
-	trace_err.err_num = E_NOERROR;
+	trace_err.err_num = TRACE_ERR_NOERROR;
         /* parse the URI to determine what sort of event we are dealing with */
 
 	if ((uridata = trace_parse_uri(uri, &scan)) == 0) {
@@ -397,8 +366,8 @@ struct libtrace_out_t *trace_create_output(const char *uri) {
                                 }
         }
         if (libtrace->format == 0) {
-		trace_err.err_num = E_BAD_FORMAT;
-		strcpy(trace_err.problem, scan);
+		trace_set_err(TRACE_ERR_BAD_FORMAT,
+				"Unknown output format (%s)",scan);
                 return 0;
         }
         libtrace->uridata = strdup(uridata);
@@ -413,8 +382,8 @@ struct libtrace_out_t *trace_create_output(const char *uri) {
 			return 0;
 		}
 	} else {
-		trace_err.err_num = E_NO_INIT_OUT;
-		strcpy(trace_err.problem, scan);
+		trace_set_err(TRACE_ERR_NO_INIT_OUT,
+				"Format does not support writing (%s)",scan);
                 return 0;
         }
 
@@ -541,7 +510,26 @@ int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *pac
 	packet->trace = libtrace;
 
 	if (libtrace->format->read_packet) {
-		return (packet->size=libtrace->format->read_packet(libtrace,packet));
+		do {
+			packet->size=libtrace->format->read_packet(libtrace,packet);
+			if (packet->size==-1)
+				return packet->size;
+			if (libtrace->filter) {
+				/* If the filter doesn't match, read another
+				 * packet
+				 */
+				if (!trace_bpf_filter(libtrace->filter,packet)){
+					continue;
+				}
+			}
+			if (libtrace->snaplen>0) {
+				/* Snap the packet */
+				trace_set_capture_length(packet,
+						libtrace->snaplen);
+			}
+
+			return packet->size;
+		} while(1);
 	}
 	packet->size=-1;
 	return -1;
@@ -1498,13 +1486,13 @@ const char * trace_parse_uri(const char *uri, char **format) {
 	
 	if((uridata = strchr(uri,':')) == NULL) {
                 /* badly formed URI - needs a : */
-                trace_err.err_num = E_URI_NOCOLON;
+		trace_set_err(TRACE_ERR_URI_NOCOLON,"Format missing");
                 return 0;
         }
 
         if ((uridata - uri) > URI_PROTO_LINE) {
                 /* badly formed URI - uri type is too long */
-                trace_err.err_num = E_URI_LONG;
+		trace_set_err(TRACE_ERR_URI_LONG,"Format too long");
                 return 0;
         }
 
@@ -1516,3 +1504,15 @@ const char * trace_parse_uri(const char *uri, char **format) {
 	return uridata;
 }
 	
+/** Update the libtrace error
+ * @param errcode either an Econstant from libc, or a LIBTRACE_ERROR
+ * @param msg a plaintext error message
+ */
+void trace_set_error(int errcode,const char *msg,...)
+{
+	va_list va;
+	va_start(msg,va);
+	trace_err.err_num=errcode;
+	vsnprintf(trace_err.problem,sizeof(trace_err.problem),msg,va);
+	va_end();
+}

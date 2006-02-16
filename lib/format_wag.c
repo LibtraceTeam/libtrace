@@ -110,6 +110,7 @@ struct libtrace_format_data_out_t {
 	union {
 		struct {
 			int level;
+			int filemode;
 		} zlib;
 	} options;
 	union {
@@ -129,7 +130,7 @@ static int wag_init_input(struct libtrace_t *libtrace) {
 	CONNINFO.path = libtrace->uridata;
 	
 	if (stat(CONNINFO.path,&buf) == -1 ) {
-		perror("stat");
+		trace_set_err(errno,"stat(%s)",CONNINFO.path);
 		return 0;
 	}
 	if (S_ISCHR(buf.st_mode)) {
@@ -138,7 +139,8 @@ static int wag_init_input(struct libtrace_t *libtrace) {
 		INPUT.fd = open(CONNINFO.path, O_RDONLY);
 
 	} else {
-		fprintf(stderr, "%s is not a valid char device, exiting\n",
+		trace_set_err(TRACE_ERR_INIT_FAILED,
+				"%s is not a valid char device",
 				CONNINFO.path);
 		return 0;
 		
@@ -156,51 +158,22 @@ static int wtf_init_input(struct libtrace_t *libtrace) {
 		/* STDIN */
 		libtrace->sourcetype = TRACE_SOURCE_STDIN;
 		INPUT.file = LIBTRACE_FDOPEN(fileno(stdin),"r");
-
 	} else {
-		/* Do we need this socket stuff at all??
-		 * If we do, put it into wag_init_input as it uses
-		 * INPUT.fd
-		 */
+		int fd;
+		/* TRACE */
+		libtrace->sourcetype = TRACE_SOURCE_TRACE;
 
-		/*
-		if (stat(CONNINFO.path,&buf) == -1 ) {
-			perror("stat");
+		/* we use an FDOPEN call to reopen an FD
+		 * returned from open(), so that we can set
+		 * O_LARGEFILE. This gets around gzopen not
+		 * letting you do this...
+		 */
+		fd = open(CONNINFO.path, O_LARGEFILE);
+		if (fd==-1) {
+			trace_set_err(errno,"open(%s)",CONNINFO.path);
 			return 0;
 		}
-		if (S_ISSOCK(buf.st_mode)) {
-			libtrace->sourcetype = SOCKET;
-			// SOCKET
-			if ((INPUT.fd = socket(
-					AF_UNIX, SOCK_STREAM, 0)) == -1) {
-				perror("socket");
-				return 0;
-			}
-			unix_sock.sun_family = AF_UNIX;
-			bzero(unix_sock.sun_path,108);
-			snprintf(unix_sock.sun_path,
-					108,"%s"
-					,CONNINFO.path);
-
-			if (connect(INPUT.fd, 
-					(struct sockaddr *)&unix_sock,
-					sizeof(struct sockaddr)) == -1) {
-				perror("connect (unix)");
-				return 0;
-			}
-		} else { 
-		*/
-			/* TRACE */
-			libtrace->sourcetype = TRACE_SOURCE_TRACE;
-			
-			/* we use an FDOPEN call to reopen an FD
-			 * returned from open(), so that we can set
-			 * O_LARGEFILE. This gets around gzopen not
-			 * letting you do this...
-			 */
-			INPUT.file = LIBTRACE_FDOPEN(open(
-					CONNINFO.path,
-					O_LARGEFILE), "r");
+		INPUT.file = LIBTRACE_FDOPEN(fd, "r");
 
 	}
 	return 1;
@@ -218,11 +191,15 @@ static int wtf_init_output(struct libtrace_out_t *libtrace) {
 		/* STDOUT */
 		OUTPUT.file = LIBTRACE_FDOPEN(dup(1), filemode);
 	} else {
+		int fd;
 		/* TRACE */
-		OUTPUT.file = LIBTRACE_FDOPEN(open(
-					libtrace->uridata,
-					O_CREAT | O_LARGEFILE | O_WRONLY,
-					S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP), filemode);
+		fd=open(libtrace->uridata,OPTIONS.zlib.filemode,
+					S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+		if (fd==-1) {
+			trace_set_err(errno,"open(%s)",libtrace->uridata);
+			return 0;
+		}
+		OUTPUT.file = LIBTRACE_FDOPEN(fd, filemode);
 	}
 
 	return 1;
@@ -241,10 +218,14 @@ static int wtf_config_output(struct libtrace_out_t *libtrace,
 #else
 		case TRACE_OPTION_OUTPUT_COMPRESS:
 			/* E feature unavailable */
+			trace_set_err(TRACE_ERR_OPTION_UNAVAIL,
+					"zlib not supported");
 			return -1;
 #endif
 		default:
 			/* E unknown feature */
+			trace_set_err(TRACE_ERR_UNKNOWN_OPTION,
+					"Unknown option");
 			return -1;
 	}
 }
@@ -282,7 +263,8 @@ static int wag_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
           if (ret == -1) {
             if (errno == EINTR || errno==EAGAIN)
               continue;
-            perror("read(frame)");
+
+	    trace_set_err(errno,"read(%s)",libtrace->uridata);
             return -1;
           }
 
@@ -296,14 +278,12 @@ static int wag_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
         magic = ntohs(((struct frame_t *)buffer)->magic);
 
         if (magic != 0xdaa1) {
-          printf("Magic number is BAD!\n");
-          return -1;
+	  trace_set_err(TRACE_ERR_BAD_PACKET,"magic number bad or missing");
+	  return -1;
         }
 
-        if (framesize > len) {
-          printf("Framesize > len\n");
-                return -1;
-        }
+	/* We should deal.  this is called "snapping", but we don't yet */
+	assert(framesize>len);
 
         buf_ptr = (void*)((char*)buffer + sizeof (struct frame_t));
         to_read = framesize - sizeof(struct frame_t);
@@ -314,7 +294,7 @@ static int wag_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
           if (ret == -1) {
             if (errno == EINTR || errno==EAGAIN)
               continue;
-            perror("read(frame)");
+	    trace_set_err(errno,"read(%s)",libtrace->uridata);
             return -1;
           }
 
@@ -362,7 +342,7 @@ static int wtf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 
 	
 	if ((numbytes = LIBTRACE_READ(INPUT.file, buffer, sizeof(struct frame_t))) == -1) {
-		perror("libtrace_read");
+		libtrace_set_err(errno,"read(%s)",packet->trace->uridata);
 		return -1;
 	}
 
@@ -377,7 +357,7 @@ static int wtf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 
 	
 	if ((numbytes=LIBTRACE_READ(INPUT.file, buffer2, size)) != size) {
-		perror("libtrace read");
+		libtrace_set_err(errno,"read(%s)",packet->trace->uridata);
 		return -1;
 	}
 
@@ -391,7 +371,8 @@ static int wtf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 static int wtf_write_packet(struct libtrace_out_t *libtrace, const struct libtrace_packet_t *packet) {
 	int numbytes =0 ;
 	if (packet->trace->format != &wag_trace) {
-		fprintf(stderr,"Cannot convert from wag trace format to %s format yet\n",
+		trace_set_err(TRACE_ERR_NO_CONVERSION,
+				"Cannot convert from wag trace format to %s format yet",
 				packet->trace->format->name);
 		return -1;
 	}
@@ -399,13 +380,13 @@ static int wtf_write_packet(struct libtrace_out_t *libtrace, const struct libtra
 	/* We could just read from packet->buffer, but I feel it is more technically correct
 	 * to read from the header and payload pointers
 	 */
-	if ((numbytes = LIBTRACE_WRITE(OUTPUT.file, packet->header, trace_get_framing_length(packet))) == 0) {
-		perror("libtrace_write");
+	if ((numbytes = LIBTRACE_WRITE(OUTPUT.file, packet->header, trace_get_framing_length(packet))) == -1) {
+		libtrace_set_err(errno,"write(%s)",packet->trace->uridata);
 		return -1;
 	}
 	if ((numbytes = LIBTRACE_WRITE(OUTPUT.file, packet->payload, 
 			packet->size - trace_get_framing_length(packet))) == 0) {
-		perror("libtrace_write");
+		libtrace_set_err(errno,"write(%s)",packet->trace->uridata);
 		return -1;
 	}
 	return numbytes;

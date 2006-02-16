@@ -32,7 +32,7 @@
 #include "config.h"
 #include <errno.h>
 #include <stdlib.h> /* free */
-#include <stdio.h> /* perror, sprintf, printf */
+#include <stdio.h> /* sprintf, printf */
 #include <assert.h> /* assert */
 #include <string.h> /* bzero */
 #include "fifo.h"
@@ -84,7 +84,7 @@ struct tracefifo_t *create_tracefifo(size_t size)
         fifo->length = size;
 
         if ((fifo->base = malloc(fifo->length)) == 0) {
-                perror("malloc");
+		libtrace_set_err(errno,"malloc failed");
                 return 0;
         }
 

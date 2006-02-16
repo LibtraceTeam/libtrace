@@ -47,6 +47,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 
 #if HAVE_PCAP_BPF_H
 #  include <pcap-bpf.h>
@@ -97,21 +98,6 @@ struct libtrace_format_data_out_t {
 	} output;
 };
 
-static int linktype_to_dlt(libtrace_linktype_t t) {
-	static int table[] = {
-		-1, /* LEGACY */
-		-1, /* HDLC over POS */
-		DLT_EN10MB, /* Ethernet */
-		-1, /* ATM */
-		DLT_IEEE802_11, /* 802.11 */
-		-1 /* END OF TABLE */
-	};
-	if (t>sizeof(table)/sizeof(*table)) {
-		return -1;
-	}
-	return table[t];
-}
-
 static int pcap_init_input(struct libtrace_t *libtrace) {
 	char errbuf[PCAP_ERRBUF_SIZE];
 	struct stat buf;
@@ -124,12 +110,12 @@ static int pcap_init_input(struct libtrace_t *libtrace) {
 		if ((INPUT.pcap = 
 			pcap_open_offline(CONNINFO.path,
 						errbuf)) == NULL) {
-			fprintf(stderr,"%s\n",errbuf);
+			trace_set_err(TRACE_ERR_INIT_FAILED,"%s",errbuf);
 			return 0;
 		}		
 	} else {
 		if (stat(CONNINFO.path,&buf) == -1) {
-			perror("stat");
+			trace_set_err(errno,"stat(%s)",CONNINFO.path);
 			return 0;
 		}
 		if (S_ISCHR(buf.st_mode)) {
@@ -139,14 +125,16 @@ static int pcap_init_input(struct libtrace_t *libtrace) {
 					1,
 					1,
 					errbuf)) == NULL) {
-				fprintf(stderr,"%s\n",errbuf);
+				trace_set_err(TRACE_ERR_INIT_FAILED,"%s",
+						errbuf);
 				return 0;
 			}
 		} else { 
 			if ((INPUT.pcap = 
 				pcap_open_offline(CONNINFO.path,
 				       	errbuf)) == NULL) {
-				fprintf(stderr,"%s\n",errbuf);
+				trace_set_err(TRACE_ERR_INIT_FAILED,"%s",
+						errbuf);
 				return 0;
 			}
 		}	
@@ -176,13 +164,14 @@ static int pcapint_init_input(struct libtrace_t *libtrace) {
 			1,
 			1,
 			errbuf)) == NULL) {
-		fprintf(stderr,"%s\n",errbuf);
+		trace_set_err(TRACE_ERR_INIT_FAILED,"%s",errbuf);
 		return 0;
 	}
 	return 1;
 }
 
 static int pcapint_init_output(struct libtrace_out_t *libtrace __attribute__((unused))) {
+	trace_set_err(TRACE_ERR_NO_INIT_OUT,"Writing to a pcap interface not implemented yet");
 	return -1;
 }
 
@@ -264,6 +253,7 @@ static int pcap_write_packet(struct libtrace_out_t *libtrace, const struct libtr
 
 static int pcapint_write_packet(struct libtrace_out_t *libtrace __attribute__((unused)), const struct libtrace_packet_t *packet __attribute__((unused))) {
 
+	assert(0);
 	return 0;
 }
 
@@ -272,25 +262,7 @@ static libtrace_linktype_t pcap_get_link_type(const struct libtrace_packet_t *pa
 	int linktype = 0;
 	pcapptr = (struct pcap_pkthdr *)packet->header;
 	linktype = pcap_datalink(packet->trace->format_data->input.pcap);
-	switch(linktype) {
-		case DLT_NULL:
-			return TRACE_TYPE_NONE;
-		case DLT_EN10MB:
-			return TRACE_TYPE_ETH;
-		case DLT_ATM_RFC1483:
-			return TRACE_TYPE_ATM;
-		case DLT_IEEE802_11:
-			return TRACE_TYPE_80211;
-#ifdef DLT_LINUX_SLL
-		case DLT_LINUX_SLL:
-			return TRACE_TYPE_LINUX_SLL;
-#endif
-#ifdef DLT_PFLOG
-		case DLT_PFLOG:
-			return TRACE_TYPE_PFLOG;
-#endif
-	}
-	return -1;
+	return pcap_dlt_to_libtrace(linktype);
 }
 
 static int8_t pcap_get_direction(const struct libtrace_packet_t *packet) {
@@ -301,6 +273,8 @@ static int8_t pcap_get_direction(const struct libtrace_packet_t *packet) {
 			struct trace_sll_header_t *sll;
 			sll = trace_get_link(packet);
 			if (!sll) {
+				trace_set_err(TRACE_ERR_BAD_PACKET,
+						"Bad or missing packet");
 				return -1;
 			}
 			/* 0 == LINUX_SLL_HOST */
@@ -327,6 +301,8 @@ static int8_t pcap_get_direction(const struct libtrace_packet_t *packet) {
 			struct trace_pflog_header_t *pflog;
 			pflog = trace_get_link(packet);
 			if (!pflog) {
+				trace_set_err(TRACE_ERR_BAD_PACKET,
+						"Bad or missing packet");
 				return -1;
 			}
 			/* enum    { PF_IN=0, PF_OUT=1 }; */

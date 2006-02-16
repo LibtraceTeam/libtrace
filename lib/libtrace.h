@@ -100,7 +100,19 @@ typedef struct libtrace_packet_t {
                      
 
 /** Enumeration of error codes */
-enum {E_NOERROR, E_BAD_FORMAT, E_NO_INIT, E_NO_INIT_OUT, E_URI_LONG, E_URI_NOCOLON, E_INIT_FAILED };
+enum {
+	TRACE_ERR_NOERROR 	= 0,
+	TRACE_ERR_BAD_FORMAT 	= -1,
+	TRACE_ERR_NO_INIT	= -2,
+	TRACE_ERR_NO_INIT_OUT	= -3,
+	TRACE_ERR_URI_LONG	= -4,
+	TRACE_ERR_URI_NOCOLON	= -5,
+	TRACE_ERR_INIT_FAILED 	= -6,
+	TRACE_ERR_UNKNOWN_OPTION= -7,
+	TRACE_ERR_NO_CONVERSION = -8,
+	TRACE_ERR_BAD_PACKET	= -9,
+	TRACE_ERR_OPTION_UNAVAIL= -10
+};
 
 /** @name Packet structures
  * These convenience structures are here as they are portable ways of dealing
@@ -273,12 +285,6 @@ void trace_help();
  */
 SIMPLE_FUNCTION
 char *trace_get_output_format(const libtrace_out_t *libtrace);
-
-/** Prints error information
- *
- * Prints out a descriptive error message for the currently set trace_err value
- */
-void trace_perror(const char *caller);
 
 /** @name Creation and destruction of traces
  * These members deal with creating, configuring and cleaning up a trace object
