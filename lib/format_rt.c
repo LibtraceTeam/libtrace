@@ -166,8 +166,6 @@ static int rt_init_input(struct libtrace_t *libtrace) {
         libtrace->format_data = (struct libtrace_format_data_t *)
                 malloc(sizeof(struct libtrace_format_data_t));
 
-        //libtrace->sourcetype = RT;
-
 	RT_INFO->dummy_erf = NULL;
 	RT_INFO->dummy_pcap = NULL;
 	RT_INFO->dummy_wag = NULL;

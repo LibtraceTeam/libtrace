@@ -134,7 +134,6 @@ static int wag_init_input(struct libtrace_t *libtrace) {
 		return 0;
 	}
 	if (S_ISCHR(buf.st_mode)) {
-		libtrace->sourcetype = TRACE_SOURCE_DEVICE;
 				
 		INPUT.fd = open(CONNINFO.path, O_RDONLY);
 
@@ -156,12 +155,10 @@ static int wtf_init_input(struct libtrace_t *libtrace) {
 
 	if (!strncmp(CONNINFO.path,"-",1)) {
 		/* STDIN */
-		libtrace->sourcetype = TRACE_SOURCE_STDIN;
 		INPUT.file = LIBTRACE_FDOPEN(fileno(stdin),"r");
 	} else {
 		int fd;
 		/* TRACE */
-		libtrace->sourcetype = TRACE_SOURCE_TRACE;
 
 		/* we use an FDOPEN call to reopen an FD
 		 * returned from open(), so that we can set
@@ -429,14 +426,6 @@ static int wag_get_fd(const struct libtrace_packet_t *packet) {
 	return packet->trace->format_data->input.fd;
 }
 
-static struct libtrace_eventobj_t wag_event_trace(struct libtrace_t *trace, struct libtrace_packet_t *packet) {
-	switch(trace->sourcetype) {
-		case TRACE_SOURCE_DEVICE:
-			return trace_event_device(trace,packet);
-		default:
-			return trace_event_trace(trace,packet);
-	}
-}
 static void wag_help() {
 	printf("wag format module: $Revision$\n");
 	printf("Supported input URIs:\n");
@@ -494,7 +483,7 @@ static struct libtrace_format_t wag = {
 	wag_get_framing_length,		/* get_framing_length */
 	NULL,				/* set_capture_length */
 	wag_get_fd,			/* get_fd */
-	wag_event_trace,		/* trace_event */
+	trace_event_device,		/* trace_event */
 	wag_help			/* help */
 };
 
@@ -529,7 +518,7 @@ static struct libtrace_format_t wag_trace = {
         wag_get_framing_length,         /* get_framing_length */
         NULL,                           /* set_capture_length */
         wag_get_fd,                     /* get_fd */
-        wag_event_trace,                /* trace_event */
+        trace_event_trace,              /* trace_event */
         wtf_help                        /* help */
 };
 

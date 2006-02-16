@@ -105,7 +105,6 @@ static int pcap_init_input(struct libtrace_t *libtrace) {
 		malloc(sizeof(struct libtrace_format_data_t));
 	CONNINFO.path = libtrace->uridata;
 
-	libtrace->sourcetype = TRACE_SOURCE_TRACE;
 	if (!strncmp(CONNINFO.path,"-",1)) {
 		if ((INPUT.pcap = 
 			pcap_open_offline(CONNINFO.path,
@@ -157,7 +156,6 @@ static int pcapint_init_input(struct libtrace_t *libtrace) {
 	libtrace->format_data = (struct libtrace_format_data_t *) 
 		malloc(sizeof(struct libtrace_format_data_t));
 	CONNINFO.path = libtrace->uridata;
-	libtrace->sourcetype = TRACE_SOURCE_INTERFACE;
 	if ((INPUT.pcap = 
 			pcap_open_live(CONNINFO.path,
 			4096,

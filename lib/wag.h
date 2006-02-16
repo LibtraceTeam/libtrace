@@ -88,7 +88,6 @@ struct frame_data_rx_t {
       uint8_t  signal;                              /* 802.11PLCP signal field */
       uint8_t  service;                             /* 802.11PLCP service field */
       uint16_t length; } plcp; } rxinfo;            /* 802.11PLCP length field (uS) */
-  char                           data[0];           /* placeholder to allow payload access */
 };
 
 /* Type: DATA, Subtype: TX */
@@ -101,7 +100,6 @@ struct frame_data_tx_t {
     uint8_t  mode;                                  /* tx mode with which to send this packet */
     uint16_t length;                                /* length in bytes of the frame payload */
     uint32_t unused_1; }         txinfo;            
-  char                           data[0];           /* placeholder to allow payload access */
 };
 
 struct ieee_802_11_header {
@@ -122,12 +120,10 @@ struct ieee_802_11_header {
         uint8_t      mac3[6];
         uint16_t     SeqCtl;
         uint8_t      mac4[6];
-        uint8_t      data[1];
 };
 
 struct ieee_802_11_payload {
         uint16_t     type;
-        uint8_t      data[1];
 };
 
 

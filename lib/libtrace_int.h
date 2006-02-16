@@ -72,15 +72,6 @@ extern "C" {
 
 #include <stdbool.h>
 
-typedef enum {
-	TRACE_SOURCE_SOCKET, 
-	TRACE_SOURCE_TRACE, 
-	TRACE_SOURCE_STDIN, 
-	TRACE_SOURCE_DEVICE, 
-	TRACE_SOURCE_INTERFACE, 
-	TRACE_SOURCE_RT 
-} 
-	source_t;
 
 
 extern struct trace_err_t{
@@ -109,7 +100,6 @@ struct libtrace_event_t {
 struct libtrace_t {
 	struct libtrace_format_t *format; /**< format driver pointer */
 	struct libtrace_format_data_t *format_data; /**<format data pointer */
-        source_t sourcetype;	/**< The type (device,file, etc */
 	bool started;
 
 	struct libtrace_event_t event;

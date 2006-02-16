@@ -600,7 +600,8 @@ struct libtrace_ip *trace_get_ip(const struct libtrace_packet_t *packet) {
 					ipptr = NULL;
 				}
 				else {
-					struct ieee_802_11_payload *eth = (void*)wifi->data;
+					struct ieee_802_11_payload *eth = 
+						(void*)((char*)wifi+sizeof(struct ieee_802_11_header));
 					ipptr = NULL;
 
 					if (ntohs(eth->type) == 0x0800) {
@@ -632,7 +633,8 @@ struct libtrace_ip *trace_get_ip(const struct libtrace_packet_t *packet) {
 					ipptr = NULL;
 				}
 				else {
-					struct ieee_802_11_payload *eth = (void*)wifi->data;
+					struct ieee_802_11_payload *eth = 
+						(void*)((char*)wifi+sizeof(struct ieee_802_11_header));
 					ipptr = NULL;
 
 					if (ntohs(eth->type) == 0x0800) {
