@@ -425,6 +425,35 @@ int trace_pause(libtrace_t *libtrace)
 	return 0;
 }
 
+int trace_config(libtrace_t *libtrace,
+		trace_option_t option,
+		void *value)
+{
+	int ret;
+	if (libtrace->format->config_input) {
+		ret=libtrace->format->config_input(libtrace,option,value);
+		if (ret==0)
+			return 0;
+	}
+	switch(option) {
+		case TRACE_OPTION_SNAPLEN:
+			libtrace->snaplen=*(int*)value;
+			break;
+		case TRACE_OPTION_FILTER:
+			libtrace->filter=value;
+			break;
+		case TRACE_OPTION_PROMISC:
+			trace_set_err(TRACE_ERR_OPTION_UNAVAIL,
+				"Promisc mode is not supported by this format module");
+			return -1;
+		default:
+			trace_set_err(TRACE_ERR_UNKNOWN_OPTION,
+				"Unknown option %i", option);
+			return -1;
+	}
+	return 0;
+}
+
 /* Parses an output options string and calls the appropriate function to deal with output options.
  *
  * @param libtrace	the output trace object to apply the options to
@@ -1513,9 +1542,16 @@ const char * trace_parse_uri(const char *uri, char **format) {
  */
 void trace_set_err(int errcode,const char *msg,...)
 {
+	char buf[256];
 	va_list va;
 	va_start(va,msg);
 	trace_err.err_num=errcode;
-	vsnprintf(trace_err.problem,sizeof(trace_err.problem),msg,va);
+	if (errcode>0) {
+		vsnprintf(buf,sizeof(buf),msg,va);
+		snprintf(trace_err.problem,sizeof(trace_err.problem),
+				"%s: %s",buf,strerror(errno));
+	} else {
+		vsnprintf(trace_err.problem,sizeof(trace_err.problem),msg,va);
+	}
 	va_end(va);
 }

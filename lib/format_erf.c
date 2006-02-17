@@ -146,10 +146,12 @@ typedef struct libtrace_packet_status {
 
 #ifdef HAVE_DAG
 static int dag_init_input(struct libtrace_t *libtrace) {
-	struct stat buf;
 	libtrace->format_data = (struct libtrace_format_data_t *)
 		malloc(sizeof(struct libtrace_format_data_t));
+}
 
+static int dag_start_input(struct libtrace_t *libtrace) {
+	struct stat buf;
 	if (stat(packet->trace->uridata) == -1) {
 		trace_set_err(errno,"stat(%s)",libtrace->uridata);
 		return 0;
@@ -202,6 +204,10 @@ static int erf_init_input(struct libtrace_t *libtrace)
 	libtrace->format_data = (struct libtrace_format_data_t *)
 		malloc(sizeof(struct libtrace_format_data_t));
 
+}
+
+static int erf_start_input(struct libtrace_t *libtrace)
+{
 	libtrace->format_data->input.file = trace_open_file(libtrace);
 
 	if (libtrace->format_data->input.file)
@@ -799,7 +805,7 @@ static struct libtrace_format_t erf = {
 	"erf",
 	erf_init_input,			/* init_input */	
 	NULL,				/* config_input */
-	NULL,				/* start_input */
+	erf_start_input,		/* start_input */
 	NULL,				/* pause_input */
 	erf_init_output,		/* init_output */
 	erf_config_output,		/* config_output */
@@ -833,7 +839,7 @@ static struct libtrace_format_t dag = {
 	"erf",
 	dag_init_input,			/* init_input */	
 	NULL,				/* config_input */
-	NULL,				/* start_output */
+	dag_start_input,		/* start_input */
 	NULL,				/* init_output */
 	NULL,				/* config_output */
 	NULL,				/* start_output */
