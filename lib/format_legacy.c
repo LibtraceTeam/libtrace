@@ -126,56 +126,18 @@ static int legacyatm_get_framing_length(const struct libtrace_packet_t *packet U
 	return sizeof(legacy_cell_t);
 }
 
-static int erf_init_input(struct libtrace_t *libtrace) {
-	struct stat buf;
-	struct sockaddr_un unix_sock;
+static int erf_init_input(struct libtrace_t *libtrace) 
+{
 	libtrace->format_data = (struct libtrace_format_data_t *)
 		malloc(sizeof(struct libtrace_format_data_t));
 
-	CONNINFO.path = libtrace->uridata;
-	if (!strncmp(CONNINFO.path,"-",1)) {
-		/* STDIN */
-		INPUT.file = LIBTRACE_FDOPEN(fileno(stdin), "r");
-	} else {
-		if (stat(CONNINFO.path,&buf) == -1 ) {
-			trace_set_err(errno,"stat(%s)",CONNINFO.path);
-			return 0;
-		}
-		if (S_ISSOCK(buf.st_mode)) {
-			if ((INPUT.fd = socket(
-					AF_UNIX, SOCK_STREAM, 0)) == -1) {
-				trace_set_err("socket(%s)",CONNINFO.path);
-				return 0;
-			}
-			unix_sock.sun_family = AF_UNIX;
-			bzero(unix_sock.sun_path,108);
-			snprintf(unix_sock.sun_path,
-					108,"%s"
-					,CONNINFO.path);
+	libtrace->format_data->input.file = trace_open_file(libtrace);
 
-			if (connect(INPUT.fd, 
-					(struct sockaddr *)&unix_sock,
-					sizeof(struct sockaddr)) == -1) {
-				trace_set_err("socket(%s)",CONNINFO.path);
-				return 0;
-			}
-		} else { 
-			int fd;
+	if (libtrace->format_data->input.file)
+		return 1;
 
-			/* we use an FDOPEN call to reopen an FD
-			// returned from open(), so that we can set
-			// O_LARGEFILE. This gets around gzopen not
-			// letting you do this...
-			*/
-			fd=open( CONNINFO.path, O_LARGEFILE);
-			if (fd==-1) {
-				trace_set_err(errno,"open(%s)",CONNINFO.path);
-				return 0;
-			}
-			INPUT.file = LIBTRACE_FDOPEN(fd,"r");
-		}
-	}
-	return 1;
+	return 0;
+
 }
 
 static int erf_fin_input(struct libtrace_t *libtrace) {

@@ -84,7 +84,7 @@ struct tracefifo_t *create_tracefifo(size_t size)
         fifo->length = size;
 
         if ((fifo->base = malloc(fifo->length)) == 0) {
-		libtrace_set_err(errno,"malloc failed");
+		trace_set_err(errno,"malloc failed");
                 return 0;
         }
 

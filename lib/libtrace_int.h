@@ -74,12 +74,8 @@ extern "C" {
 
 
 
-extern struct trace_err_t{
-	int err_num; 		/* error code */
-	char problem[255];	/* the format, uri etc that caused the error for reporting purposes */
-} trace_err;
 
-void trace_set_error(int errcode,const char *msg,...);
+void trace_set_err(int errcode,const char *msg,...);
 
 #define RP_BUFSIZE 65536
 

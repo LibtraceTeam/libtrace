@@ -30,9 +30,12 @@
 
 #ifndef FORMAT_HELPER_H
 #define FORMAT_HELPER_H
+#include "common.h"
 
-int trace_read(struct libtrace_t *libtrace, void *buffer, size_t len);
+int trace_read(libtrace_t *libtrace, void *buffer, size_t len);
 
-struct libtrace_eventobj_t trace_event_device(struct libtrace_t *trace, struct libtrace_packet_t *packet);
-struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct libtrace_packet_t *packet);
+struct libtrace_eventobj_t trace_event_device(libtrace_t *trace, libtrace_packet_t *packet);
+struct libtrace_eventobj_t trace_event_trace(libtrace_t *trace, libtrace_packet_t *packet);
+
+LIBTRACE_FILE trace_open_file(libtrace_t *libtrace);
 #endif /* FORMAT_HELPER_H */

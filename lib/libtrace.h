@@ -878,6 +878,12 @@ int8_t trace_get_server_port(uint8_t protocol, uint16_t source, uint16_t dest);
  * @author Shane Alcock
  */
 const char *trace_parse_uri(const char *uri, char **format);
+
+/** libtrace error information */
+extern struct trace_err_t{
+	int err_num; 		/**< error code */
+	char problem[255];	/**< the format, uri etc that caused the error for reporting purposes */
+} trace_err;
 #ifdef __cplusplus
 } /* extern "C" */
 #endif /* #ifdef __cplusplus */

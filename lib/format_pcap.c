@@ -225,8 +225,8 @@ static int pcap_write_packet(struct libtrace_out_t *libtrace, const struct libtr
 
 	if (!OUTPUT.trace.pcap) {
 		OUTPUT.trace.pcap = (pcap_t *)pcap_open_dead(
-				linktype_to_dlt(trace_get_link_type(packet)),
-				65536);
+			libtrace_to_pcap_dlt(trace_get_link_type(packet)),
+			65536);
 		OUTPUT.trace.dump = pcap_dump_open(OUTPUT.trace.pcap,CONNINFO.path);
 		fflush((FILE *)OUTPUT.trace.dump);
 	}

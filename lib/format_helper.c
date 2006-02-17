@@ -35,6 +35,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <errno.h>
+#include <fcntl.h> /* for O_LARGEFILE */
 #ifdef HAVE_INTTYPES_H
 #  include <inttypes.h>
 #else
@@ -133,4 +135,32 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 
 	return event;
 	
+}
+
+/* Catch undefined O_LARGEFILE on *BSD etc */
+#ifndef O_LARGEFILE
+#  define O_LARGEFILE 0
+#endif 
+
+LIBTRACE_FILE trace_open_file(libtrace_t *trace)
+{
+	int fd;
+	LIBTRACE_FILE ret;
+
+
+	if (strcmp(trace->uridata,"-")==0) {
+		ret=LIBTRACE_FDOPEN(fileno(stdin),"r");
+		return ret;
+	}
+
+	/* We open the file with open(2), so we can provide O_LARGEFILE
+	 * as zlib doesn't always do it itself
+	 */
+	fd=open(trace->uridata,O_LARGEFILE);
+	if (fd==-1) {
+		trace_set_err(errno,"Unable to open %s",trace->uridata);
+		return 0;
+	}
+	ret=LIBTRACE_FDOPEN(fd,"r");
+	return ret;
 }

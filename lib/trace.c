@@ -50,6 +50,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <stdarg.h>
 
 #ifdef HAVE_LIMITS_H
 #  include <limits.h>
@@ -1510,11 +1511,11 @@ const char * trace_parse_uri(const char *uri, char **format) {
  * @param errcode either an Econstant from libc, or a LIBTRACE_ERROR
  * @param msg a plaintext error message
  */
-void trace_set_error(int errcode,const char *msg,...)
+void trace_set_err(int errcode,const char *msg,...)
 {
 	va_list va;
-	va_start(msg,va);
+	va_start(va,msg);
 	trace_err.err_num=errcode;
 	vsnprintf(trace_err.problem,sizeof(trace_err.problem),msg,va);
-	va_end();
+	va_end(va);
 }
