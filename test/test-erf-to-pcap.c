@@ -64,7 +64,7 @@ int main(int argc, char *argv[]) {
 		printf("Error: %s\n",trace_err.problem);
 		return 1;
 	}
-	outtrace = trace_create_output("erf:traces/100_packets.out.erf");
+	outtrace = trace_create_output("pcap:traces/100_packets.out.pcap");
 	if (!outtrace) {
 		printf("Error: %s\n",trace_err.problem);
 		return 1;

@@ -48,36 +48,28 @@
 #include "dagformat.h"
 #include "libtrace.h"
 
+struct libtrace_t *trace;
 
 int main(int argc, char *argv[]) {
-        char *uri = "erf:traces/100_packets.erf";
+        char *uri = "wtf:traces/wed.wtf";
         int psize = 0;
 	int error = 0;
 	int count = 0;
-	int level = 0;
-	libtrace_t *trace;
-	libtrace_out_t *outtrace;
-	libtrace_packet_t *packet;
+	struct libtrace_packet_t *packet;
 
 	trace = trace_create(uri);
 	if (!trace) {
-		printf("Error: %s\n",trace_err.problem);
-		return 1;
-	}
-	outtrace = trace_create_output("erf:traces/100_packets.out.erf");
-	if (!outtrace) {
-		printf("Error: %s\n",trace_err.problem);
+		printf("ERROR: %s\n",trace_err.problem);
 		return 1;
 	}
 
-	level=0;
-	trace_config_output(outtrace,TRACE_OPTION_OUTPUT_COMPRESS,&level);
-
-	trace_start(trace);
-	trace_start_output(outtrace);
+	if (trace_start(trace)==-1) {
+		printf("ERROR: %s\n",trace_err.problem);
+		return 1;
+	}
 	
+	packet = trace_create_packet();
         for (;;) {
-		packet=trace_create_packet();
 		if ((psize = trace_read_packet(trace, packet)) <0) {
 			error = 1;
 			break;
@@ -87,9 +79,8 @@ int main(int argc, char *argv[]) {
 			break;
 		}
 		count ++;
-		trace_write_packet(outtrace,packet);
-		trace_destroy_packet(&packet);
         }
+	trace_destroy_packet(&packet);
 	if (error == 0) {
 		if (count == 100) {
 			printf("success: 100 packets read\n");
@@ -101,6 +92,5 @@ int main(int argc, char *argv[]) {
 		printf("failure: %s\n",trace_err.problem);
 	}
         trace_destroy(trace);
-	trace_destroy_output(outtrace);
         return error;
 }

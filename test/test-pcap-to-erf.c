@@ -50,7 +50,7 @@
 
 
 int main(int argc, char *argv[]) {
-        char *uri = "erf:traces/100_packets.erf";
+        char *uri = "pcap:traces/100_packets.pcap";
         int psize = 0;
 	int error = 0;
 	int count = 0;
