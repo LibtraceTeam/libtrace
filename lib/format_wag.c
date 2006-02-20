@@ -78,18 +78,12 @@
 static struct libtrace_format_t wag;
 static struct libtrace_format_t wag_trace;
 
-#define CONNINFO libtrace->format_data->conn_info
 #define INPUT libtrace->format_data->input
 #define OUTPUT libtrace->format_data->output
 #define OPTIONS libtrace->format_data->options
 
 struct libtrace_format_data_t {
 	union {
-		/** Information about rtclients */
-                struct {
-                        char *hostname;
-                        short port;
-                } rt;
                 char *path;		/**< information for local sockets */
         } conn_info;
 	/** Information about the current state of the input device */
@@ -127,20 +121,19 @@ static int wag_init_input(struct libtrace_t *libtrace) {
 	struct stat buf;
 	libtrace->format_data = (struct libtrace_format_data_t *) 
 		calloc(1,sizeof(struct libtrace_format_data_t));
-	CONNINFO.path = libtrace->uridata;
 	
-	if (stat(CONNINFO.path,&buf) == -1 ) {
-		trace_set_err(errno,"stat(%s)",CONNINFO.path);
+	if (stat(libtrace->uridata,&buf) == -1 ) {
+		trace_set_err(errno,"stat(%s)",libtrace->uridata);
 		return 0;
 	}
 	if (S_ISCHR(buf.st_mode)) {
 				
-		INPUT.fd = open(CONNINFO.path, O_RDONLY);
+		INPUT.fd = open(libtrace->uridata, O_RDONLY);
 
 	} else {
 		trace_set_err(TRACE_ERR_INIT_FAILED,
 				"%s is not a valid char device",
-				CONNINFO.path);
+				libtrace->uridata);
 		return 0;
 		
 	}

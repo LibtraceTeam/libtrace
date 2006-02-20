@@ -74,7 +74,6 @@ static struct libtrace_format_t legacypos;
 static struct libtrace_format_t legacyeth;
 static struct libtrace_format_t legacyatm;
 
-#define CONNINFO libtrace->format_data->conn_info
 #define INPUT libtrace->format_data->input
 #define OUTPUT libtrace->format_data->output
 #if HAVE_DAG
