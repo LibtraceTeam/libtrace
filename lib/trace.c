@@ -330,7 +330,7 @@ struct libtrace_t * trace_create_dead (const char *uri) {
  *  returned and trace_errno is set. 
  */
 	
-struct libtrace_out_t *trace_create_output(const char *uri) {
+libtrace_out_t *trace_create_output(const char *uri) {
 	struct libtrace_out_t *libtrace = malloc(sizeof(struct libtrace_out_t));
 	
 	char *scan = 0;
@@ -381,6 +381,7 @@ struct libtrace_out_t *trace_create_output(const char *uri) {
         libtrace->fifo = create_tracefifo(1048576);
         assert( libtrace->fifo);
 	free(scan);
+	libtrace->started=false;
 	return libtrace;
 }
 
@@ -402,6 +403,20 @@ int trace_start(struct libtrace_t *libtrace)
 	}
 
 	libtrace->started=true;
+	return 0;
+}
+
+int trace_start_output(libtrace_out_t *libtrace) 
+{
+	assert(libtrace);
+	if (libtrace->format->start_output) {
+		int ret=libtrace->format->start_output(libtrace);
+		if (ret < 0) {
+			return ret;
+		}
+	}
+
+	libtrace->started=false;
 	return 0;
 }
 
@@ -494,9 +509,7 @@ void trace_destroy_output(struct libtrace_out_t *libtrace) {
 
 libtrace_packet_t *trace_create_packet() {
 	libtrace_packet_t *packet = calloc(1,sizeof(libtrace_packet_t));
-	/* This used to malloc a packet!  Why do we need to malloc a packet
-	 * if we're doing zero copy?
-	 */
+	packet->buf_control=PACKET;
 	return packet;
 }
 
@@ -524,6 +537,8 @@ int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *pac
 	assert(libtrace && "You called trace_read_packet() with a NULL libtrace parameter!\n");
 	assert(libtrace->started && "BUG: You must call libtrace_start() before trace_read_packet()\n");
 	assert(packet);
+	assert((packet->buf_control==PACKET || packet->buf_control==EXTERNAL)&&
+		"BUG: You must allocate a packet using packet_create()");
       
 	/* Store the trace we are reading from into the packet opaque 
 	 * structure */
@@ -1554,6 +1569,7 @@ const char * trace_parse_uri(const char *uri, char **format) {
 /** Update the libtrace error
  * @param errcode either an Econstant from libc, or a LIBTRACE_ERROR
  * @param msg a plaintext error message
+ * @internal
  */
 void trace_set_err(int errcode,const char *msg,...)
 {

@@ -85,7 +85,10 @@ typedef struct libtrace_t libtrace_t;
 /** Opaque structure holding information about a bpf filter */
 typedef struct libtrace_filter_t libtrace_filter_t;
 
-typedef enum {PACKET, EXTERNAL } buf_control_t;
+/* the letters p and e are magic numbers used to detect if the packet
+ * wasn't created properly
+ */
+typedef enum {PACKET='p', EXTERNAL='e' } buf_control_t;
 /** Structure holding information about a packet */
 #define LIBTRACE_PACKET_BUFSIZE 65536
 typedef struct libtrace_packet_t {

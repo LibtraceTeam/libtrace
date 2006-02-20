@@ -280,37 +280,6 @@ static int erf_init_output(struct libtrace_out_t *libtrace) {
 	return 1;
 }
 
-static int erf_open_output(struct libtrace_out_t *libtrace) {
-	char *filemode;
-	int fd;
-
-#if HAVE_ZLIB
-        asprintf(&filemode,"wb%d",OPTIONS.erf.level);
-#else
-        asprintf(&filemode,"w");
-#endif
-
-	if (!strncmp(libtrace->uridata,"-",1)) {
-                /* STDOUT */
-                OUTPUT.file = LIBTRACE_FDOPEN(fileno(stdout),filemode);
-        }
-        else {
-                /* TRACE */
-                fd = open(libtrace->uridata, 
-				OPTIONS.erf.fileflag,
-				S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
-                if (fd <= 0) {
-			trace_set_err(errno,"OPEN(%s,\"w\")",
-					libtrace->uridata);
-                        return 0;
-                }
-                OUTPUT.file = LIBTRACE_FDOPEN(fd,filemode);
-
-        }
-        free(filemode);
-	return 1;
-}
-
 static int erf_config_output(struct libtrace_out_t *libtrace, trace_option_t option, void *value) {
 
 	switch (option) {
@@ -427,17 +396,13 @@ static int erf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 	int size;
 	void *buffer2 = packet->buffer;
 	int rlen;
-	if (packet->buf_control == EXTERNAL) {
-		packet->buf_control = PACKET;
+
+	if (!packet->buffer) {
 		packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
+		packet->buf_control = PACKET;
 	}
+
 	packet->header = packet->buffer;
-
-	if (packet->buffer) {
-		packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
-		packet->buf_control = PACKET;
-	}
-
 
 	if ((numbytes=LIBTRACE_READ(INPUT.file,
 					packet->buffer,
@@ -454,6 +419,7 @@ static int erf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 	buffer2 = (char*)packet->buffer + dag_record_size;
 	size = rlen - dag_record_size;
 	assert(size < LIBTRACE_PACKET_BUFSIZE);
+
 	
 	/* Unknown/corrupt */
 	assert(((dag_record_t *)packet->buffer)->type < 10);
@@ -588,32 +554,36 @@ static int erf_dump_packet(struct libtrace_out_t *libtrace,
 		return -1;
 	}
 
-	if (buffer) {
-		if ((numbytes=LIBTRACE_WRITE(OUTPUT.file, buffer, size)) == 0) {
-			trace_set_err(errno,"write(%s)",libtrace->uridata);
-			return -1;
-		}
-	
-		return numbytes + pad + dag_record_size;
+	if ((numbytes=LIBTRACE_WRITE(OUTPUT.file, buffer, size)) == 0) {
+		trace_set_err(errno,"write(%s)",libtrace->uridata);
+		return -1;
 	}
-	return numbytes;
+
+	return numbytes + pad + dag_record_size;
+}
+
+static int erf_start_output(libtrace_out_t *libtrace)
+{
+	OUTPUT.file = trace_open_file_out(libtrace,
+			OPTIONS.erf.level,
+			OPTIONS.erf.fileflag);
+	if (!OUTPUT.file) {
+		printf("%s\n",trace_err.problem);
+		return -1;
+	}
+	return 0;
 }
 		
-static int erf_write_packet(struct libtrace_out_t *libtrace, const struct libtrace_packet_t *packet) {
+static int erf_write_packet(libtrace_out_t *libtrace, 
+		const libtrace_packet_t *packet) 
+{
 	int numbytes = 0;
 	dag_record_t erfhdr;
 	int pad = 0;
 	dag_record_t *dag_hdr = (dag_record_t *)packet->header;
 	void *payload = packet->payload;
 
-	/* Because of configuration, we don't actually open the output file
-	   until we get the first packet. Not ideal, but it'll do for now */
-	if (!OUTPUT.file) {
-		if (erf_open_output(libtrace) <= 0) { 
-			trace_set_err(errno,"open(%s)",libtrace->uridata);
-			return -1;
-		}
-	}
+	assert(OUTPUT.file);
 
 	pad = erf_get_padding(packet);
 
@@ -632,8 +602,8 @@ static int erf_write_packet(struct libtrace_out_t *libtrace, const struct libtra
 				(dag_record_t *)packet->buffer,
 				pad,
 				payload,
-				packet->size - 
-					(dag_record_size + pad)); 
+				trace_get_capture_length(packet)
+				);
 	} else {
 		/* convert format - build up a new erf header */
 		/* Timestamp */
@@ -809,7 +779,7 @@ static struct libtrace_format_t erf = {
 	NULL,				/* pause_input */
 	erf_init_output,		/* init_output */
 	erf_config_output,		/* config_output */
-	NULL,				/* start_output */
+	erf_start_output,		/* start_output */
 	erf_fin_input,			/* fin_input */
 	erf_fin_output,			/* fin_output */
 	erf_read_packet,		/* read_packet */

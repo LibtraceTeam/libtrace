@@ -45,6 +45,7 @@
 #include  "format_helper.h"
 
 #include <sys/ioctl.h>
+#include <assert.h>
 
 struct libtrace_eventobj_t trace_event_device(struct libtrace_t *trace, struct libtrace_packet_t *packet) {
 	struct libtrace_eventobj_t event = {0,0,0.0,0};
@@ -164,3 +165,40 @@ LIBTRACE_FILE trace_open_file(libtrace_t *trace)
 	ret=LIBTRACE_FDOPEN(fd,"r");
 	return ret;
 }
+
+LIBTRACE_FILE trace_open_file_out(libtrace_out_t *trace,int level, int fileflag)
+{
+	int fd;
+	LIBTRACE_FILE ret;
+	char filemode[4]; /* wb9\0 */
+	assert(level<10);
+	assert(level>=0);
+#if HAVE_ZLIB
+	sprintf(filemode,"wb%d",level);
+#else
+	sprintf(filemode,"w");
+#endif
+
+	if (strcmp(trace->uridata,"-")==0) {
+		ret=LIBTRACE_FDOPEN(fileno(stdout),filemode);
+		return ret;
+	}
+
+	/* We open the file with open(2), so we can provide O_LARGEFILE
+	 * as zlib doesn't always do it itself
+	 */
+	fd=open(trace->uridata,fileflag,0666);
+	if (fd==-1) {
+		trace_set_err(errno,"Unable to open %s",trace->uridata);
+		return 0;
+	}
+	ret=LIBTRACE_FDOPEN(fd,filemode);
+	if (ret==NULL) {
+		printf("%s\n",filemode);
+		trace_set_err(TRACE_ERR_INIT_FAILED,"gz out of memory");
+	}
+	return ret;
+}
+
+
+

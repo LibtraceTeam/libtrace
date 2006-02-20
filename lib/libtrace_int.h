@@ -115,6 +115,7 @@ struct libtrace_out_t {
 
 	char *uridata;
         struct tracefifo_t *fifo;
+	bool started;
 };
 
 
