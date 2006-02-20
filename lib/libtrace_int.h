@@ -189,6 +189,18 @@ char libtrace_to_pcap_dlt(libtrace_linktype_t type);
 libtrace_linktype_t erf_type_to_libtrace(char erf);
 char libtrace_to_erf_type(libtrace_linktype_t linktype);
 
+#if HAVE_BPF
+/* A type encapsulating a bpf filter
+ * This type covers the compiled bpf filter, as well as the original filter
+ * string
+ *
+ */
+struct libtrace_filter_t {
+	struct bpf_program filter;
+	int flag;
+	char * filterstring;
+};
+#endif
 	
 #ifdef __cplusplus
 }

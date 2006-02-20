@@ -68,8 +68,8 @@
 static struct libtrace_format_t pcap;
 static struct libtrace_format_t pcapint;
 
+#define DATA(x) ((struct libtrace_format_data_t*)((x)->format_data))
 
-#define CONNINFO libtrace->format_data->conn_info
 #define INPUT libtrace->format_data->input
 #define OUTPUT libtrace->format_data->output
 struct libtrace_format_data_t {
@@ -82,6 +82,9 @@ struct libtrace_format_data_t {
         union {
                 pcap_t *pcap;
         } input;
+	int snaplen;
+	libtrace_filter_t *filter;
+	int promisc;
 };
 
 struct libtrace_format_data_out_t {
@@ -99,70 +102,121 @@ struct libtrace_format_data_out_t {
 };
 
 static int pcap_init_input(struct libtrace_t *libtrace) {
-	char errbuf[PCAP_ERRBUF_SIZE];
-	struct stat buf;
 	libtrace->format_data = (struct libtrace_format_data_t *) 
 		malloc(sizeof(struct libtrace_format_data_t));
-	CONNINFO.path = libtrace->uridata;
 
-	if (!strncmp(CONNINFO.path,"-",1)) {
-		if ((INPUT.pcap = 
-			pcap_open_offline(CONNINFO.path,
-						errbuf)) == NULL) {
-			trace_set_err(TRACE_ERR_INIT_FAILED,"%s",errbuf);
-			return 0;
-		}		
-	} else {
-		if (stat(CONNINFO.path,&buf) == -1) {
-			trace_set_err(errno,"stat(%s)",CONNINFO.path);
-			return 0;
-		}
-		if (S_ISCHR(buf.st_mode)) {
-			if ((INPUT.pcap = 
-				pcap_open_live(CONNINFO.path,
-					4096,
-					1,
-					1,
-					errbuf)) == NULL) {
-				trace_set_err(TRACE_ERR_INIT_FAILED,"%s",
-						errbuf);
-				return 0;
-			}
-		} else { 
-			if ((INPUT.pcap = 
-				pcap_open_offline(CONNINFO.path,
-				       	errbuf)) == NULL) {
-				trace_set_err(TRACE_ERR_INIT_FAILED,"%s",
-						errbuf);
-				return 0;
-			}
-		}	
-	}
+	INPUT.pcap = NULL;
+	DATA(libtrace)->filter = NULL;
+	DATA(libtrace)->snaplen = 0;
+	DATA(libtrace)->promisc = 0;
+
 	return 1;
-	
+}
+
+static int pcap_start_input(struct libtrace_t *libtrace) {
+	char errbuf[PCAP_ERRBUF_SIZE];
+	if ((INPUT.pcap = 
+		pcap_open_offline(libtrace->uridata,
+			errbuf)) == NULL) {
+		trace_set_err(TRACE_ERR_INIT_FAILED,"%s",
+				errbuf);
+		return -1;
+	}
+	if (DATA(libtrace)->filter) {
+		trace_bpf_compile(DATA(libtrace)->filter);
+		if (pcap_setfilter(INPUT.pcap,&DATA(libtrace)->filter->filter) 
+				== -1) {
+			trace_set_err(TRACE_ERR_INIT_FAILED,"%s",
+					pcap_geterr(INPUT.pcap));
+			return -1;
+		}
+	}
+	return 0;
+}
+
+static int pcap_config_input(libtrace_t *libtrace,
+		trace_option_t option,
+		void *data)
+{
+	switch(option) {
+		case TRACE_OPTION_FILTER:
+			DATA(libtrace)->filter=data;
+			return 0;
+		case TRACE_OPTION_SNAPLEN:
+			/* Snapping isn't supported directly, so fall thru
+			 * and let libtrace deal with it
+			 */
+		case TRACE_OPTION_PROMISC:
+			/* can't do promisc on a trace! fall thru */
+		default:
+			trace_set_err(TRACE_ERR_UNKNOWN_OPTION,
+					"Unknown option %i", option);
+			return -1;
+	}
+	assert(0);
+}
+
+static int pcap_pause_input(libtrace_t *libtrace) {
+	pcap_close(INPUT.pcap);
+	INPUT.pcap=NULL;
 }
 
 static int pcap_init_output(struct libtrace_out_t *libtrace) {
 	libtrace->format_data = (struct libtrace_format_data_out_t *)
 		malloc(sizeof(struct libtrace_format_data_out_t));
-	CONNINFO.path = libtrace->uridata;
 	OUTPUT.trace.pcap = NULL;
 	OUTPUT.trace.dump = NULL;
 	return 1;
 }
 
 static int pcapint_init_input(struct libtrace_t *libtrace) {
-	char errbuf[PCAP_ERRBUF_SIZE];
 	libtrace->format_data = (struct libtrace_format_data_t *) 
 		malloc(sizeof(struct libtrace_format_data_t));
-	CONNINFO.path = libtrace->uridata;
+	DATA(libtrace)->filter = NULL;
+	DATA(libtrace)->snaplen = 0;
+	DATA(libtrace)->promisc = 0;
+	return 1;
+}
+
+static int pcapint_config_input(libtrace_t *libtrace,
+		trace_option_t option,
+		void *data)
+{
+	switch(option) {
+		case TRACE_OPTION_FILTER:
+			DATA(libtrace)->filter=data;
+			return 0;
+		case TRACE_OPTION_SNAPLEN:
+			DATA(libtrace)->snaplen=*(int*)data;
+			return 0;
+		case TRACE_OPTION_PROMISC:
+			DATA(libtrace)->promisc=*(int*)data;
+			return 0;
+		default:
+			trace_set_err(TRACE_ERR_UNKNOWN_OPTION,
+					"Unknown option %i", option);
+			return -1;
+	}
+	assert(0);
+}
+
+static int pcapint_start_input(libtrace_t *libtrace) {
+	char errbuf[PCAP_ERRBUF_SIZE];
 	if ((INPUT.pcap = 
-			pcap_open_live(CONNINFO.path,
-			4096,
-			1,
+			pcap_open_live(libtrace->uridata,
+			DATA(libtrace)->snaplen,
+			DATA(libtrace)->promisc,
 			1,
 			errbuf)) == NULL) {
 		trace_set_err(TRACE_ERR_INIT_FAILED,"%s",errbuf);
+		/* Set a filter if one is defined */
+		if (DATA(libtrace)->filter)
+			if (pcap_setfilter(INPUT.pcap,&DATA(libtrace)->filter->filter)
+				== -1) {
+				trace_set_err(TRACE_ERR_INIT_FAILED,"%s",
+						pcap_geterr(INPUT.pcap));
+				return -1;
+			}
 		return 0;
 	}
 	return 1;
@@ -227,7 +281,8 @@ static int pcap_write_packet(struct libtrace_out_t *libtrace, const struct libtr
 		OUTPUT.trace.pcap = (pcap_t *)pcap_open_dead(
 			libtrace_to_pcap_dlt(trace_get_link_type(packet)),
 			65536);
-		OUTPUT.trace.dump = pcap_dump_open(OUTPUT.trace.pcap,CONNINFO.path);
+		OUTPUT.trace.dump = pcap_dump_open(OUTPUT.trace.pcap,
+				libtrace->uridata);
 		fflush((FILE *)OUTPUT.trace.dump);
 	}
 	if (packet->trace->format == &pcap || 
@@ -393,8 +448,8 @@ static struct libtrace_format_t pcap = {
 	"pcap",
 	pcap_init_input,		/* init_input */
 	NULL,				/* config_input */
-	NULL,				/* start_input */
-	NULL,				/* pause_input */
+	pcap_start_input,		/* start_input */
+	pcap_pause_input,		/* pause_input */
 	pcap_init_output,		/* init_output */
 	NULL,				/* config_output */
 	NULL,				/* start_output */
@@ -425,9 +480,9 @@ static struct libtrace_format_t pcapint = {
 	"$Id$",
 	"pcap",
 	pcapint_init_input,		/* init_input */
-	NULL,				/* config_input */
-	NULL,				/* start_input */
-	NULL,				/* pause_input */
+	pcapint_config_input,		/* config_input */
+	pcapint_start_input,		/* start_input */
+	pcap_pause_input,		/* pause_input */
 	pcapint_init_output,		/* init_output */
 	NULL,				/* config_output */
 	NULL,				/* start_output */

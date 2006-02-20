@@ -119,17 +119,6 @@
 
 #define MAXOPTS 1024
 
-#if HAVE_BPF
-/* A type encapsulating a bpf filter
- * This type covers the compiled bpf filter, as well as the original filter
- * string
- *
- */
-struct libtrace_filter_t {
-	struct bpf_insn *filter;
-	char * filterstring;
-};
-#endif
 
 struct trace_err_t trace_err;
 
@@ -404,6 +393,7 @@ struct libtrace_out_t *trace_create_output(const char *uri) {
  */
 int trace_start(struct libtrace_t *libtrace)
 {
+	assert(libtrace);
 	if (libtrace->format->start_input) {
 		int ret=libtrace->format->start_input(libtrace);
 		if (ret < 0) {
@@ -542,7 +532,7 @@ int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *pac
 	if (libtrace->format->read_packet) {
 		do {
 			packet->size=libtrace->format->read_packet(libtrace,packet);
-			if (packet->size==-1)
+			if (packet->size==-1 || packet->size==0)
 				return packet->size;
 			if (libtrace->filter) {
 				/* If the filter doesn't match, read another
@@ -1251,11 +1241,48 @@ struct libtrace_filter_t *trace_bpf_setfilter(const char *filterstring) {
 #if HAVE_BPF
 	struct libtrace_filter_t *filter = malloc(sizeof(struct libtrace_filter_t));
 	filter->filterstring = strdup(filterstring);
-	filter->filter = 0;
+	filter->flag = 0;
 	return filter;
 #else
 	fprintf(stderr,"This version of libtrace does not have bpf filter support\n");
 	return 0;
+#endif
+}
+
+/* compile a bpf filter, now we know what trace it's on
+ * @internal
+ *
+ * @returns -1 on error, 0 on success
+ */
+int trace_bpf_compile(libtrace_filter_t *filter,
+		const libtrace_packet_t *packet	) {
+#if HAVE_BPF
+	void *linkptr = 0;
+	assert(filter);
+
+	/* If this isn't a real packet, then fail */
+	linkptr = trace_get_link(packet);
+	if (!linkptr) {
+		return -1;
+	}
+	
+	if (filter->filterstring && ! filter->flag) {
+		pcap_t *pcap;
+		pcap=(pcap_t *)pcap_open_dead(
+				libtrace_to_pcap_dlt(trace_get_link_type(packet)),
+				1500);
+		/* build filter */
+		if (pcap_compile( pcap, &filter->filter, filter->filterstring, 
+					1, 0)) {
+			pcap_close(pcap);
+			return -1;
+		}
+		pcap_close(pcap);
+		filter->flag=1;
+	}
+	return 0;
+#else
+	assert(!"This should never be called when BPF not enabled");
 #endif
 }
 
@@ -1276,28 +1303,16 @@ int trace_bpf_filter(struct libtrace_filter_t *filter,
 	if (!linkptr) {
 		return 0;
 	}
+
+	/* We need to compile it now, because before we didn't know what the 
+	 * link type was
+	 */
+	trace_bpf_compile(filter,packet);
 	
 	clen = trace_get_capture_length(packet);
-	
 
-	if (filter->filterstring && ! filter->filter) {
-		pcap_t *pcap;
-		struct bpf_program bpfprog;
-		pcap=(pcap_t *)pcap_open_dead(
-				libtrace_to_pcap_dlt(trace_get_link_type(packet)),
-				1500);
-		/* build filter */
-		if (pcap_compile( pcap, &bpfprog, filter->filterstring, 1, 0)) {
-			printf("bpf compilation error: %s: %s\n", 
-				pcap_geterr(pcap),filter->filterstring);
-			assert(0);
-		}
-		pcap_close(pcap);
-		filter->filter = bpfprog.bf_insns;	
-	}
-
-	assert(filter->filter);
-	return bpf_filter(filter->filter, linkptr, clen, clen);
+	assert(filter->flag);
+	return bpf_filter(filter->filter.bf_insns, linkptr, clen, clen);
 #else
 	fprintf(stderr,"This version of libtrace does not have bpf filter support\n");
 	return 0;
