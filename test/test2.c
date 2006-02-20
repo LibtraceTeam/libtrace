@@ -55,14 +55,15 @@ int main(int argc, char *argv[]) {
         int psize = 0;
 	int error = 0;
 	int count = 0;
-	struct libtrace_packet_t packet;
+	libtrace_packet_t *packet;
 
 	trace = trace_create(uri);
 
 	trace_start(trace);
 	
         for (;;) {
-		if ((psize = trace_read_packet(trace, &packet)) <0) {
+		packet=trace_create_packet();
+		if ((psize = trace_read_packet(trace, packet)) <0) {
 			error = 1;
 			break;
 		}
@@ -71,6 +72,7 @@ int main(int argc, char *argv[]) {
 			break;
 		}
 		count ++;
+		trace_destroy_packet(&packet);
         }
 	if (error == 0) {
 		if (count == 100) {
@@ -80,8 +82,7 @@ int main(int argc, char *argv[]) {
 			error = 1;
 		}
 	} else {
-		printf("failure: Error while reading trace\n");
-		trace_perror("trace_read_packet");
+		printf("failure: %s\n",trace_err.problem);
 	}
         trace_destroy(trace);
         return error;

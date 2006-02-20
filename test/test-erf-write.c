@@ -44,29 +44,59 @@
 #include <netinet/ip_icmp.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
+#include <string.h>
 #include "dagformat.h"
 #include "libtrace.h"
 
 
 int main(int argc, char *argv[]) {
-        char *uri = "erf:./traces/100_packets.erf";
-	struct libtrace_t *trace;
+        char *uri = "erf:traces/100_packets.erf";
+        int psize = 0;
+	int error = 0;
+	int count = 0;
+	libtrace_t *trace;
+	libtrace_out_t *outtrace;
+	libtrace_packet_t *packet;
 
-	printf("create trace\n");
-	
 	trace = trace_create(uri);
-
-	printf("created trace\n");
+	if (!trace) {
+		printf("Error: %s\n",trace_err.problem);
+		return 1;
+	}
+	outtrace = trace_create_output("erf:traces/100_packets.out.erf");
+	if (!outtrace) {
+		printf("Error: %s\n",trace_err.problem);
+		return 1;
+	}
 
 	trace_start(trace);
-
-	printf("started trace\n");
+	trace_start_output(outtrace);
 	
-	if (trace) {
-		printf("success: can open erf traces\n");	
-		trace_destroy(trace);
-		return 0;
+        for (;;) {
+		packet=trace_create_packet();
+		if ((psize = trace_read_packet(trace, packet)) <0) {
+			error = 1;
+			break;
+		}
+		if (psize == 0) {
+			error = 0;
+			break;
+		}
+		count ++;
+		trace_write_packet(outtrace,packet);
+		trace_destroy_packet(&packet);
+        }
+	if (error == 0) {
+		if (count == 100) {
+			printf("success: 100 packets read\n");
+		} else {
+			printf("failure: 100 packets expected, %d seen\n",count);
+			error = 1;
+		}
+	} else {
+		printf("failure: %s\n",trace_err.problem);
 	}
-	printf("failure: %s\n",trace_err.problem);
-	return -1;
+        trace_destroy(trace);
+	trace_destroy_output(outtrace);
+        return error;
 }

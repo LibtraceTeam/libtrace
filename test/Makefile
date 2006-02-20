@@ -8,10 +8,17 @@ CFLAGS += $(INCLUDE)
 libdir = $(PREFIX)/lib/.libs
 LDLIBS = -L$(libdir) -ltrace
 
-BINS = test1 test2
-.PHONY: all clean distclean install depend
+BINS = test1 test2 test-pcap test-pcap-bpf test-erf-write
+.PHONY: all clean distclean install depend test
 
 all: $(BINS) 
+
+test: all
+	for i in $(BINS); do					\
+		echo \* $$i; 					\
+		LD_LIBRARY_PATH=$(libdir)			\
+		 ./$$i || exit $$?;				\
+	done				
  
 clean:
 	$(RM) $(BINS) $(OBJS) 
