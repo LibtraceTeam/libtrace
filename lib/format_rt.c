@@ -299,7 +299,9 @@ static int rt_set_format(struct libtrace_t *libtrace,
 		case TRACE_FORMAT_RT:
 			printf("Format in a data packet should NOT be set to RT\n");
 			return -1;
-		case TRACE_FORMAT_LEGACY:
+		case TRACE_FORMAT_LEGACY_ETH:
+		case TRACE_FORMAT_LEGACY_ATM:
+		case TRACE_FORMAT_LEGACY_POS:
 			printf("Sending legacy over RT is currently not supported\n");
 			return -1;
 		default:
