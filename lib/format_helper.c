@@ -143,6 +143,9 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 #  define O_LARGEFILE 0
 #endif 
 
+/* open a file or stdin using gzip compression if necessary (and supported)
+ * @internal
+ */
 LIBTRACE_FILE trace_open_file(libtrace_t *trace)
 {
 	int fd;
@@ -166,6 +169,9 @@ LIBTRACE_FILE trace_open_file(libtrace_t *trace)
 	return ret;
 }
 
+/* Create a file or write to stdout using compression if requested
+ * @internal
+ */
 LIBTRACE_FILE trace_open_file_out(libtrace_out_t *trace,int level, int fileflag)
 {
 	int fd;

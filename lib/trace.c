@@ -369,12 +369,20 @@ libtrace_out_t *trace_create_output(const char *uri) {
 	 */
 
         if (libtrace->format->init_output) {
-                if(!libtrace->format->init_output( libtrace)) {
-			return 0;
+		/* 0 on success, -1 on failure */
+                switch(libtrace->format->init_output(libtrace)) {
+			case -1: /* failure */
+				free(libtrace);
+				return 0;
+			case 0: /* success */
+				break;
+			default:
+				assert(!"init_output() should return -1 for failure, or 0 for success");
 		}
 	} else {
 		trace_set_err(TRACE_ERR_NO_INIT_OUT,
 				"Format does not support writing (%s)",scan);
+		free(libtrace);
                 return 0;
         }
 

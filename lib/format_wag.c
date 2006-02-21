@@ -145,6 +145,11 @@ static int wtf_init_input(struct libtrace_t *libtrace)
 	libtrace->format_data = (struct libtrace_format_data_t *)
 		malloc(sizeof(struct libtrace_format_data_t));
 
+	return 1;
+}
+
+static int wtf_start_input(libtrace_t *libtrace)
+{
 	libtrace->format_data->input.file = trace_open_file(libtrace);
 
 	if (libtrace->format_data->input.file)
@@ -154,28 +159,20 @@ static int wtf_init_input(struct libtrace_t *libtrace)
 }
 
 static int wtf_init_output(struct libtrace_out_t *libtrace) {
-	char *filemode = 0;
 	libtrace->format_data = (struct libtrace_format_data_out_t *)
 		calloc(1,sizeof(struct libtrace_format_data_out_t));
 
-	OPTIONS.zlib.level = 0;
-	asprintf(&filemode,"wb%d",OPTIONS.zlib.level);
-	if (!strncmp(libtrace->uridata,"-",1)) {
-		/* STDOUT */
-		OUTPUT.file = LIBTRACE_FDOPEN(dup(1), filemode);
-	} else {
-		int fd;
-		/* TRACE */
-		fd=open(libtrace->uridata,OPTIONS.zlib.filemode,
-					S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
-		if (fd==-1) {
-			trace_set_err(errno,"open(%s)",libtrace->uridata);
-			return 0;
-		}
-		OUTPUT.file = LIBTRACE_FDOPEN(fd, filemode);
-	}
+	return 0;
+}
 
-	return 1;
+static int wtf_start_output(libtrace_out_t *libtrace) {
+	OUTPUT.file = trace_open_file_out(libtrace,
+			OPTIONS.zlib.level,
+			OPTIONS.zlib.filemode);
+	if (!OUTPUT.file) {
+		return -1;
+	}
+	return 0;
 }
 
 static int wtf_config_output(struct libtrace_out_t *libtrace, 
@@ -247,6 +244,7 @@ static int wag_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
           buf_ptr = buf_ptr + ret;
         }
 
+
         framesize = ntohs(((struct frame_t *)buffer)->size);
         magic = ntohs(((struct frame_t *)buffer)->magic);
 
@@ -281,10 +279,10 @@ static int wag_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
 static int wag_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
 	int numbytes;
 	
-        if (packet->buf_control == EXTERNAL) {
+        if (packet->buf_control == EXTERNAL || !packet->buffer) {
                 packet->buf_control = PACKET;
                 packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
-        }
+	}
 	
 	
 	packet->trace = libtrace;
@@ -303,24 +301,30 @@ static int wag_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 
 static int wtf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
 	int numbytes;
-	void *buffer = packet->buffer;
-	void *buffer2 = packet->buffer;
+	void *buffer;
+	void *buffer2;
 	int framesize;
 	int size;
 
-        if (packet->buf_control == EXTERNAL) {
+        if (packet->buf_control == EXTERNAL || !packet->buffer) {
                 packet->buf_control = PACKET;
                 packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
         }
 
+	buffer2 = buffer = packet->buffer;
 	
 	if ((numbytes = LIBTRACE_READ(INPUT.file, buffer, sizeof(struct frame_t))) == -1) {
-		trace_set_err(errno,"read(%s)",packet->trace->uridata);
+		trace_set_err(errno,"read(%s,frame_t)",packet->trace->uridata);
 		return -1;
 	}
 
 	if (numbytes == 0) {
 		return 0;
+	}
+
+	if (htons(((struct frame_t *)buffer)->magic) != 0xdaa1) {
+		trace_set_err(TRACE_ERR_BAD_PACKET,"Insufficient magic");
+		return -1;
 	}
 
 	framesize = ntohs(((struct frame_t *)buffer)->size);
@@ -330,7 +334,7 @@ static int wtf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 
 	
 	if ((numbytes=LIBTRACE_READ(INPUT.file, buffer2, size)) != size) {
-		trace_set_err(errno,"read(%s)",packet->trace->uridata);
+		trace_set_err(errno,"read(%s,buffer)",packet->trace->uridata);
 		return -1;
 	}
 
@@ -350,15 +354,16 @@ static int wtf_write_packet(struct libtrace_out_t *libtrace, const struct libtra
 		return -1;
 	}
 
-	/* We could just read from packet->buffer, but I feel it is more technically correct
-	 * to read from the header and payload pointers
+	/* We could just read from packet->buffer, but I feel it is more
+	 * technically correct to read from the header and payload pointers
 	 */
-	if ((numbytes = LIBTRACE_WRITE(OUTPUT.file, packet->header, trace_get_framing_length(packet))) == -1) {
+	if ((numbytes = LIBTRACE_WRITE(OUTPUT.file, packet->header, 
+				trace_get_framing_length(packet))) == -1) {
 		trace_set_err(errno,"write(%s)",packet->trace->uridata);
 		return -1;
 	}
 	if ((numbytes = LIBTRACE_WRITE(OUTPUT.file, packet->payload, 
-			packet->size - trace_get_framing_length(packet))) == 0) {
+			packet->size - trace_get_framing_length(packet))) == -1) {
 		trace_set_err(errno,"write(%s)",packet->trace->uridata);
 		return -1;
 	}
@@ -471,11 +476,11 @@ static struct libtrace_format_t wag_trace = {
         TRACE_FORMAT_WAG,
 	wtf_init_input,                 /* init_input */
 	NULL,				/* config input */
-	NULL,				/* start input */
+	wtf_start_input,		/* start input */
 	NULL,				/* pause_input */
         wtf_init_output,                /* init_output */
         wtf_config_output,              /* config_output */
-	NULL,				/* start output */
+	wtf_start_output,		/* start output */
         wtf_fin_input,                  /* fin_input */
         wtf_fin_output,                 /* fin_output */
         wtf_read_packet,                /* read_packet */

@@ -274,7 +274,7 @@ static int erf_init_output(struct libtrace_out_t *libtrace) {
 	OPTIONS.erf.fileflag = O_CREAT | O_LARGEFILE | O_WRONLY;
 	OUTPUT.file = 0;
 
-	return 1;
+	return 0;
 }
 
 static int erf_config_output(struct libtrace_out_t *libtrace, trace_option_t option, void *value) {
@@ -546,9 +546,11 @@ static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_pac
 	} while(1);
 }
 
-static int erf_dump_packet(struct libtrace_out_t *libtrace,
+static int erf_dump_packet(libtrace_out_t *libtrace,
 		dag_record_t *erfptr, int pad, void *buffer, size_t size) {
 	int numbytes = 0;
+	assert(size>=0 && size<=65536);
+	/* FIXME: Shouldn't this return != dag_record_size+pad on error? */
 	if ((numbytes = LIBTRACE_WRITE(OUTPUT.file, erfptr, dag_record_size + pad)) == 0) {
 		trace_set_err(errno,"write(%s)",libtrace->uridata);
 		return -1;
@@ -568,7 +570,6 @@ static int erf_start_output(libtrace_out_t *libtrace)
 			OPTIONS.erf.level,
 			OPTIONS.erf.fileflag);
 	if (!OUTPUT.file) {
-		printf("%s\n",trace_err.problem);
 		return -1;
 	}
 	return 0;
@@ -578,7 +579,6 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 		const libtrace_packet_t *packet) 
 {
 	int numbytes = 0;
-	dag_record_t erfhdr;
 	int pad = 0;
 	dag_record_t *dag_hdr = (dag_record_t *)packet->header;
 	void *payload = packet->payload;
@@ -605,19 +605,21 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 				trace_get_capture_length(packet)
 				);
 	} else {
+		dag_record_t erfhdr;
 		/* convert format - build up a new erf header */
 		/* Timestamp */
 		erfhdr.ts = trace_get_erf_timestamp(packet);
 		erfhdr.type = libtrace_to_erf_type(trace_get_link_type(packet));
 		/* Flags. Can't do this */
-		memset(&erfhdr.flags,1,1);
+		memset(&erfhdr.flags,1,sizeof(erfhdr.flags));
 		/* Packet length (rlen includes format overhead) */
-		erfhdr.rlen = trace_get_capture_length(packet) + erf_get_framing_length(packet);
+		erfhdr.rlen = trace_get_capture_length(packet) 
+			+ erf_get_framing_length(packet);
 		/* loss counter. Can't do this */
 		erfhdr.lctr = 0;
 		/* Wire length */
 		erfhdr.wlen = trace_get_wire_length(packet);
-		
+
 		/* Write it out */
 		numbytes = erf_dump_packet(libtrace,
 				&erfhdr,

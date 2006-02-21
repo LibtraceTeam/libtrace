@@ -166,7 +166,7 @@ static int pcap_init_output(struct libtrace_out_t *libtrace) {
 		malloc(sizeof(struct libtrace_format_data_out_t));
 	OUTPUT.trace.pcap = NULL;
 	OUTPUT.trace.dump = NULL;
-	return 1;
+	return 0;
 }
 
 static int pcapint_init_input(struct libtrace_t *libtrace) {
@@ -253,11 +253,22 @@ static void trace_pcap_handler(u_char *user, const struct pcap_pkthdr *pcaphdr, 
 	*/
 	numbytes = pcaphdr->len;
 
-	packet->header = (void *)pcaphdr;
+	packet->buf_control = PACKET;
+	if (!packet->buffer) {
+		/* We only need struct pcap_pkthdr, but we have no way
+		 * to say how much we malloc'd so that formats can determine
+		 * if they need to malloc more, so at the moment we just
+		 * malloc 64k
+		 */
+		packet->buffer=malloc(65536);
+	}
+	memcpy(packet->buffer,pcaphdr,sizeof(struct pcap_pkthdr));
+	packet->header = packet->buffer;
 	packet->payload = (void *)pcappkt;
 
-
 	packet->size = numbytes + sizeof(struct pcap_pkthdr);
+
+	assert(pcaphdr->caplen>=0 && pcaphdr->caplen<=65536);
 }
 
 static int pcap_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
@@ -387,6 +398,7 @@ static struct timeval pcap_get_timeval(const struct libtrace_packet_t *packet) {
 static int pcap_get_capture_length(const struct libtrace_packet_t *packet) {
 	struct pcap_pkthdr *pcapptr = 0;
 	pcapptr = (struct pcap_pkthdr *)packet->header;
+	assert(pcapptr->caplen>=0 && pcapptr->caplen<=65536);
 	return pcapptr->caplen;
 }
 
