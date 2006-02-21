@@ -73,8 +73,6 @@ extern "C" {
 #include <stdbool.h>
 
 
-
-
 void trace_set_err(int errcode,const char *msg,...);
 
 #define RP_BUFSIZE 65536
@@ -151,7 +149,7 @@ struct trace_pflog_header_t {
 struct libtrace_format_t {
 	char *name;
 	char *version;
-	char *type;
+	enum base_format_t type;
 	int (*init_input)(libtrace_t *libtrace);
 	int (*config_input)(libtrace_t *libtrace,trace_option_t option,void *value);
 	int (*start_input)(libtrace_t *libtrace);

@@ -29,9 +29,6 @@
  */
 #define _GNU_SOURCE
 
-#define RT_MSG 2
-#define RT_DATA 1
-
 #include "config.h"
 #include "common.h"
 #include "libtrace.h"
@@ -152,30 +149,30 @@ static int dag_init_input(struct libtrace_t *libtrace) {
 
 static int dag_start_input(struct libtrace_t *libtrace) {
 	struct stat buf;
-	if (stat(packet->trace->uridata) == -1) {
+	if (stat(libtrace->uridata, &buf) == -1) {
 		trace_set_err(errno,"stat(%s)",libtrace->uridata);
 		return 0;
 	} 
 	if (S_ISCHR(buf.st_mode)) {
 		/* DEVICE */
-		if((INPUT.fd = dag_open(packet->trace->uridata)) < 0) {
+		if((INPUT.fd = dag_open(libtrace->uridata)) < 0) {
 			trace_set_err(errno,"Cannot open DAG %s",
-					packet->trace->uridata);
+					libtrace->uridata);
 			return 0;
 		}
 		if((DAG.buf = (void *)dag_mmap(INPUT.fd)) == MAP_FAILED) {
 			trace_set_err(errno,"Cannot mmap DAG %s",
-					packet->trace->uridata);
+					libtrace->uridata);
 			return 0;
 		}
 		if(dag_start(INPUT.fd) < 0) {
 			trace_set_err(errno,"Cannot start DAG %s",
-					packet->trace->uridata);
+					libtrace->uridata);
 			return 0;
 		}
 	} else {
 		trace_set_err(errno,"Not a valid dag device: %s",
-				packet->trace->uridata);
+				libtrace->uridata);
 		return 0;
 	}
 	return 1;
@@ -304,14 +301,14 @@ static int dag_fin_input(struct libtrace_t *libtrace) {
 }
 #endif
 
-static int erf_fin_input(struct libtrace_t *libtrace) {
-	LIBTRACE_CLOSE(INPUT.file);
-	free(libtrace->format_data);
+static int rtclient_fin_input(struct libtrace_t *libtrace) {
+	close(INPUT.fd);
 	return 0;
 }
 
-static int rtclient_fin_input(struct libtrace_t *libtrace) {
-	close(INPUT.fd);
+static int erf_fin_input(struct libtrace_t *libtrace) {
+	LIBTRACE_CLOSE(INPUT.file);
+	free(libtrace->format_data);
 	return 0;
 }
 
@@ -375,7 +372,7 @@ static int dag_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 	
 	packet->buffer = erfptr;
 	packet->header = erfptr;
-	if (((dag_record_t *)buffer)->flags.rxerror == 1) {
+	if (((dag_record_t *)packet->buffer)->flags.rxerror == 1) {
 		packet->payload = NULL;
 	} else {
 		packet->payload = packet->buffer + erf_get_framing_length(packet);
@@ -468,6 +465,9 @@ static int rtclient_read(struct libtrace_t *libtrace, void *buffer, size_t len) 
 	}
 	return numbytes;
 }
+
+#define RT_DATA 1
+#define RT_MSG 2
 
 static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
 	int numbytes = 0;
@@ -593,11 +593,11 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 		dag_hdr->rlen = htons(dag_record_size + pad);
 	} 
 	
-	if (packet->trace->format == &erf || 
+	if (packet->trace->format == &erf  
 #if HAVE_DAG
-			packet->trace->format == &dag ||
+			|| packet->trace->format == &dag 
 #endif
-			packet->trace->format == &rtclient ) {
+			) {
 		numbytes = erf_dump_packet(libtrace,
 				(dag_record_t *)packet->buffer,
 				pad,
@@ -750,29 +750,22 @@ static void erf_help() {
 }
 
 static void rtclient_help() {
-	printf("rtclient format module\n");
+	printf("rtclient format module: $Revision$\n");
+	printf("DEPRECATED - use rt module instead\n");
 	printf("Supported input URIs:\n");
-	printf("\trtclient:hostname:port\n");
-	printf("\trtclient:hostname (connects on default port)\n");
+	printf("\trtclient:host:port\n");
 	printf("\n");
-	printf("\te.g.: rtclient:localhost\n");
-	printf("\te.g.: rtclient:localhost:32500\n");
+	printf("\te.g.:rtclient:localhost:3435\n");
 	printf("\n");
-	printf("Supported output URIs:\n");
-	printf("\trtclient: \t(will output on default port on all available IP addresses) \n");
-	printf("\trtclient:hostname:port\n");
-	printf("\trtclient:port\n");
-	printf("\n");
-	printf("\te.g.: rtclient:32500\n");
-	printf("\te.g.: rtclient:\n");
-	printf("\n");
-
-}
+        printf("Supported output URIs:\n");
+        printf("\tnone\n");
+        printf("\n");
+}	
 
 static struct libtrace_format_t erf = {
 	"erf",
 	"$Id$",
-	"erf",
+	TRACE_FORMAT_ERF,
 	erf_init_input,			/* init_input */	
 	NULL,				/* config_input */
 	erf_start_input,		/* start_input */
@@ -806,10 +799,11 @@ static struct libtrace_format_t erf = {
 static struct libtrace_format_t dag = {
 	"dag",
 	"$Id$",
-	"erf",
+	TRACE_FORMAT_ERF,
 	dag_init_input,			/* init_input */	
 	NULL,				/* config_input */
 	dag_start_input,		/* start_input */
+	NULL,				/* pause_input */
 	NULL,				/* init_output */
 	NULL,				/* config_output */
 	NULL,				/* start_output */
@@ -823,6 +817,9 @@ static struct libtrace_format_t dag = {
 	erf_get_erf_timestamp,		/* get_erf_timestamp */
 	NULL,				/* get_timeval */
 	NULL,				/* get_seconds */
+	NULL,				/* seek_erf */
+	NULL, 				/* seek_timeval */
+	NULL, 				/* seek_seconds */
 	erf_get_capture_length,		/* get_capture_length */
 	erf_get_wire_length,		/* get_wire_length */
 	erf_get_framing_length,		/* get_framing_length */
@@ -836,7 +833,7 @@ static struct libtrace_format_t dag = {
 static struct libtrace_format_t rtclient = {
 	"rtclient",
 	"$Id$",
-	"erf",
+	TRACE_FORMAT_ERF,
 	rtclient_init_input,		/* init_input */	
 	NULL,				/* config_input */
 	NULL,				/* start_input */
@@ -867,6 +864,7 @@ static struct libtrace_format_t rtclient = {
 };
 
 void __attribute__((constructor)) erf_constructor() {
+	register_format(&rtclient);
 	register_format(&erf);
 #ifdef HAVE_DAG
 	register_format(&dag);

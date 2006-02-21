@@ -445,7 +445,7 @@ static void pcapint_help() {
 static struct libtrace_format_t pcap = {
 	"pcap",
 	"$Id$",
-	"pcap",
+	TRACE_FORMAT_PCAP,
 	pcap_init_input,		/* init_input */
 	NULL,				/* config_input */
 	pcap_start_input,		/* start_input */
@@ -478,7 +478,7 @@ static struct libtrace_format_t pcap = {
 static struct libtrace_format_t pcapint = {
 	"pcapint",
 	"$Id$",
-	"pcap",
+	TRACE_FORMAT_PCAP,
 	pcapint_init_input,		/* init_input */
 	pcapint_config_input,		/* config_input */
 	pcapint_start_input,		/* start_input */

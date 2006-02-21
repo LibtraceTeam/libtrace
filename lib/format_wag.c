@@ -433,7 +433,7 @@ static void wtf_help() {
 static struct libtrace_format_t wag = {
 	"wag",
 	"$Id$",
-	"wtf",
+	TRACE_FORMAT_WAG,
 	wag_init_input,			/* init_input */	
 	NULL,				/* config_input */
 	NULL,				/* start_input */
@@ -468,8 +468,8 @@ static struct libtrace_format_t wag = {
 static struct libtrace_format_t wag_trace = {
         "wtf",
         "$Id$",
-        "wtf",
-        wtf_init_input,                 /* init_input */
+        TRACE_FORMAT_WAG,
+	wtf_init_input,                 /* init_input */
 	NULL,				/* config input */
 	NULL,				/* start input */
 	NULL,				/* pause_input */

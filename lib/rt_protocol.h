@@ -6,10 +6,14 @@
 #define CAPTURE_PORT 3434
 #define COLLECTOR_PORT 3435
 
+#define RT_MAX_HDR_SIZE 256
+#define MAX_SEQUENCE 2147483647 
+
 /* Type field definitions */
+/* NOTE: RT_DATA should always be zero */
 enum rt_field_t {
- RT_HELLO 	=0,	/* Connection accepted */
- RT_DATA	=1, 	/* Libtrace data packet */
+ RT_DATA	=0, 	/* Libtrace data packet */
+ RT_HELLO       =1,     /* Connection accepted */
  RT_START	=2,	/* Request for data transmission to begin */
  RT_ACK		=3,	/* Data acknowledgement */
  RT_STATUS	=4,	/* Fifo status packet */
@@ -22,20 +26,13 @@ enum rt_field_t {
  RT_OPTION	=11	/* Option request */
 };
 
-/* Format field definitions */
-enum rt_format_t {
- RT_FORMAT_ERF 		=1,
- RT_FORMAT_PCAP		=2,
- RT_FORMAT_WAG		=3
-};
-
-typedef struct fifo_state {
+typedef struct fifo_info {
         uint64_t in;
         uint64_t out;
         uint64_t ack;
         uint64_t length;
         uint64_t used;
-} fifo_state_t;
+} fifo_info_t;
 
 /* RT packet header */
 typedef struct rt_header {
@@ -45,11 +42,12 @@ typedef struct rt_header {
 
 typedef struct rt_data {
 	uint16_t format;
-	char *data;
+	uint32_t sequence;
 } rt_data_t;
 
+/* TODO: Reorganise this struct once more hello info is added */
 typedef struct rt_hello {
-
+	uint8_t reliable;
 } rt_hello_t;
 
 typedef struct rt_start {
@@ -57,11 +55,11 @@ typedef struct rt_start {
 } rt_start_t;
 
 typedef struct rt_ack {
-	uint64_t timestamp;
+	uint32_t sequence;
 } rt_ack_t;
 
 typedef struct rt_status {
-	fifo_state_t fifo_status;
+	fifo_info_t fifo_status;
 } rt_status_t;
 
 typedef struct rt_duck {

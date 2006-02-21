@@ -237,7 +237,7 @@ static void legacyeth_help() {
 static struct libtrace_format_t legacyatm = {
 	"legacyatm",
 	"$Id$",
-	"legacyatm",
+	TRACE_FORMAT_LEGACY,
 	erf_init_input,			/* init_input */	
 	NULL,				/* config_input */
 	NULL,				/* start_input */
@@ -270,7 +270,7 @@ static struct libtrace_format_t legacyatm = {
 static struct libtrace_format_t legacyeth = {
 	"legacyeth",
 	"$Id$",
-	"legacyeth",
+	TRACE_FORMAT_LEGACY,
 	erf_init_input,			/* init_input */	
 	NULL,				/* config_input */
 	NULL,				/* start_input */
@@ -303,7 +303,7 @@ static struct libtrace_format_t legacyeth = {
 static struct libtrace_format_t legacypos = {
 	"legacypos",
 	"$Id$",
-	"legacypos",
+	TRACE_FORMAT_LEGACY,
 	erf_init_input,			/* init_input */	
 	NULL,				/* config_input */
 	NULL,				/* start_input */

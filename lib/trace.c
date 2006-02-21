@@ -115,6 +115,7 @@
 
 #include "libtrace_int.h"
 #include "format_helper.h"
+#include "rt_protocol.h"
 #include <err.h>
 
 #define MAXOPTS 1024
@@ -543,7 +544,8 @@ int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *pac
 	/* Store the trace we are reading from into the packet opaque 
 	 * structure */
 	packet->trace = libtrace;
-
+	packet->type = RT_DATA;
+	
 	if (libtrace->format->read_packet) {
 		do {
 			packet->size=libtrace->format->read_packet(libtrace,packet);
@@ -1564,6 +1566,12 @@ const char * trace_parse_uri(const char *uri, char **format) {
         uridata++;
 	
 	return uridata;
+}
+
+enum base_format_t trace_get_format(struct libtrace_packet_t *packet) {
+	assert(packet);
+
+	return packet->trace->format->type;
 }
 	
 /** Update the libtrace error

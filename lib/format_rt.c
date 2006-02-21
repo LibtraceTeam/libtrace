@@ -67,6 +67,8 @@
 
 #define RT_INFO libtrace->format_data
 
+int reliability = 0;
+
 char *rt_deny_reason(uint8_t reason) {
 	char *string = 0;
 
@@ -105,7 +107,9 @@ static int rt_connect(struct libtrace_t *libtrace) {
         struct hostent *he;
         struct sockaddr_in remote;
 	rt_header_t connect_msg;
-	uint8_t reason;	
+	rt_deny_conn_t deny_hdr;	
+	rt_hello_t hello_opts;
+	uint8_t reason;
 	
 	if ((he=gethostbyname(RT_INFO->hostname)) == NULL) {
                 perror("gethostbyname");
@@ -131,32 +135,42 @@ static int rt_connect(struct libtrace_t *libtrace) {
 	
 	if (recv(RT_INFO->input_fd, &connect_msg, sizeof(rt_header_t), 0) != sizeof(rt_header_t) ) {
 		printf("An error occured while connecting to %s\n", RT_INFO->hostname);
-		return -1;
+		return 0;
 	}
 
 	switch (connect_msg.type) {
 		case RT_DENY_CONN:
 			
-			if (recv(RT_INFO->input_fd, &reason, 1, 0) != 1) {
+			if (recv(RT_INFO->input_fd, &deny_hdr, 
+						sizeof(rt_deny_conn_t),
+						0) != sizeof(rt_deny_conn_t)) {
 				reason = 0;
 			}	
+			reason = deny_hdr.reason;
 			printf("Connection attempt is denied by the server: %s\n",
 					rt_deny_reason(reason));
-			return -1;
+			return 0;
 		case RT_HELLO:
 			// do something with options
-			
+			printf("Hello\n");	
+			if (recv(RT_INFO->input_fd, &hello_opts, 
+						sizeof(rt_hello_t), 0)
+					!= sizeof(rt_hello_t)) {
+				printf("Failed to read hello options\n");
+				return 0;
+			}
+			reliability = hello_opts.reliable;
 			
 			return 1;
 		case RT_DATA:
 			printf("Server needs to send RT_HELLO before sending data to clients\n");
-			return -1;
+			return 0;
 		default:
 			printf("Unexpected message type: %d\n", connect_msg.type);
-			return -1;
+			return 0;
 	}
 	
-        return -1;
+        return 0;
 }
 
 
@@ -197,7 +211,9 @@ static int rt_start_input(struct libtrace_t *libtrace) {
 	rt_header_t start_msg;
 
 	start_msg.type = RT_START;
-	start_msg.length = sizeof(rt_header_t);
+	start_msg.length = sizeof(rt_start_t);
+
+	printf("Sending start - len: %d\n", start_msg.length);
 	
 	// Need to send start message to server
 	if (send(RT_INFO->input_fd, &start_msg, sizeof(rt_header_t), 0) != sizeof(rt_header_t)) {
@@ -205,14 +221,14 @@ static int rt_start_input(struct libtrace_t *libtrace) {
 		return -1;
 	}
 
-	return 1;
+	return 0;
 }
 
 static int rt_fin_input(struct libtrace_t *libtrace) {
         rt_header_t close_msg;
 
 	close_msg.type = RT_CLOSE;
-	close_msg.length = sizeof(rt_header_t);
+	close_msg.length = sizeof(rt_close_t);
 	
 	// Send a close message to the server
 	if (send(RT_INFO->input_fd, &close_msg, sizeof(rt_header_t), 0) != sizeof(rt_header_t)) {
@@ -262,24 +278,30 @@ static int rt_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
 static int rt_set_format(struct libtrace_t *libtrace, 
 		struct libtrace_packet_t *packet, uint16_t format) {
 	switch (format) {
-		case RT_FORMAT_ERF:
+		case TRACE_FORMAT_ERF:
 			if (!RT_INFO->dummy_erf) {
 				RT_INFO->dummy_erf = trace_create_dead("erf:-");
 			}
 			packet->trace = RT_INFO->dummy_erf;
 			break;
-		case RT_FORMAT_PCAP:
+		case TRACE_FORMAT_PCAP:
 			if (!RT_INFO->dummy_pcap) {
 				RT_INFO->dummy_pcap = trace_create_dead("pcap:-");
 			}
 			packet->trace = RT_INFO->dummy_pcap;
 			break;
-		case RT_FORMAT_WAG:
+		case TRACE_FORMAT_WAG:
 			if (!RT_INFO->dummy_wag) {
 				RT_INFO->dummy_wag = trace_create_dead("wtf:-");
 			}
 			packet->trace = RT_INFO->dummy_wag;
 			break;
+		case TRACE_FORMAT_RT:
+			printf("Format in a data packet should NOT be set to RT\n");
+			return -1;
+		case TRACE_FORMAT_LEGACY:
+			printf("Sending legacy over RT is currently not supported\n");
+			return -1;
 		default:
 			printf("Unrecognised format: %d\n", format);
 			return -1;
@@ -291,7 +313,7 @@ static void rt_set_payload(struct libtrace_packet_t *packet, uint16_t format) {
 	dag_record_t *erfptr;
 	
 	switch (format) {
-		case RT_FORMAT_ERF:
+		case TRACE_FORMAT_ERF:
 			erfptr = (dag_record_t *)packet->header;
 			
 			if (erfptr->flags.rxerror == 1) {
@@ -309,7 +331,7 @@ static void rt_set_payload(struct libtrace_packet_t *packet, uint16_t format) {
 }
 
 static int rt_send_ack(struct libtrace_t *libtrace, 
-		struct libtrace_packet_t *packet)  {
+		struct libtrace_packet_t *packet, uint32_t seqno)  {
 	
 	static char *ack_buffer = 0;
 	char *buf_ptr;
@@ -326,12 +348,13 @@ static int rt_send_ack(struct libtrace_t *libtrace,
 	ack_hdr = (rt_ack_t *) (ack_buffer + sizeof(rt_header_t));
 	
 	hdr->type = RT_ACK;
-	hdr->length = sizeof(rt_header_t) + sizeof(rt_ack_t);
+	hdr->length = sizeof(rt_ack_t);
 
-	ack_hdr->timestamp = trace_get_erf_timestamp(packet);
+	ack_hdr->sequence = seqno;
 	
-	to_write = hdr->length;
+	to_write = hdr->length + sizeof(rt_header_t);
 	buf_ptr = ack_buffer;
+
 	
 	while (to_write > 0) {
 		numbytes = send(RT_INFO->input_fd, buf_ptr, to_write, 0); 
@@ -359,10 +382,9 @@ static int rt_read_packet(struct libtrace_t *libtrace,
         char buf[RP_BUFSIZE];
         int read_required = 0;
 	rt_header_t pkt_hdr;
-	uint16_t format;
 	char msg_buf[RP_BUFSIZE];
 
-	
+	rt_data_t data_hdr;
         void *buffer = 0;
 
         packet->trace = libtrace;
@@ -370,7 +392,10 @@ static int rt_read_packet(struct libtrace_t *libtrace,
         if (packet->buf_control == EXTERNAL) {
                 packet->buf_control = PACKET;
                 packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
-        }
+        } else {
+		if (!packet->buffer)
+			packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
+	}
 
         buffer = packet->buffer;
         packet->header = packet->buffer;
@@ -393,38 +418,43 @@ static int rt_read_packet(struct libtrace_t *libtrace,
                 }
 		tracefifo_out_update(libtrace->fifo, sizeof(rt_header_t));
 		
-		packet->size = pkt_hdr.length;
+		packet->size = pkt_hdr.length + sizeof(rt_header_t);
 		packet->type = pkt_hdr.type;
-
+		
 		switch (packet->type) {
 			case RT_DATA:
 				if (tracefifo_out_read(libtrace->fifo, 
-							&format, 
-							sizeof(uint16_t)) == 0) 
+							&data_hdr, 
+							sizeof(rt_data_t)) == 0) 
 				{
 					tracefifo_out_reset(libtrace->fifo);
 					read_required = 1;
 					break;
 				}
 				if (tracefifo_out_read(libtrace->fifo, buffer, 
-							packet->size - sizeof(uint16_t))== 0)
+							packet->size - sizeof(rt_data_t) - sizeof(rt_header_t))== 0)
 				{
 					tracefifo_out_reset(libtrace->fifo);
 					read_required = 1;
 					break;
 				}
 				// set packet->trace
-				if (rt_set_format(libtrace, packet, format) < 0) {
+				if (rt_set_format(libtrace, packet, 
+							data_hdr.format) < 0) {
 					return -1;
 				}
 				// set packet->payload
-				rt_set_payload(packet, format);
+				rt_set_payload(packet, data_hdr.format);
 				
-				// send ack
-				if (rt_send_ack(libtrace, packet) == -1) {
-					return -1;
-				}
-				
+				if (reliability > 0) {
+					// send ack
+					if (rt_send_ack(libtrace, packet,
+								data_hdr.sequence) 
+							== -1)
+					{
+						return -1;
+					}
+				}	
 				break;
 			case RT_STATUS:
 				if (tracefifo_out_read(libtrace->fifo, buffer,
@@ -470,10 +500,9 @@ static int rt_read_packet(struct libtrace_t *libtrace,
 				
 		
                 // got in our whole packet, so...
-                tracefifo_out_update(libtrace->fifo,packet->size);
+                tracefifo_out_update(libtrace->fifo,packet->size - sizeof(rt_header_t));
 
-                tracefifo_ack_update(libtrace->fifo,packet->size +
-				sizeof(rt_header_t));
+                tracefifo_ack_update(libtrace->fifo,packet->size);
                 return 1;
         } while(1);
 	
@@ -501,7 +530,7 @@ static void rt_help() {
 static struct libtrace_format_t rt = {
         "rt",
         "$Id$",
-        "rt",
+        TRACE_FORMAT_RT,
         rt_init_input,            	/* init_input */
         NULL,                           /* config_input */
         rt_start_input,           	/* start_input */

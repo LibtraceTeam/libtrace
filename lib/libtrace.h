@@ -882,6 +882,22 @@ int8_t trace_get_server_port(uint8_t protocol, uint16_t source, uint16_t dest);
  */
 const char *trace_parse_uri(const char *uri, char **format);
 
+/* Base format type definitions */
+enum base_format_t {
+        TRACE_FORMAT_ERF          =1,
+        TRACE_FORMAT_PCAP         =2,
+        TRACE_FORMAT_WAG          =3,
+        TRACE_FORMAT_RT           =4,
+        TRACE_FORMAT_LEGACY       =5
+};
+
+/** Gets the framing header type for a given packet.
+ * @param packet	the packet opaque pointer
+ * @return the format of the packet
+ */
+enum base_format_t trace_get_format(struct libtrace_packet_t *packet);
+
+
 /** libtrace error information */
 extern struct trace_err_t{
 	int err_num; 		/**< error code */
