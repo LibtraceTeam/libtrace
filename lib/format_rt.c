@@ -151,7 +151,7 @@ static int rt_connect(struct libtrace_t *libtrace) {
 					rt_deny_reason(reason));
 			return 0;
 		case RT_HELLO:
-			// do something with options
+			/* do something with options */
 			printf("Hello\n");	
 			if (recv(RT_INFO->input_fd, &hello_opts, 
 						sizeof(rt_hello_t), 0)
@@ -215,7 +215,7 @@ static int rt_start_input(struct libtrace_t *libtrace) {
 
 	printf("Sending start - len: %d\n", start_msg.length);
 	
-	// Need to send start message to server
+	/* Need to send start message to server */
 	if (send(RT_INFO->input_fd, &start_msg, sizeof(rt_header_t), 0) != sizeof(rt_header_t)) {
 		printf("Failed to send start message to server\n");
 		return -1;
@@ -230,7 +230,7 @@ static int rt_fin_input(struct libtrace_t *libtrace) {
 	close_msg.type = RT_CLOSE;
 	close_msg.length = sizeof(rt_close_t);
 	
-	// Send a close message to the server
+	/* Send a close message to the server */
 	if (send(RT_INFO->input_fd, &close_msg, sizeof(rt_header_t), 0) != sizeof(rt_header_t)) {
 		printf("Failed to send close message to server\n");
 	
@@ -250,8 +250,6 @@ static int rt_fin_input(struct libtrace_t *libtrace) {
 static int rt_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
         int numbytes;
 
-        if (buffer == 0)
-                buffer = malloc(len);
         while(1) {
 #ifndef MSG_NOSIGNAL
 #  define MSG_NOSIGNAL 0
@@ -261,8 +259,9 @@ static int rt_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
                                                 len,
                                                 MSG_NOSIGNAL)) == -1) {
                         if (errno == EINTR) {
-                                //ignore EINTR in case
-                                // a caller is using signals
+                                /* ignore EINTR in case
+                                 * a caller is using signals
+				 */
                                 continue;
                         }
                         perror("recv");
@@ -391,13 +390,10 @@ static int rt_read_packet(struct libtrace_t *libtrace,
 
         packet->trace = libtrace;
 
-        if (packet->buf_control == EXTERNAL) {
-                packet->buf_control = PACKET;
+        if (packet->buf_control == TRACE_CTRL_EXTERNAL || !packet->buffer) {
+                packet->buf_control = TRACE_CTRL_PACKET;
                 packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
-        } else {
-		if (!packet->buffer)
-			packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
-	}
+        } 
 
         buffer = packet->buffer;
         packet->header = packet->buffer;
@@ -412,7 +408,7 @@ static int rt_read_packet(struct libtrace_t *libtrace,
                         tracefifo_write(libtrace->fifo,buf,numbytes);
                         read_required = 0;
                 }
-                // Read rt header 
+                /* Read rt header */
                 if (tracefifo_out_read(libtrace->fifo,
                                 &pkt_hdr, sizeof(rt_header_t)) == 0) {
                         read_required = 1;
@@ -440,16 +436,16 @@ static int rt_read_packet(struct libtrace_t *libtrace,
 					read_required = 1;
 					break;
 				}
-				// set packet->trace
+				/* set packet->trace */
 				if (rt_set_format(libtrace, packet, 
 							data_hdr.format) < 0) {
 					return -1;
 				}
-				// set packet->payload
+				/* set packet->payload */
 				rt_set_payload(packet, data_hdr.format);
 				
 				if (reliability > 0) {
-					// send ack
+					/* send ack */
 					if (rt_send_ack(libtrace, packet,
 								data_hdr.sequence) 
 							== -1)
@@ -478,17 +474,16 @@ static int rt_read_packet(struct libtrace_t *libtrace,
 				break;
 
 			case RT_END_DATA:
-				// need to do something sensible here
+				/* need to do something sensible here */
 				return 0;	
 
 			case RT_PAUSE_ACK:
-				// Check if we asked for a pause
-				
+				/* Check if we asked for a pause */
 				
 				break;
 
 			case RT_OPTION:
-				// Server is requesting some option?
+				/* Server is requesting some option? */
 
 				break;
 
@@ -501,7 +496,7 @@ static int rt_read_packet(struct libtrace_t *libtrace,
 			continue;
 				
 		
-                // got in our whole packet, so...
+                /* got in our whole packet, so... */
                 tracefifo_out_update(libtrace->fifo,packet->size - sizeof(rt_header_t));
 
                 tracefifo_ack_update(libtrace->fifo,packet->size);

@@ -352,8 +352,8 @@ static int dag_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 	void *buffer2 = buffer;
 	int rlen;
 
-	if (packet->buf_control == PACKET) {
-		packet->buf_control = EXTERNAL;
+	if (packet->buf_control == TRACE_CTRL_PACKET) {
+		packet->buf_control = TRACE_CTRL_EXTERNAL;
 		free(packet->buffer);
 		packet->buffer = 0;
 	}
@@ -394,9 +394,9 @@ static int erf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 	void *buffer2 = packet->buffer;
 	int rlen;
 
-	if (!packet->buffer) {
+	if (!packet->buffer || packet->buf_control == TRACE_CTRL_EXTERNAL) {
 		packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
-		packet->buf_control = PACKET;
+		packet->buf_control = TRACE_CTRL_PACKET;
 	}
 
 	packet->header = packet->buffer;
@@ -440,8 +440,6 @@ static int erf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 static int rtclient_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
 	int numbytes;
 
-	if (buffer == 0)
-		buffer = malloc(len);
 	while(1) {
 #ifndef MSG_NOSIGNAL
 #  define MSG_NOSIGNAL 0
@@ -478,8 +476,8 @@ static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_pac
 
 	packet->trace = libtrace;
 
-	if (packet->buf_control == EXTERNAL) {
-		packet->buf_control = PACKET;
+	if (packet->buf_control == TRACE_CTRL_EXTERNAL || !packet->buffer) {
+		packet->buf_control = TRACE_CTRL_PACKET;
 		packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
 	}
 

@@ -253,13 +253,13 @@ static void trace_pcap_handler(u_char *user, const struct pcap_pkthdr *pcaphdr, 
 	*/
 	numbytes = pcaphdr->len;
 
-	packet->buf_control = PACKET;
-	if (!packet->buffer) {
+	if (!packet->buffer || packet->buf_control==TRACE_CTRL_EXTERNAL) {
 		/* We only need struct pcap_pkthdr, but we have no way
 		 * to say how much we malloc'd so that formats can determine
 		 * if they need to malloc more, so at the moment we just
 		 * malloc 64k
 		 */
+		packet->buf_control = TRACE_CTRL_PACKET;
 		packet->buffer=malloc(65536);
 	}
 	memcpy(packet->buffer,pcaphdr,sizeof(struct pcap_pkthdr));

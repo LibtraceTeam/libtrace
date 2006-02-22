@@ -279,8 +279,8 @@ static int wag_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
 static int wag_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
 	int numbytes;
 	
-        if (packet->buf_control == EXTERNAL || !packet->buffer) {
-                packet->buf_control = PACKET;
+        if (packet->buf_control == TRACE_CTRL_EXTERNAL || !packet->buffer) {
+                packet->buf_control = TRACE_CTRL_PACKET;
                 packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
 	}
 	
@@ -306,8 +306,8 @@ static int wtf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 	int framesize;
 	int size;
 
-        if (packet->buf_control == EXTERNAL || !packet->buffer) {
-                packet->buf_control = PACKET;
+        if (packet->buf_control == TRACE_CTRL_EXTERNAL || !packet->buffer) {
+                packet->buf_control = TRACE_CTRL_PACKET;
                 packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
         }
 

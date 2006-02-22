@@ -518,7 +518,7 @@ void trace_destroy_output(struct libtrace_out_t *libtrace) {
 
 libtrace_packet_t *trace_create_packet() {
 	libtrace_packet_t *packet = calloc(1,sizeof(libtrace_packet_t));
-	packet->buf_control=PACKET;
+	packet->buf_control=TRACE_CTRL_PACKET;
 	return packet;
 }
 
@@ -546,7 +546,7 @@ int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *pac
 	assert(libtrace && "You called trace_read_packet() with a NULL libtrace parameter!\n");
 	assert(libtrace->started && "BUG: You must call libtrace_start() before trace_read_packet()\n");
 	assert(packet);
-	assert((packet->buf_control==PACKET || packet->buf_control==EXTERNAL)&&
+	assert((packet->buf_control==TRACE_CTRL_PACKET || packet->buf_control==TRACE_CTRL_EXTERNAL)&&
 		"BUG: You must allocate a packet using packet_create()");
       
 	/* Store the trace we are reading from into the packet opaque 

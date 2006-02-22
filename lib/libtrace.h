@@ -88,7 +88,7 @@ typedef struct libtrace_filter_t libtrace_filter_t;
 /* the letters p and e are magic numbers used to detect if the packet
  * wasn't created properly
  */
-typedef enum {PACKET='p', EXTERNAL='e' } buf_control_t;
+typedef enum {TRACE_CTRL_PACKET='p', TRACE_CTRL_EXTERNAL='e' } buf_control_t;
 /** Structure holding information about a packet */
 #define LIBTRACE_PACKET_BUFSIZE 65536
 typedef struct libtrace_packet_t {

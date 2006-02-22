@@ -147,7 +147,13 @@ static int erf_fin_input(struct libtrace_t *libtrace) {
 
 static int legacy_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
 	int numbytes;
-	void *buffer = packet->buffer;
+	void *buffer;
+
+	if (!packet->buffer || packet->buf_control == TRACE_CTRL_EXTERNAL) {
+		packet->buf_control = TRACE_CTRL_PACKET;
+		packet->buffer=malloc(LIBTRACE_PACKET_BUFSIZE);
+	}
+	buffer = packet->buffer;
 	
 	if ((numbytes=LIBTRACE_READ(INPUT.file,
 					buffer,
