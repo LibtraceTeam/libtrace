@@ -522,12 +522,28 @@ libtrace_packet_t *trace_create_packet() {
 	return packet;
 }
 
+libtrace_packet_t *trace_copy_packet(const libtrace_packet_t *packet) {
+	libtrace_packet_t *dest = malloc(sizeof(libtrace_packet_t));
+	dest->trace=packet->trace;
+	dest->buffer=malloc(
+			trace_get_framing_length(packet)
+			+trace_get_capture_length(packet));
+	dest->header=dest->buffer;
+	dest->payload=(void*)
+		((char*)dest->buffer+trace_get_framing_length(packet));
+	dest->size=packet->size;
+	dest->type=packet->type;
+	dest->buf_control=TRACE_CTRL_PACKET;
+	memcpy(dest->header,packet->header,trace_get_framing_length(packet));
+	memcpy(dest->payload,packet->payload,trace_get_capture_length(packet));
+}
+
 /** Destroy a packet object
  *
  * sideeffect: sets packet to NULL
  */
 void trace_destroy_packet(struct libtrace_packet_t **packet) {
-	if ((*packet)->buf_control) {
+	if ((*packet)->buf_control == TRACE_CTRL_PACKET) {
 		free((*packet)->buffer);
 	}
 	free((*packet));
@@ -1288,6 +1304,7 @@ int trace_bpf_compile(libtrace_filter_t *filter,
 	/* If this isn't a real packet, then fail */
 	linkptr = trace_get_link(packet);
 	if (!linkptr) {
+		trace_set_err(TRACE_ERR_BAD_PACKET,"Packet has no payload");
 		return -1;
 	}
 	
@@ -1300,6 +1317,8 @@ int trace_bpf_compile(libtrace_filter_t *filter,
 		if (pcap_compile( pcap, &filter->filter, filter->filterstring, 
 					1, 0)) {
 			pcap_close(pcap);
+			trace_set_err(TRACE_ERR_BAD_PACKET,
+					"Packet has no payload");
 			return -1;
 		}
 		pcap_close(pcap);
@@ -1311,12 +1330,6 @@ int trace_bpf_compile(libtrace_filter_t *filter,
 #endif
 }
 
-/* apply a BPF filter
- * @param filter the filter opaque pointer
- * @param packet the packet opaque pointer
- * @returns 0 if the filter fails, 1 if it succeeds
- * @author Daniel Lawson
- */
 int trace_bpf_filter(struct libtrace_filter_t *filter,
 			const struct libtrace_packet_t *packet) {
 #if HAVE_BPF
@@ -1332,7 +1345,8 @@ int trace_bpf_filter(struct libtrace_filter_t *filter,
 	/* We need to compile it now, because before we didn't know what the 
 	 * link type was
 	 */
-	trace_bpf_compile(filter,packet);
+	if (trace_bpf_compile(filter,packet)==-1)
+		return -1;
 	
 	clen = trace_get_capture_length(packet);
 

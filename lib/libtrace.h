@@ -117,7 +117,7 @@ enum {
 	TRACE_ERR_OPTION_UNAVAIL= -10
 };
 
-/** @name Packet structures
+/** @name Protocol structures
  * These convenience structures are here as they are portable ways of dealing
  * with various protocols.
  * @{
@@ -289,8 +289,9 @@ void trace_help();
 SIMPLE_FUNCTION
 char *trace_get_output_format(const libtrace_out_t *libtrace);
 
-/** @name Creation and destruction of traces
- * These members deal with creating, configuring and cleaning up a trace object
+/** @name Trace management
+ * These members deal with creating, configuring, starting, pausing and
+ * cleaning up a trace object
  *@{
  */
 
@@ -448,6 +449,18 @@ void trace_destroy_output(libtrace_out_t *trace);
  */
 libtrace_packet_t *trace_create_packet();
 
+/** Copy a packet
+ * @param packet	the source packet to copy
+ * @return a new packet which has the same content as the source packet
+ * @note This always involves a copy, which can be slow.  Use of this 
+ * function should be avoided where possible.
+ * @par The reason you would want to use this function is that a zerocopied
+ * packet from a device is using the devices memory which may be a limited
+ * resource.  Copying the packet will cause it to be copied into the systems
+ * memory.
+ */
+libtrace_packet_t *trace_copy_packet(const libtrace_packet_t *packet);
+
 /** Destroy a packet object
  *
  * sideeffect: sets packet to NULL
@@ -509,8 +522,9 @@ libtrace_eventobj_t trace_event(libtrace_t *trace,
 int trace_write_packet(libtrace_out_t *trace, const libtrace_packet_t *packet);
 /*@}*/
 
-/** @name Headers
- * These functions locate and return a pointer to various headers inside a packet
+/** @name Protocol decodes
+ * These functions locate and return a pointer to various headers inside a
+ * packet
  * @{
  */
 
@@ -668,6 +682,29 @@ struct timeval trace_get_timeval(const libtrace_packet_t *packet);
  */
 SIMPLE_FUNCTION
 double trace_get_seconds(const libtrace_packet_t *packet);
+
+/** Seek within a trace
+ * @param trace		trace to seek
+ * @param seconds	time to seek to
+ * @return 0 on success.
+ * Make the next packet read to be the first packet to occur at or after the
+ * time searched for.  This must be called in the configuration state (ie,
+ * before trace_start() or after trace_pause().
+ * @note This function may be extremely slow.
+ */
+int trace_seek_seconds(libtrace_t *trace, double seconds);
+
+/** Seek within a trace
+ * @param trace		trace to seek
+ * @param tv		time to seek to
+ * @return 0 on success.
+ * Make the next packet read to be the first packet to occur at or after the
+ * time searched for.  This must be called in the configuration state (ie,
+ * before trace_start() or after trace_pause().
+ * @note This function may be extremely slow.
+ */
+int trace_seek_timeval(libtrace_t *trace, struct timeval tv);
+
 /*@}*/
 
 /** @name Sizes
@@ -711,7 +748,7 @@ int trace_get_wire_length(const libtrace_packet_t *packet);
 SIMPLE_FUNCTION
 int trace_get_framing_length(const libtrace_packet_t *packet);
 
-/** Truncate the packet at the suggested length
+/** Truncate ("snap") the packet at the suggested length
  * @param packet	the packet opaque pointer
  * @param size		the new length of the packet
  * @return the new length of the packet, or the original length of the 
@@ -719,28 +756,6 @@ int trace_get_framing_length(const libtrace_packet_t *packet);
  * @author Daniel Lawson
  */
 size_t trace_set_capture_length(libtrace_packet_t *packet, size_t size);
-
-/** Seek within a trace
- * @param trace		trace to seek
- * @param seconds	time to seek to
- * @return 0 on success.
- * Make the next packet read to be the first packet to occur at or after the
- * time searched for.  This must be called in the configuration state (ie,
- * before trace_start() or after trace_pause().
- * @note This function may be extremely slow.
- */
-int trace_seek_seconds(libtrace_t *trace, double seconds);
-
-/** Seek within a trace
- * @param trace		trace to seek
- * @param tv		time to seek to
- * @return 0 on success.
- * Make the next packet read to be the first packet to occur at or after the
- * time searched for.  This must be called in the configuration state (ie,
- * before trace_start() or after trace_pause().
- * @note This function may be extremely slow.
- */
-int trace_seek_timeval(libtrace_t *trace, struct timeval tv);
 
 /*@}*/
 
@@ -829,10 +844,12 @@ libtrace_filter_t *trace_bpf_setfilter(const char *filterstring);
 /** apply a BPF filter
  * @param filter 	the filter opaque pointer
  * @param packet	the packet opaque pointer
- * @return 0 if the filter fails, 1 if it succeeds
- * @author Daniel Lawson
- * @note Due to the way BPF filters are built, the filter is not actually compiled
- * until the first time trace_bpf_filter is called. If your filter is incorrect, it will generate an error message and assert, exiting the program. This behaviour may change to more graceful handling of this error in the future.
+ * @return 1 if the filter matches, 0 if it doesn't.
+ * @note Due to the way BPF filters are built, the filter is not actually
+ * compiled until the first time trace_bpf_filter is called. If your filter is
+ * incorrect, it will generate an error message and assert, exiting the
+ * program. This behaviour may change to more graceful handling of this error
+ * in the future.
  */
 int trace_bpf_filter(libtrace_filter_t *filter,
 		const libtrace_packet_t *packet);
