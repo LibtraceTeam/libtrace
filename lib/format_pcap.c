@@ -236,6 +236,8 @@ static int pcap_fin_input(struct libtrace_t *libtrace) {
 static int pcap_fin_output(struct libtrace_out_t *libtrace) {
 	pcap_dump_flush(OUTPUT.trace.dump);
 	pcap_dump_close(OUTPUT.trace.dump);
+	pcap_close(OUTPUT.trace.pcap);
+	free(libtrace->format_data);
 	return 0;
 }
 

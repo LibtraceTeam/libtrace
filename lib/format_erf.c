@@ -302,7 +302,9 @@ static int dag_fin_input(struct libtrace_t *libtrace) {
 #endif
 
 static int rtclient_fin_input(struct libtrace_t *libtrace) {
+	free(CONNINFO.rt.hostname);
 	close(INPUT.fd);
+	free(libtrace->format_data);
 	return 0;
 }
 

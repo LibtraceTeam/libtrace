@@ -202,16 +202,19 @@ static int wtf_config_output(struct libtrace_out_t *libtrace,
 
 static int wag_fin_input(struct libtrace_t *libtrace) {
 	close(INPUT.fd);
+	free(libtrace->format_data);
 	return 0;
 }
 
 static int wtf_fin_input(struct libtrace_t *libtrace) {
 	LIBTRACE_CLOSE(INPUT.file);
+	free(libtrace->format_data);
 	return 0;
 }
 
 static int wtf_fin_output(struct libtrace_out_t *libtrace) {
 	LIBTRACE_CLOSE(OUTPUT.file);
+	free(libtrace->format_data);
 	return 0;
 }
 

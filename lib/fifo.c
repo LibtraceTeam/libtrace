@@ -79,8 +79,6 @@ struct tracefifo_t *create_tracefifo(size_t size)
         struct tracefifo_t *fifo = malloc(sizeof(struct tracefifo_t));
         assert(size > 0);
 
-        if (tracefifo_stat_buffer == 0) 
-                tracefifo_stat_buffer = (char *)malloc(513);
         fifo->length = size;
 
         if ((fifo->base = malloc(fifo->length)) == 0) {
@@ -178,6 +176,9 @@ char *tracefifo_stat_str(struct tracefifo_t *fifo, char *desc, int delta)
 {
         char *scan = 0;
         assert(fifo);
+
+        if (tracefifo_stat_buffer == 0) 
+                tracefifo_stat_buffer = (char *)malloc(513);
 
         bzero(tracefifo_stat_buffer,513);
         scan = tracefifo_stat_buffer;
