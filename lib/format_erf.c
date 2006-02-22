@@ -466,9 +466,6 @@ static int rtclient_read(struct libtrace_t *libtrace, void *buffer, size_t len) 
 	return numbytes;
 }
 
-#define RT_DATA 1
-#define RT_MSG 2
-
 static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
 	int numbytes = 0;
 	char buf[RP_BUFSIZE];
@@ -513,7 +510,7 @@ static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_pac
 		}
 		tracefifo_out_update(libtrace->fifo, sizeof(uint32_t));
 		
-		if (status.type == RT_MSG) {
+		if (status.type == 2 /* RT_MSG */) {
 			/* Need to skip this packet as it is a message packet */
 			tracefifo_out_update(libtrace->fifo, packet->size);
 			tracefifo_ack_update(libtrace->fifo, packet->size + 
