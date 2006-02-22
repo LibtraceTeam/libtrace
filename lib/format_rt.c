@@ -244,6 +244,7 @@ static int rt_fin_input(struct libtrace_t *libtrace) {
 	if (RT_INFO->dummy_wag)
 		trace_destroy_dead(RT_INFO->dummy_wag);
 	close(RT_INFO->input_fd);
+	free(libtrace->format_data);
         return 0;
 }
 

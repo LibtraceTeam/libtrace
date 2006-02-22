@@ -298,6 +298,7 @@ static int erf_config_output(struct libtrace_out_t *libtrace, trace_option_t opt
 #ifdef HAVE_DAG
 static int dag_fin_input(struct libtrace_t *libtrace) {
 	dag_stop(INPUT.fd);
+	free(libtrace->format_data);
 }
 #endif
 
@@ -317,7 +318,6 @@ static int erf_fin_input(struct libtrace_t *libtrace) {
 static int erf_fin_output(struct libtrace_out_t *libtrace) {
 	LIBTRACE_CLOSE(OUTPUT.file);
 	free(libtrace->format_data);
-
 	return 0;
 }
  
