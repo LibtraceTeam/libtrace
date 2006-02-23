@@ -389,8 +389,6 @@ static int rt_read_packet(struct libtrace_t *libtrace,
 	rt_data_t data_hdr;
         void *buffer = 0;
 
-        packet->trace = libtrace;
-
         if (packet->buf_control == TRACE_CTRL_EXTERNAL || !packet->buffer) {
                 packet->buf_control = TRACE_CTRL_PACKET;
                 packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
@@ -506,8 +504,8 @@ static int rt_read_packet(struct libtrace_t *libtrace,
 	
 }
 
-static int rt_get_fd(const struct libtrace_packet_t *packet) {
-        return packet->trace->format_data->input_fd;
+static int rt_get_fd(const struct libtrace_t *trace) {
+        return trace->format_data->input_fd;
 }
 
 
@@ -553,7 +551,7 @@ static struct libtrace_format_t rt = {
         NULL,            		/* get_wire_length */
         NULL,         			/* get_framing_length */
         NULL,         			/* set_capture_length */
-        rt_get_fd,                /* get_fd */
+        rt_get_fd,                	/* get_fd */
         trace_event_device,             /* trace_event */
         rt_help                   /* help */
 };

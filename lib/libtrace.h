@@ -717,11 +717,14 @@ int trace_seek_timeval(libtrace_t *trace, struct timeval tv);
  * @return the size of the packet in the trace
  * @author Perry Lorier
  * @note Due to this being a header capture, or anonymisation, this may not
- * be the same size as the original packet.  See get_wire_length() for the original
- * size of the packet.
+ * be the same size as the original packet.  See get_wire_length() for the
+ * original size of the packet.
  * @note This can (and often is) different for different packets in a trace!
- * @par 
- *  This is sometimes called the "snaplen".
+ * @note This is sometimes called the "snaplen".
+ * @note The return size refers to the network-level payload of the packet and
+ * does not include any capture headers. For example, an Ethernet packet with
+ * an empty TCP packet will return sizeof(ethernet_header) + sizeof(ip_header)
+ * + sizeof(tcp_header).
  */
 SIMPLE_FUNCTION
 int trace_get_capture_length(const libtrace_packet_t *packet);
@@ -729,8 +732,6 @@ int trace_get_capture_length(const libtrace_packet_t *packet);
 /** Get the size of the packet as it was seen on the wire.
  * @param packet  	the packet opaque pointer
  * @return the size of the packet as it was on the wire.
- * @author Perry Lorier
- * @author Daniel Lawson
  * @note Due to the trace being a header capture, or anonymisation this may
  * not be the same as the Capture Len.
  */ 

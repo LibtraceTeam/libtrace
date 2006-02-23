@@ -298,8 +298,8 @@ static int pcap_write_packet(struct libtrace_out_t *libtrace, const struct libtr
 				libtrace->uridata);
 		fflush((FILE *)OUTPUT.trace.dump);
 	}
-	if (packet->trace->format == &pcap || 
-			packet->trace->format == &pcapint) {
+	if (libtrace->format == &pcap || 
+			libtrace->format == &pcapint) {
 		
 		pcap_dump((u_char*)OUTPUT.trace.dump,(struct pcap_pkthdr *)packet->header,packet->payload);
 	} else {
@@ -427,8 +427,8 @@ static size_t pcap_set_capture_length(struct libtrace_packet_t *packet,size_t si
 	return packet->size;
 }
 
-static int pcap_get_fd(const struct libtrace_packet_t *packet) {
-	return pcap_fileno(packet->trace->format_data->input.pcap);
+static int pcap_get_fd(const libtrace_t *trace) {
+	return pcap_fileno(trace->format_data->input.pcap);
 }
 
 static void pcap_help() {

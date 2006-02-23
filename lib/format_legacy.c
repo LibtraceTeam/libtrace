@@ -165,7 +165,7 @@ static int legacy_read_packet(struct libtrace_t *libtrace, struct libtrace_packe
 	
 	packet->header = packet->buffer;
 	packet->payload = (void*)((char*)packet->buffer + 
-		packet->trace->format->get_framing_length(packet));
+		libtrace->format->get_framing_length(packet));
 	
 	return 64;
 	

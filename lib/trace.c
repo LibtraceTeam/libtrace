@@ -557,7 +557,7 @@ void trace_destroy_packet(struct libtrace_packet_t **packet) {
  * @returns 0 on EOF, negative value on error
  *
  */
-int trace_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
+int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 
 	assert(libtrace && "You called trace_read_packet() with a NULL libtrace parameter!\n");
 	assert(libtrace->started && "BUG: You must call libtrace_start() before trace_read_packet()\n");
@@ -1026,7 +1026,7 @@ int trace_get_next_option(unsigned char **ptr,int *len,
  * past 1970-01-01, the lower 32bits are partial seconds)
  * @author Daniel Lawson
  */ 
-uint64_t trace_get_erf_timestamp(const struct libtrace_packet_t *packet) {
+uint64_t trace_get_erf_timestamp(const libtrace_packet_t *packet) {
 	uint64_t timestamp = 0;
 	double seconds = 0.0;
 	struct timeval ts;
@@ -1057,7 +1057,7 @@ uint64_t trace_get_erf_timestamp(const struct libtrace_packet_t *packet) {
  * @author Daniel Lawson
  * @author Perry Lorier
  */ 
-struct timeval trace_get_timeval(const struct libtrace_packet_t *packet) {
+struct timeval trace_get_timeval(const libtrace_packet_t *packet) {
         struct timeval tv;
 	uint64_t ts = 0;
 	double seconds = 0.0;
@@ -1120,20 +1120,6 @@ double trace_get_seconds(const struct libtrace_packet_t *packet) {
 	return seconds;
 }
 
-/* Get the size of the packet in the trace
- * @param packet 	the packet opaque pointer
- * @returns the size of the packet in the trace
- * @author Perry Lorier
- * @note The return size refers to the network-level payload of the packet and
- * does not include any capture headers. For example, an Ethernet packet with
- * an empty TCP packet will return sizeof(ethernet_header) + sizeof(ip_header)
- * + sizeof(tcp_header).
- * @note Due to this being a header capture, or anonymisation, this may not
- * be the same size as the original packet.  See trace_get_wire_length() for the 
- * original size of the packet.
- * @note This can (and often is) different for different packets in a trace!
- * @note This is sometimes called the "snaplen".
- */ 
 int trace_get_capture_length(const struct libtrace_packet_t *packet) {
 
 	assert(packet->size>0 && packet->size<65536);
@@ -1172,7 +1158,7 @@ int trace_get_wire_length(const struct libtrace_packet_t *packet){
  * captured packet in memory, and the captured length of the packet
  */ 
 SIMPLE_FUNCTION
-int trace_get_framing_length(const struct libtrace_packet_t *packet) {
+int trace_get_framing_length(const libtrace_packet_t *packet) {
 	if (packet->trace->format->get_framing_length) {
 		return packet->trace->format->get_framing_length(packet);
 	}
@@ -1186,7 +1172,7 @@ int trace_get_framing_length(const struct libtrace_packet_t *packet) {
  * @author Perry Lorier
  * @author Daniel Lawson
  */
-libtrace_linktype_t trace_get_link_type(const struct libtrace_packet_t *packet ) {
+libtrace_linktype_t trace_get_link_type(const libtrace_packet_t *packet ) {
 	if (packet->trace->format->get_link_type) {
 		return packet->trace->format->get_link_type(packet);
 	}

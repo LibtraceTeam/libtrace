@@ -407,7 +407,7 @@ static int erf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 					packet->buffer,
 					dag_record_size)) == -1) {
 		trace_set_err(errno,"read(%s)",
-				packet->trace->uridata);
+				libtrace->uridata);
 		return -1;
 	}
 	if (numbytes == 0) {
@@ -427,7 +427,7 @@ static int erf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 	if ((numbytes=LIBTRACE_READ(INPUT.file,
 					buffer2,
 					size)) != size) {
-		trace_set_err(errno, "read(%s)", packet->trace->uridata);
+		trace_set_err(errno, "read(%s)", libtrace->uridata);
 		return -1;
 	}
 	packet->size = rlen;
@@ -472,8 +472,6 @@ static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_pac
 	int read_required = 0;
 	
 	void *buffer = 0;
-
-	packet->trace = libtrace;
 
 	if (packet->buf_control == TRACE_CTRL_EXTERNAL || !packet->buffer) {
 		packet->buf_control = TRACE_CTRL_PACKET;
@@ -590,9 +588,9 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 		dag_hdr->rlen = htons(dag_record_size + pad);
 	} 
 	
-	if (packet->trace->format == &erf  
+	if (libtrace->format == &erf  
 #if HAVE_DAG
-			|| packet->trace->format == &dag 
+			|| libtrace->format == &dag 
 #endif
 			) {
 		numbytes = erf_dump_packet(libtrace,
@@ -677,12 +675,12 @@ static size_t erf_set_capture_length(struct libtrace_packet_t *packet, size_t si
 	return packet->size;
 }
 
-static int rtclient_get_fd(const struct libtrace_packet_t *packet) {
-	return packet->trace->format_data->input.fd;
+static int rtclient_get_fd(const libtrace_t *trace) {
+	return trace->format_data->input.fd;
 }
 
-static int erf_get_fd(const struct libtrace_packet_t *packet) {
-	return packet->trace->format_data->input.fd;
+static int erf_get_fd(const libtrace_t *trace) {
+	return trace->format_data->input.fd;
 }
 
 #ifdef HAVE_DAG
@@ -691,8 +689,8 @@ struct libtrace_eventobj_t trace_event_dag(struct libtrace_t *trace, struct libt
         int dag_fd;
         int data;
 
-        if (packet->trace->format->get_fd) {
-                dag_fd = packet->trace->format->get_fd(packet);
+        if (trace->format->get_fd) {
+                dag_fd = trace->format->get_fd(packet);
         } else {
                 dag_fd = 0;
         }

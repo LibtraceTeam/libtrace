@@ -406,8 +406,8 @@ static int wag_get_framing_length(const struct libtrace_packet_t *packet) {
 	return sizeof(struct frame_data_rx_t);
 }
 
-static int wag_get_fd(const struct libtrace_packet_t *packet) {
-	return packet->trace->format_data->input.fd;
+static int wag_get_fd(const libtrace_t *trace) {
+	return trace->format_data->input.fd;
 }
 
 static void wag_help() {
