@@ -162,6 +162,10 @@ static int wtf_init_output(struct libtrace_out_t *libtrace) {
 	libtrace->format_data = (struct libtrace_format_data_out_t *)
 		calloc(1,sizeof(struct libtrace_format_data_out_t));
 
+	OUTPUT.file = 0;
+	OPTIONS.zlib.level = 0;
+	OPTIONS.zlib.filemode = O_CREAT | O_LARGEFILE | O_WRONLY;
+	
 	return 0;
 }
 
