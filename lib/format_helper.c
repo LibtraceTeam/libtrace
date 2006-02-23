@@ -51,6 +51,9 @@ struct libtrace_eventobj_t trace_event_device(struct libtrace_t *trace, struct l
 	struct libtrace_eventobj_t event = {0,0,0.0,0};
 	int data;
 
+	assert(trace);
+	assert(packet);
+	
 	if (trace->format->get_fd) {
 		event.fd = trace->format->get_fd(packet);
 	} else {

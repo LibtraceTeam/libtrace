@@ -209,14 +209,16 @@ static int pcapint_start_input(libtrace_t *libtrace) {
 			1,
 			errbuf)) == NULL) {
 		trace_set_err(TRACE_ERR_INIT_FAILED,"%s",errbuf);
-		/* Set a filter if one is defined */
-		if (DATA(libtrace)->filter)
-			if (pcap_setfilter(INPUT.pcap,&DATA(libtrace)->filter->filter)
-				== -1) {
-				trace_set_err(TRACE_ERR_INIT_FAILED,"%s",
-						pcap_geterr(INPUT.pcap));
-				return -1;
-			}
+		return -1;
+	}
+	/* Set a filter if one is defined */
+	if (DATA(libtrace)->filter) {
+		if (pcap_setfilter(INPUT.pcap,&DATA(libtrace)->filter->filter)
+			== -1) {
+			trace_set_err(TRACE_ERR_INIT_FAILED,"%s",
+					pcap_geterr(INPUT.pcap));
+			return -1;
+		}
 		return 0;
 	}
 	return 1;
