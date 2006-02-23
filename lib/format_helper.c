@@ -46,6 +46,7 @@
 
 #include <sys/ioctl.h>
 #include <assert.h>
+#include <stdarg.h>
 
 struct libtrace_eventobj_t trace_event_device(struct libtrace_t *trace, struct libtrace_packet_t *packet) {
 	struct libtrace_eventobj_t event = {0,0,0.0,0};
@@ -165,7 +166,7 @@ LIBTRACE_FILE trace_open_file(libtrace_t *trace)
 	 */
 	fd=open(trace->uridata,O_LARGEFILE);
 	if (fd==-1) {
-		trace_set_err(errno,"Unable to open %s",trace->uridata);
+		trace_set_err(trace,errno,"Unable to open %s",trace->uridata);
 		return 0;
 	}
 	ret=LIBTRACE_FDOPEN(fd,"r");
@@ -198,16 +199,61 @@ LIBTRACE_FILE trace_open_file_out(libtrace_out_t *trace,int level, int fileflag)
 	 */
 	fd=open(trace->uridata,fileflag,0666);
 	if (fd==-1) {
-		trace_set_err(errno,"Unable to open %s",trace->uridata);
+		trace_set_err_out(trace,
+				errno,"Unable to open %s",trace->uridata);
 		return 0;
 	}
 	ret=LIBTRACE_FDOPEN(fd,filemode);
 	if (ret==NULL) {
 		printf("%s\n",filemode);
-		trace_set_err(TRACE_ERR_INIT_FAILED,"gz out of memory");
+		trace_set_err_out(trace,
+				TRACE_ERR_INIT_FAILED,"gz out of memory");
 	}
 	return ret;
 }
 
 
+/** Update the libtrace error
+ * @param errcode either an Econstant from libc, or a LIBTRACE_ERROR
+ * @param msg a plaintext error message
+ * @internal
+ */
+void trace_set_err(libtrace_t *trace,int errcode,const char *msg,...)
+{
+	char buf[256];
+	va_list va;
+	va_start(va,msg);
+	trace->err.err_num=errcode;
+	if (errcode>0) {
+		vsnprintf(buf,sizeof(buf),msg,va);
+		snprintf(trace->err.problem,sizeof(trace->err.problem),
+				"%s: %s",buf,strerror(errno));
+	} else {
+		vsnprintf(trace->err.problem,sizeof(trace->err.problem),
+				msg,va);
+	}
+	va_end(va);
+}
+
+/** Update the libtrace for output traces error
+ * @param errcode either an Econstant from libc, or a LIBTRACE_ERROR
+ * @param msg a plaintext error message
+ * @internal
+ */
+void trace_set_err_out(libtrace_out_t *trace,int errcode,const char *msg,...)
+{
+	char buf[256];
+	va_list va;
+	va_start(va,msg);
+	trace->err.err_num=errcode;
+	if (errcode>0) {
+		vsnprintf(buf,sizeof(buf),msg,va);
+		snprintf(trace->err.problem,sizeof(trace->err.problem),
+				"%s: %s",buf,strerror(errno));
+	} else {
+		vsnprintf(trace->err.problem,sizeof(trace->err.problem),
+				msg,va);
+	}
+	va_end(va);
+}
 

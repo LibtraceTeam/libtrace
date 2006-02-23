@@ -150,28 +150,28 @@ static int dag_init_input(struct libtrace_t *libtrace) {
 static int dag_start_input(struct libtrace_t *libtrace) {
 	struct stat buf;
 	if (stat(libtrace->uridata, &buf) == -1) {
-		trace_set_err(errno,"stat(%s)",libtrace->uridata);
+		trace_set_err(libtrace,errno,"stat(%s)",libtrace->uridata);
 		return 0;
 	} 
 	if (S_ISCHR(buf.st_mode)) {
 		/* DEVICE */
 		if((INPUT.fd = dag_open(libtrace->uridata)) < 0) {
-			trace_set_err(errno,"Cannot open DAG %s",
+			trace_set_err(libtrace,errno,"Cannot open DAG %s",
 					libtrace->uridata);
 			return 0;
 		}
 		if((DAG.buf = (void *)dag_mmap(INPUT.fd)) == MAP_FAILED) {
-			trace_set_err(errno,"Cannot mmap DAG %s",
+			trace_set_err(libtrace,errno,"Cannot mmap DAG %s",
 					libtrace->uridata);
 			return 0;
 		}
 		if(dag_start(INPUT.fd) < 0) {
-			trace_set_err(errno,"Cannot start DAG %s",
+			trace_set_err(libtrace,errno,"Cannot start DAG %s",
 					libtrace->uridata);
 			return 0;
 		}
 	} else {
-		trace_set_err(errno,"Not a valid dag device: %s",
+		trace_set_err(libtrace,errno,"Not a valid dag device: %s",
 				libtrace->uridata);
 		return 0;
 	}
@@ -243,12 +243,12 @@ static int rtclient_init_input(struct libtrace_t *libtrace) {
 	}
 	
 	if ((he=gethostbyname(CONNINFO.rt.hostname)) == NULL) {  
-		trace_set_err(errno,"failed to resolve %s",
+		trace_set_err(libtrace,errno,"failed to resolve %s",
 				CONNINFO.rt.hostname);
 		return 0;
 	} 
 	if ((INPUT.fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-		trace_set_err(errno,"socket(AF_INET,SOCK_STREAM)");
+		trace_set_err(libtrace,errno,"socket(AF_INET,SOCK_STREAM)");
 		return 0;
 	}
 
@@ -259,7 +259,7 @@ static int rtclient_init_input(struct libtrace_t *libtrace) {
 
 	if (connect(INPUT.fd, (struct sockaddr *)&remote,
 				sizeof(struct sockaddr)) == -1) {
-		trace_set_err(errno,"connect(%s)",
+		trace_set_err(libtrace,errno,"connect(%s)",
 				CONNINFO.rt.hostname);
 		return 0;
 	}
@@ -288,7 +288,7 @@ static int erf_config_output(struct libtrace_out_t *libtrace, trace_option_t opt
 			return 0;
 		default:
 			/* Unknown option */
-			trace_set_err(TRACE_ERR_UNKNOWN_OPTION,
+			trace_set_err_out(libtrace,TRACE_ERR_UNKNOWN_OPTION,
 					"Unknown option");
 			return -1;
 	}
@@ -405,7 +405,7 @@ static int erf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 	if ((numbytes=LIBTRACE_READ(INPUT.file,
 					packet->buffer,
 					dag_record_size)) == -1) {
-		trace_set_err(errno,"read(%s)",
+		trace_set_err(libtrace,errno,"read(%s)",
 				libtrace->uridata);
 		return -1;
 	}
@@ -426,7 +426,7 @@ static int erf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 	if ((numbytes=LIBTRACE_READ(INPUT.file,
 					buffer2,
 					size)) != size) {
-		trace_set_err(errno, "read(%s)", libtrace->uridata);
+		trace_set_err(libtrace,errno, "read(%s)", libtrace->uridata);
 		return -1;
 	}
 	if (((dag_record_t *)packet->buffer)->flags.rxerror == 1) {
@@ -454,7 +454,7 @@ static int rtclient_read(struct libtrace_t *libtrace, void *buffer, size_t len) 
 				 */
 				continue;
 			}
-			trace_set_err(errno,"recv(%s)",
+			trace_set_err(libtrace,errno,"recv(%s)",
 					libtrace->uridata);
 			return -1;
 		}
@@ -547,12 +547,14 @@ static int erf_dump_packet(libtrace_out_t *libtrace,
 	assert(size>=0 && size<=65536);
 	/* FIXME: Shouldn't this return != dag_record_size+pad on error? */
 	if ((numbytes = LIBTRACE_WRITE(OUTPUT.file, erfptr, dag_record_size + pad)) == 0) {
-		trace_set_err(errno,"write(%s)",libtrace->uridata);
+		trace_set_err_out(libtrace,errno,
+				"write(%s)",libtrace->uridata);
 		return -1;
 	}
 
 	if ((numbytes=LIBTRACE_WRITE(OUTPUT.file, buffer, size)) == 0) {
-		trace_set_err(errno,"write(%s)",libtrace->uridata);
+		trace_set_err_out(libtrace,errno,
+				"write(%s)",libtrace->uridata);
 		return -1;
 	}
 

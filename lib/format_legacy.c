@@ -158,7 +158,7 @@ static int legacy_read_packet(struct libtrace_t *libtrace, struct libtrace_packe
 	if ((numbytes=LIBTRACE_READ(INPUT.file,
 					buffer,
 					64)) == -1) {
-		trace_set_err(errno,"read(%s)",libtrace->uridata);
+		trace_set_err(libtrace,errno,"read(%s)",libtrace->uridata);
 		return -1;
 	}
 	

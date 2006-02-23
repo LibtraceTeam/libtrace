@@ -104,7 +104,12 @@ typedef struct libtrace_packet_t {
 				 * +trace_get_capture_length() */
 	uint8_t type;		/**< rt protocol type for the packet */
 } libtrace_packet_t;
-                     
+
+/** libtrace error information */
+typedef struct trace_err_t{
+	int err_num; 		/**< error code */
+	char problem[255];	/**< the format, uri etc that caused the error for reporting purposes */
+} libtrace_err_t;
 
 /** Enumeration of error codes */
 enum {
@@ -432,12 +437,27 @@ void trace_destroy(libtrace_t *trace);
 void trace_destroy_dead(libtrace_t *trace);
 
 /** Close a trace output file, freeing up any resources it may have been using
- *
  * @param trace		the output trace file to be destroyed
  *
  * @author Shane Alcock
  */
 void trace_destroy_output(libtrace_out_t *trace);
+
+/** Check (and clear) the current error state of an input trace
+ * @param trace		the trace file to check the error state on
+ * @return Error report
+ * This reads and returns the current error state and sets the current error 
+ * to "no error".
+ */
+libtrace_err_t trace_get_err(libtrace_t *trace);
+
+/** Check (and clear) the current error state of an output trace
+ * @param trace		the output trace file to check the error state on
+ * @return Error report
+ * This reads and returns the current error state and sets the current error 
+ * to "no error".
+ */
+libtrace_err_t trace_get_err_output(libtrace_out_t *trace);
 
 /*@}*/
 
@@ -924,11 +944,6 @@ enum base_format_t {
 enum base_format_t trace_get_format(struct libtrace_packet_t *packet);
 
 
-/** libtrace error information */
-extern struct trace_err_t{
-	int err_num; 		/**< error code */
-	char problem[255];	/**< the format, uri etc that caused the error for reporting purposes */
-} trace_err;
 #ifdef __cplusplus
 } /* extern "C" */
 #endif /* #ifdef __cplusplus */

@@ -123,7 +123,7 @@ static int wag_init_input(struct libtrace_t *libtrace) {
 		calloc(1,sizeof(struct libtrace_format_data_t));
 	
 	if (stat(libtrace->uridata,&buf) == -1 ) {
-		trace_set_err(errno,"stat(%s)",libtrace->uridata);
+		trace_set_err(libtrace,errno,"stat(%s)",libtrace->uridata);
 		return 0;
 	}
 	if (S_ISCHR(buf.st_mode)) {
@@ -131,7 +131,7 @@ static int wag_init_input(struct libtrace_t *libtrace) {
 		INPUT.fd = open(libtrace->uridata, O_RDONLY);
 
 	} else {
-		trace_set_err(TRACE_ERR_INIT_FAILED,
+		trace_set_err(libtrace,TRACE_ERR_INIT_FAILED,
 				"%s is not a valid char device",
 				libtrace->uridata);
 		return 0;
@@ -192,13 +192,13 @@ static int wtf_config_output(struct libtrace_out_t *libtrace,
 #else
 		case TRACE_OPTION_OUTPUT_COMPRESS:
 			/* E feature unavailable */
-			trace_set_err(TRACE_ERR_OPTION_UNAVAIL,
+			trace_set_err_out(libtrace,TRACE_ERR_OPTION_UNAVAIL,
 					"zlib not supported");
 			return -1;
 #endif
 		default:
 			/* E unknown feature */
-			trace_set_err(TRACE_ERR_UNKNOWN_OPTION,
+			trace_set_err_out(libtrace,TRACE_ERR_UNKNOWN_OPTION,
 					"Unknown option");
 			return -1;
 	}
@@ -241,7 +241,7 @@ static int wag_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
             if (errno == EINTR || errno==EAGAIN)
               continue;
 
-	    trace_set_err(errno,"read(%s)",libtrace->uridata);
+	    trace_set_err(libtrace,errno,"read(%s)",libtrace->uridata);
             return -1;
           }
 
@@ -256,7 +256,8 @@ static int wag_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
         magic = ntohs(((struct frame_t *)buffer)->magic);
 
         if (magic != 0xdaa1) {
-	  trace_set_err(TRACE_ERR_BAD_PACKET,"magic number bad or missing");
+	  trace_set_err(libtrace,
+			  TRACE_ERR_BAD_PACKET,"magic number bad or missing");
 	  return -1;
         }
 
@@ -272,7 +273,7 @@ static int wag_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
           if (ret == -1) {
             if (errno == EINTR || errno==EAGAIN)
               continue;
-	    trace_set_err(errno,"read(%s)",libtrace->uridata);
+	    trace_set_err(libtrace,errno,"read(%s)",libtrace->uridata);
             return -1;
           }
 
@@ -320,7 +321,8 @@ static int wtf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 	buffer2 = buffer = packet->buffer;
 	
 	if ((numbytes = LIBTRACE_READ(INPUT.file, buffer, sizeof(struct frame_t))) == -1) {
-		trace_set_err(errno,"read(%s,frame_t)",packet->trace->uridata);
+		trace_set_err(libtrace,errno,
+				"read(%s,frame_t)",packet->trace->uridata);
 		return -1;
 	}
 
@@ -329,7 +331,8 @@ static int wtf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 	}
 
 	if (htons(((struct frame_t *)buffer)->magic) != 0xdaa1) {
-		trace_set_err(TRACE_ERR_BAD_PACKET,"Insufficient magic");
+		trace_set_err(libtrace,
+				TRACE_ERR_BAD_PACKET,"Insufficient magic");
 		return -1;
 	}
 
@@ -340,7 +343,8 @@ static int wtf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 
 	
 	if ((numbytes=LIBTRACE_READ(INPUT.file, buffer2, size)) != size) {
-		trace_set_err(errno,"read(%s,buffer)",packet->trace->uridata);
+		trace_set_err(libtrace,
+				errno,"read(%s,buffer)",packet->trace->uridata);
 		return -1;
 	}
 
@@ -353,7 +357,7 @@ static int wtf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 static int wtf_write_packet(struct libtrace_out_t *libtrace, const struct libtrace_packet_t *packet) {
 	int numbytes =0 ;
 	if (packet->trace->format != &wag_trace) {
-		trace_set_err(TRACE_ERR_NO_CONVERSION,
+		trace_set_err_out(libtrace,TRACE_ERR_NO_CONVERSION,
 				"Cannot convert from wag trace format to %s format yet",
 				packet->trace->format->name);
 		return -1;
@@ -364,12 +368,14 @@ static int wtf_write_packet(struct libtrace_out_t *libtrace, const struct libtra
 	 */
 	if ((numbytes = LIBTRACE_WRITE(OUTPUT.file, packet->header, 
 				trace_get_framing_length(packet))) == -1) {
-		trace_set_err(errno,"write(%s)",packet->trace->uridata);
+		trace_set_err_out(libtrace,errno,
+				"write(%s)",packet->trace->uridata);
 		return -1;
 	}
 	if ((numbytes = LIBTRACE_WRITE(OUTPUT.file, packet->payload, 
 				trace_get_capture_length(packet)) == -1)) {
-		trace_set_err(errno,"write(%s)",packet->trace->uridata);
+		trace_set_err_out(libtrace,
+				errno,"write(%s)",packet->trace->uridata);
 		return -1;
 	}
 	return numbytes;

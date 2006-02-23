@@ -222,17 +222,18 @@ struct libtrace_t *trace_create(const char *uri) {
 	int i = 0;
 	
 	trace_err.err_num = TRACE_ERR_NOERROR;
+	libtrace->format=NULL;
         
         /* parse the URI to determine what sort of event we are dealing with */
 	if ((uridata = trace_parse_uri(uri, &scan)) == 0) {
-		return 0;
+		trace_set_err(libtrace,TRACE_ERR_BAD_FORMAT,"Bad uri format");
+		return libtrace;
 	}
 	
 	libtrace->event.tdelta = 0.0;
 	libtrace->filter = NULL;
 	libtrace->snaplen = 0;
 
-	libtrace->format = 0;
 	for (i = 0; i < nformats; i++) {
 		if (strlen(scan) == strlen(format_list[i]->name) &&
 				strncasecmp(scan,
@@ -243,7 +244,7 @@ struct libtrace_t *trace_create(const char *uri) {
 		}
 	}
 	if (libtrace->format == 0) {
-		trace_set_err(TRACE_ERR_BAD_FORMAT,
+		trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT,
 				"Unknown format (%s)",scan);
 		return 0;
 	}
@@ -254,23 +255,24 @@ struct libtrace_t *trace_create(const char *uri) {
 	 */
         
 	if (libtrace->format->init_input) {
-		if (!libtrace->format->init_input( libtrace)) {
+		if (!libtrace->format->init_input(libtrace)) {
 			/* init_input should call trace_set_err to set 
 			 * the error message
 			 */
-			return 0;
+			return libtrace;
 		}
 	} else {
-		trace_set_err(TRACE_ERR_NO_INIT,
+		trace_set_err(libtrace,TRACE_ERR_NO_INIT,
 				"Format does not support input (%s)",scan);
-		return 0;
+		return libtrace;
 	}
 	
 
         libtrace->fifo = create_tracefifo(1048576);
-	assert( libtrace->fifo);
+	assert(libtrace->fifo);
 	free(scan);
 	libtrace->started=false;
+	trace_set_err(libtrace,0,"");
         return libtrace;
 }
 
@@ -308,7 +310,7 @@ struct libtrace_t * trace_create_dead (const char *uri) {
                                 }
         }
         if (libtrace->format == 0) {
-		trace_set_err(TRACE_ERR_BAD_FORMAT,
+		trace_set_err(libtrace,TRACE_ERR_BAD_FORMAT,
 				"Unknown format (%s)",scan);
                 return 0;
         }
@@ -322,10 +324,6 @@ struct libtrace_t * trace_create_dead (const char *uri) {
  *
  * @param uri	the uri string describing the output format and destination
  * @returns opaque pointer to a libtrace_output_t 
- * @author Shane Alcock
- *
- * Valid URI's are: - gzerf:/path/to/erf/file.gz - gzerf:/path/to/erf/file -
- * rtserver:hostname - rtserver:hostname:port
  *
  *  If an error occured when attempting to open the output trace, NULL is
  *  returned and trace_errno is set. 
@@ -342,7 +340,8 @@ libtrace_out_t *trace_create_output(const char *uri) {
         /* parse the URI to determine what sort of event we are dealing with */
 
 	if ((uridata = trace_parse_uri(uri, &scan)) == 0) {
-		return 0;
+		trace_set_err_out(libtrace,TRACE_ERR_BAD_FORMAT,"Bad uri format");
+		return libtrace;
 	}
 	
 	
@@ -357,7 +356,7 @@ libtrace_out_t *trace_create_output(const char *uri) {
                                 }
         }
         if (libtrace->format == 0) {
-		trace_set_err(TRACE_ERR_BAD_FORMAT,
+		trace_set_err_out(libtrace,TRACE_ERR_BAD_FORMAT,
 				"Unknown output format (%s)",scan);
                 return 0;
         }
@@ -380,10 +379,9 @@ libtrace_out_t *trace_create_output(const char *uri) {
 				assert(!"init_output() should return -1 for failure, or 0 for success");
 		}
 	} else {
-		trace_set_err(TRACE_ERR_NO_INIT_OUT,
+		trace_set_err_out(libtrace,TRACE_ERR_NO_INIT_OUT,
 				"Format does not support writing (%s)",scan);
-		free(libtrace);
-                return 0;
+                return libtrace;
         }
 
 
@@ -457,11 +455,11 @@ int trace_config(libtrace_t *libtrace,
 			libtrace->filter=value;
 			break;
 		case TRACE_OPTION_PROMISC:
-			trace_set_err(TRACE_ERR_OPTION_UNAVAIL,
+			trace_set_err(libtrace,TRACE_ERR_OPTION_UNAVAIL,
 				"Promisc mode is not supported by this format module");
 			return -1;
 		default:
-			trace_set_err(TRACE_ERR_UNKNOWN_OPTION,
+			trace_set_err(libtrace,TRACE_ERR_UNKNOWN_OPTION,
 				"Unknown option %i", option);
 			return -1;
 	}
@@ -1290,7 +1288,8 @@ int trace_bpf_compile(libtrace_filter_t *filter,
 	/* If this isn't a real packet, then fail */
 	linkptr = trace_get_link(packet);
 	if (!linkptr) {
-		trace_set_err(TRACE_ERR_BAD_PACKET,"Packet has no payload");
+		trace_set_err(packet->trace,
+				TRACE_ERR_BAD_PACKET,"Packet has no payload");
 		return -1;
 	}
 	
@@ -1303,7 +1302,7 @@ int trace_bpf_compile(libtrace_filter_t *filter,
 		if (pcap_compile( pcap, &filter->filter, filter->filterstring, 
 					1, 0)) {
 			pcap_close(pcap);
-			trace_set_err(TRACE_ERR_BAD_PACKET,
+			trace_set_err(packet->trace,TRACE_ERR_BAD_PACKET,
 					"Packet has no payload");
 			return -1;
 		}
@@ -1562,13 +1561,11 @@ const char * trace_parse_uri(const char *uri, char **format) {
 	
 	if((uridata = strchr(uri,':')) == NULL) {
                 /* badly formed URI - needs a : */
-		trace_set_err(TRACE_ERR_URI_NOCOLON,"Format missing");
                 return 0;
         }
 
         if ((uridata - uri) > URI_PROTO_LINE) {
                 /* badly formed URI - uri type is too long */
-		trace_set_err(TRACE_ERR_URI_LONG,"Format too long");
                 return 0;
         }
 
@@ -1580,29 +1577,25 @@ const char * trace_parse_uri(const char *uri, char **format) {
 	return uridata;
 }
 
-enum base_format_t trace_get_format(struct libtrace_packet_t *packet) {
+enum base_format_t trace_get_format(struct libtrace_packet_t *packet) 
+{
 	assert(packet);
 
 	return packet->trace->format->type;
 }
 	
-/** Update the libtrace error
- * @param errcode either an Econstant from libc, or a LIBTRACE_ERROR
- * @param msg a plaintext error message
- * @internal
- */
-void trace_set_err(int errcode,const char *msg,...)
+libtrace_err_t trace_get_err(libtrace_t *trace)
 {
-	char buf[256];
-	va_list va;
-	va_start(va,msg);
-	trace_err.err_num=errcode;
-	if (errcode>0) {
-		vsnprintf(buf,sizeof(buf),msg,va);
-		snprintf(trace_err.problem,sizeof(trace_err.problem),
-				"%s: %s",buf,strerror(errno));
-	} else {
-		vsnprintf(trace_err.problem,sizeof(trace_err.problem),msg,va);
-	}
-	va_end(va);
+	libtrace_err_t err = trace->err;
+	trace->err.err_num = 0; /* "OK" */
+	trace->err.problem[0]='\0';
+	return err;
+}
+
+libtrace_err_t trace_get_err_output(libtrace_out_t *trace)
+{
+	libtrace_err_t err = trace->err;
+	trace->err.err_num = 0; /* "OK" */
+	trace->err.problem[0]='\0';
+	return err;
 }

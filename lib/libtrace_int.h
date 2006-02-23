@@ -73,7 +73,6 @@ extern "C" {
 #include <stdbool.h>
 
 
-void trace_set_err(int errcode,const char *msg,...);
 
 #define RP_BUFSIZE 65536
 
@@ -95,7 +94,7 @@ struct libtrace_t {
 	struct libtrace_format_t *format; /**< format driver pointer */
 	struct libtrace_format_data_t *format_data; /**<format data pointer */
 	bool started;
-
+	libtrace_err_t err;
 	struct libtrace_event_t event;
 	char *uridata;
 	struct tracefifo_t *fifo;   
@@ -110,12 +109,14 @@ struct libtrace_t {
 struct libtrace_out_t {
         struct libtrace_format_t *format;
 	struct libtrace_format_data_out_t *format_data;
-
+	bool started;
+	libtrace_err_t err;
 	char *uridata;
         struct tracefifo_t *fifo;
-	bool started;
 };
 
+void trace_set_err(libtrace_t *trace, int errcode,const char *msg,...);
+void trace_set_err_out(libtrace_out_t *trace, int errcode, const char *msg,...);
 
 struct trace_sll_header_t {
 	uint16_t pkttype;          	/* packet type */

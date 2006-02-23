@@ -118,7 +118,7 @@ static int pcap_start_input(struct libtrace_t *libtrace) {
 	if ((INPUT.pcap = 
 		pcap_open_offline(libtrace->uridata,
 			errbuf)) == NULL) {
-		trace_set_err(TRACE_ERR_INIT_FAILED,"%s",
+		trace_set_err(libtrace,TRACE_ERR_INIT_FAILED,"%s",
 				errbuf);
 		return -1;
 	}
@@ -126,7 +126,7 @@ static int pcap_start_input(struct libtrace_t *libtrace) {
 		trace_bpf_compile(DATA(libtrace)->filter);
 		if (pcap_setfilter(INPUT.pcap,&DATA(libtrace)->filter->filter) 
 				== -1) {
-			trace_set_err(TRACE_ERR_INIT_FAILED,"%s",
+			trace_set_err(libtrace,TRACE_ERR_INIT_FAILED,"%s",
 					pcap_geterr(INPUT.pcap));
 			return -1;
 		}
@@ -149,7 +149,7 @@ static int pcap_config_input(libtrace_t *libtrace,
 		case TRACE_OPTION_PROMISC:
 			/* can't do promisc on a trace! fall thru */
 		default:
-			trace_set_err(TRACE_ERR_UNKNOWN_OPTION,
+			trace_set_err(libtrace,TRACE_ERR_UNKNOWN_OPTION,
 					"Unknown option %i", option);
 			return -1;
 	}
@@ -193,7 +193,7 @@ static int pcapint_config_input(libtrace_t *libtrace,
 			DATA(libtrace)->promisc=*(int*)data;
 			return 0;
 		default:
-			trace_set_err(TRACE_ERR_UNKNOWN_OPTION,
+			trace_set_err(libtrace,TRACE_ERR_UNKNOWN_OPTION,
 					"Unknown option %i", option);
 			return -1;
 	}
@@ -208,14 +208,14 @@ static int pcapint_start_input(libtrace_t *libtrace) {
 			DATA(libtrace)->promisc,
 			1,
 			errbuf)) == NULL) {
-		trace_set_err(TRACE_ERR_INIT_FAILED,"%s",errbuf);
+		trace_set_err(libtrace,TRACE_ERR_INIT_FAILED,"%s",errbuf);
 		return -1;
 	}
 	/* Set a filter if one is defined */
 	if (DATA(libtrace)->filter) {
 		if (pcap_setfilter(INPUT.pcap,&DATA(libtrace)->filter->filter)
 			== -1) {
-			trace_set_err(TRACE_ERR_INIT_FAILED,"%s",
+			trace_set_err(libtrace,TRACE_ERR_INIT_FAILED,"%s",
 					pcap_geterr(INPUT.pcap));
 			return -1;
 		}
@@ -224,8 +224,9 @@ static int pcapint_start_input(libtrace_t *libtrace) {
 	return 1;
 }
 
-static int pcapint_init_output(struct libtrace_out_t *libtrace __attribute__((unused))) {
-	trace_set_err(TRACE_ERR_NO_INIT_OUT,"Writing to a pcap interface not implemented yet");
+static int pcapint_init_output(struct libtrace_out_t *libtrace) {
+	trace_set_err_out(libtrace,TRACE_ERR_NO_INIT_OUT,
+			"Writing to a pcap interface not implemented yet");
 	return -1;
 }
 
@@ -328,7 +329,7 @@ static libtrace_linktype_t pcap_get_link_type(const struct libtrace_packet_t *pa
 	return pcap_dlt_to_libtrace(linktype);
 }
 
-static int8_t pcap_get_direction(const struct libtrace_packet_t *packet) {
+static int8_t pcap_get_direction(const libtrace_packet_t *packet) {
 	int8_t direction  = -1;
 	switch(pcap_get_link_type(packet)) {
 		case TRACE_TYPE_LINUX_SLL:
@@ -336,7 +337,8 @@ static int8_t pcap_get_direction(const struct libtrace_packet_t *packet) {
 			struct trace_sll_header_t *sll;
 			sll = trace_get_link(packet);
 			if (!sll) {
-				trace_set_err(TRACE_ERR_BAD_PACKET,
+				trace_set_err(packet->trace,
+					TRACE_ERR_BAD_PACKET,
 						"Bad or missing packet");
 				return -1;
 			}
@@ -364,7 +366,8 @@ static int8_t pcap_get_direction(const struct libtrace_packet_t *packet) {
 			struct trace_pflog_header_t *pflog;
 			pflog = trace_get_link(packet);
 			if (!pflog) {
-				trace_set_err(TRACE_ERR_BAD_PACKET,
+				trace_set_err(packet->trace,
+						TRACE_ERR_BAD_PACKET,
 						"Bad or missing packet");
 				return -1;
 			}
