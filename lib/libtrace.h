@@ -91,14 +91,18 @@ typedef struct libtrace_filter_t libtrace_filter_t;
 typedef enum {TRACE_CTRL_PACKET='p', TRACE_CTRL_EXTERNAL='e' } buf_control_t;
 /** Structure holding information about a packet */
 #define LIBTRACE_PACKET_BUFSIZE 65536
+
+/** The libtrace structure, applications shouldn't be meddling around in here 
+ */
 typedef struct libtrace_packet_t {
 	struct libtrace_t *trace;
 	void *header;
 	void *payload;
-	void *buffer;
-	size_t size;
-	uint8_t type;		/* rt protocol type for the packet */
 	buf_control_t buf_control; 
+	void *buffer;
+	size_t size;		/**< trace_get_framing_length()
+				 * +trace_get_capture_length() */
+	uint8_t type;		/**< rt protocol type for the packet */
 } libtrace_packet_t;
                      
 
@@ -755,9 +759,8 @@ int trace_get_framing_length(const libtrace_packet_t *packet);
 /** Truncate ("snap") the packet at the suggested length
  * @param packet	the packet opaque pointer
  * @param size		the new length of the packet
- * @return the new length of the packet, or the original length of the 
- * packet if unchanged
- * @author Daniel Lawson
+ * @return the new capture length of the packet, or the original capture
+ * length of the packet if unchanged
  */
 size_t trace_set_capture_length(libtrace_packet_t *packet, size_t size);
 

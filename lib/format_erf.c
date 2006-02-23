@@ -380,7 +380,6 @@ static int dag_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 		packet->payload = packet->buffer + erf_get_framing_length(packet);
 	}
 
-	packet->size = size;
 	DAG.offset += size;
 	DAG.diff -= size;
 
@@ -430,7 +429,6 @@ static int erf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 		trace_set_err(errno, "read(%s)", libtrace->uridata);
 		return -1;
 	}
-	packet->size = rlen;
 	if (((dag_record_t *)packet->buffer)->flags.rxerror == 1) {
 		packet->payload = NULL;
 	} else {
@@ -484,7 +482,9 @@ static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_pac
 	
 	do {
 		struct libtrace_packet_status status;
-		if (tracefifo_out_available(libtrace->fifo) == 0 || read_required) {
+		int size;
+		if (tracefifo_out_available(libtrace->fifo) == 0 
+				|| read_required) {
 			if ((numbytes = rtclient_read(
 					libtrace,buf,RP_BUFSIZE))<=0) {
 				return numbytes;
@@ -501,7 +501,7 @@ static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_pac
 		tracefifo_out_update(libtrace->fifo,sizeof(uint32_t));
 		/* Read in packet size */
 		if (tracefifo_out_read(libtrace->fifo,
-				&packet->size, sizeof(uint32_t)) == 0) {
+				&size, sizeof(uint32_t)) == 0) {
 			tracefifo_out_reset(libtrace->fifo);
 			read_required = 1;
 			continue;
@@ -510,8 +510,8 @@ static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_pac
 		
 		if (status.type == 2 /* RT_MSG */) {
 			/* Need to skip this packet as it is a message packet */
-			tracefifo_out_update(libtrace->fifo, packet->size);
-			tracefifo_ack_update(libtrace->fifo, packet->size + 
+			tracefifo_out_update(libtrace->fifo, size);
+			tracefifo_ack_update(libtrace->fifo, size + 
 					sizeof(uint32_t) + 
 					sizeof(libtrace_packet_status_t));
 			continue;
@@ -519,16 +519,16 @@ static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_pac
 		
 		/* read in the full packet */
 		if ((numbytes = tracefifo_out_read(libtrace->fifo, 
-						buffer, packet->size)) == 0) {
+						buffer, size)) == 0) {
 			tracefifo_out_reset(libtrace->fifo);
 			read_required = 1;
 			continue;
 		}
 
 		/* got in our whole packet, so... */
-		tracefifo_out_update(libtrace->fifo,packet->size);
+		tracefifo_out_update(libtrace->fifo,size);
 
-		tracefifo_ack_update(libtrace->fifo,packet->size + 
+		tracefifo_ack_update(libtrace->fifo,size + 
 				sizeof(uint32_t) + 
 				sizeof(libtrace_packet_status_t));
 
@@ -665,14 +665,13 @@ static int erf_get_wire_length(const struct libtrace_packet_t *packet) {
 static size_t erf_set_capture_length(struct libtrace_packet_t *packet, size_t size) {
 	dag_record_t *erfptr = 0;
 	assert(packet);
-	if((size + erf_get_framing_length(packet)) > packet->size) {
+	if(size  > trace_get_capture_length(packet)) {
 		/* can't make a packet larger */
-		return (packet->size - erf_get_framing_length(packet));
+		return trace_get_capture_length(packet);
 	}
 	erfptr = (dag_record_t *)packet->header;
 	erfptr->rlen = htons(size + erf_get_framing_length(packet));
-	packet->size = size + erf_get_framing_length(packet);
-	return packet->size;
+	return trace_get_capture_length(packet);
 }
 
 static int rtclient_get_fd(const libtrace_t *trace) {

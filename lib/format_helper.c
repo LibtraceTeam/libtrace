@@ -82,7 +82,8 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 		trace->event.packet.buffer = (void *)malloc(4096);
 		trace->event.packet.size=
 			trace_read_packet(trace,packet);
-		event.size = trace->event.packet.size;
+		event.size = trace->event.packet.size = \
+			     trace->event.packet.size;
 		if (trace->event.packet.size > 0 ) {
 			memcpy(trace->event.packet.buffer,
 					packet->buffer,
@@ -127,7 +128,6 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 	}
 
 	/* This is the first packet, so just fire away. */
-	packet->size = trace->event.packet.size;
 	memcpy(packet->buffer,
 			trace->event.packet.buffer,
 			trace->event.packet.size);

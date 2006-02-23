@@ -161,7 +161,6 @@ static int legacy_read_packet(struct libtrace_t *libtrace, struct libtrace_packe
 		trace_set_err(errno,"read(%s)",libtrace->uridata);
 		return -1;
 	}
-	packet->size = 64;
 	
 	packet->header = packet->buffer;
 	packet->payload = (void*)((char*)packet->buffer + 

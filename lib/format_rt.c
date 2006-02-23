@@ -415,7 +415,6 @@ static int rt_read_packet(struct libtrace_t *libtrace,
                 }
 		tracefifo_out_update(libtrace->fifo, sizeof(rt_header_t));
 		
-		packet->size = pkt_hdr.length + sizeof(rt_header_t);
 		packet->type = pkt_hdr.type;
 		
 		switch (packet->type) {
@@ -429,7 +428,7 @@ static int rt_read_packet(struct libtrace_t *libtrace,
 					break;
 				}
 				if (tracefifo_out_read(libtrace->fifo, buffer, 
-							packet->size - sizeof(rt_data_t) - sizeof(rt_header_t))== 0)
+							pkt_hdr.length-sizeof(rt_data_t))==0)
 				{
 					tracefifo_out_reset(libtrace->fifo);
 					read_required = 1;
@@ -496,9 +495,10 @@ static int rt_read_packet(struct libtrace_t *libtrace,
 				
 		
                 /* got in our whole packet, so... */
-                tracefifo_out_update(libtrace->fifo,packet->size - sizeof(rt_header_t));
+                tracefifo_out_update(libtrace->fifo,pkt_hdr.length);
 
-                tracefifo_ack_update(libtrace->fifo,packet->size);
+                tracefifo_ack_update(libtrace->fifo,pkt_hdr.length+
+				sizeof(rt_header_t));
                 return 1;
         } while(1);
 	

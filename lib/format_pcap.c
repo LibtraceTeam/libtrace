@@ -249,13 +249,10 @@ static int pcapint_fin_output(struct libtrace_out_t *libtrace __attribute__((unu
 
 static void trace_pcap_handler(u_char *user, const struct pcap_pkthdr *pcaphdr, const u_char *pcappkt) {
 	struct libtrace_packet_t *packet = (struct libtrace_packet_t *)user;	
-	int numbytes = 0;
-
 	/*
 	// pcap provides us with the right bits, in it's own buffers.
 	// We hijack them.
 	*/
-	numbytes = pcaphdr->len;
 
 	if (!packet->buffer || packet->buf_control==TRACE_CTRL_EXTERNAL) {
 		/* We only need struct pcap_pkthdr, but we have no way
@@ -269,10 +266,6 @@ static void trace_pcap_handler(u_char *user, const struct pcap_pkthdr *pcaphdr, 
 	memcpy(packet->buffer,pcaphdr,sizeof(struct pcap_pkthdr));
 	packet->header = packet->buffer;
 	packet->payload = (void *)pcappkt;
-
-	packet->size = numbytes + sizeof(struct pcap_pkthdr);
-
-	printf("%i %i %i\n",pcaphdr->caplen,pcaphdr->len,packet->size);
 
 	assert(pcaphdr->caplen>=0 && pcaphdr->caplen<=65536);
 }
@@ -288,7 +281,7 @@ static int pcap_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_
 	if (pcapbytes <= 0) {
 		return pcapbytes;
 	}
-	return (packet->size - sizeof(struct pcap_pkthdr));
+	return ((struct pcap_pkthdr*)packet->header)->len+sizeof(struct pcap_pkthdr);
 }
 
 static int pcap_write_packet(struct libtrace_out_t *libtrace, const struct libtrace_packet_t *packet) {
@@ -401,34 +394,33 @@ static struct timeval pcap_get_timeval(const struct libtrace_packet_t *packet) {
 }
 
 
-static int pcap_get_capture_length(const struct libtrace_packet_t *packet) {
+static int pcap_get_capture_length(const libtrace_packet_t *packet) {
 	struct pcap_pkthdr *pcapptr = 0;
 	pcapptr = (struct pcap_pkthdr *)packet->header;
 	assert(pcapptr->caplen>=0 && pcapptr->caplen<=65536);
 	return pcapptr->caplen;
 }
 
-static int pcap_get_wire_length(const struct libtrace_packet_t *packet) {
+static int pcap_get_wire_length(const libtrace_packet_t *packet) {
 	struct pcap_pkthdr *pcapptr = 0;
 	pcapptr = (struct pcap_pkthdr *)packet->header;
 	return ntohs(pcapptr->len);
 }
 
-static int pcap_get_framing_length(const struct libtrace_packet_t *packet UNUSED) {
+static int pcap_get_framing_length(const libtrace_packet_t *packet UNUSED) {
 	return sizeof(struct pcap_pkthdr);
 }
 
-static size_t pcap_set_capture_length(struct libtrace_packet_t *packet,size_t size) {
+static size_t pcap_set_capture_length(libtrace_packet_t *packet,size_t size) {
 	struct pcap_pkthdr *pcapptr = 0;
 	assert(packet);
-	if ((size + sizeof(struct pcap_pkthdr)) > packet->size) {
+	if (size > trace_get_capture_length(packet)) {
 		/* can't make a packet larger */
-		return (packet->size - sizeof(struct pcap_pkthdr));
+		return trace_get_capture_length(packet);
 	}
 	pcapptr = (struct pcap_pkthdr *)packet->header;
 	pcapptr->caplen = size;
-	packet->size = size + sizeof(struct pcap_pkthdr);
-	return packet->size;
+	return trace_get_capture_length(packet);
 }
 
 static int pcap_get_fd(const libtrace_t *trace) {

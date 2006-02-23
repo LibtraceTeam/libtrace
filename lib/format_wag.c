@@ -296,7 +296,6 @@ static int wag_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 	}
 
 	
-	packet->size = numbytes;
 	packet->header = packet->buffer;
 	packet->payload=(char*)packet->buffer+trace_get_framing_length(packet);
 	return numbytes;
@@ -341,7 +340,6 @@ static int wtf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 		return -1;
 	}
 
-	packet->size = framesize;
 	packet->header = packet->buffer;
 	packet->payload=(char*)packet->buffer+trace_get_framing_length(packet);
 	return framesize;
@@ -366,7 +364,7 @@ static int wtf_write_packet(struct libtrace_out_t *libtrace, const struct libtra
 		return -1;
 	}
 	if ((numbytes = LIBTRACE_WRITE(OUTPUT.file, packet->payload, 
-			packet->size - trace_get_framing_length(packet))) == -1) {
+				trace_get_capture_length(packet)) == -1)) {
 		trace_set_err(errno,"write(%s)",packet->trace->uridata);
 		return -1;
 	}

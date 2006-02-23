@@ -1547,7 +1547,11 @@ size_t trace_set_capture_length(struct libtrace_packet_t *packet, size_t size) {
 	assert(packet->size>0 && packet->size<65536);
 
 	if (packet->trace->format->set_capture_length) {
-		return packet->trace->format->set_capture_length(packet,size);
+		int caplen=packet->trace->format->set_capture_length(packet,size);
+		if (caplen!=-1) {
+			packet->size=trace_get_framing_length(packet)+caplen;
+		}
+		return caplen;
 	}
 
 	return -1;
