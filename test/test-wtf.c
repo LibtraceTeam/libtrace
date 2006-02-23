@@ -48,27 +48,35 @@
 #include "dagformat.h"
 #include "libtrace.h"
 
-struct libtrace_t *trace;
 
 int main(int argc, char *argv[]) {
         char *uri = "wtf:traces/wed.wtf";
         int psize = 0;
 	int error = 0;
 	int count = 0;
-	struct libtrace_packet_t *packet;
+	int level = 0;
+	libtrace_t *trace;
+	libtrace_out_t *outtrace;
+	libtrace_packet_t *packet;
 
 	trace = trace_create(uri);
 	if (!trace) {
-		printf("ERROR: %s\n",trace_err.problem);
+		printf("Error: %s\n",trace_err.problem);
+		return 1;
+	}
+	outtrace = trace_create_output("wtf:traces/wed.out.wtf");
+	if (!outtrace) {
+		printf("Error: %s\n",trace_err.problem);
 		return 1;
 	}
 
-	if (trace_start(trace)==-1) {
-		printf("ERROR: %s\n",trace_err.problem);
-		return 1;
-	}
+	level=0;
+	trace_config_output(outtrace,TRACE_OPTION_OUTPUT_COMPRESS,&level);
+
+	trace_start(trace);
+	trace_start_output(outtrace);
 	
-	packet = trace_create_packet();
+	packet=trace_create_packet();
         for (;;) {
 		if ((psize = trace_read_packet(trace, packet)) <0) {
 			error = 1;
@@ -79,6 +87,7 @@ int main(int argc, char *argv[]) {
 			break;
 		}
 		count ++;
+		trace_write_packet(outtrace,packet);
         }
 	trace_destroy_packet(&packet);
 	if (error == 0) {
@@ -92,5 +101,6 @@ int main(int argc, char *argv[]) {
 		printf("failure: %s\n",trace_err.problem);
 	}
         trace_destroy(trace);
+	trace_destroy_output(outtrace);
         return error;
 }

@@ -61,8 +61,8 @@ int main(int argc, char *argv[]) {
 
 	trace_start(trace);
 	
+	packet=trace_create_packet();
         for (;;) {
-		packet=trace_create_packet();
 		if ((psize = trace_read_packet(trace, packet)) <0) {
 			error = 1;
 			break;
@@ -72,8 +72,8 @@ int main(int argc, char *argv[]) {
 			break;
 		}
 		count ++;
-		trace_destroy_packet(&packet);
         }
+	trace_destroy_packet(&packet);
 	if (error == 0) {
 		if (count == 100) {
 			printf("success: 100 packets read\n");
