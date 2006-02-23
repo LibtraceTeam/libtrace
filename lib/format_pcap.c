@@ -404,7 +404,7 @@ static int pcap_get_capture_length(const libtrace_packet_t *packet) {
 static int pcap_get_wire_length(const libtrace_packet_t *packet) {
 	struct pcap_pkthdr *pcapptr = 0;
 	pcapptr = (struct pcap_pkthdr *)packet->header;
-	return ntohs(pcapptr->len);
+	return pcapptr->len;
 }
 
 static int pcap_get_framing_length(const libtrace_packet_t *packet UNUSED) {

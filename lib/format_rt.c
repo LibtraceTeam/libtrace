@@ -380,12 +380,12 @@ static int rt_send_ack(struct libtrace_t *libtrace,
 static int rt_read_packet(struct libtrace_t *libtrace, 
 		struct libtrace_packet_t *packet) {
         
-	int numbytes = 0;
         char buf[RP_BUFSIZE];
         int read_required = 0;
 	rt_header_t pkt_hdr;
 	char msg_buf[RP_BUFSIZE];
-
+	int pkt_size = 0;
+	
 	rt_data_t data_hdr;
         void *buffer = 0;
 
@@ -397,110 +397,67 @@ static int rt_read_packet(struct libtrace_t *libtrace,
         buffer = packet->buffer;
         packet->header = packet->buffer;
 
+	/* FIXME: Better error handling required */
+	if (rt_read(libtrace, &pkt_hdr, sizeof(rt_header_t)) !=
+			sizeof(rt_header_t)) {
+		printf("Error receiving rt header\n");
+		return -1;
+	}
 
-        do {
-                if (tracefifo_out_available(libtrace->fifo) == 0 || read_required) {
-                        if ((numbytes = rt_read(
-                                        libtrace,buf,RP_BUFSIZE))<=0) {
-                                return numbytes;
-                        }
-                        tracefifo_write(libtrace->fifo,buf,numbytes);
-                        read_required = 0;
-                }
-                /* Read rt header */
-                if (tracefifo_out_read(libtrace->fifo,
-                                &pkt_hdr, sizeof(rt_header_t)) == 0) {
-                        read_required = 1;
-                        continue;
-                }
-		tracefifo_out_update(libtrace->fifo, sizeof(rt_header_t));
-		
-		packet->type = pkt_hdr.type;
-		
-		switch (packet->type) {
-			case RT_DATA:
-				if (tracefifo_out_read(libtrace->fifo, 
-							&data_hdr, 
-							sizeof(rt_data_t)) == 0) 
-				{
-					tracefifo_out_reset(libtrace->fifo);
-					read_required = 1;
-					break;
-				}
-				if (tracefifo_out_read(libtrace->fifo, buffer, 
-							pkt_hdr.length-sizeof(rt_data_t))==0)
-				{
-					tracefifo_out_reset(libtrace->fifo);
-					read_required = 1;
-					break;
-				}
-				/* set packet->trace */
-				if (rt_set_format(libtrace, packet, 
-							data_hdr.format) < 0) {
-					return -1;
-				}
-				/* set packet->payload */
-				rt_set_payload(packet, data_hdr.format);
-				
-				if (reliability > 0) {
-					/* send ack */
-					if (rt_send_ack(libtrace, packet,
-								data_hdr.sequence) 
-							== -1)
-					{
-						return -1;
-					}
-				}	
-				break;
-			case RT_STATUS:
-				if (tracefifo_out_read(libtrace->fifo, buffer,
-        					sizeof(rt_status_t)) == 0)
-                                {
-					tracefifo_out_reset(libtrace->fifo);
-					read_required = 1;
-					break;
-				}
-				break;
-			case RT_DUCK:
-				if (tracefifo_out_read(libtrace->fifo, buffer,
-						sizeof(rt_duck_t)) == 0)
-				{
-					tracefifo_out_reset(libtrace->fifo);
-					read_required = 1;
-					break;
-				}
-				break;
+	packet->type = pkt_hdr.type;
+	pkt_size = pkt_hdr.length;
 
-			case RT_END_DATA:
-				/* need to do something sensible here */
-				return 0;	
-
-			case RT_PAUSE_ACK:
-				/* Check if we asked for a pause */
-				
-				break;
-
-			case RT_OPTION:
-				/* Server is requesting some option? */
-
-				break;
-
-			default:
-				printf("Bad rt client type: %d\n", packet->type);
+	switch(packet->type) {
+		case RT_DATA:	
+			if (rt_read(libtrace, &data_hdr, sizeof(rt_data_t))
+					!= sizeof(rt_data_t)) {
+				printf("Error receiving rt data header\n");
 				return -1;
-				
-		}
-		if (read_required)
-			continue;
-				
-		
-                /* got in our whole packet, so... */
-                tracefifo_out_update(libtrace->fifo,pkt_hdr.length);
+			}
+			
+			if (rt_read(libtrace, buffer, 
+					pkt_size - sizeof(rt_data_t)) !=
+					pkt_size - sizeof(rt_data_t)) {
+				printf("Error receiving packet\n");
+				return -1;
+			}
+			
+			if (rt_set_format(libtrace, packet,
+                        		data_hdr.format) < 0) {
+                        	return -1;
+                        }
+                       	rt_set_payload(packet, data_hdr.format);
 
-                tracefifo_ack_update(libtrace->fifo,pkt_hdr.length+
-				sizeof(rt_header_t));
-                return 1;
-        } while(1);
+                        if (reliability > 0) {
+	                        
+				if (rt_send_ack(libtrace, packet,
+                                       data_hdr.sequence) == -1)
+				{
+                                	return -1;
+                                }
+			}
+			break;
+		case RT_STATUS:
+		case RT_DUCK:
+			if (rt_read(libtrace, buffer, pkt_size) !=
+					pkt_size) {
+				printf("Error receiving status packet\n");
+				return -1;
+			}
+			break;
+		case RT_END_DATA:
+			return 0;
+		case RT_PAUSE_ACK:
+			/* FIXME: Do something useful */
+			break;
+		case RT_OPTION:
+			/* FIXME: Do something useful here as well */
+			break;
+		default:
+			printf("Bad rt type for client receipt: %d\n",
+					pkt_hdr.type);
+	}
+	return 1;
 	
 }
 
