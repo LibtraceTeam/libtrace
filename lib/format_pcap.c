@@ -107,7 +107,7 @@ static int pcap_init_input(struct libtrace_t *libtrace) {
 
 	INPUT.pcap = NULL;
 	DATA(libtrace)->filter = NULL;
-	DATA(libtrace)->snaplen = 0;
+	DATA(libtrace)->snaplen = 65536;
 	DATA(libtrace)->promisc = 0;
 
 	return 1;
