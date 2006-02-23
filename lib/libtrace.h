@@ -493,8 +493,11 @@ typedef enum {
 typedef struct libtrace_eventobj_t {
 	libtrace_event_t type; /**< event type (iowait,sleep,packet) */
 	int fd;		       /**< if IOWAIT, the fd to sleep on */
-	double seconds;	       /**< if SLEEP, the amount of time to sleep for */
-	int size; 	       /**< if PACKET, the value returned from trace_read_packet */
+	double seconds;	       /**< if SLEEP, the amount of time to sleep for 
+				*/
+	int size; 	       /**< if PACKET, the value returned from 
+				*  trace_read_packet 
+				*/
 } libtrace_eventobj_t;
 
 /** process a libtrace event
