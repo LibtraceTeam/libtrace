@@ -173,7 +173,7 @@ static int pcapint_init_input(struct libtrace_t *libtrace) {
 	libtrace->format_data = (struct libtrace_format_data_t *) 
 		malloc(sizeof(struct libtrace_format_data_t));
 	DATA(libtrace)->filter = NULL;
-	DATA(libtrace)->snaplen = 0;
+	DATA(libtrace)->snaplen = LIBTRACE_PACKET_BUFSIZE;
 	DATA(libtrace)->promisc = 0;
 	return 1;
 }
@@ -271,6 +271,8 @@ static void trace_pcap_handler(u_char *user, const struct pcap_pkthdr *pcaphdr, 
 	packet->payload = (void *)pcappkt;
 
 	packet->size = numbytes + sizeof(struct pcap_pkthdr);
+
+	printf("%i %i %i\n",pcaphdr->caplen,pcaphdr->len,packet->size);
 
 	assert(pcaphdr->caplen>=0 && pcaphdr->caplen<=65536);
 }
