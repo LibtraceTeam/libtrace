@@ -93,11 +93,11 @@ struct libtrace_event_t {
 struct libtrace_t {
 	struct libtrace_format_t *format; /**< format driver pointer */
 	struct libtrace_format_data_t *format_data; /**<format data pointer */
-	bool started;
-	libtrace_err_t err;
-	struct libtrace_event_t event;
-	char *uridata;
-	struct tracefifo_t *fifo;   
+	bool started;			/**< if this trace has started */
+	libtrace_err_t err;		/**< error information */
+	struct libtrace_event_t event;	/**< the next event */
+	char *uridata;			/**< the uri of this trace */
+	struct tracefifo_t *fifo;   	/**< fifo used in this trace */
 	struct libtrace_filter_t *filter; /**< used by libtrace if the module
 					    * doesn't support filters natively
 					    */
@@ -106,13 +106,15 @@ struct libtrace_t {
 					  */
 };
 
+/** Information about output traces
+ * @internal
+ */
 struct libtrace_out_t {
-        struct libtrace_format_t *format;
-	struct libtrace_format_data_out_t *format_data;
+        struct libtrace_format_t *format;	/**< format driver */
+	struct libtrace_format_data_out_t *format_data; /**< format data */
 	bool started;
-	libtrace_err_t err;
-	char *uridata;
-        struct tracefifo_t *fifo;
+	libtrace_err_t err;		/**< Associated error */
+	char *uridata;			/**< URI associated with this trace */
 };
 
 void trace_set_err(libtrace_t *trace, int errcode,const char *msg,...);

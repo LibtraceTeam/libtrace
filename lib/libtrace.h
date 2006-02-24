@@ -85,10 +85,18 @@ typedef struct libtrace_t libtrace_t;
 /** Opaque structure holding information about a bpf filter */
 typedef struct libtrace_filter_t libtrace_filter_t;
 
-/* the letters p and e are magic numbers used to detect if the packet
+/** if a packet has memory allocated
+ * If the packet has allocated it's own memory it's buffer_control should
+ * be TRACE_CTRL_PACKET, when the packet is destroyed it's memory will be
+ * free()'d.  If it's doing zerocopy out of memory owned by something else
+ * it should be TRACE_CTRL_EXTERNAL.
+ * @note the letters p and e are magic numbers used to detect if the packet
  * wasn't created properly
  */
-typedef enum {TRACE_CTRL_PACKET='p', TRACE_CTRL_EXTERNAL='e' } buf_control_t;
+typedef enum {
+	TRACE_CTRL_PACKET='p',
+	TRACE_CTRL_EXTERNAL='e' 
+} buf_control_t;
 /** Structure holding information about a packet */
 #define LIBTRACE_PACKET_BUFSIZE 65536
 
@@ -246,21 +254,23 @@ typedef struct libtrace_llcsnap
 /** 802.3 frame */
 typedef struct libtrace_ether
 {
-  u_int8_t ether_dhost[6];	/* destination ether addr */
-  u_int8_t ether_shost[6];	/* source ether addr */
-  u_int16_t ether_type;		/* packet type ID field (next-header) */
+  u_int8_t ether_dhost[6];	/**< destination ether addr */
+  u_int8_t ether_shost[6];	/**< source ether addr */
+  u_int16_t ether_type;		/**< packet type ID field (next-header) */
 } __attribute__ ((packed)) libtrace_ether_t;
 
 /** 802.1Q frame */
 typedef struct libtrace_8021q 
 {
-  u_int8_t  ether_dhost[6];      /* destination eth addr */
-  u_int8_t  ether_shost[6];      /* source ether addr    */
-  u_int16_t ether_type;          /* packet type ID field , 0x8100 for VLAN */
-  unsigned int vlan_pri:3;	 /* vlan user priority */
-  unsigned int vlan_cfi:1; 	 /* vlan format indicator, 0 for ethernet, 1 for token ring */
-  unsigned int vlan_id:12; 	 /* vlan id */
-  u_int16_t vlan_ether_type;	 /* vlan sub-packet type ID field (next-header)*/
+  u_int8_t  ether_dhost[6];      /**< destination eth addr */
+  u_int8_t  ether_shost[6];      /**< source ether addr    */
+  u_int16_t ether_type;          /**< packet type ID field , 0x8100 for VLAN */
+  unsigned int vlan_pri:3;	 /**< vlan user priority */
+  unsigned int vlan_cfi:1; 	 /**< vlan format indicator, 
+				   * 0 for ethernet, 1 for token ring */
+  unsigned int vlan_id:12; 	 /**< vlan id */
+  u_int16_t vlan_ether_type;	 /**< vlan sub-packet type ID field 
+				   * (next-header)*/
 } __attribute__ ((packed)) libtrace_8021q_t;
 
 /** ATM cell */
@@ -325,22 +335,22 @@ char *trace_get_output_format(const libtrace_out_t *libtrace);
  *  - wag:/path/to/wag/file.gz
  *  - wag:/path/to/wag/socket
  *
- *  If an error occured when attempting to open the trace file, NULL is returned
- *  and trace_errno is set. Use trace_perror() to get more information.  
- *  The trace is created in the configuration state, you must call trace_start
- *  to start the capture.
+ *  If an error occured when attempting to open the trace file, an error
+ *  trace is returned and trace_get_error should be called to find out
+ *  if an error occured, and what that error was.  The trace is created in the
+ *  configuration state, you must call trace_start to start the capture.
  */
-struct libtrace_t *trace_create(const char *uri);
+libtrace_t *trace_create(const char *uri);
 
 /** Creates a "dummy" trace file that has only the format type set.
  *
  * @return opaque pointer to a (sparsely initialised) libtrace_t
  *
- * IMPORTANT: Do not attempt to call trace_read_packet or other such functions with
- * the dummy trace. Its intended purpose is to act as a packet->trace for libtrace_packet_t's
- * that are not associated with a libtrace_t structure.
+ * IMPORTANT: Do not attempt to call trace_read_packet or other such functions
+ * with the dummy trace. Its intended purpose is to act as a packet->trace for
+ * libtrace_packet_t's that are not associated with a libtrace_t structure.
  */
-struct libtrace_t *trace_create_dead(const char *uri);
+libtrace_t *trace_create_dead(const char *uri);
 
 /** Creates a trace output file from a URI. 
  *
@@ -926,7 +936,9 @@ int8_t trace_get_server_port(uint8_t protocol, uint16_t source, uint16_t dest);
  */
 const char *trace_parse_uri(const char *uri, char **format);
 
-/* Base format type definitions */
+/** RT protocol base format identifiers
+ * This is used to say what kind of packet is being sent over the rt protocol
+ */ 
 enum base_format_t {
         TRACE_FORMAT_ERF          =1,
         TRACE_FORMAT_PCAP         =2,

@@ -385,8 +385,6 @@ libtrace_out_t *trace_create_output(const char *uri) {
         }
 
 
-        libtrace->fifo = create_tracefifo(1048576);
-        assert( libtrace->fifo);
 	free(scan);
 	libtrace->started=false;
 	return libtrace;
@@ -510,7 +508,6 @@ void trace_destroy_output(struct libtrace_out_t *libtrace) {
 	assert(libtrace);
 	libtrace->format->fin_output(libtrace);
 	free(libtrace->uridata);
-	destroy_tracefifo(libtrace->fifo);
 	free(libtrace);
 }
 
@@ -1073,9 +1070,7 @@ struct timeval trace_get_timeval(const libtrace_packet_t *packet) {
 #else
 #error "What on earth are you running this on?"
 #endif
-		ts = (1000000 * (ts & 0xffffffffULL));
-       		ts += (ts & 0x80000000ULL) << 1;
-       		tv.tv_usec = ts >> 32;
+		tv.tv_usec = ((ts&0xFFFFFFFF)*1000000)>>32;
        		if (tv.tv_usec >= 1000000) {
                		tv.tv_usec -= 1000000;
                		tv.tv_sec += 1;
