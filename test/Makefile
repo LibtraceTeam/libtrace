@@ -9,7 +9,7 @@ libdir = $(PREFIX)/lib/.libs
 LDLIBS = -L$(libdir) -ltrace
 
 BINS = test1 test2 test-pcap test-pcap-bpf test-erf-write test-erf-to-pcap \
-	test-pcap-to-erf test-wtf test-rtclient test-event
+	test-pcap-to-erf test-wtf test-rtclient test-event test-time
 .PHONY: all clean distclean install depend test
 
 all: $(BINS) 
