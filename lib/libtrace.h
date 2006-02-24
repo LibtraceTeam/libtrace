@@ -103,11 +103,11 @@ typedef enum {
 /** The libtrace structure, applications shouldn't be meddling around in here 
  */
 typedef struct libtrace_packet_t {
-	struct libtrace_t *trace;
-	void *header;
-	void *payload;
-	buf_control_t buf_control; 
-	void *buffer;
+	struct libtrace_t *trace; /**< pointer to the trace */
+	void *header;		/**< pointer to the framing header */
+	void *payload;		/**< pointer to the link layer */
+	buf_control_t buf_control; /**< who owns the memory */
+	void *buffer;		/**< allocated buffer */
 	size_t size;		/**< trace_get_framing_length()
 				 * +trace_get_capture_length() */
 	uint8_t type;		/**< rt protocol type for the packet */
@@ -288,7 +288,7 @@ typedef struct libtrace_atm_cell
 typedef struct libtrace_pos
 {
  u_int16_t header;
- u_int16_t ether_type;
+ u_int16_t ether_type;		/**< ether type */
 } __attribute__ ((packed)) libtrace_pos;
 /*@}*/
 

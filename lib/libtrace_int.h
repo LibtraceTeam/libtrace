@@ -112,7 +112,7 @@ struct libtrace_t {
 struct libtrace_out_t {
         struct libtrace_format_t *format;	/**< format driver */
 	struct libtrace_format_data_out_t *format_data; /**< format data */
-	bool started;
+	bool started;			/**< trace started */
 	libtrace_err_t err;		/**< Associated error */
 	char *uridata;			/**< URI associated with this trace */
 };

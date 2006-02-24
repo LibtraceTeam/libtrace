@@ -42,15 +42,16 @@
 #define FRAME_SUBTYPE_DATA_RX   (0x0000)
 #define FRAME_SUBTYPE_DATA_TX   (0x0001)
 
-/* This is the common part of the frame header.
- * We synchronise by scanning a stream to look for the magic number (WAG_MAGIC).
- * We can then tell the size and type of this frame, and pass over it if necessary.
+/** This is the common part of the frame header.
+ * We synchronise by scanning a stream to look for the magic number
+ * (WAG_MAGIC).  We can then tell the size and type of this frame, and pass
+ * over it if necessary.
  */
 struct frame_t {
-  uint16_t magic;                                   /* magic number (0xdaa1) */
-  uint16_t size;                                    /* total frame size in bytes */
-  uint16_t type;                                    /* frame type */
-  uint16_t subtype;                                 /* frame subtype */
+  uint16_t magic;                           /**< magic number (0xdaa1) */
+  uint16_t size;                            /**< total frame size in bytes */
+  uint16_t type;                            /**< frame type */
+  uint16_t subtype;                         /**< frame subtype */
 };
 
 /*/////////////////////////////////////////////////////////////////////////////////
@@ -61,45 +62,48 @@ struct frame_t {
 // Common subfields...
 */
 
-/* timestamp */
+/** timestamp */
 struct timestamp_t {
-  uint32_t           secs;                          /* seconds since start of 01-01-1970 */
-  uint32_t           subsecs;                       /* (1/(2^32))ths of a second */
+  uint32_t           secs;           /**< seconds since start of 01-01-1970 */
+  uint32_t           subsecs;        /**< (1/(2^32))ths of a second */
 };
 
-/* frame stream information */
+/** frame stream information */
 struct strinfo_t {
   uint16_t unused_1;
   uint16_t unused_2;
   uint16_t unused_3;
-  uint16_t packets_lost;
+  uint16_t packets_lost;	/**< Number of packets lost */
 };
 
-/* Type: DATA, Subtype: RX */
+/** Type: DATA, Subtype: RX */
 struct frame_data_rx_t {
-  struct frame_t                 hdr;               /* common frame header */
-  struct strinfo_t               strinfo;           /* stream status */
-  struct timestamp_t             ts;                /* timestamp of reception of this frame */
+  struct frame_t     hdr;     /**< common frame header */
+  struct strinfo_t   strinfo; /**< stream status */
+  struct timestamp_t ts;      /**< timestamp of reception of this frame */
   struct {
-    uint8_t              rssi;                      /* receive signal strength of this frame */
-    uint8_t              rxstatus;                  /* rx status bits from the modem */
-    uint16_t             length;                    /* length in bytes of the frame payload */
+    uint8_t          rssi;    /**< receive signal strength of this frame */
+    uint8_t          rxstatus; /**< rx status bits from the modem */
+    uint16_t         length;  /**< length in bytes of the frame payload */
     struct {
-      uint8_t  signal;                              /* 802.11PLCP signal field */
-      uint8_t  service;                             /* 802.11PLCP service field */
-      uint16_t length; } plcp; } rxinfo;            /* 802.11PLCP length field (uS) */
+      uint8_t  signal;        /**< 802.11PLCP signal field */
+      uint8_t  service;       /**< 802.11PLCP service field */
+      uint16_t length;        /**< 802.11PLCP length field (uS) */
+    } plcp; 
+  } rxinfo;
 };
 
-/* Type: DATA, Subtype: TX */
+/** Type: DATA, Subtype: TX */
 struct frame_data_tx_t {
-  struct frame_t                 hdr;               /* common frame header */
-  uint64_t                       unused_1;         
-  uint64_t                       unused_2;          
+  struct frame_t      hdr;       /**< common frame header */
+  uint64_t            unused_1;         
+  uint64_t            unused_2;          
   struct {
-    uint8_t  gain;                                  /* tx gain with which to send this packet */
-    uint8_t  mode;                                  /* tx mode with which to send this packet */
-    uint16_t length;                                /* length in bytes of the frame payload */
-    uint32_t unused_1; }         txinfo;            
+    uint8_t  gain;        /**< tx gain with which to send this packet */
+    uint8_t  mode;        /**< tx mode with which to send this packet */
+    uint16_t length;      /**< length in bytes of the frame payload */
+    uint32_t unused_1; 
+  } txinfo;            
 };
 
 struct ieee_802_11_header {
@@ -122,8 +126,9 @@ struct ieee_802_11_header {
         uint8_t      mac4[6];
 };
 
+/** 802.11 payload */
 struct ieee_802_11_payload {
-        uint16_t     type;
+        uint16_t     type; /**< ether type of this packet */
 };
 
 
