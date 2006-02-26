@@ -27,6 +27,7 @@
  * $Id$
  *
  */
+/** @file */
 
 #ifndef LIBTRACE_INT_H
 #define LIBTRACE_INT_H
@@ -149,36 +150,155 @@ struct trace_pflog_header_t {
 	uint8_t	   pad[3];
 };
 
+/** Module definition structure */
 struct libtrace_format_t {
+	/** the uri name of this module */
 	char *name;
+	/** the version of this module */
 	char *version;
+	/** the RT protocol type of this module */
 	enum base_format_t type;
+	/** stuff that deals with input @{ */
+	/** initialise an trace (or NULL if input is not supported) */
 	int (*init_input)(libtrace_t *libtrace);
+	/** configure an trace (or NULL if input is not supported) */
 	int (*config_input)(libtrace_t *libtrace,trace_option_t option,void *value);
+	/** start/unpause an trace (or NULL if input not supported) */
 	int (*start_input)(libtrace_t *libtrace);
+	/** pause an trace (or NULL if input not supported) */
 	int (*pause_input)(libtrace_t *libtrace);
+	/** @} */
+	/** stuff that deals with output @{ */
+	/** initialise output traces (or NULL if output not supported) */
 	int (*init_output)(libtrace_out_t *libtrace);
+	/** configure output traces (or NULL if output not supported) */
 	int (*config_output)(libtrace_out_t *libtrace, trace_option_output_t, void *);
+	/** start output traces (or NULL if output not supported) 
+	 * There is no pause for output traces, as packets are not arriving
+	 * asyncronously
+	 */
 	int (*start_output)(libtrace_out_t *libtrace);
+	/** @} */
+	/** finish an input trace, cleanup (or NULL if input not supported) */
 	int (*fin_input)(libtrace_t *libtrace);
+	/** finish an output trace, cleanup (or NULL if output not supported) */
 	int (*fin_output)(libtrace_out_t *libtrace);
+	/** read a packet from a trace into the provided packet structure 
+	 * @returns -1 on error, or get_framing_length()+get_capture_length() \
+	 * on success.
+	 * if this function is not supported, this field may be NULL.
+	 */
 	int (*read_packet)(libtrace_t *libtrace, struct libtrace_packet_t *packet);
+	/** write a packet to a trace from the provided packet 
+	 * (or NULL if output not supported)
+	 */
 	int (*write_packet)(libtrace_out_t *libtrace, const libtrace_packet_t *packet);
+	/** return the libtrace link type for this packet 
+	 * @return the libtrace link type, or -1 if this link type is unknown
+	 */ 
 	libtrace_linktype_t (*get_link_type)(const libtrace_packet_t *packet);
+	/** return the direction of this packet 
+	 * This function pointer may be NULL if the format does not support
+	 * getting a direction.
+	 */ 
 	int8_t (*get_direction)(const libtrace_packet_t *packet);
+	/** set the direction of this packet 
+	 * This function pointer may be NULL if the format does not support
+	 * setting a direction.
+	 */ 
 	int8_t (*set_direction)(const libtrace_packet_t *packet, int8_t direction);
+	/** return the erf timestamp of the packet.
+	 * @return the 64bit erf timestamp
+	 * This field may be NULL in the structure, and libtrace will
+	 * synthesise the result from get_timeval or get_seconds if they
+	 * exist.  AT least one of get_erf_timestamp, get_timeval or
+	 * get_seconds must be implemented.
+	 */
 	uint64_t (*get_erf_timestamp)(const libtrace_packet_t *packet);
+	/** return the timeval of this packet.
+	 * @return the timeval
+	 * This field may be NULL in the structure, and libtrace will
+	 * synthesise the result from get_erf_timestamp or get_seconds if they
+	 * exist.  AT least one of get_erf_timestamp, get_timeval or
+	 * get_seconds must be implemented.
+	 */
 	struct timeval (*get_timeval)(const libtrace_packet_t *packet);
+	/** return the timestamp of this packet.
+	 * @return the floating point seconds since 1970-01-01 00:00:00
+	 * This field may be NULL in the structure, and libtrace will
+	 * synthesise the result from get_timeval or get_erf_timestamp if they
+	 * exist.  AT least one of get_erf_timestamp, get_timeval or
+	 * get_seconds must be implemented.
+	 */
 	double (*get_seconds)(const libtrace_packet_t *packet);
+	/** move the pointer within the trace.
+	 * @return 0 on success, -1 on failure.
+	 * The next packet returned by read_packet be the first
+	 * packet in the trace to have a timestamp equal or greater than
+	 * timestamp.
+	 * @note this function may be NULL if the format does not support
+	 * this feature.  If the format implements seek_timeval and/or 
+	 * seek_seconds then libtrace will call those functions instead.
+	 */
 	int (*seek_erf)(libtrace_t *trace, uint64_t timestamp);
+	/** move the pointer within the trace.
+	 * @return 0 on success, -1 on failure.
+	 * The next packet returned by read_packet be the first
+	 * packet in the trace to have a timestamp equal or greater than
+	 * timestamp.
+	 * @note this function may be NULL if the format does not support
+	 * this feature.  If the format implements seek_erf and/or 
+	 * seek_seconds then libtrace will call those functions instead.
+	 */
 	int (*seek_timeval)(libtrace_t *trace, struct timeval tv);
+	/** move the pointer within the trace.
+	 * @return 0 on success, -1 on failure.
+	 * The next packet returned by read_packet be the first
+	 * packet in the trace to have a timestamp equal or greater than
+	 * tv.
+	 * @note this function may be NULL if the format does not support
+	 * this feature.  If the format implements seek_erf and/or 
+	 * seek_timeval then libtrace will call those functions instead.
+	 */
 	int (*seek_seconds)(libtrace_t *trace, double seconds);
+	/** return the captured payload length 
+	 * @return the amount of data captured in a trace.
+	 * This is the number of bytes actually in the trace.  This does not
+	 * include the trace framing length.  This is usually shorter or
+	 * equal to the wire length.
+	 */
 	int (*get_capture_length)(const libtrace_packet_t *packet);
+	/** return the original length of the packet on the wire.
+	 * @return the length of the packet on the wire before truncation.
+	 * This is the number of bytes actually in the trace.  This does not
+	 * include the trace framing length.  This is usually shorter or
+	 * equal to the wire length.
+	 */
 	int (*get_wire_length)(const libtrace_packet_t *packet);
+	/** return the length of the trace framing header
+	 * @return the length of the framing header
+	 * The framing header is the extra metadata a trace stores about
+	 * a packet.  This does not include the wire or capture length
+	 * of the packet.  Usually get_framing_length()+get_capture_length()
+	 * is the size returned by read_packet
+	 */
 	int (*get_framing_length)(const libtrace_packet_t *packet);
+	/** truncate (snap) the packet 
+	 * @returns the new size
+	 * @note This callback may be NULL if not supported.
+	 */
 	size_t (*set_capture_length)(struct libtrace_packet_t *packet,size_t size);
+	/** return the filedescriptor associated with this interface.
+	 * @note This callback may be NULL if not supported.
+	 * This function is only needed if you use trace_event_interface
+	 * as the pointer for trace_event
+	 */
 	int (*get_fd)(const libtrace_t *trace);
+	/** return the next event from this source 
+	 * @note may be NULL if not supported.
+	 */
 	struct libtrace_eventobj_t (*trace_event)(libtrace_t *trace, libtrace_packet_t *packet);	
+	/** return information about this trace format to standard out */
 	void (*help)();
 };
 
