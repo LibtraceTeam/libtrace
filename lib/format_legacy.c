@@ -74,20 +74,14 @@ static struct libtrace_format_t legacypos;
 static struct libtrace_format_t legacyeth;
 static struct libtrace_format_t legacyatm;
 
-#define INPUT libtrace->format_data->input
-#define OUTPUT libtrace->format_data->output
+#define DATA(x) ((struct legacy_format_data_t *)x->format_data)
+
+#define INPUT DATA(libtrace)->input
 #if HAVE_DAG
-#define DAG libtrace->format_data->dag
+#define DAG DATA(libtrace)->dag
 #endif
-#define OPTIONS libtrace->format_data->options
-struct libtrace_format_data_t {
-	union {
-                struct {
-                        char *hostname;
-                        short port;
-                } rt;
-                char *path;		
-        } conn_info;
+
+struct legacy_format_data_t {
 	union {
                 int fd;
 #if HAVE_ZLIB
@@ -98,17 +92,6 @@ struct libtrace_format_data_t {
 #endif
         } input;
 };
-
-struct libtrace_format_data_out_t {
-        union {
-                struct {
-                        char *hostname;
-                        short port;
-                } rt;
-                char *path;
-        } conn_info;
-};
-
 
 static int legacyeth_get_framing_length(const struct libtrace_packet_t *packet UNUSED) 
 {
@@ -127,16 +110,19 @@ static int legacyatm_get_framing_length(const struct libtrace_packet_t *packet U
 
 static int erf_init_input(struct libtrace_t *libtrace) 
 {
-	libtrace->format_data = (struct libtrace_format_data_t *)
-		malloc(sizeof(struct libtrace_format_data_t));
-
-	libtrace->format_data->input.file = trace_open_file(libtrace);
-
-	if (libtrace->format_data->input.file)
-		return 1;
+	libtrace->format_data = malloc(sizeof(struct legacy_format_data_t));
 
 	return 0;
+}
 
+static int erf_start_input(libtrace_t *libtrace)
+{
+	DATA(libtrace)->input.file = trace_open_file(libtrace);
+
+	if (DATA(libtrace)->input.file)
+		return 0;
+
+	return -1;
 }
 
 static int erf_fin_input(struct libtrace_t *libtrace) {
@@ -257,7 +243,7 @@ static struct libtrace_format_t legacyatm = {
 	TRACE_FORMAT_LEGACY_ATM,
 	erf_init_input,			/* init_input */	
 	NULL,				/* config_input */
-	NULL,				/* start_input */
+	erf_start_input,		/* start_input */
 	NULL,				/* pause_input */
 	NULL,				/* init_output */
 	NULL,				/* config_output */
@@ -290,7 +276,7 @@ static struct libtrace_format_t legacyeth = {
 	TRACE_FORMAT_LEGACY_ETH,
 	erf_init_input,			/* init_input */	
 	NULL,				/* config_input */
-	NULL,				/* start_input */
+	erf_start_input,		/* start_input */
 	NULL,				/* pause_input */
 	NULL,				/* init_output */
 	NULL,				/* config_output */
@@ -323,7 +309,7 @@ static struct libtrace_format_t legacypos = {
 	TRACE_FORMAT_LEGACY_POS,
 	erf_init_input,			/* init_input */	
 	NULL,				/* config_input */
-	NULL,				/* start_input */
+	erf_start_input,		/* start_input */
 	NULL,				/* pause_input */
 	NULL,				/* init_output */
 	NULL,				/* config_output */

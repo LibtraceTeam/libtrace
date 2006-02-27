@@ -65,7 +65,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-#define RT_INFO libtrace->format_data
+#define RT_INFO ((struct rt_format_data_t*)libtrace->format_data)
 
 int reliability = 0;
 
@@ -90,7 +90,7 @@ char *rt_deny_reason(uint8_t reason) {
 }
 
 
-struct libtrace_format_data_t {
+struct rt_format_data_t {
 	char *hostname;
 	int port;
 	int input_fd;
@@ -174,8 +174,7 @@ static int rt_connect(struct libtrace_t *libtrace) {
 static int rt_init_input(struct libtrace_t *libtrace) {
         char *scan;
         char *uridata = libtrace->uridata;
-        libtrace->format_data = (struct libtrace_format_data_t *)
-                malloc(sizeof(struct libtrace_format_data_t));
+        libtrace->format_data = malloc(sizeof(struct rt_format_data_t));
 
 	RT_INFO->dummy_erf = NULL;
 	RT_INFO->dummy_pcap = NULL;
@@ -485,7 +484,7 @@ static int rt_get_framing_length(const struct libtrace_packet_t *packet) {
 
 
 static int rt_get_fd(const struct libtrace_t *trace) {
-        return trace->format_data->input_fd;
+        return ((struct rt_format_data_t *)trace->format_data)->input_fd;
 }
 
 

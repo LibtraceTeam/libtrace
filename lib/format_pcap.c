@@ -68,11 +68,12 @@
 static struct libtrace_format_t pcap;
 static struct libtrace_format_t pcapint;
 
-#define DATA(x) ((struct libtrace_format_data_t*)((x)->format_data))
+#define DATA(x) ((struct pcap_format_data_t*)((x)->format_data))
+#define DATAOUT(x) ((struct pcap_format_data_out_t*)((x)->format_data))
 
-#define INPUT libtrace->format_data->input
-#define OUTPUT libtrace->format_data->output
-struct libtrace_format_data_t {
+#define INPUT DATA(libtrace)->input
+#define OUTPUT DATAOUT(libtrace)->output
+struct pcap_format_data_t {
 	union {
                 char *path;		/**< information for local sockets */
                 char *interface;	/**< intormation for reading of network
@@ -87,7 +88,7 @@ struct libtrace_format_data_t {
 	int promisc;
 };
 
-struct libtrace_format_data_out_t {
+struct pcap_format_data_out_t {
 	union {
 		char *path;
 		char *interface;
@@ -102,8 +103,7 @@ struct libtrace_format_data_out_t {
 };
 
 static int pcap_init_input(struct libtrace_t *libtrace) {
-	libtrace->format_data = (struct libtrace_format_data_t *) 
-		malloc(sizeof(struct libtrace_format_data_t));
+	libtrace->format_data = malloc(sizeof(struct pcap_format_data_t));
 
 	INPUT.pcap = NULL;
 	DATA(libtrace)->filter = NULL;
@@ -162,16 +162,14 @@ static int pcap_pause_input(libtrace_t *libtrace) {
 }
 
 static int pcap_init_output(struct libtrace_out_t *libtrace) {
-	libtrace->format_data = (struct libtrace_format_data_out_t *)
-		malloc(sizeof(struct libtrace_format_data_out_t));
+	libtrace->format_data = malloc(sizeof(struct pcap_format_data_out_t));
 	OUTPUT.trace.pcap = NULL;
 	OUTPUT.trace.dump = NULL;
 	return 0;
 }
 
 static int pcapint_init_input(struct libtrace_t *libtrace) {
-	libtrace->format_data = (struct libtrace_format_data_t *) 
-		malloc(sizeof(struct libtrace_format_data_t));
+	libtrace->format_data = malloc(sizeof(struct pcap_format_data_t));
 	DATA(libtrace)->filter = NULL;
 	DATA(libtrace)->snaplen = LIBTRACE_PACKET_BUFSIZE;
 	DATA(libtrace)->promisc = 0;
@@ -224,28 +222,20 @@ static int pcapint_start_input(libtrace_t *libtrace) {
 	return 1;
 }
 
-static int pcapint_init_output(struct libtrace_out_t *libtrace) {
-	trace_set_err_out(libtrace,TRACE_ERR_NO_INIT_OUT,
-			"Writing to a pcap interface not implemented yet");
-	return -1;
-}
-
 static int pcap_fin_input(struct libtrace_t *libtrace) {
-	pcap_close(INPUT.pcap);
+	/* we don't need to close the pcap object since libtrace will have
+	 * paused the trace for us.
+	 */
 	free(libtrace->format_data);
 	return 0;
 }
 
-static int pcap_fin_output(struct libtrace_out_t *libtrace) {
+static int pcap_fin_output(libtrace_out_t *libtrace) {
 	pcap_dump_flush(OUTPUT.trace.dump);
 	pcap_dump_close(OUTPUT.trace.dump);
 	pcap_close(OUTPUT.trace.pcap);
 	free(libtrace->format_data);
 	return 0;
-}
-
-static int pcapint_fin_output(struct libtrace_out_t *libtrace __attribute__((unused))) {
-	return -1;
 }
 
 static void trace_pcap_handler(u_char *user, const struct pcap_pkthdr *pcaphdr, const u_char *pcappkt) {
@@ -287,16 +277,21 @@ static int pcap_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_
 	return ((struct pcap_pkthdr*)packet->header)->len+sizeof(struct pcap_pkthdr);
 }
 
-static int pcap_write_packet(struct libtrace_out_t *libtrace, const struct libtrace_packet_t *packet) {
+static int pcap_start_output(libtrace_out_t *libtrace)
+{
+	assert(!OUTPUT.trace.dump);
+	OUTPUT.trace.dump = pcap_dump_open(OUTPUT.trace.pcap,
+			libtrace->uridata);
+	fflush((FILE *)OUTPUT.trace.dump);
+}
+
+static int pcap_write_packet(libtrace_out_t *libtrace, const libtrace_packet_t *packet) {
 	struct pcap_pkthdr pcap_pkt_hdr;
 
 	if (!OUTPUT.trace.pcap) {
 		OUTPUT.trace.pcap = (pcap_t *)pcap_open_dead(
 			libtrace_to_pcap_dlt(trace_get_link_type(packet)),
 			65536);
-		OUTPUT.trace.dump = pcap_dump_open(OUTPUT.trace.pcap,
-				libtrace->uridata);
-		fflush((FILE *)OUTPUT.trace.dump);
 	}
 	if (libtrace->format == &pcap || 
 			libtrace->format == &pcapint) {
@@ -317,17 +312,11 @@ static int pcap_write_packet(struct libtrace_out_t *libtrace, const struct libtr
 	return 0;
 }
 
-static int pcapint_write_packet(struct libtrace_out_t *libtrace __attribute__((unused)), const struct libtrace_packet_t *packet __attribute__((unused))) {
-
-	assert(0);
-	return 0;
-}
-
 static libtrace_linktype_t pcap_get_link_type(const struct libtrace_packet_t *packet) {
 	struct pcap_pkthdr *pcapptr = 0;
 	int linktype = 0;
 	pcapptr = (struct pcap_pkthdr *)packet->header;
-	linktype = pcap_datalink(packet->trace->format_data->input.pcap);
+	linktype = pcap_datalink(DATA(packet->trace)->input.pcap);
 	return pcap_dlt_to_libtrace(linktype);
 }
 
@@ -429,7 +418,7 @@ static size_t pcap_set_capture_length(libtrace_packet_t *packet,size_t size) {
 }
 
 static int pcap_get_fd(const libtrace_t *trace) {
-	return pcap_fileno(trace->format_data->input.pcap);
+	return pcap_fileno(DATA(trace)->input.pcap);
 }
 
 static void pcap_help() {
@@ -462,12 +451,12 @@ static struct libtrace_format_t pcap = {
 	"$Id$",
 	TRACE_FORMAT_PCAP,
 	pcap_init_input,		/* init_input */
-	NULL,				/* config_input */
+	pcap_config_input,		/* config_input */
 	pcap_start_input,		/* start_input */
 	pcap_pause_input,		/* pause_input */
 	pcap_init_output,		/* init_output */
 	NULL,				/* config_output */
-	NULL,				/* start_output */
+	pcap_start_output,		/* start_output */
 	pcap_fin_input,			/* fin_input */
 	pcap_fin_output,		/* fin_output */
 	pcap_read_packet,		/* read_packet */
@@ -498,13 +487,13 @@ static struct libtrace_format_t pcapint = {
 	pcapint_config_input,		/* config_input */
 	pcapint_start_input,		/* start_input */
 	pcap_pause_input,		/* pause_input */
-	pcapint_init_output,		/* init_output */
+	NULL,				/* init_output */
 	NULL,				/* config_output */
 	NULL,				/* start_output */
 	pcap_fin_input,			/* fin_input */
-	pcapint_fin_output,		/* fin_output */
+	NULL,				/* fin_output */
 	pcap_read_packet,		/* read_packet */
-	pcapint_write_packet,		/* write_packet */
+	NULL,				/* write_packet */
 	pcap_get_link_type,		/* get_link_type */
 	pcap_get_direction,		/* get_direction */
 	NULL,				/* set_direction */

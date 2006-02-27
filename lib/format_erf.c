@@ -71,13 +71,15 @@ static struct libtrace_format_t rtclient;
 static struct libtrace_format_t dag;
 #endif 
 
-#define CONNINFO libtrace->format_data->conn_info
-#define INPUT libtrace->format_data->input
-#define OUTPUT libtrace->format_data->output
+#define DATA(x) ((struct libtrace_format_data_t *)x->format_data)
+#define DATAOUT(x) ((struct libtrace_format_data_out_t *)x->format_data)
+#define CONNINFO DATA(libtrace)->conn_info
+#define INPUT DATA(libtrace)->input
+#define OUTPUT DATAOUT(libtrace)->output
 #if HAVE_DAG
-#define DAG libtrace->format_data->dag
+#define DAG DATA(libtrace)->dag
 #endif
-#define OPTIONS libtrace->format_data->options
+#define OPTIONS DATAOUT(libtrace)->options
 struct libtrace_format_data_t {
 	union {
                 struct {
@@ -205,51 +207,54 @@ static int erf_init_input(struct libtrace_t *libtrace)
 
 static int erf_start_input(struct libtrace_t *libtrace)
 {
-	libtrace->format_data->input.file = trace_open_file(libtrace);
+	INPUT.file = trace_open_file(libtrace);
 
-	if (libtrace->format_data->input.file)
-		return 1;
+	if (!INPUT.file)
+		return -1;
 
 	return 0;
 }
 
 static int rtclient_init_input(struct libtrace_t *libtrace) {
 	char *scan;
-	char *uridata = libtrace->uridata;
-	struct hostent *he;
-	struct sockaddr_in remote;
 	libtrace->format_data = (struct libtrace_format_data_t *)
 		malloc(sizeof(struct libtrace_format_data_t));
 
 
-	if (strlen(uridata) == 0) {
+	if (strlen(libtrace->uridata) == 0) {
 		CONNINFO.rt.hostname = 
 			strdup("localhost");
 		CONNINFO.rt.port = 
 			COLLECTOR_PORT;
 	} else {
-		if ((scan = strchr(uridata,':')) == NULL) {
+		if ((scan = strchr(libtrace->uridata,':')) == NULL) {
 			CONNINFO.rt.hostname = 
-				strdup(uridata);
+				strdup(libtrace->uridata);
 			CONNINFO.rt.port =
 				COLLECTOR_PORT;
 		} else {
 			CONNINFO.rt.hostname = 
-				(char *)strndup(uridata,
-						(scan - uridata));
+				(char *)strndup(libtrace->uridata,
+						(scan - libtrace->uridata));
 			CONNINFO.rt.port = 
 				atoi(++scan);
 		}
 	}
 	
+}
+
+static int rtclient_start_input(libtrace_t *libtrace)
+{
+	struct hostent *he;
+	struct sockaddr_in remote;
 	if ((he=gethostbyname(CONNINFO.rt.hostname)) == NULL) {  
 		trace_set_err(libtrace,errno,"failed to resolve %s",
 				CONNINFO.rt.hostname);
-		return 0;
+		return -1;
 	} 
 	if ((INPUT.fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
 		trace_set_err(libtrace,errno,"socket(AF_INET,SOCK_STREAM)");
-		return 0;
+		return -1;
 	}
 
 	remote.sin_family = AF_INET;   
@@ -263,7 +268,7 @@ static int rtclient_init_input(struct libtrace_t *libtrace) {
 				CONNINFO.rt.hostname);
 		return 0;
 	}
-	return 1;
+	return -1;
 }
 
 static int erf_init_output(struct libtrace_out_t *libtrace) {
@@ -682,12 +687,12 @@ static size_t erf_set_capture_length(struct libtrace_packet_t *packet, size_t si
 	return trace_get_capture_length(packet);
 }
 
-static int rtclient_get_fd(const libtrace_t *trace) {
-	return trace->format_data->input.fd;
+static int rtclient_get_fd(const libtrace_t *libtrace) {
+	return INPUT.fd;
 }
 
-static int erf_get_fd(const libtrace_t *trace) {
-	return trace->format_data->input.fd;
+static int erf_get_fd(const libtrace_t *libtrace) {
+	return INPUT.fd;
 }
 
 #ifdef HAVE_DAG
@@ -840,7 +845,7 @@ static struct libtrace_format_t rtclient = {
 	TRACE_FORMAT_ERF,
 	rtclient_init_input,		/* init_input */	
 	NULL,				/* config_input */
-	NULL,				/* start_input */
+	rtclient_start_input,		/* start_input */
 	NULL,				/* pause_input */
 	NULL,				/* init_output */
 	NULL,				/* config_output */

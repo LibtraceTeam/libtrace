@@ -486,6 +486,8 @@ int trace_config_output(struct libtrace_out_t *libtrace,
  */
 void trace_destroy(struct libtrace_t *libtrace) {
         assert(libtrace);
+	if (libtrace->started && libtrace->format->pause_input)
+		libtrace->format->pause_input(libtrace);
 	libtrace->format->fin_input(libtrace);
         /* need to free things! */
         free(libtrace->uridata);

@@ -94,7 +94,7 @@ struct libtrace_event_t {
  */
 struct libtrace_t {
 	struct libtrace_format_t *format; /**< format driver pointer */
-	struct libtrace_format_data_t *format_data; /**<format data pointer */
+	void *format_data; /**<format data pointer */
 	bool started;			/**< if this trace has started */
 	libtrace_err_t err;		/**< error information */
 	struct libtrace_event_t event;	/**< the next event */
@@ -180,7 +180,10 @@ struct libtrace_format_t {
 	 */
 	int (*start_output)(libtrace_out_t *libtrace);
 	/** @} */
-	/** finish an input trace, cleanup (or NULL if input not supported) */
+	/** finish an input trace, cleanup (or NULL if input not supported) 
+	 * if the trace is not paused, libtrace will pause the trace before
+	 * calling this function.
+	 */
 	int (*fin_input)(libtrace_t *libtrace);
 	/** finish an output trace, cleanup (or NULL if output not supported) */
 	int (*fin_output)(libtrace_out_t *libtrace);
@@ -199,13 +202,11 @@ struct libtrace_format_t {
 	 */ 
 	libtrace_linktype_t (*get_link_type)(const libtrace_packet_t *packet);
 	/** return the direction of this packet 
-	 * This function pointer may be NULL if the format does not support
-	 * getting a direction.
+	 * @note This callback may be NULL if not supported.
 	 */ 
 	int8_t (*get_direction)(const libtrace_packet_t *packet);
 	/** set the direction of this packet 
-	 * This function pointer may be NULL if the format does not support
-	 * setting a direction.
+	 * @note This callback may be NULL if not supported.
 	 */ 
 	int8_t (*set_direction)(const libtrace_packet_t *packet, int8_t direction);
 	/** return the erf timestamp of the packet.

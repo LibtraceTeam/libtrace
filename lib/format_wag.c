@@ -78,14 +78,14 @@
 static struct libtrace_format_t wag;
 static struct libtrace_format_t wag_trace;
 
-#define INPUT libtrace->format_data->input
-#define OUTPUT libtrace->format_data->output
-#define OPTIONS libtrace->format_data->options
+#define DATA(x) 	((struct wag_format_data_t *)x->format_data)
+#define DATAOUT(x) 	((struct wag_format_data_out_t *)x->format_data)
 
-struct libtrace_format_data_t {
-	union {
-                char *path;		/**< information for local sockets */
-        } conn_info;
+#define INPUT DATA(libtrace)->input
+#define OUTPUT DATAOUT(libtrace)->output
+#define OPTIONS DATAOUT(libtrace)->options
+
+struct wag_format_data_t {
 	/** Information about the current state of the input device */
         union {
                 int fd;
@@ -97,10 +97,7 @@ struct libtrace_format_data_t {
         } input;	
 };
 
-struct libtrace_format_data_out_t {
-	union {
-		char *path;
-	} conn_info;
+struct wag_format_data_out_t {
 	union {
 		struct {
 			int level;
@@ -117,50 +114,49 @@ struct libtrace_format_data_out_t {
 	} output;
 };
 
-static int wag_init_input(struct libtrace_t *libtrace) {
-	struct stat buf;
-	libtrace->format_data = (struct libtrace_format_data_t *) 
-		calloc(1,sizeof(struct libtrace_format_data_t));
-	
-	if (stat(libtrace->uridata,&buf) == -1 ) {
-		trace_set_err(libtrace,errno,"stat(%s)",libtrace->uridata);
-		return 0;
-	}
-	if (S_ISCHR(buf.st_mode)) {
-				
-		INPUT.fd = open(libtrace->uridata, O_RDONLY);
-
-	} else {
-		trace_set_err(libtrace,TRACE_ERR_INIT_FAILED,
-				"%s is not a valid char device",
-				libtrace->uridata);
-		return 0;
-		
-	}
-	return 1;
-}
-
-static int wtf_init_input(struct libtrace_t *libtrace) 
-{
-	libtrace->format_data = (struct libtrace_format_data_t *)
-		malloc(sizeof(struct libtrace_format_data_t));
-
-	return 1;
-}
-
-static int wtf_start_input(libtrace_t *libtrace)
-{
-	libtrace->format_data->input.file = trace_open_file(libtrace);
-
-	if (libtrace->format_data->input.file)
-		return 1;
+static int wag_init_input(libtrace_t *libtrace) {
+	libtrace->format_data = calloc(1, sizeof(struct wag_format_data_t));
 
 	return 0;
 }
 
+static int wag_start_input(libtrace_t *libtrace)
+{
+	struct stat buf;
+	if (stat(libtrace->uridata,&buf) == -1 ) {
+		trace_set_err(libtrace,errno,"stat(%s)",libtrace->uridata);
+		return -1;
+	}
+	if (S_ISCHR(buf.st_mode)) {
+		INPUT.fd = open(libtrace->uridata, O_RDONLY);
+	} else {
+		trace_set_err(libtrace,TRACE_ERR_INIT_FAILED,
+				"%s is not a valid char device",
+				libtrace->uridata);
+		return -1;
+	}
+	return 0;
+}
+
+static int wtf_init_input(struct libtrace_t *libtrace) 
+{
+	libtrace->format_data = malloc(sizeof(struct wag_format_data_t));
+
+	return 0;
+}
+
+static int wtf_start_input(libtrace_t *libtrace)
+{
+	DATA(libtrace)->input.file = trace_open_file(libtrace);
+
+	if (DATA(libtrace)->input.file)
+		return 0;
+
+	return -1;
+}
+
 static int wtf_init_output(struct libtrace_out_t *libtrace) {
-	libtrace->format_data = (struct libtrace_format_data_out_t *)
-		calloc(1,sizeof(struct libtrace_format_data_out_t));
+	libtrace->format_data = calloc(1,sizeof(struct wag_format_data_out_t));
 
 	OUTPUT.file = 0;
 	OPTIONS.zlib.level = 0;
@@ -204,8 +200,12 @@ static int wtf_config_output(struct libtrace_out_t *libtrace,
 	}
 }
 
-static int wag_fin_input(struct libtrace_t *libtrace) {
+static int wag_pause_input(libtrace_t *libtrace)
+{
 	close(INPUT.fd);
+}
+
+static int wag_fin_input(struct libtrace_t *libtrace) {
 	free(libtrace->format_data);
 	return 0;
 }
@@ -416,7 +416,7 @@ static int wag_get_framing_length(const struct libtrace_packet_t *packet) {
 }
 
 static int wag_get_fd(const libtrace_t *trace) {
-	return trace->format_data->input.fd;
+	return DATA(trace)->input.fd;
 }
 
 static void wag_help() {
@@ -453,8 +453,8 @@ static struct libtrace_format_t wag = {
 	TRACE_FORMAT_WAG,
 	wag_init_input,			/* init_input */	
 	NULL,				/* config_input */
-	NULL,				/* start_input */
-	NULL,				/* pause_input */
+	wag_start_input,		/* start_input */
+	wag_pause_input,		/* pause_input */
 	NULL,				/* init_output */
 	NULL,				/* config_output */
 	NULL,				/* start_output */
