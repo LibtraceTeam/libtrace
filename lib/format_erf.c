@@ -115,8 +115,6 @@ struct erf_format_data_out_t {
                 char *path;
         } conn_info;
 
-
-
 	union {
 		struct {
 			int level;

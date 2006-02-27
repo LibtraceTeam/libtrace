@@ -71,9 +71,9 @@ typedef struct rt_end_data {
 
 } rt_end_data_t;
 
-typedef struct rt_close {
+ typedef struct rt_close {
 
-} rt_close_t;
+} rt_close_t; 
 
 
 /* Connection denied reasons */

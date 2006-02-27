@@ -63,8 +63,10 @@ struct tracefifo_t {
         void *base;
 };
 
-#define MIN(a,b) ({ int _a = a; int _b = b; (_a < _b) ? _a : _b; })
-
+/* This MIN is more generic but not as portable
+ * #define MIN(a,b) ({ int _a = a; int _b = b; (_a < _b) ? _a : _b; })
+ */
+#define MIN(a,b) ((a)<(b)?(a):(b))
 
 static char *tracefifo_stat_buffer = 0;
 
@@ -206,7 +208,7 @@ void tracefifo_stat(struct tracefifo_t *fifo, char *desc, int delta)
  * the fault of this function */
 static int tracefifo_read_generic(struct tracefifo_t *fifo, void *buffer, size_t len, enum which_t which, char update) {
         size_t oldptr;
-        int lenleft;
+        size_t lenleft;
         int size;
         assert(fifo);
         assert(buffer);
@@ -231,7 +233,7 @@ static int tracefifo_read_generic(struct tracefifo_t *fifo, void *buffer, size_t
 
 int tracefifo_write(struct tracefifo_t *fifo, void *buffer, size_t len) {
         int lenleft;
-        int size;
+        size_t size;
         assert(fifo);
         assert(buffer);
 
