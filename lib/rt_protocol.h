@@ -10,9 +10,7 @@
 #define MAX_SEQUENCE 2147483647 
 
 /* Type field definitions */
-/* NOTE: RT_DATA should always be zero */
 enum rt_field_t {
- RT_DATA	=0, 	/* Libtrace data packet */
  RT_HELLO       =1,     /* Connection accepted */
  RT_START	=2,	/* Request for data transmission to begin */
  RT_ACK		=3,	/* Data acknowledgement */
@@ -23,7 +21,14 @@ enum rt_field_t {
  RT_DENY_CONN	=8,	/* Connection has been denied */
  RT_PAUSE	=9,	/* Request server to suspend sending data */
  RT_PAUSE_ACK	=10,	/* Server is paused message */
- RT_OPTION	=11	/* Option request */
+ RT_OPTION	=11,	/* Option request */
+ 
+ RT_DATA_ERF		=12,	/* Erf data packet */
+ RT_DATA_PCAP		=13, 	/* Pcap data packet */
+ RT_DATA_WAG		=14, 	/* Wag data packet */
+ RT_DATA_LEGACY_ATM	=15, 	/* Legacy ATM packet */
+ RT_DATA_LEGACY_POS	=16,	/* Legacy POS packet */
+ RT_DATA_LEGACY_ETH	=17	/* Legacy ETH packet */
 };
 
 typedef struct fifo_info {
@@ -38,12 +43,8 @@ typedef struct fifo_info {
 typedef struct rt_header {
 	enum rt_field_t type;
 	uint16_t length;
-} rt_header_t;
-
-typedef struct rt_data {
-	uint16_t format;
 	uint32_t sequence;
-} rt_data_t;
+} rt_header_t;
 
 /* TODO: Reorganise this struct once more hello info is added */
 typedef struct rt_hello {

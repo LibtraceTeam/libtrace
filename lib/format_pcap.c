@@ -273,7 +273,9 @@ static void trace_pcap_handler(u_char *user, const struct pcap_pkthdr *pcaphdr, 
 
 static int pcap_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
 	int pcapbytes = 0;
-
+	
+	packet->type = RT_DATA_PCAP;
+	
 	pcapbytes = pcap_dispatch(INPUT.pcap,
 					1, /* number of packets */
 					&trace_pcap_handler,

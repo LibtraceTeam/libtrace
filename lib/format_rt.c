@@ -162,9 +162,6 @@ static int rt_connect(struct libtrace_t *libtrace) {
 			reliability = hello_opts.reliable;
 			
 			return 1;
-		case RT_DATA:
-			printf("Server needs to send RT_HELLO before sending data to clients\n");
-			return 0;
 		default:
 			printf("Unexpected message type: %d\n", connect_msg.type);
 			return 0;
@@ -216,7 +213,8 @@ static int rt_start_input(struct libtrace_t *libtrace) {
 	printf("Sending start - len: %d\n", start_msg.length);
 	
 	/* Need to send start message to server */
-	if (send(RT_INFO->input_fd, &start_msg, sizeof(rt_header_t), 0) != sizeof(rt_header_t)) {
+	if (send(RT_INFO->input_fd, &start_msg, sizeof(rt_header_t) +
+				start_msg.length, 0) != sizeof(rt_header_t)) {
 		printf("Failed to send start message to server\n");
 		return -1;
 	}
@@ -231,7 +229,8 @@ static int rt_fin_input(struct libtrace_t *libtrace) {
 	close_msg.length = sizeof(rt_close_t);
 	
 	/* Send a close message to the server */
-	if (send(RT_INFO->input_fd, &close_msg, sizeof(rt_header_t), 0) != sizeof(rt_header_t)) {
+	if (send(RT_INFO->input_fd, &close_msg, sizeof(rt_header_t) + 
+				close_msg.length, 0) != sizeof(rt_header_t)) {
 		printf("Failed to send close message to server\n");
 	
 	}
@@ -276,55 +275,50 @@ static int rt_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
 
 
 static int rt_set_format(struct libtrace_t *libtrace, 
-		struct libtrace_packet_t *packet, uint16_t format) {
-	switch (format) {
-		case TRACE_FORMAT_ERF:
+		struct libtrace_packet_t *packet) {
+	switch (packet->type) {
+		case RT_DATA_ERF:
 			if (!RT_INFO->dummy_erf) {
 				RT_INFO->dummy_erf = trace_create_dead("erf:-");
 			}
 			packet->trace = RT_INFO->dummy_erf;
 			break;
-		case TRACE_FORMAT_PCAP:
+		case RT_DATA_PCAP:
 			if (!RT_INFO->dummy_pcap) {
 				RT_INFO->dummy_pcap = trace_create_dead("pcap:-");
 			}
 			packet->trace = RT_INFO->dummy_pcap;
 			break;
-		case TRACE_FORMAT_WAG:
+		case RT_DATA_WAG:
 			if (!RT_INFO->dummy_wag) {
 				RT_INFO->dummy_wag = trace_create_dead("wtf:-");
 			}
 			packet->trace = RT_INFO->dummy_wag;
 			break;
-		case TRACE_FORMAT_RT:
-			printf("Format in a data packet should NOT be set to RT\n");
-			return -1;
-		case TRACE_FORMAT_LEGACY_ETH:
-		case TRACE_FORMAT_LEGACY_ATM:
-		case TRACE_FORMAT_LEGACY_POS:
+		case RT_DATA_LEGACY_ETH:
+		case RT_DATA_LEGACY_ATM:
+		case RT_DATA_LEGACY_POS:
 			printf("Sending legacy over RT is currently not supported\n");
 			return -1;
 		default:
-			printf("Unrecognised format: %d\n", format);
+			printf("Unrecognised format: %d\n", packet->type);
 			return -1;
 	}
 	return 1;
 }		
 
-static void rt_set_payload(struct libtrace_packet_t *packet, uint16_t format) {
+static void rt_set_payload(struct libtrace_packet_t *packet) {
 	dag_record_t *erfptr;
 	
-	switch (format) {
-		case TRACE_FORMAT_ERF:
+	switch (packet->type) {
+		case RT_DATA_ERF:
 			erfptr = (dag_record_t *)packet->header;
 			
 			if (erfptr->flags.rxerror == 1) {
 				packet->payload = NULL;
-			} else {
-				packet->payload = (char *)packet->buffer
-					+ trace_get_framing_length(packet);
+				break;
 			}
-			break;
+			/* else drop into the default case */
 		default:
 			packet->payload = (char *)packet->buffer +
 				trace_get_framing_length(packet);
@@ -386,7 +380,6 @@ static int rt_read_packet(struct libtrace_t *libtrace,
 	char msg_buf[RP_BUFSIZE];
 	int pkt_size = 0;
 	
-	rt_data_t data_hdr;
         void *buffer = 0;
 
         if (packet->buf_control == TRACE_CTRL_EXTERNAL || !packet->buffer) {
@@ -408,30 +401,26 @@ static int rt_read_packet(struct libtrace_t *libtrace,
 	pkt_size = pkt_hdr.length;
 
 	switch(packet->type) {
-		case RT_DATA:	
-			if (rt_read(libtrace, &data_hdr, sizeof(rt_data_t))
-					!= sizeof(rt_data_t)) {
-				printf("Error receiving rt data header\n");
-				return -1;
-			}
-			
-			if (rt_read(libtrace, buffer, 
-					pkt_size - sizeof(rt_data_t)) !=
-					pkt_size - sizeof(rt_data_t)) {
+		case RT_DATA_ERF:
+		case RT_DATA_PCAP:
+		case RT_DATA_WAG:
+		case RT_DATA_LEGACY_ETH:
+		case RT_DATA_LEGACY_POS:
+		case RT_DATA_LEGACY_ATM:
+			if (rt_read(libtrace, buffer, pkt_size) != pkt_size) {
 				printf("Error receiving packet\n");
 				return -1;
 			}
 			
-			if (rt_set_format(libtrace, packet,
-                        		data_hdr.format) < 0) {
+			if (rt_set_format(libtrace, packet) < 0) {
                         	return -1;
                         }
-                       	rt_set_payload(packet, data_hdr.format);
+                       	rt_set_payload(packet);
 
                         if (reliability > 0) {
 	                        
 				if (rt_send_ack(libtrace, packet,
-                                       data_hdr.sequence) == -1)
+                                       pkt_hdr.sequence) == -1)
 				{
                                 	return -1;
                                 }
@@ -460,6 +449,40 @@ static int rt_read_packet(struct libtrace_t *libtrace,
 	return 1;
 	
 }
+
+static int rt_get_capture_length(const struct libtrace_packet_t *packet) {
+	switch (packet->type) {
+		case RT_DUCK:
+			return sizeof(rt_duck_t);
+		case RT_STATUS:
+			return sizeof(rt_status_t);
+		case RT_HELLO:
+			return sizeof(rt_hello_t);
+		case RT_START:
+			return sizeof(rt_start_t);
+		case RT_ACK:
+			return sizeof(rt_ack_t);
+		case RT_END_DATA:
+			return sizeof(rt_end_data_t);
+		case RT_CLOSE:
+			return sizeof(rt_close_t);
+		case RT_DENY_CONN:
+			return sizeof(rt_deny_conn_t);
+		case RT_PAUSE:
+			return sizeof(rt_pause_t);
+		case RT_PAUSE_ACK:
+			return sizeof(rt_pause_ack_t);
+		case RT_OPTION:
+			return sizeof(rt_option_t);
+	}
+	printf("Unknown type: %d\n", packet->type);
+	return 0;
+}
+			
+static int rt_get_framing_length(const struct libtrace_packet_t *packet) {
+	return 0;
+}
+
 
 static int rt_get_fd(const struct libtrace_t *trace) {
         return trace->format_data->input_fd;
@@ -504,9 +527,9 @@ static struct libtrace_format_t rt = {
 	NULL,				/* seek_erf */
 	NULL,				/* seek_timeval */
 	NULL,				/* seek_seconds */
-        NULL,         			/* get_capture_length */
+        rt_get_capture_length,        	/* get_capture_length */
         NULL,            		/* get_wire_length */
-        NULL,         			/* get_framing_length */
+        rt_get_framing_length, 		/* get_framing_length */
         NULL,         			/* set_capture_length */
         rt_get_fd,                	/* get_fd */
         trace_event_device,             /* trace_event */

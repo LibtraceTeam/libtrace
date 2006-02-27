@@ -563,8 +563,8 @@ int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	/* Store the trace we are reading from into the packet opaque 
 	 * structure */
 	packet->trace = libtrace;
-	packet->type = RT_DATA;
-	
+
+
 	if (libtrace->format->read_packet) {
 		do {
 			packet->size=libtrace->format->read_packet(libtrace,packet);

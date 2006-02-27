@@ -359,7 +359,9 @@ static int dag_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 		free(packet->buffer);
 		packet->buffer = 0;
 	}
-   
+ 	
+	packet->type = RT_DATA_ERF;
+	
 	if ((numbytes = dag_read(libtrace,0)) <= 0) 
 		return numbytes;
 
@@ -401,6 +403,7 @@ static int erf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 	}
 
 	packet->header = packet->buffer;
+	packet->type = RT_DATA_ERF;
 
 	if ((numbytes=LIBTRACE_READ(INPUT.file,
 					packet->buffer,
@@ -478,6 +481,8 @@ static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_pac
 
 	buffer = packet->buffer;
 	packet->header = packet->buffer;
+	
+	packet->type = RT_DATA_ERF;
 
 	
 	do {
