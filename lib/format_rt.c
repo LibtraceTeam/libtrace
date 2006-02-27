@@ -373,10 +373,7 @@ static int rt_send_ack(struct libtrace_t *libtrace,
 static int rt_read_packet(struct libtrace_t *libtrace, 
 		struct libtrace_packet_t *packet) {
         
-        char buf[RP_BUFSIZE];
-        int read_required = 0;
 	rt_header_t pkt_hdr;
-	char msg_buf[RP_BUFSIZE];
 	int pkt_size = 0;
 	
         void *buffer = 0;

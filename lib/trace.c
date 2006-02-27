@@ -291,6 +291,7 @@ struct libtrace_t *trace_create(const char *uri) {
 	libtrace->event.tdelta = 0.0;
 	libtrace->filter = NULL;
 	libtrace->snaplen = 0;
+	libtrace->started=false;
 
 	for (i = 0; i < nformats; i++) {
 		if (strlen(scan) == strlen(format_list[i]->name) &&
@@ -329,9 +330,13 @@ struct libtrace_t *trace_create(const char *uri) {
 	
 
         libtrace->fifo = create_tracefifo(1048576);
+	if (!libtrace->fifo) {
+		trace_set_err(libtrace,ENOMEM,"Could not allocate memory for fifo");
+		free(scan);
+		return libtrace;
+	}
 	assert(libtrace->fifo);
 	free(scan);
-	libtrace->started=false;
 	trace_set_err(libtrace,0,"");
         return libtrace;
 }
@@ -593,6 +598,8 @@ libtrace_packet_t *trace_copy_packet(const libtrace_packet_t *packet) {
 	dest->buf_control=TRACE_CTRL_PACKET;
 	memcpy(dest->header,packet->header,trace_get_framing_length(packet));
 	memcpy(dest->payload,packet->payload,trace_get_capture_length(packet));
+
+	return dest;
 }
 
 /** Destroy a packet object
@@ -630,7 +637,7 @@ int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	if (libtrace->format->read_packet) {
 		do {
 			packet->size=libtrace->format->read_packet(libtrace,packet);
-			if (packet->size==-1 || packet->size==0)
+			if (packet->size==(size_t)-1 || packet->size==0)
 				return packet->size;
 			if (libtrace->filter) {
 				/* If the filter doesn't match, read another
@@ -1168,7 +1175,7 @@ double trace_get_seconds(const struct libtrace_packet_t *packet) {
 	return seconds;
 }
 
-int trace_get_capture_length(const struct libtrace_packet_t *packet) {
+size_t trace_get_capture_length(const libtrace_packet_t *packet) {
 
 	assert(packet->size>0 && packet->size<65536);
 
@@ -1187,7 +1194,7 @@ int trace_get_capture_length(const struct libtrace_packet_t *packet) {
  * @note Due to the trace being a header capture, or anonymisation this may
  * not be the same as the Capture Len.
  */ 
-int trace_get_wire_length(const struct libtrace_packet_t *packet){
+size_t trace_get_wire_length(const libtrace_packet_t *packet){
 	assert(packet->size>0 && packet->size<65536);
 
 	if (packet->trace->format->get_wire_length) {
@@ -1206,7 +1213,7 @@ int trace_get_wire_length(const struct libtrace_packet_t *packet){
  * captured packet in memory, and the captured length of the packet
  */ 
 SIMPLE_FUNCTION
-int trace_get_framing_length(const libtrace_packet_t *packet) {
+size_t trace_get_framing_length(const libtrace_packet_t *packet) {
 	if (packet->trace->format->get_framing_length) {
 		return packet->trace->format->get_framing_length(packet);
 	}

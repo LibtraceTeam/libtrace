@@ -184,7 +184,7 @@ static int wtf_config_output(struct libtrace_out_t *libtrace,
 			OPTIONS.zlib.level = *(int*)value;
 			assert(OPTIONS.zlib.level>=0 
 					&& OPTIONS.zlib.level<=9);
-			break;
+			return 0;
 #else
 		case TRACE_OPTION_OUTPUT_COMPRESS:
 			/* E feature unavailable */
@@ -203,6 +203,8 @@ static int wtf_config_output(struct libtrace_out_t *libtrace,
 static int wag_pause_input(libtrace_t *libtrace)
 {
 	close(INPUT.fd);
+
+	return 0;
 }
 
 static int wag_fin_input(struct libtrace_t *libtrace) {
@@ -223,12 +225,10 @@ static int wtf_fin_output(struct libtrace_out_t *libtrace) {
 }
 
 static int wag_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
-        int numbytes;
-        int framesize;
+        size_t framesize;
         char *buf_ptr = (char *)buffer;
         int to_read = 0;
         uint16_t magic = 0;
-        uint16_t lctr = 0;
 
         assert(libtrace);
 

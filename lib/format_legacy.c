@@ -151,6 +151,8 @@ static int legacy_read_packet(struct libtrace_t *libtrace, struct libtrace_packe
 		case TRACE_FORMAT_LEGACY_ETH:
 			packet->type = RT_DATA_LEGACY_ETH;
 			break;
+		default:
+			assert(0);
 	}
 	
 	if ((numbytes=LIBTRACE_READ(INPUT.file,

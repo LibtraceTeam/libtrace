@@ -554,7 +554,7 @@ static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_pac
 static int erf_dump_packet(libtrace_out_t *libtrace,
 		dag_record_t *erfptr, int pad, void *buffer, size_t size) {
 	int numbytes = 0;
-	assert(size>=0 && size<=65536);
+	assert(size<=65536);
 	/* FIXME: Shouldn't this return != dag_record_size+pad on error? */
 	if ((numbytes = LIBTRACE_WRITE(OUTPUT.file, erfptr, dag_record_size + pad)) == 0) {
 		trace_set_err_out(libtrace,errno,

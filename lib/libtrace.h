@@ -764,7 +764,7 @@ int trace_seek_timeval(libtrace_t *trace, struct timeval tv);
  * + sizeof(tcp_header).
  */
 SIMPLE_FUNCTION
-int trace_get_capture_length(const libtrace_packet_t *packet);
+size_t trace_get_capture_length(const libtrace_packet_t *packet);
 
 /** Get the size of the packet as it was seen on the wire.
  * @param packet  	the packet opaque pointer
@@ -773,7 +773,7 @@ int trace_get_capture_length(const libtrace_packet_t *packet);
  * not be the same as the Capture Len.
  */ 
 SIMPLE_FUNCTION
-int trace_get_wire_length(const libtrace_packet_t *packet);
+size_t trace_get_wire_length(const libtrace_packet_t *packet);
 
 /** Get the length of the capture framing headers.
  * @param packet  	the packet opaque pointer
@@ -784,7 +784,7 @@ int trace_get_wire_length(const libtrace_packet_t *packet);
  * captured packet in memory, and the captured length of the packet
  */ 
 SIMPLE_FUNCTION
-int trace_get_framing_length(const libtrace_packet_t *packet);
+size_t trace_get_framing_length(const libtrace_packet_t *packet);
 
 /** Truncate ("snap") the packet at the suggested length
  * @param packet	the packet opaque pointer

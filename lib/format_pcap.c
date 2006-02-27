@@ -160,6 +160,8 @@ static int pcap_config_input(libtrace_t *libtrace,
 static int pcap_pause_input(libtrace_t *libtrace) {
 	pcap_close(INPUT.pcap);
 	INPUT.pcap=NULL;
+
+	return 0;
 }
 
 static int pcap_init_output(struct libtrace_out_t *libtrace) {
@@ -259,7 +261,7 @@ static void trace_pcap_handler(u_char *user, const struct pcap_pkthdr *pcaphdr, 
 	packet->header = packet->buffer;
 	packet->payload = (void *)pcappkt;
 
-	assert(pcaphdr->caplen>=0 && pcaphdr->caplen<=65536);
+	assert(pcaphdr->caplen<=65536);
 }
 
 static int pcap_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
@@ -387,7 +389,7 @@ static struct timeval pcap_get_timeval(const struct libtrace_packet_t *packet) {
 static int pcap_get_capture_length(const libtrace_packet_t *packet) {
 	struct pcap_pkthdr *pcapptr = 0;
 	pcapptr = (struct pcap_pkthdr *)packet->header;
-	assert(pcapptr->caplen>=0 && pcapptr->caplen<=65536);
+	assert(pcapptr->caplen<=65536);
 	return pcapptr->caplen;
 }
 

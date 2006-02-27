@@ -36,6 +36,7 @@
 #include <assert.h> /* assert */
 #include <string.h> /* bzero */
 #include "fifo.h"
+#include "libtrace_int.h"
 
 #include <sys/types.h>
 
@@ -82,7 +83,6 @@ struct tracefifo_t *create_tracefifo(size_t size)
         fifo->length = size;
 
         if ((fifo->base = malloc(fifo->length)) == 0) {
-		trace_set_err(errno,"malloc failed");
                 return 0;
         }
 
