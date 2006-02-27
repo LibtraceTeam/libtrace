@@ -232,8 +232,8 @@ static int tracefifo_read_generic(struct tracefifo_t *fifo, void *buffer, size_t
 }
 
 int tracefifo_write(struct tracefifo_t *fifo, void *buffer, size_t len) {
-        int lenleft;
-        size_t size;
+        size_t lenleft;
+        int size;
         assert(fifo);
         assert(buffer);
 

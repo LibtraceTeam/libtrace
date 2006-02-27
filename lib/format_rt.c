@@ -326,7 +326,7 @@ static void rt_set_payload(struct libtrace_packet_t *packet) {
 }
 
 static int rt_send_ack(struct libtrace_t *libtrace, 
-		struct libtrace_packet_t *packet, uint32_t seqno)  {
+		uint32_t seqno)  {
 	
 	static char *ack_buffer = 0;
 	char *buf_ptr;
@@ -415,8 +415,8 @@ static int rt_read_packet(struct libtrace_t *libtrace,
 
                         if (reliability > 0) {
 	                        
-				if (rt_send_ack(libtrace, packet,
-                                       pkt_hdr.sequence) == -1)
+				if (rt_send_ack(libtrace, pkt_hdr.sequence) 
+						== -1)
 				{
                                 	return -1;
                                 }
@@ -475,12 +475,12 @@ static int rt_get_capture_length(const struct libtrace_packet_t *packet) {
 	return 0;
 }
 			
-static int rt_get_framing_length(const struct libtrace_packet_t *packet) {
+static int rt_get_framing_length(const libtrace_packet_t *packet) {
 	return 0;
 }
 
 
-static int rt_get_fd(const struct libtrace_t *trace) {
+static int rt_get_fd(const libtrace_t *trace) {
         return ((struct rt_format_data_t *)trace->format_data)->input_fd;
 }
 
