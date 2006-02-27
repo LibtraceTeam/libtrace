@@ -71,8 +71,9 @@ static struct libtrace_format_t rtclient;
 static struct libtrace_format_t dag;
 #endif 
 
-#define DATA(x) ((struct libtrace_format_data_t *)x->format_data)
-#define DATAOUT(x) ((struct libtrace_format_data_out_t *)x->format_data)
+#define DATA(x) ((struct erf_format_data_t *)x->format_data)
+#define DATAOUT(x) ((struct erf_format_data_out_t *)x->format_data)
+
 #define CONNINFO DATA(libtrace)->conn_info
 #define INPUT DATA(libtrace)->input
 #define OUTPUT DATAOUT(libtrace)->output
@@ -80,7 +81,7 @@ static struct libtrace_format_t dag;
 #define DAG DATA(libtrace)->dag
 #endif
 #define OPTIONS DATAOUT(libtrace)->options
-struct libtrace_format_data_t {
+struct erf_format_data_t {
 	union {
                 struct {
                         char *hostname;
@@ -105,7 +106,7 @@ struct libtrace_format_data_t {
 #endif
 };
 
-struct libtrace_format_data_out_t {
+struct erf_format_data_out_t {
         union {
                 struct {
                         char *hostname;
@@ -153,31 +154,31 @@ static int dag_start_input(struct libtrace_t *libtrace) {
 	struct stat buf;
 	if (stat(libtrace->uridata, &buf) == -1) {
 		trace_set_err(libtrace,errno,"stat(%s)",libtrace->uridata);
-		return 0;
+		return -1;
 	} 
 	if (S_ISCHR(buf.st_mode)) {
 		/* DEVICE */
 		if((INPUT.fd = dag_open(libtrace->uridata)) < 0) {
 			trace_set_err(libtrace,errno,"Cannot open DAG %s",
 					libtrace->uridata);
-			return 0;
+			return -1;
 		}
 		if((DAG.buf = (void *)dag_mmap(INPUT.fd)) == MAP_FAILED) {
 			trace_set_err(libtrace,errno,"Cannot mmap DAG %s",
 					libtrace->uridata);
-			return 0;
+			return -1;
 		}
 		if(dag_start(INPUT.fd) < 0) {
 			trace_set_err(libtrace,errno,"Cannot start DAG %s",
 					libtrace->uridata);
-			return 0;
+			return -1;
 		}
 	} else {
 		trace_set_err(libtrace,errno,"Not a valid dag device: %s",
 				libtrace->uridata);
-		return 0;
+		return -1;
 	}
-	return 1;
+	return 0;
 }
 #endif
 
@@ -200,9 +201,9 @@ static int erf_get_framing_length(const struct libtrace_packet_t *packet)
 
 static int erf_init_input(struct libtrace_t *libtrace) 
 {
-	libtrace->format_data = (struct libtrace_format_data_t *)
-		malloc(sizeof(struct libtrace_format_data_t));
+	libtrace->format_data = malloc(sizeof(struct erf_format_data_t));
 
+	return 0; /* success */
 }
 
 static int erf_start_input(struct libtrace_t *libtrace)
@@ -212,13 +213,12 @@ static int erf_start_input(struct libtrace_t *libtrace)
 	if (!INPUT.file)
 		return -1;
 
-	return 0;
+	return 0; /* success */
 }
 
 static int rtclient_init_input(struct libtrace_t *libtrace) {
 	char *scan;
-	libtrace->format_data = (struct libtrace_format_data_t *)
-		malloc(sizeof(struct libtrace_format_data_t));
+	libtrace->format_data = malloc(sizeof(struct erf_format_data_t));
 
 
 	if (strlen(libtrace->uridata) == 0) {
@@ -240,7 +240,8 @@ static int rtclient_init_input(struct libtrace_t *libtrace) {
 				atoi(++scan);
 		}
 	}
-	
+
+	return 0; /* success */
 }
 
 static int rtclient_start_input(libtrace_t *libtrace)
@@ -266,14 +267,13 @@ static int rtclient_start_input(libtrace_t *libtrace)
 				sizeof(struct sockaddr)) == -1) {
 		trace_set_err(libtrace,errno,"connect(%s)",
 				CONNINFO.rt.hostname);
-		return 0;
+		return -1;
 	}
-	return -1;
+	return 0;
 }
 
 static int erf_init_output(struct libtrace_out_t *libtrace) {
-	libtrace->format_data = (struct libtrace_format_data_out_t *)
-		calloc(1,sizeof(struct libtrace_format_data_out_t));
+	libtrace->format_data = calloc(1,sizeof(struct erf_format_data_out_t));
 
 	OPTIONS.erf.level = 0;
 	OPTIONS.erf.fileflag = O_CREAT | O_LARGEFILE | O_WRONLY;

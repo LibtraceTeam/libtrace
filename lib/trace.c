@@ -157,6 +157,64 @@ void register_format(struct libtrace_format_t *f) {
 				format_size);
 	}
 	format_list[nformats] = f;
+	/* Now, verify things */
+	if (format_list[nformats]->init_input) {
+#define REQUIRE(x) \
+		if (!format_list[nformats]->x) \
+			fprintf(stderr,"%s: Input format should provide " #x "\n",format_list[nformats]->name)
+		REQUIRE(read_packet);
+		REQUIRE(start_input);
+		REQUIRE(config_input);
+		REQUIRE(pause_input);
+		REQUIRE(fin_input);
+		REQUIRE(get_link_type);
+		REQUIRE(get_capture_length);
+		REQUIRE(get_wire_length);
+		REQUIRE(get_framing_length);
+		REQUIRE(trace_event);
+		if (!format_list[nformats]->get_erf_timestamp 
+			&& !format_list[nformats]->get_seconds
+			&& !format_list[nformats]->get_timeval) {
+			fprintf(stderr,"%s: A trace format capable of input, should provide at least one of\n"
+"get_erf_timestamp, get_seconds or trace_timeval\n",format_list[nformats]->name);
+		}
+#undef REQUIRE
+	}
+	else {
+#define REQUIRE(x) \
+		if (format_list[nformats]->x) \
+			fprintf(stderr,"%s: Non Input format shouldn't need " #x "\n",format_list[nformats]->name)
+		REQUIRE(read_packet);
+		REQUIRE(start_input);
+		REQUIRE(pause_input);
+		REQUIRE(fin_input);
+		REQUIRE(get_link_type);
+		REQUIRE(get_capture_length);
+		REQUIRE(get_wire_length);
+		REQUIRE(get_framing_length);
+		REQUIRE(trace_event);
+#undef REQUIRE
+	}
+	if (format_list[nformats]->init_output) {
+#define REQUIRE(x) \
+		if (!format_list[nformats]->x) \
+			fprintf(stderr,"%s: Output format should provide " #x "\n",format_list[nformats]->name)
+		REQUIRE(write_packet);
+		REQUIRE(start_output);
+		REQUIRE(config_output);
+		REQUIRE(fin_output);
+#undef REQUIRE
+	}
+	else {
+#define REQUIRE(x) \
+		if (format_list[nformats]->x) \
+			fprintf(stderr,"%s: Non Output format shouldn't need " #x "\n",format_list[nformats]->name)
+		REQUIRE(write_packet);
+		REQUIRE(start_output);
+		REQUIRE(config_output);
+		REQUIRE(fin_output);
+#undef REQUIRE
+	}
 	nformats++;
 }
 
@@ -255,7 +313,9 @@ struct libtrace_t *trace_create(const char *uri) {
 	 */
         
 	if (libtrace->format->init_input) {
-		if (!libtrace->format->init_input(libtrace)) {
+		int err=libtrace->format->init_input(libtrace);
+		assert (err==-1 || err==0);
+		if (err==-1) {
 			/* init_input should call trace_set_err to set 
 			 * the error message
 			 */
@@ -614,13 +674,6 @@ int trace_write_packet(struct libtrace_out_t *libtrace, const struct libtrace_pa
 	return -1;
 }
 
-/* get a pointer to the link layer
- * @param packet	a pointer to a libtrace_packet structure
- *
- * @returns a pointer to the link layer, or NULL if there is no link layer
- * 
- * @note you should call trace_get_link_type() to find out what type of link layer this is
- */
 void *trace_get_link(const struct libtrace_packet_t *packet) {
 	return (void *)packet->payload;
 }
@@ -1292,8 +1345,19 @@ int trace_bpf_compile(libtrace_filter_t *filter,
 	
 	if (filter->filterstring && ! filter->flag) {
 		pcap_t *pcap;
+		libtrace_linktype_t linktype=trace_get_link_type(packet);
+		if (linktype==(libtrace_linktype_t)-1) {
+			trace_set_err(packet->trace,TRACE_ERR_BAD_PACKET,
+					"Packet has an unknown linktype");
+			return -1;
+		}
+		if (libtrace_to_pcap_dlt(linktype) == -1) {
+			trace_set_err(packet->trace,TRACE_ERR_BAD_PACKET,
+					"Unknown pcap equivilent linktype");
+			return -1;
+		}
 		pcap=(pcap_t *)pcap_open_dead(
-				libtrace_to_pcap_dlt(trace_get_link_type(packet)),
+				libtrace_to_pcap_dlt(linktype),
 				1500);
 		/* build filter */
 		if (pcap_compile( pcap, &filter->filter, filter->filterstring, 

@@ -110,7 +110,7 @@ static int pcap_init_input(struct libtrace_t *libtrace) {
 	DATA(libtrace)->snaplen = LIBTRACE_PACKET_BUFSIZE;
 	DATA(libtrace)->promisc = 0;
 
-	return 1;
+	return 0;
 }
 
 static int pcap_start_input(struct libtrace_t *libtrace) {
@@ -123,7 +123,8 @@ static int pcap_start_input(struct libtrace_t *libtrace) {
 		return -1;
 	}
 	if (DATA(libtrace)->filter) {
-		trace_bpf_compile(DATA(libtrace)->filter);
+		pcap_compile(INPUT.pcap, &DATA(libtrace)->filter->filter,
+				DATA(libtrace)->filter->filterstring, 1, 0);
 		if (pcap_setfilter(INPUT.pcap,&DATA(libtrace)->filter->filter) 
 				== -1) {
 			trace_set_err(libtrace,TRACE_ERR_INIT_FAILED,"%s",
@@ -277,14 +278,6 @@ static int pcap_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_
 	return ((struct pcap_pkthdr*)packet->header)->len+sizeof(struct pcap_pkthdr);
 }
 
-static int pcap_start_output(libtrace_out_t *libtrace)
-{
-	assert(!OUTPUT.trace.dump);
-	OUTPUT.trace.dump = pcap_dump_open(OUTPUT.trace.pcap,
-			libtrace->uridata);
-	fflush((FILE *)OUTPUT.trace.dump);
-}
-
 static int pcap_write_packet(libtrace_out_t *libtrace, const libtrace_packet_t *packet) {
 	struct pcap_pkthdr pcap_pkt_hdr;
 
@@ -292,6 +285,9 @@ static int pcap_write_packet(libtrace_out_t *libtrace, const libtrace_packet_t *
 		OUTPUT.trace.pcap = (pcap_t *)pcap_open_dead(
 			libtrace_to_pcap_dlt(trace_get_link_type(packet)),
 			65536);
+		OUTPUT.trace.dump = pcap_dump_open(OUTPUT.trace.pcap,
+				libtrace->uridata);
+		fflush((FILE *)OUTPUT.trace.dump);
 	}
 	if (libtrace->format == &pcap || 
 			libtrace->format == &pcapint) {
@@ -456,7 +452,7 @@ static struct libtrace_format_t pcap = {
 	pcap_pause_input,		/* pause_input */
 	pcap_init_output,		/* init_output */
 	NULL,				/* config_output */
-	pcap_start_output,		/* start_output */
+	NULL,				/* start_output */
 	pcap_fin_input,			/* fin_input */
 	pcap_fin_output,		/* fin_output */
 	pcap_read_packet,		/* read_packet */

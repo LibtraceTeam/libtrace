@@ -37,6 +37,9 @@ int trace_read(libtrace_t *libtrace, void *buffer, size_t len);
 struct libtrace_eventobj_t trace_event_device(libtrace_t *trace, libtrace_packet_t *packet);
 struct libtrace_eventobj_t trace_event_trace(libtrace_t *trace, libtrace_packet_t *packet);
 
+int trace_bpf_compile(libtrace_filter_t *filter, 
+		const libtrace_packet_t *packet);
+
 LIBTRACE_FILE trace_open_file(libtrace_t *libtrace);
 LIBTRACE_FILE trace_open_file_out(libtrace_out_t *libtrace,
 		int level,

@@ -78,8 +78,6 @@ extern "C" {
 
 #define RP_BUFSIZE 65536
 
-struct libtrace_format_data_t;
-
 struct libtrace_event_t {
 	struct {
 		void *buffer;
@@ -113,7 +111,7 @@ struct libtrace_t {
  */
 struct libtrace_out_t {
         struct libtrace_format_t *format;	/**< format driver */
-	struct libtrace_format_data_out_t *format_data; /**< format data */
+	void *format_data; 		/**< format data */
 	bool started;			/**< trace started */
 	libtrace_err_t err;		/**< Associated error */
 	char *uridata;			/**< URI associated with this trace */
@@ -151,7 +149,10 @@ struct trace_pflog_header_t {
 	uint8_t	   pad[3];
 };
 
+
+
 /** Module definition structure */
+/* all of these should return -1, or NULL on failure */
 struct libtrace_format_t {
 	/** the uri name of this module */
 	char *name;

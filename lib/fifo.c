@@ -246,7 +246,7 @@ int tracefifo_write(struct tracefifo_t *fifo, void *buffer, size_t len) {
                                 buffer, 
                                 size);
                 increment_pointer(fifo,IN,size);
-                buffer += size;
+                buffer = (char*)buffer+size;
                 lenleft -= size;
         }
         return len;
