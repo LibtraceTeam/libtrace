@@ -67,6 +67,6 @@ int main(int argc, char *argv[]) {
 		trace_destroy(trace);
 		return 0;
 	}
-	printf("failure: %s\n",trace_err.problem);
+	printf("failure: %s\n",trace_get_err(trace).problem);
 	return -1;
 }

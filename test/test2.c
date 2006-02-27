@@ -82,7 +82,7 @@ int main(int argc, char *argv[]) {
 			error = 1;
 		}
 	} else {
-		printf("failure: %s\n",trace_err.problem);
+		printf("failure: %s\n",trace_get_err(trace).problem);
 	}
         trace_destroy(trace);
         return error;

@@ -48,6 +48,14 @@
 #include "dagformat.h"
 #include "libtrace.h"
 
+void iferr(libtrace_t *trace)
+{
+	libtrace_err_t err = trace_get_err(trace);
+	if (err.err_num==0)
+		return;
+	printf("Error: %s\n",err.problem);
+	exit(1);
+}
 
 int main(int argc, char *argv[]) {
         char *uri = "rtclient:chasm";
@@ -59,14 +67,12 @@ int main(int argc, char *argv[]) {
 	libtrace_packet_t *packet;
 
 	trace = trace_create(uri);
-	if (!trace) {
-		printf("Error: %s\n",trace_err.problem);
-		return 1;
-	}
+	iferr(trace);
 
 	level=0;
 
 	trace_start(trace);
+	iferr(trace);
 	
 	packet=trace_create_packet();
         for (;;) {
@@ -91,7 +97,7 @@ int main(int argc, char *argv[]) {
 			error = 1;
 		}
 	} else {
-		printf("failure: %s\n",trace_err.problem);
+		iferr(trace);
 	}
         trace_destroy(trace);
         return error;

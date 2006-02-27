@@ -61,12 +61,12 @@ int main(int argc, char *argv[]) {
 
 	trace = trace_create(uri);
 	if (!trace) {
-		printf("Error: %s\n",trace_err.problem);
+		printf("Error: %s\n",trace_get_err(trace).problem);
 		return 1;
 	}
 	outtrace = trace_create_output("erf:traces/100_packets.out.erf");
 	if (!outtrace) {
-		printf("Error: %s\n",trace_err.problem);
+		printf("Error: %s\n",trace_get_err_output(outtrace).problem);
 		return 1;
 	}
 
@@ -98,7 +98,7 @@ int main(int argc, char *argv[]) {
 			error = 1;
 		}
 	} else {
-		printf("failure: %s\n",trace_err.problem);
+		printf("failure: %s\n",trace_get_err(trace).problem);
 	}
         trace_destroy(trace);
 	trace_destroy_output(outtrace);

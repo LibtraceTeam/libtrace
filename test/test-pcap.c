@@ -59,12 +59,12 @@ int main(int argc, char *argv[]) {
 
 	trace = trace_create(uri);
 	if (!trace) {
-		printf("ERROR: %s\n",trace_err.problem);
+		printf("ERROR: %s\n",trace_get_err(trace).problem);
 		return 1;
 	}
 
 	if (trace_start(trace)==-1) {
-		printf("ERROR: %s\n",trace_err.problem);
+		printf("ERROR: %s\n",trace_get_err(trace).problem);
 		return 1;
 	}
 	
@@ -89,7 +89,7 @@ int main(int argc, char *argv[]) {
 			error = 1;
 		}
 	} else {
-		printf("failure: %s\n",trace_err.problem);
+		printf("failure: %s\n",trace_get_err(trace).problem);
 	}
         trace_destroy(trace);
         return error;

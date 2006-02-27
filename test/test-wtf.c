@@ -48,6 +48,23 @@
 #include "dagformat.h"
 #include "libtrace.h"
 
+void iferr(libtrace_t *trace)
+{
+	libtrace_err_t err = trace_get_err(trace);
+	if (err.err_num==0)
+		return;
+	printf("Error: %s\n",err.problem);
+	exit(1);
+}
+
+void iferrout(libtrace_out_t *trace)
+{
+	libtrace_err_t err = trace_get_err_output(trace);
+	if (err.err_num==0)
+		return;
+	printf("Error: %s\n",err.problem);
+	exit(1);
+}
 
 int main(int argc, char *argv[]) {
         char *uri = "wtf:traces/wed.wtf";
@@ -60,21 +77,18 @@ int main(int argc, char *argv[]) {
 	libtrace_packet_t *packet;
 
 	trace = trace_create(uri);
-	if (!trace) {
-		printf("Error: %s\n",trace_err.problem);
-		return 1;
-	}
+	iferr(trace);
+
 	outtrace = trace_create_output("wtf:traces/wed.out.wtf");
-	if (!outtrace) {
-		printf("Error: %s\n",trace_err.problem);
-		return 1;
-	}
+	iferrout(outtrace);
 
 	level=0;
 	trace_config_output(outtrace,TRACE_OPTION_OUTPUT_COMPRESS,&level);
 
 	trace_start(trace);
+	iferr(trace);
 	trace_start_output(outtrace);
+	iferrout(outtrace);
 	
 	packet=trace_create_packet();
         for (;;) {
@@ -88,6 +102,7 @@ int main(int argc, char *argv[]) {
 		}
 		count ++;
 		trace_write_packet(outtrace,packet);
+		iferrout(outtrace);
         }
 	trace_destroy_packet(&packet);
 	if (error == 0) {
@@ -98,7 +113,8 @@ int main(int argc, char *argv[]) {
 			error = 1;
 		}
 	} else {
-		printf("failure: %s\n",trace_err.problem);
+		iferr(trace);
+		printf("error, but no error!\n");
 	}
         trace_destroy(trace);
 	trace_destroy_output(outtrace);
