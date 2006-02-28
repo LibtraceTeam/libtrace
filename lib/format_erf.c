@@ -217,6 +217,9 @@ static int erf_init_input(struct libtrace_t *libtrace)
 
 static int erf_start_input(libtrace_t *libtrace)
 {
+	if (INPUT.file)
+		return 0; /* success */
+
 	INPUT.file = trace_open_file(libtrace);
 
 	if (!INPUT.file)
@@ -383,7 +386,13 @@ static int rtclient_start_input(libtrace_t *libtrace)
 				CONNINFO.rt.hostname);
 		return -1;
 	}
-	return 0;
+	return 0; /* success */
+}
+
+static int rtclient_pause_input(libtrace_t *libtrace)
+{
+	close(INPUT.fd);
+	return 0; /* success */
 }
 
 static int erf_init_output(struct libtrace_out_t *libtrace) {
@@ -730,10 +739,17 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 				);
 	} else {
 		dag_record_t erfhdr;
+		int type;
 		/* convert format - build up a new erf header */
 		/* Timestamp */
 		erfhdr.ts = trace_get_erf_timestamp(packet);
-		erfhdr.type = libtrace_to_erf_type(trace_get_link_type(packet));
+		type=libtrace_to_erf_type(trace_get_link_type(packet));
+		if (type==(char)-1) {
+			trace_set_err_out(libtrace,TRACE_ERR_BAD_PACKET,
+					"No erf type for packet");
+			return -1;
+		}
+		erfhdr.type = type;
 		/* Flags. Can't do this */
 		memset(&erfhdr.flags,1,sizeof(erfhdr.flags));
 		/* Packet length (rlen includes format overhead) */
@@ -805,10 +821,6 @@ static size_t erf_set_capture_length(struct libtrace_packet_t *packet, size_t si
 }
 
 static int rtclient_get_fd(const libtrace_t *libtrace) {
-	return INPUT.fd;
-}
-
-static int erf_get_fd(const libtrace_t *libtrace) {
 	return INPUT.fd;
 }
 
@@ -963,7 +975,7 @@ static struct libtrace_format_t rtclient = {
 	rtclient_init_input,		/* init_input */	
 	NULL,				/* config_input */
 	rtclient_start_input,		/* start_input */
-	NULL,				/* pause_input */
+	rtclient_pause_input,		/* pause_input */
 	NULL,				/* init_output */
 	NULL,				/* config_output */
 	NULL,				/* start_output */

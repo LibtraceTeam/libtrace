@@ -115,6 +115,11 @@ static int pcap_init_input(struct libtrace_t *libtrace) {
 
 static int pcap_start_input(struct libtrace_t *libtrace) {
 	char errbuf[PCAP_ERRBUF_SIZE];
+
+	/* if the file is already open */
+	if (INPUT.pcap)
+		return 0; /* success */
+
 	if ((INPUT.pcap = 
 		pcap_open_offline(libtrace->uridata,
 			errbuf)) == NULL) {
@@ -157,13 +162,6 @@ static int pcap_config_input(libtrace_t *libtrace,
 	assert(0);
 }
 
-static int pcap_pause_input(libtrace_t *libtrace) {
-	pcap_close(INPUT.pcap);
-	INPUT.pcap=NULL;
-
-	return 0;
-}
-
 static int pcap_init_output(struct libtrace_out_t *libtrace) {
 	libtrace->format_data = malloc(sizeof(struct pcap_format_data_out_t));
 	OUTPUT.trace.pcap = NULL;
@@ -176,7 +174,7 @@ static int pcapint_init_input(struct libtrace_t *libtrace) {
 	DATA(libtrace)->filter = NULL;
 	DATA(libtrace)->snaplen = LIBTRACE_PACKET_BUFSIZE;
 	DATA(libtrace)->promisc = 0;
-	return 1;
+	return 0; /* success */
 }
 
 static int pcapint_config_input(libtrace_t *libtrace,
@@ -210,7 +208,7 @@ static int pcapint_start_input(libtrace_t *libtrace) {
 			1,
 			errbuf)) == NULL) {
 		trace_set_err(libtrace,TRACE_ERR_INIT_FAILED,"%s",errbuf);
-		return -1;
+		return -1; /* failure */
 	}
 	/* Set a filter if one is defined */
 	if (DATA(libtrace)->filter) {
@@ -218,22 +216,27 @@ static int pcapint_start_input(libtrace_t *libtrace) {
 			== -1) {
 			trace_set_err(libtrace,TRACE_ERR_INIT_FAILED,"%s",
 					pcap_geterr(INPUT.pcap));
-			return -1;
+			return -1; /* failure */
 		}
-		return 0;
 	}
-	return 1;
+	return 0; /* success */
 }
 
-static int pcap_fin_input(struct libtrace_t *libtrace) {
-	/* we don't need to close the pcap object since libtrace will have
-	 * paused the trace for us.
-	 */
+static int pcapint_pause_input(libtrace_t *libtrace)
+{
+	pcap_close(INPUT.pcap);
+	INPUT.pcap=NULL;
+	return 0; /* success */
+}
+
+static int pcap_fin_input(libtrace_t *libtrace) 
+{
 	free(libtrace->format_data);
-	return 0;
+	return 0; /* success */
 }
 
-static int pcap_fin_output(libtrace_out_t *libtrace) {
+static int pcap_fin_output(libtrace_out_t *libtrace) 
+{
 	pcap_dump_flush(OUTPUT.trace.dump);
 	pcap_dump_close(OUTPUT.trace.dump);
 	pcap_close(OUTPUT.trace.pcap);
@@ -451,7 +454,7 @@ static struct libtrace_format_t pcap = {
 	pcap_init_input,		/* init_input */
 	pcap_config_input,		/* config_input */
 	pcap_start_input,		/* start_input */
-	pcap_pause_input,		/* pause_input */
+	NULL,				/* pause_input */
 	pcap_init_output,		/* init_output */
 	NULL,				/* config_output */
 	NULL,				/* start_output */
@@ -484,7 +487,7 @@ static struct libtrace_format_t pcapint = {
 	pcapint_init_input,		/* init_input */
 	pcapint_config_input,		/* config_input */
 	pcapint_start_input,		/* start_input */
-	pcap_pause_input,		/* pause_input */
+	pcapint_pause_input,		/* pause_input */
 	NULL,				/* init_output */
 	NULL,				/* config_output */
 	NULL,				/* start_output */

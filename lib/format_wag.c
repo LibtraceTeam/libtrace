@@ -141,18 +141,19 @@ static int wag_start_input(libtrace_t *libtrace)
 static int wtf_init_input(struct libtrace_t *libtrace) 
 {
 	libtrace->format_data = malloc(sizeof(struct wag_format_data_t));
-
 	return 0;
 }
 
 static int wtf_start_input(libtrace_t *libtrace)
 {
+	if (DATA(libtrace)->input.file)
+		return 0; /* success */
 	DATA(libtrace)->input.file = trace_open_file(libtrace);
 
-	if (DATA(libtrace)->input.file)
-		return 0;
+	if (!DATA(libtrace)->input.file)
+		return -1; 
 
-	return -1;
+	return 0; /* success */
 }
 
 static int wtf_init_output(struct libtrace_out_t *libtrace) {
@@ -359,7 +360,7 @@ static int wtf_write_packet(struct libtrace_out_t *libtrace, const struct libtra
 	int numbytes =0 ;
 	if (packet->trace->format != &wag_trace) {
 		trace_set_err_out(libtrace,TRACE_ERR_NO_CONVERSION,
-				"Cannot convert from wag trace format to %s format yet",
+				"Cannot convert to wag trace format from %s format yet",
 				packet->trace->format->name);
 		return -1;
 	}

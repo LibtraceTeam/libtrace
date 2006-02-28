@@ -1688,9 +1688,74 @@ int trace_seek_erf_timestamp(libtrace_t *trace, uint64_t ts)
 		return trace->format->seek_erf(trace,ts);
 	}
 	else {
-		/*FIXME: can this be transmuted into seek_seconds, or 
-		 * seek_timeval?
-		 */
+		if (trace->format->seek_timeval) {
+			struct timeval tv;
+#if __BYTE_ORDER == __BIG_ENDIAN
+			tv.tv_sec = ts & 0xFFFFFFFF;
+#elif __BYTE_ORDER == __LITTLE_ENDIAN
+			tv.tv_sec = ts >> 32;
+#else
+#error "What on earth are you running this on?"
+#endif
+			tv.tv_usec = ((ts&0xFFFFFFFF)*1000000)>>32;
+			if (tv.tv_usec >= 1000000) {
+				tv.tv_usec -= 1000000;
+				tv.tv_sec += 1;
+			}
+			return trace->format->seek_timeval(trace,tv);
+		}
+		if (trace->format->seek_seconds) {
+			double seconds =  
+				(ts>>32) + ((ts & UINT_MAX)*1.0 / UINT_MAX);
+			return trace->format->seek_seconds(trace,seconds);
+		}
+		trace_set_err(trace,
+				TRACE_ERR_OPTION_UNAVAIL,
+				"Feature unimplemented");
+		return -1;
+	}
+}
+
+int trace_seek_seconds(libtrace_t *trace, double seconds)
+{
+	if (trace->format->seek_seconds) {
+		return trace->format->seek_seconds(trace,seconds);
+	}
+	else {
+		if (trace->format->seek_timeval) {
+			struct timeval tv;
+			tv.tv_sec = (uint32_t)seconds;
+			tv.tv_usec = (uint32_t)(((seconds - tv.tv_sec) * 1000000)/UINT_MAX);
+			return trace->format->seek_timeval(trace,tv);
+		}
+		if (trace->format->seek_erf) {
+			uint64_t timestamp = 
+				((uint64_t)((uint32_t)seconds) << 32) + \
+			    (( seconds - (uint32_t)seconds   ) * UINT_MAX);
+			return trace->format->seek_erf(trace,timestamp);
+		}
+		trace_set_err(trace,
+				TRACE_ERR_OPTION_UNAVAIL,
+				"Feature unimplemented");
+		return -1;
+	}
+}
+
+int trace_seek_timeval(libtrace_t *trace, struct timeval tv)
+{
+	if (trace->format->seek_timeval) {
+		return trace->format->seek_timeval(trace,tv);
+	}
+	else {
+		if (trace->format->seek_erf) {
+			uint64_t timestamp = ((((uint64_t)tv.tv_sec) << 32) + \
+				(((uint64_t)tv.tv_usec * UINT_MAX)/1000000));
+			return trace->format->seek_erf(trace,timestamp);
+		}
+		if (trace->format->seek_seconds) {
+			double seconds = tv.tv_sec + ((tv.tv_usec * UINT_MAX * 1.0)/1000000);
+			return trace->format->seek_seconds(trace,seconds);
+		}
 		trace_set_err(trace,
 				TRACE_ERR_OPTION_UNAVAIL,
 				"Feature unimplemented");

@@ -273,8 +273,8 @@ static int rt_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
 }
 
 
-static int rt_set_format(struct libtrace_t *libtrace, 
-		struct libtrace_packet_t *packet) {
+static int rt_set_format(libtrace_t *libtrace, libtrace_packet_t *packet) 
+{
 	switch (packet->type) {
 		case RT_DATA_ERF:
 			if (!RT_INFO->dummy_erf) {
@@ -303,7 +303,7 @@ static int rt_set_format(struct libtrace_t *libtrace,
 			printf("Unrecognised format: %d\n", packet->type);
 			return -1;
 	}
-	return 1;
+	return 0; /* success */
 }		
 
 static void rt_set_payload(struct libtrace_packet_t *packet) {
@@ -370,8 +370,7 @@ static int rt_send_ack(struct libtrace_t *libtrace,
 	return 1;
 }
 	
-static int rt_read_packet(struct libtrace_t *libtrace, 
-		struct libtrace_packet_t *packet) {
+static int rt_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
         
 	rt_header_t pkt_hdr;
 	int pkt_size = 0;
@@ -442,8 +441,7 @@ static int rt_read_packet(struct libtrace_t *libtrace,
 			printf("Bad rt type for client receipt: %d\n",
 					pkt_hdr.type);
 	}
-	return 1;
-	
+	return trace_get_capture_length(packet)+trace_get_framing_length(packet);
 }
 
 static int rt_get_capture_length(const struct libtrace_packet_t *packet) {
