@@ -158,6 +158,7 @@ void register_format(struct libtrace_format_t *f) {
 	}
 	format_list[nformats] = f;
 	/* Now, verify things */
+#if 0
 	if (format_list[nformats]->init_input) {
 #define REQUIRE(x) \
 		if (!format_list[nformats]->x) \
@@ -178,6 +179,15 @@ void register_format(struct libtrace_format_t *f) {
 			fprintf(stderr,"%s: A trace format capable of input, should provide at least one of\n"
 "get_erf_timestamp, get_seconds or trace_timeval\n",format_list[nformats]->name);
 		}
+		if (format_list[nformats]->trace_event==trace_event_device) {
+			REQUIRE(get_fd);
+		}
+		else {
+			if (format_list[nformats]->get_fd) {
+				fprintf(stderr,"%s: Unnecessary get_fd\n",
+						format_list[nformats]->name);
+			}
+		}
 #undef REQUIRE
 	}
 	else {
@@ -193,6 +203,9 @@ void register_format(struct libtrace_format_t *f) {
 		REQUIRE(get_wire_length);
 		REQUIRE(get_framing_length);
 		REQUIRE(trace_event);
+		REQUIRE(get_seconds);
+		REQUIRE(get_timeval);
+		REQUIRE(get_erf_timestamp);
 #undef REQUIRE
 	}
 	if (format_list[nformats]->init_output) {
@@ -215,6 +228,7 @@ void register_format(struct libtrace_format_t *f) {
 		REQUIRE(fin_output);
 #undef REQUIRE
 	}
+#endif
 	nformats++;
 }
 
@@ -284,7 +298,7 @@ struct libtrace_t *trace_create(const char *uri) {
         
         /* parse the URI to determine what sort of event we are dealing with */
 	if ((uridata = trace_parse_uri(uri, &scan)) == 0) {
-		trace_set_err(libtrace,TRACE_ERR_BAD_FORMAT,"Bad uri format");
+		trace_set_err(libtrace,TRACE_ERR_BAD_FORMAT,"Bad uri format (%s)",uri);
 		return libtrace;
 	}
 	
@@ -405,7 +419,7 @@ libtrace_out_t *trace_create_output(const char *uri) {
         /* parse the URI to determine what sort of event we are dealing with */
 
 	if ((uridata = trace_parse_uri(uri, &scan)) == 0) {
-		trace_set_err_out(libtrace,TRACE_ERR_BAD_FORMAT,"Bad uri format");
+		trace_set_err_out(libtrace,TRACE_ERR_BAD_FORMAT,"Bad uri format (%s)",uri);
 		return libtrace;
 	}
 	

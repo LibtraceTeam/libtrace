@@ -510,7 +510,7 @@ static struct libtrace_format_t wag_trace = {
         wag_get_wire_length,            /* get_wire_length */
         wag_get_framing_length,         /* get_framing_length */
         NULL,                           /* set_capture_length */
-        wag_get_fd,                     /* get_fd */
+        NULL,		                /* get_fd */
         trace_event_trace,              /* trace_event */
         wtf_help                        /* help */
 };

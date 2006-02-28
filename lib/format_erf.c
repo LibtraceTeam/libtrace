@@ -916,7 +916,7 @@ static struct libtrace_format_t erf = {
 	erf_get_wire_length,		/* get_wire_length */
 	erf_get_framing_length,		/* get_framing_length */
 	erf_set_capture_length,		/* set_capture_length */
-	erf_get_fd,			/* get_fd */
+	NULL,				/* get_fd */
 	trace_event_trace,		/* trace_event */
 	erf_help			/* help */
 };
