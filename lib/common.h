@@ -19,6 +19,8 @@
 #  define LIBTRACE_CLOSE(file) gzclose(file)
 #  define LIBTRACE_WRITE(file,buf,len) gzwrite(file,buf,len)
 #  define LIBTRACE_FILE gzFile*
+#  define LIBTRACE_SEEK(file,offset,whence) gzseek(file,offset,whence)
+#  define LIBTRACE_TELL(file) gztell(file)
 #else
 #  define LIBTRACE_READ(file,buf,len) read(file,buf,len)
 #  define LIBTRACE_FDOPEN(fd,mode) dup(fd) 
@@ -26,6 +28,8 @@
 #  define LIBTRACE_CLOSE(file) close(file)
 #  define LIBTRACE_WRITE(file,buf,len) write(file,buf,len)
 #  define LIBTRACE_FILE int
+#  define LIBTRACE_SEEK(file,offset,whence) lseek(file,offset,whence)
+#  define LIBTRACE_TELL(file) tell(file,0,SEEK_CUR)
 #endif
 
 #endif /* COMMON_H */

@@ -94,6 +94,12 @@ struct erf_format_data_t {
 		LIBTRACE_FILE file;
         } input;
 
+	struct {
+		enum { INDEX_UNKNOWN=0, INDEX_NONE, INDEX_EXISTS } exists;
+		LIBTRACE_FILE index;
+		off_t index_len;
+	} seek;
+
 #if HAVE_DAG
 	struct {
 		void *buf; 
@@ -141,6 +147,10 @@ typedef struct libtrace_packet_status {
 	uint16_t message;
 } libtrace_packet_status_t;
 
+typedef struct erf_index_t {
+	uint64_t timestamp;
+	uint64_t offset; 
+} erf_index_t;
 
 #ifdef HAVE_DAG
 static int dag_init_input(struct libtrace_t *libtrace) {
@@ -204,7 +214,7 @@ static int erf_init_input(struct libtrace_t *libtrace)
 	return 0; /* success */
 }
 
-static int erf_start_input(struct libtrace_t *libtrace)
+static int erf_start_input(libtrace_t *libtrace)
 {
 	INPUT.file = trace_open_file(libtrace);
 
@@ -212,6 +222,111 @@ static int erf_start_input(struct libtrace_t *libtrace)
 		return -1;
 
 	return 0; /* success */
+}
+
+/* Binary search through the index to find the closest point before
+ * the packet.  Consider in future having a btree index perhaps?
+ */
+static int erf_fast_seek_start(libtrace_t *libtrace,uint64_t erfts)
+{
+	size_t max_off = DATA(libtrace)->seek.index_len/sizeof(erf_index_t);
+	size_t min_off = 0;
+	off_t current;
+	erf_index_t record;
+	do {
+		current=(max_off+min_off)>>2;
+
+		LIBTRACE_SEEK(DATA(libtrace)->seek.index,
+				current*sizeof(record),
+				SEEK_SET);
+		LIBTRACE_READ(DATA(libtrace)->seek.index,
+				&record,sizeof(record));
+		if (record.timestamp < erfts) {
+			min_off=current;
+		}
+		if (record.timestamp > erfts) {
+			max_off=current;
+		}
+		if (record.timestamp == erfts)
+			break;
+	} while(min_off<max_off);
+
+	/* If we've passed it, seek backwards.  This loop shouldn't
+	 * execute more than twice.
+	 */
+	do {
+		LIBTRACE_SEEK(DATA(libtrace)->seek.index,
+				current*sizeof(record),SEEK_SET);
+		LIBTRACE_READ(DATA(libtrace)->seek.index,
+				&record,sizeof(record));
+		current--;
+	} while(record.timestamp>erfts);
+
+	/* We've found our location in the trace, now use it. */
+	LIBTRACE_SEEK(INPUT.file,record.offset,SEEK_SET);
+
+	return 0; /* success */
+}
+
+/* There is no index.  Seek through the entire trace from the start, nice
+ * and slowly.
+ */
+static int erf_slow_seek_start(libtrace_t *libtrace,uint64_t erfts)
+{
+	if (INPUT.file) {
+		LIBTRACE_CLOSE(INPUT.file);
+	}
+	INPUT.file = trace_open_file(libtrace);
+	if (!INPUT.file)
+		return -1;
+	return 0;
+}
+
+static int erf_seek_erf(libtrace_t *libtrace,uint64_t erfts)
+{
+	libtrace_packet_t *packet;
+	off_t off = 0;
+
+	if (DATA(libtrace)->seek.exists==INDEX_UNKNOWN) {
+		char buffer[PATH_MAX];
+		snprintf(buffer,sizeof(buffer),"%s.idx",libtrace->uridata);
+		DATA(libtrace)->seek.index=LIBTRACE_OPEN(buffer,"r");
+		if (DATA(libtrace)->seek.index) {
+			DATA(libtrace)->seek.exists=INDEX_EXISTS;
+		}
+		else {
+			DATA(libtrace)->seek.exists=INDEX_NONE;
+		}
+	}
+
+	/* If theres an index, use it to find the nearest packet that isn't
+	 * after the time we're looking for.  If there is no index we need
+	 * to seek slowly through the trace from the beginning.  Sigh.
+	 */
+	switch(DATA(libtrace)->seek.exists) {
+		case INDEX_EXISTS:
+			erf_fast_seek_start(libtrace,erfts);
+			break;
+		case INDEX_NONE:
+			erf_slow_seek_start(libtrace,erfts);
+			break;
+		case INDEX_UNKNOWN:
+			assert(0);
+			break;
+	}
+
+	/* Now seek forward looking for the correct timestamp */
+	packet=trace_create_packet();
+	do {
+		trace_read_packet(libtrace,packet);
+		if (trace_get_erf_timestamp(packet)==erfts)
+			break;
+		off=LIBTRACE_TELL(INPUT.file);
+	} while(trace_get_erf_timestamp(packet)<erfts);
+
+	LIBTRACE_SEEK(INPUT.file,off,SEEK_SET);
+
+	return 0;
 }
 
 static int rtclient_init_input(struct libtrace_t *libtrace) {
@@ -349,6 +464,9 @@ static int dag_read(struct libtrace_t *libtrace, int block_flag) {
 #endif
 
 #if HAVE_DAG
+/* FIXME: dag_read_packet shouldn't update the pointers, dag_fin_packet
+ * should do that.
+ */
 static int dag_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
 	int numbytes;
 	int size;
@@ -790,7 +908,7 @@ static struct libtrace_format_t erf = {
 	erf_get_erf_timestamp,		/* get_erf_timestamp */
 	NULL,				/* get_timeval */
 	NULL,				/* get_seconds */
-	NULL,				/* seek_erf */
+	erf_seek_erf,			/* seek_erf */
 	NULL,				/* seek_timeval */
 	NULL,				/* seek_seconds */
 	erf_get_capture_length,		/* get_capture_length */

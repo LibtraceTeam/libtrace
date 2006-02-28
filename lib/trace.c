@@ -1667,3 +1667,20 @@ libtrace_err_t trace_get_err_output(libtrace_out_t *trace)
 	trace->err.problem[0]='\0';
 	return err;
 }
+
+int trace_seek_erf_timestamp(libtrace_t *trace, uint64_t ts)
+{
+	if (trace->format->seek_erf) {
+		return trace->format->seek_erf(trace,ts);
+	}
+	else {
+		/*FIXME: can this be transmuted into seek_seconds, or 
+		 * seek_timeval?
+		 */
+		trace_set_err(trace,
+				TRACE_ERR_OPTION_UNAVAIL,
+				"Feature unimplemented");
+		return -1;
+	}
+}
+

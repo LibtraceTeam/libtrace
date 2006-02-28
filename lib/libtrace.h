@@ -742,6 +742,17 @@ int trace_seek_seconds(libtrace_t *trace, double seconds);
  */
 int trace_seek_timeval(libtrace_t *trace, struct timeval tv);
 
+/** Seek within a trace
+ * @param trace		trace to seek
+ * @param ts		erf timestamp
+ * @return 0 on success.
+ * Make the next packet read to be the first packet to occur at or after the
+ * time searched for.  This must be called in the configuration state (ie,
+ * before trace_start() or after trace_pause().
+ * @note This function may be extremely slow.
+ */
+int trace_seek_erf_timestamp(libtrace_t *trace, uint64_t ts);
+
 /*@}*/
 
 /** @name Sizes

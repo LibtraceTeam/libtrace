@@ -79,10 +79,8 @@ extern "C" {
 #define RP_BUFSIZE 65536
 
 struct libtrace_event_t {
-	struct {
-		void *buffer;
-		int size;
-	} packet;
+	libtrace_packet_t *packet;
+	int psize;
 	double tdelta;
 	double trace_last_ts;
 };

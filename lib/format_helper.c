@@ -79,17 +79,11 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 	double now;
 	struct timeval stv;
 
-	if (!trace->event.packet.buffer) {
-		trace->event.packet.buffer = (void *)malloc(4096);
-		trace->event.packet.size=
-			trace_read_packet(trace,packet);
-		event.size = trace->event.packet.size = \
-			     trace->event.packet.size;
-		if (trace->event.packet.size > 0 ) {
-			memcpy(trace->event.packet.buffer,
-					packet->buffer,
-					trace->event.packet.size);
-		} else {
+	if (!trace->event.packet) {
+		trace->event.packet = trace_create_packet();
+		trace->event.psize=
+			trace_read_packet(trace,trace->event.packet);
+		if (trace->event.psize<1) {
 			/* return here, the test for
 			 * event.size will sort out the error
 			 */
@@ -98,7 +92,7 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 		}
 	}
 
-	ts=trace_get_seconds(packet);
+	ts=trace_get_seconds(trace->event.packet);
 	if (trace->event.tdelta!=0) {
 		/* Get the adjusted current time */
 		gettimeofday(&stv, NULL);
@@ -107,9 +101,9 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 		/* adjust for trace delta */
 		now -= trace->event.tdelta; 
 
-		/*if the trace timestamp is still in the 
-		//future, return a SLEEP event, 
-		//otherwise fire the packet
+		/* if the trace timestamp is still in the 
+		 * future, return a SLEEP event, 
+		 * otherwise fire the packet
 		 */
 		if (ts > now) {
 			event.seconds = ts - 
@@ -120,8 +114,8 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 	} else {
 		gettimeofday(&stv, NULL);
 		/* work out the difference between the 
-		// start of trace replay, and the first
-		// packet in the trace
+		 * start of trace replay, and the first
+		 * packet in the trace
 		 */
 		trace->event.tdelta = stv.tv_sec + 
 			((double)stv.tv_usec / 1000000.0);
@@ -129,17 +123,15 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 	}
 
 	/* This is the first packet, so just fire away. */
-	memcpy(packet->buffer,
-			trace->event.packet.buffer,
-			trace->event.packet.size);
-	free(trace->event.packet.buffer);
-	trace->event.packet.buffer = 0;
+	/* TODO: finalise packet */
+	*packet = *trace->event.packet;
+	trace->event.packet = NULL;
+
 	event.type = TRACE_EVENT_PACKET;
 
 	trace->event.trace_last_ts = ts;
 
 	return event;
-	
 }
 
 /* Catch undefined O_LARGEFILE on *BSD etc */
