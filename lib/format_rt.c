@@ -113,11 +113,11 @@ static int rt_connect(struct libtrace_t *libtrace) {
 	
 	if ((he=gethostbyname(RT_INFO->hostname)) == NULL) {
                 perror("gethostbyname");
-                return 0;
+                return -1;
         }
         if ((RT_INFO->input_fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
                 perror("socket");
-                return 0;
+                return -1;
         }
 
         remote.sin_family = AF_INET;
@@ -128,14 +128,14 @@ static int rt_connect(struct libtrace_t *libtrace) {
         if (connect(RT_INFO->input_fd, (struct sockaddr *)&remote,
                                 sizeof(struct sockaddr)) == -1) {
                 perror("connect (inet)");
-                return 0;
+                return -1;
         }
 	
 	/* We are connected, now receive message from server */
 	
 	if (recv(RT_INFO->input_fd, &connect_msg, sizeof(rt_header_t), 0) != sizeof(rt_header_t) ) {
 		printf("An error occured while connecting to %s\n", RT_INFO->hostname);
-		return 0;
+		return -1;
 	}
 
 	switch (connect_msg.type) {
@@ -149,7 +149,7 @@ static int rt_connect(struct libtrace_t *libtrace) {
 			reason = deny_hdr.reason;
 			printf("Connection attempt is denied by the server: %s\n",
 					rt_deny_reason(reason));
-			return 0;
+			return -1;
 		case RT_HELLO:
 			/* do something with options */
 			printf("Hello\n");	
@@ -161,13 +161,13 @@ static int rt_connect(struct libtrace_t *libtrace) {
 			}
 			reliability = hello_opts.reliable;
 			
-			return 1;
+			return 0;
 		default:
 			printf("Unexpected message type: %d\n", connect_msg.type);
-			return 0;
+			return -1;
 	}
 	
-        return 0;
+        return -1;
 }
 
 

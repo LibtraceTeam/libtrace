@@ -154,8 +154,9 @@ typedef struct erf_index_t {
 
 #ifdef HAVE_DAG
 static int dag_init_input(struct libtrace_t *libtrace) {
-	libtrace->format_data = (struct libtrace_format_data_t *)
-		malloc(sizeof(struct libtrace_format_data_t));
+	libtrace->format_data = (struct erf_format_data_t *)
+		malloc(sizeof(struct erf_format_data_t));
+	return 0;
 }
 
 static int dag_start_input(struct libtrace_t *libtrace) {
