@@ -816,7 +816,6 @@ static size_t erf_set_capture_length(struct libtrace_packet_t *packet, size_t si
 	}
 	erfptr = (dag_record_t *)packet->header;
 	erfptr->rlen = htons(size + erf_get_framing_length(packet));
-	printf("Set length: %i\n", trace_get_capture_length(packet));
 	return trace_get_capture_length(packet);
 }
 

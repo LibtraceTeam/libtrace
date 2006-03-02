@@ -428,6 +428,8 @@ static int rt_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 				printf("Error receiving status packet\n");
 				return -1;
 			}
+			packet->header = 0;
+			packet->payload = buffer;
 			break;
 		case RT_END_DATA:
 			return 0;
