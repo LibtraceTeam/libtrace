@@ -28,15 +28,16 @@
  *
  */
 
+#include "config.h"
+#include <sys/types.h>
+#include <fcntl.h> /* for O_LARGEFILE */
 #include "libtrace.h"
 #include "libtrace_int.h"
-#include "config.h"
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
-#include <fcntl.h> /* for O_LARGEFILE */
 #ifdef HAVE_INTTYPES_H
 #  include <inttypes.h>
 #else
@@ -156,7 +157,7 @@ LIBTRACE_FILE trace_open_file(libtrace_t *trace)
 	/* We open the file with open(2), so we can provide O_LARGEFILE
 	 * as zlib doesn't always do it itself
 	 */
-	fd=open(trace->uridata,O_LARGEFILE);
+	fd=open(trace->uridata,O_LARGEFILE|O_RDONLY);
 	if (fd==-1) {
 		trace_set_err(trace,errno,"Unable to open %s",trace->uridata);
 		return 0;
