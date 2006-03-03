@@ -1,0 +1,18 @@
+.TH TRACEMERGE "1" "January 2006" "tracemerge (libtrace)" "User Commands"
+.SH NAME
+tracemerge \- Merge one (or more) traces together
+.SH SYNOPSIS
+.B tracemerge 
+outputuri inputuri...
+.SH DESCRPTION
+tracemerge merges two or more traces together, keeping packets in order.
+
+.TP
+\fB\-i\fR 
+replace the "interface" bits in the erf header (or the "direction" bit in
+other trace files) to be 0 for the first file, 1 for the second file etc.
+
+.SH SEE ALSO
+libtrace(3), tracemerge(1), tracesplit(1), tracefilter(1)
+.SH AUTHORS
+Perry Lorier <perry@cs.waikato.ac.nz>

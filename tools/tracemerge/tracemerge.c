@@ -46,12 +46,16 @@ int main(int argc, char *argv[])
 
 	}
 
-	if (optind+2<argc)
+	if (optind+2>argc)
 		usage(argv[0]);
 
 	output=trace_create_output(argv[optind]);
-	if (!output) {
-		fprintf(stderr,"Unable to open output file %s\n",argv[optind]);
+	if (trace_is_err_output(output)) {
+		trace_perror_output(output,"trace_create");
+		return 1;
+	}
+	if (trace_start_output(output)==-1) {
+		trace_perror_output(output,"trace_start");
 		return 1;
 	}
 
@@ -62,13 +66,17 @@ int main(int argc, char *argv[])
 		struct libtrace_t *f;
 		struct libtrace_packet_t *p;
 		f=trace_create(argv[i+optind]);
+		if (trace_is_err(f)) {
+			trace_perror(f,"trace_create");
+			return 1;
+		}
+		if (trace_start(f)==-1) {
+			trace_perror(f,"trace_start");
+			return 1;
+		}
 		p=trace_create_packet();
 		input[i]=f;
 		packet[i]=p;
-		if (!input[i]) {
-			fprintf(stderr,"Could not read %s\n",argv[i+optind]);
-			return 1;
-		}
 		trace_read_packet(f,p);
 	}
 
