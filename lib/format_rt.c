@@ -513,6 +513,7 @@ static struct libtrace_format_t rt = {
         rt_fin_input,             	/* fin_input */
         NULL,                           /* fin_output */
         rt_read_packet,           	/* read_packet */
+	NULL,				/* fin_packet */
         NULL,                           /* write_packet */
         NULL,		                /* get_link_type */
         NULL,  		            	/* get_direction */
@@ -529,7 +530,8 @@ static struct libtrace_format_t rt = {
         NULL,         			/* set_capture_length */
         rt_get_fd,                	/* get_fd */
         trace_event_device,             /* trace_event */
-        rt_help                   /* help */
+        rt_help,			/* help */
+	NULL				/* next pointer */
 };
 
 void __attribute__((constructor)) rt_constructor() {

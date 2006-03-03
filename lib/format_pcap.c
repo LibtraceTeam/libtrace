@@ -313,7 +313,7 @@ static int pcap_write_packet(libtrace_out_t *libtrace, const libtrace_packet_t *
 	return 0;
 }
 
-static libtrace_linktype_t pcap_get_link_type(const struct libtrace_packet_t *packet) {
+static libtrace_linktype_t pcap_get_link_type(const libtrace_packet_t *packet) {
 	struct pcap_pkthdr *pcapptr = 0;
 	int linktype = 0;
 	pcapptr = (struct pcap_pkthdr *)packet->header;
@@ -461,6 +461,7 @@ static struct libtrace_format_t pcap = {
 	pcap_fin_input,			/* fin_input */
 	pcap_fin_output,		/* fin_output */
 	pcap_read_packet,		/* read_packet */
+	NULL,				/* fin_packet */
 	pcap_write_packet,		/* write_packet */
 	pcap_get_link_type,		/* get_link_type */
 	pcap_get_direction,		/* get_direction */
@@ -477,7 +478,8 @@ static struct libtrace_format_t pcap = {
 	pcap_set_capture_length,	/* set_capture_length */
 	NULL,				/* get_fd */
 	trace_event_trace,		/* trace_event */
-	pcap_help			/* help */
+	pcap_help,			/* help */
+	NULL				/* next pointer */
 };
 
 static struct libtrace_format_t pcapint = {
@@ -494,6 +496,7 @@ static struct libtrace_format_t pcapint = {
 	pcap_fin_input,			/* fin_input */
 	NULL,				/* fin_output */
 	pcap_read_packet,		/* read_packet */
+	NULL,				/* fin_packet */
 	NULL,				/* write_packet */
 	pcap_get_link_type,		/* get_link_type */
 	pcap_get_direction,		/* get_direction */
@@ -510,7 +513,8 @@ static struct libtrace_format_t pcapint = {
 	pcap_set_capture_length,	/* set_capture_length */
 	pcap_get_fd,			/* get_fd */
 	trace_event_device,		/* trace_event */
-	pcapint_help			/* help */
+	pcapint_help,			/* help */
+	NULL				/* next pointer */
 };
 
 void __attribute__((constructor)) pcap_constructor() {

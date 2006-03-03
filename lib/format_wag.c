@@ -462,6 +462,7 @@ static struct libtrace_format_t wag = {
 	wag_fin_input,			/* fin_input */
 	NULL,				/* fin_output */
 	wag_read_packet,		/* read_packet */
+	NULL,				/* fin_packet */
 	NULL,				/* write_packet */
 	wag_get_link_type,		/* get_link_type */
 	wag_get_direction,		/* get_direction */
@@ -478,7 +479,8 @@ static struct libtrace_format_t wag = {
 	NULL,				/* set_capture_length */
 	wag_get_fd,			/* get_fd */
 	trace_event_device,		/* trace_event */
-	wag_help			/* help */
+	wag_help,			/* help */
+	NULL				/* next pointer */
 };
 
 /* wtf stands for Wag Trace Format */
@@ -497,6 +499,7 @@ static struct libtrace_format_t wag_trace = {
         wtf_fin_input,                  /* fin_input */
         wtf_fin_output,                 /* fin_output */
         wtf_read_packet,                /* read_packet */
+	NULL,				/* fin_packet */
         wtf_write_packet,               /* write_packet */
         wag_get_link_type,              /* get_link_type */
         wag_get_direction,              /* get_direction */
@@ -513,7 +516,8 @@ static struct libtrace_format_t wag_trace = {
         NULL,                           /* set_capture_length */
         NULL,		                /* get_fd */
         trace_event_trace,              /* trace_event */
-        wtf_help                        /* help */
+        wtf_help,			/* help */
+	NULL				/* next pointer */
 };
 
 

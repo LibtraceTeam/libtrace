@@ -253,6 +253,7 @@ static struct libtrace_format_t legacyatm = {
 	erf_fin_input,			/* fin_input */
 	NULL,				/* fin_output */
 	legacy_read_packet,		/* read_packet */
+	NULL,				/* fin_packet */
 	NULL,				/* write_packet */
 	legacyatm_get_link_type,	/* get_link_type */
 	NULL,				/* get_direction */
@@ -269,7 +270,8 @@ static struct libtrace_format_t legacyatm = {
 	NULL,				/* set_capture_length */
 	NULL,				/* get_fd */
 	trace_event_trace,		/* trace_event */
-	legacyatm_help			/* help */
+	legacyatm_help,			/* help */
+	NULL				/* next pointer */
 };
 
 static struct libtrace_format_t legacyeth = {
@@ -286,6 +288,7 @@ static struct libtrace_format_t legacyeth = {
 	erf_fin_input,			/* fin_input */
 	NULL,				/* fin_output */
 	legacy_read_packet,		/* read_packet */
+	NULL,				/* fin_packet */
 	NULL,				/* write_packet */
 	legacyeth_get_link_type,	/* get_link_type */
 	NULL,				/* get_direction */
@@ -302,7 +305,8 @@ static struct libtrace_format_t legacyeth = {
 	NULL,				/* set_capture_length */
 	NULL,				/* get_fd */
 	trace_event_trace,		/* trace_event */
-	legacyeth_help			/* help */
+	legacyeth_help,			/* help */
+	NULL				/* next pointer */
 };
 
 static struct libtrace_format_t legacypos = {
@@ -319,6 +323,7 @@ static struct libtrace_format_t legacypos = {
 	erf_fin_input,			/* fin_input */
 	NULL,				/* fin_output */
 	legacy_read_packet,		/* read_packet */
+	NULL,				/* fin_packet */
 	NULL,				/* write_packet */
 	legacypos_get_link_type,	/* get_link_type */
 	NULL,				/* get_direction */
@@ -335,7 +340,8 @@ static struct libtrace_format_t legacypos = {
 	NULL,				/* set_capture_length */
 	NULL,				/* get_fd */
 	trace_event_trace,		/* trace_event */
-	legacypos_help			/* help */
+	legacypos_help,			/* help */
+	NULL,				/* next pointer */
 };
 
 	

@@ -57,6 +57,7 @@
 
 #include <sys/types.h>
 #include <netinet/in.h>
+#include <stdbool.h>
 /** API version as 2 byte hex digits, eg 0xXXYYZZ */
 #define LIBTRACE_API_VERSION 0x030000  /* 3.0.00 */
 
@@ -461,6 +462,19 @@ void trace_destroy_output(libtrace_out_t *trace);
  */
 libtrace_err_t trace_get_err(libtrace_t *trace);
 
+/** Return if there is an error
+ * @param trace		the trace file to check the error state on
+ * This does not clear the error status, and only returns true or false.
+ */
+bool trace_is_err(libtrace_t *trace);
+
+/** Output an error message to stderr and clear the error status.
+ * @param trace		the trace with the error to output
+ * @param msg		the message to prefix to the error
+ * This function does clear the error status.
+ */
+void trace_perror(libtrace_t *trace, const char *msg,...);
+
 /** Check (and clear) the current error state of an output trace
  * @param trace		the output trace file to check the error state on
  * @return Error report
@@ -468,6 +482,20 @@ libtrace_err_t trace_get_err(libtrace_t *trace);
  * to "no error".
  */
 libtrace_err_t trace_get_err_output(libtrace_out_t *trace);
+
+/** Return if there is an error
+ * @param trace		the trace file to check the error state on
+ * This does not clear the error status, and only returns true or false.
+ */
+bool trace_is_err_output(libtrace_out_t *trace);
+
+/** Output an error message to stderr and clear the error status.
+ * @param trace		the trace with the error to output
+ * @param msg		the message to prefix to the error
+ * This function does clear the error status.
+ */
+void trace_perror_output(libtrace_out_t *trace, const char *msg,...);
+
 
 /*@}*/
 
@@ -834,7 +862,7 @@ typedef enum {
  * @author Daniel Lawson
  */
 SIMPLE_FUNCTION
-inline libtrace_linktype_t trace_get_link_type(const libtrace_packet_t *packet);
+libtrace_linktype_t trace_get_link_type(const libtrace_packet_t *packet);
 
 /** Get the destination MAC addres
  * @param packet  	the packet opaque pointer

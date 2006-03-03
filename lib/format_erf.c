@@ -154,13 +154,10 @@ typedef struct erf_index_t {
 
 #ifdef HAVE_DAG
 static int dag_init_input(struct libtrace_t *libtrace) {
+	struct stat buf;
+
 	libtrace->format_data = (struct erf_format_data_t *)
 		malloc(sizeof(struct erf_format_data_t));
-	return 0;
-}
-
-static int dag_start_input(struct libtrace_t *libtrace) {
-	struct stat buf;
 	if (stat(libtrace->uridata, &buf) == -1) {
 		trace_set_err(libtrace,errno,"stat(%s)",libtrace->uridata);
 		return -1;
@@ -177,11 +174,6 @@ static int dag_start_input(struct libtrace_t *libtrace) {
 					libtrace->uridata);
 			return -1;
 		}
-		if(dag_start(INPUT.fd) < 0) {
-			trace_set_err(libtrace,errno,"Cannot start DAG %s",
-					libtrace->uridata);
-			return -1;
-		}
 	} else {
 		trace_set_err(libtrace,errno,"Not a valid dag device: %s",
 				libtrace->uridata);
@@ -189,26 +181,28 @@ static int dag_start_input(struct libtrace_t *libtrace) {
 	}
 	return 0;
 }
+
 #endif
 
 /* Dag erf ether packets have a 2 byte padding before the packet
  * so that the ip header is aligned on a 32 bit boundary.
  */
-static int erf_get_padding(const struct libtrace_packet_t *packet)
+static int erf_get_padding(const libtrace_packet_t *packet)
 {
-	switch(trace_get_link_type(packet)) {
-		case TRACE_TYPE_ETH: 	return 2;
+	dag_record_t *erfptr = (dag_record_t *)packet->header;
+	switch(erfptr->type) {
+		case TYPE_ETH: 		return 2;
 		default: 		return 0;
 	}
 }
 
-static int erf_get_framing_length(const struct libtrace_packet_t *packet)
+static int erf_get_framing_length(const libtrace_packet_t *packet)
 {
 	return dag_record_size + erf_get_padding(packet);
 }
 
 
-static int erf_init_input(struct libtrace_t *libtrace) 
+static int erf_init_input(libtrace_t *libtrace) 
 {
 	libtrace->format_data = malloc(sizeof(struct erf_format_data_t));
 
@@ -333,7 +327,7 @@ static int erf_seek_erf(libtrace_t *libtrace,uint64_t erfts)
 	return 0;
 }
 
-static int rtclient_init_input(struct libtrace_t *libtrace) {
+static int rtclient_init_input(libtrace_t *libtrace) {
 	char *scan;
 	libtrace->format_data = malloc(sizeof(struct erf_format_data_t));
 
@@ -395,7 +389,7 @@ static int rtclient_pause_input(libtrace_t *libtrace)
 	return 0; /* success */
 }
 
-static int erf_init_output(struct libtrace_out_t *libtrace) {
+static int erf_init_output(libtrace_out_t *libtrace) {
 	libtrace->format_data = calloc(1,sizeof(struct erf_format_data_out_t));
 
 	OPTIONS.erf.level = 0;
@@ -405,7 +399,7 @@ static int erf_init_output(struct libtrace_out_t *libtrace) {
 	return 0;
 }
 
-static int erf_config_output(struct libtrace_out_t *libtrace, trace_option_t option, void *value) {
+static int erf_config_output(libtrace_out_t *libtrace, trace_option_t option, void *value) {
 
 	switch (option) {
 		case TRACE_OPTION_OUTPUT_COMPRESS:
@@ -424,66 +418,64 @@ static int erf_config_output(struct libtrace_out_t *libtrace, trace_option_t opt
 
 
 #ifdef HAVE_DAG
-static int dag_fin_input(struct libtrace_t *libtrace) {
+static int dag_pause_input(libtrace_t *libtrace) {
 	dag_stop(INPUT.fd);
+	return 0; /* success */
+}
+
+static int dag_fin_input(libtrace_t *libtrace) {
+	/* dag pause input implicitly called to cleanup before this */
+	dag_close(INPUT.fd);
 	free(libtrace->format_data);
+	return 0; /* success */
 }
 #endif
 
-static int rtclient_fin_input(struct libtrace_t *libtrace) {
+static int rtclient_fin_input(libtrace_t *libtrace) {
 	free(CONNINFO.rt.hostname);
 	close(INPUT.fd);
 	free(libtrace->format_data);
 	return 0;
 }
 
-static int erf_fin_input(struct libtrace_t *libtrace) {
+static int erf_fin_input(libtrace_t *libtrace) {
 	LIBTRACE_CLOSE(INPUT.file);
 	free(libtrace->format_data);
 	return 0;
 }
 
-static int erf_fin_output(struct libtrace_out_t *libtrace) {
+static int erf_fin_output(libtrace_out_t *libtrace) {
 	LIBTRACE_CLOSE(OUTPUT.file);
 	free(libtrace->format_data);
 	return 0;
 }
  
 #if HAVE_DAG
-static int dag_read(struct libtrace_t *libtrace, int block_flag) {
-	int numbytes;
-	static short lctr = 0;
-	struct dag_record_t *erfptr = 0;
-	int rlen;
+static int dag_read(libtrace_t *libtrace, int block_flag) {
 
 	if (DAG.diff != 0) 
 		return DAG.diff;
 
 	DAG.bottom = DAG.top;
+
 	DAG.top = dag_offset(
 			INPUT.fd,
 			&(DAG.bottom),
 			block_flag);
-	DAG.diff = DAG.top -
-		DAG.bottom;
 
-	numbytes=DAG.diff;
+	DAG.diff = DAG.top - DAG.bottom;
+
 	DAG.offset = 0;
-	return numbytes;
+	return DAG.diff;
 }
-#endif
 
-#if HAVE_DAG
 /* FIXME: dag_read_packet shouldn't update the pointers, dag_fin_packet
  * should do that.
  */
-static int dag_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
+static int dag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	int numbytes;
 	int size;
 	dag_record_t *erfptr;
-	void *buffer = packet->buffer;
-	void *buffer2 = buffer;
-	int rlen;
 
 	if (packet->buf_control == TRACE_CTRL_PACKET) {
 		packet->buf_control = TRACE_CTRL_EXTERNAL;
@@ -493,36 +485,50 @@ static int dag_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
  	
 	packet->type = RT_DATA_ERF;
 	
-	if ((numbytes = dag_read(libtrace,0)) <= 0) 
+	if ((numbytes = dag_read(libtrace,0)) < 0) 
 		return numbytes;
+	assert(numbytes>0);
 
 	/*DAG always gives us whole packets */
-	erfptr = (dag_record_t *) ((void *)DAG.buf + 
+	erfptr = (dag_record_t *) ((char *)DAG.buf + 
 			(DAG.bottom + DAG.offset));
 	size = ntohs(erfptr->rlen);
 
-	if ( size  > LIBTRACE_PACKET_BUFSIZE) {
-		assert( size < LIBTRACE_PACKET_BUFSIZE);
-	}
+	assert( size >= dag_record_size );
+	assert( size < LIBTRACE_PACKET_BUFSIZE);
 	
 	packet->buffer = erfptr;
 	packet->header = erfptr;
 	if (((dag_record_t *)packet->buffer)->flags.rxerror == 1) {
 		packet->payload = NULL;
 	} else {
-		packet->payload = packet->buffer + erf_get_framing_length(packet);
+		packet->payload = (char*)packet->buffer 
+			+ erf_get_framing_length(packet);
 	}
 
 	DAG.offset += size;
 	DAG.diff -= size;
 
-	assert(DAG.diff >= 0);
-
 	return (size);
+}
+
+static int dag_start_input(libtrace_t *libtrace) {
+	if(dag_start(INPUT.fd) < 0) {
+		trace_set_err(libtrace,errno,"Cannot start DAG %s",
+				libtrace->uridata);
+		return -1;
+	}
+	/* dags appear to have a bug where if you call dag_start after
+	 * calling dag_stop, and at least one packet has arrived, bad things
+	 * happen.  flush the memory hole 
+	 */
+	while(dag_read(libtrace,1)!=0)
+		DAG.diff=0;
+	return 0;
 }
 #endif 
 
-static int erf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
+static int erf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	int numbytes;
 	int size;
 	void *buffer2 = packet->buffer;
@@ -571,7 +577,7 @@ static int erf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 	return rlen;
 }
 
-static int rtclient_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
+static int rtclient_read(libtrace_t *libtrace, void *buffer, size_t len) {
 	int numbytes;
 
 	while(1) {
@@ -598,7 +604,7 @@ static int rtclient_read(struct libtrace_t *libtrace, void *buffer, size_t len) 
 	return numbytes;
 }
 
-static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
+static int rtclient_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	int numbytes = 0;
 	char buf[RP_BUFSIZE];
 	int read_required = 0;
@@ -617,7 +623,7 @@ static int rtclient_read_packet(struct libtrace_t *libtrace, struct libtrace_pac
 
 	
 	do {
-		struct libtrace_packet_status status;
+		libtrace_packet_status_t status;
 		int size;
 		if (tracefifo_out_available(libtrace->fifo) == 0 
 				|| read_required) {
@@ -770,44 +776,44 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 	return numbytes;
 }
 
-static libtrace_linktype_t erf_get_link_type(const struct libtrace_packet_t *packet) {
+static libtrace_linktype_t erf_get_link_type(const libtrace_packet_t *packet) {
 	dag_record_t *erfptr = 0;
 	erfptr = (dag_record_t *)packet->header;
 	return erf_type_to_libtrace(erfptr->type);
 }
 
-static int8_t erf_get_direction(const struct libtrace_packet_t *packet) {
+static int8_t erf_get_direction(const libtrace_packet_t *packet) {
 	dag_record_t *erfptr = 0;
 	erfptr = (dag_record_t *)packet->header;
 	return erfptr->flags.iface;
 }
 
-static int8_t erf_set_direction(const struct libtrace_packet_t *packet, int8_t direction) {
+static int8_t erf_set_direction(const libtrace_packet_t *packet, int8_t direction) {
 	dag_record_t *erfptr = 0;
 	erfptr = (dag_record_t *)packet->header;
 	erfptr->flags.iface = direction;
 	return erfptr->flags.iface;
 }
 
-static uint64_t erf_get_erf_timestamp(const struct libtrace_packet_t *packet) {
+static uint64_t erf_get_erf_timestamp(const libtrace_packet_t *packet) {
 	dag_record_t *erfptr = 0;
 	erfptr = (dag_record_t *)packet->header;
 	return erfptr->ts;
 }
 
-static int erf_get_capture_length(const struct libtrace_packet_t *packet) {
+static int erf_get_capture_length(const libtrace_packet_t *packet) {
 	dag_record_t *erfptr = 0;
 	erfptr = (dag_record_t *)packet->header;
 	return (ntohs(erfptr->rlen) - erf_get_framing_length(packet));
 }
 
-static int erf_get_wire_length(const struct libtrace_packet_t *packet) {
+static int erf_get_wire_length(const libtrace_packet_t *packet) {
 	dag_record_t *erfptr = 0;
 	erfptr = (dag_record_t *)packet->header;
 	return ntohs(erfptr->wlen);
 }
 
-static size_t erf_set_capture_length(struct libtrace_packet_t *packet, size_t size) {
+static size_t erf_set_capture_length(libtrace_packet_t *packet, size_t size) {
 	dag_record_t *erfptr = 0;
 	assert(packet);
 	if(size  > trace_get_capture_length(packet)) {
@@ -824,8 +830,8 @@ static int rtclient_get_fd(const libtrace_t *libtrace) {
 }
 
 #ifdef HAVE_DAG
-struct libtrace_eventobj_t trace_event_dag(struct libtrace_t *trace, struct libtrace_packet_t *packet) {
-        struct libtrace_eventobj_t event = {0,0,0.0,0};
+libtrace_eventobj_t trace_event_dag(libtrace_t *trace, libtrace_packet_t *packet) {
+        libtrace_eventobj_t event = {0,0,0.0,0};
         int dag_fd;
         int data;
 
@@ -913,6 +919,7 @@ static struct libtrace_format_t erf = {
 	erf_fin_input,			/* fin_input */
 	erf_fin_output,			/* fin_output */
 	erf_read_packet,		/* read_packet */
+	NULL,				/* fin_packet */
 	erf_write_packet,		/* write_packet */
 	erf_get_link_type,		/* get_link_type */
 	erf_get_direction,		/* get_direction */
@@ -929,7 +936,8 @@ static struct libtrace_format_t erf = {
 	erf_set_capture_length,		/* set_capture_length */
 	NULL,				/* get_fd */
 	trace_event_trace,		/* trace_event */
-	erf_help			/* help */
+	erf_help,			/* help */
+	NULL				/* next pointer */
 };
 
 #ifdef HAVE_DAG
@@ -940,13 +948,14 @@ static struct libtrace_format_t dag = {
 	dag_init_input,			/* init_input */	
 	NULL,				/* config_input */
 	dag_start_input,		/* start_input */
-	NULL,				/* pause_input */
+	dag_pause_input,		/* pause_input */
 	NULL,				/* init_output */
 	NULL,				/* config_output */
 	NULL,				/* start_output */
 	dag_fin_input,			/* fin_input */
 	NULL,				/* fin_output */
 	dag_read_packet,		/* read_packet */
+	NULL,				/* fin_packet */
 	NULL,				/* write_packet */
 	erf_get_link_type,		/* get_link_type */
 	erf_get_direction,		/* get_direction */
@@ -963,7 +972,8 @@ static struct libtrace_format_t dag = {
 	erf_set_capture_length,		/* set_capture_length */
 	NULL,				/* get_fd */
 	trace_event_dag,		/* trace_event */
-	dag_help			/* help */
+	dag_help,			/* help */
+	NULL				/* next pointer */
 };
 #endif
 
@@ -981,6 +991,7 @@ static struct libtrace_format_t rtclient = {
 	rtclient_fin_input,		/* fin_input */
 	NULL,				/* fin_output */
 	rtclient_read_packet,		/* read_packet */
+	NULL,				/* fin_packet */
 	NULL,				/* write_packet */
 	erf_get_link_type,		/* get_link_type */
 	erf_get_direction,		/* get_direction */
@@ -997,7 +1008,8 @@ static struct libtrace_format_t rtclient = {
 	erf_set_capture_length,		/* set_capture_length */
 	rtclient_get_fd,		/* get_fd */
 	trace_event_device,		/* trace_event */
-	rtclient_help			/* help */
+	rtclient_help,			/* help */
+	NULL				/* next pointer */
 };
 
 void __attribute__((constructor)) erf_constructor() {

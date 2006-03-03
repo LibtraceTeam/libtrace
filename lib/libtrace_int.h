@@ -192,6 +192,11 @@ struct libtrace_format_t {
 	 * if this function is not supported, this field may be NULL.
 	 */
 	int (*read_packet)(libtrace_t *libtrace, struct libtrace_packet_t *packet);
+	/** finalise a packet
+	 * cleanup any resources used by a packet that can't be reused for
+	 * the next packet.
+	 */
+	void (*fin_packet)(libtrace_packet_t *packet);
 	/** write a packet to a trace from the provided packet 
 	 * (or NULL if output not supported)
 	 */
@@ -301,6 +306,8 @@ struct libtrace_format_t {
 	struct libtrace_eventobj_t (*trace_event)(libtrace_t *trace, libtrace_packet_t *packet);	
 	/** return information about this trace format to standard out */
 	void (*help)();
+	/** next pointer, should be NULL */
+	struct libtrace_format_t *next;
 };
 
 extern struct libtrace_format_t *form;

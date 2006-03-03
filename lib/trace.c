@@ -123,9 +123,7 @@
 
 struct trace_err_t trace_err;
 
-struct libtrace_format_t **format_list = 0;
-int format_size = 0;
-int nformats = 0;
+static struct libtrace_format_t *formats_list = 0;
 
 /* strncpy is not assured to copy the final \0, so we
  * will use our own one that does
@@ -144,19 +142,9 @@ static char *xstrndup(const char *src,size_t n)
 }
 
 void register_format(struct libtrace_format_t *f) {
-	if (format_list == 0) {
-		format_size = 10;
-		format_list = malloc(
-					sizeof(struct libtrace_format_t *) *
-					format_size
-				);
-	} else if (format_size == nformats) {
-		format_size = format_size + 10;
-		format_list = realloc(format_list,
-				sizeof(struct libtrace_format_t *) * 
-				format_size);
-	}
-	format_list[nformats] = f;
+	assert(f->next==NULL);
+	f->next=formats_list;
+	formats_list=f;
 	/* Now, verify things */
 #if 0
 	if (format_list[nformats]->init_input) {
@@ -229,7 +217,6 @@ void register_format(struct libtrace_format_t *f) {
 #undef REQUIRE
 	}
 #endif
-	nformats++;
 }
 
 /* Prints help information for libtrace 
@@ -238,12 +225,11 @@ void register_format(struct libtrace_format_t *f) {
  * and then prints out the help() function registered with each input module
  */
 void trace_help() {
-	int i = 0;
+	struct libtrace_format_t *tmp;
 	printf("libtrace %s\n",PACKAGE_VERSION);
-	for (i = 0; i < nformats; i++) {
-		if (format_list[i]->help) {
-			format_list[i]->help();
-		}
+	for(tmp=formats_list;tmp;tmp=tmp->next) {
+		if (tmp->help)
+			tmp->help();
 	}
 }
 
@@ -291,7 +277,7 @@ struct libtrace_t *trace_create(const char *uri) {
         struct libtrace_t *libtrace = malloc(sizeof(struct libtrace_t));
         char *scan = 0;
         const char *uridata = 0;                  
-	int i = 0;
+	struct libtrace_format_t *tmp;
 	
 	trace_err.err_num = TRACE_ERR_NOERROR;
 	libtrace->format=NULL;
@@ -307,19 +293,18 @@ struct libtrace_t *trace_create(const char *uri) {
 	libtrace->snaplen = 0;
 	libtrace->started=false;
 
-	for (i = 0; i < nformats; i++) {
-		if (strlen(scan) == strlen(format_list[i]->name) &&
-				strncasecmp(scan,
-					format_list[i]->name,
-					strlen(scan)) == 0) {
-			libtrace->format=format_list[i];
+	for (tmp=formats_list;tmp;tmp=tmp->next) {
+		if (strlen(scan) == strlen(tmp->name) &&
+				strncasecmp(scan, tmp->name, strlen(scan)) == 0
+				) {
+			libtrace->format=tmp;
 			break;
 		}
 	}
 	if (libtrace->format == 0) {
 		trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT,
 				"Unknown format (%s)",scan);
-		return 0;
+		return libtrace;
 	}
 
         libtrace->uridata = strdup(uridata);
@@ -367,7 +352,7 @@ struct libtrace_t * trace_create_dead (const char *uri) {
 	struct libtrace_t *libtrace = malloc(sizeof(struct libtrace_t));
 	char *scan = calloc(sizeof(char),URI_PROTO_LINE);
 	char *uridata;
-	int i;
+	struct libtrace_format_t *tmp;
 	
 	trace_err.err_num = TRACE_ERR_NOERROR;
 
@@ -379,12 +364,12 @@ struct libtrace_t * trace_create_dead (const char *uri) {
 	
 	libtrace->format = 0;	
 	
-	for (i = 0; i < nformats; i++) {
-                if (strlen(scan) == strlen(format_list[i]->name) &&
+	for(tmp=formats_list;tmp;tmp=tmp->next) {
+                if (strlen(scan) == strlen(tmp->name) &&
                                 !strncasecmp(scan,
-                                        format_list[i]->name,
+                                        tmp->name,
                                         strlen(scan))) {
-                                libtrace->format=format_list[i];
+                                libtrace->format=tmp;
                                 break;
                                 }
         }
@@ -409,35 +394,36 @@ struct libtrace_t * trace_create_dead (const char *uri) {
  */
 	
 libtrace_out_t *trace_create_output(const char *uri) {
-	struct libtrace_out_t *libtrace = malloc(sizeof(struct libtrace_out_t));
+	libtrace_out_t *libtrace = malloc(sizeof(struct libtrace_out_t));
 	
 	char *scan = 0;
         const char *uridata = 0;
-        int i;
+	struct libtrace_format_t *tmp;
 
 	trace_err.err_num = TRACE_ERR_NOERROR;
         /* parse the URI to determine what sort of event we are dealing with */
 
 	if ((uridata = trace_parse_uri(uri, &scan)) == 0) {
-		trace_set_err_out(libtrace,TRACE_ERR_BAD_FORMAT,"Bad uri format (%s)",uri);
+		trace_set_err_out(libtrace,TRACE_ERR_BAD_FORMAT,
+				"Bad uri format (%s)",uri);
 		return libtrace;
 	}
 	
 	
-        libtrace->format = 0;
-        for (i = 0; i < nformats; i++) {
-                if (strlen(scan) == strlen(format_list[i]->name) &&
+        libtrace->format = NULL;
+	for(tmp=formats_list;tmp;tmp=tmp->next) {
+                if (strlen(scan) == strlen(tmp->name) &&
                                 !strncasecmp(scan,
-                                        format_list[i]->name,
+                                        tmp->name,
                                         strlen(scan))) {
-                                libtrace->format=format_list[i];
+                                libtrace->format=tmp;
                                 break;
                                 }
         }
-        if (libtrace->format == 0) {
+        if (libtrace->format == NULL) {
 		trace_set_err_out(libtrace,TRACE_ERR_BAD_FORMAT,
 				"Unknown output format (%s)",scan);
-                return 0;
+                return libtrace;
         }
         libtrace->uridata = strdup(uridata);
 
@@ -451,7 +437,7 @@ libtrace_out_t *trace_create_output(const char *uri) {
                 switch(libtrace->format->init_output(libtrace)) {
 			case -1: /* failure */
 				free(libtrace);
-				return 0;
+				return libtrace;
 			case 0: /* success */
 				break;
 			default:
@@ -500,7 +486,7 @@ int trace_start_output(libtrace_out_t *libtrace)
 		}
 	}
 
-	libtrace->started=false;
+	libtrace->started=true;
 	return 0;
 }
 
@@ -688,6 +674,7 @@ int trace_write_packet(struct libtrace_out_t *libtrace, const struct libtrace_pa
 	/* Verify the packet is valid */
 	assert(packet->size<65536);
 	assert(packet->size>0);
+	assert(libtrace->started);
 
 	if (libtrace->format->write_packet) {
 		return libtrace->format->write_packet(libtrace, packet);
@@ -1674,12 +1661,53 @@ libtrace_err_t trace_get_err(libtrace_t *trace)
 	return err;
 }
 
+bool trace_is_err(libtrace_t *trace)
+{
+	return trace->err.err_num != 0;
+}
+
+void trace_perror(libtrace_t *trace,const char *msg,...)
+{
+	char buf[256];
+	va_list va;
+	va_start(va,msg);
+	vsnprintf(buf,sizeof(buf),msg,va);
+	va_end(va);
+	if(trace->err.err_num) {
+		fprintf(stderr,"%s(%s): %s\n",
+				buf,trace->uridata,trace->err.problem);
+	} else {
+		fprintf(stderr,"%s(%s): No error\n",
+				buf,trace->uridata);
+	}
+}
+
 libtrace_err_t trace_get_err_output(libtrace_out_t *trace)
 {
 	libtrace_err_t err = trace->err;
 	trace->err.err_num = 0; /* "OK" */
 	trace->err.problem[0]='\0';
 	return err;
+}
+
+bool trace_is_err_output(libtrace_out_t *trace)
+{
+	return trace->err.err_num != 0;
+}
+
+void trace_perror_output(libtrace_out_t *trace,const char *msg,...)
+{
+	char buf[256];
+	va_list va;
+	va_start(va,msg);
+	vsnprintf(buf,sizeof(buf),msg,va);
+	va_end(va);
+	if(trace->err.err_num) {
+		fprintf(stderr,"%s(%s): %s\n",
+				buf,trace->uridata,trace->err.problem);
+	} else {
+		fprintf(stderr,"%s(%s): No error\n",buf,trace->uridata);
+	}
 }
 
 int trace_seek_erf_timestamp(libtrace_t *trace, uint64_t ts)
