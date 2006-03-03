@@ -65,6 +65,15 @@ void run_trace(char *uri)
 	fprintf(stderr,"%s:\n",uri);
 
         trace = trace_create(uri);
+	if (trace_is_err(trace)) {
+		trace_perror(trace,"trace_create");
+		return 1;
+	}
+
+	if (trace_start(trace)==-1) {
+		trace_perror(trace,"trace_start");
+		return 1;
+	}
 
         for (;;) {
 		int psize;

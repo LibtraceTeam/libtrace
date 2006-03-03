@@ -104,7 +104,7 @@ void splay_visit(const splay *tree, visitor_t pre,visitor_t inorder,visitor_t po
 		keytype a = ((struct _map_t*)_map_a)->key;		\
 		keytype b = ((struct _map_t*)_map_b)->key;		\
 		return (exp);						\
-	};
+	}
 		
 		
 
@@ -157,7 +157,7 @@ void splay_visit(const splay *tree, visitor_t pre,visitor_t inorder,visitor_t po
 	name ## _t *name = NULL; 					\
 	int name ## _cmp(const splay *a,const splay *b) { 		\
 		return cmp(((name ## _t*)a)->key,((name ## _t *)b)->key); \
-	};
+	}
 
 #define SET_INSERT(name,vkey) \
 	do {				\

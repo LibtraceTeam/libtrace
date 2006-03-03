@@ -15,10 +15,11 @@ MAP(int,MAP(int,stat_t)) protocol_tree = MAP_INIT(cmp_int);
 void port_per_packet(struct libtrace_packet_t *packet)
 {
 	struct libtrace_ip *ip = trace_get_ip(packet);
+	int port;
 	if (!ip)
 		return;
 
-	int port = trace_get_server_port(ip->ip_p,
+	port = trace_get_server_port(ip->ip_p,
 			trace_get_source_port(packet),
 			trace_get_destination_port(packet))==USE_SOURCE
 		? trace_get_source_port(packet)
