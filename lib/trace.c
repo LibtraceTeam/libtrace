@@ -378,7 +378,8 @@ struct libtrace_t * trace_create_dead (const char *uri) {
 				"Unknown format (%s)",scan);
                 return 0;
         }
-	
+
+	libtrace->format_data = NULL;
 	free(scan);
 	return libtrace;
 

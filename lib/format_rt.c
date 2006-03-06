@@ -127,14 +127,18 @@ static int rt_connect(struct libtrace_t *libtrace) {
 
         if (connect(RT_INFO->input_fd, (struct sockaddr *)&remote,
                                 sizeof(struct sockaddr)) == -1) {
-                perror("connect (inet)");
-                return -1;
+                trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
+				"Could not connect to host %s on port %d",
+				RT_INFO->hostname, RT_INFO->port);
+		return -1;
         }
 	
 	/* We are connected, now receive message from server */
 	
 	if (recv(RT_INFO->input_fd, &connect_msg, sizeof(rt_header_t), 0) != sizeof(rt_header_t) ) {
-		printf("An error occured while connecting to %s\n", RT_INFO->hostname);
+		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
+				"Could not receive connection message from %s",
+				RT_INFO->hostname);
 		return -1;
 	}
 
@@ -147,8 +151,9 @@ static int rt_connect(struct libtrace_t *libtrace) {
 				reason = 0;
 			}	
 			reason = deny_hdr.reason;
-			printf("Connection attempt is denied by the server: %s\n",
-					rt_deny_reason(reason));
+			trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
+				"Connection attempt is denied: %s",
+				rt_deny_reason(reason));	
 			return -1;
 		case RT_HELLO:
 			/* do something with options */
@@ -156,17 +161,21 @@ static int rt_connect(struct libtrace_t *libtrace) {
 			if (recv(RT_INFO->input_fd, &hello_opts, 
 						sizeof(rt_hello_t), 0)
 					!= sizeof(rt_hello_t)) {
-				printf("Failed to read hello options\n");
-				return 0;
+				trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
+					"Failed to receive RT_HELLO options");
+				return -1;
 			}
 			reliability = hello_opts.reliable;
 			
 			return 0;
 		default:
-			printf("Unexpected message type: %d\n", connect_msg.type);
+			trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
+					"Unknown message type received: %d",
+					connect_msg.type);
 			return -1;
 	}
-	
+	trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
+			"Somehow you managed to reach this unreachable code");
         return -1;
 }
 
@@ -275,18 +284,21 @@ static int rt_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
 
 static int rt_set_format(libtrace_t *libtrace, libtrace_packet_t *packet) 
 {
+	
+	if (packet->type >= RT_DATA_PCAP) {
+		if (!RT_INFO->dummy_pcap) {
+			RT_INFO->dummy_pcap = trace_create_dead("pcap:-");
+		}
+		packet->trace = RT_INFO->dummy_pcap;
+		return;	
+	}
+
 	switch (packet->type) {
 		case RT_DATA_ERF:
 			if (!RT_INFO->dummy_erf) {
 				RT_INFO->dummy_erf = trace_create_dead("erf:-");
 			}
 			packet->trace = RT_INFO->dummy_erf;
-			break;
-		case RT_DATA_PCAP:
-			if (!RT_INFO->dummy_pcap) {
-				RT_INFO->dummy_pcap = trace_create_dead("pcap:-");
-			}
-			packet->trace = RT_INFO->dummy_pcap;
 			break;
 		case RT_DATA_WAG:
 			if (!RT_INFO->dummy_wag) {
@@ -394,54 +406,51 @@ static int rt_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 
 	packet->type = pkt_hdr.type;
 	pkt_size = pkt_hdr.length;
+	packet->size = pkt_hdr.length;
 
-	switch(packet->type) {
-		case RT_DATA_ERF:
-		case RT_DATA_PCAP:
-		case RT_DATA_WAG:
-		case RT_DATA_LEGACY_ETH:
-		case RT_DATA_LEGACY_POS:
-		case RT_DATA_LEGACY_ATM:
-			if (rt_read(libtrace, buffer, pkt_size) != pkt_size) {
-				printf("Error receiving packet\n");
-				return -1;
-			}
-			
-			if (rt_set_format(libtrace, packet) < 0) {
-                        	return -1;
+	if (packet->type >= RT_DATA_SIMPLE) {
+		if (rt_read(libtrace, buffer, pkt_size) != pkt_size) {
+			printf("Error receiving packet\n");
+			return -1;
+		}
+		
+		if (rt_set_format(libtrace, packet) < 0) {
+                       	return -1;
+                }
+               	rt_set_payload(packet);
+
+                if (reliability > 0) {
+                        
+			if (rt_send_ack(libtrace, pkt_hdr.sequence) 
+					== -1)
+			{
+                               	return -1;
                         }
-                       	rt_set_payload(packet);
-
-                        if (reliability > 0) {
-	                        
-				if (rt_send_ack(libtrace, pkt_hdr.sequence) 
-						== -1)
-				{
-                                	return -1;
-                                }
-			}
-			break;
-		case RT_STATUS:
-		case RT_DUCK:
-			if (rt_read(libtrace, buffer, pkt_size) !=
-					pkt_size) {
-				printf("Error receiving status packet\n");
-				return -1;
-			}
-			packet->header = 0;
-			packet->payload = buffer;
-			break;
-		case RT_END_DATA:
-			return 0;
-		case RT_PAUSE_ACK:
-			/* FIXME: Do something useful */
-			break;
-		case RT_OPTION:
-			/* FIXME: Do something useful here as well */
-			break;
-		default:
-			printf("Bad rt type for client receipt: %d\n",
+		}
+	} else {
+		switch(packet->type) {
+			case RT_STATUS:
+			case RT_DUCK:
+				if (rt_read(libtrace, buffer, pkt_size) !=
+						pkt_size) {
+					printf("Error receiving status packet\n");
+					return -1;
+				}
+				packet->header = 0;
+				packet->payload = buffer;
+				break;
+			case RT_END_DATA:
+				return 0;
+			case RT_PAUSE_ACK:
+				/* FIXME: Do something useful */
+				break;
+			case RT_OPTION:
+				/* FIXME: Do something useful here as well */
+				break;
+			default:
+				printf("Bad rt type for client receipt: %d\n",
 					pkt_hdr.type);
+		}
 	}
 	return trace_get_capture_length(packet)+trace_get_framing_length(packet);
 }

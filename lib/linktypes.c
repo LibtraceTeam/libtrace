@@ -1,6 +1,8 @@
 #include "libtrace.h"
 #include <pcap.h>
 #include "dagformat.h"
+#include "rt_protocol.h"
+#include <assert.h>
 
 /* This file maps libtrace types to/from pcap DLT and erf types
  *
@@ -43,6 +45,18 @@ int libtrace_to_pcap_dlt(libtrace_linktype_t type)
 		default:
 			return -1;
 	}
+}
+
+enum rt_field_t pcap_dlt_to_rt(int dlt) 
+{
+	/* For pcap the rt type is just the dlt + a fixed value */
+	return dlt + RT_DATA_PCAP;
+}
+
+int rt_to_pcap_dlt(enum rt_field_t rt_type)
+{
+	assert(rt_type >= RT_DATA_PCAP);
+	return rt_type - RT_DATA_PCAP;
 }
 
 libtrace_linktype_t erf_type_to_libtrace(char erf)

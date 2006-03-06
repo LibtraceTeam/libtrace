@@ -316,6 +316,8 @@ void register_format(struct libtrace_format_t *format);
 
 libtrace_linktype_t pcap_dlt_to_libtrace(int dlt);
 char libtrace_to_pcap_dlt(libtrace_linktype_t type);
+enum rt_field_t pcap_dlt_to_rt(int dlt);
+int rt_to_pcap_dlt(enum rt_field_t rt_type);
 libtrace_linktype_t erf_type_to_libtrace(char erf);
 char libtrace_to_erf_type(libtrace_linktype_t linktype);
 

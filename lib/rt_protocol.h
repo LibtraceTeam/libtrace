@@ -2,12 +2,16 @@
 #define _RT_PROTOCOL_H
 
 #include "libtrace.h"
+#include <pcap.h>
 
 #define CAPTURE_PORT 3434
 #define COLLECTOR_PORT 3435
 
 #define RT_MAX_HDR_SIZE 256
 #define MAX_SEQUENCE 2147483647 
+
+#define RT_DATA_SIMPLE 1000
+#define RT_DATA_PCAP 2000
 
 /* Type field definitions */
 enum rt_field_t {
@@ -23,12 +27,23 @@ enum rt_field_t {
  RT_PAUSE_ACK	=10,	/* Server is paused message */
  RT_OPTION	=11,	/* Option request */
  
- RT_DATA_ERF		=12,	/* Erf data packet */
- RT_DATA_PCAP		=13, 	/* Pcap data packet */
- RT_DATA_WAG		=14, 	/* Wag data packet */
- RT_DATA_LEGACY_ATM	=15, 	/* Legacy ATM packet */
- RT_DATA_LEGACY_POS	=16,	/* Legacy POS packet */
- RT_DATA_LEGACY_ETH	=17	/* Legacy ETH packet */
+ RT_DATA_ERF		=RT_DATA_SIMPLE + TRACE_FORMAT_ERF, 
+ RT_DATA_WAG		=RT_DATA_SIMPLE + TRACE_FORMAT_WAG, 
+ RT_DATA_LEGACY_ATM	=RT_DATA_SIMPLE + TRACE_FORMAT_LEGACY_ATM, 
+ RT_DATA_LEGACY_POS	=RT_DATA_SIMPLE + TRACE_FORMAT_LEGACY_POS, 
+ RT_DATA_LEGACY_ETH	=RT_DATA_SIMPLE + TRACE_FORMAT_LEGACY_ETH, 
+
+ RT_DATA_PCAP_NULL		=RT_DATA_PCAP + DLT_NULL,
+ RT_DATA_PCAP_EN10MB		=RT_DATA_PCAP + DLT_EN10MB,
+ RT_DATA_PCAP_ATM_RFC1483	=RT_DATA_PCAP + DLT_ATM_RFC1483,
+ RT_DATA_PCAP_IEEE802_11	=RT_DATA_PCAP + DLT_IEEE802_11,
+#ifdef DLT_LINUX_SLL
+ RT_DATA_PCAP_LINUX_SLL		=RT_DATA_PCAP + DLT_LINUX_SLL,
+#endif
+#ifdef DLT_PFLOG
+ RT_DATA_PCAP_PFLOG		=RT_DATA_PCAP + DLT_PFLOG,
+#endif
+
 };
 
 typedef struct fifo_info {

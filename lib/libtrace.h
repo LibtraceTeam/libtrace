@@ -111,7 +111,7 @@ typedef struct libtrace_packet_t {
 	void *buffer;		/**< allocated buffer */
 	size_t size;		/**< trace_get_framing_length()
 				 * +trace_get_capture_length() */
-	uint8_t type;		/**< rt protocol type for the packet */
+	uint32_t type;		/**< rt protocol type for the packet */
 } libtrace_packet_t;
 
 /** libtrace error information */

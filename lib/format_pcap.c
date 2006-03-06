@@ -269,8 +269,11 @@ static void trace_pcap_handler(u_char *user, const struct pcap_pkthdr *pcaphdr, 
 
 static int pcap_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
 	int pcapbytes = 0;
-	
-	packet->type = RT_DATA_PCAP;
+	int linktype;
+
+	assert(libtrace->format_data);
+	linktype = pcap_datalink(DATA(libtrace)->input.pcap);
+	packet->type = pcap_dlt_to_rt(linktype);
 	
 	pcapbytes = pcap_dispatch(INPUT.pcap,
 					1, /* number of packets */
@@ -317,7 +320,17 @@ static libtrace_linktype_t pcap_get_link_type(const libtrace_packet_t *packet) {
 	struct pcap_pkthdr *pcapptr = 0;
 	int linktype = 0;
 	pcapptr = (struct pcap_pkthdr *)packet->header;
-	linktype = pcap_datalink(DATA(packet->trace)->input.pcap);
+
+	/* pcap doesn't store dlt in the framing header so we need
+	 * rt to do it for us 
+	 */
+	linktype = rt_to_pcap_dlt(packet->type);
+	/*
+	if (packet->trace->format_data == NULL) 
+		linktype = rt_to_pcap_dlt(packet->type);
+	else 
+		linktype = pcap_datalink(DATA(packet->trace)->input.pcap);
+	*/
 	return pcap_dlt_to_libtrace(linktype);
 }
 
@@ -419,6 +432,8 @@ static size_t pcap_set_capture_length(libtrace_packet_t *packet,size_t size) {
 }
 
 static int pcap_get_fd(const libtrace_t *trace) {
+
+	assert(trace->format_data);
 	return pcap_fileno(DATA(trace)->input.pcap);
 }
 
