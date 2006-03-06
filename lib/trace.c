@@ -1782,7 +1782,7 @@ int trace_seek_timeval(libtrace_t *trace, struct timeval tv)
 			return trace->format->seek_erf(trace,timestamp);
 		}
 		if (trace->format->seek_seconds) {
-			double seconds = tv.tv_sec + ((tv.tv_usec * UINT_MAX * 1.0)/1000000);
+			double seconds = tv.tv_sec + ((tv.tv_usec * 1.0)/1000000);
 			return trace->format->seek_seconds(trace,seconds);
 		}
 		trace_set_err(trace,
