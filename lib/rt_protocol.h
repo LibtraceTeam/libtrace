@@ -13,6 +13,30 @@
 #define RT_DATA_SIMPLE 1000
 #define RT_DATA_PCAP 2000
 
+/* Procedure for adding new RT control types
+ * -------------------------------------------
+ *
+ * Add type to the enum list
+ * Add a struct below (even if it is empty)
+ * Update rt_get_capture_length
+ * If type is intended to be sent TO clients, update rt_read_packet
+ * 	Otherwise, update server implementations e.g. WDCAP
+ *
+ * Procedure for adding new RT data types
+ * ----------------------------------------
+ * 
+ * If you are adding a new format:
+ * 	RT_DATA_(new format) must be equal to RT_DATA_SIMPLE + 
+ * 		TRACE_FORMAT_(new_format)
+ * 	Add a new dummy trace type to the rt_format_t structure
+ * 	Set the dummy trace to NULL in rt_init_input
+ * 	Update rt_set_format
+ *
+ * If you are adding a new PCAP DLT type:
+ * 	RT_DATA_PCAP_(new DLT) must be equal to RT_DATA_PCAP + (DLT value)
+ * 	
+ */
+
 /* Type field definitions */
 enum rt_field_t {
  RT_HELLO       =1,     /* Connection accepted */
@@ -26,6 +50,7 @@ enum rt_field_t {
  RT_PAUSE	=9,	/* Request server to suspend sending data */
  RT_PAUSE_ACK	=10,	/* Server is paused message */
  RT_OPTION	=11,	/* Option request */
+ RT_KEYCHANGE	=12,	/* Anonymisation key has changed */ 
  
  RT_DATA_ERF		=RT_DATA_SIMPLE + TRACE_FORMAT_ERF, 
  RT_DATA_WAG		=RT_DATA_SIMPLE + TRACE_FORMAT_WAG, 
@@ -43,7 +68,7 @@ enum rt_field_t {
 #ifdef DLT_PFLOG
  RT_DATA_PCAP_PFLOG		=RT_DATA_PCAP + DLT_PFLOG,
 #endif
-
+ RT_LAST = 3000
 };
 
 typedef struct fifo_info {
@@ -115,7 +140,8 @@ typedef struct rt_option {
 
 } rt_option_t;
 
-
-
+typedef struct rt_keychange {
+	
+} rt_keychange_t;
 
 #endif

@@ -1171,7 +1171,7 @@ double trace_get_seconds(const struct libtrace_packet_t *packet) {
 	} else if (packet->trace->format->get_timeval) {
 		/* timeval -> seconds */
 		tv = packet->trace->format->get_timeval(packet);
-		seconds = tv.tv_sec + ((tv.tv_usec * UINT_MAX * 1.0)/1000000);
+		seconds = tv.tv_sec + ((tv.tv_usec * 1.0) / 1000000);
 	}
 
 	return seconds;
@@ -1179,7 +1179,8 @@ double trace_get_seconds(const struct libtrace_packet_t *packet) {
 
 size_t trace_get_capture_length(const libtrace_packet_t *packet) {
 
-	assert(packet->size>0 && packet->size<65536);
+	/* Packets can be have a size of zero */
+	assert(packet->size>=0 && packet->size<65536);
 
 	if (packet->trace->format->get_capture_length) {
 		return packet->trace->format->get_capture_length(packet);

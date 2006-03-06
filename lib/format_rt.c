@@ -447,12 +447,15 @@ static int rt_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 			case RT_OPTION:
 				/* FIXME: Do something useful here as well */
 				break;
+			case RT_KEYCHANGE:
+				break;
 			default:
 				printf("Bad rt type for client receipt: %d\n",
 					pkt_hdr.type);
 		}
 	}
-	return trace_get_capture_length(packet)+trace_get_framing_length(packet);
+	/* Return the number of bytes read from the stream */
+	return sizeof(rt_header_t) + packet->size; 
 }
 
 static int rt_get_capture_length(const struct libtrace_packet_t *packet) {
@@ -479,6 +482,8 @@ static int rt_get_capture_length(const struct libtrace_packet_t *packet) {
 			return sizeof(rt_pause_ack_t);
 		case RT_OPTION:
 			return sizeof(rt_option_t);
+		case RT_KEYCHANGE:
+			return sizeof(rt_keychange_t);
 	}
 	printf("Unknown type: %d\n", packet->type);
 	return 0;
