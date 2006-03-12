@@ -45,10 +45,20 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <string.h>
+#include <unistd.h>
 #include "dagformat.h"
 #include "libtrace.h"
 
 struct libtrace_t *trace;
+
+void iferr(libtrace_t *trace)
+{
+	libtrace_err_t err = trace_get_err(trace);
+	if (err.err_num==0)
+		return;
+	printf("Error: %s\n",err.problem);
+	exit(1);
+}
 
 int main(int argc, char *argv[]) {
         char *uri = "erf:traces/100_packets.erf";
@@ -58,8 +68,10 @@ int main(int argc, char *argv[]) {
 	libtrace_packet_t *packet;
 
 	trace = trace_create(uri);
+	iferr(trace);
 
 	trace_start(trace);
+	iferr(trace);
 	
 	packet=trace_create_packet();
 	while(running) {
@@ -85,6 +97,7 @@ int main(int argc, char *argv[]) {
 			}
 			break;
 		}
+		iferr(trace);
         }
 	trace_destroy_packet(&packet);
 	if (error == 0) {
@@ -95,7 +108,7 @@ int main(int argc, char *argv[]) {
 			error = 1;
 		}
 	} else {
-		printf("failure: %s\n",trace_get_err(trace).problem);
+		iferr(trace);
 	}
         trace_destroy(trace);
         return error;

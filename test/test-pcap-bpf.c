@@ -50,6 +50,15 @@
 
 struct libtrace_t *trace;
 
+void iferr(libtrace_t *trace)
+{
+	libtrace_err_t err = trace_get_err(trace);
+	if (err.err_num==0)
+		return;
+	printf("Error: %s\n",err.problem);
+	exit(1);
+}
+
 int main(int argc, char *argv[]) {
         char *uri = "pcap:traces/100_packets.pcap";
         int psize = 0;
@@ -59,16 +68,13 @@ int main(int argc, char *argv[]) {
 	struct libtrace_filter_t *filter = trace_bpf_setfilter("port 80");
 
 	trace = trace_create(uri);
-	if (!trace) {
-		printf("ERROR: %s\n",trace_get_err(trace).problem);
-		return 1;
-	}
+	iferr(trace);
 
 	trace_config(trace,TRACE_OPTION_FILTER,filter);
+	iferr(trace);
 
 	if (trace_start(trace)==-1) {
-		printf("ERROR: %s\n",trace_get_err(trace).problem);
-		return 1;
+		iferr(trace);
 	}
 	
 	packet=trace_create_packet();
@@ -92,7 +98,7 @@ int main(int argc, char *argv[]) {
 			error = 1;
 		}
 	} else {
-		printf("failure: %s\n",trace_get_err(trace).problem);
+		iferr(trace);
 	}
         trace_destroy(trace);
         return error;
