@@ -75,8 +75,8 @@ static void output_png_destroy(struct output_data_t *out)
 }
 
 struct output_type_t output_png = {
-	name: "png",
-	init: output_png_init,
-	flush: output_png_flush,
-	destroy: output_png_destroy,
+	.name= "png",
+	.init= output_png_init,
+	.flush= output_png_flush,
+	.destroy= output_png_destroy,
 };

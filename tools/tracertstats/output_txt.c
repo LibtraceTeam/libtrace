@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <inttypes.h>
 #include <lt_inttypes.h>
+#include <string.h>
 
 #define COLWIDTH 11
 
@@ -52,8 +53,8 @@ static void output_txt_destroy(struct output_data_t *out)
 }
 
 struct output_type_t output_txt = {
-name: "txt",
-init: output_txt_init,
-flush: output_txt_flush,
-destroy: output_txt_destroy,
+.name= "txt",
+.init= output_txt_init,
+.flush= output_txt_flush,
+.destroy= output_txt_destroy,
 };

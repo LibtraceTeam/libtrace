@@ -21,10 +21,11 @@ void usage(char *argv0)
 	"			prefix preserving\n"
 	"-p --prefix=C.I.D.R/bits Substitute the prefix of the address\n"
 	,argv0);
+	trace_help();
 	exit(1);
 }
 
-// Incrementally update a checksum
+/* Incrementally update a checksum */
 void update_in_cksum(uint16_t *csum, uint16_t old, uint16_t new)
 {
 	uint32_t sum = (~htons(*csum) & 0xFFFF) 
@@ -153,31 +154,43 @@ int main(int argc, char *argv[])
 
 	enc_init(enc_type,key);
 
-	// open input uri
+	/* open input uri */
 	trace = trace_create(argv[optind]);
-	if (!trace) {
-		fprintf(stderr,"Cannot open %s\n",argv[optind]);
-		trace_perror(argv[optind]);
+	if (trace_is_err(trace)) {
+		trace_perror(trace,argv[optind]);
+		trace_destroy(trace);
 		return 1;
 	}
 	
 	if (optind == argc) {
-		// no output specified, output in same format to stdout
+		/* no output specified, output in same format to stdout */
 		asprintf(&output,"%s:-","erf");
 		writer = trace_create_output(output);
 	} else {
 		writer = trace_create_output(argv[optind +1]);
 	}
-	if (!writer) {
-		trace_perror("trace_create_output");
+	if (trace_is_err_output(writer)) {
+		trace_perror_output(writer,"trace_create_output");
+		trace_destroy_output(writer);
+		trace_destroy(trace);
 		return 1;
 	}
 	
-	
+	if (trace_start(trace)==-1) {
+		trace_perror(trace,"trace_start");
+	}
+	if (trace_start_output(writer)==-1) {
+		trace_perror_output(writer,"trace_start_output");
+	}
 	for(;;) {
 		struct libtrace_ip *ipptr;
 		int psize;
-		if ((psize = trace_read_packet(trace, packet)) <= 0) {
+		psize = trace_read_packet(trace, packet);
+		if (psize == 0) {
+			break;
+		}
+		if (psize < 0) {
+			trace_perror(trace,"read_packet");
 			break;
 		}
 
@@ -188,7 +201,13 @@ int main(int argc, char *argv[])
 
 		/* TODO: Encrypt IP's in ARP packets */
 
-		trace_write_packet(writer,packet);
+		if (trace_write_packet(writer,packet)==-1) {
+			trace_perror_output(writer,"writer");
+			break;
+		}
 	}
+	trace_destroy_packet(&packet);
+	trace_destroy(trace);
+	trace_destroy_output(writer);
 	return 0;
 }

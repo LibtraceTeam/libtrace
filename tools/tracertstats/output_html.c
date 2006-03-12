@@ -64,8 +64,8 @@ static void output_html_destroy(struct output_data_t *out)
 }
 
 struct output_type_t output_html = {
-name: "html",
-init: output_html_init,
-flush: output_html_flush,
-destroy: output_html_destroy,
+.name= "html",
+.init= output_html_init,
+.flush= output_html_flush,
+.destroy= output_html_destroy,
 };

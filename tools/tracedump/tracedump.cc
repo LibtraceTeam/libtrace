@@ -12,7 +12,7 @@ void usage(char *argv0)
 	"%s flags inputfile\n"
 	"-f --filter=expr	BPF filter specification, quoted\n"
 	"-c --count=num		terminate after num packets\n"
-	,argv0);
+		,argv0);
 	exit(0);
 }
 
@@ -60,15 +60,19 @@ int main(int argc,char **argv)
 	while(optind <argc) {
 		trace = trace_create(argv[optind]);
 		numpackets = 0;
-		if (!trace) {
-			errx(1,"Failed to open trace");
+		if (trace_is_err(trace)) {
+			trace_perror(trace,"trace_create");
+			trace_destroy(trace);
+			continue;
 		}
 
+		trace_start(trace);
 		while(trace_read_packet(trace,packet)> 0 ){
 			if (filter && !trace_bpf_filter(filter,packet))
 				continue;
 
 			trace_dump_packet(packet);
+
 			if(count) {
 				numpackets++;
 				if (numpackets == count)

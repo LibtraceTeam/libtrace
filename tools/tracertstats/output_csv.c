@@ -45,8 +45,8 @@ static void output_csv_destroy(struct output_data_t *out)
 }
 
 struct output_type_t output_csv = {
-name: "csv",
-init: output_csv_init,
-flush: output_csv_flush,
-destroy: output_csv_destroy,
+.name= "csv",
+.init= output_csv_init,
+.flush= output_csv_flush,
+.destroy= output_csv_destroy,
 };

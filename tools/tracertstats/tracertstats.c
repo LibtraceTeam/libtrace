@@ -28,9 +28,9 @@
  *
  */
 
-// 
-// This program takes a series of traces and bpf filters and outputs how many
-// bytes/packets every time interval
+/* This program takes a series of traces and bpf filters and outputs how many
+ * bytes/packets every time interval
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -97,8 +97,8 @@ void run_trace(char *uri)
 	double last_ts = 0;
 	double ts = 0;
 
-	output=output_init(uri,output_format?:"txt");
-	output_add_column(output,"unix_time");
+	output=output_init(uri,output_format?output_format:"txt");
+	output_add_column(output,"ts");
 	output_add_column(output,"packets");
 	output_add_column(output,"bytes");
 	for(i=0;i<filter_count;++i) {
@@ -112,6 +112,18 @@ void run_trace(char *uri)
 
 
         trace = trace_create(uri);
+	if (trace_is_err(trace)) {
+		trace_perror(trace,"trace_create");
+		trace_destroy(trace);
+		output_destroy(output);
+		return; 
+	}
+	if (trace_start(trace)==-1) {
+		trace_perror(trace,"trace_start");
+		trace_destroy(trace);
+		output_destroy(output);
+		return;
+	}
 
         for (;;) {
 		int psize;
@@ -140,7 +152,7 @@ void run_trace(char *uri)
 			last_ts+=packet_interval;
 		}
 
-		if (count > packet_count) {
+		if (count >= packet_count) {
 			report_results(ts,count,bytes);
 			count=0;
 			bytes=0;
