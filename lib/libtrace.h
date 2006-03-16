@@ -931,6 +931,45 @@ int trace_bpf_filter(libtrace_filter_t *filter,
 		const libtrace_packet_t *packet);
 /*@}*/
 
+/** @name Portability
+ * This section has functions that causes annoyances to portability for one
+ * reason or another.
+ * @{
+ */
+
+/** Convert an ethernet address to a string 
+ * @param addr 	Ethernet address in network byte order
+ * @param buf	Buffer to store the ascii representation, or NULL
+ * @return buf, or if buf is NULL then a statically allocated buffer.
+ *
+ * This function is similar to the GNU ether_ntoa_r function, with a few
+ * minor differences.  if NULL is passed as buf, then the function will
+ * use an internal static buffer, if NULL isn't passed then the function
+ * will use that buffer instead.
+ *
+ * @note the type of addr isn't struct ether_addr as it is with ether_ntoa_r,
+ * however it is bit compatible so that a cast will work.
+ */ 
+char *trace_ether_ntoa(const uint8_t *addr, char *buf);
+
+/** Convert a string to an ethernet address
+ * @param buf	Ethernet address in hex format delimited with :'s.
+ * @param addr	buffer to store the binary representation, or NULL
+ * @return addr, or if addr is NULL, then a statically allocated buffer.
+ *
+ * This function is similar to the GNU ether_aton_r function, with a few
+ * minor differences.  if NULL is passed as addr, then the function will
+ * use an internal static buffer, if NULL isn't passed then the function will 
+ * use that buffer instead.
+ * 
+ * @note the type of addr isn't struct ether_addr as it is with ether_aton_r,
+ * however it is bit compatible so that a cast will work.
+ */
+uint8_t *trace_ether_aton(const char *buf, uint8_t *addr);
+
+/*@}*/
+
+
 /** Which port is the server port */
 typedef enum {
 	USE_DEST, 	/**< Destination port is the server port */

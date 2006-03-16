@@ -612,7 +612,7 @@ void trace_destroy_packet(struct libtrace_packet_t **packet) {
 		free((*packet)->buffer);
 	}
 	free((*packet));
-	packet = NULL;
+	*packet = NULL;
 }	
 
 /* Read one packet from the trace into buffer
@@ -1179,8 +1179,7 @@ double trace_get_seconds(const struct libtrace_packet_t *packet) {
 
 size_t trace_get_capture_length(const libtrace_packet_t *packet) {
 
-	/* Packets can be have a size of zero */
-	assert(packet->size>=0 && packet->size<65536);
+	assert(packet->size<65536);
 
 	if (packet->trace->format->get_capture_length) {
 		return packet->trace->format->get_capture_length(packet);
@@ -1793,3 +1792,29 @@ int trace_seek_timeval(libtrace_t *trace, struct timeval tv)
 	}
 }
 
+char *trace_ether_ntoa(const uint8_t *addr, char *buf)
+{
+	char *buf2 = buf;
+	static char staticbuf[17]={0,};
+	if (!buf2)
+		buf2=staticbuf;
+	sprintf(buf2,"%02x:%02x:%02x:%02x:%02x:%02x",
+			addr[0],addr[1],addr[2],
+			addr[3],addr[4],addr[5]);
+	return buf2;
+}
+
+uint8_t *trace_ether_aton(const char *buf, uint8_t *addr)
+{
+	uint8_t *buf2 = addr;
+	unsigned int tmp[6];
+	static uint8_t staticaddr[6];
+	if (!buf2)
+		buf2=staticaddr;
+	sscanf(buf,"%x:%x:%x:%x:%x:%x",
+			&tmp[0],&tmp[1],&tmp[2],
+			&tmp[3],&tmp[4],&tmp[5]);
+	buf2[0]=tmp[0]; buf2[1]=tmp[1]; buf2[2]=tmp[2];
+	buf2[3]=tmp[3]; buf2[4]=tmp[4]; buf2[5]=tmp[5];
+	return buf2;
+}
