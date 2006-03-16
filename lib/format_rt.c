@@ -238,7 +238,8 @@ static int rt_fin_input(struct libtrace_t *libtrace) {
 	
 	/* Send a close message to the server */
 	if (send(RT_INFO->input_fd, &close_msg, sizeof(rt_header_t) + 
-				close_msg.length, 0) != sizeof(rt_header_t)) {
+				close_msg.length, 0) != sizeof(rt_header_t)
+				+ close_msg.length) {
 		printf("Failed to send close message to server\n");
 	
 	}
@@ -290,7 +291,7 @@ static int rt_set_format(libtrace_t *libtrace, libtrace_packet_t *packet)
 			RT_INFO->dummy_pcap = trace_create_dead("pcap:-");
 		}
 		packet->trace = RT_INFO->dummy_pcap;
-		return;	
+		return 0;	
 	}
 
 	switch (packet->type) {
