@@ -299,7 +299,9 @@ static int pcap_write_packet(libtrace_out_t *libtrace, const libtrace_packet_t *
 	}
 	if (packet->trace->format == &pcap || 
 			packet->trace->format == &pcapint) {
-		pcap_dump((u_char*)OUTPUT.trace.dump,(struct pcap_pkthdr *)packet->header,packet->payload);
+		pcap_dump((u_char*)OUTPUT.trace.dump,
+				(struct pcap_pkthdr *)packet->header,
+				packet->payload);
 	} else {
 		/* Leave the manual copy as it is, as it gets around 
 		 * some OS's having different structures in pcap_pkt_hdr
@@ -308,7 +310,11 @@ static int pcap_write_packet(libtrace_out_t *libtrace, const libtrace_packet_t *
 		pcap_pkt_hdr.ts.tv_sec = ts.tv_sec;
 		pcap_pkt_hdr.ts.tv_usec = ts.tv_usec;
 		pcap_pkt_hdr.caplen = trace_get_capture_length(packet);
-		pcap_pkt_hdr.len = trace_get_wire_length(packet);
+		/* trace_get_wire_length includes FCS, while pcap doesn't */
+		if (trace_get_link_type(packet)==TRACE_TYPE_ETH)
+			pcap_pkt_hdr.len = trace_get_wire_length(packet)-4;
+		else
+			pcap_pkt_hdr.len = trace_get_wire_length(packet);
 
 		assert(pcap_pkt_hdr.caplen<65536);
 		assert(pcap_pkt_hdr.len<65536);
@@ -408,13 +414,17 @@ static int pcap_get_capture_length(const libtrace_packet_t *packet) {
 	struct pcap_pkthdr *pcapptr = 0;
 	pcapptr = (struct pcap_pkthdr *)packet->header;
 	assert(pcapptr->caplen<=65536);
+
 	return pcapptr->caplen;
 }
 
 static int pcap_get_wire_length(const libtrace_packet_t *packet) {
 	struct pcap_pkthdr *pcapptr = 0;
 	pcapptr = (struct pcap_pkthdr *)packet->header;
-	return pcapptr->len;
+	if (packet->type==pcap_dlt_to_rt(DLT_EN10MB))
+		return pcapptr->len+4; /* Include the missing FCS */
+	else
+		return pcapptr->len;
 }
 
 static int pcap_get_framing_length(const libtrace_packet_t *packet UNUSED) {

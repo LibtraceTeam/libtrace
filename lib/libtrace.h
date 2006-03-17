@@ -810,6 +810,7 @@ size_t trace_get_capture_length(const libtrace_packet_t *packet);
  * @return the size of the packet as it was on the wire.
  * @note Due to the trace being a header capture, or anonymisation this may
  * not be the same as the Capture Len.
+ * @note trace_getwire_length \em{includes} FCS.
  */ 
 SIMPLE_FUNCTION
 size_t trace_get_wire_length(const libtrace_packet_t *packet);
