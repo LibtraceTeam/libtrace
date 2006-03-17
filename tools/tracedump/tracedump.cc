@@ -59,6 +59,7 @@ int main(int argc,char **argv)
 
 	while(optind <argc) {
 		trace = trace_create(argv[optind]);
+		optind ++;
 		numpackets = 0;
 		if (trace_is_err(trace)) {
 			trace_perror(trace,"trace_create");
@@ -67,6 +68,11 @@ int main(int argc,char **argv)
 		}
 
 		trace_start(trace);
+		if (trace_is_err(trace)) {
+			trace_perror(trace,"trace_start");
+			trace_destroy(trace);
+			continue;
+		}
 		while(trace_read_packet(trace,packet)> 0 ){
 			if (filter && !trace_bpf_filter(filter,packet))
 				continue;
@@ -82,7 +88,6 @@ int main(int argc,char **argv)
 
 		printf("\n");
 		trace_destroy(trace);
-		optind ++;
 	}
 	return 0;
 }
