@@ -297,9 +297,8 @@ static int pcap_write_packet(libtrace_out_t *libtrace, const libtrace_packet_t *
 				libtrace->uridata);
 		fflush((FILE *)OUTPUT.trace.dump);
 	}
-	if (libtrace->format == &pcap || 
-			libtrace->format == &pcapint) {
-		
+	if (packet->trace->format == &pcap || 
+			packet->trace->format == &pcapint) {
 		pcap_dump((u_char*)OUTPUT.trace.dump,(struct pcap_pkthdr *)packet->header,packet->payload);
 	} else {
 		/* Leave the manual copy as it is, as it gets around 
@@ -310,6 +309,9 @@ static int pcap_write_packet(libtrace_out_t *libtrace, const libtrace_packet_t *
 		pcap_pkt_hdr.ts.tv_usec = ts.tv_usec;
 		pcap_pkt_hdr.caplen = trace_get_capture_length(packet);
 		pcap_pkt_hdr.len = trace_get_wire_length(packet);
+
+		assert(pcap_pkt_hdr.caplen<65536);
+		assert(pcap_pkt_hdr.len<65536);
 
 		pcap_dump((u_char*)OUTPUT.trace.dump, &pcap_pkt_hdr, packet->payload);
 	}

@@ -687,14 +687,14 @@ static int erf_dump_packet(libtrace_out_t *libtrace,
 		dag_record_t *erfptr, int pad, void *buffer, size_t size) {
 	int numbytes = 0;
 	assert(size<=65536);
-	/* FIXME: Shouldn't this return != dag_record_size+pad on error? */
-	if ((numbytes = LIBTRACE_WRITE(OUTPUT.file, erfptr, dag_record_size + pad)) == 0) {
+
+	if ((numbytes = LIBTRACE_WRITE(OUTPUT.file, erfptr, dag_record_size + pad)) != dag_record_size+pad) {
 		trace_set_err_out(libtrace,errno,
 				"write(%s)",libtrace->uridata);
 		return -1;
 	}
 
-	if ((numbytes=LIBTRACE_WRITE(OUTPUT.file, buffer, size)) == 0) {
+	if ((numbytes=LIBTRACE_WRITE(OUTPUT.file, buffer, size)) != size) {
 		trace_set_err_out(libtrace,errno,
 				"write(%s)",libtrace->uridata);
 		return -1;
@@ -732,13 +732,13 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 		dag_hdr->rlen = htons(dag_record_size + pad);
 	} 
 	
-	if (libtrace->format == &erf  
+	if (packet->trace->format == &erf  
 #if HAVE_DAG
-			|| libtrace->format == &dag 
+			|| packet->trace->format == &dag 
 #endif
 			) {
 		numbytes = erf_dump_packet(libtrace,
-				(dag_record_t *)packet->buffer,
+				(dag_record_t *)packet->header,
 				pad,
 				payload,
 				trace_get_capture_length(packet)
