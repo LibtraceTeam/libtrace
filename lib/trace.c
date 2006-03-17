@@ -121,8 +121,6 @@
 #define MAXOPTS 1024
 
 
-struct trace_err_t trace_err;
-
 static struct libtrace_format_t *formats_list = 0;
 
 /* strncpy is not assured to copy the final \0, so we
@@ -279,7 +277,7 @@ struct libtrace_t *trace_create(const char *uri) {
         const char *uridata = 0;                  
 	struct libtrace_format_t *tmp;
 	
-	trace_err.err_num = TRACE_ERR_NOERROR;
+	libtrace->err.err_num = TRACE_ERR_NOERROR;
 	libtrace->format=NULL;
         
         /* parse the URI to determine what sort of event we are dealing with */
@@ -354,7 +352,7 @@ struct libtrace_t * trace_create_dead (const char *uri) {
 	char *uridata;
 	struct libtrace_format_t *tmp;
 	
-	trace_err.err_num = TRACE_ERR_NOERROR;
+	libtrace->err.err_num = TRACE_ERR_NOERROR;
 
 	if((uridata = strchr(uri,':')) == NULL) {
 		xstrncpy(scan, uri, strlen(uri));
@@ -401,7 +399,9 @@ libtrace_out_t *trace_create_output(const char *uri) {
         const char *uridata = 0;
 	struct libtrace_format_t *tmp;
 
-	trace_err.err_num = TRACE_ERR_NOERROR;
+	libtrace->err.err_num = TRACE_ERR_NOERROR;
+	strcat(libtrace->err.problem,"Error message set\n");
+	
         /* parse the URI to determine what sort of event we are dealing with */
 
 	if ((uridata = trace_parse_uri(uri, &scan)) == 0) {
@@ -409,7 +409,6 @@ libtrace_out_t *trace_create_output(const char *uri) {
 				"Bad uri format (%s)",uri);
 		return libtrace;
 	}
-	
 	
         libtrace->format = NULL;
 	for(tmp=formats_list;tmp;tmp=tmp->next) {
