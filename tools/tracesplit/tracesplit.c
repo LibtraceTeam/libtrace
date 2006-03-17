@@ -105,6 +105,8 @@ int main(int argc, char *argv[])
 	output=NULL;
 	input=trace_create(argv[optind]);
 
+	trace_start(input);
+
 	while(1) {
 		if (trace_read_packet(input,packet)<1) {
 			break;
@@ -163,10 +165,14 @@ int main(int argc, char *argv[])
 				buffer=strdupcati(buffer,++filenum);
 			}
 			output=trace_create_output(buffer);
+			trace_start_output(output);
 			free(buffer);
 		}
 
-		trace_write_packet(output,packet);
+		if (trace_write_packet(output,packet)==-1) {
+			trace_perror_output(output,"write_packet");
+			break;
+		}
 	}
 
 	if (!output)

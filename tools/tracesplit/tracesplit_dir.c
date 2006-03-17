@@ -1,6 +1,5 @@
-
-
 #include "libtrace.h"
+#include <stdio.h>
 
 
 struct libtrace_out_t *create_output(char *uri) {
@@ -47,7 +46,6 @@ int main(int argc, char *argv[]) {
 		if (trace_read_packet(input, packet) < 1)
 			break;
 
-		printf("%d\n", trace_get_direction(packet));
 		switch(trace_get_direction(packet)) {
 			case 0:
 				if (!out_write) {
@@ -55,7 +53,10 @@ int main(int argc, char *argv[]) {
 					if (!out_write)
 						return 1;
 				}
-				trace_write_packet(out_write, packet);
+				if (trace_write_packet(out_write, packet)==-1){
+					trace_perror_output(in_write,"write");
+					return 1;
+				}
 				break;
 			case 1:
 				if (!in_write) {
@@ -63,7 +64,10 @@ int main(int argc, char *argv[]) {
 					if (!in_write)
 						return 1;
 				}
-				trace_write_packet(in_write, packet);
+				if (trace_write_packet(in_write, packet)==-1) {
+					trace_perror_output(in_write,"write");
+					return 1;
+				}
 				break;
 		}
 
@@ -73,7 +77,7 @@ int main(int argc, char *argv[]) {
 	if (in_write)
 		trace_destroy_output(in_write);
 	trace_destroy(input);
-	trace_destroy_packet(packet);
+	trace_destroy_packet(&packet);
 	
 	return 0;
 }
