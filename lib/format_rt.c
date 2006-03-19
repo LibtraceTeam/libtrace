@@ -95,7 +95,11 @@ struct rt_format_data_t {
 	int port;
 	int input_fd;
 	int reliable;
+	char *pkt_buffer;
+	char *buf_current;
+	int buf_left;
 
+	
 	struct libtrace_t *dummy_erf;
 	struct libtrace_t *dummy_pcap;
 	struct libtrace_t *dummy_wag;
@@ -157,7 +161,6 @@ static int rt_connect(struct libtrace_t *libtrace) {
 			return -1;
 		case RT_HELLO:
 			/* do something with options */
-			printf("Hello\n");	
 			if (recv(RT_INFO->input_fd, &hello_opts, 
 						sizeof(rt_hello_t), 0)
 					!= sizeof(rt_hello_t)) {
@@ -188,6 +191,9 @@ static int rt_init_input(struct libtrace_t *libtrace) {
 	RT_INFO->dummy_erf = NULL;
 	RT_INFO->dummy_pcap = NULL;
 	RT_INFO->dummy_wag = NULL;
+	RT_INFO->pkt_buffer = NULL;
+	RT_INFO->buf_current = NULL;
+	RT_INFO->buf_left = 0;
 	
         if (strlen(uridata) == 0) {
                 RT_INFO->hostname =
@@ -218,7 +224,6 @@ static int rt_start_input(struct libtrace_t *libtrace) {
 	start_msg.type = RT_START;
 	start_msg.length = sizeof(rt_start_t);
 
-	printf("Sending start - len: %d\n", start_msg.length);
 	
 	/* Need to send start message to server */
 	if (send(RT_INFO->input_fd, &start_msg, sizeof(rt_header_t) +
@@ -256,30 +261,52 @@ static int rt_fin_input(struct libtrace_t *libtrace) {
         return 0;
 }
 
-static int rt_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
+#define RT_BUF_SIZE 4000
+
+static int rt_read(struct libtrace_t *libtrace, void **buffer, size_t len) {
         int numbytes;
 
-        while(1) {
+	assert(len <= RT_BUF_SIZE);
+	
+	if (!RT_INFO->pkt_buffer) {
+		RT_INFO->pkt_buffer = malloc(RT_BUF_SIZE);
+		RT_INFO->buf_current = RT_INFO->pkt_buffer;
+		RT_INFO->buf_left = 0;
+	}
+
+	
+	if (len > RT_INFO->buf_left) {
+		memcpy(RT_INFO->pkt_buffer, RT_INFO->buf_current, 
+				RT_INFO->buf_left);
+		RT_INFO->buf_current = RT_INFO->pkt_buffer;
+
 #ifndef MSG_NOSIGNAL
 #  define MSG_NOSIGNAL 0
 #endif
-                if ((numbytes = recv(RT_INFO->input_fd,
-                                                buffer,
-                                                len,
+		while (len > RT_INFO->buf_left) {
+                	if ((numbytes = recv(RT_INFO->input_fd,
+                                                RT_INFO->pkt_buffer + 
+						RT_INFO->buf_left,
+                                                RT_BUF_SIZE-RT_INFO->buf_left,
                                                 MSG_NOSIGNAL)) == -1) {
-                        if (errno == EINTR) {
-                                /* ignore EINTR in case
-                                 * a caller is using signals
-				 */
-                                continue;
-                        }
-                        perror("recv");
-                        return -1;
-                }
-                break;
+                	        if (errno == EINTR) {
+                	                /* ignore EINTR in case
+                	                 * a caller is using signals
+					 */
+                	                continue;
+                	        }
+                        	perror("recv");
+                        	return -1;
+                	}
+			RT_INFO->buf_left+=numbytes;
+		}
 
         }
-        return numbytes;
+	*buffer = RT_INFO->buf_current;
+	RT_INFO->buf_current += len;
+	RT_INFO->buf_left -= len;
+	assert(RT_INFO->buf_left >= 0);
+        return len;
 }
 
 
@@ -384,33 +411,31 @@ static int rt_send_ack(struct libtrace_t *libtrace,
 }
 	
 static int rt_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
-        
-	rt_header_t pkt_hdr;
+	rt_header_t rt_hdr;
+	rt_header_t *pkt_hdr = &rt_hdr;
 	int pkt_size = 0;
 	
-        void *buffer = 0;
-
+	
         if (packet->buf_control == TRACE_CTRL_EXTERNAL || !packet->buffer) {
                 packet->buf_control = TRACE_CTRL_PACKET;
                 packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
         } 
 
-        buffer = packet->buffer;
         packet->header = packet->buffer;
 
 	/* FIXME: Better error handling required */
-	if (rt_read(libtrace, &pkt_hdr, sizeof(rt_header_t)) !=
+	if (rt_read(libtrace, (void **)&pkt_hdr, sizeof(rt_header_t)) !=
 			sizeof(rt_header_t)) {
 		printf("Error receiving rt header\n");
 		return -1;
 	}
 
-	packet->type = pkt_hdr.type;
-	pkt_size = pkt_hdr.length;
-	packet->size = pkt_hdr.length;
+	packet->type = pkt_hdr->type;
+	pkt_size = pkt_hdr->length;
+	packet->size = pkt_hdr->length;
 
 	if (packet->type >= RT_DATA_SIMPLE) {
-		if (rt_read(libtrace, buffer, pkt_size) != pkt_size) {
+		if (rt_read(libtrace, &packet->buffer, pkt_size) != pkt_size) {
 			printf("Error receiving packet\n");
 			return -1;
 		}
@@ -422,7 +447,7 @@ static int rt_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 
                 if (reliability > 0) {
                         
-			if (rt_send_ack(libtrace, pkt_hdr.sequence) 
+			if (rt_send_ack(libtrace, pkt_hdr->sequence) 
 					== -1)
 			{
                                	return -1;
@@ -432,13 +457,14 @@ static int rt_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 		switch(packet->type) {
 			case RT_STATUS:
 			case RT_DUCK:
-				if (rt_read(libtrace, buffer, pkt_size) !=
+				if (rt_read(libtrace, &packet->buffer, 
+							pkt_size) !=
 						pkt_size) {
 					printf("Error receiving status packet\n");
 					return -1;
 				}
 				packet->header = 0;
-				packet->payload = buffer;
+				packet->payload = packet->buffer;
 				break;
 			case RT_END_DATA:
 				return 0;
@@ -452,7 +478,7 @@ static int rt_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 				break;
 			default:
 				printf("Bad rt type for client receipt: %d\n",
-					pkt_hdr.type);
+					pkt_hdr->type);
 		}
 	}
 	/* Return the number of bytes read from the stream */
