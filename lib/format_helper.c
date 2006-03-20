@@ -64,8 +64,9 @@ struct libtrace_eventobj_t trace_event_device(struct libtrace_t *trace, struct l
 	if (ioctl(event.fd,FIONREAD,&data)==-1) {
 		event.type = TRACE_EVENT_TERMINATE;
 		return event;
-	}
-	if (data>0) {
+	} 
+		
+	if (data>=0) {
 		event.size = trace_read_packet(trace,packet);
 		event.type = TRACE_EVENT_PACKET;
 		return event;

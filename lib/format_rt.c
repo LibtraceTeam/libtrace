@@ -114,6 +114,8 @@ static int rt_connect(struct libtrace_t *libtrace) {
 	rt_deny_conn_t deny_hdr;	
 	rt_hello_t hello_opts;
 	uint8_t reason;
+	int oldflags;
+
 	
 	if ((he=gethostbyname(RT_INFO->hostname)) == NULL) {
                 perror("gethostbyname");
@@ -136,6 +138,25 @@ static int rt_connect(struct libtrace_t *libtrace) {
 				RT_INFO->hostname, RT_INFO->port);
 		return -1;
         }
+
+	
+#if 0
+	oldflags = fcntl(RT_INFO->input_fd, F_GETFL, 0);
+	if (oldflags == -1) {
+		trace_set_err(libtrace, errno,
+				"Could not get fd flags from fd %d\n",
+				RT_INFO->input_fd);
+		return -1;
+	}
+	oldflags |= O_NONBLOCK;
+	if (fcntl(RT_INFO->input_fd, F_SETFL, oldflags) == -1) {
+		trace_set_err(libtrace, errno,
+				"Could not set fd flags for fd %d\n",
+				RT_INFO->input_fd);
+		return -1;
+	}
+#endif
+	
 	
 	/* We are connected, now receive message from server */
 	
@@ -145,7 +166,7 @@ static int rt_connect(struct libtrace_t *libtrace) {
 				RT_INFO->hostname);
 		return -1;
 	}
-
+	
 	switch (connect_msg.type) {
 		case RT_DENY_CONN:
 			
@@ -263,8 +284,10 @@ static int rt_fin_input(struct libtrace_t *libtrace) {
 
 #define RT_BUF_SIZE 4000
 
-static int rt_read(struct libtrace_t *libtrace, void **buffer, size_t len) {
+static int rt_read(struct libtrace_t *libtrace, void **buffer, size_t len, int block) {
         int numbytes;
+	int i;
+	char *buf_ptr;
 
 	assert(len <= RT_BUF_SIZE);
 	
@@ -273,6 +296,11 @@ static int rt_read(struct libtrace_t *libtrace, void **buffer, size_t len) {
 		RT_INFO->buf_current = RT_INFO->pkt_buffer;
 		RT_INFO->buf_left = 0;
 	}
+
+	if (block)
+		block=0;
+	else
+		block=MSG_DONTWAIT;
 
 	
 	if (len > RT_INFO->buf_left) {
@@ -288,16 +316,40 @@ static int rt_read(struct libtrace_t *libtrace, void **buffer, size_t len) {
                                                 RT_INFO->pkt_buffer + 
 						RT_INFO->buf_left,
                                                 RT_BUF_SIZE-RT_INFO->buf_left,
-                                                MSG_NOSIGNAL)) == -1) {
+                                                MSG_NOSIGNAL|block)) <= 0) {
+				if (numbytes == 0) {
+					trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, 
+							"No data received");
+					return -1;
+				}
+				
                 	        if (errno == EINTR) {
                 	                /* ignore EINTR in case
                 	                 * a caller is using signals
 					 */
                 	                continue;
                 	        }
+				if (errno == EAGAIN) {
+					trace_set_err(libtrace,
+							EAGAIN,
+							"EAGAIN");
+					return -1;
+				}
+				
                         	perror("recv");
+				trace_set_err(libtrace, TRACE_ERR_RECV_FAILED,
+						"Failed to read data into rt recv buffer");
                         	return -1;
                 	}
+			/*
+			buf_ptr = RT_INFO->pkt_buffer;
+			for (i = 0; i < RT_BUF_SIZE ; i++) {
+					
+				printf("%02x", (unsigned char)*buf_ptr);
+				buf_ptr ++;
+			}
+			printf("\n");
+			*/
 			RT_INFO->buf_left+=numbytes;
 		}
 
@@ -338,9 +390,11 @@ static int rt_set_format(libtrace_t *libtrace, libtrace_packet_t *packet)
 		case RT_DATA_LEGACY_ATM:
 		case RT_DATA_LEGACY_POS:
 			printf("Sending legacy over RT is currently not supported\n");
+			trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Legacy packet cannot be sent over rt");
 			return -1;
 		default:
 			printf("Unrecognised format: %d\n", packet->type);
+			trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Unrecognised packet format");
 			return -1;
 	}
 	return 0; /* success */
@@ -399,6 +453,8 @@ static int rt_send_ack(struct libtrace_t *libtrace,
 			}
 			else {
 				printf("Error sending ack\n");
+				trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, 
+						"Error sending ack");
 				return -1;
 			}
 		}
@@ -409,8 +465,10 @@ static int rt_send_ack(struct libtrace_t *libtrace,
 
 	return 1;
 }
+
 	
-static int rt_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
+static int rt_read_packet_versatile(libtrace_t *libtrace,
+		libtrace_packet_t *packet,int blocking) {
 	rt_header_t rt_hdr;
 	rt_header_t *pkt_hdr = &rt_hdr;
 	int pkt_size = 0;
@@ -421,12 +479,10 @@ static int rt_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
                 packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
         } 
 
-        packet->header = packet->buffer;
 
 	/* FIXME: Better error handling required */
-	if (rt_read(libtrace, (void **)&pkt_hdr, sizeof(rt_header_t)) !=
+	if (rt_read(libtrace, (void **)&pkt_hdr, sizeof(rt_header_t),blocking) !=
 			sizeof(rt_header_t)) {
-		printf("Error receiving rt header\n");
 		return -1;
 	}
 
@@ -435,10 +491,11 @@ static int rt_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	packet->size = pkt_hdr->length;
 
 	if (packet->type >= RT_DATA_SIMPLE) {
-		if (rt_read(libtrace, &packet->buffer, pkt_size) != pkt_size) {
+		if (rt_read(libtrace, &packet->buffer, pkt_size,1) != pkt_size) {
 			printf("Error receiving packet\n");
 			return -1;
 		}
+        	packet->header = packet->buffer;
 		
 		if (rt_set_format(libtrace, packet) < 0) {
                        	return -1;
@@ -458,7 +515,7 @@ static int rt_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 			case RT_STATUS:
 			case RT_DUCK:
 				if (rt_read(libtrace, &packet->buffer, 
-							pkt_size) !=
+							pkt_size,1) !=
 						pkt_size) {
 					printf("Error receiving status packet\n");
 					return -1;
@@ -482,8 +539,14 @@ static int rt_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 		}
 	}
 	/* Return the number of bytes read from the stream */
-	return sizeof(rt_header_t) + packet->size; 
+	return packet->size; 
 }
+
+static int rt_read_packet(libtrace_t *libtrace,
+		libtrace_packet_t *packet) {
+	rt_read_packet_versatile(libtrace,packet,1);
+}
+
 
 static int rt_get_capture_length(const struct libtrace_packet_t *packet) {
 	switch (packet->type) {
@@ -515,17 +578,53 @@ static int rt_get_capture_length(const struct libtrace_packet_t *packet) {
 	printf("Unknown type: %d\n", packet->type);
 	return 0;
 }
+
+static int rt_get_wire_length(const libtrace_packet_t *packet) {
+	return 0;
+}
 			
 static int rt_get_framing_length(const libtrace_packet_t *packet) {
 	return 0;
 }
 
-
 static int rt_get_fd(const libtrace_t *trace) {
         return ((struct rt_format_data_t *)trace->format_data)->input_fd;
 }
 
+struct libtrace_eventobj_t trace_event_rt(struct libtrace_t *trace, struct libtrace_packet_t *packet) {
+	struct libtrace_eventobj_t event = {0,0,0.0,0};
+	libtrace_err_t read_err;
+	int data;
 
+	assert(trace);
+	assert(packet);
+	
+	if (trace->format->get_fd) {
+		event.fd = trace->format->get_fd(trace);
+	} else {
+		event.fd = 0;
+	}
+
+	event.size = rt_read_packet_versatile(trace, packet, 0);
+	if (event.size == -1) {
+		read_err = trace_get_err(trace);
+		if (read_err.err_num == EAGAIN) {
+			event.type = TRACE_EVENT_IOWAIT;
+		}
+		else {
+			printf("packet error\n");
+			event.type = TRACE_EVENT_PACKET;
+		}
+	} else if (event.size == 0) {
+		event.type = TRACE_EVENT_TERMINATE;
+		
+	}	
+	else {
+		event.type = TRACE_EVENT_PACKET;
+	}
+	
+	return event;
+}
 
 static void rt_help() {
         printf("rt format module\n");
@@ -566,11 +665,11 @@ static struct libtrace_format_t rt = {
 	NULL,				/* seek_timeval */
 	NULL,				/* seek_seconds */
         rt_get_capture_length,        	/* get_capture_length */
-        NULL,            		/* get_wire_length */
+        rt_get_wire_length,            		/* get_wire_length */
         rt_get_framing_length, 		/* get_framing_length */
         NULL,         			/* set_capture_length */
         rt_get_fd,                	/* get_fd */
-        trace_event_device,             /* trace_event */
+        trace_event_rt,             /* trace_event */
         rt_help,			/* help */
 	NULL				/* next pointer */
 };

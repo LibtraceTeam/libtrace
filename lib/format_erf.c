@@ -205,7 +205,7 @@ static int erf_get_framing_length(const libtrace_packet_t *packet)
 static int erf_init_input(libtrace_t *libtrace) 
 {
 	libtrace->format_data = malloc(sizeof(struct erf_format_data_t));
-
+	
 	INPUT.file = NULL;
 
 	return 0; /* success */
@@ -551,6 +551,7 @@ static int erf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 		return -1;
 	}
 	if (numbytes == 0) {
+		printf("eof\n");
 		return 0;
 	}
 

@@ -53,6 +53,8 @@
 
 #include "libtrace.h"
 #include "output.h"
+#include "rt_protocol.h"
+#include "dagformat.h"
 
 struct libtrace_t *trace;
 char *output_format=NULL;
@@ -127,11 +129,17 @@ void run_trace(char *uri)
 
         for (;;) {
 		int psize;
+		dag_record_t *erf_hdr;
                 if ((psize = trace_read_packet(trace, packet)) <1) {
                         break;
                 }
+		erf_hdr = (dag_record_t *)packet->header;
+		
+		if (trace_get_link(packet) == NULL) {
+			continue;
+		}
+		
 		ts = trace_get_seconds(packet);
-
 		for(i=0;i<filter_count;++i) {
 			if(trace_bpf_filter(filters[i].filter,packet)) {
 				++filters[i].count;
