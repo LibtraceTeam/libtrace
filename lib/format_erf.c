@@ -206,6 +206,8 @@ static int erf_init_input(libtrace_t *libtrace)
 {
 	libtrace->format_data = malloc(sizeof(struct erf_format_data_t));
 
+	INPUT.file = NULL;
+
 	return 0; /* success */
 }
 
@@ -330,7 +332,6 @@ static int erf_seek_erf(libtrace_t *libtrace,uint64_t erfts)
 static int rtclient_init_input(libtrace_t *libtrace) {
 	char *scan;
 	libtrace->format_data = malloc(sizeof(struct erf_format_data_t));
-
 
 	if (strlen(libtrace->uridata) == 0) {
 		CONNINFO.rt.hostname = 
