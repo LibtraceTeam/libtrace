@@ -95,6 +95,7 @@ int main(int argc, char *argv[]) {
         int psize = 0;
         struct libtrace_ip *ipptr = 0;
 	struct libtrace_packet_t *packet = trace_create_packet();
+	libtrace_err_t trace_err;
 
 	uint32_t last_second = 0;
 	double ts = 0.0;
@@ -106,10 +107,21 @@ int main(int argc, char *argv[]) {
 
         // create an trace to uri
         trace = trace_create(uri);
+	if (trace_is_err(trace)) {
+                trace_err = trace_get_err(trace);
+                printf("Error in trace_create: %s\n", trace_err.problem);
+                return -1;
+        }
+        trace_start(trace);
+        if (trace_is_err(trace)) {
+                trace_err = trace_get_err(trace);
+                printf("Error in trace_start: %s\n", trace_err.problem);
+                return -1;
+        }
 
 
         for (;;) {
-                if ((psize = trace_read_packet(trace,&packet)) < 1) {
+                if ((psize = trace_read_packet(trace,packet)) < 1) {
                         // terminate
                         break;
                 }
@@ -117,14 +129,14 @@ int main(int argc, char *argv[]) {
                         continue;
                 }
 
-                if((ipptr = trace_get_ip(&packet)) == 0) {
+                if((ipptr = trace_get_ip(packet)) == 0) {
 			continue;
 		}
 		
                 counter[BYTES][INSTANT] += ntohs(ipptr->ip_len);
                 counter[PACKETS][INSTANT] ++;
 
-		ts = trace_get_seconds(&packet);
+		ts = trace_get_seconds(packet);
 		if(last_second == 0) {
 			last_second = (int)ts;
 		} else if (last_second < (int)ts) {
