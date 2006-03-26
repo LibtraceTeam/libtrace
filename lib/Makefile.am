@@ -6,7 +6,8 @@ libtrace_la_SOURCES = trace.c fifo.c fifo.h common.h \
 		format_erf.c format_pcap.c format_wag.c format_legacy.c format_rt.c\
 		format_helper.c format_helper.h \
 		parse_cmd.c parse_cmd.h libtrace_int.h lt_inttypes.h \
-		linktypes.c 
+		linktypes.c protocols.c
+
 if DAG2_4
 nodist_libtrace_la_SOURCES = dagopts.c dagapi.c
 endif

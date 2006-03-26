@@ -695,339 +695,9 @@ typedef struct legacy_framing {
 } legacy_framing_t;
 */
 
-/* get a pointer to the IP header (if any)
- * @param packet	a pointer to a libtrace_packet structure
- *
- * @returns a pointer to the IP header, or NULL if there is not an IP packet
- */
-struct libtrace_ip *trace_get_ip(const struct libtrace_packet_t *packet) {
-        struct libtrace_ip *ipptr = 0;
-
-	switch(trace_get_link_type(packet)) {
-		case TRACE_TYPE_80211_PRISM:
-			{
-				struct ieee_802_11_header *wifi = 
-					(void*)(
-					 (char*)trace_get_link(packet)+144);
-				if (!wifi) {
-					ipptr = NULL;
-					break;
-				}
-
-				/* Data packet? */
-				if (wifi->type != 2) {
-					ipptr = NULL;
-				}
-				else {
-					struct ieee_802_11_payload *eth = 
-						(void*)((char*)wifi+sizeof(struct ieee_802_11_header));
-					ipptr = NULL;
-
-					if (ntohs(eth->type) == 0x0800) {
-					    ipptr=(void*)
-						    ((char*)eth + sizeof(*eth));
-					} else if (ntohs(eth->type) == 0x8100) {
-					    struct libtrace_8021q *vlanhdr =
-						(struct libtrace_8021q *)eth;
-					    if (ntohs(vlanhdr->vlan_ether_type)
-							    == 0x0800) {
-						ipptr=(void*)(
-						 (char*)eth+sizeof(*vlanhdr));
-					    }
-					}
-				}
-			}
-			break;
-		case TRACE_TYPE_80211:
-			{ 
-				
-				struct ieee_802_11_header *wifi = trace_get_link(packet);	
-				if (!wifi) {
-					ipptr = NULL;
-					break;
-				}
-
-				/* Data packet? */
-				if (wifi->type != 2) {
-					ipptr = NULL;
-				}
-				else {
-					struct ieee_802_11_payload *eth = 
-						(void*)((char*)wifi+sizeof(struct ieee_802_11_header));
-					ipptr = NULL;
-
-					if (ntohs(eth->type) == 0x0800) {
-					    ipptr=(void*)((char*)eth + sizeof(*eth));
-					} else if (ntohs(eth->type) == 0x8100) {
-					    struct libtrace_8021q *vlanhdr =
-						(struct libtrace_8021q *)eth;
-					    if (ntohs(vlanhdr->vlan_ether_type)
-							    == 0x0800) {
-						ipptr=(void*)((char*)eth + 
-							sizeof(*vlanhdr));
-					    }
-					}
-				}
-			}
-			break;
-		case TRACE_TYPE_ETH:
-		case TRACE_TYPE_LEGACY_ETH:
-			{
-				struct libtrace_ether *eth = 
-					trace_get_link(packet);
-				if (!eth) {
-					ipptr = NULL;
-					break;
-				}
-				ipptr = NULL;
-				
-				if (ntohs(eth->ether_type)==0x0800) {
-					ipptr = (void*)((char *)eth + sizeof(*eth));
-				} else if (ntohs(eth->ether_type) == 0x8100) {
-					struct libtrace_8021q *vlanhdr = 
-						(struct libtrace_8021q *)eth;
-					if (ntohs(vlanhdr->vlan_ether_type) 
-							== 0x0800) {
-						ipptr = (void*)((char *)eth + 
-							sizeof(*vlanhdr));
-					}
-				}
-				break;
-			}
-		case TRACE_TYPE_NONE:
-			ipptr = trace_get_link(packet);
-			break;
-		case TRACE_TYPE_LINUX_SLL:
-			{
-				struct trace_sll_header_t *sll;
-
-				sll = trace_get_link(packet);
-				if (!sll) {
-					ipptr = NULL;
-					break;
-				}
-				if (ntohs(sll->protocol)!=0x0800) {
-					ipptr = NULL;
-				}
-				else {
-					ipptr = (void*)((char*)sll+
-							sizeof(*sll));
-				}
-			}
-			break;
-		case TRACE_TYPE_PFLOG:
-			{
-				struct trace_pflog_header_t *pflog;
-				pflog = trace_get_link(packet);
-				if (!pflog) {
-					ipptr = NULL;
-					break;
-				}
-				if (pflog->af != AF_INET) {
-					ipptr = NULL;
-				} else {
-					ipptr = (void*)((char*)pflog+
-						sizeof(*pflog));
-				}
-			}
-			break;
-		case TRACE_TYPE_LEGACY_POS:
-			{
-				/* 64 byte capture. */
-				struct libtrace_pos *pos = 
-					trace_get_link(packet);
-				if (ntohs(pos->ether_type) == 0x0800) {
-					ipptr=(void*)((char *)pos+sizeof(*pos));
-				} else {
-					ipptr=NULL;
-				}
-				break;
-				
-			}
-		case TRACE_TYPE_LEGACY_ATM:
-		case TRACE_TYPE_ATM:
-			{
-				/* 64 byte capture. */
-				struct libtrace_llcsnap *llc = 
-					trace_get_link(packet);
-
-				/* advance the llc ptr +4 into the link layer.
-				 * need to check what is in these 4 bytes.
-				 * don't have time!
-				 */
-				llc = (void*)((char *)llc + 4);
-				if (ntohs(llc->type) == 0x0800) {
-					ipptr=(void*)((char*)llc+sizeof(*llc));
-				} else {
-					ipptr = NULL;
-				}
-				break;
-			}
-		default:
-			fprintf(stderr,"Don't understand link layer type %i in trace_get_ip()\n",
-				trace_get_link_type(packet));
-			ipptr=NULL;
-			break;
-	}
-
-        return ipptr;
-}
-
-#define SW_IP_OFFMASK 0xff1f
-
-/* Gets a pointer to the transport layer header (if any)
- * @param packet	a pointer to a libtrace_packet structure
- *
- * @returns a pointer to the transport layer header, or NULL if there is no header
- */
-void *trace_get_transport(const struct libtrace_packet_t *packet) {
-        void *trans_ptr = 0;
-        struct libtrace_ip *ipptr = 0;
-
-        if (!(ipptr = trace_get_ip(packet))) {
-                return 0;
-        }
-
-        if ((ipptr->ip_off & SW_IP_OFFMASK) == 0) {
-                trans_ptr = (void *)((ptrdiff_t)ipptr + (ipptr->ip_hl * 4));
-        }
-        return trans_ptr;
-}
-
-/* Gets a pointer to the transport layer header (if any) given a pointer to the
- * IP header
- * @param ip		The IP Header
- * @param[out] skipped	An output variable of the number of bytes skipped
- *
- * @returns a pointer to the transport layer header, or NULL if there is no header
- *
- * Skipped can be NULL, in which case it will be ignored
- */
-void *trace_get_transport_from_ip(const libtrace_ip_t *ip, int *skipped) {
-	void *trans_ptr = 0;	
-
-	if ((ip->ip_off & SW_IP_OFFMASK) == 0) {
-		trans_ptr = (void *)((ptrdiff_t)ip + (ip->ip_hl * 4));
-	}
-
-	if (skipped)
-		*skipped = (ip->ip_hl*4);
-
-	return trans_ptr;
-}
-
-/* get a pointer to the TCP header (if any)
- * @param packet	a pointer to a libtrace_packet structure
- *
- * @returns a pointer to the TCP header, or NULL if there is not a TCP packet
- */
-libtrace_tcp_t *trace_get_tcp(const libtrace_packet_t *packet) {
-        struct libtrace_tcp *tcpptr = 0;
-        struct libtrace_ip *ipptr = 0;
-
-        if(!(ipptr = trace_get_ip(packet))) {
-                return 0;
-	}
-        if (ipptr->ip_p == 6) {
-                tcpptr = (struct libtrace_tcp *)trace_get_transport_from_ip(ipptr, 0);
-        }
-        return tcpptr;
-}
-
-/* get a pointer to the TCP header (if any) given a pointer to the IP header
- * @param ip		The IP header
- * @param[out] skipped	An output variable of the number of bytes skipped
- *
- * @returns a pointer to the TCP header, or NULL if this is not a TCP packet
- *
- * Skipped can be NULL, in which case it will be ignored by the program.
- */
-libtrace_tcp_t *trace_get_tcp_from_ip(const libtrace_ip_t *ip, int *skipped)
-{
-	struct libtrace_tcp *tcpptr = 0;
-
-	if (ip->ip_p == 6)  {
-		tcpptr = (struct libtrace_tcp *)trace_get_transport_from_ip(ip, skipped);
-	}
-
-	return tcpptr;
-}
-
-/* get a pointer to the UDP header (if any)
- * @param packet	a pointer to a libtrace_packet structure
- *
- * @returns a pointer to the UDP header, or NULL if this is not a UDP packet
- */
-struct libtrace_udp *trace_get_udp(const struct libtrace_packet_t *packet) {
-        struct libtrace_udp *udpptr = 0;
-        struct libtrace_ip *ipptr = 0;
-        
-        if(!(ipptr = trace_get_ip(packet))) {
-                return 0;
-        }
-        if (ipptr->ip_p == 17)  {
-                udpptr = (struct libtrace_udp *)trace_get_transport_from_ip(ipptr, 0);
-        }
-
-        return udpptr;
-}
-
-/* get a pointer to the UDP header (if any) given a pointer to the IP header
- * @param ip		The IP header
- * @param[out] skipped	An output variable of the number of bytes skipped
- *
- * @returns a pointer to the UDP header, or NULL if this is not a UDP packet
- *
- * Skipped can be NULL, in which case it will be ignored by the program.
- */
-struct libtrace_udp *trace_get_udp_from_ip(const struct libtrace_ip *ip, int *skipped)
-{
-	struct libtrace_udp *udpptr = 0;
-
-	if (ip->ip_p == 17) {
-		udpptr = (struct libtrace_udp *)trace_get_transport_from_ip(ip, skipped);
-	}
-
-	return udpptr;
-}
 
 
-/* get a pointer to the ICMP header (if any)
- * @param packet	a pointer to a libtrace_packet structure
- *
- * @returns a pointer to the ICMP header, or NULL if this is not a ICMP packet
- */
-struct libtrace_icmp *trace_get_icmp(const struct libtrace_packet_t *packet) {
-        struct libtrace_icmp *icmpptr = 0;
-        struct libtrace_ip *ipptr = 0;
-        
-        if(!(ipptr = trace_get_ip(packet))) {
-                return 0;
-        }
-        if (ipptr->ip_p == 1){
-                icmpptr = (struct libtrace_icmp *)trace_get_transport_from_ip(ipptr, 0);
-        }
-        return icmpptr;
-}
 
-/* get a pointer to the ICMP header (if any) given a pointer to the IP header
- * @param ip		The IP header
- * @param[out] skipped	An output variable of the number of bytes skipped
- *
- * @returns a pointer to the ICMP header, or NULL if this is not a ICMP packet
- *
- * Skipped can be NULL, in which case it will be ignored by the program.
- */
-struct libtrace_icmp *trace_get_icmp_from_ip(const struct libtrace_ip *ip, int *skipped)
-{
-	struct libtrace_icmp *icmpptr = 0;
-
-	if (ip->ip_p == 1)  {
-		icmpptr = (struct libtrace_icmp *)trace_get_transport_from_ip(ip, skipped);
-	}
-
-	return icmpptr;
-}
 /* parse an ip or tcp option
  * @param[in,out] ptr	the pointer to the current option
  * @param[in,out] len	the length of the remaining buffer
@@ -1242,8 +912,8 @@ libtrace_linktype_t trace_get_link_type(const libtrace_packet_t *packet ) {
  */
 uint8_t *trace_get_source_mac(const struct libtrace_packet_t *packet) {
 	void *link = trace_get_link(packet);
-	struct ieee_802_11_header *wifi = link;
-        struct libtrace_ether *ethptr = link;
+	libtrace_80211_t *wifi = link;
+        libtrace_ether_t *ethptr = link;
 	if (!link)
 		return NULL;
 	switch (trace_get_link_type(packet)) {
@@ -1265,8 +935,8 @@ uint8_t *trace_get_source_mac(const struct libtrace_packet_t *packet) {
  */
 uint8_t *trace_get_destination_mac(const struct libtrace_packet_t *packet) {
 	void *link = trace_get_link(packet);
-	struct ieee_802_11_header *wifi = link;
-        struct libtrace_ether *ethptr = link;
+	libtrace_80211_t *wifi = link;
+        libtrace_ether_t *ethptr = link;
 	if (!link)
 		return NULL;
 	switch (trace_get_link_type(packet)) {
@@ -1454,15 +1124,7 @@ struct ports_t {
  */
 uint16_t trace_get_source_port(const struct libtrace_packet_t *packet)
 {
-	struct libtrace_ip *ip = trace_get_ip(packet);
-	struct ports_t *port;
-	if (6 != ip->ip_p
-	  && 17 != ip->ip_p)
-		return 0;
-	if (0 != (ip->ip_off & SW_IP_OFFMASK))
-		return 0;
-
-	port = (struct ports_t *)((ptrdiff_t)ip + (ip->ip_hl * 4));
+	struct ports_t *port = trace_get_transport(packet);
 
 	return ntohs(port->src);
 }
@@ -1470,17 +1132,7 @@ uint16_t trace_get_source_port(const struct libtrace_packet_t *packet)
 /* Same as get_source_port except use the destination port */
 uint16_t trace_get_destination_port(const struct libtrace_packet_t *packet)
 {
-	struct libtrace_ip *ip = trace_get_ip(packet);
-	struct ports_t *port;
-
-	if (6 != ip->ip_p
-	  && 17 != ip->ip_p)
-		return 0;
-
-	if (0 != (ip->ip_off & SW_IP_OFFMASK))
-		return 0;
-
-	port = (struct ports_t *)((ptrdiff_t)ip + (ip->ip_hl * 4));
+	struct ports_t *port = trace_get_transport(packet);
 
 	return ntohs(port->dst);
 }
@@ -1817,3 +1469,4 @@ uint8_t *trace_ether_aton(const char *buf, uint8_t *addr)
 	buf2[3]=tmp[3]; buf2[4]=tmp[4]; buf2[5]=tmp[5];
 	return buf2;
 }
+

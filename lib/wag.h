@@ -106,26 +106,6 @@ struct frame_data_tx_t {
   } txinfo;            
 };
 
-struct ieee_802_11_header {
-        unsigned int      protocol:2;
-        unsigned int      type:2;
-        unsigned int      subtype:4;
-        unsigned int      to_ds:1;
-        unsigned int      from_ds:1;
-        unsigned int      more_frag:1;
-        unsigned int      retry:1;
-        unsigned int      power:1;
-        unsigned int      more_data:1;
-        unsigned int      wep:1;
-        unsigned int      order:1;
-        unsigned int     duration;
-        uint8_t      mac1[6];
-        uint8_t      mac2[6];
-        uint8_t      mac3[6];
-        uint16_t     SeqCtl;
-        uint8_t      mac4[6];
-};
-
 /** 802.11 payload */
 struct ieee_802_11_payload {
         uint16_t     type; /**< ether type of this packet */

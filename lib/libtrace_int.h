@@ -118,13 +118,13 @@ struct libtrace_out_t {
 void trace_set_err(libtrace_t *trace, int errcode,const char *msg,...);
 void trace_set_err_out(libtrace_out_t *trace, int errcode, const char *msg,...);
 
-struct trace_sll_header_t {
+typedef struct trace_sll_header_t {
 	uint16_t pkttype;          	/* packet type */
 	uint16_t hatype;           	/* link-layer address type */
 	uint16_t halen;            	/* link-layer address length */
 	char addr[8];	 		/* link-layer address */
 	uint16_t protocol;         	/* protocol */
-};
+} trace_sll_header_t;
 
 #ifndef PF_RULESET_NAME_SIZE
 #define PF_RULESET_NAME_SIZE 16

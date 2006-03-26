@@ -175,8 +175,28 @@ typedef PACKED struct libtrace_ip
     u_short ip_sum;			/**< checksum */
     struct in_addr ip_src;		/**< source address */
     struct in_addr ip_dst;		/**< dest address */
-} libtrace_ip_t
-;
+} libtrace_ip_t;
+
+/** IPv6 header structure */
+typedef PACKED struct libtrace_ip6
+{
+#if BYTE_ORDER == LITTLE_ENDIAN
+    unsigned int flow:4;		/**< Flow label */
+    unsigned int tclass:8;		/**< Traffic class */
+    unsigned int version:4;		/**< IP Version (6) */
+#elif BYTE_ORDER == BIG_ENDIAN
+    unsigned int version:4;		/**< IP Version (6) */
+    unsigned int tclass:8;		/**< Traffic class */
+    unsigned int flow:4;		/**< Flow label */
+#else
+#   error "Adjust your <bits/endian.h> defines"
+#endif
+    uint16_t peln;			/**< Payload length */
+    uint8_t nxthdr;			/**< Next header */
+    uint8_t hlim;			/**< Hop limit */
+    struct in6_addr ip_src;		/**< source address */
+    struct in6_addr ip_dst;		/**< dest address */
+} libtrace_ip6_t;
 
 /** Structure for dealing with TCP packets */
 typedef struct libtrace_tcp
@@ -292,6 +312,29 @@ typedef struct libtrace_pos
  u_int16_t header;
  u_int16_t ether_type;		/**< ether type */
 } __attribute__ ((packed)) libtrace_pos;
+
+/** 802.11 header */
+typedef struct libtrace_80211_t {
+        unsigned int      protocol:2;
+        unsigned int      type:2;
+        unsigned int      subtype:4;
+        unsigned int      to_ds:1;		/**< Packet to Distribution Service */
+        unsigned int      from_ds:1;		/**< Packet from Distribution Service */
+        unsigned int      more_frag:1;		/**< Packet has more fragments */
+        unsigned int      retry:1;		/**< Packet is a retry */
+        unsigned int      power:1;
+        unsigned int      more_data:1;
+        unsigned int      wep:1;
+        unsigned int      order:1;
+        unsigned int     duration;
+        uint8_t      mac1[6];
+        uint8_t      mac2[6];
+        uint8_t      mac3[6];
+        uint16_t     SeqCtl;
+        uint8_t      mac4[6];
+} libtrace_80211_t;
+
+
 /*@}*/
 
 /** Prints help information for libtrace 
@@ -620,16 +663,49 @@ libtrace_ip_t *trace_get_ip(const libtrace_packet_t *packet);
  */
 void *trace_get_transport(const libtrace_packet_t *packet);
 
-/** Gets a pointer to the transport layer header (if any) given a pointer to the
- * IP header
+/** Gets a pointer to the payload given a pointer to the IP header
  * @param ip            The IP Header
  * @param[out] skipped  An output variable of the number of bytes skipped
  *
  * @return a pointer to the transport layer header, or NULL if there is no header
  *
  * Skipped can be NULL, in which case it will be ignored
+ * @note This was called trace_get_transport_from_ip in libtrace2
  */
-void *trace_get_transport_from_ip(const libtrace_ip_t *ip, int *skipped);
+void *trace_get_payload_from_ip(libtrace_ip_t *ip, int *skipped);
+
+/** Gets a pointer to the payload given a pointer to a tcp header
+ * @param tcp           The tcp Header
+ * @param[out] skipped  An output variable of the number of bytes skipped
+ *
+ * @return a pointer to the transport layer header, or NULL if there is no header
+ *
+ * Skipped can be NULL, in which case it will be ignored
+ * @note This was called trace_get_transport_from_ip in libtrace2
+ */
+void *trace_get_payload_from_tcp(libtrace_tcp_t *tcp, int *skipped);
+
+/** Gets a pointer to the payload given a pointer to a udp header
+ * @param udp           The udp Header
+ * @param[out] skipped  An output variable of the number of bytes skipped
+ *
+ * @return a pointer to the transport layer header, or NULL if there is no header
+ *
+ * Skipped can be NULL, in which case it will be ignored
+ * @note This was called trace_get_transport_from_ip in libtrace2
+ */
+void *trace_get_payload_from_udp(libtrace_udp_t *udp, int *skipped);
+
+/** Gets a pointer to the payload given a pointer to a icmp header
+ * @param icmp          The udp Header
+ * @param[out] skipped  An output variable of the number of bytes skipped
+ *
+ * @return a pointer to the transport layer header, or NULL if there is no header
+ *
+ * Skipped can be NULL, in which case it will be ignored
+ * @note This was called trace_get_transport_from_ip in libtrace2
+ */
+void *trace_get_payload_from_udp(libtrace_udp_t *udp, int *skipped);
 
 /** get a pointer to the TCP header (if any)
  * @param packet  	the packet opaque pointer
@@ -650,7 +726,7 @@ libtrace_tcp_t *trace_get_tcp(const libtrace_packet_t *packet);
  * @author Perry Lorier
  */
 SIMPLE_FUNCTION
-libtrace_tcp_t *trace_get_tcp_from_ip(const libtrace_ip_t *ip,int *skipped);
+libtrace_tcp_t *trace_get_tcp_from_ip(libtrace_ip_t *ip,int *skipped);
 
 /** get a pointer to the UDP header (if any)
  * @param packet  	the packet opaque pointer
@@ -658,7 +734,7 @@ libtrace_tcp_t *trace_get_tcp_from_ip(const libtrace_ip_t *ip,int *skipped);
  * @return a pointer to the UDP header, or NULL if this is not a UDP packet
  */
 SIMPLE_FUNCTION
-libtrace_udp_t *trace_get_udp(const libtrace_packet_t *packet);
+libtrace_udp_t *trace_get_udp(libtrace_packet_t *packet);
 
 /** get a pointer to the UDP header (if any) given a pointer to the IP header
  * @param 	ip	The IP header
@@ -669,7 +745,7 @@ libtrace_udp_t *trace_get_udp(const libtrace_packet_t *packet);
  * Skipped may be NULL, in which case it will be ignored by this function.
  */
 SIMPLE_FUNCTION
-libtrace_udp_t *trace_get_udp_from_ip(const libtrace_ip_t *ip,int *skipped);
+libtrace_udp_t *trace_get_udp_from_ip(libtrace_ip_t *ip,int *skipped);
 
 /** get a pointer to the ICMP header (if any)
  * @param packet  	the packet opaque pointer
@@ -688,7 +764,7 @@ libtrace_icmp_t *trace_get_icmp(const libtrace_packet_t *packet);
  * Skipped may be NULL, in which case it will be ignored by this function
  */
 SIMPLE_FUNCTION
-libtrace_icmp_t *trace_get_icmp_from_ip(const libtrace_ip_t *ip,int *skipped);
+libtrace_icmp_t *trace_get_icmp_from_ip(libtrace_ip_t *ip,int *skipped);
 /*@}*/
 
 /** parse an ip or tcp option
