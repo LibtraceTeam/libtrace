@@ -7,7 +7,7 @@
 
 void usage(char *argv0)
 {
-	fprintf(stderr,"Usage: %s [ -i | --set-interface ] outputuri traceuri...\n",argv0);
+	fprintf(stderr,"Usage: %s [ -i | --set-interface ] [ -u | --unique-packets ] outputuri traceuri...\n",argv0);
 	fprintf(stderr,"\n");
 	fprintf(stderr,"Merges traces together, with -i each trace gets it's own direction/interface,\n without traces keep whatever direction/interface they have set\n");
 	exit(1);
@@ -21,16 +21,19 @@ int main(int argc, char *argv[])
 	struct libtrace_packet_t **packet;
 	bool *live;
 	bool set_interface=false;
+	bool unique_packets=false;
 	int i=0;
+	uint64_t last_ts=0;
 
 	while (1) {
 		int option_index;
 		struct option long_options[] = {
 			{ "set-interface", 	0, 0, 'i' },
+			{ "unique-packets",	0, 0, 'u' },
 			{ NULL,			0, 0, 0 },
 		};
 
-		int c=getopt_long(argc, argv, "i:",
+		int c=getopt_long(argc, argv, "iu",
 				long_options, &option_index);
 
 		if (c==-1)
@@ -38,6 +41,7 @@ int main(int argc, char *argv[])
 
 		switch (c) {
 			case 'i': set_interface=true; break;
+			case 'u': unique_packets=true; break;
 			default:
 				fprintf(stderr,"unknown option: %c\n",c);
 				usage(argv[0]);
@@ -64,7 +68,6 @@ int main(int argc, char *argv[])
 	live=calloc((argc-optind),sizeof(bool));
 	for(i=0;i<argc-optind;++i) {
 		struct libtrace_t *f;
-		struct libtrace_packet_t *p;
 		f=trace_create(argv[i+optind]);
 		if (trace_is_err(f)) {
 			trace_perror(f,"trace_create");
@@ -77,7 +80,8 @@ int main(int argc, char *argv[])
 		p=trace_create_packet();
 		input[i]=f;
 		packet[i]=p;
-		trace_read_packet(f,p);
+		if (trace_read_packet(f,packet[i])>0)
+			live[i]=true;
 	}
 
 	while(1) {
@@ -102,7 +106,7 @@ int main(int argc, char *argv[])
 			}
 			if (live[i] && 
 				(oldest==-1 || 
-				 oldest_ts<trace_get_erf_timestamp(packet[i]))) {
+				 oldest_ts>trace_get_erf_timestamp(packet[i]))) {
 				oldest=i;
 				oldest_ts=trace_get_erf_timestamp(packet[i]);
 			}
@@ -112,10 +116,17 @@ int main(int argc, char *argv[])
 			break;
 		}
 
+		live[oldest]=false;
+
 		if (set_interface)
 			trace_set_direction(packet[oldest],oldest);
+
+		if (unique_packets && oldest_ts == last_ts)
+			continue;
+
 		trace_write_packet(output,packet[oldest]);
-		live[oldest]=false;
+
+		last_ts=oldest_ts;
 		
 	}
 	trace_destroy_output(output);
