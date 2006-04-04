@@ -66,7 +66,7 @@ struct libtrace_eventobj_t trace_event_device(struct libtrace_t *trace, struct l
 		return event;
 	} 
 		
-	if (data>=0) {
+	if (data>0) {
 		event.size = trace_read_packet(trace,packet);
 		event.type = TRACE_EVENT_PACKET;
 		return event;
