@@ -650,7 +650,7 @@ void *trace_get_link(const libtrace_packet_t *packet);
  * @return a pointer to the IP header, or NULL if there is not an IP packet
  */
 SIMPLE_FUNCTION
-libtrace_ip_t *trace_get_ip(const libtrace_packet_t *packet);
+libtrace_ip_t *trace_get_ip(libtrace_packet_t *packet);
 
 /** Gets a pointer to the transport layer header (if any)
  * @param packet        a pointer to a libtrace_packet structure
@@ -660,53 +660,72 @@ libtrace_ip_t *trace_get_ip(const libtrace_packet_t *packet);
  *
  * @note proto may be NULL if proto is unneeded.
  */
-void *trace_get_transport(const libtrace_packet_t *packet, uint8_t *proto);
+void *trace_get_transport(libtrace_packet_t *packet, uint8_t *proto, 
+		uint32_t *remaining);
 
 /** Gets a pointer to the payload given a pointer to the IP header
  * @param ip            The IP Header
  * @param[out] proto	An output variable of the IP protocol
- * @param[out] skipped  An output variable of the number of bytes skipped
+ * @param[in,out] remaining Updated with the number of bytes remaining
  *
- * @return a pointer to the transport layer header, or NULL if there is no header
+ * @return a pointer to the transport layer header, or NULL if header isn't present.
  *
- * Skipped can be NULL, in which case it will be ignored
- * @note This was called trace_get_transport_from_ip in libtrace2
+ * Remaining may be NULL.  If Remaining is not NULL it must point to the number
+ * of bytes captured of the IP header and beyond.  It will be updated after this
+ * function to the number of bytes remaining after the IP header (and any IP options)
+ * have been removed.
+ *
+ * proto may be NULL if not needed.
+ *
+ * @note This is similar to trace_get_transport_from_ip in libtrace2
  */
 void *trace_get_payload_from_ip(libtrace_ip_t *ip, uint8_t *proto,
-		int *skipped);
+		uint32_t *remaining);
 
 /** Gets a pointer to the payload given a pointer to a tcp header
  * @param tcp           The tcp Header
- * @param[out] skipped  An output variable of the number of bytes skipped
+ * @param[in,out] remaining Updated with the number of bytes remaining
  *
- * @return a pointer to the transport layer header, or NULL if there is no header
+ * @return a pointer to the tcp payload, or NULL if the payload isn't present.
  *
- * Skipped can be NULL, in which case it will be ignored
- * @note This was called trace_get_transport_from_ip in libtrace2
+ * Remaining may be NULL.  If Remaining is not NULL it must point to the number
+ * of bytes captured of the TCP header and beyond.  It will be updated after this
+ * function to the number of bytes remaining after the TCP header (and any TCP options)
+ * have been removed.
+ *
+ * @note This is similar to trace_get_transport_from_ip in libtrace2
  */
-void *trace_get_payload_from_tcp(libtrace_tcp_t *tcp, int *skipped);
+void *trace_get_payload_from_tcp(libtrace_tcp_t *tcp, uint32_t *remaining);
 
 /** Gets a pointer to the payload given a pointer to a udp header
  * @param udp           The udp Header
- * @param[out] skipped  An output variable of the number of bytes skipped
+ * @param[in,out] remaining Updated with the number of bytes remaining
  *
- * @return a pointer to the transport layer header, or NULL if there is no header
+ * @return a pointer to the udp payload, or NULL if the payload isn't present.
  *
- * Skipped can be NULL, in which case it will be ignored
- * @note This was called trace_get_transport_from_ip in libtrace2
+ * Remaining may be NULL.  If Remaining is not NULL it must point to the number
+ * of bytes captured of the TCP header and beyond.  It will be updated after this
+ * function to the number of bytes remaining after the TCP header (and any TCP options)
+ * have been removed.
+ *
+ * @note This is similar trace_get_transport_from_ip in libtrace2
  */
-void *trace_get_payload_from_udp(libtrace_udp_t *udp, int *skipped);
+void *trace_get_payload_from_udp(libtrace_udp_t *udp, uint32_t *remaining);
 
 /** Gets a pointer to the payload given a pointer to a icmp header
- * @param icmp          The udp Header
- * @param[out] skipped  An output variable of the number of bytes skipped
+ * @param icmp          The icmp Header
+ * @param[in,out] remaining Updated with the number of bytes remaining
  *
- * @return a pointer to the transport layer header, or NULL if there is no header
+ * @return a pointer to the icmp payload, or NULL if the payload isn't present.
  *
- * Skipped can be NULL, in which case it will be ignored
- * @note This was called trace_get_transport_from_ip in libtrace2
+ * Remaining may be NULL.  If Remaining is not NULL it must point to the number
+ * of bytes captured of the TCP header and beyond.  It will be updated after this
+ * function to the number of bytes remaining after the TCP header (and any TCP options)
+ * have been removed.
+ *
+ * @note This is similar to trace_get_payload_from_icmp in libtrace2
  */
-void *trace_get_payload_from_udp(libtrace_udp_t *udp, int *skipped);
+void *trace_get_payload_from_icmp(libtrace_icmp_t *icmp, uint32_t *skipped);
 
 /** get a pointer to the TCP header (if any)
  * @param packet  	the packet opaque pointer
@@ -714,20 +733,23 @@ void *trace_get_payload_from_udp(libtrace_udp_t *udp, int *skipped);
  * @return a pointer to the TCP header, or NULL if there is not a TCP packet
  */
 SIMPLE_FUNCTION
-libtrace_tcp_t *trace_get_tcp(const libtrace_packet_t *packet);
+libtrace_tcp_t *trace_get_tcp(libtrace_packet_t *packet);
 
 /** get a pointer to the TCP header (if any) given a pointer to the IP header
  * @param ip		The IP header
- * @param[out] skipped	An output variable of the number of bytes skipped
+ * @param[in,out] remaining Updated with the number of bytes remaining
  *
  * @return a pointer to the TCP header, or NULL if this is not a TCP packet
  *
- * Skipped can be NULL, in which case it will be ignored by the program.
+ * Remaining may be NULL.  If Remaining is not NULL it must point to the number
+ * of bytes captured of the TCP header and beyond.  It will be updated after this
+ * function to the number of bytes remaining after the TCP header (and any TCP options)
+ * have been removed.
  *
- * @author Perry Lorier
+ * @note The last parameter has changed from libtrace2
  */
 SIMPLE_FUNCTION
-libtrace_tcp_t *trace_get_tcp_from_ip(libtrace_ip_t *ip,int *skipped);
+libtrace_tcp_t *trace_get_tcp_from_ip(libtrace_ip_t *ip, uint32_t *remaining);
 
 /** get a pointer to the UDP header (if any)
  * @param packet  	the packet opaque pointer
@@ -739,14 +761,19 @@ libtrace_udp_t *trace_get_udp(libtrace_packet_t *packet);
 
 /** get a pointer to the UDP header (if any) given a pointer to the IP header
  * @param 	ip	The IP header
- * @param[out] 	skipped	An output variable of the number of bytes skipped
+ * @param[in,out] remaining Updated with the number of bytes remaining
  *
  * @return a pointer to the UDP header, or NULL if this is not an UDP packet
  *
- * Skipped may be NULL, in which case it will be ignored by this function.
+ * Remaining may be NULL.  If Remaining is not NULL it must point to the number
+ * of bytes captured of the TCP header and beyond.  It will be updated after this
+ * function to the number of bytes remaining after the TCP header (and any TCP options)
+ * have been removed.
+ *
+ * @note Beware the change from libtrace2 from skipped to remaining
  */
 SIMPLE_FUNCTION
-libtrace_udp_t *trace_get_udp_from_ip(libtrace_ip_t *ip,int *skipped);
+libtrace_udp_t *trace_get_udp_from_ip(libtrace_ip_t *ip,uint32_t *remaining);
 
 /** get a pointer to the ICMP header (if any)
  * @param packet  	the packet opaque pointer
@@ -754,18 +781,59 @@ libtrace_udp_t *trace_get_udp_from_ip(libtrace_ip_t *ip,int *skipped);
  * @return a pointer to the ICMP header, or NULL if this is not a ICMP packet
  */
 SIMPLE_FUNCTION
-libtrace_icmp_t *trace_get_icmp(const libtrace_packet_t *packet);
+libtrace_icmp_t *trace_get_icmp(libtrace_packet_t *packet);
 
 /** get a pointer to the ICMP header (if any) given a pointer to the IP header
  * @param ip		The IP header
- * @param[out] skipped	An output variable of the number of bytes skipped
+ * @param[in,out] remaining Updated with the number of bytes remaining
  *
  * @return a pointer to the ICMP header, or NULL if this is not an ICMP packet
  *
- * Skipped may be NULL, in which case it will be ignored by this function
+ * Remaining may be NULL.  If Remaining is not NULL it must point to the number
+ * of bytes captured of the TCP header and beyond.  It will be updated after this
+ * function to the number of bytes remaining after the TCP header (and any TCP options)
+ * have been removed.
+ *
+ * @note Beware the change from libtrace2 from skipped to remaining
  */
 SIMPLE_FUNCTION
-libtrace_icmp_t *trace_get_icmp_from_ip(libtrace_ip_t *ip,int *skipped);
+libtrace_icmp_t *trace_get_icmp_from_ip(libtrace_ip_t *ip,uint32_t *remaining);
+
+/** Get the destination MAC addres
+ * @param packet  	the packet opaque pointer
+ * @return a pointer to the destination mac, (or NULL if there is no 
+ * destination MAC)
+ */
+SIMPLE_FUNCTION
+uint8_t *trace_get_destination_mac(libtrace_packet_t *packet);
+
+/** Get the source MAC addres
+ * @param packet  	the packet opaque pointer
+ * @return a pointer to the source mac, (or NULL if there is no source MAC)
+ */
+SIMPLE_FUNCTION
+uint8_t *trace_get_source_mac(libtrace_packet_t *packet);
+
+/** Get the source addres
+ * @param packet  	the packet opaque pointer
+ * @param addr		a pointer to a sockaddr to store the address in, or NULL to use
+ * 			static storage.
+ * @return NULL if there is no source address, or a sockaddr holding a v4 or v6 address
+ */
+SIMPLE_FUNCTION
+struct sockaddr *trace_get_source_address(const libtrace_packet_t *packet,
+		struct sockaddr *addr);
+
+/** Get the source addres
+ * @param packet  	the packet opaque pointer
+ * @param addr		a pointer to a sockaddr to store the address in, or NULL to use
+ * 			static storage.
+ * @return NULL if there is no source address, or a sockaddr holding a v4 or v6 address
+ */
+SIMPLE_FUNCTION
+struct sockaddr *trace_get_destination_address(const libtrace_packet_t *packet,
+		struct sockaddr *addr);
+
 /*@}*/
 
 /** parse an ip or tcp option
@@ -942,23 +1010,6 @@ typedef enum {
  */
 SIMPLE_FUNCTION
 libtrace_linktype_t trace_get_link_type(const libtrace_packet_t *packet);
-
-/** Get the destination MAC addres
- * @param packet  	the packet opaque pointer
- * @return a pointer to the destination mac, (or NULL if there is no 
- * destination MAC)
- * @author Perry Lorier
- */
-SIMPLE_FUNCTION
-uint8_t *trace_get_destination_mac(const libtrace_packet_t *packet);
-
-/** Get the source MAC addres
- * @param packet  	the packet opaque pointer
- * @return a pointer to the source mac, (or NULL if there is no source MAC)
- * @author Perry Lorier
- */
-SIMPLE_FUNCTION
-uint8_t *trace_get_source_mac(const libtrace_packet_t *packet);
 
 /** Set the direction flag, if it has one
  * @param packet  	the packet opaque pointer

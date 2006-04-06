@@ -905,52 +905,6 @@ libtrace_linktype_t trace_get_link_type(const libtrace_packet_t *packet ) {
 	return -1;
 }
 
-/* Get the source MAC addres
- * @param packet 	a pointer to a libtrace_packet structure
- * @returns a pointer to the source mac, (or NULL if there is no source MAC)
- * @author Perry Lorier
- */
-uint8_t *trace_get_source_mac(const struct libtrace_packet_t *packet) {
-	void *link = trace_get_link(packet);
-	libtrace_80211_t *wifi = link;
-        libtrace_ether_t *ethptr = link;
-	if (!link)
-		return NULL;
-	switch (trace_get_link_type(packet)) {
-		case TRACE_TYPE_80211:
-			return (uint8_t*)&wifi->mac2;
-		case TRACE_TYPE_ETH:
-			return (uint8_t*)&ethptr->ether_shost;
-		default:
-			fprintf(stderr,"Not implemented\n");
-			assert(0);
-	}
-}
-
-/* Get the destination MAC addres
- * @param packet a libtrace_packet pointer
- * @returns a pointer to the destination mac, (or NULL if there is no 
- * destination MAC)
- * @author Perry Lorier
- */
-uint8_t *trace_get_destination_mac(const struct libtrace_packet_t *packet) {
-	void *link = trace_get_link(packet);
-	libtrace_80211_t *wifi = link;
-        libtrace_ether_t *ethptr = link;
-	if (!link)
-		return NULL;
-	switch (trace_get_link_type(packet)) {
-		case TRACE_TYPE_80211:
-			return (uint8_t*)&wifi->mac1;
-		case TRACE_TYPE_ETH:
-			return (uint8_t*)&ethptr->ether_dhost;
-		default:
-			fprintf(stderr,"Not implemented\n");
-			assert(0);
-	}
-}
-
-
 /* process a libtrace event
  * @param trace the libtrace opaque pointer
  * @param packet the libtrace_packet opaque pointer
@@ -1113,28 +1067,6 @@ int8_t trace_get_direction(const struct libtrace_packet_t *packet) {
 		return packet->trace->format->get_direction(packet);
 	}
 	return -1;
-}
-
-struct ports_t {
-	uint16_t src;
-	uint16_t dst;
-};
-
-/* Return the client port
- */
-uint16_t trace_get_source_port(const struct libtrace_packet_t *packet)
-{
-	struct ports_t *port = trace_get_transport(packet, NULL);
-
-	return ntohs(port->src);
-}
-
-/* Same as get_source_port except use the destination port */
-uint16_t trace_get_destination_port(const struct libtrace_packet_t *packet)
-{
-	struct ports_t *port = trace_get_transport(packet, NULL);
-
-	return ntohs(port->dst);
 }
 
 #define ROOT_SERVER(x) ((x) < 512)

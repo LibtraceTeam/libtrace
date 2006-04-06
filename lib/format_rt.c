@@ -544,7 +544,7 @@ static int rt_read_packet_versatile(libtrace_t *libtrace,
 
 static int rt_read_packet(libtrace_t *libtrace,
 		libtrace_packet_t *packet) {
-	rt_read_packet_versatile(libtrace,packet,1);
+	return rt_read_packet_versatile(libtrace,packet,1);
 }
 
 
