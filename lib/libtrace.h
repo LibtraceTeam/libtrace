@@ -177,22 +177,18 @@ typedef PACKED struct libtrace_ip
     struct in_addr ip_dst;		/**< dest address */
 } libtrace_ip_t;
 
+typedef PACKED struct libtrace_ip6_ext
+{
+	uint8_t nxt;
+	uint8_t len;
+} libtrace_ip6_ext_t;
+
 /** IPv6 header structure */
 typedef PACKED struct libtrace_ip6
-{
-#if BYTE_ORDER == LITTLE_ENDIAN
-    unsigned int flow:4;		/**< Flow label */
-    unsigned int tclass:8;		/**< Traffic class */
-    unsigned int version:4;		/**< IP Version (6) */
-#elif BYTE_ORDER == BIG_ENDIAN
-    unsigned int version:4;		/**< IP Version (6) */
-    unsigned int tclass:8;		/**< Traffic class */
-    unsigned int flow:4;		/**< Flow label */
-#else
-#   error "Adjust your <bits/endian.h> defines"
-#endif
-    uint16_t peln;			/**< Payload length */
-    uint8_t nxthdr;			/**< Next header */
+{ 
+    uint32_t flow;
+    uint16_t plen;			/**< Payload length */
+    uint8_t nxt;			/**< Next header */
     uint8_t hlim;			/**< Hop limit */
     struct in6_addr ip_src;		/**< source address */
     struct in6_addr ip_dst;		/**< dest address */
@@ -658,13 +654,17 @@ libtrace_ip_t *trace_get_ip(const libtrace_packet_t *packet);
 
 /** Gets a pointer to the transport layer header (if any)
  * @param packet        a pointer to a libtrace_packet structure
+ * @param[out] proto	transport layer protocol
  *
  * @return a pointer to the transport layer header, or NULL if there is no header
+ *
+ * @note proto may be NULL if proto is unneeded.
  */
-void *trace_get_transport(const libtrace_packet_t *packet);
+void *trace_get_transport(const libtrace_packet_t *packet, uint8_t *proto);
 
 /** Gets a pointer to the payload given a pointer to the IP header
  * @param ip            The IP Header
+ * @param[out] proto	An output variable of the IP protocol
  * @param[out] skipped  An output variable of the number of bytes skipped
  *
  * @return a pointer to the transport layer header, or NULL if there is no header
@@ -672,7 +672,8 @@ void *trace_get_transport(const libtrace_packet_t *packet);
  * Skipped can be NULL, in which case it will be ignored
  * @note This was called trace_get_transport_from_ip in libtrace2
  */
-void *trace_get_payload_from_ip(libtrace_ip_t *ip, int *skipped);
+void *trace_get_payload_from_ip(libtrace_ip_t *ip, uint8_t *proto,
+		int *skipped);
 
 /** Gets a pointer to the payload given a pointer to a tcp header
  * @param tcp           The tcp Header

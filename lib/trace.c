@@ -1124,7 +1124,7 @@ struct ports_t {
  */
 uint16_t trace_get_source_port(const struct libtrace_packet_t *packet)
 {
-	struct ports_t *port = trace_get_transport(packet);
+	struct ports_t *port = trace_get_transport(packet, NULL);
 
 	return ntohs(port->src);
 }
@@ -1132,7 +1132,7 @@ uint16_t trace_get_source_port(const struct libtrace_packet_t *packet)
 /* Same as get_source_port except use the destination port */
 uint16_t trace_get_destination_port(const struct libtrace_packet_t *packet)
 {
-	struct ports_t *port = trace_get_transport(packet);
+	struct ports_t *port = trace_get_transport(packet, NULL);
 
 	return ntohs(port->dst);
 }

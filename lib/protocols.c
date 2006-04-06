@@ -1,8 +1,11 @@
+/* This file has the various helper functions used to decode various protocols 
+ *
+ * $Id$
+ */ 
 #include "libtrace.h"
 #include "libtrace_int.h"
 #include "wag.h"
 
-/* This file has the various helper functions used to decode various protocols */
 
 static void *trace_get_ip_from_ethernet(void *ethernet, int *skipped)
 {
@@ -139,14 +142,11 @@ struct libtrace_ip *trace_get_ip(const struct libtrace_packet_t *packet) {
 				sll = trace_get_link(packet);
 				if (!sll) {
 					ipptr = NULL;
-					break;
-				}
-				if (ntohs(sll->protocol)!=0x86DD) {
+				} else if (ntohs(sll->protocol)!=0x0800) {
 					ipptr = NULL;
 				}
 				else {
-					ipptr = (void*)((char*)sll+
-							sizeof(*sll));
+					ipptr=(void*)((char*)sll+sizeof(*sll));
 				}
 			}
 			break;
@@ -171,7 +171,7 @@ struct libtrace_ip *trace_get_ip(const struct libtrace_packet_t *packet) {
 				/* 64 byte capture. */
 				struct libtrace_pos *pos = 
 					trace_get_link(packet);
-				if (ntohs(pos->ether_type) == 0x86DD) {
+				if (ntohs(pos->ether_type) == 0x0800) {
 					ipptr=(void*)((char *)pos+sizeof(*pos));
 				} else {
 					ipptr=NULL;
@@ -191,7 +191,7 @@ struct libtrace_ip *trace_get_ip(const struct libtrace_packet_t *packet) {
 				 * don't have time!
 				 */
 				llc = (void*)((char *)llc + 4);
-				if (ntohs(llc->type) == 0x86DD) {
+				if (ntohs(llc->type) == 0x0800) {
 					ipptr=(void*)((char*)llc+sizeof(*llc));
 				} else {
 					ipptr = NULL;
@@ -242,9 +242,7 @@ struct libtrace_ip6 *trace_get_ip6(const struct libtrace_packet_t *packet) {
 				sll = trace_get_link(packet);
 				if (!sll) {
 					ipptr = NULL;
-					break;
-				}
-				if (ntohs(sll->protocol)!=0x0800) {
+				} else if (ntohs(sll->protocol)!=0x86DD) {
 					ipptr = NULL;
 				}
 				else {
@@ -274,7 +272,7 @@ struct libtrace_ip6 *trace_get_ip6(const struct libtrace_packet_t *packet) {
 				/* 64 byte capture. */
 				struct libtrace_pos *pos = 
 					trace_get_link(packet);
-				if (ntohs(pos->ether_type) == 0x0800) {
+				if (ntohs(pos->ether_type) == 0x86DD) {
 					ipptr=(void*)((char *)pos+sizeof(*pos));
 				} else {
 					ipptr=NULL;
@@ -294,7 +292,7 @@ struct libtrace_ip6 *trace_get_ip6(const struct libtrace_packet_t *packet) {
 				 * don't have time!
 				 */
 				llc = (void*)((char *)llc + 4);
-				if (ntohs(llc->type) == 0x0800) {
+				if (ntohs(llc->type) == 0x86DD) {
 					ipptr=(void*)((char*)llc+sizeof(*llc));
 				} else {
 					ipptr = NULL;
@@ -313,39 +311,106 @@ struct libtrace_ip6 *trace_get_ip6(const struct libtrace_packet_t *packet) {
 
 #define SW_IP_OFFMASK 0xff1f
 
-void *trace_get_payload_from_ip(libtrace_ip_t *ipptr, int *skipped) 
+void *trace_get_payload_from_ip(libtrace_ip_t *ipptr, uint8_t *prot,
+		int *skipped) 
 {
         void *trans_ptr = 0;
 
         if ((ipptr->ip_off & SW_IP_OFFMASK) == 0) {
 		if (skipped) *skipped=(ipptr->ip_hl * 4);
                 trans_ptr = (void *)((char *)ipptr + (ipptr->ip_hl * 4));
+		if (prot) *prot = ipptr->ip_p;
         }
         return trans_ptr;
 }
 
-void *trace_get_transport(const struct libtrace_packet_t *packet) 
+void *trace_get_payload_from_ip6(libtrace_ip6_t *ipptr, uint8_t *prot,
+		int *skipped) 
 {
-        struct libtrace_ip *ipptr = 0;
+	void *payload = (char*)ipptr+sizeof(libtrace_ip6_t);
+	uint8_t nxt = ipptr->nxt;
+
+	if (skipped) skipped+=sizeof(libtrace_ip6_t);
+
+	while(1) {
+		switch (nxt) {
+			case 0: /* hop by hop options */
+			case 43: /* routing */
+			case 44: /* fragment */
+			case 50: /* ESP */
+			case 51: /* AH */
+			case 60: /* Destination options */
+				{
+					uint16_t len=((libtrace_ip6_ext_t*)payload)->len
+					+sizeof(libtrace_ip6_ext_t);
+
+					if (skipped)
+						*skipped+=len;
+
+					payload=(char*)payload+len;
+					nxt=((libtrace_ip6_ext_t*)payload)->nxt;
+					continue;
+				}
+			default:
+				if (prot) *prot=nxt;
+				return payload;
+		}
+	}
+}
+
+static void *trace_get_ip4_transport(const libtrace_packet_t *packet,
+		uint8_t *proto) 
+{
+        libtrace_ip_t *ipptr = 0;
 
         if (!(ipptr = trace_get_ip(packet))) {
                 return 0;
         }
 
-        return trace_get_payload_from_ip(ipptr,NULL);
+        return trace_get_payload_from_ip(ipptr,proto,NULL);
+}
+
+static void *trace_get_ip6_transport(const libtrace_packet_t *packet,
+		uint8_t *proto) 
+{
+        libtrace_ip6_t *ipptr = 0;
+
+        if (!(ipptr = trace_get_ip6(packet))) {
+                return 0;
+        }
+
+        return trace_get_payload_from_ip6(ipptr,proto,NULL);
+}
+
+void *trace_get_transport(const struct libtrace_packet_t *packet, 
+		uint8_t *proto) 
+{
+	void *transport;
+	uint8_t dummy;
+
+	if (!proto) proto=&dummy;
+
+	transport=trace_get_ip4_transport(packet,proto);
+	if (transport) {
+		if (*proto == 41) {
+			trace_get_payload_from_ip6(transport,proto,NULL);
+		}
+		return transport;
+	}
+
+	return trace_get_ip6_transport(packet,proto);
 }
 
 libtrace_tcp_t *trace_get_tcp(const libtrace_packet_t *packet) {
-        struct libtrace_tcp *tcpptr = 0;
-        struct libtrace_ip *ipptr = 0;
+	uint8_t proto;
+	libtrace_tcp_t *tcp;
 
-        if(!(ipptr = trace_get_ip(packet))) {
-                return 0;
-	}
-        if (ipptr->ip_p == 6) {
-                tcpptr = (struct libtrace_tcp *)trace_get_payload_from_ip(ipptr, 0);
-        }
-        return tcpptr;
+	tcp=trace_get_transport(packet,&proto);
+
+	if (proto != 6)
+		return NULL;
+
+	return tcp;
 }
 
 libtrace_tcp_t *trace_get_tcp_from_ip(libtrace_ip_t *ip, int *skipped)
@@ -353,24 +418,23 @@ libtrace_tcp_t *trace_get_tcp_from_ip(libtrace_ip_t *ip, int *skipped)
 	struct libtrace_tcp *tcpptr = 0;
 
 	if (ip->ip_p == 6)  {
-		tcpptr = (struct libtrace_tcp *)trace_get_payload_from_ip(ip, skipped);
+		tcpptr = (struct libtrace_tcp *)
+			trace_get_payload_from_ip(ip, NULL, skipped);
 	}
 
 	return tcpptr;
 }
 
 libtrace_udp_t *trace_get_udp(libtrace_packet_t *packet) {
-        struct libtrace_udp *udpptr = 0;
-        struct libtrace_ip *ipptr = 0;
-        
-        if(!(ipptr = trace_get_ip(packet))) {
-                return 0;
-        }
-        if (ipptr->ip_p == 17)  {
-                udpptr = (struct libtrace_udp *)trace_get_payload_from_ip(ipptr, 0);
-        }
+	uint8_t proto;
+	libtrace_udp_t *udp;
 
-        return udpptr;
+	udp=trace_get_transport(packet,&proto);
+
+	if (proto != 17)
+		return NULL;
+
+	return udp;
 }
 
 libtrace_udp_t *trace_get_udp_from_ip(libtrace_ip_t *ip, int *skipped)
@@ -378,23 +442,23 @@ libtrace_udp_t *trace_get_udp_from_ip(libtrace_ip_t *ip, int *skipped)
 	struct libtrace_udp *udpptr = 0;
 
 	if (ip->ip_p == 17) {
-		udpptr = (libtrace_udp_t *)trace_get_payload_from_ip(ip, skipped);
+		udpptr = (libtrace_udp_t *)
+			trace_get_payload_from_ip(ip, NULL, skipped);
 	}
 
 	return udpptr;
 }
 
 libtrace_icmp_t *trace_get_icmp(const libtrace_packet_t *packet) {
-        struct libtrace_icmp *icmpptr = 0;
-        struct libtrace_ip *ipptr = 0;
-        
-        if(!(ipptr = trace_get_ip(packet))) {
-                return 0;
-        }
-        if (ipptr->ip_p == 1){
-                icmpptr = (libtrace_icmp_t *)trace_get_payload_from_ip(ipptr, 0);
-        }
-        return icmpptr;
+	uint8_t proto;
+	libtrace_icmp_t *icmp;
+
+	icmp=trace_get_transport(packet,&proto);
+
+	if (proto != 1)
+		return NULL;
+
+	return icmp;
 }
 
 libtrace_icmp_t *trace_get_icmp_from_ip(libtrace_ip_t *ip, int *skipped)
@@ -402,7 +466,7 @@ libtrace_icmp_t *trace_get_icmp_from_ip(libtrace_ip_t *ip, int *skipped)
 	libtrace_icmp_t *icmpptr = 0;
 
 	if (ip->ip_p == 1)  {
-		icmpptr = (libtrace_icmp_t *)trace_get_payload_from_ip(ip, skipped);
+		icmpptr = (libtrace_icmp_t *)trace_get_payload_from_ip(ip, NULL, skipped);
 	}
 
 	return icmpptr;
