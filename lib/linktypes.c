@@ -1,5 +1,7 @@
 #include "libtrace.h"
+#ifdef HAVE_PCAP
 #include <pcap.h>
+#endif
 #include "dagformat.h"
 #include "rt_protocol.h"
 #include <assert.h>
@@ -14,6 +16,7 @@
 libtrace_linktype_t pcap_dlt_to_libtrace(int dlt)
 {
 	switch(dlt) {
+#if HAVE_PCAP
 		case DLT_NULL: return TRACE_TYPE_NONE;
 		case DLT_EN10MB: return TRACE_TYPE_ETH;
 		case DLT_ATM_RFC1483: return TRACE_TYPE_ATM;
@@ -24,6 +27,7 @@ libtrace_linktype_t pcap_dlt_to_libtrace(int dlt)
 #ifdef DLT_PFLOG
 		case DLT_PFLOG: return TRACE_TYPE_PFLOG;
 #endif
+#endif
 		default:
 			return -1;
 	}
@@ -32,6 +36,7 @@ libtrace_linktype_t pcap_dlt_to_libtrace(int dlt)
 int libtrace_to_pcap_dlt(libtrace_linktype_t type)
 {
 	switch(type) {
+#ifdef HAVE_PCAP
 		case TRACE_TYPE_NONE: return DLT_NULL;
 		case TRACE_TYPE_ETH: return DLT_EN10MB;
 		case TRACE_TYPE_ATM: return DLT_ATM_RFC1483;
@@ -41,6 +46,7 @@ int libtrace_to_pcap_dlt(libtrace_linktype_t type)
 #endif
 #ifdef DLT_PFLOG
 		case TRACE_TYPE_PFLOG: return DLT_PFLOG;
+#endif
 #endif
 		default:
 			return -1;
