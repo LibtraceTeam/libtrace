@@ -24,7 +24,7 @@ all: doxy
 distclean: doxyclean
 
 doxy:
-	@if test x"$(libtrace_doxygen)" == xtrue ; then \
+	@if test x"$(libtrace_doxygen)" = xtrue ; then \
 	  if test -f $(DOXYGEN_CONF) ; then \
 	    doxygen $(DOXYGEN_CONF) ; \
 	  else \
