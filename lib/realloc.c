@@ -9,7 +9,6 @@ void *realloc ();
 
 
 /* If N is zero, allocate a 1-byte block */
-
 void *
 rpl_realloc(void *ptr,size_t n)
 {

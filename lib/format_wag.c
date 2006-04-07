@@ -48,7 +48,6 @@
 # error "Can't find stddef.h - do you define ptrdiff_t elsewhere?"
 #endif
 #include <sys/types.h>
-#include <sys/time.h>
 #include <time.h>
 #include <sys/socket.h>
 #include <sys/un.h>
