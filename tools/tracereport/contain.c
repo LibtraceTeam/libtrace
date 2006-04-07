@@ -1,15 +1,15 @@
+/* Updated: 2006-04-07 to deal with duplicate inserts */
 #include <stdio.h>
 #include <inttypes.h>
 #include <lt_inttypes.h>
 #include <stdlib.h>
 #include "contain.h"
-#include "config.h"
 
 splay *splay_search_tree(splay *tree, splay_cmp_t cmp, splay *node) {
 	splay N, *l, *r, *y;
 
-	if (tree == 0) {
-		return 0;
+	if (tree == NULL) {
+		return NULL;
 	}
 
 	N.left = N.right = 0;
@@ -94,21 +94,28 @@ splay *splay_insert(splay *tree, splay_cmp_t cmp, splay *node)
 {
 	if (tree == NULL) {
 		tree = node;
+		node->left = NULL;
+		node->right = NULL;
 		return tree;
 	}
+	tree=splay_search_tree(tree,cmp,node);
 	if (cmp(node,tree)<0) {
 		node->left = tree->left;
 		node->right = tree;
-		tree->left = 0;
+		tree->left = NULL;
 	} else if (cmp(node,tree)>0) {
 		node->right = tree->right;
 		node->left = tree;
-		tree->right = 0;
+		tree->right = NULL;
 	} else {
-		free(node);
+		/* Replace the root node with the current node */
+		node->left = tree->left;
+		node->right = tree->right;
+		free(tree);
+		tree=node;
 	}
 
-	return node;
+	return tree;
 }
 
 void splay_visit(const splay *tree, visitor_t pre,visitor_t inorder,visitor_t post,void *userdata)
