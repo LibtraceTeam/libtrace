@@ -62,7 +62,6 @@
 
 #include <sys/socket.h>
 #include <sys/un.h>
-#include <sys/mman.h>
 #include <unistd.h>
 
 #ifdef HAVE_NET_IF_ARP_H
