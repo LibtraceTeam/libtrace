@@ -6,6 +6,7 @@
 #include "libtrace_int.h"
 #include "wag.h"
 #include <assert.h>
+#include <stdio.h>
 
 
 /* Returns the payload from 802.3 ethernet.  Type optionally returned in
@@ -180,11 +181,10 @@ void *trace_get_payload_from_link(void *link, libtrace_linktype_t linktype,
 		case TRACE_TYPE_LEGACY_ATM:
 		case TRACE_TYPE_ATM:
 			return trace_get_payload_from_atm(link,type,remaining);
-		default:
-			fprintf(stderr,"Don't understand link layer type %i in trace_get_ip6()\n",
-				linktype);
-			return NULL;
 	}
+	fprintf(stderr,"Don't understand link layer type %i in trace_get_ip6()\n",
+		linktype);
+	return NULL;
 }
 
 libtrace_ip_t *trace_get_ip(libtrace_packet_t *packet) 

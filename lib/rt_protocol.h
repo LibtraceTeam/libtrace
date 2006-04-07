@@ -2,7 +2,9 @@
 #define _RT_PROTOCOL_H
 
 #include "libtrace.h"
+#ifdef HAVE_PCAP
 #include <pcap.h>
+#endif
 
 #define CAPTURE_PORT 3434
 #define COLLECTOR_PORT 3435
@@ -58,6 +60,7 @@ enum rt_field_t {
  RT_DATA_LEGACY_POS	=RT_DATA_SIMPLE + TRACE_FORMAT_LEGACY_POS, 
  RT_DATA_LEGACY_ETH	=RT_DATA_SIMPLE + TRACE_FORMAT_LEGACY_ETH, 
 
+#ifdef HAVE_PCAP
  RT_DATA_PCAP_NULL		=RT_DATA_PCAP + DLT_NULL,
  RT_DATA_PCAP_EN10MB		=RT_DATA_PCAP + DLT_EN10MB,
  RT_DATA_PCAP_ATM_RFC1483	=RT_DATA_PCAP + DLT_ATM_RFC1483,
@@ -67,6 +70,7 @@ enum rt_field_t {
 #endif
 #ifdef DLT_PFLOG
  RT_DATA_PCAP_PFLOG		=RT_DATA_PCAP + DLT_PFLOG,
+#endif
 #endif
  RT_LAST = 3000
 };
