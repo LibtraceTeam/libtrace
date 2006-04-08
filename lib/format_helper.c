@@ -191,7 +191,7 @@ LIBTRACE_FILE trace_open_file_out(libtrace_out_t *trace,int level, int fileflag)
 	/* We open the file with open(2), so we can provide O_LARGEFILE
 	 * as zlib doesn't always do it itself
 	 */
-	fd=open(trace->uridata,fileflag,0666);
+	fd=open(trace->uridata,fileflag|O_LARGEFILE,0666);
 	if (fd==-1) {
 		trace_set_err_out(trace,
 				errno,"Unable to open %s",trace->uridata);

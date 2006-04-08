@@ -393,7 +393,7 @@ static int erf_init_output(libtrace_out_t *libtrace) {
 	libtrace->format_data = calloc(1,sizeof(struct erf_format_data_out_t));
 
 	OPTIONS.erf.level = 0;
-	OPTIONS.erf.fileflag = O_CREAT | O_LARGEFILE | O_WRONLY;
+	OPTIONS.erf.fileflag = O_CREAT | O_WRONLY;
 	OUTPUT.file = 0;
 
 	return 0;
