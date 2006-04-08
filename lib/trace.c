@@ -44,7 +44,6 @@
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <netdb.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -59,10 +58,6 @@
 #ifdef HAVE_SYS_LIMITS_H
 #  include <sys/limits.h>
 #endif
-
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <unistd.h>
 
 #ifdef HAVE_NET_IF_ARP_H
 #  include <net/if_arp.h>
@@ -85,19 +80,6 @@
 #endif
 
 #include <time.h>
-#include <sys/ioctl.h>
-
-#ifdef HAVE_INTTYPES_H
-#  include <inttypes.h>
-#else
-#  error "Can't find inttypes.h - this needs to be fixed"
-#endif 
-
-#ifdef HAVE_STDDEF_H
-#  include <stddef.h>
-#else
-# error "Can't find stddef.h - do you define ptrdiff_t elsewhere?"
-#endif
 
 #include "libtrace.h"
 #include "fifo.h"
@@ -115,7 +97,6 @@
 #include "libtrace_int.h"
 #include "format_helper.h"
 #include "rt_protocol.h"
-#include <err.h>
 
 #define MAXOPTS 1024
 
@@ -1090,7 +1071,7 @@ int8_t trace_get_direction(const struct libtrace_packet_t *packet) {
  * @returns a hint as to which port is the server port
  * @author Daniel Lawson
  */
-int8_t trace_get_server_port(uint8_t protocol __attribute__((unused)), uint16_t source, uint16_t dest) {
+int8_t trace_get_server_port(uint8_t protocol UNUSED, uint16_t source, uint16_t dest) {
 	/*
 	 * * If the ports are equal, return DEST
 	 * * Check for well-known ports in the given protocol
