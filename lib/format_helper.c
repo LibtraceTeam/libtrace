@@ -38,9 +38,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
-#include  "format_helper.h"
+#include "format_helper.h"
 
-#include <sys/ioctl.h>
 #include <assert.h>
 #include <stdarg.h>
 

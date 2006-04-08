@@ -57,7 +57,31 @@
 
 #include <sys/types.h>
 #include <netinet/in.h>
-#include <stdbool.h>
+#ifdef _MSC_VER
+    /* define the following from MSVC's internal types */
+    typedef		__int8	int8_t;
+    typedef		__int16	int16_t;
+    typedef		__int32	int32_t;
+    typedef		__int64	int64_t;
+    typedef unsigned 	__int8	uint8_t;
+    typedef unsigned	__int16 uint16_t;
+    typedef unsigned	__int32 uint32_t;
+    typedef unsigned	__int64 uint64_t;
+#endif
+
+#ifdef WIN32
+#   include <winsock2.h>
+#   include <ws2tcpip.h>
+    typedef short sa_family_t;
+    /* Make up for a lack of stdbool.h */
+#    define bool signed char
+#    define false 0
+#    define true 1
+#else
+#    include <netinet/in.h>
+#    include <stdbool.h>
+#endif
+
 /** API version as 2 byte hex digits, eg 0xXXYYZZ */
 #define LIBTRACE_API_VERSION 0x030000  /* 3.0.00 */
 
@@ -145,8 +169,13 @@ enum {
  * @{
  */
 
+#ifdef WIN32
+#pragma pack(push)
+#pragma pack(1)
+#endif
+
 /** Structure for dealing with IP packets */
-typedef PACKED struct libtrace_ip
+typedef struct libtrace_ip
 {
 #if BYTE_ORDER == LITTLE_ENDIAN
     unsigned int ip_hl:4;		/**< header length */
@@ -157,9 +186,9 @@ typedef PACKED struct libtrace_ip
 #else
 #   error "Adjust your <bits/endian.h> defines"
 #endif
-    u_int8_t ip_tos;			/**< type of service */
-    u_short ip_len;			/**< total length */
-    u_short ip_id;			/**< identification */
+    uint8_t  ip_tos;			/**< type of service */
+    uint16_t ip_len;			/**< total length */
+    int16_t  ip_id;			/**< identification */
 #if BYTE_ORDER == LITTLE_ENDIAN
     unsigned int ip_off:12;		/**< fragment offset */
     unsigned int ip_mf:1;		/**< more fragments flag */
@@ -173,18 +202,18 @@ typedef PACKED struct libtrace_ip
 #else
 #   error "Adjust your <bits/endian.h> defines"
 #endif
-    u_int8_t ip_ttl;			/**< time to live */
-    u_int8_t ip_p;			/**< protocol */
-    u_short ip_sum;			/**< checksum */
+    uint8_t  ip_ttl;			/**< time to live */
+    uint8_t  ip_p;			/**< protocol */
+    uint16_t ip_sum;			/**< checksum */
     struct in_addr ip_src;		/**< source address */
     struct in_addr ip_dst;		/**< dest address */
-} libtrace_ip_t;
+} PACKED libtrace_ip_t;
 
-typedef PACKED struct libtrace_ip6_ext
+typedef struct libtrace_ip6_ext
 {
 	uint8_t nxt;
 	uint8_t len;
-} libtrace_ip6_ext_t;
+} PACKED libtrace_ip6_ext_t;
 
 /** IPv6 header structure */
 typedef PACKED struct libtrace_ip6
