@@ -4,6 +4,7 @@
 #undef malloc
 
 #include <sys/types.h>
+#include <stdlib.h>
 
 void *malloc ();
 

@@ -216,7 +216,7 @@ typedef struct libtrace_ip6_ext
 } PACKED libtrace_ip6_ext_t;
 
 /** IPv6 header structure */
-typedef PACKED struct libtrace_ip6
+typedef struct libtrace_ip6
 { 
     uint32_t flow;
     uint16_t plen;			/**< Payload length */
@@ -224,15 +224,15 @@ typedef PACKED struct libtrace_ip6
     uint8_t hlim;			/**< Hop limit */
     struct in6_addr ip_src;		/**< source address */
     struct in6_addr ip_dst;		/**< dest address */
-} libtrace_ip6_t;
+} PACKED libtrace_ip6_t;
 
 /** Structure for dealing with TCP packets */
 typedef struct libtrace_tcp
   {
-    u_int16_t source;		/**< Source Port */
-    u_int16_t dest;		/**< Destination port */
-    u_int32_t seq;		/**< Sequence number */
-    u_int32_t ack_seq;		/**< Acknowledgement Number */
+    uint16_t source;		/**< Source Port */
+    uint16_t dest;		/**< Destination port */
+    uint32_t seq;		/**< Sequence number */
+    uint32_t ack_seq;		/**< Acknowledgement Number */
 #  if BYTE_ORDER == LITTLE_ENDIAN
     unsigned int res1:4;	/**< Reserved bits */
     unsigned int doff:4;	/**< data offset */	
@@ -256,90 +256,90 @@ typedef struct libtrace_tcp
 #  else
 #   error "Adjust your <bits/endian.h> defines"
 #  endif
-    u_int16_t window;		/**< Window Size */
-    u_int16_t check;		/**< Checksum */
-    u_int16_t urg_ptr;		/**< Urgent Pointer */
-} __attribute__ ((packed)) libtrace_tcp_t;
+    uint16_t window;		/**< Window Size */
+    uint16_t check;		/**< Checksum */
+    uint16_t urg_ptr;		/**< Urgent Pointer */
+} PACKED libtrace_tcp_t;
 
 /** UDP Header for dealing with UDP packets */
 typedef struct libtrace_udp {
-  u_int16_t	source;		/**< Source port */
-  u_int16_t	dest;		/**< Destination port */
-  u_int16_t	len;		/**< Length */
-  u_int16_t	check;		/**< Checksum */
-} __attribute__ ((packed)) libtrace_udp_t;
+  uint16_t	source;		/**< Source port */
+  uint16_t	dest;		/**< Destination port */
+  uint16_t	len;		/**< Length */
+  uint16_t	check;		/**< Checksum */
+} PACKED libtrace_udp_t;
 
 /** ICMP Header for dealing with icmp packets */
 typedef struct libtrace_icmp
 {
-  u_int8_t type;		/**< message type */
-  u_int8_t code;		/**< type sub-code */
-  u_int16_t checksum;		/**< checksum */
+  uint8_t type;		/**< message type */
+  uint8_t code;		/**< type sub-code */
+  uint16_t checksum;		/**< checksum */
   union
   {
     struct
     {
-      u_int16_t	id;
-      u_int16_t	sequence;
+      uint16_t	id;
+      uint16_t	sequence;
     } echo;			/**< echo datagram */
-    u_int32_t	gateway;	/**< gateway address */
+    uint32_t	gateway;	/**< gateway address */
     struct
     {
-      u_int16_t	unused;
-      u_int16_t	mtu;
+      uint16_t	unused;
+      uint16_t	mtu;
     } frag;			/**< path mtu discovery */
   } un;				/**< Union for payloads of various icmp codes */
-} __attribute__ ((packed)) libtrace_icmp_t;
+} PACKED libtrace_icmp_t;
 
 /** LLC/SNAP header */
 typedef struct libtrace_llcsnap
 {
-  u_int8_t dsap;
-  u_int8_t ssap;
-  u_int8_t control;
-  u_int32_t oui:24;
-  u_int16_t type;
-} __attribute__ ((packed)) libtrace_llcsnap_t;
+  uint8_t dsap;
+  uint8_t ssap;
+  uint8_t control;
+  uint32_t oui:24;
+  uint16_t type;
+} PACKED libtrace_llcsnap_t;
 
 /** 802.3 frame */
 typedef struct libtrace_ether
 {
-  u_int8_t ether_dhost[6];	/**< destination ether addr */
-  u_int8_t ether_shost[6];	/**< source ether addr */
-  u_int16_t ether_type;		/**< packet type ID field (next-header) */
-} __attribute__ ((packed)) libtrace_ether_t;
+  uint8_t ether_dhost[6];	/**< destination ether addr */
+  uint8_t ether_shost[6];	/**< source ether addr */
+  uint16_t ether_type;		/**< packet type ID field (next-header) */
+} PACKED libtrace_ether_t;
 
 /** 802.1Q frame */
 typedef struct libtrace_8021q 
 {
-  u_int8_t  ether_dhost[6];      /**< destination eth addr */
-  u_int8_t  ether_shost[6];      /**< source ether addr    */
-  u_int16_t ether_type;          /**< packet type ID field , 0x8100 for VLAN */
+  uint8_t  ether_dhost[6];      /**< destination eth addr */
+  uint8_t  ether_shost[6];      /**< source ether addr    */
+  uint16_t ether_type;          /**< packet type ID field , 0x8100 for VLAN */
   unsigned int vlan_pri:3;	 /**< vlan user priority */
   unsigned int vlan_cfi:1; 	 /**< vlan format indicator, 
 				   * 0 for ethernet, 1 for token ring */
   unsigned int vlan_id:12; 	 /**< vlan id */
-  u_int16_t vlan_ether_type;	 /**< vlan sub-packet type ID field 
+  uint16_t vlan_ether_type;	 /**< vlan sub-packet type ID field 
 				   * (next-header)*/
-} __attribute__ ((packed)) libtrace_8021q_t;
+} PACKED libtrace_8021q_t;
 
 /** ATM cell */
 typedef struct libtrace_atm_cell
 {
   unsigned int gfc:4;
-  u_int8_t vpi;
-  u_int16_t vci;
+  uint8_t vpi;
+  uint16_t vci;
   unsigned int pt:3;
   unsigned int clp:1;
   unsigned int hec;
-} __attribute__ ((packed)) libtrace_atm_cell_t;
+} PACKED libtrace_atm_cell_t;
 
 /** POS header */
 typedef struct libtrace_pos
 {
- u_int16_t header;
- u_int16_t ether_type;		/**< ether type */
-} __attribute__ ((packed)) libtrace_pos_t;
+ uint16_t header;
+ uint16_t ether_type;		/**< ether type */
+} PACKED libtrace_pos_t;
 
 /** 802.11 header */
 typedef struct libtrace_80211_t {
@@ -360,7 +360,11 @@ typedef struct libtrace_80211_t {
         uint8_t      mac3[6];
         uint16_t     SeqCtl;
         uint8_t      mac4[6];
-} libtrace_80211_t;
+} PACKED libtrace_80211_t;
+
+#ifdef WIN32
+#pragma pack(pop)
+#endif
 
 
 /*@}*/
@@ -1194,7 +1198,6 @@ enum base_format_t {
  * @return the format of the packet
  */
 enum base_format_t trace_get_format(struct libtrace_packet_t *packet);
-
 
 #ifdef __cplusplus
 } /* extern "C" */
