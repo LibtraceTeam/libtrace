@@ -227,7 +227,7 @@ static int rt_start_input(struct libtrace_t *libtrace) {
 	rt_header_t start_msg;
 
 	start_msg.type = RT_START;
-	start_msg.length = sizeof(rt_start_t);
+	start_msg.length = 0; 
 
 	
 	/* Need to send start message to server */
@@ -244,7 +244,7 @@ static int rt_fin_input(struct libtrace_t *libtrace) {
         rt_header_t close_msg;
 
 	close_msg.type = RT_CLOSE;
-	close_msg.length = sizeof(rt_close_t);
+	close_msg.length = 0; 
 	
 	/* Send a close message to the server */
 	if (send(RT_INFO->input_fd, &close_msg, sizeof(rt_header_t) + 
@@ -538,29 +538,29 @@ static int rt_read_packet(libtrace_t *libtrace,
 static int rt_get_capture_length(const struct libtrace_packet_t *packet) {
 	switch (packet->type) {
 		case RT_DUCK:
-			return sizeof(rt_duck_t);
+			return 0; /* FIXME */
 		case RT_STATUS:
 			return sizeof(rt_status_t);
 		case RT_HELLO:
 			return sizeof(rt_hello_t);
 		case RT_START:
-			return sizeof(rt_start_t);
+			return 0;
 		case RT_ACK:
 			return sizeof(rt_ack_t);
 		case RT_END_DATA:
-			return sizeof(rt_end_data_t);
+			return 0;
 		case RT_CLOSE:
-			return sizeof(rt_close_t);
+			return 0;
 		case RT_DENY_CONN:
 			return sizeof(rt_deny_conn_t);
 		case RT_PAUSE:
-			return sizeof(rt_pause_t);
+			return 0; 
 		case RT_PAUSE_ACK:
-			return sizeof(rt_pause_ack_t);
+			return 0;
 		case RT_OPTION:
-			return sizeof(rt_option_t);
+			return 0; /* FIXME */
 		case RT_KEYCHANGE:
-			return sizeof(rt_keychange_t);
+			return 0;
 	}
 	printf("Unknown type: %d\n", packet->type);
 	return 0;

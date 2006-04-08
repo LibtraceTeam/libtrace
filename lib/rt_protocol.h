@@ -95,9 +95,11 @@ typedef struct rt_hello {
 	uint8_t reliable;
 } rt_hello_t;
 
+#if 0
 typedef struct rt_start {
 
 } rt_start_t;
+#endif
 
 typedef struct rt_ack {
 	uint32_t sequence;
@@ -107,18 +109,23 @@ typedef struct rt_status {
 	fifo_info_t fifo_status;
 } rt_status_t;
 
+#if 0
 typedef struct rt_duck {
 	/*duckinf_t duck; */
 } rt_duck_t;
+#endif
 
+#if 0
 typedef struct rt_end_data {
 
 } rt_end_data_t;
+#endif
 
- typedef struct rt_close {
+#if 0
+typedef struct rt_close {
 
 } rt_close_t; 
-
+#endif
 
 /* Connection denied reasons */
 enum rt_conn_denied_t {
@@ -131,21 +138,28 @@ typedef struct rt_deny_conn {
 	enum rt_conn_denied_t reason;
 } rt_deny_conn_t;
 
-
+#if 0
 typedef struct rt_pause {
 
 } rt_pause_t;
+#endif
 
+#if 0
 typedef struct rt_pause_ack {
 
 } rt_pause_ack_t;
+#endif
 
+#if 0
 typedef struct rt_option {
 
 } rt_option_t;
+#endif
 
+#if 0
 typedef struct rt_keychange {
 	
 } rt_keychange_t;
+#endif
 
 #endif
