@@ -34,25 +34,11 @@
 #include <stdlib.h> /* free */
 #include <stdio.h> /* sprintf, printf */
 #include <assert.h> /* assert */
-#include <string.h> /* bzero */
-#include "fifo.h"
 #include "libtrace_int.h"
 
-#include <sys/types.h>
+#include <inttypes.h>
 
-#ifdef HAVE_INTTYPES_H
-# include <inttypes.h>
-#else
-# error "Can't find inttypes.h, this needs to be fixed"
-#endif
-
-#ifdef HAVE_STDDEF_H
-# include <stddef.h>
-#else
-# error "Can't find stddef.h - do you define ptrdiff_t elsewhere"
-#endif
-
-#include <netinet/in.h>
+#include "fifo.h"
 
 
 enum which_t { FIFO_PTR_IN, FIFO_PTR_OUT, FIFO_PTR_ACK };
@@ -113,7 +99,7 @@ static void increment_pointer(struct tracefifo_t *fifo, enum which_t which, int 
         }
 }
 
-void tracefifo_flush(struct tracefifo_t *fifo __attribute__((unused))) {
+void tracefifo_flush(struct tracefifo_t *fifo UNUSED) {
         /* do nothing */
         return;
 }

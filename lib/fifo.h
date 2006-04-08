@@ -31,7 +31,6 @@
 
 #ifndef _FIFO_H_
 #define _FIFO_H_
-#include <inttypes.h>
 
 struct tracefifo_t;
 
