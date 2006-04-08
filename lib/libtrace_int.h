@@ -39,6 +39,26 @@ extern "C" {
 #include "common.h"
 #include "config.h"
 #include "libtrace.h"
+
+#ifdef _MSC_VER
+#pragma warning(disable:4996)
+#endif
+
+#ifdef HAVE_INTTYPES_H
+# include <inttypes.h>
+#else
+# include "lt_inttypes.h"
+#endif
+
+#ifdef HAVE_STDDEF_H
+# include <stddef.h>
+#else
+#ifndef WIN32
+# error "Can't find stddev.h -- do you define ptrdiff_t elsewhere?"
+#endif
+#endif
+
+
 #include "fifo.h"
 #include "rt_protocol.h"
 	
@@ -71,10 +91,6 @@ extern "C" {
 #else
 #  include "dagformat.h"
 #endif
-
-#include <stdbool.h>
-
-
 
 #define RP_BUFSIZE 65536
 
