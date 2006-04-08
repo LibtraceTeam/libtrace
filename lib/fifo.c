@@ -36,10 +36,7 @@
 #include <assert.h> /* assert */
 #include "libtrace_int.h"
 
-#include <inttypes.h>
-
 #include "fifo.h"
-
 
 enum which_t { FIFO_PTR_IN, FIFO_PTR_OUT, FIFO_PTR_ACK };
 
