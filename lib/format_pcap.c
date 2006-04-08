@@ -347,7 +347,7 @@ static int8_t pcap_get_direction(const libtrace_packet_t *packet) {
 	switch(pcap_get_link_type(packet)) {
 		case TRACE_TYPE_LINUX_SLL:
 		{
-			struct trace_sll_header_t *sll;
+			libtrace_sll_header_t *sll;
 			sll = trace_get_link(packet);
 			if (!sll) {
 				trace_set_err(packet->trace,
@@ -376,7 +376,7 @@ static int8_t pcap_get_direction(const libtrace_packet_t *packet) {
 		}
 		case TRACE_TYPE_PFLOG:
 		{
-			struct trace_pflog_header_t *pflog;
+			libtrace_pflog_header_t *pflog;
 			pflog = trace_get_link(packet);
 			if (!pflog) {
 				trace_set_err(packet->trace,

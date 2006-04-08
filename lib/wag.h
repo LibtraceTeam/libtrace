@@ -107,9 +107,9 @@ struct frame_data_tx_t {
 };
 
 /** 802.11 payload */
-struct ieee_802_11_payload {
+typedef struct ieee_802_11_payload {
         uint16_t     type; /**< ether type of this packet */
-};
+} libtrace_802_11_payload_t;
 
 
 #endif

@@ -16,7 +16,7 @@ static void *trace_get_payload_from_ethernet(void *ethernet,
 		uint16_t *type,
 		uint32_t *remaining)
 {
-	libtrace_ether_t *eth = ethernet;
+	libtrace_ether_t *eth = (libtrace_ether_t*)ethernet;
 
 	if (remaining) {
 		if (*remaining < sizeof(*eth))
@@ -58,11 +58,13 @@ static void *trace_get_vlan_payload_from_ethernet_payload(void *ethernet, uint16
 
 static void *trace_get_payload_from_80211(void *link, uint16_t *type, uint32_t *remaining)
 {
-	libtrace_80211_t *wifi = link;
-	struct ieee_802_11_payload *eth;
+	libtrace_80211_t *wifi;
+	libtrace_802_11_payload_t *eth;
 
 	if (remaining && *remaining < sizeof(libtrace_80211_t))
 		return NULL;
+
+	wifi=(libtrace_80211_t*)link;
 
 	/* Data packet? */
 	if (wifi->type != 2) {
@@ -72,7 +74,7 @@ static void *trace_get_payload_from_80211(void *link, uint16_t *type, uint32_t *
 	if (remaining && *remaining < sizeof(*eth))
 		return NULL;
 
-	eth=(void*)((char*)wifi+sizeof(*eth));
+	eth=(libtrace_802_11_payload_t *)((char*)wifi+sizeof(*eth));
 
 	if (*type) *type=eth->type;
 
@@ -82,9 +84,9 @@ static void *trace_get_payload_from_80211(void *link, uint16_t *type, uint32_t *
 static void *trace_get_payload_from_linux_sll(void *link,
 		uint16_t *type, uint32_t *remaining) 
 {
-	struct trace_sll_header_t *sll;
+	libtrace_sll_header_t *sll;
 
-	sll = link;
+	sll = (libtrace_sll_header_t*) link;
 
 	if (remaining) {
 		if (*remaining < sizeof(*sll))
@@ -101,19 +103,19 @@ static void *trace_get_payload_from_atm(void *link,
 		uint16_t *type, uint32_t *remaining)
 {
 	/* 64 byte capture. */
-	struct libtrace_llcsnap *llc = link;
+	libtrace_llcsnap_t *llc = (libtrace_llcsnap_t*)link;
 
 	if (remaining) {
-		if (*remaining < sizeof(struct libtrace_llcsnap)+4)
+		if (*remaining < sizeof(libtrace_llcsnap_t)+4)
 			return NULL;
-		*remaining-=(sizeof(struct libtrace_llcsnap)+4);
+		*remaining-=(sizeof(libtrace_llcsnap_t)+4);
 	}
 
 	/* advance the llc ptr +4 into the link layer.
 	 * TODO: need to check what is in these 4 bytes.
 	 * don't have time!
 	 */
-	llc = (void*)((char *)llc + 4);
+	llc = (libtrace_llcsnap_t*)((char *)llc + 4);
 
 	if (*type) *type = ntohs(llc->type);
 
@@ -124,12 +126,12 @@ static void *trace_get_payload_from_legacy_pos(void *link,
 		uint16_t *type, uint32_t *remaining)
 {
 	/* 64 byte capture. */
-	struct libtrace_pos *pos = link;
+	libtrace_pos_t *pos = (libtrace_pos_t*)link;
 
 	if (remaining) {
-		if (*remaining < sizeof(struct libtrace_pos))
+		if (*remaining < sizeof(libtrace_pos_t))
 			return NULL;
-		*remaining-=sizeof(struct libtrace_pos);
+		*remaining-=sizeof(libtrace_pos_t);
 	}
 
 	if (type) *type = ntohs(pos->ether_type);
@@ -140,7 +142,7 @@ static void *trace_get_payload_from_legacy_pos(void *link,
 static void *trace_get_payload_from_pflog(void *link,
 		uint16_t *type, uint32_t *remaining)
 {
-	struct trace_pflog_header_t *pflog = link;
+	libtrace_pflog_header_t *pflog = (libtrace_pflog_header_t*)link;
 	if (remaining) {
 		if (*remaining<sizeof(*pflog)) 
 			return NULL;
@@ -149,7 +151,7 @@ static void *trace_get_payload_from_pflog(void *link,
 	if (type) {
 		switch(pflog->af) {
 			case AF_INET6: *type=0x86DD; break;
-			case AF_INET: *type=0x0800; break;
+			case AF_INET:  *type=0x0800; break;
 			default:
 				      /* Unknown */
 				      return NULL;
@@ -203,7 +205,7 @@ libtrace_ip_t *trace_get_ip(libtrace_packet_t *packet)
 	if (!ret || type!=0x0800)
 		return NULL;
 
-	return ret;
+	return (libtrace_ip_t*)ret;
 }
 
 libtrace_ip6_t *trace_get_ip6(libtrace_packet_t *packet) 
@@ -222,7 +224,7 @@ libtrace_ip6_t *trace_get_ip6(libtrace_packet_t *packet)
 	if (!ret || type!=0x86DD)
 		return NULL;
 
-	return ret;
+	return (libtrace_ip6_t*)ret;
 }
 
 #define SW_IP_OFFMASK 0xff1f
@@ -324,15 +326,17 @@ void *trace_get_transport(libtrace_packet_t *packet,
 
 	switch (*proto) {
 		case 0x0800: /* IPv4 */
-			transport=trace_get_payload_from_ip(transport, proto, remaining);
+			transport=trace_get_payload_from_ip(
+				(libtrace_ip_t*)transport, proto, remaining);
 			/* IPv6 */
 			if (transport && *proto == 41) {
-				transport=trace_get_payload_from_ip6(transport,
-						proto,remaining);
+				transport=trace_get_payload_from_ip6(
+				 (libtrace_ip6_t*)transport, proto,remaining);
 			}
 			return transport;
 		case 0x86DD: /* IPv6 */
-			return trace_get_payload_from_ip6(transport, proto, remaining);
+			return trace_get_payload_from_ip6(
+				(libtrace_ip6_t*)transport, proto, remaining);
 			
 		default:
 			return NULL;
@@ -344,12 +348,12 @@ libtrace_tcp_t *trace_get_tcp(libtrace_packet_t *packet) {
 	uint8_t proto;
 	libtrace_tcp_t *tcp;
 
-	tcp=trace_get_transport(packet,&proto,NULL);
+	tcp=(libtrace_tcp_t*)trace_get_transport(packet,&proto,NULL);
 
 	if (proto != 6)
 		return NULL;
 
-	return tcp;
+	return (libtrace_tcp_t*)tcp;
 }
 
 libtrace_tcp_t *trace_get_tcp_from_ip(libtrace_ip_t *ip, uint32_t *remaining)
@@ -368,7 +372,7 @@ libtrace_udp_t *trace_get_udp(libtrace_packet_t *packet) {
 	uint8_t proto;
 	libtrace_udp_t *udp;
 
-	udp=trace_get_transport(packet,&proto,NULL);
+	udp=(libtrace_udp_t*)trace_get_transport(packet,&proto,NULL);
 
 	if (proto != 17)
 		return NULL;
@@ -392,7 +396,7 @@ libtrace_icmp_t *trace_get_icmp(libtrace_packet_t *packet) {
 	uint8_t proto;
 	libtrace_icmp_t *icmp;
 
-	icmp=trace_get_transport(packet,&proto,NULL);
+	icmp=(libtrace_icmp_t*)trace_get_transport(packet,&proto,NULL);
 
 	if (proto != 1)
 		return NULL;
@@ -452,7 +456,8 @@ struct ports_t {
  */
 uint16_t trace_get_source_port(const libtrace_packet_t *packet)
 {
-	struct ports_t *port = trace_get_transport((libtrace_packet_t*)packet,
+	struct ports_t *port = 
+		(struct ports_t*)trace_get_transport((libtrace_packet_t*)packet,
 			NULL, NULL);
 
 	return ntohs(port->src);
@@ -461,7 +466,8 @@ uint16_t trace_get_source_port(const libtrace_packet_t *packet)
 /* Same as get_source_port except use the destination port */
 uint16_t trace_get_destination_port(const libtrace_packet_t *packet)
 {
-	struct ports_t *port = trace_get_transport((libtrace_packet_t*)packet,
+	struct ports_t *port = 
+		(struct ports_t*)trace_get_transport((libtrace_packet_t*)packet,
 			NULL, NULL);
 
 	return ntohs(port->dst);
@@ -470,36 +476,65 @@ uint16_t trace_get_destination_port(const libtrace_packet_t *packet)
 
 uint8_t *trace_get_source_mac(libtrace_packet_t *packet) {
 	void *link = trace_get_link(packet);
-	libtrace_80211_t *wifi = link;
-        libtrace_ether_t *ethptr = link;
+	libtrace_80211_t *wifi;
+        libtrace_ether_t *ethptr = (libtrace_ether_t*)link;
 	if (!link)
 		return NULL;
 	switch (trace_get_link_type(packet)) {
 		case TRACE_TYPE_80211:
+			wifi=(libtrace_80211_t*)link;
 			return (uint8_t*)&wifi->mac2;
+		case TRACE_TYPE_80211_PRISM:
+			wifi=(libtrace_80211_t*)((char*)link+144);
+			return (uint8_t*)&wifi->mac2;
+		case TRACE_TYPE_LEGACY_ETH:
 		case TRACE_TYPE_ETH:
 			return (uint8_t*)&ethptr->ether_shost;
-		default:
-			fprintf(stderr,"Not implemented\n");
-			assert(0);
+		case TRACE_TYPE_LEGACY:
+		case TRACE_TYPE_LEGACY_POS:
+		case TRACE_TYPE_NONE:
+		case TRACE_TYPE_ATM:
+		case TRACE_TYPE_HDLC_POS:
+		case TRACE_TYPE_LINUX_SLL:
+		case TRACE_TYPE_PFLOG:
+		case TRACE_TYPE_LEGACY_ATM:
+			return NULL;
 	}
+	fprintf(stderr,"Not implemented\n");
+	assert(0);
+	return NULL;
 }
 
 uint8_t *trace_get_destination_mac(libtrace_packet_t *packet) {
 	void *link = trace_get_link(packet);
-	libtrace_80211_t *wifi = link;
-        libtrace_ether_t *ethptr = link;
+	libtrace_80211_t *wifi;
+        libtrace_ether_t *ethptr = (libtrace_ether_t*)link;
 	if (!link)
 		return NULL;
 	switch (trace_get_link_type(packet)) {
 		case TRACE_TYPE_80211:
+			wifi=(libtrace_80211_t*)link;
+			return (uint8_t*)&wifi->mac1;
+		case TRACE_TYPE_80211_PRISM:
+			wifi=(libtrace_80211_t*)((char*)link+144);
 			return (uint8_t*)&wifi->mac1;
 		case TRACE_TYPE_ETH:
+		case TRACE_TYPE_LEGACY_ETH:
 			return (uint8_t*)&ethptr->ether_dhost;
-		default:
-			fprintf(stderr,"Not implemented\n");
-			assert(0);
+		case TRACE_TYPE_LEGACY_ATM:
+		case TRACE_TYPE_LEGACY:
+		case TRACE_TYPE_LEGACY_POS:
+		case TRACE_TYPE_NONE:
+		case TRACE_TYPE_ATM:
+		case TRACE_TYPE_HDLC_POS:
+		case TRACE_TYPE_LINUX_SLL:
+		case TRACE_TYPE_PFLOG:
+			/* No MAC address */
+			return NULL;
 	}
+	fprintf(stderr,"Not implemented\n");
+	assert(0);
+	return NULL;
 }
 
 struct sockaddr *trace_get_source_address(const libtrace_packet_t *packet, 
@@ -535,7 +570,7 @@ struct sockaddr *trace_get_source_address(const libtrace_packet_t *packet,
 		case 0x0800: /* IPv4 */
 		{
 			struct sockaddr_in *addr4=(struct sockaddr_in*)addr;
-			libtrace_ip_t *ip = transport;
+			libtrace_ip_t *ip = (libtrace_ip_t*)transport;
 			addr4->sin_family=AF_INET;
 			addr4->sin_port=0;
 			addr4->sin_addr=ip->ip_src;
@@ -544,7 +579,7 @@ struct sockaddr *trace_get_source_address(const libtrace_packet_t *packet,
 		case 0x86DD: /* IPv6 */
 		{
 			struct sockaddr_in6 *addr6=(struct sockaddr_in6*)addr;
-			libtrace_ip6_t *ip6 = transport;
+			libtrace_ip6_t *ip6 = (libtrace_ip6_t*)transport;
 			addr6->sin6_family=AF_INET6;
 			addr6->sin6_port=0;
 			addr6->sin6_flowinfo=0;
@@ -589,7 +624,7 @@ struct sockaddr *trace_get_destination_address(const libtrace_packet_t *packet,
 		case 0x0800: /* IPv4 */
 		{
 			struct sockaddr_in *addr4=(struct sockaddr_in*)addr;
-			libtrace_ip_t *ip = transport;
+			libtrace_ip_t *ip = (libtrace_ip_t*)transport;
 			addr4->sin_family=AF_INET;
 			addr4->sin_port=0;
 			addr4->sin_addr=ip->ip_dst;
@@ -598,7 +633,7 @@ struct sockaddr *trace_get_destination_address(const libtrace_packet_t *packet,
 		case 0x86DD: /* IPv6 */
 		{
 			struct sockaddr_in6 *addr6=(struct sockaddr_in6*)addr;
-			libtrace_ip6_t *ip6 = transport;
+			libtrace_ip6_t *ip6 = (libtrace_ip6_t*)transport;
 			addr6->sin6_family=AF_INET6;
 			addr6->sin6_port=0;
 			addr6->sin6_flowinfo=0;

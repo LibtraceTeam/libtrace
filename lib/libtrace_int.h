@@ -78,7 +78,7 @@ extern "C" {
 
 #define RP_BUFSIZE 65536
 
-struct libtrace_event_t {
+struct libtrace_event_status_t {
 	libtrace_packet_t *packet;
 	int psize;
 	double tdelta;
@@ -93,7 +93,7 @@ struct libtrace_t {
 	void *format_data; /**<format data pointer */
 	bool started;			/**< if this trace has started */
 	libtrace_err_t err;		/**< error information */
-	struct libtrace_event_t event;	/**< the next event */
+	struct libtrace_event_status_t event;	/**< the next event */
 	char *uridata;			/**< the uri of this trace */
 	struct tracefifo_t *fifo;   	/**< fifo used in this trace */
 	struct libtrace_filter_t *filter; /**< used by libtrace if the module
@@ -118,13 +118,13 @@ struct libtrace_out_t {
 void trace_set_err(libtrace_t *trace, int errcode,const char *msg,...);
 void trace_set_err_out(libtrace_out_t *trace, int errcode, const char *msg,...);
 
-typedef struct trace_sll_header_t {
+typedef struct libtrace_sll_header_t {
 	uint16_t pkttype;          	/* packet type */
 	uint16_t hatype;           	/* link-layer address type */
 	uint16_t halen;            	/* link-layer address length */
 	char addr[8];	 		/* link-layer address */
 	uint16_t protocol;         	/* protocol */
-} trace_sll_header_t;
+} libtrace_sll_header_t;
 
 #ifndef PF_RULESET_NAME_SIZE
 #define PF_RULESET_NAME_SIZE 16
@@ -134,7 +134,7 @@ typedef struct trace_sll_header_t {
 #define IFNAMSIZ 16
 #endif
 
-struct trace_pflog_header_t {
+typedef struct libtrace_pflog_header_t {
 	uint8_t	   length;
 	sa_family_t   af;
 	uint8_t	   action;
@@ -145,7 +145,7 @@ struct trace_pflog_header_t {
 	uint32_t   subrulenr;
 	uint8_t	   dir;
 	uint8_t	   pad[3];
-};
+} libtrace_pflog_header_t;
 
 
 

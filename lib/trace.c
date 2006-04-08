@@ -133,7 +133,7 @@ static void xstrncpy(char *dest, const char *src, size_t n)
  
 static char *xstrndup(const char *src,size_t n)
 {       
-        char *ret=malloc(n+1);
+        char *ret=(char*)malloc(n+1);
         xstrncpy(ret,src,n);
         return ret;
 }
@@ -271,7 +271,8 @@ char *trace_get_output_format(const struct libtrace_out_t *libtrace) {
  * and an error is output to stdout.
  */
 struct libtrace_t *trace_create(const char *uri) {
-        struct libtrace_t *libtrace = malloc(sizeof(struct libtrace_t));
+        struct libtrace_t *libtrace = 
+			(struct libtrace_t *)malloc(sizeof(struct libtrace_t));
         char *scan = 0;
         const char *uridata = 0;                  
 	struct libtrace_format_t *tmp;
@@ -346,8 +347,9 @@ struct libtrace_t *trace_create(const char *uri) {
  * libtrace_packet_t's that are not associated with a libtrace_t structure.
  */
 struct libtrace_t * trace_create_dead (const char *uri) {
-	struct libtrace_t *libtrace = malloc(sizeof(struct libtrace_t));
-	char *scan = calloc(sizeof(char),URI_PROTO_LINE);
+	struct libtrace_t *libtrace = (struct libtrace_t *)
+					malloc(sizeof(struct libtrace_t));
+	char *scan = (char *)calloc(sizeof(char),URI_PROTO_LINE);
 	char *uridata;
 	struct libtrace_format_t *tmp;
 	
@@ -392,7 +394,8 @@ struct libtrace_t * trace_create_dead (const char *uri) {
  */
 	
 libtrace_out_t *trace_create_output(const char *uri) {
-	libtrace_out_t *libtrace = malloc(sizeof(struct libtrace_out_t));
+	libtrace_out_t *libtrace = 
+			(libtrace_out_t*)malloc(sizeof(struct libtrace_out_t));
 	
 	char *scan = 0;
         const char *uridata = 0;
@@ -512,20 +515,18 @@ int trace_config(libtrace_t *libtrace,
 	switch(option) {
 		case TRACE_OPTION_SNAPLEN:
 			libtrace->snaplen=*(int*)value;
-			break;
+			return 0;
 		case TRACE_OPTION_FILTER:
-			libtrace->filter=value;
-			break;
+			libtrace->filter=(struct libtrace_filter_t *)value;
+			return 0;
 		case TRACE_OPTION_PROMISC:
 			trace_set_err(libtrace,TRACE_ERR_OPTION_UNAVAIL,
 				"Promisc mode is not supported by this format module");
 			return -1;
-		default:
-			trace_set_err(libtrace,TRACE_ERR_UNKNOWN_OPTION,
-				"Unknown option %i", option);
-			return -1;
 	}
-	return 0;
+	trace_set_err(libtrace,TRACE_ERR_UNKNOWN_OPTION,
+		"Unknown option %i", option);
+	return -1;
 }
 
 /* Parses an output options string and calls the appropriate function to deal with output options.
@@ -578,13 +579,15 @@ void trace_destroy_output(struct libtrace_out_t *libtrace) {
 }
 
 libtrace_packet_t *trace_create_packet() {
-	libtrace_packet_t *packet = calloc(1,sizeof(libtrace_packet_t));
+	libtrace_packet_t *packet = 
+		(libtrace_packet_t*)calloc(1,sizeof(libtrace_packet_t));
 	packet->buf_control=TRACE_CTRL_PACKET;
 	return packet;
 }
 
 libtrace_packet_t *trace_copy_packet(const libtrace_packet_t *packet) {
-	libtrace_packet_t *dest = malloc(sizeof(libtrace_packet_t));
+	libtrace_packet_t *dest = 
+		(libtrace_packet_t *)malloc(sizeof(libtrace_packet_t));
 	dest->trace=packet->trace;
 	dest->buffer=malloc(
 			trace_get_framing_length(packet)
@@ -772,7 +775,7 @@ uint64_t trace_get_erf_timestamp(const libtrace_packet_t *packet) {
 		/* seconds -> timestamp */
 		seconds = packet->trace->format->get_seconds(packet);
 		timestamp = ((uint64_t)((uint32_t)seconds) << 32) + \
-			    (( seconds - (uint32_t)seconds   ) * UINT_MAX);
+		      (uint64_t)(( seconds - (uint32_t)seconds   ) * UINT_MAX);
 	}
 	return timestamp;
 }
@@ -901,7 +904,7 @@ libtrace_linktype_t trace_get_link_type(const libtrace_packet_t *packet ) {
 	if (packet->trace->format->get_link_type) {
 		return packet->trace->format->get_link_type(packet);
 	}
-	return -1;
+	return (libtrace_linktype_t)-1;
 }
 
 /* process a libtrace event
@@ -918,7 +921,7 @@ libtrace_linktype_t trace_get_link_type(const libtrace_packet_t *packet ) {
  */
 struct libtrace_eventobj_t trace_event(struct libtrace_t *trace, 
 		struct libtrace_packet_t *packet) {
-	struct libtrace_eventobj_t event = {0,0,0.0,0};
+	struct libtrace_eventobj_t event = {TRACE_EVENT_IOWAIT,0,0.0,0};
 
 	if (!trace) {
 		fprintf(stderr,"You called trace_event() with a NULL trace object!\n");
@@ -945,7 +948,8 @@ struct libtrace_eventobj_t trace_event(struct libtrace_t *trace,
  */
 struct libtrace_filter_t *trace_bpf_setfilter(const char *filterstring) {
 #if HAVE_BPF
-	struct libtrace_filter_t *filter = malloc(sizeof(struct libtrace_filter_t));
+	struct libtrace_filter_t *filter = (struct libtrace_filter_t*)
+				malloc(sizeof(struct libtrace_filter_t));
 	filter->filterstring = strdup(filterstring);
 	filter->flag = 0;
 	return filter;
@@ -1342,7 +1346,7 @@ int trace_seek_seconds(libtrace_t *trace, double seconds)
 		if (trace->format->seek_erf) {
 			uint64_t timestamp = 
 				((uint64_t)((uint32_t)seconds) << 32) + \
-			    (( seconds - (uint32_t)seconds   ) * UINT_MAX);
+			    (uint64_t)(( seconds - (uint32_t)seconds   ) * UINT_MAX);
 			return trace->format->seek_erf(trace,timestamp);
 		}
 		trace_set_err(trace,

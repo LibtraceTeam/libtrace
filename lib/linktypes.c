@@ -28,9 +28,8 @@ libtrace_linktype_t pcap_dlt_to_libtrace(int dlt)
 		case DLT_PFLOG: return TRACE_TYPE_PFLOG;
 #endif
 #endif
-		default:
-			return -1;
 	}
+	return -1;
 }
 
 int libtrace_to_pcap_dlt(libtrace_linktype_t type)
@@ -48,9 +47,8 @@ int libtrace_to_pcap_dlt(libtrace_linktype_t type)
 		case TRACE_TYPE_PFLOG: return DLT_PFLOG;
 #endif
 #endif
-		default:
-			return -1;
 	}
+	return -1;
 }
 
 enum rt_field_t pcap_dlt_to_rt(int dlt) 
@@ -69,11 +67,12 @@ libtrace_linktype_t erf_type_to_libtrace(char erf)
 {
 	switch (erf) {
 		case TYPE_LEGACY:	return TRACE_TYPE_LEGACY;
+		case TYPE_HDLC_POS:	return TRACE_TYPE_HDLC_POS;
 		case TYPE_ETH:		return TRACE_TYPE_ETH;
 		case TYPE_ATM:		return TRACE_TYPE_ATM;
-		default:
-			return -1;
+		case TYPE_AAL5:		return TRACE_TYPE_AAL5;
 	}
+	return -1;
 }
 
 char libtrace_to_erf_type(libtrace_linktype_t linktype)
@@ -82,7 +81,6 @@ char libtrace_to_erf_type(libtrace_linktype_t linktype)
 		case TRACE_TYPE_LEGACY:	return TYPE_LEGACY;
 		case TRACE_TYPE_ETH:	return TYPE_ETH;
 		case TRACE_TYPE_ATM:	return TYPE_ATM;
-		default:
-					return -1;
 	}
+	return -1;
 }

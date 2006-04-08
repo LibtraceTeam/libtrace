@@ -300,14 +300,14 @@ typedef struct libtrace_atm_cell
   unsigned int pt:3;
   unsigned int clp:1;
   unsigned int hec;
-} __attribute__ ((packed)) libtrace_atm_cell;
+} __attribute__ ((packed)) libtrace_atm_cell_t;
 
 /** POS header */
 typedef struct libtrace_pos
 {
  u_int16_t header;
  u_int16_t ether_type;		/**< ether type */
-} __attribute__ ((packed)) libtrace_pos;
+} __attribute__ ((packed)) libtrace_pos_t;
 
 /** 802.11 header */
 typedef struct libtrace_80211_t {
@@ -991,11 +991,11 @@ typedef enum {
        TRACE_TYPE_HDLC_POS, 
        TRACE_TYPE_ETH,			/**< 802.3 style Ethernet */
        TRACE_TYPE_ATM,
+       TRACE_TYPE_AAL5,
        TRACE_TYPE_80211,		/**< 802.11 frames */
        TRACE_TYPE_NONE,
        TRACE_TYPE_LINUX_SLL,		/**< Linux "null" framing */
        TRACE_TYPE_PFLOG,		/**< FreeBSD's PFlug */
-       TRACE_TYPE_LEGACY_DEFAULT,
        TRACE_TYPE_LEGACY_POS,
        TRACE_TYPE_LEGACY_ATM,
        TRACE_TYPE_LEGACY_ETH,
