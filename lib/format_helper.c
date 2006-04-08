@@ -210,7 +210,7 @@ LIBTRACE_FILE trace_open_file_out(libtrace_out_t *trace,int level, int fileflag)
 		return 0;
 	}
 	ret=LIBTRACE_FDOPEN(fd,filemode);
-	if (ret==NULL) {
+	if (!ret) {
 		printf("%s\n",filemode);
 		trace_set_err_out(trace,
 				TRACE_ERR_INIT_FAILED,"gz out of memory");
