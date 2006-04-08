@@ -29,7 +29,7 @@
 #  define LIBTRACE_WRITE(file,buf,len) write(file,buf,len)
 #  define LIBTRACE_FILE int
 #  define LIBTRACE_SEEK(file,offset,whence) lseek(file,offset,whence)
-#  define LIBTRACE_TELL(file) tell(file,0,SEEK_CUR)
+#  define LIBTRACE_TELL(file) lseek(file,0,SEEK_CUR)
 #endif
 
 #endif /* COMMON_H */

@@ -188,7 +188,7 @@ struct libtrace_format_t {
 	/** initialise output traces (or NULL if output not supported) */
 	int (*init_output)(libtrace_out_t *libtrace);
 	/** configure output traces (or NULL if output not supported) */
-	int (*config_output)(libtrace_out_t *libtrace, trace_option_output_t, void *);
+	int (*config_output)(libtrace_out_t *libtrace, trace_option_output_t option, void *);
 	/** start output traces (or NULL if output not supported) 
 	 * There is no pause for output traces, as packets are not arriving
 	 * asyncronously

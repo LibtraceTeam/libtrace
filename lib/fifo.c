@@ -34,6 +34,7 @@
 #include <stdlib.h> /* free */
 #include <stdio.h> /* sprintf, printf */
 #include <assert.h> /* assert */
+#include <string.h> /* memset / memcpy */
 #include "libtrace_int.h"
 
 #include "fifo.h"

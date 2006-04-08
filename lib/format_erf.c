@@ -196,7 +196,7 @@ static int erf_init_input(libtrace_t *libtrace)
 {
 	libtrace->format_data = malloc(sizeof(struct erf_format_data_t));
 	
-	INPUT.file = NULL;
+	INPUT.file = 0;
 
 	return 0; /* success */
 }
@@ -390,7 +390,8 @@ static int erf_init_output(libtrace_out_t *libtrace) {
 	return 0;
 }
 
-static int erf_config_output(libtrace_out_t *libtrace, trace_option_t option, void *value) {
+static int erf_config_output(libtrace_out_t *libtrace, trace_option_output_t option,
+		void *value) {
 
 	switch (option) {
 		case TRACE_OPTION_OUTPUT_COMPRESS:
