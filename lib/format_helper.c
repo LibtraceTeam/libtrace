@@ -38,16 +38,28 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
-#ifdef HAVE_INTTYPES_H
-#  include <inttypes.h>
-#else
-#  error "Can't find inttypes.h - this needs to be fixed"
-#endif
 #include  "format_helper.h"
 
 #include <sys/ioctl.h>
 #include <assert.h>
 #include <stdarg.h>
+
+#ifdef WIN32
+#  include <io.h>
+#  include <share.h>
+#  define snprintf sprintf_s
+
+struct libtrace_eventobj_t trace_event_device(struct libtrace_t *trace, struct libtrace_packet_t *packet) {
+    struct libtrace_eventobj_t event = {0,0,0.0,0};
+
+    trace_set_err(trace,TRACE_ERR_OPTION_UNAVAIL, "trace_event() is not "
+            "supported on devices under windows in this version");
+
+    event.type = TRACE_EVENT_TERMINATE;
+    return event;
+}
+#else
+#  include <sys/ioctl.h>
 
 struct libtrace_eventobj_t trace_event_device(struct libtrace_t *trace, struct libtrace_packet_t *packet) {
 	struct libtrace_eventobj_t event = {0,0,0.0,0};
@@ -74,6 +86,7 @@ struct libtrace_eventobj_t trace_event_device(struct libtrace_t *trace, struct l
 	event.type= TRACE_EVENT_IOWAIT;
 	return event;
 }
+#endif
 
 struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct libtrace_packet_t *packet) {
 	struct libtrace_eventobj_t event = {0,0,0.0,0};

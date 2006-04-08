@@ -36,30 +36,21 @@
 #include "format_helper.h"
 #include "parse_cmd.h"
 
-#ifdef HAVE_INTTYPES_H
-#  include <inttypes.h>
-#else
-#  error "Can't find inttypes.h - this needs to be fixed"
-#endif 
-
-#ifdef HAVE_STDDEF_H
-#  include <stddef.h>
-#else
-# error "Can't find stddef.h - do you define ptrdiff_t elsewhere?"
-#endif
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include <unistd.h>
 #include <assert.h>
 #include <errno.h>
-#include <netdb.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+
+#ifdef WIN32
+#  include <io.h>
+#  include <share.h>
+#  define PATH_MAX _MAX_PATH
+#  define snprintf sprintf_s
+#else
+#  include <netdb.h>
+#endif
 
 
 #define COLLECTOR_PORT 3435
@@ -372,7 +363,7 @@ static int rtclient_start_input(libtrace_t *libtrace)
 	remote.sin_family = AF_INET;   
 	remote.sin_port = htons(CONNINFO.rt.port);
 	remote.sin_addr = *((struct in_addr *)he->h_addr);
-	bzero(&(remote.sin_zero), 8);
+	memset(&(remote.sin_zero), 0, 8);
 
 	if (connect(INPUT.fd, (struct sockaddr *)&remote,
 				sizeof(struct sockaddr)) == -1) {
@@ -1013,7 +1004,7 @@ static struct libtrace_format_t rtclient = {
 	NULL				/* next pointer */
 };
 
-void __attribute__((constructor)) erf_constructor() {
+void CONSTRUCTOR erf_constructor() {
 	register_format(&rtclient);
 	register_format(&erf);
 #ifdef HAVE_DAG

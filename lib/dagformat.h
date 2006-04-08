@@ -44,7 +44,7 @@ typedef struct flags {
 	unsigned int   rxerror:1;
 	unsigned int   dserror:1;
 	unsigned int   pad:2;
-} __attribute__((packed)) flags_t;
+} PACKED flags_t;
 
 /** GPP Global type */
 typedef struct dag_record {
@@ -60,7 +60,7 @@ typedef struct dag_record {
 		atm_rec_t       atm;
 		aal5_rec_t      aal5;
 	} rec;
-} __attribute__((packed)) dag_record_t;
+} PACKED dag_record_t;
 
 /** Dynamic(?) Universal Clock Kit Information packet */
 typedef struct duck_inf_pkt {

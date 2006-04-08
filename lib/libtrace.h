@@ -72,9 +72,12 @@ extern "C" {
 #  define SIMPLE_FUNCTION __attribute__((pure))
 #  define UNUSED __attribute__((unused))
 #  define PACKED __attribute__((packed))
+#  define CONSTRUCTOR __attribute__((constructor))
 #else
 #  define SIMPLE_FUNCTION
 #  define UNUSED
+#  define PACKED
+#  define CONSTRUCTOR
 #endif
 	
 /** Opaque structure holding information about an output trace */
