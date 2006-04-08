@@ -4,6 +4,7 @@
 #undef realloc
 
 #include <sys/types.h>
+#include <stdlib.h>
 
 void *realloc ();
 
