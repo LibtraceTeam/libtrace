@@ -56,7 +56,6 @@
  */
 
 #include <sys/types.h>
-#include <netinet/in.h>
 #ifdef _MSC_VER
     /* define the following from MSVC's internal types */
     typedef		__int8	int8_t;
