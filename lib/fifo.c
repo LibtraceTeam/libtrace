@@ -182,16 +182,16 @@ char *tracefifo_stat_str(struct tracefifo_t *fifo, char *desc, int delta)
         if (tracefifo_stat_buffer == 0) 
                 tracefifo_stat_buffer = (char *)malloc(513);
 
-        bzero(tracefifo_stat_buffer,513);
+        memset(tracefifo_stat_buffer,0,513);
         scan = tracefifo_stat_buffer;
         if (desc)
                 scan += sprintf(scan,"%s\t",desc);
-        scan += sprintf(scan,"in:   %d \t",fifo->datamap[FIFO_PTR_IN]);
-        scan += sprintf(scan,"sent: %d\t", fifo->datamap[FIFO_PTR_OUT]);
-        scan += sprintf(scan,"ack:  %d\t", fifo->datamap[FIFO_PTR_ACK]);
+        scan += sprintf(scan,"in:   %" PRIu64 " \t",(uint64_t)fifo->datamap[FIFO_PTR_IN]);
+        scan += sprintf(scan,"sent: %" PRIu64 "\t", (uint64_t)fifo->datamap[FIFO_PTR_OUT]);
+        scan += sprintf(scan,"ack:  %" PRIu64 "\t", (uint64_t)fifo->datamap[FIFO_PTR_ACK]);
         if (delta > 0)
-                scan += sprintf(scan,"delta: %d\t", delta);
-        scan += sprintf(scan,"Size: %d", tracefifo_compare(fifo,FIFO_PTR_IN,FIFO_PTR_ACK));
+                scan += sprintf(scan,"delta: %" PRIi64 "\t", (int64_t)delta);
+        scan += sprintf(scan,"Size: %" PRIu64, (uint64_t)tracefifo_compare(fifo,FIFO_PTR_IN,FIFO_PTR_ACK));
         scan += sprintf(scan,"\n");
         return tracefifo_stat_buffer;
 }
