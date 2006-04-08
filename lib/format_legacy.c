@@ -36,33 +36,20 @@
 #include "format_helper.h"
 #include "parse_cmd.h"
 
-#ifdef HAVE_INTTYPES_H
-#  include <inttypes.h>
-#else
-#  error "Can't find inttypes.h - this needs to be fixed"
-#endif 
-
-#ifdef HAVE_STDDEF_H
-#  include <stddef.h>
-#else
-# error "Can't find stddef.h - do you define ptrdiff_t elsewhere?"
-#endif
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <sys/mman.h>
 #include <sys/stat.h>
-#include <unistd.h>
 #include <assert.h>
 #include <errno.h>
-#include <netdb.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 
+#ifdef WIN32
+#  include <io.h>
+#  include <share.h>
+#  define snprintf sprintf_s
+#endif
 
-#define COLLECTOR_PORT 3435
 
 /* Catch undefined O_LARGEFILE on *BSD etc */
 #ifndef O_LARGEFILE
@@ -181,7 +168,7 @@ static libtrace_linktype_t legacyeth_get_link_type(const struct libtrace_packet_
 	return TRACE_TYPE_LEGACY_ETH;
 }
 
-static int legacy_get_capture_length(const struct libtrace_packet_t *packet __attribute__((unused))) {
+static int legacy_get_capture_length(const struct libtrace_packet_t *packet UNUSED) {
 	return 64;
 }
 
@@ -344,7 +331,7 @@ static struct libtrace_format_t legacypos = {
 };
 
 	
-static void __attribute__((constructor)) legacy_constructor() {
+static void CONSTRUCTOR legacy_constructor() {
 	register_format(&legacypos);
 	register_format(&legacyeth);
 	register_format(&legacyatm);

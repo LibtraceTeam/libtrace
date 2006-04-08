@@ -34,12 +34,6 @@
 #include "config.h"
 #include "stdlib.h"
 
-#ifdef HAVE_INTTYPES_H
-#  include <inttypes.h>
-#else
-# error "Can't find inttypes.h"
-#endif 
-
 static struct libtrace_format_t template;
 
 struct libtrace_format_data_t {

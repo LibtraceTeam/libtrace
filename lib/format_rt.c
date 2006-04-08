@@ -39,30 +39,17 @@
 #include "parse_cmd.h"
 #include "rt_protocol.h"
 
-#ifdef HAVE_INTTYPES_H
-#  include <inttypes.h>
-#else
-#  error "Can't find inttypes.h - this needs to be fixed"
-#endif
-
-#ifdef HAVE_STDDEF_H
-#  include <stddef.h>
-#else
-# error "Can't find stddef.h - do you define ptrdiff_t elsewhere?"
-#endif
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <sys/mman.h>
 #include <sys/stat.h>
-#include <unistd.h>
 #include <assert.h>
 #include <errno.h>
-#include <netdb.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+
+#ifndef WIN32
+# include <netdb.h>
+#endif
 
 #define RT_INFO ((struct rt_format_data_t*)libtrace->format_data)
 
@@ -113,8 +100,6 @@ static int rt_connect(struct libtrace_t *libtrace) {
 	rt_deny_conn_t deny_hdr;	
 	rt_hello_t hello_opts;
 	uint8_t reason;
-	int oldflags;
-
 	
 	if ((he=gethostbyname(RT_INFO->hostname)) == NULL) {
                 perror("gethostbyname");
@@ -128,7 +113,7 @@ static int rt_connect(struct libtrace_t *libtrace) {
         remote.sin_family = AF_INET;
         remote.sin_port = htons(RT_INFO->port);
         remote.sin_addr = *((struct in_addr *)he->h_addr);
-        bzero(&(remote.sin_zero), 8);
+        memset(&(remote.sin_zero), 0, 8);
 
         if (connect(RT_INFO->input_fd, (struct sockaddr *)&remote,
                                 sizeof(struct sockaddr)) == -1) {
@@ -285,7 +270,6 @@ static int rt_fin_input(struct libtrace_t *libtrace) {
 
 static int rt_read(struct libtrace_t *libtrace, void **buffer, size_t len, int block) {
         int numbytes;
-	int i;
 	char *buf_ptr;
 
 	assert(len <= RT_BUF_SIZE);
@@ -295,6 +279,10 @@ static int rt_read(struct libtrace_t *libtrace, void **buffer, size_t len, int b
 		RT_INFO->buf_current = RT_INFO->pkt_buffer;
 		RT_INFO->buf_left = 0;
 	}
+
+#ifndef MSG_DONTWAIT
+#define MSG_DONTWAIT 0
+#endif
 
 	if (block)
 		block=0;
@@ -673,6 +661,6 @@ static struct libtrace_format_t rt = {
 	NULL				/* next pointer */
 };
 
-void __attribute__((constructor)) rt_constructor() {
+void CONSTRUCTOR rt_constructor() {
 	register_format(&rt);
 }

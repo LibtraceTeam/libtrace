@@ -36,28 +36,10 @@
 #include "format_helper.h"
 #include "wag.h"
 
-#ifdef HAVE_INTTYPES_H
-#  include <inttypes.h>
-#else
-#  error "Can't find inttypes.h - this needs to be fixed"
-#endif 
-
-#ifdef HAVE_STDDEF_H
-#  include <stddef.h>
-#else
-# error "Can't find stddef.h - do you define ptrdiff_t elsewhere?"
-#endif
-#include <sys/types.h>
-#include <time.h>
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <sys/mman.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <unistd.h>
 #include <assert.h>
 #include <errno.h>
-#include <netdb.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -68,6 +50,11 @@
 
 #ifdef HAVE_SYS_LIMITS_H
 #  include <sys/limits.h>
+#endif
+
+#ifdef WIN32
+#  include <io.h>
+#  include <share.h>
 #endif
 
 static struct libtrace_format_t wag;
@@ -122,15 +109,16 @@ static int wag_start_input(libtrace_t *libtrace)
 		trace_set_err(libtrace,errno,"stat(%s)",libtrace->uridata);
 		return -1;
 	}
+#ifndef WIN32
 	if (S_ISCHR(buf.st_mode)) {
 		INPUT.fd = open(libtrace->uridata, O_RDONLY);
-	} else {
-		trace_set_err(libtrace,TRACE_ERR_INIT_FAILED,
-				"%s is not a valid char device",
-				libtrace->uridata);
-		return -1;
+		return 0;
 	}
-	return 0;
+#endif
+	trace_set_err(libtrace,TRACE_ERR_INIT_FAILED,
+			"%s is not a valid char device",
+			libtrace->uridata);
+	return -1;
 }
 
 static int wtf_init_input(struct libtrace_t *libtrace) 
@@ -378,7 +366,7 @@ static int wtf_write_packet(struct libtrace_out_t *libtrace, const struct libtra
 	return numbytes;
 }
 
-static libtrace_linktype_t wag_get_link_type(const struct libtrace_packet_t *packet __attribute__((unused))) {
+static libtrace_linktype_t wag_get_link_type(const struct libtrace_packet_t *packet UNUSED) {
 	return TRACE_TYPE_80211;
 }
 
@@ -516,7 +504,7 @@ static struct libtrace_format_t wag_trace = {
 };
 
 
-void __attribute__((constructor)) wag_constructor() {
+void CONSTRUCTOR wag_constructor() {
 	register_format(&wag);
 	register_format(&wag_trace);
 }

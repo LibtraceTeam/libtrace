@@ -34,15 +34,7 @@
 #include "libtrace_int.h"
 #include "format_helper.h"
 
-#ifdef HAVE_INTTYPES_H
-#  include <inttypes.h>
-#else
-#  error "Can't find inttypes.h - this needs to be fixed"
-#endif 
-
-#include <sys/types.h>
 #include <sys/stat.h>
-#include <unistd.h>
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
