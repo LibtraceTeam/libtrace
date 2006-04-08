@@ -1008,6 +1008,9 @@ int trace_bpf_compile(libtrace_filter_t *filter,
 	return 0;
 #else
 	assert(!"This should never be called when BPF not enabled");
+	trace_set_err(packet->trace,TRACE_ERR_OPTION_UNAVAIL,
+				"Feature unavailable");
+	return -1;
 #endif
 }
 
@@ -1381,10 +1384,10 @@ int trace_seek_timeval(libtrace_t *trace, struct timeval tv)
 char *trace_ether_ntoa(const uint8_t *addr, char *buf)
 {
 	char *buf2 = buf;
-	static char staticbuf[17]={0,};
+	static char staticbuf[18]={0,};
 	if (!buf2)
 		buf2=staticbuf;
-	sprintf(buf2,"%02x:%02x:%02x:%02x:%02x:%02x",
+	snprintf(buf2,18,"%02x:%02x:%02x:%02x:%02x:%02x",
 			addr[0],addr[1],addr[2],
 			addr[3],addr[4],addr[5]);
 	return buf2;
