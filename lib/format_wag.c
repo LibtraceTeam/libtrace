@@ -70,10 +70,6 @@
 #  include <sys/limits.h>
 #endif
 
-#ifndef O_LARGEFILE
-#define O_LARGEFILE 0
-#endif
-
 static struct libtrace_format_t wag;
 static struct libtrace_format_t wag_trace;
 
@@ -160,7 +156,7 @@ static int wtf_init_output(struct libtrace_out_t *libtrace) {
 
 	OUTPUT.file = 0;
 	OPTIONS.zlib.level = 0;
-	OPTIONS.zlib.filemode = O_CREAT | O_LARGEFILE | O_WRONLY;
+	OPTIONS.zlib.filemode = O_CREAT | O_WRONLY;
 	
 	return 0;
 }
