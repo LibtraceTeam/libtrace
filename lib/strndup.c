@@ -1,7 +1,7 @@
 /*
  * Written by mjl. Needs attributation?
  */
-#include "../config.h"
+#include "config.h"
 
 #ifndef HAVE_STRNDUP
 
