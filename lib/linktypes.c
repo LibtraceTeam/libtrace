@@ -79,8 +79,10 @@ char libtrace_to_erf_type(libtrace_linktype_t linktype)
 {
 	switch(linktype) {
 		case TRACE_TYPE_LEGACY:	return TYPE_LEGACY;
+		case TRACE_TYPE_HDLC_POS: return TYPE_HDLC_POS;
 		case TRACE_TYPE_ETH:	return TYPE_ETH;
 		case TRACE_TYPE_ATM:	return TYPE_ATM;
+		case TRACE_TYPE_AAL5:	return TYPE_AAL5;
 	}
 	return -1;
 }
