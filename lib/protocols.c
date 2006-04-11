@@ -53,7 +53,7 @@ static void *trace_get_vlan_payload_from_ethernet_payload(void *ethernet, uint16
 		return (void*)((char *)ethernet + sizeof(*vlanhdr));
 	}
 
-	return NULL;
+	return ethernet;
 }
 
 static void *trace_get_payload_from_80211(void *link, uint16_t *type, uint32_t *remaining)
@@ -192,8 +192,14 @@ void *trace_get_payload_from_link(void *link, libtrace_linktype_t linktype,
 libtrace_ip_t *trace_get_ip(libtrace_packet_t *packet) 
 {
 	uint16_t type;
-	void *ret=trace_get_payload_from_link(
-			trace_get_link(packet),
+	void *link = trace_get_link(packet);
+	void *ret;
+
+	if (!link)
+		return NULL;
+	
+	ret=trace_get_payload_from_link(
+			link,
 			trace_get_link_type(packet),
 			&type, NULL);
 
@@ -211,8 +217,14 @@ libtrace_ip_t *trace_get_ip(libtrace_packet_t *packet)
 libtrace_ip6_t *trace_get_ip6(libtrace_packet_t *packet) 
 {
 	uint16_t type;
-	void *ret=trace_get_payload_from_link(
-			trace_get_link(packet),
+	void *link=trace_get_link(packet);
+	void *ret;
+	
+	if (!link)
+		return NULL;
+
+	ret=trace_get_payload_from_link(
+			link,
 			trace_get_link_type(packet),
 			&type,NULL);
 
@@ -302,14 +314,20 @@ void *trace_get_transport(libtrace_packet_t *packet,
 	void *transport;
 	uint8_t dummy;
 	uint16_t ethertype;
+	void *link;
 
 	if (!proto) proto=&dummy;
 
 	if (remaining)
 		*remaining = trace_get_capture_length(packet);
 
+	link=trace_get_link(packet);
+
+	if (!link)
+		return NULL;
+
 	transport = trace_get_payload_from_link(
-			trace_get_link(packet),
+			link,
 			trace_get_link_type(packet),
 			&ethertype,
 			remaining);
@@ -324,7 +342,7 @@ void *trace_get_transport(libtrace_packet_t *packet,
 	if (!transport)
 		return NULL;
 
-	switch (*proto) {
+	switch (ethertype) {
 		case 0x0800: /* IPv4 */
 			transport=trace_get_payload_from_ip(
 				(libtrace_ip_t*)transport, proto, remaining);
@@ -350,7 +368,7 @@ libtrace_tcp_t *trace_get_tcp(libtrace_packet_t *packet) {
 
 	tcp=(libtrace_tcp_t*)trace_get_transport(packet,&proto,NULL);
 
-	if (proto != 6)
+	if (!tcp && proto != 6)
 		return NULL;
 
 	return (libtrace_tcp_t*)tcp;
@@ -644,4 +662,54 @@ struct sockaddr *trace_get_destination_address(const libtrace_packet_t *packet,
 			return NULL;
 	}
 }
+
+/* parse an ip or tcp option
+ * @param[in,out] ptr	the pointer to the current option
+ * @param[in,out] len	the length of the remaining buffer
+ * @param[out] type	the type of the option
+ * @param[out] optlen 	the length of the option
+ * @param[out] data	the data of the option
+ *
+ * @returns bool true if there is another option (and the fields are filled in)
+ *               or false if this was the last option.
+ *
+ * This updates ptr to point to the next option after this one, and updates
+ * len to be the number of bytes remaining in the options area.  Type is updated
+ * to be the code of this option, and data points to the data of this option,
+ * with optlen saying how many bytes there are.
+ *
+ * @note Beware of fragmented packets.
+ * @author Perry Lorier
+ */
+int trace_get_next_option(unsigned char **ptr,int *len,
+			unsigned char *type,
+			unsigned char *optlen,
+			unsigned char **data)
+{
+	if (*len<=0)
+		return 0;
+	*type=**ptr;
+	switch(*type) {
+		case 0: /* End of options */
+			return 0;
+		case 1: /* Pad */
+			(*ptr)++;
+			(*len)--;
+			return 1;
+		default:
+			*optlen = *(*ptr+1);
+			if (*optlen<2)
+				return 0; /* I have no idea wtf is going on
+					   * with these packets
+					   */
+			(*len)-=*optlen;
+			(*data)=(*ptr+2);
+			(*ptr)+=*optlen;
+			if (*len<0)
+				return 0;
+			return 1;
+	}
+	assert(0);
+}
+
 
