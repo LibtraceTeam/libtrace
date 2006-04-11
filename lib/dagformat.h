@@ -1,6 +1,8 @@
 #ifndef _DAGFORMAT_H_
 #define _DAGFORMAT_H_
 
+#include "libtrace.h"
+
 /* GPP record type defines */
 #define TYPE_LEGACY       0
 #define TYPE_HDLC_POS     1

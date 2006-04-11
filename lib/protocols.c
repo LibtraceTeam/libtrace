@@ -478,7 +478,10 @@ uint16_t trace_get_source_port(const libtrace_packet_t *packet)
 		(struct ports_t*)trace_get_transport((libtrace_packet_t*)packet,
 			NULL, NULL);
 
-	return ntohs(port->src);
+	if (port)
+		return ntohs(port->src);
+	else
+		return 0;
 }
 
 /* Same as get_source_port except use the destination port */
@@ -488,7 +491,10 @@ uint16_t trace_get_destination_port(const libtrace_packet_t *packet)
 		(struct ports_t*)trace_get_transport((libtrace_packet_t*)packet,
 			NULL, NULL);
 
-	return ntohs(port->dst);
+	if (port)
+		return ntohs(port->dst);
+	else
+		return 0;
 }
 
 
