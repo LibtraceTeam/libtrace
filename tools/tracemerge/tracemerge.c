@@ -68,6 +68,7 @@ int main(int argc, char *argv[])
 	live=calloc((argc-optind),sizeof(bool));
 	for(i=0;i<argc-optind;++i) {
 		struct libtrace_t *f;
+		libtrace_packet_t *p;
 		f=trace_create(argv[i+optind]);
 		if (trace_is_err(f)) {
 			trace_perror(f,"trace_create");
