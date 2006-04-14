@@ -67,7 +67,7 @@ static int linuxnative_init_input(struct libtrace_t *libtrace) {
 				socket(PF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
 	if (FORMAT(libtrace->format_data)->fd==-1) {
 		free(libtrace->format_data);
-		return 0;
+		return -1;
 	}
 	addr.sll_family = AF_PACKET;
 	addr.sll_protocol = htons(ETH_P_ALL);
@@ -76,7 +76,7 @@ static int linuxnative_init_input(struct libtrace_t *libtrace) {
 		if (addr.sll_ifindex == 0) {
 			close(FORMAT(libtrace->format_data)->fd);
 			free(libtrace->format_data);
-			return 0;
+			return -1;
 		}
 	}
 	else {
@@ -86,7 +86,7 @@ static int linuxnative_init_input(struct libtrace_t *libtrace) {
 				(struct sockaddr*)&addr,
 				sizeof(addr))==-1) {
 		free(libtrace->format_data);
-		return 0;
+		return -1;
 	}
 	/* enable promisc mode when listening on an interface */
 	if (addr.sll_ifindex!=0) {
@@ -101,7 +101,7 @@ static int linuxnative_init_input(struct libtrace_t *libtrace) {
 				socklen);
 	}
 
-	return 1;
+	return 0;
 }
 
 static int linuxnative_fin_input(struct libtrace_t *libtrace) {
@@ -111,11 +111,21 @@ static int linuxnative_fin_input(struct libtrace_t *libtrace) {
 }
 
 static int linuxnative_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
-	struct libtrace_linuxnative_header *hdr=(void*)packet->buffer;
+	struct libtrace_linuxnative_header *hdr;
+	if (!packet->buffer || packet->buf_control == TRACE_CTRL_EXTERNAL) {
+		packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
+		packet->buf_control = TRACE_CTRL_PACKET;
+	}
+
+	packet->header = packet->buffer;
+	packet->type = RT_DATA_LINUX_NATIVE;
+	packet->payload = packet->buffer+sizeof(*hdr);
+
+	hdr=(void*)packet->buffer;
 	socklen_t socklen=sizeof(hdr->hdr);
 	hdr->wirelen = recvfrom(FORMAT(libtrace->format_data)->fd,
-			(void*)packet->buffer+sizeof(*hdr),
-			sizeof(packet->buffer)-sizeof(*hdr),
+			(void*)packet->payload,
+			LIBTRACE_PACKET_BUFSIZE-sizeof(*hdr),
 			MSG_TRUNC,
 			(void *)&hdr->hdr,
 			&socklen);
