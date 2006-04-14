@@ -325,12 +325,6 @@ static libtrace_linktype_t pcap_get_link_type(const libtrace_packet_t *packet) {
 	 * rt to do it for us 
 	 */
 	linktype = rt_to_pcap_dlt(packet->type);
-	/*
-	if (packet->trace->format_data == NULL) 
-		linktype = rt_to_pcap_dlt(packet->type);
-	else 
-		linktype = pcap_datalink(DATA(packet->trace)->input.pcap);
-	*/
 	return pcap_dlt_to_libtrace(linktype);
 }
 

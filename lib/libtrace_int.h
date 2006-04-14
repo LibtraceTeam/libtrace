@@ -207,7 +207,7 @@ struct libtrace_format_t {
 	 * on success.
 	 * if this function is not supported, this field may be NULL.
 	 */
-	int (*read_packet)(libtrace_t *libtrace, struct libtrace_packet_t *packet);
+	int (*read_packet)(libtrace_t *libtrace, libtrace_packet_t *packet);
 	/** finalise a packet
 	 * cleanup any resources used by a packet that can't be reused for
 	 * the next packet.

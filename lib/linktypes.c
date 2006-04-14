@@ -1,4 +1,5 @@
 #include "libtrace.h"
+#include "config.h"
 #ifdef HAVE_PCAP
 #include <pcap.h>
 #endif
@@ -27,6 +28,9 @@ libtrace_linktype_t pcap_dlt_to_libtrace(int dlt)
 #ifdef DLT_PFLOG
 		case DLT_PFLOG: return TRACE_TYPE_PFLOG;
 #endif
+#else
+		default:
+				assert(!"No pcap support");
 #endif
 	}
 	return -1;

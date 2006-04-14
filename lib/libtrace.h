@@ -1189,7 +1189,8 @@ enum base_format_t {
         TRACE_FORMAT_RT           =4,
         TRACE_FORMAT_LEGACY_ATM   =5,
 	TRACE_FORMAT_LEGACY_POS	  =6,
-	TRACE_FORMAT_LEGACY_ETH   =7
+	TRACE_FORMAT_LEGACY_ETH   =7,
+	TRACE_FORMAT_LINUX_NATIVE =8
 };
 
 /** Gets the framing header type for a given packet.
