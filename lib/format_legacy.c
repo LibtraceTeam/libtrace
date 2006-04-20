@@ -70,12 +70,7 @@ static struct libtrace_format_t legacyatm;
 struct legacy_format_data_t {
 	union {
                 int fd;
-#if HAVE_ZLIB
-                gzFile *file;
-#else	
-		/*FILE  *file; */
-		int file;
-#endif
+		libtrace_io_t *file;
         } input;
 };
 
@@ -112,7 +107,7 @@ static int erf_start_input(libtrace_t *libtrace)
 }
 
 static int erf_fin_input(struct libtrace_t *libtrace) {
-	LIBTRACE_CLOSE(INPUT.file);
+	libtrace_io_close(INPUT.file);
 	free(libtrace->format_data);
 	return 0;
 }
@@ -141,7 +136,7 @@ static int legacy_read_packet(struct libtrace_t *libtrace, struct libtrace_packe
 			assert(0);
 	}
 	
-	if ((numbytes=LIBTRACE_READ(INPUT.file,
+	if ((numbytes=libtrace_io_read(INPUT.file,
 					buffer,
 					64)) == -1) {
 		trace_set_err(libtrace,errno,"read(%s)",libtrace->uridata);

@@ -71,11 +71,7 @@ struct wag_format_data_t {
 	/** Information about the current state of the input device */
         union {
                 int fd;
-#if HAVE_ZLIB
-                gzFile *file;
-#else	
-		int file;
-#endif
+		libtrace_io_t *file;
         } input;	
 };
 
@@ -88,11 +84,7 @@ struct wag_format_data_out_t {
 	} options;
 	union {
 		int fd;
-#if HAVE_ZLIB
-		gzFile *file;
-#else
-		int file;
-#endif
+		libtrace_io_t *file;
 	} output;
 };
 
@@ -197,13 +189,13 @@ static int wag_fin_input(struct libtrace_t *libtrace) {
 }
 
 static int wtf_fin_input(struct libtrace_t *libtrace) {
-	LIBTRACE_CLOSE(INPUT.file);
+	libtrace_io_close(INPUT.file);
 	free(libtrace->format_data);
 	return 0;
 }
 
 static int wtf_fin_output(struct libtrace_out_t *libtrace) {
-	LIBTRACE_CLOSE(OUTPUT.file);
+	libtrace_io_close(OUTPUT.file);
 	free(libtrace->format_data);
 	return 0;
 }
@@ -305,7 +297,7 @@ static int wtf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 	packet->type = RT_DATA_WAG;
 	buffer2 = buffer = packet->buffer;
 	
-	if ((numbytes = LIBTRACE_READ(INPUT.file, buffer, sizeof(struct frame_t))) == -1) {
+	if ((numbytes = libtrace_io_read(INPUT.file, buffer, sizeof(struct frame_t))) == -1) {
 		trace_set_err(libtrace,errno,
 				"read(%s,frame_t)",packet->trace->uridata);
 		return -1;
@@ -327,7 +319,7 @@ static int wtf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 	assert(size < LIBTRACE_PACKET_BUFSIZE);
 
 	
-	if ((numbytes=LIBTRACE_READ(INPUT.file, buffer2, size)) != size) {
+	if ((numbytes=libtrace_io_read(INPUT.file, buffer2, size)) != size) {
 		trace_set_err(libtrace,
 				errno,"read(%s,buffer)",packet->trace->uridata);
 		return -1;
@@ -351,13 +343,13 @@ static int wtf_write_packet(struct libtrace_out_t *libtrace, const struct libtra
 	/* We could just read from packet->buffer, but I feel it is more
 	 * technically correct to read from the header and payload pointers
 	 */
-	if ((numbytes = LIBTRACE_WRITE(OUTPUT.file, packet->header, 
+	if ((numbytes = libtrace_io_write(OUTPUT.file, packet->header, 
 				trace_get_framing_length(packet))) == -1) {
 		trace_set_err_out(libtrace,errno,
 				"write(%s)",packet->trace->uridata);
 		return -1;
 	}
-	if ((numbytes = LIBTRACE_WRITE(OUTPUT.file, packet->payload, 
+	if ((numbytes = libtrace_io_write(OUTPUT.file, packet->payload, 
 				trace_get_capture_length(packet)) == -1)) {
 		trace_set_err_out(libtrace,
 				errno,"write(%s)",packet->trace->uridata);

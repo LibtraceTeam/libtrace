@@ -45,6 +45,10 @@
 #include <net/ethernet.h>
 #include <net/if_arp.h>
 
+#include <string.h>
+#include <net/if.h>
+#include <sys/ioctl.h>
+
 static struct libtrace_format_t linuxnative;
 
 struct libtrace_format_data_t {
@@ -112,6 +116,7 @@ static int linuxnative_fin_input(struct libtrace_t *libtrace) {
 
 static int linuxnative_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
 	struct libtrace_linuxnative_header *hdr;
+	socklen_t socklen;
 	if (!packet->buffer || packet->buf_control == TRACE_CTRL_EXTERNAL) {
 		packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
 		packet->buf_control = TRACE_CTRL_PACKET;
@@ -119,10 +124,10 @@ static int linuxnative_read_packet(struct libtrace_t *libtrace, struct libtrace_
 
 	packet->header = packet->buffer;
 	packet->type = RT_DATA_LINUX_NATIVE;
-	packet->payload = packet->buffer+sizeof(*hdr);
+	packet->payload = (char*)packet->buffer+sizeof(*hdr);
 
 	hdr=(void*)packet->buffer;
-	socklen_t socklen=sizeof(hdr->hdr);
+	socklen=sizeof(hdr->hdr);
 	hdr->wirelen = recvfrom(FORMAT(libtrace->format_data)->fd,
 			(void*)packet->payload,
 			LIBTRACE_PACKET_BUFSIZE-sizeof(*hdr),
@@ -140,7 +145,7 @@ static int linuxnative_read_packet(struct libtrace_t *libtrace, struct libtrace_
 }
 
 static libtrace_linktype_t linuxnative_get_link_type(const struct libtrace_packet_t *packet) {
-	switch htons((((struct libtrace_linuxnative_header*)(packet->buffer))->hdr.sll_protocol)) {
+	switch (htons((((struct libtrace_linuxnative_header*)(packet->buffer))->hdr.sll_protocol))) {
 		case ETH_P_IP:
 		case ETH_P_IPV6:
 		case ETH_P_ARP:
@@ -170,10 +175,6 @@ static int linuxnative_get_wire_length(const struct libtrace_packet_t *packet) {
 
 static int linuxnative_get_framing_length(const struct libtrace_packet_t *packet) {
 	return sizeof(struct libtrace_linuxnative_header);
-}
-
-static size_t linuxnative_set_capture_length(struct libtrace_packet_t *packet,size_t size) {
-	return -1;
 }
 
 static int linuxnative_get_fd(const libtrace_t *trace) {

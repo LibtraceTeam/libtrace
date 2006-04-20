@@ -348,6 +348,7 @@ fi
 AM_CONDITIONAL([HAVE_DAG], [test "$libtrace_dag" = true])
 AM_CONDITIONAL([DAG2_4], [test "$libtrace_dag2_4" = true])
 AM_CONDITIONAL([HAVE_CXX], [test "$libtrace_cxx" = true])
+AM_CONDITIONAL([HAVE_ZLIB], [test "$libtrace_zlib" = true])
 AM_CONDITIONAL([LIBPACKETDUMP], [test "$libtrace_libpacketdump" = true])
 AM_CONDITIONAL([LIBTRACE_TOOLS], [test "$libtrace_tools" = true])
 AM_CONDITIONAL([LIBGDC], [test "$libtrace_gdc" = true])

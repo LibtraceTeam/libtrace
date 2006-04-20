@@ -156,14 +156,14 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 /* open a file or stdin using gzip compression if necessary (and supported)
  * @internal
  */
-LIBTRACE_FILE trace_open_file(libtrace_t *trace)
+libtrace_io_t *trace_open_file(libtrace_t *trace)
 {
 	int fd;
-	LIBTRACE_FILE ret;
+	libtrace_io_t *ret;
 
 
 	if (strcmp(trace->uridata,"-")==0) {
-		ret=LIBTRACE_FDOPEN(fileno(stdin),"r");
+		ret=libtrace_io_fdopen(fileno(stdin),"r");
 		return ret;
 	}
 
@@ -175,17 +175,17 @@ LIBTRACE_FILE trace_open_file(libtrace_t *trace)
 		trace_set_err(trace,errno,"Unable to open %s",trace->uridata);
 		return 0;
 	}
-	ret=LIBTRACE_FDOPEN(fd,"r");
+	ret=libtrace_io_fdopen(fd,"r");
 	return ret;
 }
 
 /* Create a file or write to stdout using compression if requested
  * @internal
  */
-LIBTRACE_FILE trace_open_file_out(libtrace_out_t *trace,int level, int fileflag)
+libtrace_io_t *trace_open_file_out(libtrace_out_t *trace,int level, int fileflag)
 {
 	int fd;
-	LIBTRACE_FILE ret;
+	libtrace_io_t *ret;
 	char filemode[4]; /* wb9\0 */
 	assert(level<10);
 	assert(level>=0);
@@ -196,7 +196,7 @@ LIBTRACE_FILE trace_open_file_out(libtrace_out_t *trace,int level, int fileflag)
 #endif
 
 	if (strcmp(trace->uridata,"-")==0) {
-		ret=LIBTRACE_FDOPEN(fileno(stdout),filemode);
+		ret=libtrace_io_fdopen(fileno(stdout),filemode);
 		return ret;
 	}
 
@@ -209,7 +209,7 @@ LIBTRACE_FILE trace_open_file_out(libtrace_out_t *trace,int level, int fileflag)
 				errno,"Unable to open %s",trace->uridata);
 		return 0;
 	}
-	ret=LIBTRACE_FDOPEN(fd,filemode);
+	ret=libtrace_io_fdopen(fd,filemode);
 	if (!ret) {
 		printf("%s\n",filemode);
 		trace_set_err_out(trace,

@@ -81,12 +81,12 @@ struct erf_format_data_t {
         
 	union {
                 int fd;
-		LIBTRACE_FILE file;
+		libtrace_io_t *file;
         } input;
 
 	struct {
 		enum { INDEX_UNKNOWN=0, INDEX_NONE, INDEX_EXISTS } exists;
-		LIBTRACE_FILE index;
+		libtrace_io_t *index;
 		off_t index_len;
 	} seek;
 
@@ -122,11 +122,7 @@ struct erf_format_data_out_t {
         union {
                 int fd;
                 struct rtserver_t * rtserver;
-#if HAVE_ZLIB
-                gzFile *file;
-#else
-		int file;
-#endif
+		libtrace_io_t *file;
         } output;
 };
 
@@ -226,10 +222,10 @@ static int erf_fast_seek_start(libtrace_t *libtrace,uint64_t erfts)
 	do {
 		current=(max_off+min_off)>>2;
 
-		LIBTRACE_SEEK(DATA(libtrace)->seek.index,
+		libtrace_io_seek(DATA(libtrace)->seek.index,
 				current*sizeof(record),
 				SEEK_SET);
-		LIBTRACE_READ(DATA(libtrace)->seek.index,
+		libtrace_io_read(DATA(libtrace)->seek.index,
 				&record,sizeof(record));
 		if (record.timestamp < erfts) {
 			min_off=current;
@@ -245,15 +241,15 @@ static int erf_fast_seek_start(libtrace_t *libtrace,uint64_t erfts)
 	 * execute more than twice.
 	 */
 	do {
-		LIBTRACE_SEEK(DATA(libtrace)->seek.index,
+		libtrace_io_seek(DATA(libtrace)->seek.index,
 				current*sizeof(record),SEEK_SET);
-		LIBTRACE_READ(DATA(libtrace)->seek.index,
+		libtrace_io_read(DATA(libtrace)->seek.index,
 				&record,sizeof(record));
 		current--;
 	} while(record.timestamp>erfts);
 
 	/* We've found our location in the trace, now use it. */
-	LIBTRACE_SEEK(INPUT.file,record.offset,SEEK_SET);
+	libtrace_io_seek(INPUT.file,record.offset,SEEK_SET);
 
 	return 0; /* success */
 }
@@ -264,7 +260,7 @@ static int erf_fast_seek_start(libtrace_t *libtrace,uint64_t erfts)
 static int erf_slow_seek_start(libtrace_t *libtrace,uint64_t erfts)
 {
 	if (INPUT.file) {
-		LIBTRACE_CLOSE(INPUT.file);
+		libtrace_io_close(INPUT.file);
 	}
 	INPUT.file = trace_open_file(libtrace);
 	if (!INPUT.file)
@@ -280,7 +276,7 @@ static int erf_seek_erf(libtrace_t *libtrace,uint64_t erfts)
 	if (DATA(libtrace)->seek.exists==INDEX_UNKNOWN) {
 		char buffer[PATH_MAX];
 		snprintf(buffer,sizeof(buffer),"%s.idx",libtrace->uridata);
-		DATA(libtrace)->seek.index=LIBTRACE_OPEN(buffer,"r");
+		DATA(libtrace)->seek.index=libtrace_io_open(buffer,"r");
 		if (DATA(libtrace)->seek.index) {
 			DATA(libtrace)->seek.exists=INDEX_EXISTS;
 		}
@@ -311,10 +307,10 @@ static int erf_seek_erf(libtrace_t *libtrace,uint64_t erfts)
 		trace_read_packet(libtrace,packet);
 		if (trace_get_erf_timestamp(packet)==erfts)
 			break;
-		off=LIBTRACE_TELL(INPUT.file);
+		off=libtrace_io_tell(INPUT.file);
 	} while(trace_get_erf_timestamp(packet)<erfts);
 
-	LIBTRACE_SEEK(INPUT.file,off,SEEK_SET);
+	libtrace_io_seek(INPUT.file,off,SEEK_SET);
 
 	return 0;
 }
@@ -431,13 +427,13 @@ static int rtclient_fin_input(libtrace_t *libtrace) {
 }
 
 static int erf_fin_input(libtrace_t *libtrace) {
-	LIBTRACE_CLOSE(INPUT.file);
+	libtrace_io_close(INPUT.file);
 	free(libtrace->format_data);
 	return 0;
 }
 
 static int erf_fin_output(libtrace_out_t *libtrace) {
-	LIBTRACE_CLOSE(OUTPUT.file);
+	libtrace_io_close(OUTPUT.file);
 	free(libtrace->format_data);
 	return 0;
 }
@@ -534,7 +530,7 @@ static int erf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	packet->header = packet->buffer;
 	packet->type = RT_DATA_ERF;
 
-	if ((numbytes=LIBTRACE_READ(INPUT.file,
+	if ((numbytes=libtrace_io_read(INPUT.file,
 					packet->buffer,
 					dag_record_size)) == -1) {
 		trace_set_err(libtrace,errno,"read(%s)",
@@ -556,7 +552,7 @@ static int erf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	assert(((dag_record_t *)packet->buffer)->type < 10);
 	
 	/* read in the rest of the packet */
-	if ((numbytes=LIBTRACE_READ(INPUT.file,
+	if ((numbytes=libtrace_io_read(INPUT.file,
 					buffer2,
 					size)) != size) {
 		trace_set_err(libtrace,errno, "read(%s)", libtrace->uridata);
@@ -681,13 +677,13 @@ static int erf_dump_packet(libtrace_out_t *libtrace,
 	int numbytes = 0;
 	assert(size<=65536);
 
-	if ((numbytes = LIBTRACE_WRITE(OUTPUT.file, erfptr, dag_record_size + pad)) != dag_record_size+pad) {
+	if ((numbytes = libtrace_io_write(OUTPUT.file, erfptr, dag_record_size + pad)) != dag_record_size+pad) {
 		trace_set_err_out(libtrace,errno,
 				"write(%s)",libtrace->uridata);
 		return -1;
 	}
 
-	if ((numbytes=LIBTRACE_WRITE(OUTPUT.file, buffer, size)) != size) {
+	if ((numbytes=libtrace_io_write(OUTPUT.file, buffer, size)) != size) {
 		trace_set_err_out(libtrace,errno,
 				"write(%s)",libtrace->uridata);
 		return -1;
