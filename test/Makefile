@@ -26,6 +26,7 @@ test: all test-format-all test-convert-all
 test-format-all: test-format
 	@for i in erf pcap wtf ; do			\
 		echo \* $$i;					\
+		LD_LIBRARY_PATH=$(libdir)			\
 		./test-format $$i || exit $$?;			\
 	done
 	
