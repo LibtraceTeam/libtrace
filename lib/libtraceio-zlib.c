@@ -1,6 +1,7 @@
 #include "libtraceio.h"
 #include <zlib.h>
 #include <stdlib.h>
+#include <errno.h>
 
 struct libtrace_io_t {
 	gzFile *file;
@@ -8,7 +9,24 @@ struct libtrace_io_t {
 
 ssize_t libtrace_io_read(libtrace_io_t *io, void *buf, size_t len)
 {
-	return gzread(io->file,buf,len);
+	int err=gzread(io->file,buf,len);
+	int err2=errno;
+	if (err>=0) {
+		return err;
+	}
+	switch(err) {
+		case Z_STREAM_END:
+			return 0;
+		case Z_ERRNO: 
+			if (err2==0)
+				return 0; /* EOF */
+			return -1;
+		case Z_MEM_ERROR: errno=ENOMEM; return -1;
+		default:
+		      /* Some decompression error or something */
+		      errno=EINVAL;
+		      return -1;
+	}
 }
 
 libtrace_io_t *libtrace_io_fdopen(int fd, const char *mode)

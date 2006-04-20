@@ -9,7 +9,7 @@ CFLAGS += $(INCLUDE)
 libdir = $(PREFIX)/lib/.libs
 LDLIBS = -L$(libdir) -ltrace
 
-BINS = test-pcap-bpf test-event test-time test-seek 
+BINS = test-pcap-bpf test-event test-time #test-seek 
 
 .PHONY: all clean distclean install depend test
 
@@ -31,14 +31,15 @@ test-format-all: test-format
 	done
 	
 test-convert-all: test-convert
-	@for i in erf pcap wtf rtclient; do			\
-		for j in erf pcap ; do				\
-			echo \* $$i -\> $$j;			\
-			./test-convert $$i $$j || exit $$?;	\
-		done;						\
-	done							
-	./test-convert wtf wtf
-
+# Not all types are convertable, for instance libtrace doesn't
+# do rtclient output, and erf doesn't support 802.11
+	@LD_LIBRARY_PATH=$(libdir) ./test-convert erf erf
+	@LD_LIBRARY_PATH=$(libdir) ./test-convert erf pcap
+	@LD_LIBRARY_PATH=$(libdir) ./test-convert pcap erf
+	@LD_LIBRARY_PATH=$(libdir) ./test-convert rtclient erf
+	@LD_LIBRARY_PATH=$(libdir) ./test-convert rtclient pcap
+	@LD_LIBRARY_PATH=$(libdir) ./test-convert wtf pcap
+	@LD_LIBRARY_PATH=$(libdir) ./test-convert wtf wtf
  
 clean:
 	$(RM) $(BINS) $(OBJS) 

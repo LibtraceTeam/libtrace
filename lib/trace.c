@@ -616,12 +616,12 @@ DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 	 * structure */
 	packet->trace = libtrace;
 
-
 	if (libtrace->format->read_packet) {
 		do {
 			packet->size=libtrace->format->read_packet(libtrace,packet);
-			if (packet->size==(size_t)-1 || packet->size==0)
+			if (packet->size==(size_t)-1 || packet->size==0) {
 				return packet->size;
+			}
 			if (libtrace->filter) {
 				/* If the filter doesn't match, read another
 				 * packet
@@ -635,10 +635,10 @@ DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 				trace_set_capture_length(packet,
 						libtrace->snaplen);
 			}
-
 			return packet->size;
 		} while(1);
 	}
+	trace_set_err(libtrace,TRACE_ERR_BAD_FORMAT,"This format does not support reading packets\n");
 	packet->size=-1;
 	return -1;
 }

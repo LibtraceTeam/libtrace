@@ -296,10 +296,13 @@ static int wtf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
         }
 	packet->type = RT_DATA_WAG;
 	buffer2 = buffer = packet->buffer;
+
 	
 	if ((numbytes = libtrace_io_read(INPUT.file, buffer, sizeof(struct frame_t))) == -1) {
-		trace_set_err(libtrace,errno,
+		int err=errno;
+		trace_set_err(libtrace,err,
 				"read(%s,frame_t)",packet->trace->uridata);
+		printf("failed to read header=%i\n",err);
 		return -1;
 	}
 
@@ -387,7 +390,7 @@ static int wag_get_wire_length(const struct libtrace_packet_t *packet) {
 	return ntohs(wagptr->hdr.size);
 }
 
-static int wag_get_framing_length(const struct libtrace_packet_t *packet) {
+static int wag_get_framing_length(UNUSED const libtrace_packet_t *packet) {
 	return sizeof(struct frame_data_rx_t);
 }
 
