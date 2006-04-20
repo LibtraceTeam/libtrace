@@ -144,7 +144,7 @@ static int rt_connect(struct libtrace_t *libtrace) {
 	
 	/* We are connected, now receive message from server */
 	
-	if (recv(RT_INFO->input_fd, &connect_msg, sizeof(rt_header_t), 0) != sizeof(rt_header_t) ) {
+	if (recv(RT_INFO->input_fd, (void*)&connect_msg, sizeof(rt_header_t), 0) != sizeof(rt_header_t) ) {
 		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
 				"Could not receive connection message from %s",
 				RT_INFO->hostname);
@@ -154,7 +154,7 @@ static int rt_connect(struct libtrace_t *libtrace) {
 	switch (connect_msg.type) {
 		case RT_DENY_CONN:
 			
-			if (recv(RT_INFO->input_fd, &deny_hdr, 
+			if (recv(RT_INFO->input_fd, (void*)&deny_hdr, 
 						sizeof(rt_deny_conn_t),
 						0) != sizeof(rt_deny_conn_t)) {
 				reason = 0;
@@ -166,7 +166,7 @@ static int rt_connect(struct libtrace_t *libtrace) {
 			return -1;
 		case RT_HELLO:
 			/* do something with options */
-			if (recv(RT_INFO->input_fd, &hello_opts, 
+			if (recv(RT_INFO->input_fd, (void*)&hello_opts, 
 						sizeof(rt_hello_t), 0)
 					!= sizeof(rt_hello_t)) {
 				trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
@@ -231,7 +231,7 @@ static int rt_start_input(struct libtrace_t *libtrace) {
 
 	
 	/* Need to send start message to server */
-	if (send(RT_INFO->input_fd, &start_msg, sizeof(rt_header_t) +
+	if (send(RT_INFO->input_fd, (void*)&start_msg, sizeof(rt_header_t) +
 				start_msg.length, 0) != sizeof(rt_header_t)) {
 		printf("Failed to send start message to server\n");
 		return -1;
@@ -247,7 +247,7 @@ static int rt_fin_input(struct libtrace_t *libtrace) {
 	close_msg.length = 0; 
 	
 	/* Send a close message to the server */
-	if (send(RT_INFO->input_fd, &close_msg, sizeof(rt_header_t) + 
+	if (send(RT_INFO->input_fd, (void*)&close_msg, sizeof(rt_header_t) + 
 				close_msg.length, 0) != sizeof(rt_header_t)
 				+ close_msg.length) {
 		printf("Failed to send close message to server\n");
@@ -270,7 +270,6 @@ static int rt_fin_input(struct libtrace_t *libtrace) {
 
 static int rt_read(struct libtrace_t *libtrace, void **buffer, size_t len, int block) {
         int numbytes;
-	char *buf_ptr;
 
 	assert(len <= RT_BUF_SIZE);
 	
@@ -581,7 +580,6 @@ static int rt_get_fd(const libtrace_t *trace) {
 struct libtrace_eventobj_t trace_event_rt(struct libtrace_t *trace, struct libtrace_packet_t *packet) {
 	struct libtrace_eventobj_t event = {0,0,0.0,0};
 	libtrace_err_t read_err;
-	int data;
 
 	assert(trace);
 	assert(packet);

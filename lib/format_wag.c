@@ -373,7 +373,7 @@ static libtrace_linktype_t wag_get_link_type(const struct libtrace_packet_t *pac
 static int8_t wag_get_direction(const struct libtrace_packet_t *packet) {
 	struct frame_data_rx_t *wagptr = (struct frame_data_rx_t *)packet->buffer;
 	if (wagptr->hdr.type == 0) {
-		return wagptr->hdr.subtype;
+		return wagptr->hdr.subtype; 
 	}
 	return -1;
 }
