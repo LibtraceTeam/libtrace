@@ -241,7 +241,7 @@ libtrace_ip6_t *trace_get_ip6(libtrace_packet_t *packet)
 
 #define SW_IP_OFFMASK 0xff1f
 
-void *trace_get_payload_from_ip(libtrace_ip_t *ipptr, uint8_t *prot,
+DLLEXPORT void *trace_get_payload_from_ip(libtrace_ip_t *ipptr, uint8_t *prot,
 		uint32_t *remaining) 
 {
         void *trans_ptr = 0;
@@ -306,7 +306,7 @@ void *trace_get_payload_from_ip6(libtrace_ip6_t *ipptr, uint8_t *prot,
 	}
 }
 
-void *trace_get_transport(libtrace_packet_t *packet, 
+DLLEXPORT void *trace_get_transport(libtrace_packet_t *packet, 
 		uint8_t *proto,
 		uint32_t *remaining
 		) 
@@ -362,7 +362,7 @@ void *trace_get_transport(libtrace_packet_t *packet,
 
 }
 
-libtrace_tcp_t *trace_get_tcp(libtrace_packet_t *packet) {
+DLLEXPORT libtrace_tcp_t *trace_get_tcp(libtrace_packet_t *packet) {
 	uint8_t proto;
 	libtrace_tcp_t *tcp;
 
@@ -374,7 +374,7 @@ libtrace_tcp_t *trace_get_tcp(libtrace_packet_t *packet) {
 	return (libtrace_tcp_t*)tcp;
 }
 
-libtrace_tcp_t *trace_get_tcp_from_ip(libtrace_ip_t *ip, uint32_t *remaining)
+DLLEXPORT libtrace_tcp_t *trace_get_tcp_from_ip(libtrace_ip_t *ip, uint32_t *remaining)
 {
 	struct libtrace_tcp *tcpptr = 0;
 
@@ -386,7 +386,7 @@ libtrace_tcp_t *trace_get_tcp_from_ip(libtrace_ip_t *ip, uint32_t *remaining)
 	return tcpptr;
 }
 
-libtrace_udp_t *trace_get_udp(libtrace_packet_t *packet) {
+DLLEXPORT libtrace_udp_t *trace_get_udp(libtrace_packet_t *packet) {
 	uint8_t proto;
 	libtrace_udp_t *udp;
 
@@ -398,7 +398,7 @@ libtrace_udp_t *trace_get_udp(libtrace_packet_t *packet) {
 	return udp;
 }
 
-libtrace_udp_t *trace_get_udp_from_ip(libtrace_ip_t *ip, uint32_t *remaining)
+DLLEXPORT libtrace_udp_t *trace_get_udp_from_ip(libtrace_ip_t *ip, uint32_t *remaining)
 {
 	struct libtrace_udp *udpptr = 0;
 
@@ -410,7 +410,7 @@ libtrace_udp_t *trace_get_udp_from_ip(libtrace_ip_t *ip, uint32_t *remaining)
 	return udpptr;
 }
 
-libtrace_icmp_t *trace_get_icmp(libtrace_packet_t *packet) {
+DLLEXPORT libtrace_icmp_t *trace_get_icmp(libtrace_packet_t *packet) {
 	uint8_t proto;
 	libtrace_icmp_t *icmp;
 
@@ -422,7 +422,7 @@ libtrace_icmp_t *trace_get_icmp(libtrace_packet_t *packet) {
 	return icmp;
 }
 
-libtrace_icmp_t *trace_get_icmp_from_ip(libtrace_ip_t *ip, uint32_t *remaining)
+DLLEXPORT libtrace_icmp_t *trace_get_icmp_from_ip(libtrace_ip_t *ip, uint32_t *remaining)
 {
 	libtrace_icmp_t *icmpptr = 0;
 
@@ -434,7 +434,7 @@ libtrace_icmp_t *trace_get_icmp_from_ip(libtrace_ip_t *ip, uint32_t *remaining)
 	return icmpptr;
 }
 
-void *trace_get_payload_from_udp(libtrace_udp_t *udp, uint32_t *remaining)
+DLLEXPORT void *trace_get_payload_from_udp(libtrace_udp_t *udp, uint32_t *remaining)
 {
 	if (remaining) {
 		if (*remaining < sizeof(libtrace_udp_t))
@@ -444,7 +444,7 @@ void *trace_get_payload_from_udp(libtrace_udp_t *udp, uint32_t *remaining)
 	return (void*)((char*)udp+sizeof(libtrace_udp_t));
 }
 
-void *trace_get_payload_from_tcp(libtrace_tcp_t *tcp, uint32_t *remaining)
+DLLEXPORT void *trace_get_payload_from_tcp(libtrace_tcp_t *tcp, uint32_t *remaining)
 {
 	unsigned int dlen = tcp->doff*4;
 	if (remaining) {
@@ -455,7 +455,7 @@ void *trace_get_payload_from_tcp(libtrace_tcp_t *tcp, uint32_t *remaining)
 	return tcp+dlen;
 }
 
-void *trace_get_payload_from_icmp(libtrace_icmp_t *icmp, uint32_t *remaining)
+DLLEXPORT void *trace_get_payload_from_icmp(libtrace_icmp_t *icmp, uint32_t *remaining)
 {
 	if (remaining) {
 		if (*remaining < sizeof(libtrace_icmp_t))
@@ -472,7 +472,7 @@ struct ports_t {
 
 /* Return the client port
  */
-uint16_t trace_get_source_port(const libtrace_packet_t *packet)
+DLLEXPORT uint16_t trace_get_source_port(const libtrace_packet_t *packet)
 {
 	struct ports_t *port = 
 		(struct ports_t*)trace_get_transport((libtrace_packet_t*)packet,
@@ -485,7 +485,7 @@ uint16_t trace_get_source_port(const libtrace_packet_t *packet)
 }
 
 /* Same as get_source_port except use the destination port */
-uint16_t trace_get_destination_port(const libtrace_packet_t *packet)
+DLLEXPORT uint16_t trace_get_destination_port(const libtrace_packet_t *packet)
 {
 	struct ports_t *port = 
 		(struct ports_t*)trace_get_transport((libtrace_packet_t*)packet,
@@ -529,7 +529,7 @@ uint8_t *trace_get_source_mac(libtrace_packet_t *packet) {
 	return NULL;
 }
 
-uint8_t *trace_get_destination_mac(libtrace_packet_t *packet) {
+DLLEXPORT uint8_t *trace_get_destination_mac(libtrace_packet_t *packet) {
 	void *link = trace_get_link(packet);
 	libtrace_80211_t *wifi;
         libtrace_ether_t *ethptr = (libtrace_ether_t*)link;
@@ -561,7 +561,7 @@ uint8_t *trace_get_destination_mac(libtrace_packet_t *packet) {
 	return NULL;
 }
 
-struct sockaddr *trace_get_source_address(const libtrace_packet_t *packet, 
+DLLEXPORT struct sockaddr *trace_get_source_address(const libtrace_packet_t *packet, 
 		struct sockaddr *addr)
 {
 	uint16_t proto;
@@ -615,7 +615,7 @@ struct sockaddr *trace_get_source_address(const libtrace_packet_t *packet,
 	}
 }
 
-struct sockaddr *trace_get_destination_address(const libtrace_packet_t *packet, 
+DLLEXPORT struct sockaddr *trace_get_destination_address(const libtrace_packet_t *packet, 
 		struct sockaddr *addr)
 {
 	uint16_t proto;
@@ -687,7 +687,7 @@ struct sockaddr *trace_get_destination_address(const libtrace_packet_t *packet,
  * @note Beware of fragmented packets.
  * @author Perry Lorier
  */
-int trace_get_next_option(unsigned char **ptr,int *len,
+DLLEXPORT int trace_get_next_option(unsigned char **ptr,int *len,
 			unsigned char *type,
 			unsigned char *optlen,
 			unsigned char **data)

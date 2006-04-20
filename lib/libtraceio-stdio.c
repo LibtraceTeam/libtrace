@@ -1,3 +1,5 @@
+#include "libtrace.h"
+#include "libtrace_int.h"
 #include "libtraceio.h"
 #include <sys/types.h> /* for ssize_t/off_t */
 #include <stdio.h>

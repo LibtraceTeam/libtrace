@@ -81,6 +81,21 @@ extern "C" {
 #  include <zlib.h>
 #endif
 
+#ifndef HAVE_STRNCASECMP
+# ifndef HAVE__STRNICMP
+int strncasecmp(const char *str1, const char *str2, size_t n);
+# else
+# define strncasecmp _strnicmp
+# endif
+#endif
+
+#ifndef HAVE_SNPRINTF
+# ifndef HAVE_SPRINTF_S
+int snprintf(char *str, size_t size, const char *format, ...);
+# else
+# define snprintf sprintf_s
+# endif 
+#endif
 
 #include "wag.h"
 #include "daglegacy.h"

@@ -67,7 +67,7 @@ int main(int argc, char *argv[])
 	packet=calloc((argc-optind),sizeof(struct libtrace_packet_t *));
 	live=calloc((argc-optind),sizeof(bool));
 	for(i=0;i<argc-optind;++i) {
-		struct libtrace_t *f;
+		libtrace_t *f;
 		libtrace_packet_t *p;
 		f=trace_create(argv[i+optind]);
 		if (trace_is_err(f)) {
