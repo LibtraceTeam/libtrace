@@ -4,55 +4,74 @@
 #include <lt_inttypes.h>
 #include <stdlib.h>
 #include "contain.h"
+#include <assert.h>
+
+/* a -> b */
+#define implies(a,b) (!(a) || (b))
+
+void assert_tree(splay *tree, splay_cmp_t cmp)
+{
+#ifndef NDEBUG
+	if (!tree)
+		return;
+
+	assert(implies(tree->left,cmp(tree->left,tree)<0));
+	assert(implies(tree->right,cmp(tree,tree->right)<0));
+	assert(implies(tree->left && tree->right,
+				cmp(tree->left,tree->right)<0));
+
+	assert_tree(tree->left,cmp);
+	assert_tree(tree->right,cmp);
+#endif
+}
+
+#undef implies
 
 splay *splay_search_tree(splay *tree, splay_cmp_t cmp, splay *node) {
-	splay N, *l, *r, *y;
 
 	if (tree == NULL) {
 		return NULL;
 	}
 
-	N.left = N.right = 0;
-	l = r = &N;
+	assert_tree(tree,cmp);
 
 	for (;;) {
 		int cmpres = cmp(node,tree);
+
 		if (cmpres<0) {
+			splay *y;
 			if (tree->left == NULL)
 				break;
-			if (cmp(node,tree->left)<0) {
-				y = tree->left;
-				tree->left = y->right;
-				y->right = tree;
-				tree = y;
-				if (tree->left == NULL)
-					break;
+			/* Rotate Right */
+			y = tree->left;
+			tree->left=y->right;
+			y->right=tree;
+			tree=y;
+			/* Not found? */
+			if (cmp(node,tree)>0) {
+				break;
 			}
-			r->left = tree;
-			r = tree;
-			tree = tree->left;
 		} else if (cmpres>0) {
+			splay *y;
 			if (tree->right == NULL)
 				break;
-			if (cmp(node,tree->right)>0) {
-				y = tree->right;
-				tree->right = y->left;
-				y->left = tree;
-				tree = y;
-				if (tree->right == NULL)
-					break;
+			/* Rotate Left */
+			y = tree->right;
+			tree->right=y->left;
+			y->left=tree;
+			tree=y;
+			/* Not found? */
+			if (cmp(node,tree)<0) {
+				break;
 			}
-			l->right = tree;
-			l = tree;
-			tree = tree->right;
 		} else {
+			/* Found it */
 			break;
 		}
 	}
-	l->right = tree->left;
-	r->left = tree->right;
-	tree->left = N.right;
-	tree->right = N.left;
+
+	assert_tree(tree,cmp);
+
 	return tree;
 }
 
@@ -88,25 +107,23 @@ void splay_purge(splay *tree) {
 	free(tree);
 }
 	
-
-
 splay *splay_insert(splay *tree, splay_cmp_t cmp, splay *node) 
 {
+	int cmpres;
+	assert_tree(tree,cmp);
 	if (tree == NULL) {
 		tree = node;
 		node->left = NULL;
 		node->right = NULL;
+		assert_tree(tree,cmp);
 		return tree;
 	}
-	tree=splay_search_tree(tree,cmp,node);
-	if (cmp(node,tree)<0) {
-		node->left = tree->left;
-		node->right = tree;
-		tree->left = NULL;
-	} else if (cmp(node,tree)>0) {
-		node->right = tree->right;
-		node->left = tree;
-		tree->right = NULL;
+	assert_tree(tree,cmp);
+	cmpres=cmp(node,tree);
+	if (cmpres<0) {
+		tree=splay_insert(tree->left,cmp,node);
+	} else if (cmpres>0) {
+		tree=splay_insert(tree->right,cmp,node);
 	} else {
 		/* Replace the root node with the current node */
 		node->left = tree->left;
@@ -115,6 +132,7 @@ splay *splay_insert(splay *tree, splay_cmp_t cmp, splay *node)
 		tree=node;
 	}
 
+	assert_tree(tree,cmp);
 	return tree;
 }
 
@@ -138,17 +156,9 @@ struct foo_t {
 };
 
 
-void visitor_pre(const struct foo_t *a)
-{
-	printf("{\n");
-}
 void visitor_inorder(const struct foo_t *a)
 {
 	printf("%s: %s\n",a->key,a->value);
-}
-void visitor_post(const struct foo_t *a)
-{
-	printf("}\n");
 }
 
 int cmp(const struct foo_t *a,const struct foo_t *b)
