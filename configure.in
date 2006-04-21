@@ -53,6 +53,10 @@ dnl AC_CHECK_HEADERS(errno.h stdlib.h stdio.h assert.h string.h netinet/in.h ass
 AC_CHECK_HEADERS(pcap.h pcap-int.h pcap-bpf.h net/bpf.h zlib.h sys/limits.h stddef.h inttypes.h limits.h net/ethernet.h )
 
 AC_CHECK_HEADERS(netinet/in.h)
+AC_CHECK_HEADER(netpacket/packet.h,
+		libtrace_netpacket_packet_h=true
+		AC_DEFINE(HAVE_NETPACKET_PACKET_H,1,[We have netpacket/packet.h]),
+		[libtrace_netpacket_packet_h=false])
 
 AC_CHECK_HEADER(net/if.h,
 		AC_DEFINE(HAVE_NET_IF_H,1,[We have net/if.h]), [],
@@ -349,6 +353,7 @@ AM_CONDITIONAL([HAVE_DAG], [test "$libtrace_dag" = true])
 AM_CONDITIONAL([DAG2_4], [test "$libtrace_dag2_4" = true])
 AM_CONDITIONAL([HAVE_CXX], [test "$libtrace_cxx" = true])
 AM_CONDITIONAL([HAVE_ZLIB], [test "$libtrace_zlib" = true])
+AM_CONDITIONAL([HAVE_NETPACKET_PACKET_H], [test "$libtrace_netpacket_packet_h" = true])
 AM_CONDITIONAL([LIBPACKETDUMP], [test "$libtrace_libpacketdump" = true])
 AM_CONDITIONAL([LIBTRACE_TOOLS], [test "$libtrace_tools" = true])
 AM_CONDITIONAL([LIBGDC], [test "$libtrace_gdc" = true])

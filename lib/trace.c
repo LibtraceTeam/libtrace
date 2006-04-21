@@ -211,7 +211,9 @@ void trace_init(void)
 	if (!formats_list) {
 		erf_constructor();
 		legacy_constructor();
+#ifdef HAVE_NETPACKET_PACKET_H
 		linuxnative_constructor();
+#endif
 #ifdef HAVE_PCAP
 		pcap_constructor();
 #endif
