@@ -257,6 +257,8 @@ DLLEXPORT struct libtrace_t *trace_create(const char *uri) {
         char *scan = 0;
         const char *uridata = 0;                  
 	struct libtrace_format_t *tmp;
+
+	assert(uri && "Passing NULL to trace_create makes me a very sad program");
 	
 	libtrace->err.err_num = TRACE_ERR_NOERROR;
 	libtrace->format=NULL;
