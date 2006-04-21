@@ -226,6 +226,6 @@ static struct libtrace_format_t linuxnative = {
 	NULL
 };
 
-void __attribute__((constructor)) linuxnative_constructor() {
+void CONSTRUCTOR linuxnative_constructor() {
 	register_format(&linuxnative);
 }

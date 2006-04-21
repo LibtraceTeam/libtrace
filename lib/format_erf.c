@@ -538,7 +538,6 @@ static int erf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 		return -1;
 	}
 	if (numbytes == 0) {
-		printf("eof\n");
 		return 0;
 	}
 

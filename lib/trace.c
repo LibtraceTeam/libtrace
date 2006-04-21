@@ -197,6 +197,30 @@ void register_format(struct libtrace_format_t *f) {
 #endif
 }
 
+void erf_constructor();
+void legacy_constructor();
+void linuxnative_constructor();
+void pcap_constructor();
+void pcapfile_constructor();
+void rt_constructor();
+void wag_constructor();
+
+/* call all the constructors if they haven't yet all been called */
+void trace_init(void)
+{
+	if (!formats_list) {
+		erf_constructor();
+		legacy_constructor();
+		linuxnative_constructor();
+#ifdef HAVE_PCAP
+		pcap_constructor();
+#endif
+		pcapfile_constructor();
+		rt_constructor();
+		wag_constructor();
+	}
+}
+
 /* Prints help information for libtrace 
  *
  * Function prints out some basic help information regarding libtrace,
@@ -204,6 +228,7 @@ void register_format(struct libtrace_format_t *f) {
  */
 DLLEXPORT void trace_help() {
 	struct libtrace_format_t *tmp;
+	trace_init();
 	printf("libtrace %s\n",PACKAGE_VERSION);
 	for(tmp=formats_list;tmp;tmp=tmp->next) {
 		if (tmp->help)
@@ -226,6 +251,7 @@ char *trace_get_output_format(const struct libtrace_out_t *libtrace) {
 
 	return format;
 }
+
 
 /* Create a trace file from a URI
  *
@@ -257,6 +283,8 @@ DLLEXPORT struct libtrace_t *trace_create(const char *uri) {
         char *scan = 0;
         const char *uridata = 0;                  
 	struct libtrace_format_t *tmp;
+
+	trace_init();
 
 	assert(uri && "Passing NULL to trace_create makes me a very sad program");
 	
@@ -383,6 +411,8 @@ DLLEXPORT libtrace_out_t *trace_create_output(const char *uri) {
 	char *scan = 0;
         const char *uridata = 0;
 	struct libtrace_format_t *tmp;
+
+	trace_init();
 
 	libtrace->err.err_num = TRACE_ERR_NOERROR;
 	strcat(libtrace->err.problem,"Error message set\n");
