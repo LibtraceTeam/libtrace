@@ -76,6 +76,8 @@ char *lookup_uri(const char *type)
 		return "wtf:traces/wed.wtf";
 	if (!strcmp(type,"rtclient"))
 		return "rtclient:chasm";
+	if (!strcmp(type,"pcapfile"))
+		return "pcapfile:traces/100_packets.pcap";
 	return "unknown";
 }
 
