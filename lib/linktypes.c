@@ -14,24 +14,17 @@
  * get_{source,destination}_mac (if your linklayer has mac's)
  */
 
-libtrace_linktype_t pcap_dlt_to_libtrace(int dlt)
+libtrace_linktype_t pcap_dlt_to_libtrace(libtrace_dlt_t dlt)
 {
 	switch(dlt) {
-#if HAVE_PCAP
-		case DLT_NULL: return TRACE_TYPE_NONE;
-		case DLT_EN10MB: return TRACE_TYPE_ETH;
-		case DLT_ATM_RFC1483: return TRACE_TYPE_ATM;
-		case DLT_IEEE802_11: return TRACE_TYPE_80211;
-#ifdef DLT_LINUX_SLL
-		case DLT_LINUX_SLL: return TRACE_TYPE_LINUX_SLL;
-#endif
-#ifdef DLT_PFLOG
-		case DLT_PFLOG: return TRACE_TYPE_PFLOG;
-#endif
-#else
+		case TRACE_DLT_NULL: return TRACE_TYPE_NONE;
+		case TRACE_DLT_EN10MB: return TRACE_TYPE_ETH;
+		case TRACE_DLT_ATM_RFC1483: return TRACE_TYPE_ATM;
+		case TRACE_DLT_IEEE802_11: return TRACE_TYPE_80211;
+		case TRACE_DLT_LINUX_SLL: return TRACE_TYPE_LINUX_SLL;
+		case TRACE_DLT_PFLOG: return TRACE_TYPE_PFLOG;
 		default:
 				assert(!"No pcap support");
-#endif
 	}
 	return -1;
 }
@@ -39,18 +32,12 @@ libtrace_linktype_t pcap_dlt_to_libtrace(int dlt)
 int libtrace_to_pcap_dlt(libtrace_linktype_t type)
 {
 	switch(type) {
-#ifdef HAVE_PCAP
-		case TRACE_TYPE_NONE: return DLT_NULL;
-		case TRACE_TYPE_ETH: return DLT_EN10MB;
-		case TRACE_TYPE_ATM: return DLT_ATM_RFC1483;
-		case TRACE_TYPE_80211: return DLT_IEEE802_11;
-#ifdef DLT_LINUX_SLL
-		case TRACE_TYPE_LINUX_SLL: return DLT_LINUX_SLL;
-#endif
-#ifdef DLT_PFLOG
-		case TRACE_TYPE_PFLOG: return DLT_PFLOG;
-#endif
-#endif
+		case TRACE_TYPE_NONE: return TRACE_DLT_NULL;
+		case TRACE_TYPE_ETH: return TRACE_DLT_EN10MB;
+		case TRACE_TYPE_ATM: return TRACE_DLT_ATM_RFC1483;
+		case TRACE_TYPE_80211: return TRACE_DLT_IEEE802_11;
+		case TRACE_TYPE_LINUX_SLL: return TRACE_DLT_LINUX_SLL;
+		case TRACE_TYPE_PFLOG: return TRACE_DLT_PFLOG;
 	}
 	return -1;
 }

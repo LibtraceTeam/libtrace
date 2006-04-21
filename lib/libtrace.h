@@ -180,6 +180,16 @@ enum {
 	TRACE_ERR_RECV_FAILED	= -11
 };
 
+typedef enum {
+	TRACE_DLT_NULL = 0,
+	TRACE_DLT_EN10MB = 1,
+	TRACE_DLT_ATM_RFC1483 = 11,
+	TRACE_DLT_IEEE802_11 = 105,
+	TRACE_DLT_LINUX_SLL = 113,
+	TRACE_DLT_PFLOG = 117
+} libtrace_dlt_t ;
+
+
 /** @name Protocol structures
  * These convenience structures are here as they are portable ways of dealing
  * with various protocols.

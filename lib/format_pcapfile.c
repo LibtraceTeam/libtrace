@@ -287,7 +287,7 @@ static int pcapfile_get_capture_length(const libtrace_packet_t *packet) {
 static int pcapfile_get_wire_length(const libtrace_packet_t *packet) {
 	struct pcapfile_pkt_hdr_t *pcapptr 
 		= (struct pcapfile_pkt_hdr_t *)packet->header;
-	if (packet->type==pcap_dlt_to_rt(DLT_EN10MB))
+	if (packet->type==pcap_dlt_to_rt(TRACE_DLT_EN10MB))
 		/* Include the missing FCS */
 		return swapl(packet->trace,pcapptr->wirelen)+4; 
 	else

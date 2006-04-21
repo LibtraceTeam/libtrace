@@ -1231,6 +1231,8 @@ DLLEXPORT void trace_perror(libtrace_t *trace,const char *msg,...)
 		fprintf(stderr,"%s(%s): No error\n",
 				buf,trace->uridata);
 	}
+	trace->err.err_num = 0; /* "OK" */
+	trace->err.problem[0]='\0';
 }
 
 DLLEXPORT libtrace_err_t trace_get_err_output(libtrace_out_t *trace)
