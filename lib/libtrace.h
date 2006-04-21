@@ -1040,8 +1040,7 @@ DLLEXPORT size_t trace_set_capture_length(libtrace_packet_t *packet, size_t size
  * This enumates the various different link types that libtrace understands
  */
 typedef enum { 
-       TRACE_TYPE_LEGACY, 	
-       TRACE_TYPE_HDLC_POS, 
+       TRACE_TYPE_HDLC_POS = 1, 
        TRACE_TYPE_ETH,			/**< 802.3 style Ethernet */
        TRACE_TYPE_ATM,
        TRACE_TYPE_AAL5,
@@ -1049,10 +1048,8 @@ typedef enum {
        TRACE_TYPE_NONE,
        TRACE_TYPE_LINUX_SLL,		/**< Linux "null" framing */
        TRACE_TYPE_PFLOG,		/**< FreeBSD's PFlug */
-       TRACE_TYPE_LEGACY_POS,
-       TRACE_TYPE_LEGACY_ATM,
-       TRACE_TYPE_LEGACY_ETH,
-       TRACE_TYPE_80211_PRISM
+       TRACE_TYPE_POS,
+       TRACE_TYPE_80211_PRISM = 12
      } libtrace_linktype_t;
 
 /** Get the type of the link layer

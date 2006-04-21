@@ -122,7 +122,7 @@ static void *trace_get_payload_from_atm(void *link,
 	return (void*)((char*)llc+sizeof(*llc));
 }
 
-static void *trace_get_payload_from_legacy_pos(void *link, 
+static void *trace_get_payload_from_pos(void *link, 
 		uint16_t *type, uint32_t *remaining)
 {
 	/* 64 byte capture. */
@@ -170,7 +170,6 @@ void *trace_get_payload_from_link(void *link, libtrace_linktype_t linktype,
 		case TRACE_TYPE_80211:
 			return trace_get_payload_from_80211(link,type,remaining);
 		case TRACE_TYPE_ETH:
-		case TRACE_TYPE_LEGACY_ETH:
 			return trace_get_payload_from_ethernet(link,type,remaining);
 		case TRACE_TYPE_NONE:
 			return link; /* I love the simplicity */
@@ -178,9 +177,8 @@ void *trace_get_payload_from_link(void *link, libtrace_linktype_t linktype,
 			return trace_get_payload_from_linux_sll(link,type,remaining);
 		case TRACE_TYPE_PFLOG:
 			return trace_get_payload_from_pflog(link,type,remaining);
-		case TRACE_TYPE_LEGACY_POS:
-			return trace_get_payload_from_legacy_pos(link,type,remaining);
-		case TRACE_TYPE_LEGACY_ATM:
+		case TRACE_TYPE_POS:
+			return trace_get_payload_from_pos(link,type,remaining);
 		case TRACE_TYPE_ATM:
 			return trace_get_payload_from_atm(link,type,remaining);
 	}
@@ -511,17 +509,14 @@ uint8_t *trace_get_source_mac(libtrace_packet_t *packet) {
 		case TRACE_TYPE_80211_PRISM:
 			wifi=(libtrace_80211_t*)((char*)link+144);
 			return (uint8_t*)&wifi->mac2;
-		case TRACE_TYPE_LEGACY_ETH:
 		case TRACE_TYPE_ETH:
 			return (uint8_t*)&ethptr->ether_shost;
-		case TRACE_TYPE_LEGACY:
-		case TRACE_TYPE_LEGACY_POS:
+		case TRACE_TYPE_POS:
 		case TRACE_TYPE_NONE:
-		case TRACE_TYPE_ATM:
 		case TRACE_TYPE_HDLC_POS:
 		case TRACE_TYPE_LINUX_SLL:
 		case TRACE_TYPE_PFLOG:
-		case TRACE_TYPE_LEGACY_ATM:
+		case TRACE_TYPE_ATM:
 			return NULL;
 	}
 	fprintf(stderr,"Not implemented\n");
@@ -543,11 +538,8 @@ DLLEXPORT uint8_t *trace_get_destination_mac(libtrace_packet_t *packet) {
 			wifi=(libtrace_80211_t*)((char*)link+144);
 			return (uint8_t*)&wifi->mac1;
 		case TRACE_TYPE_ETH:
-		case TRACE_TYPE_LEGACY_ETH:
 			return (uint8_t*)&ethptr->ether_dhost;
-		case TRACE_TYPE_LEGACY_ATM:
-		case TRACE_TYPE_LEGACY:
-		case TRACE_TYPE_LEGACY_POS:
+		case TRACE_TYPE_POS:
 		case TRACE_TYPE_NONE:
 		case TRACE_TYPE_ATM:
 		case TRACE_TYPE_HDLC_POS:

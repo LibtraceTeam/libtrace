@@ -70,7 +70,6 @@ int rt_to_pcap_dlt(enum rt_field_t rt_type)
 libtrace_linktype_t erf_type_to_libtrace(char erf)
 {
 	switch (erf) {
-		case TYPE_LEGACY:	return TRACE_TYPE_LEGACY;
 		case TYPE_HDLC_POS:	return TRACE_TYPE_HDLC_POS;
 		case TYPE_ETH:		return TRACE_TYPE_ETH;
 		case TYPE_ATM:		return TRACE_TYPE_ATM;
@@ -82,7 +81,6 @@ libtrace_linktype_t erf_type_to_libtrace(char erf)
 char libtrace_to_erf_type(libtrace_linktype_t linktype)
 {
 	switch(linktype) {
-		case TRACE_TYPE_LEGACY:	return TYPE_LEGACY;
 		case TRACE_TYPE_HDLC_POS: return TYPE_HDLC_POS;
 		case TRACE_TYPE_ETH:	return TYPE_ETH;
 		case TRACE_TYPE_ATM:	return TYPE_ATM;

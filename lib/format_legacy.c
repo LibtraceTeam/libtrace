@@ -152,15 +152,15 @@ static int legacy_read_packet(struct libtrace_t *libtrace, struct libtrace_packe
 }
 
 static libtrace_linktype_t legacypos_get_link_type(const struct libtrace_packet_t *packet UNUSED) {
-	return TRACE_TYPE_LEGACY_POS;
+	return TRACE_TYPE_POS;
 }
 
 static libtrace_linktype_t legacyatm_get_link_type(const struct libtrace_packet_t *packet UNUSED) {
-	return TRACE_TYPE_LEGACY_ATM;
+	return TRACE_TYPE_ATM;
 }
 
 static libtrace_linktype_t legacyeth_get_link_type(const struct libtrace_packet_t *packet UNUSED) {
-	return TRACE_TYPE_LEGACY_ETH;
+	return TRACE_TYPE_ETH;
 }
 
 static int legacy_get_capture_length(const struct libtrace_packet_t *packet UNUSED) {
