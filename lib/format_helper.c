@@ -175,7 +175,7 @@ libtrace_io_t *trace_open_file(libtrace_t *trace)
 		trace_set_err(trace,errno,"Unable to open %s",trace->uridata);
 		return 0;
 	}
-	ret=libtrace_io_fdopen(fd,"r");
+	ret=libtrace_io_fdopen(fd,"rb");
 	return ret;
 }
 
@@ -192,7 +192,7 @@ libtrace_io_t *trace_open_file_out(libtrace_out_t *trace,int level, int fileflag
 #if HAVE_ZLIB
 	sprintf(filemode,"wb%d",level);
 #else
-	sprintf(filemode,"w");
+	sprintf(filemode,"wb");
 #endif
 
 	if (strcmp(trace->uridata,"-")==0) {
