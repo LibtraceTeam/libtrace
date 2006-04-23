@@ -43,6 +43,10 @@
 #include <string.h>
 #include <stdlib.h>
 
+#if HAVE_DAG
+#include <sys/mman.h>
+#endif
+
 #ifdef WIN32
 #  include <io.h>
 #  include <share.h>
