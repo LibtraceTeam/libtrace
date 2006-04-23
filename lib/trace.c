@@ -123,43 +123,52 @@ void register_format(struct libtrace_format_t *f) {
 	assert(f->next==NULL);
 	f->next=formats_list;
 	formats_list=f;
-	/* Now, verify things */
+	/* Now, verify things 
+	 * This #if can be changed to a 1 to output warnings about inconsistant
+	 * functions being provided by format modules.  This generally is very
+	 * noisy, as almost all modules don't implement one or more functions
+	 * for various reasons.  This is very useful when checking a new 
+	 * format module is sane.
+	 */ 
 #if 0
-	if (format_list[nformats]->init_input) {
+	if (f->init_input) {
 #define REQUIRE(x) \
-		if (!format_list[nformats]->x) \
-			fprintf(stderr,"%s: Input format should provide " #x "\n",format_list[nformats]->name)
+		if (!f->x) \
+			fprintf(stderr,"%s: Input format should provide " #x "\n",f->name)
 		REQUIRE(read_packet);
 		REQUIRE(start_input);
-		REQUIRE(config_input);
-		REQUIRE(pause_input);
 		REQUIRE(fin_input);
 		REQUIRE(get_link_type);
 		REQUIRE(get_capture_length);
 		REQUIRE(get_wire_length);
 		REQUIRE(get_framing_length);
 		REQUIRE(trace_event);
-		if (!format_list[nformats]->get_erf_timestamp 
-			&& !format_list[nformats]->get_seconds
-			&& !format_list[nformats]->get_timeval) {
+		if (!f->get_erf_timestamp 
+			&& !f->get_seconds
+			&& !f->get_timeval) {
 			fprintf(stderr,"%s: A trace format capable of input, should provide at least one of\n"
-"get_erf_timestamp, get_seconds or trace_timeval\n",format_list[nformats]->name);
+"get_erf_timestamp, get_seconds or trace_timeval\n",f->name);
 		}
-		if (format_list[nformats]->trace_event==trace_event_device) {
+		if (f->trace_event!=trace_event_trace) {
+			/* Theres nothing that a trace file could optimise with
+			 * config_input
+			 */
+			REQUIRE(pause_input);
+			REQUIRE(config_input);
 			REQUIRE(get_fd);
 		}
 		else {
-			if (format_list[nformats]->get_fd) {
+			if (f->get_fd) {
 				fprintf(stderr,"%s: Unnecessary get_fd\n",
-						format_list[nformats]->name);
+						f->name);
 			}
 		}
 #undef REQUIRE
 	}
 	else {
 #define REQUIRE(x) \
-		if (format_list[nformats]->x) \
-			fprintf(stderr,"%s: Non Input format shouldn't need " #x "\n",format_list[nformats]->name)
+		if (f->x) \
+			fprintf(stderr,"%s: Non Input format shouldn't need " #x "\n",f->name)
 		REQUIRE(read_packet);
 		REQUIRE(start_input);
 		REQUIRE(pause_input);
@@ -174,10 +183,10 @@ void register_format(struct libtrace_format_t *f) {
 		REQUIRE(get_erf_timestamp);
 #undef REQUIRE
 	}
-	if (format_list[nformats]->init_output) {
+	if (f->init_output) {
 #define REQUIRE(x) \
-		if (!format_list[nformats]->x) \
-			fprintf(stderr,"%s: Output format should provide " #x "\n",format_list[nformats]->name)
+		if (!f->x) \
+			fprintf(stderr,"%s: Output format should provide " #x "\n",f->name)
 		REQUIRE(write_packet);
 		REQUIRE(start_output);
 		REQUIRE(config_output);
@@ -186,8 +195,8 @@ void register_format(struct libtrace_format_t *f) {
 	}
 	else {
 #define REQUIRE(x) \
-		if (format_list[nformats]->x) \
-			fprintf(stderr,"%s: Non Output format shouldn't need " #x "\n",format_list[nformats]->name)
+		if (f->x) \
+			fprintf(stderr,"%s: Non Output format shouldn't need " #x "\n",f->name)
 		REQUIRE(write_packet);
 		REQUIRE(start_output);
 		REQUIRE(config_output);
@@ -1349,7 +1358,7 @@ DLLEXPORT int trace_seek_timeval(libtrace_t *trace, struct timeval tv)
 DLLEXPORT char *trace_ether_ntoa(const uint8_t *addr, char *buf)
 {
 	char *buf2 = buf;
-	static char staticbuf[18]={0,};
+	char staticbuf[18]={0,};
 	if (!buf2)
 		buf2=staticbuf;
 	snprintf(buf2,18,"%02x:%02x:%02x:%02x:%02x:%02x",

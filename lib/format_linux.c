@@ -53,20 +53,33 @@ static struct libtrace_format_t linuxnative;
 
 struct libtrace_format_data_t {
 	int fd;
+	int snaplen;
+	int promisc;
 };
 
 struct libtrace_linuxnative_header {
 	struct timeval ts;
 	int wirelen;
+	int caplen;
 	struct sockaddr_ll hdr;
 };
 
 #define FORMAT(x) ((struct libtrace_format_data_t*)(x))
 
-static int linuxnative_init_input(struct libtrace_t *libtrace) {
-	struct sockaddr_ll addr;
+static int linuxnative_init_input(libtrace_t *libtrace) 
+{
 	libtrace->format_data = (struct libtrace_format_data_t *)
 		malloc(sizeof(struct libtrace_format_data_t));
+	FORMAT(libtrace->format_data)->fd = -1;
+	FORMAT(libtrace->format_data)->promisc = 0;
+	FORMAT(libtrace->format_data)->snaplen = 65536;
+
+	return 0;
+}
+
+static int linuxnative_start_input(libtrace_t *libtrace)
+{
+	struct sockaddr_ll addr;
 	FORMAT(libtrace->format_data)->fd = 
 				socket(PF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
 	if (FORMAT(libtrace->format_data)->fd==-1) {
@@ -108,15 +121,53 @@ static int linuxnative_init_input(struct libtrace_t *libtrace) {
 	return 0;
 }
 
-static int linuxnative_fin_input(struct libtrace_t *libtrace) {
+static int linuxnative_pause_input(libtrace_t *libtrace)
+{
 	close(FORMAT(libtrace->format_data)->fd);
+	FORMAT(libtrace->format_data)->fd=-1;
+
+	return 0;
+}
+
+static int linuxnative_fin_input(libtrace_t *libtrace) 
+{
 	free(libtrace->format_data);
 	return 0;
 }
 
-static int linuxnative_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
+static int linuxnative_config_input(libtrace_t *libtrace,
+		trace_option_t option,
+		void *data)
+{
+	switch(option) {
+		case TRACE_OPTION_SNAPLEN:
+			FORMAT(libtrace->format_data)->snaplen=*(int*)data;
+			return 0;
+		case TRACE_OPTION_PROMISC:
+			FORMAT(libtrace->format_data)->promisc=*(int*)data;
+			return 0;
+		case TRACE_OPTION_FILTER:
+			/* We don't support bpf filters in any special way
+			 * so return an error and let libtrace deal with
+			 * emulating it
+			 */
+			break;
+		/* Avoid default: so that future options will cause a warning
+		 * here to remind us to implement it, or flag it as
+		 * unimplementable
+		 */
+	}
+	trace_set_err(libtrace,TRACE_ERR_UNKNOWN_OPTION,
+			"Unknown option %i", option);
+	return -1;
+}
+
+#define LIBTRACE_MIN(a,b) ((a)<(b) ? (a) : (b))
+
+static int linuxnative_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	struct libtrace_linuxnative_header *hdr;
 	socklen_t socklen;
+	int snaplen;
 	if (!packet->buffer || packet->buf_control == TRACE_CTRL_EXTERNAL) {
 		packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
 		packet->buf_control = TRACE_CTRL_PACKET;
@@ -128,15 +179,20 @@ static int linuxnative_read_packet(struct libtrace_t *libtrace, struct libtrace_
 
 	hdr=(void*)packet->buffer;
 	socklen=sizeof(hdr->hdr);
+	snaplen=LIBTRACE_MIN(
+			(int)LIBTRACE_PACKET_BUFSIZE-(int)sizeof(*hdr),
+			(int)FORMAT(libtrace->format_data)->snaplen);
 	hdr->wirelen = recvfrom(FORMAT(libtrace->format_data)->fd,
 			(void*)packet->payload,
-			LIBTRACE_PACKET_BUFSIZE-sizeof(*hdr),
+			snaplen,
 			MSG_TRUNC,
 			(void *)&hdr->hdr,
 			&socklen);
 
 	if (hdr->wirelen==-1)
 		return -1;
+
+	hdr->caplen=LIBTRACE_MIN(snaplen,hdr->wirelen);
 
 	if (ioctl(FORMAT(libtrace->format_data)->fd,SIOCGSTAMP,&hdr->ts)==-1)
 		perror("ioctl(SIOCGSTAMP)");
@@ -165,15 +221,23 @@ static int8_t linuxnative_get_direction(const struct libtrace_packet_t *packet) 
 	}
 }
 
-static struct timeval linuxnative_get_timeval(const struct libtrace_packet_t *packet) { 
+static struct timeval linuxnative_get_timeval(const libtrace_packet_t *packet) 
+{
 	return ((struct libtrace_linuxnative_header*)(packet->buffer))->ts;
 }
 
-static int linuxnative_get_wire_length(const struct libtrace_packet_t *packet) {
+static int linuxnative_get_capture_length(const libtrace_packet_t *packet)
+{
+	return ((struct libtrace_linuxnative_header*)(packet->buffer))->caplen;
+}
+
+static int linuxnative_get_wire_length(const libtrace_packet_t *packet) 
+{
 	return ((struct libtrace_linuxnative_header*)(packet->buffer))->wirelen;
 }
 
-static int linuxnative_get_framing_length(const struct libtrace_packet_t *packet) {
+static int linuxnative_get_framing_length(const libtrace_packet_t *packet) 
+{
 	return sizeof(struct libtrace_linuxnative_header);
 }
 
@@ -196,9 +260,9 @@ static struct libtrace_format_t linuxnative = {
 	"$Id: format_linuxnative.c,v 1.13 2005/11/22 23:38:56 dlawson Exp $",
 	TRACE_FORMAT_LINUX_NATIVE,
 	linuxnative_init_input,	 	/* init_input */
-	NULL,				/* config_input */
-	NULL,				/* start_input */
-	NULL,				/* pause_input */
+	linuxnative_config_input,	/* config_input */
+	linuxnative_start_input,	/* start_input */
+	linuxnative_pause_input,	/* pause_input */
 	NULL,				/* init_output */
 	NULL,				/* config_output */
 	NULL,				/* start_ouput */
@@ -216,12 +280,12 @@ static struct libtrace_format_t linuxnative = {
 	NULL,				/* seek_erf */
 	NULL,				/* seek_timeval */
 	NULL,				/* seek_seconds */
-	NULL,				/* get_capture_length */
+	linuxnative_get_capture_length,	/* get_capture_length */
 	linuxnative_get_wire_length,	/* get_wire_length */
 	linuxnative_get_framing_length,	/* get_framing_length */
 	NULL,				/* set_capture_length */
 	linuxnative_get_fd,		/* get_fd */
-	trace_event_trace,		/* trace_event */
+	trace_event_device,		/* trace_event */
 	linuxnative_help,		/* help */
 	NULL
 };
