@@ -544,9 +544,9 @@ static int erf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	rlen = ntohs(((dag_record_t *)packet->buffer)->rlen);
 	buffer2 = (char*)packet->buffer + dag_record_size;
 	size = rlen - dag_record_size;
-	assert(size < LIBTRACE_PACKET_BUFSIZE);
 
-	
+	assert(size < LIBTRACE_PACKET_BUFSIZE && size >= dag_record_size);
+
 	/* Unknown/corrupt */
 	assert(((dag_record_t *)packet->buffer)->type < 10);
 	
