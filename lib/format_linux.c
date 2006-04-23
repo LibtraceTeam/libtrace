@@ -64,7 +64,12 @@ struct libtrace_linuxnative_header {
 	struct sockaddr_ll hdr;
 };
 
+struct libtrace_linuxnative_format_data_t {
+	int fd;
+};
+
 #define FORMAT(x) ((struct libtrace_format_data_t*)(x))
+#define DATAOUT(x) ((struct libtrace_linuxnative_format_data_t*)((x)->format_data))
 
 static int linuxnative_init_input(libtrace_t *libtrace) 
 {
@@ -73,6 +78,15 @@ static int linuxnative_init_input(libtrace_t *libtrace)
 	FORMAT(libtrace->format_data)->fd = -1;
 	FORMAT(libtrace->format_data)->promisc = 0;
 	FORMAT(libtrace->format_data)->snaplen = 65536;
+
+	return 0;
+}
+
+static int linuxnative_init_output(libtrace_out_t *libtrace)
+{
+	libtrace->format_data = (struct libtrace_linuxnative_format_data_t*)
+		malloc(sizeof(struct libtrace_linuxnative_format_data_t));
+	DATAOUT(libtrace)->fd = -1;
 
 	return 0;
 }
@@ -121,6 +135,18 @@ static int linuxnative_start_input(libtrace_t *libtrace)
 	return 0;
 }
 
+static int linuxnative_start_output(libtrace_out_t *libtrace)
+{
+	FORMAT(libtrace->format_data)->fd = 
+				socket(PF_PACKET, SOCK_RAW, 0);
+	if (FORMAT(libtrace->format_data)->fd==-1) {
+		free(libtrace->format_data);
+		return -1;
+	}
+
+	return 0;
+}
+
 static int linuxnative_pause_input(libtrace_t *libtrace)
 {
 	close(FORMAT(libtrace->format_data)->fd);
@@ -131,6 +157,14 @@ static int linuxnative_pause_input(libtrace_t *libtrace)
 
 static int linuxnative_fin_input(libtrace_t *libtrace) 
 {
+	free(libtrace->format_data);
+	return 0;
+}
+
+static int linuxnative_fin_output(libtrace_out_t *libtrace)
+{
+	close(DATAOUT(libtrace)->fd);
+	DATAOUT(libtrace)->fd=-1;
 	free(libtrace->format_data);
 	return 0;
 }
@@ -164,7 +198,8 @@ static int linuxnative_config_input(libtrace_t *libtrace,
 
 #define LIBTRACE_MIN(a,b) ((a)<(b) ? (a) : (b))
 
-static int linuxnative_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
+static int linuxnative_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) 
+{
 	struct libtrace_linuxnative_header *hdr;
 	socklen_t socklen;
 	int snaplen;
@@ -198,6 +233,27 @@ static int linuxnative_read_packet(libtrace_t *libtrace, libtrace_packet_t *pack
 		perror("ioctl(SIOCGSTAMP)");
 
 	return hdr->wirelen+sizeof(*hdr);
+}
+
+static int linuxnative_write_packet(libtrace_out_t *trace, 
+		const libtrace_packet_t *packet) 
+{
+	struct sockaddr_ll hdr;
+
+	hdr.sll_family = AF_PACKET;
+	hdr.sll_protocol = 0;
+	hdr.sll_ifindex = if_nametoindex(packet->trace->uridata);
+	hdr.sll_hatype = 0;
+	hdr.sll_pkttype = 0;
+	hdr.sll_halen = 6; /* FIXME */
+	memcpy(hdr.sll_addr,packet->payload,hdr.sll_halen);
+
+	return sendto(DATAOUT(trace)->fd,
+			packet->payload,
+			trace_get_capture_length(packet),
+			0,
+			(struct sockaddr*)&hdr, sizeof(hdr));
+
 }
 
 static libtrace_linktype_t linuxnative_get_link_type(const struct libtrace_packet_t *packet) {
@@ -263,14 +319,14 @@ static struct libtrace_format_t linuxnative = {
 	linuxnative_config_input,	/* config_input */
 	linuxnative_start_input,	/* start_input */
 	linuxnative_pause_input,	/* pause_input */
-	NULL,				/* init_output */
+	linuxnative_init_output,	/* init_output */
 	NULL,				/* config_output */
-	NULL,				/* start_ouput */
+	linuxnative_start_output,	/* start_ouput */
 	linuxnative_fin_input,		/* fin_input */
-	NULL,				/* fin_output */
+	linuxnative_fin_output,		/* fin_output */
 	linuxnative_read_packet,	/* read_packet */
 	NULL,				/* fin_packet */
-	NULL,				/* write_packet */
+	linuxnative_write_packet,	/* write_packet */
 	linuxnative_get_link_type,	/* get_link_type */
 	linuxnative_get_direction,	/* get_direction */
 	NULL,				/* set_direction */

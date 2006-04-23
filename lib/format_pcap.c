@@ -154,11 +154,31 @@ static int pcap_config_input(libtrace_t *libtrace,
 	assert(0);
 }
 
-static int pcap_init_output(struct libtrace_out_t *libtrace) {
+static int pcap_init_output(libtrace_out_t *libtrace) {
 	libtrace->format_data = malloc(sizeof(struct pcap_format_data_out_t));
 	OUTPUT.trace.pcap = NULL;
 	OUTPUT.trace.dump = NULL;
 	return 0;
+}
+
+static int pcapint_init_output(libtrace_out_t *libtrace) {
+#ifdef HAVE_PCAP_INJECT
+	libtrace->format_data = malloc(sizeof(struct pcap_format_data_out_t));
+	OUTPUT.trace.pcap = NULL;
+	OUTPUT.trace.dump = NULL;
+	return 0;
+#else
+#ifdef HAVE_PCAP_SENDPACKET
+	libtrace->format_data = malloc(sizeof(struct pcap_format_data_out_t));
+	OUTPUT.trace.pcap = NULL;
+	OUTPUT.trace.dump = NULL;
+	return 0;
+#else
+	trace_set_err_out(libtrace,TRACE_ERR_NO_INIT_OUT,
+			"writing not supported by this version of pcap");
+	return -1;
+#endif
+#endif
 }
 
 static int pcapint_init_input(struct libtrace_t *libtrace) {
@@ -236,6 +256,13 @@ static int pcap_fin_output(libtrace_out_t *libtrace)
 	return 0;
 }
 
+static int pcapint_fin_output(libtrace_out_t *libtrace)
+{
+	pcap_close(OUTPUT.trace.pcap);
+	free(libtrace->format_data);
+	return 0;
+}
+
 static void trace_pcap_handler(u_char *user, const struct pcap_pkthdr *pcaphdr, const u_char *pcappkt) {
 	struct libtrace_packet_t *packet = (struct libtrace_packet_t *)user;	
 	/*
@@ -259,6 +286,7 @@ static void trace_pcap_handler(u_char *user, const struct pcap_pkthdr *pcaphdr, 
 	assert(pcaphdr->caplen<=65536);
 }
 
+/* TODO: use pcap_next_ex() if available */
 static int pcap_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
 	int pcapbytes = 0;
 	int linktype;
@@ -314,6 +342,29 @@ static int pcap_write_packet(libtrace_out_t *libtrace, const libtrace_packet_t *
 		pcap_dump((u_char*)OUTPUT.trace.dump, &pcap_pkt_hdr, packet->payload);
 	}
 	return 0;
+}
+
+static int pcapint_write_packet(libtrace_out_t *libtrace, const libtrace_packet_t *packet) {
+	int err;
+
+	if (!OUTPUT.trace.pcap) {
+		OUTPUT.trace.pcap = (pcap_t *)pcap_open_live(
+			libtrace->uridata,65536,0,0,NULL);
+	}
+#if HAVE_PCAP_INJECT
+	err=pcap_inject(OUTPUT.trace.pcap,
+			packet->payload,
+			trace_get_capture_length(packet));
+	if (err!=trace_get_capture_length(packet))
+		err=-1;
+#else 
+#if HAVE_PCAP_SENDPACKET
+	err=pcap_sendpacket(OUTPUT.trace.pcap,
+			packet->payload,
+			trace_get_capture_length(packet));
+#endif
+#endif
+	return err;
 }
 
 static libtrace_linktype_t pcap_get_link_type(const libtrace_packet_t *packet) {
@@ -503,14 +554,14 @@ static struct libtrace_format_t pcapint = {
 	pcapint_config_input,		/* config_input */
 	pcapint_start_input,		/* start_input */
 	pcapint_pause_input,		/* pause_input */
-	NULL,				/* init_output */
+	pcapint_init_output,		/* init_output */
 	NULL,				/* config_output */
 	NULL,				/* start_output */
 	pcap_fin_input,			/* fin_input */
-	NULL,				/* fin_output */
+	pcapint_fin_output,		/* fin_output */
 	pcap_read_packet,		/* read_packet */
 	NULL,				/* fin_packet */
-	NULL,				/* write_packet */
+	pcapint_write_packet,		/* write_packet */
 	pcap_get_link_type,		/* get_link_type */
 	pcap_get_direction,		/* get_direction */
 	NULL,				/* set_direction */

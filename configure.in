@@ -153,6 +153,14 @@ fi
 	if test "$have_pcap_dump_flush" = false; then
 		AC_REPLACE_FUNCS(pcap_dump_flush)
 	fi
+
+	AC_CHECK_LIB(pcap,pcap_inject,
+			AC_DEFINE(HAVE_PCAP_INJECT,1,[pcap has pcap_inject]),
+			have_pcap_inject=false)
+
+	AC_CHECK_LIB(pcap,pcap_sendpacket,
+			AC_DEFINE(HAVE_PCAP_SENDPACKET,1,[pcap has pcap_sendpacket]),
+			have_pcap_sendpacket=false)
 fi
 
 

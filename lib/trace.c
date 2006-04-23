@@ -130,7 +130,7 @@ void register_format(struct libtrace_format_t *f) {
 	 * for various reasons.  This is very useful when checking a new 
 	 * format module is sane.
 	 */ 
-#if 0
+#if 1
 	if (f->init_input) {
 #define REQUIRE(x) \
 		if (!f->x) \
