@@ -1,3 +1,6 @@
+/** @file 
+ * Internal IO compatibility shim 
+ */
 #ifndef LIBTRACEIO_H
 #define LIBTRACEIO_H 1
 #include "config.h"
