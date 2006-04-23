@@ -5,8 +5,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <errno.h> /* for debugging */
-
 struct libtrace_io_t {
 	FILE *file;
 };
@@ -16,20 +14,14 @@ ssize_t libtrace_io_read(libtrace_io_t *io, void *buf, size_t len)
 	int ret=fread(buf,1,len,io->file);
 
 	if (ret==(int)len) {
-		printf("read %i bytes\n",ret);
 		return len;
 	}
 
 	/* EOF or an Error occurred */
 	if (ferror(io->file)) {
-		int err=errno;
-		perror("fread");
-		errno=err;
 		/* errno will be set */
 		return -1;
 	}
-
-	printf("eof\n");
 
 	return 0; /* EOF */
 }
@@ -60,7 +52,16 @@ void libtrace_io_close(libtrace_io_t *io)
 
 ssize_t libtrace_io_write(libtrace_io_t *io, const void *buf, size_t len)
 {
-	return fwrite(buf,len,1,io->file);
+	int ret=fwrite(buf,1,len,io->file);
+	if (ret==len) {
+		return ret;
+	}
+	
+	/* Error occurred? */
+	if (ferror(io->file))
+		return -1; /* errno will already be set */
+
+	return 0; /* eof */
 }
 
 off_t libtrace_io_seek(libtrace_io_t *io, off_t offset, int whence)
