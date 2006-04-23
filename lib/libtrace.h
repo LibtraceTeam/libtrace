@@ -321,11 +321,13 @@ typedef struct libtrace_icmp
 /** LLC/SNAP header */
 typedef struct libtrace_llcsnap
 {
-  uint8_t dsap;
-  uint8_t ssap;
+/* LLC */
+  uint8_t dsap;			/**< Destination Service Access Point */
+  uint8_t ssap;			/**< Source Service Access Point */
   uint8_t control;
-  uint32_t oui:24;
-  uint16_t type;
+/* SNAP */
+  uint32_t oui:24;		/**< Organisationally Unique Identifier (scope)*/
+  uint16_t type;		/**< Protocol within OUI */
 } PACKED libtrace_llcsnap_t;
 
 /** 802.3 frame */
@@ -353,12 +355,12 @@ typedef struct libtrace_8021q
 /** ATM cell */
 typedef struct libtrace_atm_cell
 {
-  unsigned int gfc:4;
-  uint8_t vpi;
-  uint16_t vci;
-  unsigned int pt:3;
-  unsigned int clp:1;
-  unsigned int hec;
+  unsigned int gfc:4;		/**< Generic Flow Control */
+  uint8_t vpi;			/**< Virtual Path Identifier */
+  uint16_t vci;			/**< Virtual Channel Identifier */
+  unsigned int pt:3;		/**< Payload Type */
+  unsigned int clp:1;		/**< Cell Loss Priority */
+  uint8_t hec;			/**< Header Error Control */
 } PACKED libtrace_atm_cell_t;
 
 /** POS header */
