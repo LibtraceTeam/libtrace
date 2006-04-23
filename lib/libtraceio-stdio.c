@@ -3,6 +3,9 @@
 #include "libtraceio.h"
 #include <sys/types.h> /* for ssize_t/off_t */
 #include <stdio.h>
+#include <stdlib.h>
+
+#include <errno.h> /* for debugging */
 
 struct libtrace_io_t {
 	FILE *file;
@@ -10,7 +13,25 @@ struct libtrace_io_t {
 
 ssize_t libtrace_io_read(libtrace_io_t *io, void *buf, size_t len)
 {
-	return fread(buf,len,1,io->file);
+	int ret=fread(buf,1,len,io->file);
+
+	if (ret==(int)len) {
+		printf("read %i bytes\n",ret);
+		return len;
+	}
+
+	/* EOF or an Error occurred */
+	if (ferror(io->file)) {
+		int err=errno;
+		perror("fread");
+		errno=err;
+		/* errno will be set */
+		return -1;
+	}
+
+	printf("eof\n");
+
+	return 0; /* EOF */
 }
 
 libtrace_io_t *libtrace_io_fdopen(int fd, const char *mode)

@@ -297,8 +297,13 @@ static int wtf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 	packet->type = RT_DATA_WAG;
 	buffer2 = buffer = packet->buffer;
 
-	
-	if ((numbytes = libtrace_io_read(INPUT.file, buffer, sizeof(struct frame_t))) == -1) {
+	numbytes = libtrace_io_read(INPUT.file, buffer, sizeof(struct frame_t));
+
+	if (numbytes == 0) {
+		return 0;
+	}
+
+	if (numbytes != sizeof(struct frame_t)) {
 		int err=errno;
 		trace_set_err(libtrace,err,
 				"read(%s,frame_t)",packet->trace->uridata);
@@ -306,13 +311,9 @@ static int wtf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 		return -1;
 	}
 
-	if (numbytes == 0) {
-		return 0;
-	}
-
 	if (htons(((struct frame_t *)buffer)->magic) != 0xdaa1) {
 		trace_set_err(libtrace,
-				TRACE_ERR_BAD_PACKET,"Insufficient magic");
+				TRACE_ERR_BAD_PACKET,"Insufficient magic (%04x)",htons(((struct frame_t *)buffer)->magic));
 		return -1;
 	}
 
