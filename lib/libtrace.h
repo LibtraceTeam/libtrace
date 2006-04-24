@@ -166,18 +166,22 @@ typedef struct trace_err_t{
 
 /** Enumeration of error codes */
 enum {
+	/** No Error has occured.... yet. */
 	TRACE_ERR_NOERROR 	= 0,
+	/** The URI passed to trace_create() is unsupported, or badly formed */
 	TRACE_ERR_BAD_FORMAT 	= -1,
-	TRACE_ERR_NO_INIT	= -2,
-	TRACE_ERR_NO_INIT_OUT	= -3,
-	TRACE_ERR_URI_LONG	= -4,
-	TRACE_ERR_URI_NOCOLON	= -5,
-	TRACE_ERR_INIT_FAILED 	= -6,
-	TRACE_ERR_UNKNOWN_OPTION= -7,
-	TRACE_ERR_NO_CONVERSION = -8,
-	TRACE_ERR_BAD_PACKET	= -9,
-	TRACE_ERR_OPTION_UNAVAIL= -10,
-	TRACE_ERR_RECV_FAILED	= -11
+	/** The trace failed to initialise */
+	TRACE_ERR_INIT_FAILED 	= -2,
+	/** Unknown config option */
+	TRACE_ERR_UNKNOWN_OPTION= -3,
+	/** Option known, but unsupported by this format */
+	TRACE_ERR_OPTION_UNAVAIL= -6,
+	/** This output uri cannot write packets of this type */
+	TRACE_ERR_NO_CONVERSION = -4,
+	/** This packet is corrupt, or unusable for the action required */ 
+	TRACE_ERR_BAD_PACKET	= -5,
+	/** This feature is unsupported */
+	TRACE_ERR_UNSUPPORTED	= -7
 };
 
 typedef enum {
@@ -341,9 +345,6 @@ typedef struct libtrace_ether
 /** 802.1Q frame */
 typedef struct libtrace_8021q 
 {
-  uint8_t  ether_dhost[6];      /**< destination eth addr */
-  uint8_t  ether_shost[6];      /**< source ether addr    */
-  uint16_t ether_type;          /**< packet type ID field , 0x8100 for VLAN */
   unsigned int vlan_pri:3;	 /**< vlan user priority */
   unsigned int vlan_cfi:1; 	 /**< vlan format indicator, 
 				   * 0 for ethernet, 1 for token ring */

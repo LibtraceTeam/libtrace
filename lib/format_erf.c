@@ -743,7 +743,7 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 		erfhdr.ts = trace_get_erf_timestamp(packet);
 		type=libtrace_to_erf_type(trace_get_link_type(packet));
 		if (type==(char)-1) {
-			trace_set_err_out(libtrace,TRACE_ERR_BAD_PACKET,
+			trace_set_err_out(libtrace,TRACE_ERR_NO_CONVERSION,
 					"No erf type for packet");
 			return -1;
 		}

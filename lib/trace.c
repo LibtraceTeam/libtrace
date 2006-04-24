@@ -342,7 +342,7 @@ DLLEXPORT struct libtrace_t *trace_create(const char *uri) {
 			return libtrace;
 		}
 	} else {
-		trace_set_err(libtrace,TRACE_ERR_NO_INIT,
+		trace_set_err(libtrace,TRACE_ERR_UNSUPPORTED,
 				"Format does not support input (%s)",scan);
 		return libtrace;
 	}
@@ -470,7 +470,7 @@ DLLEXPORT libtrace_out_t *trace_create_output(const char *uri) {
 				assert(!"init_output() should return -1 for failure, or 0 for success");
 		}
 	} else {
-		trace_set_err_out(libtrace,TRACE_ERR_NO_INIT_OUT,
+		trace_set_err_out(libtrace,TRACE_ERR_UNSUPPORTED,
 				"Format does not support writing (%s)",scan);
                 return libtrace;
         }
@@ -681,7 +681,7 @@ DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 			return packet->size;
 		} while(1);
 	}
-	trace_set_err(libtrace,TRACE_ERR_BAD_FORMAT,"This format does not support reading packets\n");
+	trace_set_err(libtrace,TRACE_ERR_UNSUPPORTED,"This format does not support reading packets\n");
 	packet->size=-1;
 	return -1;
 }

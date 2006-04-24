@@ -101,13 +101,13 @@ static int pcapfile_start_input(libtrace_t *libtrace)
 			return -1;
 		
 		if (swapl(libtrace,DATA(libtrace)->header.magic_number) != 0xa1b2c3d4) {
-			trace_set_err(libtrace,TRACE_ERR_BAD_PACKET,"Not a pcap tracefile\n");
+			trace_set_err(libtrace,TRACE_ERR_INIT_FAILED,"Not a pcap tracefile\n");
 			return -1; /* Not a pcap file */
 		}
 
 		if (swaps(libtrace,DATA(libtrace)->header.version_major)!=2
 			&& swaps(libtrace,DATA(libtrace)->header.version_minor)!=4) {
-			trace_set_err(libtrace,TRACE_ERR_BAD_PACKET,"Unknown pcap tracefile version %d.%d\n",
+			trace_set_err(libtrace,TRACE_ERR_INIT_FAILED,"Unknown pcap tracefile version %d.%d\n",
 					swaps(libtrace,
 						DATA(libtrace)->header.version_major),
 					swaps(libtrace,

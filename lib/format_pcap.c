@@ -174,7 +174,7 @@ static int pcapint_init_output(libtrace_out_t *libtrace) {
 	OUTPUT.trace.dump = NULL;
 	return 0;
 #else
-	trace_set_err_out(libtrace,TRACE_ERR_NO_INIT_OUT,
+	trace_set_err_out(libtrace,TRACE_ERR_UNSUPPORTED,
 			"writing not supported by this version of pcap");
 	return -1;
 #endif

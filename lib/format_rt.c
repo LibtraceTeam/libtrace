@@ -323,7 +323,7 @@ static int rt_read(struct libtrace_t *libtrace, void **buffer, size_t len, int b
 				}
 				
                         	perror("recv");
-				trace_set_err(libtrace, TRACE_ERR_RECV_FAILED,
+				trace_set_err(libtrace, errno,
 						"Failed to read data into rt recv buffer");
                         	return -1;
                 	}
