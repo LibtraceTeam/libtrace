@@ -209,11 +209,11 @@ typedef enum {
 typedef struct libtrace_ip
 {
 #if BYTE_ORDER == LITTLE_ENDIAN
-    unsigned int ip_hl:4;		/**< header length */
-    unsigned int ip_v:4;		/**< version */
+    uint8_t ip_hl:4;		/**< header length */
+    uint8_t ip_v:4;		/**< version */
 #elif BYTE_ORDER == BIG_ENDIAN
-    unsigned int ip_v:4;		/**< version */
-    unsigned int ip_hl:4;		/**< header length */
+    uint8_t ip_v:4;		/**< version */
+    uint8_t ip_hl:4;		/**< header length */
 #else
 #   error "Adjust your <bits/endian.h> defines"
 #endif
@@ -221,15 +221,15 @@ typedef struct libtrace_ip
     uint16_t ip_len;			/**< total length */
     int16_t  ip_id;			/**< identification */
 #if BYTE_ORDER == LITTLE_ENDIAN
-    unsigned int ip_off:12;		/**< fragment offset */
-    unsigned int ip_mf:1;		/**< more fragments flag */
-    unsigned int ip_df:1;		/**< dont fragment flag */
-    unsigned int ip_rf:1;		/**< reserved fragment flag */
+    uint16_t ip_off:12;		/**< fragment offset */
+    uint16_t ip_mf:1;		/**< more fragments flag */
+    uint16_t ip_df:1;		/**< dont fragment flag */
+    uint16_t ip_rf:1;		/**< reserved fragment flag */
 #elif BYTE_ORDER == BIG_ENDIAN
-    unsigned int ip_rf:1;
-    unsigned int ip_df:1;
-    unsigned int ip_mf:1;
-    unsigned int ip_off:12;
+    uint16_t ip_rf:1;
+    uint16_t ip_df:1;
+    uint16_t ip_mf:1;
+    uint16_t ip_off:12;
 #else
 #   error "Adjust your <bits/endian.h> defines"
 #endif
@@ -265,25 +265,25 @@ typedef struct libtrace_tcp
     uint32_t seq;		/**< Sequence number */
     uint32_t ack_seq;		/**< Acknowledgement Number */
 #  if BYTE_ORDER == LITTLE_ENDIAN
-    unsigned int res1:4;	/**< Reserved bits */
-    unsigned int doff:4;	/**< data offset */	
-    unsigned int fin:1;		/**< FIN */
-    unsigned int syn:1;		/**< SYN flag */
-    unsigned int rst:1;		/**< RST flag */
-    unsigned int psh:1;		/**< PuSH flag */
-    unsigned int ack:1;		/**< ACK flag */
-    unsigned int urg:1;		/**< URG flag */
-    unsigned int res2:2;	/**< Reserved */
+    uint8_t res1:4;	/**< Reserved bits */
+    uint8_t doff:4;	/**< data offset */	
+    uint8_t fin:1;		/**< FIN */
+    uint8_t syn:1;		/**< SYN flag */
+    uint8_t rst:1;		/**< RST flag */
+    uint8_t psh:1;		/**< PuSH flag */
+    uint8_t ack:1;		/**< ACK flag */
+    uint8_t urg:1;		/**< URG flag */
+    uint8_t res2:2;	/**< Reserved */
 #  elif BYTE_ORDER == BIG_ENDIAN
-    unsigned int doff:4;	/**< Data offset */
-    unsigned int res1:4;	/**< Reserved bits */
-    unsigned int res2:2;	/**< Reserved */
-    unsigned int urg:1;		/**< URG flag */
-    unsigned int ack:1;		/**< ACK flag */
-    unsigned int psh:1;		/**< PuSH flag */
-    unsigned int rst:1;		/**< RST flag */
-    unsigned int syn:1;		/**< SYN flag */
-    unsigned int fin:1;		/**< FIN flag */
+    uint8_t doff:4;	/**< Data offset */
+    uint8_t res1:4;	/**< Reserved bits */
+    uint8_t res2:2;	/**< Reserved */
+    uint8_t urg:1;		/**< URG flag */
+    uint8_t ack:1;		/**< ACK flag */
+    uint8_t psh:1;		/**< PuSH flag */
+    uint8_t rst:1;		/**< RST flag */
+    uint8_t syn:1;		/**< SYN flag */
+    uint8_t fin:1;		/**< FIN flag */
 #  else
 #   error "Adjust your <bits/endian.h> defines"
 #  endif
@@ -345,10 +345,10 @@ typedef struct libtrace_ether
 /** 802.1Q frame */
 typedef struct libtrace_8021q 
 {
-  unsigned int vlan_pri:3;	 /**< vlan user priority */
-  unsigned int vlan_cfi:1; 	 /**< vlan format indicator, 
+  uint16_t vlan_pri:3;	 /**< vlan user priority */
+  uint16_t vlan_cfi:1; 	 /**< vlan format indicator, 
 				   * 0 for ethernet, 1 for token ring */
-  unsigned int vlan_id:12; 	 /**< vlan id */
+  uint16_t vlan_id:12; 	 /**< vlan id */
   uint16_t vlan_ether_type;	 /**< vlan sub-packet type ID field 
 				   * (next-header)*/
 } PACKED libtrace_8021q_t;
@@ -356,12 +356,12 @@ typedef struct libtrace_8021q
 /** ATM cell */
 typedef struct libtrace_atm_cell
 {
-  unsigned int gfc:4;		/**< Generic Flow Control */
-  uint8_t vpi;			/**< Virtual Path Identifier */
-  uint16_t vci;			/**< Virtual Channel Identifier */
-  unsigned int pt:3;		/**< Payload Type */
-  unsigned int clp:1;		/**< Cell Loss Priority */
-  uint8_t hec;			/**< Header Error Control */
+  uint32_t gfc:4;		/**< Generic Flow Control */
+  uint32_t vpi:8;		/**< Virtual Path Identifier */
+  uint32_t vci:8;		/**< Virtual Channel Identifier */
+  uint32_t pt:3;		/**< Payload Type */
+  uint32_t clp:1;		/**< Cell Loss Priority */
+  uint32_t hec:8;		/**< Header Error Control */
 } PACKED libtrace_atm_cell_t;
 
 /** POS header */
@@ -373,18 +373,18 @@ typedef struct libtrace_pos
 
 /** 802.11 header */
 typedef struct libtrace_80211_t {
-        unsigned int      protocol:2;
-        unsigned int      type:2;
-        unsigned int      subtype:4;
-        unsigned int      to_ds:1;		/**< Packet to Distribution Service */
-        unsigned int      from_ds:1;		/**< Packet from Distribution Service */
-        unsigned int      more_frag:1;		/**< Packet has more fragments */
-        unsigned int      retry:1;		/**< Packet is a retry */
-        unsigned int      power:1;
-        unsigned int      more_data:1;
-        unsigned int      wep:1;
-        unsigned int      order:1;
-        unsigned int     duration;
+        uint16_t      protocol:2;
+        uint16_t      type:2;
+        uint16_t      subtype:4;
+        uint16_t      to_ds:1;		/**< Packet to Distribution Service */
+        uint16_t      from_ds:1;	/**< Packet from Distribution Service */
+        uint16_t      more_frag:1;	/**< Packet has more fragments */
+        uint16_t      retry:1;		/**< Packet is a retry */
+        uint16_t      power:1;
+        uint16_t      more_data:1;
+        uint16_t      wep:1;
+        uint16_t      order:1;
+        uint16_t     duration;
         uint8_t      mac1[6];
         uint8_t      mac2[6];
         uint8_t      mac3[6];
