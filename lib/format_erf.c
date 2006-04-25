@@ -351,7 +351,7 @@ static int rtclient_start_input(libtrace_t *libtrace)
 	struct hostent *he;
 	struct sockaddr_in remote;
 	if ((he=gethostbyname(CONNINFO.rt.hostname)) == NULL) {  
-		trace_set_err(libtrace,errno,"failed to resolve %s",
+		trace_set_err(libtrace,TRACE_ERR_INIT_FAILED,"failed to resolve %s",
 				CONNINFO.rt.hostname);
 		return -1;
 	} 
