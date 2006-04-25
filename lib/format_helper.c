@@ -234,6 +234,7 @@ void trace_set_err(libtrace_t *trace,int errcode,const char *msg,...)
 	char buf[256];
 	va_list va;
 	va_start(va,msg);
+	assert(errcode != 0 && "An error occurred, but it is unknown what it is");
 	trace->err.err_num=errcode;
 	if (errcode>0) {
 		vsnprintf(buf,sizeof(buf),msg,va);
@@ -256,6 +257,7 @@ void trace_set_err_out(libtrace_out_t *trace,int errcode,const char *msg,...)
 	char buf[256];
 	va_list va;
 	va_start(va,msg);
+	assert(errcode != 0 && "An error occurred, but it is unknown what it is");
 	trace->err.err_num=errcode;
 	if (errcode>0) {
 		vsnprintf(buf,sizeof(buf),msg,va);
