@@ -153,6 +153,11 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 #  define O_LARGEFILE 0
 #endif 
 
+/* Catching O_BINARY on all sane OS's */
+#ifndef O_BINARY
+#  define O_BINARY 0
+#endif
+
 /* open a file or stdin using gzip compression if necessary (and supported)
  * @internal
  */
@@ -170,7 +175,7 @@ libtrace_io_t *trace_open_file(libtrace_t *trace)
 	/* We open the file with open(2), so we can provide O_LARGEFILE
 	 * as zlib doesn't always do it itself
 	 */
-	fd=open(trace->uridata,O_LARGEFILE|O_RDONLY);
+	fd=open(trace->uridata,O_LARGEFILE|O_RDONLY|O_BINARY);
 	if (fd==-1) {
 		trace_set_err(trace,errno,"Unable to open %s",trace->uridata);
 		return 0;
@@ -203,7 +208,7 @@ libtrace_io_t *trace_open_file_out(libtrace_out_t *trace,int level, int fileflag
 	/* We open the file with open(2), so we can provide O_LARGEFILE
 	 * as zlib doesn't always do it itself
 	 */
-	fd=open(trace->uridata,fileflag|O_LARGEFILE,0666);
+	fd=open(trace->uridata,fileflag|O_LARGEFILE|O_BINARY,0666);
 	if (fd==-1) {
 		trace_set_err_out(trace,
 				errno,"Unable to open %s",trace->uridata);
