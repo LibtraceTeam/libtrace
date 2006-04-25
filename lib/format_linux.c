@@ -242,7 +242,7 @@ static int linuxnative_write_packet(libtrace_out_t *trace,
 
 	hdr.sll_family = AF_PACKET;
 	hdr.sll_protocol = 0;
-	hdr.sll_ifindex = if_nametoindex(packet->trace->uridata);
+	hdr.sll_ifindex = if_nametoindex(trace->uridata);
 	hdr.sll_hatype = 0;
 	hdr.sll_pkttype = 0;
 	hdr.sll_halen = 6; /* FIXME */

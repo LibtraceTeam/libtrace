@@ -66,6 +66,11 @@ static int pcapfile_init_input(struct libtrace_t *libtrace) {
 
 static uint16_t swaps(libtrace_t *libtrace, uint16_t num)
 {
+	/* to deal with open_dead traces that might try and use this
+	 * if we don't have any per trace data, assume host byte order
+	 */
+	if (!DATA(libtrace))
+		return num;
 	if (DATA(libtrace)->header.magic_number == 0xd4c3b2a1)
 		return ((num<<8)&0xFF00)|((num>>8)&0x00FF);
 	return num;
@@ -73,6 +78,11 @@ static uint16_t swaps(libtrace_t *libtrace, uint16_t num)
 
 static uint32_t swapl(libtrace_t *libtrace, uint32_t num)
 {
+	/* to deal with open_dead traces that might try and use this
+	 * if we don't have any per trace data, assume host byte order
+	 */
+	if (!DATA(libtrace))
+		return num;
 	if (DATA(libtrace)->header.magic_number == 0xd4c3b2a1)
 		return 
 			   ((num&0x000000FF)<<24)
