@@ -117,7 +117,7 @@ extern "C" {
 #else
 #  define SIMPLE_FUNCTION
 #  define UNUSED
-#  define PACKED
+#  define PACKED __declspec(align(1))
 #  define CONSTRUCTOR
 #endif
 	

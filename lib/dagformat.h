@@ -10,6 +10,11 @@
 #define TYPE_ATM          3
 #define TYPE_AAL5         4
 
+#ifdef WIN32
+#pragma pack(push)
+#pragma pack(1)
+#endif
+
 /** GPP Type 1 */
 typedef struct pos_rec {
 	uint32_t  hdlc;
@@ -40,12 +45,12 @@ typedef struct aal5_rec {
 
 /** Flags */
 typedef struct flags {
-	unsigned int   iface:2;
-	unsigned int   vlen:1;
-	unsigned int   trunc:1;
-	unsigned int   rxerror:1;
-	unsigned int   dserror:1;
-	unsigned int   pad:2;
+	uint8_t   iface:2;
+	uint8_t   vlen:1;
+	uint8_t   trunc:1;
+	uint8_t   rxerror:1;
+	uint8_t   dserror:1;
+	uint8_t  pad:2;
 } PACKED flags_t;
 
 /** GPP Global type */
@@ -87,6 +92,10 @@ typedef struct duck_inf_pkt {
         int32_t   stat_start, stat_end;  
         uint32_t  set_duck_field;
 } duck_inf;
+
+#ifdef WIN32
+#pragma pack(pop)
+#endif
 
 /** sizeof(dag_record_t) without the payload helpers */
 #define dag_record_size         16
