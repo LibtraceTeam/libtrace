@@ -66,11 +66,6 @@ static struct libtrace_format_t pcapint;
 #define INPUT DATA(libtrace)->input
 #define OUTPUT DATAOUT(libtrace)->output
 struct pcap_format_data_t {
-	union {
-                char *path;		/**< information for local sockets */
-                char *interface;	/**< intormation for reading of network
-					     interfaces */
-        } conn_info;
 	/** Information about the current state of the input device */
         union {
                 pcap_t *pcap;
@@ -81,10 +76,6 @@ struct pcap_format_data_t {
 };
 
 struct pcap_format_data_out_t {
-	union {
-		char *path;
-		char *interface;
-	} conn_info;
 	union {
 		struct {
 			pcap_t *pcap;
@@ -357,7 +348,7 @@ static int pcapint_write_packet(libtrace_out_t *libtrace, const libtrace_packet_
 	err=pcap_inject(OUTPUT.trace.pcap,
 			packet->payload,
 			trace_get_capture_length(packet));
-	if (err!=trace_get_capture_length(packet))
+	if (err!=(int)trace_get_capture_length(packet))
 		err=-1;
 #else 
 #if HAVE_PCAP_SENDPACKET
