@@ -115,7 +115,7 @@ static int wag_start_input(libtrace_t *libtrace)
 
 static int wtf_init_input(struct libtrace_t *libtrace) 
 {
-	libtrace->format_data = malloc(sizeof(struct wag_format_data_t));
+	libtrace->format_data = calloc(1,sizeof(struct wag_format_data_t));
 	return 0;
 }
 
@@ -132,7 +132,7 @@ static int wtf_start_input(libtrace_t *libtrace)
 }
 
 static int wtf_init_output(struct libtrace_out_t *libtrace) {
-	libtrace->format_data = calloc(1,sizeof(struct wag_format_data_out_t));
+	libtrace->format_data = malloc(sizeof(struct wag_format_data_out_t));
 
 	OUTPUT.file = 0;
 	OPTIONS.zlib.level = 0;

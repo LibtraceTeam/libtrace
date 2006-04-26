@@ -921,7 +921,7 @@ DLLEXPORT struct libtrace_eventobj_t trace_event(struct libtrace_t *trace,
  */
 DLLEXPORT struct libtrace_filter_t *trace_bpf_setfilter(const char *filterstring) {
 #if HAVE_BPF
-	struct libtrace_filter_t *filter = (struct libtrace_filter_t*)
+	libtrace_filter_t *filter = (struct libtrace_filter_t*)
 				malloc(sizeof(struct libtrace_filter_t));
 	filter->filterstring = strdup(filterstring);
 	filter->flag = 0;
@@ -930,6 +930,14 @@ DLLEXPORT struct libtrace_filter_t *trace_bpf_setfilter(const char *filterstring
 	fprintf(stderr,"This version of libtrace does not have bpf filter support\n");
 	return 0;
 #endif
+}
+
+DLLEXPORT void trace_destroy_bpf(libtrace_filter_t *filter)
+{
+	free(filter->filterstring);
+	if (filter->flag)
+		pcap_freecode(&filter->filter);
+	free(filter);
 }
 
 /* compile a bpf filter, now we know what trace it's on

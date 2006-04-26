@@ -234,15 +234,17 @@ static int pcapint_start_input(libtrace_t *libtrace) {
 	return 0; /* success */
 }
 
-static int pcapint_pause_input(libtrace_t *libtrace)
+static int pcap_pause_input(libtrace_t *libtrace)
 {
 	pcap_close(INPUT.pcap);
 	INPUT.pcap=NULL;
 	return 0; /* success */
 }
 
+
 static int pcap_fin_input(libtrace_t *libtrace) 
 {
+	pcap_close(INPUT.pcap);
 	free(libtrace->format_data);
 	return 0; /* success */
 }
@@ -553,7 +555,7 @@ static struct libtrace_format_t pcapint = {
 	pcapint_init_input,		/* init_input */
 	pcapint_config_input,		/* config_input */
 	pcapint_start_input,		/* start_input */
-	pcapint_pause_input,		/* pause_input */
+	pcap_pause_input,		/* pause_input */
 	pcapint_init_output,		/* init_output */
 	NULL,				/* config_output */
 	NULL,				/* start_output */

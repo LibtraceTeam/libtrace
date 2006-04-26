@@ -1122,6 +1122,12 @@ libtrace_filter_t *trace_bpf_setfilter(const char *filterstring);
  */
 DLLEXPORT int trace_bpf_filter(libtrace_filter_t *filter,
 		const libtrace_packet_t *packet);
+
+/** destory of BPF filter
+ * @param filter 	the filter opaque pointer
+ * Deallocate all the resources associated with a BPF filter
+ */
+DLLEXPORT void trace_destroy_bpf(libtrace_filter_t *filter);
 /*@}*/
 
 /** @name Portability
