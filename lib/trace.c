@@ -928,16 +928,20 @@ DLLEXPORT struct libtrace_filter_t *trace_bpf_setfilter(const char *filterstring
 	return filter;
 #else
 	fprintf(stderr,"This version of libtrace does not have bpf filter support\n");
-	return 0;
+	return NULL;
 #endif
 }
 
 DLLEXPORT void trace_destroy_bpf(libtrace_filter_t *filter)
 {
+#if HAVE_BPF
 	free(filter->filterstring);
 	if (filter->flag)
 		pcap_freecode(&filter->filter);
 	free(filter);
+#else
+
+#endif
 }
 
 /* compile a bpf filter, now we know what trace it's on
