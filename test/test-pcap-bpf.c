@@ -100,6 +100,8 @@ int main(int argc, char *argv[]) {
 	} else {
 		iferr(trace);
 	}
+	trace_destroy_bpf(filter);
         trace_destroy(trace);
+	filter=NULL;
         return error;
 }
