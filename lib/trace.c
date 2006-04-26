@@ -356,7 +356,8 @@ DLLEXPORT struct libtrace_t *trace_create(const char *uri) {
 	}
 	assert(libtrace->fifo);
 	free(scan);
-	trace_set_err(libtrace,0,"");
+	libtrace->err.err_num=TRACE_ERR_NOERROR;
+	libtrace->err.problem[0]='\0';
         return libtrace;
 }
 
@@ -1249,7 +1250,7 @@ DLLEXPORT void trace_perror(libtrace_t *trace,const char *msg,...)
 DLLEXPORT libtrace_err_t trace_get_err_output(libtrace_out_t *trace)
 {
 	libtrace_err_t err = trace->err;
-	trace->err.err_num = 0; /* "OK" */
+	trace->err.err_num = TRACE_ERR_NOERROR; /* "OK" */
 	trace->err.problem[0]='\0';
 	return err;
 }
