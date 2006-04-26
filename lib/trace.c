@@ -427,7 +427,7 @@ DLLEXPORT libtrace_out_t *trace_create_output(const char *uri) {
 	trace_init();
 
 	libtrace->err.err_num = TRACE_ERR_NOERROR;
-	strcat(libtrace->err.problem,"Error message set\n");
+	strcpy(libtrace->err.problem,"Error message set\n");
 	
         /* parse the URI to determine what sort of event we are dealing with */
 
