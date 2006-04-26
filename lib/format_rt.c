@@ -81,7 +81,7 @@ struct rt_format_data_t {
 	int reliable;
 	char *pkt_buffer;
 	char *buf_current;
-	int buf_left;
+	int buf_filled;
 
 	
 	struct libtrace_t *dummy_erf;
@@ -196,7 +196,7 @@ static int rt_init_input(struct libtrace_t *libtrace) {
 	RT_INFO->dummy_wag = NULL;
 	RT_INFO->pkt_buffer = NULL;
 	RT_INFO->buf_current = NULL;
-	RT_INFO->buf_left = 0;
+	RT_INFO->buf_filled = 0;
 	
         if (strlen(uridata) == 0) {
                 RT_INFO->hostname =
@@ -268,13 +268,14 @@ static int rt_fin_input(struct libtrace_t *libtrace) {
 
 static int rt_read(struct libtrace_t *libtrace, void **buffer, size_t len, int block) {
         int numbytes;
-
+	rt_header_t *test_hdr;
+	
 	assert(len <= RT_BUF_SIZE);
 	
 	if (!RT_INFO->pkt_buffer) {
 		RT_INFO->pkt_buffer = malloc(RT_BUF_SIZE);
 		RT_INFO->buf_current = RT_INFO->pkt_buffer;
-		RT_INFO->buf_left = 0;
+		RT_INFO->buf_filled = 0;
 	}
 
 #ifndef MSG_DONTWAIT
@@ -287,19 +288,19 @@ static int rt_read(struct libtrace_t *libtrace, void **buffer, size_t len, int b
 		block=MSG_DONTWAIT;
 
 	
-	if (len > RT_INFO->buf_left) {
+	if (len > RT_INFO->buf_filled) {
 		memcpy(RT_INFO->pkt_buffer, RT_INFO->buf_current, 
-				RT_INFO->buf_left);
+				RT_INFO->buf_filled);
 		RT_INFO->buf_current = RT_INFO->pkt_buffer;
-
+		
 #ifndef MSG_NOSIGNAL
 #  define MSG_NOSIGNAL 0
 #endif
-		while (len > RT_INFO->buf_left) {
+		while (len > RT_INFO->buf_filled) {
                 	if ((numbytes = recv(RT_INFO->input_fd,
-                                                RT_INFO->pkt_buffer + 
-						RT_INFO->buf_left,
-                                                RT_BUF_SIZE-RT_INFO->buf_left,
+                                                RT_INFO->buf_current + 
+						RT_INFO->buf_filled,
+                                                RT_BUF_SIZE-RT_INFO->buf_filled,
                                                 MSG_NOSIGNAL|block)) <= 0) {
 				if (numbytes == 0) {
 					trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, 
@@ -334,14 +335,14 @@ static int rt_read(struct libtrace_t *libtrace, void **buffer, size_t len, int b
 			}
 			printf("\n");
 			*/
-			RT_INFO->buf_left+=numbytes;
+			RT_INFO->buf_filled+=numbytes;
 		}
 
         }
 	*buffer = RT_INFO->buf_current;
 	RT_INFO->buf_current += len;
-	RT_INFO->buf_left -= len;
-	assert(RT_INFO->buf_left >= 0);
+	RT_INFO->buf_filled -= len;
+	assert(RT_INFO->buf_filled >= 0);
         return len;
 }
 
@@ -428,7 +429,6 @@ static int rt_send_ack(struct libtrace_t *libtrace,
 	to_write = hdr->length + sizeof(rt_header_t);
 	buf_ptr = ack_buffer;
 
-	
 	while (to_write > 0) {
 		numbytes = send(RT_INFO->input_fd, buf_ptr, to_write, 0); 
 		if (numbytes == -1) {
@@ -454,9 +454,12 @@ static int rt_send_ack(struct libtrace_t *libtrace,
 static int rt_read_packet_versatile(libtrace_t *libtrace,
 		libtrace_packet_t *packet,int blocking) {
 	rt_header_t rt_hdr;
-	rt_header_t *pkt_hdr = &rt_hdr;
+	static rt_header_t *pkt_hdr = 0;
 	int pkt_size = 0;
+	uint32_t seqno;
 	
+	if (pkt_hdr == 0)
+		pkt_hdr = malloc(sizeof(rt_header_t));
 	
         if (packet->buf_control == TRACE_CTRL_EXTERNAL || !packet->buffer) {
                 packet->buf_control = TRACE_CTRL_PACKET;
@@ -470,9 +473,12 @@ static int rt_read_packet_versatile(libtrace_t *libtrace,
 		return -1;
 	}
 
+	/* Need to salvage these in case the next rt_read overwrites the 
+	 * buffer they came from! */
 	packet->type = pkt_hdr->type;
 	pkt_size = pkt_hdr->length;
 	packet->size = pkt_hdr->length;
+	seqno = pkt_hdr->sequence;
 
 	if (packet->type >= RT_DATA_SIMPLE) {
 		if (rt_read(libtrace, &packet->buffer, pkt_size,1) != pkt_size) {
@@ -485,9 +491,8 @@ static int rt_read_packet_versatile(libtrace_t *libtrace,
                        	return -1;
                 }
                	rt_set_payload(packet);
-
                 if (RT_INFO->reliable > 0) {
-			if (rt_send_ack(libtrace, pkt_hdr->sequence) 
+			if (rt_send_ack(libtrace, seqno) 
 					== -1)
 			{
                                	return -1;
@@ -518,7 +523,7 @@ static int rt_read_packet_versatile(libtrace_t *libtrace,
 				break;
 			default:
 				printf("Bad rt type for client receipt: %d\n",
-					pkt_hdr->type);
+					packet->type);
 		}
 	}
 	/* Return the number of bytes read from the stream */
