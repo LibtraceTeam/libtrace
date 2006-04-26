@@ -179,7 +179,6 @@ static int wtf_config_output(struct libtrace_out_t *libtrace,
 static int wag_pause_input(libtrace_t *libtrace)
 {
 	close(INPUT.fd);
-
 	return 0;
 }
 
@@ -321,7 +320,7 @@ static int wtf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 	buffer2 = (char*)buffer + sizeof(struct frame_t);
 	size = framesize - sizeof(struct frame_t);
 	assert(size < LIBTRACE_PACKET_BUFSIZE);
-
+	assert(size > 0);
 	
 	if ((numbytes=libtrace_io_read(INPUT.file, buffer2, size)) != size) {
 		trace_set_err(libtrace,
@@ -382,13 +381,13 @@ static uint64_t wag_get_erf_timestamp(const struct libtrace_packet_t *packet) {
 }
 
 static int wag_get_capture_length(const struct libtrace_packet_t *packet) {
-	struct frame_data_rx_t *wagptr = (struct frame_data_rx_t *)packet->buffer;
-	return ntohs(wagptr->hdr.size);
+	return ntohs(((struct frame_t *)packet->header)->size)
+		-sizeof(struct frame_data_rx_t);
 }
 
 static int wag_get_wire_length(const struct libtrace_packet_t *packet) {
-	struct frame_data_rx_t *wagptr = (struct frame_data_rx_t *)packet->buffer;
-	return ntohs(wagptr->hdr.size);
+	return ntohs(((struct frame_t *)packet->header)->size)
+		-sizeof(struct frame_data_rx_t);
 }
 
 static int wag_get_framing_length(UNUSED const libtrace_packet_t *packet) {
