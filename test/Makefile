@@ -43,10 +43,10 @@ test-convert-all: test-convert
 	@LD_LIBRARY_PATH=$(libdir) ./test-convert wtf wtf
  
 clean:
-	$(RM) $(BINS) $(OBJS) 
+	$(RM) $(BINS) $(OBJS) test-format
 
 distclean:
-	$(RM) $(BINS) $(OBJS) 
+	$(RM) $(BINS) $(OBJS) test-format
 
 install:
 	@true
