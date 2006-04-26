@@ -1,0 +1,46 @@
+Compiling libtrace3 for WIN32
+=============================
+
+libtrace3 provides a MSVC build environment to allow you to compile and run
+the code in a Windows environment.
+
+There has been no extensive testing yet. Some of the format modules may be
+broken. There may be dragons here.
+
+Visual Studio 2005 or greater is required. Development has been performed
+using MS Visual C++ 2005 Express Edition. 
+
+You will also need a correctly installed copy of the Platform SDK. The
+Windows Server 2003 SP1 SDK was used for Development.
+
+To build libtrace using Visual Studio open the provided solution 
+'libtrace.sln' this solution contains three projects:
+
+* libtrace.vcproj       - The actual library, builds a DLL
+* test-format.vcproj    - Builds the test-format executable from test/
+* test-convert.vcproj   - Builds the test-convert executable from test/
+
+Before you compile libtrace you will need to copy config-win.h to config.h
+in the top level directory. There is currently no integration with autoconf
+or any of the standard GNU build tools.
+
+From the build menu select 'Build Solution'. After the build has completed
+sucessfully execute the test-format and test-convert programs with the 
+following parameters
+
+ test-format erf
+ test-format wtf
+ test-format pcapfile
+
+ test-convert erf erf
+ test-convert pcapfile erf
+
+As each program completes it should output 'success: 100 packets read'. If
+this string is not displayed there is a problem and debugging will be 
+required.
+
+The above invocations of test-format and test-convert are known to work in 
+the development environment. Other combinations of formats are not supported
+at this time.
+
+ -- Matt Brown <matt@mattb.net.nz>  Thu, 27 Apr 2006 00:49:23 +1200
