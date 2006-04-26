@@ -53,8 +53,6 @@
 
 #define RT_INFO ((struct rt_format_data_t*)libtrace->format_data)
 
-int reliability = 0;
-
 char *rt_deny_reason(uint8_t reason) {
 	char *string = 0;
 
@@ -173,7 +171,7 @@ static int rt_connect(struct libtrace_t *libtrace) {
 					"Failed to receive RT_HELLO options");
 				return -1;
 			}
-			reliability = hello_opts.reliable;
+			RT_INFO->reliable = hello_opts.reliable;
 			
 			return 0;
 		default:
@@ -488,8 +486,7 @@ static int rt_read_packet_versatile(libtrace_t *libtrace,
                 }
                	rt_set_payload(packet);
 
-                if (reliability > 0) {
-                        
+                if (RT_INFO->reliable > 0) {
 			if (rt_send_ack(libtrace, pkt_hdr->sequence) 
 					== -1)
 			{
