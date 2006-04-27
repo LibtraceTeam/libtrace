@@ -134,7 +134,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="&quot;H:\src\libtrace-win&quot;"
+				AdditionalIncludeDirectories="&quot;G:\Program Files\WpdPack\Include&quot;;&quot;H:\src\libtrace-win&quot;"
 				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;BUILDING_DLL"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
@@ -160,10 +160,10 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="Ws2_32.lib"
+				AdditionalDependencies="Ws2_32.lib wpcap.lib"
 				LinkIncremental="2"
 				SuppressStartupBanner="true"
-				AdditionalLibraryDirectories=""
+				AdditionalLibraryDirectories="&quot;G:\Program Files\WpdPack\Lib&quot;"
 				GenerateDebugInformation="true"
 				ProgramDatabaseFile=".\Debug/libtrace.pdb"
 				SubSystem="1"
