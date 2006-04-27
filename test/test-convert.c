@@ -27,24 +27,25 @@
  * $Id: test-pcap-to-erf.c,v 1.3 2006/02/27 03:41:12 perry Exp $
  *
  */
-
+#ifndef WIN32
+#  include <sys/time.h>
+#  include <netinet/in.h>
+#  include <netinet/in_systm.h>
+#  include <netinet/tcp.h>
+#  include <netinet/ip.h>
+#  include <netinet/ip_icmp.h>
+#  include <arpa/inet.h>
+#  include <sys/socket.h>
+#endif
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
-#include <sys/time.h>
 #include <sys/types.h>
 #include <time.h>
-
-#include <netinet/in.h>
-#include <netinet/in_systm.h>
-#include <netinet/tcp.h>
-#include <netinet/ip.h>
-#include <netinet/ip_icmp.h>
-#include <arpa/inet.h>
-#include <sys/socket.h>
 #include <string.h>
+
 #include "dagformat.h"
 #include "libtrace.h"
 

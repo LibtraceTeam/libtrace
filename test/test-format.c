@@ -27,24 +27,24 @@
  * $Id: test-rtclient.c,v 1.2 2006/02/27 03:41:12 perry Exp $
  *
  */
-
-
+#ifndef WIN32
+#  include <sys/time.h>
+#  include <netinet/in.h>
+#  include <netinet/in_systm.h>
+#  include <netinet/tcp.h>
+#  include <netinet/ip.h>
+#  include <netinet/ip_icmp.h>
+#  include <arpa/inet.h>
+#  include <sys/socket.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
-#include <sys/time.h>
 #include <sys/types.h>
 #include <time.h>
-
-#include <netinet/in.h>
-#include <netinet/in_systm.h>
-#include <netinet/tcp.h>
-#include <netinet/ip.h>
-#include <netinet/ip_icmp.h>
-#include <arpa/inet.h>
-#include <sys/socket.h>
 #include <string.h>
+
 #include "dagformat.h"
 #include "libtrace.h"
 
@@ -74,7 +74,7 @@ const char *lookup_uri(const char *type) {
 }
 
 int main(int argc, char *argv[]) {
-        int psize = 0;
+	int psize = 0;
 	int error = 0;
 	int count = 0;
 	int level = 0;
@@ -98,7 +98,7 @@ int main(int argc, char *argv[]) {
 	iferr(trace);
 	
 	packet=trace_create_packet();
-        for (;;) {
+	for (;;) {
 		if ((psize = trace_read_packet(trace, packet)) <0) {
 			error = 1;
 			iferr(trace);
