@@ -715,7 +715,7 @@ void *trace_get_link(const libtrace_packet_t *packet);
  *
  * @return a pointer to the IP header, or NULL if there is not an IP packet
  */
-SIMPLE_FUNCTION
+DLLEXPORT SIMPLE_FUNCTION
 libtrace_ip_t *trace_get_ip(libtrace_packet_t *packet);
 
 /** Gets a pointer to the transport layer header (if any)
