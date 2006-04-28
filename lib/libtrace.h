@@ -640,8 +640,12 @@ DLLEXPORT void trace_destroy_packet(libtrace_packet_t **packet);
  *
  * @param trace 	the libtrace opaque pointer
  * @param packet  	the packet opaque pointer
- * @return 0 on EOF, negative value on error
+ * @return 0 on EOF, negative value on error, number of bytes read when
+ * successful.
  *
+ * @note the number of bytes read is usually (but not always) the same as
+ * trace_get_framing_length()+trace_get_capture_length() depending on the
+ * trace format.
  * @note the trace must have been started with trace_start before calling
  * this function
  */

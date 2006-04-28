@@ -161,6 +161,10 @@ fi
 	AC_CHECK_LIB(pcap,pcap_sendpacket,
 			AC_DEFINE(HAVE_PCAP_SENDPACKET,1,[pcap has pcap_sendpacket]),
 			have_pcap_sendpacket=false)
+
+	AC_CHECK_LIB(pcap,pcap_setnonblock,
+			AC_DEFINE(HAVE_PCAP_SETNONBLOCK,1,[pcap has pcap_setnonblock]),
+			have_pcap_setnonblock=false)
 fi
 
 
