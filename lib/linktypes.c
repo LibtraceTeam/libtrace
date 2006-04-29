@@ -23,8 +23,6 @@ libtrace_linktype_t pcap_dlt_to_libtrace(libtrace_dlt_t dlt)
 		case TRACE_DLT_IEEE802_11: return TRACE_TYPE_80211;
 		case TRACE_DLT_LINUX_SLL: return TRACE_TYPE_LINUX_SLL;
 		case TRACE_DLT_PFLOG: return TRACE_TYPE_PFLOG;
-		default:
-				assert(!"No pcap support");
 	}
 	return -1;
 }
