@@ -258,11 +258,9 @@ static int linuxnative_write_packet(libtrace_out_t *trace,
 
 static libtrace_linktype_t linuxnative_get_link_type(const struct libtrace_packet_t *packet) {
 	int linktype=htons((((struct libtrace_linuxnative_header*)(packet->buffer))
-				->hdr.sll_protocol));
+				->hdr.sll_hatype));
 	switch (linktype) {
-		case ETH_P_IP:
-		case ETH_P_IPV6:
-		case ETH_P_ARP:
+		case ARPHRD_ETHER:
 			return TRACE_TYPE_ETH;
 		default: /* shrug, beyond me! */
 			printf("unknown type %x\n",linktype);
