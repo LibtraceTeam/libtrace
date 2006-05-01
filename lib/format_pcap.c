@@ -258,47 +258,40 @@ static int pcapint_fin_output(libtrace_out_t *libtrace)
 	return 0;
 }
 
-static void trace_pcap_handler(u_char *user, const struct pcap_pkthdr *pcaphdr, const u_char *pcappkt) {
-	libtrace_packet_t *packet = (libtrace_packet_t *)user;	
-	/*
-	// pcap provides us with the right bits, in it's own buffers.
-	// We hijack them.
-	*/
 
-	if (!packet->buffer || packet->buf_control==TRACE_CTRL_EXTERNAL) {
-		/* We only need struct pcap_pkthdr, but we have no way
-		 * to say how much we malloc'd so that formats can determine
-		 * if they need to malloc more, so at the moment we just
-		 * malloc 64k
-		 */
-		packet->buf_control = TRACE_CTRL_PACKET;
-		packet->buffer=malloc(65536);
-	}
-	memcpy(packet->buffer,pcaphdr,sizeof(struct pcap_pkthdr));
-	packet->header = packet->buffer;
-	packet->payload = (void *)pcappkt;
-
-	assert(pcaphdr->caplen<=65536);
-}
-
-/* TODO: use pcap_next_ex() if available */
 static int pcap_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
-	int pcapbytes = 0;
+	int ret = 0;
 	int linktype;
 
 	assert(libtrace->format_data);
 	linktype = pcap_datalink(DATA(libtrace)->input.pcap);
 	packet->type = pcap_dlt_to_rt(linktype);
-	
-	pcapbytes = pcap_dispatch(INPUT.pcap,
-					1, /* number of packets */
-					&trace_pcap_handler,
-					(u_char *)packet);
 
-	if (pcapbytes <= 0) {
-		return pcapbytes;
+	if (packet->buf_control==TRACE_CTRL_EXTERNAL)
+		free(packet->buffer);
+
+	packet->buf_control = TRACE_CTRL_PACKET;
+
+	for(;;) {
+
+		ret=pcap_next_ex(INPUT.pcap, 
+				(struct pcap_pkthdr **)&packet->header,
+				(const u_char **)&packet->payload);
+
+		switch(ret) {
+			case 1: break; /* no error */
+			case 0: continue; /* timeout expired */
+			case -1: 
+				trace_set_err(libtrace,TRACE_ERR_BAD_PACKET,
+						"%s",pcap_geterr(INPUT.pcap));
+				return -1; /* Error */
+			case -2:
+				return 0; /* EOF */
+		}
+
+		return ((struct pcap_pkthdr*)packet->header)->len
+			+sizeof(struct pcap_pkthdr);
 	}
-	return ((struct pcap_pkthdr*)packet->header)->len+sizeof(struct pcap_pkthdr);
 }
 
 static int pcap_write_packet(libtrace_out_t *libtrace, const libtrace_packet_t *packet) {
