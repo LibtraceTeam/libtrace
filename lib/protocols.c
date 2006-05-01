@@ -359,6 +359,7 @@ DLLEXPORT void *trace_get_transport(libtrace_packet_t *packet,
 				(libtrace_ip6_t*)transport, proto, remaining);
 			
 		default:
+			*proto=0;
 			return NULL;
 	}
 
@@ -418,7 +419,7 @@ DLLEXPORT libtrace_icmp_t *trace_get_icmp(libtrace_packet_t *packet) {
 
 	icmp=(libtrace_icmp_t*)trace_get_transport(packet,&proto,NULL);
 
-	if (proto != 1)
+	if (!icmp || proto != 1)
 		return NULL;
 
 	return icmp;
