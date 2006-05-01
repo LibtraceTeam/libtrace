@@ -172,9 +172,9 @@ void *trace_get_payload_from_link(void *link, libtrace_linktype_t linktype,
 		case TRACE_TYPE_ETH:
 			return trace_get_payload_from_ethernet(link,type,remaining);
 		case TRACE_TYPE_NONE:
-			if (*link&0xF0 == 4)
+			if (*(char*)link&0xF0 == 4)
 				*type=0x0800;
-			else if (*link&0xF0 == 6)
+			else if (*(char*)link&0xF0 == 6)
 				*type=0x86DD;
 			return link; /* I love the simplicity */
 		case TRACE_TYPE_LINUX_SLL:
