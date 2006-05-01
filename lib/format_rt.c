@@ -84,14 +84,14 @@ struct rt_format_data_t {
 	int buf_filled;
 
 	
-	struct libtrace_t *dummy_erf;
-	struct libtrace_t *dummy_pcap;
-	struct libtrace_t *dummy_wag;
+	libtrace_t *dummy_erf;
+	libtrace_t *dummy_pcap;
+	libtrace_t *dummy_wag;
 };
 
 static struct libtrace_format_t rt;
 
-static int rt_connect(struct libtrace_t *libtrace) {
+static int rt_connect(libtrace_t *libtrace) {
         struct hostent *he;
         struct sockaddr_in remote;
 	rt_header_t connect_msg;
@@ -186,7 +186,7 @@ static int rt_connect(struct libtrace_t *libtrace) {
 }
 
 
-static int rt_init_input(struct libtrace_t *libtrace) {
+static int rt_init_input(libtrace_t *libtrace) {
         char *scan;
         char *uridata = libtrace->uridata;
         libtrace->format_data = malloc(sizeof(struct rt_format_data_t));
@@ -221,7 +221,7 @@ static int rt_init_input(struct libtrace_t *libtrace) {
 	return rt_connect(libtrace);
 }
 	
-static int rt_start_input(struct libtrace_t *libtrace) {
+static int rt_start_input(libtrace_t *libtrace) {
 	rt_header_t start_msg;
 
 	start_msg.type = RT_START;
@@ -238,7 +238,7 @@ static int rt_start_input(struct libtrace_t *libtrace) {
 	return 0;
 }
 
-static int rt_fin_input(struct libtrace_t *libtrace) {
+static int rt_fin_input(libtrace_t *libtrace) {
         rt_header_t close_msg;
 
 	close_msg.type = RT_CLOSE;
@@ -266,7 +266,7 @@ static int rt_fin_input(struct libtrace_t *libtrace) {
 
 #define RT_BUF_SIZE 4000
 
-static int rt_read(struct libtrace_t *libtrace, void **buffer, size_t len, int block) {
+static int rt_read(libtrace_t *libtrace, void **buffer, size_t len, int block) {
         int numbytes;
 	rt_header_t *test_hdr;
 	
@@ -385,7 +385,7 @@ static int rt_set_format(libtrace_t *libtrace, libtrace_packet_t *packet)
 	return 0; /* success */
 }		
 
-static void rt_set_payload(struct libtrace_packet_t *packet) {
+static void rt_set_payload(libtrace_packet_t *packet) {
 	dag_record_t *erfptr;
 	
 	switch (packet->type) {
@@ -404,7 +404,7 @@ static void rt_set_payload(struct libtrace_packet_t *packet) {
 	}
 }
 
-static int rt_send_ack(struct libtrace_t *libtrace, 
+static int rt_send_ack(libtrace_t *libtrace, 
 		uint32_t seqno)  {
 	
 	static char *ack_buffer = 0;
@@ -536,7 +536,7 @@ static int rt_read_packet(libtrace_t *libtrace,
 }
 
 
-static int rt_get_capture_length(const struct libtrace_packet_t *packet) {
+static int rt_get_capture_length(const libtrace_packet_t *packet) {
 	switch (packet->type) {
 		case RT_DUCK:
 			return 0; /* FIXME */
@@ -579,8 +579,8 @@ static int rt_get_fd(const libtrace_t *trace) {
         return ((struct rt_format_data_t *)trace->format_data)->input_fd;
 }
 
-struct libtrace_eventobj_t trace_event_rt(struct libtrace_t *trace, struct libtrace_packet_t *packet) {
-	struct libtrace_eventobj_t event = {0,0,0.0,0};
+libtrace_eventobj_t trace_event_rt(libtrace_t *trace, libtrace_packet_t *packet) {
+	libtrace_eventobj_t event = {0,0,0.0,0};
 	libtrace_err_t read_err;
 
 	assert(trace);

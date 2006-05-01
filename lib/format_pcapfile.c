@@ -56,7 +56,7 @@ struct pcapfile_format_data_t {
 	} header;
 };
 
-static int pcapfile_init_input(struct libtrace_t *libtrace) {
+static int pcapfile_init_input(libtrace_t *libtrace) {
 	libtrace->format_data = malloc(sizeof(struct pcapfile_format_data_t));
 
 	DATA(libtrace)->file=NULL;
@@ -153,7 +153,7 @@ struct pcapfile_pkt_hdr_t {
 	uint32_t wirelen;
 };
 
-static int pcapfile_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
+static int pcapfile_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	int err;
 
 	assert(libtrace->format_data);
@@ -276,7 +276,7 @@ static int8_t pcapfile_get_direction(const libtrace_packet_t *packet)
 
 
 static struct timeval pcapfile_get_timeval(
-		const struct libtrace_packet_t *packet) 
+		const libtrace_packet_t *packet) 
 {
 	struct pcapfile_pkt_hdr_t *hdr =
 		(struct pcapfile_pkt_hdr_t*)packet->header;

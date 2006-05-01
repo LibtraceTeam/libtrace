@@ -378,10 +378,10 @@ DLLEXPORT libtrace_tcp_t *trace_get_tcp(libtrace_packet_t *packet) {
 
 DLLEXPORT libtrace_tcp_t *trace_get_tcp_from_ip(libtrace_ip_t *ip, uint32_t *remaining)
 {
-	struct libtrace_tcp *tcpptr = 0;
+	libtrace_tcp_t *tcpptr = 0;
 
 	if (ip->ip_p == 6)  {
-		tcpptr = (struct libtrace_tcp *)
+		tcpptr = (libtrace_tcp_t *)
 			trace_get_payload_from_ip(ip, NULL, remaining);
 	}
 
@@ -402,7 +402,7 @@ DLLEXPORT libtrace_udp_t *trace_get_udp(libtrace_packet_t *packet) {
 
 DLLEXPORT libtrace_udp_t *trace_get_udp_from_ip(libtrace_ip_t *ip, uint32_t *remaining)
 {
-	struct libtrace_udp *udpptr = 0;
+	libtrace_udp_t *udpptr = 0;
 
 	if (ip->ip_p == 17) {
 		udpptr = (libtrace_udp_t *)

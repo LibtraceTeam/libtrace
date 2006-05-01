@@ -257,7 +257,7 @@ DLLEXPORT void trace_help() {
  *
  */
 DLLEXPORT SIMPLE_FUNCTION
-char *trace_get_output_format(const struct libtrace_out_t *libtrace) {
+char *trace_get_output_format(const libtrace_out_t *libtrace) {
 	char * format = libtrace->format->name;
 
 	return format;
@@ -288,9 +288,9 @@ char *trace_get_output_format(const struct libtrace_out_t *libtrace) {
  * If an error occured when attempting to open a trace, NULL is returned
  * and an error is output to stdout.
  */
-DLLEXPORT struct libtrace_t *trace_create(const char *uri) {
-        struct libtrace_t *libtrace = 
-			(struct libtrace_t *)malloc(sizeof(struct libtrace_t));
+DLLEXPORT libtrace_t *trace_create(const char *uri) {
+        libtrace_t *libtrace = 
+			(libtrace_t *)malloc(sizeof(libtrace_t));
         char *scan = 0;
         const char *uridata = 0;                  
 	struct libtrace_format_t *tmp;
@@ -369,9 +369,8 @@ DLLEXPORT struct libtrace_t *trace_create(const char *uri) {
  * with the dummy trace. Its intended purpose is to act as a packet->trace for
  * libtrace_packet_t's that are not associated with a libtrace_t structure.
  */
-DLLEXPORT struct libtrace_t * trace_create_dead (const char *uri) {
-	struct libtrace_t *libtrace = (struct libtrace_t *)
-					malloc(sizeof(struct libtrace_t));
+DLLEXPORT libtrace_t * trace_create_dead (const char *uri) {
+	libtrace_t *libtrace = (libtrace_t *) malloc(sizeof(libtrace_t));
 	char *scan = (char *)calloc(sizeof(char),URI_PROTO_LINE);
 	char *uridata;
 	struct libtrace_format_t *tmp;
@@ -418,7 +417,7 @@ DLLEXPORT struct libtrace_t * trace_create_dead (const char *uri) {
 	
 DLLEXPORT libtrace_out_t *trace_create_output(const char *uri) {
 	libtrace_out_t *libtrace = 
-			(libtrace_out_t*)malloc(sizeof(struct libtrace_out_t));
+			(libtrace_out_t*)malloc(sizeof(libtrace_out_t));
 	
 	char *scan = 0;
         const char *uridata = 0;
@@ -489,7 +488,7 @@ DLLEXPORT libtrace_out_t *trace_create_output(const char *uri) {
  * This does the work associated with actually starting up
  * the trace.  it may fail.
  */
-DLLEXPORT int trace_start(struct libtrace_t *libtrace)
+DLLEXPORT int trace_start(libtrace_t *libtrace)
 {
 	assert(libtrace);
 	if (libtrace->format->start_input) {
@@ -542,7 +541,7 @@ DLLEXPORT int trace_config(libtrace_t *libtrace,
 			libtrace->snaplen=*(int*)value;
 			return 0;
 		case TRACE_OPTION_FILTER:
-			libtrace->filter=(struct libtrace_filter_t *)value;
+			libtrace->filter=(libtrace_filter_t *)value;
 			return 0;
 		case TRACE_OPTION_PROMISC:
 			trace_set_err(libtrace,TRACE_ERR_OPTION_UNAVAIL,
@@ -562,7 +561,7 @@ DLLEXPORT int trace_config(libtrace_t *libtrace,
  *
  * @author Shane Alcock
  */
-DLLEXPORT int trace_config_output(struct libtrace_out_t *libtrace, 
+DLLEXPORT int trace_config_output(libtrace_out_t *libtrace, 
 		trace_option_output_t option,
 		void *value) {
 	if (libtrace->format->config_output) {
@@ -574,7 +573,7 @@ DLLEXPORT int trace_config_output(struct libtrace_out_t *libtrace,
 /* Close a trace file, freeing up any resources it may have been using
  *
  */
-DLLEXPORT void trace_destroy(struct libtrace_t *libtrace) {
+DLLEXPORT void trace_destroy(libtrace_t *libtrace) {
         assert(libtrace);
 	if (libtrace->started && libtrace->format->pause_input)
 		libtrace->format->pause_input(libtrace);
@@ -586,7 +585,7 @@ DLLEXPORT void trace_destroy(struct libtrace_t *libtrace) {
 }
 
 
-DLLEXPORT void trace_destroy_dead(struct libtrace_t *libtrace) {
+DLLEXPORT void trace_destroy_dead(libtrace_t *libtrace) {
 	assert(libtrace);
 	free(libtrace);
 }
@@ -596,7 +595,7 @@ DLLEXPORT void trace_destroy_dead(struct libtrace_t *libtrace) {
  *
  * @author Shane Alcock
  * */
-DLLEXPORT void trace_destroy_output(struct libtrace_out_t *libtrace) {
+DLLEXPORT void trace_destroy_output(libtrace_out_t *libtrace) {
 	assert(libtrace);
 	libtrace->format->fin_output(libtrace);
 	free(libtrace->uridata);
@@ -633,7 +632,7 @@ DLLEXPORT libtrace_packet_t *trace_copy_packet(const libtrace_packet_t *packet) 
  *
  * sideeffect: sets packet to NULL
  */
-DLLEXPORT void trace_destroy_packet(struct libtrace_packet_t **packet) {
+DLLEXPORT void trace_destroy_packet(libtrace_packet_t **packet) {
 	if ((*packet)->buf_control == TRACE_CTRL_PACKET) {
 		free((*packet)->buffer);
 	}
@@ -695,7 +694,7 @@ DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
  *
  * @author Shane Alcock
  * */
-DLLEXPORT int trace_write_packet(struct libtrace_out_t *libtrace, const struct libtrace_packet_t *packet) {
+DLLEXPORT int trace_write_packet(libtrace_out_t *libtrace, const libtrace_packet_t *packet) {
 	assert(libtrace);
 	assert(packet);	
 	/* Verify the packet is valid */
@@ -709,7 +708,7 @@ DLLEXPORT int trace_write_packet(struct libtrace_out_t *libtrace, const struct l
 	return -1;
 }
 
-DLLEXPORT void *trace_get_link(const struct libtrace_packet_t *packet) {
+DLLEXPORT void *trace_get_link(const libtrace_packet_t *packet) {
 	return (void *)packet->payload;
 }
 
@@ -798,7 +797,7 @@ DLLEXPORT struct timeval trace_get_timeval(const libtrace_packet_t *packet) {
  * @returns time that this packet was seen in 64bit floating point seconds
  * @author Perry Lorier
  */ 
-DLLEXPORT double trace_get_seconds(const struct libtrace_packet_t *packet) {
+DLLEXPORT double trace_get_seconds(const libtrace_packet_t *packet) {
 	double seconds = 0.0;
 	uint64_t ts = 0;
 	struct timeval tv;
@@ -892,9 +891,9 @@ DLLEXPORT libtrace_linktype_t trace_get_link_type(const libtrace_packet_t *packe
  * which in turn is stored inside the new packet object...
  * @author Perry Lorier
  */
-DLLEXPORT struct libtrace_eventobj_t trace_event(struct libtrace_t *trace, 
-		struct libtrace_packet_t *packet) {
-	struct libtrace_eventobj_t event = {TRACE_EVENT_IOWAIT,0,0.0,0};
+DLLEXPORT libtrace_eventobj_t trace_event(libtrace_t *trace, 
+		libtrace_packet_t *packet) {
+	libtrace_eventobj_t event = {TRACE_EVENT_IOWAIT,0,0.0,0};
 
 	if (!trace) {
 		fprintf(stderr,"You called trace_event() with a NULL trace object!\n");
@@ -919,10 +918,10 @@ DLLEXPORT struct libtrace_eventobj_t trace_event(struct libtrace_t *trace,
  * @returns opaque pointer pointer to a libtrace_filter_t object
  * @author Daniel Lawson
  */
-DLLEXPORT struct libtrace_filter_t *trace_bpf_setfilter(const char *filterstring) {
+DLLEXPORT libtrace_filter_t *trace_bpf_setfilter(const char *filterstring) {
 #if HAVE_BPF
-	libtrace_filter_t *filter = (struct libtrace_filter_t*)
-				malloc(sizeof(struct libtrace_filter_t));
+	libtrace_filter_t *filter = (libtrace_filter_t*)
+				malloc(sizeof(libtrace_filter_t));
 	filter->filterstring = strdup(filterstring);
 	filter->flag = 0;
 	return filter;
@@ -999,8 +998,8 @@ int trace_bpf_compile(libtrace_filter_t *filter,
 #endif
 }
 
-DLLEXPORT int trace_bpf_filter(struct libtrace_filter_t *filter,
-			const struct libtrace_packet_t *packet) {
+DLLEXPORT int trace_bpf_filter(libtrace_filter_t *filter,
+			const libtrace_packet_t *packet) {
 #if HAVE_BPF
 	void *linkptr = 0;
 	int clen = 0;
@@ -1033,7 +1032,7 @@ DLLEXPORT int trace_bpf_filter(struct libtrace_filter_t *filter,
  * @returns a signed value containing the direction flag, or -1 if this is not supported
  * @author Daniel Lawson
  */
-DLLEXPORT int8_t trace_set_direction(struct libtrace_packet_t *packet, int8_t direction) {
+DLLEXPORT int8_t trace_set_direction(libtrace_packet_t *packet, int8_t direction) {
 	assert(packet);
 	assert(packet->size>0 && packet->size<65536);
 	if (packet->trace->format->set_direction) {
@@ -1051,7 +1050,7 @@ DLLEXPORT int8_t trace_set_direction(struct libtrace_packet_t *packet, int8_t di
  * for a special trace.
  * @author Daniel Lawson
  */
-DLLEXPORT int8_t trace_get_direction(const struct libtrace_packet_t *packet) {
+DLLEXPORT int8_t trace_get_direction(const libtrace_packet_t *packet) {
 	assert(packet);
 	assert(packet->size>0 && packet->size<65536);
 	if (packet->trace->format->get_direction) {
@@ -1185,7 +1184,7 @@ DLLEXPORT int8_t trace_get_server_port(uint8_t protocol UNUSED, uint16_t source,
  * original size is returned and the packet is left unchanged.
  * @author Daniel Lawson
  */
-DLLEXPORT size_t trace_set_capture_length(struct libtrace_packet_t *packet, size_t size) {
+DLLEXPORT size_t trace_set_capture_length(libtrace_packet_t *packet, size_t size) {
 	assert(packet);
 	assert(packet->size>0 && packet->size<65536);
 
@@ -1221,7 +1220,7 @@ DLLEXPORT const char * trace_parse_uri(const char *uri, char **format) {
 	return uridata;
 }
 
-enum base_format_t trace_get_format(struct libtrace_packet_t *packet) 
+enum base_format_t trace_get_format(libtrace_packet_t *packet) 
 {
 	assert(packet);
 

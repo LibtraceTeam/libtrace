@@ -143,7 +143,7 @@ typedef struct erf_index_t {
 } erf_index_t;
 
 #ifdef HAVE_DAG
-static int dag_init_input(struct libtrace_t *libtrace) {
+static int dag_init_input(libtrace_t *libtrace) {
 	struct stat buf;
 
 	libtrace->format_data = (struct erf_format_data_t *)
@@ -686,7 +686,7 @@ static int erf_dump_packet(libtrace_out_t *libtrace,
 		return -1;
 	}
 
-	if ((numbytes=libtrace_io_write(OUTPUT.file, buffer, size)) != size) {
+	if ((numbytes=libtrace_io_write(OUTPUT.file, buffer, size)) != (int)size) {
 		trace_set_err_out(libtrace,errno,
 				"write(%s)",libtrace->uridata);
 		return -1;

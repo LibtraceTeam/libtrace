@@ -74,22 +74,22 @@ struct legacy_format_data_t {
         } input;
 };
 
-static int legacyeth_get_framing_length(const struct libtrace_packet_t *packet UNUSED) 
+static int legacyeth_get_framing_length(const libtrace_packet_t *packet UNUSED) 
 {
 	return sizeof(legacy_ether_t);
 }
 
-static int legacypos_get_framing_length(const struct libtrace_packet_t *packet UNUSED) 
+static int legacypos_get_framing_length(const libtrace_packet_t *packet UNUSED) 
 {
 	return sizeof(legacy_pos_t);
 }
 
-static int legacyatm_get_framing_length(const struct libtrace_packet_t *packet UNUSED) 
+static int legacyatm_get_framing_length(const libtrace_packet_t *packet UNUSED) 
 {
 	return sizeof(legacy_cell_t);
 }
 
-static int erf_init_input(struct libtrace_t *libtrace) 
+static int erf_init_input(libtrace_t *libtrace) 
 {
 	libtrace->format_data = malloc(sizeof(struct legacy_format_data_t));
 
@@ -106,13 +106,13 @@ static int erf_start_input(libtrace_t *libtrace)
 	return -1;
 }
 
-static int erf_fin_input(struct libtrace_t *libtrace) {
+static int erf_fin_input(libtrace_t *libtrace) {
 	libtrace_io_close(INPUT.file);
 	free(libtrace->format_data);
 	return 0;
 }
 
-static int legacy_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
+static int legacy_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	int numbytes;
 	void *buffer;
 
@@ -151,37 +151,37 @@ static int legacy_read_packet(struct libtrace_t *libtrace, struct libtrace_packe
 	
 }
 
-static libtrace_linktype_t legacypos_get_link_type(const struct libtrace_packet_t *packet UNUSED) {
+static libtrace_linktype_t legacypos_get_link_type(const libtrace_packet_t *packet UNUSED) {
 	return TRACE_TYPE_POS;
 }
 
-static libtrace_linktype_t legacyatm_get_link_type(const struct libtrace_packet_t *packet UNUSED) {
+static libtrace_linktype_t legacyatm_get_link_type(const libtrace_packet_t *packet UNUSED) {
 	return TRACE_TYPE_ATM;
 }
 
-static libtrace_linktype_t legacyeth_get_link_type(const struct libtrace_packet_t *packet UNUSED) {
+static libtrace_linktype_t legacyeth_get_link_type(const libtrace_packet_t *packet UNUSED) {
 	return TRACE_TYPE_ETH;
 }
 
-static int legacy_get_capture_length(const struct libtrace_packet_t *packet UNUSED) {
+static int legacy_get_capture_length(const libtrace_packet_t *packet UNUSED) {
 	return 64;
 }
 
-static int legacypos_get_wire_length(const struct libtrace_packet_t *packet) {
+static int legacypos_get_wire_length(const libtrace_packet_t *packet) {
 	legacy_pos_t *lpos = (legacy_pos_t *)packet->header;
 	return ntohs(lpos->wlen);
 }
 
-static int legacyatm_get_wire_length(const struct libtrace_packet_t *packet UNUSED) {
+static int legacyatm_get_wire_length(const libtrace_packet_t *packet UNUSED) {
 	return 53;
 }
 
-static int legacyeth_get_wire_length(const struct libtrace_packet_t *packet) {
+static int legacyeth_get_wire_length(const libtrace_packet_t *packet) {
 	legacy_ether_t *leth = (legacy_ether_t *)packet->header;
 	return ntohs(leth->wlen);
 }
 
-static uint64_t legacy_get_erf_timestamp(const struct libtrace_packet_t *packet)
+static uint64_t legacy_get_erf_timestamp(const libtrace_packet_t *packet)
 {
 	legacy_ether_t *legacy = (legacy_ether_t*)packet->header;
 	return legacy->ts;

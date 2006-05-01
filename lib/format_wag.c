@@ -113,7 +113,7 @@ static int wag_start_input(libtrace_t *libtrace)
 	return -1;
 }
 
-static int wtf_init_input(struct libtrace_t *libtrace) 
+static int wtf_init_input(libtrace_t *libtrace) 
 {
 	libtrace->format_data = calloc(1,sizeof(struct wag_format_data_t));
 	return 0;
@@ -131,7 +131,7 @@ static int wtf_start_input(libtrace_t *libtrace)
 	return 0; /* success */
 }
 
-static int wtf_init_output(struct libtrace_out_t *libtrace) {
+static int wtf_init_output(libtrace_out_t *libtrace) {
 	libtrace->format_data = malloc(sizeof(struct wag_format_data_out_t));
 
 	OUTPUT.file = 0;
@@ -151,7 +151,7 @@ static int wtf_start_output(libtrace_out_t *libtrace) {
 	return 0;
 }
 
-static int wtf_config_output(struct libtrace_out_t *libtrace, 
+static int wtf_config_output(libtrace_out_t *libtrace, 
 		trace_option_output_t option,
 		void *value) {
 	switch(option) {
@@ -182,24 +182,24 @@ static int wag_pause_input(libtrace_t *libtrace)
 	return 0;
 }
 
-static int wag_fin_input(struct libtrace_t *libtrace) {
+static int wag_fin_input(libtrace_t *libtrace) {
 	free(libtrace->format_data);
 	return 0;
 }
 
-static int wtf_fin_input(struct libtrace_t *libtrace) {
+static int wtf_fin_input(libtrace_t *libtrace) {
 	libtrace_io_close(INPUT.file);
 	free(libtrace->format_data);
 	return 0;
 }
 
-static int wtf_fin_output(struct libtrace_out_t *libtrace) {
+static int wtf_fin_output(libtrace_out_t *libtrace) {
 	libtrace_io_close(OUTPUT.file);
 	free(libtrace->format_data);
 	return 0;
 }
 
-static int wag_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
+static int wag_read(libtrace_t *libtrace, void *buffer, size_t len) {
         size_t framesize;
         char *buf_ptr = (char *)buffer;
         int to_read = 0;
@@ -259,7 +259,7 @@ static int wag_read(struct libtrace_t *libtrace, void *buffer, size_t len) {
 }
 
 
-static int wag_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
+static int wag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	int numbytes;
 	
         if (packet->buf_control == TRACE_CTRL_EXTERNAL || !packet->buffer) {
@@ -282,7 +282,7 @@ static int wag_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 	return numbytes;
 }
 
-static int wtf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
+static int wtf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	int numbytes;
 	void *buffer;
 	void *buffer2;
@@ -334,7 +334,7 @@ static int wtf_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t
 	
 }				
 	
-static int wtf_write_packet(struct libtrace_out_t *libtrace, const struct libtrace_packet_t *packet) {
+static int wtf_write_packet(libtrace_out_t *libtrace, const libtrace_packet_t *packet) {
 	int numbytes =0 ;
 	if (packet->trace->format != &wag_trace) {
 		trace_set_err_out(libtrace,TRACE_ERR_NO_CONVERSION,
@@ -361,11 +361,11 @@ static int wtf_write_packet(struct libtrace_out_t *libtrace, const struct libtra
 	return numbytes;
 }
 
-static libtrace_linktype_t wag_get_link_type(const struct libtrace_packet_t *packet UNUSED) {
+static libtrace_linktype_t wag_get_link_type(const libtrace_packet_t *packet UNUSED) {
 	return TRACE_TYPE_80211;
 }
 
-static int8_t wag_get_direction(const struct libtrace_packet_t *packet) {
+static int8_t wag_get_direction(const libtrace_packet_t *packet) {
 	struct frame_data_rx_t *wagptr = (struct frame_data_rx_t *)packet->buffer;
 	if (wagptr->hdr.type == 0) {
 		return wagptr->hdr.subtype; 
@@ -373,19 +373,19 @@ static int8_t wag_get_direction(const struct libtrace_packet_t *packet) {
 	return -1;
 }
 
-static uint64_t wag_get_erf_timestamp(const struct libtrace_packet_t *packet) {
+static uint64_t wag_get_erf_timestamp(const libtrace_packet_t *packet) {
 	struct frame_data_rx_t *wagptr = (struct frame_data_rx_t *)packet->buffer;
 	uint64_t timestamp = 0;
 	timestamp = ((uint64_t)(ntohl(wagptr->ts.secs)) << 32) | (uint64_t)(ntohl(wagptr->ts.subsecs));
 	return timestamp;
 }
 
-static int wag_get_capture_length(const struct libtrace_packet_t *packet) {
+static int wag_get_capture_length(const libtrace_packet_t *packet) {
 	return ntohs(((struct frame_t *)packet->header)->size)
 		-sizeof(struct frame_data_rx_t);
 }
 
-static int wag_get_wire_length(const struct libtrace_packet_t *packet) {
+static int wag_get_wire_length(const libtrace_packet_t *packet) {
 	return ntohs(((struct frame_t *)packet->header)->size)
 		-sizeof(struct frame_data_rx_t);
 }

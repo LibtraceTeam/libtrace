@@ -85,7 +85,7 @@ struct pcap_format_data_out_t {
 	} output;
 };
 
-static int pcap_init_input(struct libtrace_t *libtrace) {
+static int pcap_init_input(libtrace_t *libtrace) {
 	libtrace->format_data = malloc(sizeof(struct pcap_format_data_t));
 
 	INPUT.pcap = NULL;
@@ -96,7 +96,7 @@ static int pcap_init_input(struct libtrace_t *libtrace) {
 	return 0;
 }
 
-static int pcap_start_input(struct libtrace_t *libtrace) {
+static int pcap_start_input(libtrace_t *libtrace) {
 	char errbuf[PCAP_ERRBUF_SIZE];
 
 	/* if the file is already open */
@@ -172,7 +172,7 @@ static int pcapint_init_output(libtrace_out_t *libtrace) {
 #endif
 }
 
-static int pcapint_init_input(struct libtrace_t *libtrace) {
+static int pcapint_init_input(libtrace_t *libtrace) {
 	libtrace->format_data = malloc(sizeof(struct pcap_format_data_t));
 	DATA(libtrace)->filter = NULL;
 	DATA(libtrace)->snaplen = LIBTRACE_PACKET_BUFSIZE;
@@ -260,7 +260,7 @@ static int pcapint_fin_output(libtrace_out_t *libtrace)
 }
 
 static void trace_pcap_handler(u_char *user, const struct pcap_pkthdr *pcaphdr, const u_char *pcappkt) {
-	struct libtrace_packet_t *packet = (struct libtrace_packet_t *)user;	
+	libtrace_packet_t *packet = (libtrace_packet_t *)user;	
 	/*
 	// pcap provides us with the right bits, in it's own buffers.
 	// We hijack them.
@@ -283,7 +283,7 @@ static void trace_pcap_handler(u_char *user, const struct pcap_pkthdr *pcaphdr, 
 }
 
 /* TODO: use pcap_next_ex() if available */
-static int pcap_read_packet(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
+static int pcap_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	int pcapbytes = 0;
 	int linktype;
 
@@ -434,7 +434,7 @@ static int8_t pcap_get_direction(const libtrace_packet_t *packet) {
 }
 
 
-static struct timeval pcap_get_timeval(const struct libtrace_packet_t *packet) {
+static struct timeval pcap_get_timeval(const libtrace_packet_t *packet) {
 	struct pcap_pkthdr *pcapptr = (struct pcap_pkthdr *)packet->header;
 	struct timeval ts;
 	ts.tv_sec = pcapptr->ts.tv_sec;
