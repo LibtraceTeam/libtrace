@@ -1030,9 +1030,10 @@ DLLEXPORT int trace_bpf_filter(libtrace_filter_t *filter,
  * @param packet the packet opaque pointer
  * @param direction the new direction (0,1,2,3)
  * @returns a signed value containing the direction flag, or -1 if this is not supported
- * @author Daniel Lawson
  */
-DLLEXPORT int8_t trace_set_direction(libtrace_packet_t *packet, int8_t direction) {
+DLLEXPORT libtrace_direction_t trace_set_direction(libtrace_packet_t *packet, 
+		libtrace_direction_t direction) 
+{
 	assert(packet);
 	assert(packet->size>0 && packet->size<65536);
 	if (packet->trace->format->set_direction) {
@@ -1050,7 +1051,8 @@ DLLEXPORT int8_t trace_set_direction(libtrace_packet_t *packet, int8_t direction
  * for a special trace.
  * @author Daniel Lawson
  */
-DLLEXPORT int8_t trace_get_direction(const libtrace_packet_t *packet) {
+DLLEXPORT libtrace_direction_t trace_get_direction(const libtrace_packet_t *packet) 
+{
 	assert(packet);
 	assert(packet->size>0 && packet->size<65536);
 	if (packet->trace->format->get_direction) {

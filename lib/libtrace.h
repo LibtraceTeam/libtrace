@@ -193,6 +193,32 @@ typedef enum {
 	TRACE_DLT_PFLOG = 117
 } libtrace_dlt_t ;
 
+/** Link layer types
+ * This enumates the various different link types that libtrace understands
+ */
+typedef enum { 
+       TRACE_TYPE_HDLC_POS = 1, 
+       TRACE_TYPE_ETH,			/**< 802.3 style Ethernet */
+       TRACE_TYPE_ATM,
+       TRACE_TYPE_AAL5,
+       TRACE_TYPE_80211,		/**< 802.11 frames */
+       TRACE_TYPE_NONE,			/**< Raw IP frames */
+       TRACE_TYPE_LINUX_SLL,		/**< Linux "null" framing */
+       TRACE_TYPE_PFLOG,		/**< FreeBSD's PFlug */
+       TRACE_TYPE_POS,
+       TRACE_TYPE_80211_PRISM = 12
+     } libtrace_linktype_t;
+
+/** Trace directions 
+ * Note that these are the directions used by convention, more directions 
+ * are possible, not just these 3, and that they may not conform to this
+ * convention.
+ */
+typedef enum {
+	TRACE_DIR_OUTGOING = 0,		/**< Packets originating "outside" */
+	TRACE_DIR_INCOMING = 1,		/**< Packets originating "inside" */
+	TRACE_DIR_OTHER	   = 2		/**< Packets with an unknown direction, or one that's unknown */
+} libtrace_direction_t;
 
 /** @name Protocol structures
  * These convenience structures are here as they are portable ways of dealing
@@ -1053,22 +1079,6 @@ DLLEXPORT size_t trace_set_capture_length(libtrace_packet_t *packet, size_t size
 /*@}*/
 
 
-/** Link layer types
- * This enumates the various different link types that libtrace understands
- */
-typedef enum { 
-       TRACE_TYPE_HDLC_POS = 1, 
-       TRACE_TYPE_ETH,			/**< 802.3 style Ethernet */
-       TRACE_TYPE_ATM,
-       TRACE_TYPE_AAL5,
-       TRACE_TYPE_80211,		/**< 802.11 frames */
-       TRACE_TYPE_NONE,
-       TRACE_TYPE_LINUX_SLL,		/**< Linux "null" framing */
-       TRACE_TYPE_PFLOG,		/**< FreeBSD's PFlug */
-       TRACE_TYPE_POS,
-       TRACE_TYPE_80211_PRISM = 12
-     } libtrace_linktype_t;
-
 /** Get the type of the link layer
  * @param packet  	the packet opaque pointer
  * @return libtrace_linktype_t
@@ -1080,15 +1090,14 @@ libtrace_linktype_t trace_get_link_type(const libtrace_packet_t *packet);
 
 /** Set the direction flag, if it has one
  * @param packet  	the packet opaque pointer
- * @param direction	the new direction (0,1,2,3)
- * @return a signed value containing the direction flag, or -1 if this is not supported
- * @author Daniel Lawson
+ * @param direction	the new direction 
+ * @returns -1 on error, or the direction that was set.
  */
-DLLEXPORT int8_t trace_set_direction(libtrace_packet_t *packet, int8_t direction);
+DLLEXPORT libtrace_direction_t trace_set_direction(libtrace_packet_t *packet, libtrace_direction_t direction);
 
 /** Get the direction flag, if it has one
  * @param packet  	the packet opaque pointer
- * @return a signed value containing the direction flag, or -1 if this is not supported
+ * @return a value containing the direction flag, or -1 if this is not supported
  * The direction is defined as 0 for packets originating locally (ie, outbound)
  * and 1 for packets originating remotely (ie, inbound).
  * Other values are possible, which might be overloaded to mean special things
@@ -1096,7 +1105,7 @@ DLLEXPORT int8_t trace_set_direction(libtrace_packet_t *packet, int8_t direction
  * @author Daniel Lawson
  */
 DLLEXPORT SIMPLE_FUNCTION
-int8_t trace_get_direction(const libtrace_packet_t *packet);
+libtrace_direction_t trace_get_direction(const libtrace_packet_t *packet);
 
 /** @name BPF
  * This section deals with using Berkley Packet Filters
