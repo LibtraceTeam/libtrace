@@ -223,7 +223,7 @@ static int pcapint_start_input(libtrace_t *libtrace) {
 		}
 	}
 #ifdef HAVE_PCAP_SETNONBLOCK
-	pcap_setnonblock(&INPUT.pcap,0,errbuf);
+	pcap_setnonblock(INPUT.pcap,0,errbuf);
 #endif
 	return 0; /* success */
 }
