@@ -262,6 +262,8 @@ static libtrace_linktype_t linuxnative_get_link_type(const struct libtrace_packe
 	switch (linktype) {
 		case ARPHRD_ETHER:
 			return TRACE_TYPE_ETH;
+		case ARPHRD_PPP:
+			return TRACE_TYPE_NONE;
 		default: /* shrug, beyond me! */
 			printf("unknown type %x\n",linktype);
 			return -1;
