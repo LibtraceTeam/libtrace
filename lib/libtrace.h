@@ -881,7 +881,7 @@ uint8_t *trace_get_destination_mac(libtrace_packet_t *packet);
  * @param packet  	the packet opaque pointer
  * @return a pointer to the source mac, (or NULL if there is no source MAC)
  */
-SIMPLE_FUNCTION
+DLLEXPORT SIMPLE_FUNCTION
 uint8_t *trace_get_source_mac(libtrace_packet_t *packet);
 
 /** Get the source addres
@@ -1236,6 +1236,7 @@ enum base_format_t {
  * @param packet	the packet opaque pointer
  * @return the format of the packet
  */
+DLLEXPORT 
 enum base_format_t trace_get_format(struct libtrace_packet_t *packet);
 
 #ifdef __cplusplus
