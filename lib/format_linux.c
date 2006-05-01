@@ -94,6 +94,7 @@ static int linuxnative_init_output(libtrace_out_t *libtrace)
 static int linuxnative_start_input(libtrace_t *libtrace)
 {
 	struct sockaddr_ll addr;
+	memset(&addr,0,sizeof(addr));
 	FORMAT(libtrace->format_data)->fd = 
 				socket(PF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
 	if (FORMAT(libtrace->format_data)->fd==-1) {
@@ -123,6 +124,7 @@ static int linuxnative_start_input(libtrace_t *libtrace)
 	if (addr.sll_ifindex!=0) {
 		struct packet_mreq mreq;
 		socklen_t socklen = sizeof(mreq);
+		memset(&mreq,0,sizeof(mreq));
 		mreq.mr_ifindex = addr.sll_ifindex;
 		mreq.mr_type = PACKET_MR_PROMISC;
 		setsockopt(FORMAT(libtrace->format_data)->fd,
