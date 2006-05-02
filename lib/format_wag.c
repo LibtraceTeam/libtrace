@@ -211,6 +211,7 @@ static int wag_read(libtrace_t *libtrace, void *buffer, size_t len,
 
         to_read = sizeof(struct frame_t);
 
+#ifndef WIN32
 	fd_flags = fcntl(INPUT.fd, F_GETFL);
 	if (fd_flags == -1) {
 		/* TODO: Replace with better libtrace-style 
@@ -236,6 +237,7 @@ static int wag_read(libtrace_t *libtrace, void *buffer, size_t len,
 			}
 		}
 	}
+#endif
 
 	/* I'm not sure if wag has a memory hole which we can use for 
 	 * zero-copy - something to add in later, I guess */
