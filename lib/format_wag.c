@@ -199,31 +199,68 @@ static int wtf_fin_output(libtrace_out_t *libtrace) {
 	return 0;
 }
 
-static int wag_read(libtrace_t *libtrace, void *buffer, size_t len) {
+static int wag_read(libtrace_t *libtrace, void *buffer, size_t len, 
+		int block) {
         size_t framesize;
         char *buf_ptr = (char *)buffer;
         int to_read = 0;
         uint16_t magic = 0;
-
+	long fd_flags;
+	
         assert(libtrace);
 
         to_read = sizeof(struct frame_t);
 
+	fd_flags = fcntl(INPUT.fd, F_GETFL);
+	if (fd_flags == -1) {
+		/* TODO: Replace with better libtrace-style 
+		 * error handling later */
+		perror("Could not get fd flags");
+		return 0;
+	}
+	
+	
+	
+	if (!block) {
+		if (fcntl(INPUT.fd, F_SETFL, fd_flags | O_NONBLOCK) == -1) {
+			perror("Could not set fd flags");
+			return 0;
+		}
+	}
+	else {
+		if (fd_flags & O_NONBLOCK) {
+			fd_flags &= ~O_NONBLOCK;
+			if (fcntl(INPUT.fd, F_SETFL, fd_flags) == -1) {
+				perror("Could not set fd flags");
+				return 0;
+			}
+		}
+	}
+
+	/* I'm not sure if wag has a memory hole which we can use for 
+	 * zero-copy - something to add in later, I guess */
+	
         while (to_read>0) {
-          int ret=read(INPUT.fd,buf_ptr,to_read);
+        	int ret=read(INPUT.fd,buf_ptr,to_read);
 
-          if (ret == -1) {
-            if (errno == EINTR || errno==EAGAIN)
-              continue;
+          	if (ret == -1) {
+          	  	if (errno == EINTR)
+              			continue;
+			
+			if (errno == EAGAIN) {
+				trace_set_err(libtrace, EAGAIN, "EAGAIN");
+				return -1;
+			}
+	    
+	    		trace_set_err(libtrace,errno,
+					"read(%s)",libtrace->uridata);
+            		return -1;
+          	}
 
-	    trace_set_err(libtrace,errno,"read(%s)",libtrace->uridata);
-            return -1;
-          }
+          	assert(ret>0);
 
-          assert(ret>0);
-
-          to_read = to_read - ret;
-          buf_ptr = buf_ptr + ret;
+          	to_read = to_read - ret;
+          	buf_ptr = buf_ptr + ret;
         }
 
 
@@ -237,29 +274,35 @@ static int wag_read(libtrace_t *libtrace, void *buffer, size_t len) {
         }
 
 	/* We should deal.  this is called "snapping", but we don't yet */
-	assert(framesize>len);
+	assert(framesize<=len);
 
         buf_ptr = (void*)((char*)buffer + sizeof (struct frame_t));
         to_read = framesize - sizeof(struct frame_t);
         
 	while (to_read>0) {
-          int ret=read(INPUT.fd,buf_ptr,to_read);
+          	int ret=read(INPUT.fd,buf_ptr,to_read);
 
-          if (ret == -1) {
-            if (errno == EINTR || errno==EAGAIN)
-              continue;
-	    trace_set_err(libtrace,errno,"read(%s)",libtrace->uridata);
-            return -1;
-          }
+          	if (ret == -1) {
+            		if (errno == EINTR) 
+              			continue;
+			if (errno == EAGAIN) {
+				/* What happens to the frame header?! */
+				trace_set_err(libtrace, EAGAIN, "EAGAIN");
+				return -1;
+			}
+	    		trace_set_err(libtrace,errno,"read(%s)",
+					libtrace->uridata);
+            		return -1;
+          	}
 
-          to_read = to_read - ret;
-          buf_ptr = buf_ptr + ret;
+          	to_read = to_read - ret;
+          	buf_ptr = buf_ptr + ret;
         }
         return framesize;
 }
 
 
-static int wag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
+static int wag_read_packet_versatile(libtrace_t *libtrace, libtrace_packet_t *packet, int block_flag) {
 	int numbytes;
 	
         if (packet->buf_control == TRACE_CTRL_EXTERNAL || !packet->buffer) {
@@ -271,7 +314,8 @@ static int wag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	packet->trace = libtrace;
 	packet->type = RT_DATA_WAG;
 	
-	if ((numbytes = wag_read(libtrace, (void *)packet->buffer, RP_BUFSIZE)) <= 0) {
+	if ((numbytes = wag_read(libtrace, (void *)packet->buffer, 
+					RP_BUFSIZE, block_flag)) <= 0) {
 	    
     		return numbytes;
 	}
@@ -279,7 +323,12 @@ static int wag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	
 	packet->header = packet->buffer;
 	packet->payload=(char*)packet->buffer+trace_get_framing_length(packet);
+	packet->size = trace_get_framing_length(packet) + trace_get_capture_length(packet);
 	return numbytes;
+}
+
+static int wag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
+	return wag_read_packet_versatile(libtrace, packet, 1);
 }
 
 static int wtf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
@@ -398,6 +447,39 @@ static int wag_get_fd(const libtrace_t *trace) {
 	return DATA(trace)->input.fd;
 }
 
+struct libtrace_eventobj_t trace_event_wag(libtrace_t *trace, libtrace_packet_t *packet) {
+	struct libtrace_eventobj_t event = {0,0,0.0,0};
+	libtrace_err_t read_err;
+
+	assert(trace);
+	assert(packet);
+
+	/* We could probably just call get_fd here */
+	if (trace->format->get_fd) {
+		event.fd = trace->format->get_fd(trace);
+	} else {
+		event.fd = 0;
+	}
+	
+	event.size = wag_read_packet_versatile(trace, packet, 0);
+	if (event.size == -1) {
+		read_err = trace_get_err(trace);
+		if (read_err.err_num = EAGAIN) {
+			event.type = TRACE_EVENT_IOWAIT;
+		}
+		else {
+			printf("Packet error\n");
+			event.type = TRACE_EVENT_PACKET;
+		}
+	} else if (event.size == 0) {
+		event.type = TRACE_EVENT_TERMINATE;
+	} else {
+		event.type = TRACE_EVENT_PACKET;
+	}
+
+	return event;
+}
+	
 static void wag_help() {
 	printf("wag format module: $Revision$\n");
 	printf("Supported input URIs:\n");
@@ -456,7 +538,7 @@ static struct libtrace_format_t wag = {
 	wag_get_framing_length,		/* get_framing_length */
 	NULL,				/* set_capture_length */
 	wag_get_fd,			/* get_fd */
-	trace_event_device,		/* trace_event */
+	trace_event_wag,		/* trace_event */
 	wag_help,			/* help */
 	NULL				/* next pointer */
 };
