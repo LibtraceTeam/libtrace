@@ -367,6 +367,17 @@ static libtrace_linktype_t pcap_get_link_type(const libtrace_packet_t *packet) {
 	return pcap_dlt_to_libtrace(linktype);
 }
 
+static int8_t pcap_set_direction(libtrace_packet_t *packet,int8_t dir) {
+	libtrace_sll_header_t *sll;
+	promote_packet(packet);
+	sll=packet->payload;
+	if(dir==0)
+		sll->pkttype=0;
+	else
+		sll->pkttype=1;
+	return sll->pkttype;
+}
+
 static int8_t pcap_get_direction(const libtrace_packet_t *packet) {
 	int8_t direction  = -1;
 	switch(pcap_get_link_type(packet)) {
@@ -517,7 +528,7 @@ static struct libtrace_format_t pcap = {
 	pcap_write_packet,		/* write_packet */
 	pcap_get_link_type,		/* get_link_type */
 	pcap_get_direction,		/* get_direction */
-	NULL,				/* set_direction */
+	pcap_set_direction,		/* set_direction */
 	NULL,				/* get_erf_timestamp */
 	pcap_get_timeval,		/* get_timeval */
 	NULL,				/* get_seconds */
@@ -552,7 +563,7 @@ static struct libtrace_format_t pcapint = {
 	pcapint_write_packet,		/* write_packet */
 	pcap_get_link_type,		/* get_link_type */
 	pcap_get_direction,		/* get_direction */
-	NULL,				/* set_direction */
+	pcap_set_direction,		/* set_direction */
 	NULL,				/* get_erf_timestamp */
 	pcap_get_timeval,		/* get_timeval */
 	NULL,				/* get_seconds */

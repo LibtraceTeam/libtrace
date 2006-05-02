@@ -6,6 +6,10 @@
 #include "dagformat.h"
 #include "rt_protocol.h"
 #include <assert.h>
+#include "libtrace_int.h"
+#include <stdlib.h>
+#include <net/if_arp.h>
+#include <string.h>
 
 /* This file maps libtrace types to/from pcap DLT and erf types
  *
@@ -24,10 +28,10 @@ libtrace_linktype_t pcap_dlt_to_libtrace(libtrace_dlt_t dlt)
 		case TRACE_DLT_LINUX_SLL: return TRACE_TYPE_LINUX_SLL;
 		case TRACE_DLT_PFLOG: return TRACE_TYPE_PFLOG;
 	}
-	return -1;
+	return ~0;
 }
 
-int libtrace_to_pcap_dlt(libtrace_linktype_t type)
+libtrace_dlt_t libtrace_to_pcap_dlt(libtrace_linktype_t type)
 {
 	switch(type) {
 		case TRACE_TYPE_NONE: return TRACE_DLT_NULL;
@@ -37,16 +41,16 @@ int libtrace_to_pcap_dlt(libtrace_linktype_t type)
 		case TRACE_TYPE_LINUX_SLL: return TRACE_DLT_LINUX_SLL;
 		case TRACE_TYPE_PFLOG: return TRACE_DLT_PFLOG;
 	}
-	return -1;
+	return ~0;
 }
 
-enum rt_field_t pcap_dlt_to_rt(int dlt) 
+enum rt_field_t pcap_dlt_to_rt(libtrace_dlt_t dlt) 
 {
 	/* For pcap the rt type is just the dlt + a fixed value */
 	return dlt + RT_DATA_PCAP;
 }
 
-int rt_to_pcap_dlt(enum rt_field_t rt_type)
+libtrace_dlt_t rt_to_pcap_dlt(enum rt_field_t rt_type)
 {
 	assert(rt_type >= RT_DATA_PCAP);
 	return rt_type - RT_DATA_PCAP;
@@ -60,7 +64,7 @@ libtrace_linktype_t erf_type_to_libtrace(char erf)
 		case TYPE_ATM:		return TRACE_TYPE_ATM;
 		case TYPE_AAL5:		return TRACE_TYPE_AAL5;
 	}
-	return -1;
+	return ~0;
 }
 
 char libtrace_to_erf_type(libtrace_linktype_t linktype)
@@ -72,4 +76,60 @@ char libtrace_to_erf_type(libtrace_linktype_t linktype)
 		case TRACE_TYPE_AAL5:	return TYPE_AAL5;
 	}
 	return -1;
+}
+
+/** Tinker with a packet
+ * packets that don't support direction tagging are annoying, especially
+ * when we have direction tagging information!  So this converts the packet
+ * to TRACE_TYPE_LINUX_SLL which does support direction tagging.  This is a
+ * pcap style packet for the reason that it means it works with bpf filters.
+ *
+ * @note this will copy the packet, so use sparingly if possible.
+ */
+void promote_packet(libtrace_packet_t *packet)
+{
+	if (packet->trace->format->type == TRACE_FORMAT_PCAP) {
+		char *tmpbuffer;
+		libtrace_sll_header_t *hdr;
+
+		switch(pcap_dlt_to_libtrace(rt_to_pcap_dlt(packet->type))) {
+			case TRACE_TYPE_LINUX_SLL:
+				return; /* Unnecessary */
+
+			case TRACE_TYPE_ETH:
+				/* This should be easy, just prepend the header */
+				tmpbuffer= malloc(sizeof(libtrace_sll_header_t)
+						+trace_get_capture_length(packet)
+						+trace_get_framing_length(packet)
+						);
+
+				hdr=(void*)((char*)tmpbuffer
+					+trace_get_framing_length(packet));
+
+				hdr->pkttype=0; /* "outgoing" */
+				hdr->hatype = ARPHRD_ETHER;
+				break;
+			default:
+				/* failed */
+				return;
+		}
+		memcpy(tmpbuffer,packet->header,
+				trace_get_framing_length(packet));
+		memcpy(tmpbuffer
+				+sizeof(libtrace_sll_header_t)
+				+trace_get_framing_length(packet),
+				packet->payload,
+				trace_get_capture_length(packet));
+		if (packet->buf_control == TRACE_CTRL_EXTERNAL) {
+			packet->buf_control=TRACE_CTRL_PACKET;
+		}
+		else {
+			free(packet->buffer);
+		}
+		packet->buffer=tmpbuffer;
+		packet->header=tmpbuffer;
+		packet->payload=tmpbuffer+trace_get_framing_length(packet);
+		packet->type=TRACE_TYPE_LINUX_SLL;
+		return;
+	}
 }
