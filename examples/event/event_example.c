@@ -142,20 +142,6 @@ int main(int argc, char *argv[]) {
 		/* Got a packet - let's do something with it */
 		per_packet(packet);
 		
-		/*
-		pkt_count ++;
-		byte_count += trace_get_wire_length(packet);
-		
-		ts = trace_get_seconds(packet);
-		if (last_second == 0) {
-			last_second = (uint32_t)ts;
-		} else if (last_second < (uint32_t)ts) {
-			fprintf(stdout, "%d\tPackets: %d\tBytes: %d\n", last_second, pkt_count, byte_count);
-			last_second = (uint32_t)ts;
-			pkt_count = 0;
-			byte_count = 0;
-		}
-		*/
 	}
 	free(uri);
 	trace_destroy(trace);
