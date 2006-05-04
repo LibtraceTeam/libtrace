@@ -379,7 +379,7 @@ static int8_t pcap_set_direction(libtrace_packet_t *packet,int8_t dir) {
 }
 
 static int8_t pcap_get_direction(const libtrace_packet_t *packet) {
-	int8_t direction  = -1;
+	libtrace_direction_t direction  = -1;
 	switch(pcap_get_link_type(packet)) {
 		case TRACE_TYPE_LINUX_SLL:
 		{

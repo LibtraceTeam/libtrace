@@ -24,7 +24,7 @@
  * along with libtrace; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
- * $Id$
+ * $Id: libtrace.h 773 2006-05-01 12:58:09Z perry $
  *
  */
 
@@ -38,7 +38,7 @@
  * @author Daniel Lawson
  * @author Perry Lorier
  *
- * @version $Id$
+ * @version $Id: libtrace.h 773 2006-05-01 12:58:09Z perry $
  *
  * This library provides a per packet interface into a trace file, or a live 
  * captures.  It supports ERF, DAG cards, WAG cards, WAG's event format,
@@ -100,7 +100,8 @@
 #endif
 
 /** API version as 2 byte hex digits, eg 0xXXYYZZ */
-#define LIBTRACE_API_VERSION 0x030000  /* 3.0.00 */
+#define LIBTRACE_API_VERSION \
+            ((@LIBTRACE_MAJOR@<<16)|(@LIBTRACE_MID@<<8)|(@LIBTRACE_MINOR@))
 
 #ifdef __cplusplus 
 extern "C" { 

@@ -3,7 +3,7 @@
 #ifdef HAVE_PCAP
 #include <pcap.h>
 #endif
-#include "dagformat.h"
+
 #include "rt_protocol.h"
 #include <assert.h>
 #include "libtrace_int.h"

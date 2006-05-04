@@ -243,7 +243,7 @@ struct libtrace_format_t {
 	/** set the direction of this packet 
 	 * @note This callback may be NULL if not supported.
 	 */ 
-	int8_t (*set_direction)(const libtrace_packet_t *packet, int8_t direction);
+	int8_t (*set_direction)(libtrace_packet_t *packet, int8_t direction);
 	/** return the erf timestamp of the packet.
 	 * @return the 64bit erf timestamp
 	 * This field may be NULL in the structure, and libtrace will

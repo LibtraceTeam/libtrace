@@ -15,7 +15,9 @@ PLUGINDIR=$(libdir)/libpacketdump
 
 INCLUDES= @ADD_INCLS@ -I../lib -I../
 libpacketdump_la_LIBADD = @ADD_LIBS@  -ldl
-libpacketdump_la_LDFLAGS=-version-info 3:0:0 @ADD_LDFLAGS@
+libpacketdump_la_LDFLAGS=\
+	-version-info @LIBTRACE_MAJOR@:@LIBTRACE_MINOR@:@LIBTRACE_MID@ \
+	@ADD_LDFLAGS@
 
 AM_CXXFLAGS=-g -Wall -DDIRNAME=\"$(PLUGINDIR)\" -rdynamic $(INCLUDES)
 

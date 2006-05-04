@@ -780,7 +780,7 @@ static int8_t erf_get_direction(const libtrace_packet_t *packet) {
 	return erfptr->flags.iface;
 }
 
-static int8_t erf_set_direction(const libtrace_packet_t *packet, int8_t direction) {
+static int8_t erf_set_direction(libtrace_packet_t *packet, int8_t direction) {
 	dag_record_t *erfptr = 0;
 	erfptr = (dag_record_t *)packet->header;
 	erfptr->flags.iface = direction;
