@@ -50,7 +50,7 @@ struct tracefifo_t {
 /* This MIN is more generic but not as portable
  * #define MIN(a,b) ({ int _a = a; int _b = b; (_a < _b) ? _a : _b; })
  */
-#define MIN(a,b) ((a)<(b)?(a):(b))
+#define FIFO_MIN(a,b) ((a)<(b)?(a):(b))
 
 static char *tracefifo_stat_buffer = 0;
 
@@ -200,7 +200,7 @@ static int tracefifo_read_generic(struct tracefifo_t *fifo, void *buffer, size_t
         oldptr = fifo->datamap[which];
         lenleft = len;
         while (lenleft > 0) {
-                size = MIN( ( fifo->length - fifo->datamap[which]), lenleft);
+                size = FIFO_MIN( ( fifo->length - fifo->datamap[which]), lenleft);
                 memcpy(buffer, 
                                 (char *)((ptrdiff_t)fifo->base + fifo->datamap[which]), 
                                 size);
@@ -227,7 +227,7 @@ int tracefifo_write(struct tracefifo_t *fifo, void *buffer, size_t len) {
 
         lenleft = len;
         while (lenleft > 0) {
-                size = MIN((fifo->length - fifo->datamap[FIFO_PTR_IN]), lenleft );
+                size = FIFO_MIN((fifo->length - fifo->datamap[FIFO_PTR_IN]), lenleft );
                 memcpy((char *)((ptrdiff_t)fifo->base + fifo->datamap[FIFO_PTR_IN]), 
                                 buffer, 
                                 size);

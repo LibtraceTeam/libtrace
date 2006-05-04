@@ -774,13 +774,13 @@ static libtrace_linktype_t erf_get_link_type(const libtrace_packet_t *packet) {
 	return erf_type_to_libtrace(erfptr->type);
 }
 
-static int8_t erf_get_direction(const libtrace_packet_t *packet) {
+static libtrace_direction_t erf_get_direction(const libtrace_packet_t *packet) {
 	dag_record_t *erfptr = 0;
 	erfptr = (dag_record_t *)packet->header;
 	return erfptr->flags.iface;
 }
 
-static int8_t erf_set_direction(libtrace_packet_t *packet, int8_t direction) {
+static libtrace_direction_t erf_set_direction(libtrace_packet_t *packet, libtrace_direction_t direction) {
 	dag_record_t *erfptr = 0;
 	erfptr = (dag_record_t *)packet->header;
 	erfptr->flags.iface = direction;
