@@ -529,8 +529,15 @@ static int erf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	if (!packet->buffer || packet->buf_control == TRACE_CTRL_EXTERNAL) {
 		packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
 		packet->buf_control = TRACE_CTRL_PACKET;
+		if (!packet->buffer) {
+			trace_set_err(libtrace, errno, 
+					"Cannot allocate memory");
+			return -1;
+		}
 	}
 
+	
+	
 	packet->header = packet->buffer;
 	packet->type = RT_DATA_ERF;
 

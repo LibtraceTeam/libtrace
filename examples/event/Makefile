@@ -1,5 +1,5 @@
 
-PREFIX=/usr/local
+PREFIX=/usr/local/
 CC=gcc
 
 INCLUDE = -I$(PREFIX)/include
@@ -8,7 +8,7 @@ CFLAGS  += $(INCLUDE)
 LDFLAGS = -L$(PREFIX)/lib
 LDLIBS  = -ltrace
 
-BINS = rate rate-tracetime
+BINS = event_example 
 .PHONY: all clean distclean install depend
 
 all: $(BINS) 

@@ -215,9 +215,9 @@ static libtrace_linktype_t pcapfile_get_link_type(
 			);
 }
 
-static int8_t pcapfile_get_direction(const libtrace_packet_t *packet) 
+static libtrace_direction_t pcapfile_get_direction(const libtrace_packet_t *packet) 
 {
-	int8_t direction  = -1;
+	libtrace_direction_t direction  = -1;
 	switch(pcapfile_get_link_type(packet)) {
 		case TRACE_TYPE_LINUX_SLL:
 		{
@@ -241,9 +241,9 @@ static int8_t pcapfile_get_direction(const libtrace_packet_t *packet)
 			 * use "inbound" and "outbound" on ppp in linux
 			 */
 			if (ntohs(sll->pkttype == 0)) {
-				direction = 1;
+				direction = TRACE_DIR_INCOMING;
 			} else {
-				direction = 0;
+				direction = TRACE_DIR_OUTGOING;
 			}
 			break;
 
@@ -261,10 +261,10 @@ static int8_t pcapfile_get_direction(const libtrace_packet_t *packet)
 			/* enum    { PF_IN=0, PF_OUT=1 }; */
 			if (ntohs(pflog->dir==0)) {
 
-				direction = 1;
+				direction = TRACE_DIR_INCOMING;
 			}
 			else {
-				direction = 0;
+				direction = TRACE_DIR_OUTGOING;
 			}
 			break;
 		}
