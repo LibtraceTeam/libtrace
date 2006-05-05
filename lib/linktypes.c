@@ -14,6 +14,7 @@
 #include <net/if_arp.h>
 #else
 #define ARPHRD_ETHER    1               /* Ethernet 10/100Mbps.  */
+#define ARPHRD_PPP      512
 #endif
 
 /* This file maps libtrace types to/from pcap DLT and erf types
