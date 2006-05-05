@@ -101,6 +101,7 @@ void promote_packet(libtrace_packet_t *packet)
 			case TRACE_TYPE_LINUX_SLL:
 				return; /* Unnecessary */
 
+			case TRACE_TYPE_NONE:
 			case TRACE_TYPE_ETH:
 				/* This should be easy, just prepend the header */
 				tmpbuffer= malloc(sizeof(libtrace_sll_header_t)
@@ -112,7 +113,15 @@ void promote_packet(libtrace_packet_t *packet)
 					+trace_get_framing_length(packet));
 
 				hdr->pkttype=0; /* "outgoing" */
-				hdr->hatype = ARPHRD_ETHER;
+				if (pcap_dlt_to_libtrace(rt_to_pcap_dlt(packet->type))==TRACE_TYPE_ETH)
+					hdr->hatype = ARPHRD_ETHER;
+				else
+					hdr->hatype = ARPHRD_PPP;
+				trace_get_payload_from_link(
+					trace_get_link(packet),
+					trace_get_link_type(packet),
+					&hdr->protocol,
+					NULL);
 				break;
 			default:
 				/* failed */
@@ -134,7 +143,7 @@ void promote_packet(libtrace_packet_t *packet)
 		packet->buffer=tmpbuffer;
 		packet->header=tmpbuffer;
 		packet->payload=tmpbuffer+trace_get_framing_length(packet);
-		packet->type=TRACE_TYPE_LINUX_SLL;
+		packet->type=pcap_dlt_to_rt(TRACE_DLT_LINUX_SLL);
 		return;
 	}
 }
