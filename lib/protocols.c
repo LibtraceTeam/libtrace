@@ -7,6 +7,7 @@
 #include "wag.h"
 #include <assert.h>
 #include <stdio.h>
+#include <net/if_arp.h>
 
 
 /* Returns the payload from 802.3 ethernet.  Type optionally returned in
@@ -85,6 +86,7 @@ static void *trace_get_payload_from_linux_sll(void *link,
 		uint16_t *type, uint32_t *remaining) 
 {
 	libtrace_sll_header_t *sll;
+	void *ret;
 
 	sll = (libtrace_sll_header_t*) link;
 
@@ -96,7 +98,16 @@ static void *trace_get_payload_from_linux_sll(void *link,
 
 	if (*type) *type = sll->protocol;
 
-	return (void*)((char*)sll+sizeof(*sll));
+	ret=(void*)((char*)sll+sizeof(*sll));
+
+	switch(sll->hatype) {
+		case ARPHRD_PPP:
+			break;
+		case ARPHRD_ETHER:
+			ret=trace_get_payload_from_ethernet(ret,type,remaining);
+	}
+
+	return ret;
 }
 
 static void *trace_get_payload_from_atm(void *link,
