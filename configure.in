@@ -157,13 +157,22 @@ fi
 		AC_REPLACE_FUNCS(pcap_open_dead)
 	fi
    
-	# Versions of libpcap earlier than 0.8 don't have pcap_dump_flush
+	# Versions of libpcap earlier than 0.8 don't have pcap_dump_flush or
+	# pcap_next_ex
 	AC_CHECK_LIB(pcap,pcap_dump_flush,
 		     have_pcap_dump_flush=true,
 		     have_pcap_dump_flush=false)
 
 	if test "$have_pcap_dump_flush" = false; then
 		AC_REPLACE_FUNCS(pcap_dump_flush)
+	fi
+	
+	AC_CHECK_LIB(pcap,pcap_next_ex,
+		     have_pcap_next_ex=true,
+		     have_pcap_next_ex=false)
+
+	if test "$have_pcap_next_ex" = false; then
+		AC_REPLACE_FUNCS(pcap_next_ex)
 	fi
 
 	AC_CHECK_LIB(pcap,pcap_inject,

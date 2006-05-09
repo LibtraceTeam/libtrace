@@ -16,4 +16,5 @@ int pcap_dump_flush(pcap_dumper_t *p) {
 	else
 		return (0);
 }
+
 #endif

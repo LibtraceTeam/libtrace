@@ -272,6 +272,22 @@ static int pcap_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 
 	packet->buf_control = TRACE_CTRL_PACKET;
 
+	/* If we're using the replacement pcap_next_ex() we need to
+	 * make sure we have a buffer to *shudder* memcpy into 
+	 */
+	if (!packet->buffer) {
+		packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
+		if (!packet->buffer) {
+			trace_set_err(libtrace, errno, 
+					"Cannot allocate memory");
+			return -1;
+		}
+			
+		packet->header = packet->buffer;
+		packet->payload = (char *)packet->buffer + 
+					sizeof(struct pcap_pkthdr);
+	}
+	
 	for(;;) {
 
 		ret=pcap_next_ex(INPUT.pcap, 

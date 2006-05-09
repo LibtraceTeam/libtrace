@@ -12,8 +12,13 @@
 
 #ifndef WIN32
 #include <net/if_arp.h>
-#else
+#endif
+
+#ifndef ARPHRD_ETHER
 #define ARPHRD_ETHER    1               /* Ethernet 10/100Mbps.  */
+#endif
+
+#ifndef ARPHRD_PPP
 #define ARPHRD_PPP      512
 #endif
 

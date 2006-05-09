@@ -39,6 +39,14 @@
 
 #include "fifo.h"
 
+#ifndef PRIu64
+	#define PRIu64 "llu"
+#endif
+
+#ifndef PRIi64
+	#define PRIi64 "lli"
+#endif
+
 enum which_t { FIFO_PTR_IN, FIFO_PTR_OUT, FIFO_PTR_ACK };
 
 struct tracefifo_t {

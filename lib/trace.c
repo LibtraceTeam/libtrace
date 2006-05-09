@@ -49,6 +49,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/socket.h>
 #include <stdarg.h>
 
 #ifdef HAVE_LIMITS_H
