@@ -12,7 +12,8 @@ if HAS_DOXYGEN
 man_MANS = docs/doxygen/man/man3/trace*.3 docs/doxygen/man/man3/libtrace*.3 
 endif
 #man_MANS = @MANPAGES@
-EXTRA_DIST=examples
+EXTRA_DIST=examples libtrace.sln libtrace.vcproj test-convert.vcproj \
+		   test-format.vcproj test-pcap-bpf.vcproj
 #docs/html docs/latex docs/man $(man_MANS)
 
 .PHONY: docs
@@ -26,7 +27,9 @@ bootstrap-clean:
 
 dist-hook:
 	for dir in $(EXTRA_DIST); do \
+		if [ ! -d $(distdir)/$$dir ]; then continue; fi; \
 		rm -rf `find $(distdir)/$$dir -name CVS` ; \
+		rm -rf `find $(distdir)/$$dir -name .svn` ; \
 		for i in `\ls $(distdir)/$$dir `; do make -C $(distdir)/$$dir/$$i clean; done \
 	done
 
