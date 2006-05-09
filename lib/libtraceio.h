@@ -10,6 +10,8 @@
 #include <stdio.h>
 #endif
 
+#include <unistd.h>
+
 typedef struct libtrace_io_t libtrace_io_t;
 
 /** read a block from a file
