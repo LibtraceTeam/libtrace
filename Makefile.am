@@ -32,6 +32,7 @@ dist-hook:
 		rm -rf `find $(distdir)/$$dir -name .svn` ; \
 		for i in `\ls $(distdir)/$$dir `; do make -C $(distdir)/$$dir/$$i clean; done \
 	done
+	rm -rf $(distdir)/tools/tracereport/.{svn,deps}
 
 if HAS_DOXYGEN
 docs/doxygen/man/man3/*.3: docs
