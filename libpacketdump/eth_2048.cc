@@ -1,11 +1,12 @@
-#include <netinet/ether.h>
 #include <netinet/in.h>
 #include <stdio.h>
 #include <inttypes.h>
 #include <dlfcn.h>
-#include <map>
 #include "libpacketdump.h"
 #include <sys/socket.h>
+#ifndef WIN32
+	#include <netinet/in_systm.h>
+#endif
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <arpa/inet.h>
@@ -25,33 +26,39 @@
 extern "C"
 void decode(int link_type,char *packet,int len)
 {
-	struct iphdr *ip = (struct iphdr*)packet;
+	libtrace_ip_t *ip = (libtrace_ip_t*)packet;
 	if (len>=1) {
-		printf(" IP: Header Len %i",ip->ihl*4);
-		printf(" Ver %i",ip->version);
+		printf(" IP: Header Len %i",ip->ip_hl*4);
+		printf(" Ver %i",ip->ip_v);
 	}
-	DISPLAY(tos," TOS %02x")
-	DISPLAYS(tot_len," Total Length %i")
+	DISPLAY(ip_tos," TOS %02x")
+	DISPLAYS(ip_len," Total Length %i")
 	printf("\n IP:");
-	DISPLAY(id," Id %i");
-	DISPLAY(frag_off," Fragoff %i");
+	DISPLAY(ip_id," Id %i");
+	
+	if ((unsigned int)len >= ((char *)&ip->ip_ttl - (char *)ip - 2)) {
+		printf(" \n Fragoff %i", ip->ip_off);
+		if (ip->ip_mf) printf(" MORE_FRAG");
+		if (ip->ip_df) printf(" DONT_FRAG");
+		if (ip->ip_rf) printf(" RESV_FRAG");
+	}
 	//printf("\n IP:");
-	DISPLAY(ttl," TTL %i");
-	if ((unsigned int)len>=((char*)&ip->protocol-(char*)ip+sizeof(ip->protocol))) {
-		struct protoent *ent=getprotobynumber(ip->protocol);
+	DISPLAY(ip_ttl,"\n TTL %i");
+	if ((unsigned int)len>=((char*)&ip->ip_p-(char*)ip+sizeof(ip->ip_p))) {
+		struct protoent *ent=getprotobynumber(ip->ip_p);
 		if (ent) {
-			printf(" Proto %i (%s)",ip->protocol,ent->p_name);
+			printf(" Proto %i (%s)",ip->ip_p,ent->p_name);
 		}
 		else {
-			printf(" Proto %i",ip->protocol);
+			printf(" Proto %i",ip->ip_p);
 		}
 	} else {
 		printf("\n");
 		return;
 	}
-	DISPLAYS(check," Checksum %i\n");
-	DISPLAYIP(saddr," IP: Source %s ");
-	DISPLAYIP(daddr,"Destination %s\n");
-	decode_next(packet+sizeof(*ip),len-sizeof(*ip),"ip",ip->protocol);
+	DISPLAYS(ip_sum," Checksum %i\n");
+	DISPLAYIP(ip_src," IP: Source %s ");
+	DISPLAYIP(ip_dst,"Destination %s\n");
+	decode_next(packet+sizeof(*ip),len-sizeof(*ip),"ip",ip->ip_p);
 	return;
 }

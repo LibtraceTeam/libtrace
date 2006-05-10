@@ -1,23 +1,25 @@
-#include <netinet/ether.h>
 #include <netinet/in.h>
 #include <stdio.h>
 #include <inttypes.h>
 #include <dlfcn.h>
-#include <map>
+#include "libtrace.h"
 #include "libpacketdump.h"
 
 extern "C"
 void decode(int link_type,char *packet,int len)
 {
+	char ether_buf[18] = {0, };
 	printf(" Ethernet:");
 	if (len>=6)
-		printf(" Dest: %s",ether_ntoa((struct ether_addr*)packet));
+		printf(" Dest: %s",trace_ether_ntoa((uint8_t *)packet, 
+					ether_buf));
 	else {
 		printf("[|Truncated]\n");
 		return;
 	}
 	if (len>=12) 
-		printf(" Source: %s",ether_ntoa((struct ether_addr*)(packet+6)));
+		printf(" Source: %s",trace_ether_ntoa((uint8_t*)(packet+6), 
+					ether_buf));
 	else {
 		printf("[|Truncated]\n");
 		return;

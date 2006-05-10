@@ -1,10 +1,7 @@
 #include <stdio.h>
 #include <inttypes.h>
 #include <dlfcn.h>
-#include <map>
 #include "libpacketdump.h"
-#include <netinet/ip_icmp.h>
-#include <netinet/in.h>
 
 #define STRUCT icmp
 
@@ -44,7 +41,7 @@ static char *unreach_types[]={
 extern "C"
 void decode(int link_type,char *packet,int len)
 {
-	struct icmphdr *icmp = (struct icmphdr*)packet;
+	libtrace_icmp_t *icmp = (libtrace_icmp_t*)packet;
 	if (len<1)
 		return;
 	printf(" ICMP:");

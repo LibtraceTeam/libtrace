@@ -1,9 +1,7 @@
-#include <netinet/ether.h>
 #include <netinet/in.h>
 #include <stdio.h>
 #include <inttypes.h>
 #include <dlfcn.h>
-#include <map>
 #include "libpacketdump.h"
 
 extern "C"

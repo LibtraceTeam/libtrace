@@ -52,6 +52,10 @@
 
 #include "libtrace.h"
 
+#ifndef PRIu64
+	#define PRIu64 "llu"
+#endif
+
 struct libtrace_t *trace;
 
 struct filter_t {

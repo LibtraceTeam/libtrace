@@ -1,16 +1,17 @@
 /* ARP */
-#include <netinet/ether.h>
-#include <netinet/in.h>
 #include <stdio.h>
 #include <inttypes.h>
 #include <dlfcn.h>
-#include <map>
 #include "libpacketdump.h"
 #include <sys/socket.h>
+#ifndef WIN32
+	#include <netinet/in_systm.h>
+#endif
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <net/if_arp.h>
 #include <arpa/inet.h>
+#include <string.h>
 
 #define DISPLAY_EXP(x,fmt,exp) \
 	if ((unsigned int)len>=((char*)&ip->x-(char*)ip+sizeof(ip->x))) \
@@ -26,11 +27,13 @@
 static char *format(struct arphdr *arp, char *hrd, char *pro)
 {
 	static char buffer[1024];
+	char ether_buf[18] = {0, };
 	if (hrd==NULL)
 		return "Truncated (Truncated)";
 	switch(arp->ar_hrd) {
 		case ARPHRD_ETHER:
-			strcpy(buffer,ether_ntoa((struct ether_addr*)&hrd));
+			strcpy(buffer,trace_ether_ntoa((uint8_t *)&hrd, 
+						ether_buf));
 			break;
 		default:
 			int i;

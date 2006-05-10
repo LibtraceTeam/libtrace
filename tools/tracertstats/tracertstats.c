@@ -56,6 +56,10 @@
 #include "rt_protocol.h"
 #include "dagformat.h"
 
+#ifndef UINT32_MAX
+	#define UINT32_MAX      0xffffffffU
+#endif
+
 struct libtrace_t *trace;
 char *output_format=NULL;
 

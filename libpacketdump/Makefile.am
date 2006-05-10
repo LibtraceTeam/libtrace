@@ -14,7 +14,7 @@ libpacketdump_la_SOURCES = libpacketdump.cc $(PLUGINSOURCES)
 PLUGINDIR=$(libdir)/libpacketdump
 
 INCLUDES= @ADD_INCLS@ -I../lib -I../
-libpacketdump_la_LIBADD = @ADD_LIBS@  -ldl
+libpacketdump_la_LIBADD = @ADD_LIBS@  
 libpacketdump_la_LDFLAGS=\
 	-version-info @LIBTRACE_MAJOR@:@LIBTRACE_MINOR@:@LIBTRACE_MID@ \
 	@ADD_LDFLAGS@
@@ -32,7 +32,7 @@ clean-local:
 	rm -f $(PLUGINS)
 
 install-exec-local:
-	for plugin in $(PLUGINS); do install -D -m 755 $$plugin $(DESTDIR)$(PLUGINDIR)/$$plugin; done
+	mkdir -p $(DESTDIR)$(PLUGINDIR); for plugin in $(PLUGINS); do install -m 755 $$plugin $(DESTDIR)$(PLUGINDIR)/$$plugin; done
 
 uninstall-local:
 	for plugin in $(PLUGINS); do rm -f $(PLUGINDIR)/$$plugin; done

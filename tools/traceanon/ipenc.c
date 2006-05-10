@@ -1,3 +1,4 @@
+#include "config.h"
 #include "ipenc.h"
 #include "panon.h"
 #include <stdio.h>

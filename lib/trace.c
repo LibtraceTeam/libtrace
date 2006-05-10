@@ -576,12 +576,16 @@ DLLEXPORT int trace_config_output(libtrace_out_t *libtrace,
  */
 DLLEXPORT void trace_destroy(libtrace_t *libtrace) {
         assert(libtrace);
-	if (libtrace->started && libtrace->format->pause_input)
-		libtrace->format->pause_input(libtrace);
-	libtrace->format->fin_input(libtrace);
+	if (libtrace->format) {
+		if (libtrace->started && libtrace->format->pause_input)
+			libtrace->format->pause_input(libtrace);
+		libtrace->format->fin_input(libtrace);
+	}
         /* need to free things! */
-        free(libtrace->uridata);
-	destroy_tracefifo(libtrace->fifo);
+        if (libtrace->uridata)
+		free(libtrace->uridata);
+	if (libtrace->fifo)
+		destroy_tracefifo(libtrace->fifo);
         free(libtrace);
 }
 

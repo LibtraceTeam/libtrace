@@ -1,10 +1,9 @@
-#include <netinet/ether.h>
 #include <netinet/in.h>
 #include <stdio.h>
 #include <inttypes.h>
 #include <dlfcn.h>
-#include <map>
 #include "libpacketdump.h"
+#include "libtrace.h"
 
 struct ieee_802_11_header {
         uint8_t      protocol:2;
@@ -35,12 +34,13 @@ struct ieee_802_11_payload {
 extern "C"
 void decode(int link_type,char *packet,int len)
 {
+	char ether_buf[18] = {0, };
 	printf(" 802.11:");
 	struct ieee_802_11_header *hdr = (struct ieee_802_11_header *)packet;
 
-	printf(" %s",ether_ntoa((struct ether_addr*)(hdr->mac1)));
-	printf(" %s",ether_ntoa((struct ether_addr*)(hdr->mac2)));
-	printf(" %s",ether_ntoa((struct ether_addr*)(hdr->mac3)));
+	printf(" %s",trace_ether_ntoa((uint8_t*)(hdr->mac1), ether_buf));
+	printf(" %s",trace_ether_ntoa((uint8_t*)(hdr->mac2), ether_buf));
+	printf(" %s",trace_ether_ntoa((uint8_t*)(hdr->mac3), ether_buf));
 
 	struct ieee_802_11_payload *pld = (struct ieee_802_11_payload *) ((int)packet + sizeof(struct ieee_802_11_header) - 2);
 	uint16_t type = htons(pld->type);

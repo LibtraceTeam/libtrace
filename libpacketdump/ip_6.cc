@@ -1,10 +1,7 @@
 #include <stdio.h>
 #include <inttypes.h>
 #include <dlfcn.h>
-#include <map>
 #include "libpacketdump.h"
-#include <netinet/tcp.h>
-#include <netinet/in.h>
 #include <assert.h>
 #include <netdb.h>
 
@@ -51,7 +48,7 @@ int get_next_option(unsigned char **ptr,int *len,
 extern "C"
 void decode(int link_type,char *packet,int len)
 {
-	struct tcphdr *tcp = (struct tcphdr*)packet;
+	libtrace_tcp_t *tcp = (libtrace_tcp_t *)packet;
 	printf(" TCP:");
 	if (SAFE(source)) {
 		struct servent *ent=getservbyport(tcp->source,"tcp");
