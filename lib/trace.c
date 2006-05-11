@@ -251,19 +251,6 @@ DLLEXPORT void trace_help() {
 #define RP_BUFSIZE 65536
 #define URI_PROTO_LINE 16
 
-/* Gets the name of the output format for a given output trace. 
- *
- * @params libtrace	the output trace to get the name of the format for
- * @returns callee-owned null-terminated char* containing the output format
- *
- */
-DLLEXPORT SIMPLE_FUNCTION
-char *trace_get_output_format(const libtrace_out_t *libtrace) {
-	char * format = libtrace->format->name;
-
-	return format;
-}
-
 
 /* Create a trace file from a URI
  *

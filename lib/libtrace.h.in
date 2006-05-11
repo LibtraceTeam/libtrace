@@ -139,7 +139,7 @@ typedef struct libtrace_t libtrace_t;
 /** Opaque structure holding information about a bpf filter */
 typedef struct libtrace_filter_t libtrace_filter_t;
 
-/** if a packet has memory allocated
+/** If a packet has memory allocated
  * If the packet has allocated it's own memory it's buffer_control should
  * be TRACE_CTRL_PACKET, when the packet is destroyed it's memory will be
  * free()'d.  If it's doing zerocopy out of memory owned by something else
@@ -151,10 +151,11 @@ typedef enum {
 	TRACE_CTRL_PACKET='p',
 	TRACE_CTRL_EXTERNAL='e' 
 } buf_control_t;
-/** Structure holding information about a packet */
+/** The size of a packet's buffer when managed by libtrace */
 #define LIBTRACE_PACKET_BUFSIZE 65536
 
-/** The libtrace structure, applications shouldn't be meddling around in here 
+/** The libtrace packet structure, applications shouldn't be 
+ * meddling around in here 
  */
 typedef struct libtrace_packet_t {
 	struct libtrace_t *trace; /**< pointer to the trace */
@@ -183,16 +184,17 @@ enum {
 	TRACE_ERR_INIT_FAILED 	= -2,
 	/** Unknown config option */
 	TRACE_ERR_UNKNOWN_OPTION= -3,
-	/** Option known, but unsupported by this format */
-	TRACE_ERR_OPTION_UNAVAIL= -6,
 	/** This output uri cannot write packets of this type */
 	TRACE_ERR_NO_CONVERSION = -4,
 	/** This packet is corrupt, or unusable for the action required */ 
 	TRACE_ERR_BAD_PACKET	= -5,
+	/** Option known, but unsupported by this format */
+	TRACE_ERR_OPTION_UNAVAIL= -6,
 	/** This feature is unsupported */
 	TRACE_ERR_UNSUPPORTED	= -7
 };
 
+/** Enumeration of DLT types supported by libtrace */
 typedef enum {
 	TRACE_DLT_NULL = 0,
 	TRACE_DLT_EN10MB = 1,
@@ -202,13 +204,11 @@ typedef enum {
 	TRACE_DLT_PFLOG = 117
 } libtrace_dlt_t ;
 
-/** Link layer types
- * This enumates the various different link types that libtrace understands
- */
+/** Enumeration of link layer types supported by libtrace */
 typedef enum { 
        TRACE_TYPE_HDLC_POS = 1, 
        TRACE_TYPE_ETH,			/**< 802.3 style Ethernet */
-       TRACE_TYPE_ATM,
+       TRACE_TYPE_ATM,			/**< ATM frame */
        TRACE_TYPE_AAL5,
        TRACE_TYPE_80211,		/**< 802.11 frames */
        TRACE_TYPE_NONE,			/**< Raw IP frames */
@@ -240,48 +240,49 @@ typedef enum {
 #pragma pack(1)
 #endif
 
-/** Structure for dealing with IP packets */
+/** Generic IP header structure */
 typedef struct libtrace_ip
 {
 #if BYTE_ORDER == LITTLE_ENDIAN
-    uint8_t ip_hl:4;		/**< header length */
-    uint8_t ip_v:4;		/**< version */
+    uint8_t ip_hl:4;		/**< Header Length */
+    uint8_t ip_v:4;		/**< Version */
 #elif BYTE_ORDER == BIG_ENDIAN
-    uint8_t ip_v:4;		/**< version */
-    uint8_t ip_hl:4;		/**< header length */
+    uint8_t ip_v:4;		/**< Version */
+    uint8_t ip_hl:4;		/**< Header Length */
 #else
 #   error "Adjust your <bits/endian.h> defines"
 #endif
-    uint8_t  ip_tos;			/**< type of service */
-    uint16_t ip_len;			/**< total length */
-    int16_t  ip_id;			/**< identification */
+    uint8_t  ip_tos;			/**< Type of Service */
+    uint16_t ip_len;			/**< Total Length */
+    int16_t  ip_id;			/**< Identification */
 #if BYTE_ORDER == LITTLE_ENDIAN
-    uint16_t ip_off:12;		/**< fragment offset */
-    uint16_t ip_mf:1;		/**< more fragments flag */
-    uint16_t ip_df:1;		/**< dont fragment flag */
-    uint16_t ip_rf:1;		/**< reserved fragment flag */
+    uint16_t ip_off:12;		/**< Fragment Offset */
+    uint16_t ip_mf:1;		/**< More Fragments Flag */
+    uint16_t ip_df:1;		/**< Dont Fragment Flag */
+    uint16_t ip_rf:1;		/**< Reserved Fragment Flag */
 #elif BYTE_ORDER == BIG_ENDIAN
-    uint16_t ip_rf:1;
-    uint16_t ip_df:1;
-    uint16_t ip_mf:1;
-    uint16_t ip_off:12;
+    uint16_t ip_rf:1;		/**< Fragment Offset */
+    uint16_t ip_df:1;		/**< More Fragments Flag */
+    uint16_t ip_mf:1;		/**< Dont Fragment Flag */
+    uint16_t ip_off:12;		/**< Reserved Fragment Flag */
 #else
 #   error "Adjust your <bits/endian.h> defines"
 #endif
-    uint8_t  ip_ttl;			/**< time to live */
-    uint8_t  ip_p;			/**< protocol */
-    uint16_t ip_sum;			/**< checksum */
-    struct in_addr ip_src;		/**< source address */
-    struct in_addr ip_dst;		/**< dest address */
+    uint8_t  ip_ttl;			/**< Time to Live */
+    uint8_t  ip_p;			/**< Protocol */
+    uint16_t ip_sum;			/**< Checksum */
+    struct in_addr ip_src;		/**< Source Address */
+    struct in_addr ip_dst;		/**< Destination Address */
 } PACKED libtrace_ip_t;
 
+/** IPv6 header extension structure */
 typedef struct libtrace_ip6_ext
 {
 	uint8_t nxt;
 	uint8_t len;
 } PACKED libtrace_ip6_ext_t;
 
-/** IPv6 header structure */
+/** Generic IPv6 header structure */
 typedef struct libtrace_ip6
 { 
     uint32_t flow;
@@ -292,7 +293,7 @@ typedef struct libtrace_ip6
     struct in6_addr ip_dst;		/**< dest address */
 } PACKED libtrace_ip6_t;
 
-/** Structure for dealing with TCP packets */
+/** Generic TCP header structure */
 typedef struct libtrace_tcp
   {
     uint16_t source;		/**< Source Port */
@@ -301,7 +302,7 @@ typedef struct libtrace_tcp
     uint32_t ack_seq;		/**< Acknowledgement Number */
 #  if BYTE_ORDER == LITTLE_ENDIAN
     uint8_t res1:4;	/**< Reserved bits */
-    uint8_t doff:4;	/**< data offset */	
+    uint8_t doff:4;	/**< Data Offset */	
     uint8_t fin:1;		/**< FIN */
     uint8_t syn:1;		/**< SYN flag */
     uint8_t rst:1;		/**< RST flag */
@@ -327,7 +328,7 @@ typedef struct libtrace_tcp
     uint16_t urg_ptr;		/**< Urgent Pointer */
 } PACKED libtrace_tcp_t;
 
-/** UDP Header for dealing with UDP packets */
+/** Generic UDP header structure */
 typedef struct libtrace_udp {
   uint16_t	source;		/**< Source port */
   uint16_t	dest;		/**< Destination port */
@@ -335,29 +336,29 @@ typedef struct libtrace_udp {
   uint16_t	check;		/**< Checksum */
 } PACKED libtrace_udp_t;
 
-/** ICMP Header for dealing with icmp packets */
+/** Generic ICMP header structure */
 typedef struct libtrace_icmp
 {
-  uint8_t type;		/**< message type */
-  uint8_t code;		/**< type sub-code */
-  uint16_t checksum;		/**< checksum */
+  uint8_t type;		/**< Message Type */
+  uint8_t code;		/**< Type Sub-code */
+  uint16_t checksum;		/**< Checksum */
   union
   {
     struct
     {
       uint16_t	id;
       uint16_t	sequence;
-    } echo;			/**< echo datagram */
-    uint32_t	gateway;	/**< gateway address */
+    } echo;			/**< Echo Datagram */
+    uint32_t	gateway;	/**< Gateway Address */
     struct
     {
       uint16_t	unused;
       uint16_t	mtu;
-    } frag;			/**< path mtu discovery */
-  } un;				/**< Union for payloads of various icmp codes */
+    } frag;			/**< Path MTU Discovery */
+  } un;				/**< Union for Payloads of Various ICMP Codes */
 } PACKED libtrace_icmp_t;
 
-/** LLC/SNAP header */
+/** Generic LLC/SNAP header structure */
 typedef struct libtrace_llcsnap
 {
 /* LLC */
@@ -372,19 +373,19 @@ typedef struct libtrace_llcsnap
 /** 802.3 frame */
 typedef struct libtrace_ether
 {
-  uint8_t ether_dhost[6];	/**< destination ether addr */
-  uint8_t ether_shost[6];	/**< source ether addr */
-  uint16_t ether_type;		/**< packet type ID field (next-header) */
+  uint8_t ether_dhost[6];	/**< Destination Ether Addr */
+  uint8_t ether_shost[6];	/**< Source Ether Addr */
+  uint16_t ether_type;		/**< Packet Type ID Field (next-header) */
 } PACKED libtrace_ether_t;
 
 /** 802.1Q frame */
 typedef struct libtrace_8021q 
 {
-  uint16_t vlan_pri:3;	 /**< vlan user priority */
-  uint16_t vlan_cfi:1; 	 /**< vlan format indicator, 
+  uint16_t vlan_pri:3;	 /**< VLAN User Priority */
+  uint16_t vlan_cfi:1; 	 /**< VLAN Format Indicator, 
 				   * 0 for ethernet, 1 for token ring */
-  uint16_t vlan_id:12; 	 /**< vlan id */
-  uint16_t vlan_ether_type;	 /**< vlan sub-packet type ID field 
+  uint16_t vlan_id:12; 	 /**< VLAN Id */
+  uint16_t vlan_ether_type;	 /**< VLAN Sub-packet Type ID Field 
 				   * (next-header)*/
 } PACKED libtrace_8021q_t;
 
@@ -403,7 +404,7 @@ typedef struct libtrace_atm_cell
 typedef struct libtrace_pos
 {
  uint16_t header;
- uint16_t ether_type;		/**< ether type */
+ uint16_t ether_type;		/**< Ether Type */
 } PACKED libtrace_pos_t;
 
 /** 802.11 header */
@@ -441,15 +442,6 @@ typedef struct libtrace_80211_t {
  */
 DLLEXPORT void trace_help();
 
-/** Gets the output format for a given output trace
- *
- * @param libtrace	the output trace to get the name of the format fo
- * @return callee-owned null-terminated char* containing the output format
- *
- */
-DLLEXPORT SIMPLE_FUNCTION
-char *trace_get_output_format(const libtrace_out_t *libtrace);
-
 /** @name Trace management
  * These members deal with creating, configuring, starting, pausing and
  * cleaning up a trace object
@@ -459,23 +451,22 @@ char *trace_get_output_format(const libtrace_out_t *libtrace);
 /** Create a trace file from a URI
  * 
  * @param uri containing a valid libtrace URI
- * @return opaque pointer to a libtrace_t
+ * @return an opaque pointer to a libtrace_t
  *
  * Valid URI's are:
  *  - erf:/path/to/erf/file
- *  - erf:/path/to/erf/file.gz
- *  - erf:/path/to/rtclient/socket
  *  - erf:-  (stdin)
  *  - dag:/dev/dagcard                  
  *  - pcapint:pcapinterface                (eg: pcap:eth0)
  *  - pcap:/path/to/pcap/file
  *  - pcap:-
- *  - rtclient:hostname
- *  - rtclient:hostname:port
- *  - wag:-
- *  - wag:/path/to/wag/file
- *  - wag:/path/to/wag/file.gz
- *  - wag:/path/to/wag/socket
+ *  - rt:hostname
+ *  - rt:hostname:port
+ *  - rtclient:hostname	(deprecated)
+ *  - rtclient:hostname:port (deprecated)
+ *  - wag:/dev/wagcard
+ *  - wtf:-
+ *  - wtf:/path/to/wtf/file
  *
  *  If an error occured when attempting to open the trace file, an error
  *  trace is returned and trace_get_error should be called to find out
@@ -486,7 +477,7 @@ DLLEXPORT libtrace_t *trace_create(const char *uri);
 
 /** Creates a "dummy" trace file that has only the format type set.
  *
- * @return opaque pointer to a (sparsely initialised) libtrace_t
+ * @return an opaque pointer to a (sparsely initialised) libtrace_t
  *
  * IMPORTANT: Do not attempt to call trace_read_packet or other such functions
  * with the dummy trace. Its intended purpose is to act as a packet->trace for
@@ -497,14 +488,12 @@ DLLEXPORT libtrace_t *trace_create_dead(const char *uri);
 /** Creates a trace output file from a URI. 
  *
  * @param uri	the uri string describing the output format and destination
- * @return opaque pointer to a libtrace_output_t
- * @author Shane Alcock
+ * @return an opaque pointer to a libtrace_output_t
  *
  * Valid URI's are:
- *  - gzerf:/path/to/erf/file.gz
- *  - gzerf:/path/to/erf/file
- *  - rtserver:hostname
- *  - rtserver:hostname:port
+ *  - erf:/path/to/erf/file
+ *  - pcap:/path/to/pcap/file
+ *  - wtf:/path/to/wtf/file
  *
  *  If an error occured when attempting to open the output trace, NULL is returned 
  *  and trace_errno is set. Use trace_perror() to get more information
@@ -513,7 +502,7 @@ DLLEXPORT libtrace_out_t *trace_create_output(const char *uri);
 
 /** Start the capture
  * @param libtrace	The trace to start
- * @return 0 on success
+ * @return 0 on success, -1 on failure
  *
  * This does the actual work with starting the trace capture, and applying
  * all the config options.  This may fail.
@@ -522,7 +511,7 @@ DLLEXPORT int trace_start(libtrace_t *libtrace);
 
 /** Pause the capture
  * @param libtrace	The trace to pause
- * @return 0 on success
+ * @return 0 on success, -1 on failure
  *
  * This stops a capture in progress and returns you to the configuration
  * state.  Any packets that arrive after trace_pause() has been called
@@ -532,7 +521,7 @@ DLLEXPORT int trace_pause(libtrace_t *libtrace);
 
 /** Start an output trace
  * @param libtrace	The trace to start
- * @return 0 on success
+ * @return 0 on success, -1 on failure
  *
  * This does the actual work with starting a trace for write.  This generally
  * creates the file.
@@ -590,8 +579,6 @@ DLLEXPORT void trace_destroy_dead(libtrace_t *trace);
 
 /** Close a trace output file, freeing up any resources it may have been using
  * @param trace		the output trace file to be destroyed
- *
- * @author Shane Alcock
  */
 DLLEXPORT void trace_destroy_output(libtrace_out_t *trace);
 
@@ -671,7 +658,7 @@ DLLEXPORT libtrace_packet_t *trace_copy_packet(const libtrace_packet_t *packet);
 DLLEXPORT void trace_destroy_packet(libtrace_packet_t **packet);
 
 
-/** Read one packet from the trace into buffer
+/** Read one packet from the trace 
  *
  * @param trace 	the libtrace opaque pointer
  * @param packet  	the packet opaque pointer
@@ -696,7 +683,7 @@ typedef enum {
 	TRACE_EVENT_TERMINATE	/**< End of trace */
 } libtrace_event_t;
 
-/** structure returned by libtrace_event explaining what the current event is */
+/** Structure returned by libtrace_event explaining what the current event is */
 typedef struct libtrace_eventobj_t {
 	libtrace_event_t type; /**< event type (iowait,sleep,packet) */
 	int fd;		       /**< if IOWAIT, the fd to sleep on */
@@ -707,7 +694,7 @@ typedef struct libtrace_eventobj_t {
 				*/
 } libtrace_eventobj_t;
 
-/** process a libtrace event
+/** Processes the next libtrace event
  * @param trace the libtrace opaque pointer
  * @param packet the libtrace_packet opaque pointer
  * @return libtrace_event struct containing the type, and potential
@@ -743,8 +730,8 @@ DLLEXPORT int trace_write_packet(libtrace_out_t *trace, const libtrace_packet_t 
  *
  * @return a pointer to the link layer, or NULL if there is no link layer
  *
- * @note you should call getLinkType() to find out what type of link layer 
- * this is
+ * @note you should call trace_get_link_type to find out what type of link
+ * layer this is
  */
 DLLEXPORT SIMPLE_FUNCTION
 void *trace_get_link(const libtrace_packet_t *packet);
@@ -752,7 +739,7 @@ void *trace_get_link(const libtrace_packet_t *packet);
 /** get a pointer to the IP header (if any)
  * @param packet  	the packet opaque pointer
  *
- * @return a pointer to the IP header, or NULL if there is not an IP packet
+ * @return a pointer to the IP header, or NULL if there is no IP header
  */
 DLLEXPORT SIMPLE_FUNCTION
 libtrace_ip_t *trace_get_ip(libtrace_packet_t *packet);
@@ -830,7 +817,7 @@ DLLEXPORT void *trace_get_payload_from_udp(libtrace_udp_t *udp, uint32_t *remain
  *
  * @note This is similar to trace_get_payload_from_icmp in libtrace2
  */
-DLLEXPORT void *trace_get_payload_from_icmp(libtrace_icmp_t *icmp, uint32_t *skipped);
+DLLEXPORT void *trace_get_payload_from_icmp(libtrace_icmp_t *icmp, uint32_t *remaining);
 
 /** get a pointer to the TCP header (if any)
  * @param packet  	the packet opaque pointer
@@ -974,7 +961,6 @@ DLLEXPORT int trace_get_next_option(unsigned char **ptr,int *len,
  *
  * @return a 64 bit timestamp in DAG ERF format (upper 32 bits are the seconds
  * past 1970-01-01, the lower 32bits are partial seconds)
- * @author Daniel Lawson
  */
 DLLEXPORT SIMPLE_FUNCTION
 uint64_t trace_get_erf_timestamp(const libtrace_packet_t *packet);
@@ -983,8 +969,6 @@ uint64_t trace_get_erf_timestamp(const libtrace_packet_t *packet);
  * @param packet  	the packet opaque pointer
  *
  * @return time that this packet was seen in a struct timeval
- * @author Daniel Lawson
- * @author Perry Lorier
  */ 
 DLLEXPORT SIMPLE_FUNCTION
 struct timeval trace_get_timeval(const libtrace_packet_t *packet);
@@ -993,8 +977,6 @@ struct timeval trace_get_timeval(const libtrace_packet_t *packet);
  * @param packet  	the packet opaque pointer
  *
  * @return time that this packet was seen in 64bit floating point seconds
- * @author Daniel Lawson
- * @author Perry Lorier
  */
 DLLEXPORT SIMPLE_FUNCTION
 double trace_get_seconds(const libtrace_packet_t *packet);
@@ -1042,16 +1024,15 @@ DLLEXPORT int trace_seek_erf_timestamp(libtrace_t *trace, uint64_t ts);
 /** Get the size of the packet in the trace
  * @param packet  	the packet opaque pointer
  * @return the size of the packet in the trace
- * @author Perry Lorier
  * @note Due to this being a header capture, or anonymisation, this may not
  * be the same size as the original packet.  See get_wire_length() for the
  * original size of the packet.
  * @note This can (and often is) different for different packets in a trace!
  * @note This is sometimes called the "snaplen".
  * @note The return size refers to the network-level payload of the packet and
- * does not include any capture headers. For example, an Ethernet packet with
- * an empty TCP packet will return sizeof(ethernet_header) + sizeof(ip_header)
- * + sizeof(tcp_header).
+ * does not include any capture framing headers. For example, an Ethernet 
+ * packet with an empty TCP packet will return sizeof(ethernet_header) + 
+ * sizeof(ip_header) + sizeof(tcp_header).
  */
 DLLEXPORT SIMPLE_FUNCTION
 size_t trace_get_capture_length(const libtrace_packet_t *packet);
@@ -1069,8 +1050,6 @@ size_t trace_get_wire_length(const libtrace_packet_t *packet);
 /** Get the length of the capture framing headers.
  * @param packet  	the packet opaque pointer
  * @return the size of the packet as it was on the wire.
- * @author Perry Lorier
- * @author Daniel Lawson
  * @note this length corresponds to the difference between the size of a 
  * captured packet in memory, and the captured length of the packet
  */ 
@@ -1091,8 +1070,6 @@ DLLEXPORT size_t trace_set_capture_length(libtrace_packet_t *packet, size_t size
 /** Get the type of the link layer
  * @param packet  	the packet opaque pointer
  * @return libtrace_linktype_t
- * @author Perry Lorier
- * @author Daniel Lawson
  */
 DLLEXPORT SIMPLE_FUNCTION
 libtrace_linktype_t trace_get_link_type(const libtrace_packet_t *packet);
@@ -1111,7 +1088,6 @@ DLLEXPORT libtrace_direction_t trace_set_direction(libtrace_packet_t *packet, li
  * and 1 for packets originating remotely (ie, inbound).
  * Other values are possible, which might be overloaded to mean special things
  * for a special trace.
- * @author Daniel Lawson
  */
 DLLEXPORT SIMPLE_FUNCTION
 libtrace_direction_t trace_get_direction(const libtrace_packet_t *packet);
@@ -1123,7 +1099,6 @@ libtrace_direction_t trace_get_direction(const libtrace_packet_t *packet);
 /** setup a BPF filter
  * @param filterstring a char * containing the bpf filter string
  * @return opaque pointer pointer to a libtrace_filter_t object
- * @author Daniel Lawson
  * @note The filter is not actually compiled at this point, so no correctness
  * tests are performed here. trace_bpf_setfilter will always return ok, but
  * if the filter is poorly constructed an error will be generated when the 
@@ -1199,9 +1174,8 @@ typedef enum {
 
 /** Get the source port
  * @param packet	the packet to read from
- * @return a port in \em HOST byte order, or equivilent to ports for this
+ * @return a port in \em HOST byte order, or equivalent to ports for this
  * protocol, or 0 if this protocol has no ports.
- * @author Perry Lorier
  */
 DLLEXPORT SIMPLE_FUNCTION
 uint16_t trace_get_source_port(const libtrace_packet_t *packet);
@@ -1210,7 +1184,6 @@ uint16_t trace_get_source_port(const libtrace_packet_t *packet);
  * @param packet	the packet to read from
  * @return a port in \em HOST byte order, or equivilent to ports for this
  * protocol, or 0 if this protocol has no ports.
- * @author Perry Lorier
  */
 DLLEXPORT SIMPLE_FUNCTION
 uint16_t trace_get_destination_port(const libtrace_packet_t *packet);
@@ -1221,17 +1194,14 @@ uint16_t trace_get_destination_port(const libtrace_packet_t *packet);
  * @param dest		the destination port from the packet
  * @return one of USE_SOURCE or USE_DEST depending on which one you should use
  * @note ports must be in \em HOST byte order!
- * @author Daniel Lawson
  */
 DLLEXPORT SIMPLE_FUNCTION
 int8_t trace_get_server_port(uint8_t protocol, uint16_t source, uint16_t dest);
 
 /** Takes a uri and splits it into a format and uridata component. 
- * Primarily for internal use but made available for external use.
  * @param uri		the uri to be parsed
  * @param format	destination location for the format component of the uri 
  * @return 0 if an error occured, otherwise return the uridata component
- * @author Shane Alcock
  */
 DLLEXPORT const char *trace_parse_uri(const char *uri, char **format);
 
@@ -1250,12 +1220,13 @@ enum base_format_t {
 	TRACE_FORMAT_LINUX_NATIVE =9
 };
 
-/** Gets the framing header type for a given packet.
+/** Gets the format type for a given packet.
  * @param packet	the packet opaque pointer
  * @return the format of the packet
  */
 DLLEXPORT 
 enum base_format_t trace_get_format(struct libtrace_packet_t *packet);
+
 
 #ifdef __cplusplus
 } /* extern "C" */
