@@ -267,9 +267,6 @@ static int pcap_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	linktype = pcap_datalink(DATA(libtrace)->input.pcap);
 	packet->type = pcap_dlt_to_rt(linktype);
 
-	if (packet->buf_control==TRACE_CTRL_EXTERNAL)
-		free(packet->buffer);
-
 	packet->buf_control = TRACE_CTRL_PACKET;
 
 	/* If we're using the replacement pcap_next_ex() we need to

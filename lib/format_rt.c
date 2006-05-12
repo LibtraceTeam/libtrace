@@ -538,8 +538,10 @@ static int rt_read_packet(libtrace_t *libtrace,
 
 static int rt_get_capture_length(const libtrace_packet_t *packet) {
 	switch (packet->type) {
-		case RT_DUCK:
-			return 0; /* FIXME */
+		case RT_DUCK_2_4:
+			return sizeof(duck2_4_t); 
+		case RT_DUCK_2_5:
+			return sizeof(duck2_5_t);
 		case RT_STATUS:
 			return sizeof(rt_status_t);
 		case RT_HELLO:

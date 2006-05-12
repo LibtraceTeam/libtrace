@@ -31,6 +31,15 @@
 #ifndef _WAG_H
 #define _WAG_H
 
+/* Once a proper wag api is released, most of this file will become irrelevant
+ * but for now, we need to define a lot of this stuff ourselves
+ */
+
+/* IOCTL's that we use */
+#define CAPTURE_RADIOON 	101
+#define CAPTURE_RADIOOFF	102
+#define CAPTURE_SETCHANNEL	103
+
 /* This is the WAG magic number - used to delimit frames */
 #define WAG_MAGIC               (0xdaa1)
 

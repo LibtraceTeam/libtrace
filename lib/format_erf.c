@@ -76,6 +76,7 @@ static struct libtrace_format_t dag;
 #define OUTPUT DATAOUT(libtrace)->output
 #if HAVE_DAG
 #define DAG DATA(libtrace)->dag
+#define DUCK DATA(libtrace)->duck
 #endif
 #define OPTIONS DATAOUT(libtrace)->options
 struct erf_format_data_t {
@@ -98,6 +99,13 @@ struct erf_format_data_t {
 	} seek;
 
 #if HAVE_DAG
+	struct {
+		uint32_t last_duck;	
+		uint32_t duck_freq;
+		uint32_t last_pkt;
+		libtrace_t *dummy_rt;
+	} duck;
+	
 	struct {
 		void *buf; 
 		unsigned bottom;
@@ -172,6 +180,12 @@ static int dag_init_input(libtrace_t *libtrace) {
 				libtrace->uridata);
 		return -1;
 	}
+
+	DUCK.last_duck = 0;
+	DUCK.duck_freq = 60;  /** 5 minutes */
+	DUCK.last_pkt = 0;
+	DUCK.dummy_rt = NULL;
+	
 	return 0;
 }
 
@@ -421,6 +435,8 @@ static int dag_pause_input(libtrace_t *libtrace) {
 static int dag_fin_input(libtrace_t *libtrace) {
 	/* dag pause input implicitly called to cleanup before this */
 	dag_close(INPUT.fd);
+	if (DUCK.dummy_rt)
+		trace_destroy_dead(DUCK.dummy_rt);
 	free(libtrace->format_data);
 	return 0; /* success */
 }
@@ -446,6 +462,90 @@ static int erf_fin_output(libtrace_out_t *libtrace) {
 }
  
 #if HAVE_DAG
+#if DAG_VERSION_2_4
+static int dag_get_duckinfo(libtrace_t *libtrace, 
+				libtrace_packet_t *packet) {
+	dag_inf lt_dag_inf;
+	
+	if (packet->buf_control == TRACE_CTRL_EXTERNAL || 
+			!packet->buffer) {
+		packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
+		packet->buf_control = TRACE_CTRL_PACKET;
+		if (!packet->buffer) {
+			trace_set_err(libtrace, errno,
+					"Cannot allocate packet buffer");
+			return -1;
+		}
+	}
+	
+	packet->header = 0;
+	packet->payload = packet->buffer;
+	
+	if ((ioctl(INPUT.fd, DAG_IOINF, &lt_dag_inf) < 0)) {
+		trace_set_err(libtrace, errno,
+				"Error using DAG_IOINF");
+		return -1;
+	}
+	if (!IsDUCK(&lt_dag_inf)) {
+		printf("WARNING: %s does not have modern clock support - No DUCK information will be gathered\n", libtrace->uridata);
+		return 0;
+	}
+
+	if ((ioctl(INPUT.fd, DAG_IOGETDUCK, (duck_inf *)packet->payload) 
+				< 0)) {
+		trace_set_err(libtrace, errno, "Error using DAG_IOGETDUCK");
+		return -1;
+	}
+
+	packet->type = RT_DUCK_2_4;
+	packet->size = sizeof(duck_inf);
+	if (!DUCK.dummy_rt) 
+		DUCK.dummy_rt = trace_create_dead("rt:localhost:3434");
+	packet->trace = DUCK.dummy_rt;	
+}	
+#else
+static int dag_get_duckinfo(libtrace_t *libtrace, 
+				libtrace_packet_t *packet) {
+	daginf_t lt_dag_inf;
+	
+	if (packet->buf_control == TRACE_CTRL_EXTERNAL || 
+			!packet->buffer) {
+		packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
+		packet->buf_control = TRACE_CTRL_PACKET;
+		if (!packet->buffer) {
+			trace_set_err(libtrace, errno,
+					"Cannot allocate packet buffer");
+			return -1;
+		}
+	}
+	
+	packet->header = 0;
+	packet->payload = packet->buffer;
+	
+	if ((ioctl(INPUT.fd, DAGIOCINFO, &lt_dag_inf) < 0)) {
+		trace_set_err(libtrace, errno,
+				"Error using DAGIOCINFO");
+		return -1;
+	}
+	if (!IsDUCK(&lt_dag_inf)) {
+		printf("WARNING: %s does not have modern clock support - No DUCK information will be gathered\n", libtrace->uridata);
+		return 0;
+	}
+
+	if ((ioctl(INPUT.fd, DAGIOCDUCK, (duckinf_t *)packet->payload) 
+				< 0)) {
+		trace_set_err(libtrace, errno, "Error using DAGIOCDUCK");
+		return -1;
+	}
+
+	packet->type = RT_DUCK_2_5;
+	packet->size = sizeof(duckinf_t);
+	if (!DUCK.dummy_rt) 
+		DUCK.dummy_rt = trace_create_dead("rt:localhost:3434");
+	packet->trace = DUCK.dummy_rt;	
+}	
+#endif
+
 static int dag_read(libtrace_t *libtrace, int block_flag) {
 
 	if (DAG.diff != 0) 
@@ -470,8 +570,20 @@ static int dag_read(libtrace_t *libtrace, int block_flag) {
 static int dag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	int numbytes;
 	int size;
+	struct timeval tv;
 	dag_record_t *erfptr;
 
+	if (DUCK.last_pkt - DUCK.last_duck > DUCK.duck_freq && 
+			DUCK.duck_freq != 0) {
+		size = dag_get_duckinfo(libtrace, packet);
+		DUCK.last_duck = DUCK.last_pkt;
+		if (size != 0) {
+			return size;
+		}
+		/* No DUCK support, so don't waste our time anymore */
+		DUCK.duck_freq = 0;
+	}
+	
 	if (packet->buf_control == TRACE_CTRL_PACKET) {
 		packet->buf_control = TRACE_CTRL_EXTERNAL;
 		free(packet->buffer);
@@ -504,6 +616,10 @@ static int dag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	DAG.offset += size;
 	DAG.diff -= size;
 
+	packet->size = size;
+	tv = trace_get_timeval(packet);
+	DUCK.last_pkt = tv.tv_sec;
+	
 	return (size);
 }
 

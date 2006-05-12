@@ -104,6 +104,11 @@ static int wag_start_input(libtrace_t *libtrace)
 #ifndef WIN32
 	if (S_ISCHR(buf.st_mode)) {
 		INPUT.fd = open(libtrace->uridata, O_RDONLY);
+		if (ioctl (INPUT.fd, CAPTURE_RADIOON, 0) == -1) {
+			trace_set_err(libtrace, errno,
+				"Could not turn WAG radio on");
+			return -1;
+		}
 		return 0;
 	}
 #endif
@@ -178,11 +183,16 @@ static int wtf_config_output(libtrace_out_t *libtrace,
 
 static int wag_pause_input(libtrace_t *libtrace)
 {
+	if (ioctl (INPUT.fd, CAPTURE_RADIOON, 0) == -1) {
+		trace_set_err(libtrace, errno,
+				"Could not turn WAG radio off");
+	}
 	close(INPUT.fd);
 	return 0;
 }
 
 static int wag_fin_input(libtrace_t *libtrace) {
+	ioctl (INPUT.fd, CAPTURE_RADIOON, 0);
 	free(libtrace->format_data);
 	return 0;
 }

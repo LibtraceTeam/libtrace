@@ -337,6 +337,7 @@ if test "$with_dag" != no; then
 	AC_MSG_CHECKING(if we are using DAG 2.4)
 	if grep '2.4.' $dag_root/VERSION > /dev/null 2>&1; then
 		libtrace_dag2_4=true
+		AC_DEFINE(DAG_VERSION_2_4, 1, [define if using DAG 2.4])
 	else
 		libtrace_dag2_4=false
 	fi
