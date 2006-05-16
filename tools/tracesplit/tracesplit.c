@@ -135,12 +135,12 @@ int main(int argc, char *argv[])
 			firsttime+=interval;
 		}
 
-		pktcount++;
 		if (output && pktcount%count==0) {
 			trace_destroy_output(output);
 			output=NULL;
 		}
 
+		pktcount++;
 		totbytes+=trace_get_capture_length(packet);
 		if (output && totbytes-totbyteslast>=bytes) {
 			trace_destroy_output(output);

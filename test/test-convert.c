@@ -79,6 +79,8 @@ char *lookup_uri(const char *type)
 		return "rtclient:chasm";
 	if (!strcmp(type,"pcapfile"))
 		return "pcapfile:traces/100_packets.pcap";
+	if (!strcmp(type, "duck"))
+		return "duck:traces/100_packets.duck";
 	return "unknown";
 }
 
@@ -89,6 +91,8 @@ char *lookup_out_uri(const char *type) {
 		return "pcap:traces/100_packets.out.pcap";
 	if (!strcmp(type,"wtf"))
 		return "wtf:traces/wed.out.wtf";
+	if (!strcmp(type,"duck"))
+		return "duck:traces/100_packets.out.duck";
 	return "unknown";
 }
 

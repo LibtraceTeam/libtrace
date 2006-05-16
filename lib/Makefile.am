@@ -6,7 +6,7 @@ libtrace_la_SOURCES = trace.c fifo.c fifo.h common.h \
 		format_erf.c format_pcap.c format_wag.c format_legacy.c \
 		format_rt.c format_helper.c format_helper.h format_pcapfile.c \
 		parse_cmd.c parse_cmd.h libtrace_int.h lt_inttypes.h \
-		linktypes.c protocols.c libtraceio.h 
+		linktypes.c protocols.c libtraceio.h format_duck.c 
 if HAVE_NETPACKET_PACKET_H
 libtrace_la_SOURCES+=format_linux.c
 endif

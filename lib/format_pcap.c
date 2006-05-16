@@ -137,6 +137,8 @@ static int pcap_config_input(libtrace_t *libtrace,
 			 */
 		case TRACE_OPTION_PROMISC:
 			/* can't do promisc on a trace! fall thru */
+		case TRACE_META_FREQ:
+			/* No meta data for this format */
 		default:
 			trace_set_err(libtrace,TRACE_ERR_UNKNOWN_OPTION,
 					"Unknown option %i", option);
@@ -194,6 +196,8 @@ static int pcapint_config_input(libtrace_t *libtrace,
 		case TRACE_OPTION_PROMISC:
 			DATA(libtrace)->promisc=*(int*)data;
 			return 0;
+		case TRACE_META_FREQ:
+			/* No meta-data for this format */
 		default:
 			trace_set_err(libtrace,TRACE_ERR_UNKNOWN_OPTION,
 					"Unknown option %i", option);

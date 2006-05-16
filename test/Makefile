@@ -24,7 +24,7 @@ test: all test-format-all test-convert-all
 	@echo All tests passed
 
 test-format-all: test-format
-	@for i in erf pcap wtf pcapfile; do			\
+	@for i in erf pcap wtf pcapfile duck; do			\
 		echo \* $$i;					\
 		LD_LIBRARY_PATH=$(libdir)			\
 		./test-format $$i || exit $$?;			\
@@ -41,6 +41,7 @@ test-convert-all: test-convert
 	#@LD_LIBRARY_PATH=$(libdir) ./test-convert rtclient pcap
 	@LD_LIBRARY_PATH=$(libdir) ./test-convert wtf pcap
 	@LD_LIBRARY_PATH=$(libdir) ./test-convert wtf wtf
+	@LD_LIBRARY_PATH=$(libdir) ./test-convert duck duck
  
 clean:
 	$(RM) $(BINS) $(OBJS) test-format

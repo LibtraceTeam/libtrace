@@ -219,6 +219,7 @@ void wag_constructor();
 void trace_init(void)
 {
 	if (!formats_list) {
+		duck_constructor();
 		erf_constructor();
 		legacy_constructor();
 #ifdef HAVE_NETPACKET_PACKET_H
@@ -534,6 +535,10 @@ DLLEXPORT int trace_config(libtrace_t *libtrace,
 		case TRACE_OPTION_PROMISC:
 			trace_set_err(libtrace,TRACE_ERR_OPTION_UNAVAIL,
 				"Promisc mode is not supported by this format module");
+			return -1;
+		case TRACE_META_FREQ:
+			trace_set_err(libtrace, TRACE_ERR_OPTION_UNAVAIL,
+				"This format does not support meta-data gathering");
 			return -1;
 	}
 	trace_set_err(libtrace,TRACE_ERR_UNKNOWN_OPTION,

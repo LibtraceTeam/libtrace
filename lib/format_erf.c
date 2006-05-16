@@ -103,7 +103,7 @@ struct erf_format_data_t {
 		uint32_t last_duck;	
 		uint32_t duck_freq;
 		uint32_t last_pkt;
-		libtrace_t *dummy_rt;
+		libtrace_t *dummy_duck;
 	} duck;
 	
 	struct {
@@ -182,13 +182,35 @@ static int dag_init_input(libtrace_t *libtrace) {
 	}
 
 	DUCK.last_duck = 0;
-	DUCK.duck_freq = 60;  /** 5 minutes */
+	DUCK.duck_freq = 0;  
 	DUCK.last_pkt = 0;
-	DUCK.dummy_rt = NULL;
+	DUCK.dummy_duck = NULL;
 	
 	return 0;
 }
 
+static int dag_config_input(libtrace_t *libtrace, trace_option_t option,
+				void *data) {
+	switch(option) {
+		case TRACE_META_FREQ:
+			DUCK.duck_freq = *(int *)data;
+			return 0;
+		case TRACE_OPTION_SNAPLEN:
+			/* Surely we can set this?? Fall through for now*/
+		
+		case TRACE_OPTION_PROMISC:
+			/* DAG already operates in a promisc fashion */
+
+		case TRACE_OPTION_FILTER:
+
+		default:
+			trace_set_err(libtrace, TRACE_ERR_UNKNOWN_OPTION,
+					"Unknown or unsupported option: %i",
+					option);
+			return -1;
+	}
+	assert (0);
+}
 #endif
 
 /* Dag erf ether packets have a 2 byte padding before the packet
@@ -435,8 +457,8 @@ static int dag_pause_input(libtrace_t *libtrace) {
 static int dag_fin_input(libtrace_t *libtrace) {
 	/* dag pause input implicitly called to cleanup before this */
 	dag_close(INPUT.fd);
-	if (DUCK.dummy_rt)
-		trace_destroy_dead(DUCK.dummy_rt);
+	if (DUCK.dummy_duck)
+		trace_destroy_dead(DUCK.dummy_duck);
 	free(libtrace->format_data);
 	return 0; /* success */
 }
@@ -499,9 +521,10 @@ static int dag_get_duckinfo(libtrace_t *libtrace,
 
 	packet->type = RT_DUCK_2_4;
 	packet->size = sizeof(duck_inf);
-	if (!DUCK.dummy_rt) 
-		DUCK.dummy_rt = trace_create_dead("rt:localhost:3434");
-	packet->trace = DUCK.dummy_rt;	
+	if (!DUCK.dummy_duck) 
+		DUCK.dummy_duck = trace_create_dead("duck:dummy");
+	packet->trace = DUCK.dummy_duck;
+	return packet->size;
 }	
 #else
 static int dag_get_duckinfo(libtrace_t *libtrace, 
@@ -540,9 +563,10 @@ static int dag_get_duckinfo(libtrace_t *libtrace,
 
 	packet->type = RT_DUCK_2_5;
 	packet->size = sizeof(duckinf_t);
-	if (!DUCK.dummy_rt) 
-		DUCK.dummy_rt = trace_create_dead("rt:localhost:3434");
-	packet->trace = DUCK.dummy_rt;	
+	if (!DUCK.dummy_duck) 
+		DUCK.dummy_duck = trace_create_dead("rt:localhost:3434");
+	packet->trace = DUCK.dummy_duck;	
+	return packet->size;
 }	
 #endif
 
@@ -842,6 +866,12 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 
 	assert(OUTPUT.file);
 
+	if (!packet->header) {
+		//trace_set_err_output(libtrace, TRACE_ERR_BAD_PACKET,
+		//		"Packet has no header - probably an RT packet");
+		return -1;
+	}
+	
 	pad = erf_get_padding(packet);
 
 	/* If we've had an rxerror, we have no payload to write - fix rlen to
@@ -1064,7 +1094,7 @@ static struct libtrace_format_t dag = {
 	"$Id$",
 	TRACE_FORMAT_ERF,
 	dag_init_input,			/* init_input */	
-	NULL,				/* config_input */
+	dag_config_input,		/* config_input */
 	dag_start_input,		/* start_input */
 	dag_pause_input,		/* pause_input */
 	NULL,				/* init_output */

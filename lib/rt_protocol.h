@@ -218,6 +218,7 @@ typedef struct duck2_5 {
         uint64_t        Last_TSC;
 } duck2_5_t;
 
+/*
 typedef struct rt_duck_2_4 {
 	duck2_4_t duck;
 } rt_duck_2_4_t;
@@ -225,5 +226,6 @@ typedef struct rt_duck_2_4 {
 typedef struct rt_duck_2_5 {
 	duck2_5_t duck;
 } rt_duck_2_5_t;
+*/
 
 #endif

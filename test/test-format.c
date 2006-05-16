@@ -70,6 +70,8 @@ const char *lookup_uri(const char *type) {
 		return "rtclient:chasm";
 	if (!strcmp(type,"pcapfile"))
 		return "pcapfile:traces/100_packets.pcap";
+	if (!strcmp(type, "duck"))
+		return "duck:traces/100_packets.duck";
 	return "unknown";
 }
 
@@ -91,7 +93,7 @@ int main(int argc, char *argv[]) {
 	iferr(trace);
 
 	if (strcmp(argv[1],"rtclient")==0) expected=101;
-
+	
 	level=0;
 
 	trace_start(trace);

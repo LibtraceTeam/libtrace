@@ -188,6 +188,9 @@ static int linuxnative_config_input(libtrace_t *libtrace,
 			 * emulating it
 			 */
 			break;
+		case TRACE_META_FREQ:
+			/* No meta-data for this format */
+			break;
 		/* Avoid default: so that future options will cause a warning
 		 * here to remind us to implement it, or flag it as
 		 * unimplementable

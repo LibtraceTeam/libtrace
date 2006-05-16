@@ -83,7 +83,7 @@ struct rt_format_data_t {
 	char *buf_current;
 	int buf_filled;
 
-	
+	libtrace_t *dummy_duck;
 	libtrace_t *dummy_erf;
 	libtrace_t *dummy_pcap;
 	libtrace_t *dummy_wag;
@@ -191,6 +191,7 @@ static int rt_init_input(libtrace_t *libtrace) {
         char *uridata = libtrace->uridata;
         libtrace->format_data = malloc(sizeof(struct rt_format_data_t));
 
+	RT_INFO->dummy_duck = NULL;
 	RT_INFO->dummy_erf = NULL;
 	RT_INFO->dummy_pcap = NULL;
 	RT_INFO->dummy_wag = NULL;
@@ -251,6 +252,9 @@ static int rt_fin_input(libtrace_t *libtrace) {
 		printf("Failed to send close message to server\n");
 	
 	}
+	if (RT_INFO->dummy_duck)
+		trace_destroy_dead(RT_INFO->dummy_duck);
+
 	if (RT_INFO->dummy_erf) 
 		trace_destroy_dead(RT_INFO->dummy_erf);
 		
@@ -359,6 +363,13 @@ static int rt_set_format(libtrace_t *libtrace, libtrace_packet_t *packet)
 	}
 
 	switch (packet->type) {
+		case RT_DUCK_2_4:
+		case RT_DUCK_2_5:
+			if (!RT_INFO->dummy_duck) {
+				RT_INFO->dummy_duck = trace_create_dead("duck:dummy");
+			}
+			packet->trace = RT_INFO->dummy_duck;
+			break;
 		case RT_DATA_ERF:
 			if (!RT_INFO->dummy_erf) {
 				RT_INFO->dummy_erf = trace_create_dead("erf:-");
@@ -374,6 +385,7 @@ static int rt_set_format(libtrace_t *libtrace, libtrace_packet_t *packet)
 		case RT_DATA_LEGACY_ETH:
 		case RT_DATA_LEGACY_ATM:
 		case RT_DATA_LEGACY_POS:
+		case RT_DATA_LINUX_NATIVE:
 			printf("Sending legacy over RT is currently not supported\n");
 			trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Legacy packet cannot be sent over rt");
 			return -1;
@@ -501,11 +513,24 @@ static int rt_read_packet_versatile(libtrace_t *libtrace,
 	} else {
 		switch(packet->type) {
 			case RT_STATUS:
-			case RT_DUCK:
 				if (rt_read(libtrace, &packet->buffer, 
 							pkt_size,1) !=
 						pkt_size) {
 					printf("Error receiving status packet\n");
+					return -1;
+				}
+				packet->header = 0;
+				packet->payload = packet->buffer;
+				break;
+			case RT_DUCK_2_4:
+			case RT_DUCK_2_5:
+				if (rt_read(libtrace, &packet->buffer,
+							pkt_size, 1) !=
+						pkt_size) {
+					printf("Error receiving DUCK packet\n");
+					return -1;
+				}
+				if (rt_set_format(libtrace, packet) < 0) {
 					return -1;
 				}
 				packet->header = 0;
@@ -524,6 +549,7 @@ static int rt_read_packet_versatile(libtrace_t *libtrace,
 			default:
 				printf("Bad rt type for client receipt: %d\n",
 					packet->type);
+				return -1;
 		}
 	}
 	/* Return the number of bytes read from the stream */
@@ -538,10 +564,6 @@ static int rt_read_packet(libtrace_t *libtrace,
 
 static int rt_get_capture_length(const libtrace_packet_t *packet) {
 	switch (packet->type) {
-		case RT_DUCK_2_4:
-			return sizeof(duck2_4_t); 
-		case RT_DUCK_2_5:
-			return sizeof(duck2_5_t);
 		case RT_STATUS:
 			return sizeof(rt_status_t);
 		case RT_HELLO:
