@@ -45,8 +45,29 @@
 #include <string>
 #include <ctype.h>
 #include "libpacketdump.h"
+extern "C"{
+#include "parser/parser.h"
+}
 
-typedef void (*decode_t)(uint16_t type,char *packet,int len);
+enum decode_style_t {
+    DECODE_NORMAL,
+    DECODE_PARSER
+};
+
+typedef void (*decode_norm_t)(uint16_t type,char *packet,int len);
+typedef void (*decode_parser_t)(uint16_t type,char *packet,int len, element_t* el);
+
+typedef union decode_funcs {
+    decode_norm_t decode_n;
+    decode_parser_t decode_p;
+} decode_funcs_t;
+
+typedef struct decoder {
+    enum decode_style_t style;
+    decode_funcs_t *func;
+    element_t *el; // make a union of structs with all args in it for all funcs?
+} decode_t;
+
 
 static std::map<std::string,std::map<uint16_t,decode_t> > decoders;
 
@@ -101,23 +122,66 @@ static void generic_decode(uint16_t type,char *packet, int len) {
 void decode_next(char *packet,int len,char *proto_name,int type)
 {
 	std::string sname(proto_name);
+
+	// if we haven't worked out how to decode this type yet, load the
+	// appropriate files to do so
 	if (decoders[sname].find(type)==decoders[sname].end()) {
 		void *hdl;
 		char name[1024];
+		decode_funcs_t *func = new decode_funcs_t;
+		decode_t dec;
 		snprintf(name,sizeof(name),"%s/%s_%i.so",DIRNAME,sname.c_str(),type);
 		hdl = dlopen(name,RTLD_LAZY);
-		if (!hdl) 
-			decoders[sname][type]=generic_decode;
-		else {
+		if (!hdl) {
+			// if there is no shared library, try a protocol file
+			snprintf(name,sizeof(name),"%s/%s_%i.protocol",
+				DIRNAME,sname.c_str(),type);
+			hdl = parse_protocol_file(name);
+
+			if(!hdl)
+			{
+				// no protocol file either, use a generic one
+				func->decode_n = generic_decode;
+				dec.style = DECODE_NORMAL;
+				dec.el = NULL;
+			} else {
+				// use the protocol file
+				func->decode_p = decode_protocol_file;
+				dec.style = DECODE_PARSER;
+				dec.el = (element_t*)hdl;
+			}
+		} else {
 			void *s=dlsym(hdl,"decode");
 			if (!s) {
-				decoders[sname][type]=generic_decode;
+				// the shared library doesnt have a decode func
+				// TODO should try the protocol file now
+				func->decode_n = generic_decode;
+				dec.style = DECODE_NORMAL;
+				dec.el = NULL;
 			}
 			else
-				decoders[sname][type]=(decode_t)s;
+			{
+				// use the shared library
+				func->decode_n = (decode_norm_t)s;
+				dec.style = DECODE_NORMAL;
+				dec.el = NULL; 
+			}
 		}
+		dec.func = func;
+		decoders[sname][type] = dec;
 	}
-	decoders[sname][type](type,packet,len);
+
+	// decode using the appropriate function
+	switch(decoders[sname][type].style)
+	{
+		case DECODE_NORMAL:
+			decoders[sname][type].func->decode_n(type,packet,len);
+			break;
+
+		case DECODE_PARSER:
+			decoders[sname][type].func->decode_p(type,packet,len,
+				decoders[sname][type].el);
+			break;
+
+	};
 }
-
-
