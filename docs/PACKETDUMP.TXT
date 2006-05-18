@@ -1,0 +1,92 @@
+Writing decoder modules for libpacketdump
+=========================================
+
+libpacketdump can be used to decode and print packet structure. This can be
+useful for debugging (network protocols, or your own libtrace programs), or
+just to look at the internals of the packets you are seeing to better 
+understand how things work.
+
+It has a modular design such that each decoder is only responsible for
+its specific part of the packet. It decodes the information it knows about, 
+then control is passed to the decoder that understands the next part of the 
+packet. Code only needs to be written once for each part, and then decoders
+are mixed and matched as appropriate depending on the structure and content
+of the packet.
+
+These modules can be constructed in two ways:
+
+    * as C code within a shared library
+    * as a plain text description of the field sizes and types
+    
+Each modules filename is constructed based on the part of the packet it deals
+with. The bit before the underscore describes the part of the packet it follows
+on from, while the bit after the underscore describes what it actually is.
+Shared libraries end in .so, and plain text files end in .protocol. All these
+files must reside in DIRNAME (by default /usr/local/lib/libpacketdump/).
+
+
+Writing a decoder module as a shared library
+--------------------------------------------
+
+TODO
+
+
+
+Writing a decoder module as plain text
+--------------------------------------
+
+These files have a very simple format that mimics the layout of the headers
+seen in the packets. Each line of the file represents a single field in the
+header, or describes the header that follows this one. For them to be found
+by the parser they must have a .protocol extension.
+
+A .protocol file might look something like this:
+
+    be16 integer    "FOO Src port"
+    be16 integer    "FOO Dst port"
+    be8  hex	    "FOO type"
+    be24 integer    "FOO other"
+    next "foo"	    "FOO type"	
+
+All lines in the file are one of these two types:
+
+Field description:  <byteorder> <size> <displaytype> <name>
+Next header:	    next <nextheader prefix> <nextheader fieldname>
+
+
+<byteorder> 
+Fields in packet headers can be in big endian or little endian form; most are
+in big endian. Specify 'be' for big endian fields or 'le' for little endian
+fields. This ensures they are displayed correctly.
+
+<size>
+The width of the field in bits. For example, addresses in the IP header are
+32 bits, while ports in the UDP/TCP headers are 16 bits.
+
+<display type>
+This determines how the data is treated when it is displayed. Valid values are:
+    integer - displays the data as an integer value
+    hex	    - displays the data as a hexadecimal value
+    ipv4    - displays the data as an IPV4 address in dotted quad form
+    mac	    - displays the data as a MAC address as colon separated hexadecimals
+    flag    - displays the field name if the data is true, nothing otherwise
+    hidden  - does not get displayed 
+
+<name>
+A string literal used as a prefix when printing the field value, and as an
+identifier to be referenced by the nextheader option (if present).
+
+<nextheader prefix>
+A string literal used as a prefix to the filename describing where to find 
+information on decoding the header that follows this one. It usually describes 
+the current level at which the packet is being decoded such as "eth" or "ip".
+
+<nextheader fieldname>
+The string literal used as the name of the field whose value determines what
+the next header should be. The value of this field gets appended to the prefix
+(after an underscore) to create the basename of the file describing the next
+header. For example, in the IP header the next header is described by the value
+of the protocol field, and so the name used for the protocol field should be
+given here. If a TCP packet is being decoded, the value of the protocol field
+will be '6' and this is used to construct the next file name.
+
