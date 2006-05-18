@@ -9,15 +9,18 @@ TCP_LAYERS=$(wildcard tcp_*.cc)
 PLUGINSOURCES=$(LINK_LAYERS) $(ETH_LAYERS) $(IP_LAYERS) $(TCP_LAYERS)
 PLUGINS=$(addsuffix .so,$(basename $(PLUGINSOURCES)))
 
+SUBDIRS = parser
+
 libpacketdump_la_SOURCES = libpacketdump.cc $(PLUGINSOURCES)
 
 PLUGINDIR=$(libdir)/libpacketdump
 
 INCLUDES= @ADD_INCLS@ -I../lib -I../
-libpacketdump_la_LIBADD = @ADD_LIBS@  
+libpacketdump_la_LIBADD = @ADD_LIBS@ -lparser
 libpacketdump_la_LDFLAGS=\
 	-version-info @LIBTRACE_MAJOR@:@LIBTRACE_MINOR@:@LIBTRACE_MID@ \
-	@ADD_LDFLAGS@
+	@ADD_LDFLAGS@ \
+	-L./parser
 
 AM_CXXFLAGS=-g -Wall -DDIRNAME=\"$(PLUGINDIR)\" -rdynamic $(INCLUDES)
 
