@@ -87,6 +87,7 @@ struct rt_format_data_t {
 	libtrace_t *dummy_erf;
 	libtrace_t *dummy_pcap;
 	libtrace_t *dummy_wag;
+	libtrace_t *dummy_linux;
 };
 
 static struct libtrace_format_t rt;
@@ -195,6 +196,7 @@ static int rt_init_input(libtrace_t *libtrace) {
 	RT_INFO->dummy_erf = NULL;
 	RT_INFO->dummy_pcap = NULL;
 	RT_INFO->dummy_wag = NULL;
+	RT_INFO->dummy_linux = NULL;
 	RT_INFO->pkt_buffer = NULL;
 	RT_INFO->buf_current = NULL;
 	RT_INFO->buf_filled = 0;
@@ -263,6 +265,10 @@ static int rt_fin_input(libtrace_t *libtrace) {
 
 	if (RT_INFO->dummy_wag)
 		trace_destroy_dead(RT_INFO->dummy_wag);
+
+	if (RT_INFO->dummy_linux)
+		trace_destroy_dead(RT_INFO->dummy_linux);
+
 	close(RT_INFO->input_fd);
 	free(libtrace->format_data);
         return 0;
@@ -382,10 +388,15 @@ static int rt_set_format(libtrace_t *libtrace, libtrace_packet_t *packet)
 			}
 			packet->trace = RT_INFO->dummy_wag;
 			break;
+		case RT_DATA_LINUX_NATIVE:
+			if (!RT_INFO->dummy_linux) {
+				RT_INFO->dummy_linux = trace_create_dead("int:");
+			}
+			packet->trace = RT_INFO->dummy_linux;
+			break;
 		case RT_DATA_LEGACY_ETH:
 		case RT_DATA_LEGACY_ATM:
 		case RT_DATA_LEGACY_POS:
-		case RT_DATA_LINUX_NATIVE:
 			printf("Sending legacy over RT is currently not supported\n");
 			trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Legacy packet cannot be sent over rt");
 			return -1;
