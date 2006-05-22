@@ -57,6 +57,7 @@
 #  ifndef PATH_MAX
 #	define PATH_MAX 4096
 #  endif
+#  include <sys/ioctl.h>
 #endif
 
 
@@ -545,16 +546,8 @@ static int dag_get_duckinfo(libtrace_t *libtrace,
 	packet->header = 0;
 	packet->payload = packet->buffer;
 	
-	if ((ioctl(INPUT.fd, DAGIOCINFO, &lt_dag_inf) < 0)) {
-		trace_set_err(libtrace, errno,
-				"Error using DAGIOCINFO");
-		return -1;
-	}
-	if (!IsDUCK(&lt_dag_inf)) {
-		printf("WARNING: %s does not have modern clock support - No DUCK information will be gathered\n", libtrace->uridata);
-		return 0;
-	}
-
+	/* No need to check if we can get DUCK or not - we're modern
+	 * enough */
 	if ((ioctl(INPUT.fd, DAGIOCDUCK, (duckinf_t *)packet->payload) 
 				< 0)) {
 		trace_set_err(libtrace, errno, "Error using DAGIOCDUCK");
