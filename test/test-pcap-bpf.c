@@ -84,6 +84,11 @@ int main(int argc, char *argv[]) {
 			error = 1;
 			break;
 		}
+		if (trace_get_source_port(packet)!=80
+		 && trace_get_destination_port(packet)!=80) {
+			printf("filter failed!\n");
+			return 1;
+		}
 		if (psize == 0) {
 			error = 0;
 			break;
