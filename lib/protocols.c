@@ -519,9 +519,13 @@ DLLEXPORT uint16_t trace_get_source_port(const libtrace_packet_t *packet)
 /* Same as get_source_port except use the destination port */
 DLLEXPORT uint16_t trace_get_destination_port(const libtrace_packet_t *packet)
 {
+	uint32_t remaining;
 	struct ports_t *port = 
 		(struct ports_t*)trace_get_transport((libtrace_packet_t*)packet,
-			NULL, NULL);
+			NULL, &remaining);
+	/* snapped to early */
+	if (remaining<4)
+		return 0;
 
 	if (port)
 		return ntohs(port->dst);
