@@ -320,7 +320,7 @@ static int erf_seek_erf(libtrace_t *libtrace,uint64_t erfts)
 	if (DATA(libtrace)->seek.exists==INDEX_UNKNOWN) {
 		char buffer[PATH_MAX];
 		snprintf(buffer,sizeof(buffer),"%s.idx",libtrace->uridata);
-		DATA(libtrace)->seek.index=libtrace_io_open(buffer,"r");
+		DATA(libtrace)->seek.index=libtrace_io_open(buffer,"rb");
 		if (DATA(libtrace)->seek.index) {
 			DATA(libtrace)->seek.exists=INDEX_EXISTS;
 		}
@@ -701,8 +701,12 @@ static int erf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	if ((numbytes=libtrace_io_read(INPUT.file,
 					buffer2,
 					size)) != size) {
-		trace_set_err(libtrace,errno, "read(%s)", libtrace->uridata);
-		return -1;
+		if (numbytes==-1) {
+			trace_set_err(libtrace,errno, "read(%s)", libtrace->uridata);
+			return -1;
+		}
+		/* Failed to read the full packet?  must be EOF */
+		return 0;
 	}
 	if (((dag_record_t *)packet->buffer)->flags.rxerror == 1) {
 		packet->payload = NULL;
