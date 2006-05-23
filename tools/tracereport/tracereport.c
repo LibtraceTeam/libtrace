@@ -28,9 +28,9 @@
  *
  */
 
-// 
-// This program takes a series of traces and bpf filters and outputs how many
-// bytes/packets
+/* This program takes a series of traces and bpf filters and outputs how many
+ * bytes/packets
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -58,7 +58,7 @@
 struct libtrace_t *trace;
 
 /* Process a trace, counting packets that match filter(s) */
-void run_trace(char *uri) 
+void run_trace(char *uri, libtrace_filter_t *filter, int count) 
 {
 	struct libtrace_packet_t *packet = trace_create_packet();
 
@@ -67,16 +67,22 @@ void run_trace(char *uri)
         trace = trace_create(uri);
 	if (trace_is_err(trace)) {
 		trace_perror(trace,"trace_create");
-		return 1;
+		return;
+	}
+
+	if (filter) {
+		trace_config(trace,TRACE_OPTION_FILTER,filter);
 	}
 
 	if (trace_start(trace)==-1) {
 		trace_perror(trace,"trace_start");
-		return 1;
+		return;
 	}
 
         for (;;) {
 		int psize;
+		if (count--<1)
+			break;
                 if ((psize = trace_read_packet(trace, packet)) <1) {
                         break;
                 }
@@ -103,9 +109,12 @@ int main(int argc, char *argv[]) {
 
 	int i;
 
+	/*char *filterstring="host 130.197.127.210"; */
+
+	libtrace_filter_t *filter = NULL;/*trace_bpf_setfilter(filterstring); */
 
 	for(i=1;i<argc;++i) {
-		run_trace(argv[i]);
+		run_trace(argv[i],filter,1000);
 	}
 
 	error_report();
