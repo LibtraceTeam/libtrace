@@ -5,11 +5,10 @@ endif
 
 if LIBTRACE_TOOLS
 SUBDIRS=traceanon tracemerge tracesplit $(TRACEDUMP_DIR) tracertstats tracestats
+SUBDIRS+=tracereport
 else
 SUBDIRS=
 endif
-
-EXTRA_DIST=tracereport
 
 all-hook:
 	for dir in $(SUBDIRS); do make -C $$dir; done
