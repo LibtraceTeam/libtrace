@@ -12,6 +12,7 @@ ssize_t libtrace_io_read(libtrace_io_t *io, void *buf, size_t len)
 	int err=gzread(io->file,buf,len);
 	int err2=errno;
 	if (err>=0) {
+		/* successfully read <x> bytes */
 		return err;
 	}
 	switch(err) {
@@ -21,7 +22,9 @@ ssize_t libtrace_io_read(libtrace_io_t *io, void *buf, size_t len)
 			if (err2==0)
 				return 0; /* EOF */
 			return -1;
-		case Z_MEM_ERROR: errno=ENOMEM; return -1;
+		case Z_MEM_ERROR:
+			errno=ENOMEM;
+			return -1;
 		default:
 		      /* Some decompression error or something */
 		      errno=EINVAL;
