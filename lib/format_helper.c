@@ -168,7 +168,7 @@ libtrace_io_t *trace_open_file(libtrace_t *trace)
 
 
 	if (strcmp(trace->uridata,"-")==0) {
-		ret=libtrace_io_fdopen(fileno(stdin),"r");
+		ret=libtrace_io_fdopen(fileno(stdin),"rb");
 		return ret;
 	}
 
