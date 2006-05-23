@@ -8,68 +8,70 @@
 #include "tracereport.h"
 #include "contain.h"
 
-CMP(cmp_int,int,a-b)
-MAP(int,MAP(int,stat_t)) protocol_tree = MAP_INIT(cmp_int);
-
+stat_t ports[256][65536]={{{0,0}}};
+char protn[256]={0};
 
 void port_per_packet(struct libtrace_packet_t *packet)
 {
-	struct libtrace_ip *ip = trace_get_ip(packet);
+	uint8_t proto;
 	int port;
-	if (!ip)
+
+	if(trace_get_transport(packet,&proto,NULL)==NULL) 
 		return;
 
-	port = trace_get_server_port(ip->ip_p,
+	port = trace_get_server_port(proto,
 			trace_get_source_port(packet),
 			trace_get_destination_port(packet))==USE_SOURCE
 		? trace_get_source_port(packet)
 		: trace_get_destination_port(packet);
 
-
-	if (!MAP_FIND(protocol_tree,ip->ip_p)) {
-		MAP_INSERT(protocol_tree,ip->ip_p,MAP_INIT(cmp_int));
-	}
-
-	if (!MAP_FIND(MAP_FIND(protocol_tree,ip->ip_p)->value,port)) {
-		MAP_INSERT(MAP_FIND(protocol_tree,ip->ip_p)->value,port,{0});
-	}
-
-	++MAP_FIND(MAP_FIND(protocol_tree,ip->ip_p)->value,port)->value.count;
-	MAP_FIND(MAP_FIND(protocol_tree,ip->ip_p)->value,port)->value.bytes+=trace_get_wire_length(packet);
+	ports[proto][port].bytes+=trace_get_wire_length(packet);
+	ports[proto][port].count++;
+	protn[proto]=1;
 }
 
-static MAP_VISITOR(port_visitor,int,stat_t)
+void port_port(int i,char *prot, int j)
 {
-	struct servent *ent = getservbyport(htons(node->key),(char *)userdata);
+	struct servent *ent = getservbyport(htons(j),prot);
 	if(ent)
 		printf("%20s:\t%12" PRIu64 "\t%12" PRIu64 "\n",
 				ent->s_name,
-				node->value.bytes,
-				node->value.count
+				ports[i][j].bytes,
+				ports[i][j].count
 		      );
 	else
 		printf("%20i:\t%12" PRIu64 "\t%12" PRIu64 "\n",
-				node->key,
-				node->value.bytes,
-				node->value.count
+				j,
+				ports[i][j].bytes,
+				ports[i][j].count
 		      );
 }
 
-static MAP_VISITOR(protocol_visitor,int,MAP(int,stat_t))
+void port_protocol(int i)
 {
-	struct protoent *ent = getprotobynumber(node->key);
-	printf("Protocol: %i %s%s%s\n",node->key,
+	int j;
+	struct protoent *ent = getprotobynumber(i);
+	printf("Protocol: %i %s%s%s\n",i,
 			ent?"(":"",ent?ent->p_name:"",ent?")":"");
-	MAP_VISIT(node->value,NULL,port_visitor,NULL,(void*)(ent?ent->p_name:""));
+	for(j=0;j<65536;++j) {
+		if (ports[i][j].count) {
+			port_port(i,ent?ent->p_name:"",j);
+		}
+	}
 }
 
 void port_report(void)
 {
+	int i;
 	printf("# Port breakdown:\n");
 	printf("%-20s \t%12s\t%12s\n","Port","Bytes","Packets");
 	setservent(1);
 	setprotoent(1);
-	MAP_VISIT(protocol_tree,NULL,protocol_visitor,NULL,NULL);
+	for(i=0;i<256;++i) {
+		if (protn[i]) {
+			port_protocol(i);
+		}
+	}
 	endprotoent();
 	endservent();
 }
