@@ -336,14 +336,16 @@ DLLEXPORT void *trace_get_transport(libtrace_packet_t *packet,
 		) 
 {
 	void *transport;
-	uint8_t dummy;
+	uint8_t dummy_proto;
 	uint16_t ethertype;
 	void *link;
+	uint32_t dummy_remaining;
 
-	if (!proto) proto=&dummy;
+	if (!proto) proto=&dummy_proto;
 
-	if (remaining)
-		*remaining = trace_get_capture_length(packet);
+	if (!remaining) remaining=&dummy_remaining;
+
+	*remaining = trace_get_capture_length(packet);
 
 	link=trace_get_link(packet);
 
@@ -499,9 +501,14 @@ struct ports_t {
  */
 DLLEXPORT uint16_t trace_get_source_port(const libtrace_packet_t *packet)
 {
+	uint32_t remaining;
 	struct ports_t *port = 
 		(struct ports_t*)trace_get_transport((libtrace_packet_t*)packet,
-			NULL, NULL);
+			NULL, &remaining);
+
+	/* snapped too early */
+	if (remaining<2)
+		return 0;
 
 	if (port)
 		return ntohs(port->src);
