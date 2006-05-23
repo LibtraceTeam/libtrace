@@ -10,12 +10,12 @@ static stat_t prot_stat[256] = { {0,0} } ;
 
 void protocol_per_packet(struct libtrace_packet_t *packet)
 {
-	struct libtrace_ip *ip = trace_get_ip(packet);
-	if (!ip)
+	uint8_t proto;
+	if (trace_get_transport(packet,&proto,NULL)==NULL)
 		return;
-
-	prot_stat[ip->ip_p].count++;
-	prot_stat[ip->ip_p].bytes+=trace_get_wire_length(packet);
+		
+	prot_stat[proto].count++;
+	prot_stat[proto].bytes+=trace_get_wire_length(packet);
 }
 
 void protocol_report(void)
