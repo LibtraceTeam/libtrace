@@ -114,6 +114,7 @@ struct erf_format_data_t {
 		unsigned diff;
 		unsigned curr;
 		unsigned offset;
+		unsigned int dagstream;
 	} dag;
 #endif
 };
@@ -164,6 +165,9 @@ static int dag_init_input(libtrace_t *libtrace) {
 		trace_set_err(libtrace,errno,"stat(%s)",libtrace->uridata);
 		return -1;
 	} 
+
+	DAG.dagstream = 0;
+	
 	if (S_ISCHR(buf.st_mode)) {
 		/* DEVICE */
 		if((INPUT.fd = dag_open(libtrace->uridata)) < 0) {
@@ -451,12 +455,24 @@ static int erf_config_output(libtrace_out_t *libtrace, trace_option_output_t opt
 
 #ifdef HAVE_DAG
 static int dag_pause_input(libtrace_t *libtrace) {
+#if DAG_VERSION_2_4
 	dag_stop(INPUT.fd);
+#else
+	if (dag_stop_stream(INPUT.fd, DAG.dagstream) < 0) {
+		trace_set_err(libtrace, errno, "Could not stop DAG stream");
+		return -1;
+	}
+	if (dag_detach_stream(INPUT.fd, DAG.dagstream) < 0) {
+		trace_set_err(libtrace, errno, "Could not detach DAG stream");
+		return -1;
+	}
+#endif
 	return 0; /* success */
 }
 
 static int dag_fin_input(libtrace_t *libtrace) {
 	/* dag pause input implicitly called to cleanup before this */
+	
 	dag_close(INPUT.fd);
 	if (DUCK.dummy_duck)
 		trace_destroy_dead(DUCK.dummy_duck);
@@ -641,11 +657,22 @@ static int dag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 }
 
 static int dag_start_input(libtrace_t *libtrace) {
+#if DAG_VERSION_2_4
 	if(dag_start(INPUT.fd) < 0) {
 		trace_set_err(libtrace,errno,"Cannot start DAG %s",
 				libtrace->uridata);
 		return -1;
 	}
+#else
+	if (dag_attach_stream(INPUT.fd, DAG.dagstream, 0, 0) < 0) {
+		trace_set_err(libtrace, errno, "Cannot attach DAG stream");
+		return -1;
+	}
+	if (dag_start_stream(INPUT.fd, DAG.dagstream) < 0) {
+		trace_set_err(libtrace, errno, "Cannot start DAG stream");
+		return -1;
+	}
+#endif
 	/* dags appear to have a bug where if you call dag_start after
 	 * calling dag_stop, and at least one packet has arrived, bad things
 	 * happen.  flush the memory hole 
