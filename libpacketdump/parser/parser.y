@@ -52,6 +52,8 @@ elements:   element
 	  ;
 
 element:    byteorder size output identifier { 
+		node_t *n;
+		element_t *el;
 		/* create a new field node... */
 	        field_t *new_field = (field_t *)malloc(sizeof(field_t)); 
 		new_field->order = $1;
@@ -60,11 +62,11 @@ element:    byteorder size output identifier {
 		new_field->identifier = $4;
 
 		/* to go inside a new node... */
-		node_t *n = (node_t *)malloc(sizeof(node_t));
+		n = (node_t *)malloc(sizeof(node_t));
 		n->field = new_field;
 
 		/* to go inside a new element */
-		element_t *el = (element_t *)malloc(sizeof(element_t));		
+		el = (element_t *)malloc(sizeof(element_t));		
 		el->type = FIELD;
 		el->next = NULL;
 		el->data = n;
@@ -97,6 +99,8 @@ identifier: TOK_IDENTIFIER { $$ = strdup($1); }
 nextfile:   TOK_NEXT identifier identifier { 
 
 		element_t *tmp;
+		node_t *n;
+		element_t *el;
 	        next_t *nextheader = (next_t *)malloc(sizeof(next_t)); 
 		nextheader->prefix = $2;
 		nextheader->fieldname = $3;
@@ -129,10 +133,10 @@ nextfile:   TOK_NEXT identifier identifier {
 		    }
 		}
 		
-		node_t *n = (node_t *)malloc(sizeof(node_t));
+		n = (node_t *)malloc(sizeof(node_t));
 		n->nextheader = nextheader;
 
-		element_t *el = (element_t *)malloc(sizeof(element_t));		
+		el = (element_t *)malloc(sizeof(element_t));		
 		el->type = NEXTHEADER;
 		el->next = NULL;
 		el->data = n;
@@ -144,15 +148,15 @@ nextfile:   TOK_NEXT identifier identifier {
 
 
 %%
-//#include "parser.lexer.c"
 
 element_t* parse_protocol_file(char *filename)
 {
-    // hold onto this so we can put it in any error messages
+    /* hold onto this so we can put it in any error messages */
     file = filename;
 
-    // if the protocol file doesn't exist, we return null and
-    // it will fall back to using the generic_decode function
+    /* if the protocol file doesn't exist, we return null and
+     * it will fall back to using the generic_decode function
+     */
     yyin = fopen(filename, "r");
     if(!yyin)
 	return NULL;
@@ -179,22 +183,22 @@ bitbuffer_t getbit(void **packet, int *packlen, uint64_t numbits)
      */
     while(bits < (sizeof(bitbuffer_t)-1)*8 && *packlen > 0)
     {
-	// read in one byte from the packet
+	/* read in one byte from the packet */
 	buffer |= ((*  ((bitbuffer_t*)*packet)   )&0xff) << bits;
-	// update the position within the packet
+	/* update the position within the packet */
 	*packet = ((char*)*packet) + 1;
 
 	bits += 8;
 	*packlen -= 1;
     }
 
-    // our return value is the last <numbits> of the buffer
+    /* our return value is the last <numbits> of the buffer */
     ret = buffer & (   (one<<numbits)   -1);
     
-    // remove the bits that are being returned from out buffer
+    /* remove the bits that are being returned from out buffer */
     buffer >>= numbits;
 
-    // and update our position inside this buffer
+    /* and update our position inside this buffer */
     bits -= numbits;
 
     return ret;
@@ -204,6 +208,8 @@ bitbuffer_t getbit(void **packet, int *packlen, uint64_t numbits)
 bitbuffer_t fix_byteorder(bitbuffer_t value, enum byte_order_t order, uint64_t size)
 {
     bitbuffer_t one = 1;
+    bitbuffer_t lhs;
+    bitbuffer_t rhs;;
 
     /*
      * XXX trial and error seems to show these numbers to work.
@@ -220,8 +226,8 @@ bitbuffer_t fix_byteorder(bitbuffer_t value, enum byte_order_t order, uint64_t s
 	    if(size <= 32)
 		return ntohl(value);
 	    
-	    bitbuffer_t lhs = ntohl(value& ((one<<32)-1));
-	    bitbuffer_t rhs = ntohl(value >> 32);
+	    lhs = ntohl(value& ((one<<32)-1));
+	    rhs = ntohl(value >> 32);
 	    return ((lhs<<32) | rhs);
 
 	case LITTLEENDIAN: 
@@ -229,7 +235,7 @@ bitbuffer_t fix_byteorder(bitbuffer_t value, enum byte_order_t order, uint64_t s
 
     };
 
-    // should never get here
+    /* should never get here */
     assert(0);
     return 0;
 }
@@ -245,6 +251,10 @@ void decode_protocol_file(uint16_t link_type,char *packet,int len,element_t *el)
 	switch(el->type)
 	{
 	    case FIELD:
+	    	if (len*8+bits<el->data->field->size) {
+			printf(" [Truncated]\n");
+			return;
+		}
 		result = getbit((void*)&packet, &len, el->data->field->size); 
 
 		switch(el->data->field->display)
@@ -446,6 +456,6 @@ void print_list(element_t *list)
 			    list->data->field->identifier);
 			    break;
     };
-    //printf("%s\n", list->data->identifier);
+    /*printf("%s\n", list->data->identifier); */
     print_list(list->next);
 }

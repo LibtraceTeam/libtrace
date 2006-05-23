@@ -10,7 +10,7 @@ enum node_type_t {
 
 enum byte_order_t {
     BIGENDIAN,
-    LITTLEENDIAN,
+    LITTLEENDIAN
 }; 
 
 enum display_t {
@@ -19,7 +19,7 @@ enum display_t {
     DISPLAY_INT,
     DISPLAY_IPV4,
     DISPLAY_MAC,
-    DISPLAY_FLAG,
+    DISPLAY_FLAG
 };
 
 /* This is more complicated that I feel it needs to be... */
