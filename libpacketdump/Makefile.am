@@ -5,9 +5,10 @@ LINK_LAYERS=$(wildcard link_*.cc)
 ETH_LAYERS=$(wildcard eth_*.cc)
 IP_LAYERS=$(wildcard ip_*.cc)
 TCP_LAYERS=$(wildcard tcp_*.cc)
+TEXT_PROTOCOLS=$(wildcard *.protocol)
 
 PLUGINSOURCES=$(LINK_LAYERS) $(ETH_LAYERS) $(IP_LAYERS) $(TCP_LAYERS)
-PLUGINS=$(addsuffix .so,$(basename $(PLUGINSOURCES)))
+PLUGINS=$(addsuffix .so,$(basename $(PLUGINSOURCES))) $(TEXT_PROTOCOLS)
 
 SUBDIRS = parser
 
