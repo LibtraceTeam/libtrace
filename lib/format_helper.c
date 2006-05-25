@@ -239,7 +239,7 @@ void trace_set_err(libtrace_t *trace,int errcode,const char *msg,...)
 	if (errcode>0) {
 		vsnprintf(buf,sizeof(buf),msg,va);
 		snprintf(trace->err.problem,sizeof(trace->err.problem),
-				"%s: %s",buf,strerror(errno));
+				"%s: %s",buf,strerror(errcode));
 	} else {
 		vsnprintf(trace->err.problem,sizeof(trace->err.problem),
 				msg,va);
