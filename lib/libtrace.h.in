@@ -893,7 +893,7 @@ libtrace_icmp_t *trace_get_icmp(libtrace_packet_t *packet);
 DLLEXPORT SIMPLE_FUNCTION
 libtrace_icmp_t *trace_get_icmp_from_ip(libtrace_ip_t *ip,uint32_t *remaining);
 
-/** Get the destination MAC addres
+/** Get the destination MAC address
  * @param packet  	the packet opaque pointer
  * @return a pointer to the destination mac, (or NULL if there is no 
  * destination MAC)
@@ -901,14 +901,14 @@ libtrace_icmp_t *trace_get_icmp_from_ip(libtrace_ip_t *ip,uint32_t *remaining);
 DLLEXPORT SIMPLE_FUNCTION
 uint8_t *trace_get_destination_mac(libtrace_packet_t *packet);
 
-/** Get the source MAC addres
+/** Get the source MAC address
  * @param packet  	the packet opaque pointer
  * @return a pointer to the source mac, (or NULL if there is no source MAC)
  */
 DLLEXPORT SIMPLE_FUNCTION
 uint8_t *trace_get_source_mac(libtrace_packet_t *packet);
 
-/** Get the source addres
+/** Get the source IP address
  * @param packet  	the packet opaque pointer
  * @param addr		a pointer to a sockaddr to store the address in, or NULL to use
  * 			static storage.
@@ -918,11 +918,11 @@ DLLEXPORT SIMPLE_FUNCTION
 struct sockaddr *trace_get_source_address(const libtrace_packet_t *packet,
 		struct sockaddr *addr);
 
-/** Get the source addres
+/** Get the destination IP address
  * @param packet  	the packet opaque pointer
  * @param addr		a pointer to a sockaddr to store the address in, or NULL to use
  * 			static storage.
- * @return NULL if there is no source address, or a sockaddr holding a v4 or v6 address
+ * @return NULL if there is no destination address, or a sockaddr holding a v4 or v6 address
  */
 DLLEXPORT SIMPLE_FUNCTION
 struct sockaddr *trace_get_destination_address(const libtrace_packet_t *packet,
