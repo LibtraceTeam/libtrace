@@ -223,10 +223,18 @@ static int dag_config_input(libtrace_t *libtrace, trace_option_t option,
  */
 static int erf_get_padding(const libtrace_packet_t *packet)
 {
-	dag_record_t *erfptr = (dag_record_t *)packet->header;
-	switch(erfptr->type) {
-		case TYPE_ETH: 		return 2;
-		default: 		return 0;
+	if (packet->trace->format->type==TRACE_FORMAT_ERF) {
+		dag_record_t *erfptr = (dag_record_t *)packet->header;
+		switch(erfptr->type) {
+			case TYPE_ETH: 		return 2;
+			default: 		return 0;
+		}
+	}
+	else {
+		switch(trace_get_link_type(packet)) {
+			case TYPE_ETH:		return 2;
+			default:		return 0;
+		}
 	}
 }
 
@@ -732,8 +740,9 @@ static int erf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 			trace_set_err(libtrace,errno, "read(%s)", libtrace->uridata);
 			return -1;
 		}
+		trace_set_err(libtrace,EIO,"Truncated packet (wanted %d, got %d)", size, numbytes);
 		/* Failed to read the full packet?  must be EOF */
-		return 0;
+		return -1;
 	}
 	if (((dag_record_t *)packet->buffer)->flags.rxerror == 1) {
 		packet->payload = NULL;
@@ -931,12 +940,12 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 		/* Flags. Can't do this */
 		memset(&erfhdr.flags,1,sizeof(erfhdr.flags));
 		/* Packet length (rlen includes format overhead) */
-		erfhdr.rlen = trace_get_capture_length(packet) 
-			+ erf_get_framing_length(packet);
+		erfhdr.rlen = htons(trace_get_capture_length(packet) 
+			+ erf_get_framing_length(packet));
 		/* loss counter. Can't do this */
 		erfhdr.lctr = 0;
-		/* Wire length */
-		erfhdr.wlen = trace_get_wire_length(packet);
+		/* Wire length, may contain the padding */
+		erfhdr.wlen = htons(trace_get_wire_length(packet)+pad);
 
 		/* Write it out */
 		numbytes = erf_dump_packet(libtrace,
@@ -982,7 +991,7 @@ static int erf_get_capture_length(const libtrace_packet_t *packet) {
 static int erf_get_wire_length(const libtrace_packet_t *packet) {
 	dag_record_t *erfptr = 0;
 	erfptr = (dag_record_t *)packet->header;
-	return ntohs(erfptr->wlen);
+	return ntohs(erfptr->wlen) - erf_get_padding(packet);
 }
 
 static size_t erf_set_capture_length(libtrace_packet_t *packet, size_t size) {
