@@ -33,14 +33,22 @@ test-format-all: test-format
 test-convert-all: test-convert
 # Not all types are convertable, for instance libtrace doesn't
 # do rtclient output, and erf doesn't support 802.11
+	@echo \* Conversions
+	@echo " * erf -> erf"
 	@LD_LIBRARY_PATH=$(libdir) ./test-convert erf erf
+	@echo " * erf -> pcap"
 	@LD_LIBRARY_PATH=$(libdir) ./test-convert erf pcap
+	@echo " * pcap -> erf"
 	@LD_LIBRARY_PATH=$(libdir) ./test-convert pcap erf
+	@echo " * pcapfile -> erf"
 	@LD_LIBRARY_PATH=$(libdir) ./test-convert pcapfile erf
-	#@LD_LIBRARY_PATH=$(libdir) ./test-convert rtclient erf
-	#@LD_LIBRARY_PATH=$(libdir) ./test-convert rtclient pcap
+	@#LD_LIBRARY_PATH=$(libdir) ./test-convert rtclient erf
+	@#LD_LIBRARY_PATH=$(libdir) ./test-convert rtclient pcap
+	@echo " * wtf -> pcap"
 	@LD_LIBRARY_PATH=$(libdir) ./test-convert wtf pcap
+	@echo " * wtf -> wtf"
 	@LD_LIBRARY_PATH=$(libdir) ./test-convert wtf wtf
+	@echo " * duck -> duck"
 	@LD_LIBRARY_PATH=$(libdir) ./test-convert duck duck
  
 clean:

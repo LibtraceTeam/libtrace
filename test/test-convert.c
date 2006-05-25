@@ -102,9 +102,9 @@ int main(int argc, char *argv[]) {
 	int count = 0;
 	int level = 0;
 	int expected = 100;
-	libtrace_t *trace;
+	libtrace_t *trace,*trace2;
 	libtrace_out_t *outtrace;
-	libtrace_packet_t *packet;
+	libtrace_packet_t *packet,*packet2;
 
 	trace = trace_create(lookup_uri(argv[1]));
 	iferr(trace);
@@ -142,9 +142,7 @@ int main(int argc, char *argv[]) {
         }
 	trace_destroy_packet(&packet);
 	if (error == 0) {
-		if (count == expected) {
-			printf("success: %d packets read\n",expected);
-		} else {
+		if (count != expected) {
 			printf("failure: %d packets expected, %d seen\n",expected,count);
 			error = 1;
 		}
@@ -153,5 +151,42 @@ int main(int argc, char *argv[]) {
 	}
         trace_destroy(trace);
 	trace_destroy_output(outtrace);
+
+	if (error)
+		return error;
+
+	/* Now read it back in again and check it's all kosher */
+	trace = trace_create(lookup_uri(argv[1]));
+	iferr(trace);
+	trace_start(trace);
+	trace2 = trace_create(lookup_out_uri(argv[2]));
+	iferr(trace2);
+	trace_start(trace2);
+	iferr(trace2);
+	packet=trace_create_packet();
+	packet2=trace_create_packet();
+	count=0;
+	while(trace_read_packet(trace,packet)>0) {
+		int err;
+		++count;
+		if ((err=trace_read_packet(trace2,packet2))<1) {
+			printf("premature EOF on destination, %i from %s, %i from %s\n",count,lookup_uri(argv[1]),count-1,lookup_out_uri(argv[2]));
+			iferr(trace2);
+			error=1;
+			break;
+		}
+		assert(trace_get_capture_length(packet) 
+				== trace_get_capture_length(packet2));
+		assert(trace_get_wire_length(packet) 
+				== trace_get_wire_length(packet2));
+	}
+	if (trace_read_packet(trace2,packet2)>0) {
+		printf("Extra packets after EOF\n");
+		error=1;
+	}
+	trace_destroy(trace);
+	trace_destroy(trace2);
+	trace_destroy_packet(&packet);
+
         return error;
 }
