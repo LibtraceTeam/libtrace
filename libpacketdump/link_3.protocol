@@ -1,0 +1,8 @@
+
+be32	hex	"Legacy: Timestamp"
+be8	integer "ATM: DSAP"
+be8	integer "ATM: SSAP"
+be8	integer "ATM: Control"
+be24	integer "ATM: OUI"
+be16	hex 	"ATM: Type"
+next	"eth"	"ATM: Type"
