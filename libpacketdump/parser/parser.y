@@ -11,7 +11,6 @@
 
     #define YYERROR_VERBOSE 1
 
-    typedef uint64_t bitbuffer_t;
     
     int yylex(void);
     int yyerror(char *s);
@@ -149,6 +148,8 @@ nextfile:   TOK_NEXT identifier identifier {
 
 %%
 
+#include "bitbuffer.h"
+
 element_t* parse_protocol_file(char *filename)
 {
     /* hold onto this so we can put it in any error messages */
@@ -171,38 +172,6 @@ element_t* parse_protocol_file(char *filename)
 
 
 
-bitbuffer_t getbit(void **packet, int *packlen, uint64_t numbits)
-{
-    bitbuffer_t ret;
-    bitbuffer_t one = 1;
-
-    /* While the buffer is not filled up and there is still
-     * data in the packet to read, read a byte...
-     * 
-     * The buffer gets filled from right to left
-     */
-    while(bits < (sizeof(bitbuffer_t)-1)*8 && *packlen > 0)
-    {
-	/* read in one byte from the packet */
-	buffer |= ((*  ((bitbuffer_t*)*packet)   )&0xff) << bits;
-	/* update the position within the packet */
-	*packet = ((char*)*packet) + 1;
-
-	bits += 8;
-	*packlen -= 1;
-    }
-
-    /* our return value is the last <numbits> of the buffer */
-    ret = buffer & (   (one<<numbits)   -1);
-    
-    /* remove the bits that are being returned from out buffer */
-    buffer >>= numbits;
-
-    /* and update our position inside this buffer */
-    bits -= numbits;
-
-    return ret;
-}
 
 
 bitbuffer_t fix_byteorder(bitbuffer_t value, enum byte_order_t order, uint64_t size)
@@ -370,7 +339,7 @@ void decode_protocol_file(uint16_t link_type,char *packet,int len,element_t *el)
 		buffer = 0;
 
 		decode_next(packet, len, el->data->nextheader->prefix, 
-			el->data->nextheader->target->value);
+			ntohs(el->data->nextheader->target->value));
 		break;
 	};
 	
