@@ -207,6 +207,8 @@ void *trace_get_payload_from_link(void *link, libtrace_linktype_t linktype,
 			return trace_get_payload_from_pos(link,type,remaining);
 		case TRACE_TYPE_ATM:
 			return trace_get_payload_from_atm(link,type,remaining);
+		case TRACE_TYPE_DUCK:
+			return NULL; /* duck packets have no payload! */
 	}
 	fprintf(stderr,"Don't understand link layer type %i in trace_get_payload_from_link()\n",
 		linktype);

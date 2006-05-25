@@ -247,6 +247,10 @@ static int duck_get_wire_length(const libtrace_packet_t *packet) {
 	return 0;
 }
 
+static int duck_get_link_type(const libtrace_packet_t *packet) {
+	return TRACE_TYPE_DUCK;
+}
+
 static void duck_help() {
 	printf("Endace DUCK format module\n");
 	printf("Supported input uris:\n");
@@ -272,7 +276,7 @@ static struct libtrace_format_t duck = {
         duck_read_packet,        	/* read_packet */
         NULL,                           /* fin_packet */
         duck_write_packet,              /* write_packet */
-        NULL,              		/* get_link_type */
+        duck_get_link_type,    		/* get_link_type */
         NULL,              		/* get_direction */
         NULL,              		/* set_direction */
         NULL,          			/* get_erf_timestamp */

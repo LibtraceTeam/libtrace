@@ -215,7 +215,8 @@ typedef enum {
        TRACE_TYPE_LINUX_SLL,		/**< Linux "null" framing */
        TRACE_TYPE_PFLOG,		/**< FreeBSD's PFlug */
        TRACE_TYPE_POS,
-       TRACE_TYPE_80211_PRISM = 12
+       TRACE_TYPE_80211_PRISM = 12,
+       TRACE_TYPE_DUCK,			/**< Pseudo link layer for DUCK packets */
      } libtrace_linktype_t;
 
 /** Trace directions 
