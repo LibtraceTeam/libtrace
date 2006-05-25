@@ -179,6 +179,21 @@ int main(int argc, char *argv[]) {
 				== trace_get_capture_length(packet2));
 		assert(trace_get_wire_length(packet) 
 				== trace_get_wire_length(packet2));
+	
+		if (trace_get_tcp(packet)) {
+			if (!trace_get_tcp(packet2)) {
+				printf("trace corrupt\n");
+				error=1;
+				break;
+			}
+		} else {
+			if (trace_get_tcp(packet2)) {
+				printf("trace corrupt: unexpected tcp\n");
+				error=1;
+				break;
+			}
+		}
+
 	}
 	if (trace_read_packet(trace2,packet2)>0) {
 		printf("Extra packets after EOF\n");
