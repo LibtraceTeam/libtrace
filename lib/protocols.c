@@ -557,6 +557,7 @@ uint8_t *trace_get_source_mac(libtrace_packet_t *packet) {
 		case TRACE_TYPE_LINUX_SLL:
 		case TRACE_TYPE_PFLOG:
 		case TRACE_TYPE_ATM:
+		case TRACE_TYPE_DUCK:
 			return NULL;
 	}
 	fprintf(stderr,"Not implemented\n");
@@ -585,6 +586,7 @@ DLLEXPORT uint8_t *trace_get_destination_mac(libtrace_packet_t *packet) {
 		case TRACE_TYPE_HDLC_POS:
 		case TRACE_TYPE_LINUX_SLL:
 		case TRACE_TYPE_PFLOG:
+		case TRACE_TYPE_DUCK:
 			/* No MAC address */
 			return NULL;
 	}
