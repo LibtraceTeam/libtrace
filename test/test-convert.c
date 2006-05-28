@@ -140,7 +140,7 @@ int main(int argc, char *argv[]) {
 		if (count>100)
 			break;
         }
-	trace_destroy_packet(&packet);
+	trace_destroy_packet(packet);
 	if (error == 0) {
 		if (count != expected) {
 			printf("failure: %d packets expected, %d seen\n",expected,count);
@@ -201,7 +201,8 @@ int main(int argc, char *argv[]) {
 	}
 	trace_destroy(trace);
 	trace_destroy(trace2);
-	trace_destroy_packet(&packet);
+	trace_destroy_packet(packet);
+	trace_destroy_packet(packet2);
 
         return error;
 }

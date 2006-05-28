@@ -87,7 +87,7 @@ int main(int argc, char *argv[]) {
 		}
 		count ++;
         }
-	trace_destroy_packet(&packet);
+	trace_destroy_packet(packet);
 	if (error == 0) {
 		if (count == 4) {
 			printf("success: 4 packets read\n");

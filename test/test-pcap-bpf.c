@@ -66,7 +66,7 @@ int main(int argc, char *argv[]) {
 	int error = 0;
 	int count = 0;
 	struct libtrace_packet_t *packet;
-	struct libtrace_filter_t *filter = trace_bpf_setfilter("port 80");
+	struct libtrace_filter_t *filter = trace_create_filter("port 80");
 
 	trace = trace_create(uri);
 	iferr(trace);
@@ -95,7 +95,7 @@ int main(int argc, char *argv[]) {
 		}
 		count ++;
         }
-	trace_destroy_packet(&packet);
+	trace_destroy_packet(packet);
 	if (error == 0) {
 		if (count == 54) {
 			printf("success: 54 packets read\n");
@@ -106,7 +106,7 @@ int main(int argc, char *argv[]) {
 	} else {
 		iferr(trace);
 	}
-	trace_destroy_bpf(filter);
+	trace_destroy_filter(filter);
         trace_destroy(trace);
 	filter=NULL;
         return error;

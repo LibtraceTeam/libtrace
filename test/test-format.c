@@ -117,7 +117,7 @@ int main(int argc, char *argv[]) {
 		trace_pause(trace);
 		trace_start(trace);
         }
-	trace_destroy_packet(&packet);
+	trace_destroy_packet(packet);
 	if (error == 0) {
 		if (count == expected) {
 			printf("success: %d packets read\n",expected);

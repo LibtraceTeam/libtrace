@@ -89,7 +89,7 @@ int main(int argc, char *argv[]) {
 		ts=trace_get_seconds(packet);
 		assert((tv.tv_sec+tv.tv_usec/1000000.0)-ts<.000001);
         }
-	trace_destroy_packet(&packet);
+	trace_destroy_packet(packet);
 	if (error == 0) {
 		if (count == 100) {
 			printf("success: 100 packets read\n");
