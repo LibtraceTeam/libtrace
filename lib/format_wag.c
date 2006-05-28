@@ -476,7 +476,7 @@ struct libtrace_eventobj_t trace_event_wag(libtrace_t *trace, libtrace_packet_t 
 	event.size = wag_read_packet_versatile(trace, packet, 0);
 	if (event.size == -1) {
 		read_err = trace_get_err(trace);
-		if (read_err.err_num = EAGAIN) {
+		if (read_err.err_num == EAGAIN) {
 			event.type = TRACE_EVENT_IOWAIT;
 		}
 		else {
