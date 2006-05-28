@@ -68,20 +68,36 @@
     typedef unsigned	__int16 uint16_t;
     typedef unsigned	__int32 uint32_t;
     typedef unsigned	__int64 uint64_t;
-	#ifdef BUILDING_DLL
-		#define DLLEXPORT __declspec(dllexport)
-	#else
-		#define DLLEXPORT __declspec(dllimport)
-	#endif
-	#define DLLLOCAL
+    #ifdef BUILDING_DLL
+	#define DLLEXPORT __declspec(dllexport)
+    #else
+	#define DLLEXPORT __declspec(dllimport)
+    #endif
+    #define DLLLOCAL
+    /* Windows pads bitfields out to to the size of their parent type
+     * however gcc warns that this doesn't meet with the iso C specification
+     * so produces warnings for this behaviour.  sigh.
+     */
+    #define LT_BITFIELD8 	uint8_t
+    #define LT_BITFIELD16 	uint16_t
+    #define LT_BITFIELD32 	uint32_t
+    #define LT_BITFIELD32 	uint64_t
 #else
-	#ifdef HAVE_GCCVISIBILITYPATCH
-		#define DLLEXPORT __attribute__ (visibility("default"))
-		#define DLLLOCAL __attribute__ (visibility("hidden"))
-	#else
-		#define DLLEXPORT
-		#define DLLLOCAL
-	#endif
+    #ifdef HAVE_GCCVISIBILITYPATCH
+	#define DLLEXPORT __attribute__ (visibility("default"))
+	#define DLLLOCAL __attribute__ (visibility("hidden"))
+    #else
+	#define DLLEXPORT
+	#define DLLLOCAL
+    #endif
+    /* GCC warns if the bitfield type is not "unsigned int", however windows
+     * generates incorrect code for this (see above), so we define these
+     * macros.  How Hidious.  So much for C's portability.
+     */
+    #define LT_BITFIELD8 	unsigned int
+    #define LT_BITFIELD16 	unsigned int
+    #define LT_BITFIELD32 	unsigned int
+    #define LT_BITFIELD32 	unsigned int
 #endif
 
 #ifdef WIN32
@@ -216,7 +232,7 @@ typedef enum {
        TRACE_TYPE_PFLOG,		/**< FreeBSD's PFlug */
        TRACE_TYPE_POS,
        TRACE_TYPE_80211_PRISM = 12,
-       TRACE_TYPE_DUCK,			/**< Pseudo link layer for DUCK packets */
+       TRACE_TYPE_DUCK			/**< Pseudo link layer for DUCK packets */
      } libtrace_linktype_t;
 
 /** Trace directions 
@@ -245,11 +261,11 @@ typedef enum {
 typedef struct libtrace_ip
 {
 #if BYTE_ORDER == LITTLE_ENDIAN
-    uint8_t ip_hl:4;		/**< Header Length */
-    uint8_t ip_v:4;		/**< Version */
+    LT_BITFIELD8 ip_hl:4;		/**< Header Length */
+    LT_BITFIELD8 ip_v:4;		/**< Version */
 #elif BYTE_ORDER == BIG_ENDIAN
-    uint8_t ip_v:4;		/**< Version */
-    uint8_t ip_hl:4;		/**< Header Length */
+    LT_BITFIELD8 ip_v:4;		/**< Version */
+    LT_BITFIELD8 ip_hl:4;		/**< Header Length */
 #else
 #   error "Adjust your <bits/endian.h> defines"
 #endif
@@ -257,15 +273,15 @@ typedef struct libtrace_ip
     uint16_t ip_len;			/**< Total Length */
     int16_t  ip_id;			/**< Identification */
 #if BYTE_ORDER == LITTLE_ENDIAN
-    uint16_t ip_off:12;		/**< Fragment Offset */
-    uint16_t ip_mf:1;		/**< More Fragments Flag */
-    uint16_t ip_df:1;		/**< Dont Fragment Flag */
-    uint16_t ip_rf:1;		/**< Reserved Fragment Flag */
+    LT_BITFIELD16 ip_off:12;		/**< Fragment Offset */
+    LT_BITFIELD16 ip_mf:1;		/**< More Fragments Flag */
+    LT_BITFIELD16 ip_df:1;		/**< Dont Fragment Flag */
+    LT_BITFIELD16 ip_rf:1;		/**< Reserved Fragment Flag */
 #elif BYTE_ORDER == BIG_ENDIAN
-    uint16_t ip_rf:1;		/**< Fragment Offset */
-    uint16_t ip_df:1;		/**< More Fragments Flag */
-    uint16_t ip_mf:1;		/**< Dont Fragment Flag */
-    uint16_t ip_off:12;		/**< Reserved Fragment Flag */
+    LT_BITFIELD16 ip_rf:1;		/**< Fragment Offset */
+    LT_BITFIELD16 ip_df:1;		/**< More Fragments Flag */
+    LT_BITFIELD16 ip_mf:1;		/**< Dont Fragment Flag */
+    LT_BITFIELD16 ip_off:12;		/**< Reserved Fragment Flag */
 #else
 #   error "Adjust your <bits/endian.h> defines"
 #endif
@@ -302,25 +318,25 @@ typedef struct libtrace_tcp
     uint32_t seq;		/**< Sequence number */
     uint32_t ack_seq;		/**< Acknowledgement Number */
 #  if BYTE_ORDER == LITTLE_ENDIAN
-    uint8_t res1:4;	/**< Reserved bits */
-    uint8_t doff:4;	/**< Data Offset */	
-    uint8_t fin:1;		/**< FIN */
-    uint8_t syn:1;		/**< SYN flag */
-    uint8_t rst:1;		/**< RST flag */
-    uint8_t psh:1;		/**< PuSH flag */
-    uint8_t ack:1;		/**< ACK flag */
-    uint8_t urg:1;		/**< URG flag */
-    uint8_t res2:2;	/**< Reserved */
+    LT_BITFIELD8 res1:4;	/**< Reserved bits */
+    LT_BITFIELD8 doff:4;	/**< Data Offset */	
+    LT_BITFIELD8 fin:1;		/**< FIN */
+    LT_BITFIELD8 syn:1;		/**< SYN flag */
+    LT_BITFIELD8 rst:1;		/**< RST flag */
+    LT_BITFIELD8 psh:1;		/**< PuSH flag */
+    LT_BITFIELD8 ack:1;		/**< ACK flag */
+    LT_BITFIELD8 urg:1;		/**< URG flag */
+    LT_BITFIELD8 res2:2;	/**< Reserved */
 #  elif BYTE_ORDER == BIG_ENDIAN
-    uint8_t doff:4;	/**< Data offset */
-    uint8_t res1:4;	/**< Reserved bits */
-    uint8_t res2:2;	/**< Reserved */
-    uint8_t urg:1;		/**< URG flag */
-    uint8_t ack:1;		/**< ACK flag */
-    uint8_t psh:1;		/**< PuSH flag */
-    uint8_t rst:1;		/**< RST flag */
-    uint8_t syn:1;		/**< SYN flag */
-    uint8_t fin:1;		/**< FIN flag */
+    LT_BITFIELD8 doff:4;	/**< Data offset */
+    LT_BITFIELD8 res1:4;	/**< Reserved bits */
+    LT_BITFIELD8 res2:2;	/**< Reserved */
+    LT_BITFIELD8 urg:1;		/**< URG flag */
+    LT_BITFIELD8 ack:1;		/**< ACK flag */
+    LT_BITFIELD8 psh:1;		/**< PuSH flag */
+    LT_BITFIELD8 rst:1;		/**< RST flag */
+    LT_BITFIELD8 syn:1;		/**< SYN flag */
+    LT_BITFIELD8 fin:1;		/**< FIN flag */
 #  else
 #   error "Adjust your <bits/endian.h> defines"
 #  endif
@@ -367,7 +383,7 @@ typedef struct libtrace_llcsnap
   uint8_t ssap;			/**< Source Service Access Point */
   uint8_t control;
 /* SNAP */
-  uint32_t oui:24;		/**< Organisationally Unique Identifier (scope)*/
+  LT_BITFIELD32 oui:24;		/**< Organisationally Unique Identifier (scope)*/
   uint16_t type;		/**< Protocol within OUI */
 } PACKED libtrace_llcsnap_t;
 
@@ -382,10 +398,10 @@ typedef struct libtrace_ether
 /** 802.1Q frame */
 typedef struct libtrace_8021q 
 {
-  uint16_t vlan_pri:3;	 /**< VLAN User Priority */
-  uint16_t vlan_cfi:1; 	 /**< VLAN Format Indicator, 
+  LT_BITFIELD16 vlan_pri:3;	 /**< VLAN User Priority */
+  LT_BITFIELD16 vlan_cfi:1; 	 /**< VLAN Format Indicator, 
 				   * 0 for ethernet, 1 for token ring */
-  uint16_t vlan_id:12; 	 /**< VLAN Id */
+  LT_BITFIELD16 vlan_id:12; 	 /**< VLAN Id */
   uint16_t vlan_ether_type;	 /**< VLAN Sub-packet Type ID Field 
 				   * (next-header)*/
 } PACKED libtrace_8021q_t;
@@ -393,12 +409,12 @@ typedef struct libtrace_8021q
 /** ATM cell */
 typedef struct libtrace_atm_cell
 {
-  uint32_t gfc:4;		/**< Generic Flow Control */
-  uint32_t vpi:8;		/**< Virtual Path Identifier */
-  uint32_t vci:8;		/**< Virtual Channel Identifier */
-  uint32_t pt:3;		/**< Payload Type */
-  uint32_t clp:1;		/**< Cell Loss Priority */
-  uint32_t hec:8;		/**< Header Error Control */
+  LT_BITFIELD32 gfc:4;		/**< Generic Flow Control */
+  LT_BITFIELD32 vpi:8;		/**< Virtual Path Identifier */
+  LT_BITFIELD32 vci:8;		/**< Virtual Channel Identifier */
+  LT_BITFIELD32 pt:3;		/**< Payload Type */
+  LT_BITFIELD32 clp:1;		/**< Cell Loss Priority */
+  LT_BITFIELD32 hec:8;		/**< Header Error Control */
 } PACKED libtrace_atm_cell_t;
 
 /** POS header */
@@ -410,17 +426,17 @@ typedef struct libtrace_pos
 
 /** 802.11 header */
 typedef struct libtrace_80211_t {
-        uint16_t      protocol:2;
-        uint16_t      type:2;
-        uint16_t      subtype:4;
-        uint16_t      to_ds:1;		/**< Packet to Distribution Service */
-        uint16_t      from_ds:1;	/**< Packet from Distribution Service */
-        uint16_t      more_frag:1;	/**< Packet has more fragments */
-        uint16_t      retry:1;		/**< Packet is a retry */
-        uint16_t      power:1;
-        uint16_t      more_data:1;
-        uint16_t      wep:1;
-        uint16_t      order:1;
+        LT_BITFIELD32      protocol:2;
+        LT_BITFIELD32      type:2;
+        LT_BITFIELD32      subtype:4;
+        LT_BITFIELD32      to_ds:1;		/**< Packet to Distribution Service */
+        LT_BITFIELD32      from_ds:1;	/**< Packet from Distribution Service */
+        LT_BITFIELD32      more_frag:1;	/**< Packet has more fragments */
+        LT_BITFIELD32      retry:1;		/**< Packet is a retry */
+        LT_BITFIELD32      power:1;
+        LT_BITFIELD32      more_data:1;
+        LT_BITFIELD32      wep:1;
+        LT_BITFIELD32      order:1;
         uint16_t     duration;
         uint8_t      mac1[6];
         uint8_t      mac2[6];
@@ -657,7 +673,7 @@ DLLEXPORT libtrace_packet_t *trace_copy_packet(const libtrace_packet_t *packet);
  *
  * sideeffect: sets packet to NULL
  */
-DLLEXPORT void trace_destroy_packet(libtrace_packet_t **packet);
+DLLEXPORT void trace_destroy_packet(libtrace_packet_t *packet);
 
 
 /** Read one packet from the trace 
@@ -775,6 +791,10 @@ DLLEXPORT void *trace_get_transport(libtrace_packet_t *packet, uint8_t *proto,
  */
 DLLEXPORT void *trace_get_payload_from_ip(libtrace_ip_t *ip, uint8_t *proto,
 		uint32_t *remaining);
+
+DLLEXPORT void *trace_get_payload_from_link(void *link,
+		libtrace_linktype_t linktype, 
+		uint16_t *type, uint32_t *remaining)
 
 /** Gets a pointer to the payload given a pointer to a tcp header
  * @param tcp           The tcp Header
@@ -1107,26 +1127,26 @@ libtrace_direction_t trace_get_direction(const libtrace_packet_t *packet);
  * filter is actually used
  */
 DLLEXPORT SIMPLE_FUNCTION
-libtrace_filter_t *trace_bpf_setfilter(const char *filterstring);
+libtrace_filter_t *trace_create_filter(const char *filterstring);
 
 /** apply a BPF filter
  * @param filter 	the filter opaque pointer
  * @param packet	the packet opaque pointer
- * @return 1 if the filter matches, 0 if it doesn't.
+ * @return >0 if the filter matches, 0 if it doesn't, -1 on error.
  * @note Due to the way BPF filters are built, the filter is not actually
- * compiled until the first time trace_bpf_filter is called. If your filter is
- * incorrect, it will generate an error message and assert, exiting the
+ * compiled until the first time trace_create_filter is called. If your filter
+ * is incorrect, it will generate an error message and assert, exiting the
  * program. This behaviour may change to more graceful handling of this error
  * in the future.
  */
-DLLEXPORT int trace_bpf_filter(libtrace_filter_t *filter,
+DLLEXPORT int trace_apply_filter(libtrace_filter_t *filter,
 		const libtrace_packet_t *packet);
 
 /** destory of BPF filter
  * @param filter 	the filter opaque pointer
  * Deallocate all the resources associated with a BPF filter
  */
-DLLEXPORT void trace_destroy_bpf(libtrace_filter_t *filter);
+DLLEXPORT void trace_destroy_filter(libtrace_filter_t *filter);
 /*@}*/
 
 /** @name Portability

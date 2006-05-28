@@ -214,6 +214,7 @@ void pcap_constructor();
 void pcapfile_constructor();
 void rt_constructor();
 void wag_constructor();
+void duck_constructor();
 
 /* call all the constructors if they haven't yet all been called */
 void trace_init(void)
@@ -629,12 +630,14 @@ DLLEXPORT libtrace_packet_t *trace_copy_packet(const libtrace_packet_t *packet) 
  *
  * sideeffect: sets packet to NULL
  */
-DLLEXPORT void trace_destroy_packet(libtrace_packet_t **packet) {
-	if ((*packet)->buf_control == TRACE_CTRL_PACKET) {
-		free((*packet)->buffer);
+DLLEXPORT void trace_destroy_packet(libtrace_packet_t *packet) {
+	if (packet->buf_control == TRACE_CTRL_PACKET) {
+		free(packet->buffer);
 	}
-	free((*packet));
-	*packet = NULL;
+	packet->buf_control='\0'; /* an "bad" value to force an assert
+				   * if this packet is ever reused
+				   */
+	free(packet);
 }	
 
 /* Read one packet from the trace into buffer
@@ -666,7 +669,7 @@ DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 				/* If the filter doesn't match, read another
 				 * packet
 				 */
-				if (!trace_bpf_filter(libtrace->filter,packet)){
+				if (!trace_apply_filter(libtrace->filter,packet)){
 					continue;
 				}
 			}
@@ -915,7 +918,7 @@ DLLEXPORT libtrace_eventobj_t trace_event(libtrace_t *trace,
  * @returns opaque pointer pointer to a libtrace_filter_t object
  * @author Daniel Lawson
  */
-DLLEXPORT libtrace_filter_t *trace_bpf_setfilter(const char *filterstring) {
+DLLEXPORT libtrace_filter_t *trace_create_filter(const char *filterstring) {
 #if HAVE_BPF
 	libtrace_filter_t *filter = (libtrace_filter_t*)
 				malloc(sizeof(libtrace_filter_t));
@@ -928,7 +931,7 @@ DLLEXPORT libtrace_filter_t *trace_bpf_setfilter(const char *filterstring) {
 #endif
 }
 
-DLLEXPORT void trace_destroy_bpf(libtrace_filter_t *filter)
+DLLEXPORT void trace_destroy_filter(libtrace_filter_t *filter)
 {
 #if HAVE_BPF
 	free(filter->filterstring);
@@ -995,7 +998,7 @@ int trace_bpf_compile(libtrace_filter_t *filter,
 #endif
 }
 
-DLLEXPORT int trace_bpf_filter(libtrace_filter_t *filter,
+DLLEXPORT int trace_apply_filter(libtrace_filter_t *filter,
 			const libtrace_packet_t *packet) {
 #if HAVE_BPF
 	void *linkptr = 0;

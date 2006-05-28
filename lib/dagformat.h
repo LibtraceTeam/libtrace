@@ -45,12 +45,14 @@ typedef struct aal5_rec {
 
 /** Flags */
 typedef struct flags {
-	uint8_t   iface:2;
-	uint8_t   vlen:1;
-	uint8_t   trunc:1;
-	uint8_t   rxerror:1;
-	uint8_t   dserror:1;
-	uint8_t  pad:2;
+	LT_BITFIELD8  iface:2;		/**< Interface (direction) */
+	LT_BITFIELD8  vlen:1;	
+	LT_BITFIELD8  trunc:1;		/**< Trunacted */
+	LT_BITFIELD8  rxerror:1;	/**< RX Error in this packet/before
+					  * this packet
+					  */
+	LT_BITFIELD8  dserror:1;	/**< Data stream error */
+	LT_BITFIELD8  pad:2;		/**< Unused */
 } PACKED flags_t;
 
 /** GPP Global type */

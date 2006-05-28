@@ -139,7 +139,8 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 	/* This is the first packet, so just fire away. */
 	/* TODO: finalise packet */
 	*packet = *trace->event.packet;
-	trace_destroy_packet(&trace->event.packet);
+	trace_destroy_packet(trace->event.packet);
+	trace->event.packet = NULL;
 
 	event.type = TRACE_EVENT_PACKET;
 
