@@ -28,9 +28,10 @@
  *
  */
 
-// 
-// This program takes a series of traces and bpf filters and outputs how many
-// bytes/packets
+/* 
+ * This program takes a series of traces and bpf filters and outputs how many
+ * bytes/packets
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -87,7 +88,7 @@ void run_trace(char *uri)
                 }
 
 		for(i=0;i<filter_count;++i) {
-			if(trace_bpf_filter(filters[i].filter,packet)) {
+			if(trace_apply_filter(filters[i].filter,packet)) {
 				++filters[i].count;
 				filters[i].bytes+=trace_get_wire_length(packet);
 			}
@@ -136,7 +137,7 @@ int main(int argc, char *argv[]) {
 				++filter_count;
 				filters=realloc(filters,filter_count*sizeof(struct filter_t));
 				filters[filter_count-1].expr=strdup(optarg);
-				filters[filter_count-1].filter=trace_bpf_setfilter(optarg);
+				filters[filter_count-1].filter=trace_create_filter(optarg);
 				filters[filter_count-1].count=0;
 				filters[filter_count-1].bytes=0;
 				break;

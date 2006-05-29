@@ -79,7 +79,7 @@ int main(int argc, char *argv[])
 			break;
 
 		switch (c) {
-			case 'f': filter=trace_bpf_setfilter(optarg);
+			case 'f': filter=trace_create_filter(optarg);
 				break;
 			case 'c': count=atoi(optarg);
 				break;
@@ -113,7 +113,7 @@ int main(int argc, char *argv[])
 		}
 
 
-		if (filter && !trace_bpf_filter(filter,packet)) {
+		if (filter && !trace_apply_filter(filter,packet)) {
 			continue;
 		}
 
@@ -177,6 +177,8 @@ int main(int argc, char *argv[])
 
 	if (!output)
 		trace_destroy_output(output);
+
+	trace_destroy_packet(packet);
 
 	return 0;
 }

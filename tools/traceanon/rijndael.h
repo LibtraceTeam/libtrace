@@ -1,7 +1,7 @@
 #ifndef _RIJNDAEL_H_
 #define _RIJNDAEL_H_
 
-// $Id$
+/* $Id$
 // 
 // File : rijndael.h
 // Creation date : Sun Nov 5 2000 03:21:05 CEST
@@ -11,9 +11,9 @@
 // This is intended to be an easily usable library file.
 // This code is public domain.
 // Based on the Vincent Rijmen and K.U.Leuven implementation 2.4.
-//
+*/
 
-//
+/*
 // Original Copyright notice:
 //
 //    rijndael-alg-fst.c   v2.4   April '2000
@@ -29,14 +29,14 @@
 //             v2.4: Vincent Rijmen, K.U.Leuven
 //
 //    This code is placed in the public domain.
-//
+*/
 
-//
+/*
 // This implementation works on 128 , 192 , 256 bit keys
 // and on 128 bit blocks
-//
+*/
 
-//
+/*
 // Example of usage:
 //
 //  // Input data
@@ -61,18 +61,18 @@
 //  len = rin.padDecrypt(output,len,output2);
 //  if(len >= 0)useYourDecryptedText();
 //  else decryptError(len);
-//
+*/
 
 #define _MAX_KEY_COLUMNS (256/32)
 #define _MAX_ROUNDS      14
 #define MAX_IV_SIZE      16
 
-// We assume that unsigned int is 32 bits long.... 
+/* We assume that unsigned int is 32 bits long....  */
 typedef unsigned char  UINT8;
 typedef unsigned int   UINT32;
 typedef unsigned short UINT16;
 
-// Error codes
+/* Error codes */
 #define RIJNDAEL_SUCCESS 0
 #define RIJNDAEL_UNSUPPORTED_MODE -1
 #define RIJNDAEL_UNSUPPORTED_DIRECTION -2
@@ -82,9 +82,10 @@ typedef unsigned short UINT16;
 #define RIJNDAEL_BAD_DIRECTION -6
 #define RIJNDAEL_CORRUPTED_DATA -7
 
-//class Rijndael
+/*class Rijndael
 //{	
 //public:
+*/
 
 enum Direction_e { Encrypt , Decrypt };
 enum Mode_e { ECB , CBC , CFB1 };
@@ -96,7 +97,7 @@ typedef enum Direction_e Direction;
 typedef enum KeyLength_e KeyLength;
 typedef enum State_e State;
 
-//
+/*
 // Creates a Rijndael cipher object
 // You have to call init() before you can encrypt or decrypt stuff
 //
@@ -157,5 +158,6 @@ void keyEncToDec();
 void r_encrypt(const UINT8 a[16], UINT8 b[16]);
 void r_decrypt(const UINT8 a[16], UINT8 b[16]);
 //};
+*/
 	
-#endif // _RIJNDAEL_H_
+#endif /* _RIJNDAEL_H_ */

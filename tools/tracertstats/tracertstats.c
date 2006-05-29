@@ -145,7 +145,7 @@ void run_trace(char *uri)
 		
 		ts = trace_get_seconds(packet);
 		for(i=0;i<filter_count;++i) {
-			if(trace_bpf_filter(filters[i].filter,packet)) {
+			if(trace_apply_filter(filters[i].filter,packet)) {
 				++filters[i].count;
 				filters[i].bytes+=trace_get_wire_length(packet);
 			}
@@ -174,6 +174,7 @@ void run_trace(char *uri)
 
         trace_destroy(trace);
 	output_destroy(output);
+	trace_destroy_packet(packet);
 }
 
 void usage(char *argv0)
@@ -206,7 +207,7 @@ int main(int argc, char *argv[]) {
 				++filter_count;
 				filters=realloc(filters,filter_count*sizeof(struct filter_t));
 				filters[filter_count-1].expr=strdup(optarg);
-				filters[filter_count-1].filter=trace_bpf_setfilter(optarg);
+				filters[filter_count-1].filter=trace_create_filter(optarg);
 				filters[filter_count-1].count=0;
 				filters[filter_count-1].bytes=0;
 				break;

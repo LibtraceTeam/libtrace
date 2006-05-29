@@ -77,7 +77,7 @@ int main(int argc, char *argv[]) {
 	if (in_write)
 		trace_destroy_output(in_write);
 	trace_destroy(input);
-	trace_destroy_packet(&packet);
+	trace_destroy_packet(packet);
 	
 	return 0;
 }

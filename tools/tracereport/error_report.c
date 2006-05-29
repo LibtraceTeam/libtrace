@@ -32,5 +32,5 @@ void error_report(void)
 	printf("# Errors:\n");
 	printf("RX Errors: %" PRIu64 "\n",rx_errors);
 	printf("IP Checksum errors: %" PRIu64 "\n",ip_errors);
-	//printf("TCP Checksum errors: %" PRIu64 "\n",tcp_errors);
+	/*printf("TCP Checksum errors: %" PRIu64 "\n",tcp_errors); */
 }

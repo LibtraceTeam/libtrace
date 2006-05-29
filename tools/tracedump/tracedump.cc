@@ -46,7 +46,7 @@ int main(int argc,char **argv)
 					fprintf(stderr,"You can only have one filter (quote it with " ")\n");
 					usage(argv[0]);
 				}
-				filter=trace_bpf_setfilter(optarg);
+				filter=trace_create_filter(optarg);
 				break;
 			case 'c': count=atol(optarg); break;
 			default:
@@ -74,7 +74,7 @@ int main(int argc,char **argv)
 			continue;
 		}
 		while(trace_read_packet(trace,packet)> 0 ){
-			if (filter && !trace_bpf_filter(filter,packet))
+			if (filter && !trace_apply_filter(filter,packet))
 				continue;
 
 			trace_dump_packet(packet);

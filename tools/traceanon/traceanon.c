@@ -206,7 +206,7 @@ int main(int argc, char *argv[])
 			break;
 		}
 	}
-	trace_destroy_packet(&packet);
+	trace_destroy_packet(packet);
 	trace_destroy(trace);
 	trace_destroy_output(writer);
 	return 0;
