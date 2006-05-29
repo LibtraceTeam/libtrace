@@ -794,7 +794,7 @@ DLLEXPORT void *trace_get_payload_from_ip(libtrace_ip_t *ip, uint8_t *proto,
 
 DLLEXPORT void *trace_get_payload_from_link(void *link,
 		libtrace_linktype_t linktype, 
-		uint16_t *type, uint32_t *remaining)
+		uint16_t *type, uint32_t *remaining);
 
 /** Gets a pointer to the payload given a pointer to a tcp header
  * @param tcp           The tcp Header
