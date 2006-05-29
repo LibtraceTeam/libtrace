@@ -45,7 +45,7 @@ int main(int argc, char *argv[])
 
 		switch (c) {
 			case 'f':
-				filter=trace_bpf_setfilter(optarg);
+				filter=trace_create_filter(optarg);
 				break;
 			case 's':
 				snaplen=atoi(optarg);
@@ -102,6 +102,8 @@ int main(int argc, char *argv[])
 		while (trace_read_packet(trace,packet)>0) {
 			per_packet(packet);
 		}
+
+		trace_destroy_packet(packet);
 
 		if (trace_is_err(trace)) {
 			trace_perror(trace,"Reading packets");

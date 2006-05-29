@@ -5,4 +5,4 @@ LDLIBS=-ltrace
 all: trivial complete event output
 
 clean:
-	rm -f trivial complete *.o
+	rm -f trivial complete event output *.o

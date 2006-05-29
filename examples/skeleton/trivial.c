@@ -44,6 +44,8 @@ int main(int argc, char *argv[])
 		per_packet(packet);
 	}
 
+	trace_destroy_packet(packet);
+
 	if (trace_is_err(trace)) {
 		trace_perror(trace,"Reading packets");
 		trace_destroy(trace);

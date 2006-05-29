@@ -72,7 +72,7 @@ int main(int argc, char *argv[])
 			trace_perror_output(output, "Writing packet");
 			trace_destroy(trace);
 			trace_destroy_output(output);
-			trace_destroy_packet(&packet);
+			trace_destroy_packet(packet);
 			return 1;
 		}
 		
@@ -83,13 +83,13 @@ int main(int argc, char *argv[])
 		trace_perror(trace,"Reading packets");
 		trace_destroy(trace);
 		trace_destroy_output(output);
-		trace_destroy_packet(&packet);
+		trace_destroy_packet(packet);
 		return 1;
 	}
 
 	trace_destroy(trace);
 	trace_destroy_output(output);
-	trace_destroy_packet(&packet);
+	trace_destroy_packet(packet);
 	
 	return 0;
 }

@@ -107,10 +107,6 @@ int main(int argc, char *argv[]) {
 	libtrace_packet_t *packet;
 	int psize = 0;
 	char *uri = 0;
-	uint32_t last_second = 0;
-	double ts = 0.0;
-	int pkt_count = 0;
-	int byte_count = 0;
 	
 	if (argc >= 2) {
 		uri = strdup(argv[1]);
@@ -145,7 +141,7 @@ int main(int argc, char *argv[]) {
 	}
 	free(uri);
 	trace_destroy(trace);
-	trace_destroy_packet(&packet);
+	trace_destroy_packet(packet);
 	return 0;
 
 }
