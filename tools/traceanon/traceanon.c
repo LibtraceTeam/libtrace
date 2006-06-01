@@ -43,13 +43,13 @@ void update_in_cksum32(uint16_t *csum, uint32_t old, uint32_t new)
 
 /* Ok this is remarkably complicated
  *
- * We want to change one, or the other IP address, while preserving the 
- * checksum.  TCP and UDP both include the faux header in their checksum
- * calculations, so you have to update them too.  ICMP is even worse --
- * it can include the original IP packet that caused the error!  So anonymise
- * that too, but remember that it's travelling in the opposite direction so
- * we need to encrypt the destination and source instead of the source and
- * destination!
+ * We want to change one, or the other IP address, while preserving
+ * the checksum.  TCP and UDP both include the faux header in their
+ * checksum calculations, so you have to update them too.  ICMP is
+ * even worse -- it can include the original IP packet that caused the
+ * error!  So anonymise that too, but remember that it's travelling in
+ * the opposite direction so we need to encrypt the destination and
+ * source instead of the source and destination!
  */
 void encrypt_ips(struct libtrace_ip *ip,bool enc_source,bool enc_dest)
 {
@@ -84,13 +84,17 @@ void encrypt_ips(struct libtrace_ip *ip,bool enc_source,bool enc_dest)
 	}
 
 	if (icmp) {
-		/* These are error codes that return the IP packet internally */
-		if (icmp->type == 3 || icmp->type == 5 || icmp->type == 11) {
+		/* These are error codes that return the IP packet
+		 * internally 
+		 */
+		if (icmp->type == 3 
+				|| icmp->type == 5 
+				|| icmp->type == 11) {
 			encrypt_ips(
-					(struct libtrace_ip*)icmp+
-						sizeof(struct libtrace_icmp),
-					enc_dest,
-					enc_source);
+				(struct libtrace_ip*)icmp+
+					sizeof(struct libtrace_icmp),
+				enc_dest,
+				enc_source);
 		}
 	}
 }
@@ -161,9 +165,11 @@ int main(int argc, char *argv[])
 		trace_destroy(trace);
 		return 1;
 	}
-	
-	if (optind == argc) {
-		/* no output specified, output in same format to stdout */
+
+	if (optind +1>= argc) {
+		/* no output specified, output in same format to
+		 * stdout 
+		 */
 		asprintf(&output,"%s:-","erf");
 		writer = trace_create_output(output);
 	} else {
@@ -178,6 +184,7 @@ int main(int argc, char *argv[])
 	
 	if (trace_start(trace)==-1) {
 		trace_perror(trace,"trace_start");
+		return 1;
 	}
 	if (trace_start_output(writer)==-1) {
 		trace_perror_output(writer,"trace_start_output");

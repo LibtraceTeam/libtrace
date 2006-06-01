@@ -104,8 +104,15 @@ int main(int argc, char *argv[])
 
 	output=NULL;
 	input=trace_create(argv[optind]);
+	if (trace_is_err(input)) {
+		trace_perror(input,"");
+		return 1;
+	}
 
-	trace_start(input);
+	if (trace_start(input)==-1) {
+		trace_perror(input,"");
+		return 1;
+	}
 
 	while(1) {
 		if (trace_read_packet(input,packet)<1) {

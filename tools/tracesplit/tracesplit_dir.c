@@ -40,7 +40,10 @@ int main(int argc, char *argv[]) {
 		printf("Problem reading input trace: %s\n", trace_err.problem);
 		return 1;
 	}
-	trace_start(input);
+	if (trace_start(input)==-1) {
+		trace_perror(input,"");
+		return 1;
+	}
 	
 	while(1) {
 		if (trace_read_packet(input, packet) < 1)
@@ -50,8 +53,10 @@ int main(int argc, char *argv[]) {
 			case 0:
 				if (!out_write) {
 					out_write = create_output(argv[3]);
-					if (!out_write)
+					if (trace_is_err_output(out_write)) {
+						trace_perror_output(out_write,"");
 						return 1;
+					}
 				}
 				if (trace_write_packet(out_write, packet)==-1){
 					trace_perror_output(in_write,"write");
@@ -60,6 +65,11 @@ int main(int argc, char *argv[]) {
 				break;
 			case 1:
 				if (!in_write) {
+					in_write = create_output(argv[2]);
+					if (trace_is_err_output(in_write)) {
+						trace_perror_output(in_write,"");
+						return 1;
+					}
 					in_write = create_output(argv[2]);
 					if (!in_write)
 						return 1;
