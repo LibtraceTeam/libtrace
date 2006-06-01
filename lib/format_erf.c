@@ -497,7 +497,8 @@ static int rtclient_fin_input(libtrace_t *libtrace) {
 }
 
 static int erf_fin_input(libtrace_t *libtrace) {
-	libtrace_io_close(INPUT.file);
+	if (INPUT.file)
+		libtrace_io_close(INPUT.file);
 	free(libtrace->format_data);
 	return 0;
 }
