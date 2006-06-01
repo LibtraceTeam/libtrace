@@ -81,6 +81,17 @@ void run_trace(char *uri)
 
         trace = trace_create(uri);
 
+	if (trace_is_err(trace)) {
+		trace_perror(trace,"");
+		return;
+	}
+
+	if (trace_start(trace)==-1) {
+		trace_perror(trace,"");
+		return;
+	}
+
+
         for (;;) {
 		int psize;
                 if ((psize = trace_read_packet(trace, packet)) <1) {
