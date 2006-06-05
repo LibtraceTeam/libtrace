@@ -125,7 +125,10 @@ int main(int argc, char *argv[])
 		if (unique_packets && oldest_ts == last_ts)
 			continue;
 
-		trace_write_packet(output,packet[oldest]);
+		if (trace_write_packet(output,packet[oldest]) < 0) {
+			trace_perror(output, "trace_write_packet");
+			break;
+		}
 
 		last_ts=oldest_ts;
 		
