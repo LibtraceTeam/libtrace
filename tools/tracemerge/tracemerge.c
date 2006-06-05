@@ -53,13 +53,13 @@ int main(int argc, char *argv[])
 	if (optind+2>argc)
 		usage(argv[0]);
 
-	output=trace_create_output(argv[optind]);
+	output=trace_create_output(argv[optind++]);
 	if (trace_is_err_output(output)) {
-		trace_perror_output(output,"trace_create");
+		trace_perror_output(output,"trace_create_output");
 		return 1;
 	}
 	if (trace_start_output(output)==-1) {
-		trace_perror_output(output,"trace_start");
+		trace_perror_output(output,"trace_start_output");
 		return 1;
 	}
 
