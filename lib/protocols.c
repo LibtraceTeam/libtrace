@@ -482,7 +482,7 @@ DLLEXPORT void *trace_get_payload_from_tcp(libtrace_tcp_t *tcp, uint32_t *remain
 			return NULL;
 		*remaining-=dlen;
 	}
-	return tcp+dlen;
+	return (void *)((char *)tcp+dlen);
 }
 
 DLLEXPORT void *trace_get_payload_from_icmp(libtrace_icmp_t *icmp, uint32_t *remaining)
