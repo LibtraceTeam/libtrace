@@ -8,7 +8,7 @@ extern "C"
 void decode(int link_type,char *packet,int len)
 {
 	// POS
-	printf(" Legacy Framing:");
+	printf(" Legacy POS Framing:");
 	// take into account llc
 	if (len>=4) {
 		uint16_t type = htons(
