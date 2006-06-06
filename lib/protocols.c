@@ -107,7 +107,8 @@ static void *trace_get_payload_from_linux_sll(void *link,
 		*remaining-=sizeof(*sll);
 	}
 
-	if (*type) *type = sll->protocol;
+	/* What kind of wacked out header, has this in host order?! */
+	if (*type) *type = htons(sll->protocol); 
 
 	ret=(void*)((char*)sll+sizeof(*sll));
 
