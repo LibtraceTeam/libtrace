@@ -909,8 +909,10 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 	
 	pad = erf_get_padding(packet);
 
-	/* If we've had an rxerror, we have no payload to write - fix rlen to
-	 * be the correct length */
+	/* If we've had an rxerror, we have no payload to write - fix
+	 * rlen to be the correct length 
+	 */
+	/* I Think this is bogus -- Perry */
 	if (payload == NULL) {
 		dag_hdr->rlen = htons(dag_record_size + pad);
 	} 
@@ -941,6 +943,8 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 		erfhdr.type = type;
 		/* Flags. Can't do this */
 		memset(&erfhdr.flags,1,sizeof(erfhdr.flags));
+		if (trace_get_direction(packet)!=-1)
+			erfhdr.flags.iface = trace_get_direction(packet);
 		/* Packet length (rlen includes format overhead) */
 		erfhdr.rlen = htons(trace_get_capture_length(packet) 
 			+ erf_get_framing_length(packet));
