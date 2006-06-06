@@ -705,6 +705,8 @@ DLLEXPORT int trace_write_packet(libtrace_out_t *libtrace, const libtrace_packet
 	if (libtrace->format->write_packet) {
 		return libtrace->format->write_packet(libtrace, packet);
 	}
+	trace_set_err_out(libtrace,TRACE_ERR_UNSUPPORTED,
+		"This format does not support writing packets");
 	return -1;
 }
 
