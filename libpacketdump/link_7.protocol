@@ -1,6 +1,7 @@
-be16	int	"SLL: Packet Type"
-be16	int	"SLL: Link Layer Address Type"
-be16	int	"SLL: Link Layer Address Length"
+
+be16	integer	"SLL: Packet Type"
+be16	hex	"SLL: Link Layer Address Type"
+be16	integer	"SLL: Link Layer Address Length"
 be48	mac	"SLL: Link Layer Address: "
 be16	hex	"SLL: Link Layer Address (Pad): "
 be16	hex	"SLL: Type"
