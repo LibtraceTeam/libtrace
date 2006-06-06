@@ -153,3 +153,34 @@ void promote_packet(libtrace_packet_t *packet)
 		return;
 	}
 }
+
+/* Try and simplify the packet one step, kinda the opposite to promote_packet
+ *
+ * returns true if demotion was possible, false if not.
+ */
+bool demote_packet(libtrace_packet_t *packet)
+{
+	switch(trace_get_link_type(packet)) {
+		case TRACE_TYPE_LINUX_SLL:
+			switch(((libtrace_sll_header_t*)packet->payload)
+					->hatype) {
+				case ARPHRD_PPP:
+					packet->type=pcap_dlt_to_rt(DLT_NULL);
+					break;
+				case ARPHRD_ETHER:
+					packet->type=pcap_dlt_to_rt(DLT_EN10MB);
+					break;
+				default:
+					/* Dunno how to demote this packet */
+					return false;
+			}
+			packet->payload=(void*)((char*)packet->payload
+					+sizeof(libtrace_sll_header_t));
+			trace_set_capture_length(packet,
+				trace_get_capture_length(packet)
+					-sizeof(libtrace_sll_header_t));
+			break;
+		default:
+			return false;
+	}
+}

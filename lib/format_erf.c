@@ -860,9 +860,9 @@ static int rtclient_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 }
 
 static int erf_dump_packet(libtrace_out_t *libtrace,
-		dag_record_t *erfptr, int pad, void *buffer, size_t size) {
+		dag_record_t *erfptr, int pad, void *buffer) {
 	int numbytes = 0;
-	assert(size<=65536);
+	int size;
 
 	if ((numbytes = libtrace_io_write(OUTPUT.file, erfptr, dag_record_size + pad)) != dag_record_size+pad) {
 		trace_set_err_out(libtrace,errno,
@@ -870,7 +870,10 @@ static int erf_dump_packet(libtrace_out_t *libtrace,
 		return -1;
 	}
 
-	if ((numbytes=libtrace_io_write(OUTPUT.file, buffer, size)) != (int)size) {
+	size=ntohs(erfptr->rlen)-(dag_record_size+pad);
+
+	numbytes=libtrace_io_write(OUTPUT.file, buffer, size);
+	if (numbytes != size) {
 		trace_set_err_out(libtrace,errno,
 				"write(%s)",libtrace->uridata);
 		return -1;
@@ -925,8 +928,7 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 		numbytes = erf_dump_packet(libtrace,
 				(dag_record_t *)packet->header,
 				pad,
-				payload,
-				trace_get_capture_length(packet)
+				payload
 				);
 	} else {
 		dag_record_t erfhdr;
@@ -934,9 +936,15 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 		/* convert format - build up a new erf header */
 		/* Timestamp */
 		erfhdr.ts = trace_get_erf_timestamp(packet);
-		type=libtrace_to_erf_type(trace_get_link_type(packet));
+		/* Keep trying to simplify the packet until we can find 
+		 * something we can do with it */
+		do {
+			type=libtrace_to_erf_type(trace_get_link_type(packet));
+		} while(type==(char)-1 && demote_packet(packet));
+		/* We just don't support this link type sorry */
 		if (type==(char)-1) {
-			trace_set_err_out(libtrace,TRACE_ERR_NO_CONVERSION,
+			trace_set_err_out(libtrace,
+					TRACE_ERR_NO_CONVERSION,
 					"No erf type for packet");
 			return -1;
 		}
@@ -945,7 +953,15 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 		memset(&erfhdr.flags,1,sizeof(erfhdr.flags));
 		if (trace_get_direction(packet)!=-1)
 			erfhdr.flags.iface = trace_get_direction(packet);
+
 		/* Packet length (rlen includes format overhead) */
+		assert(trace_get_capture_length(packet)>0 
+				&& trace_get_capture_length(packet)<=65536);
+		assert(erf_get_framing_length(packet)>0 
+				&& trace_get_framing_length(packet)<=65536);
+		assert(
+			trace_get_capture_length(packet)+erf_get_framing_length(packet)>0
+		      &&trace_get_capture_length(packet)+erf_get_framing_length(packet)<=65536);
 		erfhdr.rlen = htons(trace_get_capture_length(packet) 
 			+ erf_get_framing_length(packet));
 		/* loss counter. Can't do this */
@@ -957,8 +973,7 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 		numbytes = erf_dump_packet(libtrace,
 				&erfhdr,
 				pad,
-				payload,
-				trace_get_capture_length(packet));
+				payload);
 	}
 	return numbytes;
 }

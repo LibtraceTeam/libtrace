@@ -356,6 +356,7 @@ libtrace_linktype_t erf_type_to_libtrace(char erf);
 char libtrace_to_erf_type(libtrace_linktype_t linktype);
 
 void promote_packet(libtrace_packet_t *packet);
+bool demote_packet(libtrace_packet_t *packet);
 
 #if HAVE_BPF
 /* A type encapsulating a bpf filter

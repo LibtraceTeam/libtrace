@@ -9,7 +9,7 @@ CFLAGS += $(INCLUDE)
 libdir = $(PREFIX)/lib/.libs
 LDLIBS = -L$(libdir) -ltrace
 
-BINS = test-pcap-bpf test-event test-time #test-seek 
+BINS = test-pcap-bpf test-event test-time test-dir #test-seek 
 
 .PHONY: all clean distclean install depend test
 
@@ -18,14 +18,16 @@ all: $(BINS)
 test: all test-format-all test-convert-all		
 	@for i in $(BINS); do					\
 		echo \* $$i; 					\
+		rm -f traces/*.out.*;				\
 		LD_LIBRARY_PATH=$(libdir)			\
 		 ./$$i || exit $$?;				\
 	done				
 	@echo All tests passed
 
 test-format-all: test-format
-	@for i in erf pcap wtf pcapfile duck; do			\
+	@for i in erf pcap wtf pcapfile duck; do		\
 		echo \* $$i;					\
+		rm -f traces/*.out.*;				\
 		LD_LIBRARY_PATH=$(libdir)			\
 		./test-format $$i || exit $$?;			\
 	done
@@ -35,20 +37,26 @@ test-convert-all: test-convert
 # do rtclient output, and erf doesn't support 802.11
 	@echo \* Conversions
 	@echo " * erf -> erf"
+	@rm -f traces/*.out.*
 	@LD_LIBRARY_PATH=$(libdir) ./test-convert erf erf
 	@echo " * erf -> pcap"
 	@LD_LIBRARY_PATH=$(libdir) ./test-convert erf pcap
 	@echo " * pcap -> erf"
+	@rm -f traces/*.out.*
 	@LD_LIBRARY_PATH=$(libdir) ./test-convert pcap erf
 	@echo " * pcapfile -> erf"
+	@rm -f traces/*.out.*
 	@LD_LIBRARY_PATH=$(libdir) ./test-convert pcapfile erf
 	@#LD_LIBRARY_PATH=$(libdir) ./test-convert rtclient erf
 	@#LD_LIBRARY_PATH=$(libdir) ./test-convert rtclient pcap
 	@echo " * wtf -> pcap"
+	@rm -f traces/*.out.*
 	@LD_LIBRARY_PATH=$(libdir) ./test-convert wtf pcap
 	@echo " * wtf -> wtf"
+	@rm -f traces/*.out.*
 	@LD_LIBRARY_PATH=$(libdir) ./test-convert wtf wtf
 	@echo " * duck -> duck"
+	@rm -f traces/*.out.*
 	@LD_LIBRARY_PATH=$(libdir) ./test-convert duck duck
  
 clean:
