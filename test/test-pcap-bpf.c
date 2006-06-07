@@ -46,7 +46,6 @@
 #include <time.h>
 #include <string.h>
 
-#include "dagformat.h"
 #include "libtrace.h"
 
 struct libtrace_t *trace;
