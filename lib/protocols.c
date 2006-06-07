@@ -398,7 +398,7 @@ DLLEXPORT libtrace_tcp_t *trace_get_tcp(libtrace_packet_t *packet) {
 
 	tcp=(libtrace_tcp_t*)trace_get_transport(packet,&proto,NULL);
 
-	if (!tcp && proto != 6)
+	if (!tcp || proto != 6)
 		return NULL;
 
 	return (libtrace_tcp_t*)tcp;
