@@ -422,7 +422,7 @@ DLLEXPORT libtrace_udp_t *trace_get_udp(libtrace_packet_t *packet) {
 
 	udp=(libtrace_udp_t*)trace_get_transport(packet,&proto,NULL);
 
-	if (proto != 17)
+	if (!udp || proto != 17)
 		return NULL;
 
 	return udp;
