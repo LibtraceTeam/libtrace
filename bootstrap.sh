@@ -1,8 +1,8 @@
 #! /bin/sh
 
 set -x
-aclocal 
+aclocal-1.9 || aclocal 
 libtoolize --force --copy
 autoheader
-automake --add-missing --copy
+automake-1.9 --add-missing --copy || automake --add-missing --copy
 autoconf
