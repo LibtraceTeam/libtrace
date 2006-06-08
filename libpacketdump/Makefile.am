@@ -8,7 +8,8 @@ TCP_LAYERS=$(wildcard tcp_*.cc)
 TEXT_PROTOCOLS=$(wildcard *.protocol)
 
 PLUGINSOURCES=$(LINK_LAYERS) $(ETH_LAYERS) $(IP_LAYERS) $(TCP_LAYERS)
-PLUGINS=$(addsuffix .so,$(basename $(PLUGINSOURCES))) $(TEXT_PROTOCOLS)
+PLUGINS=$(addsuffix .so,$(basename $(PLUGINSOURCES))) 
+ALLPLUGINS=$(PLUGINS) $(TEXT_PROTOCOLS)
 
 SUBDIRS = parser
 
@@ -30,13 +31,13 @@ AM_CXXFLAGS=-g -Wall -DDIRNAME=\"$(PLUGINDIR)\" -rdynamic $(INCLUDES)
 %.so: %.cc
 	$(CXX) $(AM_CXXFLAGS) -fpic -shared $^ -o $@
 
-all-local: $(PLUGINS)
+all-local: $(ALLPLUGINS)
 	
 clean-local: 
 	rm -f $(PLUGINS)
 
 install-exec-local:
-	mkdir -p $(DESTDIR)$(PLUGINDIR); for plugin in $(PLUGINS); do install -m 755 $$plugin $(DESTDIR)$(PLUGINDIR)/$$plugin; done
+	mkdir -p $(DESTDIR)$(PLUGINDIR); for plugin in $(ALLPLUGINS); do install -m 755 $$plugin $(DESTDIR)$(PLUGINDIR)/$$plugin; done
 
 uninstall-local:
 	for plugin in $(PLUGINS); do rm -f $(PLUGINDIR)/$$plugin; done
