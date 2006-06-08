@@ -1,6 +1,6 @@
 $Header$
 
-libtrace 2.0.25
+libtrace 3.0.0 (Beta 1)
 
 ---------------------------------------------------------------------------
 Copyright (c) 2004 The University of Waikato, Hamilton, New Zealand.
@@ -19,15 +19,15 @@ libtrace was primarily designed for use with the real-time interface to the
 Waikato DAG Capture Point software running at The University of Waikato, 
 and has been since extended to a range of other trace and interface formats.
 
+Further information about libtrace see 
+http://research.wand.net.nz/software/libtrace.php
+Bugs should be reported in trac at http://www.wand.net.nz/trac/libtrace
 
 It is licensed under the GNU General Public License (GPL) version 2. Please
 see the included file GPL for details of this license.
 
 The files CHANGES and TODO contain more information regarding the current 
 release.
-
-Please read the included INSTALL file for information regarding the
-installation of libtrace, including required dependencies.
 
 For further information, please contact the WAND group. See 
 http://www.wand.net.nz/ for details. 
