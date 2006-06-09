@@ -114,7 +114,7 @@ int main(int argc, char *argv[]) {
 	libtrace_filter_t *filter = NULL;/*trace_bpf_setfilter(filterstring); */
 
 	for(i=1;i<argc;++i) {
-		run_trace(argv[i],filter,1000);
+		run_trace(argv[i],filter,(1<<30));
 	}
 
 	error_report();
