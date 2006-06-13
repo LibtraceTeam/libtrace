@@ -247,7 +247,7 @@ static int duck_get_wire_length(const libtrace_packet_t *packet) {
 	return 0;
 }
 
-static int duck_get_link_type(const libtrace_packet_t *packet) {
+static libtrace_linktype_t duck_get_link_type(const libtrace_packet_t *packet) {
 	return TRACE_TYPE_DUCK;
 }
 

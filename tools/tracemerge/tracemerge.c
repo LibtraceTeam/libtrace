@@ -126,7 +126,7 @@ int main(int argc, char *argv[])
 			continue;
 
 		if (trace_write_packet(output,packet[oldest]) < 0) {
-			trace_perror(output, "trace_write_packet");
+			trace_perror_output(output, "trace_write_packet");
 			break;
 		}
 
