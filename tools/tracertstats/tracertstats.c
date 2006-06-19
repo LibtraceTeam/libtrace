@@ -144,6 +144,15 @@ void run_trace(char *uri)
 		}
 		
 		ts = trace_get_seconds(packet);
+		while (packet_interval!=UINT64_MAX
+		  &&(last_ts==0 || last_ts<ts)) {
+			if (last_ts==0)
+				last_ts=ts;
+			report_results(last_ts,count,bytes);
+			count=0;
+			bytes=0;
+			last_ts+=packet_interval;
+		}
 		for(i=0;i<filter_count;++i) {
 			if(trace_apply_filter(filters[i].filter,packet)) {
 				++filters[i].count;
@@ -154,15 +163,6 @@ void run_trace(char *uri)
 		++count;
 		bytes+=trace_get_wire_length(packet);
 
-		if (packet_interval!=UINT64_MAX
-		  &&(last_ts==0 || last_ts<ts)) {
-			if (last_ts==0)
-				last_ts=ts;
-			report_results(ts,count,bytes);
-			count=0;
-			bytes=0;
-			last_ts+=packet_interval;
-		}
 
 		if (count >= packet_count) {
 			report_results(ts,count,bytes);
