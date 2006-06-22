@@ -248,8 +248,10 @@ static int pcap_fin_input(libtrace_t *libtrace)
 
 static int pcap_fin_output(libtrace_out_t *libtrace) 
 {
-	pcap_dump_flush(OUTPUT.trace.dump);
-	pcap_dump_close(OUTPUT.trace.dump);
+	if (OUTPUT.trace.dump) {
+		pcap_dump_flush(OUTPUT.trace.dump);
+		pcap_dump_close(OUTPUT.trace.dump);
+	}
 	pcap_close(OUTPUT.trace.pcap);
 	free(libtrace->format_data);
 	return 0;
@@ -318,9 +320,18 @@ static int pcap_write_packet(libtrace_out_t *libtrace, const libtrace_packet_t *
 		OUTPUT.trace.pcap = (pcap_t *)pcap_open_dead(
 			libtrace_to_pcap_dlt(trace_get_link_type(packet)),
 			65536);
+		if (!OUTPUT.trace.pcap) {
+			trace_set_err_out(libtrace,TRACE_ERR_INIT_FAILED,"Failed to open dead trace: %s\n",
+					pcap_geterr(OUTPUT.trace.pcap));
+		}
 		OUTPUT.trace.dump = pcap_dump_open(OUTPUT.trace.pcap,
 				libtrace->uridata);
-		fflush((FILE *)OUTPUT.trace.dump);
+		if (!OUTPUT.trace.dump) {
+			char *errmsg = pcap_geterr(OUTPUT.trace.pcap);
+			trace_set_err_out(libtrace,TRACE_ERR_INIT_FAILED,"Failed to open output file: %s\n",
+					errmsg ? errmsg : "Unknown error");
+			return -1;
+		}
 	}
 	if (packet->trace->format == &pcap || 
 			packet->trace->format == &pcapint) {
