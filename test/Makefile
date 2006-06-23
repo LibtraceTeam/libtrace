@@ -6,30 +6,44 @@ INCLUDE = -I$(PREFIX)/lib
 CFLAGS = -Wall -Wimplicit -Wformat -pipe -g -O2 -D_FILE_OFFSET_BITS=64 \
 		-D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE
 CFLAGS += $(INCLUDE)
-libdir = $(PREFIX)/lib/.libs
-LDLIBS = -L$(libdir) -ltrace
+libdir = $(PREFIX)/lib/.libs:$(PREFIX)/libpacketdump/.libs
+LDLIBS = -L$(PREFIX)/lib/.libs -L $(PREFIX)/libpacketdump/.libs -ltrace
 
-BINS = test-pcap-bpf test-event test-time test-dir test-decode #test-seek 
+BINS = test-pcap-bpf test-event test-time test-dir  #test-seek 
 
 .PHONY: all clean distclean install depend test
 
 all: $(BINS) 
 
-test: all test-format-all test-convert-all		
+test: all test-format-all test-convert-all test-write-all test-programs
+
+test-decode: LDLIBS+=-lpacketdump
+
+test-programs: $(BINS)
 	@for i in $(BINS); do					\
 		echo \* $$i; 					\
 		rm -f traces/*.out.*;				\
-		LD_LIBRARY_PATH=$(libdir)			\
+		LD_LIBRARY_PATH="$(libdir)"			\
 		 ./$$i || exit $$?;				\
 	done				
 	@echo All tests passed
 
-test-format-all: test-format
+test-format-all: test-format test-decode
 	@for i in erf pcap wtf pcapfile duck; do		\
-		echo \* $$i;					\
+		echo \* Read $$i;				\
 		rm -f traces/*.out.*;				\
-		LD_LIBRARY_PATH=$(libdir)			\
+		LD_LIBRARY_PATH="$(libdir)"			\
 		./test-format $$i || exit $$?;			\
+		LD_LIBRARY_PATH="$(libdir)"			\
+		./test-decode $$i || exit $$?;			\
+	done
+
+test-write-all: test-write
+	@for i in erf pcap; do					\
+		echo \* Write $$i;				\
+		rm -f traces/*.out.*;				\
+		LD_LIBRARY_PATH="$(libdir)"			\
+		./test-write $$i || exit $$?; 			\
 	done
 	
 test-convert-all: test-convert
@@ -38,29 +52,29 @@ test-convert-all: test-convert
 	@echo \* Conversions
 	@echo " * erf -> erf"
 	@rm -f traces/*.out.*
-	@LD_LIBRARY_PATH=$(libdir) ./test-convert erf erf
+	@LD_LIBRARY_PATH="$(libdir)" ./test-convert erf erf
 	@echo " * erf -> pcap"
-	@LD_LIBRARY_PATH=$(libdir) ./test-convert erf pcap
+	@LD_LIBRARY_PATH="$(libdir)" ./test-convert erf pcap
 	@echo " * pcap -> erf"
 	@rm -f traces/*.out.*
-	@LD_LIBRARY_PATH=$(libdir) ./test-convert pcap erf
+	@LD_LIBRARY_PATH="$(libdir)" ./test-convert pcap erf
 	@echo " * pcapfile -> erf"
 	@rm -f traces/*.out.*
-	@LD_LIBRARY_PATH=$(libdir) ./test-convert pcapfile erf
-	@#LD_LIBRARY_PATH=$(libdir) ./test-convert rtclient erf
-	@#LD_LIBRARY_PATH=$(libdir) ./test-convert rtclient pcap
+	@LD_LIBRARY_PATH="$(libdir)" ./test-convert pcapfile erf
+	@#LD_LIBRARY_PATH="$(libdir)" ./test-convert rtclient erf
+	@#LD_LIBRARY_PATH="$(libdir)" ./test-convert rtclient pcap
 	@echo " * wtf -> pcap"
 	@rm -f traces/*.out.*
-	@LD_LIBRARY_PATH=$(libdir) ./test-convert wtf pcap
+	@LD_LIBRARY_PATH="$(libdir)" ./test-convert wtf pcap
 	@echo " * wtf -> wtf"
 	@rm -f traces/*.out.*
-	@LD_LIBRARY_PATH=$(libdir) ./test-convert wtf wtf
+	@LD_LIBRARY_PATH="$(libdir)" ./test-convert wtf wtf
 	@echo " * duck -> duck"
 	@rm -f traces/*.out.*
-	@LD_LIBRARY_PATH=$(libdir) ./test-convert duck duck
+	@LD_LIBRARY_PATH="$(libdir)" ./test-convert duck duck
  
 clean:
-	$(RM) $(BINS) $(OBJS) test-format
+	$(RM) $(BINS) $(OBJS) test-format  test-decode
 
 distclean:
 	$(RM) $(BINS) $(OBJS) test-format
