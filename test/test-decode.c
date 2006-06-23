@@ -47,6 +47,7 @@
 
 #include "dagformat.h"
 #include "libtrace.h"
+#include "libpacketdump.h"
 
 void iferr(libtrace_t *trace)
 {
@@ -113,20 +114,35 @@ int main(int argc, char *argv[]) {
 			error = 0;
 			break;
 		}
-		
+
 		if ((trace_get_tcp(packet)!=NULL) ^ (trace_apply_filter(filter_tcp,packet)>0)) {
 			error=1;
 			printf("tcp problem\n");
+			if (trace_get_tcp(packet)) {
+				printf(" libtrace thinks this is a tcp packet\n");
+			}
+			else {
+				printf(" libtrace doesn't think this is a tcp packet\n");
+			}
+			if (trace_apply_filter(filter_tcp,packet)) {
+				printf(" bpf thinks this is a tcp packet\n");
+			}
+			else {
+				printf(" bpf doesn't think this is a tcp packet\n");
+			}
+			trace_dump_packet(packet);
 			break;
 		}
 		if ((trace_get_udp(packet)!=NULL) ^ (trace_apply_filter(filter_udp,packet)>0)) {
 			error=1;
 			printf("udp problem\n");
+			trace_dump_packet(packet);
 			break;
 		}
 		if ((trace_get_icmp(packet)!=NULL) ^ (trace_apply_filter(filter_icmp,packet)>0)) {
 			error=1;
 			printf("icmp problem\n");
+			trace_dump_packet(packet);
 			break;
 		}
 		count ++;
