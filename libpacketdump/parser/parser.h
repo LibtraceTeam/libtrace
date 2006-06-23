@@ -1,56 +1,77 @@
-#ifndef _PARSER_H
-#define _PARSER_H
+/* A Bison parser, made by GNU Bison 1.875d.  */
 
-#include <stdint.h>
+/* Skeleton parser for Yacc-like parsing with Bison,
+   Copyright (C) 1984, 1989, 1990, 2000, 2001, 2002, 2003, 2004 Free Software Foundation, Inc.
 
-enum node_type_t {
-    NEXTHEADER,
-    FIELD
-};
+   This program is free software; you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation; either version 2, or (at your option)
+   any later version.
 
-enum byte_order_t {
-    BIGENDIAN,
-    LITTLEENDIAN
-}; 
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
 
-enum display_t {
-    DISPLAY_NONE,
-    DISPLAY_HEX,
-    DISPLAY_INT,
-    DISPLAY_IPV4,
-    DISPLAY_MAC,
-    DISPLAY_FLAG
-};
+   You should have received a copy of the GNU General Public License
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 59 Temple Place - Suite 330,
+   Boston, MA 02111-1307, USA.  */
 
-/* This is more complicated that I feel it needs to be... */
+/* As a special exception, when this file is copied by Bison into a
+   Bison output file, you may use that output file without restriction.
+   This special exception was added by the Free Software Foundation
+   in version 1.24 of Bison.  */
 
-typedef struct next {
-    char *prefix;		    /* search prefix for nextheader file */
-    char *fieldname;		    /* name of the field whose value we use */
-    struct field *target;	    /* link to the field whose value we use */
-} next_t;
-    
-typedef struct field {
-    enum byte_order_t order;	    /* byte order of field */
-    uint16_t size;		    /* size of the field in bits */
-    enum display_t display;	    /* how the data should be displayed */
-    char *identifier;		    /* display prefix + field identifier */
-    uint64_t value;		    /* calculated value for this field */
-} field_t; 
-
-typedef union node {
-    field_t *field;
-    next_t *nextheader;
-} node_t;
-
-typedef struct element {
-    enum node_type_t type;
-    struct element *next;
-    node_t *data;
-} element_t;
-    
-element_t *parse_protocol_file(char *filename);
-void decode_protocol_file(uint16_t link_type,char *packet,int len, element_t* el);
-
-typedef uint64_t bitbuffer_t;
+/* Tokens.  */
+#ifndef YYTOKENTYPE
+# define YYTOKENTYPE
+   /* Put the tokens into the symbol table, so that GDB and other debuggers
+      know about them.  */
+   enum yytokentype {
+     TOK_BIGENDIAN = 258,
+     TOK_LITTLEENDIAN = 259,
+     TOK_NEXT = 260,
+     TOK_OUTPUT_INT = 261,
+     TOK_OUTPUT_HEX = 262,
+     TOK_OUTPUT_IPV4 = 263,
+     TOK_OUTPUT_FLAG = 264,
+     TOK_CONSTANT = 265,
+     TOK_IDENTIFIER = 266,
+     TOK_OUTPUT_MAC = 267,
+     TOK_OUTPUT_NONE = 268
+   };
 #endif
+#define TOK_BIGENDIAN 258
+#define TOK_LITTLEENDIAN 259
+#define TOK_NEXT 260
+#define TOK_OUTPUT_INT 261
+#define TOK_OUTPUT_HEX 262
+#define TOK_OUTPUT_IPV4 263
+#define TOK_OUTPUT_FLAG 264
+#define TOK_CONSTANT 265
+#define TOK_IDENTIFIER 266
+#define TOK_OUTPUT_MAC 267
+#define TOK_OUTPUT_NONE 268
+
+
+
+
+#if ! defined (YYSTYPE) && ! defined (YYSTYPE_IS_DECLARED)
+#line 28 "parser.y"
+typedef union YYSTYPE {
+    int intval;
+    char *textval;
+    element_t *ptr;
+} YYSTYPE;
+/* Line 1285 of yacc.c.  */
+#line 69 "parser.h"
+# define yystype YYSTYPE /* obsolescent; will be withdrawn */
+# define YYSTYPE_IS_DECLARED 1
+# define YYSTYPE_IS_TRIVIAL 1
+#endif
+
+extern YYSTYPE yylval;
+
+
+
