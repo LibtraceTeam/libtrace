@@ -940,7 +940,7 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 		 * something we can do with it */
 		do {
 			type=libtrace_to_erf_type(trace_get_link_type(packet));
-		} while(type==(char)-1 && demote_packet(packet));
+		} while(type==(char)-1 && demote_packet((libtrace_packet_t *)packet));
 		/* We just don't support this link type sorry */
 		if (type==(char)-1) {
 			trace_set_err_out(libtrace,

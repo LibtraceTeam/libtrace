@@ -1142,7 +1142,7 @@ libtrace_direction_t trace_get_direction(const libtrace_packet_t *packet);
  * @param filterstring a char * containing the bpf filter string
  * @return opaque pointer pointer to a libtrace_filter_t object
  * @note The filter is not actually compiled at this point, so no correctness
- * tests are performed here. trace_bpf_setfilter will always return ok, but
+ * tests are performed here. trace_create_filter will always return ok, but
  * if the filter is poorly constructed an error will be generated when the 
  * filter is actually used
  */

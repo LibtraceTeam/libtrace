@@ -101,12 +101,15 @@ static int rt_connect(libtrace_t *libtrace) {
 	uint8_t reason;
 	
 	if ((he=gethostbyname(RT_INFO->hostname)) == NULL) {
-                perror("gethostbyname");
-                return -1;
+                trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
+				"Failed to convert hostname %s to address",
+				RT_INFO->hostname);
+		return -1;
         }
         if ((RT_INFO->input_fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-                perror("socket");
-                return -1;
+                trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
+				"Could not create socket");
+		return -1;
         }
 
         remote.sin_family = AF_INET;
