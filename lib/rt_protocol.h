@@ -190,10 +190,10 @@ typedef struct duck2_4 {
 	uint32_t	Sickness;
         int32_t        	Error;
 	int32_t		Offset;
-        time_t        	Stat_Start;
-	time_t		Stat_End;   
+        uint32_t       	Stat_Start;
+	uint32_t	Stat_End;   
         uint32_t   	Set_Duck_Field;
-} duck2_4_t;
+} PACKED duck2_4_t;
 
 /** DAG 2.5 DUCK */
 typedef struct duck2_5 {
@@ -213,10 +213,10 @@ typedef struct duck2_5 {
         int32_t         Freq_Err;
 	int32_t		Phase_Err;
         uint32_t        Set_Duck_Field;
-        time_t          Stat_Start;
-	time_t		Stat_End;
+        uint32_t        Stat_Start;
+	uint32_t	Stat_End;
         uint64_t        Last_TSC;
-} duck2_5_t;
+} PACKED duck2_5_t;
 
 /*
 typedef struct rt_duck_2_4 {
