@@ -3,7 +3,7 @@
 # Now you only need to update the version number in two places - below,
 # and in the README
 
-AC_INIT(libtrace,3.0.0-beta1,[contact@wand.net.nz],libtrace)
+AC_INIT(libtrace,3.0.0-beta2,[contact@wand.net.nz],libtrace)
 
 LIBTRACE_MAJOR=3
 LIBTRACE_MID=0
@@ -436,8 +436,15 @@ AC_MSG_NOTICE([Libtrace version $PACKAGE_VERSION])
 reportopt "Compiled with BPF filter support" $libtrace_bpf 
 reportopt "Compiled with PCAP support" $libtrace_pcap
 reportopt "Compiled with compressed trace (zlib) support" $libtrace_zlib
-reportopt "Compiled with DAG support (libdag)" $libtrace_dag
-reportopt "Compiled with DAG support (DAG 2.4)" $libtrace_dag2_4
+if test x"$libtrace_dag" = xtrue; then
+	if test x"$libtrace_dag2_4"; then
+		AC_MSG_NOTICE([Compiled with DAG support: 2.4])
+	else
+		AC_MSG_NOTICE([Compiled with DAG support: 2.5])
+	fi
+else
+	AC_MSG_NOTICE([Compiled with DAG support: No])
+fi
 reportopt "Building man pages/documentation" $libtrace_doxygen
 reportopt "Building libpacketdump" $libtrace_libpacketdump
 reportopt "Building tools/ directory" $libtrace_tools
