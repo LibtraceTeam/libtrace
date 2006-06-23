@@ -184,11 +184,16 @@ static int duck_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 
 	if ((numbytes = libtrace_io_read(INPUT->file, packet->payload,
 					duck_size)) != duck_size) {
-		if (numbytes != 0) {
+		if (numbytes == -1) {
 			trace_set_err(libtrace, errno, "Reading DUCK failed");
 			return -1;
 		}
-		return 0;
+		else if (numbytes == 0) {
+			return 0;
+		}
+		else {
+			trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Truncated DUCK packet");
+		}
 	}
 
 	packet->size = duck_size;
