@@ -972,7 +972,7 @@ int trace_bpf_compile(libtrace_filter_t *filter,
 					"Packet has an unknown linktype");
 			return -1;
 		}
-		if (libtrace_to_pcap_dlt(linktype) == -1) {
+		if (libtrace_to_pcap_dlt(linktype) == ~0U) {
 			trace_set_err(packet->trace,TRACE_ERR_BAD_PACKET,
 					"Unknown pcap equivilent linktype");
 			return -1;
@@ -1398,3 +1398,34 @@ DLLEXPORT uint8_t *trace_ether_aton(const char *buf, uint8_t *addr)
 	return buf2;
 }
 
+DLLEXPORT
+void trace_construct_packet(libtrace_packet_t *packet,
+		libtrace_linktype_t linktype,
+		const void *data,
+		uint16_t len)
+{
+	libtrace_t *deadtrace=NULL;
+	libtrace_pcapfile_pkt_hdr_t hdr;
+	struct timeval tv;
+	if (NULL == deadtrace) deadtrace=trace_create_dead("pcapfile");
+	gettimeofday(&tv,NULL);
+	hdr.ts_sec=tv.tv_sec;
+	hdr.ts_usec=tv.tv_usec;
+	hdr.caplen=len;
+	hdr.wirelen=len;
+
+	packet->trace=deadtrace;
+	packet->size=len+sizeof(hdr);
+	if (packet->buf_control==TRACE_CTRL_PACKET) {
+		packet->buffer=realloc(packet->buffer,packet->size);
+	}
+	else {
+		packet->buffer=malloc(packet->size);
+	}
+	packet->buf_control=TRACE_CTRL_PACKET;
+	packet->header=packet->buffer;
+	packet->payload=(void*)((char*)packet->buffer+sizeof(hdr));
+	memcpy(packet->header,&hdr,sizeof(hdr));
+	memcpy(packet->payload,data,len);
+	packet->type=pcap_dlt_to_rt(libtrace_to_pcap_dlt(linktype));
+}

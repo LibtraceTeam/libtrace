@@ -222,17 +222,21 @@ typedef enum {
 
 /** Enumeration of link layer types supported by libtrace */
 typedef enum { 
+    /* TRACE_TYPE_LEGACY = 0 		Obsolete */
        TRACE_TYPE_HDLC_POS = 1, 
-       TRACE_TYPE_ETH,			/**< 802.3 style Ethernet */
-       TRACE_TYPE_ATM,			/**< ATM frame */
-       TRACE_TYPE_AAL5,
-       TRACE_TYPE_80211,		/**< 802.11 frames */
-       TRACE_TYPE_NONE,			/**< Raw IP frames */
-       TRACE_TYPE_LINUX_SLL,		/**< Linux "null" framing */
-       TRACE_TYPE_PFLOG,		/**< FreeBSD's PFlug */
-       TRACE_TYPE_POS,
+       TRACE_TYPE_ETH = 2,		/**< 802.3 style Ethernet */
+       TRACE_TYPE_ATM = 3,		/**< ATM frame */
+       TRACE_TYPE_80211 = 4,		/**< 802.11 frames */
+       TRACE_TYPE_NONE = 5,		/**< Raw IP frames */
+       TRACE_TYPE_LINUX_SLL = 6,	/**< Linux "null" framing */
+       TRACE_TYPE_PFLOG = 7,		/**< FreeBSD's PFlug */
+    /* TRACE_TYPE_LEGACY_DEFAULT	Obsolete */
+       TRACE_TYPE_POS = 9,
+    /* TRACE_TYPE_LEGACY_ATM 		Obsolete */
+    /* TRACE_TYPE_LEGACY_ETH 		Obsolete */
        TRACE_TYPE_80211_PRISM = 12,
-       TRACE_TYPE_DUCK			/**< Pseudo link layer for DUCK packets */
+       TRACE_TYPE_AAL5 = 13,
+       TRACE_TYPE_DUCK = 14		/**< Pseudo link layer for DUCK packets */
      } libtrace_linktype_t;
 
 /** Trace directions 
@@ -1265,6 +1269,17 @@ enum base_format_t {
  */
 DLLEXPORT 
 enum base_format_t trace_get_format(struct libtrace_packet_t *packet);
+
+/** Construct a packet from a buffer.
+ * @param packet[in,out]	Libtrace Packet object to update with the new 
+ * 				data.
+ * @param linktype		The linktype of the packet.
+ * @param[in] data		The packet data (including linklayer)
+ * @param len			Length of packet data
+ */
+DLLEXPORT
+void trace_construct_packet(libtrace_packet_t *packet,
+		libtrace_linktype_t linktype, const void *data, uint16_t len);
 
 
 #ifdef __cplusplus
