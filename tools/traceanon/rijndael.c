@@ -964,6 +964,10 @@ static UINT32 rcon[30]=
         0xb3, 0x7d, 0xfa, 0xef, 0xc5, 0x91
 };
 
+void keySched(UINT8 key[_MAX_KEY_COLUMNS][4]);
+void keyEncToDec();
+void r_encrypt(const UINT8 a[16], UINT8 b[16]);
+void r_decrypt(const UINT8 a[16], UINT8 b[16]);
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1035,7 +1039,7 @@ int rijndael_init(Mode mode,Direction dir,const UINT8 * key,KeyLength keyLen,UIN
 
         keySched(keyMatrix);
 
-        if(m_direction == Decrypt)keyEncToDec();
+        if(m_direction == Decrypt) keyEncToDec();
 
         m_state = Valid;
 
