@@ -370,6 +370,16 @@ struct libtrace_filter_t {
 	char * filterstring;
 };
 #endif
+
+/** libtrace packet 
+ */
+typedef struct libtrace_pcapfile_pkt_hdr_t {
+	uint32_t ts_sec;
+	uint32_t ts_usec;
+	uint32_t caplen;
+	uint32_t wirelen;
+} libtrace_pcapfile_pkt_hdr_t;
+
 	
 #ifdef __cplusplus
 }
