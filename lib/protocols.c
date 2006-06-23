@@ -88,9 +88,9 @@ static void *trace_get_payload_from_80211(void *link, uint16_t *type, uint32_t *
 
 	eth=(libtrace_802_11_payload_t *)((char*)wifi+sizeof(*wifi));
 
-	if (type) *type=eth->type;
+	if (type) *type=ntohs(eth->type);
 
-	return eth;
+	return (void*)((char*)eth+sizeof(*eth));
 }
 
 static void *trace_get_payload_from_linux_sll(void *link,
