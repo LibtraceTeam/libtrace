@@ -77,7 +77,7 @@ extern "C" {
 #  endif
 #endif 
 
-#ifdef HAVE_ZLIB_H
+#if HAVE_ZLIB_H
 #  include <zlib.h>
 #endif
 

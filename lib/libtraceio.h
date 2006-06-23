@@ -4,7 +4,7 @@
 #ifndef LIBTRACEIO_H
 #define LIBTRACEIO_H 1
 #include "config.h"
-#ifdef HAVE_ZLIB
+#if HAVE_ZLIB
 #include <zlib.h>
 #else
 #include <stdio.h>
