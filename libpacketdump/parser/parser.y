@@ -6,7 +6,7 @@
     #include <sys/socket.h>
     #include <arpa/inet.h>
     #include <assert.h>
-    #include "grammer.h"
+    #include "grammar.h"
     #include "parser.h"
     #include "libpacketdump.h"
     #include "bitbuffer.h"

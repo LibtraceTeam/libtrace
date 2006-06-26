@@ -46,7 +46,7 @@
 #include <ctype.h>
 #include "libpacketdump.h"
 extern "C"{
-#include "parser/grammer.h"
+#include "parser/grammar.h"
 }
 
 enum decode_style_t {
