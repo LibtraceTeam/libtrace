@@ -1,7 +1,7 @@
 #ifndef _PARSER_H
 #define _PARSER_H
 
-#include <stdint.h>
+#include <inttypes.h>
 
 enum node_type_t {
     NEXTHEADER,
