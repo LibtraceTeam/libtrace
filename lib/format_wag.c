@@ -160,7 +160,7 @@ static int wtf_config_output(libtrace_out_t *libtrace,
 		trace_option_output_t option,
 		void *value) {
 	switch(option) {
-#if HAVE_ZLIB
+#ifdef HAVE_ZLIB
 		case TRACE_OPTION_OUTPUT_COMPRESS:
 			OPTIONS.zlib.level = *(int*)value;
 			assert(OPTIONS.zlib.level>=0 

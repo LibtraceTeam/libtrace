@@ -1,8 +1,5 @@
 #include "libtrace.h"
 #include "config.h"
-#ifdef HAVE_PCAP
-#include <pcap.h>
-#endif
 
 #include "rt_protocol.h"
 #include <assert.h>

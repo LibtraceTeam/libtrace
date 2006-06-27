@@ -3,7 +3,7 @@
 #ifndef HAVE_PCAP_OPEN_DEAD
 #include <stdio.h>
 #include <pcap.h>
-#if HAVE_PCAP_INT_H
+#ifdef HAVE_PCAP_INT_H
 # include <pcap-int.h>
 #else
 # error "Need pcap-int.h for declaration of pcap_t"

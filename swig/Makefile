@@ -1,4 +1,4 @@
-CFLAGS=-g -Wall -I/usr/include/python2.1 -I../include -I /usr/lib/perl/5.6.1/CORE/
+CFLAGS=-g -Wall -I/usr/include/python2.3 -I../include -I /usr/lib/perl/5.6.1/CORE/
 LDDIRS=-L../lib
 LDLIBS=-ltrace -lpcap -lz
 

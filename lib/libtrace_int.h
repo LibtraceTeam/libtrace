@@ -62,22 +62,24 @@ extern "C" {
 #include "fifo.h"
 #include "rt_protocol.h"
 	
-#if HAVE_PCAP_BPF_H
+#ifdef HAVE_PCAP_BPF_H
 #  include <pcap-bpf.h>
+#  define HAVE_BPF 1
 #else
 #  ifdef HAVE_NET_BPF_H
 #    include <net/bpf.h>
+#    define HAVE_BPF 1
 #  endif
 #endif
 
-#if HAVE_PCAP_H
+#ifdef HAVE_PCAP_H
 #  include <pcap.h>
 #  ifdef HAVE_PCAP_INT_H
 #    include <pcap-int.h>
 #  endif
 #endif 
 
-#if HAVE_ZLIB_H
+#ifdef HAVE_ZLIB_H
 #  include <zlib.h>
 #endif
 
@@ -358,7 +360,7 @@ char libtrace_to_erf_type(libtrace_linktype_t linktype);
 void promote_packet(libtrace_packet_t *packet);
 bool demote_packet(libtrace_packet_t *packet);
 
-#if HAVE_BPF
+#ifdef HAVE_BPF
 /* A type encapsulating a bpf filter
  * This type covers the compiled bpf filter, as well as the original filter
  * string
@@ -369,6 +371,8 @@ struct libtrace_filter_t {
 	int flag;
 	char * filterstring;
 };
+#else
+struct libtrace_filter_t {};
 #endif
 
 /** libtrace packet 

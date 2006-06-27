@@ -87,13 +87,14 @@
 #include "libtrace_int.h"
 #include "parse_cmd.h"
 
-#if HAVE_PCAP_BPF_H
+#ifdef HAVE_PCAP_BPF_H
 #  include <pcap-bpf.h>
 #else
 #  ifdef HAVE_NET_BPF_H
 #    include <net/bpf.h>
 #  endif
 #endif
+
 
 #include "libtrace_int.h"
 #include "format_helper.h"
@@ -226,7 +227,7 @@ void trace_init(void)
 #ifdef HAVE_NETPACKET_PACKET_H
 		linuxnative_constructor();
 #endif
-#ifdef HAVE_PCAP
+#ifdef HAVE_LIBPCAP
 		pcap_constructor();
 #endif
 		pcapfile_constructor();
@@ -921,7 +922,7 @@ DLLEXPORT libtrace_eventobj_t trace_event(libtrace_t *trace,
  * @author Daniel Lawson
  */
 DLLEXPORT libtrace_filter_t *trace_create_filter(const char *filterstring) {
-#if HAVE_BPF
+#ifdef HAVE_BPF
 	libtrace_filter_t *filter = (libtrace_filter_t*)
 				malloc(sizeof(libtrace_filter_t));
 	filter->filterstring = strdup(filterstring);
@@ -935,7 +936,7 @@ DLLEXPORT libtrace_filter_t *trace_create_filter(const char *filterstring) {
 
 DLLEXPORT void trace_destroy_filter(libtrace_filter_t *filter)
 {
-#if HAVE_BPF
+#ifdef HAVE_BPF
 	free(filter->filterstring);
 	if (filter->flag)
 		pcap_freecode(&filter->filter);
@@ -952,7 +953,7 @@ DLLEXPORT void trace_destroy_filter(libtrace_filter_t *filter)
  */
 int trace_bpf_compile(libtrace_filter_t *filter,
 		const libtrace_packet_t *packet	) {
-#if HAVE_BPF
+#ifdef HAVE_BPF
 	void *linkptr = 0;
 	assert(filter);
 
@@ -1002,7 +1003,7 @@ int trace_bpf_compile(libtrace_filter_t *filter,
 
 DLLEXPORT int trace_apply_filter(libtrace_filter_t *filter,
 			const libtrace_packet_t *packet) {
-#if HAVE_BPF
+#ifdef HAVE_BPF
 	void *linkptr = 0;
 	int clen = 0;
 	assert(filter);

@@ -41,22 +41,14 @@
 #include <string.h>
 #include <errno.h>
 
-#if HAVE_PCAP_BPF_H
-#  include <pcap-bpf.h>
-#else
-#  ifdef HAVE_NET_BPF_H
-#    include <net/bpf.h>
-#  endif
-#endif
-
-#if HAVE_PCAP_H
+#ifdef HAVE_PCAP_H
 #  include <pcap.h>
 #  ifdef HAVE_PCAP_INT_H
 #    include <pcap-int.h>
 #  endif
 #endif
 
-#if HAVE_PCAP
+#ifdef HAVE_LIBPCAP
 static struct libtrace_format_t pcap;
 static struct libtrace_format_t pcapint;
 
@@ -367,14 +359,14 @@ static int pcapint_write_packet(libtrace_out_t *libtrace, const libtrace_packet_
 		OUTPUT.trace.pcap = (pcap_t *)pcap_open_live(
 			libtrace->uridata,65536,0,0,NULL);
 	}
-#if HAVE_PCAP_INJECT
+#ifdef HAVE_PCAP_INJECT
 	err=pcap_inject(OUTPUT.trace.pcap,
 			packet->payload,
 			trace_get_capture_length(packet));
 	if (err!=(int)trace_get_capture_length(packet))
 		err=-1;
 #else 
-#if HAVE_PCAP_SENDPACKET
+#ifdef HAVE_PCAP_SENDPACKET
 	err=pcap_sendpacket(OUTPUT.trace.pcap,
 			packet->payload,
 			trace_get_capture_length(packet));

@@ -43,7 +43,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-#if HAVE_DAG
+#ifdef HAVE_DAG
 #include <sys/mman.h>
 #endif
 
@@ -65,7 +65,7 @@
 
 static struct libtrace_format_t erf;
 static struct libtrace_format_t rtclient;
-#if HAVE_DAG
+#ifdef HAVE_DAG
 static struct libtrace_format_t dag;
 #endif 
 
@@ -75,7 +75,7 @@ static struct libtrace_format_t dag;
 #define CONNINFO DATA(libtrace)->conn_info
 #define INPUT DATA(libtrace)->input
 #define OUTPUT DATAOUT(libtrace)->output
-#if HAVE_DAG
+#ifdef HAVE_DAG
 #define DAG DATA(libtrace)->dag
 #define DUCK DATA(libtrace)->duck
 #endif
@@ -99,7 +99,7 @@ struct erf_format_data_t {
 		off_t index_len;
 	} seek;
 
-#if HAVE_DAG
+#ifdef HAVE_DAG
 	struct {
 		uint32_t last_duck;	
 		uint32_t duck_freq;
@@ -463,7 +463,7 @@ static int erf_config_output(libtrace_out_t *libtrace, trace_option_output_t opt
 
 #ifdef HAVE_DAG
 static int dag_pause_input(libtrace_t *libtrace) {
-#if DAG_VERSION_2_4
+#ifdef DAG_VERSION_2_4
 	dag_stop(INPUT.fd);
 #else
 	if (dag_stop_stream(INPUT.fd, DAG.dagstream) < 0) {
@@ -509,8 +509,8 @@ static int erf_fin_output(libtrace_out_t *libtrace) {
 	return 0;
 }
  
-#if HAVE_DAG
-#if DAG_VERSION_2_4
+#ifdef HAVE_DAG
+#ifdef DAG_VERSION_2_4
 static int dag_get_duckinfo(libtrace_t *libtrace, 
 				libtrace_packet_t *packet) {
 	dag_inf lt_dag_inf;
@@ -666,7 +666,7 @@ static int dag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 }
 
 static int dag_start_input(libtrace_t *libtrace) {
-#if DAG_VERSION_2_4
+#ifdef DAG_VERSION_2_4
 	if(dag_start(INPUT.fd) < 0) {
 		trace_set_err(libtrace,errno,"Cannot start DAG %s",
 				libtrace->uridata);
@@ -921,7 +921,7 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 	} 
 	
 	if (packet->trace->format == &erf  
-#if HAVE_DAG
+#ifdef HAVE_DAG
 			|| packet->trace->format == &dag 
 #endif
 			) {
@@ -1056,7 +1056,7 @@ libtrace_eventobj_t trace_event_dag(libtrace_t *trace, libtrace_packet_t *packet
 }
 #endif
 
-#if HAVE_DAG
+#ifdef HAVE_DAG
 static void dag_help() {
 	printf("dag format module: $Revision$\n");
 	printf("Supported input URIs:\n");

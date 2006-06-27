@@ -63,9 +63,6 @@ static struct libtrace_format_t legacyatm;
 #define DATA(x) ((struct legacy_format_data_t *)x->format_data)
 
 #define INPUT DATA(libtrace)->input
-#if HAVE_DAG
-#define DAG DATA(libtrace)->dag
-#endif
 
 struct legacy_format_data_t {
 	union {
