@@ -1,7 +1,5 @@
 # tracedump depends on libpacketdump
-if LIBPACKETDUMP
 TRACEDUMP_DIR=tracedump
-endif
 
 SUBDIRS=traceanon tracemerge tracesplit $(TRACEDUMP_DIR) tracertstats tracestats
 SUBDIRS+=tracereport

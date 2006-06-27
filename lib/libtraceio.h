@@ -4,11 +4,7 @@
 #ifndef LIBTRACEIO_H
 #define LIBTRACEIO_H 1
 #include "config.h"
-#ifdef HAVE_ZLIB
-#include <zlib.h>
-#else
-#include <stdio.h>
-#endif
+#include <inttypes.h>
 
 #include <unistd.h>
 
@@ -54,7 +50,7 @@ void libtrace_io_close(libtrace_io_t *io);
  * errno set 
  */
 ssize_t libtrace_io_write(libtrace_io_t *io, const void *buf, size_t len);
-off_t libtrace_io_seek(libtrace_io_t *io, off_t offset, int whence);
+int64_t libtrace_io_seek(libtrace_io_t *io, int64_t offset, int whence);
 ssize_t libtrace_io_tell(libtrace_io_t *io);
 
 #endif

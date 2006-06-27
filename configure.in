@@ -210,12 +210,9 @@ AC_CHECK_LIB(z, gzopen)
 
 AM_CONDITIONAL([HAVE_DAG], [test "$libtrace_dag" = true])
 AM_CONDITIONAL([DAG2_4], [test "$libtrace_dag2_4" = true])
-AM_CONDITIONAL([HAVE_CXX], [test "$libtrace_cxx" = true])
-AM_CONDITIONAL([HAVE_ZLIB], [test "$libtrace_zlib" = true])
+AM_CONDITIONAL([HAVE_ZLIB], [test "$ac_cv_lib_z_gzopen" = yes])
 AM_CONDITIONAL([HAVE_NETPACKET_PACKET_H], [test "$libtrace_netpacket_packet_h" = true])
-AM_CONDITIONAL([LIBPACKETDUMP], [test "$libtrace_libpacketdump" = true])
-AM_CONDITIONAL([LIBGDC], [test "$libtrace_gdc" = true])
-
+AM_CONDITIONAL([LIBGDC], [test "$ac_cv_header_gdc_h" = yes])
 
 # Check for miscellaneous programs
 AC_CHECK_PROG([libtrace_doxygen], [doxygen], [true], [false])
@@ -244,10 +241,10 @@ reportopt() {
 	fi
 }
 
+echo
 AC_MSG_NOTICE([Libtrace version $PACKAGE_VERSION])
-reportopt "Compiled with BPF filter support" $libtrace_bpf 
-reportopt "Compiled with PCAP support" $libtrace_pcap
-reportopt "Compiled with compressed trace (zlib) support" $libtrace_zlib
+reportopt "Compiled with PCAP support" $ac_cv_lib_pcap_pcap_open_live
+reportopt "Compiled with compressed trace (zlib) support" $ac_cv_lib_z_gzopen
 if test x"$libtrace_dag" = xtrue; then
 	if test x"$libtrace_dag2_4"; then
 		AC_MSG_NOTICE([Compiled with DAG support: 2.4])
@@ -258,5 +255,4 @@ else
 	AC_MSG_NOTICE([Compiled with DAG support: No])
 fi
 reportopt "Building man pages/documentation" $libtrace_doxygen
-reportopt "Building libpacketdump" $libtrace_libpacketdump
 

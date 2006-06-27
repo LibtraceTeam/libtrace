@@ -7,7 +7,7 @@ CFLAGS = -Wall -Wimplicit -Wformat -pipe -g -O2 -D_FILE_OFFSET_BITS=64 \
 		-D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE
 CFLAGS += $(INCLUDE)
 libdir = $(PREFIX)/lib/.libs:$(PREFIX)/libpacketdump/.libs
-LDLIBS = -L$(PREFIX)/lib/.libs -L $(PREFIX)/libpacketdump/.libs -ltrace
+LDLIBS = -L$(PREFIX)/lib/.libs -L $(PREFIX)/libpacketdump/.libs -ltrace -lpacketdump
 
 BINS = test-pcap-bpf test-event test-time test-dir  #test-seek 
 
@@ -16,8 +16,6 @@ BINS = test-pcap-bpf test-event test-time test-dir  #test-seek
 all: $(BINS) 
 
 test: all test-format-all test-convert-all test-write-all test-programs
-
-test-decode: LDLIBS+=-lpacketdump
 
 test-programs: $(BINS)
 	@for i in $(BINS); do					\

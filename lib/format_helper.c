@@ -195,7 +195,7 @@ libtrace_io_t *trace_open_file_out(libtrace_out_t *trace,int level, int fileflag
 	char filemode[4]; /* wb9\0 */
 	assert(level<10);
 	assert(level>=0);
-#ifdef HAVE_ZLIB
+#ifdef HAVE_LIBZ
 	sprintf(filemode,"wb%d",level);
 #else
 	sprintf(filemode,"wb");

@@ -1,6 +1,4 @@
-if LIBPACKETDUMP
 LIBPACKETDUMP_DIR = libpacketdump
-endif
 TOOLS_DIR = tools
 SUBDIRS = lib docs $(LIBPACKETDUMP_DIR) $(TOOLS_DIR)
 
