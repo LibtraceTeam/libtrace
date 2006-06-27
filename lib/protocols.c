@@ -601,7 +601,8 @@ DLLEXPORT struct sockaddr *trace_get_source_address(const libtrace_packet_t *pac
 {
 	uint16_t proto;
 	uint32_t remaining;
-	void *transport;
+	void *l3;
+	struct ports_t *ports;
 	static struct sockaddr_storage dummy;
 
 	if (!addr)
@@ -609,38 +610,46 @@ DLLEXPORT struct sockaddr *trace_get_source_address(const libtrace_packet_t *pac
 
 	remaining = trace_get_capture_length(packet);
 
-	transport = trace_get_payload_from_link(
+	l3 = trace_get_payload_from_link(
 			trace_get_link(packet),
 			trace_get_link_type(packet),
 			&proto,
 			&remaining);
 
-	if (!transport)
+	if (!l3)
 		return false;
 
-	transport = trace_get_vlan_payload_from_ethernet_payload(transport,
+	l3 = trace_get_vlan_payload_from_ethernet_payload(l3,
 			&proto,
 			&remaining);
 
-	if (!transport)
-		return false;
+	if (!l3)
+		return NULL;
 
 	switch (proto) {
 		case 0x0800: /* IPv4 */
 		{
 			struct sockaddr_in *addr4=(struct sockaddr_in*)addr;
-			libtrace_ip_t *ip = (libtrace_ip_t*)transport;
+			libtrace_ip_t *ip = (libtrace_ip_t*)l3;
+			ports = trace_get_payload_from_ip(ip,NULL,&remaining);
 			addr4->sin_family=AF_INET;
-			addr4->sin_port=0;
+			if (ports && remaining>=sizeof(*ports))
+				addr4->sin_port=ports->src;
+			else
+				addr4->sin_port=0;
 			addr4->sin_addr=ip->ip_src;
 			return addr;
 		}
 		case 0x86DD: /* IPv6 */
 		{
 			struct sockaddr_in6 *addr6=(struct sockaddr_in6*)addr;
-			libtrace_ip6_t *ip6 = (libtrace_ip6_t*)transport;
+			libtrace_ip6_t *ip6 = (libtrace_ip6_t*)l3;
+			ports = trace_get_payload_from_ip6(ip6,NULL,&remaining);
 			addr6->sin6_family=AF_INET6;
-			addr6->sin6_port=0;
+			if (ports && remaining>=sizeof(*ports))
+				addr6->sin6_port=ports->dst;
+			else
+				addr6->sin6_port=0;
 			addr6->sin6_flowinfo=0;
 			addr6->sin6_addr=ip6->ip_src;
 			return addr;
