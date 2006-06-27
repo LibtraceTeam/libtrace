@@ -2,7 +2,7 @@
 PREFIX=../
 CC=gcc
 
-INCLUDE = -I$(PREFIX)/lib
+INCLUDE = -I$(PREFIX)/lib -I$(PREFIX)/libpacketdump
 CFLAGS = -Wall -Wimplicit -Wformat -pipe -g -O2 -D_FILE_OFFSET_BITS=64 \
 		-D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE
 CFLAGS += $(INCLUDE)
@@ -72,10 +72,10 @@ test-convert-all: test-convert
 	@LD_LIBRARY_PATH="$(libdir)" ./test-convert duck duck
  
 clean:
-	$(RM) $(BINS) $(OBJS) test-format  test-decode
+	$(RM) $(BINS) $(OBJS) test-format  test-decode test-convert
 
 distclean:
-	$(RM) $(BINS) $(OBJS) test-format
+	$(RM) $(BINS) $(OBJS) test-format test-decode test-convert
 
 install:
 	@true
