@@ -244,7 +244,8 @@ void trace_init(void)
 DLLEXPORT void trace_help() {
 	struct libtrace_format_t *tmp;
 	trace_init();
-	printf("libtrace %s\n",PACKAGE_VERSION);
+	printf("libtrace %s\n\n",PACKAGE_VERSION);
+	printf("Following this are a list of the format modules supported in this build of libtrace\n\n");
 	for(tmp=formats_list;tmp;tmp=tmp->next) {
 		if (tmp->help)
 			tmp->help();

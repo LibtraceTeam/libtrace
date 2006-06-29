@@ -146,10 +146,21 @@ struct libtrace_packet_t {};
 
 %extend libtrace_packet_t {
 	libtrace_packet_t() { 
-		struct libtrace_packet_t *packet = malloc(sizeof(struct libtrace_packet_t));
+		struct libtrace_packet_t *packet = trace_create_packet();
 		return packet;
 		}
-	~libtrace_packet_t() { free(self);}
+	~libtrace_packet_t() { 
+		trace_destroy_packet(self);
+		}
+	libtrace_packet_t *trace_copy_packet() {
+		return trace_copy_packet(self);
+	}
+	void *trace_get_link() {
+		return trace_get_link(self);
+	}
+	void *trace_get_transport(uint8_t *proto, uint32_t *remaining) {
+		return trace_get_transport(self, proto, remaining);
+	}
 	struct libtrace_ip *trace_get_ip() {
 		return trace_get_ip(self);
 	}
@@ -162,8 +173,20 @@ struct libtrace_packet_t {};
 	struct libtrace_icmp *trace_get_icmp() {
 		return trace_get_icmp(self);
 	}
-	void *trace_get_link() {
-		return trace_get_link(self);
+	char *trace_get_destination_mac() {
+		return trace_ether_ntoa(trace_get_destination_mac(self),0);
+	}
+	char *trace_get_source_mac() {
+		return trace_ether_ntoa(trace_get_source_mac(self),0);
+	}
+	char *trace_ether_ntoa(uint8_t *mac) {
+		return trace_ether_ntoa(mac, 0);
+	}
+	uint16_t trace_get_source_port() {
+		return trace_get_source_port(self);
+	}
+	uint16_t trace_get_destination_port() {
+		return trace_get_destination_port(self);
 	}
 	double trace_get_seconds() {
 		return trace_get_seconds(self);
@@ -177,8 +200,14 @@ struct libtrace_packet_t {};
 	int trace_get_capture_length() {
 		return trace_get_capture_length(self);
 	}
+	size_t trace_set_capture_length(size_t size) {
+		return trace_set_capture_length(self,size);
+	}
 	int trace_get_wire_lenth() {
 		return trace_get_wire_length(self);
+	}
+	int trace_get_framing_length() {
+		return trace_get_framing_length(self);
 	}
 	libtrace_linktype_t trace_get_link_type() {
 		return trace_get_link_type(self);
@@ -189,8 +218,8 @@ struct libtrace_packet_t {};
 	int8_t trace_set_direction(int8_t direction) {
 		return trace_set_direction(self,direction);
 	}
-	int trace_bpf_filter(struct libtrace_filter_t *filter) {
-		return trace_bpf_filter(filter,self);
+	int trace_apply_filter(struct libtrace_filter_t *filter) {
+		return trace_apply_filter(filter,self);
 	}
 	uint8_t trace_get_server_port(uint8_t protocol, uint16_t source,
 			uint16_t dest) {
@@ -204,10 +233,13 @@ struct libtrace_filter_t {};
 
 %extend libtrace_filter_t {
 	libtrace_filter_t(char *filterstring) { 
-		return trace_bpf_setfilter(filterstring); 
+		return trace_create_filter(filterstring); 
 	};
-	int trace_bpf_filter(struct libtrace_packet_t *packet) {
-		return trace_bpf_filter(self,packet);
+	~libtrace_filter_t() {
+		trace_destroy_filter(self);
+	};
+	int trace_apply_filter(struct libtrace_packet_t *packet) {
+		return trace_apply_filter(self,packet);
 	}
 };
 
@@ -220,5 +252,46 @@ struct libtrace_t {};
 	int trace_read_packet(struct libtrace_packet_t *packet) { 
 		return trace_read_packet(self,packet);
 	}
+	int trace_start() {
+		return trace_start(self);
+	}
+	int trace_pause() {
+		return trace_pause(self);
+	}
+	void trace_help() {
+		trace_help();
+	}
+	int trace_config(trace_option_t option, void *value) {
+		return trace_config(self, option, value); 
+	}
+	libtrace_err_t trace_get_err() {
+		return trace_get_err(self);
+	}
+	bool trace_is_err() {
+		return trace_is_err(self);
+	}
 }; 
+
+%rename (OutputTrace) libtrace_out_t;
+struct libtrace_out_t {};
+
+%extend libtrace_out_t {
+	libtrace_out_t(char *uri) { return trace_create_output(uri); };
+	~libtrace_t() { trace_destroy_output(self); }
+	int trace_start_output() {
+		return trace_start_output(self);
+	}
+	int trace_config_output(trace_option_output_t option, void *value) {
+		return trace_config_output(self, option, value);
+	}
+	libtrace_err_t trace_get_err_output() {
+		return trace_get_err_output(self);
+	}
+	bool trace_is_err_output() {
+		return trace_is_err_output(self);
+	}
+	int trace_write_packet(libtrace_packet_t *packet) {
+		return trace_write_packet(self, packet);
+	}
+};
 
