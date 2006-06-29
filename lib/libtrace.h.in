@@ -81,7 +81,7 @@
     #define LT_BITFIELD8 	uint8_t
     #define LT_BITFIELD16 	uint16_t
     #define LT_BITFIELD32 	uint32_t
-    #define LT_BITFIELD32 	uint64_t
+    #define LT_BITFIELD64 	uint64_t
 #else
     #ifdef HAVE_GCCVISIBILITYPATCH
 	#define DLLEXPORT __attribute__ (visibility("default"))
@@ -97,7 +97,7 @@
     #define LT_BITFIELD8 	unsigned int
     #define LT_BITFIELD16 	unsigned int
     #define LT_BITFIELD32 	unsigned int
-    #define LT_BITFIELD32 	unsigned int
+    #define LT_BITFIELD64 	unsigned int
 #endif
 
 #ifdef WIN32
