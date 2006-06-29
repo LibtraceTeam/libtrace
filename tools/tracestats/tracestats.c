@@ -123,7 +123,7 @@ void run_trace(char *uri)
 
 void usage(char *argv0)
 {
-	fprintf(stderr,"Usage: %s [--filter|-f bpf ]... libtraceuri...\n",argv0);
+	fprintf(stderr,"Usage: %s [-H|--libtrace-help] [--filter|-f bpf ]... libtraceuri...\n",argv0);
 }
 
 int main(int argc, char *argv[]) {
@@ -133,11 +133,12 @@ int main(int argc, char *argv[]) {
 	while(1) {
 		int option_index;
 		struct option long_options[] = {
-			{ "filter",	1, 0, 'f' },
-			{ NULL, 	0, 0, 0   },
+			{ "filter",	   1, 0, 'f' },
+			{ "libtrace-help", 0, 0, 'H' },
+			{ NULL, 	   0, 0, 0   },
 		};
 
-		int c=getopt_long(argc, argv, "f:",
+		int c=getopt_long(argc, argv, "f:H",
 				long_options, &option_index);
 
 		if (c==-1)
@@ -151,6 +152,10 @@ int main(int argc, char *argv[]) {
 				filters[filter_count-1].filter=trace_create_filter(optarg);
 				filters[filter_count-1].count=0;
 				filters[filter_count-1].bytes=0;
+				break;
+			case 'H':
+				trace_help();
+				exit(1);
 				break;
 			default:
 				fprintf(stderr,"Unknown option: %c\n",c);

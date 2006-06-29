@@ -20,8 +20,8 @@ void usage(char *argv0)
 	"-c --cryptopan=key	Encrypt the addresses with the cryptopan\n"
 	"			prefix preserving\n"
 	"-p --prefix=C.I.D.R/bits Substitute the prefix of the address\n"
+	"-H --libtrace-help	Print libtrace runtime documentation\n"
 	,argv0);
-	trace_help();
 	exit(1);
 }
 
@@ -120,10 +120,11 @@ int main(int argc, char *argv[])
 			{ "encrypt-dest",	0, 0, 'd' },
 			{ "cryptopan",		1, 0, 'c' },
 			{ "prefix",		1, 0, 'p' },
-			{ NULL,			0, 0, 0 },
+			{ "libtrace-help", 	0, 0, 'H' },
+			{ NULL,			0, 0, 0   },
 		};
 
-		int c=getopt_long(argc, argv, "sc:dp:",
+		int c=getopt_long(argc, argv, "sc:dp:H",
 				long_options, &option_index);
 
 		if (c==-1)
@@ -147,6 +148,10 @@ int main(int argc, char *argv[])
 				  }
 				  key=strdup(optarg);
 				  enc_type = ENC_PREFIX_SUBSTITUTION;
+				  break;
+			case 'H': 
+				  trace_help(); 
+				  exit(1); 
 				  break;
 			default:
 				fprintf(stderr,"unknown option: %c\n",c);

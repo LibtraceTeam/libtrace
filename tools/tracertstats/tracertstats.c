@@ -179,7 +179,14 @@ void run_trace(char *uri)
 
 void usage(char *argv0)
 {
-	fprintf(stderr,"Usage: %s [--interval|-i seconds ] [--count|-c packets] [--output-format|-o txt|csv|html|png] [--filter|-f bpf ]... libtraceuri...\n",argv0);
+	fprintf(stderr,"Usage:\n"
+	"%s flags libtraceuri [libtraceuri...]\n"
+       	"-i --interval=seconds	Duration of reporting interval in seconds\n"
+	"-c --count=packets	Exit after count packets received\n"
+	"-o --output-format=txt|csv|html|png Reporting output format\n"
+	"-f --filter=bpf	Apply BPF filter. Can be specified multiple times\n"
+	"-H --libtrace-help	Print libtrace runtime documentation\n"
+	,argv0);
 }
 
 int main(int argc, char *argv[]) {
@@ -189,14 +196,15 @@ int main(int argc, char *argv[]) {
 	while(1) {
 		int option_index;
 		struct option long_options[] = {
-			{ "filter",	1, 0, 'f' },
-			{ "interval",	1, 0, 'i' },
-			{ "count",	1, 0, 'c' },
-			{ "output-format",1,0,'o' },
-			{ NULL, 	0, 0, 0   },
+			{ "filter",		1, 0, 'f' },
+			{ "interval",		1, 0, 'i' },
+			{ "count",		1, 0, 'c' },
+			{ "output-format",	1, 0, 'o' },
+			{ "libtrace-help",	0, 0, 'H' },
+			{ NULL, 		0, 0, 0   },
 		};
 
-		int c=getopt_long(argc, argv, "c:f:i:o:",
+		int c=getopt_long(argc, argv, "c:f:i:o:H",
 				long_options, &option_index);
 
 		if (c==-1)
@@ -221,6 +229,10 @@ int main(int argc, char *argv[]) {
 				if (output_format) free(output_format);
 				output_format=strdup(optarg);
 				break;
+			case 'H': 
+				  trace_help(); 
+				  exit(1); 
+				  break;	
 			default:
 				fprintf(stderr,"Unknown option: %c\n",c);
 				usage(argv[0]);

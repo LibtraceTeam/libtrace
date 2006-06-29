@@ -23,18 +23,18 @@ char *strdupcati(char *str,int i)
 	return strdupcat(str,buffer);
 }
 
-int usage(char *argv)
+int usage(char *argv0)
 {
-	printf("Usage: %s inputurl [ -c count ] [ -f bpffilter ] [ -b bytes ]\n\t[ -s starttime ] [ -e endtime ] [ -i interval ] outputurl\n",argv);
-	printf("\n");
-	printf("Splits up traces\n");
-	printf("-c count	split every count packets\n");
-	printf("-f bpffilter	only output packets that match filter\n");
-	printf("-b bytes	split every capture bytes\n");
-	printf("-s time		start at starttime\n");
-	printf("-e time		end at endtime\n");
-	printf("-i seconds	create a new trace every <seconds>\n");
-	printf("\n");
+	printf("Usage:\n"
+	"%s flags inputuri outputuri\n"
+	"-f --filter=bpf 	only output packets that match filter\n"
+	"-c --count=n 		split every n packets\n"
+	"-b --bytes=n	 	Split every n bytes received\n"
+	"-i --interval=n	Split every n seconds\n"
+	"-s --starttime=time 	Start at time\n"
+	"-e --endtime=time	End at time\n"
+	"-H --libtrace-help	Print libtrace runtime documentation\n"
+	,argv0);
 	exit(1);
 }
 
@@ -63,16 +63,17 @@ int main(int argc, char *argv[])
 	while(1) {
 		int option_index;
 		struct option long_options[] = {
-			{ "filter",	1, 0, 'f' },
-			{ "count",	1, 0, 'c' },
-			{ "bytes",	1, 0, 'b' },
-			{ "starttime",	1, 0, 's' },
-			{ "endtime",	1, 0, 'e' },
-			{ "interval",	1, 0, 'i' },
-			{ NULL, 	0, 0, 0   },
+			{ "filter",	   1, 0, 'f' },
+			{ "count",	   1, 0, 'c' },
+			{ "bytes",	   1, 0, 'b' },
+			{ "starttime",	   1, 0, 's' },
+			{ "endtime",	   1, 0, 'e' },
+			{ "interval",	   1, 0, 'i' },
+			{ "libtrace-help", 0, 0, 'H' },
+			{ NULL, 	   0, 0, 0   },
 		};
 
-		int c=getopt_long(argc, argv, "f:c:b:s:e:i:",
+		int c=getopt_long(argc, argv, "f:c:b:s:e:i:H",
 				long_options, &option_index);
 
 		if (c==-1)
@@ -90,6 +91,10 @@ int main(int argc, char *argv[])
 			case 'e': endtime=atoi(optarg);
 				  break;
 			case 'i': interval=atoi(optarg);
+				  break;
+			case 'H':
+				  trace_help();
+				  exit(1);
 				  break;
 			default:
 				fprintf(stderr,"Unknown option: %c\n",c);

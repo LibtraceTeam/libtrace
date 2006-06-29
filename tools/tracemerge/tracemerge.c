@@ -7,9 +7,12 @@
 
 void usage(char *argv0)
 {
-	fprintf(stderr,"Usage: %s [ -i | --set-interface ] [ -u | --unique-packets ] outputuri traceuri...\n",argv0);
-	fprintf(stderr,"\n");
-	fprintf(stderr,"Merges traces together, with -i each trace gets it's own direction/interface,\n without traces keep whatever direction/interface they have set\n");
+	fprintf(stderr,"Usage:\n"
+	"%s flags outputuri traceuri [traceuri...]\n"
+	"-i --set-interface 	Each trace is allocated an interface. Default leaves this flag as read from the original traces, if appropriate\n"
+	"-u --unique-packets    Discard duplicate packets\n"
+	"-H --libtrace-help     Print libtrace runtime documentation\n"
+	,argv0);
 	exit(1);
 }
 
@@ -30,10 +33,11 @@ int main(int argc, char *argv[])
 		struct option long_options[] = {
 			{ "set-interface", 	0, 0, 'i' },
 			{ "unique-packets",	0, 0, 'u' },
-			{ NULL,			0, 0, 0 },
+			{ "libtrace-help",	0, 0, 'H' },
+			{ NULL,			0, 0, 0   },
 		};
 
-		int c=getopt_long(argc, argv, "iu",
+		int c=getopt_long(argc, argv, "iuH",
 				long_options, &option_index);
 
 		if (c==-1)
@@ -42,6 +46,10 @@ int main(int argc, char *argv[])
 		switch (c) {
 			case 'i': set_interface=true; break;
 			case 'u': unique_packets=true; break;
+			case 'H': 
+				  trace_help();
+				  exit(1);
+				  break;
 			default:
 				fprintf(stderr,"unknown option: %c\n",c);
 				usage(argv[0]);

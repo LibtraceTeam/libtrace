@@ -102,7 +102,12 @@ void run_trace(char *uri, libtrace_filter_t *filter, int count)
 
 void usage(char *argv0)
 {
-	fprintf(stderr,"Usage: %s [--filter|-f bpf ]... libtraceuri...\n",argv0);
+	fprintf(stderr,"Usage:\n"
+	"%s flags traceuri [traceuri...]\n"
+	"-f --filter=bpf	Apply BPF filter. Can be specified multiple times\n"
+	"-H --libtrace-help	Print libtrace runtime documentation\n"
+	,argv0);
+	exit(1);
 }
 
 int main(int argc, char *argv[]) {

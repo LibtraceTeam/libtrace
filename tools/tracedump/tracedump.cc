@@ -12,6 +12,7 @@ void usage(char *argv0)
 	"%s flags inputfile\n"
 	"-f --filter=expr	BPF filter specification, quoted\n"
 	"-c --count=num		terminate after num packets\n"
+	"-H --libtrace-help	Print libtrace runtime documentation\n"
 		,argv0);
 	exit(0);
 }
@@ -31,12 +32,13 @@ int main(int argc,char **argv)
 	while(1) {
 		int option_index;
 		struct option long_options[] = {
-			{ "filter",	1, 0, 'f' },
-			{ "count",	1, 0, 'c' },
-			{ NULL,		0, 0, 0 },
+			{ "filter",	   1, 0, 'f' },
+			{ "count",	   1, 0, 'c' },
+			{ "libtrace-help", 0, 0, 'H' },
+			{ NULL,		   0, 0, 0   },
 		};
 
-		int c=getopt_long(argc,argv,"f:c:",
+		int c=getopt_long(argc,argv,"f:c:H",
 				long_options, &option_index);
 		if (c == -1)
 			break;
@@ -49,6 +51,10 @@ int main(int argc,char **argv)
 				filter=trace_create_filter(optarg);
 				break;
 			case 'c': count=atol(optarg); break;
+			case 'H': 
+				  trace_help(); 
+				  exit(1);
+				  break;
 			default:
 				  printf("unknown option: %c\n",c);
 				  usage(argv[0]);
