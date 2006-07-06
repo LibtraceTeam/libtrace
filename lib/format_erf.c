@@ -658,11 +658,15 @@ static int dag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	DAG.offset += size;
 	DAG.diff -= size;
 
-	packet->size = size;
+	if (packet->payload != NULL)
+		packet->size = size;
+	else 
+		packet->size = erf_get_framing_length(packet);
+	
 	tv = trace_get_timeval(packet);
 	DUCK.last_pkt = tv.tv_sec;
 	
-	return (size);
+	return (packet->size);
 }
 
 static int dag_start_input(libtrace_t *libtrace) {
