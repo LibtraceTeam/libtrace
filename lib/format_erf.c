@@ -649,7 +649,10 @@ static int dag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	packet->buffer = erfptr;
 	packet->header = erfptr;
 	if (((dag_record_t *)packet->buffer)->flags.rxerror == 1) {
+		/* rxerror means the payload is corrupt - drop it
+		 * by tweaking rlen */
 		packet->payload = NULL;
+		erfptr->rlen = htons(erf_get_framing_length(packet));
 	} else {
 		packet->payload = (char*)packet->buffer 
 			+ erf_get_framing_length(packet);
@@ -1009,6 +1012,9 @@ static uint64_t erf_get_erf_timestamp(const libtrace_packet_t *packet) {
 
 static int erf_get_capture_length(const libtrace_packet_t *packet) {
 	dag_record_t *erfptr = 0;
+	if (packet->payload == NULL)
+		return 0; 
+	
 	erfptr = (dag_record_t *)packet->header;
 	return (ntohs(erfptr->rlen) - erf_get_framing_length(packet));
 }

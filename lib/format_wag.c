@@ -465,11 +465,30 @@ static int wag_get_capture_length(const libtrace_packet_t *packet) {
 }
 
 static int wag_get_wire_length(const libtrace_packet_t *packet) {
+	struct frame_t * wag_frame_data = (struct frame_t *)packet->header;
+
+	
+	if (wag_frame_data->subtype == FRAME_SUBTYPE_DATA_RX) {
+		struct frame_data_rx_t *wag_hdr = 
+			(struct frame_data_rx_t *)packet->header;
+		return ntohs(wag_hdr->rxinfo.length);
+	}
+
+	if (wag_frame_data->subtype == FRAME_SUBTYPE_DATA_TX) {
+		struct frame_data_tx_t *wag_hdr =
+                       (struct frame_data_tx_t *)packet->header;
+		return ntohs(wag_hdr->txinfo.length);
+	}
+	
+	/* default option - not optimal as there tends to be an
+	 * extra 2 bytes floating around somewhere */
 	return ntohs(((struct frame_t *)packet->header)->size)
 		-sizeof(struct frame_data_rx_t);
 }
 
 static int wag_get_framing_length(UNUSED const libtrace_packet_t *packet) {
+	/* There's an extra two bytes floating around somewhere that
+	 * we can't account for! */
 	return sizeof(struct frame_data_rx_t);
 }
 
