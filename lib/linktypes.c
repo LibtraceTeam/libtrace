@@ -147,6 +147,9 @@ void promote_packet(libtrace_packet_t *packet)
 		packet->header=tmpbuffer;
 		packet->payload=tmpbuffer+trace_get_framing_length(packet);
 		packet->type=pcap_dlt_to_rt(TRACE_DLT_LINUX_SLL);
+		packet->size+=sizeof(libtrace_sll_header_t);
+		((struct pcap_pkthdr*) packet->header)->caplen+=
+			sizeof(libtrace_sll_header_t);
 		return;
 	}
 }
