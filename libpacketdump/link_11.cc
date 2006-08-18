@@ -4,7 +4,6 @@
 #include <dlfcn.h>
 #include "libpacketdump.h"
 
-extern "C"
 void decode(int link_type,char *packet,int len)
 {
 	// Ethernet - just raw ethernet frames

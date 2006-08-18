@@ -31,7 +31,6 @@ struct ieee_802_11_payload {
         uint8_t      data[1];
 };
 
-extern "C"
 void decode(int link_type,char *packet,int len)
 {
 	char ether_buf[18] = {0, };

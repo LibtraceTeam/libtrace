@@ -5,7 +5,6 @@
 #include "libtrace.h"
 #include "libpacketdump.h"
 
-extern "C"
 void decode(int link_type,char *packet,int len)
 {
 	char ether_buf[18] = {0, };

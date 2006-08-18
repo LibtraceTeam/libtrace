@@ -1,10 +1,10 @@
+#include "libpacketdump.h"
+#include "libtrace.h"
 #include <netinet/in.h>
 #include <stdio.h>
 #include <inttypes.h>
 #include <dlfcn.h>
-#include "libpacketdump.h"
 
-extern "C"
 void decode(int link_type,char *packet,int len)
 {
 	// POS
@@ -12,10 +12,10 @@ void decode(int link_type,char *packet,int len)
 	// take into account llc
 	if (len>=4) {
 		uint16_t type = htons(
-				((libtrace_pos *)packet)->ether_type);
+				((libtrace_pos_t *)packet)->ether_type);
 		printf(" %04x\n",type);
-		decode_next(packet+sizeof(libtrace_pos),
-				len-sizeof(libtrace_pos),
+		decode_next(packet+sizeof(libtrace_pos_t),
+				len-sizeof(libtrace_pos_t),
 				"eth",type);
 	}
 	else {
