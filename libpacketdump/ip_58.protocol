@@ -1,0 +1,5 @@
+
+be8	integer "ICMP6: Type"
+be8	integer "ICMP6: Code"
+be16	hex 	"ICMP6: Checksum"
+next	"icmp6"	"ICMP6: Type"
