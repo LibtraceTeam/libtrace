@@ -83,6 +83,7 @@
     #define LT_BITFIELD32 	uint32_t
     #define LT_BITFIELD64 	uint64_t
 #else
+#   include <stdint.h>
     #ifdef HAVE_GCCVISIBILITYPATCH
 	#define DLLEXPORT __attribute__ (visibility("default"))
 	#define DLLLOCAL __attribute__ (visibility("hidden"))
