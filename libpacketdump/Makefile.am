@@ -66,7 +66,7 @@ SUBDIRS = parser
 libpacketdump_la_SOURCES = libpacketdump.cc $(BIN_PROTOCOLS)
 
 plugin_LTLIBRARIES = $(BIN_PROTOCOLS)
-plugin_DATA = $(TXT_PROTOCOLS)
+dist_plugin_DATA = $(TXT_PROTOCOLS)
 
 INCLUDES= @ADD_INCLS@ -I../lib -I../
 libpacketdump_la_LIBADD = @ADD_LIBS@ -lparser
