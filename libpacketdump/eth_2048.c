@@ -1,14 +1,11 @@
+#include <sys/types.h>
+#include <sys/socket.h>
 #include <netinet/in.h>
 #include <stdio.h>
-#include <inttypes.h>
-#include <dlfcn.h>
 #include "libpacketdump.h"
-#include <sys/socket.h>
 #ifndef WIN32
 	#include <netinet/in_systm.h>
 #endif
-#include <netinet/in.h>
-#include <netinet/ip.h>
 #include <arpa/inet.h>
 #include <netdb.h>
 

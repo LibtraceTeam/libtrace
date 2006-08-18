@@ -1,7 +1,6 @@
+#include <sys/types.h>
 #include <netinet/in.h>
 #include <stdio.h>
-#include <inttypes.h>
-#include <dlfcn.h>
 #include "libpacketdump.h"
 
 void decode(int link_type,char *packet,int len)
