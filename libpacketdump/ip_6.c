@@ -45,7 +45,6 @@ int get_next_option(unsigned char **ptr,int *len,
 	}
 }
 
-extern "C"
 void decode(int link_type,char *packet,int len)
 {
 	libtrace_tcp_t *tcp = (libtrace_tcp_t *)packet;
@@ -96,7 +95,7 @@ void decode(int link_type,char *packet,int len)
 	DISPLAYS(check," Checksum %i");
 	DISPLAYS(urg_ptr," Urgent %i");
 	unsigned char *pkt = (unsigned char*)packet+sizeof(*tcp);
-	int plen = (len-sizeof *tcp) <? (tcp->doff*4-sizeof *tcp);
+	int plen = (len-sizeof *tcp) < (tcp->doff*4-sizeof(*tcp))?(len-sizeof(*tcp)):(tcp->doff*4-sizeof *tcp);
 	unsigned char type,optlen,*data;
 	while(get_next_option(&pkt,&plen,&type,&optlen,&data)) {
 		printf("\n TCP: ");

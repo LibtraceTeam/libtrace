@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <inttypes.h>
 #include <dlfcn.h>
-#include <map>
 #include "libpacketdump.h"
 
 #include <sys/socket.h>
@@ -151,7 +150,6 @@ static void parse_options(char *offset, int vlen)
     }
 }
 
-extern "C"
 void decode(int link_type,char *packet,int len)
 {
     struct sctp_common_hdr *hdr;

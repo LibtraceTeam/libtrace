@@ -24,9 +24,9 @@ BIN_PROTOCOLS+=link_11.la	# 802.11 Prism
 #				# Duck
 
 # Decoders for various ethertypes (in decimal)
-BIN_PROTOCOLS+=eth_2048.la
-BIN_PROTOCOLS+=eth_2054.la
-TXT_PROTOCOLS+=eth_33024.protocol
+BIN_PROTOCOLS+=eth_2048.la		# IPv4
+BIN_PROTOCOLS+=eth_2054.la		# ARP
+TXT_PROTOCOLS+=eth_33024.protocol	# IPv6
 
 # IP Protocol decoders
 BIN_PROTOCOLS+=ip_1.la  # ICMP
@@ -52,12 +52,21 @@ link_9_la_LDFLAGS=-module
 link_10_la_LDFLAGS=-module
 link_11_la_LDFLAGS=-module
 
+eth_2048_la_LDFLAGS=-module
+eth_2054_la_LDFLAGS=-module
+
+ip_1_la_LDFLAGS=-module
+ip_6_la_LDFLAGS=-module
+ip_17_la_LDFLAGS=-module
+ip_33_la_LDFLAGS=-module
+ip_132_la_LDFLAGS=-module
+
 SUBDIRS = parser
 
 libpacketdump_la_SOURCES = libpacketdump.cc $(BIN_PROTOCOLS)
 
 plugin_LTLIBRARIES = $(BIN_PROTOCOLS)
-plugin_DATA = $(TXT_PROTOCOLS))
+plugin_DATA = $(TXT_PROTOCOLS)
 
 INCLUDES= @ADD_INCLS@ -I../lib -I../
 libpacketdump_la_LIBADD = @ADD_LIBS@ -lparser

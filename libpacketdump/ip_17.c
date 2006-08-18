@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <inttypes.h>
 #include <dlfcn.h>
-#include <map>
 #include "libpacketdump.h"
 #include "libtrace.h"
 #include <netinet/udp.h>
@@ -25,7 +24,6 @@
 #define DISPLAYIP(x,fmt) DISPLAY_EXP(x,fmt,inet_ntoa(*(struct in_addr*)&STRUCT->x))
 
 
-extern "C"
 void decode(int link_type,char *packet,int len)
 {
 	struct libtrace_udp *udp = (struct libtrace_udp*)packet;

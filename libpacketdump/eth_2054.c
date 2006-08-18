@@ -28,6 +28,8 @@ static char *format(struct arphdr *arp, char *hrd, char *pro)
 {
 	static char buffer[1024];
 	char ether_buf[18] = {0, };
+	int i;
+
 	if (hrd==NULL)
 		return "Truncated (Truncated)";
 	switch(arp->ar_hrd) {
@@ -36,7 +38,6 @@ static char *format(struct arphdr *arp, char *hrd, char *pro)
 						ether_buf));
 			break;
 		default:
-			int i;
 			for (i=0;i<arp->ar_hln;i++) {
 				snprintf(buffer,sizeof(buffer),"%s %02x",
 						buffer,(unsigned char)hrd[i]);
@@ -52,7 +53,6 @@ static char *format(struct arphdr *arp, char *hrd, char *pro)
 					buffer,inet_ntoa(*(struct in_addr*)&pro));
 			break;
 		default:
-			int i;
 			strncat(buffer," (",sizeof(buffer));
 			for (i=0;i<arp->ar_pln;i++) {
 				snprintf(buffer,sizeof(buffer),"%s %02x",
@@ -64,7 +64,6 @@ static char *format(struct arphdr *arp, char *hrd, char *pro)
 	return buffer;
 }
 
-extern "C"
 void decode(int link_type,char *packet,int len)
 {
 	struct arphdr *arp = (struct arphdr*)packet;

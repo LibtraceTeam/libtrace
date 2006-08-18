@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <inttypes.h>
 #include <dlfcn.h>
-#include <map>
 #include "libpacketdump.h"
 #include <netinet/tcp.h>
 #include <netinet/in.h>
@@ -73,7 +72,6 @@ int get_next_option(unsigned char **ptr,int *len,
 	}
 }
 
-extern "C"
 void decode(int link_type,char *packet,int len)
 {
 	struct dccphdr *dccp = (struct dccphdr*)packet;
