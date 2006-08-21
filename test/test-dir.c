@@ -51,7 +51,6 @@
 #include <time.h>
 #include <string.h>
 
-#include "dagformat.h"
 #include "libtrace.h"
 
 void iferr(libtrace_t *trace)
@@ -140,9 +139,12 @@ int main(int argc, char *argv[]) {
 		/* Force promotion */
 		if (trace_get_source_port(packet)==80) {
 			trace_set_direction(packet,TRACE_DIR_OUTGOING);
+			assert(trace_get_direction(packet)==TRACE_DIR_OUTGOING);
+			assert(trace_get_source_port(packet)==80);
 		}
 		else {
 			trace_set_direction(packet,TRACE_DIR_INCOMING);
+			assert(trace_get_direction(packet)==TRACE_DIR_INCOMING);
 		}
 		/* And then force demotion */
 		trace_write_packet(outtrace,packet);
