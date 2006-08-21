@@ -429,7 +429,7 @@ typedef struct libtrace_pos
 
 /** 802.11 header */
 typedef struct libtrace_80211_t {
-#ifdef BYTE_ORDER == LITTLE_ENDIAN
+#if BYTE_ORDER == LITTLE_ENDIAN
         LT_BITFIELD32      protocol:2;
         LT_BITFIELD32      type:2;
         LT_BITFIELD32      subtype:4;
@@ -438,6 +438,8 @@ typedef struct libtrace_80211_t {
 	LT_BITFIELD32      type:2;
 	LT_BITFIELD32      protocol:2;
 #endif
+
+#if BYTE_ORDER == LITTLE_ENDIAN
         LT_BITFIELD32      to_ds:1;	/**< Packet to Distribution Service */
         LT_BITFIELD32      from_ds:1;	/**< Packet from Distribution Service */
         LT_BITFIELD32      more_frag:1;	/**< Packet has more fragments */
