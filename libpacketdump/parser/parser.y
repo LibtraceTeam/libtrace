@@ -7,7 +7,6 @@
     #include <arpa/inet.h>
     #include <assert.h>
     #include "grammar.h"
-    #include "parser.h"
     #include "libpacketdump.h"
     #include "bitbuffer.h"
 
