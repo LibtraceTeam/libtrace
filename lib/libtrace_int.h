@@ -236,7 +236,7 @@ struct libtrace_format_t {
 	/** write a packet to a trace from the provided packet 
 	 * (or NULL if output not supported)
 	 */
-	int (*write_packet)(libtrace_out_t *libtrace, const libtrace_packet_t *packet);
+	int (*write_packet)(libtrace_out_t *libtrace, libtrace_packet_t *packet);
 	/** return the libtrace link type for this packet 
 	 * @return the libtrace link type, or -1 if this link type is unknown
 	 */ 

@@ -737,7 +737,7 @@ DLLEXPORT libtrace_eventobj_t trace_event(libtrace_t *trace,
  * @param packet	the packet opaque pointer
  * @return the number of bytes written out, if zero or negative then an error has occured.
  */
-DLLEXPORT int trace_write_packet(libtrace_out_t *trace, const libtrace_packet_t *packet);
+DLLEXPORT int trace_write_packet(libtrace_out_t *trace, libtrace_packet_t *packet);
 /*@}*/
 
 /** @name Protocol decodes

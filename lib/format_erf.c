@@ -899,6 +899,30 @@ static int erf_start_output(libtrace_out_t *libtrace)
 	}
 	return 0;
 }
+
+static bool find_compatible_linktype(libtrace_packet_t *packet)
+{
+	/* Keep trying to simplify the packet until we can find 
+	 * something we can do with it */
+	do {
+		char type=libtrace_to_erf_type(trace_get_link_type(packet));
+
+		/* Success */
+		if (type != (char)-1)
+			return true;
+
+		if (!demote_packet(packet)) {
+			trace_set_err_out(packet->trace,
+					TRACE_ERR_NO_CONVERSION,
+					"No erf type for packet (%i)",
+					trace_get_link_type(packet));
+			return false;
+		}
+
+	} while(1);
+
+	return true;
+}
 		
 static int erf_write_packet(libtrace_out_t *libtrace, 
 		const libtrace_packet_t *packet) 
@@ -939,7 +963,6 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 				);
 	} else {
 		dag_record_t erfhdr;
-		int type;
 		/* convert format - build up a new erf header */
 		/* Timestamp */
 		erfhdr.ts = bswap_host_to_le64(trace_get_erf_timestamp(packet));
@@ -949,19 +972,11 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 		if (trace_get_direction(packet)!=-1)
 			erfhdr.flags.iface = trace_get_direction(packet);
 
-		/* Keep trying to simplify the packet until we can find 
-		 * something we can do with it */
-		do {
-			type=libtrace_to_erf_type(trace_get_link_type(packet));
-		} while(type==(char)-1 && demote_packet((libtrace_packet_t *)packet));
-		/* We just don't support this link type sorry */
-		if (type==(char)-1) {
-			trace_set_err_out(libtrace,
-					TRACE_ERR_NO_CONVERSION,
-					"No erf type for packet");
+		if (!find_compatible_linktype(packet))
 			return -1;
-		}
-		erfhdr.type = type;
+
+		erfhdr.type = libtrace_to_erf_type(trace_get_link_type(packet));
+
 		/* Packet length (rlen includes format overhead) */
 		assert(trace_get_capture_length(packet)>0 
 				&& trace_get_capture_length(packet)<=65536);

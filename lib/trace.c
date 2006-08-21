@@ -696,7 +696,7 @@ DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
  *
  * @author Shane Alcock
  * */
-DLLEXPORT int trace_write_packet(libtrace_out_t *libtrace, const libtrace_packet_t *packet) {
+DLLEXPORT int trace_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *packet) {
 	assert(libtrace);
 	assert(packet);	
 	/* Verify the packet is valid */
