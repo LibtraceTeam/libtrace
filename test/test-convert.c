@@ -102,6 +102,7 @@ int main(int argc, char *argv[]) {
 	int count = 0;
 	int level = 0;
 	int expected = 100;
+	int tcpcount = 0;
 	libtrace_t *trace,*trace2;
 	libtrace_out_t *outtrace;
 	libtrace_packet_t *packet,*packet2;
@@ -166,6 +167,7 @@ int main(int argc, char *argv[]) {
 	packet=trace_create_packet();
 	packet2=trace_create_packet();
 	count=0;
+	tcpcount=0;
 	while(trace_read_packet(trace,packet)>0) {
 		int err;
 		++count;
@@ -186,6 +188,7 @@ int main(int argc, char *argv[]) {
 				error=1;
 				break;
 			}
+			++tcpcount;
 		} else {
 			if (trace_get_tcp(packet2)) {
 				printf("trace corrupt: unexpected tcp\n");
@@ -203,6 +206,8 @@ int main(int argc, char *argv[]) {
 	trace_destroy(trace2);
 	trace_destroy_packet(packet);
 	trace_destroy_packet(packet2);
+
+	printf("tcpcount=%i\n",tcpcount);
 
         return error;
 }
