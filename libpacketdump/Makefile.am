@@ -13,8 +13,8 @@ BIN_PROTOCOLS+=link_2.la	# Ethernet
 TXT_PROTOCOLS+=link_3.protocol	# ATM
 BIN_PROTOCOLS+=link_4.la	# 802.11
 # 				# NONE
-BIN_PROTOCOLS+=link_6.la	# Linux SLL
-TXT_PROTOCOLS+=link_7.protocol	# PFLog
+TXT_PROTOCOLS+=link_6.protocol	# Linux SLL
+#				# PFLog
 # 				# Obsolete legacy
 BIN_PROTOCOLS+=link_9.la	# POS
 #				# Obsolete Legacy ATM
@@ -47,7 +47,6 @@ BIN_PROTOCOLS+=ip_132.la        # SCTP
 link_0_la_LDFLAGS=-module
 link_2_la_LDFLAGS=-module
 link_4_la_LDFLAGS=-module
-link_6_la_LDFLAGS=-module
 link_9_la_LDFLAGS=-module
 link_10_la_LDFLAGS=-module
 link_11_la_LDFLAGS=-module
