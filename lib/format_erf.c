@@ -946,7 +946,8 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 	/* If we've had an rxerror, we have no payload to write - fix
 	 * rlen to be the correct length 
 	 */
-	/* I Think this is bogus -- Perry */
+	/* I Think this is bogus, we should somehow figure out
+	 * a way to write out the payload even if it is gibberish -- Perry */
 	if (payload == NULL) {
 		dag_hdr->rlen = htons(dag_record_size + pad);
 	} 
@@ -974,6 +975,9 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 
 		if (!find_compatible_linktype(packet))
 			return -1;
+
+		payload=packet->payload;
+		pad = erf_get_padding(packet);
 
 		erfhdr.type = libtrace_to_erf_type(trace_get_link_type(packet));
 
