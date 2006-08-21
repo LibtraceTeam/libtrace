@@ -376,10 +376,6 @@ static int pcapint_write_packet(libtrace_out_t *libtrace, const libtrace_packet_
 }
 
 static libtrace_linktype_t pcap_get_link_type(const libtrace_packet_t *packet) {
-	struct pcap_pkthdr *pcapptr = 0;
-	int linktype = 0;
-	pcapptr = (struct pcap_pkthdr *)packet->header;
-
 	/* pcap doesn't store dlt in the framing header so we need
 	 * rt to do it for us 
 	 */
