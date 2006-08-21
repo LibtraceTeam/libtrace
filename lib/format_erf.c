@@ -900,7 +900,8 @@ static int erf_start_output(libtrace_out_t *libtrace)
 	return 0;
 }
 
-static bool find_compatible_linktype(libtrace_packet_t *packet)
+static bool find_compatible_linktype(libtrace_out_t *libtrace,
+				libtrace_packet_t *packet)
 {
 	/* Keep trying to simplify the packet until we can find 
 	 * something we can do with it */
@@ -912,7 +913,7 @@ static bool find_compatible_linktype(libtrace_packet_t *packet)
 			return true;
 
 		if (!demote_packet(packet)) {
-			trace_set_err_out(packet->trace,
+			trace_set_err_out(libtrace,
 					TRACE_ERR_NO_CONVERSION,
 					"No erf type for packet (%i)",
 					trace_get_link_type(packet));
@@ -925,7 +926,7 @@ static bool find_compatible_linktype(libtrace_packet_t *packet)
 }
 		
 static int erf_write_packet(libtrace_out_t *libtrace, 
-		const libtrace_packet_t *packet) 
+		libtrace_packet_t *packet) 
 {
 	int numbytes = 0;
 	int pad = 0;
@@ -973,7 +974,7 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 		if (trace_get_direction(packet)!=-1)
 			erfhdr.flags.iface = trace_get_direction(packet);
 
-		if (!find_compatible_linktype(packet))
+		if (!find_compatible_linktype(libtrace,packet))
 			return -1;
 
 		payload=packet->payload;
