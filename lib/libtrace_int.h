@@ -162,6 +162,12 @@ typedef struct libtrace_sll_header_t {
 	uint16_t protocol;         	/* protocol */
 } libtrace_sll_header_t;
 
+#define TRACE_SLL_HOST		0
+#define TRACE_SLL_BROADCAST 	1
+#define TRACE_SLL_MULTICAST	2
+#define TRACE_SLL_OTHERHOST	3
+#define TRACE_SLL_OUTGOING	4
+
 #ifndef PF_RULESET_NAME_SIZE
 #define PF_RULESET_NAME_SIZE 16
 #endif

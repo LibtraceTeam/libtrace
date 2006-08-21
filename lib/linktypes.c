@@ -115,7 +115,7 @@ void promote_packet(libtrace_packet_t *packet)
 				hdr=(void*)((char*)tmpbuffer
 					+trace_get_framing_length(packet));
 
-				hdr->pkttype=0; /* "outgoing" */
+				hdr->pkttype=TRACE_SLL_OUTGOING;
 				if (pcap_dlt_to_libtrace(rt_to_pcap_dlt(packet->type))==TRACE_TYPE_ETH)
 					hdr->hatype = ARPHRD_ETHER;
 				else
@@ -125,6 +125,10 @@ void promote_packet(libtrace_packet_t *packet)
 					trace_get_link_type(packet),
 					&hdr->protocol,
 					NULL);
+				/* Linux SLL appears to have the protocol
+				 * field in /host/ byte order.
+				 */
+				hdr->protocol=ntohs(hdr->protocol);
 				break;
 			default:
 				/* failed */
@@ -183,4 +187,5 @@ bool demote_packet(libtrace_packet_t *packet)
 		default:
 			return false;
 	}
+	return true;
 }
