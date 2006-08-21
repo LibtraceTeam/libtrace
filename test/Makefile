@@ -3,8 +3,8 @@ PREFIX=../
 CC=gcc
 
 INCLUDE = -I$(PREFIX)/lib -I$(PREFIX)/libpacketdump
-CFLAGS = -Wall -Wimplicit -Wformat -pipe -g -O2 -D_FILE_OFFSET_BITS=64 \
-		-D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE
+CFLAGS = -Wall -Wimplicit -Wformat -W -pedantic -pipe -g -O2 
+		-D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE
 CFLAGS += $(INCLUDE)
 libdir = $(PREFIX)/lib/.libs:$(PREFIX)/libpacketdump/.libs
 LDLIBS = -L$(PREFIX)/lib/.libs -L $(PREFIX)/libpacketdump/.libs -ltrace -lpacketdump
@@ -65,8 +65,8 @@ test-convert-all: test-convert
 	@rm -f traces/*.out.*
 	@LD_LIBRARY_PATH="$(libdir)" ./test-convert wtf pcap
 	@echo " * wtf -> wtf"
-	@rm -f traces/*.out.*
-	@LD_LIBRARY_PATH="$(libdir)" ./test-convert wtf wtf
+	#@rm -f traces/*.out.*
+	#@LD_LIBRARY_PATH="$(libdir)" ./test-convert wtf wtf
 	@echo " * duck -> duck"
 	@rm -f traces/*.out.*
 	@LD_LIBRARY_PATH="$(libdir)" ./test-convert duck duck
