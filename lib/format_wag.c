@@ -408,13 +408,15 @@ static int wtf_write_packet(libtrace_out_t *libtrace, const libtrace_packet_t *p
 	 * technically correct to read from the header and payload pointers
 	 */
 	if ((numbytes = libtrace_io_write(OUTPUT.file, packet->header, 
-				trace_get_framing_length(packet))) == -1) {
+				trace_get_framing_length(packet))) 
+			!=trace_get_framing_length(packet)) {
 		trace_set_err_out(libtrace,errno,
 				"write(%s)",packet->trace->uridata);
 		return -1;
 	}
 	if ((numbytes = libtrace_io_write(OUTPUT.file, packet->payload, 
-				trace_get_capture_length(packet)) == -1)) {
+				trace_get_capture_length(packet)) 
+				!= trace_get_capture_length(packet))) {
 		trace_set_err_out(libtrace,
 				errno,"write(%s)",packet->trace->uridata);
 		return -1;
