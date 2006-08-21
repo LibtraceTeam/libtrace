@@ -392,11 +392,15 @@ static libtrace_direction_t pcap_set_direction(libtrace_packet_t *packet,
 	libtrace_sll_header_t *sll;
 	promote_packet(packet);
 	sll=packet->payload;
+	/* sll->pkttype should be in the endianness of the host that the
+	 * trace was taken on.  this is impossible to achieve
+	 * so we assume host endianness
+	 */
 	if(dir==TRACE_DIR_OUTGOING)
-		sll->pkttype=TRACE_DIR_OUTGOING;
+		sll->pkttype=TRACE_SLL_OUTGOING;
 	else
-		sll->pkttype=TRACE_DIR_INCOMING;
-	return sll->pkttype;
+		sll->pkttype=TRACE_SLL_HOST;
+	return dir;
 }
 
 static libtrace_direction_t pcap_get_direction(const libtrace_packet_t *packet) {
@@ -423,10 +427,10 @@ static libtrace_direction_t pcap_get_direction(const libtrace_packet_t *packet) 
 			 * Note that in recent versions of pcap, you can
 			 * use "inbound" and "outbound" on ppp in linux
 			 */
-			if (ntohs(sll->pkttype == 0)) {
-				direction = TRACE_DIR_INCOMING;
-			} else {
+			if (sll->pkttype == TRACE_SLL_OUTGOING) {
 				direction = TRACE_DIR_OUTGOING;
+			} else {
+				direction = TRACE_DIR_INCOMING;
 			}
 			break;
 
