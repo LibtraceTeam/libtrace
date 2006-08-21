@@ -154,6 +154,8 @@ void promote_packet(libtrace_packet_t *packet)
 		packet->size+=sizeof(libtrace_sll_header_t);
 		((struct pcap_pkthdr*) packet->header)->caplen+=
 			sizeof(libtrace_sll_header_t);
+		((struct pcap_pkthdr*) packet->header)->len+=
+			sizeof(libtrace_sll_header_t);
 		return;
 	}
 }
@@ -178,6 +180,7 @@ bool demote_packet(libtrace_packet_t *packet)
 					/* Dunno how to demote this packet */
 					return false;
 			}
+			/* Skip the Linux SLL header */
 			packet->payload=(void*)((char*)packet->payload
 					+sizeof(libtrace_sll_header_t));
 			trace_set_capture_length(packet,
