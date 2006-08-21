@@ -154,7 +154,7 @@ static int duck_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	if (INPUT->dag_version == 0) {
 		/* Read in the duck version from the start of the trace */
 		if ((numbytes = libtrace_io_read(INPUT->file, &version, 
-					sizeof(version))) == sizeof(uint32_t)) {
+					sizeof(version))) != sizeof(uint32_t)) {
 			trace_set_err(libtrace, errno, 
 					"Reading DUCK version failed");
 			return -1;
