@@ -942,7 +942,13 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 		int type;
 		/* convert format - build up a new erf header */
 		/* Timestamp */
-		erfhdr.ts = trace_get_erf_timestamp(packet);
+		erfhdr.ts = bswap_host_to_le64(trace_get_erf_timestamp(packet));
+
+		/* Flags. Can't do this */
+		memset(&erfhdr.flags,1,sizeof(erfhdr.flags));
+		if (trace_get_direction(packet)!=-1)
+			erfhdr.flags.iface = trace_get_direction(packet);
+
 		/* Keep trying to simplify the packet until we can find 
 		 * something we can do with it */
 		do {
@@ -956,11 +962,6 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 			return -1;
 		}
 		erfhdr.type = type;
-		/* Flags. Can't do this */
-		memset(&erfhdr.flags,1,sizeof(erfhdr.flags));
-		if (trace_get_direction(packet)!=-1)
-			erfhdr.flags.iface = trace_get_direction(packet);
-
 		/* Packet length (rlen includes format overhead) */
 		assert(trace_get_capture_length(packet)>0 
 				&& trace_get_capture_length(packet)<=65536);
@@ -1007,7 +1008,7 @@ static libtrace_direction_t erf_set_direction(libtrace_packet_t *packet, libtrac
 static uint64_t erf_get_erf_timestamp(const libtrace_packet_t *packet) {
 	dag_record_t *erfptr = 0;
 	erfptr = (dag_record_t *)packet->header;
-	return erfptr->ts;
+	return bswap_le_to_host64(erfptr->ts);
 }
 
 static int erf_get_capture_length(const libtrace_packet_t *packet) {
