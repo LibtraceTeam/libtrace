@@ -103,7 +103,7 @@
 #define MAXOPTS 1024
 
 
-static struct libtrace_format_t *formats_list = 0;
+static struct libtrace_format_t *formats_list = NULL;
 
 /* strncpy is not assured to copy the final \0, so we
  * will use our own one that does
