@@ -630,7 +630,7 @@ static struct libtrace_format_t wag_trace = {
 };
 
 
-void CONSTRUCTOR wag_constructor() {
+void wag_constructor() {
 	register_format(&wag);
 	register_format(&wag_trace);
 }

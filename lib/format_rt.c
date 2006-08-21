@@ -699,6 +699,6 @@ static struct libtrace_format_t rt = {
 	NULL				/* next pointer */
 };
 
-void CONSTRUCTOR rt_constructor() {
+void rt_constructor() {
 	register_format(&rt);
 }

@@ -601,7 +601,7 @@ static struct libtrace_format_t pcapint = {
 	NULL				/* next pointer */
 };
 
-void CONSTRUCTOR pcap_constructor() {
+void pcap_constructor() {
 	register_format(&pcap);
 	register_format(&pcapint);
 }

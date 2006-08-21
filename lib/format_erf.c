@@ -1224,7 +1224,7 @@ static struct libtrace_format_t rtclient = {
 	NULL				/* next pointer */
 };
 
-void CONSTRUCTOR erf_constructor() {
+void erf_constructor() {
 	register_format(&rtclient);
 	register_format(&erf);
 #ifdef HAVE_DAG

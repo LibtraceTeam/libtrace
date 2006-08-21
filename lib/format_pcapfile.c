@@ -386,7 +386,7 @@ static struct libtrace_format_t pcapfile = {
 };
 
 
-void CONSTRUCTOR pcapfile_constructor() {
+void pcapfile_constructor() {
 	register_format(&pcapfile);
 }
 

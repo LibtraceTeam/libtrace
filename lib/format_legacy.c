@@ -323,7 +323,7 @@ static struct libtrace_format_t legacypos = {
 };
 
 	
-void CONSTRUCTOR legacy_constructor() {
+void legacy_constructor() {
 	register_format(&legacypos);
 	register_format(&legacyeth);
 	register_format(&legacyatm);

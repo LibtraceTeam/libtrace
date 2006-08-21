@@ -154,7 +154,7 @@ static int duck_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	if (INPUT->dag_version == 0) {
 		/* Read in the duck version from the start of the trace */
 		if ((numbytes = libtrace_io_read(INPUT->file, &version, 
-					sizeof(uint32_t))) == -1) {
+					sizeof(version))) == sizeof(uint32_t)) {
 			trace_set_err(libtrace, errno, 
 					"Reading DUCK version failed");
 			return -1;
@@ -162,7 +162,7 @@ static int duck_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 		if (numbytes == 0) {
 			return 0;
 		}
-		INPUT->dag_version = version;
+		INPUT->dag_version = bswap_le_to_host32(version);
 	}
 	
 
@@ -217,7 +217,7 @@ static int duck_write_packet(libtrace_out_t *libtrace,
 	if (OUTPUT->dag_version == 0) {
 	/* Writing the DUCK version will help with reading it back in later! */
 		if ((numbytes = libtrace_io_write(OUTPUT->file, &packet->type,
-					sizeof(uint32_t))) != sizeof(uint32_t)){
+				sizeof(packet->type))) != sizeof(uint32_t)){
 			trace_set_err_out(libtrace, errno, 
 					"Writing DUCK version failed");
 			return -1;
@@ -300,6 +300,6 @@ static struct libtrace_format_t duck = {
         NULL                            /* next pointer */
 };
 
-void CONSTRUCTOR duck_constructor() {
+void duck_constructor() {
 	register_format(&duck);
 }	
