@@ -117,6 +117,10 @@ static void *trace_get_payload_from_linux_sll(void *link,
 			break;
 		case ARPHRD_ETHER:
 			ret=trace_get_payload_from_ethernet(ret,type,remaining);
+			break;
+		default:
+			/* Unknown hardware type */
+			return NULL;
 	}
 
 	return ret;
@@ -236,6 +240,10 @@ libtrace_ip_t *trace_get_ip(libtrace_packet_t *packet)
 	ret=trace_get_vlan_payload_from_ethernet_payload(ret,&type,NULL);
 
 	if (!ret || type!=0x0800)
+		return NULL;
+
+	/* Not an IPv4 packet */
+	if (((libtrace_ip_t*)ret)->ip_v != 4)
 		return NULL;
 
 	return (libtrace_ip_t*)ret;
