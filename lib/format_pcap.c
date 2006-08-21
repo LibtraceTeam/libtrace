@@ -379,7 +379,7 @@ static libtrace_linktype_t pcap_get_link_type(const libtrace_packet_t *packet) {
 	/* pcap doesn't store dlt in the framing header so we need
 	 * rt to do it for us 
 	 */
-	linktype = rt_to_pcap_dlt(packet->type);
+	int linktype = rt_to_pcap_dlt(packet->type);
 	return pcap_dlt_to_libtrace(linktype);
 }
 

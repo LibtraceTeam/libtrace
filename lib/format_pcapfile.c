@@ -79,7 +79,8 @@ static uint16_t swaps(libtrace_t *libtrace, uint16_t num)
 	if (!DATA(libtrace))
 		return num;
 	if (DATA(libtrace)->header.magic_number == 0xd4c3b2a1)
-		return ((num<<8)&0xFF00)|((num>>8)&0x00FF);
+		return byteswap16(num);
+
 	return num;
 }
 
@@ -91,11 +92,8 @@ static uint32_t swapl(libtrace_t *libtrace, uint32_t num)
 	if (!DATA(libtrace))
 		return num;
 	if (DATA(libtrace)->header.magic_number == 0xd4c3b2a1)
-		return 
-			   ((num&0x000000FF)<<24)
-			|| ((num&0x0000FF00)<<8)
-			|| ((num&0x00FF0000)>>8)
-			|| ((num&0xFF000000)>>24);
+		return byteswap32(num);
+
 	return num;
 }
 
@@ -153,7 +151,8 @@ static int pcapfile_fin_input(libtrace_t *libtrace)
 	return 0; /* success */
 }
 
-static int pcapfile_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
+static int pcapfile_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
+{
 	int err;
 
 	assert(libtrace->format_data);
