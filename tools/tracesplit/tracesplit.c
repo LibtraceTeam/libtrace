@@ -181,6 +181,15 @@ int main(int argc, char *argv[])
 			free(buffer);
 		}
 
+		/* Some traces we have are padded (usually with 0x00), so 
+		 * lets sort that out now and truncate them properly
+		 */
+
+		if (trace_get_capture_length(packet) 
+			> trace_get_wire_length(packet)) {
+			trace_set_capture_length(packet,trace_get_wire_length(packet));
+		}
+
 		if (trace_write_packet(output,packet)==-1) {
 			trace_perror_output(output,"write_packet");
 			break;
