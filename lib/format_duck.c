@@ -47,9 +47,6 @@
 #define INPUT DATA(libtrace)
 #define OUTPUT DATAOUT(libtrace)
 
-
-static struct libtrace_format_t duck;
-
 struct duck_format_data_t {
 	char *path;
 	libtrace_io_t *file;
@@ -201,7 +198,8 @@ static int duck_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 }
 
 static int duck_write_packet(libtrace_out_t *libtrace, 
-				const libtrace_packet_t *packet) {
+		libtrace_packet_t *packet) 
+{
 
 	int numbytes = 0;
 	if (packet->type != RT_DUCK_2_4 && packet->type != RT_DUCK_2_5) {
@@ -227,7 +225,7 @@ static int duck_write_packet(libtrace_out_t *libtrace,
 	
 	if ((numbytes = libtrace_io_write(OUTPUT->file, packet->payload, 
 					trace_get_capture_length(packet))) !=
-				trace_get_capture_length(packet)) {
+				(int)trace_get_capture_length(packet)) {
 		trace_set_err_out(libtrace, errno, "Writing DUCK failed");
 		return -1;
 	}

@@ -180,7 +180,7 @@ static int pcapint_config_input(libtrace_t *libtrace,
 {
 	switch(option) {
 		case TRACE_OPTION_FILTER:
-			DATA(libtrace)->filter=data;
+			DATA(libtrace)->filter=(libtrace_filter_t*)data;
 			return 0;
 		case TRACE_OPTION_SNAPLEN:
 			DATA(libtrace)->snaplen=*(int*)data;
@@ -305,7 +305,9 @@ static int pcap_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	}
 }
 
-static int pcap_write_packet(libtrace_out_t *libtrace, const libtrace_packet_t *packet) {
+static int pcap_write_packet(libtrace_out_t *libtrace, 
+		libtrace_packet_t *packet) 
+{
 	struct pcap_pkthdr pcap_pkt_hdr;
 
 	if (!OUTPUT.trace.pcap) {
@@ -365,7 +367,9 @@ static int pcap_write_packet(libtrace_out_t *libtrace, const libtrace_packet_t *
 	return 0;
 }
 
-static int pcapint_write_packet(libtrace_out_t *libtrace, const libtrace_packet_t *packet) {
+static int pcapint_write_packet(libtrace_out_t *libtrace,
+		libtrace_packet_t *packet) 
+{
 	int err;
 
 	if (!OUTPUT.trace.pcap) {
@@ -497,7 +501,7 @@ static int pcap_get_wire_length(const libtrace_packet_t *packet) {
 		return pcapptr->len;
 }
 
-static int pcap_get_framing_length(const libtrace_packet_t *packet UNUSED) {
+static int pcap_get_framing_length(UNUSED const libtrace_packet_t *packet) {
 	return sizeof(struct pcap_pkthdr);
 }
 

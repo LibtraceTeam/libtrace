@@ -4,7 +4,7 @@
 #include <errno.h>
 
 struct libtrace_io_t {
-	gzFile *file;
+	gzFile file;
 };
 
 ssize_t libtrace_io_read(libtrace_io_t *io, void *buf, size_t len)
@@ -34,14 +34,14 @@ ssize_t libtrace_io_read(libtrace_io_t *io, void *buf, size_t len)
 
 libtrace_io_t *libtrace_io_fdopen(int fd, const char *mode)
 {
-	libtrace_io_t *io = malloc(sizeof(libtrace_io_t));
+	libtrace_io_t *io = (libtrace_io_t*)malloc(sizeof(libtrace_io_t));
 	io->file = gzdopen(fd,mode);
 	return io;
 }
 
 libtrace_io_t *libtrace_io_open(const char *path, const char *mode)
 {
-	libtrace_io_t *io = malloc(sizeof(libtrace_io_t));
+	libtrace_io_t *io = (libtrace_io_t*)malloc(sizeof(libtrace_io_t));
 	io->file = gzopen(path,mode);
 	return io;
 }

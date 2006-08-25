@@ -49,8 +49,6 @@
 #include <net/if.h>
 #include <sys/ioctl.h>
 
-static struct libtrace_format_t linuxnative;
-
 struct libtrace_format_data_t {
 	int fd;
 	int snaplen;
@@ -217,7 +215,7 @@ static int linuxnative_read_packet(libtrace_t *libtrace, libtrace_packet_t *pack
 	packet->type = RT_DATA_LINUX_NATIVE;
 	packet->payload = (char*)packet->buffer+sizeof(*hdr);
 
-	hdr=(void*)packet->buffer;
+	hdr=(struct libtrace_linuxnative_header*)packet->buffer;
 	socklen=sizeof(hdr->hdr);
 	snaplen=LIBTRACE_MIN(
 			(int)LIBTRACE_PACKET_BUFSIZE-(int)sizeof(*hdr),
@@ -226,7 +224,7 @@ static int linuxnative_read_packet(libtrace_t *libtrace, libtrace_packet_t *pack
 			(void*)packet->payload,
 			snaplen,
 			MSG_TRUNC,
-			(void *)&hdr->hdr,
+			(struct sockaddr *)&hdr->hdr,
 			&socklen);
 
 	if (hdr->wirelen==-1)
@@ -241,7 +239,7 @@ static int linuxnative_read_packet(libtrace_t *libtrace, libtrace_packet_t *pack
 }
 
 static int linuxnative_write_packet(libtrace_out_t *trace, 
-		const libtrace_packet_t *packet) 
+		libtrace_packet_t *packet) 
 {
 	struct sockaddr_ll hdr;
 
@@ -271,7 +269,7 @@ static libtrace_linktype_t linuxnative_get_link_type(const struct libtrace_packe
 			return TRACE_TYPE_NONE;
 		default: /* shrug, beyond me! */
 			printf("unknown type %x\n",linktype);
-			return -1;
+			return (libtrace_linktype_t)~0U;
 	}
 }
 
@@ -299,7 +297,8 @@ static int linuxnative_get_wire_length(const libtrace_packet_t *packet)
 	return ((struct libtrace_linuxnative_header*)(packet->buffer))->wirelen;
 }
 
-static int linuxnative_get_framing_length(const libtrace_packet_t *packet) 
+static int linuxnative_get_framing_length(UNUSED 
+		const libtrace_packet_t *packet) 
 {
 	return sizeof(struct libtrace_linuxnative_header);
 }

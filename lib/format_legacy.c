@@ -56,10 +56,6 @@
 #  define O_LARGEFILE 0
 #endif 
 
-static struct libtrace_format_t legacypos;
-static struct libtrace_format_t legacyeth;
-static struct libtrace_format_t legacyatm;
-
 #define DATA(x) ((struct legacy_format_data_t *)x->format_data)
 
 #define INPUT DATA(libtrace)->input

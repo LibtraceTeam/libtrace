@@ -107,12 +107,13 @@ void promote_packet(libtrace_packet_t *packet)
 			case TRACE_TYPE_NONE:
 			case TRACE_TYPE_ETH:
 				/* This should be easy, just prepend the header */
-				tmpbuffer= malloc(sizeof(libtrace_sll_header_t)
+				tmpbuffer= (char*)malloc(
+						sizeof(libtrace_sll_header_t)
 						+trace_get_capture_length(packet)
 						+trace_get_framing_length(packet)
 						);
 
-				hdr=(void*)((char*)tmpbuffer
+				hdr=(libtrace_sll_header_t*)((char*)tmpbuffer
 					+trace_get_framing_length(packet));
 
 				hdr->pkttype=TRACE_SLL_OUTGOING;

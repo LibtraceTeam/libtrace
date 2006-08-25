@@ -55,6 +55,8 @@
 #ifdef WIN32
 #  include <io.h>
 #  include <share.h>
+#else
+#  include <sys/ioctl.h>
 #endif
 
 static struct libtrace_format_t wag;
@@ -395,7 +397,8 @@ static int wtf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	
 }				
 	
-static int wtf_write_packet(libtrace_out_t *libtrace, const libtrace_packet_t *packet) {
+static int wtf_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *packet)
+{ 
 	int numbytes =0 ;
 	if (packet->trace->format != &wag_trace) {
 		trace_set_err_out(libtrace,TRACE_ERR_NO_CONVERSION,
@@ -409,14 +412,14 @@ static int wtf_write_packet(libtrace_out_t *libtrace, const libtrace_packet_t *p
 	 */
 	if ((numbytes = libtrace_io_write(OUTPUT.file, packet->header, 
 				trace_get_framing_length(packet))) 
-			!=trace_get_framing_length(packet)) {
+			!=(int)trace_get_framing_length(packet)) {
 		trace_set_err_out(libtrace,errno,
 				"write(%s)",packet->trace->uridata);
 		return -1;
 	}
 	if ((numbytes = libtrace_io_write(OUTPUT.file, packet->payload, 
 				trace_get_capture_length(packet)) 
-				!= trace_get_capture_length(packet))) {
+				!= (int)trace_get_capture_length(packet))) {
 		trace_set_err_out(libtrace,
 				errno,"write(%s)",packet->trace->uridata);
 		return -1;

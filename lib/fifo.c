@@ -71,7 +71,8 @@ struct tracefifo_t *create_tracefifo(size_t size)
 {
         /* Set up our fifo
         */
-        struct tracefifo_t *fifo = malloc(sizeof(struct tracefifo_t));
+        struct tracefifo_t *fifo = 
+		(struct tracefifo_t*)malloc(sizeof(struct tracefifo_t));
         assert(size > 0);
 
         fifo->length = size;
@@ -105,7 +106,7 @@ static void increment_pointer(struct tracefifo_t *fifo, enum which_t which, int 
         }
 }
 
-void tracefifo_flush(struct tracefifo_t *fifo UNUSED) {
+void tracefifo_flush(UNUSED struct tracefifo_t *fifo) {
         /* do nothing */
         return;
 }

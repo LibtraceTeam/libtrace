@@ -90,8 +90,6 @@ struct rt_format_data_t {
 	libtrace_t *dummy_linux;
 };
 
-static struct libtrace_format_t rt;
-
 static int rt_connect(libtrace_t *libtrace) {
         struct hostent *he;
         struct sockaddr_in remote;

@@ -636,9 +636,10 @@ DLLEXPORT void trace_destroy_packet(libtrace_packet_t *packet) {
 	if (packet->buf_control == TRACE_CTRL_PACKET) {
 		free(packet->buffer);
 	}
-	packet->buf_control='\0'; /* an "bad" value to force an assert
-				   * if this packet is ever reused
-				   */
+	packet->buf_control=(buf_control_t)'\0'; 
+				/* an "bad" value to force an assert
+				 * if this packet is ever reused
+				 */
 	free(packet);
 }	
 
@@ -684,8 +685,8 @@ DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 		} while(1);
 	}
 	trace_set_err(libtrace,TRACE_ERR_UNSUPPORTED,"This format does not support reading packets\n");
-	packet->size=-1;
-	return -1;
+	packet->size=~0U;
+	return ~0U;
 }
 
 /* Writes a packet to the specified output
@@ -831,7 +832,7 @@ DLLEXPORT size_t trace_get_capture_length(const libtrace_packet_t *packet) {
 	if (packet->trace->format->get_capture_length) {
 		return packet->trace->format->get_capture_length(packet);
 	}
-	return -1;
+	return ~0U;
 }
 	
 /* Get the size of the packet as it was seen on the wire.
@@ -849,7 +850,7 @@ DLLEXPORT size_t trace_get_wire_length(const libtrace_packet_t *packet){
 	if (packet->trace->format->get_wire_length) {
 		return packet->trace->format->get_wire_length(packet);
 	}
-	return -1;
+	return ~0U;
 
 }
 
@@ -866,7 +867,7 @@ size_t trace_get_framing_length(const libtrace_packet_t *packet) {
 	if (packet->trace->format->get_framing_length) {
 		return packet->trace->format->get_framing_length(packet);
 	}
-	return -1;
+	return ~0U;
 }
 
 
@@ -974,7 +975,7 @@ int trace_bpf_compile(libtrace_filter_t *filter,
 					"Packet has an unknown linktype");
 			return -1;
 		}
-		if (libtrace_to_pcap_dlt(linktype) == ~0U) {
+		if (libtrace_to_pcap_dlt(linktype) == -1) {
 			trace_set_err(packet->trace,TRACE_ERR_BAD_PACKET,
 					"Unknown pcap equivilent linktype");
 			return -1;
@@ -1023,7 +1024,7 @@ DLLEXPORT int trace_apply_filter(libtrace_filter_t *filter,
 	clen = trace_get_capture_length(packet);
 
 	assert(filter->flag);
-	return bpf_filter(filter->filter.bf_insns, linkptr, clen, clen);
+	return bpf_filter(filter->filter.bf_insns,(u_char*)linkptr,clen,clen);
 #else
 	fprintf(stderr,"This version of libtrace does not have bpf filter support\n");
 	return 0;
@@ -1043,7 +1044,7 @@ DLLEXPORT libtrace_direction_t trace_set_direction(libtrace_packet_t *packet,
 	if (packet->trace->format->set_direction) {
 		return packet->trace->format->set_direction(packet,direction);
 	}
-	return -1;
+	return (libtrace_direction_t)~0U;
 }
 
 /* Get the direction flag, if it has one
@@ -1062,7 +1063,7 @@ DLLEXPORT libtrace_direction_t trace_get_direction(const libtrace_packet_t *pack
 	if (packet->trace->format->get_direction) {
 		return packet->trace->format->get_direction(packet);
 	}
-	return -1;
+	return (libtrace_direction_t)~0U;
 }
 
 #define ROOT_SERVER(x) ((x) < 512)
@@ -1078,9 +1079,10 @@ DLLEXPORT libtrace_direction_t trace_get_direction(const libtrace_packet_t *pack
  * @param source the TCP or UDP source port
  * @param dest the TCP or UDP destination port
  * @returns a hint as to which port is the server port
- * @author Daniel Lawson
  */
-DLLEXPORT int8_t trace_get_server_port(uint8_t protocol UNUSED, uint16_t source, uint16_t dest) {
+DLLEXPORT int8_t trace_get_server_port(UNUSED uint8_t protocol, 
+		uint16_t source, uint16_t dest) 
+{
 	/*
 	 * * If the ports are equal, return DEST
 	 * * Check for well-known ports in the given protocol
@@ -1202,7 +1204,7 @@ DLLEXPORT size_t trace_set_capture_length(libtrace_packet_t *packet, size_t size
 		return caplen;
 	}
 
-	return -1;
+	return ~0U;
 }
 
 DLLEXPORT const char * trace_parse_uri(const char *uri, char **format) {

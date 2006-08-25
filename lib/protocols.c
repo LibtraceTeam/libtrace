@@ -639,7 +639,8 @@ DLLEXPORT struct sockaddr *trace_get_source_address(const libtrace_packet_t *pac
 		{
 			struct sockaddr_in *addr4=(struct sockaddr_in*)addr;
 			libtrace_ip_t *ip = (libtrace_ip_t*)l3;
-			ports = trace_get_payload_from_ip(ip,NULL,&remaining);
+			ports = (struct ports_t*)
+				trace_get_payload_from_ip(ip,NULL,&remaining);
 			addr4->sin_family=AF_INET;
 			if (ports && remaining>=sizeof(*ports))
 				addr4->sin_port=ports->src;
@@ -652,7 +653,8 @@ DLLEXPORT struct sockaddr *trace_get_source_address(const libtrace_packet_t *pac
 		{
 			struct sockaddr_in6 *addr6=(struct sockaddr_in6*)addr;
 			libtrace_ip6_t *ip6 = (libtrace_ip6_t*)l3;
-			ports = trace_get_payload_from_ip6(ip6,NULL,&remaining);
+			ports = (struct ports_t*)
+				trace_get_payload_from_ip6(ip6,NULL,&remaining);
 			addr6->sin6_family=AF_INET6;
 			if (ports && remaining>=sizeof(*ports))
 				addr6->sin6_port=ports->dst;
