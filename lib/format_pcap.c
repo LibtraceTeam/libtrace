@@ -325,6 +325,13 @@ static int pcap_write_packet(libtrace_out_t *libtrace, const libtrace_packet_t *
 			return -1;
 		}
 	}
+
+	/* Corrupt packet, or other "non data" packet, so skip it */
+	if (trace_get_link(packet) == NULL) {
+		/* Return "success", but nothing written */
+		return 0;
+	}
+
 	if (packet->trace->format == &pcap || 
 			packet->trace->format == &pcapint) {
 		pcap_dump((u_char*)OUTPUT.trace.dump,
@@ -340,7 +347,13 @@ static int pcap_write_packet(libtrace_out_t *libtrace, const libtrace_packet_t *
 		pcap_pkt_hdr.caplen = trace_get_capture_length(packet);
 		/* trace_get_wire_length includes FCS, while pcap doesn't */
 		if (trace_get_link_type(packet)==TRACE_TYPE_ETH)
-			pcap_pkt_hdr.len = trace_get_wire_length(packet)-4;
+			if (trace_get_wire_length(packet) >= 4) { 
+				pcap_pkt_hdr.len = 
+					trace_get_wire_length(packet)-4;
+			}
+			else {
+				pcap_pkt_hdr.len = 0;
+			}
 		else
 			pcap_pkt_hdr.len = trace_get_wire_length(packet);
 
