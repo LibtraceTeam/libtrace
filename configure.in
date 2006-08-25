@@ -65,7 +65,7 @@ fi
 
 # Checks for library functions.
 AC_PROG_GCC_TRADITIONAL
-AC_CHECK_FUNCS(socket strdup strlcpy)
+AC_CHECK_FUNCS(socket strdup strlcpy strcasecmp strncasecmp snprintf)
 
 AC_CHECK_SIZEOF([long int])
 
