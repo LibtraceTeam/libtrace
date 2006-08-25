@@ -84,8 +84,10 @@ void trace_dump_packet(struct libtrace_packet_t *packet)
 	char *link=(char *)trace_get_link(packet);
 
 	printf("%s",ctime(&sec));
-	decode_next(link,packet->size-trace_get_framing_length(packet),
-			"link",
+	if (!link) 
+		printf(" [No link layer available]\n");
+	else
+		decode_next(link,trace_get_capture_length(packet), "link",
 			trace_get_link_type(packet));
 }
 
