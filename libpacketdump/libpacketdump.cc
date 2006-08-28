@@ -173,6 +173,27 @@ void decode_next(char *packet,int len,char *proto_name,int type)
 		decoders[sname][type] = dec;
 	}
 
+	if (decoders[sname][type].func->decode_n == generic_decode) {
+		/* We can't decode a link, so lets skip that and see if libtrace
+		 * knows how to find us the ip header
+		 */
+		if (sname=="link") {
+			uint16_t newtype;
+			uint32_t newlen=len;
+			void *network=trace_get_payload_from_link(packet,
+					(libtrace_linktype_t)type,
+					&newtype,&newlen);
+			if (network) {
+				printf("skipping unknown link header of type %i to %i\n",type,newtype);
+				decode_next((char*)network,newlen,"eth",newtype);
+				return;
+			}
+		}
+		else {
+			printf("unknown protocol %s/%i\n",sname.c_str(),type);
+		}
+	}
+
 	// decode using the appropriate function
 	switch(decoders[sname][type].style)
 	{
