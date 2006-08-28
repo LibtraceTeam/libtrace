@@ -134,11 +134,13 @@ static int linuxnative_start_input(libtrace_t *libtrace)
 				socklen);
 	}
 
-	setsockopt(FORMAT(libtrace->format_data)->fd,
+	if (setsockopt(FORMAT(libtrace->format_data)->fd,
 			SOL_SOCKET,
 			SO_TIMESTAMP,
 			&one,
-			sizeof(one));
+			sizeof(one))==-1) {
+		perror("setsockopt(SO_TIMESTAMP)");
+	}
 
 	return 0;
 }
@@ -209,8 +211,8 @@ static int linuxnative_config_input(libtrace_t *libtrace,
 
 #define LIBTRACE_MIN(a,b) ((a)<(b) ? (a) : (b))
 
-/* 20 should be enough */
-#define CMSG_BUF_SIZE 20
+/* 20 isn't enough on x86_64 */
+#define CMSG_BUF_SIZE 128
 static int linuxnative_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) 
 {
 	struct libtrace_linuxnative_header *hdr;
@@ -263,7 +265,7 @@ static int linuxnative_read_packet(libtrace_t *libtrace, libtrace_packet_t *pack
 			cmsg = CMSG_NXTHDR(&msghdr, cmsg)) {
 		if (cmsg->cmsg_level == SOL_SOCKET
 			&& cmsg->cmsg_type == SO_TIMESTAMP
-			&& cmsg->cmsg_len == CMSG_LEN(sizeof(struct timeval))) {
+			&& cmsg->cmsg_len <= CMSG_LEN(sizeof(struct timeval))) {
 			memcpy(&hdr->ts, CMSG_DATA(cmsg),
 					sizeof(struct timeval));
 			break;
