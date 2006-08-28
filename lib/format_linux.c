@@ -48,6 +48,7 @@
 #include <string.h>
 #include <net/if.h>
 #include <sys/ioctl.h>
+#include <errno.h>
 
 struct libtrace_format_data_t {
 	int fd;
@@ -92,6 +93,7 @@ static int linuxnative_init_output(libtrace_out_t *libtrace)
 static int linuxnative_start_input(libtrace_t *libtrace)
 {
 	struct sockaddr_ll addr;
+	int one = 1;
 	memset(&addr,0,sizeof(addr));
 	FORMAT(libtrace->format_data)->fd = 
 				socket(PF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
@@ -131,6 +133,12 @@ static int linuxnative_start_input(libtrace_t *libtrace)
 				&mreq,
 				socklen);
 	}
+
+	setsockopt(FORMAT(libtrace->format_data)->fd,
+			SOL_SOCKET,
+			SO_TIMESTAMP,
+			&one,
+			sizeof(one));
 
 	return 0;
 }
@@ -201,11 +209,18 @@ static int linuxnative_config_input(libtrace_t *libtrace,
 
 #define LIBTRACE_MIN(a,b) ((a)<(b) ? (a) : (b))
 
+/* 20 should be enough */
+#define CMSG_BUF_SIZE 20
 static int linuxnative_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) 
 {
 	struct libtrace_linuxnative_header *hdr;
+	struct msghdr msghdr;
+	struct iovec iovec;
+	unsigned char controlbuf[CMSG_BUF_SIZE];
+	struct cmsghdr *cmsg;
 	socklen_t socklen;
 	int snaplen;
+
 	if (!packet->buffer || packet->buf_control == TRACE_CTRL_EXTERNAL) {
 		packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
 		packet->buf_control = TRACE_CTRL_PACKET;
@@ -220,19 +235,43 @@ static int linuxnative_read_packet(libtrace_t *libtrace, libtrace_packet_t *pack
 	snaplen=LIBTRACE_MIN(
 			(int)LIBTRACE_PACKET_BUFSIZE-(int)sizeof(*hdr),
 			(int)FORMAT(libtrace->format_data)->snaplen);
-	hdr->wirelen = recvfrom(FORMAT(libtrace->format_data)->fd,
-			(void*)packet->payload,
-			snaplen,
-			MSG_TRUNC,
-			(struct sockaddr *)&hdr->hdr,
-			&socklen);
 
-	if (hdr->wirelen==-1)
+	msghdr.msg_name = &hdr->hdr;
+	msghdr.msg_namelen = sizeof(struct sockaddr_ll);
+
+	msghdr.msg_iov = &iovec;
+	msghdr.msg_iovlen = 1;
+
+	msghdr.msg_control = &controlbuf;
+	msghdr.msg_controllen = CMSG_BUF_SIZE;
+	msghdr.msg_flags = 0;
+
+	iovec.iov_base = (void*)packet->payload;
+	iovec.iov_len = snaplen;
+
+	hdr->wirelen = recvmsg(FORMAT(libtrace->format_data)->fd, &msghdr, 0);
+
+	if (hdr->wirelen==-1) {
+		trace_set_err(libtrace,errno,"recvmsg");
 		return -1;
+	}
 
 	hdr->caplen=LIBTRACE_MIN(snaplen,hdr->wirelen);
 
-	if (ioctl(FORMAT(libtrace->format_data)->fd,SIOCGSTAMP,&hdr->ts)==-1)
+	for (cmsg = CMSG_FIRSTHDR(&msghdr);
+			cmsg != NULL;
+			cmsg = CMSG_NXTHDR(&msghdr, cmsg)) {
+		if (cmsg->cmsg_level == SOL_SOCKET
+			&& cmsg->cmsg_type == SO_TIMESTAMP
+			&& cmsg->cmsg_len == CMSG_LEN(sizeof(struct timeval))) {
+			memcpy(&hdr->ts, CMSG_DATA(cmsg),
+					sizeof(struct timeval));
+			break;
+		}
+	}
+
+	if (cmsg == NULL && ioctl(FORMAT(libtrace->format_data)->fd,
+				SIOCGSTAMP,&hdr->ts)==-1)
 		perror("ioctl(SIOCGSTAMP)");
 
 	return hdr->wirelen+sizeof(*hdr);
