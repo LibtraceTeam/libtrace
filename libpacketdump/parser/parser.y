@@ -6,9 +6,9 @@
     #include <sys/socket.h>
     #include <arpa/inet.h>
     #include <assert.h>
-    #include "grammar.h"
+    #include "parser/grammar.h"
     #include "libpacketdump.h"
-    #include "bitbuffer.h"
+    #include "parser/bitbuffer.h"
 
     #define YYERROR_VERBOSE 1
 
