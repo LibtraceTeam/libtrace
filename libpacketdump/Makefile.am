@@ -112,11 +112,11 @@ INCLUDES= @ADD_INCLS@ -I../lib -I../
 libpacketdump_la_LIBADD = @ADD_LIBS@ 
 libpacketdump_la_LDFLAGS=\
         -version-info @LIBTRACE_MAJOR@:@LIBTRACE_MINOR@:@LIBTRACE_MID@ \
-        @ADD_LDFLAGS@ \
-        -L./parser
+        @ADD_LDFLAGS@
 
 AM_CXXFLAGS=-g -Wall -DDIRNAME=\"$(plugindir)\" $(INCLUDES)
 
 EXTRA_DIST=lexer.l parser.y
 BUILT_SOURCES=parser.h
 AM_YFLAGS=-d
+

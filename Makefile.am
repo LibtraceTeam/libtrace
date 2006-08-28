@@ -1,7 +1,7 @@
 LIBPACKETDUMP_DIR = libpacketdump
 TOOLS_DIR = tools
 if LIBTRACE_SWIG
-SWIG_DIR = swig
+#SWIG_DIR = swig
 endif
 SUBDIRS = lib docs $(LIBPACKETDUMP_DIR) $(TOOLS_DIR) $(SWIG_DIR)
 
