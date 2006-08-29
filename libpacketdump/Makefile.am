@@ -103,7 +103,7 @@ libpacketdump_la_SOURCES = libpacketdump.cc \
 			parser/parser.y \
 			parser/bitbuffer.c \
 			parser/bitbuffer.h \
-			parser/grammer.h
+			parser/grammar.h
 
 plugin_LTLIBRARIES = $(BIN_PROTOCOLS)
 dist_plugin_DATA = $(TXT_PROTOCOLS)
@@ -116,7 +116,7 @@ libpacketdump_la_LDFLAGS=\
 
 AM_CXXFLAGS=-g -Wall -DDIRNAME=\"$(plugindir)\" $(INCLUDES)
 
-EXTRA_DIST=lexer.l parser.y
-BUILT_SOURCES=parser.h
+EXTRA_DIST=parser/lexer.l parser/parser.y
+BUILT_SOURCES=parser/parser.h
 AM_YFLAGS=-d
 
