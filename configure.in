@@ -17,7 +17,6 @@ AC_DEFINE([LIBTRACE_MID],${LIBTRACE_MID},[libtrace mid version])
 AC_DEFINE([LIBTRACE_MINOR],${LIBTRACE_MINOR},[libtrace minor version])
 
 AC_CONFIG_FILES([Makefile lib/Makefile docs/Makefile libpacketdump/Makefile
-	libpacketdump/parser/Makefile
 	tools/Makefile tools/traceanon/Makefile tools/tracedump/Makefile 
 	tools/tracemerge/Makefile tools/tracereport/Makefile 
 	tools/tracertstats/Makefile tools/tracesplit/Makefile 
