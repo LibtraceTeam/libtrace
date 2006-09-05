@@ -4,8 +4,8 @@ HEXDIGIT    [0-9A-Fa-f]
 
 %{
     #include <stdio.h>
-    #include "parser/grammar.h"
-    #include "parser/parser.h"
+    #include "grammar.h"
+    #include "parser.h"
 
     int yylex(void);
     int yyerror(char *s);
