@@ -309,7 +309,7 @@ static libtrace_linktype_t linuxnative_get_link_type(const struct libtrace_packe
 		case ARPHRD_PPP:
 			return TRACE_TYPE_NONE;
 		default: /* shrug, beyond me! */
-			printf("unknown Linux ARPHRD type %x\n",linktype);
+			printf("unknown Linux ARPHRD type 0x%04x\n",linktype);
 			return (libtrace_linktype_t)~0U;
 	}
 }
