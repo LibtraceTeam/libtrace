@@ -1,9 +1,9 @@
 LIBPACKETDUMP_DIR = libpacketdump
 TOOLS_DIR = tools
 if LIBTRACE_SWIG
-#SWIG_DIR = swig
+SWIG_DIR = swig
 endif
-SUBDIRS = lib docs $(LIBPACKETDUMP_DIR) $(TOOLS_DIR) $(SWIG_DIR)
+SUBDIRS = lib $(LIBPACKETDUMP_DIR) $(TOOLS_DIR) $(SWIG_DIR) docs
 
 ACLOCAL_AMFLAGS = -I m4
 AUTOMAKE_OPTIONS = 1.5
@@ -11,10 +11,8 @@ AUTOMAKE_OPTIONS = 1.5
 if HAS_DOXYGEN
 man_MANS = docs/doxygen/man/man3/trace*.3 docs/doxygen/man/man3/libtrace*.3 
 endif
-#man_MANS = @MANPAGES@
 EXTRA_DIST=examples libtrace.sln libtrace.vcproj test-convert.vcproj \
 		   test-format.vcproj test-pcap-bpf.vcproj
-#docs/html docs/latex docs/man $(man_MANS)
 
 .PHONY: docs
 
@@ -39,8 +37,5 @@ docs/doxygen/man/man3/*.3: docs
 else
 docs/doxygen/man/man3/*.3: 
 endif
-
-#docs:
-#	doxygen libtrace.doxygen
 
 install-man-hook: docs
