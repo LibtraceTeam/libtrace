@@ -1,3 +1,4 @@
+#ifdef HAVE_PCAP
 #include "config.h"
 
 #ifndef HAVE_PCAP_OPEN_DEAD
@@ -21,4 +22,5 @@ pcap_t *pcap_open_dead(int linktype, int snaplen) {
     p->linktype = linktype;
     return p;
 }
+#endif
 #endif
