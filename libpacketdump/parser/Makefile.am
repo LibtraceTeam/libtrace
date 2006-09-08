@@ -3,7 +3,7 @@
 # of the build process, therefore it needs no version informatino
 noinst_LIBRARIES = libparser.a
 libparser_a_SOURCES = lexer.l parser.y bitbuffer.c bitbuffer.h grammar.h
-libparser_a_LIBADD = @ADD_LIBS@ 
+#libparser_a_LIBADD = @ADD_LIBS@ 
 INCLUDES = @ADD_INCLS@ -I../ -I../../lib
 
 EXTRA_DIST=lexer.l parser.y

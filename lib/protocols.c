@@ -281,8 +281,9 @@ DLLEXPORT void *trace_get_payload_from_ip(libtrace_ip_t *ipptr, uint8_t *prot,
 {
         void *trans_ptr = 0;
 
-        if ((ipptr->ip_off & SW_IP_OFFMASK) != 0)
+        if ((ipptr->ip_off & SW_IP_OFFMASK) != 0) {
 		return NULL;
+	}
 
 	if (remaining) {
 		if (*remaining<(ipptr->ip_hl*4U)) {

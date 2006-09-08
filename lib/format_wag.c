@@ -449,7 +449,6 @@ static uint64_t wag_get_erf_timestamp(const libtrace_packet_t *packet) {
 static int wag_get_capture_length(const libtrace_packet_t *packet) {
 	
 	struct frame_t * wag_frame_data = (struct frame_t *)packet->header;
-
 	
 	if (wag_frame_data->subtype == FRAME_SUBTYPE_DATA_RX) {
 		struct frame_data_rx_t *wag_hdr = 
@@ -462,7 +461,7 @@ static int wag_get_capture_length(const libtrace_packet_t *packet) {
                        (struct frame_data_tx_t *)packet->header;
 		return ntohs(wag_hdr->txinfo.length);
 	}
-	
+
 	/* default option - not optimal as there tends to be an
 	 * extra 2 bytes floating around somewhere */
 	return ntohs(((struct frame_t *)packet->header)->size)
