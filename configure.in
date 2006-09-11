@@ -17,7 +17,6 @@ AC_DEFINE([LIBTRACE_MID],${LIBTRACE_MID},[libtrace mid version])
 AC_DEFINE([LIBTRACE_MINOR],${LIBTRACE_MINOR},[libtrace minor version])
 
 AC_CONFIG_FILES([Makefile lib/Makefile docs/Makefile libpacketdump/Makefile
-	libpacketdump/parser/Makefile
 	tools/Makefile tools/traceanon/Makefile tools/tracedump/Makefile 
 	tools/tracemerge/Makefile tools/tracereport/Makefile 
 	tools/tracertstats/Makefile tools/tracesplit/Makefile 
@@ -78,7 +77,7 @@ AC_REPLACE_FUNCS(strndup)
 # Checks for header files.
 AC_HEADER_STDC
 dnl AC_CHECK_HEADERS(errno.h stdlib.h stdio.h assert.h string.h netinet/in.h assert.h errno.h fcntl.h net/ethernet.h netdb.h pcap.h stdio.h stdlib.h string.h sys/stat.h sys/types.h sys/socket.h sys/un.h unistd.h time.h sys/ioctl.h net/bpf.h pcap.h zlib.h pcap-bpf.h)
-AC_CHECK_HEADERS(pcap.h pcap-int.h pcap-bpf.h net/bpf.h zlib.h sys/limits.h stddef.h inttypes.h limits.h net/ethernet.h )
+AC_CHECK_HEADERS(pcap.h pcap-int.h pcap-bpf.h net/bpf.h sys/limits.h stddef.h inttypes.h limits.h net/ethernet.h )
 
 AC_CHECK_HEADERS(netinet/in.h)
 AC_CHECK_HEADERS(netpacket/packet.h,[
