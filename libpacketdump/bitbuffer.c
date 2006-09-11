@@ -6,7 +6,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <arpa/inet.h>
-#include "../libpacketdump.h"
+#include "libpacketdump.h"
 
 uint16_t bits;
 /* "the largest possible type the compiler supports" */

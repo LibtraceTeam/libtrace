@@ -1,4 +1,3 @@
-SUBDIRS=parser
 lib_LTLIBRARIES = libpacketdump.la
 include_HEADERS = libpacketdump.h
 
@@ -100,16 +99,18 @@ ip_33_la_LDFLAGS=-module
 ip_132_la_LDFLAGS=-module
 
 libpacketdump_la_SOURCES = libpacketdump.cc \
-			parser/libparser.la
+			lexer.l parser.y bitbuffer.c bitbuffer.h grammar.h
 
 plugin_LTLIBRARIES = $(BIN_PROTOCOLS)
 dist_plugin_DATA = $(TXT_PROTOCOLS)
 
-INCLUDES= @ADD_INCLS@ -I../lib -I../
-libpacketdump_la_LIBADD = @ADD_LIBS@ parser/libparser.a @LIBFLEX@
+INCLUDES= @ADD_INCLS@ -I../lib 
+libpacketdump_la_LIBADD = @ADD_LIBS@ @LIBFLEX@
 libpacketdump_la_LDFLAGS=\
         -version-info @LIBTRACE_MAJOR@:@LIBTRACE_MINOR@:@LIBTRACE_MID@ \
         @ADD_LDFLAGS@
 
 AM_CXXFLAGS=-g -Wall -DDIRNAME=\"$(plugindir)\" $(INCLUDES)
-
+BUILT_SOURCES=parser.h
+AM_YFLAGS=-d
+EXTRA_DIST=lexer.l parser.y
