@@ -55,7 +55,7 @@ DLLEXPORT void *trace_get_radiotap_field(void *link, libtrace_radiotap_field_t f
     
     /* Check if the field exists in the radiotap header before proceeding
      */
-    if (rtap->it_present & (1 << field) == 0) return NULL;
+    if ((rtap->it_present & (1 << field)) == 0) return NULL;
 
     /* Skip over any extended bitmasks */
     p = (uint8_t *) &(rtap->it_present);
