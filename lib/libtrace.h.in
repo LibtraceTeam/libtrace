@@ -268,7 +268,7 @@ typedef enum {
     TRACE_RADIOTAP_DB_ANTSIGNAL = 12, /**< Signal power in dB from a fixed reference (uint8) */
     TRACE_RADIOTAP_DB_ANTNOISE = 13, /**< Noise power in dB from a fixed reference (uint8) */
     TRACE_RADIOTAP_FCS = 14, /**< Received frame check sequence (uint32) */
-    TRACE_RADIOTAP_EXT = 31,
+    TRACE_RADIOTAP_EXT = 31
 } libtrace_radiotap_field_t;
 
 
