@@ -259,7 +259,7 @@ DLLEXPORT bool trace_get_wireless_channel_flags(void *link,
              */
             if (p = (uint16_t *) trace_get_radiotap_field(link,
                     TRACE_RADIOTAP_CHANNEL)) {
-                *flags = bswap_le_to_host16(*(p++));
+                *flags = bswap_le_to_host16(*(++p));
                 return true;
             } else break;
     }
@@ -295,7 +295,7 @@ DLLEXPORT bool trace_get_wireless_fhss_hoppattern(void *link,
         case TRACE_TYPE_80211_RADIO:
             if(p = (uint8_t *) trace_get_radiotap_field(link,
                     TRACE_RADIOTAP_FHSS)) {
-                *hoppattern = *(p++);
+                *hoppattern = *(++p);
                 return true;
             } else break;
     }
