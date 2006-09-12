@@ -19,7 +19,7 @@ libtrace_la_SOURCES = $(LIBTRACEIO) trace.c fifo.c fifo.h common.h \
 		format_rt.c format_helper.c format_helper.h format_pcapfile.c \
 		format_duck.c $(NATIVEFORMATS) \
 		parse_cmd.c parse_cmd.h libtrace_int.h lt_inttypes.h \
-		linktypes.c protocols.c libtraceio.h 
+		linktypes.c protocols.c libtraceio.h link_wireless.c 
 
 if DAG2_4
 nodist_libtrace_la_SOURCES = dagopts.c dagapi.c

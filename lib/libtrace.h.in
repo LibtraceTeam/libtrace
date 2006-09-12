@@ -216,7 +216,8 @@ typedef enum {
 	TRACE_DLT_ATM_RFC1483 = 11,
 	TRACE_DLT_IEEE802_11 = 105,
 	TRACE_DLT_LINUX_SLL = 113,
-	TRACE_DLT_PFLOG = 117
+	TRACE_DLT_PFLOG = 117,
+    TRACE_DLT_IEEE802_11_RADIO = 127 /**< Radiotap */
 } libtrace_dlt_t ;
 
 /** Enumeration of link layer types supported by libtrace */
@@ -235,7 +236,8 @@ typedef enum {
     /* TRACE_TYPE_LEGACY_ETH 		Obsolete */
        TRACE_TYPE_80211_PRISM = 12,
        TRACE_TYPE_AAL5 = 13,
-       TRACE_TYPE_DUCK = 14		/**< Pseudo link layer for DUCK packets */
+       TRACE_TYPE_DUCK = 14,		/**< Pseudo link layer for DUCK packets */
+       TRACE_TYPE_80211_RADIO = 15 /**< Radiotap + 802.11 */
      } libtrace_linktype_t;
 
 /** Trace directions 
@@ -248,6 +250,27 @@ typedef enum {
 	TRACE_DIR_INCOMING = 1,		/**< Packets originating "inside" */
 	TRACE_DIR_OTHER	   = 2		/**< Packets with an unknown direction, or one that's unknown */
 } libtrace_direction_t;
+
+/** Enumeration of Radiotap fields */
+typedef enum {
+    TRACE_RADIOTAP_TSFT = 0, /**< Timer synchronisation function, in microseconds (uint64) */
+    TRACE_RADIOTAP_FLAGS = 1, /**< Wireless flags (uint8) */
+    TRACE_RADIOTAP_RATE = 2, /**< Bitrate in units of 500kbps (uint8) */
+    TRACE_RADIOTAP_CHANNEL = 3, /**< Frequency in MHz (uint16) and channel flags (uint16) */
+    TRACE_RADIOTAP_FHSS = 4, /**< FHSS hop set (uint8) and hopping pattern (uint8) */
+    TRACE_RADIOTAP_DBM_ANTSIGNAL = 5, /**< Signal power in dBm (int8) */
+    TRACE_RADIOTAP_DBM_ANTNOISE = 6, /**< Noise power in dBm (int8) */
+    TRACE_RADIOTAP_LOCK_QUALITY = 7, /**< Barker Code lock quality (uint16) */
+    TRACE_RADIOTAP_TX_ATTENUATION = 8, /**< TX attenuation as unitless distance from max power (uint16) */
+    TRACE_RADIOTAP_DB_TX_ATTENUATION = 9, /**< TX attenutation as dB from max power (uint16) */
+    TRACE_RADIOTAP_DBM_TX_POWER = 10, /**< TX Power in dBm (int8) */
+    TRACE_RADIOTAP_ANTENNA = 11, /**< Antenna frame was rx'd or tx'd on (uint8) */
+    TRACE_RADIOTAP_DB_ANTSIGNAL = 12, /**< Signal power in dB from a fixed reference (uint8) */
+    TRACE_RADIOTAP_DB_ANTNOISE = 13, /**< Noise power in dB from a fixed reference (uint8) */
+    TRACE_RADIOTAP_FCS = 14, /**< Received frame check sequence (uint32) */
+    TRACE_RADIOTAP_EXT = 31,
+} libtrace_radiotap_field_t;
+
 
 /** @name Protocol structures
  * These convenience structures are here as they are portable ways of dealing
@@ -465,6 +488,21 @@ typedef struct libtrace_80211_t {
         uint16_t     SeqCtl;
         uint8_t      mac4[6];
 } PACKED libtrace_80211_t;
+
+/** The Radiotap header pre-amble
+ *
+ * All Radiotap headers start with this pre-amble, followed by the fields
+ * specified in the it_present bitmask. If bit 31 of it_present is set, then
+ * another bitmask follows.
+ * NB: All of the radiotap data fields are in little-endian byte-order.
+ */
+typedef struct libtrace_radiotap_t {
+    uint8_t     it_version; /**< Radiotap version */
+    uint8_t     it_pad; /**< Padding for natural alignment */
+    uint16_t    it_len; /**< Length in bytes of the entire Radiotap header */
+    uint32_t    it_present; /**< Which Radiotap fields are present */
+} libtrace_radiotap_t;
+
 
 #ifdef WIN32
 #pragma pack(pop)
@@ -814,7 +852,45 @@ DLLEXPORT void *trace_get_payload_from_ip(libtrace_ip_t *ip, uint8_t *proto,
 		uint32_t *remaining);
 
 
-/** Gets a pointer to the payload given a pointer to the IP header
+/** Gets a pointer to the payload given a pointer to the Radiotap header
+ * @param link a pointer to the Radiotap header
+ * @param[out] type	An output variable of the ethernet type
+ * @param[in,out] remaining Updated with the number of bytes remaining
+ *
+ * @return a pointer to the 802.11 header, or NULL if header isn't
+ * present.
+ *
+ * Remaining may be NULL.  If Remaining is not NULL it must point to the number
+ * of bytes captured of the linklayer and beyond.  It will be updated after
+ * this function to the number of bytes remaining after the Radiotap header has been 
+ * removed.
+ *
+ * type may be NULL if not needed.
+ */
+DLLEXPORT void *trace_get_payload_from_radiotap(void *link,
+		uint16_t *type, uint32_t *remaining);
+
+
+/** Gets a pointer to the payload given a pointer to the Prism monitoring header
+ * @param link a pointer to the Prism monitoring header
+ * @param[out] type	An output variable of the ethernet type
+ * @param[in,out] remaining Updated with the number of bytes remaining
+ *
+ * @return a pointer to the 802.11 header, or NULL if header isn't
+ * present.
+ *
+ * Remaining may be NULL.  If Remaining is not NULL it must point to the number
+ * of bytes captured of the linklayer and beyond.  It will be updated after
+ * this function to the number of bytes remaining after the Radiotap header has been 
+ * removed.
+ *
+ * type may be NULL if not needed.
+ */
+DLLEXPORT void *trace_get_payload_from_prism(void *link,
+		uint16_t *type, uint32_t *remaining);
+
+
+/** Gets a pointer to the payload given a pointer to the link header
  * @param ip            The link pointer
  * @param[out] type	An output variable of the ethernet type
  * @param[in,out] remaining Updated with the number of bytes remaining
@@ -828,6 +904,7 @@ DLLEXPORT void *trace_get_payload_from_ip(libtrace_ip_t *ip, uint8_t *proto,
  * IP options) have been removed.
  *
  * type may be NULL if not needed.
+ *
  */
 DLLEXPORT void *trace_get_payload_from_link(void *link,
 		libtrace_linktype_t linktype, 
@@ -1298,6 +1375,198 @@ DLLEXPORT
 void trace_construct_packet(libtrace_packet_t *packet,
 		libtrace_linktype_t linktype, const void *data, uint16_t len);
 
+/*@}*/
+
+/** @name Wireless trace support
+ * Functions to access wireless information from packets that have wireless
+ * monitoring headers such as Radiotap or Prism.
+ * 
+ * The trace_get_wireless_* functions provide an abstract interface for
+ * retrieving information from wireless traces. They take a pointer to the
+ * wireless monitoring header (usually found with trace_get_link(packet)) and
+ * the linktype of the header passed in.
+ * 
+ * All of the trace_get_wireless_* functions return false if the requested
+ * information was unavailable, or true if it was. The actual data is stored
+ * in an output variable supplied by the caller. Values returned into the 
+ * output variable will always be returned in host byte order.
+ * @{
+ */
+
+
+#ifndef ARPHRD_80211_RADIOTAP
+/* libc doesn't define this yet, but it seems to be what everyone is using
+ */
+#define ARPHRD_80211_RADIOTAP 803
+#endif
+
+/** Get the wireless Timer Syncronisation Function
+ *
+ * Gets the value of the timer syncronisation function for this frame, which
+ * is a value in microseconds indicating the time that the first bit of the
+ * MPDU was received by the MAC.
+ *
+ * @param link the wireless header
+ * @param linktype the linktype of the wireless header passed in 
+ * @param[out] tsft the value of the timer syncronisation function. 
+ * @return true if the field was available, false if not.
+ */
+DLLEXPORT bool trace_get_wireless_tsft(void *link,
+        libtrace_linktype_t linktype, uint64_t *tsft);
+
+/** Get the wireless flags 
+ * @param link the wireless header
+ * @param linktype the linktype of the wireless header passed in
+ * @param[out] flags the wireless flags.
+ * @return true if the field was available, false if not.
+ */
+DLLEXPORT bool trace_get_wireless_flags(void *link,
+        libtrace_linktype_t linktype, uint8_t *flags);
+
+/** Get the wireless rate 
+ * @param link the wireless header
+ * @param linktype the linktype of the wireless header passed in
+ * @param[out] rate the data-rate of the frame in units of 500kbps
+ * @return true if the field was available, false if not.
+ */
+DLLEXPORT bool trace_get_wireless_rate(void *link,
+        libtrace_linktype_t linktype, uint8_t *rate);
+
+/** Get the wireless channel frequency
+ * @param link the wireless header
+ * @param linktype the linktype of the wireless header passed in
+ * @param[out] freq the frequency in MHz of the channel the frame was transmitted
+ * or received on.
+ * @return true if the field was available, false if not.
+ */
+DLLEXPORT bool trace_get_wireless_freq(void *link,
+        libtrace_linktype_t linktype, uint16_t *freq);
+
+/** Get the wireless channel flags
+ * @param link the wireless header
+ * @param linktype the linktype of the wireless header passed in
+ * @param[out] flags the channel flags
+ * @return true if the field was available, false if not.
+ */
+DLLEXPORT bool trace_get_wireless_channel_flags(void *link,
+        libtrace_linktype_t linktype, uint16_t *flags);
+
+/** Get the wireless FHSS Hop Set 
+ * @param link the wireless header
+ * @param linktype the linktype of the wireless header passed in
+ * @param[out] hopset the fhss hop set
+ * @return true if the field was available, false if not.
+ */
+DLLEXPORT bool trace_get_wireless_fhss_hopset(void *link,
+        libtrace_linktype_t linktype, uint8_t *hopset);
+        
+/** Get the wireless FHSS Hop Pattern 
+ * @param link the wireless header
+ * @param linktype the linktype of the wireless header passed in
+ * @param[out] hoppattern the fhss hoppattern
+ * @return true if the field was available, false if not.
+ */
+DLLEXPORT bool trace_get_wireless_fhss_hoppattern(void *link,
+        libtrace_linktype_t linktype, uint8_t *hoppattern);
+
+/** Get the wireless signal strength in dBm 
+ * @param link the wireless header
+ * @param linktype the linktype of the wireless header passed in
+ * @param[out] strength the RF signal power at the antenna, in dB difference
+ * from 1mW.
+ * @return true if the field was available, false if not.
+ */
+DLLEXPORT bool trace_get_wireless_signal_strength_dbm(void *link,
+        libtrace_linktype_t linktype, int8_t *strength);
+
+/** Get the wireless noise strength in dBm
+ * @param link the wireless header
+ * @param linktype the linktype of the wireless header passed in
+ * @param[out] strength the RF noise power at the antenna, in dB difference 
+ * from 1mW. 
+ * @return true if the field was available, false if not.
+ */
+DLLEXPORT bool trace_get_wireless_noise_strength_dbm(void *link,
+        libtrace_linktype_t linktype, int8_t *strength);
+
+/** Get the wireless signal strength in dB
+ * @param link the wireless header
+ * @param linktype the linktype of the wireless header passed in
+ * @param[out] strength the RF signal power at the antenna,in dB difference 
+ * from a fixed reference. 
+ * @return true if the field was available, false if not.
+ */
+DLLEXPORT bool trace_get_wireless_signal_strength_db(void *link,
+        libtrace_linktype_t linktype, uint8_t *strength);
+
+/** Get the wireless noise strength in dB 
+ * @param link the wireless header
+ * @param linktype the linktype of the wireless header passed in
+ * @param[out] strength the RF noise power at the antenna, in dB difference 
+ * from a fixed reference. 
+ * @return true if the field was available, false if not.
+ */
+DLLEXPORT bool trace_get_wireless_noise_strength_db(void *link,
+        libtrace_linktype_t linktype, uint8_t *strength);
+
+/** Get the wireless Barker code lock quality 
+ * @param link the wireless header
+ * @param linktype the linktype of the wireless header passed in
+ * @param[out] quality the quality of the Barker Code lock.
+ * @return true if the field was available, false if not.
+ */
+DLLEXPORT bool trace_get_wireless_lock_quality(void *link,
+        libtrace_linktype_t linktype, uint16_t *quality);
+
+/** Get the wireless transmit attenuation 
+ * @param link the wireless header
+ * @param linktype the linktype of the wireless header passed in
+ * @param[out] attenuation the transmit power as a unitless distance from maximum 
+ * power set at factory calibration. 0 indicates maximum transmission power.
+ * @return true if the field was available, false if not.
+ */
+DLLEXPORT bool trace_get_wireless_tx_attenuation(void *link,
+        libtrace_linktype_t linktype, uint16_t *attenuation);
+
+/** Get the wireless transmit attenuation in dB
+ * @param link the wireless header
+ * @param linktype the linktype of the wireless header passed in
+ * @param[out] attenuation the transmit power as dB difference from maximum power 
+ * set at factory calibration. 0 indicates maximum power.
+ * @return true if the field was available, false if not.
+ */
+DLLEXPORT bool trace_get_wireless_tx_attenuation_db(void *link,
+        libtrace_linktype_t linktype, uint16_t *attenuation);
+
+/** Get the wireless transmit power in dBm 
+ * @param link the wireless header
+ * @param linktype the linktype of the wireless header passed in
+ * @param[out] txpower the transmit power as dB from a 1mW reference. This is the 
+ * absolute power level measured at the antenna port.
+ * @return true if the field was available, false if not.
+ */
+DLLEXPORT bool trace_get_wireless_tx_power_dbm(void *link,
+        libtrace_linktype_t linktype, int8_t *txpower);
+
+/** Get the wireless antenna 
+ * @param link the wireless header
+ * @param linktype the linktype of the wireless header passed in
+ * @param[out] antenna which antenna was used to transmit or receive the frame.
+ * @return true if the field was available, false if not.
+ */
+DLLEXPORT bool trace_get_wireless_antenna(void *link,
+        libtrace_linktype_t linktype, uint8_t *antenna);
+
+/** Get the wireless Frame Check Sequence field
+ * @param link the wireless header
+ * @param linktype the linktype of the wireless header passed in
+ * @param[out] fcs the Frame Check Sequence of the frame. 
+ * @return true if the field was available, false if not.
+ */
+DLLEXPORT bool trace_get_wireless_fcs(void *link,
+        libtrace_linktype_t linktype, uint32_t *fcs);
+
+/*@}*/
 
 #ifdef __cplusplus
 } /* extern "C" */

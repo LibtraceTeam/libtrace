@@ -170,7 +170,7 @@ static void *trace_get_payload_from_pflog(void *link,
 		uint16_t *type, uint32_t *remaining)
 {
 	libtrace_pflog_header_t *pflog = (libtrace_pflog_header_t*)link;
-	if (remaining) {
+    if (remaining) {
 		if (*remaining<sizeof(*pflog)) 
 			return NULL;
 		*remaining-=sizeof(*pflog);
@@ -187,13 +187,49 @@ static void *trace_get_payload_from_pflog(void *link,
 	return (void*)((char*)pflog+ sizeof(*pflog));
 }
 
+/* Returns the 'payload' of the prism header, which is the 802.11 frame */
+static void *trace_get_payload_from_prism (void *link,
+        uint16_t *type, uint32_t *remaining)
+{
+    if (remaining) {
+        if (*remaining<144) 
+            return NULL;
+        *remaining-=144;
+    }
+
+    if (type) *type = 0;
+
+    return (void *) ((char*)link+144);
+}
+
+/* Returns the 'payload' of the radiotap header, which is the 802.11 frame */
+static void *trace_get_payload_from_radiotap (void *link, 
+        uint16_t *type, uint32_t *remaining)
+{
+    struct libtrace_radiotap_t *rtap = (struct libtrace_radiotap_t*)link;
+    if (remaining) {
+		if (*remaining<rtap->it_len) 
+			return NULL;
+		*remaining-=rtap->it_len;
+	}
+
+	if (type) *type = 0;
+    
+	return (void*) ((char*)link + rtap->it_len);
+}
+        
 void *trace_get_payload_from_link(void *link, libtrace_linktype_t linktype, 
 		uint16_t *type, uint32_t *remaining)
 {
+    void *l;
+    
 	switch(linktype) {
 		case TRACE_TYPE_80211_PRISM:
-			return trace_get_payload_from_80211((char*)link+144,
-					type,remaining);
+            l = trace_get_payload_from_prism(link,type,remaining);
+            l ? trace_get_payload_from_80211(l,type,remaining) : NULL;
+        case TRACE_TYPE_80211_RADIO:
+            l = trace_get_payload_from_radiotap(link,type,remaining);
+            l ? trace_get_payload_from_80211(l,type,remaining) : NULL ;
 		case TRACE_TYPE_80211:
 			return trace_get_payload_from_80211(link,type,remaining);
 		case TRACE_TYPE_ETH:
