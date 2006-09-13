@@ -9,7 +9,7 @@ CFLAGS += $(INCLUDE)
 libdir = $(PREFIX)/lib/.libs:$(PREFIX)/libpacketdump/.libs
 LDLIBS = -L$(PREFIX)/lib/.libs -L$(PREFIX)/libpacketdump/.libs -ltrace -lpacketdump -lfl
 
-BINS = test-pcap-bpf test-event test-time test-dir  #test-seek 
+BINS = test-pcap-bpf test-event test-time test-dir test-wireless #test-seek 
 
 .PHONY: all clean distclean install depend test
 
