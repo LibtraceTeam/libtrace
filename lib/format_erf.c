@@ -727,6 +727,7 @@ static int erf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 				libtrace->uridata);
 		return -1;
 	}
+	/* EOF */
 	if (numbytes == 0) {
 		return 0;
 	}
@@ -819,14 +820,14 @@ static int rtclient_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 		}
 		/* Read status byte */
 		if (tracefifo_out_read(libtrace->fifo,
-				&status, sizeof(uint32_t)) == 0) {
+				&status, sizeof(uint32_t)) != sizeof(uint32_t)){
 			read_required = 1;
 			continue;
 		}
 		tracefifo_out_update(libtrace->fifo,sizeof(uint32_t));
 		/* Read in packet size */
 		if (tracefifo_out_read(libtrace->fifo,
-				&size, sizeof(uint32_t)) == 0) {
+				&size, sizeof(uint32_t)) != sizeof(uint32_t)) {
 			tracefifo_out_reset(libtrace->fifo);
 			read_required = 1;
 			continue;
@@ -844,7 +845,7 @@ static int rtclient_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 		
 		/* read in the full packet */
 		if ((numbytes = tracefifo_out_read(libtrace->fifo, 
-						buffer, size)) == 0) {
+						buffer, size)) != size) {
 			tracefifo_out_reset(libtrace->fifo);
 			read_required = 1;
 			continue;
