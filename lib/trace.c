@@ -1292,6 +1292,8 @@ DLLEXPORT void trace_perror_output(libtrace_out_t *trace,const char *msg,...)
 	} else {
 		fprintf(stderr,"%s(%s): No error\n",buf,trace->uridata);
 	}
+	trace->err.err_num = TRACE_ERR_NOERROR; /* "OK" */
+	trace->err.problem[0]='\0';
 }
 
 DLLEXPORT int trace_seek_erf_timestamp(libtrace_t *trace, uint64_t ts)
