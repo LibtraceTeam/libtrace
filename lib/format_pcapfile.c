@@ -40,8 +40,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <fcntl.h>
 
 #define DATA(x) ((struct pcapfile_format_data_t*)((x)->format_data))
+#define DATAOUT(x) ((struct pcapfile_format_data_out_t*)((x)->format_data))
 
 typedef struct pcapfile_header_t {
 		uint32_t magic_number;   /* magic number */
@@ -60,6 +62,8 @@ struct pcapfile_format_data_t {
 
 struct pcapfile_format_data_out_t {
 	libtrace_io_t *file;
+	int level;
+	int flag;
 
 };
 
@@ -67,6 +71,17 @@ static int pcapfile_init_input(libtrace_t *libtrace) {
 	libtrace->format_data = malloc(sizeof(struct pcapfile_format_data_t));
 
 	DATA(libtrace)->file=NULL;
+
+	return 0;
+}
+
+static int pcapfile_init_output(libtrace_out_t *libtrace) {
+	libtrace->format_data = 
+		malloc(sizeof(struct pcapfile_format_data_out_t));
+
+	DATAOUT(libtrace)->file=NULL;
+	DATAOUT(libtrace)->level=0;
+	DATAOUT(libtrace)->flag=O_CREAT|O_WRONLY;
 
 	return 0;
 }
@@ -135,6 +150,11 @@ static int pcapfile_start_input(libtrace_t *libtrace)
 	return 0;
 }
 
+static int pcapfile_start_output(libtrace_out_t *libtrace)
+{
+	return 0;
+}
+
 static int pcapfile_config_input(libtrace_t *libtrace,
 		trace_option_t option,
 		void *data)
@@ -149,6 +169,23 @@ static int pcapfile_fin_input(libtrace_t *libtrace)
 	libtrace_io_close(DATA(libtrace)->file);
 	free(libtrace->format_data);
 	return 0; /* success */
+}
+
+static int pcapfile_fin_output(libtrace_out_t *libtrace)
+{
+	libtrace_io_close(DATA(libtrace)->file);
+	free(libtrace->format_data);
+	libtrace->format_data=NULL;
+	return 0; /* success */
+}
+
+static int pcapfile_config_output(libtrace_out_t *libtrace,
+		trace_option_t option,
+		void *data)
+{
+	trace_set_err_out(libtrace,TRACE_ERR_UNKNOWN_OPTION,
+			"Unknown option %i", option);
+	return -1;
 }
 
 static int pcapfile_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
@@ -202,24 +239,59 @@ static int pcapfile_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 		+swapl(libtrace,((libtrace_pcapfile_pkt_hdr_t*)packet->buffer)->caplen);
 }
 
-#if 0
-static void pcapfile_write_packet(libtrace_out_t *out,
-		const libtrace_packet_t *packet)
+static int pcapfile_write_packet(libtrace_out_t *out,
+		libtrace_packet_t *packet)
 {
-	struct pcapfile_pkt_hdr_t hdr;
+	struct libtrace_pcapfile_pkt_hdr_t hdr;
+	struct timeval tv = trace_get_timeval(packet);
+	int numbytes;
+	int ret;
 
-	tv = trace_get_timeval(packet);
+	/* Now we know the link type write out a header if we've not done
+	 * so already
+	 */
+	if (!DATAOUT(out)->file) {
+		struct pcapfile_header_t hdr;
+
+		DATAOUT(out)->file=trace_open_file_out(out,
+				DATAOUT(out)->level,
+				DATAOUT(out)->flag);
+		if (!DATAOUT(out)->file)
+			return -1;
+
+		hdr.magic_number = 0xa1b2c3d4;
+		hdr.version_major = 2;
+		hdr.version_minor = 4;
+		hdr.thiszone = 0;
+		hdr.sigfigs = 0;
+		hdr.snaplen = 65536;
+		hdr.network = 
+			libtrace_to_pcap_dlt(trace_get_link_type(packet));
+
+		libtrace_io_write(DATAOUT(out)->file, &hdr, sizeof(hdr));
+	}
+
 	hdr.ts_sec = tv.tv_sec;
 	hdr.ts_usec = tv.tv_usec;
 	hdr.caplen = trace_get_capture_length(packet);
-	hdr.wirelen = trace_get_wire_length(packet);
+	/* PCAP doesn't include the FCS, we do */
+	hdr.wirelen = trace_get_wire_length(packet)-4; 
 
-	write(fd,&hdr,sizeof(hdr));
-	write(fd,packet->payload,hdr.caplen);
-	
+	numbytes=libtrace_io_write(DATAOUT(out)->file,
+			&hdr, sizeof(hdr));
+
+	if (numbytes!=sizeof(hdr)) 
+		return -1;
+
+	ret=libtrace_io_write(DATAOUT(out)->file,
+			trace_get_link(packet),
+			trace_get_capture_length(packet));
+
+	if (ret!=trace_get_capture_length(packet))
+		return -1;
+
+	return numbytes+ret;
 }
-#endif
-
 
 static libtrace_linktype_t pcapfile_get_link_type(
 		const libtrace_packet_t *packet) 
@@ -357,14 +429,14 @@ static struct libtrace_format_t pcapfile = {
 	pcapfile_config_input,		/* config_input */
 	pcapfile_start_input,		/* start_input */
 	NULL,				/* pause_input */
-	NULL,			/* init_output */
-	NULL,				/* config_output */
-	NULL,				/* start_output */
+	pcapfile_init_output,		/* init_output */
+	pcapfile_config_output,		/* config_output */
+	pcapfile_start_output,		/* start_output */
 	pcapfile_fin_input,		/* fin_input */
-	NULL,				/* fin_output */
+	pcapfile_fin_output,		/* fin_output */
 	pcapfile_read_packet,		/* read_packet */
 	NULL,				/* fin_packet */
-	NULL,				/* write_packet */
+	pcapfile_write_packet,		/* write_packet */
 	pcapfile_get_link_type,		/* get_link_type */
 	pcapfile_get_direction,		/* get_direction */
 	NULL,				/* set_direction */
