@@ -59,6 +59,15 @@ test-convert-all: test-convert
 	@echo " * pcapfile -> erf"
 	@rm -f traces/*.out.*
 	@LD_LIBRARY_PATH="$(libdir)" ./test-convert pcapfile erf
+	@echo " * pcapfile -> pcapfile"
+	@rm -f traces/*.out.*
+	@LD_LIBRARY_PATH="$(libdir)" ./test-convert pcapfile pcapfile
+	@echo " * pcap -> pcapfile"
+	@rm -f traces/*.out.*
+	@LD_LIBRARY_PATH="$(libdir)" ./test-convert pcap pcapfile
+	@echo " * erf -> pcapfile"
+	@rm -f traces/*.out.*
+	@LD_LIBRARY_PATH="$(libdir)" ./test-convert erf pcapfile
 	@#LD_LIBRARY_PATH="$(libdir)" ./test-convert rtclient erf
 	@#LD_LIBRARY_PATH="$(libdir)" ./test-convert rtclient pcap
 	@echo " * wtf -> pcap"

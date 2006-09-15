@@ -89,6 +89,8 @@ char *lookup_out_uri(const char *type) {
 		return "erf:traces/100_packets.out.erf";
 	if (!strcmp(type,"pcap"))
 		return "pcap:traces/100_packets.out.pcap";
+	if (!strcmp(type,"pcapfile"))
+		return "pcapfile:traces/100_packets.out.pcap";
 	if (!strcmp(type,"wtf"))
 		return "wtf:traces/wed.out.wtf";
 	if (!strcmp(type,"duck"))
@@ -118,7 +120,9 @@ int main(int argc, char *argv[]) {
 
 	level=0;
 	trace_config_output(outtrace,TRACE_OPTION_OUTPUT_COMPRESS,&level);
-	iferrout(outtrace);
+	if (trace_is_err_output(outtrace)) {
+		trace_perror_output(outtrace,"WARNING: ");
+	}
 
 	trace_start(trace);
 	iferr(trace);
