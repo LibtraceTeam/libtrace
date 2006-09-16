@@ -105,7 +105,7 @@ plugin_LTLIBRARIES = $(BIN_PROTOCOLS)
 dist_plugin_DATA = $(TXT_PROTOCOLS)
 
 INCLUDES= @ADD_INCLS@ -I../lib 
-libpacketdump_la_LIBADD = @ADD_LIBS@ @LIBFLEX@
+libpacketdump_la_LIBADD = @ADD_LIBS@ @LEXLIB@
 libpacketdump_la_LDFLAGS=\
         -version-info @LIBTRACE_MAJOR@:@LIBTRACE_MINOR@:@LIBTRACE_MID@ \
         @ADD_LDFLAGS@
