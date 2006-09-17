@@ -47,7 +47,7 @@
  * appropriate type.
  * @note Radiotap fields are always little-endian
  */
-DLLEXPORT void *trace_get_radiotap_field(void *link, libtrace_radiotap_field_t field)
+static void *trace_get_radiotap_field(void *link, libtrace_radiotap_field_t field)
 {
     struct libtrace_radiotap_t *rtap = (struct libtrace_radiotap_t *)link;
     uint8_t *p;

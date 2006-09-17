@@ -189,47 +189,48 @@ static void *trace_get_payload_from_pflog(void *link,
 
 /* Returns the 'payload' of the prism header, which is the 802.11 frame */
 static void *trace_get_payload_from_prism (void *link,
-        uint16_t *type, uint32_t *remaining)
+		uint16_t *type, uint32_t *remaining)
 {
-    if (remaining) {
-        if (*remaining<144) 
-            return NULL;
-        *remaining-=144;
-    }
+	if (remaining) {
+		if (*remaining<144) 
+			return NULL;
+		*remaining-=144;
+	}
 
-    if (type) *type = 0;
+	if (type) *type = 0;
 
-    return (void *) ((char*)link+144);
+	return (void *) ((char*)link+144);
 }
 
 /* Returns the 'payload' of the radiotap header, which is the 802.11 frame */
 static void *trace_get_payload_from_radiotap (void *link, 
-        uint16_t *type, uint32_t *remaining)
+		uint16_t *type, uint32_t *remaining)
 {
-    struct libtrace_radiotap_t *rtap = (struct libtrace_radiotap_t*)link;
-    if (remaining) {
-		if (*remaining<rtap->it_len) 
+	struct libtrace_radiotap_t *rtap = (struct libtrace_radiotap_t*)link;
+	uint16_t rtaplen = bswap_le_to_host16(rtap->it_len);
+	if (remaining) {
+		if (*remaining < rtaplen)
 			return NULL;
-		*remaining-=rtap->it_len;
+		*remaining -= rtaplen;
 	}
 
 	if (type) *type = 0;
-    
-	return (void*) ((char*)link + rtap->it_len);
+
+	return (void*) ((char*)link + rtaplen);
 }
-        
+
 void *trace_get_payload_from_link(void *link, libtrace_linktype_t linktype, 
 		uint16_t *type, uint32_t *remaining)
 {
-    void *l;
-    
+	void *l = NULL;
+
 	switch(linktype) {
 		case TRACE_TYPE_80211_PRISM:
-            l = trace_get_payload_from_prism(link,type,remaining);
-            l ? trace_get_payload_from_80211(l,type,remaining) : NULL;
-        case TRACE_TYPE_80211_RADIO:
-            l = trace_get_payload_from_radiotap(link,type,remaining);
-            l ? trace_get_payload_from_80211(l,type,remaining) : NULL ;
+			l = trace_get_payload_from_prism(link,type,remaining);
+			return(l ? trace_get_payload_from_80211(l,type,remaining) : NULL);
+		case TRACE_TYPE_80211_RADIO:
+			l = trace_get_payload_from_radiotap(link,type,remaining);
+			return(l ? trace_get_payload_from_80211(l,type,remaining) : NULL);
 		case TRACE_TYPE_80211:
 			return trace_get_payload_from_80211(link,type,remaining);
 		case TRACE_TYPE_ETH:

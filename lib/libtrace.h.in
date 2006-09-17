@@ -494,7 +494,7 @@ typedef struct libtrace_80211_t {
  * All Radiotap headers start with this pre-amble, followed by the fields
  * specified in the it_present bitmask. If bit 31 of it_present is set, then
  * another bitmask follows.
- * NB: All of the radiotap data fields are in little-endian byte-order.
+ * @note All of the radiotap data fields are in little-endian byte-order.
  */
 typedef struct libtrace_radiotap_t {
     uint8_t     it_version; /**< Radiotap version */
@@ -850,45 +850,6 @@ DLLEXPORT void *trace_get_transport(libtrace_packet_t *packet, uint8_t *proto,
  */
 DLLEXPORT void *trace_get_payload_from_ip(libtrace_ip_t *ip, uint8_t *proto,
 		uint32_t *remaining);
-
-
-/** Gets a pointer to the payload given a pointer to the Radiotap header
- * @param link a pointer to the Radiotap header
- * @param[out] type	An output variable of the ethernet type
- * @param[in,out] remaining Updated with the number of bytes remaining
- *
- * @return a pointer to the 802.11 header, or NULL if header isn't
- * present.
- *
- * Remaining may be NULL.  If Remaining is not NULL it must point to the number
- * of bytes captured of the linklayer and beyond.  It will be updated after
- * this function to the number of bytes remaining after the Radiotap header has been 
- * removed.
- *
- * type may be NULL if not needed.
- */
-DLLEXPORT void *trace_get_payload_from_radiotap(void *link,
-		uint16_t *type, uint32_t *remaining);
-
-
-/** Gets a pointer to the payload given a pointer to the Prism monitoring header
- * @param link a pointer to the Prism monitoring header
- * @param[out] type	An output variable of the ethernet type
- * @param[in,out] remaining Updated with the number of bytes remaining
- *
- * @return a pointer to the 802.11 header, or NULL if header isn't
- * present.
- *
- * Remaining may be NULL.  If Remaining is not NULL it must point to the number
- * of bytes captured of the linklayer and beyond.  It will be updated after
- * this function to the number of bytes remaining after the Radiotap header has been 
- * removed.
- *
- * type may be NULL if not needed.
- */
-DLLEXPORT void *trace_get_payload_from_prism(void *link,
-		uint16_t *type, uint32_t *remaining);
-
 
 /** Gets a pointer to the payload given a pointer to the link header
  * @param ip            The link pointer
