@@ -51,6 +51,9 @@ BIN_PROTOCOLS+=link_11.la
 
 #				
 
+# Radiotap
+BIN_PROTOCOLS+=link_15.la
+
 # Decoders for various ethertypes (in decimal)
 # IPv4
 BIN_PROTOCOLS+=eth_2048.la
@@ -88,7 +91,7 @@ link_4_la_LDFLAGS=-module
 link_9_la_LDFLAGS=-module
 link_10_la_LDFLAGS=-module
 link_11_la_LDFLAGS=-module
-
+link_15_la_LDFLAGS=-module 
 eth_2048_la_LDFLAGS=-module
 eth_2054_la_LDFLAGS=-module
 
