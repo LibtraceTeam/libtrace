@@ -116,7 +116,11 @@ static void xstrncpy(char *dest, const char *src, size_t n)
  
 static char *xstrndup(const char *src,size_t n)
 {       
-        char *ret=(char*)malloc(n+1);
+        char *ret=(restrict char*)malloc(n+1);
+	if (ret==NULL) {
+		fprintf(stderr,"Out of memory");
+		exit(EXIT_FAILURE);
+	}
         xstrncpy(ret,src,n);
         return ret;
 }
@@ -293,6 +297,11 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 	trace_init();
 
 	assert(uri && "Passing NULL to trace_create makes me a very sad program");
+
+	if (!libtrace) {
+		/* Out of memory */
+		return NULL;
+	}
 	
 	libtrace->err.err_num = TRACE_ERR_NOERROR;
 	libtrace->format=NULL;
@@ -457,7 +466,6 @@ DLLEXPORT libtrace_out_t *trace_create_output(const char *uri) {
 		/* 0 on success, -1 on failure */
                 switch(libtrace->format->init_output(libtrace)) {
 			case -1: /* failure */
-				free(libtrace);
 				return libtrace;
 			case 0: /* success */
 				break;
