@@ -28,7 +28,7 @@ dnl GNU C library
 dnl AC_GNU_SOURCE
 
 
-AC_CONFIG_HEADERS([config.h])
+AM_CONFIG_HEADER([config.h])
 dnl Checks for programs.
 AC_PROG_CC
 AC_PROG_CXX
@@ -127,10 +127,16 @@ AC_REPLACE_FUNCS(pcap_open_dead)
 AC_REPLACE_FUNCS(pcap_dump_flush)
 AC_REPLACE_FUNCS(pcap_next_ex)
 AC_CHECK_FUNCS(pcap_inject pcap_sendpacket pcap_setnonblock)
+AC_CHECK_DECLS([BIOCSETIF],,,[
+#include <sys/types.h>
+#include <sys/time.h>
+#include <sys/ioctl.h>
+#include <net/bpf.h>
+])
 
 # configure time options for man pages
 AC_ARG_WITH(man,
-	    AS_HELP_STRING(--with-man,install man pages by default),
+	    #AS_HELP_STRING(--with-man,install man pages by default),
 
 	     if test "$withval" = yes
 	     then
@@ -145,7 +151,7 @@ AC_PROG_CXX
 # configure time options for use of DAG cards
 # borrowed from libpcap!
 AC_ARG_WITH(dag, 
-	    AS_HELP_STRING(--with-dag[=DIR],include DAG support (located in directory DIR, if supplied)),
+#	    AS_HELP_STRING(--with-dag[=DIR],include DAG support (located in directory DIR, if supplied)),
 [
         if test "$withval" = no
         then
@@ -228,6 +234,7 @@ if test -n "$PYTHON"; then
 	libtrace_python=true;
 fi
 
+AM_CONDITIONAL([HAVE_BPF], [test "$ac_cv_have_decl_BIOCSETIF" = yes ])
 AM_CONDITIONAL([HAVE_DAG], [test "$libtrace_dag" = true])
 AM_CONDITIONAL([DAG2_4], [test "$libtrace_dag2_4" = true])
 AM_CONDITIONAL([HAVE_ZLIB], [test "$ac_cv_lib_z_gzopen" = yes])
@@ -279,6 +286,7 @@ fi
 reportopt "Building man pages/documentation" $libtrace_doxygen
 
 if test x"$libtrace_swig" = xtrue; then
+H
 	if test x"$libtrace_python" = xtrue; then
 		AC_MSG_NOTICE([Building swig bindings for: python])
 	else
