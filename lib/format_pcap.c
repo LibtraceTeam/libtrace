@@ -387,6 +387,9 @@ static int pcapint_write_packet(libtrace_out_t *libtrace,
 	err=pcap_sendpacket(OUTPUT.trace.pcap,
 			packet->payload,
 			trace_get_capture_length(packet));
+#else
+    trace_set_err(packet->trace,TRACE_ERR_UNSUPPORTED,"writing is not supported on this platform");
+	return -1;
 #endif
 #endif
 	return err;
