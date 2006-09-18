@@ -70,6 +70,11 @@ struct pcapfile_format_data_out_t {
 static int pcapfile_init_input(libtrace_t *libtrace) {
 	libtrace->format_data = malloc(sizeof(struct pcapfile_format_data_t));
 
+	if (libtrace->format_data == NULL) {
+		trace_set_err(libtrace,ENOMEM,"Out of memory");
+		return -1;
+	}
+
 	DATA(libtrace)->file=NULL;
 
 	return 0;
