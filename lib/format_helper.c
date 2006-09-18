@@ -64,8 +64,8 @@ struct libtrace_eventobj_t trace_event_device(struct libtrace_t *trace, struct l
 	struct libtrace_eventobj_t event = {0,0,0.0,0};
 	int data;
 
-	assert(trace);
-	assert(packet);
+	assert(trace != NULL);
+	assert(packet != NULL);
 	
 	if (trace->format->get_fd) {
 		event.fd = trace->format->get_fd(trace);
@@ -107,7 +107,7 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 	}
 
 	ts=trace_get_seconds(trace->event.packet);
-	if (trace->event.tdelta!=0) {
+	if (trace->event.tdelta!=0.0) {
 		/* Get the adjusted current time */
 		gettimeofday(&stv, NULL);
 		now = stv.tv_sec + 
@@ -196,9 +196,9 @@ libtrace_io_t *trace_open_file_out(libtrace_out_t *trace,int level, int fileflag
 	assert(level<10);
 	assert(level>=0);
 #ifdef HAVE_LIBZ
-	sprintf(filemode,"wb%d",level);
+	snprintf(filemode,sizeof(filemode),"wb%d",level);
 #else
-	sprintf(filemode,"wb");
+	snprintf(filemode,sizeof(filemode),"wb");
 #endif
 
 	if (strcmp(trace->uridata,"-")==0) {
