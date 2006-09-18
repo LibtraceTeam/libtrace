@@ -116,7 +116,7 @@ static void xstrncpy(char *dest, const char *src, size_t n)
  
 static char *xstrndup(const char *src,size_t n)
 {       
-        char *ret=(restrict char*)malloc(n+1);
+        char *ret=(char*)malloc(n+1);
 	if (ret==NULL) {
 		fprintf(stderr,"Out of memory");
 		exit(EXIT_FAILURE);

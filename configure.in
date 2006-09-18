@@ -136,7 +136,7 @@ AC_CHECK_DECLS([BIOCSETIF],,,[
 
 # configure time options for man pages
 AC_ARG_WITH(man,
-	    #AS_HELP_STRING(--with-man,install man pages by default),
+	    AS_HELP_STRING(--with-man,install man pages by default),
 
 	     if test "$withval" = yes
 	     then
@@ -151,7 +151,7 @@ AC_PROG_CXX
 # configure time options for use of DAG cards
 # borrowed from libpcap!
 AC_ARG_WITH(dag, 
-#	    AS_HELP_STRING(--with-dag[=DIR],include DAG support (located in directory DIR, if supplied)),
+	    AS_HELP_STRING(--with-dag[=DIR],include DAG support (located in directory DIR, if supplied)),
 [
         if test "$withval" = no
         then
@@ -185,13 +185,14 @@ if test "$with_dag" != no; then
 		dag_lib_dir="$dag_root"
 	fi
 	
-        if test -r "$dag_root/tools" -a -r "$dag_root/include"; then
+        #if test -r "$dag_root/tools" -a -r "$dag_root/include"; then
+	if test -r "$dag_root/include"; then
 		dag_tools_dir="$dag_root/tools"
                 dag_include_dir="$dag_root/include"
         else
                 dag_tools_dir="$dag_root"
                 dag_include_dir="$dag_root"
-        fi
+	fi
 
         if test -r "$dag_include_dir/dagapi.h" -a -r "$dag_lib_dir/libdag.a"; 
 	then

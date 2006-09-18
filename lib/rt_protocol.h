@@ -53,6 +53,7 @@ enum rt_field_t {
  RT_KEYCHANGE	=12,	/**< Anonymisation key has changed */ 
  RT_DUCK_2_4	=13,	/**< Dag 2.4 Duck */
  RT_DUCK_2_5 	=14,	/**< Dag 2.5 Duck */
+ RT_LOSTCONN 	=15,	/**< Lost connection to server */
  
  RT_DATA_ERF		=RT_DATA_SIMPLE + TRACE_FORMAT_ERF, 
  RT_DATA_WAG		=RT_DATA_SIMPLE + TRACE_FORMAT_WAG, 

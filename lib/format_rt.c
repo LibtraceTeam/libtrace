@@ -222,7 +222,7 @@ static int rt_init_input(libtrace_t *libtrace) {
                 }
         }
 
-	return rt_connect(libtrace);
+	return 0;
 }
 	
 static int rt_start_input(libtrace_t *libtrace) {
@@ -231,6 +231,8 @@ static int rt_start_input(libtrace_t *libtrace) {
 	start_msg.type = RT_START;
 	start_msg.length = 0; 
 
+	if (rt_connect(libtrace) == -1)
+		return -1;
 	
 	/* Need to send start message to server */
 	if (send(RT_INFO->input_fd, (void*)&start_msg, sizeof(rt_header_t) +
@@ -239,6 +241,11 @@ static int rt_start_input(libtrace_t *libtrace) {
 		return -1;
 	}
 
+	return 0;
+}
+
+static int rt_pause_input(libtrace_t *libtrace) {
+	close(RT_INFO->input_fd);
 	return 0;
 }
 
@@ -477,58 +484,65 @@ static int rt_send_ack(libtrace_t *libtrace,
 	
 static int rt_read_packet_versatile(libtrace_t *libtrace,
 		libtrace_packet_t *packet,int blocking) {
-	rt_header_t rt_hdr;
+	static rt_header_t rt_hdr;
 	static rt_header_t *pkt_hdr = 0;
-	int pkt_size = 0;
-	uint32_t seqno;
 	
-	if (pkt_hdr == 0)
+	if (pkt_hdr == 0) {
+		/* first time through */
 		pkt_hdr = malloc(sizeof(rt_header_t));
+		rt_hdr.type = RT_LAST;
+	}
 	
         if (packet->buf_control == TRACE_CTRL_EXTERNAL || !packet->buffer) {
                 packet->buf_control = TRACE_CTRL_PACKET;
                 packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
         } 
 
+	/* RT_LAST means that the next bytes received should be a 
+	 * rt header - I know it's hax and maybe I'll fix it later on */
+	if (rt_hdr.type == RT_LAST) {
+	
+		/* FIXME: Better error handling required */
+		if (rt_read(libtrace, (void **)&pkt_hdr, 
+				sizeof(rt_header_t),blocking) !=
+				sizeof(rt_header_t)) {
+			return -1;
+		}
 
-	/* FIXME: Better error handling required */
-	if (rt_read(libtrace, (void **)&pkt_hdr, sizeof(rt_header_t),blocking) !=
-			sizeof(rt_header_t)) {
-		return -1;
+		/* Need to salvage these in case the next rt_read overwrites 
+		 * the buffer they came from! */
+		rt_hdr.type = pkt_hdr->type;
+		rt_hdr.length = pkt_hdr->length;
+		rt_hdr.sequence = pkt_hdr->sequence;
 	}
-
-	/* Need to salvage these in case the next rt_read overwrites the 
-	 * buffer they came from! */
-	packet->type = pkt_hdr->type;
-	pkt_size = pkt_hdr->length;
-	packet->size = pkt_hdr->length;
-	seqno = pkt_hdr->sequence;
+	packet->type = rt_hdr.type;
+	packet->size = rt_hdr.length;
 
 	if (packet->type >= RT_DATA_SIMPLE) {
-		if (rt_read(libtrace, &packet->buffer, pkt_size,1) != pkt_size) {
-			printf("Error receiving packet\n");
+		if (rt_read(libtrace, &packet->buffer, rt_hdr.length,blocking) != rt_hdr.length) {
 			return -1;
 		}
         	packet->header = packet->buffer;
 		
-		if (rt_set_format(libtrace, packet) < 0) {
-                       	return -1;
-                }
-               	rt_set_payload(packet);
                 if (RT_INFO->reliable > 0) {
-			if (rt_send_ack(libtrace, seqno) 
+			if (rt_send_ack(libtrace, rt_hdr.sequence) 
 					== -1)
 			{
                                	return -1;
                         }
 		}
+		
+			
+		if (rt_set_format(libtrace, packet) < 0) {
+                       	return -1;
+                }
+               	rt_set_payload(packet);
 	} else {
 		switch(packet->type) {
 			case RT_STATUS:
 				if (rt_read(libtrace, &packet->buffer, 
-							pkt_size,1) !=
-						pkt_size) {
-					printf("Error receiving status packet\n");
+					rt_hdr.length, blocking) != 
+						rt_hdr.length) {
 					return -1;
 				}
 				packet->header = 0;
@@ -537,9 +551,8 @@ static int rt_read_packet_versatile(libtrace_t *libtrace,
 			case RT_DUCK_2_4:
 			case RT_DUCK_2_5:
 				if (rt_read(libtrace, &packet->buffer,
-							pkt_size, 1) !=
-						pkt_size) {
-					printf("Error receiving DUCK packet\n");
+					rt_hdr.length, blocking) != 
+						rt_hdr.length) {
 					return -1;
 				}
 				if (rt_set_format(libtrace, packet) < 0) {
@@ -558,6 +571,8 @@ static int rt_read_packet_versatile(libtrace_t *libtrace,
 				break;
 			case RT_KEYCHANGE:
 				break;
+			case RT_LOSTCONN:
+				break;
 			default:
 				printf("Bad rt type for client receipt: %d\n",
 					packet->type);
@@ -565,6 +580,7 @@ static int rt_read_packet_versatile(libtrace_t *libtrace,
 		}
 	}
 	/* Return the number of bytes read from the stream */
+	rt_hdr.type = RT_LAST;
 	return packet->size; 
 }
 
@@ -635,7 +651,7 @@ libtrace_eventobj_t trace_event_rt(libtrace_t *trace, libtrace_packet_t *packet)
 			event.type = TRACE_EVENT_IOWAIT;
 		}
 		else {
-			printf("packet error\n");
+			//printf("packet error\n");
 			event.type = TRACE_EVENT_PACKET;
 		}
 	} else if (event.size == 0) {
@@ -669,10 +685,10 @@ static struct libtrace_format_t rt = {
         rt_init_input,            	/* init_input */
         NULL,                           /* config_input */
         rt_start_input,           	/* start_input */
+	rt_pause_input,			/* pause */
         NULL,                           /* init_output */
         NULL,                           /* config_output */
         NULL,                           /* start_output */
-	NULL,				/* pause_output */
         rt_fin_input,             	/* fin_input */
         NULL,                           /* fin_output */
         rt_read_packet,           	/* read_packet */
