@@ -70,9 +70,14 @@ static void *trace_get_vlan_payload_from_ethernet_payload(void *ethernet, uint16
 
 static void *trace_get_payload_from_80211(void *link, uint16_t *type, uint32_t *remaining)
 {
+	/* TODO: Decode type != DATA
+	 * TODO: We're assuming four address frame here... probably not good
+	 */
+	
 	libtrace_80211_t *wifi;
 	libtrace_802_11_payload_t *eth;
-
+	uint8_t extra; /* how many QoS bytes to skip */
+	
 	if (remaining && *remaining < sizeof(libtrace_80211_t))
 		return NULL;
 
@@ -83,13 +88,24 @@ static void *trace_get_payload_from_80211(void *link, uint16_t *type, uint32_t *
 		return NULL;
 	}
 
+	/* Check for WME */
+	if (wifi->subtype & 0x8) {
+		/* indicates two octets of QoS before payload, 
+		 * see IEEE802.11e-2005 pg 21 
+		 * */
+		extra = 2;
+	} else 
+		extra = 0;
+
 	if (remaining && *remaining < sizeof(*eth))
 		return NULL;
 
-	eth=(libtrace_802_11_payload_t *)((char*)wifi+sizeof(*wifi));
+	eth=(libtrace_802_11_payload_t *)((char*)wifi+sizeof(*wifi)+extra);
 
 	if (type) *type=ntohs(eth->type);
-
+	if (remaining) *remaining = *remaining - sizeof(libtrace_80211_t) - extra - sizeof(*eth);
+	
+	
 	return (void*)((char*)eth+sizeof(*eth));
 }
 
@@ -227,12 +243,13 @@ void *trace_get_payload_from_link(void *link, libtrace_linktype_t linktype,
 	switch(linktype) {
 		case TRACE_TYPE_80211_PRISM:
 			l = trace_get_payload_from_prism(link,type,remaining);
-			return(l ? trace_get_payload_from_80211(l,type,remaining) : NULL);
+			return (l ? trace_get_payload_from_link(l, TRACE_TYPE_80211, type, remaining) : NULL);
 		case TRACE_TYPE_80211_RADIO:
 			l = trace_get_payload_from_radiotap(link,type,remaining);
-			return(l ? trace_get_payload_from_80211(l,type,remaining) : NULL);
+			return (l ? trace_get_payload_from_link(l, TRACE_TYPE_80211, type, remaining) : NULL);
 		case TRACE_TYPE_80211:
 			return trace_get_payload_from_80211(link,type,remaining);
+
 		case TRACE_TYPE_ETH:
 			return trace_get_payload_from_ethernet(link,type,remaining);
 		case TRACE_TYPE_NONE:
