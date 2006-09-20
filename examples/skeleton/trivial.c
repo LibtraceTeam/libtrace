@@ -12,6 +12,8 @@
 
 void per_packet(libtrace_packet_t *packet)
 {
+	/* You really should consider using complete.c instead */
+
 	/* Your code goes here */
 }
 

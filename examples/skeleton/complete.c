@@ -16,7 +16,7 @@ void per_packet(libtrace_packet_t *packet)
 
 void usage(char *argv0)
 {
-	fprintf(stderr,"usage: %s [ --filter | -f bpfexp ]  [ --snaplen | -s snap ]\n\t\t[ --promisc | -p flag] [ --help | -h ] libtraceuri...\n",argv0);
+	fprintf(stderr,"usage: %s [ --filter | -f bpfexp ]  [ --snaplen | -s snap ]\n\t\t[ --promisc | -p flag] [ --help | -h ] [ --libtrace-help | -H ] libtraceuri...\n",argv0);
 }
 
 int main(int argc, char *argv[])
@@ -30,14 +30,15 @@ int main(int argc, char *argv[])
 	while(1) {
 		int option_index;
 		struct option long_options[] = {
-			{ "filter",	1, 0, 'f' },
-			{ "snaplen",	1, 0, 's' },
-			{ "promisc",	1, 0, 'p' },
-			{ "help",	0, 0, 'h' },
-			{ NULL,		0, 0, 0 }
+			{ "filter",		1, 0, 'f' },
+			{ "snaplen",		1, 0, 's' },
+			{ "promisc",		1, 0, 'p' },
+			{ "help",		0, 0, 'h' },
+			{ "libtrace-help",	0, 0, 'H' },
+			{ NULL,			0, 0, 0 }
 		};
 
-		int c= getopt_long(argc, argv, "f:s:p:h",
+		int c= getopt_long(argc, argv, "f:s:p:hH",
 				long_options, &option_index);
 
 		if (c==-1)
@@ -53,6 +54,9 @@ int main(int argc, char *argv[])
 			case 'p':
 				promisc=atoi(optarg);
 				break;
+			case 'H':
+				trace_help();
+				return 1;
 			default:
 				fprintf(stderr,"Unknown option: %c\n",c);
 				/* FALL THRU */
