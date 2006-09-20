@@ -309,8 +309,10 @@ static libtrace_linktype_t linuxnative_get_link_type(const struct libtrace_packe
 			return TRACE_TYPE_ETH;
 		case ARPHRD_PPP:
 			return TRACE_TYPE_NONE;
-        case ARPHRD_80211_RADIOTAP:
-            return TRACE_TYPE_80211_RADIO;
+		case ARPHRD_80211_RADIOTAP:
+			return TRACE_TYPE_80211_RADIO;
+		case ARPHRD_IEEE80211:
+			return TRACE_TYPE_80211;
 		default: /* shrug, beyond me! */
 			printf("unknown Linux ARPHRD type 0x%04x\n",linktype);
 			return (libtrace_linktype_t)~0U;
