@@ -82,7 +82,8 @@ struct rt_format_data_t {
 	char *pkt_buffer;
 	char *buf_current;
 	int buf_filled;
-
+	rt_header_t rt_hdr;
+	
 	libtrace_t *dummy_duck;
 	libtrace_t *dummy_erf;
 	libtrace_t *dummy_pcap;
@@ -484,23 +485,29 @@ static int rt_send_ack(libtrace_t *libtrace,
 	
 static int rt_read_packet_versatile(libtrace_t *libtrace,
 		libtrace_packet_t *packet,int blocking) {
-	static rt_header_t rt_hdr;
 	static rt_header_t *pkt_hdr = 0;
 	
 	if (pkt_hdr == 0) {
 		/* first time through */
 		pkt_hdr = malloc(sizeof(rt_header_t));
-		rt_hdr.type = RT_LAST;
+		RT_INFO->rt_hdr.type = RT_LAST;
 	}
-	
+
+	/*
         if (packet->buf_control == TRACE_CTRL_EXTERNAL || !packet->buffer) {
                 packet->buf_control = TRACE_CTRL_PACKET;
                 packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
         } 
+	*/
+	if (packet->buf_control == TRACE_CTRL_PACKET) {
+		packet->buf_control = TRACE_CTRL_EXTERNAL;
+		free(packet->buffer);
+		packet->buffer = NULL;
+	}
 
 	/* RT_LAST means that the next bytes received should be a 
 	 * rt header - I know it's hax and maybe I'll fix it later on */
-	if (rt_hdr.type == RT_LAST) {
+	if (RT_INFO->rt_hdr.type == RT_LAST) {
 	
 		/* FIXME: Better error handling required */
 		if (rt_read(libtrace, (void **)&pkt_hdr, 
@@ -511,21 +518,21 @@ static int rt_read_packet_versatile(libtrace_t *libtrace,
 
 		/* Need to salvage these in case the next rt_read overwrites 
 		 * the buffer they came from! */
-		rt_hdr.type = pkt_hdr->type;
-		rt_hdr.length = pkt_hdr->length;
-		rt_hdr.sequence = pkt_hdr->sequence;
+		RT_INFO->rt_hdr.type = pkt_hdr->type;
+		RT_INFO->rt_hdr.length = pkt_hdr->length;
+		RT_INFO->rt_hdr.sequence = pkt_hdr->sequence;
 	}
-	packet->type = rt_hdr.type;
-	packet->size = rt_hdr.length;
+	packet->type = RT_INFO->rt_hdr.type;
+	packet->size = RT_INFO->rt_hdr.length;
 
 	if (packet->type >= RT_DATA_SIMPLE) {
-		if (rt_read(libtrace, &packet->buffer, rt_hdr.length,blocking) != rt_hdr.length) {
+		if (rt_read(libtrace, &packet->buffer, RT_INFO->rt_hdr.length,blocking) != RT_INFO->rt_hdr.length) {
 			return -1;
 		}
         	packet->header = packet->buffer;
 		
                 if (RT_INFO->reliable > 0) {
-			if (rt_send_ack(libtrace, rt_hdr.sequence) 
+			if (rt_send_ack(libtrace, RT_INFO->rt_hdr.sequence) 
 					== -1)
 			{
                                	return -1;
@@ -534,15 +541,15 @@ static int rt_read_packet_versatile(libtrace_t *libtrace,
 		
 			
 		if (rt_set_format(libtrace, packet) < 0) {
-                       	return -1;
+			return -1;
                 }
                	rt_set_payload(packet);
 	} else {
 		switch(packet->type) {
 			case RT_STATUS:
 				if (rt_read(libtrace, &packet->buffer, 
-					rt_hdr.length, blocking) != 
-						rt_hdr.length) {
+					RT_INFO->rt_hdr.length, blocking) != 
+						RT_INFO->rt_hdr.length) {
 					return -1;
 				}
 				packet->header = 0;
@@ -551,8 +558,8 @@ static int rt_read_packet_versatile(libtrace_t *libtrace,
 			case RT_DUCK_2_4:
 			case RT_DUCK_2_5:
 				if (rt_read(libtrace, &packet->buffer,
-					rt_hdr.length, blocking) != 
-						rt_hdr.length) {
+					RT_INFO->rt_hdr.length, blocking) != 
+						RT_INFO->rt_hdr.length) {
 					return -1;
 				}
 				if (rt_set_format(libtrace, packet) < 0) {
@@ -562,7 +569,7 @@ static int rt_read_packet_versatile(libtrace_t *libtrace,
 				packet->payload = packet->buffer;
 				break;
 			case RT_END_DATA:
-				return 0;
+				break;
 			case RT_PAUSE_ACK:
 				/* FIXME: Do something useful */
 				break;
@@ -580,7 +587,7 @@ static int rt_read_packet_versatile(libtrace_t *libtrace,
 		}
 	}
 	/* Return the number of bytes read from the stream */
-	rt_hdr.type = RT_LAST;
+	RT_INFO->rt_hdr.type = RT_LAST;
 	return packet->size; 
 }
 
@@ -613,6 +620,8 @@ static int rt_get_capture_length(const libtrace_packet_t *packet) {
 		case RT_OPTION:
 			return 0; /* FIXME */
 		case RT_KEYCHANGE:
+			return 0;
+		case RT_LOSTCONN:
 			return 0;
 	}
 	printf("Unknown type: %d\n", packet->type);
@@ -655,7 +664,10 @@ libtrace_eventobj_t trace_event_rt(libtrace_t *trace, libtrace_packet_t *packet)
 			event.type = TRACE_EVENT_PACKET;
 		}
 	} else if (event.size == 0) {
-		event.type = TRACE_EVENT_TERMINATE;
+		if (packet->type == RT_END_DATA)
+			event.type = TRACE_EVENT_TERMINATE;
+		else
+			event.type = TRACE_EVENT_PACKET;
 		
 	}	
 	else {

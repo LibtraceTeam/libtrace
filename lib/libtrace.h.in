@@ -871,6 +871,26 @@ DLLEXPORT void *trace_get_payload_from_link(void *link,
 		libtrace_linktype_t linktype, 
 		uint16_t *type, uint32_t *remaining);
 
+/** Skips over any 802.1q headers, if present.
+ * @param ethernet      A pointer to the payload following an ethernet header -usually the result of calling trace_get_payload_from_link
+ * @param[in,out] type  The ethernet type, replaced with the vlan ether type
+ * @param[in,out] remaining Updated with the number of bytes remaining
+ *
+ * @return a pointer to the header beyond the vlan header, if present.
+ * Otherwise, returns the ethernet payload that was passed in
+ *
+ * Remaining may be NULL. If Remaining is not NULL it must point to the number
+ * of bytes captured past (but not including) the link layer. It will be
+ * updated after this function to the number of bytes remaining after the
+ * vlan header. If it is unchanged then no vlan header exists.
+ *
+ * Type must point to the value of the ethernet type. Libtrace will assert
+ * fail if type is NULL.
+ *
+ */
+DLLEXPORT void *trace_get_vlan_payload_from_ethernet_payload(
+                void *ethernet_payload, uint16_t *type, uint32_t *remaining);
+
 /** Gets a pointer to the payload given a pointer to a tcp header
  * @param tcp           The tcp Header
  * @param[in,out] remaining Updated with the number of bytes remaining

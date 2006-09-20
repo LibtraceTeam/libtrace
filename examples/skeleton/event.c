@@ -137,7 +137,6 @@ int main(int argc, char *argv[]) {
 
 		/* Got a packet - let's do something with it */
 		per_packet(packet);
-		
 	}
 	free(uri);
 	trace_destroy(trace);

@@ -45,7 +45,7 @@ static void *trace_get_payload_from_ethernet(void *ethernet,
 /* skip any 802.1q headers if necessary 
  * type is input/output
  */
-static void *trace_get_vlan_payload_from_ethernet_payload(void *ethernet, uint16_t *type,
+void *trace_get_vlan_payload_from_ethernet_payload(void *ethernet, uint16_t *type,
 		uint32_t *remaining)
 {
 	assert(type && "You must pass a type in!");

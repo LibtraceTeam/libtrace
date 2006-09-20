@@ -9,6 +9,7 @@
  */
 #include "libtrace.h"
 #include <stdio.h>
+#include <assert.h>
 
 void per_packet(libtrace_packet_t *packet)
 {

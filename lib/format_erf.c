@@ -995,8 +995,8 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 			+ erf_get_framing_length(packet));
 		/* loss counter. Can't do this */
 		erfhdr.lctr = 0;
-		/* Wire length, may contain the padding */
-		erfhdr.wlen = htons(trace_get_wire_length(packet)+pad);
+		/* Wire length, does not include padding! */
+		erfhdr.wlen = htons(trace_get_wire_length(packet));
 
 		/* Write it out */
 		numbytes = erf_dump_packet(libtrace,
@@ -1034,17 +1034,22 @@ static uint64_t erf_get_erf_timestamp(const libtrace_packet_t *packet) {
 
 static int erf_get_capture_length(const libtrace_packet_t *packet) {
 	dag_record_t *erfptr = 0;
+	int caplen;
 	if (packet->payload == NULL)
 		return 0; 
 	
 	erfptr = (dag_record_t *)packet->header;
+	caplen = ntohs(erfptr->rlen) - erf_get_framing_length(packet);
+	if (ntohs(erfptr->wlen) < caplen)
+		return ntohs(erfptr->wlen);
+
 	return (ntohs(erfptr->rlen) - erf_get_framing_length(packet));
 }
 
 static int erf_get_wire_length(const libtrace_packet_t *packet) {
 	dag_record_t *erfptr = 0;
 	erfptr = (dag_record_t *)packet->header;
-	return ntohs(erfptr->wlen) - erf_get_padding(packet);
+	return ntohs(erfptr->wlen);
 }
 
 static size_t erf_set_capture_length(libtrace_packet_t *packet, size_t size) {

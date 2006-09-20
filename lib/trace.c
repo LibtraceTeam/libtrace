@@ -401,7 +401,6 @@ DLLEXPORT libtrace_t * trace_create_dead (const char *uri) {
         if (libtrace->format == 0) {
 		trace_set_err(libtrace,TRACE_ERR_BAD_FORMAT,
 				"Unknown format (%s)",scan);
-                return 0;
         }
 
 	libtrace->format_data = NULL;
