@@ -1,0 +1,10 @@
+
+noinst_PROGRAMS=rate rate-dir
+
+AM_CFLAGS=-I$(top_srcdir)/lib -I$(top_srcdir)/libpacketdump
+AM_CXXFLAGS=-I$(top_srcdir)/lib -I$(top_srcdir)/libpacketdump
+AM_LDFLAGS=-L$(top_srcdir)/lib -L$(top_srcdir)/libpacketdump -ltrace
+
+rate_SOURCES=rate.c
+rate_dir_SOURCES=rate-dir.c
+
