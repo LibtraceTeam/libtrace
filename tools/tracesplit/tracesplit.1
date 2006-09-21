@@ -12,7 +12,9 @@ output only packets that match tcpdump style bpf filter
 
 .TP
 \fB\-c\fR count
-output count packets per output file
+output count packets per output file.  The output file will be named after
+the basename given in the outputuri with the packet number of the first packet
+in this file.
 
 .TP
 \fB\-b\fR bytes
