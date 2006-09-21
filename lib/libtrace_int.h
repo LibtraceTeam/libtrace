@@ -362,10 +362,13 @@ enum rt_field_t pcap_dlt_to_rt(libtrace_dlt_t dlt);
 libtrace_dlt_t rt_to_pcap_dlt(enum rt_field_t rt_type);
 libtrace_linktype_t erf_type_to_libtrace(char erf);
 char libtrace_to_erf_type(libtrace_linktype_t linktype);
+libtrace_linktype_t arphrd_type_to_libtrace(unsigned int);
+unsigned int libtrace_to_arphrd_type(libtrace_linktype_t);
 
 void promote_packet(libtrace_packet_t *packet);
 bool demote_packet(libtrace_packet_t *packet);
 
+void *trace_get_payload_from_linux_sll(void *, uint16_t *, uint32_t *);
 
 uint64_t byteswap64(uint64_t num);
 uint32_t byteswap32(uint32_t num);

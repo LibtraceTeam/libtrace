@@ -110,7 +110,7 @@ static void *trace_get_payload_from_80211(void *link, uint16_t *type, uint32_t *
 }
 
 /* NB: type is returned as an ARPHRD_ type for SLL*/
-static void *trace_get_payload_from_linux_sll(void *link,
+void *trace_get_payload_from_linux_sll(void *link,
 		uint16_t *type, uint32_t *remaining) 
 {
 	libtrace_sll_header_t *sll;
