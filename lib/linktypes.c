@@ -88,6 +88,24 @@ char libtrace_to_erf_type(libtrace_linktype_t linktype)
 	return -1;
 }
 
+libtrace_linktype_t arphrd_type_to_libtrace(unsigned int arphrd) {
+	switch(arphrd) {
+		case ARPHRD_ETHER: return TRACE_TYPE_ETH;	
+		case ARPHRD_IEEE80211: return TRACE_TYPE_80211;
+		case ARPHRD_80211_RADIOTAP: return TRACE_TYPE_80211_RADIO;
+	}
+	return ~0;
+}
+
+unsigned int libtrace_to_arphrd_type(libtrace_linktype_t linktype) {
+	switch(linktype) {
+		case TRACE_TYPE_ETH: return ARPHRD_ETHER;
+		case TRACE_TYPE_80211: return ARPHRD_IEEE80211;
+		case TRACE_TYPE_80211_RADIO: return ARPHRD_80211_RADIOTAP;
+	}
+	return -1;
+}
+
 /** Tinker with a packet
  * packets that don't support direction tagging are annoying, especially
  * when we have direction tagging information!  So this converts the packet
@@ -120,9 +138,9 @@ void promote_packet(libtrace_packet_t *packet)
 
 				hdr->pkttype=TRACE_SLL_OUTGOING;
 				if (pcap_dlt_to_libtrace(rt_to_pcap_dlt(packet->type))==TRACE_TYPE_ETH)
-					hdr->hatype = ARPHRD_ETHER;
+					hdr->hatype = htons(ARPHRD_ETHER);
 				else
-					hdr->hatype = ARPHRD_PPP;
+					hdr->hatype = htons(ARPHRD_PPP);
 				trace_get_payload_from_link(
 					trace_get_link(packet),
 					trace_get_link_type(packet),
@@ -171,8 +189,8 @@ bool demote_packet(libtrace_packet_t *packet)
 {
 	switch(trace_get_link_type(packet)) {
 		case TRACE_TYPE_LINUX_SLL:
-			switch(((libtrace_sll_header_t*)packet->payload)
-					->hatype) {
+			switch(ntohs(((libtrace_sll_header_t*)packet->payload)
+					->hatype)) {
 				case ARPHRD_PPP:
 					packet->type=pcap_dlt_to_rt(DLT_NULL);
 					break;

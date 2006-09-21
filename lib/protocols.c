@@ -109,6 +109,7 @@ static void *trace_get_payload_from_80211(void *link, uint16_t *type, uint32_t *
 	return (void*)((char*)eth+sizeof(*eth));
 }
 
+/* NB: type is returned as an ARPHRD_ type for SLL*/
 static void *trace_get_payload_from_linux_sll(void *link,
 		uint16_t *type, uint32_t *remaining) 
 {
@@ -124,22 +125,12 @@ static void *trace_get_payload_from_linux_sll(void *link,
 	}
 
 	/* What kind of wacked out header, has this in host order?! */
-	if (type) *type = htons(sll->protocol); 
+	//if (type) *type = htons(sll->protocol); 
 
-	ret=(void*)((char*)sll+sizeof(*sll));
+	if (type) *type = ntohs(sll->hatype);
 
-	switch(sll->hatype) {
-		case ARPHRD_PPP:
-			break;
-		case ARPHRD_ETHER:
-			ret=trace_get_payload_from_ethernet(ret,type,remaining);
-			break;
-		default:
-			/* Unknown hardware type */
-			return NULL;
-	}
+	return (void*)((char*)sll+sizeof(*sll));
 
-	return ret;
 }
 
 static void *trace_get_payload_from_atm(void *link,
@@ -239,7 +230,8 @@ void *trace_get_payload_from_link(void *link, libtrace_linktype_t linktype,
 		uint16_t *type, uint32_t *remaining)
 {
 	void *l = NULL;
-
+	uint16_t dummytype;
+	
 	switch(linktype) {
 		case TRACE_TYPE_80211_PRISM:
 			l = trace_get_payload_from_prism(link,type,remaining);
@@ -259,7 +251,11 @@ void *trace_get_payload_from_link(void *link, libtrace_linktype_t linktype,
 				*type=0x86DD;
 			return link; /* I love the simplicity */
 		case TRACE_TYPE_LINUX_SLL:
-			return trace_get_payload_from_linux_sll(link,type,remaining);
+			l = trace_get_payload_from_linux_sll(link,&dummytype,remaining);
+			if (type) *type = dummytype;
+			return (l ? trace_get_payload_from_link(l,
+						arphrd_type_to_libtrace(dummytype), type, remaining) : NULL);
+			
 		case TRACE_TYPE_PFLOG:
 			return trace_get_payload_from_pflog(link,type,remaining);
 		case TRACE_TYPE_POS:
