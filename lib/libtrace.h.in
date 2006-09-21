@@ -851,6 +851,24 @@ DLLEXPORT void *trace_get_transport(libtrace_packet_t *packet, uint8_t *proto,
 DLLEXPORT void *trace_get_payload_from_ip(libtrace_ip_t *ip, uint8_t *proto,
 		uint32_t *remaining);
 
+/** Gets a pointer to the payload given a pointer to the IPv6 header
+ * @param ipptr         The IPv6 Header
+ * @param[out] proto    An output variable of the protocol of the next header
+ * @param[in,out] remaining Updated with the number of bytes remaining
+ *
+ * @return a pointer to the transport layer header, or NULL if the IPv6 header isn't complete.
+ *
+ * Remaining may be NULL.  If Remaining is not NULL it must point to the number
+ * of bytes captured of the IP header and beyond.  It will be updated after this
+ * function to the number of bytes remaining after the IP header (and any IP options)
+ * have been removed.
+ *
+ * proto may be NULL if not needed.
+ *
+ */
+DLLEXPORT void *trace_get_payload_from_ip6(libtrace_ip6_t *ipptr,
+                uint8_t *prot, uint32_t *remaining);
+
 /** Gets a pointer to the payload given a pointer to the link header
  * @param ip            The link pointer
  * @param[out] type	An output variable of the ethernet type
