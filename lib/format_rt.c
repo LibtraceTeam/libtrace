@@ -241,6 +241,7 @@ static int rt_start_input(libtrace_t *libtrace) {
 		printf("Failed to send start message to server\n");
 		return -1;
 	}
+	RT_INFO->rt_hdr.type = RT_LAST;
 
 	return 0;
 }
@@ -287,7 +288,6 @@ static int rt_fin_input(libtrace_t *libtrace) {
 
 static int rt_read(libtrace_t *libtrace, void **buffer, size_t len, int block) {
         int numbytes;
-	rt_header_t *test_hdr;
 	
 	assert(len <= RT_BUF_SIZE);
 	
@@ -485,20 +485,9 @@ static int rt_send_ack(libtrace_t *libtrace,
 	
 static int rt_read_packet_versatile(libtrace_t *libtrace,
 		libtrace_packet_t *packet,int blocking) {
-	static rt_header_t *pkt_hdr = 0;
+	rt_header_t *pkt_hdr = NULL;
+	void *void_hdr;
 	
-	if (pkt_hdr == 0) {
-		/* first time through */
-		pkt_hdr = malloc(sizeof(rt_header_t));
-		RT_INFO->rt_hdr.type = RT_LAST;
-	}
-
-	/*
-        if (packet->buf_control == TRACE_CTRL_EXTERNAL || !packet->buffer) {
-                packet->buf_control = TRACE_CTRL_PACKET;
-                packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
-        } 
-	*/
 	if (packet->buf_control == TRACE_CTRL_PACKET) {
 		packet->buf_control = TRACE_CTRL_EXTERNAL;
 		free(packet->buffer);
@@ -508,14 +497,16 @@ static int rt_read_packet_versatile(libtrace_t *libtrace,
 	/* RT_LAST means that the next bytes received should be a 
 	 * rt header - I know it's hax and maybe I'll fix it later on */
 	if (RT_INFO->rt_hdr.type == RT_LAST) {
-	
+		void_hdr = (void *)pkt_hdr;
+		
 		/* FIXME: Better error handling required */
-		if (rt_read(libtrace, (void **)&pkt_hdr, 
+		if (rt_read(libtrace, &void_hdr, 
 				sizeof(rt_header_t),blocking) !=
 				sizeof(rt_header_t)) {
 			return -1;
 		}
-
+		pkt_hdr = (rt_header_t *)void_hdr;
+		
 		/* Need to salvage these in case the next rt_read overwrites 
 		 * the buffer they came from! */
 		RT_INFO->rt_hdr.type = pkt_hdr->type;
