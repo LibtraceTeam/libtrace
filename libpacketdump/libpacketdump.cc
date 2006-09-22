@@ -83,7 +83,7 @@ void trace_dump_packet(struct libtrace_packet_t *packet)
 	time_t sec = (time_t)trace_get_seconds(packet);
 	char *link=(char *)trace_get_link(packet);
 
-	printf("%s",ctime(&sec));
+	printf("\n%s",ctime(&sec));
 	if (!link) 
 		printf(" [No link layer available]\n");
 	else

@@ -25,7 +25,8 @@ BIN_PROTOCOLS+=link_4.la
 #
 
 # Linux SLL
-TXT_PROTOCOLS+=link_6.protocol	
+#TXT_PROTOCOLS+=link_6.protocol	
+BIN_PROTOCOLS+=link_6.la
 
 # PFLog
 #	
@@ -88,6 +89,7 @@ BIN_PROTOCOLS+=ip_132.la
 link_0_la_LDFLAGS=-module
 link_2_la_LDFLAGS=-module
 link_4_la_LDFLAGS=-module
+link_6_la_LDFLAGS=-module
 link_9_la_LDFLAGS=-module
 link_10_la_LDFLAGS=-module
 link_11_la_LDFLAGS=-module
