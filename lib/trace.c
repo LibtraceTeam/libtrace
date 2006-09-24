@@ -378,6 +378,8 @@ DLLEXPORT libtrace_t * trace_create_dead (const char *uri) {
 	char *scan = (char *)calloc(sizeof(char),URI_PROTO_LINE);
 	char *uridata;
 	struct libtrace_format_t *tmp;
+
+	trace_init();
 	
 	libtrace->err.err_num = TRACE_ERR_NOERROR;
 
