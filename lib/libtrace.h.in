@@ -1354,7 +1354,7 @@ enum base_format_t {
 	TRACE_FORMAT_LEGACY_ETH   =8,
 	TRACE_FORMAT_LINUX_NATIVE =9,
 	TRACE_FORMAT_DUCK	  =10,
-	TRACE_FORMAT_BPF	  =11,
+	TRACE_FORMAT_BPF	  =11
 };
 
 /** Gets the format type for a given packet.
