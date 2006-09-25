@@ -62,6 +62,8 @@ BIN_PROTOCOLS+=eth_2048.la
 BIN_PROTOCOLS+=eth_2054.la	
 # IPv6
 TXT_PROTOCOLS+=eth_33024.protocol	
+# MPLS
+BIN_PROTOCOLS+=eth_34887.la
 
 # IP Protocol decoders
 # ICMP
@@ -96,6 +98,7 @@ link_11_la_LDFLAGS=-module
 link_15_la_LDFLAGS=-module 
 eth_2048_la_LDFLAGS=-module
 eth_2054_la_LDFLAGS=-module
+eth_34887_la_LDFLAGS=-module
 
 ip_1_la_LDFLAGS=-module
 ip_6_la_LDFLAGS=-module
