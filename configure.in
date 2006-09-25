@@ -164,7 +164,7 @@ AC_ARG_WITH(dag,
         elif test "$withval" = yes
         then
                 want_dag=yes
-                dag_root=/root/dag
+                dag_root=/usr/local/dag
         else
                 want_dag=yes
                 dag_root=$withval
@@ -174,7 +174,7 @@ AC_ARG_WITH(dag,
         # Use DAG API if present, otherwise don't
         #
         want_dag=ifpresent
-        dag_root=/root/dag/
+        dag_root=/usr/local/dag
 ])
 
 # turn the test part of the next block into a function, so it can be 
@@ -190,7 +190,6 @@ if test "$with_dag" != no; then
 		dag_lib_dir="$dag_root"
 	fi
 	
-        #if test -r "$dag_root/tools" -a -r "$dag_root/include"; then
 	if test -r "$dag_root/include"; then
 		dag_tools_dir="$dag_root/tools"
                 dag_include_dir="$dag_root/include"
