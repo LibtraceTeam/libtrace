@@ -48,7 +48,7 @@ AC_HEADER_TIME
 AC_SYS_LARGEFILE
 
 if test "$GCC" = "yes"; then
-	CFLAGS="$CFLAGS -Wall"
+	CFLAGS="$CFLAGS -Wall -W"
 fi
 
 AC_PROG_LIBTOOL
