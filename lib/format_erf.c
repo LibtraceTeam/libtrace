@@ -662,7 +662,8 @@ static int dag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	DAG.diff -= size;
 
 	if (packet->payload != NULL)
-		packet->size = size;
+		packet->size = trace_get_capture_length(packet) + 
+			erf_get_framing_length(packet);
 	else 
 		packet->size = erf_get_framing_length(packet);
 	
