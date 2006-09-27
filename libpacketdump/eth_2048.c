@@ -33,13 +33,13 @@ void decode(int link_type,char *packet,int len)
 	DISPLAY(ip_id," Id %u");
 	
 	if ((unsigned int)len >= ((char *)&ip->ip_ttl - (char *)ip - 2)) {
-		printf(" \n Fragoff %i", ip->ip_off);
+		printf(" Fragoff %i", ip->ip_off);
 		if (ip->ip_mf) printf(" MORE_FRAG");
 		if (ip->ip_df) printf(" DONT_FRAG");
 		if (ip->ip_rf) printf(" RESV_FRAG");
 	}
 	//printf("\n IP:");
-	DISPLAY(ip_ttl,"\n TTL %i");
+	DISPLAY(ip_ttl,"\n IP: TTL %i");
 	if ((unsigned int)len>=((char*)&ip->ip_p-(char*)ip+sizeof(ip->ip_p))) {
 		struct protoent *ent=getprotobynumber(ip->ip_p);
 		if (ent) {
