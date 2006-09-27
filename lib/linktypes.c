@@ -19,6 +19,11 @@
 #define ARPHRD_PPP      512
 #endif
 
+#ifndef ARPHRD_IEEE80211
+#define ARPHRD_IEEE80211	801
+#endif
+
+
 /* This file maps libtrace types to/from pcap DLT and erf types
  *
  * When adding a new linktype to libtrace, add the mapping(s) here,
