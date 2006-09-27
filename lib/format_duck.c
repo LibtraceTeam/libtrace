@@ -193,7 +193,6 @@ static int duck_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 		}
 	}
 
-	packet->size = duck_size;
 	return numbytes;
 }
 
@@ -209,8 +208,6 @@ static int duck_write_packet(libtrace_out_t *libtrace,
 	}
 	
 	assert(OUTPUT->file);
-	/* Common sense size checking */
-	assert(packet->size < 400);
 
 	if (OUTPUT->dag_version == 0) {
 	/* Writing the DUCK version will help with reading it back in later! */

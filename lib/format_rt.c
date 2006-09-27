@@ -514,7 +514,6 @@ static int rt_read_packet_versatile(libtrace_t *libtrace,
 		RT_INFO->rt_hdr.sequence = pkt_hdr->sequence;
 	}
 	packet->type = RT_INFO->rt_hdr.type;
-	packet->size = RT_INFO->rt_hdr.length;
 
 	if (packet->type >= RT_DATA_SIMPLE) {
 		if (rt_read(libtrace, &packet->buffer, RT_INFO->rt_hdr.length,blocking) != RT_INFO->rt_hdr.length) {
@@ -579,7 +578,7 @@ static int rt_read_packet_versatile(libtrace_t *libtrace,
 	}
 	/* Return the number of bytes read from the stream */
 	RT_INFO->rt_hdr.type = RT_LAST;
-	return packet->size; 
+	return RT_INFO->rt_hdr.length;
 }
 
 static int rt_read_packet(libtrace_t *libtrace,

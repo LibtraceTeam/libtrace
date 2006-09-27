@@ -546,11 +546,10 @@ static int dag_get_duckinfo(libtrace_t *libtrace,
 	}
 
 	packet->type = RT_DUCK_2_4;
-	packet->size = sizeof(duck_inf);
 	if (!DUCK.dummy_duck) 
 		DUCK.dummy_duck = trace_create_dead("duck:dummy");
 	packet->trace = DUCK.dummy_duck;
-	return packet->size;
+	return sizeof(duck_inf);
 }	
 #else
 static int dag_get_duckinfo(libtrace_t *libtrace, 
@@ -580,11 +579,10 @@ static int dag_get_duckinfo(libtrace_t *libtrace,
 	}
 
 	packet->type = RT_DUCK_2_5;
-	packet->size = sizeof(duckinf_t);
 	if (!DUCK.dummy_duck) 
 		DUCK.dummy_duck = trace_create_dead("rt:localhost:3434");
 	packet->trace = DUCK.dummy_duck;	
-	return packet->size;
+	return sizeof(duck_inf);
 }	
 #endif
 
@@ -661,16 +659,10 @@ static int dag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	DAG.offset += size;
 	DAG.diff -= size;
 
-	if (packet->payload != NULL)
-		packet->size = trace_get_capture_length(packet) + 
-			erf_get_framing_length(packet);
-	else 
-		packet->size = erf_get_framing_length(packet);
-	
 	tv = trace_get_timeval(packet);
 	DUCK.last_pkt = tv.tv_sec;
 	
-	return (packet->size);
+	return packet->payload ? size : erf_get_framing_length(packet);
 }
 
 static int dag_start_input(libtrace_t *libtrace) {

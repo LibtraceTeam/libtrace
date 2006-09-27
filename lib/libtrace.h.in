@@ -176,11 +176,9 @@ typedef struct libtrace_packet_t {
 	struct libtrace_t *trace; /**< pointer to the trace */
 	void *header;		/**< pointer to the framing header */
 	void *payload;		/**< pointer to the link layer */
-	buf_control_t buf_control; /**< who owns the memory */
 	void *buffer;		/**< allocated buffer */
-	size_t size;		/**< trace_get_framing_length()
-				 * +trace_get_capture_length() */
 	uint32_t type;		/**< rt protocol type for the packet */
+	buf_control_t buf_control; /**< who owns the memory */
 } libtrace_packet_t;
 
 /** libtrace error information */

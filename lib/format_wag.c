@@ -337,7 +337,6 @@ static int wag_read_packet_versatile(libtrace_t *libtrace, libtrace_packet_t *pa
 	
 	packet->header = packet->buffer;
 	packet->payload=(char*)packet->buffer+trace_get_framing_length(packet);
-	packet->size = trace_get_framing_length(packet) + trace_get_capture_length(packet);
 	return numbytes;
 }
 

@@ -631,7 +631,6 @@ DLLEXPORT libtrace_packet_t *trace_copy_packet(const libtrace_packet_t *packet) 
 	dest->header=dest->buffer;
 	dest->payload=(void*)
 		((char*)dest->buffer+trace_get_framing_length(packet));
-	dest->size=packet->size;
 	dest->type=packet->type;
 	dest->buf_control=TRACE_CTRL_PACKET;
 	memcpy(dest->header,packet->header,trace_get_framing_length(packet));
@@ -676,9 +675,10 @@ DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 
 	if (libtrace->format->read_packet) {
 		do {
-			packet->size=libtrace->format->read_packet(libtrace,packet);
-			if (packet->size==(size_t)-1 || packet->size==0) {
-				return packet->size;
+			size_t ret;
+			ret=libtrace->format->read_packet(libtrace,packet);
+			if (ret==(size_t)-1 || ret==0) {
+				return ret;
 			}
 			if (libtrace->filter) {
 				/* If the filter doesn't match, read another
@@ -693,11 +693,10 @@ DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 				trace_set_capture_length(packet,
 						libtrace->snaplen);
 			}
-			return packet->size;
+			return ret;
 		} while(1);
 	}
 	trace_set_err(libtrace,TRACE_ERR_UNSUPPORTED,"This format does not support reading packets\n");
-	packet->size=~0U;
 	return ~0U;
 }
 
@@ -713,8 +712,6 @@ DLLEXPORT int trace_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *pa
 	assert(libtrace);
 	assert(packet);	
 	/* Verify the packet is valid */
-	assert(packet->size<65536);
-	assert(packet->size>0);
 	assert(libtrace->started);
 
 	if (libtrace->format->write_packet) {
@@ -750,8 +747,6 @@ DLLEXPORT uint64_t trace_get_erf_timestamp(const libtrace_packet_t *packet) {
 	double seconds = 0.0;
 	struct timeval ts;
 
-	assert(packet->size>0 && packet->size<65536);
-
 	if (packet->trace->format->get_erf_timestamp) {
 		/* timestamp -> timestamp */
 		timestamp = packet->trace->format->get_erf_timestamp(packet);
@@ -780,7 +775,6 @@ DLLEXPORT struct timeval trace_get_timeval(const libtrace_packet_t *packet) {
         struct timeval tv;
 	uint64_t ts = 0;
 	double seconds = 0.0;
-	assert(packet->size>0 && packet->size<65536);
 	if (packet->trace->format->get_timeval) {
 		/* timeval -> timeval */
 		tv = packet->trace->format->get_timeval(packet);
@@ -819,8 +813,6 @@ DLLEXPORT double trace_get_seconds(const libtrace_packet_t *packet) {
 	uint64_t ts = 0;
 	struct timeval tv;
 
-	assert(packet->size>0 && packet->size<65536);
-	
 	if (packet->trace->format->get_seconds) {
 		/* seconds->seconds */
 		seconds = packet->trace->format->get_seconds(packet);
@@ -837,10 +829,8 @@ DLLEXPORT double trace_get_seconds(const libtrace_packet_t *packet) {
 	return seconds;
 }
 
-DLLEXPORT size_t trace_get_capture_length(const libtrace_packet_t *packet) {
-
-	assert(packet->size<65536);
-
+DLLEXPORT size_t trace_get_capture_length(const libtrace_packet_t *packet) 
+{
 	if (packet->trace->format->get_capture_length) {
 		return packet->trace->format->get_capture_length(packet);
 	}
@@ -857,8 +847,6 @@ DLLEXPORT size_t trace_get_capture_length(const libtrace_packet_t *packet) {
  * not be the same as the Capture Len.
  */ 
 DLLEXPORT size_t trace_get_wire_length(const libtrace_packet_t *packet){
-	assert(packet->size>0 && packet->size<65536);
-
 	if (packet->trace->format->get_wire_length) {
 		return packet->trace->format->get_wire_length(packet);
 	}
@@ -1052,7 +1040,6 @@ DLLEXPORT libtrace_direction_t trace_set_direction(libtrace_packet_t *packet,
 		libtrace_direction_t direction) 
 {
 	assert(packet);
-	assert(packet->size>0 && packet->size<65536);
 	if (packet->trace->format->set_direction) {
 		return packet->trace->format->set_direction(packet,direction);
 	}
@@ -1071,7 +1058,6 @@ DLLEXPORT libtrace_direction_t trace_set_direction(libtrace_packet_t *packet,
 DLLEXPORT libtrace_direction_t trace_get_direction(const libtrace_packet_t *packet) 
 {
 	assert(packet);
-	assert(packet->size>0 && packet->size<65536);
 	if (packet->trace->format->get_direction) {
 		return packet->trace->format->get_direction(packet);
 	}
@@ -1206,12 +1192,11 @@ DLLEXPORT int8_t trace_get_server_port(UNUSED uint8_t protocol,
  */
 DLLEXPORT size_t trace_set_capture_length(libtrace_packet_t *packet, size_t size) {
 	assert(packet);
-	assert(packet->size>0 && packet->size<65536);
 
 	if (packet->trace->format->set_capture_length) {
 		int caplen=packet->trace->format->set_capture_length(packet,size);
 		if (caplen!=-1) {
-			packet->size=trace_get_framing_length(packet)+caplen;
+			trace_get_framing_length(packet)+caplen;
 		}
 		return caplen;
 	}
@@ -1422,6 +1407,7 @@ void trace_construct_packet(libtrace_packet_t *packet,
 		const void *data,
 		uint16_t len)
 {
+	size_t size;
 	libtrace_t *deadtrace=NULL;
 	libtrace_pcapfile_pkt_hdr_t hdr;
 	struct timeval tv;
@@ -1433,12 +1419,12 @@ void trace_construct_packet(libtrace_packet_t *packet,
 	hdr.wirelen=len;
 
 	packet->trace=deadtrace;
-	packet->size=len+sizeof(hdr);
+	size=len+sizeof(hdr);
 	if (packet->buf_control==TRACE_CTRL_PACKET) {
-		packet->buffer=realloc(packet->buffer,packet->size);
+		packet->buffer=realloc(packet->buffer,size);
 	}
 	else {
-		packet->buffer=malloc(packet->size);
+		packet->buffer=malloc(size);
 	}
 	packet->buf_control=TRACE_CTRL_PACKET;
 	packet->header=packet->buffer;

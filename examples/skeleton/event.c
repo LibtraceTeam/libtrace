@@ -87,7 +87,7 @@ uint32_t event_read_packet(libtrace_t *trace, libtrace_packet_t *packet) {
 				/* Check for error first */
 				if (obj.size == -1)
 					return -1;
-				return packet->size;
+				return 1;
 				
 			/* End of trace has been reached */
 			case TRACE_EVENT_TERMINATE:
