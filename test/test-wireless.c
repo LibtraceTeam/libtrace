@@ -63,13 +63,12 @@ int main(int argc, char *argv[]) {
 	libtrace_packet_t *packet;
 	int result;
 	uint64_t tsft;
-	uint16_t freq, cflags, tmp16;
+	uint16_t freq, tmp16;
 	uint32_t fcs;
 	uint8_t flags, rate, sdbm, ndbm, sdb, antenna, tmp8;
 	
 	uint32_t total_fcs, expected_fcs = 3012874435;
 	uint16_t total_freq, expected_freq = 24170;
-	uint16_t total_cflags, expected_cflags = 1600;
 	
 	void *l;
 	libtrace_linktype_t lt;
@@ -92,10 +91,8 @@ int main(int argc, char *argv[]) {
 	/* Check that fields that exist in this trace are reported as 
 	 * existing */
 	assert(trace_get_wireless_tsft(l,lt,&tsft));
-	assert(trace_get_wireless_flags(l,lt,&flags));
 	assert(trace_get_wireless_rate(l,lt,&rate));
 	assert(trace_get_wireless_freq(l,lt,&freq));
-	assert(trace_get_wireless_channel_flags(l,lt,&cflags));
 	assert(trace_get_wireless_signal_strength_dbm(l,lt,(int8_t *)&sdbm));
 	assert(trace_get_wireless_noise_strength_dbm(l,lt,(int8_t *)&ndbm));
 	assert(trace_get_wireless_signal_strength_db(l,lt,&sdb));
@@ -104,10 +101,7 @@ int main(int argc, char *argv[]) {
 
 	/* Check that the fields that do not exist in this trace are
 	 * reported as not existing */
-	assert(!trace_get_wireless_fhss_hopset(l,lt,&tmp8));
-	assert(!trace_get_wireless_fhss_hoppattern(l,lt,&tmp8));
 	assert(!trace_get_wireless_noise_strength_db(l,lt,&tmp8));
-	assert(!trace_get_wireless_lock_quality(l,lt,&tmp16));
 	assert(!trace_get_wireless_tx_attenuation(l,lt,&tmp16));
 	assert(!trace_get_wireless_tx_attenuation_db(l,lt,&tmp16));
 	assert(!trace_get_wireless_tx_power_dbm(l,lt,(int8_t *)&tmp8));
@@ -118,20 +112,16 @@ int main(int argc, char *argv[]) {
 	 */
 	total_fcs = fcs;
 	total_freq = freq;
-	total_cflags = cflags;
 	
 	while((result = trace_read_packet(trace, packet)) > 0) {
 		if(trace_get_wireless_fcs(l,lt,&fcs)) 
 			total_fcs += fcs;
 		if(trace_get_wireless_freq(l,lt,&freq)) 
 			total_freq += freq;
-		if(trace_get_wireless_channel_flags(l,lt,&cflags))
-			total_cflags += cflags;
 	}
 
 	assert(total_fcs == expected_fcs);
 	assert(total_freq == expected_freq);
-	assert(total_cflags == expected_cflags);
 
 	trace_destroy_packet(packet);
 	trace_destroy(trace);
@@ -149,19 +139,14 @@ int main(int argc, char *argv[]) {
 	assert(lt != TRACE_TYPE_80211_RADIO);
 
 	assert(!trace_get_wireless_tsft(l,lt,&tsft));
-	assert(!trace_get_wireless_flags(l,lt,&flags));
 	assert(!trace_get_wireless_rate(l,lt,&rate));
 	assert(!trace_get_wireless_freq(l,lt,&freq));
-	assert(!trace_get_wireless_channel_flags(l,lt,&cflags));
 	assert(!trace_get_wireless_signal_strength_dbm(l,lt,(int8_t *)&sdbm));
 	assert(!trace_get_wireless_noise_strength_dbm(l,lt,(int8_t *)&ndbm));
 	assert(!trace_get_wireless_signal_strength_db(l,lt,&sdb));
 	assert(!trace_get_wireless_antenna(l,lt,&antenna));
 	assert(!trace_get_wireless_fcs(l,lt,&fcs));
-	assert(!trace_get_wireless_fhss_hopset(l,lt,&tmp8));
-	assert(!trace_get_wireless_fhss_hoppattern(l,lt,&tmp8));
 	assert(!trace_get_wireless_noise_strength_db(l,lt,&tmp8));
-	assert(!trace_get_wireless_lock_quality(l,lt,&tmp16));
 	assert(!trace_get_wireless_tx_attenuation(l,lt,&tmp16));
 	assert(!trace_get_wireless_tx_attenuation_db(l,lt,&tmp16));
 	assert(!trace_get_wireless_tx_power_dbm(l,lt,(int8_t *)&tmp8));

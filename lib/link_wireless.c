@@ -193,7 +193,13 @@ DLLEXPORT bool trace_get_wireless_tsft(void *link,
 	return false;
 }
 
-DLLEXPORT bool trace_get_wireless_flags(void *link, 
+/* 
+ * This function isn't portable across drivers, so has been left static
+ * for now. Maybe it will be included in the API later if it becomes useful
+ * and we come up with a suitable abstraction.
+ */
+static
+bool trace_get_wireless_flags(void *link, 
 		libtrace_linktype_t linktype, uint8_t *flags)
 {
 	uint8_t *p;
@@ -270,7 +276,13 @@ DLLEXPORT bool trace_get_wireless_freq(void *link,
 	return false;
 }
 
-DLLEXPORT bool trace_get_wireless_channel_flags(void *link,
+/* 
+ * This function isn't portable across drivers, so has been left static
+ * for now. Maybe it will be included in the API later if it becomes useful
+ * and we come up with a suitable abstraction.
+ */
+static
+bool trace_get_wireless_channel_flags(void *link,
 		libtrace_linktype_t linktype, uint16_t *flags)
 {
 	uint16_t *p;
@@ -298,7 +310,11 @@ DLLEXPORT bool trace_get_wireless_channel_flags(void *link,
 	return false;
 }
 
-DLLEXPORT bool trace_get_wireless_fhss_hopset(void *link,
+/* Not sure that this function is useful for now - who uses FHSS?
+ * This might get exported in the future if it becomes useful
+ */
+static
+bool trace_get_wireless_fhss_hopset(void *link,
 		libtrace_linktype_t linktype, uint8_t *hopset)
 {
 	uint8_t *p;
@@ -325,7 +341,11 @@ DLLEXPORT bool trace_get_wireless_fhss_hopset(void *link,
 	return false;
 }
 
-DLLEXPORT bool trace_get_wireless_fhss_hoppattern(void *link,
+/* Not sure that this function is useful for now - who uses FHSS?
+ * This might get exported in the future if it becomes useful
+ */
+static
+bool trace_get_wireless_fhss_hoppattern(void *link,
 		libtrace_linktype_t linktype, uint8_t *hoppattern)
 {
 	uint8_t *p;
@@ -444,7 +464,12 @@ DLLEXPORT bool trace_get_wireless_noise_strength_db(void *link,
 	return false;
 }
 
-DLLEXPORT bool trace_get_wireless_lock_quality(void *link,
+/* Not sure if this function is useful. As the radiotap documentation says,
+ * there's no set metric for defining the quality of the Barker Code Lock.
+ * Maybe it will be exported later if it becomes useful.
+ */
+static
+bool trace_get_wireless_lock_quality(void *link,
 		libtrace_linktype_t linktype, uint16_t *quality)
 {
 	uint16_t *p;

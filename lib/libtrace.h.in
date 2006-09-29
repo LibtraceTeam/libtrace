@@ -1412,15 +1412,6 @@ void trace_construct_packet(libtrace_packet_t *packet,
 DLLEXPORT bool trace_get_wireless_tsft(void *link,
         libtrace_linktype_t linktype, uint64_t *tsft);
 
-/** Get the wireless flags 
- * @param link the wireless header
- * @param linktype the linktype of the wireless header passed in
- * @param[out] flags the wireless flags.
- * @return true if the field was available, false if not.
- */
-DLLEXPORT bool trace_get_wireless_flags(void *link,
-        libtrace_linktype_t linktype, uint8_t *flags);
-
 /** Get the wireless rate 
  * @param link the wireless header
  * @param linktype the linktype of the wireless header passed in
@@ -1439,33 +1430,6 @@ DLLEXPORT bool trace_get_wireless_rate(void *link,
  */
 DLLEXPORT bool trace_get_wireless_freq(void *link,
         libtrace_linktype_t linktype, uint16_t *freq);
-
-/** Get the wireless channel flags
- * @param link the wireless header
- * @param linktype the linktype of the wireless header passed in
- * @param[out] flags the channel flags
- * @return true if the field was available, false if not.
- */
-DLLEXPORT bool trace_get_wireless_channel_flags(void *link,
-        libtrace_linktype_t linktype, uint16_t *flags);
-
-/** Get the wireless FHSS Hop Set 
- * @param link the wireless header
- * @param linktype the linktype of the wireless header passed in
- * @param[out] hopset the fhss hop set
- * @return true if the field was available, false if not.
- */
-DLLEXPORT bool trace_get_wireless_fhss_hopset(void *link,
-        libtrace_linktype_t linktype, uint8_t *hopset);
-        
-/** Get the wireless FHSS Hop Pattern 
- * @param link the wireless header
- * @param linktype the linktype of the wireless header passed in
- * @param[out] hoppattern the fhss hoppattern
- * @return true if the field was available, false if not.
- */
-DLLEXPORT bool trace_get_wireless_fhss_hoppattern(void *link,
-        libtrace_linktype_t linktype, uint8_t *hoppattern);
 
 /** Get the wireless signal strength in dBm 
  * @param link the wireless header
@@ -1507,15 +1471,6 @@ DLLEXPORT bool trace_get_wireless_signal_strength_db(void *link,
 DLLEXPORT bool trace_get_wireless_noise_strength_db(void *link,
         libtrace_linktype_t linktype, uint8_t *strength);
 
-/** Get the wireless Barker code lock quality 
- * @param link the wireless header
- * @param linktype the linktype of the wireless header passed in
- * @param[out] quality the quality of the Barker Code lock.
- * @return true if the field was available, false if not.
- */
-DLLEXPORT bool trace_get_wireless_lock_quality(void *link,
-        libtrace_linktype_t linktype, uint16_t *quality);
-
 /** Get the wireless transmit attenuation 
  * @param link the wireless header
  * @param linktype the linktype of the wireless header passed in
@@ -1536,15 +1491,13 @@ DLLEXPORT bool trace_get_wireless_tx_attenuation(void *link,
 DLLEXPORT bool trace_get_wireless_tx_attenuation_db(void *link,
         libtrace_linktype_t linktype, uint16_t *attenuation);
 
-/** Get the wireless transmit power in dBm 
- * @param link the wireless header
- * @param linktype the linktype of the wireless header passed in
- * @param[out] txpower the transmit power as dB from a 1mW reference. This is the 
- * absolute power level measured at the antenna port.
+/** Get the wireless transmit power in dBm @param link the wireless header
+ * @param linktype the linktype of the wireless header passed in 
+ * @param[out] txpower the transmit power as dB from a 1mW reference. This is the absolute power level measured at the antenna port.  
  * @return true if the field was available, false if not.
  */
-DLLEXPORT bool trace_get_wireless_tx_power_dbm(void *link,
-        libtrace_linktype_t linktype, int8_t *txpower);
+DLLEXPORT bool trace_get_wireless_tx_power_dbm(void *link, libtrace_linktype_t
+		linktype, int8_t *txpower);
 
 /** Get the wireless antenna 
  * @param link the wireless header
