@@ -39,8 +39,10 @@ libtrace_linktype_t pcap_dlt_to_libtrace(libtrace_dlt_t dlt)
 		case TRACE_DLT_ATM_RFC1483: return TRACE_TYPE_ATM;
 		case TRACE_DLT_IEEE802_11: return TRACE_TYPE_80211;
 		case TRACE_DLT_LINUX_SLL: return TRACE_TYPE_LINUX_SLL;
-		case TRACE_DLT_PFLOG: return TRACE_TYPE_PFLOG;
-        case TRACE_DLT_IEEE802_11_RADIO: return TRACE_TYPE_80211_RADIO;
+		case TRACE_DLT_PFLOG: 
+					return TRACE_TYPE_PFLOG;
+        	case TRACE_DLT_IEEE802_11_RADIO:
+					return TRACE_TYPE_80211_RADIO;
 	}
 	return ~0;
 }
