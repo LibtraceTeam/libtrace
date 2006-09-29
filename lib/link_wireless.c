@@ -55,12 +55,12 @@ static void *trace_get_radiotap_field(void *link, libtrace_radiotap_field_t fiel
 
 	/* Check if the field exists in the radiotap header before proceeding
 	*/
-	if ((rtap->it_present & (1 << field)) == 0) return NULL;
+	if ((bswap_le_to_host32(rtap->it_present) & (1 << field)) == 0) return NULL;
 
 	/* Skip over any extended bitmasks */
 	p = (uint8_t *) &(rtap->it_present);
 
-	while ( *((uint32_t*)p) & (1 << TRACE_RADIOTAP_EXT) ) {
+	while ( bswap_le_to_host32(*((uint32_t*)p)) & (1 << TRACE_RADIOTAP_EXT) ) {
 		p += sizeof (uint32_t);
 	}
 
@@ -73,19 +73,19 @@ static void *trace_get_radiotap_field(void *link, libtrace_radiotap_field_t fiel
 	if (field == TRACE_RADIOTAP_TSFT) 
 		/* Always aligned */
 		return (void*)p;
-	if (rtap->it_present & (1 << TRACE_RADIOTAP_TSFT))
+	if (bswap_le_to_host32(rtap->it_present) & (1 << TRACE_RADIOTAP_TSFT))
 		p += sizeof (uint64_t);
 
 	if (field == TRACE_RADIOTAP_FLAGS)
 		/* Always aligned */
 		return (void*)p;
-	if (rtap->it_present & (1 << TRACE_RADIOTAP_FLAGS))
+	if (bswap_le_to_host32(rtap->it_present) & (1 << TRACE_RADIOTAP_FLAGS))
 		p += sizeof (uint8_t);
 
 	if (field == TRACE_RADIOTAP_RATE)
 		/* Always aligned */
 		return (void*)p;
-	if (rtap->it_present & (1 << TRACE_RADIOTAP_RATE))
+	if (bswap_le_to_host32(rtap->it_present) & (1 << TRACE_RADIOTAP_RATE))
 		p+= sizeof (uint8_t);
 
 	if (field == TRACE_RADIOTAP_CHANNEL)
@@ -93,7 +93,7 @@ static void *trace_get_radiotap_field(void *link, libtrace_radiotap_field_t fiel
 		ALIGN_NATURAL_16(p,s);
 		return (void *)p;
 	}
-	if (rtap->it_present & (1 << TRACE_RADIOTAP_CHANNEL))
+	if (bswap_le_to_host32(rtap->it_present) & (1 << TRACE_RADIOTAP_CHANNEL))
 		p+= sizeof (uint32_t);
 
 	if (field == TRACE_RADIOTAP_FHSS)
@@ -101,17 +101,17 @@ static void *trace_get_radiotap_field(void *link, libtrace_radiotap_field_t fiel
 		ALIGN_NATURAL_16(p,s);
 		return (void *)p;
 	}
-	if (rtap->it_present & (1 << TRACE_RADIOTAP_FHSS))
+	if (bswap_le_to_host32(rtap->it_present) & (1 << TRACE_RADIOTAP_FHSS))
 		p+= sizeof (uint16_t);
 
 	if (field == TRACE_RADIOTAP_DBM_ANTSIGNAL)
 		return (void *)p;
-	if (rtap->it_present & (1 << TRACE_RADIOTAP_DBM_ANTSIGNAL))
+	if (bswap_le_to_host32(rtap->it_present) & (1 << TRACE_RADIOTAP_DBM_ANTSIGNAL))
 		p+= sizeof (uint8_t);
 
 	if (field == TRACE_RADIOTAP_DBM_ANTNOISE)
 		return (void *)p;
-	if (rtap->it_present & (1 << TRACE_RADIOTAP_DBM_ANTNOISE))
+	if (bswap_le_to_host32(rtap->it_present) & (1 << TRACE_RADIOTAP_DBM_ANTNOISE))
 		p+= sizeof (uint8_t);
 
 	if (field == TRACE_RADIOTAP_LOCK_QUALITY)
@@ -119,7 +119,7 @@ static void *trace_get_radiotap_field(void *link, libtrace_radiotap_field_t fiel
 		ALIGN_NATURAL_16(p,s);
 		return (void *)p;
 	}
-	if (rtap->it_present & (1 << TRACE_RADIOTAP_LOCK_QUALITY))
+	if (bswap_le_to_host32(rtap->it_present) & (1 << TRACE_RADIOTAP_LOCK_QUALITY))
 		p+= sizeof (uint16_t);
 
 	if (field == TRACE_RADIOTAP_TX_ATTENUATION)
@@ -127,7 +127,7 @@ static void *trace_get_radiotap_field(void *link, libtrace_radiotap_field_t fiel
 		ALIGN_NATURAL_16(p,s);
 		return (void *)p;
 	}
-	if (rtap->it_present & (1 << TRACE_RADIOTAP_TX_ATTENUATION))
+	if (bswap_le_to_host32(rtap->it_present) & (1 << TRACE_RADIOTAP_TX_ATTENUATION))
 		p+= sizeof (uint16_t);
 
 	if (field == TRACE_RADIOTAP_DB_TX_ATTENUATION)
@@ -135,27 +135,27 @@ static void *trace_get_radiotap_field(void *link, libtrace_radiotap_field_t fiel
 		ALIGN_NATURAL_16(p,s);
 		return (void *)p;
 	}
-	if (rtap->it_present & (1 << TRACE_RADIOTAP_DB_TX_ATTENUATION))
+	if (bswap_le_to_host32(rtap->it_present) & (1 << TRACE_RADIOTAP_DB_TX_ATTENUATION))
 		p+= sizeof (uint16_t);
 
 	if (field == TRACE_RADIOTAP_DBM_TX_POWER)
 		return (void *)p;
-	if (rtap->it_present & (1 << TRACE_RADIOTAP_DBM_TX_POWER))
+	if (bswap_le_to_host32(rtap->it_present) & (1 << TRACE_RADIOTAP_DBM_TX_POWER))
 		p+= sizeof (uint8_t);
 
 	if (field == TRACE_RADIOTAP_ANTENNA)
 		return (void *)p;
-	if (rtap->it_present & (1 << TRACE_RADIOTAP_ANTENNA))
+	if (bswap_le_to_host32(rtap->it_present) & (1 << TRACE_RADIOTAP_ANTENNA))
 		p+= sizeof (uint8_t);
 
 	if (field == TRACE_RADIOTAP_DB_ANTSIGNAL)
 		return (void *)p;
-	if (rtap->it_present & (1 << TRACE_RADIOTAP_DB_ANTSIGNAL))
+	if (bswap_le_to_host32(rtap->it_present) & (1 << TRACE_RADIOTAP_DB_ANTSIGNAL))
 		p+= sizeof (uint8_t);
 
 	if (field == TRACE_RADIOTAP_DB_ANTNOISE)
 		return (void *) p;
-	if (rtap->it_present & (1 << TRACE_RADIOTAP_DB_ANTNOISE))
+	if (bswap_le_to_host32(rtap->it_present) & (1 << TRACE_RADIOTAP_DB_ANTNOISE))
 		p+= sizeof (uint8_t);
 
 	if (field == TRACE_RADIOTAP_FCS)
