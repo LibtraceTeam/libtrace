@@ -64,7 +64,6 @@
 #define COLLECTOR_PORT 3435
 
 static struct libtrace_format_t erf;
-static struct libtrace_format_t rtclient;
 #ifdef HAVE_DAG
 static struct libtrace_format_t dag;
 #endif 
@@ -371,67 +370,6 @@ static int erf_seek_erf(libtrace_t *libtrace,uint64_t erfts)
 	return 0;
 }
 
-static int rtclient_init_input(libtrace_t *libtrace) {
-	char *scan;
-	libtrace->format_data = malloc(sizeof(struct erf_format_data_t));
-
-	if (strlen(libtrace->uridata) == 0) {
-		CONNINFO.rt.hostname = 
-			strdup("localhost");
-		CONNINFO.rt.port = 
-			COLLECTOR_PORT;
-	} else {
-		if ((scan = strchr(libtrace->uridata,':')) == NULL) {
-			CONNINFO.rt.hostname = 
-				strdup(libtrace->uridata);
-			CONNINFO.rt.port =
-				COLLECTOR_PORT;
-		} else {
-			CONNINFO.rt.hostname = 
-				(char *)strndup(libtrace->uridata,
-						(scan - libtrace->uridata));
-			CONNINFO.rt.port = 
-				atoi(++scan);
-		}
-	}
-
-	return 0; /* success */
-}
-
-static int rtclient_start_input(libtrace_t *libtrace)
-{
-	struct hostent *he;
-	struct sockaddr_in remote;
-	if ((he=gethostbyname(CONNINFO.rt.hostname)) == NULL) {  
-		trace_set_err(libtrace,TRACE_ERR_INIT_FAILED,"failed to resolve %s",
-				CONNINFO.rt.hostname);
-		return -1;
-	} 
-	if ((INPUT.fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-		trace_set_err(libtrace,errno,"socket(AF_INET,SOCK_STREAM)");
-		return -1;
-	}
-
-	remote.sin_family = AF_INET;   
-	remote.sin_port = htons(CONNINFO.rt.port);
-	remote.sin_addr = *((struct in_addr *)he->h_addr);
-	memset(&(remote.sin_zero), 0, 8);
-
-	if (connect(INPUT.fd, (struct sockaddr *)&remote,
-				sizeof(struct sockaddr)) == -1) {
-		trace_set_err(libtrace,errno,"connect(%s)",
-				CONNINFO.rt.hostname);
-		return -1;
-	}
-	return 0; /* success */
-}
-
-static int rtclient_pause_input(libtrace_t *libtrace)
-{
-	close(INPUT.fd);
-	return 0; /* success */
-}
-
 static int erf_init_output(libtrace_out_t *libtrace) {
 	libtrace->format_data = malloc(sizeof(struct erf_format_data_out_t));
 
@@ -488,13 +426,6 @@ static int dag_fin_input(libtrace_t *libtrace) {
 	return 0; /* success */
 }
 #endif
-
-static int rtclient_fin_input(libtrace_t *libtrace) {
-	free(CONNINFO.rt.hostname);
-	close(INPUT.fd);
-	free(libtrace->format_data);
-	return 0;
-}
 
 static int erf_fin_input(libtrace_t *libtrace) {
 	if (INPUT.file)
@@ -754,112 +685,6 @@ static int erf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	return rlen;
 }
 
-static int rtclient_read(libtrace_t *libtrace, void *buffer, size_t len) {
-	int numbytes;
-
-	while(1) {
-#ifndef MSG_NOSIGNAL
-#  define MSG_NOSIGNAL 0
-#endif
-		if ((numbytes = recv(INPUT.fd,
-						buffer,
-						len,
-						MSG_NOSIGNAL)) == -1) {
-			if (errno == EINTR) {
-				/*ignore EINTR in case
-				 *a caller is using signals
-				 */
-				continue;
-			}
-			trace_set_err(libtrace,errno,"recv(%s)",
-					libtrace->uridata);
-			return -1;
-		}
-		break;
-
-	}
-	return numbytes;
-}
-
-static int rtclient_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
-	int numbytes = 0;
-	char buf[RP_BUFSIZE];
-	int read_required = 0;
-	
-	void *buffer = 0;
-
-	if (packet->buf_control == TRACE_CTRL_EXTERNAL || !packet->buffer) {
-		packet->buf_control = TRACE_CTRL_PACKET;
-		packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
-	}
-
-	buffer = packet->buffer;
-	packet->header = packet->buffer;
-	
-	packet->type = RT_DATA_ERF;
-
-	
-	do {
-		libtrace_packet_status_t status;
-		int size;
-		if (tracefifo_out_available(libtrace->fifo) == 0 
-				|| read_required) {
-			if ((numbytes = rtclient_read(
-					libtrace,buf,RP_BUFSIZE))<=0) {
-				return numbytes;
-			}
-			tracefifo_write(libtrace->fifo,buf,numbytes);
-			read_required = 0;
-		}
-		/* Read status byte */
-		if (tracefifo_out_read(libtrace->fifo,
-				&status, sizeof(uint32_t)) != sizeof(uint32_t)){
-			read_required = 1;
-			continue;
-		}
-		tracefifo_out_update(libtrace->fifo,sizeof(uint32_t));
-		/* Read in packet size */
-		if (tracefifo_out_read(libtrace->fifo,
-				&size, sizeof(uint32_t)) != sizeof(uint32_t)) {
-			tracefifo_out_reset(libtrace->fifo);
-			read_required = 1;
-			continue;
-		}
-		tracefifo_out_update(libtrace->fifo, sizeof(uint32_t));
-		
-		if (status.type == 2 /* RT_MSG */) {
-			/* Need to skip this packet as it is a message packet */
-			tracefifo_out_update(libtrace->fifo, size);
-			tracefifo_ack_update(libtrace->fifo, size + 
-					sizeof(uint32_t) + 
-					sizeof(libtrace_packet_status_t));
-			continue;
-		}
-		
-		/* read in the full packet */
-		if ((numbytes = tracefifo_out_read(libtrace->fifo, 
-						buffer, size)) != size) {
-			tracefifo_out_reset(libtrace->fifo);
-			read_required = 1;
-			continue;
-		}
-
-		/* got in our whole packet, so... */
-		tracefifo_out_update(libtrace->fifo,size);
-
-		tracefifo_ack_update(libtrace->fifo,size + 
-				sizeof(uint32_t) + 
-				sizeof(libtrace_packet_status_t));
-
-		if (((dag_record_t *)buffer)->flags.rxerror == 1) {
-			packet->payload = NULL;
-		} else {
-			packet->payload = (char*)packet->buffer + erf_get_framing_length(packet);
-		}
-		return numbytes;
-	} while(1);
-}
-
 static int erf_dump_packet(libtrace_out_t *libtrace,
 		dag_record_t *erfptr, int pad, void *buffer) {
 	int numbytes = 0;
@@ -1057,10 +882,6 @@ static size_t erf_set_capture_length(libtrace_packet_t *packet, size_t size) {
 	return trace_get_capture_length(packet);
 }
 
-static int rtclient_get_fd(const libtrace_t *libtrace) {
-	return INPUT.fd;
-}
-
 #ifdef HAVE_DAG
 libtrace_eventobj_t trace_event_dag(libtrace_t *trace, libtrace_packet_t *packet) {
         libtrace_eventobj_t event = {0,0,0.0,0};
@@ -1123,19 +944,6 @@ static void erf_help() {
 
 	
 }
-
-static void rtclient_help() {
-	printf("rtclient format module: $Revision$\n");
-	printf("DEPRECATED - use rt module instead\n");
-	printf("Supported input URIs:\n");
-	printf("\trtclient:host:port\n");
-	printf("\n");
-	printf("\te.g.:rtclient:localhost:3435\n");
-	printf("\n");
-        printf("Supported output URIs:\n");
-        printf("\tnone\n");
-        printf("\n");
-}	
 
 static struct libtrace_format_t erf = {
 	"erf",
@@ -1209,43 +1017,7 @@ static struct libtrace_format_t dag = {
 };
 #endif
 
-static struct libtrace_format_t rtclient = {
-	"rtclient",
-	"$Id$",
-	TRACE_FORMAT_ERF,
-	rtclient_init_input,		/* init_input */	
-	NULL,				/* config_input */
-	rtclient_start_input,		/* start_input */
-	rtclient_pause_input,		/* pause_input */
-	NULL,				/* init_output */
-	NULL,				/* config_output */
-	NULL,				/* start_output */
-	rtclient_fin_input,		/* fin_input */
-	NULL,				/* fin_output */
-	rtclient_read_packet,		/* read_packet */
-	NULL,				/* fin_packet */
-	NULL,				/* write_packet */
-	erf_get_link_type,		/* get_link_type */
-	erf_get_direction,		/* get_direction */
-	erf_set_direction,		/* set_direction */
-	erf_get_erf_timestamp,		/* get_erf_timestamp */
-	NULL,				/* get_timeval */
-	NULL,				/* get_seconds */
-	NULL,				/* seek_erf */
-	NULL,				/* seek_timeval */
-	NULL,				/* seek_seconds */
-	erf_get_capture_length,		/* get_capture_length */
-	erf_get_wire_length,		/* get_wire_length */
-	erf_get_framing_length,		/* get_framing_length */
-	erf_set_capture_length,		/* set_capture_length */
-	rtclient_get_fd,		/* get_fd */
-	trace_event_device,		/* trace_event */
-	rtclient_help,			/* help */
-	NULL				/* next pointer */
-};
-
 void erf_constructor() {
-	register_format(&rtclient);
 	register_format(&erf);
 #ifdef HAVE_DAG
 	register_format(&dag);

@@ -20,7 +20,7 @@ else
 LIBTRACEIO=libtraceio-stdio.c
 endif
 
-libtrace_la_SOURCES = $(LIBTRACEIO) trace.c fifo.c fifo.h common.h \
+libtrace_la_SOURCES = $(LIBTRACEIO) trace.c common.h \
 		format_erf.c format_pcap.c format_wag.c format_legacy.c \
 		format_rt.c format_helper.c format_helper.h format_pcapfile.c \
 		format_duck.c $(NATIVEFORMATS) $(BPFFORMATS) \

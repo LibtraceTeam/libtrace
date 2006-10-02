@@ -83,7 +83,6 @@
 #include <time.h>
 
 #include "libtrace.h"
-#include "fifo.h"
 #include "libtrace_int.h"
 #include "parse_cmd.h"
 
@@ -352,13 +351,6 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 	}
 	
 
-        libtrace->fifo = create_tracefifo(1048576);
-	if (!libtrace->fifo) {
-		trace_set_err(libtrace,ENOMEM,"Could not allocate memory for fifo");
-		free(scan);
-		return libtrace;
-	}
-	assert(libtrace->fifo);
 	free(scan);
 	libtrace->err.err_num=TRACE_ERR_NOERROR;
 	libtrace->err.problem[0]='\0';
@@ -591,8 +583,6 @@ DLLEXPORT void trace_destroy(libtrace_t *libtrace) {
         /* need to free things! */
         if (libtrace->uridata)
 		free(libtrace->uridata);
-	if (libtrace->fifo)
-		destroy_tracefifo(libtrace->fifo);
         free(libtrace);
 }
 

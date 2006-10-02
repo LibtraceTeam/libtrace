@@ -59,7 +59,6 @@ extern "C" {
 #endif
 
 
-#include "fifo.h"
 #include "rt_protocol.h"
 	
 #ifdef HAVE_PCAP_BPF_H
@@ -131,7 +130,6 @@ struct libtrace_t {
 	libtrace_err_t err;		/**< error information */
 	struct libtrace_event_status_t event;	/**< the next event */
 	char *uridata;			/**< the uri of this trace */
-	struct tracefifo_t *fifo;   	/**< fifo used in this trace */
 	struct libtrace_filter_t *filter; /**< used by libtrace if the module
 					    * doesn't support filters natively
 					    */
