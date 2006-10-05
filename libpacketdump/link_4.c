@@ -452,7 +452,7 @@ void decode_80211_assoc_response(char *pkt, int len) {
 	}
 	decode_80211_capinfo(&r->capinfo);
 	printf(" 802.11MAC: Status Code = ");
-	print_80211_status_code(r->status_code);
+	ieee80211_print_status_code(r->status_code);
 	/* AID has two most significant bits set to 1 */
 	printf("\n 802.11MAC: Association ID = %u\n", r->assoc_id & 0x3FFF);
 	decode_80211_information_elements((char *)pkt + sizeof(ieee80211_assoc_resp), len-sizeof(ieee80211_assoc_resp));
@@ -481,7 +481,7 @@ void decode_80211_authentication_frame(char *pkt, int len) {
 	printf(" 802.11MAC: Authentication algorithm number = %u\n", auth->auth_algo_num);
 	printf(" 802.11MAC: Authentication transaction sequence number = %u\n", auth->auth_trans_seq_num);
 	printf(" 802.11MAC: Status Code = ");
-	print_80211_status_code(auth->status_code);
+	ieee80211_print_status_code(auth->status_code);
 	printf("\n 802.11MAC: Information Elements:\n");
 	decode_80211_information_elements((char *)pkt + sizeof(ieee80211_auth), len - sizeof(ieee80211_auth));
 
@@ -549,7 +549,7 @@ void decode_80211_mgmt(char *pkt, int len) {
 		case 10:
 			data = ((char *)pkt + sizeof(ieee80211_mgmt_frame));
 			printf(" 802.11MAC: Reason Code = ");
-			print_80211_reason_code((uint16_t) ((data[0] << 8) | (data[1])));
+			ieee80211_print_reason_code((uint16_t) ((data[0] << 8) | (data[1])));
 			printf("\n");
 			break;
 						    
@@ -559,7 +559,7 @@ void decode_80211_mgmt(char *pkt, int len) {
 		case 12:
 			data = ((char *)pkt + sizeof(ieee80211_mgmt_frame));
 			printf(" 802.11MAC: Reason Code = ");
-			print_80211_reason_code((uint16_t) ((data[0] << 8) | (data[1])));
+			ieee80211_print_reason_code((uint16_t) ((data[0] << 8) | (data[1])));
 			printf("\n");
 			break;
 		default:
