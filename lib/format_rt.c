@@ -650,7 +650,6 @@ libtrace_eventobj_t trace_event_rt(libtrace_t *trace, libtrace_packet_t *packet)
 			event.type = TRACE_EVENT_IOWAIT;
 		}
 		else {
-			//printf("packet error\n");
 			event.type = TRACE_EVENT_PACKET;
 		}
 	} else if (event.size == 0) {

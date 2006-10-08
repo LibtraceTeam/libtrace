@@ -17,7 +17,6 @@ pcap_t *pcap_open_dead(int linktype, int snaplen) {
     p = (pcap_t *)malloc(sizeof(*p));
     if (p == NULL)
         return NULL;    
-  //  memset (p, 0, sizeof(*p));
     p->snapshot = snaplen;
     p->linktype = linktype;
     return p;

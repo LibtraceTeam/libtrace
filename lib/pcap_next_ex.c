@@ -5,8 +5,6 @@
 #include <pcap.h>
 #ifdef HAVE_PCAP_INT_H
 # include <pcap-int.h>
-#else
-//# error "Need pcap-int.h for declaration of pcap_t"
 #endif
 #include <string.h>
 #include <libtrace.h>
@@ -53,10 +51,6 @@ int pcap_next_ex(pcap_t *p, struct pcap_pkthdr **pkt_header,
 	if (pcapbytes == 0)
 		return 0;
 
-        //*pkt_header = pcap_data.header;
-        //*pkt_data = pcap_data.payload;
-
-	
         return 1;
 }
 #endif

@@ -716,16 +716,6 @@ DLLEXPORT void *trace_get_link(const libtrace_packet_t *packet) {
 	return (void *)packet->payload;
 }
 
-/*
-typedef struct legacy_framing {
-	uint64_t 	ts;
-	uint32_t	crc;
-	uint32_t	header;
-	uint32_t	data[12]; // pad to 64 bytes 
-} legacy_framing_t;
-*/
-
-
 /* Get the current time in DAG time format 
  * @param packet 	a pointer to a libtrace_packet structure
  * @returns a 64 bit timestamp in DAG ERF format (upper 32 bits are the seconds
