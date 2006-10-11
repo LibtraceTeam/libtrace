@@ -69,9 +69,10 @@ void *trace_get_vlan_payload_from_ethernet_payload(void *ethernet, uint16_t *typ
 }
 
 /* skip any MPLS headers if necessary, guessing what the next type is
- * type is input/output
+ * type is input/output.  If the next type is "ethernet" this will
+ * return a type of 0x0000.
  */
-void *trace_get_mpls_payload_from_ethernet_payload(void *ethernet,
+static void *trace_get_mpls_payload_from_ethernet_payload(void *ethernet,
 		uint16_t *type, uint32_t *remaining)
 {
 	assert(type && "You must pass a type in!");
