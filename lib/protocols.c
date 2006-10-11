@@ -68,6 +68,48 @@ void *trace_get_vlan_payload_from_ethernet_payload(void *ethernet, uint16_t *typ
 	return ethernet;
 }
 
+/* skip any MPLS headers if necessary, guessing what the next type is
+ * type is input/output
+ */
+void *trace_get_mpls_payload_from_ethernet_payload(void *ethernet,
+		uint16_t *type, uint32_t *remaining)
+{
+	assert(type && "You must pass a type in!");
+
+	if (*type == 0x8847) {
+		if ((((char*)ethernet)[2]&0x01)==0) {
+			*type = 0x8847;
+		}
+		else {
+			if (!remaining || *remaining>=5) {
+				switch (((char*)ethernet)[4]&0xF0) {
+					case 0x40:
+						*type = 0x0800;
+						break;
+					case 0x60:
+						*type = 0x86DD;
+						break;
+					default:
+						/* Ethernet */
+						*type = 0;
+				}
+			}
+		}
+		ethernet=(char*)ethernet+4;
+		if (remaining) {
+			if (*remaining<4)
+				return NULL;
+			else
+				*remaining-=4;
+		}
+
+
+		return ethernet;
+	}
+	else
+		return NULL;
+}
+
 static void *trace_get_payload_from_80211(void *link, uint16_t *type, uint32_t *remaining)
 {
 	/* TODO: Decode type != DATA
@@ -285,7 +327,24 @@ libtrace_ip_t *trace_get_ip(libtrace_packet_t *packet)
 	if (!ret)
 		return NULL;
 
-	ret=trace_get_vlan_payload_from_ethernet_payload(ret,&type,NULL);
+	for(;;) {
+		switch(type) {
+			case 0x8100:
+				ret=trace_get_vlan_payload_from_ethernet_payload(ret,&type,NULL);
+				continue;
+			case 0x8847:
+				ret=trace_get_mpls_payload_from_ethernet_payload(ret,&type,NULL);
+
+				if (ret && type == 0x0) {
+					ret=trace_get_payload_from_ethernet(ret,&type,NULL);
+				}
+				continue;
+			default:
+				break;
+		}
+
+		break;
+	}
 
 	if (!ret || type!=0x0800)
 		return NULL;
@@ -314,7 +373,24 @@ libtrace_ip6_t *trace_get_ip6(libtrace_packet_t *packet)
 	if (!ret)
 		return NULL;
 
-	ret=trace_get_vlan_payload_from_ethernet_payload(ret,&type,NULL);
+	for(;;) {
+		switch(type) {
+			case 0x8100:
+				ret=trace_get_vlan_payload_from_ethernet_payload(ret,&type,NULL);
+				continue;
+			case 0x8847:
+				ret=trace_get_mpls_payload_from_ethernet_payload(ret,&type,NULL);
+
+				if (ret && type == 0x0) {
+					ret=trace_get_payload_from_ethernet(ret,&type,NULL);
+				}
+				continue;
+			default:
+				break;
+		}
+
+		break;
+	}
 
 	if (!ret || type!=0x86DD)
 		return NULL;
@@ -421,9 +497,27 @@ DLLEXPORT void *trace_get_transport(libtrace_packet_t *packet,
 	if (!transport)
 		return NULL;
 
-	transport = trace_get_vlan_payload_from_ethernet_payload(transport,
-			&ethertype,
-			remaining);
+	for(;;) {
+		switch(ethertype) {
+		case 0x8100:
+			transport=trace_get_vlan_payload_from_ethernet_payload(
+					  transport,&ethertype,NULL);
+			continue;
+		case 0x8847:
+			transport=trace_get_mpls_payload_from_ethernet_payload(
+					  transport,&ethertype,NULL);
+
+			if (transport && ethertype == 0x0) {
+				transport=trace_get_payload_from_ethernet(
+						transport,&ethertype,NULL);
+			}
+			continue;
+		default:
+			break;
+		}
+
+		break;
+	}
 
 	if (!transport)
 		return NULL;
@@ -676,9 +770,27 @@ DLLEXPORT struct sockaddr *trace_get_source_address(const libtrace_packet_t *pac
 	if (!l3)
 		return false;
 
-	l3 = trace_get_vlan_payload_from_ethernet_payload(l3,
-			&proto,
-			&remaining);
+	for(;;) {
+		switch(proto) {
+			case 0x8100:
+				l3=trace_get_vlan_payload_from_ethernet_payload(
+						l3,&proto,NULL);
+				continue;
+			case 0x8847:
+				l3=trace_get_mpls_payload_from_ethernet_payload(
+						l3,&proto,NULL);
+
+				if (l3 && proto == 0x0) {
+					l3=trace_get_payload_from_ethernet(
+						l3,&proto,NULL);
+				}
+				continue;
+			default:
+				break;
+		}
+
+		break;
+	}
 
 	if (!l3)
 		return NULL;
@@ -739,10 +851,25 @@ DLLEXPORT struct sockaddr *trace_get_destination_address(const libtrace_packet_t
 
 	if (!transport)
 		return false;
+	for(;;) {
+		switch(proto) {
+			case 0x8100:
+				transport=trace_get_vlan_payload_from_ethernet_payload(transport,&proto,NULL);
+				continue;
+			case 0x8847:
+				transport=trace_get_mpls_payload_from_ethernet_payload(transport,&proto,NULL);
 
-	transport = trace_get_vlan_payload_from_ethernet_payload(transport,
-			&proto,
-			&remaining);
+				if (transport && proto == 0x0) {
+					transport=trace_get_payload_from_ethernet(
+							transport,&proto,NULL);
+				}
+				continue;
+			default:
+				break;
+		}
+
+		break;
+	}
 
 	if (!transport)
 		return false;
