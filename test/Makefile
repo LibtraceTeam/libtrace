@@ -26,7 +26,7 @@ test-programs: $(BINS)
 	done				
 	@echo All tests passed
 
-test-format-all: test-format test-decode
+test-format-all: test-format test-decode test-decode2
 	@for i in erf pcap wtf pcapfile duck; do		\
 		echo \* Read $$i;				\
 		rm -f traces/*.out.*;				\
@@ -35,6 +35,18 @@ test-format-all: test-format test-decode
 		LD_LIBRARY_PATH="$(libdir)"			\
 		./test-decode $$i || exit $$?;			\
 	done
+# Try various link layer decodes
+	# SLL Decoder 
+	@LD_LIBRARY_PATH="$(libdir)" \
+	./test-decode2 pcap:traces/100_sll.pcap
+
+	# 802.1x decoder
+	@LD_LIBRARY_PATH="$(libdir)" \
+	./test-decode2 pcap:traces/8021x.pcap
+
+	# MPLS Decoder
+	@LD_LIBRARY_PATH="$(libdir)" \
+	./test-decode2 pcap:traces/10_mpls_ip.pcap
 
 test-write-all: test-write
 	@for i in erf pcap; do					\
