@@ -48,6 +48,10 @@ test-format-all: test-format test-decode test-decode2
 	@LD_LIBRARY_PATH="$(libdir)" \
 	./test-decode2 pcap:traces/10_mpls_ip.pcap
 
+	# Radius Decoder
+	@LD_LIBRARY_PATH="$(libdir)" \
+	./test-decode2 pcap:traces/radius.pcap
+
 test-write-all: test-write
 	@for i in erf pcap; do					\
 		echo \* Write $$i;				\
