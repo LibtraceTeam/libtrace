@@ -402,8 +402,8 @@ DLLEXPORT bool trace_get_wireless_noise_strength_dbm(void *link,
 	if (link == NULL || strength == NULL) return false;
 	switch (linktype) {
 		case TRACE_TYPE_80211_RADIO:
-			if (( p = (int8_t *) trace_get_radiotap_field(link,
-							TRACE_RADIOTAP_DBM_ANTNOISE))) {
+			if (( p = (uint8_t *) trace_get_radiotap_field(link,
+					TRACE_RADIOTAP_DBM_ANTNOISE))) {
 				*strength = *p;
 				return true;
 			} else break;
