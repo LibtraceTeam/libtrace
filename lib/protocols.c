@@ -157,7 +157,6 @@ void *trace_get_payload_from_linux_sll(void *link,
 		uint16_t *type, uint32_t *remaining) 
 {
 	libtrace_sll_header_t *sll;
-	void *ret;
 
 	sll = (libtrace_sll_header_t*) link;
 
@@ -699,6 +698,10 @@ uint8_t *trace_get_source_mac(libtrace_packet_t *packet) {
 		case TRACE_TYPE_80211:
 			wifi=(libtrace_80211_t*)link;
 			return (uint8_t*)&wifi->mac2;
+		case TRACE_TYPE_80211_RADIO:
+			wifi=(libtrace_80211_t*)trace_get_payload_from_radiotap(
+					link,NULL,NULL);
+			return (uint8_t*)&wifi->mac1;
 		case TRACE_TYPE_80211_PRISM:
 			wifi=(libtrace_80211_t*)((char*)link+144);
 			return (uint8_t*)&wifi->mac2;
@@ -727,6 +730,10 @@ DLLEXPORT uint8_t *trace_get_destination_mac(libtrace_packet_t *packet) {
 	switch (trace_get_link_type(packet)) {
 		case TRACE_TYPE_80211:
 			wifi=(libtrace_80211_t*)link;
+			return (uint8_t*)&wifi->mac1;
+		case TRACE_TYPE_80211_RADIO:
+			wifi=(libtrace_80211_t*)trace_get_payload_from_radiotap(
+					link,NULL,NULL);
 			return (uint8_t*)&wifi->mac1;
 		case TRACE_TYPE_80211_PRISM:
 			wifi=(libtrace_80211_t*)((char*)link+144);
