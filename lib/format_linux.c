@@ -290,7 +290,7 @@ static int linuxnative_write_packet(libtrace_out_t *trace,
 	hdr.sll_ifindex = if_nametoindex(trace->uridata);
 	hdr.sll_hatype = 0;
 	hdr.sll_pkttype = 0;
-	hdr.sll_halen = 6; /* FIXME */
+	hdr.sll_halen = htons(6); /* FIXME */
 	memcpy(hdr.sll_addr,packet->payload,hdr.sll_halen);
 
 	return sendto(DATAOUT(trace)->fd,
