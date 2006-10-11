@@ -127,36 +127,38 @@ void promote_packet(libtrace_packet_t *packet)
 		char *tmpbuffer;
 		libtrace_sll_header_t *hdr;
 
+		if (pcap_dlt_to_libtrace(rt_to_pcap_dlt(packet->type))
+			== TRACE_TYPE_LINUX_SLL) {
+			/* This is already been promoted, so ignore it */
+			return;
+		}
+
+		/* This should be easy, just prepend the header */
+		tmpbuffer= (char*)malloc(
+				sizeof(libtrace_sll_header_t)
+				+trace_get_capture_length(packet)
+				+trace_get_framing_length(packet)
+				);
+
+		hdr=(libtrace_sll_header_t*)((char*)tmpbuffer
+			+trace_get_framing_length(packet));
+
+		hdr->halen=htons(6);
+		hdr->pkttype=TRACE_SLL_OUTGOING;
+
 		switch(pcap_dlt_to_libtrace(rt_to_pcap_dlt(packet->type))) {
-			case TRACE_TYPE_LINUX_SLL:
-				return; /* Unnecessary */
-
 			case TRACE_TYPE_NONE:
-			case TRACE_TYPE_ETH:
-				/* This should be easy, just prepend the header */
-				tmpbuffer= (char*)malloc(
-						sizeof(libtrace_sll_header_t)
-						+trace_get_capture_length(packet)
-						+trace_get_framing_length(packet)
-						);
-
-				hdr=(libtrace_sll_header_t*)((char*)tmpbuffer
-					+trace_get_framing_length(packet));
-
-				hdr->pkttype=TRACE_SLL_OUTGOING;
-				if (pcap_dlt_to_libtrace(rt_to_pcap_dlt(packet->type))==TRACE_TYPE_ETH)
-					hdr->hatype = htons(ARPHRD_ETHER);
-				else
-					hdr->hatype = htons(ARPHRD_PPP);
 				trace_get_payload_from_link(
 					trace_get_link(packet),
 					trace_get_link_type(packet),
 					&hdr->protocol,
 					NULL);
-				/* Linux SLL appears to have the protocol
-				 * field in /host/ byte order.
-				 */
-				hdr->protocol=ntohs(hdr->protocol);
+				hdr->hatype = htons(ARPHRD_PPP);
+				hdr->protocol=htons(hdr->protocol);
+				break;
+			case TRACE_TYPE_ETH:
+				hdr->hatype = htons(ARPHRD_ETHER);
+				hdr->protocol=htons(0x0060); /* ETH_P_LOOP */
 				break;
 			default:
 				/* failed */
