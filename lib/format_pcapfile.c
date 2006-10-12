@@ -186,10 +186,21 @@ static int pcapfile_fin_output(libtrace_out_t *libtrace)
 
 static int pcapfile_config_output(libtrace_out_t *libtrace,
 		trace_option_t option,
-		void *data)
+		void *value)
 {
-	trace_set_err_out(libtrace,TRACE_ERR_UNKNOWN_OPTION,
-			"Unknown option %i", option);
+	switch (option) {
+		case TRACE_OPTION_OUTPUT_COMPRESS:
+			DATAOUT(libtrace)->level = *(int*)value;
+			return 0;
+		case TRACE_OPTION_OUTPUT_FILEFLAGS:
+			DATAOUT(libtrace)->flag = *(int*)value;
+			return 0;
+		default:
+			/* Unknown option */
+			trace_set_err_out(libtrace,TRACE_ERR_UNKNOWN_OPTION,
+					"Unknown option");
+			return -1;
+	}
 	return -1;
 }
 
@@ -292,7 +303,7 @@ static int pcapfile_write_packet(libtrace_out_t *out,
 			trace_get_link(packet),
 			trace_get_capture_length(packet));
 
-	if (ret!=trace_get_capture_length(packet))
+	if (ret!=(int)trace_get_capture_length(packet))
 		return -1;
 
 	return numbytes+ret;
