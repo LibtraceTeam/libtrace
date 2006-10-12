@@ -779,6 +779,10 @@ DLLEXPORT struct timeval trace_get_timeval(const libtrace_packet_t *packet) {
 		tv.tv_sec = (uint32_t)seconds;
 		tv.tv_usec = (uint32_t)(((seconds - tv.tv_sec) * 1000000)/UINT_MAX);
 	}
+	else {
+		tv.tv_sec=-1;
+		tv.tv_usec=-1;
+	}
 
         return tv;
 }
@@ -951,7 +955,8 @@ int trace_bpf_compile(libtrace_filter_t *filter,
 		pcap_t *pcap;
 		libtrace_linktype_t linktype=trace_get_link_type(packet);
 		if (linktype==(libtrace_linktype_t)-1) {
-			trace_set_err(packet->trace,TRACE_ERR_BAD_PACKET,
+			trace_set_err(packet->trace,
+					TRACE_ERR_BAD_PACKET,
 					"Packet has an unknown linktype");
 			return -1;
 		}

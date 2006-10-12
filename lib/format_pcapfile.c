@@ -185,7 +185,7 @@ static int pcapfile_fin_output(libtrace_out_t *libtrace)
 }
 
 static int pcapfile_config_output(libtrace_out_t *libtrace,
-		trace_option_t option,
+		trace_option_output_t option,
 		void *value)
 {
 	switch (option) {
