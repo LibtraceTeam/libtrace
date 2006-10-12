@@ -2,6 +2,8 @@ DIGIT	    [0-9]
 LETTER	    [a-zA-Z_: ]
 HEXDIGIT    [0-9A-Fa-f]
 
+%option noyywrap
+
 %{
     #include <stdio.h>
     #include "grammar.h"
