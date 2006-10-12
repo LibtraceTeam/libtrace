@@ -960,7 +960,7 @@ int trace_bpf_compile(libtrace_filter_t *filter,
 					"Packet has an unknown linktype");
 			return -1;
 		}
-		if (libtrace_to_pcap_dlt(linktype) == -1) {
+		if (libtrace_to_pcap_dlt(linktype) == ~1U) {
 			trace_set_err(packet->trace,TRACE_ERR_BAD_PACKET,
 					"Unknown pcap equivilent linktype");
 			return -1;
