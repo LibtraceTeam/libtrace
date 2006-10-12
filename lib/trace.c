@@ -1179,11 +1179,7 @@ DLLEXPORT size_t trace_set_capture_length(libtrace_packet_t *packet, size_t size
 	assert(packet);
 
 	if (packet->trace->format->set_capture_length) {
-		int caplen=packet->trace->format->set_capture_length(packet,size);
-		if (caplen!=-1) {
-			trace_get_framing_length(packet)+caplen;
-		}
-		return caplen;
+		return packet->trace->format->set_capture_length(packet,size);
 	}
 
 	return ~0U;
