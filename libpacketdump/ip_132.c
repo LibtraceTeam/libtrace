@@ -35,7 +35,7 @@ struct sctp_data
     uint32_t payload_proto_id;
 } __attribute__((__packed__));
 
-// The following works for INIT and INIT ACK packets
+/* The following works for INIT and INIT ACK packets */
 struct sctp_init_ack
 {
     uint32_t init_tag;
@@ -155,6 +155,7 @@ void decode(int link_type,char *packet,int len)
     struct sctp_common_hdr *hdr;
     struct sctp_chunk_hdr *chunk;
     int chunk_num = 1;
+    int vlen;
 
     if(len < (signed)sizeof(struct sctp_common_hdr)) {
         printf(" SCTP: packet too short!\n");
@@ -185,7 +186,7 @@ void decode(int link_type,char *packet,int len)
         }
 
         switch(chunk->type) {
-            case 0: // DATA
+            case 0: /* DATA */
             {
                 struct sctp_data *data = (struct sctp_data *)(chunk + 1);
 
@@ -196,10 +197,10 @@ void decode(int link_type,char *packet,int len)
                         ntohl(data->payload_proto_id));
             }
             break;
-            case 1: // INIT and 
-            case 2: // INIT ACK packets have the same structure
+            case 1: /* INIT and  */
+            case 2: /* INIT ACK packets have the same structure */
             {
-                // INIT ACK
+                /* INIT ACK */
                 struct sctp_init_ack *ack = (struct sctp_init_ack *)
                     (chunk + 1);
                 
@@ -211,7 +212,7 @@ void decode(int link_type,char *packet,int len)
                         ntohs(ack->inbound_streams),
                         ntohl(ack->init_tsn));
 
-                int vlen = chunk->length - (sizeof(struct sctp_init_ack) +
+                vlen = chunk->length - (sizeof(struct sctp_init_ack) +
                         sizeof(struct sctp_chunk_hdr) +
                         sizeof(struct sctp_common_hdr)
                         );
@@ -219,7 +220,7 @@ void decode(int link_type,char *packet,int len)
 
             }
             break;
-            case 3: // SACK
+            case 3: /* SACK */
             {
                 struct sctp_sack *sack = (struct sctp_sack *)(chunk + 1);
                 int i;
