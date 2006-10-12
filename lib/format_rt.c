@@ -81,7 +81,7 @@ struct rt_format_data_t {
 	int reliable;
 	char *pkt_buffer;
 	char *buf_current;
-	int buf_filled;
+	size_t buf_filled;
 	rt_header_t rt_hdr;
 	
 	libtrace_t *dummy_duck;
@@ -259,7 +259,7 @@ static int rt_fin_input(libtrace_t *libtrace) {
 	
 	/* Send a close message to the server */
 	if (send(RT_INFO->input_fd, (void*)&close_msg, sizeof(rt_header_t) + 
-				close_msg.length, 0) != sizeof(rt_header_t)
+				close_msg.length, 0) != (int)sizeof(rt_header_t)
 				+ close_msg.length) {
 		printf("Failed to send close message to server\n");
 	
@@ -361,7 +361,6 @@ static int rt_read(libtrace_t *libtrace, void **buffer, size_t len, int block) {
 	*buffer = RT_INFO->buf_current;
 	RT_INFO->buf_current += len;
 	RT_INFO->buf_filled -= len;
-	assert(RT_INFO->buf_filled >= 0);
         return len;
 }
 
@@ -619,11 +618,11 @@ static int rt_get_capture_length(const libtrace_packet_t *packet) {
 	return 0;
 }
 
-static int rt_get_wire_length(const libtrace_packet_t *packet) {
+static int rt_get_wire_length(UNUSED const libtrace_packet_t *packet) {
 	return 0;
 }
 			
-static int rt_get_framing_length(const libtrace_packet_t *packet) {
+static int rt_get_framing_length(UNUSED const libtrace_packet_t *packet) {
 	return 0;
 }
 
