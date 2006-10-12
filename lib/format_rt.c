@@ -469,6 +469,7 @@ static int rt_send_ack(libtrace_t *libtrace,
 			}
 			else {
 				printf("Error sending ack\n");
+				perror("send");
 				trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, 
 						"Error sending ack");
 				return -1;
