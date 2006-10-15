@@ -660,7 +660,7 @@ static int erf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	buffer2 = (char*)packet->buffer + dag_record_size;
 	size = rlen - dag_record_size;
 
-	assert(size < LIBTRACE_PACKET_BUFSIZE && size >= dag_record_size);
+	assert(size < LIBTRACE_PACKET_BUFSIZE);
 
 	/* Unknown/corrupt */
 	assert(((dag_record_t *)packet->buffer)->type < 10);
