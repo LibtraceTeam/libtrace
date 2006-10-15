@@ -27,6 +27,22 @@ test-programs: $(BINS)
 	@echo All tests passed
 
 test-format-all: test-format test-decode test-decode2
+# Try various link layer decodes
+	@echo SLL Decoder 
+	@LD_LIBRARY_PATH="$(libdir)" \
+	./test-decode2 pcap:traces/100_sll.pcap
+
+	@echo 802.1x decoder
+	@LD_LIBRARY_PATH="$(libdir)" \
+	./test-decode2 pcap:traces/8021x.pcap
+
+	@echo MPLS Decoder
+	@LD_LIBRARY_PATH="$(libdir)" \
+	./test-decode2 pcap:traces/10_mpls_ip.pcap
+
+	@echo Radius Decoder
+	@LD_LIBRARY_PATH="$(libdir)" \
+	./test-decode2 pcap:traces/radius.pcap
 	@for i in erf pcap wtf pcapfile duck; do		\
 		echo \* Read $$i;				\
 		rm -f traces/*.out.*;				\
@@ -35,22 +51,6 @@ test-format-all: test-format test-decode test-decode2
 		LD_LIBRARY_PATH="$(libdir)"			\
 		./test-decode $$i || exit $$?;			\
 	done
-# Try various link layer decodes
-	# SLL Decoder 
-	@LD_LIBRARY_PATH="$(libdir)" \
-	./test-decode2 pcap:traces/100_sll.pcap
-
-	# 802.1x decoder
-	@LD_LIBRARY_PATH="$(libdir)" \
-	./test-decode2 pcap:traces/8021x.pcap
-
-	# MPLS Decoder
-	@LD_LIBRARY_PATH="$(libdir)" \
-	./test-decode2 pcap:traces/10_mpls_ip.pcap
-
-	# Radius Decoder
-	@LD_LIBRARY_PATH="$(libdir)" \
-	./test-decode2 pcap:traces/radius.pcap
 
 test-write-all: test-write
 	@for i in erf pcap; do					\
