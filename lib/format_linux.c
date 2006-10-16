@@ -76,7 +76,7 @@ static int linuxnative_init_input(libtrace_t *libtrace)
 	libtrace->format_data = (struct libtrace_format_data_t *)
 		malloc(sizeof(struct libtrace_format_data_t));
 	FORMAT(libtrace->format_data)->fd = -1;
-	FORMAT(libtrace->format_data)->promisc = 0;
+	FORMAT(libtrace->format_data)->promisc = -1;
 	FORMAT(libtrace->format_data)->snaplen = 65536;
 
 	return 0;
@@ -121,8 +121,19 @@ static int linuxnative_start_input(libtrace_t *libtrace)
 		free(libtrace->format_data);
 		return -1;
 	}
-	/* enable promisc mode when listening on an interface */
-	if (addr.sll_ifindex!=0) {
+
+	/* If promisc hasn't been specified, set it to "true" if we're 
+	 * capturing on one interface, or "false" if we're capturing on
+	 * all interfaces.
+	 */ 
+	if (FORMAT(libtrace->format_data)->promisc==-1) {
+		if (addr.sll_ifindex!=0)
+			FORMAT(libtrace->format_data)->promisc=1;
+		else
+			FORMAT(libtrace->format_data)->promisc=0;
+	}
+				
+	if (FORMAT(libtrace->format_data)->promisc) {
 		struct packet_mreq mreq;
 		socklen_t socklen = sizeof(mreq);
 		memset(&mreq,0,sizeof(mreq));
