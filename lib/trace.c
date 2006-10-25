@@ -993,38 +993,56 @@ DLLEXPORT int trace_apply_filter(libtrace_filter_t *filter,
 #ifdef HAVE_BPF
 	void *linkptr = 0;
 	int clen = 0;
+	bool free_packet_needed = false;
+	int ret;
 	assert(filter);
 	assert(packet);
-	linkptr = trace_get_link(packet);
-	if (!linkptr) {
-		return 0;
-	}
-
-	/* We need to compile it now, because before we didn't know what the 
-	 * link type was
-	 */
-	if (trace_bpf_compile(filter,packet)==-1)
-		return -1;
 
 	if (libtrace_to_pcap_dlt(trace_get_link_type(packet))==~0) {
 		/* Copy the packet, as we don't want to trash the one we
 		 * were passed in
 		 */
 		packet=trace_copy_packet(packet);
+		free_packet_needed=true;
 		while (libtrace_to_pcap_dlt(trace_get_link_type(packet))==~0) {
 			if (!demote_packet(packet)) {
 				trace_set_err_out(packet->trace, 
 						TRACE_ERR_NO_CONVERSION,
 						"pcap does not support this format");
+				if (free_packet_needed) {
+					trace_destroy_packet(packet);
+				}
 				return -1;
 			}
 		}
 	}
 	
+	linkptr = trace_get_link(packet);
+	if (!linkptr) {
+		if (free_packet_needed) {
+			trace_destroy_packet(packet);
+		}
+		return 0;
+	}
+
+	/* We need to compile it now, because before we didn't know what the 
+	 * link type was
+	 */
+	if (trace_bpf_compile(filter,packet)==-1) {
+		if (free_packet_needed) {
+			trace_destroy_packet(packet);
+		}
+		return -1;
+	}
+
 	clen = trace_get_capture_length(packet);
 
 	assert(filter->flag);
-	return bpf_filter(filter->filter.bf_insns,(u_char*)linkptr,clen,clen);
+	ret=bpf_filter(filter->filter.bf_insns,(u_char*)linkptr,clen,clen);
+	if (free_packet_needed) {
+		trace_destroy_packet(packet);
+	}
+	return ret;
 #else
 	fprintf(stderr,"This version of libtrace does not have bpf filter support\n");
 	return 0;
