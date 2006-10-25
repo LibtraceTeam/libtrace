@@ -141,14 +141,14 @@ AC_CHECK_DECLS([BIOCSETIF],,,[
 
 # configure time options for man pages
 AC_ARG_WITH(man,
-	    AS_HELP_STRING(--with-man,install man pages by default),
+	    AS_HELP_STRING(--with-man,install man pages by default),[
 	     if test "$withval" = yes
 	     then
 		     MANPAGES="docs/man/man3/[a-zA-Z]*.3"
 	     else
 		     MANPAGES=""
 	     fi
-)
+])
 
 AC_PROG_CXX
 
