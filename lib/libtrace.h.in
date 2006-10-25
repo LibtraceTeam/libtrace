@@ -430,16 +430,58 @@ typedef struct libtrace_8021q
 				   * (next-header)*/
 } PACKED libtrace_8021q_t;
 
-/** ATM cell */
+/** ATM User Network Interface (UNI) Cell. */
 typedef struct libtrace_atm_cell
 {
   LT_BITFIELD32 gfc:4;		/**< Generic Flow Control */
   LT_BITFIELD32 vpi:8;		/**< Virtual Path Identifier */
-  LT_BITFIELD32 vci:8;		/**< Virtual Channel Identifier */
+  LT_BITFIELD32 vci:16;		/**< Virtual Channel Identifier */
   LT_BITFIELD32 pt:3;		/**< Payload Type */
   LT_BITFIELD32 clp:1;		/**< Cell Loss Priority */
   LT_BITFIELD32 hec:8;		/**< Header Error Control */
 } PACKED libtrace_atm_cell_t;
+
+/** ATM Network Node/Network Interface (NNI) Cell. */
+typedef struct libtrace_atm_nni_cell
+{
+  LT_BITFIELD32 vpi:12;		/**< Virtual Path Identifier */
+  LT_BITFIELD32 vci:16;		/**< Virtual Channel Identifier */
+  LT_BITFIELD32 pt:3;		/**< Payload Type */
+  LT_BITFIELD32 clp:1;		/**< Cell Loss Priority */
+  LT_BITFIELD32 hec:8;		/**< Header Error Control */
+} PACKED libtrace_atm_nni_cell_t;
+
+/** Captured UNI cell.
+ *
+ * Endance don't capture the HEC, presumably to keep alignment.  This 
+ * version of the \ref{libtrace_atm_cell} is used when dealing with dag
+ * captures of uni cells.
+ *
+ */
+typedef struct libtrace_atm_capture_cell
+{
+  LT_BITFIELD32 gfc:4;		/**< Generic Flow Control */
+  LT_BITFIELD32 vpi:8;		/**< Virtual Path Identifier */
+  LT_BITFIELD32 vci:16;		/**< Virtual Channel Identifier */
+  LT_BITFIELD32 pt:3;		/**< Payload Type */
+  LT_BITFIELD32 clp:1;		/**< Cell Loss Priority */
+} PACKED libtrace_atm_capture_cell_t;
+
+/** Captured NNI cell.
+ *
+ * Endance don't capture the HEC, presumably to keep alignment.  This 
+ * version of the \ref{libtrace_atm_nni_cell} is used when dealing with dag
+ * captures of nni cells.
+ *
+ */
+typedef struct libtrace_atm_nni_capture_cell
+{
+  LT_BITFIELD32 vpi:12;		/**< Virtual Path Identifier */
+  LT_BITFIELD32 vci:16;		/**< Virtual Channel Identifier */
+  LT_BITFIELD32 pt:3;		/**< Payload Type */
+  LT_BITFIELD32 clp:1;		/**< Cell Loss Priority */
+  LT_BITFIELD32 hec:8;		/**< Header Error Control */
+} PACKED libtrace_atm_nni_capture_cell_t;
 
 /** POS header */
 typedef struct libtrace_pos

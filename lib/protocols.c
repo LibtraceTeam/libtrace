@@ -174,22 +174,35 @@ void *trace_get_payload_from_linux_sll(void *link,
 }
 
 static void *trace_get_payload_from_atm(void *link,
+		uint8_t *type, uint32_t *remaining)
+{
+	libtrace_atm_capture_cell_t *cell;
+	if (remaining && *remaining<sizeof(libtrace_atm_capture_cell_t))
+		return NULL;
+	cell=(libtrace_atm_capture_cell_t*)link;
+
+	if (type)
+		type=cell->pt;
+
+	if (remaining)
+		*remaining-=sizeof(libtrace_atm_capture_cell_t);
+
+	return ((char*)link)+sizeof(libtrace_atm_capture_cell_t);
+}
+
+static void *trace_get_payload_from_llcsnap(void *link,
 		uint16_t *type, uint32_t *remaining)
 {
 	/* 64 byte capture. */
 	libtrace_llcsnap_t *llc = (libtrace_llcsnap_t*)link;
 
 	if (remaining) {
-		if (*remaining < sizeof(libtrace_llcsnap_t)+4)
+		if (*remaining < sizeof(libtrace_llcsnap_t))
 			return NULL;
-		*remaining-=(sizeof(libtrace_llcsnap_t)+4);
+		*remaining-=(sizeof(libtrace_llcsnap_t));
 	}
 
-	/* advance the llc ptr +4 into the link layer.
-	 * TODO: need to check what is in these 4 bytes.
-	 * don't have time!
-	 */
-	llc = (libtrace_llcsnap_t*)((char *)llc + 4);
+	llc = (libtrace_llcsnap_t*)((char *)llc);
 
 	if (type) *type = ntohs(llc->type);
 
@@ -301,7 +314,9 @@ void *trace_get_payload_from_link(void *link, libtrace_linktype_t linktype,
 		case TRACE_TYPE_POS:
 			return trace_get_payload_from_pos(link,type,remaining);
 		case TRACE_TYPE_ATM:
-			return trace_get_payload_from_atm(link,type,remaining);
+			l=trace_get_payload_from_atm(link,NULL,remaining);
+			return (l ? trace_get_payload_from_llcsnap(l,
+						type, remaining):NULL);
 		case TRACE_TYPE_DUCK:
 			return NULL; /* duck packets have no payload! */
 	}
