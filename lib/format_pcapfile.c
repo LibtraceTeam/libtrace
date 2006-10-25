@@ -263,6 +263,19 @@ static int pcapfile_write_packet(libtrace_out_t *out,
 	int numbytes;
 	int ret;
 
+	/* If this packet cannot be converted to a pcap linktype then
+	 * pop off the top header until it can be converted
+	 */
+	while (libtrace_to_pcap_dlt(trace_get_link_type(packet))==~0) {
+		if (!demote_packet(packet)) {
+			trace_set_err_out(out, 
+				TRACE_ERR_NO_CONVERSION,
+				"pcap does not support this format");
+			return -1;
+		}
+	}
+
+
 	/* Now we know the link type write out a header if we've not done
 	 * so already
 	 */
