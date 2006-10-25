@@ -194,9 +194,9 @@ void promote_packet(libtrace_packet_t *packet)
 		packet->header=tmpbuffer;
 		packet->payload=tmpbuffer+trace_get_framing_length(packet);
 		packet->type=pcap_dlt_to_rt(TRACE_DLT_LINUX_SLL);
-		((struct pcap_pkthdr*) packet->header)->caplen+=
+		((struct libtrace_pcapfile_pkt_hdr_t*) packet->header)->caplen+=
 			sizeof(libtrace_sll_header_t);
-		((struct pcap_pkthdr*) packet->header)->len+=
+		((struct libtrace_pcapfile_pkt_hdr_t*) packet->header)->wirelen+=
 			sizeof(libtrace_sll_header_t);
 		return;
 	}
@@ -258,10 +258,10 @@ bool demote_packet(libtrace_packet_t *packet)
 			switch(ntohs(((libtrace_sll_header_t*)packet->payload)
 					->hatype)) {
 				case ARPHRD_PPP:
-					packet->type=pcap_dlt_to_rt(DLT_NULL);
+					packet->type=pcap_dlt_to_rt(TRACE_DLT_NULL);
 					break;
 				case ARPHRD_ETHER:
-					packet->type=pcap_dlt_to_rt(DLT_EN10MB);
+					packet->type=pcap_dlt_to_rt(TRACE_DLT_EN10MB);
 					break;
 				default:
 					/* Dunno how to demote this packet */

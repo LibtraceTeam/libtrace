@@ -1,3 +1,4 @@
+#ifdef HAVE_PCAP
 #include "config.h"
 
 #ifndef HAVE_PCAP_NEXT_EX
@@ -54,3 +55,5 @@ int pcap_next_ex(pcap_t *p, struct pcap_pkthdr **pkt_header,
         return 1;
 }
 #endif
+
+#endif //HAVE_PCAP

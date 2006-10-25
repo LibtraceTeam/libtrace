@@ -1,3 +1,4 @@
+#ifdef HAVE_PCAP
 #include "config.h"
 
 #ifndef HAVE_PCAP_DUMP_FLUSH
@@ -16,3 +17,5 @@ int pcap_dump_flush(pcap_dumper_t *p) {
 }
 
 #endif
+
+#endif // HAVE_PCAP
