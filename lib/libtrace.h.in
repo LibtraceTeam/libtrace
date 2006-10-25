@@ -224,7 +224,7 @@ typedef enum {
        TRACE_TYPE_AAL5 = 13,
        TRACE_TYPE_DUCK = 14,	     /**< Pseudo link layer for DUCK packets */
        TRACE_TYPE_80211_RADIO = 15,  /**< Radiotap + 802.11 */
-       TRACE_TYPE_LLCSNAP = 16,      /**< Raw LLC/SNAP */
+       TRACE_TYPE_LLCSNAP = 16       /**< Raw LLC/SNAP */
 	
 } libtrace_linktype_t;
 
