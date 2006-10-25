@@ -1005,6 +1005,21 @@ DLLEXPORT int trace_apply_filter(libtrace_filter_t *filter,
 	 */
 	if (trace_bpf_compile(filter,packet)==-1)
 		return -1;
+
+	if (libtrace_to_pcap_dlt(trace_get_link_type(packet))==~0) {
+		/* Copy the packet, as we don't want to trash the one we
+		 * were passed in
+		 */
+		packet=trace_copy_packet(packet);
+		while (libtrace_to_pcap_dlt(trace_get_link_type(packet))==~0) {
+			if (!demote_packet(packet)) {
+				trace_set_err_out(packet->trace, 
+						TRACE_ERR_NO_CONVERSION,
+						"pcap does not support this format");
+				return -1;
+			}
+		}
+	}
 	
 	clen = trace_get_capture_length(packet);
 
