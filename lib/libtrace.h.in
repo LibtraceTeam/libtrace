@@ -169,18 +169,6 @@ typedef enum {
 /** The size of a packet's buffer when managed by libtrace */
 #define LIBTRACE_PACKET_BUFSIZE 65536
 
-/** The libtrace packet structure, applications shouldn't be 
- * meddling around in here 
- */
-typedef struct libtrace_packet_t {
-	struct libtrace_t *trace; /**< pointer to the trace */
-	void *header;		/**< pointer to the framing header */
-	void *payload;		/**< pointer to the link layer */
-	void *buffer;		/**< allocated buffer */
-	uint32_t type;		/**< rt protocol type for the packet */
-	buf_control_t buf_control; /**< who owns the memory */
-} libtrace_packet_t;
-
 /** libtrace error information */
 typedef struct trace_err_t{
 	int err_num; 		/**< error code */
@@ -215,7 +203,7 @@ typedef enum {
 	TRACE_DLT_IEEE802_11 = 105,
 	TRACE_DLT_LINUX_SLL = 113,
 	TRACE_DLT_PFLOG = 117,
-    TRACE_DLT_IEEE802_11_RADIO = 127 /**< Radiotap */
+	TRACE_DLT_IEEE802_11_RADIO = 127 /**< Radiotap */
 } libtrace_dlt_t ;
 
 /** Enumeration of link layer types supported by libtrace */
@@ -234,9 +222,29 @@ typedef enum {
     /* TRACE_TYPE_LEGACY_ETH 		Obsolete */
        TRACE_TYPE_80211_PRISM = 12,
        TRACE_TYPE_AAL5 = 13,
-       TRACE_TYPE_DUCK = 14,		/**< Pseudo link layer for DUCK packets */
-       TRACE_TYPE_80211_RADIO = 15 /**< Radiotap + 802.11 */
-     } libtrace_linktype_t;
+       TRACE_TYPE_DUCK = 14,	     /**< Pseudo link layer for DUCK packets */
+       TRACE_TYPE_80211_RADIO = 15,  /**< Radiotap + 802.11 */
+       TRACE_TYPE_LLCSNAP = 16,      /**< Raw LLC/SNAP */
+	
+} libtrace_linktype_t;
+
+typedef enum {
+	TRACE_RT_DLT_ATM_RFC1483 = 2000+TRACE_DLT_ATM_RFC1483,
+	TRACE_RT_LAST	= (2<<31)
+} libtrace_rt_types_t;
+
+/** The libtrace packet structure, applications shouldn't be 
+ * meddling around in here 
+ */
+typedef struct libtrace_packet_t {
+	struct libtrace_t *trace; 	/**< pointer to the trace */
+	void *header;			/**< pointer to the framing header */
+	void *payload;			/**< pointer to the link layer */
+	void *buffer;			/**< allocated buffer */
+	libtrace_rt_types_t  type; 	/**< rt protocol type for the packet */
+	buf_control_t buf_control; 	/**< who owns the memory */
+} libtrace_packet_t;
+
 
 /** Trace directions 
  * Note that these are the directions used by convention, more directions 

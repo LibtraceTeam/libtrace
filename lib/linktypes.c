@@ -36,27 +36,40 @@ libtrace_linktype_t pcap_dlt_to_libtrace(libtrace_dlt_t dlt)
 	switch(dlt) {
 		case TRACE_DLT_NULL: return TRACE_TYPE_NONE;
 		case TRACE_DLT_EN10MB: return TRACE_TYPE_ETH;
-		case TRACE_DLT_ATM_RFC1483: return TRACE_TYPE_ATM;
 		case TRACE_DLT_IEEE802_11: return TRACE_TYPE_80211;
 		case TRACE_DLT_LINUX_SLL: return TRACE_TYPE_LINUX_SLL;
-		case TRACE_DLT_PFLOG: 
-					return TRACE_TYPE_PFLOG;
-        	case TRACE_DLT_IEEE802_11_RADIO:
-					return TRACE_TYPE_80211_RADIO;
+		case TRACE_DLT_PFLOG: return TRACE_TYPE_PFLOG;
+        	case TRACE_DLT_IEEE802_11_RADIO: return TRACE_TYPE_80211_RADIO;
+		case TRACE_DLT_ATM_RFC1483: return TRACE_TYPE_LLCSNAP;
+					 
 	}
 	return ~0;
 }
 
+
 libtrace_dlt_t libtrace_to_pcap_dlt(libtrace_linktype_t type)
 {
+	/* If pcap doesn't have a DLT, you can either ask pcap to register
+	 * you a DLT, (and perhaps write a tcpdump decoder for it), or you
+	 * can add it to demote_packet
+	 */
 	switch(type) {
 		case TRACE_TYPE_NONE: return TRACE_DLT_NULL;
 		case TRACE_TYPE_ETH: return TRACE_DLT_EN10MB;
-		case TRACE_TYPE_ATM: return TRACE_DLT_ATM_RFC1483;
 		case TRACE_TYPE_80211: return TRACE_DLT_IEEE802_11;
 		case TRACE_TYPE_LINUX_SLL: return TRACE_DLT_LINUX_SLL;
 		case TRACE_TYPE_PFLOG: return TRACE_DLT_PFLOG;
-        case TRACE_TYPE_80211_RADIO: return TRACE_DLT_IEEE802_11_RADIO;
+		case TRACE_TYPE_80211_RADIO: return TRACE_DLT_IEEE802_11_RADIO;
+		case TRACE_TYPE_ATM: 
+			/* Dispite hints to the contrary, there is no DLT
+			 * for 'raw atm packets that happen to be missing
+			 * the HEC' or even 'raw atm packets that have a hec'.
+			 *
+			 * The closest are DLT_ATM_RFC1483 but that doesn't
+			 * include the ATM header, only the LLCSNAP header.
+			 */
+			return ~0;
+		case TRACE_TYPE_LLCSNAP: return TRACE_DLT_ATM_RFC1483;
 	}
 	return ~0;
 }
@@ -195,7 +208,52 @@ void promote_packet(libtrace_packet_t *packet)
  */
 bool demote_packet(libtrace_packet_t *packet)
 {
+	uint8_t type;
+	uint32_t remaining;
+	char *tmp;
+	struct timeval tv;
+	static libtrace_t *trace = NULL;
 	switch(trace_get_link_type(packet)) {
+		case TRACE_TYPE_ATM:
+			remaining=trace_get_capture_length(packet);
+			packet->payload=trace_get_payload_from_atm(
+				packet->payload,&type,&remaining);
+
+			tmp=malloc(
+				trace_get_capture_length(packet)
+				+sizeof(libtrace_pcapfile_pkt_hdr_t)
+				);
+
+			tv=trace_get_timeval(packet);
+			((libtrace_pcapfile_pkt_hdr_t*)tmp)->ts_sec=tv.tv_sec;
+			((libtrace_pcapfile_pkt_hdr_t*)tmp)->ts_usec=tv.tv_usec;
+			((libtrace_pcapfile_pkt_hdr_t*)tmp)->caplen
+				= remaining;
+			((libtrace_pcapfile_pkt_hdr_t*)tmp)->wirelen
+				= trace_get_capture_length(packet)-remaining;
+
+			memcpy(tmp+sizeof(libtrace_pcapfile_pkt_hdr_t),
+					packet->payload,
+					remaining);
+			if (packet->buf_control == TRACE_CTRL_EXTERNAL) {
+				packet->buf_control=TRACE_CTRL_PACKET;
+			}
+			else {
+				free(packet->buffer);
+			}
+			packet->buffer=tmp;
+			packet->header=tmp;
+			packet->payload=tmp+sizeof(libtrace_pcapfile_pkt_hdr_t);
+			packet->type=pcap_dlt_to_rt(TRACE_DLT_ATM_RFC1483);
+			
+			if (trace == NULL) {
+				trace = trace_create_dead("pcap:-");
+			}
+
+			packet->trace=trace;
+
+			return true;
+
 		case TRACE_TYPE_LINUX_SLL:
 			switch(ntohs(((libtrace_sll_header_t*)packet->payload)
 					->hatype)) {

@@ -310,6 +310,18 @@ static int pcap_write_packet(libtrace_out_t *libtrace,
 {
 	struct pcap_pkthdr pcap_pkt_hdr;
 
+	/* If this packet cannot be converted to a pcap linktype then
+	 * pop off the top header until it can be converted
+	 */
+	while (libtrace_to_pcap_dlt(trace_get_link_type(packet))==~0) {
+		if (!demote_packet(packet)) {
+			trace_set_err_out(libtrace, 
+				TRACE_ERR_NO_CONVERSION,
+				"pcap does not support this format");
+			return -1;
+		}
+	}
+
 	if (!OUTPUT.trace.pcap) {
 		OUTPUT.trace.pcap = (pcap_t *)pcap_open_dead(
 			libtrace_to_pcap_dlt(trace_get_link_type(packet)),

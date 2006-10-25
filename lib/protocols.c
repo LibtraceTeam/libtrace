@@ -173,7 +173,8 @@ void *trace_get_payload_from_linux_sll(void *link,
 
 }
 
-static void *trace_get_payload_from_atm(void *link,
+DLLEXPORT
+void *trace_get_payload_from_atm(void *link,
 		uint8_t *type, uint32_t *remaining)
 {
 	libtrace_atm_capture_cell_t *cell;
