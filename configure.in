@@ -3,7 +3,7 @@
 # Now you only need to update the version number in two places - below,
 # and in the README
 
-AC_INIT([libtrace],[3.0.0-beta5],[contact@wand.net.nz],[libtrace])
+AC_INIT([libtrace],[3.0.0beta6],[contact@wand.net.nz],[libtrace])
 
 LIBTRACE_MAJOR=3
 LIBTRACE_MID=0
