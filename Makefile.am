@@ -28,7 +28,7 @@ dist-hook:
 		if [ ! -d $(distdir)/$$dir ]; then continue; fi; \
 		rm -rf `find $(distdir)/$$dir -name CVS` ; \
 		rm -rf `find $(distdir)/$$dir -name .svn` ; \
-		for i in `\ls $(distdir)/$$dir `; do make -C $(distdir)/$$dir/$$i clean; done \
+		for i in `\ls -d $(distdir)/$$dir `; do make -C $(distdir)/$$dir/$$i clean; done \
 	done
 	rm -rf $(distdir)/tools/tracereport/.{svn,deps}
 
