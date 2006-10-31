@@ -27,7 +27,9 @@ void decode(int link_type,char *packet,int len)
 		printf(" IP: Header Len %i",ip->ip_hl*4);
 		printf(" Ver %i",ip->ip_v);
 	}
-	DISPLAY(ip_tos," TOS %02x")
+	//DISPLAY(ip_tos," TOS %02x")
+	DISPLAY_EXP(ip_tos," DSCP %02x",ip->ip_tos >> 2)
+	DISPLAY_EXP(ip_tos," ECN %x",ip->ip_tos & 0x2)
 	DISPLAYS(ip_len," Total Length %i")
 	printf("\n IP:");
 	DISPLAY(ip_id," Id %u");
