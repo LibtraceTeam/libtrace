@@ -697,14 +697,12 @@ static int erf_dump_packet(libtrace_out_t *libtrace,
 	}
 
 	size=ntohs(erfptr->rlen)-(dag_record_size+pad);
-
 	numbytes=libtrace_io_write(OUTPUT.file, buffer, size);
 	if (numbytes != size) {
 		trace_set_err_out(libtrace,errno,
 				"write(%s)",libtrace->uridata);
 		return -1;
 	}
-
 	return numbytes + pad + dag_record_size;
 }
 
@@ -770,6 +768,7 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 	 * a way to write out the payload even if it is gibberish -- Perry */
 	if (payload == NULL) {
 		dag_hdr->rlen = htons(dag_record_size + pad);
+		
 	} 
 	
 	if (packet->trace->format == &erf  
@@ -790,7 +789,7 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 
 		/* Flags. Can't do this */
 		memset(&erfhdr.flags,1,sizeof(erfhdr.flags));
-		if (trace_get_direction(packet)!=-1)
+		if (trace_get_direction(packet)!=~0U)
 			erfhdr.flags.iface = trace_get_direction(packet);
 
 		if (!find_compatible_linktype(libtrace,packet))

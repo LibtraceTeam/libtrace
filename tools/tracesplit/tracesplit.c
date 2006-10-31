@@ -8,6 +8,7 @@
 #include <stdbool.h>
 #include <getopt.h>
 #include <string.h>
+#include <assert.h>
 
 char *strdupcat(char *str,char *app)
 {
@@ -120,11 +121,11 @@ int main(int argc, char *argv[])
 	}
 
 	while(1) {
+		
 		if (trace_read_packet(input,packet)<1) {
 			break;
 		}
-
-
+		
 		if (filter && !trace_apply_filter(filter,packet)) {
 			continue;
 		}
@@ -159,7 +160,6 @@ int main(int argc, char *argv[])
 			output=NULL;
 			totbyteslast=totbytes;
 		}
-
 		if (!output) {
 			char *buffer;
 			buffer=strdup(argv[optind+1]);
@@ -189,15 +189,20 @@ int main(int argc, char *argv[])
 			> trace_get_wire_length(packet)) {
 			trace_set_capture_length(packet,trace_get_wire_length(packet));
 		}
-
+		
 		if (trace_write_packet(output,packet)==-1) {
 			trace_perror_output(output,"write_packet");
 			break;
 		}
+
 	}
 
-	if (!output)
-		trace_destroy_output(output);
+	if (trace_is_err(input)) {
+		trace_perror(input, "Reading packets");
+	}
+	
+	trace_destroy(input);
+	trace_destroy_output(output);
 
 	trace_destroy_packet(packet);
 
