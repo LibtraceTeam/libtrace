@@ -304,7 +304,17 @@ static int pcapfile_write_packet(libtrace_out_t *out,
 	hdr.ts_usec = tv.tv_usec;
 	hdr.caplen = trace_get_capture_length(packet);
 	/* PCAP doesn't include the FCS, we do */
-	hdr.wirelen = trace_get_wire_length(packet)-4; 
+	if (trace_get_link_type(packet)==TRACE_TYPE_ETH)
+		if (trace_get_wire_length(packet) >= 4) {
+			hdr.wirelen =
+					trace_get_wire_length(packet)-4;
+		}
+		else {
+			hdr.wirelen = 0;
+		}
+	else
+		hdr.wirelen = trace_get_wire_length(packet);
+
 
 	numbytes=libtrace_io_write(DATAOUT(out)->file,
 			&hdr, sizeof(hdr));

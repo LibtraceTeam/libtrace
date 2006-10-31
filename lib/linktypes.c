@@ -34,7 +34,7 @@
 libtrace_linktype_t pcap_dlt_to_libtrace(libtrace_dlt_t dlt)
 {
 	switch(dlt) {
-		case TRACE_DLT_NULL: return TRACE_TYPE_NONE;
+		case TRACE_DLT_RAW: return TRACE_TYPE_NONE;
 		case TRACE_DLT_EN10MB: return TRACE_TYPE_ETH;
 		case TRACE_DLT_IEEE802_11: return TRACE_TYPE_80211;
 		case TRACE_DLT_LINUX_SLL: return TRACE_TYPE_LINUX_SLL;
@@ -54,7 +54,7 @@ libtrace_dlt_t libtrace_to_pcap_dlt(libtrace_linktype_t type)
 	 * can add it to demote_packet
 	 */
 	switch(type) {
-		case TRACE_TYPE_NONE: return TRACE_DLT_NULL;
+		case TRACE_TYPE_NONE: return TRACE_DLT_RAW;
 		case TRACE_TYPE_ETH: return TRACE_DLT_EN10MB;
 		case TRACE_TYPE_80211: return TRACE_DLT_IEEE802_11;
 		case TRACE_TYPE_LINUX_SLL: return TRACE_DLT_LINUX_SLL;
@@ -258,7 +258,7 @@ bool demote_packet(libtrace_packet_t *packet)
 			switch(ntohs(((libtrace_sll_header_t*)packet->payload)
 					->hatype)) {
 				case ARPHRD_PPP:
-					packet->type=pcap_dlt_to_rt(TRACE_DLT_NULL);
+					packet->type=pcap_dlt_to_rt(TRACE_DLT_RAW);
 					break;
 				case ARPHRD_ETHER:
 					packet->type=pcap_dlt_to_rt(TRACE_DLT_EN10MB);
