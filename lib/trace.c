@@ -997,30 +997,33 @@ DLLEXPORT int trace_apply_filter(libtrace_filter_t *filter,
 	int ret;
 	assert(filter);
 	assert(packet);
+	libtrace_packet_t *packet_copy = packet;
 
+	
 	if (libtrace_to_pcap_dlt(trace_get_link_type(packet))==~0) {
 		/* Copy the packet, as we don't want to trash the one we
 		 * were passed in
 		 */
-		packet=trace_copy_packet(packet);
+		packet_copy=trace_copy_packet(packet);
 		free_packet_needed=true;
-		while (libtrace_to_pcap_dlt(trace_get_link_type(packet))==~0) {
-			if (!demote_packet(packet)) {
+		while (libtrace_to_pcap_dlt(trace_get_link_type(packet_copy))==
+				~0) {
+			if (!demote_packet(packet_copy)) {
 				trace_set_err_out(packet->trace, 
 						TRACE_ERR_NO_CONVERSION,
 						"pcap does not support this format");
 				if (free_packet_needed) {
-					trace_destroy_packet(packet);
+					trace_destroy_packet(packet_copy);
 				}
 				return -1;
 			}
 		}
 	}
 	
-	linkptr = trace_get_link(packet);
+	linkptr = trace_get_link(packet_copy);
 	if (!linkptr) {
 		if (free_packet_needed) {
-			trace_destroy_packet(packet);
+			trace_destroy_packet(packet_copy);
 		}
 		return 0;
 	}
@@ -1028,19 +1031,19 @@ DLLEXPORT int trace_apply_filter(libtrace_filter_t *filter,
 	/* We need to compile it now, because before we didn't know what the 
 	 * link type was
 	 */
-	if (trace_bpf_compile(filter,packet)==-1) {
+	if (trace_bpf_compile(filter,packet_copy)==-1) {
 		if (free_packet_needed) {
-			trace_destroy_packet(packet);
+			trace_destroy_packet(packet_copy);
 		}
 		return -1;
 	}
 
-	clen = trace_get_capture_length(packet);
+	clen = trace_get_capture_length(packet_copy);
 
 	assert(filter->flag);
 	ret=bpf_filter(filter->filter.bf_insns,(u_char*)linkptr,clen,clen);
 	if (free_packet_needed) {
-		trace_destroy_packet(packet);
+		trace_destroy_packet(packet_copy);
 	}
 	return ret;
 #else
