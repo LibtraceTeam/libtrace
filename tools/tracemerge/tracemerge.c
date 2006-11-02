@@ -96,7 +96,7 @@ int main(int argc, char *argv[])
 	while(1) {
 		uint64_t oldest_ts=0;
 		int oldest=-1;
-		for(i=0;i<argc-2;++i) {
+		for(i=0;i<argc-optind;++i) {
 			if (!live[i] && input[i]) {
 				int ret=trace_read_packet(input[i],packet[i]);
 				if (ret<0) {
