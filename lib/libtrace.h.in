@@ -568,7 +568,7 @@ typedef struct libtrace_radiotap_t {
  * Function prints out some basic help information regarding libtrace,
  * and then prints out the help() function registered with each input module
  */
-DLLEXPORT void trace_help();
+DLLEXPORT void trace_help(void);
 
 /** @name Trace management
  * These members deal with creating, configuring, starting, pausing and
@@ -937,7 +937,7 @@ DLLEXPORT void *trace_get_payload_from_ip6(libtrace_ip6_t *ipptr,
  * type may be NULL if not needed.
  *
  */
-DLLEXPORT void *trace_get_payload_from_link(void *link,
+DLLEXPORT void *trace_get_payload_from_link(void *linkptr,
 		libtrace_linktype_t linktype, 
 		uint16_t *type, uint32_t *remaining);
 
@@ -1463,7 +1463,7 @@ void trace_construct_packet(libtrace_packet_t *packet,
  * @param[out] tsft the value of the timer syncronisation function. 
  * @return true if the field was available, false if not.
  */
-DLLEXPORT bool trace_get_wireless_tsft(void *link,
+DLLEXPORT bool trace_get_wireless_tsft(void *linkptr,
         libtrace_linktype_t linktype, uint64_t *tsft);
 
 /** Get the wireless rate 
@@ -1472,7 +1472,7 @@ DLLEXPORT bool trace_get_wireless_tsft(void *link,
  * @param[out] rate the data-rate of the frame in units of 500kbps
  * @return true if the field was available, false if not.
  */
-DLLEXPORT bool trace_get_wireless_rate(void *link,
+DLLEXPORT bool trace_get_wireless_rate(void *linkptr,
         libtrace_linktype_t linktype, uint8_t *rate);
 
 /** Get the wireless channel frequency
@@ -1482,7 +1482,7 @@ DLLEXPORT bool trace_get_wireless_rate(void *link,
  * or received on.
  * @return true if the field was available, false if not.
  */
-DLLEXPORT bool trace_get_wireless_freq(void *link,
+DLLEXPORT bool trace_get_wireless_freq(void *linkptr,
         libtrace_linktype_t linktype, uint16_t *freq);
 
 /** Get the wireless signal strength in dBm 
@@ -1492,7 +1492,7 @@ DLLEXPORT bool trace_get_wireless_freq(void *link,
  * from 1mW.
  * @return true if the field was available, false if not.
  */
-DLLEXPORT bool trace_get_wireless_signal_strength_dbm(void *link,
+DLLEXPORT bool trace_get_wireless_signal_strength_dbm(void *linkptr,
         libtrace_linktype_t linktype, int8_t *strength);
 
 /** Get the wireless noise strength in dBm
@@ -1502,7 +1502,7 @@ DLLEXPORT bool trace_get_wireless_signal_strength_dbm(void *link,
  * from 1mW. 
  * @return true if the field was available, false if not.
  */
-DLLEXPORT bool trace_get_wireless_noise_strength_dbm(void *link,
+DLLEXPORT bool trace_get_wireless_noise_strength_dbm(void *linkptr,
         libtrace_linktype_t linktype, int8_t *strength);
 
 /** Get the wireless signal strength in dB
@@ -1512,7 +1512,7 @@ DLLEXPORT bool trace_get_wireless_noise_strength_dbm(void *link,
  * from a fixed reference. 
  * @return true if the field was available, false if not.
  */
-DLLEXPORT bool trace_get_wireless_signal_strength_db(void *link,
+DLLEXPORT bool trace_get_wireless_signal_strength_db(void *linkptr,
         libtrace_linktype_t linktype, uint8_t *strength);
 
 /** Get the wireless noise strength in dB 
@@ -1522,7 +1522,7 @@ DLLEXPORT bool trace_get_wireless_signal_strength_db(void *link,
  * from a fixed reference. 
  * @return true if the field was available, false if not.
  */
-DLLEXPORT bool trace_get_wireless_noise_strength_db(void *link,
+DLLEXPORT bool trace_get_wireless_noise_strength_db(void *linkptr,
         libtrace_linktype_t linktype, uint8_t *strength);
 
 /** Get the wireless transmit attenuation 
@@ -1532,7 +1532,7 @@ DLLEXPORT bool trace_get_wireless_noise_strength_db(void *link,
  * power set at factory calibration. 0 indicates maximum transmission power.
  * @return true if the field was available, false if not.
  */
-DLLEXPORT bool trace_get_wireless_tx_attenuation(void *link,
+DLLEXPORT bool trace_get_wireless_tx_attenuation(void *linkptr,
         libtrace_linktype_t linktype, uint16_t *attenuation);
 
 /** Get the wireless transmit attenuation in dB
@@ -1542,7 +1542,7 @@ DLLEXPORT bool trace_get_wireless_tx_attenuation(void *link,
  * set at factory calibration. 0 indicates maximum power.
  * @return true if the field was available, false if not.
  */
-DLLEXPORT bool trace_get_wireless_tx_attenuation_db(void *link,
+DLLEXPORT bool trace_get_wireless_tx_attenuation_db(void *linkptr,
         libtrace_linktype_t linktype, uint16_t *attenuation);
 
 /** Get the wireless transmit power in dBm @param link the wireless header
@@ -1550,7 +1550,7 @@ DLLEXPORT bool trace_get_wireless_tx_attenuation_db(void *link,
  * @param[out] txpower the transmit power as dB from a 1mW reference. This is the absolute power level measured at the antenna port.  
  * @return true if the field was available, false if not.
  */
-DLLEXPORT bool trace_get_wireless_tx_power_dbm(void *link, libtrace_linktype_t
+DLLEXPORT bool trace_get_wireless_tx_power_dbm(void *linkptr, libtrace_linktype_t
 		linktype, int8_t *txpower);
 
 /** Get the wireless antenna 
@@ -1559,7 +1559,7 @@ DLLEXPORT bool trace_get_wireless_tx_power_dbm(void *link, libtrace_linktype_t
  * @param[out] antenna which antenna was used to transmit or receive the frame.
  * @return true if the field was available, false if not.
  */
-DLLEXPORT bool trace_get_wireless_antenna(void *link,
+DLLEXPORT bool trace_get_wireless_antenna(void *linkptr,
         libtrace_linktype_t linktype, uint8_t *antenna);
 
 /** Get the wireless Frame Check Sequence field
@@ -1568,7 +1568,7 @@ DLLEXPORT bool trace_get_wireless_antenna(void *link,
  * @param[out] fcs the Frame Check Sequence of the frame. 
  * @return true if the field was available, false if not.
  */
-DLLEXPORT bool trace_get_wireless_fcs(void *link,
+DLLEXPORT bool trace_get_wireless_fcs(void *linkptr,
         libtrace_linktype_t linktype, uint32_t *fcs);
 
 /*@}*/
