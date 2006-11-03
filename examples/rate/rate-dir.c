@@ -126,7 +126,7 @@ int main(int argc, char *argv[]) {
                 uri = strdup(argv[1]);
         }
 
-        // create an trace to uri
+        /* create an trace to uri */
         trace = trace_create(uri);
 	if (trace_is_err(trace)) {
 		trace_err = trace_get_err(trace);
@@ -142,7 +142,7 @@ int main(int argc, char *argv[]) {
 
         for (;;) {
                 if ((psize = trace_read_packet(trace,packet)) == -1) {
-                        // terminate
+                        /* terminate */
                         break;
                 }
                 if (psize == 0) {
