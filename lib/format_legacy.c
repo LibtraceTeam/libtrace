@@ -131,9 +131,11 @@ static int legacy_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	
 	if ((numbytes=libtrace_io_read(INPUT.file,
 					buffer,
-					64)) == -1) {
-		trace_set_err(libtrace,errno,"read(%s)",libtrace->uridata);
-		return -1;
+					64)) != 64) {
+		if (numbytes!=0) {
+			trace_set_err(libtrace,errno,"read(%s)",libtrace->uridata);
+		}
+		return numbytes;
 	}
 	
 	packet->header = packet->buffer;
