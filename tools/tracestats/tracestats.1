@@ -6,7 +6,9 @@ tracestats \- perform simple analysis on a trace
 [ -f | --filter bpf ]... inputuri...
 .SH DESCRPTION
 tracestats reads one or more traces and outputs summaries for each trace of
-how many packets/bytes match each bpf filter, as well as totals
+how many packets/bytes match each bpf filter, as well as totals.  If instead
+of doing this for the entire trace, but to do it for portions then use
+tracertstats(1) instead.
 .TP
 .PD 0
 .BI \-f " bpf-filter"
@@ -30,6 +32,9 @@ tracestats \-\^\-filter 'host sundown' \\
 .fi
 
 .SH SEE ALSO
-libtrace(3), tracemerge(1), tracefilter(1), traceconvert(1)
+libtrace(3), tracemerge(1), tracefilter(1), traceconvert(1), tracesplit(1), 
+tracesplit_dir(1), tracereport(1), tracertstats(1), tracedump(1), traceanon(1),
+tracesummary(1)
+
 .SH AUTHORS
 Perry Lorier <perry@cs.waikato.ac.nz>
