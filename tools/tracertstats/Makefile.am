@@ -13,3 +13,4 @@ OUTPUT_MODULES=output_csv.c output_html.c output_txt.c $(LIBGDC_MODULES)
 include ../Makefile.tools
 tracertstats_SOURCES = tracertstats.c output.h output.c $(OUTPUT_MODULES)
 tracertstats_LDADD = -ltrace $(OUTPUT_PNG_LD)
+man_MAN = tracertstats.1

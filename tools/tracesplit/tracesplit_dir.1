@@ -1,0 +1,18 @@
+.TH TRACESPLIT "1" "November 2006" "tracesplit (libtrace)" "User Commands"
+.SH NAME
+tracesplit_dir \- split traces into two directions
+.SH SYNOPSIS
+.B tracemerge
+inputuri outputuri_incoming outputuri_outgoing
+.SH DESCRIPTION
+tracesplit splits one trace into two tracefiles, one for each direction.
+
+.SH EXAMPLES
+.nf
+tracesplit erf:/traces/bigtrace.gz erf:in.gz erf:out.gz
+.fi
+
+.SH SEE ALSO
+libtrace(3), tracemerge(1), tracefilter(1), traceconvert(1), tracesplit(1)
+.SH AUTHORS
+Perry Lorier <perry@cs.waikato.ac.nz>

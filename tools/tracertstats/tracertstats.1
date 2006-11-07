@@ -1,0 +1,88 @@
+.TH TRACESTATS "1" "November 2006" "tracestats (libtrace)" "User Commands"
+.SH NAME
+tracertstats \- perform simple filter based analysis on a trace
+.SH SYNOPSIS
+.B tracertstats 
+[ -f | --filter bpf ]
+[ -i | --interval interval ]
+[ -c | --count count ]
+[ -o | --output-format csv,txt,png,html ]
+inputuri...
+.P
+.B tracertstats 
+-H|--libtrace-help
+.SH DESCRPTION
+tracertstats takes a list of bpf expressions and outputs the number of packets
+and bytes that match that expression every interval seconds, or count packets.
+.TP
+.PD 0
+.BI \-f " bpf-filter"
+.TP
+.PD
+.BI \-\^\-filter " bpf-filter"
+Add another "bpf filter"
+
+.TP
+.PD 0
+.BI \-i " interval"
+.TP
+.PD
+.BI \-\^\-interval " interval"
+Output results every \fIinterval\fR seconds.
+
+.TP
+.PD 0
+.BI \-i " count"
+.TP
+.PD
+.BI \-\^\-count " count"
+Output results every \fIcount\fR packets.
+
+.TP
+.PD 0
+.BI \-o " format"
+.TP
+.PD
+.BI \-\^\-output\-format " format"
+Selects the output format
+
+.RS
+.TP
+txt
+Human readable text.  This is the default output format which provides output
+easily understood by a human.  This format has the disadvantage that it takes
+up quite a bit of horizontal space.
+
+.TP
+csv
+Comma Seperated Values. This is suitable for further analysis in a spreadsheet,
+or other program.
+
+.TP
+png
+PNG Graphic.  Produces a fairly incomprehensible png graph.  This relies on
+gdc being available at compile time.
+
+.TP
+html
+This produces output suitable for display to a human in a webbrowser.
+
+.SH EXAMPLES
+.nf
+tracertstats \-\^\-filter 'host sundown' \\
+	\-\^\-filter 'port http' \\
+	\-\^\-filter 'port ftp or ftp-data' \\
+	\-\^\-filter 'port smtp' \\
+	\-\^\-filter 'tcp[tcpflags] & tcp-syn!=0' \\
+	\-\^\-filter 'not ip' \\
+	\-\^\-filter 'ether[0] & 1 == 1' \\
+	\-\^\-filter 'icmp[icmptype] == icmp-unreach' \\
+	\-\^\-output\-format html
+	erf:/traces/trace1.gz \\
+	erf:/traces/trace2.gz 
+.fi
+
+.SH SEE ALSO
+libtrace(3), tracemerge(1), tracefilter(1), traceconvert(1)
+.SH AUTHORS
+Perry Lorier <perry@cs.waikato.ac.nz>
