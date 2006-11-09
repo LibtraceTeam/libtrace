@@ -52,6 +52,8 @@ char *lookup_out_uri(const char *type) {
 		return "erf:traces/100_packets.out.erf";
 	if (!strcmp(type,"pcap"))
 		return "pcap:traces/100_packets.out.pcap";
+	if (!strcmp(type,"pcapfile"))
+		return "pcapfile:traces/100_packets.out.pcap";
 	if (!strcmp(type,"wtf"))
 		return "wtf:traces/wed.out.wtf";
 	if (!strcmp(type,"duck"))

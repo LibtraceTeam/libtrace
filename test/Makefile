@@ -43,7 +43,7 @@ test-format-all: test-format test-decode test-decode2
 	@echo Radius Decoder
 	@LD_LIBRARY_PATH="$(libdir)" \
 	./test-decode2 pcap:traces/radius.pcap
-	@for i in erf pcap wtf pcapfile duck; do		\
+	@for i in erf pcap wtf pcapfile duck legacyatm; do	\
 		echo \* Read $$i;				\
 		rm -f traces/*.out.*;				\
 		LD_LIBRARY_PATH="$(libdir)"			\
@@ -53,7 +53,7 @@ test-format-all: test-format test-decode test-decode2
 	done
 
 test-write-all: test-write
-	@for i in erf pcap; do					\
+	@for i in erf pcap pcapfile; do				\
 		echo \* Write $$i;				\
 		rm -f traces/*.out.*;				\
 		LD_LIBRARY_PATH="$(libdir)"			\
@@ -89,12 +89,18 @@ test-convert-all: test-convert
 	@echo " * wtf -> pcap"
 	@rm -f traces/*.out.*
 	@LD_LIBRARY_PATH="$(libdir)" ./test-convert wtf pcap
+	@echo " * legacyatm -> pcapfile"
+	@rm -f traces/*.out.*
+	@LD_LIBRARY_PATH="$(libdir)" ./test-convert wtf pcapfile
+	@echo " * legacyatm -> pcap"
+	@rm -f traces/*.out.*
+	@LD_LIBRARY_PATH="$(libdir)" ./test-convert wtf pcap
 	@echo " * wtf -> wtf"
 	#@rm -f traces/*.out.*
 	#@LD_LIBRARY_PATH="$(libdir)" ./test-convert wtf wtf
 	@echo " * duck -> duck"
-	@rm -f traces/*.out.*
-	@LD_LIBRARY_PATH="$(libdir)" ./test-convert duck duck
+	#@rm -f traces/*.out.*
+	#@LD_LIBRARY_PATH="$(libdir)" ./test-convert duck duck
  
 clean:
 	$(RM) $(BINS) $(OBJS) test-format  test-decode test-convert

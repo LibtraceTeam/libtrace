@@ -72,6 +72,8 @@ const char *lookup_uri(const char *type) {
 		return "pcapfile:traces/100_packets.pcap";
 	if (!strcmp(type, "duck"))
 		return "duck:traces/100_packets.duck";
+	if (!strcmp(type, "legacyatm"))
+		return "legacyatm:traces/legacyatm.gz";
 	return "unknown";
 }
 
