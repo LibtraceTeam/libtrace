@@ -215,7 +215,7 @@ static int wag_read(libtrace_t *libtrace, void *buffer, size_t len,
 		int block) {
         size_t framesize;
         char *buf_ptr = (char *)buffer;
-        int to_read = 0;
+        unsigned int to_read = 0;
         uint16_t magic = 0;
 	long fd_flags;
 	
@@ -499,7 +499,8 @@ static int wag_get_fd(const libtrace_t *trace) {
 	return DATA(trace)->input.fd;
 }
 
-struct libtrace_eventobj_t trace_event_wag(libtrace_t *trace, libtrace_packet_t *packet) {
+static struct libtrace_eventobj_t trace_event_wag(libtrace_t *trace, libtrace_packet_t *packet) 
+{
 	struct libtrace_eventobj_t event = {0,0,0.0,0};
 	libtrace_err_t read_err;
 
@@ -532,7 +533,7 @@ struct libtrace_eventobj_t trace_event_wag(libtrace_t *trace, libtrace_packet_t 
 	return event;
 }
 	
-static void wag_help() {
+static void wag_help(void) {
 	printf("wag format module: $Revision$\n");
 	printf("Supported input URIs:\n");
 	printf("\twag:/dev/wagn\n");
@@ -544,7 +545,7 @@ static void wag_help() {
 	printf("\n");
 }
 
-static void wtf_help() {
+static void wtf_help(void) {
 	printf("wag trace format module: $Revision$\n");
 	printf("Supported input URIs:\n");
 	printf("\twtf:/path/to/trace.wag\n");
@@ -633,7 +634,7 @@ static struct libtrace_format_t wag_trace = {
 };
 
 
-void wag_constructor() {
+void wag_constructor(void) {
 	register_format(&wag);
 	register_format(&wag_trace);
 }

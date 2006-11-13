@@ -266,7 +266,7 @@ static int pcapfile_write_packet(libtrace_out_t *out,
 	/* If this packet cannot be converted to a pcap linktype then
 	 * pop off the top header until it can be converted
 	 */
-	while (libtrace_to_pcap_dlt(trace_get_link_type(packet))==~0) {
+	while (libtrace_to_pcap_dlt(trace_get_link_type(packet))==~0U) {
 		if (!demote_packet(packet)) {
 			trace_set_err_out(out, 
 				TRACE_ERR_NO_CONVERSION,
@@ -280,7 +280,7 @@ static int pcapfile_write_packet(libtrace_out_t *out,
 	 * so already
 	 */
 	if (!DATAOUT(out)->file) {
-		struct pcapfile_header_t hdr;
+		struct pcapfile_header_t pcaphdr;
 
 		DATAOUT(out)->file=trace_open_file_out(out,
 				DATAOUT(out)->level,
@@ -288,16 +288,16 @@ static int pcapfile_write_packet(libtrace_out_t *out,
 		if (!DATAOUT(out)->file)
 			return -1;
 
-		hdr.magic_number = 0xa1b2c3d4;
-		hdr.version_major = 2;
-		hdr.version_minor = 4;
-		hdr.thiszone = 0;
-		hdr.sigfigs = 0;
-		hdr.snaplen = 65536;
-		hdr.network = 
+		pcaphdr.magic_number = 0xa1b2c3d4;
+		pcaphdr.version_major = 2;
+		pcaphdr.version_minor = 4;
+		pcaphdr.thiszone = 0;
+		pcaphdr.sigfigs = 0;
+		pcaphdr.snaplen = 65536;
+		pcaphdr.network = 
 			libtrace_to_pcap_dlt(trace_get_link_type(packet));
 
-		libtrace_io_write(DATAOUT(out)->file, &hdr, sizeof(hdr));
+		libtrace_io_write(DATAOUT(out)->file, &pcaphdr, sizeof(pcaphdr));
 	}
 
 	hdr.ts_sec = tv.tv_sec;
@@ -450,7 +450,7 @@ static size_t pcapfile_set_capture_length(libtrace_packet_t *packet,size_t size)
 	return trace_get_capture_length(packet);
 }
 
-static void pcapfile_help() {
+static void pcapfile_help(void) {
 	printf("pcapfile format module: $Revision$\n");
 	printf("Supported input URIs:\n");
 	printf("\tpcapfile:/path/to/file\n");
@@ -496,7 +496,7 @@ static struct libtrace_format_t pcapfile = {
 };
 
 
-void pcapfile_constructor() {
+void pcapfile_constructor(void) {
 	register_format(&pcapfile);
 }
 

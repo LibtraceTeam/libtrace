@@ -313,7 +313,7 @@ static int pcap_write_packet(libtrace_out_t *libtrace,
 	/* If this packet cannot be converted to a pcap linktype then
 	 * pop off the top header until it can be converted
 	 */
-	while (libtrace_to_pcap_dlt(trace_get_link_type(packet))==~0) {
+	while (libtrace_to_pcap_dlt(trace_get_link_type(packet))==~0U) {
 		if (!demote_packet(packet)) {
 			trace_set_err_out(libtrace, 
 				TRACE_ERR_NO_CONVERSION,
@@ -324,7 +324,7 @@ static int pcap_write_packet(libtrace_out_t *libtrace,
 
 	if (!OUTPUT.trace.pcap) {
 		OUTPUT.trace.pcap = (pcap_t *)pcap_open_dead(
-			libtrace_to_pcap_dlt(trace_get_link_type(packet)),
+			(int)libtrace_to_pcap_dlt(trace_get_link_type(packet)),
 			65536);
 		if (!OUTPUT.trace.pcap) {
 			trace_set_err_out(libtrace,TRACE_ERR_INIT_FAILED,"Failed to open dead trace: %s\n",
@@ -538,7 +538,7 @@ static int pcap_get_fd(const libtrace_t *trace) {
 	return pcap_fileno(DATA(trace)->input.pcap);
 }
 
-static void pcap_help() {
+static void pcap_help(void) {
 	printf("pcap format module: $Revision$\n");
 	printf("Supported input URIs:\n");
 	printf("\tpcap:/path/to/file\n");
@@ -550,7 +550,7 @@ static void pcap_help() {
 	printf("\n");
 }
 
-static void pcapint_help() {
+static void pcapint_help(void) {
 	printf("pcapint format module: $Revision$\n");
 	printf("Supported input URIs:\n");
 	printf("\tpcapint:interface\n");
@@ -633,7 +633,7 @@ static struct libtrace_format_t pcapint = {
 	NULL				/* next pointer */
 };
 
-void pcap_constructor() {
+void pcap_constructor(void) {
 	register_format(&pcap);
 	register_format(&pcapint);
 }

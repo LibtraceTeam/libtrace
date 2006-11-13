@@ -136,7 +136,7 @@ static int duck_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 
 	int numbytes = 0;
 	uint32_t version = 0;
-	int duck_size;
+	unsigned int duck_size;
 	
 	if (!packet->buffer || packet->buf_control == TRACE_CTRL_EXTERNAL) {
                 packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
@@ -251,7 +251,7 @@ static libtrace_linktype_t duck_get_link_type(const libtrace_packet_t *packet) {
 	return TRACE_TYPE_DUCK;
 }
 
-static void duck_help() {
+static void duck_help(void) {
 	printf("Endace DUCK format module\n");
 	printf("Supported input uris:\n");
 	printf("\tduck:/path/to/input/file\n");
@@ -295,6 +295,6 @@ static struct libtrace_format_t duck = {
         NULL                            /* next pointer */
 };
 
-void duck_constructor() {
+void duck_constructor(void) {
 	register_format(&duck);
 }	

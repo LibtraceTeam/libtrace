@@ -133,7 +133,7 @@ struct libtrace_t {
 	struct libtrace_filter_t *filter; /**< used by libtrace if the module
 					    * doesn't support filters natively
 					    */
-	int snaplen;			/**< used by libtrace if the module
+	unsigned int snaplen;		/**< used by libtrace if the module
 					  * doesn't support snapping natively
 					  */
 };
@@ -345,7 +345,7 @@ struct libtrace_format_t {
 	 */
 	struct libtrace_eventobj_t (*trace_event)(libtrace_t *trace, libtrace_packet_t *packet);	
 	/** return information about this trace format to standard out */
-	void (*help)();
+	void (*help)(void);
 	/** next pointer, should be NULL */
 	struct libtrace_format_t *next;
 };
@@ -367,6 +367,8 @@ void promote_packet(libtrace_packet_t *packet);
 bool demote_packet(libtrace_packet_t *packet);
 
 void *trace_get_payload_from_linux_sll(void *, uint16_t *, uint32_t *);
+void *trace_get_payload_from_pos(void *, uint16_t *, uint32_t *);
+void *trace_get_payload_from_atm(void *, uint8_t *, uint32_t *);
 
 uint64_t byteswap64(uint64_t num);
 uint32_t byteswap32(uint32_t num);

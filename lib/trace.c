@@ -211,17 +211,17 @@ void register_format(struct libtrace_format_t *f) {
 #endif
 }
 
-void erf_constructor();
-void legacy_constructor();
-void linuxnative_constructor();
-void pcap_constructor();
-void pcapfile_constructor();
-void rt_constructor();
-void wag_constructor();
-void duck_constructor();
+void erf_constructor(void);
+void legacy_constructor(void);
+void linuxnative_constructor(void);
+void pcap_constructor(void);
+void pcapfile_constructor(void);
+void rt_constructor(void);
+void wag_constructor(void);
+void duck_constructor(void);
 
 /* call all the constructors if they haven't yet all been called */
-void trace_init(void)
+static void trace_init(void)
 {
 	if (!formats_list) {
 		duck_constructor();
@@ -601,14 +601,16 @@ DLLEXPORT void trace_destroy_dead(libtrace_t *libtrace) {
  *
  * @author Shane Alcock
  * */
-DLLEXPORT void trace_destroy_output(libtrace_out_t *libtrace) {
+DLLEXPORT void trace_destroy_output(libtrace_out_t *libtrace) 
+{
 	assert(libtrace);
 	libtrace->format->fin_output(libtrace);
 	free(libtrace->uridata);
 	free(libtrace);
 }
 
-DLLEXPORT libtrace_packet_t *trace_create_packet() {
+DLLEXPORT libtrace_packet_t *trace_create_packet(void) 
+{
 	libtrace_packet_t *packet = 
 		(libtrace_packet_t*)calloc(1,sizeof(libtrace_packet_t));
 	packet->buf_control=TRACE_CTRL_PACKET;
@@ -996,24 +998,24 @@ DLLEXPORT int trace_apply_filter(libtrace_filter_t *filter,
 			const libtrace_packet_t *packet) {
 #ifdef HAVE_BPF
 	void *linkptr = 0;
-	int clen = 0;
+	unsigned int clen = 0;
 	bool free_packet_needed = false;
 	int ret;
-	assert(filter);
-	assert(packet);
 	libtrace_packet_t *packet_copy = packet;
 
-	
-	if (libtrace_to_pcap_dlt(trace_get_link_type(packet))==~0) {
+	assert(filter);
+	assert(packet);
+
+	if (libtrace_to_pcap_dlt(trace_get_link_type(packet))==~0U) {
 		/* Copy the packet, as we don't want to trash the one we
 		 * were passed in
 		 */
 		packet_copy=trace_copy_packet(packet);
 		free_packet_needed=true;
 		while (libtrace_to_pcap_dlt(trace_get_link_type(packet_copy))==
-				~0) {
+				~0U) {
 			if (!demote_packet(packet_copy)) {
-				trace_set_err_out(packet->trace, 
+				trace_set_err(packet->trace, 
 						TRACE_ERR_NO_CONVERSION,
 						"pcap does not support this format");
 				if (free_packet_needed) {

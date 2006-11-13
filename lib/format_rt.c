@@ -36,7 +36,6 @@
 #include "libtrace.h"
 #include "libtrace_int.h"
 #include "format_helper.h"
-#include "parse_cmd.h"
 #include "rt_protocol.h"
 
 #include <sys/stat.h>
@@ -53,7 +52,7 @@
 
 #define RT_INFO ((struct rt_format_data_t*)libtrace->format_data)
 
-char *rt_deny_reason(uint8_t reason) {
+static char *rt_deny_reason(uint8_t reason) {
 	char *string = 0;
 
 	switch(reason) {
@@ -441,7 +440,7 @@ static int rt_send_ack(libtrace_t *libtrace,
 	static char *ack_buffer = 0;
 	char *buf_ptr;
 	int numbytes = 0;
-	int to_write = 0;
+	unsigned int to_write = 0;
 	rt_header_t *hdr;
 	rt_ack_t *ack_hdr;
 	
@@ -630,7 +629,9 @@ static int rt_get_fd(const libtrace_t *trace) {
         return ((struct rt_format_data_t *)trace->format_data)->input_fd;
 }
 
-libtrace_eventobj_t trace_event_rt(libtrace_t *trace, libtrace_packet_t *packet) {
+static libtrace_eventobj_t trace_event_rt(libtrace_t *trace,
+					libtrace_packet_t *packet) 
+{
 	libtrace_eventobj_t event = {0,0,0.0,0};
 	libtrace_err_t read_err;
 
@@ -666,7 +667,7 @@ libtrace_eventobj_t trace_event_rt(libtrace_t *trace, libtrace_packet_t *packet)
 	return event;
 }
 
-static void rt_help() {
+static void rt_help(void) {
         printf("rt format module\n");
         printf("Supported input URIs:\n");
         printf("\trt:hostname:port\n");
@@ -714,6 +715,6 @@ static struct libtrace_format_t rt = {
 	NULL				/* next pointer */
 };
 
-void rt_constructor() {
+void rt_constructor(void) {
 	register_format(&rt);
 }

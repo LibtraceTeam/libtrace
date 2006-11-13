@@ -34,7 +34,6 @@
 #include "libtrace.h"
 #include "libtrace_int.h"
 #include "format_helper.h"
-#include "parse_cmd.h"
 
 #include <assert.h>
 #include <errno.h>
@@ -625,9 +624,9 @@ static int dag_start_input(libtrace_t *libtrace) {
 
 static int erf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	int numbytes;
-	int size;
+	unsigned int size;
 	void *buffer2 = packet->buffer;
-	int rlen;
+	unsigned int rlen;
 
 	if (!packet->buffer || packet->buf_control == TRACE_CTRL_EXTERNAL) {
 		packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
@@ -882,7 +881,8 @@ static size_t erf_set_capture_length(libtrace_packet_t *packet, size_t size) {
 }
 
 #ifdef HAVE_DAG
-libtrace_eventobj_t trace_event_dag(libtrace_t *trace, libtrace_packet_t *packet) {
+static libtrace_eventobj_t trace_event_dag(libtrace_t *trace, 
+					libtrace_packet_t *packet) {
         libtrace_eventobj_t event = {0,0,0.0,0};
         int dag_fd;
         int data;
@@ -907,7 +907,7 @@ libtrace_eventobj_t trace_event_dag(libtrace_t *trace, libtrace_packet_t *packet
 #endif
 
 #ifdef HAVE_DAG
-static void dag_help() {
+static void dag_help(void) {
 	printf("dag format module: $Revision$\n");
 	printf("Supported input URIs:\n");
 	printf("\tdag:/dev/dagn\n");
@@ -920,7 +920,7 @@ static void dag_help() {
 }
 #endif
 
-static void erf_help() {
+static void erf_help(void) {
 	printf("erf format module: $Revision$\n");
 	printf("Supported input URIs:\n");
 	printf("\terf:/path/to/file\t(uncompressed)\n");
@@ -1016,7 +1016,7 @@ static struct libtrace_format_t dag = {
 };
 #endif
 
-void erf_constructor() {
+void erf_constructor(void) {
 	register_format(&erf);
 #ifdef HAVE_DAG
 	register_format(&dag);

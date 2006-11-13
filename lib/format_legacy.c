@@ -34,7 +34,6 @@
 #include "libtrace.h"
 #include "libtrace_int.h"
 #include "format_helper.h"
-#include "parse_cmd.h"
 
 #include <sys/stat.h>
 #include <assert.h>
@@ -188,7 +187,7 @@ static uint64_t legacy_get_erf_timestamp(const libtrace_packet_t *packet)
 	return legacy->ts;
 }  
 
-static void legacypos_help() {
+static void legacypos_help(void) {
 	printf("legacypos format module: $Revision$\n");
 	printf("Supported input URIs:\n");
 	printf("\tlegacypos:/path/to/file\t(uncompressed)\n");
@@ -199,7 +198,7 @@ static void legacypos_help() {
 	printf("\n");
 }
 
-static void legacyatm_help() {
+static void legacyatm_help(void) {
 	printf("legacyatm format module: $Revision$\n");
 	printf("Supported input URIs:\n");
 	printf("\tlegacyatm:/path/to/file\t(uncompressed)\n");
@@ -210,7 +209,7 @@ static void legacyatm_help() {
 	printf("\n");
 }
 
-static void legacyeth_help() {
+static void legacyeth_help(void) {
 	printf("legacyeth format module: $Revision$\n");
 	printf("Supported input URIs:\n");
 	printf("\tlegacyeth:/path/to/file\t(uncompressed)\n");
@@ -327,7 +326,7 @@ static struct libtrace_format_t legacypos = {
 };
 
 	
-void legacy_constructor() {
+void legacy_constructor(void) {
 	register_format(&legacypos);
 	register_format(&legacyeth);
 	register_format(&legacyatm);

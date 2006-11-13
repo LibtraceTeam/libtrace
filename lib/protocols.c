@@ -183,7 +183,7 @@ void *trace_get_payload_from_atm(void *link,
 	cell=(libtrace_atm_capture_cell_t*)link;
 
 	if (type)
-		type=cell->pt;
+		*type=cell->pt;
 
 	if (remaining)
 		*remaining-=sizeof(libtrace_atm_capture_cell_t);
@@ -677,8 +677,8 @@ struct ports_t {
 DLLEXPORT uint16_t trace_get_source_port(const libtrace_packet_t *packet)
 {
 	uint32_t remaining;
-	struct ports_t *port = 
-		(struct ports_t*)trace_get_transport((libtrace_packet_t*)packet,
+	const struct ports_t *port = 
+		(const struct ports_t*)trace_get_transport((libtrace_packet_t*)packet,
 			NULL, &remaining);
 
 	/* snapped too early */

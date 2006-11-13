@@ -43,7 +43,7 @@ libtrace_linktype_t pcap_dlt_to_libtrace(libtrace_dlt_t dlt)
 		case TRACE_DLT_ATM_RFC1483: return TRACE_TYPE_LLCSNAP;
 					 
 	}
-	return ~0;
+	return ~0U;
 }
 
 
@@ -68,10 +68,10 @@ libtrace_dlt_t libtrace_to_pcap_dlt(libtrace_linktype_t type)
 			 * The closest are DLT_ATM_RFC1483 but that doesn't
 			 * include the ATM header, only the LLCSNAP header.
 			 */
-			return ~0;
+			return ~0U;
 		case TRACE_TYPE_LLCSNAP: return TRACE_DLT_ATM_RFC1483;
 	}
-	return ~0;
+	return ~0U;
 }
 
 enum rt_field_t pcap_dlt_to_rt(libtrace_dlt_t dlt) 
@@ -94,7 +94,7 @@ libtrace_linktype_t erf_type_to_libtrace(char erf)
 		case TYPE_ATM:		return TRACE_TYPE_ATM;
 		case TYPE_AAL5:		return TRACE_TYPE_AAL5;
 	}
-	return ~0;
+	return ~0U;
 }
 
 char libtrace_to_erf_type(libtrace_linktype_t linktype)
@@ -114,7 +114,7 @@ libtrace_linktype_t arphrd_type_to_libtrace(unsigned int arphrd) {
 		case ARPHRD_IEEE80211: return TRACE_TYPE_80211;
 		case ARPHRD_80211_RADIOTAP: return TRACE_TYPE_80211_RADIO;
 	}
-	return ~0;
+	return ~0U;
 }
 
 unsigned int libtrace_to_arphrd_type(libtrace_linktype_t linktype) {
@@ -123,7 +123,7 @@ unsigned int libtrace_to_arphrd_type(libtrace_linktype_t linktype) {
 		case TRACE_TYPE_80211: return ARPHRD_IEEE80211;
 		case TRACE_TYPE_80211_RADIO: return ARPHRD_80211_RADIOTAP;
 	}
-	return -1;
+	return ~0U;
 }
 
 /** Tinker with a packet

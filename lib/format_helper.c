@@ -60,7 +60,8 @@ struct libtrace_eventobj_t trace_event_device(struct libtrace_t *trace, struct l
 #else
 #  include <sys/ioctl.h>
 
-struct libtrace_eventobj_t trace_event_device(struct libtrace_t *trace, struct libtrace_packet_t *packet) {
+struct libtrace_eventobj_t trace_event_device(struct libtrace_t *trace, 
+					struct libtrace_packet_t *packet) {
 	struct libtrace_eventobj_t event = {0,0,0.0,0};
 	int data;
 

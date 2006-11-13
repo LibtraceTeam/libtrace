@@ -364,7 +364,7 @@ static int linuxnative_get_fd(const libtrace_t *trace) {
 	return FORMAT(trace->format_data)->fd;
 }
 
-static void linuxnative_help() {
+static void linuxnative_help(void) {
 	printf("linuxnative format module: $Revision$\n");
 	printf("Supported input URIs:\n");
 	printf("\tint:\n");
@@ -409,6 +409,6 @@ static struct libtrace_format_t linuxnative = {
 	NULL
 };
 
-void linuxnative_constructor() {
+void linuxnative_constructor(void) {
 	register_format(&linuxnative);
 }

@@ -24,7 +24,7 @@ libtrace_la_SOURCES = $(LIBTRACEIO) trace.c common.h \
 		format_erf.c format_pcap.c format_wag.c format_legacy.c \
 		format_rt.c format_helper.c format_helper.h format_pcapfile.c \
 		format_duck.c $(NATIVEFORMATS) $(BPFFORMATS) \
-		parse_cmd.c parse_cmd.h libtrace_int.h lt_inttypes.h \
+		libtrace_int.h lt_inttypes.h \
 		linktypes.c protocols.c libtraceio.h link_wireless.c 
 
 if DAG2_4
