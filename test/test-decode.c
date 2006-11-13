@@ -75,6 +75,10 @@ const char *lookup_uri(const char *type) {
 		return "duck:traces/100_packets.duck";
 	if (!strcmp(type, "legacyatm"))
 		return "legacyatm:traces/legacyatm.gz";
+	if (!strcmp(type, "legacypos"))
+		return "legacypos:traces/legacypos.gz";
+	if (!strcmp(type, "legacyeth"))
+		return "legacyeth:traces/legacyeth.gz";
 	return "unknown";
 }
 

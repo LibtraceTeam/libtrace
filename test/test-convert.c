@@ -79,6 +79,12 @@ char *lookup_uri(const char *type)
 		return "rtclient:chasm";
 	if (!strcmp(type,"pcapfile"))
 		return "pcapfile:traces/100_packets.pcap";
+	if (!strcmp(type,"legacyatm"))
+		return "legacyatm:traces/legacyatm.gz";
+	if (!strcmp(type,"legacypos"))
+		return "legacypos:traces/legacypos.gz";
+	if (!strcmp(type,"legacyeth"))
+		return "legacyeth:traces/legacyeth.gz";
 	if (!strcmp(type, "duck"))
 		return "duck:traces/100_packets.duck";
 	return "unknown";
@@ -160,6 +166,8 @@ int main(int argc, char *argv[]) {
 	if (error)
 		return error;
 
+	printf("now to read it again\n");
+
 	/* Now read it back in again and check it's all kosher */
 	trace = trace_create(lookup_uri(argv[1]));
 	iferr(trace);
@@ -181,8 +189,12 @@ int main(int argc, char *argv[]) {
 			error=1;
 			break;
 		}
-		assert(trace_get_capture_length(packet) 
-				== trace_get_capture_length(packet2));
+		if (trace_get_capture_length(packet) != trace_get_capture_length(packet2)) {
+			printf("capturelen %i!=%i\n",
+					trace_get_capture_length(packet),
+					trace_get_capture_length(packet2));
+			assert(0);
+		}
 		assert(trace_get_wire_length(packet) 
 				== trace_get_wire_length(packet2));
 	
