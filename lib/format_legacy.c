@@ -86,6 +86,8 @@ static int erf_init_input(libtrace_t *libtrace)
 {
 	libtrace->format_data = malloc(sizeof(struct legacy_format_data_t));
 
+	DATA(libtrace)->input.file = NULL;
+
 	return 0;
 }
 

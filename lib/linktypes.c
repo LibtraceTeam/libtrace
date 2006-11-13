@@ -232,12 +232,6 @@ bool demote_packet(libtrace_packet_t *packet)
 			((libtrace_pcapfile_pkt_hdr_t*)tmp)->caplen
 				= remaining;
 
-			fprintf(stderr,"%i %i %i %i\n",
-					trace_get_capture_length(packet),
-					trace_get_wire_length(packet),
-					remaining,
-					trace_get_capture_length(packet)-remaining);
-
 			memcpy(tmp+sizeof(libtrace_pcapfile_pkt_hdr_t),
 					packet->payload,
 					remaining);
