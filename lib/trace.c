@@ -487,6 +487,7 @@ DLLEXPORT libtrace_out_t *trace_create_output(const char *uri) {
 DLLEXPORT int trace_start(libtrace_t *libtrace)
 {
 	assert(libtrace);
+	assert(!trace_is_err(libtrace) && "Please use trace_is_err to check for errors after calling trace_create!");
 	if (libtrace->format->start_input) {
 		int ret=libtrace->format->start_input(libtrace);
 		if (ret < 0) {
