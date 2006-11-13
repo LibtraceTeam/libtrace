@@ -312,6 +312,9 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 	}
 	
 	libtrace->event.tdelta = 0.0;
+	libtrace->event.packet = NULL;
+	libtrace->event.psize = 0;
+	libtrace->event.trace_last_ts = 0.0;
 	libtrace->filter = NULL;
 	libtrace->snaplen = 0;
 	libtrace->started=false;
