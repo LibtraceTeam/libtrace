@@ -210,7 +210,7 @@ static void *trace_get_payload_from_llcsnap(void *link,
 	return (void*)((char*)llc+sizeof(*llc));
 }
 
-static void *trace_get_payload_from_pos(void *link, 
+void *trace_get_payload_from_pos(void *link, 
 		uint16_t *type, uint32_t *remaining)
 {
 	/* 64 byte capture. */
@@ -222,7 +222,12 @@ static void *trace_get_payload_from_pos(void *link,
 		*remaining-=sizeof(libtrace_pos_t);
 	}
 
-	if (type) *type = ntohs(pos->ether_type);
+	/* This is documented by endace to be an ethertype.  The ethertype
+	 * however is always ntohs(0x0021), which endace in their own tools
+	 * ignore and assume IP, so...
+	 */
+	/*if (type) *type = ntohs(pos->ether_type); */
+	if (type) *type = ntohs(0x0800);
 
 	return (void*)((char *)pos+sizeof(*pos));
 }

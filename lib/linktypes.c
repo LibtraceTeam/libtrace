@@ -214,6 +214,51 @@ bool demote_packet(libtrace_packet_t *packet)
 	struct timeval tv;
 	static libtrace_t *trace = NULL;
 	switch(trace_get_link_type(packet)) {
+		case TRACE_TYPE_POS:
+			remaining=trace_get_capture_length(packet);
+			packet->payload=trace_get_payload_from_pos(
+				packet->payload,NULL,&remaining);
+
+			tmp=malloc(
+				trace_get_capture_length(packet)
+				+sizeof(libtrace_pcapfile_pkt_hdr_t)
+				);
+
+			tv=trace_get_timeval(packet);
+			((libtrace_pcapfile_pkt_hdr_t*)tmp)->ts_sec=tv.tv_sec;
+			((libtrace_pcapfile_pkt_hdr_t*)tmp)->ts_usec=tv.tv_usec;
+			((libtrace_pcapfile_pkt_hdr_t*)tmp)->wirelen
+				= trace_get_wire_length(packet)-(trace_get_capture_length(packet)-remaining);
+			((libtrace_pcapfile_pkt_hdr_t*)tmp)->caplen
+				= remaining;
+
+			fprintf(stderr,"%i %i %i %i\n",
+					trace_get_capture_length(packet),
+					trace_get_wire_length(packet),
+					remaining,
+					trace_get_capture_length(packet)-remaining);
+
+			memcpy(tmp+sizeof(libtrace_pcapfile_pkt_hdr_t),
+					packet->payload,
+					remaining);
+			if (packet->buf_control == TRACE_CTRL_EXTERNAL) {
+				packet->buf_control=TRACE_CTRL_PACKET;
+			}
+			else {
+				free(packet->buffer);
+			}
+			packet->buffer=tmp;
+			packet->header=tmp;
+			packet->payload=tmp+sizeof(libtrace_pcapfile_pkt_hdr_t);
+			packet->type=pcap_dlt_to_rt(TRACE_DLT_RAW);
+			
+			if (trace == NULL) {
+				trace = trace_create_dead("pcap:-");
+			}
+
+			packet->trace=trace;
+
+			return true;
 		case TRACE_TYPE_ATM:
 			remaining=trace_get_capture_length(packet);
 			packet->payload=trace_get_payload_from_atm(
@@ -227,10 +272,10 @@ bool demote_packet(libtrace_packet_t *packet)
 			tv=trace_get_timeval(packet);
 			((libtrace_pcapfile_pkt_hdr_t*)tmp)->ts_sec=tv.tv_sec;
 			((libtrace_pcapfile_pkt_hdr_t*)tmp)->ts_usec=tv.tv_usec;
+			((libtrace_pcapfile_pkt_hdr_t*)tmp)->wirelen
+				= trace_get_wire_length(packet)-(trace_get_capture_length(packet)-remaining);
 			((libtrace_pcapfile_pkt_hdr_t*)tmp)->caplen
 				= remaining;
-			((libtrace_pcapfile_pkt_hdr_t*)tmp)->wirelen
-				= trace_get_capture_length(packet)-remaining;
 
 			memcpy(tmp+sizeof(libtrace_pcapfile_pkt_hdr_t),
 					packet->payload,

@@ -91,6 +91,9 @@ static int erf_init_input(libtrace_t *libtrace)
 
 static int erf_start_input(libtrace_t *libtrace)
 {
+	if (DATA(libtrace)->input.file)
+		return 0;
+
 	DATA(libtrace)->input.file = trace_open_file(libtrace);
 
 	if (DATA(libtrace)->input.file)
@@ -164,7 +167,8 @@ static int legacy_get_capture_length(const libtrace_packet_t *packet UNUSED) {
 
 static int legacypos_get_wire_length(const libtrace_packet_t *packet) {
 	legacy_pos_t *lpos = (legacy_pos_t *)packet->header;
-	return ntohs(lpos->wlen);
+	assert(ntohl(lpos->wlen)>0);
+	return ntohl(lpos->wlen);
 }
 
 static int legacyatm_get_wire_length(const libtrace_packet_t *packet UNUSED) {
