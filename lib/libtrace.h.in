@@ -822,7 +822,7 @@ DLLEXPORT void trace_perror_output(libtrace_out_t *trace, const char *msg,...);
  *
  * @return a pointer to an initialised libtrace_packet_t object
  */
-DLLEXPORT libtrace_packet_t *trace_create_packet();
+DLLEXPORT libtrace_packet_t *trace_create_packet(void);
 
 /** Copy a packet
  * @param packet	the source packet to copy

@@ -236,6 +236,10 @@ static int duck_get_capture_length(const libtrace_packet_t *packet) {
 			return sizeof(duck2_4_t);
 		case TRACE_RT_DUCK_2_5:
 			return sizeof(duck2_5_t);
+		default:
+			trace_set_err(packet->trace,TRACE_ERR_BAD_PACKET,
+					"Not a duck packet");
+			return -1;
 	}
 	return 0;
 }
