@@ -323,8 +323,8 @@ static int pcap_write_packet(libtrace_out_t *libtrace,
 	}
 
 	if (!OUTPUT.trace.pcap) {
-		OUTPUT.trace.pcap = (pcap_t *)pcap_open_dead(
-			(int)libtrace_to_pcap_dlt(trace_get_link_type(packet)),
+		OUTPUT.trace.pcap = pcap_open_dead(
+			libtrace_to_pcap_dlt(trace_get_link_type(packet)),
 			65536);
 		if (!OUTPUT.trace.pcap) {
 			trace_set_err_out(libtrace,TRACE_ERR_INIT_FAILED,"Failed to open dead trace: %s\n",

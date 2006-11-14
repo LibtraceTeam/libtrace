@@ -104,6 +104,7 @@ char libtrace_to_erf_type(libtrace_linktype_t linktype)
 		case TRACE_TYPE_ETH:	return TYPE_ETH;
 		case TRACE_TYPE_ATM:	return TYPE_ATM;
 		case TRACE_TYPE_AAL5:	return TYPE_AAL5;
+		case TRACE_TYPE_LLCSNAP: return -1;
 	}
 	return -1;
 }
