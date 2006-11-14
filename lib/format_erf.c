@@ -689,7 +689,9 @@ static int erf_dump_packet(libtrace_out_t *libtrace,
 	int numbytes = 0;
 	int size;
 
-	if ((numbytes = libtrace_io_write(OUTPUT.file, erfptr, dag_record_size + pad)) != dag_record_size+pad) {
+	if ((numbytes = 
+		libtrace_io_write(OUTPUT.file, erfptr, dag_record_size + pad)) 
+			!= (int)dag_record_size+pad) {
 		trace_set_err_out(libtrace,errno,
 				"write(%s)",libtrace->uridata);
 		return -1;
