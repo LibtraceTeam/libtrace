@@ -5,7 +5,7 @@
 #include <stdbool.h>
 #include <getopt.h>
 
-void usage(char *argv0)
+static void usage(char *argv0)
 {
 	fprintf(stderr,"Usage:\n"
 	"%s flags outputuri traceuri [traceuri...]\n"

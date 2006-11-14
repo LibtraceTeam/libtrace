@@ -11,7 +11,7 @@
 #include "ipenc.h"
 
 
-void usage(char *argv0)
+static void usage(char *argv0)
 {
 	fprintf(stderr,"Usage:\n"
 	"%s flags inputfile outputfile\n"
@@ -26,7 +26,7 @@ void usage(char *argv0)
 }
 
 /* Incrementally update a checksum */
-void update_in_cksum(uint16_t *csum, uint16_t old, uint16_t new)
+static void update_in_cksum(uint16_t *csum, uint16_t old, uint16_t new)
 {
 	uint32_t sum = (~htons(*csum) & 0xFFFF) 
 		     + (~htons(old) & 0xFFFF) 
@@ -35,10 +35,10 @@ void update_in_cksum(uint16_t *csum, uint16_t old, uint16_t new)
 	*csum = htons(~(sum + (sum >> 16)));
 }
 
-void update_in_cksum32(uint16_t *csum, uint32_t old, uint32_t new)
+static void update_in_cksum32(uint16_t *csum, uint32_t old, uint32_t new)
 {
-	update_in_cksum(csum,old>>16,new>>16);
-	update_in_cksum(csum,old&0xFFFF,new&0xFFFF);
+	update_in_cksum(csum,(uint16_t)(old>>16),(uint16_t)(new>>16));
+	update_in_cksum(csum,(uint16_t)(old&0xFFFF),(uint16_t)(new&0xFFFF));
 }
 
 /* Ok this is remarkably complicated
@@ -51,7 +51,7 @@ void update_in_cksum32(uint16_t *csum, uint32_t old, uint32_t new)
  * the opposite direction so we need to encrypt the destination and
  * source instead of the source and destination!
  */
-void encrypt_ips(struct libtrace_ip *ip,bool enc_source,bool enc_dest)
+static void encrypt_ips(struct libtrace_ip *ip,bool enc_source,bool enc_dest)
 {
 	struct libtrace_tcp *tcp;
 	struct libtrace_udp *udp;
@@ -67,8 +67,8 @@ void encrypt_ips(struct libtrace_ip *ip,bool enc_source,bool enc_dest)
 					htonl(ip->ip_src.s_addr)
 					));
 		update_in_cksum32(&ip->ip_sum,old_ip,new_ip);
-		if (tcp) update_in_cksum(&tcp->check,old_ip,new_ip);
-		if (udp) update_in_cksum(&udp->check,old_ip,new_ip);
+		if (tcp) update_in_cksum32(&tcp->check,old_ip,new_ip);
+		if (udp) update_in_cksum32(&udp->check,old_ip,new_ip);
 		ip->ip_src.s_addr = new_ip;
 	}
 
@@ -78,8 +78,8 @@ void encrypt_ips(struct libtrace_ip *ip,bool enc_source,bool enc_dest)
 					htonl(ip->ip_dst.s_addr)
 					));
 		update_in_cksum32(&ip->ip_sum,old_ip,new_ip);
-		if (tcp) update_in_cksum(&tcp->check,old_ip,new_ip);
-		if (udp) update_in_cksum(&udp->check,old_ip,new_ip);
+		if (tcp) update_in_cksum32(&tcp->check,old_ip,new_ip);
+		if (udp) update_in_cksum32(&udp->check,old_ip,new_ip);
 		ip->ip_dst.s_addr = new_ip;
 	}
 
@@ -102,7 +102,7 @@ void encrypt_ips(struct libtrace_ip *ip,bool enc_source,bool enc_dest)
 int main(int argc, char *argv[]) 
 {
 	enum enc_type_t enc_type = ENC_NONE;
-	char *key = NULL;
+	uint8_t *key = NULL;
 	struct libtrace_t *trace = 0;
 	struct libtrace_packet_t *packet = trace_create_packet();
 	struct libtrace_out_t *writer = 0;

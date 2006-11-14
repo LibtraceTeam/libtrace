@@ -6,6 +6,7 @@
 #include "libtrace.h"
 #include "tracereport.h"
 #include "contain.h"
+#include "report.h"
 
 static uint64_t flow_count=0;
 

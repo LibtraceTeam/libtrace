@@ -58,7 +58,7 @@
 struct libtrace_t *trace;
 
 /* Process a trace, counting packets that match filter(s) */
-void run_trace(char *uri, libtrace_filter_t *filter, int count) 
+static void run_trace(char *uri, libtrace_filter_t *filter, int count) 
 {
 	struct libtrace_packet_t *packet = trace_create_packet();
 
@@ -100,7 +100,7 @@ void run_trace(char *uri, libtrace_filter_t *filter, int count)
         trace_destroy(trace);
 }
 
-void usage(char *argv0)
+static void usage(char *argv0)
 {
 	fprintf(stderr,"Usage:\n"
 	"%s flags traceuri [traceuri...]\n"

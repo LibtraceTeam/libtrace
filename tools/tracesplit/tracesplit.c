@@ -10,21 +10,21 @@
 #include <string.h>
 #include <assert.h>
 
-char *strdupcat(char *str,char *app)
+static char *strdupcat(char *str,char *app)
 {
 	str=realloc(str,strlen(str)+strlen(app)+1);
 	strcat(str,app);
 	return str;
 }
 
-char *strdupcati(char *str,int i)
+static char *strdupcati(char *str,uint64_t i)
 {
 	char buffer[64];
-	snprintf(buffer,sizeof(buffer),"%i",i);
+	snprintf(buffer,sizeof(buffer),"%" PRIu64,i);
 	return strdupcat(str,buffer);
 }
 
-int usage(char *argv0)
+static int usage(char *argv0)
 {
 	printf("Usage:\n"
 	"%s flags inputuri outputuri\n"
@@ -165,16 +165,16 @@ int main(int argc, char *argv[])
 			buffer=strdup(argv[optind+1]);
 			if (interval!=UINT64_MAX) {
 				buffer=strdupcat(buffer,"-");
-				buffer=strdupcati(buffer,firsttime);
+				buffer=strdupcati(buffer,(uint64_t)firsttime);
 			}
 			if (count!=UINT64_MAX) {
 				buffer=strdupcat(buffer,"-");
-				buffer=strdupcati(buffer,pktcount);
+				buffer=strdupcati(buffer,(uint64_t)pktcount);
 			}
 			if (bytes!=UINT64_MAX) {
 				static int filenum=0;
 				buffer=strdupcat(buffer,"-");
-				buffer=strdupcati(buffer,++filenum);
+				buffer=strdupcati(buffer,(uint64_t)++filenum);
 			}
 			output=trace_create_output(buffer);
 			trace_start_output(output);

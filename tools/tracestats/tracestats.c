@@ -70,7 +70,7 @@ uint64_t totcount;
 uint64_t totbytes;
 
 /* Process a trace, counting packets that match filter(s) */
-void run_trace(char *uri) 
+static void run_trace(char *uri) 
 {
 	struct libtrace_packet_t *packet = trace_create_packet();
 	int i;
@@ -121,7 +121,7 @@ void run_trace(char *uri)
         trace_destroy(trace);
 }
 
-void usage(char *argv0)
+static void usage(char *argv0)
 {
 	fprintf(stderr,"Usage: %s [-H|--libtrace-help] [--filter|-f bpf ]... libtraceuri...\n",argv0);
 }

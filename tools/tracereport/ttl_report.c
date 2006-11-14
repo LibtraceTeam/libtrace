@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include "libtrace.h"
 #include "tracereport.h"
+#include "report.h"
 
 static stat_t ttl_stat[256] = { {0,0} } ;
 

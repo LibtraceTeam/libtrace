@@ -1,7 +1,7 @@
 #ifndef _PANON_H_
 #define _PANON_H_
 
-// $Id$
+/* $Id$ */
 
 #include "rijndael.h"
 #include <inttypes.h>
@@ -12,4 +12,4 @@ uint32_t cpp_anonymize( const uint32_t orig_addr );
 void panon_init_decrypt(const uint8_t * key);
 void panon_init(const uint8_t * key);
 void panon_init_cache(); 
-#endif // _PANON_H_
+#endif 

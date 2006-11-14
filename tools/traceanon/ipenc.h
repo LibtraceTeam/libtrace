@@ -8,6 +8,6 @@ enum enc_type_t {
 	ENC_PREFIX_SUBSTITUTION,	/**< Substitute a prefix */
 	ENC_CRYPTOPAN			/**< Prefix preserving encryption */
 	};
-void enc_init(enum enc_type_t type, char *key);
+void enc_init(enum enc_type_t type, uint8_t *key);
 uint32_t enc_ip(uint32_t orig_addr);
 #endif

@@ -1,6 +1,6 @@
-// $Id$
+/* $Id$ */
 
-//
+/*
 // File : rijndael.cpp
 // Creation date : Sun Nov 5 2000 03:22:10 CEST
 // Author : Szymon Stefanek (stefanek@tin.it)
@@ -9,9 +9,9 @@
 // This is intended to be an easily usable library file.
 // This code is public domain.
 // Based on the Vincent Rijmen and K.U.Leuven implementation 2.4.
-//
+*/
 
-//
+/*
 // Original Copyright notice:
 //
 //    rijndael-alg-fst.c   v2.4   April '2000
@@ -27,12 +27,12 @@
 //             v2.4: Vincent Rijmen, K.U.Leuven
 //
 //    This code is placed in the public domain.
-//
+*/
 
-//
+/*
 // This implementation works on 128 , 192 , 256 bit keys
 // and on 128 bit blocks
-//
+*/
 
 #define _RIJNDAEL_CPP_
 
@@ -970,9 +970,9 @@ void r_encrypt(const UINT8 a[16], UINT8 b[16]);
 void r_decrypt(const UINT8 a[16], UINT8 b[16]);
 
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/*////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // API
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////// */
 
 int rijndael_init(Mode mode,Direction dir,const UINT8 * key,KeyLength keyLen,UINT8 * initVector)
 {
@@ -981,27 +981,27 @@ int rijndael_init(Mode mode,Direction dir,const UINT8 * key,KeyLength keyLen,UIN
         UINT8 keyMatrix[_MAX_KEY_COLUMNS][4];
         UINT32 j; 
 
-        // Not initialized yet
+        /* Not initialized yet */
         m_state = Invalid;
 
-        // Check the mode
+        /* Check the mode */
         if((mode != CBC) && (mode != ECB) && (mode != CFB1))return RIJNDAEL_UNSUPPORTED_MODE;
         m_mode = mode;
 
-        // And the direction
+        /* And the direction */
         if((dir != Encrypt) && (dir != Decrypt))return RIJNDAEL_UNSUPPORTED_DIRECTION;
         m_direction = dir;
 
-        // Allow to set an init vector
+        /* Allow to set an init vector */
         if(initVector)
         {
-                // specified init vector
+                /* specified init vector */
                 for(i = 0;i < MAX_IV_SIZE;i++)
                 {
                         m_initVector[i] = initVector[i];
                 }
         } else {
-                // zero init vector
+                /* zero init vector */
                 for(i = 0;i < MAX_IV_SIZE;i++)
                 {
                         m_initVector[i] = 0;
@@ -1009,7 +1009,7 @@ int rijndael_init(Mode mode,Direction dir,const UINT8 * key,KeyLength keyLen,UIN
         }
 
 
-        // And check the key length
+        /* And check the key length */
         switch(keyLen)
         {
                 case Key16Bytes:
@@ -1028,8 +1028,9 @@ int rijndael_init(Mode mode,Direction dir,const UINT8 * key,KeyLength keyLen,UIN
                         return RIJNDAEL_UNSUPPORTED_KEY_LENGTH;
                         break;
         }
-        // The number of rounds is calculated as
+        /* The number of rounds is calculated as
         // m_uRounds = (m_uKeyLenInBits / 32) + 6;
+	*/
 
         if(!key)return RIJNDAEL_BAD_KEY;
 
@@ -1153,7 +1154,6 @@ int padEncrypt(const UINT8 *input, int inputOctets, UINT8 *outBuffer)
                                 outBuffer += 16;
                         }
                         padLen = 16 - (inputOctets - 16*numBlocks);
-                        //			assert(padLen > 0 && padLen <= 16);
                         memcpy(block, input, 16 - padLen);
                         memset(block + 16 - padLen, padLen, padLen);
                         r_encrypt(block,outBuffer);
@@ -1172,7 +1172,6 @@ int padEncrypt(const UINT8 *input, int inputOctets, UINT8 *outBuffer)
                                 outBuffer += 16;
                         }
                         padLen = 16 - (inputOctets - 16*numBlocks);
-                        //			assert(padLen > 0 && padLen <= 16); // DO SOMETHING HERE ?
                         for (i = 0; i < 16 - padLen; i++) {
                                 block[i] = input[i] ^ iv[i];
                         }
@@ -1357,9 +1356,9 @@ int padDecrypt(const UINT8 *input, int inputOctets, UINT8 *outBuffer)
         return 16*numBlocks - padLen;
 }
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/*////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // ALGORITHM
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////// */
 
 
 void keySched(UINT8 key[_MAX_KEY_COLUMNS][4])
@@ -1368,13 +1367,13 @@ void keySched(UINT8 key[_MAX_KEY_COLUMNS][4])
         int r = 0;
         int t = 0;
 
-        // Calculate the necessary round keys
-        // The number of calculations depends on keyBits and blockBits
+        /* Calculate the necessary round keys */
+        /* The number of calculations depends on keyBits and blockBits */
         int uKeyColumns = m_uRounds - 6;
 
         UINT8 tempKey[_MAX_KEY_COLUMNS][4];
 
-        // Copy the input key to the temporary key matrix
+        /* Copy the input key to the temporary key matrix */
 
         for(j = 0;j < uKeyColumns;j++)
         {
@@ -1382,7 +1381,7 @@ void keySched(UINT8 key[_MAX_KEY_COLUMNS][4])
         }
 
 
-        // copy values into round key array
+        /* copy values into round key array */
         for(j = 0;(j < uKeyColumns) && (r <= m_uRounds); )
         {
                 for(;(j < uKeyColumns) && (t < 4); j++, t++)
@@ -1539,27 +1538,27 @@ void r_decrypt(const UINT8 a[16], UINT8 b[16])
         int r;
         UINT8 temp[4][4];
 
-        *((UINT32*)temp[0]) = *((UINT32*)(a   )) ^ *((UINT32*)m_expandedKey[m_uRounds][0]);
-        *((UINT32*)temp[1]) = *((UINT32*)(a+ 4)) ^ *((UINT32*)m_expandedKey[m_uRounds][1]);
-        *((UINT32*)temp[2]) = *((UINT32*)(a+ 8)) ^ *((UINT32*)m_expandedKey[m_uRounds][2]);
-        *((UINT32*)temp[3]) = *((UINT32*)(a+12)) ^ *((UINT32*)m_expandedKey[m_uRounds][3]);
+        *((UINT32*)temp[0]) = *((const UINT32*)(a   )) ^ *((const UINT32*)m_expandedKey[m_uRounds][0]);
+        *((UINT32*)temp[1]) = *((const UINT32*)(a+ 4)) ^ *((const UINT32*)m_expandedKey[m_uRounds][1]);
+        *((UINT32*)temp[2]) = *((const UINT32*)(a+ 8)) ^ *((const UINT32*)m_expandedKey[m_uRounds][2]);
+        *((UINT32*)temp[3]) = *((const UINT32*)(a+12)) ^ *((const UINT32*)m_expandedKey[m_uRounds][3]);
 
-        *((UINT32*)(b   )) = *((UINT32*)T5[temp[0][0]])
-                ^ *((UINT32*)T6[temp[3][1]])
-                ^ *((UINT32*)T7[temp[2][2]]) 
-                ^ *((UINT32*)T8[temp[1][3]]);
-        *((UINT32*)(b+ 4)) = *((UINT32*)T5[temp[1][0]])
-                ^ *((UINT32*)T6[temp[0][1]])
-                ^ *((UINT32*)T7[temp[3][2]]) 
-                ^ *((UINT32*)T8[temp[2][3]]);
+        *((UINT32*)(b   )) = *((const UINT32*)T5[temp[0][0]])
+                ^ *((const UINT32*)T6[temp[3][1]])
+                ^ *((const UINT32*)T7[temp[2][2]]) 
+                ^ *((const UINT32*)T8[temp[1][3]]);
+        *((UINT32*)(b+ 4)) = *((const UINT32*)T5[temp[1][0]])
+                ^ *((const UINT32*)T6[temp[0][1]])
+                ^ *((const UINT32*)T7[temp[3][2]]) 
+                ^ *((const UINT32*)T8[temp[2][3]]);
         *((UINT32*)(b+ 8)) = *((UINT32*)T5[temp[2][0]])
-                ^ *((UINT32*)T6[temp[1][1]])
-                ^ *((UINT32*)T7[temp[0][2]]) 
-                ^ *((UINT32*)T8[temp[3][3]]);
+                ^ *((const UINT32*)T6[temp[1][1]])
+                ^ *((const UINT32*)T7[temp[0][2]]) 
+                ^ *((const UINT32*)T8[temp[3][3]]);
         *((UINT32*)(b+12)) = *((UINT32*)T5[temp[3][0]])
-                ^ *((UINT32*)T6[temp[2][1]])
-                ^ *((UINT32*)T7[temp[1][2]]) 
-                ^ *((UINT32*)T8[temp[0][3]]);
+                ^ *((const UINT32*)T6[temp[2][1]])
+                ^ *((const UINT32*)T7[temp[1][2]]) 
+                ^ *((const UINT32*)T8[temp[0][3]]);
         for(r = m_uRounds-1; r > 1; r--)
         {
                 *((UINT32*)temp[0]) = *((UINT32*)(b   )) ^ *((UINT32*)m_expandedKey[r][0]);

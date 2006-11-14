@@ -79,7 +79,7 @@ double packet_interval=UINT32_MAX;
 
 struct output_data_t *output;
 
-void report_results(double ts,uint64_t count,uint64_t bytes)
+static void report_results(double ts,uint64_t count,uint64_t bytes)
 {
 	int i=0;
 	output_set_data_time(output,0,ts);
@@ -94,7 +94,7 @@ void report_results(double ts,uint64_t count,uint64_t bytes)
 }
 
 /* Process a trace, counting packets that match filter(s) */
-void run_trace(char *uri) 
+static void run_trace(char *uri) 
 {
 	struct libtrace_packet_t *packet = trace_create_packet();
 	int i;
@@ -177,7 +177,7 @@ void run_trace(char *uri)
 	trace_destroy_packet(packet);
 }
 
-void usage(char *argv0)
+static void usage(char *argv0)
 {
 	fprintf(stderr,"Usage:\n"
 	"%s flags libtraceuri [libtraceuri...]\n"

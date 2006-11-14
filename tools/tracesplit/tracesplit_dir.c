@@ -2,7 +2,7 @@
 #include <stdio.h>
 
 
-struct libtrace_out_t *create_output(char *uri) {
+static struct libtrace_out_t *create_output(char *uri) {
 	struct libtrace_out_t *output = NULL;
 	libtrace_err_t trace_err;
 	output = trace_create_output(uri);
@@ -17,8 +17,8 @@ struct libtrace_out_t *create_output(char *uri) {
 	return output;
 }
 
-void usage() {
-	printf("tracesplit_dir inputuri outputuri_incoming outputuri_outgoing\n");
+static void usage(char*argv0) {
+	printf("%s inputuri outputuri_incoming outputuri_outgoing\n",argv0);
 }
 
 int main(int argc, char *argv[]) {
