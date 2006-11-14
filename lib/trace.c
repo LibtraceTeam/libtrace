@@ -84,7 +84,6 @@
 
 #include "libtrace.h"
 #include "libtrace_int.h"
-#include "parse_cmd.h"
 
 #ifdef HAVE_PCAP_BPF_H
 #  include <pcap-bpf.h>
@@ -210,15 +209,6 @@ void register_format(struct libtrace_format_t *f) {
 	}
 #endif
 }
-
-void erf_constructor(void);
-void legacy_constructor(void);
-void linuxnative_constructor(void);
-void pcap_constructor(void);
-void pcapfile_constructor(void);
-void rt_constructor(void);
-void wag_constructor(void);
-void duck_constructor(void);
 
 /* call all the constructors if they haven't yet all been called */
 static void trace_init(void)

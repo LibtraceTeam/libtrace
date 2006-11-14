@@ -152,7 +152,7 @@ static int rt_connect(libtrace_t *libtrace) {
 	}
 	
 	switch (connect_msg.type) {
-		case RT_DENY_CONN:
+		case TRACE_RT_DENY_CONN:
 			
 			if (recv(RT_INFO->input_fd, (void*)&deny_hdr, 
 						sizeof(rt_deny_conn_t),
@@ -164,13 +164,13 @@ static int rt_connect(libtrace_t *libtrace) {
 				"Connection attempt is denied: %s",
 				rt_deny_reason(reason));	
 			return -1;
-		case RT_HELLO:
+		case TRACE_RT_HELLO:
 			/* do something with options */
 			if (recv(RT_INFO->input_fd, (void*)&hello_opts, 
 						sizeof(rt_hello_t), 0)
 					!= sizeof(rt_hello_t)) {
 				trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
-					"Failed to receive RT_HELLO options");
+					"Failed to receive TRACE_RT_HELLO options");
 				return -1;
 			}
 			RT_INFO->reliable = hello_opts.reliable;
@@ -228,7 +228,7 @@ static int rt_init_input(libtrace_t *libtrace) {
 static int rt_start_input(libtrace_t *libtrace) {
 	rt_header_t start_msg;
 
-	start_msg.type = RT_START;
+	start_msg.type = TRACE_RT_START;
 	start_msg.length = 0; 
 
 	if (rt_connect(libtrace) == -1)
@@ -240,7 +240,7 @@ static int rt_start_input(libtrace_t *libtrace) {
 		printf("Failed to send start message to server\n");
 		return -1;
 	}
-	RT_INFO->rt_hdr.type = RT_LAST;
+	RT_INFO->rt_hdr.type = TRACE_RT_LAST;
 
 	return 0;
 }
@@ -253,7 +253,7 @@ static int rt_pause_input(libtrace_t *libtrace) {
 static int rt_fin_input(libtrace_t *libtrace) {
         rt_header_t close_msg;
 
-	close_msg.type = RT_CLOSE;
+	close_msg.type = TRACE_RT_CLOSE;
 	close_msg.length = 0; 
 	
 	/* Send a close message to the server */
@@ -367,7 +367,7 @@ static int rt_read(libtrace_t *libtrace, void **buffer, size_t len, int block) {
 static int rt_set_format(libtrace_t *libtrace, libtrace_packet_t *packet) 
 {
 	
-	if (packet->type >= RT_DATA_PCAP) {
+	if (packet->type >= TRACE_RT_DATA_DLT) {
 		if (!RT_INFO->dummy_pcap) {
 			RT_INFO->dummy_pcap = trace_create_dead("pcap:-");
 		}
@@ -376,34 +376,34 @@ static int rt_set_format(libtrace_t *libtrace, libtrace_packet_t *packet)
 	}
 
 	switch (packet->type) {
-		case RT_DUCK_2_4:
-		case RT_DUCK_2_5:
+		case TRACE_RT_DUCK_2_4:
+		case TRACE_RT_DUCK_2_5:
 			if (!RT_INFO->dummy_duck) {
 				RT_INFO->dummy_duck = trace_create_dead("duck:dummy");
 			}
 			packet->trace = RT_INFO->dummy_duck;
 			break;
-		case RT_DATA_ERF:
+		case TRACE_RT_DATA_ERF:
 			if (!RT_INFO->dummy_erf) {
 				RT_INFO->dummy_erf = trace_create_dead("erf:-");
 			}
 			packet->trace = RT_INFO->dummy_erf;
 			break;
-		case RT_DATA_WAG:
+		case TRACE_RT_DATA_WAG:
 			if (!RT_INFO->dummy_wag) {
 				RT_INFO->dummy_wag = trace_create_dead("wtf:-");
 			}
 			packet->trace = RT_INFO->dummy_wag;
 			break;
-		case RT_DATA_LINUX_NATIVE:
+		case TRACE_RT_DATA_LINUX_NATIVE:
 			if (!RT_INFO->dummy_linux) {
 				RT_INFO->dummy_linux = trace_create_dead("int:");
 			}
 			packet->trace = RT_INFO->dummy_linux;
 			break;
-		case RT_DATA_LEGACY_ETH:
-		case RT_DATA_LEGACY_ATM:
-		case RT_DATA_LEGACY_POS:
+		case TRACE_RT_DATA_LEGACY_ETH:
+		case TRACE_RT_DATA_LEGACY_ATM:
+		case TRACE_RT_DATA_LEGACY_POS:
 			printf("Sending legacy over RT is currently not supported\n");
 			trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Legacy packet cannot be sent over rt");
 			return -1;
@@ -419,7 +419,7 @@ static void rt_set_payload(libtrace_packet_t *packet) {
 	dag_record_t *erfptr;
 	
 	switch (packet->type) {
-		case RT_DATA_ERF:
+		case TRACE_RT_DATA_ERF:
 			erfptr = (dag_record_t *)packet->header;
 			
 			if (erfptr->flags.rxerror == 1) {
@@ -451,7 +451,7 @@ static int rt_send_ack(libtrace_t *libtrace,
 	hdr = (rt_header_t *) ack_buffer;
 	ack_hdr = (rt_ack_t *) (ack_buffer + sizeof(rt_header_t));
 	
-	hdr->type = RT_ACK;
+	hdr->type = TRACE_RT_ACK;
 	hdr->length = sizeof(rt_ack_t);
 
 	ack_hdr->sequence = seqno;
@@ -495,7 +495,7 @@ static int rt_read_packet_versatile(libtrace_t *libtrace,
 
 	/* RT_LAST means that the next bytes received should be a 
 	 * rt header - I know it's hax and maybe I'll fix it later on */
-	if (RT_INFO->rt_hdr.type == RT_LAST) {
+	if (RT_INFO->rt_hdr.type == TRACE_RT_LAST) {
 		void_hdr = (void *)pkt_hdr;
 		
 		/* FIXME: Better error handling required */
@@ -514,7 +514,7 @@ static int rt_read_packet_versatile(libtrace_t *libtrace,
 	}
 	packet->type = RT_INFO->rt_hdr.type;
 
-	if (packet->type >= RT_DATA_SIMPLE) {
+	if (packet->type >= TRACE_RT_DATA_SIMPLE) {
 		if (rt_read(libtrace, &packet->buffer, RT_INFO->rt_hdr.length,blocking) != RT_INFO->rt_hdr.length) {
 			return -1;
 		}
@@ -535,7 +535,7 @@ static int rt_read_packet_versatile(libtrace_t *libtrace,
                	rt_set_payload(packet);
 	} else {
 		switch(packet->type) {
-			case RT_STATUS:
+			case TRACE_RT_STATUS:
 				if (rt_read(libtrace, &packet->buffer, 
 					RT_INFO->rt_hdr.length, blocking) != 
 						RT_INFO->rt_hdr.length) {
@@ -544,8 +544,8 @@ static int rt_read_packet_versatile(libtrace_t *libtrace,
 				packet->header = 0;
 				packet->payload = packet->buffer;
 				break;
-			case RT_DUCK_2_4:
-			case RT_DUCK_2_5:
+			case TRACE_RT_DUCK_2_4:
+			case TRACE_RT_DUCK_2_5:
 				if (rt_read(libtrace, &packet->buffer,
 					RT_INFO->rt_hdr.length, blocking) != 
 						RT_INFO->rt_hdr.length) {
@@ -557,17 +557,17 @@ static int rt_read_packet_versatile(libtrace_t *libtrace,
 				packet->header = 0;
 				packet->payload = packet->buffer;
 				break;
-			case RT_END_DATA:
+			case TRACE_RT_END_DATA:
 				break;
-			case RT_PAUSE_ACK:
+			case TRACE_RT_PAUSE_ACK:
 				/* FIXME: Do something useful */
 				break;
-			case RT_OPTION:
+			case TRACE_RT_OPTION:
 				/* FIXME: Do something useful here as well */
 				break;
-			case RT_KEYCHANGE:
+			case TRACE_RT_KEYCHANGE:
 				break;
-			case RT_LOSTCONN:
+			case TRACE_RT_LOSTCONN:
 				break;
 			default:
 				printf("Bad rt type for client receipt: %d\n",
@@ -576,7 +576,7 @@ static int rt_read_packet_versatile(libtrace_t *libtrace,
 		}
 	}
 	/* Return the number of bytes read from the stream */
-	RT_INFO->rt_hdr.type = RT_LAST;
+	RT_INFO->rt_hdr.type = TRACE_RT_LAST;
 	return RT_INFO->rt_hdr.length;
 }
 
@@ -588,29 +588,29 @@ static int rt_read_packet(libtrace_t *libtrace,
 
 static int rt_get_capture_length(const libtrace_packet_t *packet) {
 	switch (packet->type) {
-		case RT_STATUS:
+		case TRACE_RT_STATUS:
 			return sizeof(rt_status_t);
-		case RT_HELLO:
+		case TRACE_RT_HELLO:
 			return sizeof(rt_hello_t);
-		case RT_START:
+		case TRACE_RT_START:
 			return 0;
-		case RT_ACK:
+		case TRACE_RT_ACK:
 			return sizeof(rt_ack_t);
-		case RT_END_DATA:
+		case TRACE_RT_END_DATA:
 			return 0;
-		case RT_CLOSE:
+		case TRACE_RT_CLOSE:
 			return 0;
-		case RT_DENY_CONN:
+		case TRACE_RT_DENY_CONN:
 			return sizeof(rt_deny_conn_t);
-		case RT_PAUSE:
+		case TRACE_RT_PAUSE:
 			return 0; 
-		case RT_PAUSE_ACK:
+		case TRACE_RT_PAUSE_ACK:
 			return 0;
-		case RT_OPTION:
+		case TRACE_RT_OPTION:
 			return 0; /* FIXME */
-		case RT_KEYCHANGE:
+		case TRACE_RT_KEYCHANGE:
 			return 0;
-		case RT_LOSTCONN:
+		case TRACE_RT_LOSTCONN:
 			return 0;
 	}
 	printf("Unknown type: %d\n", packet->type);
@@ -654,7 +654,7 @@ static libtrace_eventobj_t trace_event_rt(libtrace_t *trace,
 			event.type = TRACE_EVENT_PACKET;
 		}
 	} else if (event.size == 0) {
-		if (packet->type == RT_END_DATA)
+		if (packet->type == TRACE_RT_END_DATA)
 			event.type = TRACE_EVENT_TERMINATE;
 		else
 			event.type = TRACE_EVENT_PACKET;

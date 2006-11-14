@@ -356,8 +356,8 @@ void register_format(struct libtrace_format_t *format);
 
 libtrace_linktype_t pcap_dlt_to_libtrace(libtrace_dlt_t dlt);
 libtrace_dlt_t libtrace_to_pcap_dlt(libtrace_linktype_t type);
-enum rt_field_t pcap_dlt_to_rt(libtrace_dlt_t dlt);
-libtrace_dlt_t rt_to_pcap_dlt(enum rt_field_t rt_type);
+libtrace_rt_types_t pcap_dlt_to_rt(libtrace_dlt_t dlt);
+libtrace_dlt_t rt_to_pcap_dlt(libtrace_rt_types_t rt_type);
 libtrace_linktype_t erf_type_to_libtrace(char erf);
 char libtrace_to_erf_type(libtrace_linktype_t linktype);
 libtrace_linktype_t arphrd_type_to_libtrace(unsigned int);
@@ -438,6 +438,16 @@ typedef struct libtrace_pcapfile_pkt_hdr_t {
 	uint32_t caplen;
 	uint32_t wirelen;
 } libtrace_pcapfile_pkt_hdr_t;
+
+void erf_constructor(void);
+void legacy_constructor(void);
+void linuxnative_constructor(void);
+void pcap_constructor(void);
+void pcapfile_constructor(void);
+void rt_constructor(void);
+void wag_constructor(void);
+void duck_constructor(void);
+
 
 	
 #ifdef __cplusplus

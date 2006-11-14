@@ -475,7 +475,7 @@ static int dag_get_duckinfo(libtrace_t *libtrace,
 		return -1;
 	}
 
-	packet->type = RT_DUCK_2_4;
+	packet->type = TRACE_RT_DUCK_2_4;
 	if (!DUCK.dummy_duck) 
 		DUCK.dummy_duck = trace_create_dead("duck:dummy");
 	packet->trace = DUCK.dummy_duck;
@@ -560,7 +560,7 @@ static int dag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 		packet->buffer = 0;
 	}
  	
-	packet->type = RT_DATA_ERF;
+	packet->type = TRACE_RT_DATA_ERF;
 	
 	if ((numbytes = dag_read(libtrace,0)) < 0) 
 		return numbytes;
@@ -641,7 +641,7 @@ static int erf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	
 	
 	packet->header = packet->buffer;
-	packet->type = RT_DATA_ERF;
+	packet->type = TRACE_RT_DATA_ERF;
 
 	if ((numbytes=libtrace_io_read(INPUT.file,
 					packet->buffer,
@@ -667,7 +667,7 @@ static int erf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	/* read in the rest of the packet */
 	if ((numbytes=libtrace_io_read(INPUT.file,
 					buffer2,
-					size)) != size) {
+					size)) != (int)size) {
 		if (numbytes==-1) {
 			trace_set_err(libtrace,errno, "read(%s)", libtrace->uridata);
 			return -1;
@@ -685,7 +685,7 @@ static int erf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 }
 
 static int erf_dump_packet(libtrace_out_t *libtrace,
-		dag_record_t *erfptr, int pad, void *buffer) {
+		dag_record_t *erfptr, unsigned int pad, void *buffer) {
 	int numbytes = 0;
 	int size;
 

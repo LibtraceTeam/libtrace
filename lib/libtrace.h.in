@@ -232,9 +232,65 @@ typedef enum {
 	
 } libtrace_linktype_t;
 
+/** RT protocol base format identifiers
+ * This is used to say what kind of packet is being sent over the rt protocol
+ */ 
+enum base_format_t {
+        TRACE_FORMAT_ERF          =1,
+        TRACE_FORMAT_PCAP         =2,
+        TRACE_FORMAT_PCAPFILE     =3,
+        TRACE_FORMAT_WAG          =4,
+        TRACE_FORMAT_RT           =5,
+        TRACE_FORMAT_LEGACY_ATM   =6,
+	TRACE_FORMAT_LEGACY_POS	  =7,
+	TRACE_FORMAT_LEGACY_ETH   =8,
+	TRACE_FORMAT_LINUX_NATIVE =9,
+	TRACE_FORMAT_DUCK	  =10,
+	TRACE_FORMAT_BPF	  =11
+};
+
+/* RT protocol packet types */
 typedef enum {
-	TRACE_RT_DLT_ATM_RFC1483 = 2000+TRACE_DLT_ATM_RFC1483,
-	TRACE_RT_LAST	= (2<<31)
+	TRACE_RT_HELLO       	=1, /**< Connection accepted */
+	TRACE_RT_START		=2, /**< Request for data transmission to begin 
+				    */
+	TRACE_RT_ACK		=3, /**< Data acknowledgement */
+	TRACE_RT_STATUS		=4, /**< Fifo status packet */
+	TRACE_RT_DUCK		=5, /**< Dag duck info packet */
+	TRACE_RT_END_DATA	=6, /**< Server is exiting message */
+	TRACE_RT_CLOSE		=7, /**< Client is exiting message */
+	TRACE_RT_DENY_CONN	=8, /**< Connection has been denied */
+	TRACE_RT_PAUSE		=9, /**< Request server to suspend sending data 
+				     */
+	TRACE_RT_PAUSE_ACK	=10,/**< Server is paused message */
+	TRACE_RT_OPTION	 	=11,/**< Option request */
+	TRACE_RT_KEYCHANGE	=12,/**< Anonymisation key has changed */ 
+	TRACE_RT_DUCK_2_4	=13,/**< Dag 2.4 Duck */
+	TRACE_RT_DUCK_2_5 	=14,/**< Dag 2.5 Duck */
+	TRACE_RT_LOSTCONN 	=15,/**< Lost connection to server */
+
+	TRACE_RT_DATA_SIMPLE	= 1000, /**< Trace types that know their link
+					  * type
+					  */
+	TRACE_RT_DATA_ERF	=TRACE_RT_DATA_SIMPLE+TRACE_FORMAT_ERF, 
+	TRACE_RT_DATA_WAG	=TRACE_RT_DATA_SIMPLE+TRACE_FORMAT_WAG, 
+	TRACE_RT_DATA_LEGACY_ATM=TRACE_RT_DATA_SIMPLE+TRACE_FORMAT_LEGACY_ATM, 
+	TRACE_RT_DATA_LEGACY_POS=TRACE_RT_DATA_SIMPLE+TRACE_FORMAT_LEGACY_POS, 
+	TRACE_RT_DATA_LEGACY_ETH=TRACE_RT_DATA_SIMPLE+TRACE_FORMAT_LEGACY_ETH, 
+	TRACE_RT_DATA_LINUX_NATIVE=TRACE_RT_DATA_SIMPLE+TRACE_FORMAT_LINUX_NATIVE,
+
+	TRACE_RT_DATA_DLT		= 2000, /**< Pcap doesn't store the
+						  * linktype per packet, and
+						  * thus we have to store it
+						  * in here.  sigh.
+						  */
+	TRACE_RT_DLT_NULL		=TRACE_RT_DATA_DLT+TRACE_DLT_NULL,
+	TRACE_RT_DLT_EN10MB		=TRACE_RT_DATA_DLT+TRACE_DLT_EN10MB,
+	TRACE_RT_DLT_IEEE802_11		=TRACE_RT_DATA_DLT+TRACE_DLT_IEEE802_11,
+	TRACE_RT_DLT_LINUX_SLL		=TRACE_RT_DATA_DLT+TRACE_DLT_LINUX_SLL,
+	TRACE_RT_DLT_PFLOG		=TRACE_RT_DATA_DLT+TRACE_DLT_PFLOG,
+	TRACE_RT_DLT_ATM_RFC1483 	=TRACE_RT_DATA_DLT+TRACE_DLT_ATM_RFC1483,
+	TRACE_RT_LAST			= (2<<31)
 } libtrace_rt_types_t;
 
 /** The libtrace packet structure, applications shouldn't be 
@@ -1391,23 +1447,6 @@ int8_t trace_get_server_port(uint8_t protocol, uint16_t source, uint16_t dest);
  * @return 0 if an error occured, otherwise return the uridata component
  */
 DLLEXPORT const char *trace_parse_uri(const char *uri, char **format);
-
-/** RT protocol base format identifiers
- * This is used to say what kind of packet is being sent over the rt protocol
- */ 
-enum base_format_t {
-        TRACE_FORMAT_ERF          =1,
-        TRACE_FORMAT_PCAP         =2,
-        TRACE_FORMAT_PCAPFILE     =3,
-        TRACE_FORMAT_WAG          =4,
-        TRACE_FORMAT_RT           =5,
-        TRACE_FORMAT_LEGACY_ATM   =6,
-	TRACE_FORMAT_LEGACY_POS	  =7,
-	TRACE_FORMAT_LEGACY_ETH   =8,
-	TRACE_FORMAT_LINUX_NATIVE =9,
-	TRACE_FORMAT_DUCK	  =10,
-	TRACE_FORMAT_BPF	  =11
-};
 
 /** Gets the format type for a given packet.
  * @param packet	the packet opaque pointer

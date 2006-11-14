@@ -326,7 +326,7 @@ static int wag_read_packet_versatile(libtrace_t *libtrace, libtrace_packet_t *pa
 	
 	
 	packet->trace = libtrace;
-	packet->type = RT_DATA_WAG;
+	packet->type = TRACE_RT_DATA_WAG;
 	
 	if ((numbytes = wag_read(libtrace, (void *)packet->buffer, 
 					RP_BUFSIZE, block_flag)) <= 0) {
@@ -355,7 +355,7 @@ static int wtf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
                 packet->buf_control = TRACE_CTRL_PACKET;
                 packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
         }
-	packet->type = RT_DATA_WAG;
+	packet->type = TRACE_RT_DATA_WAG;
 	buffer2 = buffer = packet->buffer;
 
 	numbytes = libtrace_io_read(INPUT.file, buffer, sizeof(struct frame_t));

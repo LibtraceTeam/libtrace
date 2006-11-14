@@ -121,13 +121,13 @@ static int legacy_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 
 	switch(libtrace->format->type) {
 		case TRACE_FORMAT_LEGACY_ATM:
-			packet->type = RT_DATA_LEGACY_ATM;
+			packet->type = TRACE_RT_DATA_LEGACY_ATM;
 			break;
 		case TRACE_FORMAT_LEGACY_POS:
-			packet->type = RT_DATA_LEGACY_POS;
+			packet->type = TRACE_RT_DATA_LEGACY_POS;
 			break;
 		case TRACE_FORMAT_LEGACY_ETH:
-			packet->type = RT_DATA_LEGACY_ETH;
+			packet->type = TRACE_RT_DATA_LEGACY_ETH;
 			break;
 		default:
 			assert(0);

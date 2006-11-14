@@ -74,16 +74,16 @@ libtrace_dlt_t libtrace_to_pcap_dlt(libtrace_linktype_t type)
 	return ~0U;
 }
 
-enum rt_field_t pcap_dlt_to_rt(libtrace_dlt_t dlt) 
+libtrace_rt_types_t pcap_dlt_to_rt(libtrace_dlt_t dlt) 
 {
 	/* For pcap the rt type is just the dlt + a fixed value */
-	return dlt + RT_DATA_PCAP;
+	return dlt + TRACE_RT_DATA_DLT;
 }
 
-libtrace_dlt_t rt_to_pcap_dlt(enum rt_field_t rt_type)
+libtrace_dlt_t rt_to_pcap_dlt(libtrace_rt_types_t rt_type)
 {
-	assert(rt_type >= RT_DATA_PCAP);
-	return rt_type - RT_DATA_PCAP;
+	assert(rt_type >= TRACE_RT_DATA_DLT);
+	return rt_type - TRACE_RT_DATA_DLT;
 }
 
 libtrace_linktype_t erf_type_to_libtrace(char erf)

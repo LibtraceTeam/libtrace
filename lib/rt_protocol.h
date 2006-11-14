@@ -10,9 +10,6 @@
 #define RT_MAX_HDR_SIZE 256
 #define MAX_SEQUENCE 2147483647 
 
-#define RT_DATA_SIMPLE 1000
-#define RT_DATA_PCAP 2000
-
 /* Procedure for adding new RT control types
  * -------------------------------------------
  *
@@ -37,40 +34,6 @@
  * 	
  */
 
-/** Type field definitions */
-enum rt_field_t {
- RT_HELLO       =1,     /**< Connection accepted */
- RT_START	=2,	/**< Request for data transmission to begin */
- RT_ACK		=3,	/**< Data acknowledgement */
- RT_STATUS	=4,	/**< Fifo status packet */
- RT_DUCK	=5,	/**< Dag duck info packet */
- RT_END_DATA	=6,	/**< Server is exiting message */
- RT_CLOSE	=7,	/**< Client is exiting message */
- RT_DENY_CONN	=8,	/**< Connection has been denied */
- RT_PAUSE	=9,	/**< Request server to suspend sending data */
- RT_PAUSE_ACK	=10,	/**< Server is paused message */
- RT_OPTION	=11,	/**< Option request */
- RT_KEYCHANGE	=12,	/**< Anonymisation key has changed */ 
- RT_DUCK_2_4	=13,	/**< Dag 2.4 Duck */
- RT_DUCK_2_5 	=14,	/**< Dag 2.5 Duck */
- RT_LOSTCONN 	=15,	/**< Lost connection to server */
- 
- RT_DATA_ERF		=RT_DATA_SIMPLE + TRACE_FORMAT_ERF, 
- RT_DATA_WAG		=RT_DATA_SIMPLE + TRACE_FORMAT_WAG, 
- RT_DATA_LEGACY_ATM	=RT_DATA_SIMPLE + TRACE_FORMAT_LEGACY_ATM, 
- RT_DATA_LEGACY_POS	=RT_DATA_SIMPLE + TRACE_FORMAT_LEGACY_POS, 
- RT_DATA_LEGACY_ETH	=RT_DATA_SIMPLE + TRACE_FORMAT_LEGACY_ETH, 
- RT_DATA_LINUX_NATIVE	=RT_DATA_SIMPLE + TRACE_FORMAT_LINUX_NATIVE,
-
- RT_DATA_PCAP_NULL		=RT_DATA_PCAP + TRACE_DLT_NULL,
- RT_DATA_PCAP_EN10MB		=RT_DATA_PCAP + TRACE_DLT_EN10MB,
- RT_DATA_PCAP_ATM_RFC1483	=RT_DATA_PCAP + TRACE_DLT_ATM_RFC1483,
- RT_DATA_PCAP_IEEE802_11	=RT_DATA_PCAP + TRACE_DLT_IEEE802_11,
- RT_DATA_PCAP_LINUX_SLL		=RT_DATA_PCAP + TRACE_DLT_LINUX_SLL,
- RT_DATA_PCAP_PFLOG		=RT_DATA_PCAP + TRACE_DLT_PFLOG,
- RT_LAST = 3000
-};
-
 typedef struct fifo_info {
         uint64_t in;
         uint64_t out;
@@ -81,7 +44,7 @@ typedef struct fifo_info {
 
 /** RT packet header */
 typedef struct rt_header {
-	enum rt_field_t type;
+	libtrace_rt_types_t type;
 	uint16_t length;
 	uint32_t sequence;
 } rt_header_t;

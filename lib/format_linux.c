@@ -241,7 +241,7 @@ static int linuxnative_read_packet(libtrace_t *libtrace, libtrace_packet_t *pack
 	}
 
 	packet->header = packet->buffer;
-	packet->type = RT_DATA_LINUX_NATIVE;
+	packet->type = TRACE_RT_DATA_LINUX_NATIVE;
 	packet->payload = (char*)packet->buffer+sizeof(*hdr);
 
 	hdr=(struct libtrace_linuxnative_header*)packet->buffer;
