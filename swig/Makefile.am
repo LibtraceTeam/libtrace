@@ -1,10 +1,15 @@
+BUILT_SOURCES=python_wrap.c
+SWIG_SOURCES=libtrace.i
+
 #SWIG=/usr/bin/swig
-EXTRA_DIST = libtrace.i
+python_PYTHON=libtrace.py
+pyexec_LTLIBRARIES=_libtrace.la
+_libtrace_la_SOURCES=python_wrap.c
+_libtrace_la_LDFLAGS=-module
+_libtrace_la_LIBADD=../lib/libtrace.la
+_libtrace_la_CFLAGS=-I../lib -I/usr/include/python@PYTHON_VERSION@/
 
-#lib_LTLIBRARIES = libtrace.la
-#libtrace_la_SOURCES = libtrace_wrap.c
-#INCLUDES = -I/usr/local/python2.3
+python_wrap.c: $(SWIG_SOURCES)
+	$(SWIG) -Wall $(SWIG_PYTHON_OPT) -I../lib -o $@ $<
 
-libtrace_wrap.c: libtrace.i
-	$(SWIG) -python $(SWIG_ARGS) -o $@ $<
 
