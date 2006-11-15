@@ -290,7 +290,6 @@ fi
 reportopt "Building man pages/documentation" $libtrace_doxygen
 
 if test x"$libtrace_swig" = xtrue; then
-H
 	if test x"$libtrace_python" = xtrue; then
 		AC_MSG_NOTICE([Building swig bindings for: python])
 	else
