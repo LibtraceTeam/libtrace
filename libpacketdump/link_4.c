@@ -244,6 +244,7 @@ void decode_80211_information_elements(char *pkt, int len) {
 						}
 					}
 				}		
+				printf("\n");
 						
 				break;
 			case 7:
@@ -756,7 +757,9 @@ void decode(int link_type, char *pkt, int len)
 			decode_80211_data(pkt, len);
 			break;
 		case 3:
-			printf("BAD FRAME TYPE!\n");
+			printf(" Unable to decode frame type %u, dumping rest of packet\n", fc->type);
+			decode_next(pkt + sizeof(ieee80211_frame_control), len - sizeof(ieee80211_frame_control), "eth", 0);
+			
 			break;
 	}
 
