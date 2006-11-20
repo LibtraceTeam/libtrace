@@ -200,12 +200,12 @@ static int dag_config_input(libtrace_t *libtrace, trace_option_t option,
 			return 0;
 		case TRACE_OPTION_SNAPLEN:
 			/* Surely we can set this?? Fall through for now*/
-		
+			return -1;
 		case TRACE_OPTION_PROMISC:
 			/* DAG already operates in a promisc fashion */
-
+			return -1;
 		case TRACE_OPTION_FILTER:
-
+			return -1;
 		default:
 			trace_set_err(libtrace, TRACE_ERR_UNKNOWN_OPTION,
 					"Unknown or unsupported option: %i",
@@ -898,9 +898,21 @@ static libtrace_eventobj_t trace_event_dag(libtrace_t *trace,
 	data = dag_read(trace, DAGF_NONBLOCK);
 
         if (data > 0) {
-                event.size = trace_read_packet(trace,packet);
-                event.type = TRACE_EVENT_PACKET;
-                return event;
+                event.size = dag_read_packet(trace,packet);
+                if (trace->filter) {
+			if (trace_apply_filter(trace->filter, packet)) {
+				event.type = TRACE_EVENT_PACKET;
+			} else {
+        			event.type = TRACE_EVENT_SLEEP;
+        			event.seconds = 0.000001;
+				return event;
+			}
+		}	
+		if (trace->snaplen > 0) {
+			trace_set_capture_length(packet, trace->snaplen);
+		}
+
+		return event;
         }
         event.type = TRACE_EVENT_SLEEP;
         event.seconds = 0.0001;
