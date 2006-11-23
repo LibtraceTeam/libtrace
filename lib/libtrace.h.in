@@ -609,7 +609,7 @@ typedef struct libtrace_radiotap_t {
     uint8_t     it_pad; /**< Padding for natural alignment */
     uint16_t    it_len; /**< Length in bytes of the entire Radiotap header */
     uint32_t    it_present; /**< Which Radiotap fields are present */
-} libtrace_radiotap_t;
+} PACKED libtrace_radiotap_t;
 
 
 #ifdef WIN32
