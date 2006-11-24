@@ -9,6 +9,7 @@
 #include <getopt.h>
 #include <string.h>
 #include <assert.h>
+#include <signal.h>
 
 static char *strdupcat(char *str,char *app)
 {
@@ -37,6 +38,13 @@ static int usage(char *argv0)
 	"-H --libtrace-help	Print libtrace runtime documentation\n"
 	,argv0);
 	exit(1);
+}
+
+int done=0;
+
+void cleanup_signal(int sig)
+{
+	done=1;
 }
 
 int main(int argc, char *argv[])
@@ -120,7 +128,10 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	while(1) {
+	signal(SIGINT,&cleanup_signal);
+	signal(SIGTERM,&cleanup_signal);
+
+	while(!done) {
 		
 		if (trace_read_packet(input,packet)<1) {
 			break;
