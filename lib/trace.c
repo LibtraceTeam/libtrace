@@ -1421,7 +1421,7 @@ void trace_construct_packet(libtrace_packet_t *packet,
 		uint16_t len)
 {
 	size_t size;
-	libtrace_t *deadtrace=NULL;
+	static libtrace_t *deadtrace=NULL;
 	libtrace_pcapfile_pkt_hdr_t hdr;
 	struct timeval tv;
 	if (NULL == deadtrace) deadtrace=trace_create_dead("pcapfile");
