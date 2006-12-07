@@ -46,7 +46,11 @@ void decode(int link_type,char *packet,int len)
 	printf(" ICMP:");
 	switch(icmp->type) {
 		case 0:
-			printf(" Type: 0 (ICMP Echo Reply)\n");
+			printf(" Type: 0 (ICMP Echo Reply) Sequence: ");
+			if (len < 4)
+				printf("(Truncated)\n");
+			else
+				printf("%u\n", ntohs(icmp->un.echo.sequence));
 			break;
 		case 3:
 			printf(" Type: 3 (ICMP Destination Unreachable)\n");
@@ -65,7 +69,11 @@ void decode(int link_type,char *packet,int len)
 
 			break;
 		case 8:
-			printf(" Type: 8 (ICMP Echo Request)\n");
+			printf(" Type: 8 (ICMP Echo Request) Sequence: ");
+			if (len < 4)
+				printf("(Truncated)\n");
+			else
+				printf("%u\n", ntohs(icmp->un.echo.sequence));
 			break;
 		case 11:
 			printf(" Type: 11 (ICMP TTL Exceeded)\n");
