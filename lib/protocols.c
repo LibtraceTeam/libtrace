@@ -119,7 +119,7 @@ static void *trace_get_payload_from_80211(void *link, uint16_t *type, uint32_t *
 	
 	libtrace_80211_t *wifi;
 	libtrace_802_11_payload_t *eth;
-	uint8_t extra; /* how many QoS bytes to skip */
+	uint8_t extra = 0; /* how many QoS bytes to skip */
 	
 	if (remaining && *remaining < sizeof(libtrace_80211_t))
 		return NULL;
@@ -131,14 +131,9 @@ static void *trace_get_payload_from_80211(void *link, uint16_t *type, uint32_t *
 		return NULL;
 	}
 
-	/* Check for WME */
-	if (wifi->subtype & 0x8) {
-		/* indicates two octets of QoS before payload, 
-		 * see IEEE802.11e-2005 pg 21 
-		 * */
-		extra = 2;
-	} else 
-		extra = 0;
+	/* Indicates QoS field present, see IEEE802.11e-2005 pg 21 */
+	if (wifi->subtype & 0x8) 
+		extra += 2;
 
 	if (remaining && *remaining < sizeof(*eth))
 		return NULL;
