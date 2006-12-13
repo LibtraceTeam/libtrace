@@ -209,6 +209,9 @@ struct libtrace_packet_t {};
 	int get_framing_length() {
 		return trace_get_framing_length(self);
 	}
+	int get_wire_length() {
+		return trace_get_wire_length(self);
+	}
 	libtrace_linktype_t get_link_type() {
 		return trace_get_link_type(self);
 	}
