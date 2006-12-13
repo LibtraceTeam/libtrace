@@ -106,8 +106,8 @@ void decode(int link_type,char *packet,int len)
 					format_hrd(arp, source_hrd));
 			break;
 		case ARPOP_REPLY:
-			printf(" ARP: reply %s", format_pro(arp, dest_pro));
-			printf(" is-at %s\n", format_hrd(arp, dest_hrd));
+			printf(" ARP: reply %s", format_pro(arp, source_pro));
+			printf(" is-at %s\n", format_hrd(arp, source_hrd));
 			break;
 		default:
 			printf(" ARP: Unknown opcode (%i) from %s to %s\n",
