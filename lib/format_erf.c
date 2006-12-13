@@ -508,11 +508,11 @@ static int dag_get_duckinfo(libtrace_t *libtrace,
 		return -1;
 	}
 
-	packet->type = RT_DUCK_2_5;
+	packet->type = TRACE_RT_DUCK_2_5;
 	if (!DUCK.dummy_duck) 
 		DUCK.dummy_duck = trace_create_dead("rt:localhost:3434");
 	packet->trace = DUCK.dummy_duck;	
-	return sizeof(duck_inf);
+	return sizeof(duckinf_t);
 }	
 #endif
 
