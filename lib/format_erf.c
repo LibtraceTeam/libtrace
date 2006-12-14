@@ -407,10 +407,12 @@ static int dag_pause_input(libtrace_t *libtrace) {
 		trace_set_err(libtrace, errno, "Could not stop DAG stream");
 		return -1;
 	}
+	/*
 	if (dag_detach_stream(INPUT.fd, DAG.dagstream) < 0) {
 		trace_set_err(libtrace, errno, "Could not detach DAG stream");
 		return -1;
 	}
+	*/
 #endif
 	return 0; /* success */
 }
@@ -542,6 +544,7 @@ static int dag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	int size;
 	struct timeval tv;
 	dag_record_t *erfptr;
+	char *next_record = NULL;	
 
 	if (DUCK.last_pkt - DUCK.last_duck > DUCK.duck_freq && 
 			DUCK.duck_freq != 0) {
@@ -561,7 +564,7 @@ static int dag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	}
  	
 	packet->type = TRACE_RT_DATA_ERF;
-	
+#ifdef DAG_VERSION_2_4
 	if ((numbytes = dag_read(libtrace,0)) < 0) 
 		return numbytes;
 	assert(numbytes>0);
@@ -569,8 +572,11 @@ static int dag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	/*DAG always gives us whole packets */
 	erfptr = (dag_record_t *) ((char *)DAG.buf + 
 			(DAG.bottom + DAG.offset));
+#else
+	next_record = (char *)dag_rx_stream_next_record(INPUT.fd, 0);
+	erfptr = (dag_record_t *)next_record;
+#endif
 	size = ntohs(erfptr->rlen);
-
 	assert( size >= dag_record_size );
 	assert( size < LIBTRACE_PACKET_BUFSIZE);
 	
@@ -586,15 +592,16 @@ static int dag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 			+ erf_get_framing_length(packet);
 	}
 
+#ifdef DAG_VERSION_2_4
 	DAG.offset += size;
 	DAG.diff -= size;
-
+#endif
 	tv = trace_get_timeval(packet);
 	DUCK.last_pkt = tv.tv_sec;
 	
 	return packet->payload ? size : erf_get_framing_length(packet);
 }
-
+	
 static int dag_start_input(libtrace_t *libtrace) {
 #ifdef DAG_VERSION_2_4
 	if(dag_start(INPUT.fd) < 0) {
@@ -616,7 +623,7 @@ static int dag_start_input(libtrace_t *libtrace) {
 	 * calling dag_stop, and at least one packet has arrived, bad things
 	 * happen.  flush the memory hole 
 	 */
-	while(dag_read(libtrace,1)!=0)
+	while(dag_read(libtrace,DAGF_NONBLOCK)!=0)
 		DAG.diff=0;
 	return 0;
 }
@@ -899,6 +906,7 @@ static libtrace_eventobj_t trace_event_dag(libtrace_t *trace,
 
         if (data > 0) {
                 event.size = dag_read_packet(trace,packet);
+		DATA(trace)->dag.diff -= event.size;
                 if (trace->filter) {
 			if (trace_apply_filter(trace->filter, packet)) {
 				event.type = TRACE_EVENT_PACKET;
@@ -907,7 +915,9 @@ static libtrace_eventobj_t trace_event_dag(libtrace_t *trace,
         			event.seconds = 0.000001;
 				return event;
 			}
-		}	
+		} else {
+			event.type = TRACE_EVENT_PACKET;
+		}
 		if (trace->snaplen > 0) {
 			trace_set_capture_length(packet, trace->snaplen);
 		}
