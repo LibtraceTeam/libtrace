@@ -549,13 +549,16 @@ static int dag_available(libtrace_t *libtrace) {
 }
 
 dag_record_t *dag_get_record(libtrace_t *libtrace) {
-	dag_record_t *erfptr;
+	dag_record_t *erfptr = NULL;
 	uint16_t size;
 #ifdef DAG_VERSION_2_4
 	erfptr = (dag_record_t *) ((char *)DAG.buf + (DAG.bottom + DAG.offset));
 #else
-	erfptr = (dag_record_t *) DAG.bottom;	
+	erfptr = (dag_record_t *) dag_rx_stream_next_record(INPUT.fd,
+			DAG.dagstream);	
 #endif
+	if (!erfptr)
+		return NULL;
 	size = ntohs(erfptr->rlen);
 	assert( size >= dag_record_size );
 	DAG.offset += size;
@@ -585,7 +588,7 @@ static int dag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	int numbytes;
 	int size = 0;
 	struct timeval tv;
-	dag_record_t *erfptr;
+	dag_record_t *erfptr = NULL;
 
 	if (DUCK.last_pkt - DUCK.last_duck > DUCK.duck_freq && 
 			DUCK.duck_freq != 0) {
@@ -610,9 +613,12 @@ static int dag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 		numbytes = dag_available(libtrace);
 		if (numbytes < 0)
 			return numbytes;
-	} while (numbytes == 0);
+		if (numbytes == 0)
+			continue;
+		erfptr = dag_get_record(libtrace);
+		
+	} while (erfptr == NULL);
 
-	erfptr = dag_get_record(libtrace);
 	dag_form_packet(erfptr, packet);
 	
 	tv = trace_get_timeval(packet);
