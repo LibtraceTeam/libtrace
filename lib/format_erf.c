@@ -107,12 +107,16 @@ struct erf_format_data_t {
 	
 	struct {
 		void *buf; 
-		unsigned bottom;
-		unsigned top;
-		unsigned diff;
-		unsigned curr;
-		unsigned offset;
+		uint32_t diff;
+		uint32_t offset;
+#ifdef DAG_VERSION_2_4
+		uint32_t bottom;
+		uint32_t top;
+#else
+		uint8_t *bottom;
+		uint8_t *top;
 		unsigned int dagstream;
+#endif
 	} dag;
 #endif
 };
@@ -163,9 +167,14 @@ static int dag_init_input(libtrace_t *libtrace) {
 		trace_set_err(libtrace,errno,"stat(%s)",libtrace->uridata);
 		return -1;
 	} 
-
+#ifdef DAG_VERSION_2_4
+	DAG.top = 0;
+	DAG.bottom = 0;
+#else
+	DAG.top = NULL;
+	DAG.bottom = NULL;
 	DAG.dagstream = 0;
-	
+#endif	
 	if (S_ISCHR(buf.st_mode)) {
 		/* DEVICE */
 		if((INPUT.fd = dag_open(libtrace->uridata)) < 0) {
@@ -518,22 +527,55 @@ static int dag_get_duckinfo(libtrace_t *libtrace,
 }	
 #endif
 
-static int dag_read(libtrace_t *libtrace, int block_flag) {
+static int dag_available(libtrace_t *libtrace) {
 
 	if (DAG.diff != 0) 
 		return DAG.diff;
 
 	DAG.bottom = DAG.top;
-
+#ifdef DAG_VERSION_2_4
 	DAG.top = dag_offset(
 			INPUT.fd,
 			&(DAG.bottom),
-			block_flag);
+			DAGF_NONBLOCK);
 
+#else
+	DAG.top = dag_advance_stream(INPUT.fd, DAG.dagstream, &(DAG.bottom));
+#endif
 	DAG.diff = DAG.top - DAG.bottom;
 
 	DAG.offset = 0;
 	return DAG.diff;
+}
+
+dag_record_t *dag_get_record(libtrace_t *libtrace) {
+	dag_record_t *erfptr;
+	uint16_t size;
+#ifdef DAG_VERSION_2_4
+	erfptr = (dag_record_t *) ((char *)DAG.buf + (DAG.bottom + DAG.offset));
+#else
+	erfptr = (dag_record_t *) DAG.bottom;	
+#endif
+	size = ntohs(erfptr->rlen);
+	assert( size >= dag_record_size );
+	DAG.offset += size;
+	DAG.diff -= size;
+	return erfptr;
+}
+
+void dag_form_packet(dag_record_t *erfptr, libtrace_packet_t *packet) {
+	packet->buffer = erfptr;
+	packet->header = erfptr;
+	if (erfptr->flags.rxerror == 1) {
+		/* rxerror means the payload is corrupt - drop it
+		 * by tweaking rlen */
+		packet->payload = NULL;
+		erfptr->rlen = htons(erf_get_framing_length(packet));
+	} else {
+		packet->payload = (char*)packet->buffer 
+			+ erf_get_framing_length(packet);
+	}
+
 }
 
 /* FIXME: dag_read_packet shouldn't update the pointers, dag_fin_packet
@@ -541,10 +583,9 @@ static int dag_read(libtrace_t *libtrace, int block_flag) {
  */
 static int dag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	int numbytes;
-	int size;
+	int size = 0;
 	struct timeval tv;
 	dag_record_t *erfptr;
-	char *next_record = NULL;	
 
 	if (DUCK.last_pkt - DUCK.last_duck > DUCK.duck_freq && 
 			DUCK.duck_freq != 0) {
@@ -564,45 +605,27 @@ static int dag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	}
  	
 	packet->type = TRACE_RT_DATA_ERF;
-#ifdef DAG_VERSION_2_4
-	if ((numbytes = dag_read(libtrace,0)) < 0) 
-		return numbytes;
-	assert(numbytes>0);
 
-	/*DAG always gives us whole packets */
-	erfptr = (dag_record_t *) ((char *)DAG.buf + 
-			(DAG.bottom + DAG.offset));
-#else
-	next_record = (char *)dag_rx_stream_next_record(INPUT.fd, 0);
-	erfptr = (dag_record_t *)next_record;
-#endif
-	size = ntohs(erfptr->rlen);
-	assert( size >= dag_record_size );
-	assert( size < LIBTRACE_PACKET_BUFSIZE);
+	do {
+		numbytes = dag_available(libtrace);
+		if (numbytes < 0)
+			return numbytes;
+	} while (numbytes == 0);
+
+	erfptr = dag_get_record(libtrace);
+	dag_form_packet(erfptr, packet);
 	
-	packet->buffer = erfptr;
-	packet->header = erfptr;
-	if (((dag_record_t *)packet->buffer)->flags.rxerror == 1) {
-		/* rxerror means the payload is corrupt - drop it
-		 * by tweaking rlen */
-		packet->payload = NULL;
-		erfptr->rlen = htons(erf_get_framing_length(packet));
-	} else {
-		packet->payload = (char*)packet->buffer 
-			+ erf_get_framing_length(packet);
-	}
-
-#ifdef DAG_VERSION_2_4
-	DAG.offset += size;
-	DAG.diff -= size;
-#endif
 	tv = trace_get_timeval(packet);
 	DUCK.last_pkt = tv.tv_sec;
-	
-	return packet->payload ? size : erf_get_framing_length(packet);
+	return packet->payload ? ntohs(erfptr->rlen) : erf_get_framing_length(packet);
 }
 	
 static int dag_start_input(libtrace_t *libtrace) {
+	struct timeval zero, nopoll;
+	zero.tv_sec = 0;
+	zero.tv_usec = 0;
+	nopoll = zero;
+
 #ifdef DAG_VERSION_2_4
 	if(dag_start(INPUT.fd) < 0) {
 		trace_set_err(libtrace,errno,"Cannot start DAG %s",
@@ -618,12 +641,13 @@ static int dag_start_input(libtrace_t *libtrace) {
 		trace_set_err(libtrace, errno, "Cannot start DAG stream");
 		return -1;
 	}
+	dag_set_stream_poll(INPUT.fd, DAG.dagstream, 0, &zero, &nopoll);
 #endif
 	/* dags appear to have a bug where if you call dag_start after
 	 * calling dag_stop, and at least one packet has arrived, bad things
 	 * happen.  flush the memory hole 
 	 */
-	while(dag_read(libtrace,DAGF_NONBLOCK)!=0)
+	while(dag_available(libtrace)!=0)
 		DAG.diff=0;
 	return 0;
 }
@@ -902,11 +926,11 @@ static libtrace_eventobj_t trace_event_dag(libtrace_t *trace,
                 dag_fd = 0;
         }
 	
-	data = dag_read(trace, DAGF_NONBLOCK);
+	data = dag_available(trace);
 
         if (data > 0) {
                 event.size = dag_read_packet(trace,packet);
-		DATA(trace)->dag.diff -= event.size;
+		//DATA(trace)->dag.diff -= event.size;
                 if (trace->filter) {
 			if (trace_apply_filter(trace->filter, packet)) {
 				event.type = TRACE_EVENT_PACKET;
