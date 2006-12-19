@@ -439,6 +439,9 @@ typedef struct libtrace_pcapfile_pkt_hdr_t {
 	uint32_t wirelen;
 } libtrace_pcapfile_pkt_hdr_t;
 
+#ifdef HAVE_DAG
+void dag_constructor(void);
+#endif
 void erf_constructor(void);
 void legacy_constructor(void);
 void linuxnative_constructor(void);
