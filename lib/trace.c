@@ -229,6 +229,9 @@ static void trace_init(void)
 		pcapfile_constructor();
 		rt_constructor();
 		wag_constructor();
+#ifdef HAVE_DAG
+		dag_constructor();
+#endif
 	}
 }
 

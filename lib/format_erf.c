@@ -34,6 +34,7 @@
 #include "libtrace.h"
 #include "libtrace_int.h"
 #include "format_helper.h"
+#include "format_erf.h"
 
 #include <assert.h>
 #include <errno.h>
@@ -41,10 +42,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-
-#ifdef HAVE_DAG
-#include <sys/mman.h>
-#endif
 
 #ifdef WIN32
 #  include <io.h>
@@ -63,28 +60,14 @@
 #define COLLECTOR_PORT 3435
 
 static struct libtrace_format_t erf;
-#ifdef HAVE_DAG
-static struct libtrace_format_t dag;
-#endif 
 
 #define DATA(x) ((struct erf_format_data_t *)x->format_data)
 #define DATAOUT(x) ((struct erf_format_data_out_t *)x->format_data)
 
-#define CONNINFO DATA(libtrace)->conn_info
 #define INPUT DATA(libtrace)->input
 #define OUTPUT DATAOUT(libtrace)->output
-#ifdef HAVE_DAG
-#define DAG DATA(libtrace)->dag
-#define DUCK DATA(libtrace)->duck
-#endif
 #define OPTIONS DATAOUT(libtrace)->options
 struct erf_format_data_t {
-	union {
-                struct {
-                        char *hostname;
-                        short port;
-                } rt;
-        } conn_info;
         
 	union {
                 int fd;
@@ -97,39 +80,9 @@ struct erf_format_data_t {
 		off_t index_len;
 	} seek;
 
-#ifdef HAVE_DAG
-	struct {
-		uint32_t last_duck;	
-		uint32_t duck_freq;
-		uint32_t last_pkt;
-		libtrace_t *dummy_duck;
-	} duck;
-	
-	struct {
-		void *buf; 
-		uint32_t diff;
-		uint32_t offset;
-#ifdef DAG_VERSION_2_4
-		uint32_t bottom;
-		uint32_t top;
-#else
-		uint8_t *bottom;
-		uint8_t *top;
-		unsigned int dagstream;
-#endif
-	} dag;
-#endif
 };
 
 struct erf_format_data_out_t {
-        union {
-                struct {
-                        char *hostname;
-                        short port;
-                } rt;
-                char *path;
-        } conn_info;
-
 	union {
 		struct {
 			int level;
@@ -157,73 +110,6 @@ typedef struct erf_index_t {
 	uint64_t offset; 
 } erf_index_t;
 
-#ifdef HAVE_DAG
-static int dag_init_input(libtrace_t *libtrace) {
-	struct stat buf;
-
-	libtrace->format_data = (struct erf_format_data_t *)
-		malloc(sizeof(struct erf_format_data_t));
-	if (stat(libtrace->uridata, &buf) == -1) {
-		trace_set_err(libtrace,errno,"stat(%s)",libtrace->uridata);
-		return -1;
-	} 
-#ifdef DAG_VERSION_2_4
-	DAG.top = 0;
-	DAG.bottom = 0;
-#else
-	DAG.top = NULL;
-	DAG.bottom = NULL;
-	DAG.dagstream = 0;
-#endif	
-	if (S_ISCHR(buf.st_mode)) {
-		/* DEVICE */
-		if((INPUT.fd = dag_open(libtrace->uridata)) < 0) {
-			trace_set_err(libtrace,errno,"Cannot open DAG %s",
-					libtrace->uridata);
-			return -1;
-		}
-		if((DAG.buf = (void *)dag_mmap(INPUT.fd)) == MAP_FAILED) {
-			trace_set_err(libtrace,errno,"Cannot mmap DAG %s",
-					libtrace->uridata);
-			return -1;
-		}
-	} else {
-		trace_set_err(libtrace,errno,"Not a valid dag device: %s",
-				libtrace->uridata);
-		return -1;
-	}
-
-	DUCK.last_duck = 0;
-	DUCK.duck_freq = 0;  
-	DUCK.last_pkt = 0;
-	DUCK.dummy_duck = NULL;
-	
-	return 0;
-}
-
-static int dag_config_input(libtrace_t *libtrace, trace_option_t option,
-				void *data) {
-	switch(option) {
-		case TRACE_META_FREQ:
-			DUCK.duck_freq = *(int *)data;
-			return 0;
-		case TRACE_OPTION_SNAPLEN:
-			/* Surely we can set this?? Fall through for now*/
-			return -1;
-		case TRACE_OPTION_PROMISC:
-			/* DAG already operates in a promisc fashion */
-			return -1;
-		case TRACE_OPTION_FILTER:
-			return -1;
-		default:
-			trace_set_err(libtrace, TRACE_ERR_UNKNOWN_OPTION,
-					"Unknown or unsupported option: %i",
-					option);
-			return -1;
-	}
-	assert (0);
-}
-#endif
 
 /* Dag erf ether packets have a 2 byte padding before the packet
  * so that the ip header is aligned on a 32 bit boundary.
@@ -245,7 +131,7 @@ static int erf_get_padding(const libtrace_packet_t *packet)
 	}
 }
 
-static int erf_get_framing_length(const libtrace_packet_t *packet)
+int erf_get_framing_length(const libtrace_packet_t *packet)
 {
 	return dag_record_size + erf_get_padding(packet);
 }
@@ -320,7 +206,7 @@ static int erf_fast_seek_start(libtrace_t *libtrace,uint64_t erfts)
 /* There is no index.  Seek through the entire trace from the start, nice
  * and slowly.
  */
-static int erf_slow_seek_start(libtrace_t *libtrace,uint64_t erfts)
+static int erf_slow_seek_start(libtrace_t *libtrace,uint64_t erfts UNUSED)
 {
 	if (INPUT.file) {
 		libtrace_io_close(INPUT.file);
@@ -407,35 +293,6 @@ static int erf_config_output(libtrace_out_t *libtrace, trace_option_output_t opt
 }
 
 
-#ifdef HAVE_DAG
-static int dag_pause_input(libtrace_t *libtrace) {
-#ifdef DAG_VERSION_2_4
-	dag_stop(INPUT.fd);
-#else
-	if (dag_stop_stream(INPUT.fd, DAG.dagstream) < 0) {
-		trace_set_err(libtrace, errno, "Could not stop DAG stream");
-		return -1;
-	}
-	/*
-	if (dag_detach_stream(INPUT.fd, DAG.dagstream) < 0) {
-		trace_set_err(libtrace, errno, "Could not detach DAG stream");
-		return -1;
-	}
-	*/
-#endif
-	return 0; /* success */
-}
-
-static int dag_fin_input(libtrace_t *libtrace) {
-	/* dag pause input implicitly called to cleanup before this */
-	
-	dag_close(INPUT.fd);
-	if (DUCK.dummy_duck)
-		trace_destroy_dead(DUCK.dummy_duck);
-	free(libtrace->format_data);
-	return 0; /* success */
-}
-#endif
 
 static int erf_fin_input(libtrace_t *libtrace) {
 	if (INPUT.file)
@@ -450,214 +307,6 @@ static int erf_fin_output(libtrace_out_t *libtrace) {
 	return 0;
 }
  
-#ifdef HAVE_DAG
-#ifdef DAG_VERSION_2_4
-static int dag_get_duckinfo(libtrace_t *libtrace, 
-				libtrace_packet_t *packet) {
-	dag_inf lt_dag_inf;
-	
-	if (packet->buf_control == TRACE_CTRL_EXTERNAL || 
-			!packet->buffer) {
-		packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
-		packet->buf_control = TRACE_CTRL_PACKET;
-		if (!packet->buffer) {
-			trace_set_err(libtrace, errno,
-					"Cannot allocate packet buffer");
-			return -1;
-		}
-	}
-	
-	packet->header = 0;
-	packet->payload = packet->buffer;
-	
-	if ((ioctl(INPUT.fd, DAG_IOINF, &lt_dag_inf) < 0)) {
-		trace_set_err(libtrace, errno,
-				"Error using DAG_IOINF");
-		return -1;
-	}
-	if (!IsDUCK(&lt_dag_inf)) {
-		printf("WARNING: %s does not have modern clock support - No DUCK information will be gathered\n", libtrace->uridata);
-		return 0;
-	}
-
-	if ((ioctl(INPUT.fd, DAG_IOGETDUCK, (duck_inf *)packet->payload) 
-				< 0)) {
-		trace_set_err(libtrace, errno, "Error using DAG_IOGETDUCK");
-		return -1;
-	}
-
-	packet->type = TRACE_RT_DUCK_2_4;
-	if (!DUCK.dummy_duck) 
-		DUCK.dummy_duck = trace_create_dead("duck:dummy");
-	packet->trace = DUCK.dummy_duck;
-	return sizeof(duck_inf);
-}	
-#else
-static int dag_get_duckinfo(libtrace_t *libtrace, 
-				libtrace_packet_t *packet) {
-	daginf_t lt_dag_inf;
-	
-	if (packet->buf_control == TRACE_CTRL_EXTERNAL || 
-			!packet->buffer) {
-		packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
-		packet->buf_control = TRACE_CTRL_PACKET;
-		if (!packet->buffer) {
-			trace_set_err(libtrace, errno,
-					"Cannot allocate packet buffer");
-			return -1;
-		}
-	}
-	
-	packet->header = 0;
-	packet->payload = packet->buffer;
-	
-	/* No need to check if we can get DUCK or not - we're modern
-	 * enough */
-	if ((ioctl(INPUT.fd, DAGIOCDUCK, (duckinf_t *)packet->payload) 
-				< 0)) {
-		trace_set_err(libtrace, errno, "Error using DAGIOCDUCK");
-		return -1;
-	}
-
-	packet->type = TRACE_RT_DUCK_2_5;
-	if (!DUCK.dummy_duck) 
-		DUCK.dummy_duck = trace_create_dead("rt:localhost:3434");
-	packet->trace = DUCK.dummy_duck;	
-	return sizeof(duckinf_t);
-}	
-#endif
-
-static int dag_available(libtrace_t *libtrace) {
-
-	if (DAG.diff != 0) 
-		return DAG.diff;
-
-	DAG.bottom = DAG.top;
-#ifdef DAG_VERSION_2_4
-	DAG.top = dag_offset(
-			INPUT.fd,
-			&(DAG.bottom),
-			DAGF_NONBLOCK);
-
-#else
-	DAG.top = dag_advance_stream(INPUT.fd, DAG.dagstream, &(DAG.bottom));
-#endif
-	DAG.diff = DAG.top - DAG.bottom;
-
-	DAG.offset = 0;
-	return DAG.diff;
-}
-
-dag_record_t *dag_get_record(libtrace_t *libtrace) {
-	dag_record_t *erfptr = NULL;
-	uint16_t size;
-#ifdef DAG_VERSION_2_4
-	erfptr = (dag_record_t *) ((char *)DAG.buf + (DAG.bottom + DAG.offset));
-#else
-	erfptr = (dag_record_t *) dag_rx_stream_next_record(INPUT.fd,
-			DAG.dagstream);	
-#endif
-	if (!erfptr)
-		return NULL;
-	size = ntohs(erfptr->rlen);
-	assert( size >= dag_record_size );
-	DAG.offset += size;
-	DAG.diff -= size;
-	return erfptr;
-}
-
-void dag_form_packet(dag_record_t *erfptr, libtrace_packet_t *packet) {
-	packet->buffer = erfptr;
-	packet->header = erfptr;
-	if (erfptr->flags.rxerror == 1) {
-		/* rxerror means the payload is corrupt - drop it
-		 * by tweaking rlen */
-		packet->payload = NULL;
-		erfptr->rlen = htons(erf_get_framing_length(packet));
-	} else {
-		packet->payload = (char*)packet->buffer 
-			+ erf_get_framing_length(packet);
-	}
-
-}
-
-/* FIXME: dag_read_packet shouldn't update the pointers, dag_fin_packet
- * should do that.
- */
-static int dag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
-	int numbytes;
-	int size = 0;
-	struct timeval tv;
-	dag_record_t *erfptr = NULL;
-
-	if (DUCK.last_pkt - DUCK.last_duck > DUCK.duck_freq && 
-			DUCK.duck_freq != 0) {
-		size = dag_get_duckinfo(libtrace, packet);
-		DUCK.last_duck = DUCK.last_pkt;
-		if (size != 0) {
-			return size;
-		}
-		/* No DUCK support, so don't waste our time anymore */
-		DUCK.duck_freq = 0;
-	}
-	
-	if (packet->buf_control == TRACE_CTRL_PACKET) {
-		packet->buf_control = TRACE_CTRL_EXTERNAL;
-		free(packet->buffer);
-		packet->buffer = 0;
-	}
- 	
-	packet->type = TRACE_RT_DATA_ERF;
-
-	do {
-		numbytes = dag_available(libtrace);
-		if (numbytes < 0)
-			return numbytes;
-		if (numbytes == 0)
-			continue;
-		erfptr = dag_get_record(libtrace);
-		
-	} while (erfptr == NULL);
-
-	dag_form_packet(erfptr, packet);
-	
-	tv = trace_get_timeval(packet);
-	DUCK.last_pkt = tv.tv_sec;
-	return packet->payload ? ntohs(erfptr->rlen) : erf_get_framing_length(packet);
-}
-	
-static int dag_start_input(libtrace_t *libtrace) {
-	struct timeval zero, nopoll;
-	zero.tv_sec = 0;
-	zero.tv_usec = 0;
-	nopoll = zero;
-
-#ifdef DAG_VERSION_2_4
-	if(dag_start(INPUT.fd) < 0) {
-		trace_set_err(libtrace,errno,"Cannot start DAG %s",
-				libtrace->uridata);
-		return -1;
-	}
-#else
-	if (dag_attach_stream(INPUT.fd, DAG.dagstream, 0, 0) < 0) {
-		trace_set_err(libtrace, errno, "Cannot attach DAG stream");
-		return -1;
-	}
-	if (dag_start_stream(INPUT.fd, DAG.dagstream) < 0) {
-		trace_set_err(libtrace, errno, "Cannot start DAG stream");
-		return -1;
-	}
-	dag_set_stream_poll(INPUT.fd, DAG.dagstream, 0, &zero, &nopoll);
-#endif
-	/* dags appear to have a bug where if you call dag_start after
-	 * calling dag_stop, and at least one packet has arrived, bad things
-	 * happen.  flush the memory hole 
-	 */
-	while(dag_available(libtrace)!=0)
-		DAG.diff=0;
-	return 0;
-}
-#endif 
 
 static int erf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	int numbytes;
@@ -809,12 +458,8 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 		
 	} 
 	
-	if (packet->trace->format == &erf  
-#ifdef HAVE_DAG
-			|| packet->trace->format == &dag 
-#endif
-			) {
-		numbytes = erf_dump_packet(libtrace,
+	if (packet->type == TRACE_RT_DATA_ERF) {
+			numbytes = erf_dump_packet(libtrace,
 				(dag_record_t *)packet->header,
 				pad,
 				payload
@@ -862,32 +507,32 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 	return numbytes;
 }
 
-static libtrace_linktype_t erf_get_link_type(const libtrace_packet_t *packet) {
+libtrace_linktype_t erf_get_link_type(const libtrace_packet_t *packet) {
 	dag_record_t *erfptr = 0;
 	erfptr = (dag_record_t *)packet->header;
 	return erf_type_to_libtrace(erfptr->type);
 }
 
-static libtrace_direction_t erf_get_direction(const libtrace_packet_t *packet) {
+libtrace_direction_t erf_get_direction(const libtrace_packet_t *packet) {
 	dag_record_t *erfptr = 0;
 	erfptr = (dag_record_t *)packet->header;
 	return erfptr->flags.iface;
 }
 
-static libtrace_direction_t erf_set_direction(libtrace_packet_t *packet, libtrace_direction_t direction) {
+libtrace_direction_t erf_set_direction(libtrace_packet_t *packet, libtrace_direction_t direction) {
 	dag_record_t *erfptr = 0;
 	erfptr = (dag_record_t *)packet->header;
 	erfptr->flags.iface = direction;
 	return erfptr->flags.iface;
 }
 
-static uint64_t erf_get_erf_timestamp(const libtrace_packet_t *packet) {
+uint64_t erf_get_erf_timestamp(const libtrace_packet_t *packet) {
 	dag_record_t *erfptr = 0;
 	erfptr = (dag_record_t *)packet->header;
 	return bswap_le_to_host64(erfptr->ts);
 }
 
-static int erf_get_capture_length(const libtrace_packet_t *packet) {
+int erf_get_capture_length(const libtrace_packet_t *packet) {
 	dag_record_t *erfptr = 0;
 	int caplen;
 	if (packet->payload == NULL)
@@ -901,13 +546,13 @@ static int erf_get_capture_length(const libtrace_packet_t *packet) {
 	return (ntohs(erfptr->rlen) - erf_get_framing_length(packet));
 }
 
-static int erf_get_wire_length(const libtrace_packet_t *packet) {
+int erf_get_wire_length(const libtrace_packet_t *packet) {
 	dag_record_t *erfptr = 0;
 	erfptr = (dag_record_t *)packet->header;
 	return ntohs(erfptr->wlen);
 }
 
-static size_t erf_set_capture_length(libtrace_packet_t *packet, size_t size) {
+size_t erf_set_capture_length(libtrace_packet_t *packet, size_t size) {
 	dag_record_t *erfptr = 0;
 	assert(packet);
 	if(size  > trace_get_capture_length(packet)) {
@@ -918,61 +563,6 @@ static size_t erf_set_capture_length(libtrace_packet_t *packet, size_t size) {
 	erfptr->rlen = htons(size + erf_get_framing_length(packet));
 	return trace_get_capture_length(packet);
 }
-
-#ifdef HAVE_DAG
-static libtrace_eventobj_t trace_event_dag(libtrace_t *trace, 
-					libtrace_packet_t *packet) {
-        libtrace_eventobj_t event = {0,0,0.0,0};
-        int dag_fd;
-        int data;
-
-        if (trace->format->get_fd) {
-                dag_fd = trace->format->get_fd(trace);
-        } else {
-                dag_fd = 0;
-        }
-	
-	data = dag_available(trace);
-
-        if (data > 0) {
-                event.size = dag_read_packet(trace,packet);
-		//DATA(trace)->dag.diff -= event.size;
-                if (trace->filter) {
-			if (trace_apply_filter(trace->filter, packet)) {
-				event.type = TRACE_EVENT_PACKET;
-			} else {
-        			event.type = TRACE_EVENT_SLEEP;
-        			event.seconds = 0.000001;
-				return event;
-			}
-		} else {
-			event.type = TRACE_EVENT_PACKET;
-		}
-		if (trace->snaplen > 0) {
-			trace_set_capture_length(packet, trace->snaplen);
-		}
-
-		return event;
-        }
-        event.type = TRACE_EVENT_SLEEP;
-        event.seconds = 0.0001;
-        return event;
-}
-#endif
-
-#ifdef HAVE_DAG
-static void dag_help(void) {
-	printf("dag format module: $Revision$\n");
-	printf("Supported input URIs:\n");
-	printf("\tdag:/dev/dagn\n");
-	printf("\n");
-	printf("\te.g.: dag:/dev/dag0\n");
-	printf("\n");
-	printf("Supported output URIs:\n");
-	printf("\tnone\n");
-	printf("\n");
-}
-#endif
 
 static void erf_help(void) {
 	printf("erf format module: $Revision$\n");
@@ -1033,46 +623,7 @@ static struct libtrace_format_t erf = {
 	NULL				/* next pointer */
 };
 
-#ifdef HAVE_DAG
-static struct libtrace_format_t dag = {
-	"dag",
-	"$Id$",
-	TRACE_FORMAT_ERF,
-	dag_init_input,			/* init_input */	
-	dag_config_input,		/* config_input */
-	dag_start_input,		/* start_input */
-	dag_pause_input,		/* pause_input */
-	NULL,				/* init_output */
-	NULL,				/* config_output */
-	NULL,				/* start_output */
-	dag_fin_input,			/* fin_input */
-	NULL,				/* fin_output */
-	dag_read_packet,		/* read_packet */
-	NULL,				/* fin_packet */
-	NULL,				/* write_packet */
-	erf_get_link_type,		/* get_link_type */
-	erf_get_direction,		/* get_direction */
-	erf_set_direction,		/* set_direction */
-	erf_get_erf_timestamp,		/* get_erf_timestamp */
-	NULL,				/* get_timeval */
-	NULL,				/* get_seconds */
-	NULL,				/* seek_erf */
-	NULL, 				/* seek_timeval */
-	NULL, 				/* seek_seconds */
-	erf_get_capture_length,		/* get_capture_length */
-	erf_get_wire_length,		/* get_wire_length */
-	erf_get_framing_length,		/* get_framing_length */
-	erf_set_capture_length,		/* set_capture_length */
-	NULL,				/* get_fd */
-	trace_event_dag,		/* trace_event */
-	dag_help,			/* help */
-	NULL				/* next pointer */
-};
-#endif
 
 void erf_constructor(void) {
 	register_format(&erf);
-#ifdef HAVE_DAG
-	register_format(&dag);
-#endif
 }
