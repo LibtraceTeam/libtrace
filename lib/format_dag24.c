@@ -242,6 +242,7 @@ dag_record_t *dag_get_record(libtrace_t *libtrace) {
 void dag_form_packet(dag_record_t *erfptr, libtrace_packet_t *packet) {
         packet->buffer = erfptr;
         packet->header = erfptr;
+        packet->type = TRACE_RT_DATA_ERF;
         if (erfptr->flags.rxerror == 1) {
                 /* rxerror means the payload is corrupt - drop it
                  * by tweaking rlen */
@@ -277,7 +278,6 @@ static int dag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
                 packet->buffer = 0;
         }
 
-        packet->type = TRACE_RT_DATA_ERF;
 
         do {
                 numbytes = dag_available(libtrace);
