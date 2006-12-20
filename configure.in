@@ -127,10 +127,11 @@ AC_CHECK_HEADER(gdc.h)
 # Check to see if we have libdl - *BSD has built-in libdl
 AC_CHECK_LIB(dl, dlopen)
 # check pcap
-AC_CHECK_LIB(pcap,pcap_open_live)
-AC_REPLACE_FUNCS(pcap_open_dead)
-AC_REPLACE_FUNCS(pcap_dump_flush)
-AC_REPLACE_FUNCS(pcap_next_ex)
+AC_CHECK_LIB(pcap,pcap_next_ex,pcapfound=1,pcapfound=0)
+#AC_CHECK_LIB(pcap,pcap_next_ex)
+#AC_REPLACE_FUNCS(pcap_open_dead)
+#AC_REPLACE_FUNCS(pcap_dump_flush)
+#AC_REPLACE_FUNCS(pcap_next_ex)
 AC_CHECK_FUNCS(pcap_inject pcap_sendpacket pcap_setnonblock)
 AC_CHECK_DECLS([BIOCSETIF],,,[
 #include <sys/types.h>
@@ -151,6 +152,12 @@ AC_ARG_WITH(man,
 ])
 
 AC_PROG_CXX
+
+if test "$pcapfound" = 0; then
+	AC_MSG_ERROR(libpcap0.8 or greater is required to compile libtrace. If you have installed it in a non-standard location please use LDFLAGS to specify the location of the library)
+else
+	ADD_LIBS="$ADD_LIBS -lpcap"
+fi
 
 # configure time options for use of DAG cards
 # borrowed from libpcap!
@@ -276,7 +283,7 @@ reportopt() {
 
 echo
 AC_MSG_NOTICE([Libtrace version $PACKAGE_VERSION])
-reportopt "Compiled with PCAP support" $ac_cv_lib_pcap_pcap_open_live
+reportopt "Compiled with PCAP 0.8 support" $ac_cv_lib_pcap_pcap_next_ex
 reportopt "Compiled with compressed trace (zlib) support" $ac_cv_lib_z_gzopen
 if test x"$libtrace_dag" = xtrue; then
 	if test x"$libtrace_dag2_4"; then
