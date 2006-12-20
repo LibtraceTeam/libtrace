@@ -320,6 +320,8 @@ void *trace_get_payload_from_link(void *link, libtrace_linktype_t linktype,
 						type, remaining):NULL);
 		case TRACE_TYPE_DUCK:
 			return NULL; /* duck packets have no payload! */
+		default:
+			break;
 	}
 	fprintf(stderr,"Don't understand link layer type %i in trace_get_payload_from_link()\n",
 		linktype);
@@ -731,6 +733,8 @@ uint8_t *trace_get_source_mac(libtrace_packet_t *packet) {
 		case TRACE_TYPE_ATM:
 		case TRACE_TYPE_DUCK:
 			return NULL;
+		default:
+			break;
 	}
 	fprintf(stderr,"Not implemented\n");
 	assert(0);
@@ -765,6 +769,8 @@ DLLEXPORT uint8_t *trace_get_destination_mac(libtrace_packet_t *packet) {
 		case TRACE_TYPE_DUCK:
 			/* No MAC address */
 			return NULL;
+		default:
+			break;
 	}
 	fprintf(stderr,"Not implemented\n");
 	assert(0);

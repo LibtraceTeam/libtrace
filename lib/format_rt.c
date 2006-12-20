@@ -612,8 +612,10 @@ static int rt_get_capture_length(const libtrace_packet_t *packet) {
 			return 0;
 		case TRACE_RT_LOSTCONN:
 			return 0;
+		default:
+			printf("Unknown type: %d\n", packet->type);
+			
 	}
-	printf("Unknown type: %d\n", packet->type);
 	return 0;
 }
 
