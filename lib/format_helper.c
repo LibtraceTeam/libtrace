@@ -102,6 +102,9 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 			/* return here, the test for
 			 * event.size will sort out the error
 			 */
+			if (trace_is_err(trace)) {
+				trace_perror(trace, "read packet");
+			}
 			event.type = TRACE_EVENT_TERMINATE;
 			return event;
 		}
@@ -139,7 +142,24 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 
 	/* This is the first packet, so just fire away. */
 	/* TODO: finalise packet */
-	*packet = *trace->event.packet;
+	
+	/* XXX: Could we do this more efficiently? */
+	/* We do a lot of freeing and creating of packet buffers with this
+	 * method, but at least it works unlike what was here previously */
+	if (packet->buf_control == TRACE_CTRL_PACKET) {
+		free(packet->buffer);
+	}
+		
+	packet->type = trace->event.packet->type;
+	packet->trace = trace->event.packet->trace;
+	packet->header = trace->event.packet->header;
+	packet->payload = trace->event.packet->payload;
+	
+	packet->buffer = trace->event.packet->buffer;
+	packet->buf_control = trace->event.packet->buf_control;
+
+	trace->event.packet->buf_control = TRACE_CTRL_EXTERNAL;
+	
 	trace_destroy_packet(trace->event.packet);
 	trace->event.packet = NULL;
 
