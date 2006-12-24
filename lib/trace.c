@@ -994,7 +994,7 @@ DLLEXPORT int trace_apply_filter(libtrace_filter_t *filter,
 	unsigned int clen = 0;
 	bool free_packet_needed = false;
 	int ret;
-	libtrace_packet_t *packet_copy = packet;
+	libtrace_packet_t *packet_copy = (libtrace_packet_t*)packet;
 
 	assert(filter);
 	assert(packet);
