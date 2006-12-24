@@ -100,6 +100,6 @@ typedef struct duck_inf_pkt {
 #endif
 
 /** sizeof(dag_record_t) without the payload helpers */
-#define dag_record_size         16
+#define dag_record_size         16U
 
 #endif /* _DAGFORMAT_H_ */

@@ -111,7 +111,7 @@ int snprintf(char *str, size_t size, const char *format, ...);
 #  include "dagformat.h"
 #endif
 
-#define RP_BUFSIZE 65536
+#define RP_BUFSIZE 65536U
 
 struct libtrace_event_status_t {
 	libtrace_packet_t *packet;
@@ -133,7 +133,7 @@ struct libtrace_t {
 	struct libtrace_filter_t *filter; /**< used by libtrace if the module
 					    * doesn't support filters natively
 					    */
-	unsigned int snaplen;		/**< used by libtrace if the module
+	size_t snaplen;		/**< used by libtrace if the module
 					  * doesn't support snapping natively
 					  */
 };
@@ -358,8 +358,8 @@ libtrace_linktype_t pcap_dlt_to_libtrace(libtrace_dlt_t dlt);
 libtrace_dlt_t libtrace_to_pcap_dlt(libtrace_linktype_t type);
 libtrace_rt_types_t pcap_dlt_to_rt(libtrace_dlt_t dlt);
 libtrace_dlt_t rt_to_pcap_dlt(libtrace_rt_types_t rt_type);
-libtrace_linktype_t erf_type_to_libtrace(char erf);
-char libtrace_to_erf_type(libtrace_linktype_t linktype);
+libtrace_linktype_t erf_type_to_libtrace(uint8_t erf);
+uint8_t libtrace_to_erf_type(libtrace_linktype_t linktype);
 libtrace_linktype_t arphrd_type_to_libtrace(unsigned int);
 unsigned int libtrace_to_arphrd_type(libtrace_linktype_t);
 

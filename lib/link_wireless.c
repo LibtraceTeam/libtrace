@@ -60,7 +60,7 @@ static void *trace_get_radiotap_field(void *link, libtrace_radiotap_field_t fiel
 	/* Skip over any extended bitmasks */
 	p = (uint8_t *) &(rtap->it_present);
 
-	while ( bswap_le_to_host32(*((uint32_t*)p)) & (1 << TRACE_RADIOTAP_EXT) ) {
+	while ( bswap_le_to_host32(*((uint32_t*)p)) & (1U << TRACE_RADIOTAP_EXT) ) {
 		p += sizeof (uint32_t);
 	}
 

@@ -139,7 +139,7 @@ static int duck_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	unsigned int duck_size;
 	
 	if (!packet->buffer || packet->buf_control == TRACE_CTRL_EXTERNAL) {
-                packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
+                packet->buffer = malloc((size_t)LIBTRACE_PACKET_BUFSIZE);
                 packet->buf_control = TRACE_CTRL_PACKET;
                 if (!packet->buffer) {
                         trace_set_err(libtrace, errno,
@@ -180,7 +180,7 @@ static int duck_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	}
 
 	if ((numbytes = libtrace_io_read(INPUT->file, packet->payload,
-					duck_size)) != (int)duck_size) {
+					(size_t)duck_size)) != (int)duck_size) {
 		if (numbytes == -1) {
 			trace_set_err(libtrace, errno, "Reading DUCK failed");
 			return -1;

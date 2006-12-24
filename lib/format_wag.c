@@ -91,8 +91,8 @@ struct wag_format_data_out_t {
 };
 
 static int wag_init_input(libtrace_t *libtrace) {
-	libtrace->format_data = calloc(1, sizeof(struct wag_format_data_t));
-
+	libtrace->format_data = calloc((size_t)1, 
+					sizeof(struct wag_format_data_t));
 	return 0;
 }
 
@@ -122,7 +122,8 @@ static int wag_start_input(libtrace_t *libtrace)
 
 static int wtf_init_input(libtrace_t *libtrace) 
 {
-	libtrace->format_data = calloc(1,sizeof(struct wag_format_data_t));
+	libtrace->format_data = calloc((size_t)1,
+					sizeof(struct wag_format_data_t));
 	return 0;
 }
 
@@ -215,7 +216,7 @@ static int wag_read(libtrace_t *libtrace, void *buffer, size_t len,
 		int block) {
         size_t framesize;
         char *buf_ptr = (char *)buffer;
-        unsigned int to_read = 0;
+        size_t to_read = 0;
         uint16_t magic = 0;
 	long fd_flags;
 	
@@ -294,7 +295,7 @@ static int wag_read(libtrace_t *libtrace, void *buffer, size_t len,
         to_read = framesize - sizeof(struct frame_t);
         
 	while (to_read>0) {
-          	int ret=read(INPUT.fd,buf_ptr,to_read);
+          	int ret=read(INPUT.fd,buf_ptr,(size_t)to_read);
 
           	if (ret == -1) {
             		if (errno == EINTR) 
@@ -321,7 +322,7 @@ static int wag_read_packet_versatile(libtrace_t *libtrace, libtrace_packet_t *pa
 	
         if (packet->buf_control == TRACE_CTRL_EXTERNAL || !packet->buffer) {
                 packet->buf_control = TRACE_CTRL_PACKET;
-                packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
+                packet->buffer = malloc((size_t)LIBTRACE_PACKET_BUFSIZE);
 	}
 	
 	
@@ -329,7 +330,7 @@ static int wag_read_packet_versatile(libtrace_t *libtrace, libtrace_packet_t *pa
 	packet->type = TRACE_RT_DATA_WAG;
 	
 	if ((numbytes = wag_read(libtrace, (void *)packet->buffer, 
-					RP_BUFSIZE, block_flag)) <= 0) {
+					(size_t)RP_BUFSIZE, block_flag)) <= 0) {
 	    
     		return numbytes;
 	}
@@ -353,7 +354,7 @@ static int wtf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 
         if (packet->buf_control == TRACE_CTRL_EXTERNAL || !packet->buffer) {
                 packet->buf_control = TRACE_CTRL_PACKET;
-                packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
+                packet->buffer = malloc((size_t)LIBTRACE_PACKET_BUFSIZE);
         }
 	packet->type = TRACE_RT_DATA_WAG;
 	buffer2 = buffer = packet->buffer;
@@ -384,7 +385,8 @@ static int wtf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	assert(size < LIBTRACE_PACKET_BUFSIZE);
 	assert(size > 0);
 	
-	if ((numbytes=libtrace_io_read(INPUT.file, buffer2, size)) != size) {
+	if ((numbytes=libtrace_io_read(INPUT.file, buffer2, (size_t)size)) 
+				!= size) {
 		trace_set_err(libtrace,
 				errno,"read(%s,buffer)",packet->trace->uridata);
 		return -1;

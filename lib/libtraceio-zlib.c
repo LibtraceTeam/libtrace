@@ -9,7 +9,7 @@ struct libtrace_io_t {
 
 ssize_t libtrace_io_read(libtrace_io_t *io, void *buf, size_t len)
 {
-	int err=gzread(io->file,buf,len);
+	int err=gzread(io->file,buf,(unsigned) len);
 	int err2=errno;
 	if (err>=0) {
 		/* successfully read <x> bytes */
@@ -62,7 +62,7 @@ void libtrace_io_close(libtrace_io_t *io)
 
 ssize_t libtrace_io_write(libtrace_io_t *io, const void *buf, size_t len)
 {
-	return (ssize_t)gzwrite(io->file,buf,len);
+	return (ssize_t)gzwrite(io->file,buf,(unsigned)len);
 }
 
 off_t libtrace_io_seek(libtrace_io_t *io, off_t offset, int whence)

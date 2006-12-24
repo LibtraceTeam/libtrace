@@ -214,7 +214,7 @@ static int pcapfile_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 				DATA(libtrace)->header.network));
 
 	if (!packet->buffer || packet->buf_control == TRACE_CTRL_EXTERNAL) {
-		packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
+		packet->buffer = malloc((size_t)LIBTRACE_PACKET_BUFSIZE);
 		packet->buf_control = TRACE_CTRL_PACKET;
 	}
 
@@ -236,7 +236,7 @@ static int pcapfile_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 
 	err=libtrace_io_read(DATA(libtrace)->file,
 			(char*)packet->buffer+sizeof(libtrace_pcapfile_pkt_hdr_t),
-			swapl(libtrace,((libtrace_pcapfile_pkt_hdr_t*)packet->buffer)->caplen)
+			(size_t)swapl(libtrace,((libtrace_pcapfile_pkt_hdr_t*)packet->buffer)->caplen)
 			);
 
 	
@@ -446,7 +446,7 @@ static size_t pcapfile_set_capture_length(libtrace_packet_t *packet,size_t size)
 		return trace_get_capture_length(packet);
 	}
 	pcapptr = (libtrace_pcapfile_pkt_hdr_t *)packet->header;
-	pcapptr->caplen = swapl(packet->trace,size);
+	pcapptr->caplen = swapl(packet->trace,(uint32_t)size);
 	return trace_get_capture_length(packet);
 }
 

@@ -115,7 +115,7 @@ static int legacy_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 
 	if (!packet->buffer || packet->buf_control == TRACE_CTRL_EXTERNAL) {
 		packet->buf_control = TRACE_CTRL_PACKET;
-		packet->buffer=malloc(LIBTRACE_PACKET_BUFSIZE);
+		packet->buffer=malloc((size_t)LIBTRACE_PACKET_BUFSIZE);
 	}
 	buffer = packet->buffer;
 
@@ -135,7 +135,7 @@ static int legacy_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	
 	if ((numbytes=libtrace_io_read(INPUT.file,
 					buffer,
-					64)) != 64) {
+					(size_t)64)) != 64) {
 		if (numbytes!=0) {
 			trace_set_err(libtrace,errno,"read(%s)",libtrace->uridata);
 		}

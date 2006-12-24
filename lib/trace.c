@@ -223,7 +223,7 @@ static void trace_init(void)
 #ifdef HAVE_LIBPCAP
 		pcap_constructor();
 #endif
-#if HAVE_BIOCSETIF
+#ifdef HAVE_BIOCSETIF
 		bpf_constructor();
 #endif
 		pcapfile_constructor();
@@ -251,8 +251,7 @@ DLLEXPORT void trace_help() {
 	}
 }
 
-#define RP_BUFSIZE 65536
-#define URI_PROTO_LINE 16
+#define URI_PROTO_LINE 16U
 
 
 /* Create a trace file from a URI
@@ -374,7 +373,7 @@ DLLEXPORT libtrace_t * trace_create_dead (const char *uri) {
 	if((uridata = strchr(uri,':')) == NULL) {
 		xstrncpy(scan, uri, strlen(uri));
 	} else {
-		xstrncpy(scan,uri, (uridata - uri));
+		xstrncpy(scan,uri, (size_t)(uridata - uri));
 	}
 	
 	libtrace->format = 0;	
@@ -605,7 +604,7 @@ DLLEXPORT void trace_destroy_output(libtrace_out_t *libtrace)
 DLLEXPORT libtrace_packet_t *trace_create_packet(void) 
 {
 	libtrace_packet_t *packet = 
-		(libtrace_packet_t*)calloc(1,sizeof(libtrace_packet_t));
+		(libtrace_packet_t*)calloc((size_t)1,sizeof(libtrace_packet_t));
 	packet->buf_control=TRACE_CTRL_PACKET;
 	return packet;
 }
@@ -965,8 +964,8 @@ int trace_bpf_compile(libtrace_filter_t *filter,
 			return -1;
 		}
 		pcap=(pcap_t *)pcap_open_dead(
-				libtrace_to_pcap_dlt(linktype),
-				1500);
+				(int)libtrace_to_pcap_dlt(linktype),
+				1500U);
 		/* build filter */
 		if (pcap_compile( pcap, &filter->filter, filter->filterstring, 
 					1, 0)) {
@@ -1233,7 +1232,7 @@ DLLEXPORT const char * trace_parse_uri(const char *uri, char **format) {
                 return 0;
         }
 
-        *format=xstrndup(uri, (uridata - uri));
+        *format=xstrndup(uri, (size_t)(uridata - uri));
 
 	/* push uridata past the delimiter */
         uridata++;
@@ -1396,7 +1395,7 @@ DLLEXPORT char *trace_ether_ntoa(const uint8_t *addr, char *buf)
 	char staticbuf[18]={0,};
 	if (!buf2)
 		buf2=staticbuf;
-	snprintf(buf2,18,"%02x:%02x:%02x:%02x:%02x:%02x",
+	snprintf(buf2,(size_t)18,"%02x:%02x:%02x:%02x:%02x:%02x",
 			addr[0],addr[1],addr[2],
 			addr[3],addr[4],addr[5]);
 	return buf2;
@@ -1446,6 +1445,6 @@ void trace_construct_packet(libtrace_packet_t *packet,
 	packet->header=packet->buffer;
 	packet->payload=(void*)((char*)packet->buffer+sizeof(hdr));
 	memcpy(packet->header,&hdr,sizeof(hdr));
-	memcpy(packet->payload,data,len);
+	memcpy(packet->payload,data,(size_t)len);
 	packet->type=pcap_dlt_to_rt(libtrace_to_pcap_dlt(linktype));
 }

@@ -929,6 +929,14 @@ void *trace_get_link(const libtrace_packet_t *packet);
 DLLEXPORT SIMPLE_FUNCTION
 libtrace_ip_t *trace_get_ip(libtrace_packet_t *packet);
 
+/** get a pointer to the IPv6 header (if any)
+ * @param packet  	the packet opaque pointer
+ *
+ * @return a pointer to the IPv6 header, or NULL if there is no IPv6 header
+ */
+DLLEXPORT SIMPLE_FUNCTION
+libtrace_ip6_t *trace_get_ip6(libtrace_packet_t *packet);
+
 /** Gets a pointer to the transport layer header (if any)
  * @param packet        a pointer to a libtrace_packet structure
  * @param[out] proto	transport layer protocol

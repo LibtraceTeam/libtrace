@@ -117,7 +117,7 @@ static int linuxnative_start_input(libtrace_t *libtrace)
 	}
 	if (bind(FORMAT(libtrace->format_data)->fd,
 				(struct sockaddr*)&addr,
-				sizeof(addr))==-1) {
+				(socklen_t)sizeof(addr))==-1) {
 		free(libtrace->format_data);
 		return -1;
 	}
@@ -150,7 +150,7 @@ static int linuxnative_start_input(libtrace_t *libtrace)
 			SOL_SOCKET,
 			SO_TIMESTAMP,
 			&one,
-			sizeof(one))==-1) {
+			(socklen_t)sizeof(one))==-1) {
 		perror("setsockopt(SO_TIMESTAMP)");
 	}
 
@@ -236,7 +236,7 @@ static int linuxnative_read_packet(libtrace_t *libtrace, libtrace_packet_t *pack
 	int snaplen;
 
 	if (!packet->buffer || packet->buf_control == TRACE_CTRL_EXTERNAL) {
-		packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
+		packet->buffer = malloc((size_t)LIBTRACE_PACKET_BUFSIZE);
 		packet->buf_control = TRACE_CTRL_PACKET;
 	}
 
@@ -302,13 +302,13 @@ static int linuxnative_write_packet(libtrace_out_t *trace,
 	hdr.sll_hatype = 0;
 	hdr.sll_pkttype = 0;
 	hdr.sll_halen = htons(6); /* FIXME */
-	memcpy(hdr.sll_addr,packet->payload,hdr.sll_halen);
+	memcpy(hdr.sll_addr,packet->payload,(size_t)hdr.sll_halen);
 
 	return sendto(DATAOUT(trace)->fd,
 			packet->payload,
 			trace_get_capture_length(packet),
 			0,
-			(struct sockaddr*)&hdr, sizeof(hdr));
+			(struct sockaddr*)&hdr, (socklen_t)sizeof(hdr));
 
 }
 

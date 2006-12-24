@@ -52,7 +52,8 @@
 
 #define RT_INFO ((struct rt_format_data_t*)libtrace->format_data)
 
-static char *rt_deny_reason(uint8_t reason) {
+static char *rt_deny_reason(enum rt_conn_denied_t reason) 
+{
 	char *string = 0;
 
 	switch(reason) {
@@ -110,13 +111,13 @@ static int rt_connect(libtrace_t *libtrace) {
 		return -1;
         }
 
+	memset(&remote,0, sizeof(remote));
         remote.sin_family = AF_INET;
         remote.sin_port = htons(RT_INFO->port);
         remote.sin_addr = *((struct in_addr *)he->h_addr);
-        memset(&(remote.sin_zero), 0, 8);
 
         if (connect(RT_INFO->input_fd, (struct sockaddr *)&remote,
-                                sizeof(struct sockaddr)) == -1) {
+                                (socklen_t)sizeof(struct sockaddr)) == -1) {
                 trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
 				"Could not connect to host %s on port %d",
 				RT_INFO->hostname, RT_INFO->port);
@@ -216,7 +217,7 @@ static int rt_init_input(libtrace_t *libtrace) {
                 } else {
                         RT_INFO->hostname =
                                 (char *)strndup(uridata,
-                                                (scan - uridata));
+                                                (size_t)(scan - uridata));
                         RT_INFO->port =
                                 atoi(++scan);
                 }
@@ -283,15 +284,16 @@ static int rt_fin_input(libtrace_t *libtrace) {
         return 0;
 }
 
-#define RT_BUF_SIZE 4000
+#define RT_BUF_SIZE 4000U
 
-static int rt_read(libtrace_t *libtrace, void **buffer, size_t len, int block) {
+static int rt_read(libtrace_t *libtrace, void **buffer, size_t len, int block) 
+{
         int numbytes;
 	
 	assert(len <= RT_BUF_SIZE);
 	
 	if (!RT_INFO->pkt_buffer) {
-		RT_INFO->pkt_buffer = malloc(RT_BUF_SIZE);
+		RT_INFO->pkt_buffer = malloc((size_t)RT_BUF_SIZE);
 		RT_INFO->buf_current = RT_INFO->pkt_buffer;
 		RT_INFO->buf_filled = 0;
 	}
@@ -440,7 +442,7 @@ static int rt_send_ack(libtrace_t *libtrace,
 	static char *ack_buffer = 0;
 	char *buf_ptr;
 	int numbytes = 0;
-	unsigned int to_write = 0;
+	size_t to_write = 0;
 	rt_header_t *hdr;
 	rt_ack_t *ack_hdr;
 	
@@ -515,7 +517,10 @@ static int rt_read_packet_versatile(libtrace_t *libtrace,
 	packet->type = RT_INFO->rt_hdr.type;
 
 	if (packet->type >= TRACE_RT_DATA_SIMPLE) {
-		if (rt_read(libtrace, &packet->buffer, RT_INFO->rt_hdr.length,blocking) != RT_INFO->rt_hdr.length) {
+		if (rt_read(libtrace, 
+					&packet->buffer,
+					(size_t)RT_INFO->rt_hdr.length,
+					blocking) != RT_INFO->rt_hdr.length) {
 			return -1;
 		}
         	packet->header = packet->buffer;
@@ -537,7 +542,8 @@ static int rt_read_packet_versatile(libtrace_t *libtrace,
 		switch(packet->type) {
 			case TRACE_RT_STATUS:
 				if (rt_read(libtrace, &packet->buffer, 
-					RT_INFO->rt_hdr.length, blocking) != 
+					(size_t)RT_INFO->rt_hdr.length,
+					blocking) != 
 						RT_INFO->rt_hdr.length) {
 					return -1;
 				}
@@ -547,7 +553,8 @@ static int rt_read_packet_versatile(libtrace_t *libtrace,
 			case TRACE_RT_DUCK_2_4:
 			case TRACE_RT_DUCK_2_5:
 				if (rt_read(libtrace, &packet->buffer,
-					RT_INFO->rt_hdr.length, blocking) != 
+					(size_t)RT_INFO->rt_hdr.length,
+					blocking) != 
 						RT_INFO->rt_hdr.length) {
 					return -1;
 				}

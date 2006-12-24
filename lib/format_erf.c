@@ -59,7 +59,7 @@
 
 #define COLLECTOR_PORT 3435
 
-static struct libtrace_format_t erf;
+static struct libtrace_format_t erfformat;
 
 #define DATA(x) ((struct erf_format_data_t *)x->format_data)
 #define DATAOUT(x) ((struct erf_format_data_out_t *)x->format_data)
@@ -172,7 +172,7 @@ static int erf_fast_seek_start(libtrace_t *libtrace,uint64_t erfts)
 		current=(max_off+min_off)>>2;
 
 		libtrace_io_seek(DATA(libtrace)->seek.index,
-				current*sizeof(record),
+				(int64_t)(current*sizeof(record)),
 				SEEK_SET);
 		libtrace_io_read(DATA(libtrace)->seek.index,
 				&record,sizeof(record));
@@ -191,14 +191,14 @@ static int erf_fast_seek_start(libtrace_t *libtrace,uint64_t erfts)
 	 */
 	do {
 		libtrace_io_seek(DATA(libtrace)->seek.index,
-				current*sizeof(record),SEEK_SET);
+				(int64_t)(current*sizeof(record)),SEEK_SET);
 		libtrace_io_read(DATA(libtrace)->seek.index,
 				&record,sizeof(record));
 		current--;
 	} while(record.timestamp>erfts);
 
 	/* We've found our location in the trace, now use it. */
-	libtrace_io_seek(INPUT.file,record.offset,SEEK_SET);
+	libtrace_io_seek(INPUT.file,(int64_t) record.offset,SEEK_SET);
 
 	return 0; /* success */
 }
@@ -315,7 +315,7 @@ static int erf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	unsigned int rlen;
 
 	if (!packet->buffer || packet->buf_control == TRACE_CTRL_EXTERNAL) {
-		packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
+		packet->buffer = malloc((size_t)LIBTRACE_PACKET_BUFSIZE);
 		packet->buf_control = TRACE_CTRL_PACKET;
 		if (!packet->buffer) {
 			trace_set_err(libtrace, errno, 
@@ -331,7 +331,7 @@ static int erf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 
 	if ((numbytes=libtrace_io_read(INPUT.file,
 					packet->buffer,
-					dag_record_size)) == -1) {
+					(size_t)dag_record_size)) == -1) {
 		trace_set_err(libtrace,errno,"read(%s)",
 				libtrace->uridata);
 		return -1;
@@ -353,7 +353,7 @@ static int erf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	/* read in the rest of the packet */
 	if ((numbytes=libtrace_io_read(INPUT.file,
 					buffer2,
-					size)) != (int)size) {
+					(size_t)size)) != (int)size) {
 		if (numbytes==-1) {
 			trace_set_err(libtrace,errno, "read(%s)", libtrace->uridata);
 			return -1;
@@ -376,15 +376,17 @@ static int erf_dump_packet(libtrace_out_t *libtrace,
 	int size;
 
 	if ((numbytes = 
-		libtrace_io_write(OUTPUT.file, erfptr, dag_record_size + pad)) 
-			!= (int)dag_record_size+pad) {
+		libtrace_io_write(OUTPUT.file, 
+				erfptr,
+				(size_t)(dag_record_size + pad))) 
+			!= (int)(dag_record_size+pad)) {
 		trace_set_err_out(libtrace,errno,
 				"write(%s)",libtrace->uridata);
 		return -1;
 	}
 
 	size=ntohs(erfptr->rlen)-(dag_record_size+pad);
-	numbytes=libtrace_io_write(OUTPUT.file, buffer, size);
+	numbytes=libtrace_io_write(OUTPUT.file, buffer, (size_t)size);
 	if (numbytes != size) {
 		trace_set_err_out(libtrace,errno,
 				"write(%s)",libtrace->uridata);
@@ -433,7 +435,7 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 		libtrace_packet_t *packet) 
 {
 	int numbytes = 0;
-	int pad = 0;
+	unsigned int pad = 0;
 	dag_record_t *dag_hdr = (dag_record_t *)packet->header;
 	void *payload = packet->payload;
 
@@ -588,7 +590,7 @@ static void erf_help(void) {
 	
 }
 
-static struct libtrace_format_t erf = {
+static struct libtrace_format_t erfformat = {
 	"erf",
 	"$Id$",
 	TRACE_FORMAT_ERF,
@@ -625,5 +627,5 @@ static struct libtrace_format_t erf = {
 
 
 void erf_constructor(void) {
-	register_format(&erf);
+	register_format(&erfformat);
 }

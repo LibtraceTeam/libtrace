@@ -31,6 +31,7 @@
 #include "config.h"
 #include <sys/types.h>
 #include <fcntl.h> /* for O_LARGEFILE */
+#include <math.h>
 #include "libtrace.h"
 #include "libtrace_int.h"
 
@@ -111,7 +112,7 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 	}
 
 	ts=trace_get_seconds(trace->event.packet);
-	if (trace->event.tdelta!=0.0) {
+	if (fabs(trace->event.tdelta)<1e-9) {
 		/* Get the adjusted current time */
 		gettimeofday(&stv, NULL);
 		now = stv.tv_sec + 

@@ -100,7 +100,7 @@ libtrace_dlt_t rt_to_pcap_dlt(libtrace_rt_types_t rt_type)
 	return rt_type - TRACE_RT_DATA_DLT;
 }
 
-libtrace_linktype_t erf_type_to_libtrace(char erf)
+libtrace_linktype_t erf_type_to_libtrace(uint8_t erf)
 {
 	switch (erf) {
 		case TYPE_HDLC_POS:	return TRACE_TYPE_HDLC_POS;
@@ -111,7 +111,7 @@ libtrace_linktype_t erf_type_to_libtrace(char erf)
 	return ~0U;
 }
 
-char libtrace_to_erf_type(libtrace_linktype_t linktype)
+uint8_t libtrace_to_erf_type(libtrace_linktype_t linktype)
 {
 	switch(linktype) {
 		case TRACE_TYPE_HDLC_POS: return TYPE_HDLC_POS;
@@ -130,7 +130,7 @@ char libtrace_to_erf_type(libtrace_linktype_t linktype)
 		case TRACE_TYPE_LINUX_SLL:
 			break;
 	}
-	return -1;
+	return 255;
 }
 
 libtrace_linktype_t arphrd_type_to_libtrace(unsigned int arphrd) {
@@ -260,7 +260,7 @@ bool demote_packet(libtrace_packet_t *packet)
 
 			memcpy(tmp+sizeof(libtrace_pcapfile_pkt_hdr_t),
 					packet->payload,
-					remaining);
+					(size_t)remaining);
 			if (packet->buf_control == TRACE_CTRL_EXTERNAL) {
 				packet->buf_control=TRACE_CTRL_PACKET;
 			}
@@ -299,7 +299,7 @@ bool demote_packet(libtrace_packet_t *packet)
 
 			memcpy(tmp+sizeof(libtrace_pcapfile_pkt_hdr_t),
 					packet->payload,
-					remaining);
+					(size_t)remaining);
 			if (packet->buf_control == TRACE_CTRL_EXTERNAL) {
 				packet->buf_control=TRACE_CTRL_PACKET;
 			}
