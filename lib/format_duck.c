@@ -180,7 +180,7 @@ static int duck_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	}
 
 	if ((numbytes = libtrace_io_read(INPUT->file, packet->payload,
-					duck_size)) != duck_size) {
+					duck_size)) != (int)duck_size) {
 		if (numbytes == -1) {
 			trace_set_err(libtrace, errno, "Reading DUCK failed");
 			return -1;
@@ -244,15 +244,19 @@ static int duck_get_capture_length(const libtrace_packet_t *packet) {
 	return 0;
 }
 
-static int duck_get_framing_length(const libtrace_packet_t *packet) {
+static int duck_get_framing_length(const libtrace_packet_t *packet UNUSED) 
+{
 	return 0;
 }
 
-static int duck_get_wire_length(const libtrace_packet_t *packet) {
+static int duck_get_wire_length(const libtrace_packet_t *packet UNUSED) 
+{
 	return 0;
 }
 
-static libtrace_linktype_t duck_get_link_type(const libtrace_packet_t *packet) {
+static libtrace_linktype_t duck_get_link_type(
+				const libtrace_packet_t *packet UNUSED) 
+{
 	return TRACE_TYPE_DUCK;
 }
 
