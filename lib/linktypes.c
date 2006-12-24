@@ -41,6 +41,12 @@ libtrace_linktype_t pcap_dlt_to_libtrace(libtrace_dlt_t dlt)
 		case TRACE_DLT_PFLOG: return TRACE_TYPE_PFLOG;
         	case TRACE_DLT_IEEE802_11_RADIO: return TRACE_TYPE_80211_RADIO;
 		case TRACE_DLT_ATM_RFC1483: return TRACE_TYPE_LLCSNAP;
+		/* Unhandled */
+		case TRACE_DLT_NULL: 	/* Raw IP frame with a BSD specific
+					 * header If you want raw L3 headers
+					 * use TRACE_DLT_RAW
+					 */
+			break;
 	}
 	return ~0U;
 }
@@ -59,17 +65,25 @@ libtrace_dlt_t libtrace_to_pcap_dlt(libtrace_linktype_t type)
 		case TRACE_TYPE_LINUX_SLL: return TRACE_DLT_LINUX_SLL;
 		case TRACE_TYPE_PFLOG: return TRACE_DLT_PFLOG;
 		case TRACE_TYPE_80211_RADIO: return TRACE_DLT_IEEE802_11_RADIO;
-		case TRACE_TYPE_ATM: 
-			/* Dispite hints to the contrary, there is no DLT
-			 * for 'raw atm packets that happen to be missing
-			 * the HEC' or even 'raw atm packets that have a hec'.
-			 *
-			 * The closest are DLT_ATM_RFC1483 but that doesn't
-			 * include the ATM header, only the LLCSNAP header.
-			 */
-			return ~0U;
 		case TRACE_TYPE_LLCSNAP: return TRACE_DLT_ATM_RFC1483;
-		default: break;
+		/* Below here are unsupported conversions */
+		/* Dispite hints to the contrary, there is no DLT
+		 * for 'raw atm packets that happen to be missing
+		 * the HEC' or even 'raw atm packets that have a hec'.
+		 *
+		 * The closest are DLT_ATM_RFC1483 but that doesn't
+		 * include the ATM header, only the LLCSNAP header.
+		 */
+		case TRACE_TYPE_ATM: 
+		/* pcap has no DLT for DUCK */
+		case TRACE_TYPE_DUCK:
+		/* Used for test traces within WAND */
+		case TRACE_TYPE_80211_PRISM: 	
+		/* TODO: We haven't researched these yet */
+		case TRACE_TYPE_POS:
+		case TRACE_TYPE_HDLC_POS:
+		case TRACE_TYPE_AAL5:
+			break;
 	}
 	return ~0U;
 }
@@ -104,8 +118,17 @@ char libtrace_to_erf_type(libtrace_linktype_t linktype)
 		case TRACE_TYPE_ETH:	return TYPE_ETH;
 		case TRACE_TYPE_ATM:	return TYPE_ATM;
 		case TRACE_TYPE_AAL5:	return TYPE_AAL5;
-		case TRACE_TYPE_LLCSNAP: return -1;
-		default:		break;
+		/* Unsupported conversions */
+		case TRACE_TYPE_LLCSNAP: 
+		case TRACE_TYPE_DUCK:
+		case TRACE_TYPE_80211_RADIO:
+		case TRACE_TYPE_80211_PRISM:
+		case TRACE_TYPE_80211:
+		case TRACE_TYPE_POS:
+		case TRACE_TYPE_PFLOG:
+		case TRACE_TYPE_NONE:
+		case TRACE_TYPE_LINUX_SLL:
+			break;
 	}
 	return -1;
 }
