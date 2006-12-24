@@ -45,7 +45,7 @@ int main(int argc,char **argv)
 		switch(c) {
 			case 'f': 
 				if (filter!=NULL) {
-					fprintf(stderr,"You can only have one filter (quote it with " ")\n");
+					fprintf(stderr,"You can only have one filter\n");
 					usage(argv[0]);
 				}
 				filter=trace_create_filter(optarg);

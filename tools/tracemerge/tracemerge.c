@@ -71,9 +71,9 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	input=calloc((argc-optind),sizeof(struct libtrace_t *));
-	packet=calloc((argc-optind),sizeof(struct libtrace_packet_t *));
-	live=calloc((argc-optind),sizeof(bool));
+	input=calloc((size_t)(argc-optind),sizeof(struct libtrace_t *));
+	packet=calloc((size_t)(argc-optind),sizeof(struct libtrace_packet_t *));
+	live=calloc((size_t)(argc-optind),sizeof(bool));
 	for(i=0;i<argc-optind;++i) {
 		libtrace_t *f;
 		libtrace_packet_t *p;

@@ -12,7 +12,7 @@ struct output_type_t *output_formats[] = {
 	&output_txt,
 	&output_csv,
 	&output_html,
-#if HAVE_GDC_H
+#ifdef HAVE_GDC_H
 	&output_png,
 #endif
 	NULL
