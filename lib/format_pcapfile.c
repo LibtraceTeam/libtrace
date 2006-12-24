@@ -155,14 +155,14 @@ static int pcapfile_start_input(libtrace_t *libtrace)
 	return 0;
 }
 
-static int pcapfile_start_output(libtrace_out_t *libtrace)
+static int pcapfile_start_output(libtrace_out_t *libtrace UNUSED)
 {
 	return 0;
 }
 
 static int pcapfile_config_input(libtrace_t *libtrace,
 		trace_option_t option,
-		void *data)
+		void *data UNUSED)
 {
 	trace_set_err(libtrace,TRACE_ERR_UNKNOWN_OPTION,
 			"Unknown option %i", option);
