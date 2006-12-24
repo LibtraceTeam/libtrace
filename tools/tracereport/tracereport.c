@@ -104,7 +104,7 @@ static void usage(char *argv0)
 {
 	fprintf(stderr,"Usage:\n"
 	"%s flags traceuri [traceuri...]\n"
-	"-f --filter=bpf	Apply BPF filter. Can be specified multiple times\n"
+	"-f --filter		Apply BPF filter. Can be specified multiple times\n"
 	"-H --libtrace-help	Print libtrace runtime documentation\n"
 	,argv0);
 	exit(1);
@@ -112,14 +112,42 @@ static void usage(char *argv0)
 
 int main(int argc, char *argv[]) {
 
-	int i;
+	libtrace_filter_t *filter = NULL;
 
-	/*char *filterstring="host 130.197.127.210"; */
+	if (argc<2)
+		usage(argv[0]);
 
-	libtrace_filter_t *filter = NULL;/*trace_bpf_setfilter(filterstring); */
+	while(1) {
+		int option_index;
+		struct option long_options[] = {
+				{ "filter",		1, 0, 'f' },
+			      	{ "libtrace-help",	0, 0, 'H' },
+				{NULL,			0, 0, 0   },
+			};
+		int c = getopt_long(argc, argv, "f:H",
+				long_options, &option_index);
+		if (c == -1)
+			break;
+		switch(c) {
+			case 'f':
+				if (filter != NULL) {
+					fprintf(stderr,"You can only have one filter\n");
+					usage(argv[0]);
+				}
+				filter=trace_create_filter(optarg);
+				break;
+			case 'H':
+				trace_help();
+				exit(1);
+				break;
+			default:
+				printf("Unknown option: %c\n", c);
+				usage(argv[0]);
+		}
+	}
 
-	for(i=1;i<argc;++i) {
-		run_trace(argv[i],filter,(1<<30));
+	while(optind < argc) {
+		run_trace(argv[optind++],filter,(1<<30));
 	}
 
 	error_report();
@@ -129,7 +157,6 @@ int main(int argc, char *argv[]) {
 	port_report();
 	ttl_report();
 	dir_report();
-
 
         return 0;
 }
