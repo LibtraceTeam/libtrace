@@ -240,7 +240,7 @@ static void trace_init(void)
  * Function prints out some basic help information regarding libtrace,
  * and then prints out the help() function registered with each input module
  */
-DLLEXPORT void trace_help() {
+DLLEXPORT void trace_help(void) {
 	struct libtrace_format_t *tmp;
 	trace_init();
 	printf("libtrace %s\n\n",PACKAGE_VERSION);
@@ -1170,10 +1170,11 @@ DLLEXPORT int8_t trace_get_server_port(UNUSED uint8_t protocol,
 		return USE_SOURCE;
 
 	/* dynamic range */
-	if (DYNAMIC(source) && DYNAMIC(dest))
+	if (DYNAMIC(source) && DYNAMIC(dest)) {
 		if (source < dest)
 			return USE_SOURCE;
 		return USE_DEST;
+	}
 	if (DYNAMIC(source) && !DYNAMIC(dest))
 		return USE_DEST;
 	if (!DYNAMIC(source) && DYNAMIC(dest))

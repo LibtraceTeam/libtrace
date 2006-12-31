@@ -149,8 +149,10 @@ struct libtrace_out_t {
 	char *uridata;			/**< URI associated with this trace */
 };
 
-void trace_set_err(libtrace_t *trace, int errcode,const char *msg,...);
-void trace_set_err_out(libtrace_out_t *trace, int errcode, const char *msg,...);
+void trace_set_err(libtrace_t *trace, int errcode,const char *msg,...) 
+								PRINTF(3,4);
+void trace_set_err_out(libtrace_out_t *trace, int errcode, const char *msg,...)
+								PRINTF(3,4);
 
 typedef struct libtrace_sll_header_t {
 	uint16_t pkttype;          	/* packet type */

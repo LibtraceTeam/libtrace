@@ -139,10 +139,12 @@ extern "C" {
 #  define SIMPLE_FUNCTION __attribute__((pure))
 #  define UNUSED __attribute__((unused))
 #  define PACKED __attribute__((packed))
+#  define PRINTF(formatpos,argpos) __attribute__((format(printf,formatpos,argpos)))
 #else
 #  define SIMPLE_FUNCTION
 #  define UNUSED
 #  define PACKED 
+#  define PRINTF(formatpos,argpos) 
 #endif
 	
 /** Opaque structure holding information about an output trace */
@@ -786,7 +788,7 @@ DLLEXPORT bool trace_is_err(libtrace_t *trace);
  * @param msg		the message to prefix to the error
  * This function does clear the error status.
  */
-DLLEXPORT void trace_perror(libtrace_t *trace, const char *msg,...);
+DLLEXPORT void trace_perror(libtrace_t *trace, const char *msg,...) PRINTF(2,3);
 
 /** Check (and clear) the current error state of an output trace
  * @param trace		the output trace file to check the error state on
@@ -807,7 +809,8 @@ DLLEXPORT bool trace_is_err_output(libtrace_out_t *trace);
  * @param msg		the message to prefix to the error
  * This function does clear the error status.
  */
-DLLEXPORT void trace_perror_output(libtrace_out_t *trace, const char *msg,...);
+DLLEXPORT void trace_perror_output(libtrace_out_t *trace, const char *msg,...)
+	PRINTF(2,3);
 
 
 /*@}*/
