@@ -291,7 +291,7 @@ static int wag_read(libtrace_t *libtrace, void *buffer, size_t len,
 	/* We should deal.  this is called "snapping", but we don't yet */
 	assert(framesize<=len);
 
-        buf_ptr = (void*)((char*)buffer + sizeof (struct frame_t));
+        buf_ptr = ((char*)buffer + sizeof (struct frame_t));
         to_read = framesize - sizeof(struct frame_t);
         
 	while (to_read>0) {

@@ -352,7 +352,7 @@ static libtrace_direction_t pcapfile_get_direction(const libtrace_packet_t *pack
 		case TRACE_TYPE_LINUX_SLL:
 		{
 			libtrace_sll_header_t *sll;
-			sll = trace_get_link(packet);
+			sll = (libtrace_sll_header_t*)trace_get_link(packet);
 			if (!sll) {
 				trace_set_err(packet->trace,
 					TRACE_ERR_BAD_PACKET,
@@ -381,7 +381,7 @@ static libtrace_direction_t pcapfile_get_direction(const libtrace_packet_t *pack
 		case TRACE_TYPE_PFLOG:
 		{
 			libtrace_pflog_header_t *pflog;
-			pflog = trace_get_link(packet);
+			pflog=(libtrace_pflog_header_t*)trace_get_link(packet);
 			if (!pflog) {
 				trace_set_err(packet->trace,
 						TRACE_ERR_BAD_PACKET,

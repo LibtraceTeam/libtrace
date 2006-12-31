@@ -52,9 +52,9 @@
 
 #define RT_INFO ((struct rt_format_data_t*)libtrace->format_data)
 
-static char *rt_deny_reason(enum rt_conn_denied_t reason) 
+static const char *rt_deny_reason(enum rt_conn_denied_t reason) 
 {
-	char *string = 0;
+	const char *string = 0;
 
 	switch(reason) {
 		case RT_DENY_WRAPPER:
@@ -293,7 +293,7 @@ static int rt_read(libtrace_t *libtrace, void **buffer, size_t len, int block)
 	assert(len <= RT_BUF_SIZE);
 	
 	if (!RT_INFO->pkt_buffer) {
-		RT_INFO->pkt_buffer = malloc((size_t)RT_BUF_SIZE);
+		RT_INFO->pkt_buffer = (char*)malloc((size_t)RT_BUF_SIZE);
 		RT_INFO->buf_current = RT_INFO->pkt_buffer;
 		RT_INFO->buf_filled = 0;
 	}
@@ -447,7 +447,8 @@ static int rt_send_ack(libtrace_t *libtrace,
 	rt_ack_t *ack_hdr;
 	
 	if (!ack_buffer) {
-		ack_buffer = malloc(sizeof(rt_header_t) + sizeof(rt_ack_t));
+		ack_buffer = (char*)malloc(sizeof(rt_header_t) 
+							+ sizeof(rt_ack_t));
 	}
 	
 	hdr = (rt_header_t *) ack_buffer;

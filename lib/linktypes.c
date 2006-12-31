@@ -245,7 +245,7 @@ bool demote_packet(libtrace_packet_t *packet)
 			packet->payload=trace_get_payload_from_pos(
 				packet->payload,NULL,&remaining);
 
-			tmp=malloc(
+			tmp=(char*)malloc(
 				trace_get_capture_length(packet)
 				+sizeof(libtrace_pcapfile_pkt_hdr_t)
 				);
@@ -284,7 +284,7 @@ bool demote_packet(libtrace_packet_t *packet)
 			packet->payload=trace_get_payload_from_atm(
 				packet->payload,&type,&remaining);
 
-			tmp=malloc(
+			tmp=(char*)malloc(
 				trace_get_capture_length(packet)
 				+sizeof(libtrace_pcapfile_pkt_hdr_t)
 				);

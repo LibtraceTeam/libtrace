@@ -195,9 +195,9 @@ typedef struct libtrace_pflog_header_t {
 /* all of these should return -1, or NULL on failure */
 struct libtrace_format_t {
 	/** the uri name of this module */
-	char *name;
+	const char *name;
 	/** the version of this module */
-	char *version;
+	const char *version;
 	/** the RT protocol type of this module */
 	enum base_format_t type;
 	/** stuff that deals with input @{ */
