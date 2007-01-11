@@ -35,6 +35,7 @@ static int usage(char *argv0)
 	"-i --interval=n	Split every n seconds\n"
 	"-s --starttime=time 	Start at time\n"
 	"-e --endtime=time	End at time\n"
+	"-m --maxfiles=n	Create a maximum of n trace files\n"
 	"-H --libtrace-help	Print libtrace runtime documentation\n"
 	,argv0);
 	exit(1);
@@ -62,7 +63,9 @@ int main(int argc, char *argv[])
 	uint64_t pktcount=0;
 	uint64_t totbytes=0;
 	uint64_t totbyteslast=0;
-
+	uint64_t maxfiles = UINT64_MAX;
+	uint64_t filescreated = 0;
+	
 	if (argc<2) {
 		usage(argv[0]);
 		return 1;
@@ -79,10 +82,11 @@ int main(int argc, char *argv[])
 			{ "endtime",	   1, 0, 'e' },
 			{ "interval",	   1, 0, 'i' },
 			{ "libtrace-help", 0, 0, 'H' },
+			{ "maxfiles", 	   1, 0, 'm' },
 			{ NULL, 	   0, 0, 0   },
 		};
 
-		int c=getopt_long(argc, argv, "f:c:b:s:e:i:H",
+		int c=getopt_long(argc, argv, "f:c:b:s:e:i:m:H",
 				long_options, &option_index);
 
 		if (c==-1)
@@ -100,6 +104,8 @@ int main(int argc, char *argv[])
 			case 'e': endtime=atoi(optarg);
 				  break;
 			case 'i': interval=atoi(optarg);
+				  break;
+			case 'm': maxfiles=atoi(optarg);
 				  break;
 			case 'H':
 				  trace_help();
@@ -173,6 +179,9 @@ int main(int argc, char *argv[])
 		}
 		if (!output) {
 			char *buffer;
+			if (maxfiles <= filescreated) {
+				break;
+			}
 			buffer=strdup(argv[optind+1]);
 			if (interval!=UINT64_MAX) {
 				buffer=strdupcat(buffer,"-");
@@ -190,6 +199,7 @@ int main(int argc, char *argv[])
 			output=trace_create_output(buffer);
 			trace_start_output(output);
 			free(buffer);
+			filescreated ++;
 		}
 
 		/* Some traces we have are padded (usually with 0x00), so 
@@ -213,7 +223,8 @@ int main(int argc, char *argv[])
 	}
 	
 	trace_destroy(input);
-	trace_destroy_output(output);
+	if (output)
+		trace_destroy_output(output);
 
 	trace_destroy_packet(packet);
 
