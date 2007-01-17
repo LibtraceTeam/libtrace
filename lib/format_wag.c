@@ -113,10 +113,13 @@ static int wag_start_input(libtrace_t *libtrace)
 		}
 		return 0;
 	}
-#endif
 	trace_set_err(libtrace,TRACE_ERR_INIT_FAILED,
 			"%s is not a valid char device",
 			libtrace->uridata);
+#else
+	trace_set_err(libtrace, TRACE_ERR_UNSUPPORTED,
+			"WAG cards are not supported in Windows");
+#endif
 	return -1;
 }
 
@@ -186,16 +189,23 @@ static int wtf_config_output(libtrace_out_t *libtrace,
 
 static int wag_pause_input(libtrace_t *libtrace)
 {
+#ifndef WIN32
 	if (ioctl (INPUT.fd, CAPTURE_RADIOON, 0) == -1) {
 		trace_set_err(libtrace, errno,
 				"Could not turn WAG radio off");
 	}
 	close(INPUT.fd);
 	return 0;
+#endif
+	trace_set_err(libtrace, TRACE_ERR_UNSUPPORTED,
+				"WAG cards are not supported in Windows");
+	return -1;
 }
 
 static int wag_fin_input(libtrace_t *libtrace) {
+#ifndef WIN32
 	ioctl (INPUT.fd, CAPTURE_RADIOON, 0);
+#endif
 	free(libtrace->format_data);
 	return 0;
 }

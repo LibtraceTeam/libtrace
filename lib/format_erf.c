@@ -47,7 +47,6 @@
 #  include <io.h>
 #  include <share.h>
 #  define PATH_MAX _MAX_PATH
-#  define snprintf sprintf_s
 #else
 #  include <netdb.h>
 #  ifndef PATH_MAX

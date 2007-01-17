@@ -49,7 +49,9 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#ifndef WIN32
 #include <sys/socket.h>
+#endif
 #include <stdarg.h>
 
 #ifdef HAVE_LIMITS_H
@@ -81,6 +83,9 @@
 #endif
 
 #include <time.h>
+#ifdef WIN32
+#include <sys/timeb.h>
+#endif
 
 #include "libtrace.h"
 #include "libtrace_int.h"
@@ -1426,11 +1431,25 @@ void trace_construct_packet(libtrace_packet_t *packet,
 	size_t size;
 	static libtrace_t *deadtrace=NULL;
 	libtrace_pcapfile_pkt_hdr_t hdr;
+#ifdef WIN32
+	struct _timeb tstruct;
+#else
 	struct timeval tv;
-	if (NULL == deadtrace) deadtrace=trace_create_dead("pcapfile");
+#endif
+
+	if (NULL == deadtrace) 
+		deadtrace=trace_create_dead("pcapfile");
+
+#ifdef WIN32
+	_ftime(&tstruct);
+	hdr.ts_sec=tstruct.time;
+	hdr.ts_usec=tstruct.millitm * 1000;
+#else
 	gettimeofday(&tv,NULL);
 	hdr.ts_sec=tv.tv_sec;
 	hdr.ts_usec=tv.tv_usec;
+#endif
+
 	hdr.caplen=len;
 	hdr.wirelen=len;
 

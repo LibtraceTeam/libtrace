@@ -41,7 +41,10 @@ extern "C" {
 #include "libtrace.h"
 
 #ifdef _MSC_VER
+// warning: deprecated function
 #pragma warning(disable:4996)
+// warning: benign redefinitions of types
+#pragma warning(disable:4142)
 #endif
 
 #ifdef HAVE_INTTYPES_H
@@ -370,7 +373,7 @@ bool demote_packet(libtrace_packet_t *packet);
 
 void *trace_get_payload_from_linux_sll(void *, uint16_t *, uint32_t *);
 void *trace_get_payload_from_pos(void *, uint16_t *, uint32_t *);
-void *trace_get_payload_from_atm(void *, uint8_t *, uint32_t *);
+DLLEXPORT void *trace_get_payload_from_atm(void *, uint8_t *, uint32_t *);
 
 uint64_t byteswap64(uint64_t num);
 uint32_t byteswap32(uint32_t num);

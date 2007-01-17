@@ -4,9 +4,11 @@
 #ifndef LIBTRACEIO_H
 #define LIBTRACEIO_H 1
 #include "config.h"
+#ifndef WIN32
 #include <inttypes.h>
-
 #include <unistd.h>
+#endif
+
 
 typedef struct libtrace_io_t libtrace_io_t;
 

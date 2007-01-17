@@ -47,7 +47,7 @@
 #ifdef WIN32
 #  include <io.h>
 #  include <share.h>
-#  define snprintf sprintf_s
+#  include <sys/timeb.h>
 
 struct libtrace_eventobj_t trace_event_device(struct libtrace_t *trace, struct libtrace_packet_t *packet) {
     struct libtrace_eventobj_t event = {0,0,0.0,0};
@@ -93,7 +93,11 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 	struct libtrace_eventobj_t event = {0,0,0.0,0};
 	double ts;
 	double now;
+#ifdef WIN32
+	struct __timeb64 tstruct;
+#else
 	struct timeval stv;
+#endif
 
 	if (!trace->event.packet) {
 		trace->event.packet = trace_create_packet();
@@ -112,11 +116,19 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 	}
 
 	ts=trace_get_seconds(trace->event.packet);
+
+	/* Get the adjusted current time */
+#ifdef WIN32
+	_ftime64(&tstruct);
+	now = tstruct.time + 
+		((double)tstruct.millitm / 1000.0);
+#else
+	gettimeofday(&stv, NULL);
+	now = stv.tv_sec + 
+		((double)stv.tv_usec / 1000000.0);
+#endif
+
 	if (fabs(trace->event.tdelta)<1e-9) {
-		/* Get the adjusted current time */
-		gettimeofday(&stv, NULL);
-		now = stv.tv_sec + 
-			((double)stv.tv_usec / 1000000.0);
 		/* adjust for trace delta */
 		now -= trace->event.tdelta; 
 
@@ -131,14 +143,11 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 			return event;
 		}
 	} else {
-		gettimeofday(&stv, NULL);
 		/* work out the difference between the 
 		 * start of trace replay, and the first
 		 * packet in the trace
 		 */
-		trace->event.tdelta = stv.tv_sec + 
-			((double)stv.tv_usec / 1000000.0);
-		trace->event.tdelta -= ts;
+		trace->event.tdelta = now - ts;
 	}
 
 	/* This is the first packet, so just fire away. */

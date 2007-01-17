@@ -46,7 +46,6 @@
 #ifdef WIN32
 #  include <io.h>
 #  include <share.h>
-#  define snprintf sprintf_s
 #endif
 
 
