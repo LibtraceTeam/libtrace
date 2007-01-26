@@ -1,7 +1,7 @@
 /*
  * This file is part of libtrace
  *
- * Copyright (c) 2004 The University of Waikato, Hamilton, New Zealand.
+ * Copyright (c) 2007 The University of Waikato, Hamilton, New Zealand.
  * Authors: Daniel Lawson
  *          Perry Lorier
  *	    Shane Alcock

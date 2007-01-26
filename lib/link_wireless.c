@@ -4,7 +4,7 @@
  * link_wireless.c
  * Implements the trace_get_wireless_* methods defined in libtrace.h
  *
- * Copyright (c) 2006 The University of Waikato, Hamilton, New Zealand.
+ * Copyright (c) 2007 The University of Waikato, Hamilton, New Zealand.
  * Authors: Scott Raynel 
  *          Perry Lorier 
  *          

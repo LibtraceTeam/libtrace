@@ -1,9 +1,6 @@
 LIBPACKETDUMP_DIR = libpacketdump
 TOOLS_DIR = tools
-if LIBTRACE_SWIG
-SWIG_DIR = swig
-endif
-SUBDIRS = lib $(LIBPACKETDUMP_DIR) $(TOOLS_DIR) $(SWIG_DIR) docs examples
+SUBDIRS = lib $(LIBPACKETDUMP_DIR) $(TOOLS_DIR) docs examples
 
 ACLOCAL_AMFLAGS = -I m4
 AUTOMAKE_OPTIONS = 1.5
