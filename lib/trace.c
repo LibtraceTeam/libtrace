@@ -528,6 +528,10 @@ DLLEXPORT int trace_config(libtrace_t *libtrace,
 		void *value)
 {
 	int ret;
+	libtrace_err_t err;
+	
+	assert(!trace_is_err(libtrace) && "Please use trace_is_err to check for errors after calling trace_create!");
+	
 	if (libtrace->format->config_input) {
 		ret=libtrace->format->config_input(libtrace,option,value);
 		if (ret==0)
@@ -535,22 +539,37 @@ DLLEXPORT int trace_config(libtrace_t *libtrace,
 	}
 	switch(option) {
 		case TRACE_OPTION_SNAPLEN:
+			/* Clear the error if there was one */
+			if (trace_is_err(libtrace)) {
+				err = trace_get_err(libtrace);
+			}
 			libtrace->snaplen=*(int*)value;
 			return 0;
 		case TRACE_OPTION_FILTER:
+			/* Clear the error if there was one */
+			if (trace_is_err(libtrace)) {
+				err = trace_get_err(libtrace);
+			}
 			libtrace->filter=(libtrace_filter_t *)value;
 			return 0;
 		case TRACE_OPTION_PROMISC:
-			trace_set_err(libtrace,TRACE_ERR_OPTION_UNAVAIL,
-				"Promisc mode is not supported by this format module");
+			if (!trace_is_err(libtrace)) {
+				trace_set_err(libtrace,TRACE_ERR_OPTION_UNAVAIL,
+						"Promisc mode is not supported by this format module");
+			}
 			return -1;
 		case TRACE_META_FREQ:
-			trace_set_err(libtrace, TRACE_ERR_OPTION_UNAVAIL,
-				"This format does not support meta-data gathering");
+			if (!trace_is_err(libtrace)) {
+				trace_set_err(libtrace, 
+						TRACE_ERR_OPTION_UNAVAIL,
+						"This format does not support meta-data gathering");
+			}
 			return -1;
 	}
-	trace_set_err(libtrace,TRACE_ERR_UNKNOWN_OPTION,
-		"Unknown option %i", option);
+	if (!trace_is_err(libtrace)) {
+		trace_set_err(libtrace,TRACE_ERR_UNKNOWN_OPTION,
+			"Unknown option %i", option);
+	}
 	return -1;
 }
 
