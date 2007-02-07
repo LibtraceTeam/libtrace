@@ -54,6 +54,14 @@ typedef struct ieee80211_ctrl_frame_2addr {
         uint8_t      addr2[6];
 } __attribute__ ((__packed__)) ieee80211_ctrl_frame_2addr;
 
+typedef struct ieee80211_data_frame_3 {
+	ieee80211_frame_control ctl;
+	uint16_t	duration;
+	uint8_t		addr1[6];
+	uint8_t		addr2[6];
+	uint8_t		addr3[6];
+	uint16_t	seq_ctrl;
+} __attribute__ ((__packed__)) ieee80211_data_frame_3;
 
 typedef struct ieee80211_data_frame {
 	ieee80211_frame_control ctl;
@@ -649,7 +657,7 @@ void decode_80211_data(char *pkt, int len) {
 	
 	printf(" 802.11MAC: Data frame: ");
 	
-	if (len < sizeof(ieee80211_data_frame)) {
+	if (len < sizeof(ieee80211_data_frame_3)) {
 		printf("[Truncated]\n");
 		return;
 	}
@@ -680,6 +688,8 @@ void decode_80211_data(char *pkt, int len) {
 			(data->seq_ctrl & 0x000F) ,
 			(data->seq_ctrl & 0xFFF0) >> 4);
 
+	hdrlen = sizeof(ieee80211_data_frame_3);
+	
 	if (! data->ctl.from_ds && ! data->ctl.to_ds) {
 		printf(" 802.11MAC: DA      = %s\n", macaddr(data->addr1));
 		printf(" 802.11MAC: SA      = %s\n", macaddr(data->addr2));
@@ -693,25 +703,26 @@ void decode_80211_data(char *pkt, int len) {
 		printf(" 802.11MAC: SA      = %s\n", macaddr(data->addr3));
 		printf(" 802.11MAC: BSSID   = %s\n", macaddr(data->addr2));
 	} else {
+		/* Check to make sure we have a four-address frame first */
+		if (len < sizeof(ieee80211_data_frame)) {
+			printf(" 802.11MAC: [Truncated]\n");
+			return;
+		}
 		printf(" 802.11MAC: DA      = %s\n", macaddr(data->addr3));
 		printf(" 802.11MAC: SA      = %s\n", macaddr(data->addr4));
 		printf(" 802.11MAC: TA      = %s\n", macaddr(data->addr2));
 		printf(" 802.11MAC: RA      = %s\n", macaddr(data->addr1));
+		hdrlen = sizeof(ieee80211_data_frame); /* 4 addr header */
 	}
 
-	hdrlen = 0;
 
 	if (data->ctl.subtype >= 8) { 
 		printf(" 802.11e: QoS = 0x%04x\n", qos->qos);
 		if (len > sizeof(ieee80211_qos_data_frame)) 
 			hdrlen = sizeof(ieee80211_qos_data_frame);
-	} else {
-		if (len > sizeof(ieee80211_data_frame)) 
-			hdrlen = sizeof(ieee80211_data_frame);
 	}
 	
-	/* hdrlen will be zero if there wasn't a payload */
-	if (hdrlen > 0) {
+	if (len > hdrlen) {
 		pld = (ieee80211_payload *) ((char *)pkt + hdrlen) ;
 		printf(" 802.11MAC: Payload ethertype = 0x%04x\n", ntohs(pld->ethertype));
 		decode_next((char *) pld->payload, len - hdrlen - 2, "eth", ntohs(pld->ethertype));
