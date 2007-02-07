@@ -99,9 +99,16 @@ static void run_trace(char *uri)
                 }
 
 		for(i=0;i<filter_count;++i) {
-			if(trace_apply_filter(filters[i].filter,packet)) {
+			if (filters[i].filter == NULL)
+				continue;
+			if(trace_apply_filter(filters[i].filter,packet) > 0) {
 				++filters[i].count;
 				filters[i].bytes+=trace_get_wire_length(packet);
+			}
+			if (trace_is_err(trace)) {
+				trace_perror(trace, "trace_apply_filter");
+				fprintf(stderr, "Removing filter from filterlist\n");
+				filters[i].filter = NULL;
 			}
 		}
 
@@ -109,6 +116,7 @@ static void run_trace(char *uri)
 		bytes+=trace_get_wire_length(packet);
         }
 
+	printf("%-30s\t%12s\t%12s\t%7s\n","filter","count","bytes","%");
 	for(i=0;i<filter_count;++i) {
 		printf("%30s:\t%12"PRIu64"\t%12"PRIu64"\t%7.03f\n",filters[i].expr,filters[i].count,filters[i].bytes,filters[i].count*100.0/count);
 		filters[i].bytes=0;
@@ -164,7 +172,6 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
-	printf("%-30s\t%12s\t%12s\t%7s\n","filter","count","bytes","%");
 	for(i=optind;i<argc;++i) {
 		run_trace(argv[i]);
 	}

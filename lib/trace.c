@@ -974,7 +974,7 @@ int trace_bpf_compile(libtrace_filter_t *filter,
 	}
 	
 	if (filter->filterstring && ! filter->flag) {
-		pcap_t *pcap;
+		pcap_t *pcap = NULL;
 		libtrace_linktype_t linktype=trace_get_link_type(packet);
 		if (linktype==(libtrace_linktype_t)-1) {
 			trace_set_err(packet->trace,
@@ -984,18 +984,21 @@ int trace_bpf_compile(libtrace_filter_t *filter,
 		}
 		if (libtrace_to_pcap_dlt(linktype) == ~1U) {
 			trace_set_err(packet->trace,TRACE_ERR_BAD_PACKET,
-					"Unknown pcap equivilent linktype");
+					"Unknown pcap equivalent linktype");
 			return -1;
 		}
 		pcap=(pcap_t *)pcap_open_dead(
 				(int)libtrace_to_pcap_dlt(linktype),
 				1500U);
 		/* build filter */
+		assert(pcap);
 		if (pcap_compile( pcap, &filter->filter, filter->filterstring, 
 					1, 0)) {
-			pcap_close(pcap);
 			trace_set_err(packet->trace,TRACE_ERR_BAD_PACKET,
-					"Packet has no payload");
+					"Unable to compile the filter \"%s\": %s", 
+					filter->filterstring,
+					pcap_geterr(pcap));
+			pcap_close(pcap);
 			return -1;
 		}
 		pcap_close(pcap);
