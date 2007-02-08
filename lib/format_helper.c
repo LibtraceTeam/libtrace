@@ -248,7 +248,6 @@ libtrace_io_t *trace_open_file_out(libtrace_out_t *trace,int level, int fileflag
 	}
 	ret=libtrace_io_fdopen(fd,filemode);
 	if (!ret) {
-		printf("%s\n",filemode);
 		trace_set_err_out(trace,
 				TRACE_ERR_INIT_FAILED,"gz out of memory");
 	}
