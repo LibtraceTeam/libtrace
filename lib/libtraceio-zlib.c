@@ -38,6 +38,10 @@ libtrace_io_t *libtrace_io_fdopen(int fd, const char *mode)
 	if (io == NULL)
 		return NULL;
 	io->file = gzdopen(fd,mode);
+	if (!io->file) {
+		free(io);
+		return NULL;
+	}
 	return io;
 }
 
