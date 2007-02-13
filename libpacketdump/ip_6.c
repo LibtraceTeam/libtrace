@@ -38,7 +38,7 @@ int get_next_option(unsigned char **ptr,int *len,
 			*optlen = *(*ptr+1);
 			(*len)-=*optlen;
 			(*data)=(*ptr+2);
-			(*ptr)+=*optlen+2;
+			(*ptr)+=*optlen;	/* Not optlen + 2! */
 			if (*len<0)
 				return 0;
 			return 1;
