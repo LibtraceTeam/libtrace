@@ -4,14 +4,13 @@
 #include <stdio.h>
 #include "libtrace.h"
 #include "tracereport.h"
-#include "report.h"
 
 static uint64_t dir_bytes[8];
 static uint64_t dir_packets[8];
 
 void dir_per_packet(struct libtrace_packet_t *packet)
 {
-	if (trace_get_direction(packet)==~0U)
+	if (trace_get_direction(packet)==-1)
 		return;
 	dir_bytes[trace_get_direction(packet)]+=trace_get_wire_length(packet);
 	++dir_packets[trace_get_direction(packet)];

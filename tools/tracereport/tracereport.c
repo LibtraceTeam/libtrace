@@ -1,9 +1,10 @@
 /*
  * This file is part of libtrace
  *
- * Copyright (c) 2007 The University of Waikato, Hamilton, New Zealand.
+ * Copyright (c) 2004 The University of Waikato, Hamilton, New Zealand.
  * Authors: Daniel Lawson 
  *          Perry Lorier 
+ *			Josef Vodanovich
  *          
  * All rights reserved.
  *
@@ -49,7 +50,7 @@
 #include <sys/socket.h>
 #include <getopt.h>
 #include <inttypes.h>
-#include "lt_inttypes.h"
+//#include "lt_inttypes.h"
 
 #include "libtrace.h"
 #include "tracereport.h"
@@ -58,13 +59,13 @@
 struct libtrace_t *trace;
 
 /* Process a trace, counting packets that match filter(s) */
-static void run_trace(char *uri, libtrace_filter_t *filter, int count) 
+void run_trace(char *uri, libtrace_filter_t *filter, int count) 
 {
 	struct libtrace_packet_t *packet = trace_create_packet();
 
 	fprintf(stderr,"%s:\n",uri);
-
-        trace = trace_create(uri);
+	trace = trace_create(uri);
+	
 	if (trace_is_err(trace)) {
 		trace_perror(trace,"trace_create");
 		return;
@@ -79,32 +80,33 @@ static void run_trace(char *uri, libtrace_filter_t *filter, int count)
 		return;
 	}
 
-        for (;;) {
+	for (;;) {
 		int psize;
 		if (count--<1)
 			break;
-                if ((psize = trace_read_packet(trace, packet)) <1) {
-                        break;
-                }
-
+		if ((psize = trace_read_packet(trace, packet)) <1) {
+			break;
+		}
 		error_per_packet(packet);
 		port_per_packet(packet);
 		protocol_per_packet(packet);
 		tos_per_packet(packet);
 		ttl_per_packet(packet);
 		flow_per_packet(packet);
+		tcpopt_per_packet(packet);
+		nlp_per_packet(packet);
 		dir_per_packet(packet);
-
-        }
-
-        trace_destroy(trace);
+		//ecn_per_packet(packet);
+		//tcpseg_per_packet(packet);
+	}
+	trace_destroy(trace);
 }
 
-static void usage(char *argv0)
+void usage(char *argv0)
 {
 	fprintf(stderr,"Usage:\n"
 	"%s flags traceuri [traceuri...]\n"
-	"-f --filter		Apply BPF filter. Can be specified multiple times\n"
+	"-f --filter=bpf	Apply BPF filter. Can be specified multiple times\n"
 	"-H --libtrace-help	Print libtrace runtime documentation\n"
 	,argv0);
 	exit(1);
@@ -112,42 +114,14 @@ static void usage(char *argv0)
 
 int main(int argc, char *argv[]) {
 
-	libtrace_filter_t *filter = NULL;
+	int i;
 
-	if (argc<2)
-		usage(argv[0]);
+	/*char *filterstring="host 130.197.127.210"; */
 
-	while(1) {
-		int option_index;
-		struct option long_options[] = {
-				{ "filter",		1, 0, 'f' },
-			      	{ "libtrace-help",	0, 0, 'H' },
-				{NULL,			0, 0, 0   },
-			};
-		int c = getopt_long(argc, argv, "f:H",
-				long_options, &option_index);
-		if (c == -1)
-			break;
-		switch(c) {
-			case 'f':
-				if (filter != NULL) {
-					fprintf(stderr,"You can only have one filter\n");
-					usage(argv[0]);
-				}
-				filter=trace_create_filter(optarg);
-				break;
-			case 'H':
-				trace_help();
-				exit(1);
-				break;
-			default:
-				printf("Unknown option: %c\n", c);
-				usage(argv[0]);
-		}
-	}
+	libtrace_filter_t *filter = NULL;/*trace_bpf_setfilter(filterstring); */
 
-	while(optind < argc) {
-		run_trace(argv[optind++],filter,(1<<30));
+	for(i=1;i<argc;++i) {
+		run_trace(argv[i],filter,(1<<30));
 	}
 
 	error_report();
@@ -156,7 +130,10 @@ int main(int argc, char *argv[]) {
 	protocol_report();
 	port_report();
 	ttl_report();
+	tcpopt_report();
+	nlp_report();
 	dir_report();
-
-        return 0;
+	//ecn_report();
+	//tcpseg_report();
+    return 0;
 }

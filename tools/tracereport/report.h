@@ -8,6 +8,10 @@ void port_per_packet(struct libtrace_packet_t *packet);
 void protocol_per_packet(struct libtrace_packet_t *packet);
 void tos_per_packet(struct libtrace_packet_t *packet);
 void ttl_per_packet(struct libtrace_packet_t *packet);
+void tcpopt_per_packet(struct libtrace_packet_t *packet);
+void nlp_per_packet(struct libtrace_packet_t *packet);
+void ecn_per_packet(struct libtrace_packet_t *packet);
+void tcpseg_per_packet(struct libtrace_packet_t *packet);
 
 void dir_report(void);
 void error_report(void);
@@ -16,5 +20,9 @@ void port_report(void);
 void protocol_report(void);
 void tos_report(void);
 void ttl_report(void);
+void tcpopt_report(void);
+void nlp_report(void);
+void ecn_report(void);
+void tcpseg_report(void);
 
 #endif

@@ -5,10 +5,10 @@
 #include "libtrace.h"
 #include "tracereport.h"
 
-static stat_t ttl_stat[4][256] = {{{0,0}}} ;
+static stat_t ecn_stat[4][4] = {{{0,0}}} ;
 static bool suppress[4] = {true,true,true,true};
 
-void ttl_per_packet(struct libtrace_packet_t *packet)
+void ecn_per_packet(struct libtrace_packet_t *packet)
 {
 	struct libtrace_ip *ip = trace_get_ip(packet);
 	if (!ip)
@@ -16,12 +16,15 @@ void ttl_per_packet(struct libtrace_packet_t *packet)
 	int dir = trace_get_direction(packet);
 	if(dir < 0 || dir > 1)
 		dir = 2;
-	ttl_stat[dir][ip->ip_ttl].count++;
-	ttl_stat[dir][ip->ip_ttl].bytes+=trace_get_wire_length(packet);
+	
+	int ecn = ip->ip_tos;
+	ecn &= 3;
+	ecn_stat[dir][ecn].count++;
+	ecn_stat[dir][ecn].bytes+=trace_get_wire_length(packet);
 	suppress[dir] = false;
 }
 
-void ttl_suppress()
+void ecn_suppress()
 {
 	int i;
 	printf("%-20s","Direction:");
@@ -44,7 +47,7 @@ void ttl_suppress()
 		}
 	}
 	printf("\n");
-	printf("%-20s","TTL");
+	printf("%-20s","ECN");
 	for(i=0;i<4;i++){
 		if(!suppress[i]){
 			printf("\t%12s\t%12s", "bytes","packets");
@@ -53,34 +56,33 @@ void ttl_suppress()
 	printf("\n");
 }
 
-void ttl_report(void)
+void ecn_report(void)
 {
 	int i,j;
-	printf("# TTL breakdown:\n");
-	ttl_suppress();
-	for(i=0;i<256;++i) {
-		if (ttl_stat[0][i].count==0 && 
-			ttl_stat[1][i].count==0 && ttl_stat[2][i].count==0)
+	printf("# ECN breakdown:\n");
+	ecn_suppress();
+	for(i=0;i<4;++i) {
+		if (ecn_stat[0][i].count==0 && 
+			ecn_stat[1][i].count==0 && ecn_stat[2][i].count==0)
 			continue;
 		printf("%20i:",i);
 		for(j=0;j<4;j++){
-			if (ttl_stat[j][i].count==0){
+			if (ecn_stat[j][i].count==0){
 				if(!suppress[j])
 					printf("\t%24s"," ");
 				continue;
 			}
 			printf("\t%12" PRIu64 "\t%12" PRIu64,
-				ttl_stat[j][i].bytes,
-				ttl_stat[j][i].count);
+				ecn_stat[j][i].bytes,
+				ecn_stat[j][i].count);
 		}
 		printf("\n");
 	}
 	
-	int total;
+	int total = 0;
 	for(i=0;i<4;i++){
-		total = 0;
-		for(j=0;j<256;j++)
-			total += ttl_stat[i][j].count;
-		//printf("%s: %i\n", "Total", total);
+		for(j=1;j<4;j++)
+			total += ecn_stat[i][j].count;
 	}
+	printf("%s: %i\n", "Total ECN", total);
 }
