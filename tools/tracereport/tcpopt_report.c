@@ -6,36 +6,37 @@
 #include "tracereport.h"
 
 static stat_t tcpopt_stat[4][256] = {{{0,0}}};
+/* Suppressing things seems a little pointless to me */
 static bool suppress[4] = {true,true,true,true};
 
 void tcpopt_per_packet(struct libtrace_packet_t *packet)
 {
-	unsigned char *p=trace_get_link(packet);
 	struct libtrace_tcp *tcp = trace_get_tcp(packet);
+	unsigned char *opt_ptr;
+	libtrace_direction_t dir = trace_get_direction(packet);
+	int tcp_payload, len;
+	unsigned char type, optlen, *data;
 	
 	if(!tcp)
 		return;
 	
-	int dir = trace_get_direction(packet);
-	if(dir < 0 || dir > 1)
-		dir = 2;
+	if (dir != TRACE_DIR_INCOMING && dir != TRACE_DIR_OUTGOING)
+		dir = TRACE_DIR_OTHER;
 	
-	int len = trace_get_capture_length(packet) - 54;
+	len = tcp->doff * 4 - sizeof(libtrace_tcp_t);
 	if(len == 0)
 		return;
 	
-	int tcp_bytes = trace_get_wire_length(packet) - trace_get_capture_length(packet);
-	int i = tcp->doff*4 - sizeof *tcp;
+	tcp_payload = trace_get_wire_length(packet) - trace_get_capture_length(packet);
 	
-	if(len > i)
-		len = i;
+	opt_ptr = (unsigned char *)tcp + sizeof (libtrace_tcp_t);
 	
-	unsigned char type,optlen,*data;
-	p += 54; //hax 14 mac header, 20 ip header, 20tcp header
-	
-	while(trace_get_next_option(&p,&len,&type,&optlen,&data)){
+	while(trace_get_next_option(&opt_ptr,&len,&type,&optlen,&data)){
+		/* I don't think we need to count NO-OPs */
+		if (type == 1)
+			continue;
 		tcpopt_stat[dir][type].count++;
-		tcpopt_stat[dir][type].bytes+= tcp_bytes;
+		tcpopt_stat[dir][type].bytes+= tcp_payload;
 	}
 	
 	suppress[dir] = false;
