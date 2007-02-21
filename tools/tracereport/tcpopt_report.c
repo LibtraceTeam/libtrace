@@ -5,9 +5,7 @@
 #include "libtrace.h"
 #include "tracereport.h"
 
-static stat_t tcpopt_stat[4][256] = {{{0,0}}};
-/* Suppressing things seems a little pointless to me */
-static bool suppress[4] = {true,true,true,true};
+static stat_t tcpopt_stat[3][256] = {{{0,0}}};
 
 void tcpopt_per_packet(struct libtrace_packet_t *packet)
 {
@@ -39,45 +37,26 @@ void tcpopt_per_packet(struct libtrace_packet_t *packet)
 		tcpopt_stat[dir][type].bytes+= tcp_payload;
 	}
 	
-	suppress[dir] = false;
 }
 
-void tcpopt_suppress()
-{
-	int i;
-	printf("%-20s","Direction:");
-	for(i=0;i<4;i++){
-		if(!suppress[i]){
-			switch(i){
-				case 0:
-					printf("\t%24s", "Outbound   ");
-					break;
-				case 1:
-					printf("\t%24s", "Inbound   ");
-					break;
-				case 2:
-					printf("\t%24s", "Undefined   ");
-					break;
-				default:
-					break;
-			}
-		}
-	}
-	printf("\n");
-	printf("%-20s","TCP OPTIONS");
-	for(i=0;i<4;i++){
-		if(!suppress[i]){
-			printf("\t%12s\t%12s", "bytes","packets");
-		}
-	}
-	printf("\n");
-}
 
 void tcpopt_report(void)
 {
+	
 	int i,j;
-	printf("# TCP OPTION breakdown:\n");
-	tcpopt_suppress();
+	
+	FILE *out = fopen("tcpopt.out", "w");
+	if (!out) {
+		perror("fopen");
+		return;
+	}
+
+	/* Put some headings up for human-readability */
+	fprintf(out, "%-12s\t%8s\t%12s\t%12s\n",
+			"OPTION",
+			"DIRECTION",
+			"BYTES",
+			"PACKETS");
 	
 	for(i=0;i<256;++i) {
 		if (tcpopt_stat[0][i].count==0 && 
@@ -86,39 +65,50 @@ void tcpopt_report(void)
 		
 		switch(i) {
 			case 1:
-				printf("%20s", "NOP: ");
+				fprintf(out, "%12s", "NOP |");
 				break;
 			case 2:
-				printf("%20s", "MSS: ");
+				fprintf(out, "%12s", "MSS |");
 				break;
 			case 3:
-				printf("%20s", "Winscale: ");
+				fprintf(out, "%12s", "Winscale |");
 				break;
 			case 4:
-				printf("%20s", "SACK Permitted: ");
+				fprintf(out, "%12s", "SACK Perm |");
 				break;
 			case 5:
-				printf("%20s", "SACK Information: ");
+				fprintf(out, "%12s", "SACK Info |");
 				break;
 			case 8:
-				printf("%20s", "Timestamp: ");
+				fprintf(out, "%12s", "Timestamp |");
 				break;
 			case 19:
-				printf("%20s", "MD5: ");
+				fprintf(out, "%12s", "MD5 |");
 			default:
-				printf("%20i:",i);
+				fprintf(out, "%12i |",i);
 		}
 		
-		for(j=0;j<4;j++){
-			if (tcpopt_stat[j][i].count==0){
-				if(!suppress[j])
-					printf("\t%24s"," ");
-				continue;
+		for(j=0;j<3;j++){
+			if (j != 0) {
+				fprintf(out, "%12s", " |");
 			}
-			printf("\t%12" PRIu64 "\t%12" PRIu64,
+		
+			switch (j) {
+				case 0:
+					fprintf(out, "\t%8s", "Outbound");
+					break;
+				case 1:
+					fprintf(out, "\t%8s", "Inbound");
+					break;
+				case 2:
+					fprintf(out, "\t%8s", "Unknown");
+					break;
+			}
+			
+			fprintf(out, "\t%12llu %12llu\n",
 				tcpopt_stat[j][i].bytes,
 				tcpopt_stat[j][i].count);
 		}
-		printf("\n");
 	}
+	fclose(out);
 }
