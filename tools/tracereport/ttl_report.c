@@ -25,7 +25,6 @@ void ttl_suppress()
 {
 	int i;
 	printf("%-20s","Direction:");
-	//printf("%20s", " ");
 	for(i=0;i<4;i++){
 		if(!suppress[i]){
 			switch(i){
@@ -74,13 +73,5 @@ void ttl_report(void)
 				ttl_stat[j][i].count);
 		}
 		printf("\n");
-	}
-	
-	int total;
-	for(i=0;i<4;i++){
-		total = 0;
-		for(j=0;j<256;j++)
-			total += ttl_stat[i][j].count;
-		//printf("%s: %i\n", "Total", total);
 	}
 }

@@ -27,7 +27,6 @@ void protocol_suppress()
 {
 	int i;
 	printf("%-20s","Direction:");
-	//printf("%20s", " ");
 	for(i=0;i<4;i++){
 		if(!suppress[i]){
 			switch(i){
@@ -96,12 +95,4 @@ void protocol_report(void)
 		printf("\n");
 	}
 	setprotoent(0);
-	
-	int total;
-	for(i=0;i<4;i++){
-		total = 0;
-		for(j=0;j<256;j++)
-			total += prot_stat[i][j].count;
-		//printf("%s: %i\n", "Total", total);
-	}
 }

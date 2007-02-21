@@ -38,7 +38,6 @@ void port_suppress()
 {
 	int i;
 	printf("%-20s","Direction:");
-	//printf("%20s", " ");
 	for(i=0;i<4;i++){
 		if(!suppress[i]){
 			switch(i){
@@ -132,13 +131,4 @@ void port_report(void)
 	}
 	endprotoent();
 	endservent();
-	
-	int total, j,k;
-	for(i=0;i<4;i++){
-		total = 0;
-		for(j=0;j<256;j++)
-			for(k=0;k<65536;k++)
-				total += ports[i][j][k].count;
-		//printf("%s: %i\n", "Total", total);
-	}
 }

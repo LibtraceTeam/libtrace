@@ -19,9 +19,7 @@ void tcpseg_per_packet(struct libtrace_packet_t *packet)
 	
 	int a = trace_get_wire_length(packet);
 	a -= 34;
-	//int b = tcp->doff*4;
-	//if(b == 20)
-	//	printf("Wire: %i\n", a);
+
 	tcpseg_stat[dir][a].count++;
 	tcpseg_stat[dir][a].bytes+=trace_get_wire_length(packet);
 	suppress[dir] = false;
@@ -31,7 +29,6 @@ void tcpseg_suppress()
 {
 	int i;
 	printf("%-20s","Direction:");
-	//printf("%20s", " ");
 	for(i=0;i<4;i++){
 		if(!suppress[i]){
 			switch(i){

@@ -1,10 +1,10 @@
 /*
  * This file is part of libtrace
  *
- * Copyright (c) 2004 The University of Waikato, Hamilton, New Zealand.
+ * Copyright (c) 2007 The University of Waikato, Hamilton, New Zealand.
  * Authors: Daniel Lawson 
  *          Perry Lorier 
- *			Josef Vodanovich
+ *          Josef Vodanovich
  *          
  * All rights reserved.
  *
@@ -135,5 +135,5 @@ int main(int argc, char *argv[]) {
 	dir_report();
 	//ecn_report();
 	//tcpseg_report();
-    return 0;
+	return 0;
 }

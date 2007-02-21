@@ -11,7 +11,6 @@ static bool suppress[4] = {true,true,true,true};
 void tos_per_packet(struct libtrace_packet_t *packet)
 {
 	struct libtrace_ip *ip = trace_get_ip(packet);
-	
 	if (!ip)
 		return;
 	int dir = trace_get_direction(packet);
@@ -26,7 +25,6 @@ void tos_suppress()
 {
 	int i;
 	printf("%-20s","Direction:");
-	//printf("%20s", " ");
 	for(i=0;i<4;i++){
 		if(!suppress[i]){
 			switch(i){
@@ -75,13 +73,5 @@ void tos_report(void)
 				tos_stat[j][i].count);
 		}
 		printf("\n");
-	}
-	
-	int total;
-	for(i=0;i<4;i++){
-		total = 0;
-		for(j=0;j<256;j++)
-			total += tos_stat[i][j].count;
-		//printf("%s: %i\n", "Total", total);
 	}
 }
