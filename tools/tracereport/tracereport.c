@@ -39,15 +39,7 @@
 #include <string.h>
 #include <sys/time.h>
 #include <sys/types.h>
-#include <time.h>
 
-#include <netinet/in.h>
-#include <netinet/in_systm.h>
-#include <netinet/tcp.h>
-#include <netinet/ip.h>
-#include <netinet/ip_icmp.h>
-#include <arpa/inet.h>
-#include <sys/socket.h>
 #include <getopt.h>
 #include <inttypes.h>
 //#include "lt_inttypes.h"
@@ -57,13 +49,13 @@
 #include "report.h"
 
 struct libtrace_t *trace;
+uint32_t reports_required = 0;
 
 /* Process a trace, counting packets that match filter(s) */
 void run_trace(char *uri, libtrace_filter_t *filter, int count) 
 {
 	struct libtrace_packet_t *packet = trace_create_packet();
 
-	fprintf(stderr,"%s:\n",uri);
 	trace = trace_create(uri);
 	
 	if (trace_is_err(trace)) {
@@ -82,22 +74,39 @@ void run_trace(char *uri, libtrace_filter_t *filter, int count)
 
 	for (;;) {
 		int psize;
+		
+		/* Not convinced we need this count business */
+		/*
 		if (count--<1)
 			break;
+		*/
 		if ((psize = trace_read_packet(trace, packet)) <1) {
 			break;
 		}
-		error_per_packet(packet);
-		port_per_packet(packet);
-		protocol_per_packet(packet);
-		tos_per_packet(packet);
-		ttl_per_packet(packet);
-		flow_per_packet(packet);
-		tcpopt_per_packet(packet);
-		nlp_per_packet(packet);
-		dir_per_packet(packet);
-		//ecn_per_packet(packet);
-		//tcpseg_per_packet(packet);
+		if (reports_required & REPORT_TYPE_ERROR)
+			error_per_packet(packet);
+		if (reports_required & REPORT_TYPE_PORT)
+			port_per_packet(packet);
+		if (reports_required & REPORT_TYPE_PROTO)
+			protocol_per_packet(packet);
+		if (reports_required & REPORT_TYPE_TOS)
+			tos_per_packet(packet);
+		if (reports_required & REPORT_TYPE_TTL)
+			ttl_per_packet(packet);
+		if (reports_required & REPORT_TYPE_FLOW)
+			flow_per_packet(packet);
+		if (reports_required & REPORT_TYPE_TCPOPT)
+			tcpopt_per_packet(packet);
+		if (reports_required & REPORT_TYPE_NLP)
+			nlp_per_packet(packet);
+		if (reports_required & REPORT_TYPE_DIR)
+			dir_per_packet(packet);
+		/*
+		if (reports_required & REPORT_TYPE_ECN)
+			ecn_per_packet(packet);
+		if (reports_required & REPORT_TYPE_TCPSEQ)
+			tcpseg_per_packet(packet);
+		*/
 	}
 	trace_destroy(trace);
 }
@@ -106,8 +115,18 @@ void usage(char *argv0)
 {
 	fprintf(stderr,"Usage:\n"
 	"%s flags traceuri [traceuri...]\n"
-	"-f --filter=bpf	Apply BPF filter. Can be specified multiple times\n"
-	"-H --libtrace-help	Print libtrace runtime documentation\n"
+	"-f --filter=bpf	\tApply BPF filter. Can be specified multiple times\n"
+	"-e --error		Report packet errors (e.g. checksum failures, rxerrors)\n"
+	"-F --flow		Report flows\n"
+	"-P --protocol		Report transport protocols\n"
+	"-p --port		Report port numbers\n"
+	"-T --tos		Report IP TOS\n"
+	"-O --tcpoptions	\tReport TCP Options\n"
+	"-n --nlp		Report network layer protocols\n"
+	"-d --direction		Report direction\n"
+	"-C --ecn		Report TCP ECN information\n"
+	"-s --tcpsegment	\tReport TCP segment size\n"
+	"-H --help		Print libtrace runtime documentation\n"
 	,argv0);
 	exit(1);
 }
@@ -115,25 +134,115 @@ void usage(char *argv0)
 int main(int argc, char *argv[]) {
 
 	int i;
-
-	/*char *filterstring="host 130.197.127.210"; */
+	int opt;
+	char *filterstring=NULL;
 
 	libtrace_filter_t *filter = NULL;/*trace_bpf_setfilter(filterstring); */
 
-	for(i=1;i<argc;++i) {
+	while (1) {
+		int option_index;
+		struct option long_options[] = {
+			{ "filter",		1, 0, 'f' },
+			{ "help",		0, 0, 'H' },
+			{ "error",		0, 0, 'e' },
+			{ "flow", 		0, 0, 'F' },
+			{ "protocol", 		0, 0, 'P' },
+			{ "port",		0, 0, 'p' },
+			{ "tos",		0, 0, 'T' },
+			{ "ttl", 		0, 0, 't' },
+			{ "tcpoptions",		0, 0, 'O' },
+			{ "nlp",		0, 0, 'n' },
+			{ "direction", 		0, 0, 'd' },
+			{ "ecn",		0, 0, 'C' },
+			{ "tcpsegment", 	0, 0, 's' },
+			{ NULL, 		0, 0, 0 }
+		};
+		opt = getopt_long(argc, argv, "f:HeFPpTtOndCs", long_options,
+				&option_index);
+		if (opt == -1)
+			break;
+		
+		switch (opt) {
+			case 'C':
+				reports_required |= REPORT_TYPE_ECN;
+				break;
+			case 'd':
+				reports_required |= REPORT_TYPE_DIR;
+				break;
+			case 'e':
+				reports_required |= REPORT_TYPE_ERROR;
+				break;
+			case 'F':
+				reports_required |= REPORT_TYPE_FLOW;
+				break;
+			case 'f':
+				filterstring = optarg;
+				break;
+			case 'H':
+				usage(argv[0]);
+				break;
+			case 'n':
+				reports_required |= REPORT_TYPE_NLP;
+				break;
+			case 'O':
+				reports_required |= REPORT_TYPE_TCPOPT;
+				break;
+			case 'P':
+				reports_required |= REPORT_TYPE_PROTO;
+				break;
+			case 'p':
+				reports_required |= REPORT_TYPE_PORT;
+				break;
+			case 's':
+				reports_required |= REPORT_TYPE_TCPSEG;
+				break;
+			case 'T':
+				reports_required |= REPORT_TYPE_TOS;
+				break;
+			case 't':
+				reports_required |= REPORT_TYPE_TTL;
+				break;
+			default:
+				usage(argv[0]);
+		}
+	}
+
+	if (filterstring) {
+		filter = trace_create_filter(filterstring);
+	}
+		
+	
+	for(i=optind;i<argc;++i) {
+		/* This is handy for knowing how far through the traceset
+		 * we are - printing to stderr because we use stdout for
+		 * genuine output at the moment */
+		fprintf(stderr, "Reading from trace: %s\n", argv[i]);
 		run_trace(argv[i],filter,(1<<30));
 	}
 
-	error_report();
-	flow_report();
-	tos_report();
-	protocol_report();
-	port_report();
-	ttl_report();
-	tcpopt_report();
-	nlp_report();
-	dir_report();
-	//ecn_report();
-	//tcpseg_report();
+	if (reports_required & REPORT_TYPE_ERROR)
+		error_report();
+	if (reports_required & REPORT_TYPE_FLOW)
+		flow_report();
+	if (reports_required & REPORT_TYPE_TOS)
+		tos_report();
+	if (reports_required & REPORT_TYPE_PROTO)
+		protocol_report();
+	if (reports_required & REPORT_TYPE_PORT)
+		port_report();
+	if (reports_required & REPORT_TYPE_TTL)
+		ttl_report();	
+	if (reports_required & REPORT_TYPE_TCPOPT)
+		tcpopt_report();
+	if (reports_required & REPORT_TYPE_NLP)
+		nlp_report();
+	if (reports_required & REPORT_TYPE_DIR)
+		dir_report();
+	/*
+	if (reports_required & REPORT_TYPE_ECN)
+		ecn_report();
+	if (reports_required & REPORT_TYPE_TCPSEG)
+		tcpseg_report();
+	*/
 	return 0;
 }
