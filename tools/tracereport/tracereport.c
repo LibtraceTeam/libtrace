@@ -103,10 +103,8 @@ void run_trace(char *uri, libtrace_filter_t *filter, int count)
 			dir_per_packet(packet);
 		if (reports_required & REPORT_TYPE_ECN)
 			ecn_per_packet(packet);
-		/*
-		if (reports_required & REPORT_TYPE_TCPSEQ)
+		if (reports_required & REPORT_TYPE_TCPSEG)
 			tcpseg_per_packet(packet);
-		*/
 	}
 	trace_destroy(trace);
 }
@@ -241,9 +239,7 @@ int main(int argc, char *argv[]) {
 		dir_report();
 	if (reports_required & REPORT_TYPE_ECN)
 		ecn_report();
-	/*
 	if (reports_required & REPORT_TYPE_TCPSEG)
 		tcpseg_report();
-	*/
 	return 0;
 }

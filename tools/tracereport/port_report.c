@@ -8,20 +8,22 @@
 #include "tracereport.h"
 #include "contain.h"
 
-stat_t ports[4][256][65536]={{{{0,0}}}};
+stat_t ports[3][256][65536]={{{{0,0}}}};
 char protn[256]={0};
-static bool suppress[4] = {true,true,true,true};
+static bool suppress[3] = {true,true,true};
 
 void port_per_packet(struct libtrace_packet_t *packet)
 {
 	uint8_t proto;
 	int port;
-	int dir = trace_get_direction(packet);
-	if(dir < 0 || dir > 1)
-		dir = 2;
+	libtrace_direction_t dir = trace_get_direction(packet);
+
 	if(trace_get_transport(packet,&proto,NULL)==NULL) 
 		return;
 
+	if (dir != TRACE_DIR_INCOMING && dir != TRACE_DIR_OUTGOING)
+		dir = TRACE_DIR_OTHER;
+	
 	port = trace_get_server_port(proto,
 			trace_get_source_port(packet),
 			trace_get_destination_port(packet))==USE_SOURCE
@@ -38,7 +40,7 @@ void port_suppress()
 {
 	int i;
 	printf("%-20s","Direction:");
-	for(i=0;i<4;i++){
+	for(i=0;i<3;i++){
 		if(!suppress[i]){
 			switch(i){
 				case 0:
@@ -57,7 +59,7 @@ void port_suppress()
 	}
 	printf("\n");
 	printf("%-20s","Port");
-	for(i=0;i<4;i++){
+	for(i=0;i<3;i++){
 		if(!suppress[i]){
 			printf("\t%12s\t%12s", "bytes","packets");
 		}
@@ -72,7 +74,7 @@ void port_port(int i,char *prot, int j)
 	
 	if(ent){
 		printf("%20s:",ent->s_name);
-		for(k=0;k<4;k++){
+		for(k=0;k<3;k++){
 			if (ports[k][i][j].count==0){
 				if(!suppress[k])
 					printf("\t%24s"," ");
@@ -86,7 +88,7 @@ void port_port(int i,char *prot, int j)
 	}
 	else{
 		printf("%20i:",j);
-		for(k=0;k<4;k++){
+		for(k=0;k<3;k++){
 			if (ports[k][i][j].count==0){
 				if(!suppress[k])
 					printf("\t%24s"," ");
@@ -108,7 +110,7 @@ void port_protocol(int i)
 	printf("Protocol: %i %s%s%s\n",i,
 			ent?"(":"",ent?ent->p_name:"",ent?")":"");
 	for(j=0;j<65536;++j) {
-		for(k=0;k<4;k++){
+		for(k=0;k<3;k++){
 			if (ports[k][i][j].count) {
 				port_port(i,ent?ent->p_name:"",j);
 				break;

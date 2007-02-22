@@ -30,7 +30,7 @@ void nlp_report(void){
 	}
 	
 	/* Put some headings up for human-readability */
-	fprintf(out, "%-12s\t%8s\t%12s\t%12s\n",
+	fprintf(out, "%-12s\t%10s\t%16s %16s\n",
 			"NETWORK LAYER",
 			"DIRECTION",
 			"BYTES",
@@ -68,17 +68,17 @@ void nlp_report(void){
 
 			switch (j) {
 				case 0:
-					fprintf(out, "\t%8s", "Outbound");
+					fprintf(out, "\t%10s", "Outbound");
 					break;
 				case 1:
-					fprintf(out, "\t%8s", "Inbound");
+					fprintf(out, "\t%10s", "Inbound");
 					break;
 				case 2:
-					fprintf(out, "\t%8s", "Unknown");
+					fprintf(out, "\t%10s", "Unknown");
 					break;
 			}
 			
-			fprintf(out, "\t%12llu %12llu\n",
+			fprintf(out, "\t%16llu %16llu\n",
 				nlp_stat[j][i].bytes,
 				nlp_stat[j][i].count);
 		}
