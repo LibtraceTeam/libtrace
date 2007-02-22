@@ -52,7 +52,7 @@ void tcpopt_report(void)
 	}
 
 	/* Put some headings up for human-readability */
-	fprintf(out, "%-12s\t%8s\t%12s\t%12s\n",
+	fprintf(out, "%-12s\t%10s\t%16s %16s\n",
 			"OPTION",
 			"DIRECTION",
 			"BYTES",
@@ -82,10 +82,14 @@ void tcpopt_report(void)
 			case 8:
 				fprintf(out, "%12s", "Timestamp |");
 				break;
+			case 12:
+				fprintf(out, "%12s", "CC.New |");
+				break;
 			case 19:
 				fprintf(out, "%12s", "MD5 |");
+				break;
 			default:
-				fprintf(out, "%12i |",i);
+				fprintf(out, "%10i |",i);
 		}
 		
 		for(j=0;j<3;j++){
@@ -95,17 +99,17 @@ void tcpopt_report(void)
 		
 			switch (j) {
 				case 0:
-					fprintf(out, "\t%8s", "Outbound");
+					fprintf(out, "\t%10s", "Outbound");
 					break;
 				case 1:
-					fprintf(out, "\t%8s", "Inbound");
+					fprintf(out, "\t%10s", "Inbound");
 					break;
 				case 2:
-					fprintf(out, "\t%8s", "Unknown");
+					fprintf(out, "\t%10s", "Unknown");
 					break;
 			}
 			
-			fprintf(out, "\t%12llu %12llu\n",
+			fprintf(out, "\t%16llu %16llu\n",
 				tcpopt_stat[j][i].bytes,
 				tcpopt_stat[j][i].count);
 		}

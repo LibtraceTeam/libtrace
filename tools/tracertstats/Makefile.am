@@ -1,5 +1,6 @@
 bin_PROGRAMS = tracertstats
 man_MANS = tracertstats.1
+EXTRA_DIST = $(man_MANS)
 
 if LIBGDC
 LIBGDC_MODULES=output_png.c
