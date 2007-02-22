@@ -101,9 +101,9 @@ void run_trace(char *uri, libtrace_filter_t *filter, int count)
 			nlp_per_packet(packet);
 		if (reports_required & REPORT_TYPE_DIR)
 			dir_per_packet(packet);
-		/*
 		if (reports_required & REPORT_TYPE_ECN)
 			ecn_per_packet(packet);
+		/*
 		if (reports_required & REPORT_TYPE_TCPSEQ)
 			tcpseg_per_packet(packet);
 		*/
@@ -121,6 +121,7 @@ void usage(char *argv0)
 	"-P --protocol		Report transport protocols\n"
 	"-p --port		Report port numbers\n"
 	"-T --tos		Report IP TOS\n"
+	"-t --ttl		Report IP TTL\n"
 	"-O --tcpoptions	\tReport TCP Options\n"
 	"-n --nlp		Report network layer protocols\n"
 	"-d --direction		Report direction\n"
@@ -238,9 +239,9 @@ int main(int argc, char *argv[]) {
 		nlp_report();
 	if (reports_required & REPORT_TYPE_DIR)
 		dir_report();
-	/*
 	if (reports_required & REPORT_TYPE_ECN)
 		ecn_report();
+	/*
 	if (reports_required & REPORT_TYPE_TCPSEG)
 		tcpseg_report();
 	*/
