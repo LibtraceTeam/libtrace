@@ -20,6 +20,7 @@ tracereport_SOURCES = \
 	tos_report.c\
 	ttl_report.c\
 	tcpopt_report.c\
+	synopt_report.c\
 	nlp_report.c\
 	ecn_report.c\
 	tcpsegment_report.c\

@@ -97,6 +97,8 @@ void run_trace(char *uri, libtrace_filter_t *filter, int count)
 			flow_per_packet(packet);
 		if (reports_required & REPORT_TYPE_TCPOPT)
 			tcpopt_per_packet(packet);
+		if (reports_required & REPORT_TYPE_SYNOPT)
+			synopt_per_packet(packet);
 		if (reports_required & REPORT_TYPE_NLP)
 			nlp_per_packet(packet);
 		if (reports_required & REPORT_TYPE_DIR)
@@ -121,6 +123,7 @@ void usage(char *argv0)
 	"-T --tos		Report IP TOS\n"
 	"-t --ttl		Report IP TTL\n"
 	"-O --tcpoptions	\tReport TCP Options\n"
+	"-o --synoptions	\tReport TCP Options seen on SYNs\n"
 	"-n --nlp		Report network layer protocols\n"
 	"-d --direction		Report direction\n"
 	"-C --ecn		Report TCP ECN information\n"
@@ -150,13 +153,14 @@ int main(int argc, char *argv[]) {
 			{ "tos",		0, 0, 'T' },
 			{ "ttl", 		0, 0, 't' },
 			{ "tcpoptions",		0, 0, 'O' },
+			{ "synoptions",		0, 0, 'o' },
 			{ "nlp",		0, 0, 'n' },
 			{ "direction", 		0, 0, 'd' },
 			{ "ecn",		0, 0, 'C' },
 			{ "tcpsegment", 	0, 0, 's' },
 			{ NULL, 		0, 0, 0 }
 		};
-		opt = getopt_long(argc, argv, "f:HeFPpTtOndCs", long_options,
+		opt = getopt_long(argc, argv, "f:HeFPpTtOondCs", long_options,
 				&option_index);
 		if (opt == -1)
 			break;
@@ -185,6 +189,9 @@ int main(int argc, char *argv[]) {
 				break;
 			case 'O':
 				reports_required |= REPORT_TYPE_TCPOPT;
+				break;
+			case 'o':
+				reports_required |= REPORT_TYPE_SYNOPT;
 				break;
 			case 'P':
 				reports_required |= REPORT_TYPE_PROTO;
@@ -233,6 +240,8 @@ int main(int argc, char *argv[]) {
 		ttl_report();	
 	if (reports_required & REPORT_TYPE_TCPOPT)
 		tcpopt_report();
+	if (reports_required & REPORT_TYPE_SYNOPT)
+		synopt_report();
 	if (reports_required & REPORT_TYPE_NLP)
 		nlp_report();
 	if (reports_required & REPORT_TYPE_DIR)
