@@ -12,6 +12,7 @@ struct tcp_opts {
 	bool winscale;
 	bool ts;
 	bool ttcp;
+	bool other;
 };
 
 struct opt_counter {
@@ -21,28 +22,30 @@ struct opt_counter {
 	uint64_t ms;
 	uint64_t mw;
 	uint64_t msw;
+	uint64_t mt;
 	uint64_t all_four;
 	uint64_t ts_and_another;
 	uint64_t ttcp;
+	uint64_t other;
 };
 
-struct opt_counter counts = {0,0,0,0,0,0,0,0,0};
+struct opt_counter counts = {0,0,0,0,0,0,0,0,0,0,0};
 uint64_t total_syns = 0;
 
 void classify_packet(struct tcp_opts opts) {
-	if (!opts.mss && !opts.sack && !opts.winscale && !opts.ts && !opts.ttcp)
+	if (!opts.mss && !opts.sack && !opts.winscale && !opts.ts && !opts.ttcp && !opts.other)
 	{
 		counts.no_options ++;
 		return;
 	}
 
-	if (opts.mss && !opts.sack && !opts.winscale && !opts.ts && !opts.ttcp)
+	if (opts.mss && !opts.sack && !opts.winscale && !opts.ts && !opts.ttcp && !opts.other)
 	{
 		counts.mss_only ++;
 		return;
 	}
 
-	if (!opts.mss && !opts.sack && !opts.winscale && opts.ts && !opts.ttcp)
+	if (!opts.mss && !opts.sack && !opts.winscale && opts.ts && !opts.ttcp && !opts.other)
 	{
 		counts.ts_only ++;
 		return;
@@ -57,6 +60,8 @@ void classify_packet(struct tcp_opts opts) {
 	if (opts.mss && opts.winscale && opts.sack && !opts.ts)
 		counts.msw ++;
 	
+	if (opts.mss && opts.ts && !opts.winscale && !opts.sack)
+		counts.mt ++;
 	if (opts.mss && opts.sack && opts.winscale && opts.ts) {
 		counts.all_four ++;
 	}
@@ -67,7 +72,8 @@ void classify_packet(struct tcp_opts opts) {
 	
 	if (opts.ttcp)
 		counts.ttcp ++;
-	
+	if (opts.other)
+		counts.other ++;	
 }
 
 void synopt_per_packet(struct libtrace_packet_t *packet)
@@ -77,7 +83,7 @@ void synopt_per_packet(struct libtrace_packet_t *packet)
 	libtrace_direction_t dir = trace_get_direction(packet);
 	int tcp_payload, len;
 	unsigned char type, optlen, *data;
-	struct tcp_opts opts_seen = {false, false, false, false, false};
+	struct tcp_opts opts_seen = {false, false, false, false, false, false};
 	
 	if(!tcp)
 		return;
@@ -108,6 +114,9 @@ void synopt_per_packet(struct libtrace_packet_t *packet)
 			case 3:
 				opts_seen.winscale = true;
 				break;
+			case 4:
+				opts_seen.sack = true;
+				break;
 			case 5:
 				opts_seen.sack = true;
 				break;
@@ -119,6 +128,8 @@ void synopt_per_packet(struct libtrace_packet_t *packet)
 			case 13:
 				opts_seen.ttcp = true;
 				break;
+			default:
+				opts_seen.other = true;
 		}
 	}
 	
@@ -155,14 +166,20 @@ void synopt_report(void)
 			"M, S and W",
 			(double)(counts.msw) / total_syns * 100.0);
 	fprintf(out, "%-20s\t%.2f%%\n",
+			"M, T",
+			(double)(counts.mt) / total_syns * 100.0);
+	fprintf(out, "%-20s\t%.2f%%\n",
 			"M, S, W and T",
 			(double)(counts.all_four) / total_syns * 100.0);
-	fprintf(out, "%-20s\t%.2f%%\n",
-			"T and (M or S or W)",
-			(double)(counts.ts_and_another) / total_syns * 100.0);
+	//fprintf(out, "%-20s\t%.2f%%\n",
+	//		"T and (M or S or W)",
+	//		(double)(counts.ts_and_another) / total_syns * 100.0);
 	fprintf(out, "%-20s\t%.2f%%\n",
 			"T/TCP",
 			(double)(counts.ttcp) / total_syns * 100.0);
+	fprintf(out, "%-20s\t%.2f%%\n",
+			"Other options",
+			(double)(counts.other) / total_syns * 100.0);
 	
 	
 	fclose(out);

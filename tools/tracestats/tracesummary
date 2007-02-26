@@ -4,9 +4,7 @@ if [ $# -lt 1 ]; then
 	echo usage: $0 inputuri...
 fi
 
-exec tracestats 
-		# XXX: Fix the formatting for these filters
-		--filter 'not ether proto \ip and not ether proto 0x86dd' \
+exec tracestats --filter 'not ether proto \ip and not ether proto 0x86dd' \
 		--filter 'ether proto 0x86dd' \
 		--filter 'ether proto \ip' \
 		--filter tcp \
