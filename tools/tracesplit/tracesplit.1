@@ -3,6 +3,13 @@
 tracesplit \- split traces
 .SH SYNOPSIS
 .B tracesplit
+[ \fB-f \fRbpf | \fB--filter=\fRbpf]
+[ \fB-c \fRcount | \fB--count=\fRcount]
+[ \fB-b \fRbytes | \fB--bytes=\fRbytes]
+[ \fB-i \fRseconds | \fB--seconds=\fRseconds]
+[ \fB-s \fRunixtime | \fB--starttime=\fRunixtime]
+[ \fB-e \fRunixtime | \fB--endtime=\fRunixtime]
+[ \fB-m \fRmaxfiles | \fB--maxfiles=\fRmaxfiles]
 inputuri outputuri ...
 .SH DESCRIPTION
 tracesplit splits one trace into multiple tracefiles
@@ -32,12 +39,20 @@ don't output any packets before unixtime
 \fB\-e\fR unixtime
 don't output any packets after unixtime
 
+.TP
+\fB\-m\fR maxfiles
+do not create more than "maxfiles" trace files
+
 .SH EXAMPLES
 create a 1MB erf trace of port 80 traffic.
 .nf
 tracemerge erf:/traces/bigtrace.gz \-f 'port 80' \-b $[ 1024 * 1024 ] 
 erf:/traces/port80.gz 
 .fi
+
+.SH LINKS
+More details about tracesplit (and libtrace) can be found at
+http://www.wand.net.nz/trac/libtrace/wiki/UserDocumentation
 
 .SH SEE ALSO
 libtrace(3), tracemerge(1), tracefilter(1), traceconvert(1), tracesplit_dir(1),

@@ -1,27 +1,146 @@
 .TH TRACEMERGE "1" "October 2006" "tracereport (libtrace)" "User Commands"
 .SH NAME
-tracereport \- Report summary statistics on a trace
+tracereport \- produce various reports on a trace (or traceset)
 .SH SYNOPSIS
 .B tracereport 
+[ \fB-f \fRbpf | \fB--filter=\fRbpf ]
+[ \fB-e \fR| \fB --error \fR]
+[ \fB-F \fR| \fB --flow \fR]
+[ \fB-P \fR| \fB --protocol \fR]
+[ \fB-p \fR| \fB --port \fR]
+[ \fB-T \fR| \fB --tos \fR]
+[ \fB-t \fR| \fB --ttl \fR]
+[ \fB-O \fR| \fB --tcpoptions \fR]
+[ \fB-o \fR| \fB --synoptions \fR]
+[ \fB-n \fR| \fB --nlp \fR]
+[ \fB-d \fR| \fB --direction \fR]
+[ \fB-C \fR| \fB --ecn \fR]
+[ \fB-s \fR| \fB --tcpsegment \fR]
 inputuri...
-.SH DESCRPTION
-tracereport lists various summary statistics about a trace.
+.P
+.B tracereport
+-H | --help
 
-The sections are:
-.IP \(bu 4 
-Errors
-.IP \(bu 4
-Flows
-.IP \(bu 4
-Type of Service
-.IP \(bu 4
-Protocol breakdown
-.IP \(bu 4
-Port breakdown
-.IP \(bu 4
-TTL breakdown
-.IP \(bu 4
-Direction
+.SH DESCRIPTION
+tracereport can produce a variety of reports on the properties of a trace.
+The user specifies the reports required using command-line options.
+.TP
+.PD 0
+.BI \-f " bpf-filter"
+.TP
+.PD 0
+.BI \-\^\-filter " bpf-filter"
+Only report on packets that match the provided bpf filter. See
+tcpdump(1) for the syntax of the bpf-filter expression.
+
+.TP
+.PD 0
+.BI \-e 
+.TP
+.PD 0
+.BI \-\^\-error
+Produce a report on packet errors (e.g checksum failures, rxerrors)
+
+.TP
+.PD 0
+.BI \-F 
+.TP
+.PD 0
+.BI \-\^\-flow
+Produces a report on the number of flows observed in the trace
+
+.TP
+.PD 0
+.BI \-P
+.TP
+.PD 0
+.BI \-\^\-protocol
+Produces a report on which transport layer protocols are observed in the trace
+
+.TP
+.PD 0
+.BI \-p 
+.TP
+.PD 0
+.BI \-\^\-port
+Produces a report on which port numbers are observed in the trace
+
+.TP
+.PD 0
+.BI \-T
+.TP
+.PD 0
+.BI \-\^\-tos
+Produces a report on the contents of the IP header's ToS field
+
+.TP
+.PD 0
+.BI \-t
+.TP
+.PD 0
+.BI \-\^\-ttl
+Produces a report on the TTL of packets in the trace
+
+.TP
+.PD 0
+.BI \-O
+.TP
+.PD 0
+.BI \-\^\-tcpoptions
+Produces a report on which TCP options are observed on all packets in the trace
+
+.TP
+.PD 0
+.BI \-o 
+.TP
+.PD 0
+.BI \-\^\-synoptions
+Produces a report on which combinations of TCP options are observed on SYN packets in the trace
+
+.TP
+.PD 0
+.BI \-n
+.TP
+.PD 0
+.BI \-\^\-nlp
+Produces a report on the network layer protocols observed in the trace
+
+.TP
+.PD 0
+.BI \-d
+.TP
+.PD 0
+.BI \-\^\-direction
+Produces a report on how much traffic is travelling in each direction
+
+.TP
+.PD 0
+.BI \-C
+.TP
+.PD 0
+.BI \-\^\-ecn
+Produces a report on the usage of the ECN field of the TCP header
+
+.TP
+.PD 0
+.BI \-s 
+.TP
+.PD 0
+.BI \-\^\-tcpsegment
+Produces a report on the sizes of TCP segments in the trace
+
+.TP
+.PD 0
+.BI \-H
+.TP
+.PD 0
+.BI \-\^\-help
+Provides usage instructions
+
+
+.SH LINKS
+More details about tracereport (and libtrace) can be found at
+http://www.wand.net.nz/trac/libtrace/wiki/UserDocumentation
 
 .SH SEE ALSO
 libtrace(3), tracemerge(1), tracesplit(1), tracesplit_dir(1), tracefilter(1),
