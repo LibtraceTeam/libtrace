@@ -526,7 +526,7 @@ typedef struct libtrace_atm_nni_cell
 /** Captured UNI cell.
  *
  * Endance don't capture the HEC, presumably to keep alignment.  This 
- * version of the \ref{libtrace_atm_cell} is used when dealing with dag
+ * version of the \ref libtrace_atm_cell  is used when dealing with dag
  * captures of uni cells.
  *
  */
@@ -542,7 +542,7 @@ typedef struct libtrace_atm_capture_cell
 /** Captured NNI cell.
  *
  * Endance don't capture the HEC, presumably to keep alignment.  This 
- * version of the \ref{libtrace_atm_nni_cell} is used when dealing with dag
+ * version of the \ref libtrace_atm_nni_cell  is used when dealing with dag
  * captures of nni cells.
  *
  */
