@@ -247,11 +247,6 @@ static int rt_start_input(libtrace_t *libtrace) {
 }
 
 static int rt_pause_input(libtrace_t *libtrace) {
-	close(RT_INFO->input_fd);
-	return 0;
-}
-
-static int rt_fin_input(libtrace_t *libtrace) {
         rt_header_t close_msg;
 
 	close_msg.type = TRACE_RT_CLOSE;
@@ -264,6 +259,12 @@ static int rt_fin_input(libtrace_t *libtrace) {
 		printf("Failed to send close message to server\n");
 	
 	}
+
+	close(RT_INFO->input_fd);
+	return 0;
+}
+
+static int rt_fin_input(libtrace_t *libtrace) {
 	if (RT_INFO->dummy_duck)
 		trace_destroy_dead(RT_INFO->dummy_duck);
 
@@ -278,8 +279,6 @@ static int rt_fin_input(libtrace_t *libtrace) {
 
 	if (RT_INFO->dummy_linux)
 		trace_destroy_dead(RT_INFO->dummy_linux);
-
-	close(RT_INFO->input_fd);
 	free(libtrace->format_data);
         return 0;
 }
