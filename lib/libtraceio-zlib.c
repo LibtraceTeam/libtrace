@@ -66,6 +66,10 @@ void libtrace_io_close(libtrace_io_t *io)
 
 ssize_t libtrace_io_write(libtrace_io_t *io, const void *buf, size_t len)
 {
+	/* gzip doesn't like writing 0 bytes - tends to break the
+	 * crc calculations */
+	if (len == 0)
+		return 0;
 	return (ssize_t)gzwrite(io->file,buf,(unsigned)len);
 }
 
