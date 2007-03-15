@@ -1,35 +1,35 @@
 Requirements:
  * >=automake-1.9
  * >=libpcap-0.8
- 
+ * flex and bison
+
+Strongly recommended:
+ * zlib-dev (for reading and writing compressed traces)
+
+Optional:
+ * DAG libraries (both 2.4 and 2.5 versions are supported)
+----------------------------------
+
 Installing libtrace:
 
 ./configure
 make
+make install
 
+The above series of commands will install libtrace into /usr/local/lib. If
+you wish to install to a non-standard location, append the 
+--prefix=DIR option to the ./configure command. ./configure also takes
+a number of other options - run ./configure --help to view a comprehensive
+list.
 
-You may need to add the line '/usr/local/lib' to your /etc/ld.so.conf and
-run 'ldconfig' as root.
+You may need to add the library location (e.g. /usr/local/lib) to your 
+/etc/ld.so.conf and run 'ldconfig' as root.
 
 ----------------------------------
 Using libtrace:
 
-There are a number of example programs which should cover the basics of what you need within libtrace-x.y.z/examples/.
-
-----------------------------------
-Large trace files:
-
-The versions of libpcap that ship with Debian Woody don't support
-large file offsets.
-
-
-To get around this, you have a number of options:
-
-* Don't use compressed files.
-* Use stdin as the target of the input uri, and use cat or zcat to pipe the 
-  file into stdin, eg:
-  zcat largetrace.pcap.gz | program -i pcap:-
-* Use process substitution in place of a filename, eg:
-  program -i pcap:<(zcat largetrace.pcap.gz)
+The best source of information on how to use libtrace and the tools that come
+with it is the libtrace wiki located at 
+http://www.wand.net.nz/trac/libtrace/wiki
 
 

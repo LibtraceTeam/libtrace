@@ -576,6 +576,10 @@ static int rt_read_packet_versatile(libtrace_t *libtrace,
 				break;
 			case TRACE_RT_LOSTCONN:
 				break;
+			case TRACE_RT_SERVERSTART:
+				break;
+			case TRACE_RT_CLIENTDROP:
+				break;
 			default:
 				printf("Bad rt type for client receipt: %d\n",
 					packet->type);
@@ -618,6 +622,10 @@ static int rt_get_capture_length(const libtrace_packet_t *packet) {
 		case TRACE_RT_KEYCHANGE:
 			return 0;
 		case TRACE_RT_LOSTCONN:
+			return 0;
+		case TRACE_RT_SERVERSTART:
+			return 0;
+		case TRACE_RT_CLIENTDROP:
 			return 0;
 		default:
 			printf("Unknown type: %d\n", packet->type);

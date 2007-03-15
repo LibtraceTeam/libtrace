@@ -130,6 +130,8 @@
 #define LIBTRACE_API_VERSION \
             ((@LIBTRACE_MAJOR@<<16)|(@LIBTRACE_MID@<<8)|(@LIBTRACE_MINOR@))
 
+#define LIBTRACE_SVN_REVISION 0
+
 #ifdef __cplusplus 
 extern "C" { 
 #endif
@@ -272,6 +274,8 @@ typedef enum {
 	TRACE_RT_DUCK_2_4	=13,/**< Dag 2.4 Duck */
 	TRACE_RT_DUCK_2_5 	=14,/**< Dag 2.5 Duck */
 	TRACE_RT_LOSTCONN 	=15,/**< Lost connection to server */
+	TRACE_RT_SERVERSTART	=16,/**< Server has been restarted */
+	TRACE_RT_CLIENTDROP	=17,/**< Reliable client was lost */
 
 	TRACE_RT_DATA_SIMPLE	= 1000, /**< Trace types that know their link
 					  * type

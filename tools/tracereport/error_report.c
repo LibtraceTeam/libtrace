@@ -17,6 +17,18 @@ void error_per_packet(struct libtrace_packet_t *packet)
 	if (!link) {
 		++rx_errors;
 	}
+	
+	/* This isn't quite as simple as it seems.
+	 *
+	 * If the packets were captured via wdcap's anonymisation module,
+	 * the checksum is set to 1 when it is correct and 0 if incorrect.
+	 *
+	 * Earlier versions of wdcap appear to set the checksum the other
+	 * way around.
+	 *
+	 * If a different capture method is used, there's a good chance the
+	 * checksum has not been altered
+	 */
 	if (ip) {
 		if (ntohs(ip->ip_sum)!=0)
 			++ip_errors;

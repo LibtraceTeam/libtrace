@@ -24,12 +24,17 @@ struct opt_counter {
 	uint64_t msw;
 	uint64_t mt;
 	uint64_t all_four;
+	uint64_t ts_and_sack;
+	uint64_t wt;
+	uint64_t tms;
+	uint64_t tws;
+	uint64_t tmw;
 	uint64_t ts_and_another;
 	uint64_t ttcp;
 	uint64_t other;
 };
 
-struct opt_counter counts = {0,0,0,0,0,0,0,0,0,0,0};
+struct opt_counter counts = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 uint64_t total_syns = 0;
 
 void classify_packet(struct tcp_opts opts) {
@@ -62,6 +67,20 @@ void classify_packet(struct tcp_opts opts) {
 	
 	if (opts.mss && opts.ts && !opts.winscale && !opts.sack)
 		counts.mt ++;
+	if (opts.ts && opts.sack && !opts.mss && !opts.winscale)
+		counts.ts_and_sack ++;
+
+	if (opts.ts && opts.winscale && !opts.mss && !opts.sack)
+		counts.wt ++;
+
+	if (opts.ts && opts.mss && opts.winscale && !opts.sack)
+		counts.tmw ++;
+	if (opts.ts && opts.mss && opts.sack && !opts.winscale)
+		counts.tms ++;
+	if (opts.ts && opts.sack && opts.winscale && !opts.mss)
+		counts.tws ++;
+	
+	
 	if (opts.mss && opts.sack && opts.winscale && opts.ts) {
 		counts.all_four ++;
 	}
@@ -168,6 +187,21 @@ void synopt_report(void)
 	fprintf(out, "%-20s\t%.2f%%\n",
 			"M, T",
 			(double)(counts.mt) / total_syns * 100.0);
+	fprintf(out, "%-20s\t%.2f%%\n",
+			"W, T",
+			(double)(counts.wt) / total_syns * 100.0);
+	fprintf(out, "%-20s\t%.2f%%\n",
+			"S, T",
+			(double)(counts.ts_and_sack) / total_syns * 100.0);
+	fprintf(out, "%-20s\t%.2f%%\n",
+			"S, M, T",
+			(double)(counts.tms) / total_syns * 100.0);
+	fprintf(out, "%-20s\t%.2f%%\n",
+			"W, M, T",
+			(double)(counts.tmw) / total_syns * 100.0);
+	fprintf(out, "%-20s\t%.2f%%\n",
+			"S, W, T",
+			(double)(counts.tws) / total_syns * 100.0);
 	fprintf(out, "%-20s\t%.2f%%\n",
 			"M, S, W and T",
 			(double)(counts.all_four) / total_syns * 100.0);
