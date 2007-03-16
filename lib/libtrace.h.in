@@ -131,7 +131,8 @@
             ((@LIBTRACE_MAJOR@<<16)|(@LIBTRACE_MID@<<8)|(@LIBTRACE_MINOR@))
 
 #define LIBTRACE_SVN_REVISION 0
-
+#define DAG_DRIVER_V "@DAG_VERSION_NUM@"
+    
 #ifdef __cplusplus 
 extern "C" { 
 #endif
