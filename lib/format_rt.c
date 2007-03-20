@@ -541,6 +541,7 @@ static int rt_read_packet_versatile(libtrace_t *libtrace,
 	} else {
 		switch(packet->type) {
 			case TRACE_RT_STATUS:
+			case TRACE_RT_METADATA:
 				if (rt_read(libtrace, &packet->buffer, 
 					(size_t)RT_INFO->rt_hdr.length,
 					blocking) != 
@@ -598,6 +599,7 @@ static int rt_read_packet(libtrace_t *libtrace,
 
 
 static int rt_get_capture_length(const libtrace_packet_t *packet) {
+	rt_metadata_t *rt_md_hdr;
 	switch (packet->type) {
 		case TRACE_RT_STATUS:
 			return sizeof(rt_status_t);
@@ -627,6 +629,10 @@ static int rt_get_capture_length(const libtrace_packet_t *packet) {
 			return 0;
 		case TRACE_RT_CLIENTDROP:
 			return 0;
+		case TRACE_RT_METADATA:
+			/* This is a little trickier to work out */
+			rt_md_hdr = (rt_metadata_t *)packet->buffer;
+			return rt_md_hdr->label_len + rt_md_hdr->value_len;
 		default:
 			printf("Unknown type: %d\n", packet->type);
 			

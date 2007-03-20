@@ -37,7 +37,7 @@ libtrace_la_SOURCES = $(LIBTRACEIO) trace.c common.h \
 		format_duck.c $(NATIVEFORMATS) $(BPFFORMATS) \
 		libtrace_int.h lt_inttypes.h \
 		linktypes.c protocols.c libtraceio.h link_wireless.c \
-		$(DAGSOURCE) format_erf.h
+		$(DAGSOURCE) format_erf.h 
 
 if DAG2_4
 nodist_libtrace_la_SOURCES = dagopts.c dagapi.c

@@ -277,6 +277,7 @@ typedef enum {
 	TRACE_RT_LOSTCONN 	=15,/**< Lost connection to server */
 	TRACE_RT_SERVERSTART	=16,/**< Server has been restarted */
 	TRACE_RT_CLIENTDROP	=17,/**< Reliable client was lost */
+	TRACE_RT_METADATA	=18,/**< Packet contains server meta-data */
 
 	TRACE_RT_DATA_SIMPLE	= 1000, /**< Trace types that know their link
 					  * type

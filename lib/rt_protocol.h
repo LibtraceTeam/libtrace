@@ -125,6 +125,11 @@ typedef struct rt_keychange {
 } rt_keychange_t;
 #endif
 
+typedef struct rt_metadata {
+	uint32_t label_len;
+	uint32_t value_len;
+} rt_metadata_t ;
+
 /** Specifications of duck structures - duck2_4 and duck2_5 match Endace's
  * duck_inf and duckinf_t respectively */
 
