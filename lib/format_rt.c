@@ -632,7 +632,8 @@ static int rt_get_capture_length(const libtrace_packet_t *packet) {
 		case TRACE_RT_METADATA:
 			/* This is a little trickier to work out */
 			rt_md_hdr = (rt_metadata_t *)packet->buffer;
-			return rt_md_hdr->label_len + rt_md_hdr->value_len;
+			return rt_md_hdr->label_len + rt_md_hdr->value_len + 
+				sizeof(rt_metadata_t);
 		default:
 			printf("Unknown type: %d\n", packet->type);
 			

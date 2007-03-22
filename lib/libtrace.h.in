@@ -275,7 +275,7 @@ typedef enum {
 	TRACE_RT_DUCK_2_4	=13,/**< Dag 2.4 Duck */
 	TRACE_RT_DUCK_2_5 	=14,/**< Dag 2.5 Duck */
 	TRACE_RT_LOSTCONN 	=15,/**< Lost connection to server */
-	TRACE_RT_SERVERSTART	=16,/**< Server has been restarted */
+	TRACE_RT_SERVERSTART	=16,/**< Reliable server has been restarted */
 	TRACE_RT_CLIENTDROP	=17,/**< Reliable client was lost */
 	TRACE_RT_METADATA	=18,/**< Packet contains server meta-data */
 

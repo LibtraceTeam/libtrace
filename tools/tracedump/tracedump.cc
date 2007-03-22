@@ -82,7 +82,9 @@ int main(int argc,char **argv)
 		while(trace_read_packet(trace,packet)> 0 ){
 			if (filter && !trace_apply_filter(filter,packet))
 				continue;
-
+			if (packet->type < TRACE_RT_DATA_SIMPLE)
+				/* Ignore RT messages */
+				continue;
 			trace_dump_packet(packet);
 
 			if(count) {
