@@ -34,26 +34,29 @@ BIN_PROTOCOLS+=link_6.la
 # Obsolete legacy
 # 		
 
-# POS
-BIN_PROTOCOLS+=link_9.la
-
 # Obsolete Legacy ATM
 #				
+
+# PoS 
 
 # Obsolete Legacy Ethernet
 BIN_PROTOCOLS+=link_10.la	
 
-# 802.11 Prisom
+# 802.11 Prism
 BIN_PROTOCOLS+=link_11.la	
 
-# AAL5
+# 13: AAL5
 #			
-# Duck
+# 14: Duck
+#
 
-#				
-
-# Radiotap
+# 15: Radiotap
 BIN_PROTOCOLS+=link_15.la
+
+# 16: LLC/SNAP
+#
+# 17: PPP
+TXT_PROTOCOLS+=link_17.protocol
 
 # Decoders for various ethertypes (in decimal)
 # IPv4
@@ -94,7 +97,6 @@ link_0_la_LDFLAGS=-module
 link_2_la_LDFLAGS=-module
 link_4_la_LDFLAGS=-module
 link_6_la_LDFLAGS=-module
-link_9_la_LDFLAGS=-module
 link_10_la_LDFLAGS=-module
 link_11_la_LDFLAGS=-module
 link_15_la_LDFLAGS=-module 
@@ -129,3 +131,6 @@ AM_CXXFLAGS=-g -Wall -DDIRNAME=\"$(plugindir)\" $(INCLUDES)
 BUILT_SOURCES=parser.h
 AM_YFLAGS=-d
 EXTRA_DIST=lexer.l parser.y
+
+install-exec-hook:
+	cd $(DESTDIR)$(plugindir) && $(LN_S) eth_2048.so ppp_33.so
