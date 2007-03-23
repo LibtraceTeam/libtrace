@@ -511,7 +511,14 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 libtrace_linktype_t erf_get_link_type(const libtrace_packet_t *packet) {
 	dag_record_t *erfptr = 0;
 	erfptr = (dag_record_t *)packet->header;
-	return erf_type_to_libtrace(erfptr->type);
+	if (erfptr->type != TYPE_LEGACY)
+		return erf_type_to_libtrace(erfptr->type);
+	else {
+		/* Sigh, lets start wildly guessing */
+		if (((char*)packet->payload)[4]==0x45)
+			return TRACE_TYPE_PPP;
+		return ~0;
+	}
 }
 
 libtrace_direction_t erf_get_direction(const libtrace_packet_t *packet) {

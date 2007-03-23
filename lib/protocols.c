@@ -205,26 +205,25 @@ static void *trace_get_payload_from_llcsnap(void *link,
 	return (void*)((char*)llc+sizeof(*llc));
 }
 
-void *trace_get_payload_from_pos(void *link, 
+void *trace_get_payload_from_ppp(void *link, 
 		uint16_t *type, uint32_t *remaining)
 {
 	/* 64 byte capture. */
-	libtrace_pos_t *pos = (libtrace_pos_t*)link;
+	libtrace_ppp_t *ppp = (libtrace_ppp_t*)link;
 
 	if (remaining) {
-		if (*remaining < sizeof(libtrace_pos_t))
+		if (*remaining < sizeof(libtrace_ppp_t))
 			return NULL;
-		*remaining-=sizeof(libtrace_pos_t);
+		*remaining-=sizeof(libtrace_ppp_t);
 	}
 
-	/* This is documented by endace to be an ethertype.  The ethertype
-	 * however is always ntohs(0x0021), which endace in their own tools
-	 * ignore and assume IP, so...
-	 */
-	/*if (type) *type = ntohs(pos->ether_type); */
-	if (type) *type = ntohs(0x0800);
+	if (type) {
+		switch(ppp->protocol) {
+			case 0x0021: *type = ntohs(0x0800);
+		}
+	}
 
-	return (void*)((char *)pos+sizeof(*pos));
+	return (void*)((char *)ppp+sizeof(*ppp));
 }
 
 static void *trace_get_payload_from_pflog(void *link,
@@ -312,8 +311,8 @@ void *trace_get_payload_from_link(void *link, libtrace_linktype_t linktype,
 			
 		case TRACE_TYPE_PFLOG:
 			return trace_get_payload_from_pflog(link,type,remaining);
-		case TRACE_TYPE_POS:
-			return trace_get_payload_from_pos(link,type,remaining);
+		case TRACE_TYPE_PPP:
+			return trace_get_payload_from_ppp(link,type,remaining);
 		case TRACE_TYPE_ATM:
 			l=trace_get_payload_from_atm(link,NULL,remaining);
 			return (l ? trace_get_payload_from_llcsnap(l,

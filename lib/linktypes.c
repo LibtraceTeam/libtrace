@@ -41,6 +41,7 @@ libtrace_linktype_t pcap_dlt_to_libtrace(libtrace_dlt_t dlt)
 		case TRACE_DLT_PFLOG: return TRACE_TYPE_PFLOG;
         	case TRACE_DLT_IEEE802_11_RADIO: return TRACE_TYPE_80211_RADIO;
 		case TRACE_DLT_ATM_RFC1483: return TRACE_TYPE_LLCSNAP;
+		case TRACE_DLT_PPP: return TRACE_TYPE_PPP;
 		/* Unhandled */
 		case TRACE_DLT_NULL: 	/* Raw IP frame with a BSD specific
 					 * header If you want raw L3 headers
@@ -66,6 +67,7 @@ libtrace_dlt_t libtrace_to_pcap_dlt(libtrace_linktype_t type)
 		case TRACE_TYPE_PFLOG: return TRACE_DLT_PFLOG;
 		case TRACE_TYPE_80211_RADIO: return TRACE_DLT_IEEE802_11_RADIO;
 		case TRACE_TYPE_LLCSNAP: return TRACE_DLT_ATM_RFC1483;
+		case TRACE_TYPE_PPP:	return TRACE_DLT_PPP;
 		/* Below here are unsupported conversions */
 		/* Dispite hints to the contrary, there is no DLT
 		 * for 'raw atm packets that happen to be missing
@@ -79,10 +81,11 @@ libtrace_dlt_t libtrace_to_pcap_dlt(libtrace_linktype_t type)
 		case TRACE_TYPE_DUCK:
 		/* Used for test traces within WAND */
 		case TRACE_TYPE_80211_PRISM: 	
-		/* TODO: We haven't researched these yet */
+		/* Probably == PPP */
 		case TRACE_TYPE_POS:
-		case TRACE_TYPE_HDLC_POS:
+		/* TODO: We haven't researched these yet */
 		case TRACE_TYPE_AAL5:
+		case TRACE_TYPE_HDLC_POS:
 			break;
 	}
 	return ~0U;
@@ -124,10 +127,11 @@ uint8_t libtrace_to_erf_type(libtrace_linktype_t linktype)
 		case TRACE_TYPE_80211_RADIO:
 		case TRACE_TYPE_80211_PRISM:
 		case TRACE_TYPE_80211:
-		case TRACE_TYPE_POS:
 		case TRACE_TYPE_PFLOG:
 		case TRACE_TYPE_NONE:
 		case TRACE_TYPE_LINUX_SLL:
+		case TRACE_TYPE_PPP:
+		case TRACE_TYPE_POS:
 			break;
 	}
 	return 255;
@@ -240,45 +244,6 @@ bool demote_packet(libtrace_packet_t *packet)
 	struct timeval tv;
 	static libtrace_t *trace = NULL;
 	switch(trace_get_link_type(packet)) {
-		case TRACE_TYPE_POS:
-			remaining=trace_get_capture_length(packet);
-			packet->payload=trace_get_payload_from_pos(
-				packet->payload,NULL,&remaining);
-
-			tmp=(char*)malloc(
-				trace_get_capture_length(packet)
-				+sizeof(libtrace_pcapfile_pkt_hdr_t)
-				);
-
-			tv=trace_get_timeval(packet);
-			((libtrace_pcapfile_pkt_hdr_t*)tmp)->ts_sec=tv.tv_sec;
-			((libtrace_pcapfile_pkt_hdr_t*)tmp)->ts_usec=tv.tv_usec;
-			((libtrace_pcapfile_pkt_hdr_t*)tmp)->wirelen
-				= trace_get_wire_length(packet)-(trace_get_capture_length(packet)-remaining);
-			((libtrace_pcapfile_pkt_hdr_t*)tmp)->caplen
-				= remaining;
-
-			memcpy(tmp+sizeof(libtrace_pcapfile_pkt_hdr_t),
-					packet->payload,
-					(size_t)remaining);
-			if (packet->buf_control == TRACE_CTRL_EXTERNAL) {
-				packet->buf_control=TRACE_CTRL_PACKET;
-			}
-			else {
-				free(packet->buffer);
-			}
-			packet->buffer=tmp;
-			packet->header=tmp;
-			packet->payload=tmp+sizeof(libtrace_pcapfile_pkt_hdr_t);
-			packet->type=pcap_dlt_to_rt(TRACE_DLT_RAW);
-			
-			if (trace == NULL) {
-				trace = trace_create_dead("pcap:-");
-			}
-
-			packet->trace=trace;
-
-			return true;
 		case TRACE_TYPE_ATM:
 			remaining=trace_get_capture_length(packet);
 			packet->payload=trace_get_payload_from_atm(

@@ -150,7 +150,7 @@ static int legacy_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 }
 
 static libtrace_linktype_t legacypos_get_link_type(const libtrace_packet_t *packet UNUSED) {
-	return TRACE_TYPE_POS;
+	return TRACE_TYPE_PPP;
 }
 
 static libtrace_linktype_t legacyatm_get_link_type(const libtrace_packet_t *packet UNUSED) {

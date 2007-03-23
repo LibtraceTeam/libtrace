@@ -209,6 +209,7 @@ enum {
 typedef enum {
 	TRACE_DLT_NULL = 0,
 	TRACE_DLT_EN10MB = 1,
+	TRACE_DLT_PPP = 9,
 	TRACE_DLT_ATM_RFC1483 = 11,
 	TRACE_DLT_RAW = 101,
 	TRACE_DLT_IEEE802_11 = 105,
@@ -235,7 +236,8 @@ typedef enum {
        TRACE_TYPE_AAL5 = 13,
        TRACE_TYPE_DUCK = 14,	     /**< Pseudo link layer for DUCK packets */
        TRACE_TYPE_80211_RADIO = 15,  /**< Radiotap + 802.11 */
-       TRACE_TYPE_LLCSNAP = 16       /**< Raw LLC/SNAP */
+       TRACE_TYPE_LLCSNAP = 16,      /**< Raw LLC/SNAP */
+       TRACE_TYPE_PPP = 17	     /**< PPP frames */
 	
 } libtrace_linktype_t;
 
@@ -561,12 +563,13 @@ typedef struct libtrace_atm_nni_capture_cell
   LT_BITFIELD32 hec:8;		/**< Header Error Control */
 } PACKED libtrace_atm_nni_capture_cell_t;
 
-/** POS header */
-typedef struct libtrace_pos
+/** PPP header */
+typedef struct libtrace_pps
 {
- uint16_t header;
- uint16_t ether_type;		/**< Ether Type */
-} PACKED libtrace_pos_t;
+ uint8_t addres;		/**< PPP Address (0xFF - All stations) */
+ uint8_t header;		/**< PPP Control (0x03 - Unnumbered info) */
+ uint16_t protocol;		/**< PPP Protocol (htons(0x0021) - IPv4 */
+} PACKED libtrace_ppp_t;
 
 /** 802.11 header */
 typedef struct libtrace_80211_t {
