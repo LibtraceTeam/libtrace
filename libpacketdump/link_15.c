@@ -148,15 +148,8 @@ void decode(int link_type,char *packet,int len)
 		rtap_real_len += sizeof(uint8_t);
 	}
 
-	if (rtap->it_present & (1 << TRACE_RADIOTAP_FCS)) {
-		ALIGN_NATURAL_32(p,s,rtap_real_len);
-		printf(" Radiotap: Frame Check Sequence = %#10x\n", bswap_le_to_host32(*((uint32_t *)p))); 
-		p += sizeof (uint32_t);
-		rtap_real_len += sizeof(uint32_t);
-	}
-
 	if (rtap_real_len != rtap_len) 
-		printf(" Radiotap: WARNING: Header length does not match fields present (%u)\n", rtap_real_len);
+		printf(" Radiotap: WARNING: Header contains un-decoded fields.\n");
 
 	if (len > rtap_len) 
 		decode_next(packet + rtap_len, len - rtap_len, "link", TRACE_TYPE_80211);

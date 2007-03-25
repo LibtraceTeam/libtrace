@@ -155,12 +155,10 @@ static void *trace_get_radiotap_field(void *link, libtrace_radiotap_field_t fiel
 
 	if (field == TRACE_RADIOTAP_DB_ANTNOISE)
 		return (void *) p;
+	/*
 	if (bswap_le_to_host32(rtap->it_present) & (1 << TRACE_RADIOTAP_DB_ANTNOISE))
 		p+= sizeof (uint8_t);
-
-	if (field == TRACE_RADIOTAP_FCS)
-		ALIGN_NATURAL_32(p,s);
-	return (void *)p;
+	*/
 
 	/* Unknown field */
 	return NULL;
@@ -197,8 +195,9 @@ DLLEXPORT bool trace_get_wireless_tsft(void *link,
  * This function isn't portable across drivers, so has been left static
  * for now. Maybe it will be included in the API later if it becomes useful
  * and we come up with a suitable abstraction.
+ * This function isn't marked static as the various format modules need to
+ * access it for get_wire_length(). It's not meant to be exported though.
  */
-static
 bool trace_get_wireless_flags(void *link, 
 		libtrace_linktype_t linktype, uint8_t *flags)
 {
@@ -584,30 +583,6 @@ DLLEXPORT bool trace_get_wireless_antenna(void *link,
 		case TRACE_TYPE_LINUX_SLL:
 			l = trace_get_payload_from_linux_sll(link, &type, NULL);
 			return trace_get_wireless_antenna(l, arphrd_type_to_libtrace(type), antenna);
-		default:
-			return false;
-	}
-	return false;
-}
-
-DLLEXPORT bool trace_get_wireless_fcs(void *link,
-		libtrace_linktype_t linktype, uint32_t *fcs)
-{
-	uint32_t *p;
-	void *l;
-	uint16_t type;
-
-	if (link == NULL || fcs == NULL) return false;
-	switch (linktype) {
-		case TRACE_TYPE_80211_RADIO:
-			if ((p = (uint32_t *) trace_get_radiotap_field(link,
-							TRACE_RADIOTAP_FCS))) {
-				*fcs = bswap_le_to_host32(*p);
-				return true;
-			} else break;
-		case TRACE_TYPE_LINUX_SLL:
-			l = trace_get_payload_from_linux_sll(link, &type, NULL);
-			return trace_get_wireless_fcs(l, arphrd_type_to_libtrace(type), fcs);
 		default:
 			return false;
 	}

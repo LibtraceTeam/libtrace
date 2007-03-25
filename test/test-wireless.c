@@ -64,10 +64,8 @@ int main(int argc, char *argv[]) {
 	int result;
 	uint64_t tsft;
 	uint16_t freq, tmp16;
-	uint32_t fcs;
 	uint8_t flags, rate, sdbm, ndbm, sdb, antenna, tmp8;
 	
-	uint32_t total_fcs, expected_fcs = 3012874435;
 	uint16_t total_freq, expected_freq = 24170;
 	
 	void *l;
@@ -97,7 +95,6 @@ int main(int argc, char *argv[]) {
 	assert(trace_get_wireless_noise_strength_dbm(l,lt,(int8_t *)&ndbm));
 	assert(trace_get_wireless_signal_strength_db(l,lt,&sdb));
 	assert(trace_get_wireless_antenna(l,lt,&antenna));
-	assert(trace_get_wireless_fcs(l,lt,&fcs));
 
 	/* Check that the fields that do not exist in this trace are
 	 * reported as not existing */
@@ -110,17 +107,18 @@ int main(int argc, char *argv[]) {
 	 * this trace
 	 * TODO: Check all fields :)
 	 */
-	total_fcs = fcs;
 	total_freq = freq;
 	
 	while((result = trace_read_packet(trace, packet)) > 0) {
-		if(trace_get_wireless_fcs(l,lt,&fcs)) 
-			total_fcs += fcs;
+		/* This trace has no FCS at the end of packets, so ensure
+		 * that wire-length is 4 bytes greater than capture length */
+		int caplen = trace_get_capture_length(packet);
+		int wirelen = trace_get_wire_length(packet);
+		assert(wirelen == caplen + 4);
 		if(trace_get_wireless_freq(l,lt,&freq)) 
 			total_freq += freq;
 	}
 
-	assert(total_fcs == expected_fcs);
 	assert(total_freq == expected_freq);
 
 	trace_destroy_packet(packet);
@@ -145,7 +143,6 @@ int main(int argc, char *argv[]) {
 	assert(!trace_get_wireless_noise_strength_dbm(l,lt,(int8_t *)&ndbm));
 	assert(!trace_get_wireless_signal_strength_db(l,lt,&sdb));
 	assert(!trace_get_wireless_antenna(l,lt,&antenna));
-	assert(!trace_get_wireless_fcs(l,lt,&fcs));
 	assert(!trace_get_wireless_noise_strength_db(l,lt,&tmp8));
 	assert(!trace_get_wireless_tx_attenuation(l,lt,&tmp16));
 	assert(!trace_get_wireless_tx_attenuation_db(l,lt,&tmp16));

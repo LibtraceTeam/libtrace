@@ -456,7 +456,9 @@ void rt_constructor(void);
 void wag_constructor(void);
 void duck_constructor(void);
 
-
+/* Used internally by get_wire_length() methods */
+bool trace_get_wireless_flags(void *link, libtrace_linktype_t linktype, uint8_t *flags);
+#define TRACE_RADIOTAP_F_FCS 0x10
 	
 #ifdef __cplusplus
 }

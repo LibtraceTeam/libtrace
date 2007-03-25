@@ -512,8 +512,17 @@ static int pcap_get_wire_length(const libtrace_packet_t *packet) {
 	pcapptr = (struct pcap_pkthdr *)packet->header;
 	if (packet->type==pcap_dlt_to_rt(TRACE_DLT_EN10MB))
 		return pcapptr->len+4; /* Include the missing FCS */
-	else
-		return pcapptr->len;
+	else if (packet->type==pcap_dlt_to_rt(TRACE_DLT_IEEE802_11_RADIO)) {
+		/* If the packet is Radiotap and the flags field indicates
+		 * that the FCS is not included in the 802.11 frame, then
+		 * we need to add 4 to the wire-length to account for it.
+		 */
+		uint16_t flags;
+		trace_get_wireless_flags(trace_get_link(packet), trace_get_link_type(packet), &flags);
+		if ((flags & TRACE_RADIOTAP_F_FCS) == 0)
+			return pcapptr->len + 4;
+	}
+	return pcapptr->len;
 }
 
 static int pcap_get_framing_length(UNUSED const libtrace_packet_t *packet) {

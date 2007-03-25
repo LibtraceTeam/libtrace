@@ -346,7 +346,6 @@ typedef enum {
     TRACE_RADIOTAP_ANTENNA = 11, /**< Antenna frame was rx'd or tx'd on (uint8) */
     TRACE_RADIOTAP_DB_ANTSIGNAL = 12, /**< Signal power in dB from a fixed reference (uint8) */
     TRACE_RADIOTAP_DB_ANTNOISE = 13, /**< Noise power in dB from a fixed reference (uint8) */
-    TRACE_RADIOTAP_FCS = 14, /**< Received frame check sequence (uint32) */
     TRACE_RADIOTAP_EXT = 31
 } libtrace_radiotap_field_t;
 
@@ -1623,15 +1622,6 @@ DLLEXPORT bool trace_get_wireless_tx_power_dbm(void *linkptr, libtrace_linktype_
  */
 DLLEXPORT bool trace_get_wireless_antenna(void *linkptr,
         libtrace_linktype_t linktype, uint8_t *antenna);
-
-/** Get the wireless Frame Check Sequence field
- * @param link the wireless header
- * @param linktype the linktype of the wireless header passed in
- * @param[out] fcs the Frame Check Sequence of the frame. 
- * @return true if the field was available, false if not.
- */
-DLLEXPORT bool trace_get_wireless_fcs(void *linkptr,
-        libtrace_linktype_t linktype, uint32_t *fcs);
 
 /*@}*/
 
