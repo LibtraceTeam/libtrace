@@ -319,6 +319,10 @@ void *trace_get_payload_from_link(void *link, libtrace_linktype_t linktype,
 						type, remaining):NULL);
 		case TRACE_TYPE_DUCK:
 			return NULL; /* duck packets have no payload! */
+		case TRACE_TYPE_METADATA:
+			return NULL; /* The payload is in these packets does
+					not correspond to a genuine link-layer
+					*/
 		default:
 			break;
 	}
@@ -731,6 +735,7 @@ uint8_t *trace_get_source_mac(libtrace_packet_t *packet) {
 		case TRACE_TYPE_PFLOG:
 		case TRACE_TYPE_ATM:
 		case TRACE_TYPE_DUCK:
+		case TRACE_TYPE_METADATA:
 			return NULL;
 		default:
 			break;
@@ -766,6 +771,7 @@ DLLEXPORT uint8_t *trace_get_destination_mac(libtrace_packet_t *packet) {
 		case TRACE_TYPE_LINUX_SLL:
 		case TRACE_TYPE_PFLOG:
 		case TRACE_TYPE_DUCK:
+		case TRACE_TYPE_METADATA:
 			/* No MAC address */
 			return NULL;
 		default:

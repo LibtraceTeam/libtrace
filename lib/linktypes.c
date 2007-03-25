@@ -86,6 +86,7 @@ libtrace_dlt_t libtrace_to_pcap_dlt(libtrace_linktype_t type)
 		/* TODO: We haven't researched these yet */
 		case TRACE_TYPE_AAL5:
 		case TRACE_TYPE_HDLC_POS:
+		case TRACE_TYPE_METADATA:
 			break;
 	}
 	return ~0U;
@@ -132,6 +133,7 @@ uint8_t libtrace_to_erf_type(libtrace_linktype_t linktype)
 		case TRACE_TYPE_LINUX_SLL:
 		case TRACE_TYPE_PPP:
 		case TRACE_TYPE_POS:
+		case TRACE_TYPE_METADATA:
 			break;
 	}
 	return 255;
