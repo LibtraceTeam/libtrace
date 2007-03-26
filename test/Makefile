@@ -23,6 +23,7 @@ test-programs: $(BINS)
 		echo \* $$i; 					\
 		rm -f traces/*.out.*;				\
 		LD_LIBRARY_PATH="$(libdir)"			\
+		DYLD_LIBRARY_PATH="$(libdir)"			\
 		 ./$$i || exit $$?;				\
 	done				
 	@echo All tests passed
@@ -31,25 +32,31 @@ test-format-all: test-format test-decode test-decode2
 # Try various link layer decodes
 	@echo SLL Decoder 
 	@LD_LIBRARY_PATH="$(libdir)" \
+	DYLD_LIBRARY_PATH="$(libdir)" \
 	./test-decode2 pcap:traces/100_sll.pcap
 
 	@echo 802.1x decoder
 	@LD_LIBRARY_PATH="$(libdir)" \
+	DYLD_LIBRARY_PATH="$(libdir)" \
 	./test-decode2 pcap:traces/8021x.pcap
 
 	@echo MPLS Decoder
 	@LD_LIBRARY_PATH="$(libdir)" \
+	DYLD_LIBRARY_PATH="$(libdir)" \
 	./test-decode2 pcap:traces/10_mpls_ip.pcap
 
 	@echo Radius Decoder
 	@LD_LIBRARY_PATH="$(libdir)" \
+	DYLD_LIBRARY_PATH="$(libdir)" \
 	./test-decode2 pcap:traces/radius.pcap
 	@for i in erf pcap wtf pcapfile duck legacyatm legacyeth legacypos; do \
 		echo \* Read $$i;				\
 		rm -f traces/*.out.*;				\
 		LD_LIBRARY_PATH="$(libdir)"			\
+		DYLD_LIBRARY_PATH="$(libdir)" 			\
 		./test-format $$i || exit $$?;			\
 		LD_LIBRARY_PATH="$(libdir)"			\
+		DYLD_LIBRARY_PATH="$(libdir)" 			\
 		./test-decode $$i || exit $$?;			\
 	done
 
@@ -58,6 +65,7 @@ test-write-all: test-write
 		echo \* Write $$i;				\
 		rm -f traces/*.out.*;				\
 		LD_LIBRARY_PATH="$(libdir)"			\
+		DYLD_LIBRARY_PATH="$(libdir)" 			\
 		./test-write $$i || exit $$?; 			\
 	done
 	
@@ -67,47 +75,48 @@ test-convert-all: test-convert
 	@echo \* Conversions
 	@echo " * erf -> erf"
 	@rm -f traces/*.out.*
-	@LD_LIBRARY_PATH="$(libdir)" ./test-convert erf erf
+	@LD_LIBRARY_PATH="$(libdir)" DYLD_LIBRARY_PATH="$(libdir)" ./test-convert erf erf
 	@echo " * erf -> pcap"
-	@LD_LIBRARY_PATH="$(libdir)" ./test-convert erf pcap
+	@LD_LIBRARY_PATH="$(libdir)" DYLD_LIBRARY_PATH="$(libdir)" ./test-convert erf pcap
 	@echo " * pcap -> erf"
 	@rm -f traces/*.out.*
-	@LD_LIBRARY_PATH="$(libdir)" ./test-convert pcap erf
+	@LD_LIBRARY_PATH="$(libdir)" DYLD_LIBRARY_PATH="$(libdir)" ./test-convert pcap erf
 	@echo " * pcapfile -> erf"
 	@rm -f traces/*.out.*
-	@LD_LIBRARY_PATH="$(libdir)" ./test-convert pcapfile erf
+	@LD_LIBRARY_PATH="$(libdir)" DYLD_LIBRARY_PATH="$(libdir)" ./test-convert pcapfile erf
 	@echo " * pcapfile -> pcapfile"
 	@rm -f traces/*.out.*
-	@LD_LIBRARY_PATH="$(libdir)" ./test-convert pcapfile pcapfile
+	@LD_LIBRARY_PATH="$(libdir)" DYLD_LIBRARY_PATH="$(libdir)" ./test-convert pcapfile pcapfile
 	@echo " * pcap -> pcapfile"
 	@rm -f traces/*.out.*
-	@LD_LIBRARY_PATH="$(libdir)" ./test-convert pcap pcapfile
+	@LD_LIBRARY_PATH="$(libdir)" DYLD_LIBRARY_PATH="$(libdir)" ./test-convert pcap pcapfile
 	@echo " * erf -> pcapfile"
 	@rm -f traces/*.out.*
-	@LD_LIBRARY_PATH="$(libdir)" ./test-convert erf pcapfile
-	@#LD_LIBRARY_PATH="$(libdir)" ./test-convert rtclient erf
-	@#LD_LIBRARY_PATH="$(libdir)" ./test-convert rtclient pcap
+	@LD_LIBRARY_PATH="$(libdir)" DYLD_LIBRARY_PATH="$(libdir)" ./test-convert erf pcapfile
+	@#LD_LIBRARY_PATH="$(libdir)" DYLD_LIBRARY_PATH="$(libdir)" ./test-convert rtclient erf
+	@#LD_LIBRARY_PATH="$(libdir)" DYLD_LIBRARY_PATH="$(libdir)" ./test-convert rtclient pcap
 	@echo " * wtf -> pcap"
 	@rm -f traces/*.out.*
-	@LD_LIBRARY_PATH="$(libdir)" ./test-convert wtf pcap
+	@LD_LIBRARY_PATH="$(libdir)" DYLD_LIBRARY_PATH="$(libdir)" ./test-convert wtf pcap
 	#@echo " * wtf -> wtf"
 	#@rm -f traces/*.out.*
-	#@LD_LIBRARY_PATH="$(libdir)" ./test-convert wtf wtf
+	#@LD_LIBRARY_PATH="$(libdir)" DYLD_LIBRARY_PATH="$(libdir)" ./test-convert wtf wtf
 	#@echo " * legacyatm -> pcapfile"
 	#@rm -f traces/*.out.*
-	#@LD_LIBRARY_PATH="$(libdir)" ./test-convert legacyatm pcapfile
+	#@LD_LIBRARY_PATH="$(libdir)" DYLD_LIBRARY_PATH="$(libdir)" ./test-convert legacyatm pcapfile
 	@echo " * legacyeth -> pcapfile"
 	@rm -f traces/*.out.*
-	@LD_LIBRARY_PATH="$(libdir)" ./test-convert legacyeth pcapfile
+	@LD_LIBRARY_PATH="$(libdir)" DYLD_LIBRARY_PATH="$(libdir)" ./test-convert legacyeth pcapfile
 	#@echo " * legacypos -> pcapfile"
 	#@rm -f traces/*.out.*
-	#@LD_LIBRARY_PATH="$(libdir)" ./test-convert legacypos pcapfile
+	#@LD_LIBRARY_PATH="$(libdir)" DYLD_LIBRARY_PATH="$(libdir)" ./test-convert legacypos pcapfile
 	#@echo " * duck -> duck"
 	#@rm -f traces/*.out.*
-	#@LD_LIBRARY_PATH="$(libdir)" ./test-convert duck duck
+	#@LD_LIBRARY_PATH="$(libdir)" DYLD_LIBRARY_PATH="$(libdir)" ./test-convert duck duck
  
 clean:
-	$(RM) $(BINS) $(OBJS) test-format  test-decode test-convert
+	$(RM) $(BINS) $(OBJS) test-format  test-decode test-convert \
+	test-decode2 test-write
 
 distclean:
 	$(RM) $(BINS) $(OBJS) test-format test-decode test-convert
