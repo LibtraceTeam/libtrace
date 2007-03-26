@@ -64,6 +64,7 @@ extern "C" {
 
 #include "rt_protocol.h"
 	
+/* Prefer net/bpf.h over pcap-bpf.h for format_bpf.c on MacOS */
 #ifdef HAVE_NET_BPF_H
 #    include <net/bpf.h>
 #    define HAVE_BPF 1
