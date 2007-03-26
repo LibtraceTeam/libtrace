@@ -161,8 +161,8 @@ static libtrace_direction_t tsh_get_direction(const libtrace_packet_t *packet) {
 static struct timeval tsh_get_timeval(const libtrace_packet_t *packet)
 {
 	struct timeval tv;
-	tv.tv_sec=((tsh_pkt_header_t*)(packet->header))->seconds;
-	tv.tv_usec=((tsh_pkt_header_t*)(packet->header))->usecs;
+	tv.tv_sec=ntohl(((tsh_pkt_header_t*)(packet->header))->seconds);
+	tv.tv_usec=ntohl(((tsh_pkt_header_t*)(packet->header))->usecs);
 
 	return tv;
 }
