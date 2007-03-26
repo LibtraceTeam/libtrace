@@ -218,10 +218,11 @@ void *trace_get_payload_from_ppp(void *link,
 	}
 
 	if (type) {
-		switch(ppp->protocol) {
-			case 0x0021: *type = ntohs(0x0800);
+		switch(ntohs(ppp->protocol)) {
+			case 0x0021: *type = 0x0800; break;
 		}
 	}
+
 
 	return (void*)((char *)ppp+sizeof(*ppp));
 }
