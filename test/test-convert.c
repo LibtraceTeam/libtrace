@@ -87,6 +87,8 @@ char *lookup_uri(const char *type)
 		return "legacyeth:traces/legacyeth.gz";
 	if (!strcmp(type, "duck"))
 		return "duck:traces/100_packets.duck";
+	if (!strcmp(type, "tsh"))
+		return "tsh:traces/10_packets.tsh.gz";
 	return "unknown";
 }
 
