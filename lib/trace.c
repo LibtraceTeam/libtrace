@@ -221,6 +221,7 @@ static void trace_init(void)
 	if (!formats_list) {
 		duck_constructor();
 		erf_constructor();
+		tsh_constructor();
 		legacy_constructor();
 #ifdef HAVE_NETPACKET_PACKET_H
 		linuxnative_constructor();

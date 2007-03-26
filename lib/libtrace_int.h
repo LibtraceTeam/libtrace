@@ -449,6 +449,7 @@ typedef struct libtrace_pcapfile_pkt_hdr_t {
 void dag_constructor(void);
 #endif
 void erf_constructor(void);
+void tsh_constructor(void);
 void legacy_constructor(void);
 void linuxnative_constructor(void);
 void pcap_constructor(void);

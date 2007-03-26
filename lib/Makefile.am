@@ -34,7 +34,7 @@ EXTRA_DIST=format_dag24.c format_dag25.c
 libtrace_la_SOURCES = $(LIBTRACEIO) trace.c common.h \
 		format_erf.c format_pcap.c format_wag.c format_legacy.c \
 		format_rt.c format_helper.c format_helper.h format_pcapfile.c \
-		format_duck.c $(NATIVEFORMATS) $(BPFFORMATS) \
+		format_duck.c format_tsh.c $(NATIVEFORMATS) $(BPFFORMATS) \
 		libtrace_int.h lt_inttypes.h \
 		linktypes.c protocols.c libtraceio.h link_wireless.c \
 		$(DAGSOURCE) format_erf.h 
