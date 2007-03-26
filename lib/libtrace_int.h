@@ -64,14 +64,14 @@ extern "C" {
 
 #include "rt_protocol.h"
 	
+#ifdef HAVE_NET_BPF_H
+#    include <net/bpf.h>
+#    define HAVE_BPF 1
+#else
 #ifdef HAVE_PCAP_BPF_H
 #  include <pcap-bpf.h>
 #  define HAVE_BPF 1
-#else
-#  ifdef HAVE_NET_BPF_H
-#    include <net/bpf.h>
-#    define HAVE_BPF 1
-#  endif
+#endif
 #endif
 
 #ifdef HAVE_PCAP_H

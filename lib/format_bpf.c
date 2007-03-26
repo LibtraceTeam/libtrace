@@ -44,8 +44,6 @@
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/ioctl.h>
-#include <net/bpf.h>
-
 
 #include <string.h>
 #include <net/if.h>
