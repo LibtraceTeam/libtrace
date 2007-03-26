@@ -91,7 +91,8 @@ int main(int argc, char *argv[]) {
 	libtrace_t *trace;
 	libtrace_packet_t *packet;
 	libtrace_filter_t *filter_tcp = trace_create_filter("tcp");
-	libtrace_filter_t *filter_udp = trace_create_filter("udp");
+	libtrace_filter_t *filter_udp = 
+		trace_create_filter("udp and ip[6:2] & 0x1fff = 0");
 	libtrace_filter_t *filter_icmp = trace_create_filter("icmp");
 
 	if (argc<2) {
@@ -142,6 +143,18 @@ int main(int argc, char *argv[]) {
 		if ((trace_get_udp(packet)!=NULL) ^ (trace_apply_filter(filter_udp,packet)>0)) {
 			error=1;
 			printf("udp problem\n");
+			if (trace_get_udp(packet)) {
+				printf(" libtrace thinks this is a udp packet\n");
+			}
+			else {
+				printf(" libtrace doesn't think this is a udp packet\n");
+			}
+			if (trace_apply_filter(filter_udp,packet)) {
+				printf(" bpf thinks this is a udp packet\n");
+			}
+			else {
+				printf(" bpf doesn't think this is a udp packet\n");
+			}
 			trace_dump_packet(packet);
 			break;
 		}
