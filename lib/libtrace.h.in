@@ -348,6 +348,10 @@ typedef enum {
     TRACE_RADIOTAP_ANTENNA = 11, /**< Antenna frame was rx'd or tx'd on (uint8) */
     TRACE_RADIOTAP_DB_ANTSIGNAL = 12, /**< Signal power in dB from a fixed reference (uint8) */
     TRACE_RADIOTAP_DB_ANTNOISE = 13, /**< Noise power in dB from a fixed reference (uint8) */
+    TRACE_RADIOTAP_RX_FLAGS = 14, /** Properties of received frame (uint16) */
+    TRACE_RADIOTAP_TX_FLAGS = 15, /** Properties of transmitted frame (uint16) */
+    TRACE_RADIOTAP_RTS_RETRIES = 16, /** Number of rts retries frame used (uint8) */
+    TRACE_RADIOTAP_DATA_RETRIES = 17, /** Number of unicast retries a transmitted frame used (uint8) */
     TRACE_RADIOTAP_EXT = 31
 } libtrace_radiotap_field_t;
 

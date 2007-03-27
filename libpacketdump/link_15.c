@@ -60,7 +60,7 @@ void decode(int link_type,char *packet,int len)
 	}
 
 	if (rtap->it_present & (1 << TRACE_RADIOTAP_FLAGS)) {
-		printf(" Radiotap: Flags = %#04x\n", *p);
+		printf(" Radiotap: Flags = 0x%02x\n", *p);
 		p += sizeof (uint8_t);
 		rtap_real_len += sizeof(uint8_t);
 	}
@@ -74,7 +74,7 @@ void decode(int link_type,char *packet,int len)
 	
 	if (rtap->it_present & (1 << TRACE_RADIOTAP_CHANNEL)) {
 		ALIGN_NATURAL_16(p,s,rtap_real_len);
-		printf(" Radiotap: Freq = %u MHz, ChanFlags: %#06x\n", bswap_le_to_host16(*((uint16_t *)p)), 
+		printf(" Radiotap: Freq = %u MHz, ChanFlags: 0x%04x\n", bswap_le_to_host16(*((uint16_t *)p)), 
 				*(((uint16_t *)p) + 1));
 		p += sizeof (uint32_t);
 		rtap_real_len += sizeof(uint32_t);
@@ -144,6 +144,32 @@ void decode(int link_type,char *packet,int len)
 
 	if (rtap->it_present & (1 << TRACE_RADIOTAP_DB_ANTNOISE)) {
 		printf(" Radiotap: Noise = %u dB\n", *p); 
+		p += sizeof (uint8_t);
+		rtap_real_len += sizeof(uint8_t);
+	}
+
+	if (rtap->it_present & (1 << TRACE_RADIOTAP_RX_FLAGS)) {
+		ALIGN_NATURAL_16(p,s,rtap_real_len);
+		printf(" Radiotap: RX Flags = 0x%04x\n", *((uint16_t *)p));
+		p += sizeof (uint16_t);
+		rtap_real_len += sizeof(uint16_t);
+	}
+
+	if (rtap->it_present & (1 << TRACE_RADIOTAP_TX_FLAGS)) {
+		ALIGN_NATURAL_16(p,s,rtap_real_len);
+		printf(" Radiotap: TX Flags = 0x%04x\n", *((uint16_t *)p));
+		p += sizeof (uint16_t);
+		rtap_real_len += sizeof(uint16_t);
+	}
+
+	if (rtap->it_present & (1 << TRACE_RADIOTAP_RTS_RETRIES)) {
+		printf(" Radiotap: RTS Retries = %u\n", *p);
+		p += sizeof (uint8_t);
+		rtap_real_len += sizeof(uint8_t);
+	}
+
+	if (rtap->it_present & (1 << TRACE_RADIOTAP_DATA_RETRIES)) {
+		printf(" Radiotap: Data Retries = %u\n", *p);
 		p += sizeof (uint8_t);
 		rtap_real_len += sizeof(uint8_t);
 	}
