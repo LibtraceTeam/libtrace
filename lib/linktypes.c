@@ -53,7 +53,7 @@ libtrace_linktype_t pcap_linktype_to_libtrace(libtrace_dlt_t linktype)
 	return ~0U;
 }
 
-libtrace_linktype_t libtrace_to_pcap_dlt(libtrace_linktype_t type)
+libtrace_dlt_t libtrace_to_pcap_dlt(libtrace_linktype_t type)
 {
 	/* If pcap doesn't have a DLT, you can either ask pcap to register
 	 * you a DLT, (and perhaps write a tcpdump decoder for it), or you
@@ -92,7 +92,7 @@ libtrace_linktype_t libtrace_to_pcap_dlt(libtrace_linktype_t type)
 	return ~0U;
 }
 
-libtrace_linktype_t libtrace_to_pcap_linktype(libtrace_linktype_t type)
+libtrace_dlt_t libtrace_to_pcap_linktype(libtrace_linktype_t type)
 {
 	return pcap_dlt_to_pcap_linktype(libtrace_to_pcap_dlt(type));
 }
@@ -112,7 +112,7 @@ libtrace_rt_types_t pcap_linktype_to_rt(libtrace_dlt_t linktype)
 	return pcap_dlt_to_pcap_linktype(linktype) + TRACE_RT_DATA_DLT;
 }
 
-libtrace_linktype_t rt_to_pcap_linktype(libtrace_rt_types_t rt_type)
+libtrace_dlt_t rt_to_pcap_linktype(libtrace_rt_types_t rt_type)
 {
 	assert(rt_type >= TRACE_RT_DATA_DLT);
 	return rt_type - TRACE_RT_DATA_DLT;
