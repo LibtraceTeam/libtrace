@@ -49,7 +49,8 @@ test-format-all: test-format test-decode test-decode2
 	@LD_LIBRARY_PATH="$(libdir)" \
 	DYLD_LIBRARY_PATH="$(libdir)" \
 	./test-decode2 pcap:traces/radius.pcap
-	@for i in erf pcap wtf pcapfile duck legacyatm legacyeth legacypos; do \
+	@for i in erf pcap wtf pcapfile duck legacyatm legacyeth legacypos tsh;\
+	do \
 		echo \* Read $$i;				\
 		rm -f traces/*.out.*;				\
 		LD_LIBRARY_PATH="$(libdir)"			\
@@ -101,18 +102,32 @@ test-convert-all: test-convert
 	#@echo " * wtf -> wtf"
 	#@rm -f traces/*.out.*
 	#@LD_LIBRARY_PATH="$(libdir)" DYLD_LIBRARY_PATH="$(libdir)" ./test-convert wtf wtf
-	#@echo " * legacyatm -> pcapfile"
-	#@rm -f traces/*.out.*
-	#@LD_LIBRARY_PATH="$(libdir)" DYLD_LIBRARY_PATH="$(libdir)" ./test-convert legacyatm pcapfile
+
+	@# This doesn't work because pcap doesn't support legacyatm's linketype
+	@# so the packet is converted to a raw IP packet, which when read
+	@# back in again doesn't match legacyatm's original packet.
+	@#echo " * legacyatm -> pcapfile"
+	@#rm -f traces/*.out.*
+	@#LD_LIBRARY_PATH="$(libdir)" DYLD_LIBRARY_PATH="$(libdir)" ./test-convert legacyatm pcapfile
+
 	@echo " * legacyeth -> pcapfile"
 	@rm -f traces/*.out.*
 	@LD_LIBRARY_PATH="$(libdir)" DYLD_LIBRARY_PATH="$(libdir)" ./test-convert legacyeth pcapfile
-	#@echo " * legacypos -> pcapfile"
-	#@rm -f traces/*.out.*
-	#@LD_LIBRARY_PATH="$(libdir)" DYLD_LIBRARY_PATH="$(libdir)" ./test-convert legacypos pcapfile
-	#@echo " * duck -> duck"
-	#@rm -f traces/*.out.*
-	#@LD_LIBRARY_PATH="$(libdir)" DYLD_LIBRARY_PATH="$(libdir)" ./test-convert duck duck
+
+	@echo " * legacypos -> pcapfile"
+	@rm -f traces/*.out.*
+	@LD_LIBRARY_PATH="$(libdir)" DYLD_LIBRARY_PATH="$(libdir)" ./test-convert legacypos pcapfile
+
+	@echo " * duck -> duck"
+	@rm -f traces/*.out.*
+	@LD_LIBRARY_PATH="$(libdir)" DYLD_LIBRARY_PATH="$(libdir)" ./test-convert duck duck
+
+	@echo " * tsh -> pcapfile"
+	@rm -f traces/*.out.*
+	@LD_LIBRARY_PATH="$(libdir)" DYLD_LIBRARY_PATH="$(libdir)" ./test-convert tsh pcapfile
+	@echo " * tsh -> pcap"
+	@rm -f traces/*.out.*
+	@LD_LIBRARY_PATH="$(libdir)" DYLD_LIBRARY_PATH="$(libdir)" ./test-convert tsh pcap
  
 clean:
 	$(RM) $(BINS) $(OBJS) test-format  test-decode test-convert \
