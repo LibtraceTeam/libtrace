@@ -92,11 +92,6 @@ libtrace_dlt_t libtrace_to_pcap_dlt(libtrace_linktype_t type)
 	return ~0U;
 }
 
-libtrace_dlt_t libtrace_to_pcap_linktype(libtrace_linktype_t type)
-{
-	return pcap_dlt_to_pcap_linktype(libtrace_to_pcap_dlt(type));
-}
-
 static libtrace_dlt_t pcap_dlt_to_pcap_linktype(libtrace_dlt_t linktype)
 {
 	switch (linktype) {
@@ -104,6 +99,11 @@ static libtrace_dlt_t pcap_dlt_to_pcap_linktype(libtrace_dlt_t linktype)
 		default:
 				    return linktype;
 	}
+}
+
+libtrace_dlt_t libtrace_to_pcap_linktype(libtrace_linktype_t type)
+{
+	return pcap_dlt_to_pcap_linktype(libtrace_to_pcap_dlt(type));
 }
 
 libtrace_rt_types_t pcap_linktype_to_rt(libtrace_dlt_t linktype) 
