@@ -60,7 +60,7 @@ struct libtrace_format_data_t {
 	void *bufptr;
 	unsigned int buffersize;
 	int remaining;
-	unsigned int dlt;
+	unsigned int linktype;
 };
 
 #define FORMATIN(x) ((struct libtrace_format_data_t*)((x->format_data)))
@@ -150,7 +150,7 @@ static int bpf_start_input(libtrace_t *libtrace)
 	}
 
 	if (ioctl(FORMATIN(libtrace)->fd, BIOCGDLT,
-			 &FORMATIN(libtrace)->dlt) == -1) {
+			 &FORMATIN(libtrace)->linktype) == -1) {
 		trace_set_err(libtrace,errno,"Failed to retrieve link type");
 		close(FORMATIN(libtrace)->fd);
 		return -1;
@@ -277,7 +277,7 @@ static int bpf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 	packet->header=FORMATIN(libtrace)->bufptr;
 
 	/* Find the payload */
-	/* TODO: Pcap deals with a padded FDDI dlt here */
+	/* TODO: Pcap deals with a padded FDDI linktype here */
 	packet->payload=FORMATIN(libtrace)->bufptr+BPFHDR(packet)->bh_hdrlen;
 
 	/* Now deal with any padding */
@@ -292,7 +292,7 @@ static int bpf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 }
 
 static libtrace_linktype_t bpf_get_link_type(const libtrace_packet_t *packet) {
-	return pcap_dlt_to_libtrace(FORMATIN(packet->trace)->dlt);
+	return pcap_linktype_to_libtrace(FORMATIN(packet->trace)->linktype);
 }
 
 static libtrace_direction_t bpf_get_direction(const libtrace_packet_t *packet) {

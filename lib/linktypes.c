@@ -31,10 +31,11 @@
  * get_{source,destination}_mac (if your linklayer has mac's)
  */
 
-libtrace_linktype_t pcap_dlt_to_libtrace(libtrace_dlt_t dlt)
+libtrace_linktype_t pcap_linktype_to_libtrace(libtrace_dlt_t linktype)
 {
-	switch(dlt) {
-		case TRACE_DLT_RAW: return TRACE_TYPE_NONE;
+	switch(linktype) {
+		case TRACE_DLT_RAW:
+		case TRACE_DLT_LINKTYPE_RAW: return TRACE_TYPE_NONE;
 		case TRACE_DLT_EN10MB: return TRACE_TYPE_ETH;
 		case TRACE_DLT_IEEE802_11: return TRACE_TYPE_80211;
 		case TRACE_DLT_LINUX_SLL: return TRACE_TYPE_LINUX_SLL;
@@ -52,15 +53,14 @@ libtrace_linktype_t pcap_dlt_to_libtrace(libtrace_dlt_t dlt)
 	return ~0U;
 }
 
-
-libtrace_dlt_t libtrace_to_pcap_dlt(libtrace_linktype_t type)
+libtrace_linktype_t libtrace_to_pcap_dlt(libtrace_linktype_t type)
 {
 	/* If pcap doesn't have a DLT, you can either ask pcap to register
 	 * you a DLT, (and perhaps write a tcpdump decoder for it), or you
 	 * can add it to demote_packet
 	 */
 	switch(type) {
-		case TRACE_TYPE_NONE: return TRACE_DLT_RAW;
+		case TRACE_TYPE_NONE: return TRACE_DLT_RAW; 
 		case TRACE_TYPE_ETH: return TRACE_DLT_EN10MB;
 		case TRACE_TYPE_80211: return TRACE_DLT_IEEE802_11;
 		case TRACE_TYPE_LINUX_SLL: return TRACE_DLT_LINUX_SLL;
@@ -92,13 +92,27 @@ libtrace_dlt_t libtrace_to_pcap_dlt(libtrace_linktype_t type)
 	return ~0U;
 }
 
-libtrace_rt_types_t pcap_dlt_to_rt(libtrace_dlt_t dlt) 
+libtrace_linktype_t libtrace_to_pcap_linktype(libtrace_linktype_t type)
 {
-	/* For pcap the rt type is just the dlt + a fixed value */
-	return dlt + TRACE_RT_DATA_DLT;
+	return pcap_dlt_to_pcap_linktype(libtrace_to_pcap_dlt(type));
 }
 
-libtrace_dlt_t rt_to_pcap_dlt(libtrace_rt_types_t rt_type)
+static libtrace_dlt_t pcap_dlt_to_pcap_linktype(libtrace_dlt_t linktype)
+{
+	switch (linktype) {
+		case TRACE_DLT_RAW: return TRACE_DLT_LINKTYPE_RAW;
+		default:
+				    return linktype;
+	}
+}
+
+libtrace_rt_types_t pcap_linktype_to_rt(libtrace_dlt_t linktype) 
+{
+	/* For pcap the rt type is just the linktype + a fixed value */
+	return pcap_dlt_to_pcap_linktype(linktype) + TRACE_RT_DATA_DLT;
+}
+
+libtrace_linktype_t rt_to_pcap_linktype(libtrace_rt_types_t rt_type)
 {
 	assert(rt_type >= TRACE_RT_DATA_DLT);
 	return rt_type - TRACE_RT_DATA_DLT;
@@ -172,7 +186,7 @@ void promote_packet(libtrace_packet_t *packet)
 		char *tmpbuffer;
 		libtrace_sll_header_t *hdr;
 
-		if (pcap_dlt_to_libtrace(rt_to_pcap_dlt(packet->type))
+		if (pcap_linktype_to_libtrace(rt_to_pcap_linktype(packet->type))
 			== TRACE_TYPE_LINUX_SLL) {
 			/* This is already been promoted, so ignore it */
 			return;
@@ -191,7 +205,7 @@ void promote_packet(libtrace_packet_t *packet)
 		hdr->halen=htons(6);
 		hdr->pkttype=TRACE_SLL_OUTGOING;
 
-		switch(pcap_dlt_to_libtrace(rt_to_pcap_dlt(packet->type))) {
+		switch(pcap_linktype_to_libtrace(rt_to_pcap_linktype(packet->type))) {
 			case TRACE_TYPE_NONE:
 				trace_get_payload_from_link(
 					trace_get_link(packet),
@@ -225,7 +239,7 @@ void promote_packet(libtrace_packet_t *packet)
 		packet->buffer=tmpbuffer;
 		packet->header=tmpbuffer;
 		packet->payload=tmpbuffer+trace_get_framing_length(packet);
-		packet->type=pcap_dlt_to_rt(TRACE_DLT_LINUX_SLL);
+		packet->type=pcap_linktype_to_rt(TRACE_DLT_LINUX_SLL);
 		((struct libtrace_pcapfile_pkt_hdr_t*) packet->header)->caplen+=
 			sizeof(libtrace_sll_header_t);
 		((struct libtrace_pcapfile_pkt_hdr_t*) packet->header)->wirelen+=
@@ -276,7 +290,7 @@ bool demote_packet(libtrace_packet_t *packet)
 			packet->buffer=tmp;
 			packet->header=tmp;
 			packet->payload=tmp+sizeof(libtrace_pcapfile_pkt_hdr_t);
-			packet->type=pcap_dlt_to_rt(TRACE_DLT_ATM_RFC1483);
+			packet->type=pcap_linktype_to_rt(TRACE_DLT_ATM_RFC1483);
 			
 			if (trace == NULL) {
 				trace = trace_create_dead("pcap:-");
@@ -290,10 +304,10 @@ bool demote_packet(libtrace_packet_t *packet)
 			switch(ntohs(((libtrace_sll_header_t*)packet->payload)
 					->hatype)) {
 				case ARPHRD_PPP:
-					packet->type=pcap_dlt_to_rt(TRACE_DLT_RAW);
+					packet->type=pcap_linktype_to_rt(TRACE_DLT_RAW);
 					break;
 				case ARPHRD_ETHER:
-					packet->type=pcap_dlt_to_rt(TRACE_DLT_EN10MB);
+					packet->type=pcap_linktype_to_rt(TRACE_DLT_EN10MB);
 					break;
 				default:
 					/* Dunno how to demote this packet */

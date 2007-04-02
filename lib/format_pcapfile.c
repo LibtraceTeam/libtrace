@@ -211,7 +211,7 @@ static int pcapfile_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 
 	assert(libtrace->format_data);
 
-	packet->type = pcap_dlt_to_rt(swapl(libtrace,
+	packet->type = pcap_linktype_to_rt(swapl(libtrace,
 				DATA(libtrace)->header.network));
 
 	if (!packet->buffer || packet->buf_control == TRACE_CTRL_EXTERNAL) {
@@ -267,7 +267,7 @@ static int pcapfile_write_packet(libtrace_out_t *out,
 	/* If this packet cannot be converted to a pcap linktype then
 	 * pop off the top header until it can be converted
 	 */
-	while (libtrace_to_pcap_dlt(trace_get_link_type(packet))==~0U) {
+	while (libtrace_to_pcap_linktype(trace_get_link_type(packet))==~0U) {
 		if (!demote_packet(packet)) {
 			trace_set_err_out(out, 
 				TRACE_ERR_NO_CONVERSION,
@@ -296,7 +296,7 @@ static int pcapfile_write_packet(libtrace_out_t *out,
 		pcaphdr.sigfigs = 0;
 		pcaphdr.snaplen = 65536;
 		pcaphdr.network = 
-			libtrace_to_pcap_dlt(trace_get_link_type(packet));
+			libtrace_to_pcap_linktype(trace_get_link_type(packet));
 
 		libtrace_io_write(DATAOUT(out)->file, &pcaphdr, sizeof(pcaphdr));
 	}
@@ -337,13 +337,13 @@ static libtrace_linktype_t pcapfile_get_link_type(
 		const libtrace_packet_t *packet) 
 {
 #if 0
-	return pcap_dlt_to_libtrace(
+	return pcap_linktype_to_libtrace(
 			swapl(packet->trace,
 				DATA(packet->trace)->header.network
 			     )
 			);
 #endif
-	return pcap_dlt_to_libtrace(rt_to_pcap_dlt(packet->type));
+	return pcap_linktype_to_libtrace(rt_to_pcap_linktype(packet->type));
 }
 
 static libtrace_direction_t pcapfile_get_direction(const libtrace_packet_t *packet) 
@@ -428,10 +428,10 @@ static int pcapfile_get_capture_length(const libtrace_packet_t *packet) {
 static int pcapfile_get_wire_length(const libtrace_packet_t *packet) {
 	libtrace_pcapfile_pkt_hdr_t *pcapptr 
 		= (libtrace_pcapfile_pkt_hdr_t *)packet->header;
-	if (packet->type==pcap_dlt_to_rt(TRACE_DLT_EN10MB))
+	if (packet->type==pcap_linktype_to_rt(TRACE_DLT_EN10MB))
 		/* Include the missing FCS */
 		return swapl(packet->trace,pcapptr->wirelen)+4; 
-	else if (packet->type==pcap_dlt_to_rt(TRACE_DLT_IEEE802_11_RADIO)) {
+	else if (packet->type==pcap_linktype_to_rt(TRACE_DLT_IEEE802_11_RADIO)) {
 		/* If the packet is Radiotap and the flags field indicates
 		 * that the FCS is not included in the 802.11 frame, then
 		 * we need to add 4 to the wire-length to account for it.

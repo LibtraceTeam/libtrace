@@ -1489,5 +1489,5 @@ void trace_construct_packet(libtrace_packet_t *packet,
 	packet->payload=(void*)((char*)packet->buffer+sizeof(hdr));
 	memcpy(packet->header,&hdr,sizeof(hdr));
 	memcpy(packet->payload,data,(size_t)len);
-	packet->type=pcap_dlt_to_rt(libtrace_to_pcap_dlt(linktype));
+	packet->type=pcap_linktype_to_rt(libtrace_to_pcap_linktype(linktype));
 }

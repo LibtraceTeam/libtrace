@@ -263,7 +263,7 @@ static int pcap_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 
 	assert(libtrace->format_data);
 	linktype = pcap_datalink(DATA(libtrace)->input.pcap);
-	packet->type = pcap_dlt_to_rt(linktype);
+	packet->type = pcap_linktype_to_rt(linktype);
 
 	packet->buf_control = TRACE_CTRL_PACKET;
 
@@ -313,7 +313,7 @@ static int pcap_write_packet(libtrace_out_t *libtrace,
 	/* If this packet cannot be converted to a pcap linktype then
 	 * pop off the top header until it can be converted
 	 */
-	while (libtrace_to_pcap_dlt(trace_get_link_type(packet))==~0U) {
+	while (libtrace_to_pcap_linktype(trace_get_link_type(packet))==~0U) {
 		if (!demote_packet(packet)) {
 			trace_set_err_out(libtrace, 
 				TRACE_ERR_NO_CONVERSION,
@@ -322,12 +322,13 @@ static int pcap_write_packet(libtrace_out_t *libtrace,
 		}
 	}
 
+
 	if (!OUTPUT.trace.pcap) {
-		OUTPUT.trace.pcap = pcap_open_dead(
-			libtrace_to_pcap_dlt(trace_get_link_type(packet)),
-			65536);
+		int linktype=libtrace_to_pcap_dlt(trace_get_link_type(packet));
+		OUTPUT.trace.pcap = pcap_open_dead(linktype,65536);
 		if (!OUTPUT.trace.pcap) {
-			trace_set_err_out(libtrace,TRACE_ERR_INIT_FAILED,"Failed to open dead trace: %s\n",
+			trace_set_err_out(libtrace,TRACE_ERR_INIT_FAILED,
+					"Failed to open dead trace: %s\n",
 					pcap_geterr(OUTPUT.trace.pcap));
 		}
 		OUTPUT.trace.dump = pcap_dump_open(OUTPUT.trace.pcap,
@@ -408,11 +409,11 @@ static int pcapint_write_packet(libtrace_out_t *libtrace,
 }
 
 static libtrace_linktype_t pcap_get_link_type(const libtrace_packet_t *packet) {
-	/* pcap doesn't store dlt in the framing header so we need
+	/* pcap doesn't store linktype in the framing header so we need
 	 * rt to do it for us 
 	 */
-	int linktype = rt_to_pcap_dlt(packet->type);
-	return pcap_dlt_to_libtrace(linktype);
+	int linktype = rt_to_pcap_linktype(packet->type);
+	return pcap_linktype_to_libtrace(linktype);
 }
 
 static libtrace_direction_t pcap_set_direction(libtrace_packet_t *packet,
@@ -510,15 +511,16 @@ static int pcap_get_capture_length(const libtrace_packet_t *packet) {
 static int pcap_get_wire_length(const libtrace_packet_t *packet) {
 	struct pcap_pkthdr *pcapptr = 0;
 	pcapptr = (struct pcap_pkthdr *)packet->header;
-	if (packet->type==pcap_dlt_to_rt(TRACE_DLT_EN10MB))
+	if (packet->type==pcap_linktype_to_rt(TRACE_DLT_EN10MB))
 		return pcapptr->len+4; /* Include the missing FCS */
-	else if (packet->type==pcap_dlt_to_rt(TRACE_DLT_IEEE802_11_RADIO)) {
+	else if (packet->type==pcap_linktype_to_rt(TRACE_DLT_IEEE802_11_RADIO)) {
 		/* If the packet is Radiotap and the flags field indicates
 		 * that the FCS is not included in the 802.11 frame, then
 		 * we need to add 4 to the wire-length to account for it.
 		 */
-		uint16_t flags;
-		trace_get_wireless_flags(trace_get_link(packet), trace_get_link_type(packet), &flags);
+		uint8_t flags;
+		trace_get_wireless_flags(trace_get_link(packet), 
+				trace_get_link_type(packet), &flags);
 		if ((flags & TRACE_RADIOTAP_F_FCS) == 0)
 			return pcapptr->len + 4;
 	}
