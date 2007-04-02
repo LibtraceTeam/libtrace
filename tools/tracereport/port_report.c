@@ -8,7 +8,7 @@
 #include "tracereport.h"
 #include "contain.h"
 
-stat_t ports[3][256][65536]={{{{0,0}}}};
+stat_t *ports[3][256] = {{NULL}};
 char protn[256]={0};
 static bool suppress[3] = {true,true,true};
 
@@ -30,6 +30,8 @@ void port_per_packet(struct libtrace_packet_t *packet)
 		? trace_get_source_port(packet)
 		: trace_get_destination_port(packet);
 
+	if (!ports[dir][proto])
+		ports[dir][proto]=calloc(65536,sizeof(stat_t));
 	ports[dir][proto][port].bytes+=trace_get_wire_length(packet);
 	ports[dir][proto][port].count++;
 	protn[proto]=1;
@@ -75,7 +77,7 @@ void port_port(int i,char *prot, int j)
 	if(ent){
 		printf("%20s:",ent->s_name);
 		for(k=0;k<3;k++){
-			if (ports[k][i][j].count==0){
+			if (!ports[k][i] || ports[k][i][j].count==0){
 				if(!suppress[k])
 					printf("\t%24s"," ");
 				continue;
@@ -89,7 +91,7 @@ void port_port(int i,char *prot, int j)
 	else{
 		printf("%20i:",j);
 		for(k=0;k<3;k++){
-			if (ports[k][i][j].count==0){
+			if (!ports[k][i] || ports[k][i][j].count==0){
 				if(!suppress[k])
 					printf("\t%24s"," ");
 				continue;
@@ -111,7 +113,7 @@ void port_protocol(int i)
 			ent?"(":"",ent?ent->p_name:"",ent?")":"");
 	for(j=0;j<65536;++j) {
 		for(k=0;k<3;k++){
-			if (ports[k][i][j].count) {
+			if (ports[k][i] && ports[k][i][j].count) {
 				port_port(i,ent?ent->p_name:"",j);
 				break;
 			}
@@ -129,6 +131,9 @@ void port_report(void)
 	for(i=0;i<256;++i) {
 		if (protn[i]) {
 			port_protocol(i);
+			free(ports[0][i]);
+			free(ports[1][i]);
+			free(ports[2][i]);
 		}
 	}
 	endprotoent();
