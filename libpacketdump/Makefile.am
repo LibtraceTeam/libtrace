@@ -133,5 +133,6 @@ AM_YFLAGS=-d
 EXTRA_DIST=lexer.l parser.y
 
 install-exec-hook:
+	mkdir -p $(DESTDIR)$(plugindir)
 	cd $(DESTDIR)$(plugindir) && $(LN_S) -f eth_2048.so ppp_33.so
 	cd $(DESTDIR)$(plugindir) && $(LN_S) -f eth_2048.so link_5.so
