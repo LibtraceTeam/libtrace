@@ -19,32 +19,6 @@
 #define DISPLAYL(x,fmt) DISPLAY_EXP(x,fmt,htonl(tcp->x))
 #define DISPLAYIP(x,fmt) DISPLAY_EXP(x,fmt,inet_ntoa(*(struct in_addr*)&tcp->x))
 
-int get_next_option(unsigned char **ptr,int *len,
-			unsigned char *type,
-			unsigned char *optlen,
-			unsigned char **data)
-{
-	if (*len<=0)
-		return 0;
-	*type=**ptr;
-	switch(*type) {
-		case 0:
-			return 0;
-		case 1:
-			(*ptr)++;
-			(*len)--;
-			return 1;
-		default:
-			*optlen = *(*ptr+1);
-			(*len)-=*optlen;
-			(*data)=(*ptr+2);
-			(*ptr)+=*optlen;	/* Not optlen + 2! */
-			if (*len<0)
-				return 0;
-			return 1;
-	}
-}
-
 void decode(int link_type,char *packet,int len)
 {
 	libtrace_tcp_t *tcp = (libtrace_tcp_t *)packet;
@@ -97,7 +71,7 @@ void decode(int link_type,char *packet,int len)
 	unsigned char *pkt = (unsigned char*)packet+sizeof(*tcp);
 	int plen = (len-sizeof *tcp) < (tcp->doff*4-sizeof(*tcp))?(len-sizeof(*tcp)):(tcp->doff*4-sizeof *tcp);
 	unsigned char type,optlen,*data;
-	while(get_next_option(&pkt,&plen,&type,&optlen,&data)) {
+	while(trace_get_next_option(&pkt,&plen,&type,&optlen,&data)) {
 		printf("\n TCP: ");
 		switch(type) {
 			case 0:
