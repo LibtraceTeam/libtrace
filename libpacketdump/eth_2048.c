@@ -32,7 +32,7 @@ void decode(int link_type,char *packet,int len)
 	DISPLAY_EXP(ip_tos," ECN %x",ip->ip_tos & 0x2)
 	DISPLAYS(ip_len," Total Length %i")
 	printf("\n IP:");
-	DISPLAY(ip_id," Id %u");
+	DISPLAYS(ip_id," Id %u");
 	
 	if ((unsigned int)len >= ((char *)&ip->ip_ttl - (char *)ip - 2)) {
 		printf(" Fragoff %i", ip->ip_off);
