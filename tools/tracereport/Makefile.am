@@ -15,6 +15,7 @@ tracereport_SOURCES = \
 	dir_report.c\
 	error_report.c\
 	flow_report.c\
+	misc_report.c\
 	port_report.c\
 	protocol_report.c\
 	tos_report.c\

@@ -83,6 +83,8 @@ void run_trace(char *uri, libtrace_filter_t *filter, int count)
 		if ((psize = trace_read_packet(trace, packet)) <1) {
 			break;
 		}
+		if (reports_required & REPORT_TYPE_MISC)
+			misc_per_packet(packet);
 		if (reports_required & REPORT_TYPE_ERROR)
 			error_per_packet(packet);
 		if (reports_required & REPORT_TYPE_PORT)
@@ -118,6 +120,7 @@ void usage(char *argv0)
 	"-f --filter=bpf	\tApply BPF filter. Can be specified multiple times\n"
 	"-e --error		Report packet errors (e.g. checksum failures, rxerrors)\n"
 	"-F --flow		Report flows\n"
+	"-m --misc		Report misc information (start/end times, duration, pps)\n"
 	"-P --protocol		Report transport protocols\n"
 	"-p --port		Report port numbers\n"
 	"-T --tos		Report IP TOS\n"
@@ -150,6 +153,7 @@ int main(int argc, char *argv[]) {
 			{ "flow", 		0, 0, 'F' },
 			{ "protocol", 		0, 0, 'P' },
 			{ "port",		0, 0, 'p' },
+			{ "misc",		0, 0, 'm' },
 			{ "tos",		0, 0, 'T' },
 			{ "ttl", 		0, 0, 't' },
 			{ "tcpoptions",		0, 0, 'O' },
@@ -160,7 +164,7 @@ int main(int argc, char *argv[]) {
 			{ "tcpsegment", 	0, 0, 's' },
 			{ NULL, 		0, 0, 0 }
 		};
-		opt = getopt_long(argc, argv, "f:HeFPpTtOondCs", long_options,
+		opt = getopt_long(argc, argv, "f:HeFmPpTtOondCs", long_options,
 				&option_index);
 		if (opt == -1)
 			break;
@@ -193,6 +197,9 @@ int main(int argc, char *argv[]) {
 			case 'o':
 				reports_required |= REPORT_TYPE_SYNOPT;
 				break;
+			case 'm':
+				reports_required |= REPORT_TYPE_MISC;
+				break;
 			case 'P':
 				reports_required |= REPORT_TYPE_PROTO;
 				break;
@@ -213,6 +220,13 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
+	/* Default to all reports, instead of no reports at all.  It's annoying
+	 * waiting for 10 minutes for a trace to process then discover you 
+	 * forgot to ask for any reports!
+	 */
+	if (reports_required == 0)
+		reports_required = ~0;
+
 	if (filterstring) {
 		filter = trace_create_filter(filterstring);
 	}
@@ -226,6 +240,8 @@ int main(int argc, char *argv[]) {
 		run_trace(argv[i],filter,(1<<30));
 	}
 
+	if (reports_required & REPORT_TYPE_MISC)
+		misc_report();
 	if (reports_required & REPORT_TYPE_ERROR)
 		error_report();
 	if (reports_required & REPORT_TYPE_FLOW)

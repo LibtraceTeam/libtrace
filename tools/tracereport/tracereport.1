@@ -6,6 +6,7 @@ tracereport \- produce various reports on a trace (or traceset)
 [ \fB-f \fRbpf | \fB--filter=\fRbpf ]
 [ \fB-e \fR| \fB --error \fR]
 [ \fB-F \fR| \fB --flow \fR]
+[ \fB-m \fR| \fB --misc \fR]
 [ \fB-P \fR| \fB --protocol \fR]
 [ \fB-p \fR| \fB --port \fR]
 [ \fB-T \fR| \fB --tos \fR]
@@ -48,6 +49,16 @@ Produce a report on packet errors (e.g checksum failures, rxerrors)
 .PD 0
 .BI \-\^\-flow
 Produces a report on the number of flows observed in the trace
+
+.TP
+.PD 0
+.BI \-m
+.TP
+.PD 0
+.BI \-\^\-misc
+Provides a report listing the time of the first packet, and the time of the
+last packet in the trace, the duration, the total number of packets in the 
+trace, and the average number of packets per second.
 
 .TP
 .PD 0

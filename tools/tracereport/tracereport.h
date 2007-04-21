@@ -18,7 +18,8 @@ typedef enum {
 	REPORT_TYPE_DIR = 1 << 8,
 	REPORT_TYPE_ECN = 1 << 9,
 	REPORT_TYPE_TCPSEG = 1 << 10,
-	REPORT_TYPE_SYNOPT = 1 << 11
+	REPORT_TYPE_SYNOPT = 1 << 11,
+	REPORT_TYPE_MISC = 1 << 12
 } report_type_t;
 
 #endif
