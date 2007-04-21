@@ -7,13 +7,17 @@ static struct libtrace_out_t *create_output(char *uri) {
 	libtrace_err_t trace_err;
 	output = trace_create_output(uri);
 	if (trace_is_err_output(output)) {
-		trace_err = trace_get_err_output(output);
-		printf("Problem creating output trace (uri=%s): %s\n", 
-				uri, trace_err.problem);
+		trace_perror_output(output,"%s",uri);
+		trace_destroy_output(output);
 		return NULL;
 	}
 	/* Default values for now */
 	trace_start_output(output);
+	if (trace_is_err_output(output)) {
+		trace_perror_output(output,"%s",uri);
+		trace_destroy_output(output);
+		return NULL;
+	}
 	return output;
 }
 
@@ -27,7 +31,6 @@ int main(int argc, char *argv[]) {
 	struct libtrace_out_t *out_write = NULL;
 	libtrace_err_t trace_err;
 	struct libtrace_packet_t *packet = trace_create_packet();
-
 	
 	if (argc < 3) {
 		usage(argv[0]);
@@ -41,7 +44,7 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 	if (trace_start(input)==-1) {
-		trace_perror(input,"");
+		trace_perror(input,argv[1]);
 		return 1;
 	}
 	
@@ -53,10 +56,8 @@ int main(int argc, char *argv[]) {
 			case 0:
 				if (!out_write) {
 					out_write = create_output(argv[3]);
-					if (trace_is_err_output(out_write)) {
-						trace_perror_output(out_write,"");
+					if (!out_write)
 						return 1;
-					}
 				}
 				if (trace_write_packet(out_write, packet)==-1){
 					trace_perror_output(in_write,"write");
@@ -65,11 +66,6 @@ int main(int argc, char *argv[]) {
 				break;
 			case 1:
 				if (!in_write) {
-					in_write = create_output(argv[2]);
-					if (trace_is_err_output(in_write)) {
-						trace_perror_output(in_write,"");
-						return 1;
-					}
 					in_write = create_output(argv[2]);
 					if (!in_write)
 						return 1;

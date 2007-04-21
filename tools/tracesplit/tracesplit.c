@@ -125,12 +125,12 @@ int main(int argc, char *argv[])
 	output=NULL;
 	input=trace_create(argv[optind]);
 	if (trace_is_err(input)) {
-		trace_perror(input,"");
+		trace_perror(input,"%s",argv[optind]);
 		return 1;
 	}
 
 	if (trace_start(input)==-1) {
-		trace_perror(input,"");
+		trace_perror(input,"%s",argv[optind]);
 		return 1;
 	}
 
@@ -197,7 +197,17 @@ int main(int argc, char *argv[])
 				buffer=strdupcati(buffer,(uint64_t)++filenum);
 			}
 			output=trace_create_output(buffer);
+			if (trace_is_err_output(output)) {
+				trace_perror_output(output,"%s",buffer);
+				free(buffer);
+				break;
+			}
 			trace_start_output(output);
+			if (trace_is_err_output(output)) {
+				trace_perror_output(output,"%s",buffer);
+				free(buffer);
+				break;
+			}
 			free(buffer);
 			filescreated ++;
 		}
