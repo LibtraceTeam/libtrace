@@ -621,7 +621,8 @@ DLLEXPORT void trace_destroy_dead(libtrace_t *libtrace) {
 DLLEXPORT void trace_destroy_output(libtrace_out_t *libtrace) 
 {
 	assert(libtrace);
-	libtrace->format->fin_output(libtrace);
+	if (libtrace->format)
+		libtrace->format->fin_output(libtrace);
 	free(libtrace->uridata);
 	free(libtrace);
 }
@@ -1329,7 +1330,9 @@ DLLEXPORT void trace_perror_output(libtrace_out_t *trace,const char *msg,...)
 	va_end(va);
 	if(trace->err.err_num) {
 		fprintf(stderr,"%s(%s): %s\n",
-				buf,trace->uridata,trace->err.problem);
+				buf,
+				trace->uridata?trace->uridata:"no uri",
+				trace->err.problem);
 	} else {
 		fprintf(stderr,"%s(%s): No error\n",buf,trace->uridata);
 	}
