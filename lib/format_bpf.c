@@ -23,7 +23,7 @@
  * along with libtrace; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
- * $Id: format_template.c,v 1.13 2005/11/22 23:38:56 dlawson Exp $
+ * $Id$
  *
  */
 
@@ -337,7 +337,7 @@ static void bpf_help() {
 }
 static struct libtrace_format_t bpf = {
 	"bpf",
-	"$Id: format_bpf.c,v 1.13 2005/11/22 23:38:56 dlawson Exp $",
+	"$Id$",
 	TRACE_FORMAT_BPF,
 	bpf_init_input,	 	/* init_input */
 	bpf_config_input,	/* config_input */

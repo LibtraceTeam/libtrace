@@ -24,7 +24,7 @@
  * along with libtrace; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
- * $Id: format_template.c,v 1.13 2005/11/22 23:38:56 dlawson Exp $
+ * $Id$
  *
  */
 
@@ -382,7 +382,7 @@ static void linuxnative_help(void) {
 }
 static struct libtrace_format_t linuxnative = {
 	"int",
-	"$Id: format_linuxnative.c,v 1.13 2005/11/22 23:38:56 dlawson Exp $",
+	"$Id$",
 	TRACE_FORMAT_LINUX_NATIVE,
 	linuxnative_init_input,	 	/* init_input */
 	linuxnative_config_input,	/* config_input */

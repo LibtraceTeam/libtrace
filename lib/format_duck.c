@@ -24,7 +24,7 @@
  * along with libtrace; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
- * $Id: format_template.c 691 2006-04-08 04:31:40Z perry $
+ * $Id$
  *
  */
 
@@ -271,7 +271,7 @@ static void duck_help(void) {
 }
 static struct libtrace_format_t duck = {
         "duck",
-        "$Id: format_duck.c 799 2006-05-12 05:07:59Z spa1 $",
+        "$Id$",
         TRACE_FORMAT_DUCK,
         duck_init_input,	        /* init_input */
         NULL,                           /* config_input */

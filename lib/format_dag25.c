@@ -25,7 +25,7 @@
  * along with libtrace; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
- * $Id: format_dag25.c 1 2006-12-14 21:13:09Z spa1 $
+ * $Id$
  *
  */
 #define _GNU_SOURCE
@@ -323,7 +323,7 @@ static libtrace_eventobj_t trace_event_dag(libtrace_t *trace,
 
 
 static void dag_help(void) {
-        printf("dag format module: $Revision: 1110 $\n");
+        printf("dag format module: $Revision$\n");
         printf("Supported input URIs:\n");
         printf("\tdag:/dev/dagn\n");
         printf("\n");
@@ -336,7 +336,7 @@ static void dag_help(void) {
 
 static struct libtrace_format_t dag = {
         "dag",
-        "$Id: format_dag25.c 0 2006-12-14 21:13:09Z spa1 $",
+        "$Id$",
         TRACE_FORMAT_ERF,
         dag_init_input,                 /* init_input */
         dag_config_input,               /* config_input */
