@@ -1,0 +1,23 @@
+.TH TRACESPLIT "1" "April 2007" "traceflow (libtrace)" "User Commands"
+.SH NAME
+traceflow \- Produce simplistic per flow statistics
+.SH SYNOPSIS
+.B traceflow
+inputuri ...
+.SH DESCRIPTION
+traceflow outputs one record per flow with the 5 tuple, number of bytes and
+packets sent and recieved.
+
+.SH EXAMPLES
+traceflow erf:/traces/smalltrace.gz
+.fi
+
+.SH LINKS
+More details about traceflow (and libtrace) can be found at
+http://www.wand.net.nz/trac/libtrace/wiki/UserDocumentation
+
+.SH SEE ALSO
+libtrace(3), tracemerge(1), tracefilter(1), traceconvert(1), tracesplit_dir(1),
+tracereport(1), tracertstats(1), tracestats(1), tracedump(1), traceanon(1),
+tracesummary(1)
+
