@@ -301,7 +301,8 @@ static int erf_fin_input(libtrace_t *libtrace) {
 }
 
 static int erf_fin_output(libtrace_out_t *libtrace) {
-	libtrace_io_close(OUTPUT.file);
+	if (OUTPUT.file)
+		libtrace_io_close(OUTPUT.file);
 	free(libtrace->format_data);
 	return 0;
 }
