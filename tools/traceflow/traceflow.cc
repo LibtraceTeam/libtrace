@@ -242,7 +242,7 @@ void per_packet(libtrace_packet_t *packet) {
 }
 
 void usage(char *prog) {
-	printf("You fail at using %s\n", prog);
+	fprintf(stderr,"Usage: %s tracefile...\n",prog);
 }
 
 int main(int argc, char *argv[]) {
