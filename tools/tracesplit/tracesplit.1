@@ -10,6 +10,7 @@ tracesplit \- split traces
 [ \fB-s \fRunixtime | \fB--starttime=\fRunixtime]
 [ \fB-e \fRunixtime | \fB--endtime=\fRunixtime]
 [ \fB-m \fRmaxfiles | \fB--maxfiles=\fRmaxfiles]
+[ \fB-S \fRsnaplen | \fB--snaplen=\fRsnaplen]
 inputuri outputuri ...
 .SH DESCRIPTION
 tracesplit splits one trace into multiple tracefiles
@@ -42,6 +43,10 @@ don't output any packets after unixtime
 .TP
 \fB\-m\fR maxfiles
 do not create more than "maxfiles" trace files
+
+.TP
+\fB\-S\fR snaplen
+Truncate packets to "snaplen" bytes long.
 
 .SH EXAMPLES
 create a 1MB erf trace of port 80 traffic.

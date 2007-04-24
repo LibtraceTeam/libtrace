@@ -37,6 +37,7 @@ static int usage(char *argv0)
 	"-e --endtime=time	End at time\n"
 	"-m --maxfiles=n	Create a maximum of n trace files\n"
 	"-H --libtrace-help	Print libtrace runtime documentation\n"
+	"-S --snaplen		Snap packets at the specified length\n"
 	,argv0);
 	exit(1);
 }
@@ -65,6 +66,7 @@ int main(int argc, char *argv[])
 	uint64_t totbyteslast=0;
 	uint64_t maxfiles = UINT64_MAX;
 	uint64_t filescreated = 0;
+	uint16_t snaplen = 0;
 	
 	if (argc<2) {
 		usage(argv[0]);
@@ -83,10 +85,11 @@ int main(int argc, char *argv[])
 			{ "interval",	   1, 0, 'i' },
 			{ "libtrace-help", 0, 0, 'H' },
 			{ "maxfiles", 	   1, 0, 'm' },
+			{ "snaplen",	   1, 0, 'S' },
 			{ NULL, 	   0, 0, 0   },
 		};
 
-		int c=getopt_long(argc, argv, "f:c:b:s:e:i:m:H",
+		int c=getopt_long(argc, argv, "f:c:b:s:e:i:m:S:H",
 				long_options, &option_index);
 
 		if (c==-1)
@@ -106,6 +109,8 @@ int main(int argc, char *argv[])
 			case 'i': interval=atoi(optarg);
 				  break;
 			case 'm': maxfiles=atoi(optarg);
+				  break;
+			case 'S': snaplen=atoi(optarg);
 				  break;
 			case 'H':
 				  trace_help();
@@ -141,6 +146,10 @@ int main(int argc, char *argv[])
 		
 		if (trace_read_packet(input,packet)<1) {
 			break;
+		}
+
+		if (snaplen>0) {
+			trace_set_capture_length(packet,snaplen);
 		}
 		
 		if (filter && !trace_apply_filter(filter,packet)) {
