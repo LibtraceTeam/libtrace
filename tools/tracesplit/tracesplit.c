@@ -183,15 +183,15 @@ int main(int argc, char *argv[])
 				break;
 			}
 			buffer=strdup(argv[optind+1]);
-			if (interval!=UINT64_MAX) {
+			if (interval!=UINT64_MAX && maxfiles>1) {
 				buffer=strdupcat(buffer,"-");
 				buffer=strdupcati(buffer,(uint64_t)firsttime);
 			}
-			if (count!=UINT64_MAX) {
+			if (count!=UINT64_MAX && maxfiles>1) {
 				buffer=strdupcat(buffer,"-");
 				buffer=strdupcati(buffer,(uint64_t)pktcount);
 			}
-			if (bytes!=UINT64_MAX) {
+			if (bytes!=UINT64_MAX && maxfiles>1) {
 				static int filenum=0;
 				buffer=strdupcat(buffer,"-");
 				buffer=strdupcati(buffer,(uint64_t)++filenum);
