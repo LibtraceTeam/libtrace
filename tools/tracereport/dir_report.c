@@ -19,21 +19,26 @@ void dir_per_packet(struct libtrace_packet_t *packet)
 void dir_report(void)
 {
 	int i;
-	printf("# Direction\n");
-	printf("%-20s \t%12s\t%12s\n","Direction","bytes","packets");
+	FILE *out = fopen("dir.out", "w");
+	if (!out) {
+		perror("fopen");
+		return;
+	}
+	fprintf(out, "%-20s \t%12s\t%12s\n","DIRECTION","BYTES","PACKETS");
 	for(i=0;i<8;++i) {
 		if (!dir_packets[i])
 			continue;
 		switch(i) {
-			case 0: printf("%20s:\t%12" PRIu64 "\t%12" PRIu64 "\n",
-					"in",dir_bytes[i],dir_packets[i]);
+			case 0: fprintf(out, "%20s:\t%12" PRIu64 "\t%12" PRIu64 "\n",
+					"Incoming",dir_bytes[i],dir_packets[i]);
 				break;
-			case 1: printf("%20s:\t%12" PRIu64 "\t%12" PRIu64 "\n",
-					"out",dir_bytes[i],dir_packets[i]);
+			case 1: fprintf(out, "%20s:\t%12" PRIu64 "\t%12" PRIu64 "\n",
+					"Outgoing",dir_bytes[i],dir_packets[i]);
 				break;
-			default: printf("%20i:\t%12" PRIu64 "\t%12" PRIu64 "\n",
+			default: fprintf(out, "%20i:\t%12" PRIu64 "\t%12" PRIu64 "\n",
 					i,dir_bytes[i],dir_packets[i]);
 				break;
 		}
 	}
+	fclose(out);
 }

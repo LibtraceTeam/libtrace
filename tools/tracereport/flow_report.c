@@ -47,6 +47,11 @@ void flow_per_packet(struct libtrace_packet_t *packet)
 
 void flow_report(void)
 {
-	printf("# Flows:\n");
-	printf("Flows: %" PRIu64 "\n",flow_count);
+	FILE *out = fopen("flows.out", "w");
+	if (!out) {
+		perror("fopen");
+		return;
+	}
+	fprintf(out, "Flows: %" PRIu64 "\n",flow_count);
+	fclose(out);
 }

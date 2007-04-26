@@ -21,10 +21,7 @@ void error_per_packet(struct libtrace_packet_t *packet)
 	/* This isn't quite as simple as it seems.
 	 *
 	 * If the packets were captured via wdcap's anonymisation module,
-	 * the checksum is set to 1 when it is correct and 0 if incorrect.
-	 *
-	 * Earlier versions of wdcap appear to set the checksum the other
-	 * way around.
+	 * the checksum is set to 0 when it is correct and 1 if incorrect.
 	 *
 	 * If a different capture method is used, there's a good chance the
 	 * checksum has not been altered
@@ -41,8 +38,15 @@ void error_per_packet(struct libtrace_packet_t *packet)
 
 void error_report(void)
 {
-	printf("# Errors:\n");
-	printf("RX Errors: %" PRIu64 "\n",rx_errors);
-	printf("IP Checksum errors: %" PRIu64 "\n",ip_errors);
+	FILE *out = fopen("error.out", "w");
+	if (!out) {
+		perror("fopen");
+		return;
+	}
+	
+	fprintf(out, "RX Errors: %" PRIu64 "\n",rx_errors);
+	fprintf(out, "IP Checksum errors: %" PRIu64 "\n",ip_errors);
 	/*printf("TCP Checksum errors: %" PRIu64 "\n",tcp_errors); */
+
+	fclose(out);
 }

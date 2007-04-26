@@ -8,6 +8,8 @@
 static stat_t ttl_stat[3][256] = {{{0,0}}} ;
 static bool suppress[3] = {true,true,true};
 
+FILE *out = NULL;
+
 void ttl_per_packet(struct libtrace_packet_t *packet)
 {
 	struct libtrace_ip *ip = trace_get_ip(packet);
@@ -24,57 +26,46 @@ void ttl_per_packet(struct libtrace_packet_t *packet)
 	suppress[dir] = false;
 }
 
-void ttl_suppress()
-{
-	int i;
-	printf("%-20s","Direction:");
-	for(i=0;i<3;i++){
-		if(!suppress[i]){
-			switch(i){
-				case 0:
-					printf("\t%24s", "Outbound   ");
-					break;
-				case 1:
-					printf("\t%24s", "Inbound   ");
-					break;
-				case 2:
-					printf("\t%24s", "Undefined   ");
-					break;
-				default:
-					break;
-			}
-		}
-	}
-	printf("\n");
-	printf("%-20s","TTL");
-	for(i=0;i<3;i++){
-		if(!suppress[i]){
-			printf("\t%12s\t%12s", "bytes","packets");
-		}
-	}
-	printf("\n");
-}
+	
 
 void ttl_report(void)
 {
 	int i,j;
-	printf("# TTL breakdown:\n");
-	ttl_suppress();
+	out = fopen("ttl.out", "w");
+	if (!out) {
+		perror("fopen");
+		return;
+	}
+	fprintf(out, "%-12s\t%10s\t%16s %16s\n",
+			"TTL",
+			"DIRECTION",
+			"BYTES",
+			"PACKETS");
 	for(i=0;i<256;++i) {
 		if (ttl_stat[0][i].count==0 && 
 			ttl_stat[1][i].count==0 && ttl_stat[2][i].count==0)
 			continue;
-		printf("%20i:",i);
+		fprintf(out, "%12i:",i);
 		for(j=0;j<3;j++){
-			if (ttl_stat[j][i].count==0){
-				if(!suppress[j])
-					printf("\t%24s"," ");
-				continue;
+			if (j != 0) {
+				fprintf(out, "%12s", " ");
 			}
-			printf("\t%12" PRIu64 "\t%12" PRIu64,
-				ttl_stat[j][i].bytes,
-				ttl_stat[j][i].count);
+			switch (j) {
+				case 0:
+					fprintf(out, "\t%10s", "Outbound");
+					break;
+				case 1:
+					fprintf(out, "\t%10s", "Inbound");
+					break;
+				case 2:
+					fprintf(out, "\t%10s", "Unknown");
+					break;
+			}
+			
+			fprintf(out, "\t%16llu %16llu\n",
+					ttl_stat[j][i].bytes,
+					ttl_stat[j][i].count);
 		}
-		printf("\n");
 	}
+	fclose(out);
 }
