@@ -25,6 +25,7 @@ tracereport_SOURCES = \
 	nlp_report.c\
 	ecn_report.c\
 	tcpsegment_report.c\
+	locality_report.c\
 	contain.h\
 	report.h\
 	tracereport.h

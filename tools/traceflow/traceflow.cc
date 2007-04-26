@@ -103,7 +103,7 @@ void update_expiry(Flow *flow, double ts) {
 	FlowList *lru = &active_lru;
 	
 	flow->expiry_ts = ts + timeout;
-	flow->flow_list->remove(flow);
+	flow->flow_list->erase(active_flows[flow->id]);
 	flow->flow_list = lru;
 	lru->push_front(flow);
 	active_flows[flow->id] = lru->begin();

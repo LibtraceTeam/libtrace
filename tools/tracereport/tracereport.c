@@ -109,6 +109,8 @@ void run_trace(char *uri, libtrace_filter_t *filter, int count)
 			ecn_per_packet(packet);
 		if (reports_required & REPORT_TYPE_TCPSEG)
 			tcpseg_per_packet(packet);
+		if (reports_required & REPORT_TYPE_LOCALITY)
+			locality_per_packet(packet);
 	}
 	trace_destroy(trace);
 }
@@ -131,6 +133,7 @@ void usage(char *argv0)
 	"-d --direction		Report direction\n"
 	"-C --ecn		Report TCP ECN information\n"
 	"-s --tcpsegment	\tReport TCP segment size\n"
+	"-l --locality=input	\tReport traffic locality using <input> to describe local IP addresses\n"
 	"-H --help		Print libtrace runtime documentation\n"
 	,argv0);
 	exit(1);
@@ -162,10 +165,11 @@ int main(int argc, char *argv[]) {
 			{ "direction", 		0, 0, 'd' },
 			{ "ecn",		0, 0, 'C' },
 			{ "tcpsegment", 	0, 0, 's' },
+			{ "locality", 		1, 0, 'l' },
 			{ NULL, 		0, 0, 0 }
 		};
-		opt = getopt_long(argc, argv, "f:HeFmPpTtOondCs", long_options,
-				&option_index);
+		opt = getopt_long(argc, argv, "f:HemFPpTtOondCsl:", 
+				long_options, &option_index);
 		if (opt == -1)
 			break;
 		
@@ -188,6 +192,12 @@ int main(int argc, char *argv[]) {
 			case 'H':
 				usage(argv[0]);
 				break;
+			case 'l':
+				if (locality_init(optarg) > 0)
+					reports_required |= REPORT_TYPE_LOCALITY;
+			case 'm':
+				reports_required |= REPORT_TYPE_MISC;
+				break;
 			case 'n':
 				reports_required |= REPORT_TYPE_NLP;
 				break;
@@ -196,9 +206,6 @@ int main(int argc, char *argv[]) {
 				break;
 			case 'o':
 				reports_required |= REPORT_TYPE_SYNOPT;
-				break;
-			case 'm':
-				reports_required |= REPORT_TYPE_MISC;
 				break;
 			case 'P':
 				reports_required |= REPORT_TYPE_PROTO;
@@ -266,5 +273,7 @@ int main(int argc, char *argv[]) {
 		ecn_report();
 	if (reports_required & REPORT_TYPE_TCPSEG)
 		tcpseg_report();
+	if (reports_required & REPORT_TYPE_LOCALITY)
+		locality_report();
 	return 0;
 }
