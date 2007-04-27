@@ -9,12 +9,12 @@
 #include <getopt.h>
 #include <stdlib.h>
 
-void per_packet(libtrace_packet_t *packet)
+static void per_packet(libtrace_packet_t *packet)
 {
 	/* Your code goes here */
 }
 
-void usage(char *argv0)
+static void usage(char *argv0)
 {
 	fprintf(stderr,"usage: %s [ --filter | -f bpfexp ]  [ --snaplen | -s snap ]\n\t\t[ --promisc | -p flag] [ --help | -h ] [ --libtrace-help | -H ] libtraceuri...\n",argv0);
 }

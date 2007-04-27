@@ -48,12 +48,13 @@
 #include <string.h>
 #include <libtrace.h>
 
-void per_packet(libtrace_packet_t *packet) {
+static void per_packet(libtrace_packet_t *packet) {
 
 	/* Your code goes here */
 }
 
-uint32_t event_read_packet(libtrace_t *trace, libtrace_packet_t *packet) {
+static uint32_t event_read_packet(libtrace_t *trace, libtrace_packet_t *packet) 
+{
 	libtrace_eventobj_t obj;
 	fd_set rfds;
 	struct timeval sleep_tv;

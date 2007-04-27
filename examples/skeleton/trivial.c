@@ -11,7 +11,7 @@
 #include <stdio.h>
 #include <assert.h>
 
-void per_packet(libtrace_packet_t *packet)
+static void per_packet(libtrace_packet_t *packet)
 {
 	/* You really should consider using complete.c instead */
 

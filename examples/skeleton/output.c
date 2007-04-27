@@ -7,7 +7,7 @@
 #include "libtrace.h"
 #include <stdio.h>
 
-void per_packet(libtrace_packet_t *packet)
+static void per_packet(libtrace_packet_t *packet)
 {
 	/* Your code goes here */
 }

@@ -160,9 +160,9 @@ int main(int argc, char *argv[]) {
 
 		ts = trace_get_seconds(packet);
 		if(last_second == 0) {
-			last_second = (int)ts;
-		} else if (last_second < (int)ts) {
-			last_second = (int)ts;
+			last_second = ts;
+		} else if (last_second < ts) {
+			last_second = ts;
 			docalc++;
 		}
 
