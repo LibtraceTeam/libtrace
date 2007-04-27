@@ -361,9 +361,9 @@ extern struct libtrace_format_t *form;
 void register_format(struct libtrace_format_t *format);
 
 libtrace_linktype_t pcap_linktype_to_libtrace(libtrace_dlt_t linktype);
+libtrace_rt_types_t pcap_linktype_to_rt(libtrace_dlt_t linktype);
 libtrace_dlt_t libtrace_to_pcap_linktype(libtrace_linktype_t type);
 libtrace_dlt_t libtrace_to_pcap_dlt(libtrace_linktype_t type);
-libtrace_rt_types_t pcap_dlt_to_rt(libtrace_dlt_t linktype);
 libtrace_dlt_t rt_to_pcap_linktype(libtrace_rt_types_t rt_type);
 libtrace_linktype_t erf_type_to_libtrace(uint8_t erf);
 uint8_t libtrace_to_erf_type(libtrace_linktype_t linktype);
