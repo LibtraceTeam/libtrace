@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include "libtrace.h"
 #include "tracereport.h"
+#include "report.h"
 
 static uint64_t dir_bytes[8];
 static uint64_t dir_packets[8];

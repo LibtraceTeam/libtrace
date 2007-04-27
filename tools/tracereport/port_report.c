@@ -7,6 +7,7 @@
 #include "libtrace.h"
 #include "tracereport.h"
 #include "contain.h"
+#include "report.h"
 
 stat_t *ports[3][256] = {{NULL}};
 char protn[256]={0};
@@ -39,7 +40,7 @@ void port_per_packet(struct libtrace_packet_t *packet)
 }
 
 
-void port_port(int i,char *prot, int j, FILE *out)
+static void port_port(int i,char *prot, int j, FILE *out)
 {
 	struct servent *ent = getservbyport(htons(j),prot);
 	int k;
@@ -74,7 +75,7 @@ void port_port(int i,char *prot, int j, FILE *out)
 	}
 }
 
-void port_protocol(int i, FILE *out)
+static void port_protocol(int i, FILE *out)
 {
 	int j,k;
 	struct protoent *ent = getprotobynumber(i);

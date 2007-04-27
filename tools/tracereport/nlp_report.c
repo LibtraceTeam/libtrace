@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include "libtrace.h"
 #include "tracereport.h"
+#include "report.h"
 
 static stat_t nlp_stat[3][65536] = {{{0,0}}} ;
 

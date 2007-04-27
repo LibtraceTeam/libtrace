@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include "libtrace.h"
 #include "tracereport.h"
+#include "report.h"
 
 static stat_t ecn_stat[3][4] = {{{0,0}}} ;
 

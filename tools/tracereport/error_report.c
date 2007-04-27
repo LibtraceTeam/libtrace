@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include "libtrace.h"
 #include "tracereport.h"
+#include "report.h"
 
 static uint64_t rx_errors = 0;
 static uint64_t ip_errors = 0;

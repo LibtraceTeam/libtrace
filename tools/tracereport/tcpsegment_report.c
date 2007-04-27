@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include "libtrace.h"
 #include "tracereport.h"
+#include "report.h"
 
 static stat_t tcpseg_stat[3][2048] = {{{0,0}}} ;
 static bool suppress[3] = {true,true,true};
@@ -30,7 +31,7 @@ void tcpseg_per_packet(struct libtrace_packet_t *packet)
 	suppress[dir] = false;
 }
 
-void tcpseg_suppress()
+static void tcpseg_suppress()
 {
 	int i;
 	printf("%-20s","Direction:");

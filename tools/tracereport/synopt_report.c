@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include "libtrace.h"
 #include "tracereport.h"
-
+#include "report.h"
 
 struct tcp_opts {
 	bool mss;
@@ -37,7 +37,7 @@ struct opt_counter {
 struct opt_counter counts = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 uint64_t total_syns = 0;
 
-void classify_packet(struct tcp_opts opts) {
+static void classify_packet(struct tcp_opts opts) {
 	if (!opts.mss && !opts.sack && !opts.winscale && !opts.ts && !opts.ttcp && !opts.other)
 	{
 		counts.no_options ++;

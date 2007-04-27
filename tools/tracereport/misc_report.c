@@ -5,6 +5,7 @@
 #include <string.h>
 #include "libtrace.h"
 #include "tracereport.h"
+#include "report.h"
 
 static double starttime;
 static double endtime;
