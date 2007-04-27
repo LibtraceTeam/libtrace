@@ -1,10 +1,11 @@
 #include "libtrace.h"
 #include <stdio.h>
+#include <inttypes.h>
 
+static uint64_t ignored = 0;
 
 static struct libtrace_out_t *create_output(char *uri) {
 	struct libtrace_out_t *output = NULL;
-	libtrace_err_t trace_err;
 	output = trace_create_output(uri);
 	if (trace_is_err_output(output)) {
 		trace_perror_output(output,"%s",uri);
@@ -53,7 +54,7 @@ int main(int argc, char *argv[]) {
 			break;
 
 		switch(trace_get_direction(packet)) {
-			case 0:
+			case TRACE_DIR_INCOMING:
 				if (!out_write) {
 					out_write = create_output(argv[3]);
 					if (!out_write)
@@ -64,7 +65,7 @@ int main(int argc, char *argv[]) {
 					return 1;
 				}
 				break;
-			case 1:
+			case TRACE_DIR_OUTGOING:
 				if (!in_write) {
 					in_write = create_output(argv[2]);
 					if (!in_write)
@@ -75,6 +76,8 @@ int main(int argc, char *argv[]) {
 					return 1;
 				}
 				break;
+			default:
+				ignored++;
 		}
 
 	}
@@ -84,6 +87,10 @@ int main(int argc, char *argv[]) {
 		trace_destroy_output(in_write);
 	trace_destroy(input);
 	trace_destroy_packet(packet);
+
+	if (ignored)
+		fprintf(stderr,"warning: Ignored %" PRIu64 " packets with unknown directions\n",
+				ignored);
 	
 	return 0;
 }
