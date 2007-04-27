@@ -293,7 +293,7 @@ bool demote_packet(libtrace_packet_t *packet)
 			packet->type=pcap_linktype_to_rt(TRACE_DLT_ATM_RFC1483);
 			
 			if (trace == NULL) {
-				trace = trace_create_dead("pcap:-");
+				trace = trace_create_dead("pcapfile:-");
 			}
 
 			packet->trace=trace;
