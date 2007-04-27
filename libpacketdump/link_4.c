@@ -190,7 +190,7 @@ void decode_80211_vendor_ie(ieee80211_ie *ie) {
  * Takes a pointer to the start of the IEs in a beacon and the
  * length remaining and decodes the IEs.
  */
-void decode_80211_information_elements(char *pkt, int len) {
+void decode_80211_information_elements(char *pkt, unsigned len) {
 	ieee80211_ie *ie;
 	int i = 0;
 	uint8_t * data;
@@ -424,7 +424,7 @@ void decode_80211_capinfo(ieee80211_capinfo *c) {
 }
 	
 /* Decodes a beacon (or a probe response) */
-void decode_80211_beacon(char *pkt, int len) {
+void decode_80211_beacon(char *pkt, unsigned len) {
 	ieee80211_beacon *b = (ieee80211_beacon *)pkt;
 	if (len < sizeof(ieee80211_beacon)) {
 		printf(" 802.11MAC: [Truncated]\n");
@@ -438,7 +438,7 @@ void decode_80211_beacon(char *pkt, int len) {
 	decode_80211_information_elements((char *) pkt + sizeof(ieee80211_beacon), len - sizeof(ieee80211_beacon));		
 }
 
-void decode_80211_assoc_request(char *pkt, int len) {
+void decode_80211_assoc_request(char *pkt, unsigned len) {
 	ieee80211_assoc_req *a = (ieee80211_assoc_req *) pkt;
 	
 	if (len < sizeof(ieee80211_assoc_req)) {
@@ -452,7 +452,7 @@ void decode_80211_assoc_request(char *pkt, int len) {
 	decode_80211_information_elements((char *)pkt + sizeof(ieee80211_assoc_req), len - sizeof(ieee80211_assoc_req));
 }
 
-void decode_80211_assoc_response(char *pkt, int len) {
+void decode_80211_assoc_response(char *pkt, unsigned len) {
 	ieee80211_assoc_resp *r = (ieee80211_assoc_resp *) pkt;
 
 	if (len < sizeof(ieee80211_assoc_resp)) {
@@ -467,7 +467,7 @@ void decode_80211_assoc_response(char *pkt, int len) {
 	decode_80211_information_elements((char *)pkt + sizeof(ieee80211_assoc_resp), len-sizeof(ieee80211_assoc_resp));
 }
 	
-void decode_80211_reassoc_request(char *pkt, int len) {
+void decode_80211_reassoc_request(char *pkt, unsigned len) {
 	ieee80211_reassoc_req *r = (ieee80211_reassoc_req *) pkt;
 
 	if (len < sizeof(ieee80211_reassoc_req)) {
@@ -481,7 +481,7 @@ void decode_80211_reassoc_request(char *pkt, int len) {
 	decode_80211_information_elements((char *)pkt + sizeof(ieee80211_reassoc_req), len - sizeof(ieee80211_reassoc_req));
 
 }
-void decode_80211_authentication_frame(char *pkt, int len) {
+void decode_80211_authentication_frame(char *pkt, unsigned len) {
 	ieee80211_auth *auth = (ieee80211_auth *)pkt;
 	if(len < sizeof(ieee80211_auth)) {
 		printf(" [Truncated authentication frame]\n");
@@ -496,7 +496,7 @@ void decode_80211_authentication_frame(char *pkt, int len) {
 
 }
 
-void decode_80211_mgmt(char *pkt, int len) {
+void decode_80211_mgmt(char *pkt, unsigned len) {
 	ieee80211_mgmt_frame *mgmt = (ieee80211_mgmt_frame *)pkt;
 	uint8_t *data;
 	
@@ -579,7 +579,7 @@ void decode_80211_mgmt(char *pkt, int len) {
 
 }
 
-void decode_80211_ctrl(char *pkt, int len) {
+void decode_80211_ctrl(char *pkt, unsigned len) {
 	ieee80211_ctrl_frame_1addr *ctrl1 = (ieee80211_ctrl_frame_1addr *) pkt;
 	ieee80211_ctrl_frame_2addr *ctrl2 = (ieee80211_ctrl_frame_2addr *) pkt;
 	printf(" 802.11MAC: Control frame: ");
@@ -649,7 +649,7 @@ void decode_80211_ctrl(char *pkt, int len) {
 
 }
 
-void decode_80211_data(char *pkt, int len) {
+void decode_80211_data(char *pkt, unsigned len) {
 	ieee80211_data_frame *data = (ieee80211_data_frame *) pkt;
 	ieee80211_qos_data_frame *qos = (ieee80211_qos_data_frame *)pkt;
 	ieee80211_payload *pld; 
@@ -731,7 +731,7 @@ void decode_80211_data(char *pkt, int len) {
 	
 }
 
-void decode(int link_type, char *pkt, int len) 
+void decode(int link_type, char *pkt, unsigned len) 
 {
 	ieee80211_frame_control *fc;
 	
