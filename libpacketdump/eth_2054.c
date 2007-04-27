@@ -21,7 +21,6 @@
  */
 char *format_hrd(struct arphdr *arp, char *hrd) {
 	static char buffer[1024] = {0,};
-	uint8_t *addr = (uint8_t *)hrd;
 	int i;
 
 	if (!hrd) {
@@ -77,7 +76,7 @@ char *format_pro(struct arphdr *arp, char *pro) {
 	
 }
 	
-void decode(int link_type,char *packet,int len)
+void decode(int link_type,char *packet,unsigned len)
 {
 	struct arphdr *arp = (struct arphdr*)packet;
 	char *source_hrd = NULL;
