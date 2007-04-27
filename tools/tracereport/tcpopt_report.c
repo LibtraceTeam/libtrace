@@ -109,7 +109,7 @@ void tcpopt_report(void)
 					break;
 			}
 			
-			fprintf(out, "\t%16llu %16llu\n",
+			fprintf(out, "\t%16" PRIu64 " %16" PRIu64 "\n",
 				tcpopt_stat[j][i].bytes,
 				tcpopt_stat[j][i].count);
 		}

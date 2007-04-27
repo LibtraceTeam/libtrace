@@ -8,8 +8,6 @@
 static stat_t ttl_stat[3][256] = {{{0,0}}} ;
 static bool suppress[3] = {true,true,true};
 
-FILE *out = NULL;
-
 void ttl_per_packet(struct libtrace_packet_t *packet)
 {
 	struct libtrace_ip *ip = trace_get_ip(packet);
@@ -31,7 +29,7 @@ void ttl_per_packet(struct libtrace_packet_t *packet)
 void ttl_report(void)
 {
 	int i,j;
-	out = fopen("ttl.rpt", "w");
+	FILE *out = fopen("ttl.rpt", "w");
 	if (!out) {
 		perror("fopen");
 		return;
@@ -62,7 +60,7 @@ void ttl_report(void)
 					break;
 			}
 			
-			fprintf(out, "\t%16llu %16llu\n",
+			fprintf(out, "\t%16" PRIu64 " %16" PRIu64 "\n",
 					ttl_stat[j][i].bytes,
 					ttl_stat[j][i].count);
 		}

@@ -61,7 +61,7 @@ void tos_report(void)
 					fprintf(out, "\t%10s", "Unknown");
 					break;
 			}
-			fprintf(out, "\t%16llu %16llu\n",
+			fprintf(out, "\t%16" PRIu64 " %16" PRIu64 "\n",
 				tos_stat[j][i].bytes,
 				tos_stat[j][i].count);
 		}

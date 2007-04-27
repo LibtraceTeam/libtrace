@@ -68,12 +68,16 @@ static char *duration(double ts)
 
 void misc_report(void)
 {
-	printf("# Misc\n");
-	printf("Start time: %.04f (%s)\n",starttime,ts_to_date(starttime));
-	printf("End time: %.04f (%s)\n",endtime,ts_to_date(endtime));
-	printf("Duration: %.04f (%s)\n",endtime-starttime,
+	FILE *out = fopen("misc.rpt", "w");
+	if (!out) {
+		perror("fopen");
+		return;
+	}
+	fprintf(out, "Start time: %.04f (%s)\n",starttime,ts_to_date(starttime));
+	fprintf(out, "End time: %.04f (%s)\n",endtime,ts_to_date(endtime));
+	fprintf(out, "Duration: %.04f (%s)\n",endtime-starttime,
 			duration(endtime-starttime));
-	printf("Total Packets: %" PRIu64 "\n",packets);
-	printf("Average packet rate: %.02f packets/sec\n",
+	fprintf(out, "Total Packets: %" PRIu64 "\n",packets);
+	fprintf(out, "Average packet rate: %.02f packets/sec\n",
 			packets/(endtime-starttime));
 }

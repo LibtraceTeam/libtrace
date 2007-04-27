@@ -75,7 +75,7 @@ void ecn_report(void)
 					fprintf(out, "\t%10s", "Unknown");
 					break;
 			}
-			fprintf(out, "\t%16llu %16llu\n",
+			fprintf(out, "\t%16" PRIu64 " %16" PRIu64 "\n",
 				ecn_stat[j][i].bytes,
 				ecn_stat[j][i].count);
 		}

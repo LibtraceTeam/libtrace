@@ -38,83 +38,52 @@ void port_per_packet(struct libtrace_packet_t *packet)
 	suppress[dir] = false;
 }
 
-void port_suppress()
-{
-	int i;
-	printf("%-20s","Direction:");
-	for(i=0;i<3;i++){
-		if(!suppress[i]){
-			switch(i){
-				case 0:
-					printf("\t%24s", "Outbound   ");
-					break;
-				case 1:
-					printf("\t%24s", "Inbound   ");
-					break;
-				case 2:
-					printf("\t%24s", "Undefined   ");
-					break;
-				default:
-					break;
-			}
-		}
-	}
-	printf("\n");
-	printf("%-20s","Port");
-	for(i=0;i<3;i++){
-		if(!suppress[i]){
-			printf("\t%12s\t%12s", "bytes","packets");
-		}
-	}
-	printf("\n");
-}
 
-void port_port(int i,char *prot, int j)
+void port_port(int i,char *prot, int j, FILE *out)
 {
 	struct servent *ent = getservbyport(htons(j),prot);
 	int k;
 	
 	if(ent){
-		printf("%20s:",ent->s_name);
-		for(k=0;k<3;k++){
-			if (!ports[k][i] || ports[k][i][j].count==0){
-				if(!suppress[k])
-					printf("\t%24s"," ");
-				continue;
-			}
-			printf("\t%12" PRIu64 "\t%12" PRIu64,
-				ports[k][i][j].bytes,
-				ports[k][i][j].count
-		      );
-		}
+		fprintf(out,"%16s:",ent->s_name);
 	}
 	else{
-		printf("%20i:",j);
-		for(k=0;k<3;k++){
-			if (!ports[k][i] || ports[k][i][j].count==0){
-				if(!suppress[k])
-					printf("\t%24s"," ");
-				continue;
-			}
-			printf("\t%12" PRIu64 "\t%12" PRIu64,
-				ports[k][i][j].bytes,
-				ports[k][i][j].count
-		      );
-		}
+		fprintf(out,"%16i:",j);
 	}
-	printf("\n");
+
+	for (k = 0; k < 3; k++) {
+		if (!ports[k][i])
+			continue;
+		if (k != 0) {
+			fprintf(out, "%16s", " ");
+		}
+		switch (k) {
+			case 0:
+	                        fprintf(out, "\t%10s", "Outbound");
+                                break;
+			case 1:
+				fprintf(out, "\t%10s", "Inbound");
+				break;
+			case 2:
+				fprintf(out, "\t%10s", "Unknown");
+				break;
+		}
+		fprintf(out, "\t%16" PRIu64 " %16" PRIu64 "\n",
+			ports[k][i][j].bytes,
+			ports[k][i][j].count);
+	}
 }
 
-void port_protocol(int i)
+void port_protocol(int i, FILE *out)
 {
 	int j,k;
 	struct protoent *ent = getprotobynumber(i);
-	printf("Protocol: %i %s%s%s\n",i,
+	fprintf(out, "Protocol: %i %s%s%s\n",i,
 			ent?"(":"",ent?ent->p_name:"",ent?")":"");
 	for(j=0;j<65536;++j) {
 		for(k=0;k<3;k++){
 			if (ports[k][i] && ports[k][i][j].count) {
-				port_port(i,ent?ent->p_name:"",j);
+				port_port(i,ent?ent->p_name:"",j, out);
 				break;
 			}
 		}
@@ -124,13 +93,22 @@ void port_protocol(int i)
 void port_report(void)
 {
 	int i;
-	printf("# Port breakdown:\n");
-	port_suppress();
+	FILE *out = fopen("ports.rpt", "w");
+	if (!out) {
+		perror("fopen");
+		return;
+	}
+	fprintf(out, "%-16s\t%10s\t%16s %16s\n",
+                        "PORT",
+                        "DIRECTION",
+                        "BYTES",
+                        "PACKETS");	
+
 	setservent(1);
 	setprotoent(1);
 	for(i=0;i<256;++i) {
 		if (protn[i]) {
-			port_protocol(i);
+			port_protocol(i, out);
 			free(ports[0][i]);
 			free(ports[1][i]);
 			free(ports[2][i]);
@@ -138,4 +116,5 @@ void port_report(void)
 	}
 	endprotoent();
 	endservent();
+	fclose(out);
 }

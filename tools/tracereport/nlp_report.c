@@ -78,7 +78,7 @@ void nlp_report(void){
 					break;
 			}
 			
-			fprintf(out, "\t%16llu %16llu\n",
+			fprintf(out, "\t%16" PRIu64 " %16" PRIu64 "\n",
 				nlp_stat[j][i].bytes,
 				nlp_stat[j][i].count);
 		}
