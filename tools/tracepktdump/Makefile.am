@@ -4,4 +4,4 @@ EXTRA_DIST = $(man_MANS)
 
 include ../Makefile.tools
 tracepktdump_SOURCES = tracepktdump.cc
-tracepktdump_LDADD = -ltrace -lpacketdump -lfl
+tracepktdump_LDADD = -ltrace -lpacketdump 
