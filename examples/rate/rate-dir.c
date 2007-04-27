@@ -79,7 +79,7 @@ static int32_t smoothed(int32_t smoothed, int32_t instant, int32_t alpha) {
         return alpha * smoothed + (1-alpha) * instant;
 }
 
-void secondreport() {
+static void secondreport() {
         int i;
         static int hdrcount = 10;
 

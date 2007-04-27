@@ -68,7 +68,7 @@ int32_t counter[MAXCOUNTERTYPE][MAXCOUNTERFRAME];
 struct timeval current,last,diff,total;
 
 
-void secondreport() {
+static void secondreport() {
 
         static int hdrcount = 10;
 
@@ -138,9 +138,9 @@ int main(int argc, char *argv[]) {
 
 		ts = trace_get_seconds(packet);
 		if(last_second == 0) {
-			last_second = (int)ts;
-		} else if (last_second < (int)ts) {
-			last_second = (int)ts;
+			last_second = ts;
+		} else if (last_second < ts) {
+			last_second = ts;
 			docalc++;
 		}
 
