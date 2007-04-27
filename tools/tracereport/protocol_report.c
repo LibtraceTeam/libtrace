@@ -25,42 +25,20 @@ void protocol_per_packet(struct libtrace_packet_t *packet)
 	suppress[dir] = false;
 }
 
-void protocol_suppress()
-{
-	int i;
-	printf("%-20s","Direction:");
-	for(i=0;i<3;i++){
-		if(!suppress[i]){
-			switch(i){
-				case 0:
-					printf("\t%24s", "Outbound   ");
-					break;
-				case 1:
-					printf("\t%24s", "Inbound   ");
-					break;
-				case 2:
-					printf("\t%24s", "Undefined   ");
-					break;
-				default:
-					break;
-			}
-		}
-	}
-	printf("\n");
-	printf("%-20s","Protocol");
-	for(i=0;i<3;i++){
-		if(!suppress[i]){
-			printf("\t%12s\t%12s", "bytes","packets");
-		}
-	}
-	printf("\n");
-}
-
 void protocol_report(void)
 {
 	int i,j;
-	printf("# Protocol breakdown:\n");
-	protocol_suppress();
+	FILE *out = fopen("protocol.rpt", "w");
+	if (!out) {
+		perror("fopen");
+		return;
+	}
+	fprintf(out, "%-16s\t%10s\t%16s %16s\n",
+			"PROTOCOL",
+			"DIRECTION",
+			"BYTES",
+			"PACKETS");
+	
 	setprotoent(1);
 	for(i=0;i<256;++i) {
 		struct protoent *prot;
@@ -69,32 +47,33 @@ void protocol_report(void)
 			continue;
 		prot = getprotobynumber(i);
 		if (prot) {
-			printf("%20s",prot->p_name);
-			for(j=0;j<3;j++){
-				if (prot_stat[j][i].count==0){
-					if(!suppress[j])
-						printf("\t%24s"," ");
-					continue;
-				}
-				printf("\t%12" PRIu64 "\t%12" PRIu64,
-						prot_stat[j][i].bytes,
-						prot_stat[j][i].count);
-			}
+			fprintf(out, "%16s",prot->p_name);
 		}
 		else {
-			printf("%20i:",i);
-			for(j=0;j<3;j++){
-				if (prot_stat[j][i].count==0){
-					if(!suppress[j])
-						printf("\t%24s"," ");
-					continue;
-				}
-				printf("\t%12" PRIu64 "\t%12" PRIu64,
-						prot_stat[j][i].bytes,
-						prot_stat[j][i].count);
-			}
+			fprintf(out, "%16i:",i);
 		}
-		printf("\n");
+		for (j=0; j < 3; j++) {
+			if (j != 0) {
+				fprintf(out, "%16s", " ");
+			}
+			switch (j) {
+				case 0:
+                                        fprintf(out, "\t%10s", "Outbound");
+                                        break;
+                                case 1:
+                                        fprintf(out, "\t%10s", "Inbound");
+                                        break;
+                                case 2:
+                                        fprintf(out, "\t%10s", "Unknown");
+                                        break;
+                        }
+
+                        fprintf(out, "\t%16llu %16llu\n",
+                                        prot_stat[j][i].bytes,
+                                        prot_stat[j][i].count);
+                }
 	}
+
 	setprotoent(0);
+	fclose(out);
 }

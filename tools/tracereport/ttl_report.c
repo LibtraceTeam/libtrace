@@ -31,7 +31,7 @@ void ttl_per_packet(struct libtrace_packet_t *packet)
 void ttl_report(void)
 {
 	int i,j;
-	out = fopen("ttl.out", "w");
+	out = fopen("ttl.rpt", "w");
 	if (!out) {
 		perror("fopen");
 		return;

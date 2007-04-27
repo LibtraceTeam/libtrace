@@ -159,7 +159,7 @@ void synopt_per_packet(struct libtrace_packet_t *packet)
 void synopt_report(void)
 {
 	
-	FILE *out = fopen("tcpopt_syn.out", "w");
+	FILE *out = fopen("tcpopt_syn.rpt", "w");
 	if (!out) {
 		perror("fopen");
 		return;

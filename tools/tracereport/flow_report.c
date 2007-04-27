@@ -47,7 +47,7 @@ void flow_per_packet(struct libtrace_packet_t *packet)
 
 void flow_report(void)
 {
-	FILE *out = fopen("flows.out", "w");
+	FILE *out = fopen("flows.rpt", "w");
 	if (!out) {
 		perror("fopen");
 		return;

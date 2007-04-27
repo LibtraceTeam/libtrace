@@ -45,7 +45,7 @@ void tcpopt_report(void)
 	
 	int i,j;
 	
-	FILE *out = fopen("tcpopt.out", "w");
+	FILE *out = fopen("tcpopt.rpt", "w");
 	if (!out) {
 		perror("fopen");
 		return;

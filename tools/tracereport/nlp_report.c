@@ -23,7 +23,7 @@ void nlp_per_packet(struct libtrace_packet_t *packet)
 void nlp_report(void){
 	int i,j;
 	
-	FILE *out = fopen("nlp.out", "w");
+	FILE *out = fopen("nlp.rpt", "w");
 	if (!out) {
 		perror("fopen");
 		return;

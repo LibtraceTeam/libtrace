@@ -11,8 +11,10 @@ static bool suppress[3] = {true,true,true};
 void tcpseg_per_packet(struct libtrace_packet_t *packet)
 {
 	struct libtrace_tcp *tcp = trace_get_tcp(packet);
+	libtrace_ip_t *ip = trace_get_ip(packet);
 	libtrace_direction_t dir = trace_get_direction(packet);
-	int payload, tcplen, ss;
+	int ss;
+	uint16_t ip_len ;
 	
 	if (!tcp)
 		return;
@@ -20,9 +22,8 @@ void tcpseg_per_packet(struct libtrace_packet_t *packet)
 	if (dir != TRACE_DIR_INCOMING && dir != TRACE_DIR_OUTGOING)
 		dir = TRACE_DIR_OTHER;
 	
-	payload = trace_get_wire_length(packet) - trace_get_capture_length(packet);
-	tcplen = tcp->doff * 4;
-	ss = payload + tcplen;
+	ip_len = ntohs(ip->ip_len);
+	ss = ip_len - (ip->ip_hl * 4);
 
 	tcpseg_stat[dir][ss].count++;
 	tcpseg_stat[dir][ss].bytes+=trace_get_wire_length(packet);
@@ -63,23 +64,41 @@ void tcpseg_suppress()
 void tcpseg_report(void)
 {
 	int i,j;
-	printf("# TCP Segment Size breakdown:\n");
-	tcpseg_suppress();
+	FILE *out = fopen("tcpseg.rpt", "w");
+	if (!out) {
+		perror("fopen");
+		return;
+	}
+	fprintf(out, "%-16s\t%10s\t%16s %16s\n",
+			"SEGMENT SIZE",
+			"DIRECTION",
+			"BYTES",
+			"PACKETS");
+	
 	for(i=0;i<2048;++i) {
 		if (tcpseg_stat[0][i].count==0 && 
 			tcpseg_stat[1][i].count==0 && tcpseg_stat[2][i].count==0)
 			continue;
-		printf("%20i:",i);
+		fprintf(out, "%16i:",i);
 		for(j=0;j<3;j++){
-			if (tcpseg_stat[j][i].count==0){
-				if(!suppress[j])
-					printf("\t%24s"," ");
-				continue;
+			if (j != 0) {
+				fprintf(out, "%16s", " ");
 			}
-			printf("\t%12" PRIu64 "\t%12" PRIu64,
+			switch (j) {
+                                case 0:
+                                        fprintf(out, "\t%10s", "Outbound");
+                                        break;
+                                case 1:
+                                        fprintf(out, "\t%10s", "Inbound");
+                                        break;
+                                case 2:
+                                        fprintf(out, "\t%10s", "Unknown");
+                                        break;
+                        }
+			fprintf(out, "\t%16llu %16llu\n",
 				tcpseg_stat[j][i].bytes,
-				tcpseg_stat[j][i].count);
+				tcpseg_stat[j][i].count);	
 		}
-		printf("\n");
 	}
+	fclose(out);
 }

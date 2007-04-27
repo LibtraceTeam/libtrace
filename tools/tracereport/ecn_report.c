@@ -28,7 +28,7 @@ void ecn_report(void)
 {
 	int i,j;
 	
-	FILE *out = fopen("ecn.out", "w");
+	FILE *out = fopen("ecn.rpt", "w");
 	if (!out) {
 		perror("fopen");
 		return;

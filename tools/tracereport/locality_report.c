@@ -137,7 +137,7 @@ void locality_report(void) {
 	uint64_t total_bytes = 0;
 	uint64_t total_packets = 0;
 	
-	FILE *out = fopen("locality.out", "w");
+	FILE *out = fopen("locality.rpt", "w");
 	if (!out) {
 		perror("fopen");
 		return;

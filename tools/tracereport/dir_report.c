@@ -19,7 +19,7 @@ void dir_per_packet(struct libtrace_packet_t *packet)
 void dir_report(void)
 {
 	int i;
-	FILE *out = fopen("dir.out", "w");
+	FILE *out = fopen("dir.rpt", "w");
 	if (!out) {
 		perror("fopen");
 		return;

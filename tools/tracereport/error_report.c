@@ -38,7 +38,7 @@ void error_per_packet(struct libtrace_packet_t *packet)
 
 void error_report(void)
 {
-	FILE *out = fopen("error.out", "w");
+	FILE *out = fopen("error.rpt", "w");
 	if (!out) {
 		perror("fopen");
 		return;
