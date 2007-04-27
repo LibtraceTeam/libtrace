@@ -19,7 +19,7 @@
 #define DISPLAYL(x,fmt) DISPLAY_EXP(x,fmt,htonl(tcp->x))
 #define DISPLAYIP(x,fmt) DISPLAY_EXP(x,fmt,inet_ntoa(*(struct in_addr*)&tcp->x))
 
-void decode(int link_type,char *packet,int len)
+void decode(int link_type,char *packet,unsigned len)
 {
 	libtrace_tcp_t *tcp = (libtrace_tcp_t *)packet;
 	printf(" TCP:");

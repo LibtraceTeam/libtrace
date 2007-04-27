@@ -16,7 +16,7 @@
 		lhs=num&((1<<(n+1))-1);				\
 	} while(0)
 
-void decode(int link_type,char *packet,int len)
+void decode(int link_type,char *packet,unsigned len)
 {
 	int offset=0;
 	int value;

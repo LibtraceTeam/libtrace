@@ -14,7 +14,7 @@
 			packet+=2;		\
 		} while(0)
 
-static void decode_eap_request(char *packet, int len)
+static void decode_eap_request(char *packet, unsigned len)
 {
 	int v;
 	POPBYTE(v);
@@ -33,7 +33,7 @@ static void decode_eap_request(char *packet, int len)
 	}
 }
 
-static void decode_eap(char *packet, int len)
+static void decode_eap(char *packet, unsigned len)
 {
 	int v;
 	POPWORD(v);
@@ -53,14 +53,14 @@ static void decode_eap(char *packet, int len)
 	
 }
 
-static void decode_eapol_start(char *packet, int len)
+static void decode_eapol_start(char *packet, unsigned len)
 {
 	int v;
 	POPWORD(v);
 	printf(" 802.1x: Length: %d\n",v);
 }
 
-static void decode_eapol_logoff(char *packet, int len)
+static void decode_eapol_logoff(char *packet, unsigned len)
 {
 	int v;
 	POPWORD(v);
@@ -76,21 +76,21 @@ struct key_descriptor {
 		uint8_t key_signature[44-29];
 };
 
-static void decode_eapol_key(char *packet, int len)
+static void decode_eapol_key(char *packet, unsigned len)
 {
 	int v;
 	POPWORD(v);
 	printf(" 802.1x: Length: %d\n",v);
 }
 
-static void decode_eapol_encapsulated_asf_alert(char *packet, int len)
+static void decode_eapol_encapsulated_asf_alert(char *packet, unsigned len)
 {
 	int v;
 	POPWORD(v);
 	printf(" 802.1x: Length: %d\n",v);
 }
 
-void decode(int link_type,char *packet,int len)
+void decode(int link_type,char *packet,unsigned len)
 {
 	int offset;
 	int v;

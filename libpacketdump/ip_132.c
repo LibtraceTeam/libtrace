@@ -150,7 +150,7 @@ static void parse_options(char *offset, int vlen)
     }
 }
 
-void decode(int link_type,char *packet,int len)
+void decode(int link_type,char *packet,unsigned len)
 {
     struct sctp_common_hdr *hdr;
     struct sctp_chunk_hdr *chunk;

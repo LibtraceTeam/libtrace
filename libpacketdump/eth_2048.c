@@ -20,7 +20,7 @@
 #define DISPLAYS(x,fmt) DISPLAY_EXP(x,fmt,htons(ip->x))
 #define DISPLAYIP(x,fmt) DISPLAY_EXP(x,fmt,inet_ntoa(*(struct in_addr*)&ip->x))
 
-void decode(int link_type,char *packet,int len)
+void decode(int link_type,char *packet,unsigned len)
 {
 	libtrace_ip_t *ip = (libtrace_ip_t*)packet;
 	if (len>=1) {

@@ -46,33 +46,7 @@ static char *dccp_types[]={
 	"DCCP-Move packet",
 	};
 
-int get_next_option(unsigned char **ptr,int *len,
-			unsigned char *type,
-			unsigned char *optlen,
-			unsigned char **data)
-{
-	if (*len<=0)
-		return 0;
-	*type=**ptr;
-	switch(*type) {
-		case 0:
-			return 0;
-		case 1:
-			(*ptr)++;
-			(*len)--;
-			return 1;
-		default:
-			*optlen = *(*ptr+1);
-			(*len)-=*optlen;
-			(*data)=(*ptr+2);
-			(*ptr)+=*optlen;
-			if (*len<0)
-				return 0;
-			return 1;
-	}
-}
-
-void decode(int link_type,char *packet,int len)
+void decode(int link_type,char *packet,unsigned len)
 {
 	struct dccphdr *dccp = (struct dccphdr*)packet;
 	DISPLAYS(source," DCCP: Source %i");
