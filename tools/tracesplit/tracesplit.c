@@ -44,7 +44,7 @@ static int usage(char *argv0)
 
 int done=0;
 
-void cleanup_signal(int sig)
+static void cleanup_signal(int sig)
 {
 	done=1;
 }
