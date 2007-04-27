@@ -1257,7 +1257,7 @@ DLLEXPORT const char * trace_parse_uri(const char *uri, char **format) {
                 return 0;
         }
 
-        if ((uridata - uri) > URI_PROTO_LINE) {
+        if ((unsigned)(uridata - uri) > URI_PROTO_LINE) {
                 /* badly formed URI - uri type is too long */
                 return 0;
         }
