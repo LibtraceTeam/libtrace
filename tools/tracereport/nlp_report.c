@@ -11,8 +11,12 @@ static stat_t nlp_stat[3][65536] = {{{0,0}}} ;
 void nlp_per_packet(struct libtrace_packet_t *packet)
 {
 	char *link=(char *)trace_get_link(packet);
-	uint16_t type = htons(*(uint16_t*)(link+12));
+	uint16_t type;
 	libtrace_direction_t dir = trace_get_direction(packet);
+	
+	if (!link)
+		return;
+	type = htons(*(uint16_t*)(link+12));
 
 	if (dir != TRACE_DIR_INCOMING && dir != TRACE_DIR_OUTGOING)
 		dir = TRACE_DIR_OTHER;
