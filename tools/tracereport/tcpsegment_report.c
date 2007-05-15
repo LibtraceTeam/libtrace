@@ -17,7 +17,7 @@ void tcpseg_per_packet(struct libtrace_packet_t *packet)
 	int ss;
 	uint16_t ip_len ;
 	
-	if (!tcp)
+	if (!tcp || !ip)
 		return;
 
 	if (dir != TRACE_DIR_INCOMING && dir != TRACE_DIR_OUTGOING)
