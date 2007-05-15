@@ -1307,7 +1307,8 @@ DLLEXPORT int trace_seek_erf_timestamp(libtrace_t *trace, uint64_t ts);
  * @note The return size refers to the network-level payload of the packet and
  * does not include any capture framing headers. For example, an Ethernet 
  * packet with an empty TCP packet will return sizeof(ethernet_header) + 
- * sizeof(ip_header) + sizeof(tcp_header).
+ * sizeof(ip_header) + sizeof(tcp_header), but not the capture file 
+ * (pcap/erf/etc) header.
  */
 DLLEXPORT SIMPLE_FUNCTION
 size_t trace_get_capture_length(const libtrace_packet_t *packet);
@@ -1318,6 +1319,11 @@ size_t trace_get_capture_length(const libtrace_packet_t *packet);
  * @note Due to the trace being a header capture, or anonymisation this may
  * not be the same as the Capture Len.
  * @note trace_getwire_length \em{includes} FCS.
+ * @note The return size refers to the network-level payload of the packet and
+ * does not include any capture framing headers. For example, an Ethernet 
+ * packet with an empty TCP packet will return sizeof(ethernet_header) + 
+ * sizeof(ip_header) + sizeof(tcp_header), but not the capture file 
+ * (pcap/erf/etc) header.
  */ 
 DLLEXPORT SIMPLE_FUNCTION
 size_t trace_get_wire_length(const libtrace_packet_t *packet);
