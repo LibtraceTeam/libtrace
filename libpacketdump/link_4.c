@@ -724,8 +724,23 @@ static void decode_80211_data(char *pkt, unsigned len) {
 	
 	if (len > hdrlen) {
 		pld = (ieee80211_payload *) ((char *)pkt + hdrlen) ;
-		printf(" 802.11MAC: Payload ethertype = 0x%04x\n", ntohs(pld->ethertype));
-		decode_next((char *) pld->payload, len - hdrlen - 2, "eth", ntohs(pld->ethertype));
+		int payload_offset = 0;
+		uint16_t ethertype = 0;
+		if (ntohs(pld->ethertype) == 0xaaaa) {
+			/* 802.11 payload contains an 802.2 LLC/SNAP header */
+			libtrace_llcsnap_t *llcsnap = (libtrace_llcsnap_t *) pld;
+			printf(" 802.2: DSAP = 0x%x, SSAP = 0x%x, OUI = 0x%x, Type = 0x%x\n", 
+					llcsnap->dsap, llcsnap->ssap, llcsnap->oui, ntohs(llcsnap->type));
+			payload_offset = sizeof(libtrace_llcsnap_t);
+			ethertype = ntohs(llcsnap->type);
+		} else {
+			/* 802.11 payload contains an Ethernet II frame */
+			printf(" 802.11MAC: Payload ethertype = 0x%04x\n", ntohs(pld->ethertype));
+			payload_offset = sizeof(pld->ethertype);
+			ethertype = ntohs(pld->ethertype);
+		}
+		decode_next((char *) pkt + hdrlen + payload_offset, 
+				len - hdrlen - payload_offset, "eth", ethertype);
 	}
 
 	
