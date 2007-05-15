@@ -205,7 +205,7 @@ static void *trace_get_payload_from_llcsnap(void *link,
 	return (void*)((char*)llc+sizeof(*llc));
 }
 
-void *trace_get_payload_from_ppp(void *link, 
+static void *trace_get_payload_from_ppp(void *link, 
 		uint16_t *type, uint32_t *remaining)
 {
 	/* 64 byte capture. */
