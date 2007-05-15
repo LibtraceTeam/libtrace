@@ -21,6 +21,9 @@
 #endif
 
 
+static void *trace_get_payload_from_llcsnap(void *link,
+		uint16_t *type, uint32_t *remaining);
+
 /* Returns the payload from 802.3 ethernet.  Type optionally returned in
  * "type" in host byte order.  This will return a vlan header.
  */
