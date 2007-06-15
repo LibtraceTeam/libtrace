@@ -303,12 +303,6 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 	libtrace->err.err_num = TRACE_ERR_NOERROR;
 	libtrace->format=NULL;
         
-        /* parse the URI to determine what sort of event we are dealing with */
-	if ((uridata = trace_parse_uri(uri, &scan)) == 0) {
-		trace_set_err(libtrace,TRACE_ERR_BAD_FORMAT,"Bad uri format (%s)",uri);
-		return libtrace;
-	}
-	
 	libtrace->event.tdelta = 0.0;
 	libtrace->event.packet = NULL;
 	libtrace->event.psize = 0;
@@ -317,6 +311,12 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 	libtrace->snaplen = 0;
 	libtrace->started=false;
 
+        /* parse the URI to determine what sort of event we are dealing with */
+	if ((uridata = trace_parse_uri(uri, &scan)) == 0) {
+		trace_set_err(libtrace,TRACE_ERR_BAD_FORMAT,"Bad uri format (%s)",uri);
+		return libtrace;
+	}
+	
 	for (tmp=formats_list;tmp;tmp=tmp->next) {
 		if (strlen(scan) == strlen(tmp->name) &&
 				strncasecmp(scan, tmp->name, strlen(scan)) == 0
