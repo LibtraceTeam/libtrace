@@ -1,4 +1,4 @@
-
+# Linux SLL header
 be16	integer	"SLL: Packet Type"
 be16	hex	"SLL: Link Layer Address Type"
 be16	integer	"SLL: Link Layer Address Length"

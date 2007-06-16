@@ -1,6 +1,6 @@
-
+# VLAN's (802.1q)
 be3	integer "VLAN: User Priority"
 be1	integer "VLAN: Format Indicator"
 be12	integer "VLAN: ID"
-be16	integer "VLAN: Ether Type"
+be16	hex 	"VLAN: Ether Type"
 next	"eth"	"VLAN: Ether Type"

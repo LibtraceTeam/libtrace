@@ -1,4 +1,4 @@
-
+# IPv6 (RFC2460)
 be4	integer	"IPv6: Version"
 be8 	integer	"IPv6: Class"
 be20	integer "IPv6: Flow Label"
