@@ -26,7 +26,7 @@ void decode(int link_type,char *packet,unsigned len)
 	}
 	if (len>=14) {
 		uint16_t type = htons(*(uint16_t*)(packet+12));
-		printf(" Ethertype: %04x\n",type);
+		printf(" Ethertype: 0x%04x\n",type);
 		decode_next(packet+14,len-14,"eth",type);
 	}
 	else {
