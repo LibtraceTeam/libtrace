@@ -334,8 +334,8 @@ typedef struct libtrace_packet_t {
  * convention.
  */
 typedef enum {
-	TRACE_DIR_OUTGOING = 0,		/**< Packets originating "outside" */
-	TRACE_DIR_INCOMING = 1,		/**< Packets originating "inside" */
+	TRACE_DIR_OUTGOING = 0,		/**< Packets originating "inside" */
+	TRACE_DIR_INCOMING = 1,		/**< Packets originating "outside" */
 	TRACE_DIR_OTHER	   = 2		/**< Packets with an unknown direction, or one that's unknown */
 } libtrace_direction_t;
 
