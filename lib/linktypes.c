@@ -160,6 +160,7 @@ libtrace_linktype_t arphrd_type_to_libtrace(unsigned int arphrd) {
 		case ARPHRD_80211_RADIOTAP: return TRACE_TYPE_80211_RADIO;
 		case ARPHRD_PPP: return TRACE_TYPE_NONE;
 	}
+	printf("Unknown ARPHRD %08x\n",arphrd);
 	return ~0U;
 }
 
@@ -299,6 +300,10 @@ bool demote_packet(libtrace_packet_t *packet)
 
 			packet->trace=trace;
 
+			/* Invalidate caches */
+			packet->l3_header = NULL;
+			packet->capture_length = -1;
+
 			return true;
 
 		case TRACE_TYPE_LINUX_SLL:
@@ -320,9 +325,17 @@ bool demote_packet(libtrace_packet_t *packet)
 			trace_set_capture_length(packet,
 				trace_get_capture_length(packet)
 					-sizeof(libtrace_sll_header_t));
+
+			/* Invalidate caches */
+			packet->l3_header = NULL;
+			packet->capture_length = -1;
 			break;
 		default:
 			return false;
 	}
+
+	/* Invalidate caches */
+	packet->l3_header = NULL;
+	packet->capture_length = -1;
 	return true;
 }

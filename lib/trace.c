@@ -631,7 +631,9 @@ DLLEXPORT libtrace_packet_t *trace_create_packet(void)
 {
 	libtrace_packet_t *packet = 
 		(libtrace_packet_t*)calloc((size_t)1,sizeof(libtrace_packet_t));
+
 	packet->buf_control=TRACE_CTRL_PACKET;
+	packet->capture_length=-1;
 	return packet;
 }
 
@@ -686,6 +688,18 @@ DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 	/* Store the trace we are reading from into the packet opaque 
 	 * structure */
 	packet->trace = libtrace;
+
+	/* Finalise the packet, freeing any resources the format module
+	 * may have allocated it
+	 */
+	if (libtrace->format->fin_packet) {
+		libtrace->format->fin_packet(packet);
+	}
+
+	/* Clear the packet cache */
+	packet->capture_length = -1;
+	packet->l3_header = NULL;
+	packet->l3_ethertype = 0;
 
 	if (libtrace->format->read_packet) {
 		do {
@@ -837,12 +851,17 @@ DLLEXPORT double trace_get_seconds(const libtrace_packet_t *packet) {
 	return seconds;
 }
 
-DLLEXPORT size_t trace_get_capture_length(const libtrace_packet_t *packet) 
+DLLEXPORT size_t trace_get_capture_length(libtrace_packet_t *packet) 
 {
-	if (packet->trace->format->get_capture_length) {
-		return packet->trace->format->get_capture_length(packet);
+	/* Cache the capture length */
+	if (packet->capture_length == -1) {
+		if (!packet->trace->format->get_capture_length)
+			return ~0U;
+		packet->capture_length = 
+			packet->trace->format->get_capture_length(packet);
 	}
-	return ~0U;
+
+	return packet->capture_length;
 }
 	
 /* Get the size of the packet as it was seen on the wire.

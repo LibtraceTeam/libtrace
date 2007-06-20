@@ -322,6 +322,9 @@ typedef struct libtrace_packet_t {
 	void *buffer;			/**< allocated buffer */
 	libtrace_rt_types_t  type; 	/**< rt protocol type for the packet */
 	buf_control_t buf_control; 	/**< who owns the memory */
+	int capture_length;		/**< Cached capture length */
+	void *l3_header;		/**< Cached l3 header */
+	uint16_t l3_ethertype;		/**< Cached l3 ethertype */
 } libtrace_packet_t;
 
 
@@ -945,10 +948,10 @@ DLLEXPORT int trace_write_packet(libtrace_out_t *trace, libtrace_packet_t *packe
 DLLEXPORT SIMPLE_FUNCTION
 void *trace_get_link(const libtrace_packet_t *packet);
 
-/** get a pointer to the IP header (if any)
+/** get a pointer to the IPv4 header (if any)
  * @param packet  	the packet opaque pointer
  *
- * @return a pointer to the IP header, or NULL if there is no IP header
+ * @return a pointer to the IPv4 header, or NULL if there is no IPv4 header
  */
 DLLEXPORT SIMPLE_FUNCTION
 libtrace_ip_t *trace_get_ip(libtrace_packet_t *packet);
@@ -960,6 +963,20 @@ libtrace_ip_t *trace_get_ip(libtrace_packet_t *packet);
  */
 DLLEXPORT SIMPLE_FUNCTION
 libtrace_ip6_t *trace_get_ip6(libtrace_packet_t *packet);
+
+/** Get a pointer to the layer 3 header.
+ * @param packet  		The packet opaque pointer
+ * @param[out] ethertype	The ethertype of the layer 3 header
+ * @param[out] remaining	The amount of space available after this header
+ * 				has been removed.
+ *
+ * @return a pointer to the layer 3 header.
+ * remaining may be NULL, otherwise it will be filled in by the remaining size
+ * of the captured packet.
+ */
+DLLEXPORT SIMPLE_FUNCTION
+void *trace_get_layer3(libtrace_packet_t *packet,
+		uint16_t *ethertype, uint32_t *remaining);
 
 /** Gets a pointer to the transport layer header (if any)
  * @param packet        a pointer to a libtrace_packet structure
@@ -1311,7 +1328,7 @@ DLLEXPORT int trace_seek_erf_timestamp(libtrace_t *trace, uint64_t ts);
  * (pcap/erf/etc) header.
  */
 DLLEXPORT SIMPLE_FUNCTION
-size_t trace_get_capture_length(const libtrace_packet_t *packet);
+size_t trace_get_capture_length(libtrace_packet_t *packet);
 
 /** Get the size of the packet as it was seen on the wire.
  * @param packet  	the packet opaque pointer

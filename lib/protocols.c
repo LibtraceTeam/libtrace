@@ -342,41 +342,14 @@ void *trace_get_payload_from_link(void *link, libtrace_linktype_t linktype,
 
 libtrace_ip_t *trace_get_ip(libtrace_packet_t *packet) 
 {
-	uint16_t type;
-	void *link = trace_get_link(packet);
+	uint16_t ethertype;
 	void *ret;
 
-	if (!link)
-		return NULL;
-	
-	ret=trace_get_payload_from_link(
-			link,
-			trace_get_link_type(packet),
-			&type, NULL);
+	uint32_t remaining = trace_get_capture_length(packet);
 
-	if (!ret)
-		return NULL;
+	ret = trace_get_layer3(packet,&ethertype,&remaining);
 
-	for(;;) {
-		switch(type) {
-			case 0x8100:
-				ret=trace_get_vlan_payload_from_ethernet_payload(ret,&type,NULL);
-				continue;
-			case 0x8847:
-				ret=trace_get_mpls_payload_from_ethernet_payload(ret,&type,NULL);
-
-				if (ret && type == 0x0) {
-					ret=trace_get_payload_from_ethernet(ret,&type,NULL);
-				}
-				continue;
-			default:
-				break;
-		}
-
-		break;
-	}
-
-	if (!ret || type!=0x0800)
+	if (!ret || ethertype!=0x0800)
 		return NULL;
 
 	/* Not an IPv4 packet */
@@ -388,41 +361,14 @@ libtrace_ip_t *trace_get_ip(libtrace_packet_t *packet)
 
 libtrace_ip6_t *trace_get_ip6(libtrace_packet_t *packet) 
 {
-	uint16_t type;
-	void *link=trace_get_link(packet);
+	uint16_t ethertype;
 	void *ret;
-	
-	if (!link)
-		return NULL;
 
-	ret=trace_get_payload_from_link(
-			link,
-			trace_get_link_type(packet),
-			&type,NULL);
+	uint32_t remaining = trace_get_capture_length(packet);
 
-	if (!ret)
-		return NULL;
+	ret = trace_get_layer3(packet,&ethertype,&remaining);
 
-	for(;;) {
-		switch(type) {
-			case 0x8100:
-				ret=trace_get_vlan_payload_from_ethernet_payload(ret,&type,NULL);
-				continue;
-			case 0x8847:
-				ret=trace_get_mpls_payload_from_ethernet_payload(ret,&type,NULL);
-
-				if (ret && type == 0x0) {
-					ret=trace_get_payload_from_ethernet(ret,&type,NULL);
-				}
-				continue;
-			default:
-				break;
-		}
-
-		break;
-	}
-
-	if (!ret || type!=0x86DD)
+	if (!ret || ethertype!=0x86DD)
 		return NULL;
 
 	return (libtrace_ip6_t*)ret;
@@ -496,18 +442,24 @@ void *trace_get_payload_from_ip6(libtrace_ip6_t *ipptr, uint8_t *prot,
 	}
 }
 
-DLLEXPORT void *trace_get_transport(libtrace_packet_t *packet, 
-		uint8_t *proto,
-		uint32_t *remaining
-		) 
+DLLEXPORT void *trace_get_layer3(libtrace_packet_t *packet,
+		uint16_t *ethertype,
+		uint32_t *remaining)
 {
-	void *transport;
-	uint8_t dummy_proto;
-	uint16_t ethertype;
+	void *iphdr;
+	uint16_t dummy_ethertype;
 	void *link;
 	uint32_t dummy_remaining;
 
-	if (!proto) proto=&dummy_proto;
+	/* use l3 cache */
+	if (packet->l3_header)
+	{
+		*ethertype = packet->l3_ethertype;
+		*remaining -= (packet->l3_header - trace_get_link(packet));
+		return packet->l3_header;
+	}
+
+	if (!ethertype) ethertype=&dummy_ethertype;
 
 	if (!remaining) remaining=&dummy_remaining;
 
@@ -518,28 +470,28 @@ DLLEXPORT void *trace_get_transport(libtrace_packet_t *packet,
 	if (!link)
 		return NULL;
 
-	transport = trace_get_payload_from_link(
+	iphdr = trace_get_payload_from_link(
 			link,
 			trace_get_link_type(packet),
-			&ethertype,
+			ethertype,
 			remaining);
 
-	if (!transport)
+	if (!iphdr)
 		return NULL;
 
 	for(;;) {
-		switch(ethertype) {
-		case 0x8100:
-			transport=trace_get_vlan_payload_from_ethernet_payload(
-					  transport,&ethertype,NULL);
+		switch(*ethertype) {
+		case 0x8100: /* VLAN */
+			iphdr=trace_get_vlan_payload_from_ethernet_payload(
+					  iphdr,ethertype,NULL);
 			continue;
-		case 0x8847:
-			transport=trace_get_mpls_payload_from_ethernet_payload(
-					  transport,&ethertype,NULL);
+		case 0x8847: /* MPLS */
+			iphdr=trace_get_mpls_payload_from_ethernet_payload(
+					  iphdr,ethertype,NULL);
 
-			if (transport && ethertype == 0x0) {
-				transport=trace_get_payload_from_ethernet(
-						transport,&ethertype,NULL);
+			if (iphdr && ethertype == 0x0) {
+				iphdr=trace_get_payload_from_ethernet(
+						iphdr,ethertype,NULL);
 			}
 			continue;
 		default:
@@ -548,6 +500,31 @@ DLLEXPORT void *trace_get_transport(libtrace_packet_t *packet,
 
 		break;
 	}
+
+	/* Store values in the cache for later */
+	packet->l3_ethertype = *ethertype;
+	packet->l3_header = iphdr;
+
+	return iphdr;
+}
+
+DLLEXPORT void *trace_get_transport(libtrace_packet_t *packet, 
+		uint8_t *proto,
+		uint32_t *remaining
+		) 
+{
+	uint8_t dummy_proto;
+	uint16_t ethertype;
+	uint32_t dummy_remaining;
+	void *transport;
+
+	if (!proto) proto=&dummy_proto;
+
+	if (!remaining) remaining=&dummy_remaining;
+
+	*remaining = trace_get_capture_length(packet);
+
+	transport = trace_get_layer3(packet,&ethertype,remaining);
 
 	if (!transport)
 		return NULL;
@@ -791,10 +768,10 @@ DLLEXPORT uint8_t *trace_get_destination_mac(libtrace_packet_t *packet) {
 	return NULL;
 }
 
-DLLEXPORT struct sockaddr *trace_get_source_address(const libtrace_packet_t *packet, 
-		struct sockaddr *addr)
+DLLEXPORT struct sockaddr *trace_get_source_address(
+		const libtrace_packet_t *packet, struct sockaddr *addr)
 {
-	uint16_t proto;
+	uint16_t ethertype;
 	uint32_t remaining;
 	void *l3;
 	struct ports_t *ports;
@@ -805,41 +782,12 @@ DLLEXPORT struct sockaddr *trace_get_source_address(const libtrace_packet_t *pac
 
 	remaining = trace_get_capture_length(packet);
 
-	l3 = trace_get_payload_from_link(
-			trace_get_link(packet),
-			trace_get_link_type(packet),
-			&proto,
-			&remaining);
-
-	if (!l3)
-		return false;
-
-	for(;;) {
-		switch(proto) {
-			case 0x8100:
-				l3=trace_get_vlan_payload_from_ethernet_payload(
-						l3,&proto,NULL);
-				continue;
-			case 0x8847:
-				l3=trace_get_mpls_payload_from_ethernet_payload(
-						l3,&proto,NULL);
-
-				if (l3 && proto == 0x0) {
-					l3=trace_get_payload_from_ethernet(
-						l3,&proto,NULL);
-				}
-				continue;
-			default:
-				break;
-		}
-
-		break;
-	}
+	l3 = trace_get_layer3(packet,&ethertype,&remaining);
 
 	if (!l3)
 		return NULL;
 
-	switch (proto) {
+	switch (ethertype) {
 		case 0x0800: /* IPv4 */
 		{
 			struct sockaddr_in *addr4=(struct sockaddr_in*)addr;
@@ -862,7 +810,7 @@ DLLEXPORT struct sockaddr *trace_get_source_address(const libtrace_packet_t *pac
 				trace_get_payload_from_ip6(ip6,NULL,&remaining);
 			addr6->sin6_family=AF_INET6;
 			if (ports && remaining>=sizeof(*ports))
-				addr6->sin6_port=ports->dst;
+				addr6->sin6_port=ports->src;
 			else
 				addr6->sin6_port=0;
 			addr6->sin6_flowinfo=0;
@@ -874,12 +822,13 @@ DLLEXPORT struct sockaddr *trace_get_source_address(const libtrace_packet_t *pac
 	}
 }
 
-DLLEXPORT struct sockaddr *trace_get_destination_address(const libtrace_packet_t *packet, 
-		struct sockaddr *addr)
+DLLEXPORT struct sockaddr *trace_get_destination_address(
+		const libtrace_packet_t *packet, struct sockaddr *addr)
 {
-	uint16_t proto;
+	uint16_t ethertype;
 	uint32_t remaining;
-	void *transport;
+	void *l3;
+	struct ports_t *ports;
 	static struct sockaddr_storage dummy;
 
 	if (!addr)
@@ -887,53 +836,37 @@ DLLEXPORT struct sockaddr *trace_get_destination_address(const libtrace_packet_t
 
 	remaining = trace_get_capture_length(packet);
 
-	transport = trace_get_payload_from_link(
-			trace_get_link(packet),
-			trace_get_link_type(packet),
-			&proto,
-			&remaining);
+	l3 = trace_get_layer3(packet,&ethertype,&remaining);
 
-	if (!transport)
-		return false;
-	for(;;) {
-		switch(proto) {
-			case 0x8100:
-				transport=trace_get_vlan_payload_from_ethernet_payload(transport,&proto,NULL);
-				continue;
-			case 0x8847:
-				transport=trace_get_mpls_payload_from_ethernet_payload(transport,&proto,NULL);
+	if (!l3)
+		return NULL;
 
-				if (transport && proto == 0x0) {
-					transport=trace_get_payload_from_ethernet(
-							transport,&proto,NULL);
-				}
-				continue;
-			default:
-				break;
-		}
-
-		break;
-	}
-
-	if (!transport)
-		return false;
-
-	switch (proto) {
+	switch (ethertype) {
 		case 0x0800: /* IPv4 */
 		{
 			struct sockaddr_in *addr4=(struct sockaddr_in*)addr;
-			libtrace_ip_t *ip = (libtrace_ip_t*)transport;
+			libtrace_ip_t *ip = (libtrace_ip_t*)l3;
+			ports = (struct ports_t*)
+				trace_get_payload_from_ip(ip,NULL,&remaining);
 			addr4->sin_family=AF_INET;
-			addr4->sin_port=0;
+			if (ports && remaining>=sizeof(*ports))
+				addr4->sin_port=ports->dst;
+			else
+				addr4->sin_port=0;
 			addr4->sin_addr=ip->ip_dst;
 			return addr;
 		}
 		case 0x86DD: /* IPv6 */
 		{
 			struct sockaddr_in6 *addr6=(struct sockaddr_in6*)addr;
-			libtrace_ip6_t *ip6 = (libtrace_ip6_t*)transport;
+			libtrace_ip6_t *ip6 = (libtrace_ip6_t*)l3;
+			ports = (struct ports_t*)
+				trace_get_payload_from_ip6(ip6,NULL,&remaining);
 			addr6->sin6_family=AF_INET6;
-			addr6->sin6_port=0;
+			if (ports && remaining>=sizeof(*ports))
+				addr6->sin6_port=ports->dst;
+			else
+				addr6->sin6_port=0;
 			addr6->sin6_flowinfo=0;
 			addr6->sin6_addr=ip6->ip_dst;
 			return addr;
