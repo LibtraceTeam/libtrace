@@ -1268,7 +1268,8 @@ struct timeval trace_get_timeval(const libtrace_packet_t *packet);
 /** Get the current time in floating point seconds
  * @param packet  	the packet opaque pointer
  *
- * @return time that this packet was seen in 64bit floating point seconds
+ * @return time that this packet was seen in 64bit floating point seconds from
+ * the unix epoch (1970-01-01 00:00:00 UTC).
  */
 DLLEXPORT SIMPLE_FUNCTION
 double trace_get_seconds(const libtrace_packet_t *packet);
