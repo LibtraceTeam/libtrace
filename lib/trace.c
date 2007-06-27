@@ -1442,14 +1442,13 @@ DLLEXPORT int trace_seek_timeval(libtrace_t *trace, struct timeval tv)
 
 DLLEXPORT char *trace_ether_ntoa(const uint8_t *addr, char *buf)
 {
-	char *buf2 = buf;
-	char staticbuf[18]={0,};
-	if (!buf2)
-		buf2=staticbuf;
-	snprintf(buf2,(size_t)18,"%02x:%02x:%02x:%02x:%02x:%02x",
+	static char staticbuf[18]={0,};
+	if (!buf)
+		buf=staticbuf;
+	snprintf(buf,(size_t)18,"%02x:%02x:%02x:%02x:%02x:%02x",
 			addr[0],addr[1],addr[2],
 			addr[3],addr[4],addr[5]);
-	return buf2;
+	return buf;
 }
 
 DLLEXPORT uint8_t *trace_ether_aton(const char *buf, uint8_t *addr)
