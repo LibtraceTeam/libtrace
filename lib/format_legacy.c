@@ -177,7 +177,7 @@ static int legacyatm_get_wire_length(const libtrace_packet_t *packet UNUSED) {
 
 static int legacyeth_get_wire_length(const libtrace_packet_t *packet) {
 	legacy_ether_t *leth = (legacy_ether_t *)packet->header;
-	return ntohs(leth->wlen);
+	return leth->wlen;
 }
 
 static uint64_t legacy_get_erf_timestamp(const libtrace_packet_t *packet)

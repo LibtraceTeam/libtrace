@@ -13,6 +13,8 @@ static bool has_starttime = false;
 static bool has_endtime = false;
 static uint64_t packets = 0;
 
+static uint64_t capture_bytes = 0;
+
 void misc_per_packet(struct libtrace_packet_t *packet)
 {
 	double ts = trace_get_seconds(packet);
@@ -22,6 +24,7 @@ void misc_per_packet(struct libtrace_packet_t *packet)
 		endtime = ts;
 	has_starttime = has_endtime = true;
 	++packets;
+	capture_bytes += trace_get_capture_length(packet) + trace_get_framing_length(packet);
 }
 
 static char *ts_to_date(double ts)
@@ -81,4 +84,5 @@ void misc_report(void)
 	fprintf(out, "Total Packets: %" PRIu64 "\n",packets);
 	fprintf(out, "Average packet rate: %.02f packets/sec\n",
 			packets/(endtime-starttime));
+	fprintf(out, "Uncompressed trace size: %" PRIu64 "\n", capture_bytes);
 }
