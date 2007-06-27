@@ -1,5 +1,5 @@
 # PPP (RFC1661)
 be8	hex	"PPP: Address"
 be8	hex	"PPP: Control"
-be16	hex	"PPP: Type"
+le16	hex	"PPP: Type"
 next	"ppp"	"PPP: Type"
