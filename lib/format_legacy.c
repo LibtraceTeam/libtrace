@@ -131,14 +131,23 @@ static int legacy_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 		default:
 			assert(0);
 	}
+
+	/* This is going to block until we either get an entire record
+	 * or we reach the end of the file */
+	while (1) {
 	
-	if ((numbytes=libtrace_io_read(INPUT.file,
-					buffer,
-					(size_t)64)) != 64) {
-		if (numbytes!=0) {
-			trace_set_err(libtrace,errno,"read(%s)",libtrace->uridata);
+		if ((numbytes=libtrace_io_read(INPUT.file,
+						buffer,
+						(size_t)64)) != 64) {
+			if (numbytes < 0) {
+				trace_set_err(libtrace,errno,"read(%s)",libtrace->uridata);
+			} else if (numbytes > 0) {
+				
+				continue;
+			}
+			return numbytes;
 		}
-		return numbytes;
+		break;
 	}
 	
 	packet->header = packet->buffer;

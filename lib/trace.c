@@ -223,6 +223,7 @@ static void trace_init(void)
 		erf_constructor();
 		tsh_constructor();
 		legacy_constructor();
+		atmhdr_constructor();
 #ifdef HAVE_NETPACKET_PACKET_H
 		linuxnative_constructor();
 #endif
@@ -649,6 +650,11 @@ DLLEXPORT libtrace_packet_t *trace_copy_packet(const libtrace_packet_t *packet) 
 		((char*)dest->buffer+trace_get_framing_length(packet));
 	dest->type=packet->type;
 	dest->buf_control=TRACE_CTRL_PACKET;
+	/* Reset the cache - better to recalculate than try to convert
+	 * the values over to the new packet */
+	dest->capture_length = -1;
+	dest->l3_header = NULL;
+	dest->l3_ethertype = 0;
 	memcpy(dest->header,packet->header,trace_get_framing_length(packet));
 	memcpy(dest->payload,packet->payload,trace_get_capture_length(packet));
 

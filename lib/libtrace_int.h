@@ -458,6 +458,7 @@ void pcapfile_constructor(void);
 void rt_constructor(void);
 void wag_constructor(void);
 void duck_constructor(void);
+void atmhdr_constructor(void);
 
 /* Used internally by get_wire_length() methods */
 bool trace_get_wireless_flags(void *link, libtrace_linktype_t linktype, uint8_t *flags);

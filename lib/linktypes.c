@@ -257,7 +257,7 @@ void promote_packet(libtrace_packet_t *packet)
 bool demote_packet(libtrace_packet_t *packet)
 {
 	uint8_t type;
-	uint32_t remaining;
+	uint32_t remaining = 0;
 	char *tmp;
 	struct timeval tv;
 	static libtrace_t *trace = NULL;
@@ -266,7 +266,8 @@ bool demote_packet(libtrace_packet_t *packet)
 			remaining=trace_get_capture_length(packet);
 			packet->payload=trace_get_payload_from_atm(
 				packet->payload,&type,&remaining);
-
+			if (!packet->payload)
+				return false;
 			tmp=(char*)malloc(
 				trace_get_capture_length(packet)
 				+sizeof(libtrace_pcapfile_pkt_hdr_t)
