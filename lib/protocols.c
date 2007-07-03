@@ -335,7 +335,7 @@ void *trace_get_payload_from_link(void *link, libtrace_linktype_t linktype,
 		default:
 			break;
 	}
-	fprintf(stderr,"Don't understand link layer type %i in trace_get_payload_from_link()\n",
+	fprintf(stderr, "Don't understand link layer type %i in trace_get_payload_from_link()\n",
 		linktype);
 	return NULL;
 }

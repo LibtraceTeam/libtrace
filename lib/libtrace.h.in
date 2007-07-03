@@ -262,7 +262,8 @@ enum base_format_t {
 	TRACE_FORMAT_DUCK	  =10,
 	TRACE_FORMAT_BPF	  =11,
 	TRACE_FORMAT_TSH	  =12,
-	TRACE_FORMAT_ATMHDR	  =13
+	TRACE_FORMAT_ATMHDR	  =13,
+	TRACE_FORMAT_LEGACY_NZIX  =14
 };
 
 /* RT protocol packet types */
@@ -300,6 +301,7 @@ typedef enum {
 	TRACE_RT_DATA_TSH	=TRACE_RT_DATA_SIMPLE+TRACE_FORMAT_TSH,
 
 	TRACE_RT_DATA_ATMHDR = TRACE_RT_DATA_SIMPLE + TRACE_FORMAT_ATMHDR,
+	TRACE_RT_DATA_LEGACY_NZIX=TRACE_RT_DATA_SIMPLE + TRACE_FORMAT_LEGACY_NZIX,
 	TRACE_RT_DATA_DLT		= 2000, /**< Pcap doesn't store the
 						  * linktype per packet, and
 						  * thus we have to store it

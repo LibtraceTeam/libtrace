@@ -42,6 +42,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <regex.h>
 
 #ifdef WIN32
 #  include <io.h>
@@ -55,7 +56,6 @@
 #endif 
 
 #define DATA(x) ((struct legacy_format_data_t *)x->format_data)
-
 #define INPUT DATA(libtrace)->input
 
 struct legacy_format_data_t {
@@ -63,6 +63,9 @@ struct legacy_format_data_t {
                 int fd;
 		libtrace_io_t *file;
         } input;
+	time_t starttime;	/* Used for legacy_nzix */
+	uint64_t ts_high;	/* Used for legacy_nzix */
+	uint32_t ts_old; 	/* Used for legacy_nzix */
 };
 
 static int legacyeth_get_framing_length(const libtrace_packet_t *packet UNUSED) 
@@ -80,12 +83,73 @@ static int legacyatm_get_framing_length(const libtrace_packet_t *packet UNUSED)
 	return sizeof(legacy_cell_t);
 }
 
+static int legacynzix_get_framing_length(const libtrace_packet_t *packet UNUSED)
+{
+	return sizeof(legacy_nzix_t);
+}
+
 static int erf_init_input(libtrace_t *libtrace) 
 {
 	libtrace->format_data = malloc(sizeof(struct legacy_format_data_t));
 
 	DATA(libtrace)->input.file = NULL;
 
+	return 0;
+}
+
+static time_t trtime(char *s) {
+	/* XXX: this function may not be particularly portable to
+	 * other platforms, e.g. *BSDs, Windows */
+	struct tm tm;
+	char *tz;
+	time_t ret;
+	static char envbuf[256];
+
+	if(sscanf(s, "%4u%2u%2u-%2u%2u%2u", &tm.tm_year, &tm.tm_mon,
+				&tm.tm_mday, &tm.tm_hour, &tm.tm_min,
+				&tm.tm_sec) != 6) {
+		return (time_t)0;
+	}
+	tm.tm_year = tm.tm_year - 1900;
+	tm.tm_mon --;
+	tm.tm_wday = 0; /* ignored */
+	tm.tm_yday = 0; /* ignored */
+	tm.tm_isdst = -1; /* forces check for summer time */
+	
+	tz = getenv("TZ");
+	if (putenv("TZ=Pacific/Auckland")) {
+		perror("putenv");
+		return (time_t)0;
+	}
+	tzset();
+	ret = mktime(&tm);
+
+	return ret;
+}
+	
+
+static int legacynzix_init_input(libtrace_t *libtrace) {
+
+	int retval;
+	char *filename = libtrace->uridata;
+	regex_t reg;
+	regmatch_t match;
+
+	libtrace->format_data = malloc(sizeof(struct legacy_format_data_t));
+
+	DATA(libtrace)->input.file = NULL;
+	
+	if((retval = regcomp(&reg, "[0-9]{8}-[0-9]{6}", REG_EXTENDED)) != 0) {
+		trace_set_err(libtrace, errno, "Failed to compile regex");
+		return -1;
+	}
+	if ((retval = regexec(&reg, filename, 1, &match, 0)) !=0) {
+		trace_set_err(libtrace, errno, "Failed to exec regex");
+		return -1;
+	}
+	DATA(libtrace)->starttime = trtime(&filename[match.rm_so]);
+	DATA(libtrace)->ts_high = 0;
+	DATA(libtrace)->ts_old = 0;
 	return 0;
 }
 
@@ -158,6 +222,53 @@ static int legacy_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	
 }
 
+static int legacynzix_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
+	/* Firstly, I apologize for all the constants being thrown around in
+	 * this function, but it does befit the hackish origins of the
+	 * NZIX format that I use them. Anyone who wants to clean them up is
+	 * welcome to do so */
+	int numbytes;
+	void *buffer;
+	char *data_ptr;
+	
+	if (!packet->buffer || packet->buf_control == TRACE_CTRL_EXTERNAL) {
+		packet->buf_control = TRACE_CTRL_PACKET;
+		packet->buffer=malloc((size_t)LIBTRACE_PACKET_BUFSIZE);
+	}
+	buffer = packet->buffer;
+
+	packet->type = TRACE_RT_DATA_LEGACY_NZIX;
+	
+	while (1) {
+		if ((numbytes = libtrace_io_read(INPUT.file, buffer,
+						(size_t)68)) != 68) {
+			if (numbytes < 0) {
+				trace_set_err(libtrace,errno,"read(%s)",libtrace->uridata);
+			} else if (numbytes > 0)
+				continue;
+			return numbytes;
+		} 
+		/* Packets with a zero length are GPS timestamp packets
+		 * but they aren't inserted at the right time to be
+		 * useful - instead we'll ignore them unless we can think
+		 * of a compelling reason to do otherwise */
+		if (((legacy_nzix_t *)buffer)->len == 0)
+			continue;
+		
+		break;
+	}
+
+	/* lets move the padding so that it's in the framing header */
+	data_ptr = ((char *)buffer) + 12;
+	memmove(data_ptr + 2, data_ptr, 26);
+
+	packet->header = packet->buffer;
+	packet->payload = (void*)((char*)packet->buffer +
+			libtrace->format->get_framing_length(packet));
+	return 68;
+}
+		
+
 static libtrace_linktype_t legacypos_get_link_type(const libtrace_packet_t *packet UNUSED) {
 	return TRACE_TYPE_PPP;
 }
@@ -170,8 +281,17 @@ static libtrace_linktype_t legacyeth_get_link_type(const libtrace_packet_t *pack
 	return TRACE_TYPE_ETH;
 }
 
+static libtrace_linktype_t legacynzix_get_link_type(const libtrace_packet_t *packet UNUSED) {
+	return TRACE_TYPE_ETH;
+}
+
 static int legacy_get_capture_length(const libtrace_packet_t *packet UNUSED) {
 	return 64;
+}
+
+static int legacynzix_get_capture_length(const libtrace_packet_t *packet UNUSED)
+{
+	return 54;
 }
 
 static int legacypos_get_wire_length(const libtrace_packet_t *packet) {
@@ -189,11 +309,61 @@ static int legacyeth_get_wire_length(const libtrace_packet_t *packet) {
 	return leth->wlen;
 }
 
+static int legacynzix_get_wire_length(const libtrace_packet_t *packet) {
+	legacy_nzix_t *lnzix = (legacy_nzix_t *)packet->header;
+	return lnzix->len;
+}
+
 static uint64_t legacy_get_erf_timestamp(const libtrace_packet_t *packet)
 {
 	legacy_ether_t *legacy = (legacy_ether_t*)packet->header;
 	return legacy->ts;
 }  
+
+static uint32_t ts_cmp(uint32_t ts_a, uint32_t ts_b) {
+	
+	/* each ts is actually a 30 bit value */
+	ts_a <<= 2;
+	ts_b <<= 2;
+
+
+	if (ts_a > ts_b) 
+		return (ts_a - ts_b);
+	else
+		return (ts_b - ts_a);
+	
+}
+
+static struct timeval legacynzix_get_timeval(const libtrace_packet_t *packet) {
+	uint64_t new_ts = DATA(packet->trace)->ts_high;
+	uint32_t old_ts = DATA(packet->trace)->ts_old;
+	struct timeval tv;
+	uint32_t hdr_ts;
+
+	double dts;
+	
+	legacy_nzix_t *legacy = (legacy_nzix_t *)packet->header;
+		
+	hdr_ts = legacy->ts;
+
+	/* seems we only need 30 bits to represent our timestamp */
+	hdr_ts >>=2;
+	/* try a sequence number wrap-around comparison */
+	if (ts_cmp(hdr_ts, old_ts) > (UINT32_MAX / 2) )
+		new_ts += (1LL << 30); /* wraparound */
+	new_ts &= ~((1LL << 30) -1);	/* mask lower 30 bits */
+	new_ts += hdr_ts;		/* packet ts is the new 30 bits */
+	DATA(packet->trace)->ts_old = hdr_ts;
+
+	tv.tv_sec = DATA(packet->trace)->starttime + (new_ts / (1000 * 1000));
+	tv.tv_usec = new_ts % (1000 * 1000);
+	DATA(packet->trace)->ts_high = new_ts;
+
+
+	dts = tv.tv_sec + (double)tv.tv_usec / 1000 / 1000;
+	return tv;
+	
+}	
 
 static void legacypos_help(void) {
 	printf("legacypos format module: $Revision$\n");
@@ -225,6 +395,17 @@ static void legacyeth_help(void) {
 	printf("\tlegacyeth:-\t(stdin, either compressed or not)\n");
 	printf("\n");
 	printf("\te.g.: legacyeth:/tmp/trace.gz\n");
+	printf("\n");
+}
+
+static void legacynzix_help(void) {
+	printf("legacynzix format module: $Revision$\n");
+	printf("Supported input URIs:\n");
+	printf("\tlegacynzix:/path/to/file\t(uncompressed)\n");
+	printf("\tlegacynzix:/path/to/file.gz\t(gzip-compressed)\n");
+	printf("\tlegacynzix:-\t(stdin, either compressed or not)\n");
+	printf("\n");
+	printf("\te.g.: legacynzix:/tmp/trace.gz\n");
 	printf("\n");
 }
 
@@ -333,9 +514,44 @@ static struct libtrace_format_t legacypos = {
 	NULL,				/* next pointer */
 };
 
+static struct libtrace_format_t legacynzix = {
+	"legacynzix",
+	"$Id$",
+	TRACE_FORMAT_LEGACY_NZIX,
+	legacynzix_init_input,		/* init_input */	
+	NULL,				/* config_input */
+	erf_start_input,		/* start_input */
+	NULL,				/* pause_input */
+	NULL,				/* init_output */
+	NULL,				/* config_output */
+	NULL,				/* start_output */
+	erf_fin_input,			/* fin_input */
+	NULL,				/* fin_output */
+	legacynzix_read_packet,		/* read_packet */
+	NULL,				/* fin_packet */
+	NULL,				/* write_packet */
+	legacynzix_get_link_type,	/* get_link_type */
+	NULL,				/* get_direction */
+	NULL,				/* set_direction */
+	NULL,				/* get_erf_timestamp */
+	legacynzix_get_timeval,		/* get_timeval */
+	NULL,				/* get_seconds */
+	NULL,				/* seek_erf */
+	NULL,				/* seek_timeval */
+	NULL,				/* seek_seconds */
+	legacynzix_get_capture_length,	/* get_capture_length */
+	legacynzix_get_wire_length,	/* get_wire_length */
+	legacynzix_get_framing_length,	/* get_framing_length */
+	NULL,				/* set_capture_length */
+	NULL,				/* get_fd */
+	trace_event_trace,		/* trace_event */
+	legacynzix_help,		/* help */
+	NULL,				/* next pointer */
+};
 	
 void legacy_constructor(void) {
 	register_format(&legacypos);
 	register_format(&legacyeth);
 	register_format(&legacyatm);
+	register_format(&legacynzix);
 }
