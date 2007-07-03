@@ -345,10 +345,16 @@ static int erf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	buffer2 = (char*)packet->buffer + dag_record_size;
 	size = rlen - dag_record_size;
 
-	assert(size < LIBTRACE_PACKET_BUFSIZE);
+	if (size >= LIBTRACE_PACKET_BUFSIZE) {
+		trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Packet size %u larger than supported by libtrace - packet is probably corrupt", size);
+		return -1;
+	}
 
 	/* Unknown/corrupt */
-	assert(((dag_record_t *)packet->buffer)->type < 10);
+	if (((dag_record_t *)packet->buffer)->type >= 10) {
+		trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Corrupt or Unknown ERF type");
+		return -1;
+	}
 	
 	/* read in the rest of the packet */
 	if ((numbytes=libtrace_io_read(INPUT.file,
