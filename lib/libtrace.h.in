@@ -710,7 +710,7 @@ DLLEXPORT libtrace_t *trace_create_dead(const char *uri);
  *  - wtf:/path/to/wtf/file
  *
  *  If an error occured when attempting to open the output trace, NULL is returned 
- *  and trace_errno is set. Use trace_perror() to get more information
+ *  and trace_errno is set. Use trace_perror_output() to get more information
  */
 DLLEXPORT libtrace_out_t *trace_create_output(const char *uri);
 
