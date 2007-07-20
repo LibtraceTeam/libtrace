@@ -744,10 +744,12 @@ DLLEXPORT int trace_start_output(libtrace_out_t *libtrace);
 
 /** Valid trace capture options */
 typedef enum {
-	TRACE_OPTION_SNAPLEN, /**< Number of bytes captured */
-	TRACE_OPTION_PROMISC, /**< Capture packets to other hosts */
-	TRACE_OPTION_FILTER,  /**< Apply this filter to all packets recieved */
-	TRACE_META_FREQ	      /**< Frequency of meta-data information, e.g. DUCK packets */
+	TRACE_OPTION_SNAPLEN, 	/**< Number of bytes captured */
+	TRACE_OPTION_PROMISC, 	/**< Capture packets to other hosts */
+	TRACE_OPTION_FILTER,  	/**< Apply this filter to all packets */
+	TRACE_OPTION_META_FREQ,	/**< Frequency of meta-data information, e.g. DUCK packets */
+	/** trace_event ignores gaps between packets when reading traces off disk */
+	TRACE_OPTION_EVENT_REALTIME
 } trace_option_t;
 
 /** Sets an input config option

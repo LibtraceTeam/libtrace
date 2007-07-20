@@ -136,7 +136,7 @@ static int dag_init_input(libtrace_t *libtrace) {
 static int dag_config_input(libtrace_t *libtrace, trace_option_t option,
                                 void *data) {
         switch(option) {
-                case TRACE_META_FREQ:
+                case TRACE_OPTION_META_FREQ:
                         DUCK.duck_freq = *(int *)data;
                         return 0;
                 case TRACE_OPTION_SNAPLEN:

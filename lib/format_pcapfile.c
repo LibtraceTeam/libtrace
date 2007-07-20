@@ -44,6 +44,7 @@
 
 #define DATA(x) ((struct pcapfile_format_data_t*)((x)->format_data))
 #define DATAOUT(x) ((struct pcapfile_format_data_out_t*)((x)->format_data))
+#define IN_OPTIONS DATA(libtrace)->options
 
 typedef struct pcapfile_header_t {
 		uint32_t magic_number;   /* magic number */
@@ -57,6 +58,9 @@ typedef struct pcapfile_header_t {
 
 struct pcapfile_format_data_t {
 	libtrace_io_t *file;
+	struct {
+		int real_time;
+	} options;
 	pcapfile_header_t header;
 };
 
@@ -76,7 +80,7 @@ static int pcapfile_init_input(libtrace_t *libtrace) {
 	}
 
 	DATA(libtrace)->file=NULL;
-
+	IN_OPTIONS.real_time = 0;
 	return 0;
 }
 
@@ -162,8 +166,21 @@ static int pcapfile_start_output(libtrace_out_t *libtrace UNUSED)
 
 static int pcapfile_config_input(libtrace_t *libtrace,
 		trace_option_t option,
-		void *data UNUSED)
+		void *data)
 {
+	switch(option) {
+		case TRACE_OPTION_EVENT_REALTIME:
+			IN_OPTIONS.real_time = *(int *)data;
+			return 0;
+		case TRACE_OPTION_META_FREQ:
+		case TRACE_OPTION_SNAPLEN:
+		case TRACE_OPTION_PROMISC:
+		case TRACE_OPTION_FILTER:
+			/* all these are either unsupported or handled
+			 * by trace_config */
+			break;
+	}
+	
 	trace_set_err(libtrace,TRACE_ERR_UNKNOWN_OPTION,
 			"Unknown option %i", option);
 	return -1;
@@ -459,6 +476,22 @@ static size_t pcapfile_set_capture_length(libtrace_packet_t *packet,size_t size)
 	pcapptr = (libtrace_pcapfile_pkt_hdr_t *)packet->header;
 	pcapptr->caplen = swapl(packet->trace,(uint32_t)size);
 	return trace_get_capture_length(packet);
+}
+
+static struct libtrace_eventobj_t pcapfile_event(libtrace_t *libtrace, libtrace_packet_t *packet) {
+	
+	libtrace_eventobj_t event = {0,0,0.0,0};
+	
+	if (IN_OPTIONS.real_time) {
+		event.size = pcapfile_read_packet(libtrace, packet);
+		if (event.size < 1)
+			event.type = TRACE_EVENT_TERMINATE;
+		else
+			event.type = TRACE_EVENT_PACKET;
+		return event;
+	} else {
+		return trace_event_trace(libtrace, packet);
+	}
 }
 
 static void pcapfile_help(void) {

@@ -560,13 +560,21 @@ DLLEXPORT int trace_config(libtrace_t *libtrace,
 						"Promisc mode is not supported by this format module");
 			}
 			return -1;
-		case TRACE_META_FREQ:
+		case TRACE_OPTION_META_FREQ:
 			if (!trace_is_err(libtrace)) {
 				trace_set_err(libtrace, 
 						TRACE_ERR_OPTION_UNAVAIL,
 						"This format does not support meta-data gathering");
 			}
 			return -1;
+		case TRACE_OPTION_EVENT_REALTIME:
+			if (!trace_is_err(libtrace)) {
+				trace_set_err(libtrace, 
+						TRACE_ERR_OPTION_UNAVAIL,
+						"This format does not support meta-data gathering");
+			}
+			return -1;
+			
 	}
 	if (!trace_is_err(libtrace)) {
 		trace_set_err(libtrace,TRACE_ERR_UNKNOWN_OPTION,

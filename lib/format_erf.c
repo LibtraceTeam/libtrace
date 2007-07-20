@@ -64,8 +64,9 @@ static struct libtrace_format_t erfformat;
 #define DATAOUT(x) ((struct erf_format_data_out_t *)x->format_data)
 
 #define INPUT DATA(libtrace)->input
+#define IN_OPTIONS DATA(libtrace)->options
 #define OUTPUT DATAOUT(libtrace)->output
-#define OPTIONS DATAOUT(libtrace)->options
+#define OUT_OPTIONS DATAOUT(libtrace)->options
 struct erf_format_data_t {
         
 	union {
@@ -73,12 +74,16 @@ struct erf_format_data_t {
 		libtrace_io_t *file;
         } input;
 
+	
 	struct {
 		enum { INDEX_UNKNOWN=0, INDEX_NONE, INDEX_EXISTS } exists;
 		libtrace_io_t *index;
 		off_t index_len;
 	} seek;
 
+	struct {
+		int real_time;
+	} options;
 };
 
 struct erf_format_data_out_t {
@@ -141,8 +146,24 @@ static int erf_init_input(libtrace_t *libtrace)
 	libtrace->format_data = malloc(sizeof(struct erf_format_data_t));
 	
 	INPUT.file = 0;
-
+	IN_OPTIONS.real_time = 0;
+	
 	return 0; /* success */
+}
+
+static int erf_config_input(libtrace_t *libtrace, trace_option_t option,
+		void *value) {
+
+	switch (option) {
+		case TRACE_OPTION_EVENT_REALTIME:
+			IN_OPTIONS.real_time = *(int *)value;
+			return 0;
+		default:
+			/* Unknown option */
+			trace_set_err(libtrace,TRACE_ERR_UNKNOWN_OPTION,
+					"Unknown option");
+			return -1;
+	}
 }
 
 static int erf_start_input(libtrace_t *libtrace)
@@ -266,8 +287,8 @@ static int erf_seek_erf(libtrace_t *libtrace,uint64_t erfts)
 static int erf_init_output(libtrace_out_t *libtrace) {
 	libtrace->format_data = malloc(sizeof(struct erf_format_data_out_t));
 
-	OPTIONS.erf.level = 0;
-	OPTIONS.erf.fileflag = O_CREAT | O_WRONLY;
+	OUT_OPTIONS.erf.level = 0;
+	OUT_OPTIONS.erf.fileflag = O_CREAT | O_WRONLY;
 	OUTPUT.file = 0;
 
 	return 0;
@@ -278,10 +299,10 @@ static int erf_config_output(libtrace_out_t *libtrace, trace_option_output_t opt
 
 	switch (option) {
 		case TRACE_OPTION_OUTPUT_COMPRESS:
-			OPTIONS.erf.level = *(int*)value;
+			OUT_OPTIONS.erf.level = *(int*)value;
 			return 0;
 		case TRACE_OPTION_OUTPUT_FILEFLAGS:
-			OPTIONS.erf.fileflag = *(int*)value;
+			OUT_OPTIONS.erf.fileflag = *(int*)value;
 			return 0;
 		default:
 			/* Unknown option */
@@ -404,8 +425,8 @@ static int erf_dump_packet(libtrace_out_t *libtrace,
 static int erf_start_output(libtrace_out_t *libtrace)
 {
 	OUTPUT.file = trace_open_file_out(libtrace,
-			OPTIONS.erf.level,
-			OPTIONS.erf.fileflag);
+			OUT_OPTIONS.erf.level,
+			OUT_OPTIONS.erf.fileflag);
 	if (!OUTPUT.file) {
 		return -1;
 	}
@@ -579,6 +600,23 @@ size_t erf_set_capture_length(libtrace_packet_t *packet, size_t size) {
 	return trace_get_capture_length(packet);
 }
 
+static struct libtrace_eventobj_t erf_event(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
+	struct libtrace_eventobj_t event = {0,0,0.0,0};
+	
+	if (IN_OPTIONS.real_time) {
+		event.size = erf_read_packet(libtrace, packet);
+		if (event.size < 1)
+			event.type = TRACE_EVENT_TERMINATE;
+		else
+			event.type = TRACE_EVENT_PACKET;
+		return event;
+		
+	} else {
+		return trace_event_trace(libtrace, packet);
+	}
+	
+}
+
 static void erf_help(void) {
 	printf("erf format module: $Revision$\n");
 	printf("Supported input URIs:\n");
@@ -608,7 +646,7 @@ static struct libtrace_format_t erfformat = {
 	"$Id$",
 	TRACE_FORMAT_ERF,
 	erf_init_input,			/* init_input */	
-	NULL,				/* config_input */
+	erf_config_input,		/* config_input */
 	erf_start_input,		/* start_input */
 	NULL,				/* pause_input */
 	erf_init_output,		/* init_output */
@@ -633,7 +671,7 @@ static struct libtrace_format_t erfformat = {
 	erf_get_framing_length,		/* get_framing_length */
 	erf_set_capture_length,		/* set_capture_length */
 	NULL,				/* get_fd */
-	trace_event_trace,		/* trace_event */
+	erf_event,			/* trace_event */
 	erf_help,			/* help */
 	NULL				/* next pointer */
 };
