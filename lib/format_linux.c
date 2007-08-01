@@ -222,8 +222,8 @@ static int linuxnative_config_input(libtrace_t *libtrace,
 		 */
 	}
 	
-	trace_set_err(libtrace,TRACE_ERR_UNKNOWN_OPTION,
-			"Unknown option %i", option);
+	/* Don't set an error - trace_config will try to deal with the
+	 * option and will set an error if it fails */
 	return -1;
 }
 

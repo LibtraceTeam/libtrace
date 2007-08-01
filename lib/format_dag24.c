@@ -147,13 +147,10 @@ static int dag_config_input(libtrace_t *libtrace, trace_option_t option,
                         return -1;
                 case TRACE_OPTION_FILTER:
                         return -1;
-                default:
-                        trace_set_err(libtrace, TRACE_ERR_UNKNOWN_OPTION,
-                                        "Unknown or unsupported option: %i",
-                                        option);
-                        return -1;
+		case TRACE_OPTION_EVENT_REALTIME:
+			return -1;
         }
-        assert (0);
+	return -1;
 }
 
 static int dag_start_input(libtrace_t *libtrace) {	

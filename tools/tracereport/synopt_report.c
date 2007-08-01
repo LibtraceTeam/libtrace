@@ -34,65 +34,68 @@ struct opt_counter {
 	uint64_t other;
 };
 
-struct opt_counter counts = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-uint64_t total_syns = 0;
+struct opt_counter syn_counts = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+struct opt_counter synack_counts = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 
-static void classify_packet(struct tcp_opts opts) {
+uint64_t total_syns = 0;
+uint64_t total_synacks = 0;
+
+static void classify_packet(struct tcp_opts opts, struct opt_counter *counts) {
 	if (!opts.mss && !opts.sack && !opts.winscale && !opts.ts && !opts.ttcp && !opts.other)
 	{
-		counts.no_options ++;
+		counts->no_options ++;
 		return;
 	}
 
 	if (opts.mss && !opts.sack && !opts.winscale && !opts.ts && !opts.ttcp && !opts.other)
 	{
-		counts.mss_only ++;
+		counts->mss_only ++;
 		return;
 	}
 
 	if (!opts.mss && !opts.sack && !opts.winscale && opts.ts && !opts.ttcp && !opts.other)
 	{
-		counts.ts_only ++;
+		counts->ts_only ++;
 		return;
 	}
 
 	if (opts.mss && opts.sack && !opts.winscale && !opts.ts)
-		counts.ms ++;
+		counts->ms ++;
 
 	if (opts.mss && opts.winscale && !opts.sack && !opts.ts)
-		counts.mw ++;
+		counts->mw ++;
 
 	if (opts.mss && opts.winscale && opts.sack && !opts.ts)
-		counts.msw ++;
+		counts->msw ++;
 	
 	if (opts.mss && opts.ts && !opts.winscale && !opts.sack)
-		counts.mt ++;
+		counts->mt ++;
 	if (opts.ts && opts.sack && !opts.mss && !opts.winscale)
-		counts.ts_and_sack ++;
+		counts->ts_and_sack ++;
 
 	if (opts.ts && opts.winscale && !opts.mss && !opts.sack)
-		counts.wt ++;
+		counts->wt ++;
 
 	if (opts.ts && opts.mss && opts.winscale && !opts.sack)
-		counts.tmw ++;
+		counts->tmw ++;
 	if (opts.ts && opts.mss && opts.sack && !opts.winscale)
-		counts.tms ++;
+		counts->tms ++;
 	if (opts.ts && opts.sack && opts.winscale && !opts.mss)
-		counts.tws ++;
+		counts->tws ++;
 	
 	
 	if (opts.mss && opts.sack && opts.winscale && opts.ts) {
-		counts.all_four ++;
+		counts->all_four ++;
 	}
 
 	if (opts.ts && (opts.mss || opts.winscale || opts.sack)) {
-		counts.ts_and_another ++;
+		counts->ts_and_another ++;
 	}
 	
 	if (opts.ttcp)
-		counts.ttcp ++;
+		counts->ttcp ++;
 	if (opts.other)
-		counts.other ++;	
+		counts->other ++;	
 }
 
 void synopt_per_packet(struct libtrace_packet_t *packet)
@@ -110,7 +113,6 @@ void synopt_per_packet(struct libtrace_packet_t *packet)
 	if (!tcp->syn)
 		return;
 	
-	total_syns += 1;
 	if (dir != TRACE_DIR_INCOMING && dir != TRACE_DIR_OUTGOING)
 		dir = TRACE_DIR_OTHER;
 	
@@ -151,8 +153,14 @@ void synopt_per_packet(struct libtrace_packet_t *packet)
 				opts_seen.other = true;
 		}
 	}
-	
-	classify_packet(opts_seen);
+
+	if (tcp->ack) {
+		total_synacks ++;
+		classify_packet(opts_seen, &synack_counts);
+	} else {
+		total_syns ++;
+		classify_packet(opts_seen, &syn_counts);
+	}
 }
 
 
@@ -166,54 +174,70 @@ void synopt_report(void)
 	}
 
 
-	fprintf(out, "%-20s\t%.2f%%\n",
+	
+	fprintf(out, "%-20s\t%.2f%%\t%.2f%%\n",
 			"No Options",
-			(double)(counts.no_options) / total_syns * 100.0);
-	fprintf(out, "%-20s\t%.2f%%\n",
+			(double)(syn_counts.no_options) / total_syns * 100.0,
+			(double)(synack_counts.no_options) / total_synacks * 100.0);
+	fprintf(out, "%-20s\t%.2f%%\t%.2f%%\n",
 			"M Only",
-			(double)(counts.mss_only) / total_syns * 100.0);
-	fprintf(out, "%-20s\t%.2f%%\n",
+			(double)(syn_counts.mss_only) / total_syns * 100.0,
+			(double)(synack_counts.mss_only) / total_synacks * 100.0);
+	fprintf(out, "%-20s\t%.2f%%\t%.2f%%\n",
 			"T Only",
-			(double)(counts.ts_only) / total_syns * 100.0);
-	fprintf(out, "%-20s\t%.2f%%\n",
+			(double)(syn_counts.ts_only) / total_syns * 100.0,
+			(double)(synack_counts.ts_only) / total_synacks * 100.0);
+	fprintf(out, "%-20s\t%.2f%%\t%.2f%%\n",
 			"M and S",
-			(double)(counts.ms) / total_syns * 100.0);
-	fprintf(out, "%-20s\t%.2f%%\n",
+			(double)(syn_counts.ms) / total_syns * 100.0,
+			(double)(synack_counts.ms) / total_synacks * 100.0);
+	fprintf(out, "%-20s\t%.2f%%\t%.2f%%\n",
 			"M and W",
-			(double)(counts.mw) / total_syns * 100.0);
-	fprintf(out, "%-20s\t%.2f%%\n",
+			(double)(syn_counts.mw) / total_syns * 100.0,
+			(double)(synack_counts.mw) / total_synacks * 100.0);
+	fprintf(out, "%-20s\t%.2f%%\t%.2f%%\n",
 			"M, S and W",
-			(double)(counts.msw) / total_syns * 100.0);
-	fprintf(out, "%-20s\t%.2f%%\n",
+			(double)(syn_counts.msw) / total_syns * 100.0,
+			(double)(synack_counts.msw) / total_synacks * 100.0);
+	fprintf(out, "%-20s\t%.2f%%\t%.2f%%\n",
 			"M, T",
-			(double)(counts.mt) / total_syns * 100.0);
-	fprintf(out, "%-20s\t%.2f%%\n",
+			(double)(syn_counts.mt) / total_syns * 100.0,
+			(double)(synack_counts.mt) / total_synacks * 100.0);
+	fprintf(out, "%-20s\t%.2f%%\t%.2f%%\n",
 			"W, T",
-			(double)(counts.wt) / total_syns * 100.0);
-	fprintf(out, "%-20s\t%.2f%%\n",
+			(double)(syn_counts.wt) / total_syns * 100.0,
+			(double)(synack_counts.wt) / total_synacks * 100.0);
+	fprintf(out, "%-20s\t%.2f%%\t%.2f%%\n",
 			"S, T",
-			(double)(counts.ts_and_sack) / total_syns * 100.0);
-	fprintf(out, "%-20s\t%.2f%%\n",
+			(double)(syn_counts.ts_and_sack) / total_syns * 100.0,
+			(double)(synack_counts.ts_and_sack) / total_synacks * 100.0);
+	fprintf(out, "%-20s\t%.2f%%\t%.2f%%\n",
 			"S, M, T",
-			(double)(counts.tms) / total_syns * 100.0);
-	fprintf(out, "%-20s\t%.2f%%\n",
+			(double)(syn_counts.tms) / total_syns * 100.0,
+			(double)(synack_counts.tms) / total_synacks * 100.0);
+	fprintf(out, "%-20s\t%.2f%%\t%.2f%%\n",
 			"W, M, T",
-			(double)(counts.tmw) / total_syns * 100.0);
-	fprintf(out, "%-20s\t%.2f%%\n",
+			(double)(syn_counts.tmw) / total_syns * 100.0,
+			(double)(synack_counts.tmw) / total_synacks * 100.0);
+	fprintf(out, "%-20s\t%.2f%%\t%.2f%%\n",
 			"S, W, T",
-			(double)(counts.tws) / total_syns * 100.0);
-	fprintf(out, "%-20s\t%.2f%%\n",
+			(double)(syn_counts.tws) / total_syns * 100.0,
+			(double)(synack_counts.tws) / total_synacks * 100.0);
+	fprintf(out, "%-20s\t%.2f%%\t%.2f%%\n",
 			"M, S, W and T",
-			(double)(counts.all_four) / total_syns * 100.0);
+			(double)(syn_counts.all_four) / total_syns * 100.0,
+			(double)(synack_counts.all_four) / total_synacks * 100.0);
 	//fprintf(out, "%-20s\t%.2f%%\n",
 	//		"T and (M or S or W)",
 	//		(double)(counts.ts_and_another) / total_syns * 100.0);
-	fprintf(out, "%-20s\t%.2f%%\n",
+	fprintf(out, "%-20s\t%.2f%%\t%.2f%%\n",
 			"T/TCP",
-			(double)(counts.ttcp) / total_syns * 100.0);
-	fprintf(out, "%-20s\t%.2f%%\n",
+			(double)(syn_counts.ttcp) / total_syns * 100.0,
+			(double)(synack_counts.ttcp) / total_synacks * 100.0);
+	fprintf(out, "%-20s\t%.2f%%\t%.2f%%\n",
 			"Other options",
-			(double)(counts.other) / total_syns * 100.0);
+			(double)(syn_counts.other) / total_syns * 100.0,
+			(double)(synack_counts.other) / total_synacks * 100.0);
 	
 	
 	fclose(out);

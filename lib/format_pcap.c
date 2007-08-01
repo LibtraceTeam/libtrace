@@ -131,9 +131,8 @@ static int pcap_config_input(libtrace_t *libtrace,
 			/* can't do promisc on a trace! fall thru */
 		case TRACE_OPTION_META_FREQ:
 			/* No meta data for this format */
+		case TRACE_OPTION_EVENT_REALTIME:
 		default:
-			trace_set_err(libtrace,TRACE_ERR_UNKNOWN_OPTION,
-					"Unknown option %i", option);
 			return -1;
 	}
 	assert(0);
@@ -190,9 +189,13 @@ static int pcapint_config_input(libtrace_t *libtrace,
 			return 0;
 		case TRACE_OPTION_META_FREQ:
 			/* No meta-data for this format */
+		case TRACE_OPTION_EVENT_REALTIME:
+			/* live interface is always real-time! */
 		default:
-			trace_set_err(libtrace,TRACE_ERR_UNKNOWN_OPTION,
-					"Unknown option %i", option);
+			/* Don't set an error here - trace_config will try
+			 * to handle the option when we return. If it can't
+			 * deal with it, then it will do the necessary
+			 * error-setting. */
 			return -1;
 	}
 	assert(0);
