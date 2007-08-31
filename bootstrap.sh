@@ -9,10 +9,10 @@ aclocal-1.9 -I m4 ||
 libtoolize --force --copy ||
 	glibtoolize --force --copy
 
-autoheader
+autoheader2.50 || autoheader
 
 # Prefer automake-1.9 if we can find it
 automake-1.9 --add-missing --copy --foreign || 
 	automake --add-missing --copy --foreign
 
-autoconf #-Wall
+autoconf2.50 || autoconf 
