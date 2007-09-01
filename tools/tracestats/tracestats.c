@@ -50,6 +50,7 @@
 #include <sys/socket.h>
 #include <getopt.h>
 #include <inttypes.h>
+#include <signal.h>
 
 #include "libtrace.h"
 
@@ -58,6 +59,13 @@
 #endif
 
 struct libtrace_t *trace;
+
+volatile static int done=0;
+
+static void cleanup_signal(int signal)
+{
+	done=1;
+}
 
 struct filter_t {
 	char *expr;
@@ -97,6 +105,9 @@ static void run_trace(char *uri)
                 if ((psize = trace_read_packet(trace, packet)) <1) {
                         break;
                 }
+		
+		if (done)
+			break;
 
 		for(i=0;i<filter_count;++i) {
 			if (filters[i].filter == NULL)
@@ -137,6 +148,7 @@ static void usage(char *argv0)
 int main(int argc, char *argv[]) {
 
 	int i;
+	struct sigaction sigact;
 
 	while(1) {
 		int option_index;
@@ -171,6 +183,13 @@ int main(int argc, char *argv[]) {
 				return 1;
 		}
 	}
+
+	sigact.sa_handler = cleanup_signal;
+	sigemptyset(&sigact.sa_mask);
+	sigact.sa_flags = SA_RESTART;
+
+	sigaction(SIGINT, &sigact, NULL);
+	sigaction(SIGTERM, &sigact, NULL);
 
 	for(i=optind;i<argc;++i) {
 		run_trace(argv[i]);

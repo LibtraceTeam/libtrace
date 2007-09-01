@@ -4,6 +4,7 @@
 #include <inttypes.h>
 #include <stdbool.h>
 #include <getopt.h>
+#include <signal.h>
 
 static void usage(char *argv0)
 {
@@ -14,6 +15,13 @@ static void usage(char *argv0)
 	"-H --libtrace-help     Print libtrace runtime documentation\n"
 	,argv0);
 	exit(1);
+}
+
+volatile int done=0;
+
+static void cleanup_signal(int sig)
+{
+	done=1;
 }
 
 int main(int argc, char *argv[])
@@ -27,6 +35,7 @@ int main(int argc, char *argv[])
 	bool unique_packets=false;
 	int i=0;
 	uint64_t last_ts=0;
+	struct sigaction sigact;
 
 	while (1) {
 		int option_index;
@@ -71,6 +80,13 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
+	sigact.sa_handler = cleanup_signal;
+	sigemptyset(&sigact.sa_mask);
+	sigact.sa_flags = SA_RESTART;
+
+	sigaction(SIGINT,&sigact,NULL);
+	sigaction(SIGTERM,&sigact,NULL);
+
 	input=calloc((size_t)(argc-optind),sizeof(struct libtrace_t *));
 	packet=calloc((size_t)(argc-optind),sizeof(struct libtrace_packet_t *));
 	live=calloc((size_t)(argc-optind),sizeof(bool));
@@ -96,6 +112,8 @@ int main(int argc, char *argv[])
 	while(1) {
 		uint64_t oldest_ts=0;
 		int oldest=-1;
+		if (done)
+			break;
 		for(i=0;i<argc-optind;++i) {
 			if (!live[i] && input[i]) {
 				int ret=trace_read_packet(input[i],packet[i]);

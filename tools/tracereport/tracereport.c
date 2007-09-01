@@ -42,7 +42,7 @@
 
 #include <getopt.h>
 #include <inttypes.h>
-//#include "lt_inttypes.h"
+#include <signal.h>
 
 #include "libtrace.h"
 #include "tracereport.h"
@@ -50,6 +50,13 @@
 
 struct libtrace_t *trace;
 uint32_t reports_required = 0;
+
+static volatile int done=0;
+
+static void cleanup_signal(int sig)
+{
+	done=1;
+}
 
 /* Process a trace, counting packets that match filter(s) */
 static void run_trace(char *uri, libtrace_filter_t *filter, int count) 
@@ -80,6 +87,8 @@ static void run_trace(char *uri, libtrace_filter_t *filter, int count)
 		if (count--<1)
 			break;
 		*/
+		if (done)
+			break;
 		if ((psize = trace_read_packet(trace, packet)) <1) {
 			break;
 		}
@@ -141,6 +150,7 @@ int main(int argc, char *argv[]) {
 	int i;
 	int opt;
 	char *filterstring=NULL;
+	struct sigaction sigact;
 
 	libtrace_filter_t *filter = NULL;/*trace_bpf_setfilter(filterstring); */
 
@@ -230,6 +240,13 @@ int main(int argc, char *argv[]) {
 	if (filterstring) {
 		filter = trace_create_filter(filterstring);
 	}
+
+	sigact.sa_handler = cleanup_signal;
+	sigemptyset(&sigact.sa_mask);
+	sigact.sa_flags = SA_RESTART;
+
+	sigaction(SIGINT, &sigact, NULL);
+	sigaction(SIGTERM, &sigact, NULL);
 		
 	
 	for(i=optind;i<argc;++i) {
