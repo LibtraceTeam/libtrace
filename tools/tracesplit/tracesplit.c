@@ -42,7 +42,7 @@ static int usage(char *argv0)
 	exit(1);
 }
 
-int done=0;
+volatile int done=0;
 
 static void cleanup_signal(int sig)
 {
@@ -51,10 +51,12 @@ static void cleanup_signal(int sig)
 
 int main(int argc, char *argv[])
 {
+	/* All these variables are getting silly */
 	struct libtrace_filter_t *filter=NULL;
 	struct libtrace_out_t *output = NULL;
 	struct libtrace_t *input;
 	struct libtrace_packet_t *packet = trace_create_packet();
+	struct sigaction sigact;
 	uint64_t count=UINT64_MAX;
 	uint64_t bytes=UINT64_MAX;
 	uint64_t starttime=0;
@@ -126,6 +128,13 @@ int main(int argc, char *argv[])
 		fprintf(stderr,"missing inputuri or outputuri\n");
 		usage(argv[0]);
 	}
+
+	sigact.sa_handler = cleanup_signal;
+	sigact.sa_mask = 0;
+	sigact.sa_flags = SA_RESTART;
+
+	sigaction(SIGINT, &sigact, NULL);
+	sigaction(SIGTERM, &sigact, NULL);
 
 	output=NULL;
 	input=trace_create(argv[optind]);
