@@ -130,7 +130,7 @@ int main(int argc, char *argv[])
 	}
 
 	sigact.sa_handler = cleanup_signal;
-	sigact.sa_mask = 0;
+	sigemptyset(&sigact.sa_mask);
 	sigact.sa_flags = SA_RESTART;
 
 	sigaction(SIGINT, &sigact, NULL);
