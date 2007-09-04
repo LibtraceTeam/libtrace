@@ -694,24 +694,45 @@ DLLEXPORT uint16_t trace_get_destination_port(const libtrace_packet_t *packet)
 		return 0;
 }
 
+/* Take a pointer to the start of an IEEE 802.11 MAC frame and return a pointer
+ * to the source MAC address.  
+ * If the frame does not contain a sender address, e.g. ACK frame, return NULL.
+ * If the frame is a 4-address WDS frame, return TA, i.e. addr2.
+ * NB: This function decodes the 802.11 header, so it assumes that there are no
+ * bit-errors. If there are, all bets are off.
+ */
+static
+uint8_t *get_source_mac_from_wifi(void *wifi) {
+	if (wifi == NULL) return NULL;
+	struct libtrace_80211_t *w = (struct libtrace_80211_t *) wifi;
+	
+	/* If the frame is of type CTRL */
+	if (w->type == 0x1) 
+		/* If bit 2 of the subtype field is zero, this indicates that
+		 * there is no transmitter address, i.e. the frame is either an
+		 * ACK or a CTS frame */
+		if ((w->subtype & 0x2) == 0)
+			return NULL;
+
+	/* Always return the address of the transmitter, i.e. address 2 */
+	return (uint8_t *) &w->mac2;
+}
 
 uint8_t *trace_get_source_mac(libtrace_packet_t *packet) {
 	void *link = trace_get_link(packet);
-	libtrace_80211_t *wifi;
         libtrace_ether_t *ethptr = (libtrace_ether_t*)link;
 	if (!link)
 		return NULL;
 	switch (trace_get_link_type(packet)) {
-		case TRACE_TYPE_80211:
-			wifi=(libtrace_80211_t*)link;
-			return (uint8_t*)&wifi->mac2;
 		case TRACE_TYPE_80211_RADIO:
-			wifi=(libtrace_80211_t*)trace_get_payload_from_radiotap(
-					link,NULL,NULL);
-			return (uint8_t*)&wifi->mac1;
+			link = trace_get_payload_from_radiotap(
+					link, NULL, NULL);
+			/* Fall through for 802.11 */
+		case TRACE_TYPE_80211:
+			return get_source_mac_from_wifi(link);
 		case TRACE_TYPE_80211_PRISM:
-			wifi=(libtrace_80211_t*)((char*)link+144);
-			return (uint8_t*)&wifi->mac2;
+			link = ((char*)link+144);
+			return get_source_mac_from_wifi(link);
 		case TRACE_TYPE_ETH:
 			return (uint8_t*)&ethptr->ether_shost;
 		case TRACE_TYPE_POS:
