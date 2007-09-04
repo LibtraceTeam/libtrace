@@ -341,7 +341,7 @@ static libtrace_linktype_t linuxnative_get_link_type(const struct libtrace_packe
 static libtrace_direction_t linuxnative_get_direction(const struct libtrace_packet_t *packet) {
 	switch (((struct libtrace_linuxnative_header*)(packet->buffer))->hdr.sll_pkttype) {
 		case PACKET_OUTGOING:
-		case PACKET_LOOPBACK;
+		case PACKET_LOOPBACK:
 			return TRACE_DIR_OUTGOING;
 		default:
 			return TRACE_DIR_INCOMING;
@@ -357,7 +357,7 @@ static libtrace_direction_t linuxnative_set_direction(
 			((struct libtrace_linuxnative_header*)(packet->buffer))->hdr.sll_pkttype = PACKET_OUTGOING;
 			return TRACE_DIR_OUTGOING;
 		case TRACE_DIR_INCOMING:
-			((struct libtrace_linuxnative_header*)(packet->buffer))->hdr.sll_pkttype = PACKET_INCOMING;
+			((struct libtrace_linuxnative_header*)(packet->buffer))->hdr.sll_pkttype = PACKET_HOST;
 			return TRACE_DIR_INCOMING;
 		default:
 			return -1;
