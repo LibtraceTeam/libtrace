@@ -172,13 +172,36 @@ AC_ARG_WITH(dag,
         dag_root=/usr/local/dag
 ])
 
+# DAG 3.0 actually puts header files and shared libraries into sensible
+# places now, so we should be able to do a simple CHECK_LIB to see if
+# they're there!
+
+# Addendum: It turns out DAG 2.5 does this too, so we'll match DAG2.5 in here
+# also. This isn't such a bad thing, the DAG2.5 API is essentially the same as
+# DAG 3.0 and libtrace will use the same format_dagXX source for both
+libtrace_dag=false
+libtrace_dag_version=none
+
+if test "$with_dag" != no; then
+	AC_CHECK_LIB(dag, dag_open, dag_found=1, dag_found=0)
+	if test "$dag_found" = 1; then
+		ADD_LIBS="$ADD_LIBS -ldag"
+		AC_DEFINE(HAVE_DAG_API, 1, [define if you have a DAG API])
+		AC_DEFINE(HAVE_DAG,1,[conditional for building with DAG support])
+		libtrace_dag=true
+		
+		AC_DEFINE(DAG_VERSION,30,[defines the DAG driver version])
+		libtrace_dag_version=30
+	fi
+fi
+
 # turn the test part of the next block into a function, so it can be 
 # called multiple times for $dag_root, /root/dag, /usr/local/lib
-libtrace_dag=false
-libtrace_dag2_4=false
-dag_drv_v="DAG not present"
-if test "$with_dag" != no; then
-        AC_MSG_CHECKING(whether we have DAG API)
+#dag_drv_v="DAG not present"
+
+# Now check for 2.4 DAG drivers which don't install as cleanly!
+if test "$with_dag" != no -a "$libtrace_dag" = false; then
+        AC_MSG_CHECKING(whether we have DAG 2.4 API)
 
 	if test -r "$dag_root/lib"; then
 		dag_lib_dir="$dag_root/lib"
@@ -205,6 +228,8 @@ if test "$with_dag" != no; then
                 
 		AC_DEFINE(HAVE_DAG_API, 1, [define if you have a DAG API])
 		AC_DEFINE(HAVE_DAG,1,[conditional for building with DAG support])
+		AC_DEFINE(DAG_VERSION, 24, [defines the DAG driver version])
+		libtrace_dag_version=24
         else
                 if test "$want_dag" = yes; then
                         AC_MSG_ERROR(DAG API not found under directory $dag_root
@@ -214,24 +239,15 @@ if test "$with_dag" != no; then
         fi
         AC_MSG_RESULT($libtrace_dag)
 
-	if test "$libtrace_dag" != false; then
-		AC_MSG_CHECKING(if we are using DAG 2.4)
-		if grep '2.4.' $dag_root/VERSION > /dev/null 2>&1; then
-			libtrace_dag2_4=true
-			AC_DEFINE(DAG_VERSION_2_4, 1, [define if using DAG 2.4])
-		else
-			libtrace_dag2_4=false
-		fi
-		AC_MSG_RESULT($libtrace_dag2_4)
-		dag_drv_v=`cat $dag_root/VERSION`
-	fi
 fi
-DAG_VERSION_NUM=$dag_drv_v
+
 AC_CHECK_LIB(z, gzopen)
 
 AM_CONDITIONAL([HAVE_BPF], [test "$ac_cv_have_decl_BIOCSETIF" = yes ])
 AM_CONDITIONAL([HAVE_DAG], [test "$libtrace_dag" = true])
-AM_CONDITIONAL([DAG2_4], [test "$libtrace_dag2_4" = true])
+AM_CONDITIONAL([DAG2_4], [test "$libtrace_dag_version" = 24])
+AM_CONDITIONAL([DAG2_5], [test "$libtrace_dag_version" = 25])
+AM_CONDITIONAL([DAG3_0], [test "$libtrace_dag_version" = 30])
 AM_CONDITIONAL([HAVE_ZLIB], [test "$ac_cv_lib_z_gzopen" = yes])
 AM_CONDITIONAL([HAVE_NETPACKET_PACKET_H], [test "$libtrace_netpacket_packet_h" = true])
 AM_CONDITIONAL([LIBGDC], [test "$ac_cv_header_gdc_h" = yes])
@@ -268,11 +284,13 @@ AC_MSG_NOTICE([Libtrace version $PACKAGE_VERSION])
 reportopt "Compiled with PCAP 0.8 support" $ac_cv_lib_pcap_pcap_next_ex
 reportopt "Compiled with compressed trace (zlib) support" $ac_cv_lib_z_gzopen
 if test x"$libtrace_dag" = xtrue; then
-	if test x"$libtrace_dag2_4"; then
+	if test "$libtrace_dag_version" = 24; then
 		AC_MSG_NOTICE([Compiled with DAG support: 2.4])
+	elif test "$libtrace_dag_version" = 30; then
+		AC_MSG_NOTICE([Compiled with DAG support: 3.0])
 	else
 		AC_MSG_NOTICE([Compiled with DAG support: 2.5])
-	fi
+	fi	
 else
 	AC_MSG_NOTICE([Compiled with DAG support: No])
 fi

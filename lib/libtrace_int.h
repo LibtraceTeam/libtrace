@@ -108,7 +108,7 @@ int snprintf(char *str, size_t size, const char *format, ...);
 #ifdef HAVE_DAG_API
 #  include "dagnew.h"
 #  include "dagapi.h"
-#	ifndef DAG_VERSION_2_4
+#	if DAG_VERSION == 25
 #		include <daginf.h>
 #	endif
 #else

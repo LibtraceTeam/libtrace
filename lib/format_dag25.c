@@ -74,6 +74,9 @@ struct dag_format_data_t {
 
 	int fd;
 	unsigned int dagstream;
+	int stream_attached;
+	uint8_t *bottom;
+	uint8_t *top;
 };
 
 static int dag_init_input(libtrace_t *libtrace) {
@@ -104,19 +107,25 @@ static int dag_init_input(libtrace_t *libtrace) {
         DUCK.duck_freq = 0;
         DUCK.last_pkt = 0;
         DUCK.dummy_duck = NULL;
-
+	FORMAT_DATA->stream_attached = 0;
+	
         return 0;
 }
 	
 static int dag_config_input(libtrace_t *libtrace, trace_option_t option,
                                 void *data) {
-        switch(option) {
+        char conf_str[4096];
+	switch(option) {
                 case TRACE_OPTION_META_FREQ:
                         DUCK.duck_freq = *(int *)data;
                         return 0;
                 case TRACE_OPTION_SNAPLEN:
-                        /* Surely we can set this?? Fall through for now*/
-                        return -1;
+                        snprintf(conf_str, 4096, "varlen slen=%i", *(int *)data);
+			if (dag_configure(FORMAT_DATA->fd, conf_str) != 0) {
+				trace_set_err(libtrace, errno, "Failed to configure snaplen on DAG card: %s", libtrace->uridata);
+				return -1;
+			}
+			return 0;
                 case TRACE_OPTION_PROMISC:
                         /* DAG already operates in a promisc fashion */
                         return -1;
@@ -151,18 +160,21 @@ static int dag_start_input(libtrace_t *libtrace) {
                 trace_set_err(libtrace, errno, "Cannot start DAG stream");
                 return -1;
         }
+	FORMAT_DATA->stream_attached = 1;
 	/* We don't want the dag card to do any sleeping */
         dag_set_stream_poll(FORMAT_DATA->fd, 
 				FORMAT_DATA->dagstream, 0, &zero, 
 				&nopoll);
 	
 	/* Should probably flush the memory hole now */
+	
 	do {
 		top = dag_advance_stream(FORMAT_DATA->fd,
 					FORMAT_DATA->dagstream,
 					&bottom);
 		assert(top && bottom);
 		diff = top - bottom;
+		bottom -= diff;
 	} while (diff != 0);
 
 	return 0;
@@ -179,11 +191,14 @@ static int dag_pause_input(libtrace_t *libtrace) {
                 trace_set_err(libtrace, errno, "Could not detach DAG stream");
                 return -1;
 	}
-
+	FORMAT_DATA->stream_attached = 0;
 	return 0;
 }
 
 static int dag_fin_input(libtrace_t *libtrace) {
+	if (FORMAT_DATA->stream_attached)
+		dag_pause_input(libtrace);
+	dag_close(FORMAT_DATA->fd);
 	if (DUCK.dummy_duck)
 		trace_destroy_dead(DUCK.dummy_duck);
 	free(libtrace->format_data);
@@ -192,8 +207,6 @@ static int dag_fin_input(libtrace_t *libtrace) {
 
 static int dag_get_duckinfo(libtrace_t *libtrace,
                                 libtrace_packet_t *packet) {
-        daginf_t lt_dag_inf;
-
         if (packet->buf_control == TRACE_CTRL_EXTERNAL ||
                         !packet->buffer) {
                 packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
@@ -223,19 +236,37 @@ static int dag_get_duckinfo(libtrace_t *libtrace,
         return sizeof(duckinf_t);
 }
 
-dag_record_t *dag_get_record(libtrace_t *libtrace) {
+static int dag_available(libtrace_t *libtrace) {
+	uint32_t diff = FORMAT_DATA->top - FORMAT_DATA->bottom;
+	if (diff >= dag_record_size)
+		return diff;
+	FORMAT_DATA->top = dag_advance_stream(FORMAT_DATA->fd, 
+			FORMAT_DATA->dagstream, 
+			&(FORMAT_DATA->bottom));
+	if (FORMAT_DATA->top == NULL) {
+		trace_set_err(libtrace, errno, "dag_advance_stream failed!");
+		return -1;
+	}
+	diff = FORMAT_DATA->top - FORMAT_DATA->bottom;
+	return diff;
+}
+
+static dag_record_t *dag_get_record(libtrace_t *libtrace) {
         dag_record_t *erfptr = NULL;
         uint16_t size;
-	erfptr = (dag_record_t *) dag_rx_stream_next_record(FORMAT_DATA->fd,
-                        FORMAT_DATA->dagstream);
+	erfptr = (dag_record_t *)FORMAT_DATA->bottom;
 	if (!erfptr)
                 return NULL;
         size = ntohs(erfptr->rlen);
         assert( size >= dag_record_size );
+	/* Make certain we have the full packet available */
+	if (size > (FORMAT_DATA->top - FORMAT_DATA->bottom))
+		return NULL;
+	FORMAT_DATA->bottom += size;
 	return erfptr;
 }
 
-void dag_form_packet(dag_record_t *erfptr, libtrace_packet_t *packet) {
+static void dag_form_packet(dag_record_t *erfptr, libtrace_packet_t *packet) {
         packet->buffer = erfptr;
         packet->header = erfptr;
         packet->type = TRACE_RT_DATA_ERF;
@@ -256,7 +287,8 @@ static int dag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
         int size = 0;
         struct timeval tv;
         dag_record_t *erfptr = NULL;
-
+	int numbytes = 0;
+	
         if (DUCK.last_pkt - DUCK.last_duck > DUCK.duck_freq &&
                         DUCK.duck_freq != 0) {
                 size = dag_get_duckinfo(libtrace, packet);
@@ -275,6 +307,12 @@ static int dag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
         }
 
 	do {
+		numbytes = dag_available(libtrace);
+		if (numbytes < 0)
+			return numbytes;
+		if (numbytes < dag_record_size)
+			/* Block until we see a packet */
+			continue;
 		erfptr = dag_get_record(libtrace);
 	} while (erfptr == NULL);
 
