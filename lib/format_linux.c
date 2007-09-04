@@ -341,9 +341,26 @@ static libtrace_linktype_t linuxnative_get_link_type(const struct libtrace_packe
 static libtrace_direction_t linuxnative_get_direction(const struct libtrace_packet_t *packet) {
 	switch (((struct libtrace_linuxnative_header*)(packet->buffer))->hdr.sll_pkttype) {
 		case PACKET_OUTGOING:
+		case PACKET_LOOPBACK;
 			return TRACE_DIR_OUTGOING;
 		default:
 			return TRACE_DIR_INCOMING;
+	}
+}
+
+static libtrace_direction_t linuxnative_set_direction(
+		const libtrace_packet_t *packet,
+		libtrace_direction_t direction) {
+
+	switch (direction) {
+		case TRACE_DIR_OUTGOING:
+			((struct libtrace_linuxnative_header*)(packet->buffer))->hdr.sll_pkttype = PACKET_OUTGOING;
+			return TRACE_DIR_OUTGOING;
+		case TRACE_DIR_INCOMING:
+			((struct libtrace_linuxnative_header*)(packet->buffer))->hdr.sll_pkttype = PACKET_INCOMING;
+			return TRACE_DIR_INCOMING;
+		default:
+			return -1;
 	}
 }
 
@@ -400,7 +417,7 @@ static struct libtrace_format_t linuxnative = {
 	linuxnative_write_packet,	/* write_packet */
 	linuxnative_get_link_type,	/* get_link_type */
 	linuxnative_get_direction,	/* get_direction */
-	NULL,				/* set_direction */
+	linuxnative_set_direction,	/* set_direction */
 	NULL,				/* get_erf_timestamp */
 	linuxnative_get_timeval,	/* get_timeval */
 	NULL,				/* get_seconds */
