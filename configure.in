@@ -201,7 +201,7 @@ fi
 
 # Now check for 2.4 DAG drivers which don't install as cleanly!
 if test "$with_dag" != no -a "$libtrace_dag" = false; then
-        AC_MSG_CHECKING(whether we have DAG 2.4 API)
+        AC_MSG_CHECKING(whether we have DAG 2.4 API instead)
 
 	if test -r "$dag_root/lib"; then
 		dag_lib_dir="$dag_root/lib"

@@ -221,7 +221,7 @@ static int dag_get_duckinfo(libtrace_t *libtrace,
 }
 
 
-dag_record_t *dag_get_record(libtrace_t *libtrace) {
+static dag_record_t *dag_get_record(libtrace_t *libtrace) {
         dag_record_t *erfptr = NULL;
         uint16_t size;
 	erfptr = (dag_record_t *) ((char *)FORMAT_DATA->buf + 
@@ -236,7 +236,7 @@ dag_record_t *dag_get_record(libtrace_t *libtrace) {
         return erfptr;
 }
 
-void dag_form_packet(dag_record_t *erfptr, libtrace_packet_t *packet) {
+static void dag_form_packet(dag_record_t *erfptr, libtrace_packet_t *packet) {
         packet->buffer = erfptr;
         packet->header = erfptr;
         packet->type = TRACE_RT_DATA_ERF;
