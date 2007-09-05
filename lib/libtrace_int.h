@@ -457,6 +457,9 @@ void pcapfile_constructor(void);
 void rt_constructor(void);
 void duck_constructor(void);
 void atmhdr_constructor(void);
+#ifdef HAVE_BPF
+void bpf_constructor(void);
+#endif
 
 /* Used internally by get_wire_length() methods */
 bool trace_get_wireless_flags(void *link, libtrace_linktype_t linktype, uint8_t *flags);
