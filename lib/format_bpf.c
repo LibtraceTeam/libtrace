@@ -229,9 +229,13 @@ static int bpf_config_input(libtrace_t *libtrace,
 			 * emulating it
 			 */
 			break;
-		case TRACE_META_FREQ:
+		case TRACE_OPTION_META_FREQ:
 			/* No meta-data for this format */
 			break;
+		case TRACE_OPTION_EVENT_REALTIME:
+			/* captures are always realtime */
+			break;
+
 		/* Avoid default: so that future options will cause a warning
 		 * here to remind us to implement it, or flag it as
 		 * unimplementable
