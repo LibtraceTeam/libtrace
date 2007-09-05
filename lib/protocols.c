@@ -265,7 +265,7 @@ static void *trace_get_payload_from_prism (void *link,
 		*remaining-=144;
 	}
 
-	if (type) *type = 0;
+	if (type) *type = TRACE_TYPE_80211;
 
 	return (void *) ((char*)link+144);
 }
@@ -282,7 +282,7 @@ static void *trace_get_payload_from_radiotap (void *link,
 		*remaining -= rtaplen;
 	}
 
-	if (type) *type = 0;
+	if (type) *type = TRACE_TYPE_80211;
 
 	return (void*) ((char*)link + rtaplen);
 }
@@ -717,27 +717,34 @@ uint8_t *get_source_mac_from_wifi(void *wifi) {
 	return (uint8_t *) &w->mac2;
 }
 
-uint8_t *trace_get_source_mac(libtrace_packet_t *packet) {
-	void *link = trace_get_link(packet);
-        libtrace_ether_t *ethptr = (libtrace_ether_t*)link;
+static
+uint8_t *__trace_get_source_mac(void *link, libtrace_linktype_t *linktype, uint32_t *rem) {
+	libtrace_ether_t *ethptr = (libtrace_ether_t *) link;
+	uint16_t arphrd;
 	if (!link)
 		return NULL;
-	switch (trace_get_link_type(packet)) {
-		case TRACE_TYPE_80211_RADIO:
-			link = trace_get_payload_from_radiotap(
-					link, NULL, NULL);
-			/* Fall through for 802.11 */
+	
+	switch (*linktype) {
+		case TRACE_TYPE_ETH:
+			return (uint8_t *)&ethptr->ether_shost;
 		case TRACE_TYPE_80211:
 			return get_source_mac_from_wifi(link);
+		case TRACE_TYPE_80211_RADIO:
+			link = trace_get_payload_from_radiotap(
+					link, linktype, rem);
+			return __trace_get_source_mac(link, linktype, rem);
 		case TRACE_TYPE_80211_PRISM:
-			link = ((char*)link+144);
-			return get_source_mac_from_wifi(link);
-		case TRACE_TYPE_ETH:
-			return (uint8_t*)&ethptr->ether_shost;
+			link = trace_get_payload_from_prism(
+					link, linktype, rem);
+			return __trace_get_source_mac(link, linktype, rem);
+		case TRACE_TYPE_LINUX_SLL:
+			link = trace_get_payload_from_linux_sll(
+					link, &arphrd, rem);
+			*linktype = arphrd_type_to_libtrace(arphrd);
+			return __trace_get_source_mac(link, linktype, rem);
 		case TRACE_TYPE_POS:
 		case TRACE_TYPE_NONE:
 		case TRACE_TYPE_HDLC_POS:
-		case TRACE_TYPE_LINUX_SLL:
 		case TRACE_TYPE_PFLOG:
 		case TRACE_TYPE_ATM:
 		case TRACE_TYPE_DUCK:
@@ -746,9 +753,18 @@ uint8_t *trace_get_source_mac(libtrace_packet_t *packet) {
 		default:
 			break;
 	}
-	fprintf(stderr,"Not implemented\n");
+	fprintf(stderr,"%s not implemented for linktype %i\n", __func__, *linktype);
 	assert(0);
 	return NULL;
+}
+
+DLLEXPORT uint8_t *trace_get_source_mac(libtrace_packet_t *packet) {
+	if (packet == NULL) 
+		return NULL;
+	void *link = trace_get_link(packet);
+	uint32_t len = trace_get_capture_length(packet);
+	libtrace_linktype_t lt = trace_get_link_type(packet);
+	return __trace_get_source_mac(link, &lt, &len);
 }
 
 DLLEXPORT uint8_t *trace_get_destination_mac(libtrace_packet_t *packet) {
