@@ -10,7 +10,8 @@ static void usage(char *argv0)
 {
 	fprintf(stderr,"Usage:\n"
 	"%s flags outputuri traceuri [traceuri...]\n"
-	"-i --set-interface 	Each trace is allocated an interface. Default leaves this flag as read from the original traces, if appropriate\n"
+	"-i [interfaces_per_input] --set-interface [interfaces_per_input]\n"
+	"			Each trace is allocated an interface. Default leaves this flag as read from the original traces, if appropriate\n"
 	"-u --unique-packets    Discard duplicate packets\n"
 	"-H --libtrace-help     Print libtrace runtime documentation\n"
 	,argv0);
@@ -31,7 +32,7 @@ int main(int argc, char *argv[])
 	struct libtrace_t **input;
 	struct libtrace_packet_t **packet;
 	bool *live;
-	bool set_interface=false;
+	int interfaces_per_input=0;
 	bool unique_packets=false;
 	int i=0;
 	uint64_t last_ts=0;
@@ -40,20 +41,25 @@ int main(int argc, char *argv[])
 	while (1) {
 		int option_index;
 		struct option long_options[] = {
-			{ "set-interface", 	0, 0, 'i' },
+			{ "set-interface", 	2, 0, 'i' },
 			{ "unique-packets",	0, 0, 'u' },
 			{ "libtrace-help",	0, 0, 'H' },
 			{ NULL,			0, 0, 0   },
 		};
 
-		int c=getopt_long(argc, argv, "iuH",
+		int c=getopt_long(argc, argv, "i::uH",
 				long_options, &option_index);
 
 		if (c==-1)
 			break;
 
 		switch (c) {
-			case 'i': set_interface=true; break;
+			case 'i': 
+				if (optarg) 
+					interfaces_per_input=atoi(optarg);
+				else
+					interfaces_per_input=1;
+				break;
 			case 'u': unique_packets=true; break;
 			case 'H': 
 				  trace_help();
@@ -112,6 +118,7 @@ int main(int argc, char *argv[])
 	while(1) {
 		uint64_t oldest_ts=0;
 		int oldest=-1;
+		int curr_dir;
 		if (done)
 			break;
 		for(i=0;i<argc-optind;++i) {
@@ -145,8 +152,21 @@ int main(int argc, char *argv[])
 
 		live[oldest]=false;
 
-		if (set_interface)
-			trace_set_direction(packet[oldest],oldest);
+		curr_dir = trace_get_direction(packet[oldest]);
+		if (curr_dir != -1 && interfaces_per_input) {
+			/* If there are more interfaces than
+			 * interfaces_per_input, then clamp at the 
+			 * highest input.  This means things should
+			 * end up in "OTHER" or the unused 3rd bin if
+			 * we're lucky */
+			curr_dir = curr_dir < interfaces_per_input
+				? curr_dir
+				: interfaces_per_input-1;
+
+			trace_set_direction(packet[oldest],
+					oldest*interfaces_per_input
+					+curr_dir);
+		}
 
 		if (unique_packets && oldest_ts == last_ts)
 			continue;

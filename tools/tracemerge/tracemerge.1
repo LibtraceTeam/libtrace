@@ -3,7 +3,7 @@
 tracemerge \- Merge one (or more) traces together
 .SH SYNOPSIS
 .B tracemerge 
-[ \-i | \-\^\-set-interface ]
+[ \-i [ interfaces_per_input ] | \-\^\-set-interface [ interfaces_per_input ] ]
 [ \-u | \-\^\-unique-packets ]
 outputuri inputuri...
 .SH DESCRPTION
@@ -11,12 +11,20 @@ tracemerge merges two or more traces together, keeping packets in order.
 
 .TP
 .PD 0
-.BI \-i
+.BI \-i [ interfaces_per_input ]
 .TP
 .PD
-.BI \-\^\-set-interface
-replace the "interface" bits in the erf header (or the "direction" bit in
-other trace files) to be 0 for the first file, 1 for the second file etc.
+.BI \-\^\-set-interface [interfaces_per_input ] 
+set the interface ("direction") for each input to be unique.  The optional
+inputs_per_interface parameter is how many inputs to reserve for each trace,
+and defaults to 1.  Thus if you have two traces with two interfaces (in/out),
+and interfaces_per_input is set to 2, then tracemerge will have the first
+interface of the first input will be 0, the second interface of the first input
+will be 1, the first interface of the second input will be 2, and the second
+interface of the second input will be 3.
+
+Beware that erf only supports 4 interfaces, and pcap only supports 2.
+Limitations apply based on the input trace format (not the output trace format)
 
 .TP
 .PD 0
