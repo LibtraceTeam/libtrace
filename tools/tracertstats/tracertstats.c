@@ -139,7 +139,7 @@ static void run_trace(char *uri)
                 }
 		erf_hdr = (dag_record_t *)packet->header;
 		
-		if (trace_get_link(packet) == NULL) {
+		if (trace_get_packet_buffer(packet,NULL,NULL) == NULL) {
 			continue;
 		}
 		

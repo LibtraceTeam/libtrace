@@ -14,7 +14,7 @@ void error_per_packet(struct libtrace_packet_t *packet)
 {
 	struct libtrace_ip *ip = trace_get_ip(packet);
 	struct libtrace_tcp *tcp = trace_get_tcp(packet);
-	void *link = trace_get_link(packet);
+	void *link = trace_get_packet_buffer(packet,NULL,NULL);
 	if (!link) {
 		++rx_errors;
 	}

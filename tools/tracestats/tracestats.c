@@ -60,7 +60,7 @@
 
 struct libtrace_t *trace;
 
-volatile static int done=0;
+static volatile int done=0;
 
 static void cleanup_signal(int signal)
 {

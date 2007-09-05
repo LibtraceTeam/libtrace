@@ -10,19 +10,20 @@ static stat_t nlp_stat[3][65536] = {{{0,0}}} ;
 
 void nlp_per_packet(struct libtrace_packet_t *packet)
 {
-	char *link=(char *)trace_get_link(packet);
-	uint16_t type;
+	uint16_t ethertype;
+	void *link;
 	libtrace_direction_t dir = trace_get_direction(packet);
+
+	link = trace_get_layer3(packet,&ethertype,NULL);
 	
 	if (!link)
 		return;
-	type = htons(*(uint16_t*)(link+12));
 
 	if (dir != TRACE_DIR_INCOMING && dir != TRACE_DIR_OUTGOING)
 		dir = TRACE_DIR_OTHER;
 	
-	nlp_stat[dir][type].count++;
-	nlp_stat[dir][type].bytes+=trace_get_wire_length(packet);
+	nlp_stat[dir][ethertype].count++;
+	nlp_stat[dir][ethertype].bytes+=trace_get_wire_length(packet);
 }
 
 void nlp_report(void){
