@@ -30,11 +30,14 @@ void dir_report(void)
 		if (!dir_packets[i])
 			continue;
 		switch(i) {
-			case 0: fprintf(out, "%20s:\t%12" PRIu64 "\t%12" PRIu64 "\n",
+			case TRACE_DIR_INCOMING: fprintf(out, "%20s:\t%12" PRIu64 "\t%12" PRIu64 "\n",
 					"Incoming",dir_bytes[i],dir_packets[i]);
 				break;
-			case 1: fprintf(out, "%20s:\t%12" PRIu64 "\t%12" PRIu64 "\n",
+			case TRACE_DIR_OUTGOING: fprintf(out, "%20s:\t%12" PRIu64 "\t%12" PRIu64 "\n",
 					"Outgoing",dir_bytes[i],dir_packets[i]);
+				break;
+			case TRACE_DIR_OTHER: fprintf(out, "%20s:\t%12" PRIu64 "\t%12" PRIu64 "\n",
+					"Other",dir_bytes[i],dir_packets[i]);
 				break;
 			default: fprintf(out, "%20i:\t%12" PRIu64 "\t%12" PRIu64 "\n",
 					i,dir_bytes[i],dir_packets[i]);
