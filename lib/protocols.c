@@ -441,6 +441,117 @@ void *trace_get_payload_from_ip6(libtrace_ip6_t *ipptr, uint8_t *prot,
 	}
 }
 
+DLLEXPORT void *trace_get_packet_meta(const libtrace_packet_t *packet, 
+		libtrace_linktype_t *linktype,
+		uint32_t *remaining)
+{
+	uint32_t dummyrem = trace_get_capture_length(packet);
+
+	assert(packet != NULL);
+	assert(linktype != NULL);
+	
+	if (remaining == NULL) 
+		remaining = &dummyrem;
+	
+	void *pktbuf = trace_get_packet_buffer(packet, linktype, remaining);
+	switch (*linktype) {
+		case TRACE_TYPE_LINUX_SLL:
+		case TRACE_TYPE_80211_RADIO:
+		case TRACE_TYPE_80211_PRISM:
+			return pktbuf;
+		case TRACE_TYPE_HDLC_POS:
+		case TRACE_TYPE_ETH:
+		case TRACE_TYPE_ATM:
+		case TRACE_TYPE_80211:
+		case TRACE_TYPE_NONE:
+		case TRACE_TYPE_PFLOG:
+		case TRACE_TYPE_POS:
+		case TRACE_TYPE_AAL5:
+		case TRACE_TYPE_DUCK:
+		case TRACE_TYPE_LLCSNAP:
+		case TRACE_TYPE_PPP:
+		case TRACE_TYPE_METADATA:
+			return NULL;
+	}
+}
+
+DLLEXPORT void *trace_get_payload_from_meta(const void *meta,
+		libtrace_linktype_t *linktype,
+		uint32_t *remaining)
+{
+	void *nexthdr; 
+	uint16_t arphrd;
+	
+	assert(meta != NULL);
+	assert(linktype != NULL);
+	assert(remaining != NULL);
+	
+	switch(*linktype) {
+		case TRACE_TYPE_LINUX_SLL:
+			nexthdr = trace_get_payload_from_linux_sll(meta,
+					&arphrd, remaining);
+			*linktype = arphrd_type_to_libtrace(arphrd);
+			return nexthdr;
+		case TRACE_TYPE_80211_RADIO:
+			nexthdr = trace_get_payload_from_radiotap(meta,
+					linktype, remaining);
+			return nexthdr;
+		case TRACE_TYPE_80211_PRISM:
+			nexthdr = trace_get_payload_from_prism(meta,
+					linktype, remaining);
+			return nexthdr;
+		case TRACE_TYPE_HDLC_POS:
+		case TRACE_TYPE_ETH:
+		case TRACE_TYPE_ATM:
+		case TRACE_TYPE_80211:
+		case TRACE_TYPE_NONE:
+		case TRACE_TYPE_PFLOG:
+		case TRACE_TYPE_POS:
+		case TRACE_TYPE_AAL5:
+		case TRACE_TYPE_DUCK:
+		case TRACE_TYPE_LLCSNAP:
+		case TRACE_TYPE_PPP:
+		case TRACE_TYPE_METADATA:
+			/* In this case, the pointer passed in does not point
+			 * to a metadata header and so we cannot get the
+			 * payload.
+			 */
+			return NULL;
+	}
+}
+
+DLLEXPORT void *trace_get_layer2(const libtrace_packet_t *packet,
+		libtrace_linktype_t *linktype,
+		uint32_t *remaining) 
+{
+	uint32_t dummyrem;
+	
+	assert(packet != NULL);
+	assert(linktype != NULL);
+
+	if (remaining == NULL)
+		remaining = &dummyrem;
+	
+	void *meta = trace_get_packet_meta(packet, linktype, remaining);
+
+	/* If there are no meta-data headers, we just return the start of the
+	 * packet buffer, along with the linktype, etc.
+	 */
+	if (meta == NULL) 
+		return trace_get_packet_buffer(packet, linktype, remaining);
+	
+	/* If there are meta-data headers, we need to skip over them until we
+	 * find a non-meta data header and return that.
+	 */
+	for(;;) {
+		void *nexthdr = trace_get_payload_from_meta(meta, 
+				linktype, remaining);
+		if (nexthdr == NULL)
+			return meta;
+		meta = nexthdr;
+	}
+}
+
 DLLEXPORT void *trace_get_layer3(libtrace_packet_t *packet,
 		uint16_t *ethertype,
 		uint32_t *remaining)

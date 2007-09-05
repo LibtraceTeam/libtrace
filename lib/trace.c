@@ -759,6 +759,14 @@ DLLEXPORT int trace_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *pa
 	return -1;
 }
 
+DLLEXPORT void *trace_get_packet_buffer(const libtrace_packet_t *packet,
+		libtrace_linktype_t *linktype, uint32_t *remaining) {
+	assert(packet != NULL);
+	if (linktype) *linktype = trace_get_link_type(packet);
+	if (remaining) *remaining = trace_get_capture_length(packet);
+	return (void *) packet->payload;
+}
+
 DLLEXPORT void *trace_get_link(const libtrace_packet_t *packet) {
 	return (void *)packet->payload;
 }

@@ -141,11 +141,13 @@ extern "C" {
  * parameters, used to hint gcc's optimisations
  */
 #if __GNUC__ >= 3 
+#  define DEPRECATED __attribute__((deprecated))
 #  define SIMPLE_FUNCTION __attribute__((pure))
 #  define UNUSED __attribute__((unused))
 #  define PACKED __attribute__((packed))
 #  define PRINTF(formatpos,argpos) __attribute__((format(printf,formatpos,argpos)))
 #else
+#  define DEPRECATED
 #  define SIMPLE_FUNCTION
 #  define UNUSED
 #  define PACKED 
@@ -940,15 +942,32 @@ DLLEXPORT int trace_write_packet(libtrace_out_t *trace, libtrace_packet_t *packe
  * @{
  */
 
+
+/* Gets a pointer to the first byte of the packet as it was captured and
+ * returns its corresponding linktype and capture length.
+ *
+ * Use this function instead of the deprecated trace_get_link().
+ *
+ * @param packet the packet pointer
+ * @param linktype[out] the linktype of the returned pointer
+ * @param remaining[out] the capture length (number of valid bytes from the
+ * pointer)
+ * @return a pointer to the first byte of the packet
+ */
+DLLEXPORT void *trace_get_packet_buffer(const libtrace_packet_t *packet,
+                libtrace_linktype_t *linktype, uint32_t *remaining);
+
 /** get a pointer to the link layer
  * @param packet  	the packet opaque pointer
  *
  * @return a pointer to the link layer, or NULL if there is no link layer
  *
+ * @deprecated This function is deprecated. Use trace_get_packet_buffer(..) or
+ * one of the trace_get_layer*(..) functions instead.
  * @note you should call trace_get_link_type to find out what type of link
  * layer this is
  */
-DLLEXPORT SIMPLE_FUNCTION
+DLLEXPORT SIMPLE_FUNCTION DEPRECATED
 void *trace_get_link(const libtrace_packet_t *packet);
 
 /** get a pointer to the IPv4 header (if any)
@@ -966,6 +985,82 @@ libtrace_ip_t *trace_get_ip(libtrace_packet_t *packet);
  */
 DLLEXPORT SIMPLE_FUNCTION
 libtrace_ip6_t *trace_get_ip6(libtrace_packet_t *packet);
+
+/* Return a pointer to the first metadata header in a packet, if present.
+ *
+ * This function takes a pointer to a libtrace packet and if any metadata
+ * headers exist, returns a pointer to the first one, along with its
+ * corresponding linktype. 
+ *
+ * If no metadata headers exist in the packet, NULL is returned.
+ *
+ * A metadata header is a header that was prepended by the capturing device,
+ * such as a Linux SLL header, or a Radiotap wireless monitoring header.
+ * Subsequent metadata headers may be accessed with the
+ * trace_get_payload_from_meta(...) function. 
+ *
+ * @param packet the libtrace packet
+ * @param linktype[out] the linktype of the returned metadata header
+ * @param remaining[out] the amount of space availabled after this header
+ * @return a pointer to the first metadata header, or NULL if there are no metadata headers present.
+ *
+ * remaining may be NULL, however linktype must be provided.
+ */
+DLLEXPORT void *trace_get_packet_meta(const libtrace_packet_t *packet,
+                libtrace_linktype_t *linktype,
+                uint32_t *remaining);
+
+/* Returns the payload of a metadata header.
+ * 
+ * This function takes a pointer to the start of a metadata header (either
+ * obtained via trace_get_packet_meta(...) or by a previous call to
+ * trace_get_payload_from_meta(...)) along with its corresponding linktype and
+ * returns the payload, i.e. the next header. It will also update the linktype
+ * parameter to indicate the type of payload.
+ *  
+ * If the linktype indicates that the header passed in is not a metadata
+ * header, the function returns NULL to indicate this. The linktype remains
+ * unchanged in this case.
+ *
+ * This function allows the user to iterate through metadata headers which are
+ * sometimes present before the actual packet as it was received on the wire.
+ * Examples of metadata headers include the Linux SLL header and the Radiotap
+ * wireless monitoring header.
+ *
+ * @param meta[in] a pointer to a header
+ * @param linktype[in,out] the linktype of meta (updated to indicate the
+ * linktype of the returned header if applicable).
+ * @param remaining[in,out] the number of bytes after the meta pointer.
+ * @return a pointer to the payload of the metadata header. If meta is not a
+ * pointer to a metadata header, NULL is returned and linktype remains
+ * unchanged.
+ *
+ * All parameters are mandatory. NULL will be returned if any are NULL.
+ */
+DLLEXPORT void *trace_get_payload_from_meta(const void *meta,
+                libtrace_linktype_t *linktype,
+                uint32_t *remaining);
+
+
+/* Get a pointer to the layer 2 header. Generally this is the first byte of the
+ * packet as it was seen on the wire.
+ * 
+ * This function takes a libtrace packet and skips over any metadata headers if
+ * present (such as Linux SLL or Radiotap) and returns a pointer to the first
+ * byte of the packet that was actually received by the network interface.
+ *
+ * @param packet the libtrace packet
+ * @param linktype[out] the linktype of the returned layer 2 header
+ * @param remaining[out] the number of bytes left in the packet after the
+ * returned pointer.
+ * @return a pointer to the first byte of the packet as it was seen on the
+ * wire.
+ *
+ * remaining may be NULL, otherwise it will be filled in by the function.
+ */
+DLLEXPORT void *trace_get_layer2(const libtrace_packet_t *packet,
+                libtrace_linktype_t *linktype,
+                uint32_t *remaining);
 
 /** Get a pointer to the layer 3 header.
  * @param packet  		The packet opaque pointer
