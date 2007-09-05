@@ -372,7 +372,7 @@ unsigned int libtrace_to_arphrd_type(libtrace_linktype_t);
 void promote_packet(libtrace_packet_t *packet);
 bool demote_packet(libtrace_packet_t *packet);
 
-void *trace_get_payload_from_linux_sll(void *, uint16_t *, uint32_t *);
+void *trace_get_payload_from_linux_sll(const void *, uint16_t *, uint32_t *);
 void *trace_get_payload_from_pos(void *, uint16_t *, uint32_t *);
 DLLEXPORT void *trace_get_payload_from_atm(void *, uint8_t *, uint32_t *);
 

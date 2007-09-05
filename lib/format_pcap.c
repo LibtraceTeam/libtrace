@@ -312,17 +312,24 @@ static int pcap_write_packet(libtrace_out_t *libtrace,
 		libtrace_packet_t *packet) 
 {
 	struct pcap_pkthdr pcap_pkt_hdr;
+	void *link;
+	libtrace_linktype_t linktype;
+	uint32_t remaining;
+
+	link = trace_get_packet_buffer(packet,&linktype,&remaining);
 
 	/* If this packet cannot be converted to a pcap linktype then
 	 * pop off the top header until it can be converted
 	 */
-	while (libtrace_to_pcap_linktype(trace_get_link_type(packet))==~0U) {
+	while (libtrace_to_pcap_linktype(linktype)==~0U) {
 		if (!demote_packet(packet)) {
 			trace_set_err_out(libtrace, 
 				TRACE_ERR_NO_CONVERSION,
 				"pcap does not support this format");
 			return -1;
 		}
+
+		link = trace_get_packet_buffer(packet,&linktype,&remaining);
 	}
 
 
@@ -345,7 +352,7 @@ static int pcap_write_packet(libtrace_out_t *libtrace,
 	}
 
 	/* Corrupt packet, or other "non data" packet, so skip it */
-	if (trace_get_link(packet) == NULL) {
+	if (link == NULL) {
 		/* Return "success", but nothing written */
 		return 0;
 	}
@@ -362,7 +369,7 @@ static int pcap_write_packet(libtrace_out_t *libtrace,
 		struct timeval ts = trace_get_timeval(packet);
 		pcap_pkt_hdr.ts.tv_sec = ts.tv_sec;
 		pcap_pkt_hdr.ts.tv_usec = ts.tv_usec;
-		pcap_pkt_hdr.caplen = trace_get_capture_length(packet);
+		pcap_pkt_hdr.caplen = remaining;
 		/* trace_get_wire_length includes FCS, while pcap doesn't */
 		if (trace_get_link_type(packet)==TRACE_TYPE_ETH)
 			if (trace_get_wire_length(packet) >= 4) { 
@@ -441,7 +448,8 @@ static libtrace_direction_t pcap_get_direction(const libtrace_packet_t *packet) 
 		case TRACE_TYPE_LINUX_SLL:
 		{
 			libtrace_sll_header_t *sll;
-			sll = trace_get_link(packet);
+			sll = trace_get_packet_buffer(packet, NULL, NULL);
+			/* TODO: should check remaining>=sizeof(*sll) */
 			if (!sll) {
 				trace_set_err(packet->trace,
 					TRACE_ERR_BAD_PACKET,
@@ -470,7 +478,8 @@ static libtrace_direction_t pcap_get_direction(const libtrace_packet_t *packet) 
 		case TRACE_TYPE_PFLOG:
 		{
 			libtrace_pflog_header_t *pflog;
-			pflog = trace_get_link(packet);
+			pflog = trace_get_packet_buffer(packet, NULL, NULL);
+			/* TODO: should check remaining >= sizeof(*pflog) */
 			if (!pflog) {
 				trace_set_err(packet->trace,
 						TRACE_ERR_BAD_PACKET,
@@ -517,13 +526,15 @@ static int pcap_get_wire_length(const libtrace_packet_t *packet) {
 	if (packet->type==pcap_linktype_to_rt(TRACE_DLT_EN10MB))
 		return pcapptr->len+4; /* Include the missing FCS */
 	else if (packet->type==pcap_linktype_to_rt(TRACE_DLT_IEEE802_11_RADIO)) {
+		libtrace_linktype_t linktype;
+		void *link = trace_get_packet_buffer(packet,&linktype,NULL);
 		/* If the packet is Radiotap and the flags field indicates
 		 * that the FCS is not included in the 802.11 frame, then
 		 * we need to add 4 to the wire-length to account for it.
 		 */
 		uint8_t flags;
-		trace_get_wireless_flags(trace_get_link(packet), 
-				trace_get_link_type(packet), &flags);
+		trace_get_wireless_flags(link, 
+				linktype, &flags);
 		if ((flags & TRACE_RADIOTAP_F_FCS) == 0)
 			return pcapptr->len + 4;
 	}

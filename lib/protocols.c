@@ -155,7 +155,7 @@ static void *trace_get_payload_from_80211(void *link, uint16_t *type, uint32_t *
 }
 
 /* NB: type is returned as an ARPHRD_ type for SLL*/
-void *trace_get_payload_from_linux_sll(void *link,
+void *trace_get_payload_from_linux_sll(const void *link,
 		uint16_t *type, uint32_t *remaining) 
 {
 	libtrace_sll_header_t *sll;
@@ -256,8 +256,8 @@ static void *trace_get_payload_from_pflog(void *link,
 }
 
 /* Returns the 'payload' of the prism header, which is the 802.11 frame */
-static void *trace_get_payload_from_prism (void *link,
-		uint16_t *type, uint32_t *remaining)
+static void *trace_get_payload_from_prism (const void *link,
+		libtrace_linktype_t *type, uint32_t *remaining)
 {
 	if (remaining) {
 		if (*remaining<144) 
@@ -271,8 +271,8 @@ static void *trace_get_payload_from_prism (void *link,
 }
 
 /* Returns the 'payload' of the radiotap header, which is the 802.11 frame */
-static void *trace_get_payload_from_radiotap (void *link, 
-		uint16_t *type, uint32_t *remaining)
+static void *trace_get_payload_from_radiotap (const void *link, 
+		libtrace_linktype_t *type, uint32_t *remaining)
 {
 	struct libtrace_radiotap_t *rtap = (struct libtrace_radiotap_t*)link;
 	uint16_t rtaplen = bswap_le_to_host16(rtap->it_len);
@@ -295,10 +295,10 @@ void *trace_get_payload_from_link(void *link, libtrace_linktype_t linktype,
 	
 	switch(linktype) {
 		case TRACE_TYPE_80211_PRISM:
-			l = trace_get_payload_from_prism(link,type,remaining);
+			l = trace_get_payload_from_prism(link,&linktype,remaining);
 			return (l ? trace_get_payload_from_link(l, TRACE_TYPE_80211, type, remaining) : NULL);
 		case TRACE_TYPE_80211_RADIO:
-			l = trace_get_payload_from_radiotap(link,type,remaining);
+			l = trace_get_payload_from_radiotap(link,&linktype,remaining);
 			return (l ? trace_get_payload_from_link(l, TRACE_TYPE_80211, type, remaining) : NULL);
 		case TRACE_TYPE_80211:
 			return trace_get_payload_from_80211(link,type,remaining);
@@ -445,7 +445,7 @@ DLLEXPORT void *trace_get_packet_meta(const libtrace_packet_t *packet,
 		libtrace_linktype_t *linktype,
 		uint32_t *remaining)
 {
-	uint32_t dummyrem = trace_get_capture_length(packet);
+	uint32_t dummyrem;
 
 	assert(packet != NULL);
 	assert(linktype != NULL);
@@ -473,6 +473,9 @@ DLLEXPORT void *trace_get_packet_meta(const libtrace_packet_t *packet,
 		case TRACE_TYPE_METADATA:
 			return NULL;
 	}
+
+	/* Shouldn't get here */
+	return NULL;
 }
 
 DLLEXPORT void *trace_get_payload_from_meta(const void *meta,
@@ -518,6 +521,8 @@ DLLEXPORT void *trace_get_payload_from_meta(const void *meta,
 			 */
 			return NULL;
 	}
+	/* Shouldn't get here */
+	return NULL;
 }
 
 DLLEXPORT void *trace_get_layer2(const libtrace_packet_t *packet,
@@ -552,7 +557,64 @@ DLLEXPORT void *trace_get_layer2(const libtrace_packet_t *packet,
 	}
 }
 
-DLLEXPORT void *trace_get_layer3(libtrace_packet_t *packet,
+DLLEXPORT void *trace_get_payload_from_layer2(void *link,
+		libtrace_linktype_t linktype,
+		uint16_t *ethertype,
+		uint32_t *remaining)
+{
+	void *l;
+	switch(linktype) {
+		/* Packet Metadata headers, not layer2 headers */
+		case TRACE_TYPE_80211_PRISM:
+		case TRACE_TYPE_80211_RADIO:
+		case TRACE_TYPE_LINUX_SLL:
+			return NULL;
+
+		/* duck packets have no payload! */
+		case TRACE_TYPE_DUCK:
+			return NULL;
+
+		/* The payload is in these packets does
+		   not correspond to a genuine link-layer
+		   */
+		case TRACE_TYPE_METADATA:
+			return NULL;
+
+		case TRACE_TYPE_80211:
+			return trace_get_payload_from_80211(link,ethertype,remaining);
+		case TRACE_TYPE_ETH:
+			return trace_get_payload_from_ethernet(link,ethertype,remaining);
+		case TRACE_TYPE_NONE:
+			if ((*(char*)link&0xF0) == 0x40)
+				*ethertype=0x0800;
+			else if ((*(char*)link&0xF0) == 0x60)
+				*ethertype=0x86DD;
+			return link; /* I love the simplicity */
+		case TRACE_TYPE_PFLOG:
+			return trace_get_payload_from_pflog(link,ethertype,remaining);
+		case TRACE_TYPE_PPP:
+			return trace_get_payload_from_ppp(link,ethertype,remaining);
+		case TRACE_TYPE_ATM:
+			l=trace_get_payload_from_atm(link,NULL,remaining);
+			/* FIXME: We shouldn't skip llcsnap here, we should return
+			 * an ethertype for it (somehow)
+			 */
+			return (l ? trace_get_payload_from_llcsnap(l,
+						ethertype, remaining):NULL);
+		case TRACE_TYPE_LLCSNAP:
+			return trace_get_payload_from_llcsnap(link,ethertype,remaining);
+
+		/* TODO: Unsupported */
+		case TRACE_TYPE_HDLC_POS:
+		case TRACE_TYPE_POS:
+		case TRACE_TYPE_AAL5:
+			return NULL;
+	}
+	return NULL;
+
+}
+
+DLLEXPORT void *trace_get_layer3(const libtrace_packet_t *packet,
 		uint16_t *ethertype,
 		uint32_t *remaining)
 {
@@ -560,29 +622,31 @@ DLLEXPORT void *trace_get_layer3(libtrace_packet_t *packet,
 	uint16_t dummy_ethertype;
 	void *link;
 	uint32_t dummy_remaining;
-
-	/* use l3 cache */
-	if (packet->l3_header)
-	{
-		*ethertype = packet->l3_ethertype;
-		*remaining -= (packet->l3_header - trace_get_link(packet));
-		return packet->l3_header;
-	}
+	libtrace_linktype_t linktype;
 
 	if (!ethertype) ethertype=&dummy_ethertype;
 
 	if (!remaining) remaining=&dummy_remaining;
 
-	*remaining = trace_get_capture_length(packet);
+	/* use l3 cache */
+	if (packet->l3_header)
+	{
+		link = trace_get_packet_buffer(packet,&linktype,remaining);
 
-	link=trace_get_link(packet);
+		if (!link)
+			return NULL;
 
-	if (!link)
-		return NULL;
+		*ethertype = packet->l3_ethertype;
+		*remaining -= (packet->l3_header - link);
 
-	iphdr = trace_get_payload_from_link(
+		return packet->l3_header;
+	}
+
+	link = trace_get_layer2(packet,&linktype,remaining);
+
+	iphdr = trace_get_payload_from_layer2(
 			link,
-			trace_get_link_type(packet),
+			linktype,
 			ethertype,
 			remaining);
 
@@ -612,13 +676,14 @@ DLLEXPORT void *trace_get_layer3(libtrace_packet_t *packet,
 	}
 
 	/* Store values in the cache for later */
-	packet->l3_ethertype = *ethertype;
-	packet->l3_header = iphdr;
+	/* Cast away constness, nasty, but this is just a cache */
+	((libtrace_packet_t*)packet)->l3_ethertype = *ethertype;
+	((libtrace_packet_t*)packet)->l3_header = iphdr;
 
 	return iphdr;
 }
 
-DLLEXPORT void *trace_get_transport(libtrace_packet_t *packet, 
+DLLEXPORT void *trace_get_transport(const libtrace_packet_t *packet, 
 		uint8_t *proto,
 		uint32_t *remaining
 		) 
@@ -631,8 +696,6 @@ DLLEXPORT void *trace_get_transport(libtrace_packet_t *packet,
 	if (!proto) proto=&dummy_proto;
 
 	if (!remaining) remaining=&dummy_remaining;
-
-	*remaining = trace_get_capture_length(packet);
 
 	transport = trace_get_layer3(packet,&ethertype,remaining);
 
@@ -828,31 +891,22 @@ uint8_t *get_source_mac_from_wifi(void *wifi) {
 	return (uint8_t *) &w->mac2;
 }
 
-static
-uint8_t *__trace_get_source_mac(void *link, libtrace_linktype_t *linktype, uint32_t *rem) {
-	libtrace_ether_t *ethptr = (libtrace_ether_t *) link;
-	uint16_t arphrd;
+DLLEXPORT uint8_t *trace_get_source_mac(libtrace_packet_t *packet) {
+	void *link;
+	uint32_t remaining;
+	libtrace_linktype_t linktype;
+	assert(packet);
+	link = trace_get_layer2(packet,&linktype,&remaining);
+
 	if (!link)
 		return NULL;
 	
-	switch (*linktype) {
+	switch (linktype) {
 		case TRACE_TYPE_ETH:
-			return (uint8_t *)&ethptr->ether_shost;
+			return (uint8_t *)&(((libtrace_ether_t*)link)->ether_shost);
 		case TRACE_TYPE_80211:
 			return get_source_mac_from_wifi(link);
-		case TRACE_TYPE_80211_RADIO:
-			link = trace_get_payload_from_radiotap(
-					link, linktype, rem);
-			return __trace_get_source_mac(link, linktype, rem);
-		case TRACE_TYPE_80211_PRISM:
-			link = trace_get_payload_from_prism(
-					link, linktype, rem);
-			return __trace_get_source_mac(link, linktype, rem);
-		case TRACE_TYPE_LINUX_SLL:
-			link = trace_get_payload_from_linux_sll(
-					link, &arphrd, rem);
-			*linktype = arphrd_type_to_libtrace(arphrd);
-			return __trace_get_source_mac(link, linktype, rem);
+		/* These packets don't have MAC addresses */
 		case TRACE_TYPE_POS:
 		case TRACE_TYPE_NONE:
 		case TRACE_TYPE_HDLC_POS:
@@ -860,31 +914,39 @@ uint8_t *__trace_get_source_mac(void *link, libtrace_linktype_t *linktype, uint3
 		case TRACE_TYPE_ATM:
 		case TRACE_TYPE_DUCK:
 		case TRACE_TYPE_METADATA:
+		case TRACE_TYPE_AAL5:
+		case TRACE_TYPE_LLCSNAP:
+		case TRACE_TYPE_PPP:
 			return NULL;
-		default:
+
+		/* Metadata headers should already be skipped */
+		case TRACE_TYPE_LINUX_SLL:
+		case TRACE_TYPE_80211_PRISM:
+		case TRACE_TYPE_80211_RADIO:
+			assert(!"Metadata headers should already be skipped");
 			break;
 	}
-	fprintf(stderr,"%s not implemented for linktype %i\n", __func__, *linktype);
+	fprintf(stderr,"%s not implemented for linktype %i\n", __func__, linktype);
 	assert(0);
 	return NULL;
 }
 
-DLLEXPORT uint8_t *trace_get_source_mac(libtrace_packet_t *packet) {
-	if (packet == NULL) 
-		return NULL;
-	void *link = trace_get_link(packet);
-	uint32_t len = trace_get_capture_length(packet);
-	libtrace_linktype_t lt = trace_get_link_type(packet);
-	return __trace_get_source_mac(link, &lt, &len);
-}
+DLLEXPORT uint8_t *trace_get_destination_mac(libtrace_packet_t *packet) 
+{
+	void *link;
+	libtrace_linktype_t linktype;
+	uint32_t remaining;
 
-DLLEXPORT uint8_t *trace_get_destination_mac(libtrace_packet_t *packet) {
-	void *link = trace_get_link(packet);
+	link = trace_get_layer2(packet,&linktype,&remaining);
+
 	libtrace_80211_t *wifi;
         libtrace_ether_t *ethptr = (libtrace_ether_t*)link;
+
+
 	if (!link)
 		return NULL;
-	switch (trace_get_link_type(packet)) {
+
+	switch (linktype) {
 		case TRACE_TYPE_80211:
 			wifi=(libtrace_80211_t*)link;
 			return (uint8_t*)&wifi->mac1;
@@ -926,8 +988,6 @@ DLLEXPORT struct sockaddr *trace_get_source_address(
 
 	if (!addr)
 		addr=(struct sockaddr*)&dummy;
-
-	remaining = trace_get_capture_length(packet);
 
 	l3 = trace_get_layer3(packet,&ethertype,&remaining);
 
@@ -980,8 +1040,6 @@ DLLEXPORT struct sockaddr *trace_get_destination_address(
 
 	if (!addr)
 		addr=(struct sockaddr*)&dummy;
-
-	remaining = trace_get_capture_length(packet);
 
 	l3 = trace_get_layer3(packet,&ethertype,&remaining);
 

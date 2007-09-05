@@ -645,9 +645,7 @@ DLLEXPORT libtrace_packet_t *trace_copy_packet(const libtrace_packet_t *packet) 
 	libtrace_packet_t *dest = 
 		(libtrace_packet_t *)malloc(sizeof(libtrace_packet_t));
 	dest->trace=packet->trace;
-	dest->buffer=malloc(
-			trace_get_framing_length(packet)
-			+trace_get_capture_length(packet));
+	dest->buffer=malloc(65536);
 	dest->header=dest->buffer;
 	dest->payload=(void*)
 		((char*)dest->buffer+trace_get_framing_length(packet));
@@ -868,13 +866,14 @@ DLLEXPORT double trace_get_seconds(const libtrace_packet_t *packet) {
 	return seconds;
 }
 
-DLLEXPORT size_t trace_get_capture_length(libtrace_packet_t *packet) 
+DLLEXPORT size_t trace_get_capture_length(const libtrace_packet_t *packet) 
 {
 	/* Cache the capture length */
 	if (packet->capture_length == -1) {
 		if (!packet->trace->format->get_capture_length)
 			return ~0U;
-		packet->capture_length = 
+		/* Cast away constness because this is "just" a cache */
+		((libtrace_packet_t*)packet)->capture_length = 
 			packet->trace->format->get_capture_length(packet);
 	}
 
@@ -1001,10 +1000,11 @@ int trace_bpf_compile(libtrace_filter_t *filter,
 		const libtrace_packet_t *packet	) {
 #ifdef HAVE_BPF
 	void *linkptr = 0;
+	libtrace_linktype_t linktype;
 	assert(filter);
 
 	/* If this isn't a real packet, then fail */
-	linkptr = trace_get_link(packet);
+	linkptr = trace_get_packet_buffer(packet,&linktype,NULL);
 	if (!linkptr) {
 		trace_set_err(packet->trace,
 				TRACE_ERR_BAD_PACKET,"Packet has no payload");
@@ -1013,7 +1013,6 @@ int trace_bpf_compile(libtrace_filter_t *filter,
 	
 	if (filter->filterstring && ! filter->flag) {
 		pcap_t *pcap = NULL;
-		libtrace_linktype_t linktype=trace_get_link_type(packet);
 		if (linktype==(libtrace_linktype_t)-1) {
 			trace_set_err(packet->trace,
 					TRACE_ERR_BAD_PACKET,
@@ -1055,7 +1054,7 @@ DLLEXPORT int trace_apply_filter(libtrace_filter_t *filter,
 			const libtrace_packet_t *packet) {
 #ifdef HAVE_BPF
 	void *linkptr = 0;
-	unsigned int clen = 0;
+	uint32_t clen = 0;
 	bool free_packet_needed = false;
 	int ret;
 	libtrace_packet_t *packet_copy = (libtrace_packet_t*)packet;
@@ -1083,7 +1082,7 @@ DLLEXPORT int trace_apply_filter(libtrace_filter_t *filter,
 		}
 	}
 	
-	linkptr = trace_get_link(packet_copy);
+	linkptr = trace_get_packet_buffer(packet_copy,NULL,&clen);
 	if (!linkptr) {
 		if (free_packet_needed) {
 			trace_destroy_packet(packet_copy);
@@ -1101,10 +1100,8 @@ DLLEXPORT int trace_apply_filter(libtrace_filter_t *filter,
 		return -1;
 	}
 
-	clen = trace_get_capture_length(packet_copy);
-
 	assert(filter->flag);
-	ret=bpf_filter(filter->filter.bf_insns,(u_char*)linkptr,clen,clen);
+	ret=bpf_filter(filter->filter.bf_insns,(u_char*)linkptr,(unsigned int)clen,(unsigned int)clen);
 	if (free_packet_needed) {
 		trace_destroy_packet(packet_copy);
 	}

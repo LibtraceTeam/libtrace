@@ -396,7 +396,7 @@ typedef struct libtrace_ip
     uint16_t ip_len;			/**< Total Length */
     int16_t  ip_id;			/**< Identification */
 #if BYTE_ORDER == LITTLE_ENDIAN
-    LT_BITFIELD16 ip_off:12;		/**< Fragment Offset */
+    LT_BITFIELD16 ip_off:13;		/**< Fragment Offset */
     LT_BITFIELD16 ip_mf:1;		/**< More Fragments Flag */
     LT_BITFIELD16 ip_df:1;		/**< Dont Fragment Flag */
     LT_BITFIELD16 ip_rf:1;		/**< Reserved Fragment Flag */
@@ -404,7 +404,7 @@ typedef struct libtrace_ip
     LT_BITFIELD16 ip_rf:1;		/**< Fragment Offset */
     LT_BITFIELD16 ip_df:1;		/**< More Fragments Flag */
     LT_BITFIELD16 ip_mf:1;		/**< Dont Fragment Flag */
-    LT_BITFIELD16 ip_off:12;		/**< Reserved Fragment Flag */
+    LT_BITFIELD16 ip_off:13;		/**< Reserved Fragment Flag */
 #else
 #   error "Adjust your <bits/endian.h> defines"
 #endif
@@ -1062,6 +1062,30 @@ DLLEXPORT void *trace_get_layer2(const libtrace_packet_t *packet,
                 libtrace_linktype_t *linktype,
                 uint32_t *remaining);
 
+/** Gets a pointer to the next header given a pointer to a layer2 header
+ *
+ * @param l2            	The pointer to the current layer2 header
+ * @param linktype		The type of the layer2 header
+ * @param[out] ethertype 	An optional output variable of the ethernet type
+ * @param[in,out] remaining 	Optionally updated with the length remaining
+ *
+ * @return a pointer to the transport layer header, or NULL if header isn't
+ * present.
+ *
+ * type may be NULL if not needed.
+ *
+ * Remaining may be NULL.  If Remaining is not NULL it must point to the number
+ * of bytes captured of the layer2 header and beyond.  It will be updated after
+ * this function to the number of bytes remaining after the layer2 header
+ * was removed.
+ *
+ */
+DLLEXPORT void *trace_get_payload_from_layer2(void *l2,
+		libtrace_linktype_t linktype,
+		uint16_t *ethertype,
+		uint32_t *remaining);
+
+
 /** Get a pointer to the layer 3 header.
  * @param packet  		The packet opaque pointer
  * @param[out] ethertype	The ethertype of the layer 3 header
@@ -1073,7 +1097,7 @@ DLLEXPORT void *trace_get_layer2(const libtrace_packet_t *packet,
  * of the captured packet.
  */
 DLLEXPORT SIMPLE_FUNCTION
-void *trace_get_layer3(libtrace_packet_t *packet,
+void *trace_get_layer3(const libtrace_packet_t *packet,
 		uint16_t *ethertype, uint32_t *remaining);
 
 /** Gets a pointer to the transport layer header (if any)
@@ -1084,7 +1108,7 @@ void *trace_get_layer3(libtrace_packet_t *packet,
  *
  * @note proto may be NULL if proto is unneeded.
  */
-DLLEXPORT void *trace_get_transport(libtrace_packet_t *packet, uint8_t *proto, 
+DLLEXPORT void *trace_get_transport(const libtrace_packet_t *packet, uint8_t *proto, 
 		uint32_t *remaining);
 
 /** Gets a pointer to the payload given a pointer to the IP header
@@ -1425,7 +1449,7 @@ DLLEXPORT int trace_seek_erf_timestamp(libtrace_t *trace, uint64_t ts);
  * (pcap/erf/etc) header.
  */
 DLLEXPORT SIMPLE_FUNCTION
-size_t trace_get_capture_length(libtrace_packet_t *packet);
+size_t trace_get_capture_length(const libtrace_packet_t *packet);
 
 /** Get the size of the packet as it was seen on the wire.
  * @param packet  	the packet opaque pointer

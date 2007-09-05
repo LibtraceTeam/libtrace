@@ -209,11 +209,7 @@ void promote_packet(libtrace_packet_t *packet)
 
 		switch(pcap_linktype_to_libtrace(rt_to_pcap_linktype(packet->type))) {
 			case TRACE_TYPE_NONE:
-				trace_get_payload_from_link(
-					trace_get_link(packet),
-					trace_get_link_type(packet),
-					&hdr->protocol,
-					NULL);
+				trace_get_layer3(packet, &hdr->protocol, NULL);
 				hdr->hatype = htons(ARPHRD_PPP);
 				hdr->protocol=htons(hdr->protocol);
 				break;
