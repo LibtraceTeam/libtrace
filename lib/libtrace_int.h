@@ -102,7 +102,6 @@ int snprintf(char *str, size_t size, const char *format, ...);
 # endif 
 #endif
 
-#include "wag.h"
 #include "daglegacy.h"
 	
 #ifdef HAVE_DAG_API
@@ -456,7 +455,6 @@ void linuxnative_constructor(void);
 void pcap_constructor(void);
 void pcapfile_constructor(void);
 void rt_constructor(void);
-void wag_constructor(void);
 void duck_constructor(void);
 void atmhdr_constructor(void);
 

@@ -678,9 +678,6 @@ DLLEXPORT void trace_help(void);
  *  - rt:hostname:port
  *  - rtclient:hostname	(deprecated)
  *  - rtclient:hostname:port (deprecated)
- *  - wag:/dev/wagcard
- *  - wtf:-
- *  - wtf:/path/to/wtf/file
  *
  *  If an error occured when attempting to open the trace file, an error
  *  trace is returned and trace_get_error should be called to find out

@@ -87,7 +87,6 @@ struct rt_format_data_t {
 	libtrace_t *dummy_duck;
 	libtrace_t *dummy_erf;
 	libtrace_t *dummy_pcap;
-	libtrace_t *dummy_wag;
 	libtrace_t *dummy_linux;
 };
 
@@ -197,7 +196,6 @@ static int rt_init_input(libtrace_t *libtrace) {
 	RT_INFO->dummy_duck = NULL;
 	RT_INFO->dummy_erf = NULL;
 	RT_INFO->dummy_pcap = NULL;
-	RT_INFO->dummy_wag = NULL;
 	RT_INFO->dummy_linux = NULL;
 	RT_INFO->pkt_buffer = NULL;
 	RT_INFO->buf_current = NULL;
@@ -273,9 +271,6 @@ static int rt_fin_input(libtrace_t *libtrace) {
 		
 	if (RT_INFO->dummy_pcap)
 		trace_destroy_dead(RT_INFO->dummy_pcap);
-
-	if (RT_INFO->dummy_wag)
-		trace_destroy_dead(RT_INFO->dummy_wag);
 
 	if (RT_INFO->dummy_linux)
 		trace_destroy_dead(RT_INFO->dummy_linux);
@@ -389,12 +384,6 @@ static int rt_set_format(libtrace_t *libtrace, libtrace_packet_t *packet)
 				RT_INFO->dummy_erf = trace_create_dead("erf:-");
 			}
 			packet->trace = RT_INFO->dummy_erf;
-			break;
-		case TRACE_RT_DATA_WAG:
-			if (!RT_INFO->dummy_wag) {
-				RT_INFO->dummy_wag = trace_create_dead("wtf:-");
-			}
-			packet->trace = RT_INFO->dummy_wag;
 			break;
 		case TRACE_RT_DATA_LINUX_NATIVE:
 			if (!RT_INFO->dummy_linux) {

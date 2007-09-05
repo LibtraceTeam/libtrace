@@ -276,10 +276,6 @@ DLLEXPORT void trace_help(void) {
  *  pcap:-
  *  rtclient:hostname
  *  rtclient:hostname:port
- *  wag:-
- *  wag:/path/to/wag/file
- *  wag:/path/to/wag/file.gz
- *  wag:/path/to/wag/socket
  *
  * If an error occured when attempting to open a trace, NULL is returned
  * and an error is output to stdout.
