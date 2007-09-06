@@ -81,18 +81,20 @@ static std::map<std::string,std::map<uint16_t,decode_t> > decoders;
 void trace_dump_packet(struct libtrace_packet_t *packet)
 {
 	time_t sec = (time_t)trace_get_seconds(packet);
-	char *link=(char *)trace_get_link(packet);
+	libtrace_linktype_t linktype;
+	uint32_t length;
+	char *link=(char *)trace_get_packet_buffer(packet,&linktype,&length);
 
 	printf("\n%s",ctime(&sec));
 	printf(" Capture: Packet Length: %i/%i Direction Value: %i\n",
-			(int)trace_get_capture_length(packet),
+			(int)length,
 			(int)trace_get_wire_length(packet),
 			(int)trace_get_direction(packet));
 	if (!link) 
 		printf(" [No link layer available]\n");
 	else
-		decode_next(link,trace_get_capture_length(packet), "link",
-			trace_get_link_type(packet));
+		decode_next(link,length, "link",
+			linktype);
 }
 
 static void generic_decode(uint16_t type,char *packet, int len) {
