@@ -626,7 +626,7 @@ DLLEXPORT void trace_destroy_dead(libtrace_t *libtrace) {
 DLLEXPORT void trace_destroy_output(libtrace_out_t *libtrace) 
 {
 	assert(libtrace);
-	if (libtrace->format)
+	if (libtrace->format && libtrace->format->fin_output)
 		libtrace->format->fin_output(libtrace);
 	if (libtrace->uridata)
 		free(libtrace->uridata);
