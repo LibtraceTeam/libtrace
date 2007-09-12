@@ -421,6 +421,8 @@ DLLEXPORT libtrace_out_t *trace_create_output(const char *uri) {
 
 	libtrace->err.err_num = TRACE_ERR_NOERROR;
 	strcpy(libtrace->err.problem,"Error message set\n");
+        libtrace->format = NULL;
+	libtrace->uridata = NULL;
 	
         /* parse the URI to determine what sort of event we are dealing with */
 
@@ -430,7 +432,6 @@ DLLEXPORT libtrace_out_t *trace_create_output(const char *uri) {
 		return libtrace;
 	}
 	
-        libtrace->format = NULL;
 	for(tmp=formats_list;tmp;tmp=tmp->next) {
                 if (strlen(scan) == strlen(tmp->name) &&
                                 !strncasecmp(scan,
@@ -440,13 +441,14 @@ DLLEXPORT libtrace_out_t *trace_create_output(const char *uri) {
                                 break;
                                 }
         }
+	free(scan);
+
         if (libtrace->format == NULL) {
 		trace_set_err_out(libtrace,TRACE_ERR_BAD_FORMAT,
 				"Unknown output format (%s)",scan);
                 return libtrace;
         }
         libtrace->uridata = strdup(uridata);
-
 
         /* libtrace->format now contains the type of uri
          * libtrace->uridata contains the appropriate data for this
@@ -469,7 +471,6 @@ DLLEXPORT libtrace_out_t *trace_create_output(const char *uri) {
         }
 
 
-	free(scan);
 	libtrace->started=false;
 	return libtrace;
 }
@@ -627,7 +628,8 @@ DLLEXPORT void trace_destroy_output(libtrace_out_t *libtrace)
 	assert(libtrace);
 	if (libtrace->format)
 		libtrace->format->fin_output(libtrace);
-	free(libtrace->uridata);
+	if (libtrace->uridata)
+		free(libtrace->uridata);
 	free(libtrace);
 }
 
