@@ -269,11 +269,19 @@ static int legacynzix_read_packet(libtrace_t *libtrace, libtrace_packet_t *packe
 }
 		
 
-static libtrace_linktype_t legacypos_get_link_type(const libtrace_packet_t *packet UNUSED) {
+static libtrace_linktype_t legacypos_get_link_type(
+		const libtrace_packet_t *packet) {
+	/* Is this a cisco hdlc frame? */
+	if ((((uint8_t*)packet->payload)[0] == 0x0F /* Unicast */
+		|| ((uint8_t*)packet->payload)[0] == 0x8F /* Multicast */)
+		&& ((uint8_t*)packet->payload)[1] == 0x00 /* control == 0x00 */
+	   )
+		return TRACE_TYPE_HDLC_POS;
 	return TRACE_TYPE_PPP;
 }
 
-static libtrace_linktype_t legacyatm_get_link_type(const libtrace_packet_t *packet UNUSED) {
+static libtrace_linktype_t legacyatm_get_link_type(
+		const libtrace_packet_t *packet UNUSED) {
 	return TRACE_TYPE_ATM;
 }
 

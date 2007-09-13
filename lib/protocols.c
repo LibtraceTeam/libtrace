@@ -234,6 +234,31 @@ static void *trace_get_payload_from_ppp(void *link,
 	return (void*)((char *)ppp+sizeof(*ppp));
 }
 
+typedef struct libtrace_chdlc_t {
+	uint8_t address;	/** 0xF0 for unicast, 0xF8 for multicast */
+	uint8_t control;
+	uint16_t ethertype;
+} libtrace_chdlc_t;
+
+static void *trace_get_payload_from_chdlc(void *link, 
+		uint16_t *type, uint32_t *remaining)
+{
+	libtrace_chdlc_t *chdlc = (libtrace_chdlc_t*)link;
+
+	if (remaining) {
+		if (*remaining < sizeof(libtrace_chdlc_t))
+			return NULL;
+		*remaining-=sizeof(libtrace_chdlc_t);
+	}
+
+	if (type) {
+		*type=ntohs(chdlc->ethertype);
+	}
+
+
+	return (void*)((char *)chdlc+sizeof(*chdlc));
+}
+
 static void *trace_get_payload_from_pflog(void *link,
 		uint16_t *type, uint32_t *remaining)
 {
@@ -380,7 +405,7 @@ DLLEXPORT void *trace_get_payload_from_ip(libtrace_ip_t *ipptr, uint8_t *prot,
 {
         void *trans_ptr = 0;
 
-        if ((ipptr->ip_off & SW_IP_OFFMASK) != 0) {
+        if ((ntohs(ipptr->ip_off) & SW_IP_OFFMASK) != 0) {
 		return NULL;
 	}
 
@@ -459,6 +484,7 @@ DLLEXPORT void *trace_get_packet_meta(const libtrace_packet_t *packet,
 		case TRACE_TYPE_80211_RADIO:
 		case TRACE_TYPE_80211_PRISM:
 			return pktbuf;
+		/* Non metadata packets */
 		case TRACE_TYPE_HDLC_POS:
 		case TRACE_TYPE_ETH:
 		case TRACE_TYPE_ATM:
@@ -604,8 +630,10 @@ DLLEXPORT void *trace_get_payload_from_layer2(void *link,
 		case TRACE_TYPE_LLCSNAP:
 			return trace_get_payload_from_llcsnap(link,ethertype,remaining);
 
-		/* TODO: Unsupported */
 		case TRACE_TYPE_HDLC_POS:
+			return trace_get_payload_from_chdlc(link,ethertype,
+					remaining);
+		/* TODO: Unsupported */
 		case TRACE_TYPE_POS:
 		case TRACE_TYPE_AAL5:
 			return NULL;

@@ -68,6 +68,7 @@ libtrace_dlt_t libtrace_to_pcap_dlt(libtrace_linktype_t type)
 		case TRACE_TYPE_80211_RADIO: return TRACE_DLT_IEEE802_11_RADIO;
 		case TRACE_TYPE_LLCSNAP: return TRACE_DLT_ATM_RFC1483;
 		case TRACE_TYPE_PPP:	return TRACE_DLT_PPP;
+		case TRACE_TYPE_HDLC_POS: return TRACE_DLT_C_HDLC;
 		/* Below here are unsupported conversions */
 		/* Dispite hints to the contrary, there is no DLT
 		 * for 'raw atm packets that happen to be missing
@@ -85,7 +86,6 @@ libtrace_dlt_t libtrace_to_pcap_dlt(libtrace_linktype_t type)
 		case TRACE_TYPE_POS:
 		/* TODO: We haven't researched these yet */
 		case TRACE_TYPE_AAL5:
-		case TRACE_TYPE_HDLC_POS:
 		case TRACE_TYPE_METADATA:
 			break;
 	}
