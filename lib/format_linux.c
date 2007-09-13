@@ -55,6 +55,7 @@ struct libtrace_format_data_t {
 	int fd;
 	int snaplen;
 	int promisc;
+	libtrace_filter_t *filter;
 };
 
 struct libtrace_linuxnative_header {
@@ -78,6 +79,7 @@ static int linuxnative_init_input(libtrace_t *libtrace)
 	FORMAT(libtrace->format_data)->fd = -1;
 	FORMAT(libtrace->format_data)->promisc = -1;
 	FORMAT(libtrace->format_data)->snaplen = 65536;
+	FORMAT(libtrace->format_data)->filter = NULL;
 
 	return 0;
 }
@@ -96,6 +98,7 @@ static int linuxnative_start_input(libtrace_t *libtrace)
 	struct sockaddr_ll addr;
 	int one = 1;
 	memset(&addr,0,sizeof(addr));
+	libtrace_filter_t *filter = FORMAT(libtrace->format_data)->filter;
 	FORMAT(libtrace->format_data)->fd = 
 				socket(PF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
 	if (FORMAT(libtrace->format_data)->fd==-1) {
@@ -157,6 +160,29 @@ static int linuxnative_start_input(libtrace_t *libtrace)
 		perror("setsockopt(SO_TIMESTAMP)");
 	}
 
+	/* Push BPF filter into the kernel.
+	 */
+	if (filter != NULL) {
+		if (setsockopt(FORMAT(libtrace->format_data)->fd,
+					SOL_SOCKET,
+					SO_ATTACH_FILTER,
+					&filter->filter,
+					sizeof(filter->filter)) == -1) {
+			perror("setsockopt(SO_ATTACH_FILTER)");
+		} else { 
+			/* The socket accepted the filter, so we need to
+			 * consume any buffered packets that were received
+			 * between opening the socket and applying the filter.
+			 */
+			void *buf = malloc((size_t)LIBTRACE_PACKET_BUFSIZE);
+			while(recv(FORMAT(libtrace->format_data)->fd,
+					buf,
+					(size_t) LIBTRACE_PACKET_BUFSIZE,
+					MSG_DONTWAIT) != -1) { }
+			free(buf);
+		}
+	}
+					
 	return 0;
 }
 
@@ -182,7 +208,10 @@ static int linuxnative_pause_input(libtrace_t *libtrace)
 
 static int linuxnative_fin_input(libtrace_t *libtrace) 
 {
+	if (FORMAT(libtrace->format_data)->filter != NULL)
+		free(FORMAT(libtrace->format_data)->filter);
 	free(libtrace->format_data);
+	
 	return 0;
 }
 
@@ -194,6 +223,54 @@ static int linuxnative_fin_output(libtrace_out_t *libtrace)
 	return 0;
 }
 
+static int linuxnative_configure_bpf(libtrace_t *libtrace, 
+		libtrace_filter_t *filter) {
+#ifdef HAVE_LIBPCAP 
+	struct ifreq ifr;
+	unsigned int arphrd;
+	libtrace_dlt_t dlt;
+	libtrace_filter_t *f;
+	int sock;
+	pcap_t *pcap;
+
+	/* We've been passed a filter, which hasn't been compiled yet. We need
+	 * to figure out the linktype of the socket, compile the filter, check
+	 * to make sure it's sane, then save it for trace_start() to push down
+	 * into the kernel.
+	 */
+	sock = socket(PF_INET, SOCK_STREAM, 0);
+	memset(&ifr, 0, sizeof(struct ifreq));
+	strncpy(ifr.ifr_name, libtrace->uridata, IF_NAMESIZE);
+	if (ioctl(sock, SIOCGIFHWADDR, &ifr) != 0) {
+		perror("Can't get HWADDR for interface");
+		return -1;
+	}
+	close(socket);
+
+	arphrd = ifr.ifr_hwaddr.sa_family;
+	dlt = libtrace_to_pcap_dlt(arphrd_type_to_libtrace(arphrd));
+
+	f = (libtrace_filter_t *) malloc(sizeof(libtrace_filter_t));
+	memcpy(f, filter, sizeof(libtrace_filter_t));
+
+	pcap = pcap_open_dead(dlt, FORMAT(libtrace->format_data)->snaplen);
+	
+	if (pcap_compile(pcap, &f->filter, f->filterstring, 0, 0) == -1) {
+		perror("PCAP failed to compile the filterstring");
+		return -1;
+	}
+
+	pcap_close(pcap);
+
+	if (FORMAT(libtrace->format_data)->filter != NULL)
+		free(FORMAT(libtrace->format_data)->filter);
+	
+	FORMAT(libtrace->format_data)->filter = f;
+	return 0;
+#else
+	return -1
+#endif
+}
 static int linuxnative_config_input(libtrace_t *libtrace,
 		trace_option_t option,
 		void *data)
@@ -206,11 +283,8 @@ static int linuxnative_config_input(libtrace_t *libtrace,
 			FORMAT(libtrace->format_data)->promisc=*(int*)data;
 			return 0;
 		case TRACE_OPTION_FILTER:
-			/* We don't support bpf filters in any special way
-			 * so return an error and let libtrace deal with
-			 * emulating it
-			 */
-			break;
+		 	return linuxnative_configure_bpf(libtrace, 
+					(libtrace_filter_t *) data);
 		case TRACE_OPTION_META_FREQ:
 			/* No meta-data for this format */
 			break;
