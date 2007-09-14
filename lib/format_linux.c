@@ -50,6 +50,7 @@
 #include <sys/ioctl.h>
 #include <errno.h>
 
+#include <assert.h>
 
 struct libtrace_format_data_t {
 	int fd;
@@ -160,9 +161,12 @@ static int linuxnative_start_input(libtrace_t *libtrace)
 		perror("setsockopt(SO_TIMESTAMP)");
 	}
 
-	/* Push BPF filter into the kernel.
+	/* Push BPF filter into the kernel. At this stage we can safely assume
+	 * that the filterstring has been compiled, or the filter was supplied
+	 * pre-compiled.
 	 */
 	if (filter != NULL) {
+		assert(filter->flag == 1);
 		if (setsockopt(FORMAT(libtrace->format_data)->fd,
 					SOL_SOCKET,
 					SO_ATTACH_FILTER,
@@ -233,39 +237,53 @@ static int linuxnative_configure_bpf(libtrace_t *libtrace,
 	int sock;
 	pcap_t *pcap;
 
-	/* We've been passed a filter, which hasn't been compiled yet. We need
-	 * to figure out the linktype of the socket, compile the filter, check
-	 * to make sure it's sane, then save it for trace_start() to push down
-	 * into the kernel.
-	 */
-	sock = socket(PF_INET, SOCK_STREAM, 0);
-	memset(&ifr, 0, sizeof(struct ifreq));
-	strncpy(ifr.ifr_name, libtrace->uridata, IF_NAMESIZE);
-	if (ioctl(sock, SIOCGIFHWADDR, &ifr) != 0) {
-		perror("Can't get HWADDR for interface");
-		return -1;
-	}
-	close(socket);
-
-	arphrd = ifr.ifr_hwaddr.sa_family;
-	dlt = libtrace_to_pcap_dlt(arphrd_type_to_libtrace(arphrd));
-
+	/* Take a copy of the filter object as it was passed in */
 	f = (libtrace_filter_t *) malloc(sizeof(libtrace_filter_t));
 	memcpy(f, filter, sizeof(libtrace_filter_t));
-
-	pcap = pcap_open_dead(dlt, FORMAT(libtrace->format_data)->snaplen);
 	
-	if (pcap_compile(pcap, &f->filter, f->filterstring, 0, 0) == -1) {
-		perror("PCAP failed to compile the filterstring");
-		return -1;
+	/* If we are passed a filter with "flag" set to zero, then we must
+	 * compile the filterstring before continuing. This involves
+	 * determining the linktype, passing the filterstring to libpcap to
+	 * compile, and saving the result for trace_start() to push into the
+	 * kernel.
+	 * If flag is set to one, then the filter was probably generated using
+	 * trace_create_filter_from_bytecode() and so we don't need to do
+	 * anything (we've just copied it above).
+	 */
+	if (f->flag == 0) {
+		sock = socket(PF_INET, SOCK_STREAM, 0);
+		memset(&ifr, 0, sizeof(struct ifreq));
+		strncpy(ifr.ifr_name, libtrace->uridata, IF_NAMESIZE);
+		if (ioctl(sock, SIOCGIFHWADDR, &ifr) != 0) {
+			perror("Can't get HWADDR for interface");
+			return -1;
+		}
+		close(socket);
+
+		arphrd = ifr.ifr_hwaddr.sa_family;
+		dlt = libtrace_to_pcap_dlt(arphrd_type_to_libtrace(arphrd));
+
+		pcap = pcap_open_dead(dlt, 
+				FORMAT(libtrace->format_data)->snaplen);
+
+		if (pcap_compile(pcap, &f->filter, f->filterstring, 0, 0) == -1) {
+			perror("PCAP failed to compile the filterstring");
+			return -1;
+		}
+
+		pcap_close(pcap);
+		
+		/* Set the "flag" to indicate that the filterstring has been
+		 * compiled
+		 */
+		f->flag = 1;
 	}
-
-	pcap_close(pcap);
-
+	
 	if (FORMAT(libtrace->format_data)->filter != NULL)
 		free(FORMAT(libtrace->format_data)->filter);
 	
 	FORMAT(libtrace->format_data)->filter = f;
+	
 	return 0;
 #else
 	return -1

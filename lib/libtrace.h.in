@@ -1527,7 +1527,17 @@ libtrace_direction_t trace_get_direction(const libtrace_packet_t *packet);
 DLLEXPORT SIMPLE_FUNCTION
 libtrace_filter_t *trace_create_filter(const char *filterstring);
 
-/** apply a BPF filter
+/** Setup a BPF filter based on pre-compiled byte-code.
+ * @param bf_insns	A pointer to the start of the byte-code
+ * @param bf_len	The number of BPF instructions	
+ * @returns		an opaque pointer to a libtrace_filter_t object
+ * @note		The supplied byte-code is not checked for correctness.
+ * @author		Scott Raynel
+ */
+DLLEXPORT libtrace_filter_t *
+trace_create_filter_from_bytecode(void *bf_insns, unsigned int bf_len);
+
+/** Apply a BPF filter to a packet
  * @param filter 	the filter opaque pointer
  * @param packet	the packet opaque pointer
  * @return >0 if the filter matches, 0 if it doesn't, -1 on error.
@@ -1540,7 +1550,7 @@ libtrace_filter_t *trace_create_filter(const char *filterstring);
 DLLEXPORT int trace_apply_filter(libtrace_filter_t *filter,
 		const libtrace_packet_t *packet);
 
-/** destory of BPF filter
+/** Destroy a BPF filter
  * @param filter 	the filter opaque pointer
  * Deallocate all the resources associated with a BPF filter
  */

@@ -103,8 +103,13 @@ static int pcap_start_input(libtrace_t *libtrace) {
 		return -1;
 	}
 	if (DATA(libtrace)->filter) {
-		pcap_compile(INPUT.pcap, &DATA(libtrace)->filter->filter,
-				DATA(libtrace)->filter->filterstring, 1, 0);
+		if (DATA(libtrace)->filter->flag == 0) {
+			pcap_compile(INPUT.pcap, 
+					&DATA(libtrace)->filter->filter,
+					DATA(libtrace)->filter->filterstring, 
+					1, 0);
+			DATA(libtrace)->filter->flag = 1;
+		}
 		if (pcap_setfilter(INPUT.pcap,&DATA(libtrace)->filter->filter) 
 				== -1) {
 			trace_set_err(libtrace,TRACE_ERR_INIT_FAILED,"%s",
