@@ -37,7 +37,10 @@ libtrace_la_SOURCES = $(LIBTRACEIO) trace.c common.h \
 		format_duck.c format_tsh.c $(NATIVEFORMATS) $(BPFFORMATS) \
 		format_atmhdr.c \
 		libtrace_int.h lt_inttypes.h \
-		linktypes.c protocols.c libtraceio.h link_wireless.c \
+		linktypes.c link_wireless.c \
+		protocols_pktmeta.c protocols_l2.c protocols_l3.c \
+		protocols_transport.c \
+		libtraceio.h \
 		$(DAGSOURCE) format_erf.h 
 
 if DAG2_4
