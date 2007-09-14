@@ -396,19 +396,7 @@ typedef struct libtrace_ip
     uint8_t  ip_tos;			/**< Type of Service */
     uint16_t ip_len;			/**< Total Length */
     int16_t  ip_id;			/**< Identification */
-#if BYTE_ORDER == LITTLE_ENDIAN
-    LT_BITFIELD16 ip_off:13;		/**< Fragment Offset */
-    LT_BITFIELD16 ip_mf:1;		/**< More Fragments Flag */
-    LT_BITFIELD16 ip_df:1;		/**< Dont Fragment Flag */
-    LT_BITFIELD16 ip_rf:1;		/**< Reserved Fragment Flag */
-#elif BYTE_ORDER == BIG_ENDIAN
-    LT_BITFIELD16 ip_rf:1;		/**< Fragment Offset */
-    LT_BITFIELD16 ip_df:1;		/**< More Fragments Flag */
-    LT_BITFIELD16 ip_mf:1;		/**< Dont Fragment Flag */
-    LT_BITFIELD16 ip_off:13;		/**< Reserved Fragment Flag */
-#else
-#   error "Adjust your <bits/endian.h> defines"
-#endif
+    uint16_t ip_off;			/**< IP Fragment offset (and flags) */
     uint8_t  ip_ttl;			/**< Time to Live */
     uint8_t  ip_p;			/**< Protocol */
     uint16_t ip_sum;			/**< Checksum */

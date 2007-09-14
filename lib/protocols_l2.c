@@ -203,55 +203,21 @@ static void *trace_get_payload_from_chdlc(void *link,
 }
 
 void *trace_get_payload_from_link(void *link, libtrace_linktype_t linktype, 
-		uint16_t *type, uint32_t *remaining)
+		uint16_t *ethertype, uint32_t *remaining)
 {
 	void *l = NULL;
 	uint16_t dummytype;
-	
-	switch(linktype) {
-		case TRACE_TYPE_80211_PRISM:
-			l = trace_get_payload_from_prism(link,&linktype,remaining);
-			return (l ? trace_get_payload_from_link(l, TRACE_TYPE_80211, type, remaining) : NULL);
-		case TRACE_TYPE_80211_RADIO:
-			l = trace_get_payload_from_radiotap(link,&linktype,remaining);
-			return (l ? trace_get_payload_from_link(l, TRACE_TYPE_80211, type, remaining) : NULL);
-		case TRACE_TYPE_80211:
-			return trace_get_payload_from_80211(link,type,remaining);
 
-		case TRACE_TYPE_ETH:
-			return trace_get_payload_from_ethernet(link,type,remaining);
-		case TRACE_TYPE_NONE:
-			if ((*(char*)link&0xF0) == 0x40)
-				*type=0x0800;
-			else if ((*(char*)link&0xF0) == 0x60)
-				*type=0x86DD;
-			return link; /* I love the simplicity */
-		case TRACE_TYPE_LINUX_SLL:
-			l = trace_get_payload_from_linux_sll(link,&dummytype,remaining);
-			if (type) *type = dummytype;
-			return (l ? trace_get_payload_from_link(l,
-						arphrd_type_to_libtrace(dummytype), type, remaining) : NULL);
-			
-		case TRACE_TYPE_PFLOG:
-			return trace_get_payload_from_pflog(link,type,remaining);
-		case TRACE_TYPE_PPP:
-			return trace_get_payload_from_ppp(link,type,remaining);
-		case TRACE_TYPE_ATM:
-			l=trace_get_payload_from_atm(link,NULL,remaining);
-			return (l ? trace_get_payload_from_llcsnap(l,
-						type, remaining):NULL);
-		case TRACE_TYPE_DUCK:
-			return NULL; /* duck packets have no payload! */
-		case TRACE_TYPE_METADATA:
-			return NULL; /* The payload is in these packets does
-					not correspond to a genuine link-layer
-					*/
-		default:
-			break;
-	}
-	fprintf(stderr, "Don't understand link layer type %i in trace_get_payload_from_link()\n",
-		linktype);
-	return NULL;
+	do {
+		l = trace_get_payload_from_meta(link, &linktype, remaining);
+		if (l != NULL) {
+			link=l;
+			continue;
+		}
+	} while (0);
+
+	return trace_get_payload_from_layer2(link,linktype,ethertype,remaining);
+	
 }
 
 DLLEXPORT void *trace_get_layer2(const libtrace_packet_t *packet,
@@ -316,6 +282,7 @@ DLLEXPORT void *trace_get_payload_from_layer2(void *link,
 		/* Packet Metadata headers, not layer2 headers */
 		case TRACE_TYPE_80211_PRISM:
 		case TRACE_TYPE_80211_RADIO:
+		case TRACE_TYPE_PFLOG:
 		case TRACE_TYPE_LINUX_SLL:
 			return NULL;
 
@@ -339,8 +306,6 @@ DLLEXPORT void *trace_get_payload_from_layer2(void *link,
 			else if ((*(char*)link&0xF0) == 0x60)
 				*ethertype=0x86DD;
 			return link; /* I love the simplicity */
-		case TRACE_TYPE_PFLOG:
-			return trace_get_payload_from_pflog(link,ethertype,remaining);
 		case TRACE_TYPE_PPP:
 			return trace_get_payload_from_ppp(link,ethertype,remaining);
 		case TRACE_TYPE_ATM:
