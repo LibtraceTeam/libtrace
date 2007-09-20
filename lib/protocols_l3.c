@@ -37,7 +37,7 @@ libtrace_ip6_t *trace_get_ip6(libtrace_packet_t *packet)
 	return (libtrace_ip6_t*)ret;
 }
 
-#define SW_IP_OFFMASK 0xff1f
+#define SW_IP_OFFMASK 0x1fff
 
 DLLEXPORT void *trace_get_payload_from_ip(libtrace_ip_t *ipptr, uint8_t *prot,
 		uint32_t *remaining) 
