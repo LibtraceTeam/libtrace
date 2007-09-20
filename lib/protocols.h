@@ -10,14 +10,6 @@
  */
 
 /* pkt meta headers */
-void *trace_get_payload_from_linux_sll(const void *link,
-		uint16_t *type, uint32_t *remaining) ;
-void *trace_get_payload_from_prism (const void *link,
-		libtrace_linktype_t *type, uint32_t *remaining);
-void *trace_get_payload_from_radiotap (const void *link, 
-		libtrace_linktype_t *type, uint32_t *remaining);
-void *trace_get_payload_from_pflog(void *link,
-		uint16_t *type, uint32_t *remaining);
 
 /* l2 headers */
 void *trace_get_mpls_payload_from_ethernet_payload(void *ethernet,
