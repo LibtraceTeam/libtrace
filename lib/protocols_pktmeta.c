@@ -30,36 +30,30 @@ void *trace_get_payload_from_linux_sll(const void *link,
 		*remaining-=sizeof(*sll);
 	}
 
-	/* What kind of wacked out header, has this in host order?! */
 	if (type) *type = ntohs(sll->hatype);
 
 	return (void*)((char*)sll+sizeof(*sll));
 
 }
 
-void *trace_get_payload_from_pflog(void *link,
-		uint16_t *type, uint32_t *remaining)
+/* NB: type is returned as an ethertype */
+static void *trace_get_payload_from_pflog(const void *link,
+		libtrace_linktype_t *type, uint32_t *remaining)
 {
 	libtrace_pflog_header_t *pflog = (libtrace_pflog_header_t*)link;
-    if (remaining) {
+	if (remaining) {
 		if (*remaining<sizeof(*pflog)) 
 			return NULL;
 		*remaining-=sizeof(*pflog);
 	}
 	if (type) {
-		switch(pflog->af) {
-			case AF_INET6: *type=0x86DD; break;
-			case AF_INET:  *type=0x0800; break;
-			default:
-				      /* Unknown */
-				      return NULL;
-		}
+		*type = TRACE_TYPE_NONE;
 	}
 	return (void*)((char*)pflog+ sizeof(*pflog));
 }
 
 /* Returns the 'payload' of the prism header, which is the 802.11 frame */
-void *trace_get_payload_from_prism (const void *link,
+static void *trace_get_payload_from_prism (const void *link,
 		libtrace_linktype_t *type, uint32_t *remaining)
 {
 	if (remaining) {
@@ -74,7 +68,7 @@ void *trace_get_payload_from_prism (const void *link,
 }
 
 /* Returns the 'payload' of the radiotap header, which is the 802.11 frame */
-void *trace_get_payload_from_radiotap (const void *link, 
+static void *trace_get_payload_from_radiotap (const void *link, 
 		libtrace_linktype_t *type, uint32_t *remaining)
 {
 	struct libtrace_radiotap_t *rtap = (struct libtrace_radiotap_t*)link;
@@ -153,12 +147,15 @@ DLLEXPORT void *trace_get_payload_from_meta(const void *meta,
 			nexthdr = trace_get_payload_from_prism(meta,
 					linktype, remaining);
 			return nexthdr;
+		case TRACE_TYPE_PFLOG:
+			nexthdr = trace_get_payload_from_pflog(meta,
+					linktype, remaining);
+			return nexthdr;
 		case TRACE_TYPE_HDLC_POS:
 		case TRACE_TYPE_ETH:
 		case TRACE_TYPE_ATM:
 		case TRACE_TYPE_80211:
 		case TRACE_TYPE_NONE:
-		case TRACE_TYPE_PFLOG:
 		case TRACE_TYPE_POS:
 		case TRACE_TYPE_AAL5:
 		case TRACE_TYPE_DUCK:
