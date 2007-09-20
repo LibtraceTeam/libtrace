@@ -348,7 +348,7 @@ static int pcapfile_write_packet(libtrace_out_t *out,
 		return -1;
 
 	ret=libtrace_io_write(DATAOUT(out)->file,
-			link,
+			ptr,
 			remaining);
 
 	if (ret!=(int)remaining)
