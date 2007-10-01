@@ -1423,7 +1423,7 @@ DLLEXPORT int trace_seek_erf_timestamp(libtrace_t *trace, uint64_t ts);
  * a packet can have
  * @{
  */
-/** Get the size of the packet in the trace
+/** Get the size of the packet in the trace (in bytes)
  * @param packet  	the packet opaque pointer
  * @return the size of the packet in the trace
  * @note Due to this being a header capture, or anonymisation, this may not
@@ -1440,7 +1440,7 @@ DLLEXPORT int trace_seek_erf_timestamp(libtrace_t *trace, uint64_t ts);
 DLLEXPORT SIMPLE_FUNCTION
 size_t trace_get_capture_length(const libtrace_packet_t *packet);
 
-/** Get the size of the packet as it was seen on the wire.
+/** Get the size of the packet as it was seen on the wire (in bytes).
  * @param packet  	the packet opaque pointer
  * @return the size of the packet as it was on the wire.
  * @note Due to the trace being a header capture, or anonymisation this may
@@ -1455,7 +1455,7 @@ size_t trace_get_capture_length(const libtrace_packet_t *packet);
 DLLEXPORT SIMPLE_FUNCTION
 size_t trace_get_wire_length(const libtrace_packet_t *packet);
 
-/** Get the length of the capture framing headers.
+/** Get the length of the capture framing headers (in bytes).
  * @param packet  	the packet opaque pointer
  * @return the size of the packet as it was on the wire.
  * @note this length corresponds to the difference between the size of a 
@@ -1466,7 +1466,7 @@ size_t trace_get_framing_length(const libtrace_packet_t *packet);
 
 /** Truncate ("snap") the packet at the suggested length
  * @param packet	the packet opaque pointer
- * @param size		the new length of the packet
+ * @param size		the new length of the packet (in bytes)
  * @return the new capture length of the packet, or the original capture
  * length of the packet if unchanged
  */
