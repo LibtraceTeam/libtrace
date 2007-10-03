@@ -35,10 +35,10 @@ void decode(int link_type,char *packet,unsigned len)
 	DISPLAYS(ip_id," Id %u");
 	
 	if ((unsigned int)len >= ((char *)&ip->ip_ttl - (char *)ip - 2)) {
-		printf(" Fragoff %i", ip->ip_off);
-		if (ip->ip_mf) printf(" MORE_FRAG");
-		if (ip->ip_df) printf(" DONT_FRAG");
-		if (ip->ip_rf) printf(" RESV_FRAG");
+		printf(" Fragoff %i", ntohs(ip->ip_off) & 0x1FFF);
+		if (ntohs(ip->ip_off) & 0x2000) printf(" MORE_FRAG");
+		if (ntohs(ip->ip_off) & 0x4000) printf(" DONT_FRAG");
+		if (ntohs(ip->ip_off) & 0x8000) printf(" RESV_FRAG");
 	}
 	//printf("\n IP:");
 	DISPLAY(ip_ttl,"\n IP: TTL %i");
