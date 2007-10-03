@@ -646,8 +646,16 @@ DLLEXPORT libtrace_packet_t *trace_create_packet(void)
 DLLEXPORT libtrace_packet_t *trace_copy_packet(const libtrace_packet_t *packet) {
 	libtrace_packet_t *dest = 
 		(libtrace_packet_t *)malloc(sizeof(libtrace_packet_t));
+	if (!dest) {
+		printf("out of memory constructing packet\n");
+		abort();
+	}
 	dest->trace=packet->trace;
 	dest->buffer=malloc(65536);
+	if (!dest->buffer) {
+		printf("out of memory allocating buffer memory\n");
+		abort();
+	}
 	dest->header=dest->buffer;
 	dest->payload=(void*)
 		((char*)dest->buffer+trace_get_framing_length(packet));
