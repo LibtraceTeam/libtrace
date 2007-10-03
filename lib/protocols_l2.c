@@ -206,7 +206,6 @@ void *trace_get_payload_from_link(void *link, libtrace_linktype_t linktype,
 		uint16_t *ethertype, uint32_t *remaining)
 {
 	void *l = NULL;
-	uint16_t dummytype;
 
 	do {
 		l = trace_get_payload_from_meta(link, &linktype, remaining);
