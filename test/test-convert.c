@@ -202,7 +202,7 @@ int main(int argc, char *argv[]) {
 	
 		if (trace_get_tcp(packet)) {
 			if (!trace_get_tcp(packet2)) {
-				printf("trace corrupt\n");
+				printf("trace corrupt -- expected tcp\n");
 				error=1;
 				break;
 			}
