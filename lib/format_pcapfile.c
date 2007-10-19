@@ -285,6 +285,12 @@ static int pcapfile_write_packet(libtrace_out_t *out,
 	libtrace_linktype_t linktype;
 
 	ptr = trace_get_packet_buffer(packet,&linktype,&remaining);
+	
+	/* Silently discard RT metadata packets and packets with an
+	 * unknown linktype. */
+	if (linktype == TRACE_TYPE_METADATA || linktype == -1) {
+		return 0;
+	}
 
 	/* If this packet cannot be converted to a pcap linktype then
 	 * pop off the top header until it can be converted
