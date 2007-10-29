@@ -1,2 +1,2 @@
 
-SUBDIRS=skeleton rate
+SUBDIRS=skeleton rate stats
