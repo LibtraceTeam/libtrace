@@ -3,11 +3,11 @@
 # Now you only need to update the version number in two places - below,
 # and in the README
 
-AC_INIT([libtrace],[3.0.2],[contact@wand.net.nz],[libtrace])
+AC_INIT([libtrace],[3.0.3],[contact@wand.net.nz],[libtrace])
 
 LIBTRACE_MAJOR=3
 LIBTRACE_MID=0
-LIBTRACE_MINOR=2
+LIBTRACE_MINOR=3
 
 AC_CONFIG_SRCDIR(lib/trace.c)
 AM_INIT_AUTOMAKE
@@ -152,7 +152,7 @@ fi
 # configure time options for use of DAG cards
 # borrowed from libpcap!
 AC_ARG_WITH(dag, 
-	    AS_HELP_STRING(--with-dag[=DIR],include DAG support (located in directory DIR, if supplied)),
+	    AS_HELP_STRING(--with-dag[=DIR],include DAG capture support (located in directory DIR, if supplied)),
 [
         if test "$withval" = no
         then
@@ -188,7 +188,7 @@ if test "$with_dag" != no; then
 	if test "$dag_found" = 1; then
 		ADD_LIBS="$ADD_LIBS -ldag"
 		AC_DEFINE(HAVE_DAG_API, 1, [define if you have a DAG API])
-		AC_DEFINE(HAVE_DAG,1,[conditional for building with DAG support])
+		AC_DEFINE(HAVE_DAG,1,[conditional for building with DAG capture support])
 		libtrace_dag=true
 		
 		AC_DEFINE(DAG_VERSION,30,[defines the DAG driver version])
@@ -286,14 +286,14 @@ reportopt "Compiled with PCAP 0.8 support" $ac_cv_lib_pcap_pcap_next_ex
 reportopt "Compiled with compressed trace (zlib) support" $ac_cv_lib_z_gzopen
 if test x"$libtrace_dag" = xtrue; then
 	if test "$libtrace_dag_version" = 24; then
-		AC_MSG_NOTICE([Compiled with DAG support: 2.4])
+		AC_MSG_NOTICE([Compiled with DAG capture support: 2.4])
 	elif test "$libtrace_dag_version" = 30; then
-		AC_MSG_NOTICE([Compiled with DAG support: 3.0])
+		AC_MSG_NOTICE([Compiled with DAG capture support: 3.0])
 	else
-		AC_MSG_NOTICE([Compiled with DAG support: 2.5])
+		AC_MSG_NOTICE([Compiled with DAG capture support: 2.5])
 	fi	
 else
-	AC_MSG_NOTICE([Compiled with DAG support: No])
+	AC_MSG_NOTICE([Compiled with DAG capture support: No])
 fi
 reportopt "Building man pages/documentation" $libtrace_doxygen
 
