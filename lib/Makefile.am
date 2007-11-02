@@ -39,7 +39,7 @@ libtrace_la_SOURCES = $(LIBTRACEIO) trace.c common.h \
 		libtrace_int.h lt_inttypes.h \
 		linktypes.c link_wireless.c \
 		protocols_pktmeta.c protocols_l2.c protocols_l3.c \
-		protocols_transport.c \
+		protocols_transport.c protocols.h \
 		libtraceio.h \
 		$(DAGSOURCE) format_erf.h 
 
