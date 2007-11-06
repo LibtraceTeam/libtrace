@@ -129,7 +129,7 @@ static char *xstrndup(const char *src,size_t n)
 }
 
 void register_format(struct libtrace_format_t *f) {
-	assert(f->next==NULL);
+	assert(f->next==NULL); /* Can't register a format twice */
 	f->next=formats_list;
 	formats_list=f;
 	/* Now, verify things 
@@ -462,7 +462,7 @@ DLLEXPORT libtrace_out_t *trace_create_output(const char *uri) {
 			case 0: /* success */
 				break;
 			default:
-				assert(!"init_output() should return -1 for failure, or 0 for success");
+				assert(!"Internal error: init_output() should return -1 for failure, or 0 for success");
 		}
 	} else {
 		trace_set_err_out(libtrace,TRACE_ERR_UNSUPPORTED,
@@ -485,7 +485,8 @@ DLLEXPORT libtrace_out_t *trace_create_output(const char *uri) {
 DLLEXPORT int trace_start(libtrace_t *libtrace)
 {
 	assert(libtrace);
-	assert(!trace_is_err(libtrace) && "Please use trace_is_err to check for errors after calling trace_create!");
+	if (trace_is_err(libtrace))
+		return -1;
 	if (libtrace->format->start_input) {
 		int ret=libtrace->format->start_input(libtrace);
 		if (ret < 0) {
@@ -514,7 +515,10 @@ DLLEXPORT int trace_start_output(libtrace_out_t *libtrace)
 DLLEXPORT int trace_pause(libtrace_t *libtrace)
 {
 	assert(libtrace);
-	assert(libtrace->started && "BUG: Called trace_pause without calling trace_start first");
+	if (!libtrace->started) {
+		trace_set_err(libtrace,TRACE_ERR_BAD_STATE, "You must call trace_start() before calling trace_pause()");
+		return -1;
+	}
 	if (libtrace->format->pause_input)
 		libtrace->format->pause_input(libtrace);
 	libtrace->started=false;
@@ -527,8 +531,10 @@ DLLEXPORT int trace_config(libtrace_t *libtrace,
 {
 	int ret;
 	libtrace_err_t err;
-	
-	assert(!trace_is_err(libtrace) && "Please use trace_is_err to check for errors after calling trace_create!");
+
+	if (trace_is_err(libtrace)) {
+		return -1;
+	}
 	
 	if (libtrace->format->config_input) {
 		ret=libtrace->format->config_input(libtrace,option,value);
@@ -697,10 +703,17 @@ DLLEXPORT void trace_destroy_packet(libtrace_packet_t *packet) {
 DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 
 	assert(libtrace && "You called trace_read_packet() with a NULL libtrace parameter!\n");
-	assert(libtrace->started && "BUG: You must call libtrace_start() before trace_read_packet()\n");
+	if (trace_is_err(libtrace))
+		return -1;
+	if (!libtrace->started) {
+		trace_set_err(libtrace,TRACE_ERR_BAD_STATE,"You must call libtrace_start() before trace_read_packet()\n");
+		return -1;
+	}
+	if (packet->buf_control==TRACE_CTRL_PACKET || packet->buf_control==TRACE_CTRL_EXTERNAL) {
+		trace_set_err(libtrace,TRACE_ERR_BAD_STATE,"Packet passed to trace_read_packet() is invalid\n");
+		return -1;
+	}
 	assert(packet);
-	assert((packet->buf_control==TRACE_CTRL_PACKET || packet->buf_control==TRACE_CTRL_EXTERNAL)&&
-		"BUG: You must allocate a packet using packet_create()");
       
 	/* Store the trace we are reading from into the packet opaque 
 	 * structure */
@@ -757,7 +770,11 @@ DLLEXPORT int trace_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *pa
 	assert(libtrace);
 	assert(packet);	
 	/* Verify the packet is valid */
-	assert(libtrace->started);
+	if (!libtrace->started) {
+		trace_set_err_out(libtrace,TRACE_ERR_BAD_STATE,
+			"Trace is not started before trace_write_packet");
+		return -1;
+	}
 
 	if (libtrace->format->write_packet) {
 		return libtrace->format->write_packet(libtrace, packet);
@@ -1084,7 +1101,7 @@ int trace_bpf_compile(libtrace_filter_t *filter,
 	}
 	return 0;
 #else
-	assert(!"This should never be called when BPF not enabled");
+	assert(!"Internal bug: This never be called when BPF not enabled");
 	trace_set_err(packet->trace,TRACE_ERR_OPTION_UNAVAIL,
 				"Feature unavailable");
 	return -1;

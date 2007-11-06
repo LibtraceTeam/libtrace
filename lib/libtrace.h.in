@@ -201,7 +201,9 @@ enum {
 	/** Option known, but unsupported by this format */
 	TRACE_ERR_OPTION_UNAVAIL= -6,
 	/** This feature is unsupported */
-	TRACE_ERR_UNSUPPORTED	= -7
+	TRACE_ERR_UNSUPPORTED	= -7,
+	/** Illegal use of the API */
+	TRACE_ERR_BAD_STATE	= -8
 };
 
 /** Enumeration of DLT supported by libtrace 
