@@ -17,7 +17,6 @@
 
 void decode(int link_type,char *packet,unsigned len)
 {
-	uint8_t has_fcs = 0;
 	uint32_t *ptr; 
 	uint8_t *p; /* Our current field "cursor" */
 	uint8_t *s; /* Start of data fields, for alignment */
@@ -62,10 +61,8 @@ void decode(int link_type,char *packet,unsigned len)
 
 	if (rtap->it_present & (1 << TRACE_RADIOTAP_FLAGS)) {
 		printf(" Radiotap: Flags = 0x%02x\n", *p);
-		has_fcs = *p & 0x10; /* Determine if the packet has an FCS attached */
 		p += sizeof (uint8_t);
 		rtap_real_len += sizeof(uint8_t);
-		
 	}
 
 	
@@ -180,17 +177,8 @@ void decode(int link_type,char *packet,unsigned len)
 	if (rtap_real_len != rtap_len) 
 		printf(" Radiotap: WARNING: Header contains un-decoded fields.\n");
 
-	if (len > rtap_len) {
-		unsigned pktlen = len - rtap_len;
-		if (has_fcs && pktlen >= 4) pktlen -= 4;
-		decode_next(packet + rtap_len, pktlen, "link", TRACE_TYPE_80211);
-		if (has_fcs && pktlen >= 4) {
-			uint32_t *fcs;
-			fcs = packet + rtap_len + pktlen - 4;
-			printf(" 802.11MAC: FCS = 0x%4x\n", *fcs);
-		}
-	}
-		
+	if (len > rtap_len) 
+		decode_next(packet + rtap_len, len - rtap_len, "link", TRACE_TYPE_80211);
 		
 	return;
 

@@ -200,8 +200,6 @@ static void decode_80211_information_elements(char *pkt, unsigned len) {
 		
 		if ( len < ( sizeof(ieee80211_ie) + ie->length)) {
 			printf("  [Truncated]\n");
-			printf("  len = %u, sizeof_ie = %u, ie->len = %u\n",
-					len, sizeof(ieee80211_ie), ie->length);
 			return;
 		}
 		
@@ -364,7 +362,7 @@ static void decode_80211_information_elements(char *pkt, unsigned len) {
 			default:
 				printf("  Unknown IE Element ID, 0x%02x\n", ie->id);
 		}
-		len -= (sizeof(ieee80211_ie) + ie->length);
+		len -= sizeof(ieee80211_ie) + ie->length;
 		pkt = ((char *)pkt + sizeof(ieee80211_ie) + ie->length);
 	}
 }
