@@ -578,7 +578,7 @@ static int rt_read_packet_versatile(libtrace_t *libtrace,
 	}
 	/* Return the number of bytes read from the stream */
 	RT_INFO->rt_hdr.type = TRACE_RT_LAST;
-	return RT_INFO->rt_hdr.length;
+	return RT_INFO->rt_hdr.length + sizeof(rt_header_t);
 }
 
 static int rt_read_packet(libtrace_t *libtrace,
