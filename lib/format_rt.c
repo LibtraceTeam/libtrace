@@ -306,7 +306,6 @@ static int rt_read(libtrace_t *libtrace, void **buffer, size_t len, int block)
 		memcpy(RT_INFO->pkt_buffer, RT_INFO->buf_current, 
 				RT_INFO->buf_filled);
 		RT_INFO->buf_current = RT_INFO->pkt_buffer;
-		
 #ifndef MSG_NOSIGNAL
 #  define MSG_NOSIGNAL 0
 #endif
@@ -362,8 +361,11 @@ static int rt_read(libtrace_t *libtrace, void **buffer, size_t len, int block)
 
 static int rt_set_format(libtrace_t *libtrace, libtrace_packet_t *packet) 
 {
-	
-	if (packet->type >= TRACE_RT_DATA_DLT) {
+
+	/* Try to minimize the number of corrupt packets that slip through
+	 * while making it easy to identify new pcap DLTs */
+	if (packet->type > TRACE_RT_DATA_DLT && 
+			packet->type < TRACE_RT_DATA_DLT_END) {
 		if (!RT_INFO->dummy_pcap) {
 			RT_INFO->dummy_pcap = trace_create_dead("pcap:-");
 		}
@@ -398,7 +400,7 @@ static int rt_set_format(libtrace_t *libtrace, libtrace_packet_t *packet)
 			trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Legacy packet cannot be sent over rt");
 			return -1;
 		default:
-			printf("Unrecognised format: %d\n", packet->type);
+			printf("Unrecognised format: %u\n", packet->type);
 			trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Unrecognised packet format");
 			return -1;
 	}
@@ -488,7 +490,6 @@ static int rt_read_packet_versatile(libtrace_t *libtrace,
 	 * rt header - I know it's hax and maybe I'll fix it later on */
 	if (RT_INFO->rt_hdr.type == TRACE_RT_LAST) {
 		void_hdr = (void *)pkt_hdr;
-		
 		/* FIXME: Better error handling required */
 		if (rt_read(libtrace, &void_hdr, 
 				sizeof(rt_header_t),blocking) !=
@@ -505,6 +506,7 @@ static int rt_read_packet_versatile(libtrace_t *libtrace,
 	}
 	packet->type = RT_INFO->rt_hdr.type;
 
+	
 	if (packet->type >= TRACE_RT_DATA_SIMPLE) {
 		if (rt_read(libtrace, 
 					&packet->buffer,
@@ -676,6 +678,7 @@ static libtrace_eventobj_t trace_event_rt(libtrace_t *trace,
 	else {
 		event.type = TRACE_EVENT_PACKET;
 	}
+
 	
 	return event;
 }

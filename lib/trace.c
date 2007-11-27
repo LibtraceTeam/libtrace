@@ -976,6 +976,11 @@ DLLEXPORT libtrace_eventobj_t trace_event(libtrace_t *trace,
 	assert(trace);
 	assert(packet);
 
+	/* Clear the packet cache */
+	packet->capture_length = -1;
+	packet->l3_header = NULL;
+	packet->l3_ethertype = 0;
+	
 	/* Store the trace we are reading from into the packet opaque
 	 * structure */
 	packet->trace = trace;
