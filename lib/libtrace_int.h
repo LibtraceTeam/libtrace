@@ -141,6 +141,9 @@ struct libtrace_t {
 	uint64_t accepted_packets;	/**< Number of packets returned to the
 					  * user 
 					  */
+	uint64_t filtered_packets;	/**< Number of packets filtered by
+					  * libtrace
+					  */
 	char *uridata;			/**< the uri of this trace */
 
 };

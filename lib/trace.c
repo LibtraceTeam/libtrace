@@ -743,6 +743,7 @@ DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 				 * packet
 				 */
 				if (!trace_apply_filter(libtrace->filter,packet)){
+					++libtrace->filtered_packets;
 					continue;
 				}
 			}
@@ -751,6 +752,7 @@ DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 				trace_set_capture_length(packet,
 						libtrace->snaplen);
 			}
+			++libtrace->accepted_packets;
 			return ret;
 		} while(1);
 	}
@@ -986,10 +988,12 @@ DLLEXPORT libtrace_eventobj_t trace_event(libtrace_t *trace,
 	packet->trace = trace;
 
 	if (packet->trace->format->trace_event) {
-		return packet->trace->format->trace_event(trace,packet);
-	} else {
-		return event;
+		event=packet->trace->format->trace_event(trace,packet);
+		if (event.type == TRACE_EVENT_PACKET) {
+			++trace->accepted_packets;
+		}
 	}
+	return event;
 
 }
 
@@ -1603,16 +1607,18 @@ uint64_t trace_get_filtered_packets(const libtrace_t *trace)
 {
 	assert(trace);
 	if (trace->format->get_filtered_packets) {
-		return trace->format->get_filtered_packets(trace);
+		return trace->format->get_filtered_packets(trace)+
+			trace->filtered_packets;
 	}
 	if (trace->format->get_received_packets
 		&& trace->format->get_dropped_packets) {
 		return 
-			trace_get_received_packets(trace)
-			-trace_get_accepted_packets(trace)
-			-trace_get_dropped_packets(trace);
+			((trace_get_received_packets(trace)
+			-trace_get_accepted_packets(trace))
+			-trace_get_dropped_packets(trace))
+			+trace->filtered_packets;
 	}
-	return (uint64_t)-1;
+	return trace->filtered_packets;
 }
 
 uint64_t trace_get_dropped_packets(const libtrace_t *trace)
