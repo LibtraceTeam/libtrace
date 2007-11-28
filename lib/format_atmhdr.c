@@ -106,19 +106,19 @@ static struct libtrace_format_t atmhdr = {
 	"atmhdr",
 	"$Id$",
 	TRACE_FORMAT_ATMHDR,
-        atmhdr_init_input,                 /* init_input */
+        atmhdr_init_input,              /* init_input */
         NULL,                           /* config_input */
-        atmhdr_start_input,                /* start_input */
+        atmhdr_start_input,             /* start_input */
         NULL,                           /* pause_input */
         NULL,                           /* init_output */
         NULL,                           /* config_output */
         NULL,                           /* start_output */
-        atmhdr_fin_input,                  /* fin_input */
+        atmhdr_fin_input,               /* fin_input */
         NULL,                           /* fin_output */
         atmhdr_read_packet,             /* read_packet */
         NULL,                           /* fin_packet */
         NULL,                           /* write_packet */
-        atmhdr_get_link_type,        /* get_link_type */
+        atmhdr_get_link_type,        	/* get_link_type */
         NULL,                           /* get_direction */
         NULL,                           /* set_direction */
         atmhdr_get_erf_timestamp,       /* get_erf_timestamp */
@@ -128,12 +128,16 @@ static struct libtrace_format_t atmhdr = {
         NULL,                           /* seek_timeval */
         NULL,                           /* seek_seconds */
         atmhdr_get_capture_length,      /* get_capture_length */
-        atmhdr_get_wire_length,      /* get_wire_length */
-        atmhdr_get_framing_length,   /* get_framing_length */
+        atmhdr_get_wire_length,      	/* get_wire_length */
+        atmhdr_get_framing_length,   	/* get_framing_length */
         NULL,                           /* set_capture_length */
+	NULL,				/* get_received_packets */
+	NULL,				/* get_filtered_packets */
+	NULL,				/* get_dropped_packets */
+	NULL,				/* get_captured_packets */
         NULL,                           /* get_fd */
         trace_event_trace,              /* trace_event */
-        NULL,                 /* help */
+        NULL,                 		/* help */
         NULL                            /* next pointer */
 };
 	

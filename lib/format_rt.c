@@ -725,6 +725,10 @@ static struct libtrace_format_t rt = {
         rt_get_wire_length,            		/* get_wire_length */
         rt_get_framing_length, 		/* get_framing_length */
         NULL,         			/* set_capture_length */
+	NULL,				/* get_received_packets */
+	NULL,				/* get_filtered_packets */
+	NULL,				/* get_dropped_packets */
+	NULL,				/* get_captured_packets */
         rt_get_fd,                	/* get_fd */
         trace_event_rt,             /* trace_event */
         rt_help,			/* help */

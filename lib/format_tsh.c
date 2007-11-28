@@ -219,6 +219,10 @@ static struct libtrace_format_t tshformat = {
 	tsh_get_wire_length,		/* get_wire_length */
 	tsh_get_framing_length,		/* get_framing_length */
 	NULL,				/* set_capture_length */
+	NULL,				/* get_received_packets */
+	NULL,				/* get_filtered_packets */
+	NULL,				/* get_dropped_packets */
+	NULL,				/* get_captured_packets */
 	NULL,				/* get_fd */
 	trace_event_trace,		/* trace_event */
 	tsh_help,			/* help */
@@ -259,6 +263,10 @@ static struct libtrace_format_t frplusformat = {
 	tsh_get_wire_length,		/* get_wire_length */
 	tsh_get_framing_length,		/* get_framing_length */
 	NULL,				/* set_capture_length */
+	NULL,				/* get_received_packets */
+	NULL,				/* get_filtered_packets */
+	NULL,				/* get_dropped_packets */
+	NULL,				/* get_captured_packets */
 	NULL,				/* get_fd */
 	trace_event_trace,		/* trace_event */
 	tsh_help,			/* help */

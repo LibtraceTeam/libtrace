@@ -446,6 +446,10 @@ static struct libtrace_format_t legacyatm = {
 	legacyatm_get_wire_length,	/* get_wire_length */
 	legacyatm_get_framing_length,	/* get_framing_length */
 	NULL,				/* set_capture_length */
+	NULL,				/* get_received_packets */
+	NULL,				/* get_filtered_packets */
+	NULL,				/* get_dropped_packets */
+	NULL,				/* get_captured_packets */
 	NULL,				/* get_fd */
 	trace_event_trace,		/* trace_event */
 	legacyatm_help,			/* help */
@@ -481,6 +485,10 @@ static struct libtrace_format_t legacyeth = {
 	legacyeth_get_wire_length,	/* get_wire_length */
 	legacyeth_get_framing_length,	/* get_framing_length */
 	NULL,				/* set_capture_length */
+	NULL,				/* get_received_packets */
+	NULL,				/* get_filtered_packets */
+	NULL,				/* get_dropped_packets */
+	NULL,				/* get_captured_packets */
 	NULL,				/* get_fd */
 	trace_event_trace,		/* trace_event */
 	legacyeth_help,			/* help */
@@ -516,6 +524,10 @@ static struct libtrace_format_t legacypos = {
 	legacypos_get_wire_length,	/* get_wire_length */
 	legacypos_get_framing_length,	/* get_framing_length */
 	NULL,				/* set_capture_length */
+	NULL,				/* get_received_packets */
+	NULL,				/* get_filtered_packets */
+	NULL,				/* get_dropped_packets */
+	NULL,				/* get_captured_packets */
 	NULL,				/* get_fd */
 	trace_event_trace,		/* trace_event */
 	legacypos_help,			/* help */
@@ -551,6 +563,10 @@ static struct libtrace_format_t legacynzix = {
 	legacynzix_get_wire_length,	/* get_wire_length */
 	legacynzix_get_framing_length,	/* get_framing_length */
 	NULL,				/* set_capture_length */
+	NULL,				/* get_received_packets */
+	NULL,				/* get_filtered_packets */
+	NULL,				/* get_dropped_packets */
+	NULL,				/* get_captured_packets */
 	NULL,				/* get_fd */
 	trace_event_trace,		/* trace_event */
 	legacynzix_help,		/* help */

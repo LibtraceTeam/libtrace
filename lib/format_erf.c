@@ -670,6 +670,10 @@ static struct libtrace_format_t erfformat = {
 	erf_get_wire_length,		/* get_wire_length */
 	erf_get_framing_length,		/* get_framing_length */
 	erf_set_capture_length,		/* set_capture_length */
+	NULL,				/* get_received_packets */
+	NULL,				/* get_filtered_packets */
+	NULL,				/* get_dropped_packets */
+	NULL,				/* get_captured_packets */
 	NULL,				/* get_fd */
 	erf_event,			/* trace_event */
 	erf_help,			/* help */

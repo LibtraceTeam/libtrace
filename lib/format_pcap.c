@@ -622,6 +622,10 @@ static struct libtrace_format_t pcap = {
 	pcap_get_wire_length,		/* get_wire_length */
 	pcap_get_framing_length,	/* get_framing_length */
 	pcap_set_capture_length,	/* set_capture_length */
+	NULL,				/* get_received_packets */
+	NULL,				/* get_filtered_packets */
+	NULL,				/* get_dropped_packets */
+	NULL,				/* get_captured_packets */
 	NULL,				/* get_fd */
 	trace_event_trace,		/* trace_event */
 	pcap_help,			/* help */
@@ -657,6 +661,10 @@ static struct libtrace_format_t pcapint = {
 	pcap_get_wire_length,		/* get_wire_length */
 	pcap_get_framing_length,	/* get_framing_length */
 	pcap_set_capture_length,	/* set_capture_length */
+	NULL,				/* get_received_packets */
+	NULL,				/* get_filtered_packets */
+	NULL,				/* get_dropped_packets */
+	NULL,				/* get_captured_packets */
 	pcap_get_fd,			/* get_fd */
 	trace_event_device,		/* trace_event */
 	pcapint_help,			/* help */

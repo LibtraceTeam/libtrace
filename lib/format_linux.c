@@ -258,7 +258,7 @@ static int linuxnative_configure_bpf(libtrace_t *libtrace,
 			perror("Can't get HWADDR for interface");
 			return -1;
 		}
-		close(socket);
+		close(sock);
 
 		arphrd = ifr.ifr_hwaddr.sa_family;
 		dlt = libtrace_to_pcap_dlt(arphrd_type_to_libtrace(arphrd));
@@ -441,7 +441,7 @@ static libtrace_direction_t linuxnative_get_direction(const struct libtrace_pack
 }
 
 static libtrace_direction_t linuxnative_set_direction(
-		const libtrace_packet_t *packet,
+		libtrace_packet_t *packet,
 		libtrace_direction_t direction) {
 
 	switch (direction) {
@@ -520,6 +520,10 @@ static struct libtrace_format_t linuxnative = {
 	linuxnative_get_wire_length,	/* get_wire_length */
 	linuxnative_get_framing_length,	/* get_framing_length */
 	NULL,				/* set_capture_length */
+	NULL,				/* get_received_packets */
+	NULL,				/* get_filtered_packets */
+	NULL,				/* get_dropped_packets */
+	NULL,				/* get_captured_packets */
 	linuxnative_get_fd,		/* get_fd */
 	trace_event_device,		/* trace_event */
 	linuxnative_help,		/* help */

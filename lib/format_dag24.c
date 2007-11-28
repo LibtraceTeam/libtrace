@@ -363,6 +363,10 @@ static struct libtrace_format_t dag = {
         erf_get_wire_length,            /* get_wire_length */
         erf_get_framing_length,         /* get_framing_length */
         erf_set_capture_length,         /* set_capture_length */
+	NULL,				/* get_received_packets */
+	NULL,				/* get_filtered_packets */
+	NULL,				/* get_dropped_packets */
+	NULL,				/* get_captured_packets */
         NULL,                           /* get_fd */
         trace_event_dag,                /* trace_event */
         dag_help,                       /* help */
