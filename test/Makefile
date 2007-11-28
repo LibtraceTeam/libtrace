@@ -49,7 +49,7 @@ test-format-all: test-format test-decode test-decode2
 	@LD_LIBRARY_PATH="$(libdir)" \
 	DYLD_LIBRARY_PATH="$(libdir)" \
 	./test-decode2 pcap:traces/radius.pcap
-	@for i in erf pcap pcapfile duck legacyatm legacyeth legacypos tsh;\
+	@for i in erf pcap pcapfile legacyatm legacyeth legacypos tsh;\
 	do \
 		echo \* Read $$i;				\
 		rm -f traces/*.out.*;				\
