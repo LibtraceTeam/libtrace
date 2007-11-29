@@ -84,6 +84,7 @@ struct erf_format_data_t {
 	struct {
 		int real_time;
 	} options;
+	uint64_t drops;
 };
 
 struct erf_format_data_out_t {
@@ -147,6 +148,7 @@ static int erf_init_input(libtrace_t *libtrace)
 	
 	INPUT.file = 0;
 	IN_OPTIONS.real_time = 0;
+	DATA(libtrace)->drops = 0;
 	
 	return 0; /* success */
 }
@@ -175,6 +177,8 @@ static int erf_start_input(libtrace_t *libtrace)
 
 	if (!INPUT.file)
 		return -1;
+
+	DATA(libtrace)->drops = 0;
 
 	return 0; /* success */
 }
@@ -617,6 +621,11 @@ static struct libtrace_eventobj_t erf_event(struct libtrace_t *libtrace, struct 
 	
 }
 
+static uint64_t erf_get_dropped_packets(libtrace_t *trace)
+{
+	return DATA(trace)->drops;
+}
+
 static void erf_help(void) {
 	printf("erf format module: $Revision$\n");
 	printf("Supported input URIs:\n");
@@ -672,7 +681,7 @@ static struct libtrace_format_t erfformat = {
 	erf_set_capture_length,		/* set_capture_length */
 	NULL,				/* get_received_packets */
 	NULL,				/* get_filtered_packets */
-	NULL,				/* get_dropped_packets */
+	erf_get_dropped_packets,	/* get_dropped_packets */
 	NULL,				/* get_captured_packets */
 	NULL,				/* get_fd */
 	erf_event,			/* trace_event */

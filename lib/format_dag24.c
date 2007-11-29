@@ -79,6 +79,7 @@ struct dag_format_data_t {
 	uint32_t offset;
 	uint32_t bottom;
 	uint32_t top;
+	uint64_t drops;
 };
 
 static int dag_available(libtrace_t *libtrace) {
@@ -129,6 +130,7 @@ static int dag_init_input(libtrace_t *libtrace) {
         DUCK.duck_freq = 0;
         DUCK.last_pkt = 0;
         DUCK.dummy_duck = NULL;
+	FORMAT_DATA->drops = 0;
 
         return 0;
 }
@@ -163,6 +165,7 @@ static int dag_start_input(libtrace_t *libtrace) {
 	/* Flush the memory hole */
 	while(dag_available(libtrace) != 0)
 		FORMAT_DATA->diff = 0;
+	FORMAT_DATA->drops = 0;
 	return 0;
 }
 
@@ -287,6 +290,7 @@ static int dag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
         dag_form_packet(erfptr, packet);
         tv = trace_get_timeval(packet);
         DUCK.last_pkt = tv.tv_sec;
+	DATA(libtrace)->drops += ntohs(erfptr->lctr);
         return packet->payload ? htons(erfptr->rlen) : erf_get_framing_length(packet);
 }
 
@@ -320,6 +324,11 @@ static libtrace_eventobj_t trace_event_dag(libtrace_t *trace,
         event.type = TRACE_EVENT_SLEEP;
         event.seconds = 0.0001;
         return event;
+}
+
+static uint64_t dag24_get_dropped_packets(libtrace_t *trace)
+{
+	return DATA(trace)->drops;
 }
 
 static void dag_help(void) {
@@ -365,7 +374,7 @@ static struct libtrace_format_t dag = {
         erf_set_capture_length,         /* set_capture_length */
 	NULL,				/* get_received_packets */
 	NULL,				/* get_filtered_packets */
-	NULL,				/* get_dropped_packets */
+	dag24_get_dropped_packets,	/* get_dropped_packets */
 	NULL,				/* get_captured_packets */
         NULL,                           /* get_fd */
         trace_event_dag,                /* trace_event */

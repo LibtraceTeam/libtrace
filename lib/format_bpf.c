@@ -61,6 +61,8 @@ struct libtrace_format_data_t {
 	unsigned int buffersize;
 	int remaining;
 	unsigned int linktype;
+	struct bpf_stat stats;
+	int stats_valid;
 };
 
 #define FORMATIN(x) ((struct libtrace_format_data_t*)((x->format_data)))
@@ -74,6 +76,7 @@ static int bpf_init_input(libtrace_t *libtrace)
 	FORMATIN(libtrace)->fd = -1;
 	FORMATIN(libtrace)->promisc = 0;
 	FORMATIN(libtrace)->snaplen = 65536;
+	FORMATIN(libtrace)->stats_valid = 0;
 
 	return 0;
 }
@@ -192,10 +195,40 @@ static int bpf_start_input(libtrace_t *libtrace)
 		}
 	}
 
+	FORMATIN(libtrace)->stats_valid = 0;
+
 	/* TODO: we should always set a bpf filter for snapping */
 
 	/* We're done! */
 	return 0;
+}
+
+static uint64_t bpf_get_received_packets(libtrace_t *trace)
+{
+	/* If we're called with stats_valid == 0, or we're called again
+	 * then refresh the stats.  Don't refresh the stats if we're called
+	 * immediately after get_dropped_packets
+	 */
+	if (FORMATIN(trace)->stats_valid != 2) {
+		ioctl(FORMATIN(trace)->fd, BIOCGSTATS, &FORMATIN(trace)->stats);
+		FORMATIN(trace)->stats_valid = 1;
+	}
+
+	return FORMATIN(trace)->stats.bs_recv;
+}
+
+static uint64_t bpf_get_dropped_packets(libtrace_t *trace)
+{
+	/* If we're called with stats_valid == 0, or we're called again
+	 * then refresh the stats.  Don't refresh the stats if we're called
+	 * immediately after get_received_packets
+	 */
+	if (!FORMATIN(trace)->stats_valid != 1) {
+		ioctl(FORMATIN(trace)->fd, BIOCGSTATS, &FORMATIN(trace)->stats);
+		FORMATIN(trace)->stats_valid = 2;
+	}
+
+	return FORMATIN(trace)->stats.bs_drop;
 }
 
 static int bpf_pause_input(libtrace_t *libtrace)
@@ -368,9 +401,9 @@ static struct libtrace_format_t bpf = {
 	bpf_get_wire_length,	/* get_wire_length */
 	bpf_get_framing_length,	/* get_framing_length */
 	NULL,			/* set_capture_length */
-	NULL,			/* get_received_packets */
+	bpf_get_received_packets,/* get_received_packets */
 	NULL,			/* get_filtered_packets */
-	NULL,			/* get_dropped_packets */
+	bpf_get_dropped_packets,/* get_dropped_packets */
 	NULL,			/* get_captured_packets */
 	bpf_get_fd,		/* get_fd */
 	trace_event_device,	/* trace_event */

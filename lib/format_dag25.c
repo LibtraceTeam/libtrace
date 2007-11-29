@@ -78,6 +78,7 @@ struct dag_format_data_t {
 	uint8_t *bottom;
 	uint8_t *top;
 	uint32_t processed;
+	uint64_t drops;
 };
 
 static int dag_init_input(libtrace_t *libtrace) {
@@ -109,6 +110,7 @@ static int dag_init_input(libtrace_t *libtrace) {
         DUCK.last_pkt = 0;
         DUCK.dummy_duck = NULL;
 	FORMAT_DATA->stream_attached = 0;
+	FORMAT_DATA->drops = 0;
 	
         return 0;
 }
@@ -180,6 +182,7 @@ static int dag_start_input(libtrace_t *libtrace) {
 	FORMAT_DATA->top = NULL;
 	FORMAT_DATA->bottom = NULL;
 	FORMAT_DATA->processed = 0;
+	FORMAT_DATA->drops = 0;
 	
 	return 0;
 }
@@ -328,6 +331,7 @@ static int dag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	dag_form_packet(erfptr, packet);
 	tv = trace_get_timeval(packet);
         DUCK.last_pkt = tv.tv_sec;
+	DATA(libtrace)->drops += ntohs(erfptr->lctr);
 	return packet->payload ? htons(erfptr->rlen) : 
 				erf_get_framing_length(packet);
 }
@@ -409,7 +413,7 @@ static struct libtrace_format_t dag = {
         erf_set_capture_length,         /* set_capture_length */
 	NULL,				/* get_received_packets */
 	NULL,				/* get_filtered_packets */
-	NULL,				/* get_dropped_packets */
+	dag25_get_dropped_packets,	/* get_dropped_packets */
 	NULL,				/* get_captured_packets */
         NULL,                           /* get_fd */
         trace_event_dag,                /* trace_event */

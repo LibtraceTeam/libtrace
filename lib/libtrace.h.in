@@ -842,7 +842,7 @@ DLLEXPORT void trace_perror_output(libtrace_out_t *trace, const char *msg,...)
  *
  * If this is not known, this will return UINT64_MAX
  */
-uint64_t trace_get_received_packets(const libtrace_t *trace);
+uint64_t trace_get_received_packets(libtrace_t *trace);
 
 /** Return the number of filtered packets
  * Returns the number of packets that were captured, but discarded for not
@@ -853,19 +853,19 @@ uint64_t trace_get_received_packets(const libtrace_t *trace);
  *
  * If this is not known, this will return UINT64_MAX
  */
-uint64_t trace_get_filtered_packets(const libtrace_t *trace);
+uint64_t trace_get_filtered_packets(libtrace_t *trace);
 
 /** Return the number of packets that have been dropped for lack of packets
  * @param trace		Trace file to examine
  * @returns The number of packets captured, but dropped due to buffer overruns
  */
-uint64_t trace_get_dropped_packets(const libtrace_t *trace);
+uint64_t trace_get_dropped_packets(libtrace_t *trace);
 
 /** Return the number of packets that have been returned to library user
  * @param trace		Trace file to examine
  * @returns The number of packets returned to the user of the library.
  */
-uint64_t trace_get_accepted_packets(const libtrace_t *trace);
+uint64_t trace_get_accepted_packets(libtrace_t *trace);
 
 
 /*@}*/

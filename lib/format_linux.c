@@ -52,11 +52,18 @@
 
 #include <assert.h>
 
+struct tpacket_stats {
+	unsigned int tp_packets;
+	unsigned int tp_drops;
+};
+
 struct libtrace_format_data_t {
 	int fd;
 	int snaplen;
 	int promisc;
 	libtrace_filter_t *filter;
+	struct tpacket_stats stats;
+	int stats_valid;
 };
 
 struct libtrace_linuxnative_header {
@@ -81,6 +88,7 @@ static int linuxnative_init_input(libtrace_t *libtrace)
 	FORMAT(libtrace->format_data)->promisc = -1;
 	FORMAT(libtrace->format_data)->snaplen = 65536;
 	FORMAT(libtrace->format_data)->filter = NULL;
+	FORMAT(libtrace->format_data)->stats_valid = 0;
 
 	return 0;
 }
@@ -186,6 +194,8 @@ static int linuxnative_start_input(libtrace_t *libtrace)
 			free(buf);
 		}
 	}
+
+	FORMAT(libtrace->format_data)->stats_valid=0;
 					
 	return 0;
 }
@@ -198,6 +208,7 @@ static int linuxnative_start_output(libtrace_out_t *libtrace)
 		free(libtrace->format_data);
 		return -1;
 	}
+	FORMAT(libtrace->format_data)->stats_valid=0;
 
 	return 0;
 }
@@ -481,6 +492,34 @@ static int linuxnative_get_fd(const libtrace_t *trace) {
 	return FORMAT(trace->format_data)->fd;
 }
 
+static uint64_t linuxnative_get_captured_packets(libtrace_t *trace) {
+	if (FORMAT(trace->format_data)->stats_valid != 2) {
+		socklen_t len = sizeof(FORMAT(trace->format_data)->stats);
+		getsockopt(FORMAT(trace->format_data)->fd, 
+				SOL_PACKET,
+				PACKET_STATISTICS,
+				&FORMAT(trace->format_data)->stats,
+				&len);
+		FORMAT(trace->format_data)->stats_valid = 1;
+	}
+
+	return FORMAT(trace->format_data)->stats.tp_packets;
+}
+
+static uint64_t linuxnative_get_dropped_packets(libtrace_t *trace) {
+	if (FORMAT(trace->format_data)->stats_valid != 1) {
+		socklen_t len = sizeof(FORMAT(trace->format_data)->stats);
+		getsockopt(FORMAT(trace->format_data)->fd, 
+				SOL_PACKET,
+				PACKET_STATISTICS,
+				&FORMAT(trace->format_data)->stats,
+				&len);
+		FORMAT(trace->format_data)->stats_valid = 2;
+	}
+
+	return FORMAT(trace->format_data)->stats.tp_drops;
+}
+
 static void linuxnative_help(void) {
 	printf("linuxnative format module: $Revision$\n");
 	printf("Supported input URIs:\n");
@@ -522,8 +561,8 @@ static struct libtrace_format_t linuxnative = {
 	NULL,				/* set_capture_length */
 	NULL,				/* get_received_packets */
 	NULL,				/* get_filtered_packets */
-	NULL,				/* get_dropped_packets */
-	NULL,				/* get_captured_packets */
+	linuxnative_get_dropped_packets,/* get_dropped_packets */
+	linuxnative_get_captured_packets,/* get_captured_packets */
 	linuxnative_get_fd,		/* get_fd */
 	trace_event_device,		/* trace_event */
 	linuxnative_help,		/* help */

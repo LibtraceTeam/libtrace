@@ -1594,7 +1594,7 @@ void trace_construct_packet(libtrace_packet_t *packet,
 	packet->type=pcap_linktype_to_rt(libtrace_to_pcap_linktype(linktype));
 }
 
-uint64_t trace_get_received_packets(const libtrace_t *trace)
+uint64_t trace_get_received_packets(libtrace_t *trace)
 {
 	assert(trace);
 	if (trace->format->get_received_packets) {
@@ -1603,7 +1603,7 @@ uint64_t trace_get_received_packets(const libtrace_t *trace)
 	return (uint64_t)-1;
 }
 
-uint64_t trace_get_filtered_packets(const libtrace_t *trace)
+uint64_t trace_get_filtered_packets(libtrace_t *trace)
 {
 	assert(trace);
 	if (trace->format->get_filtered_packets) {
@@ -1621,7 +1621,7 @@ uint64_t trace_get_filtered_packets(const libtrace_t *trace)
 	return trace->filtered_packets;
 }
 
-uint64_t trace_get_dropped_packets(const libtrace_t *trace)
+uint64_t trace_get_dropped_packets(libtrace_t *trace)
 {
 	assert(trace);
 	if (trace->format->get_dropped_packets) {
@@ -1630,7 +1630,7 @@ uint64_t trace_get_dropped_packets(const libtrace_t *trace)
 	return (uint64_t)-1;
 }
 
-uint64_t trace_get_accepted_packets(const libtrace_t *trace)
+uint64_t trace_get_accepted_packets(libtrace_t *trace)
 {
 	assert(trace);
 	return trace->accepted_packets;

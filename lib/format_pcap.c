@@ -91,6 +91,7 @@ static int pcap_init_input(libtrace_t *libtrace) {
 static int pcap_start_input(libtrace_t *libtrace) {
 	char errbuf[PCAP_ERRBUF_SIZE];
 
+
 	/* if the file is already open */
 	if (INPUT.pcap)
 		return 0; /* success */
@@ -568,6 +569,20 @@ static int pcap_get_fd(const libtrace_t *trace) {
 	return pcap_fileno(DATA(trace)->input.pcap);
 }
 
+static uint64_t pcap_get_dropped_packets(libtrace_t *trace)
+{
+	struct pcap_stat stats;
+	if (pcap_stats(DATA(trace)->input.pcap,&stats)==-1) {
+		char *errmsg = pcap_geterr(DATA(trace)->input.pcap);
+		trace_set_err(trace,TRACE_ERR_UNSUPPORTED,
+				"Failed to retreive stats: %s\n",
+				errmsg ? errmsg : "Unknown pcap error");
+		return ~0;
+	}
+
+	return stats.ps_drop;
+}
+
 static void pcap_help(void) {
 	printf("pcap format module: $Revision$\n");
 	printf("Supported input URIs:\n");
@@ -663,7 +678,7 @@ static struct libtrace_format_t pcapint = {
 	pcap_set_capture_length,	/* set_capture_length */
 	NULL,				/* get_received_packets */
 	NULL,				/* get_filtered_packets */
-	NULL,				/* get_dropped_packets */
+	pcap_get_dropped_packets,	/* get_dropped_packets */
 	NULL,				/* get_captured_packets */
 	pcap_get_fd,			/* get_fd */
 	trace_event_device,		/* trace_event */

@@ -348,15 +348,15 @@ struct libtrace_format_t {
 	size_t (*set_capture_length)(struct libtrace_packet_t *packet,size_t size);
 	/** Report the number of packets ever seen as early as possible
 	 */
-	uint64_t (*get_received_packets)(const libtrace_t *trace);
+	uint64_t (*get_received_packets)(libtrace_t *trace);
 	/** Report the number of filtered packets.
 	 */
-	uint64_t (*get_filtered_packets)(const libtrace_t *trace);
+	uint64_t (*get_filtered_packets)(libtrace_t *trace);
 	/** Return the number of dropped packets */
-	uint64_t (*get_dropped_packets)(const libtrace_t *trace);
+	uint64_t (*get_dropped_packets)(libtrace_t *trace);
 	/** Report number of captured packets
 	 */
-	uint64_t (*get_captured_packets)(const libtrace_t *trace);
+	uint64_t (*get_captured_packets)(libtrace_t *trace);
 	/** return the filedescriptor associated with this interface.
 	 * @note This callback may be NULL if not supported.
 	 * This function is only needed if you use trace_event_interface
