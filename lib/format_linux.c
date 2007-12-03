@@ -492,6 +492,14 @@ static int linuxnative_get_fd(const libtrace_t *trace) {
 	return FORMAT(trace->format_data)->fd;
 }
 
+/* Linux doesn't keep track how many packets were seen before filtering
+ * so we can't tell how many packets were filtered.  Bugger.  So annoying.
+ */
+static uint64_t linuxnative_get_filtered_packets(libtrace_t *trace) {
+	return UINT64_MAX;
+}
+
+/* Number of packets that past filtering */
 static uint64_t linuxnative_get_captured_packets(libtrace_t *trace) {
 	if (FORMAT(trace->format_data)->stats_valid != 2) {
 		socklen_t len = sizeof(FORMAT(trace->format_data)->stats);
@@ -506,6 +514,9 @@ static uint64_t linuxnative_get_captured_packets(libtrace_t *trace) {
 	return FORMAT(trace->format_data)->stats.tp_packets;
 }
 
+/* Number of packets that got past filtering and were then dropped because
+ * of lack of space
+ */
 static uint64_t linuxnative_get_dropped_packets(libtrace_t *trace) {
 	if (FORMAT(trace->format_data)->stats_valid != 1) {
 		socklen_t len = sizeof(FORMAT(trace->format_data)->stats);
@@ -560,7 +571,7 @@ static struct libtrace_format_t linuxnative = {
 	linuxnative_get_framing_length,	/* get_framing_length */
 	NULL,				/* set_capture_length */
 	NULL,				/* get_received_packets */
-	NULL,				/* get_filtered_packets */
+	linuxnative_get_filtered_packets,/* get_filtered_packets */
 	linuxnative_get_dropped_packets,/* get_dropped_packets */
 	linuxnative_get_captured_packets,/* get_captured_packets */
 	linuxnative_get_fd,		/* get_fd */
