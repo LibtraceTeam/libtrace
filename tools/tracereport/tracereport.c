@@ -119,6 +119,8 @@ static void run_trace(char *uri, libtrace_filter_t *filter, int count)
 		if (reports_required & REPORT_TYPE_TCPSEG)
 			tcpseg_per_packet(packet);
 	}
+	if (reports_required & REPORT_TYPE_DROPS)
+		drops_per_trace(trace);
 	trace_destroy(trace);
 }
 
@@ -157,24 +159,25 @@ int main(int argc, char *argv[]) {
 	while (1) {
 		int option_index;
 		struct option long_options[] = {
-			{ "filter",		1, 0, 'f' },
-			{ "help",		0, 0, 'H' },
+			{ "ecn",		0, 0, 'C' },
+			{ "direction", 		0, 0, 'd' },
+			{ "drops",		0, 0, 'D' },
 			{ "error",		0, 0, 'e' },
 			{ "flow", 		0, 0, 'F' },
-			{ "protocol", 		0, 0, 'P' },
-			{ "port",		0, 0, 'p' },
+			{ "filter",		1, 0, 'f' },
+			{ "help",		0, 0, 'H' },
 			{ "misc",		0, 0, 'm' },
-			{ "tos",		0, 0, 'T' },
-			{ "ttl", 		0, 0, 't' },
+			{ "nlp",		0, 0, 'n' },
 			{ "tcpoptions",		0, 0, 'O' },
 			{ "synoptions",		0, 0, 'o' },
-			{ "nlp",		0, 0, 'n' },
-			{ "direction", 		0, 0, 'd' },
-			{ "ecn",		0, 0, 'C' },
+			{ "protocol", 		0, 0, 'P' },
+			{ "port",		0, 0, 'p' },
 			{ "tcpsegment", 	0, 0, 's' },
+			{ "tos",		0, 0, 'T' },
+			{ "ttl", 		0, 0, 't' },
 			{ NULL, 		0, 0, 0 }
 		};
-		opt = getopt_long(argc, argv, "f:HemFPpTtOondCsl:", 
+		opt = getopt_long(argc, argv, "Df:HemFPpTtOondCsl:", 
 				long_options, &option_index);
 		if (opt == -1)
 			break;
@@ -185,6 +188,9 @@ int main(int argc, char *argv[]) {
 				break;
 			case 'd':
 				reports_required |= REPORT_TYPE_DIR;
+				break;
+			case 'D':
+				reports_required |= REPORT_TYPE_DROPS;
 				break;
 			case 'e':
 				reports_required |= REPORT_TYPE_ERROR;
@@ -283,5 +289,7 @@ int main(int argc, char *argv[]) {
 		ecn_report();
 	if (reports_required & REPORT_TYPE_TCPSEG)
 		tcpseg_report();
+	if (reports_required & REPORT_TYPE_DROPS)
+		drops_report();
 	return 0;
 }

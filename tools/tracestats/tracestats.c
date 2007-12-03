@@ -84,6 +84,7 @@ static void run_trace(char *uri)
 	int i;
 	uint64_t count = 0;
 	uint64_t bytes = 0;
+	uint64_t packets;
 
 	fprintf(stderr,"%s:\n",uri);
 
@@ -133,6 +134,22 @@ static void run_trace(char *uri)
 		filters[i].bytes=0;
 		filters[i].count=0;
 	}
+	packets=trace_get_received_packets(trace);
+	if (packets!=UINT64_MAX)
+		fprintf(stderr,"%30s:\t%12" PRIu64"\n", 
+				"Input packets", packets);
+	packets=trace_get_filtered_packets(trace);
+	if (packets!=UINT64_MAX)
+		fprintf(stderr,"%30s:\t%12" PRIu64"\n", 
+				"Filtered packets", packets);
+	packets=trace_get_dropped_packets(trace);
+	if (packets!=UINT64_MAX)
+		fprintf(stderr,"%30s:\t%12" PRIu64"\n",
+				"Dropped packets",packets);
+	packets=trace_get_accepted_packets(trace);
+	if (packets!=UINT64_MAX)
+		fprintf(stderr,"%30s:\t%12" PRIu64 "\n",
+				"Accepted Packets",packets);
 	printf("%30s:\t%12"PRIu64"\t%12" PRIu64 "\n","Total",count,bytes);
 	totcount+=count;
 	totbytes+=bytes;

@@ -15,6 +15,8 @@ void nlp_per_packet(struct libtrace_packet_t *packet);
 void ecn_per_packet(struct libtrace_packet_t *packet);
 void tcpseg_per_packet(struct libtrace_packet_t *packet);
 
+void drops_per_trace(libtrace_t *trace);
+
 void dir_report(void);
 void error_report(void);
 void flow_report(void);
@@ -28,5 +30,6 @@ void synopt_report(void);
 void nlp_report(void);
 void ecn_report(void);
 void tcpseg_report(void);
+void drops_report(void);
 
 #endif

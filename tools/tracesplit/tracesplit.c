@@ -38,6 +38,7 @@ static int usage(char *argv0)
 	"-m --maxfiles=n	Create a maximum of n trace files\n"
 	"-H --libtrace-help	Print libtrace runtime documentation\n"
 	"-S --snaplen		Snap packets at the specified length\n"
+	"-v --verbose		Output statistics\n"
 	,argv0);
 	exit(1);
 }
@@ -69,6 +70,7 @@ int main(int argc, char *argv[])
 	uint64_t maxfiles = UINT64_MAX;
 	uint64_t filescreated = 0;
 	uint16_t snaplen = 0;
+	int verbose=0;
 	
 	if (argc<2) {
 		usage(argv[0]);
@@ -88,10 +90,11 @@ int main(int argc, char *argv[])
 			{ "libtrace-help", 0, 0, 'H' },
 			{ "maxfiles", 	   1, 0, 'm' },
 			{ "snaplen",	   1, 0, 'S' },
+			{ "verbose",       0, 0, 'v' },
 			{ NULL, 	   0, 0, 0   },
 		};
 
-		int c=getopt_long(argc, argv, "f:c:b:s:e:i:m:S:H",
+		int c=getopt_long(argc, argv, "f:c:b:s:e:i:m:S:Hv",
 				long_options, &option_index);
 
 		if (c==-1)
@@ -117,6 +120,9 @@ int main(int argc, char *argv[])
 			case 'H':
 				  trace_help();
 				  exit(1);
+				  break;
+			case 'v':
+				  verbose++;
 				  break;
 			default:
 				fprintf(stderr,"Unknown option: %c\n",c);
@@ -248,6 +254,22 @@ int main(int argc, char *argv[])
 
 	if (trace_is_err(input)) {
 		trace_perror(input, "Reading packets");
+	}
+
+	if (verbose) {
+		uint64_t f;
+		f=trace_get_received_packets(input);
+		if (f!=UINT64_MAX)
+			fprintf(stderr,"%" PRIu64 " packets on input\n",f);
+		f=trace_get_filtered_packets(input);
+		if (f!=UINT64_MAX)
+			fprintf(stderr,"%" PRIu64 " packets filtered\n",f);
+		f=trace_get_dropped_packets(input);
+		if (f!=UINT64_MAX)
+			fprintf(stderr,"%" PRIu64 " packets dropped\n",f);
+		f=trace_get_accepted_packets(input);
+		if (f!=UINT64_MAX)
+			fprintf(stderr,"%" PRIu64 " packets accepted\n",f);
 	}
 	
 	trace_destroy(input);

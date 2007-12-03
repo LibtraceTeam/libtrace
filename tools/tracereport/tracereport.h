@@ -20,7 +20,8 @@ typedef enum {
 	REPORT_TYPE_TCPSEG = 1 << 10,
 	REPORT_TYPE_SYNOPT = 1 << 11,
 	REPORT_TYPE_LOCALITY = 1 << 12,	/* No longer used by libtrace */
-	REPORT_TYPE_MISC = 1 << 13
+	REPORT_TYPE_MISC = 1 << 13,
+	REPORT_TYPE_DROPS = 1<< 14
 } report_type_t;
 
 #endif
