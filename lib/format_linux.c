@@ -494,6 +494,10 @@ static int linuxnative_get_fd(const libtrace_t *trace) {
 
 /* Linux doesn't keep track how many packets were seen before filtering
  * so we can't tell how many packets were filtered.  Bugger.  So annoying.
+ *
+ * Since we tell libtrace that we do support filtering, if we don't declare
+ * this here as failing, libtrace will happily report for us that it didn't
+ * filter any packets, so don't lie -- return that we don't know.
  */
 static uint64_t linuxnative_get_filtered_packets(libtrace_t *trace) {
 	return UINT64_MAX;
