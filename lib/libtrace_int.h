@@ -118,9 +118,9 @@ int snprintf(char *str, size_t size, const char *format, ...);
 
 struct libtrace_event_status_t {
 	libtrace_packet_t *packet;
-	int psize;
 	double tdelta;
 	double trace_last_ts;
+	int psize;
 };
 
 /** The information about traces that are open 
@@ -128,10 +128,8 @@ struct libtrace_event_status_t {
  */
 struct libtrace_t {
 	struct libtrace_format_t *format; /**< format driver pointer */
-	void *format_data; 		/**<format data pointer */
-	bool started;			/**< if this trace has started */
-	libtrace_err_t err;		/**< error information */
 	struct libtrace_event_status_t event;	/**< the next event */
+	void *format_data; 		/**<format data pointer */
 	struct libtrace_filter_t *filter; /**< used by libtrace if the module
 					    * doesn't support filters natively
 					    */
@@ -146,6 +144,8 @@ struct libtrace_t {
 					  */
 	char *uridata;			/**< the uri of this trace */
 
+	libtrace_err_t err;		/**< error information */
+	bool started;			/**< if this trace has started */
 };
 
 /** Information about output traces
@@ -154,9 +154,9 @@ struct libtrace_t {
 struct libtrace_out_t {
         struct libtrace_format_t *format;	/**< format driver */
 	void *format_data; 		/**< format data */
-	bool started;			/**< trace started */
-	libtrace_err_t err;		/**< Associated error */
 	char *uridata;			/**< URI associated with this trace */
+	libtrace_err_t err;		/**< Associated error */
+	bool started;			/**< trace started */
 };
 
 void trace_set_err(libtrace_t *trace, int errcode,const char *msg,...) 
@@ -197,7 +197,7 @@ typedef struct libtrace_pflog_header_t {
 	uint32_t   subrulenr;
 	uint8_t	   dir;
 	uint8_t	   pad[3];
-} libtrace_pflog_header_t;
+} PACKED libtrace_pflog_header_t;
 
 
 
@@ -447,8 +447,8 @@ uint16_t byteswap16(uint16_t num);
  */
 struct libtrace_filter_t {
 	struct bpf_program filter;
-	int flag;
 	char * filterstring;
+	int flag;
 };
 #else
 struct libtrace_filter_t {};
