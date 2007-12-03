@@ -9,7 +9,7 @@ CFLAGS += $(INCLUDE)
 libdir = $(PREFIX)/lib/.libs:$(PREFIX)/libpacketdump/.libs
 LDLIBS = -L$(PREFIX)/lib/.libs -L$(PREFIX)/libpacketdump/.libs -ltrace -lpacketdump -lfl
 
-BINS = test-pcap-bpf test-event test-time test-dir test-wireless test-errors 
+BINS = test-pcap-bpf test-event test-time test-dir test-wireless test-errors \
 	#test-seek 
 
 .PHONY: all clean distclean install depend test
@@ -26,6 +26,12 @@ test-programs: $(BINS)
 		DYLD_LIBRARY_PATH="$(libdir)"			\
 		 ./$$i || exit $$?;				\
 	done				
+	@for i in erf pcap pcapfile duck legacyatm legacypos legacyeth tsh;\
+		do 						\
+		LD_LIBRARY_PATH="$(libdir)"			\
+		DYLD_LIBRARY_PATH="$(libdir)"			\
+		 ./test-drops $$i || exit $$?;			\
+	done
 	@echo All tests passed
 
 test-format-all: test-format test-decode test-decode2
