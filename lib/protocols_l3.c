@@ -15,6 +15,10 @@ libtrace_ip_t *trace_get_ip(libtrace_packet_t *packet)
 	if (!ret || ethertype!=0x0800)
 		return NULL;
 
+	/* Make sure we have at least a base IPv4 header */
+	if (remaining < sizeof(libtrace_ip_t))
+		return NULL;
+	
 	/* Not an IPv4 packet */
 	if (((libtrace_ip_t*)ret)->ip_v != 4)
 		return NULL;
@@ -49,7 +53,7 @@ DLLEXPORT void *trace_get_payload_from_ip(libtrace_ip_t *ipptr, uint8_t *prot,
 	}
 
 	if (remaining) {
-		if (*remaining<(ipptr->ip_hl*4U)) {
+		if (*remaining<=(ipptr->ip_hl*4U)) {
 			return NULL;
 		}
 		*remaining-=(ipptr->ip_hl * 4);
@@ -134,29 +138,28 @@ DLLEXPORT void *trace_get_layer3(const libtrace_packet_t *packet,
 	}
 
 	link = trace_get_layer2(packet,&linktype,remaining);
-
 	iphdr = trace_get_payload_from_layer2(
 			link,
 			linktype,
 			ethertype,
 			remaining);
 
-	if (!iphdr)
-		return NULL;
-
+	/* These should really update remaining */
 	for(;;) {
+		if (!iphdr || *remaining == 0)
+			return NULL;
 		switch(*ethertype) {
 		case 0x8100: /* VLAN */
 			iphdr=trace_get_vlan_payload_from_ethernet_payload(
-					  iphdr,ethertype,NULL);
+					  iphdr,ethertype,remaining);
 			continue;
 		case 0x8847: /* MPLS */
 			iphdr=trace_get_mpls_payload_from_ethernet_payload(
-					  iphdr,ethertype,NULL);
+					  iphdr,ethertype,remaining);
 
 			if (iphdr && ethertype == 0x0) {
 				iphdr=trace_get_payload_from_ethernet(
-						iphdr,ethertype,NULL);
+						iphdr,ethertype,remaining);
 			}
 			continue;
 		default:
@@ -166,11 +169,12 @@ DLLEXPORT void *trace_get_layer3(const libtrace_packet_t *packet,
 		break;
 	}
 
+	if (!iphdr || *remaining == 0)
+		return NULL;
 	/* Store values in the cache for later */
 	/* Cast away constness, nasty, but this is just a cache */
 	((libtrace_packet_t*)packet)->l3_ethertype = *ethertype;
 	((libtrace_packet_t*)packet)->l3_header = iphdr;
-
 	return iphdr;
 }
 

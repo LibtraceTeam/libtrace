@@ -1127,7 +1127,7 @@ DLLEXPORT void *trace_get_payload_from_layer2(void *l2,
  * remaining may be NULL, otherwise it will be set to the number of captured
  * bytes after the pointer returned.
  */
-DLLEXPORT SIMPLE_FUNCTION
+DLLEXPORT 
 void *trace_get_layer3(const libtrace_packet_t *packet,
 		uint16_t *ethertype, uint32_t *remaining);
 

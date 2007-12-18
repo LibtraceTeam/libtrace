@@ -35,7 +35,7 @@ void *trace_get_vlan_payload_from_ethernet_payload(void *ethernet, uint16_t *typ
 		libtrace_8021q_t *vlanhdr = (libtrace_8021q_t *)ethernet;
 
 		if (remaining) {
-			if (*remaining < sizeof(libtrace_8021q_t))
+			if (*remaining <= sizeof(libtrace_8021q_t))
 				return NULL;
 
 			*remaining=*remaining-sizeof(libtrace_8021q_t);
@@ -77,7 +77,7 @@ void *trace_get_mpls_payload_from_ethernet_payload(void *ethernet,
 		}
 		ethernet=(char*)ethernet+4;
 		if (remaining) {
-			if (*remaining<4)
+			if (*remaining<=4)
 				return NULL;
 			else
 				*remaining-=4;
@@ -97,7 +97,7 @@ static void *trace_get_payload_from_llcsnap(void *link,
 	libtrace_llcsnap_t *llc = (libtrace_llcsnap_t*)link;
 
 	if (remaining) {
-		if (*remaining < sizeof(libtrace_llcsnap_t))
+		if (*remaining <= sizeof(libtrace_llcsnap_t))
 			return NULL;
 		*remaining-=(sizeof(libtrace_llcsnap_t));
 	}
@@ -116,7 +116,7 @@ static void *trace_get_payload_from_80211(void *link, uint16_t *type, uint32_t *
 	uint16_t *eth; /* ethertype */
 	int8_t extra = 0; /* how many QoS bytes to skip */
 	
-	if (remaining && *remaining < sizeof(libtrace_80211_t))
+	if (remaining && *remaining <= sizeof(libtrace_80211_t))
 		return NULL;
 
 	wifi=(libtrace_80211_t*)link;
@@ -158,7 +158,7 @@ static void *trace_get_payload_from_ppp(void *link,
 	libtrace_ppp_t *ppp = (libtrace_ppp_t*)link;
 
 	if (remaining) {
-		if (*remaining < sizeof(libtrace_ppp_t))
+		if (*remaining <= sizeof(libtrace_ppp_t))
 			return NULL;
 		*remaining-=sizeof(libtrace_ppp_t);
 	}
@@ -185,7 +185,7 @@ static void *trace_get_payload_from_chdlc(void *link,
 	libtrace_chdlc_t *chdlc = (libtrace_chdlc_t*)link;
 
 	if (remaining) {
-		if (*remaining < sizeof(libtrace_chdlc_t))
+		if (*remaining <= sizeof(libtrace_chdlc_t))
 			return NULL;
 		*remaining-=sizeof(libtrace_chdlc_t);
 	}
@@ -252,7 +252,7 @@ void *trace_get_payload_from_atm(void *link,
 		uint8_t *type, uint32_t *remaining)
 {
 	libtrace_atm_capture_cell_t *cell;
-	if (remaining && *remaining<sizeof(libtrace_atm_capture_cell_t))
+	if (remaining && *remaining<=sizeof(libtrace_atm_capture_cell_t))
 		return NULL;
 	cell=(libtrace_atm_capture_cell_t*)link;
 
