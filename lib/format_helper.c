@@ -130,7 +130,8 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 		((double)stv.tv_usec / 1000000.0);
 #endif
 
-	if (fabs(trace->event.tdelta)<1e-9) {
+	
+	if (fabs(trace->event.tdelta)>1e-9) {
 		/* adjust for trace delta */
 		now -= trace->event.tdelta; 
 
