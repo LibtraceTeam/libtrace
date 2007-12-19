@@ -144,7 +144,6 @@ DLLEXPORT void *trace_get_layer3(const libtrace_packet_t *packet,
 			ethertype,
 			remaining);
 
-	/* These should really update remaining */
 	for(;;) {
 		if (!iphdr || *remaining == 0)
 			return NULL;
@@ -171,10 +170,12 @@ DLLEXPORT void *trace_get_layer3(const libtrace_packet_t *packet,
 
 	if (!iphdr || *remaining == 0)
 		return NULL;
+
 	/* Store values in the cache for later */
 	/* Cast away constness, nasty, but this is just a cache */
 	((libtrace_packet_t*)packet)->l3_ethertype = *ethertype;
 	((libtrace_packet_t*)packet)->l3_header = iphdr;
+
 	return iphdr;
 }
 
