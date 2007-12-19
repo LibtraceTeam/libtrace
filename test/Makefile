@@ -18,7 +18,7 @@ all: $(BINS)
 
 test: all test-format-all test-convert-all test-write-all test-programs
 
-test-programs: $(BINS)
+test-programs: $(BINS) test-drops
 	@for i in $(BINS); do					\
 		echo \* $$i; 					\
 		rm -f traces/*.out.*;				\
@@ -30,6 +30,7 @@ test-programs: $(BINS)
 		do 						\
 		LD_LIBRARY_PATH="$(libdir)"			\
 		DYLD_LIBRARY_PATH="$(libdir)"			\
+		echo $$i; \
 		 ./test-drops $$i || exit $$?;			\
 	done
 	@echo All tests passed
