@@ -3,7 +3,7 @@
 # Now you only need to update the version number in two places - below,
 # and in the README
 
-AC_INIT([libtrace],[3.0.3],[contact@wand.net.nz],[libtrace])
+AC_INIT([libtrace],[3.0.4],[contact@wand.net.nz],[libtrace])
 
 LIBTRACE_MAJOR=3
 LIBTRACE_MID=0
@@ -147,6 +147,7 @@ if test "$pcapfound" = 0; then
 else
 	ADD_LIBS="$ADD_LIBS -lpcap"
 	AC_DEFINE([HAVE_LIBPCAP],1,[compile with libpcap support])
+	AC_DEFINE([HAVE_BPF_FILTER],1,[compile with bpf filter support])
 fi
 
 # configure time options for use of DAG cards
@@ -244,7 +245,7 @@ fi
 
 AC_CHECK_LIB(z, gzopen)
 
-AM_CONDITIONAL([HAVE_BPF], [test "$ac_cv_have_decl_BIOCSETIF" = yes ])
+AM_CONDITIONAL([HAVE_BPF_CAPTURE], [test "$ac_cv_have_decl_BIOCSETIF" = yes ])
 AM_CONDITIONAL([HAVE_DAG], [test "$libtrace_dag" = true])
 AM_CONDITIONAL([DAG2_4], [test "$libtrace_dag_version" = 24])
 AM_CONDITIONAL([DAG2_5], [test "$libtrace_dag_version" = 25])
@@ -258,7 +259,6 @@ AC_CHECK_PROG([libtrace_doxygen], [doxygen], [true], [false])
 
 AM_CONDITIONAL(HAS_DOXYGEN, [test x"$libtrace_doxygen" = xtrue])
 
-
 AC_SUBST([ADD_LIBS])
 AC_SUBST([ADD_LDFLAGS])
 AC_SUBST([ADD_INCLS])
@@ -269,6 +269,7 @@ AC_SUBST([LIBTRACE_MAJOR])
 AC_SUBST([LIBTRACE_MID])
 AC_SUBST([LIBTRACE_MINOR])
 AC_SUBST([DAG_VERSION_NUM])
+AC_SUBST([HAVE_BPF_CAPTURE])
 dnl and finally, output our Makefiles
 AC_OUTPUT
 

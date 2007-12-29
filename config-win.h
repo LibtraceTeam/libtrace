@@ -11,7 +11,7 @@
 
 #define HAVE_LIBPCAP 1
 #define HAVE_PCAP 1
-#define HAVE_BPF 1
+#define HAVE_BPF_FILTER 1
 #define HAVE_PCAP_H 1
 #define HAVE_PCAP_BPF_H 1
 #define HAVE_PCAP_INT_H 1

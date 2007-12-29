@@ -230,7 +230,7 @@ static void trace_init(void)
 #ifdef HAVE_LIBPCAP
 		pcap_constructor();
 #endif
-#ifdef HAVE_BIOCSETIF
+#if HAVE_DECL_BIOCSETIF
 		bpf_constructor();
 #endif
 		pcapfile_constructor();
@@ -1007,7 +1007,7 @@ DLLEXPORT libtrace_eventobj_t trace_event(libtrace_t *trace,
 DLLEXPORT libtrace_filter_t *
 trace_create_filter_from_bytecode(void *bf_insns, unsigned int bf_len)
 {
-#ifndef HAVE_BPF
+#ifndef HAVE_BPF_FILTER
 	fprintf(stderr, "This version of libtrace does not have BPF support\n");
 	return NULL;
 #else
@@ -1034,7 +1034,7 @@ trace_create_filter_from_bytecode(void *bf_insns, unsigned int bf_len)
  * @author Daniel Lawson
  */
 DLLEXPORT libtrace_filter_t *trace_create_filter(const char *filterstring) {
-#ifdef HAVE_BPF
+#ifdef HAVE_BPF_FILTER
 	libtrace_filter_t *filter = (libtrace_filter_t*)
 				malloc(sizeof(libtrace_filter_t));
 	filter->filterstring = strdup(filterstring);
@@ -1048,7 +1048,7 @@ DLLEXPORT libtrace_filter_t *trace_create_filter(const char *filterstring) {
 
 DLLEXPORT void trace_destroy_filter(libtrace_filter_t *filter)
 {
-#ifdef HAVE_BPF
+#ifdef HAVE_BPF_FILTER
 	free(filter->filterstring);
 	if (filter->flag)
 		pcap_freecode(&filter->filter);
@@ -1065,7 +1065,7 @@ DLLEXPORT void trace_destroy_filter(libtrace_filter_t *filter)
  */
 int trace_bpf_compile(libtrace_filter_t *filter,
 		const libtrace_packet_t *packet	) {
-#ifdef HAVE_BPF
+#ifdef HAVE_BPF_FILTER
 	void *linkptr = 0;
 	libtrace_linktype_t linktype;
 	assert(filter);
@@ -1119,7 +1119,7 @@ int trace_bpf_compile(libtrace_filter_t *filter,
 
 DLLEXPORT int trace_apply_filter(libtrace_filter_t *filter,
 			const libtrace_packet_t *packet) {
-#ifdef HAVE_BPF
+#ifdef HAVE_BPF_FILTER
 	void *linkptr = 0;
 	uint32_t clen = 0;
 	bool free_packet_needed = false;

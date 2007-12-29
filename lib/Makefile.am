@@ -8,7 +8,7 @@ else
 NATIVEFORMATS=
 endif
 
-if HAVE_BPF
+if HAVE_BPF_CAPTURE
 BPFFORMATS=format_bpf.c
 else
 BPFFORMATS=
