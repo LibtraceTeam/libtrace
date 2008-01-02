@@ -209,9 +209,10 @@ static uint64_t bpf_get_received_packets(libtrace_t *trace)
 	 * then refresh the stats.  Don't refresh the stats if we're called
 	 * immediately after get_dropped_packets
 	 */
-	if (FORMATIN(trace)->stats_valid != 2) {
+	if ((FORMATIN(trace)->stats_valid & 1)
+		|| (FORMATIN(trace)->stats_valid == 0)) {
 		ioctl(FORMATIN(trace)->fd, BIOCGSTATS, &FORMATIN(trace)->stats);
-		FORMATIN(trace)->stats_valid = 1;
+		FORMATIN(trace)->stats_valid |= 1;
 	}
 
 	return FORMATIN(trace)->stats.bs_recv;
@@ -223,9 +224,10 @@ static uint64_t bpf_get_dropped_packets(libtrace_t *trace)
 	 * then refresh the stats.  Don't refresh the stats if we're called
 	 * immediately after get_received_packets
 	 */
-	if (!FORMATIN(trace)->stats_valid != 1) {
+	if ((FORMATIN(trace)->stats_valid & 2) 
+		|| (FORMATIN(trace)->stats_valid == 0)) {
 		ioctl(FORMATIN(trace)->fd, BIOCGSTATS, &FORMATIN(trace)->stats);
-		FORMATIN(trace)->stats_valid = 2;
+		FORMATIN(trace)->stats_valid |= 2;
 	}
 
 	return FORMATIN(trace)->stats.bs_drop;

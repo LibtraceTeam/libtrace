@@ -505,14 +505,15 @@ static uint64_t linuxnative_get_filtered_packets(libtrace_t *trace) {
 
 /* Number of packets that past filtering */
 static uint64_t linuxnative_get_captured_packets(libtrace_t *trace) {
-	if (FORMAT(trace->format_data)->stats_valid != 2) {
+	if ((FORMAT(trace->format_data)->stats_valid & 1) 
+			|| FORMAT(trace->format_data)->stats_valid == 0) {
 		socklen_t len = sizeof(FORMAT(trace->format_data)->stats);
 		getsockopt(FORMAT(trace->format_data)->fd, 
 				SOL_PACKET,
 				PACKET_STATISTICS,
 				&FORMAT(trace->format_data)->stats,
 				&len);
-		FORMAT(trace->format_data)->stats_valid = 1;
+		FORMAT(trace->format_data)->stats_valid |= 1;
 	}
 
 	return FORMAT(trace->format_data)->stats.tp_packets;
@@ -522,14 +523,15 @@ static uint64_t linuxnative_get_captured_packets(libtrace_t *trace) {
  * of lack of space
  */
 static uint64_t linuxnative_get_dropped_packets(libtrace_t *trace) {
-	if (FORMAT(trace->format_data)->stats_valid != 1) {
+	if ((FORMAT(trace->format_data)->stats_valid & 2)
+			|| (FORMAT(trace->format_data)->stats_valid==0)) {
 		socklen_t len = sizeof(FORMAT(trace->format_data)->stats);
 		getsockopt(FORMAT(trace->format_data)->fd, 
 				SOL_PACKET,
 				PACKET_STATISTICS,
 				&FORMAT(trace->format_data)->stats,
 				&len);
-		FORMAT(trace->format_data)->stats_valid = 2;
+		FORMAT(trace->format_data)->stats_valid |= 2;
 	}
 
 	return FORMAT(trace->format_data)->stats.tp_drops;
