@@ -49,7 +49,7 @@ struct tsh_format_data_t {
 
 typedef struct tsh_pkt_header_t {
 	uint32_t seconds;
-	LT_BITFIELD32 interface:8;
+	LT_BITFIELD32 iface:8;
 	LT_BITFIELD32 usecs:24;
 } tsh_pkt_header_t;
 
@@ -120,7 +120,7 @@ static int tsh_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 		return 0;
 	}
 
-	buffer2+=numbytes;
+	(char*)buffer2 += numbytes;
 	packet->payload = buffer2;
 
 	/* Read the IP header */
@@ -136,7 +136,7 @@ static int tsh_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	/* IP Options aren't captured in the trace, so leave room
 	 * for them, and put the transport header where it "should" be
 	 */
-	buffer2+=((libtrace_ip_t*)buffer2)->ip_hl*4;
+	(char*)buffer2 += ((libtrace_ip_t*)buffer2)->ip_hl*4;
 
 	/* Read the transport header */
 	if ((numbytes=libtrace_io_read(DATA(libtrace)->file,
@@ -155,7 +155,7 @@ static libtrace_linktype_t tsh_get_link_type(const libtrace_packet_t *packet) {
 }
 
 static libtrace_direction_t tsh_get_direction(const libtrace_packet_t *packet) {
-	return ((tsh_pkt_header_t*)(packet->header))->interface;
+	return ((tsh_pkt_header_t*)(packet->header))->iface;
 }
 
 static struct timeval tsh_get_timeval(const libtrace_packet_t *packet)
