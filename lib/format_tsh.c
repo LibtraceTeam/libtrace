@@ -120,7 +120,7 @@ static int tsh_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 		return 0;
 	}
 
-	(char*)buffer2 += numbytes;
+	buffer2 = (char*)buffer2 + numbytes;
 	packet->payload = buffer2;
 
 	/* Read the IP header */
@@ -136,7 +136,7 @@ static int tsh_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	/* IP Options aren't captured in the trace, so leave room
 	 * for them, and put the transport header where it "should" be
 	 */
-	(char*)buffer2 += ((libtrace_ip_t*)buffer2)->ip_hl*4;
+	buffer2 = (char*)buffer2 + ((libtrace_ip_t*)buffer2)->ip_hl*4;
 
 	/* Read the transport header */
 	if ((numbytes=libtrace_io_read(DATA(libtrace)->file,
