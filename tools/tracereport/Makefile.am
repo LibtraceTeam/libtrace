@@ -30,8 +30,4 @@ tracereport_SOURCES = \
 	report.h\
 	tracereport.h
 
-tracereport_LDFLAGS = 
-
-tracereport_LDADD = \
-	 -ltrace
 
