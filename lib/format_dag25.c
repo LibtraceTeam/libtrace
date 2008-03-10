@@ -369,6 +369,9 @@ static libtrace_eventobj_t trace_event_dag(libtrace_t *trace,
 	return event;
 }
 
+static uint64_t dag_get_dropped_packets(libtrace_t *trace) {
+	return DATA(trace)->drops;
+}
 
 static void dag_help(void) {
         printf("dag format module: $Revision$\n");
@@ -413,7 +416,7 @@ static struct libtrace_format_t dag = {
         erf_set_capture_length,         /* set_capture_length */
 	NULL,				/* get_received_packets */
 	NULL,				/* get_filtered_packets */
-	dag25_get_dropped_packets,	/* get_dropped_packets */
+	dag_get_dropped_packets,	/* get_dropped_packets */
 	NULL,				/* get_captured_packets */
         NULL,                           /* get_fd */
         trace_event_dag,                /* trace_event */
