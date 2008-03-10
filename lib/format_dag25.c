@@ -340,8 +340,16 @@ static libtrace_eventobj_t trace_event_dag(libtrace_t *trace,
                                         libtrace_packet_t *packet) {
         libtrace_eventobj_t event = {0,0,0.0,0};
 	dag_record_t *erfptr = NULL;
+	int numbytes;
 	
-	erfptr = dag_get_record(trace);
+	/* Need to call dag_available so that the top pointer will get
+	 * updated, otherwise we'll never see any data! */
+	numbytes = dag_available(trace);
+
+	/* May as well not bother calling dag_get_record if dag_available
+	 * suggests that there's no data */
+	if (numbytes != 0)
+		erfptr = dag_get_record(trace);
 	if (erfptr == NULL) {
 		/* No packet available */
 		event.type = TRACE_EVENT_SLEEP;
