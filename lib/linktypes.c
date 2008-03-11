@@ -125,6 +125,7 @@ libtrace_linktype_t erf_type_to_libtrace(uint8_t erf)
 		case TYPE_ETH:		return TRACE_TYPE_ETH;
 		case TYPE_ATM:		return TRACE_TYPE_ATM;
 		case TYPE_AAL5:		return TRACE_TYPE_AAL5;
+		case TYPE_DSM_COLOR_ETH:return TRACE_TYPE_ETH;
 	}
 	return ~0U;
 }

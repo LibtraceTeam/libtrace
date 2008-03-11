@@ -46,6 +46,7 @@
 
 #include <sys/mman.h>
 
+
 #ifdef WIN32
 #  include <io.h>
 #  include <share.h>
@@ -57,12 +58,22 @@
 #       define PATH_MAX 4096
 #  endif
 #  include <sys/ioctl.h>
+#  include <pthread.h>
 #endif
+
 
 #define DATA(x) ((struct dag_format_data_t *)x->format_data)
 #define FORMAT_DATA DATA(libtrace)
 #define DUCK FORMAT_DATA->duck
 static struct libtrace_format_t dag;
+
+struct dag_dev_t {
+	//pthread_mutex_t dag_mutex;
+	char * dev_name;
+	int fd;
+	uint16_t ref_count;
+	struct dag_dev_t *next;
+};	
 
 struct dag_format_data_t {
 	struct {
@@ -72,7 +83,7 @@ struct dag_format_data_t {
                 libtrace_t *dummy_duck;
         } duck;
 
-	int fd;
+	struct dag_dev_t *device;
 	unsigned int dagstream;
 	int stream_attached;
 	uint8_t *bottom;
@@ -81,34 +92,145 @@ struct dag_format_data_t {
 	uint64_t drops;
 };
 
-static int dag_init_input(libtrace_t *libtrace) {
+pthread_mutex_t open_dag_mutex;
+struct dag_dev_t *open_dags = NULL;
+
+static struct dag_dev_t *dag_find_open_device(char *dev_name) {
+	struct dag_dev_t *dag_dev;
+	
+	pthread_mutex_lock(&open_dag_mutex);
+	dag_dev = open_dags;
+
+	/* XXX: Not exactly zippy, but how often are we going to be dealing
+	 * with multiple dag cards? */
+	while (dag_dev != NULL) {
+		if (strcmp(dag_dev->dev_name, dev_name) == 0) {
+			pthread_mutex_unlock(&open_dag_mutex);
+			return dag_dev;
+			
+		}
+		dag_dev = dag_dev->next;
+	}
+	pthread_mutex_unlock(&open_dag_mutex);
+	return NULL;
+		
+	
+}
+
+static void dag_close_device(struct dag_dev_t *dev) {
+	/* Need to remove from the device list */
+	struct dag_dev_t *prev, *d;
+
+	prev = NULL;
+	pthread_mutex_lock(&open_dag_mutex);
+
+	d = open_dags;
+
+	while (d != NULL) {
+		if (strcmp(dev->dev_name, d->dev_name) == 0) {
+			/* Found it! */
+			if (prev == NULL) {
+				open_dags = d->next;
+			} else {
+				prev->next = d->next;
+			}
+			assert(d->ref_count == 0);
+			dag_close(d->fd);
+			free(d->dev_name);
+			free(d);
+			return;
+		}
+		prev = d;
+		d = d->next;
+	}
+
+	/* Not sure what we do here - we've been asked to close a
+	 * device that isn't in our linked list - probably safest to
+	 * just return. Is there anything else we can really do? */
+	return;
+}
+
+static struct dag_dev_t *dag_open_device(libtrace_t *libtrace, char *dev_name) {
 	struct stat buf;
-        libtrace->format_data = (struct dag_format_data_t *)
-                malloc(sizeof(struct dag_format_data_t));
-        if (stat(libtrace->uridata, &buf) == -1) {
-                trace_set_err(libtrace,errno,"stat(%s)",libtrace->uridata);
-                return -1;
+	int fd;
+	struct dag_dev_t *new_dev;
+	
+        if (stat(dev_name, &buf) == -1) {
+                trace_set_err(libtrace,errno,"stat(%s)",dev_name);
+                return NULL;
         }
-
-	/* For now, we don't offer the ability to select the stream */
-	FORMAT_DATA->dagstream = 0;
-
+	
 	if (S_ISCHR(buf.st_mode)) {
-		if((FORMAT_DATA->fd = dag_open(libtrace->uridata)) < 0) {
+		if((fd = dag_open(dev_name)) < 0) {
                         trace_set_err(libtrace,errno,"Cannot open DAG %s",
-                                        libtrace->uridata);
-                        return -1;
+                                        dev_name);
+                        return NULL;
                 }
 	} else {
 		trace_set_err(libtrace,errno,"Not a valid dag device: %s",
-                                libtrace->uridata);
-                return -1;
+                                dev_name);
+                return NULL;
         }
+	
+	new_dev = (struct dag_dev_t *)malloc(sizeof(struct dag_dev_t));
+	new_dev->fd = fd;
+	new_dev->dev_name = dev_name;
+	new_dev->ref_count = 0;
+	
+	pthread_mutex_lock(&open_dag_mutex);
+	new_dev->next = open_dags;
+	open_dags = new_dev;
+	pthread_mutex_unlock(&open_dag_mutex);
+	
+	return new_dev;
+}
+	
+
+static int dag_init_input(libtrace_t *libtrace) {
+        char *dag_dev_name = NULL;
+	char *scan = NULL;
+	int stream = 0;
+	struct dag_dev_t *dag_device = NULL;
+	
+	if ((scan = strchr(libtrace->uridata,',')) == NULL) {
+		dag_dev_name = strdup(libtrace->uridata);
+	} else {
+		dag_dev_name = (char *)strndup(libtrace->uridata,
+				(size_t)(scan - libtrace->uridata));
+		stream = atoi(++scan);
+	}
+	
+	
+	libtrace->format_data = (struct dag_format_data_t *)
+                malloc(sizeof(struct dag_format_data_t));
+
+	/* For now, we don't offer the ability to select the stream */
+	FORMAT_DATA->dagstream = stream;
+
+	dag_device = dag_find_open_device(dag_dev_name);
+
+	if (dag_device == NULL) {
+		/* Device not yet opened - open it ourselves */
+		dag_device = dag_open_device(libtrace, dag_dev_name);
+	} else {
+		free(dag_dev_name);
+		dag_dev_name = NULL;
+	}
+
+	if (dag_device == NULL) {
+		if (dag_dev_name)
+			free(dag_dev_name);
+		return -1;
+	}
+
+
+	dag_device->ref_count ++;
 
 	DUCK.last_duck = 0;
         DUCK.duck_freq = 0;
         DUCK.last_pkt = 0;
         DUCK.dummy_duck = NULL;
+	FORMAT_DATA->device = dag_device;
 	FORMAT_DATA->stream_attached = 0;
 	FORMAT_DATA->drops = 0;
 	
@@ -124,7 +246,8 @@ static int dag_config_input(libtrace_t *libtrace, trace_option_t option,
                         return 0;
                 case TRACE_OPTION_SNAPLEN:
                         snprintf(conf_str, 4096, "varlen slen=%i", *(int *)data);
-			if (dag_configure(FORMAT_DATA->fd, conf_str) != 0) {
+			if (dag_configure(FORMAT_DATA->device->fd, 
+						conf_str) != 0) {
 				trace_set_err(libtrace, errno, "Failed to configure snaplen on DAG card: %s", libtrace->uridata);
 				return -1;
 			}
@@ -152,27 +275,27 @@ static int dag_start_input(libtrace_t *libtrace) {
 
 
 	
-	if (dag_attach_stream(FORMAT_DATA->fd, 
+	if (dag_attach_stream(FORMAT_DATA->device->fd, 
 				FORMAT_DATA->dagstream, 0, 0) < 0) {
                 trace_set_err(libtrace, errno, "Cannot attach DAG stream");
                 return -1;
         }
 
-	if (dag_start_stream(FORMAT_DATA->fd, 
+	if (dag_start_stream(FORMAT_DATA->device->fd, 
 				FORMAT_DATA->dagstream) < 0) {
                 trace_set_err(libtrace, errno, "Cannot start DAG stream");
                 return -1;
         }
 	FORMAT_DATA->stream_attached = 1;
 	/* We don't want the dag card to do any sleeping */
-        dag_set_stream_poll(FORMAT_DATA->fd, 
+        dag_set_stream_poll(FORMAT_DATA->device->fd, 
 				FORMAT_DATA->dagstream, 0, &zero, 
 				&nopoll);
 	
 	/* Should probably flush the memory hole now */
 	
 	do {
-		top = dag_advance_stream(FORMAT_DATA->fd,
+		top = dag_advance_stream(FORMAT_DATA->device->fd,
 					FORMAT_DATA->dagstream,
 					&bottom);
 		assert(top && bottom);
@@ -188,12 +311,12 @@ static int dag_start_input(libtrace_t *libtrace) {
 }
 
 static int dag_pause_input(libtrace_t *libtrace) {
-	if (dag_stop_stream(FORMAT_DATA->fd, 
+	if (dag_stop_stream(FORMAT_DATA->device->fd, 
 				FORMAT_DATA->dagstream) < 0) {
                 trace_set_err(libtrace, errno, "Could not stop DAG stream");
                 return -1;
         }
-        if (dag_detach_stream(FORMAT_DATA->fd, 
+        if (dag_detach_stream(FORMAT_DATA->device->fd, 
 				FORMAT_DATA->dagstream) < 0) {
                 trace_set_err(libtrace, errno, "Could not detach DAG stream");
                 return -1;
@@ -205,7 +328,10 @@ static int dag_pause_input(libtrace_t *libtrace) {
 static int dag_fin_input(libtrace_t *libtrace) {
 	if (FORMAT_DATA->stream_attached)
 		dag_pause_input(libtrace);
-	dag_close(FORMAT_DATA->fd);
+	FORMAT_DATA->device->ref_count --;
+	
+	if (FORMAT_DATA->device->ref_count == 0)
+		dag_close_device(FORMAT_DATA->device);
 	if (DUCK.dummy_duck)
 		trace_destroy_dead(DUCK.dummy_duck);
 	free(libtrace->format_data);
@@ -230,8 +356,8 @@ static int dag_get_duckinfo(libtrace_t *libtrace,
 
         /* No need to check if we can get DUCK or not - we're modern
          * enough */
-        if ((ioctl(FORMAT_DATA->fd, DAGIOCDUCK, (duckinf_t *)packet->payload)
-                                < 0)) {
+        if ((ioctl(FORMAT_DATA->device->fd, DAGIOCDUCK, 
+					(duckinf_t *)packet->payload) < 0)) {
                 trace_set_err(libtrace, errno, "Error using DAGIOCDUCK");
                 return -1;
         }
@@ -250,7 +376,7 @@ static int dag_available(libtrace_t *libtrace) {
 	 * space occupied by that 4MB to be released */
 	if (diff >= dag_record_size && FORMAT_DATA->processed < 4 * 1024 * 1024)
 		return diff;
-	FORMAT_DATA->top = dag_advance_stream(FORMAT_DATA->fd, 
+	FORMAT_DATA->top = dag_advance_stream(FORMAT_DATA->device->fd, 
 			FORMAT_DATA->dagstream, 
 			&(FORMAT_DATA->bottom));
 	if (FORMAT_DATA->top == NULL) {
@@ -331,7 +457,14 @@ static int dag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	dag_form_packet(erfptr, packet);
 	tv = trace_get_timeval(packet);
         DUCK.last_pkt = tv.tv_sec;
-	DATA(libtrace)->drops += ntohs(erfptr->lctr);
+	
+	/* No loss counter for DSM coloured records - have to use 
+	 * some other API */
+	if (erfptr->type == TYPE_DSM_COLOR_ETH) {
+		
+	} else {
+		DATA(libtrace)->drops += ntohs(erfptr->lctr);
+	}
 	return packet->payload ? htons(erfptr->rlen) : 
 				erf_get_framing_length(packet);
 }
