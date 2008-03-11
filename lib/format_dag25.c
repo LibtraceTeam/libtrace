@@ -72,6 +72,7 @@ struct dag_dev_t {
 	char * dev_name;
 	int fd;
 	uint16_t ref_count;
+	struct dag_dev_t *prev;
 	struct dag_dev_t *next;
 };	
 
@@ -98,20 +99,18 @@ struct dag_dev_t *open_dags = NULL;
 static struct dag_dev_t *dag_find_open_device(char *dev_name) {
 	struct dag_dev_t *dag_dev;
 	
-	pthread_mutex_lock(&open_dag_mutex);
 	dag_dev = open_dags;
 
 	/* XXX: Not exactly zippy, but how often are we going to be dealing
 	 * with multiple dag cards? */
 	while (dag_dev != NULL) {
 		if (strcmp(dag_dev->dev_name, dev_name) == 0) {
-			pthread_mutex_unlock(&open_dag_mutex);
+			dag_dev->ref_count ++;
 			return dag_dev;
 			
 		}
 		dag_dev = dag_dev->next;
 	}
-	pthread_mutex_unlock(&open_dag_mutex);
 	return NULL;
 		
 	
@@ -119,35 +118,23 @@ static struct dag_dev_t *dag_find_open_device(char *dev_name) {
 
 static void dag_close_device(struct dag_dev_t *dev) {
 	/* Need to remove from the device list */
-	struct dag_dev_t *prev, *d;
-
-	prev = NULL;
-	pthread_mutex_lock(&open_dag_mutex);
-
-	d = open_dags;
-
-	while (d != NULL) {
-		if (strcmp(dev->dev_name, d->dev_name) == 0) {
-			/* Found it! */
-			if (prev == NULL) {
-				open_dags = d->next;
-			} else {
-				prev->next = d->next;
-			}
-			assert(d->ref_count == 0);
-			dag_close(d->fd);
-			free(d->dev_name);
-			free(d);
-			return;
-		}
-		prev = d;
-		d = d->next;
+	
+	assert(dev->ref_count == 0);
+	
+	if (dev->prev == NULL) {
+		open_dags = dev->next;
+		if (dev->next)
+			dev->next->prev = NULL;
+	} else {
+		dev->prev->next = dev->next;
+		if (dev->next)
+			dev->next->prev = dev->prev;
 	}
 
-	/* Not sure what we do here - we've been asked to close a
-	 * device that isn't in our linked list - probably safest to
-	 * just return. Is there anything else we can really do? */
-	return;
+	dag_close(dev->fd);
+	free(dev->dev_name);
+	free(dev);
+		
 }
 
 static struct dag_dev_t *dag_open_device(libtrace_t *libtrace, char *dev_name) {
@@ -175,12 +162,14 @@ static struct dag_dev_t *dag_open_device(libtrace_t *libtrace, char *dev_name) {
 	new_dev = (struct dag_dev_t *)malloc(sizeof(struct dag_dev_t));
 	new_dev->fd = fd;
 	new_dev->dev_name = dev_name;
-	new_dev->ref_count = 0;
+	new_dev->ref_count = 1;
 	
-	pthread_mutex_lock(&open_dag_mutex);
+	new_dev->prev = NULL;
 	new_dev->next = open_dags;
+	if (open_dags)
+		open_dags->prev = new_dev;
+	
 	open_dags = new_dev;
-	pthread_mutex_unlock(&open_dag_mutex);
 	
 	return new_dev;
 }
@@ -192,6 +181,7 @@ static int dag_init_input(libtrace_t *libtrace) {
 	int stream = 0;
 	struct dag_dev_t *dag_device = NULL;
 	
+	pthread_mutex_lock(&open_dag_mutex);
 	if ((scan = strchr(libtrace->uridata,',')) == NULL) {
 		dag_dev_name = strdup(libtrace->uridata);
 	} else {
@@ -224,7 +214,6 @@ static int dag_init_input(libtrace_t *libtrace) {
 	}
 
 
-	dag_device->ref_count ++;
 
 	DUCK.last_duck = 0;
         DUCK.duck_freq = 0;
@@ -234,6 +223,7 @@ static int dag_init_input(libtrace_t *libtrace) {
 	FORMAT_DATA->stream_attached = 0;
 	FORMAT_DATA->drops = 0;
 	
+	pthread_mutex_unlock(&open_dag_mutex);
         return 0;
 }
 	
@@ -326,6 +316,7 @@ static int dag_pause_input(libtrace_t *libtrace) {
 }
 
 static int dag_fin_input(libtrace_t *libtrace) {
+	pthread_mutex_lock(&open_dag_mutex);
 	if (FORMAT_DATA->stream_attached)
 		dag_pause_input(libtrace);
 	FORMAT_DATA->device->ref_count --;
@@ -335,6 +326,7 @@ static int dag_fin_input(libtrace_t *libtrace) {
 	if (DUCK.dummy_duck)
 		trace_destroy_dead(DUCK.dummy_duck);
 	free(libtrace->format_data);
+	pthread_mutex_unlock(&open_dag_mutex);
         return 0; /* success */
 }
 
