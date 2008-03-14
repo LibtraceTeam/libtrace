@@ -1,5 +1,5 @@
 lib_LTLIBRARIES = libtrace.la
-include_HEADERS = libtrace.h dagformat.h lt_inttypes.h daglegacy.h rt_protocol.h libtraceio.h
+include_HEADERS = libtrace.h dagformat.h lt_inttypes.h daglegacy.h rt_protocol.h libtraceio.h erftypes.h
 
 extra_DIST = format_template.c
 if HAVE_NETPACKET_PACKET_H

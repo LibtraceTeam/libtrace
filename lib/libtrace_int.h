@@ -109,6 +109,8 @@ int snprintf(char *str, size_t size, const char *format, ...);
 #  include "dagapi.h"
 #	if DAG_VERSION == 25
 #		include <daginf.h>
+#	else
+#		include <erftypes.h>
 #	endif
 #else
 #  include "dagformat.h"

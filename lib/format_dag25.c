@@ -45,6 +45,9 @@
 #include <stdlib.h>
 
 #include <sys/mman.h>
+/* XXX: Windows doesn't have pthreads, but this code doesn't compile under
+ * Windows anyway so we'll worry about this more later :] */
+#include <pthread.h>
 
 
 #ifdef WIN32
@@ -58,7 +61,6 @@
 #       define PATH_MAX 4096
 #  endif
 #  include <sys/ioctl.h>
-#  include <pthread.h>
 #endif
 
 
@@ -96,6 +98,7 @@ struct dag_format_data_t {
 pthread_mutex_t open_dag_mutex;
 struct dag_dev_t *open_dags = NULL;
 
+/* NOTE: This function assumes the open_dag_mutex is held by the caller */
 static struct dag_dev_t *dag_find_open_device(char *dev_name) {
 	struct dag_dev_t *dag_dev;
 	
@@ -116,6 +119,7 @@ static struct dag_dev_t *dag_find_open_device(char *dev_name) {
 	
 }
 
+/* NOTE: This function assumes the open_dag_mutex is held by the caller */
 static void dag_close_device(struct dag_dev_t *dev) {
 	/* Need to remove from the device list */
 	
@@ -137,6 +141,7 @@ static void dag_close_device(struct dag_dev_t *dev) {
 		
 }
 
+/* NOTE: This function assumes the open_dag_mutex is held by the caller */
 static struct dag_dev_t *dag_open_device(libtrace_t *libtrace, char *dev_name) {
 	struct stat buf;
 	int fd;
