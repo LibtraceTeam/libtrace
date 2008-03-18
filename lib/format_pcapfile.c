@@ -496,6 +496,8 @@ static size_t pcapfile_set_capture_length(libtrace_packet_t *packet,size_t size)
 		/* can't make a packet larger */
 		return trace_get_capture_length(packet);
 	}
+	/* Reset the cached capture length */
+	packet->capture_length = -1;
 	pcapptr = (libtrace_pcapfile_pkt_hdr_t *)packet->header;
 	pcapptr->caplen = swapl(packet->trace,(uint32_t)size);
 	return trace_get_capture_length(packet);

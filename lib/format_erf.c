@@ -385,7 +385,7 @@ static int erf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	}
 
 	/* Unknown/corrupt */
-	if (((dag_record_t *)packet->buffer)->type >= 10) {
+	if (((dag_record_t *)packet->buffer)->type >= TYPE_AAL2) {
 		trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Corrupt or Unknown ERF type");
 		return -1;
 	}
@@ -608,6 +608,10 @@ size_t erf_set_capture_length(libtrace_packet_t *packet, size_t size) {
 		/* can't make a packet larger */
 		return trace_get_capture_length(packet);
 	}
+	/* Reset cached capture length - otherwise we will both return the
+	 * wrong value here and subsequent get_capture_length() calls will
+	 * return the wrong value. */
+	packet->capture_length = -1;
 	erfptr = (dag_record_t *)packet->header;
 	erfptr->rlen = htons(size + erf_get_framing_length(packet));
 	return trace_get_capture_length(packet);
