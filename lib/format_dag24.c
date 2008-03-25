@@ -281,7 +281,7 @@ static int dag_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
 	} else 
 		packet->buf_control = TRACE_CTRL_EXTERNAL;
 	
-        erfptr = (dag_record_t *)packet->buffer;
+        erfptr = (dag_record_t *)buffer;
         packet->buffer = erfptr;
         packet->header = erfptr;
         packet->type = rt_type;
