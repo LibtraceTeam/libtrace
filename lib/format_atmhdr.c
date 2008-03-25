@@ -55,16 +55,44 @@ static int atmhdr_fin_input(libtrace_t *libtrace)
 	return 0;
 }
 
+static int atmhdr_prepare_packet(libtrace_t *libtrace, 
+		libtrace_packet_t *packet, void *buffer, 
+		libtrace_rt_types_t rt_type, uint32_t flags) {
+
+	if (packet->buffer != buffer &&
+                        packet->buf_control == TRACE_CTRL_PACKET) {
+                free(packet->buffer);
+        }
+
+        if ((flags & TRACE_PREP_OWN_BUFFER) == TRACE_PREP_OWN_BUFFER) {
+                packet->buf_control = TRACE_CTRL_PACKET;
+        } else
+                packet->buf_control = TRACE_CTRL_EXTERNAL;
+
+	packet->buffer = buffer;
+	packet->header = buffer;
+	packet->payload = (void*)((char*)packet->buffer + 
+			libtrace->format->get_framing_length(packet));
+	packet->type = rt_type;
+
+	if (libtrace->format_data == NULL) {
+		if (atmhdr_init_input(libtrace))
+			return -1;
+	}
+	return 0;
+}
+
 static int atmhdr_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	int numbytes;
 	void *buffer;
-
+	uint32_t flags = 0;
+	
 	if (!packet->buffer || packet->buf_control == TRACE_CTRL_EXTERNAL) {
-		packet->buf_control = TRACE_CTRL_PACKET;
 		packet->buffer=malloc((size_t)LIBTRACE_PACKET_BUFSIZE);
 	}
 	buffer = packet->buffer;
-
+	flags |= TRACE_PREP_OWN_BUFFER;
+	
 	packet->type = TRACE_RT_DATA_ATMHDR;
 
 	if ((numbytes=libtrace_io_read(INPUT.file, buffer, (size_t)12)) != 12)
@@ -75,10 +103,12 @@ static int atmhdr_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 		return numbytes;
 	}
 
-	packet->header = packet->buffer;
-	packet->payload = (void*)((char*)packet->buffer +
-			libtrace->format->get_framing_length(packet));
-
+	if (atmhdr_prepare_packet(libtrace, packet, buffer, 
+				TRACE_RT_DATA_ATMHDR, flags)) {
+		return -1;
+	}
+				
+	
 	return 12;
 }
 
@@ -116,7 +146,8 @@ static struct libtrace_format_t atmhdr = {
         atmhdr_fin_input,               /* fin_input */
         NULL,                           /* fin_output */
         atmhdr_read_packet,             /* read_packet */
-        NULL,                           /* fin_packet */
+        atmhdr_prepare_packet,		/* prepare_packet */
+	NULL,                           /* fin_packet */
         NULL,                           /* write_packet */
         atmhdr_get_link_type,        	/* get_link_type */
         NULL,                           /* get_direction */

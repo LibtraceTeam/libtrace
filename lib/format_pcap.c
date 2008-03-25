@@ -265,16 +265,44 @@ static int pcapint_fin_output(libtrace_out_t *libtrace)
 	return 0;
 }
 
+static int pcap_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
+		void *buffer, libtrace_rt_types_t rt_type, uint32_t flags) {
+	
+	if (packet->buffer != buffer &&
+			packet->buf_control == TRACE_CTRL_PACKET) {
+			free(packet->buffer);
+	}
+
+	if ((flags & TRACE_PREP_OWN_BUFFER) == TRACE_PREP_OWN_BUFFER) {
+		packet->buf_control = TRACE_CTRL_PACKET;
+	} else
+		packet->buf_control = TRACE_CTRL_EXTERNAL;
+	
+	
+	packet->buffer = buffer;
+	packet->header = buffer;
+	packet->type = rt_type;
+
+	/* Assuming header and payload are sequential in the buffer - 
+	 * regular pcap often doesn't work like this though, so hopefully
+	 * we're not called by something that is reading genuine pcap! */
+	packet->payload = (char *)packet->header + sizeof(struct pcap_pkthdr);
+
+	if (libtrace->format_data == NULL) {
+		if (pcap_init_input(libtrace))
+			return -1;
+	}
+	return 0;
+}
 
 static int pcap_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	int ret = 0;
 	int linktype;
-
+	uint32_t flags = 0;
+	
 	assert(libtrace->format_data);
 	linktype = pcap_datalink(DATA(libtrace)->input.pcap);
 	packet->type = pcap_linktype_to_rt(linktype);
-
-	packet->buf_control = TRACE_CTRL_PACKET;
 
 	/* If we're using the replacement pcap_next_ex() we need to
 	 * make sure we have a buffer to *shudder* memcpy into 
@@ -286,11 +314,12 @@ static int pcap_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 					"Cannot allocate memory");
 			return -1;
 		}
-			
 		packet->header = packet->buffer;
-		packet->payload = (char *)packet->buffer + 
-					sizeof(struct pcap_pkthdr);
+		packet->payload = (char *)packet->buffer+sizeof(struct pcap_pkthdr);
+			
 	}
+
+	flags |= TRACE_PREP_OWN_BUFFER;
 	
 	for(;;) {
 
@@ -309,6 +338,19 @@ static int pcap_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 				return 0; /* EOF */
 		}
 
+		/*
+		 * pcap is nasty in that the header and payload aren't 
+		 * necessarily located sequentially in memory, but most
+		 * sensible uses of pcap_prepare_packet will involve a
+		 * buffer where header and payload are sequential. 
+		 *
+		 * Basically, don't call pcap_prepare_packet here! 
+		 *
+		if (pcap_prepare_packet(libtrace, packet, packet->buffer,
+				packet->type, flags)) {
+			return -1;
+		}
+		*/
 		return ((struct pcap_pkthdr*)packet->header)->len
 			+sizeof(struct pcap_pkthdr);
 	}
@@ -624,6 +666,7 @@ static struct libtrace_format_t pcap = {
 	pcap_fin_input,			/* fin_input */
 	pcap_fin_output,		/* fin_output */
 	pcap_read_packet,		/* read_packet */
+	pcap_prepare_packet,		/* prepare_packet */
 	NULL,				/* fin_packet */
 	pcap_write_packet,		/* write_packet */
 	pcap_get_link_type,		/* get_link_type */
@@ -663,6 +706,7 @@ static struct libtrace_format_t pcapint = {
 	pcap_fin_input,			/* fin_input */
 	pcapint_fin_output,		/* fin_output */
 	pcap_read_packet,		/* read_packet */
+	pcap_prepare_packet,		/* prepare_packet */
 	NULL,				/* fin_packet */
 	pcapint_write_packet,		/* write_packet */
 	pcap_get_link_type,		/* get_link_type */

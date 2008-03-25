@@ -341,16 +341,63 @@ static int erf_fin_output(libtrace_out_t *libtrace) {
 	return 0;
 }
  
+static int erf_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
+		void *buffer, libtrace_rt_types_t rt_type, uint32_t flags) {
+	
+	dag_record_t *erfptr;
+	
+	if (packet->buffer != buffer && 
+		packet->buf_control == TRACE_CTRL_PACKET) {
+		free(packet->buffer);
+	}
+
+	if ((flags & TRACE_PREP_OWN_BUFFER) == TRACE_PREP_OWN_BUFFER) {
+		packet->buf_control = TRACE_CTRL_PACKET;
+	} else
+	        packet->buf_control = TRACE_CTRL_EXTERNAL;
+	
+	
+	packet->type = rt_type;
+	packet->buffer = buffer;
+	packet->header = buffer;
+	erfptr = (dag_record_t *)packet->buffer;
+	if (erfptr->flags.rxerror == 1) {
+		packet->payload = NULL;
+		/* XXX: Do we want to do this? We never used to do this
+		 
+		erfptr->rlen = htons(erf_get_framing_length(packet));
+		*/
+	} else {
+		packet->payload = (char*)packet->buffer + erf_get_framing_length(packet);
+	}
+	
+	if (libtrace->format_data == NULL) {
+		/* Allocates the format_data structure */
+		if (erf_init_input(libtrace)) 
+			return -1;
+	}
+
+	/* Check for loss */
+	if (erfptr->type == TYPE_DSM_COLOR_ETH) {
+		/* No idea how we get this yet */
+
+	} else {
+		DATA(libtrace)->drops += ntohs(erfptr->lctr);
+	}
+
+	return 0;
+}
 
 static int erf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	int numbytes;
 	unsigned int size;
 	void *buffer2 = packet->buffer;
 	unsigned int rlen;
-
+	uint32_t flags = 0;
+	
+	
 	if (!packet->buffer || packet->buf_control == TRACE_CTRL_EXTERNAL) {
 		packet->buffer = malloc((size_t)LIBTRACE_PACKET_BUFSIZE);
-		packet->buf_control = TRACE_CTRL_PACKET;
 		if (!packet->buffer) {
 			trace_set_err(libtrace, errno, 
 					"Cannot allocate memory");
@@ -358,11 +405,8 @@ static int erf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 		}
 	}
 
+	flags |= TRACE_PREP_OWN_BUFFER;	
 	
-	
-	packet->header = packet->buffer;
-	packet->type = TRACE_RT_DATA_ERF;
-
 	if ((numbytes=libtrace_io_read(INPUT.file,
 					packet->buffer,
 					(size_t)dag_record_size)) == -1) {
@@ -402,11 +446,10 @@ static int erf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 		/* Failed to read the full packet?  must be EOF */
 		return -1;
 	}
-	if (((dag_record_t *)packet->buffer)->flags.rxerror == 1) {
-		packet->payload = NULL;
-	} else {
-		packet->payload = (char*)packet->buffer + erf_get_framing_length(packet);
-	}
+	
+	if (erf_prepare_packet(libtrace, packet, packet->buffer, TRACE_RT_DATA_ERF, flags))
+		return -1;
+	
 	return rlen;
 }
 
@@ -636,6 +679,8 @@ static struct libtrace_eventobj_t erf_event(struct libtrace_t *libtrace, struct 
 
 static uint64_t erf_get_dropped_packets(libtrace_t *trace)
 {
+	if (trace->format_data == NULL)
+		return (uint64_t)-1;
 	return DATA(trace)->drops;
 }
 
@@ -677,6 +722,7 @@ static struct libtrace_format_t erfformat = {
 	erf_fin_input,			/* fin_input */
 	erf_fin_output,			/* fin_output */
 	erf_read_packet,		/* read_packet */
+	erf_prepare_packet,		/* prepare_packet */
 	NULL,				/* fin_packet */
 	erf_write_packet,		/* write_packet */
 	erf_get_link_type,		/* get_link_type */

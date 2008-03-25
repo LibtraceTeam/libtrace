@@ -132,15 +132,42 @@ static int duck_fin_output(libtrace_out_t *libtrace) {
 	return 0;
 }
 
+static int duck_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
+		void *buffer, libtrace_rt_types_t rt_type, uint32_t flags) {
+
+        if (packet->buffer != buffer &&
+                        packet->buf_control == TRACE_CTRL_PACKET) {
+                free(packet->buffer);
+        }
+
+        if ((flags & TRACE_PREP_OWN_BUFFER) == TRACE_PREP_OWN_BUFFER) {
+                packet->buf_control = TRACE_CTRL_PACKET;
+        } else
+                packet->buf_control = TRACE_CTRL_EXTERNAL;
+
+
+        packet->buffer = buffer;
+        packet->header = NULL;
+	packet->payload = buffer;
+	packet->type = rt_type;
+
+	if (libtrace->format_data == NULL) {
+		if (duck_init_input(libtrace))
+			return -1;
+	}
+
+	return 0;
+}
+
 static int duck_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 
 	int numbytes = 0;
 	uint32_t version = 0;
 	unsigned int duck_size;
+	uint32_t flags = 0;
 	
 	if (!packet->buffer || packet->buf_control == TRACE_CTRL_EXTERNAL) {
                 packet->buffer = malloc((size_t)LIBTRACE_PACKET_BUFSIZE);
-                packet->buf_control = TRACE_CTRL_PACKET;
                 if (!packet->buffer) {
                         trace_set_err(libtrace, errno,
                                         "Cannot allocate memory");
@@ -148,6 +175,8 @@ static int duck_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
                 }
         }
 
+	flags |= TRACE_PREP_OWN_BUFFER;
+	
 	if (INPUT->dag_version == 0) {
 		/* Read in the duck version from the start of the trace */
 		if ((numbytes = libtrace_io_read(INPUT->file, &version, 
@@ -163,9 +192,6 @@ static int duck_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	}
 	
 
-	packet->header = 0;
-	packet->payload = packet->buffer;
-	
 	if (INPUT->dag_version == TRACE_RT_DUCK_2_4) {
 		duck_size = sizeof(duck2_4_t);
 		packet->type = TRACE_RT_DUCK_2_4;
@@ -179,7 +205,7 @@ static int duck_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 		return -1;
 	}
 
-	if ((numbytes = libtrace_io_read(INPUT->file, packet->payload,
+	if ((numbytes = libtrace_io_read(INPUT->file, packet->buffer,
 					(size_t)duck_size)) != (int)duck_size) {
 		if (numbytes == -1) {
 			trace_set_err(libtrace, errno, "Reading DUCK failed");
@@ -193,6 +219,10 @@ static int duck_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 		}
 	}
 
+	if (duck_prepare_packet(libtrace, packet, packet->buffer, packet->type,
+				flags)) 
+		return -1;
+	
 	return numbytes;
 }
 
@@ -283,7 +313,8 @@ static struct libtrace_format_t duck = {
         duck_fin_input,	               	/* fin_input */
         duck_fin_output,                /* fin_output */
         duck_read_packet,        	/* read_packet */
-        NULL,                           /* fin_packet */
+        duck_prepare_packet,		/* prepare_packet */
+	NULL,                           /* fin_packet */
         duck_write_packet,              /* write_packet */
         duck_get_link_type,    		/* get_link_type */
         NULL,              		/* get_direction */

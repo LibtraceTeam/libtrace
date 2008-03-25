@@ -82,6 +82,23 @@ struct dag_format_data_t {
 	uint64_t drops;
 };
 
+static void dag_init_format_data(libtrace_t *libtrace) {
+	libtrace->format_data = (struct dag_format_data_t *)
+		malloc(sizeof(struct dag_format_data_t));
+
+	DUCK.last_duck = 0;
+        DUCK.duck_freq = 0;
+        DUCK.last_pkt = 0;
+        DUCK.dummy_duck = NULL;
+	FORMAT_DATA->drops = 0;
+	FORMAT_DATA->top = 0;
+	FORMAT_DATA->bottom = 0;
+	FORMAT_DATA->buf = NULL;
+	FORMAT_DATA->fd = -1;
+	FORMAT_DATA->offset = 0;
+	FORMAT_DATA->diff = 0;
+}
+
 static int dag_available(libtrace_t *libtrace) {
 
         if (FORMAT_DATA->diff > 0)
@@ -119,10 +136,7 @@ static int dag_init_input(libtrace_t *libtrace) {
                 return -1;
         }
 	
-	libtrace->format_data = (struct dag_format_data_t *)
-                malloc(sizeof(struct dag_format_data_t));
-	FORMAT_DATA->top = 0;
-	FORMAT_DATA->bottom = 0;
+	dag_init_format_data(libtrace);
 	if (S_ISCHR(buf.st_mode)) {
                 /* DEVICE */
                 if((FORMAT_DATA->fd = dag_open(dag_dev_name)) < 0) {
@@ -144,11 +158,6 @@ static int dag_init_input(libtrace_t *libtrace) {
                 return -1;
         }
 
-	DUCK.last_duck = 0;
-        DUCK.duck_freq = 0;
-        DUCK.last_pkt = 0;
-        DUCK.dummy_duck = NULL;
-	FORMAT_DATA->drops = 0;
 	free(dag_dev_name);
 
         return 0;
@@ -258,10 +267,25 @@ static dag_record_t *dag_get_record(libtrace_t *libtrace) {
         return erfptr;
 }
 
-static void dag_form_packet(dag_record_t *erfptr, libtrace_packet_t *packet) {
+static int dag_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
+		void *buffer, libtrace_rt_types_t rt_type, uint32_t flags) {
+
+        dag_record_t *erfptr;
+        if (packet->buffer != buffer &&
+                        packet->buf_control == TRACE_CTRL_PACKET) {
+                free(packet->buffer);
+        }
+
+	if ((flags & TRACE_PREP_OWN_BUFFER) == TRACE_PREP_OWN_BUFFER) {
+		packet->buf_control = TRACE_CTRL_PACKET;
+	} else 
+		packet->buf_control = TRACE_CTRL_EXTERNAL;
+	
+        erfptr = (dag_record_t *)packet->buffer;
         packet->buffer = erfptr;
         packet->header = erfptr;
-        packet->type = TRACE_RT_DATA_ERF;
+        packet->type = rt_type;
+
         if (erfptr->flags.rxerror == 1) {
                 /* rxerror means the payload is corrupt - drop it
                  * by tweaking rlen */
@@ -272,12 +296,21 @@ static void dag_form_packet(dag_record_t *erfptr, libtrace_packet_t *packet) {
                         + erf_get_framing_length(packet);
         }
 
+        if (libtrace->format_data == NULL) {
+                dag_init_format_data(libtrace);
+        }
+
+        DATA(libtrace)->drops += ntohs(erfptr->lctr);
+
+        return 0;
+
 }
 
 static int dag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
         int numbytes;
         int size = 0;
-        struct timeval tv;
+        uint32_t flags = 0;
+	struct timeval tv;
         dag_record_t *erfptr = NULL;
 
         if (DUCK.last_pkt - DUCK.last_duck > DUCK.duck_freq &&
@@ -306,10 +339,13 @@ static int dag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
                         continue;
                 erfptr = dag_get_record(libtrace);
         } while (erfptr == NULL);
-        dag_form_packet(erfptr, packet);
-        tv = trace_get_timeval(packet);
+        
+	
+	if (dag_prepare_packet(libtrace, packet, erfptr, TRACE_RT_DATA_ERF, 
+				flags))
+		return -1;
+	tv = trace_get_timeval(packet);
         DUCK.last_pkt = tv.tv_sec;
-	DATA(libtrace)->drops += ntohs(erfptr->lctr);
         return packet->payload ? htons(erfptr->rlen) : erf_get_framing_length(packet);
 }
 
@@ -347,6 +383,8 @@ static libtrace_eventobj_t trace_event_dag(libtrace_t *trace,
 
 static uint64_t dag_get_dropped_packets(libtrace_t *trace)
 {
+	if (!trace->format_data)
+		return (uint64_t)-1;
 	return DATA(trace)->drops;
 }
 
@@ -376,7 +414,8 @@ static struct libtrace_format_t dag = {
         dag_fin_input,                  /* fin_input */
         NULL,                           /* fin_output */
         dag_read_packet,                /* read_packet */
-        NULL,                           /* fin_packet */
+        dag_prepare_packet,		/* prepare_packet */
+	NULL,                           /* fin_packet */
         NULL,                           /* write_packet */
         erf_get_link_type,              /* get_link_type */
         erf_get_direction,              /* get_direction */

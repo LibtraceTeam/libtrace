@@ -187,10 +187,7 @@ static int rt_connect(libtrace_t *libtrace) {
         return -1;
 }
 
-
-static int rt_init_input(libtrace_t *libtrace) {
-        char *scan;
-        char *uridata = libtrace->uridata;
+static void rt_init_format_data(libtrace_t *libtrace) {
         libtrace->format_data = malloc(sizeof(struct rt_format_data_t));
 
 	RT_INFO->dummy_duck = NULL;
@@ -200,6 +197,15 @@ static int rt_init_input(libtrace_t *libtrace) {
 	RT_INFO->pkt_buffer = NULL;
 	RT_INFO->buf_current = NULL;
 	RT_INFO->buf_filled = 0;
+	RT_INFO->hostname = NULL;
+	RT_INFO->port = 0;
+}
+
+static int rt_init_input(libtrace_t *libtrace) {
+        char *scan;
+        char *uridata = libtrace->uridata;
+
+	rt_init_format_data(libtrace);
 	
         if (strlen(uridata) == 0) {
                 RT_INFO->hostname =
@@ -393,6 +399,11 @@ static int rt_set_format(libtrace_t *libtrace, libtrace_packet_t *packet)
 			}
 			packet->trace = RT_INFO->dummy_linux;
 			break;
+		case TRACE_RT_STATUS:
+		case TRACE_RT_METADATA:
+			/* Just use the RT trace! */
+			packet->trace = libtrace;
+			break;
 		case TRACE_RT_DATA_LEGACY_ETH:
 		case TRACE_RT_DATA_LEGACY_ATM:
 		case TRACE_RT_DATA_LEGACY_POS:
@@ -406,25 +417,6 @@ static int rt_set_format(libtrace_t *libtrace, libtrace_packet_t *packet)
 	}
 	return 0; /* success */
 }		
-
-static void rt_set_payload(libtrace_packet_t *packet) {
-	dag_record_t *erfptr;
-	
-	switch (packet->type) {
-		case TRACE_RT_DATA_ERF:
-			erfptr = (dag_record_t *)packet->header;
-			
-			if (erfptr->flags.rxerror == 1) {
-				packet->payload = NULL;
-				break;
-			}
-			/* else drop into the default case */
-		default:
-			packet->payload = (char *)packet->buffer +
-				trace_get_framing_length(packet);
-			break;
-	}
-}
 
 static int rt_send_ack(libtrace_t *libtrace, 
 		uint32_t seqno)  {
@@ -474,11 +466,64 @@ static int rt_send_ack(libtrace_t *libtrace,
 	return 1;
 }
 
+static int rt_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
+		void *buffer, libtrace_rt_types_t rt_type, uint32_t flags) {
+
+	if (packet->buffer != buffer &&
+                        packet->buf_control == TRACE_CTRL_PACKET) {
+                free(packet->buffer);
+        }
+
+        if ((flags & TRACE_PREP_OWN_BUFFER) == TRACE_PREP_OWN_BUFFER) {
+                packet->buf_control = TRACE_CTRL_PACKET;
+        } else
+                packet->buf_control = TRACE_CTRL_EXTERNAL;
+
+
+        packet->buffer = buffer;
+        packet->header = NULL;
+        packet->type = rt_type;
+	packet->payload = buffer;
+
+	if (libtrace->format_data == NULL) {
+		rt_init_format_data(libtrace);
+	}
+
+	return 0;
+}	
+
+static int rt_read_data_packet(libtrace_t *libtrace,
+		libtrace_packet_t *packet, int blocking) {
+	uint32_t prep_flags = 0;
 	
+	if (rt_read(libtrace, &packet->buffer, (size_t)RT_INFO->rt_hdr.length, 
+				blocking) != RT_INFO->rt_hdr.length) {
+		return -1;
+	}
+
+        if (RT_INFO->reliable > 0 && packet->type >= TRACE_RT_DATA_SIMPLE) {
+		if (rt_send_ack(libtrace, RT_INFO->rt_hdr.sequence) == -1)
+                               	return -1;
+	}
+	
+	if (rt_set_format(libtrace, packet) < 0) {
+		return -1;
+        }
+               	
+	/* Update payload pointers and loss counters correctly */
+	if (trace_prepare_packet(packet->trace, packet, packet->buffer,
+				packet->type, prep_flags)) {
+		return -1;
+	}
+
+	return 0;
+}
+
 static int rt_read_packet_versatile(libtrace_t *libtrace,
 		libtrace_packet_t *packet,int blocking) {
 	rt_header_t *pkt_hdr = NULL;
 	void *void_hdr;
+	libtrace_rt_types_t switch_type;
 	
 	if (packet->buf_control == TRACE_CTRL_PACKET) {
 		packet->buf_control = TRACE_CTRL_EXTERNAL;
@@ -505,79 +550,43 @@ static int rt_read_packet_versatile(libtrace_t *libtrace,
 		RT_INFO->rt_hdr.sequence = pkt_hdr->sequence;
 	}
 	packet->type = RT_INFO->rt_hdr.type;
-
 	
 	if (packet->type >= TRACE_RT_DATA_SIMPLE) {
-		if (rt_read(libtrace, 
-					&packet->buffer,
-					(size_t)RT_INFO->rt_hdr.length,
-					blocking) != RT_INFO->rt_hdr.length) {
-			return -1;
-		}
-        	packet->header = packet->buffer;
-		
-                if (RT_INFO->reliable > 0) {
-			if (rt_send_ack(libtrace, RT_INFO->rt_hdr.sequence) 
-					== -1)
-			{
-                               	return -1;
-                        }
-		}
-		
-			
-		if (rt_set_format(libtrace, packet) < 0) {
-			return -1;
-                }
-               	rt_set_payload(packet);
+		switch_type = TRACE_RT_DATA_SIMPLE;
 	} else {
-		switch(packet->type) {
-			case TRACE_RT_STATUS:
-			case TRACE_RT_METADATA:
-				if (rt_read(libtrace, &packet->buffer, 
-					(size_t)RT_INFO->rt_hdr.length,
-					blocking) != 
-						RT_INFO->rt_hdr.length) {
-					return -1;
-				}
-				packet->header = 0;
-				packet->payload = packet->buffer;
-				break;
-			case TRACE_RT_DUCK_2_4:
-			case TRACE_RT_DUCK_2_5:
-				if (rt_read(libtrace, &packet->buffer,
-					(size_t)RT_INFO->rt_hdr.length,
-					blocking) != 
-						RT_INFO->rt_hdr.length) {
-					return -1;
-				}
-				if (rt_set_format(libtrace, packet) < 0) {
-					return -1;
-				}
-				packet->header = 0;
-				packet->payload = packet->buffer;
-				break;
-			case TRACE_RT_END_DATA:
-				break;
-			case TRACE_RT_PAUSE_ACK:
-				/* FIXME: Do something useful */
-				break;
-			case TRACE_RT_OPTION:
-				/* FIXME: Do something useful here as well */
-				break;
-			case TRACE_RT_KEYCHANGE:
-				break;
-			case TRACE_RT_LOSTCONN:
-				break;
-			case TRACE_RT_SERVERSTART:
-				break;
-			case TRACE_RT_CLIENTDROP:
-				break;
-			default:
-				printf("Bad rt type for client receipt: %d\n",
-					packet->type);
-				return -1;
-		}
+		switch_type = packet->type;
 	}
+
+	switch(switch_type) {
+		case TRACE_RT_DATA_SIMPLE:
+		case TRACE_RT_DUCK_2_4:
+		case TRACE_RT_DUCK_2_5:
+		case TRACE_RT_STATUS:
+		case TRACE_RT_METADATA:
+			if (rt_read_data_packet(libtrace, packet, blocking))
+				return -1;
+			break;
+		case TRACE_RT_END_DATA:
+		case TRACE_RT_KEYCHANGE:
+		case TRACE_RT_LOSTCONN:
+		case TRACE_RT_CLIENTDROP:
+		case TRACE_RT_SERVERSTART:
+			/* All these have no payload */
+			break;
+		case TRACE_RT_PAUSE_ACK:
+			/* XXX: Add support for this */
+			break;
+		case TRACE_RT_OPTION:
+			/* XXX: Add support for this */
+			break;
+		default:
+			printf("Bad rt type for client receipt: %d\n",
+					switch_type);
+			return -1;
+	}
+				
+			
+		
 	/* Return the number of bytes read from the stream */
 	RT_INFO->rt_hdr.type = TRACE_RT_LAST;
 	return RT_INFO->rt_hdr.length + sizeof(rt_header_t);
@@ -710,6 +719,7 @@ static struct libtrace_format_t rt = {
         rt_fin_input,             	/* fin_input */
         NULL,                           /* fin_output */
         rt_read_packet,           	/* read_packet */
+	rt_prepare_packet,		/* prepare_packet */
 	NULL,				/* fin_packet */
         NULL,                           /* write_packet */
         NULL,		                /* get_link_type */

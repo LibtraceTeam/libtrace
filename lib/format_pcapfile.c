@@ -222,10 +222,40 @@ static int pcapfile_config_output(libtrace_out_t *libtrace,
 	return -1;
 }
 
+static int pcapfile_prepare_packet(libtrace_t *libtrace, 
+		libtrace_packet_t *packet, void *buffer, 
+		libtrace_rt_types_t rt_type, uint32_t flags) {
+
+	if (packet->buffer != buffer && 
+			packet->buf_control == TRACE_CTRL_PACKET) {
+		free(packet->buffer);
+	}
+
+	if ((flags & TRACE_PREP_OWN_BUFFER) == TRACE_PREP_OWN_BUFFER) {
+		packet->buf_control = TRACE_CTRL_PACKET;
+	} else
+                packet->buf_control = TRACE_CTRL_EXTERNAL;
+	
+	
+	packet->buffer = buffer;
+	packet->header = buffer;
+	packet->payload = (char*)packet->buffer 
+		+ sizeof(libtrace_pcapfile_pkt_hdr_t);
+	packet->type = rt_type;	
+
+	if (libtrace->format_data == NULL) {
+		if (pcapfile_init_input(libtrace))
+			return -1;
+	}
+	
+	return 0;
+}
+
 static int pcapfile_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 {
 	int err;
-
+	uint32_t flags = 0;
+	
 	assert(libtrace->format_data);
 
 	packet->type = pcap_linktype_to_rt(swapl(libtrace,
@@ -233,9 +263,10 @@ static int pcapfile_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 
 	if (!packet->buffer || packet->buf_control == TRACE_CTRL_EXTERNAL) {
 		packet->buffer = malloc((size_t)LIBTRACE_PACKET_BUFSIZE);
-		packet->buf_control = TRACE_CTRL_PACKET;
 	}
 
+	flags |= TRACE_PREP_OWN_BUFFER;
+	
 	err=libtrace_io_read(DATA(libtrace)->file,
 			packet->buffer,
 			sizeof(libtrace_pcapfile_pkt_hdr_t));
@@ -248,9 +279,6 @@ static int pcapfile_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 		/* EOF */
 		return 0;
 	}
-
-	packet->header = packet->buffer;
-
 
 	err=libtrace_io_read(DATA(libtrace)->file,
 			(char*)packet->buffer+sizeof(libtrace_pcapfile_pkt_hdr_t),
@@ -266,8 +294,10 @@ static int pcapfile_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 		return 0;
 	}
 
-	packet->payload = (char*)packet->buffer 
-		+ sizeof(libtrace_pcapfile_pkt_hdr_t);
+	if (pcapfile_prepare_packet(libtrace, packet, packet->buffer,
+				packet->type, flags)) {
+		return -1;
+	}
 	
 	return sizeof(libtrace_pcapfile_pkt_hdr_t)
 		+swapl(libtrace,((libtrace_pcapfile_pkt_hdr_t*)packet->buffer)->caplen);
@@ -543,6 +573,7 @@ static struct libtrace_format_t pcapfile = {
 	pcapfile_fin_input,		/* fin_input */
 	pcapfile_fin_output,		/* fin_output */
 	pcapfile_read_packet,		/* read_packet */
+	pcapfile_prepare_packet,	/* prepare_packet */
 	NULL,				/* fin_packet */
 	pcapfile_write_packet,		/* write_packet */
 	pcapfile_get_link_type,		/* get_link_type */

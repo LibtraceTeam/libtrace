@@ -621,6 +621,8 @@ DLLEXPORT void trace_destroy(libtrace_t *libtrace) {
 
 DLLEXPORT void trace_destroy_dead(libtrace_t *libtrace) {
 	assert(libtrace);
+	if (libtrace->format_data)
+		free(libtrace->format_data);
 	free(libtrace);
 }
 /* Close an output trace file, freeing up any resources it may have been using
@@ -758,6 +760,38 @@ DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 	}
 	trace_set_err(libtrace,TRACE_ERR_UNSUPPORTED,"This format does not support reading packets\n");
 	return ~0U;
+}
+
+int trace_prepare_packet(libtrace_t *trace, libtrace_packet_t *packet,
+		void *buffer, libtrace_rt_types_t rt_type, uint32_t flags) {
+
+	assert(packet);
+	assert(trace);
+	
+	/* XXX Proper error handling?? */
+	if (buffer == NULL)
+		return -1;
+
+	if (!(packet->buf_control==TRACE_CTRL_PACKET || packet->buf_control==TRACE_CTRL_EXTERNAL)) {
+		trace_set_err(trace,TRACE_ERR_BAD_STATE,"Packet passed to trace_read_packet() is invalid\n");
+		return -1;
+	}
+	
+	packet->trace = trace;
+	
+	/* Clear packet cache */
+	packet->capture_length = -1;
+	packet->l3_header = NULL;
+	packet->l3_ethertype = 0;
+
+	if (trace->format->prepare_packet) {
+		return trace->format->prepare_packet(trace, packet,
+				buffer, rt_type, flags);
+	}
+	trace_set_err(trace, TRACE_ERR_UNSUPPORTED, 
+			"This format does not support preparing packets\n");
+	return -1;
+
 }
 
 /* Writes a packet to the specified output
@@ -1593,6 +1627,7 @@ void trace_construct_packet(libtrace_packet_t *packet,
 	memcpy(packet->payload,data,(size_t)len);
 	packet->type=pcap_linktype_to_rt(libtrace_to_pcap_linktype(linktype));
 }
+
 
 uint64_t trace_get_received_packets(libtrace_t *trace)
 {

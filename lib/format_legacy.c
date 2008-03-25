@@ -68,6 +68,15 @@ struct legacy_format_data_t {
 	uint32_t ts_old; 	/* Used for legacy_nzix */
 };
 
+static void legacy_init_format_data(libtrace_t *libtrace) {
+	libtrace->format_data = malloc(sizeof(struct legacy_format_data_t));
+	
+	DATA(libtrace)->input.file = NULL;
+	DATA(libtrace)->ts_high = 0;
+	DATA(libtrace)->ts_old = 0;
+	DATA(libtrace)->starttime = 0;
+}
+
 static int legacyeth_get_framing_length(const libtrace_packet_t *packet UNUSED) 
 {
 	return sizeof(legacy_ether_t);
@@ -90,9 +99,7 @@ static int legacynzix_get_framing_length(const libtrace_packet_t *packet UNUSED)
 
 static int erf_init_input(libtrace_t *libtrace) 
 {
-	libtrace->format_data = malloc(sizeof(struct legacy_format_data_t));
-
-	DATA(libtrace)->input.file = NULL;
+	legacy_init_format_data(libtrace);
 
 	return 0;
 }
@@ -135,10 +142,8 @@ static int legacynzix_init_input(libtrace_t *libtrace) {
 	regex_t reg;
 	regmatch_t match;
 
-	libtrace->format_data = malloc(sizeof(struct legacy_format_data_t));
 
-	DATA(libtrace)->input.file = NULL;
-	
+	legacy_init_format_data(libtrace);	
 	if((retval = regcomp(&reg, "[0-9]{8}-[0-9]{6}", REG_EXTENDED)) != 0) {
 		trace_set_err(libtrace, errno, "Failed to compile regex");
 		return -1;
@@ -148,8 +153,6 @@ static int legacynzix_init_input(libtrace_t *libtrace) {
 		return -1;
 	}
 	DATA(libtrace)->starttime = trtime(&filename[match.rm_so]);
-	DATA(libtrace)->ts_high = 0;
-	DATA(libtrace)->ts_old = 0;
 	return 0;
 }
 
@@ -172,14 +175,43 @@ static int erf_fin_input(libtrace_t *libtrace) {
 	return 0;
 }
 
+static int legacy_prepare_packet(libtrace_t *libtrace, 
+		libtrace_packet_t *packet, void *buffer, 
+		libtrace_rt_types_t rt_type, uint32_t flags) {
+
+	if (packet->buffer != buffer &&
+                        packet->buf_control == TRACE_CTRL_PACKET) {
+                free(packet->buffer);
+        }
+
+        if ((flags & TRACE_PREP_OWN_BUFFER) == TRACE_PREP_OWN_BUFFER) {
+                packet->buf_control = TRACE_CTRL_PACKET;
+        } else
+                packet->buf_control = TRACE_CTRL_EXTERNAL;
+
+
+        packet->buffer = buffer;
+        packet->header = buffer;
+	packet->type = rt_type;
+	packet->payload = (void*)((char*)packet->buffer + 
+		libtrace->format->get_framing_length(packet));
+
+
+	if (libtrace->format_data == NULL) {
+		legacy_init_format_data(libtrace);
+	}
+	return 0;
+}
+
 static int legacy_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	int numbytes;
 	void *buffer;
-
+	uint32_t flags = 0;
+	
 	if (!packet->buffer || packet->buf_control == TRACE_CTRL_EXTERNAL) {
-		packet->buf_control = TRACE_CTRL_PACKET;
 		packet->buffer=malloc((size_t)LIBTRACE_PACKET_BUFSIZE);
 	}
+	flags |= TRACE_PREP_OWN_BUFFER;
 	buffer = packet->buffer;
 
 	switch(libtrace->format->type) {
@@ -214,9 +246,10 @@ static int legacy_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 		break;
 	}
 	
-	packet->header = packet->buffer;
-	packet->payload = (void*)((char*)packet->buffer + 
-		libtrace->format->get_framing_length(packet));
+	if (legacy_prepare_packet(libtrace, packet, packet->buffer, 
+				packet->type, flags)) {
+		return -1;
+	}
 	
 	return 64;
 	
@@ -230,13 +263,14 @@ static int legacynzix_read_packet(libtrace_t *libtrace, libtrace_packet_t *packe
 	int numbytes;
 	void *buffer;
 	char *data_ptr;
+	uint32_t flags = 0;
 	
 	if (!packet->buffer || packet->buf_control == TRACE_CTRL_EXTERNAL) {
-		packet->buf_control = TRACE_CTRL_PACKET;
 		packet->buffer=malloc((size_t)LIBTRACE_PACKET_BUFSIZE);
 	}
+	flags |= TRACE_PREP_OWN_BUFFER;
+	
 	buffer = packet->buffer;
-
 	packet->type = TRACE_RT_DATA_LEGACY_NZIX;
 	
 	while (1) {
@@ -262,9 +296,10 @@ static int legacynzix_read_packet(libtrace_t *libtrace, libtrace_packet_t *packe
 	data_ptr = ((char *)buffer) + 12;
 	memmove(data_ptr + 2, data_ptr, 26);
 
-	packet->header = packet->buffer;
-	packet->payload = (void*)((char*)packet->buffer +
-			libtrace->format->get_framing_length(packet));
+	if (legacy_prepare_packet(libtrace, packet, packet->buffer, 
+				packet->type, flags)) {
+		return -1;
+	}
 	return 68;
 }
 		
@@ -431,6 +466,7 @@ static struct libtrace_format_t legacyatm = {
 	erf_fin_input,			/* fin_input */
 	NULL,				/* fin_output */
 	legacy_read_packet,		/* read_packet */
+	legacy_prepare_packet,		/* prepare_packet */
 	NULL,				/* fin_packet */
 	NULL,				/* write_packet */
 	legacyatm_get_link_type,	/* get_link_type */
@@ -470,6 +506,7 @@ static struct libtrace_format_t legacyeth = {
 	erf_fin_input,			/* fin_input */
 	NULL,				/* fin_output */
 	legacy_read_packet,		/* read_packet */
+	legacy_prepare_packet,		/* prepare_packet */
 	NULL,				/* fin_packet */
 	NULL,				/* write_packet */
 	legacyeth_get_link_type,	/* get_link_type */
@@ -509,6 +546,7 @@ static struct libtrace_format_t legacypos = {
 	erf_fin_input,			/* fin_input */
 	NULL,				/* fin_output */
 	legacy_read_packet,		/* read_packet */
+	legacy_prepare_packet,		/* prepare_packet */
 	NULL,				/* fin_packet */
 	NULL,				/* write_packet */
 	legacypos_get_link_type,	/* get_link_type */
@@ -548,6 +586,7 @@ static struct libtrace_format_t legacynzix = {
 	erf_fin_input,			/* fin_input */
 	NULL,				/* fin_output */
 	legacynzix_read_packet,		/* read_packet */
+	legacy_prepare_packet,		/* prepare_packet */
 	NULL,				/* fin_packet */
 	NULL,				/* write_packet */
 	legacynzix_get_link_type,	/* get_link_type */

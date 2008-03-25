@@ -88,13 +88,39 @@ static int tsh_fin_input(libtrace_t *libtrace) {
 	return 0;
 }
 
+static int tsh_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
+		void *buffer, libtrace_rt_types_t rt_type, uint32_t flags) {
+	if (packet->buffer != buffer &&
+                        packet->buf_control == TRACE_CTRL_PACKET) {
+                free(packet->buffer);
+        }
+
+        if ((flags & TRACE_PREP_OWN_BUFFER) == TRACE_PREP_OWN_BUFFER) {
+                packet->buf_control = TRACE_CTRL_PACKET;
+        } else
+                packet->buf_control = TRACE_CTRL_EXTERNAL;
+
+
+        packet->buffer = buffer;
+        packet->header = buffer;
+	packet->type = rt_type;
+	packet->payload = (char *)packet->buffer + sizeof(tsh_pkt_header_t);
+
+	if (libtrace->format_data == NULL) {
+		if (tsh_init_input(libtrace))
+			return -1;
+	}
+
+	return 0;
+}
+
 static int tsh_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	int numbytes;
 	void *buffer2 = packet->buffer;
+	uint32_t flags = 0;
 
 	if (!packet->buffer || packet->buf_control == TRACE_CTRL_EXTERNAL) {
 		packet->buffer = malloc((size_t)LIBTRACE_PACKET_BUFSIZE);
-		packet->buf_control = TRACE_CTRL_PACKET;
 		if (!packet->buffer) {
 			trace_set_err(libtrace, errno, 
 					"Cannot allocate memory");
@@ -102,7 +128,7 @@ static int tsh_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 		}
 	}
 
-	packet->header = packet->buffer;
+	flags |= TRACE_PREP_OWN_BUFFER;
 	packet->type = TRACE_RT_DATA_TSH;
 
 	buffer2 = packet->buffer;
@@ -121,7 +147,6 @@ static int tsh_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	}
 
 	buffer2 = (char*)buffer2 + numbytes;
-	packet->payload = buffer2;
 
 	/* Read the IP header */
 	if ((numbytes=libtrace_io_read(DATA(libtrace)->file,
@@ -146,6 +171,12 @@ static int tsh_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 				libtrace->uridata);
 		return -1;
 	}
+	
+	if (tsh_prepare_packet(libtrace, packet, packet->buffer, packet->type, 
+				flags)) {
+		return -1;
+	}
+
 
 	return 80;
 }
@@ -204,6 +235,7 @@ static struct libtrace_format_t tshformat = {
 	tsh_fin_input,			/* fin_input */
 	NULL,				/* fin_output */
 	tsh_read_packet,		/* read_packet */
+	tsh_prepare_packet,		/* prepare_packet */
 	NULL,				/* fin_packet */
 	NULL,				/* write_packet */
 	tsh_get_link_type,		/* get_link_type */
@@ -248,6 +280,7 @@ static struct libtrace_format_t frplusformat = {
 	tsh_fin_input,			/* fin_input */
 	NULL,				/* fin_output */
 	tsh_read_packet,		/* read_packet */
+	tsh_prepare_packet,		/* prepare_packet */
 	NULL,				/* fin_packet */
 	NULL,				/* write_packet */
 	tsh_get_link_type,		/* get_link_type */

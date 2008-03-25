@@ -330,6 +330,35 @@ static int linuxnative_config_input(libtrace_t *libtrace,
 	return -1;
 }
 
+static int linuxnative_prepare_packet(libtrace_t *libtrace, 
+		libtrace_packet_t *packet, void *buffer, 
+		libtrace_rt_types_t rt_type, uint32_t flags) {
+
+        if (packet->buffer != buffer &&
+                        packet->buf_control == TRACE_CTRL_PACKET) {
+                free(packet->buffer);
+        }
+
+        if ((flags & TRACE_PREP_OWN_BUFFER) == TRACE_PREP_OWN_BUFFER) {
+                packet->buf_control = TRACE_CTRL_PACKET;
+        } else
+                packet->buf_control = TRACE_CTRL_EXTERNAL;
+
+
+        packet->buffer = buffer;
+        packet->header = buffer;
+	packet->payload = (char *)buffer + 
+		sizeof(struct libtrace_linuxnative_header);
+	packet->type = rt_type;
+
+	if (libtrace->format_data == NULL) {
+		if (linuxnative_init_input(libtrace))
+			return -1;
+	}
+	return 0;
+	
+}
+
 #define LIBTRACE_MIN(a,b) ((a)<(b) ? (a) : (b))
 
 /* 20 isn't enough on x86_64 */
@@ -343,15 +372,15 @@ static int linuxnative_read_packet(libtrace_t *libtrace, libtrace_packet_t *pack
 	struct cmsghdr *cmsg;
 	socklen_t socklen;
 	int snaplen;
-
+	uint32_t flags = 0;
+	
 	if (!packet->buffer || packet->buf_control == TRACE_CTRL_EXTERNAL) {
 		packet->buffer = malloc((size_t)LIBTRACE_PACKET_BUFSIZE);
-		packet->buf_control = TRACE_CTRL_PACKET;
 	}
 
-	packet->header = packet->buffer;
+	flags |= TRACE_PREP_OWN_BUFFER;
+	
 	packet->type = TRACE_RT_DATA_LINUX_NATIVE;
-	packet->payload = (char*)packet->buffer+sizeof(*hdr);
 
 	hdr=(struct libtrace_linuxnative_header*)packet->buffer;
 	socklen=sizeof(hdr->hdr);
@@ -397,6 +426,10 @@ static int linuxnative_read_packet(libtrace_t *libtrace, libtrace_packet_t *pack
 				SIOCGSTAMP,&hdr->ts)==-1)
 		perror("ioctl(SIOCGSTAMP)");
 
+	if (linuxnative_prepare_packet(libtrace, packet, packet->buffer,
+				packet->type, flags))
+		return -1;
+	
 	return hdr->wirelen+sizeof(*hdr);
 }
 
@@ -489,6 +522,8 @@ static int linuxnative_get_framing_length(UNUSED
 }
 
 static int linuxnative_get_fd(const libtrace_t *trace) {
+	if (trace->format_data == NULL)
+		return -1;
 	return FORMAT(trace->format_data)->fd;
 }
 
@@ -505,6 +540,14 @@ static uint64_t linuxnative_get_filtered_packets(libtrace_t *trace) {
 
 /* Number of packets that past filtering */
 static uint64_t linuxnative_get_captured_packets(libtrace_t *trace) {
+	if (trace->format_data == NULL)
+		return UINT64_MAX;
+	if (FORMAT(trace->format_data)->fd == -1) {
+		/* This is probably a 'dead' trace so obviously we can't query
+		 * the socket for capture counts, can we? */
+		return UINT64_MAX;
+	}
+	
 	if ((FORMAT(trace->format_data)->stats_valid & 1) 
 			|| FORMAT(trace->format_data)->stats_valid == 0) {
 		socklen_t len = sizeof(FORMAT(trace->format_data)->stats);
@@ -523,6 +566,14 @@ static uint64_t linuxnative_get_captured_packets(libtrace_t *trace) {
  * of lack of space
  */
 static uint64_t linuxnative_get_dropped_packets(libtrace_t *trace) {
+	if (trace->format_data == NULL)
+		return UINT64_MAX;
+	if (FORMAT(trace->format_data)->fd == -1) {
+		/* This is probably a 'dead' trace so obviously we can't query
+		 * the socket for drop counts, can we? */
+		return UINT64_MAX;
+	}
+	
 	if ((FORMAT(trace->format_data)->stats_valid & 2)
 			|| (FORMAT(trace->format_data)->stats_valid==0)) {
 		socklen_t len = sizeof(FORMAT(trace->format_data)->stats);
@@ -561,6 +612,7 @@ static struct libtrace_format_t linuxnative = {
 	linuxnative_fin_input,		/* fin_input */
 	linuxnative_fin_output,		/* fin_output */
 	linuxnative_read_packet,	/* read_packet */
+	linuxnative_prepare_packet,	/* prepare_packet */
 	NULL,				/* fin_packet */
 	linuxnative_write_packet,	/* write_packet */
 	linuxnative_get_link_type,	/* get_link_type */

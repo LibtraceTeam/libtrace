@@ -166,6 +166,42 @@ void trace_set_err(libtrace_t *trace, int errcode,const char *msg,...)
 void trace_set_err_out(libtrace_out_t *trace, int errcode, const char *msg,...)
 								PRINTF(3,4);
 
+
+/* 
+ *
+ * The basic idea of this function is that it will take the data pointed to
+ * by 'buffer' and treat it as a packet of the same format type as the 
+ * libtrace_t pointed to by 'trace', including the format framing (e.g. an
+ * erf header for erf and dag formats, a pcap header for pcap formats).
+ * 
+ * The libtrace packet pointed to by 'packet' will then have its internal
+ * pointers and values replaced with ones that describe the packet in 'buffer'.
+ * 
+ * 'rt_type' is used to set packet->type while 'flags' is relatively 
+ * self-explanatory. Definitions of the accepted flags will be provided below.
+ *
+ * The primary use of this function is to allow rt_read_packet to nicely
+ * convert packets from the RT format back to the format that they were
+ * originally captured with, as RT essentially encapsulates the original trace
+ * format. We've decided to not make this function available via the API
+ * because there are a number of issues that can arise if it is not used
+ * very carefully and there are few situations outside of the RT case where
+ * you'd want to do something like this anyway.
+ *
+ * Returns 0 if successful, -1 if something goes horribly wrong
+ */
+int trace_prepare_packet(libtrace_t *trace, libtrace_packet_t *packet,
+		void *buffer, libtrace_rt_types_t rt_type, uint32_t flags);
+
+/* Flags for prepare_packet functions */
+/*-------------------------------------*/
+/* If set, the memory pointed to by 'buffer' is malloc()'d and libtrace should
+ * undertake ownership of that memory. If not set, the memory is treated as
+ * externally-owned and will not be freed by libtrace when the packet is
+ * destroyed. */
+#define TRACE_PREP_OWN_BUFFER 	1
+
+								
 typedef struct libtrace_sll_header_t {
 	uint16_t pkttype;          	/* packet type */
 	uint16_t hatype;           	/* link-layer address type */
@@ -246,6 +282,14 @@ struct libtrace_format_t {
 	 * if this function is not supported, this field may be NULL.
 	 */
 	int (*read_packet)(libtrace_t *libtrace, libtrace_packet_t *packet);
+	/** prepares a packet for general libtrace usage
+	 * updates internal trace and packet details, such as payload pointers,
+	 * loss counters and packet types.
+	 * Intended (at this stage) only for internal use, particularly by
+	 * RT which needs to decapsulate RT packets */
+	int (*prepare_packet)(libtrace_t *libtrace, libtrace_packet_t *packet,
+			void *buffer, libtrace_rt_types_t rt_type, 
+			uint32_t flags);
 	/** finalise a packet
 	 * cleanup any resources used by a packet that can't be reused for
 	 * the next packet.

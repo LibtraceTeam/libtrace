@@ -205,6 +205,14 @@ static int bpf_start_input(libtrace_t *libtrace)
 
 static uint64_t bpf_get_received_packets(libtrace_t *trace)
 {
+	if (trace->format_data == NULL)
+		return (uint64_t)-1;
+
+	if (FORMATIN(trace)->fd == -1) {
+		/* Almost certainly a 'dead' trace so there is no socket
+		 * for us to query */
+		return (uint64_t) -1;
+	}
 	/* If we're called with stats_valid == 0, or we're called again
 	 * then refresh the stats.  Don't refresh the stats if we're called
 	 * immediately after get_dropped_packets
@@ -220,6 +228,14 @@ static uint64_t bpf_get_received_packets(libtrace_t *trace)
 
 static uint64_t bpf_get_dropped_packets(libtrace_t *trace)
 {
+	if (trace->format_data == NULL)
+		return (uint64_t)-1;
+
+	if (FORMATIN(trace)->fd == -1) {
+		/* Almost certainly a 'dead' trace so there is no socket
+		 * for us to query */
+		return (uint64_t) -1;
+	}
 	/* If we're called with stats_valid == 0, or we're called again
 	 * then refresh the stats.  Don't refresh the stats if we're called
 	 * immediately after get_received_packets
@@ -281,8 +297,39 @@ static int bpf_config_input(libtrace_t *libtrace,
 	return -1;
 }
 
+static int bpf_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
+		void *buffer, libtrace_rt_types_t rt_type, uint32_t flags) {
+        if (packet->buffer != buffer &&
+                        packet->buf_control == TRACE_CTRL_PACKET) {
+                free(packet->buffer);
+        }
+
+        if ((flags & TRACE_PREP_OWN_BUFFER) == TRACE_PREP_OWN_BUFFER) {
+                packet->buf_control = TRACE_CTRL_PACKET;
+        } else
+                packet->buf_control = TRACE_CTRL_EXTERNAL;
+
+
+        packet->buffer = buffer;
+        packet->header = buffer;
+	packet->type = rt_type;
+
+	/* Find the payload */
+	/* TODO: Pcap deals with a padded FDDI linktype here */
+	packet->payload=(char *)buffer + BPFHDR(packet)->bh_hdrlen;
+
+	if (libtrace->format_data == NULL) {
+		if (bpf_init_input(libtrace))
+			return -1;
+	}
+
+	return 0;
+}
+	
 static int bpf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) 
 {
+	uint32_t flags = 0;
+	
 	/* Fill the buffer */
 	if (FORMATIN(libtrace)->remaining<=0) {
 		int ret;
@@ -310,14 +357,12 @@ static int bpf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 	
 	if (packet->buf_control == TRACE_CTRL_PACKET)
 		free(packet->buffer);
-	packet->buf_control = TRACE_CTRL_EXTERNAL;
 
-	/* Find the bpf header */
-	packet->header=FORMATIN(libtrace)->bufptr;
-
-	/* Find the payload */
-	/* TODO: Pcap deals with a padded FDDI linktype here */
-	packet->payload=FORMATIN(libtrace)->bufptr+BPFHDR(packet)->bh_hdrlen;
+	if (bpf_prepare_packet(libtrace, packet, FORMATIN(libtrace)->bufptr,
+		TRACE_RT_DATA_BPF, flags)) {
+		return -1;
+	}
+	
 
 	/* Now deal with any padding */
 	FORMATIN(libtrace)->bufptr+=
@@ -388,6 +433,7 @@ static struct libtrace_format_t bpf = {
 	bpf_fin_input,		/* fin_input */
 	NULL,			/* fin_output */
 	bpf_read_packet,	/* read_packet */
+	bpf_prepare_packet, 	/* prepare_packet */
 	NULL,			/* fin_packet */
 	NULL,			/* write_packet */
 	bpf_get_link_type,	/* get_link_type */
