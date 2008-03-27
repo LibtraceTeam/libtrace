@@ -188,7 +188,8 @@ static int pcapfile_config_input(libtrace_t *libtrace,
 
 static int pcapfile_fin_input(libtrace_t *libtrace) 
 {
-	libtrace_io_close(DATA(libtrace)->file);
+	if (DATA(libtrace)->file)
+		libtrace_io_close(DATA(libtrace)->file);
 	free(libtrace->format_data);
 	return 0; /* success */
 }
