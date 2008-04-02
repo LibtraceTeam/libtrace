@@ -133,11 +133,9 @@ static void run_trace(char *uri)
 
         for (;;) {
 		int psize;
-		dag_record_t *erf_hdr;
                 if ((psize = trace_read_packet(trace, packet)) <1) {
                         break;
                 }
-		erf_hdr = (dag_record_t *)packet->header;
 		
 		if (trace_get_packet_buffer(packet,NULL,NULL) == NULL) {
 			continue;
