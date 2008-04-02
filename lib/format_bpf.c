@@ -352,7 +352,7 @@ static int bpf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 		FORMATIN(libtrace)->bufptr=
 				FORMATIN(libtrace)->buffer;
 	}
-
+	flags |= TRACE_PREP_DO_NOT_OWN_BUFFER;
 	/* Read one packet out */
 	
 	if (packet->buf_control == TRACE_CTRL_PACKET)
@@ -387,7 +387,12 @@ static libtrace_direction_t bpf_get_direction(const libtrace_packet_t *packet) {
 static struct timeval bpf_get_timeval(const libtrace_packet_t *packet) 
 {
 	struct timeval tv;
-	tv=BPFHDR(packet)->bh_tstamp;
+	/* OpenBSD uses a bpf_timeval rather than a timeval so we must copy
+	 * each timeval element individually rather than doing a structure
+	 * assignment */
+	tv.tv_sec = BPFHDR(packet)->bh_tstamp.tv_sec;
+	tv.tv_usec = BPFHDR(packet)->bh_tstamp.tv_usec;
+
 	return tv;
 }
 

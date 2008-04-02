@@ -495,7 +495,9 @@ static int rt_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
 static int rt_read_data_packet(libtrace_t *libtrace,
 		libtrace_packet_t *packet, int blocking) {
 	uint32_t prep_flags = 0;
-	
+
+	prep_flags |= TRACE_PREP_DO_NOT_OWN_BUFFER;
+
 	if (rt_read(libtrace, &packet->buffer, (size_t)RT_INFO->rt_hdr.length, 
 				blocking) != RT_INFO->rt_hdr.length) {
 		return -1;

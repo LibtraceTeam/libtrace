@@ -472,6 +472,8 @@ static int dag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
                 DUCK.duck_freq = 0;
         }
 
+	flags |= TRACE_PREP_DO_NOT_OWN_BUFFER;
+	
         if (packet->buf_control == TRACE_CTRL_PACKET) {
                 free(packet->buffer);
                 packet->buffer = 0;
