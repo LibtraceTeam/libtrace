@@ -1,6 +1,7 @@
 #include "libtrace.h"
 #include <stdio.h>
 #include <inttypes.h>
+#include "lt_inttypes.h"
 
 static uint64_t ignored = 0;
 
