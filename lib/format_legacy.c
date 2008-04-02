@@ -55,6 +55,10 @@
 #  define O_LARGEFILE 0
 #endif 
 
+#ifndef UINT32_MAX
+#  define UINT32_MAX 0xffffffff
+#endif
+
 #define DATA(x) ((struct legacy_format_data_t *)x->format_data)
 #define INPUT DATA(libtrace)->input
 
