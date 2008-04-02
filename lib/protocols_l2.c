@@ -220,6 +220,7 @@ DLLEXPORT void *trace_get_layer2(const libtrace_packet_t *packet,
 		uint32_t *remaining) 
 {
 	uint32_t dummyrem;
+	void *meta = NULL;
 	
 	assert(packet != NULL);
 	assert(linktype != NULL);
@@ -227,7 +228,7 @@ DLLEXPORT void *trace_get_layer2(const libtrace_packet_t *packet,
 	if (remaining == NULL)
 		remaining = &dummyrem;
 	
-	void *meta = trace_get_packet_meta(packet, linktype, remaining);
+	meta = trace_get_packet_meta(packet, linktype, remaining);
 
 	/* If there are no meta-data headers, we just return the start of the
 	 * packet buffer, along with the linktype, etc.

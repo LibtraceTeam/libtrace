@@ -89,14 +89,14 @@ DLLEXPORT void *trace_get_packet_meta(const libtrace_packet_t *packet,
 		uint32_t *remaining)
 {
 	uint32_t dummyrem;
-
+	void *pktbuf = NULL;
 	assert(packet != NULL);
 	assert(linktype != NULL);
 	
 	if (remaining == NULL) 
 		remaining = &dummyrem;
 	
-	void *pktbuf = trace_get_packet_buffer(packet, linktype, remaining);
+	pktbuf = trace_get_packet_buffer(packet, linktype, remaining);
 	switch (*linktype) {
 		case TRACE_TYPE_LINUX_SLL:
 		case TRACE_TYPE_80211_RADIO:
@@ -181,8 +181,9 @@ DLLEXPORT void *trace_get_payload_from_meta(const void *meta,
  */
 static
 uint8_t *get_source_mac_from_wifi(void *wifi) {
+	struct libtrace_80211_t *w;
 	if (wifi == NULL) return NULL;
-	struct libtrace_80211_t *w = (struct libtrace_80211_t *) wifi;
+	w = (struct libtrace_80211_t *) wifi;
 	
 	/* If the frame is of type CTRL */
 	if (w->type == 0x1) 
@@ -241,11 +242,12 @@ DLLEXPORT uint8_t *trace_get_destination_mac(libtrace_packet_t *packet)
 	void *link;
 	libtrace_linktype_t linktype;
 	uint32_t remaining;
-
+	libtrace_80211_t *wifi;
+	libtrace_ether_t *ethptr;
+	
 	link = trace_get_layer2(packet,&linktype,&remaining);
 
-	libtrace_80211_t *wifi;
-        libtrace_ether_t *ethptr = (libtrace_ether_t*)link;
+        ethptr = (libtrace_ether_t*)link;
 
 
 	if (!link)
