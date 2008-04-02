@@ -21,6 +21,9 @@
 
 void decode(int link_type,char *packet,unsigned len)
 {
+	unsigned char *pkt = NULL;
+	unsigned char type,optlen,*data;
+	int plen, i;
 	libtrace_tcp_t *tcp = (libtrace_tcp_t *)packet;
 	printf(" TCP:");
 	if (SAFE(source)) {
@@ -68,9 +71,8 @@ void decode(int link_type,char *packet,unsigned len)
 	printf("\n TCP:");
 	DISPLAYS(check," Checksum %i");
 	DISPLAYS(urg_ptr," Urgent %i");
-	unsigned char *pkt = (unsigned char*)packet+sizeof(*tcp);
-	int plen = (len-sizeof *tcp) < (tcp->doff*4-sizeof(*tcp))?(len-sizeof(*tcp)):(tcp->doff*4-sizeof *tcp);
-	unsigned char type,optlen,*data;
+	pkt = (unsigned char*)packet+sizeof(*tcp);
+	plen = (len-sizeof *tcp) < (tcp->doff*4-sizeof(*tcp))?(len-sizeof(*tcp)):(tcp->doff*4-sizeof *tcp);
 	while(trace_get_next_option(&pkt,&plen,&type,&optlen,&data)) {
 		printf("\n TCP: ");
 		switch(type) {
@@ -91,7 +93,6 @@ void decode(int link_type,char *packet,unsigned len)
 				break;
 			case 5:
 				printf("SACK Information");
-				int i;
 				i=0;
 				while(i+8<optlen) {
 					printf("\n TCP:  %u-%u",

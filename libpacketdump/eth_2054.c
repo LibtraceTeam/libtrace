@@ -19,7 +19,7 @@
  * of the hardware address in the structure that we should
  * attempt to decode.
  */
-char *format_hrd(struct arphdr *arp, char *hrd) {
+static char *format_hrd(struct arphdr *arp, char *hrd) {
 	static char buffer[1024] = {0,};
 	int i;
 
@@ -49,7 +49,7 @@ char *format_hrd(struct arphdr *arp, char *hrd) {
  * of the protocol address in the structure that we should
  * attempt to decode.
  */
-char *format_pro(struct arphdr *arp, char *pro) {
+static char *format_pro(struct arphdr *arp, char *pro) {
 	static char buffer[1024] = {0,};
 	int i;
 	

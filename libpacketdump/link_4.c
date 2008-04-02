@@ -98,7 +98,7 @@ typedef struct ieee80211_payload {
 	uint8_t		payload[1];
 } __attribute__ ((__packed__)) ieee80211_payload;
 
-char *macaddr(uint8_t mac[]) {
+static char *macaddr(uint8_t mac[]) {
 	static char ether_buf[18] = {0, };
 	trace_ether_ntoa(mac, ether_buf);
 	return ether_buf;
@@ -723,9 +723,9 @@ static void decode_80211_data(char *pkt, unsigned len) {
 	}
 	
 	if (len > hdrlen) {
-		pld = (ieee80211_payload *) ((char *)pkt + hdrlen) ;
 		int payload_offset = 0;
 		uint16_t ethertype = 0;
+		pld = (ieee80211_payload *) ((char *)pkt + hdrlen) ;
 		if (ntohs(pld->ethertype) == 0xaaaa) {
 			/* 802.11 payload contains an 802.2 LLC/SNAP header */
 			libtrace_llcsnap_t *llcsnap = (libtrace_llcsnap_t *) pld;
