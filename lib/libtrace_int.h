@@ -195,10 +195,15 @@ int trace_prepare_packet(libtrace_t *trace, libtrace_packet_t *packet,
 
 /* Flags for prepare_packet functions */
 /*-------------------------------------*/
-/* If set, the memory pointed to by 'buffer' is malloc()'d and libtrace should
- * undertake ownership of that memory. If not set, the memory is treated as
- * externally-owned and will not be freed by libtrace when the packet is
- * destroyed. */
+enum {
+	/* If set, the memory pointed to by 'buffer' is malloc()'d and 
+	 * libtrace should undertake ownership of that memory. If not set, 
+	 * the memory is treated as externally-owned and will not be freed by 
+	 * libtrace when the packet is destroyed. */
+	TRACE_PREP_OWN_BUFFER		=1,
+	TRACE_PREP_DO_NOT_OWN_BUFFER	=0
+};
+
 #define TRACE_PREP_OWN_BUFFER 	1
 
 								
