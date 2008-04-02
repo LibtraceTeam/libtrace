@@ -53,10 +53,7 @@
 #include <signal.h>
 
 #include "libtrace.h"
-
-#ifndef PRIu64
-	#define PRIu64 "llu"
-#endif
+#include "lt_inttypes.h"
 
 struct libtrace_t *trace;
 

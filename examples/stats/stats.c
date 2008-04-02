@@ -4,6 +4,7 @@
 #include <getopt.h>
 #include <stdlib.h>
 #include <string.h>
+#include "lt_inttypes.h"
 
 double lastts = 0.0;
 uint64_t v4=0;

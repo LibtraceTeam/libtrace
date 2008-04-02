@@ -1,6 +1,8 @@
 #ifndef TRACEREPORT_H
 #define TRACEREPORT_H
 
+#include "lt_inttypes.h"
+
 typedef struct {
 	uint64_t count;
 	uint64_t bytes;

@@ -28,6 +28,7 @@ void ecn_per_packet(struct libtrace_packet_t *packet)
 void ecn_report(void)
 {
 	int i,j;
+	int total = 0;
 	
 	FILE *out = fopen("ecn.rpt", "w");
 	if (!out) {
@@ -82,7 +83,6 @@ void ecn_report(void)
 		}
 	}
 	
-	int total = 0;
 	for(i=0;i<4;i++){
 		for(j=1;j<4;j++)
 			total += ecn_stat[i][j].count;
