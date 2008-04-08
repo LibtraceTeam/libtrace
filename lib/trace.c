@@ -547,6 +547,11 @@ DLLEXPORT int trace_config(libtrace_t *libtrace,
 			if (trace_is_err(libtrace)) {
 				err = trace_get_err(libtrace);
 			}
+			if (*(int*)value<0 
+				|| *(int*)value>LIBTRACE_PACKET_BUFSIZE) {
+				trace_set_err(libtrace,TRACE_ERR_BAD_STATE,
+					"Invalid snap length");
+			}
 			libtrace->snaplen=*(int*)value;
 			return 0;
 		case TRACE_OPTION_FILTER:

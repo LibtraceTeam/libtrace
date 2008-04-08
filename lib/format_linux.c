@@ -86,7 +86,7 @@ static int linuxnative_init_input(libtrace_t *libtrace)
 		malloc(sizeof(struct libtrace_format_data_t));
 	FORMAT(libtrace->format_data)->fd = -1;
 	FORMAT(libtrace->format_data)->promisc = -1;
-	FORMAT(libtrace->format_data)->snaplen = 65536;
+	FORMAT(libtrace->format_data)->snaplen = LIBTRACE_PACKET_BUFSIZE;
 	FORMAT(libtrace->format_data)->filter = NULL;
 	FORMAT(libtrace->format_data)->stats_valid = 0;
 
@@ -154,11 +154,13 @@ static int linuxnative_start_input(libtrace_t *libtrace)
 		memset(&mreq,0,sizeof(mreq));
 		mreq.mr_ifindex = addr.sll_ifindex;
 		mreq.mr_type = PACKET_MR_PROMISC;
-		setsockopt(FORMAT(libtrace->format_data)->fd,
+		if (setsockopt(FORMAT(libtrace->format_data)->fd,
 				SOL_PACKET,
 				PACKET_ADD_MEMBERSHIP,
 				&mreq,
-				socklen);
+				socklen)==-1) {
+			perror("setsockopt(PROMISC)");
+		}
 	}
 
 	if (setsockopt(FORMAT(libtrace->format_data)->fd,
@@ -376,6 +378,9 @@ static int linuxnative_read_packet(libtrace_t *libtrace, libtrace_packet_t *pack
 	
 	if (!packet->buffer || packet->buf_control == TRACE_CTRL_EXTERNAL) {
 		packet->buffer = malloc((size_t)LIBTRACE_PACKET_BUFSIZE);
+		if (!packet->buffer) {
+			perror("Cannot allocate buffer");
+		}
 	}
 
 	flags |= TRACE_PREP_OWN_BUFFER;
@@ -398,7 +403,7 @@ static int linuxnative_read_packet(libtrace_t *libtrace, libtrace_packet_t *pack
 	msghdr.msg_controllen = CMSG_BUF_SIZE;
 	msghdr.msg_flags = 0;
 
-	iovec.iov_base = (void*)packet->payload;
+	iovec.iov_base = (void*)packet->buffer;
 	iovec.iov_len = snaplen;
 
 	hdr->wirelen = recvmsg(FORMAT(libtrace->format_data)->fd, &msghdr, 0);
