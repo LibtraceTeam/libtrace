@@ -728,14 +728,15 @@ DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 		libtrace->format->fin_packet(packet);
 	}
 
-	/* Clear the packet cache */
-	packet->capture_length = -1;
-	packet->l3_header = NULL;
-	packet->l3_ethertype = 0;
 
 	if (libtrace->format->read_packet) {
 		do {
 			size_t ret;
+			/* Clear the packet cache */
+			packet->capture_length = -1;
+			packet->l3_header = NULL;
+			packet->l3_ethertype = 0;
+
 			ret=libtrace->format->read_packet(libtrace,packet);
 			if (ret==(size_t)-1 || ret==0) {
 				return ret;
