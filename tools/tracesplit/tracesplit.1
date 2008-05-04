@@ -46,12 +46,13 @@ do not create more than "maxfiles" trace files
 
 .TP
 \fB\-S\fR snaplen
-Truncate packets to "snaplen" bytes long.
+Truncate packets to "snaplen" bytes long.  The default is collect the entire
+packet.
 
 .SH EXAMPLES
 create a 1MB erf trace of port 80 traffic.
 .nf
-tracemerge erf:/traces/bigtrace.gz \-f 'port 80' \-b $[ 1024 * 1024 ] 
+tracesplit erf:/traces/bigtrace.gz \-f 'port 80' \-b $[ 1024 * 1024 ] 
 erf:/traces/port80.gz 
 .fi
 
