@@ -39,6 +39,7 @@ static int usage(char *argv0)
 	"-H --libtrace-help	Print libtrace runtime documentation\n"
 	"-S --snaplen		Snap packets at the specified length\n"
 	"-v --verbose		Output statistics\n"
+	"-z --compress		Set compression level\n"
 	,argv0);
 	exit(1);
 }
@@ -71,6 +72,7 @@ int main(int argc, char *argv[])
 	uint64_t filescreated = 0;
 	uint16_t snaplen = 0;
 	int verbose=0;
+	int compress_level=-1;
 	
 	if (argc<2) {
 		usage(argv[0]);
@@ -91,10 +93,11 @@ int main(int argc, char *argv[])
 			{ "maxfiles", 	   1, 0, 'm' },
 			{ "snaplen",	   1, 0, 'S' },
 			{ "verbose",       0, 0, 'v' },
+			{ "compress",	   1, 0, 'z' },
 			{ NULL, 	   0, 0, 0   },
 		};
 
-		int c=getopt_long(argc, argv, "f:c:b:s:e:i:m:S:Hv",
+		int c=getopt_long(argc, argv, "f:c:b:s:e:i:m:S:Hvz:",
 				long_options, &option_index);
 
 		if (c==-1)
@@ -123,6 +126,13 @@ int main(int argc, char *argv[])
 				  break;
 			case 'v':
 				  verbose++;
+				  break;
+			case 'z':
+				  compress_level=atoi(optarg);
+				  if (compress_level<0 || compress_level>9) {
+					usage(argv[0]);
+				  	exit(1);
+				  }
 				  break;
 			default:
 				fprintf(stderr,"Unknown option: %c\n",c);
@@ -203,6 +213,7 @@ int main(int argc, char *argv[])
 		}
 		if (!output) {
 			char *buffer;
+			bool need_ext=false;
 			if (maxfiles <= filescreated) {
 				break;
 			}
@@ -210,15 +221,22 @@ int main(int argc, char *argv[])
 			if (interval!=UINT64_MAX && maxfiles>1) {
 				buffer=strdupcat(buffer,"-");
 				buffer=strdupcati(buffer,(uint64_t)firsttime);
+				need_ext=true;
 			}
 			if (count!=UINT64_MAX && maxfiles>1) {
 				buffer=strdupcat(buffer,"-");
 				buffer=strdupcati(buffer,(uint64_t)pktcount);
+				need_ext=true;
 			}
 			if (bytes!=UINT64_MAX && maxfiles>1) {
 				static int filenum=0;
 				buffer=strdupcat(buffer,"-");
 				buffer=strdupcati(buffer,(uint64_t)++filenum);
+				need_ext=true;
+			}
+			if (need_ext) {
+				if (compress_level!=0)
+					buffer=strdupcat(buffer,".gz");
 			}
 			output=trace_create_output(buffer);
 			if (trace_is_err_output(output)) {
@@ -226,11 +244,21 @@ int main(int argc, char *argv[])
 				free(buffer);
 				break;
 			}
+			if (compress_level!=-1) {
+				if (trace_config_output(output,
+					TRACE_OPTION_OUTPUT_COMPRESS,
+					&compress_level)==-1) {
+					trace_perror_output(output,"Unable to set compression");
+				}
+			}
 			trace_start_output(output);
 			if (trace_is_err_output(output)) {
 				trace_perror_output(output,"%s",buffer);
 				free(buffer);
 				break;
+			}
+			if (verbose) {
+				fprintf(stderr,"%s\n",buffer);
 			}
 			free(buffer);
 			filescreated ++;
