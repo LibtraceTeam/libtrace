@@ -52,6 +52,11 @@
 
 #include <assert.h>
 
+/* Declared in linux/if_arp.h but not in net/if_arp.h sigh */
+#ifndef ARPHRD_NONE
+#define ARPHRD_NONE 0xfffe
+#endif
+
 struct tpacket_stats {
 	unsigned int tp_packets;
 	unsigned int tp_drops;
@@ -472,6 +477,7 @@ static libtrace_linktype_t linuxnative_get_link_type(const struct libtrace_packe
 		case ARPHRD_IEEE80211:
 			return TRACE_TYPE_80211;
 		case ARPHRD_SIT:
+		case ARPHRD_NONE:
 			return TRACE_TYPE_NONE;
 		default: /* shrug, beyond me! */
 			printf("unknown Linux ARPHRD type 0x%04x\n",linktype);
