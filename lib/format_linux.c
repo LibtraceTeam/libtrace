@@ -408,7 +408,7 @@ static int linuxnative_read_packet(libtrace_t *libtrace, libtrace_packet_t *pack
 	msghdr.msg_controllen = CMSG_BUF_SIZE;
 	msghdr.msg_flags = 0;
 
-	iovec.iov_base = (void*)packet->buffer;
+	iovec.iov_base = (void*)(packet->buffer+sizeof(*hdr));
 	iovec.iov_len = snaplen;
 
 	hdr->wirelen = recvmsg(FORMAT(libtrace->format_data)->fd, &msghdr, 0);
