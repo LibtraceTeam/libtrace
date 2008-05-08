@@ -54,8 +54,8 @@ enum decode_style_t {
     DECODE_PARSER
 };
 
-typedef void (*decode_norm_t)(uint16_t type,char *packet,int len);
-typedef void (*decode_parser_t)(uint16_t type,char *packet,int len, element_t* el);
+typedef void (*decode_norm_t)(uint16_t type,const char *packet,int len);
+typedef void (*decode_parser_t)(uint16_t type,const char *packet,int len, element_t* el);
 
 typedef union decode_funcs {
     decode_norm_t decode_n;
@@ -83,7 +83,7 @@ void trace_dump_packet(struct libtrace_packet_t *packet)
 	time_t sec = (time_t)trace_get_seconds(packet);
 	libtrace_linktype_t linktype;
 	uint32_t length;
-	char *link=(char *)trace_get_packet_buffer(packet,&linktype,&length);
+	const char *link=(char *)trace_get_packet_buffer(packet,&linktype,&length);
 
 	printf("\n%s",ctime(&sec));
 	printf(" Capture: Packet Length: %i/%i Direction Value: %i\n",
@@ -97,7 +97,7 @@ void trace_dump_packet(struct libtrace_packet_t *packet)
 			linktype);
 }
 
-static void generic_decode(uint16_t type,char *packet, int len) {
+static void generic_decode(uint16_t type,const char *packet, int len) {
 	int i;
 	printf(" Unknown Protocol: %i",type);
 	for(i=0;i<len; /* Nothing */ ) {
@@ -127,7 +127,7 @@ static void generic_decode(uint16_t type,char *packet, int len) {
 	printf("\n");
 }
 
-void decode_next(char *packet,int len,char *proto_name,int type)
+void decode_next(const char *packet,int len,const char *proto_name,int type)
 {
 	std::string sname(proto_name);
 
@@ -186,12 +186,12 @@ void decode_next(char *packet,int len,char *proto_name,int type)
 		if (sname=="link") {
 			uint16_t newtype;
 			uint32_t newlen=len;
-			void *network=trace_get_payload_from_link(packet,
+			const char *network=(const char*)trace_get_payload_from_link((void*)packet,
 					(libtrace_linktype_t)type,
 					&newtype,&newlen);
 			if (network) {
 				printf("skipping unknown link header of type %i to %i\n",type,newtype);
-				decode_next((char*)network,newlen,"eth",newtype);
+				decode_next(network,newlen,"eth",newtype);
 				return;
 			}
 		}

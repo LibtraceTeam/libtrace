@@ -50,7 +50,7 @@ typedef struct element {
 } element_t;
     
 element_t *parse_protocol_file(char *filename);
-void decode_protocol_file(uint16_t link_type,char *packet,int len, element_t* el);
+void decode_protocol_file(uint16_t link_type,const char *packet,int len, element_t* el);
 
 typedef uint64_t bitbuffer_t;
 #endif

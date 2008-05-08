@@ -10,7 +10,7 @@ typedef struct gre_t {
 	uint16_t reserved1;
 } gre_t;
 
-void decode(int link_type,char *packet,unsigned len)
+void decode(int link_type,const char *packet,unsigned len)
 {
 	// GRE
 	if (len<2) {

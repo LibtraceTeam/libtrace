@@ -108,7 +108,7 @@ static bitbuffer_t fix_byteorder(bitbuffer_t value,
 
 
 
-void decode_protocol_file(uint16_t link_type,char *packet,int len,element_t *el)
+void decode_protocol_file(uint16_t link_type,const char *packet,int len,element_t *el)
 {
     bitbuffer_t result;
 

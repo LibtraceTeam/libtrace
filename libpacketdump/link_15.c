@@ -15,7 +15,7 @@
 #define ALIGN_NATURAL_16(_p,_s,_c) \
 	while ( (_p - _s) % sizeof(uint16_t)) {_p++; _c++;} 
 
-void decode(int link_type,char *packet,unsigned len)
+void decode(int link_type,const char *packet,unsigned len)
 {
 	uint32_t *ptr; 
 	uint8_t *p; /* Our current field "cursor" */

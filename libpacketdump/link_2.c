@@ -6,7 +6,7 @@
 #include "libtrace.h"
 #include "libpacketdump.h"
 
-void decode(int link_type,char *packet,unsigned len)
+void decode(int link_type,const char *packet,unsigned len)
 {
 	char ether_buf[18] = {0, };
 	printf(" Ethernet:");

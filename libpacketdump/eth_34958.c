@@ -90,7 +90,7 @@ static void decode_eapol_encapsulated_asf_alert(char *packet, unsigned len)
 	printf(" 802.1x: Length: %d\n",v);
 }
 
-void decode(int link_type,char *packet,unsigned len)
+void decode(int link_type,const char *packet,unsigned len)
 {
 	int offset;
 	int v;

@@ -7,9 +7,9 @@ extern "C" {
 #endif
 
 void trace_dump_packet(libtrace_packet_t *packet);
-void decode_next(char *packet,int len,char *proto_name,int type);
+void decode_next(const char *packet,int len,const char *proto_name,int type);
 
-void decode(int link_type, char *pkt, unsigned len);
+void decode(int link_type, const char *pkt, unsigned len);
 
 #ifdef __cplusplus 
 }
