@@ -31,6 +31,7 @@ void *trace_get_payload_from_ethernet(void *ethernet,
 void *trace_get_vlan_payload_from_ethernet_payload(void *ethernet, uint16_t *type,
 		uint32_t *remaining)
 {
+	assert(type != NULL);
 	if (*type == 0x8100) {
 		libtrace_8021q_t *vlanhdr = (libtrace_8021q_t *)ethernet;
 
@@ -56,6 +57,8 @@ void *trace_get_vlan_payload_from_ethernet_payload(void *ethernet, uint16_t *typ
 void *trace_get_mpls_payload_from_ethernet_payload(void *ethernet,
 		uint16_t *type, uint32_t *remaining)
 {
+	assert(type != NULL);
+	
 	if (*type == 0x8847) {
 		if ((((char*)ethernet)[2]&0x01)==0) {
 			*type = 0x8847;

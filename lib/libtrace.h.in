@@ -1223,6 +1223,32 @@ DLLEXPORT void *trace_get_payload_from_link(void *linkptr,
 DLLEXPORT void *trace_get_vlan_payload_from_ethernet_payload(
                 void *ethernet_payload, uint16_t *type, uint32_t *remaining);
 
+/** Skips over any MPLS headers, if present.
+ * @param ethernet_payload      A pointer to the payload following an ethernet
+ * header - usually the result of calling trace_get_payload_from_link
+ * @param[in,out] type  The ethernet type, replaced by the ether type of the
+ * following header - 0x0000 if an Ethernet header is deemed to be next
+ * @param[in,out] remaining     Updated with the number of bytes remaining
+ *
+ * @return a pointer to the header beyond the MPLS label, if present. Will
+ * return NULL if there is not enough bytes remaining to skip past the MPLS
+ * label or if the ether type is not MPLS.
+ *
+ * Remaining may be NULL. If remaining is not NULL it must point to the number
+ * of bytes captured past (but not including) the link layer. This function
+ * will decrement it by the length of the topmost MPLS label if present.
+ *
+ * Type must point to the value of the ethernet type. Libtrace will assert
+ * fail if type is NULL.
+ *
+ * NOTE that this function will only remove one MPLS label at a time - the type
+ * will be set to 0x8847 if there is another MPLS label after the one
+ * removed by this function.
+ *
+ */
+DLLEXPORT void *trace_get_mpls_payload_from_ethernet_payload(
+                void *ethernet_payload, uint16_t *type, uint32_t *remaining);
+
 /** Gets a pointer to the payload given a pointer to a tcp header
  * @param tcp           The tcp Header
  * @param[in,out] remaining Updated with the number of bytes remaining
