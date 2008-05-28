@@ -16,7 +16,7 @@ libtrace_ip_t *trace_get_ip(libtrace_packet_t *packet)
 		return NULL;
 
 	/* Make sure we have at least a base IPv4 header */
-	if (remaining < sizeof(libtrace_ip_t))
+	if (remaining < sizeof(libtrace_ip_t)) 
 		return NULL;
 	
 	/* Not an IPv4 packet */
@@ -49,11 +49,15 @@ DLLEXPORT void *trace_get_payload_from_ip(libtrace_ip_t *ipptr, uint8_t *prot,
         void *trans_ptr = 0;
 
         if ((ntohs(ipptr->ip_off) & SW_IP_OFFMASK) != 0) {
+		*remaining = 0;		/* Not sure if this is right but
+					   consistency is a good thing, right?
+					 */
 		return NULL;
 	}
 
 	if (remaining) {
 		if (*remaining<=(ipptr->ip_hl*4U)) {
+			*remaining = 0;
 			return NULL;
 		}
 		*remaining-=(ipptr->ip_hl * 4);
@@ -73,8 +77,10 @@ void *trace_get_payload_from_ip6(libtrace_ip6_t *ipptr, uint8_t *prot,
 	uint8_t nxt = ipptr->nxt;
 
 	if (remaining) {
-		if (*remaining<sizeof(libtrace_ip6_t))
+		if (*remaining<sizeof(libtrace_ip6_t)) {
+			*remaining = 0;
 			return NULL;
+		}
 		*remaining-=sizeof(libtrace_ip6_t);
 	}
 
@@ -93,6 +99,7 @@ void *trace_get_payload_from_ip6(libtrace_ip6_t *ipptr, uint8_t *prot,
 					if (remaining) {
 						if (*remaining < len) {
 							/* Snap too short */
+							*remaining = 0;
 							return NULL;
 						}
 						*remaining-=len;

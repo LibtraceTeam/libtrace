@@ -14,8 +14,10 @@ void *trace_get_payload_from_ethernet(void *ethernet,
 	libtrace_ether_t *eth = (libtrace_ether_t*)ethernet;
 
 	if (remaining) {
-		if (*remaining < sizeof(*eth))
+		if (*remaining <= sizeof(*eth)) {
+			*remaining = 0;
 			return NULL;
+		}
 		*remaining-=sizeof(*eth);
 	}
 
@@ -36,8 +38,10 @@ void *trace_get_vlan_payload_from_ethernet_payload(void *ethernet, uint16_t *typ
 		libtrace_8021q_t *vlanhdr = (libtrace_8021q_t *)ethernet;
 
 		if (remaining) {
-			if (*remaining <= sizeof(libtrace_8021q_t))
+			if (*remaining <= sizeof(libtrace_8021q_t)) {
+				*remaining = 0;
 				return NULL;
+			}
 
 			*remaining=*remaining-sizeof(libtrace_8021q_t);
 		}
@@ -100,8 +104,10 @@ static void *trace_get_payload_from_llcsnap(void *link,
 	libtrace_llcsnap_t *llc = (libtrace_llcsnap_t*)link;
 
 	if (remaining) {
-		if (*remaining <= sizeof(libtrace_llcsnap_t))
+		if (*remaining <= sizeof(libtrace_llcsnap_t)) {
+			*remaining = 0;
 			return NULL;
+		}
 		*remaining-=(sizeof(libtrace_llcsnap_t));
 	}
 
@@ -119,8 +125,10 @@ static void *trace_get_payload_from_80211(void *link, uint16_t *type, uint32_t *
 	uint16_t *eth; /* ethertype */
 	int8_t extra = 0; /* how many QoS bytes to skip */
 	
-	if (remaining && *remaining <= sizeof(libtrace_80211_t))
+	if (remaining && *remaining <= sizeof(libtrace_80211_t)) {
+		*remaining = 0;
 		return NULL;
+	}
 
 	wifi=(libtrace_80211_t*)link;
 
@@ -138,8 +146,10 @@ static void *trace_get_payload_from_80211(void *link, uint16_t *type, uint32_t *
 	if (wifi->subtype & 0x8) 
 		extra += 2;
 
-	if (remaining && *remaining < sizeof(*eth))
+	if (remaining && *remaining < sizeof(*eth)) {
+		*remaining = 0;
 		return NULL;
+	}
 
 	eth=(uint16_t *)((char*)wifi+sizeof(*wifi)+extra);
 	
@@ -161,8 +171,10 @@ static void *trace_get_payload_from_ppp(void *link,
 	libtrace_ppp_t *ppp = (libtrace_ppp_t*)link;
 
 	if (remaining) {
-		if (*remaining <= sizeof(libtrace_ppp_t))
+		if (*remaining <= sizeof(libtrace_ppp_t)) {
+			*remaining = 0;
 			return NULL;
+		}
 		*remaining-=sizeof(libtrace_ppp_t);
 	}
 
@@ -188,8 +200,10 @@ static void *trace_get_payload_from_chdlc(void *link,
 	libtrace_chdlc_t *chdlc = (libtrace_chdlc_t*)link;
 
 	if (remaining) {
-		if (*remaining <= sizeof(libtrace_chdlc_t))
+		if (*remaining <= sizeof(libtrace_chdlc_t)) {
+			*remaining = 0;
 			return NULL;
+		}
 		*remaining-=sizeof(libtrace_chdlc_t);
 	}
 
@@ -256,8 +270,10 @@ void *trace_get_payload_from_atm(void *link,
 		uint8_t *type, uint32_t *remaining)
 {
 	libtrace_atm_capture_cell_t *cell;
-	if (remaining && *remaining<=sizeof(libtrace_atm_capture_cell_t))
+	if (remaining && *remaining<=sizeof(libtrace_atm_capture_cell_t)) {
+		*remaining = 0;
 		return NULL;
+	}
 	cell=(libtrace_atm_capture_cell_t*)link;
 
 	if (type)
