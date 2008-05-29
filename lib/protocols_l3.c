@@ -49,9 +49,8 @@ DLLEXPORT void *trace_get_payload_from_ip(libtrace_ip_t *ipptr, uint8_t *prot,
         void *trans_ptr = 0;
 
         if ((ntohs(ipptr->ip_off) & SW_IP_OFFMASK) != 0) {
-		*remaining = 0;		/* Not sure if this is right but
-					   consistency is a good thing, right?
-					 */
+		if (remaining)
+			*remaining = 0;		
 		return NULL;
 	}
 
