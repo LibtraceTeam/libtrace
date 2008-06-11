@@ -855,13 +855,14 @@ DLLEXPORT uint64_t trace_get_erf_timestamp(const libtrace_packet_t *packet) {
 	} else if (packet->trace->format->get_timeval) {
 		/* timeval -> timestamp */
 		ts = packet->trace->format->get_timeval(packet);
-		timestamp = ((((uint64_t)ts.tv_sec) << 32) + \
-				(((uint64_t)ts.tv_usec * UINT_MAX)/1000000));
+		timestamp = ((((uint64_t)ts.tv_sec) << 32) +
+				(((uint64_t)ts.tv_usec << 32)/1000000));
 	} else if (packet->trace->format->get_seconds) {
 		/* seconds -> timestamp */
 		seconds = packet->trace->format->get_seconds(packet);
-		timestamp = ((uint64_t)((uint32_t)seconds) << 32) + \
-		      (uint64_t)(( seconds - (uint32_t)seconds   ) * UINT_MAX);
+		timestamp = (((uint64_t)seconds)<<32)
+		          + (uint64_t)((seconds-(uint64_t)seconds)*UINT_MAX);
+		      
 	}
 	return timestamp;
 }
