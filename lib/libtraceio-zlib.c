@@ -73,7 +73,7 @@ ssize_t libtrace_io_write(libtrace_io_t *io, const void *buf, size_t len)
 	return (ssize_t)gzwrite(io->file,buf,(unsigned)len);
 }
 
-off_t libtrace_io_seek(libtrace_io_t *io, off_t offset, int whence)
+int64_t libtrace_io_seek(libtrace_io_t *io, int64_t offset, int whence)
 {
 	return gzseek(io->file,offset,whence);
 }
