@@ -132,10 +132,10 @@ test-convert-all: test-convert
  
 clean:
 	$(RM) $(BINS) $(OBJS) test-format  test-decode test-convert \
-	test-decode2 test-write
+	test-decode2 test-write test-drops
 
 distclean:
-	$(RM) $(BINS) $(OBJS) test-format test-decode test-convert
+	$(RM) $(BINS) $(OBJS) test-format test-decode test-convert test-drops
 
 install:
 	@true
