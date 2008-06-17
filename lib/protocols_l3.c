@@ -152,7 +152,7 @@ DLLEXPORT void *trace_get_layer3(const libtrace_packet_t *packet,
 
 	for(;;) {
 		if (!iphdr || *remaining == 0)
-			return NULL;
+			break;
 		switch(*ethertype) {
 		case 0x8100: /* VLAN */
 			iphdr=trace_get_vlan_payload_from_ethernet_payload(
@@ -166,6 +166,10 @@ DLLEXPORT void *trace_get_layer3(const libtrace_packet_t *packet,
 				iphdr=trace_get_payload_from_ethernet(
 						iphdr,ethertype,remaining);
 			}
+			continue;
+		case 0x8864: /* PPPoE */
+			iphdr = trace_get_payload_from_pppoe(iphdr, ethertype,
+					remaining);
 			continue;
 		default:
 			break;

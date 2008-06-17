@@ -17,6 +17,8 @@ void *trace_get_mpls_payload_from_ethernet_payload(void *ethernet,
 void *trace_get_payload_from_ethernet(void *ethernet, 
 		uint16_t *type,
 		uint32_t *remaining);
+void *trace_get_payload_from_pppoe(void *link, uint16_t *type, 
+		uint32_t *remaining);
 /* l3 definitions */
 struct ports_t {
 	uint16_t src;

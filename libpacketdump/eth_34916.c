@@ -26,8 +26,8 @@ void decode(int link_type,const char *pkt,unsigned len)
 	printf(" PPPoE: Version: %d\n",pppoe->ver);
 	printf(" PPPoE: Type: %d\n",pppoe->type);
 	printf(" PPPoE: Code: %d\n",pppoe->code);
-	printf(" PPPoE: Session: %d\n",pppoe->session);
-	printf(" PPPoE: Length: %d\n",pppoe->length);
+	printf(" PPPoE: Session: %d\n",ntohs(pppoe->session));
+	printf(" PPPoE: Length: %d\n",ntohs(pppoe->length));
 
 	/* Meh.. pass it off to eth decoder */
 	decode_next(pkt + sizeof(*pppoe), len - sizeof(*pppoe), "link", 5);

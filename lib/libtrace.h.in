@@ -578,12 +578,26 @@ typedef struct libtrace_atm_nni_capture_cell
 } PACKED libtrace_atm_nni_capture_cell_t;
 
 /** PPP header */
-typedef struct libtrace_pps
+typedef struct libtrace_ppp
 {
- uint8_t addres;		/**< PPP Address (0xFF - All stations) */
- uint8_t header;		/**< PPP Control (0x03 - Unnumbered info) */
+ /* I can't figure out where the hell these two variables come from. They're
+  * definitely not in RFC 1661 which defines PPP. Probably some weird thing
+  * relating to the lack of distinction between PPP, HDLC and CHDLC */
+	
+/* uint8_t address; */		/**< PPP Address (0xFF - All stations) */
+/* uint8_t header;  */		/**< PPP Control (0x03 - Unnumbered info) */
  uint16_t protocol;		/**< PPP Protocol (htons(0x0021) - IPv4 */
 } PACKED libtrace_ppp_t;
+
+/** PPPoE header */
+typedef struct libtrace_pppoe
+{
+ LT_BITFIELD8 version:4;	/**< Protocol version number */
+ LT_BITFIELD8 type:4;		/**< PPPoE Type */
+ uint8_t code;			/**< PPPoE Code */
+ uint16_t session_id;		/**< Session Identifier */
+ uint16_t length;		/**< Total Length of the PPP packet */
+} PACKED libtrace_pppoe_t;
 
 /** 802.11 header */
 typedef struct libtrace_80211_t {

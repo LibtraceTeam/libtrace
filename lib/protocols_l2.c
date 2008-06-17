@@ -181,12 +181,32 @@ static void *trace_get_payload_from_ppp(void *link,
 	if (type) {
 		switch(ntohs(ppp->protocol)) {
 			case 0x0021: *type = 0x0800; break;
+			/* If it isn't IP, then it is probably PPP control and
+			 * I can't imagine anyone caring about that too much
+			 */
+			default: *type = 0; break;
 		}
 	}
 
 
 	return (void*)((char *)ppp+sizeof(*ppp));
 }
+
+void *trace_get_payload_from_pppoe(void *link, uint16_t *type, 
+		uint32_t *remaining) {
+	if (remaining) {
+		if (*remaining <= sizeof(libtrace_pppoe_t)) {
+			*remaining = 0;
+			return NULL;
+		}
+		*remaining -= sizeof(libtrace_pppoe_t);
+	}
+	
+	/* PPPoE is always followed by PPP */
+	return trace_get_payload_from_ppp(link + sizeof(libtrace_pppoe_t),
+			type, remaining);
+}
+	
 
 typedef struct libtrace_chdlc_t {
 	uint8_t address;	/** 0xF0 for unicast, 0xF8 for multicast */
