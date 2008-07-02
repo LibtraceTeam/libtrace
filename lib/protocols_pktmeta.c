@@ -20,21 +20,22 @@
 void *trace_get_payload_from_linux_sll(const void *link,
 		uint16_t *type, uint32_t *remaining) 
 {
-	libtrace_sll_header_t *sll;
+	libtrace_sll_header_t *sll = (libtrace_sll_header_t*) link;
 
-	sll = (libtrace_sll_header_t*) link;
+	/* Determine SLL header length */
+	uint32_t hlen = ntohs(sll->halen) + (sizeof(uint16_t) * 4);
 
 	if (remaining) {
-		if (*remaining <= sizeof(*sll)) {
+		if (*remaining <= hlen) {
 			*remaining = 0;
 			return NULL;
 		}
-		*remaining-=sizeof(*sll);
+		*remaining -= hlen;
 	}
 
 	if (type) *type = ntohs(sll->hatype);
 
-	return (void*)((char*)sll+sizeof(*sll));
+	return (void*) ((char*)sll + hlen);
 
 }
 
