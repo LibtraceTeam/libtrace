@@ -63,8 +63,8 @@ TXT_PROTOCOLS+=link_17.protocol
 BIN_PROTOCOLS+=eth_2048.la
 # ARP
 BIN_PROTOCOLS+=eth_2054.la	
-# IPv6
-TXT_PROTOCOLS+=eth_33024.protocol	
+# VLAN (802.1Q)
+BIN_PROTOCOLS+=eth_33024.la
 # MPLS
 BIN_PROTOCOLS+=eth_34887.la
 # pppoe
@@ -106,6 +106,7 @@ link_11_la_LDFLAGS=-module
 link_15_la_LDFLAGS=-module 
 eth_2048_la_LDFLAGS=-module
 eth_2054_la_LDFLAGS=-module
+eth_33024_la_LDFLAGS=-module
 eth_34887_la_LDFLAGS=-module
 eth_34916_la_LDFLAGS=-module
 eth_34958_la_LDFLAGS=-module
