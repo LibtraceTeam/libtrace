@@ -10,6 +10,7 @@
 #include <string.h>
 #include <assert.h>
 #include <signal.h>
+#include <time.h>
 
 static char *strdupcat(char *str,char *app)
 {
@@ -191,7 +192,13 @@ int main(int argc, char *argv[])
 		}
 
 		if (firsttime==0) {
-			firsttime=trace_get_seconds(packet);
+			time_t now = trace_get_seconds(packet);
+			if (starttime != 0) {
+				firsttime=now-((now - starttime)%interval);
+			}
+			else {
+				firsttime=now;
+			}
 		}
 
 		if (output && trace_get_seconds(packet)>firsttime+interval) {
@@ -239,6 +246,20 @@ int main(int argc, char *argv[])
 				if (compress_level!=0)
 					buffer=strdupcat(buffer,".gz");
 			}
+			if (verbose>1) {
+				fprintf(stderr,"%s:",buffer);
+				if (count!=UINT64_MAX)
+					fprintf(stderr," count=%" PRIu64,pktcount);
+				if (bytes!=UINT64_MAX)
+					fprintf(stderr," bytes=%" PRIu64,bytes);
+				if (interval!=UINT64_MAX) {
+					time_t filetime = firsttime;
+					fprintf(stderr," time=%s",ctime(&filetime));
+				}
+				else {
+					fprintf(stderr,"\n");
+				}
+			}
 			output=trace_create_output(buffer);
 			if (trace_is_err_output(output)) {
 				trace_perror_output(output,"%s",buffer);
@@ -257,9 +278,6 @@ int main(int argc, char *argv[])
 				trace_perror_output(output,"%s",buffer);
 				free(buffer);
 				break;
-			}
-			if (verbose) {
-				fprintf(stderr,"%s\n",buffer);
 			}
 			free(buffer);
 			filescreated ++;
