@@ -140,7 +140,8 @@ int main(int argc, char *argv[])
 				return 1;
 		}
 	}
-	if (optind+2<argc) {
+
+	if (optind+2>argc) {
 		fprintf(stderr,"missing inputuri or outputuri\n");
 		usage(argv[0]);
 	}
