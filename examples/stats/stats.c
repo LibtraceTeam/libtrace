@@ -14,7 +14,7 @@ uint64_t tcp=0;
 uint64_t icmp=0;
 uint64_t ok=0;
 
-void per_packet(libtrace_packet_t *packet)
+static void per_packet(libtrace_packet_t *packet)
 {
 	/* Packet data */
 	uint32_t remaining;
@@ -99,7 +99,7 @@ void per_packet(libtrace_packet_t *packet)
 	++ok;
 }
 
-void usage(char *argv0)
+static void usage(char *argv0)
 {
 	fprintf(stderr,"usage: %s [ --filter | -f bpfexp ]  [ --snaplen | -s snap ]\n\t\t[ --promisc | -p flag] [ --help | -h ] [ --libtrace-help | -H ] libtraceuri...\n",argv0);
 }
