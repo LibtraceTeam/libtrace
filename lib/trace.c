@@ -947,6 +947,8 @@ DLLEXPORT size_t trace_get_capture_length(const libtrace_packet_t *packet)
 			packet->trace->format->get_capture_length(packet);
 	}
 
+	assert(packet->capture_length < LIBTRACE_PACKET_BUFSIZE);
+
 	return packet->capture_length;
 }
 	
