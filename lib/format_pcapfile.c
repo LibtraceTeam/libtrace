@@ -272,6 +272,8 @@ static int pcapfile_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 			packet->buffer,
 			sizeof(libtrace_pcapfile_pkt_hdr_t));
 
+	assert(swapl(libtrace,((libtrace_pcapfile_pkt_hdr_t*)packet->buffer)->caplen)<LIBTRACE_PACKET_BUFSIZE);
+
 	if (err<0) {
 		trace_set_err(libtrace,errno,"reading packet");
 		return -1;
@@ -366,6 +368,7 @@ static int pcapfile_write_packet(libtrace_out_t *out,
 	hdr.ts_sec = tv.tv_sec;
 	hdr.ts_usec = tv.tv_usec;
 	hdr.caplen = trace_get_capture_length(packet);
+	assert(hdr.caplen < LIBTRACE_PACKET_BUFSIZE);
 	/* PCAP doesn't include the FCS, we do */
 	if (linktype==TRACE_TYPE_ETH)
 		if (trace_get_wire_length(packet) >= 4) {
@@ -376,6 +379,8 @@ static int pcapfile_write_packet(libtrace_out_t *out,
 		}
 	else
 		hdr.wirelen = trace_get_wire_length(packet);
+
+	assert(hdr.wirelen < LIBTRACE_PACKET_BUFSIZE);
 
 
 	numbytes=libtrace_io_write(DATAOUT(out)->file,
