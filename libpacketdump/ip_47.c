@@ -14,7 +14,7 @@ void decode(int link_type,const char *packet,unsigned len)
 {
 	// GRE
 	if (len<2) {
-		printf(" GRE: [Truncated]");
+		printf(" GRE: [Truncated]\n");
 		return;
 	}
 	printf(" GRE: %s\n",
