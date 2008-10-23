@@ -30,7 +30,7 @@ void *trace_get_payload_from_ethernet(void *ethernet,
 /* skip any 802.1q headers if necessary 
  * type is input/output
  */
-void *trace_get_vlan_payload_from_ethernet_payload(void *ethernet, uint16_t *type,
+void *trace_get_payload_from_vlan(void *ethernet, uint16_t *type,
 		uint32_t *remaining)
 {
 	assert(type != NULL);
@@ -49,17 +49,17 @@ void *trace_get_vlan_payload_from_ethernet_payload(void *ethernet, uint16_t *typ
 		*type = ntohs(vlanhdr->vlan_ether_type);
 
 		return (void*)((char *)ethernet + sizeof(*vlanhdr));
-	}
+	} else
+		return NULL;
 
-	return ethernet;
 }
 
 /* skip any MPLS headers if necessary, guessing what the next type is
  * type is input/output.  If the next type is "ethernet" this will
  * return a type of 0x0000.
  */
-void *trace_get_mpls_payload_from_ethernet_payload(void *ethernet,
-		uint16_t *type, uint32_t *remaining)
+void *trace_get_payload_from_mpls(void *ethernet, uint16_t *type, 
+		uint32_t *remaining)
 {
 	assert(type != NULL);
 	

@@ -1218,13 +1218,12 @@ DLLEXPORT void *trace_get_payload_from_link(void *linkptr,
 		uint16_t *type, uint32_t *remaining);
 
 /** Skips over any 802.1q headers, if present.
- * @param ethernet      A pointer to the payload following an ethernet header
- * -usually the result of calling trace_get_payload_from_link
+ * @param vlan      A pointer to the vlan header
  * @param[in,out] type  The ethernet type, replaced with the vlan ether type
  * @param[in,out] remaining Updated with the number of bytes remaining
  *
  * @return a pointer to the header beyond the vlan header, if present.
- * Otherwise, returns the ethernet payload that was passed in
+ * Otherwise, returns NULL
  *
  * Remaining may be NULL. If Remaining is not NULL it must point to the number
  * of bytes captured past (but not including) the link layer. This function
@@ -1234,12 +1233,11 @@ DLLEXPORT void *trace_get_payload_from_link(void *linkptr,
  * fail if type is NULL.
  *
  */
-DLLEXPORT void *trace_get_vlan_payload_from_ethernet_payload(
-                void *ethernet_payload, uint16_t *type, uint32_t *remaining);
+DLLEXPORT void *trace_get_payload_from_vlan(
+                void *vlan, uint16_t *type, uint32_t *remaining);
 
 /** Skips over any MPLS headers, if present.
- * @param ethernet_payload      A pointer to the payload following an ethernet
- * header - usually the result of calling trace_get_payload_from_link
+ * @param mpls      A pointer to the mpls header
  * @param[in,out] type  The ethernet type, replaced by the ether type of the
  * following header - 0x0000 if an Ethernet header is deemed to be next
  * @param[in,out] remaining     Updated with the number of bytes remaining
@@ -1260,8 +1258,8 @@ DLLEXPORT void *trace_get_vlan_payload_from_ethernet_payload(
  * removed by this function.
  *
  */
-DLLEXPORT void *trace_get_mpls_payload_from_ethernet_payload(
-                void *ethernet_payload, uint16_t *type, uint32_t *remaining);
+DLLEXPORT void *trace_get_payload_from_mpls(
+                void *mpls, uint16_t *type, uint32_t *remaining);
 
 /** Gets a pointer to the payload given a pointer to a tcp header
  * @param tcp           The tcp Header

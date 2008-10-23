@@ -48,7 +48,10 @@ DLLEXPORT void *trace_get_payload_from_ip(libtrace_ip_t *ipptr, uint8_t *prot,
 {
         void *trans_ptr = 0;
 
-        if ((ntohs(ipptr->ip_off) & SW_IP_OFFMASK) != 0) {
+        if (ipptr == NULL)
+		return NULL;
+
+	if ((ntohs(ipptr->ip_off) & SW_IP_OFFMASK) != 0) {
 		if (remaining)
 			*remaining = 0;		
 		return NULL;
@@ -75,6 +78,9 @@ void *trace_get_payload_from_ip6(libtrace_ip6_t *ipptr, uint8_t *prot,
 	void *payload = (char*)ipptr+sizeof(libtrace_ip6_t);
 	uint8_t nxt = ipptr->nxt;
 
+	if (ipptr == NULL)
+		return NULL;
+	
 	if (remaining) {
 		if (*remaining<sizeof(libtrace_ip6_t)) {
 			*remaining = 0;
@@ -155,11 +161,11 @@ DLLEXPORT void *trace_get_layer3(const libtrace_packet_t *packet,
 			break;
 		switch(*ethertype) {
 		case 0x8100: /* VLAN */
-			iphdr=trace_get_vlan_payload_from_ethernet_payload(
+			iphdr=trace_get_payload_from_vlan(
 					  iphdr,ethertype,remaining);
 			continue;
 		case 0x8847: /* MPLS */
-			iphdr=trace_get_mpls_payload_from_ethernet_payload(
+			iphdr=trace_get_payload_from_mpls(
 					  iphdr,ethertype,remaining);
 
 			if (iphdr && ethertype == 0x0) {
