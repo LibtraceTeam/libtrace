@@ -11,8 +11,11 @@ static void usage(char *argv0)
 	fprintf(stderr,"Usage:\n"
 	"%s flags outputuri traceuri [traceuri...]\n"
 	"-i [interfaces_per_input] --set-interface [interfaces_per_input]\n"
-	"			Each trace is allocated an interface. Default leaves this flag as read from the original traces, if appropriate\n"
+	"			Each trace is allocated an interface. Default leaves this flag as\n"
+	"			read from the original traces, if appropriate\n"
 	"-u --unique-packets    Discard duplicate packets\n"
+	"-z [level] --compression [level]\n"
+	"			Compression level\n"
 	"-H --libtrace-help     Print libtrace runtime documentation\n"
 	,argv0);
 	exit(1);
@@ -37,6 +40,7 @@ int main(int argc, char *argv[])
 	int i=0;
 	uint64_t last_ts=0;
 	struct sigaction sigact;
+	int compression=6;
 
 	while (1) {
 		int option_index;
@@ -44,10 +48,11 @@ int main(int argc, char *argv[])
 			{ "set-interface", 	2, 0, 'i' },
 			{ "unique-packets",	0, 0, 'u' },
 			{ "libtrace-help",	0, 0, 'H' },
+			{ "compression",	2, 0, 'z' },
 			{ NULL,			0, 0, 0   },
 		};
 
-		int c=getopt_long(argc, argv, "i::uH",
+		int c=getopt_long(argc, argv, "i::uHz::",
 				long_options, &option_index);
 
 		if (c==-1)
@@ -65,6 +70,16 @@ int main(int argc, char *argv[])
 				  trace_help();
 				  exit(1);
 				  break;
+			case 'z':
+				if (optarg)
+					compression = atoi(optarg);
+				else
+					compression = 6;
+				if (compression<0 || compression>9) {
+					fprintf(stderr,"Compression level must be between 0 and 9\n");
+					usage(argv[0]);
+				}
+				break;
 			default:
 				fprintf(stderr,"unknown option: %c\n",c);
 				usage(argv[0]);
@@ -81,6 +96,11 @@ int main(int argc, char *argv[])
 		trace_perror_output(output,"trace_create_output");
 		return 1;
 	}
+
+	if (trace_config_output(output, TRACE_OPTION_OUTPUT_COMPRESS, &compression) == -1) {
+		trace_perror_output(output,"Unable to set compression level");
+	}
+
 	if (trace_start_output(output)==-1) {
 		trace_perror_output(output,"trace_start_output");
 		return 1;
