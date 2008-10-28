@@ -34,6 +34,15 @@ Limitations apply based on the input trace format (not the output trace format)
 .BI \-\^\-unique-packets
 Ignore duplicate packets with identical timestamps.
 
+.TP
+.PD 0
+.BI \-z [ compression_level ]
+.TP
+.PD
+.BI \-\^\-compression [ compression_level ]
+Sets the amount of compression performed on the output file.  Currently libtrace will always write
+out compressed files, even when -z0 is given.
+
 .SH LINKS
 More details about tracemerge (and libtrace) can be found at
 http://www.wand.net.nz/trac/libtrace/wiki/UserDocumentation
