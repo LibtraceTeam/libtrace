@@ -49,8 +49,7 @@ struct tsh_format_data_t {
 
 typedef struct tsh_pkt_header_t {
 	uint32_t seconds;
-	LT_BITFIELD32 iface:8;
-	LT_BITFIELD32 usecs:24;
+	uint32_t usecs;
 } tsh_pkt_header_t;
 
 static int tsh_get_framing_length(const libtrace_packet_t *packet)
@@ -186,14 +185,14 @@ static libtrace_linktype_t tsh_get_link_type(const libtrace_packet_t *packet) {
 }
 
 static libtrace_direction_t tsh_get_direction(const libtrace_packet_t *packet) {
-	return ((tsh_pkt_header_t*)(packet->header))->iface;
+	return ntohl(((tsh_pkt_header_t*)(packet->header))->usecs & htonl(0xFF000000)) >> 24;
 }
 
 static struct timeval tsh_get_timeval(const libtrace_packet_t *packet)
 {
 	struct timeval tv;
 	tv.tv_sec=ntohl(((tsh_pkt_header_t*)(packet->header))->seconds);
-	tv.tv_usec=ntohl(((tsh_pkt_header_t*)(packet->header))->usecs);
+	tv.tv_usec=ntohl(((tsh_pkt_header_t*)(packet->header))->usecs & htonl(0x00FFFFFF));
 
 	return tv;
 }
