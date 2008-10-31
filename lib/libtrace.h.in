@@ -1076,6 +1076,9 @@ DLLEXPORT void *trace_get_packet_meta(const libtrace_packet_t *packet,
  * Examples of metadata headers include the Linux SLL header and the Radiotap
  * wireless monitoring header.
  *
+ * If the header is truncated, this function will return NULL, and remaining will be 0.
+ * If there are 0 bytes of payload, the function will return a pointer, and remaining will be 0.
+ *
  * @param[in] meta a pointer to a header
  * @param[in,out] linktype the linktype of meta (updated to indicate the
  * linktype of the returned header if applicable).
@@ -1084,7 +1087,7 @@ DLLEXPORT void *trace_get_packet_meta(const libtrace_packet_t *packet,
  * pointer to a metadata header, NULL is returned and linktype remains
  * unchanged.
  *
- * All parameters are mandatory. NULL will be returned if any are NULL.
+ * All parameters are mandatory. 
  */
 DLLEXPORT void *trace_get_payload_from_meta(const void *meta,
                 libtrace_linktype_t *linktype,
@@ -1115,17 +1118,19 @@ DLLEXPORT void *trace_get_layer2(const libtrace_packet_t *packet,
  *
  * @param l2            	The pointer to the current layer2 header
  * @param linktype		The type of the layer2 header
- * @param[out] ethertype 	An optional output variable of the ethernet type
- * @param[in,out] remaining 	Optionally updated with the length remaining
+ * @param[out] ethertype 	An optional output variable of the ethernet type of the new header
+ * @param[in,out] remaining 	Updated with the length remaining
  *
  * @return a pointer to the transport layer header, or NULL if header isn't
  * present.
  *
- * type may be NULL if not needed.
+ * Remaining must point to the number of bytes captured of the layer2 header
+ * and beyond.  It will be decremented by the number of bytes skipped to find
+ * the payload.
  *
- * Remaining may be NULL.  If Remaining is not NULL it must point to the number
- * of bytes captured of the layer2 header and beyond.  It will be decremented
- * by the number of bytes skipped to find the payload.
+ * If the layer2 header is complete but there are zero bytes of payload after the end of the header,
+ * a pointer to where the payload would be is returned and remaining will be set to 0.  If the 
+ * layer2 header is incomplete (truncated), then NULL is returned and remaining will be set to 0.
  *
  */
 DLLEXPORT void *trace_get_payload_from_layer2(void *l2,
@@ -1168,11 +1173,12 @@ DLLEXPORT void *trace_get_transport(const libtrace_packet_t *packet,
  * @return a pointer to the transport layer header, or NULL if header isn't
  * present.
  *
- * Remaining may be NULL.  If Remaining is not NULL it must point to the number
- * of bytes captured of the IP header and beyond.  It will be decremented by
- * the length of the IPv4 header (including any options).
+ * Remaining will be decremented by the size of the IPv4 header (including any options). 
+ * If the IPv4 header is complete but there are zero bytes of payload after the IPv4 header, a pointer
+ * to where the payload would be is returned and remaining will be set to 0.  If the IPv4 header is
+ * incomplete, NULL will be returned and remaining will be set to 0.
  *
- * proto may be NULL if not needed.
+ * proto may be NULL, in which case it won't be updated
  *
  * @note This is similar to trace_get_transport_from_ip in libtrace2
  */
@@ -1187,11 +1193,12 @@ DLLEXPORT void *trace_get_payload_from_ip(libtrace_ip_t *ip, uint8_t *proto,
  * @return a pointer to the transport layer header, or NULL if the IPv6 header
  * isn't complete.
  *
- * Remaining may be NULL.  If Remaining is not NULL it must point to the number
- * of bytes captured of the IP header and beyond.  It will be decremented by
- * this function by the length of the IPV6 header.
+ * Remaining will be decremented by the size of the IPv6 header (including any options). 
+ * If the IPv6 header is complete but there are zero bytes of payload after the IPv6 header, a pointer
+ * to where the payload would be is returned and remaining will be set to 0.  If the IPv6 header is
+ * incomplete, NULL will be returned and remaining will be set to 0.
  *
- * proto may be NULL if not needed.
+ * proto may be NULL, in which case it won't be updated.
  *
  */
 DLLEXPORT void *trace_get_payload_from_ip6(libtrace_ip6_t *ipptr,
@@ -1217,38 +1224,41 @@ DLLEXPORT void *trace_get_payload_from_link(void *linkptr,
 		libtrace_linktype_t linktype, 
 		uint16_t *type, uint32_t *remaining);
 
-/** Skips over any 802.1q headers, if present.
+/** Skips over any 802.1q header, if present.
  * @param vlan      A pointer to the vlan header
- * @param[in,out] type  The ethernet type, replaced with the vlan ether type
+ * @param[out] type  The ethernet type, replaced with the vlan ether type
  * @param[in,out] remaining Updated with the number of bytes remaining
  *
  * @return a pointer to the header beyond the vlan header, if present.
- * Otherwise, returns NULL
+ * Otherwise, returns NULL.  
  *
- * Remaining may be NULL. If Remaining is not NULL it must point to the number
- * of bytes captured past (but not including) the link layer. This function
- * will decrement it by the length of the 802.1q headers if present.
+ * Remaining will be decremented by the size of the vlan header.  If the vlan
+ * header is complete but there are zero bytes of payload after the vlan
+ * header, a pointer to where the payload would be is returned and remaining
+ * will be set to 0.  If the vlan header is incomplete, NULL will be returned
+ * and remaining will be set to 0.
  *
- * Type must point to the value of the ethernet type. Libtrace will assert
- * fail if type is NULL.
+ * type will be set to the ethertype contained within the vlan payload.
  *
  */
 DLLEXPORT void *trace_get_payload_from_vlan(
                 void *vlan, uint16_t *type, uint32_t *remaining);
 
-/** Skips over any MPLS headers, if present.
+/** Skips over a MPLS header
  * @param mpls      A pointer to the mpls header
- * @param[in,out] type  The ethernet type, replaced by the ether type of the
+ * @param[out] type  The ethernet type, replaced by the ether type of the
  * following header - 0x0000 if an Ethernet header is deemed to be next
  * @param[in,out] remaining     Updated with the number of bytes remaining
  *
  * @return a pointer to the header beyond the MPLS label, if present. Will
  * return NULL if there is not enough bytes remaining to skip past the MPLS
- * label or if the ether type is not MPLS.
+ * label.
  *
- * Remaining may be NULL. If remaining is not NULL it must point to the number
- * of bytes captured past (but not including) the link layer. This function
- * will decrement it by the length of the topmost MPLS label if present.
+ * Remaining will be decremented by the size of the MPLS header.  If the MPLS
+ * header is complete but there are zero bytes of payload after the MPLS
+ * header, a pointer to where the payload would be is returned and remaining
+ * will be set to 0.  If the MPLS header is incomplete, NULL will be returned
+ * and remaining will be set to 0.
  *
  * Type must point to the value of the ethernet type. Libtrace will assert
  * fail if type is NULL.
@@ -1265,11 +1275,13 @@ DLLEXPORT void *trace_get_payload_from_mpls(
  * @param tcp           The tcp Header
  * @param[in,out] remaining Updated with the number of bytes remaining
  *
- * @return a pointer to the tcp payload, or NULL if the payload isn't present.
+ * @return a pointer to the tcp payload, or NULL if the tcp header is truncated.
  *
- * Remaining may be NULL.  If remaining is not NULL it must point to the number
- * of bytes captured of the TCP header and beyond.  It will be decremented by
- * this function by the length of the TCP header (including any options).
+ * Remaining will be decremented by the size of the TCP header.  If the TCP
+ * header is complete but there are zero bytes of payload after the TCP
+ * header, a pointer to where the payload would be is returned and remaining
+ * will be set to 0.  If the TCP header is incomplete, NULL will be returned
+ * and remaining will be set to 0.
  *
  */
 DLLEXPORT void *trace_get_payload_from_tcp(libtrace_tcp_t *tcp, 
@@ -1279,11 +1291,13 @@ DLLEXPORT void *trace_get_payload_from_tcp(libtrace_tcp_t *tcp,
  * @param udp           The udp Header
  * @param[in,out] remaining Updated with the number of bytes remaining
  *
- * @return a pointer to the udp payload, or NULL if the payload isn't present.
+ * @return a pointer to the udp payload, or NULL if the udp header is truncated.
  *
- * Remaining may be NULL.  If Remaining is not NULL it must point to the number
- * of bytes captured of the UDP header and beyond.  It will be decremented by
- * this function to the number of bytes remaining after the UDP header.
+ * Remaining will be decremented by the size of the TCP header.  If the TCP
+ * header is complete but there are zero bytes of payload after the TCP
+ * header, a pointer to where the payload would be is returned and remaining
+ * will be set to 0.  If the TCP header is incomplete, NULL will be returned
+ * and remaining will be set to 0.
  *
  */
 DLLEXPORT void *trace_get_payload_from_udp(libtrace_udp_t *udp, uint32_t *remaining);
@@ -1292,11 +1306,13 @@ DLLEXPORT void *trace_get_payload_from_udp(libtrace_udp_t *udp, uint32_t *remain
  * @param icmp          The icmp Header
  * @param[in,out] remaining Updated with the number of bytes remaining
  *
- * @return a pointer to the icmp payload, or NULL if the payload isn't present.
+ * @return a pointer to the icmp payload, or NULL if the icmp header is truncated.
  *
- * Remaining may be NULL.  If remaining is not NULL it must point to the number
- * of bytes captured of the ICMP header and beyond.  It will be decremented
- * by the number of bytes in the ICMP header.
+ * Remaining will be decremented by the size of the TCP header.  If the TCP
+ * header is complete but there are zero bytes of payload after the TCP
+ * header, a pointer to where the payload would be is returned and remaining
+ * will be set to 0.  If the TCP header is incomplete, NULL will be returned
+ * and remaining will be set to 0.
  * 
  */
 DLLEXPORT void *trace_get_payload_from_icmp(libtrace_icmp_t *icmp, 

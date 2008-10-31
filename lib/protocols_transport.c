@@ -36,6 +36,7 @@ DLLEXPORT void *trace_get_transport(const libtrace_packet_t *packet,
 				(libtrace_ip6_t*)transport, proto, remaining);
 			
 		default:
+			printf("unknown ethertype=%04x\n",ethertype);
 			*proto=0;
 			return NULL;
 	}
@@ -117,7 +118,7 @@ DLLEXPORT libtrace_icmp_t *trace_get_icmp_from_ip(libtrace_ip_t *ip, uint32_t *r
 DLLEXPORT void *trace_get_payload_from_udp(libtrace_udp_t *udp, uint32_t *remaining)
 {
 	if (remaining) {
-		if (*remaining <= sizeof(libtrace_udp_t)) {
+		if (*remaining < sizeof(libtrace_udp_t)) {
 			*remaining = 0;
 			return NULL;
 		}
@@ -130,7 +131,7 @@ DLLEXPORT void *trace_get_payload_from_tcp(libtrace_tcp_t *tcp, uint32_t *remain
 {
 	unsigned int dlen = tcp->doff*4;
 	if (remaining) {
-		if (*remaining <= dlen) {
+		if (*remaining < dlen) {
 			*remaining = 0;
 			return NULL;
 		}
@@ -142,7 +143,7 @@ DLLEXPORT void *trace_get_payload_from_tcp(libtrace_tcp_t *tcp, uint32_t *remain
 DLLEXPORT void *trace_get_payload_from_icmp(libtrace_icmp_t *icmp, uint32_t *remaining)
 {
 	if (remaining) {
-		if (*remaining <= sizeof(libtrace_icmp_t)) {
+		if (*remaining < sizeof(libtrace_icmp_t)) {
 			*remaining = 0;
 			return NULL;
 		}

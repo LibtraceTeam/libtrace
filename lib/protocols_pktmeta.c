@@ -25,7 +25,7 @@ void *trace_get_payload_from_linux_sll(const void *link,
 	sll = (libtrace_sll_header_t*) link;
 
 	if (remaining) {
-		if (*remaining <= sizeof(*sll)) {
+		if (*remaining < sizeof(*sll)) {
 			*remaining = 0;
 			return NULL;
 		}
@@ -44,7 +44,7 @@ static void *trace_get_payload_from_pflog(const void *link,
 {
 	libtrace_pflog_header_t *pflog = (libtrace_pflog_header_t*)link;
 	if (remaining) {
-		if (*remaining<=sizeof(*pflog)) {
+		if (*remaining<sizeof(*pflog)) {
 			*remaining = 0;
 			return NULL;
 		}
@@ -61,7 +61,8 @@ static void *trace_get_payload_from_prism (const void *link,
 		libtrace_linktype_t *type, uint32_t *remaining)
 {
 	if (remaining) {
-		if (*remaining<=144) {
+		/* Prism header is 144 bytes long */
+		if (*remaining<144) {
 			*remaining = 0;
 			return NULL;
 		}
@@ -80,7 +81,7 @@ static void *trace_get_payload_from_radiotap (const void *link,
 	struct libtrace_radiotap_t *rtap = (struct libtrace_radiotap_t*)link;
 	uint16_t rtaplen = bswap_le_to_host16(rtap->it_len);
 	if (remaining) {
-		if (*remaining <= rtaplen) {
+		if (*remaining < rtaplen) {
 			*remaining = 0;
 			return NULL;
 		}

@@ -48,8 +48,8 @@ DLLEXPORT void *trace_get_payload_from_ip(libtrace_ip_t *ipptr, uint8_t *prot,
 {
         void *trans_ptr = 0;
 
-        if (ipptr == NULL)
-		return NULL;
+        assert(ipptr != NULL);
+	assert(ipptr->ip_v == 4);
 
 	if ((ntohs(ipptr->ip_off) & SW_IP_OFFMASK) != 0) {
 		if (remaining)
@@ -58,7 +58,7 @@ DLLEXPORT void *trace_get_payload_from_ip(libtrace_ip_t *ipptr, uint8_t *prot,
 	}
 
 	if (remaining) {
-		if (*remaining<=(ipptr->ip_hl*4U)) {
+		if (*remaining<(ipptr->ip_hl*4U)) {
 			*remaining = 0;
 			return NULL;
 		}
@@ -76,11 +76,10 @@ void *trace_get_payload_from_ip6(libtrace_ip6_t *ipptr, uint8_t *prot,
 		uint32_t *remaining) 
 {
 	void *payload = (char*)ipptr+sizeof(libtrace_ip6_t);
-	uint8_t nxt = ipptr->nxt;
+	uint8_t nxt;
 
-	if (ipptr == NULL)
-		return NULL;
-	
+	assert (ipptr != NULL);
+ 	nxt = ipptr->nxt;	
 	if (remaining) {
 		if (*remaining<sizeof(libtrace_ip6_t)) {
 			*remaining = 0;

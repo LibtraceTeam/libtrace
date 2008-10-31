@@ -14,7 +14,7 @@ void *trace_get_payload_from_ethernet(void *ethernet,
 	libtrace_ether_t *eth = (libtrace_ether_t*)ethernet;
 
 	if (remaining) {
-		if (*remaining <= sizeof(*eth)) {
+		if (*remaining < sizeof(*eth)) {
 			*remaining = 0;
 			return NULL;
 		}
@@ -28,29 +28,26 @@ void *trace_get_payload_from_ethernet(void *ethernet,
 }
 
 /* skip any 802.1q headers if necessary 
- * type is input/output
+ * type is now output only (why check it if we don't need to?)
  */
 void *trace_get_payload_from_vlan(void *ethernet, uint16_t *type,
 		uint32_t *remaining)
 {
-	assert(type != NULL);
-	if (*type == 0x8100) {
-		libtrace_8021q_t *vlanhdr = (libtrace_8021q_t *)ethernet;
+	libtrace_8021q_t *vlanhdr = (libtrace_8021q_t *)ethernet;
 
-		if (remaining) {
-			if (*remaining <= sizeof(libtrace_8021q_t)) {
-				*remaining = 0;
-				return NULL;
-			}
-
-			*remaining=*remaining-sizeof(libtrace_8021q_t);
+	if (remaining) {
+		if (*remaining < sizeof(libtrace_8021q_t)) {
+			*remaining = 0;
+			return NULL;
 		}
 
+		*remaining=*remaining-sizeof(libtrace_8021q_t);
+	}
+
+	if (type)
 		*type = ntohs(vlanhdr->vlan_ether_type);
 
-		return (void*)((char *)ethernet + sizeof(*vlanhdr));
-	} else
-		return NULL;
+	return (void*)((char *)ethernet + sizeof(*vlanhdr));
 
 }
 
@@ -61,40 +58,37 @@ void *trace_get_payload_from_vlan(void *ethernet, uint16_t *type,
 void *trace_get_payload_from_mpls(void *ethernet, uint16_t *type, 
 		uint32_t *remaining)
 {
-	assert(type != NULL);
 	
-	if (*type == 0x8847) {
-		if ((((char*)ethernet)[2]&0x01)==0) {
-			*type = 0x8847;
-		}
-		else {
-			if (!remaining || *remaining>=5) {
-				switch (((char*)ethernet)[4]&0xF0) {
-					case 0x40:
-						*type = 0x0800;
-						break;
-					case 0x60:
-						*type = 0x86DD;
-						break;
-					default:
-						/* Ethernet */
-						*type = 0;
-				}
+	assert(type);
+	if ((((char*)ethernet)[2]&0x01)==0) {
+		/* The MPLS Stack bit is set */
+		*type = 0x8847;
+	}
+	else {
+		if (!remaining || *remaining>=5) {
+			switch (((char*)ethernet)[4]&0xF0) {
+				case 0x40:	/* IPv4 */
+					*type = 0x0800;
+					break;
+				case 0x60:	/* IPv6 */
+					*type = 0x86DD;
+					break;
+				default:	/* VPLS */
+					/* Ethernet */
+					*type = 0;
 			}
 		}
-		ethernet=(char*)ethernet+4;
-		if (remaining) {
-			if (*remaining<=4)
-				return NULL;
-			else
-				*remaining-=4;
-		}
-
-
-		return ethernet;
 	}
-	else
-		return NULL;
+	ethernet=(char*)ethernet+4;
+	if (remaining) {
+		if (*remaining<4)
+			return NULL;
+		else
+			*remaining-=4;
+	}
+
+
+	return ethernet;
 }
 
 static void *trace_get_payload_from_llcsnap(void *link,
@@ -104,7 +98,7 @@ static void *trace_get_payload_from_llcsnap(void *link,
 	libtrace_llcsnap_t *llc = (libtrace_llcsnap_t*)link;
 
 	if (remaining) {
-		if (*remaining <= sizeof(libtrace_llcsnap_t)) {
+		if (*remaining < sizeof(libtrace_llcsnap_t)) {
 			*remaining = 0;
 			return NULL;
 		}
@@ -125,7 +119,7 @@ static void *trace_get_payload_from_80211(void *link, uint16_t *type, uint32_t *
 	uint16_t *eth; /* ethertype */
 	int8_t extra = 0; /* how many QoS bytes to skip */
 	
-	if (remaining && *remaining <= sizeof(libtrace_80211_t)) {
+	if (remaining && *remaining < sizeof(libtrace_80211_t)) {
 		*remaining = 0;
 		return NULL;
 	}
@@ -171,7 +165,7 @@ static void *trace_get_payload_from_ppp(void *link,
 	libtrace_ppp_t *ppp = (libtrace_ppp_t*)link;
 
 	if (remaining) {
-		if (*remaining <= sizeof(libtrace_ppp_t)) {
+		if (*remaining < sizeof(libtrace_ppp_t)) {
 			*remaining = 0;
 			return NULL;
 		}
@@ -195,7 +189,7 @@ static void *trace_get_payload_from_ppp(void *link,
 void *trace_get_payload_from_pppoe(void *link, uint16_t *type, 
 		uint32_t *remaining) {
 	if (remaining) {
-		if (*remaining <= sizeof(libtrace_pppoe_t)) {
+		if (*remaining < sizeof(libtrace_pppoe_t)) {
 			*remaining = 0;
 			return NULL;
 		}
@@ -220,7 +214,7 @@ static void *trace_get_payload_from_chdlc(void *link,
 	libtrace_chdlc_t *chdlc = (libtrace_chdlc_t*)link;
 
 	if (remaining) {
-		if (*remaining <= sizeof(libtrace_chdlc_t)) {
+		if (*remaining < sizeof(libtrace_chdlc_t)) {
 			*remaining = 0;
 			return NULL;
 		}
@@ -244,9 +238,8 @@ void *trace_get_payload_from_link(void *link, libtrace_linktype_t linktype,
 		l = trace_get_payload_from_meta(link, &linktype, remaining);
 		if (l != NULL) {
 			link=l;
-			continue;
 		}
-	} while (0);
+	} while (l != NULL);
 
 	return trace_get_payload_from_layer2(link,linktype,ethertype,remaining);
 	
@@ -290,7 +283,7 @@ void *trace_get_payload_from_atm(void *link,
 		uint8_t *type, uint32_t *remaining)
 {
 	libtrace_atm_capture_cell_t *cell;
-	if (remaining && *remaining<=sizeof(libtrace_atm_capture_cell_t)) {
+	if (remaining && *remaining<sizeof(libtrace_atm_capture_cell_t)) {
 		*remaining = 0;
 		return NULL;
 	}
@@ -337,9 +330,9 @@ DLLEXPORT void *trace_get_payload_from_layer2(void *link,
 			return trace_get_payload_from_ethernet(link,ethertype,remaining);
 		case TRACE_TYPE_NONE:
 			if ((*(char*)link&0xF0) == 0x40)
-				*ethertype=0x0800;
+				*ethertype=0x0800;	/* IPv4 */
 			else if ((*(char*)link&0xF0) == 0x60)
-				*ethertype=0x86DD;
+				*ethertype=0x86DD;	/* IPv6 */
 			return link; /* I love the simplicity */
 		case TRACE_TYPE_PPP:
 			return trace_get_payload_from_ppp(link,ethertype,remaining);
