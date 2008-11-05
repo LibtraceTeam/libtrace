@@ -310,17 +310,17 @@ static int legacynzix_read_packet(libtrace_t *libtrace, libtrace_packet_t *packe
 
 static libtrace_linktype_t legacypos_get_link_type(
 		const libtrace_packet_t *packet) {
-	/* This code used to look for (0x0F|0x8F 0x00) frames
- 	 * and return TRACE_TYPE_HDLC_POS, otherwise return PPP.
- 	 * However the PPP frames were being decoded using HDLC_POS semantics
- 	 * so when we fixed PPP, this all broke.  I've changed this to always
- 	 * assume HDLC_POS.  If we ever find a trace that does raw PPP over
- 	 * HDLC_POS then this should be changed to detect that it's PPP and 
- 	 * do the right thing.  I suspect this is due to an original confusion
- 	 * as to how exactly POS works.
- 	 *  -- Perry Lorier (2008-10-14)
+	/* POS can be PPP over HDLC (DLT_PPP_SERIAL), or it can be
+ 	 * just straight PPP.  Sigh.
+ 	 *
+ 	 * Ref: RFC 1549
+ 	 * 	- Perry Lorier (2008-11-04)
  	 */
-	return TRACE_TYPE_HDLC_POS;
+	if (((char *)packet->payload)[0] == '\xFF'
+		&& ((char*)packet->payload)[1] == '\x03')
+		return TRACE_TYPE_POS;
+	else 
+		return TRACE_TYPE_PPP;
 }
 
 static libtrace_linktype_t legacyatm_get_link_type(

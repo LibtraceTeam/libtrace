@@ -222,7 +222,14 @@ static void *trace_get_payload_from_chdlc(void *link,
 	}
 
 	if (type) {
-		*type=ntohs(chdlc->ethertype);
+		switch(ntohs(chdlc->ethertype)) {
+			case 0x0021: /* IP */
+				*type = 0x0800;
+				break;
+			default:
+				printf("Unknown chdlc type: %04x\n",ntohs(chdlc->ethertype));
+				*type = 0; /* Unknown */
+		}
 	}
 
 
@@ -306,6 +313,7 @@ DLLEXPORT void *trace_get_payload_from_layer2(void *link,
 		uint32_t *remaining)
 {
 	void *l;
+	assert(linktype != -1);
 	switch(linktype) {
 		/* Packet Metadata headers, not layer2 headers */
 		case TRACE_TYPE_80211_PRISM:
@@ -349,8 +357,10 @@ DLLEXPORT void *trace_get_payload_from_layer2(void *link,
 		case TRACE_TYPE_HDLC_POS:
 			return trace_get_payload_from_chdlc(link,ethertype,
 					remaining);
-		/* TODO: Unsupported */
 		case TRACE_TYPE_POS:
+			return trace_get_payload_from_chdlc(link,ethertype,
+					remaining);
+		/* TODO: Unsupported */
 		case TRACE_TYPE_AAL5:
 			return NULL;
 	}

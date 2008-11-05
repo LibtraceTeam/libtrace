@@ -43,6 +43,7 @@ libtrace_linktype_t pcap_linktype_to_libtrace(libtrace_dlt_t linktype)
         	case TRACE_DLT_IEEE802_11_RADIO: return TRACE_TYPE_80211_RADIO;
 		case TRACE_DLT_ATM_RFC1483: return TRACE_TYPE_LLCSNAP;
 		case TRACE_DLT_PPP: return TRACE_TYPE_PPP;
+		case TRACE_DLT_PPP_SERIAL: return TRACE_TYPE_POS;
 		/* Unhandled */
 		case TRACE_DLT_NULL: 	/* Raw IP frame with a BSD specific
 					 * header If you want raw L3 headers
@@ -69,6 +70,9 @@ libtrace_dlt_t libtrace_to_pcap_dlt(libtrace_linktype_t type)
 		case TRACE_TYPE_LLCSNAP: return TRACE_DLT_ATM_RFC1483;
 		case TRACE_TYPE_PPP:	return TRACE_DLT_PPP;
 		case TRACE_TYPE_HDLC_POS: return TRACE_DLT_C_HDLC;
+		/* Theres more than one type of PPP.  Who knew? */
+		case TRACE_TYPE_POS:	return TRACE_DLT_PPP_SERIAL; 
+
 		/* Below here are unsupported conversions */
 		/* Dispite hints to the contrary, there is no DLT
 		 * for 'raw atm packets that happen to be missing
@@ -83,7 +87,6 @@ libtrace_dlt_t libtrace_to_pcap_dlt(libtrace_linktype_t type)
 		/* Used for test traces within WAND */
 		case TRACE_TYPE_80211_PRISM: 	
 		/* Probably == PPP */
-		case TRACE_TYPE_POS:
 		/* TODO: We haven't researched these yet */
 		case TRACE_TYPE_AAL5:
 		case TRACE_TYPE_METADATA:
