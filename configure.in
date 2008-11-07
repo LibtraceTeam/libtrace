@@ -3,11 +3,11 @@
 # Now you only need to update the version number in two places - below,
 # and in the README
 
-AC_INIT([libtrace],[3.0.4],[contact@wand.net.nz],[libtrace])
+AC_INIT([libtrace],[3.0.5],[contact@wand.net.nz],[libtrace])
 
 LIBTRACE_MAJOR=3
 LIBTRACE_MID=0
-LIBTRACE_MINOR=3
+LIBTRACE_MINOR=5
 
 AC_CONFIG_SRCDIR(lib/trace.c)
 AM_INIT_AUTOMAKE
@@ -18,9 +18,9 @@ AC_DEFINE([LIBTRACE_MINOR],${LIBTRACE_MINOR},[libtrace minor version])
 
 AC_CONFIG_FILES([Makefile lib/Makefile docs/Makefile libpacketdump/Makefile
 	tools/Makefile tools/traceanon/Makefile tools/tracepktdump/Makefile 
-	tools/tracemerge/Makefile tools/tracereport/Makefile 
-	tools/tracertstats/Makefile tools/tracesplit/Makefile 
-	tools/tracestats/Makefile tools/traceflow/Makefile 
+	tools/tracemerge/Makefile tools/tracereport/Makefile
+	tools/tracertstats/Makefile tools/tracesplit/Makefile
+	tools/tracestats/Makefile 
 	examples/Makefile examples/skeleton/Makefile examples/rate/Makefile
 	examples/stats/Makefile
 	docs/libtrace.doxygen 
