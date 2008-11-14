@@ -3,6 +3,7 @@
 #include "protocols.h"
 #include "libtrace_int.h"
 #include <assert.h>
+#include <stdlib.h>
 
 /* Returns the payload from 802.3 ethernet.  Type optionally returned in
  * "type" in host byte order.  This will return a vlan header.
@@ -313,7 +314,7 @@ DLLEXPORT void *trace_get_payload_from_layer2(void *link,
 		uint32_t *remaining)
 {
 	void *l;
-	assert(linktype != -1);
+	assert(linktype != ~0U);
 	switch(linktype) {
 		/* Packet Metadata headers, not layer2 headers */
 		case TRACE_TYPE_80211_PRISM:

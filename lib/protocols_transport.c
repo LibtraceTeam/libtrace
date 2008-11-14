@@ -1,6 +1,8 @@
 #include "libtrace.h"
 #include "protocols.h"
 #include <assert.h>
+#include <stdlib.h>
+#include <stdio.h> // fprintf
 
 DLLEXPORT void *trace_get_transport(const libtrace_packet_t *packet, 
 		uint8_t *proto,
@@ -36,7 +38,7 @@ DLLEXPORT void *trace_get_transport(const libtrace_packet_t *packet,
 				(libtrace_ip6_t*)transport, proto, remaining);
 			
 		default:
-			printf("unknown ethertype=%04x\n",ethertype);
+			fprintf(stderr,"unknown ethertype=%04x\n",ethertype);
 			*proto=0;
 			return NULL;
 	}

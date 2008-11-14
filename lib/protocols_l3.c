@@ -2,6 +2,7 @@
 #include "libtrace.h"
 #include "protocols.h"
 #include <assert.h>
+#include <stdlib.h>
 
 libtrace_ip_t *trace_get_ip(libtrace_packet_t *packet) 
 {
