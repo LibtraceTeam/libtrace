@@ -189,6 +189,8 @@ static void *trace_get_payload_from_ppp(void *link,
 
 void *trace_get_payload_from_pppoe(void *link, uint16_t *type, 
 		uint32_t *remaining) {
+	assert(type);
+	
 	if (remaining) {
 		if (*remaining < sizeof(libtrace_pppoe_t)) {
 			*remaining = 0;

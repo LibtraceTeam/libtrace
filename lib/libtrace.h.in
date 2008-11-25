@@ -1272,6 +1272,30 @@ DLLEXPORT void *trace_get_payload_from_vlan(
 DLLEXPORT void *trace_get_payload_from_mpls(
                 void *mpls, uint16_t *type, uint32_t *remaining);
 
+/** Skips over a PPPoE header and the following PPP header
+ * @param pppoe      A pointer to the PPPoE header
+ * @param[out] type  The ethernet type, replaced by the ether type of the
+ * next header - 0x0000 if an Ethernet header is deemed to be next
+ * @param[in,out] remaining     Updated with the number of bytes remaining
+ *
+ * @return a pointer to the header beyond the PPPoE header. NOTE that this
+ * function will also skip over the PPP header that will immediately follow
+ * the PPPoE header. This function will return NULL if there are not enough
+ * bytes remaining to skip past both the PPPoE and PPP headers.
+ *
+ * Remaining will be decremented by the size of the PPPoE and PPP headers.  If 
+ * the headers are complete but there are zero bytes of payload after the PPP
+ * header, a pointer to where the payload would be is returned and remaining
+ * will be set to 0.  If the PPP or PPPoE header is incomplete, NULL will be 
+ * returned and remaining will be set to 0.
+ *
+ * Type must point to the value of the ethernet type. Libtrace will assert
+ * fail if type is NULL.
+ *
+ */
+DLLEXPORT void *trace_get_payload_from_pppoe(
+		void *pppoe, uint16_t *type, uint32_t *remaining);
+
 /** Gets a pointer to the payload given a pointer to a tcp header
  * @param tcp           The tcp Header
  * @param[in,out] remaining Updated with the number of bytes remaining
