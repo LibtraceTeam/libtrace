@@ -8,6 +8,7 @@
 #include "gdcpie.h"
 #include <inttypes.h>
 #include <lt_inttypes.h>
+#include <err.h>
 
 struct private_png_t {
 	int rows;
@@ -53,7 +54,9 @@ static void output_png_destroy(struct output_data_t *out)
 	float data1[(out->columns-1)/2][prv->rows];
 	float data2[(out->columns-1)/2][prv->rows];
 	for(i=0;i<prv->rows;++i) {
-		asprintf(&labels[i],"%i",(int)prv->data[i*out->columns]);
+		if (asprintf(&labels[i],"%i",(int)prv->data[i*out->columns])==-1) {
+			err(1,"Out of memory");
+		}
 		for(j=0;j<(out->columns-1)/2;++j) {
 			data1[j][i]=prv->data[i*out->columns+j*2+1];
 			data2[j][i]=prv->data[i*out->columns+j*2+2];

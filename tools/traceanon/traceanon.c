@@ -175,7 +175,7 @@ int main(int argc, char *argv[])
 		/* no output specified, output in same format to
 		 * stdout 
 		 */
-		asprintf(&output,"%s:-","erf");
+		output = strdup("erf:-");
 		writer = trace_create_output(output);
 	} else {
 		writer = trace_create_output(argv[optind +1]);
