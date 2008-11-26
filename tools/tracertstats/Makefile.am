@@ -2,7 +2,7 @@ bin_PROGRAMS = tracertstats
 man_MANS = tracertstats.1
 EXTRA_DIST = $(man_MANS)
 
-if LIBGDC
+if HAVE_LIBGDC
 LIBGDC_MODULES=output_png.c
 OUTPUT_PNG_LD=-lgdc
 else

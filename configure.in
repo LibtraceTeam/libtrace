@@ -111,7 +111,7 @@ AC_CHECK_HEADER(net/if_arp.h,
 # Checking for the right bpf header to include
 AC_CHECK_HEADER(pcap-bpf.h)
 AC_CHECK_HEADER(net/bpf.h)
-AC_CHECK_HEADER(gdc.h)
+AC_CHECK_HEADER(gdc.h,AC_DEFINE(HAVE_LIBGDC,1,[has gdc.h]))
 
 # Check to see if we have libdl - *BSD has built-in libdl
 AC_CHECK_LIB(dl, dlopen)
@@ -270,7 +270,7 @@ AM_CONDITIONAL([DAG2_5], [test "$libtrace_dag_version" = 25])
 AM_CONDITIONAL([DAG3_0], [test "$libtrace_dag_version" = 30])
 AM_CONDITIONAL([HAVE_ZLIB], [test "$ac_cv_lib_z_gzopen" = yes])
 AM_CONDITIONAL([HAVE_NETPACKET_PACKET_H], [test "$libtrace_netpacket_packet_h" = true])
-AM_CONDITIONAL([LIBGDC], [test "$ac_cv_header_gdc_h" = yes])
+AM_CONDITIONAL([HAVE_LIBGDC], [test "$ac_cv_header_gdc_h" = yes])
 
 # Check for miscellaneous programs
 AC_CHECK_PROG([libtrace_doxygen], [doxygen], [true], [false])
@@ -288,6 +288,7 @@ AC_SUBST([LIBTRACE_MID])
 AC_SUBST([LIBTRACE_MINOR])
 AC_SUBST([DAG_VERSION_NUM])
 AC_SUBST([HAVE_BPF_CAPTURE])
+AC_SUBST([HAVE_LIBGDC])
 dnl and finally, output our Makefiles
 AC_OUTPUT
 

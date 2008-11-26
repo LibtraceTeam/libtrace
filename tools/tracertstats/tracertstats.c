@@ -103,7 +103,12 @@ static void run_trace(char *uri)
 	double last_ts = 0;
 	double ts = 0;
 
+	fprintf(stderr,"output format: '%s'\n",output_format);
 	output=output_init(uri,output_format?output_format:"txt");
+	if (!output) {
+		fprintf(stderr,"Failed to create output file\n");
+		return;
+	}
 	output_add_column(output,"ts");
 	output_add_column(output,"packets");
 	output_add_column(output,"bytes");
