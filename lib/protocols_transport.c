@@ -28,7 +28,7 @@ DLLEXPORT void *trace_get_transport(const libtrace_packet_t *packet,
 			transport=trace_get_payload_from_ip(
 				(libtrace_ip_t*)transport, proto, remaining);
 			/* IPv6 */
-			if (transport && *proto == 41) {
+			if (transport && *proto == TRACE_IPPROTO_IPV6) {
 				transport=trace_get_payload_from_ip6(
 				 (libtrace_ip6_t*)transport, proto,remaining);
 			}
@@ -51,7 +51,7 @@ DLLEXPORT libtrace_tcp_t *trace_get_tcp(libtrace_packet_t *packet) {
 
 	tcp=(libtrace_tcp_t*)trace_get_transport(packet,&proto,NULL);
 
-	if (!tcp || proto != 6)
+	if (!tcp || proto != TRACE_IPPROTO_TCP)
 		return NULL;
 
 	return (libtrace_tcp_t*)tcp;
@@ -85,7 +85,7 @@ DLLEXPORT libtrace_udp_t *trace_get_udp_from_ip(libtrace_ip_t *ip, uint32_t *rem
 {
 	libtrace_udp_t *udpptr = 0;
 
-	if (ip->ip_p == 17) {
+	if (ip->ip_p == TRACE_IPPROTO_UDP) {
 		udpptr = (libtrace_udp_t *)
 			trace_get_payload_from_ip(ip, NULL, remaining);
 	}
@@ -99,7 +99,7 @@ DLLEXPORT libtrace_icmp_t *trace_get_icmp(libtrace_packet_t *packet) {
 
 	icmp=(libtrace_icmp_t*)trace_get_transport(packet,&proto,NULL);
 
-	if (!icmp || proto != 1)
+	if (!icmp || proto != TRACE_IPPROTO_ICMP)
 		return NULL;
 
 	return icmp;
@@ -109,7 +109,7 @@ DLLEXPORT libtrace_icmp_t *trace_get_icmp_from_ip(libtrace_ip_t *ip, uint32_t *r
 {
 	libtrace_icmp_t *icmpptr = 0;
 
-	if (ip->ip_p == 1)  {
+	if (ip->ip_p == TRACE_IPPROTO_ICMP)  {
 		icmpptr = (libtrace_icmp_t *)trace_get_payload_from_ip(ip, 
 				NULL, remaining);
 	}
