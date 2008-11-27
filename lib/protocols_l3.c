@@ -13,7 +13,7 @@ libtrace_ip_t *trace_get_ip(libtrace_packet_t *packet)
 
 	ret = trace_get_layer3(packet,&ethertype,&remaining);
 
-	if (!ret || ethertype!=0x0800)
+	if (!ret || ethertype!=TRACE_ETHERTYPE_IP)
 		return NULL;
 
 	/* Make sure we have at least a base IPv4 header */
@@ -36,7 +36,7 @@ libtrace_ip6_t *trace_get_ip6(libtrace_packet_t *packet)
 
 	ret = trace_get_layer3(packet,&ethertype,&remaining);
 
-	if (!ret || ethertype!=0x86DD)
+	if (!ret || ethertype!=TRACE_ETHERTYPE_IPV6)
 		return NULL;
 
 	return (libtrace_ip6_t*)ret;
@@ -160,11 +160,11 @@ DLLEXPORT void *trace_get_layer3(const libtrace_packet_t *packet,
 		if (!iphdr || *remaining == 0)
 			break;
 		switch(*ethertype) {
-		case 0x8100: /* VLAN */
+		case TRACE_ETHERTYPE_8021Q: /* VLAN */
 			iphdr=trace_get_payload_from_vlan(
 					  iphdr,ethertype,remaining);
 			continue;
-		case 0x8847: /* MPLS */
+		case TRACE_ETHERTYPE_MPLS: /* MPLS */
 			iphdr=trace_get_payload_from_mpls(
 					  iphdr,ethertype,remaining);
 
@@ -173,7 +173,7 @@ DLLEXPORT void *trace_get_layer3(const libtrace_packet_t *packet,
 						iphdr,ethertype,remaining);
 			}
 			continue;
-		case 0x8864: /* PPPoE */
+		case TRACE_ETHERTYPE_PPP_SES: /* PPPoE */
 			iphdr = trace_get_payload_from_pppoe(iphdr, ethertype,
 					remaining);
 			continue;
@@ -262,7 +262,7 @@ DLLEXPORT struct sockaddr *trace_get_source_address(
 		return NULL;
 
 	switch (ethertype) {
-		case 0x0800: /* IPv4 */
+		case TRACE_ETHERTYPE_IP: /* IPv4 */
 		{
 			struct sockaddr_in *addr4=(struct sockaddr_in*)addr;
 			libtrace_ip_t *ip = (libtrace_ip_t*)l3;
@@ -276,7 +276,7 @@ DLLEXPORT struct sockaddr *trace_get_source_address(
 			addr4->sin_addr=ip->ip_src;
 			return addr;
 		}
-		case 0x86DD: /* IPv6 */
+		case TRACE_ETHERTYPE_IPV6: /* IPv6 */
 		{
 			struct sockaddr_in6 *addr6=(struct sockaddr_in6*)addr;
 			libtrace_ip6_t *ip6 = (libtrace_ip6_t*)l3;
@@ -314,7 +314,7 @@ DLLEXPORT struct sockaddr *trace_get_destination_address(
 		return NULL;
 
 	switch (ethertype) {
-		case 0x0800: /* IPv4 */
+		case TRACE_ETHERTYPE_IP: /* IPv4 */
 		{
 			struct sockaddr_in *addr4=(struct sockaddr_in*)addr;
 			libtrace_ip_t *ip = (libtrace_ip_t*)l3;
@@ -328,7 +328,7 @@ DLLEXPORT struct sockaddr *trace_get_destination_address(
 			addr4->sin_addr=ip->ip_dst;
 			return addr;
 		}
-		case 0x86DD: /* IPv6 */
+		case TRACE_ETHERTYPE_IPV6: /* IPv6 */
 		{
 			struct sockaddr_in6 *addr6=(struct sockaddr_in6*)addr;
 			libtrace_ip6_t *ip6 = (libtrace_ip6_t*)l3;

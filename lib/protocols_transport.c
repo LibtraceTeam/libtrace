@@ -24,7 +24,7 @@ DLLEXPORT void *trace_get_transport(const libtrace_packet_t *packet,
 		return NULL;
 
 	switch (ethertype) {
-		case 0x0800: /* IPv4 */
+		case TRACE_ETHERTYPE_IP: /* IPv4 */
 			transport=trace_get_payload_from_ip(
 				(libtrace_ip_t*)transport, proto, remaining);
 			/* IPv6 */
@@ -33,7 +33,7 @@ DLLEXPORT void *trace_get_transport(const libtrace_packet_t *packet,
 				 (libtrace_ip6_t*)transport, proto,remaining);
 			}
 			return transport;
-		case 0x86DD: /* IPv6 */
+		case TRACE_ETHERTYPE_IPV6: /* IPv6 */
 			return trace_get_payload_from_ip6(
 				(libtrace_ip6_t*)transport, proto, remaining);
 			

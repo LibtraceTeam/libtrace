@@ -63,16 +63,16 @@ void *trace_get_payload_from_mpls(void *ethernet, uint16_t *type,
 	assert(type);
 	if ((((char*)ethernet)[2]&0x01)==0) {
 		/* The MPLS Stack bit is set */
-		*type = 0x8847;
+		*type = TRACE_ETHERTYPE_MPLS;
 	}
 	else {
 		if (!remaining || *remaining>=5) {
 			switch (((char*)ethernet)[4]&0xF0) {
 				case 0x40:	/* IPv4 */
-					*type = 0x0800;
+					*type = TRACE_ETHERTYPE_IP;
 					break;
 				case 0x60:	/* IPv6 */
-					*type = 0x86DD;
+					*type = TRACE_ETHERTYPE_IPV6;
 					break;
 				default:	/* VPLS */
 					/* Ethernet */
@@ -175,7 +175,7 @@ static void *trace_get_payload_from_ppp(void *link,
 
 	if (type) {
 		switch(ntohs(ppp->protocol)) {
-			case 0x0021: *type = 0x0800; break;
+			case 0x0021: *type = TRACE_ETHERTYPE_IP; break;
 			/* If it isn't IP, then it is probably PPP control and
 			 * I can't imagine anyone caring about that too much
 			 */
@@ -227,7 +227,7 @@ static void *trace_get_payload_from_chdlc(void *link,
 	if (type) {
 		switch(ntohs(chdlc->ethertype)) {
 			case 0x0021: /* IP */
-				*type = 0x0800;
+				*type = TRACE_ETHERTYPE_IP;
 				break;
 			default:
 				printf("Unknown chdlc type: %04x\n",ntohs(chdlc->ethertype));
@@ -341,9 +341,9 @@ DLLEXPORT void *trace_get_payload_from_layer2(void *link,
 			return trace_get_payload_from_ethernet(link,ethertype,remaining);
 		case TRACE_TYPE_NONE:
 			if ((*(char*)link&0xF0) == 0x40)
-				*ethertype=0x0800;	/* IPv4 */
+				*ethertype=TRACE_ETHERTYPE_IP;	/* IPv4 */
 			else if ((*(char*)link&0xF0) == 0x60)
-				*ethertype=0x86DD;	/* IPv6 */
+				*ethertype=TRACE_ETHERTYPE_IPV6;	/* IPv6 */
 			return link; /* I love the simplicity */
 		case TRACE_TYPE_PPP:
 			return trace_get_payload_from_ppp(link,ethertype,remaining);
