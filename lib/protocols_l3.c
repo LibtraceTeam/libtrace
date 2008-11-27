@@ -92,11 +92,11 @@ void *trace_get_payload_from_ip6(libtrace_ip6_t *ipptr, uint8_t *prot,
 	while(1) {
 		switch (nxt) {
 			case 0: /* hop by hop options */
-			case 43: /* routing */
-			case 44: /* fragment */
-			case 50: /* ESP */
-			case 51: /* AH */
-			case 60: /* Destination options */
+			case TRACE_IPPROTO_ROUTING:
+			case TRACE_IPPROTO_FRAGMENT:
+			case TRACE_IPPROTO_ESP:
+			case TRACE_IPPROTO_AH: 
+			case TRACE_IPPROTO_DSTOPTS: 
 				{
 					uint16_t len=((libtrace_ip6_ext_t*)payload)->len
 					+sizeof(libtrace_ip6_ext_t);

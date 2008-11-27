@@ -61,7 +61,7 @@ DLLEXPORT libtrace_tcp_t *trace_get_tcp_from_ip(libtrace_ip_t *ip, uint32_t *rem
 {
 	libtrace_tcp_t *tcpptr = 0;
 
-	if (ip->ip_p == 6)  {
+	if (ip->ip_p == TRACE_IPPROTO_TCP)  {
 		tcpptr = (libtrace_tcp_t *)
 			trace_get_payload_from_ip(ip, NULL, remaining);
 	}
@@ -75,7 +75,7 @@ DLLEXPORT libtrace_udp_t *trace_get_udp(libtrace_packet_t *packet) {
 
 	udp=(libtrace_udp_t*)trace_get_transport(packet,&proto,NULL);
 
-	if (!udp || proto != 17)
+	if (!udp || proto != TRACE_IPPROTO_UDP)
 		return NULL;
 
 	return udp;
