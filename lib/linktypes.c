@@ -45,6 +45,7 @@ libtrace_linktype_t pcap_linktype_to_libtrace(libtrace_dlt_t linktype)
 		case TRACE_DLT_PPP: return TRACE_TYPE_PPP;
 		case TRACE_DLT_PPP_SERIAL: return TRACE_TYPE_POS;
 		/* Unhandled */
+		case TRACE_DLT_C_HDLC:
 		case TRACE_DLT_NULL: 	/* Raw IP frame with a BSD specific
 					 * header If you want raw L3 headers
 					 * use TRACE_DLT_RAW
