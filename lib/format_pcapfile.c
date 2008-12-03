@@ -57,7 +57,7 @@ typedef struct pcapfile_header_t {
 } pcapfile_header_t; 
 
 struct pcapfile_format_data_t {
-	libtrace_io_t *file;
+	io_t *file;
 	struct {
 		int real_time;
 	} options;
@@ -65,7 +65,7 @@ struct pcapfile_format_data_t {
 };
 
 struct pcapfile_format_data_out_t {
-	libtrace_io_t *file;
+	iow_t *file;
 	int level;
 	int flag;
 
@@ -132,7 +132,7 @@ static int pcapfile_start_input(libtrace_t *libtrace)
 		if (!DATA(libtrace)->file)
 			return -1;
 
-		err=libtrace_io_read(DATA(libtrace)->file,
+		err=wandio_read(DATA(libtrace)->file,
 				&DATA(libtrace)->header,
 				sizeof(DATA(libtrace)->header));
 
@@ -189,7 +189,7 @@ static int pcapfile_config_input(libtrace_t *libtrace,
 static int pcapfile_fin_input(libtrace_t *libtrace) 
 {
 	if (DATA(libtrace)->file)
-		libtrace_io_close(DATA(libtrace)->file);
+		wandio_destroy(DATA(libtrace)->file);
 	free(libtrace->format_data);
 	return 0; /* success */
 }
@@ -197,7 +197,7 @@ static int pcapfile_fin_input(libtrace_t *libtrace)
 static int pcapfile_fin_output(libtrace_out_t *libtrace)
 {
 	if (DATA(libtrace)->file)
-		libtrace_io_close(DATA(libtrace)->file);
+		wandio_wdestroy(DATAOUT(libtrace)->file);
 	free(libtrace->format_data);
 	libtrace->format_data=NULL;
 	return 0; /* success */
@@ -268,7 +268,7 @@ static int pcapfile_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 
 	flags |= TRACE_PREP_OWN_BUFFER;
 	
-	err=libtrace_io_read(DATA(libtrace)->file,
+	err=wandio_read(DATA(libtrace)->file,
 			packet->buffer,
 			sizeof(libtrace_pcapfile_pkt_hdr_t));
 
@@ -283,7 +283,7 @@ static int pcapfile_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 		return 0;
 	}
 
-	err=libtrace_io_read(DATA(libtrace)->file,
+	err=wandio_read(DATA(libtrace)->file,
 			(char*)packet->buffer+sizeof(libtrace_pcapfile_pkt_hdr_t),
 			(size_t)swapl(libtrace,((libtrace_pcapfile_pkt_hdr_t*)packet->buffer)->caplen)
 			);
@@ -361,7 +361,7 @@ static int pcapfile_write_packet(libtrace_out_t *out,
 		pcaphdr.network = 
 			libtrace_to_pcap_linktype(linktype);
 
-		libtrace_io_write(DATAOUT(out)->file, 
+		wandio_wwrite(DATAOUT(out)->file, 
 				&pcaphdr, sizeof(pcaphdr));
 	}
 
@@ -383,13 +383,13 @@ static int pcapfile_write_packet(libtrace_out_t *out,
 	assert(hdr.wirelen < LIBTRACE_PACKET_BUFSIZE);
 
 
-	numbytes=libtrace_io_write(DATAOUT(out)->file,
+	numbytes=wandio_wwrite(DATAOUT(out)->file,
 			&hdr, sizeof(hdr));
 
 	if (numbytes!=sizeof(hdr)) 
 		return -1;
 
-	ret=libtrace_io_write(DATAOUT(out)->file,
+	ret=wandio_wwrite(DATAOUT(out)->file,
 			ptr,
 			remaining);
 

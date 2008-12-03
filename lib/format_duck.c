@@ -32,6 +32,7 @@
 #include "libtrace_int.h"
 #include "format_helper.h"
 #include "config.h"
+#include "wandio.h"
 #include <stdlib.h>
 #include "libtraceio.h"
 #include "rt_protocol.h"
@@ -49,7 +50,7 @@
 
 struct duck_format_data_t {
 	char *path;
-	libtrace_io_t *file;
+	io_t *file;
 	int dag_version;
 };
 
@@ -57,7 +58,7 @@ struct duck_format_data_out_t {
 	char *path;
 	int level;
 	int fileflag;
-	libtrace_io_t *file;
+	iow_t *file;
 	int dag_version;	
 };
 
@@ -120,14 +121,14 @@ static int duck_start_output(libtrace_out_t *libtrace) {
 }
 
 static int duck_fin_input(libtrace_t *libtrace) {
-	libtrace_io_close(INPUT->file);
+	wandio_destroy(INPUT->file);
 	free(libtrace->format_data);
 
 	return 0;
 }
 
 static int duck_fin_output(libtrace_out_t *libtrace) {
-	libtrace_io_close(OUTPUT->file);
+	wandio_wdestroy(OUTPUT->file);
 	free(libtrace->format_data);
 	return 0;
 }
@@ -179,7 +180,7 @@ static int duck_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	
 	if (INPUT->dag_version == 0) {
 		/* Read in the duck version from the start of the trace */
-		if ((numbytes = libtrace_io_read(INPUT->file, &version, 
+		if ((numbytes = wandio_read(INPUT->file, &version, 
 					sizeof(version))) != sizeof(uint32_t)) {
 			trace_set_err(libtrace, errno, 
 					"Reading DUCK version failed");
@@ -205,7 +206,7 @@ static int duck_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 		return -1;
 	}
 
-	if ((numbytes = libtrace_io_read(INPUT->file, packet->buffer,
+	if ((numbytes = wandio_read(INPUT->file, packet->buffer,
 					(size_t)duck_size)) != (int)duck_size) {
 		if (numbytes == -1) {
 			trace_set_err(libtrace, errno, "Reading DUCK failed");
@@ -242,7 +243,7 @@ static int duck_write_packet(libtrace_out_t *libtrace,
 
 	if (OUTPUT->dag_version == 0) {
 	/* Writing the DUCK version will help with reading it back in later! */
-		if ((numbytes = libtrace_io_write(OUTPUT->file, &packet->type,
+		if ((numbytes = wandio_wwrite(OUTPUT->file, &packet->type,
 				sizeof(packet->type))) != sizeof(uint32_t)){
 			trace_set_err_out(libtrace, errno, 
 					"Writing DUCK version failed");
@@ -251,7 +252,7 @@ static int duck_write_packet(libtrace_out_t *libtrace,
 		OUTPUT->dag_version = packet->type;
 	}
 	
-	if ((numbytes = libtrace_io_write(OUTPUT->file, packet->payload, 
+	if ((numbytes = wandio_wwrite(OUTPUT->file, packet->payload, 
 					trace_get_capture_length(packet))) !=
 				(int)trace_get_capture_length(packet)) {
 		trace_set_err_out(libtrace, errno, "Writing DUCK failed");

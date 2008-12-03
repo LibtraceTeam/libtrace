@@ -1,5 +1,5 @@
 lib_LTLIBRARIES = libtrace.la
-include_HEADERS = libtrace.h dagformat.h lt_inttypes.h daglegacy.h rt_protocol.h libtraceio.h erftypes.h
+include_HEADERS = libtrace.h dagformat.h lt_inttypes.h daglegacy.h rt_protocol.h erftypes.h wandio.h
 
 extra_DIST = format_template.c
 if HAVE_NETPACKET_PACKET_H
@@ -15,9 +15,15 @@ BPFFORMATS=
 endif
 
 if HAVE_ZLIB
-LIBTRACEIO=libtraceio-zlib.c
+LIBTRACEIO_ZLIB=ior-zlib.c iow-zlib.c
 else
-LIBTRACEIO=libtraceio-stdio.c
+LIBTRACEIO_ZLIB=
+endif
+
+if HAVE_BZLIB
+LIBTRACEIO_BZLIB=ior-bzip.c iow-bzip.c
+else
+LIBTRACEIO_BZLIB=
 endif
 
 if HAVE_DAG
@@ -31,7 +37,7 @@ DAGSOURCE=
 endif
 EXTRA_DIST=format_dag24.c format_dag25.c
 
-libtrace_la_SOURCES = $(LIBTRACEIO) trace.c common.h \
+libtrace_la_SOURCES = trace.c common.h \
 		format_erf.c format_pcap.c format_legacy.c \
 		format_rt.c format_helper.c format_helper.h format_pcapfile.c \
 		format_duck.c format_tsh.c $(NATIVEFORMATS) $(BPFFORMATS) \
@@ -40,8 +46,10 @@ libtrace_la_SOURCES = $(LIBTRACEIO) trace.c common.h \
 		linktypes.c link_wireless.c \
 		protocols_pktmeta.c protocols_l2.c protocols_l3.c \
 		protocols_transport.c protocols.h \
-		libtraceio.h \
-		$(DAGSOURCE) format_erf.h 
+		$(DAGSOURCE) format_erf.h \
+		$(LIBTRACEIO_ZLIB) $(LIBTRACEIO_BZLIB) ior-peek.c ior-stdio.c ior-thread.c \
+		iow-stdio.c iow-thread.c wandio.c \
+		wandio.h
 
 if DAG2_4
 nodist_libtrace_la_SOURCES = dagopts.c dagapi.c

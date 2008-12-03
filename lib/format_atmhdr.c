@@ -5,6 +5,7 @@
 #include "libtrace.h"
 #include "libtrace_int.h"
 #include "format_helper.h"
+#include "wandio.h"
 
 #include <sys/stat.h>
 #include <assert.h>
@@ -23,7 +24,7 @@
 struct atmhdr_format_data_t {
         union {
                 int fd;
-                libtrace_io_t *file;
+                io_t *file;
         } input;
 };
 
@@ -50,7 +51,7 @@ static int atmhdr_start_input(libtrace_t *libtrace)
 
 static int atmhdr_fin_input(libtrace_t *libtrace)
 {
-	libtrace_io_close(INPUT.file);
+	wandio_destroy(INPUT.file);
 	free(libtrace->format_data);
 	return 0;
 }
@@ -95,7 +96,7 @@ static int atmhdr_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	
 	packet->type = TRACE_RT_DATA_ATMHDR;
 
-	if ((numbytes=libtrace_io_read(INPUT.file, buffer, (size_t)12)) != 12)
+	if ((numbytes=wandio_read(INPUT.file, buffer, (size_t)12)) != 12)
 	{
 		if (numbytes != 0) {
 			trace_set_err(libtrace,errno,"read(%s)",libtrace->uridata);

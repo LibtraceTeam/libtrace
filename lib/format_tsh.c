@@ -44,7 +44,7 @@ static struct libtrace_format_t tshformat;
 #define DATA(x) ((struct tsh_format_data_t *)x->format_data)
 
 struct tsh_format_data_t {
-	libtrace_io_t *file;
+	io_t *file;
 };
 
 typedef struct tsh_pkt_header_t {
@@ -82,7 +82,7 @@ static int tsh_start_input(libtrace_t *libtrace)
 
 static int tsh_fin_input(libtrace_t *libtrace) {
 	if (DATA(libtrace)->file)
-		libtrace_io_close(DATA(libtrace)->file);
+		wandio_destroy(DATA(libtrace)->file);
 	free(libtrace->format_data);
 	return 0;
 }
@@ -133,7 +133,7 @@ static int tsh_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	buffer2 = packet->buffer;
 
 	/* Read the TSH header */
-	if ((numbytes=libtrace_io_read(DATA(libtrace)->file,
+	if ((numbytes=wandio_read(DATA(libtrace)->file,
 					buffer2,
 					(size_t)sizeof(tsh_pkt_header_t))) == -1) {
 		trace_set_err(libtrace,errno,"read(%s)",
@@ -148,7 +148,7 @@ static int tsh_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	buffer2 = (char*)buffer2 + numbytes;
 
 	/* Read the IP header */
-	if ((numbytes=libtrace_io_read(DATA(libtrace)->file,
+	if ((numbytes=wandio_read(DATA(libtrace)->file,
 				buffer2,
 				(size_t)sizeof(libtrace_ip_t))) 
 			!= sizeof(libtrace_ip_t)) {
@@ -163,7 +163,7 @@ static int tsh_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	buffer2 = (char*)buffer2 + ((libtrace_ip_t*)buffer2)->ip_hl*4;
 
 	/* Read the transport header */
-	if ((numbytes=libtrace_io_read(DATA(libtrace)->file,
+	if ((numbytes=wandio_read(DATA(libtrace)->file,
 				buffer2,
 				16)) != 16) {
 		trace_set_err(libtrace,errno,"read(%s)",

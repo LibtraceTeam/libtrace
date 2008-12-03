@@ -34,6 +34,7 @@
 #include <math.h>
 #include "libtrace.h"
 #include "libtrace_int.h"
+#include "wandio.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -197,65 +198,20 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 /* open a file or stdin using gzip compression if necessary (and supported)
  * @internal
  */
-libtrace_io_t *trace_open_file(libtrace_t *trace)
+io_t *trace_open_file(libtrace_t *trace)
 {
-	int fd;
-	libtrace_io_t *ret;
-
-
-	if (strcmp(trace->uridata,"-")==0) {
-		ret=libtrace_io_fdopen(fileno(stdin),"rb");
-		return ret;
-	}
-
-	/* We open the file with open(2), so we can provide O_LARGEFILE
-	 * as zlib doesn't always do it itself
-	 */
-	fd=open(trace->uridata,O_LARGEFILE|O_RDONLY|O_BINARY);
-	if (fd==-1) {
-		trace_set_err(trace,errno,"Unable to open %s",trace->uridata);
-		return 0;
-	}
-	ret=libtrace_io_fdopen(fd,"rb");
-	return ret;
+	return wandio_create(trace->uridata);
 }
 
 /* Create a file or write to stdout using compression if requested
  * @internal
  */
-libtrace_io_t *trace_open_file_out(libtrace_out_t *trace,int level, int fileflag)
+iow_t *trace_open_file_out(libtrace_out_t *trace,int level, int fileflag)
 {
-	int fd;
-	libtrace_io_t *ret;
-	char filemode[4]; /* wb9\0 */
 	assert(level<10);
 	assert(level>=0);
-#ifdef HAVE_LIBZ
-	snprintf(filemode,sizeof(filemode),"wb%d",level);
-#else
-	snprintf(filemode,sizeof(filemode),"wb");
-#endif
 
-	if (strcmp(trace->uridata,"-")==0) {
-		ret=libtrace_io_fdopen(fileno(stdout),filemode);
-		return ret;
-	}
-
-	/* We open the file with open(2), so we can provide O_LARGEFILE
-	 * as zlib doesn't always do it itself
-	 */
-	fd=open(trace->uridata,fileflag|O_LARGEFILE|O_BINARY,0666);
-	if (fd==-1) {
-		trace_set_err_out(trace,
-				errno,"Unable to open %s",trace->uridata);
-		return 0;
-	}
-	ret=libtrace_io_fdopen(fd,filemode);
-	if (!ret) {
-		trace_set_err_out(trace,
-				TRACE_ERR_INIT_FAILED,"gz out of memory");
-	}
-	return ret;
+	return wandio_wcreate(trace->uridata, level, fileflag);
 }
 
 

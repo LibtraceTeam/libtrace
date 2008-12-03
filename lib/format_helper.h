@@ -32,6 +32,7 @@
 #define FORMAT_HELPER_H
 #include "common.h"
 #include "libtraceio.h"
+#include "wandio.h"
 
 int trace_read(libtrace_t *libtrace, void *buffer, size_t len);
 
@@ -41,8 +42,8 @@ struct libtrace_eventobj_t trace_event_trace(libtrace_t *trace, libtrace_packet_
 int trace_bpf_compile(libtrace_filter_t *filter, 
 		const libtrace_packet_t *packet);
 
-libtrace_io_t *trace_open_file(libtrace_t *libtrace);
-libtrace_io_t *trace_open_file_out(libtrace_out_t *libtrace,
+io_t *trace_open_file(libtrace_t *libtrace);
+iow_t *trace_open_file_out(libtrace_out_t *libtrace,
 		int level,
 		int filemode);
 #endif /* FORMAT_HELPER_H */

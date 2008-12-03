@@ -34,6 +34,7 @@
 #include "libtrace.h"
 #include "libtrace_int.h"
 #include "format_helper.h"
+#include "wandio.h"
 
 #include <sys/stat.h>
 #include <assert.h>
@@ -65,7 +66,7 @@
 struct legacy_format_data_t {
 	union {
                 int fd;
-		libtrace_io_t *file;
+		io_t *file;
         } input;
 	time_t starttime;	/* Used for legacy_nzix */
 	uint64_t ts_high;	/* Used for legacy_nzix */
@@ -174,7 +175,7 @@ static int erf_start_input(libtrace_t *libtrace)
 }
 
 static int erf_fin_input(libtrace_t *libtrace) {
-	libtrace_io_close(INPUT.file);
+	wandio_destroy(INPUT.file);
 	free(libtrace->format_data);
 	return 0;
 }
@@ -236,7 +237,7 @@ static int legacy_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	 * or we reach the end of the file */
 	while (1) {
 	
-		if ((numbytes=libtrace_io_read(INPUT.file,
+		if ((numbytes=wandio_read(INPUT.file,
 						buffer,
 						(size_t)64)) != 64) {
 			if (numbytes < 0) {
@@ -278,7 +279,7 @@ static int legacynzix_read_packet(libtrace_t *libtrace, libtrace_packet_t *packe
 	packet->type = TRACE_RT_DATA_LEGACY_NZIX;
 	
 	while (1) {
-		if ((numbytes = libtrace_io_read(INPUT.file, buffer,
+		if ((numbytes = wandio_read(INPUT.file, buffer,
 						(size_t)68)) != 68) {
 			if (numbytes < 0) {
 				trace_set_err(libtrace,errno,"read(%s)",libtrace->uridata);
