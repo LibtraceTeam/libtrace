@@ -263,6 +263,7 @@ DAG_VERSION_NUM=$dag_drv_v
 
 AC_CHECK_LIB(z, deflate)
 AC_CHECK_LIB(bz2, BZ2_bzDecompressInit)
+AC_CHECK_LIB(pthread, pthread_create)
 
 AM_CONDITIONAL([HAVE_BPF_CAPTURE], [test "$ac_cv_have_decl_BIOCSETIF" = yes ])
 AM_CONDITIONAL([HAVE_DAG], [test "$libtrace_dag" = true])
@@ -270,7 +271,7 @@ AM_CONDITIONAL([DAG2_4], [test "$libtrace_dag_version" = 24])
 AM_CONDITIONAL([DAG2_5], [test "$libtrace_dag_version" = 25])
 AM_CONDITIONAL([DAG3_0], [test "$libtrace_dag_version" = 30])
 AM_CONDITIONAL([HAVE_ZLIB], [test "$ac_cv_lib_z_deflate" = yes])
-AM_CONDITIONAL([HAVE_BZLIB], [test "$ac_cv_lib_bz_BZ2_bzDecompressInit" = yes])
+AM_CONDITIONAL([HAVE_BZLIB], [test "$ac_cv_lib_bz2_BZ2_bzDecompressInit" = yes])
 AM_CONDITIONAL([HAVE_NETPACKET_PACKET_H], [test "$libtrace_netpacket_packet_h" = true])
 AM_CONDITIONAL([HAVE_LIBGDC], [test "$ac_cv_header_gdc_h" = yes])
 
