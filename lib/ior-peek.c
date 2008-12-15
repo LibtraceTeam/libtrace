@@ -30,6 +30,7 @@ io_t *peek_open(io_t *child)
 	DATA(io)->child = child;
 	DATA(io)->buffer = NULL;
 	DATA(io)->length = 0;
+	DATA(io)->offset = 0;	
 
 	return io;
 }
