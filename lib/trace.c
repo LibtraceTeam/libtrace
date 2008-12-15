@@ -306,6 +306,8 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 	libtrace->filter = NULL;
 	libtrace->snaplen = 0;
 	libtrace->started=false;
+	libtrace->uridata = NULL;
+	libtrace->filtered_packets = 0;
 
         /* parse the URI to determine what sort of event we are dealing with */
 	if ((uridata = trace_parse_uri(uri, &scan)) == 0) {
@@ -1441,11 +1443,18 @@ DLLEXPORT void trace_perror(libtrace_t *trace,const char *msg,...)
 	vsnprintf(buf,sizeof(buf),msg,va);
 	va_end(va);
 	if(trace->err.err_num) {
-		fprintf(stderr,"%s(%s): %s\n",
-				buf,trace->uridata,trace->err.problem);
+		if (trace->uridata) {
+			fprintf(stderr,"%s(%s): %s\n",
+					buf,trace->uridata,trace->err.problem);
+		} else {
+			fprintf(stderr,"%s: %s\n", buf, trace->err.problem);
+		}
 	} else {
-		fprintf(stderr,"%s(%s): No error\n",
-				buf,trace->uridata);
+		if (trace->uridata) {
+			fprintf(stderr,"%s(%s): No error\n",buf,trace->uridata);
+		} else {
+			fprintf(stderr,"%s: No error\n");
+		}
 	}
 	trace->err.err_num = 0; /* "OK" */
 	trace->err.problem[0]='\0';
