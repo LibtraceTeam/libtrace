@@ -17,9 +17,6 @@ struct buffer_t {
 	char buffer[BUFFERSIZE];
 	int len;
 	enum { EMPTY = 0, FULL = 1 } state;
-	pthread_cond_t dataready;
-	pthread_cond_t spaceavail;
-	pthread_mutex_t mutex;
 };
 
 struct state_t {
@@ -27,7 +24,11 @@ struct state_t {
 	int in_buffer;
 	int offset;
 	pthread_t producer;
+	pthread_cond_t space_avail;
+	pthread_cond_t data_ready;
+	pthread_mutex_t mutex;
 	bool closing;
+	bool closed;
 	io_t *io;
 };
 
@@ -41,35 +42,45 @@ static void *thread_producer(void* userdata)
 	int buffer=0;
 	bool running = true;
 
+	pthread_mutex_lock(&DATA(state)->mutex);
 	do {
-		pthread_mutex_lock(&DATA(state)->buffer[buffer].mutex);
 		while (DATA(state)->buffer[buffer].state == FULL) {
 			if (DATA(state)->closing)
 				break;
-			pthread_cond_wait(&DATA(state)->buffer[buffer].spaceavail,
-					&DATA(state)->buffer[buffer].mutex);
+			pthread_cond_wait(&DATA(state)->space_avail, &DATA(state)->mutex);
 		}
+
+		if (DATA(state)->closing) {
+			break;
+		}
+		pthread_mutex_unlock(&DATA(state)->mutex);
+
 		/* Fill the buffer */
 		DATA(state)->buffer[buffer].len=wandio_read(
 				DATA(state)->io,
 				DATA(state)->buffer[buffer].buffer,
 				sizeof(DATA(state)->buffer[buffer].buffer));
 
+		pthread_mutex_lock(&DATA(state)->mutex);
+
 		DATA(state)->buffer[buffer].state = FULL;
 
 		/* if we've not reached the end of the file keep going */
 		running = (DATA(state)->buffer[buffer].len > 0 );
 
-		pthread_cond_signal(&DATA(state)->buffer[buffer].dataready);
-
-		pthread_mutex_unlock(&DATA(state)->buffer[buffer].mutex);
+		pthread_cond_signal(&DATA(state)->data_ready);
 
 		/* Flip buffers */
 		buffer=(buffer+1) % BUFFERS;
 
 	} while(running);
 
+
 	wandio_destroy(DATA(state)->io);
+
+	DATA(state)->closed = true;
+	pthread_cond_signal(&DATA(state)->data_ready);
+	pthread_mutex_unlock(&DATA(state)->mutex);
 
 	return NULL;
 }
@@ -89,12 +100,13 @@ io_t *thread_open(io_t *parent)
 
 	DATA(state)->in_buffer = 0;
 	DATA(state)->offset = 0;
-	pthread_mutex_init(&DATA(state)->buffer[0].mutex,NULL);
-	pthread_cond_init(&DATA(state)->buffer[0].dataready,NULL);
-	pthread_cond_init(&DATA(state)->buffer[0].spaceavail,NULL);
+	pthread_mutex_init(&DATA(state)->mutex,NULL);
+	pthread_cond_init(&DATA(state)->data_ready,NULL);
+	pthread_cond_init(&DATA(state)->space_avail,NULL);
 
 	DATA(state)->io = parent;
 	DATA(state)->closing = false;
+	DATA(state)->closed = false;
 
 	pthread_create(&DATA(state)->producer,NULL,thread_producer,state);
 
@@ -108,10 +120,9 @@ static off_t thread_read(io_t *state, void *buffer, off_t len)
 	int newbuffer;
 
 	while(len>0) {
-		pthread_mutex_lock(&INBUFFER(state).mutex);
+		pthread_mutex_lock(&DATA(state)->mutex);
 		while (INBUFFER(state).state == EMPTY) {
-			pthread_cond_wait(&INBUFFER(state).dataready,
-					&INBUFFER(state).mutex);
+			pthread_cond_wait(&DATA(state)->data_ready, &DATA(state)->mutex);
 
 		}
 
@@ -120,11 +131,13 @@ static off_t thread_read(io_t *state, void *buffer, off_t len)
 			if (copied<1)
 				copied = INBUFFER(state).len;
 
-			pthread_mutex_unlock(&INBUFFER(state).mutex);
+			pthread_mutex_unlock(&DATA(state)->mutex);
 			return copied;
 		}
 
 		slice=min( INBUFFER(state).len-DATA(state)->offset,len);
+
+		pthread_mutex_unlock(&DATA(state)->mutex);
 				
 		memcpy(
 			buffer,
@@ -135,17 +148,19 @@ static off_t thread_read(io_t *state, void *buffer, off_t len)
 		buffer+=slice;
 		len-=slice;
 		copied+=slice;
+
+		pthread_mutex_lock(&DATA(state)->mutex);
 		DATA(state)->offset+=slice;
 		newbuffer = DATA(state)->in_buffer;
 
 		if (DATA(state)->offset >= INBUFFER(state).len) {
 			INBUFFER(state).state = EMPTY;
-			pthread_cond_signal(&INBUFFER(state).spaceavail);
+			pthread_cond_signal(&DATA(state)->space_avail);
 			newbuffer = (newbuffer+1) % BUFFERS;
 			DATA(state)->offset = 0;
 		}
 
-		pthread_mutex_unlock(&INBUFFER(state).mutex);
+		pthread_mutex_unlock(&DATA(state)->mutex);
 
 		DATA(state)->in_buffer = newbuffer;
 	}
@@ -154,10 +169,16 @@ static off_t thread_read(io_t *state, void *buffer, off_t len)
 
 static void thread_close(io_t *io)
 {
-	pthread_mutex_lock(&INBUFFER(io).mutex);
+	pthread_mutex_lock(&DATA(io)->mutex);
 	DATA(io)->closing = true;
-	pthread_cond_signal(&INBUFFER(io).spaceavail);
-	pthread_mutex_unlock(&INBUFFER(io).mutex);
+	pthread_cond_signal(&DATA(io)->space_avail);
+
+	/* Wait until the producer thread dies */
+	while (!DATA(io)->closed) {
+		pthread_cond_wait(&DATA(io)->data_ready, &DATA(io)->mutex);
+	}
+	pthread_mutex_unlock(&DATA(io)->mutex);
+	free(DATA(io));
 	free(io);
 }
 

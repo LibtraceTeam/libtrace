@@ -17,22 +17,23 @@ io_t *wandio_create(const char *filename)
 {
 	io_t *io = peek_open(stdio_open(filename));
 	char buffer[1024];
+	int len;
 	if (!io)
 		return NULL;
-	wandio_peek(io, buffer, sizeof(buffer));
+	len = wandio_peek(io, buffer, sizeof(buffer));
 #if HAVE_LIBZ
 	/* auto detect gzip compressed data */
-	if (buffer[0] == '\037' && buffer[1] == '\213') { 
+	if (len>=2 && buffer[0] == '\037' && buffer[1] == '\213') { 
 		io = zlib_open(io);
 	}
 	/* auto detect compress(1) compressed data (gzip can read this) */
-	if (buffer[0] == '\037' && buffer[1] == '\235') {
+	if (len>=2 && buffer[0] == '\037' && buffer[1] == '\235') {
 		io = zlib_open(io);
 	}
 #endif
 #if HAVE_LIBBZ2
 	/* auto detect bzip compressed data */
-	else if (buffer[0] == 'B' && buffer[1] == 'Z' && buffer[2] == 'h') { 
+	if (len>=3 && buffer[0] == 'B' && buffer[1] == 'Z' && buffer[2] == 'h') { 
 		io = bz_open(io);
 	}
 #endif

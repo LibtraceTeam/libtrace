@@ -51,6 +51,7 @@ static off_t stdio_seek(io_t *io, off_t offset, int whence)
 static void stdio_close(io_t *io)
 {
 	close(DATA(io)->fd);
+	free(io->data);
 	free(io);
 }
 

@@ -156,6 +156,7 @@ static void thread_wclose(iow_t *iow)
 	pthread_cond_signal(&OUTBUFFER(iow).dataready);
 	pthread_mutex_unlock(&OUTBUFFER(iow).mutex);
 	pthread_join(DATA(iow)->consumer,NULL);
+	free(iow->data);
 	free(iow);
 }
 
