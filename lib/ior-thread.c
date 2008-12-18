@@ -28,7 +28,6 @@ struct state_t {
 	pthread_cond_t data_ready;
 	pthread_mutex_t mutex;
 	bool closing;
-	bool closed;
 	io_t *io;
 };
 
@@ -78,7 +77,6 @@ static void *thread_producer(void* userdata)
 
 	wandio_destroy(DATA(state)->io);
 
-	DATA(state)->closed = true;
 	pthread_cond_signal(&DATA(state)->data_ready);
 	pthread_mutex_unlock(&DATA(state)->mutex);
 
@@ -106,7 +104,6 @@ io_t *thread_open(io_t *parent)
 
 	DATA(state)->io = parent;
 	DATA(state)->closing = false;
-	DATA(state)->closed = false;
 
 	pthread_create(&DATA(state)->producer,NULL,thread_producer,state);
 
@@ -172,12 +169,10 @@ static void thread_close(io_t *io)
 	pthread_mutex_lock(&DATA(io)->mutex);
 	DATA(io)->closing = true;
 	pthread_cond_signal(&DATA(io)->space_avail);
-
-	/* Wait until the producer thread dies */
-	while (!DATA(io)->closed) {
-		pthread_cond_wait(&DATA(io)->data_ready, &DATA(io)->mutex);
-	}
 	pthread_mutex_unlock(&DATA(io)->mutex);
+
+	/* Wait for the thread to exit */
+	pthread_join(&DATA(io)->producer, NULL);
 	free(DATA(io));
 	free(io);
 }

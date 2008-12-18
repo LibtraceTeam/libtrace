@@ -17,9 +17,6 @@ struct buffer_t {
 	char buffer[BUFFERSIZE];
 	int len;
 	enum { EMPTY = 0, FULL = 1 } state;
-	pthread_cond_t dataready;
-	pthread_cond_t spaceavail;
-	pthread_mutex_t mutex;
 };
 
 struct state_t {
@@ -29,6 +26,9 @@ struct state_t {
 	pthread_t consumer;
 	bool closing;
 	iow_t *iow;
+	pthread_cond_t data_ready;
+	pthread_cond_t space_avail;
+	pthread_mutex_t mutex;
 };
 
 #define DATA(x) ((struct state_t *)((x)->data))
@@ -41,29 +41,33 @@ static void *thread_consumer(void *userdata)
 	bool running = true;
 	iow_t *state = (iow_t *) userdata;
 
+	pthread_mutex_lock(&DATA(state)->mutex);
 	do {
-		pthread_mutex_lock(&DATA(state)->buffer[buffer].mutex);
 		while (DATA(state)->buffer[buffer].state == EMPTY) {
 			if (DATA(state)->closing)
 				break;
-			pthread_cond_wait(&DATA(state)->buffer[buffer].dataready,
-					&DATA(state)->buffer[buffer].mutex);
+			pthread_cond_wait(&DATA(state)->data_ready,
+					&DATA(state)->mutex);
 		}
 		/* Empty the buffer */
+
+		if (DATA(state)->closing)
+			break;
+
+		pthread_mutex_unlock(&DATA(state)->mutex);
 		wandio_wwrite(
 				DATA(state)->iow,
 				DATA(state)->buffer[buffer].buffer,
 				DATA(state)->buffer[buffer].len);
-
+		pthread_mutex_lock(&DATA(state)->mutex);
 
 		/* if we've not reached the end of the file keep going */
 		running = ( DATA(state)->buffer[buffer].len > 0 );
 		DATA(state)->buffer[buffer].len = 0;
 		DATA(state)->buffer[buffer].state = EMPTY;
 
-		pthread_cond_signal(&DATA(state)->buffer[buffer].spaceavail);
+		pthread_cond_signal(&DATA(state)->space_avail);
 
-		pthread_mutex_unlock(&DATA(state)->buffer[buffer].mutex);
 
 		/* Flip buffers */
 		buffer=(buffer+1) % BUFFERS;
@@ -74,6 +78,7 @@ static void *thread_consumer(void *userdata)
 
 	wandio_wdestroy(DATA(state)->iow);
 
+	pthread_mutex_unlock(&DATA(state)->mutex);
 	return NULL;
 }
 
@@ -92,9 +97,9 @@ iow_t *thread_wopen(iow_t *child)
 
 	DATA(state)->out_buffer = 0;
 	DATA(state)->offset = 0;
-	pthread_mutex_init(&DATA(state)->buffer[0].mutex,NULL);
-	pthread_cond_init(&DATA(state)->buffer[0].dataready,NULL);
-	pthread_cond_init(&DATA(state)->buffer[0].spaceavail,NULL);
+	pthread_mutex_init(&DATA(state)->mutex,NULL);
+	pthread_cond_init(&DATA(state)->data_ready,NULL);
+	pthread_cond_init(&DATA(state)->space_avail,NULL);
 
 	DATA(state)->iow = child;
 	DATA(state)->closing = false;
@@ -110,22 +115,24 @@ static off_t thread_wwrite(iow_t *state, const char *buffer, off_t len)
 	int copied=0;
 	int newbuffer;
 
+	pthread_mutex_lock(&DATA(state)->mutex);
 	while(len>0) {
-		pthread_mutex_lock(&OUTBUFFER(state).mutex);
 		while (OUTBUFFER(state).state == FULL) {
-			pthread_cond_wait(&OUTBUFFER(state).spaceavail,
-					&OUTBUFFER(state).mutex);
+			pthread_cond_wait(&DATA(state)->space_avail,
+					&DATA(state)->mutex);
 		}
 
 		slice=min( 
 			(off_t)sizeof(OUTBUFFER(state).buffer)-DATA(state)->offset,
 			len);
 				
+		pthread_mutex_unlock(&DATA(state)->mutex);
 		memcpy(
 			OUTBUFFER(state).buffer+DATA(state)->offset,
 			buffer,
 			slice
 			);
+		pthread_mutex_lock(&DATA(state)->mutex);
 
 		DATA(state)->offset += slice;
 		OUTBUFFER(state).len += slice;
@@ -137,24 +144,24 @@ static off_t thread_wwrite(iow_t *state, const char *buffer, off_t len)
 
 		if (DATA(state)->offset >= (off_t)sizeof(OUTBUFFER(state).buffer)) {
 			OUTBUFFER(state).state = FULL;
-			pthread_cond_signal(&OUTBUFFER(state).dataready);
+			pthread_cond_signal(&DATA(state)->data_ready);
 			DATA(state)->offset = 0;
 			newbuffer = (newbuffer+1) % BUFFERS;
 		}
 
-		pthread_mutex_unlock(&OUTBUFFER(state).mutex);
-
 		DATA(state)->out_buffer = newbuffer;
 	}
+
+	pthread_mutex_unlock(&DATA(state)->mutex);
 	return copied;
 }
 
 static void thread_wclose(iow_t *iow)
 {
-	pthread_mutex_lock(&OUTBUFFER(iow).mutex);
+	pthread_mutex_lock(&DATA(iow)->mutex);
 	DATA(iow)->closing = true;
-	pthread_cond_signal(&OUTBUFFER(iow).dataready);
-	pthread_mutex_unlock(&OUTBUFFER(iow).mutex);
+	pthread_cond_signal(&DATA(iow)->data_ready);
+	pthread_mutex_unlock(&DATA(iow)->mutex);
 	pthread_join(DATA(iow)->consumer,NULL);
 	free(iow->data);
 	free(iow);
