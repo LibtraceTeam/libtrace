@@ -172,7 +172,7 @@ static void thread_close(io_t *io)
 	pthread_mutex_unlock(&DATA(io)->mutex);
 
 	/* Wait for the thread to exit */
-	pthread_join(&DATA(io)->producer, NULL);
+	pthread_join(DATA(io)->producer, NULL);
 	free(DATA(io));
 	free(io);
 }
