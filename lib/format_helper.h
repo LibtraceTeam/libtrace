@@ -31,7 +31,6 @@
 #ifndef FORMAT_HELPER_H
 #define FORMAT_HELPER_H
 #include "common.h"
-#include "libtraceio.h"
 #include "wandio.h"
 
 int trace_read(libtrace_t *libtrace, void *buffer, size_t len);

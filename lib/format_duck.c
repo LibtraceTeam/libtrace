@@ -34,7 +34,6 @@
 #include "config.h"
 #include "wandio.h"
 #include <stdlib.h>
-#include "libtraceio.h"
 #include "rt_protocol.h"
 
 #include <errno.h>
