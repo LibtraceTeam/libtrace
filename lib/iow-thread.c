@@ -51,9 +51,6 @@ static void *thread_consumer(void *userdata)
 		}
 		/* Empty the buffer */
 
-		if (DATA(state)->closing)
-			break;
-
 		pthread_mutex_unlock(&DATA(state)->mutex);
 		wandio_wwrite(
 				DATA(state)->iow,
