@@ -1453,7 +1453,7 @@ DLLEXPORT void trace_perror(libtrace_t *trace,const char *msg,...)
 		if (trace->uridata) {
 			fprintf(stderr,"%s(%s): No error\n",buf,trace->uridata);
 		} else {
-			fprintf(stderr,"%s: No error\n");
+			fprintf(stderr,"%s: No error\n", buf);
 		}
 	}
 	trace->err.err_num = 0; /* "OK" */
