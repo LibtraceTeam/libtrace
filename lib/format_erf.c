@@ -64,18 +64,11 @@ static struct libtrace_format_t erfformat;
 #define DATA(x) ((struct erf_format_data_t *)x->format_data)
 #define DATAOUT(x) ((struct erf_format_data_out_t *)x->format_data)
 
-#define INPUT DATA(libtrace)->input
 #define IN_OPTIONS DATA(libtrace)->options
 #define OUTPUT DATAOUT(libtrace)->output
 #define OUT_OPTIONS DATAOUT(libtrace)->options
 struct erf_format_data_t {
         
-	union {
-                int fd;
-		io_t *file;
-        } input;
-
-	
 	struct {
 		enum { INDEX_UNKNOWN=0, INDEX_NONE, INDEX_EXISTS } exists;
 		io_t *index;
@@ -144,12 +137,45 @@ int erf_get_framing_length(const libtrace_packet_t *packet)
 	return dag_record_size + erf_get_padding(packet);
 }
 
+static int erf_probe_magic(io_t *io)
+{
+	char buffer[4096];
+	int len;
+	dag_record_t *erf;
+	len = wandio_peek(io, buffer, sizeof(buffer));
+	if (len < dag_record_size) {
+		return 0; /* False */
+	}
+	erf = (dag_record_t *) buffer;
+	/* If the record is too short */
+	if (ntohs(erf->rlen) < dag_record_size) {
+		return 0;
+	}
+	/* There aren't any erf traces before 1995-01-01 */
+	if (bswap_le_to_host64(erf->ts) < 0x2f0539b000000000ULL) {
+		return 0;
+	}
+	/* And not pcap! */
+	if (bswap_le_to_host64(erf->ts) >>32 == 0xa1b2c3d4) {
+		return 0;
+	}
+	/* And not the other pcap! */
+	if (bswap_le_to_host64(erf->ts) >>32 == 0xd4c3b2a1) {
+		return 0;
+	}
+	/* Is this a proper typed packet */
+	if (erf->type > TYPE_AAL2) {
+		return 0;
+	}
+	/* We should put some more tests in here. */
+	/* Yeah, this is probably ERF */
+	return 1;
+}
 
 static int erf_init_input(libtrace_t *libtrace) 
 {
 	libtrace->format_data = malloc(sizeof(struct erf_format_data_t));
 	
-	INPUT.file = 0;
 	IN_OPTIONS.real_time = 0;
 	DATA(libtrace)->drops = 0;
 	
@@ -180,12 +206,12 @@ static int erf_config_input(libtrace_t *libtrace, trace_option_t option,
 
 static int erf_start_input(libtrace_t *libtrace)
 {
-	if (INPUT.file)
-		return 0; /* success */
+	if (libtrace->io)
+		return 0; /* Success -- already done. */
 
-	INPUT.file = trace_open_file(libtrace);
+	libtrace->io = trace_open_file(libtrace);
 
-	if (!INPUT.file)
+	if (!libtrace->io)
 		return -1;
 
 	DATA(libtrace)->drops = 0;
@@ -232,7 +258,7 @@ static int erf_fast_seek_start(libtrace_t *libtrace,uint64_t erfts)
 	} while(record.timestamp>erfts);
 
 	/* We've found our location in the trace, now use it. */
-	wandio_seek(INPUT.file,(int64_t) record.offset,SEEK_SET);
+	wandio_seek(libtrace->io,(int64_t) record.offset,SEEK_SET);
 
 	return 0; /* success */
 }
@@ -242,11 +268,11 @@ static int erf_fast_seek_start(libtrace_t *libtrace,uint64_t erfts)
  */
 static int erf_slow_seek_start(libtrace_t *libtrace,uint64_t erfts UNUSED)
 {
-	if (INPUT.file) {
-		wandio_destroy(INPUT.file);
+	if (libtrace->io) {
+		wandio_destroy(libtrace->io);
 	}
-	INPUT.file = trace_open_file(libtrace);
-	if (!INPUT.file)
+	libtrace->io = trace_open_file(libtrace);
+	if (!libtrace->io)
 		return -1;
 	return 0;
 }
@@ -290,10 +316,10 @@ static int erf_seek_erf(libtrace_t *libtrace,uint64_t erfts)
 		trace_read_packet(libtrace,packet);
 		if (trace_get_erf_timestamp(packet)==erfts)
 			break;
-		off=wandio_tell(INPUT.file);
+		off=wandio_tell(libtrace->io);
 	} while(trace_get_erf_timestamp(packet)<erfts);
 
-	wandio_seek(INPUT.file,off,SEEK_SET);
+	wandio_seek(libtrace->io,off,SEEK_SET);
 
 	return 0;
 }
@@ -329,8 +355,8 @@ static int erf_config_output(libtrace_out_t *libtrace, trace_option_output_t opt
 
 
 static int erf_fin_input(libtrace_t *libtrace) {
-	if (INPUT.file)
-		wandio_destroy(INPUT.file);
+	if (libtrace->io)
+		wandio_destroy(libtrace->io);
 	free(libtrace->format_data);
 	return 0;
 }
@@ -408,7 +434,7 @@ static int erf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 
 	flags |= TRACE_PREP_OWN_BUFFER;	
 	
-	if ((numbytes=wandio_read(INPUT.file,
+	if ((numbytes=wandio_read(libtrace->io,
 					packet->buffer,
 					(size_t)dag_record_size)) == -1) {
 		trace_set_err(libtrace,errno,"read(%s)",
@@ -436,7 +462,7 @@ static int erf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	}
 	
 	/* read in the rest of the packet */
-	if ((numbytes=wandio_read(INPUT.file,
+	if ((numbytes=wandio_read(libtrace->io,
 					buffer2,
 					(size_t)size)) != (int)size) {
 		if (numbytes==-1) {
@@ -713,6 +739,8 @@ static struct libtrace_format_t erfformat = {
 	"erf",
 	"$Id$",
 	TRACE_FORMAT_ERF,
+	NULL,				/* probe filename */
+	erf_probe_magic,		/* probe magic */
 	erf_init_input,			/* init_input */	
 	erf_config_input,		/* config_input */
 	erf_start_input,		/* start_input */

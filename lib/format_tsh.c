@@ -41,12 +41,6 @@
 
 static struct libtrace_format_t tshformat;
 
-#define DATA(x) ((struct tsh_format_data_t *)x->format_data)
-
-struct tsh_format_data_t {
-	io_t *file;
-};
-
 typedef struct tsh_pkt_header_t {
 	uint32_t seconds;
 	uint32_t usecs;
@@ -60,30 +54,27 @@ static int tsh_get_framing_length(const libtrace_packet_t *packet)
 
 static int tsh_init_input(libtrace_t *libtrace) 
 {
-	libtrace->format_data = malloc(sizeof(struct tsh_format_data_t));
+	libtrace->format_data = NULL; /* No format data */
 	
-	DATA(libtrace)->file = 0;
-
 	return 0; /* success */
 }
 
 static int tsh_start_input(libtrace_t *libtrace)
 {
-	if (DATA(libtrace)->file)
+	if (libtrace->io)
 		return 0; /* success */
 
-	DATA(libtrace)->file = trace_open_file(libtrace);
+	libtrace->io = trace_open_file(libtrace);
 
-	if (!DATA(libtrace)->file)
+	if (!libtrace->io)
 		return -1;
 
 	return 0; /* success */
 }
 
 static int tsh_fin_input(libtrace_t *libtrace) {
-	if (DATA(libtrace)->file)
-		wandio_destroy(DATA(libtrace)->file);
-	free(libtrace->format_data);
+	if (libtrace->io)
+		wandio_destroy(libtrace->io);
 	return 0;
 }
 
@@ -133,7 +124,7 @@ static int tsh_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	buffer2 = packet->buffer;
 
 	/* Read the TSH header */
-	if ((numbytes=wandio_read(DATA(libtrace)->file,
+	if ((numbytes=wandio_read(libtrace->io,
 					buffer2,
 					(size_t)sizeof(tsh_pkt_header_t))) == -1) {
 		trace_set_err(libtrace,errno,"read(%s)",
@@ -148,7 +139,7 @@ static int tsh_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	buffer2 = (char*)buffer2 + numbytes;
 
 	/* Read the IP header */
-	if ((numbytes=wandio_read(DATA(libtrace)->file,
+	if ((numbytes=wandio_read(libtrace->io,
 				buffer2,
 				(size_t)sizeof(libtrace_ip_t))) 
 			!= sizeof(libtrace_ip_t)) {
@@ -163,7 +154,7 @@ static int tsh_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	buffer2 = (char*)buffer2 + ((libtrace_ip_t*)buffer2)->ip_hl*4;
 
 	/* Read the transport header */
-	if ((numbytes=wandio_read(DATA(libtrace)->file,
+	if ((numbytes=wandio_read(libtrace->io,
 				buffer2,
 				16)) != 16) {
 		trace_set_err(libtrace,errno,"read(%s)",
@@ -224,6 +215,8 @@ static struct libtrace_format_t tshformat = {
 	"tsh",
 	"$Id$",
 	TRACE_FORMAT_TSH,
+	NULL,				/* probe filename */
+	NULL,				/* probe magic */
 	tsh_init_input,			/* init_input */	
 	NULL,				/* config_input */
 	tsh_start_input,		/* start_input */
@@ -269,6 +262,8 @@ static struct libtrace_format_t frplusformat = {
 	"fr+",
 	"$Id$",
 	TRACE_FORMAT_TSH,
+	NULL,				/* probe filename */
+	NULL,				/* probe magic */
 	tsh_init_input,			/* init_input */	
 	NULL,				/* config_input */
 	tsh_start_input,		/* start_input */

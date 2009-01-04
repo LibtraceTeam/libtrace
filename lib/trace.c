@@ -259,6 +259,42 @@ DLLEXPORT void trace_help(void) {
 
 #define URI_PROTO_LINE 16U
 
+/* Try to guess which format module */
+static void guess_format(libtrace_t *libtrace, const char *filename)
+{
+	struct libtrace_format_t *tmp;
+	
+	/* Try and guess based on filename */
+	for(tmp = formats_list; tmp; tmp=tmp->next) {
+		if (tmp->probe_filename && tmp->probe_filename(filename)) {
+			libtrace->format = tmp;
+			libtrace->uridata = malloc(strlen(tmp->name)+1+strlen(filename)+1);
+			strcpy(libtrace->uridata,tmp->name);
+			strcat(libtrace->uridata,":");
+			strcat(libtrace->uridata,filename);
+			return;
+		}
+	}
+
+	libtrace->io = wandio_create(filename);
+	if (!libtrace->io)
+		return;
+
+	/* Try and guess based on file magic */
+	for(tmp = formats_list; tmp; tmp=tmp->next) {
+		if (tmp->probe_magic && tmp->probe_magic(libtrace->io)) {
+			libtrace->format = tmp;
+			libtrace->uridata = malloc(strlen(tmp->name)+1+strlen(filename)+1);
+			strcpy(libtrace->uridata,tmp->name);
+			strcat(libtrace->uridata,":");
+			strcat(libtrace->uridata,filename);
+			return;
+		}
+	}
+	
+	/* Oh well */
+	return;
+}
 
 /* Create a trace file from a URI
  *
@@ -285,7 +321,6 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 			(libtrace_t *)malloc(sizeof(libtrace_t));
         char *scan = 0;
         const char *uridata = 0;                  
-	struct libtrace_format_t *tmp;
 
 	trace_init();
 
@@ -307,29 +342,36 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 	libtrace->snaplen = 0;
 	libtrace->started=false;
 	libtrace->uridata = NULL;
+	libtrace->io = NULL;
 	libtrace->filtered_packets = 0;
 
         /* parse the URI to determine what sort of event we are dealing with */
 	if ((uridata = trace_parse_uri(uri, &scan)) == 0) {
-		trace_set_err(libtrace,TRACE_ERR_BAD_FORMAT,"Bad uri format (%s)",uri);
-		return libtrace;
-	}
-	
-	for (tmp=formats_list;tmp;tmp=tmp->next) {
-		if (strlen(scan) == strlen(tmp->name) &&
-				strncasecmp(scan, tmp->name, strlen(scan)) == 0
-				) {
-			libtrace->format=tmp;
-			break;
+		guess_format(libtrace,uri);
+		if (!libtrace->format) {
+			trace_set_err(libtrace,TRACE_ERR_BAD_FORMAT,"Unable to guess format (%s)",uri);
+			return libtrace;
 		}
 	}
-	if (libtrace->format == 0) {
-		trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT,
-				"Unknown format (%s)",scan);
-		return libtrace;
-	}
+	else {
+		struct libtrace_format_t *tmp;
 
-        libtrace->uridata = strdup(uridata);
+		for (tmp=formats_list;tmp;tmp=tmp->next) {
+			if (strlen(scan) == strlen(tmp->name) &&
+					strncasecmp(scan, tmp->name, strlen(scan)) == 0
+					) {
+				libtrace->format=tmp;
+				break;
+			}
+		}
+		if (libtrace->format == 0) {
+			trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT,
+					"Unknown format (%s)",scan);
+			return libtrace;
+		}
+
+		libtrace->uridata = strdup(uridata);
+	}
         /* libtrace->format now contains the type of uri
          * libtrace->uridata contains the appropriate data for this
 	 */
@@ -380,7 +422,19 @@ DLLEXPORT libtrace_t * trace_create_dead (const char *uri) {
 		xstrncpy(scan,uri, (size_t)(uridata - uri));
 	}
 	
-	libtrace->format = 0;	
+	libtrace->err.err_num = TRACE_ERR_NOERROR;
+	libtrace->format=NULL;
+        
+	libtrace->event.tdelta = 0.0;
+	libtrace->event.packet = NULL;
+	libtrace->event.psize = 0;
+	libtrace->event.trace_last_ts = 0.0;
+	libtrace->filter = NULL;
+	libtrace->snaplen = 0;
+	libtrace->started=false;
+	libtrace->uridata = NULL;
+	libtrace->io = NULL;
+	libtrace->filtered_packets = 0;
 	
 	for(tmp=formats_list;tmp;tmp=tmp->next) {
                 if (strlen(scan) == strlen(tmp->name) &&

@@ -41,6 +41,7 @@
 #include <string.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <stdbool.h>
 
 #define DATA(x) ((struct pcapfile_format_data_t*)((x)->format_data))
 #define DATAOUT(x) ((struct pcapfile_format_data_out_t*)((x)->format_data))
@@ -57,10 +58,10 @@ typedef struct pcapfile_header_t {
 } pcapfile_header_t; 
 
 struct pcapfile_format_data_t {
-	io_t *file;
 	struct {
 		int real_time;
 	} options;
+	bool started;
 	pcapfile_header_t header;
 };
 
@@ -71,6 +72,23 @@ struct pcapfile_format_data_out_t {
 
 };
 
+static int pcapfile_probe_magic(io_t *io)
+{
+	pcapfile_header_t header;
+	int len;
+	len = wandio_peek(io, &header, sizeof(header));
+	/* Is this long enough? */
+	if (len < (int)sizeof(header)) {
+		return 0;
+	}
+	/* Pcap magic? */
+	if (header.magic_number == 0xa1b2c3d4 || header.magic_number == 0xd4c3b2a1) {
+		return 1;
+	}
+	/* Nope, not pcap */
+	return 0;
+}
+
 static int pcapfile_init_input(libtrace_t *libtrace) {
 	libtrace->format_data = malloc(sizeof(struct pcapfile_format_data_t));
 
@@ -79,8 +97,8 @@ static int pcapfile_init_input(libtrace_t *libtrace) {
 		return -1;
 	}
 
-	DATA(libtrace)->file=NULL;
 	IN_OPTIONS.real_time = 0;
+	DATA(libtrace)->started = false;
 	return 0;
 }
 
@@ -126,13 +144,17 @@ static int pcapfile_start_input(libtrace_t *libtrace)
 {
 	int err;
 
-	if (!DATA(libtrace)->file) {
-		DATA(libtrace)->file=trace_open_file(libtrace);
+	if (!libtrace->io) {
+		libtrace->io=trace_open_file(libtrace);
+		DATA(libtrace)->started=false;
+	}
 
-		if (!DATA(libtrace)->file)
+	if (!DATA(libtrace)->started) {
+
+		if (!libtrace->io)
 			return -1;
 
-		err=wandio_read(DATA(libtrace)->file,
+		err=wandio_read(libtrace->io,
 				&DATA(libtrace)->header,
 				sizeof(DATA(libtrace)->header));
 
@@ -188,15 +210,15 @@ static int pcapfile_config_input(libtrace_t *libtrace,
 
 static int pcapfile_fin_input(libtrace_t *libtrace) 
 {
-	if (DATA(libtrace)->file)
-		wandio_destroy(DATA(libtrace)->file);
+	if (libtrace->io)
+		wandio_destroy(libtrace->io);
 	free(libtrace->format_data);
 	return 0; /* success */
 }
 
 static int pcapfile_fin_output(libtrace_out_t *libtrace)
 {
-	if (DATA(libtrace)->file)
+	if (DATAOUT(libtrace)->file)
 		wandio_wdestroy(DATAOUT(libtrace)->file);
 	free(libtrace->format_data);
 	libtrace->format_data=NULL;
@@ -268,7 +290,7 @@ static int pcapfile_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 
 	flags |= TRACE_PREP_OWN_BUFFER;
 	
-	err=wandio_read(DATA(libtrace)->file,
+	err=wandio_read(libtrace->io,
 			packet->buffer,
 			sizeof(libtrace_pcapfile_pkt_hdr_t));
 
@@ -283,7 +305,7 @@ static int pcapfile_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 		return 0;
 	}
 
-	err=wandio_read(DATA(libtrace)->file,
+	err=wandio_read(libtrace->io,
 			(char*)packet->buffer+sizeof(libtrace_pcapfile_pkt_hdr_t),
 			(size_t)swapl(libtrace,((libtrace_pcapfile_pkt_hdr_t*)packet->buffer)->caplen)
 			);
@@ -321,7 +343,7 @@ static int pcapfile_write_packet(libtrace_out_t *out,
 	
 	/* Silently discard RT metadata packets and packets with an
 	 * unknown linktype. */
-	if (linktype == TRACE_TYPE_METADATA || linktype == -1) {
+	if (linktype == TRACE_TYPE_METADATA || linktype == ~0U) {
 		return 0;
 	}
 
@@ -569,6 +591,8 @@ static struct libtrace_format_t pcapfile = {
 	"pcapfile",
 	"$Id$",
 	TRACE_FORMAT_PCAPFILE,
+	NULL,				/* probe filename */
+	pcapfile_probe_magic,		/* probe magic */
 	pcapfile_init_input,		/* init_input */
 	pcapfile_config_input,		/* config_input */
 	pcapfile_start_input,		/* start_input */

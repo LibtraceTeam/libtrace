@@ -200,7 +200,11 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
  */
 io_t *trace_open_file(libtrace_t *trace)
 {
-	return wandio_create(trace->uridata);
+	io_t *io=wandio_create(trace->uridata);
+	if (!io) {
+		trace_set_err(trace,errno,"Unable to open %s",trace->uridata);
+	}
+	return io;
 }
 
 /* Create a file or write to stdout using compression if requested

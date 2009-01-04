@@ -15,44 +15,29 @@
 #include <string.h>
 #include <stdlib.h>
 
-
-
-#define DATA(x) ((struct atmhdr_format_data_t *)x->format_data)
-
-#define INPUT DATA(libtrace)->input
-
-struct atmhdr_format_data_t {
-        union {
-                int fd;
-                io_t *file;
-        } input;
-};
-
 static int atmhdr_get_framing_length(const libtrace_packet_t *packet UNUSED)
 {
 	return sizeof(atmhdr_t);
 }
 
 static int atmhdr_init_input(libtrace_t *libtrace) {
-	libtrace->format_data = malloc(sizeof(struct atmhdr_format_data_t));
-	DATA(libtrace)->input.file = NULL;
+	libtrace->format_data = NULL; /* No format data needed */
 	return 0;
 }
 
 static int atmhdr_start_input(libtrace_t *libtrace)
 {
-	if (DATA(libtrace)->input.file)
+	if (libtrace->io) /* Already open? */
 		return 0;
-	DATA(libtrace)->input.file = trace_open_file(libtrace);
-	if (DATA(libtrace)->input.file)
+	libtrace->io = trace_open_file(libtrace);
+	if (libtrace->io)
 		return 0;
 	return -1;
 }
 
 static int atmhdr_fin_input(libtrace_t *libtrace)
 {
-	wandio_destroy(INPUT.file);
-	free(libtrace->format_data);
+	wandio_destroy(libtrace->io);
 	return 0;
 }
 
@@ -96,7 +81,7 @@ static int atmhdr_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	
 	packet->type = TRACE_RT_DATA_ATMHDR;
 
-	if ((numbytes=wandio_read(INPUT.file, buffer, (size_t)12)) != 12)
+	if ((numbytes=wandio_read(libtrace->io, buffer, (size_t)12)) != 12)
 	{
 		if (numbytes != 0) {
 			trace_set_err(libtrace,errno,"read(%s)",libtrace->uridata);
@@ -137,6 +122,8 @@ static struct libtrace_format_t atmhdr = {
 	"atmhdr",
 	"$Id$",
 	TRACE_FORMAT_ATMHDR,
+	NULL,				/* probe filename */
+	NULL,				/* probe magic */
         atmhdr_init_input,              /* init_input */
         NULL,                           /* config_input */
         atmhdr_start_input,             /* start_input */

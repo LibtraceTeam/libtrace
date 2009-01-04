@@ -656,6 +656,8 @@ static struct libtrace_format_t pcap = {
 	"pcap",
 	"$Id$",
 	TRACE_FORMAT_PCAP,
+	NULL,				/* probe filename */
+	NULL,				/* probe magic */
 	pcap_init_input,		/* init_input */
 	pcap_config_input,		/* config_input */
 	pcap_start_input,		/* start_input */
@@ -696,6 +698,8 @@ static struct libtrace_format_t pcapint = {
 	"pcapint",
 	"$Id$",
 	TRACE_FORMAT_PCAP,
+	NULL,				/* probe filename */
+	NULL,				/* probe magic */
 	pcapint_init_input,		/* init_input */
 	pcapint_config_input,		/* config_input */
 	pcapint_start_input,		/* start_input */

@@ -61,13 +61,8 @@
 #endif
 
 #define DATA(x) ((struct legacy_format_data_t *)x->format_data)
-#define INPUT DATA(libtrace)->input
 
 struct legacy_format_data_t {
-	union {
-                int fd;
-		io_t *file;
-        } input;
 	time_t starttime;	/* Used for legacy_nzix */
 	uint64_t ts_high;	/* Used for legacy_nzix */
 	uint32_t ts_old; 	/* Used for legacy_nzix */
@@ -76,7 +71,6 @@ struct legacy_format_data_t {
 static void legacy_init_format_data(libtrace_t *libtrace) {
 	libtrace->format_data = malloc(sizeof(struct legacy_format_data_t));
 	
-	DATA(libtrace)->input.file = NULL;
 	DATA(libtrace)->ts_high = 0;
 	DATA(libtrace)->ts_old = 0;
 	DATA(libtrace)->starttime = 0;
@@ -163,19 +157,19 @@ static int legacynzix_init_input(libtrace_t *libtrace) {
 
 static int erf_start_input(libtrace_t *libtrace)
 {
-	if (DATA(libtrace)->input.file)
-		return 0;
+	if (libtrace->io)
+		return 0; /* Already open */
 
-	DATA(libtrace)->input.file = trace_open_file(libtrace);
+	libtrace->io = trace_open_file(libtrace);
 
-	if (DATA(libtrace)->input.file)
+	if (libtrace->io)
 		return 0;
 
 	return -1;
 }
 
 static int erf_fin_input(libtrace_t *libtrace) {
-	wandio_destroy(INPUT.file);
+	wandio_destroy(libtrace->io);
 	free(libtrace->format_data);
 	return 0;
 }
@@ -237,7 +231,7 @@ static int legacy_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	 * or we reach the end of the file */
 	while (1) {
 	
-		if ((numbytes=wandio_read(INPUT.file,
+		if ((numbytes=wandio_read(libtrace->io,
 						buffer,
 						(size_t)64)) != 64) {
 			if (numbytes < 0) {
@@ -279,7 +273,7 @@ static int legacynzix_read_packet(libtrace_t *libtrace, libtrace_packet_t *packe
 	packet->type = TRACE_RT_DATA_LEGACY_NZIX;
 	
 	while (1) {
-		if ((numbytes = wandio_read(INPUT.file, buffer,
+		if ((numbytes = wandio_read(libtrace->io, buffer,
 						(size_t)68)) != 68) {
 			if (numbytes < 0) {
 				trace_set_err(libtrace,errno,"read(%s)",libtrace->uridata);
@@ -465,6 +459,8 @@ static struct libtrace_format_t legacyatm = {
 	"legacyatm",
 	"$Id$",
 	TRACE_FORMAT_LEGACY_ATM,
+	NULL,				/* probe filename */
+	NULL,				/* probe magic */
 	erf_init_input,			/* init_input */	
 	NULL,				/* config_input */
 	erf_start_input,		/* start_input */
@@ -505,6 +501,8 @@ static struct libtrace_format_t legacyeth = {
 	"legacyeth",
 	"$Id$",
 	TRACE_FORMAT_LEGACY_ETH,
+	NULL,				/* probe filename */
+	NULL,				/* probe magic */
 	erf_init_input,			/* init_input */	
 	NULL,				/* config_input */
 	erf_start_input,		/* start_input */
@@ -545,6 +543,8 @@ static struct libtrace_format_t legacypos = {
 	"legacypos",
 	"$Id$",
 	TRACE_FORMAT_LEGACY_POS,
+	NULL,				/* probe filename */
+	NULL,				/* probe magic */
 	erf_init_input,			/* init_input */	
 	NULL,				/* config_input */
 	erf_start_input,		/* start_input */
@@ -585,6 +585,8 @@ static struct libtrace_format_t legacynzix = {
 	"legacynzix",
 	"$Id$",
 	TRACE_FORMAT_LEGACY_NZIX,
+	NULL,				/* probe filename */
+	NULL,				/* probe magic */
 	legacynzix_init_input,		/* init_input */	
 	NULL,				/* config_input */
 	erf_start_input,		/* start_input */

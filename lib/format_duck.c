@@ -44,12 +44,10 @@
 #define DATA(x) ((struct duck_format_data_t *)x->format_data)
 #define DATAOUT(x) ((struct duck_format_data_out_t *)x->format_data)
 
-#define INPUT DATA(libtrace)
 #define OUTPUT DATAOUT(libtrace)
 
 struct duck_format_data_t {
 	char *path;
-	io_t *file;
 	int dag_version;
 };
 
@@ -64,8 +62,7 @@ struct duck_format_data_out_t {
 static int duck_init_input(libtrace_t *libtrace) {
 	libtrace->format_data = malloc(sizeof(struct duck_format_data_t));
 
-	INPUT->file = 0;
-	INPUT->dag_version = 0;
+	DATA(libtrace)->dag_version = 0;
 	return 0;
 }
 
@@ -99,12 +96,12 @@ static int duck_config_output(libtrace_out_t *libtrace,
 
 static int duck_start_input(libtrace_t *libtrace) {
 	
-	if (INPUT->file)
+	if (libtrace->io)
 		/* File already open */
 		return 0;
 	
-	INPUT->file = trace_open_file(libtrace);
-	if (!INPUT->file)
+	libtrace->io = trace_open_file(libtrace);
+	if (!libtrace->io)
 		return -1;
 
 	return 0;
@@ -120,7 +117,7 @@ static int duck_start_output(libtrace_out_t *libtrace) {
 }
 
 static int duck_fin_input(libtrace_t *libtrace) {
-	wandio_destroy(INPUT->file);
+	wandio_destroy(libtrace->io);
 	free(libtrace->format_data);
 
 	return 0;
@@ -177,9 +174,9 @@ static int duck_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 
 	flags |= TRACE_PREP_OWN_BUFFER;
 	
-	if (INPUT->dag_version == 0) {
+	if (DATA(libtrace)->dag_version == 0) {
 		/* Read in the duck version from the start of the trace */
-		if ((numbytes = wandio_read(INPUT->file, &version, 
+		if ((numbytes = wandio_read(libtrace->io, &version, 
 					sizeof(version))) != sizeof(uint32_t)) {
 			trace_set_err(libtrace, errno, 
 					"Reading DUCK version failed");
@@ -188,24 +185,24 @@ static int duck_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 		if (numbytes == 0) {
 			return 0;
 		}
-		INPUT->dag_version = bswap_le_to_host32(version);
+		DATA(libtrace)->dag_version = bswap_le_to_host32(version);
 	}
 	
 
-	if (INPUT->dag_version == TRACE_RT_DUCK_2_4) {
+	if (DATA(libtrace)->dag_version == TRACE_RT_DUCK_2_4) {
 		duck_size = sizeof(duck2_4_t);
 		packet->type = TRACE_RT_DUCK_2_4;
-	} else if (INPUT->dag_version == TRACE_RT_DUCK_2_5) {
+	} else if (DATA(libtrace)->dag_version == TRACE_RT_DUCK_2_5) {
 		duck_size = sizeof(duck2_5_t);
 		packet->type = TRACE_RT_DUCK_2_5;
 	} else {
 		trace_set_err(libtrace, TRACE_ERR_BAD_PACKET,
 				"Unrecognised DUCK version %i", 
-				INPUT->dag_version);
+				DATA(libtrace)->dag_version);
 		return -1;
 	}
 
-	if ((numbytes = wandio_read(INPUT->file, packet->buffer,
+	if ((numbytes = wandio_read(libtrace->io, packet->buffer,
 					(size_t)duck_size)) != (int)duck_size) {
 		if (numbytes == -1) {
 			trace_set_err(libtrace, errno, "Reading DUCK failed");
@@ -303,6 +300,8 @@ static struct libtrace_format_t duck = {
         "duck",
         "$Id$",
         TRACE_FORMAT_DUCK,
+	NULL,				/* probe filename */
+	NULL,				/* probe magic */
         duck_init_input,	        /* init_input */
         NULL,                           /* config_input */
         duck_start_input,	        /* start_input */

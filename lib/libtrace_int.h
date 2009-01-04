@@ -39,6 +39,7 @@ extern "C" {
 #include "common.h"
 #include "config.h"
 #include "libtrace.h"
+#include "wandio.h"
 
 #ifdef _MSC_VER
 // warning: deprecated function
@@ -145,6 +146,7 @@ struct libtrace_t {
 					  * libtrace
 					  */
 	char *uridata;			/**< the uri of this trace */
+	io_t *io;			/**< The tracefile (if applicable) */
 
 	libtrace_err_t err;		/**< error information */
 	bool started;			/**< if this trace has started */
@@ -254,6 +256,12 @@ struct libtrace_format_t {
 	/** the RT protocol type of this module */
 	enum base_format_t type;
 	/** stuff that deals with input @{ */
+	/** Given a filename, return if this format is responsible
+ 	 * (used for devices)
+ 	 */
+	int (*probe_filename)(const char *fname);
+	/** Given a file, look for file magic. */
+	int (*probe_magic)(io_t *io);
 	/** initialise an trace (or NULL if input is not supported) */
 	int (*init_input)(libtrace_t *libtrace);
 	/** configure an trace (or NULL if input is not supported) */

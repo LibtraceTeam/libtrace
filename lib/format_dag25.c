@@ -98,6 +98,21 @@ struct dag_format_data_t {
 pthread_mutex_t open_dag_mutex;
 struct dag_dev_t *open_dags = NULL;
 
+static void dag_probe_filename(const char *filename) 
+{
+	struct stat statbuf;
+	/* Can we stat the file? */
+	if (stat(filename, &statbuf) != 0) {
+		return 0;
+	}
+	/* Is it a character device? */
+	if (!S_ISCHR(statbuf.st_mode)) {
+		return 0;
+	}
+	/* Yeah, it's probably us. */
+	return 1;
+}
+
 static void dag_init_format_data(libtrace_t *libtrace) {
 	libtrace->format_data = (struct dag_format_data_t *)
                 malloc(sizeof(struct dag_format_data_t));
@@ -571,6 +586,8 @@ static struct libtrace_format_t dag = {
         "dag",
         "$Id$",
         TRACE_FORMAT_ERF,
+	dag_probe_filename,		/* probe filename */
+	NULL,				/* probe magic */
         dag_init_input,                 /* init_input */
         dag_config_input,               /* config_input */
         dag_start_input,                /* start_input */

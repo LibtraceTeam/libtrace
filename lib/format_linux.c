@@ -32,7 +32,7 @@
 #include "libtrace_int.h"
 #include "format_helper.h"
 #include "config.h"
-#include "stdlib.h"
+#include <stdlib.h>
 
 #ifdef HAVE_INTTYPES_H
 #  include <inttypes.h>
@@ -49,6 +49,7 @@
 #include <net/if.h>
 #include <sys/ioctl.h>
 #include <errno.h>
+#include <unistd.h>
 
 #include <assert.h>
 
@@ -84,6 +85,14 @@ struct libtrace_linuxnative_format_data_t {
 
 #define FORMAT(x) ((struct libtrace_format_data_t*)(x))
 #define DATAOUT(x) ((struct libtrace_linuxnative_format_data_t*)((x)->format_data))
+
+static int linuxnative_probe_filename(const char *filename)
+{
+	int sock;
+
+	/* Is this an interface? */
+	return (if_nametoindex(filename) != 0);
+}
 
 static int linuxnative_init_input(libtrace_t *libtrace) 
 {
@@ -613,6 +622,8 @@ static struct libtrace_format_t linuxnative = {
 	"int",
 	"$Id$",
 	TRACE_FORMAT_LINUX_NATIVE,
+	linuxnative_probe_filename,	/* probe filename */
+	NULL,				/* probe magic */
 	linuxnative_init_input,	 	/* init_input */
 	linuxnative_config_input,	/* config_input */
 	linuxnative_start_input,	/* start_input */

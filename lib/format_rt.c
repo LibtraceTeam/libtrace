@@ -711,6 +711,8 @@ static struct libtrace_format_t rt = {
         "rt",
         "$Id$",
         TRACE_FORMAT_RT,
+	NULL,				/* probe filename */
+	NULL,				/* probe magic */
         rt_init_input,            	/* init_input */
         NULL,                           /* config_input */
         rt_start_input,           	/* start_input */

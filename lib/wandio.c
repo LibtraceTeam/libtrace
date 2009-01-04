@@ -37,7 +37,7 @@ io_t *wandio_create(const char *filename)
 		io = bz_open(io);
 	}
 #endif
-	return thread_open(io);
+	return peek_open(thread_open(io));
 }
 
 off_t wandio_tell(io_t *io)

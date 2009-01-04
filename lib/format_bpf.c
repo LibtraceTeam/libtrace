@@ -69,6 +69,11 @@ struct libtrace_format_data_t {
 
 #define BPFHDR(x) ((struct bpf_hdr *)((x)->header))
 
+static int bpf_start_filename(const char *filename)
+{
+	return 0;
+}
+
 static int bpf_init_input(libtrace_t *libtrace) 
 {
 	libtrace->format_data = (struct libtrace_format_data_t *)
@@ -428,6 +433,8 @@ static struct libtrace_format_t bpf = {
 	"bpf",
 	"$Id$",
 	TRACE_FORMAT_BPF,
+	bpf_probe_filename,	/* probe filename */
+	NULL,			/* probe magic */
 	bpf_init_input,	 	/* init_input */
 	bpf_config_input,	/* config_input */
 	bpf_start_input,	/* start_input */
