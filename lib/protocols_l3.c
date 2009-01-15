@@ -50,7 +50,10 @@ DLLEXPORT void *trace_get_payload_from_ip(libtrace_ip_t *ipptr, uint8_t *prot,
         void *trans_ptr = 0;
 
         assert(ipptr != NULL);
-	assert(ipptr->ip_v == 4);
+	
+	/* Er? IPv5? */
+	if (ipptr->ip_v != 4)
+		return NULL;
 
 	if ((ntohs(ipptr->ip_off) & SW_IP_OFFMASK) != 0) {
 		if (remaining)
