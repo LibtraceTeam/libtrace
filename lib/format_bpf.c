@@ -69,6 +69,11 @@ struct libtrace_format_data_t {
 
 #define BPFHDR(x) ((struct bpf_hdr *)((x)->header))
 
+static int bpf_probe_filename(const char *filename)
+{
+	return (if_nametoindex(filename) != 0);
+}
+
 static int bpf_start_filename(const char *filename)
 {
 	return 0;
