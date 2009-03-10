@@ -1239,7 +1239,7 @@ DLLEXPORT void *trace_get_payload_from_ip(libtrace_ip_t *ip, uint8_t *proto,
  *
  */
 DLLEXPORT void *trace_get_payload_from_ip6(libtrace_ip6_t *ipptr,
-                uint8_t *prot, uint32_t *remaining);
+                uint8_t *proto, uint32_t *remaining);
 
 /** Gets a pointer to the payload given a pointer to the link header
  * @param ip            The link pointer
