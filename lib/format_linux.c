@@ -463,7 +463,7 @@ static int linuxnative_write_packet(libtrace_out_t *trace,
 	hdr.sll_hatype = 0;
 	hdr.sll_pkttype = 0;
 	hdr.sll_halen = htons(6); /* FIXME */
-	memcpy(hdr.sll_addr,packet->payload,(size_t)hdr.sll_halen);
+	memcpy(hdr.sll_addr,packet->payload,(size_t)ntohs(hdr.sll_halen));
 
 	return sendto(DATAOUT(trace)->fd,
 			packet->payload,
