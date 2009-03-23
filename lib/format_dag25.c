@@ -65,8 +65,9 @@
 
 
 #define DATA(x) ((struct dag_format_data_t *)x->format_data)
-#define FORMAT_DATA DATA(libtrace)
 #define DATA_OUT(x) ((struct dag_format_data_out_t *)x->format_data)
+
+#define FORMAT_DATA DATA(libtrace)
 #define FORMAT_DATA_OUT DATA_OUT(libtrace)
 
 #define DUCK FORMAT_DATA->duck
@@ -111,7 +112,7 @@ struct dag_format_data_t {
 pthread_mutex_t open_dag_mutex;
 struct dag_dev_t *open_dags = NULL;
 
-static void dag_probe_filename(const char *filename)
+static int dag_probe_filename(const char *filename)
 {
 	struct stat statbuf;
 	/* Can we stat the file? */
@@ -288,7 +289,7 @@ static int dag_init_output(libtrace_out_t *libtrace) {
 				(size_t)(scan - libtrace->uridata));
 		stream = atoi(++scan);
 	}
-	FORMAT_DATA->dagstream = stream;
+	FORMAT_DATA_OUT->dagstream = stream;
 
 	dag_device = dag_find_open_device(dag_dev_name);
 
@@ -301,12 +302,13 @@ static int dag_init_output(libtrace_out_t *libtrace) {
 	}
 
 	if (dag_device == NULL) {
-		if (dag_dev_name)
+		if (dag_dev_name) {
 			free(dag_dev_name);
+		}
 		return -1;
 	}
 
-	FORMAT_DATA->device = dag_device;
+	FORMAT_DATA_OUT->device = dag_device;
 	pthread_mutex_unlock(&open_dag_mutex);
 	return 0;
 }
@@ -380,31 +382,31 @@ static int dag_config_input(libtrace_t *libtrace, trace_option_t option,
 static int dag_start_output(libtrace_out_t *libtrace) {
 	struct timeval zero, nopoll;
 	uint8_t *top, *bottom;
-	uint8_t diff = 0;
 	top = bottom = NULL;
 
 	zero.tv_sec = 0;
 	zero.tv_usec = 0;
 	nopoll = zero;
 
-	if (dag_attach_stream(FORMAT_DATA->device->fd,
-			FORMAT_DATA->dagstream, 0, 1048576) < 0) {
+	if (dag_attach_stream(FORMAT_DATA_OUT->device->fd,
+			FORMAT_DATA_OUT->dagstream, 0, 1048576) < 0) {
 		trace_set_err_out(libtrace, errno, "Cannot attach DAG stream");
 		return -1;
 	}
 
-	if (dag_start_stream(FORMAT_DATA->device->fd,
-			FORMAT_DATA->dagstream) < 0) {
+	if (dag_start_stream(FORMAT_DATA_OUT->device->fd,
+			FORMAT_DATA_OUT->dagstream) < 0) {
 		trace_set_err_out(libtrace, errno, "Cannot start DAG stream");
 		return -1;
 	}
-	FORMAT_DATA->stream_attached = 1;
+	FORMAT_DATA_OUT->stream_attached = 1;
 
 	/* We don't want the dag card to do any sleeping */
+	/*
 	dag_set_stream_poll(FORMAT_DATA->device->fd,
 			FORMAT_DATA->dagstream, 0, &zero,
 			&nopoll);
-
+*/
 	return 0;
 }
 
@@ -456,17 +458,17 @@ static int dag_start_input(libtrace_t *libtrace) {
 }
 
 static int dag_pause_output(libtrace_out_t *libtrace) {
-	if (dag_stop_stream(FORMAT_DATA->device->fd,
-			FORMAT_DATA->dagstream) < 0) {
+	if (dag_stop_stream(FORMAT_DATA_OUT->device->fd,
+			FORMAT_DATA_OUT->dagstream) < 0) {
 		trace_set_err_out(libtrace, errno, "Could not stop DAG stream");
 		return -1;
 	}
-	if (dag_detach_stream(FORMAT_DATA->device->fd,
-			FORMAT_DATA->dagstream) < 0) {
+	if (dag_detach_stream(FORMAT_DATA_OUT->device->fd,
+			FORMAT_DATA_OUT->dagstream) < 0) {
 		trace_set_err_out(libtrace, errno, "Could not detach DAG stream");
 		return -1;
 	}
-	FORMAT_DATA->stream_attached = 0;
+	FORMAT_DATA_OUT->stream_attached = 0;
 	return 0;
 }
 
@@ -502,12 +504,12 @@ static int dag_fin_input(libtrace_t *libtrace) {
 
 static int dag_fin_output(libtrace_out_t *libtrace) {
 	pthread_mutex_lock(&open_dag_mutex);
-	if (FORMAT_DATA->stream_attached)
+	if (FORMAT_DATA_OUT->stream_attached)
 		dag_pause_output(libtrace);
-	FORMAT_DATA->device->ref_count --;
+	FORMAT_DATA_OUT->device->ref_count --;
 
-	if (FORMAT_DATA->device->ref_count == 0)
-		dag_close_device(FORMAT_DATA->device);
+	if (FORMAT_DATA_OUT->device->ref_count == 0)
+		dag_close_device(FORMAT_DATA_OUT->device);
 	free(libtrace->format_data);
 	pthread_mutex_unlock(&open_dag_mutex);
 	return 0; /* success */
@@ -628,14 +630,27 @@ static int dag_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
 static int dag_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *packet) {
 	int err;
 	void *record;
-	int size = trace_get_capture_length(packet);
+	int size = trace_get_capture_length(packet) + dag_record_size;
 	size = size + (8 - (size % 8));
 
-	err = dag_tx_stream_copy_bytes(FORMAT_DATA->device->fd, FORMAT_DATA->dagstream,
-			packet->buffer, size);
 
-	if (err == NULL)
-		trace_set_err(libtrace, errno, "dag_tx_stream_copy_bytes failed!");
+	//dag_record_t *erf = packet->buffer;
+/*
+	record = dag_tx_get_stream_space(FORMAT_DATA_OUT->device->fd, FORMAT_DATA_OUT->dagstream, 65535);
+
+	memcpy(record,packet->buffer,size);
+
+	dag_tx_stream_commit_bytes(FORMAT_DATA_OUT->device->fd, FORMAT_DATA_OUT->dagstream,
+			size );
+*/
+
+
+
+	if (dag_tx_stream_copy_bytes(FORMAT_DATA_OUT->device->fd, FORMAT_DATA_OUT->dagstream,
+			packet->buffer, size) == -1 ) {
+		trace_set_err_out(libtrace, errno, "dag_tx_stream_copy_bytes failed!");
+		return 1;
+	}
 
 	return 0;
 }
@@ -763,15 +778,15 @@ static struct libtrace_format_t dag = {
         dag_config_input,               /* config_input */
         dag_start_input,                /* start_input */
         dag_pause_input,                /* pause_input */
-	dag_init_output,		/* init_output */ /* done */
+	dag_init_output,		/* init_output */
         NULL,                           /* config_output */
-	dag_start_output,               /* start_output */ /* done */
+	dag_start_output,               /* start_output */
         dag_fin_input,                  /* fin_input */
-	dag_fin_output,                 /* fin_output */ /* done */
+	dag_fin_output,                 /* fin_output */
         dag_read_packet,                /* read_packet */
         dag_prepare_packet,		/* prepare_packet */
 	NULL,                           /* fin_packet */
-	dag_write_packet,               /* write_packet */ /* todo */
+	dag_write_packet,               /* write_packet */
         erf_get_link_type,              /* get_link_type */
         erf_get_direction,              /* get_direction */
         erf_set_direction,              /* set_direction */
