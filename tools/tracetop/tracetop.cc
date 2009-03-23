@@ -21,6 +21,7 @@
 
 typedef enum { BITS_PER_SEC, BYTES } display_t;
 display_t display_as = BYTES;
+int interval=1;
 
 int cmp_sockaddr_in6(const struct sockaddr_in6 *a, const struct sockaddr_in6 *b)
 {
@@ -180,15 +181,16 @@ static void do_report()
 	}
 	getmaxyx(stdscr,row,col);
 	attrset(A_REVERSE);
-	mvprintw(0,0,"%20s/%s\t%20s/%s\tproto\tbytes\tpackets\n",
+	mvprintw(0,0,"%20s/%s\t%20s/%s\tproto\t%s\tpackets\n",
 		"source ip","sport",
-		"dest ip","dport"
+		"dest ip","dport",
+		(display_as == BYTES ? "bytes" : "bits/sec")
 		);
 	attrset(A_NORMAL);
 	char sipstr[1024];
 	char dipstr[1024];
 	for(int i=0; i<row-2 && !pq.empty(); ++i) {
-		mvprintw(i+1,0,"%20s/%-5d\t%20s/%-5d\t%d\t%"PRIu64"\t%"PRIu64"\n",
+		mvprintw(i+1,0,"%20s/%-5d\t%20s/%-5d\t%d\t",
 				trace_sockaddr2string((struct sockaddr*)&pq.top().sip,
 					sizeof(struct sockaddr_storage),
 					sipstr,sizeof(sipstr)), 
@@ -197,9 +199,18 @@ static void do_report()
 					sizeof(struct sockaddr_storage),
 					dipstr,sizeof(dipstr)), 
 				pq.top().dport,
-				pq.top().protocol,
-				pq.top().bytes,
-				pq.top().packets);
+				pq.top().protocol);
+		switch (display_as) {
+			case BYTES:
+				printw("%"PRIu64"\t%"PRIu64"\n",
+						pq.top().bytes,
+						pq.top().packets);
+				break;
+			case BITS_PER_SEC:
+				printw("%8.03f\t%"PRIu64"\n",
+						8.0*pq.top().bytes/interval,
+						pq.top().packets);
+		}
 		pq.pop();
 	}
 	flows.clear();
@@ -230,6 +241,7 @@ int main(int argc, char *argv[])
 			{ "promisc",		1, 0, 'p' },
 			{ "help",		0, 0, 'h' },
 			{ "libtrace-help",	0, 0, 'H' },
+			{ "bits-per-sec",	0, 0, 'b' },
 			{ NULL,			0, 0, 0 }
 		};
 
@@ -252,6 +264,9 @@ int main(int argc, char *argv[])
 			case 'H':
 				trace_help();
 				return 1;
+			case 'b':
+				display_as = BITS_PER_SEC;
+				break;
 			default:
 				fprintf(stderr,"Unknown option: %c\n",c);
 				/* FALL THRU */
@@ -303,7 +318,7 @@ int main(int argc, char *argv[])
 		packet = trace_create_packet();
 
 		while (trace_read_packet(trace,packet)>0) {
-			if (trace_get_seconds(packet) - last_report > 1) {
+			if (trace_get_seconds(packet) - last_report >= interval) {
 				do_report();
 					
 				last_report=trace_get_seconds(packet);
