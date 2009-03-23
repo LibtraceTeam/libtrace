@@ -129,7 +129,8 @@ static void per_packet(libtrace_packet_t *packet)
 		flowkey.sip.ss_family = AF_UNSPEC;
 	if (trace_get_destination_address(packet,(struct sockaddr*)&flowkey.dip)==NULL)
 		flowkey.dip.ss_family = AF_UNSPEC;
-	trace_get_transport(packet,&flowkey.protocol, NULL);
+	if (trace_get_transport(packet,&flowkey.protocol, NULL) == NULL)
+		flowkey.protocol = NULL;
 	flowkey.sport = trace_get_source_port(packet);
 	flowkey.dport = trace_get_destination_port(packet);
 
@@ -203,6 +204,7 @@ static void do_report()
 	}
 	flows.clear();
 
+	clrtobot();
 	refresh();
 }
 
