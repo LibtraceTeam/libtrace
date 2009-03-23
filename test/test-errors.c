@@ -30,6 +30,9 @@
 #include <libtrace.h>
 #include <assert.h>
 
+/* If you don't specify O_WONLY or O_RDWR on the fileflags, then this should
+ * fail.
+ */
 void test_forgotten_wronly()
 {
 	libtrace_out_t *out;
