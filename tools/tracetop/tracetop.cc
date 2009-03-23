@@ -10,19 +10,71 @@
 #include <queue>
 #include <inttypes.h>
 #include <ncurses.h>
+#include <sys/socket.h>
+#include <netdb.h>
+
+int cmp_sockaddr_in6(const struct sockaddr_in6 *a, const struct sockaddr_in6 *b)
+{
+	if (a->sin6_port != b->sin6_port)
+		return a->sin6_port - b->sin6_port;
+	return memcmp(a->sin6_addr.s6_addr,b->sin6_addr.s6_addr,sizeof(a->sin6_addr.s6_addr));
+}
+
+int cmp_sockaddr_in(const struct sockaddr_in *a, const struct sockaddr_in *b)
+{
+	if (a->sin_port != b->sin_port)
+		return a->sin_port - b->sin_port;
+	return a->sin_addr.s_addr - b->sin_addr.s_addr;
+}
+
+int cmp_sockaddr(const struct sockaddr *a, const struct sockaddr *b)
+{
+	if (a->sa_family != b->sa_family) {
+		return a->sa_family - b->sa_family;
+	}
+	switch (a->sa_family) {
+		case AF_INET:
+			return cmp_sockaddr_in((struct sockaddr_in *)a,(struct sockaddr_in*)b);
+		case AF_INET6:
+			return cmp_sockaddr_in6((struct sockaddr_in6 *)a,(struct sockaddr_in6*)b);
+		case AF_UNSPEC:
+			return 0; /* Can't compare UNSPEC's! */
+		default:
+			fprintf(stderr,"Don't know how to compare family %d\n",a->sa_family);
+			abort();
+	}
+}
+
+char *trace_sockaddr2string(const struct sockaddr *a, socklen_t salen, char *buffer, size_t bufflen)
+{
+	static char intbuffer[NI_MAXHOST];
+	char *mybuf = buffer ? buffer : intbuffer;
+	size_t mybufflen = buffer ? bufflen : sizeof(intbuffer);
+	int err;
+	if ((err=getnameinfo(a, salen, mybuf, mybufflen, NULL, 0, NI_NUMERICHOST))!=0) {
+		strncpy(mybuf,gai_strerror(err),mybufflen);
+	}
+	return mybuf;
+}
 
 struct flowkey_t {
-	uint32_t sip;
-	uint32_t dip;
+	struct sockaddr_storage sip;
+	struct sockaddr_storage dip;
 	uint16_t sport;
 	uint16_t dport;
 	uint8_t protocol;
 
 	bool operator <(const flowkey_t &b) const {
-		if (sip != b.sip) return sip < b.sip;
-		if (dip != b.dip) return dip < b.dip;
+		int c;
+
+		c = cmp_sockaddr((struct sockaddr*)&sip,(struct sockaddr*)&b.sip);
+		if (c != 0) return c<0;
+		c = cmp_sockaddr((struct sockaddr*)&dip,(struct sockaddr*)&b.dip);
+		if (c != 0) return c<0;
+
 		if (sport != b.sport) return sport < b.sport;
 		if (dport != b.dport) return dport < b.dport;
+
 		return protocol < b.protocol;
 	}
 };
@@ -40,21 +92,15 @@ static void per_packet(libtrace_packet_t *packet)
 {
 	flowkey_t flowkey;
 	flows_t::iterator it;
-	libtrace_ip_t *ip = trace_get_ip(packet);
-	if (!ip) {
-		flowkey.sip = 0;
-		flowkey.dip = 0;
-		flowkey.sport = 0;
-		flowkey.dport = 0;
-		flowkey.protocol = 0;
-	}
-	else {
-		flowkey.sip = ntohs(ip->ip_src.s_addr);
-		flowkey.dip = ntohs(ip->ip_dst.s_addr);
-		flowkey.protocol = ip->ip_p;
-		flowkey.sport = trace_get_source_port(packet);
-		flowkey.dport = trace_get_destination_port(packet);
-	}
+
+	if (trace_get_source_address(packet,(struct sockaddr*)&flowkey.sip)==0)
+		flowkey.sip.ss_family = AF_UNSPEC;
+	if (trace_get_destination_address(packet,(struct sockaddr*)&flowkey.dip)==0)
+		flowkey.dip.ss_family = AF_UNSPEC;
+	trace_get_transport(packet,&flowkey.protocol, NULL);
+	flowkey.sport = trace_get_source_port(packet);
+	flowkey.dport = trace_get_destination_port(packet);
+
 	it = flows.find(flowkey);
 	if (it == flows.end()) {
 		flowdata_t flowdata = { 0, 0 };
@@ -70,8 +116,8 @@ static void per_packet(libtrace_packet_t *packet)
 struct flow_data_t {
 	uint64_t bytes;
 	uint64_t packets;
-	uint32_t sip;
-	uint32_t dip;
+	struct sockaddr_storage sip;
+	struct sockaddr_storage dip;
 	uint16_t sport;
 	uint16_t dport;
 	uint8_t protocol;
@@ -100,15 +146,23 @@ static void do_report()
 	}
 	getmaxyx(stdscr,row,col);
 	attrset(A_REVERSE);
-	mvprintw(0,0,"%08s:%s\t%8s:%s\tproto\tbytes\tpackets\n",
+	mvprintw(0,0,"%15s:%s\t%15s:%s\tproto\tbytes\tpackets\n",
 		"sip","sport",
 		"dip","dport"
 		);
 	attrset(A_NORMAL);
+	char sipstr[1024];
+	char dipstr[1024];
 	for(int i=0; i<row-2 && !pq.empty(); ++i) {
-		mvprintw(i+1,0,"%08x:%d\t%08x:%d\t%d\t%"PRIu64"\t%"PRIu64"\n",
-				pq.top().sip, pq.top().sport,
-				pq.top().dip, pq.top().dport,
+		mvprintw(i+1,0,"%s/%d\t%s/%d\t%d\t%"PRIu64"\t%"PRIu64"\n",
+				trace_sockaddr2string((struct sockaddr*)&pq.top().sip,
+					sizeof(struct sockaddr_storage),
+					sipstr,sizeof(sipstr)), 
+				pq.top().sport,
+				trace_sockaddr2string((struct sockaddr*)&pq.top().dip,
+					sizeof(struct sockaddr_storage),
+					dipstr,sizeof(dipstr)), 
+				pq.top().dport,
 				pq.top().protocol,
 				pq.top().bytes,
 				pq.top().packets);
