@@ -180,15 +180,15 @@ static void do_report()
 	}
 	getmaxyx(stdscr,row,col);
 	attrset(A_REVERSE);
-	mvprintw(0,0,"%15s:%s\t%15s:%s\tproto\tbytes\tpackets\n",
-		"sip","sport",
-		"dip","dport"
+	mvprintw(0,0,"%20s/%s\t%20s/%s\tproto\tbytes\tpackets\n",
+		"source ip","sport",
+		"dest ip","dport"
 		);
 	attrset(A_NORMAL);
 	char sipstr[1024];
 	char dipstr[1024];
 	for(int i=0; i<row-2 && !pq.empty(); ++i) {
-		mvprintw(i+1,0,"%s/%d\t%s/%d\t%d\t%"PRIu64"\t%"PRIu64"\n",
+		mvprintw(i+1,0,"%20s/%-5d\t%20s/%-5d\t%d\t%"PRIu64"\t%"PRIu64"\n",
 				trace_sockaddr2string((struct sockaddr*)&pq.top().sip,
 					sizeof(struct sockaddr_storage),
 					sipstr,sizeof(sipstr)), 
