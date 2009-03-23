@@ -1,0 +1,28 @@
+.TH TRACETOP "1" "March 2009" "tracetop (libtrace)" "User Commands"
+.SH NAME
+tracetop \- show top flows
+.SH SYNOPSIS
+.B tracetop
+[ \fB-f \fRbpf | \fB--filter=\fRbpf]
+[ \fB-s \fRsnaplen | \fB--snaplen=\fRsnaplen]
+[ \fB-p \fRpromisc | \fB--promisc=\fRpromisc]
+[ \fB-h \fR| \fB--help\fR]
+[ \fB-H \fR| \fB--libtrace-help\fR]
+inputuri ...
+.SH DESCRIPTION
+tracetop shows the top 'n' flows every second
+.TP
+\fB\-f\fR bpf filter
+Count only packets that match tcpdump style bpf filter
+
+.SH LINKS
+More details about tracesplit (and libtrace) can be found at
+http://www.wand.net.nz/trac/libtrace/wiki/UserDocumentation
+
+.SH SEE ALSO
+libtrace(3), tracemerge(1), tracefilter(1), traceconvert(1), tracesplit_dir(1),
+tracereport(1), tracertstats(1), tracestats(1), tracedump(1), traceanon(1),
+tracesummary(1)
+
+.SH AUTHORS
+Perry Lorier <perry@cs.waikato.ac.nz>

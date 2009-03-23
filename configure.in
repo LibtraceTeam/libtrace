@@ -20,7 +20,7 @@ AC_CONFIG_FILES([Makefile lib/Makefile docs/Makefile libpacketdump/Makefile
 	tools/Makefile tools/traceanon/Makefile tools/tracepktdump/Makefile 
 	tools/tracemerge/Makefile tools/tracereport/Makefile
 	tools/tracertstats/Makefile tools/tracesplit/Makefile
-	tools/tracestats/Makefile 
+	tools/tracestats/Makefile tools/tracetop/Makefile
 	examples/Makefile examples/skeleton/Makefile examples/rate/Makefile
 	examples/stats/Makefile
 	docs/libtrace.doxygen 
@@ -264,6 +264,7 @@ DAG_VERSION_NUM=$dag_drv_v
 AC_CHECK_LIB(z, deflate)
 AC_CHECK_LIB(bz2, BZ2_bzDecompressInit)
 AC_CHECK_LIB(pthread, pthread_create)
+AC_SEARCH_LIBS(mvprintw, ncurses, [], [ AC_MSG_ERROR([NCurses library not available]) ])
 
 AM_CONDITIONAL([HAVE_BPF_CAPTURE], [test "$ac_cv_have_decl_BIOCSETIF" = yes ])
 AM_CONDITIONAL([HAVE_DAG], [test "$libtrace_dag" = true])
