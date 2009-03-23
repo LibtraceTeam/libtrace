@@ -12,6 +12,15 @@
 #include <ncurses.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include "config.h"
+#ifdef HAVE_NETPACKET_PACKET_H
+#include <sys/socket.h>
+#include <netpacket/packet.h>
+#include <net/ethernet.h>
+#endif
+
+typedef enum { BITS_PER_SEC, BYTES } display_t;
+display_t display_as = BYTES;
 
 int cmp_sockaddr_in6(const struct sockaddr_in6 *a, const struct sockaddr_in6 *b)
 {
@@ -27,6 +36,13 @@ int cmp_sockaddr_in(const struct sockaddr_in *a, const struct sockaddr_in *b)
 	return a->sin_addr.s_addr - b->sin_addr.s_addr;
 }
 
+#ifdef HAVE_NETPACKET_PACKET_H
+int cmp_sockaddr_ll(const struct sockaddr_ll *a, const struct sockaddr_ll *b)
+{
+	return memcmp(a->sll_addr, b->sll_addr, b->sll_halen);
+}
+#endif
+
 int cmp_sockaddr(const struct sockaddr *a, const struct sockaddr *b)
 {
 	if (a->sa_family != b->sa_family) {
@@ -37,6 +53,10 @@ int cmp_sockaddr(const struct sockaddr *a, const struct sockaddr *b)
 			return cmp_sockaddr_in((struct sockaddr_in *)a,(struct sockaddr_in*)b);
 		case AF_INET6:
 			return cmp_sockaddr_in6((struct sockaddr_in6 *)a,(struct sockaddr_in6*)b);
+#ifdef HAVE_NETPACKET_PACKET_H
+		case AF_PACKET:
+			return cmp_sockaddr_ll((struct sockaddr_ll *)a,(struct sockaddr_ll*)b);
+#endif
 		case AF_UNSPEC:
 			return 0; /* Can't compare UNSPEC's! */
 		default:
@@ -51,8 +71,20 @@ char *trace_sockaddr2string(const struct sockaddr *a, socklen_t salen, char *buf
 	char *mybuf = buffer ? buffer : intbuffer;
 	size_t mybufflen = buffer ? bufflen : sizeof(intbuffer);
 	int err;
-	if ((err=getnameinfo(a, salen, mybuf, mybufflen, NULL, 0, NI_NUMERICHOST))!=0) {
-		strncpy(mybuf,gai_strerror(err),mybufflen);
+	switch (a->sa_family) {
+		case AF_INET:
+		case AF_INET6:
+			if ((err=getnameinfo(a, salen, mybuf, mybufflen, NULL, 0, NI_NUMERICHOST))!=0) {
+				strncpy(mybuf,gai_strerror(err),mybufflen);
+			}
+			break;
+#ifdef HAVE_NETPACKET_PACKET_H
+		case AF_PACKET:
+			trace_ether_ntoa(((struct sockaddr_ll*)a)->sll_addr, mybuf);
+			break;
+#endif
+		default:
+			snprintf(mybuf,mybufflen,"Unknown family %d",a->sa_family);
 	}
 	return mybuf;
 }
@@ -93,9 +125,9 @@ static void per_packet(libtrace_packet_t *packet)
 	flowkey_t flowkey;
 	flows_t::iterator it;
 
-	if (trace_get_source_address(packet,(struct sockaddr*)&flowkey.sip)==0)
+	if (trace_get_source_address(packet,(struct sockaddr*)&flowkey.sip)==NULL)
 		flowkey.sip.ss_family = AF_UNSPEC;
-	if (trace_get_destination_address(packet,(struct sockaddr*)&flowkey.dip)==0)
+	if (trace_get_destination_address(packet,(struct sockaddr*)&flowkey.dip)==NULL)
 		flowkey.dip.ss_family = AF_UNSPEC;
 	trace_get_transport(packet,&flowkey.protocol, NULL);
 	flowkey.sport = trace_get_source_port(packet);
@@ -111,6 +143,7 @@ static void per_packet(libtrace_packet_t *packet)
 
 	++it->second.packets;
 	it->second.bytes+=trace_get_capture_length(packet);
+
 }
 
 struct flow_data_t {

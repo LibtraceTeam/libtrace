@@ -3,6 +3,15 @@
 #include "protocols.h"
 #include <assert.h>
 #include <stdlib.h>
+#include "config.h"
+
+#ifdef HAVE_NETPACKET_PACKET_H
+#include <sys/socket.h>
+#include <netpacket/packet.h>
+#include <net/ethernet.h>
+#include <net/if_arp.h>
+#include <string.h>
+#endif
 
 libtrace_ip_t *trace_get_ip(libtrace_packet_t *packet) 
 {
@@ -247,6 +256,59 @@ DLLEXPORT int trace_get_next_option(unsigned char **ptr,int *len,
 	assert(0);
 }
 
+/* Extract the source mac address from a frame and bundle it up into a sockaddr */
+static struct sockaddr *get_source_ethernet_address(
+	libtrace_ether_t *ethernet, struct sockaddr *addr)
+{
+#ifdef HAVE_NETPACKET_PACKET_H
+/* Use linux's sockaddr_ll structure */
+	static struct sockaddr_storage dummy;
+	struct sockaddr_ll *l2addr;
+
+	if (addr)
+		l2addr = (struct sockaddr_ll*)addr;
+	else
+		l2addr = (struct sockaddr_ll*)&dummy;
+	
+	l2addr->sll_family = AF_PACKET;
+	l2addr->sll_protocol = ethernet->ether_type;
+	l2addr->sll_ifindex = 0; /* Irrelevant */
+	l2addr->sll_hatype = ARPHRD_ETHER; 
+	l2addr->sll_pkttype = PACKET_OTHERHOST;
+	l2addr->sll_halen = 6;
+	memcpy(l2addr->sll_addr,ethernet->ether_shost, 6);
+
+	return (struct sockaddr*)l2addr;
+#else
+/* TODO: implement BSD's sockaddr_dl structure, sigh. */
+	return NULL;
+#endif
+}
+
+static struct sockaddr *get_source_l2_address(
+	const libtrace_packet_t *packet, struct sockaddr *addr)
+{
+	static struct sockaddr_storage dummy;
+	void *l2;
+	libtrace_linktype_t linktype;
+	uint32_t remaining;
+
+	if (!addr)
+		addr =(struct sockaddr*)&dummy;
+
+	l2=trace_get_layer2(packet, &linktype, &remaining);
+	if (!l2) {
+		return NULL;
+	}
+
+	switch (linktype) {
+		case TRACE_TYPE_ETH:
+			return get_source_ethernet_address((libtrace_ether_t*)l2, addr);
+		default:
+			return NULL;
+	}
+}
+
 DLLEXPORT struct sockaddr *trace_get_source_address(
 		const libtrace_packet_t *packet, struct sockaddr *addr)
 {
@@ -262,7 +324,7 @@ DLLEXPORT struct sockaddr *trace_get_source_address(
 	l3 = trace_get_layer3(packet,&ethertype,&remaining);
 
 	if (!l3)
-		return NULL;
+		return get_source_l2_address(packet,addr);
 
 	switch (ethertype) {
 		case TRACE_ETHERTYPE_IP: /* IPv4 */
@@ -295,6 +357,55 @@ DLLEXPORT struct sockaddr *trace_get_source_address(
 			return addr;
 		}
 		default:
+			return get_source_l2_address(packet, addr);
+	}
+}
+
+
+static struct sockaddr *get_destination_ethernet_address(
+	libtrace_ether_t *ethernet, struct sockaddr *addr)
+{
+#ifdef HAVE_NETPACKET_PACKET_H
+/* Use linux's sockaddr_ll structure */
+	static struct sockaddr_storage dummy;
+	struct sockaddr_ll *l2addr;
+	if (addr)
+		l2addr = (struct sockaddr_ll*)addr;
+	else
+		l2addr = (struct sockaddr_ll*)&dummy;
+	
+	l2addr->sll_family = AF_PACKET;
+	l2addr->sll_protocol = ethernet->ether_type;
+	l2addr->sll_ifindex = 0; /* Irrelevant */
+	l2addr->sll_hatype = ARPHRD_ETHER; 
+	l2addr->sll_pkttype = PACKET_OTHERHOST;
+	l2addr->sll_halen = 6;
+	memcpy(l2addr->sll_addr,ethernet->ether_dhost, 6);
+
+	return (struct sockaddr*)l2addr;
+#else
+/* TODO: implement BSD's sockaddr_dl structure, sigh. */
+	return NULL;
+#endif
+}
+
+static struct sockaddr *get_destination_l2_address(
+	const libtrace_packet_t *packet, struct sockaddr *addr)
+{
+	static struct sockaddr_storage dummy;
+	void *l2;
+	libtrace_linktype_t linktype;
+	uint32_t remaining;
+	if (!addr)
+		addr =(struct sockaddr*)&dummy;
+	l2=trace_get_layer2(packet, &linktype, &remaining);
+	if (!l2)
+		return NULL;
+
+	switch (linktype) {
+		case TRACE_TYPE_ETH:
+			return get_destination_ethernet_address((libtrace_ether_t*)l2, addr);
+		default:
 			return NULL;
 	}
 }
@@ -314,7 +425,7 @@ DLLEXPORT struct sockaddr *trace_get_destination_address(
 	l3 = trace_get_layer3(packet,&ethertype,&remaining);
 
 	if (!l3)
-		return NULL;
+		return get_destination_l2_address(packet,addr);
 
 	switch (ethertype) {
 		case TRACE_ETHERTYPE_IP: /* IPv4 */
@@ -347,7 +458,7 @@ DLLEXPORT struct sockaddr *trace_get_destination_address(
 			return addr;
 		}
 		default:
-			return NULL;
+			return get_destination_l2_address(packet, addr);
 	}
 }
 
