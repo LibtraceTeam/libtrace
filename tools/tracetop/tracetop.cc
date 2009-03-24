@@ -19,9 +19,18 @@
 #include <net/ethernet.h>
 #endif
 
-typedef enum { BITS_PER_SEC, BYTES } display_t;
+typedef enum { BITS_PER_SEC, BYTES, PERCENT } display_t;
 display_t display_as = BYTES;
-int interval=1;
+float interval=2;
+
+bool use_sip = true;
+bool use_dip = true;
+bool use_sport = true;
+bool use_dport = true;
+bool use_protocol = true;
+
+uint64_t total_bytes=0;
+uint64_t total_packets=0;
 
 int cmp_sockaddr_in6(const struct sockaddr_in6 *a, const struct sockaddr_in6 *b)
 {
@@ -100,13 +109,17 @@ struct flowkey_t {
 	bool operator <(const flowkey_t &b) const {
 		int c;
 
-		c = cmp_sockaddr((struct sockaddr*)&sip,(struct sockaddr*)&b.sip);
-		if (c != 0) return c<0;
-		c = cmp_sockaddr((struct sockaddr*)&dip,(struct sockaddr*)&b.dip);
-		if (c != 0) return c<0;
+		if (use_sip) {
+			c = cmp_sockaddr((struct sockaddr*)&sip,(struct sockaddr*)&b.sip);
+			if (c != 0) return c<0;
+		}
+		if (use_dip) {
+			c = cmp_sockaddr((struct sockaddr*)&dip,(struct sockaddr*)&b.dip);
+			if (c != 0) return c<0;
+		}
 
-		if (sport != b.sport) return sport < b.sport;
-		if (dport != b.dport) return dport < b.dport;
+		if (use_sport && sport != b.sport) return sport < b.sport;
+		if (use_dport && dport != b.dport) return dport < b.dport;
 
 		return protocol < b.protocol;
 	}
@@ -121,19 +134,37 @@ typedef std::map<flowkey_t,flowdata_t> flows_t;
 
 flows_t flows;
 
+const char *nice_bandwidth(double bytespersec)
+{
+	static char ret[1024];
+	double bitspersec = bytespersec*8;
+
+	if (bitspersec>1e12)
+		snprintf(ret,sizeof(ret),"%.03fTb/s", bitspersec/1e12);
+	else if (bitspersec>1e9)
+		snprintf(ret,sizeof(ret),"%.03fGb/s", bitspersec/1e9);
+	else if (bitspersec>1e6)
+		snprintf(ret,sizeof(ret),"%.03fMb/s", bitspersec/1e6);
+	else if (bitspersec>1e3)
+		snprintf(ret,sizeof(ret),"%.03fkb/s", bitspersec/1e3);
+	else
+		snprintf(ret,sizeof(ret),"%.03fb/s", bitspersec);
+	return ret;
+}
+
 static void per_packet(libtrace_packet_t *packet)
 {
 	flowkey_t flowkey;
 	flows_t::iterator it;
 
-	if (trace_get_source_address(packet,(struct sockaddr*)&flowkey.sip)==NULL)
+	if (use_sip && trace_get_source_address(packet,(struct sockaddr*)&flowkey.sip)==NULL)
 		flowkey.sip.ss_family = AF_UNSPEC;
-	if (trace_get_destination_address(packet,(struct sockaddr*)&flowkey.dip)==NULL)
+	if (use_dip && trace_get_destination_address(packet,(struct sockaddr*)&flowkey.dip)==NULL)
 		flowkey.dip.ss_family = AF_UNSPEC;
-	if (trace_get_transport(packet,&flowkey.protocol, NULL) == NULL)
-		flowkey.protocol = NULL;
-	flowkey.sport = trace_get_source_port(packet);
-	flowkey.dport = trace_get_destination_port(packet);
+	if (use_protocol && trace_get_transport(packet,&flowkey.protocol, NULL) == NULL)
+		flowkey.protocol = 0;
+	if (use_sport) flowkey.sport = trace_get_source_port(packet);
+	if (use_dport) flowkey.dport = trace_get_destination_port(packet);
 
 	it = flows.find(flowkey);
 	if (it == flows.end()) {
@@ -145,6 +176,9 @@ static void per_packet(libtrace_packet_t *packet)
 
 	++it->second.packets;
 	it->second.bytes+=trace_get_capture_length(packet);
+
+	++total_packets;
+	total_bytes+=trace_get_capture_length(packet);
 
 }
 
@@ -180,26 +214,80 @@ static void do_report()
 		pq.push(data);
 	}
 	getmaxyx(stdscr,row,col);
+	move(0,0);
+	printw("Total Bytes: %10" PRIu64 " (%s)\tTotal Packets: %10" PRIu64, total_bytes, nice_bandwidth(total_bytes), total_packets);
+	clrtoeol();
 	attrset(A_REVERSE);
-	mvprintw(0,0,"%20s/%s\t%20s/%s\tproto\t%s\tpackets\n",
-		"source ip","sport",
-		"dest ip","dport",
-		(display_as == BYTES ? "bytes" : "bits/sec")
-		);
+	move(1,0);
+	if (use_sip) {
+		printw("%20s", "source ip");
+		if (use_sport)
+			printw("/");
+		else
+			printw("\t");
+	}
+	if (use_sport)
+		printw("%d\t", "sport");
+	if (use_dip) {
+		printw("%20s", "dest ip");
+		if (use_dport)
+			printw("/");
+		else
+			printw("\t");
+	}
+	if (use_dport)
+		printw("%d\t", "dport");
+	if (use_protocol)
+		printw("proto\t");
+	switch(display_as) {
+		case BYTES:
+			printw("Bytes\t");
+			break;
+		case BITS_PER_SEC:
+			printw("%14s\t","Bits/sec");
+			break;
+		case PERCENT:
+			printw("%% bytes\t");
+			break;
+	}
+	printw("Packets");
+
 	attrset(A_NORMAL);
 	char sipstr[1024];
 	char dipstr[1024];
-	for(int i=0; i<row-2 && !pq.empty(); ++i) {
-		mvprintw(i+1,0,"%20s/%-5d\t%20s/%-5d\t%d\t",
+	for(int i=1; i<row-3 && !pq.empty(); ++i) {
+		move(i+1,0);
+		if (use_sip) {
+			printw("%20s",
 				trace_sockaddr2string((struct sockaddr*)&pq.top().sip,
 					sizeof(struct sockaddr_storage),
-					sipstr,sizeof(sipstr)), 
-				pq.top().sport,
+					sipstr,sizeof(sipstr)));
+			if (use_sport)
+				printw("/");
+			else
+				printw("\t");
+		}
+		if (use_sport)
+			printw("%-5d\t", pq.top().sport);
+		if (use_dip) {
+			printw("%20s",
 				trace_sockaddr2string((struct sockaddr*)&pq.top().dip,
 					sizeof(struct sockaddr_storage),
-					dipstr,sizeof(dipstr)), 
-				pq.top().dport,
-				pq.top().protocol);
+					dipstr,sizeof(dipstr)));
+			if (use_dport)
+				printw("/");
+			else
+				printw("\t");
+		}
+		if (use_dport)
+			printw("%-5d\t", pq.top().dport);
+		if (use_protocol) {
+			struct protoent *proto = getprotobynumber(pq.top().protocol);
+			if (proto) 
+				printw("%-5s\t", proto->p_name);
+			else
+				printw("%5d\t",pq.top().protocol);
+		}
 		switch (display_as) {
 			case BYTES:
 				printw("%"PRIu64"\t%"PRIu64"\n",
@@ -207,13 +295,19 @@ static void do_report()
 						pq.top().packets);
 				break;
 			case BITS_PER_SEC:
-				printw("%8.03f\t%"PRIu64"\n",
+				printw("%14.03f\t%"PRIu64"\n",
 						8.0*pq.top().bytes/interval,
 						pq.top().packets);
+			case PERCENT:
+				printw("%6.2f%%\t%6.2f%%\n",
+						100.0*pq.top().bytes/total_bytes,
+						100.0*pq.top().packets/total_packets);
 		}
 		pq.pop();
 	}
 	flows.clear();
+	total_packets = 0;
+	total_bytes = 0;
 
 	clrtobot();
 	refresh();
@@ -233,6 +327,8 @@ int main(int argc, char *argv[])
 	int promisc=-1;
 	double last_report=0;
 
+	setprotoent(1);
+
 	while(1) {
 		int option_index;
 		struct option long_options[] = {
@@ -241,11 +337,13 @@ int main(int argc, char *argv[])
 			{ "promisc",		1, 0, 'p' },
 			{ "help",		0, 0, 'h' },
 			{ "libtrace-help",	0, 0, 'H' },
-			{ "bits-per-sec",	0, 0, 'b' },
+			{ "bits-per-sec",	0, 0, 'B' },
+			{ "percent",		0, 0, 'P' },
+			{ "interval",		1, 0, 'i' },
 			{ NULL,			0, 0, 0 }
 		};
 
-		int c= getopt_long(argc, argv, "f:s:p:hH",
+		int c= getopt_long(argc, argv, "f:s:p:hHi:",
 				long_options, &option_index);
 
 		if (c==-1)
@@ -264,8 +362,18 @@ int main(int argc, char *argv[])
 			case 'H':
 				trace_help();
 				return 1;
-			case 'b':
+			case 'B':
 				display_as = BITS_PER_SEC;
+				break;
+			case 'P':
+				display_as = PERCENT;
+				break;
+			case 'i':
+				interval = atof(optarg);
+				if (interval<=0) {
+					fprintf(stderr,"Interval must be >0\n");
+					return 1;
+				}
 				break;
 			default:
 				fprintf(stderr,"Unknown option: %c\n",c);
@@ -336,6 +444,7 @@ int main(int argc, char *argv[])
 	}
 
 	endwin();
+	endprotoent();
 
 	return 0;
 }
