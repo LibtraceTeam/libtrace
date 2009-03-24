@@ -6,6 +6,9 @@ tracetop \- show top flows
 [ \fB-f \fRbpf | \fB--filter=\fRbpf]
 [ \fB-s \fRsnaplen | \fB--snaplen=\fRsnaplen]
 [ \fB-p \fRpromisc | \fB--promisc=\fRpromisc]
+[ \fB--bytes-per-sec ]
+[ \fB--percent ]
+[ \fB-interval \fRi | \fB--interval=\fRinterval]
 [ \fB-h \fR| \fB--help\fR]
 [ \fB-H \fR| \fB--libtrace-help\fR]
 inputuri ...
@@ -15,8 +18,20 @@ tracetop shows the top 'n' flows every second
 \fB\-f\fR bpf filter
 Count only packets that match tcpdump style bpf filter
 
+.TP
+\fB\-i\fR interval
+Wait interval seconds between updates.  (default 2).
+
+.TP
+\fB\-\-percent\fR 
+Display flow bytes and packets as a percentage of total traffic
+
+.TP
+\fB\-\-bits\-per\-second\fR 
+Display flow bandwidth as the number of bits per second.
+
 .SH LINKS
-More details about tracesplit (and libtrace) can be found at
+More details about tracetop (and libtrace) can be found at
 http://www.wand.net.nz/trac/libtrace/wiki/UserDocumentation
 
 .SH SEE ALSO
