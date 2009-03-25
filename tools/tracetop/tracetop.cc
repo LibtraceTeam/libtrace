@@ -215,7 +215,7 @@ static void do_report()
 	}
 	getmaxyx(stdscr,row,col);
 	move(0,0);
-	printw("Total Bytes: %10" PRIu64 " (%s)\tTotal Packets: %10" PRIu64, total_bytes, nice_bandwidth(total_bytes), total_packets);
+	printw("Total Bytes: %10" PRIu64 " (%s)\tTotal Packets: %10" PRIu64, total_bytes, nice_bandwidth(total_bytes/interval), total_packets);
 	clrtoeol();
 	attrset(A_REVERSE);
 	move(1,0);
@@ -241,7 +241,7 @@ static void do_report()
 		printw("proto\t");
 	switch(display_as) {
 		case BYTES:
-			printw("Bytes\t");
+			printw("%7s","Bytes\t");
 			break;
 		case BITS_PER_SEC:
 			printw("%14s\t","Bits/sec");
@@ -290,7 +290,7 @@ static void do_report()
 		}
 		switch (display_as) {
 			case BYTES:
-				printw("%"PRIu64"\t%"PRIu64"\n",
+				printw("%7"PRIu64"\t%7"PRIu64"\n",
 						pq.top().bytes,
 						pq.top().packets);
 				break;
