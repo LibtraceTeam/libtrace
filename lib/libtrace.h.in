@@ -1026,9 +1026,11 @@ DLLEXPORT int trace_write_packet(libtrace_out_t *trace, libtrace_packet_t *packe
  * generally this includes capture lengths, wire lengths, timestamps, direction information and
  * any other metadata that is part of the capture format.  
  * 
- * @li Metadata header (optional) -- A header that was captured, but was not transmitted over
- * the wire.  Some examples include RadioTap and Linux_sll headers.  This can be retrieved by
+ * @li Metadata header (optional) -- A header containing metadata about a packet that was captured, 
+ * but the metadata was not transmitted over the wire.  Some examples include
+ * RadioTap and Linux_sll headers.  This can be retrieved by
  * trace_get_packet_meta(), or skipped using trace_get_payload_from_meta().
+ * There may be multiple "metadata" headers on a packet.
  *
  * @li Layer 2/Link layer/Datalink header -- This can be retrieved by trace_get_layer2(), or
  * skipped using trace_get_payload_from_layer2().
