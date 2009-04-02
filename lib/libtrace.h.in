@@ -1019,6 +1019,26 @@ DLLEXPORT int trace_write_packet(libtrace_out_t *trace, libtrace_packet_t *packe
 /** @name Protocol decodes
  * These functions locate and return a pointer to various headers inside a
  * packet
+ * 
+ * A packet is divided up into several "layers.":
+ *
+ * @li Framing header -- This is the header in a tracefile, or as captured from the network.
+ * generally this includes capture lengths, wire lengths, timestamps, direction information and
+ * any other metadata that is part of the capture format.  
+ * 
+ * @li Metadata header (optional) -- A header that was captured, but was not transmitted over
+ * the wire.  Some examples include RadioTap and Linux_sll headers.  This can be retrieved by
+ * trace_get_packet_meta(), or skipped using trace_get_payload_from_meta().
+ *
+ * @li Layer 2/Link layer/Datalink header -- This can be retrieved by trace_get_layer2(), or
+ * skipped using trace_get_payload_from_layer2().
+ *
+ * @li Layer 3/IP/IPv6 -- This can be retrieved by trace_get_layer3().  As a convenience 
+ * trace_get_ip()/trace_get_ip6() can be used to find an IPv4/IPv6 header.
+ *
+ * @li Layer 5/transport -- These are protocols carried in IPv4/IPv6 frames.  These can be
+ * retrieved using trace_get_transport().
+ * 
  * @{
  */
 
@@ -1470,7 +1490,7 @@ uint8_t *trace_get_source_mac(libtrace_packet_t *packet);
  * @param addr		a pointer to a sockaddr to store the address in, or NULL to use
  * 			static storage.
  * @return NULL if there is no source address, or a sockaddr holding a v4 or v6
- * address
+ * address, or on some platforms a sockaddr holding a MAC address.
  */
 DLLEXPORT SIMPLE_FUNCTION
 struct sockaddr *trace_get_source_address(const libtrace_packet_t *packet,
@@ -1481,7 +1501,7 @@ struct sockaddr *trace_get_source_address(const libtrace_packet_t *packet,
  * @param addr		a pointer to a sockaddr to store the address in, or NULL to use
  * 			static storage.
  * @return NULL if there is no destination address, or a sockaddr holding a v4
- * or v6 address
+ * or v6 address, or on some platforms a sockaddr holding a MAC address.
  */
 DLLEXPORT SIMPLE_FUNCTION
 struct sockaddr *trace_get_destination_address(const libtrace_packet_t *packet,
