@@ -972,6 +972,7 @@ static struct libtrace_format_t dag = {
         erf_get_erf_timestamp,          /* get_erf_timestamp */
         NULL,                           /* get_timeval */
         NULL,                           /* get_seconds */
+	NULL,				/* get_timespec */
         NULL,                           /* seek_erf */
         NULL,                           /* seek_timeval */
         NULL,                           /* seek_seconds */

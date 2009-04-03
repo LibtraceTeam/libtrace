@@ -901,26 +901,31 @@ DLLEXPORT void *trace_get_link(const libtrace_packet_t *packet) {
  * @author Daniel Lawson
  */ 
 DLLEXPORT uint64_t trace_get_erf_timestamp(const libtrace_packet_t *packet) {
-	uint64_t timestamp = 0;
-	double seconds = 0.0;
-	struct timeval ts;
-
 	if (packet->trace->format->get_erf_timestamp) {
 		/* timestamp -> timestamp */
-		timestamp = packet->trace->format->get_erf_timestamp(packet);
+		return packet->trace->format->get_erf_timestamp(packet);
+	} else if (packet->trace->format->get_timespec) {
+		/* timespec -> timestamp */
+		struct timespec ts;
+		ts = packet->trace->format->get_timespec(packet);
+		return ((((uint64_t)ts.tv_sec) << 32) +
+				(((uint64_t)ts.tv_nsec << 32)/1000000000));
 	} else if (packet->trace->format->get_timeval) {
 		/* timeval -> timestamp */
-		ts = packet->trace->format->get_timeval(packet);
-		timestamp = ((((uint64_t)ts.tv_sec) << 32) +
-				(((uint64_t)ts.tv_usec << 32)/1000000));
+		struct timeval tv;
+		tv = packet->trace->format->get_timeval(packet);
+		return ((((uint64_t)tv.tv_sec) << 32) +
+				(((uint64_t)tv.tv_usec << 32)/1000000));
 	} else if (packet->trace->format->get_seconds) {
 		/* seconds -> timestamp */
-		seconds = packet->trace->format->get_seconds(packet);
-		timestamp = (((uint64_t)seconds)<<32)
+		double seconds = packet->trace->format->get_seconds(packet);
+		return (((uint64_t)seconds)<<32)
 		          + (uint64_t)((seconds-(uint64_t)seconds)*UINT_MAX);
-		      
 	}
-	return timestamp;
+	else {
+		return (uint64_t)0;
+	}
+		      
 }
 
 /* Get the current time in struct timeval
@@ -933,7 +938,6 @@ DLLEXPORT uint64_t trace_get_erf_timestamp(const libtrace_packet_t *packet) {
 DLLEXPORT struct timeval trace_get_timeval(const libtrace_packet_t *packet) {
         struct timeval tv;
 	uint64_t ts = 0;
-	double seconds = 0.0;
 	if (packet->trace->format->get_timeval) {
 		/* timeval -> timeval */
 		tv = packet->trace->format->get_timeval(packet);
@@ -952,9 +956,13 @@ DLLEXPORT struct timeval trace_get_timeval(const libtrace_packet_t *packet) {
                		tv.tv_usec -= 1000000;
                		tv.tv_sec += 1;
        		}
+	} else if (packet->trace->format->get_timespec) {
+		struct timespec ts = packet->trace->format->get_timespec(packet);
+		tv.tv_sec = ts.tv_sec;
+		tv.tv_usec = ts.tv_nsec/1000;
 	} else if (packet->trace->format->get_seconds) {
 		/* seconds -> timeval */
-		seconds = packet->trace->format->get_seconds(packet);
+		double seconds = packet->trace->format->get_seconds(packet);
 		tv.tv_sec = (uint32_t)seconds;
 		tv.tv_usec = (uint32_t)(((seconds - tv.tv_sec) * 1000000)/UINT_MAX);
 	}
@@ -966,6 +974,48 @@ DLLEXPORT struct timeval trace_get_timeval(const libtrace_packet_t *packet) {
         return tv;
 }
 
+DLLEXPORT struct timespec trace_get_timespec(const libtrace_packet_t *packet) {
+	struct timespec ts;
+
+	if (packet->trace->format->get_timespec) {
+		return packet->trace->format->get_timespec(packet);
+	} else if (packet->trace->format->get_erf_timestamp) {
+		/* timestamp -> timeval */
+		uint64_t erfts = packet->trace->format->get_erf_timestamp(packet);
+#if __BYTE_ORDER == __BIG_ENDIAN
+		ts.tv_sec = erfts & 0xFFFFFFFF;
+#elif __BYTE_ORDER == __LITTLE_ENDIAN
+		ts.tv_sec = erfts >> 32;
+#else
+#error "What on earth are you running this on?"
+#endif
+		ts.tv_nsec = ((erfts&0xFFFFFFFF)*1000000000)>>32;
+       		if (ts.tv_nsec >= 1000000000) {
+               		ts.tv_nsec -= 1000000000;
+               		ts.tv_sec += 1;
+       		}
+		return ts;
+	} else if (packet->trace->format->get_timeval) {
+		/* timeval -> timespec */
+		struct timeval tv = packet->trace->format->get_timeval(packet);
+		ts.tv_sec = tv.tv_sec;
+		ts.tv_nsec = tv.tv_usec*1000;
+		return ts;
+	} else if (packet->trace->format->get_seconds) {
+		/* seconds -> timespec */
+		double seconds = packet->trace->format->get_seconds(packet);
+		ts.tv_sec = (uint32_t)seconds;
+		ts.tv_nsec = (long)(((seconds - ts.tv_sec) * 1000000000)/UINT_MAX);
+		return ts;
+	}
+	else {
+		ts.tv_sec=-1;
+		ts.tv_nsec=-1;
+		return ts;
+	}
+}
+
+
 /* Get the current time in floating point seconds
  * @param packet 	a pointer to a libtrace_packet structure
  * @returns time that this packet was seen in 64bit floating point seconds
@@ -973,18 +1023,23 @@ DLLEXPORT struct timeval trace_get_timeval(const libtrace_packet_t *packet) {
  */ 
 DLLEXPORT double trace_get_seconds(const libtrace_packet_t *packet) {
 	double seconds = 0.0;
-	uint64_t ts = 0;
-	struct timeval tv;
 
 	if (packet->trace->format->get_seconds) {
 		/* seconds->seconds */
 		seconds = packet->trace->format->get_seconds(packet);
 	} else if (packet->trace->format->get_erf_timestamp) {
 		/* timestamp -> seconds */
+		uint64_t ts = 0;
 		ts = packet->trace->format->get_erf_timestamp(packet);
 		seconds =  (ts>>32) + ((ts & UINT_MAX)*1.0 / UINT_MAX);
+	} else if (packet->trace->format->get_timespec) {
+		/* timespec -> seconds */
+		struct timespec ts;
+		ts = packet->trace->format->get_timespec(packet);
+		seconds = ts.tv_sec + ((ts.tv_nsec * 1.0) / 1000000000);
 	} else if (packet->trace->format->get_timeval) {
 		/* timeval -> seconds */
+		struct timeval tv;
 		tv = packet->trace->format->get_timeval(packet);
 		seconds = tv.tv_sec + ((tv.tv_usec * 1.0) / 1000000);
 	}

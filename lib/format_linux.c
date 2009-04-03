@@ -63,17 +63,23 @@ struct tpacket_stats {
 	unsigned int tp_drops;
 };
 
+typedef enum { TS_NONE, TS_TIMEVAL, TS_TIMESPEC } timestamptype_t;
+
 struct libtrace_format_data_t {
 	int fd;
 	int snaplen;
 	int promisc;
+	timestamptype_t timestamptype;
 	libtrace_filter_t *filter;
 	struct tpacket_stats stats;
 	int stats_valid;
 };
 
+
 struct libtrace_linuxnative_header {
-	struct timeval ts;
+	struct timeval tv;
+	struct timespec ts;
+	timestamptype_t timestamptype;
 	int wirelen;
 	int caplen;
 	struct sockaddr_ll hdr;
@@ -88,8 +94,6 @@ struct libtrace_linuxnative_format_data_t {
 
 static int linuxnative_probe_filename(const char *filename)
 {
-	int sock;
-
 	/* Is this an interface? */
 	return (if_nametoindex(filename) != 0);
 }
@@ -176,14 +180,26 @@ static int linuxnative_start_input(libtrace_t *libtrace)
 			perror("setsockopt(PROMISC)");
 		}
 	}
-
+#ifdef SO_TIMESTAMPNS
+	if (setsockopt(FORMAT(libtrace->format_data)->fd,
+			SOL_SOCKET,
+			SO_TIMESTAMPNS,
+			&one,
+			(socklen_t)sizeof(one))!=-1) {
+		FORMAT(libtrace->format_data)->timestamptype = TS_TIMESPEC;
+	}
+	else
+	/* DANGER: This is a dangling else to only do the next setsockopt() if we fail the first! */
+#endif
 	if (setsockopt(FORMAT(libtrace->format_data)->fd,
 			SOL_SOCKET,
 			SO_TIMESTAMP,
 			&one,
-			(socklen_t)sizeof(one))==-1) {
-		perror("setsockopt(SO_TIMESTAMP)");
+			(socklen_t)sizeof(one))!=-1) {
+		FORMAT(libtrace->format_data)->timestamptype = TS_TIMEVAL;
 	}
+	else 
+		FORMAT(libtrace->format_data)->timestamptype = TS_NONE;
 
 	/* Push BPF filter into the kernel. At this stage we can safely assume
 	 * that the filterstring has been compiled, or the filter was supplied
@@ -435,15 +451,33 @@ static int linuxnative_read_packet(libtrace_t *libtrace, libtrace_packet_t *pack
 		if (cmsg->cmsg_level == SOL_SOCKET
 			&& cmsg->cmsg_type == SO_TIMESTAMP
 			&& cmsg->cmsg_len <= CMSG_LEN(sizeof(struct timeval))) {
+			memcpy(&hdr->tv, CMSG_DATA(cmsg),
+					sizeof(struct timeval));
+			hdr->timestamptype = TS_TIMEVAL;
+			break;
+		} 
+#ifdef SO_TIMESTAMPNS
+		else if (cmsg->cmsg_level == SOL_SOCKET
+			&& cmsg->cmsg_type == SO_TIMESTAMPNS
+			&& cmsg->cmsg_len <= CMSG_LEN(sizeof(struct timespec))) {
 			memcpy(&hdr->ts, CMSG_DATA(cmsg),
 					sizeof(struct timeval));
+			hdr->timestamptype = TS_TIMESPEC;
 			break;
 		}
+#endif
 	}
 
-	if (cmsg == NULL && ioctl(FORMAT(libtrace->format_data)->fd,
-				SIOCGSTAMP,&hdr->ts)==-1)
-		perror("ioctl(SIOCGSTAMP)");
+	/* Did we not get given a timestamp? */
+	if (cmsg == NULL) {
+		if (ioctl(FORMAT(libtrace->format_data)->fd, 
+				  SIOCGSTAMP,&hdr->tv)==0) {
+			hdr->timestamptype = TS_TIMEVAL;
+		}
+		else {
+			hdr->timestamptype = TS_NONE;
+		}
+	}
 
 	if (linuxnative_prepare_packet(libtrace, packet, packet->buffer,
 				packet->type, flags))
@@ -520,9 +554,34 @@ static libtrace_direction_t linuxnative_set_direction(
 	}
 }
 
+static struct timespec linuxnative_get_timespec(const libtrace_packet_t *packet) 
+{
+	struct libtrace_linuxnative_header *hdr = 
+		(struct libtrace_linuxnative_header*) packet->buffer;
+	/* We have to upconvert from timeval to timespec */
+	if (hdr->timestamptype == TS_TIMEVAL) {
+		struct timespec ts;
+		ts.tv_sec = hdr->tv.tv_sec;
+		ts.tv_nsec = hdr->tv.tv_usec*1000;
+		return ts;
+	}
+	else
+		return hdr->ts;
+}
+
 static struct timeval linuxnative_get_timeval(const libtrace_packet_t *packet) 
 {
-	return ((struct libtrace_linuxnative_header*)(packet->buffer))->ts;
+	struct libtrace_linuxnative_header *hdr = 
+		(struct libtrace_linuxnative_header*) packet->buffer;
+	/* We have to downconvert from timespec to timeval */
+	if (hdr->timestamptype == TS_TIMESPEC) {
+		struct timeval tv;
+		tv.tv_sec = hdr->ts.tv_sec;
+		tv.tv_usec = hdr->ts.tv_nsec/1000;
+		return tv;
+	}
+	else
+		return hdr->tv;
 }
 
 static int linuxnative_get_capture_length(const libtrace_packet_t *packet)
@@ -642,6 +701,7 @@ static struct libtrace_format_t linuxnative = {
 	linuxnative_set_direction,	/* set_direction */
 	NULL,				/* get_erf_timestamp */
 	linuxnative_get_timeval,	/* get_timeval */
+	linuxnative_get_timespec,	/* get_timespec */
 	NULL,				/* get_seconds */
 	NULL,				/* seek_erf */
 	NULL,				/* seek_timeval */

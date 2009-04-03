@@ -458,6 +458,7 @@ static struct libtrace_format_t bpf = {
 	NULL,			/* set_direction */
 	NULL,			/* get_erf_timestamp */
 	bpf_get_timeval,	/* get_timeval */
+	NULL,			/* get_timespec */
 	NULL,			/* get_seconds */
 	NULL,			/* seek_erf */
 	NULL,			/* seek_timeval */

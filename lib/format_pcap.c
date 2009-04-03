@@ -677,6 +677,7 @@ static struct libtrace_format_t pcap = {
 	NULL,				/* get_erf_timestamp */
 	pcap_get_timeval,		/* get_timeval */
 	NULL,				/* get_seconds */
+	NULL,				/* get_timespec */
 	NULL,				/* seek_erf */
 	NULL,				/* seek_timeval */
 	NULL,				/* seek_seconds */
@@ -719,6 +720,7 @@ static struct libtrace_format_t pcapint = {
 	NULL,				/* get_erf_timestamp */
 	pcap_get_timeval,		/* get_timeval */
 	NULL,				/* get_seconds */
+	NULL,				/* get_timespec */
 	NULL,				/* seek_erf */
 	NULL,				/* seek_timeval */
 	NULL,				/* seek_seconds */

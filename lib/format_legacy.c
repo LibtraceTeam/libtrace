@@ -109,7 +109,6 @@ static time_t trtime(char *s) {
 	struct tm tm;
 	char *tz;
 	time_t ret;
-	static char envbuf[256];
 
 	if(sscanf(s, "%4u%2u%2u-%2u%2u%2u", &tm.tm_year, &tm.tm_mon,
 				&tm.tm_mday, &tm.tm_hour, &tm.tm_min,
@@ -479,6 +478,7 @@ static struct libtrace_format_t legacyatm = {
 	NULL,				/* set_direction */
 	legacy_get_erf_timestamp,	/* get_erf_timestamp */
 	NULL,				/* get_timeval */
+	NULL,				/* get_timespec */
 	NULL,				/* get_seconds */
 	NULL,				/* seek_erf */
 	NULL,				/* seek_timeval */
@@ -521,6 +521,7 @@ static struct libtrace_format_t legacyeth = {
 	NULL,				/* set_direction */
 	legacy_get_erf_timestamp,	/* get_erf_timestamp */
 	NULL,				/* get_timeval */
+	NULL,				/* get_timespec */
 	NULL,				/* get_seconds */
 	NULL,				/* seek_erf */
 	NULL,				/* seek_timeval */
@@ -563,6 +564,7 @@ static struct libtrace_format_t legacypos = {
 	NULL,				/* set_direction */
 	legacy_get_erf_timestamp,	/* get_erf_timestamp */
 	NULL,				/* get_timeval */
+	NULL,				/* get_timespec */
 	NULL,				/* get_seconds */
 	NULL,				/* seek_erf */
 	NULL,				/* seek_timeval */
@@ -605,6 +607,7 @@ static struct libtrace_format_t legacynzix = {
 	NULL,				/* set_direction */
 	NULL,				/* get_erf_timestamp */
 	legacynzix_get_timeval,		/* get_timeval */
+	NULL,				/* get_timespec */
 	NULL,				/* get_seconds */
 	NULL,				/* seek_erf */
 	NULL,				/* seek_timeval */

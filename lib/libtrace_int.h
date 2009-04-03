@@ -340,6 +340,14 @@ struct libtrace_format_t {
 	 * get_seconds must be implemented.
 	 */
 	struct timeval (*get_timeval)(const libtrace_packet_t *packet);
+	/** return the timespec of this packet.
+	 * @return the timespec
+	 * This field may be NULL in the structure, and libtrace will
+	 * synthesise the result from get_erf_timestamp or get_seconds if they
+	 * exist.  AT least one of get_erf_timestamp, get_timeval or
+	 * get_seconds must be implemented.
+	 */
+	struct timespec (*get_timespec)(const libtrace_packet_t *packet);
 	/** return the timestamp of this packet.
 	 * @return the floating point seconds since 1970-01-01 00:00:00
 	 * This field may be NULL in the structure, and libtrace will

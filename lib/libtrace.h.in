@@ -1556,6 +1556,14 @@ uint64_t trace_get_erf_timestamp(const libtrace_packet_t *packet);
 DLLEXPORT SIMPLE_FUNCTION
 struct timeval trace_get_timeval(const libtrace_packet_t *packet);
 
+/** Get the current time in struct timespec
+ * @param packet  	the packet opaque pointer
+ *
+ * @return time that this packet was seen in a struct timespec
+ */ 
+DLLEXPORT SIMPLE_FUNCTION
+struct timespec trace_get_timespec(const libtrace_packet_t *packet);
+
 /** Get the current time in floating point seconds
  * @param packet  	the packet opaque pointer
  *
