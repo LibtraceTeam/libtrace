@@ -625,7 +625,7 @@ static struct libtrace_format_t pcapfile = {
 	NULL,				/* get_dropped_packets */
 	NULL,				/* get_captured_packets */
 	NULL,				/* get_fd */
-	trace_event_trace,		/* trace_event */
+	pcapfile_event,		/* trace_event */
 	pcapfile_help,			/* help */
 	NULL				/* next pointer */
 };
