@@ -294,8 +294,6 @@ static int pcapfile_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 			packet->buffer,
 			sizeof(libtrace_pcapfile_pkt_hdr_t));
 
-	assert(swapl(libtrace,((libtrace_pcapfile_pkt_hdr_t*)packet->buffer)->caplen)<LIBTRACE_PACKET_BUFSIZE);
-
 	if (err<0) {
 		trace_set_err(libtrace,errno,"reading packet");
 		return -1;
@@ -304,6 +302,9 @@ static int pcapfile_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 		/* EOF */
 		return 0;
 	}
+	
+	assert(swapl(libtrace,((libtrace_pcapfile_pkt_hdr_t*)packet->buffer)->caplen)<LIBTRACE_PACKET_BUFSIZE);
+
 
 	err=wandio_read(libtrace->io,
 			(char*)packet->buffer+sizeof(libtrace_pcapfile_pkt_hdr_t),
