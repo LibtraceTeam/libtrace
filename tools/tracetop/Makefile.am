@@ -4,4 +4,4 @@ EXTRA_DIST = $(man_MANS)
 
 include ../Makefile.tools
 tracetop_SOURCES = tracetop.cc
-tracetop_LDFLAGS = -lncurses -ltrace
+#tracetop_LDFLAGS = -lncurses 
