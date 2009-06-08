@@ -12,6 +12,7 @@
 #include <ncurses.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <string.h>
 #include "config.h"
 #ifdef HAVE_NETPACKET_PACKET_H
 #include <sys/socket.h>
