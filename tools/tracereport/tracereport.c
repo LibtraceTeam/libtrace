@@ -50,6 +50,7 @@
 
 struct libtrace_t *trace;
 uint32_t reports_required = 0;
+int packets_read = 0;
 
 static volatile int done=0;
 
@@ -62,6 +63,11 @@ static void cleanup_signal(int sig)
 static void run_trace(char *uri, libtrace_filter_t *filter, int count) 
 {
 	struct libtrace_packet_t *packet = trace_create_packet();
+
+	/* Already read the maximum number of packets - don't need to read
+	 * anything from this trace */
+	if ((count >= 0 && packets_read >= count) || done)
+		return;
 
 	trace = trace_create(uri);
 	
@@ -79,14 +85,11 @@ static void run_trace(char *uri, libtrace_filter_t *filter, int count)
 		return;
 	}
 
-	for (;;) {
+	while (1) {
 		int psize;
 		
-		/* Not convinced we need this count business */
-		/*
-		if (count--<1)
+		if (count >= 0 && packets_read >= count)
 			break;
-		*/
 		if (done)
 			break;
 		if ((psize = trace_read_packet(trace, packet)) <1) {
@@ -118,6 +121,8 @@ static void run_trace(char *uri, libtrace_filter_t *filter, int count)
 			ecn_per_packet(packet);
 		if (reports_required & REPORT_TYPE_TCPSEG)
 			tcpseg_per_packet(packet);
+
+		packets_read ++;
 	}
 	if (reports_required & REPORT_TYPE_DROPS)
 		drops_per_trace(trace);
@@ -129,6 +134,7 @@ static void usage(char *argv0)
 	fprintf(stderr,"Usage:\n"
 	"%s flags traceuri [traceuri...]\n"
 	"-f --filter=bpf	\tApply BPF filter. Can be specified multiple times\n"
+	"-c --count=N		Stop after reading N packets\n"
 	"-e --error		Report packet errors (e.g. checksum failures, rxerrors)\n"
 	"-F --flow		Report flows\n"
 	"-m --misc		Report misc information (start/end times, duration, pps)\n"
@@ -153,12 +159,14 @@ int main(int argc, char *argv[]) {
 	int opt;
 	char *filterstring=NULL;
 	struct sigaction sigact;
+	int count = -1;
 
 	libtrace_filter_t *filter = NULL;/*trace_bpf_setfilter(filterstring); */
 
 	while (1) {
 		int option_index;
 		struct option long_options[] = {
+			{ "count", 		1, 0, 'c' },
 			{ "ecn",		0, 0, 'C' },
 			{ "direction", 		0, 0, 'd' },
 			{ "drops",		0, 0, 'D' },
@@ -177,12 +185,15 @@ int main(int argc, char *argv[]) {
 			{ "ttl", 		0, 0, 't' },
 			{ NULL, 		0, 0, 0 }
 		};
-		opt = getopt_long(argc, argv, "Df:HemFPpTtOondCsl:", 
+		opt = getopt_long(argc, argv, "Df:HemFPpTtOondCsc:", 
 				long_options, &option_index);
 		if (opt == -1)
 			break;
 		
 		switch (opt) {
+			case 'c':
+				count = atoi(optarg);
+				break;
 			case 'C':
 				reports_required |= REPORT_TYPE_ECN;
 				break;
@@ -260,7 +271,7 @@ int main(int argc, char *argv[]) {
 		 * we are - printing to stderr because we use stdout for
 		 * genuine output at the moment */
 		fprintf(stderr, "Reading from trace: %s\n", argv[i]);
-		run_trace(argv[i],filter,(1<<30));
+		run_trace(argv[i],filter, count);
 	}
 
 	if (reports_required & REPORT_TYPE_MISC)
