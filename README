@@ -1,6 +1,6 @@
 $Header$
 
-libtrace 3.0.6
+libtrace 3.0.7
 
 ---------------------------------------------------------------------------
 Copyright (c) 2007-2008 The University of Waikato, Hamilton, New Zealand.
@@ -26,8 +26,11 @@ Bugs should be reported in trac at http://www.wand.net.nz/trac/libtrace
 It is licensed under the GNU General Public License (GPL) version 2. Please
 see the included file GPL for details of this license.
 
-The files CHANGES and TODO contain more information regarding the current 
-release.
+A detailed ChangeLog can be found on the libtrace wiki: 
+https://secure.wand.net.nz/trac/libtrace/wiki/ChangeLog
+
+Documentation, usage instructions and a detailed tutorial can also found
+on the libtrace wiki.
 
 For further information, please contact the WAND group. See 
 http://www.wand.net.nz/ for details. 
