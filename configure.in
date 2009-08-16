@@ -35,7 +35,8 @@ dnl Checks for programs.
 AC_PROG_CC
 AC_PROG_CXX
 AC_PROG_INSTALL
-AC_PROG_YACC
+dnl AC_PROG_YACC
+AC_CHECK_PROGS(YACC, 'bison -y' byacc yacc) 
 AM_PROG_LEX
 
 AC_CONFIG_LIBOBJ_DIR(lib)
@@ -321,4 +322,20 @@ else
 	AC_MSG_NOTICE([Compiled with DAG live capture support: No])
 fi
 reportopt "Building man pages/documentation" $libtrace_doxygen
+
+echo 
+ac_cv_errcount=0;
+if test -z "$YACC"; then
+	AC_MSG_WARN(bison or yacc not found. Please install bison before continuing)
+	ac_cv_errcount=$((ac_cv_errcount + 1))
+fi
+
+if test -z "$LEXLIB"; then
+	AC_MSG_WARN(flex or lex not found. Please install flex before continuing)
+	ac_cv_errcount=$((ac_cv_errcount + 1))
+fi
+
+if test $ac_cv_errcount -gt 0; then
+	AC_MSG_ERROR(Critical packages are missing and compilation will fail. Please install the packages listed above and rerun ./configure)
+fi
 
