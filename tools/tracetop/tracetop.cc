@@ -163,7 +163,7 @@ static void per_packet(libtrace_packet_t *packet)
 	if (use_dip && trace_get_destination_address(packet,(struct sockaddr*)&flowkey.dip)==NULL)
 		flowkey.dip.ss_family = AF_UNSPEC;
 	if (use_protocol && trace_get_transport(packet,&flowkey.protocol, NULL) == NULL)
-		flowkey.protocol = 0;
+		flowkey.protocol = 255;
 	if (use_sport) flowkey.sport = trace_get_source_port(packet);
 	if (use_dport) flowkey.dport = trace_get_destination_port(packet);
 
@@ -228,7 +228,7 @@ static void do_report()
 			printw("\t");
 	}
 	if (use_sport)
-		printw("%d\t", "sport");
+		printw("%s\t", "sport");
 	if (use_dip) {
 		printw("%20s", "dest ip");
 		if (use_dport)
@@ -237,7 +237,7 @@ static void do_report()
 			printw("\t");
 	}
 	if (use_dport)
-		printw("%d\t", "dport");
+		printw("%s\t", "dport");
 	if (use_protocol)
 		printw("proto\t");
 	switch(display_as) {
