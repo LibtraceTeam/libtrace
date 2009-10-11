@@ -7,6 +7,7 @@ tracertstats \- perform simple filter based analysis on a trace
 [ -i | --interval interval ]
 [ -c | --count count ]
 [ -o | --output-format csv,txt,png,html ]
+[ -m | --merge-inputs ]
 inputuri...
 .P
 .B tracertstats 
@@ -40,11 +41,21 @@ Output results every \fIcount\fR packets.
 
 .TP
 .PD 0
+.BI \-m 
+.TP
+.PD
+.BI \-\^\-merge-inputs
+Treats all inputs as a single input, resulting a single unified output rather
+than an output for each input. Works best with traces that are consecutive to
+create a single CSV, for instance.
+
+.TP
+.PD 0
 .BI \-o " format"
 .TP
 .PD
 .BI \-\^\-output\-format " format"
-Selects the output format
+Selects the output format.
 
 .RS
 .TP

@@ -63,6 +63,8 @@
 struct libtrace_t *trace;
 char *output_format=NULL;
 
+int merge_inputs = 0;
+
 struct filter_t {
 	char *expr;
 	struct libtrace_filter_t *filter;
@@ -93,18 +95,10 @@ static void report_results(double ts,uint64_t count,uint64_t bytes)
 	output_flush_row(output);
 }
 
-/* Process a trace, counting packets that match filter(s) */
-static void run_trace(char *uri) 
-{
-	struct libtrace_packet_t *packet = trace_create_packet();
+static void create_output(char *title) {
 	int i;
-	uint64_t count = 0;
-	uint64_t bytes = 0;
-	double last_ts = 0;
-	double ts = 0;
-
-	fprintf(stderr,"output format: '%s'\n",output_format);
-	output=output_init(uri,output_format?output_format:"txt");
+	
+	output=output_init(title,output_format?output_format:"txt");
 	if (!output) {
 		fprintf(stderr,"Failed to create output file\n");
 		return;
@@ -121,6 +115,20 @@ static void run_trace(char *uri)
 	}
 	output_flush_headings(output);
 
+}
+
+/* Process a trace, counting packets that match filter(s) */
+static void run_trace(char *uri) 
+{
+	struct libtrace_packet_t *packet = trace_create_packet();
+	int i;
+	uint64_t count = 0;
+	uint64_t bytes = 0;
+	double last_ts = 0;
+	double ts = 0;
+
+	if (!merge_inputs) 
+		create_output(uri);
 
         trace = trace_create(uri);
 	if (trace_is_err(trace)) {
@@ -147,10 +155,11 @@ static void run_trace(char *uri)
 		}
 		
 		ts = trace_get_seconds(packet);
-		while (packet_interval!=UINT64_MAX
-		  &&(last_ts==0 || last_ts<ts)) {
-			if (last_ts==0)
-				last_ts=ts;
+
+		if (last_ts == 0)
+			last_ts = ts;
+
+		while (packet_interval != UINT64_MAX && last_ts<ts) {
 			report_results(last_ts,count,bytes);
 			count=0;
 			bytes=0;
@@ -176,7 +185,10 @@ static void run_trace(char *uri)
 	report_results(ts,count,bytes);
 
         trace_destroy(trace);
-	output_destroy(output);
+
+	if (!merge_inputs)
+		output_destroy(output);
+
 	trace_destroy_packet(packet);
 }
 
@@ -188,6 +200,7 @@ static void usage(char *argv0)
 	"-c --count=packets	Exit after count packets received\n"
 	"-o --output-format=txt|csv|html|png Reporting output format\n"
 	"-f --filter=bpf	Apply BPF filter. Can be specified multiple times\n"
+	"-m --merge-inputs	Do not create separate outputs for each input trace\n"
 	"-H --libtrace-help	Print libtrace runtime documentation\n"
 	,argv0);
 }
@@ -195,7 +208,7 @@ static void usage(char *argv0)
 int main(int argc, char *argv[]) {
 
 	int i;
-
+	
 	while(1) {
 		int option_index;
 		struct option long_options[] = {
@@ -204,10 +217,11 @@ int main(int argc, char *argv[]) {
 			{ "count",		1, 0, 'c' },
 			{ "output-format",	1, 0, 'o' },
 			{ "libtrace-help",	0, 0, 'H' },
+			{ "merge-inputs",	0, 0, 'm' },
 			{ NULL, 		0, 0, 0   },
 		};
 
-		int c=getopt_long(argc, argv, "c:f:i:o:H",
+		int c=getopt_long(argc, argv, "c:f:i:o:Hm",
 				long_options, &option_index);
 
 		if (c==-1)
@@ -232,6 +246,9 @@ int main(int argc, char *argv[]) {
 				if (output_format) free(output_format);
 				output_format=strdup(optarg);
 				break;
+			case 'm':
+				merge_inputs = 1;
+				break;
 			case 'H': 
 				  trace_help(); 
 				  exit(1); 
@@ -247,9 +264,33 @@ int main(int argc, char *argv[]) {
 		packet_interval = 300; /* every 5 minutes */
 	}
 
+	if (optind >= argc)
+		return 0;
+
+	fprintf(stderr,"output format: '%s'\n",output_format);
+	
+	
+
+	if (merge_inputs) {
+		/* If we're merging the inputs, we only want to create all
+		 * the column headers etc. once rather than doing them once
+		 * per trace */
+
+		/* This is going to "name" the output based on the first 
+		 * provided URI - admittedly not ideal */
+		create_output(argv[optind]);
+
+	}
+		
 	for(i=optind;i<argc;++i) {
 		run_trace(argv[i]);
 	}
+
+	if (merge_inputs) {
+		/* Clean up after ourselves */
+		output_destroy(output);
+	}
+
 
         return 0;
 }
