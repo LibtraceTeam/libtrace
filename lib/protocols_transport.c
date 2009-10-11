@@ -37,12 +37,10 @@ DLLEXPORT void *trace_get_transport(const libtrace_packet_t *packet,
 			return trace_get_payload_from_ip6(
 				(libtrace_ip6_t*)transport, proto, remaining);
 			
-		default:
-			fprintf(stderr,"unknown ethertype=%04x\n",ethertype);
-			*proto=0;
-			return NULL;
 	}
 
+	*proto=0;
+	return NULL;
 }
 
 DLLEXPORT libtrace_tcp_t *trace_get_tcp(libtrace_packet_t *packet) {
