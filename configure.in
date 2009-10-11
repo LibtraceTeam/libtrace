@@ -11,6 +11,7 @@ LIBTRACE_MINOR=7
 
 AC_CONFIG_SRCDIR(lib/trace.c)
 AM_INIT_AUTOMAKE
+m4_ifdef([AM_SILENT_RULES],[AM_SILENT_RULES([yes])])
 
 AC_DEFINE([LIBTRACE_MAJOR],${LIBTRACE_MAJOR},[libtrace major version])
 AC_DEFINE([LIBTRACE_MID],${LIBTRACE_MID},[libtrace mid version])
