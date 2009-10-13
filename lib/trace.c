@@ -268,10 +268,7 @@ static void guess_format(libtrace_t *libtrace, const char *filename)
 	for(tmp = formats_list; tmp; tmp=tmp->next) {
 		if (tmp->probe_filename && tmp->probe_filename(filename)) {
 			libtrace->format = tmp;
-			libtrace->uridata = malloc(strlen(tmp->name)+1+strlen(filename)+1);
-			strcpy(libtrace->uridata,tmp->name);
-			strcat(libtrace->uridata,":");
-			strcat(libtrace->uridata,filename);
+			libtrace->uridata = strdup(filename);
 			return;
 		}
 	}
@@ -284,10 +281,7 @@ static void guess_format(libtrace_t *libtrace, const char *filename)
 	for(tmp = formats_list; tmp; tmp=tmp->next) {
 		if (tmp->probe_magic && tmp->probe_magic(libtrace->io)) {
 			libtrace->format = tmp;
-			libtrace->uridata = malloc(strlen(tmp->name)+1+strlen(filename)+1);
-			strcpy(libtrace->uridata,tmp->name);
-			strcat(libtrace->uridata,":");
-			strcat(libtrace->uridata,filename);
+			libtrace->uridata = strdup(filename);
 			return;
 		}
 	}
