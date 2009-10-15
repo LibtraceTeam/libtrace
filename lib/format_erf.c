@@ -143,7 +143,7 @@ static int erf_probe_magic(io_t *io)
 	int len;
 	dag_record_t *erf;
 	len = wandio_peek(io, buffer, sizeof(buffer));
-	if (len < dag_record_size) {
+	if (len < (int)dag_record_size) {
 		return 0; /* False */
 	}
 	erf = (dag_record_t *) buffer;
