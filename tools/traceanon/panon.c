@@ -20,7 +20,7 @@ static uint32_t fullcache[2][2];
 
 
 
-void panon_init_cache() {
+void panon_init_cache(void) {
         if (enc_cache == 0) { 
                 enc_cache = (uint32_t *)malloc(CACHESIZE * sizeof(uint32_t));
         }
@@ -77,12 +77,12 @@ static uint32_t lookup_cache(uint32_t orig_addr) {
         return enc_cache[lookup_addr];
 }
 
-void panon_init(const uint8_t * key) {
+void panon_init(const char * key) {
         // initialise the 128-bit secret key
         memcpy(m_key, key, 16);
         // initialise the Rijndael cipher
-        rijndael_init(ECB, Encrypt, key, Key16Bytes,0);
-        blockEncrypt(key + 16, 128, m_pad);
+        rijndael_init(ECB, Encrypt, (const UINT8*)key, Key16Bytes,0);
+        blockEncrypt((const UINT8*)key + 16, 128, m_pad);
         panon_init_cache();
 }
 void panon_init_decrypt(const uint8_t * key) {

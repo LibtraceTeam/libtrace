@@ -9,7 +9,7 @@
 /* a -> b */
 #define implies(a,b) (!(a) || (b))
 
-void assert_tree(splay *tree, splay_cmp_t cmp)
+static void assert_tree(splay *tree, splay_cmp_t cmp)
 {
 #ifndef NDEBUG
 	if (!tree)

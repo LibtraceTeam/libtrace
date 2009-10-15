@@ -58,6 +58,7 @@ static void output_html_flush(struct output_data_t *out)
 
 static void output_html_destroy(struct output_data_t *out)
 {
+	(void)out;
 	printf("</table>\n");
 	printf("</body>\n");
 	printf("</html>\n");

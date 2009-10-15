@@ -27,6 +27,7 @@ static int fivetuplecmp(struct fivetuple_t a, struct fivetuple_t b)
 	return a.prot - b.prot;
 }
 
+static int flowset_cmp(const splay *a, const splay *b);
 SET_CREATE(flowset,struct fivetuple_t,fivetuplecmp)
 
 void flow_per_packet(struct libtrace_packet_t *packet)

@@ -54,7 +54,7 @@ int packets_read = 0;
 
 static volatile int done=0;
 
-static void cleanup_signal(int sig)
+static void cleanup_signal(int sig UNUSED)
 {
 	done=1;
 }

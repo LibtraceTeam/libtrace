@@ -32,7 +32,7 @@ static uint32_t masks[33] = {
 
 static uint32_t prefix;
 static uint32_t netmask;
-static void init_prefix(uint8_t *key)
+static void init_prefix(const char *key)
 {
 	int a,b,c,d;
 	int bits;
@@ -48,9 +48,9 @@ static uint32_t prefix_substitute(uint32_t ip)
 	return (prefix & netmask) | (ip & ~netmask);
 }
 
-void enc_init(enum enc_type_t type, uint8_t *key)
+void enc_init(enum enc_type_t type, char *key)
 {
-	uint8_t cryptopan_key[32];
+	char cryptopan_key[32];
 	memset(cryptopan_key,0,sizeof(cryptopan_key));
 	enc_type = type;
 	switch (enc_type) {

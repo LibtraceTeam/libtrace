@@ -49,6 +49,7 @@ static void output_txt_flush(struct output_data_t *out)
 
 static void output_txt_destroy(struct output_data_t *out)
 {
+	(void)out;
 	/* Do nothing */
 }
 

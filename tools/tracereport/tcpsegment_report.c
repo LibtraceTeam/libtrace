@@ -31,37 +31,6 @@ void tcpseg_per_packet(struct libtrace_packet_t *packet)
 	suppress[dir] = false;
 }
 
-static void tcpseg_suppress()
-{
-	int i;
-	printf("%-20s","Direction:");
-	for(i=0;i<3;i++){
-		if(!suppress[i]){
-			switch(i){
-				case 0:
-					printf("\t%24s", "Outbound   ");
-					break;
-				case 1:
-					printf("\t%24s", "Inbound   ");
-					break;
-				case 2:
-					printf("\t%24s", "Undefined   ");
-					break;
-				default:
-					break;
-			}
-		}
-	}
-	printf("\n");
-	printf("%-20s","TCP SS");
-	for(i=0;i<3;i++){
-		if(!suppress[i]){
-			printf("\t%12s\t%12s", "bytes","packets");
-		}
-	}
-	printf("\n");
-}
-
 void tcpseg_report(void)
 {
 	int i,j;
@@ -77,14 +46,18 @@ void tcpseg_report(void)
 			"PACKETS");
 	
 	for(i=0;i<2048;++i) {
+		bool indent_needed;
 		if (tcpseg_stat[0][i].count==0 && 
 			tcpseg_stat[1][i].count==0 && tcpseg_stat[2][i].count==0)
 			continue;
 		fprintf(out, "%16i:",i);
+		indent_needed=false;
 		for(j=0;j<3;j++){
-			if (j != 0) {
+			if (indent_needed) {
 				fprintf(out, "%16s", " ");
 			}
+			if (suppress[j])
+				continue;
 			switch (j) {
                                 case 0:
                                         fprintf(out, "\t%10s", "Outbound");
@@ -99,6 +72,7 @@ void tcpseg_report(void)
 			fprintf(out, "\t%16" PRIu64 " %16" PRIu64 "\n",
 				tcpseg_stat[j][i].bytes,
 				tcpseg_stat[j][i].count);	
+			indent_needed=true;
 		}
 	}
 	fclose(out);

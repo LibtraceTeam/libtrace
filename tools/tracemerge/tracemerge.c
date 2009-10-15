@@ -23,7 +23,7 @@ static void usage(char *argv0)
 
 volatile int done=0;
 
-static void cleanup_signal(int sig)
+static void cleanup_signal(int sig UNUSED)
 {
 	done=1;
 }

@@ -61,6 +61,7 @@ static volatile int done=0;
 
 static void cleanup_signal(int signal)
 {
+	(void)signal;
 	done=1;
 }
 
@@ -88,12 +89,12 @@ static void run_trace(char *uri)
         trace = trace_create(uri);
 
 	if (trace_is_err(trace)) {
-		trace_perror(trace,"");
+		trace_perror(trace,"Failed to create trace");
 		return;
 	}
 
 	if (trace_start(trace)==-1) {
-		trace_perror(trace,"");
+		trace_perror(trace,"Failed to start trace");
 		return;
 	}
 

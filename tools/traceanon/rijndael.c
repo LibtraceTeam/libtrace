@@ -965,7 +965,7 @@ static UINT32 rcon[30]=
 };
 
 void keySched(UINT8 key[_MAX_KEY_COLUMNS][4]);
-void keyEncToDec();
+static void keyEncToDec(void);
 void r_encrypt(const UINT8 a[16], UINT8 b[16]);
 void r_decrypt(const UINT8 a[16], UINT8 b[16]);
 
@@ -1382,7 +1382,7 @@ void keySched(UINT8 key[_MAX_KEY_COLUMNS][4])
 
 
         /* copy values into round key array */
-        for(j = 0;(j < uKeyColumns) && (r <= m_uRounds); )
+        for(j = 0;(j < uKeyColumns) && (r <= (int)m_uRounds); )
         {
                 for(;(j < uKeyColumns) && (t < 4); j++, t++)
                 {
@@ -1397,7 +1397,7 @@ void keySched(UINT8 key[_MAX_KEY_COLUMNS][4])
                 }
         }
 
-        while(r <= m_uRounds)
+        while(r <= (int)m_uRounds)
         {
                 tempKey[0][0] ^= S[tempKey[uKeyColumns-1][1]];
                 tempKey[0][1] ^= S[tempKey[uKeyColumns-1][2]];
@@ -1425,7 +1425,7 @@ void keySched(UINT8 key[_MAX_KEY_COLUMNS][4])
                                 *((UINT32*)tempKey[j]) ^= *((UINT32*)tempKey[j-1]);
                         }
                 }
-                for(j = 0; (j < uKeyColumns) && (r <= m_uRounds); )
+                for(j = 0; (j < uKeyColumns) && (r <= (int)m_uRounds); )
                 {
                         for(; (j < uKeyColumns) && (t < 4); j++, t++)
                         {
@@ -1440,12 +1440,12 @@ void keySched(UINT8 key[_MAX_KEY_COLUMNS][4])
         }		
 }
 
-void keyEncToDec()
+void keyEncToDec(void)
 {
         int r;
         UINT8 *w;
 
-        for(r = 1; r < m_uRounds; r++)
+        for(r = 1; r < (int)m_uRounds; r++)
         {
                 w = m_expandedKey[r][0];
                 *((UINT32*)w) = *((UINT32*)U1[w[0]]) ^ *((UINT32*)U2[w[1]]) ^ *((UINT32*)U3[w[2]]) ^ *((UINT32*)U4[w[3]]);
@@ -1483,7 +1483,7 @@ void r_encrypt(const UINT8 a[16], UINT8 b[16])
                 ^ *((UINT32*)T2[temp[0][1]])
                 ^ *((UINT32*)T3[temp[1][2]]) 
                 ^ *((UINT32*)T4[temp[2][3]]);
-        for(r = 1; r < m_uRounds-1; r++)
+        for(r = 1; r < (int)m_uRounds-1; r++)
         {
                 *((UINT32*)temp[0]) = *((UINT32*)(b   )) ^ *((UINT32*)m_expandedKey[r][0]);
                 *((UINT32*)temp[1]) = *((UINT32*)(b+ 4)) ^ *((UINT32*)m_expandedKey[r][1]);

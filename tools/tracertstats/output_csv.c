@@ -42,6 +42,7 @@ static void output_csv_flush(struct output_data_t *out)
 static void output_csv_destroy(struct output_data_t *out)
 {
 	/* Do nothing */
+	(void)out;
 }
 
 struct output_type_t output_csv = {

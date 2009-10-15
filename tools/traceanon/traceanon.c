@@ -102,7 +102,7 @@ static void encrypt_ips(struct libtrace_ip *ip,bool enc_source,bool enc_dest)
 int main(int argc, char *argv[]) 
 {
 	enum enc_type_t enc_type = ENC_NONE;
-	uint8_t *key = NULL;
+	char *key = NULL;
 	struct libtrace_t *trace = 0;
 	struct libtrace_packet_t *packet = trace_create_packet();
 	struct libtrace_out_t *writer = 0;
