@@ -46,7 +46,7 @@ static char *dccp_types[]={
 	"DCCP-Move packet",
 	};
 
-void decode(int link_type,const char *packet,unsigned len)
+void decode(int link_type UNUSED,const char *packet,unsigned len)
 {
 	struct dccphdr *dccp = (struct dccphdr*)packet;
 	DISPLAYS(source," DCCP: Source %i");

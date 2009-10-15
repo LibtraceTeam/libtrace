@@ -49,6 +49,8 @@ static bitbuffer_t getbit(void **packet, int *packlen, uint64_t numbits)
     return ret;
 }
 
+int yyparse(void);
+
 element_t* parse_protocol_file(char *filename)
 {
     /* hold onto this so we can put it in any error messages */
@@ -108,7 +110,7 @@ static bitbuffer_t fix_byteorder(bitbuffer_t value,
 
 
 
-void decode_protocol_file(uint16_t link_type,const char *packet,int len,element_t *el)
+void decode_protocol_file(uint16_t link_type UNUSED,const char *packet,int len,element_t *el)
 {
     bitbuffer_t result;
 
@@ -133,7 +135,7 @@ void decode_protocol_file(uint16_t link_type,const char *packet,int len,element_
 				el->data->field->size);
 				
 			el->data->field->value = result;
-			printf(" %s %lld\n", 
+			printf(" %s %" PRIi64 "\n", 
 				el->data->field->identifier,
 				result);
 		    }
@@ -150,7 +152,7 @@ void decode_protocol_file(uint16_t link_type,const char *packet,int len,element_
 				el->data->field->size);
 			
 			el->data->field->value = result;
-			printf(" %s 0x%llx\n", 
+			printf(" %s 0x%" PRIx64 "\n", 
 				el->data->field->identifier,
 				result);
 		    }

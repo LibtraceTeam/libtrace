@@ -14,7 +14,7 @@ typedef struct pppoe_t {
 	uint16_t	length;
 } pppoe_t;
 
-void decode(int link_type,const char *pkt,unsigned len) 
+void decode(int link_type UNUSED,const char *pkt,unsigned len) 
 {
 	pppoe_t *pppoe = (pppoe_t *) pkt;
 	

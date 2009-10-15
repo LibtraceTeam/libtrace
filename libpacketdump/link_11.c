@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include "libpacketdump.h"
 
-void decode(int link_type,const char *packet,unsigned len)
+void decode(int link_type UNUSED,const char *packet,unsigned len)
 {
 	// Ethernet - just raw ethernet frames
 	printf(" Legacy: ");

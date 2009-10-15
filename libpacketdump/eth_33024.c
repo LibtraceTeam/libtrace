@@ -21,9 +21,9 @@
                 lhs=num&((1<<(n))-1);                           \
         } while(0)
 
-void decode(int link_type,const char *packet,unsigned len)
+void decode(int link_type UNUSED,const char *packet,unsigned len)
 {
-        int offset=0;
+        unsigned int offset=0;
         int value;
         uint16_t ethertype;
 

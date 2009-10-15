@@ -19,7 +19,7 @@
  * of the hardware address in the structure that we should
  * attempt to decode.
  */
-static char *format_hrd(struct arphdr *arp, char *hrd) {
+static char *format_hrd(const struct arphdr *arp, const char *hrd) {
 	static char buffer[1024] = {0,};
 	int i;
 
@@ -30,7 +30,7 @@ static char *format_hrd(struct arphdr *arp, char *hrd) {
 
 	switch(ntohs(arp->ar_hrd)) {
 		case ARPHRD_ETHER:
-			trace_ether_ntoa(hrd, buffer);
+			trace_ether_ntoa((const unsigned char *)hrd, buffer);
 			break;
 		default:
 			for (i=0;i<arp->ar_hln;i++) {
@@ -49,7 +49,7 @@ static char *format_hrd(struct arphdr *arp, char *hrd) {
  * of the protocol address in the structure that we should
  * attempt to decode.
  */
-static char *format_pro(struct arphdr *arp, char *pro) {
+static char *format_pro(const struct arphdr *arp, const char *pro) {
 	static char buffer[1024] = {0,};
 	int i;
 	
@@ -76,13 +76,13 @@ static char *format_pro(struct arphdr *arp, char *pro) {
 	
 }
 	
-void decode(int link_type,const char *packet,unsigned len)
+void decode(int link_type UNUSED,const char *packet,unsigned len)
 {
 	struct arphdr *arp = (struct arphdr*)packet;
-	char *source_hrd = NULL;
-	char *source_pro = NULL;
-	char *dest_hrd = NULL;
-	char *dest_pro = NULL;
+	const char *source_hrd = NULL;
+	const char *source_pro = NULL;
+	const char *dest_hrd = NULL;
+	const char *dest_pro = NULL;
 
 	if (len < sizeof(struct arphdr)) {
 		printf(" ARP: (Truncated)\n");

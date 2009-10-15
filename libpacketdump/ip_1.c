@@ -38,7 +38,7 @@ static char *unreach_types[]={
 	"Precedence Cutoff In Effect",
 };
 
-void decode(int link_type,const char *packet,unsigned len)
+void decode(int link_type UNUSED,const char *packet,unsigned len)
 {
 	libtrace_icmp_t *icmp = (libtrace_icmp_t*)packet;
 	if (len<1)

@@ -18,9 +18,6 @@
     char *file;
     element_t *el_list = NULL;
 
-    /* i didnt want these to be global, but i think they have to be? :/ */
-    static bitbuffer_t buffer = 0;
-    static int bits = 0;
 %}
 
 

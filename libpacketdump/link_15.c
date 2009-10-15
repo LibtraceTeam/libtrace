@@ -15,7 +15,7 @@
 #define ALIGN_NATURAL_16(_p,_s,_c) \
 	while ( (_p - _s) % sizeof(uint16_t)) {_p++; _c++;} 
 
-void decode(int link_type,const char *packet,unsigned len)
+void decode(int link_type UNUSED,const char *packet,unsigned len)
 {
 	uint32_t *ptr; 
 	uint8_t *p; /* Our current field "cursor" */
@@ -54,7 +54,7 @@ void decode(int link_type,const char *packet,unsigned len)
 	s = p = (uint8_t *) ++ptr;
 
 	if (rtap->it_present & (1 << TRACE_RADIOTAP_TSFT)) {
-		printf(" Radiotap: TSFT = %llu microseconds\n", bswap_le_to_host64(*((uint64_t *)p)));
+		printf(" Radiotap: TSFT = %" PRIu64 " microseconds\n", bswap_le_to_host64(*((uint64_t *)p)));
 		p += sizeof (uint64_t);
 		rtap_real_len += sizeof (uint64_t);
 	}

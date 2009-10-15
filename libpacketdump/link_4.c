@@ -24,6 +24,7 @@
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <stdio.h>
+#include <inttypes.h>
 #include "libpacketdump.h"
 #include "libtrace.h"
 
@@ -193,7 +194,7 @@ static void decode_80211_vendor_ie(ieee80211_ie *ie) {
 static void decode_80211_information_elements(const char *pkt, unsigned len) {
 	ieee80211_ie *ie;
 	int i = 0;
-	uint8_t * data;
+	const uint8_t * data;
 	uint8_t bmap_offset;
 	while (len >= sizeof(ieee80211_ie)) {
 		ie = (ieee80211_ie *) pkt;
@@ -203,7 +204,7 @@ static void decode_80211_information_elements(const char *pkt, unsigned len) {
 			return;
 		}
 		
-		data = (( char *)pkt + sizeof (ieee80211_ie));
+		data = (( const unsigned char *)pkt + sizeof (ieee80211_ie));
 		
 		switch (ie->id) {
 			case 0:
@@ -431,7 +432,7 @@ static void decode_80211_beacon(const char *pkt, unsigned len) {
 		return;
 	}
 	
-	printf(" 802.11MAC: Timestamp = %llu\n", b->ts);
+	printf(" 802.11MAC: Timestamp = %" PRIu64 "\n", b->ts);
 	printf(" 802.11MAC: Beacon Interval = %u\n", b->interval);
 	decode_80211_capinfo(&b->capinfo);
 	printf(" 802.11MAC: Information Elements:\n");
@@ -498,7 +499,7 @@ static void decode_80211_authentication_frame(const char *pkt, unsigned len) {
 
 static void decode_80211_mgmt(const char *pkt, unsigned len) {
 	ieee80211_mgmt_frame *mgmt = (ieee80211_mgmt_frame *)pkt;
-	uint8_t *data;
+	const char *data;
 	
 	printf(" 802.11MAC: Management frame: ");
 	
@@ -556,7 +557,7 @@ static void decode_80211_mgmt(const char *pkt, unsigned len) {
 			decode_80211_beacon(pkt, len);
 			break;
 		case 10:
-			data = ((char *)pkt + sizeof(ieee80211_mgmt_frame));
+			data = (pkt + sizeof(ieee80211_mgmt_frame));
 			printf(" 802.11MAC: Reason Code = ");
 			ieee80211_print_reason_code((uint16_t) ((data[0] << 8) | (data[1])));
 			printf("\n");
@@ -566,7 +567,7 @@ static void decode_80211_mgmt(const char *pkt, unsigned len) {
 			decode_80211_authentication_frame(pkt, len);
 			break;
 		case 12:
-			data = ((char *)pkt + sizeof(ieee80211_mgmt_frame));
+			data = (pkt + sizeof(ieee80211_mgmt_frame));
 			printf(" 802.11MAC: Reason Code = ");
 			ieee80211_print_reason_code((uint16_t) ((data[0] << 8) | (data[1])));
 			printf("\n");
@@ -746,7 +747,7 @@ static void decode_80211_data(const char *pkt, unsigned len) {
 	
 }
 
-void decode(int link_type, const char *pkt, unsigned len) 
+void decode(int link_type UNUSED, const char *pkt, unsigned len) 
 {
 	ieee80211_frame_control *fc;
 	
