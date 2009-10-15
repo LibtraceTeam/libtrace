@@ -70,15 +70,15 @@ static struct libtrace_format_t erfformat;
 struct erf_format_data_t {
         
 	struct {
-		enum { INDEX_UNKNOWN=0, INDEX_NONE, INDEX_EXISTS } exists;
 		io_t *index;
 		off_t index_len;
+		enum { INDEX_UNKNOWN=0, INDEX_NONE, INDEX_EXISTS } exists;
 	} seek;
 
+	uint64_t drops;
 	struct {
 		int real_time;
 	} options;
-	uint64_t drops;
 };
 
 struct erf_format_data_out_t {

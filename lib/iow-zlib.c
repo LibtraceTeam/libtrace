@@ -15,9 +15,9 @@ enum err_t {
 struct zlibw_t {
 	z_stream strm;
 	Bytef outbuff[1024*1024];
-	int inoffset;
 	iow_t *child;
 	enum err_t err;
+	int inoffset;
 };
 
 

@@ -76,12 +76,12 @@ static const char *rt_deny_reason(enum rt_conn_denied_t reason)
 
 struct rt_format_data_t {
 	char *hostname;
-	int port;
-	int input_fd;
-	int reliable;
 	char *pkt_buffer;
 	char *buf_current;
 	size_t buf_filled;
+	int port;
+	int input_fd;
+	int reliable;
 	rt_header_t rt_hdr;
 	
 	libtrace_t *dummy_duck;

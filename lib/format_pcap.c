@@ -62,8 +62,8 @@ struct pcap_format_data_t {
         union {
                 pcap_t *pcap;
         } input;
-	int snaplen;
 	libtrace_filter_t *filter;
+	int snaplen;
 	int promisc;
 };
 
