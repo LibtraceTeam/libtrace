@@ -8,8 +8,8 @@ typedef struct iow_t iow_t;
 
 struct compression_type {
 	const char *name;
-	int compress_flag;
 	const char *ext;
+	int compress_flag;
 };
 extern struct compression_type compression_type[];
 

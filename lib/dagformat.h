@@ -15,7 +15,7 @@
 typedef struct pos_rec {
 	uint32_t  hdlc;
 	uint8_t	  pload[1];		/**< payload */
-}  pos_rec_t;
+}  PACKED pos_rec_t;
 
 /** GPP Type 2 */
 typedef struct eth_rec {
@@ -25,19 +25,19 @@ typedef struct eth_rec {
 	uint8_t   src[6];
 	uint16_t  etype;		/**< ether type (?) */
 	uint8_t   pload[1];		/**< payload */
-}  eth_rec_t;
+}  PACKED eth_rec_t;
 
 /** GPP Type 3 */
 typedef struct atm_rec {
 	uint32_t  header; 
 	uint8_t   pload[1];		/**< payload */
-}  atm_rec_t;
+}  PACKED atm_rec_t;
 
 /** GPP Type 4 */
 typedef struct aal5_rec {
 	uint32_t  header; 
 	uint8_t   pload[1];		/**< payload */
-}  aal5_rec_t;
+}  PACKED aal5_rec_t;
 
 /** Flags */
 typedef struct flags {

@@ -27,8 +27,8 @@ struct state_t {
 	pthread_cond_t space_avail;
 	pthread_cond_t data_ready;
 	pthread_mutex_t mutex;
-	bool closing;
 	io_t *io;
+	bool closing;
 };
 
 #define DATA(x) ((struct state_t *)((x)->data))

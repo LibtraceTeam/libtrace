@@ -61,8 +61,8 @@ struct pcapfile_format_data_t {
 	struct {
 		int real_time;
 	} options;
-	bool started;
 	pcapfile_header_t header;
+	bool started;
 };
 
 struct pcapfile_format_data_out_t {

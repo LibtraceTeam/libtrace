@@ -21,14 +21,14 @@ struct buffer_t {
 
 struct state_t {
 	struct buffer_t buffer[BUFFERS];
-	int out_buffer;
 	off_t offset;
 	pthread_t consumer;
-	bool closing;
 	iow_t *iow;
 	pthread_cond_t data_ready;
 	pthread_cond_t space_avail;
 	pthread_mutex_t mutex;
+	int out_buffer;
+	bool closing;
 };
 
 #define DATA(x) ((struct state_t *)((x)->data))

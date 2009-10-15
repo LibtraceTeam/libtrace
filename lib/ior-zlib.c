@@ -15,8 +15,8 @@ enum err_t {
 struct zlib_t {
 	z_stream strm;
 	Bytef inbuff[1024*1024]; /* bytef is what zlib uses for buffer pointers */
-	int outoffset;
 	io_t *parent;
+	int outoffset;
 	enum err_t err;
 };
 
@@ -52,7 +52,7 @@ io_t *zlib_open(io_t *parent)
 }
 
 
-static off_t zlib_read(io_t *io, char *buffer, off_t len)
+static off_t zlib_read(io_t *io, void *buffer, off_t len)
 {
 	if (DATA(io)->err == ERR_EOF)
 		return 0; /* EOF */

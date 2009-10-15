@@ -5,9 +5,9 @@
 #include <errno.h>
 
 struct compression_type compression_type[]  = {
-	{ "GZ",		WANDIO_COMPRESS_ZLIB, 	"gz" },
-	{ "BZ2",	WANDIO_COMPRESS_BZ2, 	"bz2" },
-	{ "NONE",	WANDIO_COMPRESS_NONE,	""}
+	{ "GZ",		"gz", 	WANDIO_COMPRESS_ZLIB 	},
+	{ "BZ2",	"bz2", 	WANDIO_COMPRESS_BZ2	},
+	{ "NONE",	"",	WANDIO_COMPRESS_NONE	}
 };
 
 #define READ_TRACE 0
