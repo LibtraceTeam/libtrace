@@ -46,7 +46,7 @@ typedef struct tsh_pkt_header_t {
 	uint32_t usecs;
 } tsh_pkt_header_t;
 
-static int tsh_get_framing_length(const libtrace_packet_t *packet)
+static int tsh_get_framing_length(const libtrace_packet_t *packet UNUSED)
 {
 	return sizeof(tsh_pkt_header_t);
 }
@@ -171,7 +171,7 @@ static int tsh_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	return 80;
 }
 
-static libtrace_linktype_t tsh_get_link_type(const libtrace_packet_t *packet) {
+static libtrace_linktype_t tsh_get_link_type(const libtrace_packet_t *packet UNUSED) {
 	return TRACE_TYPE_NONE;
 }
 

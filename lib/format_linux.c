@@ -614,7 +614,7 @@ static int linuxnative_get_fd(const libtrace_t *trace) {
  * this here as failing, libtrace will happily report for us that it didn't
  * filter any packets, so don't lie -- return that we don't know.
  */
-static uint64_t linuxnative_get_filtered_packets(libtrace_t *trace) {
+static uint64_t linuxnative_get_filtered_packets(libtrace_t *trace UNUSED) {
 	return UINT64_MAX;
 }
 
