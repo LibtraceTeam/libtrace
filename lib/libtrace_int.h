@@ -255,6 +255,9 @@ struct libtrace_format_t {
 	const char *version;
 	/** the RT protocol type of this module */
 	enum base_format_t type;
+
+/* Padding inserted here to make the enum fit properly */
+
 	/** stuff that deals with input @{ */
 	/** Given a filename, return if this format is responsible
  	 * (used for devices)
