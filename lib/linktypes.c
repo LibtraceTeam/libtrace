@@ -23,6 +23,10 @@
 #define ARPHRD_IEEE80211	801
 #endif
 
+#ifndef ARPHRD_NONE
+#define ARPHRD_NONE	0xFFFE
+#endif
+
 
 /* This file maps libtrace types to/from pcap DLT and erf types
  *
@@ -164,6 +168,7 @@ libtrace_linktype_t arphrd_type_to_libtrace(unsigned int arphrd) {
 		case ARPHRD_IEEE80211: return TRACE_TYPE_80211;
 		case ARPHRD_80211_RADIOTAP: return TRACE_TYPE_80211_RADIO;
 		case ARPHRD_PPP: return TRACE_TYPE_NONE;
+		case ARPHRD_NONE: return TRACE_TYPE_NONE;
 	}
 	printf("Unknown ARPHRD %08x\n",arphrd);
 	return ~0U;
