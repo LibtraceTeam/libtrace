@@ -15,7 +15,6 @@
 #include <string.h>
 #include "config.h"
 #ifdef HAVE_NETPACKET_PACKET_H
-#include <sys/socket.h>
 #include <netpacket/packet.h>
 #include <net/ethernet.h>
 #endif
@@ -23,12 +22,14 @@
 typedef enum { BITS_PER_SEC, BYTES, PERCENT } display_t;
 display_t display_as = BYTES;
 float interval=2;
+double last_report=0;
 
 bool use_sip = true;
 bool use_dip = true;
 bool use_sport = true;
 bool use_dport = true;
 bool use_protocol = true;
+bool quit = false;
 
 uint64_t total_bytes=0;
 uint64_t total_packets=0;
@@ -314,9 +315,110 @@ static void do_report()
 	refresh();
 }
 
+static void run_trace(libtrace_t *trace)
+{
+	libtrace_packet_t *packet = trace_create_packet();
+	libtrace_eventobj_t obj;
+	fd_set rfds;
+	struct timeval sleep_tv;
+	struct timeval *tv = NULL;
+
+	do {
+		int maxfd=0;
+		FD_ZERO(&rfds);
+		FD_SET(0, &rfds); /* stdin */
+		tv=NULL;
+		maxfd=0;
+
+		obj = trace_event(trace, packet);
+		switch(obj.type) {
+			case TRACE_EVENT_IOWAIT:
+				FD_SET(obj.fd, &rfds);
+				maxfd = obj.fd;
+				break;
+
+			case TRACE_EVENT_SLEEP:
+				sleep_tv.tv_sec = (int)obj.seconds;
+				sleep_tv.tv_usec = (int)((obj.seconds - sleep_tv.tv_sec)*1000000.0);
+
+				tv = &sleep_tv;
+				break;;
+
+			case TRACE_EVENT_TERMINATE:
+				trace_destroy_packet(packet);
+				return;
+
+			case TRACE_EVENT_PACKET:
+				if (obj.size == -1)
+					break;
+				if (trace_get_seconds(packet) - last_report >= interval) {
+					do_report();
+						
+					last_report=trace_get_seconds(packet);
+				}
+				if (trace_read_packet(trace,packet) <= 0) {
+					obj.size = -1;
+					break;
+				}
+				per_packet(packet);
+				continue;
+		}
+
+		if (tv && tv->tv_sec > interval) {
+			tv->tv_sec = (int)interval;
+			tv->tv_usec = 0;
+		}
+
+		select(maxfd+1, &rfds, 0, 0, tv);
+		if (FD_ISSET(0, &rfds)) {
+			switch (getch()) {
+				case '%':
+					display_as = PERCENT;
+					break;
+				case 'b':
+					display_as = BITS_PER_SEC;
+					break;
+				case 'B':
+					display_as = BYTES;
+					break;
+				case '\x1b': /* Escape */
+				case 'q':
+					quit = true;
+					trace_destroy_packet(packet);
+					return;
+				case '1': use_sip 	= !use_sip; break;
+				case '2': use_sport 	= !use_sport; break;
+				case '3': use_dip 	= !use_dip; break;
+				case '4': use_dport 	= !use_dport; break;
+				case '5': use_protocol 	= !use_protocol; break;
+			}
+		}
+	} while (obj.type != TRACE_EVENT_TERMINATE || obj.size == -1);
+
+	trace_destroy_packet(packet);
+} 
+
 static void usage(char *argv0)
 {
-	fprintf(stderr,"usage: %s [ --filter | -f bpfexp ]  [ --snaplen | -s snap ]\n\t\t[ --promisc | -p flag] [ --help | -h ] [ --libtrace-help | -H ] libtraceuri...\n",argv0);
+	fprintf(stderr,"usage: %s [options] libtraceuri...\n",argv0);
+	fprintf(stderr," --filter bpfexpr\n");
+	fprintf(stderr," -f bpfexpr\n");
+	fprintf(stderr,"\t\tApply a bpf filter expression\n");
+	fprintf(stderr," --snaplen snaplen\n");
+	fprintf(stderr," -s snaplen\n");
+	fprintf(stderr,"\t\tCapture only snaplen bytes\n");
+	fprintf(stderr," --promisc 0|1\n");
+	fprintf(stderr," -p 0|1\n");
+	fprintf(stderr,"\t\tEnable/Disable promiscuous mode\n");
+	fprintf(stderr," --bits-per-sec\n");
+	fprintf(stderr," -B\n");
+	fprintf(stderr,"\t\tDisplay usage in bits per second, not bytes per second\n");
+	fprintf(stderr," --percent\n");
+	fprintf(stderr," -P\n");
+	fprintf(stderr,"\t\tDisplay usage in percentage of total usage\n");
+	fprintf(stderr," --interval int\n");
+	fprintf(stderr," -i int\n");
+	fprintf(stderr,"\t\tUpdate the display every int seconds\n");
 }
 
 int main(int argc, char *argv[])
@@ -326,7 +428,6 @@ int main(int argc, char *argv[])
 	libtrace_filter_t *filter=NULL;
 	int snaplen=-1;
 	int promisc=-1;
-	double last_report=0;
 
 	setprotoent(1);
 
@@ -393,7 +494,7 @@ int main(int argc, char *argv[])
 
 	initscr(); cbreak(); noecho();
 
-	while (optind<argc) {
+	while (!quit && optind<argc) {
 		trace = trace_create(argv[optind]);
 		++optind;
 
@@ -424,18 +525,7 @@ int main(int argc, char *argv[])
 			return 1;
 		}
 
-		packet = trace_create_packet();
-
-		while (trace_read_packet(trace,packet)>0) {
-			if (trace_get_seconds(packet) - last_report >= interval) {
-				do_report();
-					
-				last_report=trace_get_seconds(packet);
-			}
-			per_packet(packet);
-		}
-
-		trace_destroy_packet(packet);
+		run_trace(trace);
 
 		if (trace_is_err(trace)) {
 			trace_perror(trace,"Reading packets");
