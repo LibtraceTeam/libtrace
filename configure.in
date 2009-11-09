@@ -51,7 +51,11 @@ AC_HEADER_TIME
 AC_SYS_LARGEFILE
 
 if test "$GCC" = "yes"; then
-	CFLAGS="$CFLAGS -Wall -Wextra -Wmissing-prototypes -O2 -DLT_BUILDING_DLL=1 -fvisibility=hidden"
+	CFLAGS="$CFLAGS -Wall -Wextra -Wmissing-prototypes -O2"
+# We assume that gcc knows about -fvisibility and friends, as I can't see
+# a good easy way of testing for it here.
+	CFLAGS="$CFLAGS -DLT_BUILDING_DLL=1"
+	CFLAGS="$CFLAGS -fvisibility=hidden -fvisibility-inlines-hidden"
 fi
 
 AC_PROG_LIBTOOL
