@@ -9,6 +9,7 @@
  * higher level.
  */
 
+#include "libtrace.h"
 /* pkt meta headers */
 
 /* l2 headers */
