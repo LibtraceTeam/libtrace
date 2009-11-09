@@ -70,7 +70,7 @@
     typedef unsigned	__int16 uint16_t;
     typedef unsigned	__int32 uint32_t;
     typedef unsigned	__int64 uint64_t;
-    #ifdef BUILDING_DLL
+    #ifdef LT_BUILDING_DLL
 	#define DLLEXPORT __declspec(dllexport)
     #else
 	#define DLLEXPORT __declspec(dllimport)
@@ -88,9 +88,14 @@
     #ifdef HAVE_STDINT_H
 	#   include <stdint.h>
     #endif
-    #ifdef HAVE_GCCVISIBILITYPATCH
-	#define DLLEXPORT __attribute__ (visibility("default"))
-	#define DLLLOCAL __attribute__ (visibility("hidden"))
+    #if __GNUC__ >= 4
+	#ifdef LT_BUILDING_DLL
+		#define DLLEXPORT __attribute__ ((visibility("default")))
+		#define DLLLOCAL __attribute__ ((visibility("hidden")))
+	#else
+		#define DLLEXPORT
+		#define DLLLOCAL
+	#endif
     #else
 	#define DLLEXPORT
 	#define DLLLOCAL
@@ -896,6 +901,7 @@ DLLEXPORT void trace_perror_output(libtrace_out_t *trace, const char *msg,...)
  *
  * If this is not known, this will return UINT64_MAX
  */
+DLLEXPORT
 uint64_t trace_get_received_packets(libtrace_t *trace);
 
 /** Return the number of filtered packets
@@ -907,18 +913,21 @@ uint64_t trace_get_received_packets(libtrace_t *trace);
  *
  * If this is not known, this will return UINT64_MAX
  */
+DLLEXPORT
 uint64_t trace_get_filtered_packets(libtrace_t *trace);
 
 /** Return the number of packets that have been dropped for lack of packets
  * @param trace		Trace file to examine
  * @returns The number of packets captured, but dropped due to buffer overruns
  */
+DLLEXPORT
 uint64_t trace_get_dropped_packets(libtrace_t *trace);
 
 /** Return the number of packets that have been returned to library user
  * @param trace		Trace file to examine
  * @returns The number of packets returned to the user of the library.
  */
+DLLEXPORT
 uint64_t trace_get_accepted_packets(libtrace_t *trace);
 
 
