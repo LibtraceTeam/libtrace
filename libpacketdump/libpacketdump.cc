@@ -183,7 +183,11 @@ void decode_next(const char *packet,int len,const char *proto_name,int type)
 		/* We can't decode a link, so lets skip that and see if libtrace
 		 * knows how to find us the ip header
 		 */
-		if (sname=="link") {
+
+		/* Also, don't try to skip if the linktype is not valid, 
+		 * because libtrace will just assert fail and that's never
+		 * good */
+		if (sname=="link" && type != -1) {
 			uint16_t newtype;
 			uint32_t newlen=len;
 			const char *network=(const char*)trace_get_payload_from_link((void*)packet,
