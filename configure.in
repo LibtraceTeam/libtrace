@@ -9,6 +9,7 @@ LIBTRACE_MAJOR=3
 LIBTRACE_MID=0
 LIBTRACE_MINOR=7
 
+AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR(lib/trace.c)
 AM_INIT_AUTOMAKE
 m4_ifdef([AM_SILENT_RULES],[AM_SILENT_RULES([yes])])
@@ -22,6 +23,7 @@ AC_CONFIG_FILES([Makefile lib/Makefile docs/Makefile libpacketdump/Makefile
 	tools/tracemerge/Makefile tools/tracereport/Makefile
 	tools/tracertstats/Makefile tools/tracesplit/Makefile
 	tools/tracestats/Makefile tools/tracetop/Makefile
+	tools/tracereplay/Makefile
 	examples/Makefile examples/skeleton/Makefile examples/rate/Makefile
 	examples/stats/Makefile
 	docs/libtrace.doxygen 

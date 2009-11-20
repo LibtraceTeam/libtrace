@@ -438,7 +438,8 @@ static struct libtrace_format_t bpf = {
 	"bpf",
 	"$Id$",
 	TRACE_FORMAT_BPF,
-	bpf_probe_filename,	/* probe filename */
+	//bpf_probe_filename,	/* probe filename */
+	NULL,
 	NULL,			/* probe magic */
 	bpf_init_input,	 	/* init_input */
 	bpf_config_input,	/* config_input */
