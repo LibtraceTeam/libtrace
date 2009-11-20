@@ -22,7 +22,7 @@ static libtrace_packet_t * per_packet(libtrace_packet_t *packet) {
   uint32_t remaining;
   libtrace_linktype_t linktype;
   void * pkt_buffer = trace_get_packet_buffer(packet,&linktype,&remaining);
-  libtrace_packet_t *new_packet;
+  libtrace_packet_t *new_packet = trace_create_packet();
 
   size_t wire_length = trace_get_wire_length(packet);
 
