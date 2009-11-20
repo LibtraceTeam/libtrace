@@ -16,6 +16,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <libtrace.h>
+#include <getopt.h>
 
 static libtrace_packet_t * per_packet(libtrace_packet_t *packet) {
   
@@ -27,7 +28,6 @@ static libtrace_packet_t * per_packet(libtrace_packet_t *packet) {
   size_t wire_length = trace_get_wire_length(packet);
 
   trace_construct_packet(new_packet,linktype,pkt_buffer,wire_length);
-
 
   return new_packet;
   
@@ -81,21 +81,61 @@ static uint32_t event_read_packet(libtrace_t *trace, libtrace_packet_t *packet)
 		}
 	}
 }
-		
+
+static void usage(char * argv) {
+	fprintf(stderr, "usage: %s [options] libtraceuri outputuri...\n", argv);
+	fprintf(stderr, " --filter bpfexpr\n");
+	fprintf(stderr, " -f bpfexpr\n");
+	fprintf(stderr, "\t\tApply a bpf filter expression\n");
+}
+
 int main(int argc, char *argv[]) {
 	
 	libtrace_t *trace;
 	libtrace_out_t *output;
 	libtrace_packet_t *packet;
+	libtrace_filter_t *filter=NULL;
 	int psize = 0;
 	char *uri = 0;
-	
-	if (argc == 3) {
-		uri = strdup(argv[1]);
-	} else {
-		fprintf(stderr,"usage: %s <input uri> <outputuri>\n",argv[0]);
-		return -1;
+
+	while(1) {
+		int option_index;
+		struct option long_options[] = {
+			{ "filter",	1, 0, 'f'},
+			{ "help",	0, 0, 'h'},
+			{ NULL,		0, 0, 0}
+		};
+
+		int c = getopt_long(argc, argv, "f:",
+				long_options, &option_index);
+
+		if(c == -1)
+			break;
+
+		switch (c) {
+			case 'f':
+				filter = trace_create_filter(optarg);
+				break;
+			case 'h':
+				usage(argv[0]);
+				return 1;
+			default:
+				fprintf(stderr, "Unknown option: %c\n", c);
+		}
 	}
+
+	if(optind>=argc) {
+		fprintf(stderr, "Missing input uri\n");
+		usage(argv[0]);
+		return 1;
+	}
+	if(optind+1>=argc) {
+		fprintf(stderr, "Missing output uri\n");
+		usage(argv[0]);
+		return 1;
+	}
+
+	uri = strdup(argv[optind]);
 
 	/* Create the trace */
 	trace = trace_create(uri);
@@ -103,7 +143,14 @@ int main(int argc, char *argv[]) {
 		trace_perror(trace, "trace_create");
 		return 1;
 	}
-	
+
+	/* apply filter */
+	if(filter) {
+		if(trace_config(trace, TRACE_OPTION_FILTER, filter)) {
+			trace_perror(trace, "ignoring: ");
+		}
+	}
+
 	/* Starting the trace */
 	if (trace_start(trace) != 0) {
 		trace_perror(trace, "trace_start");
@@ -111,19 +158,18 @@ int main(int argc, char *argv[]) {
 	}
 
 	/* Creating output trace */
-	output = trace_create_output(argv[2]);
+	output = trace_create_output(argv[optind+1]);
 	
 	if (trace_is_err_output(output)) {
-		trace_perror_output(output, "Opening output trace");
+		trace_perror_output(output, "Opening output trace: ");
 		return 1;
 	}
 	if (trace_start_output(output)) {
-		trace_perror_output(output, "Starting output trace");
+		trace_perror_output(output, "Starting output trace: ");
 		trace_destroy_output(output);
 		trace_destroy(trace);
 		return 1;
 	}
-		
 
 	packet = trace_create_packet();
 
@@ -146,6 +192,7 @@ int main(int argc, char *argv[]) {
 	}
 	free(uri);
 	trace_destroy(trace);
+	trace_destroy_filter(filter);
 	trace_destroy_output(output);
 	trace_destroy_packet(packet);
 	return 0;
