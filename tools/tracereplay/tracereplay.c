@@ -192,7 +192,9 @@ int main(int argc, char *argv[]) {
 	}
 	free(uri);
 	trace_destroy(trace);
-	trace_destroy_filter(filter);
+	if(filter != NULL) {
+	  trace_destroy_filter(filter);
+	}
 	trace_destroy_output(output);
 	trace_destroy_packet(packet);
 	return 0;
