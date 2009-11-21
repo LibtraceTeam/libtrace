@@ -1,11 +1,16 @@
 
+/*
+
+  Tracereplay is a simple utility that takes a trace and replays it to a 
+  specified interface. 
+  It pads packets with zeroes to reach the original length of the packet 
+  and recalculates crc checksums in ip/tcp/udp headers.
+
+  Authors: Andreas Loef and Yuwei Wang
 
 
-/* This is a simple example program that demonstrates how to use the libtrace
- * event framework. The event framework is ideal for reading from devices and 
- * interfaces in a non-blocking manner, and for reading from a trace in 
- * "tracetime" as opposed to as fast as possible.
  */
+
 
 
 
