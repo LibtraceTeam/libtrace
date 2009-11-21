@@ -23,6 +23,8 @@
 #include <libtrace.h>
 #include <getopt.h>
 
+#define FCS_SIZE 4
+
 static libtrace_packet_t * per_packet(libtrace_packet_t *packet) {
   
   uint32_t remaining;
@@ -32,10 +34,34 @@ static libtrace_packet_t * per_packet(libtrace_packet_t *packet) {
 
   size_t wire_length = trace_get_wire_length(packet);
 
+  if(linktype == TRACE_TYPE_ETH || linktype == TRACE_TYPE_80211) {
+    wire_length -= FCS_SIZE;
+  }
+
   trace_construct_packet(new_packet,linktype,pkt_buffer,wire_length);
 
   return new_packet;
   
+}
+
+
+/* This function assumes that the relevant fields have been zeroed out */
+static uint16_t checksum(void * buffer, size_t length) {
+  uint8_t * data;
+  int i;
+  uint16_t result = 0;
+
+
+  data = (uint8_t) buffer;
+
+
+
+  for(i = 0; i < length; i++) {
+    result = ~data[i];
+  }
+  
+  return ~result;
+
 }
 
 static uint32_t event_read_packet(libtrace_t *trace, libtrace_packet_t *packet) 
