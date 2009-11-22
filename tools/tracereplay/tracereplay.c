@@ -22,8 +22,28 @@
 #include <string.h>
 #include <libtrace.h>
 #include <getopt.h>
+#include <arpa/inet.h>
 
 #define FCS_SIZE 4
+
+/* This function assumes that the relevant fields have been zeroed out. RFC 1071*/
+static uint16_t checksum(void * buffer, uint16_t length) {
+  //printf("length: %d\n",length);
+  uint32_t sum = 0;
+  uint16_t * buff = (uint16_t *) buffer;
+  uint16_t i;
+  uint16_t result;
+
+  for (i=0;i<length;i=i+2) {
+    sum += ~ntohs(buff[i]);
+  }
+  
+  result = sum;
+  result += sum >> 16;
+
+  return ~sum;
+}
+
 
 static libtrace_packet_t * per_packet(libtrace_packet_t *packet) {
   
@@ -34,35 +54,26 @@ static libtrace_packet_t * per_packet(libtrace_packet_t *packet) {
 
   size_t wire_length = trace_get_wire_length(packet);
 
+  libtrace_ip_t * header;
+
   if(linktype == TRACE_TYPE_ETH || linktype == TRACE_TYPE_80211) {
     wire_length -= FCS_SIZE;
   }
 
   trace_construct_packet(new_packet,linktype,pkt_buffer,wire_length);
+  
+
+  header = trace_get_ip(new_packet);
+  if(header != NULL) {
+    header -> ip_sum = 0;
+    header -> ip_sum = htons(checksum(header,header->ip_hl*4));
+  }
 
   return new_packet;
   
 }
 
 
-/* This function assumes that the relevant fields have been zeroed out */
-static uint16_t checksum(void * buffer, size_t length) {
-  uint8_t * data;
-  int i;
-  uint16_t result = 0;
-
-
-  data = (uint8_t) buffer;
-
-
-
-  for(i = 0; i < length; i++) {
-    result = ~data[i];
-  }
-  
-  return ~result;
-
-}
 
 static uint32_t event_read_packet(libtrace_t *trace, libtrace_packet_t *packet) 
 {
