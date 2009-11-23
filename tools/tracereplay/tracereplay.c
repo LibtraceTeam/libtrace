@@ -28,20 +28,31 @@
 
 /* This function assumes that the relevant fields have been zeroed out. RFC 1071*/
 static uint16_t checksum(void * buffer, uint16_t length) {
-  //printf("length: %d\n",length);
   uint32_t sum = 0;
   uint16_t * buff = (uint16_t *) buffer;
-  uint16_t i;
-  uint16_t result;
+  uint16_t count = length;
 
-  for (i=0;i<length;i=i+2) {
-    sum += ~ntohs(buff[i]);
+  while(count > 1 ) {
+    sum += *buff++;
+    count = count -2;
+  }
+
+  if(count > 0) {
+    sum += buff;
   }
   
-  result = sum;
-  result += sum >> 16;
+  while (sum>>16)
+    sum = (sum & 0xffff) + (sum >> 16);
 
   return ~sum;
+}
+
+static uint16_t udp_tcp_checksum(libtrace_packet_t *packet) {
+
+  uint32_t sum;
+
+
+
 }
 
 
@@ -66,7 +77,7 @@ static libtrace_packet_t * per_packet(libtrace_packet_t *packet) {
   header = trace_get_ip(new_packet);
   if(header != NULL) {
     header -> ip_sum = 0;
-    header -> ip_sum = htons(checksum(header,header->ip_hl*4));
+    header -> ip_sum = checksum(header,header->ip_hl*sizeof(uint32_t));
   }
 
   return new_packet;
@@ -130,6 +141,28 @@ static void usage(char * argv) {
 	fprintf(stderr, " -f bpfexpr\n");
 	fprintf(stderr, "\t\tApply a bpf filter expression\n");
 }
+
+/* int main(int argc, char *argv[]) {  */
+  
+/*   /\* uint16_t buffer[] = {0x45,0x00,0x00,0x30, */
+/* 		       0x3b,0xa9,0x40,0x00, */
+/* 		       0x6e,0x06,0x44,0x5b, */
+/* 		       0x25,0xdb,0xef,0x28, */
+/* 		       0x7d,0xb6,0x6a,0xb1 */
+/* 		       };*\/  */
+
+/*   uint8_t buffer[] = {0x00,0x01, */
+/* 		      0xf2,0x03, */
+/* 		      0xf4,0xf5, */
+/* 		      0xf6,0xf7 */
+/*   }; */
+
+/*   uint16_t checksum = ip_checksum(buffer,8); */
+
+/*   printf("checksum: %04X\n",checksum); */
+  
+/* } */
+
 
 int main(int argc, char *argv[]) {
 	
@@ -242,3 +275,4 @@ int main(int argc, char *argv[]) {
 	return 0;
 
 }
+
