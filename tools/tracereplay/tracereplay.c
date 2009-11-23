@@ -4,7 +4,7 @@
   Tracereplay is a simple utility that takes a trace and replays it to a 
   specified interface. 
   It pads packets with zeroes to reach the original length of the packet 
-  and recalculates crc checksums in ip/tcp/udp headers.
+  and recalculates checksums in ip/tcp/udp headers.
 
   Authors: Andreas Loef and Yuwei Wang
 
@@ -38,47 +38,109 @@ static uint16_t checksum(void * buffer, uint16_t length) {
   }
 
   if(count > 0) {
-    sum += buff;
+    sum += *buff;
   }
   
   while (sum>>16)
     sum = (sum & 0xffff) + (sum >> 16);
-
+  printf("%04X\n",~sum);
   return ~sum;
 }
 
-static uint16_t udp_tcp_checksum(libtrace_packet_t *packet) {
+static void udp_tcp_checksum(libtrace_ip_t *ip, uint32_t* remaining) {
 
   uint32_t sum;
+  uint32_t pseudoheader[3];
+  uint8_t * other8;
+  uint16_t * other16;
+  
+  uint8_t proto;
 
+  void * transportheader = trace_get_payload_from_ip(ip,&proto,remaining);
 
+  uint16_t * check = 0;
+  uint16_t tsum = 0;
+
+  pseudoheader[0] = (uint32_t) (ip -> ip_src).s_addr;
+  pseudoheader[1] = (uint32_t)(ip -> ip_dst).s_addr;
+  
+  other8 = (uint8_t *) &pseudoheader[2];
+
+  *other8 = 0x00;
+  other8++;
+  *other8 = ip -> ip_p;
+  other8++;
+  
+  other16 = (uint16_t *) other8;
+
+  if(proto == 17 ) {
+    libtrace_udp_t * udp_header = transportheader;
+    udp_header -> check = 0;
+    check = &udp_header -> check;
+    *other16 = *remaining + sizeof(libtrace_udp_t);
+    tsum = checksum(transportheader,*other16);
+  }
+  else if(proto == 6) {
+    libtrace_tcp_t * tcp_header = transportheader;
+    tcp_header -> check = 0;
+    check = &tcp_header -> check;
+    *other16 = *remaining + sizeof(libtrace_tcp_t);
+    tsum = checksum(transportheader,*other16);
+  }
+
+  sum = ~(~checksum(pseudoheader,3*sizeof(uint32_t)) + ~tsum);
+
+  while (sum>>16)
+    sum = (sum & 0xffff) + (sum >> 16);
+  
+  if(check != NULL) {
+    *check = (uint16_t)sum;
+  }
+  
 
 }
 
 
 static libtrace_packet_t * per_packet(libtrace_packet_t *packet) {
-  
-  uint32_t remaining;
+  uint32_t remaining;  
   libtrace_linktype_t linktype;
   void * pkt_buffer = trace_get_packet_buffer(packet,&linktype,&remaining);
+  remaining = 0;
   libtrace_packet_t *new_packet = trace_create_packet();
-
+  
   size_t wire_length = trace_get_wire_length(packet);
 
   libtrace_ip_t * header;
+  void * l3_header;
+  uint16_t sum;
+  uint16_t ethertype;
+
+  l3_header = trace_get_layer3(packet, &ethertype, &remaining);
 
   if(linktype == TRACE_TYPE_ETH || linktype == TRACE_TYPE_80211) {
     wire_length -= FCS_SIZE;
+    remaining -= FCS_SIZE;
   }
 
   trace_construct_packet(new_packet,linktype,pkt_buffer,wire_length);
   
 
-  header = trace_get_ip(new_packet);
-  if(header != NULL) {
+  //header = trace_get_ip(new_packet);
+  //if(header != NULL) {
+
+  l3_header = trace_get_layer3(packet, &ethertype, &remaining);
+  if(ethertype == 0x0800) {
+    header = (libtrace_ip_t *) l3_header;
     header -> ip_sum = 0;
-    header -> ip_sum = checksum(header,header->ip_hl*sizeof(uint32_t));
+    printf("after zero %04X\n", header -> ip_sum);
+    sum = checksum(l3_header,header->ip_hl*sizeof(uint32_t));
+    printf("first %04X\n", sum);
+    header -> ip_sum = sum;
+    printf("final %04X\n", header -> ip_sum);
+    udp_tcp_checksum(header,&remaining);
   }
+
+
 
   return new_packet;
   
