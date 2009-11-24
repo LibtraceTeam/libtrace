@@ -43,22 +43,31 @@ static uint16_t checksum(void * buffer, uint16_t length) {
   
   while (sum>>16)
     sum = (sum & 0xffff) + (sum >> 16);
-  printf("%04X\n",~sum);
   return ~sum;
 }
 
 static void udp_tcp_checksum(libtrace_ip_t *ip, uint32_t* remaining) {
 
-  uint32_t sum;
-  uint32_t pseudoheader[3];
-  uint8_t * other8;
-  uint16_t * other16;
-  
-  uint8_t proto;
 
+
+  uint32_t sum = 0;
+  uint32_t pseudoheader[3] = {0,0,0};
+  uint8_t * other8 = NULL;
+  uint16_t * other16 = NULL;
+  
+  uint8_t proto = 0;
+
+  printf("IP payload length: %d\n",*remaining);
+  
+  /*
+    Remaining gets the wrong value here.
+
+   */
   void * transportheader = trace_get_payload_from_ip(ip,&proto,remaining);
 
-  uint16_t * check = 0;
+  printf("l3 payload length: %d\n",*remaining);  
+
+  uint16_t * check = NULL;
   uint16_t tsum = 0;
 
   pseudoheader[0] = (uint32_t) (ip -> ip_src).s_addr;
@@ -74,27 +83,32 @@ static void udp_tcp_checksum(libtrace_ip_t *ip, uint32_t* remaining) {
   other16 = (uint16_t *) other8;
 
   if(proto == 17 ) {
+    printf("udp  length: %d\n",sizeof(libtrace_udp_t));
     libtrace_udp_t * udp_header = transportheader;
     udp_header -> check = 0;
     check = &udp_header -> check;
     *other16 = *remaining + sizeof(libtrace_udp_t);
-    tsum = checksum(transportheader,*other16);
+    tsum = checksum(transportheader,*remaining + sizeof(libtrace_udp_t));
   }
   else if(proto == 6) {
+    
     libtrace_tcp_t * tcp_header = transportheader;
     tcp_header -> check = 0;
     check = &tcp_header -> check;
     *other16 = *remaining + sizeof(libtrace_tcp_t);
-    tsum = checksum(transportheader,*other16);
+    //use tcp header length and datagram length instead
+    tsum = checksum(transportheader,*remaining+sizeof(libtrace_tcp_t));
   }
 
-  sum = ~(~checksum(pseudoheader,3*sizeof(uint32_t)) + ~tsum);
+  *other16 = *remaining;
+
+  sum = (~checksum(pseudoheader,3*sizeof(uint32_t)) + ~tsum);
 
   while (sum>>16)
     sum = (sum & 0xffff) + (sum >> 16);
   
   if(check != NULL) {
-    *check = (uint16_t)sum;
+    *check = (uint16_t)~sum;
   }
   
 
@@ -102,42 +116,34 @@ static void udp_tcp_checksum(libtrace_ip_t *ip, uint32_t* remaining) {
 
 
 static libtrace_packet_t * per_packet(libtrace_packet_t *packet) {
-  uint32_t remaining;  
-  libtrace_linktype_t linktype;
+  uint32_t remaining = 0;  
+  libtrace_linktype_t linktype = 0;
   void * pkt_buffer = trace_get_packet_buffer(packet,&linktype,&remaining);
   remaining = 0;
+  libtrace_ip_t * header = NULL;
+  uint16_t sum = 0;
   libtrace_packet_t *new_packet = trace_create_packet();
   
   size_t wire_length = trace_get_wire_length(packet);
 
-  libtrace_ip_t * header;
-  void * l3_header;
-  uint16_t sum;
-  uint16_t ethertype;
-
-  l3_header = trace_get_layer3(packet, &ethertype, &remaining);
+  printf("wire length: %d\n",wire_length);
 
   if(linktype == TRACE_TYPE_ETH || linktype == TRACE_TYPE_80211) {
     wire_length -= FCS_SIZE;
-    remaining -= FCS_SIZE;
   }
+
+  printf("wire length after FCS: %d\n",wire_length);
 
   trace_construct_packet(new_packet,linktype,pkt_buffer,wire_length);
   
 
-  //header = trace_get_ip(new_packet);
-  //if(header != NULL) {
-
-  l3_header = trace_get_layer3(packet, &ethertype, &remaining);
-  if(ethertype == 0x0800) {
-    header = (libtrace_ip_t *) l3_header;
+  header = trace_get_ip(new_packet);
+  if(header != NULL) {
+    wire_length -= sizeof(libtrace_ip_t);
     header -> ip_sum = 0;
-    printf("after zero %04X\n", header -> ip_sum);
-    sum = checksum(l3_header,header->ip_hl*sizeof(uint32_t));
-    printf("first %04X\n", sum);
+    sum = checksum(header,header->ip_hl*sizeof(uint32_t));
     header -> ip_sum = sum;
-    printf("final %04X\n", header -> ip_sum);
-    udp_tcp_checksum(header,&remaining);
+    udp_tcp_checksum(header,&wire_length);
   }
 
 
@@ -318,6 +324,11 @@ int main(int argc, char *argv[]) {
 		/* Got a packet - let's do something with it */
 		libtrace_packet_t * new = per_packet(packet);
 
+		//libtrace_ip_t * header;
+		//		header = trace_get_ip(new);
+
+		//printf("before write: %04X\n",header->ip_sum);
+		
 		if (trace_write_packet(output, new) < 0) {
 			trace_perror_output(output, "Writing packet");
 			trace_destroy(trace);
