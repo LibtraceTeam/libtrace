@@ -41,12 +41,12 @@ static uint16_t checksum(void * buffer, uint16_t length) {
   }
 
   if(count > 0) {
-    sum += (*buff << 8);
+    sum += *buff;
   }
   
   while (sum>>16)
     sum = (sum & 0xffff) + (sum >> 16);
-  printf("%04X\n",sum);
+
   return ~sum;
 }
 
@@ -58,12 +58,19 @@ static void udp_tcp_checksum(libtrace_ip_t *ip, uint32_t length) {
   
   uint16_t protocol = ip->ip_p;
 
-  uint16_t temp;
+  uint16_t temp = 0;
 
-  sum += ~checksum(&ip->ip_src,sizeof(uint32_t));
-  sum += ~checksum(&ip->ip_dst,sizeof(uint32_t));
+  uint16_t * check = NULL;
+  uint16_t tsum = 0;
+
+
+  sum += ~checksum(&ip->ip_src.s_addr,sizeof(uint32_t));
+  sum += ~checksum(&ip->ip_dst.s_addr,sizeof(uint32_t));
+
   temp = htons(protocol);
+
   sum += ~checksum(&temp,sizeof(uint16_t));
+
   temp = htons(length);
   sum += ~checksum(&temp,sizeof(uint16_t));
 
@@ -72,8 +79,6 @@ static void udp_tcp_checksum(libtrace_ip_t *ip, uint32_t length) {
   
   void * transportheader = trace_get_payload_from_ip(ip,NULL,NULL);
 
-  uint16_t * check = NULL;
-  uint16_t tsum = 0;
 
   printf("proto: %d\n",ip->ip_p);
 
@@ -84,7 +89,6 @@ static void udp_tcp_checksum(libtrace_ip_t *ip, uint32_t length) {
     *check = 0;
     printf("l3 payload length: %d\n",length);  
     tsum = checksum(transportheader, length);
-    int odd = 0;//length % 2;
   }
   else if(protocol == 6) {
     libtrace_tcp_t * tcp_header = transportheader;
@@ -98,15 +102,17 @@ static void udp_tcp_checksum(libtrace_ip_t *ip, uint32_t length) {
 
   printf("tsum: %04X\n", tsum);
 
-  sum = ~tsum;
+  sum += ~tsum;
 
   while (sum>>16)
     sum = (sum & 0xffff) + (sum >> 16);
   
   if(check != NULL) {
     *check = (uint16_t)~sum;
+    printf("checksum: %04X\n",*check);
   }
   
+
 
 }
 
