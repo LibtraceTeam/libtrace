@@ -52,64 +52,48 @@ static uint16_t checksum(void * buffer, uint16_t length) {
 
 static void udp_tcp_checksum(libtrace_ip_t *ip, uint32_t length) {
 
-  uint32_t remaining = 0;
-
   uint32_t sum = 0;
-  
   uint16_t protocol = ip->ip_p;
-
   uint16_t temp = 0;
-
   uint16_t * check = NULL;
   uint16_t tsum = 0;
 
 
-  sum += ~checksum(&ip->ip_src.s_addr,sizeof(uint32_t));
-  sum += ~checksum(&ip->ip_dst.s_addr,sizeof(uint32_t));
+  sum += (uint16_t) ~checksum(&ip->ip_src.s_addr,sizeof(uint32_t));
+  sum += (uint16_t) ~checksum(&ip->ip_dst.s_addr,sizeof(uint32_t));
 
+
+  /*this will be in host order whereas everything else is in network order*/
   temp = htons(protocol);
+  sum += (uint16_t) ~checksum(&temp,sizeof(uint16_t));
 
-  sum += ~checksum(&temp,sizeof(uint16_t));
-
+  /*this will be in host order whereas everything else is in network order*/
   temp = htons(length);
-  sum += ~checksum(&temp,sizeof(uint16_t));
+  sum += (uint16_t) ~checksum(&temp,sizeof(uint16_t));
 
-
-  printf("IP payload length: %d\n",length);
-  
   void * transportheader = trace_get_payload_from_ip(ip,NULL,NULL);
-
-
-  printf("proto: %d\n",ip->ip_p);
 
   if(protocol == 17 ) {
     libtrace_udp_t * udp_header = transportheader;
-    printf("udp  length: %d\n",ntohs(udp_header -> len));
     check = &udp_header -> check;
     *check = 0;
-    printf("l3 payload length: %d\n",length);  
     tsum = checksum(transportheader, length);
   }
   else if(protocol == 6) {
     libtrace_tcp_t * tcp_header = transportheader;
     tcp_header -> check = 0;
     check = &tcp_header -> check;
-
-    //use tcp header length and datagram length instead
+    *check = 0;
     tsum = checksum(transportheader,length);
   }
 
-
-  printf("tsum: %04X\n", tsum);
-
-  sum += ~tsum;
+  sum += (uint16_t) ~tsum;
 
   while (sum>>16)
     sum = (sum & 0xffff) + (sum >> 16);
-  
+
   if(check != NULL) {
     *check = (uint16_t)~sum;
-    printf("checksum: %04X\n",*check);
   }
   
 
@@ -128,13 +112,9 @@ static libtrace_packet_t * per_packet(libtrace_packet_t *packet) {
   
   size_t wire_length = trace_get_wire_length(packet);
 
-  printf("wire length: %d\n",wire_length);
-
   if(linktype == TRACE_TYPE_ETH || linktype == TRACE_TYPE_80211) {
     wire_length -= FCS_SIZE;
   }
-
-  printf("wire length after FCS: %d\n",wire_length);
 
   trace_construct_packet(new_packet,linktype,pkt_buffer,wire_length);
   
@@ -145,7 +125,7 @@ static libtrace_packet_t * per_packet(libtrace_packet_t *packet) {
     header -> ip_sum = 0;
     sum = checksum(header,header->ip_hl*sizeof(uint32_t));
     header -> ip_sum = sum;
-    udp_tcp_checksum(header,ntohs(header->ip_len) - sizeof(uint32_t)*header->ip_hl);
+    udp_tcp_checksum(header,ntohs(header->ip_len)-sizeof(uint32_t)*header->ip_hl);
   }
 
   return new_packet;
@@ -209,28 +189,6 @@ static void usage(char * argv) {
 	fprintf(stderr, " -f bpfexpr\n");
 	fprintf(stderr, "\t\tApply a bpf filter expression\n");
 }
-
-/* int main(int argc, char *argv[]) {  */
-  
-/*   /\* uint16_t buffer[] = {0x45,0x00,0x00,0x30, */
-/* 		       0x3b,0xa9,0x40,0x00, */
-/* 		       0x6e,0x06,0x44,0x5b, */
-/* 		       0x25,0xdb,0xef,0x28, */
-/* 		       0x7d,0xb6,0x6a,0xb1 */
-/* 		       };*\/  */
-
-/*   uint8_t buffer[] = {0x00,0x01, */
-/* 		      0xf2,0x03, */
-/* 		      0xf4,0xf5, */
-/* 		      0xf6,0xf7 */
-/*   }; */
-
-/*   uint16_t checksum = ip_checksum(buffer,8); */
-
-/*   printf("checksum: %04X\n",checksum); */
-  
-/* } */
-
 
 int main(int argc, char *argv[]) {
 	
@@ -324,11 +282,6 @@ int main(int argc, char *argv[]) {
 		/* Got a packet - let's do something with it */
 		libtrace_packet_t * new = per_packet(packet);
 
-		//libtrace_ip_t * header;
-		//		header = trace_get_ip(new);
-
-		//printf("before write: %04X\n",header->ip_sum);
-		
 		if (trace_write_packet(output, new) < 0) {
 			trace_perror_output(output, "Writing packet");
 			trace_destroy(trace);
