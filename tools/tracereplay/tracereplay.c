@@ -26,6 +26,9 @@
 
 #define FCS_SIZE 4
 
+
+
+
 /* This function assumes that the relevant fields have been zeroed out. RFC 1071*/
 static uint16_t checksum(void * buffer, uint16_t length) {
   uint32_t sum = 0;
@@ -38,71 +41,64 @@ static uint16_t checksum(void * buffer, uint16_t length) {
   }
 
   if(count > 0) {
-    sum += *buff;
+    sum += (*buff << 8);
   }
   
   while (sum>>16)
     sum = (sum & 0xffff) + (sum >> 16);
+  printf("%04X\n",sum);
   return ~sum;
 }
 
-static void udp_tcp_checksum(libtrace_ip_t *ip, uint32_t* remaining) {
+static void udp_tcp_checksum(libtrace_ip_t *ip, uint32_t length) {
 
-
+  uint32_t remaining = 0;
 
   uint32_t sum = 0;
-  uint32_t pseudoheader[3] = {0,0,0};
-  uint8_t * other8 = NULL;
-  uint16_t * other16 = NULL;
   
-  uint8_t proto = 0;
+  uint16_t protocol = ip->ip_p;
 
-  printf("IP payload length: %d\n",*remaining);
+  uint16_t temp;
+
+  sum += ~checksum(&ip->ip_src,sizeof(uint32_t));
+  sum += ~checksum(&ip->ip_dst,sizeof(uint32_t));
+  temp = htons(protocol);
+  sum += ~checksum(&temp,sizeof(uint16_t));
+  temp = htons(length);
+  sum += ~checksum(&temp,sizeof(uint16_t));
+
+
+  printf("IP payload length: %d\n",length);
   
-  /*
-    Remaining gets the wrong value here.
-
-   */
-  void * transportheader = trace_get_payload_from_ip(ip,&proto,remaining);
-
-  printf("l3 payload length: %d\n",*remaining);  
+  void * transportheader = trace_get_payload_from_ip(ip,NULL,NULL);
 
   uint16_t * check = NULL;
   uint16_t tsum = 0;
 
-  pseudoheader[0] = (uint32_t) (ip -> ip_src).s_addr;
-  pseudoheader[1] = (uint32_t)(ip -> ip_dst).s_addr;
-  
-  other8 = (uint8_t *) &pseudoheader[2];
+  printf("proto: %d\n",ip->ip_p);
 
-  *other8 = 0x00;
-  other8++;
-  *other8 = ip -> ip_p;
-  other8++;
-  
-  other16 = (uint16_t *) other8;
-
-  if(proto == 17 ) {
-    printf("udp  length: %d\n",sizeof(libtrace_udp_t));
+  if(protocol == 17 ) {
     libtrace_udp_t * udp_header = transportheader;
-    udp_header -> check = 0;
+    printf("udp  length: %d\n",ntohs(udp_header -> len));
     check = &udp_header -> check;
-    *other16 = *remaining + sizeof(libtrace_udp_t);
-    tsum = checksum(transportheader,*remaining + sizeof(libtrace_udp_t));
+    *check = 0;
+    printf("l3 payload length: %d\n",length);  
+    tsum = checksum(transportheader, length);
+    int odd = 0;//length % 2;
   }
-  else if(proto == 6) {
-    
+  else if(protocol == 6) {
     libtrace_tcp_t * tcp_header = transportheader;
     tcp_header -> check = 0;
     check = &tcp_header -> check;
-    *other16 = *remaining + sizeof(libtrace_tcp_t);
+
     //use tcp header length and datagram length instead
-    tsum = checksum(transportheader,*remaining+sizeof(libtrace_tcp_t));
+    tsum = checksum(transportheader,length);
   }
 
-  *other16 = *remaining;
 
-  sum = (~checksum(pseudoheader,3*sizeof(uint32_t)) + ~tsum);
+  printf("tsum: %04X\n", tsum);
+
+  sum = ~tsum;
 
   while (sum>>16)
     sum = (sum & 0xffff) + (sum >> 16);
@@ -139,14 +135,12 @@ static libtrace_packet_t * per_packet(libtrace_packet_t *packet) {
 
   header = trace_get_ip(new_packet);
   if(header != NULL) {
-    wire_length -= sizeof(libtrace_ip_t);
+    wire_length -= sizeof(uint32_t)*header->ip_hl;
     header -> ip_sum = 0;
     sum = checksum(header,header->ip_hl*sizeof(uint32_t));
     header -> ip_sum = sum;
-    udp_tcp_checksum(header,&wire_length);
+    udp_tcp_checksum(header,ntohs(header->ip_len) - sizeof(uint32_t)*header->ip_hl);
   }
-
-
 
   return new_packet;
   
