@@ -30,6 +30,7 @@ bool use_sport = true;
 bool use_dport = true;
 bool use_protocol = true;
 bool quit = false;
+bool fullspeed = false;
 
 uint64_t total_bytes=0;
 uint64_t total_packets=0;
@@ -442,10 +443,11 @@ int main(int argc, char *argv[])
 			{ "bits-per-sec",	0, 0, 'B' },
 			{ "percent",		0, 0, 'P' },
 			{ "interval",		1, 0, 'i' },
+			{ "fast",		0, 0, 'F' },
 			{ NULL,			0, 0, 0 }
 		};
 
-		int c= getopt_long(argc, argv, "f:s:p:hHi:",
+		int c= getopt_long(argc, argv, "f:Fs:p:hHi:",
 				long_options, &option_index);
 
 		if (c==-1)
@@ -454,6 +456,9 @@ int main(int argc, char *argv[])
 		switch (c) {
 			case 'f':
 				filter=trace_create_filter(optarg);
+				break;
+			case 'F':
+				fullspeed = true;
 				break;
 			case 's':
 				snaplen=atoi(optarg);
@@ -515,6 +520,12 @@ int main(int argc, char *argv[])
 		if (promisc!=-1) {
 			if (trace_config(trace,TRACE_OPTION_PROMISC,&promisc)) {
 				trace_perror(trace,"ignoring: ");
+			}
+		}
+		if (fullspeed) {
+			int flag=1;
+			if (trace_config(trace,TRACE_OPTION_EVENT_REALTIME,&flag)) {
+				trace_perror(trace,"Setting EVENT_REALTIME option");
 			}
 		}
 
