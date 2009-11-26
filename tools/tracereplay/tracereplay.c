@@ -12,8 +12,6 @@
  */
 
 
-
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -26,10 +24,10 @@
 
 #define FCS_SIZE 4
 
+int broadcast;
 
-
-
-/* This function assumes that the relevant fields have been zeroed out. RFC 1071*/
+/* This function assumes that the relevant fields have been zeroed out. 
+   RFC 1071 describes the method and provides a code example*/
 static uint16_t checksum(void * buffer, uint16_t length) {
   uint32_t sum = 0;
   uint16_t * buff = (uint16_t *) buffer;
@@ -50,6 +48,12 @@ static uint16_t checksum(void * buffer, uint16_t length) {
   return ~sum;
 }
 
+/*
+  This function calculates and fills in the correct checksum on
+  a transport protocol header.
+  Currently only UDP and TCP are supported.
+*/
+
 static void udp_tcp_checksum(libtrace_ip_t *ip, uint32_t length) {
 
   uint32_t sum = 0;
@@ -57,7 +61,7 @@ static void udp_tcp_checksum(libtrace_ip_t *ip, uint32_t length) {
   uint16_t temp = 0;
   uint16_t * check = NULL;
   uint16_t tsum = 0;
-
+  void * transportheader = NULL;
 
   sum += (uint16_t) ~checksum(&ip->ip_src.s_addr,sizeof(uint32_t));
   sum += (uint16_t) ~checksum(&ip->ip_dst.s_addr,sizeof(uint32_t));
@@ -71,14 +75,16 @@ static void udp_tcp_checksum(libtrace_ip_t *ip, uint32_t length) {
   temp = htons(length);
   sum += (uint16_t) ~checksum(&temp,sizeof(uint16_t));
 
-  void * transportheader = trace_get_payload_from_ip(ip,NULL,NULL);
+  transportheader = trace_get_payload_from_ip(ip,NULL,NULL);
 
+  /* UDP */
   if(protocol == 17 ) {
     libtrace_udp_t * udp_header = transportheader;
     check = &udp_header -> check;
     *check = 0;
     tsum = checksum(transportheader, length);
   }
+  /* TCP */
   else if(protocol == 6) {
     libtrace_tcp_t * tcp_header = transportheader;
     tcp_header -> check = 0;
@@ -100,31 +106,60 @@ static void udp_tcp_checksum(libtrace_ip_t *ip, uint32_t length) {
 
 }
 
-
+/*
+  Create a copy of the packet that can be written to the output URI.
+  if the packet is IPv4 the checksum will be recalculated to account for
+  cryptopan. Same for TCP and UDP. No other protocols are supported at the 
+  moment.
+ */
 static libtrace_packet_t * per_packet(libtrace_packet_t *packet) {
   uint32_t remaining = 0;  
   libtrace_linktype_t linktype = 0;
-  void * pkt_buffer = trace_get_packet_buffer(packet,&linktype,&remaining);
-  remaining = 0;
   libtrace_ip_t * header = NULL;
   uint16_t sum = 0;
-  libtrace_packet_t *new_packet = trace_create_packet();
-  
-  size_t wire_length = trace_get_wire_length(packet);
+  libtrace_packet_t *new_packet;
+  size_t wire_length;
+  void * pkt_buffer;
+  void * l2_header;
+  libtrace_ether_t * ether_header;
+  int i;
 
+  pkt_buffer = trace_get_packet_buffer(packet,&linktype,&remaining);
+  remaining = 0;
+  new_packet = trace_create_packet();
+  
+  wire_length = trace_get_wire_length(packet);
+
+  /* if it's ehternet we don't want to add space for the FCS that will
+     be appended. */
   if(linktype == TRACE_TYPE_ETH || linktype == TRACE_TYPE_80211) {
     wire_length -= FCS_SIZE;
   }
 
   trace_construct_packet(new_packet,linktype,pkt_buffer,wire_length);
-  
 
+
+  if(broadcast) {
+    l2_header = trace_get_layer2(new_packet,&linktype,&remaining);
+    if(linktype == TRACE_TYPE_ETH){
+      ether_header = (libtrace_ether_t *) l2_header;
+      for(i = 0; i < 6; i++) {
+	ether_header -> ether_dhost[i] = 0xFF;
+      }
+    }
+    
+  }
+
+  
+  
   header = trace_get_ip(new_packet);
   if(header != NULL) {
+    /* update ip checksum */
     wire_length -= sizeof(uint32_t)*header->ip_hl;
     header -> ip_sum = 0;
     sum = checksum(header,header->ip_hl*sizeof(uint32_t));
     header -> ip_sum = sum;
+    /* update transport layer checksums */
     udp_tcp_checksum(header,ntohs(header->ip_len)-sizeof(uint32_t)*header->ip_hl);
   }
 
@@ -184,10 +219,17 @@ static uint32_t event_read_packet(libtrace_t *trace, libtrace_packet_t *packet)
 }
 
 static void usage(char * argv) {
-	fprintf(stderr, "usage: %s [options] libtraceuri outputuri...\n", argv);
+	fprintf(stderr, "usage: %s [options] inputuri outputuri...\n", argv);
 	fprintf(stderr, " --filter bpfexpr\n");
 	fprintf(stderr, " -f bpfexpr\n");
 	fprintf(stderr, "\t\tApply a bpf filter expression\n");
+	fprintf(stderr, " -s snaplength\n");
+	fprintf(stderr, " --snaplength snaplength\n");
+	fprintf(stderr, "\t\tTruncate the packets read from inputuri to <snaplength>\n");
+	fprintf(stderr, " -b\n");
+	fprintf(stderr, " --broadcast\n");
+	fprintf(stderr, "\t\tSend ethernet frames to broadcast address\n");
+
 }
 
 int main(int argc, char *argv[]) {
@@ -198,30 +240,44 @@ int main(int argc, char *argv[]) {
 	libtrace_filter_t *filter=NULL;
 	int psize = 0;
 	char *uri = 0;
+	libtrace_packet_t * new;
+	int snaplen = 0;
+	
 
 	while(1) {
 		int option_index;
 		struct option long_options[] = {
 			{ "filter",	1, 0, 'f'},
 			{ "help",	0, 0, 'h'},
+			{ "snaplen",	1, 0, 's'},
+			{ "broadcast",	0, 0, 'b'},
 			{ NULL,		0, 0, 0}
 		};
 
-		int c = getopt_long(argc, argv, "f:",
+		int c = getopt_long(argc, argv, "bhs:f:",
 				long_options, &option_index);
 
 		if(c == -1)
 			break;
 
 		switch (c) {
-			case 'f':
-				filter = trace_create_filter(optarg);
-				break;
-			case 'h':
-				usage(argv[0]);
-				return 1;
-			default:
-				fprintf(stderr, "Unknown option: %c\n", c);
+		case 'f':
+		  filter = trace_create_filter(optarg);
+		  break;
+		case 's':
+		  snaplen = atoi(optarg);
+		  break;
+
+		case 'b':
+		  broadcast = 1;
+		  break;
+		  
+		case 'h':
+		  
+		  usage(argv[0]);
+		  return 1;
+		default:
+		  fprintf(stderr, "Unknown option: %c\n", c);
 		}
 	}
 
@@ -243,6 +299,13 @@ int main(int argc, char *argv[]) {
 	if (trace_is_err(trace)) {
 		trace_perror(trace, "trace_create");
 		return 1;
+	}
+
+	/*apply snaplength */
+	if(snaplen) {
+	  if(trace_config(trace,TRACE_OPTION_SNAPLEN,&snaplen)) {
+	    trace_perror(trace,"error setting snaplength, proceeding anyway");
+	  }
 	}
 
 	/* apply filter */
@@ -280,7 +343,7 @@ int main(int argc, char *argv[]) {
 		}
 
 		/* Got a packet - let's do something with it */
-		libtrace_packet_t * new = per_packet(packet);
+		new = per_packet(packet);
 
 		if (trace_write_packet(output, new) < 0) {
 			trace_perror_output(output, "Writing packet");
