@@ -24,7 +24,7 @@
 
 #define FCS_SIZE 4
 
-int broadcast;
+int broadcast = 0;
 
 /* This function assumes that the relevant fields have been zeroed out. 
    RFC 1071 describes the method and provides a code example*/
