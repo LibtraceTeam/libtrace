@@ -19,7 +19,7 @@
 #define DISPLAYL(x,fmt) DISPLAY_EXP(x,fmt,htonl(tcp->x))
 #define DISPLAYIP(x,fmt) DISPLAY_EXP(x,fmt,inet_ntoa(*(struct in_addr*)&tcp->x))
 
-void decode(int link_type UNUSED,const char *packet,unsigned len)
+DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len)
 {
 	unsigned char *pkt = NULL;
 	unsigned char type,optlen,*data;

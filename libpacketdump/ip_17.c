@@ -24,7 +24,7 @@
 #define DISPLAYIP(x,fmt) DISPLAY_EXP(x,fmt,inet_ntoa(*(struct in_addr*)&STRUCT->x))
 
 
-void decode(int link_type UNUSED,const char *packet,unsigned len)
+DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len)
 {
 	struct libtrace_udp *udp = (struct libtrace_udp*)packet;
 	printf(" UDP:");

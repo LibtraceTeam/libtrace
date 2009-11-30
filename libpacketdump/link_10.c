@@ -4,7 +4,7 @@
 #include "libpacketdump.h"
 #include "libtrace.h"
 
-void decode(int link_type UNUSED,const char *packet,unsigned len)
+DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len)
 {
 	// ATM
 	printf(" Legacy Framing:");

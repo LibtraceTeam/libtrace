@@ -21,7 +21,7 @@
                 lhs=num&((1<<(n))-1);                           \
         } while(0)
 
-void decode(int link_type UNUSED,const char *packet,unsigned len)
+DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len)
 {
         unsigned int offset=0;
         int value;

@@ -76,7 +76,7 @@ static char *format_pro(const struct arphdr *arp, const char *pro) {
 	
 }
 	
-void decode(int link_type UNUSED,const char *packet,unsigned len)
+DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len)
 {
 	struct arphdr *arp = (struct arphdr*)packet;
 	const char *source_hrd = NULL;

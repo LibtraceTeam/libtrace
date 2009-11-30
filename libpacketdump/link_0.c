@@ -5,7 +5,7 @@
 #include <dlfcn.h>
 #include "libpacketdump.h"
 
-void decode(int link_type UNUSED,const char *packet,unsigned len)
+DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len)
 {
 	printf(" Legacy PoS:");
 	if (len>=4)

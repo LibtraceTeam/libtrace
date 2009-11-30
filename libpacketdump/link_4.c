@@ -747,7 +747,7 @@ static void decode_80211_data(const char *pkt, unsigned len) {
 	
 }
 
-void decode(int link_type UNUSED, const char *pkt, unsigned len) 
+DLLEXPORT void decode(int link_type UNUSED, const char *pkt, unsigned len) 
 {
 	ieee80211_frame_control *fc;
 	

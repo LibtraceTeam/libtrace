@@ -10,7 +10,7 @@
 #include "libtrace.h"
 #include "libtrace_int.h"
 
-void decode(int link_type UNUSED,const char *pkt,unsigned len) 
+DLLEXPORT void decode(int link_type UNUSED,const char *pkt,unsigned len) 
 {
 	libtrace_sll_header_t *sll = (libtrace_sll_header_t *) pkt;
 	uint16_t type;
