@@ -102,6 +102,42 @@ char *trace_sockaddr2string(const struct sockaddr *a, socklen_t salen, char *buf
 	return mybuf;
 }
 
+static void set_port_for_sockaddr(struct sockaddr *sa,uint16_t port)
+{
+	switch (sa->sa_family) {
+		case AF_INET:
+			((struct sockaddr_in *)sa)->sin_port = htons(port);
+			break;
+		case AF_INET6:
+			((struct sockaddr_in6 *)sa)->sin6_port = htons(port);
+			break;
+	}
+}
+
+static void clear_addr_for_sockaddr(struct sockaddr *sa)
+{
+	switch (sa->sa_family) {
+		case AF_INET:
+			((struct sockaddr_in *)sa)->sin_addr.s_addr = 0;
+			break;
+		case AF_INET6:
+			memset((void*)&((struct sockaddr_in6 *)sa)->sin6_addr,0,sizeof(((struct sockaddr_in6 *)sa)->sin6_addr));
+			break;
+	}
+}
+
+static uint16_t get_port_from_sockaddr(struct sockaddr *sa)
+{
+	switch (sa->sa_family) {
+		case AF_INET:
+			return ntohs(((struct sockaddr_in *)sa)->sin_port);
+			break;
+		case AF_INET6:
+			return ntohs(((struct sockaddr_in6 *)sa)->sin6_port);
+			break;
+	}
+}
+
 struct flowkey_t {
 	struct sockaddr_storage sip;
 	struct sockaddr_storage dip;
@@ -120,9 +156,6 @@ struct flowkey_t {
 			c = cmp_sockaddr((struct sockaddr*)&dip,(struct sockaddr*)&b.dip);
 			if (c != 0) return c<0;
 		}
-
-		if (use_sport && sport != b.sport) return sport < b.sport;
-		if (use_dport && dport != b.dport) return dport < b.dport;
 
 		return protocol < b.protocol;
 	}
@@ -160,14 +193,27 @@ static void per_packet(libtrace_packet_t *packet)
 	flowkey_t flowkey;
 	flows_t::iterator it;
 
-	if (use_sip && trace_get_source_address(packet,(struct sockaddr*)&flowkey.sip)==NULL)
+	if (trace_get_source_address(packet,(struct sockaddr*)&flowkey.sip)==NULL)
 		flowkey.sip.ss_family = AF_UNSPEC;
-	if (use_dip && trace_get_destination_address(packet,(struct sockaddr*)&flowkey.dip)==NULL)
+
+	if (trace_get_destination_address(packet,(struct sockaddr*)&flowkey.dip)==NULL)
 		flowkey.dip.ss_family = AF_UNSPEC;
+
+	if (!use_sip)
+		clear_addr_for_sockaddr((struct sockaddr *)&flowkey.sip);
+
+	if (!use_dip)
+		clear_addr_for_sockaddr((struct sockaddr *)&flowkey.dip);
+
+	if (!use_sport)
+		set_port_for_sockaddr((struct sockaddr *)&flowkey.sip,0);
+
+	if (!use_dport) 
+		set_port_for_sockaddr((struct sockaddr *)&flowkey.dip,0);
+
 	if (use_protocol && trace_get_transport(packet,&flowkey.protocol, NULL) == NULL)
 		flowkey.protocol = 255;
-	if (use_sport) flowkey.sport = trace_get_source_port(packet);
-	if (use_dport) flowkey.dport = trace_get_destination_port(packet);
+
 
 	it = flows.find(flowkey);
 	if (it == flows.end()) {
@@ -190,8 +236,6 @@ struct flow_data_t {
 	uint64_t packets;
 	struct sockaddr_storage sip;
 	struct sockaddr_storage dip;
-	uint16_t sport;
-	uint16_t dport;
 	uint8_t protocol;
 
 	bool operator< (const flow_data_t &b) const {
@@ -211,8 +255,6 @@ static void do_report()
 		data.packets = it->second.packets,
 		data.sip = it->first.sip;
 		data.dip = it->first.dip;
-		data.sport = it->first.sport;
-		data.dport = it->first.dport;
 		data.protocol = it->first.protocol;
 		pq.push(data);
 	}
@@ -271,7 +313,7 @@ static void do_report()
 				printw("\t");
 		}
 		if (use_sport)
-			printw("%-5d\t", pq.top().sport);
+			printw("%-5d\t", get_port_from_sockaddr((struct sockaddr*)&pq.top().sip));
 		if (use_dip) {
 			printw("%20s",
 				trace_sockaddr2string((struct sockaddr*)&pq.top().dip,
@@ -283,7 +325,7 @@ static void do_report()
 				printw("\t");
 		}
 		if (use_dport)
-			printw("%-5d\t", pq.top().dport);
+			printw("%-5d\t", get_port_from_sockaddr((struct sockaddr*)&pq.top().dip));
 		if (use_protocol) {
 			struct protoent *proto = getprotobynumber(pq.top().protocol);
 			if (proto) 
