@@ -489,7 +489,7 @@ int main(int argc, char *argv[])
 			{ NULL,			0, 0, 0 }
 		};
 
-		int c= getopt_long(argc, argv, "f:Fs:p:hHi:",
+		int c= getopt_long(argc, argv, "f:Fs:p:hHi:12345",
 				long_options, &option_index);
 
 		if (c==-1)
@@ -524,6 +524,11 @@ int main(int argc, char *argv[])
 					return 1;
 				}
 				break;
+			case '1': use_sip 	= !use_sip; break;
+			case '2': use_sport 	= !use_sport; break;
+			case '3': use_dip 	= !use_dip; break;
+			case '4': use_dport 	= !use_dport; break;
+			case '5': use_protocol 	= !use_protocol; break;
 			default:
 				fprintf(stderr,"Unknown option: %c\n",c);
 				/* FALL THRU */
