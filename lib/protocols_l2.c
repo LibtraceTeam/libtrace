@@ -229,6 +229,10 @@ static void *trace_get_payload_from_chdlc(void *link,
 			case 0x0021: /* IP */
 				*type = TRACE_ETHERTYPE_IP;
 				break;
+			case 0xc021: /* Link Control Protocol */
+				*type = 0; /* No ethertype for this */
+				break;
+
 			default:
 				printf("Unknown chdlc type: %04x\n",ntohs(chdlc->ethertype));
 				*type = 0; /* Unknown */
