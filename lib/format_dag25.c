@@ -887,44 +887,54 @@ static libtrace_eventobj_t trace_event_dag(libtrace_t *trace,
 	int numbytes;
 	uint32_t flags = 0;
 
-	/* Need to call dag_available so that the top pointer will get
-	 * updated, otherwise we'll never see any data! */
-	numbytes = dag_available(trace);
+	do {
+		erfptr = NULL;
+		numbytes = 0;
+	
+		/* Need to call dag_available so that the top pointer will get
+		 * updated, otherwise we'll never see any data! */
+		numbytes = dag_available(trace);
 
-	/* May as well not bother calling dag_get_record if dag_available
-	 * suggests that there's no data */
-	if (numbytes != 0)
-		erfptr = dag_get_record(trace);
-	if (erfptr == NULL) {
-		/* No packet available */
-		event.type = TRACE_EVENT_SLEEP;
-		event.seconds = 0.0001;
-		return event;
-	}
-	//dag_form_packet(erfptr, packet);
-	if (dag_prepare_packet(trace, packet, erfptr, TRACE_RT_DATA_ERF,
-				flags)) {
-		event.type = TRACE_EVENT_TERMINATE;
-		return event;
-	}
-
-
-	event.size = trace_get_capture_length(packet) + trace_get_framing_length(packet);
-	if (trace->filter) {
-		if (trace_apply_filter(trace->filter, packet)) {
-			event.type = TRACE_EVENT_PACKET;
-		} else {
+		/* May as well not bother calling dag_get_record if 
+		 * dag_available suggests that there's no data */
+		if (numbytes != 0)
+			erfptr = dag_get_record(trace);
+		if (erfptr == NULL) {
+			/* No packet available */
 			event.type = TRACE_EVENT_SLEEP;
-                        event.seconds = 0.000001;
-                        return event;
+			event.seconds = 0.0001;
+			break;
 		}
-	} else {
-		event.type = TRACE_EVENT_PACKET;
-	}
+		//dag_form_packet(erfptr, packet);
+		if (dag_prepare_packet(trace, packet, erfptr, 
+					TRACE_RT_DATA_ERF, flags)) {
+			event.type = TRACE_EVENT_TERMINATE;
+			break;
+		}
 
-	if (trace->snaplen > 0) {
-		trace_set_capture_length(packet, trace->snaplen);
-	}
+
+		event.size = trace_get_capture_length(packet) + 
+				trace_get_framing_length(packet);
+		if (trace->filter) {
+			if (trace_apply_filter(trace->filter, packet)) {
+				event.type = TRACE_EVENT_PACKET;
+			} else {
+				/* This packet isn't useful so we want to
+				 * immediately see if there is another suitable
+				 * one - we definitely DO NOT want to return
+				 * a sleep event in this case, like we used to
+				 * do! */
+				continue;
+			}
+		} else {
+			event.type = TRACE_EVENT_PACKET;
+		}
+
+		if (trace->snaplen > 0) {
+			trace_set_capture_length(packet, trace->snaplen);
+		}
+		break;
+	} while (1);
 
 	return event;
 }

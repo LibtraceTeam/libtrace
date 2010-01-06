@@ -371,17 +371,20 @@ static libtrace_eventobj_t trace_event_dag(libtrace_t *trace,
         libtrace_eventobj_t event = {0,0,0.0,0};
         int data;
 
-        data = dag_available(trace);
-        if (data > 0) {
+	do {
+	        data = dag_available(trace);
+
+		if (data <= 0)
+			break;
+
                 event.size = dag_read_packet(trace,packet);
                 //DATA(trace)->dag.diff -= event.size;
                 if (trace->filter) {
                         if (trace_apply_filter(trace->filter, packet)) {
                                 event.type = TRACE_EVENT_PACKET;
                         } else {
-                                event.type = TRACE_EVENT_SLEEP;
-                                event.seconds = 0.000001;
-                                return event;
+                                /* Do not sleep - try to read another packet */
+				continue;
                         }
                 } else {
                         event.type = TRACE_EVENT_PACKET;
@@ -391,11 +394,13 @@ static libtrace_eventobj_t trace_event_dag(libtrace_t *trace,
                 }
 
                 return event;
-        }
+        } while (1);
+
         assert(data == 0);
         event.type = TRACE_EVENT_SLEEP;
         event.seconds = 0.0001;
-        return event;
+        event.size = 0;
+	return event;
 }
 
 static uint64_t dag_get_dropped_packets(libtrace_t *trace)
