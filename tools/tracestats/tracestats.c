@@ -152,6 +152,9 @@ static void run_trace(char *uri)
 	totcount+=count;
 	totbytes+=bytes;
 
+	if (trace_is_err(trace))
+		trace_perror(trace,"%s",uri);
+
         trace_destroy(trace);
 }
 

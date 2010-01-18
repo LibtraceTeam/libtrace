@@ -184,6 +184,9 @@ static void run_trace(char *uri)
         }
 	report_results(ts,count,bytes);
 
+	if (trace_is_err(trace))
+		trace_perror(trace,"%s",uri);
+
         trace_destroy(trace);
 
 	if (!merge_inputs)

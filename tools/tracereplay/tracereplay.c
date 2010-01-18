@@ -354,6 +354,9 @@ int main(int argc, char *argv[]) {
 		}
 		trace_destroy_packet(new);
 	}
+	if (trace_is_err(trace)) {
+		trace_perror(trace,"%s",uri);
+	}
 	free(uri);
 	trace_destroy(trace);
 	if(filter != NULL) {

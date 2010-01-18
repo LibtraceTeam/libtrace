@@ -146,7 +146,7 @@ int main(int argc, char *argv[])
 				int ret=trace_read_packet(input[i],packet[i]);
 				if (ret<0) {
 					/* Error */
-					perror(argv[i+2]);
+					trace_perror(input[i], "%s", argv[i+2]);
 					trace_destroy(input[i]);
 					input[i]=NULL;
 				}
