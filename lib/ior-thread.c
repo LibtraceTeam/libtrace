@@ -125,8 +125,10 @@ static off_t thread_read(io_t *state, void *buffer, off_t len)
 
 		if (INBUFFER(state).len <1) {
 
-			if (copied<1)
+			if (copied<1) {
+				errno=EIO; /* FIXME: Preserve the errno from the other thread */
 				copied = INBUFFER(state).len;
+			}
 
 			pthread_mutex_unlock(&DATA(state)->mutex);
 			return copied;

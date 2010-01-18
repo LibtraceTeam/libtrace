@@ -56,8 +56,10 @@ static off_t zlib_read(io_t *io, void *buffer, off_t len)
 {
 	if (DATA(io)->err == ERR_EOF)
 		return 0; /* EOF */
-	if (DATA(io)->err == ERR_ERROR)
+	if (DATA(io)->err == ERR_ERROR) {
+		errno=EIO;
 		return -1; /* ERROR! */
+	}
 
 	DATA(io)->strm.avail_out = len;
 	DATA(io)->strm.next_out = (Bytef*)buffer;
@@ -70,6 +72,7 @@ static off_t zlib_read(io_t *io, void *buffer, off_t len)
 			if (bytes_read == 0) /* EOF */
 				return len-DATA(io)->strm.avail_out;
 			if (bytes_read < 0) { /* Error */
+				/* errno should be set */
 				DATA(io)->err = ERR_ERROR;
 				/* Return how much data we managed to read ok */
 				if (DATA(io)->strm.avail_out != len) {
@@ -91,6 +94,7 @@ static off_t zlib_read(io_t *io, void *buffer, off_t len)
 				DATA(io)->err = ERR_EOF;
 				break;
 			default:
+				errno=EIO;
 				DATA(io)->err = ERR_ERROR;
 		}
 	}
