@@ -6,6 +6,7 @@
 #include <pthread.h>
 #include <string.h>
 #include <stdbool.h>
+#include <errno.h>
 
 /* 1MB Buffer */
 #define BUFFERSIZE (1024*1024)
