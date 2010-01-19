@@ -194,7 +194,7 @@ void decode_next(const char *packet,int len,const char *proto_name,int type)
 					(libtrace_linktype_t)type,
 					&newtype,&newlen);
 			if (network) {
-				printf("skipping unknown link header of type %i to %i\n",type,newtype);
+				printf("skipping unknown link header of type %i to network type %i\n",type,newtype);
 				decode_next(network,newlen,"eth",newtype);
 				return;
 			}
