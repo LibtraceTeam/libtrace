@@ -785,7 +785,7 @@ DLLEXPORT void decode(int link_type UNUSED, const char *pkt, unsigned len)
 			break;
 		case 3:
 			printf(" Unable to decode frame type %u, dumping rest of packet\n", fc->type);
-			decode_next(pkt + sizeof(ieee80211_frame_control), len - sizeof(ieee80211_frame_control), "eth", 0);
+			decode_next(pkt + sizeof(ieee80211_frame_control), len - sizeof(ieee80211_frame_control), "unknown", 0);
 			
 			break;
 	}
