@@ -278,7 +278,8 @@ static int pcapfile_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 {
 	int err;
 	uint32_t flags = 0;
-	
+	size_t bytes_to_read = 0;
+
 	assert(libtrace->format_data);
 
 	packet->type = pcap_linktype_to_rt(swapl(libtrace,
@@ -302,9 +303,17 @@ static int pcapfile_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 		/* EOF */
 		return 0;
 	}
-	
-	assert(swapl(libtrace,((libtrace_pcapfile_pkt_hdr_t*)packet->buffer)->caplen)<LIBTRACE_PACKET_BUFSIZE);
 
+	bytes_to_read = swapl(libtrace,((libtrace_pcapfile_pkt_hdr_t*)packet->buffer)->caplen);
+
+	assert(bytes_to_read < LIBTRACE_PACKET_BUFSIZE);
+
+	/* If there is no payload to read, do not ask wandio_read to try and
+	 * read zero bytes - we'll just get back a zero that we will 
+	 * misinterpret as EOF! */
+	if (bytes_to_read == 0) {
+		return sizeof(libtrace_pcapfile_pkt_hdr_t);
+	}
 
 	err=wandio_read(libtrace->io,
 			(char*)packet->buffer+sizeof(libtrace_pcapfile_pkt_hdr_t),
@@ -325,8 +334,7 @@ static int pcapfile_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 		return -1;
 	}
 	
-	return sizeof(libtrace_pcapfile_pkt_hdr_t)
-		+swapl(libtrace,((libtrace_pcapfile_pkt_hdr_t*)packet->buffer)->caplen);
+	return sizeof(libtrace_pcapfile_pkt_hdr_t) + bytes_to_read;
 }
 
 static int pcapfile_write_packet(libtrace_out_t *out,
