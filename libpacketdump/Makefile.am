@@ -60,6 +60,7 @@ TXT_PROTOCOLS+=link_17.protocol
 
 # Decoders for various ethertypes (in decimal)
 # IPv4
+BIN_PROTOCOLS+=eth_0.la
 BIN_PROTOCOLS+=eth_2048.la
 # ARP
 BIN_PROTOCOLS+=eth_2054.la	
@@ -104,6 +105,7 @@ link_6_la_LDFLAGS=-module
 link_10_la_LDFLAGS=-module
 link_11_la_LDFLAGS=-module
 link_15_la_LDFLAGS=-module 
+eth_0_la_LDFLAGS=-module
 eth_2048_la_LDFLAGS=-module
 eth_2054_la_LDFLAGS=-module
 eth_33024_la_LDFLAGS=-module
