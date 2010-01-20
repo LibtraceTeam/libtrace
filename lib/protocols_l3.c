@@ -48,6 +48,10 @@ libtrace_ip6_t *trace_get_ip6(libtrace_packet_t *packet)
 	if (!ret || ethertype!=TRACE_ETHERTYPE_IPV6)
 		return NULL;
 
+	/* Make sure we have at least the base IPv6 header */
+	if (remaining < sizeof(libtrace_ip6_t))
+		return NULL;
+
 	return (libtrace_ip6_t*)ret;
 }
 
@@ -246,6 +250,12 @@ DLLEXPORT int trace_get_next_option(unsigned char **ptr,int *len,
 				return 0; /* I have no idea wtf is going on
 					   * with these packets
 					   */
+
+			/* Ensure that optlen is not greater than the
+			 * amount of buffer remaining */
+			if (*optlen > *len) 
+				return 0;
+			
 			(*len)-=*optlen;
 			(*data)=(*ptr+2);
 			(*ptr)+=*optlen;
