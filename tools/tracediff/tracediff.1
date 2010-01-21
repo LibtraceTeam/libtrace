@@ -1,0 +1,38 @@
+.TH TRACEDIFF "1" "January 2010" "tracediff (libtrace)" "User Commands"
+.SH NAME
+tracediff \- find and print differences between two traces
+.SH SYNOPSIS
+.B tracediff
+[ \-m maxdiff ]
+firsturi
+seconduri
+.SH DESCRIPTION
+tracediff compares two trace files and prints the details of packets that
+differ to standard output. This is useful for finding packets that are present
+in one trace but not another or for finding conversion or snapping errors.
+
+.TP
+.PD 0
+.BI \-m maxdiff
+stop processing after displaying 'maxdiff' differences
+
+.SH EXAMPLES
+.nf 
+tracediff \-m 10 erf:/traces/orig.erf.gz pcapfile:/traces/convert.pcap.gz
+.fi
+
+.SH BUGS
+Not exactly a bug, but the contents of the framing headers (i.e. the PCAP or
+ERF encapsulation) are not compared. 
+
+.SH LINKS
+More details about tracediff (and libtrace) can be found at
+http://www.wand.net.nz/trac/libtrace/wiki/UserDocumentation
+
+.SH SEE ALSO
+libtrace(3), tracemerge(1), tracefilter(1), traceconvert(1), tracestats(1),
+tracesummary(1), tracertstats(1), tracesplit(1), tracesplit_dir(1),
+tracereport(1), tracepktdump(1), traceanon(1), tracereplay(1)
+
+.SH AUTHORS
+Shane Alcock <salcock@cs.waikato.ac.nz>

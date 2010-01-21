@@ -23,7 +23,7 @@ AC_CONFIG_FILES([Makefile lib/Makefile docs/Makefile libpacketdump/Makefile
 	tools/tracemerge/Makefile tools/tracereport/Makefile
 	tools/tracertstats/Makefile tools/tracesplit/Makefile
 	tools/tracestats/Makefile tools/tracetop/Makefile
-	tools/tracereplay/Makefile
+	tools/tracereplay/Makefile tools/tracediff/Makefile
 	examples/Makefile examples/skeleton/Makefile examples/rate/Makefile
 	examples/stats/Makefile
 	docs/libtrace.doxygen 
