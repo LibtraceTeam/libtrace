@@ -1,4 +1,4 @@
-.TH TRACEMERGE "1" "November 2009" "tracereplay (libtrace)" "User Commands"
+.TH TRACEREPLAY "1" "November 2009" "tracereplay (libtrace)" "User Commands"
 .SH NAME
 tracereplay \- Replay a trace in trace time from one uri to another
 .SH SYNOPSIS
@@ -26,9 +26,9 @@ This will send the transmitted packets to any hosts on the local network.
 .TP
 .PD
 .BI \-\^\-snaplength [snaplength]
-Truncate the packets to the length specified. This is only makes a difference
- if the inputuri is a capture device. The value should be > 0. Wrong values will
-be ignored, but a warning will be printed.
+Truncate the packets to the length specified. This only makes a difference
+if the inputuri is a capture device. The value should be > 0. Inappropriate 
+values will be ignored, but a warning will be printed.
 
 .TP
 .PD 0
@@ -39,13 +39,13 @@ be ignored, but a warning will be printed.
 Apply a filter to the inputuri.
 
 .SH LINKS
-More details about tracemerge (and libtrace) can be found at
+More details about tracereplay (and libtrace) can be found at
 http://www.wand.net.nz/trac/libtrace/wiki/UserDocumentation
 
 .SH SEE ALSO
-libtrace(3), tracesplit(1), tracesplit_dir(1), tracefilter(1),
-traceconvert(1), tracereport(1), tracertstats(1), tracestats(1), tracedump(1),
-traceanon(1), tracesummary(1)
+libtrace(3), tracesplit(1), tracesplit_dir(1), tracefilter(1), tracemerge(1),
+traceconvert(1), tracereport(1), tracertstats(1), tracestats(1), 
+tracepktdump(1), traceanon(1), tracesummary(1), tracediff(1)
 
 .SH AUTHORS
 Andreas Loef <andreas.lof@cs.waikato.ac.nz>, Yuwei Wang <yww4@cs.waikato.ac.nz>

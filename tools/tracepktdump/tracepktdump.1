@@ -1,17 +1,17 @@
-.TH TRACEDUMP "1" "November 2005" "tracedump (libtrace)" "User Commands"
+.TH TRACEPKTDUMP "1" "November 2005" "tracepktdump (libtrace)" "User Commands"
 .SH NAME
-tracedump \- output packets in human readable format
+tracepktdump \- output packets in human readable format
 .SH SYNOPSIS
-.B tracedump
+.B tracepktdump
 [ \fB-f\fR exp | \fB--filter=\fRexp ]
 [ \fB-c\fR num | \fB--count=\fRnum ]
 inputuri ...
 
 .SH DESCRPTION
-tracedump verbosely outputs packets in a human readable form, suitable for
+tracepktdump verbosely outputs packets in a human readable form, suitable for
 diagnosing packets.
 
-tracedump uses the libpacketdump library.  There is an examlpe tracedump 
+tracepktdump uses the libpacketdump library.  There is an example tracepktdump 
 program in the examples directory that shows how to use libpacketdump.
 
 .TP
@@ -32,13 +32,13 @@ tcpdump(1) for the syntax of the bpf-filter expression.
 stop after displaying \fInum\fR packets.
 
 .SH LINKS
-More details about tracedump (and libtrace) can be found at
+More details about tracepktdump (and libtrace) can be found at
 http://www.wand.net.nz/trac/libtrace/wiki/UserDocumentation
 
 .SH SEE ALSO
 libtrace(3), tracemerge(1), tracesplit(1), tracesplit_dir(1), tracefilter(1),
-tracestats(1), tracesummary(1), traceconvert(1), tracereport(1) tracertstats(1),
-traceanon(1)
+tracestats(1), tracesummary(1), traceconvert(1), tracereport(1), 
+tracertstats(1), traceanon(1), tracereplay(1), tracediff(1)
 
 .SH AUTHORS
 Perry Lorier <perry@cs.waikato.ac.nz>, Daniel Lawson <dlawson@cs.waikato.ac.nz>
