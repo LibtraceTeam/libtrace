@@ -285,7 +285,18 @@ static int rt_fin_input(libtrace_t *libtrace) {
         return 0;
 }
 
-#define RT_BUF_SIZE 4000U
+
+/* I've upped this to 10K to deal with jumbo-grams that have not been snapped
+ * in any way. This means we have a much larger memory overhead per packet
+ * (which won't be used in the vast majority of cases), so we may want to think
+ * about doing something smarter, e.g. allocate a smaller block of memory and
+ * only increase it as required.
+ *
+ * XXX Capturing off int: can still lead to packets that are larger than 10K,
+ * in instances where the fragmentation is done magically by the NIC. This
+ * is pretty nasty, but also very rare.
+ */
+#define RT_BUF_SIZE 10000U
 
 static int rt_read(libtrace_t *libtrace, void **buffer, size_t len, int block) 
 {
