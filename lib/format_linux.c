@@ -601,6 +601,24 @@ static int linuxnative_get_framing_length(UNUSED
 	return sizeof(struct libtrace_linuxnative_header);
 }
 
+static size_t linuxnative_set_capture_length(libtrace_packet_t *packet, 
+		size_t size) {
+
+	struct libtrace_linuxnative_header *linux_hdr = NULL;
+	assert(packet);
+	if (size > trace_get_capture_length(packet)) {
+		/* We should avoid making a packet larger */
+		return trace_get_capture_length(packet);
+	}
+	
+	/* Reset the cached capture length */
+	packet->capture_length = -1;
+
+	linux_hdr = (struct libtrace_linuxnative_header *)packet->header;
+	linux_hdr->caplen = size;
+	return trace_get_capture_length(packet);
+}
+
 static int linuxnative_get_fd(const libtrace_t *trace) {
 	if (trace->format_data == NULL)
 		return -1;
@@ -710,7 +728,7 @@ static struct libtrace_format_t linuxnative = {
 	linuxnative_get_capture_length,	/* get_capture_length */
 	linuxnative_get_wire_length,	/* get_wire_length */
 	linuxnative_get_framing_length,	/* get_framing_length */
-	NULL,				/* set_capture_length */
+	linuxnative_set_capture_length,	/* set_capture_length */
 	NULL,				/* get_received_packets */
 	linuxnative_get_filtered_packets,/* get_filtered_packets */
 	linuxnative_get_dropped_packets,/* get_dropped_packets */
