@@ -76,12 +76,21 @@ struct libtrace_format_data_t {
 };
 
 
+/* Note that this structure is passed over the wire in rt encapsulation, and thus we need to be 
+ * careful with data sizes.  timeval's and timespec's change their size on 32/64 machines
+ */
 struct libtrace_linuxnative_header {
-	struct timeval tv;
-	struct timespec ts;
-	timestamptype_t timestamptype;
-	int wirelen;
-	int caplen;
+	struct {
+		uint32_t tv_sec;
+		uint32_t tv_usec;
+	} tv;
+	struct {
+		uint32_t tv_sec;
+		uint32_t tv_nsec;
+	} ts;
+	uint8_t timestamptype;
+	uint32_t wirelen;
+	uint32_t caplen;
 	struct sockaddr_ll hdr;
 };
 
@@ -452,8 +461,8 @@ static int linuxnative_read_packet(libtrace_t *libtrace, libtrace_packet_t *pack
 		if (cmsg->cmsg_level == SOL_SOCKET
 			&& cmsg->cmsg_type == SO_TIMESTAMP
 			&& cmsg->cmsg_len <= CMSG_LEN(sizeof(struct timeval))) {
-			memcpy(&hdr->tv, CMSG_DATA(cmsg),
-					sizeof(struct timeval));
+			hdr->tv.tv_sec = ((struct timeval*)CMSG_DATA(cmsg))->tv_sec;
+			hdr->tv.tv_usec = ((struct timeval*)CMSG_DATA(cmsg))->tv_usec;
 			hdr->timestamptype = TS_TIMEVAL;
 			break;
 		} 
@@ -461,8 +470,8 @@ static int linuxnative_read_packet(libtrace_t *libtrace, libtrace_packet_t *pack
 		else if (cmsg->cmsg_level == SOL_SOCKET
 			&& cmsg->cmsg_type == SO_TIMESTAMPNS
 			&& cmsg->cmsg_len <= CMSG_LEN(sizeof(struct timespec))) {
-			memcpy(&hdr->ts, CMSG_DATA(cmsg),
-					sizeof(struct timeval));
+			hdr->ts.tv_sec = ((struct timespec*)CMSG_DATA(cmsg))->tv_sec;
+			hdr->ts.tv_nsec = ((struct timespec*)CMSG_DATA(cmsg))->tv_nsec;
 			hdr->timestamptype = TS_TIMESPEC;
 			break;
 		}
@@ -471,8 +480,11 @@ static int linuxnative_read_packet(libtrace_t *libtrace, libtrace_packet_t *pack
 
 	/* Did we not get given a timestamp? */
 	if (cmsg == NULL) {
+		struct timeval tv;
 		if (ioctl(FORMAT(libtrace->format_data)->fd, 
-				  SIOCGSTAMP,&hdr->tv)==0) {
+				  SIOCGSTAMP,&tv)==0) {
+			hdr->tv.tv_sec = tv.tv_sec;
+			hdr->tv.tv_usec = tv.tv_usec;
 			hdr->timestamptype = TS_TIMEVAL;
 		}
 		else {
@@ -566,8 +578,12 @@ static struct timespec linuxnative_get_timespec(const libtrace_packet_t *packet)
 		ts.tv_nsec = hdr->tv.tv_usec*1000;
 		return ts;
 	}
-	else
-		return hdr->ts;
+	else {
+		struct timespec ts;
+		ts.tv_sec = hdr->ts.tv_sec;
+		ts.tv_nsec = hdr->ts.tv_nsec;
+		return ts;
+	}
 }
 
 static struct timeval linuxnative_get_timeval(const libtrace_packet_t *packet) 
@@ -581,8 +597,12 @@ static struct timeval linuxnative_get_timeval(const libtrace_packet_t *packet)
 		tv.tv_usec = hdr->ts.tv_nsec/1000;
 		return tv;
 	}
-	else
-		return hdr->tv;
+	else {
+		struct timeval tv;
+		tv.tv_sec = hdr->tv.tv_sec;
+		tv.tv_usec = hdr->tv.tv_usec;
+		return tv;
+	}
 }
 
 static int linuxnative_get_capture_length(const libtrace_packet_t *packet)
