@@ -663,6 +663,11 @@ static int rt_get_framing_length(UNUSED const libtrace_packet_t *packet) {
 	return 0;
 }
 
+static libtrace_linktype_t rt_get_link_type(UNUSED const libtrace_packet_t *packet)
+{
+	return TRACE_TYPE_NONDATA;
+}
+
 static int rt_get_fd(const libtrace_t *trace) {
         return ((struct rt_format_data_t *)trace->format_data)->input_fd;
 }
@@ -738,7 +743,7 @@ static struct libtrace_format_t rt = {
 	rt_prepare_packet,		/* prepare_packet */
 	NULL,				/* fin_packet */
         NULL,                           /* write_packet */
-        NULL,		                /* get_link_type */
+        rt_get_link_type,	        /* get_link_type */
         NULL,  		            	/* get_direction */
         NULL,              		/* set_direction */
         NULL,          			/* get_erf_timestamp */
