@@ -5,7 +5,8 @@
  * New Zealand.
  *
  * Authors: Daniel Lawson 
- *          Perry Lorier 
+ *          Perry Lorier
+ *          Shane Alcock 
  *          
  * All rights reserved.
  *
@@ -39,6 +40,7 @@
  *
  * @author Daniel Lawson
  * @author Perry Lorier
+ * @author Shane Alcock
  *
  * @version $Id: libtrace.h 773 2006-05-01 12:58:09Z perry $
  *
@@ -106,7 +108,7 @@
     #endif
     /* GCC warns if the bitfield type is not "unsigned int", however windows
      * generates incorrect code for this (see above), so we define these
-     * macros.  How Hidious.  So much for C's portability.
+     * macros.  How Hideous.  So much for C's portability.
      */
     #define LT_BITFIELD8 	unsigned int
     #define LT_BITFIELD16 	unsigned int
@@ -752,6 +754,20 @@ DLLEXPORT void trace_help(void);
  *@{
  */
 
+/** Takes a uri and splits it into a format and uridata component. 
+ * @param uri		The uri to be parsed
+ * @param [out] format	A pointer that will be updated to point to an allocated 
+ * 			string holding the format component of the URI
+ * @return NULL if an error occured, otherwise return a pointer to the uridata 
+ * component
+ *
+ * @note The format component is strdup'd by this function, so be sure to free
+ * it when you are done with the split URI. Similarly, do not pass a pointer
+ * to an allocated string into this function as the 'format' parameter, as
+ * that memory will be leaked and replaced with the strdup'd format.
+ */
+DLLEXPORT const char *trace_parse_uri(const char *uri, char **format);
+
 /** Create an input trace from a URI
  * 
  * @param uri A valid libtrace URI to be opened
@@ -849,7 +865,7 @@ typedef enum {
 	/** Defines the frequency of meta-data reporting, e.g. DUCK packets */
 	TRACE_OPTION_META_FREQ,	
 
-	/* If enabled, the libtrace event API will ignore time gaps between
+	/** If enabled, the libtrace event API will ignore time gaps between
 	 * packets when reading from a trace file */
 	TRACE_OPTION_EVENT_REALTIME
 } trace_option_t;
@@ -1005,7 +1021,7 @@ uint64_t trace_get_accepted_packets(libtrace_t *trace);
 
 /*@}*/
 
-/** @name Reading/Writing packets
+/** @name Reading / Writing packets
  * These members deal with creating, reading and writing packets
  *
  * @{
@@ -1101,6 +1117,34 @@ DLLEXPORT libtrace_eventobj_t trace_event(libtrace_t *trace,
  * @return The number of bytes written out, if zero or negative then an error has occured.
  */
 DLLEXPORT int trace_write_packet(libtrace_out_t *trace, libtrace_packet_t *packet);
+
+/** Gets the capture format for a given packet.
+ * @param packet	The packet to get the capture format for.
+ * @return The capture format of the packet
+ *
+ * @note Due to ability to convert packets between formats relatively easily
+ * in Libtrace, the format of the packet right now may not be the format that
+ * the packet was originally captured with.
+ */
+DLLEXPORT 
+enum base_format_t trace_get_format(struct libtrace_packet_t *packet);
+
+/** Construct a libtrace packet from a buffer containing the packet payload.
+ * @param packet[in,out]	Libtrace Packet object to update with the new 
+ * 				data.
+ * @param linktype		The linktype of the packet data.
+ * @param[in] data		The packet data (including linklayer).
+ * @param len			Length of packet data provided in the buffer.
+ *
+ * @note The constructed packet will be in the PCAP format.
+ *
+ * @note To be useful, the provided buffer must start with the layer 2 header
+ * (or a metadata header, if desired).
+ */
+DLLEXPORT
+void trace_construct_packet(libtrace_packet_t *packet,
+		libtrace_linktype_t linktype, const void *data, uint16_t len);
+
 /*@}*/
 
 /** @name Protocol decodes
@@ -1177,9 +1221,12 @@ DLLEXPORT SIMPLE_FUNCTION
 libtrace_ip_t *trace_get_ip(libtrace_packet_t *packet);
 
 /** get a pointer to the IPv6 header (if any)
- * @param packet  	the packet opaque pointer
+ * @param packet  	The packet to get the IPv6 header for
  *
- * @return a pointer to the IPv6 header, or NULL if there is no IPv6 header
+ * @return A pointer to the IPv6 header, or NULL if there is no IPv6 header
+ *
+ * If a partial IPv6 header is present, i.e. the packet has been truncated
+ * before the end of the IP header, this function will return NULL.
  *
  * You should consider using \ref trace_get_layer3 instead of this function.
  */
@@ -1199,11 +1246,11 @@ libtrace_ip6_t *trace_get_ip6(libtrace_packet_t *packet);
  * Subsequent metadata headers may be accessed with the
  * trace_get_payload_from_meta(...) function. 
  *
- * @param packet the libtrace packet
- * @param[out] linktype the linktype of the returned metadata header
- * @param[out] remaining the number of bytes captured after the returned
+ * @param packet The libtrace packet
+ * @param[out] linktype The linktype of the returned metadata header
+ * @param[out] remaining The number of bytes captured after the returned
  * pointer.
- * @return a pointer to the first metadata header, or NULL if there are no
+ * @return A pointer to the first metadata header, or NULL if there are no
  * metadata headers present.
  *
  * remaining may be NULL, however linktype must be provided.
@@ -1229,14 +1276,21 @@ DLLEXPORT void *trace_get_packet_meta(const libtrace_packet_t *packet,
  * Examples of metadata headers include the Linux SLL header and the Radiotap
  * wireless monitoring header.
  *
- * If the header is truncated, this function will return NULL, and remaining will be 0.
- * If there are 0 bytes of payload, the function will return a pointer, and remaining will be 0.
+ * If the metadata header passed into this function is truncated, this 
+ * function will return NULL, and remaining will be set to 0.
  *
- * @param[in] meta a pointer to a header
- * @param[in,out] linktype the linktype of meta (updated to indicate the
+ * If there are 0 bytes of payload following the provided metadata header, the 
+ * function will return a pointer to where the header would otherwise be and 
+ * remaining will be 0.
+ *
+ * Therefore, be sure to check the value of remaining after calling this
+ * function!
+ *
+ * @param[in] meta A pointer to a metadata header
+ * @param[in,out] linktype The linktype of meta (updated to indicate the
  * linktype of the returned header if applicable).
- * @param[in,out] remaining the number of bytes after the meta pointer.
- * @return a pointer to the payload of the metadata header. If meta is not a
+ * @param[in,out] remaining The number of bytes after the meta pointer.
+ * @return A pointer to the payload of the metadata header. If meta is not a
  * pointer to a metadata header, NULL is returned and linktype remains
  * unchanged.
  *
@@ -1254,12 +1308,12 @@ DLLEXPORT void *trace_get_payload_from_meta(const void *meta,
  * present (such as Linux SLL or Radiotap) and returns a pointer to the first
  * byte of the packet that was actually received by the network interface.
  *
- * @param packet the libtrace packet
- * @param[out] linktype the linktype of the returned layer 2 header
- * @param[out] remaining the number of bytes left in the packet after the
+ * @param packet The libtrace packet to find the layer 2 header for
+ * @param[out] linktype The linktype of the returned layer 2 header
+ * @param[out] remaining The number of bytes left in the packet after the
  * returned pointer.
- * @return a pointer to the first byte of the packet as it was seen on the
- * wire.
+ * @return A pointer to the first byte of the packet as it was seen on the
+ * wire. If no layer 2 header is present, this function will return NULL.
  *
  * remaining may be NULL, otherwise it will be filled in by the function.
  */
@@ -1267,23 +1321,26 @@ DLLEXPORT void *trace_get_layer2(const libtrace_packet_t *packet,
                 libtrace_linktype_t *linktype,
                 uint32_t *remaining);
 
-/** Gets a pointer to the next header given a pointer to a layer2 header
+/** Gets a pointer to the next header following a layer 2 header
  *
- * @param l2            	The pointer to the current layer2 header
- * @param linktype		The type of the layer2 header
+ * @param l2            	The pointer to the current layer 2 header
+ * @param linktype		The type of the layer 2 header
  * @param[out] ethertype 	An optional output variable of the ethernet type of the new header
  * @param[in,out] remaining 	Updated with the length remaining
  *
- * @return a pointer to the transport layer header, or NULL if header isn't
- * present.
+ * @return A pointer to the header following the provided layer 2 header, or 
+ * NULL if no subsequent header is present.
  *
- * Remaining must point to the number of bytes captured of the layer2 header
+ * Remaining must point to the number of bytes captured from the layer 2 header
  * and beyond.  It will be decremented by the number of bytes skipped to find
  * the payload.
  *
- * If the layer2 header is complete but there are zero bytes of payload after the end of the header,
- * a pointer to where the payload would be is returned and remaining will be set to 0.  If the 
- * layer2 header is incomplete (truncated), then NULL is returned and remaining will be set to 0.
+ * If the layer 2 header is complete but there are zero bytes of payload after 
+ * the end of the header, a pointer to where the payload would be is returned 
+ * and remaining will be set to 0.  If the layer 2 header is incomplete 
+ * (truncated), then NULL is returned and remaining will be set to 0. 
+ * Therefore, it is very important to check the value of remaining after
+ * calling this function. 
  *
  */
 DLLEXPORT void *trace_get_payload_from_layer2(void *l2,
@@ -1292,13 +1349,16 @@ DLLEXPORT void *trace_get_payload_from_layer2(void *l2,
 		uint32_t *remaining);
 
 
-/** Get a pointer to the layer 3 header.
- * @param packet  		The packet opaque pointer
- * @param[out] ethertype	The ethertype of the layer 3 header
- * @param[out] remaining	The amount of space available after this header
- * 				has been removed.
+/** Get a pointer to the layer 3 (e.g. IP) header.
+ * @param packet  The libtrace packet to find the layer 3 header for
+ * @param[out] ethertype The ethertype of the layer 3 header
+ * @param[out] remaining The amount of captured data remaining in the packet starting from the returned pointer, i.e. including the layer 3 header.
  *
- * @return a pointer to the layer 3 header.
+ * @return A pointer to the layer 3 header. If no layer 3 header is present in
+ * the packet, NULL is returned. If the layer 3 header is truncated, a valid 
+ * pointer will still be returned so be sure to check the value of remaining
+ * before attempting to process the returned header.
+ *
  * remaining may be NULL, otherwise it will be set to the number of captured
  * bytes after the pointer returned.
  */
@@ -1307,49 +1367,68 @@ void *trace_get_layer3(const libtrace_packet_t *packet,
 		uint16_t *ethertype, uint32_t *remaining);
 
 /** Gets a pointer to the transport layer header (if any)
- * @param packet        a pointer to a libtrace_packet structure
- * @param[out] proto	transport layer protocol
+ * @param packet   The libtrace packet to find the transport header for
+ * @param[out] proto	The protocol present at the transport layer.
+ * @param[out] remaining The amount of captured data remaining in the packet 
+ * starting from the returned pointer, i.e. including the transport header.
  *
- * @return a pointer to the transport layer header, or NULL if there is no
- * header
+ * @return A pointer to the transport layer header. If no transport header is
+ * present in the packet, NULL is returned. If the transport header is 
+ * truncated, a valid pointer will still be returned so be sure to check the
+ * value of remaining before attempting to process the returned header.
+ *
+ * remaining may be NULL, otherwise it will be set to the number of captured
+ * bytes after the returned pointer.
  *
  * @note proto may be NULL if proto is unneeded.
  */
 DLLEXPORT void *trace_get_transport(const libtrace_packet_t *packet, 
 		uint8_t *proto, uint32_t *remaining);
 
-/** Gets a pointer to the payload given a pointer to the IP header
- * @param ip            The IP Header
- * @param[out] proto	An output variable of the IP protocol
- * @param[in,out] remaining Updated with the number of bytes remaining
+/** Gets a pointer to the payload following an IPv4 header
+ * @param ip            The IPv4 Header
+ * @param[out] proto	The protocol of the header following the IPv4 header
+ * @param[in,out] remaining Updated with the number of captured bytes remaining
  *
- * @return a pointer to the transport layer header, or NULL if header isn't
- * present.
+ * @return A pointer to the transport layer header, or NULL if no subsequent 
+ * header is present.
  *
- * Remaining will be decremented by the size of the IPv4 header (including any options). 
- * If the IPv4 header is complete but there are zero bytes of payload after the IPv4 header, a pointer
- * to where the payload would be is returned and remaining will be set to 0.  If the IPv4 header is
- * incomplete, NULL will be returned and remaining will be set to 0.
+ * When calling this function, remaining must contain the number of captured
+ * bytes remaining in the packet starting from the IPv4 header (including the
+ * IPv4 header itself).
  *
- * proto may be NULL, in which case it won't be updated
+ * remaining will be decremented by the size of the IPv4 header (including any 
+ * options). If the IPv4 header is complete but there are zero bytes of payload
+ * after the IPv4 header, a pointer to where the payload would be is returned 
+ * and remaining will be set to 0.  If the IPv4 header is incomplete, NULL will
+ * be returned and remaining will be set to 0. Therefore, it is very important
+ * to check the value of remaining after calling this function.
+ *
+ * proto may be NULL, in which case it won't be updated.
  *
  * @note This is similar to trace_get_transport_from_ip in libtrace2
  */
 DLLEXPORT void *trace_get_payload_from_ip(libtrace_ip_t *ip, uint8_t *proto,
 		uint32_t *remaining);
 
-/** Gets a pointer to the payload given a pointer to the IPv6 header
+/** Gets a pointer to the payload following an IPv6 header
  * @param ipptr         The IPv6 Header
- * @param[out] proto    An output variable of the protocol of the next header
- * @param[in,out] remaining Updated with the number of bytes remaining
+ * @param[out] proto	The protocol of the header following the IPv6 header
+ * @param[in,out] remaining Updated with the number of captured bytes remaining
  *
- * @return a pointer to the transport layer header, or NULL if the IPv6 header
- * isn't complete.
+ * @return A pointer to the transport layer header, or NULL if no subsequent 
+ * header is present.
  *
- * Remaining will be decremented by the size of the IPv6 header (including any options). 
- * If the IPv6 header is complete but there are zero bytes of payload after the IPv6 header, a pointer
- * to where the payload would be is returned and remaining will be set to 0.  If the IPv6 header is
- * incomplete, NULL will be returned and remaining will be set to 0.
+ * When calling this function, remaining must contain the number of captured
+ * bytes remaining in the packet starting from the IPv6 header (including the
+ * IPv6 header itself).
+ *
+ * remaining will be decremented by the size of the IPv6 header (including any 
+ * options). If the IPv6 header is complete but there are zero bytes of payload
+ * after the IPv6 header, a pointer to where the payload would be is returned 
+ * and remaining will be set to 0.  If the IPv6 header is incomplete, NULL will
+ * be returned and remaining will be set to 0. Therefore, it is very important
+ * to check the value of remaining after calling this function.
  *
  * proto may be NULL, in which case it won't be updated.
  *
@@ -1357,260 +1436,377 @@ DLLEXPORT void *trace_get_payload_from_ip(libtrace_ip_t *ip, uint8_t *proto,
 DLLEXPORT void *trace_get_payload_from_ip6(libtrace_ip6_t *ipptr,
                 uint8_t *proto, uint32_t *remaining);
 
-/** Gets a pointer to the payload given a pointer to the link header
- * @param ip            The link pointer
- * @param[out] type	An output variable of the ethernet type
- * @param[in,out] remaining Updated with the number of bytes remaining
+/** Gets a pointer to the payload following a link header
+ * @param ip            A pointer to the link layer header
+ * @param linktype	The linktype of the link header being examined
+ * @param[out] type	An output variable for the ethernet type
+ * @param[in,out] remaining Updated with the number of captured bytes remaining
  *
- * @return a pointer to the transport layer header, or NULL if header isn't
- * present.
+ * @return A pointer to the header following the link header, or NULL if no
+ * subsequent header is present.
  *
- * Remaining may be NULL.  If Remaining is not NULL it must point to the number
- * of bytes captured of the linklayer and beyond.  It will be updated after
- * this function to the number of bytes remaining after the IP header (and any
- * IP options) have been removed.
+ * When calling this function, remaining must contain the number of captured
+ * bytes remaining in the packet starting from the link header (including the
+ * link header itself). remaining will be updated to contain the number of 
+ * bytes remaining after the link header has been skipped.
  *
- * type may be NULL if not needed.
+ * @deprecated This function is deprecated: you should be using 
+ * trace_get_payload_from_layer2() or trace_get_payload_from_meta() instead.
  *
  */
 DLLEXPORT void *trace_get_payload_from_link(void *linkptr,
 		libtrace_linktype_t linktype, 
 		uint16_t *type, uint32_t *remaining);
 
-/** Skips over any 802.1q header, if present.
- * @param vlan      A pointer to the vlan header
- * @param[out] type  The ethernet type, replaced with the vlan ether type
- * @param[in,out] remaining Updated with the number of bytes remaining
+/** Gets a pointer to the payload following an 802.1q (VLAN) header.
+ * @param vlan      A pointer to the VLAN header
+ * @param[out] type  The ethernet type, replaced with the VLAN ether type
+ * @param[in,out] remaining Updated with the number of captured bytes remaining
  *
- * @return a pointer to the header beyond the vlan header, if present.
+ * @return A pointer to the header beyond the VLAN header, if one is present.
  * Otherwise, returns NULL.  
  *
- * Remaining will be decremented by the size of the vlan header.  If the vlan
- * header is complete but there are zero bytes of payload after the vlan
- * header, a pointer to where the payload would be is returned and remaining
- * will be set to 0.  If the vlan header is incomplete, NULL will be returned
- * and remaining will be set to 0.
+ * When calling this function, remaining must contain the number of captured
+ * bytes remaining in the packet starting from the VLAN header (including the
+ * VLAN header itself). remaining will be updated to contain the number of 
+ * bytes remaining after the VLAN header has been skipped.
  *
- * type will be set to the ethertype contained within the vlan payload.
+ * If the VLAN header is complete but there are zero bytes of payload after 
+ * the VLAN header, a pointer to where the payload would be is returned and 
+ * remaining will be set to 0.  If the VLAN header is incomplete, NULL will be 
+ * returned and remaining will be set to 0. Therefore, it is important to check
+ * the value of remaining after calling this function.
+ *
+ * type will be set to the ethertype of the VLAN payload. This parameter is not
+ * mandatory, but is highly recommended.
  *
  */
 DLLEXPORT void *trace_get_payload_from_vlan(
                 void *vlan, uint16_t *type, uint32_t *remaining);
 
-/** Skips over a MPLS header
- * @param mpls      A pointer to the mpls header
+/** Gets a pointer to the payload following an MPLS header.
+ * @param mpls      A pointer to the MPLS header
  * @param[out] type  The ethernet type, replaced by the ether type of the
- * following header - 0x0000 if an Ethernet header is deemed to be next
- * @param[in,out] remaining     Updated with the number of bytes remaining
+ * returned header - 0x0000 if an Ethernet header is returned
+ * @param[in,out] remaining Updated with the number of captured bytes remaining
  *
- * @return a pointer to the header beyond the MPLS label, if present. Will
- * return NULL if there is not enough bytes remaining to skip past the MPLS
- * label.
+ * @return A pointer to the header beyond the MPLS label, if one is present. 
+ * Will return NULL if there is not enough bytes remaining to skip past the 
+ * MPLS label.
  *
- * Remaining will be decremented by the size of the MPLS header.  If the MPLS
- * header is complete but there are zero bytes of payload after the MPLS
- * header, a pointer to where the payload would be is returned and remaining
- * will be set to 0.  If the MPLS header is incomplete, NULL will be returned
- * and remaining will be set to 0.
+ * When calling this function, remaining must contain the number of captured
+ * bytes remaining in the packet starting from the MPLS header (including the
+ * MPLS header itself). remaining will be updated to contain the number of 
+ * bytes remaining after the MPLS header has been skipped.
  *
- * Type must point to the value of the ethernet type. Libtrace will assert
- * fail if type is NULL.
+ * If the MPLS header is complete but there are zero bytes of payload after 
+ * the MPLS header, a pointer to where the payload would be is returned and 
+ * remaining will be set to 0.  If the MPLS header is incomplete, NULL will be 
+ * returned and remaining will be set to 0. Therefore, it is important to check
+ * the value of remaining after calling this function.
  *
- * NOTE that this function will only remove one MPLS label at a time - the type
- * will be set to 0x8847 if there is another MPLS label after the one
- * removed by this function.
+ * type will be set to the ethertype of the MPLS payload. This parameter is
+ * mandatory - it may not be NULL.
+ *
+ * @note This function will only remove one MPLS label at a time - the type
+ * will be set to 0x8847 if there is another MPLS label following the one
+ * skipped by this function.
  *
  */
 DLLEXPORT void *trace_get_payload_from_mpls(
                 void *mpls, uint16_t *type, uint32_t *remaining);
 
-/** Skips over a PPPoE header and the following PPP header
+/** Gets a pointer to the payload following a PPPoE header
  * @param pppoe      A pointer to the PPPoE header
  * @param[out] type  The ethernet type, replaced by the ether type of the
- * next header - 0x0000 if an Ethernet header is deemed to be next
- * @param[in,out] remaining     Updated with the number of bytes remaining
+ * returned header - 0x0000 if an Ethernet header is returned
+ * @param[in,out] remaining  Updated with the number of captured bytes remaining
  *
- * @return a pointer to the header beyond the PPPoE header. NOTE that this
+ * @return A pointer to the header beyond the PPPoE header. NOTE that this
  * function will also skip over the PPP header that will immediately follow
  * the PPPoE header. This function will return NULL if there are not enough
  * bytes remaining to skip past both the PPPoE and PPP headers.
  *
- * Remaining will be decremented by the size of the PPPoE and PPP headers.  If 
- * the headers are complete but there are zero bytes of payload after the PPP
- * header, a pointer to where the payload would be is returned and remaining
- * will be set to 0.  If the PPP or PPPoE header is incomplete, NULL will be 
- * returned and remaining will be set to 0.
+ * When calling this function, remaining must contain the number of captured
+ * bytes remaining in the packet starting from the PPPoE header (including the
+ * PPPoE header itself). remaining will be updated to contain the number of 
+ * bytes remaining after the PPPoE and PPP headers have been removed.
  *
- * Type must point to the value of the ethernet type. Libtrace will assert
- * fail if type is NULL.
+ * If the PPPoE and PPP headers are complete but there are zero bytes of 
+ * payload after the PPP header, a pointer to where the payload would be is 
+ * returned and remaining will be set to 0.  If the PPPoE or PPP header is 
+ * incomplete, NULL will be returned and remaining will be set to 0. Therefore, 
+ * it is important to check the value of remaining after calling this function.
+ *
+ * type will be set to the ether type of the PPP payload. This parameter is
+ * mandatory - it may not be NULL.
  *
  */
 DLLEXPORT void *trace_get_payload_from_pppoe(
 		void *pppoe, uint16_t *type, uint32_t *remaining);
 
-/** Gets a pointer to the payload given a pointer to a tcp header
- * @param tcp           The tcp Header
- * @param[in,out] remaining Updated with the number of bytes remaining
+/** Gets a pointer to the payload following a TCP header
+ * @param tcp           A pointer to the TCP header
+ * @param[in,out] remaining Updated with the number of captured bytes remaining
  *
- * @return a pointer to the tcp payload, or NULL if the tcp header is truncated.
+ * @return A pointer to the TCP payload, or NULL if the TCP header is truncated.
  *
- * Remaining will be decremented by the size of the TCP header.  If the TCP
- * header is complete but there are zero bytes of payload after the TCP
- * header, a pointer to where the payload would be is returned and remaining
- * will be set to 0.  If the TCP header is incomplete, NULL will be returned
- * and remaining will be set to 0.
+ * When calling this function, remaining must contain the number of captured
+ * bytes remaining in the packet starting from the TCP header (including the
+ * TCP header itself). remaining will be updated to contain the number of 
+ * bytes remaining after the TCP header has been skipped.
+ *
+ * If the TCP header is complete but there are zero bytes of payload after 
+ * the TCP header, a pointer to where the payload would be is returned and 
+ * remaining will be set to 0.  If the TCP header is incomplete, NULL will be 
+ * returned and remaining will be set to 0. Therefore, it is important to check
+ * the value of remaining after calling this function.
  *
  */
 DLLEXPORT void *trace_get_payload_from_tcp(libtrace_tcp_t *tcp, 
 		uint32_t *remaining);
 
-/** Gets a pointer to the payload given a pointer to a udp header
- * @param udp           The udp Header
- * @param[in,out] remaining Updated with the number of bytes remaining
+/** Gets a pointer to the payload following a UDP header
+ * @param udp           A pointer to the UDP header
+ * @param[in,out] remaining Updated with the number of captured bytes remaining
  *
- * @return a pointer to the udp payload, or NULL if the udp header is truncated.
+ * @return A pointer to the UDP payload, or NULL if the UDP header is truncated.
  *
- * Remaining will be decremented by the size of the TCP header.  If the TCP
- * header is complete but there are zero bytes of payload after the TCP
- * header, a pointer to where the payload would be is returned and remaining
- * will be set to 0.  If the TCP header is incomplete, NULL will be returned
- * and remaining will be set to 0.
+ * When calling this function, remaining must contain the number of captured
+ * bytes remaining in the packet starting from the UDP header (including the
+ * UDP header itself). remaining will be updated to contain the number of 
+ * bytes remaining after the UDP header has been skipped.
+ *
+ * If the UDP header is complete but there are zero bytes of payload after 
+ * the UDP header, a pointer to where the payload would be is returned and 
+ * remaining will be set to 0.  If the UDP header is incomplete, NULL will be 
+ * returned and remaining will be set to 0. Therefore, it is important to check
+ * the value of remaining after calling this function.
  *
  */
 DLLEXPORT void *trace_get_payload_from_udp(libtrace_udp_t *udp, uint32_t *remaining);
 
-/** Gets a pointer to the payload given a pointer to a icmp header
- * @param icmp          The icmp Header
- * @param[in,out] remaining Updated with the number of bytes remaining
+/** Gets a pointer to the payload following a ICMP header
+ * @param icmp           A pointer to the ICMP header
+ * @param[in,out] remaining Updated with the number of captured bytes remaining
  *
- * @return a pointer to the icmp payload, or NULL if the icmp header is truncated.
+ * @return A pointer to the ICMP payload, or NULL if the ICMP header is 
+ * truncated.
  *
- * Remaining will be decremented by the size of the TCP header.  If the TCP
- * header is complete but there are zero bytes of payload after the TCP
- * header, a pointer to where the payload would be is returned and remaining
- * will be set to 0.  If the TCP header is incomplete, NULL will be returned
- * and remaining will be set to 0.
- * 
+ * When calling this function, remaining must contain the number of captured
+ * bytes remaining in the packet starting from the ICMP header (including the
+ * ICMP header itself). remaining will be updated to contain the number of 
+ * bytes remaining after the ICMP header has been skipped.
+ *
+ * If the ICMP header is complete but there are zero bytes of payload after 
+ * the ICMP header, a pointer to where the payload would be is returned and 
+ * remaining will be set to 0.  If the ICMP header is incomplete, NULL will be 
+ * returned and remaining will be set to 0. Therefore, it is important to check
+ * the value of remaining after calling this function.
+ *
+ * @note In the case of some ICMP messages, the payload may be the IP header
+ * from the packet that triggered the ICMP message. 
+ *
  */
 DLLEXPORT void *trace_get_payload_from_icmp(libtrace_icmp_t *icmp, 
 		uint32_t *remaining);
 
-/** get a pointer to the TCP header (if any)
- * @param packet  	the packet opaque pointer
+/** Get a pointer to the TCP header (if present)
+ * @param packet  	The packet to get the TCP header from
  *
- * @return a pointer to the TCP header, or NULL if there is not a TCP packet
+ * @return A pointer to the TCP header, or NULL if there is not a complete TCP
+ * header present in the packet.
  *
- * @note you should probably use trace_get_transport()
+ * This is a short-cut function enabling quick and easy access to the TCP
+ * header if that is all you care about. However, we recommend the use of the
+ * more generic trace_get_transport() function instead.
+ *
+ * @note Unlike trace_get_transport(), this function will return NULL if the
+ * TCP header is incomplete or truncated.
  */
 DLLEXPORT SIMPLE_FUNCTION
 libtrace_tcp_t *trace_get_tcp(libtrace_packet_t *packet);
 
-/** get a pointer to the TCP header (if any) given a pointer to the IP header
- * @param ip		The IP header
- * @param[in,out] remaining Updated with the number of bytes remaining
+/** Get a pointer to the TCP header following an IPv4 header (if present)
+ * @param ip		The IP header to find the subsequent TCP header for
+ * @param[in,out] remaining Updated with the number of captured bytes remaining
  *
- * @return a pointer to the TCP header, or NULL if this is not a TCP packet
+ * @return A pointer to the TCP header, or NULL if no TCP header is present in 
+ * the packet.
  *
- * Remaining may be NULL.  If Remaining is not NULL it must point to the number
- * of bytes captured of the TCP header and beyond.  It will be decremented by
- * the number of bytes in the TCP header (including any TCP options).
+ * When calling this function, remaining must contain the number of captured
+ * bytes remaining in the packet starting from the IP header (including the
+ * IP header itself). remaining will be updated to contain the number of 
+ * bytes remaining after the IP header has been skipped.
+ *
+ * If the IP header is complete but there are zero bytes of payload after 
+ * the IP header, a pointer to where the payload would be is returned and 
+ * remaining will be set to 0.  If the IP header is incomplete, NULL will be 
+ * returned and remaining will be set to 0. Therefore, it is important to check
+ * the value of remaining after calling this function.
+ *
+ * @note This function is rather redundant now that the layer 3 header is
+ * cached. There should be no performance advantage for the user to call this
+ * function over just calling trace_get_transport().
  *
  * @note The last parameter has changed from libtrace2
  */
 DLLEXPORT SIMPLE_FUNCTION
 libtrace_tcp_t *trace_get_tcp_from_ip(libtrace_ip_t *ip, uint32_t *remaining);
 
-/** get a pointer to the UDP header (if any)
- * @param packet  	the packet opaque pointer
+/** Get a pointer to the UDP header (if present)
+ * @param packet  	The packet to get the UDP header from
  *
- * @return a pointer to the UDP header, or NULL if this is not a UDP packet
+ * @return A pointer to the UDP header, or NULL if there is not a complete UDP
+ * header present in the packet.
+ *
+ * This is a short-cut function enabling quick and easy access to the UDP
+ * header if that is all you care about. However, we recommend the use of the
+ * more generic trace_get_transport() function instead.
+ *
+ * @note Unlike trace_get_transport(), this function will return NULL if the
+ * UDP header is incomplete or truncated.
  */
 DLLEXPORT SIMPLE_FUNCTION
 libtrace_udp_t *trace_get_udp(libtrace_packet_t *packet);
 
-/** get a pointer to the UDP header (if any) given a pointer to the IP header
- * @param 	ip	The IP header
- * @param[in,out] remaining Updated with the number of bytes remaining
+/** Get a pointer to the UDP header following an IPv4 header (if present)
+ * @param ip		The IP header to find the subsequent UDP header for
+ * @param[in,out] remaining Updated with the number of captured bytes remaining
  *
- * @return a pointer to the UDP header, or NULL if this is not an UDP packet
+ * @return A pointer to the UDP header, or NULL if no UDP header is present in 
+ * the packet.
  *
- * Remaining may be NULL.  If Remaining is not NULL it must point to the number
- * of bytes captured of the UDP header and beyond.  This function will
- * decremented it by the length of the UDP header.
+ * When calling this function, remaining must contain the number of captured
+ * bytes remaining in the packet starting from the IP header (including the
+ * IP header itself). remaining will be updated to contain the number of 
+ * bytes remaining after the IP header has been skipped.
  *
- * @note Beware the change from libtrace2 from skipped to remaining
+ * If the IP header is complete but there are zero bytes of payload after 
+ * the IP header, a pointer to where the payload would be is returned and 
+ * remaining will be set to 0.  If the IP header is incomplete, NULL will be 
+ * returned and remaining will be set to 0. Therefore, it is important to check
+ * the value of remaining after calling this function.
+ *
+ * @note This function is rather redundant now that the layer 3 header is
+ * cached. There should be no performance advantage for the user to call this
+ * function over just calling trace_get_transport().
+ *
+ * @note The last parameter has changed from libtrace2
  */
 DLLEXPORT SIMPLE_FUNCTION
 libtrace_udp_t *trace_get_udp_from_ip(libtrace_ip_t *ip,uint32_t *remaining);
 
-/** get a pointer to the ICMP header (if any)
- * @param packet  	the packet opaque pointer
+/** Get a pointer to the ICMP header (if present)
+ * @param packet  	The packet to get the ICMP header from
  *
- * @return a pointer to the ICMP header, or NULL if this is not a ICMP packet
+ * @return A pointer to the ICMP header, or NULL if there is not a complete 
+ * ICMP header present in the packet.
+ *
+ * This is a short-cut function enabling quick and easy access to the ICMP
+ * header if that is all you care about. However, we recommend the use of the
+ * more generic trace_get_transport() function instead.
+ *
+ * @note Unlike trace_get_transport(), this function will return NULL if the
+ * ICMP header is incomplete or truncated.
  */
 DLLEXPORT SIMPLE_FUNCTION
 libtrace_icmp_t *trace_get_icmp(libtrace_packet_t *packet);
 
-/** get a pointer to the ICMP header (if any) given a pointer to the IP header
- * @param ip		The IP header
- * @param[in,out] remaining Updated with the number of bytes remaining
+/** Get a pointer to the ICMP header following an IPv4 header (if present)
+ * @param ip		The IP header to find the subsequent ICMP header for
+ * @param[in,out] remaining Updated with the number of captured bytes remaining
  *
- * @return a pointer to the ICMP header, or NULL if this is not an ICMP packet
+ * @return A pointer to the ICMP header, or NULL if no UDP header is present in 
+ * the packet.
  *
- * Remaining may be NULL.  If Remaining is not NULL it must point to the number
- * of bytes captured of the ICMP header and beyond.  It will be decremented by
- * the length of the ICMP head in bytes.
+ * When calling this function, remaining must contain the number of captured
+ * bytes remaining in the packet starting from the IP header (including the
+ * IP header itself). remaining will be updated to contain the number of 
+ * bytes remaining after the IP header has been skipped.
  *
- * @note Beware the change from libtrace2 from skipped to remaining
+ * If the IP header is complete but there are zero bytes of payload after 
+ * the IP header, a pointer to where the payload would be is returned and 
+ * remaining will be set to 0.  If the IP header is incomplete, NULL will be 
+ * returned and remaining will be set to 0. Therefore, it is important to check
+ * the value of remaining after calling this function.
+ *
+ * @note This function is rather redundant now that the layer 3 header is
+ * cached. There should be no performance advantage for the user to call this
+ * function over just calling trace_get_transport().
+ *
+ * @note The last parameter has changed from libtrace2
  */
 DLLEXPORT SIMPLE_FUNCTION
 libtrace_icmp_t *trace_get_icmp_from_ip(libtrace_ip_t *ip,uint32_t *remaining);
 
-/** Get the destination MAC address
- * @param packet  	the packet opaque pointer
- * @return a pointer to the destination mac, (or NULL if there is no 
- * destination MAC)
+/** Gets the destination MAC address for a given packet
+ * @param packet  	The packet to extract the destination MAC address from
+ *
+ * @return A pointer to the destination MAC address field in the layer 2 
+ * header, (or NULL if there is no destination MAC address or layer 2 header
+ * available)
+ *
+ * @note This is a zero-copy function, so the memory that the returned pointer
+ * points to is part of the packet itself. 
  */
 DLLEXPORT SIMPLE_FUNCTION
 uint8_t *trace_get_destination_mac(libtrace_packet_t *packet);
 
-/** Get the source MAC address
- * @param packet  	the packet opaque pointer
- * @return a pointer to the source mac, (or NULL if there is no source MAC)
+/** Gets the source MAC address for a given packet
+ * @param packet  	The packet to extract the source MAC address from
+ *
+ * @return A pointer to the source MAC address field in the layer 2 
+ * header, (or NULL if there is no source MAC address or layer 2 header
+ * available)
+ *
+ * @note This is a zero-copy function, so the memory that the returned pointer
+ * points to is part of the packet itself. 
  */
 DLLEXPORT SIMPLE_FUNCTION
 uint8_t *trace_get_source_mac(libtrace_packet_t *packet);
 
-/** Get the source IP address
- * @param packet  	the packet opaque pointer
- * @param addr		a pointer to a sockaddr to store the address in, or NULL to use
- * 			static storage.
- * @return NULL if there is no source address, or a sockaddr holding a v4 or v6
- * address, or on some platforms a sockaddr holding a MAC address.
+/** Get the source IP address for a given packet
+ * @param packet  	The packet to extract the source IP address from
+ * @param addr		A pointer to a sockaddr structure to store the address 
+ * 			in. If NULL, static storage is used instead.
+ * @return A pointer to a sockaddr holding a v4 or v6 IP address or on some 
+ * platforms a sockaddr holding a MAC address. Returns NULL if no source IP
+ * address was available.
+ *
+ * @note The best way to use this function is to pass in a pointer to the
+ * struct sockaddr_storage for the addr parameter. This will avoid problems
+ * with trying to shoe-horn an IPv6 address into a sockaddr that only supports
+ * IPv4.
  */
 DLLEXPORT SIMPLE_FUNCTION
 struct sockaddr *trace_get_source_address(const libtrace_packet_t *packet,
 		struct sockaddr *addr);
 
-/** Get the destination IP address
- * @param packet  	the packet opaque pointer
- * @param addr		a pointer to a sockaddr to store the address in, or NULL to use
- * 			static storage.
- * @return NULL if there is no destination address, or a sockaddr holding a v4
- * or v6 address, or on some platforms a sockaddr holding a MAC address.
+/** Get the destination IP address for a given packet
+ * @param packet  	The packet to extract the destination IP address from
+ * @param addr		A pointer to a sockaddr structure to store the address 
+ * 			in. If NULL, static storage is used instead.
+ * @return A pointer to a sockaddr holding a v4 or v6 IP address or on some 
+ * platforms a sockaddr holding a MAC address. Returns NULL if no destination 
+ * IP address was available.
+ *
+ * @note The best way to use this function is to pass in a pointer to the
+ * struct sockaddr_storage for the addr parameter. This will avoid problems
+ * with trying to shoe-horn an IPv6 address into a sockaddr that only supports
+ * IPv4.
  */
 DLLEXPORT SIMPLE_FUNCTION
 struct sockaddr *trace_get_destination_address(const libtrace_packet_t *packet,
 		struct sockaddr *addr);
 
-/*@}*/
 
-/** parse an ip or tcp option
- * @param[in,out] ptr	the pointer to the current option
- * @param[in,out] len	the length of the remaining buffer
- * @param[out] type	the type of the option
- * @param[out] optlen 	the length of the option
- * @param[out] data	the data of the option
+/** Parses an IP or TCP option
+ * @param[in,out] ptr	The pointer to the current option
+ * @param[in,out] len	The total length of all the remaining options
+ * @param[out] type	The type of the option
+ * @param[out] optlen 	The length of the option
+ * @param[out] data	The data of the option
  *
  * @return bool true if there is another option (and the fields are filled in)
  *               or false if this was the last option.
@@ -1627,14 +1823,16 @@ DLLEXPORT int trace_get_next_option(unsigned char **ptr,int *len,
 			unsigned char *optlen,
 			unsigned char **data);
 
+/*@}*/
 
 /** @name Time
- * These functions deal with time that a packet arrived and return it
- * in various formats
+ * These functions deal with the timestamp describing when a packet was 
+ * captured and can convert it into various formats
  * @{
  */
-/** Get the current time in DAG time format 
- * @param packet  	the packet opaque pointer
+
+/** Get the packet timestamp in the DAG time format 
+ * @param packet  	The packet to extract the timestamp from
  *
  * @return a 64 bit timestamp in DAG ERF format (upper 32 bits are the seconds
  * past 1970-01-01, the lower 32bits are partial seconds)
@@ -1642,60 +1840,79 @@ DLLEXPORT int trace_get_next_option(unsigned char **ptr,int *len,
 DLLEXPORT SIMPLE_FUNCTION
 uint64_t trace_get_erf_timestamp(const libtrace_packet_t *packet);
 
-/** Get the current time in struct timeval
- * @param packet  	the packet opaque pointer
+/** Get the packet timestamp as a struct timeval
+ * @param packet  	The packet to extract the timestamp from
  *
- * @return time that this packet was seen in a struct timeval
+ * @return The time that this packet was captured in a struct timeval
  */ 
 DLLEXPORT SIMPLE_FUNCTION
 struct timeval trace_get_timeval(const libtrace_packet_t *packet);
 
-/** Get the current time in struct timespec
- * @param packet  	the packet opaque pointer
+/** Get the packet timestamp as a struct timespec
+ * @param packet  	The packet to extract the timestamp from
  *
- * @return time that this packet was seen in a struct timespec
+ * @return The time that this packet was captured in a struct timespec
  */ 
 DLLEXPORT SIMPLE_FUNCTION
 struct timespec trace_get_timespec(const libtrace_packet_t *packet);
 
-/** Get the current time in floating point seconds
- * @param packet  	the packet opaque pointer
+/** Get the packet timestamp in floating point seconds
+ * @param packet  	The packet to extract the timestamp from
  *
- * @return time that this packet was seen in 64bit floating point seconds from
- * the unix epoch (1970-01-01 00:00:00 UTC).
+ * @return time that this packet was seen in 64-bit floating point seconds from
+ * the UNIX epoch (1970-01-01 00:00:00 UTC).
  */
 DLLEXPORT SIMPLE_FUNCTION
 double trace_get_seconds(const libtrace_packet_t *packet);
 
-/** Seek within a trace
- * @param trace		trace to seek
- * @param seconds	time to seek to
- * @return 0 on success.
- * Make the next packet read to be the first packet to occur at or after the
- * time searched for.  This must be called in the configuration state (ie,
- * before trace_start() or after trace_pause().
+/** Seek within an input trace to a time specified in floating point seconds
+ * @param trace		The input trace to seek within
+ * @param seconds	The time to seek to, in floating point seconds
+ * @return 0 on success, -1 if the seek fails. Use trace_perror() to determine
+ * the error that occurred.
+ *
+ * This will make the next packet read to be the first packet to occur at or 
+ * after the specified time.  This must be called in the configuration state 
+ * (i.e. before trace_start() or after trace_pause()).
+ *
+ * The time format accepted by this function is 64-bit floating point seconds
+ * since the UNIX epoch (1970-01-01 00:00:00 UTC), i.e. the same format as
+ * trace_get_seconds().
+ *
  * @note This function may be extremely slow.
  */
 DLLEXPORT int trace_seek_seconds(libtrace_t *trace, double seconds);
 
-/** Seek within a trace
- * @param trace		trace to seek
- * @param tv		time to seek to
- * @return 0 on success.
- * Make the next packet read to be the first packet to occur at or after the
- * time searched for.  This must be called in the configuration state (ie,
- * before trace_start() or after trace_pause().
+/** Seek within an input trace to a time specified as a timeval
+ * @param trace		The input trace to seek within
+ * @param tv		The time to seek to, as a timeval
+ *
+ * @return 0 on success, -1 if the seek fails. Use trace_perror() to determine
+ * the error that occurred.
+ *
+ * This will make the next packet read to be the first packet to occur at or 
+ * after the specified time.  This must be called in the configuration state 
+ * (i.e. before trace_start() or after trace_pause()).
+ *
  * @note This function may be extremely slow.
  */
 DLLEXPORT int trace_seek_timeval(libtrace_t *trace, struct timeval tv);
 
-/** Seek within a trace
- * @param trace		trace to seek
- * @param ts		erf timestamp
- * @return 0 on success.
- * Make the next packet read to be the first packet to occur at or after the
- * time searched for.  This must be called in the configuration state (ie,
- * before trace_start() or after trace_pause().
+/** Seek within an input trace to a time specified as an ERF timestamp
+ * @param trace		The input trace to seek within
+ * @param tv		The time to seek to, as an ERF timestamp
+ *
+ * @return 0 on success, -1 if the seek fails. Use trace_perror() to determine
+ * the error that occurred.
+ *
+ * This will make the next packet read to be the first packet to occur at or 
+ * after the specified time.  This must be called in the configuration state 
+ * (i.e. before trace_start() or after trace_pause()).
+ *
+ * The time format accepted by this function is the ERF timestamp, which is a
+ * 64-bit value where the upper 32 bits are seconds since the UNIX epoch and
+ * the lower 32 bits are partial seconds.
+ *
  * @note This function may be extremely slow.
  */
 DLLEXPORT int trace_seek_erf_timestamp(libtrace_t *trace, uint64_t ts);
@@ -1704,162 +1921,209 @@ DLLEXPORT int trace_seek_erf_timestamp(libtrace_t *trace, uint64_t ts);
 
 /** @name Sizes
  * This section deals with finding or setting the various different lengths
- * a packet can have
+ * that a packet can have, e.g. capture lengths, wire lengths, etc.
  * @{
  */
-/** Get the size of the packet in the trace (in bytes)
- * @param packet  	the packet opaque pointer
- * @return the size of the packet in the trace
- * @note Due to this being a header capture, or anonymisation, this may not
- * be the same size as the original packet.  See get_wire_length() for the
- * original size of the packet.
+/** Get the current size of the packet (in bytes), taking into account any 
+ * truncation or snapping that may have previously been performed. 
+ *
+ * @param packet  	The packet to determine the capture length for
+ * @return The size of the packet read from the input trace, i.e. what is
+ * actually available to libtrace at the moment.
+ *
+ * @note Most traces are header captures, so this value may not be the same
+ * as the size of the packet when it was captured. Use trace_get_wire_length()
+ * to get the original size of the packet.
+ 
  * @note This can (and often is) different for different packets in a trace!
+ 
  * @note This is sometimes called the "snaplen".
+ *
  * @note The return size refers to the network-level payload of the packet and
  * does not include any capture framing headers. For example, an Ethernet 
  * packet with an empty TCP packet will return sizeof(ethernet_header) + 
- * sizeof(ip_header) + sizeof(tcp_header), but not the capture file 
+ * sizeof(ip_header) + sizeof(tcp_header), but not the capture format
  * (pcap/erf/etc) header.
  */
 DLLEXPORT SIMPLE_FUNCTION
 size_t trace_get_capture_length(const libtrace_packet_t *packet);
 
-/** Get the size of the packet as it was seen on the wire (in bytes).
- * @param packet  	the packet opaque pointer
- * @return the size of the packet as it was on the wire.
- * @note Due to the trace being a header capture, or anonymisation this may
- * not be the same as the Capture Len.
- * @note trace_get_wire_length \em{includes} FCS.  This is different to pcap based tools.
+/** Get the size of the packet as it was originally seen on the wire (in bytes).
+ * @param packet  	The packet to determine the wire length for
+ * @return The size of the packet as it was on the wire.
+ *
+ * @note This value may not be the same as the capture length, due to 
+ * truncation.
+ *
+ * @note trace_get_wire_length \em{includes} the Frame Check Sequence. This is 
+ * different behaviour compared to most PCAP-based tools.
+ *
  * @note The return size refers to the network-level payload of the packet and
  * does not include any capture framing headers. For example, an Ethernet 
  * packet with an empty TCP packet will return sizeof(ethernet_header) + 
- * sizeof(ip_header) + sizeof(tcp_header), but not the capture file 
+ * sizeof(ip_header) + sizeof(tcp_header), but not the capture format
  * (pcap/erf/etc) header.
  */ 
 DLLEXPORT SIMPLE_FUNCTION
 size_t trace_get_wire_length(const libtrace_packet_t *packet);
 
 /** Get the length of the capture framing headers (in bytes).
- * @param packet  	the packet opaque pointer
- * @return the size of the packet as it was on the wire.
- * @note this length corresponds to the difference between the size of a 
- * captured packet in memory, and the captured length of the packet
+ * @param packet  	The packet to determine the framing length for
+ * @return The size of the capture format header encapsulating the packet.
+ *
+ * @note This length corresponds to the difference between the amount of
+ * memory required to store a captured packet and the capture length reported
+ * by trace_capture_length()
  */ 
 DLLEXPORT SIMPLE_FUNCTION
 size_t trace_get_framing_length(const libtrace_packet_t *packet);
 
-/** Truncate ("snap") the packet at the suggested length
- * @param packet	the packet opaque pointer
- * @param size		the new length of the packet (in bytes)
- * @return the new capture length of the packet, or the original capture
- * length of the packet if unchanged
+/** Truncate ("snap") the packet to the suggested length
+ * @param packet	The packet to truncate
+ * @param size		The new length of the packet (in bytes)
+ *
+ * @return The new capture length of the packet or the original capture
+ * length of the packet if unchanged.
+ *
+ * This function will modify the capture length of the given packet. The wire
+ * length will not be changed, so you can always determine what the original
+ * packet size was, prior to the truncation.
+ *
+ * @note You can only use this function to decrease the capture length. Any
+ * attempt to increase capture length will have no effect.
  */
 DLLEXPORT size_t trace_set_capture_length(libtrace_packet_t *packet, size_t size);
 
 /*@}*/
 
 
-/** Get the type of the link layer
- * @param packet  	the packet opaque pointer
- * @return libtrace_linktype_t
+/** Gets the link layer type for a packet
+ * @param packet  	The packet to extract the link layer type for
+ * @return A libtrace_linktype_t describing the link layer protocol being used
+ * by this packet.
  */
 DLLEXPORT SIMPLE_FUNCTION
 libtrace_linktype_t trace_get_link_type(const libtrace_packet_t *packet);
 
-/** Set the direction flag, if it has one
- * @param packet  	the packet opaque pointer
- * @param direction	the new direction 
+/** Set the direction flag for a packet, if the capture format supports
+ * direction tagging.
+ *
+ * @param packet  	The packet to set the direction for
+ * @param direction	The new direction 
  * @returns -1 on error, or the direction that was set.
+ *
+ * @note Few capture formats actually support direction tagging. Most notably,
+ * we cannot set the direction on PCAP packets.
  */
 DLLEXPORT libtrace_direction_t trace_set_direction(libtrace_packet_t *packet, libtrace_direction_t direction);
 
-/** Get the direction flag, if it has one
- * @param packet  	the packet opaque pointer
- * @return a value containing the direction flag, or -1 if this is not supported
+/** Get the direction flag for a packet, if it has one.
+ * @param packet  The packet to get the direction for
+ *
+ * @return A value representing the direction flag, or -1 if this is not 
+ * supported by the capture format.
+ * 
  * The direction is defined as 0 for packets originating locally (ie, outbound)
- * and 1 for packets originating remotely (ie, inbound).
- * Other values are possible, which might be overloaded to mean special things
- * for a special trace.
+ * and 1 for packets originating remotely (ie, inbound). Other values are 
+ * possible, which might be overloaded to mean special things for certain 
+ * traces, e.g. in the Waikato traces, 2 is used to represent an "Unknown"
+ * direction.
+ *
+ * For DAG/ERF traces, the direction is extracted from the "Interface" bits in 
+ * the ERF header, which can range from 0 - 3.
  */
 DLLEXPORT SIMPLE_FUNCTION
 libtrace_direction_t trace_get_direction(const libtrace_packet_t *packet);
 
 /** @name BPF
- * This section deals with using Berkley Packet Filters
+ * This section deals with using Berkley Packet Filters to filter input traces
  * @{
  */
-/** setup a BPF filter
- * @param filterstring a char * containing the bpf filter string
- * @return opaque pointer pointer to a libtrace_filter_t object
+/** Creates a BPF filter
+ * @param filterstring The filter string describing the BPF filter to create
+ * @return An opaque pointer to a libtrace_filter_t object
+ *
  * @note The filter is not actually compiled at this point, so no correctness
- * tests are performed here. trace_create_filter will always return ok, but
+ * tests are performed here. trace_create_filter() will always return ok, but
  * if the filter is poorly constructed an error will be generated when the 
- * filter is actually used
+ * filter is actually used.
  */
 DLLEXPORT SIMPLE_FUNCTION
 libtrace_filter_t *trace_create_filter(const char *filterstring);
 
-/** Setup a BPF filter based on pre-compiled byte-code.
+/** Create a BPF filter based on pre-compiled byte-code.
  * @param bf_insns	A pointer to the start of the byte-code
  * @param bf_len	The number of BPF instructions	
- * @returns		an opaque pointer to a libtrace_filter_t object
+ * @return		An opaque pointer to a libtrace_filter_t object
  * @note		The supplied byte-code is not checked for correctness.
+ * 			Instead, incorrect byte-code will generate an error
+ * 			once the filter is actually used.
  * @author		Scott Raynel
  */
 DLLEXPORT libtrace_filter_t *
 trace_create_filter_from_bytecode(void *bf_insns, unsigned int bf_len);
 
 /** Apply a BPF filter to a packet
- * @param filter 	the filter opaque pointer
- * @param packet	the packet opaque pointer
+ * @param filter 	The filter to be applied	
+ * @param packet	The packet to be matched against the filter
  * @return >0 if the filter matches, 0 if it doesn't, -1 on error.
+ * 
  * @note Due to the way BPF filters are built, the filter is not actually
  * compiled until the first time trace_create_filter is called. If your filter
  * is incorrect, it will generate an error message and assert, exiting the
- * program. This behaviour may change to more graceful handling of this error
+ * program. This behaviour may change to a more graceful handling of this error
  * in the future.
  */
 DLLEXPORT int trace_apply_filter(libtrace_filter_t *filter,
 		const libtrace_packet_t *packet);
 
 /** Destroy a BPF filter
- * @param filter 	the filter opaque pointer
- * Deallocate all the resources associated with a BPF filter
+ * @param filter 	The filter to be destroyed
+ * 
+ * Deallocates all the resources associated with a BPF filter.
  */
 DLLEXPORT void trace_destroy_filter(libtrace_filter_t *filter);
 /*@}*/
 
 /** @name Portability
- * This section has functions that causes annoyances to portability for one
- * reason or another.
+ * This section contains functions that deal with portability issues, e.g. byte
+ * ordering.
  * @{
  */
 
-/** Convert an ethernet address to a string 
+/** Converts an ethernet address to a printable string 
  * @param addr 	Ethernet address in network byte order
- * @param buf	Buffer to store the ascii representation, or NULL
+ * @param buf	Buffer to store the ascii representation, or NULL to indicate
+ * that static storage should be used.
  * @return buf, or if buf is NULL then a statically allocated buffer.
  *
  * This function is similar to the GNU ether_ntoa_r function, with a few
- * minor differences.  if NULL is passed as buf, then the function will
- * use an internal static buffer, if NULL isn't passed then the function
+ * minor differences.  If NULL is passed as buf, then the function will
+ * use an internal static buffer. If NULL isn't passed then the function
  * will use that buffer instead.
  *
- * @note the type of addr isn't struct ether_addr as it is with ether_ntoa_r,
+ * The address pointers returned by trace_get_source_mac() and 
+ * trace_get_destination_mac() can be passed directly into this function.
+ *
+ * @note The type of addr isn't struct ether_addr as it is with ether_ntoa_r,
  * however it is bit compatible so that a cast will work.
  */ 
 DLLEXPORT char *trace_ether_ntoa(const uint8_t *addr, char *buf);
 
 /** Convert a string to an ethernet address
- * @param buf	Ethernet address in hex format delimited with :'s.
- * @param addr	buffer to store the binary representation, or NULL
- * @return addr, or if addr is NULL, then a statically allocated buffer.
+ * @param buf	A string containing an Ethernet address in hex format 
+ * delimited with :'s.
+ * @param addr	Buffer to store the binary representation, or NULL to indicate
+ * that static storage should be used.
+ * @return addr, or if addr is NULL then a statically allocated buffer.
  *
  * This function is similar to the GNU ether_aton_r function, with a few
- * minor differences.  if NULL is passed as addr, then the function will
- * use an internal static buffer, if NULL isn't passed then the function will 
+ * minor differences.  If NULL is passed as addr, then the function will
+ * use an internal static buffer. If NULL isn't passed then the function will 
  * use that buffer instead.
  * 
+ * The address returned by this function will be in network byte order.
+ *
  * @note the type of addr isn't struct ether_addr as it is with ether_aton_r,
  * however it is bit compatible so that a cast will work.
  */
@@ -1867,63 +2131,71 @@ DLLEXPORT uint8_t *trace_ether_aton(const char *buf, uint8_t *addr);
 
 /*@}*/
 
+/** @name Ports
+ * This section contains functions for dealing with port numbers at the 
+ * transport layer.
+ *
+ * @{
+ */
 
-/** Which port is the server port */
+/** An indication of which port is the "server" port for a given port pair */
 typedef enum {
 	USE_DEST, 	/**< Destination port is the server port */
 	USE_SOURCE	/**< Source port is the server port */
 } serverport_t;
 
-/** Get the source port
- * @param packet	the packet to read from
- * @return a port in \em HOST byte order, or equivalent to ports for this
- * protocol, or 0 if this protocol has no ports.
+/** Gets the source port for a given packet
+ * @param packet	The packet to get the source port from
+ * @return The source port in HOST byte order or 0 if no suitable port number
+ * can be extracted from the packet.
+ *
+ * This function will return 0 if the transport protocol is known not to
+ * use port numbers, e.g. ICMP. 0 is also returned if no transport header is
+ * present in the packet or the transport header has been truncated such that
+ * the port fields are not readable.
+ *
+ * @note If the transport protocol is not known by libtrace, the first two
+ * bytes of the transport header will be treated as the source port field.
  */
 DLLEXPORT SIMPLE_FUNCTION
 uint16_t trace_get_source_port(const libtrace_packet_t *packet);
 
-/** Get the destination port
- * @param packet	the packet to read from
- * @return a port in \em HOST byte order, or equivilent to ports for this
- * protocol, or 0 if this protocol has no ports.
+/** Gets the destination port for a given packet
+ * @param packet	The packet to get the destination port from
+ * @return The destination port in HOST byte order or 0 if no suitable port
+ * number can be extracted from the packet.
+ *
+ * This function will return 0 if the transport protocol is known not to
+ * use port numbers, e.g. ICMP. 0 is also returned if no transport header is
+ * present in the packet or the transport header has been truncated such that
+ * the port fields are not readable.
+ *
+ * @note If the transport protocol is not known by libtrace, the third and
+ * fourth bytes of the transport header will be treated as the destination 
+ * port field.
+ *
  */
 DLLEXPORT SIMPLE_FUNCTION
 uint16_t trace_get_destination_port(const libtrace_packet_t *packet);
 
-/** hint at the server port in specified protocol
- * @param protocol	the IP layer protocol, eg 6 (tcp), 17 (udp)
- * @param source	the source port from the packet
- * @param dest		the destination port from the packet
- * @return one of USE_SOURCE or USE_DEST depending on which one you should use
- * @note ports must be in \em HOST byte order!
+/** Hint at which of the two provided ports is the server port.
+ *
+ * @param protocol	The IP layer protocol, eg 6 (tcp), 17 (udp)
+ * @param source	The source port from the packet
+ * @param dest		The destination port from the packet
+ *
+ * @return one of USE_SOURCE or USE_DEST describing on which of the two ports
+ * is most likely to be the server port.
+ *
+ * @note Ports must be provided in HOST byte order!
+ *
+ * This function is based almost entirely on heuristics and should not be
+ * treated as a definitive means of identifying the server port. However, it
+ * is deterministic, so it is very handy for identifying both halves of the
+ * same flow. 
  */
 DLLEXPORT SIMPLE_FUNCTION
 int8_t trace_get_server_port(uint8_t protocol, uint16_t source, uint16_t dest);
-
-/** Takes a uri and splits it into a format and uridata component. 
- * @param uri		the uri to be parsed
- * @param format	destination location for the format component of the uri 
- * @return 0 if an error occured, otherwise return the uridata component
- */
-DLLEXPORT const char *trace_parse_uri(const char *uri, char **format);
-
-/** Gets the format type for a given packet.
- * @param packet	the packet opaque pointer
- * @return the format of the packet
- */
-DLLEXPORT 
-enum base_format_t trace_get_format(struct libtrace_packet_t *packet);
-
-/** Construct a packet from a buffer.
- * @param packet[in,out]	Libtrace Packet object to update with the new 
- * 				data.
- * @param linktype		The linktype of the packet.
- * @param[in] data		The packet data (including linklayer)
- * @param len			Length of packet data
- */
-DLLEXPORT
-void trace_construct_packet(libtrace_packet_t *packet,
-		libtrace_linktype_t linktype, const void *data, uint16_t len);
 
 /*@}*/
 
@@ -1933,7 +2205,7 @@ void trace_construct_packet(libtrace_packet_t *packet,
  * 
  * The trace_get_wireless_* functions provide an abstract interface for
  * retrieving information from wireless traces. They take a pointer to the
- * wireless monitoring header (usually found with trace_get_link(packet)) and
+ * wireless monitoring header (usually found with trace_get_packet_meta()) and
  * the linktype of the header passed in.
  * 
  * All of the trace_get_wireless_* functions return false if the requested
@@ -1945,48 +2217,48 @@ void trace_construct_packet(libtrace_packet_t *packet,
 
 
 #ifndef ARPHRD_80211_RADIOTAP
-/* libc doesn't define this yet, but it seems to be what everyone is using
- */
+/** libc doesn't define this yet, so we have to do so ourselves */
 #define ARPHRD_80211_RADIOTAP 803
 #endif
 
-/** Get the wireless Timer Syncronisation Function
+/** Get the wireless Timer Synchronisation Function
  *
- * Gets the value of the timer syncronisation function for this frame, which
+ * Gets the value of the timer synchronisation function for this frame, which
  * is a value in microseconds indicating the time that the first bit of the
  * MPDU was received by the MAC.
  *
- * @param link the wireless header
- * @param linktype the linktype of the wireless header passed in 
- * @param[out] tsft the value of the timer syncronisation function. 
+ * @param link The wireless meta header
+ * @param linktype The linktype of the wireless meta header passed in 
+ * @param[out] tsft The value of the timer synchronisation function. 
  * @return true if the field was available, false if not.
  */
 DLLEXPORT bool trace_get_wireless_tsft(void *linkptr,
         libtrace_linktype_t linktype, uint64_t *tsft);
 
-/** Get the wireless rate 
- * @param link the wireless header
- * @param linktype the linktype of the wireless header passed in
- * @param[out] rate the data-rate of the frame in units of 500kbps
+/** Get the wireless data rate 
+ *
+ * @param link The wireless meta header
+ * @param linktype The linktype of the wireless meta header passed in
+ * @param[out] rate The data-rate of the frame in units of 500kbps
  * @return true if the field was available, false if not.
  */
 DLLEXPORT bool trace_get_wireless_rate(void *linkptr,
         libtrace_linktype_t linktype, uint8_t *rate);
 
 /** Get the wireless channel frequency
- * @param link the wireless header
- * @param linktype the linktype of the wireless header passed in
- * @param[out] freq the frequency in MHz of the channel the frame was transmitted
- * or received on.
+ * @param link The wireless meta header
+ * @param linktype The linktype of the wireless meta header passed in
+ * @param[out] freq The frequency in MHz of the channel the frame was 
+ * transmitted or received on.
  * @return true if the field was available, false if not.
  */
 DLLEXPORT bool trace_get_wireless_freq(void *linkptr,
         libtrace_linktype_t linktype, uint16_t *freq);
 
 /** Get the wireless signal strength in dBm 
- * @param link the wireless header
- * @param linktype the linktype of the wireless header passed in
- * @param[out] strength the RF signal power at the antenna, in dB difference
+ * @param link The wireless meta header
+ * @param linktype The linktype of the wireless meta header passed in
+ * @param[out] strength The RF signal power at the antenna, in dB difference
  * from 1mW.
  * @return true if the field was available, false if not.
  */
@@ -1994,9 +2266,9 @@ DLLEXPORT bool trace_get_wireless_signal_strength_dbm(void *linkptr,
         libtrace_linktype_t linktype, int8_t *strength);
 
 /** Get the wireless noise strength in dBm
- * @param link the wireless header
- * @param linktype the linktype of the wireless header passed in
- * @param[out] strength the RF noise power at the antenna, in dB difference 
+ * @param link The wireless meta header
+ * @param linktype The linktype of the wireless meta header passed in
+ * @param[out] strength The RF noise power at the antenna, in dB difference 
  * from 1mW. 
  * @return true if the field was available, false if not.
  */
@@ -2004,9 +2276,9 @@ DLLEXPORT bool trace_get_wireless_noise_strength_dbm(void *linkptr,
         libtrace_linktype_t linktype, int8_t *strength);
 
 /** Get the wireless signal strength in dB
- * @param link the wireless header
- * @param linktype the linktype of the wireless header passed in
- * @param[out] strength the RF signal power at the antenna,in dB difference 
+ * @param link The wireless meta header
+ * @param linktype The linktype of the wireless meta header passed in
+ * @param[out] strength The RF signal power at the antenna, in dB difference 
  * from a fixed reference. 
  * @return true if the field was available, false if not.
  */
@@ -2014,9 +2286,9 @@ DLLEXPORT bool trace_get_wireless_signal_strength_db(void *linkptr,
         libtrace_linktype_t linktype, uint8_t *strength);
 
 /** Get the wireless noise strength in dB 
- * @param link the wireless header
- * @param linktype the linktype of the wireless header passed in
- * @param[out] strength the RF noise power at the antenna, in dB difference 
+ * @param link The wireless meta header
+ * @param linktype The linktype of the wireless meta header passed in
+ * @param[out] strength The RF noise power at the antenna, in dB difference 
  * from a fixed reference. 
  * @return true if the field was available, false if not.
  */
@@ -2024,37 +2296,41 @@ DLLEXPORT bool trace_get_wireless_noise_strength_db(void *linkptr,
         libtrace_linktype_t linktype, uint8_t *strength);
 
 /** Get the wireless transmit attenuation 
- * @param link the wireless header
- * @param linktype the linktype of the wireless header passed in
- * @param[out] attenuation the transmit power as a unitless distance from maximum 
- * power set at factory calibration. 0 indicates maximum transmission power.
+ * @param link The wireless meta header
+ * @param linktype The linktype of the wireless meta header passed in
+ * @param[out] attenuation The transmit power as a unitless distance from 
+ * maximum power set at factory calibration. 0 indicates maximum transmission 
+ * power.
  * @return true if the field was available, false if not.
  */
 DLLEXPORT bool trace_get_wireless_tx_attenuation(void *linkptr,
         libtrace_linktype_t linktype, uint16_t *attenuation);
 
 /** Get the wireless transmit attenuation in dB
- * @param link the wireless header
- * @param linktype the linktype of the wireless header passed in
- * @param[out] attenuation the transmit power as dB difference from maximum power 
- * set at factory calibration. 0 indicates maximum power.
+ * @param link The wireless meta header
+ * @param linktype The linktype of the wireless meta header passed in
+ * @param[out] attenuation The transmit power as dB difference from maximum 
+ * power set at factory calibration. 0 indicates maximum power.
  * @return true if the field was available, false if not.
  */
 DLLEXPORT bool trace_get_wireless_tx_attenuation_db(void *linkptr,
         libtrace_linktype_t linktype, uint16_t *attenuation);
 
-/** Get the wireless transmit power in dBm @param link the wireless header
- * @param linktype the linktype of the wireless header passed in 
- * @param[out] txpower the transmit power as dB from a 1mW reference. This is the absolute power level measured at the antenna port.  
+/** Get the wireless transmit power in dBm 
+ * @param link The wireless meta header
+ * @param linktype The linktype of the wireless meta header passed in 
+ * @param[out] txpower The transmit power as dB from a 1mW reference. This is 
+ * the absolute power level measured at the antenna port.  
  * @return true if the field was available, false if not.
  */
-DLLEXPORT bool trace_get_wireless_tx_power_dbm(void *linkptr, libtrace_linktype_t
-		linktype, int8_t *txpower);
+DLLEXPORT bool trace_get_wireless_tx_power_dbm(void *linkptr, 
+		libtrace_linktype_t linktype, int8_t *txpower);
 
 /** Get the wireless antenna 
- * @param link the wireless header
- * @param linktype the linktype of the wireless header passed in
- * @param[out] antenna which antenna was used to transmit or receive the frame.
+ * @param link The wireless meta header
+ * @param linktype The linktype of the wireless meta header passed in
+ * @param[out] antenna The antenna that was used to transmit or receive the 
+ * frame.
  * @return true if the field was available, false if not.
  */
 DLLEXPORT bool trace_get_wireless_antenna(void *linkptr,
