@@ -183,12 +183,17 @@ DLLEXPORT void *trace_get_payload_from_icmp(libtrace_icmp_t *icmp, uint32_t *rem
 DLLEXPORT uint16_t trace_get_source_port(const libtrace_packet_t *packet)
 {
 	uint32_t remaining;
+	uint8_t proto;
 	const struct ports_t *port = 
 		(const struct ports_t*)trace_get_transport((libtrace_packet_t*)packet,
-			NULL, &remaining);
+			&proto, &remaining);
 
 	/* snapped too early */
 	if (remaining<2)
+		return 0;
+
+	/* ICMP *technically* doesn't have ports */
+	if (proto == TRACE_IPPROTO_ICMP)
 		return 0;
 
 	if (port)
@@ -201,11 +206,16 @@ DLLEXPORT uint16_t trace_get_source_port(const libtrace_packet_t *packet)
 DLLEXPORT uint16_t trace_get_destination_port(const libtrace_packet_t *packet)
 {
 	uint32_t remaining;
+	uint8_t proto;
 	struct ports_t *port = 
 		(struct ports_t*)trace_get_transport((libtrace_packet_t*)packet,
-			NULL, &remaining);
+			&proto, &remaining);
 	/* snapped to early */
 	if (remaining<4)
+		return 0;
+	
+	/* ICMP *technically* doesn't have ports */
+	if (proto == TRACE_IPPROTO_ICMP)
 		return 0;
 
 	if (port)
