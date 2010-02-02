@@ -1,0 +1,57 @@
+The source files in this directory are copies of the programs that were
+written for the Libtrace tutorial presented at PDCAT'08. Each demonstrates
+a different feature of the Libtrace programming API, often by building upon
+the previous examples.
+
+The slides that accompany these programs can be found at
+http://wand.net.nz/trac/libtrace/wiki/PDCAT08
+
+Below is a full list of the examples in order of increasing complexity, along
+with a brief description of the API features that are covered by each program.
+
+
+createdemo:  	
+	Demonstrates how to create and start an input trace, plus how to detect 
+	and handle errors with trace files.
+
+readdemo:
+	Demonstrates how to read packets from an input trace.
+
+timedemo:
+	Demonstrates how to get and use timestamps from packets.
+
+lengthdemo:
+	Demonstrates how to get and use the different packet size measurements.
+
+sourcedemo:
+	Demonstrates how to use the port, IP address and MAC address access
+	functions.
+
+gettcpdemo:
+	Demonstrates how to use the protocol access functions.
+
+writedemo:
+	Demonstrates how to create and start an output traces, and how to
+	write packets to the output trace.
+
+filterdemo:
+	Demonstrates how to use BPF filters within Libtrace.
+
+configdemo:
+	Demonstrates how to use the configuration system to configure both
+	input and output traces before starting them.
+
+httpcount:
+	Demonstrates how to use the generic trace_get_transport function
+	rather than the shortcut trace_get_tcp shown in gettcpdemo
+
+mplscount:
+	Demonstrates how to access a second link layer header using
+	trace_get_payload_from_layer2
+
+mplstag:
+	Demonstrates how to iterate through multiple link layer headers.
+
+headerdemo:
+	A much more complicated tool that puts a lot of the previously
+	demonstrated concepts together to create a useful tool.

@@ -25,7 +25,7 @@ AC_CONFIG_FILES([Makefile lib/Makefile docs/Makefile libpacketdump/Makefile
 	tools/tracestats/Makefile tools/tracetop/Makefile
 	tools/tracereplay/Makefile tools/tracediff/Makefile
 	examples/Makefile examples/skeleton/Makefile examples/rate/Makefile
-	examples/stats/Makefile
+	examples/stats/Makefile examples/tutorial/Makefile
 	docs/libtrace.doxygen 
 	lib/libtrace.h
 	])
