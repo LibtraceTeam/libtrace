@@ -1,14 +1,16 @@
 /*
  * This file is part of libtrace
  *
- * Copyright (c) 2007,2008 The University of Waikato, Hamilton, New Zealand.
- * Authors: Daniel Lawson
- *          Perry Lorier
- *          Shane Alcock
+ * Copyright (c) 2007,2008,2009,2010 The University of Waikato, Hamilton, 
+ * New Zealand.
  *
+ * Authors: Daniel Lawson 
+ *          Perry Lorier
+ *          Shane Alcock 
+ *          
  * All rights reserved.
  *
- * This code has been developed by the University of Waikato WAND
+ * This code has been developed by the University of Waikato WAND 
  * research group. For further information please see http://www.wand.net.nz/
  *
  * libtrace is free software; you can redistribute it and/or modify
@@ -28,6 +30,7 @@
  * $Id$
  *
  */
+
 #define _GNU_SOURCE
 
 #include "config.h"
@@ -58,6 +61,15 @@
 #  include <sys/ioctl.h>
 #endif
 
+/* This format deals with DAG cards that are using drivers from the 2.4.X
+ * versions. 
+ *
+ * DAG is a LIVE capture format.
+ *
+ * We do not support writing using this format, as transmit support was not
+ * added until a subsequent version of the DAG software (see format_dag25.c).
+ * Instead, you should write the packets read using this format as ERF traces.
+ */
 
 static struct libtrace_format_t dag;
 
@@ -65,23 +77,41 @@ static struct libtrace_format_t dag;
 #define DUCK DATA(libtrace)->duck
 #define FORMAT_DATA DATA(libtrace)
 
+/* "Global" data that is stored for each DAG input trace */
 struct dag_format_data_t {
+
+	/* Data required for regular DUCK reporting */
 	struct {
+		/* Timestamp of the last DUCK report */
                 uint32_t last_duck;
+		/* The number of seconds between each DUCK report */
                 uint32_t duck_freq;
+		/* Timestamp of the last packet read from the DAG card */
                 uint32_t last_pkt;
+		/* Dummy trace to ensure DUCK packets are dealt with using
+		 * the DUCK format functions */
                 libtrace_t *dummy_duck;
         } duck;	
 	
+	/* File descriptor for the DAG card */
 	int fd;
+	/* Pointer to DAG memory hole */
 	void *buf;
+	/* Difference between the top and bottom pointers in the DAG memory
+	 * hole, i.e. the amount of available data to read */
 	uint32_t diff;
+	/* The amount of data read thus far from the start of the bottom
+	 * pointer */
 	uint32_t offset;
+	/* The offset for the first unread byte in the DAG memory hole */
 	uint32_t bottom;
+	/* The offset for the last unread byte in the DAG memory hole */
 	uint32_t top;
+	/* The number of packets that have been dropped */
 	uint64_t drops;
 };
 
+/* Determines if a given filename refers to a DAG device */
 static void dag_probe_filename(const char *filename) 
 {
 	struct stat statbuf;
@@ -97,6 +127,7 @@ static void dag_probe_filename(const char *filename)
 	return 1;
 }
 
+/* Initialises the DAG "global" variables */
 static void dag_init_format_data(libtrace_t *libtrace) {
 	libtrace->format_data = (struct dag_format_data_t *)
 		malloc(sizeof(struct dag_format_data_t));
@@ -114,6 +145,8 @@ static void dag_init_format_data(libtrace_t *libtrace) {
 	FORMAT_DATA->diff = 0;
 }
 
+/* Determines how much data is available for reading on the DAG card and
+ * updates the various offsets accordingly */
 static int dag_available(libtrace_t *libtrace) {
 
         if (FORMAT_DATA->diff > 0)
@@ -129,6 +162,7 @@ static int dag_available(libtrace_t *libtrace) {
         return FORMAT_DATA->diff;
 }
 
+/* Initialises a DAG input trace */
 static int dag_init_input(libtrace_t *libtrace) {
 	struct stat buf;
         char *dag_dev_name = NULL;
@@ -144,7 +178,8 @@ static int dag_init_input(libtrace_t *libtrace) {
 				(size_t)(scan - libtrace->uridata));
 	}
 
-	
+
+	/* Make sure a DAG device with the right name exists */	
         if (stat(dag_dev_name, &buf) == -1) {
                 trace_set_err(libtrace,errno,"stat(%s)",dag_dev_name);
 		free(dag_dev_name);
@@ -160,6 +195,8 @@ static int dag_init_input(libtrace_t *libtrace) {
 			free(dag_dev_name);
                         return -1;
                 }
+
+		/* Memory-map ourselves a pointer to the DAG memory hole */
                 if((FORMAT_DATA->buf = (void *)dag_mmap(FORMAT_DATA->fd)) == MAP_FAILED) {
                         trace_set_err(libtrace,errno,"Cannot mmap DAG %s",
                                         dag_dev_name);
@@ -178,10 +215,13 @@ static int dag_init_input(libtrace_t *libtrace) {
         return 0;
 }
 
+/* Configures a DAG input trace */
 static int dag_config_input(libtrace_t *libtrace, trace_option_t option,
                                 void *data) {
         switch(option) {
                 case TRACE_OPTION_META_FREQ:
+			/* We use this option to specify the frequency of
+			 * DUCK updates */
                         DUCK.duck_freq = *(int *)data;
                         return 0;
                 case TRACE_OPTION_SNAPLEN:
@@ -191,13 +231,17 @@ static int dag_config_input(libtrace_t *libtrace, trace_option_t option,
                         /* DAG already operates in a promisc fashion */
                         return -1;
                 case TRACE_OPTION_FILTER:
+			/* Cards that use the older drivers don't do 
+			 * filtering */
                         return -1;
 		case TRACE_OPTION_EVENT_REALTIME:
+			/* Live capture is always going to be realtime */
 			return -1;
         }
 	return -1;
 }
 
+/* Starts a DAG input trace */
 static int dag_start_input(libtrace_t *libtrace) {	
 	if(dag_start(FORMAT_DATA->fd) < 0) {
                 trace_set_err(libtrace,errno,"Cannot start DAG %s",
@@ -212,11 +256,13 @@ static int dag_start_input(libtrace_t *libtrace) {
 	return 0;
 }
 
+/* Pauses a DAG input trace */
 static int dag_pause_input(libtrace_t *libtrace) {
 	dag_stop(FORMAT_DATA->fd);
 	return 0;
 }
 
+/* Destroys a DAG input trace */
 static int dag_fin_input(libtrace_t *libtrace) {
         dag_close(FORMAT_DATA->fd);
 	if (DUCK.dummy_duck)
@@ -225,10 +271,12 @@ static int dag_fin_input(libtrace_t *libtrace) {
         return 0; /* success */
 }
 
+/* Extracts DUCK information from the DAG card and produces a DUCK packet */
 static int dag_get_duckinfo(libtrace_t *libtrace,
                                 libtrace_packet_t *packet) {
         dag_inf lt_dag_inf;
 
+	/* Allocate memory for the DUCK data */
         if (packet->buf_control == TRACE_CTRL_EXTERNAL ||
                         !packet->buffer) {
                 packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
@@ -240,9 +288,11 @@ static int dag_get_duckinfo(libtrace_t *libtrace,
                 }
         }
 
+	/* DUCK doesn't actually have a format header, as such */
         packet->header = 0;
         packet->payload = packet->buffer;
 
+	/* Check that the DAG card supports DUCK */
         if ((ioctl(FORMAT_DATA->fd, DAG_IOINF, &lt_dag_inf) < 0)) {
                 trace_set_err(libtrace, errno,
                                 "Error using DAG_IOINF");
@@ -253,20 +303,26 @@ static int dag_get_duckinfo(libtrace_t *libtrace,
                 return 0;
         }
 
+	/* Get the DUCK information from the card */
         if ((ioctl(FORMAT_DATA->fd, DAG_IOGETDUCK, (duck_inf *)packet->payload)
                                 < 0)) {
                 trace_set_err(libtrace, errno, "Error using DAG_IOGETDUCK");
                 return -1;
         }
 
+	/* Set the type */
         packet->type = TRACE_RT_DUCK_2_4;
+
+	/* Set the packet's trace to point at a DUCK trace, so that the
+	 * DUCK format functions will be called on the packet rather than the
+	 * DAG ones */
         if (!DUCK.dummy_duck)
                 DUCK.dummy_duck = trace_create_dead("duck:dummy");
         packet->trace = DUCK.dummy_duck;
         return sizeof(duck_inf);
 }
 
-
+/* Reads the next ERF record from the DAG memory hole */
 static dag_record_t *dag_get_record(libtrace_t *libtrace) {
         dag_record_t *erfptr = NULL;
         uint16_t size;
@@ -282,27 +338,34 @@ static dag_record_t *dag_get_record(libtrace_t *libtrace) {
         return erfptr;
 }
 
+/* Converts a buffer containing a recently read DAG packet record into a 
+ * libtrace packet */
 static int dag_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
 		void *buffer, libtrace_rt_types_t rt_type, uint32_t flags) {
 
         dag_record_t *erfptr;
+	/* If the packet previously owned a buffer that is not the buffer
+         * that contains the new packet data, we're going to need to free the
+         * old one to avoid memory leaks */
         if (packet->buffer != buffer &&
                         packet->buf_control == TRACE_CTRL_PACKET) {
                 free(packet->buffer);
         }
 
+	/* Set the buffer owner appropriately */
 	if ((flags & TRACE_PREP_OWN_BUFFER) == TRACE_PREP_OWN_BUFFER) {
 		packet->buf_control = TRACE_CTRL_PACKET;
 	} else 
 		packet->buf_control = TRACE_CTRL_EXTERNAL;
 	
+	/* Update packet pointers and type appropriately */
         erfptr = (dag_record_t *)buffer;
         packet->buffer = erfptr;
         packet->header = erfptr;
         packet->type = rt_type;
 
         if (erfptr->flags.rxerror == 1) {
-                /* rxerror means the payload is corrupt - drop it
+                /* rxerror means the payload is corrupt - drop the payload
                  * by tweaking rlen */
                 packet->payload = NULL;
                 erfptr->rlen = htons(erf_get_framing_length(packet));
@@ -315,12 +378,17 @@ static int dag_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
                 dag_init_format_data(libtrace);
         }
 
+	/* Update the dropped packets counter, using the value of the ERF
+	 * loss counter */
         DATA(libtrace)->drops += ntohs(erfptr->lctr);
 
         return 0;
 
 }
 
+/* Reads the next available packet from a DAG card, in a BLOCKING fashion
+ *
+ * If DUCK reporting is enabled, the packet returned may be a DUCK update */
 static int dag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
         int numbytes;
         int size = 0;
@@ -328,6 +396,7 @@ static int dag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	struct timeval tv;
         dag_record_t *erfptr = NULL;
 
+	/* Check if we're due for a DUCK report */
         if (DUCK.last_pkt - DUCK.last_duck > DUCK.duck_freq &&
                         DUCK.duck_freq != 0) {
                 size = dag_get_duckinfo(libtrace, packet);
@@ -339,15 +408,18 @@ static int dag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
                 DUCK.duck_freq = 0;
         }
 
+	/* Don't let anyone try to free our DAG memory hole */
 	flags |= TRACE_PREP_DO_NOT_OWN_BUFFER;
 	
-        if (packet->buf_control == TRACE_CTRL_PACKET) {
+	/* If the packet buffer is currently owned by libtrace, free it so
+	 * that we can set the packet to point into the DAG memory hole */
+	if (packet->buf_control == TRACE_CTRL_PACKET) {
                 packet->buf_control = TRACE_CTRL_EXTERNAL;
                 free(packet->buffer);
                 packet->buffer = 0;
         }
 
-
+	/* Grab a full ERF record */
         do {
                 numbytes = dag_available(libtrace);
                 if (numbytes < 0)
@@ -357,15 +429,21 @@ static int dag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
                 erfptr = dag_get_record(libtrace);
         } while (erfptr == NULL);
         
-	
+	/* Prepare the libtrace packet */
 	if (dag_prepare_packet(libtrace, packet, erfptr, TRACE_RT_DATA_ERF, 
 				flags))
 		return -1;
+	
+	/* Update the DUCK timer */
 	tv = trace_get_timeval(packet);
         DUCK.last_pkt = tv.tv_sec;
         return packet->payload ? htons(erfptr->rlen) : erf_get_framing_length(packet);
 }
 
+/* Attempts to read a packet from a DAG card in a NON-BLOCKING fashion. If
+ * a packet is available, we will return a packet event. Otherwise we will
+ * return a SLEEP event (as we cannot select on the DAG file descriptor).
+ */
 static libtrace_eventobj_t trace_event_dag(libtrace_t *trace,
                                         libtrace_packet_t *packet) {
         libtrace_eventobj_t event = {0,0,0.0,0};
@@ -374,11 +452,20 @@ static libtrace_eventobj_t trace_event_dag(libtrace_t *trace,
 	do {
 	        data = dag_available(trace);
 
+		/* If no data is available, drop out and return a sleep event */
 		if (data <= 0)
 			break;
 
+		/* Data is available, so we can call the blocking read because
+		 * we know that we will get a packet straight away */
                 event.size = dag_read_packet(trace,packet);
                 //DATA(trace)->dag.diff -= event.size;
+		
+		/* XXX trace_read_packet() normally applies the following
+		 * config options for us, but this function is called via
+		 * trace_event() so we have to do it ourselves */
+
+		/* Check that the packet matches any pre-existing filter */
                 if (trace->filter) {
                         if (trace_apply_filter(trace->filter, packet)) {
                                 event.type = TRACE_EVENT_PACKET;
@@ -389,6 +476,8 @@ static libtrace_eventobj_t trace_event_dag(libtrace_t *trace,
                 } else {
                         event.type = TRACE_EVENT_PACKET;
                 }
+
+		/* If the user has specified a snap length, apply that too */
                 if (trace->snaplen > 0) {
                         trace_set_capture_length(packet, trace->snaplen);
                 }
@@ -396,6 +485,8 @@ static libtrace_eventobj_t trace_event_dag(libtrace_t *trace,
                 return event;
         } while (1);
 
+
+	/* We only want to sleep for a very short time */
         assert(data == 0);
         event.type = TRACE_EVENT_SLEEP;
         event.seconds = 0.0001;
@@ -403,6 +494,7 @@ static libtrace_eventobj_t trace_event_dag(libtrace_t *trace,
 	return event;
 }
 
+/* Gets the number of dropped packets */
 static uint64_t dag_get_dropped_packets(libtrace_t *trace)
 {
 	if (!trace->format_data)
@@ -410,6 +502,7 @@ static uint64_t dag_get_dropped_packets(libtrace_t *trace)
 	return DATA(trace)->drops;
 }
 
+/* Prints some semi-useful help text about the DAG format module */
 static void dag_help(void) {
         printf("dag format module: $Revision$\n");
         printf("Supported input URIs:\n");

@@ -1,8 +1,12 @@
 /*
  * This file is part of libtrace
  *
- * Copyright (c) 2007,2008 The University of Waikato, Hamilton, New Zealand.
- * Authors: Perry Lorier 
+ * Copyright (c) 2007,2008,2009,2010 The University of Waikato, Hamilton, 
+ * New Zealand.
+ *
+ * Authors: Daniel Lawson 
+ *          Perry Lorier
+ *          Shane Alcock 
  *          
  * All rights reserved.
  *
@@ -51,17 +55,39 @@
 #include <errno.h>
 #include <fcntl.h>
 
+/* This format deals with the BSD Native capture format, perhaps better
+ * known as BPF, which is the equivalent of the Linux Native format for
+ * *BSD systems.
+ *
+ * This is a LIVE capture format - we're always dealing with reading from an
+ * interface.
+ *
+ * This format does not support writing, but BPF packet records can be easily
+ * converted to PCAP or ERF.
+ */ 
 
+/* "Global" data that is stored for each BPF input trace */
 struct libtrace_format_data_t {
-	int fd;
+	/* The file descriptor that is being captured from */
+	int fd;	
+	/* The snap length for the capture */
 	int snaplen;
+	/* A boolean flag indicating whether the capture interface should be
+	 * in promiscuous mode */ 
 	int promisc;
+	/* A buffer to write captured data into */
 	void *buffer;
+	/* The current read location in the capture buffer */
 	void *bufptr;
+	/* The total size of the capture buffer */
 	unsigned int buffersize;
+	/* The amount of space remaining before the capture buffer is full */
 	int remaining;
+	/* The linktype of the capture interface */ 
 	unsigned int linktype;
+	/* Statistics about how many packets have been dropped, received etc. */
 	struct bpf_stat stats;
+	/* A boolean flag indicating whether the statistics are up-to-date */
 	int stats_valid;
 };
 
@@ -69,20 +95,26 @@ struct libtrace_format_data_t {
 
 #define BPFHDR(x) ((struct bpf_hdr *)((x)->header))
 
+/* Attempts to determine if a given filename could refer to a BPF interface */
 static int bpf_probe_filename(const char *filename)
 {
 	return (if_nametoindex(filename) != 0);
 }
 
+/* XXX This function doesn't appear to be used anywhere - nor does it do
+ * anything particularly useful :) */
 static int bpf_start_filename(const char *filename)
 {
 	return 0;
 }
 
+/* Initialises a BPF input trace */
 static int bpf_init_input(libtrace_t *libtrace) 
 {
 	libtrace->format_data = (struct libtrace_format_data_t *)
 		malloc(sizeof(struct libtrace_format_data_t));
+	
+	/* Throw some default values into the format data */
 	FORMATIN(libtrace)->fd = -1;
 	FORMATIN(libtrace)->promisc = 0;
 	FORMATIN(libtrace)->snaplen = 65536;
@@ -91,6 +123,7 @@ static int bpf_init_input(libtrace_t *libtrace)
 	return 0;
 }
 
+/* Starts a BPF input trace */
 static int bpf_start_input(libtrace_t *libtrace)
 {
 	int bpfid=0;
@@ -154,7 +187,7 @@ static int bpf_start_input(libtrace_t *libtrace)
 	FORMATIN(libtrace)->bufptr = FORMATIN(libtrace)->buffer;
 	FORMATIN(libtrace)->remaining = 0;
 
-	/* attach to the device */
+	/* Attach to the device */
 	strncpy(ifr.ifr_name, libtrace->uridata, sizeof(ifr.ifr_name));
 	if (ioctl(FORMATIN(libtrace)->fd, BIOCSETIF, &ifr) == -1) {
 		trace_set_err(libtrace,errno,"Failed to attach");
@@ -162,6 +195,7 @@ static int bpf_start_input(libtrace_t *libtrace)
 		return -1;
 	}
 
+	/* Set the link type */
 	if (ioctl(FORMATIN(libtrace)->fd, BIOCGDLT,
 			 &FORMATIN(libtrace)->linktype) == -1) {
 		trace_set_err(libtrace,errno,"Failed to retrieve link type");
@@ -184,7 +218,7 @@ static int bpf_start_input(libtrace_t *libtrace)
 	/* Using timeouts seems sucky.  We'll always use immediate mode.  We
          * pray the kernel is smart enough that if a another packet arrives
          * while we're processing this one that it will buffer them into it's
-	 * kernel buffer so we can recieve packets later. (It'll need to do this
+	 * kernel buffer so we can receive packets later. (It'll need to do this
 	 * to deal with us spending time processing the last 'n' packets anyway)
 	 */
 	
@@ -195,6 +229,7 @@ static int bpf_start_input(libtrace_t *libtrace)
 		return -1;
 	}
 
+	/* Set promiscous mode, if the user has asked us to do so */
 	if (FORMATIN(libtrace)->promisc) {
 		if (ioctl(FORMATIN(libtrace)->fd, BIOCPROMISC, NULL) == -1) {
 			trace_set_err(libtrace,errno,
@@ -213,6 +248,7 @@ static int bpf_start_input(libtrace_t *libtrace)
 	return 0;
 }
 
+/* Gets a count of the number of packets received on the BPF interface */
 static uint64_t bpf_get_received_packets(libtrace_t *trace)
 {
 	if (trace->format_data == NULL)
@@ -236,6 +272,7 @@ static uint64_t bpf_get_received_packets(libtrace_t *trace)
 	return FORMATIN(trace)->stats.bs_recv;
 }
 
+/* Gets a count of the number of packets dropped on the BPF interface */
 static uint64_t bpf_get_dropped_packets(libtrace_t *trace)
 {
 	if (trace->format_data == NULL)
@@ -259,6 +296,7 @@ static uint64_t bpf_get_dropped_packets(libtrace_t *trace)
 	return FORMATIN(trace)->stats.bs_drop;
 }
 
+/* Pauses a BPF input trace */
 static int bpf_pause_input(libtrace_t *libtrace)
 {
 	close(FORMATIN(libtrace)->fd);
@@ -267,12 +305,14 @@ static int bpf_pause_input(libtrace_t *libtrace)
 	return 0;
 }
 
+/* Closes a BPF input trace */
 static int bpf_fin_input(libtrace_t *libtrace) 
 {
 	free(libtrace->format_data);
 	return 0;
 }
 
+/* Configures a BPF input trace */
 static int bpf_config_input(libtrace_t *libtrace,
 		trace_option_t option,
 		void *data)
@@ -294,7 +334,7 @@ static int bpf_config_input(libtrace_t *libtrace,
 			/* No meta-data for this format */
 			break;
 		case TRACE_OPTION_EVENT_REALTIME:
-			/* captures are always realtime */
+			/* Captures are always realtime */
 			break;
 
 		/* Avoid default: so that future options will cause a warning
@@ -307,19 +347,26 @@ static int bpf_config_input(libtrace_t *libtrace,
 	return -1;
 }
 
+/* Converts a buffer containing a recently read BPF packet record into a
+ * libtrace packet */
 static int bpf_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
 		void *buffer, libtrace_rt_types_t rt_type, uint32_t flags) {
-        if (packet->buffer != buffer &&
+        
+	/* If the packet previously owned a buffer that is not the buffer
+	 * that contains the new packet data, we're going to need to free the
+	 * old one to avoid memory leaks */
+	if (packet->buffer != buffer &&
                         packet->buf_control == TRACE_CTRL_PACKET) {
                 free(packet->buffer);
         }
 
+	/* Set the buffer owner appropriately */
         if ((flags & TRACE_PREP_OWN_BUFFER) == TRACE_PREP_OWN_BUFFER) {
                 packet->buf_control = TRACE_CTRL_PACKET;
         } else
                 packet->buf_control = TRACE_CTRL_EXTERNAL;
 
-
+	/* Update the packet pointers and type appropriately */
         packet->buffer = buffer;
         packet->header = buffer;
 	packet->type = rt_type;
@@ -335,12 +382,14 @@ static int bpf_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
 
 	return 0;
 }
-	
+
+/* Reads the next packet record from a BPF interface and writes it into a 
+ * libtrace packet */	
 static int bpf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) 
 {
 	uint32_t flags = 0;
 	
-	/* Fill the buffer */
+	/* Read from the BPF interface into our capture buffer */
 	if (FORMATIN(libtrace)->remaining<=0) {
 		int ret;
 
@@ -362,19 +411,24 @@ static int bpf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 		FORMATIN(libtrace)->bufptr=
 				FORMATIN(libtrace)->buffer;
 	}
+
+	/* We do NOT want anything trying to free the memory the packet is
+	 * stored in */
 	flags |= TRACE_PREP_DO_NOT_OWN_BUFFER;
-	/* Read one packet out */
-	
+
 	if (packet->buf_control == TRACE_CTRL_PACKET)
 		free(packet->buffer);
 
+	/* Update 'packet' to point to the first packet in our capture
+	 * buffer */
 	if (bpf_prepare_packet(libtrace, packet, FORMATIN(libtrace)->bufptr,
 		TRACE_RT_DATA_BPF, flags)) {
 		return -1;
 	}
 	
 
-	/* Now deal with any padding */
+	/* Skip past the packet record we're going to return, making sure
+	 * that we deal with padding correctly */
 	FORMATIN(libtrace)->bufptr+=
 		BPF_WORDALIGN(BPFHDR(packet)->bh_hdrlen
 		+BPFHDR(packet)->bh_caplen);
@@ -385,15 +439,21 @@ static int bpf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 	return BPFHDR(packet)->bh_datalen+BPFHDR(packet)->bh_hdrlen;
 }
 
+/* Returns the linktype for the interface that we are capturing from */
 static libtrace_linktype_t bpf_get_link_type(const libtrace_packet_t *packet) {
+	/* Convert the linktype that we recorded when we started the trace
+	 * into a suitable libtrace linktype */
 	return pcap_linktype_to_libtrace(FORMATIN(packet->trace)->linktype);
 }
 
+/* Returns the direction for a given BPF packet record */
 static libtrace_direction_t bpf_get_direction(const libtrace_packet_t *packet) {
-	/* BPF Sadly can't do direction tagging */
+	/* BPF sadly can't do direction tagging */
 	return ~0;
 }
 
+/* Returns the timestamp for a given BPF packet record, in the form of a 
+ * struct timeval */
 static struct timeval bpf_get_timeval(const libtrace_packet_t *packet) 
 {
 	struct timeval tv;
@@ -406,27 +466,36 @@ static struct timeval bpf_get_timeval(const libtrace_packet_t *packet)
 	return tv;
 }
 
+/* Returns the capture length for a given BPF packet record */
 static int bpf_get_capture_length(const libtrace_packet_t *packet)
 {
-	/* BPF Doesn't include the FCS, we do. */
+	/* BPF doesn't include the FCS in its caplen field, but libtrace
+	 * does so we need to add this extra 4 bytes */
 	return BPFHDR(packet)->bh_caplen+4;
 }
 
+/* Returns the wire length for a given BPF packet record */
 static int bpf_get_wire_length(const libtrace_packet_t *packet) 
 {
+
+	/* BPF doesn't include the FCS in its datalen field, but libtrace
+	 * does so we need to add this extra 4 bytes */
 	return BPFHDR(packet)->bh_datalen+4;
 }
 
+/* Returns the framing length for a given BPF packet record */
 static int bpf_get_framing_length(UNUSED 
 		const libtrace_packet_t *packet) 
 {
 	return BPFHDR(packet)->bh_hdrlen;
 }
 
+/* Returns the file descriptor that the capture interface is operating on */
 static int bpf_get_fd(const libtrace_t *trace) {
 	return FORMATIN(trace)->fd;
 }
 
+/* Prints some slightly useful help text for the BPF capture format */
 static void bpf_help() {
 	printf("bpf format module: $Revision$\n");
 	printf("Supported input URIs:\n");
