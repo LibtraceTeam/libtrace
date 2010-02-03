@@ -304,8 +304,14 @@ static int dag_init_output(libtrace_out_t *libtrace) {
 	char *scan = NULL;
 	struct dag_dev_t *dag_device = NULL;
 	int stream = 1;
+	
+	/* XXX I don't know if this is important or not, but this function
+	 * isn't present in all of the driver releases that this code is
+	 * supposed to support! */
+	/*
 	unsigned long wake_time;
 	dagutil_sleep_get_wake_time(&wake_time,0);
+	*/
 
 	dag_init_format_out_data(libtrace);
 	pthread_mutex_lock(&open_dag_mutex);
