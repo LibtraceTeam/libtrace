@@ -1,14 +1,16 @@
 /*
  * This file is part of libtrace
  *
- * Copyright (c) 2007,2008 The University of Waikato, Hamilton, New Zealand.
- * Authors: Daniel Lawson
- *          Perry Lorier
- *	    Shane Alcock
+ * Copyright (c) 2007,2008,2009,2010 The University of Waikato, Hamilton, 
+ * New Zealand.
  *
+ * Authors: Daniel Lawson 
+ *          Perry Lorier
+ *          Shane Alcock 
+ *          
  * All rights reserved.
  *
- * This code has been developed by the University of Waikato WAND
+ * This code has been developed by the University of Waikato WAND 
  * research group. For further information please see http://www.wand.net.nz/
  *
  * libtrace is free software; you can redistribute it and/or modify
@@ -28,6 +30,7 @@
  * $Id$
  *
  */
+
 #define _GNU_SOURCE
 
 #include "config.h"
@@ -63,6 +66,17 @@
 #  include <sys/ioctl.h>
 #endif
 
+/* This format deals with DAG cards that are using drivers from the 2.5 version
+ * onwards, including 3.X.
+ *
+ * DAG is a LIVE capture format.
+ *
+ * This format does support writing, provided the DAG card that you are using
+ * has transmit (Tx) support. Additionally, packets read using this format
+ * are in the ERF format, so can easily be written as ERF traces without
+ * losing any data.
+ */
+
 
 #define DATA(x) ((struct dag_format_data_t *)x->format_data)
 #define DATA_OUT(x) ((struct dag_format_data_out_t *)x->format_data)
@@ -73,52 +87,84 @@
 #define DUCK FORMAT_DATA->duck
 static struct libtrace_format_t dag;
 
+/* A DAG device - a DAG device can support multiple streams (and therefore
+ * multiple input traces) so each trace needs to refer to a device */
 struct dag_dev_t {
-	//pthread_mutex_t dag_mutex;
-	char * dev_name;
-	int fd;
-	uint16_t ref_count;
-	struct dag_dev_t *prev;
-	struct dag_dev_t *next;
+	char * dev_name;		/* Device name */
+	int fd;				/* File descriptor */
+	uint16_t ref_count;		/* Number of input / output traces
+					   that are using this device */
+	struct dag_dev_t *prev;		/* Pointer to the previous device in
+					   the device list */
+	struct dag_dev_t *next;		/* Pointer to the next device in the
+					   device list */
 };
 
+/* "Global" data that is stored for each DAG output trace */
 struct dag_format_data_out_t {
+	/* The DAG device being used for writing */
 	struct dag_dev_t *device;
+	/* The DAG stream that is being written on */
 	unsigned int dagstream;
+	/* Boolean flag indicating whether the stream is currently attached */
 	int stream_attached;
-	uint8_t *bottom;
-	uint8_t *top;
-	uint32_t processed;
-	uint64_t drops;
+	/* The amount of data waiting to be transmitted, in bytes */
 	uint64_t waiting;
+	/* A buffer to hold the data to be transmittted */
 	uint8_t *txbuffer;
 };
 
+/* "Global" data that is stored for each DAG input trace */
 struct dag_format_data_t {
+
+	/* Data required for regular DUCK reporting */
 	struct {
+		/* Timestamp of the last DUCK report */
 		uint32_t last_duck;
+		/* The number of seconds between each DUCK report */
                 uint32_t duck_freq;
+		/* Timestamp of the last packet read from the DAG card */
                 uint32_t last_pkt;
+		/* Dummy trace to ensure DUCK packets are dealt with using the
+		 * DUCK format functions */
                 libtrace_t *dummy_duck;
         } duck;
 
+	/* The DAG device that we are reading from */
 	struct dag_dev_t *device;
+	/* The DAG stream that we are reading from */
 	unsigned int dagstream;
+	/* Boolean flag indicating whether the stream is currently attached */
 	int stream_attached;
+	/* Pointer to the first unread byte in the DAG memory hole */
 	uint8_t *bottom;
+	/* Pointer to the last unread byte in the DAG memory hole */
 	uint8_t *top;
+	/* The amount of data processed thus far from the bottom pointer */
 	uint32_t processed;
+	/* The number of packets that have been dropped */
 	uint64_t drops;
 };
 
+/* To be thread-safe, we're going to need a mutex for operating on the list
+ * of DAG devices */
 pthread_mutex_t open_dag_mutex;
+
+/* The list of DAG devices that have been opened by libtrace.
+ *
+ * We can only open each DAG device once, but we might want to read from
+ * multiple streams. Therefore, we need to maintain a list of devices that we
+ * have opened (with ref counts!) so that we don't try to open a device too
+ * many times or close a device that we're still using */
 struct dag_dev_t *open_dags = NULL;
 
-/* Dag erf ether packets have a 2 byte padding before the packet
- * so that the ip header is aligned on a 32 bit boundary.
- */
+/* Returns the amount of padding between the ERF header and the start of the
+ * captured packet data */
 static int dag_get_padding(const libtrace_packet_t *packet)
 {
+	/* ERF Ethernet records have a 2 byte padding before the packet itself
+	 * so that the IP header is aligned on a 32 bit boundary.
+	 */
 	if (packet->trace->format->type==TRACE_FORMAT_ERF) {
 		dag_record_t *erfptr = (dag_record_t *)packet->header;
 		switch(erfptr->type) {
@@ -136,6 +182,7 @@ static int dag_get_padding(const libtrace_packet_t *packet)
 	}
 }
 
+/* Attempts to determine if the given filename refers to a DAG device */
 static int dag_probe_filename(const char *filename)
 {
 	struct stat statbuf;
@@ -151,20 +198,18 @@ static int dag_probe_filename(const char *filename)
 	return 1;
 }
 
+/* Initialises the DAG output data structure */
 static void dag_init_format_out_data(libtrace_out_t *libtrace) {
 	libtrace->format_data = (struct dag_format_data_out_t *) malloc(sizeof(struct dag_format_data_out_t));
 	// no DUCK on output
 	FORMAT_DATA_OUT->stream_attached = 0;
-	FORMAT_DATA_OUT->drops = 0;
 	FORMAT_DATA_OUT->device = NULL;
 	FORMAT_DATA_OUT->dagstream = 0;
-	FORMAT_DATA_OUT->processed = 0;
-	FORMAT_DATA_OUT->bottom = NULL;
-	FORMAT_DATA_OUT->top = NULL;
 	FORMAT_DATA_OUT->waiting = 0;
 
 }
 
+/* Initialises the DAG input data structure */
 static void dag_init_format_data(libtrace_t *libtrace) {
 	libtrace->format_data = (struct dag_format_data_t *)
 		malloc(sizeof(struct dag_format_data_t));
@@ -181,7 +226,10 @@ static void dag_init_format_data(libtrace_t *libtrace) {
 	FORMAT_DATA->top = NULL;
 }
 
-/* NOTE: This function assumes the open_dag_mutex is held by the caller */
+/* Determines if there is already an entry for the given DAG device in the
+ * device list and increments the reference count for that device, if found.
+ *
+ * NOTE: This function assumes the open_dag_mutex is held by the caller */
 static struct dag_dev_t *dag_find_open_device(char *dev_name) {
 	struct dag_dev_t *dag_dev;
 
@@ -202,7 +250,12 @@ static struct dag_dev_t *dag_find_open_device(char *dev_name) {
 
 }
 
-/* NOTE: This function assumes the open_dag_mutex is held by the caller */
+/* Closes a DAG device and removes it from the device list.
+ *
+ * Attempting to close a DAG device that has a non-zero reference count will
+ * cause an assertion failure!
+ *
+ * NOTE: This function assumes the open_dag_mutex is held by the caller */
 static void dag_close_device(struct dag_dev_t *dev) {
 	/* Need to remove from the device list */
 
@@ -224,17 +277,32 @@ static void dag_close_device(struct dag_dev_t *dev) {
 	free(dev);
 }
 
+
+/* Opens a new DAG device for writing and adds it to the DAG device list
+ *
+ * NOTE: this function should only be called when opening a DAG device for
+ * writing - there is little practical difference between this and the 
+ * function below that covers the reading case, but we need the output trace
+ * object to report errors properly so the two functions take slightly 
+ * different arguments. This is really lame and there should be a much better
+ * way of doing this.
+ *
+ * NOTE: This function assumes the open_dag_mutex is held by the caller 
+ */
 static struct dag_dev_t *dag_open_output_device(libtrace_out_t *libtrace, char *dev_name) {
 	struct stat buf;
 	int fd;
 	struct dag_dev_t *new_dev;
 
+	/* Make sure the device exists */
 	if (stat(dev_name, &buf) == -1) {
 		trace_set_err_out(libtrace,errno,"stat(%s)",dev_name);
 		return NULL;
 }
 
+	/* Make sure it is the appropriate type of device */
 	if (S_ISCHR(buf.st_mode)) {
+		/* Try opening the DAG device */
 		if((fd = dag_open(dev_name)) < 0) {
 			trace_set_err_out(libtrace,errno,"Cannot open DAG %s",
 					dev_name);
@@ -246,6 +314,9 @@ static struct dag_dev_t *dag_open_output_device(libtrace_out_t *libtrace, char *
 		return NULL;
 	}
 
+	/* Add the device to our device list - it is just a doubly linked
+	 * list with no inherent ordering; just tack the new one on the front
+	 */
 	new_dev = (struct dag_dev_t *)malloc(sizeof(struct dag_dev_t));
 	new_dev->fd = fd;
 	new_dev->dev_name = dev_name;
@@ -261,18 +332,30 @@ static struct dag_dev_t *dag_open_output_device(libtrace_out_t *libtrace, char *
 	return new_dev;
 }
 
-/* NOTE: This function assumes the open_dag_mutex is held by the caller */
+/* Opens a new DAG device for reading and adds it to the DAG device list
+ *
+ * NOTE: this function should only be called when opening a DAG device for
+ * reading - there is little practical difference between this and the 
+ * function above that covers the writing case, but we need the input trace
+ * object to report errors properly so the two functions take slightly 
+ * different arguments. This is really lame and there should be a much better
+ * way of doing this.
+ *
+ * NOTE: This function assumes the open_dag_mutex is held by the caller */
 static struct dag_dev_t *dag_open_device(libtrace_t *libtrace, char *dev_name) {
 	struct stat buf;
 	int fd;
 	struct dag_dev_t *new_dev;
 
+	/* Make sure the device exists */
         if (stat(dev_name, &buf) == -1) {
                 trace_set_err(libtrace,errno,"stat(%s)",dev_name);
                 return NULL;
         }
 
+	/* Make sure it is the appropriate type of device */
 	if (S_ISCHR(buf.st_mode)) {
+		/* Try opening the DAG device */
 		if((fd = dag_open(dev_name)) < 0) {
                         trace_set_err(libtrace,errno,"Cannot open DAG %s",
                                         dev_name);
@@ -284,6 +367,9 @@ static struct dag_dev_t *dag_open_device(libtrace_t *libtrace, char *dev_name) {
                 return NULL;
         }
 
+	/* Add the device to our device list - it is just a doubly linked
+	 * list with no inherent ordering; just tack the new one on the front
+	 */
 	new_dev = (struct dag_dev_t *)malloc(sizeof(struct dag_dev_t));
 	new_dev->fd = fd;
 	new_dev->dev_name = dev_name;
@@ -299,6 +385,7 @@ static struct dag_dev_t *dag_open_device(libtrace_t *libtrace, char *dev_name) {
 	return new_dev;
 }
 
+/* Creates and initialises a DAG output trace */
 static int dag_init_output(libtrace_out_t *libtrace) {
 	char *dag_dev_name = NULL;
 	char *scan = NULL;
@@ -314,7 +401,14 @@ static int dag_init_output(libtrace_out_t *libtrace) {
 	*/
 
 	dag_init_format_out_data(libtrace);
+	/* Grab the mutex while we're likely to be messing with the device 
+	 * list */
 	pthread_mutex_lock(&open_dag_mutex);
+	
+	/* Specific streams are signified using a comma in the libtrace URI,
+	 * e.g. dag:/dev/dag0,1 refers to stream 1 on the dag0 device.
+	 *
+	 * If no stream is specified, we will write using stream 1 */
 	if ((scan = strchr(libtrace->uridata,',')) == NULL) {
 		dag_dev_name = strdup(libtrace->uridata);
 	} else {
@@ -324,20 +418,24 @@ static int dag_init_output(libtrace_out_t *libtrace) {
 	}
 	FORMAT_DATA_OUT->dagstream = stream;
 
+	/* See if our DAG device is already open */
 	dag_device = dag_find_open_device(dag_dev_name);
 
 	if (dag_device == NULL) {
 		/* Device not yet opened - open it ourselves */
 		dag_device = dag_open_output_device(libtrace, dag_dev_name);
 	} else {
+		/* Otherwise, just use the existing one */
 		free(dag_dev_name);
 		dag_dev_name = NULL;
 	}
 
+	/* Make sure we have successfully opened a DAG device */
 	if (dag_device == NULL) {
 		if (dag_dev_name) {
 			free(dag_dev_name);
 		}
+		pthread_mutex_unlock(&open_dag_mutex);
 		return -1;
 	}
 
@@ -346,6 +444,7 @@ static int dag_init_output(libtrace_out_t *libtrace) {
 	return 0;
 }
 
+/* Creates and initialises a DAG input trace */
 static int dag_init_input(libtrace_t *libtrace) {
         char *dag_dev_name = NULL;
 	char *scan = NULL;
@@ -353,7 +452,15 @@ static int dag_init_input(libtrace_t *libtrace) {
 	struct dag_dev_t *dag_device = NULL;
 
 	dag_init_format_data(libtrace);
+	/* Grab the mutex while we're likely to be messing with the device 
+	 * list */
 	pthread_mutex_lock(&open_dag_mutex);
+	
+	
+	/* Specific streams are signified using a comma in the libtrace URI,
+	 * e.g. dag:/dev/dag0,2 refers to stream 2 on the dag0 device.
+	 *
+	 * If no stream is specified, we will read from stream 0 */
 	if ((scan = strchr(libtrace->uridata,',')) == NULL) {
 		dag_dev_name = strdup(libtrace->uridata);
 	} else {
@@ -364,20 +471,24 @@ static int dag_init_input(libtrace_t *libtrace) {
 
 	FORMAT_DATA->dagstream = stream;
 
+	/* See if our DAG device is already open */
 	dag_device = dag_find_open_device(dag_dev_name);
 
 	if (dag_device == NULL) {
 		/* Device not yet opened - open it ourselves */
 		dag_device = dag_open_device(libtrace, dag_dev_name);
 	} else {
+		/* Otherwise, just use the existing one */
 		free(dag_dev_name);
 		dag_dev_name = NULL;
 	}
 
+	/* Make sure we have successfully opened a DAG device */
 	if (dag_device == NULL) {
 		if (dag_dev_name)
 			free(dag_dev_name);
 		dag_dev_name = NULL;
+		pthread_mutex_unlock(&open_dag_mutex);
 		return -1;
 	}
 
@@ -387,14 +498,18 @@ static int dag_init_input(libtrace_t *libtrace) {
         return 0;
 }
 
+/* Configures a DAG input trace */
 static int dag_config_input(libtrace_t *libtrace, trace_option_t option,
                                 void *data) {
         char conf_str[4096];
 	switch(option) {
                 case TRACE_OPTION_META_FREQ:
+			/* This option is used to specify the frequency of DUCK
+			 * updates */
                         DUCK.duck_freq = *(int *)data;
                         return 0;
                 case TRACE_OPTION_SNAPLEN:
+			/* Tell the card our new snap length */
                         snprintf(conf_str, 4096, "varlen slen=%i", *(int *)data);
 			if (dag_configure(FORMAT_DATA->device->fd,
 						conf_str) != 0) {
@@ -406,12 +521,17 @@ static int dag_config_input(libtrace_t *libtrace, trace_option_t option,
                         /* DAG already operates in a promisc fashion */
                         return -1;
                 case TRACE_OPTION_FILTER:
+			/* We don't yet support pushing filters into DAG 
+			 * cards */
                         return -1;
                 case TRACE_OPTION_EVENT_REALTIME:
+			/* Live capture is always going to be realtime */
 			return -1;
         }
 	return -1;
 }
+
+/* Starts a DAG output trace */
 static int dag_start_output(libtrace_out_t *libtrace) {
 	struct timeval zero, nopoll;
 	uint8_t *top, *bottom;
@@ -420,6 +540,8 @@ static int dag_start_output(libtrace_out_t *libtrace) {
 	zero.tv_sec = 0;
 	zero.tv_usec = 0;
 	nopoll = zero;
+
+	/* Attach and start the DAG stream */
 
 	if (dag_attach_stream(FORMAT_DATA_OUT->device->fd,
 			FORMAT_DATA_OUT->dagstream, 0, 1048576) < 0) {
@@ -443,6 +565,7 @@ static int dag_start_output(libtrace_out_t *libtrace) {
 	return 0;
 }
 
+/* Starts a DAG input trace */
 static int dag_start_input(libtrace_t *libtrace) {
         struct timeval zero, nopoll;
         uint8_t *top, *bottom;
@@ -453,8 +576,7 @@ static int dag_start_input(libtrace_t *libtrace) {
         zero.tv_usec = 0;
         nopoll = zero;
 
-
-
+	/* Attach and start the DAG stream */
 	if (dag_attach_stream(FORMAT_DATA->device->fd,
 				FORMAT_DATA->dagstream, 0, 0) < 0) {
                 trace_set_err(libtrace, errno, "Cannot attach DAG stream");
@@ -467,13 +589,13 @@ static int dag_start_input(libtrace_t *libtrace) {
                 return -1;
         }
 	FORMAT_DATA->stream_attached = 1;
+	
 	/* We don't want the dag card to do any sleeping */
         dag_set_stream_poll(FORMAT_DATA->device->fd,
 				FORMAT_DATA->dagstream, 0, &zero,
 				&nopoll);
 
 	/* Should probably flush the memory hole now */
-
 	do {
 		top = dag_advance_stream(FORMAT_DATA->device->fd,
 					FORMAT_DATA->dagstream,
@@ -490,7 +612,10 @@ static int dag_start_input(libtrace_t *libtrace) {
 	return 0;
 }
 
+/* Pauses a DAG output trace */
 static int dag_pause_output(libtrace_out_t *libtrace) {
+
+	/* Stop and detach the stream */
 	if (dag_stop_stream(FORMAT_DATA_OUT->device->fd,
 			FORMAT_DATA_OUT->dagstream) < 0) {
 		trace_set_err_out(libtrace, errno, "Could not stop DAG stream");
@@ -505,7 +630,10 @@ static int dag_pause_output(libtrace_out_t *libtrace) {
 	return 0;
 }
 
+/* Pauses a DAG input trace */
 static int dag_pause_input(libtrace_t *libtrace) {
+
+	/* Stop and detach the stream */
 	if (dag_stop_stream(FORMAT_DATA->device->fd,
 				FORMAT_DATA->dagstream) < 0) {
                 trace_set_err(libtrace, errno, "Could not stop DAG stream");
@@ -520,12 +648,17 @@ static int dag_pause_input(libtrace_t *libtrace) {
 	return 0;
 }
 
+/* Closes a DAG input trace */
 static int dag_fin_input(libtrace_t *libtrace) {
+	/* Need the lock, since we're going to be handling the device list */
 	pthread_mutex_lock(&open_dag_mutex);
+	
+	/* Detach the stream if we are not paused */
 	if (FORMAT_DATA->stream_attached)
 		dag_pause_input(libtrace);
 	FORMAT_DATA->device->ref_count --;
 
+	/* Close the DAG device if there are no more references to it */
 	if (FORMAT_DATA->device->ref_count == 0)
 		dag_close_device(FORMAT_DATA->device);
 	if (DUCK.dummy_duck)
@@ -535,26 +668,32 @@ static int dag_fin_input(libtrace_t *libtrace) {
         return 0; /* success */
 }
 
+/* Closes a DAG output trace */
 static int dag_fin_output(libtrace_out_t *libtrace) {
-	// commit any outstanding traffic in the txbuffer
+	
+	/* Commit any outstanding traffic in the txbuffer */
 	if (FORMAT_DATA_OUT->waiting) {
 		dag_tx_stream_commit_bytes(FORMAT_DATA_OUT->device->fd, FORMAT_DATA_OUT->dagstream,
 				FORMAT_DATA_OUT->waiting );
 	}
 
-	// wait until the buffer is nearly clear before exiting the program, as we
-	// will lose packets otherwise
+	/* Wait until the buffer is nearly clear before exiting the program, 
+	 * as we will lose packets otherwise */
 	dag_tx_get_stream_space(FORMAT_DATA_OUT->device->fd,
 			FORMAT_DATA_OUT->dagstream,
 			dag_get_stream_buffer_size(FORMAT_DATA_OUT->device->fd,
 					FORMAT_DATA_OUT->dagstream) - 8
 			);
 
+	/* Need the lock, since we're going to be handling the device list */
 	pthread_mutex_lock(&open_dag_mutex);
+
+	/* Detach the stream if we are not paused */
 	if (FORMAT_DATA_OUT->stream_attached)
 		dag_pause_output(libtrace);
 	FORMAT_DATA_OUT->device->ref_count --;
 
+	/* Close the DAG device if there are no more references to it */
 	if (FORMAT_DATA_OUT->device->ref_count == 0)
 		dag_close_device(FORMAT_DATA_OUT->device);
 	free(libtrace->format_data);
@@ -562,8 +701,11 @@ static int dag_fin_output(libtrace_out_t *libtrace) {
 	return 0; /* success */
 }
 
+/* Extracts DUCK information from the DAG card and produces a DUCK packet */
 static int dag_get_duckinfo(libtrace_t *libtrace,
                                 libtrace_packet_t *packet) {
+
+	/* Allocate memory for the DUCK data */
         if (packet->buf_control == TRACE_CTRL_EXTERNAL ||
                         !packet->buffer) {
                 packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
@@ -575,11 +717,12 @@ static int dag_get_duckinfo(libtrace_t *libtrace,
                 }
         }
 
+	/* DUCK doesn't have a format header */
         packet->header = 0;
         packet->payload = packet->buffer;
 
         /* No need to check if we can get DUCK or not - we're modern
-         * enough */
+         * enough so just grab the DUCK info */
         if ((ioctl(FORMAT_DATA->device->fd, DAGIOCDUCK,
 					(duckinf_t *)packet->payload) < 0)) {
                 trace_set_err(libtrace, errno, "Error using DAGIOCDUCK");
@@ -587,22 +730,31 @@ static int dag_get_duckinfo(libtrace_t *libtrace,
         }
 
         packet->type = TRACE_RT_DUCK_2_5;
+
+	/* Set the packet's tracce to point at a DUCK trace, so that the
+	 * DUCK format functions will be called on the packet rather than the
+	 * DAG ones */
         if (!DUCK.dummy_duck)
                 DUCK.dummy_duck = trace_create_dead("rt:localhost:3434");
         packet->trace = DUCK.dummy_duck;
         return sizeof(duckinf_t);
 }
 
+/* Determines the amount of data available to read from the DAG card */
 static int dag_available(libtrace_t *libtrace) {
 	uint32_t diff = FORMAT_DATA->top - FORMAT_DATA->bottom;
+
 	/* If we've processed more than 4MB of data since we last called
 	 * dag_advance_stream, then we should call it again to allow the
 	 * space occupied by that 4MB to be released */
 	if (diff >= dag_record_size && FORMAT_DATA->processed < 4 * 1024 * 1024)
 		return diff;
+	
+	/* Update the top and bottom pointers */
 	FORMAT_DATA->top = dag_advance_stream(FORMAT_DATA->device->fd,
 			FORMAT_DATA->dagstream,
 			&(FORMAT_DATA->bottom));
+	
 	if (FORMAT_DATA->top == NULL) {
 		trace_set_err(libtrace, errno, "dag_advance_stream failed!");
 		return -1;
@@ -612,6 +764,7 @@ static int dag_available(libtrace_t *libtrace) {
 	return diff;
 }
 
+/* Returns a pointer to the start of the next complete ERF record */
 static dag_record_t *dag_get_record(libtrace_t *libtrace) {
         dag_record_t *erfptr = NULL;
         uint16_t size;
@@ -628,28 +781,35 @@ static dag_record_t *dag_get_record(libtrace_t *libtrace) {
 	return erfptr;
 }
 
+/* Converts a buffer containing a recently read DAG packet record into a
+ * libtrace packet */
 static int dag_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
 		void *buffer, libtrace_rt_types_t rt_type, uint32_t flags) {
 
 	dag_record_t *erfptr;
-
+	
+	/* If the packet previously owned a buffer that is not the buffer
+         * that contains the new packet data, we're going to need to free the
+         * old one to avoid memory leaks */
 	if (packet->buffer != buffer &&
 			packet->buf_control == TRACE_CTRL_PACKET) {
 		free(packet->buffer);
 	}
 
+	/* Set the buffer owner appropriately */
 	if ((flags & TRACE_PREP_OWN_BUFFER) == TRACE_PREP_OWN_BUFFER) {
 		packet->buf_control = TRACE_CTRL_PACKET;
 	} else
 		packet->buf_control = TRACE_CTRL_EXTERNAL;
 
+	/* Update the packet pointers and type appropriately */
 	erfptr = (dag_record_t *)buffer;
 	packet->buffer = erfptr;
         packet->header = erfptr;
         packet->type = rt_type;
 
 	if (erfptr->flags.rxerror == 1) {
-                /* rxerror means the payload is corrupt - drop it
+                /* rxerror means the payload is corrupt - drop the payload
                  * by tweaking rlen */
                 packet->payload = NULL;
                 erfptr->rlen = htons(erf_get_framing_length(packet));
@@ -662,11 +822,14 @@ static int dag_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
 		dag_init_format_data(libtrace);
 	}
 
+	/* Update the dropped packets counter */
+
 	/* No loss counter for DSM coloured records - have to use
 	 * some other API */
 	if (erfptr->type == TYPE_DSM_COLOR_ETH) {
-
+		/* TODO */
 	} else {
+		/* Use the ERF loss counter */
 		DATA(libtrace)->drops += ntohs(erfptr->lctr);
 	}
 
@@ -681,9 +844,9 @@ static int dag_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
  * was attempted.
  */
 
+/* Pushes an ERF record onto the transmit stream */
 static int dag_dump_packet(libtrace_out_t *libtrace,
 		dag_record_t *erfptr, unsigned int pad, void *buffer) {
-	//int numbytes = 0;
 	int size;
 
 	/*
@@ -701,8 +864,8 @@ static int dag_dump_packet(libtrace_out_t *libtrace,
 	}
 
 	/*
-	 * Copy the header separately to the body, as we can't guarantee they are
-	 * in contiguous memory
+	 * Copy the header separately to the body, as we can't guarantee they 
+	 * are in contiguous memory
 	 */
 	memcpy(FORMAT_DATA_OUT->txbuffer + FORMAT_DATA_OUT->waiting,erfptr,(dag_record_size + pad));
 	FORMAT_DATA_OUT->waiting += (dag_record_size + pad);
@@ -710,17 +873,18 @@ static int dag_dump_packet(libtrace_out_t *libtrace,
 
 
 	/*
-	 * Copy our incoming packet into the outgoing buffer, and increment our waiting count
+	 * Copy our incoming packet into the outgoing buffer, and increment 
+	 * our waiting count
 	 */
 	size = ntohs(erfptr->rlen)-(dag_record_size + pad);
 	memcpy(FORMAT_DATA_OUT->txbuffer + FORMAT_DATA_OUT->waiting,buffer,size);
 	FORMAT_DATA_OUT->waiting += size;
 
 	/*
-	 * if our output buffer has more than 16 Mebibytes in it, commit those bytes and
-	 * reset the waiting count to 0.
-	 * Note: dag_fin_output will also call dag_tx_stream_commit_bytes() in case
-	 * there is still data in the buffer at program exit.
+	 * If our output buffer has more than 16 Mebibytes in it, commit those 
+	 * bytes and reset the waiting count to 0.
+	 * Note: dag_fin_output will also call dag_tx_stream_commit_bytes() in 
+	 * case there is still data in the buffer at program exit.
 	 */
 
 	if (FORMAT_DATA_OUT->waiting >= 16*1024*1024) {
@@ -733,17 +897,19 @@ static int dag_dump_packet(libtrace_out_t *libtrace,
 
 }
 
+/* Attempts to determine a suitable ERF type for a given packet. Returns true
+ * if one is found, false otherwise */
 static bool find_compatible_linktype(libtrace_out_t *libtrace,
-				libtrace_packet_t *packet)
+				libtrace_packet_t *packet, char *type)
 {
 	 // Keep trying to simplify the packet until we can find
 	 //something we can do with it
 
 	do {
-		char type=libtrace_to_erf_type(trace_get_link_type(packet));
+		*type=libtrace_to_erf_type(trace_get_link_type(packet));
 
 		// Success
-		if (type != (char)-1)
+		if (*type != (char)-1)
 			return true;
 
 		if (!demote_packet(packet)) {
@@ -759,26 +925,28 @@ static bool find_compatible_linktype(libtrace_out_t *libtrace,
 	return true;
 }
 
+/* Writes a packet to the provided DAG output trace */
 static int dag_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *packet) {
 	/*
-	 * This is heavily borrowed from erf_write_packet(). Yes, CnP coding sucks,
-	 * sorry about that.
+	 * This is heavily borrowed from erf_write_packet(). Yes, CnP coding 
+	 * sucks, sorry about that.
 	 */
 	unsigned int pad = 0;
 	int numbytes;
 	void *payload = packet->payload;
 	dag_record_t *header = (dag_record_t *)packet->header;
+	char erf_type = 0;
 
-	FORMAT_DATA_OUT->processed ++;
 	if(!packet->header) {
-		// No header, probably an RT packet. Lifted from erf_write_packet().
+		/* No header, probably an RT packet. Lifted from 
+		 * erf_write_packet(). */
 		return -1;
 	}
 
 	pad = dag_get_padding(packet);
 
 	/*
-	 * if the payload is null, adjust the rlen. Discussion of this is
+	 * If the payload is null, adjust the rlen. Discussion of this is
 	 * attached to erf_write_packet()
 	 */
 	if (payload == NULL) {
@@ -795,8 +963,9 @@ static int dag_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *packet)
 	} else {
 		/* Build up a new packet header from the existing header */
 
-		// Simplify the packet first - if we can't do this, break early
-		if (!find_compatible_linktype(libtrace,packet))
+		/* Simplify the packet first - if we can't do this, break 
+		 * early */
+		if (!find_compatible_linktype(libtrace,packet,&erf_type))
 			return -1;
 
 		dag_record_t erfhdr;
@@ -810,7 +979,7 @@ static int dag_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *packet)
 		if (trace_get_direction(packet)!=~0U)
 			erfhdr.flags.iface = trace_get_direction(packet);
 
-		erfhdr.type = libtrace_to_erf_type(trace_get_link_type(packet));
+		erfhdr.type = erf_type;
 
 		/* Packet length (rlen includes format overhead) */
 		assert(trace_get_capture_length(packet)>0
@@ -824,7 +993,7 @@ static int dag_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *packet)
 			+ erf_get_framing_length(packet));
 
 
-		/* loss counter. Can't do this */
+		/* Loss counter. Can't do this */
 		erfhdr.lctr = 0;
 		/* Wire length, does not include padding! */
 		erfhdr.wlen = htons(trace_get_wire_length(packet));
@@ -840,6 +1009,10 @@ static int dag_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *packet)
 	return numbytes;
 }
 
+/* Reads the next available packet from a DAG card, in a BLOCKING fashion
+ *
+ * If DUCK reporting is enabled, the packet returned may be a DUCK update
+ */
 static int dag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
         int size = 0;
         struct timeval tv;
@@ -847,7 +1020,8 @@ static int dag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	int numbytes = 0;
 	uint32_t flags = 0;
 
-        if (DUCK.last_pkt - DUCK.last_duck > DUCK.duck_freq &&
+        /* Check if we're due for a DUCK report */
+	if (DUCK.last_pkt - DUCK.last_duck > DUCK.duck_freq &&
                         DUCK.duck_freq != 0) {
                 size = dag_get_duckinfo(libtrace, packet);
                 DUCK.last_duck = DUCK.last_pkt;
@@ -858,13 +1032,17 @@ static int dag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
                 DUCK.duck_freq = 0;
         }
 
+	/* Don't let anyone try to free our DAG memory hole! */
 	flags |= TRACE_PREP_DO_NOT_OWN_BUFFER;
 
+	/* If the packet buffer is currently owned by libtrace, free it so
+	 * that we can set the packet to point into the DAG memory hole */
         if (packet->buf_control == TRACE_CTRL_PACKET) {
                 free(packet->buffer);
                 packet->buffer = 0;
         }
 
+	/* Grab a full ERF record */
 	do {
 		numbytes = dag_available(libtrace);
 		if (numbytes < 0)
@@ -875,10 +1053,12 @@ static int dag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 		erfptr = dag_get_record(libtrace);
 	} while (erfptr == NULL);
 
-	//dag_form_packet(erfptr, packet);
+	/* Prepare the libtrace packet */
 	if (dag_prepare_packet(libtrace, packet, erfptr, TRACE_RT_DATA_ERF,
 				flags))
 		return -1;
+
+	/* Update the DUCK timer */
 	tv = trace_get_timeval(packet);
         DUCK.last_pkt = tv.tv_sec;
 
@@ -886,6 +1066,10 @@ static int dag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 				erf_get_framing_length(packet);
 }
 
+/* Attempts to read a packet from a DAG card in a NON-BLOCKING fashion. If a
+ * packet is available, we will return a packet event. Otherwise we will
+ * return a SLEEP event (as we cannot select on the DAG file descriptor).
+ */
 static libtrace_eventobj_t trace_event_dag(libtrace_t *trace,
                                         libtrace_packet_t *packet) {
         libtrace_eventobj_t event = {0,0,0.0,0};
@@ -906,12 +1090,11 @@ static libtrace_eventobj_t trace_event_dag(libtrace_t *trace,
 		if (numbytes != 0)
 			erfptr = dag_get_record(trace);
 		if (erfptr == NULL) {
-			/* No packet available */
+			/* No packet available - sleep for a very short time */
 			event.type = TRACE_EVENT_SLEEP;
 			event.seconds = 0.0001;
 			break;
 		}
-		//dag_form_packet(erfptr, packet);
 		if (dag_prepare_packet(trace, packet, erfptr, 
 					TRACE_RT_DATA_ERF, flags)) {
 			event.type = TRACE_EVENT_TERMINATE;
@@ -921,6 +1104,11 @@ static libtrace_eventobj_t trace_event_dag(libtrace_t *trace,
 
 		event.size = trace_get_capture_length(packet) + 
 				trace_get_framing_length(packet);
+		
+		/* XXX trace_read_packet() normally applies the following
+		 * config options for us, but this function is called via
+		 * trace_event() so we have to do it ourselves */
+
 		if (trace->filter) {
 			if (trace_apply_filter(trace->filter, packet)) {
 				event.type = TRACE_EVENT_PACKET;
@@ -945,12 +1133,14 @@ static libtrace_eventobj_t trace_event_dag(libtrace_t *trace,
 	return event;
 }
 
+/* Gets the number of dropped packets */
 static uint64_t dag_get_dropped_packets(libtrace_t *trace) {
 	if (trace->format_data == NULL)
 		return (uint64_t)-1;
 	return DATA(trace)->drops;
 }
 
+/* Prints some semi-useful help text about the DAG format module */
 static void dag_help(void) {
         printf("dag format module: $Revision$\n");
         printf("Supported input URIs:\n");
