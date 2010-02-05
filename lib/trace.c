@@ -1211,7 +1211,7 @@ DLLEXPORT void trace_destroy_filter(libtrace_filter_t *filter)
  *
  * @returns -1 on error, 0 on success
  */
-int trace_bpf_compile(libtrace_filter_t *filter,
+static int trace_bpf_compile(libtrace_filter_t *filter,
 		const libtrace_packet_t *packet	) {
 #ifdef HAVE_BPF_FILTER
 	void *linkptr = 0;
