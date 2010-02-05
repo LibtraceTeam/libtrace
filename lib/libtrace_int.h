@@ -1,9 +1,12 @@
 /*
  * This file is part of libtrace
  *
- * Copyright (c) 2007,2008 The University of Waikato, Hamilton, New Zealand.
+ * Copyright (c) 2007,2008,2009,2010 The University of Waikato, Hamilton, 
+ * New Zealand.
+ *
  * Authors: Daniel Lawson 
- *          Perry Lorier 
+ *          Perry Lorier
+ *          Shane Alcock 
  *          
  * All rights reserved.
  *
@@ -27,8 +30,23 @@
  * $Id$
  *
  */
-/** @file */
 
+/** @file
+ *
+ * @brief Header file containing definitions for structures and functions that
+ * are internal
+ *
+ * @author Daniel Lawson
+ * @author Perry Lorier
+ * @author Shane Alcock
+ *
+ * @version $Id$
+ *
+ * All of the structures and functions defined in this header file are intended
+ * for internal use within Libtrace only. They should not be exported as part
+ * of the library API as we don't want users accessing things like the
+ * contents of the libtrace packet structure directly!
+ */
 #ifndef LIBTRACE_INT_H
 #define LIBTRACE_INT_H
 
@@ -89,6 +107,7 @@ extern "C" {
 
 #ifndef HAVE_STRNCASECMP
 # ifndef HAVE__STRNICMP
+/** A local implementation of strncasecmp (as some systems do not have it) */
 int strncasecmp(const char *str1, const char *str2, size_t n);
 # else
 # define strncasecmp _strnicmp
@@ -97,6 +116,7 @@ int strncasecmp(const char *str1, const char *str2, size_t n);
 
 #ifndef HAVE_SNPRINTF
 # ifndef HAVE_SPRINTF_S
+/** A local implementation of snprintf (as some systems do not have it) */
 int snprintf(char *str, size_t size, const char *format, ...);
 # else
 # define snprintf sprintf_s
@@ -117,110 +137,150 @@ int snprintf(char *str, size_t size, const char *format, ...);
 #  include "dagformat.h"
 #endif
 
-#define RP_BUFSIZE 65536U
+//#define RP_BUFSIZE 65536U
 
+/** Data about the most recent event from a trace file */
 struct libtrace_event_status_t {
+	/** A libtrace packet to store the packet when a PACKET event occurs */
 	libtrace_packet_t *packet;
+	/** Time between the timestamp for the current packet and the current 
+	 * walltime */
 	double tdelta;
+	/** The timestamp of the previous PACKET event */
 	double trace_last_ts;
+	/** The size of the current PACKET event */
 	int psize;
 };
 
-/** The information about traces that are open 
+/** A libtrace input trace 
  * @internal
  */
 struct libtrace_t {
-	struct libtrace_format_t *format; /**< format driver pointer */
-	struct libtrace_event_status_t event;	/**< the next event */
-	void *format_data; 		/**<format data pointer */
-	struct libtrace_filter_t *filter; /**< used by libtrace if the module
-					    * doesn't support filters natively
-					    */
-	size_t snaplen;			/**< used by libtrace if the module
-					  * doesn't support snapping natively
-					  */
-	uint64_t accepted_packets;	/**< Number of packets returned to the
-					  * user 
-					  */
-	uint64_t filtered_packets;	/**< Number of packets filtered by
-					  * libtrace
-					  */
-	char *uridata;			/**< the uri of this trace */
-	io_t *io;			/**< The tracefile (if applicable) */
-
-	libtrace_err_t err;		/**< error information */
-	bool started;			/**< if this trace has started */
+	/** The capture format for the input trace */
+	struct libtrace_format_t *format; 
+	/** Details of the most recent PACKET event reported by the trace */
+	struct libtrace_event_status_t event;
+	/** Pointer to the "global" data for the capture format module */	
+	void *format_data; 		
+	/** A BPF filter to be applied to all packets read by the trace - 
+	 * used only if the capture format does not support filters natively */
+	struct libtrace_filter_t *filter; 
+	/** The snap length to be applied to all packets read by the trace - 
+	 * used only if the capture format does not support snapping natively */
+	size_t snaplen;			
+	/** Count of the number of packets returned to the libtrace user */
+	uint64_t accepted_packets;	
+	/** Count of the number of packets filtered by libtrace */
+	uint64_t filtered_packets;	
+	/** The filename from the uri for the trace */
+	char *uridata;			
+	/** The libtrace IO reader for this trace (if applicable) */
+	io_t *io;			
+	/** Error information for the trace */
+	libtrace_err_t err;		
+	/** Boolean flag indicating whether the trace has been started */
+	bool started;			
 };
 
-/** Information about output traces
+/** A libtrace output trace
  * @internal
  */
 struct libtrace_out_t {
-        struct libtrace_format_t *format;	/**< format driver */
-	void *format_data; 		/**< format data */
-	char *uridata;			/**< URI associated with this trace */
-	libtrace_err_t err;		/**< Associated error */
-	bool started;			/**< trace started */
+	/** The capture format for the output trace */
+        struct libtrace_format_t *format;
+	/** Pointer to the "global" data for the capture format module */
+	void *format_data; 		
+	/** The filename for the uri for the output trace */
+	char *uridata;			
+	/** Error information for the output trace */
+	libtrace_err_t err;
+	/** Boolean flag indicating whether the trace has been started */
+	bool started;			
 };
 
+/** Sets the error status on an input trace
+ *
+ * @param trace		The input trace to set the error status for
+ * @param errcode	The code for the error - can be a libtrace error code or a regular errno value
+ * @param msg 		A message to print when reporting the error
+ */
 void trace_set_err(libtrace_t *trace, int errcode,const char *msg,...) 
+
 								PRINTF(3,4);
+/** Sets the error status on an output trace
+ *
+ * @param trace		The output trace to set the error status for
+ * @param errcode	The code for the error - can be a libtrace error code or a regular errno value
+ * @param msg 		A message to print when reporting the error
+ */
 void trace_set_err_out(libtrace_out_t *trace, int errcode, const char *msg,...)
 								PRINTF(3,4);
 
 
-/* 
+/** Converts the data provided in buffer into a valid libtrace packet
  *
- * The basic idea of this function is that it will take the data pointed to
- * by 'buffer' and treat it as a packet of the same format type as the 
- * libtrace_t pointed to by 'trace', including the format framing (e.g. an
- * erf header for erf and dag formats, a pcap header for pcap formats).
- * 
- * The libtrace packet pointed to by 'packet' will then have its internal
- * pointers and values replaced with ones that describe the packet in 'buffer'.
- * 
- * 'rt_type' is used to set packet->type while 'flags' is relatively 
- * self-explanatory. Definitions of the accepted flags will be provided below.
+ * @param trace		An input trace of the same format as the "packet" 
+ * 			contained in the buffer
+ * @param packet	The libtrace packet to prepare
+ * @param buffer	A buffer containing the packet data, including the
+ * 			capture format header
+ * @param rt_type	The RT type for the packet that is being prepared
+ * @param flags		Used to specify options for the preparation function,
+ * 			e.g. who owns the packet buffer
  *
- * The primary use of this function is to allow rt_read_packet to nicely
- * convert packets from the RT format back to the format that they were
- * originally captured with, as RT essentially encapsulates the original trace
- * format. We've decided to not make this function available via the API
- * because there are a number of issues that can arise if it is not used
- * very carefully and there are few situations outside of the RT case where
- * you'd want to do something like this anyway.
+ * @return -1 if an error occurs, 0 otherwise 
  *
- * Returns 0 if successful, -1 if something goes horribly wrong
+ * Packet preparation is a tricky concept - the idea is to take the data
+ * pointed to by 'buffer' and treat it as a packet record of the same capture
+ * format as that used by the input trace. The provided libtrace packet then
+ * has its internal pointers and values set to describe the packet record in
+ * the buffer. 
+ *
+ * The primary use of this function is to allow the RT packet reader to 
+ * easily and safely convert packets from the RT format back into the format
+ * that they were originally captured with., essentially removing the RT
+ * encapsulation.
+ *
+ * We've decided not to make this function available via the exported API 
+ * because there are several issues that can arise if it is not used very
+ * carefully and it is not very useful outside of internal contexts anyway.
  */
 int trace_prepare_packet(libtrace_t *trace, libtrace_packet_t *packet,
 		void *buffer, libtrace_rt_types_t rt_type, uint32_t flags);
 
-/* Flags for prepare_packet functions */
-/*-------------------------------------*/
+/** Flags for prepare_packet functions */
 enum {
-	/* If set, the memory pointed to by 'buffer' is malloc()'d and 
-	 * libtrace should undertake ownership of that memory. If not set, 
-	 * the memory is treated as externally-owned and will not be freed by 
-	 * libtrace when the packet is destroyed. */
+	/** The buffer memory has been allocated by libtrace and should be
+	 * freed when the packet is destroyed. */
 	TRACE_PREP_OWN_BUFFER		=1,
+	
+	/** The buffer memory is externally-owned and must not be freed by 
+	 * libtrace when the packet is destroyed. */
 	TRACE_PREP_DO_NOT_OWN_BUFFER	=0
 };
 
-#define TRACE_PREP_OWN_BUFFER 	1
-
-								
+/** A local definition of an SLL header */
 typedef struct libtrace_sll_header_t {
-	uint16_t pkttype;          	/* packet type */
-	uint16_t hatype;           	/* link-layer address type */
-	uint16_t halen;            	/* link-layer address length */
-	unsigned char addr[8];	 	/* link-layer address */
-	uint16_t protocol;         	/* protocol */
+	uint16_t pkttype;          	/**< Packet type */
+	uint16_t hatype;           	/**< Link-layer address type */
+	uint16_t halen;            	/**< Link-layer address length */
+	unsigned char addr[8];	 	/**< Link-layer address */
+	uint16_t protocol;         	/**< Protocol */
 } libtrace_sll_header_t;
 
+
+/* SLL packet types */
+
+/** Packet was addressed for the local host */
 #define TRACE_SLL_HOST		0
+/** Packet was addressed for a broadcast address */
 #define TRACE_SLL_BROADCAST 	1
+/** Packet was addressed for a multicast address */
 #define TRACE_SLL_MULTICAST	2
+/** Packet was addressed for another host but was captured by a promiscuous
+ * device */
 #define TRACE_SLL_OTHERHOST	3
+/** Packet originated from the local host */
 #define TRACE_SLL_OUTGOING	4
 
 #ifndef PF_RULESET_NAME_SIZE
@@ -231,8 +291,10 @@ typedef struct libtrace_sll_header_t {
 #define IFNAMSIZ 16
 #endif
 
+
+/** A local definition of a PFLOG header */
 typedef struct libtrace_pflog_header_t {
-	uint8_t	   length;
+	uint8_t	   length;	
 	sa_family_t   af;
 	uint8_t	   action;
 	uint8_t	   reason;
@@ -246,231 +308,616 @@ typedef struct libtrace_pflog_header_t {
 
 
 
-/** Module definition structure */
-/* all of these should return -1, or NULL on failure */
+/** A libtrace capture format module */
+/* All functions should return -1, or NULL on failure */
 struct libtrace_format_t {
-	/** the uri name of this module */
+	/** The name of this module, used in the libtrace URI to identify the
+	 * capture format */
 	const char *name;
-	/** the version of this module */
+	/** The version of this module */
 	const char *version;
-	/** the RT protocol type of this module */
+	/** The RT protocol type of this module */
 	enum base_format_t type;
 
-/* Padding inserted here to make the enum fit properly */
 
-	/** stuff that deals with input @{ */
-	/** Given a filename, return if this format is responsible
- 	 * (used for devices)
+	/** Given a filename, return if this is the most likely capture format
+ 	 * (used for devices). Used to "guess" the capture format when the
+	 * URI is not fully specified.
+	 *
+	 * @param fname 	The name of the device or file to examine
+	 * @return 1 if the name matches the capture format, 0 otherwise
  	 */
 	int (*probe_filename)(const char *fname);
-	/** Given a file, look for file magic. */
+	
+	/** Given a file, looks at the start of the file to determine if this
+	 * is the capture format. Used to "guess" the capture format when the
+	 * URI is not fully specified.
+	 *
+	 * @param io		An open libtrace IO reader for the file to check
+	 * @return 1 if the file matches the capture format, 0 otherwise
+	 */
 	int (*probe_magic)(io_t *io);
-	/** initialise an trace (or NULL if input is not supported) */
+
+	/** Initialises an input trace using the capture format.
+	 *
+	 * @param libtrace 	The input trace to be initialised
+	 * @return 0 if successful, -1 in the event of error 
+	 */
 	int (*init_input)(libtrace_t *libtrace);
-	/** configure an trace (or NULL if input is not supported) */
+	
+	/** Applies a configuration option to an input trace.
+	 *
+	 * @param libtrace	The input trace to apply the option to
+	 * @param option	The option that is being configured
+	 * @param value		A pointer to the value that the option is to be
+	 * 			set to
+	 * @return 0 if successful, -1 if the option is unsupported or an error
+	 * occurs
+	 */
 	int (*config_input)(libtrace_t *libtrace,trace_option_t option,void *value);
-	/** start/unpause an trace (or NULL if input not supported) */
+	/** Starts or unpauses an input trace - note that this function is
+	 * often the one that opens the file or device for reading.
+	 *
+	 * @param libtrace	The input trace to be started or unpaused
+	 * @return 0 if successful, -1 in the event of error */
 	int (*start_input)(libtrace_t *libtrace);
-	/** pause an trace (or NULL if input not supported) */
+
+	/** Pauses an input trace - this function should close or detach the
+	 * file or device that is being read from. 
+	 *
+	 * @param libtrace	The input trace to be paused
+	 * @return 0 if successful, -1 in the event of error
+	 */
 	int (*pause_input)(libtrace_t *libtrace);
-	/** @} */
-	/** stuff that deals with output @{ */
-	/** initialise output traces (or NULL if output not supported) */
+
+	/** Initialises an output trace using the capture format.
+	 *
+	 * @param libtrace	The output trace to be initialised
+	 * @return 0 if successful, -1 in the event of error
+	 */
 	int (*init_output)(libtrace_out_t *libtrace);
-	/** configure output traces (or NULL if output not supported) */
-	int (*config_output)(libtrace_out_t *libtrace, trace_option_output_t option, void *);
-	/** start output traces (or NULL if output not supported) 
-	 * There is no pause for output traces, as packets are not arriving
-	 * asyncronously
+	
+	/** Applies a configuration option to an output trace.
+	 *
+	 * @param libtrace      The output trace to apply the option to 
+	 * @param option        The option that is being configured
+	 * @param value         A pointer to the value that the option is to be
+	 * 			set to
+	 * @return 0 if successful, -1 if the option is unsupported or an error
+	 * occurs
+	 * */
+	int (*config_output)(libtrace_out_t *libtrace, trace_option_output_t option, void *value);
+
+	/** Starts an output trace - note that this function is often the one
+	 * that opens the file or device for writing.
+	 *
+	 * @param libtrace 	The output trace to be started
+	 * @return 0 if successful, -1 if an error occurs
+	 *
+	 * There is no pause for output traces, as writing is not performed
+	 * asynchronously.
 	 */
 	int (*start_output)(libtrace_out_t *libtrace);
-	/** @} */
-	/** finish an input trace, cleanup (or NULL if input not supported) 
-	 * if the trace is not paused, libtrace will pause the trace before
-	 * calling this function.
+
+	/** Concludes an input trace and cleans up the capture format data.
+	 *
+	 * @param libtrace 	The input trace to be concluded
+	 * @return 0 if successful, -1 if an error occurs
+	 *
+	 * Libtrace will call the pause_input function if the input trace is
+	 * currently active prior to calling this function.
 	 */
 	int (*fin_input)(libtrace_t *libtrace);
-	/** finish an output trace, cleanup (or NULL if output not supported) */
+
+	/** Concludes an output trace and cleans up the capture format data.
+	 *
+	 * @param libtrace 	The output trace to be concluded
+	 * @return 0 if successful, -1 if an error occurs
+	 */
 	int (*fin_output)(libtrace_out_t *libtrace);
-	/** read a packet from a trace into the provided packet structure 
-	 * @returns -1 on error, or get_framing_length()+get_capture_length() \
-	 * on success.
-	 * if this function is not supported, this field may be NULL.
+
+	/** Reads the next packet from an input trace into the provided packet 
+	 * structure.
+	 *
+	 * @param libtrace	The input trace to read from
+	 * @param packet	The libtrace packet to read into
+	 * @return The size of the packet read (in bytes) including the capture
+	 * framing header, or -1 if an error occurs. 0 is returned in the
+	 * event of an EOF. 
+	 *
+	 * If no packets are available for reading, this function should block
+	 * until one appears or return 0 if the end of a trace file has been
+	 * reached.
 	 */
 	int (*read_packet)(libtrace_t *libtrace, libtrace_packet_t *packet);
-	/** prepares a packet for general libtrace usage
-	 * updates internal trace and packet details, such as payload pointers,
-	 * loss counters and packet types.
+	
+	/** Converts a buffer containing a packet record into a libtrace packet
+	 * 
+	 * @param libtrace	An input trace in the capture format for the 
+	 * 			packet
+	 * @param packet	A libtrace packet to put the prepared packet
+	 * 			into
+	 * @param buffer	The buffer containing the packet record 
+	 * 			(including the capture format header)
+	 * @param rt_type	The RT type for the packet
+	 * @param flags		Flags describing properties that should be
+	 * 			applied to the new packet
+	 * @return 0 if successful, -1 if an error occurs.
+	 *
+	 * Updates internal trace and packet details, such as payload pointers,
+	 * loss counters and packet types to match the packet record provided
+	 * in the buffer. This is a zero-copy function.
+	 *
 	 * Intended (at this stage) only for internal use, particularly by
 	 * RT which needs to decapsulate RT packets */
 	int (*prepare_packet)(libtrace_t *libtrace, libtrace_packet_t *packet,
 			void *buffer, libtrace_rt_types_t rt_type, 
 			uint32_t flags);
-	/** finalise a packet
-	 * cleanup any resources used by a packet that can't be reused for
-	 * the next packet.
-	 */
+	
+	/** Frees any resources allocated by the capture format module for a
+	 * libtrace packet.
+	 *
+	 * @param The packet to be finalised
+	 * 	 */
 	void (*fin_packet)(libtrace_packet_t *packet);
-	/** write a packet to a trace from the provided packet 
-	 * (or NULL if output not supported)
+
+	/** Write a libtrace packet to an output trace.
+	 *
+	 * @param libtrace 	The output trace to write the packet to
+	 * @param packet	The packet to be written out
+	 * @return The number of bytes written, or -1 if an error occurs
 	 */
 	int (*write_packet)(libtrace_out_t *libtrace, libtrace_packet_t *packet);
-	/** return the libtrace link type for this packet 
-	 * @return the libtrace link type, or -1 if this link type is unknown
+	/** Returns the libtrace link type for a packet.
+	 *
+	 * @param packet 	The packet to get the link type for
+	 * @return The libtrace link type, or -1 if this link type is unknown
 	 */ 
 	libtrace_linktype_t (*get_link_type)(const libtrace_packet_t *packet);
-	/** return the direction of this packet 
-	 * @note This callback may be NULL if not supported.
+
+	/** Returns the direction of a packet.
+	 *
+	 * @param packet 	The packet to get the direction for
+	 * @return The direction of the packet, or -1 if no direction tag is
+	 * present or an error occurs
 	 */ 
 	libtrace_direction_t (*get_direction)(const libtrace_packet_t *packet);
-	/** set the direction of this packet 
-	 * @note This callback may be NULL if not supported.
+	
+	/** Sets the direction of a packet.
+	 *
+	 * @param packet	The packet to set the direction for
+	 * @param direction	The direction to assign to the packet
+	 * @return The updated direction for the packet, or -1 if an error
+	 * occurs
+	 *
+	 * @note Some capture formats do not feature direction tagging, so it
+	 * will not make sense to implement a set_direction function for them.
 	 */ 
 	libtrace_direction_t (*set_direction)(libtrace_packet_t *packet, libtrace_direction_t direction);
-	/** return the erf timestamp of the packet.
-	 * @return the 64bit erf timestamp
-	 * This field may be NULL in the structure, and libtrace will
-	 * synthesise the result from get_timeval or get_seconds if they
-	 * exist.  AT least one of get_erf_timestamp, get_timeval or
-	 * get_seconds must be implemented.
+	
+	/** Returns the timestamp for a packet in the ERF timestamp format.
+	 *
+	 * @param packet	The packet to get the timestamp from
+	 * @return The 64-bit ERF timestamp
+	 *
+	 * @note Each format must implement at least one of the four "get 
+	 * timestamp" functions. 
+	 *
+	 * If not implemented, libtrace will convert the result of one of the
+	 * other timestamp functions into the appropriate format instead. 
+	 * This means each capture format only needs to implement the most
+	 * sensible of the four and let libtrace handle any conversions.
+	 *
 	 */
 	uint64_t (*get_erf_timestamp)(const libtrace_packet_t *packet);
-	/** return the timeval of this packet.
-	 * @return the timeval
-	 * This field may be NULL in the structure, and libtrace will
-	 * synthesise the result from get_erf_timestamp or get_seconds if they
-	 * exist.  AT least one of get_erf_timestamp, get_timeval or
-	 * get_seconds must be implemented.
+
+	/** Returns the timestamp for a packet in the timeval format
+	 *
+	 * @param packet	The packet to get the timestamp from
+	 * @return The timestamp from the packet as a timeval
+	 *
+	 * @note Each format must implement at least one of the four "get 
+	 * timestamp" functions. 
+	 *
+	 * If not implemented, libtrace will convert the result of one of the
+	 * other timestamp functions into the appropriate format instead. 
+	 * This means each capture format only needs to implement the most
+	 * sensible of the four and let libtrace handle any conversions.
 	 */
 	struct timeval (*get_timeval)(const libtrace_packet_t *packet);
-	/** return the timespec of this packet.
-	 * @return the timespec
-	 * This field may be NULL in the structure, and libtrace will
-	 * synthesise the result from get_erf_timestamp or get_seconds if they
-	 * exist.  AT least one of get_erf_timestamp, get_timeval or
-	 * get_seconds must be implemented.
+	
+	/** Returns the timestamp for a packet in the timespec format.
+	 *
+	 * @param packet	The packet to get the timestamp from
+	 * @return The timestamp from the packet as a timespec
+	 *
+	 * @note Each format must implement at least one of the four "get 
+	 * timestamp" functions. 
+	 *
+	 * If not implemented, libtrace will convert the result of one of the
+	 * other timestamp functions into the appropriate format instead. 
+	 * This means each capture format only needs to implement the most
+	 * sensible of the four and let libtrace handle any conversions.
 	 */
 	struct timespec (*get_timespec)(const libtrace_packet_t *packet);
-	/** return the timestamp of this packet.
-	 * @return the floating point seconds since 1970-01-01 00:00:00
-	 * This field may be NULL in the structure, and libtrace will
-	 * synthesise the result from get_timeval or get_erf_timestamp if they
-	 * exist.  AT least one of get_erf_timestamp, get_timeval or
-	 * get_seconds must be implemented.
+	
+	/** Returns the timestamp for a packet in floating point seconds.
+	 *
+	 * @param packet	The packet to get the timestamp from
+	 * @return The timestamp from the packet as a floating point number of
+	 * seconds since 1970-01-01 00:00:00 UTC
+	 *
+	 * @note Each format must implement at least one of the four "get 
+	 * timestamp" functions. 
+	 *
+	 * If not implemented, libtrace will convert the result of one of the
+	 * other timestamp functions into the appropriate format instead. 
+	 * This means each capture format only needs to implement the most
+	 * sensible of the four and let libtrace handle any conversions.
 	 */
 	double (*get_seconds)(const libtrace_packet_t *packet);
-	/** move the pointer within the trace.
+	
+	/** Moves the read pointer to a certain ERF timestamp within an input 
+	 * trace file.
+	 *
+	 * @param trace		The input trace to seek within
+	 * @param timestamp	The timestamp to seek to, as an ERF timestamp
+	 *
 	 * @return 0 on success, -1 on failure.
-	 * The next packet returned by read_packet be the first
-	 * packet in the trace to have a timestamp equal or greater than
-	 * timestamp.
-	 * @note this function may be NULL if the format does not support
-	 * this feature.  If the format implements seek_timeval and/or 
-	 * seek_seconds then libtrace will call those functions instead.
+	 *
+	 * The next packet read from this trace will now be the first packet
+	 * to have a timestamp equal to or greater than the provided timestamp.
+	 *
+	 * @note Each format that supports seeking must implement at least one
+	 * of the seek functions.
+	 *
+	 * If not implemented, libtrace will convert the timestamp into the
+	 * appropriate format to use a seek function that has been implemented.
+	 * This means each capture format only needs to implement the seek
+	 * function that matches the native timestamp format for that capture.
+	 *
 	 */
 	int (*seek_erf)(libtrace_t *trace, uint64_t timestamp);
-	/** move the pointer within the trace.
+	/** Moves the read pointer to a certain timestamp represented using a
+	 * timeval within an input trace file.
+	 *
+	 * @param trace		The input trace to seek within
+	 * @param timestamp	The timestamp to seek to, as a timeval
+	 *
 	 * @return 0 on success, -1 on failure.
-	 * The next packet returned by read_packet be the first
-	 * packet in the trace to have a timestamp equal or greater than
-	 * timestamp.
-	 * @note this function may be NULL if the format does not support
-	 * this feature.  If the format implements seek_erf and/or 
-	 * seek_seconds then libtrace will call those functions instead.
+	 *
+	 * The next packet read from this trace will now be the first packet
+	 * to have a timestamp equal to or greater than the provided timestamp.
+	 *
+	 * @note Each format that supports seeking must implement at least one
+	 * of the seek functions.
+	 *
+	 * If not implemented, libtrace will convert the timestamp into the
+	 * appropriate format to use a seek function that has been implemented.
+	 * This means each capture format only needs to implement the seek
+	 * function that matches the native timestamp format for that capture.
+	 *
 	 */
 	int (*seek_timeval)(libtrace_t *trace, struct timeval tv);
-	/** move the pointer within the trace.
+	
+	/** Moves the read pointer to a certain timestamp represented using 
+	 * floating point seconds within an input trace file.
+	 *
+	 * @param trace		The input trace to seek within
+	 * @param timestamp	The timestamp to seek to, as floating point
+	 * 			seconds since 1970-01-01 00:00:00 UTC
+	 *
 	 * @return 0 on success, -1 on failure.
-	 * The next packet returned by read_packet be the first
-	 * packet in the trace to have a timestamp equal or greater than
-	 * tv.
-	 * @note this function may be NULL if the format does not support
-	 * this feature.  If the format implements seek_erf and/or 
-	 * seek_timeval then libtrace will call those functions instead.
+	 *
+	 * The next packet read from this trace will now be the first packet
+	 * to have a timestamp equal to or greater than the provided timestamp.
+	 *
+	 * @note Each format that supports seeking must implement at least one
+	 * of the seek functions.
+	 *
+	 * If not implemented, libtrace will convert the timestamp into the
+	 * appropriate format to use a seek function that has been implemented.
+	 * This means each capture format only needs to implement the seek
+	 * function that matches the native timestamp format for that capture.
+	 *
 	 */
 	int (*seek_seconds)(libtrace_t *trace, double seconds);
-	/** return the captured payload length 
-	 * @return the amount of data captured in a trace.
-	 * This is the number of bytes actually in the trace.  This does not
-	 * include the trace framing length.  This is usually shorter or
-	 * equal to the wire length.
+	
+	/** Returns the payload length of the captured packet record.
+	 *
+	 * @param packet	The packet to get the capture length from
+	 * @return The capture length for the packet, or -1 if an error occurs
+	 *
+	 * Capture length is the current size of the packet record itself,
+	 * following any truncation that may have occurred during the capture
+	 * process. This length does not include the capture format framing
+	 * header.
 	 */
 	int (*get_capture_length)(const libtrace_packet_t *packet);
-	/** return the original length of the packet on the wire.
-	 * @return the length of the packet on the wire before truncation.
-	 * This is the number of bytes actually in the trace.  This does not
-	 * include the trace framing length.  This is usually shorter or
-	 * equal to the wire length.
+
+	/** Returns the original length of the packet as it was on the wire.
+	 *
+	 * @param packet	The packet to get the wire length from
+	 * @return The length of the packet on the wire at the time of capture,
+	 * or -1 if an error occurs
+	 *
+	 * Wire length is the original size of the packet prior to any
+	 * truncation that may have occurred as part of the capture process.
+	 * This length does not include the capture format framing header.
 	 */
 	int (*get_wire_length)(const libtrace_packet_t *packet);
-	/** return the length of the trace framing header
-	 * @return the length of the framing header
-	 * The framing header is the extra metadata a trace stores about
-	 * a packet.  This does not include the wire or capture length
-	 * of the packet.  Usually get_framing_length()+get_capture_length()
-	 * is the size returned by read_packet
+	
+	/** Returns the length of the capture format framing header
+	 *
+	 * @param packet	The packet to get the framing length from
+	 * @return The length of the framing header, or -1 if an error occurs
+	 *
+	 * The framing header is the extra metadata that the capture process
+	 * records about a packet.  The framing length does not include any
+	 * of the packet payload itself. The total size of the packet record
+	 * can be calculated be adding this value with the capture length.
 	 */
 	int (*get_framing_length)(const libtrace_packet_t *packet);
-	/** truncate (snap) the packet 
-	 * @returns the new size
-	 * @note This callback may be NULL if not supported.
+
+	/** Sets the capture length for a packet.
+	 *
+	 * @param packet 	The packet to adjust the capture length for.
+	 * @param size		The new capture length
+	 * @return The new capture length of the packet, or -1 if an error
+	 * occurs
+	 *
+	 * @note This function should only reduce the capture length. If the
+	 * provided length is larger than the current capture length, -1 should
+	 * be returned.
 	 */
 	size_t (*set_capture_length)(struct libtrace_packet_t *packet,size_t size);
-	/** Report the number of packets ever seen as early as possible
+	/** Returns the number of packets observed by an input trace.
+	 *
+	 * @param trace		The input trace to get the packet count for
+	 * @return The number of packets observed by an input trace, or
+	 * UINT64_MAX if the number is unknown
+	 *
+	 * This count includes packets that have been filtered and dropped.
 	 */
 	uint64_t (*get_received_packets)(libtrace_t *trace);
-	/** Report the number of filtered packets.
+
+	/** Returns the number of packets filtered by an input trace.
+	 *
+	 * @param trace		The input trace to get the filtered count for
+	 * @return The number of packets filtered by the input trace, or
+	 * UINT64_MAX if the number is unknown
+	 *
 	 */
 	uint64_t (*get_filtered_packets)(libtrace_t *trace);
-	/** Return the number of dropped packets */
+	
+	/** Returns the number of packets dropped by an input trace.
+	 *
+	 * @param trace		The input trace to get the dropped count for
+	 * @return The number of packets dropped by the input trace, or
+	 * UINT64_MAX if the number is unknown
+	 *
+	 */
 	uint64_t (*get_dropped_packets)(libtrace_t *trace);
-	/** Report number of captured packets
+	
+	/** Returns the number of packets captured and returned by an input 
+	 * trace.
+	 *
+	 * @param trace		The input trace to get the capture count for
+	 * @return The number of packets returned to the libtrace user, or
+	 * UINT64_MAX if the number is unknown
+	 *
+	 * This is the number of packets that have been successfully returned
+	 * to the libtrace user via the read_packet() function.
+	 *
 	 */
 	uint64_t (*get_captured_packets)(libtrace_t *trace);
-	/** return the filedescriptor associated with this interface.
-	 * @note This callback may be NULL if not supported.
-	 * This function is only needed if you use trace_event_interface
-	 * as the pointer for trace_event
+	
+	/** Returns the file descriptor used by the input trace.
+	 *
+	 * @param trace		The input trace to get the file descriptor for
+	 * @return The file descriptor used by the input trace to read packets 
+	 *
 	 */
 	int (*get_fd)(const libtrace_t *trace);
-	/** return the next event from this source 
-	 * @note may be NULL if not supported.
+	
+	/** Returns the next libtrace event for the input trace.
+	 *
+	 * @param trace		The input trace to get the next event from
+	 * @param packet	A libtrace packet to read a packet into
+	 * @return A libtrace event describing the event that occured
+	 *
+	 * The event API allows for non-blocking reading of packets from an
+	 * input trace. If a packet is available and ready to be read, a packet
+	 * event should be returned. Otherwise a sleep or fd event should be
+	 * returned to indicate that the caller needs to wait. If the input
+	 * trace has an error or reaches EOF, a terminate event should be
+	 * returned.
 	 */
 	struct libtrace_eventobj_t (*trace_event)(libtrace_t *trace, libtrace_packet_t *packet);	
-	/** return information about this trace format to standard out */
+
+	/** Prints some useful help information to standard output. */
 	void (*help)(void);
-	/** next pointer, should be NULL */
+
+	/** Next pointer, should always be NULL - used by the format module
+	 * manager. */
 	struct libtrace_format_t *next;
 };
 
+/** The list of registered capture formats */
 extern struct libtrace_format_t *form;
 
+/** Registers a new capture format module.
+ *
+ * @param format	The format module to be registered
+ */
 void register_format(struct libtrace_format_t *format);
 
+/** Converts a PCAP DLT into a libtrace link type.
+ *
+ * @param linktype	The PCAP DLT to be converted
+ * @return The libtrace link type that is equivalent to the provided DLT, or 
+ * -1 if the DLT is unknown
+ */
 libtrace_linktype_t pcap_linktype_to_libtrace(libtrace_dlt_t linktype);
-libtrace_rt_types_t pcap_linktype_to_rt(libtrace_dlt_t linktype);
-libtrace_dlt_t libtrace_to_pcap_linktype(libtrace_linktype_t type);
-libtrace_dlt_t libtrace_to_pcap_dlt(libtrace_linktype_t type);
-libtrace_dlt_t rt_to_pcap_linktype(libtrace_rt_types_t rt_type);
-libtrace_linktype_t erf_type_to_libtrace(uint8_t erf);
-uint8_t libtrace_to_erf_type(libtrace_linktype_t linktype);
-libtrace_linktype_t arphrd_type_to_libtrace(unsigned int);
-unsigned int libtrace_to_arphrd_type(libtrace_linktype_t);
 
+/** Converts a PCAP DLT into an RT protocol type.
+ *
+ * @param linktype	The PCAP DLT to be converted
+ * @return The RT type that is equivalent to the provided DLT
+ */
+libtrace_rt_types_t pcap_linktype_to_rt(libtrace_dlt_t linktype);
+
+/** Converts a libtrace link type into a PCAP linktype.
+ *
+ * @param type		The libtrace link type to be converted
+ * @return The PCAP linktype that is equivalent to the provided libtrace link 
+ * type, or -1 if the link type is unknown
+ */
+libtrace_dlt_t libtrace_to_pcap_linktype(libtrace_linktype_t type);
+
+/** Converts a libtrace link type into a PCAP DLT.
+ *
+ * @param type		The libtrace link type to be converted
+ * @return The PCAP DLT that is equivalent to the provided libtrace link
+ * type, or -1 if the link type is unknown
+ */
+libtrace_dlt_t libtrace_to_pcap_dlt(libtrace_linktype_t type);
+
+/** Converts an RT protocol type into a PCAP DLT.
+ *
+ * @param rt_type	The RT type to be converted
+ * @return The PCAP DLT that is equivalent to the provided RT protocol
+ */
+libtrace_dlt_t rt_to_pcap_linktype(libtrace_rt_types_t rt_type);
+
+/** Converts an ERF type into a libtrace link type.
+ *
+ * @param erf		The ERF type to be converted
+ * @return The libtrace link type that is equivalent to the provided ERF type,
+ * or -1 if the ERF type is unknown
+ */
+libtrace_linktype_t erf_type_to_libtrace(uint8_t erf);
+
+/** Converts a libtrace link type into an ERF type.
+ *
+ * @param linktype	The libtrace link type to be converted
+ * @return The ERF type that is equivalent to the provided libtrace link type,
+ * or -1 if the link type cannot be matched to an ERF type.
+ */
+uint8_t libtrace_to_erf_type(libtrace_linktype_t linktype);
+
+/** Converts an ARPHRD type into a libtrace link type.
+ *
+ * @param arphrd	The ARPHRD type to be converted
+ * @return The libtrace link type that is equivalent to the provided ARPHRD
+ * type, or -1 if the ARPHRD type is unknown
+ */
+libtrace_linktype_t arphrd_type_to_libtrace(unsigned int arphrd);
+
+/** Converts a libtrace link type into an ARPHRD type.
+ *
+ * @param type		The libtrace link type to be converted
+ * @return The ARPHRD type that is equivalent to the provided libtrace link
+ * type, or -1 if the link type cannot be matched to an ARPHRD type
+ */
+unsigned int libtrace_to_arphrd_type(libtrace_linktype_t type);
+
+/** Converts a libtrace packet to the Linux SLL type.
+ *
+ * @param packet	The packet to be promoted
+ *
+ * @note This will involve memcpy() so use sparingly.
+ *
+ * This function prepends a Linux SLL header to a packet so that we can store
+ * direction tagging information.
+ */
 void promote_packet(libtrace_packet_t *packet);
+
+/** Attempts to demote a packet by removing the first header.
+ *
+ * @param packet	The packet to be demoted
+ * @return True if the packet was demoted, false otherwise.
+ *
+ * Essentially the opposite of promote_packet, except that it will also remove
+ * an ATM header as well as Linux SLL.
+ *
+ */
 bool demote_packet(libtrace_packet_t *packet);
 
-void *trace_get_payload_from_linux_sll(const void *, uint16_t *, uint32_t *);
-void *trace_get_payload_from_pos(void *, uint16_t *, uint32_t *);
-DLLEXPORT void *trace_get_payload_from_atm(void *, uint8_t *, uint32_t *);
+/** Returns a pointer to the header following a Linux SLL header.
+ *
+ * @param link		A pointer to the Linux SLL header to be skipped
+ * @param[out] type	The ethertype of the next header
+ * @param[in,out] remaining	Updated with the number of captured bytes
+ * 				remaining
+ * @return A pointer to the header following the Linux SLL header, or NULL if
+ * no subsequent header is present.
+ *
+ * Remaining must point to the number of bytes captured from the Linux SLL 
+ * header and beyond.  It will be decremented by the number of bytes skipped
+ * to find the payload.
+ *
+ * If the Linux SLL header is complete but there are zero bytes of payload 
+ * after the end of the header, a pointer to where the payload would be is
+ * returned and remaining will be set to zero. If the Linux SLL header is
+ * incomplete (truncated), then NULL is returned and remaining will be set to
+ * 0. Therefore, it is very important to check the value of remaining after
+ * calling this function.
+ */	
+void *trace_get_payload_from_linux_sll(const void *link, uint16_t *type, 
+		uint32_t *remaining);
 
+/** Returns a pointer to the header following an ATM header.
+ *
+ * @param link		A pointer to the ATM header to be skipped
+ * @param[out] type	The ethertype of the next header
+ * @param[in,out] remaining	Updated with the number of captured bytes
+ * 				remaining
+ * @return A pointer to the header following the ATM header, or NULL if
+ * no subsequent header is present.
+ *
+ * Remaining must point to the number of bytes captured from the ATM header
+ * and beyond.  It will be decremented by the number of bytes skipped to find
+ * the payload.
+ *
+ * If the ATM header is complete but there are zero bytes of payload 
+ * after the end of the header, a pointer to where the payload would be is
+ * returned and remaining will be set to zero. If the ATM header is
+ * incomplete (truncated), then NULL is returned and remaining will be set to
+ * 0. Therefore, it is very important to check the value of remaining after
+ * calling this function.
+ */	
+DLLEXPORT void *trace_get_payload_from_atm(void *link, uint8_t *type, 
+		uint32_t *remaining);
+
+/** Byteswaps a 64-bit value.
+ *
+ * @param num		The value to be byteswapped.
+ * @return The byteswapped 64-bit number
+ *
+ */
 uint64_t byteswap64(uint64_t num);
+
+/** Byteswaps a 32-bit value.
+ *
+ * @param num		The value to be byteswapped.
+ * @return The byteswapped 32-bit number
+ *
+ */
 uint32_t byteswap32(uint32_t num);
+
+/** Byteswaps a 16-bit value.
+ *
+ * @param num		The value to be byteswapped.
+ * @return The byteswapped 16-bit number
+ *
+ */
 uint16_t byteswap16(uint16_t num);
 
-/* Because some traces/protocols are defined as
- * being "big endian" or "little endian" we have
- * this series of macros.
+/** @name Byte ordering
+ * Macros that define how to convert a value into a particular byte-order 
+ *
+ * @{
  */
 #if BYTE_ORDER == BIG_ENDIAN
 #define bswap_host_to_be64(num) ((uint64_t)(num))
@@ -508,6 +955,7 @@ uint16_t byteswap16(uint16_t num);
 #else
 #error "Unknown byte order"
 #endif
+/** @} */
 
 #ifdef HAVE_BPF
 /* A type encapsulating a bpf filter
@@ -515,41 +963,65 @@ uint16_t byteswap16(uint16_t num);
  * string
  *
  */
+
+/** Internal representation of a BPF filter */
 struct libtrace_filter_t {
-	struct bpf_program filter;
-	char * filterstring;
-	int flag;
+	struct bpf_program filter;	/**< The BPF program itself */
+	char * filterstring;		/**< The filter string */
+	int flag;			/**< Indicates if the filter is valid */
 };
 #else
+/** BPF not supported by this system, but we still need to define a structure
+ * for the filter */
 struct libtrace_filter_t {};
 #endif
 
-/** libtrace packet 
- */
+/** Local definition of a PCAP header */
 typedef struct libtrace_pcapfile_pkt_hdr_t {
-	uint32_t ts_sec;
-	uint32_t ts_usec;
-	uint32_t caplen;
-	uint32_t wirelen;
+	uint32_t ts_sec;	/* Seconds portion of the timestamp */
+	uint32_t ts_usec;	/* Microseconds portion of the timestamp */
+	uint32_t caplen;	/* Capture length of the packet */
+	uint32_t wirelen;	/* The wire length of the packet */
 } libtrace_pcapfile_pkt_hdr_t;
 
 #ifdef HAVE_DAG
+/** Constructor for the DAG format module */
 void dag_constructor(void);
 #endif
+/** Constructor for the ERF format module */
 void erf_constructor(void);
+/** Constructor for the TSH format module */
 void tsh_constructor(void);
+/** Constructor for the Legacy DAG format module */
 void legacy_constructor(void);
+/** Constructor for the Linux Native format module */
 void linuxnative_constructor(void);
+/** Constructor for the PCAP format module */
 void pcap_constructor(void);
+/** Constructor for the PCAP File format module */
 void pcapfile_constructor(void);
+/** Constructor for the RT format module */
 void rt_constructor(void);
+/** Constructor for the DUCK format module */
 void duck_constructor(void);
+/** Constructor for the ATM Header format module */
 void atmhdr_constructor(void);
 #ifdef HAVE_BPF
+/** Constructor for the BPF format module */
 void bpf_constructor(void);
 #endif
 
-/* Used internally by get_wire_length() methods */
+/** Extracts the RadioTap flags from a wireless link header
+ *
+ * @param link		A pointer to the wireless link header
+ * @param linktype	The link type of the wireless header
+ * @param[out] flags	Space to store the extracted flags
+ * @return True if libtrace was able to extract flags from the link header,
+ * false otherwise.
+ *
+ * This function has been left internal because it is not portable across
+ * drivers.
+ */
 bool trace_get_wireless_flags(void *link, libtrace_linktype_t linktype, uint8_t *flags);
 #define TRACE_RADIOTAP_F_FCS 0x10
 	
