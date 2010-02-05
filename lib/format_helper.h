@@ -1,9 +1,12 @@
 /*
  * This file is part of libtrace
  *
- * Copyright (c) 2007,2008 The University of Waikato, Hamilton, New Zealand.
+ * Copyright (c) 2007,2008,2009,2010 The University of Waikato, Hamilton, 
+ * New Zealand.
+ *
  * Authors: Daniel Lawson 
- *          Perry Lorier 
+ *          Perry Lorier
+ *          Shane Alcock 
  *          
  * All rights reserved.
  *
@@ -33,15 +36,59 @@
 #include "common.h"
 #include "wandio.h"
 
-int trace_read(libtrace_t *libtrace, void *buffer, size_t len);
+/** @file
+ *
+ * @brief Header file containing prototypes for functions that are useful for
+ * multiple format modules
+ *
+ * @author Daniel Lawson
+ * @author Perry Lorier
+ * @author Shane Alcock
+ *
+ * @version $Id$
+ */
 
+/** Generic event function for a live capture device
+ *
+ * @param trace 	The input trace for the live capture device
+ * @param packet	A libtrace packet to read the next available packet 
+ * 			into
+ * @return A libtrace event describing the next event of interest
+ *
+ * Any live capture format that does not require a custom event handler
+ * should use this function.
+ */
 struct libtrace_eventobj_t trace_event_device(libtrace_t *trace, libtrace_packet_t *packet);
+
+/** Generic event function for a offline trace file
+ *
+ * @param trace		The input trace for the trace file
+ * @param packet	A libtrace packet to read the next available packet 
+ * 			into
+ * @return A libtrace event describing the next event of interest 
+ *
+ * Any trace file format that does not require a custom event handler should
+ * use this function
+ */
 struct libtrace_eventobj_t trace_event_trace(libtrace_t *trace, libtrace_packet_t *packet);
 
-int trace_bpf_compile(libtrace_filter_t *filter, 
-		const libtrace_packet_t *packet);
-
+/** Opens an input trace file for reading
+ *
+ * @param libtrace	The input trace to be opened
+ * @return A libtrace IO reader for the newly opened file or NULL if the file
+ * was unable to be opened
+ */
 io_t *trace_open_file(libtrace_t *libtrace);
+
+/** Opens an output trace file for writing
+ *
+ * @param libtrace	The output trace to be opened
+ * @param level		The compression level to use when writing, ranging from
+ * 			0 to 9
+ * @param filemode	The file status flags for the file, bitwise-ORed.
+ * @return A libtrace IO writer for the newly opened file or NULL if the file
+ * was unable to be opened
+ */
 iow_t *trace_open_file_out(libtrace_out_t *libtrace,
 		int level,
 		int filemode);
