@@ -1326,7 +1326,8 @@ DLLEXPORT void *trace_get_layer2(const libtrace_packet_t *packet,
  * @param l2            	The pointer to the current layer 2 header
  * @param linktype		The type of the layer 2 header
  * @param[out] ethertype 	An optional output variable of the ethernet type of the new header
- * @param[in,out] remaining 	Updated with the length remaining
+ * @param[in,out] remaining 	Updated with the number of captured bytes 
+				remaining
  *
  * @return A pointer to the header following the provided layer 2 header, or 
  * NULL if no subsequent header is present.
