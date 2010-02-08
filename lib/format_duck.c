@@ -1,9 +1,12 @@
 /*
  * This file is part of libtrace
  *
- * Copyright (c) 2007,2008 The University of Waikato, Hamilton, New Zealand.
+ * Copyright (c) 2007,2008,2009,2010 The University of Waikato, Hamilton, 
+ * New Zealand.
+ *
  * Authors: Daniel Lawson 
- *          Perry Lorier 
+ *          Perry Lorier
+ *          Shane Alcock 
  *          
  * All rights reserved.
  *
@@ -40,6 +43,16 @@
 #include <assert.h>
 #include <stdio.h>
 #include <fcntl.h>
+
+/* This format module deals with reading and writing DUCK records.
+ *
+ * Both DUCK record types (the DAG 2.4 and 2.5 versions) are supported by this
+ * module. 
+ *
+ * We differentiate between DUCK versions by writing the RT type to the start
+ * of the DUCK trace. This means that this code can only read DUCK files that
+ * were written using libtrace 3.
+ */
 
 #define DATA(x) ((struct duck_format_data_t *)x->format_data)
 #define DATAOUT(x) ((struct duck_format_data_out_t *)x->format_data)

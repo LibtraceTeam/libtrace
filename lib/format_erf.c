@@ -1,9 +1,12 @@
 /*
  * This file is part of libtrace
  *
- * Copyright (c) 2007,2008 The University of Waikato, Hamilton, New Zealand.
+ * Copyright (c) 2007,2008,2009,2010 The University of Waikato, Hamilton, 
+ * New Zealand.
+ *
  * Authors: Daniel Lawson 
- *          Perry Lorier 
+ *          Perry Lorier
+ *          Shane Alcock 
  *          
  * All rights reserved.
  *
@@ -27,6 +30,8 @@
  * $Id$
  *
  */
+
+
 #define _GNU_SOURCE
 
 #include "config.h"
@@ -56,8 +61,13 @@
 #  include <sys/ioctl.h>
 #endif
 
+/* This format module deals with reading and writing ERF traces. ERF is the
+ * trace format developed by Endace for use by DAG hardware capture cards.
+ *
+ * ERF is not a live capture format. 
+ *
+ */
 
-#define COLLECTOR_PORT 3435
 
 static struct libtrace_format_t erfformat;
 
@@ -65,44 +75,49 @@ static struct libtrace_format_t erfformat;
 #define DATAOUT(x) ((struct erf_format_data_out_t *)x->format_data)
 
 #define IN_OPTIONS DATA(libtrace)->options
-#define OUTPUT DATAOUT(libtrace)->output
+#define OUTPUT DATAOUT(libtrace)
 #define OUT_OPTIONS DATAOUT(libtrace)->options
+
+/* "Global" data that is stored for each ERF input trace */
 struct erf_format_data_t {
         
+	/* Index used for seeking within a trace */
 	struct {
+		/* The index itself */
 		io_t *index;
+		/* The offset of the index */
 		off_t index_len;
+		/* Indicates the existence of an index */
 		enum { INDEX_UNKNOWN=0, INDEX_NONE, INDEX_EXISTS } exists;
 	} seek;
 
+	/* Number of packets that were dropped during the capture */
 	uint64_t drops;
+
+	/* Config options for the input trace */
 	struct {
+		/* Flag indicating whether the event API should replicate the
+		 * time gaps between each packet or return a PACKET event for
+		 * each packet */
 		int real_time;
 	} options;
 };
 
+/* "Global" data that is stored for each ERF output trace */
 struct erf_format_data_out_t {
-	union {
-		struct {
-			int level;
-			int fileflag;
-		} erf;
-		
-	} options;
-	
-        union {
-                int fd;
-                struct rtserver_t * rtserver;
-		iow_t *file;
-        } output;
-};
 
-/** Structure holding status information for a packet */
-typedef struct libtrace_packet_status {
-	uint8_t type;
-	uint8_t reserved;
-	uint16_t message;
-} libtrace_packet_status_t;
+	/* Config options for the output trace */
+	struct {
+		/* Compression level for the output file */
+		int level;
+		/* File flags used to open the file, e.g. O_CREATE */
+		int fileflag;
+	} options;
+
+	/* The output file itself */
+	iow_t *file;
+	
+};
 
 typedef struct erf_index_t {
 	uint64_t timestamp;
@@ -110,8 +125,8 @@ typedef struct erf_index_t {
 } erf_index_t;
 
 
-/* Dag erf ether packets have a 2 byte padding before the packet
- * so that the ip header is aligned on a 32 bit boundary.
+/* Ethernet packets have a 2 byte padding before the packet
+ * so that the IP header is aligned on a 32 bit boundary.
  */
 static int erf_get_padding(const libtrace_packet_t *packet)
 {
@@ -137,6 +152,10 @@ int erf_get_framing_length(const libtrace_packet_t *packet)
 	return dag_record_size + erf_get_padding(packet);
 }
 
+/* Attempts to determine whether a given trace file is using the ERF format
+ *
+ * Returns 1 if the trace is probably ERF, 0 otherwise
+ */
 static int erf_probe_magic(io_t *io)
 {
 	char buffer[4096];
@@ -277,6 +296,7 @@ static int erf_slow_seek_start(libtrace_t *libtrace,uint64_t erfts UNUSED)
 	return 0;
 }
 
+/* Seek within an ERF trace based on an ERF timestamp */
 static int erf_seek_erf(libtrace_t *libtrace,uint64_t erfts)
 {
 	libtrace_packet_t *packet;
@@ -327,22 +347,22 @@ static int erf_seek_erf(libtrace_t *libtrace,uint64_t erfts)
 static int erf_init_output(libtrace_out_t *libtrace) {
 	libtrace->format_data = malloc(sizeof(struct erf_format_data_out_t));
 
-	OUT_OPTIONS.erf.level = 0;
-	OUT_OPTIONS.erf.fileflag = O_CREAT | O_WRONLY;
-	OUTPUT.file = 0;
+	OUT_OPTIONS.level = 0;
+	OUT_OPTIONS.fileflag = O_CREAT | O_WRONLY;
+	OUTPUT->file = 0;
 
 	return 0;
 }
 
-static int erf_config_output(libtrace_out_t *libtrace, trace_option_output_t option,
-		void *value) {
+static int erf_config_output(libtrace_out_t *libtrace, 
+		trace_option_output_t option, void *value) {
 
 	switch (option) {
 		case TRACE_OPTION_OUTPUT_COMPRESS:
-			OUT_OPTIONS.erf.level = *(int*)value;
+			OUT_OPTIONS.level = *(int*)value;
 			return 0;
 		case TRACE_OPTION_OUTPUT_FILEFLAGS:
-			OUT_OPTIONS.erf.fileflag = *(int*)value;
+			OUT_OPTIONS.fileflag = *(int*)value;
 			return 0;
 		default:
 			/* Unknown option */
@@ -362,8 +382,8 @@ static int erf_fin_input(libtrace_t *libtrace) {
 }
 
 static int erf_fin_output(libtrace_out_t *libtrace) {
-	if (OUTPUT.file)
-		wandio_wdestroy(OUTPUT.file);
+	if (OUTPUT->file)
+		wandio_wdestroy(OUTPUT->file);
 	free(libtrace->format_data);
 	return 0;
 }
@@ -390,10 +410,6 @@ static int erf_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
 	erfptr = (dag_record_t *)packet->buffer;
 	if (erfptr->flags.rxerror == 1) {
 		packet->payload = NULL;
-		/* XXX: Do we want to do this? We never used to do this
-		 
-		erfptr->rlen = htons(erf_get_framing_length(packet));
-		*/
 	} else {
 		packet->payload = (char*)packet->buffer + erf_get_framing_length(packet);
 	}
@@ -451,13 +467,16 @@ static int erf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	size = rlen - dag_record_size;
 
 	if (size >= LIBTRACE_PACKET_BUFSIZE) {
-		trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Packet size %u larger than supported by libtrace - packet is probably corrupt", size);
+		trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, 
+				"Packet size %u larger than supported by libtrace - packet is probably corrupt", 
+				size);
 		return -1;
 	}
 
 	/* Unknown/corrupt */
-	if (((dag_record_t *)packet->buffer)->type >= TYPE_AAL2) {
-		trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Corrupt or Unknown ERF type");
+	if (((dag_record_t *)packet->buffer)->type >= TYPE_RAW_LINK) {
+		trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, 
+				"Corrupt or Unknown ERF type");
 		return -1;
 	}
 	
@@ -466,15 +485,19 @@ static int erf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 					buffer2,
 					(size_t)size)) != (int)size) {
 		if (numbytes==-1) {
-			trace_set_err(libtrace,errno, "read(%s)", libtrace->uridata);
+			trace_set_err(libtrace,errno, "read(%s)", 
+					libtrace->uridata);
 			return -1;
 		}
-		trace_set_err(libtrace,EIO,"Truncated packet (wanted %d, got %d)", size, numbytes);
+		trace_set_err(libtrace,EIO,
+				"Truncated packet (wanted %d, got %d)", 
+				size, numbytes);
 		/* Failed to read the full packet?  must be EOF */
 		return -1;
 	}
 	
-	if (erf_prepare_packet(libtrace, packet, packet->buffer, TRACE_RT_DATA_ERF, flags))
+	if (erf_prepare_packet(libtrace, packet, packet->buffer, 
+				TRACE_RT_DATA_ERF, flags))
 		return -1;
 	
 	return rlen;
@@ -486,7 +509,7 @@ static int erf_dump_packet(libtrace_out_t *libtrace,
 	int size;
 
 	if ((numbytes = 
-		wandio_wwrite(OUTPUT.file, 
+		wandio_wwrite(OUTPUT->file, 
 				erfptr,
 				(size_t)(dag_record_size + pad))) 
 			!= (int)(dag_record_size+pad)) {
@@ -496,7 +519,7 @@ static int erf_dump_packet(libtrace_out_t *libtrace,
 	}
 
 	size=ntohs(erfptr->rlen)-(dag_record_size+pad);
-	numbytes=wandio_wwrite(OUTPUT.file, buffer, (size_t)size);
+	numbytes=wandio_wwrite(OUTPUT->file, buffer, (size_t)size);
 	if (numbytes != size) {
 		trace_set_err_out(libtrace,errno,
 				"write(%s)",libtrace->uridata);
@@ -507,10 +530,10 @@ static int erf_dump_packet(libtrace_out_t *libtrace,
 
 static int erf_start_output(libtrace_out_t *libtrace)
 {
-	OUTPUT.file = trace_open_file_out(libtrace,
-			OUT_OPTIONS.erf.level,
-			OUT_OPTIONS.erf.fileflag);
-	if (!OUTPUT.file) {
+	OUTPUT->file = trace_open_file_out(libtrace,
+			OUT_OPTIONS.level,
+			OUT_OPTIONS.fileflag);
+	if (!OUTPUT->file) {
 		return -1;
 	}
 	return 0;
@@ -549,7 +572,7 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 	dag_record_t *dag_hdr = (dag_record_t *)packet->header;
 	void *payload = packet->payload;
 
-	assert(OUTPUT.file);
+	assert(OUTPUT->file);
 
 	if (!packet->header) {
 		/*trace_set_err_output(libtrace, TRACE_ERR_BAD_PACKET,
@@ -578,6 +601,7 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 				);
 	} else {
 		dag_record_t erfhdr;
+		int rlen;
 		/* convert format - build up a new erf header */
 		/* Timestamp */
 		erfhdr.ts = bswap_host_to_le64(trace_get_erf_timestamp(packet));
@@ -600,11 +624,11 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 				&& trace_get_capture_length(packet)<=65536);
 		assert(erf_get_framing_length(packet)>0 
 				&& trace_get_framing_length(packet)<=65536);
-		assert(
-			trace_get_capture_length(packet)+erf_get_framing_length(packet)>0
-		      &&trace_get_capture_length(packet)+erf_get_framing_length(packet)<=65536);
-		erfhdr.rlen = htons(trace_get_capture_length(packet) 
-			+ erf_get_framing_length(packet));
+
+		rlen = trace_get_capture_length(packet) + 
+				erf_get_framing_length(packet);
+		assert(rlen > 0 && rlen <= 65536);
+		erfhdr.rlen = htons(rlen);
 		/* loss counter. Can't do this */
 		erfhdr.lctr = 0;
 		/* Wire length, does not include padding! */
@@ -675,7 +699,7 @@ size_t erf_set_capture_length(libtrace_packet_t *packet, size_t size) {
 	dag_record_t *erfptr = 0;
 	assert(packet);
 	if(size  > trace_get_capture_length(packet)) {
-		/* can't make a packet larger */
+		/* Can't make a packet larger */
 		return trace_get_capture_length(packet);
 	}
 	/* Reset cached capture length - otherwise we will both return the
@@ -690,6 +714,8 @@ size_t erf_set_capture_length(libtrace_packet_t *packet, size_t size) {
 static struct libtrace_eventobj_t erf_event(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
 	struct libtrace_eventobj_t event = {0,0,0.0,0};
 	
+	/* If we are being told to replay packets as fast as possible, then
+	 * we just need to read and return the next packet in the trace */
 	if (IN_OPTIONS.real_time) {
 		event.size = erf_read_packet(libtrace, packet);
 		if (event.size < 1)
@@ -699,6 +725,7 @@ static struct libtrace_eventobj_t erf_event(struct libtrace_t *libtrace, struct 
 		return event;
 		
 	} else {
+		/* Otherwise, use the generic event function */
 		return trace_event_trace(libtrace, packet);
 	}
 	
@@ -727,9 +754,6 @@ static void erf_help(void) {
 	printf("\terf:-\t(stdout, either compressed or not)\n");
 	printf("\n");
 	printf("\te.g.: erf:/tmp/trace\n");
-	printf("\n");
-	printf("Supported output options:\n");
-	printf("\t-z\tSpecify the gzip compression, ranging from 0 (uncompressed) to 9 - defaults to 1\n");
 	printf("\n");
 
 	
