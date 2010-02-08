@@ -1,13 +1,55 @@
+/*
+ * This file is part of libtrace
+ *
+ * Copyright (c) 2007,2008,2009,2010 The University of Waikato, Hamilton, 
+ * New Zealand.
+ *
+ * Authors: Daniel Lawson 
+ *          Perry Lorier
+ *          Shane Alcock 
+ *          
+ * All rights reserved.
+ *
+ * This code has been developed by the University of Waikato WAND 
+ * research group. For further information please see http://www.wand.net.nz/
+ *
+ * libtrace is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * libtrace is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with libtrace; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ * $Id$
+ *
+ */
+
 #ifndef _RT_PROTOCOL_H
 #define _RT_PROTOCOL_H
 
 #include "libtrace.h"
 #include <time.h>
 
-#define CAPTURE_PORT 3434
+/** @file
+ *
+ * @brief Header file containing definitions specific to the RT protocol that
+ * can be used to transport captured packets over a network connection.
+ *
+ */
+
+/** Default port for RT clients */
 #define COLLECTOR_PORT 3435
 
+/** Maximum size for the RT header */
 #define RT_MAX_HDR_SIZE 256
+/** Maximum sequence number for the RT protocol */
 #define MAX_SEQUENCE 2147483647 
 
 /* Procedure for adding new RT control types
@@ -34,25 +76,32 @@
  * 	
  */
 
+/** Fifo statistics reported by the RT_STATUS message */
 typedef struct fifo_info {
-        uint64_t in;
-        uint64_t out;
-        uint64_t ack;
-        uint64_t length;
-        uint64_t used;
+        uint64_t in;		/**< The offset for the fifo write pointer */
+        uint64_t out;		/**< The offset for the fifo read pointer */
+        uint64_t ack;		/**< The offset for the fifo ACK pointer */
+        uint64_t length;	/**< The total length of the fifo */
+        uint64_t used;		/**< The amount of fifo space in use */
 } fifo_info_t;
 
 /** RT packet header */
 typedef struct rt_header {
-	libtrace_rt_types_t type;
-	uint16_t length;
+	/** The type of RT packet */
+	libtrace_rt_types_t type;	
+	/** The length of the packet (not including the RT header */
+	uint16_t length;		
+	/** The sequence number of the packet */
 	uint32_t sequence;
 } rt_header_t;
 
 /* TODO: Reorganise this struct once more hello info is added */
+
 /** RT Hello packet sub-header */
 typedef struct rt_hello {
-	uint8_t reliable;
+	/** Indicates whether the sender is acting in a reliable fashion, 
+	 *  i.e. expecting acknowledgements */
+	uint8_t reliable;	
 } rt_hello_t;
 
 #if 0
@@ -63,11 +112,13 @@ typedef struct rt_start {
 
 /** RT Ack sub-header */
 typedef struct rt_ack {
+	/** The sequence number of the last received RT packet */
 	uint32_t sequence;
 } rt_ack_t;
 
 /** RT Status sub-header */
 typedef struct rt_status {
+	/** Statistics describing the current status of the sender fifo */
 	fifo_info_t fifo_status;
 } rt_status_t;
 
@@ -89,15 +140,19 @@ typedef struct rt_close {
 } rt_close_t; 
 #endif
 
-/** Connection denied reasons */
+/** Reasons that an RT connection may be denied */
 enum rt_conn_denied_t {
- RT_DENY_WRAPPER 	=1,
- RT_DENY_FULL		=2,
- RT_DENY_AUTH		=3
+	/** The client failed a TCP wrapper check */
+ 	RT_DENY_WRAPPER 	=1,
+	/** The server has reached the maximum number of client connections */
+ 	RT_DENY_FULL		=2,
+	/** Client failed to correctly authenticate */
+ 	RT_DENY_AUTH		=3
 };
 
 /** RT Denied Connection sub-header */
 typedef struct rt_deny_conn {
+	/** The reason that the connection was denied */
 	enum rt_conn_denied_t reason;
 } rt_deny_conn_t;
 
@@ -125,13 +180,19 @@ typedef struct rt_keychange {
 } rt_keychange_t;
 #endif
 
+/** RT meta-data sub-header */
 typedef struct rt_metadata {
+	/** Length of the label string that follows the header */
 	uint32_t label_len;
+	/** Length of the value string that follows the header */
 	uint32_t value_len;
 } rt_metadata_t ;
 
 /** Specifications of duck structures - duck2_4 and duck2_5 match Endace's
- * duck_inf and duckinf_t respectively */
+ * duck_inf and duckinf_t respectively. Unfortunately, Endace don't exactly
+ * make it clear what each value within the duck structure actually means.
+ * Some are self-explanatory but I have no idea about the others so our own
+ * documentation is a bit weak as a result */
 
 /** DAG 2.4 DUCK */
 typedef struct duck2_4 {
