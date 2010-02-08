@@ -1,8 +1,12 @@
 /*
  * This file is part of libtrace
  *
- * Copyright (c) 2007,2008 The University of Waikato, Hamilton, New Zealand.
- * Authors: Perry Lorier 
+ * Copyright (c) 2007,2008,2009,2010 The University of Waikato, Hamilton, 
+ * New Zealand.
+ *
+ * Authors: Daniel Lawson 
+ *          Perry Lorier
+ *          Shane Alcock 
  *          
  * All rights reserved.
  *
@@ -26,6 +30,8 @@
  * $Id$
  *
  */
+
+
 #include "config.h"
 #include "common.h"
 #include "libtrace.h"
@@ -38,6 +44,11 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+
+/* This format module deals with reading traces that are in the TSH format.
+ *
+ * We do not support writing TSH traces, because it's a pretty rubbish format.
+ */
 
 static struct libtrace_format_t tshformat;
 

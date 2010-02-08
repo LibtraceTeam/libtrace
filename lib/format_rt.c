@@ -1,14 +1,16 @@
 /*
  * This file is part of libtrace
  *
- * Copyright (c) 2007,2008 The University of Waikato, Hamilton, New Zealand.
- * Authors: Daniel Lawson
- *          Perry Lorier
- *	    Shane Alcock
+ * Copyright (c) 2007,2008,2009,2010 The University of Waikato, Hamilton, 
+ * New Zealand.
  *
+ * Authors: Daniel Lawson 
+ *          Perry Lorier
+ *          Shane Alcock 
+ *          
  * All rights reserved.
  *
- * This code has been developed by the University of Waikato WAND
+ * This code has been developed by the University of Waikato WAND 
  * research group. For further information please see http://www.wand.net.nz/
  *
  * libtrace is free software; you can redistribute it and/or modify
@@ -28,6 +30,7 @@
  * $Id$
  *
  */
+
 
 #define _GNU_SOURCE
 
@@ -53,6 +56,7 @@
 
 #define RT_INFO ((struct rt_format_data_t*)libtrace->format_data)
 
+/* Convert the RT denial code into a nice printable and coherent string */
 static const char *rt_deny_reason(enum rt_conn_denied_t reason) 
 {
 	const char *string = 0;
@@ -76,21 +80,36 @@ static const char *rt_deny_reason(enum rt_conn_denied_t reason)
 
 
 struct rt_format_data_t {
+	/* Name of the host to connect to */
 	char *hostname;
+	/* Buffer to store received packets into */
 	char *pkt_buffer;
+	/* Pointer to the next packet to be read from the buffer */
 	char *buf_current;
+	/* Amount of buffer space used */
 	size_t buf_filled;
+	/* The port to connect to */
 	int port;
+	/* The file descriptor for the RT connection */
 	int input_fd;
+	/* Flag indicating whether the server is doing reliable RT */
 	int reliable;
+
+	/* Header for the packet currently being received */
 	rt_header_t rt_hdr;
 	
+	/* Dummy traces that can be assigned to the received packets to ensure
+	 * that the appropriate functions can be used to process them */
 	libtrace_t *dummy_duck;
 	libtrace_t *dummy_erf;
 	libtrace_t *dummy_pcap;
 	libtrace_t *dummy_linux;
 };
 
+/* Connects to an RT server 
+ *
+ * Returns -1 if an error occurs
+ */
 static int rt_connect(libtrace_t *libtrace) {
         struct hostent *he;
         struct sockaddr_in remote;
@@ -124,25 +143,6 @@ static int rt_connect(libtrace_t *libtrace) {
 		return -1;
         }
 
-	
-#if 0
-	oldflags = fcntl(RT_INFO->input_fd, F_GETFL, 0);
-	if (oldflags == -1) {
-		trace_set_err(libtrace, errno,
-				"Could not get fd flags from fd %d\n",
-				RT_INFO->input_fd);
-		return -1;
-	}
-	oldflags |= O_NONBLOCK;
-	if (fcntl(RT_INFO->input_fd, F_SETFL, oldflags) == -1) {
-		trace_set_err(libtrace, errno,
-				"Could not set fd flags for fd %d\n",
-				RT_INFO->input_fd);
-		return -1;
-	}
-#endif
-	
-	
 	/* We are connected, now receive message from server */
 	
 	if (recv(RT_INFO->input_fd, (void*)&connect_msg, sizeof(rt_header_t), 0) != sizeof(rt_header_t) ) {
@@ -154,6 +154,7 @@ static int rt_connect(libtrace_t *libtrace) {
 	
 	switch (connect_msg.type) {
 		case TRACE_RT_DENY_CONN:
+			/* Connection was denied */
 			
 			if (recv(RT_INFO->input_fd, (void*)&deny_hdr, 
 						sizeof(rt_deny_conn_t),
@@ -166,7 +167,8 @@ static int rt_connect(libtrace_t *libtrace) {
 				rt_deny_reason(reason));	
 			return -1;
 		case TRACE_RT_HELLO:
-			/* do something with options */
+			/* Hello message - read the options sent to us by the
+			 * server */
 			if (recv(RT_INFO->input_fd, (void*)&hello_opts, 
 						sizeof(rt_hello_t), 0)
 					!= sizeof(rt_hello_t)) {
@@ -207,14 +209,18 @@ static int rt_init_input(libtrace_t *libtrace) {
         char *uridata = libtrace->uridata;
 
 	rt_init_format_data(libtrace);
-	
+
+	/* If the user specifies "rt:" then assume localhost and the default
+	 * port */	
         if (strlen(uridata) == 0) {
                 RT_INFO->hostname =
                         strdup("localhost");
                 RT_INFO->port =
                         COLLECTOR_PORT;
         } else {
-                if ((scan = strchr(uridata,':')) == NULL) {
+                /* If the user does not specify a port, assume the default 
+		 * port */
+		if ((scan = strchr(uridata,':')) == NULL) {
                         RT_INFO->hostname =
                                 strdup(uridata);
                         RT_INFO->port =
@@ -270,6 +276,8 @@ static int rt_pause_input(libtrace_t *libtrace) {
 }
 
 static int rt_fin_input(libtrace_t *libtrace) {
+	/* Make sure we clean up any dummy traces that we have been using */
+	
 	if (RT_INFO->dummy_duck)
 		trace_destroy_dead(RT_INFO->dummy_duck);
 
@@ -298,6 +306,7 @@ static int rt_fin_input(libtrace_t *libtrace) {
  */
 #define RT_BUF_SIZE 10000U
 
+/* Receives data from an RT server */
 static int rt_read(libtrace_t *libtrace, void **buffer, size_t len, int block) 
 {
         int numbytes;
@@ -319,7 +328,9 @@ static int rt_read(libtrace_t *libtrace, void **buffer, size_t len, int block)
 	else
 		block=MSG_DONTWAIT;
 
-	
+	/* If we don't have enough buffer space for the amount we want to
+	 * read, move the current buffer contents to the front of the buffer
+	 * to make room */
 	if (len > RT_INFO->buf_filled) {
 		memcpy(RT_INFO->pkt_buffer, RT_INFO->buf_current, 
 				RT_INFO->buf_filled);
@@ -327,6 +338,8 @@ static int rt_read(libtrace_t *libtrace, void **buffer, size_t len, int block)
 #ifndef MSG_NOSIGNAL
 #  define MSG_NOSIGNAL 0
 #endif
+		/* Loop as long as we don't have all the data that we were
+		 * asked for */
 		while (len > RT_INFO->buf_filled) {
                 	if ((numbytes = recv(RT_INFO->input_fd,
                                                 RT_INFO->buf_current + 
@@ -346,6 +359,8 @@ static int rt_read(libtrace_t *libtrace, void **buffer, size_t len, int block)
                 	                continue;
                 	        }
 				if (errno == EAGAIN) {
+					/* We asked for non-blocking mode, so
+					 * we need to return now */
 					trace_set_err(libtrace,
 							EAGAIN,
 							"EAGAIN");
@@ -357,15 +372,6 @@ static int rt_read(libtrace_t *libtrace, void **buffer, size_t len, int block)
 						"Failed to read data into rt recv buffer");
                         	return -1;
                 	}
-			/*
-			buf_ptr = RT_INFO->pkt_buffer;
-			for (i = 0; i < RT_BUF_SIZE ; i++) {
-					
-				printf("%02x", (unsigned char)*buf_ptr);
-				buf_ptr ++;
-			}
-			printf("\n");
-			*/
 			RT_INFO->buf_filled+=numbytes;
 		}
 
@@ -377,8 +383,12 @@ static int rt_read(libtrace_t *libtrace, void **buffer, size_t len, int block)
 }
 
 
+/* Sets the trace format for the packet to match the format it was originally
+ * captured in, rather than the RT format */
 static int rt_set_format(libtrace_t *libtrace, libtrace_packet_t *packet) 
 {
+
+	/* We need to assign the packet to a "dead" trace */
 
 	/* Try to minimize the number of corrupt packets that slip through
 	 * while making it easy to identify new pcap DLTs */
@@ -430,6 +440,7 @@ static int rt_set_format(libtrace_t *libtrace, libtrace_packet_t *packet)
 	return 0; /* success */
 }		
 
+/* Sends an RT ACK to the server to acknowledge receipt of packets */
 static int rt_send_ack(libtrace_t *libtrace, 
 		uint32_t seqno)  {
 	
@@ -456,6 +467,7 @@ static int rt_send_ack(libtrace_t *libtrace,
 	to_write = hdr->length + sizeof(rt_header_t);
 	buf_ptr = ack_buffer;
 
+	/* Keep trying until we write the entire ACK */
 	while (to_write > 0) {
 		numbytes = send(RT_INFO->input_fd, buf_ptr, to_write, 0); 
 		if (numbytes == -1) {
@@ -478,6 +490,7 @@ static int rt_send_ack(libtrace_t *libtrace,
 	return 1;
 }
 
+/* Shouldn't need to call this too often */
 static int rt_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
 		void *buffer, libtrace_rt_types_t rt_type, uint32_t flags) {
 
@@ -504,27 +517,32 @@ static int rt_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
 	return 0;
 }	
 
+/* Reads the body of an RT packet from the network */
 static int rt_read_data_packet(libtrace_t *libtrace,
 		libtrace_packet_t *packet, int blocking) {
 	uint32_t prep_flags = 0;
 
 	prep_flags |= TRACE_PREP_DO_NOT_OWN_BUFFER;
 
+	/* The stored RT header will tell us how much data we need to read */
 	if (rt_read(libtrace, &packet->buffer, (size_t)RT_INFO->rt_hdr.length, 
 				blocking) != RT_INFO->rt_hdr.length) {
 		return -1;
 	}
 
+	/* Send an ACK if required */
         if (RT_INFO->reliable > 0 && packet->type >= TRACE_RT_DATA_SIMPLE) {
 		if (rt_send_ack(libtrace, RT_INFO->rt_hdr.sequence) == -1)
                                	return -1;
 	}
 	
+	/* Convert to the original capture format */
 	if (rt_set_format(libtrace, packet) < 0) {
 		return -1;
         }
                	
-	/* Update payload pointers and loss counters correctly */
+	/* Update payload pointers and packet type to match the original
+	 * format */
 	if (trace_prepare_packet(packet->trace, packet, packet->buffer,
 				packet->type, prep_flags)) {
 		return -1;
@@ -533,6 +551,8 @@ static int rt_read_data_packet(libtrace_t *libtrace,
 	return 0;
 }
 
+/* Reads an RT packet from the network. Will block if the "blocking" flag is
+ * set to 1, otherwise will return if insufficient data is available */
 static int rt_read_packet_versatile(libtrace_t *libtrace,
 		libtrace_packet_t *packet,int blocking) {
 	rt_header_t *pkt_hdr = NULL;
@@ -545,8 +565,8 @@ static int rt_read_packet_versatile(libtrace_t *libtrace,
 		packet->buffer = NULL;
 	}
 
-	/* RT_LAST means that the next bytes received should be a 
-	 * rt header - I know it's hax and maybe I'll fix it later on */
+	/* RT_LAST indicates that we need to read the RT header for the next
+	 * packet. This is a touch hax, I admit */
 	if (RT_INFO->rt_hdr.type == TRACE_RT_LAST) {
 		void_hdr = (void *)pkt_hdr;
 		/* FIXME: Better error handling required */
@@ -557,7 +577,7 @@ static int rt_read_packet_versatile(libtrace_t *libtrace,
 		}
 		pkt_hdr = (rt_header_t *)void_hdr;
 		
-		/* Need to salvage these in case the next rt_read overwrites 
+		/* Need to store these in case the next rt_read overwrites 
 		 * the buffer they came from! */
 		RT_INFO->rt_hdr.type = pkt_hdr->type;
 		RT_INFO->rt_hdr.length = pkt_hdr->length;
@@ -565,6 +585,9 @@ static int rt_read_packet_versatile(libtrace_t *libtrace,
 	}
 	packet->type = RT_INFO->rt_hdr.type;
 	
+	/* All data-bearing packets (as opposed to RT internal messages) 
+	 * should be treated the same way when it comes to reading the rest
+	 * of the packet */
 	if (packet->type >= TRACE_RT_DATA_SIMPLE) {
 		switch_type = TRACE_RT_DATA_SIMPLE;
 	} else {
@@ -606,12 +629,15 @@ static int rt_read_packet_versatile(libtrace_t *libtrace,
 	return RT_INFO->rt_hdr.length + sizeof(rt_header_t);
 }
 
+/* Reads the next available packet in a blocking fashion */
 static int rt_read_packet(libtrace_t *libtrace,
 		libtrace_packet_t *packet) {
 	return rt_read_packet_versatile(libtrace,packet,1);
 }
 
 
+/* This should only get called for RT messages - RT-encapsulated data records
+ * should be converted to the appropriate capture format */
 static int rt_get_capture_length(const libtrace_packet_t *packet) {
 	rt_metadata_t *rt_md_hdr;
 	switch (packet->type) {
@@ -655,16 +681,22 @@ static int rt_get_capture_length(const libtrace_packet_t *packet) {
 	return 0;
 }
 
+/* RT messages do not have a wire length because they were not captured from
+ * the wire - they were generated by the capture process */
 static int rt_get_wire_length(UNUSED const libtrace_packet_t *packet) {
 	return 0;
 }
-			
+
+/* Although RT messages do contain "framing", this framing is considered to be
+ * stripped as soon as the packet is read by the RT client */			
 static int rt_get_framing_length(UNUSED const libtrace_packet_t *packet) {
 	return 0;
 }
 
+
 static libtrace_linktype_t rt_get_link_type(UNUSED const libtrace_packet_t *packet)
 {
+	/* RT messages don't have a link type */
 	return TRACE_TYPE_NONDATA;
 }
 
@@ -687,19 +719,26 @@ static libtrace_eventobj_t trace_event_rt(libtrace_t *trace,
 		event.fd = 0;
 	}
 
+	/* Attempt to read a packet in a non-blocking fashion */
 	event.size = rt_read_packet_versatile(trace, packet, 0);
 	if (event.size == -1) {
 		read_err = trace_get_err(trace);
 		if (read_err.err_num == EAGAIN) {
+			/* No data available - do an IOWAIT */
 			event.type = TRACE_EVENT_IOWAIT;
 		}
 		else {
 			event.type = TRACE_EVENT_PACKET;
 		}
 	} else if (event.size == 0) {
+		/* RT gives us a specific indicator that there will be no
+		 * more packets. */
 		if (packet->type == TRACE_RT_END_DATA)
 			event.type = TRACE_EVENT_TERMINATE;
 		else
+			/* Since several RT messages can have zero-byte
+			 * length (once the framing is removed), an event size
+			 * of zero can still indicate a PACKET event */
 			event.type = TRACE_EVENT_PACKET;
 		
 	}	
