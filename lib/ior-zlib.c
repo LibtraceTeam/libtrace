@@ -27,7 +27,7 @@
  * along with libtrace; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
- * $Id: format_erf.c 1517 2010-02-08 01:11:04Z salcock $
+ * $Id$
  *
  */
 

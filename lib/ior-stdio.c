@@ -27,7 +27,7 @@
  * along with libtrace; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
- * $Id: libtrace.h.in 1511 2010-02-05 03:23:49Z salcock $
+ * $Id$
  *
  */
 
