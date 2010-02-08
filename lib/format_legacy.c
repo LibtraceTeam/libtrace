@@ -1,9 +1,12 @@
 /*
  * This file is part of libtrace
  *
- * Copyright (c) 2007,2008 The University of Waikato, Hamilton, New Zealand.
+ * Copyright (c) 2007,2008,2009,2010 The University of Waikato, Hamilton, 
+ * New Zealand.
+ *
  * Authors: Daniel Lawson 
- *          Perry Lorier 
+ *          Perry Lorier
+ *          Shane Alcock 
  *          
  * All rights reserved.
  *
@@ -27,6 +30,7 @@
  * $Id$
  *
  */
+
 #define _GNU_SOURCE
 
 #include "config.h"
@@ -50,6 +54,25 @@
 #  include <share.h>
 #endif
 
+/* The format module deals with legacy DAG formats from older revisions of the
+ * DAG hardware and software. Aside from a few minor differences, the legacy
+ * formats are very similar so we can deal with them using the same callback
+ * functions for the most part.
+ *
+ * These formats are intended for reading old ERF traces such as the earlier
+ * Auckland traces.
+ *
+ * We definitely do not support writing using these formats - one should 
+ * convert packets to regular ERF instead before writing.
+ */
+
+/* Several formats are covered in this source file:
+ *
+ * Legacy Ethernet:	as seen in Auckland VI
+ * Legacy ATM:		as seen in Auckland II and IV
+ * Legacy PoS:		as seen in Leipzig I and II
+ * Legacy NZIX:		as seen in NZIX I
+ */
 
 /* Catch undefined O_LARGEFILE on *BSD etc */
 #ifndef O_LARGEFILE
@@ -62,10 +85,15 @@
 
 #define DATA(x) ((struct legacy_format_data_t *)x->format_data)
 
+/* Legacy NZIX timestamps are all relative to the start of the trace, so we
+ * have to remember all sorts of stuff so that we can convert them into a
+ * useful timestamp */
+
 struct legacy_format_data_t {
-	time_t starttime;	/* Used for legacy_nzix */
-	uint64_t ts_high;	/* Used for legacy_nzix */
-	uint32_t ts_old; 	/* Used for legacy_nzix */
+	time_t starttime;	/* Time that the trace file was started */
+	uint64_t ts_high;	/* The timestamp of the last packet */
+	uint32_t ts_old; 	/* The timestamp of the last packet as 
+				   reported in the NZIX header */
 };
 
 static void legacy_init_format_data(libtrace_t *libtrace) {
@@ -103,6 +131,11 @@ static int erf_init_input(libtrace_t *libtrace)
 	return 0;
 }
 
+/* Takes a trace file name and determines the time that the capture began.
+ *
+ * NZIX only features relative timestamps so the trace file name is the only
+ * indication we have of where the relative timestamping begins from
+ */
 static time_t trtime(char *s) {
 	/* XXX: this function may not be particularly portable to
 	 * other platforms, e.g. *BSDs, Windows */
@@ -142,6 +175,10 @@ static int legacynzix_init_input(libtrace_t *libtrace) {
 
 
 	legacy_init_format_data(libtrace);	
+	
+	/* Check that the filename appears to contain a suitable timestamp.
+	 * Without it, we have no way of determining the actual timestamps
+	 * for each packet */
 	if((retval = regcomp(&reg, "[0-9]{8}-[0-9]{6}", REG_EXTENDED)) != 0) {
 		trace_set_err(libtrace, errno, "Failed to compile regex");
 		return -1;
@@ -154,6 +191,7 @@ static int legacynzix_init_input(libtrace_t *libtrace) {
 	return 0;
 }
 
+/* All of the formats can be started in exactly the same way */
 static int erf_start_input(libtrace_t *libtrace)
 {
 	if (libtrace->io)
@@ -290,7 +328,7 @@ static int legacynzix_read_packet(libtrace_t *libtrace, libtrace_packet_t *packe
 		break;
 	}
 
-	/* lets move the padding so that it's in the framing header */
+	/* Lets move the padding so that it's in the framing header */
 	data_ptr = ((char *)buffer) + 12;
 	memmove(data_ptr + 2, data_ptr, 26);
 
@@ -391,13 +429,14 @@ static struct timeval legacynzix_get_timeval(const libtrace_packet_t *packet) {
 		
 	hdr_ts = legacy->ts;
 
-	/* seems we only need 30 bits to represent our timestamp */
+	/* Seems we only need 30 bits to represent our timestamp */
 	hdr_ts >>=2;
-	/* try a sequence number wrap-around comparison */
+	
+	/* Try a sequence number wrap-around comparison */
 	if (ts_cmp(hdr_ts, old_ts) > (UINT32_MAX / 2) )
-		new_ts += (1LL << 30); /* wraparound */
-	new_ts &= ~((1LL << 30) -1);	/* mask lower 30 bits */
-	new_ts += hdr_ts;		/* packet ts is the new 30 bits */
+		new_ts += (1LL << 30); /* Wraparound */
+	new_ts &= ~((1LL << 30) -1);	/* Mask lower 30 bits */
+	new_ts += hdr_ts;		/* Packet ts is the new 30 bits */
 	DATA(packet->trace)->ts_old = hdr_ts;
 
 	tv.tv_sec = DATA(packet->trace)->starttime + (new_ts / (1000 * 1000));

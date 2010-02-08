@@ -1,9 +1,12 @@
 /*
  * This file is part of libtrace
  *
- * Copyright (c) 2007,2008 The University of Waikato, Hamilton, New Zealand.
+ * Copyright (c) 2007,2008,2009,2010 The University of Waikato, Hamilton, 
+ * New Zealand.
+ *
  * Authors: Daniel Lawson 
- *          Perry Lorier 
+ *          Perry Lorier
+ *          Shane Alcock 
  *          
  * All rights reserved.
  *
@@ -48,6 +51,24 @@
 #  endif
 #endif
 
+/* This format module deals with traces captured using the PCAP library. This
+ * format module handles both captures from a live interface and from PCAP
+ * files.
+ *
+ * However, the PCAP file support featured in this code is superceded by our 
+ * own implementation of the PCAP file format, called pcapfile. See 
+ * format_pcapfile.c for more information.
+ *
+ * Both the live and trace formats support writing, provided your PCAP library
+ * also supports it.
+ *
+ */
+
+/* Formats implemented in this module:
+ * 	pcap - deals with PCAP trace files
+ * 	pcapint - deals with live PCAP interfaces
+ */
+
 #ifdef HAVE_LIBPCAP
 static struct libtrace_format_t pcap;
 static struct libtrace_format_t pcapint;
@@ -58,19 +79,27 @@ static struct libtrace_format_t pcapint;
 #define INPUT DATA(libtrace)->input
 #define OUTPUT DATAOUT(libtrace)->output
 struct pcap_format_data_t {
-	/** Information about the current state of the input device */
+	/** Information about the current state of the input trace */
         union {
-                pcap_t *pcap;
+                /* The PCAP input source */
+		pcap_t *pcap;
         } input;
+	/* A filter to be applied to all packets read from the source */
 	libtrace_filter_t *filter;
+	/* The snap length to be applied to all captured packets (live only) */
 	int snaplen;
+	/* Whether the capture interface should be set to promiscuous mode
+	 * (live only) */
 	int promisc;
 };
 
 struct pcap_format_data_out_t {
+	/* Information about the current state of the output trace */
 	union {
 		struct {
-			pcap_t *pcap;
+			/* The PCAP output device or trace */
+			pcap_t *pcap;	
+			/* The PCAP dumper */
 			pcap_dumper_t *dump;
 		} trace;
 
@@ -92,10 +121,11 @@ static int pcap_start_input(libtrace_t *libtrace) {
 	char errbuf[PCAP_ERRBUF_SIZE];
 
 
-	/* if the file is already open */
+	/* Check if the file is already open */
 	if (INPUT.pcap)
 		return 0; /* success */
 
+	/* Open the trace file for reading */
 	if ((INPUT.pcap = 
 		pcap_open_offline(libtrace->uridata,
 			errbuf)) == NULL) {
@@ -103,6 +133,8 @@ static int pcap_start_input(libtrace_t *libtrace) {
 				errbuf);
 		return -1;
 	}
+
+	/* If a filter has been configured, compile and apply it */
 	if (DATA(libtrace)->filter) {
 		if (DATA(libtrace)->filter->flag == 0) {
 			pcap_compile(INPUT.pcap, 
@@ -134,10 +166,11 @@ static int pcap_config_input(libtrace_t *libtrace,
 			 * and let libtrace deal with it
 			 */
 		case TRACE_OPTION_PROMISC:
-			/* can't do promisc on a trace! fall thru */
+			/* Can't do promisc on a trace! */
 		case TRACE_OPTION_META_FREQ:
 			/* No meta data for this format */
 		case TRACE_OPTION_EVENT_REALTIME:
+			/* We do not support this option for PCAP traces */
 		default:
 			return -1;
 	}
@@ -209,6 +242,8 @@ static int pcapint_config_input(libtrace_t *libtrace,
 
 static int pcapint_start_input(libtrace_t *libtrace) {
 	char errbuf[PCAP_ERRBUF_SIZE];
+	
+	/* Open the live device */
 	if ((INPUT.pcap = 
 			pcap_open_live(libtrace->uridata,
 			DATA(libtrace)->snaplen,
@@ -366,6 +401,8 @@ static int pcap_write_packet(libtrace_out_t *libtrace,
 
 	link = trace_get_packet_buffer(packet,&linktype,&remaining);
 
+	/* We may have to convert this packet into a suitable PCAP packet */
+
 	/* If this packet cannot be converted to a pcap linktype then
 	 * pop off the top header until it can be converted
 	 */
@@ -405,12 +442,17 @@ static int pcap_write_packet(libtrace_out_t *libtrace,
 		return 0;
 	}
 
+	/* Check if the packet was captured using one of the PCAP formats */
 	if (packet->trace->format == &pcap || 
 			packet->trace->format == &pcapint) {
+		/* Yes - this means we can write it straight out */
 		pcap_dump((u_char*)OUTPUT.trace.dump,
 				(struct pcap_pkthdr *)packet->header,
 				packet->payload);
 	} else {
+		/* No - need to fill in a PCAP header with the appropriate
+		 * values */
+
 		/* Leave the manual copy as it is, as it gets around 
 		 * some OS's having different structures in pcap_pkt_hdr
 		 */
@@ -467,8 +509,8 @@ static int pcapint_write_packet(libtrace_out_t *libtrace,
 }
 
 static libtrace_linktype_t pcap_get_link_type(const libtrace_packet_t *packet) {
-	/* pcap doesn't store linktype in the framing header so we need
-	 * rt to do it for us 
+	/* PCAP doesn't store linktype in the framing header so we need
+	 * RT to do it for us 
 	 */
 	int linktype = rt_to_pcap_linktype(packet->type);
 	return pcap_linktype_to_libtrace(linktype);
@@ -476,12 +518,16 @@ static libtrace_linktype_t pcap_get_link_type(const libtrace_packet_t *packet) {
 
 static libtrace_direction_t pcap_set_direction(libtrace_packet_t *packet,
 		libtrace_direction_t dir) {
+	
+	/* PCAP doesn't have a direction field in the header, so we need to
+	 * promote to Linux SLL to tag it properly */
 	libtrace_sll_header_t *sll;
 	promote_packet(packet);
 	sll=packet->payload;
+	
 	/* sll->pkttype should be in the endianness of the host that the
-	 * trace was taken on.  this is impossible to achieve
-	 * so we assume host endianness
+	 * trace was taken on.  This is impossible to achieve so we assume 
+	 * host endianness
 	 */
 	if(dir==TRACE_DIR_OUTGOING)
 		sll->pkttype=TRACE_SLL_OUTGOING;
@@ -493,6 +539,9 @@ static libtrace_direction_t pcap_set_direction(libtrace_packet_t *packet,
 static libtrace_direction_t pcap_get_direction(const libtrace_packet_t *packet) {
 	libtrace_direction_t direction  = -1;
 	switch(pcap_get_link_type(packet)) {
+		/* Only packets encapsulated in Linux SLL or PFLOG have any
+		 * direction information */
+
 		case TRACE_TYPE_LINUX_SLL:
 		{
 			libtrace_sll_header_t *sll;
@@ -597,7 +646,7 @@ static size_t pcap_set_capture_length(libtrace_packet_t *packet,size_t size) {
 	struct pcap_pkthdr *pcapptr = 0;
 	assert(packet);
 	if (size > trace_get_capture_length(packet)) {
-		/* can't make a packet larger */
+		/* Can't make a packet larger */
 		return trace_get_capture_length(packet);
 	}
 	/* Reset the cached capture length */

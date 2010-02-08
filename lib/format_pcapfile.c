@@ -1,9 +1,12 @@
 /*
  * This file is part of libtrace
  *
- * Copyright (c) 2007,2008 The University of Waikato, Hamilton, New Zealand.
+ * Copyright (c) 2007,2008,2009,2010 The University of Waikato, Hamilton, 
+ * New Zealand.
+ *
  * Authors: Daniel Lawson 
- *          Perry Lorier 
+ *          Perry Lorier
+ *          Shane Alcock 
  *          
  * All rights reserved.
  *
@@ -43,6 +46,17 @@
 #include <fcntl.h>
 #include <stdbool.h>
 
+/* This format module implements our own, more efficient, version of the PCAP
+ * file format. This should always be used in preference to the "pcap" format
+ * provided in format_pcap.c.
+ *
+ * This is a trace file format and does not implement any live interface 
+ * capture. This is covered by "pcapint" in format_pcap.c.
+ *
+ * This format supports both reading and writing, regardless of the version
+ * of your PCAP library.
+ */
+
 #define DATA(x) ((struct pcapfile_format_data_t*)((x)->format_data))
 #define DATAOUT(x) ((struct pcapfile_format_data_out_t*)((x)->format_data))
 #define IN_OPTIONS DATA(libtrace)->options
@@ -59,9 +73,15 @@ typedef struct pcapfile_header_t {
 
 struct pcapfile_format_data_t {
 	struct {
+		/* Indicates whether the event API should replicate the pauses
+		 * between packets */
 		int real_time;
 	} options;
+
+	/* The PCAP meta-header that should be written at the start of each
+	 * trace */
 	pcapfile_header_t header;
+	/* Indicates whether the input trace is started */
 	bool started;
 };
 
@@ -113,13 +133,16 @@ static int pcapfile_init_output(libtrace_out_t *libtrace) {
 	return 0;
 }
 
+
 static uint16_t swaps(libtrace_t *libtrace, uint16_t num)
 {
-	/* to deal with open_dead traces that might try and use this
+	/* To deal with open_dead traces that might try and use this
 	 * if we don't have any per trace data, assume host byte order
 	 */
 	if (!DATA(libtrace))
 		return num;
+	
+	/* We can use the PCAP magic number to determine the byte order */
 	if (DATA(libtrace)->header.magic_number == 0xd4c3b2a1)
 		return byteswap16(num);
 
@@ -128,11 +151,13 @@ static uint16_t swaps(libtrace_t *libtrace, uint16_t num)
 
 static uint32_t swapl(libtrace_t *libtrace, uint32_t num)
 {
-	/* to deal with open_dead traces that might try and use this
+	/* To deal with open_dead traces that might try and use this
 	 * if we don't have any per trace data, assume host byte order
 	 */
 	if (!DATA(libtrace))
 		return num;
+	
+	/* We can use the PCAP magic number to determine the byte order */
 	if (DATA(libtrace)->header.magic_number == 0xd4c3b2a1)
 		return byteswap32(num);
 
@@ -161,14 +186,17 @@ static int pcapfile_start_input(libtrace_t *libtrace)
 		if (err<1)
 			return -1;
 		
-		if (swapl(libtrace,DATA(libtrace)->header.magic_number) != 0xa1b2c3d4) {
-			trace_set_err(libtrace,TRACE_ERR_INIT_FAILED,"Not a pcap tracefile\n");
+		if (swapl(libtrace,DATA(libtrace)->header.magic_number) != 
+					0xa1b2c3d4) {
+			trace_set_err(libtrace,TRACE_ERR_INIT_FAILED,
+					"Not a pcap tracefile\n");
 			return -1; /* Not a pcap file */
 		}
 
 		if (swaps(libtrace,DATA(libtrace)->header.version_major)!=2
 			&& swaps(libtrace,DATA(libtrace)->header.version_minor)!=4) {
-			trace_set_err(libtrace,TRACE_ERR_INIT_FAILED,"Unknown pcap tracefile version %d.%d\n",
+			trace_set_err(libtrace,TRACE_ERR_INIT_FAILED,
+					"Unknown pcap tracefile version %d.%d\n",
 					swaps(libtrace,
 						DATA(libtrace)->header.version_major),
 					swaps(libtrace,
@@ -183,6 +211,10 @@ static int pcapfile_start_input(libtrace_t *libtrace)
 
 static int pcapfile_start_output(libtrace_out_t *libtrace UNUSED)
 {
+	/* We can't open the output file until we've seen the first packet.
+	 * This is because we need to know the DLT to set the "network" 
+	 * value in the meta-header */
+	
 	return 0;
 }
 
@@ -198,7 +230,7 @@ static int pcapfile_config_input(libtrace_t *libtrace,
 		case TRACE_OPTION_SNAPLEN:
 		case TRACE_OPTION_PROMISC:
 		case TRACE_OPTION_FILTER:
-			/* all these are either unsupported or handled
+			/* All these are either unsupported or handled
 			 * by trace_config */
 			break;
 	}
@@ -400,7 +432,7 @@ static int pcapfile_write_packet(libtrace_out_t *out,
 	hdr.ts_usec = tv.tv_usec;
 	hdr.caplen = trace_get_capture_length(packet);
 	assert(hdr.caplen < LIBTRACE_PACKET_BUFSIZE);
-	/* PCAP doesn't include the FCS, we do */
+	/* PCAP doesn't include the FCS in its wire length value, but we do */
 	if (linktype==TRACE_TYPE_ETH)
 		if (trace_get_wire_length(packet) >= 4) {
 			hdr.wirelen = trace_get_wire_length(packet)-4;
@@ -414,12 +446,14 @@ static int pcapfile_write_packet(libtrace_out_t *out,
 	assert(hdr.wirelen < LIBTRACE_PACKET_BUFSIZE);
 
 
+	/* Write the packet header */
 	numbytes=wandio_wwrite(DATAOUT(out)->file,
 			&hdr, sizeof(hdr));
 
 	if (numbytes!=sizeof(hdr)) 
 		return -1;
 
+	/* Write the rest of the packet now */
 	ret=wandio_wwrite(DATAOUT(out)->file,
 			ptr,
 			remaining);
@@ -433,13 +467,6 @@ static int pcapfile_write_packet(libtrace_out_t *out,
 static libtrace_linktype_t pcapfile_get_link_type(
 		const libtrace_packet_t *packet) 
 {
-#if 0
-	return pcap_linktype_to_libtrace(
-			swapl(packet->trace,
-				DATA(packet->trace)->header.network
-			     )
-			);
-#endif
 	return pcap_linktype_to_libtrace(rt_to_pcap_linktype(packet->type));
 }
 
@@ -447,6 +474,8 @@ static libtrace_direction_t pcapfile_get_direction(const libtrace_packet_t *pack
 {
 	libtrace_direction_t direction  = -1;
 	switch(pcapfile_get_link_type(packet)) {
+		/* We can only get the direction for PCAP packets that have
+		 * been encapsulated in Linux SLL or PFLOG */
 		case TRACE_TYPE_LINUX_SLL:
 		{
 			libtrace_sll_header_t *sll;
@@ -560,7 +589,7 @@ static size_t pcapfile_set_capture_length(libtrace_packet_t *packet,size_t size)
 	libtrace_pcapfile_pkt_hdr_t *pcapptr = 0;
 	assert(packet);
 	if (size > trace_get_capture_length(packet)) {
-		/* can't make a packet larger */
+		/* Can't make a packet larger */
 		return trace_get_capture_length(packet);
 	}
 	/* Reset the cached capture length */
@@ -574,6 +603,9 @@ static struct libtrace_eventobj_t pcapfile_event(libtrace_t *libtrace, libtrace_
 	
 	libtrace_eventobj_t event = {0,0,0.0,0};
 	
+	/* If we are being told to replay packets as fast as possible, then
+	 * we just need to read and return the next packet in the trace */
+
 	if (IN_OPTIONS.real_time) {
 		event.size = pcapfile_read_packet(libtrace, packet);
 		if (event.size < 1)

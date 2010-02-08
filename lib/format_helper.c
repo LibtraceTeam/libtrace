@@ -1,9 +1,12 @@
 /*
  * This file is part of libtrace
  *
- * Copyright (c) 2007,2008 The University of Waikato, Hamilton, New Zealand.
+ * Copyright (c) 2007,2008,2009,2010 The University of Waikato, Hamilton, 
+ * New Zealand.
+ *
  * Authors: Daniel Lawson 
- *          Perry Lorier 
+ *          Perry Lorier
+ *          Shane Alcock 
  *          
  * All rights reserved.
  *
@@ -63,6 +66,7 @@ struct libtrace_eventobj_t trace_event_device(struct libtrace_t *trace, struct l
 #else
 #  include <sys/ioctl.h>
 
+/* Generic event function for live capture devices / interfaces */
 struct libtrace_eventobj_t trace_event_device(struct libtrace_t *trace, 
 					struct libtrace_packet_t *packet) {
 	struct libtrace_eventobj_t event = {0,0,0.0,0};
@@ -126,6 +130,7 @@ struct libtrace_eventobj_t trace_event_device(struct libtrace_t *trace,
 }
 #endif
 
+/* Generic event function for trace files */ 
 struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct libtrace_packet_t *packet) {
 	struct libtrace_eventobj_t event = {0,0,0.0,0};
 	double ts;
@@ -137,13 +142,20 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 #endif
 
 	if (!trace->event.packet) {
+		/* There is no packet event waiting for us, so create a new
+		 * libtrace packet in the event structure and read the next
+		 * packet into that.
+		 *
+		 * If a SLEEP event is reported this time around, the read
+		 * packet can therefore be saved until the next time this
+		 * function is called. */
+
 		trace->event.packet = trace_create_packet();
 		trace->event.psize=
 			trace_read_packet(trace,trace->event.packet);
 		if (trace->event.psize<1) {
-			/* return here, the test for
-			 * event.size will sort out the error
-			 */
+			/* Return here, the test for event.size will sort out 
+			 * the error  */
 			if (trace_is_err(trace)) {
 				trace_perror(trace, "read packet");
 			}
@@ -154,9 +166,12 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 		}
 	}
 
+	/* The goal here is to replicate the inter-packet gaps that are
+	 * present in the trace. */
+
 	ts=trace_get_seconds(trace->event.packet);
 
-	/* Get the adjusted current time */
+	/* Get the current walltime */
 #ifdef WIN32
 	_ftime64(&tstruct);
 	now = tstruct.time + 
@@ -169,13 +184,12 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 
 	
 	if (fabs(trace->event.tdelta)>1e-9) {
-		/* adjust for trace delta */
+		/* Subtract the tdelta from the walltime to get a suitable
+		 * "relative" time */
 		now -= trace->event.tdelta; 
 
-		/* if the trace timestamp is still in the 
-		 * future, return a SLEEP event, 
-		 * otherwise fire the packet
-		 */
+		/* If the trace timestamp is still in the future, return a 
+		 * SLEEP event, otherwise return the packet */
 		if (ts > now) {
 			event.seconds = ts - 
 				trace->event.trace_last_ts;
@@ -183,9 +197,11 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 			return event;
 		}
 	} else {
-		/* work out the difference between the 
-		 * start of trace replay, and the first
-		 * packet in the trace
+		/* Work out the difference between the walltime at the start 
+		 * of the trace replay and the timestamp of the first packet 
+		 * in the trace. This will be used to convert the walltime
+		 * into a timeline that is relative to the timestamps in the
+		 * trace file.
 		 */
 		trace->event.tdelta = now - ts;
 	}
@@ -194,12 +210,15 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 	/* TODO: finalise packet */
 	
 	/* XXX: Could we do this more efficiently? */
+
 	/* We do a lot of freeing and creating of packet buffers with this
 	 * method, but at least it works unlike what was here previously */
 	if (packet->buf_control == TRACE_CTRL_PACKET) {
 		free(packet->buffer);
 	}
-		
+	
+	/* The packet that we had read earlier is now ready to be returned
+	 * to the user - switch all the pointers etc. over */	
 	packet->type = trace->event.packet->type;
 	packet->trace = trace->event.packet->trace;
 	packet->header = trace->event.packet->header;
@@ -231,9 +250,7 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 #  define O_BINARY 0
 #endif
 
-/* open a file or stdin using gzip compression if necessary (and supported)
- * @internal
- */
+/* Open a file for reading using the new Libtrace IO system */
 io_t *trace_open_file(libtrace_t *trace)
 {
 	io_t *io=wandio_create(trace->uridata);
@@ -243,9 +260,7 @@ io_t *trace_open_file(libtrace_t *trace)
 	return io;
 }
 
-/* Create a file or write to stdout using compression if requested
- * @internal
- */
+/* Open a file for writing using the new Libtrace IO system */ 
 iow_t *trace_open_file_out(libtrace_out_t *trace,int level, int fileflag)
 {
 	assert(level<10);
@@ -255,7 +270,7 @@ iow_t *trace_open_file_out(libtrace_out_t *trace,int level, int fileflag)
 }
 
 
-/** Update the libtrace error
+/** Sets the error status for an input trace
  * @param errcode either an Econstant from libc, or a LIBTRACE_ERROR
  * @param msg a plaintext error message
  * @internal
@@ -278,7 +293,7 @@ void trace_set_err(libtrace_t *trace,int errcode,const char *msg,...)
 	va_end(va);
 }
 
-/** Update the libtrace for output traces error
+/** Sets the error status for an output trace
  * @param errcode either an Econstant from libc, or a LIBTRACE_ERROR
  * @param msg a plaintext error message
  * @internal
@@ -301,6 +316,7 @@ void trace_set_err_out(libtrace_out_t *trace,int errcode,const char *msg,...)
 	va_end(va);
 }
 
+/* Byte swapping functions for various inttypes */
 uint64_t byteswap64(uint64_t num)
 {
 	return (byteswap32((num&0xFFFFFFFF00000000ULL)>>32))

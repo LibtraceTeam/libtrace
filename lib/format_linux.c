@@ -1,9 +1,12 @@
 /*
  * This file is part of libtrace
  *
- * Copyright (c) 2007,2008 The University of Waikato, Hamilton, New Zealand.
+ * Copyright (c) 2007,2008,2009,2010 The University of Waikato, Hamilton, 
+ * New Zealand.
+ *
  * Authors: Daniel Lawson 
- *          Perry Lorier 
+ *          Perry Lorier
+ *          Shane Alcock 
  *          
  * All rights reserved.
  *
@@ -27,6 +30,7 @@
  * $Id$
  *
  */
+
 
 #include "libtrace.h"
 #include "libtrace_int.h"
@@ -53,6 +57,16 @@
 
 #include <assert.h>
 
+/* This format module deals with using the Linux Native capture format.
+ *
+ * Linux Native is a LIVE capture format.
+ *
+ * This format also supports writing which will write packets out to the 
+ * network as a form of packet replay. This should not be confused with the 
+ * RT protocol which is intended to transfer captured packet records between 
+ * RT-speaking programs.
+ */
+
 /* Declared in linux/if_arp.h but not in net/if_arp.h sigh */
 #ifndef ARPHRD_NONE
 #define ARPHRD_NONE 0xfffe
@@ -65,41 +79,59 @@ struct tpacket_stats {
 
 typedef enum { TS_NONE, TS_TIMEVAL, TS_TIMESPEC } timestamptype_t;
 
-struct libtrace_format_data_t {
+struct linux_format_data_t {
+	/* The file descriptor being used for the capture */
 	int fd;
+	/* The snap length for the capture */
 	int snaplen;
+	/* Flag indicating whether the interface should be placed in 
+	 * promiscuous mode */
 	int promisc;
+	/* The timestamp format used by the capture */ 
 	timestamptype_t timestamptype;
+	/* A BPF filter that is applied to every captured packet */
 	libtrace_filter_t *filter;
+	/* Statistics for the capture process, e.g. dropped packet counts */
 	struct tpacket_stats stats;
+	/* Flag indicating whether the statistics are current or not */
 	int stats_valid;
 };
 
 
-/* Note that this structure is passed over the wire in rt encapsulation, and thus we need to be 
- * careful with data sizes.  timeval's and timespec's change their size on 32/64 machines
+/* Note that this structure is passed over the wire in rt encapsulation, and 
+ * thus we need to be careful with data sizes.  timeval's and timespec's 
+ * can also change their size on 32/64 machines.
  */
+
+/* Format header for encapsulating packets captured using linux native */
 struct libtrace_linuxnative_header {
+	/* Timestamp of the packet, as a timeval */
 	struct {
 		uint32_t tv_sec;
 		uint32_t tv_usec;
 	} tv;
+	/* Timestamp of the packet, as a timespec */
 	struct {
 		uint32_t tv_sec;
 		uint32_t tv_nsec;
 	} ts;
+	/* The timestamp format used by the process that captured this packet */
 	uint8_t timestamptype;
+	/* Wire length */
 	uint32_t wirelen;
+	/* Capture length */
 	uint32_t caplen;
+	/* The linux native header itself */
 	struct sockaddr_ll hdr;
 };
 
-struct libtrace_linuxnative_format_data_t {
+struct linux_output_format_data_t {
+	/* The file descriptor used to write the packets */
 	int fd;
 };
 
-#define FORMAT(x) ((struct libtrace_format_data_t*)(x))
-#define DATAOUT(x) ((struct libtrace_linuxnative_format_data_t*)((x)->format_data))
+#define FORMAT(x) ((struct linux_format_data_t*)(x))
+#define DATAOUT(x) ((struct linux_output_format_data_t*)((x)->format_data))
 
 static int linuxnative_probe_filename(const char *filename)
 {
@@ -109,8 +141,8 @@ static int linuxnative_probe_filename(const char *filename)
 
 static int linuxnative_init_input(libtrace_t *libtrace) 
 {
-	libtrace->format_data = (struct libtrace_format_data_t *)
-		malloc(sizeof(struct libtrace_format_data_t));
+	libtrace->format_data = (struct linux_format_data_t *)
+		malloc(sizeof(struct linux_format_data_t));
 	FORMAT(libtrace->format_data)->fd = -1;
 	FORMAT(libtrace->format_data)->promisc = -1;
 	FORMAT(libtrace->format_data)->snaplen = LIBTRACE_PACKET_BUFSIZE;
@@ -122,8 +154,8 @@ static int linuxnative_init_input(libtrace_t *libtrace)
 
 static int linuxnative_init_output(libtrace_out_t *libtrace)
 {
-	libtrace->format_data = (struct libtrace_linuxnative_format_data_t*)
-		malloc(sizeof(struct libtrace_linuxnative_format_data_t));
+	libtrace->format_data = (struct linux_output_format_data_t*)
+		malloc(sizeof(struct linux_output_format_data_t));
 	DATAOUT(libtrace)->fd = -1;
 
 	return 0;
@@ -135,6 +167,8 @@ static int linuxnative_start_input(libtrace_t *libtrace)
 	int one = 1;
 	memset(&addr,0,sizeof(addr));
 	libtrace_filter_t *filter = FORMAT(libtrace->format_data)->filter;
+	
+	/* Create a raw socket for reading packets on */
 	FORMAT(libtrace->format_data)->fd = 
 				socket(PF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
 	if (FORMAT(libtrace->format_data)->fd==-1) {
@@ -142,6 +176,8 @@ static int linuxnative_start_input(libtrace_t *libtrace)
 		free(libtrace->format_data);
 		return -1;
 	}
+
+	/* Bind to the capture interface */
 	addr.sll_family = AF_PACKET;
 	addr.sll_protocol = htons(ETH_P_ALL);
 	if (strlen(libtrace->uridata)) {
@@ -174,7 +210,8 @@ static int linuxnative_start_input(libtrace_t *libtrace)
 		else
 			FORMAT(libtrace->format_data)->promisc=0;
 	}
-				
+	
+	/* Enable promiscuous mode, if requested */			
 	if (FORMAT(libtrace->format_data)->promisc) {
 		struct packet_mreq mreq;
 		socklen_t socklen = sizeof(mreq);
@@ -189,6 +226,9 @@ static int linuxnative_start_input(libtrace_t *libtrace)
 			perror("setsockopt(PROMISC)");
 		}
 	}
+
+	/* Set the timestamp option on the socket - aim for the most detailed 
+	 * clock resolution possible */
 #ifdef SO_TIMESTAMPNS
 	if (setsockopt(FORMAT(libtrace->format_data)->fd,
 			SOL_SOCKET,
@@ -280,6 +320,7 @@ static int linuxnative_fin_output(libtrace_out_t *libtrace)
 	return 0;
 }
 
+/* Compiles a libtrace BPF filter for use with a linux native socket */
 static int linuxnative_configure_bpf(libtrace_t *libtrace, 
 		libtrace_filter_t *filter) {
 #ifdef HAVE_LIBPCAP 
@@ -360,6 +401,7 @@ static int linuxnative_config_input(libtrace_t *libtrace,
 			/* No meta-data for this format */
 			break;
 		case TRACE_OPTION_EVENT_REALTIME:
+			/* Live captures are always going to be in trace time */
 			break;
 		/* Avoid default: so that future options will cause a warning
 		 * here to remind us to implement it, or flag it as
@@ -433,6 +475,11 @@ static int linuxnative_read_packet(libtrace_t *libtrace, libtrace_packet_t *pack
 			(int)LIBTRACE_PACKET_BUFSIZE-(int)sizeof(*hdr),
 			(int)FORMAT(libtrace->format_data)->snaplen);
 
+	/* Prepare the msghdr and iovec for the kernel to write the
+	 * captured packet into. The msghdr will point to the part of our
+	 * buffer reserved for sll header, while the iovec will point at
+	 * the buffer following the sll header. */
+
 	msghdr.msg_name = &hdr->hdr;
 	msghdr.msg_namelen = sizeof(struct sockaddr_ll);
 
@@ -454,6 +501,10 @@ static int linuxnative_read_packet(libtrace_t *libtrace, libtrace_packet_t *pack
 	}
 
 	hdr->caplen=LIBTRACE_MIN(snaplen,hdr->wirelen);
+
+	/* Extract the timestamps from the msghdr and store them in our
+	 * linux native encapsulation, so that we can preserve the formatting
+	 * across multiple architectures */
 
 	for (cmsg = CMSG_FIRSTHDR(&msghdr);
 			cmsg != NULL;
@@ -478,7 +529,8 @@ static int linuxnative_read_packet(libtrace_t *libtrace, libtrace_packet_t *pack
 #endif
 	}
 
-	/* Did we not get given a timestamp? */
+	/* Did we not get given a timestamp? Try to get one from the
+	 * file descriptor directly */
 	if (cmsg == NULL) {
 		struct timeval tv;
 		if (ioctl(FORMAT(libtrace->format_data)->fd, 
@@ -492,6 +544,10 @@ static int linuxnative_read_packet(libtrace_t *libtrace, libtrace_packet_t *pack
 		}
 	}
 
+	/* Buffer contains all of our packet (including our custom header) so
+	 * we just need to get prepare_packet to set all our packet pointers
+	 * appropriately */
+	
 	if (linuxnative_prepare_packet(libtrace, packet, packet->buffer,
 				packet->type, flags))
 		return -1;
@@ -512,6 +568,8 @@ static int linuxnative_write_packet(libtrace_out_t *trace,
 	hdr.sll_halen = htons(6); /* FIXME */
 	memcpy(hdr.sll_addr,packet->payload,(size_t)ntohs(hdr.sll_halen));
 
+	/* This is pretty easy, just send the payload using sendto() (after
+	 * setting up the sll header properly, of course) */
 	return sendto(DATAOUT(trace)->fd,
 			packet->payload,
 			trace_get_capture_length(packet),
@@ -523,6 +581,8 @@ static int linuxnative_write_packet(libtrace_out_t *trace,
 static libtrace_linktype_t linuxnative_get_link_type(const struct libtrace_packet_t *packet) {
 	int linktype=(((struct libtrace_linuxnative_header*)(packet->buffer))
 				->hdr.sll_hatype);
+	/* Convert the ARPHRD type into an appropriate libtrace link type */
+
 	switch (linktype) {
 		case ARPHRD_ETHER:
 			return TRACE_TYPE_ETH;
@@ -656,7 +716,7 @@ static uint64_t linuxnative_get_filtered_packets(libtrace_t *trace UNUSED) {
 	return UINT64_MAX;
 }
 
-/* Number of packets that past filtering */
+/* Number of packets that passed filtering */
 static uint64_t linuxnative_get_captured_packets(libtrace_t *trace) {
 	if (trace->format_data == NULL)
 		return UINT64_MAX;
@@ -709,10 +769,10 @@ static uint64_t linuxnative_get_dropped_packets(libtrace_t *trace) {
 static void linuxnative_help(void) {
 	printf("linuxnative format module: $Revision$\n");
 	printf("Supported input URIs:\n");
-	printf("\tint:\n");
+	printf("\tint:eth0\n");
 	printf("\n");
 	printf("Supported output URIs:\n");
-	printf("\tnone\n");
+	printf("\tint:eth0\n");
 	printf("\n");
 	return;
 }
