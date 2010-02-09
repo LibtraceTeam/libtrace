@@ -1,9 +1,12 @@
 /*
  * This file is part of libtrace
  *
- * Copyright (c) 2007,2008 The University of Waikato, Hamilton, New Zealand.
+ * Copyright (c) 2007,2008,2009,2010 The University of Waikato, Hamilton, 
+ * New Zealand.
+ *
  * Authors: Daniel Lawson 
- *          Perry Lorier 
+ *          Perry Lorier
+ *          Shane Alcock 
  *          
  * All rights reserved.
  *
@@ -29,15 +32,6 @@
  */
 
 
-/* @file 
- *
- * @brief Trace file processing library
- *
- * @author Daniel Lawson
- * @author Perry Lorier
- *
- * @internal
- */
 #define _GNU_SOURCE
 #include "common.h"
 #include "config.h"
@@ -105,6 +99,7 @@
 
 #define MAXOPTS 1024
 
+/* This file contains much of the implementation of the libtrace API itself. */
 
 static struct libtrace_format_t *formats_list = NULL;
 
@@ -128,92 +123,6 @@ static char *xstrndup(const char *src,size_t n)
         return ret;
 }
 
-void register_format(struct libtrace_format_t *f) {
-	assert(f->next==NULL); /* Can't register a format twice */
-	f->next=formats_list;
-	formats_list=f;
-	/* Now, verify things 
-	 * This #if can be changed to a 1 to output warnings about inconsistant
-	 * functions being provided by format modules.  This generally is very
-	 * noisy, as almost all modules don't implement one or more functions
-	 * for various reasons.  This is very useful when checking a new 
-	 * format module is sane.
-	 */ 
-#if 0
-	if (f->init_input) {
-#define REQUIRE(x) \
-		if (!f->x) \
-			fprintf(stderr,"%s: Input format should provide " #x "\n",f->name)
-		REQUIRE(read_packet);
-		REQUIRE(start_input);
-		REQUIRE(fin_input);
-		REQUIRE(get_link_type);
-		REQUIRE(get_capture_length);
-		REQUIRE(get_wire_length);
-		REQUIRE(get_framing_length);
-		REQUIRE(trace_event);
-		if (!f->get_erf_timestamp 
-			&& !f->get_seconds
-			&& !f->get_timeval) {
-			fprintf(stderr,"%s: A trace format capable of input, should provide at least one of\n"
-"get_erf_timestamp, get_seconds or trace_timeval\n",f->name);
-		}
-		if (f->trace_event!=trace_event_trace) {
-			/* Theres nothing that a trace file could optimise with
-			 * config_input
-			 */
-			REQUIRE(pause_input);
-			REQUIRE(config_input);
-			REQUIRE(get_fd);
-		}
-		else {
-			if (f->get_fd) {
-				fprintf(stderr,"%s: Unnecessary get_fd\n",
-						f->name);
-			}
-		}
-#undef REQUIRE
-	}
-	else {
-#define REQUIRE(x) \
-		if (f->x) \
-			fprintf(stderr,"%s: Non Input format shouldn't need " #x "\n",f->name)
-		REQUIRE(read_packet);
-		REQUIRE(start_input);
-		REQUIRE(pause_input);
-		REQUIRE(fin_input);
-		REQUIRE(get_link_type);
-		REQUIRE(get_capture_length);
-		REQUIRE(get_wire_length);
-		REQUIRE(get_framing_length);
-		REQUIRE(trace_event);
-		REQUIRE(get_seconds);
-		REQUIRE(get_timeval);
-		REQUIRE(get_erf_timestamp);
-#undef REQUIRE
-	}
-	if (f->init_output) {
-#define REQUIRE(x) \
-		if (!f->x) \
-			fprintf(stderr,"%s: Output format should provide " #x "\n",f->name)
-		REQUIRE(write_packet);
-		REQUIRE(start_output);
-		REQUIRE(config_output);
-		REQUIRE(fin_output);
-#undef REQUIRE
-	}
-	else {
-#define REQUIRE(x) \
-		if (f->x) \
-			fprintf(stderr,"%s: Non Output format shouldn't need " #x "\n",f->name)
-		REQUIRE(write_packet);
-		REQUIRE(start_output);
-		REQUIRE(config_output);
-		REQUIRE(fin_output);
-#undef REQUIRE
-	}
-#endif
-}
 
 /* call all the constructors if they haven't yet all been called */
 static void trace_init(void)
@@ -259,7 +168,8 @@ DLLEXPORT void trace_help(void) {
 
 #define URI_PROTO_LINE 16U
 
-/* Try to guess which format module */
+/* Try to guess which format module is appropriate for a given trace file or
+ * device */
 static void guess_format(libtrace_t *libtrace, const char *filename)
 {
 	struct libtrace_format_t *tmp;
@@ -290,22 +200,22 @@ static void guess_format(libtrace_t *libtrace, const char *filename)
 	return;
 }
 
-/* Create a trace file from a URI
+/* Creates an input trace from a URI
  *
  * @params char * containing a valid libtrace URI
  * @returns opaque pointer to a libtrace_t
  *
- * Valid URI's are:
+ * Some valid URI's are:
  *  erf:/path/to/erf/file
  *  erf:/path/to/erf/file.gz
- *  erf:/path/to/rtclient/socket
  *  erf:-  			(stdin)
  *  dag:/dev/dagcard
  *  pcapint:pcapinterface 		(eg: pcapint:eth0)
- *  pcap:/path/to/pcap/file
- *  pcap:-
- *  rtclient:hostname
- *  rtclient:hostname:port
+ *  pcapfile:/path/to/pcap/file
+ *  pcapfile:-
+ *  int:interface			(eg: int:eth0) only on Linux
+ *  rt:hostname
+ *  rt:hostname:port
  *
  * If an error occured when attempting to open a trace, NULL is returned
  * and an error is output to stdout.
@@ -339,8 +249,9 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 	libtrace->io = NULL;
 	libtrace->filtered_packets = 0;
 
-        /* parse the URI to determine what sort of event we are dealing with */
+        /* Parse the URI to determine what sort of trace we are dealing with */
 	if ((uridata = trace_parse_uri(uri, &scan)) == 0) {
+		/* Could not parse the URI nicely */
 		guess_format(libtrace,uri);
 		if (!libtrace->format) {
 			trace_set_err(libtrace,TRACE_ERR_BAD_FORMAT,"Unable to guess format (%s)",uri);
@@ -350,6 +261,7 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 	else {
 		struct libtrace_format_t *tmp;
 
+		/* Find a format that matches the first part of the URI */
 		for (tmp=formats_list;tmp;tmp=tmp->next) {
 			if (strlen(scan) == strlen(tmp->name) &&
 					strncasecmp(scan, tmp->name, strlen(scan)) == 0
@@ -358,6 +270,7 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 				break;
 			}
 		}
+
 		if (libtrace->format == 0) {
 			trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT,
 					"Unknown format (%s)",scan);
@@ -369,7 +282,8 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
         /* libtrace->format now contains the type of uri
          * libtrace->uridata contains the appropriate data for this
 	 */
-        
+       
+       	/* Call the init_input function for the matching capture format */ 
 	if (libtrace->format->init_input) {
 		int err=libtrace->format->init_input(libtrace);
 		assert (err==-1 || err==0);
@@ -450,7 +364,7 @@ DLLEXPORT libtrace_t * trace_create_dead (const char *uri) {
 
 }
 
-/* Creates a trace output file from a URI. 
+/* Creates an output trace from a URI. 
  *
  * @param uri	the uri string describing the output format and destination
  * @returns opaque pointer to a libtrace_output_t 
@@ -474,7 +388,7 @@ DLLEXPORT libtrace_out_t *trace_create_output(const char *uri) {
         libtrace->format = NULL;
 	libtrace->uridata = NULL;
 	
-        /* parse the URI to determine what sort of event we are dealing with */
+        /* Parse the URI to determine what capture format we want to write */
 
 	if ((uridata = trace_parse_uri(uri, &scan)) == 0) {
 		trace_set_err_out(libtrace,TRACE_ERR_BAD_FORMAT,
@@ -482,6 +396,7 @@ DLLEXPORT libtrace_out_t *trace_create_output(const char *uri) {
 		return libtrace;
 	}
 	
+	/* Attempt to find the format in the list of supported formats */
 	for(tmp=formats_list;tmp;tmp=tmp->next) {
                 if (strlen(scan) == strlen(tmp->name) &&
                                 !strncasecmp(scan,
@@ -525,7 +440,7 @@ DLLEXPORT libtrace_out_t *trace_create_output(const char *uri) {
 	return libtrace;
 }
 
-/* Start a trace
+/* Start an input trace
  * @param libtrace	the input trace to start
  * @returns 0 on success
  *
@@ -548,6 +463,7 @@ DLLEXPORT int trace_start(libtrace_t *libtrace)
 	return 0;
 }
 
+/* Start an output trace */
 DLLEXPORT int trace_start_output(libtrace_out_t *libtrace) 
 {
 	assert(libtrace);
@@ -586,11 +502,17 @@ DLLEXPORT int trace_config(libtrace_t *libtrace,
 		return -1;
 	}
 	
+	/* If the capture format supports configuration, try using their
+	 * native configuration first */
 	if (libtrace->format->config_input) {
 		ret=libtrace->format->config_input(libtrace,option,value);
 		if (ret==0)
 			return 0;
 	}
+
+	/* If we get here, either the native configuration failed or the
+	 * format did not support configuration. However, libtrace can 
+	 * deal with some options itself, so give that a go */
 	switch(option) {
 		case TRACE_OPTION_SNAPLEN:
 			/* Clear the error if there was one */
@@ -640,24 +562,20 @@ DLLEXPORT int trace_config(libtrace_t *libtrace,
 	return -1;
 }
 
-/* Parses an output options string and calls the appropriate function to deal with output options.
- *
- * @param libtrace	the output trace object to apply the options to
- * @param options	the options string
- * @returns -1 if option configuration failed, 0 otherwise
- *
- * @author Shane Alcock
- */
 DLLEXPORT int trace_config_output(libtrace_out_t *libtrace, 
 		trace_option_output_t option,
 		void *value) {
+	
+	/* Unlike the input options, libtrace does not natively support any of
+	 * the output options - the format module must be able to deal with
+	 * them. */
 	if (libtrace->format->config_output) {
 		return libtrace->format->config_output(libtrace, option, value);
 	}
 	return -1;
 }
 
-/* Close a trace file, freeing up any resources it may have been using
+/* Close an input trace file, freeing up any resources it may have been using
  *
  */
 DLLEXPORT void trace_destroy(libtrace_t *libtrace) {
@@ -667,7 +585,7 @@ DLLEXPORT void trace_destroy(libtrace_t *libtrace) {
 			libtrace->format->pause_input(libtrace);
 		libtrace->format->fin_input(libtrace);
 	}
-        /* need to free things! */
+        /* Need to free things! */
         if (libtrace->uridata)
 		free(libtrace->uridata);
         free(libtrace);
@@ -676,6 +594,10 @@ DLLEXPORT void trace_destroy(libtrace_t *libtrace) {
 
 DLLEXPORT void trace_destroy_dead(libtrace_t *libtrace) {
 	assert(libtrace);
+
+	/* Don't call pause_input or fin_input, because we should never have
+	 * used this trace to do any reading anyway. Do make sure we free
+	 * any format_data that has been created, though. */
 	if (libtrace->format_data)
 		free(libtrace->format_data);
 	free(libtrace);
@@ -683,9 +605,7 @@ DLLEXPORT void trace_destroy_dead(libtrace_t *libtrace) {
 /* Close an output trace file, freeing up any resources it may have been using
  *
  * @param libtrace	the output trace file to be destroyed
- *
- * @author Shane Alcock
- * */
+ */
 DLLEXPORT void trace_destroy_output(libtrace_out_t *libtrace) 
 {
 	assert(libtrace);
@@ -710,13 +630,13 @@ DLLEXPORT libtrace_packet_t *trace_copy_packet(const libtrace_packet_t *packet) 
 	libtrace_packet_t *dest = 
 		(libtrace_packet_t *)malloc(sizeof(libtrace_packet_t));
 	if (!dest) {
-		printf("out of memory constructing packet\n");
+		printf("Out of memory constructing packet\n");
 		abort();
 	}
 	dest->trace=packet->trace;
 	dest->buffer=malloc(65536);
 	if (!dest->buffer) {
-		printf("out of memory allocating buffer memory\n");
+		printf("Out of memory allocating buffer memory\n");
 		abort();
 	}
 	dest->header=dest->buffer;
@@ -729,6 +649,9 @@ DLLEXPORT libtrace_packet_t *trace_copy_packet(const libtrace_packet_t *packet) 
 	dest->capture_length = -1;
 	dest->l3_header = NULL;
 	dest->l3_ethertype = 0;
+	
+	/* Ooooh nasty memcpys! This is why we want to avoid copying packets
+	 * as much as possible */
 	memcpy(dest->header,packet->header,trace_get_framing_length(packet));
 	memcpy(dest->payload,packet->payload,trace_get_capture_length(packet));
 
@@ -736,21 +659,20 @@ DLLEXPORT libtrace_packet_t *trace_copy_packet(const libtrace_packet_t *packet) 
 }
 
 /** Destroy a packet object
- *
- * sideeffect: sets packet to NULL
  */
 DLLEXPORT void trace_destroy_packet(libtrace_packet_t *packet) {
 	if (packet->buf_control == TRACE_CTRL_PACKET) {
 		free(packet->buffer);
 	}
 	packet->buf_control=(buf_control_t)'\0'; 
-				/* an "bad" value to force an assert
+				/* A "bad" value to force an assert
 				 * if this packet is ever reused
 				 */
 	free(packet);
 }	
 
-/* Read one packet from the trace into buffer
+/* Read one packet from the trace into buffer. Note that this function will
+ * block until a packet is read (or EOF is reached).
  *
  * @param libtrace 	the libtrace opaque pointer
  * @param packet  	the packet opaque pointer
@@ -818,6 +740,23 @@ DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 	return ~0U;
 }
 
+/* Converts the provided buffer into a libtrace packet of the given type.
+ *
+ * Unlike trace_construct_packet, the buffer is expected to begin with the
+ * appropriate capture format header for the format type that the packet is
+ * being converted to. This also allows for a packet to be converted into
+ * just about capture format that is supported by libtrace, provided the 
+ * format header is present in the buffer.
+ *
+ * This function is primarily used to convert packets received via the RT
+ * protocol back into their original capture format. The RT header encapsulates
+ * the original capture format header, so after removing it the packet must 
+ * have it's header and payload pointers updated and the packet format and type
+ * changed, amongst other things.
+ *
+ * Intended only for internal use at this point - this function is not 
+ * available through the external libtrace API.
+ */
 int trace_prepare_packet(libtrace_t *trace, libtrace_packet_t *packet,
 		void *buffer, libtrace_rt_types_t rt_type, uint32_t flags) {
 
@@ -850,14 +789,12 @@ int trace_prepare_packet(libtrace_t *trace, libtrace_packet_t *packet,
 
 }
 
-/* Writes a packet to the specified output
+/* Writes a packet to the specified output trace
  *
  * @param libtrace	describes the output format, destination, etc.
  * @param packet	the packet to be written out
  * @returns the number of bytes written, -1 if write failed
- *
- * @author Shane Alcock
- * */
+ */
 DLLEXPORT int trace_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *packet) {
 	assert(libtrace);
 	assert(packet);	
@@ -876,6 +813,7 @@ DLLEXPORT int trace_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *pa
 	return -1;
 }
 
+/* Get a pointer to the first byte of the packet payload */
 DLLEXPORT void *trace_get_packet_buffer(const libtrace_packet_t *packet,
 		libtrace_linktype_t *linktype, uint32_t *remaining) {
 	assert(packet != NULL);
@@ -884,6 +822,10 @@ DLLEXPORT void *trace_get_packet_buffer(const libtrace_packet_t *packet,
 	return (void *) packet->payload;
 }
 
+
+/* Get a pointer to the first byte of the packet payload 
+ *
+ * DEPRECATED - use trace_get_packet_buffer() instead */
 DLLEXPORT void *trace_get_link(const libtrace_packet_t *packet) {
 	return (void *)packet->payload;
 }
@@ -892,7 +834,6 @@ DLLEXPORT void *trace_get_link(const libtrace_packet_t *packet) {
  * @param packet 	a pointer to a libtrace_packet structure
  * @returns a 64 bit timestamp in DAG ERF format (upper 32 bits are the seconds
  * past 1970-01-01, the lower 32bits are partial seconds)
- * @author Daniel Lawson
  */ 
 DLLEXPORT uint64_t trace_get_erf_timestamp(const libtrace_packet_t *packet) {
 	if (packet->trace->format->get_erf_timestamp) {
@@ -1013,7 +954,6 @@ DLLEXPORT struct timespec trace_get_timespec(const libtrace_packet_t *packet) {
 /* Get the current time in floating point seconds
  * @param packet 	a pointer to a libtrace_packet structure
  * @returns time that this packet was seen in 64bit floating point seconds
- * @author Perry Lorier
  */ 
 DLLEXPORT double trace_get_seconds(const libtrace_packet_t *packet) {
 	double seconds = 0.0;
@@ -1061,8 +1001,6 @@ DLLEXPORT size_t trace_get_capture_length(const libtrace_packet_t *packet)
  * @param packet	a pointer to a libtrace_packet structure
  *
  * @returns the size of the packet as it was on the wire.
- * @author Perry Lorier
- * @author Daniel Lawson
  * @note Due to the trace being a header capture, or anonymisation this may
  * not be the same as the Capture Len.
  */ 
@@ -1077,8 +1015,6 @@ DLLEXPORT size_t trace_get_wire_length(const libtrace_packet_t *packet){
 /* Get the length of the capture framing headers.
  * @param packet  	the packet opaque pointer
  * @returns the size of the packet as it was on the wire.
- * @author Perry Lorier
- * @author Daniel Lawson
  * @note this length corresponds to the difference between the size of a 
  * captured packet in memory, and the captured length of the packet
  */ 
@@ -1094,8 +1030,6 @@ size_t trace_get_framing_length(const libtrace_packet_t *packet) {
 /* Get the type of the link layer
  * @param packet 	a pointer to a libtrace_packet structure
  * @returns libtrace_linktype_t
- * @author Perry Lorier
- * @author Daniel Lawson
  */
 DLLEXPORT libtrace_linktype_t trace_get_link_type(const libtrace_packet_t *packet ) {
 	if (packet->trace->format->get_link_type) {
@@ -1114,7 +1048,6 @@ DLLEXPORT libtrace_linktype_t trace_get_link_type(const libtrace_packet_t *packe
  *  TRACE_EVENT_TERMINATE Trace terminated (perhaps with an error condition)
  * FIXME currently keeps a copy of the packet inside the trace pointer,
  * which in turn is stored inside the new packet object...
- * @author Perry Lorier
  */
 DLLEXPORT libtrace_eventobj_t trace_event(libtrace_t *trace, 
 		libtrace_packet_t *packet) {
@@ -1176,10 +1109,9 @@ trace_create_filter_from_bytecode(void *bf_insns, unsigned int bf_len)
 #endif
 }
 
-/* setup a BPF filter
+/* Create a BPF filter
  * @param filterstring a char * containing the bpf filter string
  * @returns opaque pointer pointer to a libtrace_filter_t object
- * @author Daniel Lawson
  */
 DLLEXPORT libtrace_filter_t *trace_create_filter(const char *filterstring) {
 #ifdef HAVE_BPF_FILTER
@@ -1206,7 +1138,9 @@ DLLEXPORT void trace_destroy_filter(libtrace_filter_t *filter)
 #endif
 }
 
-/* compile a bpf filter, now we know what trace it's on
+/* Compile a bpf filter, now we know the link type for the trace that we're
+ * applying it to.
+ *
  * @internal
  *
  * @returns -1 on error, 0 on success
@@ -1258,7 +1192,7 @@ static int trace_bpf_compile(libtrace_filter_t *filter,
 	}
 	return 0;
 #else
-	assert(!"Internal bug: This never be called when BPF not enabled");
+	assert(!"Internal bug: This should never be called when BPF not enabled");
 	trace_set_err(packet->trace,TRACE_ERR_OPTION_UNAVAIL,
 				"Feature unavailable");
 	return -1;
@@ -1278,11 +1212,18 @@ DLLEXPORT int trace_apply_filter(libtrace_filter_t *filter,
 	assert(packet);
 
 	if (libtrace_to_pcap_dlt(trace_get_link_type(packet))==~0U) {
+		
+		/* If we cannot get a suitable DLT for the packet, it may
+		 * be because the packet is encapsulated in a link type that
+		 * does not correspond to a DLT. Therefore, we should try
+		 * popping off headers until we either can find a suitable
+		 * link type or we can't do any more sensible decapsulation. */
+		
 		/* Copy the packet, as we don't want to trash the one we
-		 * were passed in
-		 */
+		 * were passed in */
 		packet_copy=trace_copy_packet(packet);
 		free_packet_needed=true;
+
 		while (libtrace_to_pcap_dlt(trace_get_link_type(packet_copy))==
 				~0U) {
 			if (!demote_packet(packet_copy)) {
@@ -1305,8 +1246,8 @@ DLLEXPORT int trace_apply_filter(libtrace_filter_t *filter,
 		return 0;
 	}
 
-	/* We need to compile it now, because before we didn't know what the 
-	 * link type was
+	/* We need to compile the filter now, because before we didn't know 
+	 * what the link type was
 	 */
 	if (trace_bpf_compile(filter,packet_copy)==-1) {
 		if (free_packet_needed) {
@@ -1317,6 +1258,8 @@ DLLEXPORT int trace_apply_filter(libtrace_filter_t *filter,
 
 	assert(filter->flag);
 	ret=bpf_filter(filter->filter.bf_insns,(u_char*)linkptr,(unsigned int)clen,(unsigned int)clen);
+
+	/* If we copied the packet earlier, make sure that we free it */
 	if (free_packet_needed) {
 		trace_destroy_packet(packet_copy);
 	}
@@ -1349,7 +1292,6 @@ DLLEXPORT libtrace_direction_t trace_set_direction(libtrace_packet_t *packet,
  * and 1 for packets originating remotely (ie, inbound).
  * Other values are possible, which might be overloaded to mean special things
  * for a special trace.
- * @author Daniel Lawson
  */
 DLLEXPORT libtrace_direction_t trace_get_direction(const libtrace_packet_t *packet) 
 {
@@ -1485,7 +1427,6 @@ DLLEXPORT int8_t trace_get_server_port(UNUSED uint8_t protocol,
  * sizeof(ip_header)
  * @note If the original network-level payload is smaller than size, then the
  * original size is returned and the packet is left unchanged.
- * @author Daniel Lawson
  */
 DLLEXPORT size_t trace_set_capture_length(libtrace_packet_t *packet, size_t size) {
 	assert(packet);
@@ -1497,22 +1438,31 @@ DLLEXPORT size_t trace_set_capture_length(libtrace_packet_t *packet, size_t size
 	return ~0U;
 }
 
+/* Splits a URI into two components - the format component which is seen before
+ * the ':', and the uridata which follows the ':'.
+ *
+ * Returns a pointer to the URI data, but updates the format parameter to
+ * point to a copy of the format component. 
+ */
+
 DLLEXPORT const char * trace_parse_uri(const char *uri, char **format) {
 	const char *uridata = 0;
 	
 	if((uridata = strchr(uri,':')) == NULL) {
-                /* badly formed URI - needs a : */
+                /* Badly formed URI - needs a : */
                 return 0;
         }
 
         if ((unsigned)(uridata - uri) > URI_PROTO_LINE) {
-                /* badly formed URI - uri type is too long */
+                /* Badly formed URI - uri type is too long */
                 return 0;
         }
 
+	/* NOTE: this is allocated memory - it should be freed by the caller
+	 * once they are done with it */
         *format=xstrndup(uri, (size_t)(uridata - uri));
 
-	/* push uridata past the delimiter */
+	/* Push uridata past the delimiter */
         uridata++;
 	
 	return uridata;
@@ -1538,6 +1488,7 @@ DLLEXPORT bool trace_is_err(libtrace_t *trace)
 	return trace->err.err_num != 0;
 }
 
+/* Prints the input error status to standard error and clears the error state */
 DLLEXPORT void trace_perror(libtrace_t *trace,const char *msg,...)
 {
 	char buf[256];
@@ -1576,6 +1527,8 @@ DLLEXPORT bool trace_is_err_output(libtrace_out_t *trace)
 	return trace->err.err_num != 0;
 }
 
+/* Prints the output error status to standard error and clears the error state
+ */
 DLLEXPORT void trace_perror_output(libtrace_out_t *trace,const char *msg,...)
 {
 	char buf[256];
@@ -1676,6 +1629,7 @@ DLLEXPORT int trace_seek_timeval(libtrace_t *trace, struct timeval tv)
 	}
 }
 
+/* Converts a binary ethernet MAC address into a printable string */
 DLLEXPORT char *trace_ether_ntoa(const uint8_t *addr, char *buf)
 {
 	static char staticbuf[18]={0,};
@@ -1687,6 +1641,7 @@ DLLEXPORT char *trace_ether_ntoa(const uint8_t *addr, char *buf)
 	return buf;
 }
 
+/* Converts a printable ethernet MAC address into a binary format */
 DLLEXPORT uint8_t *trace_ether_aton(const char *buf, uint8_t *addr)
 {
 	uint8_t *buf2 = addr;
@@ -1702,6 +1657,16 @@ DLLEXPORT uint8_t *trace_ether_aton(const char *buf, uint8_t *addr)
 	return buf2;
 }
 
+
+/* Creates a libtrace packet from scratch using the contents of the provided 
+ * buffer as the packet payload.
+ *
+ * Unlike trace_prepare_packet(), the buffer should not contain any capture
+ * format headers; instead this function will add the PCAP header to the 
+ * packet record. This also means only PCAP packets can be constructed using
+ * this function.
+ *
+ */
 DLLEXPORT
 void trace_construct_packet(libtrace_packet_t *packet,
 		libtrace_linktype_t linktype,
@@ -1717,9 +1682,12 @@ void trace_construct_packet(libtrace_packet_t *packet,
 	struct timeval tv;
 #endif
 
+	/* We need a trace to attach the constructed packet to (and it needs
+	 * to be PCAP) */
 	if (NULL == deadtrace) 
 		deadtrace=trace_create_dead("pcapfile");
 
+	/* Fill in the new PCAP header */
 #ifdef WIN32
 	_ftime(&tstruct);
 	hdr.ts_sec=tstruct.time;
@@ -1733,6 +1701,7 @@ void trace_construct_packet(libtrace_packet_t *packet,
 	hdr.caplen=len;
 	hdr.wirelen=len;
 
+	/* Now fill in the libtrace packet itself */
 	packet->trace=deadtrace;
 	size=len+sizeof(hdr);
 	if (packet->buf_control==TRACE_CTRL_PACKET) {
@@ -1744,6 +1713,8 @@ void trace_construct_packet(libtrace_packet_t *packet,
 	packet->buf_control=TRACE_CTRL_PACKET;
 	packet->header=packet->buffer;
 	packet->payload=(void*)((char*)packet->buffer+sizeof(hdr));
+	
+	/* Ugh, memcpy - sadly necessary */
 	memcpy(packet->header,&hdr,sizeof(hdr));
 	memcpy(packet->payload,data,(size_t)len);
 	packet->type=pcap_linktype_to_rt(libtrace_to_pcap_linktype(linktype));
@@ -1790,5 +1761,94 @@ uint64_t trace_get_accepted_packets(libtrace_t *trace)
 {
 	assert(trace);
 	return trace->accepted_packets;
+}
+
+void register_format(struct libtrace_format_t *f) {
+	assert(f->next==NULL); /* Can't register a format twice */
+	f->next=formats_list;
+	formats_list=f;
+
+	/* Now, verify that the format has at least the minimum functionality.
+	 * 
+	 * This #if can be changed to a 1 to output warnings about inconsistent
+	 * functions being provided by format modules.  This generally is very
+	 * noisy, as almost all modules don't implement one or more functions
+	 * for various reasons.  This is very useful when checking a new 
+	 * format module is sane.
+	 */ 
+#if 0
+	if (f->init_input) {
+#define REQUIRE(x) \
+		if (!f->x) \
+			fprintf(stderr,"%s: Input format should provide " #x "\n",f->name)
+		REQUIRE(read_packet);
+		REQUIRE(start_input);
+		REQUIRE(fin_input);
+		REQUIRE(get_link_type);
+		REQUIRE(get_capture_length);
+		REQUIRE(get_wire_length);
+		REQUIRE(get_framing_length);
+		REQUIRE(trace_event);
+		if (!f->get_erf_timestamp 
+			&& !f->get_seconds
+			&& !f->get_timeval) {
+			fprintf(stderr,"%s: A trace format capable of input, should provide at least one of\n"
+"get_erf_timestamp, get_seconds or trace_timeval\n",f->name);
+		}
+		if (f->trace_event!=trace_event_trace) {
+			/* Theres nothing that a trace file could optimise with
+			 * config_input
+			 */
+			REQUIRE(pause_input);
+			REQUIRE(config_input);
+			REQUIRE(get_fd);
+		}
+		else {
+			if (f->get_fd) {
+				fprintf(stderr,"%s: Unnecessary get_fd\n",
+						f->name);
+			}
+		}
+#undef REQUIRE
+	}
+	else {
+#define REQUIRE(x) \
+		if (f->x) \
+			fprintf(stderr,"%s: Non Input format shouldn't need " #x "\n",f->name)
+		REQUIRE(read_packet);
+		REQUIRE(start_input);
+		REQUIRE(pause_input);
+		REQUIRE(fin_input);
+		REQUIRE(get_link_type);
+		REQUIRE(get_capture_length);
+		REQUIRE(get_wire_length);
+		REQUIRE(get_framing_length);
+		REQUIRE(trace_event);
+		REQUIRE(get_seconds);
+		REQUIRE(get_timeval);
+		REQUIRE(get_erf_timestamp);
+#undef REQUIRE
+	}
+	if (f->init_output) {
+#define REQUIRE(x) \
+		if (!f->x) \
+			fprintf(stderr,"%s: Output format should provide " #x "\n",f->name)
+		REQUIRE(write_packet);
+		REQUIRE(start_output);
+		REQUIRE(config_output);
+		REQUIRE(fin_output);
+#undef REQUIRE
+	}
+	else {
+#define REQUIRE(x) \
+		if (f->x) \
+			fprintf(stderr,"%s: Non Output format shouldn't need " #x "\n",f->name)
+		REQUIRE(write_packet);
+		REQUIRE(start_output);
+		REQUIRE(config_output);
+		REQUIRE(fin_output);
+#undef REQUIRE
+	}
+#endif
 }
 
