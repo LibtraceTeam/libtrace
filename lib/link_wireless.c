@@ -1,12 +1,11 @@
 /*
  * This file is part of libtrace
  *
- * link_wireless.c
- * Implements the trace_get_wireless_* methods defined in libtrace.h
+ * Copyright (c) 2007,2008,2009,2010 The University of Waikato, Hamilton, 
+ * New Zealand.
  *
- * Copyright (c) 2007,2008 The University of Waikato, Hamilton, New Zealand.
- * Authors: Scott Raynel 
- *          Perry Lorier 
+ * Authors: Scott Raynel
+ *          Perry Lorier
  *          
  * All rights reserved.
  *
@@ -27,10 +26,18 @@
  * along with libtrace; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
+ * $Id$
+ *
  */
 
 #include "libtrace.h"
 #include "libtrace_int.h" 
+
+/* The file contains all the functions necessary to access various measurement
+ * values that are specific to wireless MACs ( RadioTap in particular ).
+ *
+ * Credit for all this code goes to Scott Raynel.
+ */
 
 /* Used for Radiotap fields which must be naturally aligned */
 #define ALIGN_NATURAL_64(_p,_s) \

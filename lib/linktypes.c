@@ -1,3 +1,36 @@
+/*
+ * This file is part of libtrace
+ *
+ * Copyright (c) 2007,2008,2009,2010 The University of Waikato, Hamilton, 
+ * New Zealand.
+ *
+ * Authors: Daniel Lawson 
+ *          Perry Lorier
+ *          Shane Alcock 
+ *          
+ * All rights reserved.
+ *
+ * This code has been developed by the University of Waikato WAND 
+ * research group. For further information please see http://www.wand.net.nz/
+ *
+ * libtrace is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * libtrace is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with libtrace; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ * $Id$
+ *
+ */
+
 #include "libtrace.h"
 #include "config.h"
 
@@ -83,7 +116,7 @@ libtrace_dlt_t libtrace_to_pcap_dlt(libtrace_linktype_t type)
 		case TRACE_TYPE_POS:	return TRACE_DLT_PPP_SERIAL; 
 
 		/* Below here are unsupported conversions */
-		/* Dispite hints to the contrary, there is no DLT
+		/* Despite hints to the contrary, there is no DLT
 		 * for 'raw atm packets that happen to be missing
 		 * the HEC' or even 'raw atm packets that have a hec'.
 		 *
@@ -189,8 +222,9 @@ unsigned int libtrace_to_arphrd_type(libtrace_linktype_t linktype) {
 	return ~0U;
 }
 
-/** Tinker with a packet
- * packets that don't support direction tagging are annoying, especially
+/** Prepends a Linux SLL header to the packet.
+ * 
+ * Packets that don't support direction tagging are annoying, especially
  * when we have direction tagging information!  So this converts the packet
  * to TRACE_TYPE_LINUX_SLL which does support direction tagging.  This is a
  * pcap style packet for the reason that it means it works with bpf filters.
@@ -261,9 +295,10 @@ void promote_packet(libtrace_packet_t *packet)
 	}
 }
 
-/* Try and simplify the packet one step, kinda the opposite to promote_packet
+/* Try and remove any extraneous encapsulation that may have been added to
+ * a packet. Effectively the opposite to promote_packet.
  *
- * returns true if demotion was possible, false if not.
+ * Returns true if demotion was possible, false if not.
  */
 bool demote_packet(libtrace_packet_t *packet)
 {
