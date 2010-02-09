@@ -1,4 +1,36 @@
-/* Protocol decodes for packet metadata headers */
+/*
+ * This file is part of libtrace
+ *
+ * Copyright (c) 2007,2008,2009,2010 The University of Waikato, Hamilton, 
+ * New Zealand.
+ *
+ * Authors: Daniel Lawson 
+ *          Perry Lorier
+ *          Shane Alcock 
+ *          
+ * All rights reserved.
+ *
+ * This code has been developed by the University of Waikato WAND 
+ * research group. For further information please see http://www.wand.net.nz/
+ *
+ * libtrace is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * libtrace is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with libtrace; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ * $Id$
+ *
+ */
+
 #include "libtrace.h"
 #include "libtrace_int.h"
 #include "protocols.h"
@@ -15,6 +47,16 @@
 #ifndef ARPHRD_PPP
 #define ARPHRD_PPP      512
 #endif
+
+/* This file contains all the protocol decoding functions for the meta-data
+ * headers that may be prepended to captured packets.
+ *
+ * Supported protocols include (but are not limited to):
+ * 	Linux SLL
+ * 	PFLOG
+ * 	RadioTap
+ * 	Prism
+ */
 
 /* NB: type is returned as an ARPHRD_ type for SLL*/
 void *trace_get_payload_from_linux_sll(const void *link,
@@ -180,117 +222,4 @@ DLLEXPORT void *trace_get_payload_from_meta(const void *meta,
 	/* Shouldn't get here */
 	return NULL;
 }
-
-/* Take a pointer to the start of an IEEE 802.11 MAC frame and return a pointer
- * to the source MAC address.  
- * If the frame does not contain a sender address, e.g. ACK frame, return NULL.
- * If the frame is a 4-address WDS frame, return TA, i.e. addr2.
- * NB: This function decodes the 802.11 header, so it assumes that there are no
- * bit-errors. If there are, all bets are off.
- */
-static
-uint8_t *get_source_mac_from_wifi(void *wifi) {
-	struct libtrace_80211_t *w;
-	if (wifi == NULL) return NULL;
-	w = (struct libtrace_80211_t *) wifi;
-	
-	/* If the frame is of type CTRL */
-	if (w->type == 0x1) 
-		/* If bit 2 of the subtype field is zero, this indicates that
-		 * there is no transmitter address, i.e. the frame is either an
-		 * ACK or a CTS frame */
-		if ((w->subtype & 0x2) == 0)
-			return NULL;
-
-	/* Always return the address of the transmitter, i.e. address 2 */
-	return (uint8_t *) &w->mac2;
-}
-
-DLLEXPORT uint8_t *trace_get_source_mac(libtrace_packet_t *packet) {
-	void *link;
-	uint32_t remaining;
-	libtrace_linktype_t linktype;
-	assert(packet);
-	link = trace_get_layer2(packet,&linktype,&remaining);
-
-	if (!link)
-		return NULL;
-	
-	switch (linktype) {
-		case TRACE_TYPE_ETH:
-			return (uint8_t *)&(((libtrace_ether_t*)link)->ether_shost);
-		case TRACE_TYPE_80211:
-			return get_source_mac_from_wifi(link);
-		/* These packets don't have MAC addresses */
-		case TRACE_TYPE_POS:
-		case TRACE_TYPE_NONE:
-		case TRACE_TYPE_HDLC_POS:
-		case TRACE_TYPE_PFLOG:
-		case TRACE_TYPE_ATM:
-		case TRACE_TYPE_DUCK:
-		case TRACE_TYPE_METADATA:
-		case TRACE_TYPE_AAL5:
-		case TRACE_TYPE_LLCSNAP:
-		case TRACE_TYPE_PPP:
-			return NULL;
-
-		/* Metadata headers should already be skipped */
-		case TRACE_TYPE_LINUX_SLL:
-		case TRACE_TYPE_80211_PRISM:
-		case TRACE_TYPE_80211_RADIO:
-			assert(!"Metadata headers should already be skipped");
-			break;
-	}
-	fprintf(stderr,"%s not implemented for linktype %i\n", __func__, linktype);
-	assert(0);
-	return NULL;
-}
-
-DLLEXPORT uint8_t *trace_get_destination_mac(libtrace_packet_t *packet) 
-{
-	void *link;
-	libtrace_linktype_t linktype;
-	uint32_t remaining;
-	libtrace_80211_t *wifi;
-	libtrace_ether_t *ethptr;
-	
-	link = trace_get_layer2(packet,&linktype,&remaining);
-
-        ethptr = (libtrace_ether_t*)link;
-
-
-	if (!link)
-		return NULL;
-
-	switch (linktype) {
-		case TRACE_TYPE_80211:
-			wifi=(libtrace_80211_t*)link;
-			return (uint8_t*)&wifi->mac1;
-		case TRACE_TYPE_80211_RADIO:
-			wifi=(libtrace_80211_t*)trace_get_payload_from_radiotap(
-					link,NULL,NULL);
-			return (uint8_t*)&wifi->mac1;
-		case TRACE_TYPE_80211_PRISM:
-			wifi=(libtrace_80211_t*)((char*)link+144);
-			return (uint8_t*)&wifi->mac1;
-		case TRACE_TYPE_ETH:
-			return (uint8_t*)&ethptr->ether_dhost;
-		case TRACE_TYPE_POS:
-		case TRACE_TYPE_NONE:
-		case TRACE_TYPE_ATM:
-		case TRACE_TYPE_HDLC_POS:
-		case TRACE_TYPE_LINUX_SLL:
-		case TRACE_TYPE_PFLOG:
-		case TRACE_TYPE_DUCK:
-		case TRACE_TYPE_METADATA:
-			/* No MAC address */
-			return NULL;
-		default:
-			break;
-	}
-	fprintf(stderr,"Not implemented\n");
-	assert(0);
-	return NULL;
-}
-
 

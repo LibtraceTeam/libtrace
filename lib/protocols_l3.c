@@ -1,4 +1,37 @@
-/* Protocol decodes for Layer 3 protocols */
+/*
+ * This file is part of libtrace
+ *
+ * Copyright (c) 2007,2008,2009,2010 The University of Waikato, Hamilton, 
+ * New Zealand.
+ *
+ * Authors: Daniel Lawson 
+ *          Perry Lorier
+ *          Shane Alcock 
+ *          
+ * All rights reserved.
+ *
+ * This code has been developed by the University of Waikato WAND 
+ * research group. For further information please see http://www.wand.net.nz/
+ *
+ * libtrace is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * libtrace is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with libtrace; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ * $Id$
+ *
+ */
+
+
 #include "libtrace.h"
 #include "protocols.h"
 #include <assert.h>
@@ -13,6 +46,16 @@
 #include <string.h>
 #endif
 
+/* This file contains all the protocol decoding functions for layer 3
+ * (the IP layer) protocols. This includes functions for accessing IP
+ * addresses. 
+ *
+ * Supported protocols include:
+ * 	IPv4
+ * 	IPv6
+ */
+
+/* Gets an IPv4 header */
 libtrace_ip_t *trace_get_ip(libtrace_packet_t *packet) 
 {
 	uint16_t ethertype;
@@ -211,7 +254,7 @@ DLLEXPORT void *trace_get_layer3(const libtrace_packet_t *packet,
 	return iphdr;
 }
 
-/* parse an ip or tcp option
+/* Parse an ip or tcp option
  * @param[in,out] ptr	the pointer to the current option
  * @param[in,out] len	the length of the remaining buffer
  * @param[out] type	the type of the option

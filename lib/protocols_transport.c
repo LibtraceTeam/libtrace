@@ -1,8 +1,51 @@
+/*
+ * This file is part of libtrace
+ *
+ * Copyright (c) 2007,2008,2009,2010 The University of Waikato, Hamilton, 
+ * New Zealand.
+ *
+ * Authors: Daniel Lawson 
+ *          Perry Lorier
+ *          Shane Alcock 
+ *          
+ * All rights reserved.
+ *
+ * This code has been developed by the University of Waikato WAND 
+ * research group. For further information please see http://www.wand.net.nz/
+ *
+ * libtrace is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * libtrace is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with libtrace; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ * $Id$
+ *
+ */
+
+
 #include "libtrace.h"
 #include "protocols.h"
 #include <assert.h>
 #include <stdlib.h>
 #include <stdio.h> // fprintf
+
+/* This file contains all the protocol decoding functions for transport layer
+ * protocols. This includes functions for access port numbers.
+ *
+ * Supported protocols include (but are not limited to):
+ * 	TCP
+ * 	UDP
+ * 	ICMP
+ */
 
 DLLEXPORT void *trace_get_transport(const libtrace_packet_t *packet, 
 		uint8_t *proto,
@@ -178,7 +221,7 @@ DLLEXPORT void *trace_get_payload_from_icmp(libtrace_icmp_t *icmp, uint32_t *rem
 	return (char*)icmp+sizeof(libtrace_icmp_t);
 }
 
-/* Return the client port
+/* Return the source port
  */
 DLLEXPORT uint16_t trace_get_source_port(const libtrace_packet_t *packet)
 {
@@ -188,7 +231,7 @@ DLLEXPORT uint16_t trace_get_source_port(const libtrace_packet_t *packet)
 		(const struct ports_t*)trace_get_transport((libtrace_packet_t*)packet,
 			&proto, &remaining);
 
-	/* snapped too early */
+	/* Snapped too early */
 	if (remaining<2)
 		return 0;
 
@@ -210,7 +253,7 @@ DLLEXPORT uint16_t trace_get_destination_port(const libtrace_packet_t *packet)
 	struct ports_t *port = 
 		(struct ports_t*)trace_get_transport((libtrace_packet_t*)packet,
 			&proto, &remaining);
-	/* snapped to early */
+	/* Snapped too early */
 	if (remaining<4)
 		return 0;
 	

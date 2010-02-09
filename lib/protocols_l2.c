@@ -1,9 +1,55 @@
-/* Protocol decodes for layer 2 */
+/*
+ * This file is part of libtrace
+ *
+ * Copyright (c) 2007,2008,2009,2010 The University of Waikato, Hamilton, 
+ * New Zealand.
+ *
+ * Authors: Daniel Lawson 
+ *          Perry Lorier
+ *          Shane Alcock 
+ *          
+ * All rights reserved.
+ *
+ * This code has been developed by the University of Waikato WAND 
+ * research group. For further information please see http://www.wand.net.nz/
+ *
+ * libtrace is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * libtrace is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with libtrace; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ * $Id$
+ *
+ */
+
 #include "libtrace.h"
 #include "protocols.h"
 #include "libtrace_int.h"
 #include <assert.h>
 #include <stdlib.h>
+
+/* This file contains all the protocol decoding functions for layer 2 
+ * (and 2.5) protocols. This includes functions for accessing MAC addresses.
+ *
+ * Supported protocols include (but are not limited to):
+ * 	Ethernet
+ * 	802.11
+ * 	802.1q (vlan)
+ * 	MPLS
+ * 	PPPoE
+ * 	LLCSnap
+ * 	ATM
+ */
+
 
 /* Returns the payload from 802.3 ethernet.  Type optionally returned in
  * "type" in host byte order.  This will return a vlan header.
@@ -28,7 +74,7 @@ void *trace_get_payload_from_ethernet(void *ethernet,
 	return (void*)((char *)eth + sizeof(*eth));
 }
 
-/* skip any 802.1q headers if necessary 
+/* Skip any 802.1q headers if necessary 
  * type is now output only (why check it if we don't need to?)
  */
 void *trace_get_payload_from_vlan(void *ethernet, uint16_t *type,
@@ -52,7 +98,7 @@ void *trace_get_payload_from_vlan(void *ethernet, uint16_t *type,
 
 }
 
-/* skip any MPLS headers if necessary, guessing what the next type is
+/* Skip any MPLS headers if necessary, guessing what the next type is
  * type is input/output.  If the next type is "ethernet" this will
  * return a type of 0x0000.
  */
@@ -337,6 +383,7 @@ DLLEXPORT void *trace_get_payload_from_layer2(void *link,
 		   not correspond to a genuine link-layer
 		   */
 		case TRACE_TYPE_METADATA:
+		case TRACE_TYPE_NONDATA:
 			return NULL;
 
 		case TRACE_TYPE_80211:
@@ -345,16 +392,16 @@ DLLEXPORT void *trace_get_payload_from_layer2(void *link,
 			return trace_get_payload_from_ethernet(link,ethertype,remaining);
 		case TRACE_TYPE_NONE:
 			if ((*(char*)link&0xF0) == 0x40)
-				*ethertype=TRACE_ETHERTYPE_IP;	/* IPv4 */
+				*ethertype=TRACE_ETHERTYPE_IP;	 /* IPv4 */
 			else if ((*(char*)link&0xF0) == 0x60)
-				*ethertype=TRACE_ETHERTYPE_IPV6;	/* IPv6 */
+				*ethertype=TRACE_ETHERTYPE_IPV6; /* IPv6 */
 			return link; /* I love the simplicity */
 		case TRACE_TYPE_PPP:
 			return trace_get_payload_from_ppp(link,ethertype,remaining);
 		case TRACE_TYPE_ATM:
 			l=trace_get_payload_from_atm(link,NULL,remaining);
-			/* FIXME: We shouldn't skip llcsnap here, we should return
-			 * an ethertype for it (somehow)
+			/* FIXME: We shouldn't skip llcsnap here, we should 
+			 * return an ethertype for it (somehow)
 			 */
 			return (l ? trace_get_payload_from_llcsnap(l,
 						ethertype, remaining):NULL);
@@ -375,5 +422,116 @@ DLLEXPORT void *trace_get_payload_from_layer2(void *link,
 
 }
 
+/* Take a pointer to the start of an IEEE 802.11 MAC frame and return a pointer
+ * to the source MAC address.  
+ * If the frame does not contain a sender address, e.g. ACK frame, return NULL.
+ * If the frame is a 4-address WDS frame, return TA, i.e. addr2.
+ * NB: This function decodes the 802.11 header, so it assumes that there are no
+ * bit-errors. If there are, all bets are off.
+ */
+static
+uint8_t *get_source_mac_from_wifi(void *wifi) {
+        struct libtrace_80211_t *w;
+        if (wifi == NULL) return NULL;
+        w = (struct libtrace_80211_t *) wifi;
 
+        /* If the frame is of type CTRL */
+        if (w->type == 0x1)
+                /* If bit 2 of the subtype field is zero, this indicates that
+                 * there is no transmitter address, i.e. the frame is either an
+                 * ACK or a CTS frame */
+                if ((w->subtype & 0x2) == 0)
+                        return NULL;
+
+        /* Always return the address of the transmitter, i.e. address 2 */
+        return (uint8_t *) &w->mac2;
+}
+
+DLLEXPORT uint8_t *trace_get_source_mac(libtrace_packet_t *packet) {
+        void *link;
+        uint32_t remaining;
+        libtrace_linktype_t linktype;
+        assert(packet);
+        link = trace_get_layer2(packet,&linktype,&remaining);
+
+        if (!link)
+                return NULL;
+
+        switch (linktype) {
+                case TRACE_TYPE_ETH:
+                        return (uint8_t *)&(((libtrace_ether_t*)link)->ether_shost);
+                case TRACE_TYPE_80211:
+                        return get_source_mac_from_wifi(link);
+                /* These packets don't have MAC addresses */
+                case TRACE_TYPE_POS:
+                case TRACE_TYPE_NONE:
+                case TRACE_TYPE_HDLC_POS:
+                case TRACE_TYPE_PFLOG:
+                case TRACE_TYPE_ATM:
+                case TRACE_TYPE_DUCK:
+                case TRACE_TYPE_METADATA:
+                case TRACE_TYPE_AAL5:
+                case TRACE_TYPE_LLCSNAP:
+                case TRACE_TYPE_PPP:
+		case TRACE_TYPE_NONDATA:
+                        return NULL;
+
+                /* Metadata headers should already be skipped */
+                case TRACE_TYPE_LINUX_SLL:
+                case TRACE_TYPE_80211_PRISM:
+                case TRACE_TYPE_80211_RADIO:
+                        assert(!"Metadata headers should already be skipped");
+                        break;
+        }
+        fprintf(stderr,"%s not implemented for linktype %i\n", __func__, linktype);
+        assert(0);
+        return NULL;
+}
+
+DLLEXPORT uint8_t *trace_get_destination_mac(libtrace_packet_t *packet)
+{
+        void *link;
+        libtrace_linktype_t linktype;
+        uint32_t remaining;
+        libtrace_80211_t *wifi;
+        libtrace_ether_t *ethptr;
+
+        link = trace_get_layer2(packet,&linktype,&remaining);
+
+        ethptr = (libtrace_ether_t*)link;
+
+
+        if (!link)
+                return NULL;
+
+        switch (linktype) {
+                case TRACE_TYPE_80211:
+                        wifi=(libtrace_80211_t*)link;
+                        return (uint8_t*)&wifi->mac1;
+                case TRACE_TYPE_ETH:
+                        return (uint8_t*)&ethptr->ether_dhost;
+                case TRACE_TYPE_POS:
+                case TRACE_TYPE_NONE:
+                case TRACE_TYPE_ATM:
+                case TRACE_TYPE_HDLC_POS:
+                case TRACE_TYPE_PFLOG:
+                case TRACE_TYPE_DUCK:
+                case TRACE_TYPE_METADATA:
+		case TRACE_TYPE_AAL5:
+		case TRACE_TYPE_LLCSNAP:
+		case TRACE_TYPE_PPP:	
+		case TRACE_TYPE_NONDATA:
+                        /* No MAC address */
+                        return NULL;
+                /* Metadata headers should already be skipped */
+                case TRACE_TYPE_LINUX_SLL:
+                case TRACE_TYPE_80211_PRISM:
+                case TRACE_TYPE_80211_RADIO:
+                        assert(!"Metadata headers should already be skipped");
+                        break;
+        }
+        fprintf(stderr,"Not implemented\n");
+        assert(0);
+        return NULL;
+}
 
