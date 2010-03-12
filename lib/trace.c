@@ -550,7 +550,7 @@ DLLEXPORT int trace_config(libtrace_t *libtrace,
 			if (!trace_is_err(libtrace)) {
 				trace_set_err(libtrace, 
 						TRACE_ERR_OPTION_UNAVAIL,
-						"This format does not support meta-data gathering");
+						"This format does not support realtime events");
 			}
 			return -1;
 			
