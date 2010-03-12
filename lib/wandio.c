@@ -100,7 +100,6 @@ static void parse_env(void)
 }
 
 
->>>>>>> .r1529
 #define READ_TRACE 0
 #define WRITE_TRACE 0
 
