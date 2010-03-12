@@ -33,6 +33,7 @@
 
 
 #include "wandio.h"
+#include "config.h"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -41,6 +42,9 @@
 #include <string.h>
 #include <stdbool.h>
 #include <errno.h>
+#ifdef HAVE_SYS_PRCTL_H
+#include <sys/prctl.h>
+#endif
 
 /* Libtrace IO module implementing a threaded reader.
  *
@@ -96,6 +100,21 @@ static void *thread_producer(void* userdata)
 	io_t *state = (io_t*) userdata;
 	int buffer=0;
 	bool running = true;
+	char namebuf[17];
+
+#ifdef PR_SET_NAME
+	if (prctl(PR_GET_NAME, namebuf, 0,0,0) == 0) {
+		namebuf[16] = '\0'; /* Make sure it's NUL terminated */
+		/* If the filename is too long, overwrite the last few bytes */
+		if (strlen(namebuf)>9) {
+			strcpy(namebuf+10,"[ior]");
+		}
+		else {
+			strncat(namebuf," [ior]",16);
+		}
+		prctl(PR_SET_NAME, namebuf, 0,0,0);
+	}
+#endif
 
 	pthread_mutex_lock(&DATA(state)->mutex);
 	do {
