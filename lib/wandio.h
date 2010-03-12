@@ -35,6 +35,7 @@
 #define IO_H 1
 #include <sys/types.h>
 #include <stdio.h>
+#include <inttypes.h>
 
 /** @file
  *
@@ -161,7 +162,7 @@ enum {
 	/** Bzip compression */
 	WANDIO_COMPRESS_BZ2	= 2,
 	/** All supported methods - used as a bitmask */
-	WANDIO_COMPRESS_MASK	= 3
+	WANDIO_COMPRESS_MASK	= 7
 };
 
 /** @name IO open functions
@@ -278,4 +279,13 @@ off_t wandio_wwrite(iow_t *iow, const void *buffer, off_t len);
 void wandio_wdestroy(iow_t *iow);
 
 /** @} */
+
+/** @name libtraceio options 
+ * @{ */
+extern int force_directio_read;
+extern int force_directio_write;
+extern uint64_t write_waits;
+extern uint64_t read_waits;
+/* @} */
+
 #endif

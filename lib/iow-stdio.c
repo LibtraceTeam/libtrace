@@ -32,6 +32,7 @@
  */
 
 
+#define _GNU_SOURCE 1
 #include "wandio.h"
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -60,7 +61,12 @@ iow_t *stdio_wopen(const char *filename)
 	if (strcmp(filename,"-") == 0) 
 		DATA(iow)->fd = 1; /* STDOUT */
 	else
-		DATA(iow)->fd = open(filename,O_WRONLY|O_CREAT|O_TRUNC,0666);
+		DATA(iow)->fd = open(filename,
+				O_WRONLY
+				|O_CREAT
+				|O_TRUNC
+				|(force_directio_write?O_DIRECT:0),
+				0666);
 
 	if (DATA(iow)->fd == -1) {
 		free(iow);

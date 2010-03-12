@@ -32,6 +32,7 @@
  */
 
 
+#define _GNU_SOURCE 1
 #include "wandio.h"
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -59,7 +60,7 @@ io_t *stdio_open(const char *filename)
 	if (strcmp(filename,"-") == 0)
 		DATA(io)->fd = 0; /* STDIN */
 	else
-		DATA(io)->fd = open(filename,O_RDONLY);
+		DATA(io)->fd = open(filename,O_RDONLY|(force_directio_read?O_DIRECT:0));
 	io->source = &stdio_source;
 
 	if (DATA(io)->fd == -1) {

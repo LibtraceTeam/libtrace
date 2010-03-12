@@ -202,6 +202,7 @@ static off_t thread_read(io_t *state, void *buffer, off_t len)
 		
 		/* Wait for the reader thread to provide us with some data */
 		while (INBUFFER(state).state == EMPTY) {
+			++read_waits;
 			pthread_cond_wait(&DATA(state)->data_ready, &DATA(state)->mutex);
 
 		}

@@ -195,6 +195,7 @@ static off_t thread_wwrite(iow_t *state, const char *buffer, off_t len)
 
 		/* Wait for there to be space available for us to write into */
 		while (OUTBUFFER(state).state == FULL) {
+			write_waits++;
 			pthread_cond_wait(&DATA(state)->space_avail,
 					&DATA(state)->mutex);
 		}
