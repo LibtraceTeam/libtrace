@@ -26,6 +26,12 @@ else
 LIBTRACEIO_BZLIB=
 endif
 
+if HAVE_LZO
+LIBTRACEIO_LZO=iow-lzo.c
+else
+LIBTRACEIO_LZO=
+endif
+
 if HAVE_DAG
 if DAG2_4
 DAGSOURCE=format_dag24.c
@@ -47,7 +53,8 @@ libtrace_la_SOURCES = trace.c common.h \
 		protocols_pktmeta.c protocols_l2.c protocols_l3.c \
 		protocols_transport.c protocols.h \
 		$(DAGSOURCE) format_erf.h \
-		$(LIBTRACEIO_ZLIB) $(LIBTRACEIO_BZLIB) ior-peek.c ior-stdio.c ior-thread.c \
+		$(LIBTRACEIO_ZLIB) $(LIBTRACEIO_BZLIB) $(LIBTRACEIO_LZO) \
+		ior-peek.c ior-stdio.c ior-thread.c \
 		iow-stdio.c iow-thread.c wandio.c \
 		wandio.h
 

@@ -161,6 +161,8 @@ enum {
 	WANDIO_COMPRESS_ZLIB	= 1,
 	/** Bzip compression */
 	WANDIO_COMPRESS_BZ2	= 2,
+	/** LZO compression */
+	WANDIO_COMPRESS_LZO	= 3,
 	/** All supported methods - used as a bitmask */
 	WANDIO_COMPRESS_MASK	= 7
 };
@@ -181,6 +183,7 @@ io_t *stdio_open(const char *filename);
 
 iow_t *zlib_wopen(iow_t *child, int compress_level);
 iow_t *bz_wopen(iow_t *child, int compress_level);
+iow_t *lzo_wopen(iow_t *child, int compress_level);
 iow_t *thread_wopen(iow_t *child);
 iow_t *stdio_wopen(const char *filename);
 

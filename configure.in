@@ -271,6 +271,7 @@ DAG_VERSION_NUM=$dag_drv_v
 
 AC_CHECK_LIB(z, deflate)
 AC_CHECK_LIB(bz2, BZ2_bzDecompressInit)
+AC_CHECK_LIB(lzo2, lzo1x_1_compress)
 AC_CHECK_LIB(pthread, pthread_create)
 AC_SEARCH_LIBS(mvprintw, ncurses, [], [ AC_MSG_ERROR([NCurses library not available]) ])
 
@@ -281,6 +282,7 @@ AM_CONDITIONAL([DAG2_5], [test "$libtrace_dag_version" = 25])
 AM_CONDITIONAL([DAG3_0], [test "$libtrace_dag_version" = 30])
 AM_CONDITIONAL([HAVE_ZLIB], [test "$ac_cv_lib_z_deflate" = yes])
 AM_CONDITIONAL([HAVE_BZLIB], [test "$ac_cv_lib_bz2_BZ2_bzDecompressInit" = yes])
+AM_CONDITIONAL([HAVE_LZO], [test "$ac_cv_lib_lzo2_lzo1x_1_compress" = yes])
 AM_CONDITIONAL([HAVE_NETPACKET_PACKET_H], [test "$libtrace_netpacket_packet_h" = true])
 AM_CONDITIONAL([HAVE_LIBGDC], [test "$ac_cv_header_gdc_h" = yes])
 
@@ -317,6 +319,7 @@ AC_MSG_NOTICE([Libtrace version $PACKAGE_VERSION])
 reportopt "Compiled with PCAP 0.8 support" $ac_cv_lib_pcap_pcap_next_ex
 reportopt "Compiled with compressed trace (zlib) support" $ac_cv_lib_z_deflate
 reportopt "Compiled with compressed trace (bz2) support" $ac_cv_lib_bz2_BZ2_bzDecompressInit
+reportopt "Compiled with compressed trace (lzo write only) support" $ac_cv_lib_lzo2_lzo1x_1_compress
 if test x"$libtrace_dag" = xtrue; then
 	if test "$libtrace_dag_version" = 24; then
 		AC_MSG_NOTICE([Compiled with DAG live capture support: 2.4])
