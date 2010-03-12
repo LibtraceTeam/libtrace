@@ -47,6 +47,7 @@
 struct compression_type compression_type[]  = {
 	{ "GZ",		"gz", 	WANDIO_COMPRESS_ZLIB 	},
 	{ "BZ2",	"bz2", 	WANDIO_COMPRESS_BZ2	},
+	{ "LZO",	"lzo",  WANDIO_COMPRESS_LZO	},
 	{ "NONE",	"",	WANDIO_COMPRESS_NONE	}
 };
 
@@ -99,6 +100,7 @@ static void parse_env(void)
 }
 
 
+>>>>>>> .r1529
 #define READ_TRACE 0
 #define WRITE_TRACE 0
 
@@ -109,6 +111,7 @@ io_t *wandio_create(const char *filename)
 	/* Use a peeking reader to look at the start of the trace file and
 	 * determine what type of compression may have been used to write
 	 * the file */
+
 	io_t *io = peek_open(stdio_open(filename));
 	char buffer[1024];
 	int len;
@@ -193,6 +196,8 @@ iow_t *wandio_wcreate(const char *filename, int compression_level, int flags)
 	iow_t *iow;
 
 	assert ( compression_level >= 0 && compression_level <= 9 );
+	fprintf(stderr,"Compression level= %d\n",compression_level);
+	fprintf(stderr,"flags=%d\n",flags);
 
 	iow=stdio_wopen(filename);
 
@@ -201,15 +206,30 @@ iow_t *wandio_wcreate(const char *filename, int compression_level, int flags)
 #if HAVE_LIBZ
 	if (compression_level != 0 && 
 	    (flags & WANDIO_COMPRESS_MASK) == WANDIO_COMPRESS_ZLIB) {
+	    	fprintf(stderr,"GZip compression\n");
 		iow = zlib_wopen(iow,compression_level);
+	}
+#endif
+#if HAVE_LIBLZO2
+	else if (compression_level != 0 && 
+	    (flags & WANDIO_COMPRESS_MASK) == WANDIO_COMPRESS_LZO) {
+		fprintf(stderr,"Using LZO\n");
+		iow = lzo_wopen(iow,compression_level);
 	}
 #endif
 #if HAVE_LIBBZ2
 	else if (compression_level != 0 && 
 	    (flags & WANDIO_COMPRESS_MASK) == WANDIO_COMPRESS_BZ2) {
+	    	fprintf(stderr,"BZ compression\n");
 		iow = bz_wopen(iow,compression_level);
 	}
 #endif
+	else if (compression_level != 0) {
+		fprintf(stderr,"Compression %d unavailable\n",flags);
+	}
+	else {
+		fprintf(stderr,"No compression requested\n");
+	}
 	/* Open a threaded writer */
 	if (use_threads)
 		return thread_wopen(iow);
