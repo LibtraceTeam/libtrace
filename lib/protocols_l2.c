@@ -250,28 +250,58 @@ void *trace_get_payload_from_pppoe(void *link, uint16_t *type,
 			type, remaining);
 }
 	
-
+/* Header for CHDLC framing */
 typedef struct libtrace_chdlc_t {
 	uint8_t address;	/** 0xF0 for unicast, 0xF8 for multicast */
-	uint8_t control;
+	uint8_t control;	/** Always 0x00 */
 	uint16_t ethertype;
 } libtrace_chdlc_t;
 
-static void *trace_get_payload_from_chdlc(void *link, 
-		uint16_t *type, uint32_t *remaining)
-{
-	libtrace_chdlc_t *chdlc = (libtrace_chdlc_t*)link;
+/* Header for PPP in HDLC-like framing */
+typedef struct libtrace_ppp_hdlc_t {
+	uint8_t address;	/** Always should be 0xff */
+	uint8_t control;	/** Always should be 0x03 */
+	uint16_t protocol;	
+} libtrace_ppp_hdlc_t;
+
+static void *trace_get_payload_from_chdlc(void *link, uint16_t *type,
+		uint32_t *remaining) {
+
+	libtrace_chdlc_t *chdlc = (libtrace_chdlc_t *)link;
 
 	if (remaining) {
 		if (*remaining < sizeof(libtrace_chdlc_t)) {
 			*remaining = 0;
 			return NULL;
 		}
-		*remaining-=sizeof(libtrace_chdlc_t);
+		*remaining -= sizeof(libtrace_chdlc_t);
 	}
 
 	if (type) {
-		switch(ntohs(chdlc->ethertype)) {
+		*type = ntohs(chdlc->ethertype);
+	}
+
+	return (void *)((char *)chdlc + sizeof(*chdlc));
+
+}
+
+static void *trace_get_payload_from_ppp_hdlc(void *link, 
+		uint16_t *type, uint32_t *remaining)
+{
+	libtrace_ppp_hdlc_t *ppp_hdlc = (libtrace_ppp_hdlc_t*)link;
+
+	if (remaining) {
+		if (*remaining < sizeof(libtrace_ppp_hdlc_t)) {
+			*remaining = 0;
+			return NULL;
+		}
+		*remaining-=sizeof(libtrace_ppp_hdlc_t);
+	}
+
+	if (type) {
+		/* http://www.iana.org/assignments/ppp-numbers */
+
+		switch(ntohs(ppp_hdlc->protocol)) {
 			case 0x0021: /* IP */
 				*type = TRACE_ETHERTYPE_IP;
 				break;
@@ -280,13 +310,14 @@ static void *trace_get_payload_from_chdlc(void *link,
 				break;
 
 			default:
-				printf("Unknown chdlc type: %04x\n",ntohs(chdlc->ethertype));
+				printf("Unknown chdlc type: %04x\n",
+						ntohs(ppp_hdlc->protocol));
 				*type = 0; /* Unknown */
 		}
 	}
 
 
-	return (void*)((char *)chdlc+sizeof(*chdlc));
+	return (void*)((char *)ppp_hdlc+sizeof(*ppp_hdlc));
 }
 
 void *trace_get_payload_from_link(void *link, libtrace_linktype_t linktype, 
@@ -412,7 +443,7 @@ DLLEXPORT void *trace_get_payload_from_layer2(void *link,
 			return trace_get_payload_from_chdlc(link,ethertype,
 					remaining);
 		case TRACE_TYPE_POS:
-			return trace_get_payload_from_chdlc(link,ethertype,
+			return trace_get_payload_from_ppp_hdlc(link,ethertype,
 					remaining);
 		/* TODO: Unsupported */
 		case TRACE_TYPE_AAL5:
