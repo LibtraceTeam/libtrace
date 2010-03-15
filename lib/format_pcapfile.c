@@ -344,6 +344,7 @@ static int pcapfile_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 	 * read zero bytes - we'll just get back a zero that we will 
 	 * misinterpret as EOF! */
 	if (bytes_to_read == 0) {
+		packet->header = packet->buffer;
 		return sizeof(libtrace_pcapfile_pkt_hdr_t);
 	}
 
@@ -433,13 +434,14 @@ static int pcapfile_write_packet(libtrace_out_t *out,
 	hdr.caplen = trace_get_capture_length(packet);
 	assert(hdr.caplen < LIBTRACE_PACKET_BUFSIZE);
 	/* PCAP doesn't include the FCS in its wire length value, but we do */
-	if (linktype==TRACE_TYPE_ETH)
+	if (linktype==TRACE_TYPE_ETH) {
 		if (trace_get_wire_length(packet) >= 4) {
 			hdr.wirelen = trace_get_wire_length(packet)-4;
 		}
 		else {
 			hdr.wirelen = 0;
 		}
+	}
 	else
 		hdr.wirelen = trace_get_wire_length(packet);
 
@@ -543,9 +545,12 @@ static libtrace_direction_t pcapfile_get_direction(const libtrace_packet_t *pack
 static struct timeval pcapfile_get_timeval(
 		const libtrace_packet_t *packet) 
 {
-	libtrace_pcapfile_pkt_hdr_t *hdr =
-		(libtrace_pcapfile_pkt_hdr_t*)packet->header;
+	libtrace_pcapfile_pkt_hdr_t *hdr;
 	struct timeval ts;
+	
+	assert(packet->header);
+	
+	hdr = (libtrace_pcapfile_pkt_hdr_t*)packet->header;
 	ts.tv_sec = swapl(packet->trace,hdr->ts_sec);
 	ts.tv_usec = swapl(packet->trace,hdr->ts_usec);
 	return ts;
@@ -553,15 +558,20 @@ static struct timeval pcapfile_get_timeval(
 
 
 static int pcapfile_get_capture_length(const libtrace_packet_t *packet) {
-	libtrace_pcapfile_pkt_hdr_t *pcapptr 
-		= (libtrace_pcapfile_pkt_hdr_t *)packet->header;
+	libtrace_pcapfile_pkt_hdr_t *pcapptr; 
+
+	assert(packet->header);
+	pcapptr = (libtrace_pcapfile_pkt_hdr_t *)packet->header;
 
 	return swapl(packet->trace,pcapptr->caplen);
 }
 
 static int pcapfile_get_wire_length(const libtrace_packet_t *packet) {
-	libtrace_pcapfile_pkt_hdr_t *pcapptr 
-		= (libtrace_pcapfile_pkt_hdr_t *)packet->header;
+	libtrace_pcapfile_pkt_hdr_t *pcapptr;
+	 
+	assert(packet->header); 
+
+	pcapptr	= (libtrace_pcapfile_pkt_hdr_t *)packet->header;
 	if (packet->type==pcap_linktype_to_rt(TRACE_DLT_EN10MB))
 		/* Include the missing FCS */
 		return swapl(packet->trace,pcapptr->wirelen)+4; 
@@ -588,6 +598,7 @@ static int pcapfile_get_framing_length(const libtrace_packet_t *packet UNUSED) {
 static size_t pcapfile_set_capture_length(libtrace_packet_t *packet,size_t size) {
 	libtrace_pcapfile_pkt_hdr_t *pcapptr = 0;
 	assert(packet);
+	assert(packet->header);
 	if (size > trace_get_capture_length(packet)) {
 		/* Can't make a packet larger */
 		return trace_get_capture_length(packet);
