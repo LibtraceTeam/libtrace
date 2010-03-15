@@ -259,9 +259,9 @@ static void *lzo_compress_thread(void *data)
 			tdata->inbuf.offset,
 			&tdata->outbuf);
 
+		pthread_mutex_lock(&tdata->mutex);
 		tdata->state = FULL;
 		pthread_cond_signal(&tdata->out_ready);
-		pthread_mutex_lock(&tdata->mutex);
 	}
 	pthread_mutex_unlock(&tdata->mutex);
 
@@ -432,8 +432,8 @@ static off_t lzo_wwrite(iow_t *iow, const char *buffer, off_t len)
 			if (get_next_thread(iow)->inbuf.offset >= sizeof(get_next_thread(iow)->inbuf.buffer)
 			  ||get_next_thread(iow)->inbuf.offset >= MAX_BLOCK_SIZE) {
 				get_next_thread(iow)->state = WAITING;
-				pthread_mutex_unlock(&get_next_thread(iow)->mutex);
 				pthread_cond_signal(&get_next_thread(iow)->in_ready);
+				pthread_mutex_unlock(&get_next_thread(iow)->mutex);
 
 				DATA(iow)->next_thread = 
 						(DATA(iow)->next_thread+1) % DATA(iow)->threads;
@@ -474,8 +474,8 @@ static void shutdown_thread(iow_t *iow, struct lzothread_t *thread)
 	}
 	/* Now the thread should be empty, so ask it to shut down */
 	thread->closing = true;
-	pthread_mutex_unlock(&thread->mutex);
 	pthread_cond_signal(&thread->in_ready);
+	pthread_mutex_unlock(&thread->mutex);
 	/* And wait for it to die */
 	pthread_join(thread->thread,NULL);
 }
