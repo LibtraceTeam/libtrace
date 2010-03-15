@@ -54,11 +54,18 @@ struct compression_type compression_type[]  = {
 int keep_stats = 0;
 int force_directio_write = 0;
 int force_directio_read = 0;
-int use_threads = 1;
+unsigned int use_threads = -1;
 
 uint64_t read_waits = 0;
 uint64_t write_waits = 0;
 
+/** Parse an option.
+ * stats -- Show summary stats
+ * directwrite -- bypass the diskcache on write
+ * directread -- bypass the diskcache on read
+ * nothreads -- Don't use threads
+ * threads=n -- Use a maximum of 'n' threads for thread farms
+ */
 static void do_option(const char *option)
 {
 	if (*option == '\0') 
@@ -71,6 +78,8 @@ static void do_option(const char *option)
 		force_directio_read  = 1;
 	else if (strcmp(option,"nothreads") == 0)
 		use_threads = 0;
+	else if (strncmp(option,"threads=",8) == 0)
+		use_threads = atoi(option+8);
 	else {
 		fprintf(stderr,"Unknown libtraceio debug option '%s'\n", option);
 	}
@@ -193,10 +202,9 @@ void wandio_destroy(io_t *io)
 iow_t *wandio_wcreate(const char *filename, int compression_level, int flags)
 {
 	iow_t *iow;
+	parse_env();
 
 	assert ( compression_level >= 0 && compression_level <= 9 );
-	fprintf(stderr,"Compression level= %d\n",compression_level);
-	fprintf(stderr,"flags=%d\n",flags);
 
 	iow=stdio_wopen(filename);
 
@@ -205,30 +213,21 @@ iow_t *wandio_wcreate(const char *filename, int compression_level, int flags)
 #if HAVE_LIBZ
 	if (compression_level != 0 && 
 	    (flags & WANDIO_COMPRESS_MASK) == WANDIO_COMPRESS_ZLIB) {
-	    	fprintf(stderr,"GZip compression\n");
 		iow = zlib_wopen(iow,compression_level);
 	}
 #endif
 #if HAVE_LIBLZO2
 	else if (compression_level != 0 && 
 	    (flags & WANDIO_COMPRESS_MASK) == WANDIO_COMPRESS_LZO) {
-		fprintf(stderr,"Using LZO\n");
 		iow = lzo_wopen(iow,compression_level);
 	}
 #endif
 #if HAVE_LIBBZ2
 	else if (compression_level != 0 && 
 	    (flags & WANDIO_COMPRESS_MASK) == WANDIO_COMPRESS_BZ2) {
-	    	fprintf(stderr,"BZ compression\n");
 		iow = bz_wopen(iow,compression_level);
 	}
 #endif
-	else if (compression_level != 0) {
-		fprintf(stderr,"Compression %d unavailable\n",flags);
-	}
-	else {
-		fprintf(stderr,"No compression requested\n");
-	}
 	/* Open a threaded writer */
 	if (use_threads)
 		return thread_wopen(iow);

@@ -36,6 +36,7 @@
 #include <sys/types.h>
 #include <stdio.h>
 #include <inttypes.h>
+#include <stdbool.h>
 
 /** @file
  *
@@ -289,6 +290,7 @@ extern int force_directio_read;
 extern int force_directio_write;
 extern uint64_t write_waits;
 extern uint64_t read_waits;
+extern unsigned int use_threads;
 /* @} */
 
 #endif
