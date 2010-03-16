@@ -6,7 +6,7 @@
 #include "tracereport.h"
 #include "report.h"
 
-static stat_t tcpseg_stat[3][2048] = {{{0,0}}} ;
+static stat_t tcpseg_stat[3][9000] = {{{0,0}}} ;
 static bool suppress[3] = {true,true,true};
 
 void tcpseg_per_packet(struct libtrace_packet_t *packet)
