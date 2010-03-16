@@ -11,6 +11,7 @@ TXT_PROTOCOLS=
 BIN_PROTOCOLS+=link_0.la
 
 # HDLC_POS
+BIN_PROTOCOLS+=link_1.la
 
 # Ethernet
 BIN_PROTOCOLS+=link_2.la
@@ -38,6 +39,7 @@ BIN_PROTOCOLS+=link_6.la
 #				
 
 # PoS 
+BIN_PROTOCOLS+=link_9.la
 
 # Obsolete Legacy Ethernet
 BIN_PROTOCOLS+=link_10.la	
@@ -99,9 +101,11 @@ BIN_PROTOCOLS+=ip_132.la
 
 # I shouldn't need to do this
 link_0_la_LDFLAGS=-module
+link_1_la_LDFLAGS=-module
 link_2_la_LDFLAGS=-module
 link_4_la_LDFLAGS=-module
 link_6_la_LDFLAGS=-module
+link_9_la_LDFLAGS=-module
 link_10_la_LDFLAGS=-module
 link_11_la_LDFLAGS=-module
 link_15_la_LDFLAGS=-module 
