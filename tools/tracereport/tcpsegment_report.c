@@ -6,7 +6,9 @@
 #include "tracereport.h"
 #include "report.h"
 
-static stat_t tcpseg_stat[3][9000] = {{{0,0}}} ;
+#define MAX_SEG_SIZE 10000
+
+static stat_t tcpseg_stat[3][MAX_SEG_SIZE + 1] = {{{0,0}}} ;
 static bool suppress[3] = {true,true,true};
 
 void tcpseg_per_packet(struct libtrace_packet_t *packet)
@@ -25,6 +27,13 @@ void tcpseg_per_packet(struct libtrace_packet_t *packet)
 	
 	ip_len = ntohs(ip->ip_len);
 	ss = ip_len - (ip->ip_hl * 4);
+
+	if (ss > MAX_SEG_SIZE) {
+		fprintf(stderr, "Maximum segment size %u exceeded - size was %u\n",
+				MAX_SEG_SIZE, ss);
+		return;
+	}
+
 
 	tcpseg_stat[dir][ss].count++;
 	tcpseg_stat[dir][ss].bytes+=trace_get_wire_length(packet);
