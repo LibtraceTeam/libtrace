@@ -36,21 +36,52 @@
 #include "wandio.h"
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/uio.h>
 #include <fcntl.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <assert.h>
 
 /* Libtrace IO module implementing a standard IO writer, i.e. no decompression
  */
 
+enum { MIN_WRITE_SIZE = 4096 };
+
 struct stdiow_t {
+	char buffer[MIN_WRITE_SIZE];
+	int offset;
 	int fd;
 };
 
 extern iow_source_t stdio_wsource;
 
 #define DATA(iow) ((struct stdiow_t *)((iow)->data))
+
+static int safe_open(const char *filename)
+{
+	int fd;
+/* Try opening with O_DIRECT */
+#ifdef O_DIRECT
+	fd = open(filename,
+		O_WRONLY
+		|O_CREAT
+		|O_TRUNC
+		|(force_directio_write?O_DIRECT:0),
+		0666);
+	if (fd != -1)
+		return fd;
+#endif
+/* If that failed (or we don't support O_DIRECT) try opening without */
+	fd = open(filename,
+		O_WRONLY
+		|O_CREAT
+		|O_TRUNC,
+		0666);
+	if (fd != -1)
+		return fd;
+	return fd;
+}
 
 iow_t *stdio_wopen(const char *filename)
 {
@@ -60,29 +91,82 @@ iow_t *stdio_wopen(const char *filename)
 
 	if (strcmp(filename,"-") == 0) 
 		DATA(iow)->fd = 1; /* STDOUT */
-	else
-		DATA(iow)->fd = open(filename,
-				O_WRONLY
-				|O_CREAT
-				|O_TRUNC
-				|(force_directio_write?O_DIRECT:0),
-				0666);
+	else {
+		DATA(iow)->fd = safe_open(filename);
+	}
 
 	if (DATA(iow)->fd == -1) {
 		free(iow);
 		return NULL;
 	}
 
+	DATA(iow)->offset = 0;
+
 	return iow;
 }
 
+#define min(a,b) ((a)<(b) ? (a) : (b))
+#define max(a,b) ((a)>(b) ? (a) : (b))
+/* Round A Down to the nearest multiple of B */
+#define rounddown(a,b) ((a)-((a)%b)
+
+/* When doing directio (O_DIRECT) we need to make sure that we write multiples of MIN_WRITE_SIZE.
+ * So we accumulate data into DATA(iow)->buffer, and write it out when we get at least MIN_WRITE_SIZE.
+ *
+ * Since most writes are likely to be larger than MIN_WRITE_SIZE optimise for that case.
+ */
 static off_t stdio_wwrite(iow_t *iow, const char *buffer, off_t len)
 {
-	return write(DATA(iow)->fd,buffer,len);
+	struct iovec iov[2];
+	int err;
+	/* Round down size to the nearest multiple of MIN_WRITE_SIZE */
+
+	assert(len >= 0);
+	
+	if (DATA(iow)->offset + len >= MIN_WRITE_SIZE) {
+		int amount;
+		iov[0].iov_base = DATA(iow)->buffer;
+		iov[0].iov_len = DATA(iow)->offset;
+		iov[1].iov_base = (void*)buffer; /* cast away constness, which is safe here */
+		iov[1].iov_len = len - (DATA(iow)->offset+len) % MIN_WRITE_SIZE;
+		err=writev(DATA(iow)->fd, iov, 2);
+		if (err==-1)
+			return -1;
+		/* Drop off "err" bytes from the beginning of the buffers */
+		amount = min(DATA(iow)->offset, err);
+		DATA(iow)->offset -= amount;
+		err -= amount;
+		buffer += err;
+		len -= err;
+	}
+
+	/* Make sure we're not going to overflow the buffer.  The above writev should assure
+ 	 * that this is true
+ 	 */
+	assert(DATA(iow)->offset + len <= MIN_WRITE_SIZE);
+	assert(len >= 0);
+
+	/* Copy the remainder into the buffer to write next time. */
+	memcpy(DATA(iow)->buffer + DATA(iow)->offset, buffer, len);
+	DATA(iow)->offset += len;
+
+	return len;
 }
 
 static void stdio_wclose(iow_t *iow)
 {
+	long err;
+	/* Now, there might be some non multiple of the direct filesize left over, if so turn off
+ 	 * O_DIRECT and write the final chunk.
+ 	 */
+#ifdef O_DIRECT
+	err=fcntl(DATA(iow)->fd, F_GETFL);
+	if (err != -1 && (err & O_DIRECT) != 0) {
+		fcntl(DATA(iow)->fd,F_SETFL, err & ~O_DIRECT);
+	}
+	write(DATA(iow)->fd, DATA(iow)->buffer, DATA(iow)->offset);
+	DATA(iow)->offset = 0;
+#endif
 	close(DATA(iow)->fd);
 	free(iow->data);
 	free(iow);
