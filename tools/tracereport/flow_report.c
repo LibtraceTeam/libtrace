@@ -40,6 +40,7 @@ void flow_per_packet(struct libtrace_packet_t *packet)
 	ft.ipb=ip->ip_dst.s_addr;
 	ft.porta=trace_get_source_port(packet);
 	ft.portb=trace_get_destination_port(packet);
+	ft.prot = 0;
 
 	if (!SET_CONTAINS(flowset,ft)) {
 		SET_INSERT(flowset,ft);
