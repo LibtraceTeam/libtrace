@@ -23,7 +23,7 @@ uint32_t dumped_diff = 0;
  * Note that only the contents of the packet are compared; the framing provided
  * by the trace format, e.g. the ERF or PCAP header, is not examined.
  */
-void per_packet(libtrace_packet_t *a, libtrace_packet_t *b)
+static void per_packet(libtrace_packet_t *a, libtrace_packet_t *b)
 {
 	char *buf_a, *buf_b;
 	libtrace_linktype_t lt;
@@ -73,7 +73,7 @@ void per_packet(libtrace_packet_t *a, libtrace_packet_t *b)
 
 }
 
-void usage(char *prog) {
+static void usage(char *prog) {
 	printf("Usage instructions for %s\n\n", prog);
 	printf("\t%s [options] traceA traceB\n\n", prog);
 	printf("Supported options:\n");
@@ -88,7 +88,7 @@ int main(int argc, char *argv[])
 {
 	libtrace_t *trace[2];
 	libtrace_packet_t *packet[2];
-	int opt, i;
+	int opt;
 	
 	if (argc<2) {
 		usage(argv[0]);

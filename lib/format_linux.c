@@ -495,12 +495,12 @@ static int linuxnative_read_packet(libtrace_t *libtrace, libtrace_packet_t *pack
 
 	hdr->wirelen = recvmsg(FORMAT(libtrace->format_data)->fd, &msghdr, 0);
 
-	if (hdr->wirelen==-1) {
+	if (hdr->wirelen==~0U) {
 		trace_set_err(libtrace,errno,"recvmsg");
 		return -1;
 	}
 
-	hdr->caplen=LIBTRACE_MIN(snaplen,hdr->wirelen);
+	hdr->caplen=LIBTRACE_MIN((unsigned int)snaplen,(unsigned int)hdr->wirelen);
 
 	/* Extract the timestamps from the msghdr and store them in our
 	 * linux native encapsulation, so that we can preserve the formatting
