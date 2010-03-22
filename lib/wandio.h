@@ -31,8 +31,8 @@
  *
  */
 
-#ifndef IO_H
-#define IO_H 1
+#ifndef IO_H 
+#define IO_H 1 /**< Guard Define */
 #include <sys/types.h>
 #include <stdio.h>
 #include <inttypes.h>
@@ -48,8 +48,8 @@
  * @version $Id$
  */
 
-typedef struct io_t io_t;
-typedef struct iow_t iow_t;
+typedef struct io_t io_t; /**< Opaque IO handle structure for reading */
+typedef struct iow_t iow_t; /**< Opaque IO handle structure for writing */
 
 /** Structure defining a supported compression method */
 struct compression_type {
