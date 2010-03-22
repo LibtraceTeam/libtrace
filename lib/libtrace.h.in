@@ -292,7 +292,7 @@ enum base_format_t {
 	TRACE_FORMAT_LEGACY_NZIX  =14	/**< Legacy format used for NZIX traces */
 };
 
-/* RT protocol packet types */
+/** RT protocol packet types */
 typedef enum {
 	TRACE_RT_HELLO       	=1, /**< Connection accepted */
 	TRACE_RT_START		=2, /**< Request for data transmission to begin 
@@ -1130,7 +1130,7 @@ DLLEXPORT
 enum base_format_t trace_get_format(struct libtrace_packet_t *packet);
 
 /** Construct a libtrace packet from a buffer containing the packet payload.
- * @param packet[in,out]	Libtrace Packet object to update with the new 
+ * @param[in,out] packet	Libtrace Packet object to update with the new 
  * 				data.
  * @param linktype		The linktype of the packet data.
  * @param[in] data		The packet data (including linklayer).
@@ -1438,7 +1438,7 @@ DLLEXPORT void *trace_get_payload_from_ip6(libtrace_ip6_t *ipptr,
                 uint8_t *proto, uint32_t *remaining);
 
 /** Gets a pointer to the payload following a link header
- * @param ip            A pointer to the link layer header
+ * @param linkptr       A pointer to the link layer header
  * @param linktype	The linktype of the link header being examined
  * @param[out] type	An output variable for the ethernet type
  * @param[in,out] remaining Updated with the number of captured bytes remaining
@@ -1901,7 +1901,7 @@ DLLEXPORT int trace_seek_timeval(libtrace_t *trace, struct timeval tv);
 
 /** Seek within an input trace to a time specified as an ERF timestamp
  * @param trace		The input trace to seek within
- * @param tv		The time to seek to, as an ERF timestamp
+ * @param ts		The time to seek to, as an ERF timestamp
  *
  * @return 0 on success, -1 if the seek fails. Use trace_perror() to determine
  * the error that occurred.
@@ -1956,7 +1956,7 @@ size_t trace_get_capture_length(const libtrace_packet_t *packet);
  * @note This value may not be the same as the capture length, due to 
  * truncation.
  *
- * @note trace_get_wire_length \em{includes} the Frame Check Sequence. This is 
+ * @note trace_get_wire_length \em includes  the Frame Check Sequence. This is 
  * different behaviour compared to most PCAP-based tools.
  *
  * @note The return size refers to the network-level payload of the packet and
@@ -2228,7 +2228,7 @@ int8_t trace_get_server_port(uint8_t protocol, uint16_t source, uint16_t dest);
  * is a value in microseconds indicating the time that the first bit of the
  * MPDU was received by the MAC.
  *
- * @param link The wireless meta header
+ * @param linkptr The wireless meta header
  * @param linktype The linktype of the wireless meta header passed in 
  * @param[out] tsft The value of the timer synchronisation function. 
  * @return true if the field was available, false if not.
@@ -2238,7 +2238,7 @@ DLLEXPORT bool trace_get_wireless_tsft(void *linkptr,
 
 /** Get the wireless data rate 
  *
- * @param link The wireless meta header
+ * @param linkptr The wireless meta header
  * @param linktype The linktype of the wireless meta header passed in
  * @param[out] rate The data-rate of the frame in units of 500kbps
  * @return true if the field was available, false if not.
@@ -2247,7 +2247,7 @@ DLLEXPORT bool trace_get_wireless_rate(void *linkptr,
         libtrace_linktype_t linktype, uint8_t *rate);
 
 /** Get the wireless channel frequency
- * @param link The wireless meta header
+ * @param linkptr The wireless meta header
  * @param linktype The linktype of the wireless meta header passed in
  * @param[out] freq The frequency in MHz of the channel the frame was 
  * transmitted or received on.
@@ -2257,7 +2257,7 @@ DLLEXPORT bool trace_get_wireless_freq(void *linkptr,
         libtrace_linktype_t linktype, uint16_t *freq);
 
 /** Get the wireless signal strength in dBm 
- * @param link The wireless meta header
+ * @param linkptr The wireless meta header
  * @param linktype The linktype of the wireless meta header passed in
  * @param[out] strength The RF signal power at the antenna, in dB difference
  * from 1mW.
@@ -2267,7 +2267,7 @@ DLLEXPORT bool trace_get_wireless_signal_strength_dbm(void *linkptr,
         libtrace_linktype_t linktype, int8_t *strength);
 
 /** Get the wireless noise strength in dBm
- * @param link The wireless meta header
+ * @param linkptr The wireless meta header
  * @param linktype The linktype of the wireless meta header passed in
  * @param[out] strength The RF noise power at the antenna, in dB difference 
  * from 1mW. 
@@ -2277,7 +2277,7 @@ DLLEXPORT bool trace_get_wireless_noise_strength_dbm(void *linkptr,
         libtrace_linktype_t linktype, int8_t *strength);
 
 /** Get the wireless signal strength in dB
- * @param link The wireless meta header
+ * @param linkptr The wireless meta header
  * @param linktype The linktype of the wireless meta header passed in
  * @param[out] strength The RF signal power at the antenna, in dB difference 
  * from a fixed reference. 
@@ -2287,7 +2287,7 @@ DLLEXPORT bool trace_get_wireless_signal_strength_db(void *linkptr,
         libtrace_linktype_t linktype, uint8_t *strength);
 
 /** Get the wireless noise strength in dB 
- * @param link The wireless meta header
+ * @param linkptr The wireless meta header
  * @param linktype The linktype of the wireless meta header passed in
  * @param[out] strength The RF noise power at the antenna, in dB difference 
  * from a fixed reference. 
@@ -2297,7 +2297,7 @@ DLLEXPORT bool trace_get_wireless_noise_strength_db(void *linkptr,
         libtrace_linktype_t linktype, uint8_t *strength);
 
 /** Get the wireless transmit attenuation 
- * @param link The wireless meta header
+ * @param linkptr The wireless meta header
  * @param linktype The linktype of the wireless meta header passed in
  * @param[out] attenuation The transmit power as a unitless distance from 
  * maximum power set at factory calibration. 0 indicates maximum transmission 
@@ -2308,7 +2308,7 @@ DLLEXPORT bool trace_get_wireless_tx_attenuation(void *linkptr,
         libtrace_linktype_t linktype, uint16_t *attenuation);
 
 /** Get the wireless transmit attenuation in dB
- * @param link The wireless meta header
+ * @param linkptr The wireless meta header
  * @param linktype The linktype of the wireless meta header passed in
  * @param[out] attenuation The transmit power as dB difference from maximum 
  * power set at factory calibration. 0 indicates maximum power.
@@ -2318,7 +2318,7 @@ DLLEXPORT bool trace_get_wireless_tx_attenuation_db(void *linkptr,
         libtrace_linktype_t linktype, uint16_t *attenuation);
 
 /** Get the wireless transmit power in dBm 
- * @param link The wireless meta header
+ * @param linkptr The wireless meta header
  * @param linktype The linktype of the wireless meta header passed in 
  * @param[out] txpower The transmit power as dB from a 1mW reference. This is 
  * the absolute power level measured at the antenna port.  
@@ -2328,7 +2328,7 @@ DLLEXPORT bool trace_get_wireless_tx_power_dbm(void *linkptr,
 		libtrace_linktype_t linktype, int8_t *txpower);
 
 /** Get the wireless antenna 
- * @param link The wireless meta header
+ * @param linkptr The wireless meta header
  * @param linktype The linktype of the wireless meta header passed in
  * @param[out] antenna The antenna that was used to transmit or receive the 
  * frame.
