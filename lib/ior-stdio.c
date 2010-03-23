@@ -63,9 +63,9 @@ io_t *stdio_open(const char *filename)
 		DATA(io)->fd = open(filename,
 			O_RDONLY
 #ifdef O_DIRECT
-			|(force_directio_read?O_DIRECT:0
+			|(force_directio_read?O_DIRECT:0)
 #endif
-			));
+			);
 	io->source = &stdio_source;
 
 	if (DATA(io)->fd == -1) {
