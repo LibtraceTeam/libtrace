@@ -437,6 +437,7 @@ static int pcapfile_write_packet(libtrace_out_t *out,
 	if (linktype==TRACE_TYPE_ETH) {
 		if (trace_get_wire_length(packet) >= 4) {
 			hdr.wirelen = trace_get_wire_length(packet)-4;
+
 		}
 		else {
 			hdr.wirelen = 0;
@@ -447,6 +448,10 @@ static int pcapfile_write_packet(libtrace_out_t *out,
 
 	assert(hdr.wirelen < LIBTRACE_PACKET_BUFSIZE);
 
+	/* Ensure we have a valid capture length, especially if we're going
+	 * to "remove" the FCS from the wire length */
+	if (hdr.caplen > hdr.wirelen)
+		hdr.caplen = hdr.wirelen;
 
 	/* Write the packet header */
 	numbytes=wandio_wwrite(DATAOUT(out)->file,
@@ -458,9 +463,9 @@ static int pcapfile_write_packet(libtrace_out_t *out,
 	/* Write the rest of the packet now */
 	ret=wandio_wwrite(DATAOUT(out)->file,
 			ptr,
-			remaining);
+			hdr.caplen);
 
-	if (ret!=(int)remaining)
+	if (ret!=(int)hdr.caplen)
 		return -1;
 
 	return numbytes+ret;
