@@ -251,8 +251,14 @@ int main(int argc, char *argv[]) {
 	 * waiting for 10 minutes for a trace to process then discover you 
 	 * forgot to ask for any reports!
 	 */
-	if (reports_required == 0)
+	if (reports_required == 0) {
 		reports_required = ~0;
+
+		/* Except we might want to not do the flow report, because 
+		 * that can be rather resource-intensive */
+		reports_required &= ~REPORT_TYPE_FLOW;
+	}
+
 
 	if (filterstring) {
 		filter = trace_create_filter(filterstring);
