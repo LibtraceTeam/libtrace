@@ -109,6 +109,7 @@ int main(int argc, char *argv[])
 	bool enc_source = false;
 	bool enc_dest 	= false;
 	char *output = 0;
+	int level = 1;
 
 	if (argc<2)
 		usage(argv[0]);
@@ -120,17 +121,19 @@ int main(int argc, char *argv[])
 			{ "encrypt-dest",	0, 0, 'd' },
 			{ "cryptopan",		1, 0, 'c' },
 			{ "prefix",		1, 0, 'p' },
+			{ "compression-level",	1, 0, 'z' },
 			{ "libtrace-help", 	0, 0, 'H' },
 			{ NULL,			0, 0, 0   },
 		};
 
-		int c=getopt_long(argc, argv, "sc:dp:H",
+		int c=getopt_long(argc, argv, "z:sc:dp:H",
 				long_options, &option_index);
 
 		if (c==-1)
 			break;
 
 		switch (c) {
+			case 'z': level = atoi(optarg); break;
 			case 's': enc_source=true; break;
 			case 'd': enc_dest  =true; break;
 			case 'c': 
@@ -187,6 +190,14 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 	
+	if (trace_config_output(writer, TRACE_OPTION_OUTPUT_COMPRESS, 
+				&level) == -1) {
+		trace_perror_output(writer, "Configuring compression level");
+		trace_destroy_output(writer);
+		trace_destroy(trace);
+		return 1;
+	}
+
 	if (trace_start(trace)==-1) {
 		trace_perror(trace,"trace_start");
 		return 1;
