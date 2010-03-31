@@ -172,6 +172,7 @@ static int lzo_wwrite_block(const char *buffer, off_t len, struct buffer_t *outb
 
 	outbuf->offset=0;
 
+	memset(scratch,0,sizeof(scratch));
 	err=lzo1x_1_compress((void*)buffer, len, 
 			(void*)b2, &dst_len, 
 			scratch);
@@ -222,7 +223,7 @@ static int lzo_wwrite_block(const char *buffer, off_t len, struct buffer_t *outb
  */
 static void *lzo_compress_thread(void *data)
 {
-	struct lzothread_t *tdata = (struct lzothread_t *)data;
+	struct lzothread_t *me = (struct lzothread_t *)data;
 	int err;
 	char namebuf[17];
 
@@ -230,7 +231,7 @@ static void *lzo_compress_thread(void *data)
 	if (prctl(PR_GET_NAME, namebuf, 0,0,0) == 0) {
 		char label[16];
 		namebuf[16] = '\0'; /* Make sure it's NUL terminated */
-		sprintf(label,"[lzo%d]",tdata->num);
+		sprintf(label,"[lzo%d]",me->num);
 		/* If the filename is too long, overwrite the last few bytes */
 		if (strlen(namebuf)>=16-strlen(label)) {
 			strcpy(namebuf+15-strlen(label),label);
@@ -243,27 +244,27 @@ static void *lzo_compress_thread(void *data)
 	}
 #endif
 
-	pthread_mutex_lock(&tdata->mutex);
-	while (!tdata->closing) {
-		while (tdata->state != WAITING) {
-			if (tdata->closing)
+	pthread_mutex_lock(&me->mutex);
+	while (!me->closing) {
+		while (me->state != WAITING) {
+			if (me->closing)
 				break;
-			pthread_cond_wait(&tdata->in_ready, &tdata->mutex);
+			pthread_cond_wait(&me->in_ready, &me->mutex);
 		}
-		if (tdata->closing)
+		if (me->closing)
 			break;
-		pthread_mutex_unlock(&tdata->mutex);
 
 		err=lzo_wwrite_block(
-			tdata->inbuf.buffer, 
-			tdata->inbuf.offset,
-			&tdata->outbuf);
+			me->inbuf.buffer, 
+			me->inbuf.offset,
+			&me->outbuf);
 
-		pthread_mutex_lock(&tdata->mutex);
-		tdata->state = FULL;
-		pthread_cond_signal(&tdata->out_ready);
+		/* Make sure someone else hasn't clobbered us!*/
+		assert(me->state == WAITING);
+		me->state = FULL;
+		pthread_cond_signal(&me->out_ready);
 	}
-	pthread_mutex_unlock(&tdata->mutex);
+	pthread_mutex_unlock(&me->mutex);
 
 	return NULL;
 }
@@ -367,16 +368,15 @@ static struct lzothread_t *get_next_thread(iow_t *iow)
 
 static off_t lzo_wwrite(iow_t *iow, const char *buffer, off_t len)
 {
-	/* lzo can only deal with blocks up to 256k */
 	off_t ret = 0;
 	while (len>0) {
-		unsigned int size = min(len, MAX_BLOCK_SIZE);
+		unsigned int size = len;
 		off_t err;
 		struct buffer_t outbuf;
 
-		if (!use_threads) {
+		if (!DATA(iow)->threads) {
+			size = min(len, MAX_BLOCK_SIZE);
 			err=lzo_wwrite_block(buffer, size, &outbuf);
-
 			/* Flush the data out */
 			wandio_wwrite(DATA(iow)->child,
 					outbuf.buffer,
@@ -397,8 +397,9 @@ static off_t lzo_wwrite(iow_t *iow, const char *buffer, off_t len)
 			}
 		}
 		else {
+			off_t space;
+
 			pthread_mutex_lock(&get_next_thread(iow)->mutex);
-				
 			/* If this thread is still compressing, wait for it to finish */
 			while (get_next_thread(iow)->state == WAITING) {
 				pthread_cond_wait(
@@ -408,6 +409,8 @@ static off_t lzo_wwrite(iow_t *iow, const char *buffer, off_t len)
 
 			/* Flush any data out thats there */
 			if (get_next_thread(iow)->state == FULL) {
+				assert(get_next_thread(iow)->outbuf.offset 
+						< sizeof(get_next_thread(iow)->outbuf.buffer));
 				wandio_wwrite(DATA(iow)->child,
 						get_next_thread(iow)->outbuf.buffer,
 						get_next_thread(iow)->outbuf.offset);
@@ -415,10 +418,16 @@ static off_t lzo_wwrite(iow_t *iow, const char *buffer, off_t len)
 				get_next_thread(iow)->inbuf.offset = 0;
 			}
 
+			assert(get_next_thread(iow)->state == EMPTY);
+
 			/* Figure out how much space we can copy into this buffer */
-			size = min(
-				sizeof(get_next_thread(iow)->inbuf.buffer)-get_next_thread(iow)->inbuf.offset,
-				size);
+			assert(MAX_BLOCK_SIZE <= sizeof(get_next_thread(iow)->inbuf.buffer));
+			space = MAX_BLOCK_SIZE-get_next_thread(iow)->inbuf.offset;
+			size = min(space, size);
+
+			assert(size>0);
+			assert(size <= MAX_BLOCK_SIZE);
+			assert(get_next_thread(iow)->inbuf.offset + size <= MAX_BLOCK_SIZE);
 
 			/* Move our data in */
 			memcpy(&get_next_thread(iow)->inbuf.buffer[get_next_thread(iow)->inbuf.offset], 
@@ -431,8 +440,10 @@ static off_t lzo_wwrite(iow_t *iow, const char *buffer, off_t len)
 			 */
 			if (get_next_thread(iow)->inbuf.offset >= sizeof(get_next_thread(iow)->inbuf.buffer)
 			  ||get_next_thread(iow)->inbuf.offset >= MAX_BLOCK_SIZE) {
+			  	assert(get_next_thread(iow)->state == EMPTY);
 				get_next_thread(iow)->state = WAITING;
 				pthread_cond_signal(&get_next_thread(iow)->in_ready);
+
 				pthread_mutex_unlock(&get_next_thread(iow)->mutex);
 
 				DATA(iow)->next_thread = 
@@ -453,13 +464,12 @@ static void shutdown_thread(iow_t *iow, struct lzothread_t *thread)
 {
 	pthread_mutex_lock(&thread->mutex);
 
-	if (thread->state == EMPTY) {
-		/* Partially full buffer, force a flush */
-		if (thread->inbuf.offset != 0) {
-			thread->state = WAITING;
-			pthread_cond_signal(&thread->in_ready);
-		}
-	}
+	/* If this buffer is empty it shouldn't have any data in it, we should have taken
+         * care of that before.
+	 */
+	/* thread->state == EMPTY implies thread->inbuf.offset == 0 */
+	assert(!(thread->state == EMPTY) || thread->inbuf.offset == 0);
+
 	while (thread->state == WAITING) {
 		pthread_cond_wait(
 			&thread->out_ready,
@@ -473,6 +483,7 @@ static void shutdown_thread(iow_t *iow, struct lzothread_t *thread)
 		thread->inbuf.offset = 0;
 	}
 	/* Now the thread should be empty, so ask it to shut down */
+	assert(thread->state == EMPTY && thread->inbuf.offset == 0);
 	thread->closing = true;
 	pthread_cond_signal(&thread->in_ready);
 	pthread_mutex_unlock(&thread->mutex);
@@ -484,6 +495,17 @@ static void lzo_wclose(iow_t *iow)
 {
 	const uint32_t zero = 0;
 	int i;
+
+	/* Flush the last buffer */
+	pthread_mutex_lock(&get_next_thread(iow)->mutex);
+	if (get_next_thread(iow)->state == EMPTY && get_next_thread(iow)->inbuf.offset != 0) {
+		get_next_thread(iow)->state = WAITING;
+		pthread_cond_signal(&get_next_thread(iow)->in_ready);
+	}
+	pthread_mutex_unlock(&get_next_thread(iow)->mutex);
+
+	DATA(iow)->next_thread = 
+			(DATA(iow)->next_thread+1) % DATA(iow)->threads;
 
 	/* Right, now we have to shutdown all our threads -- in order */
 	for(i=DATA(iow)->next_thread; i<DATA(iow)->threads; ++i) {
