@@ -38,6 +38,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <assert.h>
 
 /* Libtrace IO module implementing a peeking reader.
  *
@@ -50,6 +51,11 @@
  * are serviced from the managed buffer, which means that we do not have to
  * manipulate the read offsets directly in zlib or bzip, for instance.
  */
+
+/* for O_DIRECT we have to read in multiples of this */
+#define MIN_READ_SIZE 4096
+/* Round reads for peeks into the buffer up to this size */
+#define PEEK_SIZE (1024*1024)
 
 struct peek_t {
 	io_t *child;
@@ -89,7 +95,7 @@ static off_t peek_read(io_t *io, void *buffer, off_t len)
 	if (DATA(io)->buffer) {
 		ret = MIN(len,DATA(io)->length - DATA(io)->offset);
 
-		/* Copy everything we've got into their buffer, and shift our
+		/* Copy anything we've got into their buffer, and shift our
 		 * offset so that we don't peek at the data we've read again */
 		memcpy(buffer, 
 			DATA(io)->buffer + DATA(io)->offset,
@@ -100,16 +106,49 @@ static off_t peek_read(io_t *io, void *buffer, off_t len)
 	}
 	/* Use the child reader to get the rest of the required data */
 	if (len>0) {
-		off_t bytes_read = 
-			DATA(io)->child->source->read(
-				DATA(io)->child, buffer, len);
-		/* Error? */
-		if (bytes_read < 1) {
-			/* Return if we have managed to get some data ok */
-			if (ret > 0)
-				return ret;
-			/* Return the error upstream */
-			return bytes_read;
+		/* To get here, the buffer must be empty */
+		assert(DATA(io)->length-DATA(io)->offset == 0);
+		off_t bytes_read;
+		if (len % MIN_READ_SIZE  == 0) {
+			bytes_read = DATA(io)->child->source->read(
+					DATA(io)->child, buffer, len);
+			/* Error? */
+			if (bytes_read < 1) {
+				/* Return if we have managed to get some data ok */
+				if (ret > 0)
+					return ret;
+				/* Return the error upstream */
+				return bytes_read;
+			}
+		}
+		else {
+			/* Select the largest of "len", PEEK_SIZE and the current peek buffer size
+			 * and then round up to the nearest multiple of MIN_READ_SIZE 
+			 */
+			bytes_read = len < PEEK_SIZE ? PEEK_SIZE : len;
+			bytes_read = bytes_read < DATA(io)->length ? DATA(io)->length : bytes_read;
+			bytes_read += MIN_READ_SIZE - (bytes_read % MIN_READ_SIZE);
+			/* Is the current buffer big enough? */
+			if (DATA(io)->length < bytes_read) {
+				if (DATA(io)->buffer)
+					free(DATA(io)->buffer);
+				DATA(io)->length = bytes_read;
+				DATA(io)->offset = 0;
+				DATA(io)->buffer = malloc(DATA(io)->length);
+			}
+			/* Now actually attempt to read that many bytes */
+			bytes_read = DATA(io)->child->source->read(	
+					DATA(io)->child, DATA(io)->buffer, bytes_read);
+			/* Error? */
+			if (bytes_read < 1) {
+				if (ret > 0)
+					return ret;
+				return bytes_read;
+			}
+			/* Now grab the number of bytes asked for. */
+			len = len < bytes_read ? len : bytes_read;
+			memcpy(buffer, DATA(io)->buffer, len);
+			bytes_read = len;
 		}
 		ret += bytes_read;
 	}
@@ -126,8 +165,6 @@ static off_t peek_read(io_t *io, void *buffer, off_t len)
 	return ret;
 }
 
-/* Round reads for peeks into the buffer up to this size */
-#define PEEK_SIZE (1024*1024)
 
 static off_t peek_peek(io_t *io, void *buffer, off_t len)
 {
