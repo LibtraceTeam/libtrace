@@ -494,6 +494,16 @@ static int dag_init_input(libtrace_t *libtrace) {
 
 	FORMAT_DATA->device = dag_device;
 
+	/* See Config_Status_API_Programming_Guide.pdf from the Endace Dag Documentation */
+	/* Check kBooleanAttributeActive is true -- no point capturing on an interface that's disabled */
+	/* Check kBooleanAttributeFault is false */
+	/* Check kBooleanAttributeLocalFault is false */
+	/* Check kBooleanAttributeLock is true ? */
+	/* Check kBooleanAttributePeerLink ? */
+
+	/* Set kBooleanAttributePromisc/kBooleanPromiscuousMode based on libtrace promisc attribute?*/
+	/* Set kUint32AttributeSnapLength to the snaplength */
+
 	pthread_mutex_unlock(&open_dag_mutex);
         return 0;
 }
