@@ -259,12 +259,13 @@ void wandio_destroy(io_t *io);
 /** Creates a new libtrace IO writer and opens the provided file for writing.
  *
  * @param filename		The name of the file to open
+ * @param compression_type	Compression type
  * @param compression_level	The compression level to use when writing
  * @param flags			Flags to apply when opening the file, e.g.
  * 				O_CREATE
  * @return A pointer to the new libtrace IO writer, or NULL if an error occurs
  */
-iow_t *wandio_wcreate(const char *filename, int compression_level, int flags);
+iow_t *wandio_wcreate(const char *filename, int compression_type, int compression_level, int flags);
 
 /** Writes the contents of a buffer using a libtrace IO writer.
  *

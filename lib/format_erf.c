@@ -110,6 +110,8 @@ struct erf_format_data_out_t {
 	struct {
 		/* Compression level for the output file */
 		int level;
+		/* Compression type */
+		int compress_type;
 		/* File flags used to open the file, e.g. O_CREATE */
 		int fileflag;
 	} options;
@@ -348,6 +350,7 @@ static int erf_init_output(libtrace_out_t *libtrace) {
 	libtrace->format_data = malloc(sizeof(struct erf_format_data_out_t));
 
 	OUT_OPTIONS.level = 0;
+	OUT_OPTIONS.compress_type = TRACE_OPTION_COMPRESSTYPE_NONE;
 	OUT_OPTIONS.fileflag = O_CREAT | O_WRONLY;
 	OUTPUT->file = 0;
 
@@ -360,6 +363,9 @@ static int erf_config_output(libtrace_out_t *libtrace,
 	switch (option) {
 		case TRACE_OPTION_OUTPUT_COMPRESS:
 			OUT_OPTIONS.level = *(int*)value;
+			return 0;
+		case TRACE_OPTION_OUTPUT_COMPRESSTYPE:
+			OUT_OPTIONS.compress_type = *(int*)value;
 			return 0;
 		case TRACE_OPTION_OUTPUT_FILEFLAGS:
 			OUT_OPTIONS.fileflag = *(int*)value;
@@ -531,8 +537,10 @@ static int erf_dump_packet(libtrace_out_t *libtrace,
 static int erf_start_output(libtrace_out_t *libtrace)
 {
 	OUTPUT->file = trace_open_file_out(libtrace,
+			OUT_OPTIONS.compress_type,
 			OUT_OPTIONS.level,
 			OUT_OPTIONS.fileflag);
+
 	if (!OUTPUT->file) {
 		return -1;
 	}

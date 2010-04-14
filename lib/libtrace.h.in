@@ -398,7 +398,7 @@ typedef enum {
 	TRACE_ETHERTYPE_IPV6	= 0x86DD,	/**< IPv6 */
 	TRACE_ETHERTYPE_MPLS	= 0x8847,	/**< MPLS Unicast traffic */
 	TRACE_ETHERTYPE_MPLS_MC = 0x8848,	/**< MPLS Multicast traffic */
-	TRACE_ETHERTYPE_PPP_DISC = 0x8863,	/**< PPPoE Service Discovery */
+	TRACE_ETHERTYPE_PPP_DISC= 0x8863,	/**< PPPoE Service Discovery */
 	TRACE_ETHERTYPE_PPP_SES = 0x8864	/**< PPPoE Session Messages */
 } libtrace_ethertype_t;
 
@@ -881,13 +881,25 @@ DLLEXPORT int trace_config(libtrace_t *libtrace,
 		trace_option_t option,
 		void *value);
 
+/** Valid compression types 
+ * Note, this must be kept in sync with WANDIO_COMPRESS_* numbers in wandio.h
+ */ 
+typedef enum {
+	TRACE_OPTION_COMPRESSTYPE_NONE = 0, /**< No compression */
+	TRACE_OPTION_COMPRESSTYPE_ZLIB = 1, /**< GZip Compression */
+	TRACE_OPTION_COMPRESSTYPE_BZ2  = 2, /**< BZip2 Compression */
+	TRACE_OPTION_COMPRESSTYPE_LZO  = 3, /**< LZO Compression */
+} trace_option_compresstype_t;
+
 /** Valid configuration options for output traces */
 typedef enum {
 	/** File flags to use when opening an output file, e.g. O_APPEND */
 	TRACE_OPTION_OUTPUT_FILEFLAGS,
 	/** Compression level: 0 = no compression, 1 = faster compression,
 	 * 9 = better compression */
-	TRACE_OPTION_OUTPUT_COMPRESS   
+	TRACE_OPTION_OUTPUT_COMPRESS,
+	/** Compression type, see trace_option_compresstype_t */
+	TRACE_OPTION_OUTPUT_COMPRESSTYPE,
 } trace_option_output_t;
 
 /** Sets an output config option

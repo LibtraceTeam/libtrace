@@ -87,6 +87,7 @@ struct pcapfile_format_data_t {
 
 struct pcapfile_format_data_out_t {
 	iow_t *file;
+	int compress_type;
 	int level;
 	int flag;
 
@@ -127,6 +128,7 @@ static int pcapfile_init_output(libtrace_out_t *libtrace) {
 		malloc(sizeof(struct pcapfile_format_data_out_t));
 
 	DATAOUT(libtrace)->file=NULL;
+	DATAOUT(libtrace)->compress_type=TRACE_OPTION_COMPRESSTYPE_NONE;
 	DATAOUT(libtrace)->level=0;
 	DATAOUT(libtrace)->flag=O_CREAT|O_WRONLY;
 
@@ -264,6 +266,9 @@ static int pcapfile_config_output(libtrace_out_t *libtrace,
 	switch (option) {
 		case TRACE_OPTION_OUTPUT_COMPRESS:
 			DATAOUT(libtrace)->level = *(int*)value;
+			return 0;
+		case TRACE_OPTION_OUTPUT_COMPRESSTYPE:
+			DATAOUT(libtrace)->compress_type = *(int*)value;
 			return 0;
 		case TRACE_OPTION_OUTPUT_FILEFLAGS:
 			DATAOUT(libtrace)->flag = *(int*)value;
@@ -411,6 +416,7 @@ static int pcapfile_write_packet(libtrace_out_t *out,
 		struct pcapfile_header_t pcaphdr;
 
 		DATAOUT(out)->file=trace_open_file_out(out,
+				DATAOUT(out)->compress_type,
 				DATAOUT(out)->level,
 				DATAOUT(out)->flag);
 		if (!DATAOUT(out)->file)

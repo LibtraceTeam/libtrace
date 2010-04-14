@@ -83,6 +83,7 @@ io_t *trace_open_file(libtrace_t *libtrace);
 /** Opens an output trace file for writing
  *
  * @param libtrace	The output trace to be opened
+ * @param compress_type	The compression type to use when writing
  * @param level		The compression level to use when writing, ranging from
  * 			0 to 9
  * @param filemode	The file status flags for the file, bitwise-ORed.
@@ -90,6 +91,7 @@ io_t *trace_open_file(libtrace_t *libtrace);
  * was unable to be opened
  */
 iow_t *trace_open_file_out(libtrace_out_t *libtrace,
+		int compress_type,
 		int level,
 		int filemode);
 #endif /* FORMAT_HELPER_H */

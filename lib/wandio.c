@@ -199,7 +199,7 @@ void wandio_destroy(io_t *io)
 	io->source->close(io); 
 }
 
-iow_t *wandio_wcreate(const char *filename, int compression_level, int flags)
+iow_t *wandio_wcreate(const char *filename, int compress_type, int compression_level, int flags)
 {
 	iow_t *iow;
 	parse_env();
@@ -212,19 +212,19 @@ iow_t *wandio_wcreate(const char *filename, int compression_level, int flags)
 	 * are present, guess we'll just have to write uncompressed */
 #if HAVE_LIBZ
 	if (compression_level != 0 && 
-	    (flags & WANDIO_COMPRESS_MASK) == WANDIO_COMPRESS_ZLIB) {
+	    compress_type == WANDIO_COMPRESS_ZLIB) {
 		iow = zlib_wopen(iow,compression_level);
 	}
 #endif
 #if HAVE_LIBLZO2
 	else if (compression_level != 0 && 
-	    (flags & WANDIO_COMPRESS_MASK) == WANDIO_COMPRESS_LZO) {
+	    compress_type == WANDIO_COMPRESS_LZO) {
 		iow = lzo_wopen(iow,compression_level);
 	}
 #endif
 #if HAVE_LIBBZ2
 	else if (compression_level != 0 && 
-	    (flags & WANDIO_COMPRESS_MASK) == WANDIO_COMPRESS_BZ2) {
+	    compress_type == WANDIO_COMPRESS_BZ2) {
 		iow = bz_wopen(iow,compression_level);
 	}
 #endif

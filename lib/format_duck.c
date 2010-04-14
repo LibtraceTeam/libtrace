@@ -67,6 +67,7 @@ struct duck_format_data_t {
 struct duck_format_data_out_t {
 	char *path;
 	int level;
+	int compress_type;
 	int fileflag;
 	iow_t *file;
 	int dag_version;	
@@ -83,6 +84,7 @@ static int duck_init_output(libtrace_out_t *libtrace) {
 	libtrace->format_data = malloc(sizeof(struct duck_format_data_out_t));
 	
 	OUTPUT->level = 0;
+	OUTPUT->compress_type = TRACE_OPTION_COMPRESSTYPE_NONE;
 	OUTPUT->fileflag = O_CREAT | O_WRONLY;
 	OUTPUT->file = 0;
 	OUTPUT->dag_version = 0;
@@ -95,6 +97,9 @@ static int duck_config_output(libtrace_out_t *libtrace,
 	switch (option) {
 		case TRACE_OPTION_OUTPUT_COMPRESS:
 			OUTPUT->level = *(int *)data;
+			return 0;
+		case TRACE_OPTION_OUTPUT_COMPRESSTYPE:
+			OUTPUT->compress_type = *(int *)data;
 			return 0;
 		case TRACE_OPTION_OUTPUT_FILEFLAGS:
 			OUTPUT->fileflag = *(int *)data;
@@ -121,7 +126,9 @@ static int duck_start_input(libtrace_t *libtrace) {
 }
 
 static int duck_start_output(libtrace_out_t *libtrace) {
-	OUTPUT->file = trace_open_file_out(libtrace, OUTPUT->level,
+	OUTPUT->file = trace_open_file_out(libtrace, 
+						OUTPUT->compress_type,
+						OUTPUT->level,
 						OUTPUT->fileflag);
 	if (!OUTPUT->file) {
 		return -1;

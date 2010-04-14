@@ -261,12 +261,12 @@ io_t *trace_open_file(libtrace_t *trace)
 }
 
 /* Open a file for writing using the new Libtrace IO system */ 
-iow_t *trace_open_file_out(libtrace_out_t *trace,int level, int fileflag)
+iow_t *trace_open_file_out(libtrace_out_t *trace, int compress_type, int level, int fileflag)
 {
 	assert(level<10);
 	assert(level>=0);
 
-	return wandio_wcreate(trace->uridata, level, fileflag);
+	return wandio_wcreate(trace->uridata, compress_type, level, fileflag);
 }
 
 
