@@ -168,8 +168,6 @@ int main(int argc, char *argv[]) {
 	if (error)
 		return error;
 
-	printf("now to read it again\n");
-
 	/* Now read it back in again and check it's all kosher */
 	trace = trace_create(lookup_uri(argv[1]));
 	iferr(trace);
@@ -192,7 +190,7 @@ int main(int argc, char *argv[]) {
 			break;
 		}
 		if (trace_get_capture_length(packet) != trace_get_capture_length(packet2)) {
-			printf("capturelen %i!=%i\n",
+			printf("capturelen %zd!=%zd\n",
 					trace_get_capture_length(packet),
 					trace_get_capture_length(packet2));
 			assert(0);
