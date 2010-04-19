@@ -60,8 +60,8 @@
 struct peek_t {
 	io_t *child;
 	char *buffer;
-	int length;
-	int offset;
+	int length; /* Length of buffer */
+	int offset; /* Offset into buffer */
 };
 
 extern io_source_t peek_source;
@@ -109,6 +109,7 @@ static off_t peek_read(io_t *io, void *buffer, off_t len)
 		/* To get here, the buffer must be empty */
 		assert(DATA(io)->length-DATA(io)->offset == 0);
 		off_t bytes_read;
+		/* If they're reading a block size, use that */
 		if (len % MIN_READ_SIZE  == 0) {
 			bytes_read = DATA(io)->child->source->read(
 					DATA(io)->child, buffer, len);
@@ -148,6 +149,7 @@ static off_t peek_read(io_t *io, void *buffer, off_t len)
 			/* Now grab the number of bytes asked for. */
 			len = len < bytes_read ? len : bytes_read;
 			memcpy(buffer, DATA(io)->buffer, len);
+			DATA(io)->offset = len;
 			bytes_read = len;
 		}
 		ret += bytes_read;
