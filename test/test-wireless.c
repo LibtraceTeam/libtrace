@@ -80,8 +80,7 @@ int main(int argc, char *argv[]) {
 
 	trace_read_packet(trace, packet);
 
-	l = trace_get_link(packet);
-	lt = trace_get_link_type(packet);
+	l = trace_get_packet_buffer(packet, &lt,NULL);
 
 	/* Check that the right linktype is being reported for this trace */
 	assert(lt == TRACE_TYPE_80211_RADIO);
@@ -132,8 +131,7 @@ int main(int argc, char *argv[]) {
 	iferr(trace);
 	packet = trace_create_packet();
 	trace_read_packet(trace,packet);
-	l = trace_get_link(packet);
-	lt = trace_get_link_type(packet);
+	l = trace_get_packet_buffer(packet,&lt,NULL);
 	assert(lt != TRACE_TYPE_80211_RADIO);
 
 	assert(!trace_get_wireless_tsft(l,lt,&tsft));
@@ -151,6 +149,5 @@ int main(int argc, char *argv[]) {
 
 	trace_destroy_packet(packet);
         trace_destroy(trace);
-	printf("%s: success\n", argv[0]);
 	return 0;
 }
