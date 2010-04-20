@@ -38,7 +38,7 @@
  */
 
 #ifndef LT_INTTYPES_H
-#define LT_INTTYPES_H 1
+#define LT_INTTYPES_H 1 /**< Include Guard */
 
 #ifndef PRIu64
 /* We need PRIu64 and others, but inttypes.h either doesn't exist, or it
@@ -57,20 +57,20 @@
 #   define __PRIPTR_PREFIX
 #  endif
 
-#  define PRId8			"d"
-#  define PRId16		"d"
-#  define PRId32		"d"
-#  define PRId64		__PRI64_PREFIX "d"
+#  define PRId8			"d"			/**< Print format for an 8 bit integer */
+#  define PRId16		"d"			/**< Print format for a 16 bit integer */
+#  define PRId32		"d"			/**< Print format for a 32 bit integer */
+#  define PRId64		__PRI64_PREFIX "d"	/**< Print format for a 64 bit integer */
 
-#  define PRIi8			"i"
-#  define PRIi16		"i"
-#  define PRIi32		"i"
-#  define PRIi64		__PRI64_PREFIX "i"
+#  define PRIi8			"i"			/**< Print format for an 8 bit integer */
+#  define PRIi16		"i"			/**< Print format for a 16 bit integer */
+#  define PRIi32		"i"			/**< Print format for a 32 bit integer */
+#  define PRIi64		__PRI64_PREFIX "i"	/**< Print format for a 64 bit integer */
 
-#  define PRIo8			"o"
-#  define PRIo16		"o"
-#  define PRIo32		"o"
-#  define PRIo64		__PRI64_PREFIX "o"
+#  define PRIo8			"o"			/**< Print format for an 8 bit octal */
+#  define PRIo16		"o"			/**< Print format for a 16 bit octal */
+#  define PRIo32		"o"			/**< Print format for a 32 bit octal */
+#  define PRIo64		__PRI64_PREFIX "o"	/**< Print format for a 64 bit octal */
 
 #  define PRIu8			"u"
 #  define PRIu16		"u"
@@ -91,9 +91,9 @@
 
 # ifndef UINT64_MAX
 #  if __WORDSIZE == 64
-#   define UINT64_MAX    18446744073709551615UL
+#   define UINT64_MAX    18446744073709551615UL		/**< Maximum value of a uint64_t */
 #  else
-#   define UINT64_MAX    18446744073709551615ULL
+#   define UINT64_MAX    18446744073709551615ULL	/**< Maximum value of a uint64_t */
 #  endif
 # endif
 
