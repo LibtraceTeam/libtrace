@@ -87,6 +87,45 @@ io_t *peek_open(io_t *child)
 	return io;
 }
 
+/* Read at least "len" bytes from the child io into the internal buffer, and return how many
+   bytes was actually read.
+ */
+static off_t refill_buffer(io_t *io, off_t len)
+{
+	off_t bytes_read;
+	assert(DATA(io)->length - DATA(io)->offset == 0);
+	/* Select the largest of "len", PEEK_SIZE and the current peek buffer size
+	 * and then round up to the nearest multiple of MIN_READ_SIZE 
+	 */
+	bytes_read = len < PEEK_SIZE ? PEEK_SIZE : len;
+	bytes_read = bytes_read < DATA(io)->length ? DATA(io)->length : bytes_read;
+	bytes_read += MIN_READ_SIZE - (bytes_read % MIN_READ_SIZE);
+	/* Is the current buffer big enough? */
+	if (DATA(io)->length < bytes_read) {
+		if (DATA(io)->buffer)
+			free(DATA(io)->buffer);
+		DATA(io)->length = bytes_read;
+		DATA(io)->offset = 0;
+		DATA(io)->buffer = malloc(DATA(io)->length);
+	}
+	else
+		DATA(io)->length = bytes_read;
+
+	/* Now actually attempt to read that many bytes */
+	bytes_read = DATA(io)->child->source->read(	
+			DATA(io)->child, DATA(io)->buffer, bytes_read);
+
+	DATA(io)->offset = 0;
+	DATA(io)->length = bytes_read;
+
+	/* Error? */
+	if (bytes_read < 1)
+		return bytes_read;
+
+	return bytes_read;
+	
+}
+
 static off_t peek_read(io_t *io, void *buffer, off_t len)
 {
 	off_t ret = 0;
@@ -104,12 +143,15 @@ static off_t peek_read(io_t *io, void *buffer, off_t len)
 		DATA(io)->offset += ret;
 		len -= ret;
 	}
+
 	/* Use the child reader to get the rest of the required data */
 	if (len>0) {
 		/* To get here, the buffer must be empty */
 		assert(DATA(io)->length-DATA(io)->offset == 0);
 		off_t bytes_read;
-		/* If they're reading a block size, use that */
+		/* If they're reading exactly a block size, just use that, no point in malloc'ing 
+		 * and memcpy()ing needlessly 
+		 */
 		if (len % MIN_READ_SIZE  == 0) {
 			bytes_read = DATA(io)->child->source->read(
 					DATA(io)->child, buffer, len);
@@ -123,32 +165,18 @@ static off_t peek_read(io_t *io, void *buffer, off_t len)
 			}
 		}
 		else {
-			/* Select the largest of "len", PEEK_SIZE and the current peek buffer size
-			 * and then round up to the nearest multiple of MIN_READ_SIZE 
-			 */
-			bytes_read = len < PEEK_SIZE ? PEEK_SIZE : len;
-			bytes_read = bytes_read < DATA(io)->length ? DATA(io)->length : bytes_read;
-			bytes_read += MIN_READ_SIZE - (bytes_read % MIN_READ_SIZE);
-			/* Is the current buffer big enough? */
-			if (DATA(io)->length < bytes_read) {
-				if (DATA(io)->buffer)
-					free(DATA(io)->buffer);
-				DATA(io)->length = bytes_read;
-				DATA(io)->offset = 0;
-				DATA(io)->buffer = malloc(DATA(io)->length);
-			}
-			/* Now actually attempt to read that many bytes */
-			bytes_read = DATA(io)->child->source->read(	
-					DATA(io)->child, DATA(io)->buffer, bytes_read);
-			/* Error? */
+			bytes_read = refill_buffer(io, len);
 			if (bytes_read < 1) {
+				/* Return if we have managed to get some data ok */
 				if (ret > 0)
 					return ret;
+				/* Return the error upstream */
 				return bytes_read;
 			}
 			/* Now grab the number of bytes asked for. */
 			len = len < bytes_read ? len : bytes_read;
 			memcpy(buffer, DATA(io)->buffer, len);
+
 			DATA(io)->offset = len;
 			bytes_read = len;
 		}
