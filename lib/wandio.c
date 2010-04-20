@@ -111,6 +111,13 @@ static void parse_env(void)
 
 #define READ_TRACE 0
 #define WRITE_TRACE 0
+#define PIPELINE_TRACE 0
+
+#if PIPELINE_TRACE
+#define DEBUG_PIPELINE(x) fprintf(stderr,"PIPELINE: %s\n",x)
+#else
+#define DEBUG_PIPELINE(x) 
+#endif
 
 io_t *wandio_create(const char *filename)
 {
@@ -120,6 +127,8 @@ io_t *wandio_create(const char *filename)
 	 * determine what type of compression may have been used to write
 	 * the file */
 
+	DEBUG_PIPELINE("stdio");
+	DEBUG_PIPELINE("peek");
 	io_t *io = peek_open(stdio_open(filename));
 	char buffer[1024];
 	int len;
@@ -129,16 +138,19 @@ io_t *wandio_create(const char *filename)
 #if HAVE_LIBZ
 	/* Auto detect gzip compressed data */
 	if (len>=2 && buffer[0] == '\037' && buffer[1] == '\213') { 
+		DEBUG_PIPELINE("zlib");
 		io = zlib_open(io);
 	}
 	/* Auto detect compress(1) compressed data (gzip can read this) */
 	if (len>=2 && buffer[0] == '\037' && buffer[1] == '\235') {
+		DEBUG_PIPELINE("zlib");
 		io = zlib_open(io);
 	}
 #endif
 #if HAVE_LIBBZ2
 	/* Auto detect bzip compressed data */
 	if (len>=3 && buffer[0] == 'B' && buffer[1] == 'Z' && buffer[2] == 'h') { 
+		DEBUG_PIPELINE("bzip");
 		io = bz_open(io);
 	}
 #endif
@@ -146,9 +158,12 @@ io_t *wandio_create(const char *filename)
 	/* Now open a threaded, peekable reader using the appropriate module
 	 * to read the data */
 
-	if (use_threads)
+	if (use_threads) {
+		DEBUG_PIPELINE("thread");
 		io = thread_open(io);
+	}
 	
+	DEBUG_PIPELINE("peek");
 	return peek_open(io);
 }
 
@@ -173,10 +188,10 @@ off_t wandio_seek(io_t *io, off_t offset, int whence)
 off_t wandio_read(io_t *io, void *buffer, off_t len)
 { 
 	off_t ret;
-#if READ_TRACE
-	fprintf(stderr,"read(%s): %d bytes\n",io->source->name, (int)len);
-#endif
 	ret=io->source->read(io,buffer,len); 
+#if READ_TRACE
+	fprintf(stderr,"%p: read(%s): %d bytes = %d\n",io,io->source->name, (int)len,(int)ret);
+#endif
 	return ret;
 }
 
@@ -206,7 +221,7 @@ iow_t *wandio_wcreate(const char *filename, int compress_type, int compression_l
 
 	assert ( compression_level >= 0 && compression_level <= 9 );
 
-	iow=stdio_wopen(filename);
+	iow=stdio_wopen(filename, flags);
 
 	/* We prefer zlib if available, otherwise we'll use bzip. If neither
 	 * are present, guess we'll just have to write uncompressed */

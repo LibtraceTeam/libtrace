@@ -59,7 +59,7 @@ struct compression_type {
 	 *  method */
 	const char *ext;
 	/** Internal type identifying the compression method */
-	int compress_flag;
+	int compress_type;
 };
 
 /** The list of supported compression methods */
@@ -186,7 +186,7 @@ iow_t *zlib_wopen(iow_t *child, int compress_level);
 iow_t *bz_wopen(iow_t *child, int compress_level);
 iow_t *lzo_wopen(iow_t *child, int compress_level);
 iow_t *thread_wopen(iow_t *child);
-iow_t *stdio_wopen(const char *filename);
+iow_t *stdio_wopen(const char *filename, int fileflags);
 
 /* @} */
 

@@ -58,13 +58,14 @@ extern iow_source_t stdio_wsource;
 
 #define DATA(iow) ((struct stdiow_t *)((iow)->data))
 
-static int safe_open(const char *filename)
+static int safe_open(const char *filename, int flags)
 {
 	int fd;
 /* Try opening with O_DIRECT */
 #ifdef O_DIRECT
 	fd = open(filename,
-		O_WRONLY
+		flags
+		|O_WRONLY
 		|O_CREAT
 		|O_TRUNC
 		|(force_directio_write?O_DIRECT:0),
@@ -74,7 +75,8 @@ static int safe_open(const char *filename)
 #endif
 /* If that failed (or we don't support O_DIRECT) try opening without */
 	fd = open(filename,
-		O_WRONLY
+		flags
+		|O_WRONLY
 		|O_CREAT
 		|O_TRUNC,
 		0666);
@@ -83,7 +85,7 @@ static int safe_open(const char *filename)
 	return fd;
 }
 
-iow_t *stdio_wopen(const char *filename)
+iow_t *stdio_wopen(const char *filename,int flags)
 {
 	iow_t *iow = malloc(sizeof(iow_t));
 	iow->source = &stdio_wsource;
@@ -92,7 +94,7 @@ iow_t *stdio_wopen(const char *filename)
 	if (strcmp(filename,"-") == 0) 
 		DATA(iow)->fd = 1; /* STDOUT */
 	else {
-		DATA(iow)->fd = safe_open(filename);
+		DATA(iow)->fd = safe_open(filename, flags);
 	}
 
 	if (DATA(iow)->fd == -1) {
