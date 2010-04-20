@@ -59,7 +59,7 @@ void iferr(libtrace_t *trace)
 }
 
 const char *lookup_uri(const char *type) {
-	if (strchr(type,':'))
+	if (strchr(type,':') || strchr(type,'/'))
 		return type;
 	if (!strcmp(type,"erf"))
 		return "erf:traces/100_packets.erf";
