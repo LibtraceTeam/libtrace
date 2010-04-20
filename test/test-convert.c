@@ -193,7 +193,7 @@ int main(int argc, char *argv[]) {
 			printf("capturelen %zd!=%zd\n",
 					trace_get_capture_length(packet),
 					trace_get_capture_length(packet2));
-			assert(0);
+			abort();
 		}
 		assert(trace_get_wire_length(packet) 
 				== trace_get_wire_length(packet2));
