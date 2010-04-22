@@ -207,6 +207,9 @@ int main(int argc, char *argv[])
 	}
 	for(;;) {
 		struct libtrace_ip *ipptr;
+		libtrace_udp_t *udp = NULL;
+		libtrace_tcp_t *tcp = NULL;
+
 		int psize;
 		psize = trace_read_packet(trace, packet);
 		if (psize == 0) {
@@ -219,8 +222,25 @@ int main(int argc, char *argv[])
 
 		ipptr = trace_get_ip(packet);
 
-		if (ipptr && (enc_source || enc_dest))
+		if (ipptr && (enc_source || enc_dest)) {
 			encrypt_ips(ipptr,enc_source,enc_dest);
+			ipptr->ip_sum = 0;
+		}
+
+		/* Replace checksums so that IP encryption cannot be
+		 * reversed */
+
+		/* XXX replace with nice use of trace_get_transport() */
+
+		udp = trace_get_udp(packet);
+		if (udp && (enc_source || enc_dest)) {
+			udp->check = 0;
+		} 
+
+		tcp = trace_get_tcp(packet);
+		if (tcp && (enc_source || enc_dest)) {
+			tcp->check = 0;
+		}
 
 		/* TODO: Encrypt IP's in ARP packets */
 
