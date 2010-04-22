@@ -21,6 +21,8 @@ static void usage(char *argv0)
 	"			prefix preserving\n"
 	"-p --prefix=C.I.D.R/bits Substitute the prefix of the address\n"
 	"-H --libtrace-help	Print libtrace runtime documentation\n"
+	"-z --compression-level	Compress the output trace at the specified level\n"
+	"-Z --compression-type 	Compress the output trace using the specified                                   compression algorithm\n"
 	,argv0);
 	exit(1);
 }
@@ -109,7 +111,10 @@ int main(int argc, char *argv[])
 	bool enc_source = false;
 	bool enc_dest 	= false;
 	char *output = 0;
-	int level = 1;
+	int level = -1;
+	char *compress_type_str=NULL;
+	trace_option_compresstype_t compress_type = TRACE_OPTION_COMPRESSTYPE_NONE;
+
 
 	if (argc<2)
 		usage(argv[0]);
@@ -122,17 +127,19 @@ int main(int argc, char *argv[])
 			{ "cryptopan",		1, 0, 'c' },
 			{ "prefix",		1, 0, 'p' },
 			{ "compression-level",	1, 0, 'z' },
+			{ "compression-type",	1, 0, 'Z' },
 			{ "libtrace-help", 	0, 0, 'H' },
 			{ NULL,			0, 0, 0   },
 		};
 
-		int c=getopt_long(argc, argv, "z:sc:dp:H",
+		int c=getopt_long(argc, argv, "Z:z:sc:dp:H",
 				long_options, &option_index);
 
 		if (c==-1)
 			break;
 
 		switch (c) {
+			case 'Z': compress_type_str=optarg; break;         
 			case 'z': level = atoi(optarg); break;
 			case 's': enc_source=true; break;
 			case 'd': enc_dest  =true; break;
@@ -164,6 +171,35 @@ int main(int argc, char *argv[])
 
 	}
 
+	if (compress_type_str == NULL && level >= 0) {
+                fprintf(stderr, "Compression level set, but no compression type was defined, setting to gzip\n");
+                compress_type = TRACE_OPTION_COMPRESSTYPE_ZLIB;
+        }
+
+        else if (compress_type_str == NULL) {
+                /* If a level or type is not specified, use the "none"
+                 * compression module */
+                compress_type = TRACE_OPTION_COMPRESSTYPE_NONE;
+        }
+
+        /* I decided to be fairly generous in what I accept for the
+         * compression type string */
+        else if (strncmp(compress_type_str, "gz", 2) == 0 ||
+                        strncmp(compress_type_str, "zlib", 4) == 0) {
+                compress_type = TRACE_OPTION_COMPRESSTYPE_ZLIB;
+        } else if (strncmp(compress_type_str, "bz", 2) == 0) {
+                compress_type = TRACE_OPTION_COMPRESSTYPE_BZ2;
+        } else if (strncmp(compress_type_str, "lzo", 3) == 0) {
+                compress_type = TRACE_OPTION_COMPRESSTYPE_LZO;
+        } else if (strncmp(compress_type_str, "no", 2) == 0) {
+                compress_type = TRACE_OPTION_COMPRESSTYPE_NONE;
+        } else {
+                fprintf(stderr, "Unknown compression type: %s\n",
+                        compress_type_str);
+                return 1;
+        }
+	
+
 	enc_init(enc_type,key);
 
 	/* open input uri */
@@ -190,9 +226,24 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 	
-	if (trace_config_output(writer, TRACE_OPTION_OUTPUT_COMPRESS, 
-				&level) == -1) {
+	/* Hopefully this will deal nicely with people who want to crank the
+	 * compression level up to 11 :) */
+	if (level > 9) {
+		fprintf(stderr, "WARNING: Compression level > 9 specified, setting to 9 instead\n");
+		level = 9;
+	}
+
+	if (level >= 0 && trace_config_output(writer, 
+			TRACE_OPTION_OUTPUT_COMPRESS, &level) == -1) {
 		trace_perror_output(writer, "Configuring compression level");
+		trace_destroy_output(writer);
+		trace_destroy(trace);
+		return 1;
+	}
+
+	if (trace_config_output(writer, TRACE_OPTION_OUTPUT_COMPRESSTYPE,
+				&compress_type) == -1) {
+		trace_perror_output(writer, "Configuring compression type");
 		trace_destroy_output(writer);
 		trace_destroy(trace);
 		return 1;
