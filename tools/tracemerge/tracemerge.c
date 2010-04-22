@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <getopt.h>
 #include <signal.h>
+#include <string.h>
 
 static void usage(char *argv0)
 {
@@ -14,8 +15,10 @@ static void usage(char *argv0)
 	"			Each trace is allocated an interface. Default leaves this flag as\n"
 	"			read from the original traces, if appropriate\n"
 	"-u --unique-packets    Discard duplicate packets\n"
-	"-z [level] --compression [level]\n"
+	"-z level --compression level\n"
 	"			Compression level\n"
+	"-Z method --compression-type method\n"
+	"			Compression method\n"
 	"-H --libtrace-help     Print libtrace runtime documentation\n"
 	,argv0);
 	exit(1);
@@ -40,7 +43,9 @@ int main(int argc, char *argv[])
 	int i=0;
 	uint64_t last_ts=0;
 	struct sigaction sigact;
-	int compression=6;
+	int compression=-1;
+	char *compress_type_str = NULL;
+	trace_option_compresstype_t compress_type = TRACE_OPTION_COMPRESSTYPE_NONE;
 
 	while (1) {
 		int option_index;
@@ -48,11 +53,12 @@ int main(int argc, char *argv[])
 			{ "set-interface", 	2, 0, 'i' },
 			{ "unique-packets",	0, 0, 'u' },
 			{ "libtrace-help",	0, 0, 'H' },
-			{ "compression",	2, 0, 'z' },
+			{ "compression",	1, 0, 'z' },
+			{ "compression-type", 	1, 0, 'Z' },
 			{ NULL,			0, 0, 0   },
 		};
 
-		int c=getopt_long(argc, argv, "i::uHz::",
+		int c=getopt_long(argc, argv, "i::uHz:Z:",
 				long_options, &option_index);
 
 		if (c==-1)
@@ -71,14 +77,15 @@ int main(int argc, char *argv[])
 				  exit(1);
 				  break;
 			case 'z':
-				if (optarg)
-					compression = atoi(optarg);
-				else
-					compression = 6;
+				compression = atoi(optarg);
 				if (compression<0 || compression>9) {
 					fprintf(stderr,"Compression level must be between 0 and 9\n");
 					usage(argv[0]);
 				}
+				break;
+
+			case 'Z':
+				compress_type_str = optarg;
 				break;
 			default:
 				fprintf(stderr,"unknown option: %c\n",c);
@@ -91,14 +98,52 @@ int main(int argc, char *argv[])
 	if (optind+2>argc)
 		usage(argv[0]);
 
+	if (compress_type_str == NULL && compression >= 0) {
+                fprintf(stderr, "Compression level set, but no compression type was defined, setting to gzip\n");
+                compress_type = TRACE_OPTION_COMPRESSTYPE_ZLIB;
+        }
+
+        else if (compress_type_str == NULL) {
+                /* If a level or type is not specified, use the "none"
+                 * compression module */
+                compress_type = TRACE_OPTION_COMPRESSTYPE_NONE;
+        }
+
+        /* I decided to be fairly generous in what I accept for the
+         * compression type string */
+        else if (strncmp(compress_type_str, "gz", 2) == 0 ||
+                        strncmp(compress_type_str, "zlib", 4) == 0) {
+                compress_type = TRACE_OPTION_COMPRESSTYPE_ZLIB;
+        } else if (strncmp(compress_type_str, "bz", 2) == 0) {
+                compress_type = TRACE_OPTION_COMPRESSTYPE_BZ2;
+        } else if (strncmp(compress_type_str, "lzo", 3) == 0) {
+                compress_type = TRACE_OPTION_COMPRESSTYPE_LZO;
+        } else if (strncmp(compress_type_str, "no", 2) == 0) {
+                compress_type = TRACE_OPTION_COMPRESSTYPE_NONE;
+        } else {
+                fprintf(stderr, "Unknown compression type: %s\n",
+                        compress_type_str);
+                return 1;
+        }
+
+
 	output=trace_create_output(argv[optind++]);
 	if (trace_is_err_output(output)) {
 		trace_perror_output(output,"trace_create_output");
 		return 1;
 	}
 
-	if (trace_config_output(output, TRACE_OPTION_OUTPUT_COMPRESS, &compression) == -1) {
+	if (compression >= 0 && 
+			trace_config_output(output, 
+			TRACE_OPTION_OUTPUT_COMPRESS, &compression) == -1) {
 		trace_perror_output(output,"Unable to set compression level");
+		return 1;
+	}
+
+	if (trace_config_output(output, TRACE_OPTION_OUTPUT_COMPRESSTYPE,
+			&compress_type) == -1) {
+		trace_perror_output(output, "Unable to set compression method");
+		return 1;
 	}
 
 	if (trace_start_output(output)==-1) {

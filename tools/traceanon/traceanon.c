@@ -22,7 +22,8 @@ static void usage(char *argv0)
 	"-p --prefix=C.I.D.R/bits Substitute the prefix of the address\n"
 	"-H --libtrace-help	Print libtrace runtime documentation\n"
 	"-z --compression-level	Compress the output trace at the specified level\n"
-	"-Z --compression-type 	Compress the output trace using the specified                                   compression algorithm\n"
+	"-Z --compression-type 	Compress the output trace using the specified"
+	"			compression algorithm\n"
 	,argv0);
 	exit(1);
 }
