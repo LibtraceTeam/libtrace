@@ -127,9 +127,12 @@ static off_t stdio_wwrite(iow_t *iow, const char *buffer, off_t len)
 	while (DATA(iow)->offset + towrite >= MIN_WRITE_SIZE) {
 		int err;
 		struct iovec iov[2];
-		int total = towrite - (DATA(iow)->offset+towrite) % MIN_WRITE_SIZE;
-		int amount = total;
+		int total = (DATA(iow)->offset+towrite);
+		int amount;
 		int count=0;
+		/* Round down to the nearest multiple */
+		total = total - (total % MIN_WRITE_SIZE);
+		amount = total;
 		if (DATA(iow)->offset) {
 			iov[count].iov_base = DATA(iow)->buffer;
 			iov[count].iov_len = min(DATA(iow)->offset,amount);
@@ -148,8 +151,6 @@ static off_t stdio_wwrite(iow_t *iow, const char *buffer, off_t len)
 		err=writev(DATA(iow)->fd, iov, count);
 		if (err==-1)
 			return -1;
-		if (err != total)
-			fprintf(stderr,"Wrote %d/%d\n",err,total);
 
 		/* Drop off "err" bytes from the beginning of the buffers */
 		amount = min(DATA(iow)->offset, err); /* How much we took out of the buffer */
