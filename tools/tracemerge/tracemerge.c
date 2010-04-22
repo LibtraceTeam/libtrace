@@ -15,9 +15,9 @@ static void usage(char *argv0)
 	"			Each trace is allocated an interface. Default leaves this flag as\n"
 	"			read from the original traces, if appropriate\n"
 	"-u --unique-packets    Discard duplicate packets\n"
-	"-z level --compression level\n"
+	"-z level --compress-level level\n"
 	"			Compression level\n"
-	"-Z method --compression-type method\n"
+	"-Z method --compress-type method\n"
 	"			Compression method\n"
 	"-H --libtrace-help     Print libtrace runtime documentation\n"
 	,argv0);
@@ -53,8 +53,8 @@ int main(int argc, char *argv[])
 			{ "set-interface", 	2, 0, 'i' },
 			{ "unique-packets",	0, 0, 'u' },
 			{ "libtrace-help",	0, 0, 'H' },
-			{ "compression",	1, 0, 'z' },
-			{ "compression-type", 	1, 0, 'Z' },
+			{ "compress-level",	1, 0, 'z' },
+			{ "compress-type", 	1, 0, 'Z' },
 			{ NULL,			0, 0, 0   },
 		};
 

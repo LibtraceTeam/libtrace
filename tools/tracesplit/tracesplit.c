@@ -40,7 +40,7 @@ static int usage(char *argv0)
 	"-H --libtrace-help	Print libtrace runtime documentation\n"
 	"-S --snaplen		Snap packets at the specified length\n"
 	"-v --verbose		Output statistics\n"
-	"-z --compress		Set compression level\n"
+	"-z --compress-level	Set compression level\n"
 	"-Z --compress-type 	Set compression type\n"
 	,argv0);
 	exit(1);
@@ -98,7 +98,7 @@ int main(int argc, char *argv[])
 			{ "maxfiles", 	   1, 0, 'm' },
 			{ "snaplen",	   1, 0, 'S' },
 			{ "verbose",       0, 0, 'v' },
-			{ "compress",	   1, 0, 'z' },
+			{ "compress-level", 1, 0, 'z' },
 			{ "compress-type", 1, 0, 'Z' },
 			{ NULL, 	   0, 0, 0   },
 		};

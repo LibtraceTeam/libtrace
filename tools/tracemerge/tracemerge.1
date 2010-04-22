@@ -4,7 +4,8 @@ tracemerge \- Merge one (or more) traces together
 .SH SYNOPSIS
 .B tracemerge 
 [ \-i [ interfaces_per_input ] | \-\^\-set-interface [ interfaces_per_input ] ]
-[ \-u | \-\^\-unique-packets ]
+[ \-u | \-\^\-unique-packets ] [ \-z | \-\^\-compress-level <level> ] 
+[ \-Z | \-\^\-compress-type <method> ]
 outputuri inputuri...
 .SH DESCRPTION
 tracemerge merges two or more traces together, keeping packets in order.
@@ -36,12 +37,23 @@ Ignore duplicate packets with identical timestamps.
 
 .TP
 .PD 0
-.BI \-z [ compression_level ]
+.BI \-z level
 .TP
 .PD
-.BI \-\^\-compression [ compression_level ]
-Sets the amount of compression performed on the output file.  Currently libtrace will always write
-out compressed files, even when -z0 is given.
+.BI \-\^\-compress-level level
+Sets the amount of compression performed on the output file. This value can
+range from 0 (no compression) to 9 (maximum compression). Higher compression
+levels require more CPU to compress data. Defaults to 0.
+
+.TP
+.PD 0
+.BI \-Z method 
+.TP
+.PD
+.BI \-\^\-compress-type method 
+Describes the compression algorithm to be used when writing the output trace.
+Possible methods are "gzip", "bzip2", "lzo" and "none". Defaults to "none".
+
 
 .SH LINKS
 More details about tracemerge (and libtrace) can be found at

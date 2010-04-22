@@ -21,8 +21,8 @@ static void usage(char *argv0)
 	"			prefix preserving\n"
 	"-p --prefix=C.I.D.R/bits Substitute the prefix of the address\n"
 	"-H --libtrace-help	Print libtrace runtime documentation\n"
-	"-z --compression-level	Compress the output trace at the specified level\n"
-	"-Z --compression-type 	Compress the output trace using the specified"
+	"-z --compress-level	Compress the output trace at the specified level\n"
+	"-Z --compress-type 	Compress the output trace using the specified"
 	"			compression algorithm\n"
 	,argv0);
 	exit(1);
@@ -127,8 +127,8 @@ int main(int argc, char *argv[])
 			{ "encrypt-dest",	0, 0, 'd' },
 			{ "cryptopan",		1, 0, 'c' },
 			{ "prefix",		1, 0, 'p' },
-			{ "compression-level",	1, 0, 'z' },
-			{ "compression-type",	1, 0, 'Z' },
+			{ "compress-level",	1, 0, 'z' },
+			{ "compress-type",	1, 0, 'Z' },
 			{ "libtrace-help", 	0, 0, 'H' },
 			{ NULL,			0, 0, 0   },
 		};

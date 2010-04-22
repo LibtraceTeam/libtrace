@@ -7,6 +7,8 @@ traceanon \- anonymise ip addresses of traces
 [ \-d | \-\^\-encrypt-dest ]
 [ \-p prefix | \-\^\-prefix=prefix ]
 [ \-c key | \-\^\-cryptopan=key ]
+[ \-z level | \-\^\-compress-level=level ]
+[ \-Z method | \-\^\-compress-type=method ]
 sourceuri
 desturi
 .SH DESCRPTION
@@ -50,14 +52,34 @@ substitute the high bits of the IP addresses with the provided prefix.
 .BI \-\^\-cryptopan=key
 encrypt the IP addresses using the prefix-preserving cryptopan method using
 the key "key".  The key can be up to 32 bytes long, and will be padded with
-NUL charactors.
+NULL characters.
 
+.TP
+.PD 0
+.BI \-z 
+.TP
+.PD
+.BI \-\^\-compress-level=level
+compress the output trace using a compression level of "level". Compression
+level can range from 0 (no compression) through to 9. Higher compression levels
+require more CPU to compress data. Defaults to no compression.
+
+.TP
+.PD 0
+.BI \-Z 
+.TP
+.PD
+.BI \-\^\-compress-type=method
+compress the output trace using the compression algorithm "method". Possible
+algorithms are "gzip", "bzip2", "lzo" and "none". Default is "none".
 
 .SH EXAMPLES
 .nf
 traceanon \-\^\-cryptopan="fish go moo, oh yes they do" \\
 	\-\^\-encrypt-source \\
 	\-\^\-encrypt-dest \\
+	\-\^\-compress-level=1 \\
+	\-\^\-compress-type=gzip \\
 	erf:/traces/unenc.gz \\
 	erf:/traces/enc.gz \\
 .fi
