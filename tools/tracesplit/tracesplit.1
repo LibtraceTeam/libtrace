@@ -11,6 +11,8 @@ tracesplit \- split traces
 [ \fB-e \fRunixtime | \fB--endtime=\fRunixtime]
 [ \fB-m \fRmaxfiles | \fB--maxfiles=\fRmaxfiles]
 [ \fB-S \fRsnaplen | \fB--snaplen=\fRsnaplen]
+[ \fB-z \fRlevel | \fB--compress=\fRlevel]
+[ \fB-Z \fRmethod | \fB--compress-type=\fRmethod]
 inputuri outputuri ...
 .SH DESCRIPTION
 tracesplit splits one trace into multiple tracefiles
@@ -49,11 +51,23 @@ do not create more than "maxfiles" trace files
 Truncate packets to "snaplen" bytes long.  The default is collect the entire
 packet.
 
+.TP
+\fB\-z\fR level
+Compress the data using the specified compression level, ranging from 0 to 9. 
+Higher compression levels tend to result in better compression but require
+more processing power to compress.
+
+.TP
+\fB-Z\fR compression-method
+Compress the data using the specified compression algorithm. Accepted methods
+are "gzip", "bzip2", "lzo" or "none". Default value is none unless a 
+compression level is specified, in which case gzip will be used.
+
 .SH EXAMPLES
 create a 1MB erf trace of port 80 traffic.
 .nf
-tracesplit erf:/traces/bigtrace.gz \-f 'port 80' \-b $[ 1024 * 1024 ] 
-erf:/traces/port80.gz 
+tracesplit \-z 1 -Z gzip \-f 'port 80' \-b $[ 1024 * 1024 ] 
+erf:/traces/bigtrace.gz erf:/traces/port80.gz 
 .fi
 
 .SH LINKS
