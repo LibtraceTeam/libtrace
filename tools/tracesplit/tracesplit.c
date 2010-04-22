@@ -41,6 +41,7 @@ static int usage(char *argv0)
 	"-S --snaplen		Snap packets at the specified length\n"
 	"-v --verbose		Output statistics\n"
 	"-z --compress		Set compression level\n"
+	"-Z --compress-type 	Set compression type\n"
 	,argv0);
 	exit(1);
 }
@@ -75,7 +76,9 @@ int main(int argc, char *argv[])
 	uint16_t snaplen = 0;
 	int verbose=0;
 	int compress_level=-1;
-	
+	char *compress_type_str=NULL;
+	trace_option_compresstype_t compress_type = TRACE_OPTION_COMPRESSTYPE_NONE;
+
 	if (argc<2) {
 		usage(argv[0]);
 		return 1;
@@ -96,10 +99,11 @@ int main(int argc, char *argv[])
 			{ "snaplen",	   1, 0, 'S' },
 			{ "verbose",       0, 0, 'v' },
 			{ "compress",	   1, 0, 'z' },
+			{ "compress-type", 1, 0, 'Z' },
 			{ NULL, 	   0, 0, 0   },
 		};
 
-		int c=getopt_long(argc, argv, "f:c:b:s:e:i:m:S:Hvz:",
+		int c=getopt_long(argc, argv, "f:c:b:s:e:i:m:S:Hvz:Z:",
 				long_options, &option_index);
 
 		if (c==-1)
@@ -136,11 +140,42 @@ int main(int argc, char *argv[])
 				  	exit(1);
 				  }
 				  break;
+			case 'Z':
+				  compress_type_str=optarg;
+				  break;	
 			default:
 				fprintf(stderr,"Unknown option: %c\n",c);
 				usage(argv[0]);
 				return 1;
 		}
+	}
+
+	if (compress_type_str == NULL && compress_level >= 0) {
+		fprintf(stderr, "Compression level set, but no compression type was defined, setting to gzip\n");
+		compress_type = TRACE_OPTION_COMPRESSTYPE_ZLIB;
+	}
+
+	else if (compress_type_str == NULL) {
+		/* If a level or type is not specified, use the "none"
+		 * compression module */
+		compress_type = TRACE_OPTION_COMPRESSTYPE_NONE;
+	}
+
+	/* I decided to be fairly generous in what I accept for the
+	 * compression type string */
+	else if (strncmp(compress_type_str, "gz", 2) == 0 ||
+			strncmp(compress_type_str, "zlib", 4) == 0) {
+		compress_type = TRACE_OPTION_COMPRESSTYPE_ZLIB;
+	} else if (strncmp(compress_type_str, "bz", 2) == 0) {
+		compress_type = TRACE_OPTION_COMPRESSTYPE_BZ2;
+	} else if (strncmp(compress_type_str, "lzo", 3) == 0) {
+		compress_type = TRACE_OPTION_COMPRESSTYPE_LZO;
+	} else if (strncmp(compress_type_str, "no", 2) == 0) {
+		compress_type = TRACE_OPTION_COMPRESSTYPE_NONE;
+	} else {
+		fprintf(stderr, "Unknown compression type: %s\n", 
+			compress_type_str);
+		return 1;
 	}
 
 	if (optind+2>argc) {
@@ -173,6 +208,11 @@ int main(int argc, char *argv[])
 	while(!done) {
 		
 		if (trace_read_packet(input,packet)<1) {
+			break;
+		}
+
+		if (trace_get_link_type(packet) == ~0U) {
+			fprintf(stderr, "Halted due to being unable to determine linktype - input trace may be corrupt.\n");
 			break;
 		}
 
@@ -271,9 +311,16 @@ int main(int argc, char *argv[])
 				if (trace_config_output(output,
 					TRACE_OPTION_OUTPUT_COMPRESS,
 					&compress_level)==-1) {
-					trace_perror_output(output,"Unable to set compression");
+					trace_perror_output(output,"Unable to set compression level");
 				}
 			}
+
+			if (trace_config_output(output,
+				TRACE_OPTION_OUTPUT_COMPRESSTYPE,
+				&compress_type) == -1) {
+					trace_perror_output(output, "Unable to set compression type");
+			}
+
 			trace_start_output(output);
 			if (trace_is_err_output(output)) {
 				trace_perror_output(output,"%s",buffer);
