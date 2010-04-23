@@ -48,12 +48,12 @@
 #include "dagformat.h"
 #include "libtrace.h"
 
-void iferr(libtrace_t *trace)
+void iferr(libtrace_t *trace,const char *msg)
 {
 	libtrace_err_t err = trace_get_err(trace);
 	if (err.err_num==0)
 		return;
-	printf("Error: %s\n",err.problem);
+	printf("Error: %s: %s\n", msg, err.problem);
 	exit(1);
 }
 
@@ -89,6 +89,7 @@ int main(int argc, char *argv[]) {
 	int count = 0;
 	int level = 0;
 	int expected = 100;
+	const char *tracename;
 	libtrace_t *trace;
 	libtrace_packet_t *packet;
 
@@ -97,21 +98,23 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
-	trace = trace_create(lookup_uri(argv[1]));
-	iferr(trace);
+	tracename = lookup_uri(argv[1]);
+
+	trace = trace_create(tracename);
+	iferr(trace,tracename);
 
 	if (strcmp(argv[1],"rtclient")==0) expected=101;
 	
 	level=0;
 
 	trace_start(trace);
-	iferr(trace);
+	iferr(trace,tracename);
 	
 	packet=trace_create_packet();
 	for (;;) {
 		if ((psize = trace_read_packet(trace, packet)) <0) {
 			error = 1;
-			iferr(trace);
+			iferr(trace,tracename);
 			break;
 		}
 		if (psize == 0) {
@@ -134,7 +137,7 @@ int main(int argc, char *argv[]) {
 			error = 1;
 		}
 	} else {
-		iferr(trace);
+		iferr(trace,tracename);
 	}
         trace_destroy(trace);
         return error;
