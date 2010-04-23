@@ -185,13 +185,15 @@ static int pcapfile_start_input(libtrace_t *libtrace)
 				&DATA(libtrace)->header,
 				sizeof(DATA(libtrace)->header));
 
+		DATA(libtrace)->started = true;
+
 		if (err<1)
 			return -1;
 		
 		if (swapl(libtrace,DATA(libtrace)->header.magic_number) != 
 					0xa1b2c3d4) {
 			trace_set_err(libtrace,TRACE_ERR_INIT_FAILED,
-					"Not a pcap tracefile\n");
+					"Not a pcap tracefile (magic=%08x)\n",swapl(libtrace,DATA(libtrace)->header.magic_number));
 			return -1; /* Not a pcap file */
 		}
 
