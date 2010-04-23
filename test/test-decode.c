@@ -114,6 +114,9 @@ int main(int argc, char *argv[]) {
 	
 	packet=trace_create_packet();
 	for (;;) {
+		uint8_t proto;
+		bool lt_tcp;
+		bool bpf_tcp;
 		if ((psize = trace_read_packet(trace, packet)) <0) {
 			error = 1;
 			iferr(trace);
@@ -124,7 +127,10 @@ int main(int argc, char *argv[]) {
 			break;
 		}
 
-		if ((trace_get_tcp(packet)!=NULL) ^ (trace_apply_filter(filter_tcp,packet)>0)) {
+		lt_tcp = trace_get_transport(packet,&proto,NULL) && proto == 6;
+		bpf_tcp = trace_apply_filter(filter_tcp,packet)>0;
+
+		if (lt_tcp != bpf_tcp) {
 			error=1;
 			printf("tcp problem\n");
 			if (trace_get_tcp(packet)) {
