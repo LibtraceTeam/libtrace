@@ -116,6 +116,8 @@ int main(int argc, char *argv[]) {
 	libtrace_t *trace,*trace2;
 	libtrace_out_t *outtrace;
 	libtrace_packet_t *packet,*packet2;
+	const char *trace1name;
+	const char *trace2name;
 
 	trace = trace_create(lookup_uri(argv[1]));
 	iferr(trace);
@@ -169,10 +171,12 @@ int main(int argc, char *argv[]) {
 		return error;
 
 	/* Now read it back in again and check it's all kosher */
-	trace = trace_create(lookup_uri(argv[1]));
+	trace1name = lookup_uri(argv[1]);
+	trace = trace_create(trace1name);
 	iferr(trace);
 	trace_start(trace);
-	trace2 = trace_create(lookup_out_uri(argv[2]));
+	trace2name = lookup_out_uri(argv[2]);
+	trace2 = trace_create(trace2name);
 	iferr(trace2);
 	trace_start(trace2);
 	iferr(trace2);
@@ -189,14 +193,27 @@ int main(int argc, char *argv[]) {
 			error=1;
 			break;
 		}
-		if (trace_get_capture_length(packet) != trace_get_capture_length(packet2)) {
-			printf("capturelen %zd!=%zd\n",
-					trace_get_capture_length(packet),
-					trace_get_capture_length(packet2));
+		/* The capture length might be snapped down to the wire length */
+		if (
+		((  trace_get_capture_length(packet) != trace_get_capture_length(packet2)
+		 && trace_get_capture_length(packet2) != trace_get_wire_length(packet2)))
+		 || (trace_get_wire_length(packet) != trace_get_wire_length(packet2))) {
+			printf("\t%s\t%s\n",
+				trace1name,
+				trace2name);
+			printf("caplen\t%zd\t%zd\t%+zd\n",
+				trace_get_capture_length(packet),
+				trace_get_capture_length(packet2),
+				trace_get_capture_length(packet2)-trace_get_capture_length(packet));
+			printf("wirelen\t%zd\t%zd\t%+zd\n",
+				trace_get_wire_length(packet),
+				trace_get_wire_length(packet2),
+				trace_get_wire_length(packet2)-trace_get_wire_length(packet));
+			printf("link\t%d\t%d\n",
+				trace_get_link_type(packet),
+				trace_get_link_type(packet2));
 			abort();
 		}
-		assert(trace_get_wire_length(packet) 
-				== trace_get_wire_length(packet2));
 	
 		if (trace_get_tcp(packet)) {
 			if (!trace_get_tcp(packet2)) {
