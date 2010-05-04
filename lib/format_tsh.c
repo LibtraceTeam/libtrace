@@ -152,13 +152,14 @@ static int tsh_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	/* Read the IP header */
 	if ((numbytes=wandio_read(libtrace->io,
 				buffer2,
-				(size_t)sizeof(libtrace_ip_t))) 
-			!= sizeof(libtrace_ip_t)) {
+				(size_t)sizeof(libtrace_ip_t)+16))  /* 16 bytes of transport header */
+			!= sizeof(libtrace_ip_t)+16) {
 		trace_set_err(libtrace,errno,"read(%s)",
 				libtrace->uridata);
 		return -1;
 	}
 
+#if 0
 	/* IP Options aren't captured in the trace, so leave room
 	 * for them, and put the transport header where it "should" be
 	 */
@@ -172,6 +173,7 @@ static int tsh_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 				libtrace->uridata);
 		return -1;
 	}
+#endif
 	
 	if (tsh_prepare_packet(libtrace, packet, packet->buffer, packet->type, 
 				flags)) {
@@ -203,11 +205,15 @@ static int tsh_get_capture_length(const libtrace_packet_t *packet) {
 	/* 16 bytes transport + 24 bytes IP, and we're missing the
 	 * IP options, but we'll pretend we have them
 	 */
+#if 0
 	return 16+((libtrace_ip_t*)packet->payload)->ip_hl*4;
+#else
+	return 16+sizeof(libtrace_ip_t);
+#endif
 }
 
 static int tsh_get_wire_length(const libtrace_packet_t *packet) {
-	return ((libtrace_ip_t*)packet->payload)->ip_len;
+	return ntohs(((libtrace_ip_t*)packet->payload)->ip_len);
 }
 
 static void tsh_help(void) {
