@@ -227,19 +227,25 @@ enum {
 /** Enumeration of DLTs supported by libtrace 
  */
 typedef enum {
-	TRACE_DLT_NULL = 0,
+	/** pcap documents this as having the Address Family value in host byte order as the 
+ 	  * framing.  Ugly? Yes.
+ 	  */
+	TRACE_DLT_NULL = 0, 
 	TRACE_DLT_EN10MB = 1,
 	TRACE_DLT_PPP = 9,
 	TRACE_DLT_ATM_RFC1483 = 11,
 	
-	/* Sigh. This is handled in files with LINKTYPE's */
+	/** Ok, so OpenBSD has a different value for DLT_RAW as the rest of the planet, so detect
+          * this.  When reading to/from files we should be using TRACE_DLT_LINKTYPE_RAW instead.
+          * When talking about DLT's inside libtrace tho, we should be using /these/ DLT's.
+          */
 #ifdef __OpenBSD__
 	TRACE_DLT_RAW = 14,	
 #else
 	TRACE_DLT_RAW = 12,
 #endif
 	TRACE_DLT_PPP_SERIAL = 50,
-	TRACE_DLT_LINKTYPE_RAW = 101,
+	TRACE_DLT_LINKTYPE_RAW = 101, /**< See TRACE_DLT_RAW for explainations of pain. */
 	TRACE_DLT_C_HDLC = 104,
 	TRACE_DLT_IEEE802_11 = 105,
 	TRACE_DLT_LINUX_SLL = 113,
