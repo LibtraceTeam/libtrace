@@ -421,8 +421,11 @@ static int pcapfile_write_packet(libtrace_out_t *out,
 				DATAOUT(out)->compress_type,
 				DATAOUT(out)->level,
 				DATAOUT(out)->flag);
-		if (!DATAOUT(out)->file)
+
+		if (!DATAOUT(out)->file) {
+			trace_set_err_out(out,errno,"Unable to open file");
 			return -1;
+		}
 
 		pcaphdr.magic_number = 0xa1b2c3d4;
 		pcaphdr.version_major = 2;
@@ -445,7 +448,6 @@ static int pcapfile_write_packet(libtrace_out_t *out,
 	if (linktype==TRACE_TYPE_ETH) {
 		if (trace_get_wire_length(packet) >= 4) {
 			hdr.wirelen = trace_get_wire_length(packet)-4;
-
 		}
 		else {
 			hdr.wirelen = 0;
