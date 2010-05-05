@@ -404,8 +404,8 @@ static int legacyatm_get_wire_length(const libtrace_packet_t *packet UNUSED) {
 }
 
 static int legacyeth_get_wire_length(const libtrace_packet_t *packet) {
-	legacy_ether_t *leth = (legacy_ether_t *)packet->header;
-	return leth->wlen;
+	legacy_ether_t *leth = (legacy_ether_t *)packet->header; 
+	return leth->wlen+4; /* +4 for FCS, wirelen is in little endian sigh. */
 }
 
 static int legacynzix_get_wire_length(const libtrace_packet_t *packet) {
