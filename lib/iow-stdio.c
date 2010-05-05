@@ -139,6 +139,7 @@ static off_t stdio_wwrite(iow_t *iow, const char *buffer, off_t len)
 			amount -= iov[count].iov_len;
 			++count;
 		}
+		/* How much to write from this buffer? */
 		if (towrite) {
 			iov[count].iov_base = (void*)buffer; 	/* cast away constness, which is safe 
 								 * here 
