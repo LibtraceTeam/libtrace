@@ -106,8 +106,15 @@ static off_t zlib_read(io_t *io, void *buffer, off_t len)
 			int bytes_read = wandio_read(DATA(io)->parent, 
 				(char*)DATA(io)->inbuff,
 				sizeof(DATA(io)->inbuff));
-			if (bytes_read == 0) /* EOF */
+			if (bytes_read == 0) {
+				/* EOF */
+				if (DATA(io)->strm.avail_out == len) {
+					DATA(io)->err = ERR_EOF;
+					return 0;
+				}
+				/* Return how much data we've managed to read so far. */
 				return len-DATA(io)->strm.avail_out;
+			}
 			if (bytes_read < 0) { /* Error */
 				/* errno should be set */
 				DATA(io)->err = ERR_ERROR;
@@ -128,7 +135,14 @@ static off_t zlib_read(io_t *io, void *buffer, off_t len)
 				DATA(io)->err = ERR_OK;
 				break;
 			case Z_STREAM_END:
-				DATA(io)->err = ERR_EOF;
+				/* You would think that an "EOF" on the stream would mean we'd
+ 				 * want to pass on an EOF?  Nope.  Some tools (*cough* corel *cough*)
+ 				 * annoyingly close and reopen the gzip stream leaving Z_STREAM_END
+ 				 * mines for us to find.
+ 				 */
+				inflateEnd(&DATA(io)->strm);
+				inflateInit2(&DATA(io)->strm, 15 | 32);
+				DATA(io)->err = ERR_OK;
 				break;
 			default:
 				errno=EIO;
