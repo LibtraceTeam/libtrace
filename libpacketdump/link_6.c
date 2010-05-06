@@ -10,11 +10,12 @@
 #include "libtrace.h"
 #include "libtrace_int.h"
 
-DLLEXPORT void decode(int link_type UNUSED,const char *pkt,unsigned len) 
+DLLEXPORT void decode(int link_type ,const char *pkt,unsigned len) 
 {
 	libtrace_sll_header_t *sll = (libtrace_sll_header_t *) pkt;
-	uint16_t type;
-	
+	libtrace_linktype_t linktype = link_type;
+	void *ret;	
+
 	if (len < sizeof(*sll)) {
 		printf(" Linux SLL: Truncated (len = %u)\n", len);
 		return;
@@ -39,9 +40,11 @@ DLLEXPORT void decode(int link_type UNUSED,const char *pkt,unsigned len)
 	/* Decide how to continue processing... */
 	
 	/* Do we recognise the hardware address type? */
-	type = arphrd_type_to_libtrace(ntohs(sll->hatype));
-	if (type != 65535) { 
-		decode_next(pkt + sizeof(*sll), len - sizeof(*sll), "link", type);
+	ret=trace_get_payload_from_meta(pkt, &linktype, &len);
+	/*type = arphrd_type_to_libtrace(ntohs(sll->hatype)); */
+	if (linktype != 65535) { 
+		decode_next(ret, len, "link", linktype);
+		/*decode_next(pkt + sizeof(*sll), len - sizeof(*sll), "link", type);*/
 		return;
 	}
 
