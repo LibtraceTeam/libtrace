@@ -127,6 +127,52 @@ static void generic_decode(uint16_t type,const char *packet, int len) {
 	printf("\n");
 }
 
+static void *open_so_decoder(const char *name,int type)
+{
+	char path[1024];
+	void *hdl;
+	/* Only check LIBPKTDUMPDIR if we're not setuid.  Not bulletproof, but hopefully anyone who
+	 * sets uid == euid will also clear the environment (eg sudo).
+	 */
+	if (getuid() == geteuid() && getenv("LIBPKTDUMPDIR")) {
+		snprintf(path,sizeof(path),"%s/%s_%i.so",getenv("LIBPKTDUMPDIR"),name,type);
+		hdl = dlopen(path,RTLD_LAZY);
+		if (hdl)
+			return hdl;
+	}
+	/* If the variable isn't set, *or* if we don't find anything, try the system location. */
+	snprintf(path,sizeof(path),DIRNAME "/%s_%i.so",name,type);
+	hdl = dlopen(path,RTLD_LAZY);
+	if (hdl)
+		return hdl;
+
+	return hdl;
+}
+
+static void *open_protocol_decoder(const char *name, int type)
+{
+	char path[1024];
+	void *hdl;
+	/* Only check LIBPKTDUMPDIR if we're not setuid.  Not bulletproof, but hopefully anyone who
+	 * sets uid == euid will also clear the environment (eg sudo).
+	 */
+	if (getuid() == geteuid() && getenv("LIBPKTDUMPDIR")) {
+		snprintf(path,sizeof(path),"%s/%s_%i.protocol",getenv("LIBPKTDUMPDIR"),name,type);
+		hdl = parse_protocol_file(path);
+		if (hdl)
+			return hdl;
+	}
+	/* Try the system directory */
+	snprintf(path,sizeof(path),DIRNAME "/%s_%i.protocol",
+		name,type);
+	hdl = parse_protocol_file(path);
+
+	if (!hdl)
+		return hdl;
+
+	return hdl;
+}
+
 void decode_next(const char *packet,int len,const char *proto_name,int type)
 {
 	std::string sname(proto_name);
@@ -135,50 +181,53 @@ void decode_next(const char *packet,int len,const char *proto_name,int type)
 	// appropriate files to do so
 	if (decoders[sname].find(type)==decoders[sname].end()) {
 		void *hdl;
-		char name[1024];
 		decode_funcs_t *func = new decode_funcs_t;
 		decode_t dec;
-		snprintf(name,sizeof(name),"%s/%s_%i.so",DIRNAME,sname.c_str(),type);
-		hdl = dlopen(name,RTLD_LAZY);
-		if (!hdl) {
-			// if there is no shared library, try a protocol file
-			snprintf(name,sizeof(name),"%s/%s_%i.protocol",
-				DIRNAME,sname.c_str(),type);
-			hdl = parse_protocol_file(name);
 
-			if(!hdl)
-			{
-				// no protocol file either, use a generic one
-				func->decode_n = generic_decode;
-				dec.style = DECODE_NORMAL;
-				dec.el = NULL;
-			} else {
-				// use the protocol file
-				func->decode_p = decode_protocol_file;
-				dec.style = DECODE_PARSER;
-				dec.el = (element_t*)hdl;
-			}
-		} else {
+		/* Try and find a .so to handle this protocol */
+		hdl = open_so_decoder(sname.c_str(),type);
+		if (hdl) {
 			void *s=dlsym(hdl,"decode");
-			if (!s) {
-				// the shared library doesnt have a decode func
-				// TODO should try the protocol file now
-				func->decode_n = generic_decode;
-				dec.style = DECODE_NORMAL;
-				dec.el = NULL;
-			}
-			else
-			{
+			if (s) {
 				// use the shared library
 				func->decode_n = (decode_norm_t)s;
 				dec.style = DECODE_NORMAL;
 				dec.el = NULL; 
 			}
+			else {
+				dlclose(hdl);
+				hdl = NULL;
+			}
 		}
+
+		/* We didn't successfully open the .so, try finding a .protocol that we can use */
+		if (!hdl) {
+			hdl = open_protocol_decoder(sname.c_str(),type);
+			if (hdl) {
+				// use the protocol file
+				func->decode_p = decode_protocol_file;
+				dec.style = DECODE_PARSER;
+				dec.el = (element_t*)hdl;
+			}
+		}
+
+		/* No matches found, fall back to the generic decoder. */
+		/* TODO: We should have a variety of fallback decoders based on the protocol. */
+		if(!hdl)
+		{
+			// no protocol file either, use a generic one
+			func->decode_n = generic_decode;
+			dec.style = DECODE_NORMAL;
+			dec.el = NULL;
+		} 
+
 		dec.func = func;
 		decoders[sname][type] = dec;
 	}
 
+	/* TODO: Instead of haxing this here, we should provide a series of generic_decode's
+	 * and let the code above deal with it.
+	 */
 	if (decoders[sname][type].func->decode_n == generic_decode) {
 		/* We can't decode a link, so lets skip that and see if libtrace
 		 * knows how to find us the ip header
@@ -195,6 +244,7 @@ void decode_next(const char *packet,int len,const char *proto_name,int type)
 					&newtype,&newlen);
 			if (network) {
 				printf("skipping unknown link header of type %i to network type %i\n",type,newtype);
+				/* Should hex dump this too. */
 				decode_next(network,newlen,"eth",newtype);
 				return;
 			}
