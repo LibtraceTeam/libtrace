@@ -137,6 +137,10 @@ int snprintf(char *str, size_t size, const char *format, ...);
 #  include "dagformat.h"
 #endif
 
+#ifdef HAVE_LLVM
+#include "bpf-jit/bpf-jit.h"
+#endif
+
 //#define RP_BUFSIZE 65536U
 
 /** Data about the most recent event from a trace file */
@@ -969,6 +973,7 @@ struct libtrace_filter_t {
 	struct bpf_program filter;	/**< The BPF program itself */
 	char * filterstring;		/**< The filter string */
 	int flag;			/**< Indicates if the filter is valid */
+	struct bpf_jit_t *jitfilter;
 };
 #else
 /** BPF not supported by this system, but we still need to define a structure
