@@ -204,6 +204,9 @@ off_t wandio_peek(io_t *io, void *buffer, off_t len)
 				   * first.
 				   */
 	ret=io->source->peek(io, buffer, len);
+#if READ_TRACE
+	fprintf(stderr,"%p: peek(%s): %d bytes = %d\n",io,io->source->name, (int)len, (int)ret);
+#endif
 	return ret;
 }
 
@@ -222,6 +225,8 @@ iow_t *wandio_wcreate(const char *filename, int compress_type, int compression_l
 	assert ( compression_level >= 0 && compression_level <= 9 );
 
 	iow=stdio_wopen(filename, flags);
+	if (!iow)
+		return NULL;
 
 	/* We prefer zlib if available, otherwise we'll use bzip. If neither
 	 * are present, guess we'll just have to write uncompressed */
