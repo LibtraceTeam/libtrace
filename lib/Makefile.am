@@ -2,6 +2,7 @@ lib_LTLIBRARIES = libtrace.la
 include_HEADERS = libtrace.h dagformat.h lt_inttypes.h daglegacy.h rt_protocol.h erftypes.h wandio.h
 
 AM_CFLAGS=@LIBCFLAGS@
+AM_CXXFLAGS=@LIBCXXFLAGS@
 
 extra_DIST = format_template.c
 if HAVE_NETPACKET_PACKET_H
@@ -45,6 +46,13 @@ DAGSOURCE=
 endif
 EXTRA_DIST=format_dag24.c format_dag25.c
 
+if HAVE_LLVM
+BPFJITSOURCE=bpf-jit/bpf-jit.cc 
+else
+BPFJITSOURCE=
+endif
+
+
 libtrace_la_SOURCES = trace.c common.h \
 		format_erf.c format_pcap.c format_legacy.c \
 		format_rt.c format_helper.c format_helper.h format_pcapfile.c \
@@ -55,6 +63,7 @@ libtrace_la_SOURCES = trace.c common.h \
 		protocols_pktmeta.c protocols_l2.c protocols_l3.c \
 		protocols_transport.c protocols.h \
 		$(DAGSOURCE) format_erf.h \
+		$(BPFJITSOURCE) \
 		$(LIBTRACEIO_ZLIB) $(LIBTRACEIO_BZLIB) $(LIBTRACEIO_LZO) \
 		ior-peek.c ior-stdio.c ior-thread.c \
 		iow-stdio.c iow-thread.c wandio.c \
@@ -73,3 +82,18 @@ dagapi.c:
 
 dagopts.c:
 	cp @DAG_TOOLS_DIR@/dagopts.c .
+
+if HAVE_LLVM
+# Rules to build the llvm .cc file from a C description of each opcode.
+bpf-jit/bpf-opcodes.llvm.bc: bpf-jit/bpf-opcodes.c
+	`$(LLVM_CONFIG) --bindir`/llvm-gcc -std=c99 -c -O0 -emit-llvm $< -o $@
+
+bpf-jit/bpf-opcodes.llvm.cc: bpf-jit/bpf-opcodes.llvm.bc
+	`$(LLVM_CONFIG) --bindir`/llc -f -march=cpp -cppgen=module $< -o $@
+
+bpf-jit/bpf-jit.cc: bpf-jit/bpf-opcodes.llvm.cc
+
+EXTRA_DIST+=bpf-jit/bpf-opcodes.c
+BUILT_SOURCES=bpf-jit/bpf-opcodes.llvm.cc
+endif
+CLEANFILES=bpf-jit/bpf-opcodes.llvm.cc bpf-jit/bpf-opcodes.llvm.bc

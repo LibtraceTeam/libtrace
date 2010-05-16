@@ -54,11 +54,15 @@ AC_SYS_LARGEFILE
 
 if test "$GCC" = "yes"; then
 	CFLAGS="$CFLAGS -Wall -Wextra -Wmissing-prototypes -O2"
+	CXXFLAGS="$CXXFLAGS -Wall -Wextra -O2"
 # We assume that gcc knows about -fvisibility and friends, as I can't see
 # a good easy way of testing for it here.
 	LIBCFLAGS="$CFLAGS"
 	LIBCFLAGS="$LIBCFLAGS -DLT_BUILDING_DLL=1"
 	LIBCFLAGS="$LIBCFLAGS -fvisibility=hidden"
+	LIBCXXFLAGS="$CXXFLAGS"
+	LIBCXXFLAGS="$CXXFLAGS -DLT_BUILDING_DLL=1"
+	LIBCXXFLAGS="$CXXFLAGS -fvisibility=hidden"
 fi
 
 AC_PROG_LIBTOOL
@@ -276,6 +280,29 @@ AC_CHECK_LIB(lzo2, lzo1x_1_compress)
 AC_CHECK_LIB(pthread, pthread_create)
 AC_SEARCH_LIBS(mvprintw, ncurses, [], [ AC_MSG_ERROR([NCurses library not available]) ])
 
+AC_ARG_WITH([llvm],
+	[AC_HELP_STRING([--with-llvm],
+		[support Just In Time compiler])],
+	use_llvm="yes",
+	use_llvm="check")
+
+AC_PATH_PROG(llvm_config, llvm-config)
+
+if (test "$use_llvm" != "no"); then
+	AC_PATH_PROG(LLVM_CONFIG, llvm-config, no)
+	if test "$LLVM_CONFIG" = "no" ; then
+		AC_MSG_NOTICE([Unable to find llvm-config.  JIT support disabled.])
+		JIT=no
+	else
+		LIBCXXFLAGS="`$LLVM_CONFIG --cxxflags` $CXXFLAGS"
+		ADD_LIBS="$ADD_LIBS `$LLVM_CONFIG --libs all`";
+		LDFLAGS="`$LLVM_CONFIG --ldflags` $LDFLAGS";
+		JIT=yes
+		AC_DEFINE(HAVE_LLVM, 1, [Set to 1 if you have LLVM installed])
+	fi
+fi
+
+
 AM_CONDITIONAL([HAVE_BPF_CAPTURE], [test "$ac_cv_have_decl_BIOCSETIF" = yes ])
 AM_CONDITIONAL([HAVE_DAG], [test "$libtrace_dag" = true])
 AM_CONDITIONAL([DAG2_4], [test "$libtrace_dag_version" = 24])
@@ -286,6 +313,7 @@ AM_CONDITIONAL([HAVE_BZLIB], [test "$ac_cv_lib_bz2_BZ2_bzDecompressInit" = yes])
 AM_CONDITIONAL([HAVE_LZO], [test "$ac_cv_lib_lzo2_lzo1x_1_compress" = yes])
 AM_CONDITIONAL([HAVE_NETPACKET_PACKET_H], [test "$libtrace_netpacket_packet_h" = true])
 AM_CONDITIONAL([HAVE_LIBGDC], [test "$ac_cv_header_gdc_h" = yes])
+AM_CONDITIONAL([HAVE_LLVM], [test "x$LLVM_CONFIG" != "xno" ])
 
 # Check for miscellaneous programs
 AC_CHECK_PROG([libtrace_doxygen], [doxygen], [true], [false])
@@ -304,7 +332,9 @@ AC_SUBST([LIBTRACE_MINOR])
 AC_SUBST([DAG_VERSION_NUM])
 AC_SUBST([HAVE_BPF_CAPTURE])
 AC_SUBST([HAVE_LIBGDC])
+AC_SUBST([HAVE_LLVM])
 AC_SUBST([LIBCFLAGS])
+AC_SUBST([LIBCXXFLAGS])
 dnl and finally, output our Makefiles
 AC_OUTPUT
 
@@ -333,6 +363,7 @@ if test x"$libtrace_dag" = xtrue; then
 else
 	AC_MSG_NOTICE([Compiled with DAG live capture support: No])
 fi
+reportopt "Compiled with LLVM BPF JIT support" $JIT
 reportopt "Building man pages/documentation" $libtrace_doxygen
 
 echo 

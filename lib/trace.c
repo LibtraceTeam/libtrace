@@ -1102,6 +1102,7 @@ trace_create_filter_from_bytecode(void *bf_insns, unsigned int bf_len)
 	
 	filter->filter.bf_len = bf_len;
 	filter->filterstring = NULL;
+	filter->jitfilter = NULL;
 	/* "flag" indicates that the filter member is valid */
 	filter->flag = 1; 
 	
@@ -1118,6 +1119,7 @@ DLLEXPORT libtrace_filter_t *trace_create_filter(const char *filterstring) {
 	libtrace_filter_t *filter = (libtrace_filter_t*)
 				malloc(sizeof(libtrace_filter_t));
 	filter->filterstring = strdup(filterstring);
+	filter->jitfilter = NULL;
 	filter->flag = 0;
 	return filter;
 #else
@@ -1132,6 +1134,10 @@ DLLEXPORT void trace_destroy_filter(libtrace_filter_t *filter)
 	free(filter->filterstring);
 	if (filter->flag)
 		pcap_freecode(&filter->filter);
+#ifdef HAVE_LLVM
+	if (filter->jitfilter) 
+		destroy_program(filter->jitfilter);
+#endif
 	free(filter);
 #else
 
@@ -1256,8 +1262,20 @@ DLLEXPORT int trace_apply_filter(libtrace_filter_t *filter,
 		return -1;
 	}
 
+	/* If we're jitting, we may need to JIT the BPF code now too */
+#if HAVE_LLVM
+	if (!filter->jitfilter) {
+		filter->jitfilter = compile_program(filter->filter.bf_insns, filter->filter.bf_len);
+	}
+#endif
+
 	assert(filter->flag);
+	/* Now execute the filter */
+#if HAVE_LLVM
+	ret=filter->jitfilter->bpf_run((unsigned char *)linkptr, clen);
+#else
 	ret=bpf_filter(filter->filter.bf_insns,(u_char*)linkptr,(unsigned int)clen,(unsigned int)clen);
+#endif
 
 	/* If we copied the packet earlier, make sure that we free it */
 	if (free_packet_needed) {
