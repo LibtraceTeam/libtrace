@@ -39,6 +39,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <assert.h>
+#include <stddef.h>
 
 /* Libtrace IO module implementing a peeking reader.
  *
@@ -106,10 +107,21 @@ static off_t refill_buffer(io_t *io, off_t len)
 			free(DATA(io)->buffer);
 		DATA(io)->length = bytes_read;
 		DATA(io)->offset = 0;
+#ifdef _POSIX_C_SOURCE >= 200112L || _XOPEN_SOURCE >= 600
+		/* We need to do this as read() of O_DIRECT might happen into this buffer.
+		 * The docs suggest 512 bytes is all we need to align to, but I'm suspicious
+		 * I expect disks with 4k blocks will arrive soon, and thus 4k is the minimum I'm
+		 * willing to live with.
+		 */
+		posix_memalign(&DATA(io)->buffer, 4096, DATA(io)->length);
+#else
 		DATA(io)->buffer = malloc(DATA(io)->length);
+#endif
 	}
 	else
 		DATA(io)->length = bytes_read;
+
+	assert(DATA(io)->buffer);
 
 	/* Now actually attempt to read that many bytes */
 	bytes_read = DATA(io)->child->source->read(	
@@ -150,9 +162,11 @@ static off_t peek_read(io_t *io, void *buffer, off_t len)
 		assert(DATA(io)->length-DATA(io)->offset == 0);
 		off_t bytes_read;
 		/* If they're reading exactly a block size, just use that, no point in malloc'ing 
-		 * and memcpy()ing needlessly 
+		 * and memcpy()ing needlessly.  However, if the buffer isn't aligned, we need to
+		 * pass on an aligning buffer, skip this and do it into our own aligned buffer.
 		 */
-		if (len % MIN_READ_SIZE  == 0) {
+		if ((len % MIN_READ_SIZE  == 0) && ((ptrdiff_t)buffer % 4096)==0) {
+			assert(((ptrdiff_t)buffer % 4096) == 0);
 			bytes_read = DATA(io)->child->source->read(
 					DATA(io)->child, buffer, len);
 			/* Error? */
@@ -195,6 +209,23 @@ static off_t peek_read(io_t *io, void *buffer, off_t len)
 	return ret;
 }
 
+static void *alignedrealloc(void *old, size_t oldsize, size_t size)
+{
+#if _POSIX_C_SOURCE >= 200112L || _XOPEN_SOURCE >= 600
+	void *new;
+	/* Shortcut resizing */
+	if (size < oldsize)
+		return old;
+	posix_memalign(&new, 4096, size);
+	assert(oldsize<size);
+	memcpy(new,old,oldsize);
+	free(old);
+	return new;
+#else
+	return realloc(old,size);
+#endif
+}
+
 
 static off_t peek_peek(io_t *io, void *buffer, off_t len)
 {
@@ -206,7 +237,8 @@ static off_t peek_peek(io_t *io, void *buffer, off_t len)
 		off_t read_amount = len - (DATA(io)->length - DATA(io)->offset);
 		/* Round the read_amount up to the nearest MB */
 		read_amount += PEEK_SIZE - ((DATA(io)->length + read_amount) % PEEK_SIZE);
-		DATA(io)->buffer = realloc(DATA(io)->buffer, DATA(io)->length + read_amount);
+		DATA(io)->buffer = alignedrealloc(DATA(io)->buffer, DATA(io)->length, 
+			DATA(io)->length + read_amount);
 		/* Use the child reader to read more data into our managed
 		 * buffer */
 		read_amount = wandio_read(DATA(io)->child, 
