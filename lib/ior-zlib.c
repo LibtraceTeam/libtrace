@@ -50,8 +50,8 @@ enum err_t {
 };
 
 struct zlib_t {
-	z_stream strm;
 	Bytef inbuff[1024*1024]; /* bytef is what zlib uses for buffer pointers */
+	z_stream strm;
 	io_t *parent;
 	int outoffset;
 	enum err_t err;
