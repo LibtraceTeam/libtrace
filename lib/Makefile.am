@@ -89,7 +89,7 @@ bpf-jit/bpf-opcodes.llvm.bc: bpf-jit/bpf-opcodes.c
 	`$(LLVM_CONFIG) --bindir`/llvm-gcc -std=c99 -c -O0 -emit-llvm $< -o $@
 
 bpf-jit/bpf-opcodes.llvm.cc: bpf-jit/bpf-opcodes.llvm.bc
-	`$(LLVM_CONFIG) --bindir`/llc -f -march=cpp -cppgen=module $< -o $@
+	`$(LLVM_CONFIG) --bindir`/llc -march=cpp -cppgen=module $< -o $@
 
 bpf-jit/bpf-jit.cc: bpf-jit/bpf-opcodes.llvm.cc
 
