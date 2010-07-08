@@ -273,11 +273,13 @@ Module* build_bpf_program(struct bpf_insn insns[], int plen)
   
   FunctionType* memsetType = FunctionType::get(
     /*Result=*/Type::getVoidTy(getGlobalContext()),
-    		construct_vector<const Type*>(4,
-			PointerType::get(IntegerType::get(getGlobalContext(), 8), 0),
-			IntegerType::get(getGlobalContext(), 8),
-			IntegerType::get(getGlobalContext(), 64),
-			IntegerType::get(getGlobalContext(), 32)),
+    		construct_vector<const Type*>(5,
+			PointerType::get(IntegerType::get(getGlobalContext(), 8), 0), /*dest*/
+			IntegerType::get(getGlobalContext(), 8),  /* i8 val */
+			IntegerType::get(getGlobalContext(), 64), /* i64 len */
+			IntegerType::get(getGlobalContext(), 32), /* i32 align */
+			IntegerType::get(getGlobalContext(), 1)  /* i1 volatile */
+			),
     /*isVarArg=*/false);
   
   // Function Declarations
@@ -329,6 +331,7 @@ Module* build_bpf_program(struct bpf_insn insns[], int plen)
   ConstantInt* const_int8_12 = ConstantInt::get(getGlobalContext(), APInt(8,  StringRef("0"), 10));
   ConstantInt* const_int64_13 = ConstantInt::get(getGlobalContext(), APInt(64,  StringRef("1056"), 10));
   ConstantInt* const_int32_14 = ConstantInt::get(getGlobalContext(), APInt(32,  StringRef("8"), 10));
+  ConstantInt* const_int1_false = ConstantInt::get(getGlobalContext(), APInt(1,  StringRef("0"), 10));
   
   // Function: bpf_run (func_bpf_run)
   {
@@ -356,13 +359,18 @@ Module* build_bpf_program(struct bpf_insn insns[], int plen)
 		PointerType::get(IntegerType::get(getGlobalContext(), 8), 0),
 		"state1", label_entry);
     std::vector<Value*> void_25_params;
-    void_25_params.push_back(ptr_state1);
-    void_25_params.push_back(const_int8_12);
-    void_25_params.push_back(const_int64_13);
-    void_25_params.push_back(const_int32_14);
-    CallInst* void_25 = CallInst::Create(func_llvm_memset_i64, void_25_params.begin(), void_25_params.end(), "", label_entry);
+    void_25_params.push_back(ptr_state1);	/* dest */
+    void_25_params.push_back(const_int8_12);	/* value */
+    void_25_params.push_back(const_int64_13);	/* length */
+    void_25_params.push_back(const_int32_14);	/* alignment */
+    void_25_params.push_back(const_int1_false);	/* volatile */
+    CallInst* void_25 = CallInst::Create(func_llvm_memset_i64, 
+    		void_25_params.begin(), void_25_params.end(), 
+		"", 
+		label_entry);
     void_25->setCallingConv(CallingConv::C);
-    void_25->setTailCall(false);AttrListPtr void_25_PAL;
+    void_25->setTailCall(false);
+    AttrListPtr void_25_PAL;
     void_25->setAttributes(void_25_PAL);
  
  /* set state->P */
