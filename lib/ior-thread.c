@@ -58,7 +58,7 @@
 
 /* 1MB Buffer */
 #define BUFFERSIZE (1024*1024)
-#define BUFFERS 100
+#define BUFFERS 5
 
 extern io_source_t thread_source;
 
