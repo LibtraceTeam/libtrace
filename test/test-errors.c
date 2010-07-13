@@ -78,7 +78,13 @@ void test_forgotten_wronly()
 
 int main(int argc, char *argv[]) 
 {
-	test_forgotten_wronly();
+	
+	/* This test is no longer useful, as the new libtrace IO system
+	 * ensures that all output files are opened with WRONLY, so the
+	 * test will always assert fail when the write error does not
+	 * occur */
+	
+	/* test_forgotten_wronly(); */
 
 	return 0;
 }
