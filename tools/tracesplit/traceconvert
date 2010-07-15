@@ -5,4 +5,4 @@ if [ $# -lt 2 ]; then
 	exit 1
 fi
 
-exec tracesplit "$1" "$2"
+exec tracesplit -z 1 -Z gzip "$1" "$2"
