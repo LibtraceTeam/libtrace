@@ -397,7 +397,11 @@ DLLEXPORT void *trace_get_payload_from_layer2(void *link,
 		uint32_t *remaining)
 {
 	void *l;
-	assert(linktype != ~0U);
+	if (linktype == ~0U) {
+		fprintf(stderr, "Unable to determine linktype for packet\n");
+		return NULL;
+	}
+	
 	switch(linktype) {
 		/* Packet Metadata headers, not layer2 headers */
 		case TRACE_TYPE_80211_PRISM:
