@@ -186,9 +186,12 @@ static int pcapfile_start_input(libtrace_t *libtrace)
 				sizeof(DATA(libtrace)->header));
 
 		DATA(libtrace)->started = true;
+		assert(sizeof(DATA(libtrace)->header) > 0);
+		
+		if (err<1) {
 
-		if (err<1)
 			return -1;
+		}
 		
 		if (swapl(libtrace,DATA(libtrace)->header.magic_number) != 
 					0xa1b2c3d4) {
@@ -456,7 +459,18 @@ static int pcapfile_write_packet(libtrace_out_t *out,
 	else
 		hdr.wirelen = trace_get_wire_length(packet);
 
-	assert(hdr.wirelen < LIBTRACE_PACKET_BUFSIZE);
+	/* Reason for removing this assert:
+	 *
+	 * There exist some packets, e.g. in IPLS II, where the wire length
+	 * is clearly corrupt. When converting to pcap, we *could* try to
+	 * adjust the wire length to something sane but for now, I'll just let
+	 * the broken length persist through the conversion.
+	 *
+	 * XXX Is setting the wire length to zero the best solution in such
+	 * cases?
+	 */
+
+	/* assert(hdr.wirelen < LIBTRACE_PACKET_BUFSIZE); */
 
 	/* Ensure we have a valid capture length, especially if we're going
 	 * to "remove" the FCS from the wire length */
