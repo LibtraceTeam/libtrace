@@ -78,28 +78,9 @@ static std::map<std::string,std::map<uint16_t,decode_t> > decoders;
 #warning "No DIRNAME set!"
 #endif
 
-void trace_dump_packet(struct libtrace_packet_t *packet)
-{
-	time_t sec = (time_t)trace_get_seconds(packet);
-	libtrace_linktype_t linktype;
-	uint32_t length;
-	const char *link=(char *)trace_get_packet_buffer(packet,&linktype,&length);
-
-	printf("\n%s",ctime(&sec));
-	printf(" Capture: Packet Length: %i/%i Direction Value: %i\n",
-			(int)length,
-			(int)trace_get_wire_length(packet),
-			(int)trace_get_direction(packet));
-	if (!link) 
-		printf(" [No link layer available]\n");
-	else
-		decode_next(link,length, "link",
-			linktype);
-}
-
-static void generic_decode(uint16_t type,const char *packet, int len) {
+static void formatted_hexdump(const char *packet, int len) {
 	int i;
-	printf(" Unknown Protocol: %i",type);
+
 	for(i=0;i<len; /* Nothing */ ) {
 		int j;
 		printf("\n ");
@@ -125,6 +106,59 @@ static void generic_decode(uint16_t type,const char *packet, int len) {
 			i+=WIDTH;
 	}
 	printf("\n");
+}
+
+void trace_hexdump_packet(struct libtrace_packet_t *packet) {
+
+	libtrace_linktype_t linktype;
+	uint32_t length;
+	const char *pkt_ptr = (char *)trace_get_packet_buffer(packet, &linktype, NULL);
+
+	time_t sec = (time_t)trace_get_seconds(packet);
+	
+	length = trace_get_capture_length(packet);
+
+	if (pkt_ptr == NULL || length == 0) {
+		printf(" [No packet payload]\n");
+		return;
+	}
+
+	printf("\n%s",ctime(&sec));
+	printf(" Capture: Packet Length: %i/%i Direction Value: %i\n",
+			(int)length,
+			(int)trace_get_wire_length(packet),
+			(int)trace_get_direction(packet));
+	
+
+	formatted_hexdump(pkt_ptr, (int)length);
+	return;
+}
+
+void trace_dump_packet(struct libtrace_packet_t *packet)
+{
+	time_t sec = (time_t)trace_get_seconds(packet);
+	libtrace_linktype_t linktype;
+	uint32_t length;
+	const char *link=(char *)trace_get_packet_buffer(packet,&linktype,NULL);
+	
+	length = trace_get_capture_length(packet);
+
+	printf("\n%s",ctime(&sec));
+	printf(" Capture: Packet Length: %i/%i Direction Value: %i\n",
+			(int)length,
+			(int)trace_get_wire_length(packet),
+			(int)trace_get_direction(packet));
+	if (!link) 
+		printf(" [No link layer available]\n");
+	else
+		decode_next(link,length, "link",
+			linktype);
+}
+
+static void generic_decode(uint16_t type,const char *packet, int len) {
+	printf(" Unknown Protocol: %i",type);
+
+	formatted_hexdump(packet, len);
 }
 
 static void *open_so_decoder(const char *name,int type)
