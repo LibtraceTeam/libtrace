@@ -54,6 +54,7 @@
 #include <sys/ioctl.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <unistd.h>
 
 /* This format deals with the BSD Native capture format, perhaps better
  * known as BPF, which is the equivalent of the Linux Native format for
@@ -99,13 +100,6 @@ struct libtrace_format_data_t {
 static int bpf_probe_filename(const char *filename)
 {
 	return (if_nametoindex(filename) != 0);
-}
-
-/* XXX This function doesn't appear to be used anywhere - nor does it do
- * anything particularly useful :) */
-static int bpf_start_filename(const char *filename)
-{
-	return 0;
 }
 
 /* Initialises a BPF input trace */
@@ -447,7 +441,7 @@ static libtrace_linktype_t bpf_get_link_type(const libtrace_packet_t *packet) {
 }
 
 /* Returns the direction for a given BPF packet record */
-static libtrace_direction_t bpf_get_direction(const libtrace_packet_t *packet) {
+static libtrace_direction_t bpf_get_direction(const libtrace_packet_t *packet UNUSED) {
 	/* BPF sadly can't do direction tagging */
 	return ~0;
 }
@@ -507,8 +501,7 @@ static struct libtrace_format_t bpf = {
 	"bpf",
 	"$Id$",
 	TRACE_FORMAT_BPF,
-	//bpf_probe_filename,	/* probe filename */
-	NULL,
+	bpf_probe_filename,	/* probe filename */
 	NULL,			/* probe magic */
 	bpf_init_input,	 	/* init_input */
 	bpf_config_input,	/* config_input */
