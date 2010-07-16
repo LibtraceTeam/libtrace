@@ -136,6 +136,8 @@ static uint16_t get_port_from_sockaddr(struct sockaddr *sa)
 			return ntohs(((struct sockaddr_in6 *)sa)->sin6_port);
 			break;
 	}
+
+	return 0;
 }
 
 struct flowkey_t {
