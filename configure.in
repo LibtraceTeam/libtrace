@@ -53,16 +53,35 @@ AC_HEADER_TIME
 AC_SYS_LARGEFILE
 
 if test "$GCC" = "yes"; then
+	
+	gcc_version=`gcc -dumpversion`
+
+	# This is probably not the most reliable way to test whether our
+	# compiler supports visibility, but it's better than nothing
+	#
+	# According to the gcc wiki - http://gcc.gnu.org/wiki/Visibility - 
+	# visibility is supported in gcc 4.0 or later, so we just need to
+	# check the major version number
+
+	major=${gcc_version%\.*\.*}
+
+	if test "$major" -lt 4; then
+		vis=no
+	else
+		vis=yes
+	fi
+	
 	CFLAGS="$CFLAGS -Wall -Wextra -Wmissing-prototypes -O2"
 	CXXFLAGS="$CXXFLAGS -Wall -Wextra -O2"
-# We assume that gcc knows about -fvisibility and friends, as I can't see
-# a good easy way of testing for it here.
 	LIBCFLAGS="$CFLAGS"
 	LIBCFLAGS="$LIBCFLAGS -DLT_BUILDING_DLL=1"
-	LIBCFLAGS="$LIBCFLAGS -fvisibility=hidden"
 	LIBCXXFLAGS="$CXXFLAGS"
 	LIBCXXFLAGS="$CXXFLAGS -DLT_BUILDING_DLL=1"
-	LIBCXXFLAGS="$CXXFLAGS -fvisibility=hidden"
+	
+	if test "$vis" = "yes"; then
+		LIBCFLAGS="$LIBCFLAGS -fvisibility=hidden"
+		LIBCXXFLAGS="$CXXFLAGS -fvisibility=hidden"
+	fi
 fi
 
 AC_PROG_LIBTOOL
