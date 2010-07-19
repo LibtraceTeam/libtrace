@@ -105,6 +105,10 @@ extern "C" {
 #  include <zlib.h>
 #endif
 
+#ifndef HAVE_STRNDUP
+char *strndup(const char *s, size_t size);
+#endif
+
 #ifndef HAVE_STRNCASECMP
 # ifndef HAVE__STRNICMP
 /** A local implementation of strncasecmp (as some systems do not have it) */
