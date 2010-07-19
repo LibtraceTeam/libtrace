@@ -206,7 +206,7 @@ int main(int argc, char *argv[])
 	/* open input uri */
 	trace = trace_create(argv[optind]);
 	if (trace_is_err(trace)) {
-		trace_perror(trace,argv[optind]);
+		trace_perror(trace,"trace_create");
 		trace_destroy(trace);
 		return 1;
 	}
