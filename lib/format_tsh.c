@@ -201,7 +201,7 @@ static struct timeval tsh_get_timeval(const libtrace_packet_t *packet)
 	return tv;
 }
 
-static int tsh_get_capture_length(const libtrace_packet_t *packet) {
+static int tsh_get_capture_length(const libtrace_packet_t *packet UNUSED) {
 	/* 16 bytes transport + 24 bytes IP, and we're missing the
 	 * IP options, but we'll pretend we have them
 	 */
