@@ -107,7 +107,7 @@ static off_t refill_buffer(io_t *io, off_t len)
 			free(DATA(io)->buffer);
 		DATA(io)->length = bytes_read;
 		DATA(io)->offset = 0;
-#ifdef _POSIX_C_SOURCE >= 200112L || _XOPEN_SOURCE >= 600
+#if _POSIX_C_SOURCE >= 200112L || _XOPEN_SOURCE >= 600
 		/* We need to do this as read() of O_DIRECT might happen into this buffer.
 		 * The docs suggest 512 bytes is all we need to align to, but I'm suspicious
 		 * I expect disks with 4k blocks will arrive soon, and thus 4k is the minimum I'm
