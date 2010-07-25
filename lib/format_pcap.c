@@ -357,10 +357,15 @@ static int pcap_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	flags |= TRACE_PREP_OWN_BUFFER;
 	
 	for(;;) {
+		
+		struct pcap_pkthdr *pcap_hdr = NULL;
+		u_char *pcap_payload = NULL;
 
-		ret=pcap_next_ex(INPUT.pcap, 
-				(struct pcap_pkthdr **)&packet->header,
-				(const u_char **)&packet->payload);
+		ret = pcap_next_ex(INPUT.pcap, &pcap_hdr, 
+				(const u_char **)&pcap_payload);
+		
+		packet->header = pcap_hdr;
+		packet->payload = pcap_payload;
 
 		switch(ret) {
 			case 1: break; /* no error */
