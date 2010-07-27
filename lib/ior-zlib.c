@@ -108,7 +108,7 @@ static off_t zlib_read(io_t *io, void *buffer, off_t len)
 				sizeof(DATA(io)->inbuff));
 			if (bytes_read == 0) {
 				/* EOF */
-				if (DATA(io)->strm.avail_out == len) {
+				if (DATA(io)->strm.avail_out == (uint32_t)len) {
 					DATA(io)->err = ERR_EOF;
 					return 0;
 				}
@@ -119,7 +119,7 @@ static off_t zlib_read(io_t *io, void *buffer, off_t len)
 				/* errno should be set */
 				DATA(io)->err = ERR_ERROR;
 				/* Return how much data we managed to read ok */
-				if (DATA(io)->strm.avail_out != len) {
+				if (DATA(io)->strm.avail_out != (uint32_t)len) {
 					return len-DATA(io)->strm.avail_out;
 				}
 				/* Now return error */
