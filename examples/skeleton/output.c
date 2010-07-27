@@ -6,9 +6,11 @@
  */
 #include "libtrace.h"
 #include <stdio.h>
+#include <assert.h>
 
 static void per_packet(libtrace_packet_t *packet)
 {
+	assert(packet);
 	/* Your code goes here */
 }
 

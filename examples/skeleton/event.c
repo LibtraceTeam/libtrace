@@ -50,6 +50,7 @@
 
 static void per_packet(libtrace_packet_t *packet) {
 
+	assert(packet);
 	/* Your code goes here */
 }
 

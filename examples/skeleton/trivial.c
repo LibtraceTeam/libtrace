@@ -14,8 +14,10 @@
 static void per_packet(libtrace_packet_t *packet)
 {
 	/* You really should consider using complete.c instead */
-
+	assert(packet);
+	
 	/* Your code goes here */
+
 }
 
 int main(int argc, char *argv[])

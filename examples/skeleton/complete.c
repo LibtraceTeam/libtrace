@@ -8,9 +8,11 @@
 #include <stdio.h>
 #include <getopt.h>
 #include <stdlib.h>
+#include <assert.h>
 
 static void per_packet(libtrace_packet_t *packet)
 {
+	assert(packet);
 	/* Your code goes here */
 }
 
