@@ -282,6 +282,8 @@ DLLEXPORT bool trace_get_wireless_freq(void *link,
 	return false;
 }
 
+#if 0
+
 /* 
  * This function isn't portable across drivers, so has been left static
  * for now. Maybe it will be included in the API later if it becomes useful
@@ -373,6 +375,8 @@ bool trace_get_wireless_fhss_hoppattern(void *link,
 	}
 	return false;
 }
+
+#endif
 
 DLLEXPORT bool trace_get_wireless_signal_strength_dbm(void *link,
 		libtrace_linktype_t linktype, int8_t *strength)
@@ -470,6 +474,7 @@ DLLEXPORT bool trace_get_wireless_noise_strength_db(void *link,
 	return false;
 }
 
+#if 0
 /* Not sure if this function is useful. As the radiotap documentation says,
  * there's no set metric for defining the quality of the Barker Code Lock.
  * Maybe it will be exported later if it becomes useful.
@@ -498,6 +503,8 @@ bool trace_get_wireless_lock_quality(void *link,
 	}
 	return false;
 }
+
+#endif
 
 DLLEXPORT bool trace_get_wireless_tx_attenuation(void *link,
 		libtrace_linktype_t linktype, uint16_t *attenuation)
