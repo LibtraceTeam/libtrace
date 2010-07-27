@@ -2,7 +2,9 @@ DIGIT	    [0-9]
 LETTER	    [a-zA-Z_: ]
 HEXDIGIT    [0-9A-Fa-f]
 
-%option noyywrap
+%option noyywrap 
+%option nounput 
+%option noinput
 
 %{
     #include <stdio.h>
