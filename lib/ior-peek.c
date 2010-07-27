@@ -103,17 +103,26 @@ static off_t refill_buffer(io_t *io, off_t len)
 	bytes_read += MIN_READ_SIZE - (bytes_read % MIN_READ_SIZE);
 	/* Is the current buffer big enough? */
 	if (DATA(io)->length < bytes_read) {
+		int res = 0;
+
 		if (DATA(io)->buffer)
 			free(DATA(io)->buffer);
 		DATA(io)->length = bytes_read;
 		DATA(io)->offset = 0;
 #if _POSIX_C_SOURCE >= 200112L || _XOPEN_SOURCE >= 600
-		/* We need to do this as read() of O_DIRECT might happen into this buffer.
-		 * The docs suggest 512 bytes is all we need to align to, but I'm suspicious
-		 * I expect disks with 4k blocks will arrive soon, and thus 4k is the minimum I'm
-		 * willing to live with.
+		/* We need to do this as read() of O_DIRECT might happen into 
+		 * this buffer.  The docs suggest 512 bytes is all we need to 
+		 * align to, but I'm suspicious. I expect disks with 4k blocks 
+		 * will arrive soon, and thus 4k is the minimum I'm willing to 
+		 * live with.
 		 */
-		posix_memalign(&DATA(io)->buffer, 4096, DATA(io)->length);
+		res = posix_memalign((void **)&DATA(io)->buffer, 4096, 
+				DATA(io)->length);
+		if (res != 0) {
+			fprintf(stderr, "Error aligning IO buffer: %d\n",
+					res);
+			return res;
+		}
 #else
 		DATA(io)->buffer = malloc(DATA(io)->length);
 #endif
@@ -209,14 +218,19 @@ static off_t peek_read(io_t *io, void *buffer, off_t len)
 	return ret;
 }
 
-static void *alignedrealloc(void *old, size_t oldsize, size_t size)
+static void *alignedrealloc(void *old, size_t oldsize, size_t size, int *res)
 {
 #if _POSIX_C_SOURCE >= 200112L || _XOPEN_SOURCE >= 600
 	void *new;
 	/* Shortcut resizing */
 	if (size < oldsize)
 		return old;
-	posix_memalign(&new, 4096, size);
+	*res = posix_memalign(&new, 4096, size);
+	if (*res != 0) {
+		fprintf(stderr, "Error aligning IO buffer: %d\n", *res);
+		
+		return NULL;
+	}
 	assert(oldsize<size);
 	memcpy(new,old,oldsize);
 	free(old);
@@ -230,6 +244,7 @@ static void *alignedrealloc(void *old, size_t oldsize, size_t size)
 static off_t peek_peek(io_t *io, void *buffer, off_t len)
 {
 	off_t ret = 0;
+	int res = 0;
 
 	/* Is there enough data in the buffer to serve this request? */
 	if (DATA(io)->length - DATA(io)->offset < len) {
@@ -237,8 +252,14 @@ static off_t peek_peek(io_t *io, void *buffer, off_t len)
 		off_t read_amount = len - (DATA(io)->length - DATA(io)->offset);
 		/* Round the read_amount up to the nearest MB */
 		read_amount += PEEK_SIZE - ((DATA(io)->length + read_amount) % PEEK_SIZE);
-		DATA(io)->buffer = alignedrealloc(DATA(io)->buffer, DATA(io)->length, 
-			DATA(io)->length + read_amount);
+		DATA(io)->buffer = alignedrealloc(DATA(io)->buffer, 
+			DATA(io)->length, 
+			DATA(io)->length + read_amount, &res);
+
+		if (DATA(io)->buffer == NULL) {
+			return res;	
+		}
+
 		/* Use the child reader to read more data into our managed
 		 * buffer */
 		read_amount = wandio_read(DATA(io)->child, 
