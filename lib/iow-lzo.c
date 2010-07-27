@@ -59,6 +59,8 @@
 #include <sys/prctl.h>
 #endif
 
+#include "libtrace.h"
+
 enum { 
 	M_LZO1X_1     =     1,
 	M_LZO1X_1_15  =     2,
@@ -269,7 +271,7 @@ static void *lzo_compress_thread(void *data)
 	return NULL;
 }
 
-iow_t *lzo_wopen(iow_t *child, int compress_level)
+iow_t *lzo_wopen(iow_t *child, int compress_level UNUSED)
 {
 	const int opt_filter = 0;
 	int flags;
@@ -339,7 +341,8 @@ iow_t *lzo_wopen(iow_t *child, int compress_level)
 		buffer.offset);
 
 	/* Set up the thread pool -- one thread per core */
-	DATA(iow)->threads = min(sysconf(_SC_NPROCESSORS_ONLN),use_threads);
+	DATA(iow)->threads = min((uint32_t)sysconf(_SC_NPROCESSORS_ONLN),
+			use_threads);
 	DATA(iow)->thread = malloc(
 			sizeof(struct lzothread_t) * DATA(iow)->threads);
 	DATA(iow)->next_thread = 0;
@@ -370,7 +373,7 @@ static off_t lzo_wwrite(iow_t *iow, const char *buffer, off_t len)
 {
 	off_t ret = 0;
 	while (len>0) {
-		unsigned int size = len;
+		off_t size = len;
 		off_t err;
 		struct buffer_t outbuf;
 
@@ -424,7 +427,6 @@ static off_t lzo_wwrite(iow_t *iow, const char *buffer, off_t len)
 			assert(MAX_BLOCK_SIZE <= sizeof(get_next_thread(iow)->inbuf.buffer));
 			space = MAX_BLOCK_SIZE-get_next_thread(iow)->inbuf.offset;
 			size = min(space, size);
-
 			assert(size>0);
 			assert(size <= MAX_BLOCK_SIZE);
 			assert(get_next_thread(iow)->inbuf.offset + size <= MAX_BLOCK_SIZE);

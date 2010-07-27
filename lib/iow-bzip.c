@@ -110,7 +110,7 @@ static off_t bz_wwrite(iow_t *iow, const char *buffer, off_t len)
 			if (bytes_written <= 0) { /* Error */
 				DATA(iow)->err = ERR_ERROR;
 				/* Return how much data we managed to write ok */
-				if (DATA(iow)->strm.avail_in != len) {
+				if (DATA(iow)->strm.avail_in != (uint32_t)len) {
 					return len-DATA(iow)->strm.avail_in;
 				}
 				/* Now return error */

@@ -114,7 +114,7 @@ static off_t bz_read(io_t *io, void *buffer, off_t len)
 				/* Errno should already be set */
 				DATA(io)->err = ERR_ERROR;
 				/* Return how much data we managed to read ok */
-				if (DATA(io)->strm.avail_out != len) {
+				if (DATA(io)->strm.avail_out != (uint32_t)len) {
 					return len-DATA(io)->strm.avail_out;
 				}
 				/* Now return error */
