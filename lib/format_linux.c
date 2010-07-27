@@ -512,8 +512,13 @@ static int linuxnative_read_packet(libtrace_t *libtrace, libtrace_packet_t *pack
 		if (cmsg->cmsg_level == SOL_SOCKET
 			&& cmsg->cmsg_type == SO_TIMESTAMP
 			&& cmsg->cmsg_len <= CMSG_LEN(sizeof(struct timeval))) {
-			hdr->tv.tv_sec = ((struct timeval*)CMSG_DATA(cmsg))->tv_sec;
-			hdr->tv.tv_usec = ((struct timeval*)CMSG_DATA(cmsg))->tv_usec;
+			
+			struct timeval *tv;
+			tv = (struct timeval *)CMSG_DATA(cmsg);
+			
+			
+			hdr->tv.tv_sec = tv->tv_sec;
+			hdr->tv.tv_usec = tv->tv_usec;
 			hdr->timestamptype = TS_TIMEVAL;
 			break;
 		} 
@@ -521,8 +526,12 @@ static int linuxnative_read_packet(libtrace_t *libtrace, libtrace_packet_t *pack
 		else if (cmsg->cmsg_level == SOL_SOCKET
 			&& cmsg->cmsg_type == SO_TIMESTAMPNS
 			&& cmsg->cmsg_len <= CMSG_LEN(sizeof(struct timespec))) {
-			hdr->ts.tv_sec = ((struct timespec*)CMSG_DATA(cmsg))->tv_sec;
-			hdr->ts.tv_nsec = ((struct timespec*)CMSG_DATA(cmsg))->tv_nsec;
+
+			struct timespec *tv;
+			tv = (struct timespec *)CMSG_DATA(cmsg);
+
+			hdr->ts.tv_sec = tv->tv_sec;
+			hdr->ts.tv_nsec = tv->tv_nsec;
 			hdr->timestamptype = TS_TIMESPEC;
 			break;
 		}
