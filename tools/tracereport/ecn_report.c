@@ -83,7 +83,7 @@ void ecn_report(void)
 		}
 	}
 	
-	for(i=0;i<4;i++){
+	for(i=0;i<3;i++){
 		for(j=1;j<4;j++)
 			total += ecn_stat[i][j].count;
 	}
