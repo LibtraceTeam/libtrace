@@ -5,12 +5,14 @@
 #include <stdio.h>
 #include <inttypes.h>
 #include <err.h>
+#include <assert.h>
 
 uint64_t count = 0;
 
 
 static void per_packet(libtrace_packet_t *packet)
 {
+	assert(packet);
 	/* This function turns out to be really simple, because we are just
 	 * counting the number of packets in the trace */
 	count += 1;

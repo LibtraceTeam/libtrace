@@ -37,7 +37,7 @@ static void per_packet(libtrace_packet_t *packet)
 	 * Note that I use a while loop here to ensure that we correctly deal
 	 * with periods in which no packets are observed.
 	 */
-	while (ts.tv_sec > next_report) {
+	while ((uint32_t)ts.tv_sec > next_report) {
 		/* Print a timestamp for the report and the packet count */
 		printf("%u \t%" PRIu64 "\n", next_report, count);
 		/* Reset the counter */

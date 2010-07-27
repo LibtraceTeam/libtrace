@@ -65,7 +65,7 @@ static void check_report(libtrace_packet_t *packet) {
 	 * the next report is due, a la timedemo.c
 	 */
 
-	while (ts.tv_sec > next_report) {
+	while ((uint32_t)ts.tv_sec > next_report) {
 		/* Print all our stats */
 		print_stats();
 
