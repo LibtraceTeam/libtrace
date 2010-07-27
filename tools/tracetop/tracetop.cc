@@ -469,7 +469,6 @@ static void usage(char *argv0)
 int main(int argc, char *argv[])
 {
 	libtrace_t *trace;
-	libtrace_packet_t *packet;
 	libtrace_filter_t *filter=NULL;
 	int snaplen=-1;
 	int promisc=-1;
