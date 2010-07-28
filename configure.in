@@ -224,8 +224,8 @@ if test "$with_dag" != no; then
 		AC_DEFINE(HAVE_DAG,1,[conditional for building with DAG live capture support])
 		libtrace_dag=true
 		
-		AC_DEFINE(DAG_VERSION,30,[defines the DAG driver version])
-		libtrace_dag_version=30
+		AC_DEFINE(DAG_VERSION,25,[defines the DAG driver version])
+		libtrace_dag_version=25
 	fi
 fi
 
@@ -326,7 +326,7 @@ AM_CONDITIONAL([HAVE_BPF_CAPTURE], [test "$ac_cv_have_decl_BIOCSETIF" = yes ])
 AM_CONDITIONAL([HAVE_DAG], [test "$libtrace_dag" = true])
 AM_CONDITIONAL([DAG2_4], [test "$libtrace_dag_version" = 24])
 AM_CONDITIONAL([DAG2_5], [test "$libtrace_dag_version" = 25])
-AM_CONDITIONAL([DAG3_0], [test "$libtrace_dag_version" = 30])
+#AM_CONDITIONAL([DAG3_0], [test "$libtrace_dag_version" = 30])
 AM_CONDITIONAL([HAVE_ZLIB], [test "$ac_cv_lib_z_deflate" = yes])
 AM_CONDITIONAL([HAVE_BZLIB], [test "$ac_cv_lib_bz2_BZ2_bzDecompressInit" = yes])
 AM_CONDITIONAL([HAVE_LZO], [test "$ac_cv_lib_lzo2_lzo1x_1_compress" = yes])
