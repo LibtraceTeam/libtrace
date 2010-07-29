@@ -104,9 +104,10 @@ static off_t refill_buffer(io_t *io, off_t len)
 	/* Is the current buffer big enough? */
 	if (DATA(io)->length < bytes_read) {
 		int res = 0;
+		void *buf_ptr = (void *)(DATA(io)->buffer);
 
-		if (DATA(io)->buffer)
-			free(DATA(io)->buffer);
+		if (buf_ptr)
+			free(buf_ptr);
 		DATA(io)->length = bytes_read;
 		DATA(io)->offset = 0;
 #if _POSIX_C_SOURCE >= 200112L || _XOPEN_SOURCE >= 600
@@ -116,13 +117,13 @@ static off_t refill_buffer(io_t *io, off_t len)
 		 * will arrive soon, and thus 4k is the minimum I'm willing to 
 		 * live with.
 		 */
-		res = posix_memalign((void **)&DATA(io)->buffer, 4096, 
-				DATA(io)->length);
+		res = posix_memalign(&buf_ptr, 4096, DATA(io)->length);
 		if (res != 0) {
 			fprintf(stderr, "Error aligning IO buffer: %d\n",
 					res);
 			return res;
 		}
+		DATA(io)->buffer = buf_ptr;
 #else
 		DATA(io)->buffer = malloc(DATA(io)->length);
 #endif
