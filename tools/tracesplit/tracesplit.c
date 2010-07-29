@@ -1,9 +1,7 @@
 #include <libtrace.h>
 #include <stdio.h>
 #include <stdlib.h>
-#ifdef HAVE_INTTYPES_H
-#  include <inttypes.h>
-#endif
+#include <inttypes.h>
 #include <lt_inttypes.h>
 #include <stdbool.h>
 #include <getopt.h>
