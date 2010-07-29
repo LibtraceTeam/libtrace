@@ -44,6 +44,9 @@
 #include <net/ethernet.h>
 #include <net/if_arp.h>
 #include <string.h>
+#else
+#include <net/if_dl.h>
+#include <string.h>
 #endif
 
 /* This file contains all the protocol decoding functions for layer 3
@@ -313,9 +316,9 @@ DLLEXPORT int trace_get_next_option(unsigned char **ptr,int *len,
 static struct sockaddr *get_source_ethernet_address(
 	libtrace_ether_t *ethernet, struct sockaddr *addr)
 {
+	static struct sockaddr_storage dummy;
 #ifdef HAVE_NETPACKET_PACKET_H
 /* Use linux's sockaddr_ll structure */
-	static struct sockaddr_storage dummy;
 	struct sockaddr_ll *l2addr;
 
 	if (addr)
@@ -333,8 +336,24 @@ static struct sockaddr *get_source_ethernet_address(
 
 	return (struct sockaddr*)l2addr;
 #else
-/* TODO: implement BSD's sockaddr_dl structure, sigh. */
-	return NULL;
+/* Use BSD's sockaddr_dl structure */
+	struct sockaddr_dl *l2addr;
+
+	if (addr)
+		l2addr = (struct sockaddr_dl *)addr;
+	else
+		l2addr = (struct sockaddr_dl *)&dummy;
+	
+	l2addr->sdl_family = AF_LINK;
+	l2addr->sdl_len = sizeof(struct sockaddr_dl);
+	l2addr->sdl_index = 0; /* Unused */
+	l2addr->sdl_alen = 6; /* Address length  */
+	l2addr->sdl_nlen = 0; /* No name in here - this *should* work, right? */
+	l2addr->sdl_slen = 0;	
+	l2addr->sdl_type = 0; /* Hopefully zero is OK for this value too */
+	memcpy(l2addr->sdl_data, ethernet->ether_shost, 6);
+
+	return (struct sockaddr *)l2addr;
 #endif
 }
 
@@ -418,9 +437,9 @@ DLLEXPORT struct sockaddr *trace_get_source_address(
 static struct sockaddr *get_destination_ethernet_address(
 	libtrace_ether_t *ethernet, struct sockaddr *addr)
 {
+	static struct sockaddr_storage dummy;
 #ifdef HAVE_NETPACKET_PACKET_H
 /* Use linux's sockaddr_ll structure */
-	static struct sockaddr_storage dummy;
 	struct sockaddr_ll *l2addr;
 	if (addr)
 		l2addr = (struct sockaddr_ll*)addr;
@@ -437,8 +456,24 @@ static struct sockaddr *get_destination_ethernet_address(
 
 	return (struct sockaddr*)l2addr;
 #else
-/* TODO: implement BSD's sockaddr_dl structure, sigh. */
-	return NULL;
+/* Use BSD's sockaddr_dl structure */
+	struct sockaddr_dl *l2addr;
+
+	if (addr)
+		l2addr = (struct sockaddr_dl *)addr;
+	else
+		l2addr = (struct sockaddr_dl *)&dummy;
+	
+	l2addr->sdl_family = AF_LINK;
+	l2addr->sdl_len = sizeof(struct sockaddr_dl);
+	l2addr->sdl_index = 0; /* Unused */
+	l2addr->sdl_alen = 6; /* Address length  */
+	l2addr->sdl_nlen = 0; /* No name in here - this *should* work, right? */
+	l2addr->sdl_slen = 0;	
+	l2addr->sdl_type = 0; /* Hopefully zero is OK for this value too */
+	memcpy(l2addr->sdl_data, ethernet->ether_dhost, 6);
+
+	return (struct sockaddr *)l2addr;
 #endif
 }
 
