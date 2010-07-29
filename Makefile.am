@@ -23,7 +23,7 @@ bootstrap-clean:
 dist-hook:
 	if which svnversion > /dev/null; then \
 		r=`svnversion -nc . | sed -e 's/^[^:]*://;s/[A-Za-z]//'` ;\
-		sed -i "s/SVN_REVISION.*/SVN_REVISION $$r/" $(distdir)/lib/libtrace.h.in \
+		sed -i "s/SVN_REVISION.*/SVN_REVISION $$r/" $(distdir)/lib/libtrace.h.in; \
 	fi
 
 if HAS_DOXYGEN
