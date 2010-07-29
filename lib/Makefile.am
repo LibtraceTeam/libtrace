@@ -86,7 +86,7 @@ dagopts.c:
 if HAVE_LLVM
 # Rules to build the llvm .cc file from a C description of each opcode.
 bpf-jit/bpf-opcodes.llvm.bc: bpf-jit/bpf-opcodes.c
-	`$(LLVM_CONFIG) --bindir`/llvm-gcc -std=c99 -c -O0 -emit-llvm $< -o $@
+	$(LLVM_GCC) -std=c99 -c -O0 -emit-llvm $< -o $@
 
 bpf-jit/bpf-opcodes.llvm.cc: bpf-jit/bpf-opcodes.llvm.bc
 	`$(LLVM_CONFIG) --bindir`/llc -march=cpp -cppgen=module $< -o $@
