@@ -37,6 +37,8 @@
 #include <errno.h>
 #include <string.h>
 
+#include <libtrace_int.h>
+
 /* Some systems don't include strndup as part of their standard C library, so
  * we need to provide our own version.
  *
