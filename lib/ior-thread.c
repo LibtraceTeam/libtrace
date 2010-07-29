@@ -100,9 +100,9 @@ static void *thread_producer(void* userdata)
 	io_t *state = (io_t*) userdata;
 	int buffer=0;
 	bool running = true;
-	char namebuf[17];
 
 #ifdef PR_SET_NAME
+	char namebuf[17];
 	if (prctl(PR_GET_NAME, namebuf, 0,0,0) == 0) {
 		namebuf[16] = '\0'; /* Make sure it's NUL terminated */
 		/* If the filename is too long, overwrite the last few bytes */
