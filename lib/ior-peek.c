@@ -125,6 +125,7 @@ static off_t refill_buffer(io_t *io, off_t len)
 		}
 		DATA(io)->buffer = buf_ptr;
 #else
+		res = 0;	/* << Silly warning */ 
 		DATA(io)->buffer = malloc(DATA(io)->length);
 #endif
 	}
@@ -237,6 +238,10 @@ static void *alignedrealloc(void *old, size_t oldsize, size_t size, int *res)
 	free(old);
 	return new;
 #else
+	/* These no-ops are to stop the compiler whinging about unused
+	 * parameters */
+	oldsize = oldsize;
+	res = res;
 	return realloc(old,size);
 #endif
 }
