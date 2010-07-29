@@ -21,8 +21,10 @@ bootstrap-clean:
 	$(RM) -rf autom4te.cache/
 
 dist-hook:
-	r=`svnversion -nc . | sed -e 's/^[^:]*://;s/[A-Za-z]//'` ;\
-	sed -i "s/SVN_REVISION.*/SVN_REVISION $$r/" $(distdir)/lib/libtrace.h.in
+	if which svnversion > /dev/null; then \
+		r=`svnversion -nc . | sed -e 's/^[^:]*://;s/[A-Za-z]//'` ;\
+		sed -i "s/SVN_REVISION.*/SVN_REVISION $$r/" $(distdir)/lib/libtrace.h.in \
+	fi
 
 if HAS_DOXYGEN
 docs/doxygen/man/man3/*.3: docs
