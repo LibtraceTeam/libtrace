@@ -223,6 +223,7 @@ iow_t *wandio_wcreate(const char *filename, int compress_type, int compression_l
 	parse_env();
 
 	assert ( compression_level >= 0 && compression_level <= 9 );
+	assert (compress_type != WANDIO_COMPRESS_MASK);
 
 	iow=stdio_wopen(filename, flags);
 	if (!iow)
