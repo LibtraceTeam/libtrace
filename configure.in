@@ -32,11 +32,30 @@ AC_CONFIG_FILES([Makefile lib/Makefile docs/Makefile libpacketdump/Makefile
 dnl GNU C library
 dnl AC_GNU_SOURCE
 
+AC_DEFUN([rw_PROG_CXX_WORKS],
+[AC_REQUIRE([AC_PROG_CXX])dnl
+AC_CACHE_CHECK([whether the C++ compiler works],
+	[rw_cv_prog_cxx_works],
+	[AC_LANG_PUSH([C++])
+	AC_LINK_IFELSE([AC_LANG_PROGRAM([], [])],
+		[rw_cv_prog_cxx_works=yes],
+		[rw_cv_prog_cxx_works=no])
+	AC_LANG_POP([C++])])
+])
+
 
 AM_CONFIG_HEADER([config.h])
 dnl Checks for programs.
 AC_PROG_CC
 AC_PROG_CXX
+rw_PROG_CXX_WORKS
+
+if test "$rw_cv_prog_cxx_works" = "no"; then
+	AC_MSG_ERROR("Failed to find working C++ compiler")
+fi
+
+
+
 AC_PROG_INSTALL
 dnl AC_PROG_YACC
 AC_CHECK_PROGS(YACC, 'bison -y' byacc yacc) 
@@ -71,16 +90,16 @@ if test "$GCC" = "yes"; then
 		vis=yes
 	fi
 	
-	CFLAGS="$CFLAGS -Wall -Wextra -Wmissing-prototypes -O2"
-	CXXFLAGS="$CXXFLAGS -Wall -Wextra -O2"
+	CFLAGS="$CFLAGS -Wall -Wmissing-prototypes -O2"
+	CXXFLAGS="$CXXFLAGS -Wall -O2"
 	LIBCFLAGS="$CFLAGS"
 	LIBCFLAGS="$LIBCFLAGS -DLT_BUILDING_DLL=1"
 	LIBCXXFLAGS="$CXXFLAGS"
 	LIBCXXFLAGS="$CXXFLAGS -DLT_BUILDING_DLL=1"
 	
 	if test "$vis" = "yes"; then
-		LIBCFLAGS="$LIBCFLAGS -fvisibility=hidden"
-		LIBCXXFLAGS="$CXXFLAGS -fvisibility=hidden"
+		LIBCFLAGS="$LIBCFLAGS -Wextra -fvisibility=hidden"
+		LIBCXXFLAGS="$CXXFLAGS -Wextra -fvisibility=hidden"
 	fi
 fi
 
