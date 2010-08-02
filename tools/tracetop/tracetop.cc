@@ -2,6 +2,7 @@
  *
  */
 #define __STDC_FORMAT_MACROS 1
+#include "config.h"
 #include "libtrace.h"
 #include <stdio.h>
 #include <getopt.h>
@@ -13,7 +14,6 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <string.h>
-#include "config.h"
 #ifdef HAVE_NETPACKET_PACKET_H
 #include <netpacket/packet.h>
 #include <net/ethernet.h>

@@ -14,6 +14,7 @@ LIBTRACE_MINOR=7
 # finding it
 if test -d "/usr/gnu/lib"; then
 	LDFLAGS+=" -L/usr/gnu/lib"
+	CPPFLAGS+=" -I/usr/gnu/include"
 fi
 
 AC_CONFIG_MACRO_DIR([m4])
