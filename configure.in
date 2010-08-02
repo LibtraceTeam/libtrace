@@ -176,7 +176,6 @@ if test "$libtrace_netpacket_packet_h" != "true"; then
 		])
 fi
 
-		
 
 
 # Checking for the right bpf header to include
@@ -337,6 +336,7 @@ AC_CHECK_LIB(bz2, BZ2_bzDecompressInit)
 AC_CHECK_LIB(lzo2, lzo1x_1_compress)
 AC_CHECK_LIB(pthread, pthread_create)
 AC_SEARCH_LIBS(mvprintw, ncurses, [], [ AC_MSG_ERROR([NCurses library not available]) ])
+AC_SEARCH_LIBS(getservent, socket, [], [], -lnsl)		
 
 
 # For now, the user has to explicitly ask for the LLVM stuff, as it's a bit
