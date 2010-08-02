@@ -164,6 +164,19 @@ AC_CHECK_HEADER(net/if_arp.h,
  #include <net/if.h>
 ])
 
+if test "$libtrace_netpacket_packet_h" != "true"; then
+# Check for sdl_len in sockaddr_dl
+	AC_CHECK_MEMBER([struct sockaddr_dl.sdl_len], 
+		AC_DEFINE(HAVE_SDL_LEN,1,[Has sdl_len in sockaddr_dl]),,[
+ #include <sys/types.h>
+ #include <sys/socket.h>
+ #include <net/if_dl.h>
+		])
+fi
+
+		
+
+
 # Checking for the right bpf header to include
 AC_CHECK_HEADER(pcap-bpf.h)
 AC_CHECK_HEADER(net/bpf.h)

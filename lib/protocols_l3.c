@@ -32,11 +32,11 @@
  */
 
 
+#include "libtrace_int.h"
 #include "libtrace.h"
 #include "protocols.h"
 #include <assert.h>
 #include <stdlib.h>
-#include "config.h"
 
 #ifdef HAVE_NETPACKET_PACKET_H
 #include <sys/socket.h>
@@ -345,7 +345,9 @@ static struct sockaddr *get_source_ethernet_address(
 		l2addr = (struct sockaddr_dl *)&dummy;
 	
 	l2addr->sdl_family = AF_LINK;
+#if HAVE_SDL_LEN == 1
 	l2addr->sdl_len = sizeof(struct sockaddr_dl);
+#endif
 	l2addr->sdl_index = 0; /* Unused */
 	l2addr->sdl_alen = 6; /* Address length  */
 	l2addr->sdl_nlen = 0; /* No name in here - this *should* work, right? */
@@ -465,7 +467,9 @@ static struct sockaddr *get_destination_ethernet_address(
 		l2addr = (struct sockaddr_dl *)&dummy;
 	
 	l2addr->sdl_family = AF_LINK;
+#if HAVE_SDL_LEN == 1
 	l2addr->sdl_len = sizeof(struct sockaddr_dl);
+#endif
 	l2addr->sdl_index = 0; /* Unused */
 	l2addr->sdl_alen = 6; /* Address length  */
 	l2addr->sdl_nlen = 0; /* No name in here - this *should* work, right? */
