@@ -31,10 +31,10 @@
  *
  */
 
+#include "config.h"
 #include "libtrace.h"
 #include "libtrace_int.h"
 #include "format_helper.h"
-#include "config.h"
 #include "wandio.h"
 #include <stdlib.h>
 #include "rt_protocol.h"
@@ -248,6 +248,8 @@ static int duck_write_packet(libtrace_out_t *libtrace,
 {
 
 	int numbytes = 0;
+	uint32_t duck_version;
+
 	if (packet->type != TRACE_RT_DUCK_2_4 
 			&& packet->type != TRACE_RT_DUCK_2_5) {
 		trace_set_err_out(libtrace, TRACE_ERR_BAD_PACKET,
@@ -259,8 +261,9 @@ static int duck_write_packet(libtrace_out_t *libtrace,
 
 	if (OUTPUT->dag_version == 0) {
 	/* Writing the DUCK version will help with reading it back in later! */
-		if ((numbytes = wandio_wwrite(OUTPUT->file, &packet->type,
-				sizeof(packet->type))) != sizeof(uint32_t)){
+		duck_version = bswap_host_to_le32(packet->type);
+		if ((numbytes = wandio_wwrite(OUTPUT->file, &duck_version,
+				sizeof(duck_version))) != sizeof(uint32_t)){
 			trace_set_err_out(libtrace, errno, 
 					"Writing DUCK version failed");
 			return -1;
