@@ -31,8 +31,8 @@
  *
  */
 
-#include "wandio.h"
 #include "config.h"
+#include "wandio.h"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>

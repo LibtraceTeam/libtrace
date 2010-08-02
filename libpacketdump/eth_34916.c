@@ -1,10 +1,10 @@
 
+#include "libtrace_int.h"
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <stdio.h>
 #include "libpacketdump.h"
 #include "libtrace.h"
-#include "libtrace_int.h"
 
 typedef struct pppoe_t {
 	LT_BITFIELD8	ver:4;

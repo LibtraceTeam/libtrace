@@ -1,8 +1,8 @@
+#include "config.h"
 #include <libtrace.h>
 #include <err.h>
 #include <time.h>
 #include "libpacketdump.h"
-#include "config.h"
 #include <stdio.h>
 #include <netdb.h>
 #include <stdlib.h>

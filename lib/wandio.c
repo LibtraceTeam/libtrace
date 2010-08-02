@@ -32,8 +32,8 @@
  */
 
 
-#include "wandio.h"
 #include "config.h"
+#include "wandio.h"
 #include <stdlib.h>
 #include <assert.h>
 #include <errno.h>

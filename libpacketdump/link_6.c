@@ -3,12 +3,12 @@
  * 
  */
 
+#include "libtrace_int.h"
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <stdio.h>
 #include "libpacketdump.h"
 #include "libtrace.h"
-#include "libtrace_int.h"
 
 DLLEXPORT void decode(int link_type ,const char *pkt,unsigned len) 
 {

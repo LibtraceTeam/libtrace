@@ -1,6 +1,7 @@
 /*
  * libpacketdump decoder for Radiotap 
  */
+#include "libtrace_int.h" /* bswaps */
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <stdio.h>
@@ -8,7 +9,6 @@
 #include <dlfcn.h>
 #include "libtrace.h"
 #include "libpacketdump.h"
-#include "libtrace_int.h" /* bswaps */
 
 #define ALIGN_NATURAL_32(_p,_s,_c) \
 	while ( (_p - _s) % sizeof(uint32_t)) {_p++; _c++;}

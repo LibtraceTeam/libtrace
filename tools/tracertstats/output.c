@@ -1,3 +1,4 @@
+#include "config.h"
 #include <inttypes.h>
 #include <lt_inttypes.h>
 #include <stdio.h>
@@ -6,7 +7,6 @@
 #include <string.h>
 
 #include "output.h"
-#include "config.h"
 
 struct output_type_t *output_formats[] = {
 	&output_txt,
