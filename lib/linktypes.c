@@ -31,8 +31,8 @@
  *
  */
 
-#include "libtrace.h"
 #include "config.h"
+#include "libtrace.h"
 
 #include "rt_protocol.h"
 #include <assert.h>

@@ -30,8 +30,8 @@
  *
  */
 
-#include "libtrace.h"
 #include "libtrace_int.h" 
+#include "libtrace.h"
 
 /* The file contains all the functions necessary to access various measurement
  * values that are specific to wireless MACs ( RadioTap in particular ).

@@ -54,8 +54,8 @@
 extern "C" {
 #endif
 
-#include "common.h"
 #include "config.h"
+#include "common.h"
 #include "libtrace.h"
 #include "wandio.h"
 
