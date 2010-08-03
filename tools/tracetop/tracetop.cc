@@ -10,13 +10,18 @@
 #include <map>
 #include <queue>
 #include <inttypes.h>
-#include <ncurses.h>
 #include <sys/socket.h>
 #include <netdb.h>
 #include <string.h>
 #ifdef HAVE_NETPACKET_PACKET_H
 #include <netpacket/packet.h>
 #include <net/ethernet.h>
+#endif
+
+#if HAVE_NCURSES_NCURSES_H
+#include <ncurses/ncurses.h>
+#else
+#include <ncurses.h>
 #endif
 
 typedef enum { BITS_PER_SEC, BYTES, PERCENT } display_t;

@@ -14,7 +14,6 @@ LIBTRACE_MINOR=7
 # finding it
 if test -d "/usr/gnu/lib"; then
 	LDFLAGS+=" -L/usr/gnu/lib"
-	CPPFLAGS+=" -I/usr/gnu/include"
 fi
 
 AC_CONFIG_MACRO_DIR([m4])
@@ -131,6 +130,15 @@ AC_REPLACE_FUNCS(strndup)
 # Checks for header files.
 AC_HEADER_STDC
 AC_CHECK_HEADERS(pcap.h pcap-int.h pcap-bpf.h net/bpf.h sys/limits.h stddef.h inttypes.h limits.h net/ethernet.h sys/prctl.h)
+
+AC_CHECK_HEADERS(ncurses.h,,[missing_ncurses=true])
+
+if test "x$missing_ncurses" = xtrue; then
+	if test -f "/usr/include/ncurses/ncurses.h"; then
+		AC_DEFINE(HAVE_NCURSES_NCURSES_H,1,[Has nested ncurses header])
+	fi
+fi
+
 
 AC_CHECK_HEADERS(netinet/in.h)
 AC_CHECK_HEADERS(netpacket/packet.h,[
@@ -338,6 +346,7 @@ AC_CHECK_LIB(lzo2, lzo1x_1_compress)
 AC_CHECK_LIB(pthread, pthread_create)
 AC_SEARCH_LIBS(mvprintw, ncurses, [], [ AC_MSG_ERROR([NCurses library not available]) ])
 AC_SEARCH_LIBS(getservent, socket, [], [], -lnsl)		
+AC_SEARCH_LIBS(inet_ntop, nsl, [], [], -lsocket)
 
 
 # For now, the user has to explicitly ask for the LLVM stuff, as it's a bit
