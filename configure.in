@@ -339,12 +339,13 @@ if test x"$libtrace_dag" = xtrue; then
 fi
 DAG_VERSION_NUM=$dag_drv_v
 
+have_ncurses=yes
 
 AC_CHECK_LIB(z, deflate)
 AC_CHECK_LIB(bz2, BZ2_bzDecompressInit)
 AC_CHECK_LIB(lzo2, lzo1x_1_compress)
 AC_CHECK_LIB(pthread, pthread_create)
-AC_SEARCH_LIBS(mvprintw, ncurses, [], [ AC_MSG_ERROR([NCurses library not available]) ])
+AC_SEARCH_LIBS(mvprintw, ncurses, , have_ncurses=no)
 AC_SEARCH_LIBS(getservent, socket, [], [], -lnsl)		
 AC_SEARCH_LIBS(inet_ntop, nsl, [], [], -lsocket)
 
@@ -403,6 +404,7 @@ AM_CONDITIONAL([HAVE_LZO], [test "$ac_cv_lib_lzo2_lzo1x_1_compress" = yes])
 AM_CONDITIONAL([HAVE_NETPACKET_PACKET_H], [test "$libtrace_netpacket_packet_h" = true])
 AM_CONDITIONAL([HAVE_LIBGDC], [test "$ac_cv_header_gdc_h" = yes])
 AM_CONDITIONAL([HAVE_LLVM], [test "x$JIT" != "xno" ])
+AM_CONDITIONAL([HAVE_NCURSES], [test "x$have_ncurses" = "xyes"])
 
 # Check for miscellaneous programs
 AC_CHECK_PROG([libtrace_doxygen], [doxygen], [true], [false])
@@ -422,6 +424,7 @@ AC_SUBST([DAG_VERSION_NUM])
 AC_SUBST([HAVE_BPF_CAPTURE])
 AC_SUBST([HAVE_LIBGDC])
 AC_SUBST([HAVE_LLVM])
+AC_SUBST([HAVE_NCURSES])
 AC_SUBST([LIBCFLAGS])
 AC_SUBST([LIBCXXFLAGS])
 dnl and finally, output our Makefiles
@@ -454,6 +457,7 @@ else
 fi
 reportopt "Compiled with LLVM BPF JIT support" $JIT
 reportopt "Building man pages/documentation" $libtrace_doxygen
+reportopt "Building tracetop (requires libncurses)" $have_ncurses
 
 echo 
 ac_cv_errcount=0;
