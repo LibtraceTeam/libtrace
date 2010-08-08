@@ -174,6 +174,7 @@ static int linuxnative_start_input(libtrace_t *libtrace)
 	if (FORMAT(libtrace->format_data)->fd==-1) {
 		trace_set_err(libtrace, errno, "Could not create raw socket");
 		free(libtrace->format_data);
+		libtrace->format_data = NULL;
 		return -1;
 	}
 
@@ -186,6 +187,7 @@ static int linuxnative_start_input(libtrace_t *libtrace)
 			close(FORMAT(libtrace->format_data)->fd);
 			trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Failed to find interface %s", libtrace->uridata);
 			free(libtrace->format_data);
+			libtrace->format_data = NULL;
 			return -1;
 		}
 	}
@@ -196,6 +198,7 @@ static int linuxnative_start_input(libtrace_t *libtrace)
 				(struct sockaddr*)&addr,
 				(socklen_t)sizeof(addr))==-1) {
 		free(libtrace->format_data);
+		libtrace->format_data = NULL;
 		trace_set_err(libtrace, errno, "Failed to bind to interface %s", libtrace->uridata);
 		return -1;
 	}
@@ -304,10 +307,11 @@ static int linuxnative_pause_input(libtrace_t *libtrace)
 
 static int linuxnative_fin_input(libtrace_t *libtrace) 
 {
-	if (FORMAT(libtrace->format_data)->filter != NULL)
-		free(FORMAT(libtrace->format_data)->filter);
-	if (libtrace->format_data)
+	if (libtrace->format_data) {
+		if (FORMAT(libtrace->format_data)->filter != NULL)
+			free(FORMAT(libtrace->format_data)->filter);
 		free(libtrace->format_data);
+	}
 	
 	return 0;
 }
