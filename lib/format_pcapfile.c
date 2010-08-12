@@ -189,7 +189,8 @@ static int pcapfile_start_input(libtrace_t *libtrace)
 		assert(sizeof(DATA(libtrace)->header) > 0);
 		
 		if (err<1) {
-
+			trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
+					"Reading pcap file header\n");
 			return -1;
 		}
 		
