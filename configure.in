@@ -19,12 +19,17 @@ fi
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR(lib/trace.c)
 AM_INIT_AUTOMAKE
+
+# Make sure we use the relatively silent automake output
 m4_ifdef([AM_SILENT_RULES],[AM_SILENT_RULES([yes])])
 
+# Define our libtrace version number externally so we can use it in the source
+# as well, if needed.
 AC_DEFINE([LIBTRACE_MAJOR],${LIBTRACE_MAJOR},[libtrace major version])
 AC_DEFINE([LIBTRACE_MID],${LIBTRACE_MID},[libtrace mid version])
 AC_DEFINE([LIBTRACE_MINOR],${LIBTRACE_MINOR},[libtrace minor version])
 
+# These are all the files we want to be built for us by configure
 AC_CONFIG_FILES([Makefile lib/Makefile docs/Makefile libpacketdump/Makefile
 	tools/Makefile tools/traceanon/Makefile tools/tracepktdump/Makefile 
 	tools/tracemerge/Makefile tools/tracereport/Makefile
@@ -36,8 +41,12 @@ AC_CONFIG_FILES([Makefile lib/Makefile docs/Makefile libpacketdump/Makefile
 	docs/libtrace.doxygen 
 	lib/libtrace.h
 	])
-dnl GNU C library
-dnl AC_GNU_SOURCE
+
+
+# Function that checks if the C++ compiler actually works - there's a bit of
+# oversight in autoconf that will set the C++ compiler to g++ if no compiler
+# is found, even if g++ is not present! So we need an extra test to make sure
+# that the compiler works :(
 
 AC_DEFUN([rw_PROG_CXX_WORKS],
 [AC_REQUIRE([AC_PROG_CXX])dnl
@@ -50,9 +59,10 @@ AC_CACHE_CHECK([whether the C++ compiler works],
 	AC_LANG_POP([C++])])
 ])
 
-
+# Put all our automake definitions in config.h
 AM_CONFIG_HEADER([config.h])
-dnl Checks for programs.
+
+# Checks for C and C++ compilers
 AC_PROG_CC
 AC_PROG_CXX
 rw_PROG_CXX_WORKS
@@ -61,14 +71,23 @@ if test "$rw_cv_prog_cxx_works" = "no"; then
 	AC_MSG_ERROR("Failed to find working C++ compiler")
 fi
 
-
-
+# Checking for 'install'
 AC_PROG_INSTALL
-dnl AC_PROG_YACC
+
+# Checking for bison and flex
 AC_CHECK_PROGS(YACC, 'bison -y' byacc yacc) 
 AM_PROG_LEX
 
+# All our source files for function replacements are in lib/
 AC_CONFIG_LIBOBJ_DIR(lib)
+
+# Check for various "replacement" functions
+AC_FUNC_MALLOC
+AC_FUNC_REALLOC
+
+# *BSD doesn't have strndup. Currently provide our own.
+AC_REPLACE_FUNCS(strndup)
+
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
@@ -78,6 +97,7 @@ AC_TYPE_SIZE_T
 AC_HEADER_TIME
 AC_SYS_LARGEFILE
 
+# Set our C compiler flags based on the gcc version
 if test "$GCC" = "yes"; then
 	
 	gcc_version=`gcc -dumpversion`
@@ -110,27 +130,25 @@ if test "$GCC" = "yes"; then
 	fi
 fi
 
+# Check for libtool
 AC_PROG_LIBTOOL
 
 # Checks for library functions.
 AC_PROG_GCC_TRADITIONAL
+
+# Fail if any of these functions are missing
 AC_CHECK_FUNCS(socket strdup strlcpy strcasecmp strncasecmp snprintf)
 
 AC_CHECK_SIZEOF([long int])
 
 
-
-# Check for various broken functions
-AC_FUNC_MALLOC
-AC_FUNC_REALLOC
-
-# *BSD doesn't have strndup. Currently provide our own.
-AC_REPLACE_FUNCS(strndup)
-
 # Checks for header files.
 AC_HEADER_STDC
 AC_CHECK_HEADERS(pcap.h pcap-int.h pcap-bpf.h net/bpf.h sys/limits.h stddef.h inttypes.h limits.h net/ethernet.h sys/prctl.h)
 
+
+# OpenSolaris puts ncurses.h in /usr/include/ncurses rather than /usr/include,
+# so check for that
 AC_CHECK_HEADERS(ncurses.h,,[missing_ncurses=true])
 
 if test "x$missing_ncurses" = xtrue; then
@@ -140,6 +158,8 @@ if test "x$missing_ncurses" = xtrue; then
 fi
 
 
+# Check for the presence of various networking headers and define appropriate
+# macros
 AC_CHECK_HEADERS(netinet/in.h)
 AC_CHECK_HEADERS(netpacket/packet.h,[
 	libtrace_netpacket_packet_h=true
@@ -175,8 +195,8 @@ AC_CHECK_HEADER(net/if_arp.h,
  #include <net/if.h>
 ])
 
+# Check for sdl_len in sockaddr_dl - sockaddr_dl is used on BSD systems
 if test "$libtrace_netpacket_packet_h" != "true"; then
-# Check for sdl_len in sockaddr_dl
 	AC_CHECK_MEMBER([struct sockaddr_dl.sdl_len], 
 		AC_DEFINE(HAVE_SDL_LEN,1,[Has sdl_len in sockaddr_dl]),,[
  #include <sys/types.h>
@@ -185,21 +205,18 @@ if test "$libtrace_netpacket_packet_h" != "true"; then
 		])
 fi
 
-
-
 # Checking for the right bpf header to include
 AC_CHECK_HEADER(pcap-bpf.h)
 AC_CHECK_HEADER(net/bpf.h)
+
+# Checking for libgdc
 AC_CHECK_HEADER(gdc.h,AC_DEFINE(HAVE_LIBGDC,1,[has gdc.h]))
 
 # Check to see if we have libdl - *BSD has built-in libdl
 AC_CHECK_LIB(dl, dlopen)
-# check pcap
+
+# Check for libpcap
 AC_CHECK_LIB(pcap,pcap_next_ex,pcapfound=1,pcapfound=0)
-#AC_CHECK_LIB(pcap,pcap_next_ex)
-#AC_REPLACE_FUNCS(pcap_open_dead)
-#AC_REPLACE_FUNCS(pcap_dump_flush)
-#AC_REPLACE_FUNCS(pcap_next_ex)
 AC_CHECK_FUNCS(pcap_inject pcap_sendpacket pcap_setnonblock)
 AC_CHECK_DECLS([BIOCSETIF],,,[
 #include <sys/types.h>
@@ -208,7 +225,7 @@ AC_CHECK_DECLS([BIOCSETIF],,,[
 #include <net/bpf.h>
 ])
 
-# configure time options for man pages
+# Configure options for man pages
 AC_ARG_WITH(man,
 	    AS_HELP_STRING(--with-man,install man pages by default),[
 	     if test "$withval" = yes
@@ -219,8 +236,7 @@ AC_ARG_WITH(man,
 	     fi
 ])
 
-AC_PROG_CXX
-
+# Complain if we didn't find a suitable libpcap
 if test "$pcapfound" = 0; then
 	AC_MSG_ERROR(libpcap0.8 or greater is required to compile libtrace. If you have installed it in a non-standard location please use LDFLAGS to specify the location of the library)
 else
@@ -229,8 +245,11 @@ else
 	AC_DEFINE([HAVE_BPF_FILTER],1,[compile with bpf filter support])
 fi
 
-# configure time options for use of DAG cards
-# borrowed from libpcap!
+# Configure options for use of DAG cards
+# Originally borrowed from libpcap, but extended quite a bit :)
+# More details on how this check works: 
+#	http://wand.net.nz/trac/libtrace/wiki/DAGNotes
+
 AC_ARG_WITH(dag, 
 	    AS_HELP_STRING(--with-dag[=DIR],include DAG live capture support (located in directory DIR, if supplied)),
 [
@@ -276,7 +295,7 @@ if test "$with_dag" != no; then
 	fi
 fi
 
-# turn the test part of the next block into a function, so it can be 
+# TODO: turn the test part of the next block into a function, so it can be 
 # called multiple times for $dag_root, /root/dag, /usr/local/lib
 dag_drv_v="DAG not present"
 
@@ -323,29 +342,34 @@ if test "$with_dag" != no -a "$libtrace_dag" = false; then
 fi
 
 # Try to determine the DAG driver version
-if test x"$libtrace_dag" = xtrue; then
-        dag_drv_v="Unknown"
-	files=`locate /usr/*dag*/VERSION`
-        file_count=0
-
-        for i in $files; do
-                if $file_count > 0; then
-                        dag_drv_v="Indeterminate"
-                        break
-                fi
-                dag_drv_v=`cat $i`
-                file_count=$file_count+1
-        done
-fi
-DAG_VERSION_NUM=$dag_drv_v
+#if test x"$libtrace_dag" = xtrue; then
+#       dag_drv_v="Unknown"
+#	files=`locate /usr/*dag*/VERSION`
+#       file_count=0
+#
+#       for i in $files; do
+#                if $file_count > 0; then
+#                        dag_drv_v="Indeterminate"
+#                        break
+#                fi
+#                dag_drv_v=`cat $i`
+#                file_count=$file_count+1
+#        done
+#fi
+#DAG_VERSION_NUM=$dag_drv_v
 
 have_ncurses=yes
 
+# Checks for various "optional" libraries
 AC_CHECK_LIB(z, deflate)
 AC_CHECK_LIB(bz2, BZ2_bzDecompressInit)
 AC_CHECK_LIB(lzo2, lzo1x_1_compress)
 AC_CHECK_LIB(pthread, pthread_create)
+
+# Check for ncurses
 AC_SEARCH_LIBS(mvprintw, ncurses, , have_ncurses=no)
+
+# These libraries have to be explicitly linked in OpenSolaris
 AC_SEARCH_LIBS(getservent, socket, [], [], -lnsl)		
 AC_SEARCH_LIBS(inet_ntop, nsl, [], [], -lsocket)
 
@@ -359,6 +383,7 @@ AC_ARG_WITH([llvm],
 	use_llvm="no")
 JIT=no
 
+# Search for LLVM and the libraries that it requires
 if (test "$use_llvm" != "no"); then
 	AC_PATH_PROG(LLVM_CONFIG, llvm-config, no)
 
@@ -393,11 +418,11 @@ if (test "$use_llvm" != "no"); then
 fi
 
 
+# Define automake conditionals for use in our Makefile.am files
 AM_CONDITIONAL([HAVE_BPF_CAPTURE], [test "$ac_cv_have_decl_BIOCSETIF" = yes ])
 AM_CONDITIONAL([HAVE_DAG], [test "$libtrace_dag" = true])
 AM_CONDITIONAL([DAG2_4], [test "$libtrace_dag_version" = 24])
 AM_CONDITIONAL([DAG2_5], [test "$libtrace_dag_version" = 25])
-#AM_CONDITIONAL([DAG3_0], [test "$libtrace_dag_version" = 30])
 AM_CONDITIONAL([HAVE_ZLIB], [test "$ac_cv_lib_z_deflate" = yes])
 AM_CONDITIONAL([HAVE_BZLIB], [test "$ac_cv_lib_bz2_BZ2_bzDecompressInit" = yes])
 AM_CONDITIONAL([HAVE_LZO], [test "$ac_cv_lib_lzo2_lzo1x_1_compress" = yes])
@@ -411,6 +436,7 @@ AC_CHECK_PROG([libtrace_doxygen], [doxygen], [true], [false])
 
 AM_CONDITIONAL(HAS_DOXYGEN, [test x"$libtrace_doxygen" = xtrue])
 
+# Set all our output variables
 AC_SUBST([ADD_LIBS])
 AC_SUBST([ADD_LDFLAGS])
 AC_SUBST([ADD_INCLS])
@@ -427,9 +453,12 @@ AC_SUBST([HAVE_LLVM])
 AC_SUBST([HAVE_NCURSES])
 AC_SUBST([LIBCFLAGS])
 AC_SUBST([LIBCXXFLAGS])
-dnl and finally, output our Makefiles
+
+
+# Finally, output our Makefiles
 AC_OUTPUT
 
+# Function for reporting whether an option was set or not
 reportopt() {
 	if test x"$2" = xtrue -o x"$2" = xyes; then
 		AC_MSG_NOTICE([$1: Yes])
@@ -438,6 +467,8 @@ reportopt() {
 	fi
 }
 
+
+# Report which configure options were set
 echo
 AC_MSG_NOTICE([Libtrace version $PACKAGE_VERSION])
 reportopt "Compiled with PCAP 0.8 support" $ac_cv_lib_pcap_pcap_next_ex
@@ -459,6 +490,7 @@ reportopt "Compiled with LLVM BPF JIT support" $JIT
 reportopt "Building man pages/documentation" $libtrace_doxygen
 reportopt "Building tracetop (requires libncurses)" $have_ncurses
 
+# Report any errors relating to missing bison, flex, etc.
 echo 
 ac_cv_errcount=0;
 if test -z "$YACC"; then
