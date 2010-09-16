@@ -19,6 +19,7 @@ static void usage(char *argv0)
 	"-d --encrypt-dest	Encrypt the destination addresses\n"
 	"-c --cryptopan=key	Encrypt the addresses with the cryptopan\n"
 	"			prefix preserving\n"
+	"-f --keyfile=file      A file containing the cryptopan key\n"
 	"-p --prefix=C.I.D.R/bits Substitute the prefix of the address\n"
 	"-H --libtrace-help	Print libtrace runtime documentation\n"
 	"-z --compress-level	Compress the output trace at the specified level\n"
@@ -126,6 +127,7 @@ int main(int argc, char *argv[])
 			{ "encrypt-source", 	0, 0, 's' },
 			{ "encrypt-dest",	0, 0, 'd' },
 			{ "cryptopan",		1, 0, 'c' },
+			{ "cryptopan-file",	1, 0, 'f' },
 			{ "prefix",		1, 0, 'p' },
 			{ "compress-level",	1, 0, 'z' },
 			{ "compress-type",	1, 0, 'Z' },
@@ -133,7 +135,7 @@ int main(int argc, char *argv[])
 			{ NULL,			0, 0, 0   },
 		};
 
-		int c=getopt_long(argc, argv, "Z:z:sc:dp:H",
+		int c=getopt_long(argc, argv, "Z:z:sc:f:dp:H",
 				long_options, &option_index);
 
 		if (c==-1)
@@ -152,7 +154,25 @@ int main(int argc, char *argv[])
 				  key=strdup(optarg);
 				  enc_type = ENC_CRYPTOPAN;
 				  break;
-			case 'p':
+		        case 'f':
+			          if(key != NULL) {
+				    fprintf(stderr,"You can only have one encryption type and one key\n");
+				    usage(argv[0]);
+				  }
+				  FILE * infile = fopen(optarg,"rb");
+				  if(infile == NULL) {
+				    perror("Failed to open cryptopan keyfile");
+				  }
+				  key = (char *) malloc(sizeof(char *) * 32);
+				  if(fread(key,1,32,infile) != 32) {
+				    if(ferror(infile)) {
+				      perror("Failed while reading cryptopan keyfile");
+				    }
+				  }
+				  fclose(infile);
+				  enc_type = ENC_CRYPTOPAN;
+				  break;
+		        case 'p':
 				  if (key!=NULL) {
 					  fprintf(stderr,"You can only have one encryption type and one key\n");
 					  usage(argv[0]);

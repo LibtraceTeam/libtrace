@@ -7,6 +7,7 @@ traceanon \- anonymise ip addresses of traces
 [ \-d | \-\^\-encrypt-dest ]
 [ \-p prefix | \-\^\-prefix=prefix ]
 [ \-c key | \-\^\-cryptopan=key ]
+[ \-f key-file | \-\^\-keyfile=file ]
 [ \-z level | \-\^\-compress-level=level ]
 [ \-Z method | \-\^\-compress-type=method ]
 sourceuri
@@ -53,6 +54,19 @@ substitute the high bits of the IP addresses with the provided prefix.
 encrypt the IP addresses using the prefix-preserving cryptopan method using
 the key "key".  The key can be up to 32 bytes long, and will be padded with
 NULL characters.
+
+
+.TP
+.PD 0
+.BI \-f
+.TP
+.PD
+.BI \-\^\-keyfile=file
+encrypt the IP addresses using the prefix-preserving cryptopan method using
+the key specified in the file "file".  The key must be 32 bytes
+long. A suitable method of generating a key is by using the command dd to read
+from /dev/urandom.
+
 
 .TP
 .PD 0
