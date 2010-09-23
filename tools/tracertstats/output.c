@@ -34,6 +34,7 @@ struct output_data_t *output_init(char *title,char *type)
 		++i;
 	}
 	/* Not found */
+	free(data->title);
 	free(data);
 	return NULL;
 }

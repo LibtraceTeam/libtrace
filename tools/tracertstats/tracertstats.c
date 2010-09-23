@@ -130,6 +130,9 @@ static void run_trace(char *uri)
 	if (!merge_inputs) 
 		create_output(uri);
 
+	if (output == NULL)
+		return;
+
         trace = trace_create(uri);
 	if (trace_is_err(trace)) {
 		trace_perror(trace,"trace_create");
@@ -282,6 +285,8 @@ int main(int argc, char *argv[]) {
 		/* This is going to "name" the output based on the first 
 		 * provided URI - admittedly not ideal */
 		create_output(argv[optind]);
+		if (output == NULL)
+			return 0;
 
 	}
 		
