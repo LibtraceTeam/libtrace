@@ -1997,6 +1997,23 @@ size_t trace_get_wire_length(const libtrace_packet_t *packet);
 DLLEXPORT SIMPLE_FUNCTION
 size_t trace_get_framing_length(const libtrace_packet_t *packet);
 
+/** Get the length of the original payload content of the packet (in bytes).
+ * @param packet	The packet to determine the payload length for
+ * @return The size of the packet payload (without headers). Returns 0 if
+ * unable to calculate payload length correctly.
+ *
+ * This function reports the amount of data that followed the transport header
+ * when the packet was originally captured, i.e. prior to any snapping. Best
+ * described as the wire length minus the packet headers. 
+ *
+ * Currently only supports some protocols and will return 0 if an unsupported
+ * protocol header is encountered, or if one of the headers is truncated. 
+ *
+ * @note Supports IPv4, IPv6, TCP, UDP and ICMP.
+ */ 
+DLLEXPORT SIMPLE_FUNCTION
+size_t trace_get_payload_length(const libtrace_packet_t *packet);
+
 /** Truncate ("snap") the packet to the suggested length
  * @param packet	The packet to truncate
  * @param size		The new length of the packet (in bytes)

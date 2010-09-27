@@ -47,6 +47,70 @@
  * 	ICMP
  */
 
+/* Get the size of the payload as it was in the original packet, i.e. prior
+ * to any truncation.
+ *
+ * Basically, wire length minus the packet headers.
+ *
+ * Currently only supports IP (v4 and v6) and TCP, UDP and ICMP. Will return
+ * 0 if an unsupported protocol header is encountered, or if one of the 
+ * headers is truncated.
+ */
+DLLEXPORT size_t trace_get_payload_length(const libtrace_packet_t *packet) {
+
+	void *layer;
+	uint16_t ethertype;
+	uint8_t proto;
+	uint32_t rem;
+	libtrace_ip_t *ip;
+	libtrace_ip6_t *ip6;
+	libtrace_tcp_t *tcp;
+	size_t len = 0;
+
+	layer = trace_get_layer3(packet, &ethertype, &rem);
+
+	if (!layer)
+		return 0;
+	switch (ethertype) {
+		case TRACE_ETHERTYPE_IP:
+			ip = (libtrace_ip_t *)layer;
+			if (rem < sizeof(libtrace_ip_t))
+				return 0;
+			len = ntohs(ip->ip_len) - (4 * ip->ip_hl);
+			break;
+		case TRACE_ETHERTYPE_IPV6:
+			ip6 = (libtrace_ip6_t *)layer;
+			if (rem < sizeof(libtrace_ip6_t))
+				return 0;
+			len = ntohs(ip6->plen);
+			break;
+		default:
+			return 0;
+	}
+
+	layer = trace_get_transport(packet, &proto, &rem);
+	if (!layer)
+		return 0;
+	
+	switch(proto) {
+		case TRACE_IPPROTO_TCP:
+			tcp = (libtrace_tcp_t *)layer;
+			len -= (4 * tcp->doff);
+			break;
+		case TRACE_IPPROTO_UDP:
+			len -= sizeof(libtrace_udp_t);
+			break;
+		case TRACE_IPPROTO_ICMP:
+			len -= sizeof(libtrace_icmp_t);
+			break;
+		default:
+			return 0;
+	}
+
+	return len;
+
+}
+
 DLLEXPORT void *trace_get_transport(const libtrace_packet_t *packet, 
 		uint8_t *proto,
 		uint32_t *remaining
