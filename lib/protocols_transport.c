@@ -67,6 +67,8 @@ DLLEXPORT size_t trace_get_payload_length(const libtrace_packet_t *packet) {
 	libtrace_tcp_t *tcp;
 	size_t len = 0;
 
+	
+
 	layer = trace_get_layer3(packet, &ethertype, &rem);
 
 	if (!layer)
@@ -77,6 +79,11 @@ DLLEXPORT size_t trace_get_payload_length(const libtrace_packet_t *packet) {
 			if (rem < sizeof(libtrace_ip_t))
 				return 0;
 			len = ntohs(ip->ip_len) - (4 * ip->ip_hl);
+		
+			/* Deal with v6 within v4 */
+			if (ip->ip_p == TRACE_IPPROTO_IPV6)
+				len -= sizeof(libtrace_ip6_t);
+			
 			break;
 		case TRACE_ETHERTYPE_IPV6:
 			ip6 = (libtrace_ip6_t *)layer;
@@ -94,6 +101,8 @@ DLLEXPORT size_t trace_get_payload_length(const libtrace_packet_t *packet) {
 	
 	switch(proto) {
 		case TRACE_IPPROTO_TCP:
+			if (rem < sizeof(libtrace_tcp_t))
+				return 0;
 			tcp = (libtrace_tcp_t *)layer;
 			len -= (4 * tcp->doff);
 			break;
@@ -103,6 +112,7 @@ DLLEXPORT size_t trace_get_payload_length(const libtrace_packet_t *packet) {
 		case TRACE_IPPROTO_ICMP:
 			len -= sizeof(libtrace_icmp_t);
 			break;
+		
 		default:
 			return 0;
 	}
