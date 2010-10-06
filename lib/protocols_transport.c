@@ -104,6 +104,10 @@ DLLEXPORT size_t trace_get_payload_length(const libtrace_packet_t *packet) {
 			if (rem < sizeof(libtrace_tcp_t))
 				return 0;
 			tcp = (libtrace_tcp_t *)layer;
+			
+			if (len < (size_t)(4 * tcp->doff))
+				return 0;
+			
 			len -= (4 * tcp->doff);
 			break;
 		case TRACE_IPPROTO_UDP:
