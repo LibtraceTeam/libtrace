@@ -490,6 +490,9 @@ static int pcapint_write_packet(libtrace_out_t *libtrace,
 {
 	int err;
 
+	if (trace_get_link_type(packet) == TRACE_TYPE_NONDATA)
+		return 0;
+
 	if (!OUTPUT.trace.pcap) {
 		OUTPUT.trace.pcap = (pcap_t *)pcap_open_live(
 			libtrace->uridata,65536,0,0,NULL);

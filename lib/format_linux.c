@@ -573,6 +573,9 @@ static int linuxnative_write_packet(libtrace_out_t *trace,
 {
 	struct sockaddr_ll hdr;
 
+	if (trace_get_link_type(packet) == TRACE_TYPE_NONDATA)
+		return 0;
+
 	hdr.sll_family = AF_PACKET;
 	hdr.sll_protocol = 0;
 	hdr.sll_ifindex = if_nametoindex(trace->uridata);

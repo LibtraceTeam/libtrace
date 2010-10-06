@@ -956,6 +956,9 @@ static int dag_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *packet)
 		return -1;
 	}
 
+	if (trace_get_link_type(packet) == TRACE_TYPE_NONDATA)
+		return 0;
+
 	pad = dag_get_padding(packet);
 
 	/*

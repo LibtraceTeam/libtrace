@@ -398,7 +398,7 @@ static int pcapfile_write_packet(libtrace_out_t *out,
 	
 	/* Silently discard RT metadata packets and packets with an
 	 * unknown linktype. */
-	if (linktype == TRACE_TYPE_METADATA || linktype == ~0U) {
+	if (linktype == TRACE_TYPE_NONDATA || linktype == ~0U) {
 		return 0;
 	}
 
@@ -410,6 +410,7 @@ static int pcapfile_write_packet(libtrace_out_t *out,
 			trace_set_err_out(out, 
 				TRACE_ERR_NO_CONVERSION,
 				"pcap does not support this format");
+			assert(0);
 			return -1;
 		}
 
