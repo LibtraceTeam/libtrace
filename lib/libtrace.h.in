@@ -500,6 +500,14 @@ typedef struct libtrace_ip6_ext
 	uint8_t len;	/**< Length of the current header */
 } PACKED libtrace_ip6_ext_t;
 
+typedef struct libtrace_ip6_frag 
+{
+	uint8_t nxt;	/**< Next header */
+	uint8_t res;	/**< Reserved */
+	uint16_t frag_off;	/**< Fragment Offset (includes M flag) */
+	uint32_t ident;	/** Fragment identification */
+} PACKED libtrace_ip6_frag_t;
+
 /** Generic IPv6 header structure
  *
  * @note The flow label field also includes the Version and Traffic Class

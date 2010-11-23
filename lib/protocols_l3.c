@@ -140,6 +140,7 @@ void *trace_get_payload_from_ip6(libtrace_ip6_t *ipptr, uint8_t *prot,
 {
 	void *payload = (char*)ipptr+sizeof(libtrace_ip6_t);
 	uint8_t nxt;
+	uint16_t len;
 
 	assert (ipptr != NULL);
  	nxt = ipptr->nxt;	
@@ -155,12 +156,11 @@ void *trace_get_payload_from_ip6(libtrace_ip6_t *ipptr, uint8_t *prot,
 		switch (nxt) {
 			case 0: /* hop by hop options */
 			case TRACE_IPPROTO_ROUTING:
-			case TRACE_IPPROTO_FRAGMENT:
 			case TRACE_IPPROTO_ESP:
 			case TRACE_IPPROTO_AH: 
 			case TRACE_IPPROTO_DSTOPTS: 
 				{
-					uint16_t len=((libtrace_ip6_ext_t*)payload)->len
+					len=((libtrace_ip6_ext_t*)payload)->len
 					+sizeof(libtrace_ip6_ext_t);
 
 					if (remaining) {
@@ -176,6 +176,22 @@ void *trace_get_payload_from_ip6(libtrace_ip6_t *ipptr, uint8_t *prot,
 					nxt=((libtrace_ip6_ext_t*)payload)->nxt;
 					continue;
 				}
+			case TRACE_IPPROTO_FRAGMENT:
+				{
+					len = sizeof(libtrace_ip6_frag_t);
+					if (remaining) {
+						if (*remaining < len) {
+							/* Snap too short */
+							*remaining = 0;
+							return NULL;
+						}
+						*remaining-=len;
+					}
+					payload=(char*)payload+len;
+					nxt=((libtrace_ip6_frag_t*)payload)->nxt;
+					continue;
+				}
+
 			default:
 				if (prot) *prot=nxt;
 				return payload;
