@@ -87,6 +87,8 @@ BIN_PROTOCOLS+=ip_6.la
 BIN_PROTOCOLS+=ip_17.la
 # DCCP
 BIN_PROTOCOLS+=ip_33.la 
+# IPv6 Fragment Header
+BIN_PROTOCOLS+=ip_44.la
 # GRE
 BIN_PROTOCOLS+=ip_47.la
 # ICMP6
@@ -123,6 +125,7 @@ ip_1_la_LDFLAGS=-module
 ip_6_la_LDFLAGS=-module
 ip_17_la_LDFLAGS=-module
 ip_33_la_LDFLAGS=-module
+ip_44_la_LDFLAGS=-module
 ip_47_la_LDFLAGS=-module
 ip_132_la_LDFLAGS=-module
 
