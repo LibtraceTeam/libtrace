@@ -172,8 +172,8 @@ void *trace_get_payload_from_ip6(libtrace_ip6_t *ipptr, uint8_t *prot,
 						*remaining-=len;
 					}
 
-					payload=(char*)payload+len;
 					nxt=((libtrace_ip6_ext_t*)payload)->nxt;
+					payload=(char*)payload+len;
 					continue;
 				}
 			case TRACE_IPPROTO_FRAGMENT:
@@ -187,8 +187,8 @@ void *trace_get_payload_from_ip6(libtrace_ip6_t *ipptr, uint8_t *prot,
 						}
 						*remaining-=len;
 					}
-					payload=(char*)payload+len;
 					nxt=((libtrace_ip6_frag_t*)payload)->nxt;
+					payload=(char*)payload+len;
 					continue;
 				}
 
