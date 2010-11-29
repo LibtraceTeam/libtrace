@@ -137,6 +137,7 @@ int snprintf(char *str, size_t size, const char *format, ...);
 #	else
 #		include <daginf.h>
 #	endif
+#  include "erftypes.h"
 #else
 #  include "dagformat.h"
 #endif
