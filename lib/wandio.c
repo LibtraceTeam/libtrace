@@ -72,10 +72,12 @@ static void do_option(const char *option)
 		;
 	else if (strcmp(option,"stats") == 0)
 		keep_stats = 1;
+	/*
 	else if (strcmp(option,"directwrite") == 0)
 		force_directio_write = 1;
 	else if (strcmp(option,"directread") == 0)
 		force_directio_read  = 1;
+	*/
 	else if (strcmp(option,"nothreads") == 0)
 		use_threads = 0;
 	else if (strncmp(option,"threads=",8) == 0)
