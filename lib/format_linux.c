@@ -688,7 +688,14 @@ static int linuxnative_get_capture_length(const libtrace_packet_t *packet)
 
 static int linuxnative_get_wire_length(const libtrace_packet_t *packet) 
 {
-	return ((struct libtrace_linuxnative_header*)(packet->buffer))->wirelen;
+
+	int wirelen = ((struct libtrace_linuxnative_header*)(packet->buffer))->wirelen;
+
+	/* Include the missing FCS */
+	if (trace_get_link_type(packet) == TRACE_TYPE_ETH)
+		wirelen += 4;
+
+	return wirelen;
 }
 
 static int linuxnative_get_framing_length(UNUSED 
