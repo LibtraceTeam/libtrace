@@ -9,16 +9,6 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 
-//#define DISPLAY_EXP(x,fmt,exp) \
-//	if ((unsigned int)len>=((char*)&ip->x-(char*)ip+sizeof(ip->x))) \
-//		printf(fmt,exp); \
-//	else \
-//		return; 
-//
-//#define DISPLAY(x,fmt) DISPLAY_EXP(x,fmt,ip->x)
-//#define DISPLAYS(x,fmt) DISPLAY_EXP(x,fmt,htons(ip->x))
-//#define DISPLAYIP(x,fmt) DISPLAY_EXP(x,fmt,inet_ntoa(*(struct in_addr*)&ip->x))
-//
 DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len)
 {
 	libtrace_ip6_t *ip = (libtrace_ip6_t*)packet;
