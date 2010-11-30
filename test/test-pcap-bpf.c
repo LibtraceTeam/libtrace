@@ -79,8 +79,8 @@ int main(int argc, char *argv[]) {
 	
 	packet=trace_create_packet();
         for (;;) {
-		if ((psize = trace_read_packet(trace, packet)) <0) {
-			error = 1;
+		if ((psize = trace_read_packet(trace, packet)) <=0) {
+			if (psize != 0) error = 1;
 			break;
 		}
 		if (psize == 0) {
