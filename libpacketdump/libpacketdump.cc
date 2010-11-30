@@ -7,7 +7,7 @@
 #include <netdb.h>
 #include <stdlib.h>
 #include <getopt.h>
-
+#include <unistd.h>
 #include <sys/socket.h>
 
 #ifdef HAVE_NETINET_ETHER
