@@ -10,7 +10,7 @@ libdir = $(PREFIX)/lib/.libs:$(PREFIX)/libpacketdump/.libs
 LDLIBS = -L$(PREFIX)/lib/.libs -L$(PREFIX)/libpacketdump/.libs -ltrace -lpacketdump 
 
 BINS = test-pcap-bpf test-event test-time test-dir test-wireless test-errors \
-	#test-seek 
+	test-plen 
 
 .PHONY: all clean distclean install depend test
 
