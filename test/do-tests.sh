@@ -59,6 +59,9 @@ do_test ./test-decode tsh
 echo \* Testing pcap-bpf
 do_test ./test-pcap-bpf
 
+echo \* Testing payload length
+do_test ./test-plen
+
 echo \* Testing event framework
 do_test ./test-event
 

@@ -24,7 +24,7 @@
  * along with libtrace; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
- * $Id: test-pcap-bpf.c 1672 2010-11-30 21:30:03Z salcock $
+ * $Id$
  *
  */
 #ifndef WIN32

@@ -1,9 +1,10 @@
 
+RM=rm
 PREFIX=../
 CC=gcc
 
 INCLUDE = -I$(PREFIX)/lib -I$(PREFIX)/libpacketdump
-CFLAGS = -Wall -Wimplicit -Wformat -W -pedantic -pipe -g -O2 
+CFLAGS = -Wall -Wimplicit -Wformat -W -pedantic -pipe -g -O2 \
 		-D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE
 CFLAGS += $(INCLUDE)
 libdir = $(PREFIX)/lib/.libs:$(PREFIX)/libpacketdump/.libs
