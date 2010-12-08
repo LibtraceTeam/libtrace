@@ -10,6 +10,26 @@
 #include <signal.h>
 #include <time.h>
 
+/* Global variables */
+struct libtrace_out_t *output = NULL;
+uint64_t count=UINT64_MAX;
+uint64_t bytes=UINT64_MAX;
+uint64_t starttime=0;
+uint64_t endtime=UINT64_MAX;
+uint64_t interval=UINT64_MAX;
+double firsttime=0;
+uint64_t pktcount=0;
+uint64_t totbytes=0;
+uint64_t totbyteslast=0;
+uint64_t maxfiles = UINT64_MAX;
+uint64_t filescreated = 0;
+uint16_t snaplen = 0;
+int verbose=0;
+int compress_level=-1;
+trace_option_compresstype_t compress_type = TRACE_OPTION_COMPRESSTYPE_NONE;
+char *output_base = NULL;
+
+
 static char *strdupcat(char *str,char *app)
 {
 	str=realloc(str,strlen(str)+strlen(app)+1);
@@ -27,7 +47,7 @@ static char *strdupcati(char *str,uint64_t i)
 static int usage(char *argv0)
 {
 	printf("Usage:\n"
-	"%s flags inputuri outputuri\n"
+	"%s flags inputuri [inputuri ... ] outputuri\n"
 	"-f --filter=bpf 	only output packets that match filter\n"
 	"-c --count=n 		split every n packets\n"
 	"-b --bytes=n	 	Split every n bytes received\n"
@@ -52,31 +72,157 @@ static void cleanup_signal(int sig)
 	done=1;
 }
 
+
+/* Return values:
+ *  1 = continue reading packets
+ *  0 = stop reading packets, cos we're done
+ *  -1 = stop reading packets, we've got an error
+ */
+static int per_packet(libtrace_packet_t *packet) {
+
+	if (trace_get_link_type(packet) == ~0U) {
+		fprintf(stderr, "Halted due to being unable to determine linktype - input trace may be corrupt.\n");
+		return -1;
+	}
+
+	if (snaplen>0) {
+		trace_set_capture_length(packet,snaplen);
+	}
+
+	if (trace_get_seconds(packet)<starttime) {
+		return 1;
+	}
+
+	if (trace_get_seconds(packet)>endtime) {
+		return 0;
+	}
+
+	if (firsttime==0) {
+		time_t now = trace_get_seconds(packet);
+		if (starttime != 0) {
+			firsttime=now-((now - starttime)%interval);
+		}
+		else {
+			firsttime=now;
+		}
+	}
+
+	if (output && trace_get_seconds(packet)>firsttime+interval) {
+		trace_destroy_output(output);
+		output=NULL;
+		firsttime+=interval;
+	}
+
+	if (output && pktcount%count==0) {
+		trace_destroy_output(output);
+		output=NULL;
+	}
+
+	pktcount++;
+	totbytes+=trace_get_capture_length(packet);
+	if (output && totbytes-totbyteslast>=bytes) {
+		trace_destroy_output(output);
+		output=NULL;
+		totbyteslast=totbytes;
+	}
+	if (!output) {
+		char *buffer;
+		bool need_ext=false;
+		if (maxfiles <= filescreated) {
+			return 0;
+		}
+		buffer=strdup(output_base);
+		if (interval!=UINT64_MAX && maxfiles>1) {
+			buffer=strdupcat(buffer,"-");
+			buffer=strdupcati(buffer,(uint64_t)firsttime);
+			need_ext=true;
+		}
+		if (count!=UINT64_MAX && maxfiles>1) {
+			buffer=strdupcat(buffer,"-");
+			buffer=strdupcati(buffer,(uint64_t)pktcount);
+			need_ext=true;
+		}
+		if (bytes!=UINT64_MAX && maxfiles>1) {
+			static int filenum=0;
+			buffer=strdupcat(buffer,"-");
+			buffer=strdupcati(buffer,(uint64_t)++filenum);
+			need_ext=true;
+		}
+		if (need_ext) {
+			if (compress_level!=0)
+				buffer=strdupcat(buffer,".gz");
+		}
+		if (verbose>1) {
+			fprintf(stderr,"%s:",buffer);
+			if (count!=UINT64_MAX)
+				fprintf(stderr," count=%" PRIu64,pktcount);
+			if (bytes!=UINT64_MAX)
+				fprintf(stderr," bytes=%" PRIu64,bytes);
+			if (interval!=UINT64_MAX) {
+				time_t filetime = firsttime;
+				fprintf(stderr," time=%s",ctime(&filetime));
+			}
+			else {
+				fprintf(stderr,"\n");
+			}
+		}
+		output=trace_create_output(buffer);
+		if (trace_is_err_output(output)) {
+			trace_perror_output(output,"%s",buffer);
+			free(buffer);
+			return -1;
+		}
+		if (compress_level!=-1) {
+			if (trace_config_output(output,
+						TRACE_OPTION_OUTPUT_COMPRESS,
+						&compress_level)==-1) {
+				trace_perror_output(output,"Unable to set compression level");
+			}
+		}
+
+		if (trace_config_output(output,
+					TRACE_OPTION_OUTPUT_COMPRESSTYPE,
+					&compress_type) == -1) {
+			trace_perror_output(output, "Unable to set compression type");
+		}
+
+		trace_start_output(output);
+		if (trace_is_err_output(output)) {
+			trace_perror_output(output,"%s",buffer);
+			free(buffer);
+			return -1;
+		}
+		free(buffer);
+		filescreated ++;
+	}
+
+	/* Some traces we have are padded (usually with 0x00), so 
+	 * lets sort that out now and truncate them properly
+	 */
+
+	if (trace_get_capture_length(packet) 
+			> trace_get_wire_length(packet)) {
+		trace_set_capture_length(packet,trace_get_wire_length(packet));
+	}
+
+	if (trace_write_packet(output,packet)==-1) {
+		trace_perror_output(output,"write_packet");
+		return -1;
+	}
+
+	return 1;
+
+}
+
 int main(int argc, char *argv[])
 {
-	/* All these variables are getting silly */
+	char *compress_type_str=NULL;
 	struct libtrace_filter_t *filter=NULL;
-	struct libtrace_out_t *output = NULL;
 	struct libtrace_t *input;
 	struct libtrace_packet_t *packet = trace_create_packet();
 	struct sigaction sigact;
-	uint64_t count=UINT64_MAX;
-	uint64_t bytes=UINT64_MAX;
-	uint64_t starttime=0;
-	uint64_t endtime=UINT64_MAX;
-	uint64_t interval=UINT64_MAX;
-	double firsttime=0;
-	uint64_t pktcount=0;
-	uint64_t totbytes=0;
-	uint64_t totbyteslast=0;
-	uint64_t maxfiles = UINT64_MAX;
-	uint64_t filescreated = 0;
-	uint16_t snaplen = 0;
-	int verbose=0;
-	int compress_level=-1;
-	char *compress_type_str=NULL;
-	trace_option_compresstype_t compress_type = TRACE_OPTION_COMPRESSTYPE_NONE;
-
+	int i;	
+	
 	if (argc<2) {
 		usage(argv[0]);
 		return 1;
@@ -181,6 +327,8 @@ int main(int argc, char *argv[])
 		usage(argv[0]);
 	}
 
+	output_base = argv[argc - 1];
+
 	sigact.sa_handler = cleanup_signal;
 	sigemptyset(&sigact.sa_mask);
 	sigact.sa_flags = SA_RESTART;
@@ -189,164 +337,48 @@ int main(int argc, char *argv[])
 	sigaction(SIGTERM, &sigact, NULL);
 
 	output=NULL;
-	input=trace_create(argv[optind]);
-	if (trace_is_err(input)) {
-		trace_perror(input,"%s",argv[optind]);
-		return 1;
-	}
-
-	if (trace_start(input)==-1) {
-		trace_perror(input,"%s",argv[optind]);
-		return 1;
-	}
 
 	signal(SIGINT,&cleanup_signal);
 	signal(SIGTERM,&cleanup_signal);
 
-	while(!done) {
+	for (i = optind; i < argc - 1; i++) {
+
+
+		input = trace_create(argv[i]);	
 		
-		if (trace_read_packet(input,packet)<1) {
-			break;
+		if (trace_is_err(input)) {
+			trace_perror(input,"%s",argv[i]);
+			return 1;
 		}
 
-		if (trace_get_link_type(packet) == ~0U) {
-			fprintf(stderr, "Halted due to being unable to determine linktype - input trace may be corrupt.\n");
-			break;
+		if (filter && trace_config(input, TRACE_OPTION_FILTER, filter) == 1) {
+			trace_perror(input, "Configuring filter for %s", 
+					argv[i]);
+			return 1;
 		}
 
-		if (snaplen>0) {
-			trace_set_capture_length(packet,snaplen);
+		if (trace_start(input)==-1) {
+			trace_perror(input,"%s",argv[i]);
+			return 1;
 		}
+
+		while (trace_read_packet(input,packet)>0) {
+			if (per_packet(packet) < 1)
+				done = 1;
+			if (done)
+				break;
+		}
+
+		if (done)
+			break;
 		
-		if (filter && !trace_apply_filter(filter,packet)) {
-			continue;
-		}
-
-		if (trace_get_seconds(packet)<starttime) {
-			continue;
-		}
-
-		if (trace_get_seconds(packet)>endtime) {
+		if (trace_is_err(input)) {
+			trace_perror(input,"Reading packets");
+			trace_destroy(input);
 			break;
 		}
 
-		if (firsttime==0) {
-			time_t now = trace_get_seconds(packet);
-			if (starttime != 0) {
-				firsttime=now-((now - starttime)%interval);
-			}
-			else {
-				firsttime=now;
-			}
-		}
-
-		if (output && trace_get_seconds(packet)>firsttime+interval) {
-			trace_destroy_output(output);
-			output=NULL;
-			firsttime+=interval;
-		}
-
-		if (output && pktcount%count==0) {
-			trace_destroy_output(output);
-			output=NULL;
-		}
-
-		pktcount++;
-		totbytes+=trace_get_capture_length(packet);
-		if (output && totbytes-totbyteslast>=bytes) {
-			trace_destroy_output(output);
-			output=NULL;
-			totbyteslast=totbytes;
-		}
-		if (!output) {
-			char *buffer;
-			bool need_ext=false;
-			if (maxfiles <= filescreated) {
-				break;
-			}
-			buffer=strdup(argv[optind+1]);
-			if (interval!=UINT64_MAX && maxfiles>1) {
-				buffer=strdupcat(buffer,"-");
-				buffer=strdupcati(buffer,(uint64_t)firsttime);
-				need_ext=true;
-			}
-			if (count!=UINT64_MAX && maxfiles>1) {
-				buffer=strdupcat(buffer,"-");
-				buffer=strdupcati(buffer,(uint64_t)pktcount);
-				need_ext=true;
-			}
-			if (bytes!=UINT64_MAX && maxfiles>1) {
-				static int filenum=0;
-				buffer=strdupcat(buffer,"-");
-				buffer=strdupcati(buffer,(uint64_t)++filenum);
-				need_ext=true;
-			}
-			if (need_ext) {
-				if (compress_level!=0)
-					buffer=strdupcat(buffer,".gz");
-			}
-			if (verbose>1) {
-				fprintf(stderr,"%s:",buffer);
-				if (count!=UINT64_MAX)
-					fprintf(stderr," count=%" PRIu64,pktcount);
-				if (bytes!=UINT64_MAX)
-					fprintf(stderr," bytes=%" PRIu64,bytes);
-				if (interval!=UINT64_MAX) {
-					time_t filetime = firsttime;
-					fprintf(stderr," time=%s",ctime(&filetime));
-				}
-				else {
-					fprintf(stderr,"\n");
-				}
-			}
-			output=trace_create_output(buffer);
-			if (trace_is_err_output(output)) {
-				trace_perror_output(output,"%s",buffer);
-				free(buffer);
-				break;
-			}
-			if (compress_level!=-1) {
-				if (trace_config_output(output,
-					TRACE_OPTION_OUTPUT_COMPRESS,
-					&compress_level)==-1) {
-					trace_perror_output(output,"Unable to set compression level");
-				}
-			}
-
-			if (trace_config_output(output,
-				TRACE_OPTION_OUTPUT_COMPRESSTYPE,
-				&compress_type) == -1) {
-					trace_perror_output(output, "Unable to set compression type");
-			}
-
-			trace_start_output(output);
-			if (trace_is_err_output(output)) {
-				trace_perror_output(output,"%s",buffer);
-				free(buffer);
-				break;
-			}
-			free(buffer);
-			filescreated ++;
-		}
-
-		/* Some traces we have are padded (usually with 0x00), so 
-		 * lets sort that out now and truncate them properly
-		 */
-
-		if (trace_get_capture_length(packet) 
-			> trace_get_wire_length(packet)) {
-			trace_set_capture_length(packet,trace_get_wire_length(packet));
-		}
-		
-		if (trace_write_packet(output,packet)==-1) {
-			trace_perror_output(output,"write_packet");
-			break;
-		}
-
-	}
-
-	if (trace_is_err(input)) {
-		trace_perror(input, "Reading packets");
+		trace_destroy(input);
 	}
 
 	if (verbose) {
@@ -365,7 +397,6 @@ int main(int argc, char *argv[])
 			fprintf(stderr,"%" PRIu64 " packets accepted\n",f);
 	}
 	
-	trace_destroy(input);
 	if (output)
 		trace_destroy_output(output);
 
