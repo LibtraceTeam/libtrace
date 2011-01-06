@@ -117,8 +117,8 @@ if test "$GCC" = "yes"; then
 		vis=yes
 	fi
 	
-	CFLAGS="$CFLAGS -Wall -Wmissing-prototypes -O2"
-	CXXFLAGS="$CXXFLAGS -Wall -O2"
+	CFLAGS="$CFLAGS -Wall -Wmissing-prototypes"
+	CXXFLAGS="$CXXFLAGS -Wall"
 	LIBCFLAGS="$CFLAGS"
 	LIBCFLAGS="$LIBCFLAGS -DLT_BUILDING_DLL=1"
 	LIBCXXFLAGS="$CXXFLAGS"
