@@ -191,11 +191,12 @@ io_t *thread_open(io_t *parent)
 	return state;
 }
 
-static off_t thread_read(io_t *state, void *buffer, off_t len)
+static off_t thread_read(io_t *state, void *buffer, const off_t to_read)
 {
 	int slice;
 	int copied=0;
 	int newbuffer;
+	int len = to_read;
 
 	while(len>0) {
 		pthread_mutex_lock(&DATA(state)->mutex);
