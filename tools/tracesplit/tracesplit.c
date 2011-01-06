@@ -218,7 +218,7 @@ int main(int argc, char *argv[])
 {
 	char *compress_type_str=NULL;
 	struct libtrace_filter_t *filter=NULL;
-	struct libtrace_t *input;
+	struct libtrace_t *input = NULL;
 	struct libtrace_packet_t *packet = trace_create_packet();
 	struct sigaction sigact;
 	int i;	
