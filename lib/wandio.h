@@ -33,6 +33,7 @@
 
 #ifndef IO_H 
 #define IO_H 1 /**< Guard Define */
+#include "config.h"
 #include <sys/types.h>
 #include <stdio.h>
 #include <inttypes.h>
