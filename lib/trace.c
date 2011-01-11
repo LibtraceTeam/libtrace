@@ -248,6 +248,7 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 	libtrace->uridata = NULL;
 	libtrace->io = NULL;
 	libtrace->filtered_packets = 0;
+	libtrace->accepted_packets = 0;
 
         /* Parse the URI to determine what sort of trace we are dealing with */
 	if ((uridata = trace_parse_uri(uri, &scan)) == 0) {
