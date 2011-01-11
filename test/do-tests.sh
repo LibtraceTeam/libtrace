@@ -98,6 +98,9 @@ do_test ./test-drops legacyeth
 echo \* Testing drop counters for tsh
 do_test ./test-drops tsh
 
+echo \* Testing larger trace file
+do_test ./test-drops legacylarge
+
 echo \* Testing writing erf
 do_test ./test-write erf 
 

@@ -3,8 +3,7 @@
 PREFIX=${1:-/trace/mojo-public}
 TEST=./test-convert2
 export LD_LIBRARY_PATH=../lib/.libs:../libpacketdump/.libs
-export LIBTRACEIO=directread
-
+#export LIBTRACEIO=directread
 
 # Auckland I
 
