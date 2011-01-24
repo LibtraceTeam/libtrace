@@ -300,8 +300,8 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 		return libtrace;
 	}
 	
-
-	free(scan);
+	if (scan)
+		free(scan);
 	libtrace->err.err_num=TRACE_ERR_NOERROR;
 	libtrace->err.problem[0]='\0';
         return libtrace;
