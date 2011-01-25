@@ -3,11 +3,11 @@
 # Now you only need to update the version number in two places - below,
 # and in the README
 
-AC_INIT([libtrace],[3.0.8],[contact@wand.net.nz],[libtrace])
+AC_INIT([libtrace],[3.0.9],[contact@wand.net.nz],[libtrace])
 
 LIBTRACE_MAJOR=3
 LIBTRACE_MID=0
-LIBTRACE_MINOR=8
+LIBTRACE_MINOR=9
 
 # OpenSolaris hides libraries like libncurses in /usr/gnu/lib, which is not
 # searched by default - add it to LDFLAGS so we at least have a chance of 
@@ -213,7 +213,7 @@ AC_CHECK_HEADER(net/bpf.h)
 AC_CHECK_HEADER(gdc.h,AC_DEFINE(HAVE_LIBGDC,1,[has gdc.h]))
 
 # Check to see if we have libdl - *BSD has built-in libdl
-AC_CHECK_LIB(dl, dlopen)
+AC_SEARCH_LIBS(dl, dlopen)
 
 # Check for libpcap
 AC_CHECK_LIB(pcap,pcap_next_ex,pcapfound=1,pcapfound=0)
@@ -372,7 +372,6 @@ AC_SEARCH_LIBS(mvprintw, ncurses, , have_ncurses=no)
 # These libraries have to be explicitly linked in OpenSolaris
 AC_SEARCH_LIBS(getservent, socket, [], [], -lnsl)		
 AC_SEARCH_LIBS(inet_ntop, nsl, [], [], -lsocket)
-
 
 # For now, the user has to explicitly ask for the LLVM stuff, as it's a bit
 # rough around the edges :(
