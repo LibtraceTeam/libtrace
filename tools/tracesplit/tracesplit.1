@@ -1,4 +1,4 @@
-.TH TRACESPLIT "1" "October 2005" "tracesplit (libtrace)" "User Commands"
+.TH TRACESPLIT "1" "January 2011" "tracesplit (libtrace)" "User Commands"
 .SH NAME
 tracesplit \- split traces
 .SH SYNOPSIS
@@ -13,9 +13,9 @@ tracesplit \- split traces
 [ \fB-S \fRsnaplen | \fB--snaplen=\fRsnaplen]
 [ \fB-z \fRlevel | \fB--compress-level=\fRlevel]
 [ \fB-Z \fRmethod | \fB--compress-type=\fRmethod]
-inputuri outputuri ...
+inputuri [inputuri ...] outputuri
 .SH DESCRIPTION
-tracesplit splits one trace into multiple tracefiles
+tracesplit splits the given input traces into multiple tracefiles
 .TP
 \fB\-f\fR bpf filter
 output only packets that match tcpdump style bpf filter
