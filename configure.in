@@ -3,11 +3,11 @@
 # Now you only need to update the version number in two places - below,
 # and in the README
 
-AC_INIT([libtrace],[3.0.9],[contact@wand.net.nz],[libtrace])
+AC_INIT([libtrace],[3.0.10],[contact@wand.net.nz],[libtrace])
 
 LIBTRACE_MAJOR=3
 LIBTRACE_MID=0
-LIBTRACE_MINOR=9
+LIBTRACE_MINOR=10
 
 # OpenSolaris hides libraries like libncurses in /usr/gnu/lib, which is not
 # searched by default - add it to LDFLAGS so we at least have a chance of 
@@ -213,7 +213,11 @@ AC_CHECK_HEADER(net/bpf.h)
 AC_CHECK_HEADER(gdc.h,AC_DEFINE(HAVE_LIBGDC,1,[has gdc.h]))
 
 # Check to see if we have libdl - *BSD has built-in libdl
-AC_SEARCH_LIBS(dl, dlopen)
+AC_SEARCH_LIBS(dlopen,dl, dlfound=1,dlfound=0 )
+
+if test "$dlfound" = 0; then
+	AC_MSG_ERROR("Unable to find dlopen. Please use LDFLAGS to specify the location of libdl and re-run configure")
+fi
 
 # Check for libpcap
 AC_CHECK_LIB(pcap,pcap_next_ex,pcapfound=1,pcapfound=0)
