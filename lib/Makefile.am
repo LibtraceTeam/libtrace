@@ -1,5 +1,5 @@
 lib_LTLIBRARIES = libtrace.la
-include_HEADERS = libtrace.h dagformat.h lt_inttypes.h daglegacy.h rt_protocol.h erftypes.h wandio.h
+include_HEADERS = libtrace.h dagformat.h lt_inttypes.h daglegacy.h rt_protocol.h erftypes.h wandio.h 
 
 AM_CFLAGS=@LIBCFLAGS@
 AM_CXXFLAGS=@LIBCXXFLAGS@
@@ -67,7 +67,7 @@ libtrace_la_SOURCES = trace.c common.h \
 		$(LIBTRACEIO_ZLIB) $(LIBTRACEIO_BZLIB) $(LIBTRACEIO_LZO) \
 		ior-peek.c ior-stdio.c ior-thread.c \
 		iow-stdio.c iow-thread.c wandio.c \
-		wandio.h
+		wandio.h arphrd.h
 
 if DAG2_4
 nodist_libtrace_la_SOURCES = dagopts.c dagapi.c

@@ -67,10 +67,14 @@ DLLEXPORT size_t trace_get_payload_length(const libtrace_packet_t *packet) {
 	libtrace_tcp_t *tcp;
 	size_t len = 0;
 
-	
+	/* Just use the cached length if we can */
+	if (packet->payload_length != -1)
+		return packet->payload_length;	
 
+	/* Set to zero so that we can return early without having to 
+	 * worry about forgetting to update the cached value */
+	((libtrace_packet_t *)packet)->payload_length = 0;
 	layer = trace_get_layer3(packet, &ethertype, &rem);
-
 	if (!layer)
 		return 0;
 	switch (ethertype) {
@@ -121,6 +125,8 @@ DLLEXPORT size_t trace_get_payload_length(const libtrace_packet_t *packet) {
 			return 0;
 	}
 
+
+	((libtrace_packet_t *)packet)->payload_length = len;
 	return len;
 
 }
@@ -139,6 +145,17 @@ DLLEXPORT void *trace_get_transport(const libtrace_packet_t *packet,
 
 	if (!remaining) remaining=&dummy_remaining;
 
+	if (packet->l4_header) {
+		void *link;
+		libtrace_linktype_t linktype;
+		link = trace_get_packet_buffer(packet, &linktype, remaining);
+		if (!link)
+			return NULL;
+		*proto = packet->transport_proto;
+		*remaining -= (packet->l4_header - link);
+		return packet->l4_header;
+	}
+
 	transport = trace_get_layer3(packet,&ethertype,remaining);
 
 	if (!transport || *remaining == 0)
@@ -153,15 +170,23 @@ DLLEXPORT void *trace_get_transport(const libtrace_packet_t *packet,
 				transport=trace_get_payload_from_ip6(
 				 (libtrace_ip6_t*)transport, proto,remaining);
 			}
-			return transport;
+			break;
 		case TRACE_ETHERTYPE_IPV6: /* IPv6 */
-			return trace_get_payload_from_ip6(
+			transport = trace_get_payload_from_ip6(
 				(libtrace_ip6_t*)transport, proto, remaining);
+			break;
+		default:
+			*proto = 0;
+			transport = NULL;
+			break;
 			
 	}
 
-	*proto=0;
-	return NULL;
+	((libtrace_packet_t *)packet)->transport_proto = *proto;
+	((libtrace_packet_t *)packet)->l4_header = transport;
+
+
+	return transport;
 }
 
 DLLEXPORT libtrace_tcp_t *trace_get_tcp(libtrace_packet_t *packet) {

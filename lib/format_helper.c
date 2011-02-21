@@ -142,6 +142,10 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 #endif
 
 	if (!trace->event.packet) {
+		trace->event.packet = trace_create_packet();
+	}
+
+	if (!trace->event.waiting) {
 		/* There is no packet event waiting for us, so create a new
 		 * libtrace packet in the event structure and read the next
 		 * packet into that.
@@ -150,7 +154,6 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 		 * packet can therefore be saved until the next time this
 		 * function is called. */
 
-		trace->event.packet = trace_create_packet();
 		trace->event.psize=
 			trace_read_packet(trace,trace->event.packet);
 		if (trace->event.psize<1) {
@@ -194,6 +197,7 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 			event.seconds = ts - 
 				trace->event.trace_last_ts;
 			event.type = TRACE_EVENT_SLEEP;
+			trace->event.waiting = true;
 			return event;
 		}
 	} else {
@@ -213,9 +217,9 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 
 	/* We do a lot of freeing and creating of packet buffers with this
 	 * method, but at least it works unlike what was here previously */
-	if (packet->buf_control == TRACE_CTRL_PACKET) {
-		free(packet->buffer);
-	}
+	//if (packet->buf_control == TRACE_CTRL_PACKET) {
+	//	free(packet->buffer);
+	//}
 	
 	/* The packet that we had read earlier is now ready to be returned
 	 * to the user - switch all the pointers etc. over */	
@@ -227,15 +231,16 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 	packet->buffer = trace->event.packet->buffer;
 	packet->buf_control = trace->event.packet->buf_control;
 
-	trace->event.packet->buffer = NULL;
-	trace->event.packet->buf_control = TRACE_CTRL_EXTERNAL;
+	//trace->event.packet->buffer = NULL;
+	//trace->event.packet->buf_control = TRACE_CTRL_EXTERNAL;
 	
-	trace_destroy_packet(trace->event.packet);
-	trace->event.packet = NULL;
+	//trace_destroy_packet(trace->event.packet);
+	//trace->event.packet = NULL;
 
 	event.type = TRACE_EVENT_PACKET;
 
 	trace->event.trace_last_ts = ts;
+	trace->event.waiting = false;
 
 	return event;
 }

@@ -60,7 +60,8 @@
 
 /* NB: type is returned as an ARPHRD_ type for SLL*/
 void *trace_get_payload_from_linux_sll(const void *link,
-		uint16_t *type, uint32_t *remaining) 
+		uint16_t *arphrd_type, uint16_t *next, 
+		uint32_t *remaining) 
 {
 	libtrace_sll_header_t *sll;
 
@@ -74,7 +75,11 @@ void *trace_get_payload_from_linux_sll(const void *link,
 		*remaining-=sizeof(*sll);
 	}
 
-	if (type) *type = ntohs(sll->hatype);
+	/* The SLL header is actually in place of a link layer header, so
+	 * we want to use the protocol field to tell our caller what the
+	 * next header is going to be */
+	if (next) *next = (libtrace_linktype_t)(ntohs(sll->protocol));
+	if (arphrd_type) *arphrd_type = ntohs(sll->hatype);
 
 	return (void*)((char*)sll+sizeof(*sll));
 
@@ -188,8 +193,14 @@ DLLEXPORT void *trace_get_payload_from_meta(const void *meta,
 	switch(*linktype) {
 		case TRACE_TYPE_LINUX_SLL:
 			nexthdr = trace_get_payload_from_linux_sll(meta,
-					&arphrd, remaining);
-			*linktype = arphrd_type_to_libtrace(arphrd);
+					&arphrd, NULL, remaining);
+
+			/* Ethernet header is usually absent in SLL captures,
+			 * so we don't want to skip it just yet */
+			if (arphrd_type_to_libtrace(arphrd) == TRACE_TYPE_ETH) 
+				*linktype = TRACE_TYPE_NONE; 
+			else 
+				*linktype = arphrd_type_to_libtrace(arphrd);
 			return nexthdr;
 		case TRACE_TYPE_80211_RADIO:
 			nexthdr = trace_get_payload_from_radiotap(meta,

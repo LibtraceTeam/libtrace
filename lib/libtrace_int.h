@@ -159,6 +159,9 @@ struct libtrace_event_status_t {
 	double trace_last_ts;
 	/** The size of the current PACKET event */
 	int psize;
+	/** Whether there is a packet stored in *packet above waiting for an
+	 * event to occur */
+	bool waiting;
 };
 
 /** A libtrace input trace 
@@ -225,6 +228,11 @@ void trace_set_err(libtrace_t *trace, int errcode,const char *msg,...)
 void trace_set_err_out(libtrace_out_t *trace, int errcode, const char *msg,...)
 								PRINTF(3,4);
 
+/** Clears the cached values for a libtrace packet
+ *
+ * @param packet	The libtrace packet that requires a cache reset
+ */
+void trace_clear_cache(libtrace_packet_t *packet);
 
 /** Converts the data provided in buffer into a valid libtrace packet
  *
@@ -856,7 +864,8 @@ bool demote_packet(libtrace_packet_t *packet);
 /** Returns a pointer to the header following a Linux SLL header.
  *
  * @param link		A pointer to the Linux SLL header to be skipped
- * @param[out] type	The ethertype of the next header
+ * @param[out] arphrd_type	The arp hardware type of the packet
+ * @param[out] next_header	The ethertype of the next header
  * @param[in,out] remaining	Updated with the number of captured bytes
  * 				remaining
  * @return A pointer to the header following the Linux SLL header, or NULL if
@@ -873,7 +882,9 @@ bool demote_packet(libtrace_packet_t *packet);
  * 0. Therefore, it is very important to check the value of remaining after
  * calling this function.
  */	
-void *trace_get_payload_from_linux_sll(const void *link, uint16_t *type, 
+void *trace_get_payload_from_linux_sll(const void *link,
+		uint16_t *arphrd_type, 
+		uint16_t *next_header, 
 		uint32_t *remaining);
 
 /** Returns a pointer to the header following an ATM header.

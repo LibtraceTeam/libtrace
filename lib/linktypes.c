@@ -40,29 +40,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#ifndef WIN32
-#include <net/if_arp.h>
-#endif
-
-#ifndef ARPHRD_ETHER
-#define ARPHRD_ETHER    1               /* Ethernet 10/100Mbps.  */
-#endif
-
-#ifndef ARPHRD_EETHER
-#define ARPHRD_EETHER    2               /* Experimental Ethernet 10/100Mbps.  */
-#endif
-
-#ifndef ARPHRD_PPP
-#define ARPHRD_PPP      512
-#endif
-
-#ifndef ARPHRD_IEEE80211
-#define ARPHRD_IEEE80211	801
-#endif
-
-#ifndef ARPHRD_NONE
-#define ARPHRD_NONE	0xFFFE
-#endif
+#include "arphrd.h"
 
 
 /* This file maps libtrace types to/from pcap DLT and erf types
@@ -208,6 +186,7 @@ libtrace_linktype_t arphrd_type_to_libtrace(unsigned int arphrd) {
 		case ARPHRD_IEEE80211: return TRACE_TYPE_80211;
 		case ARPHRD_80211_RADIOTAP: return TRACE_TYPE_80211_RADIO;
 		case ARPHRD_PPP: return TRACE_TYPE_NONE;
+		case ARPHRD_LOOPBACK: return TRACE_TYPE_NONE;
 		case ARPHRD_NONE: return TRACE_TYPE_NONE;
 	}
 	printf("Unknown ARPHRD %08x\n",arphrd);
@@ -350,9 +329,7 @@ bool demote_packet(libtrace_packet_t *packet)
 			packet->trace=trace;
 
 			/* Invalidate caches */
-			packet->l3_header = NULL;
-			packet->capture_length = -1;
-
+			trace_clear_cache(packet);
 			return true;
 
 		case TRACE_TYPE_LINUX_SLL:
@@ -376,15 +353,13 @@ bool demote_packet(libtrace_packet_t *packet)
 					-sizeof(libtrace_sll_header_t));
 
 			/* Invalidate caches */
-			packet->l3_header = NULL;
-			packet->capture_length = -1;
+			trace_clear_cache(packet);
 			break;
 		default:
 			return false;
 	}
 
 	/* Invalidate caches */
-	packet->l3_header = NULL;
-	packet->capture_length = -1;
+	trace_clear_cache(packet);
 	return true;
 }

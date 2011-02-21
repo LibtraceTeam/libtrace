@@ -242,6 +242,7 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 	libtrace->event.packet = NULL;
 	libtrace->event.psize = 0;
 	libtrace->event.trace_last_ts = 0.0;
+	libtrace->event.waiting = false;
 	libtrace->filter = NULL;
 	libtrace->snaplen = 0;
 	libtrace->started=false;
@@ -589,6 +590,8 @@ DLLEXPORT void trace_destroy(libtrace_t *libtrace) {
         /* Need to free things! */
         if (libtrace->uridata)
 		free(libtrace->uridata);
+	if (libtrace->event.packet)
+		trace_destroy_packet(libtrace->event.packet);
         free(libtrace);
 }
 
@@ -623,7 +626,7 @@ DLLEXPORT libtrace_packet_t *trace_create_packet(void)
 		(libtrace_packet_t*)calloc((size_t)1,sizeof(libtrace_packet_t));
 
 	packet->buf_control=TRACE_CTRL_PACKET;
-	packet->capture_length=-1;
+	trace_clear_cache(packet);
 	return packet;
 }
 
@@ -647,10 +650,7 @@ DLLEXPORT libtrace_packet_t *trace_copy_packet(const libtrace_packet_t *packet) 
 	dest->buf_control=TRACE_CTRL_PACKET;
 	/* Reset the cache - better to recalculate than try to convert
 	 * the values over to the new packet */
-	dest->capture_length = -1;
-	dest->l3_header = NULL;
-	dest->l3_ethertype = 0;
-	
+	trace_clear_cache(dest);	
 	/* Ooooh nasty memcpys! This is why we want to avoid copying packets
 	 * as much as possible */
 	memcpy(dest->header,packet->header,trace_get_framing_length(packet));
@@ -711,10 +711,7 @@ DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 		do {
 			size_t ret;
 			/* Clear the packet cache */
-			packet->capture_length = -1;
-			packet->l3_header = NULL;
-			packet->l3_ethertype = 0;
-
+			trace_clear_cache(packet);
 			ret=libtrace->format->read_packet(libtrace,packet);
 			if (ret==(size_t)-1 || ret==0) {
 				return ret;
@@ -776,9 +773,7 @@ int trace_prepare_packet(libtrace_t *trace, libtrace_packet_t *packet,
 	packet->trace = trace;
 	
 	/* Clear packet cache */
-	packet->capture_length = -1;
-	packet->l3_header = NULL;
-	packet->l3_ethertype = 0;
+	trace_clear_cache(packet);
 
 	if (trace->format->prepare_packet) {
 		return trace->format->prepare_packet(trace, packet,
@@ -1098,9 +1093,7 @@ DLLEXPORT libtrace_eventobj_t trace_event(libtrace_t *trace,
 	assert(packet);
 
 	/* Clear the packet cache */
-	packet->capture_length = -1;
-	packet->l3_header = NULL;
-	packet->l3_ethertype = 0;
+	trace_clear_cache(packet);
 	
 	/* Store the trace we are reading from into the packet opaque
 	 * structure */
@@ -1817,6 +1810,17 @@ uint64_t trace_get_accepted_packets(libtrace_t *trace)
 {
 	assert(trace);
 	return trace->accepted_packets;
+}
+
+void trace_clear_cache(libtrace_packet_t *packet) {
+
+	packet->l3_header = NULL;
+	packet->l4_header = NULL;
+	packet->l3_ethertype = 0;
+	packet->transport_proto = 0;
+	packet->capture_length = -1;
+	packet->payload_length = -1;
+
 }
 
 void register_format(struct libtrace_format_t *f) {

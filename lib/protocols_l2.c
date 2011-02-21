@@ -37,6 +37,7 @@
 #include <assert.h>
 #include <stdlib.h>
 
+
 /* This file contains all the protocol decoding functions for layer 2 
  * (and 2.5) protocols. This includes functions for accessing MAC addresses.
  *
@@ -397,6 +398,7 @@ DLLEXPORT void *trace_get_payload_from_layer2(void *link,
 		uint32_t *remaining)
 {
 	void *l;
+
 	if (linktype == ~0U) {
 		fprintf(stderr, "Unable to determine linktype for packet\n");
 		return NULL;

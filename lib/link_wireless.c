@@ -187,7 +187,7 @@ DLLEXPORT bool trace_get_wireless_tsft(void *link,
 				return true;
 			} else break;
 		case TRACE_TYPE_LINUX_SLL:
-			l = trace_get_payload_from_linux_sll(link, &type, NULL );
+			l = trace_get_payload_from_linux_sll(link, &type, NULL, NULL );
 			return trace_get_wireless_tsft(l, arphrd_type_to_libtrace(type), tsft);
 
 		case TRACE_TYPE_80211_PRISM:
@@ -222,7 +222,7 @@ bool trace_get_wireless_flags(void *link,
 				return true;
 			} else break;
 		case TRACE_TYPE_LINUX_SLL:
-			l = trace_get_payload_from_linux_sll(link, &type, NULL);
+			l = trace_get_payload_from_linux_sll(link, &type, NULL, NULL);
 			return trace_get_wireless_flags(l, arphrd_type_to_libtrace(type), flags);
 		default:
 			return false;
@@ -246,7 +246,7 @@ DLLEXPORT bool trace_get_wireless_rate(void *link,
 				return true;
 			} else break;
 		case TRACE_TYPE_LINUX_SLL:
-			l = trace_get_payload_from_linux_sll(link, &type, NULL);
+			l = trace_get_payload_from_linux_sll(link, &type, NULL, NULL);
 			return trace_get_wireless_rate(l, arphrd_type_to_libtrace(type), rate);
 		default:
 			return false;
@@ -274,7 +274,7 @@ DLLEXPORT bool trace_get_wireless_freq(void *link,
 				return true;
 			} else break;
 		case TRACE_TYPE_LINUX_SLL:
-			l = trace_get_payload_from_linux_sll(link, &type, NULL);
+			l = trace_get_payload_from_linux_sll(link, &type, NULL, NULL);
 			return trace_get_wireless_freq(l, arphrd_type_to_libtrace(type), freq);
 		default:
 			return false;
@@ -310,7 +310,7 @@ bool trace_get_wireless_channel_flags(void *link,
 				return true;
 			} else break;
 		case TRACE_TYPE_LINUX_SLL:
-			l = trace_get_payload_from_linux_sll(link, &type, NULL);
+			l = trace_get_payload_from_linux_sll(link, &type, NULL, NULL);
 			return trace_get_wireless_channel_flags(l, arphrd_type_to_libtrace(type), flags);
 		default:
 			return false;
@@ -341,7 +341,7 @@ bool trace_get_wireless_fhss_hopset(void *link,
 				return true;
 			} else break;
 		case TRACE_TYPE_LINUX_SLL:
-			l = trace_get_payload_from_linux_sll(link, &type, NULL);
+			l = trace_get_payload_from_linux_sll(link, &type, NULL, NULL);
 			return trace_get_wireless_fhss_hopset(l, arphrd_type_to_libtrace(type), hopset);
 		default:
 			return false;
@@ -368,7 +368,7 @@ bool trace_get_wireless_fhss_hoppattern(void *link,
 				return true;
 			} else break;
 		case TRACE_TYPE_LINUX_SLL:
-			l = trace_get_payload_from_linux_sll(link, &type, NULL);
+			l = trace_get_payload_from_linux_sll(link, &type, NULL, NULL);
 			return trace_get_wireless_fhss_hoppattern(l, arphrd_type_to_libtrace(type), hoppattern);
 		default:
 			return false;
@@ -394,7 +394,7 @@ DLLEXPORT bool trace_get_wireless_signal_strength_dbm(void *link,
 				return true;
 			} else break;
 		case TRACE_TYPE_LINUX_SLL:
-			l = trace_get_payload_from_linux_sll(link, &type, NULL);
+			l = trace_get_payload_from_linux_sll(link, &type, NULL, NULL);
 			return trace_get_wireless_signal_strength_dbm(l, arphrd_type_to_libtrace(type), strength);
 		default:
 			return false;
@@ -418,7 +418,7 @@ DLLEXPORT bool trace_get_wireless_noise_strength_dbm(void *link,
 				return true;
 			} else break;
 		case TRACE_TYPE_LINUX_SLL:
-			l = trace_get_payload_from_linux_sll(link, &type, NULL);
+			l = trace_get_payload_from_linux_sll(link, &type, NULL, NULL);
 			return trace_get_wireless_noise_strength_dbm(l, arphrd_type_to_libtrace(type), strength);
 		default:
 			return false;
@@ -442,7 +442,7 @@ DLLEXPORT bool trace_get_wireless_signal_strength_db(void *link,
 				return true;
 			} else break;
 		case TRACE_TYPE_LINUX_SLL:
-			l = trace_get_payload_from_linux_sll(link, &type, NULL);
+			l = trace_get_payload_from_linux_sll(link, &type, NULL, NULL);
 			return trace_get_wireless_signal_strength_db(l, arphrd_type_to_libtrace(type), strength);
 		default:
 			return false;
@@ -466,7 +466,7 @@ DLLEXPORT bool trace_get_wireless_noise_strength_db(void *link,
 				return true;
 			} else break;
 		case TRACE_TYPE_LINUX_SLL:
-			l = trace_get_payload_from_linux_sll(link, &type, NULL);
+			l = trace_get_payload_from_linux_sll(link, &type, NULL, NULL);
 			return trace_get_wireless_noise_strength_db(l, arphrd_type_to_libtrace(type), strength);
 		default:
 			return false;
@@ -496,7 +496,7 @@ bool trace_get_wireless_lock_quality(void *link,
 				return true;
 			} else break;
 		case TRACE_TYPE_LINUX_SLL:
-			l = trace_get_payload_from_linux_sll(link, &type, NULL);
+			l = trace_get_payload_from_linux_sll(link, &type, NULL, NULL);
 			return trace_get_wireless_lock_quality(l, arphrd_type_to_libtrace(type), quality);
 		default:
 			return false;
@@ -522,7 +522,7 @@ DLLEXPORT bool trace_get_wireless_tx_attenuation(void *link,
 				return true;
 			} else break;
 		case TRACE_TYPE_LINUX_SLL:
-			l = trace_get_payload_from_linux_sll(link, &type, NULL);
+			l = trace_get_payload_from_linux_sll(link, &type, NULL, NULL);
 			return trace_get_wireless_tx_attenuation(l, arphrd_type_to_libtrace(type), attenuation);
 		default:
 			return false;
@@ -546,7 +546,7 @@ DLLEXPORT bool trace_get_wireless_tx_attenuation_db(void *link,
 				return true;
 			} else break;
 		case TRACE_TYPE_LINUX_SLL:
-			l = trace_get_payload_from_linux_sll(link, &type, NULL);
+			l = trace_get_payload_from_linux_sll(link, &type, NULL, NULL);
 			return trace_get_wireless_tx_attenuation_db(l, arphrd_type_to_libtrace(type), attenuation);
 		default:
 			return false;
@@ -570,7 +570,7 @@ DLLEXPORT bool trace_get_wireless_tx_power_dbm(void *link,
 				return true;
 			} else break;
 		case TRACE_TYPE_LINUX_SLL:
-			l = trace_get_payload_from_linux_sll(link, &type, NULL);
+			l = trace_get_payload_from_linux_sll(link, &type, NULL, NULL);
 			return trace_get_wireless_tx_power_dbm(l, arphrd_type_to_libtrace(type), txpower);
 		default:
 			return false;
@@ -595,7 +595,7 @@ DLLEXPORT bool trace_get_wireless_antenna(void *link,
 				return true;
 			} else break;
 		case TRACE_TYPE_LINUX_SLL:
-			l = trace_get_payload_from_linux_sll(link, &type, NULL);
+			l = trace_get_payload_from_linux_sll(link, &type, NULL, NULL);
 			return trace_get_wireless_antenna(l, arphrd_type_to_libtrace(type), antenna);
 		default:
 			return false;

@@ -419,8 +419,11 @@ typedef struct libtrace_packet_t {
 	libtrace_rt_types_t  type; 	/**< RT protocol type for the packet */
 	buf_control_t buf_control; 	/**< Describes memory ownership */
 	int capture_length;		/**< Cached capture length */
+	int payload_length;		/**< Cached payload length */
 	void *l3_header;		/**< Cached l3 header */
 	uint16_t l3_ethertype;		/**< Cached l3 ethertype */
+	void *l4_header;		/**< Cached transport header */
+	uint8_t transport_proto;	/**< Cached transport protocol */
 } libtrace_packet_t;
 
 
