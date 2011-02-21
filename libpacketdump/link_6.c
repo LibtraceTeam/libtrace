@@ -3,12 +3,15 @@
  * 
  */
 
+#include "config.h"
 #include "libtrace_int.h"
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <stdio.h>
 #include "libpacketdump.h"
 #include "libtrace.h"
+
+#include "arphrd.h"
 
 DLLEXPORT void decode(int link_type ,const char *pkt,unsigned len) 
 {
@@ -41,16 +44,16 @@ DLLEXPORT void decode(int link_type ,const char *pkt,unsigned len)
 	
 	/* Do we recognise the hardware address type? */
 	ret=trace_get_payload_from_meta(pkt, &linktype, &len);
-	/*type = arphrd_type_to_libtrace(ntohs(sll->hatype)); */
-	if (linktype != 65535) { 
-		decode_next(ret, len, "link", linktype);
-		/*decode_next(pkt + sizeof(*sll), len - sizeof(*sll), "link", type);*/
-		return;
-	}
+	
+	if (ntohs(sll->hatype) == ARPHRD_ETHER || 
+				ntohs(sll->hatype) == ARPHRD_LOOPBACK) 
+		decode_next(pkt + sizeof(*sll), len - sizeof(*sll), "eth", ntohs(sll->protocol));
+	
+	else
+		decode_next(ret, len, "link", ntohs(sll->hatype));
 
-	/* Meh.. pass it off to eth decoder */
-	decode_next(pkt + sizeof(*sll), len - sizeof(*sll), "eth", ntohs(sll->protocol));
-
+	return;
+	
 }
 
 
