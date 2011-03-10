@@ -36,17 +36,7 @@
 #include "protocols.h"
 #include <assert.h>
 
-#ifndef WIN32
-#include <net/if_arp.h>
-#endif
-
-#ifndef ARPHRD_ETHER
-#define ARPHRD_ETHER    1               /* Ethernet 10/100Mbps.  */
-#endif
-
-#ifndef ARPHRD_PPP
-#define ARPHRD_PPP      512
-#endif
+#include "arphrd.h"
 
 /* This file contains all the protocol decoding functions for the meta-data
  * headers that may be prepended to captured packets.
@@ -185,6 +175,7 @@ DLLEXPORT void *trace_get_payload_from_meta(const void *meta,
 {
 	void *nexthdr; 
 	uint16_t arphrd;
+	uint16_t next;
 	
 	assert(meta != NULL);
 	assert(linktype != NULL);
@@ -193,11 +184,11 @@ DLLEXPORT void *trace_get_payload_from_meta(const void *meta,
 	switch(*linktype) {
 		case TRACE_TYPE_LINUX_SLL:
 			nexthdr = trace_get_payload_from_linux_sll(meta,
-					&arphrd, NULL, remaining);
+					&arphrd, &next, remaining);
 
 			/* Ethernet header is usually absent in SLL captures,
 			 * so we don't want to skip it just yet */
-			if (arphrd_type_to_libtrace(arphrd) == TRACE_TYPE_ETH) 
+			if (arphrd_type_to_libtrace(arphrd) == TRACE_TYPE_ETH && next != 0x0060) 
 				*linktype = TRACE_TYPE_NONE; 
 			else 
 				*linktype = arphrd_type_to_libtrace(arphrd);

@@ -165,6 +165,10 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 			event.type = TRACE_EVENT_TERMINATE;
 			trace_destroy_packet(trace->event.packet);
 			trace->event.packet = NULL;
+			packet->buffer = NULL;
+			packet->header = NULL;
+			packet->payload = NULL;
+			packet->buf_control = TRACE_CTRL_EXTERNAL;
 			return event;
 		}
 	}
