@@ -13,6 +13,22 @@
 
 #include "arphrd.h"
 
+/* Copied this here because this isn't currently part of our external API -
+ * maybe we need to think about doing that? */
+libtrace_linktype_t arphrd_type_to_libtrace(unsigned int arphrd) {
+        switch(arphrd) {
+                case ARPHRD_ETHER: return TRACE_TYPE_ETH;
+                case ARPHRD_EETHER: return TRACE_TYPE_ETH;
+                case ARPHRD_IEEE80211: return TRACE_TYPE_80211;
+                case ARPHRD_80211_RADIOTAP: return TRACE_TYPE_80211_RADIO;
+                case ARPHRD_PPP: return TRACE_TYPE_NONE;
+                case ARPHRD_LOOPBACK: return TRACE_TYPE_NONE;
+                case ARPHRD_NONE: return TRACE_TYPE_NONE;
+        }
+	printf("Unknown ARPHRD: %u\n", arphrd);
+	return ~0U;
+}
+
 DLLEXPORT void decode(int link_type ,const char *pkt,unsigned len) 
 {
 	libtrace_sll_header_t *sll = (libtrace_sll_header_t *) pkt;
@@ -46,12 +62,20 @@ DLLEXPORT void decode(int link_type ,const char *pkt,unsigned len)
 	ret=trace_get_payload_from_meta(pkt, &linktype, &len);
 	
 	if (ntohs(sll->hatype) == ARPHRD_ETHER || 
-				ntohs(sll->hatype) == ARPHRD_LOOPBACK) 
-		decode_next(pkt + sizeof(*sll), len - sizeof(*sll), "eth", ntohs(sll->protocol));
-	
-	else
-		decode_next(ret, len, "link", ntohs(sll->hatype));
-
+				ntohs(sll->hatype) == ARPHRD_LOOPBACK) { 
+		
+		if (ntohs(sll->protocol) == 0x0060) {
+			decode_next(ret, len, "link", 
+				arphrd_type_to_libtrace(ntohs(sll->hatype)));
+		}
+		else
+			decode_next(pkt + sizeof(*sll), len - sizeof(*sll), 
+					"eth", ntohs(sll->protocol));
+	}
+	else {
+		decode_next(ret, len, "link", 
+				arphrd_type_to_libtrace(ntohs(sll->hatype)));
+	}
 	return;
 	
 }
