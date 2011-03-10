@@ -99,7 +99,8 @@ int main(int argc, char *argv[]) {
 		}
 		iferr(trace);
         }
-	trace_destroy_packet(packet);
+	if (packet)
+		trace_destroy_packet(packet);
 	if (error == 0) {
 		if (count == 100) {
 			printf("success: 100 packets read\n");

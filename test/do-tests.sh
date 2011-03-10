@@ -17,6 +17,7 @@ export LD_LIBRARY_PATH="$libdir"
 export DYLD_LIBRARY_PATH="${libdir}"
 echo SLL Decoder 
 do_test ./test-decode2 pcap:traces/100_sll.pcap
+do_test ./test-decode2 pcapfile:traces/sll.pcap.gz
 
 echo 802.1x decoder
 do_test ./test-decode2 pcap:traces/8021x.pcap
