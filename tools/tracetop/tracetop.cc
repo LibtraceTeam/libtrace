@@ -231,10 +231,10 @@ static void per_packet(libtrace_packet_t *packet)
 	}
 
 	++it->second.packets;
-	it->second.bytes+=trace_get_capture_length(packet);
+	it->second.bytes+=trace_get_wire_length(packet);
 
 	++total_packets;
-	total_bytes+=trace_get_capture_length(packet);
+	total_bytes+=trace_get_wire_length(packet);
 
 }
 
