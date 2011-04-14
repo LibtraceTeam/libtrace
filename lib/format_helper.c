@@ -200,6 +200,7 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 		if (ts > now) {
 			event.seconds = ts - 
 				trace->event.trace_last_ts;
+			trace->event.trace_last_ts = ts;
 			event.type = TRACE_EVENT_SLEEP;
 			trace->event.waiting = true;
 			return event;
