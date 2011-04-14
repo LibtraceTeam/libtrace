@@ -1767,6 +1767,8 @@ void trace_construct_packet(libtrace_packet_t *packet,
 	memcpy(packet->header,&hdr,sizeof(hdr));
 	memcpy(packet->payload,data,(size_t)len);
 	packet->type=pcap_linktype_to_rt(libtrace_to_pcap_linktype(linktype));
+
+	trace_clear_cache(packet);
 }
 
 
