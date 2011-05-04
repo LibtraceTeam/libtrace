@@ -97,6 +97,10 @@ AC_TYPE_SIZE_T
 AC_HEADER_TIME
 AC_SYS_LARGEFILE
 
+LIBPKTDUMP_LIBS="-ltrace "
+LIBTRACE_LIBS=""
+TOOLS_LIBS=""
+
 # Set our C compiler flags based on the gcc version
 if test "$GCC" = "yes"; then
 	
@@ -212,13 +216,6 @@ AC_CHECK_HEADER(net/bpf.h)
 # Checking for libgdc
 AC_CHECK_HEADER(gdc.h,AC_DEFINE(HAVE_LIBGDC,1,[has gdc.h]))
 
-# Check to see if we have libdl - *BSD has built-in libdl
-AC_SEARCH_LIBS(dlopen,dl, dlfound=1,dlfound=0 )
-
-if test "$dlfound" = 0; then
-	AC_MSG_ERROR("Unable to find dlopen. Please use LDFLAGS to specify the location of libdl and re-run configure")
-fi
-
 # Check for libpcap
 AC_CHECK_LIB(pcap,pcap_next_ex,pcapfound=1,pcapfound=0)
 AC_CHECK_FUNCS(pcap_inject pcap_sendpacket pcap_setnonblock)
@@ -244,7 +241,8 @@ AC_ARG_WITH(man,
 if test "$pcapfound" = 0; then
 	AC_MSG_ERROR(libpcap0.8 or greater is required to compile libtrace. If you have installed it in a non-standard location please use LDFLAGS to specify the location of the library)
 else
-	ADD_LIBS="$ADD_LIBS -lpcap"
+	TOOL_LIBS="$TOOL_LIBS -lpcap"
+	LIBTRACE_LIBS="$LIBTRACE_LIBS -lpcap"
 	AC_DEFINE([HAVE_LIBPCAP],1,[compile with libpcap support])
 	AC_DEFINE([HAVE_BPF_FILTER],1,[compile with bpf filter support])
 fi
@@ -290,6 +288,7 @@ if test "$with_dag" != no; then
 	AC_CHECK_LIB(dag, dag_open, dag_found=1, dag_found=0)
 	if test "$dag_found" = 1; then
 		ADD_LIBS="$ADD_LIBS -ldag"
+		LIBTRACE_LIBS="$LIBTRACE_LIBS -ldag"
 		AC_DEFINE(HAVE_DAG_API, 1, [define if you have the DAG API])
 		AC_DEFINE(HAVE_DAG,1,[conditional for building with DAG live capture support])
 		libtrace_dag=true
@@ -365,17 +364,80 @@ fi
 have_ncurses=yes
 
 # Checks for various "optional" libraries
-AC_CHECK_LIB(z, deflate)
-AC_CHECK_LIB(bz2, BZ2_bzDecompressInit)
-AC_CHECK_LIB(lzo2, lzo1x_1_compress)
-AC_CHECK_LIB(pthread, pthread_create)
+AC_CHECK_LIB(z, deflate, have_zlib=1, have_zlib=0)
+AC_CHECK_LIB(bz2, BZ2_bzDecompressInit, have_bzip=1, have_bzip=0)
+AC_CHECK_LIB(lzo2, lzo1x_1_compress, have_lzo=1, have_lzo=0)
+AC_CHECK_LIB(pthread, pthread_create, have_pthread=1, have_pthread=0)
 
 # Check for ncurses
-AC_SEARCH_LIBS(mvprintw, ncurses, , have_ncurses=no)
+AC_SEARCH_LIBS(mvprintw, ncurses, have_ncurses=yes, have_ncurses=no)
+LIBS=
 
 # These libraries have to be explicitly linked in OpenSolaris
-AC_SEARCH_LIBS(getservent, socket, [], [], -lnsl)		
-AC_SEARCH_LIBS(inet_ntop, nsl, [], [], -lsocket)
+AC_SEARCH_LIBS(getservent, socket, have_socket=1, have_socket=0, -lnsl)		
+LIBS=
+
+AC_SEARCH_LIBS(inet_ntop, nsl, have_nsl=1, have_nsl=0, -lsocket)
+LIBS=
+
+# Check to see if we have libdl - *BSD has built-in libdl
+AC_SEARCH_LIBS(dlopen,dl, dlfound=1,dlfound=0 )
+LIBS=
+
+if test "$dlfound" = 0; then
+	AC_MSG_ERROR("Unable to find dlopen. Please use LDFLAGS to specify the location of libdl and re-run configure")
+fi
+
+if test "$ac_cv_search_dlopen" != "none required"; then 
+	LIBPKTDUMP_LIBS="$LIBPKTDUMP_LIBS $ac_cv_search_dlopen"
+fi
+
+
+if test "$have_zlib" = 1; then
+	LIBTRACE_LIBS="$LIBTRACE_LIBS -lz"
+	AC_DEFINE(HAVE_LIBZ, 1, [Set to 1 if zlib is supported])
+fi
+
+if test "$have_bzip" = 1; then
+	LIBTRACE_LIBS="$LIBTRACE_LIBS -lbz2"
+	AC_DEFINE(HAVE_LIBBZ2, 1, [Set to 1 if bzip2 is supported])
+fi
+
+if test "$have_lzo" = 1; then
+	LIBTRACE_LIBS="$LIBTRACE_LIBS -llzo2"
+	AC_DEFINE(HAVE_LIBLZO2, 1, [Set to 1 if lzo2 is supported])
+fi
+
+if test "$have_pthread" = 1; then
+	LIBTRACE_LIBS="$LIBTRACE_LIBS -lpthread"
+	AC_DEFINE(HAVE_LIBPTHREAD, 1, [Set to 1 if pthreads are supported])
+fi
+
+if test "$have_ncurses" = "yes"; then
+	if test "$ac_cv_search_mvprintw" != "none required"; then
+		TOOLS_LIBS="$TOOLS_LIBS $ac_cv_search_mvprintw"
+	fi
+fi
+
+if test "$have_nsl" = 1; then
+	if test "$ac_cv_search_inet_ntop" != "none required"; then
+		LIBTRACE_LIBS="$LIBTRACE_LIBS $ac_cv_search_inet_ntop"
+		LIBPKTDUMP_LIBS="$LIBPKTDUMP_LIBS $ac_cv_search_inet_ntop"
+	fi
+fi
+
+if test "$have_socket" = 1; then
+	if test "$ac_cv_search_getservent" != "none required"; then
+		LIBTRACE_LIBS="$LIBTRACE_LIBS $ac_cv_search_getservent"
+		LIBPKTDUMP_LIBS="$LIBPKTDUMP_LIBS $ac_cv_search_getservent"
+	fi 
+fi
+
+
+# Stupid AC_SEARCH_LIB appends stuff to LIBS even when I don't want it to, so
+# just set libs to null here to avoid linking against them by default
+LIBS=
+
 
 # For now, the user has to explicitly ask for the LLVM stuff, as it's a bit
 # rough around the edges :(
@@ -413,7 +475,7 @@ if (test "$use_llvm" != "no"); then
 		JIT=no
 	else
 		LIBCXXFLAGS="`$LLVM_CONFIG --cxxflags` $CXXFLAGS"
-		ADD_LIBS="$ADD_LIBS `$LLVM_CONFIG --libs all`";
+		LIBTRACE_LIBS="$LIBRACE_LIBS `$LLVM_CONFIG --libs all`";
 		LDFLAGS="`$LLVM_CONFIG --ldflags` $LDFLAGS";
 		JIT=yes
 		AC_DEFINE(HAVE_LLVM, 1, [Set to 1 if you have LLVM installed])
@@ -426,13 +488,13 @@ AM_CONDITIONAL([HAVE_BPF_CAPTURE], [test "$ac_cv_have_decl_BIOCSETIF" = yes ])
 AM_CONDITIONAL([HAVE_DAG], [test "$libtrace_dag" = true])
 AM_CONDITIONAL([DAG2_4], [test "$libtrace_dag_version" = 24])
 AM_CONDITIONAL([DAG2_5], [test "$libtrace_dag_version" = 25])
-AM_CONDITIONAL([HAVE_ZLIB], [test "$ac_cv_lib_z_deflate" = yes])
-AM_CONDITIONAL([HAVE_BZLIB], [test "$ac_cv_lib_bz2_BZ2_bzDecompressInit" = yes])
-AM_CONDITIONAL([HAVE_LZO], [test "$ac_cv_lib_lzo2_lzo1x_1_compress" = yes])
+AM_CONDITIONAL([HAVE_ZLIB], [test "$have_zlib" = 1])
+AM_CONDITIONAL([HAVE_BZLIB], [test "$have_bzip" = 1])
+AM_CONDITIONAL([HAVE_LZO], [test "$have_lzo" = 1])
 AM_CONDITIONAL([HAVE_NETPACKET_PACKET_H], [test "$libtrace_netpacket_packet_h" = true])
 AM_CONDITIONAL([HAVE_LIBGDC], [test "$ac_cv_header_gdc_h" = yes])
 AM_CONDITIONAL([HAVE_LLVM], [test "x$JIT" != "xno" ])
-AM_CONDITIONAL([HAVE_NCURSES], [test "x$have_ncurses" = "xyes"])
+AM_CONDITIONAL([HAVE_NCURSES], [test "$xhave_ncurses" = "xyes"])
 
 # Check for miscellaneous programs
 AC_CHECK_PROG([libtrace_doxygen], [doxygen], [true], [false])
@@ -440,7 +502,10 @@ AC_CHECK_PROG([libtrace_doxygen], [doxygen], [true], [false])
 AM_CONDITIONAL(HAS_DOXYGEN, [test x"$libtrace_doxygen" = xtrue])
 
 # Set all our output variables
-AC_SUBST([ADD_LIBS])
+AC_SUBST([LIBTRACE_LIBS])
+AC_SUBST([LIBPKTDUMP_LIBS])
+AC_SUBST([TOOLS_LIBS])
+#AC_SUBST([ADD_LIBS])
 AC_SUBST([ADD_LDFLAGS])
 AC_SUBST([ADD_INCLS])
 AC_SUBST([LTLIBOBJS])

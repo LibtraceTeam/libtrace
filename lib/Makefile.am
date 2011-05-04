@@ -74,7 +74,7 @@ nodist_libtrace_la_SOURCES = dagopts.c dagapi.c
 endif
 
 INCLUDES = @ADD_INCLS@
-libtrace_la_LIBADD = @ADD_LIBS@ @LTLIBOBJS@
+libtrace_la_LIBADD = @LIBTRACE_LIBS@ @LTLIBOBJS@
 libtrace_la_LDFLAGS=-version-info @LIBTRACE_MAJOR@:@LIBTRACE_MINOR@:@LIBTRACE_MID@ @ADD_LDFLAGS@
 
 dagapi.c:

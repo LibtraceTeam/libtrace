@@ -141,7 +141,7 @@ INCLUDES= @ADD_INCLS@ -I../lib
 # NOTE: You CANNOT add @LEXLIBS@ here, as they are statically compiled
 # which on non x86_32 platforms means that they cannot be linked into
 # a shared library.
-libpacketdump_la_LIBADD = @ADD_LIBS@ 
+libpacketdump_la_LIBADD = @LIBPKTDUMP_LIBS@ 
 libpacketdump_la_LDFLAGS=\
         -version-info @LIBTRACE_MAJOR@:@LIBTRACE_MINOR@:@LIBTRACE_MID@ \
         @ADD_LDFLAGS@
