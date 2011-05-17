@@ -98,6 +98,7 @@ AC_HEADER_TIME
 AC_SYS_LARGEFILE
 
 LIBPKTDUMP_LIBS="-ltrace "
+ADD_LDFLAGS="$ADD_LDFLAGS -L\$(abs_top_srcdir)/lib" 
 LIBTRACE_LIBS=""
 TOOLS_LIBS=""
 
@@ -494,7 +495,7 @@ AM_CONDITIONAL([HAVE_LZO], [test "$have_lzo" = 1])
 AM_CONDITIONAL([HAVE_NETPACKET_PACKET_H], [test "$libtrace_netpacket_packet_h" = true])
 AM_CONDITIONAL([HAVE_LIBGDC], [test "$ac_cv_header_gdc_h" = yes])
 AM_CONDITIONAL([HAVE_LLVM], [test "x$JIT" != "xno" ])
-AM_CONDITIONAL([HAVE_NCURSES], [test "$xhave_ncurses" = "xyes"])
+AM_CONDITIONAL([HAVE_NCURSES], [test "x$have_ncurses" = "xyes"])
 
 # Check for miscellaneous programs
 AC_CHECK_PROG([libtrace_doxygen], [doxygen], [true], [false])
