@@ -1,6 +1,6 @@
+if HAVE_NCURSES
 man_MANS = tracetop.1
 EXTRA_DIST = $(man_MANS)
-if HAVE_NCURSES
 bin_PROGRAMS = tracetop
 
 include ../Makefile.tools
