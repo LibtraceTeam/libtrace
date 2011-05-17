@@ -93,8 +93,11 @@ int main(int argc,char **argv)
 					break;
 			}
 		}
-
 		printf("\n");
+
+		if (trace_is_err(trace)) {
+			trace_perror(trace, "trace_read_packet");
+		}
 		trace_destroy(trace);
 	}
 	return 0;
