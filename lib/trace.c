@@ -1248,6 +1248,11 @@ DLLEXPORT int trace_apply_filter(libtrace_filter_t *filter,
 	assert(filter);
 	assert(packet);
 
+	/* Match all non-data packets as we probably want them to pass
+	 * through to the caller */
+	if (trace_get_link_type(packet) == TRACE_TYPE_NONDATA)
+		return 1;	
+
 	if (libtrace_to_pcap_dlt(trace_get_link_type(packet))==~0U) {
 		
 		/* If we cannot get a suitable DLT for the packet, it may
