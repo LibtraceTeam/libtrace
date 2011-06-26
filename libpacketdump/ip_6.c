@@ -61,6 +61,9 @@ DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len)
 	printf("\n TCP:");
 	printf(" DOFF %i",tcp->doff);
 	printf(" Flags:");
+	if (tcp->ecn_ns) printf(" ECN_NS");
+	if (tcp->cwr) printf(" CWR");
+	if (tcp->ece) printf(" ECE");
 	if (tcp->fin) printf(" FIN");
 	if (tcp->syn) printf(" SYN");
 	if (tcp->rst) printf(" RST");

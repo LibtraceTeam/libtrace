@@ -534,25 +534,29 @@ typedef struct libtrace_tcp
     uint32_t seq;		/**< Sequence number */
     uint32_t ack_seq;		/**< Acknowledgement Number */
 #  if BYTE_ORDER == LITTLE_ENDIAN
-    LT_BITFIELD8 res1:4;	/**< Reserved bits */
-    LT_BITFIELD8 doff:4;	/**< Data Offset */	
-    LT_BITFIELD8 fin:1;		/**< FIN */
-    LT_BITFIELD8 syn:1;		/**< SYN flag */
-    LT_BITFIELD8 rst:1;		/**< RST flag */
-    LT_BITFIELD8 psh:1;		/**< PuSH flag */
-    LT_BITFIELD8 ack:1;		/**< ACK flag */
-    LT_BITFIELD8 urg:1;		/**< URG flag */
-    LT_BITFIELD8 res2:2;	/**< Reserved */
+    LT_BITFIELD8 ecn_ns:1;      /**< ECN Nonce Sum */
+    LT_BITFIELD8 res1:3;        /**< Reserved bits */
+    LT_BITFIELD8 doff:4;        /**< Data Offset */
+    LT_BITFIELD8 fin:1;         /**< FIN */
+    LT_BITFIELD8 syn:1;         /**< SYN flag */
+    LT_BITFIELD8 rst:1;         /**< RST flag */
+    LT_BITFIELD8 psh:1;         /**< PuSH flag */
+    LT_BITFIELD8 ack:1;         /**< ACK flag */
+    LT_BITFIELD8 urg:1;         /**< URG flag */
+    LT_BITFIELD8 ece:1;         /**< ECN Echo */
+    LT_BITFIELD8 cwr:1;         /**< ECN CWR */
 #  elif BYTE_ORDER == BIG_ENDIAN
-    LT_BITFIELD8 doff:4;	/**< Data offset */
-    LT_BITFIELD8 res1:4;	/**< Reserved bits */
-    LT_BITFIELD8 res2:2;	/**< Reserved */
-    LT_BITFIELD8 urg:1;		/**< URG flag */
-    LT_BITFIELD8 ack:1;		/**< ACK flag */
-    LT_BITFIELD8 psh:1;		/**< PuSH flag */
-    LT_BITFIELD8 rst:1;		/**< RST flag */
-    LT_BITFIELD8 syn:1;		/**< SYN flag */
-    LT_BITFIELD8 fin:1;		/**< FIN flag */
+    LT_BITFIELD8 doff:4;        /**< Data offset */
+    LT_BITFIELD8 res1:3;        /**< Reserved bits */
+    LT_BITFIELD8 ecn_ns:1;      /**< ECN Nonce Sum */
+    LT_BITFIELD8 cwr:1;         /**< ECN CWR */
+    LT_BITFIELD8 ece:1;         /**< ECN Echo */
+    LT_BITFIELD8 urg:1;         /**< URG flag */
+    LT_BITFIELD8 ack:1;         /**< ACK flag */
+    LT_BITFIELD8 psh:1;         /**< PuSH flag */
+    LT_BITFIELD8 rst:1;         /**< RST flag */
+    LT_BITFIELD8 syn:1;         /**< SYN flag */
+    LT_BITFIELD8 fin:1;         /**< FIN flag */
 #  else
 #   error "Adjust your <bits/endian.h> defines"
 #  endif
