@@ -1134,6 +1134,7 @@ static libtrace_eventobj_t trace_event_dag(libtrace_t *trace,
 				 * one - we definitely DO NOT want to return
 				 * a sleep event in this case, like we used to
 				 * do! */
+				trace_clear_cache(packet);
 				continue;
 			}
 		} else {
