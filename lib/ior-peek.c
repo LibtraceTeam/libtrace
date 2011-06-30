@@ -140,7 +140,7 @@ static off_t refill_buffer(io_t *io, off_t len)
 
 	DATA(io)->offset = 0;
 	DATA(io)->length = bytes_read;
-
+	
 	/* Error? */
 	if (bytes_read < 1)
 		return bytes_read;
@@ -273,7 +273,7 @@ static off_t peek_peek(io_t *io, void *buffer, off_t len)
 			read_amount);
 
 		/* Pass errors up */
-		if (read_amount <1) {
+		if (read_amount <0) {
 			return read_amount;
 		}
 
