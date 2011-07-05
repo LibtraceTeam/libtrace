@@ -170,9 +170,12 @@ echo " * tsh -> pcap"
 rm -f traces/*.out.*
 do_test ./test-convert tsh pcap
 
-echo " * format autodetection"
+echo " * format autodetection - uncompressed"
 do_test ./test-autodetect traces/5_packets.erf
+echo " * format autodetection - gzip"
 do_test ./test-autodetect traces/5_packets.erf.gz
+echo " * format autodetection - bzip2"
+do_test ./test-autodetect traces/5_packets.erf.bz2
 
 echo
 echo "Tests passed: $OK"
