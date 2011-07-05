@@ -170,6 +170,10 @@ echo " * tsh -> pcap"
 rm -f traces/*.out.*
 do_test ./test-convert tsh pcap
 
+echo " * format autodetection"
+do_test ./test-autodetect traces/5_packets.erf
+do_test ./test-autodetect traces/5_packets.erf.gz
+
 echo
 echo "Tests passed: $OK"
 echo "Tests failed: $FAIL"
