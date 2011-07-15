@@ -79,6 +79,8 @@ BIN_PROTOCOLS+=eth_34958.la
 BIN_PROTOCOLS+=eth_34525.la
 
 # IP Protocol decoders
+# IPv6 Hop by Hop Options Header
+BIN_PROTOCOLS+=ip_0.la
 # ICMP
 BIN_PROTOCOLS+=ip_1.la
 # TCP
@@ -87,12 +89,16 @@ BIN_PROTOCOLS+=ip_6.la
 BIN_PROTOCOLS+=ip_17.la
 # DCCP
 BIN_PROTOCOLS+=ip_33.la 
+# IPv6 Routing Header
+BIN_PROTOCOLS+=ip_43.la
 # IPv6 Fragment Header
 BIN_PROTOCOLS+=ip_44.la
 # GRE
 BIN_PROTOCOLS+=ip_47.la
 # ICMP6
 TXT_PROTOCOLS+=ip_58.protocol 
+# IPv6 Destination Options Header
+BIN_PROTOCOLS+=ip_60.la
 # SCTP
 BIN_PROTOCOLS+=ip_132.la        
 
@@ -121,12 +127,15 @@ eth_34916_la_LDFLAGS=-module
 eth_34958_la_LDFLAGS=-module
 eth_34525_la_LDFLAGS=-module
 
+ip_0_la_LDFLAGS=-module
 ip_1_la_LDFLAGS=-module
 ip_6_la_LDFLAGS=-module
 ip_17_la_LDFLAGS=-module
 ip_33_la_LDFLAGS=-module
+ip_43_la_LDFLAGS=-module
 ip_44_la_LDFLAGS=-module
 ip_47_la_LDFLAGS=-module
+ip_60_la_LDFLAGS=-module
 ip_132_la_LDFLAGS=-module
 
 
