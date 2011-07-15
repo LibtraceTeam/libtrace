@@ -364,8 +364,35 @@ DLLEXPORT void *trace_get_layer2(const libtrace_packet_t *packet,
 	for(;;) {
 		void *nexthdr = trace_get_payload_from_meta(meta, 
 				linktype, remaining);
-		if (nexthdr == NULL)
-			return meta;
+		
+		if (nexthdr == NULL) {
+			switch (*linktype) {
+				/* meta points to a layer 2 header! */
+				case TRACE_TYPE_HDLC_POS:
+				case TRACE_TYPE_ETH:
+				case TRACE_TYPE_ATM:
+				case TRACE_TYPE_80211:
+				case TRACE_TYPE_NONE:
+				case TRACE_TYPE_POS:
+				case TRACE_TYPE_AAL5:
+				case TRACE_TYPE_DUCK:
+				case TRACE_TYPE_LLCSNAP:
+				case TRACE_TYPE_PPP:
+				case TRACE_TYPE_METADATA:
+				case TRACE_TYPE_NONDATA:
+					return meta;
+				case TRACE_TYPE_LINUX_SLL:
+				case TRACE_TYPE_80211_RADIO:
+				case TRACE_TYPE_80211_PRISM:
+				case TRACE_TYPE_PFLOG:
+					break;
+			}
+			
+			/* Otherwise, we must have hit the end of the packet */
+			return NULL;
+		}
+	 
+	 	
 		meta = nexthdr;
 	}
 }
