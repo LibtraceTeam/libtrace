@@ -46,6 +46,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <sys/stat.h>
 
 #include <sys/mman.h>
 /* XXX: Windows doesn't have pthreads, but this code doesn't compile under
