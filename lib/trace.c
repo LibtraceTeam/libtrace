@@ -1821,12 +1821,17 @@ uint64_t trace_get_accepted_packets(libtrace_t *trace)
 
 void trace_clear_cache(libtrace_packet_t *packet) {
 
+	packet->l2_header = NULL;
 	packet->l3_header = NULL;
 	packet->l4_header = NULL;
+	packet->link_type = 0;
 	packet->l3_ethertype = 0;
 	packet->transport_proto = 0;
 	packet->capture_length = -1;
 	packet->payload_length = -1;
+	packet->l2_remaining = 0;
+	packet->l3_remaining = 0;
+	packet->l4_remaining = 0;
 
 }
 

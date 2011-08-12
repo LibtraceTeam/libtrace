@@ -125,6 +125,12 @@ DLLEXPORT void *trace_get_payload_from_ip(libtrace_ip_t *ipptr, uint8_t *prot,
 			*remaining = 0;
 			return NULL;
 		}
+		/* If the packet features extra "padding", we probably
+		 * don't want that counting as possible payload, e.g. for
+		 * payload length calculations */
+		if (*remaining > ntohs(ipptr->ip_len))
+			*remaining = ntohs(ipptr->ip_len);
+
 		*remaining-=(ipptr->ip_hl * 4);
 	}
 
@@ -222,13 +228,16 @@ DLLEXPORT void *trace_get_layer3(const libtrace_packet_t *packet,
 	/* use l3 cache */
 	if (packet->l3_header)
 	{
+		/*
 		link = trace_get_packet_buffer(packet,&linktype,remaining);
 
 		if (!link)
 			return NULL;
+		*/
 
 		*ethertype = packet->l3_ethertype;
-		*remaining -= (packet->l3_header - link);
+		/* *remaining -= (packet->l3_header - link); */
+		*remaining = packet->l3_remaining;
 
 		return packet->l3_header;
 	}
@@ -275,6 +284,7 @@ DLLEXPORT void *trace_get_layer3(const libtrace_packet_t *packet,
 	/* Cast away constness, nasty, but this is just a cache */
 	((libtrace_packet_t*)packet)->l3_ethertype = *ethertype;
 	((libtrace_packet_t*)packet)->l3_header = iphdr;
+	((libtrace_packet_t*)packet)->l3_remaining = *remaining;
 
 	return iphdr;
 }

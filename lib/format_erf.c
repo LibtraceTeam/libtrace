@@ -430,7 +430,7 @@ static int erf_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
 	if (erfptr->type == TYPE_DSM_COLOR_ETH) {
 		/* No idea how we get this yet */
 
-	} else {
+	} else if (erfptr->lctr) {
 		DATA(libtrace)->drops += ntohs(erfptr->lctr);
 	}
 

@@ -146,13 +146,16 @@ DLLEXPORT void *trace_get_transport(const libtrace_packet_t *packet,
 	if (!remaining) remaining=&dummy_remaining;
 
 	if (packet->l4_header) {
+		/*
 		void *link;
 		libtrace_linktype_t linktype;
 		link = trace_get_packet_buffer(packet, &linktype, remaining);
 		if (!link)
 			return NULL;
+		*/
 		*proto = packet->transport_proto;
-		*remaining -= (packet->l4_header - link);
+		/* *remaining -= (packet->l4_header - link); */
+		*remaining = packet->l4_remaining;
 		return packet->l4_header;
 	}
 
@@ -184,6 +187,7 @@ DLLEXPORT void *trace_get_transport(const libtrace_packet_t *packet,
 
 	((libtrace_packet_t *)packet)->transport_proto = *proto;
 	((libtrace_packet_t *)packet)->l4_header = transport;
+	((libtrace_packet_t *)packet)->l4_remaining = *remaining;
 
 
 	return transport;

@@ -420,10 +420,15 @@ typedef struct libtrace_packet_t {
 	buf_control_t buf_control; 	/**< Describes memory ownership */
 	int capture_length;		/**< Cached capture length */
 	int payload_length;		/**< Cached payload length */
+	void *l2_header;		/**< Cached link header */
+	libtrace_linktype_t link_type;	/**< Cached link type */
+	uint32_t l2_remaining;		/**< Cached link remaining */
 	void *l3_header;		/**< Cached l3 header */
 	uint16_t l3_ethertype;		/**< Cached l3 ethertype */
+	uint32_t l3_remaining;		/**< Cached l3 remaining */
 	void *l4_header;		/**< Cached transport header */
 	uint8_t transport_proto;	/**< Cached transport protocol */
+	uint32_t l4_remaining;		/**< Cached transport remaining */
 } libtrace_packet_t;
 
 
