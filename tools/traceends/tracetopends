@@ -1,0 +1,121 @@
+#!/bin/bash
+
+if [ $# -lt 1 ]; then
+	echo usage: $0 [options] inputuri...
+	echo See manpage for more details.
+	exit
+fi
+
+top_count=10
+send=1
+sort="bytes"
+filter=""
+addr="v4"
+
+while getopts "f:sdn:bapA:" opt; do
+	case $opt in
+		A)
+			addr=$OPTARG
+			;;
+		f)
+			filter=$OPTARG
+			;;
+		s)
+			send=1
+			;;
+		d)
+			send=0
+			;;
+		n)
+			top_count=$OPTARG
+			;;
+		b)
+			sort="bytes"
+			;;
+		a)
+			sort="app"
+			;;
+		p)
+			sort="pkts"
+			;;
+		/?)
+			echo "Invalid option: -$OPTARG"
+			exit 1
+			;;
+		:)
+			echo "Option -$OPTARG requires an argument"
+			exit 1
+			;;
+	esac
+done
+
+sort_index=0
+
+if [ $send = 1 ]; then
+	if [ $sort = "bytes" ]; then
+		sort_index=4
+	elif [ $sort = "pkts" ]; then
+		sort_index=3
+	else
+		sort_index=5
+	fi
+fi
+	
+if [ $send = 0 ]; then
+	if [ $sort = "bytes" ]; then
+		sort_index=7
+	elif [ $sort = "pkts" ]; then
+		sort_index=6
+	else
+		sort_index=8
+	fi
+fi
+
+exec 		
+
+shift $(($OPTIND - 1))
+
+if [ $addr = "mac" ]; then
+	printf "%18s %16s %16s %16s %16s %16s %16s %16s\n" \
+	"MAC Address" \
+	"Last Seen" \
+	"Src Pkts" \
+	"Src Bytes" \
+	"Src Payload" \
+	"Dst Pkts" \
+	"Dst Bytes" \
+	"Dst Payload"
+fi
+
+if [ $addr = "v4" ]; then
+	printf "%16s %16s %16s %16s %16s %16s %16s %16s\n" \
+	"IPv4 Address" \
+	"Last Seen" \
+	"Src Pkts" \
+	"Src Bytes" \
+	"Src Payload" \
+	"Dst Pkts" \
+	"Dst Bytes" \
+	"Dst Payload"
+fi
+
+if [ $addr = "v6" ]; then
+	printf "%40s %16s %16s %16s %16s %16s %16s %16s\n" \
+	"IPv6 Address" \
+	"Last Seen" \
+	"Src Pkts" \
+	"Src Bytes" \
+	"Src Payload" \
+	"Dst Pkts" \
+	"Dst Bytes" \
+	"Dst Payload"
+fi
+
+if [ "$filter" = "" ]; then
+	traceends -a $addr $@ | { trap '' int; sort -n -k $sort_index -r -s; } | { trap '' int; head -n $top_count; }
+else
+	traceends -a $addr -f "$filter" $@  | { trap '' int; sort -n -k $sort_index -r -s; } | { trap '' int; head -n $top_count; }
+fi
+
+exit 1
+
