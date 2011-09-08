@@ -112,9 +112,9 @@ if [ $addr = "v6" ]; then
 fi
 
 if [ "$filter" = "" ]; then
-	traceends -a $addr $@ | { trap '' int; sort -n -k $sort_index -r -s; } | { trap '' int; head -n $top_count; }
+	traceends -A $addr $@ | { trap '' int; sort -n -k $sort_index -r -s; } | { trap '' int; head -n $top_count; }
 else
-	traceends -a $addr -f "$filter" $@  | { trap '' int; sort -n -k $sort_index -r -s; } | { trap '' int; head -n $top_count; }
+	traceends -A $addr -f "$filter" $@  | { trap '' int; sort -n -k $sort_index -r -s; } | { trap '' int; head -n $top_count; }
 fi
 
 exit 1

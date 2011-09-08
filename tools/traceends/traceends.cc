@@ -68,8 +68,8 @@ static int usage(char *argv0)
         printf("Usage:\n"
         "%s flags inputuri [inputuri ... ] \n"
         "-f --filter=bpf        Only output packets that match filter\n"
-        "-H --libtrace-help     Print libtrace runtime documentation\n"
-        "-a --address     	Specifies which address type to match (mac, v4, v6)\n"
+        "-H --help     		Print this message\n"
+        "-A --address     	Specifies which address type to match (mac, v4, v6)\n"
         ,argv0);
         exit(1);
 }
@@ -359,24 +359,28 @@ int main(int argc, char *argv[]) {
                 int option_index;
                 struct option long_options[] = {
                         { "filter",        1, 0, 'f' },
-                        { "libtrace-help", 0, 0, 'H' },
-			{ "addresses", 	   1, 0, 'a' },	
+                        { "help", 	   0, 0, 'H' },
+			{ "addresses", 	   1, 0, 'A' },	
                         { NULL,            0, 0, 0   },
                 };
 
-                int c=getopt_long(argc, argv, "a:f:H",
+                int c=getopt_long(argc, argv, "A:f:H",
                                 long_options, &option_index);
 
                 if (c==-1)
                         break;
 		switch (c) {
-			case 'a':
+			case 'A':
 				if (strncmp(optarg, "mac", 3) == 0)
 					mode = MODE_MAC;
-				if (strncmp(optarg, "v4", 2) == 0)
+				else if (strncmp(optarg, "v4", 2) == 0)
 					mode = MODE_IPV4;
-				if (strncmp(optarg, "v6", 2) == 0)
+				else if (strncmp(optarg, "v6", 2) == 0)
 					mode = MODE_IPV6;
+				else {
+					fprintf(stderr, "Invalid address type, must be either mac, v4 or v6\n");
+					return 1;
+				}
 				break;
 
                         case 'f': filter=trace_create_filter(optarg);

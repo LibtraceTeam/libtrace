@@ -1,83 +1,55 @@
-.TH TRACESPLIT "1" "January 2011" "tracesplit (libtrace)" "User Commands"
+.TH TRACEENDS "1" "September 2011" "traceends (libtrace)" "User Commands"
 .SH NAME
-tracesplit \- split traces
+traceends \- summarise traffic done by every endpoint observed in a trace
 .SH SYNOPSIS
-.B tracesplit
+.B tracetopends
 [ \fB-f \fRbpf | \fB--filter=\fRbpf]
-[ \fB-c \fRcount | \fB--count=\fRcount]
-[ \fB-b \fRbytes | \fB--bytes=\fRbytes]
-[ \fB-i \fRseconds | \fB--seconds=\fRseconds]
-[ \fB-s \fRunixtime | \fB--starttime=\fRunixtime]
-[ \fB-e \fRunixtime | \fB--endtime=\fRunixtime]
-[ \fB-m \fRmaxfiles | \fB--maxfiles=\fRmaxfiles]
-[ \fB-S \fRsnaplen | \fB--snaplen=\fRsnaplen]
-[ \fB-z \fRlevel | \fB--compress-level=\fRlevel]
-[ \fB-Z \fRmethod | \fB--compress-type=\fRmethod]
-inputuri [inputuri ...] outputuri
+[ \fB-a \fRaddrtype | \fB--address=\fRaddrtype]
+[ \fB-H | \fB--help]
+
+inputuri [inputuri ...] 
 .SH DESCRIPTION
-tracesplit splits the given input traces into multiple tracefiles
+traceends reports the number of bytes and packets sent and received by each
+endpoint observed in the input trace(s). Usually, you don't want to run this
+program directly \-\- see \fBtracetopends\fR instead.
+
 .TP
 \fB\-f\fR bpf filter
 output only packets that match tcpdump style bpf filter
 
 .TP
-\fB\-c\fR count
-output count packets per output file.  The output file will be named after
-the basename given in the outputuri with the packet number of the first packet
-in this file.
+\fB\-A\fR address type
+Specifies how an endpoint should be defined. Suitable options are "mac", "v4" 
+and "v6" which will report endpoint stats for each observed MAC address, IPv4
+address and IPv6 address respectively.
 
-.TP
-\fB\-b\fR bytes
-output bytes bytes per file
+.SH OUTPUT
+Output is written to stdout in columns separated by blank space. 
 
-.TP
-\fB\-i\fR seconds
-start a new tracefile after "seconds" seconds
-
-.TP
-\fB\-s\fR unixtime
-don't output any packets before unixtime
-
-.TP
-\fB\-e\fR unixtime
-don't output any packets after unixtime
-
-.TP
-\fB\-m\fR maxfiles
-do not create more than "maxfiles" trace files
-
-.TP
-\fB\-S\fR snaplen
-Truncate packets to "snaplen" bytes long.  The default is collect the entire
-packet.
-
-.TP
-\fB\-z\fR level
-Compress the data using the specified compression level, ranging from 0 to 9. 
-Higher compression levels tend to result in better compression but require
-more processing power to compress.
-
-.TP
-\fB-Z\fR compression-method
-Compress the data using the specified compression algorithm. Accepted methods
-are "gzip", "bzip2", "lzo" or "none". Default value is none unless a 
-compression level is specified, in which case gzip will be used.
+The columns are (in order):
+ * Endpoint address
+ * Time last observed
+ * Packets originating from the endpoint
+ * Bytes originating from the endpoint (IP header onwards)
+ * Payload originating from the endpoint (post transport header)
+ * Packets sent to the endpoint
+ * Bytes sent to the endpoint (IP header onwards)
+ * Payload sent to the endpoint (post transport header)
 
 .SH EXAMPLES
-create a 1MB erf trace of port 80 traffic.
+Get stats for each individual MAC address in a trace:
 .nf
-tracesplit \-z 1 -Z gzip \-f 'port 80' \-b $[ 1024 * 1024 ] 
-erf:/traces/bigtrace.gz erf:/traces/port80.gz 
+traceends -a mac erf:trace.erf.gz
 .fi
 
 .SH LINKS
-More details about tracesplit (and libtrace) can be found at
+More details about traceends (and libtrace) can be found at
 http://www.wand.net.nz/trac/libtrace/wiki/UserDocumentation
 
 .SH SEE ALSO
 libtrace(3), tracemerge(1), tracefilter(1), traceconvert(1), tracesplit_dir(1),
 tracereport(1), tracertstats(1), tracestats(1), tracepktdump(1), traceanon(1),
-tracesummary(1), tracereplay(1), tracediff(1)
+tracesummary(1), tracereplay(1), tracediff(1), tracetopends(1)
 
 .SH AUTHORS
-Perry Lorier <perry@cs.waikato.ac.nz>
+Shane Alcock <salcock@cs.waikato.ac.nz>
