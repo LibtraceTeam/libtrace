@@ -12,7 +12,7 @@ sort="bytes"
 filter=""
 addr="v4"
 
-while getopts "f:sdn:bapA:" opt; do
+while getopts "f:sdn:bapA:h" opt; do
 	case $opt in
 		A)
 			addr=$OPTARG
@@ -37,6 +37,11 @@ while getopts "f:sdn:bapA:" opt; do
 			;;
 		p)
 			sort="pkts"
+			;;
+		h)
+			echo usage: $0 [options] inputuri...
+			echo Type \'man tracetopends\' for more details.
+			exit 1
 			;;
 		/?)
 			echo "Invalid option: -$OPTARG"
@@ -117,5 +122,5 @@ else
 	traceends -A $addr -f "$filter" $@  | { trap '' int; sort -n -k $sort_index -r -s; } | { trap '' int; head -n $top_count; }
 fi
 
-exit 1
+exit $ 
 
