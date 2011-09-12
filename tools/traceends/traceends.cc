@@ -118,7 +118,7 @@ static void dump_mac_map() {
 		t = (time_t)(it->second->last_active);
 		tm = localtime(&t);
 		strftime(timestr, 80, "%d/%m,%H:%M:%S", tm);
-		printf("%18s %16s %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 "\n", 
+		printf("%18s %16s %16" PRIu64 " %16" PRIu64 " %16" PRIu64 " %16" PRIu64 " %16" PRIu64 " %16" PRIu64 "\n", 
 				mac_string(it->first, str),
 				timestr,
 				it->second->src_pkts,
@@ -141,7 +141,7 @@ static void dump_ipv4_map() {
 		t = (time_t)(it->second->last_active);
 		tm = localtime(&t);
 		strftime(timestr, 80, "%d/%m,%H:%M:%S", tm);
-		printf("%16s %16s %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 "\n", 
+		printf("%16s %16s %16" PRIu64 " %16" PRIu64 " %16" PRIu64 " %16" PRIu64 " %16" PRIu64 " %16" PRIu64 "\n", 
 				inet_ntoa(in),
 				timestr,
 				it->second->src_pkts,
@@ -166,7 +166,7 @@ static void dump_ipv6_map() {
 		t = (time_t)(it->second->last_active);
 		tm = localtime(&t);
 		strftime(timestr, 80, "%d/%m,%H:%M:%S", tm);
-		printf("%40s %16s %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 "\n", 
+		printf("%40s %16s %16" PRIu64 " %16" PRIu64 " %16" PRIu64 " %16" PRIu64 " %16" PRIu64 " %16" PRIu64 "\n", 
 				inet_ntop(AF_INET6, &in, ip6_addr, 128),
 				timestr,
 				it->second->src_pkts,
