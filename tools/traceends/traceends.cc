@@ -1,3 +1,5 @@
+#define __STDC_FORMAT_MACROS
+
 #include <libtrace.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -69,7 +71,7 @@ static int usage(char *argv0)
         "%s flags inputuri [inputuri ... ] \n"
         "-f --filter=bpf        Only output packets that match filter\n"
         "-H --help     		Print this message\n"
-        "-A --address     	Specifies which address type to match (mac, v4, v6)\n"
+        "-A --address=addr     	Specifies which address type to match (mac, v4, v6)\n"
         ,argv0);
         exit(1);
 }
@@ -116,7 +118,7 @@ static void dump_mac_map() {
 		t = (time_t)(it->second->last_active);
 		tm = localtime(&t);
 		strftime(timestr, 80, "%d/%m,%H:%M:%S", tm);
-		printf("%18s %16s %16lu %16lu %16lu %16lu %16lu %16lu\n", 
+		printf("%18s %16s %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 "\n", 
 				mac_string(it->first, str),
 				timestr,
 				it->second->src_pkts,
@@ -139,7 +141,7 @@ static void dump_ipv4_map() {
 		t = (time_t)(it->second->last_active);
 		tm = localtime(&t);
 		strftime(timestr, 80, "%d/%m,%H:%M:%S", tm);
-		printf("%16s %16s %16lu %16lu %16lu %16lu %16lu %16lu\n", 
+		printf("%16s %16s %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 "\n", 
 				inet_ntoa(in),
 				timestr,
 				it->second->src_pkts,
@@ -164,7 +166,7 @@ static void dump_ipv6_map() {
 		t = (time_t)(it->second->last_active);
 		tm = localtime(&t);
 		strftime(timestr, 80, "%d/%m,%H:%M:%S", tm);
-		printf("%40s %16s %16lu %16lu %16lu %16lu %16lu %16lu\n", 
+		printf("%40s %16s %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 "\n", 
 				inet_ntop(AF_INET6, &in, ip6_addr, 128),
 				timestr,
 				it->second->src_pkts,
