@@ -52,64 +52,127 @@
  * NOTE: "Color" refers to the concept of marking packets based on matching
  * a particular filter or classification */
 
+#ifndef TYPE_LEGACY
 #define TYPE_LEGACY             0	/**< Legacy */
+#endif
+
+#ifndef TYPE_HDLC_POS
 #define TYPE_HDLC_POS           1	/**< PoS with HDLC framing */
+#endif
+
+#ifndef TYPE_ETH
 #define TYPE_ETH                2	/**< Ethernet */
+#endif
+
+#ifndef TYPE_ATM
 #define TYPE_ATM                3	/**< ATM Cell */
+#endif
+
+#ifndef TYPE_AAL5
 #define TYPE_AAL5               4	/**< AAL5 Frame */
+#endif
+
+#ifndef TYPE_MC_HDLC
 #define TYPE_MC_HDLC            5	/**< Multi-channel HDLC */
+#endif
+
+#ifndef TYPE_MC_RAW
 #define TYPE_MC_RAW             6	/**< Multi-channel Raw link record */
+#endif
+
+#ifndef TYPE_MC_ATM
 #define TYPE_MC_ATM             7	/**< Multi-channel ATM Cell */
+#endif
+
+#ifndef TYPE_MC_RAW_CHANNEL
 #define TYPE_MC_RAW_CHANNEL     8	/**< Multi-channel Raw link data */
+#endif
+
+#ifndef TYPE_MC_AAL5
 #define TYPE_MC_AAL5            9	/**< Multi-channel AAL5 */
+#endif
 
 /** PoS with HDLC framing and classification information in the loss counter
  *  field */
+#ifndef TYPE_COLOR_HDLC_POS
 #define TYPE_COLOR_HDLC_POS     10	
+#endif
 
 /** Ethernet with classification information in the loss counter field */
+#ifndef TYPE_COLOR_ETH
 #define TYPE_COLOR_ETH          11
+#endif
 
 /** Multi-channel AAL2 */
+#ifndef TYPE_MC_AAL2
 #define TYPE_MC_AAL2            12
+#endif
 
 /** IP counter ERF record */
+#ifndef TYPE_IP_COUNTER
 #define TYPE_IP_COUNTER         13
+#endif
 
 /** TCP flow counter ERF record */
+#ifndef TYPE_TCP_FLOW_COUNTER
 #define TYPE_TCP_FLOW_COUNTER   14
+#endif
 
 /** PoS with HDLC framing with DSM color information in the loss counter field*/
+#ifndef TYPE_DSM_COLOR_HDLC_POS
 #define TYPE_DSM_COLOR_HDLC_POS 15
+#endif
 
 /** Ethernet with DSM color information in the loss counter field */
+#ifndef TYPE_DSM_COLOR_ETH
 #define TYPE_DSM_COLOR_ETH      16
+#endif
 
 /** Multi-channel HDLC with classification information in the loss counter 
  *  field */
+#ifndef TYPE_COLOR_MC_HDLC_POS
 #define TYPE_COLOR_MC_HDLC_POS  17
+#endif
 
 /** AAL2 Frame */
+#ifndef TYPE_AAL2
 #define TYPE_AAL2               18
+#endif
 
 /** Colored PoS HDLC record with Hash load balancing */
+#ifndef TYPE_COLOR_HASH_POS
 #define TYPE_COLOR_HASH_POS	19
+#endif
 
 /** Colored Ethernet with Hash load balancing */
+#ifndef TYPE_COLOR_HASH_ETH
 #define TYPE_COLOR_HASH_ETH	20
+#endif
 
 /** Infiniband */
+#ifndef TYPE_INFINIBAND
 #define TYPE_INFINIBAND 	21
+#endif
 
 /** IPv4 */
+#ifndef TYPE_IPV4
 #define TYPE_IPV4		22
+#endif
 
 /** IPv6 */
+#ifndef TYPE_IPV6
 #define TYPE_IPV6		23
+#endif
 
 /** Raw link data, usually SONET or SDH */
+#ifndef TYPE_RAW_LINK
 #define TYPE_RAW_LINK		24
+#endif
 
 /** Padding record */
+#ifndef TYPE_PAD
 #define TYPE_PAD		48
 #endif
+
+
+#endif /* _ERFTYPES_H_ */
