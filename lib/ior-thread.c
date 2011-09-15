@@ -58,7 +58,6 @@
 
 /* 1MB Buffer */
 #define BUFFERSIZE (1024*1024)
-#define BUFFERS 5
 
 extern io_source_t thread_source;
 
@@ -71,7 +70,7 @@ struct buffer_t {
 
 struct state_t {
 	/* The collection of buffers (or slices) */
-	struct buffer_t buffer[BUFFERS];
+	struct buffer_t *buffer;
 	/* The index of the buffer to read into next */
 	int in_buffer;
 	/* The read offset into the current buffer */
@@ -150,7 +149,7 @@ static void *thread_producer(void* userdata)
 		pthread_cond_signal(&DATA(state)->data_ready);
 
 		/* Move on to the next buffer */
-		buffer=(buffer+1) % BUFFERS;
+		buffer=(buffer+1) % max_buffers;
 
 	} while(running);
 
@@ -176,6 +175,7 @@ io_t *thread_open(io_t *parent)
 	state->data = calloc(1,sizeof(struct state_t));
 	state->source = &thread_source;
 
+	DATA(state)->buffer = (struct buffer_t *)malloc(sizeof(struct buffer_t) * max_buffers);
 	DATA(state)->in_buffer = 0;
 	DATA(state)->offset = 0;
 	pthread_mutex_init(&DATA(state)->mutex,NULL);
@@ -244,7 +244,7 @@ static off_t thread_read(io_t *state, void *buffer, off_t len)
 		if (DATA(state)->offset >= INBUFFER(state).len) {
 			INBUFFER(state).state = EMPTY;
 			pthread_cond_signal(&DATA(state)->space_avail);
-			newbuffer = (newbuffer+1) % BUFFERS;
+			newbuffer = (newbuffer+1) % max_buffers;
 			DATA(state)->offset = 0;
 		}
 

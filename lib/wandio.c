@@ -55,6 +55,7 @@ int keep_stats = 0;
 int force_directio_write = 0;
 int force_directio_read = 0;
 unsigned int use_threads = -1;
+unsigned int max_buffers = 50;
 
 uint64_t read_waits = 0;
 uint64_t write_waits = 0;
@@ -82,6 +83,8 @@ static void do_option(const char *option)
 		use_threads = 0;
 	else if (strncmp(option,"threads=",8) == 0)
 		use_threads = atoi(option+8);
+	else if (strncmp(option,"buffers=",8) == 0)
+		max_buffers = atoi(option+8);
 	else {
 		fprintf(stderr,"Unknown libtraceio debug option '%s'\n", option);
 	}

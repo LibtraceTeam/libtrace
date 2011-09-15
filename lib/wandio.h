@@ -293,6 +293,7 @@ extern int force_directio_write;
 extern uint64_t write_waits;
 extern uint64_t read_waits;
 extern unsigned int use_threads;
+extern unsigned int max_buffers;
 /* @} */
 
 #endif
