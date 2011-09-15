@@ -136,7 +136,7 @@ static int pcapfile_init_output(libtrace_out_t *libtrace) {
 }
 
 
-static uint16_t swaps(libtrace_t *libtrace, uint16_t num)
+static inline uint16_t swaps(libtrace_t *libtrace, uint16_t num)
 {
 	/* To deal with open_dead traces that might try and use this
 	 * if we don't have any per trace data, assume host byte order
@@ -151,7 +151,7 @@ static uint16_t swaps(libtrace_t *libtrace, uint16_t num)
 	return num;
 }
 
-static uint32_t swapl(libtrace_t *libtrace, uint32_t num)
+static inline uint32_t swapl(libtrace_t *libtrace, uint32_t num)
 {
 	/* To deal with open_dead traces that might try and use this
 	 * if we don't have any per trace data, assume host byte order
@@ -379,7 +379,10 @@ static int pcapfile_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 				packet->type, flags)) {
 		return -1;
 	}
-	
+
+	/* We may as well cache this value now, seeing as we already had to 
+	 * look it up */
+	packet->capture_length = bytes_to_read;	
 	return sizeof(libtrace_pcapfile_pkt_hdr_t) + bytes_to_read;
 }
 
