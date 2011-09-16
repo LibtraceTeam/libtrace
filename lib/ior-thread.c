@@ -176,6 +176,7 @@ io_t *thread_open(io_t *parent)
 	state->source = &thread_source;
 
 	DATA(state)->buffer = (struct buffer_t *)malloc(sizeof(struct buffer_t) * max_buffers);
+	memset(DATA(state)->buffer, 0, sizeof(struct buffer_t) * max_buffers);
 	DATA(state)->in_buffer = 0;
 	DATA(state)->offset = 0;
 	pthread_mutex_init(&DATA(state)->mutex,NULL);
@@ -264,6 +265,7 @@ static void thread_close(io_t *io)
 
 	/* Wait for the thread to exit */
 	pthread_join(DATA(io)->producer, NULL);
+	free(DATA(io)->buffer);
 	free(DATA(io));
 	free(io);
 }
