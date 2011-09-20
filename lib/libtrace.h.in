@@ -774,6 +774,23 @@ typedef struct libtrace_radiotap_t {
  */
 DLLEXPORT void trace_help(void);
 
+/** Causes a libtrace reader to stop blocking whilst waiting on new packets
+ * and immediately return EOF.
+ *
+ * This function is useful if you are handling signals within your libtrace
+ * program. If a live source is not receiving any packets (or they are being
+ * filtered), a call to trace_read_packet will result in an infinite loop as
+ * it will block until a packet is received. Normally, a SIGINT would cause the
+ * program to end and thus break the loop, but if you are handling the signal
+ * yourself then that signal will never reach libtrace.
+ *
+ * Instead this function sets a global variable within libtrace that will 
+ * cause a blocking live capture to break on the next internal timeout, 
+ * allowing control to be returned to the user and their own signal handling
+ * to kick in.
+ */
+DLLEXPORT void trace_interrupt(void); 
+
 /** @name Trace management
  * These members deal with creating, configuring, starting, pausing and
  * cleaning up a trace object

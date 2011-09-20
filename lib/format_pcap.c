@@ -242,7 +242,47 @@ static int pcapint_config_input(libtrace_t *libtrace,
 
 static int pcapint_start_input(libtrace_t *libtrace) {
 	char errbuf[PCAP_ERRBUF_SIZE];
+
+#ifdef HAVE_PCAP_CREATE
+	int ret = 0;
 	
+	if ((INPUT.pcap = pcap_create(libtrace->uridata, errbuf)) == NULL) {
+		trace_set_err(libtrace,TRACE_ERR_INIT_FAILED,"%s",errbuf);
+		return -1; /* failure */
+	}
+	if ((pcap_set_snaplen(INPUT.pcap, DATA(libtrace)->snaplen) == 
+				PCAP_ERROR_ACTIVATED)) {
+		trace_set_err(libtrace,TRACE_ERR_INIT_FAILED,"%s",errbuf);
+		return -1; /* failure */
+	}
+
+	if ((pcap_set_promisc(INPUT.pcap, DATA(libtrace)->promisc) == 
+				PCAP_ERROR_ACTIVATED)) {
+		trace_set_err(libtrace,TRACE_ERR_INIT_FAILED,"%s",errbuf);
+		return -1; /* failure */
+	}
+	
+	if ((pcap_set_timeout(INPUT.pcap, 1) == PCAP_ERROR_ACTIVATED)) {
+		trace_set_err(libtrace,TRACE_ERR_INIT_FAILED,"%s",errbuf);
+		return -1; /* failure */
+	}
+
+	if ((ret = pcap_activate(INPUT.pcap)) != 0) {
+		if (ret == PCAP_WARNING_PROMISC_NOTSUP) {
+			trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,"Promiscuous mode unsupported");
+			return -1;
+		}
+		if (ret == PCAP_WARNING) {
+			pcap_perror(INPUT.pcap, "Pcap Warning:");
+		} else {
+			trace_set_err(libtrace,TRACE_ERR_INIT_FAILED,"%s",
+					pcap_geterr(INPUT.pcap));
+			return -1;
+		}
+	}
+			 
+#else	
+
 	/* Open the live device */
 	if ((INPUT.pcap = 
 			pcap_open_live(libtrace->uridata,
@@ -253,8 +293,16 @@ static int pcapint_start_input(libtrace_t *libtrace) {
 		trace_set_err(libtrace,TRACE_ERR_INIT_FAILED,"%s",errbuf);
 		return -1; /* failure */
 	}
+#endif
 	/* Set a filter if one is defined */
 	if (DATA(libtrace)->filter) {
+		if (DATA(libtrace)->filter->flag == 0) {
+			pcap_compile(INPUT.pcap, 
+					&DATA(libtrace)->filter->filter,
+					DATA(libtrace)->filter->filterstring, 
+					1, 0);
+			DATA(libtrace)->filter->flag = 1;
+		}
 		if (pcap_setfilter(INPUT.pcap,&DATA(libtrace)->filter->filter)
 			== -1) {
 			trace_set_err(libtrace,TRACE_ERR_INIT_FAILED,"%s",
@@ -369,7 +417,10 @@ static int pcap_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 
 		switch(ret) {
 			case 1: break; /* no error */
-			case 0: continue; /* timeout expired */
+			case 0: 
+				if (libtrace_halt)
+					return 0;
+				continue; /* timeout expired */
 			case -1: 
 				trace_set_err(libtrace,TRACE_ERR_BAD_PACKET,
 						"%s",pcap_geterr(INPUT.pcap));

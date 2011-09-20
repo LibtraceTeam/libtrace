@@ -761,7 +761,12 @@ struct libtrace_format_t {
 };
 
 /** The list of registered capture formats */
-extern struct libtrace_format_t *form;
+//extern struct libtrace_format_t *form;
+
+/** Specifies whether any blocking packet readers should cease reading 
+ * immediately
+ */
+extern int libtrace_halt;
 
 /** Registers a new capture format module.
  *

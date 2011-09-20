@@ -103,6 +103,8 @@
 
 static struct libtrace_format_t *formats_list = NULL;
 
+int libtrace_halt = 0;
+
 /* strncpy is not assured to copy the final \0, so we
  * will use our own one that does
  */
@@ -1183,14 +1185,13 @@ DLLEXPORT void trace_destroy_filter(libtrace_filter_t *filter)
  * @returns -1 on error, 0 on success
  */
 static int trace_bpf_compile(libtrace_filter_t *filter,
-		const libtrace_packet_t *packet	) {
+		const libtrace_packet_t *packet,
+		void *linkptr, 
+		libtrace_linktype_t linktype	) {
 #ifdef HAVE_BPF_FILTER
-	void *linkptr = 0;
-	libtrace_linktype_t linktype;
 	assert(filter);
 
 	/* If this isn't a real packet, then fail */
-	linkptr = trace_get_packet_buffer(packet,&linktype,NULL);
 	if (!linkptr) {
 		trace_set_err(packet->trace,
 				TRACE_ERR_BAD_PACKET,"Packet has no payload");
@@ -1243,6 +1244,7 @@ DLLEXPORT int trace_apply_filter(libtrace_filter_t *filter,
 	uint32_t clen = 0;
 	bool free_packet_needed = false;
 	int ret;
+	libtrace_linktype_t linktype;
 	libtrace_packet_t *packet_copy = (libtrace_packet_t*)packet;
 
 	assert(filter);
@@ -1250,10 +1252,12 @@ DLLEXPORT int trace_apply_filter(libtrace_filter_t *filter,
 
 	/* Match all non-data packets as we probably want them to pass
 	 * through to the caller */
-	if (trace_get_link_type(packet) == TRACE_TYPE_NONDATA)
+	linktype = trace_get_link_type(packet);
+
+	if (linktype == TRACE_TYPE_NONDATA)
 		return 1;	
 
-	if (libtrace_to_pcap_dlt(trace_get_link_type(packet))==~0U) {
+	if (libtrace_to_pcap_dlt(linktype)==~0U) {
 		
 		/* If we cannot get a suitable DLT for the packet, it may
 		 * be because the packet is encapsulated in a link type that
@@ -1266,8 +1270,7 @@ DLLEXPORT int trace_apply_filter(libtrace_filter_t *filter,
 		packet_copy=trace_copy_packet(packet);
 		free_packet_needed=true;
 
-		while (libtrace_to_pcap_dlt(trace_get_link_type(packet_copy))==
-				~0U) {
+		while (libtrace_to_pcap_dlt(linktype) == ~0U) {
 			if (!demote_packet(packet_copy)) {
 				trace_set_err(packet->trace, 
 						TRACE_ERR_NO_CONVERSION,
@@ -1277,7 +1280,9 @@ DLLEXPORT int trace_apply_filter(libtrace_filter_t *filter,
 				}
 				return -1;
 			}
+			linktype = trace_get_link_type(packet_copy);
 		}
+
 	}
 	
 	linkptr = trace_get_packet_buffer(packet_copy,NULL,&clen);
@@ -1291,7 +1296,7 @@ DLLEXPORT int trace_apply_filter(libtrace_filter_t *filter,
 	/* We need to compile the filter now, because before we didn't know 
 	 * what the link type was
 	 */
-	if (trace_bpf_compile(filter,packet_copy)==-1) {
+	if (trace_bpf_compile(filter,packet_copy,linkptr,linktype)==-1) {
 		if (free_packet_needed) {
 			trace_destroy_packet(packet_copy);
 		}
@@ -1833,6 +1838,10 @@ void trace_clear_cache(libtrace_packet_t *packet) {
 	packet->l3_remaining = 0;
 	packet->l4_remaining = 0;
 
+}
+
+void trace_interrupt(void) {
+	libtrace_halt = 1;
 }
 
 void register_format(struct libtrace_format_t *f) {

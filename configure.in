@@ -3,11 +3,11 @@
 # Now you only need to update the version number in two places - below,
 # and in the README
 
-AC_INIT([libtrace],[3.0.12],[contact@wand.net.nz],[libtrace])
+AC_INIT([libtrace],[3.0.13],[contact@wand.net.nz],[libtrace])
 
 LIBTRACE_MAJOR=3
 LIBTRACE_MID=0
-LIBTRACE_MINOR=12
+LIBTRACE_MINOR=13
 
 # OpenSolaris hides libraries like libncurses in /usr/gnu/lib, which is not
 # searched by default - add it to LDFLAGS so we at least have a chance of 
@@ -220,6 +220,7 @@ AC_CHECK_HEADER(gdc.h,AC_DEFINE(HAVE_LIBGDC,1,[has gdc.h]))
 
 # Check for libpcap
 AC_CHECK_LIB(pcap,pcap_next_ex,pcapfound=1,pcapfound=0)
+AC_CHECK_LIB(pcap,pcap_create,pcapcreate=1,pcapcreate=0)
 AC_CHECK_FUNCS(pcap_inject pcap_sendpacket pcap_setnonblock)
 AC_CHECK_DECLS([BIOCSETIF],,,[
 #include <sys/types.h>
@@ -247,6 +248,10 @@ else
 	LIBTRACE_LIBS="$LIBTRACE_LIBS -lpcap"
 	AC_DEFINE([HAVE_LIBPCAP],1,[compile with libpcap support])
 	AC_DEFINE([HAVE_BPF_FILTER],1,[compile with bpf filter support])
+fi
+
+if test "$pcapcreate" = 1; then
+	AC_DEFINE([HAVE_PCAP_CREATE],1,[compile with libpcap 1.0 support])
 fi
 
 # Configure options for use of DAG cards
@@ -541,7 +546,12 @@ reportopt() {
 # Report which configure options were set
 echo
 AC_MSG_NOTICE([Libtrace version $PACKAGE_VERSION])
-reportopt "Compiled with PCAP 0.8 support" $ac_cv_lib_pcap_pcap_next_ex
+if test "$pcapcreate" = 1; then
+	AC_MSG_NOTICE([Compiled with PCAP support: >= 1.0])
+else
+	AC_MSG_NOTICE([Compiled with PCAP support: < 1.0])
+fi
+
 reportopt "Compiled with compressed trace (zlib) support" $ac_cv_lib_z_deflate
 reportopt "Compiled with compressed trace (bz2) support" $ac_cv_lib_bz2_BZ2_bzDecompressInit
 reportopt "Compiled with compressed trace (lzo write only) support" $ac_cv_lib_lzo2_lzo1x_1_compress
