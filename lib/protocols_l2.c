@@ -380,7 +380,6 @@ DLLEXPORT void *trace_get_layer2(const libtrace_packet_t *packet,
 		case TRACE_TYPE_PPP:
 		case TRACE_TYPE_METADATA:
 		case TRACE_TYPE_NONDATA:
-			((libtrace_packet_t*)packet)->link_type = *linktype;
 			((libtrace_packet_t*)packet)->l2_header = meta;
 			((libtrace_packet_t*)packet)->l2_remaining = *remaining;
 			return meta;
@@ -413,7 +412,6 @@ DLLEXPORT void *trace_get_layer2(const libtrace_packet_t *packet,
 				case TRACE_TYPE_PPP:
 				case TRACE_TYPE_METADATA:
 				case TRACE_TYPE_NONDATA:
-					((libtrace_packet_t*)packet)->link_type = *linktype;
 					((libtrace_packet_t*)packet)->l2_header = meta;
 					((libtrace_packet_t*)packet)->l2_remaining = *remaining;
 					return meta;

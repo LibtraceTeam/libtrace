@@ -1040,10 +1040,16 @@ DLLEXPORT size_t trace_get_capture_length(const libtrace_packet_t *packet)
  * not be the same as the Capture Len.
  */ 
 DLLEXPORT size_t trace_get_wire_length(const libtrace_packet_t *packet){
-	if (packet->trace->format->get_wire_length) {
-		return packet->trace->format->get_wire_length(packet);
+	
+	if (packet->wire_length == -1) {
+		if (!packet->trace->format->get_wire_length) 
+			return ~0U;
+		((libtrace_packet_t *)packet)->wire_length = 
+			packet->trace->format->get_wire_length(packet);
 	}
-	return ~0U;
+
+	assert(packet->wire_length < LIBTRACE_PACKET_BUFSIZE);
+	return packet->wire_length;
 
 }
 
@@ -1067,10 +1073,15 @@ size_t trace_get_framing_length(const libtrace_packet_t *packet) {
  * @returns libtrace_linktype_t
  */
 DLLEXPORT libtrace_linktype_t trace_get_link_type(const libtrace_packet_t *packet ) {
-	if (packet->trace->format->get_link_type) {
-		return packet->trace->format->get_link_type(packet);
+
+	if (packet->link_type == 0) {
+		if (!packet->trace->format->get_link_type)
+			return (libtrace_linktype_t)-1;
+		((libtrace_packet_t *)packet)->link_type =
+			packet->trace->format->get_link_type(packet);
 	}
-	return (libtrace_linktype_t)-1;
+
+	return packet->link_type;
 }
 
 /* process a libtrace event
@@ -1833,6 +1844,7 @@ void trace_clear_cache(libtrace_packet_t *packet) {
 	packet->l3_ethertype = 0;
 	packet->transport_proto = 0;
 	packet->capture_length = -1;
+	packet->wire_length = -1;
 	packet->payload_length = -1;
 	packet->l2_remaining = 0;
 	packet->l3_remaining = 0;
