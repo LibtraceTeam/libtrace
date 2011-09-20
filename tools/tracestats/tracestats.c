@@ -63,6 +63,7 @@ static void cleanup_signal(int signal)
 {
 	(void)signal;
 	done=1;
+	trace_interrupt();
 }
 
 struct filter_t {
@@ -101,19 +102,21 @@ static void run_trace(char *uri)
 
         for (;;) {
 		int psize;
+		int wlen;
                 if ((psize = trace_read_packet(trace, packet)) <1) {
                         break;
                 }
 		
 		if (done)
 			break;
+		wlen = trace_get_wire_length(packet);
 
 		for(i=0;i<filter_count;++i) {
 			if (filters[i].filter == NULL)
 				continue;
 			if(trace_apply_filter(filters[i].filter,packet) > 0) {
 				++filters[i].count;
-				filters[i].bytes+=trace_get_wire_length(packet);
+				filters[i].bytes+=wlen;
 			}
 			if (trace_is_err(trace)) {
 				trace_perror(trace, "trace_apply_filter");
@@ -123,7 +126,7 @@ static void run_trace(char *uri)
 		}
 
 		++count;
-		bytes+=trace_get_wire_length(packet);
+		bytes+=wlen;
         }
 
 	printf("%-30s\t%12s\t%12s\t%7s\n","filter","count","bytes","%");

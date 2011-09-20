@@ -82,6 +82,7 @@ static void cleanup_signal(int sig)
 {
         (void)sig;
         done=1;
+	trace_interrupt();
 }
 
 static end_counter_t *create_counter() {

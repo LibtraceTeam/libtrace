@@ -29,6 +29,7 @@ volatile int done=0;
 static void cleanup_signal(int sig UNUSED)
 {
 	done=1;
+	trace_interrupt();
 }
 
 int main(int argc, char *argv[])

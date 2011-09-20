@@ -57,6 +57,7 @@ static volatile int done=0;
 static void cleanup_signal(int sig UNUSED)
 {
 	done=1;
+	trace_interrupt();
 }
 
 /* Process a trace, counting packets that match filter(s) */
