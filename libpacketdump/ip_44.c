@@ -26,6 +26,10 @@ DLLEXPORT void decode(int link_type UNUSED, const char *packet, unsigned len)
 	printf("\n"); 
 	printf(" IPv6 Frag: Identification: %u\n", ntohl(frag->ident));
 
+	/* Only dump the next header if this is the first fragment */
+	if ((offset & 0xFFF8) != 0)
+		return;
+
 	decode_next(packet + sizeof(libtrace_ip6_frag_t), 
 			len - sizeof(libtrace_ip6_frag_t), "ip", frag->nxt);
 	return;	
