@@ -128,8 +128,8 @@ DLLEXPORT void *trace_get_payload_from_ip(libtrace_ip_t *ipptr, uint8_t *prot,
 		/* If the packet features extra "padding", we probably
 		 * don't want that counting as possible payload, e.g. for
 		 * payload length calculations */
-		if (*remaining > ntohs(ipptr->ip_len))
-			*remaining = ntohs(ipptr->ip_len);
+		//if (*remaining > ntohs(ipptr->ip_len))
+		//	*remaining = ntohs(ipptr->ip_len);
 
 		*remaining-=(ipptr->ip_hl * 4);
 	}

@@ -272,6 +272,7 @@ void promote_packet(libtrace_packet_t *packet)
 			sizeof(libtrace_sll_header_t);
 		((struct libtrace_pcapfile_pkt_hdr_t*) packet->header)->wirelen+=
 			sizeof(libtrace_sll_header_t);
+		trace_clear_cache(packet);
 		return;
 	}
 }
