@@ -390,6 +390,7 @@ typedef enum {
 	TRACE_IPPROTO_ICMPV6	= 58,	/**< ICMPv6 */
 	TRACE_IPPROTO_NONE	= 59,	/**< IPv6 no next header */
 	TRACE_IPPROTO_DSTOPTS	= 60,	/**< IPv6 destination options */
+	TRACE_IPPROTO_OSPF	= 89,	/**< Open Shortest Path First routing protocol */
 	TRACE_IPPROTO_PIM	= 103,	/**< Protocol Independant Multicast */
 	TRACE_IPPROTO_SCTP	= 132	/**< Stream Control Transmission Protocol */
 } libtrace_ipproto_t;
@@ -759,6 +760,170 @@ typedef struct libtrace_radiotap_t {
     uint16_t    it_len; /**< Length in bytes of the entire Radiotap header */
     uint32_t    it_present; /**< Which Radiotap fields are present */
 } PACKED libtrace_radiotap_t;
+
+/** OSPF header */
+typedef struct libtrace_ospf_v2_t
+{
+	uint8_t ospf_v;
+	uint8_t type;
+	uint16_t len;
+	struct in_addr router;
+	struct in_addr area;
+	uint16_t sum;
+	uint16_t au_type;
+	uint16_t zero;
+	uint8_t au_key_id;
+	uint8_t au_data_len;
+	uint32_t au_seq_num;
+} PACKED libtrace_ospf_v2_t;
+
+typedef struct libtrace_ospf_options_t {
+#if BYTE_ORDER == LITTLE_ENDIAN
+	LT_BITFIELD8 unused1:1;
+	LT_BITFIELD8 e_bit:1;
+	LT_BITFIELD8 mc_bit:1;
+	LT_BITFIELD8 np_bit:1;
+	LT_BITFIELD8 ea_bit:1;
+	LT_BITFIELD8 dc_bit:1;
+	LT_BITFIELD8 unused2:2;
+#elif BYTE_ORDER == BIG_ENDIAN
+	LT_BITFIELD8 unused2:2;
+	LT_BITFIELD8 dc_bit:1;
+	LT_BITFIELD8 ea_bit:1;
+	LT_BITFIELD8 np_bit:1;
+	LT_BITFIELD8 mc_bit:1;
+	LT_BITFIELD8 e_bit:1;
+	LT_BITFIELD8 unused1:1;
+#endif
+} PACKED libtrace_ospf_options_t;
+
+typedef struct libtrace_ospf_lsa_v2_t
+{
+	uint16_t age;
+	libtrace_ospf_options_t lsa_options;
+	uint8_t lsa_type;
+	struct in_addr ls_id;
+	struct in_addr adv_router;
+	uint32_t seq;
+	uint16_t checksum;
+	uint16_t length;
+} PACKED libtrace_ospf_lsa_v2_t;
+
+typedef struct libtrace_ospf_hello_v2_t
+{
+	struct in_addr mask;
+	uint16_t interval;
+	libtrace_ospf_options_t hello_options;
+	uint8_t priority;
+	uint32_t deadint;
+	struct in_addr designated;
+	struct in_addr backup;
+	struct in_addr neighbor;
+} PACKED libtrace_ospf_hello_v2_t;
+
+typedef struct libtrace_ospf_db_desc_v2_t
+{
+	uint16_t mtu;
+	uint8_t db_desc_options;
+#if BYTE_ORDER == LITTLE_ENDIAN
+	LT_BITFIELD8 db_desc_ms:1;
+	LT_BITFIELD8 db_desc_m:1;
+	LT_BITFIELD8 db_desc_i:1;
+	LT_BITFIELD8 zero:5;
+#elif BYTE_ORDER == BIG_ENDIAN
+	LT_BITFIELD8 zero:5;
+	LT_BITFIELD8 db_desc_i:1;
+	LT_BITFIELD8 db_desc_m:1;
+	LT_BITFIELD8 db_desc_ms:1;
+#endif
+	uint32_t seq;
+} PACKED libtrace_ospf_db_desc_v2_t;
+
+typedef struct libtrace_ospf_ls_req_t
+{
+	uint32_t ls_type;
+	uint32_t ls_id;
+	uint32_t advertising_router;
+} PACKED libtrace_ospf_ls_req_t;
+
+typedef struct libtrace_ospf_ls_update_t
+{
+	uint32_t ls_num_adv;
+} PACKED libtrace_ospf_ls_update_t;
+
+typedef struct libtrace_ospf_as_external_lsa_t
+{
+	struct in_addr netmask;
+#if BYTE_ORDER == LITTLE_ENDIAN
+	LT_BITFIELD8 tos:7;
+	LT_BITFIELD8 e:1;
+#elif BYTE_ORDER == BIG_ENDIAN
+	LT_BITFIELD8 e:1;
+	LT_BITFIELD8 tos:7;
+#endif
+	uint8_t metric_a;
+	uint8_t metric_b;
+	uint8_t metric_c;	
+	struct in_addr forwarding;
+	uint32_t external_tag;
+} PACKED libtrace_ospf_as_external_lsa_v2_t;
+
+typedef struct libtrace_ospf_summary_lsa
+{
+	struct in_addr netmask;
+	uint8_t zero;
+	uint8_t metric_a;
+	uint8_t metric_b;
+	uint8_t metric_c;	
+	
+} PACKED libtrace_ospf_summary_lsa_v2_t;
+
+typedef struct libtrace_ospf_network_lsa_t
+{
+	struct in_addr netmask;
+} PACKED libtrace_ospf_network_lsa_v2_t;
+
+typedef struct libtrace_ospf_link_t
+{
+	struct in_addr link_id;
+	struct in_addr link_data;
+	uint8_t type;
+	uint8_t num_tos;
+	uint16_t tos_metric;
+} PACKED libtrace_ospf_link_v2_t;
+
+typedef struct libtrace_ospf_router_lsa_t
+{
+#if BYTE_ORDER == LITTLE_ENDIAN
+	LT_BITFIELD8 b:1;
+	LT_BITFIELD8 e:1;
+	LT_BITFIELD8 v:1;
+	LT_BITFIELD8 zero:5;
+#elif BYTE_ORDER == BIG_ENDIAN
+	LT_BITFIELD8 zero:5;
+	LT_BITFIELD8 v:1;
+	LT_BITFIELD8 e:1;
+	LT_BITFIELD8 b:1;
+#endif
+	uint8_t zero2;
+	uint16_t num_links;
+} PACKED libtrace_ospf_router_lsa_v2_t;
+
+typedef enum {
+	TRACE_OSPF_HELLO = 1,
+	TRACE_OSPF_DATADESC = 2,
+	TRACE_OSPF_LSREQ = 3,
+	TRACE_OSPF_LSUPDATE = 4,
+	TRACE_OSPF_LSACK = 5
+} libtrace_ospf_types_t;
+
+typedef enum {
+        TRACE_OSPF_LS_ROUTER = 1,
+        TRACE_OSPF_LS_NETWORK = 2,
+        TRACE_OSPF_LS_SUMMARY = 3,
+        TRACE_OSPF_LS_ASBR_SUMMARY = 4,
+        TRACE_OSPF_LS_EXTERNAL = 5
+} libtrace_ospf_ls_types_t;
 
 
 #ifdef WIN32
@@ -1796,6 +1961,98 @@ libtrace_icmp_t *trace_get_icmp(libtrace_packet_t *packet);
  */
 DLLEXPORT SIMPLE_FUNCTION
 libtrace_icmp_t *trace_get_icmp_from_ip(libtrace_ip_t *ip,uint32_t *remaining);
+
+/** Get a pointer to the OSPF header (if present)
+ * @param packet	The packet to get the OSPF header from
+ * @param[out] version	The OSPF version number
+ * @param[out] remaining	Updated with the number of captured bytes remaining
+ * @return A pointer to the start of the OSPF header or NULL if there is no 
+ * complete OSPF header present in the packet
+ *
+ * This is a short-cut function enabling quick and easy access to the OSPF
+ * header. If you only care about the OSPF header, this function may be useful
+ * but we otherwise recommend the use of the more generic trace_get_transport()
+ * function instead.
+ *
+ * Upon return, 'version' is updated to contain the OSPF version number for the
+ * packet so that the returned pointer may be cast to the correct type.
+ * The version parameter MUST contain a valid pointer; it MUST NOT be NULL.
+ *
+ * 'remaining' is also set to contain the number of captured bytes remaining
+ * starting from the pointer returned by this function. 
+ *
+ * @note Unlike trace_get_transport(), this function will return NULL if the
+ * OSPF header is incomplete or truncated.
+ */
+DLLEXPORT SIMPLE_FUNCTION
+void *trace_get_ospf_header(libtrace_packet_t *packet, uint8_t *version,
+		uint32_t *remaining);
+
+/** Get a pointer to the contents of the OSPF packet *after* the OSPF header
+ * @param header	The OSPF header to get the OSPF contents from
+ * @param[out] ospf_type	The OSPF packet type
+ * @param[in, out] remaining	Updated with the number of captured bytes remaining
+ * @return A pointer to the first byte after the OSPF header.
+ *
+ * This function returns a void pointer that can be cast appropriately
+ * based on the ospf_type. For example, if the ospf_type is TRACE_OSPF_HELLO 
+ * then the return pointer should be cast as a libtrace_ospf_hello_v2_t 
+ * structure.
+ *
+ * If the OSPF header is truncated, then NULL will be returned. If the OSPF 
+ * contents are missing or truncated, the pointer to the start of the content 
+ * will still be returned so be careful to check the value of remaining.
+ *
+ * 'remaining' MUST be set to the amount of bytes remaining in the captured
+ * packet starting from the beginning of the OSPF header. It will be updated
+ * to contain the number of bytes remaining from the start of the OSPF contents.
+ *
+ * @note This function only works for OSPF version 2 packets.
+ * @note Use trace_get_first_ospf_lsa() and trace_get_next_ospf_lsa() to read the LSAs from Link State Request
+ * and Update packets.
+ * 
+ */ 
+DLLEXPORT SIMPLE_FUNCTION
+void *trace_get_ospf_contents_v2(libtrace_ospf_v2_t *header,
+		uint8_t *ospf_type, uint32_t *remaining);
+
+DLLEXPORT SIMPLE_FUNCTION 
+unsigned char *trace_get_first_ospf_lsa_from_update_v2(
+                libtrace_ospf_ls_update_t *ls_update,
+                uint32_t *remaining);
+
+DLLEXPORT SIMPLE_FUNCTION 
+unsigned char *trace_get_first_ospf_lsa_from_db_desc_v2(
+                libtrace_ospf_db_desc_v2_t *db_desc,
+                uint32_t *remaining);
+
+DLLEXPORT SIMPLE_FUNCTION
+unsigned char *trace_get_first_ospf_link_from_router_lsa_v2(
+		libtrace_ospf_router_lsa_v2_t *lsa,
+		uint32_t *remaining);
+
+DLLEXPORT SIMPLE_FUNCTION
+int trace_get_next_ospf_link_v2(unsigned char **current,
+		libtrace_ospf_link_v2_t **link,
+		uint32_t *remaining,
+		uint32_t *link_len);
+
+DLLEXPORT SIMPLE_FUNCTION
+int trace_get_next_ospf_lsa_v2(unsigned char **current,
+                libtrace_ospf_lsa_v2_t **lsa_hdr,
+                unsigned char **lsa_body,
+                uint32_t *remaining,
+                uint8_t *lsa_type,
+                uint16_t *lsa_length);
+
+DLLEXPORT SIMPLE_FUNCTION
+uint32_t trace_get_ospf_metric_from_as_external_lsa_v2(
+		libtrace_ospf_as_external_lsa_v2_t *as_lsa);
+
+DLLEXPORT SIMPLE_FUNCTION
+uint32_t trace_get_ospf_metric_from_summary_lsa_v2(
+		libtrace_ospf_summary_lsa_v2_t *sum_lsa);
+
 
 /** Gets the destination MAC address for a given packet
  * @param packet  	The packet to extract the destination MAC address from
