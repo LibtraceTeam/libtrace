@@ -99,6 +99,8 @@ BIN_PROTOCOLS+=ip_47.la
 TXT_PROTOCOLS+=ip_58.protocol 
 # IPv6 Destination Options Header
 BIN_PROTOCOLS+=ip_60.la
+# OSPF
+BIN_PROTOCOLS+=ip_89.la
 # SCTP
 BIN_PROTOCOLS+=ip_132.la        
 
@@ -107,6 +109,19 @@ BIN_PROTOCOLS+=ip_132.la
 
 # UDP protocol decoders
 # (udp_*.la)
+
+# OSPF decoders
+BIN_PROTOCOLS+=ospf2_1.la
+BIN_PROTOCOLS+=ospf2_4.la
+BIN_PROTOCOLS+=ospf2_5.la
+
+# Start numbering OSPF LSA types from 1000
+BIN_PROTOCOLS+=ospf2_1000.la
+BIN_PROTOCOLS+=ospf2_1001.la
+BIN_PROTOCOLS+=ospf2_1002.la
+BIN_PROTOCOLS+=ospf2_1003.la
+BIN_PROTOCOLS+=ospf2_1004.la
+BIN_PROTOCOLS+=ospf2_1005.la
 
 # I shouldn't need to do this
 link_0_la_LDFLAGS=-module
@@ -136,8 +151,18 @@ ip_43_la_LDFLAGS=-module
 ip_44_la_LDFLAGS=-module
 ip_47_la_LDFLAGS=-module
 ip_60_la_LDFLAGS=-module
+ip_89_la_LDFLAGS=-module
 ip_132_la_LDFLAGS=-module
 
+ospf2_1_la_LDFLAGS=-module
+ospf2_4_la_LDFLAGS=-module
+ospf2_5_la_LDFLAGS=-module
+ospf2_1000_la_LDFLAGS=-module
+ospf2_1001_la_LDFLAGS=-module
+ospf2_1002_la_LDFLAGS=-module
+ospf2_1003_la_LDFLAGS=-module
+ospf2_1004_la_LDFLAGS=-module
+ospf2_1005_la_LDFLAGS=-module
 
 libpacketdump_la_SOURCES = libpacketdump.cc \
 			lexer.l parser.y bitbuffer.c bitbuffer.h grammar.h
