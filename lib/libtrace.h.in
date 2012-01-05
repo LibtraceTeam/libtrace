@@ -2008,8 +2008,8 @@ void *trace_get_ospf_header(libtrace_packet_t *packet, uint8_t *version,
  * to contain the number of bytes remaining from the start of the OSPF contents.
  *
  * @note This function only works for OSPF version 2 packets.
- * @note Use trace_get_first_ospf_lsa() and trace_get_next_ospf_lsa() to read the LSAs from Link State Request
- * and Update packets.
+ * @note Use trace_get_first_ospf_lsa_v2_from_X() and trace_get_next_ospf_lsa_v2() to read the LSAs from Link State Update packets.
+ * @note Use trace_get_first_ospf_lsa_v2_from_X() and trace_get_next_ospf_lsa_header_v2() to read the LSA headers from Link State Ack packets.
  * 
  */ 
 DLLEXPORT SIMPLE_FUNCTION
@@ -2044,6 +2044,14 @@ int trace_get_next_ospf_lsa_v2(unsigned char **current,
                 uint32_t *remaining,
                 uint8_t *lsa_type,
                 uint16_t *lsa_length);
+
+DLLEXPORT SIMPLE_FUNCTION
+int trace_get_next_ospf_lsa_header_v2(unsigned char **current,
+                libtrace_ospf_lsa_v2_t **lsa_hdr,
+                uint32_t *remaining,
+                uint8_t *lsa_type,
+                uint16_t *lsa_length); 
+
 
 DLLEXPORT SIMPLE_FUNCTION
 uint32_t trace_get_ospf_metric_from_as_external_lsa_v2(
