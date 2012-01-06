@@ -2016,27 +2016,152 @@ DLLEXPORT SIMPLE_FUNCTION
 void *trace_get_ospf_contents_v2(libtrace_ospf_v2_t *header,
 		uint8_t *ospf_type, uint32_t *remaining);
 
+/** Get a pointer to the start of the first LSA contained within an LS Update packet
+ * @param ls_update	Pointer to the LS Update header
+ * @param[in,out] remaining	Updated with the number of captured bytes remaining
+ * @return A pointer to the first LSA in the packet.
+ *
+ * This function simply skips past the LS Update header to provide a suitable
+ * pointer to pass into trace_get_next_ospf_lsa_v2.
+ *
+ * If the OSPF packet is truncated, then NULL will be returned.
+ *
+ * 'remaining' MUST be set to the amount of bytes remaining in the captured
+ * packet starting from the beginning of the LS Update header. It will be 
+ * updated to contain the number of bytes remaining from the start of the 
+ * first LSA.
+ *
+ * @note This function only works for OSPF version 2 packets.
+ * @note trace_get_next_ospf_lsa_v2() should be subequently used to process the LSAs
+ */
 DLLEXPORT SIMPLE_FUNCTION 
 unsigned char *trace_get_first_ospf_lsa_from_update_v2(
                 libtrace_ospf_ls_update_t *ls_update,
                 uint32_t *remaining);
 
+/** Get a pointer to the start of the first LSA contained within an Database Description packet
+ * @param db_desc	Pointer to the Database Description header
+ * @param[in,out] remaining	Updated with the number of captured bytes remaining
+ * @return A pointer to the first LSA in the packet.
+ *
+ * This function simply skips past the Database Description header to provide a 
+ * suitable pointer to pass into trace_get_next_ospf_lsa_header_v2.
+ *
+ * If the OSPF packet is truncated, then NULL will be returned.
+ *
+ * 'remaining' MUST be set to the amount of bytes remaining in the captured
+ * packet starting from the beginning of the Database Description header. It 
+ * will be updated to contain the number of bytes remaining from the start of 
+ * the first LSA.
+ *
+ * @note This function only works for OSPF version 2 packets.
+ * @note trace_get_next_ospf_lsa_header_v2() should be subequently used to process the LSA headers
+ */
 DLLEXPORT SIMPLE_FUNCTION 
 unsigned char *trace_get_first_ospf_lsa_from_db_desc_v2(
                 libtrace_ospf_db_desc_v2_t *db_desc,
                 uint32_t *remaining);
 
+/** Get a pointer to the start of the first link contained within a Router LSA
+ * @param lsa	Pointer to the Router LSA
+ * @param[in,out] remaining	Updated with the number of captured bytes remaining
+ * @return A pointer to the first link in the packet.
+ *
+ * This function simply skips past the Router LSA header to provide a 
+ * suitable pointer to pass into trace_get_next_ospf_link_v2.
+ *
+ * If the OSPF packet is truncated, then NULL will be returned.
+ *
+ * 'remaining' MUST be set to the amount of bytes remaining in the captured
+ * packet starting from the beginning of the Router LSA (not including the LSA 
+ * header) header. It will be updated to contain the number of bytes remaining 
+ * from the start of the first Link.
+ *
+ * @note This function only works for OSPF version 2 packets.
+ * @note trace_get_next_ospf_link_v2() should be subequently used to process
+ * the links
+ */
 DLLEXPORT SIMPLE_FUNCTION
 unsigned char *trace_get_first_ospf_link_from_router_lsa_v2(
 		libtrace_ospf_router_lsa_v2_t *lsa,
 		uint32_t *remaining);
 
+/** Parses an OSPF Router LSA Link and finds the next Link (if there is one)
+ * @param[in,out] current	Pointer to the next Link (updated by this function)
+ * @param[out] link		Set to point to the Link located at the original value of current
+ * @param[in,out] remaining	Updated with the number of captured bytes remaining
+ * @param[out] link_len		Set to the size of the Link pointed to by 'link'
+ * @return 0 if there are no more links after the current one, 1 otherwise.
+ *
+ * When called, 'current' MUST point to an OSPF Router LSA link. Ideally, this
+ * would come from either a call to 
+ * trace_get_first_ospf_link_from_router_lsa_v2() or a previous call of this
+ * function. 
+ *
+ * 'link' will be set to the value of 'current', so that the caller may then
+ * do any processing they wish on that particular link. 'current' is advanced
+ * to point to the next link and 'link_len' is updated to report the size of
+ * the original link.
+ *
+ * 'remaining' MUST be set to the amount of bytes remaining in the captured
+ * packet starting from the beginning of the Link pointed to by 'current'.
+ * It will be updated to contain the number of bytes remaining from the start 
+ * of the next link.
+ *
+ * If this function returns 0 but 'link' is NOT NULL, that link is still valid
+ * but there are no more links after this one.
+ * If this function returns 0 AND link is NULL, the link is obviously not 
+ * suitable for processing. 
+ *
+ * @note This function only works for OSPF version 2 packets.
+ */
 DLLEXPORT SIMPLE_FUNCTION
 int trace_get_next_ospf_link_v2(unsigned char **current,
 		libtrace_ospf_link_v2_t **link,
 		uint32_t *remaining,
 		uint32_t *link_len);
 
+/** Parses an OSPF LSA and finds the next LSA (if there is one)
+ * @param[in,out] current 	Pointer to the next LSA (updated by this function)
+ * @param[out] lsa_hdr		Set to point to the header of the LSA located at the original value of current
+ * @param[out] lsa_body		Set to point to the body of the LSA located at the original value of current
+ * @param[in,out] remaining	Updated with the number of captured bytes remaining
+ * @param[out] lsa_type		Set to the type of the LSA located at the original value of current
+ * @param[out] lsa_length	Set to the size of the LSA located at the original value of current
+ * @return 1 if there are more LSAs after the current one, 0 if there are no more LSAs to come, and -1 if the current LSA is incomplete, truncated or invalid.
+ *
+ * When called, 'current' MUST point to an OSPF LSA. Ideally, this would come 
+ * from either a call to trace_get_first_ospf_lsa_from_update_v2() or a 
+ * previous call of this function. 
+ *
+ * This function should only be used to access COMPLETE LSAs, i.e. LSAs that
+ * have both a header and a body. In OSPFv2, only the LSAs contained within
+ * LSA Update packets meet this requirement. trace_get_next_ospf_lsa_header_v2
+ * should be used to read header-only LSAs, e.g. those present in LS Acks.
+ *
+ * 'lsa_hdr' will be set to the value of 'current', so that the caller may then
+ * do any processing they wish on that particular LSA. 'lsa_body' will be set
+ * to point to the first byte after the LSA header. 'current' is advanced
+ * to point to the next LSA. 'lsa_length' is updated to contain the size of
+ * the parsed LSA, while 'lsa_type' is set to indicate the LSA type.
+ *
+ * 'remaining' MUST be set to the amount of bytes remaining in the captured
+ * packet starting from the beginning of the LSA pointed to by 'current'.
+ * It will be updated to contain the number of bytes remaining from the start 
+ * of the next LSA.
+ *
+ * If this function returns 0 but 'lsa_hdr' is NOT NULL, that LSA is still 
+ * valid but there are no more LSAs after this one.
+ * If this function returns 0 AND 'lsa_hdr' is NULL, the LSA is obviously not 
+ * suitable for processing. 
+ *
+ * It is also recommended to check the value of 'lsa_body' before 
+ * de-referencing it. 'lsa_body' will be set to NULL if there is only an LSA
+ * header present.
+ * 
+ * @note This function only works for OSPF version 2 packets.
+ *
+ */
 DLLEXPORT SIMPLE_FUNCTION
 int trace_get_next_ospf_lsa_v2(unsigned char **current,
                 libtrace_ospf_lsa_v2_t **lsa_hdr,
@@ -2045,6 +2170,41 @@ int trace_get_next_ospf_lsa_v2(unsigned char **current,
                 uint8_t *lsa_type,
                 uint16_t *lsa_length);
 
+/** Parses an OSPF LSA header and finds the next LSA (if there is one)
+ * @param[in,out] current 	Pointer to the next LSA (updated by this function)
+ * @param[out] lsa_hdr		Set to point to the header of the LSA located at the original value of current
+ * @param[in,out] remaining	Updated with the number of captured bytes remaining
+ * @param[out] lsa_length	Set to the size of the LSA located at the original value of current
+ * @return 1 if there are more LSAs after the current one, 0 if there are no more LSAs to come, and -1 if the current LSA is incomplete, truncated or invalid.
+ *
+ * When called, 'current' MUST point to an OSPF LSA. Ideally, this would come 
+ * from either a call to trace_get_first_ospf_lsa_from_db_desc_v2() or a 
+ * previous call of this function. 
+ *
+ * This function should only be used to access LSA headers, i.e. LSAs that
+ * have a header only. In OSPFv2, the LSAs contained within LSA Ack and 
+ * Database Description packets meet this requirement. 
+ * trace_get_next_ospf_lsa_v2 should be used to read full LSAs, e.g. those 
+ * present in LS Updates.
+ *
+ * 'lsa_hdr' will be set to the value of 'current', so that the caller may then
+ * do any processing they wish on that particular LSA header. 'current' is 
+ * advanced to point to the next LSA header. 'lsa_length' is updated to contain 
+ * the size of the parsed LSA header.
+ *
+ * 'remaining' MUST be set to the amount of bytes remaining in the captured
+ * packet starting from the beginning of the LSA pointed to by 'current'.
+ * It will be updated to contain the number of bytes remaining from the start 
+ * of the next LSA.
+ *
+ * If this function returns 0 but 'lsa_hdr' is NOT NULL, that LSA is still 
+ * valid but there are no more LSAs after this one.
+ * If this function returns 0 AND 'lsa_hdr' is NULL, the LSA is obviously not 
+ * suitable for processing. 
+ *
+ * @note This function only works for OSPF version 2 packets.
+ *
+ */
 DLLEXPORT SIMPLE_FUNCTION
 int trace_get_next_ospf_lsa_header_v2(unsigned char **current,
                 libtrace_ospf_lsa_v2_t **lsa_hdr,
@@ -2052,11 +2212,28 @@ int trace_get_next_ospf_lsa_header_v2(unsigned char **current,
                 uint8_t *lsa_type,
                 uint16_t *lsa_length); 
 
-
+/** Extracts the metric field from an AS External LSA packet
+ *
+ * @param as_lsa	The AS External LSA
+ * @returns The value of the metric field
+ *
+ * The metric field in the AS External LSA packet is a 24-bit value, which
+ * is difficult to extract correctly. To avoid byte-ordering issues, use this
+ * function which will extract the correct value for you.
+ */
 DLLEXPORT SIMPLE_FUNCTION
 uint32_t trace_get_ospf_metric_from_as_external_lsa_v2(
 		libtrace_ospf_as_external_lsa_v2_t *as_lsa);
 
+/** Extracts the metric field from a Summary LSA packet
+ *
+ * @param sum_lsa	The Summary LSA
+ * @returns The value of the metric field
+ *
+ * The metric field in the Summary LSA packet is a 24-bit value, which
+ * is difficult to extract correctly. To avoid byte-ordering issues, use this
+ * function which will extract the correct value for you.
+ */
 DLLEXPORT SIMPLE_FUNCTION
 uint32_t trace_get_ospf_metric_from_summary_lsa_v2(
 		libtrace_ospf_summary_lsa_v2_t *sum_lsa);
