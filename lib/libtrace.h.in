@@ -798,7 +798,7 @@ typedef struct libtrace_ospf_options_t {
 #endif
 } PACKED libtrace_ospf_options_t;
 
-/* LSA Header for OSPFv2 */
+/** LSA Header for OSPFv2 */
 typedef struct libtrace_ospf_lsa_v2_t
 {
 	uint16_t age;		/**< Time in seconds since LSA originated */
