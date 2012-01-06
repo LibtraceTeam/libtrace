@@ -764,19 +764,20 @@ typedef struct libtrace_radiotap_t {
 /** OSPF header */
 typedef struct libtrace_ospf_v2_t
 {
-	uint8_t ospf_v;
-	uint8_t type;
-	uint16_t len;
-	struct in_addr router;
-	struct in_addr area;
-	uint16_t sum;
-	uint16_t au_type;
-	uint16_t zero;
-	uint8_t au_key_id;
-	uint8_t au_data_len;
-	uint32_t au_seq_num;
+	uint8_t ospf_v;		/**< OSPF Version, should be 2 */
+	uint8_t type;		/**< OSPF Packet Type */
+	uint16_t len;		/**< Packet length, including OSPF header */
+	struct in_addr router;	/**< Router ID of the packet source */
+	struct in_addr area;	/**< Area the packet belongs to */
+	uint16_t sum;		/**< Checksum */
+	uint16_t au_type;	/**< Authentication procedure */
+	uint16_t zero;		/**< Always zero */
+	uint8_t au_key_id;	/**< Authentication Key ID */
+	uint8_t au_data_len;	/**< Authentication Data Length */
+	uint32_t au_seq_num;	/**< Cryptographic Sequence Number */
 } PACKED libtrace_ospf_v2_t;
 
+/** Options Field present in some OSPFv2 packets */
 typedef struct libtrace_ospf_options_t {
 #if BYTE_ORDER == LITTLE_ENDIAN
 	LT_BITFIELD8 unused1:1;
@@ -797,132 +798,147 @@ typedef struct libtrace_ospf_options_t {
 #endif
 } PACKED libtrace_ospf_options_t;
 
+/* LSA Header for OSPFv2 */
 typedef struct libtrace_ospf_lsa_v2_t
 {
-	uint16_t age;
-	libtrace_ospf_options_t lsa_options;
-	uint8_t lsa_type;
-	struct in_addr ls_id;
-	struct in_addr adv_router;
-	uint32_t seq;
-	uint16_t checksum;
-	uint16_t length;
+	uint16_t age;		/**< Time in seconds since LSA originated */
+	libtrace_ospf_options_t lsa_options;	/**< Options */
+	uint8_t lsa_type;	/**< LSA type */
+	struct in_addr ls_id;	/**< Link State ID */
+	struct in_addr adv_router; /**< Router that originated this LSA */
+	uint32_t seq;		/**< LS sequence number */
+	uint16_t checksum;	/**< Checksum */ 
+	uint16_t length;	/**< Length of the LSA including LSA header */
 } PACKED libtrace_ospf_lsa_v2_t;
 
+/** OSPFv2 Hello Packet */
 typedef struct libtrace_ospf_hello_v2_t
 {
-	struct in_addr mask;
-	uint16_t interval;
-	libtrace_ospf_options_t hello_options;
-	uint8_t priority;
-	uint32_t deadint;
-	struct in_addr designated;
-	struct in_addr backup;
-	struct in_addr neighbor;
+	struct in_addr mask;	/**< Network mask for this interface */
+	uint16_t interval;	/**< Interval between Hello packets (secs) */
+	libtrace_ospf_options_t hello_options;	/**< Options */
+	uint8_t priority;	/**< Router Priority */
+	uint32_t deadint;	/**< Interval before declaring a router down */
+	struct in_addr designated;	/**< Designated router for the network */
+	struct in_addr backup;	/**< Backup designated router */
+
+	/** Neighbors follow from here, but there can be anywhere from 1 to N
+	 * neighbors so I can't include that here */
 } PACKED libtrace_ospf_hello_v2_t;
 
+/** OSPFv2 Database Description packet */
 typedef struct libtrace_ospf_db_desc_v2_t
 {
-	uint16_t mtu;
-	uint8_t db_desc_options;
+	uint16_t mtu;		/**< Interface MTU */
+	libtrace_ospf_options_t db_desc_options;	/**< Options */
 #if BYTE_ORDER == LITTLE_ENDIAN
-	LT_BITFIELD8 db_desc_ms:1;
-	LT_BITFIELD8 db_desc_m:1;
-	LT_BITFIELD8 db_desc_i:1;
+	LT_BITFIELD8 db_desc_ms:1;	/**< If set, this router is the master */
+	LT_BITFIELD8 db_desc_m:1;	/**< If set, more packets to follow */
+	LT_BITFIELD8 db_desc_i:1;	/**< If set, this is the first packet in sequence */
 	LT_BITFIELD8 zero:5;
 #elif BYTE_ORDER == BIG_ENDIAN
 	LT_BITFIELD8 zero:5;
-	LT_BITFIELD8 db_desc_i:1;
-	LT_BITFIELD8 db_desc_m:1;
-	LT_BITFIELD8 db_desc_ms:1;
+	LT_BITFIELD8 db_desc_i:1;	/**< If set, this is the first packet in sequence */
+	LT_BITFIELD8 db_desc_m:1;	/**< If set, more packets to follow */
+	LT_BITFIELD8 db_desc_ms:1;	/**< If set, this router is the master */
 #endif
-	uint32_t seq;
+	uint32_t seq;		/**< Sequence number for DD packets */
 } PACKED libtrace_ospf_db_desc_v2_t;
 
+/** OSPF Link State Request Packet */
 typedef struct libtrace_ospf_ls_req_t
 {
-	uint32_t ls_type;
-	uint32_t ls_id;
-	uint32_t advertising_router;
+	uint32_t ls_type;	/**< Link State Type */
+	uint32_t ls_id;		/**< Link State Id */
+	uint32_t advertising_router;	/**< Advertising Router */
 } PACKED libtrace_ospf_ls_req_t;
 
+/** OSPF Link State Update Packet */
 typedef struct libtrace_ospf_ls_update_t
 {
-	uint32_t ls_num_adv;
+	uint32_t ls_num_adv;	/**< Number of LSAs in this packet */
+
+	/* Followed by LSAs, use API functions to access these */
 } PACKED libtrace_ospf_ls_update_t;
 
+/** OSPFv2 AS External LSA Body */
 typedef struct libtrace_ospf_as_external_lsa_t
 {
-	struct in_addr netmask;
+	struct in_addr netmask;	/**< Netmask for the destination */
 #if BYTE_ORDER == LITTLE_ENDIAN
 	LT_BITFIELD8 tos:7;
-	LT_BITFIELD8 e:1;
+	LT_BITFIELD8 e:1;	/**< If set, metric is Type 2. Else, Type 1 */
 #elif BYTE_ORDER == BIG_ENDIAN
-	LT_BITFIELD8 e:1;
+	LT_BITFIELD8 e:1;	/**< If set, metric is Type 2. Else, Type 1 */
 	LT_BITFIELD8 tos:7;
 #endif
-	uint8_t metric_a;
-	uint8_t metric_b;
-	uint8_t metric_c;	
-	struct in_addr forwarding;
-	uint32_t external_tag;
+	uint8_t metric_a;	/**< Byte 1 of the Metric field */
+	uint8_t metric_b;	/**< Byte 2 of the Metric field */
+	uint8_t metric_c;	/**< Byte 3 of the Metric field */
+	struct in_addr forwarding;	/**< Forwarding address */
+	uint32_t external_tag;		/**< External Route Tag */
 } PACKED libtrace_ospf_as_external_lsa_v2_t;
 
+/** OSPFv2 Summary LSA Body */
 typedef struct libtrace_ospf_summary_lsa
 {
-	struct in_addr netmask;
-	uint8_t zero;
-	uint8_t metric_a;
-	uint8_t metric_b;
-	uint8_t metric_c;	
+	struct in_addr netmask;	/**< Netmask for the destination */
+	uint8_t zero;		/**< Always zero */
+	uint8_t metric_a;	/**< Byte 1 of the Metric field */
+	uint8_t metric_b;	/**< Byte 2 of the Metric field */
+	uint8_t metric_c;	/**< Byte 3 of the Metric field */
 	
 } PACKED libtrace_ospf_summary_lsa_v2_t;
 
+/** OSPFv2 Network LSA Body */
 typedef struct libtrace_ospf_network_lsa_t
 {
-	struct in_addr netmask;
+	struct in_addr netmask;	/**< Netmask for the network */
+	/* Followed by IDs of attached routers */
 } PACKED libtrace_ospf_network_lsa_v2_t;
 
+/** OSPFv2 Router Link structure */
 typedef struct libtrace_ospf_link_t
 {
-	struct in_addr link_id;
-	struct in_addr link_data;
-	uint8_t type;
-	uint8_t num_tos;
-	uint16_t tos_metric;
+	struct in_addr link_id;		/**< Object that link connects to */
+	struct in_addr link_data;	/**< Link Data field */
+	uint8_t type;			/**< Link Type */
+	uint8_t num_tos;		/**< Number of TOS metrics */
+	uint16_t tos_metric;		/**< Cost of router link */
 } PACKED libtrace_ospf_link_v2_t;
 
+/** OSPFv2 Router LSA */
 typedef struct libtrace_ospf_router_lsa_t
 {
 #if BYTE_ORDER == LITTLE_ENDIAN
-	LT_BITFIELD8 b:1;
-	LT_BITFIELD8 e:1;
-	LT_BITFIELD8 v:1;
+	LT_BITFIELD8 b:1;	/**< Area Border Router Flag */
+	LT_BITFIELD8 e:1;	/**< External Router Flag */
+	LT_BITFIELD8 v:1;	/**< Virtual Endpoint Flag */
 	LT_BITFIELD8 zero:5;
 #elif BYTE_ORDER == BIG_ENDIAN
 	LT_BITFIELD8 zero:5;
-	LT_BITFIELD8 v:1;
-	LT_BITFIELD8 e:1;
-	LT_BITFIELD8 b:1;
+	LT_BITFIELD8 v:1;	/**< Virtual Endpoint Flag */
+	LT_BITFIELD8 e:1;	/**< External Router Flag */
+	LT_BITFIELD8 b:1;	/**< Area Border Router Flag */
 #endif
-	uint8_t zero2;
-	uint16_t num_links;
+	uint8_t zero2;		/**< Always zero */
+	uint16_t num_links;	/**< Number of links in LSA */
 } PACKED libtrace_ospf_router_lsa_v2_t;
 
 typedef enum {
-	TRACE_OSPF_HELLO = 1,
-	TRACE_OSPF_DATADESC = 2,
-	TRACE_OSPF_LSREQ = 3,
-	TRACE_OSPF_LSUPDATE = 4,
-	TRACE_OSPF_LSACK = 5
+	TRACE_OSPF_HELLO = 1,		/**< OSPF Hello */
+	TRACE_OSPF_DATADESC = 2,	/**< OSPF Database Description */
+	TRACE_OSPF_LSREQ = 3,		/**< OSPF Link State Request */
+	TRACE_OSPF_LSUPDATE = 4,	/**< OSPF Link State Update */
+	TRACE_OSPF_LSACK = 5		/**< OSPF Link State Acknowledgement */
 } libtrace_ospf_types_t;
 
 typedef enum {
-        TRACE_OSPF_LS_ROUTER = 1,
-        TRACE_OSPF_LS_NETWORK = 2,
-        TRACE_OSPF_LS_SUMMARY = 3,
-        TRACE_OSPF_LS_ASBR_SUMMARY = 4,
-        TRACE_OSPF_LS_EXTERNAL = 5
+        TRACE_OSPF_LS_ROUTER = 1,	/**< OSPF Router LSA */
+        TRACE_OSPF_LS_NETWORK = 2,	/**< OSPF Network LSA */
+        TRACE_OSPF_LS_SUMMARY = 3,	/**< OSPF Summary LSA */
+        TRACE_OSPF_LS_ASBR_SUMMARY = 4,	/**< OSPF Summary LSA (ASBR) */
+        TRACE_OSPF_LS_EXTERNAL = 5	/**< OSPF AS External LSA */
 } libtrace_ospf_ls_types_t;
 
 
