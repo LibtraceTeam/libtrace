@@ -52,6 +52,7 @@
 #include <string.h>
 
 #include "libtrace.h"
+#include "libpacketdump.h"
 
 void iferr(libtrace_t *trace)
 {
@@ -106,6 +107,7 @@ int main(int argc, char *argv[]) {
 	int count = 0;
 	int level = 0;
 	int expected = 100;
+	int err;
 	libtrace_t *trace;
 	libtrace_out_t *outtrace;
 	libtrace_packet_t *packet;
@@ -174,12 +176,12 @@ int main(int argc, char *argv[]) {
 	iferr(trace);
 	packet=trace_create_packet();
 	count=0;
-	int err;
 	while((err=trace_read_packet(trace,packet))>0) {
 		++count;
 		if (!((trace_get_source_port(packet)==80)
 			^ (trace_get_direction(packet)==TRACE_DIR_INCOMING))) {
 
+			trace_dump_packet(packet);
 			printf("Direction tagging broken\n");
 			error=1;
 			break;
