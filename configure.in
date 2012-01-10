@@ -578,7 +578,7 @@ if test -z "$YACC"; then
 	ac_cv_errcount=$((ac_cv_errcount + 1))
 fi
 
-if test -z "$LEXLIB"; then
+if test "x$LEX" != xflex -a "x$LEX" != xlex; then
 	AC_MSG_WARN(flex or lex not found. Please install flex before continuing)
 	ac_cv_errcount=$((ac_cv_errcount + 1))
 fi
