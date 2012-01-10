@@ -1501,7 +1501,8 @@ DLLEXPORT size_t trace_set_capture_length(libtrace_packet_t *packet, size_t size
 	assert(packet);
 
 	if (packet->trace->format->set_capture_length) {
-		return packet->trace->format->set_capture_length(packet,size);
+		packet->capture_length = packet->trace->format->set_capture_length(packet,size);
+		return packet->capture_length;
 	}
 
 	return ~0U;
