@@ -61,7 +61,7 @@ libtrace_la_SOURCES = trace.c common.h \
 		libtrace_int.h lt_inttypes.h \
 		linktypes.c link_wireless.c \
 		protocols_pktmeta.c protocols_l2.c protocols_l3.c \
-		protocols_transport.c protocols.h \
+		protocols_transport.c protocols.h protocols_ospf.c \
 		$(DAGSOURCE) format_erf.h \
 		$(BPFJITSOURCE) \
 		$(LIBTRACEIO_ZLIB) $(LIBTRACEIO_BZLIB) $(LIBTRACEIO_LZO) \
