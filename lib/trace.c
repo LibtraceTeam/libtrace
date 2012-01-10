@@ -500,7 +500,6 @@ DLLEXPORT int trace_config(libtrace_t *libtrace,
 		void *value)
 {
 	int ret;
-	libtrace_err_t err;
 
 	if (trace_is_err(libtrace)) {
 		return -1;
@@ -521,7 +520,7 @@ DLLEXPORT int trace_config(libtrace_t *libtrace,
 		case TRACE_OPTION_SNAPLEN:
 			/* Clear the error if there was one */
 			if (trace_is_err(libtrace)) {
-				err = trace_get_err(libtrace);
+				trace_get_err(libtrace);
 			}
 			if (*(int*)value<0 
 				|| *(int*)value>LIBTRACE_PACKET_BUFSIZE) {
@@ -533,7 +532,7 @@ DLLEXPORT int trace_config(libtrace_t *libtrace,
 		case TRACE_OPTION_FILTER:
 			/* Clear the error if there was one */
 			if (trace_is_err(libtrace)) {
-				err = trace_get_err(libtrace);
+				trace_get_err(libtrace);
 			}
 			libtrace->filter=(libtrace_filter_t *)value;
 			return 0;

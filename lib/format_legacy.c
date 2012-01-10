@@ -140,7 +140,6 @@ static time_t trtime(char *s) {
 	/* XXX: this function may not be particularly portable to
 	 * other platforms, e.g. *BSDs, Windows */
 	struct tm tm;
-	char *tz;
 	time_t ret;
 
 	if(sscanf(s, "%4u%2u%2u-%2u%2u%2u", &tm.tm_year, &tm.tm_mon,
@@ -154,7 +153,7 @@ static time_t trtime(char *s) {
 	tm.tm_yday = 0; /* ignored */
 	tm.tm_isdst = -1; /* forces check for summer time */
 	
-	tz = getenv("TZ");
+	getenv("TZ");
 	if (putenv("TZ=Pacific/Auckland")) {
 		perror("putenv");
 		return (time_t)0;
@@ -439,8 +438,6 @@ static struct timeval legacynzix_get_timeval(const libtrace_packet_t *packet) {
 	struct timeval tv;
 	uint32_t hdr_ts;
 
-	double dts;
-	
 	legacy_nzix_t *legacy = (legacy_nzix_t *)packet->header;
 		
 	hdr_ts = legacy->ts;
@@ -460,7 +457,7 @@ static struct timeval legacynzix_get_timeval(const libtrace_packet_t *packet) {
 	DATA(packet->trace)->ts_high = new_ts;
 
 
-	dts = tv.tv_sec + (double)tv.tv_usec / 1000 / 1000;
+	/*dts = tv.tv_sec + (double)tv.tv_usec / 1000 / 1000; */
 	return tv;
 	
 }	

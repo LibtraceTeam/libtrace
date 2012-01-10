@@ -218,7 +218,6 @@ static uint64_t calc_ip_size(libtrace_packet_t *packet, demo_proto_t *proto) {
 	uint8_t protocol;
 	uint32_t remaining;
 	uint32_t prev_rem;
-	libtrace_ip_t *ip;
 	libtrace_ip6_t *ip6;
 
 	/* Start by finding the first layer 3 header */
@@ -242,7 +241,6 @@ static uint64_t calc_ip_size(libtrace_packet_t *packet, demo_proto_t *proto) {
 	switch(ethertype) {
 		case 0x0800:	/* IPv4 */
 			/* Skip past the IPv4 header */
-			ip = (libtrace_ip_t *)ip_hdr;
 			nexthdr = trace_get_payload_from_ip(ip_hdr, &protocol, 
 					&remaining);
 			
@@ -331,6 +329,11 @@ static uint64_t calc_transport_size(libtrace_packet_t *packet) {
 			return 0;
 	}
 
+	/* If we don't have any post-transport payload, just return the 
+	 * transport header size */
+	if (!nexthdr)
+		return trans_size;
+	
 	/* Determine how many bytes we just skipped over and add it to the
 	 * total transport size */
 	assert(prev_rem >= remaining);

@@ -103,7 +103,7 @@ void synopt_per_packet(struct libtrace_packet_t *packet)
 	struct libtrace_tcp *tcp = trace_get_tcp(packet);
 	unsigned char *opt_ptr;
 	libtrace_direction_t dir = trace_get_direction(packet);
-	int tcp_payload, len;
+	int len;
 	unsigned char type, optlen, *data;
 	struct tcp_opts opts_seen = {false, false, false, false, false, false};
 	
@@ -119,8 +119,6 @@ void synopt_per_packet(struct libtrace_packet_t *packet)
 	len = tcp->doff * 4 - sizeof(libtrace_tcp_t);
 	if(len == 0)
 		return;
-	
-	tcp_payload = trace_get_wire_length(packet) - trace_get_capture_length(packet);
 	
 	opt_ptr = (unsigned char *)tcp + sizeof (libtrace_tcp_t);
 	

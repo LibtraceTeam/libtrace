@@ -458,7 +458,6 @@ static int linuxnative_read_packet(libtrace_t *libtrace, libtrace_packet_t *pack
 	struct iovec iovec;
 	unsigned char controlbuf[CMSG_BUF_SIZE];
 	struct cmsghdr *cmsg;
-	socklen_t socklen;
 	int snaplen;
 	uint32_t flags = 0;
 	
@@ -474,7 +473,6 @@ static int linuxnative_read_packet(libtrace_t *libtrace, libtrace_packet_t *pack
 	packet->type = TRACE_RT_DATA_LINUX_NATIVE;
 
 	hdr=(struct libtrace_linuxnative_header*)packet->buffer;
-	socklen=sizeof(hdr->hdr);
 	snaplen=LIBTRACE_MIN(
 			(int)LIBTRACE_PACKET_BUFSIZE-(int)sizeof(*hdr),
 			(int)FORMAT(libtrace->format_data)->snaplen);

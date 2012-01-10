@@ -143,7 +143,7 @@ uint32_t cpp_anonymize(const uint32_t orig_addr) {
         uint8_t rin_output[16];
         uint8_t rin_input[16];
         
-        uint32_t firstnbits;
+        //uint32_t firstnbits;
 
         uint32_t result = 0;
         uint32_t first4bytes_pad, first4bytes_input;
@@ -171,7 +171,7 @@ uint32_t cpp_anonymize(const uint32_t orig_addr) {
         // Look up the first CACHESIZE bits from enc_cache and start the 
         // result with this, then proceed
 
-        firstnbits = (uint32_t) orig_addr >> (32 - CACHEBITS);
+        //firstnbits = (uint32_t) orig_addr >> (32 - CACHEBITS);
         //result = (enc_cache[firstnbits] << (32 - CACHEBITS));
 
 
