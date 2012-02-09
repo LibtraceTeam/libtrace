@@ -719,34 +719,46 @@ static libtrace_eventobj_t trace_event_rt(libtrace_t *trace,
 		event.fd = 0;
 	}
 
-	/* Attempt to read a packet in a non-blocking fashion */
-	event.size = rt_read_packet_versatile(trace, packet, 0);
-	if (event.size == -1) {
-		read_err = trace_get_err(trace);
-		if (read_err.err_num == EAGAIN) {
-			/* No data available - do an IOWAIT */
-			event.type = TRACE_EVENT_IOWAIT;
-		}
+	do {
+
+		event.size = rt_read_packet_versatile(trace, packet, 0);
+		if (event.size == -1) {
+			read_err = trace_get_err(trace);
+			if (read_err.err_num == EAGAIN) {
+				/* No data available - do an IOWAIT */
+				event.type = TRACE_EVENT_IOWAIT;
+			}
+			else {
+				event.type = TRACE_EVENT_PACKET;
+				break;
+			}
+		} else if (event.size == 0) {
+			/* RT gives us a specific indicator that there will be 
+			 * no more packets. */
+			if (packet->type == TRACE_RT_END_DATA)
+				event.type = TRACE_EVENT_TERMINATE;
+			else
+				/* Since several RT messages can have zero-byte
+				 * length (once the framing is removed), an 
+				 * event size of zero can still indicate a 
+				 * PACKET event */
+				event.type = TRACE_EVENT_PACKET;
+
+		}	
 		else {
 			event.type = TRACE_EVENT_PACKET;
 		}
-	} else if (event.size == 0) {
-		/* RT gives us a specific indicator that there will be no
-		 * more packets. */
-		if (packet->type == TRACE_RT_END_DATA)
-			event.type = TRACE_EVENT_TERMINATE;
-		else
-			/* Since several RT messages can have zero-byte
-			 * length (once the framing is removed), an event size
-			 * of zero can still indicate a PACKET event */
-			event.type = TRACE_EVENT_PACKET;
-		
-	}	
-	else {
-		event.type = TRACE_EVENT_PACKET;
-	}
 
-	
+		if (trace->filter && event.type == TRACE_EVENT_PACKET) {
+			if (!trace_apply_filter(trace->filter, packet)) {
+				trace_clear_cache(packet);
+				continue;
+			}
+		}
+
+		break;	
+	} while (1);
+
 	return event;
 }
 
