@@ -368,20 +368,14 @@ fi
 #fi
 #DAG_VERSION_NUM=$dag_drv_v
 
-have_ncurses=yes
 
 # Checks for various "optional" libraries
-AC_CHECK_LIB(z, deflate, have_zlib=1, have_zlib=0)
-AC_CHECK_LIB(bz2, BZ2_bzDecompressInit, have_bzip=1, have_bzip=0)
-AC_CHECK_LIB(lzo2, lzo1x_1_compress, have_lzo=1, have_lzo=0)
 AC_CHECK_LIB(pthread, pthread_create, have_pthread=1, have_pthread=0)
 
 # Check for ncurses
-AC_SEARCH_LIBS(mvprintw, ncurses, have_ncurses=yes, have_ncurses=no)
-LIBS=
 
 # These libraries have to be explicitly linked in OpenSolaris
-AC_SEARCH_LIBS(getservent, socket, have_socket=1, have_socket=0, -lnsl)		
+AC_SEARCH_LIBS(getservent, socket, have_socket=1, have_socket=0, -lnsl)
 LIBS=
 
 AC_SEARCH_LIBS(inet_ntop, nsl, have_nsl=1, have_nsl=0, -lsocket)
@@ -399,32 +393,11 @@ if test "$ac_cv_search_dlopen" != "none required"; then
 	LIBPKTDUMP_LIBS="$LIBPKTDUMP_LIBS $ac_cv_search_dlopen"
 fi
 
-
-if test "$have_zlib" = 1; then
-	LIBTRACE_LIBS="$LIBTRACE_LIBS -lz"
-	AC_DEFINE(HAVE_LIBZ, 1, [Set to 1 if zlib is supported])
-fi
-
-if test "$have_bzip" = 1; then
-	LIBTRACE_LIBS="$LIBTRACE_LIBS -lbz2"
-	AC_DEFINE(HAVE_LIBBZ2, 1, [Set to 1 if bzip2 is supported])
-fi
-
-if test "$have_lzo" = 1; then
-	LIBTRACE_LIBS="$LIBTRACE_LIBS -llzo2"
-	AC_DEFINE(HAVE_LIBLZO2, 1, [Set to 1 if lzo2 is supported])
-fi
-
 if test "$have_pthread" = 1; then
 	LIBTRACE_LIBS="$LIBTRACE_LIBS -lpthread"
 	AC_DEFINE(HAVE_LIBPTHREAD, 1, [Set to 1 if pthreads are supported])
 fi
 
-if test "$have_ncurses" = "yes"; then
-	if test "$ac_cv_search_mvprintw" != "none required"; then
-		TOOLS_LIBS="$TOOLS_LIBS $ac_cv_search_mvprintw"
-	fi
-fi
 
 if test "$have_nsl" = 1; then
 	if test "$ac_cv_search_inet_ntop" != "none required"; then
@@ -444,7 +417,6 @@ fi
 # Stupid AC_SEARCH_LIB appends stuff to LIBS even when I don't want it to, so
 # just set libs to null here to avoid linking against them by default
 LIBS=
-
 
 # For now, the user has to explicitly ask for the LLVM stuff, as it's a bit
 # rough around the edges :(
@@ -489,19 +461,107 @@ if (test "$use_llvm" != "no"); then
 	fi
 fi
 
+AC_ARG_WITH([ncurses],
+	AC_HELP_STRING([--with-ncurses], [build tracetop (requires ncurses)]))
+
+AS_IF([test "x$with_ncurses" != "xno"],
+	[AC_SEARCH_LIBS(mvprintw, ncurses, have_ncurses=yes, have_ncurses=no)
+	 LIBS=
+	], [have_ncurses=no])
+
+AS_IF([test "x$have_ncurses" = "xyes"], [
+	if test "$ac_cv_search_mvprintw" != "none required"; then
+		TOOLS_LIBS="$TOOLS_LIBS $ac_cv_search_mvprintw"
+	fi
+	HAVE_NCURSES=1
+	with_ncurses=yes],
+
+	
+	[AS_IF([test "x$with_ncurses" = "xyes"],
+		[AC_MSG_ERROR([ncurses requested but not found])])
+	HAVE_NCURSES=0
+	with_ncurses=no]
+)
+			
+AC_ARG_WITH([bzip2],
+	AC_HELP_STRING([--with-bzip2], [build with support for bzip2 compressed files]))
+
+AS_IF([test "x$with_bzip2" != "xno"],
+	[
+	AC_CHECK_LIB(bz2, BZ2_bzDecompressInit, have_bzip=yes, have_bzip=no)
+	], [have_bzip=no])
+
+AS_IF([test "x$have_bzip" = "xyes"], [
+	if test "$ac_cv_lib_bz2_BZ2_bzDecompressInit" != "none required"; then
+		LIBTRACE_LIBS="$LIBTRACE_LIBS -lbz2"
+	fi
+	HAVE_LIBBZ2=1
+	with_bzip2=yes],
+
+	
+	[AS_IF([test "x$with_bzip2" = "xyes"],
+		[AC_MSG_ERROR([bzip2 requested but not found])])
+	HAVE_LIBBZ2=0
+	with_bzip2=no]
+)
+
+AC_ARG_WITH([zlib],
+	AC_HELP_STRING([--with-zlib], [build with support for zlib compressed files]))
+
+AS_IF([test "x$with_zlib" != "xno"],
+	[
+	AC_CHECK_LIB(z, deflate, have_zlib=yes, have_zlib=no)
+	], [have_zlib=no])
+
+AS_IF([test "x$have_zlib" = "xyes"], [
+	if test "$ac_cv_lib_z_deflate" != "none required"; then
+		LIBTRACE_LIBS="$LIBTRACE_LIBS -lz"
+	fi
+	HAVE_LIBZ=1
+	with_zlib=yes],
+
+	
+	[AS_IF([test "x$with_zlib" = "xyes"],
+		[AC_MSG_ERROR([zlib requested but not found])])
+	HAVE_LIBZ=0
+	with_zlib=no]
+)
+
+AC_ARG_WITH([lzo],
+	AC_HELP_STRING([--with-lzo], [build with support for writing lzo compressed files]))
+
+AS_IF([test "x$with_lzo" != "xno"],
+	[
+	AC_CHECK_LIB(lzo2, lzo1x_1_compress, have_lzo=yes, have_lzo=yes)
+	], [have_lzo=no])
+
+AS_IF([test "x$have_lzo" = "xyes"], [
+	if test "$ac_cv_lib_lzo2_lzo1x_1_compress" != "none required"; then
+		LIBTRACE_LIBS="$LIBTRACE_LIBS -llzo2"
+	fi
+	HAVE_LIBLZO2=1
+	with_lzo=yes],
+
+	
+	[AS_IF([test "x$with_lzo" = "xyes"],
+		[AC_MSG_ERROR([lzo requested but not found])])
+	HAVE_LIBLZO2=0
+	with_lzo=no]
+)
+
 
 # Define automake conditionals for use in our Makefile.am files
 AM_CONDITIONAL([HAVE_BPF_CAPTURE], [test "$ac_cv_have_decl_BIOCSETIF" = yes ])
 AM_CONDITIONAL([HAVE_DAG], [test "$libtrace_dag" = true])
 AM_CONDITIONAL([DAG2_4], [test "$libtrace_dag_version" = 24])
 AM_CONDITIONAL([DAG2_5], [test "$libtrace_dag_version" = 25])
-AM_CONDITIONAL([HAVE_ZLIB], [test "$have_zlib" = 1])
-AM_CONDITIONAL([HAVE_BZLIB], [test "$have_bzip" = 1])
-AM_CONDITIONAL([HAVE_LZO], [test "$have_lzo" = 1])
 AM_CONDITIONAL([HAVE_NETPACKET_PACKET_H], [test "$libtrace_netpacket_packet_h" = true])
 AM_CONDITIONAL([HAVE_LIBGDC], [test "$ac_cv_header_gdc_h" = yes])
 AM_CONDITIONAL([HAVE_LLVM], [test "x$JIT" != "xno" ])
-AM_CONDITIONAL([HAVE_NCURSES], [test "x$have_ncurses" = "xyes"])
+AM_CONDITIONAL([HAVE_NCURSES], [test "$HAVE_NCURSES" != 0])
+AM_CONDITIONAL([HAVE_BZLIB], [test "$HAVE_LIBBZ2" != 0])
+AM_CONDITIONAL([HAVE_ZLIB], [test "$HAVE_LIBZ" != 0])
+AM_CONDITIONAL([HAVE_LZO], [ test "$HAVE_LIBLZO2" != 0])
 
 # Check for miscellaneous programs
 AC_CHECK_PROG([libtrace_doxygen], [doxygen], [true], [false])
@@ -552,9 +612,9 @@ else
 	AC_MSG_NOTICE([Compiled with PCAP support: < 1.0])
 fi
 
-reportopt "Compiled with compressed trace (zlib) support" $ac_cv_lib_z_deflate
-reportopt "Compiled with compressed trace (bz2) support" $ac_cv_lib_bz2_BZ2_bzDecompressInit
-reportopt "Compiled with compressed trace (lzo write only) support" $ac_cv_lib_lzo2_lzo1x_1_compress
+reportopt "Compiled with compressed trace (zlib) support" $with_zlib
+reportopt "Compiled with compressed trace (bz2) support" $with_bzip2
+reportopt "Compiled with compressed trace (lzo write only) support" $with_lzo
 if test x"$libtrace_dag" = xtrue; then
 	if test "$libtrace_dag_version" = 24; then
 		AC_MSG_NOTICE([Compiled with DAG live capture support: 2.4])
@@ -568,7 +628,7 @@ else
 fi
 reportopt "Compiled with LLVM BPF JIT support" $JIT
 reportopt "Building man pages/documentation" $libtrace_doxygen
-reportopt "Building tracetop (requires libncurses)" $have_ncurses
+reportopt "Building tracetop (requires libncurses)" $with_ncurses
 
 # Report any errors relating to missing bison, flex, etc.
 echo 
