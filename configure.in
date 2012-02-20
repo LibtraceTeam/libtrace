@@ -473,13 +473,13 @@ AS_IF([test "x$have_ncurses" = "xyes"], [
 	if test "$ac_cv_search_mvprintw" != "none required"; then
 		TOOLS_LIBS="$TOOLS_LIBS $ac_cv_search_mvprintw"
 	fi
-	HAVE_NCURSES=1
+	AC_DEFINE(HAVE_NCURSES, 1, "Compiled with ncurses support")
 	with_ncurses=yes],
 
 	
 	[AS_IF([test "x$with_ncurses" = "xyes"],
 		[AC_MSG_ERROR([ncurses requested but not found])])
-	HAVE_NCURSES=0
+	AC_DEFINE(HAVE_NCURSES, 0, "Compiled with ncurses support")
 	with_ncurses=no]
 )
 			
@@ -495,13 +495,12 @@ AS_IF([test "x$have_bzip" = "xyes"], [
 	if test "$ac_cv_lib_bz2_BZ2_bzDecompressInit" != "none required"; then
 		LIBTRACE_LIBS="$LIBTRACE_LIBS -lbz2"
 	fi
-	HAVE_LIBBZ2=1
-	with_bzip2=yes],
-
+	with_bzip2=yes
+	AC_DEFINE(HAVE_LIBBZ2, 1, "Compiled with bzip2 support")],
 	
 	[AS_IF([test "x$with_bzip2" = "xyes"],
 		[AC_MSG_ERROR([bzip2 requested but not found])])
-	HAVE_LIBBZ2=0
+	AC_DEFINE(HAVE_LIBBZ2, 0, "Compiled with bzip2 support")
 	with_bzip2=no]
 )
 
@@ -517,13 +516,13 @@ AS_IF([test "x$have_zlib" = "xyes"], [
 	if test "$ac_cv_lib_z_deflate" != "none required"; then
 		LIBTRACE_LIBS="$LIBTRACE_LIBS -lz"
 	fi
-	HAVE_LIBZ=1
+	AC_DEFINE(HAVE_LIBZ, 1, "Compiled with zlib support")
 	with_zlib=yes],
 
 	
 	[AS_IF([test "x$with_zlib" = "xyes"],
 		[AC_MSG_ERROR([zlib requested but not found])])
-	HAVE_LIBZ=0
+	AC_DEFINE(HAVE_LIBZ, 0, "Compiled with zlib support")
 	with_zlib=no]
 )
 
@@ -532,20 +531,20 @@ AC_ARG_WITH([lzo],
 
 AS_IF([test "x$with_lzo" != "xno"],
 	[
-	AC_CHECK_LIB(lzo2, lzo1x_1_compress, have_lzo=yes, have_lzo=yes)
+	AC_CHECK_LIB(lzo2, lzo1x_1_compress, have_lzo=yes, have_lzo=no)
 	], [have_lzo=no])
 
 AS_IF([test "x$have_lzo" = "xyes"], [
 	if test "$ac_cv_lib_lzo2_lzo1x_1_compress" != "none required"; then
 		LIBTRACE_LIBS="$LIBTRACE_LIBS -llzo2"
 	fi
-	HAVE_LIBLZO2=1
+	AC_DEFINE(HAVE_LIBLZO2, 1, "Compiled with lzo2 support")
 	with_lzo=yes],
 
 	
 	[AS_IF([test "x$with_lzo" = "xyes"],
 		[AC_MSG_ERROR([lzo requested but not found])])
-	HAVE_LIBLZO2=0
+	AC_DEFINE(HAVE_LIBLZO2, 0, "Compiled with lzo2 support")
 	with_lzo=no]
 )
 
@@ -558,10 +557,10 @@ AM_CONDITIONAL([DAG2_5], [test "$libtrace_dag_version" = 25])
 AM_CONDITIONAL([HAVE_NETPACKET_PACKET_H], [test "$libtrace_netpacket_packet_h" = true])
 AM_CONDITIONAL([HAVE_LIBGDC], [test "$ac_cv_header_gdc_h" = yes])
 AM_CONDITIONAL([HAVE_LLVM], [test "x$JIT" != "xno" ])
-AM_CONDITIONAL([HAVE_NCURSES], [test "$HAVE_NCURSES" != 0])
-AM_CONDITIONAL([HAVE_BZLIB], [test "$HAVE_LIBBZ2" != 0])
-AM_CONDITIONAL([HAVE_ZLIB], [test "$HAVE_LIBZ" != 0])
-AM_CONDITIONAL([HAVE_LZO], [ test "$HAVE_LIBLZO2" != 0])
+AM_CONDITIONAL([HAVE_NCURSES], [test "x$with_ncurses" != "xno"])
+AM_CONDITIONAL([HAVE_BZLIB], [test "x$with_bzip2" != "xno"])
+AM_CONDITIONAL([HAVE_ZLIB], [test "x$with_zlib" != "xno"])
+AM_CONDITIONAL([HAVE_LZO], [ test "x$with_lzo" != "xno"])
 
 # Check for miscellaneous programs
 AC_CHECK_PROG([libtrace_doxygen], [doxygen], [true], [false])
