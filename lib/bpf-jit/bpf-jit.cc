@@ -568,7 +568,7 @@ void initialise_array(void)
 	opcode_names[BPF_RET+BPF_K]		= "bpf_ret_k";
 
 	opcode_names[BPF_MISC+BPF_TAX]		= "bpf_tax";
-	opcode_names[BPF_MISC+BPF_TXA]		= "bpf_tax";
+	opcode_names[BPF_MISC+BPF_TXA]		= "bpf_txa";
 
 }
 
