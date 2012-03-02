@@ -729,6 +729,7 @@ static libtrace_eventobj_t trace_event_rt(libtrace_t *trace,
 				event.type = TRACE_EVENT_IOWAIT;
 			}
 			else {
+				trace_perror(trace, "Error doing a non-blocking read from rt");
 				event.type = TRACE_EVENT_PACKET;
 				break;
 			}

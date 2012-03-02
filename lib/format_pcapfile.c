@@ -351,6 +351,11 @@ static int pcapfile_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 
 	bytes_to_read = swapl(libtrace,((libtrace_pcapfile_pkt_hdr_t*)packet->buffer)->caplen);
 
+	if (bytes_to_read >= LIBTRACE_PACKET_BUFSIZE) {
+		trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Invalid caplen in pcap header (%u) - trace may be corrupt", (uint32_t)bytes_to_read);
+		return -1;
+	}
+
 	assert(bytes_to_read < LIBTRACE_PACKET_BUFSIZE);
 
 	/* If there is no payload to read, do not ask wandio_read to try and
