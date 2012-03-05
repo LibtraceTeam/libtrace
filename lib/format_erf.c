@@ -586,9 +586,6 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 		return 0;
 
 	if (!packet->header) {
-		/*trace_set_err_output(libtrace, TRACE_ERR_BAD_PACKET,
-				"Packet has no header - probably an RT packet");
-		*/
 		return -1;
 	}
 	

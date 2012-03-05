@@ -347,7 +347,7 @@ static int rt_read(libtrace_t *libtrace, void **buffer, size_t len, int block)
                                                 RT_BUF_SIZE-RT_INFO->buf_filled,
                                                 MSG_NOSIGNAL|block)) <= 0) {
 				if (numbytes == 0) {
-					trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, 
+					trace_set_err(libtrace, TRACE_ERR_RT_FAILURE, 
 							"No data received");
 					return -1;
 				}
@@ -477,7 +477,7 @@ static int rt_send_ack(libtrace_t *libtrace,
 			else {
 				printf("Error sending ack\n");
 				perror("send");
-				trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, 
+				trace_set_err(libtrace, TRACE_ERR_RT_FAILURE, 
 						"Error sending ack");
 				return -1;
 			}

@@ -221,7 +221,11 @@ enum {
 	/** This feature is unsupported */
 	TRACE_ERR_UNSUPPORTED	= -7,
 	/** Illegal use of the API */
-	TRACE_ERR_BAD_STATE	= -8
+	TRACE_ERR_BAD_STATE	= -8,
+	/** Failed to compile a BPF filter */
+	TRACE_ERR_BAD_FILTER    = -9,
+	/** RT communication breakdown */
+	TRACE_ERR_RT_FAILURE    = -10
 };
 
 /** Enumeration of DLTs supported by libtrace 
