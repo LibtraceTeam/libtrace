@@ -153,7 +153,10 @@ static time_t trtime(char *s) {
 	tm.tm_yday = 0; /* ignored */
 	tm.tm_isdst = -1; /* forces check for summer time */
 	
-	getenv("TZ");
+	if (getenv("TZ") == NULL) {
+		perror("getenv(TZ)");
+		return (time_t)0;
+	}
 	if (putenv("TZ=Pacific/Auckland")) {
 		perror("putenv");
 		return (time_t)0;
