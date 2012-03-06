@@ -548,8 +548,6 @@ static int dag_config_input(libtrace_t *libtrace, trace_option_t option,
 /* Starts a DAG output trace */
 static int dag_start_output(libtrace_out_t *libtrace) {
 	struct timeval zero, nopoll;
-	uint8_t *top, *bottom;
-	top = bottom = NULL;
 
 	zero.tv_sec = 0;
 	zero.tv_usec = 0;
