@@ -39,6 +39,21 @@
 #include <inttypes.h>
 #include <stdbool.h>
 
+#if __GNUC__ >= 4
+	#ifdef LT_BUILDING_DLL
+		#define DLLEXPORT __attribute__ ((visibility("default")))
+		#define DLLLOCAL __attribute__ ((visibility("hidden")))
+	#else
+		#define DLLEXPORT
+		#define DLLLOCAL
+	#endif
+#else
+	#define DLLEXPORT
+	#define DLLLOCAL
+#endif
+
+
+
 /** @file
  *
  * @brief Header file dealing with the Libtrace IO sub-system

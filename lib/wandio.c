@@ -124,7 +124,7 @@ static void parse_env(void)
 #define DEBUG_PIPELINE(x) 
 #endif
 
-io_t *wandio_create(const char *filename)
+DLLEXPORT io_t *wandio_create(const char *filename)
 {
 	parse_env();
 
@@ -172,7 +172,7 @@ io_t *wandio_create(const char *filename)
 	return peek_open(io);
 }
 
-off_t wandio_tell(io_t *io)
+DLLEXPORT off_t wandio_tell(io_t *io)
 {
 	if (!io->source->tell) {
 		errno = -ENOSYS;
@@ -181,7 +181,7 @@ off_t wandio_tell(io_t *io)
 	return io->source->tell(io);
 }
 
-off_t wandio_seek(io_t *io, off_t offset, int whence)
+DLLEXPORT off_t wandio_seek(io_t *io, off_t offset, int whence)
 {
 	if (!io->source->seek) {
 		errno = -ENOSYS;
@@ -190,7 +190,7 @@ off_t wandio_seek(io_t *io, off_t offset, int whence)
 	return io->source->seek(io,offset,whence);
 }
 
-off_t wandio_read(io_t *io, void *buffer, off_t len)
+DLLEXPORT off_t wandio_read(io_t *io, void *buffer, off_t len)
 { 
 	off_t ret;
 	ret=io->source->read(io,buffer,len); 
@@ -200,7 +200,7 @@ off_t wandio_read(io_t *io, void *buffer, off_t len)
 	return ret;
 }
 
-off_t wandio_peek(io_t *io, void *buffer, off_t len)
+DLLEXPORT off_t wandio_peek(io_t *io, void *buffer, off_t len)
 {
 	off_t ret;
 	assert(io->source->peek); /* If this fails, it means you're calling
@@ -215,14 +215,14 @@ off_t wandio_peek(io_t *io, void *buffer, off_t len)
 	return ret;
 }
 
-void wandio_destroy(io_t *io)
+DLLEXPORT void wandio_destroy(io_t *io)
 { 
 	if (keep_stats) 
 		fprintf(stderr,"LIBTRACEIO STATS: %"PRIu64" blocks on read\n", read_waits);
 	io->source->close(io); 
 }
 
-iow_t *wandio_wcreate(const char *filename, int compress_type, int compression_level, int flags)
+DLLEXPORT iow_t *wandio_wcreate(const char *filename, int compress_type, int compression_level, int flags)
 {
 	iow_t *iow;
 	parse_env();
@@ -261,7 +261,7 @@ iow_t *wandio_wcreate(const char *filename, int compress_type, int compression_l
 		return iow;
 }
 
-off_t wandio_wwrite(iow_t *iow, const void *buffer, off_t len)
+DLLEXPORT off_t wandio_wwrite(iow_t *iow, const void *buffer, off_t len)
 {
 #if WRITE_TRACE
 	fprintf(stderr,"wwrite(%s): %d bytes\n",iow->source->name, (int)len);
@@ -269,7 +269,7 @@ off_t wandio_wwrite(iow_t *iow, const void *buffer, off_t len)
 	return iow->source->write(iow,buffer,len);	
 }
 
-void wandio_wdestroy(iow_t *iow)
+DLLEXPORT void wandio_wdestroy(iow_t *iow)
 {
 	iow->source->close(iow);
 	if (keep_stats) 
