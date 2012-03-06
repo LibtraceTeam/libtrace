@@ -1,5 +1,5 @@
 lib_LTLIBRARIES = libtrace.la
-include_HEADERS = libtrace.h dagformat.h lt_inttypes.h daglegacy.h rt_protocol.h erftypes.h wandio.h 
+include_HEADERS = libtrace.h dagformat.h lt_inttypes.h daglegacy.h rt_protocol.h erftypes.h 
 
 AM_CFLAGS=@LIBCFLAGS@
 AM_CXXFLAGS=@LIBCXXFLAGS@
@@ -15,24 +15,6 @@ if HAVE_BPF_CAPTURE
 BPFFORMATS=format_bpf.c
 else
 BPFFORMATS=
-endif
-
-if HAVE_ZLIB
-LIBTRACEIO_ZLIB=ior-zlib.c iow-zlib.c
-else
-LIBTRACEIO_ZLIB=
-endif
-
-if HAVE_BZLIB
-LIBTRACEIO_BZLIB=ior-bzip.c iow-bzip.c
-else
-LIBTRACEIO_BZLIB=
-endif
-
-if HAVE_LZO
-LIBTRACEIO_LZO=iow-lzo.c
-else
-LIBTRACEIO_LZO=
 endif
 
 if HAVE_DAG
@@ -64,16 +46,13 @@ libtrace_la_SOURCES = trace.c common.h \
 		protocols_transport.c protocols.h protocols_ospf.c \
 		$(DAGSOURCE) format_erf.h \
 		$(BPFJITSOURCE) \
-		$(LIBTRACEIO_ZLIB) $(LIBTRACEIO_BZLIB) $(LIBTRACEIO_LZO) \
-		ior-peek.c ior-stdio.c ior-thread.c \
-		iow-stdio.c iow-thread.c wandio.c \
-		wandio.h arphrd.h
+		arphrd.h
 
 if DAG2_4
 nodist_libtrace_la_SOURCES = dagopts.c dagapi.c
 endif
 
-INCLUDES = @ADD_INCLS@
+INCLUDES= @ADD_INCLS@ -I../libwandio
 libtrace_la_LIBADD = @LIBTRACE_LIBS@ @LTLIBOBJS@
 libtrace_la_LDFLAGS=-version-info @LIBTRACE_MAJOR@:@LIBTRACE_MINOR@:@LIBTRACE_MID@ @ADD_LDFLAGS@
 

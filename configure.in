@@ -40,7 +40,7 @@ AC_CONFIG_FILES([Makefile lib/Makefile docs/Makefile libpacketdump/Makefile
 	examples/Makefile examples/skeleton/Makefile examples/rate/Makefile
 	examples/stats/Makefile examples/tutorial/Makefile
 	docs/libtrace.doxygen 
-	lib/libtrace.h
+	lib/libtrace.h libwandio/Makefile
 	])
 
 
@@ -99,9 +99,10 @@ AC_HEADER_TIME
 AC_SYS_LARGEFILE
 
 LIBPKTDUMP_LIBS="-ltrace "
-ADD_LDFLAGS="$ADD_LDFLAGS -L\$(abs_top_srcdir)/lib" 
-LIBTRACE_LIBS=""
+ADD_LDFLAGS="$ADD_LDFLAGS -L\$(abs_top_srcdir)/libwandio -L\$(abs_top_srcdir)/lib" 
+LIBTRACE_LIBS="-lwandio"
 TOOLS_LIBS=""
+LIBWANDIO_LIBS=""
 
 # Set our C compiler flags based on the gcc version
 if test "$GCC" = "yes"; then
@@ -394,7 +395,7 @@ if test "$ac_cv_search_dlopen" != "none required"; then
 fi
 
 if test "$have_pthread" = 1; then
-	LIBTRACE_LIBS="$LIBTRACE_LIBS -lpthread"
+	LIBWANDIO_LIBS="$LIBWANDIO_LIBS -lpthread"
 	AC_DEFINE(HAVE_LIBPTHREAD, 1, [Set to 1 if pthreads are supported])
 fi
 
@@ -493,7 +494,7 @@ AS_IF([test "x$with_bzip2" != "xno"],
 
 AS_IF([test "x$have_bzip" = "xyes"], [
 	if test "$ac_cv_lib_bz2_BZ2_bzDecompressInit" != "none required"; then
-		LIBTRACE_LIBS="$LIBTRACE_LIBS -lbz2"
+		LIBWANDIO_LIBS="$LIBWANDIO_LIBS -lbz2"
 	fi
 	with_bzip2=yes
 	AC_DEFINE(HAVE_LIBBZ2, 1, "Compiled with bzip2 support")],
@@ -514,7 +515,7 @@ AS_IF([test "x$with_zlib" != "xno"],
 
 AS_IF([test "x$have_zlib" = "xyes"], [
 	if test "$ac_cv_lib_z_deflate" != "none required"; then
-		LIBTRACE_LIBS="$LIBTRACE_LIBS -lz"
+		LIBWANDIO_LIBS="$LIBWANDIO_LIBS -lz"
 	fi
 	AC_DEFINE(HAVE_LIBZ, 1, "Compiled with zlib support")
 	with_zlib=yes],
@@ -536,7 +537,7 @@ AS_IF([test "x$with_lzo" != "xno"],
 
 AS_IF([test "x$have_lzo" = "xyes"], [
 	if test "$ac_cv_lib_lzo2_lzo1x_1_compress" != "none required"; then
-		LIBTRACE_LIBS="$LIBTRACE_LIBS -llzo2"
+		LIBWANDIO_LIBS="$LIBWANDIO_LIBS -llzo2"
 	fi
 	AC_DEFINE(HAVE_LIBLZO2, 1, "Compiled with lzo2 support")
 	with_lzo=yes],
@@ -570,6 +571,7 @@ AM_CONDITIONAL(HAS_DOXYGEN, [test x"$libtrace_doxygen" = xtrue])
 # Set all our output variables
 AC_SUBST([LIBTRACE_LIBS])
 AC_SUBST([LIBPKTDUMP_LIBS])
+AC_SUBST([LIBWANDIO_LIBS])
 AC_SUBST([TOOLS_LIBS])
 #AC_SUBST([ADD_LIBS])
 AC_SUBST([ADD_LDFLAGS])
