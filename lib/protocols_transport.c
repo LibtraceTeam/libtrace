@@ -115,16 +115,23 @@ DLLEXPORT size_t trace_get_payload_length(const libtrace_packet_t *packet) {
 			len -= (4 * tcp->doff);
 			break;
 		case TRACE_IPPROTO_UDP:
+			if (rem < sizeof(libtrace_udp_t))
+				return 0;
+			if (len < sizeof(libtrace_udp_t))
+				return 0;
 			len -= sizeof(libtrace_udp_t);
 			break;
 		case TRACE_IPPROTO_ICMP:
+			if (rem < sizeof(libtrace_icmp_t))
+				return 0;
+			if (len < sizeof(libtrace_icmp_t))
+				return 0;
 			len -= sizeof(libtrace_icmp_t);
 			break;
 		
 		default:
 			return 0;
 	}
-
 
 	((libtrace_packet_t *)packet)->payload_length = len;
 	return len;
