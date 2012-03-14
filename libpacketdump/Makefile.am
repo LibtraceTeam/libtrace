@@ -170,7 +170,7 @@ libpacketdump_la_SOURCES = libpacketdump.cc \
 plugin_LTLIBRARIES = $(BIN_PROTOCOLS)
 dist_plugin_DATA = $(TXT_PROTOCOLS)
 
-INCLUDES= @ADD_INCLS@ -I../lib 
+INCLUDES= @ADD_INCLS@ -I../lib -I../libwandio 
 
 # NOTE: You CANNOT add @LEXLIBS@ here, as they are statically compiled
 # which on non x86_32 platforms means that they cannot be linked into

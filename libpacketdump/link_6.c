@@ -4,7 +4,7 @@
  */
 
 #include "config.h"
-#include "libtrace_int.h"
+//#include "libtrace_int.h"
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <stdio.h>
@@ -15,7 +15,7 @@
 
 /* Copied this here because this isn't currently part of our external API -
  * maybe we need to think about doing that? */
-libtrace_linktype_t arphrd_type_to_libtrace(unsigned int arphrd) {
+static libtrace_linktype_t arphrd_type_to_libtrace(unsigned int arphrd) {
         switch(arphrd) {
                 case ARPHRD_ETHER: return TRACE_TYPE_ETH;
                 case ARPHRD_EETHER: return TRACE_TYPE_ETH;
