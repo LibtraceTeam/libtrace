@@ -59,7 +59,6 @@
 #include <sys/prctl.h>
 #endif
 
-#include "libtrace.h"
 
 enum { 
 	M_LZO1X_1     =     1,
