@@ -276,29 +276,6 @@ enum {
 	TRACE_PREP_DO_NOT_OWN_BUFFER	=0
 };
 
-/** A local definition of an SLL header */
-typedef struct libtrace_sll_header_t {
-	uint16_t pkttype;          	/**< Packet type */
-	uint16_t hatype;           	/**< Link-layer address type */
-	uint16_t halen;            	/**< Link-layer address length */
-	unsigned char addr[8];	 	/**< Link-layer address */
-	uint16_t protocol;         	/**< Protocol */
-} libtrace_sll_header_t;
-
-
-/* SLL packet types */
-
-/** Packet was addressed for the local host */
-#define TRACE_SLL_HOST		0
-/** Packet was addressed for a broadcast address */
-#define TRACE_SLL_BROADCAST 	1
-/** Packet was addressed for a multicast address */
-#define TRACE_SLL_MULTICAST	2
-/** Packet was addressed for another host but was captured by a promiscuous
- * device */
-#define TRACE_SLL_OTHERHOST	3
-/** Packet originated from the local host */
-#define TRACE_SLL_OUTGOING	4
 
 #ifndef PF_RULESET_NAME_SIZE
 #define PF_RULESET_NAME_SIZE 16
