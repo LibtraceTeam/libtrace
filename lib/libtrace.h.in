@@ -225,7 +225,9 @@ enum {
 	/** Failed to compile a BPF filter */
 	TRACE_ERR_BAD_FILTER    = -9,
 	/** RT communication breakdown */
-	TRACE_ERR_RT_FAILURE    = -10
+	TRACE_ERR_RT_FAILURE    = -10,
+	/** Compression format unsupported */
+	TRACE_ERR_UNSUPPORTED_COMPRESS 	= -11
 };
 
 /** Enumeration of DLTs supported by libtrace 
@@ -743,6 +745,7 @@ typedef struct libtrace_80211_t {
         LT_BITFIELD32      from_ds:1;	/**< Packet from Distribution Service */
         LT_BITFIELD32      to_ds:1;	/**< Packet to Distribution Service */
 #endif
+	
         uint16_t     duration;	/**< Duration value for NAV calculation */
         uint8_t      mac1[6];	/**< MAC Address 1 */
         uint8_t      mac2[6];	/**< MAC Address 2 */

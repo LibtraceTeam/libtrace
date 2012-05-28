@@ -140,25 +140,37 @@ DLLEXPORT io_t *wandio_create(const char *filename)
 	if (!io)
 		return NULL;
 	len = wandio_peek(io, buffer, sizeof(buffer));
-#if HAVE_LIBZ
 	/* Auto detect gzip compressed data */
 	if (len>=2 && buffer[0] == '\037' && buffer[1] == '\213') { 
+#if HAVE_LIBZ
 		DEBUG_PIPELINE("zlib");
 		io = zlib_open(io);
+#else
+		fprintf(stderr, "File %s is gzip compressed but libtrace has not been built with zlib support!\n", filename);
+		return NULL;
+#endif
 	}
 	/* Auto detect compress(1) compressed data (gzip can read this) */
 	if (len>=2 && buffer[0] == '\037' && buffer[1] == '\235') {
+#if HAVE_LIBZ
 		DEBUG_PIPELINE("zlib");
 		io = zlib_open(io);
-	}
+#else
+		fprintf(stderr, "File %s is compress(1) compressed but libtrace has not been built with zlib support!\n", filename);
+		return NULL;
 #endif
-#if HAVE_LIBBZ2
+	}
+
 	/* Auto detect bzip compressed data */
 	if (len>=3 && buffer[0] == 'B' && buffer[1] == 'Z' && buffer[2] == 'h') { 
+#if HAVE_LIBBZ2
 		DEBUG_PIPELINE("bzip");
 		io = bz_open(io);
-	}
+#else
+		fprintf(stderr, "File %s is bzip compressed but libtrace has not been built with bzip2 support!\n", filename);
+		return NULL;
 #endif
+	}
 	
 	/* Now open a threaded, peekable reader using the appropriate module
 	 * to read the data */
@@ -217,6 +229,9 @@ DLLEXPORT off_t wandio_peek(io_t *io, void *buffer, off_t len)
 
 DLLEXPORT void wandio_destroy(io_t *io)
 { 
+	if (!io)
+		return;
+	
 	if (keep_stats) 
 		fprintf(stderr,"LIBTRACEIO STATS: %"PRIu64" blocks on read\n", read_waits);
 	io->source->close(io); 

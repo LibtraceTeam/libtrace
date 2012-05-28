@@ -265,7 +265,11 @@ io_t *trace_open_file(libtrace_t *trace)
 {
 	io_t *io=wandio_create(trace->uridata);
 	if (!io) {
-		trace_set_err(trace,errno,"Unable to open %s",trace->uridata);
+		if (errno != 0) {
+			trace_set_err(trace,errno,"Unable to open %s",trace->uridata);
+		} else {
+			trace_set_err(trace,TRACE_ERR_UNSUPPORTED_COMPRESS,"Unsupported compression error: %s", trace->uridata);
+		}
 	}
 	return io;
 }
