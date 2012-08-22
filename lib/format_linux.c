@@ -599,6 +599,7 @@ static libtrace_linktype_t linuxnative_get_link_type(const struct libtrace_packe
 
 	switch (linktype) {
 		case ARPHRD_ETHER:
+		case ARPHRD_LOOPBACK:
 			return TRACE_TYPE_ETH;
 		case ARPHRD_PPP:
 			return TRACE_TYPE_NONE;
