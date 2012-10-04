@@ -222,7 +222,6 @@ AC_CHECK_HEADER(gdc.h,AC_DEFINE(HAVE_LIBGDC,1,[has gdc.h]))
 # Check for libpcap
 AC_CHECK_LIB(pcap,pcap_next_ex,pcapfound=1,pcapfound=0)
 AC_CHECK_LIB(pcap,pcap_create,pcapcreate=1,pcapcreate=0)
-AC_CHECK_FUNCS(pcap_inject pcap_sendpacket pcap_setnonblock)
 AC_CHECK_DECLS([BIOCSETIF],,,[
 #include <sys/types.h>
 #include <sys/time.h>
@@ -249,6 +248,11 @@ else
 	LIBTRACE_LIBS="$LIBTRACE_LIBS -lpcap"
 	AC_DEFINE([HAVE_LIBPCAP],1,[compile with libpcap support])
 	AC_DEFINE([HAVE_BPF_FILTER],1,[compile with bpf filter support])
+
+	LIBS+="-lpcap"
+	AC_CHECK_FUNCS(pcap_inject pcap_sendpacket pcap_setnonblock)
+	LIBS=""
+
 fi
 
 if test "$pcapcreate" = 1; then
