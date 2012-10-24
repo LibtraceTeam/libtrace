@@ -89,6 +89,10 @@ char *lookup_uri(const char *type)
 		return "duck:traces/100_packets.duck";
 	if (!strcmp(type, "tsh"))
 		return "tsh:traces/10_packets.tsh.gz";
+	if (!strcmp(type, "sll1"))
+		return "pcapfile:traces/sll.pcap.gz";
+	if (!strcmp(type, "sll2"))
+		return "pcapfile:traces/100_sll.pcap";
 	return "unknown";
 }
 
@@ -104,6 +108,34 @@ char *lookup_out_uri(const char *type) {
 	if (!strcmp(type,"duck"))
 		return "duck:traces/100_packets.out.duck";
 	return "unknown";
+}
+
+
+static int length_changed(libtrace_packet_t *packet, 
+		libtrace_packet_t *packet2) {
+
+	uint16_t cap_len_1 = trace_get_capture_length(packet);
+	uint16_t cap_len_2 = trace_get_capture_length(packet2);
+	uint16_t wlen_1 = trace_get_wire_length(packet);
+	uint16_t wlen_2 = trace_get_wire_length(packet2);
+
+	/* Special case where we demoted a packet */
+	if (trace_get_link_type(packet) == TRACE_TYPE_LINUX_SLL && 
+			trace_get_link_type(packet2) != TRACE_TYPE_LINUX_SLL) {
+		
+		if (cap_len_2 != cap_len_1 - sizeof(libtrace_sll_header_t))
+			return true;
+	} else {
+
+		if (cap_len_1 != cap_len_2 && cap_len_2 != wlen_2)
+			return true;
+	}
+	
+	if (wlen_1 != wlen_2)
+		return true;
+
+	return false;
+
 }
 
 int main(int argc, char *argv[]) {
@@ -194,10 +226,7 @@ int main(int argc, char *argv[]) {
 			break;
 		}
 		/* The capture length might be snapped down to the wire length */
-		if (
-		((  trace_get_capture_length(packet) != trace_get_capture_length(packet2)
-		 && trace_get_capture_length(packet2) != trace_get_wire_length(packet2)))
-		 || (trace_get_wire_length(packet) != trace_get_wire_length(packet2))) {
+		if (length_changed(packet, packet2)) {
 			printf("\t%s\t%s\n",
 				trace1name,
 				trace2name);

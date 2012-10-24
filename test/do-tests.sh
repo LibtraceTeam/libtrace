@@ -140,6 +140,16 @@ do_test ./test-convert pcap pcapfile
 echo " * erf -> pcapfile"
 rm -f traces/*.out.*
 do_test ./test-convert erf pcapfile
+
+echo " * pcap (sll) -> erf    raw IP"
+rm -f traces/*.out.*
+do_test ./test-convert sll1 erf
+
+echo " * pcap (sll) -> erf    loopback"
+rm -f traces/*.out.*
+do_test ./test-convert sll2 erf
+
+
 #./test-convert rtclient erf
 #./test-convert rtclient pcap
 
