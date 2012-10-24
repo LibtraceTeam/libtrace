@@ -150,6 +150,8 @@ libtrace_linktype_t erf_type_to_libtrace(uint8_t erf)
 		case TYPE_ATM:		return TRACE_TYPE_ATM;
 		case TYPE_AAL5:		return TRACE_TYPE_AAL5;
 		case TYPE_DSM_COLOR_ETH:return TRACE_TYPE_ETH;
+		case TYPE_IPV4:		return TRACE_TYPE_NONE;
+		case TYPE_IPV6:		return TRACE_TYPE_NONE;
 	}
 	return ~0U;
 }
@@ -161,6 +163,7 @@ uint8_t libtrace_to_erf_type(libtrace_linktype_t linktype)
 		case TRACE_TYPE_ETH:	return TYPE_ETH;
 		case TRACE_TYPE_ATM:	return TYPE_ATM;
 		case TRACE_TYPE_AAL5:	return TYPE_AAL5;
+		case TRACE_TYPE_NONE:	return TYPE_IPV4;
 		/* Unsupported conversions */
 		case TRACE_TYPE_LLCSNAP: 
 		case TRACE_TYPE_DUCK:
@@ -168,7 +171,6 @@ uint8_t libtrace_to_erf_type(libtrace_linktype_t linktype)
 		case TRACE_TYPE_80211_PRISM:
 		case TRACE_TYPE_80211:
 		case TRACE_TYPE_PFLOG:
-		case TRACE_TYPE_NONE:
 		case TRACE_TYPE_LINUX_SLL:
 		case TRACE_TYPE_PPP:
 		case TRACE_TYPE_POS:
@@ -285,6 +287,8 @@ void promote_packet(libtrace_packet_t *packet)
 bool demote_packet(libtrace_packet_t *packet)
 {
 	uint8_t type;
+	uint16_t ha_type, next_proto;
+	libtrace_sll_header_t *sll = NULL;
 	uint32_t remaining = 0;
 	char *tmp;
 	struct timeval tv;
@@ -334,6 +338,28 @@ bool demote_packet(libtrace_packet_t *packet)
 			return true;
 
 		case TRACE_TYPE_LINUX_SLL:
+			sll = (libtrace_sll_header_t *)(packet->payload);
+
+			ha_type = ntohs(sll->hatype);
+			next_proto = ntohs(sll->protocol);
+		
+			/* Preserved from older libtrace behaviour */
+			if (ha_type == ARPHRD_PPP)
+				packet->type = pcap_linktype_to_rt(TRACE_DLT_RAW);
+			/* Don't decide trace type based on ha_type,
+			 * decide based on the protocol header that is
+			 * coming up!
+			 */
+			else if (next_proto == TRACE_ETHERTYPE_LOOPBACK)
+				packet->type = pcap_linktype_to_rt(TRACE_DLT_EN10MB);
+			else if (next_proto == TRACE_ETHERTYPE_IP) 
+				packet->type = pcap_linktype_to_rt(TRACE_DLT_RAW);
+			else if (next_proto == TRACE_ETHERTYPE_IPV6)
+				packet->type = pcap_linktype_to_rt(TRACE_DLT_RAW);
+			else
+				return false;
+
+#if 0
 			switch(ntohs(((libtrace_sll_header_t*)packet->payload)
 					->hatype)) {
 				case ARPHRD_PPP:
@@ -346,6 +372,7 @@ bool demote_packet(libtrace_packet_t *packet)
 					/* Dunno how to demote this packet */
 					return false;
 			}
+#endif
 			/* Skip the Linux SLL header */
 			packet->payload=(void*)((char*)packet->payload
 					+sizeof(libtrace_sll_header_t));

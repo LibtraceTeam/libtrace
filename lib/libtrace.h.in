@@ -404,6 +404,7 @@ typedef enum {
 /** Ethertypes supported by Libtrace */
 typedef enum {
 	/* Numbers <=1500 are of course, LLC/SNAP */
+	TRACE_ETHERTYPE_LOOPBACK= 0x0060,	/**< Ethernet Loopback */
 	TRACE_ETHERTYPE_IP	= 0x0800,	/**< IPv4 */
 	TRACE_ETHERTYPE_ARP	= 0x0806,	/**< Address resolution protocol */
 	TRACE_ETHERTYPE_RARP	= 0x8035,	/**< Reverse ARP */
