@@ -286,13 +286,11 @@ static int linuxnative_start_input(libtrace_t *libtrace)
 
 static int linuxnative_start_output(libtrace_out_t *libtrace)
 {
-	FORMAT(libtrace->format_data)->fd = 
-				socket(PF_PACKET, SOCK_RAW, 0);
-	if (FORMAT(libtrace->format_data)->fd==-1) {
-		free(libtrace->format_data);
+	DATAOUT(libtrace)->fd =	socket(PF_PACKET, SOCK_RAW, 0);
+	if (DATAOUT(libtrace)->fd==-1) {
+		free(DATAOUT(libtrace));
 		return -1;
 	}
-	FORMAT(libtrace->format_data)->stats_valid=0;
 
 	return 0;
 }
