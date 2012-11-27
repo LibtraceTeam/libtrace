@@ -301,7 +301,8 @@ enum base_format_t {
 	TRACE_FORMAT_BPF	  =11,	/**< BSD native interface capture */
 	TRACE_FORMAT_TSH	  =12,	/**< TSH trace format */
 	TRACE_FORMAT_ATMHDR	  =13,	/**< Legacy ATM header capture */
-	TRACE_FORMAT_LEGACY_NZIX  =14	/**< Legacy format used for NZIX traces */
+	TRACE_FORMAT_LEGACY_NZIX  =14,	/**< Legacy format used for NZIX traces */
+	TRACE_FORMAT_LINUX_RING	  =15	/**< Linux native interface capture PACKET_MMAP */
 };
 
 /** RT protocol packet types */
@@ -350,6 +351,8 @@ typedef enum {
 	TRACE_RT_DATA_ATMHDR = TRACE_RT_DATA_SIMPLE + TRACE_FORMAT_ATMHDR,
 	/** RT is encapsulating a Legacy NZIX capture record */
 	TRACE_RT_DATA_LEGACY_NZIX=TRACE_RT_DATA_SIMPLE + TRACE_FORMAT_LEGACY_NZIX,
+	/** RT is encapsulating a Linux native PACKET_MMAP capture record */
+	TRACE_RT_DATA_LINUX_RING=TRACE_RT_DATA_SIMPLE+TRACE_FORMAT_LINUX_RING,
 
 	/** As PCAP does not store the linktype with the packet, we need to 
 	 * create a separate RT type for each supported DLT, starting from
