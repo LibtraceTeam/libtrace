@@ -591,8 +591,18 @@ DLLEXPORT void trace_destroy(libtrace_t *libtrace) {
         /* Need to free things! */
         if (libtrace->uridata)
 		free(libtrace->uridata);
-	if (libtrace->event.packet)
-		trace_destroy_packet(libtrace->event.packet);
+	if (libtrace->event.packet) {
+		/* Don't use trace_destroy_packet here - there is almost
+		 * certainly going to be another libtrace_packet_t that is
+		 * pointing to the buffer for this packet, so we don't want
+		 * to free it. Rather, it will get freed when the user calls
+		 * trace_destroy_packet on the libtrace_packet_t that they
+		 * own.
+		 *
+		 * All we need to do then is free our packet structure itself.
+		 */
+		 free(libtrace->event.packet);
+	}
         free(libtrace);
 }
 
@@ -663,7 +673,7 @@ DLLEXPORT libtrace_packet_t *trace_copy_packet(const libtrace_packet_t *packet) 
 /** Destroy a packet object
  */
 DLLEXPORT void trace_destroy_packet(libtrace_packet_t *packet) {
-	if (packet->buf_control == TRACE_CTRL_PACKET) {
+	if (packet->buf_control == TRACE_CTRL_PACKET && packet->buffer) {
 		free(packet->buffer);
 	}
 	packet->buf_control=(buf_control_t)'\0'; 

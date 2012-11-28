@@ -215,17 +215,6 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 		trace->event.tdelta = now - ts;
 	}
 
-	/* This is the first packet, so just fire away. */
-	/* TODO: finalise packet */
-	
-	/* XXX: Could we do this more efficiently? */
-
-	/* We do a lot of freeing and creating of packet buffers with this
-	 * method, but at least it works unlike what was here previously */
-	//if (packet->buf_control == TRACE_CTRL_PACKET) {
-	//	free(packet->buffer);
-	//}
-	
 	/* The packet that we had read earlier is now ready to be returned
 	 * to the user - switch all the pointers etc. over */	
 	packet->type = trace->event.packet->type;
@@ -235,12 +224,6 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 	
 	packet->buffer = trace->event.packet->buffer;
 	packet->buf_control = trace->event.packet->buf_control;
-
-	//trace->event.packet->buffer = NULL;
-	//trace->event.packet->buf_control = TRACE_CTRL_EXTERNAL;
-	
-	//trace_destroy_packet(trace->event.packet);
-	//trace->event.packet = NULL;
 
 	event.type = TRACE_EVENT_PACKET;
 
