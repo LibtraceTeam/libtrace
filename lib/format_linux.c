@@ -1093,7 +1093,7 @@ static int linuxring_write_packet(libtrace_out_t *trace,
 
 }
 
-static inline libtrace_linktype_t get_libtrace_link_type(int linktype){
+static inline libtrace_linktype_t get_libtrace_link_type(uint16_t linktype){
 	/* Convert the ARPHRD type into an appropriate libtrace link type */
 	switch (linktype) {
 		case ARPHRD_ETHER:
@@ -1114,16 +1114,16 @@ static inline libtrace_linktype_t get_libtrace_link_type(int linktype){
 	}
 }
 static libtrace_linktype_t linuxnative_get_link_type(const struct libtrace_packet_t *packet) {
-	int linktype=(((struct libtrace_linuxnative_header*)(packet->buffer))
+	uint16_t linktype=(((struct libtrace_linuxnative_header*)(packet->buffer))
 				->hdr.sll_hatype);
 	return get_libtrace_link_type(linktype);
 }
 static libtrace_linktype_t linuxring_get_link_type(const struct libtrace_packet_t *packet) {
-	int linktype= GET_SOCKADDR_HDR(packet->buffer)->sll_hatype;
+	uint16_t linktype= GET_SOCKADDR_HDR(packet->buffer)->sll_hatype;
 	return get_libtrace_link_type(linktype);
 }
 
-static inline libtrace_direction_t get_libtrace_direction(int pkttype){
+static inline libtrace_direction_t get_libtrace_direction(uint8_t pkttype){
 	switch (pkttype) {
 		case PACKET_OUTGOING:
 		case PACKET_LOOPBACK:
@@ -1133,10 +1133,10 @@ static inline libtrace_direction_t get_libtrace_direction(int pkttype){
 	}
 }
 static libtrace_direction_t linuxnative_get_direction(const struct libtrace_packet_t *packet) {
-	return get_libtrace_link_type(((struct libtrace_linuxnative_header*)(packet->buffer))->hdr.sll_pkttype);
+	return get_libtrace_direction(((struct libtrace_linuxnative_header*)(packet->buffer))->hdr.sll_pkttype);
 }
 static libtrace_direction_t linuxring_get_direction(const struct libtrace_packet_t *packet) {
-	return get_libtrace_link_type(GET_SOCKADDR_HDR(packet->buffer)->sll_pkttype);
+	return get_libtrace_direction(GET_SOCKADDR_HDR(packet->buffer)->sll_pkttype);
 }
 
 static libtrace_direction_t set_direction(struct sockaddr_ll * skadr, libtrace_direction_t direction){
