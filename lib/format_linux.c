@@ -271,9 +271,9 @@ static void calculate_buffers(struct tpacket_req * req, int fd, char * uri){
 
 	/* Calculate frame size */
 	req->tp_frame_size = pagesize;
-	do {
+	while(req->tp_frame_size < mtu && req->tp_frame_size < LIBTRACE_PACKET_BUFSIZE){
 		req->tp_frame_size <<= 1;
-	} while(req->tp_frame_size < mtu && req->tp_frame_size < LIBTRACE_PACKET_BUFSIZE);
+	}
 	if(req->tp_frame_size > LIBTRACE_PACKET_BUFSIZE)
 		req->tp_frame_size >>= 1;
 
@@ -281,7 +281,7 @@ static void calculate_buffers(struct tpacket_req * req, int fd, char * uri){
 	req->tp_block_size = pagesize << max_order;
 	do{
 		req->tp_block_size >>= 1;
-	} while((CONF_RING_FRAMES * req->tp_frame_size) < req->tp_block_size);
+	} while((CONF_RING_FRAMES * req->tp_frame_size) <= req->tp_block_size);
 	req->tp_block_size <<= 1;
 	
 	/* Calculate number of blocks */
@@ -294,12 +294,12 @@ static void calculate_buffers(struct tpacket_req * req, int fd, char * uri){
 	req->tp_frame_nr = req->tp_block_nr * 
 			(req->tp_block_size / req->tp_frame_size);
 
-	printf("MaxO 0x%x BS 0x%x BN 0x%x FS 0x%x FN 0x%x\n", 
+	/*printf("MaxO 0x%x BS 0x%x BN 0x%x FS 0x%x FN 0x%x\n", 
 		max_order, 
 		req->tp_block_size, 
 		req->tp_block_nr, 
 		req->tp_frame_size, 
-		req->tp_frame_nr);
+		req->tp_frame_nr);*/
 	
 	/* In case we have some silly values*/
 	assert(req->tp_block_size);
@@ -932,15 +932,16 @@ static int linuxnative_read_packet(libtrace_t *libtrace, libtrace_packet_t *pack
 static int linuxring_get_capture_length(const libtrace_packet_t *packet);
 static int linuxring_get_framing_length(const libtrace_packet_t *packet);
 
-static int linuxring_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
-
-	struct tpacket2_hdr *header;
-	struct pollfd pollset;	
-	int ret;
-	
+/* Release a frame back to the kernel or free() if it's a malloc'd buffer 
+ */
+inline static void ring_release_frame(libtrace_t *libtrace, libtrace_packet_t *packet ){
 	/* Free the old packet */
+	if(packet->buffer == NULL)
+		return;
+
 	if(packet->buf_control == TRACE_CTRL_PACKET){
 		free(packet->buffer);
+		packet->buffer = NULL;
 	}
 	if(packet->buf_control == TRACE_CTRL_EXTERNAL) {
 		struct linux_format_data_t *ftd = FORMAT(libtrace->format_data);
@@ -954,6 +955,15 @@ static int linuxring_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet
 			packet->buffer = NULL;
 		}
 	}
+}
+
+static int linuxring_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
+
+	struct tpacket2_hdr *header;
+	struct pollfd pollset;	
+	int ret;
+	
+	ring_release_frame(libtrace, packet);
 	
 	packet->buf_control = TRACE_CTRL_EXTERNAL;
 	packet->type = TRACE_RT_DATA_LINUX_RING;
@@ -967,6 +977,7 @@ static int linuxring_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet
 	 * ready for consumption.
 	 */
 	while (!(header->tp_status & TP_STATUS_USER)) {
+		printf("I shouldn't run if event handler\n");
 		pollset.fd = FORMAT(libtrace->format_data)->fd;
 		pollset.events = POLLIN;
 		pollset.revents = 0;
@@ -993,6 +1004,30 @@ static int linuxring_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet
 	return  linuxring_get_framing_length(packet) + 
 				linuxring_get_capture_length(packet);
 
+}
+
+/* Non-blocking read */
+static libtrace_eventobj_t linuxring_event(libtrace_t *libtrace, libtrace_packet_t *packet) {
+	struct tpacket2_hdr *header;
+	libtrace_eventobj_t event = {0,0,0.0,0};
+
+	/* We must free the old packet, otherwise select() will instantly return 
+	 */
+	ring_release_frame(libtrace, packet);
+
+	/* Fetch the current frame */
+	header = GET_CURRENT_BUFFER(libtrace);
+	if(header->tp_status & TP_STATUS_USER){
+		/* We have a frame waiting */
+		event.size = linuxring_read_packet(libtrace, packet);
+		event.type = TRACE_EVENT_PACKET;
+	} else {
+		/* Ok we don't have a packet waiting */
+		event.type = TRACE_EVENT_IOWAIT;
+		event.fd = FORMAT(libtrace->format_data)->fd;
+	}
+
+	return event;
 }
 
 
@@ -1467,7 +1502,7 @@ static struct libtrace_format_t linuxring = {
 	linuxnative_get_dropped_packets,/* get_dropped_packets */
 	linuxnative_get_captured_packets,/* get_captured_packets */
 	linuxnative_get_fd,		/* get_fd */
-	trace_event_device,		/* trace_event */
+	linuxring_event,		/* trace_event */
 	linuxring_help,		/* help */
 	NULL
 };
