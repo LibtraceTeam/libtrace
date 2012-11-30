@@ -136,10 +136,24 @@ libtrace_rt_types_t pcap_linktype_to_rt(libtrace_dlt_t linktype)
 	return pcap_dlt_to_pcap_linktype(linktype) + TRACE_RT_DATA_DLT;
 }
 
+libtrace_rt_types_t bpf_linktype_to_rt(libtrace_dlt_t linktype) {
+	return pcap_dlt_to_pcap_linktype(linktype) + TRACE_RT_DATA_BPF;
+
+}
+
 libtrace_dlt_t rt_to_pcap_linktype(libtrace_rt_types_t rt_type)
 {
-	assert(rt_type >= TRACE_RT_DATA_DLT);
-	return rt_type - TRACE_RT_DATA_DLT;
+	
+	if (rt_type >= TRACE_RT_DATA_DLT && rt_type < TRACE_RT_DATA_DLT_END) {
+		/* RT type is in the pcap range */
+		return rt_type - TRACE_RT_DATA_DLT;
+	} 
+	else if (rt_type >= TRACE_RT_DATA_BPF && rt_type < TRACE_RT_DATA_BPF_END) {
+		return rt_type - TRACE_RT_DATA_BPF;
+	}
+	
+	fprintf(stderr, "Error: RT type %u cannot be converted to a pcap DLT\n", rt_type);
+
 }
 
 libtrace_linktype_t erf_type_to_libtrace(uint8_t erf)

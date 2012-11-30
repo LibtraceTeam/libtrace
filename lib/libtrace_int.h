@@ -789,6 +789,13 @@ libtrace_dlt_t libtrace_to_pcap_dlt(libtrace_linktype_t type);
  */
 libtrace_dlt_t rt_to_pcap_linktype(libtrace_rt_types_t rt_type);
 
+/** Converts a PCAP DLT into an RT protocol type for the BPF format.
+ *
+ * @param linktype	The PCAP DLT to be converted
+ * @return The RT type that is equivalent to the provided DLT for BPF
+ */
+libtrace_rt_types_t bpf_linktype_to_rt(libtrace_dlt_t linktype);
+
 /** Converts an ERF type into a libtrace link type.
  *
  * @param erf		The ERF type to be converted
