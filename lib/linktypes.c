@@ -163,6 +163,14 @@ uint8_t libtrace_to_erf_type(libtrace_linktype_t linktype)
 		case TRACE_TYPE_ETH:	return TYPE_ETH;
 		case TRACE_TYPE_ATM:	return TYPE_ATM;
 		case TRACE_TYPE_AAL5:	return TYPE_AAL5;
+		
+		/* Not technically correct! Could be IPv6 packet 
+		 *
+		 * TODO: Maybe we want TRACE_TYPE_RAW_IPV4 and
+		 * TRACE_TYPE_RAW_IPV6 to replace TRACE_TYPE_NONE.
+		 * Still need a good way to figure out how to convert
+		 * TRACE_DLT_LINKTYPE_RAW into the correct type for the
+		 * IP version though :( */
 		case TRACE_TYPE_NONE:	return TYPE_IPV4;
 		/* Unsupported conversions */
 		case TRACE_TYPE_LLCSNAP: 
@@ -359,20 +367,6 @@ bool demote_packet(libtrace_packet_t *packet)
 			else
 				return false;
 
-#if 0
-			switch(ntohs(((libtrace_sll_header_t*)packet->payload)
-					->hatype)) {
-				case ARPHRD_PPP:
-					packet->type=pcap_linktype_to_rt(TRACE_DLT_RAW);
-					break;
-				case ARPHRD_ETHER:
-					packet->type=pcap_linktype_to_rt(TRACE_DLT_EN10MB);
-					break;
-				default:
-					/* Dunno how to demote this packet */
-					return false;
-			}
-#endif
 			/* Skip the Linux SLL header */
 			packet->payload=(void*)((char*)packet->payload
 					+sizeof(libtrace_sll_header_t));

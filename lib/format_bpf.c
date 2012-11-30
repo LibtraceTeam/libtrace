@@ -382,6 +382,9 @@ static int bpf_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
 static int bpf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) 
 {
 	uint32_t flags = 0;
+
+	packet->type = bpf_linktype_to_rt(swapl(libtrace, 
+			FORMATIN(libtrace)->linktype));
 	
 	/* Read from the BPF interface into our capture buffer */
 	if (FORMATIN(libtrace)->remaining<=0) {
@@ -416,7 +419,7 @@ static int bpf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 	/* Update 'packet' to point to the first packet in our capture
 	 * buffer */
 	if (bpf_prepare_packet(libtrace, packet, FORMATIN(libtrace)->bufptr,
-		TRACE_RT_DATA_BPF, flags)) {
+			packet->type, flags)) {
 		return -1;
 	}
 	
@@ -437,7 +440,7 @@ static int bpf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 static libtrace_linktype_t bpf_get_link_type(const libtrace_packet_t *packet) {
 	/* Convert the linktype that we recorded when we started the trace
 	 * into a suitable libtrace linktype */
-	return pcap_linktype_to_libtrace(FORMATIN(packet->trace)->linktype);
+	return pcap_linktype_to_libtrace(rt_to_pcap_linktype(packet->type));
 }
 
 /* Returns the direction for a given BPF packet record */
