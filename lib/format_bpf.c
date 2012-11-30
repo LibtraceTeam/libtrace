@@ -383,7 +383,7 @@ static int bpf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 {
 	uint32_t flags = 0;
 
-	packet->type = bpf_linktype_to_rt(ntohs(FORMATIN(libtrace)->linktype));
+	packet->type = bpf_linktype_to_rt(FORMATIN(libtrace)->linktype);
 	
 	/* Read from the BPF interface into our capture buffer */
 	if (FORMATIN(libtrace)->remaining<=0) {

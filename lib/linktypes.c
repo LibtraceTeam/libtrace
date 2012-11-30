@@ -153,7 +153,8 @@ libtrace_dlt_t rt_to_pcap_linktype(libtrace_rt_types_t rt_type)
 	}
 	
 	fprintf(stderr, "Error: RT type %u cannot be converted to a pcap DLT\n", rt_type);
-
+	assert(rt_type >= TRACE_RT_DATA_DLT && rt_type < TRACE_RT_DATA_BPF_END);
+	return 0;	/* satisfy warnings */
 }
 
 libtrace_linktype_t erf_type_to_libtrace(uint8_t erf)
