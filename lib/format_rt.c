@@ -104,6 +104,7 @@ struct rt_format_data_t {
 	libtrace_t *dummy_erf;
 	libtrace_t *dummy_pcap;
 	libtrace_t *dummy_linux;
+	libtrace_t *dummy_bpf;
 };
 
 /* Connects to an RT server 
@@ -197,6 +198,7 @@ static void rt_init_format_data(libtrace_t *libtrace) {
 	RT_INFO->dummy_erf = NULL;
 	RT_INFO->dummy_pcap = NULL;
 	RT_INFO->dummy_linux = NULL;
+	RT_INFO->dummy_bpf = NULL;
 	RT_INFO->pkt_buffer = NULL;
 	RT_INFO->buf_current = NULL;
 	RT_INFO->buf_filled = 0;
@@ -289,6 +291,9 @@ static int rt_fin_input(libtrace_t *libtrace) {
 
 	if (RT_INFO->dummy_linux)
 		trace_destroy_dead(RT_INFO->dummy_linux);
+
+	if (RT_INFO->dummy_bpf)
+		trace_destroy_dead(RT_INFO->dummy_bpf);
 	free(libtrace->format_data);
         return 0;
 }
@@ -401,6 +406,21 @@ static int rt_set_format(libtrace_t *libtrace, libtrace_packet_t *packet)
 		return 0;	
 	}
 
+	if (packet->type > TRACE_RT_DATA_BPF &&
+			packet->type < TRACE_RT_DATA_DLT_END) {
+
+		if (!RT_INFO->dummy_bpf) {
+			RT_INFO->dummy_bpf = trace_create_dead("bpf:-");
+			/* This may fail on a non-BSD machine */
+			if (trace_is_err(RT_INFO->dummy_bpf)) {
+				trace_perror(RT_INFO->dummy_bpf, "Creating dead bpf trace");
+				return -1;
+			}
+		}
+		packet->trace = RT_INFO->dummy_bpf;
+		return 0;
+	}
+
 	switch (packet->type) {
 		case TRACE_RT_DUCK_2_4:
 		case TRACE_RT_DUCK_2_5:
@@ -418,6 +438,11 @@ static int rt_set_format(libtrace_t *libtrace, libtrace_packet_t *packet)
 		case TRACE_RT_DATA_LINUX_NATIVE:
 			if (!RT_INFO->dummy_linux) {
 				RT_INFO->dummy_linux = trace_create_dead("int:");
+				/* This may fail on a non-Linux machine */
+				if (trace_is_err(RT_INFO->dummy_linux)) {
+					trace_perror(RT_INFO->dummy_linux, "Creating dead bpf trace");
+					return -1;
+				}
 			}
 			packet->trace = RT_INFO->dummy_linux;
 			break;
