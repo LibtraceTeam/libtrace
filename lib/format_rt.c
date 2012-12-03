@@ -407,7 +407,7 @@ static int rt_set_format(libtrace_t *libtrace, libtrace_packet_t *packet)
 	}
 
 	if (packet->type > TRACE_RT_DATA_BPF &&
-			packet->type < TRACE_RT_DATA_DLT_END) {
+			packet->type < TRACE_RT_DATA_BPF_END) {
 
 		if (!RT_INFO->dummy_bpf) {
 			RT_INFO->dummy_bpf = trace_create_dead("bpf:-");

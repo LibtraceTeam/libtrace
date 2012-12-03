@@ -336,8 +336,6 @@ static int bpf_config_input(libtrace_t *libtrace,
 		 * unimplementable
 		 */
 	}
-	trace_set_err(libtrace,TRACE_ERR_UNKNOWN_OPTION,
-			"Unknown option %i", option);
 	return -1;
 }
 
