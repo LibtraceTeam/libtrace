@@ -6,12 +6,7 @@ AM_CXXFLAGS=@LIBCXXFLAGS@
 
 extra_DIST = format_template.c
 NATIVEFORMATS=format_linux.c
-
-if HAVE_BPF_CAPTURE
 BPFFORMATS=format_bpf.c
-else
-BPFFORMATS=
-endif
 
 if HAVE_DAG
 if DAG2_4

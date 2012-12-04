@@ -139,9 +139,7 @@ static void trace_init(void)
 #ifdef HAVE_LIBPCAP
 		pcap_constructor();
 #endif
-#if HAVE_DECL_BIOCSETIF
 		bpf_constructor();
-#endif
 		pcapfile_constructor();
 		rt_constructor();
 #ifdef HAVE_DAG

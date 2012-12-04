@@ -67,6 +67,21 @@
  * converted to PCAP or ERF.
  */ 
 
+struct bpf_timeval {
+	uint32_t tv_sec;
+	uint32_t tv_usec;
+};
+
+struct libtrace_bpf_hdr {
+	struct bpf_timeval bh_tstamp;	/* timestamp */
+	uint32_t bh_caplen;		/* capture length */
+	uint32_t bh_datalen;		/* wire length */
+	uint16_t bh_hdrlen;		/* header length (incl padding) */
+};
+
+#define BPFHDR(x) ((struct libtrace_bpf_hdr *)((x)->header))
+
+#if HAVE_DECL_BIOCSETIF
 /* "Global" data that is stored for each BPF input trace */
 struct libtrace_format_data_t {
 	/* The file descriptor that is being captured from */
@@ -94,7 +109,6 @@ struct libtrace_format_data_t {
 
 #define FORMATIN(x) ((struct libtrace_format_data_t*)((x->format_data)))
 
-#define BPFHDR(x) ((struct bpf_hdr *)((x)->header))
 
 /* Attempts to determine if a given filename could refer to a BPF interface */
 static int bpf_probe_filename(const char *filename)
@@ -339,9 +353,12 @@ static int bpf_config_input(libtrace_t *libtrace,
 	return -1;
 }
 
+#endif  /* HAVE_DECL_BIOCSETIF */
+
 /* Converts a buffer containing a recently read BPF packet record into a
  * libtrace packet */
-static int bpf_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
+static int bpf_prepare_packet(libtrace_t *libtrace UNUSED, 
+		libtrace_packet_t *packet,
 		void *buffer, libtrace_rt_types_t rt_type, uint32_t flags) {
         
 	/* If the packet previously owned a buffer that is not the buffer
@@ -367,13 +384,17 @@ static int bpf_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
 	/* TODO: Pcap deals with a padded FDDI linktype here */
 	packet->payload=(char *)buffer + BPFHDR(packet)->bh_hdrlen;
 
+	/*
 	if (libtrace->format_data == NULL) {
 		if (bpf_init_input(libtrace))
 			return -1;
 	}
+	*/
 
 	return 0;
 }
+
+#if HAVE_DECL_BIOCSETIF
 
 /* Reads the next packet record from a BPF interface and writes it into a 
  * libtrace packet */	
@@ -433,6 +454,8 @@ static int bpf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 	return BPFHDR(packet)->bh_datalen+BPFHDR(packet)->bh_hdrlen;
 }
 
+#endif  /* HAVE_DECL_BIOCSETIF */
+
 /* Returns the linktype for the interface that we are capturing from */
 static libtrace_linktype_t bpf_get_link_type(const libtrace_packet_t *packet) {
 	/* Convert the linktype that we recorded when we started the trace
@@ -484,6 +507,7 @@ static int bpf_get_framing_length(UNUSED
 	return BPFHDR(packet)->bh_hdrlen;
 }
 
+#if HAVE_DECL_BIOCSETIF
 /* Returns the file descriptor that the capture interface is operating on */
 static int bpf_get_fd(const libtrace_t *trace) {
 	return FORMATIN(trace)->fd;
@@ -539,6 +563,56 @@ static struct libtrace_format_t bpf = {
 	bpf_help,		/* help */
 	NULL
 };
+#else 	/* HAVE_DECL_BIOCSETIF */
+/* Prints some slightly useful help text for the BPF capture format */
+static void bpf_help() {
+	printf("bpf format module: $Revision$\n");
+	printf("Not supported on this host\n");
+	return;
+}
+static struct libtrace_format_t bpf = {
+	"bpf",
+	"$Id$",
+	TRACE_FORMAT_BPF,
+	NULL,			/* probe filename */
+	NULL,			/* probe magic */
+	NULL,	 		/* init_input */
+	NULL,			/* config_input */
+	NULL,			/* start_input */
+	NULL,			/* pause_input */
+	NULL,			/* init_output */
+	NULL,			/* config_output */
+	NULL,			/* start_ouput */
+	NULL,			/* fin_input */
+	NULL,			/* fin_output */
+	NULL,			/* read_packet */
+	bpf_prepare_packet, 	/* prepare_packet */
+	NULL,			/* fin_packet */
+	NULL,			/* write_packet */
+	bpf_get_link_type,	/* get_link_type */
+	bpf_get_direction,	/* get_direction */
+	NULL,			/* set_direction */
+	NULL,			/* get_erf_timestamp */
+	bpf_get_timeval,	/* get_timeval */
+	NULL,			/* get_timespec */
+	NULL,			/* get_seconds */
+	NULL,			/* seek_erf */
+	NULL,			/* seek_timeval */
+	NULL,			/* seek_seconds */
+	bpf_get_capture_length,	/* get_capture_length */
+	bpf_get_wire_length,	/* get_wire_length */
+	bpf_get_framing_length,	/* get_framing_length */
+	NULL,			/* set_capture_length */
+	NULL,/* get_received_packets */
+	NULL,			/* get_filtered_packets */
+	NULL,/* get_dropped_packets */
+	NULL,			/* get_captured_packets */
+	NULL,			/* get_fd */
+	NULL,			/* trace_event */
+	bpf_help,		/* help */
+	NULL
+};
+#endif  /* HAVE_DECL_BIOCSETIF */
 
 void bpf_constructor() {
 	register_format(&bpf);
