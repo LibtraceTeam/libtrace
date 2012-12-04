@@ -32,35 +32,6 @@
  *
  */
 
-
-#include "libtrace.h"
-#include "libtrace_int.h"
-#include "format_helper.h"
-#include "config.h"
-#include <stdlib.h>
-
-#ifdef HAVE_INTTYPES_H
-#  include <inttypes.h>
-#else
-# error "Can't find inttypes.h"
-#endif 
-
-#include <sys/socket.h>
-#include <netpacket/packet.h>
-#include <net/ethernet.h>
-#include <net/if_arp.h>
-
-#include <string.h>
-#include <net/if.h>
-#include <sys/ioctl.h>
-#include <errno.h>
-#include <unistd.h>
-
-#include <assert.h>
-
-#include <poll.h>
-#include <sys/mman.h>
-
 /* This format module deals with using the Linux Native capture format.
  *
  * Linux Native is a LIVE capture format.
@@ -71,10 +42,93 @@
  * RT-speaking programs.
  */
 
-/* Declared in linux/if_arp.h but not in net/if_arp.h sigh */
-#ifndef ARPHRD_NONE
-#define ARPHRD_NONE 0xfffe
-#endif
+#include "config.h"
+#include "libtrace.h"
+#include "libtrace_int.h"
+#include "format_helper.h"
+#include "libtrace_arphrd.h"
+#include <stdlib.h>
+#include <errno.h>
+#include <unistd.h>
+#include <string.h>
+#include <assert.h>
+
+#ifdef HAVE_INTTYPES_H
+#  include <inttypes.h>
+#else
+# error "Can't find inttypes.h"
+#endif 
+
+#ifdef HAVE_NETPACKET_PACKET_H_
+
+#include <sys/socket.h>
+#include <netpacket/packet.h>
+#include <net/ethernet.h>
+#include <net/if_arp.h>
+
+#include <net/if.h>
+#include <sys/ioctl.h>
+#include <poll.h>
+#include <sys/mman.h>
+
+/* MAX_ORDER is defined in linux/mmzone.h. 10 is default for 2.4 kernel.
+ * max_order will be decreased by one if the ring buffer fails to allocate.
+ * Used to get correct sized buffers from the kernel.
+ */
+#define MAX_ORDER 10
+static unsigned int max_order = MAX_ORDER;
+
+/* Cached page size, the page size shoudn't be changing */
+static int pagesize = 0;
+
+/* Number of frames in the ring used by both TX and TR rings. More frames 
+ * hopefully means less packet loss, especially if traffic comes in bursts.
+ */
+#define CONF_RING_FRAMES        0x100
+
+/* The maximum frames allowed to be waiting in the TX_RING before the kernel is 
+ * notified to write them out. Make sure this is less than CONF_RING_FRAMES. 
+ * Performance doesn't seem to increase any more when setting this above 10.
+ */
+#define TX_MAX_QUEUE		10
+
+/* Get current frame in the ring buffer*/
+#define GET_CURRENT_BUFFER(libtrace) ((void *) FORMAT(libtrace->format_data)->rx_ring + \
+	(FORMAT(libtrace->format_data)->rxring_offset * FORMAT(libtrace->format_data)->req.tp_frame_size))
+
+
+#else	/* HAVE_NETPACKET_PACKET_H */
+/* Need to know what a sockaddr_ll looks like */
+struct sockaddr_ll {
+	uint16_t sll_family;
+	uint16_t sll_protocol;
+	int32_t  sll_ifindex;
+	uint16_t sll_hatype;
+	uint8_t  sll_pkttype;
+	uint8_t  sll_halen;
+ 	uint8_t  sll_addr[8];
+};
+
+/* Packet types.  */
+
+#define PACKET_HOST             0               /* To us.  */
+#define PACKET_BROADCAST        1               /* To all.  */
+#define PACKET_MULTICAST        2               /* To group.  */
+#define PACKET_OTHERHOST        3               /* To someone else.  */
+#define PACKET_OUTGOING         4               /* Originated by us . */
+#define PACKET_LOOPBACK         5
+#define PACKET_FASTROUTE        6
+
+/* Packet socket options.  */
+
+#define PACKET_ADD_MEMBERSHIP           1
+#define PACKET_DROP_MEMBERSHIP          2
+#define PACKET_RECV_OUTPUT              3
+#define PACKET_RX_RING                  5
+#define PACKET_STATISTICS               6
+
+
+#endif /* HAVE_NETPACKET_PACKET_H_ */
 
 struct tpacket_stats {
 	unsigned int tp_packets;
@@ -106,21 +160,21 @@ enum tpacket_versions {
 
 struct tpacket2_hdr {
 	/* Frame status - in use by kernel or libtrace etc. */
-	__u32	tp_status;
+	uint32_t	tp_status;
 	/* Wire length */
-	__u32	tp_len;
+	uint32_t	tp_len;
 	/* Captured length */
-	__u32	tp_snaplen;
+	uint32_t	tp_snaplen;
 	/* Offset in bytes from frame start to the mac (link layer) header */
-	__u16	tp_mac;
+	uint16_t	tp_mac;
 	/* Offset in bytes from frame start to the net (network layer) header */
-	__u16	tp_net;
+	uint16_t	tp_net;
 	/* Timestamp */
-	__u32	tp_sec;
-	__u32	tp_nsec;
+	uint32_t	tp_sec;
+	uint32_t	tp_nsec;
 	/* Not used VLAN tag control information */
-	__u16	tp_vlan_tci;
-	__u16	tp_padding;
+	uint16_t	tp_vlan_tci;
+	uint16_t	tp_padding;
 };
 
 struct tpacket_req {
@@ -201,37 +255,6 @@ struct linux_output_format_data_t {
 	libtrace_rt_types_t format;
 };
 
-/* MAX_ORDER is defined in linux/mmzone.h. 10 is default for 2.4 kernel.
- * max_order will be decreased by one if the ring buffer fails to allocate.
- * Used to get correct sized buffers from the kernel.
- */
-#define MAX_ORDER 10
-static unsigned int max_order = MAX_ORDER;
-
-/* Cached page size, the page size shoudn't be changing */
-static int pagesize = 0;
-
-/* Number of frames in the ring used by both TX and TR rings. More frames 
- * hopefully means less packet loss, especially if traffic comes in bursts.
- */
-#define CONF_RING_FRAMES        0x100
-
-/* The maximum frames allowed to be waiting in the TX_RING before the kernel is 
- * notified to write them out. Make sure this is less than CONF_RING_FRAMES. 
- * Performance doesn't seem to increase any more when setting this above 10.
- */
-#define TX_MAX_QUEUE		10
-
-/* Get the start of the captured data. I'm not sure if tp_mac (link layer) is
- * always guaranteed. If it's not there then just use tp_net.
- */
-#define TP_TRACE_START(mac, net, hdrend) \
-	((mac) > (hdrend) && (mac) < (net) ? (mac) : (net))
-
-/* Get current frame in the ring buffer*/
-#define GET_CURRENT_BUFFER(libtrace) ((void *) FORMAT(libtrace->format_data)->rx_ring + \
-	(FORMAT(libtrace->format_data)->rxring_offset * FORMAT(libtrace->format_data)->req.tp_frame_size))
-
 /* Get the sockaddr_ll structure from a frame */
 #define GET_SOCKADDR_HDR(x)  ((struct sockaddr_ll *) (((char *) (x))\
 	+ TPACKET_ALIGN(sizeof(struct tpacket2_hdr))))
@@ -241,6 +264,14 @@ static int pagesize = 0;
 #define FORMAT(x) ((struct linux_format_data_t*)(x))
 #define DATAOUT(x) ((struct linux_output_format_data_t*)((x)->format_data))
 
+/* Get the start of the captured data. I'm not sure if tp_mac (link layer) is
+ * always guaranteed. If it's not there then just use tp_net.
+ */
+#define TP_TRACE_START(mac, net, hdrend) \
+	((mac) > (hdrend) && (mac) < (net) ? (mac) : (net))
+
+
+#ifdef HAVE_NETPACKET_PACKET_H_
 
 /*
  * Try figure out the best sizes for the ring buffer. Ensure that:
@@ -308,6 +339,7 @@ static void calculate_buffers(struct tpacket_req * req, int fd, char * uri){
 	assert(req->tp_frame_nr);
 	assert(req->tp_block_size % req->tp_frame_size == 0);
 }
+
 
 static int linuxnative_probe_filename(const char *filename)
 {
@@ -747,8 +779,9 @@ static int linuxnative_config_input(libtrace_t *libtrace,
 	 * option and will set an error if it fails */
 	return -1;
 }
+#endif /* HAVE_NETPACKET_PACKET_H_ */
 
-static int linuxnative_prepare_packet(libtrace_t *libtrace, 
+static int linuxnative_prepare_packet(libtrace_t *libtrace UNUSED, 
 		libtrace_packet_t *packet, void *buffer, 
 		libtrace_rt_types_t rt_type, uint32_t flags) {
 
@@ -769,15 +802,17 @@ static int linuxnative_prepare_packet(libtrace_t *libtrace,
 		sizeof(struct libtrace_linuxnative_header);
 	packet->type = rt_type;
 
+	/*
 	if (libtrace->format_data == NULL) {
 		if (linuxnative_init_input(libtrace))
 			return -1;
 	}
+	*/
 	return 0;
 	
 }
 
-static int linuxring_prepare_packet(libtrace_t *libtrace, 
+static int linuxring_prepare_packet(libtrace_t *libtrace UNUSED, 
 		libtrace_packet_t *packet, void *buffer, 
 		libtrace_rt_types_t rt_type, uint32_t flags) {
 
@@ -801,10 +836,12 @@ static int linuxring_prepare_packet(libtrace_t *libtrace,
 					TPACKET2_HDRLEN);
 	packet->type = rt_type;
 
+	/*
 	if (libtrace->format_data == NULL) {
 		if (linuxnative_init_input(libtrace))
 			return -1;
 	}
+	*/
 	return 0;
 	
 }
@@ -813,6 +850,8 @@ static int linuxring_prepare_packet(libtrace_t *libtrace,
 
 /* 20 isn't enough on x86_64 */
 #define CMSG_BUF_SIZE 128
+
+#ifdef HAVE_NETPACKET_PACKET_H_
 static int linuxnative_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) 
 {
 	struct libtrace_linuxnative_header *hdr;
@@ -1127,21 +1166,22 @@ static int linuxring_write_packet(libtrace_out_t *trace,
 	return header->tp_len;
 
 }
+#endif /* HAVE_NETPACKET_PACKET_H_ */
 
 static inline libtrace_linktype_t get_libtrace_link_type(uint16_t linktype){
 	/* Convert the ARPHRD type into an appropriate libtrace link type */
 	switch (linktype) {
-		case ARPHRD_ETHER:
-		case ARPHRD_LOOPBACK:
+		case LIBTRACE_ARPHRD_ETHER:
+		case LIBTRACE_ARPHRD_LOOPBACK:
 			return TRACE_TYPE_ETH;
-		case ARPHRD_PPP:
+		case LIBTRACE_ARPHRD_PPP:
 			return TRACE_TYPE_NONE;
-		case ARPHRD_80211_RADIOTAP:
+		case LIBTRACE_ARPHRD_IEEE80211_RADIOTAP:
 			return TRACE_TYPE_80211_RADIO;
-		case ARPHRD_IEEE80211:
+		case LIBTRACE_ARPHRD_IEEE80211:
 			return TRACE_TYPE_80211;
-		case ARPHRD_SIT:
-		case ARPHRD_NONE:
+		case LIBTRACE_ARPHRD_SIT:
+		case LIBTRACE_ARPHRD_NONE:
 			return TRACE_TYPE_NONE;
 		default: /* shrug, beyond me! */
 			printf("unknown Linux ARPHRD type 0x%04x\n",linktype);
@@ -1358,7 +1398,8 @@ static uint64_t linuxnative_get_captured_packets(libtrace_t *trace) {
 		 * the socket for capture counts, can we? */
 		return UINT64_MAX;
 	}
-	
+
+#ifdef HAVE_NETPACKET_PACKET_H_	
 	if ((FORMAT(trace->format_data)->stats_valid & 1) 
 			|| FORMAT(trace->format_data)->stats_valid == 0) {
 		socklen_t len = sizeof(FORMAT(trace->format_data)->stats);
@@ -1371,6 +1412,9 @@ static uint64_t linuxnative_get_captured_packets(libtrace_t *trace) {
 	}
 
 	return FORMAT(trace->format_data)->stats.tp_packets;
+#else
+	return UINT64_MAX;
+#endif
 }
 
 /* Number of packets that got past filtering and were then dropped because
@@ -1385,6 +1429,7 @@ static uint64_t linuxnative_get_dropped_packets(libtrace_t *trace) {
 		return UINT64_MAX;
 	}
 	
+#ifdef HAVE_NETPACKET_PACKET_H_	
 	if ((FORMAT(trace->format_data)->stats_valid & 2)
 			|| (FORMAT(trace->format_data)->stats_valid==0)) {
 		socklen_t len = sizeof(FORMAT(trace->format_data)->stats);
@@ -1397,8 +1442,12 @@ static uint64_t linuxnative_get_dropped_packets(libtrace_t *trace) {
 	}
 
 	return FORMAT(trace->format_data)->stats.tp_drops;
+#else
+	return UINT64_MAX;
+#endif
 }
 
+#ifdef HAVE_NETPACKET_PACKET_H_
 static void linuxnative_help(void) {
 	printf("linuxnative format module: $Revision$\n");
 	printf("Supported input URIs:\n");
@@ -1459,7 +1508,7 @@ static struct libtrace_format_t linuxnative = {
 	linuxnative_get_dropped_packets,/* get_dropped_packets */
 	linuxnative_get_captured_packets,/* get_captured_packets */
 	linuxnative_get_fd,		/* get_fd */
-	trace_event_device,		/* trace_event */
+	NULL,				/* trace_event */
 	linuxnative_help,		/* help */
 	NULL
 };
@@ -1506,6 +1555,104 @@ static struct libtrace_format_t linuxring = {
 	linuxring_help,		/* help */
 	NULL
 };
+#else
+static void linuxnative_help(void) {
+	printf("linuxnative format module: $Revision$\n");
+	printf("Not supported on this host\n");
+}
+static void linuxring_help(void) {
+	printf("linuxring format module: $Revision$\n");
+	printf("Not supported on this host\n");
+}
+
+static struct libtrace_format_t linuxnative = {
+	"int",
+	"$Id$",
+	TRACE_FORMAT_LINUX_NATIVE,
+	NULL,				/* probe filename */
+	NULL,				/* probe magic */
+	NULL,	 			/* init_input */
+	NULL,				/* config_input */
+	NULL,				/* start_input */
+	NULL,				/* pause_input */
+	NULL,				/* init_output */
+	NULL,				/* config_output */
+	NULL,				/* start_ouput */
+	NULL,				/* fin_input */
+	NULL,				/* fin_output */
+	NULL,				/* read_packet */
+	linuxnative_prepare_packet,	/* prepare_packet */
+	NULL,				/* fin_packet */
+	NULL,				/* write_packet */
+	linuxnative_get_link_type,	/* get_link_type */
+	linuxnative_get_direction,	/* get_direction */
+	linuxnative_set_direction,	/* set_direction */
+	NULL,				/* get_erf_timestamp */
+	linuxnative_get_timeval,	/* get_timeval */
+	linuxnative_get_timespec,	/* get_timespec */
+	NULL,				/* get_seconds */
+	NULL,				/* seek_erf */
+	NULL,				/* seek_timeval */
+	NULL,				/* seek_seconds */
+	linuxnative_get_capture_length,	/* get_capture_length */
+	linuxnative_get_wire_length,	/* get_wire_length */
+	linuxnative_get_framing_length,	/* get_framing_length */
+	linuxnative_set_capture_length,	/* set_capture_length */
+	NULL,				/* get_received_packets */
+	linuxnative_get_filtered_packets,/* get_filtered_packets */
+	linuxnative_get_dropped_packets,/* get_dropped_packets */
+	linuxnative_get_captured_packets,/* get_captured_packets */
+	linuxnative_get_fd,		/* get_fd */
+	trace_event_device,		/* trace_event */
+	linuxnative_help,		/* help */
+	NULL
+};
+
+static struct libtrace_format_t linuxring = {
+	"ring",
+	"$Id$",
+	TRACE_FORMAT_LINUX_RING,
+	NULL,				/* probe filename */
+	NULL,				/* probe magic */
+	NULL,	 			/* init_input */
+	NULL,				/* config_input */
+	NULL,				/* start_input */
+	NULL,				/* pause_input */
+	NULL,				/* init_output */
+	NULL,				/* config_output */
+	NULL,				/* start_ouput */
+	NULL,				/* fin_input */
+	NULL,				/* fin_output */
+	NULL,				/* read_packet */
+	linuxring_prepare_packet,	/* prepare_packet */
+	NULL,				/* fin_packet */
+	NULL,				/* write_packet */
+	linuxring_get_link_type,	/* get_link_type */
+	linuxring_get_direction,	/* get_direction */
+	linuxring_set_direction,	/* set_direction */
+	NULL,				/* get_erf_timestamp */
+	linuxring_get_timeval,		/* get_timeval */
+	linuxring_get_timespec,		/* get_timespec */
+	NULL,				/* get_seconds */
+	NULL,				/* seek_erf */
+	NULL,				/* seek_timeval */
+	NULL,				/* seek_seconds */
+	linuxring_get_capture_length,	/* get_capture_length */
+	linuxring_get_wire_length,	/* get_wire_length */
+	linuxring_get_framing_length,	/* get_framing_length */
+	linuxring_set_capture_length,	/* set_capture_length */
+	NULL,				/* get_received_packets */
+	linuxnative_get_filtered_packets,/* get_filtered_packets */
+	linuxnative_get_dropped_packets,/* get_dropped_packets */
+	linuxnative_get_captured_packets,/* get_captured_packets */
+	linuxnative_get_fd,		/* get_fd */
+	NULL,				/* trace_event */
+	linuxring_help,			/* help */
+	NULL
+};
+
+#endif /* HAVE_NETPACKET_PACKET_H */
+
 
 void linuxnative_constructor(void) {
 	register_format(&linuxnative);

@@ -309,7 +309,7 @@ static int rt_fin_input(libtrace_t *libtrace) {
  * in instances where the fragmentation is done magically by the NIC. This
  * is pretty nasty, but also very rare.
  */
-#define RT_BUF_SIZE 10000U
+#define RT_BUF_SIZE (LIBTRACE_PACKET_BUFSIZE * 2)
 
 /* Receives data from an RT server */
 static int rt_read(libtrace_t *libtrace, void **buffer, size_t len, int block) 
@@ -440,7 +440,7 @@ static int rt_set_format(libtrace_t *libtrace, libtrace_packet_t *packet)
 				RT_INFO->dummy_linux = trace_create_dead("int:");
 				/* This may fail on a non-Linux machine */
 				if (trace_is_err(RT_INFO->dummy_linux)) {
-					trace_perror(RT_INFO->dummy_linux, "Creating dead bpf trace");
+					trace_perror(RT_INFO->dummy_linux, "Creating dead int trace");
 					return -1;
 				}
 			}

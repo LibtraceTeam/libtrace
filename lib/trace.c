@@ -135,9 +135,7 @@ static void trace_init(void)
 		tsh_constructor();
 		legacy_constructor();
 		atmhdr_constructor();
-#ifdef HAVE_NETPACKET_PACKET_H
 		linuxnative_constructor();
-#endif
 #ifdef HAVE_LIBPCAP
 		pcap_constructor();
 #endif
@@ -586,7 +584,8 @@ DLLEXPORT void trace_destroy(libtrace_t *libtrace) {
 	if (libtrace->format) {
 		if (libtrace->started && libtrace->format->pause_input)
 			libtrace->format->pause_input(libtrace);
-		libtrace->format->fin_input(libtrace);
+		if (libtrace->format->fin_input)
+			libtrace->format->fin_input(libtrace);
 	}
         /* Need to free things! */
         if (libtrace->uridata)

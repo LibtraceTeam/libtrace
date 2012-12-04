@@ -11,19 +11,19 @@
 #include "libpacketdump.h"
 #include "libtrace.h"
 
-#include "arphrd.h"
+#include "libtrace_arphrd.h"
 
 /* Copied this here because this isn't currently part of our external API -
  * maybe we need to think about doing that? */
 static libtrace_linktype_t arphrd_type_to_libtrace(unsigned int arphrd) {
         switch(arphrd) {
-                case ARPHRD_ETHER: return TRACE_TYPE_ETH;
-                case ARPHRD_EETHER: return TRACE_TYPE_ETH;
-                case ARPHRD_IEEE80211: return TRACE_TYPE_80211;
-                case ARPHRD_80211_RADIOTAP: return TRACE_TYPE_80211_RADIO;
-                case ARPHRD_PPP: return TRACE_TYPE_NONE;
-                case ARPHRD_LOOPBACK: return TRACE_TYPE_NONE;
-                case ARPHRD_NONE: return TRACE_TYPE_NONE;
+                case LIBTRACE_ARPHRD_ETHER: return TRACE_TYPE_ETH;
+                case LIBTRACE_ARPHRD_EETHER: return TRACE_TYPE_ETH;
+                case LIBTRACE_ARPHRD_IEEE80211: return TRACE_TYPE_80211;
+                case LIBTRACE_ARPHRD_IEEE80211_RADIOTAP: return TRACE_TYPE_80211_RADIO;
+                case LIBTRACE_ARPHRD_PPP: return TRACE_TYPE_NONE;
+                case LIBTRACE_ARPHRD_LOOPBACK: return TRACE_TYPE_NONE;
+                case LIBTRACE_ARPHRD_NONE: return TRACE_TYPE_NONE;
         }
 	printf("Unknown ARPHRD: %u\n", arphrd);
 	return ~0U;
@@ -61,8 +61,8 @@ DLLEXPORT void decode(int link_type ,const char *pkt,unsigned len)
 	/* Do we recognise the hardware address type? */
 	ret=trace_get_payload_from_meta(pkt, &linktype, &len);
 	
-	if (ntohs(sll->hatype) == ARPHRD_ETHER || 
-				ntohs(sll->hatype) == ARPHRD_LOOPBACK) { 
+	if (ntohs(sll->hatype) == LIBTRACE_ARPHRD_ETHER || 
+				ntohs(sll->hatype) == LIBTRACE_ARPHRD_LOOPBACK) { 
 		
 		if (ntohs(sll->protocol) == 0x0060) {
 			decode_next(ret, len, "link", 

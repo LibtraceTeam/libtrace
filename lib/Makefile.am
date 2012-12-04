@@ -1,15 +1,11 @@
 lib_LTLIBRARIES = libtrace.la
-include_HEADERS = libtrace.h dagformat.h lt_inttypes.h daglegacy.h rt_protocol.h erftypes.h 
+include_HEADERS = libtrace.h dagformat.h lt_inttypes.h daglegacy.h rt_protocol.h erftypes.h  
 
 AM_CFLAGS=@LIBCFLAGS@
 AM_CXXFLAGS=@LIBCXXFLAGS@
 
 extra_DIST = format_template.c
-if HAVE_NETPACKET_PACKET_H
 NATIVEFORMATS=format_linux.c
-else
-NATIVEFORMATS=
-endif
 
 if HAVE_BPF_CAPTURE
 BPFFORMATS=format_bpf.c
@@ -46,7 +42,7 @@ libtrace_la_SOURCES = trace.c common.h \
 		protocols_transport.c protocols.h protocols_ospf.c \
 		$(DAGSOURCE) format_erf.h \
 		$(BPFJITSOURCE) \
-		arphrd.h
+		libtrace_arphrd.h
 
 if DAG2_4
 nodist_libtrace_la_SOURCES = dagopts.c dagapi.c

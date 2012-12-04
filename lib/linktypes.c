@@ -40,7 +40,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "arphrd.h"
+#include "libtrace_arphrd.h" 
 
 
 /* This file maps libtrace types to/from pcap DLT and erf types
@@ -206,13 +206,13 @@ uint8_t libtrace_to_erf_type(libtrace_linktype_t linktype)
 
 libtrace_linktype_t arphrd_type_to_libtrace(unsigned int arphrd) {
 	switch(arphrd) {
-		case ARPHRD_ETHER: return TRACE_TYPE_ETH;	
-		case ARPHRD_EETHER: return TRACE_TYPE_ETH;	
-		case ARPHRD_IEEE80211: return TRACE_TYPE_80211;
-		case ARPHRD_80211_RADIOTAP: return TRACE_TYPE_80211_RADIO;
-		case ARPHRD_PPP: return TRACE_TYPE_NONE;
-		case ARPHRD_LOOPBACK: return TRACE_TYPE_ETH;
-		case ARPHRD_NONE: return TRACE_TYPE_NONE;
+		case LIBTRACE_ARPHRD_ETHER: return TRACE_TYPE_ETH;	
+		case LIBTRACE_ARPHRD_EETHER: return TRACE_TYPE_ETH;	
+		case LIBTRACE_ARPHRD_IEEE80211: return TRACE_TYPE_80211;
+		case LIBTRACE_ARPHRD_IEEE80211_RADIOTAP: return TRACE_TYPE_80211_RADIO;
+		case LIBTRACE_ARPHRD_PPP: return TRACE_TYPE_NONE;
+		case LIBTRACE_ARPHRD_LOOPBACK: return TRACE_TYPE_ETH;
+		case LIBTRACE_ARPHRD_NONE: return TRACE_TYPE_NONE;
 	}
 	printf("Unknown ARPHRD %08x\n",arphrd);
 	return ~0U;
@@ -220,9 +220,9 @@ libtrace_linktype_t arphrd_type_to_libtrace(unsigned int arphrd) {
 
 unsigned int libtrace_to_arphrd_type(libtrace_linktype_t linktype) {
 	switch(linktype) {
-		case TRACE_TYPE_ETH: return ARPHRD_ETHER;
-		case TRACE_TYPE_80211: return ARPHRD_IEEE80211;
-		case TRACE_TYPE_80211_RADIO: return ARPHRD_80211_RADIOTAP;
+		case TRACE_TYPE_ETH: return LIBTRACE_ARPHRD_ETHER;
+		case TRACE_TYPE_80211: return LIBTRACE_ARPHRD_IEEE80211;
+		case TRACE_TYPE_80211_RADIO: return LIBTRACE_ARPHRD_IEEE80211_RADIOTAP;
 	  	default: break;
 	}
 	return ~0U;
@@ -265,11 +265,11 @@ void promote_packet(libtrace_packet_t *packet)
 		switch(pcap_linktype_to_libtrace(rt_to_pcap_linktype(packet->type))) {
 			case TRACE_TYPE_NONE:
 				trace_get_layer3(packet, &hdr->protocol, NULL);
-				hdr->hatype = htons(ARPHRD_PPP);
+				hdr->hatype = htons(LIBTRACE_ARPHRD_PPP);
 				hdr->protocol=htons(hdr->protocol);
 				break;
 			case TRACE_TYPE_ETH:
-				hdr->hatype = htons(ARPHRD_ETHER);
+				hdr->hatype = htons(LIBTRACE_ARPHRD_ETHER);
 				hdr->protocol=htons(0x0060); /* ETH_P_LOOP */
 				break;
 			default:
@@ -367,7 +367,7 @@ bool demote_packet(libtrace_packet_t *packet)
 			next_proto = ntohs(sll->protocol);
 		
 			/* Preserved from older libtrace behaviour */
-			if (ha_type == ARPHRD_PPP)
+			if (ha_type == LIBTRACE_ARPHRD_PPP)
 				packet->type = pcap_linktype_to_rt(TRACE_DLT_RAW);
 			/* Don't decide trace type based on ha_type,
 			 * decide based on the protocol header that is

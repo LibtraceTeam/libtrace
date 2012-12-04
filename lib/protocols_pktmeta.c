@@ -36,8 +36,6 @@
 #include "protocols.h"
 #include <assert.h>
 
-#include "arphrd.h"
-
 /* This file contains all the protocol decoding functions for the meta-data
  * headers that may be prepended to captured packets.
  *
