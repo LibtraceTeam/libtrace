@@ -59,7 +59,7 @@
 # error "Can't find inttypes.h"
 #endif 
 
-#ifdef HAVE_NETPACKET_PACKET_H_
+#ifdef HAVE_NETPACKET_PACKET_H
 
 #include <sys/socket.h>
 #include <netpacket/packet.h>
@@ -128,7 +128,7 @@ struct sockaddr_ll {
 #define PACKET_STATISTICS               6
 
 
-#endif /* HAVE_NETPACKET_PACKET_H_ */
+#endif /* HAVE_NETPACKET_PACKET_H */
 
 struct tpacket_stats {
 	unsigned int tp_packets;
@@ -271,7 +271,7 @@ struct linux_output_format_data_t {
 	((mac) > (hdrend) && (mac) < (net) ? (mac) : (net))
 
 
-#ifdef HAVE_NETPACKET_PACKET_H_
+#ifdef HAVE_NETPACKET_PACKET_H
 
 /*
  * Try figure out the best sizes for the ring buffer. Ensure that:
@@ -779,7 +779,7 @@ static int linuxnative_config_input(libtrace_t *libtrace,
 	 * option and will set an error if it fails */
 	return -1;
 }
-#endif /* HAVE_NETPACKET_PACKET_H_ */
+#endif /* HAVE_NETPACKET_PACKET_H */
 
 static int linuxnative_prepare_packet(libtrace_t *libtrace UNUSED, 
 		libtrace_packet_t *packet, void *buffer, 
@@ -851,7 +851,7 @@ static int linuxring_prepare_packet(libtrace_t *libtrace UNUSED,
 /* 20 isn't enough on x86_64 */
 #define CMSG_BUF_SIZE 128
 
-#ifdef HAVE_NETPACKET_PACKET_H_
+#ifdef HAVE_NETPACKET_PACKET_H
 static int linuxnative_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) 
 {
 	struct libtrace_linuxnative_header *hdr;
@@ -1016,7 +1016,6 @@ static int linuxring_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet
 	 * ready for consumption.
 	 */
 	while (!(header->tp_status & TP_STATUS_USER)) {
-		printf("I shouldn't run if event handler\n");
 		pollset.fd = FORMAT(libtrace->format_data)->fd;
 		pollset.events = POLLIN;
 		pollset.revents = 0;
@@ -1154,7 +1153,8 @@ static int linuxring_write_packet(libtrace_out_t *trace,
 						DATAOUT(trace)->req.tp_frame_nr;
 
 	/* Notify kernel there are frames to send */
-	DATAOUT(trace)->queue = (++DATAOUT(trace)->queue) % TX_MAX_QUEUE;
+	DATAOUT(trace)->queue ++;
+	DATAOUT(trace)->queue %= TX_MAX_QUEUE;
 	if(DATAOUT(trace)->queue == 0){
 		sendto(DATAOUT(trace)->fd, 
 			NULL, 
@@ -1166,7 +1166,7 @@ static int linuxring_write_packet(libtrace_out_t *trace,
 	return header->tp_len;
 
 }
-#endif /* HAVE_NETPACKET_PACKET_H_ */
+#endif /* HAVE_NETPACKET_PACKET_H */
 
 static inline libtrace_linktype_t get_libtrace_link_type(uint16_t linktype){
 	/* Convert the ARPHRD type into an appropriate libtrace link type */
@@ -1399,7 +1399,7 @@ static uint64_t linuxnative_get_captured_packets(libtrace_t *trace) {
 		return UINT64_MAX;
 	}
 
-#ifdef HAVE_NETPACKET_PACKET_H_	
+#ifdef HAVE_NETPACKET_PACKET_H	
 	if ((FORMAT(trace->format_data)->stats_valid & 1) 
 			|| FORMAT(trace->format_data)->stats_valid == 0) {
 		socklen_t len = sizeof(FORMAT(trace->format_data)->stats);
@@ -1429,7 +1429,7 @@ static uint64_t linuxnative_get_dropped_packets(libtrace_t *trace) {
 		return UINT64_MAX;
 	}
 	
-#ifdef HAVE_NETPACKET_PACKET_H_	
+#ifdef HAVE_NETPACKET_PACKET_H	
 	if ((FORMAT(trace->format_data)->stats_valid & 2)
 			|| (FORMAT(trace->format_data)->stats_valid==0)) {
 		socklen_t len = sizeof(FORMAT(trace->format_data)->stats);
@@ -1447,7 +1447,7 @@ static uint64_t linuxnative_get_dropped_packets(libtrace_t *trace) {
 #endif
 }
 
-#ifdef HAVE_NETPACKET_PACKET_H_
+#ifdef HAVE_NETPACKET_PACKET_H
 static void linuxnative_help(void) {
 	printf("linuxnative format module: $Revision$\n");
 	printf("Supported input URIs:\n");
