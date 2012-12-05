@@ -76,7 +76,6 @@
  * Used to get correct sized buffers from the kernel.
  */
 #define MAX_ORDER 10
-static unsigned int max_order = MAX_ORDER;
 
 /* Cached page size, the page size shoudn't be changing */
 static int pagesize = 0;
@@ -141,6 +140,8 @@ typedef enum { TS_NONE, TS_TIMEVAL, TS_TIMESPEC } timestamptype_t;
  * this means that we can interpret a ring frame on a kernel that doesn't
  * support the format directly.
  */
+
+
 #define	PACKET_RX_RING	5
 #define PACKET_VERSION	10
 #define PACKET_HDRLEN	11
@@ -151,7 +152,7 @@ typedef enum { TS_NONE, TS_TIMEVAL, TS_TIMESPEC } timestamptype_t;
 #define TO_TP_HDR(x)	((struct tpacket2_hdr *) (x))
 #define TPACKET_ALIGNMENT       16
 #define TPACKET_ALIGN(x)        (((x)+TPACKET_ALIGNMENT-1)&~(TPACKET_ALIGNMENT-1))
-#define TPACKET2_HDRLEN         (TPACKET_ALIGN(sizeof(struct tpacket2_hdr)) + sizeof(struct sockaddr_ll))
+#define TPACKET_HDRLEN         (TPACKET_ALIGN(sizeof(struct tpacket2_hdr)) + sizeof(struct sockaddr_ll))
 
 enum tpacket_versions {
 	TPACKET_V1,
@@ -204,10 +205,12 @@ struct linux_format_data_t {
 	char * rx_ring;
 	/* The current frame number within the rx ring */	
 	int rxring_offset;
-	/* The format this trace is using linuxring or linuxnative */
+	/* The actual format being used - ring vs int */
 	libtrace_rt_types_t format;
 	/* The current ring buffer layout */
 	struct tpacket_req req;
+	/* Used to determine buffer size for the ring buffer */	
+	uint32_t max_order;
 };
 
 
@@ -253,13 +256,13 @@ struct linux_output_format_data_t {
 	int queue;
 	/* The format this trace is using linuxring or linuxnative */
 	libtrace_rt_types_t format;
+	/* Used to determine buffer size for the ring buffer */	
+	uint32_t max_order;
 };
 
 /* Get the sockaddr_ll structure from a frame */
 #define GET_SOCKADDR_HDR(x)  ((struct sockaddr_ll *) (((char *) (x))\
 	+ TPACKET_ALIGN(sizeof(struct tpacket2_hdr))))
-
-#define TPACKET_HDRLEN TPACKET2_HDRLEN
 
 #define FORMAT(x) ((struct linux_format_data_t*)(x))
 #define DATAOUT(x) ((struct linux_output_format_data_t*)((x)->format_data))
@@ -272,7 +275,6 @@ struct linux_output_format_data_t {
 
 
 #ifdef HAVE_NETPACKET_PACKET_H
-
 /*
  * Try figure out the best sizes for the ring buffer. Ensure that:
  * - max(Block_size) == page_size << max_order
@@ -285,24 +287,28 @@ struct linux_output_format_data_t {
  * - CONF_RING_FRAMES is used a minimum number of frames to hold
  * - Calculates based on max_order and buf_min
  */
-static void calculate_buffers(struct tpacket_req * req, int fd, char * uri){
+static void calculate_buffers(struct tpacket_req * req, int fd, char * uri,
+		uint32_t max_order){
 	
 	struct ifreq ifr;
-	unsigned mtu = LIBTRACE_PACKET_BUFSIZE;
+	unsigned max_frame = LIBTRACE_PACKET_BUFSIZE;
 	pagesize = getpagesize();
 
-	/* Don't bother trying to set frame size above mtu linux will drop
-	 * these anyway
-	 */
 	strcpy(ifr.ifr_name, uri);
+	/* Don't bother trying to set frame size above mtu linux will drop
+	 * these anyway.
+	 *
+	 * Remember, that our frame also has to include a TPACKET header!
+	 */
 	if (ioctl(fd, SIOCGIFMTU, (caddr_t) &ifr) >= 0) 
-		mtu = ifr.ifr_mtu;
-	if(mtu > LIBTRACE_PACKET_BUFSIZE)
-		mtu = LIBTRACE_PACKET_BUFSIZE;
+		max_frame = ifr.ifr_mtu + sizeof(struct tpacket2_hdr);
+	if (max_frame > LIBTRACE_PACKET_BUFSIZE)
+		max_frame = LIBTRACE_PACKET_BUFSIZE;
 
 	/* Calculate frame size */
 	req->tp_frame_size = pagesize;
-	while(req->tp_frame_size < mtu && req->tp_frame_size < LIBTRACE_PACKET_BUFSIZE){
+	while(req->tp_frame_size < max_frame && 
+			req->tp_frame_size < LIBTRACE_PACKET_BUFSIZE){
 		req->tp_frame_size <<= 1;
 	}
 	if(req->tp_frame_size > LIBTRACE_PACKET_BUFSIZE)
@@ -325,12 +331,14 @@ static void calculate_buffers(struct tpacket_req * req, int fd, char * uri){
 	req->tp_frame_nr = req->tp_block_nr * 
 			(req->tp_block_size / req->tp_frame_size);
 
-	/*printf("MaxO 0x%x BS 0x%x BN 0x%x FS 0x%x FN 0x%x\n", 
+	/*
+	printf("MaxO 0x%x BS 0x%x BN 0x%x FS 0x%x FN 0x%x\n", 
 		max_order, 
 		req->tp_block_size, 
 		req->tp_block_nr, 
 		req->tp_frame_size, 
-		req->tp_frame_nr);*/
+		req->tp_frame_nr);
+	*/
 	
 	/* In case we have some silly values*/
 	assert(req->tp_block_size);
@@ -518,7 +526,8 @@ static int linuxnative_start_input(libtrace_t *libtrace)
 static inline int socket_to_packetmmap(char * uridata, int ring_type, 
 					int fd, 
 					struct tpacket_req * req,
-					char ** ring_location){
+					char ** ring_location,
+					uint32_t *max_order){
 	socklen_t len;
 	int val;
 
@@ -546,17 +555,17 @@ static inline int socket_to_packetmmap(char * uridata, int ring_type,
 	 * cannot allocate a block of that size, so decrease max_block and retry.
 	 */
 	while(1) {	
-		if (max_order <= 0) {
+		if (*max_order <= 0) {
 			return -1;
 		}
-		calculate_buffers(req, fd, uridata);
+		calculate_buffers(req, fd, uridata, *max_order);
 		if (setsockopt(fd, 
 				SOL_PACKET, 
 				ring_type, 
 				req, 
 				sizeof(struct tpacket_req)) == -1) {
 			if(errno == ENOMEM){
-				max_order--;
+				(*max_order)--;
 			} else {
 				return -1;
 			}
@@ -583,15 +592,18 @@ static int linuxring_start_input(libtrace_t *libtrace){
 		return -1;
 
 	/* Make it a packetmmap */
-	if(socket_to_packetmmap(libtrace->uridata, PACKET_RX_RING, FORMAT(libtrace->format_data)->fd,
-		 &FORMAT(libtrace->format_data)->req, &FORMAT(libtrace->format_data)->rx_ring) != 0){
+	if(socket_to_packetmmap(libtrace->uridata, PACKET_RX_RING, 
+			FORMAT(libtrace->format_data)->fd,
+		 	&FORMAT(libtrace->format_data)->req, 
+			&FORMAT(libtrace->format_data)->rx_ring,
+			&FORMAT(libtrace->format_data)->max_order) != 0){
 		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, 
 			"TPACKET2 not supported or ring buffer is too large");
 		close(DATAOUT(libtrace)->fd);
 		free(libtrace->format_data);
 		return -1;
 	}
-		
+
 	return 0;
 }
 
@@ -613,8 +625,11 @@ static int linuxring_start_output(libtrace_out_t *libtrace)
 		return -1;
 
 	/* Make it a packetmmap */
-	if(socket_to_packetmmap(libtrace->uridata, PACKET_TX_RING, DATAOUT(libtrace)->fd,
-		 &DATAOUT(libtrace)->req, &DATAOUT(libtrace)->tx_ring) != 0){
+	if(socket_to_packetmmap(libtrace->uridata, PACKET_TX_RING, 
+			DATAOUT(libtrace)->fd,
+		 	&DATAOUT(libtrace)->req, 
+			&DATAOUT(libtrace)->tx_ring,
+			&DATAOUT(libtrace)->max_order) != 0){
 		trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED, 
 			"TPACKET2 not supported or ring buffer is too large");
 		close(DATAOUT(libtrace)->fd);
@@ -833,7 +848,7 @@ static int linuxring_prepare_packet(libtrace_t *libtrace UNUSED,
 					TP_TRACE_START(
 					TO_TP_HDR(packet->header)->tp_mac, 
 					TO_TP_HDR(packet->header)->tp_net, 
-					TPACKET2_HDRLEN);
+					TPACKET_HDRLEN);
 	packet->type = rt_type;
 
 	/*
@@ -1023,7 +1038,7 @@ static int linuxring_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet
 		ret = poll(&pollset, 1, -1);
 		if (ret < 0) {
 			if (errno != EINTR)
-			trace_set_err(libtrace,errno,"poll()");
+				trace_set_err(libtrace,errno,"poll()");
 			return -1;
 		}
 	}
@@ -1332,7 +1347,7 @@ static int linuxnative_get_framing_length(UNUSED
 static int linuxring_get_framing_length(const libtrace_packet_t *packet)
 {	
 	/* 
-	 * Need to make frame_length + capture_length = compelete capture length 
+	 * Need to make frame_length + capture_length = complete capture length 
 	 * so include alligment whitespace. So reverse calculate from packet.
 	 */
 	return (char *) packet->payload - (char *) packet->buffer;
@@ -1655,6 +1670,11 @@ static struct libtrace_format_t linuxring = {
 
 
 void linuxnative_constructor(void) {
+	/* TODO: once we're happy with ring:, it would be a good idea to 
+	 * swap the order of these calls so that ring: is preferred over
+	 * int: if the user just gives an interface name as an input without
+	 * explicitly choosing a format.
+	 */
 	register_format(&linuxnative);
 	register_format(&linuxring);
 }
