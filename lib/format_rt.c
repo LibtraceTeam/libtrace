@@ -104,6 +104,7 @@ struct rt_format_data_t {
 	libtrace_t *dummy_erf;
 	libtrace_t *dummy_pcap;
 	libtrace_t *dummy_linux;
+	libtrace_t *dummy_ring;
 	libtrace_t *dummy_bpf;
 };
 
@@ -198,6 +199,7 @@ static void rt_init_format_data(libtrace_t *libtrace) {
 	RT_INFO->dummy_erf = NULL;
 	RT_INFO->dummy_pcap = NULL;
 	RT_INFO->dummy_linux = NULL;
+	RT_INFO->dummy_ring = NULL;
 	RT_INFO->dummy_bpf = NULL;
 	RT_INFO->pkt_buffer = NULL;
 	RT_INFO->buf_current = NULL;
@@ -291,6 +293,9 @@ static int rt_fin_input(libtrace_t *libtrace) {
 
 	if (RT_INFO->dummy_linux)
 		trace_destroy_dead(RT_INFO->dummy_linux);
+	
+	if (RT_INFO->dummy_ring)
+		trace_destroy_dead(RT_INFO->dummy_ring);
 
 	if (RT_INFO->dummy_bpf)
 		trace_destroy_dead(RT_INFO->dummy_bpf);
@@ -445,6 +450,17 @@ static int rt_set_format(libtrace_t *libtrace, libtrace_packet_t *packet)
 				}
 			}
 			packet->trace = RT_INFO->dummy_linux;
+			break;
+		case TRACE_RT_DATA_LINUX_RING:
+			if (!RT_INFO->dummy_ring) {
+				RT_INFO->dummy_ring = trace_create_dead("ring:");
+				/* This may fail on a non-Linux machine */
+				if (trace_is_err(RT_INFO->dummy_ring)) {
+					trace_perror(RT_INFO->dummy_ring, "Creating dead int trace");
+					return -1;
+				}
+			}
+			packet->trace = RT_INFO->dummy_ring;
 			break;
 		case TRACE_RT_STATUS:
 		case TRACE_RT_METADATA:
