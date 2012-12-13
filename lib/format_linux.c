@@ -77,7 +77,7 @@
  */
 #define MAX_ORDER 10
 
-/* Cached page size, the page size shoudn't be changing */
+/* Cached page size, the page size shouldn't be changing */
 static int pagesize = 0;
 
 /* Number of frames in the ring used by both TX and TR rings. More frames 
@@ -301,7 +301,7 @@ static void calculate_buffers(struct tpacket_req * req, int fd, char * uri,
 	 * Remember, that our frame also has to include a TPACKET header!
 	 */
 	if (ioctl(fd, SIOCGIFMTU, (caddr_t) &ifr) >= 0) 
-		max_frame = ifr.ifr_mtu + sizeof(struct tpacket2_hdr);
+		max_frame = ifr.ifr_mtu + TPACKET_ALIGN(TPACKET_HDRLEN);
 	if (max_frame > LIBTRACE_PACKET_BUFSIZE)
 		max_frame = LIBTRACE_PACKET_BUFSIZE;
 
