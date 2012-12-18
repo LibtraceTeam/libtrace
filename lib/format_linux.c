@@ -365,6 +365,7 @@ static inline void init_input(libtrace_t *libtrace){
 	FORMAT(libtrace->format_data)->stats_valid = 0;
 	FORMAT(libtrace->format_data)->rx_ring = NULL;
 	FORMAT(libtrace->format_data)->rxring_offset = 0;
+	FORMAT(libtrace->format_data)->max_order = MAX_ORDER;
 }
 static int linuxring_init_input(libtrace_t *libtrace) 
 {	
@@ -387,6 +388,7 @@ static inline void init_output(libtrace_out_t *libtrace)
 	DATAOUT(libtrace)->tx_ring = NULL;
 	DATAOUT(libtrace)->txring_offset = 0;
 	DATAOUT(libtrace)->queue = 0;
+	DATAOUT(libtrace)->max_order = MAX_ORDER;
 }
 static int linuxnative_init_output(libtrace_out_t *libtrace)
 {
@@ -523,24 +525,15 @@ static int linuxnative_start_input(libtrace_t *libtrace)
 					
 	return 0;
 }
-static inline int socket_to_packetmmap(char * uridata, int ring_type, 
+static inline int socket_to_packetmmap(	char * uridata, int ring_type, 
 					int fd, 
 					struct tpacket_req * req,
 					char ** ring_location,
-					uint32_t *max_order){
-	socklen_t len;
+					uint32_t *max_order,
+					char *error){
 	int val;
 
 	/* Switch to TPACKET header version 2, we only try support v2 because v1 had problems */
-	val = TPACKET_V2;
-	len = sizeof(val);
-	if(getsockopt(fd, 
-			SOL_PACKET, 
-			PACKET_HDRLEN, 
-			&val, 
-			&len) == -1){
-		return -1;
-	}
 
 	val = TPACKET_V2;
 	if (setsockopt(fd, 
@@ -548,6 +541,7 @@ static inline int socket_to_packetmmap(char * uridata, int ring_type,
 			PACKET_VERSION, 
 			&val, 
 			sizeof(val)) == -1){
+		strncpy(error, "TPACKET2 not supported", 2048);
 		return -1;
 	}
 
@@ -556,6 +550,7 @@ static inline int socket_to_packetmmap(char * uridata, int ring_type,
 	 */
 	while(1) {	
 		if (*max_order <= 0) {
+			strncpy(error,"Cannot allocate enough memory for ring buffer", 2048);
 			return -1;
 		}
 		calculate_buffers(req, fd, uridata, *max_order);
@@ -567,6 +562,7 @@ static inline int socket_to_packetmmap(char * uridata, int ring_type,
 			if(errno == ENOMEM){
 				(*max_order)--;
 			} else {
+				strncpy(error, "Error setting the ring buffer size", 2048);
 				return -1;
 			}
 
@@ -580,12 +576,14 @@ static inline int socket_to_packetmmap(char * uridata, int ring_type,
 					MAP_SHARED, 
 					fd, 0);
 	if(*ring_location == MAP_FAILED){
+		strncpy(error, "Failed to map memory for ring buffer", 2048);
 		return -1;
 	}
 	return 0;
 }
 static int linuxring_start_input(libtrace_t *libtrace){
-	
+
+	char error[2048];	
 
 	/* We set the socket up the same and then convert it to PACKET_MMAP */
 	if(linuxnative_start_input(libtrace) != 0)
@@ -596,11 +594,12 @@ static int linuxring_start_input(libtrace_t *libtrace){
 			FORMAT(libtrace->format_data)->fd,
 		 	&FORMAT(libtrace->format_data)->req, 
 			&FORMAT(libtrace->format_data)->rx_ring,
-			&FORMAT(libtrace->format_data)->max_order) != 0){
-		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, 
-			"TPACKET2 not supported or ring buffer is too large");
+			&FORMAT(libtrace->format_data)->max_order,
+			error) != 0){
+		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, error);
 		close(DATAOUT(libtrace)->fd);
 		free(libtrace->format_data);
+		libtrace->format_data = NULL;
 		return -1;
 	}
 
@@ -620,6 +619,7 @@ static int linuxnative_start_output(libtrace_out_t *libtrace)
 
 static int linuxring_start_output(libtrace_out_t *libtrace)
 {
+	char error[2048];	
 	/* We set the socket up the same and then convert it to PACKET_MMAP */
 	if(linuxnative_start_output(libtrace) != 0)
 		return -1;
@@ -629,11 +629,12 @@ static int linuxring_start_output(libtrace_out_t *libtrace)
 			DATAOUT(libtrace)->fd,
 		 	&DATAOUT(libtrace)->req, 
 			&DATAOUT(libtrace)->tx_ring,
-			&DATAOUT(libtrace)->max_order) != 0){
-		trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED, 
-			"TPACKET2 not supported or ring buffer is too large");
+			&DATAOUT(libtrace)->max_order,
+			error) != 0){
+		trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED, error);
 		close(DATAOUT(libtrace)->fd);
 		free(libtrace->format_data);
+		libtrace->format_data = NULL;
 		return -1;
 	}
 	
