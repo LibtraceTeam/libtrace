@@ -249,7 +249,7 @@ else
 	AC_DEFINE([HAVE_LIBPCAP],1,[compile with libpcap support])
 	AC_DEFINE([HAVE_BPF_FILTER],1,[compile with bpf filter support])
 
-	LIBS+="-lpcap"
+	LIBS="-lpcap"
 	AC_CHECK_FUNCS(pcap_inject pcap_sendpacket pcap_setnonblock)
 	LIBS=""
 
