@@ -260,10 +260,16 @@ io_t *trace_open_file(libtrace_t *trace)
 /* Open a file for writing using the new Libtrace IO system */ 
 iow_t *trace_open_file_out(libtrace_out_t *trace, int compress_type, int level, int fileflag)
 {
+	iow_t *io = NULL;
 	assert(level<10);
 	assert(level>=0);
 
-	return wandio_wcreate(trace->uridata, compress_type, level, fileflag);
+	io = wandio_wcreate(trace->uridata, compress_type, level, fileflag);
+
+	if (!io) {
+		trace_set_err_out(trace, errno, "Unable to create output file %s", trace->uridata);
+	}
+	return io;
 }
 
 
