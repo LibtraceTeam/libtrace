@@ -1089,6 +1089,7 @@ static int linuxnative_write_packet(libtrace_out_t *trace,
 		libtrace_packet_t *packet) 
 {
 	struct sockaddr_ll hdr;
+	int ret = 0;
 
 	if (trace_get_link_type(packet) == TRACE_TYPE_NONDATA)
 		return 0;
@@ -1103,11 +1104,17 @@ static int linuxnative_write_packet(libtrace_out_t *trace,
 
 	/* This is pretty easy, just send the payload using sendto() (after
 	 * setting up the sll header properly, of course) */
-	return sendto(DATAOUT(trace)->fd,
+	ret = sendto(DATAOUT(trace)->fd,
 			packet->payload,
 			trace_get_capture_length(packet),
 			0,
 			(struct sockaddr*)&hdr, (socklen_t)sizeof(hdr));
+
+	if (ret < 0) {
+		trace_set_err_out(trace, errno, "sendto failed");
+	}
+
+	return ret;
 
 }
 static int linuxring_write_packet(libtrace_out_t *trace, 
@@ -1143,12 +1150,17 @@ static int linuxring_write_packet(libtrace_out_t *trace,
 			/* Timeout something has gone wrong - maybe the queue is
 			 * to large so try issue another send command
 			 */
-			sendto(DATAOUT(trace)->fd, 
+			ret = sendto(DATAOUT(trace)->fd, 
 				NULL, 
 				0, 
 				0, 
 				(void *) &DATAOUT(trace)->sock_hdr, 
 				sizeof(DATAOUT(trace)->sock_hdr));
+			if (ret < 0) {
+				trace_set_err_out(trace, errno, 
+						"sendto after timeout failed");
+				return -1;
+			}
 	}
 	
 	header->tp_len = trace_get_capture_length(packet);
@@ -1172,12 +1184,16 @@ static int linuxring_write_packet(libtrace_out_t *trace,
 	DATAOUT(trace)->queue ++;
 	DATAOUT(trace)->queue %= TX_MAX_QUEUE;
 	if(DATAOUT(trace)->queue == 0){
-		sendto(DATAOUT(trace)->fd, 
-			NULL, 
-			0, 
-			MSG_DONTWAIT, 
-			(void *) &DATAOUT(trace)->sock_hdr, 
-			sizeof(DATAOUT(trace)->sock_hdr));
+		ret = sendto(DATAOUT(trace)->fd, 
+				NULL, 
+				0, 
+				MSG_DONTWAIT, 
+				(void *) &DATAOUT(trace)->sock_hdr, 
+				sizeof(DATAOUT(trace)->sock_hdr));
+		if (ret < 0) {
+			trace_set_err_out(trace, errno, "sendto failed");
+			return -1;
+		}
 	}
 	return header->tp_len;
 
