@@ -624,6 +624,27 @@ typedef struct libtrace_icmp
   } un;				/**< Union for Payloads of Various ICMP Codes */
 } PACKED libtrace_icmp_t;
 
+typedef struct libtrace_icmp6 {
+  uint8_t type;		/**< Message Type */
+  uint8_t code;		/**< Type Sub-code */
+  uint16_t checksum;	/**< Checksum */
+
+  union {
+    struct {
+	uint8_t length;	  /**< Length of original datagram content in 64 bit words */
+	uint8_t unused;	  /**< Unused */	
+	uint8_t unused1;  /**< Unused */
+    } extend;	/**< Extensions added in RFC 4884 for Time Exceeded and Destination Unreachable Messages */
+
+    uint32_t mtu;	/**< MTU from Packet Too Big Message */
+    uint32_t pointer;	/**< Pointer from Parameter Problem Message */
+    struct {
+	uint16_t id;	/**< Echo Identifier */
+	uint16_t sequence; /**< Echo Sequence Number */
+    } echo; /**< Data required for Echo Request and Reply messages */
+  } un;
+} PACKED libtrace_icmp6_t;
+
 /** Generic LLC/SNAP header structure */
 typedef struct libtrace_llcsnap
 {
