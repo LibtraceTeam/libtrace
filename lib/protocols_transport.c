@@ -293,6 +293,24 @@ DLLEXPORT libtrace_icmp_t *trace_get_icmp(libtrace_packet_t *packet) {
 	return icmp;
 }
 
+DLLEXPORT libtrace_icmp6_t *trace_get_icmp6(libtrace_packet_t *packet) {
+	uint8_t proto;
+	uint32_t rem = 0;
+	libtrace_icmp6_t *icmp;
+
+	icmp=(libtrace_icmp6_t*)trace_get_transport(packet,&proto,&rem);
+
+	if (!icmp || proto != TRACE_IPPROTO_ICMPV6)
+		return NULL;
+
+	/* Make sure we return a full ICMP header as the caller has no way of
+	 * telling how much of the packet is remaining */
+	if (rem < sizeof(libtrace_icmp6_t))
+		return NULL;
+
+	return icmp;
+}
+
 DLLEXPORT libtrace_icmp_t *trace_get_icmp_from_ip(libtrace_ip_t *ip, uint32_t *remaining)
 {
 	libtrace_icmp_t *icmpptr = 0;
@@ -340,6 +358,18 @@ DLLEXPORT void *trace_get_payload_from_icmp(libtrace_icmp_t *icmp, uint32_t *rem
 		*remaining-=sizeof(libtrace_icmp_t);
 	}
 	return (char*)icmp+sizeof(libtrace_icmp_t);
+}
+
+DLLEXPORT void *trace_get_payload_from_icmp6(libtrace_icmp6_t *icmp, uint32_t *remaining)
+{
+	if (remaining) {
+		if (*remaining < sizeof(libtrace_icmp6_t)) {
+			*remaining = 0;
+			return NULL;
+		}
+		*remaining-=sizeof(libtrace_icmp6_t);
+	}
+	return (char*)icmp+sizeof(libtrace_icmp6_t);
 }
 
 /* Return the source port

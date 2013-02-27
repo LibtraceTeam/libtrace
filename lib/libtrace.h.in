@@ -1917,6 +1917,31 @@ DLLEXPORT void *trace_get_payload_from_udp(libtrace_udp_t *udp, uint32_t *remain
 DLLEXPORT void *trace_get_payload_from_icmp(libtrace_icmp_t *icmp, 
 		uint32_t *remaining);
 
+/** Gets a pointer to the payload following a ICMPv6 header
+ * @param icmp           A pointer to the ICMPv6 header
+ * @param[in,out] remaining Updated with the number of captured bytes remaining
+ *
+ * @return A pointer to the ICMPv6 payload, or NULL if the ICMPv6 header is 
+ * truncated.
+ *
+ * When calling this function, remaining must contain the number of captured
+ * bytes remaining in the packet starting from the ICMPv6 header (including the
+ * ICMP header itself). remaining will be updated to contain the number of 
+ * bytes remaining after the ICMPv6 header has been skipped.
+ *
+ * If the ICMPv6 header is complete but there are zero bytes of payload after 
+ * the header, a pointer to where the payload would be is returned and 
+ * remaining will be set to 0.  If the ICMPv6 header is incomplete, NULL will be 
+ * returned and remaining will be set to 0. Therefore, it is important to check
+ * the value of remaining after calling this function.
+ *
+ * @note In the case of some ICMPv6 messages, the payload may be the IP header
+ * from the packet that triggered the ICMP message. 
+ *
+ */
+DLLEXPORT void *trace_get_payload_from_icmp6(libtrace_icmp6_t *icmp, 
+		uint32_t *remaining);
+
 /** Get a pointer to the TCP header (if present)
  * @param packet  	The packet to get the TCP header from
  *
@@ -2018,6 +2043,22 @@ libtrace_udp_t *trace_get_udp_from_ip(libtrace_ip_t *ip,uint32_t *remaining);
  */
 DLLEXPORT SIMPLE_FUNCTION
 libtrace_icmp_t *trace_get_icmp(libtrace_packet_t *packet);
+
+/** Get a pointer to the ICMPv6 header (if present)
+ * @param packet  	The packet to get the ICMPv6 header from
+ *
+ * @return A pointer to the ICMPv6 header, or NULL if there is not a complete 
+ * ICMP header present in the packet.
+ *
+ * This is a short-cut function enabling quick and easy access to the ICMPv6
+ * header if that is all you care about. However, we recommend the use of the
+ * more generic trace_get_transport() function instead.
+ *
+ * @note Unlike trace_get_transport(), this function will return NULL if the
+ * ICMPv6 header is incomplete or truncated.
+ */
+DLLEXPORT SIMPLE_FUNCTION
+libtrace_icmp6_t *trace_get_icmp6(libtrace_packet_t *packet);
 
 /** Get a pointer to the ICMP header following an IPv4 header (if present)
  * @param ip		The IP header to find the subsequent ICMP header for
