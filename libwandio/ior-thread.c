@@ -265,6 +265,11 @@ static void thread_close(io_t *io)
 
 	/* Wait for the thread to exit */
 	pthread_join(DATA(io)->producer, NULL);
+	
+	pthread_mutex_destroy(&DATA(io)->mutex);
+	pthread_cond_destroy(&DATA(io)->space_avail);
+	pthread_cond_destroy(&DATA(io)->data_ready);
+	
 	free(DATA(io)->buffer);
 	free(DATA(io));
 	free(io);

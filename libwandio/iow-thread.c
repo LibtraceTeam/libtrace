@@ -245,6 +245,11 @@ static void thread_wclose(iow_t *iow)
 	pthread_cond_signal(&DATA(iow)->data_ready);
 	pthread_mutex_unlock(&DATA(iow)->mutex);
 	pthread_join(DATA(iow)->consumer,NULL);
+	
+	pthread_mutex_destroy(&DATA(iow)->mutex);
+	pthread_cond_destroy(&DATA(iow)->data_ready);
+	pthread_cond_destroy(&DATA(iow)->space_avail);
+	
 	free(iow->data);
 	free(iow);
 }
