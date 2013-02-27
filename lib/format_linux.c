@@ -1540,7 +1540,7 @@ static struct libtrace_format_t linuxnative = {
 	linuxnative_get_dropped_packets,/* get_dropped_packets */
 	linuxnative_get_captured_packets,/* get_captured_packets */
 	linuxnative_get_fd,		/* get_fd */
-	NULL,				/* trace_event */
+	trace_event_device,		/* trace_event */
 	linuxnative_help,		/* help */
 	NULL
 };
