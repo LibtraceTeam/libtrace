@@ -370,9 +370,6 @@ int main(int argc, char *argv[])
 				break;
 		}
 
-		if (done)
-			break;
-		
 		if (trace_is_err(input)) {
 			trace_perror(input,"Reading packets");
 			trace_destroy(input);
@@ -380,6 +377,10 @@ int main(int argc, char *argv[])
 		}
 
 		trace_destroy(input);
+		
+		if (done)
+			break;
+		
 	}
 
 	if (verbose) {
