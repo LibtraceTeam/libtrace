@@ -37,6 +37,7 @@
 #include "protocols.h"
 #include <assert.h>
 #include <stdlib.h>
+#include <arpa/inet.h>
 
 #ifdef HAVE_NETPACKET_PACKET_H
 #include <sys/socket.h>
@@ -344,6 +345,51 @@ DLLEXPORT int trace_get_next_option(unsigned char **ptr,int *len,
 	assert(0);
 }
 
+static char *sockaddr_to_string(struct sockaddr *addrptr, char *space,
+		int spacelen) {
+
+	assert(addrptr && space);
+	assert(spacelen > 0);
+	
+	if (addrptr->sa_family == AF_INET) {
+		struct sockaddr_in *v4 = (struct sockaddr_in *)addrptr;
+		inet_ntop(AF_INET, &(v4->sin_addr), space, spacelen);
+	}
+
+	else if (addrptr->sa_family == AF_INET6) {
+		struct sockaddr_in6 *v6 = (struct sockaddr_in6 *)addrptr;
+		inet_ntop(AF_INET6, &(v6->sin6_addr), space, spacelen);
+	}
+#ifdef HAVE_NETPACKET_PACKET_H
+	else if (addrptr->sa_family == AF_PACKET) {
+		struct sockaddr_ll *l2addr = (struct sockaddr_ll *)addrptr;
+		uint8_t *macbytes = (uint8_t *)l2addr->sll_addr;
+
+		snprintf(space, spacelen, "%02x:%02x:%02x:%02x:%02x:%02x",
+				macbytes[0], macbytes[1], macbytes[2],
+				macbytes[3], macbytes[4], macbytes[5]);
+
+	}
+#else
+	else if (addrptr->sa_family == AF_LINK) {
+		struct sockaddr_dl *l2addr = (struct sockaddr_dl *)addrptr;
+		uint8_t *macbytes = (uint8_t *)l2addr->sdl_data;
+
+		snprintf(space, spacelen, "%02x:%02x:%02x:%02x:%02x:%02x",
+				macbytes[0], macbytes[1], macbytes[2],
+				macbytes[3], macbytes[4], macbytes[5]);
+	
+	}
+#endif
+	else {
+		space[0] = '\0';
+		return NULL;
+	}
+
+	return space;
+
+}
+
 /* Extract the source mac address from a frame and bundle it up into a sockaddr */
 static struct sockaddr *get_source_ethernet_address(
 	libtrace_ether_t *ethernet, struct sockaddr *addr)
@@ -468,6 +514,27 @@ DLLEXPORT struct sockaddr *trace_get_source_address(
 }
 
 
+DLLEXPORT char *trace_get_source_address_string(
+		const libtrace_packet_t *packet, char *space, int spacelen) {
+
+	static char staticspace[INET6_ADDRSTRLEN];
+	struct sockaddr_storage addr;
+	struct sockaddr *addrptr;
+	
+
+	if (space == NULL || spacelen == 0) {
+		space = staticspace;
+		spacelen = INET6_ADDRSTRLEN;
+	}
+
+	addrptr = trace_get_source_address(packet, (struct sockaddr *)&addr);
+
+	if (addrptr == NULL)
+		return NULL;
+	
+	return sockaddr_to_string(addrptr, space, spacelen);
+}
+
 static struct sockaddr *get_destination_ethernet_address(
 	libtrace_ether_t *ethernet, struct sockaddr *addr)
 {
@@ -586,4 +653,25 @@ DLLEXPORT struct sockaddr *trace_get_destination_address(
 	}
 }
 
+DLLEXPORT char *trace_get_destination_address_string(
+		const libtrace_packet_t *packet, char *space, int spacelen) {
+
+	struct sockaddr_storage addr;
+	struct sockaddr *addrptr;
+	
+	static char staticspace[INET6_ADDRSTRLEN];
+
+	if (space == NULL || spacelen == 0) {
+		space = staticspace;
+		spacelen = INET6_ADDRSTRLEN;
+	}
+
+	addrptr = trace_get_destination_address(packet, 
+			(struct sockaddr *)&addr);
+
+	if (addrptr == NULL)
+		return NULL;
+	
+	return sockaddr_to_string(addrptr, space, spacelen);
+}
 

@@ -2407,6 +2407,26 @@ DLLEXPORT SIMPLE_FUNCTION
 struct sockaddr *trace_get_source_address(const libtrace_packet_t *packet,
 		struct sockaddr *addr);
 
+/** Get the source IP address for a packet and convert it into a string
+ * @param packet	The packet to extract the source IP address from
+ * @param space		A pointer to a character buffer to store the address 
+ *			in. If NULL, static storage is used instead.
+ * @param spacelen	The size of the buffer passed in via 'space'. Set this
+ *			to zero if you are going to pass in a NULL buffer.
+ * @return A pointer to a character buffer containing the string representation
+ * of the source IP address. For packets where there is no suitable IP address,
+ * the source MAC will be returned instead. Returns NULL if no valid address
+ * is available.
+ *
+ * @note Be wary of the possibility of the address being an IPv6 address - make
+ * sure your buffer is large enough!
+ *
+ * New in libtrace 3.0.17.
+ */
+DLLEXPORT SIMPLE_FUNCTION
+char *trace_get_source_address_string(const libtrace_packet_t *packet,
+		char *space, int spacelen);
+
 /** Get the destination IP address for a given packet
  * @param packet  	The packet to extract the destination IP address from
  * @param addr		A pointer to a sockaddr structure to store the address 
@@ -2424,6 +2444,25 @@ DLLEXPORT SIMPLE_FUNCTION
 struct sockaddr *trace_get_destination_address(const libtrace_packet_t *packet,
 		struct sockaddr *addr);
 
+/** Get the destination IP address for a packet and convert it into a string
+ * @param packet	The packet to extract the destination IP address from
+ * @param space		A pointer to a character buffer to store the address 
+ *			in. If NULL, static storage is used instead.
+ * @param spacelen	The size of the buffer passed in via 'space'. Set this
+ *			to zero if you are going to pass in a NULL buffer.
+ * @return A pointer to a character buffer containing the string representation
+ * of the destination IP address. For packets where there is no suitable IP 
+ * address, the destination MAC will be returned instead. Returns NULL if no 
+ * valid address is available.
+ *
+ * @note Be wary of the possibility of the address being an IPv6 address - make
+ * sure your buffer is large enough!
+ *
+ * New in libtrace 3.0.17.
+ */
+DLLEXPORT SIMPLE_FUNCTION
+char *trace_get_destination_address_string(const libtrace_packet_t *packet,
+		char *space, int spacelen);
 
 /** Parses an IP or TCP option
  * @param[in,out] ptr	The pointer to the current option
