@@ -1,6 +1,7 @@
 
-noinst_PROGRAMS=configdemo createdemo filterdemo gettcpdemo headerdemo \
-httpcount lengthdemo mplscount mplstag readdemo sourcedemo timedemo writedemo
+noinst_PROGRAMS=configdemo createdemo filterdemo getpayloaddemo gettcpdemo \
+gettransportdemo headerdemo httpcount lengthdemo mplscount mplstag readdemo \
+sourcedemo timedemo writedemo 
 
 AM_CFLAGS=-I$(top_srcdir)/lib -I$(top_srcdir)/libpacketdump
 AM_CXXFLAGS=-I$(top_srcdir)/lib -I$(top_srcdir)/libpacketdump
@@ -9,7 +10,9 @@ AM_LDFLAGS=-L$(top_srcdir)/lib -L$(top_srcdir)/libpacketdump -ltrace
 configdemo_SOURCES=configdemo.c
 createdemo_SOURCES=createdemo.c
 filterdemo_SOURCES=filterdemo.c
+getpayloaddemo_SOURCES=getpayloaddemo.c
 gettcpdemo_SOURCES=gettcpdemo.c
+gettransportdemo_SOURCES=gettransportdemo.c
 headerdemo_SOURCES=headerdemo.c
 httpcount_SOURCES=httpcount.c
 lengthdemo_SOURCES=lengthdemo.c
