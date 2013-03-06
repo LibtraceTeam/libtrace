@@ -217,7 +217,7 @@ static int tsh_get_wire_length(const libtrace_packet_t *packet) {
 }
 
 static void tsh_help(void) {
-	printf("tsh format module: $Revision$\n");
+	printf("tsh format module: $Revision: 1611 $\n");
 	printf("Supported input URIs:\n");
 	printf("\ttsh:/path/to/file\t(uncompressed)\n");
 	printf("\ttsh:/path/to/file.gz\t(gzip-compressed)\n");

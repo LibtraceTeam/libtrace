@@ -515,7 +515,7 @@ static int bpf_get_fd(const libtrace_t *trace) {
 
 /* Prints some slightly useful help text for the BPF capture format */
 static void bpf_help() {
-	printf("bpf format module: $Revision$\n");
+	printf("bpf format module: $Revision: 1782 $\n");
 	printf("Supported input URIs:\n");
 	printf("\tbpf:\n");
 	printf("\n");
@@ -566,7 +566,7 @@ static struct libtrace_format_t bpf = {
 #else 	/* HAVE_DECL_BIOCSETIF */
 /* Prints some slightly useful help text for the BPF capture format */
 static void bpf_help() {
-	printf("bpf format module: $Revision$\n");
+	printf("bpf format module: $Revision: 1782 $\n");
 	printf("Not supported on this host\n");
 	return;
 }

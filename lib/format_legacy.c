@@ -466,7 +466,7 @@ static struct timeval legacynzix_get_timeval(const libtrace_packet_t *packet) {
 }	
 
 static void legacypos_help(void) {
-	printf("legacypos format module: $Revision$\n");
+	printf("legacypos format module: $Revision: 1753 $\n");
 	printf("Supported input URIs:\n");
 	printf("\tlegacypos:/path/to/file\t(uncompressed)\n");
 	printf("\tlegacypos:/path/to/file.gz\t(gzip-compressed)\n");
@@ -477,7 +477,7 @@ static void legacypos_help(void) {
 }
 
 static void legacyatm_help(void) {
-	printf("legacyatm format module: $Revision$\n");
+	printf("legacyatm format module: $Revision: 1753 $\n");
 	printf("Supported input URIs:\n");
 	printf("\tlegacyatm:/path/to/file\t(uncompressed)\n");
 	printf("\tlegacyatm:/path/to/file.gz\t(gzip-compressed)\n");
@@ -488,7 +488,7 @@ static void legacyatm_help(void) {
 }
 
 static void legacyeth_help(void) {
-	printf("legacyeth format module: $Revision$\n");
+	printf("legacyeth format module: $Revision: 1753 $\n");
 	printf("Supported input URIs:\n");
 	printf("\tlegacyeth:/path/to/file\t(uncompressed)\n");
 	printf("\tlegacyeth:/path/to/file.gz\t(gzip-compressed)\n");
@@ -499,7 +499,7 @@ static void legacyeth_help(void) {
 }
 
 static void legacynzix_help(void) {
-	printf("legacynzix format module: $Revision$\n");
+	printf("legacynzix format module: $Revision: 1753 $\n");
 	printf("Supported input URIs:\n");
 	printf("\tlegacynzix:/path/to/file\t(uncompressed)\n");
 	printf("\tlegacynzix:/path/to/file.gz\t(gzip-compressed)\n");

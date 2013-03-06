@@ -736,7 +736,7 @@ static uint64_t pcap_get_dropped_packets(libtrace_t *trace)
 }
 
 static void pcap_help(void) {
-	printf("pcap format module: $Revision$\n");
+	printf("pcap format module: $Revision: 1729 $\n");
 	printf("Supported input URIs:\n");
 	printf("\tpcap:/path/to/file\n");
 	printf("\n");
@@ -748,7 +748,7 @@ static void pcap_help(void) {
 }
 
 static void pcapint_help(void) {
-	printf("pcapint format module: $Revision$\n");
+	printf("pcapint format module: $Revision: 1729 $\n");
 	printf("Supported input URIs:\n");
 	printf("\tpcapint:interface\n");
 	printf("\n");

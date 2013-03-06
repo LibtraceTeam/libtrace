@@ -747,7 +747,7 @@ static uint64_t erf_get_dropped_packets(libtrace_t *trace)
 }
 
 static void erf_help(void) {
-	printf("erf format module: $Revision$\n");
+	printf("erf format module: $Revision: 1752 $\n");
 	printf("Supported input URIs:\n");
 	printf("\terf:/path/to/file\t(uncompressed)\n");
 	printf("\terf:/path/to/file.gz\t(gzip-compressed)\n");

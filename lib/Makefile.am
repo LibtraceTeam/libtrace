@@ -33,6 +33,7 @@ libtrace_la_SOURCES = trace.c common.h \
 		format_atmhdr.c \
 		libtrace_int.h lt_inttypes.h \
 		linktypes.c link_wireless.c \
+		checksum.c checksum.h \
 		protocols_pktmeta.c protocols_l2.c protocols_l3.c \
 		protocols_transport.c protocols.h protocols_ospf.c \
 		$(DAGSOURCE) format_erf.h \

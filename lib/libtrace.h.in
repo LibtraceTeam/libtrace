@@ -1672,6 +1672,56 @@ DLLEXPORT
 void *trace_get_layer3(const libtrace_packet_t *packet,
 		uint16_t *ethertype, uint32_t *remaining);
 
+/** Calculates the expected IP checksum for a packet.
+ * @param packet	The libtrace packet to calculate the checksum for
+ * @param[out] csum	The checksum that is calculated by this function. This
+ * 			may not be NULL.
+ * 
+ * @return A pointer to the original checksum field within the IP
+ * header. If the checksum field is not present in the packet, NULL is returned.
+ *
+ * @note The return value points to the checksum that exists within the current
+ * packet. The value in csum is the value that the checksum should be, given
+ * the current packet contents.  
+ *
+ * @note This function involves the use of a memcpy, so be careful about
+ * calling it excessively if performance is a concern for you.
+ * 
+ * New in libtrace 3.0.17
+ */
+DLLEXPORT uint16_t *trace_checksum_layer3(libtrace_packet_t *packet, 
+		uint16_t *csum);
+
+/** Calculates the expected checksum for the transport header in a packet.
+ * @param packet	The libtrace packet to calculate the checksum for
+ * @param[out] csum	The checksum that is calculated by this function. This
+ * 			may not be NULL.
+ * 
+ * @return A pointer to the original checksum field within the transport 
+ * header. If the checksum field is not present in the packet, NULL is returned.
+ *
+ * @note The return value points to the checksum that exists within the current
+ * packet. The value in csum is the value that the checksum should be, given
+ * the current packet contents.  
+ *
+ * @note This function involves the use of a memcpy, so be careful about
+ * calling it excessively if performance is a concern for you.
+ * 
+ * @note Because transport checksums are calculated across the entire payload,
+ * truncated packets will result in NULL being returned.
+ *
+ * This function will determine the appropriate checksum for whatever transport
+ * layer header is present in the provided packet. At this stage, this only
+ * currently works for TCP, UDP and ICMP packets.
+ *
+ * Be wary of TCP checksum offloading if you are examining the checksum of
+ * packets captured on the same host that generated them!
+ *
+ * New in libtrace 3.0.17
+ */
+DLLEXPORT uint16_t *trace_checksum_transport(libtrace_packet_t *packet,
+                uint16_t *csum);
+
 /** Gets a pointer to the transport layer header (if any)
  * @param packet   The libtrace packet to find the transport header for
  * @param[out] proto	The protocol present at the transport layer.

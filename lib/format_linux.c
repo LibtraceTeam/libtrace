@@ -1481,7 +1481,7 @@ static uint64_t linuxnative_get_dropped_packets(libtrace_t *trace) {
 
 #ifdef HAVE_NETPACKET_PACKET_H
 static void linuxnative_help(void) {
-	printf("linuxnative format module: $Revision$\n");
+	printf("linuxnative format module: $Revision: 1793 $\n");
 	printf("Supported input URIs:\n");
 	printf("\tint:eth0\n");
 	printf("\n");
@@ -1492,7 +1492,7 @@ static void linuxnative_help(void) {
 }
 
 static void linuxring_help(void) {
-	printf("linuxring format module: $Revision$\n");
+	printf("linuxring format module: $Revision: 1793 $\n");
 	printf("Supported input URIs:\n");
 	printf("\tring:eth0\n");
 	printf("\n");
@@ -1589,11 +1589,11 @@ static struct libtrace_format_t linuxring = {
 };
 #else
 static void linuxnative_help(void) {
-	printf("linuxnative format module: $Revision$\n");
+	printf("linuxnative format module: $Revision: 1793 $\n");
 	printf("Not supported on this host\n");
 }
 static void linuxring_help(void) {
-	printf("linuxring format module: $Revision$\n");
+	printf("linuxring format module: $Revision: 1793 $\n");
 	printf("Not supported on this host\n");
 }
 

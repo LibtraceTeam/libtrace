@@ -505,7 +505,7 @@ static uint64_t dag_get_dropped_packets(libtrace_t *trace)
 
 /* Prints some semi-useful help text about the DAG format module */
 static void dag_help(void) {
-        printf("dag format module: $Revision$\n");
+        printf("dag format module: $Revision: 1715 $\n");
         printf("Supported input URIs:\n");
         printf("\tdag:/dev/dagn\n");
         printf("\n");

@@ -682,7 +682,7 @@ static struct libtrace_eventobj_t pcapfile_event(libtrace_t *libtrace, libtrace_
 }
 
 static void pcapfile_help(void) {
-	printf("pcapfile format module: $Revision$\n");
+	printf("pcapfile format module: $Revision: 1768 $\n");
 	printf("Supported input URIs:\n");
 	printf("\tpcapfile:/path/to/file\n");
 	printf("\tpcapfile:/path/to/file.gz\n");
