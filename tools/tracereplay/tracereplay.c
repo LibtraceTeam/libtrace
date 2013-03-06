@@ -26,93 +26,29 @@ Authors: Andreas Loef and Yuwei Wang
 
 int broadcast = 0;
 
-/* This function assumes that the relevant fields have been zeroed out. 
-   RFC 1071 describes the method and provides a code example*/
-static uint16_t checksum(void * buffer, uint16_t length) {
-	uint32_t sum = 0;
-	uint16_t * buff = (uint16_t *) buffer;
-	uint16_t count = length;
+static void replace_ip_checksum(libtrace_packet_t *packet) {
 
-	while(count > 1 ) {
-		sum += *buff++;
-		count = count -2;
-	}
+	uint16_t *ip_csm_ptr = NULL;
+	uint16_t calc_csum;
 
-	if(count > 0) {
-		sum += *buff;
-	}
+	ip_csm_ptr = trace_checksum_layer3(packet, &calc_csum);
 
-	while (sum>>16)
-		sum = (sum & 0xffff) + (sum >> 16);
+	if (ip_csm_ptr == NULL)
+		return;
+	*ip_csm_ptr = htons(calc_csum);
 
-	return ~sum;
 }
 
-/*
-   This function calculates and fills in the correct checksum on
-   a transport protocol header.
-   Currently only UDP and TCP are supported.
- */
+static void replace_transport_checksum(libtrace_packet_t *packet) {
 
-static void udp_tcp_checksum(libtrace_ip_t *ip, uint32_t length) {
+	uint16_t *csm_ptr = NULL;
+	uint16_t calc_csum;
+	
+	csm_ptr = trace_checksum_transport(packet, &calc_csum);
 
-	uint32_t sum = 0;
-	uint16_t protocol = ip->ip_p;
-	uint16_t temp = 0;
-	uint16_t * check = NULL;
-	uint16_t tsum = 0;
-	void * transportheader = NULL;
-	uint32_t rem;
-
-	sum += (uint16_t) ~checksum(&ip->ip_src.s_addr,sizeof(uint32_t));
-	sum += (uint16_t) ~checksum(&ip->ip_dst.s_addr,sizeof(uint32_t));
-
-
-	/*this will be in host order whereas everything else is in network order*/
-	temp = htons(protocol);
-	sum += (uint16_t) ~checksum(&temp,sizeof(uint16_t));
-
-	/*this will be in host order whereas everything else is in network order*/
-	temp = htons(length);
-	sum += (uint16_t) ~checksum(&temp,sizeof(uint16_t));
-
-	transportheader = trace_get_payload_from_ip(ip,NULL,&rem);
-
-	if (transportheader == NULL)
+	if (csm_ptr == NULL)
 		return;
-
-	/* UDP */
-	if(protocol == 17 ) {
-		libtrace_udp_t * udp_header = transportheader;
-
-		if (rem < sizeof(libtrace_udp_t))
-			return;
-		check = &udp_header -> check;
-		*check = 0;
-		tsum = checksum(transportheader, length);
-	}
-	/* TCP */
-	else if(protocol == 6) {
-		libtrace_tcp_t * tcp_header = transportheader;
-
-		if (rem < sizeof(libtrace_tcp_t))
-			return;
-		tcp_header -> check = 0;
-		check = &tcp_header -> check;
-		*check = 0;
-		tsum = checksum(transportheader,length);
-	}
-
-	sum += (uint16_t) ~tsum;
-
-	while (sum>>16)
-		sum = (sum & 0xffff) + (sum >> 16);
-
-	if(check != NULL) {
-		*check = (uint16_t)~sum;
-	}
-
-
+	*csm_ptr = htons(calc_csum);
 
 }
 
@@ -160,18 +96,8 @@ static libtrace_packet_t * per_packet(libtrace_packet_t *packet) {
 
 	}
 
-
-
-	header = trace_get_ip(new_packet);
-	if(header != NULL) {
-		/* update ip checksum */
-		wire_length -= sizeof(uint32_t)*header->ip_hl;
-		header -> ip_sum = 0;
-		sum = checksum(header,header->ip_hl*sizeof(uint32_t));
-		header -> ip_sum = sum;
-		/* update transport layer checksums */
-		udp_tcp_checksum(header,ntohs(header->ip_len)-sizeof(uint32_t)*header->ip_hl);
-	}
+	replace_ip_checksum(new_packet);
+	replace_transport_checksum(new_packet);
 
 	return new_packet;
 
