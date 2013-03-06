@@ -85,5 +85,12 @@ DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len)
 			break;
 
 	}
+	printf(" ICMP: Checksum: ");
+	if (len < 8)
+		printf("(Truncated)\n");
+	else
+		printf("%u\n", ntohs(icmp->checksum));
+
+
 	return;
 }
