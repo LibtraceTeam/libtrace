@@ -262,7 +262,7 @@ void decode_protocol_file(uint16_t link_type UNUSED,const char *packet,int len,e
 
 
 
-int yyerror(char *s)
+int yyerror(const char *s)
 {
     element_t *tmp;
     

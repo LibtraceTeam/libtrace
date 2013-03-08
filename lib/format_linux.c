@@ -589,6 +589,8 @@ static int linuxring_start_input(libtrace_t *libtrace){
 	if(linuxnative_start_input(libtrace) != 0)
 		return -1;
 
+	strncpy(error, "No known error", 2048);
+
 	/* Make it a packetmmap */
 	if(socket_to_packetmmap(libtrace->uridata, PACKET_RX_RING, 
 			FORMAT(libtrace->format_data)->fd,
