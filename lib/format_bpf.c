@@ -79,8 +79,12 @@ struct libtrace_bpf_hdr {
 	uint16_t bh_hdrlen;		/* header length (incl padding) */
 };
 
+#ifndef BPF_TIMEVAL
+#define BPF_TIMEVAL timeval
+#endif
+
 struct local_bpf_hdr {
-	struct timeval bh_tstamp;
+	struct BPF_TIMEVAL bh_tstamp;
 	uint32_t bh_caplen;
 	uint32_t bh_datalen;
 	uint16_t bh_hdrlen;
@@ -398,16 +402,20 @@ static int bpf_prepare_packet(libtrace_t *libtrace UNUSED,
 	 * Let's try to standardise our header a bit, hopefully without
 	 * overwriting anything else important */
 
-	ptr = ((struct local_bpf_hdr *)(packet->header));
-	replace = ((struct libtrace_bpf_hdr *)(packet->header));
-	orig = *ptr;
-	
-	replace->bh_tstamp.tv_sec = (uint32_t) (orig.bh_tstamp.tv_sec & 0xffffffff);
-	replace->bh_tstamp.tv_usec = (uint32_t) (orig.bh_tstamp.tv_usec & 0xffffffff);
-	replace->bh_caplen = orig.bh_caplen;
-	replace->bh_datalen = orig.bh_datalen;
-	replace->bh_hdrlen = orig.bh_hdrlen;
+	if (sizeof(struct BPF_TIMEVAL) != sizeof(struct bpf_timeval)) { 	
 		
+		ptr = ((struct local_bpf_hdr *)(packet->header));
+		replace = ((struct libtrace_bpf_hdr *)(packet->header));
+		orig = *ptr;
+
+		replace->bh_tstamp.tv_sec = (uint32_t) (orig.bh_tstamp.tv_sec & 0xffffffff);
+		replace->bh_tstamp.tv_usec = (uint32_t) (orig.bh_tstamp.tv_usec & 0xffffffff);
+		replace->bh_caplen = orig.bh_caplen;
+		replace->bh_datalen = orig.bh_datalen;
+		replace->bh_hdrlen = orig.bh_hdrlen;
+
+
+	}
 
 	/* Find the payload */
 	/* TODO: Pcap deals with a padded FDDI linktype here */
