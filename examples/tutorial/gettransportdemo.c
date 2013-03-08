@@ -10,11 +10,6 @@
 #include <getopt.h>
 #include <arpa/inet.h>
 
-uint64_t packet_count = 0;
-uint64_t capture_count = 0;
-uint64_t wire_count = 0;
-uint32_t next_report = 0;
-
 static void per_packet(libtrace_packet_t *packet)
 {
 	uint8_t proto;
@@ -125,12 +120,6 @@ int main(int argc, char *argv[])
 		libtrace_cleanup(trace, packet);
 		return 1;
 	}
-
-	/* Print the stats for the final reporting period that was probably
-	 * not complete when the trace finished */
-	printf("%u\t", next_report);
-	printf("%.2f\t\t", ((double)wire_count) / packet_count);
-	printf("%.2f\n", ((double)capture_count) / packet_count);
 
 	libtrace_cleanup(trace, packet);
 	return 0;
