@@ -61,8 +61,6 @@ static void replace_transport_checksum(libtrace_packet_t *packet) {
 static libtrace_packet_t * per_packet(libtrace_packet_t *packet) {
 	uint32_t remaining = 0;  
 	libtrace_linktype_t linktype = 0;
-	libtrace_ip_t * header = NULL;
-	uint16_t sum = 0;
 	libtrace_packet_t *new_packet;
 	size_t wire_length;
 	void * pkt_buffer;
