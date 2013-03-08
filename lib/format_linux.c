@@ -598,7 +598,7 @@ static int linuxring_start_input(libtrace_t *libtrace){
 			&FORMAT(libtrace->format_data)->rx_ring,
 			&FORMAT(libtrace->format_data)->max_order,
 			error) != 0){
-		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, error);
+		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Initialisation of packet MMAP failed: %s", error);
 		close(DATAOUT(libtrace)->fd);
 		free(libtrace->format_data);
 		libtrace->format_data = NULL;
@@ -633,7 +633,7 @@ static int linuxring_start_output(libtrace_out_t *libtrace)
 			&DATAOUT(libtrace)->tx_ring,
 			&DATAOUT(libtrace)->max_order,
 			error) != 0){
-		trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED, error);
+		trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED, "Initialisation of packet MMAP failed: %s", error);
 		close(DATAOUT(libtrace)->fd);
 		free(libtrace->format_data);
 		libtrace->format_data = NULL;
