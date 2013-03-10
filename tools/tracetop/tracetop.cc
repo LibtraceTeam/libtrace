@@ -61,6 +61,12 @@ int cmp_sockaddr_ll(const struct sockaddr_ll *a, const struct sockaddr_ll *b)
 {
 	return memcmp(a->sll_addr, b->sll_addr, b->sll_halen);
 }
+#else
+int cmp_sockaddr_dl(const struct sockaddr_dl *a, const struct sockaddr_dl *b)
+{
+	return memcmp(a->sdl_data, b->sdl_data, b->sdl_alen);
+}
+
 #endif
 
 int cmp_sockaddr(const struct sockaddr *a, const struct sockaddr *b)
@@ -76,6 +82,9 @@ int cmp_sockaddr(const struct sockaddr *a, const struct sockaddr *b)
 #ifdef HAVE_NETPACKET_PACKET_H
 		case AF_PACKET:
 			return cmp_sockaddr_ll((struct sockaddr_ll *)a,(struct sockaddr_ll*)b);
+#else
+		case AF_LINK:
+			return cmp_sockaddr_dl((struct sockaddr_dl *)a, (struct sockaddr_dl *)b);
 #endif
 		case AF_UNSPEC:
 			return 0; /* Can't compare UNSPEC's! */
