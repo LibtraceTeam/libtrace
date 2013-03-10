@@ -16,6 +16,8 @@
 #ifdef HAVE_NETPACKET_PACKET_H
 #include <netpacket/packet.h>
 #include <net/ethernet.h>
+#else
+#include <net/if_dl.h>
 #endif
 
 #if HAVE_NCURSES_NCURSES_H
@@ -89,9 +91,24 @@ char *trace_sockaddr2string(const struct sockaddr *a, socklen_t salen, char *buf
 	char *mybuf = buffer ? buffer : intbuffer;
 	size_t mybufflen = buffer ? bufflen : sizeof(intbuffer);
 	int err;
+
+	/* Some systems (FreeBSD and Solaris, I'm looking at you) have a bug
+	 * where they can't deal with the idea of a sockaddr_storage being
+	 * passed into getnameinfo. Linux just deals by looking
+	 * at sa_family and figuring out what sockaddr it is really.
+	 *
+	 * Anyway, the fix appears to be to manually hax the sockaddr length
+	 * to be the right value for the underlying family.
+	 */
 	switch (a->sa_family) {
 		case AF_INET:
+			salen = sizeof(struct sockaddr_in);
+			if ((err=getnameinfo(a, salen, mybuf, mybufflen, NULL, 0, NI_NUMERICHOST))!=0) {
+				strncpy(mybuf,gai_strerror(err),mybufflen);
+			}
+			break;
 		case AF_INET6:
+			salen = sizeof(struct sockaddr_in6);
 			if ((err=getnameinfo(a, salen, mybuf, mybufflen, NULL, 0, NI_NUMERICHOST))!=0) {
 				strncpy(mybuf,gai_strerror(err),mybufflen);
 			}
@@ -99,6 +116,10 @@ char *trace_sockaddr2string(const struct sockaddr *a, socklen_t salen, char *buf
 #ifdef HAVE_NETPACKET_PACKET_H
 		case AF_PACKET:
 			trace_ether_ntoa(((struct sockaddr_ll*)a)->sll_addr, mybuf);
+			break;
+#else
+		case AF_LINK:
+			trace_ether_ntoa((uint8_t *)((struct sockaddr_dl *)a)->sdl_data, mybuf);
 			break;
 #endif
 		default:
