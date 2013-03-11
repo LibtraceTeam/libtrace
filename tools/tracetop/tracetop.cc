@@ -546,7 +546,7 @@ int main(int argc, char *argv[])
 		struct option long_options[] = {
 			{ "filter",		1, 0, 'f' },
 			{ "snaplen",		1, 0, 's' },
-			{ "promisc",		1, 0, 'p' },
+			{ "promisc",		0, 0, 'p' },
 			{ "help",		0, 0, 'h' },
 			{ "libtrace-help",	0, 0, 'H' },
 			{ "bits-per-sec",	0, 0, 'B' },
@@ -557,7 +557,7 @@ int main(int argc, char *argv[])
 			{ NULL,			0, 0, 0 }
 		};
 
-		int c= getopt_long(argc, argv, "f:Fs:p:hHi:w12345",
+		int c= getopt_long(argc, argv, "Pf:Fs:p:hHi:w12345",
 				long_options, &option_index);
 
 		if (c==-1)
