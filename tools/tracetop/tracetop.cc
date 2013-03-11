@@ -305,7 +305,7 @@ static void do_report()
 	move(1,0);
 	if (use_sip) {
 		if (wide_display)
-			printw("%46s", "source ip");
+			printw("%42s", "source ip");
 		else
 			printw("%20s", "source ip");
 			
@@ -315,10 +315,10 @@ static void do_report()
 			printw("\t");
 	}
 	if (use_sport)
-		printw("%s\t", "sport");
+		printw("%s  ", "sport");
 	if (use_dip) {
 		if (wide_display)
-			printw("%46s", "dest ip");
+			printw("%42s", "dest ip");
 		else
 			printw("%20s", "dest ip");
 		if (use_dport)
@@ -327,7 +327,7 @@ static void do_report()
 			printw("\t");
 	}
 	if (use_dport)
-		printw("%s\t", "dport");
+		printw("%s  ", "dport");
 	if (use_protocol)
 		printw("%10s\t", "proto");
 	switch(display_as) {
@@ -350,7 +350,7 @@ static void do_report()
 		move(i+1,0);
 		if (use_sip) {
 			if (wide_display) {
-				printw("%46s",
+				printw("%42s",
 					trace_sockaddr2string(
 						(struct sockaddr*)&pq.top().sip,
 						sizeof(struct sockaddr_storage),
@@ -368,10 +368,10 @@ static void do_report()
 				printw("\t");
 		}
 		if (use_sport)
-			printw("%-5d\t", get_port_from_sockaddr((struct sockaddr*)&pq.top().sip));
+			printw("%-5d  ", get_port_from_sockaddr((struct sockaddr*)&pq.top().sip));
 		if (use_dip) {
 			if (wide_display) {
-				printw("%46s",
+				printw("%42s",
 					trace_sockaddr2string(
 						(struct sockaddr*)&pq.top().dip,
 						sizeof(struct sockaddr_storage),
@@ -390,13 +390,13 @@ static void do_report()
 				printw("\t");
 		}
 		if (use_dport)
-			printw("%-5d\t", get_port_from_sockaddr((struct sockaddr*)&pq.top().dip));
+			printw("%-5d  ", get_port_from_sockaddr((struct sockaddr*)&pq.top().dip));
 		if (use_protocol) {
 			struct protoent *proto = getprotobynumber(pq.top().protocol);
 			if (proto) 
-				printw("%-10s\t", proto->p_name);
+				printw("%-10s  ", proto->p_name);
 			else
-				printw("%10d\t",pq.top().protocol);
+				printw("%10d  ",pq.top().protocol);
 		}
 		switch (display_as) {
 			case BYTES:
