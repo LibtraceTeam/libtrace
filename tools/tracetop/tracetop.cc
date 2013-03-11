@@ -329,7 +329,7 @@ static void do_report()
 	if (use_dport)
 		printw("%s\t", "dport");
 	if (use_protocol)
-		printw("proto\t");
+		printw("%10s\t", "proto");
 	switch(display_as) {
 		case BYTES:
 			printw("%7s","Bytes\t");
@@ -394,9 +394,9 @@ static void do_report()
 		if (use_protocol) {
 			struct protoent *proto = getprotobynumber(pq.top().protocol);
 			if (proto) 
-				printw("%-5s\t", proto->p_name);
+				printw("%-10s\t", proto->p_name);
 			else
-				printw("%5d\t",pq.top().protocol);
+				printw("%10d\t",pq.top().protocol);
 		}
 		switch (display_as) {
 			case BYTES:
