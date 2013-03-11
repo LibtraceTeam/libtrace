@@ -547,7 +547,7 @@ int main(int argc, char *argv[])
 		struct option long_options[] = {
 			{ "filter",		1, 0, 'f' },
 			{ "snaplen",		1, 0, 's' },
-			{ "promisc",		0, 0, 'p' },
+			{ "promisc",		1, 0, 'p' },
 			{ "help",		0, 0, 'h' },
 			{ "libtrace-help",	0, 0, 'H' },
 			{ "bits-per-sec",	0, 0, 'B' },
