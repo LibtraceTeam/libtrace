@@ -408,6 +408,7 @@ static void do_report()
 				printw("%14.03f\t%"PRIu64"\n",
 						8.0*pq.top().bytes/interval,
 						pq.top().packets);
+				break;
 			case PERCENT:
 				printw("%6.2f%%\t%6.2f%%\n",
 						100.0*pq.top().bytes/total_bytes,
@@ -557,7 +558,7 @@ int main(int argc, char *argv[])
 			{ NULL,			0, 0, 0 }
 		};
 
-		int c= getopt_long(argc, argv, "Pf:Fs:p:hHi:w12345",
+		int c= getopt_long(argc, argv, "BPf:Fs:p:hHi:w12345",
 				long_options, &option_index);
 
 		if (c==-1)
