@@ -8,6 +8,7 @@ tracetop \- show top flows
 [ \fB-p \fRpromisc | \fB--promisc=\fRpromisc]
 [ \fB--bits-per-sec ]
 [ \fB--percent ]
+[ \fB--wide | -w ]
 [ \fB-i \fRinterval | \fB--interval=\fRinterval]
 [ \fB-h \fR| \fB--help\fR]
 [ \fB-H \fR| \fB--libtrace-help\fR]
@@ -21,6 +22,11 @@ Count only packets that match tcpdump style bpf filter
 .TP
 \fB\-i\fR interval
 Wait interval seconds between updates.  (default 2).
+
+.TP
+\fB\-\-wide
+Expand the display to be able to fit IPv6 addresses. Use this to ensure the
+formatting lines up in the presence of IPv6 traffic.
 
 .TP
 \fB\-\-percent\fR 

@@ -13,6 +13,7 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <string.h>
+#include <assert.h>
 #ifdef HAVE_NETPACKET_PACKET_H
 #include <netpacket/packet.h>
 #include <net/ethernet.h>
@@ -38,6 +39,7 @@ bool use_dport = true;
 bool use_protocol = true;
 bool quit = false;
 bool fullspeed = false;
+bool wide_display = false;
 
 uint64_t total_bytes=0;
 uint64_t total_packets=0;
@@ -302,7 +304,11 @@ static void do_report()
 	attrset(A_REVERSE);
 	move(1,0);
 	if (use_sip) {
-		printw("%20s", "source ip");
+		if (wide_display)
+			printw("%46s", "source ip");
+		else
+			printw("%20s", "source ip");
+			
 		if (use_sport)
 			printw("/");
 		else
@@ -311,7 +317,10 @@ static void do_report()
 	if (use_sport)
 		printw("%s\t", "sport");
 	if (use_dip) {
-		printw("%20s", "dest ip");
+		if (wide_display)
+			printw("%46s", "dest ip");
+		else
+			printw("%20s", "dest ip");
 		if (use_dport)
 			printw("/");
 		else
@@ -340,10 +349,19 @@ static void do_report()
 	for(int i=1; i<row-3 && !pq.empty(); ++i) {
 		move(i+1,0);
 		if (use_sip) {
-			printw("%20s",
-				trace_sockaddr2string((struct sockaddr*)&pq.top().sip,
-					sizeof(struct sockaddr_storage),
-					sipstr,sizeof(sipstr)));
+			if (wide_display) {
+				printw("%46s",
+					trace_sockaddr2string(
+						(struct sockaddr*)&pq.top().sip,
+						sizeof(struct sockaddr_storage),
+						sipstr,sizeof(sipstr)));
+			} else {
+				printw("%20s",
+					trace_sockaddr2string(
+						(struct sockaddr*)&pq.top().sip,
+						sizeof(struct sockaddr_storage),
+						sipstr,sizeof(sipstr)));
+			}
 			if (use_sport)
 				printw("/");
 			else
@@ -352,10 +370,20 @@ static void do_report()
 		if (use_sport)
 			printw("%-5d\t", get_port_from_sockaddr((struct sockaddr*)&pq.top().sip));
 		if (use_dip) {
-			printw("%20s",
-				trace_sockaddr2string((struct sockaddr*)&pq.top().dip,
-					sizeof(struct sockaddr_storage),
-					dipstr,sizeof(dipstr)));
+			if (wide_display) {
+				printw("%46s",
+					trace_sockaddr2string(
+						(struct sockaddr*)&pq.top().dip,
+						sizeof(struct sockaddr_storage),
+						dipstr,sizeof(dipstr)));
+			} else {
+				printw("%20s",
+					trace_sockaddr2string(
+						(struct sockaddr*)&pq.top().dip,
+						sizeof(struct sockaddr_storage),
+						dipstr,sizeof(dipstr)));
+
+			}
 			if (use_dport)
 				printw("/");
 			else
@@ -499,6 +527,9 @@ static void usage(char *argv0)
 	fprintf(stderr," --interval int\n");
 	fprintf(stderr," -i int\n");
 	fprintf(stderr,"\t\tUpdate the display every int seconds\n");
+	fprintf(stderr," --wide\n");
+	fprintf(stderr," -w\n");
+	fprintf(stderr,"\t\tExpand IP address fields to fit IPv6 addresses\n");
 }
 
 int main(int argc, char *argv[])
@@ -522,10 +553,11 @@ int main(int argc, char *argv[])
 			{ "percent",		0, 0, 'P' },
 			{ "interval",		1, 0, 'i' },
 			{ "fast",		0, 0, 'F' },
+			{ "wide", 		0, 0, 'w' },
 			{ NULL,			0, 0, 0 }
 		};
 
-		int c= getopt_long(argc, argv, "f:Fs:p:hHi:12345",
+		int c= getopt_long(argc, argv, "f:Fs:p:hHi:w12345",
 				long_options, &option_index);
 
 		if (c==-1)
@@ -559,6 +591,9 @@ int main(int argc, char *argv[])
 					fprintf(stderr,"Interval must be >0\n");
 					return 1;
 				}
+				break;
+			case 'w':
+				wide_display = true;
 				break;
 			case '1': use_sip 	= !use_sip; break;
 			case '2': use_sport 	= !use_sport; break;
