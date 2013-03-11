@@ -507,6 +507,7 @@ DLLEXPORT struct sockaddr *trace_get_source_address(
 				addr6->sin6_port=0;
 			addr6->sin6_flowinfo=0;
 			addr6->sin6_addr=ip6->ip_src;
+			addr6->sin6_scope_id = 0;
 			return addr;
 		}
 		default:
