@@ -124,45 +124,46 @@ BIN_PROTOCOLS+=ospf2_1004.la
 BIN_PROTOCOLS+=ospf2_1005.la
 
 # I shouldn't need to do this
-link_0_la_LDFLAGS=-module
-link_1_la_LDFLAGS=-module
-link_2_la_LDFLAGS=-module
-link_4_la_LDFLAGS=-module
-link_6_la_LDFLAGS=-module 
-link_9_la_LDFLAGS=-module
-link_10_la_LDFLAGS=-module
-link_11_la_LDFLAGS=-module
-link_15_la_LDFLAGS=-module 
-eth_0_la_LDFLAGS=-module
-eth_2048_la_LDFLAGS=-module
-eth_2054_la_LDFLAGS=-module
-eth_33024_la_LDFLAGS=-module
-eth_34887_la_LDFLAGS=-module
-eth_34916_la_LDFLAGS=-module
-eth_34958_la_LDFLAGS=-module
-eth_34525_la_LDFLAGS=-module
+modflags=-module -avoid-version -shared
+link_0_la_LDFLAGS=$(modflags)
+link_1_la_LDFLAGS=$(modflags)
+link_2_la_LDFLAGS=$(modflags)
+link_4_la_LDFLAGS=$(modflags)
+link_6_la_LDFLAGS=$(modflags) 
+link_9_la_LDFLAGS=$(modflags)
+link_10_la_LDFLAGS=$(modflags)
+link_11_la_LDFLAGS=$(modflags)
+link_15_la_LDFLAGS=$(modflags) 
+eth_0_la_LDFLAGS=$(modflags)
+eth_2048_la_LDFLAGS=$(modflags)
+eth_2054_la_LDFLAGS=$(modflags)
+eth_33024_la_LDFLAGS=$(modflags)
+eth_34887_la_LDFLAGS=$(modflags)
+eth_34916_la_LDFLAGS=$(modflags)
+eth_34958_la_LDFLAGS=$(modflags)
+eth_34525_la_LDFLAGS=$(modflags)
 
-ip_0_la_LDFLAGS=-module
-ip_1_la_LDFLAGS=-module
-ip_6_la_LDFLAGS=-module
-ip_17_la_LDFLAGS=-module
-ip_33_la_LDFLAGS=-module
-ip_43_la_LDFLAGS=-module
-ip_44_la_LDFLAGS=-module
-ip_47_la_LDFLAGS=-module
-ip_60_la_LDFLAGS=-module
-ip_89_la_LDFLAGS=-module
-ip_132_la_LDFLAGS=-module
+ip_0_la_LDFLAGS=$(modflags)
+ip_1_la_LDFLAGS=$(modflags)
+ip_6_la_LDFLAGS=$(modflags)
+ip_17_la_LDFLAGS=$(modflags)
+ip_33_la_LDFLAGS=$(modflags)
+ip_43_la_LDFLAGS=$(modflags)
+ip_44_la_LDFLAGS=$(modflags)
+ip_47_la_LDFLAGS=$(modflags)
+ip_60_la_LDFLAGS=$(modflags)
+ip_89_la_LDFLAGS=$(modflags)
+ip_132_la_LDFLAGS=$(modflags)
 
-ospf2_1_la_LDFLAGS=-module
-ospf2_4_la_LDFLAGS=-module
-ospf2_5_la_LDFLAGS=-module
-ospf2_1000_la_LDFLAGS=-module
-ospf2_1001_la_LDFLAGS=-module
-ospf2_1002_la_LDFLAGS=-module
-ospf2_1003_la_LDFLAGS=-module
-ospf2_1004_la_LDFLAGS=-module
-ospf2_1005_la_LDFLAGS=-module
+ospf2_1_la_LDFLAGS=$(modflags)
+ospf2_4_la_LDFLAGS=$(modflags)
+ospf2_5_la_LDFLAGS=$(modflags)
+ospf2_1000_la_LDFLAGS=$(modflags)
+ospf2_1001_la_LDFLAGS=$(modflags)
+ospf2_1002_la_LDFLAGS=$(modflags)
+ospf2_1003_la_LDFLAGS=$(modflags)
+ospf2_1004_la_LDFLAGS=$(modflags)
+ospf2_1005_la_LDFLAGS=$(modflags)
 
 libpacketdump_la_SOURCES = libpacketdump.cc \
 			lexer.l parser.y bitbuffer.c bitbuffer.h grammar.h
@@ -190,3 +191,6 @@ install-exec-hook:
 	$(AM_V_GEN)cd $(DESTDIR)$(plugindir) && $(LN_S) -f eth_2048.so ppp_33.so
 	$(AM_V_GEN)cd $(DESTDIR)$(plugindir) && $(LN_S) -f eth_2048.so link_5.so
 	$(AM_V_GEN)cd $(DESTDIR)$(plugindir) && $(LN_S) -f eth_34525.so ip_41.so
+
+install-data-hook:
+	rm -vf $(DESTDIR)$(plugindir)/*.la
