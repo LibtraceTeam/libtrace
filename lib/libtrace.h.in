@@ -254,6 +254,7 @@ typedef enum {
 	TRACE_DLT_LINKTYPE_RAW = 101, /**< See TRACE_DLT_RAW for explainations of pain. */
 	TRACE_DLT_C_HDLC = 104,
 	TRACE_DLT_IEEE802_11 = 105,
+	TRACE_DLT_OPENBSD_LOOP = 108,
 	TRACE_DLT_LINUX_SLL = 113,
 	TRACE_DLT_PFLOG = 117,
 	TRACE_DLT_IEEE802_11_RADIO = 127 /**< Radiotap */
@@ -280,7 +281,8 @@ typedef enum {
        TRACE_TYPE_LLCSNAP = 16,      /**< Raw LLC/SNAP */
        TRACE_TYPE_PPP = 17,	     /**< PPP frames */
        TRACE_TYPE_METADATA = 18,     	/**< WDCAP-style meta-data */
-       TRACE_TYPE_NONDATA = 19		/**< Not a data packet */
+       TRACE_TYPE_NONDATA = 19,		/**< Not a data packet */
+       TRACE_TYPE_OPENBSD_LOOP = 20	/**< OpenBSD loopback */
 } libtrace_linktype_t;
 
 /** RT protocol base format identifiers.

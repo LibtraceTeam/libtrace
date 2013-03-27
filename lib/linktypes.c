@@ -64,6 +64,7 @@ libtrace_linktype_t pcap_linktype_to_libtrace(libtrace_dlt_t linktype)
 		case TRACE_DLT_PPP: return TRACE_TYPE_PPP;
 		case TRACE_DLT_PPP_SERIAL: return TRACE_TYPE_POS;
 		case TRACE_DLT_C_HDLC: return TRACE_TYPE_HDLC_POS;
+		case TRACE_DLT_OPENBSD_LOOP: return TRACE_TYPE_OPENBSD_LOOP;
 		/* Unhandled */
 		case TRACE_DLT_NULL: 	/* Raw IP frame with a BSD specific
 					 * header If you want raw L3 headers
@@ -92,6 +93,7 @@ libtrace_dlt_t libtrace_to_pcap_dlt(libtrace_linktype_t type)
 		case TRACE_TYPE_HDLC_POS: return TRACE_DLT_C_HDLC;
 		/* Theres more than one type of PPP.  Who knew? */
 		case TRACE_TYPE_POS:	return TRACE_DLT_PPP_SERIAL; 
+		case TRACE_TYPE_OPENBSD_LOOP: return TRACE_DLT_OPENBSD_LOOP;
 
 		/* Below here are unsupported conversions */
 		/* Despite hints to the contrary, there is no DLT
@@ -199,6 +201,7 @@ uint8_t libtrace_to_erf_type(libtrace_linktype_t linktype)
 		case TRACE_TYPE_POS:
 		case TRACE_TYPE_METADATA:
 		case TRACE_TYPE_NONDATA:
+		case TRACE_TYPE_OPENBSD_LOOP:
 			break;
 	}
 	return 255;

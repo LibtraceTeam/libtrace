@@ -380,6 +380,7 @@ DLLEXPORT void *trace_get_layer2(const libtrace_packet_t *packet,
 		case TRACE_TYPE_PPP:
 		case TRACE_TYPE_METADATA:
 		case TRACE_TYPE_NONDATA:
+		case TRACE_TYPE_OPENBSD_LOOP:
 			((libtrace_packet_t*)packet)->l2_header = meta;
 			((libtrace_packet_t*)packet)->l2_remaining = *remaining;
 			return meta;
@@ -412,6 +413,7 @@ DLLEXPORT void *trace_get_layer2(const libtrace_packet_t *packet,
 				case TRACE_TYPE_PPP:
 				case TRACE_TYPE_METADATA:
 				case TRACE_TYPE_NONDATA:
+				case TRACE_TYPE_OPENBSD_LOOP:
 					((libtrace_packet_t*)packet)->l2_header = meta;
 					((libtrace_packet_t*)packet)->l2_remaining = *remaining;
 					return meta;
@@ -516,6 +518,16 @@ DLLEXPORT void *trace_get_payload_from_layer2(void *link,
 		/* TODO: Unsupported */
 		case TRACE_TYPE_AAL5:
 			return NULL;
+
+		case TRACE_TYPE_OPENBSD_LOOP:
+			link = link + 4; /* Loopback header is 4 bytes */
+			if ((*(char*)link&0xF0) == 0x40)
+				*ethertype=TRACE_ETHERTYPE_IP;	 /* IPv4 */
+			else if ((*(char*)link&0xF0) == 0x60)
+				*ethertype=TRACE_ETHERTYPE_IPV6; /* IPv6 */
+			return link; /* I love the simplicity */
+		
+
 	}
 	return NULL;
 
@@ -573,6 +585,7 @@ DLLEXPORT uint8_t *trace_get_source_mac(libtrace_packet_t *packet) {
                 case TRACE_TYPE_LLCSNAP:
                 case TRACE_TYPE_PPP:
 		case TRACE_TYPE_NONDATA:
+		case TRACE_TYPE_OPENBSD_LOOP:
                         return NULL;
 
                 /* Metadata headers should already be skipped */
@@ -620,6 +633,7 @@ DLLEXPORT uint8_t *trace_get_destination_mac(libtrace_packet_t *packet)
 		case TRACE_TYPE_LLCSNAP:
 		case TRACE_TYPE_PPP:	
 		case TRACE_TYPE_NONDATA:
+		case TRACE_TYPE_OPENBSD_LOOP:
                         /* No MAC address */
                         return NULL;
                 /* Metadata headers should already be skipped */
