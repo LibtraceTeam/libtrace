@@ -1,0 +1,33 @@
+The primary authors of libtrace were:
+ * Perry Lorier
+ * Shane Alcock
+ * Daniel Lawson
+
+Libtrace is currently maintained by Shane Alcock <salcock@waikato.ac.nz>.
+
+However, we would also like to acknowledge a number of people who have 
+generously contributed bug-fixes, extensions and other improvements over the
+years. It is contributions like these that help keep libtrace relevant and
+useful to a broad community, so thanks very much.
+
+In no particular order, we would like to recognise:
+
+ * Matt Brown for getting us into Debian and keeping us up to date.
+ * Alistair King for reporting and suggesting fixes for numerous bugs, 
+   particularly in libwandio
+ * Simon Wadsworth for writing the original version of most of the OSPF code
+ * Nevil Brownlee for reporting a huge number of bugs
+ * Andreas Löf and Yuwei Wang for writing tracereplay
+ * Richard Sanger for writing the ring: format
+ * Scott Raynel for writing most of the wireless metadata code
+ * Josef Vodanovich for writing parts of tracereport
+ * Guillaume Vu-Brugier for reporting and fixing some build errors
+ * John Dickinson for patching in support for ICMPv6
+ * Kaio Rafael and Diógenes Freitas for patching in support for OpenBSD loopback
+ * Robert Edmonds for tidying up the libpacketdump plugin install
+ * Jamie Curtis for fixing a couple of bugs many many years ago
+ * Brendon Jones for creating the original Windows DLLs and writing bits of
+   code here and there
+
+Apologies to anyone that we've missed out or forgotten. If you're really 
+offended, fire us an email and we'll add you to the list.
