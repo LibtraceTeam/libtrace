@@ -304,11 +304,7 @@ static void do_report()
 	attrset(A_REVERSE);
 	move(1,0);
 	if (use_sip) {
-		if (wide_display)
-			printw("%42s", "source ip");
-		else
-			printw("%20s", "source ip");
-			
+		printw("%*s", wide_display ? 42 : 20, "source ip");
 		if (use_sport)
 			printw("/");
 		else
@@ -317,10 +313,7 @@ static void do_report()
 	if (use_sport)
 		printw("%s  ", "sport");
 	if (use_dip) {
-		if (wide_display)
-			printw("%42s", "dest ip");
-		else
-			printw("%20s", "dest ip");
+		printw("%*s", wide_display ? 42 : 20, "dest ip");
 		if (use_dport)
 			printw("/");
 		else
@@ -349,19 +342,11 @@ static void do_report()
 	for(int i=1; i<row-3 && !pq.empty(); ++i) {
 		move(i+1,0);
 		if (use_sip) {
-			if (wide_display) {
-				printw("%42s",
+			printw("%*s", wide_display ? 42 : 20, 
 					trace_sockaddr2string(
 						(struct sockaddr*)&pq.top().sip,
 						sizeof(struct sockaddr_storage),
 						sipstr,sizeof(sipstr)));
-			} else {
-				printw("%20s",
-					trace_sockaddr2string(
-						(struct sockaddr*)&pq.top().sip,
-						sizeof(struct sockaddr_storage),
-						sipstr,sizeof(sipstr)));
-			}
 			if (use_sport)
 				printw("/");
 			else
@@ -370,20 +355,11 @@ static void do_report()
 		if (use_sport)
 			printw("%-5d  ", get_port_from_sockaddr((struct sockaddr*)&pq.top().sip));
 		if (use_dip) {
-			if (wide_display) {
-				printw("%42s",
+			printw("%*s", wide_display ? 42 : 20, 
 					trace_sockaddr2string(
 						(struct sockaddr*)&pq.top().dip,
 						sizeof(struct sockaddr_storage),
 						dipstr,sizeof(dipstr)));
-			} else {
-				printw("%20s",
-					trace_sockaddr2string(
-						(struct sockaddr*)&pq.top().dip,
-						sizeof(struct sockaddr_storage),
-						dipstr,sizeof(dipstr)));
-
-			}
 			if (use_dport)
 				printw("/");
 			else
