@@ -67,13 +67,13 @@
  * converted to PCAP or ERF.
  */ 
 
-struct bpf_timeval {
+struct lt_bpf_timeval {
 	uint32_t tv_sec;
 	uint32_t tv_usec;
 };
 
 struct libtrace_bpf_hdr {
-	struct bpf_timeval bh_tstamp;	/* timestamp */
+	struct lt_bpf_timeval bh_tstamp;	/* timestamp */
 	uint32_t bh_caplen;		/* capture length */
 	uint32_t bh_datalen;		/* wire length */
 	uint16_t bh_hdrlen;		/* header length (incl padding) */
@@ -402,7 +402,7 @@ static int bpf_prepare_packet(libtrace_t *libtrace UNUSED,
 	 * Let's try to standardise our header a bit, hopefully without
 	 * overwriting anything else important */
 
-	if (sizeof(struct BPF_TIMEVAL) != sizeof(struct bpf_timeval)) { 	
+	if (sizeof(struct BPF_TIMEVAL) != sizeof(struct lt_bpf_timeval)) { 	
 		
 		ptr = ((struct local_bpf_hdr *)(packet->header));
 		replace = ((struct libtrace_bpf_hdr *)(packet->header));
