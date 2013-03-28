@@ -246,15 +246,16 @@ typedef enum {
           * When talking about DLT's inside libtrace tho, we should be using /these/ DLT's.
           */
 #ifdef __OpenBSD__
+	TRACE_DLT_OPENBSD_LOOP=12,
 	TRACE_DLT_RAW = 14,	
 #else
 	TRACE_DLT_RAW = 12,
+	TRACE_DLT_OPENBSD_LOOP = 108,
 #endif
 	TRACE_DLT_PPP_SERIAL = 50,
 	TRACE_DLT_LINKTYPE_RAW = 101, /**< See TRACE_DLT_RAW for explainations of pain. */
 	TRACE_DLT_C_HDLC = 104,
 	TRACE_DLT_IEEE802_11 = 105,
-	TRACE_DLT_OPENBSD_LOOP = 108,
 	TRACE_DLT_LINUX_SLL = 113,
 	TRACE_DLT_PFLOG = 117,
 	TRACE_DLT_IEEE802_11_RADIO = 127 /**< Radiotap */
