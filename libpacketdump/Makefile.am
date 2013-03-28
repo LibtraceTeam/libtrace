@@ -193,4 +193,4 @@ install-exec-hook:
 	$(AM_V_GEN)cd $(DESTDIR)$(plugindir) && $(LN_S) -f eth_34525.so ip_41.so
 
 install-data-hook:
-	rm -vf $(DESTDIR)$(plugindir)/*.la
+	rm -f $(DESTDIR)$(plugindir)/*.la
