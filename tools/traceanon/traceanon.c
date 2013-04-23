@@ -91,15 +91,20 @@ static void encrypt_ips(struct libtrace_ip *ip,bool enc_source,bool enc_dest)
 		/* These are error codes that return the IP packet
 		 * internally 
 		 */
+		
 		if (icmp->type == 3 
 				|| icmp->type == 5 
 				|| icmp->type == 11) {
+			char *ptr = (char *)icmp;
 			encrypt_ips(
-				(struct libtrace_ip*)icmp+
-					sizeof(struct libtrace_icmp),
+				(struct libtrace_ip*)(ptr+
+					sizeof(struct libtrace_icmp)),
 				enc_dest,
 				enc_source);
 		}
+
+		if (enc_source || enc_dest)
+			icmp->checksum = 0;
 	}
 }
 
@@ -313,7 +318,7 @@ int main(int argc, char *argv[])
 		if (tcp && (enc_source || enc_dest)) {
 			tcp->check = 0;
 		}
-
+	
 		/* TODO: Encrypt IP's in ARP packets */
 
 		if (trace_write_packet(writer,packet)==-1) {
