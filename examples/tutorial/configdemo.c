@@ -55,6 +55,7 @@ int main(int argc, char *argv[])
 	libtrace_filter_t *filter = NULL;
 
 	int level = 6;
+	trace_option_compresstype_t method = TRACE_OPTION_COMPRESSTYPE_ZLIB;
 
 	/* Check that we have all the required command line arguments */
 	if (argc < 4) {
@@ -119,6 +120,21 @@ int main(int argc, char *argv[])
                 libtrace_cleanup(trace, output, packet, filter);
                 return 1;
         }
+
+	/* We want to write compressed output, so tell libtrace which 
+	 * compression format to use for our output trace. 
+	 * 
+	 * Not configuring this will result in uncompressed output, 
+	 * regardless of whether a compression level is set or not. This
+	 * is different behaviour to earlier versions of libtrace where
+	 * the default was to produce a compressed file.
+	 */
+	if (trace_config_output(output, TRACE_OPTION_OUTPUT_COMPRESSTYPE, 
+			&method) == -1) {
+		trace_perror_output(output, "Configuring compression method");
+		libtrace_cleanup(trace, output, packet, filter);
+		return 1;
+	}
 
         /* We're also going to set a compression level option for the output
 	 * trace to ensure that our traces are compressed sensibly.
