@@ -141,7 +141,8 @@ DLLEXPORT io_t *wandio_create(const char *filename)
 		return NULL;
 	len = wandio_peek(io, buffer, sizeof(buffer));
 	/* Auto detect gzip compressed data */
-	if (len>=2 && buffer[0] == '\037' && buffer[1] == '\213') { 
+	if (len>=3 && buffer[0] == '\037' && buffer[1] == '\213' &&
+			buffer[2] == 0x08) { 
 #if HAVE_LIBZ
 		DEBUG_PIPELINE("zlib");
 		io = zlib_open(io);
