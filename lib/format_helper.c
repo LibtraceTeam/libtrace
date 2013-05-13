@@ -246,7 +246,9 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 /* Open a file for reading using the new Libtrace IO system */
 io_t *trace_open_file(libtrace_t *trace)
 {
+	int ad = (trace->format->type != TRACE_FORMAT_ERF);
 	io_t *io=wandio_create(trace->uridata);
+
 	if (!io) {
 		if (errno != 0) {
 			trace_set_err(trace,errno,"Unable to open %s",trace->uridata);

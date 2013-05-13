@@ -232,11 +232,26 @@ iow_t *stdio_wopen(const char *filename, int fileflags);
  * @param filename	The name of the file to open
  * @return A pointer to a new libtrace IO reader, or NULL if an error occurs
  *
- * This function will attempt to detect the compression format used for the
- * given file (if any), provided that libtrace was built with the appropriate
- * libraries.
+ * The compression format will be determined automatically by peeking at the 
+ * first few bytes of the file and comparing them against known compression 
+ * file header formats. If no formats match, the file will be assumed to be
+ * uncompressed.
  */
 io_t *wandio_create(const char *filename);
+
+/** Creates a new libtrace IO reader and opens the provided file for reading.
+ *
+ * @param filename	The name of the file to open
+ * @return A pointer to a new libtrace IO reader, or NULL if an error occurs
+ *
+ * Unlike wandio_create, this function will always assume the file is 
+ * uncompressed and therefore not run the compression autodetection algorithm.
+ *
+ * Use this function if you are only working with uncompressed files and are
+ * running into problems with the start of your files resembling compression
+ * format headers. Otherwise, you should really be using wandio_create.
+ */
+io_t *wandio_create_uncompressed(const char *filename);
 
 /** Returns the current offset of the read pointer for a libtrace IO reader. 
  *

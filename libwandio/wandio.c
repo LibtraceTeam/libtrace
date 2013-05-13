@@ -124,7 +124,7 @@ static void parse_env(void)
 #define DEBUG_PIPELINE(x) 
 #endif
 
-DLLEXPORT io_t *wandio_create(const char *filename)
+static io_t *create_io_reader(const char *filename, int autodetect)
 {
 	parse_env();
 
@@ -140,39 +140,43 @@ DLLEXPORT io_t *wandio_create(const char *filename)
 	if (!io)
 		return NULL;
 	len = wandio_peek(io, buffer, sizeof(buffer));
-	/* Auto detect gzip compressed data */
-	if (len>=3 && buffer[0] == '\037' && buffer[1] == '\213' &&
-			buffer[2] == 0x08) { 
-#if HAVE_LIBZ
-		DEBUG_PIPELINE("zlib");
-		io = zlib_open(io);
-#else
-		fprintf(stderr, "File %s is gzip compressed but libtrace has not been built with zlib support!\n", filename);
-		return NULL;
-#endif
-	}
-	/* Auto detect compress(1) compressed data (gzip can read this) */
-	if (len>=2 && buffer[0] == '\037' && buffer[1] == '\235') {
-#if HAVE_LIBZ
-		DEBUG_PIPELINE("zlib");
-		io = zlib_open(io);
-#else
-		fprintf(stderr, "File %s is compress(1) compressed but libtrace has not been built with zlib support!\n", filename);
-		return NULL;
-#endif
-	}
+	/* Auto detect gzip compressed data -- if autodetect is false,
+	 * instead we just assume uncompressed.
+	 */
 
-	/* Auto detect bzip compressed data */
-	if (len>=3 && buffer[0] == 'B' && buffer[1] == 'Z' && buffer[2] == 'h') { 
-#if HAVE_LIBBZ2
-		DEBUG_PIPELINE("bzip");
-		io = bz_open(io);
+	if (autodetect) {
+		if (len>=3 && buffer[0] == '\037' && buffer[1] == '\213' &&
+				buffer[2] == 0x08) { 
+#if HAVE_LIBZ
+			DEBUG_PIPELINE("zlib");
+			io = zlib_open(io);
 #else
-		fprintf(stderr, "File %s is bzip compressed but libtrace has not been built with bzip2 support!\n", filename);
-		return NULL;
+			fprintf(stderr, "File %s is gzip compressed but libtrace has not been built with zlib support!\n", filename);
+			return NULL;
 #endif
-	}
-	
+		}
+		/* Auto detect compress(1) compressed data (gzip can read this) */
+		if (len>=2 && buffer[0] == '\037' && buffer[1] == '\235') {
+#if HAVE_LIBZ
+			DEBUG_PIPELINE("zlib");
+			io = zlib_open(io);
+#else
+			fprintf(stderr, "File %s is compress(1) compressed but libtrace has not been built with zlib support!\n", filename);
+			return NULL;
+#endif
+		}
+
+		/* Auto detect bzip compressed data */
+		if (len>=3 && buffer[0] == 'B' && buffer[1] == 'Z' && buffer[2] == 'h') { 
+#if HAVE_LIBBZ2
+			DEBUG_PIPELINE("bzip");
+			io = bz_open(io);
+#else
+			fprintf(stderr, "File %s is bzip compressed but libtrace has not been built with bzip2 support!\n", filename);
+			return NULL;
+#endif
+		}
+	}	
 	/* Now open a threaded, peekable reader using the appropriate module
 	 * to read the data */
 
@@ -184,6 +188,15 @@ DLLEXPORT io_t *wandio_create(const char *filename)
 	DEBUG_PIPELINE("peek");
 	return peek_open(io);
 }
+
+DLLEXPORT io_t *wandio_create(const char *filename) {
+	return create_io_reader(filename, 1);
+}
+
+DLLEXPORT io_t *wandio_create_uncompressed(const char *filename) {
+	return create_io_reader(filename, 0);
+}
+
 
 DLLEXPORT off_t wandio_tell(io_t *io)
 {
