@@ -236,8 +236,6 @@ static int erf_start_input(libtrace_t *libtrace)
                 return -1;
 
         DATA(libtrace)->drops = 0;
-	printf("Calling erf_start_input\n");
-
         return 0; /* success */
 }
 

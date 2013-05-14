@@ -54,6 +54,7 @@ struct compression_type compression_type[]  = {
 int keep_stats = 0;
 int force_directio_write = 0;
 int force_directio_read = 0;
+int use_autodetect = 1;
 unsigned int use_threads = -1;
 unsigned int max_buffers = 50;
 
@@ -64,6 +65,8 @@ uint64_t write_waits = 0;
  * stats -- Show summary stats
  * directwrite -- bypass the diskcache on write
  * directread -- bypass the diskcache on read
+ * noautodetect -- disable autodetection of file compression, assume all files
+ *		   are uncompressed
  * nothreads -- Don't use threads
  * threads=n -- Use a maximum of 'n' threads for thread farms
  */
@@ -81,6 +84,8 @@ static void do_option(const char *option)
 	*/
 	else if (strcmp(option,"nothreads") == 0)
 		use_threads = 0;
+	else if (strcmp(option,"noautodetect") == 0)
+		use_autodetect = 0;
 	else if (strncmp(option,"threads=",8) == 0)
 		use_threads = atoi(option+8);
 	else if (strncmp(option,"buffers=",8) == 0)
@@ -126,7 +131,6 @@ static void parse_env(void)
 
 static io_t *create_io_reader(const char *filename, int autodetect)
 {
-	parse_env();
 
 	/* Use a peeking reader to look at the start of the trace file and
 	 * determine what type of compression may have been used to write
@@ -190,10 +194,12 @@ static io_t *create_io_reader(const char *filename, int autodetect)
 }
 
 DLLEXPORT io_t *wandio_create(const char *filename) {
-	return create_io_reader(filename, 1);
+	parse_env();
+	return create_io_reader(filename, use_autodetect);
 }
 
 DLLEXPORT io_t *wandio_create_uncompressed(const char *filename) {
+	parse_env();
 	return create_io_reader(filename, 0);
 }
 
