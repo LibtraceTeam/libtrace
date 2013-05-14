@@ -225,15 +225,37 @@ static int erf_config_input(libtrace_t *libtrace, trace_option_t option,
 	}
 }
 
-static int erf_start_input(libtrace_t *libtrace)
+static int erf_start_input(libtrace_t *libtrace) 
+{
+        if (libtrace->io)
+                return 0; /* Success -- already done. */
+
+        libtrace->io = trace_open_file(libtrace);
+
+        if (!libtrace->io)
+                return -1;
+
+        DATA(libtrace)->drops = 0;
+	printf("Calling erf_start_input\n");
+
+        return 0; /* success */
+}
+
+/* Raw ERF is a special case -- we want to force libwandio to treat the file
+ * as uncompressed so we can't just use trace_open_file() */
+static int rawerf_start_input(libtrace_t *libtrace)
 {
 	if (libtrace->io)
-		return 0; /* Success -- already done. */
+		wandio_destroy(libtrace->io); 
 
-	libtrace->io = trace_open_file(libtrace);
+	libtrace->io = wandio_create_uncompressed(libtrace->uridata);
 
-	if (!libtrace->io)
+	if (!libtrace->io) {
+		if (errno != 0) {
+			trace_set_err(libtrace, errno, "Unable to open raw ERF file %s", libtrace->uridata);
+		}
 		return -1;
+	}
 
 	DATA(libtrace)->drops = 0;
 
@@ -810,7 +832,52 @@ static struct libtrace_format_t erfformat = {
 	NULL				/* next pointer */
 };
 
+static struct libtrace_format_t rawerfformat = {
+	"rawerf",
+	"$Id$",
+	TRACE_FORMAT_RAWERF,
+	NULL,				/* probe filename */
+	NULL,		/* probe magic */
+	erf_init_input,			/* init_input */	
+	erf_config_input,		/* config_input */
+	rawerf_start_input,		/* start_input */
+	NULL,				/* pause_input */
+	erf_init_output,		/* init_output */
+	erf_config_output,		/* config_output */
+	erf_start_output,		/* start_output */
+	erf_fin_input,			/* fin_input */
+	erf_fin_output,			/* fin_output */
+	erf_read_packet,		/* read_packet */
+	erf_prepare_packet,		/* prepare_packet */
+	NULL,				/* fin_packet */
+	erf_write_packet,		/* write_packet */
+	erf_get_link_type,		/* get_link_type */
+	erf_get_direction,		/* get_direction */
+	erf_set_direction,		/* set_direction */
+	erf_get_erf_timestamp,		/* get_erf_timestamp */
+	NULL,				/* get_timeval */
+	NULL,				/* get_timespec */
+	NULL,				/* get_seconds */
+	erf_seek_erf,			/* seek_erf */
+	NULL,				/* seek_timeval */
+	NULL,				/* seek_seconds */
+	erf_get_capture_length,		/* get_capture_length */
+	erf_get_wire_length,		/* get_wire_length */
+	erf_get_framing_length,		/* get_framing_length */
+	erf_set_capture_length,		/* set_capture_length */
+	NULL,				/* get_received_packets */
+	NULL,				/* get_filtered_packets */
+	erf_get_dropped_packets,	/* get_dropped_packets */
+	NULL,				/* get_captured_packets */
+	NULL,				/* get_fd */
+	erf_event,			/* trace_event */
+	erf_help,			/* help */
+	NULL				/* next pointer */
+};
+
+
 
 void erf_constructor(void) {
 	register_format(&erfformat);
+	register_format(&rawerfformat);
 }

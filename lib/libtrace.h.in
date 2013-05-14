@@ -305,7 +305,8 @@ enum base_format_t {
 	TRACE_FORMAT_TSH	  =12,	/**< TSH trace format */
 	TRACE_FORMAT_ATMHDR	  =13,	/**< Legacy ATM header capture */
 	TRACE_FORMAT_LEGACY_NZIX  =14,	/**< Legacy format used for NZIX traces */
-	TRACE_FORMAT_LINUX_RING	  =15	/**< Linux native interface capture PACKET_MMAP */
+	TRACE_FORMAT_LINUX_RING	  =15,	/**< Linux native interface capture PACKET_MMAP */
+	TRACE_FORMAT_RAWERF	  =16,	/**< Special format for reading uncompressed ERF traces without checking for compression */
 };
 
 /** RT protocol packet types */
