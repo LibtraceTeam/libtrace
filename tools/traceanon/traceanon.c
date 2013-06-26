@@ -282,6 +282,7 @@ int main(int argc, char *argv[])
 	}
 	if (trace_start_output(writer)==-1) {
 		trace_perror_output(writer,"trace_start_output");
+                return 1;
 	}
 	for(;;) {
 		struct libtrace_ip *ipptr;
