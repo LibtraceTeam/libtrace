@@ -167,6 +167,7 @@ int main(int argc, char *argv[])
 				  FILE * infile = fopen(optarg,"rb");
 				  if(infile == NULL) {
 				    perror("Failed to open cryptopan keyfile");
+                                    return 1;
 				  }
 				  key = (char *) malloc(sizeof(char *) * 32);
 				  if(fread(key,1,32,infile) != 32) {
