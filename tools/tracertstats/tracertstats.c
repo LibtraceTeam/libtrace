@@ -79,7 +79,7 @@ uint64_t packet_count=UINT64_MAX;
 double packet_interval=UINT32_MAX;
 
 
-struct output_data_t *output;
+struct output_data_t *output = NULL;
 
 static void report_results(double ts,uint64_t count,uint64_t bytes)
 {
@@ -137,13 +137,15 @@ static void run_trace(char *uri)
 	if (trace_is_err(trace)) {
 		trace_perror(trace,"trace_create");
 		trace_destroy(trace);
-		output_destroy(output);
+		if (!merge_inputs)
+			output_destroy(output);
 		return; 
 	}
 	if (trace_start(trace)==-1) {
 		trace_perror(trace,"trace_start");
 		trace_destroy(trace);
-		output_destroy(output);
+		if (!merge_inputs)
+			output_destroy(output);
 		return;
 	}
 
