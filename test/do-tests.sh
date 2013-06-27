@@ -57,6 +57,11 @@ echo \* Read tsh
 do_test ./test-format tsh
 do_test ./test-decode tsh
 
+echo \* Read rawerf
+do_test ./test-format rawerf 
+do_test ./test-decode rawerf
+
+
 echo \* Testing pcap-bpf
 do_test ./test-pcap-bpf
 
