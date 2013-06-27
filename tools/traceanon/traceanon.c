@@ -278,10 +278,14 @@ int main(int argc, char *argv[])
 
 	if (trace_start(trace)==-1) {
 		trace_perror(trace,"trace_start");
+		trace_destroy_output(writer);
+		trace_destroy(trace);
 		return 1;
 	}
 	if (trace_start_output(writer)==-1) {
 		trace_perror_output(writer,"trace_start_output");
+		trace_destroy_output(writer);
+		trace_destroy(trace);
                 return 1;
 	}
 	for(;;) {
