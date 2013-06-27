@@ -244,7 +244,7 @@ static int erf_start_input(libtrace_t *libtrace)
 static int rawerf_start_input(libtrace_t *libtrace)
 {
 	if (libtrace->io)
-		wandio_destroy(libtrace->io); 
+		return 0; 
 
 	libtrace->io = wandio_create_uncompressed(libtrace->uridata);
 
