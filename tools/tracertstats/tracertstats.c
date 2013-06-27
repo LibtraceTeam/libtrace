@@ -60,6 +60,8 @@
 	#define UINT32_MAX      0xffffffffU
 #endif
 
+#define DEFAULT_OUTPUT_FMT "txt"
+
 struct libtrace_t *trace;
 char *output_format=NULL;
 
@@ -98,7 +100,7 @@ static void report_results(double ts,uint64_t count,uint64_t bytes)
 static void create_output(char *title) {
 	int i;
 	
-	output=output_init(title,output_format?output_format:"txt");
+	output=output_init(title,output_format?output_format:DEFAULT_OUTPUT_FMT);
 	if (!output) {
 		fprintf(stderr,"Failed to create output file\n");
 		return;
@@ -275,7 +277,10 @@ int main(int argc, char *argv[]) {
 	if (optind >= argc)
 		return 0;
 
-	fprintf(stderr,"output format: '%s'\n",output_format);
+	if (output_format)
+		fprintf(stderr,"output format: '%s'\n",output_format);
+	else
+		fprintf(stderr,"output format: '%s'\n", DEFAULT_OUTPUT_FMT);
 	
 	
 
