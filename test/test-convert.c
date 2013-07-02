@@ -110,6 +110,21 @@ char *lookup_out_uri(const char *type) {
 	return "unknown";
 }
 
+static int time_changed(libtrace_packet_t *packet, 
+		libtrace_packet_t *packet2) {
+
+	struct timeval tv1, tv2;
+
+	tv1 = trace_get_timeval(packet);
+	tv2 = trace_get_timeval(packet2);
+
+	if (tv1.tv_sec != tv2.tv_sec)
+		return 1;
+	if (tv1.tv_usec != tv1.tv_usec)
+		return 1;
+	return 0;
+
+}
 
 static int length_changed(libtrace_packet_t *packet, 
 		libtrace_packet_t *packet2) {
@@ -242,6 +257,12 @@ int main(int argc, char *argv[]) {
 				trace_get_link_type(packet),
 				trace_get_link_type(packet2));
 			abort();
+		}
+		
+		if (time_changed(packet, packet2)) {
+			printf("Timestamps differ: %.6f vs %.6f\n",
+				trace_get_seconds(packet),
+				trace_get_seconds(packet2));
 		}
 	
 		if (trace_get_tcp(packet)) {
