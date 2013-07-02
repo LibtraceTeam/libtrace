@@ -47,6 +47,7 @@
 #include <sys/socket.h>
 #endif
 #include <stdarg.h>
+#include <sys/param.h>
 
 #ifdef HAVE_LIMITS_H
 #  include <limits.h>
@@ -922,12 +923,13 @@ DLLEXPORT struct timeval trace_get_timeval(const libtrace_packet_t *packet) {
 		ts = packet->trace->format->get_erf_timestamp(packet);
 #if __BYTE_ORDER == __BIG_ENDIAN
 		tv.tv_sec = ts & 0xFFFFFFFF;
+		tv.tv_usec = ((ts >> 32) * 1000000) & 0xFFFFFFFF;
 #elif __BYTE_ORDER == __LITTLE_ENDIAN
 		tv.tv_sec = ts >> 32;
+		tv.tv_usec = ((ts&0xFFFFFFFF)*1000000)>>32;
 #else
 #error "What on earth are you running this on?"
 #endif
-		tv.tv_usec = ((ts&0xFFFFFFFF)*1000000)>>32;
        		if (tv.tv_usec >= 1000000) {
                		tv.tv_usec -= 1000000;
                		tv.tv_sec += 1;
@@ -960,12 +962,13 @@ DLLEXPORT struct timespec trace_get_timespec(const libtrace_packet_t *packet) {
 		uint64_t erfts = packet->trace->format->get_erf_timestamp(packet);
 #if __BYTE_ORDER == __BIG_ENDIAN
 		ts.tv_sec = erfts & 0xFFFFFFFF;
+		tv.tv_nsec = ((ts >> 32) * 1000000000) & 0xFFFFFFFF;
 #elif __BYTE_ORDER == __LITTLE_ENDIAN
 		ts.tv_sec = erfts >> 32;
+		ts.tv_nsec = ((erfts&0xFFFFFFFF)*1000000000)>>32;
 #else
 #error "What on earth are you running this on?"
 #endif
-		ts.tv_nsec = ((erfts&0xFFFFFFFF)*1000000000)>>32;
        		if (ts.tv_nsec >= 1000000000) {
                		ts.tv_nsec -= 1000000000;
                		ts.tv_sec += 1;
@@ -1635,12 +1638,13 @@ DLLEXPORT int trace_seek_erf_timestamp(libtrace_t *trace, uint64_t ts)
 			struct timeval tv;
 #if __BYTE_ORDER == __BIG_ENDIAN
 			tv.tv_sec = ts & 0xFFFFFFFF;
+			tv.tv_usec = ((ts >> 32) * 1000000) & 0xFFFFFFFF;
 #elif __BYTE_ORDER == __LITTLE_ENDIAN
 			tv.tv_sec = ts >> 32;
+			tv.tv_usec = ((ts&0xFFFFFFFF)*1000000)>>32;
 #else
 #error "What on earth are you running this on?"
 #endif
-			tv.tv_usec = ((ts&0xFFFFFFFF)*1000000)>>32;
 			if (tv.tv_usec >= 1000000) {
 				tv.tv_usec -= 1000000;
 				tv.tv_sec += 1;

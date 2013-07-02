@@ -66,6 +66,21 @@
 #include <sys/time.h>
 #endif
 
+/* Deal with missing byte order macros */
+#include <sys/param.h>
+
+#if defined(BYTE_ORDER) && !defined(__BYTE_ORDER)
+#define __BYTE_ORDER 	BYTE_ORDER
+#endif
+
+#if defined(BIG_ENDIAN) && !defined(__BIG_ENDIAN)
+#define __BIG_ENDIAN	BIG_ENDIAN
+#endif
+
+#if defined(LITTLE_ENDIAN) && !defined(__LITTLE_ENDIAN)
+#define __LITTLE_ENDIAN	LITTLE_ENDIAN
+#endif
+
 #ifdef _MSC_VER
     /* define the following from MSVC's internal types */
     typedef		__int8	int8_t;
@@ -509,10 +524,10 @@ typedef enum {
 /** Generic IP header structure */
 typedef struct libtrace_ip
 {
-#if BYTE_ORDER == LITTLE_ENDIAN
+#if __BYTE_ORDER == __LITTLE_ENDIAN
     LT_BITFIELD8 ip_hl:4;		/**< Header Length */
     LT_BITFIELD8 ip_v:4;		/**< Version */
-#elif BYTE_ORDER == BIG_ENDIAN
+#elif __BYTE_ORDER == __BIG_ENDIAN
     LT_BITFIELD8 ip_v:4;		/**< Version */
     LT_BITFIELD8 ip_hl:4;		/**< Header Length */
 #else
@@ -566,7 +581,7 @@ typedef struct libtrace_tcp
     uint16_t dest;		/**< Destination port */
     uint32_t seq;		/**< Sequence number */
     uint32_t ack_seq;		/**< Acknowledgement Number */
-#  if BYTE_ORDER == LITTLE_ENDIAN
+#  if __BYTE_ORDER == __LITTLE_ENDIAN
     LT_BITFIELD8 ecn_ns:1;      /**< ECN Nonce Sum */
     LT_BITFIELD8 res1:3;        /**< Reserved bits */
     LT_BITFIELD8 doff:4;        /**< Data Offset */
@@ -578,7 +593,7 @@ typedef struct libtrace_tcp
     LT_BITFIELD8 urg:1;         /**< URG flag */
     LT_BITFIELD8 ece:1;         /**< ECN Echo */
     LT_BITFIELD8 cwr:1;         /**< ECN CWR */
-#  elif BYTE_ORDER == BIG_ENDIAN
+#  elif __BYTE_ORDER == __BIG_ENDIAN
     LT_BITFIELD8 doff:4;        /**< Data offset */
     LT_BITFIELD8 res1:3;        /**< Reserved bits */
     LT_BITFIELD8 ecn_ns:1;      /**< ECN Nonce Sum */
@@ -757,7 +772,7 @@ typedef struct libtrace_pppoe
 
 /** 802.11 header */
 typedef struct libtrace_80211_t {
-#if BYTE_ORDER == LITTLE_ENDIAN
+#if __BYTE_ORDER == __LITTLE_ENDIAN
         LT_BITFIELD32      protocol:2;	/**< Protocol Version */
         LT_BITFIELD32      type:2;	/**< Frame Type */
         LT_BITFIELD32      subtype:4;	/**< Frame Subtype */
@@ -767,7 +782,7 @@ typedef struct libtrace_80211_t {
 	LT_BITFIELD32      protocol:2;	/**< Protocol Version */
 #endif
 
-#if BYTE_ORDER == LITTLE_ENDIAN
+#if __BYTE_ORDER == __LITTLE_ENDIAN
         LT_BITFIELD32      to_ds:1;	/**< Packet to Distribution Service */
         LT_BITFIELD32      from_ds:1;	/**< Packet from Distribution Service */
         LT_BITFIELD32      more_frag:1;	/**< Packet has more fragments */
@@ -827,7 +842,7 @@ typedef struct libtrace_ospf_v2_t
 
 /** Options Field present in some OSPFv2 packets */
 typedef struct libtrace_ospf_options_t {
-#if BYTE_ORDER == LITTLE_ENDIAN
+#if __BYTE_ORDER == __LITTLE_ENDIAN
 	LT_BITFIELD8 unused1:1;
 	LT_BITFIELD8 e_bit:1;
 	LT_BITFIELD8 mc_bit:1;
@@ -835,7 +850,7 @@ typedef struct libtrace_ospf_options_t {
 	LT_BITFIELD8 ea_bit:1;
 	LT_BITFIELD8 dc_bit:1;
 	LT_BITFIELD8 unused2:2;
-#elif BYTE_ORDER == BIG_ENDIAN
+#elif __BYTE_ORDER == __BIG_ENDIAN
 	LT_BITFIELD8 unused2:2;
 	LT_BITFIELD8 dc_bit:1;
 	LT_BITFIELD8 ea_bit:1;
@@ -879,12 +894,12 @@ typedef struct libtrace_ospf_db_desc_v2_t
 {
 	uint16_t mtu;		/**< Interface MTU */
 	libtrace_ospf_options_t db_desc_options;	/**< Options */
-#if BYTE_ORDER == LITTLE_ENDIAN
+#if __BYTE_ORDER == __LITTLE_ENDIAN
 	LT_BITFIELD8 db_desc_ms:1;	/**< If set, this router is the master */
 	LT_BITFIELD8 db_desc_m:1;	/**< If set, more packets to follow */
 	LT_BITFIELD8 db_desc_i:1;	/**< If set, this is the first packet in sequence */
 	LT_BITFIELD8 zero:5;
-#elif BYTE_ORDER == BIG_ENDIAN
+#elif __BYTE_ORDER == __BIG_ENDIAN
 	LT_BITFIELD8 zero:5;
 	LT_BITFIELD8 db_desc_i:1;	/**< If set, this is the first packet in sequence */
 	LT_BITFIELD8 db_desc_m:1;	/**< If set, more packets to follow */
@@ -913,10 +928,10 @@ typedef struct libtrace_ospf_ls_update_t
 typedef struct libtrace_ospf_as_external_lsa_t
 {
 	struct in_addr netmask;	/**< Netmask for the destination */
-#if BYTE_ORDER == LITTLE_ENDIAN
+#if __BYTE_ORDER == __LITTLE_ENDIAN
 	LT_BITFIELD8 tos:7;
 	LT_BITFIELD8 e:1;	/**< If set, metric is Type 2. Else, Type 1 */
-#elif BYTE_ORDER == BIG_ENDIAN
+#elif __BYTE_ORDER == __BIG_ENDIAN
 	LT_BITFIELD8 e:1;	/**< If set, metric is Type 2. Else, Type 1 */
 	LT_BITFIELD8 tos:7;
 #endif
@@ -958,12 +973,12 @@ typedef struct libtrace_ospf_link_t
 /** OSPFv2 Router LSA */
 typedef struct libtrace_ospf_router_lsa_t
 {
-#if BYTE_ORDER == LITTLE_ENDIAN
+#if __BYTE_ORDER == __LITTLE_ENDIAN
 	LT_BITFIELD8 b:1;	/**< Area Border Router Flag */
 	LT_BITFIELD8 e:1;	/**< External Router Flag */
 	LT_BITFIELD8 v:1;	/**< Virtual Endpoint Flag */
 	LT_BITFIELD8 zero:5;
-#elif BYTE_ORDER == BIG_ENDIAN
+#elif __BYTE_ORDER == __BIG_ENDIAN
 	LT_BITFIELD8 zero:5;
 	LT_BITFIELD8 v:1;	/**< Virtual Endpoint Flag */
 	LT_BITFIELD8 e:1;	/**< External Router Flag */

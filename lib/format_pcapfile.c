@@ -455,8 +455,9 @@ static int pcapfile_write_packet(libtrace_out_t *out,
 				&pcaphdr, sizeof(pcaphdr));
 	}
 
-	hdr.ts_sec = tv.tv_sec;
-	hdr.ts_usec = tv.tv_usec;
+
+	hdr.ts_sec = (uint32_t)tv.tv_sec;
+	hdr.ts_usec = (uint32_t)tv.tv_usec;
 	hdr.caplen = trace_get_capture_length(packet);
 	assert(hdr.caplen < LIBTRACE_PACKET_BUFSIZE);
 	/* PCAP doesn't include the FCS in its wire length value, but we do */
