@@ -118,8 +118,10 @@ static int time_changed(libtrace_packet_t *packet,
 	tv1 = trace_get_timeval(packet);
 	tv2 = trace_get_timeval(packet2);
 	
-	if (tv1.tv_sec != tv2.tv_sec || tv1.tv_usec != tv2.tv_usec) { 
-		printf("Timestamps differ: %u.%u vs %u.%u",
+	if (tv1.tv_sec != tv2.tv_sec || 
+		tv1.tv_usec - tv2.tv_usec > 1 ||
+		tv2.tv_usec - tv1.tv_usec > 1) { 
+		printf("Timestamps differ: %u.%u vs %u.%u\n",
 				tv1.tv_sec, tv1.tv_usec, 
 				tv2.tv_sec, tv2.tv_usec);
 
