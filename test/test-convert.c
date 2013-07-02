@@ -117,11 +117,14 @@ static int time_changed(libtrace_packet_t *packet,
 
 	tv1 = trace_get_timeval(packet);
 	tv2 = trace_get_timeval(packet2);
+	
+	if (tv1.tv_sec != tv2.tv_sec || tv1.tv_usec != tv2.tv_usec) { 
+		printf("Timestamps differ: %u.%u vs %u.%u",
+				tv1.tv_sec, tv1.tv_usec, 
+				tv2.tv_sec, tv2.tv_usec);
 
-	if (tv1.tv_sec != tv2.tv_sec)
 		return 1;
-	if (tv1.tv_usec != tv1.tv_usec)
-		return 1;
+	}
 	return 0;
 
 }
@@ -260,9 +263,8 @@ int main(int argc, char *argv[]) {
 		}
 		
 		if (time_changed(packet, packet2)) {
-			printf("Timestamps differ: %.6f vs %.6f\n",
-				trace_get_seconds(packet),
-				trace_get_seconds(packet2));
+			error = 1;
+			break;
 		}
 	
 		if (trace_get_tcp(packet)) {
