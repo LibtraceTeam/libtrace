@@ -921,15 +921,8 @@ DLLEXPORT struct timeval trace_get_timeval(const libtrace_packet_t *packet) {
 	} else if (packet->trace->format->get_erf_timestamp) {
 		/* timestamp -> timeval */
 		ts = packet->trace->format->get_erf_timestamp(packet);
-#if __BYTE_ORDER == __BIG_ENDIAN
-		tv.tv_sec = ts & 0xFFFFFFFF;
-		tv.tv_usec = ((ts >> 32) * 1000000) & 0xFFFFFFFF;
-#elif __BYTE_ORDER == __LITTLE_ENDIAN
 		tv.tv_sec = ts >> 32;
 		tv.tv_usec = ((ts&0xFFFFFFFF)*1000000)>>32;
-#else
-#error "What on earth are you running this on?"
-#endif
        		if (tv.tv_usec >= 1000000) {
                		tv.tv_usec -= 1000000;
                		tv.tv_sec += 1;
@@ -960,15 +953,8 @@ DLLEXPORT struct timespec trace_get_timespec(const libtrace_packet_t *packet) {
 	} else if (packet->trace->format->get_erf_timestamp) {
 		/* timestamp -> timeval */
 		uint64_t erfts = packet->trace->format->get_erf_timestamp(packet);
-#if __BYTE_ORDER == __BIG_ENDIAN
-		ts.tv_sec = erfts & 0xFFFFFFFF;
-		tv.tv_nsec = ((ts >> 32) * 1000000000) & 0xFFFFFFFF;
-#elif __BYTE_ORDER == __LITTLE_ENDIAN
 		ts.tv_sec = erfts >> 32;
 		ts.tv_nsec = ((erfts&0xFFFFFFFF)*1000000000)>>32;
-#else
-#error "What on earth are you running this on?"
-#endif
        		if (ts.tv_nsec >= 1000000000) {
                		ts.tv_nsec -= 1000000000;
                		ts.tv_sec += 1;
