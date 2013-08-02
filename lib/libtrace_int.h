@@ -928,7 +928,7 @@ uint16_t byteswap16(uint16_t num);
  *
  * @{
  */
-#if BYTE_ORDER == BIG_ENDIAN
+#if __BYTE_ORDER == __BIG_ENDIAN
 #define bswap_host_to_be64(num) ((uint64_t)(num))
 #define bswap_host_to_le64(num) byteswap64(num)
 #define bswap_host_to_be32(num) ((uint32_t)(num))
@@ -946,7 +946,7 @@ uint16_t byteswap16(uint16_t num);
 /* We use ntoh*() here, because the compiler may
  * attempt to optimise it
  */
-#elif BYTE_ORDER == LITTLE_ENDIAN
+#elif __BYTE_ORDER == __LITTLE_ENDIAN
 #define bswap_host_to_be64(num) (byteswap64(num))
 #define bswap_host_to_le64(num) ((uint64_t)(num))
 #define bswap_host_to_be32(num) (htonl(num))
