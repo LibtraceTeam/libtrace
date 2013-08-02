@@ -1,0 +1,13 @@
+diff -ur ./DPDKORG/lib/librte_pmd_e1000/igb_rxtx.c ./DPDK/lib/librte_pmd_e1000/igb_rxtx.c
+--- ./DPDKORG/lib/librte_pmd_e1000/igb_rxtx.c	2013-06-24 10:21:14.000000000 +1200
++++ ./DPDK/lib/librte_pmd_e1000/igb_rxtx.c	2013-07-12 17:02:02.000000000 +1200
+@@ -1060,7 +1060,7 @@
+  *      (num_ring_desc * sizeof(struct e1000_rx/tx_desc)) % 128 == 0
+  */
+ #define IGB_MIN_RING_DESC 32
+-#define IGB_MAX_RING_DESC 4096
++#define IGB_MAX_RING_DESC 32768
+ 
+ static const struct rte_memzone *
+ ring_dma_zone_reserve(struct rte_eth_dev *dev, const char *ring_name,
+

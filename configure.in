@@ -373,6 +373,40 @@ fi
 #fi
 #DAG_VERSION_NUM=$dag_drv_v
 
+# Check for DPDK 
+AC_ARG_WITH(dpdk,
+	    AS_HELP_STRING(--with-dpdk,include DPDK live capture support (Must set RTE_SDK/_TARGET enviroment variable)),
+[
+        if test "$withval" = no
+        then
+            want_dpdk=no
+        else
+            want_dpdk=ifpresent
+        fi
+],[
+        # Default to building without DPDK format
+        want_dpdk=ifpresent
+])
+
+libtrace_dpdk=false
+if test "$want_dpdk" != no; then
+    saved_ldflags="$LDFLAGS"
+    # Add to our libpath location
+    LDFLAGS="$LDFLAGS -L$RTE_SDK/$RTE_TARGET/lib/"
+    AC_CHECK_LIB(rte_eal, rte_eal_init, dpdk_found=1, dpdk_found=0, -lpthread -lrte_malloc -lethdev -lrte_mempool -lrte_ring)
+    # Revert back
+    LDFLAGS="$saved_ldflags"
+    if test "$dpdk_found" = 1; then
+        # Save these now so that they can be re-exported later
+		AC_SUBST([RTE_TARGET])
+        AC_SUBST([RTE_SDK])
+        LIBTRACE_LIBS="$LIBTRACE_LIBS -lrte_eal -lrte_pmd_e1000 -lrte_pmd_ixgbe"
+        LIBTRACE_LIBS="$LIBTRACE_LIBS -lethdev -lrte_mempool -lrte_ring -lrte_malloc"
+        LIBTRACE_LIBS="$LIBTRACE_LIBS -lrte_mbuf"
+		AC_DEFINE(HAVE_DPDK,1,[conditional for building with DPDK live capture support])
+		libtrace_dpdk=true
+	fi
+fi
 
 # Checks for various "optional" libraries
 AC_CHECK_LIB(pthread, pthread_create, have_pthread=1, have_pthread=0)
@@ -388,6 +422,10 @@ LIBS=
 
 # Check to see if we have libdl - *BSD has built-in libdl
 AC_SEARCH_LIBS(dlopen,dl, dlfound=1,dlfound=0 )
+LIBS=
+
+# Check for clock_gettime
+AC_CHECK_LIB(rt, clock_gettime, have_clock_gettime=1, have_clock_gettime=0)
 LIBS=
 
 if test "$dlfound" = 0; then
@@ -416,6 +454,10 @@ if test "$have_socket" = 1; then
 		LIBTRACE_LIBS="$LIBTRACE_LIBS $ac_cv_search_getservent"
 		LIBPKTDUMP_LIBS="$LIBPKTDUMP_LIBS $ac_cv_search_getservent"
 	fi 
+fi
+
+if test "$have_get_clocktime" = 1; then
+    LIBTRACE_LIBS="$LIBTRACE_LIBS -lrt"
 fi
 
 
@@ -557,6 +599,7 @@ AS_IF([test "x$have_lzo" = "xyes"], [
 # Define automake conditionals for use in our Makefile.am files
 AM_CONDITIONAL([HAVE_BPF_CAPTURE], [test "$ac_cv_have_decl_BIOCSETIF" = yes ])
 AM_CONDITIONAL([HAVE_DAG], [test "$libtrace_dag" = true])
+AM_CONDITIONAL([HAVE_DPDK], [test "$libtrace_dpdk" = true])
 AM_CONDITIONAL([DAG2_4], [test "$libtrace_dag_version" = 24])
 AM_CONDITIONAL([DAG2_5], [test "$libtrace_dag_version" = 25])
 AM_CONDITIONAL([HAVE_NETPACKET_PACKET_H], [test "$libtrace_netpacket_packet_h" = true])
@@ -630,6 +673,12 @@ if test x"$libtrace_dag" = xtrue; then
 	fi	
 else
 	AC_MSG_NOTICE([Compiled with DAG live capture support: No])
+fi
+
+if test x"$libtrace_dpdk" = xtrue; then
+    AC_MSG_NOTICE([Compiled with DPDK live capture support: Yes])
+else
+    AC_MSG_NOTICE([Compiled with DPDK live capture support: No])
 fi
 reportopt "Compiled with LLVM BPF JIT support" $JIT
 reportopt "Building man pages/documentation" $libtrace_doxygen

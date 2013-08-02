@@ -928,7 +928,7 @@ uint16_t byteswap16(uint16_t num);
  *
  * @{
  */
-#if __BYTE_ORDER == __BIG_ENDIAN
+#if BYTE_ORDER == BIG_ENDIAN
 #define bswap_host_to_be64(num) ((uint64_t)(num))
 #define bswap_host_to_le64(num) byteswap64(num)
 #define bswap_host_to_be32(num) ((uint32_t)(num))
@@ -946,7 +946,7 @@ uint16_t byteswap16(uint16_t num);
 /* We use ntoh*() here, because the compiler may
  * attempt to optimise it
  */
-#elif __BYTE_ORDER == __LITTLE_ENDIAN
+#elif BYTE_ORDER == LITTLE_ENDIAN
 #define bswap_host_to_be64(num) (byteswap64(num))
 #define bswap_host_to_le64(num) ((uint64_t)(num))
 #define bswap_host_to_be32(num) (htonl(num))
@@ -1019,6 +1019,10 @@ void atmhdr_constructor(void);
 #ifdef HAVE_BPF
 /** Constructor for the BPF format module */
 void bpf_constructor(void);
+#endif
+#if HAVE_DPDK
+/** Constructor for Intels DPDK format module */
+void dpdk_constructor(void);
 #endif
 
 /** Extracts the RadioTap flags from a wireless link header

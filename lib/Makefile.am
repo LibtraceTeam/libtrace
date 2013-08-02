@@ -25,6 +25,18 @@ else
 BPFJITSOURCE=
 endif
 
+if HAVE_DPDK
+NATIVEFORMATS+= format_dpdk.c
+# So we also make libtrace.mk in dpdk otherwise automake tries to expand
+# it to early which I cannot seem to stop unless we use a path that
+# doesn't exist currently
+export RTE_SDK=@RTE_SDK@
+export RTE_TARGET=@RTE_TARGET@
+include $(RTE_SDK)/mk/rte.vars.mk
+# We need to add -Wl before the linker otherwise this breaks our build
+# This is added in with our make script patch to the DPDK library
+include $(RTE_SDK)/mk/libtrace.mk
+endif
 
 libtrace_la_SOURCES = trace.c common.h \
 		format_erf.c format_pcap.c format_legacy.c \

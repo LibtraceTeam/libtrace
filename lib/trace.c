@@ -146,6 +146,9 @@ static void trace_init(void)
 #ifdef HAVE_DAG
 		dag_constructor();
 #endif
+#ifdef HAVE_DPDK
+        dpdk_constructor();
+#endif
 	}
 }
 

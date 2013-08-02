@@ -1,0 +1,33 @@
+diff -ur ./DPDKORG/lib/librte_pmd_e1000/igb_rxtx.c ./DPDK/lib/librte_pmd_e1000/igb_rxtx.c
+--- ./DPDKORG/lib/librte_pmd_e1000/igb_rxtx.c	2013-06-24 10:21:14.000000000 +1200
++++ ./DPDK/lib/librte_pmd_e1000/igb_rxtx.c	2013-07-12 16:59:57.000000000 +1200
+@@ -1656,6 +1656,9 @@
+ 		if (rxq->drop_en)
+ 			srrctl |= E1000_SRRCTL_DROP_EN;
+ 
++		/* Place timestamps at the start of the receive buffer */
++		srrctl |= E1000_SRRCTL_TIMESTAMP;
++
+ 		E1000_WRITE_REG(hw, E1000_SRRCTL(i), srrctl);
+ 
+ 		/* Enable this RX queue. */
+@@ -1751,6 +1754,18 @@
+ 	/* Enable Receives. */
+ 	E1000_WRITE_REG(hw, E1000_RCTL, rctl);
+ 
++	/* Timestamp every rx packet */
++	rctl = E1000_READ_REG(hw, E1000_TSYNCRXCTL);
++	rctl &= ~(E1000_TSYNCRXCTL_TYPE_MASK);
++	rctl |= E1000_TSYNCRXCTL_ENABLED;
++	rctl |= E1000_TSYNCRXCTL_TYPE_ALL;
++	E1000_WRITE_REG(hw, E1000_TSYNCRXCTL, rctl);
++
++	rctl = 0;
++	E1000_WRITE_REG(hw, E1000_TSYNCRXCFG, rctl);
++	/* Start the clock timestamping */
++	E1000_WRITE_REG(hw, E1000_TSAUXC, 0x0);
++	E1000_WRITE_FLUSH(hw);
+ 	/*
+ 	 * Setup the HW Rx Head and Tail Descriptor Pointers.
+ 	 * This needs to be done after enable.
+
