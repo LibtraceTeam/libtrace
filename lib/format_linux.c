@@ -1237,6 +1237,8 @@ static inline libtrace_direction_t get_libtrace_direction(uint8_t pkttype){
 		case PACKET_OUTGOING:
 		case PACKET_LOOPBACK:
 			return TRACE_DIR_OUTGOING;
+		case PACKET_OTHERHOST:
+			return TRACE_DIR_OTHER;
 		default:
 			return TRACE_DIR_INCOMING;
 	}
@@ -1256,6 +1258,9 @@ static libtrace_direction_t set_direction(struct sockaddr_ll * skadr, libtrace_d
 		case TRACE_DIR_INCOMING:
 			skadr->sll_pkttype = PACKET_HOST;
 			return TRACE_DIR_INCOMING;
+		case TRACE_DIR_OTHER:
+			skadr->sll_pkttype = PACKET_OTHERHOST;
+			return TRACE_DIR_OTHER;
 		default:
 			return -1;
 	}
@@ -1401,7 +1406,7 @@ static size_t linuxring_set_capture_length(libtrace_packet_t *packet,
 	/* Reset the cached capture length */
 	packet->capture_length = -1;
 
-	TO_TP_HDR(packet->buffer)->tp_len = size;
+	TO_TP_HDR(packet->buffer)->tp_snaplen = size;
 
 	return trace_get_capture_length(packet);
 }
