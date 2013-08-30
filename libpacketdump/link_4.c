@@ -29,6 +29,7 @@
 #include "libtrace.h"
 
 typedef struct ieee80211_frame_control {
+# if __BYTE_ORDER == __LITTLE_ENDIAN	
 	uint8_t		version:2;
 	uint8_t		type:2;
 	uint8_t		subtype:4;
@@ -40,6 +41,21 @@ typedef struct ieee80211_frame_control {
         uint8_t		more_data:1;
         uint8_t		wep:1;
         uint8_t		order:1;
+# elif __BYTE_ORDER == __BIG_ENDIAN
+	uint8_t		subtype:4;
+	uint8_t		type:2;
+	uint8_t		version:2;
+        uint8_t		order:1;
+        uint8_t		wep:1;
+        uint8_t		more_data:1;
+        uint8_t		power:1;
+        uint8_t		retry:1;
+	uint8_t		more_frag:1;
+	uint8_t		from_ds:1;
+	uint8_t		to_ds:1;
+#else
+#	error "Adjust your <bits/endian.h> defines"
+# endif	
 } __attribute__ ((__packed__)) ieee80211_frame_control;
 
 typedef struct ieee80211_ctrl_frame_1addr {
@@ -106,22 +122,43 @@ static char *macaddr(uint8_t mac[]) {
 }
 
 typedef struct ieee80211_capinfo {
-	uint16_t	ess:1;
-	uint16_t	ibss:1;
-	uint16_t	cf_pollable:1;
-	uint16_t	cf_poll_req:1;
-	uint16_t	privacy:1;
-	uint16_t	short_preamble:1;
-	uint16_t	pbcc:1;
-	uint16_t	channel_agility:1;
-	uint16_t	spectrum_mgmt:1;
-	uint16_t	qos:1;
-	uint16_t	short_slot_time:1;
-	uint16_t	apsd:1;
-	uint16_t	res1:1;
-	uint16_t	dsss_ofdm:1;
-	uint16_t	delayed_block_ack:1;
-	uint16_t	immediate_block_ack:1;
+#if __BYTE_ORDER == __LITTLE_ENDIAN 
+	uint8_t	ess:1;
+	uint8_t	ibss:1;
+	uint8_t	cf_pollable:1;
+	uint8_t	cf_poll_req:1;
+	uint8_t	privacy:1;
+	uint8_t	short_preamble:1;
+	uint8_t	pbcc:1;
+	uint8_t	channel_agility:1;
+	uint8_t	spectrum_mgmt:1;
+	uint8_t	qos:1;
+	uint8_t	short_slot_time:1;
+	uint8_t	apsd:1;
+	uint8_t	res1:1;
+	uint8_t	dsss_ofdm:1;
+	uint8_t	delayed_block_ack:1;
+	uint8_t	immediate_block_ack:1;
+#elif __BYTE_ORDER == __BIG_ENDIAN
+	uint8_t	channel_agility:1;
+	uint8_t	pbcc:1;
+	uint8_t	short_preamble:1;
+	uint8_t	privacy:1;
+	uint8_t	cf_poll_req:1;
+	uint8_t	cf_pollable:1;
+	uint8_t	ibss:1;
+	uint8_t	ess:1;
+	uint8_t	immediate_block_ack:1;
+	uint8_t	delayed_block_ack:1;
+	uint8_t	dsss_ofdm:1;
+	uint8_t	res1:1;
+	uint8_t	apsd:1;
+	uint8_t	short_slot_time:1;
+	uint8_t	qos:1;
+	uint8_t	spectrum_mgmt:1;
+#else
+# error "Unknown byte order -- please check <bits/endian.h>"
+#endif
 } __attribute__ ((__packed__)) ieee80211_capinfo;
 
 typedef struct ieee80211_beacon {
