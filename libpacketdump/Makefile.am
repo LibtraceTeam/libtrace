@@ -165,7 +165,7 @@ ospf2_1003_la_LDFLAGS=$(modflags)
 ospf2_1004_la_LDFLAGS=$(modflags)
 ospf2_1005_la_LDFLAGS=$(modflags)
 
-libpacketdump_la_SOURCES = libpacketdump.cc \
+libpacketdump_la_SOURCES = libpacketdump.cc ../lib/byteswap.c \
 			lexer.l parser.y bitbuffer.c bitbuffer.h grammar.h
 
 plugin_LTLIBRARIES = $(BIN_PROTOCOLS)

@@ -3,6 +3,7 @@
 #include <err.h>
 #include <time.h>
 #include "libpacketdump.h"
+#include "lt_bswap.h"
 #include <stdio.h>
 #include <netdb.h>
 #include <stdlib.h>
@@ -302,3 +303,4 @@ void decode_next(const char *packet,int len,const char *proto_name,int type)
 
 	};
 }
+
