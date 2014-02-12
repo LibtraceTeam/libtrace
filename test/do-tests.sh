@@ -41,6 +41,10 @@ echo \* Read pcapfile
 do_test ./test-format pcapfile
 do_test ./test-decode pcapfile
 
+echo \* Read pcapfilens
+do_test ./test-format pcapfilens
+do_test ./test-decode pcapfilens
+
 echo \* Read legacyatm
 do_test ./test-format legacyatm
 do_test ./test-decode legacyatm
