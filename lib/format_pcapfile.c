@@ -69,7 +69,25 @@ typedef struct pcapfile_header_t {
 		uint32_t sigfigs;        /* timestamp accuracy */
 		uint32_t snaplen;        /* aka "wirelen" */
 		uint32_t network;        /* data link type */
-} pcapfile_header_t; 
+} pcapfile_header_t;
+
+#define MAGIC1      0xa1b2c3d4  /* Original */
+#define MAGIC2      0xa1b23c4d  /* Newer nanosecond format */
+#define MAGIC1_REV  0xd4c3b2a1  /* Reversed byteorder detection */
+#define MAGIC2_REV  0x4d3cb2a1
+
+static inline int header_is_backwards_magic(pcapfile_header_t *header) {
+	return (header->magic_number == MAGIC1_REV || header->magic_number == MAGIC2_REV);
+}
+
+static inline int header_is_magic(pcapfile_header_t *header) {
+	return (header->magic_number == MAGIC1 || header->magic_number == MAGIC2 ||
+	        header_is_backwards_magic(header));
+}
+
+static inline int trace_in_nanoseconds(pcapfile_header_t *header) {
+	return (header->magic_number == MAGIC2 || header->magic_number == MAGIC2_REV);
+}
 
 struct pcapfile_format_data_t {
 	struct {
@@ -98,17 +116,19 @@ static int pcapfile_probe_magic(io_t *io)
 	pcapfile_header_t header;
 	int len;
 	len = wandio_peek(io, &header, sizeof(header));
+
 	/* Is this long enough? */
 	if (len < (int)sizeof(header)) {
 		return 0;
 	}
 	/* Pcap magic? */
-	if (header.magic_number == 0xa1b2c3d4 || header.magic_number == 0xd4c3b2a1) {
+	if (header_is_magic(&header)) {
 		return 1;
 	}
 	/* Nope, not pcap */
 	return 0;
 }
+
 
 static int pcapfile_init_input(libtrace_t *libtrace) {
 	libtrace->format_data = malloc(sizeof(struct pcapfile_format_data_t));
@@ -145,7 +165,7 @@ static inline uint16_t swaps(libtrace_t *libtrace, uint16_t num)
 		return num;
 	
 	/* We can use the PCAP magic number to determine the byte order */
-	if (DATA(libtrace)->header.magic_number == 0xd4c3b2a1)
+	if (header_is_backwards_magic(&(DATA(libtrace)->header)))
 		return byteswap16(num);
 
 	return num;
@@ -160,7 +180,7 @@ static inline uint32_t swapl(libtrace_t *libtrace, uint32_t num)
 		return num;
 	
 	/* We can use the PCAP magic number to determine the byte order */
-	if (DATA(libtrace)->header.magic_number == 0xd4c3b2a1)
+	if (header_is_backwards_magic(&(DATA(libtrace)->header)))
 		return byteswap32(num);
 
 	return num;
@@ -196,8 +216,7 @@ static int pcapfile_start_input(libtrace_t *libtrace)
 			return -1;
 		}
 		
-		if (swapl(libtrace,DATA(libtrace)->header.magic_number) != 
-					0xa1b2c3d4) {
+		if (!header_is_magic(&(DATA(libtrace)->header))) {
 			trace_set_err(libtrace,TRACE_ERR_INIT_FAILED,
 					"Not a pcap tracefile (magic=%08x)\n",swapl(libtrace,DATA(libtrace)->header.magic_number));
 			return -1; /* Not a pcap file */
@@ -302,7 +321,7 @@ static int pcapfile_prepare_packet(libtrace_t *libtrace,
 	if ((flags & TRACE_PREP_OWN_BUFFER) == TRACE_PREP_OWN_BUFFER) {
 		packet->buf_control = TRACE_CTRL_PACKET;
 	} else
-                packet->buf_control = TRACE_CTRL_EXTERNAL;
+		packet->buf_control = TRACE_CTRL_EXTERNAL;
 	
 	
 	packet->buffer = buffer;
@@ -594,7 +613,28 @@ static struct timeval pcapfile_get_timeval(
 	
 	hdr = (libtrace_pcapfile_pkt_hdr_t*)packet->header;
 	ts.tv_sec = swapl(packet->trace,hdr->ts_sec);
-	ts.tv_usec = swapl(packet->trace,hdr->ts_usec);
+	if (trace_in_nanoseconds(packet->header))
+		ts.tv_usec = swapl(packet->trace, hdr->ts_usec) / 1000;
+	else
+		ts.tv_usec = swapl(packet->trace,hdr->ts_usec);
+	return ts;
+}
+
+static struct timespec pcapfile_get_timespec(
+		const libtrace_packet_t *packet) 
+{
+	libtrace_pcapfile_pkt_hdr_t *hdr;
+	pcapfile_header_t *header = &(DATA(packet->trace)->header);
+	struct timespec ts;
+	
+	assert(packet->header);
+	
+	hdr = (libtrace_pcapfile_pkt_hdr_t*)packet->header;
+	ts.tv_sec = swapl(packet->trace,hdr->ts_sec);
+	if (trace_in_nanoseconds(header))
+		ts.tv_nsec = swapl(packet->trace, hdr->ts_usec);
+	else
+		ts.tv_nsec = swapl(packet->trace, hdr->ts_usec) * 1000;
 	return ts;
 }
 
@@ -610,7 +650,7 @@ static int pcapfile_get_capture_length(const libtrace_packet_t *packet) {
 
 static int pcapfile_get_wire_length(const libtrace_packet_t *packet) {
 	libtrace_pcapfile_pkt_hdr_t *pcapptr;
-	 
+
 	assert(packet->header); 
 
 	pcapptr	= (libtrace_pcapfile_pkt_hdr_t *)packet->header;
@@ -716,7 +756,7 @@ static struct libtrace_format_t pcapfile = {
 	NULL,				/* set_direction */
 	NULL,				/* get_erf_timestamp */
 	pcapfile_get_timeval,		/* get_timeval */
-	NULL,				/* get_timespec */
+	pcapfile_get_timespec,   	/* get_timespec */
 	NULL,				/* get_seconds */
 	NULL,				/* seek_erf */
 	NULL,				/* seek_timeval */
