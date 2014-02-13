@@ -613,7 +613,8 @@ static struct timeval pcapfile_get_timeval(
 	
 	hdr = (libtrace_pcapfile_pkt_hdr_t*)packet->header;
 	ts.tv_sec = swapl(packet->trace,hdr->ts_sec);
-	if (trace_in_nanoseconds(packet->header))
+	/* Check trace is not a dummy calling trace_in_nanoseconds */
+	if (DATA(packet->trace) && trace_in_nanoseconds(&DATA(packet->trace)->header))
 		ts.tv_usec = swapl(packet->trace, hdr->ts_usec) / 1000;
 	else
 		ts.tv_usec = swapl(packet->trace,hdr->ts_usec);
@@ -624,14 +625,14 @@ static struct timespec pcapfile_get_timespec(
 		const libtrace_packet_t *packet) 
 {
 	libtrace_pcapfile_pkt_hdr_t *hdr;
-	pcapfile_header_t *header = &(DATA(packet->trace)->header);
 	struct timespec ts;
 	
 	assert(packet->header);
 	
 	hdr = (libtrace_pcapfile_pkt_hdr_t*)packet->header;
 	ts.tv_sec = swapl(packet->trace,hdr->ts_sec);
-	if (trace_in_nanoseconds(header))
+	/* Check trace is not a dummy calling trace_in_nanoseconds */
+	if (DATA(packet->trace) && trace_in_nanoseconds(&DATA(packet->trace)->header))
 		ts.tv_nsec = swapl(packet->trace, hdr->ts_usec);
 	else
 		ts.tv_nsec = swapl(packet->trace, hdr->ts_usec) * 1000;
@@ -756,7 +757,7 @@ static struct libtrace_format_t pcapfile = {
 	NULL,				/* set_direction */
 	NULL,				/* get_erf_timestamp */
 	pcapfile_get_timeval,		/* get_timeval */
-	pcapfile_get_timespec,   	/* get_timespec */
+	pcapfile_get_timespec,		/* get_timespec */
 	NULL,				/* get_seconds */
 	NULL,				/* seek_erf */
 	NULL,				/* seek_timeval */
