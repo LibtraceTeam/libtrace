@@ -137,10 +137,10 @@
  * kernel.
  */
 #ifdef HAVE_LIBRT
-/* DONT CHANGE THIS !!! */
+/* You can turn this on (set to 1) to prefer clock_gettime */
 #define USE_CLOCK_GETTIME 0
 #else
-/* You can turn this on (set to 1) to prefer clock_gettime */
+/* DONT CHANGE THIS !!! */
 #define USE_CLOCK_GETTIME 0
 #endif
 
@@ -852,7 +852,8 @@ static int dpdk_fin_input(libtrace_t * libtrace) {
 	}
 
     /* Revert to the original PCI drivers */
-    rte_eal_pci_exit();
+    /* No longer in DPDK
+    rte_eal_pci_exit(); */
     return 0;
 }
 
@@ -868,7 +869,8 @@ static int dpdk_fin_output(libtrace_out_t * libtrace) {
 	}
 
     /* Revert to the original PCI drivers */
-    rte_eal_pci_exit();
+    /* No longer in DPDK
+    rte_eal_pci_exit(); */
     return 0;
 }
 

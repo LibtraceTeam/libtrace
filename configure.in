@@ -393,16 +393,20 @@ if test "$want_dpdk" != no; then
     saved_ldflags="$LDFLAGS"
     # Add to our libpath location
     LDFLAGS="$LDFLAGS -L$RTE_SDK/$RTE_TARGET/lib/"
-    AC_CHECK_LIB(rte_eal, rte_eal_init, dpdk_found=1, dpdk_found=0, -lpthread -lrte_malloc -lethdev -lrte_mempool -lrte_ring)
+    # Test that the library exists, we cannot be sure of what extra library flags need to be added
+    # this could change in the next version which would make the test fail
+    #AC_CHECK_LIB(intel_dpdk, rte_eal_init, dpdk_found=1, dpdk_found=0, -lpthread -lm -lrt)
+
+    # So instead simply check for existence
+    AC_CHECK_FILE("$RTE_SDK/$RTE_TARGET/lib/libintel_dpdk.a", dpdk_found=1, dpdk_found=0)
     # Revert back
     LDFLAGS="$saved_ldflags"
     if test "$dpdk_found" = 1; then
         # Save these now so that they can be re-exported later
 		AC_SUBST([RTE_TARGET])
         AC_SUBST([RTE_SDK])
-        LIBTRACE_LIBS="$LIBTRACE_LIBS -lrte_eal -lrte_pmd_e1000 -lrte_pmd_ixgbe"
-        LIBTRACE_LIBS="$LIBTRACE_LIBS -lethdev -lrte_mempool -lrte_ring -lrte_malloc"
-        LIBTRACE_LIBS="$LIBTRACE_LIBS -lrte_mbuf"
+        # Force dpdk library to be statically linked to allow compiler optimisations
+        LIBTRACE_LIBS="$LIBTRACE_LIBS -l:libintel_dpdk.a"
 		AC_DEFINE(HAVE_DPDK,1,[conditional for building with DPDK live capture support])
 		libtrace_dpdk=true
 	fi
@@ -456,7 +460,8 @@ if test "$have_socket" = 1; then
 	fi 
 fi
 
-if test "$have_get_clocktime" = 1; then
+
+if test "$have_clock_gettime" = 1; then
     LIBTRACE_LIBS="$LIBTRACE_LIBS -lrt"
 fi
 
@@ -678,7 +683,7 @@ fi
 if test x"$libtrace_dpdk" = xtrue; then
     AC_MSG_NOTICE([Compiled with DPDK live capture support: Yes])
 else
-    AC_MSG_NOTICE([Compiled with DPDK live capture support: No])
+    AC_MSG_NOTICE([Compiled with DPDK live capture support: No (Requires DPDK v1.5 or newer)])
 fi
 reportopt "Compiled with LLVM BPF JIT support" $JIT
 reportopt "Building man pages/documentation" $libtrace_doxygen

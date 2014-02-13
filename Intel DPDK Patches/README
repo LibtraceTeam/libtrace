@@ -8,8 +8,6 @@ wiki https://secure.wand.net.nz/trac/libtrace/wiki/UserDocumentation.
 These can be applied from the directory a level above /DPDK using this command:
 ~patch -p0 < name.patch
 
-dpdk_libtrace.patch - REQUIRED to build libtrace! Fixes some make settings.
-
 larger_ring.patch - Allow the number of buffers in the RX ring to be increased
                   past the 4K limit. Once patched update #define NB_RX_MBUF to the
                   increased value.

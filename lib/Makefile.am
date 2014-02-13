@@ -34,8 +34,9 @@ export RTE_SDK=@RTE_SDK@
 export RTE_TARGET=@RTE_TARGET@
 include $(RTE_SDK)/mk/rte.vars.mk
 # We need to add -Wl before the linker otherwise this breaks our build
-# This is added in with our make script patch to the DPDK library
-include $(RTE_SDK)/mk/libtrace.mk
+# And include any libraries that DPDK might depend upon
+export DPDK_LIBTRACE_MK=dpdk_libtrace.mk
+include $(DPDK_LIBTRACE_MK)
 endif
 
 libtrace_la_SOURCES = trace.c common.h \
@@ -57,9 +58,8 @@ nodist_libtrace_la_SOURCES = dagopts.c dagapi.c
 endif
 
 INCLUDES= @ADD_INCLS@ -I../libwandio
-libtrace_la_LIBADD = @LIBTRACE_LIBS@ @LTLIBOBJS@
+libtrace_la_LIBADD = @LIBTRACE_LIBS@ @LTLIBOBJS@ $(DPDKLIBS)
 libtrace_la_LDFLAGS=-version-info @LIBTRACE_MAJOR@:@LIBTRACE_MINOR@:@LIBTRACE_MID@ @ADD_LDFLAGS@
-
 dagapi.c:
 	cp @DAG_TOOLS_DIR@/dagapi.c .
 
