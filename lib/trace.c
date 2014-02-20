@@ -1074,7 +1074,7 @@ DLLEXPORT libtrace_linktype_t trace_get_link_type(const libtrace_packet_t *packe
 
 	if (packet->link_type == 0) {
 		if (!packet->trace->format->get_link_type)
-			return (libtrace_linktype_t)-1;
+			return TRACE_TYPE_UNKNOWN;
 		((libtrace_packet_t *)packet)->link_type =
 			packet->trace->format->get_link_type(packet);
 	}
@@ -1215,7 +1215,7 @@ static int trace_bpf_compile(libtrace_filter_t *filter,
 					"Packet has an unknown linktype");
 			return -1;
 		}
-		if (libtrace_to_pcap_dlt(linktype) == ~1U) {
+		if (libtrace_to_pcap_dlt(linktype) == TRACE_DLT_ERROR) {
 			trace_set_err(packet->trace,TRACE_ERR_BAD_FILTER,
 					"Unknown pcap equivalent linktype");
 			return -1;
@@ -1266,7 +1266,7 @@ DLLEXPORT int trace_apply_filter(libtrace_filter_t *filter,
 	if (linktype == TRACE_TYPE_NONDATA)
 		return 1;	
 
-	if (libtrace_to_pcap_dlt(linktype)==~0U) {
+	if (libtrace_to_pcap_dlt(linktype)==TRACE_DLT_ERROR) {
 		
 		/* If we cannot get a suitable DLT for the packet, it may
 		 * be because the packet is encapsulated in a link type that
@@ -1279,7 +1279,7 @@ DLLEXPORT int trace_apply_filter(libtrace_filter_t *filter,
 		packet_copy=trace_copy_packet(packet);
 		free_packet_needed=true;
 
-		while (libtrace_to_pcap_dlt(linktype) == ~0U) {
+		while (libtrace_to_pcap_dlt(linktype) == TRACE_DLT_ERROR) {
 			if (!demote_packet(packet_copy)) {
 				trace_set_err(packet->trace, 
 						TRACE_ERR_NO_CONVERSION,

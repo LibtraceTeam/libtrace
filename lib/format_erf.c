@@ -636,7 +636,7 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 
 		/* Flags. Can't do this */
 		memset(&erfhdr.flags,1,sizeof(erfhdr.flags));
-		if (trace_get_direction(packet)!=~0U)
+		if (trace_get_direction(packet)!=TRACE_DIR_UNKNOWN)
 			erfhdr.flags.iface = trace_get_direction(packet);
 
 		if (!find_compatible_linktype(libtrace,packet))

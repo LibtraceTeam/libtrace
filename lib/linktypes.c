@@ -66,13 +66,14 @@ libtrace_linktype_t pcap_linktype_to_libtrace(libtrace_dlt_t linktype)
 		case TRACE_DLT_C_HDLC: return TRACE_TYPE_HDLC_POS;
 		case TRACE_DLT_OPENBSD_LOOP: return TRACE_TYPE_OPENBSD_LOOP;
 		/* Unhandled */
+		case TRACE_DLT_ERROR:
 		case TRACE_DLT_NULL: 	/* Raw IP frame with a BSD specific
 					 * header If you want raw L3 headers
 					 * use TRACE_DLT_RAW
 					 */
 			break;
 	}
-	return ~0U;
+	return TRACE_TYPE_UNKNOWN;
 }
 
 libtrace_dlt_t libtrace_to_pcap_dlt(libtrace_linktype_t type)
@@ -114,8 +115,10 @@ libtrace_dlt_t libtrace_to_pcap_dlt(libtrace_linktype_t type)
 		case TRACE_TYPE_METADATA:
 		case TRACE_TYPE_NONDATA:
 			break;
+		case TRACE_TYPE_UNKNOWN:
+			break;
 	}
-	return ~0U;
+	return TRACE_DLT_ERROR;
 }
 
 static libtrace_dlt_t pcap_dlt_to_pcap_linktype(libtrace_dlt_t linktype)
@@ -202,6 +205,7 @@ uint8_t libtrace_to_erf_type(libtrace_linktype_t linktype)
 		case TRACE_TYPE_METADATA:
 		case TRACE_TYPE_NONDATA:
 		case TRACE_TYPE_OPENBSD_LOOP:
+		case TRACE_TYPE_UNKNOWN:
 			break;
 	}
 	return 255;

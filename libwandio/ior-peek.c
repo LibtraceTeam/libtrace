@@ -240,8 +240,8 @@ static void *alignedrealloc(void *old, size_t oldsize, size_t size, int *res)
 #else
 	/* These no-ops are to stop the compiler whinging about unused
 	 * parameters */
-	oldsize = oldsize;
-	res = res;
+	(void)oldsize;
+	(void)res;
 	return realloc(old,size);
 #endif
 }

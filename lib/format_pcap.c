@@ -462,7 +462,7 @@ static int pcap_write_packet(libtrace_out_t *libtrace,
 	/* If this packet cannot be converted to a pcap linktype then
 	 * pop off the top header until it can be converted
 	 */
-	while (libtrace_to_pcap_linktype(linktype)==~0U) {
+	while (libtrace_to_pcap_linktype(linktype)==TRACE_DLT_ERROR) {
 		if (!demote_packet(packet)) {
 			trace_set_err_out(libtrace, 
 				TRACE_ERR_NO_CONVERSION,

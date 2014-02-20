@@ -389,6 +389,8 @@ DLLEXPORT void *trace_get_layer2(const libtrace_packet_t *packet,
 		case TRACE_TYPE_80211_PRISM:
 		case TRACE_TYPE_PFLOG:
 			break;
+		case TRACE_TYPE_UNKNOWN:
+			return NULL;
 	}
 
 	/* If there are meta-data headers, we need to skip over them until we
@@ -422,6 +424,8 @@ DLLEXPORT void *trace_get_layer2(const libtrace_packet_t *packet,
 				case TRACE_TYPE_80211_PRISM:
 				case TRACE_TYPE_PFLOG:
 					break;
+				case TRACE_TYPE_UNKNOWN:
+					return NULL;
 			}
 			
 			/* Otherwise, we must have hit the end of the packet */
@@ -463,7 +467,7 @@ DLLEXPORT void *trace_get_payload_from_layer2(void *link,
 {
 	void *l;
 
-	if (linktype == ~0U) {
+	if (linktype == TRACE_TYPE_UNKNOWN) {
 		fprintf(stderr, "Unable to determine linktype for packet\n");
 		return NULL;
 	}
@@ -485,6 +489,7 @@ DLLEXPORT void *trace_get_payload_from_layer2(void *link,
 		   */
 		case TRACE_TYPE_METADATA:
 		case TRACE_TYPE_NONDATA:
+		case TRACE_TYPE_UNKNOWN:
 			return NULL;
 
 		case TRACE_TYPE_80211:
@@ -586,6 +591,7 @@ DLLEXPORT uint8_t *trace_get_source_mac(libtrace_packet_t *packet) {
                 case TRACE_TYPE_PPP:
 		case TRACE_TYPE_NONDATA:
 		case TRACE_TYPE_OPENBSD_LOOP:
+		case TRACE_TYPE_UNKNOWN:
                         return NULL;
 
                 /* Metadata headers should already be skipped */
@@ -634,6 +640,7 @@ DLLEXPORT uint8_t *trace_get_destination_mac(libtrace_packet_t *packet)
 		case TRACE_TYPE_PPP:	
 		case TRACE_TYPE_NONDATA:
 		case TRACE_TYPE_OPENBSD_LOOP:
+		case TRACE_TYPE_UNKNOWN:
                         /* No MAC address */
                         return NULL;
                 /* Metadata headers should already be skipped */

@@ -64,12 +64,12 @@ static char *format_pro(const struct arphdr *arp, const char *pro) {
 					inet_ntoa(*(struct in_addr*)pro));
 			break;
 		default:
-			strncat(buffer," (",sizeof(buffer));
+			snprintf(buffer, sizeof(buffer), "%s", " (");
 			for (i=0;i<arp->ar_pln;i++) {
 				snprintf(buffer,sizeof(buffer),"%s %02x",
 						buffer,(unsigned char)pro[i]);
 			}
-			strncat(buffer,")",sizeof(buffer));
+			strncat(buffer,")",sizeof(buffer) - strlen(buffer) - 1);
 			break;
 	}
 	return buffer;

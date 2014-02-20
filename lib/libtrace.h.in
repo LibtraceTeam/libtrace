@@ -248,6 +248,10 @@ enum {
 /** Enumeration of DLTs supported by libtrace 
  */
 typedef enum {
+	/* Special value used to indicate a failure to convert to libtrace
+         * DLT */
+        TRACE_DLT_ERROR = -1,
+	
 	/** pcap documents this as having the Address Family value in host byte order as the 
  	  * framing.  Ugly? Yes.
  	  */
@@ -278,6 +282,7 @@ typedef enum {
 
 /** Enumeration of link layer types supported by libtrace */
 typedef enum { 
+       TRACE_TYPE_UNKNOWN = -1,		/**< Unable to determine link type */
     /* TRACE_TYPE_LEGACY = 0 		Obsolete */
        TRACE_TYPE_HDLC_POS = 1, 	/**< HDLC over POS */
        TRACE_TYPE_ETH = 2,		/**< 802.3 style Ethernet */
@@ -486,7 +491,8 @@ typedef struct libtrace_packet_t {
 typedef enum {
 	TRACE_DIR_OUTGOING = 0,		/**< Packets originating "inside" */
 	TRACE_DIR_INCOMING = 1,		/**< Packets originating "outside" */
-	TRACE_DIR_OTHER	   = 2		/**< Packets with an unknown direction, or one that's unknown */
+	TRACE_DIR_OTHER	   = 2,		/**< Packets with an unknown direction, or one that's unknown */
+	TRACE_DIR_UNKNOWN = -1,		/**< No direction information available */
 } libtrace_direction_t;
 
 /** Enumeration of Radiotap fields */
