@@ -116,7 +116,9 @@ if test "$GCC" = "yes"; then
 	# visibility is supported in gcc 4.0 or later, so we just need to
 	# check the major version number
 
-	major=${gcc_version%\.*\.*}
+	major=$(echo $gcc_version | cut -d'.' -f1)
+
+	#major=${gcc_version%\.*\.*}
 
 	if test "$major" -lt 4; then
 		vis=no
@@ -375,7 +377,7 @@ fi
 
 # Check for DPDK 
 AC_ARG_WITH(dpdk,
-	    AS_HELP_STRING(--with-dpdk,include DPDK live capture support (Must set RTE_SDK/_TARGET enviroment variable)),
+	    AS_HELP_STRING(--with-dpdk,include DPDK live capture support (Must set RTE_SDK/_TARGET environment variable)),
 [
         if test "$withval" = no
         then
@@ -385,7 +387,7 @@ AC_ARG_WITH(dpdk,
         fi
 ],[
         # Default to building without DPDK format
-        want_dpdk=ifpresent
+        want_dpdk=no
 ])
 
 libtrace_dpdk=false
@@ -682,8 +684,13 @@ fi
 
 if test x"$libtrace_dpdk" = xtrue; then
     AC_MSG_NOTICE([Compiled with DPDK live capture support: Yes])
-else
-    AC_MSG_NOTICE([Compiled with DPDK live capture support: No (Requires DPDK v1.5 or newer)])
+elif test x"$want_dpdk" != "xno"; then
+#   We don't officially support DPDK so only report failure if the user
+#   explicitly asked for DPDK. That way, we can hopefully keep it hidden
+#   from most users for now...
+	
+    AC_MSG_NOTICE([Compiled with DPDK live capture support: No])
+    AC_MSG_NOTICE([Note: Requires DPDK v1.5 or newer])
 fi
 reportopt "Compiled with LLVM BPF JIT support" $JIT
 reportopt "Building man pages/documentation" $libtrace_doxygen
