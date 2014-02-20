@@ -142,6 +142,14 @@ echo " * pcapfile -> pcapfile"
 rm -f traces/*.out.*
 do_test ./test-convert pcapfile pcapfile
 
+echo " * pcapfilens -> pcapfile"
+rm -f traces/*.out.*
+do_test ./test-convert pcapfilens pcapfile
+
+echo " * pcapfilens -> erf"
+rm -f traces/*.out.*
+do_test ./test-convert pcapfilens erf
+
 echo " * pcap -> pcapfile"
 rm -f traces/*.out.*
 do_test ./test-convert pcap pcapfile
