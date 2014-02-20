@@ -71,6 +71,7 @@ int cmp_sockaddr_dl(const struct sockaddr_dl *a, const struct sockaddr_dl *b)
 
 #endif
 
+
 int cmp_sockaddr(const struct sockaddr *a, const struct sockaddr *b)
 {
 	if (a->sa_family != b->sa_family) {

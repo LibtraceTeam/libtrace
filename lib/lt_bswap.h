@@ -32,7 +32,7 @@
  */
 
 #include <arpa/inet.h>
-
+#include <inttypes.h>
 /** @file
  *
  * @brief Header file containing definitions of functions and macros that deal
