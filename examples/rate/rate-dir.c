@@ -75,7 +75,7 @@ int32_t counter[MAXCOUNTERDIR][MAXCOUNTERTYPE][MAXCOUNTERFRAME];
 struct timeval current,last,diff,total;
 
 
-static int32_t smoothed(int32_t smoothed, int32_t instant, int32_t alpha) {
+static int32_t smoothed(int32_t smoothed, int32_t instant, double alpha) {
         return alpha * smoothed + (1-alpha) * instant;
 }
 
