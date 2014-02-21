@@ -260,6 +260,8 @@ static void *lzo_compress_thread(void *data)
 			me->inbuf.offset,
 			&me->outbuf);
 
+                if (err < 0)
+                        break; 
 		/* Make sure someone else hasn't clobbered us!*/
 		assert(me->state == WAITING);
 		me->state = FULL;
