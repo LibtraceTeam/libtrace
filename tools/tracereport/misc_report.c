@@ -31,7 +31,7 @@ static char *ts_to_date(double ts)
 {
 	time_t sec = (time_t)ts;
 	static char ret[1024];
-	strcpy(ret,ctime(&sec));
+	strncpy(ret,ctime(&sec),1024-1);
 	ret[strlen(ret)-1]='\0'; /* Get rid of the annoying \n */
 	return ret;
 }
@@ -66,7 +66,6 @@ static char *duration(double ts)
 				ret[0]?", ":"",
 				ts);
 		strncat(ret,tmp, 1024 - strlen(ret) - 1);
-		strcat(ret,tmp);
 	}
 	return ret;
 }
