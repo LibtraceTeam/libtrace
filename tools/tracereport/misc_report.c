@@ -51,20 +51,21 @@ static char *duration(double ts)
 		snprintf(tmp,sizeof(tmp),"%s%i hours",
 				ret[0]?", ":"",
 				(int)ts/(60*60));
-		strcat(ret,tmp);
+		strncat(ret,tmp, 1024 - strlen(ret) - 1);
 		ts-=(int)(ts/(60*60))*60*60;
 	}
 	if (ts>=60) {
 		snprintf(tmp,sizeof(tmp),"%s%i minutes",
 				ret[0]?", ":"",
 				(int)ts/60);
-		strcat(ret,tmp);
+		strncat(ret,tmp, 1024 - strlen(ret) - 1);
 		ts-=(int)(ts/60)*60;
 	}
 	if (ts>0) {
 		snprintf(tmp,sizeof(tmp),"%s%.04f seconds",
 				ret[0]?", ":"",
 				ts);
+		strncat(ret,tmp, 1024 - strlen(ret) - 1);
 		strcat(ret,tmp);
 	}
 	return ret;

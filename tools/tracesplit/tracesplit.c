@@ -33,7 +33,7 @@ char *output_base = NULL;
 static char *strdupcat(char *str,char *app)
 {
 	str=realloc(str,strlen(str)+strlen(app)+1);
-	strcat(str,app);
+	strncat(str,app,strlen(str) + strlen(app));
 	return str;
 }
 
