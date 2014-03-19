@@ -420,7 +420,7 @@ static int legacynzix_get_wire_length(const libtrace_packet_t *packet) {
 static uint64_t legacy_get_erf_timestamp(const libtrace_packet_t *packet)
 {
 	legacy_ether_t *legacy = (legacy_ether_t*)packet->header;
-	return legacy->ts;
+	return bswap_le_to_host64(legacy->ts);
 }  
 
 static uint32_t ts_cmp(uint32_t ts_a, uint32_t ts_b) {
