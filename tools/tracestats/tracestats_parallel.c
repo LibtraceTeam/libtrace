@@ -54,7 +54,8 @@
 
 #include "libtrace.h"
 #include "lt_inttypes.h"
-#include "trace_vector.h"
+#include "data-struct/vector.h"
+#include "data-struct/message_queue.h"
 #include <pthread.h>
 
 struct libtrace_t *trace;

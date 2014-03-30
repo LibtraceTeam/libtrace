@@ -1,7 +1,7 @@
 #include <pthread.h>
 
-#ifndef DEQUE_H
-#define DEQUE_H
+#ifndef LIBTRACE_DEQUE_H
+#define LIBTRACE_DEQUE_H
 
 typedef struct list_node list_node_t;
 typedef struct libtrace_queue {

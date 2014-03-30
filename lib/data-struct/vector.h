@@ -1,8 +1,9 @@
 #include <pthread.h>
-#include "libtrace_int.h"
+/* Need libtrace.h for DLLEXPORT defines */
+#include "../libtrace.h"
 
-#ifndef TRACE_VECTOR_H
-#define TRACE_VECTOR_H
+#ifndef LIBTRACE_VECTOR_H
+#define LIBTRACE_VECTOR_H
 
 typedef struct libtrace_vector {
 	int max_size;

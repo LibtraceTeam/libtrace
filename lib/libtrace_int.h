@@ -147,6 +147,12 @@ int snprintf(char *str, size_t size, const char *format, ...);
 #include "bpf-jit/bpf-jit.h"
 #endif
 
+#include "data-struct/ring_buffer.h"
+#include "data-struct/vector.h"
+#include "data-struct/message_queue.h"
+#include "data-struct/deque.h"
+#include "data-struct/sliding_window.h"
+
 //#define RP_BUFSIZE 65536U
 
 /** Data about the most recent event from a trace file */
@@ -200,13 +206,6 @@ enum hasher_types {
 #define REDUCE_STEPPING 0x10
 
 #define MAPPER_USE_SLIDING_WINDOW 0x20
-
-
-#include "trace_ringbuffer.h"
-#include "trace_vector.h"
-#include "libtrace_message_queue.h"
-#include "deque.h"
-#include "trace_sliding_window.h"
 
 /**
  * Information of this thread

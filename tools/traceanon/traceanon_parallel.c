@@ -8,8 +8,10 @@
 #include <stddef.h>
 #include <string.h>
 #include <time.h>
+#include <assert.h>
 #include "ipenc.h"
-#include <trace_vector.h>
+#include <data-struct/vector.h>
+#include <data-struct/message_queue.h>
 
 bool enc_source = false;
 bool enc_dest 	= false;

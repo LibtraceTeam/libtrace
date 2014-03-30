@@ -1,6 +1,7 @@
+#include "message_queue.h"
+
 #include <unistd.h>
 #include <stdio.h>
-#include "libtrace_message_queue.h"
 #include <limits.h>
 
 /**

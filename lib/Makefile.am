@@ -52,7 +52,9 @@ libtrace_la_SOURCES = trace.c trace_parallel.c common.h \
 		$(DAGSOURCE) format_erf.h \
 		$(BPFJITSOURCE) \
 		libtrace_arphrd.h \
-		trace_ringbuffer.c trace_vector.c libtrace_message_queue.c deque.c trace_sliding_window.c hash_toeplitz.c
+		data-struct/ring_buffer.c data-struct/vector.c data-struct/message_queue.c \
+		data-struct/deque.c data-struct/sliding_window.c \
+		hash_toeplitz.c
 
 if DAG2_4
 nodist_libtrace_la_SOURCES = dagopts.c dagapi.c

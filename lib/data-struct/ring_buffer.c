@@ -2,7 +2,8 @@
  * A ring or circular buffer, very useful
  */
 
-#include "trace_ringbuffer.h"
+#include "ring_buffer.h"
+
 #include <stdlib.h>
 #include <assert.h>
 

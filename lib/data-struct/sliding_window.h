@@ -1,9 +1,7 @@
-#include <pthread.h>
-#include <semaphore.h>
 #include <stdint.h>
 
-#ifndef TRACE_SLIDING_WINDOW_H
-#define TRACE_SLIDING_WINDOW_H
+#ifndef LIBTRACE_SLIDING_WINDOW_H
+#define LIBTRACE_SLIDING_WINDOW_H
 
 #define LIBTRACE_SLIDING_WINDOW_BLOCKING 0
 #define LIBTRACE_SLIDING_WINDOW_SPINNING 1

@@ -56,7 +56,8 @@
 #include "rt_protocol.h"
 #include "dagformat.h"
 
-#include "trace_vector.h"
+#include "data-struct/vector.h"
+#include "data-struct/message_queue.h"
 
 #ifndef UINT32_MAX
 	#define UINT32_MAX      0xffffffffU

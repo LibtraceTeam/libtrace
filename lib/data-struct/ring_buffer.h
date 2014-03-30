@@ -1,8 +1,8 @@
 #include <pthread.h>
 #include <semaphore.h>
 
-#ifndef TRACE_RINGBUFFER_H
-#define TRACE_RINGBUFFER_H
+#ifndef LIBTRACE_RINGBUFFER_H
+#define LIBTRACE_RINGBUFFER_H
 
 #define LIBTRACE_RINGBUFFER_BLOCKING 0
 #define LIBTRACE_RINGBUFFER_POLLING 1

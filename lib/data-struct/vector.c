@@ -1,4 +1,5 @@
-#include "trace_vector.h"
+#include "vector.h"
+
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
