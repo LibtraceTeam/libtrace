@@ -5,7 +5,6 @@
 #include "trace_ringbuffer.h"
 #include <stdlib.h>
 #include <assert.h>
-#include <xmmintrin.h> // This will break stuff on non x86x64 systems
 
 #define LOCK_TYPE_MUTEX 0 // Default if not defined
 #define LOCK_TYPE_SPIN 1
