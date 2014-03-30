@@ -359,6 +359,11 @@ static struct libtrace_format_t duck = {
         NULL,                           /* get_fd */
         NULL,              		/* trace_event */
         duck_help,                     	/* help */
+        NULL, /* pstart_input */
+        NULL, /* pread_packet */
+        NULL, /* ppause_input */
+        NULL, /* pfin_input */
+        NULL, /* pconfig_input */
         NULL                            /* next pointer */
 };
 

@@ -1,8 +1,8 @@
 lib_LTLIBRARIES = libtrace.la
 include_HEADERS = libtrace.h dagformat.h lt_inttypes.h daglegacy.h rt_protocol.h erftypes.h  
 
-AM_CFLAGS=@LIBCFLAGS@
-AM_CXXFLAGS=@LIBCXXFLAGS@
+AM_CFLAGS=@LIBCFLAGS@ -pthread
+AM_CXXFLAGS=@LIBCXXFLAGS@ -pthread
 
 extra_DIST = format_template.c
 NATIVEFORMATS=format_linux.c
@@ -39,7 +39,7 @@ export DPDK_LIBTRACE_MK=dpdk_libtrace.mk
 include $(DPDK_LIBTRACE_MK)
 endif
 
-libtrace_la_SOURCES = trace.c common.h \
+libtrace_la_SOURCES = trace.c trace_parallel.c common.h \
 		format_erf.c format_pcap.c format_legacy.c \
 		format_rt.c format_helper.c format_helper.h format_pcapfile.c \
 		format_duck.c format_tsh.c $(NATIVEFORMATS) $(BPFFORMATS) \
@@ -51,7 +51,8 @@ libtrace_la_SOURCES = trace.c common.h \
 		protocols_transport.c protocols.h protocols_ospf.c \
 		$(DAGSOURCE) format_erf.h \
 		$(BPFJITSOURCE) \
-		libtrace_arphrd.h
+		libtrace_arphrd.h \
+		trace_ringbuffer.c trace_vector.c libtrace_message_queue.c deque.c trace_sliding_window.c hash_toeplitz.c
 
 if DAG2_4
 nodist_libtrace_la_SOURCES = dagopts.c dagapi.c

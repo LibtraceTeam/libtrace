@@ -647,6 +647,11 @@ static struct libtrace_format_t bpf = {
 	NULL,			/* get_fd */
 	NULL,			/* trace_event */
 	bpf_help,		/* help */
+	NULL, /* pstart_input */
+	NULL, /* pread_packet */
+	NULL, /* ppause_input */
+	NULL, /* pfin_input */
+	NULL, /* pconfig_input */
 	NULL
 };
 #endif  /* HAVE_DECL_BIOCSETIF */

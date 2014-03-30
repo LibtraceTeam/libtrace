@@ -7,16 +7,16 @@
 #include <inttypes.h>
 #include "panon.h"
 
-static uint8_t m_key[16];
-static uint8_t m_pad[16];
+static __thread uint8_t m_key[16];
+static __thread  uint8_t m_pad[16];
 
 #define CACHEBITS 20
 #define CACHESIZE (1 << CACHEBITS)
 
 //static uint32_t enc_cache[CACHESIZE];
 
-static uint32_t *enc_cache = 0;
-static uint32_t fullcache[2][2];
+static __thread  uint32_t *enc_cache = 0; // Should be ok shared across multiple
+static __thread  uint32_t fullcache[2][2]; // Needs to be against on thread
 
 
 

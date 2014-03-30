@@ -1,0 +1,163 @@
+#include "deque.h"
+#include <assert.h>
+#include <stddef.h>
+#include <malloc.h>
+#include <string.h>
+
+
+/* Ensure we don't do any reads without locking even if we *know* that 
+ * any write will be atomic */
+#ifndef RACE_SAFE
+#define RACE_SAFE 1
+#endif
+
+struct list_node {
+	list_node_t * next;
+	list_node_t * prev;
+	char data[]; // Our item goes here
+};
+
+void libtrace_deque_init(libtrace_queue_t * q, int element_size)
+{
+	q->head = NULL;
+	q->tail = NULL;
+	q->size = 0;
+	q->element_size = element_size;
+//	q->max_size;
+	assert(pthread_mutex_init(&q->lock, NULL) == 0);
+}
+
+inline void libtrace_deque_push_back(libtrace_queue_t *q, void *d)
+{
+	// Do as much work as possible outside the lock
+	list_node_t * new_node = (list_node_t *) malloc(sizeof(list_node_t) + q->element_size);
+	new_node->next = NULL;
+	// Fill it
+	memcpy(&new_node->data, d, q->element_size);
+	// Only ->prev is unknown at this stage to be completed in lock
+	assert(pthread_mutex_lock(&q->lock) == 0);
+	if (q->head == NULL) {
+		assert(q->tail == NULL && q->size == 0);
+		new_node->prev = NULL;
+		q->head = q->tail = new_node;
+	} else {
+		assert (q->tail != NULL);
+		q->tail->next = new_node;
+		new_node->prev = q->tail; // Done the double link
+		q->tail = new_node; // Relink tail
+	}
+	q->size++;
+	assert(pthread_mutex_unlock(&q->lock) == 0);
+}
+
+inline void libtrace_deque_push_front(libtrace_queue_t *q, void *d)
+{
+	// Do as much work as possible outside the lock
+	list_node_t * new_node = (list_node_t *) malloc(sizeof(list_node_t) + q->element_size);
+	new_node->prev = NULL;
+	// Fill it
+	memcpy(&new_node->data, d, q->element_size);
+	// Only ->next is unknown at this stage to be completed in lock
+	assert(pthread_mutex_lock(&q->lock) == 0);
+	if (q->head == NULL) {
+		assert(q->tail == NULL && q->size == 0);
+		new_node->next = NULL;
+		q->head = q->tail = new_node;
+	} else {
+		assert (q->head != NULL);
+		q->head->prev = new_node;
+		new_node->next = q->head; // Done the double link
+		q->head = new_node; // Relink head
+		// Void out the other things
+	}
+	q->size++;
+	assert(pthread_mutex_unlock(&q->lock) == 0);
+}
+
+inline int libtrace_deque_peek_front(libtrace_queue_t *q, void *d)
+{
+	int ret = 1;
+	assert(pthread_mutex_lock(&q->lock) == 0);
+	if (q->head == NULL)
+		ret = 0;
+	else
+		memcpy(d, &q->head->data, q->element_size);
+	assert(pthread_mutex_unlock(&q->lock) == 0);
+	return ret;
+}
+
+inline int libtrace_deque_peek_tail(libtrace_queue_t *q, void *d)
+{
+	int ret = 1;
+	assert(pthread_mutex_lock(&q->lock) == 0);
+	if (q->tail == NULL)
+		ret = 0;
+	else
+		memcpy(d, &q->tail->data, q->element_size);
+	assert(pthread_mutex_unlock(&q->lock) == 0);
+	return ret;
+}
+
+inline int libtrace_deque_pop_front(libtrace_queue_t *q, void *d)
+{
+	int ret = 0;
+	list_node_t * n = NULL;
+	assert(pthread_mutex_lock(&q->lock) == 0);
+	if (q->head != NULL) {
+		n = q->head;
+		ret = 1;
+		q->head = n->next;
+		if (q->head)
+			q->head->prev = NULL;
+		q->size--;
+		if (q->size <= 1) // Either 1 or 0 items
+			q->tail = q->head;
+	}
+	assert(pthread_mutex_unlock(&q->lock) == 0);
+	// Unlock once we've removed it :)
+	if (ret) {
+		memcpy(d, &n->data, q->element_size);
+		free(n);
+	}
+	return ret;
+}
+
+inline int libtrace_deque_pop_tail(libtrace_queue_t *q, void *d)
+{
+	int ret = 0;
+	list_node_t * n;
+	assert(pthread_mutex_lock(&q->lock) == 0);
+	if (q->tail != NULL) {
+		n = q->tail;
+		ret = 1;
+		q->tail = n->prev;
+		if(q->tail)
+			q->tail->next = NULL;
+		q->size--;
+		if (q->size <= 1) // Either 1 or 0 items
+			q->head = q->tail;
+	}
+	assert(pthread_mutex_unlock(&q->lock) == 0);
+	memcpy(d, &q->tail->data, q->element_size);
+	free(n);
+	return ret;
+}
+
+inline int libtrace_deque_get_size(libtrace_queue_t *q)
+{
+#if RACE_SAFE
+	int ret;
+	assert(pthread_mutex_lock(&q->lock) == 0);
+	ret = q->size;
+	assert(pthread_mutex_unlock(&q->lock) == 0);
+	return ret;
+#else
+	return q->size;
+#endif
+}
+
+inline void libtrace_zero_deque(libtrace_queue_t *q)
+{
+	q->head = q->tail = NULL;
+	q->size = q->element_size = 0;
+}

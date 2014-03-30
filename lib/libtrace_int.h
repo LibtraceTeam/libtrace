@@ -165,6 +165,93 @@ struct libtrace_event_status_t {
 	bool waiting;
 };
 
+enum thread_types {
+	THREAD_EMPTY,
+	THREAD_HASHER,
+	THREAD_MAPPER,
+	THREAD_REDUCER
+};
+
+enum thread_states {
+	THREAD_RUNNING,
+	THREAD_FINISHING,
+	THREAD_FINISHED,
+	THREAD_PAUSED
+};
+
+enum hasher_types {
+	HASHER_BALANCE, /** Balance load across CPUs best as possible this is basically to say don't care about hash, but this might still might be implemented using a hash or round robin etc.. */
+	HASHER_BIDIRECTIONAL, /** Use a hash which is uni-directional for TCP flows (IP src dest,TCP port src dest), non TCP
+							Will be sent to the same place, with the exception of UDP which may or may not be sent to separate cores */
+	HASHER_UNIDIRECTIONAL, /** Use a hash which is uni-directional across TCP flow */
+	HASHER_CUSTOM, /** Always use the user supplied hasher */
+	HASHER_HARDWARE, /** Set by the format if the hashing is going to be done in hardware */
+};
+
+// Reduce expects sequential data
+#define REDUCE_SEQUENTIAL 0x1
+// Reduce is working on ordered data
+#define REDUCE_ORDERED 0x2
+// Reduce should sort the data
+#define REDUCE_SORT 0x4
+// Drop out of order valid with
+#define REDUCE_DROP_OOO 0x8
+// Reduce reads all queues with same key
+#define REDUCE_STEPPING 0x10
+
+#define MAPPER_USE_SLIDING_WINDOW 0x20
+
+
+#include "trace_ringbuffer.h"
+#include "trace_vector.h"
+#include "libtrace_message_queue.h"
+#include "deque.h"
+#include "trace_sliding_window.h"
+
+/**
+ * Information of this thread
+ */
+typedef struct libtrace_thread_t {
+	libtrace_t * trace;
+	void* ret;
+	enum thread_types type;
+	enum thread_states state;
+	void* user_data; // TLS for the user to use
+	pthread_t tid;
+	int map_num; // A number from 0-X that represents this mapper number
+				// in the table, intended to quickly identify this thread
+				// -1 represents NA (such as in the case this is not a mapper thread)
+	libtrace_ringbuffer_t rbuffer; // Input
+	libtrace_vector_t vector; // Output
+	libtrace_queue_t deque; // Real Output type makes more sense
+	libtrace_message_queue_t messages; // Message handling
+	// Temp storage for time sensitive results
+	uint64_t tmp_key;
+	void *tmp_data;
+	pthread_spinlock_t tmp_spinlock;
+	// Set to true once the first packet has been stored
+	bool recorded_first;
+	// For thread safety reason we actually must store this here
+	int64_t tracetime_offset_usec;
+} libtrace_thread_t;
+
+/**
+ * Storage to note time value against each.
+ * Used both internally to do trace time playback
+ * and can be used externally to assist applications which need
+ * a trace starting time such as tracertstats.
+ */
+struct first_packets {
+	pthread_spinlock_t lock;
+	size_t count; // If == mappers we have all
+	size_t first; // Valid if count != 0
+	struct __packet_storage_magic_type {
+		libtrace_packet_t * packet;
+		struct timeval tv;
+	} * packets;
+};
+
+
 /** A libtrace input trace 
  * @internal
  */
@@ -186,21 +273,71 @@ struct libtrace_t {
 	/** Count of the number of packets filtered by libtrace */
 	uint64_t filtered_packets;	
 	/** The filename from the uri for the trace */
-	char *uridata;			
+	char *uridata;
 	/** The libtrace IO reader for this trace (if applicable) */
-	io_t *io;			
+	io_t *io;
 	/** Error information for the trace */
-	libtrace_err_t err;		
+	libtrace_err_t err;
 	/** Boolean flag indicating whether the trace has been started */
-	bool started;			
+	bool started;
+	/** Synchronise writes/reads across this format object and attached threads etc */
+	pthread_mutex_t libtrace_lock;
+	
+	/** Use to control pausing threads and finishing threads etc always used with libtrace_lock */
+	pthread_cond_t perpkt_cond;
+	/** Set to the number of mapper threads that are finishing (or have finished), or to -1 once all have been joined, 0 implies all are running */
+	int mappers_finishing;
+	/** A count of mappers that are pausing */
+	int perpkt_pausing;
+	
+	/** For the sliding window hasher implementation */
+	pthread_rwlock_t window_lock;
+	/** Set once trace_join has been called */
+	bool joined;
+	/** Set to indicate a mappers queue is full and such the writing mapper cannot proceed */
+	bool mapper_queue_full;
+	/** Global storage for this trace, shared among all the threads  */
+	void* global_blob;
+	/** Requested size of the pkt buffer (currently only used if using dedicated hasher thread) */
+	int packet_freelist_size;
+	/** The actual freelist */
+	libtrace_ringbuffer_t packet_freelist;
+	/** The number of packets that can queue per mapper thread - XXX consider deadlocks with non malloc()'d packets that need to be released */
+	int mapper_buffer_size;
+	/** The reducer flags */
+	int reducer_flags;
+	/** Used to track the next expected key */
+	uint64_t expected_key;
+	/** User defined per_pkt function called when a pkt is ready */
+	fn_per_pkt per_pkt;
+	/** User defined reducer function entry point XXX not hooked up */
+	fn_reducer reducer;
+	/** The hasher function */
+	enum hasher_types hasher_type;
+	/** The hasher function - NULL implies they don't care or balance */
+	fn_hasher hasher; // If valid using a separate thread
+	void *hasher_data;
+	
+	libtrace_thread_t hasher_thread;
+	libtrace_thread_t reducer_thread;
+	int mapper_thread_count;
+	libtrace_thread_t * mapper_threads; // All our mapper threads
+	libtrace_slidingwindow_t sliding_window;
+	sem_t sem;
+	// Used to keep track of the first packet seen on each thread
+	struct first_packets first_packets;
+	int tracetime;
 };
+
+inline void libtrace_zero_thread(libtrace_thread_t * t);
+inline void store_first_packet(libtrace_t *libtrace, libtrace_packet_t *packet, libtrace_thread_t *t);
 
 /** A libtrace output trace
  * @internal
  */
 struct libtrace_out_t {
 	/** The capture format for the output trace */
-        struct libtrace_format_t *format;
+	struct libtrace_format_t *format;
 	/** Pointer to the "global" data for the capture format module */
 	void *format_data; 		
 	/** The filename for the uri for the output trace */
@@ -208,7 +345,7 @@ struct libtrace_out_t {
 	/** Error information for the output trace */
 	libtrace_err_t err;
 	/** Boolean flag indicating whether the trace has been started */
-	bool started;			
+	bool started;
 };
 
 /** Sets the error status on an input trace
@@ -732,7 +869,41 @@ struct libtrace_format_t {
 
 	/** Prints some useful help information to standard output. */
 	void (*help)(void);
-
+	
+	/** Starts or unpauses an input trace in parallel mode - note that
+	 * this function is often the one that opens the file or device for
+	 * reading.
+	 *
+	 * @param libtrace	The input trace to be started or unpaused
+	 * @return If successful the number of threads started, 0 indicates
+	 * 		   no threads started and this should be done automatically.
+	 * 		   Otherwise in event of an error -1 is returned.
+	 * 
+	 */
+	int (*pstart_input)(libtrace_t *trace);
+	
+	/** Read a packet in the new parallel mode 
+	 * @return same as read_packet, with the addition of return -2 to represent
+	 * interrupted due to message waiting. */
+	int (*pread_packet)(libtrace_t *trace, libtrace_packet_t *packet);
+	
+	/** Pause a parallel trace */
+	int (*ppause_input)(libtrace_t *trace);
+	
+	/** Called after all threads have been paused, Finish (close) a parallel trace */
+	int (*pfin_input)(libtrace_t *trace);
+	
+	/** Applies a configuration option to an input trace.
+	 *
+	 * @param libtrace	The input trace to apply the option to
+	 * @param option	The option that is being configured
+	 * @param value		A pointer to the value that the option is to be
+	 * 			set to
+	 * @return 0 if successful, -1 if the option is unsupported or an error
+	 * occurs
+	 */
+	int (*pconfig_input)(libtrace_t *libtrace,trace_parallel_option_t option,void *value);
+	
 	/** Next pointer, should always be NULL - used by the format module
 	 * manager. */
 	struct libtrace_format_t *next;

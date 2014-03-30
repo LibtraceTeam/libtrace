@@ -556,6 +556,11 @@ static struct libtrace_format_t dag = {
         NULL,                           /* get_fd */
         trace_event_dag,                /* trace_event */
         dag_help,                       /* help */
+        NULL, /* pstart_input */
+        NULL, /* pread_packet */
+        NULL, /* ppause_input */
+        NULL, /* pfin_input */
+        NULL, /* pconfig_input */
         NULL                            /* next pointer */
 };
 
