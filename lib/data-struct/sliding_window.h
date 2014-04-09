@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <stddef.h>
 
 #ifndef LIBTRACE_SLIDING_WINDOW_H
 #define LIBTRACE_SLIDING_WINDOW_H
@@ -9,13 +10,13 @@
 // All of start, elements and end must be accessed in the listed order
 // if LIBTRACE_RINGBUFFER_SPINNING is to work.
 typedef struct libtrace_slidingwindow {
-	volatile int start;
-	int size;
+	volatile size_t start;
+	size_t size;
 	volatile uint64_t start_number; 
 	void *volatile*elements;
 } libtrace_slidingwindow_t;
 
-void libtrace_slidingwindow_init(libtrace_slidingwindow_t * sw, int size, uint64_t start_number);
+void libtrace_slidingwindow_init(libtrace_slidingwindow_t * sw, size_t size, uint64_t start_number);
 inline void libtrace_zero_slidingwindow(libtrace_slidingwindow_t * sw);
 void libtrace_slidingwindow_destroy(libtrace_slidingwindow_t * sw);
 

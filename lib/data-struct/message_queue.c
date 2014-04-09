@@ -71,7 +71,7 @@ inline int libtrace_message_queue_get(libtrace_message_queue_t *mq, void *messag
 	ret = mq->message_count--;
 	pthread_spin_unlock(&mq->spin);
 	assert(read(mq->pipefd[0], message, mq->message_len) == (int) mq->message_len);
-	return ret; 
+	return ret;
 }
 
 /**

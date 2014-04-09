@@ -52,7 +52,7 @@
  * 				becomes available. LIBTRACE_RINGBUFFER_BLOCKING or LIBTRACE_RINGBUFFER_POLLING.
  * 				NOTE: this mainly applies to the blocking functions
  */
-inline void libtrace_ringbuffer_init(libtrace_ringbuffer_t * rb, int size, int mode) {
+DLLEXPORT void libtrace_ringbuffer_init(libtrace_ringbuffer_t * rb, size_t size, int mode) {
 	size = size + 1;
 	assert (size > 1);
 	rb->size = size; // Only this -1 actually usable :)
@@ -87,7 +87,7 @@ inline void libtrace_ringbuffer_init(libtrace_ringbuffer_t * rb, int size, int m
  * Destroys the ring buffer along with any memory allocated to it
  * @param rb The ringbuffer to destroy
  */
-inline void libtrace_ringbuffer_destroy(libtrace_ringbuffer_t * rb) {
+DLLEXPORT void libtrace_ringbuffer_destroy(libtrace_ringbuffer_t * rb) {
 #if USE_LOCK_TYPE == LOCK_TYPE_SPIN
 	assert(pthread_spin_destroy(&rb->swlock) == 0);
 	assert(pthread_spin_destroy(&rb->srlock) == 0);
@@ -115,7 +115,7 @@ inline void libtrace_ringbuffer_destroy(libtrace_ringbuffer_t * rb) {
  * this doesn't guarantee that the next operation wont block. Use
  * write/read try instead.
  */
-inline int libtrace_ringbuffer_is_empty(const libtrace_ringbuffer_t * rb) {
+DLLEXPORT int libtrace_ringbuffer_is_empty(const libtrace_ringbuffer_t * rb) {
 	return rb->start == rb->end;
 }
 
@@ -124,7 +124,7 @@ inline int libtrace_ringbuffer_is_empty(const libtrace_ringbuffer_t * rb) {
  * this doesn't guarantee that the next operation wont block. Use
  * write/read try instead.
  */
-inline int libtrace_ringbuffer_is_full(const libtrace_ringbuffer_t * rb) {
+DLLEXPORT int libtrace_ringbuffer_is_full(const libtrace_ringbuffer_t * rb) {
 #if USE_MODULUS
 	return rb->start == ((rb->end + 1) % rb->size);
 #else
@@ -142,7 +142,7 @@ inline int libtrace_ringbuffer_is_full(const libtrace_ringbuffer_t * rb) {
  * @param rb a pointer to libtrace_ringbuffer structure
  * @param value the value to store
  */
-inline void libtrace_ringbuffer_write(libtrace_ringbuffer_t * rb, void* value) {
+DLLEXPORT void libtrace_ringbuffer_write(libtrace_ringbuffer_t * rb, void* value) {
 	/* Need an empty to start with */
 	if (rb->mode == LIBTRACE_RINGBUFFER_BLOCKING)
 		assert(sem_wait(&rb->emptys) == 0);
@@ -179,7 +179,7 @@ inline void libtrace_ringbuffer_write(libtrace_ringbuffer_t * rb, void* value) {
  * @param value the value to store
  * @return 1 if a object was written otherwise 0.
  */
-inline int libtrace_ringbuffer_try_write(libtrace_ringbuffer_t * rb, void* value) {
+DLLEXPORT int libtrace_ringbuffer_try_write(libtrace_ringbuffer_t * rb, void* value) {
 	if (libtrace_ringbuffer_is_full(rb))
 		return 0;
 	libtrace_ringbuffer_write(rb, value);
@@ -193,7 +193,7 @@ inline int libtrace_ringbuffer_try_write(libtrace_ringbuffer_t * rb, void* value
  * @param out a pointer to a memory address where the returned item would be placed
  * @return The object that was read
  */
-inline void* libtrace_ringbuffer_read(libtrace_ringbuffer_t *rb) {
+DLLEXPORT void* libtrace_ringbuffer_read(libtrace_ringbuffer_t *rb) {
 	void* value;
 	
 	/* We need a full slot */
@@ -227,7 +227,7 @@ inline void* libtrace_ringbuffer_read(libtrace_ringbuffer_t *rb) {
  * @param out a pointer to a memory address where the returned item would be placed
  * @return 1 if a object was received otherwise 0, in this case out remains unchanged
  */
-inline int libtrace_ringbuffer_try_read(libtrace_ringbuffer_t *rb, void ** value) {
+DLLEXPORT int libtrace_ringbuffer_try_read(libtrace_ringbuffer_t *rb, void ** value) {
 	if (libtrace_ringbuffer_is_empty(rb))
 		return 0;
 	*value = libtrace_ringbuffer_read(rb);
@@ -237,7 +237,7 @@ inline int libtrace_ringbuffer_try_read(libtrace_ringbuffer_t *rb, void ** value
 /**
  * A thread safe version of libtrace_ringbuffer_write
  */
-inline void libtrace_ringbuffer_swrite(libtrace_ringbuffer_t * rb, void* value) {
+DLLEXPORT void libtrace_ringbuffer_swrite(libtrace_ringbuffer_t * rb, void* value) {
 	LOCK(w);
 	libtrace_ringbuffer_write(rb, value);
 	UNLOCK(w);
@@ -246,7 +246,7 @@ inline void libtrace_ringbuffer_swrite(libtrace_ringbuffer_t * rb, void* value) 
 /**
  * A thread safe version of libtrace_ringbuffer_try_write
  */
-inline int libtrace_ringbuffer_try_swrite(libtrace_ringbuffer_t * rb, void* value) {
+DLLEXPORT int libtrace_ringbuffer_try_swrite(libtrace_ringbuffer_t * rb, void* value) {
 	int ret;
 #if USE_CHECK_EARLY
 	if (libtrace_ringbuffer_is_full(rb)) // Check early, drd issues
@@ -265,7 +265,7 @@ inline int libtrace_ringbuffer_try_swrite(libtrace_ringbuffer_t * rb, void* valu
  * is holding the lock. However will not block for long if only libtrace_ringbuffer_try_swrite_bl
  * and libtrace_ringbuffer_try_swrite are being used.
  */
-inline int libtrace_ringbuffer_try_swrite_bl(libtrace_ringbuffer_t * rb, void* value) {
+DLLEXPORT int libtrace_ringbuffer_try_swrite_bl(libtrace_ringbuffer_t * rb, void* value) {
 	int ret;
 #if USE_CHECK_EARLY
 	if (libtrace_ringbuffer_is_full(rb)) // Check early
@@ -280,7 +280,7 @@ inline int libtrace_ringbuffer_try_swrite_bl(libtrace_ringbuffer_t * rb, void* v
 /**
  * A thread safe version of libtrace_ringbuffer_read
  */
-inline void * libtrace_ringbuffer_sread(libtrace_ringbuffer_t *rb) {
+DLLEXPORT void * libtrace_ringbuffer_sread(libtrace_ringbuffer_t *rb) {
 	void* value;
 	LOCK(r);
 	value = libtrace_ringbuffer_read(rb);
@@ -291,7 +291,7 @@ inline void * libtrace_ringbuffer_sread(libtrace_ringbuffer_t *rb) {
 /**
  * A thread safe version of libtrace_ringbuffer_try_write
  */
-inline int libtrace_ringbuffer_try_sread(libtrace_ringbuffer_t *rb, void ** value) {
+DLLEXPORT int libtrace_ringbuffer_try_sread(libtrace_ringbuffer_t *rb, void ** value) {
 	int ret;
 #if USE_CHECK_EARLY
 	if (libtrace_ringbuffer_is_empty(rb)) // Check early
@@ -310,7 +310,7 @@ inline int libtrace_ringbuffer_try_sread(libtrace_ringbuffer_t *rb, void ** valu
  * is holding the lock. However will not block for long if only libtrace_ringbuffer_try_sread_bl
  * and libtrace_ringbuffer_try_sread are being used.
  */
-inline int libtrace_ringbuffer_try_sread_bl(libtrace_ringbuffer_t *rb, void ** value) {
+DLLEXPORT int libtrace_ringbuffer_try_sread_bl(libtrace_ringbuffer_t *rb, void ** value) {
 	int ret;
 #if USE_CHECK_EARLY
 	if (libtrace_ringbuffer_is_empty(rb)) // Check early
@@ -322,7 +322,7 @@ inline int libtrace_ringbuffer_try_sread_bl(libtrace_ringbuffer_t *rb, void ** v
 	return ret;
 }
 
-inline void libtrace_zero_ringbuffer(libtrace_ringbuffer_t * rb)
+DLLEXPORT void libtrace_zero_ringbuffer(libtrace_ringbuffer_t * rb)
 {
 	rb->start = 0;
 	rb->end = 0;

@@ -13,12 +13,12 @@
  * 				becomes available. LIBTRACE_RINGBUFFER_BLOCKING or LIBTRACE_RINGBUFFER_POLLING.
  * 				NOTE: this mainly applies to the blocking functions
  */
-inline void libtrace_slidingwindow_init(libtrace_slidingwindow_t *sw, int size, uint64_t start_number) {
+inline void libtrace_slidingwindow_init(libtrace_slidingwindow_t *sw, size_t size, uint64_t start_number) {
 	sw->size = size; // All of this size can be used
 	sw->start = 0;
 	sw->elements = calloc(sw->size, sizeof(void*));
 	assert(sw->elements);
-	memset(sw->elements, 0, sizeof(void*) * sw->size);
+	memset((void *) sw->elements, 0, sizeof(void*) * sw->size);
 	sw->start_number = start_number;
 }
 
