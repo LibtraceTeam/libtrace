@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <limits.h>
+#include <assert.h>
 
 /**
  * TODO look into using eventfd instead of a pipe if we have it available XXX
