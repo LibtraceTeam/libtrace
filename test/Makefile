@@ -4,14 +4,16 @@ PREFIX=../
 CC=gcc
 
 INCLUDE = -I$(PREFIX)/lib -I$(PREFIX)/libpacketdump
-CFLAGS = -Wall -Wimplicit -Wformat -W -pedantic -pipe -g -O2 \
+CFLAGS = -Wall -Wimplicit -Wformat -W -pedantic -pipe -g -O2 -std=gnu99 -pthread \
 		-D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE
 CFLAGS += $(INCLUDE)
 libdir = $(PREFIX)/lib/.libs:$(PREFIX)/libpacketdump/.libs
 LDLIBS = -L$(PREFIX)/lib/.libs -L$(PREFIX)/libpacketdump/.libs -ltrace -lpacketdump 
 
+BINS_DATASTRUCT = test-datastruct-vector test-datastruct-deque test-datastruct-ringbuffer
+
 BINS = test-pcap-bpf test-event test-time test-dir test-wireless test-errors \
-	test-plen test-autodetect 
+	test-plen test-autodetect $(BINS_DATASTRUCT)
 
 .PHONY: all clean distclean install depend test
 
