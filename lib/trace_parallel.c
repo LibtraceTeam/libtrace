@@ -99,6 +99,8 @@
 #include <signal.h>
 
 
+extern int libtrace_parallel;
+
 struct multithreading_stats {
 	uint64_t full_queue_hits;
 	uint64_t wait_for_fill_complete_hits;
@@ -995,6 +997,8 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob, fn_per_pkt p
 		assert(pthread_mutex_unlock(&libtrace->libtrace_lock) == 0);
 		return 0;
 	}
+
+	libtrace_parallel = 1;
 
 	// Store the user defined things against the trace
 	libtrace->global_blob = global_blob;

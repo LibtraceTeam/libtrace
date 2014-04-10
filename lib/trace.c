@@ -109,6 +109,9 @@ static struct libtrace_format_t *formats_list = NULL;
 
 int libtrace_halt = 0;
 
+/* Set once pstart is called used for backwards compatibility reasons */
+extern int libtrace_parallel = 0;
+
 /* strncpy is not assured to copy the final \0, so we
  * will use our own one that does
  */
@@ -743,7 +746,7 @@ DLLEXPORT libtrace_packet_t *trace_copy_packet(const libtrace_packet_t *packet) 
  */
 DLLEXPORT void trace_destroy_packet(libtrace_packet_t *packet) {
 	/* Free any resources possibly associated with the packet */
-	if (packet->trace && packet->trace->format->fin_packet) {
+	if (libtrace_parallel && packet->trace && packet->trace->format->fin_packet) {
 		packet->trace->format->fin_packet(packet);
 	}
 	
