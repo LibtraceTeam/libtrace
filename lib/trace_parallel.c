@@ -119,7 +119,7 @@ static inline bool trace_supports_parallel(libtrace_t *trace)
 	//return trace->format->pstart_input;
 }
 
-DLLEXPORT inline void print_contention_stats(libtrace_t *libtrace) {
+DLLEXPORT void print_contention_stats(libtrace_t *libtrace) {
 	int i;
 	struct multithreading_stats totals = {0};
 	for (i = 0; i < libtrace->mapper_thread_count ; i++) {
@@ -1409,19 +1409,19 @@ DLLEXPORT int trace_send_message_to_thread(libtrace_t * libtrace, libtrace_threa
 	return libtrace_message_queue_put(&t->messages, message);
 }
 
-DLLEXPORT inline void libtrace_result_set_key(libtrace_result_t * result, uint64_t key) {
+DLLEXPORT void libtrace_result_set_key(libtrace_result_t * result, uint64_t key) {
 	result->key = key;
 }
-DLLEXPORT inline uint64_t libtrace_result_get_key(libtrace_result_t * result) {
+DLLEXPORT uint64_t libtrace_result_get_key(libtrace_result_t * result) {
 	return result->key;
 }
-DLLEXPORT inline void libtrace_result_set_value(libtrace_result_t * result, void * value) {
+DLLEXPORT void libtrace_result_set_value(libtrace_result_t * result, void * value) {
 	result->value = value;
 }
-DLLEXPORT inline void* libtrace_result_get_value(libtrace_result_t * result) {
+DLLEXPORT void* libtrace_result_get_value(libtrace_result_t * result) {
 	return result->value;
 }
-DLLEXPORT inline void libtrace_result_set_key_value(libtrace_result_t * result, uint64_t key, void * value) {
+DLLEXPORT void libtrace_result_set_key_value(libtrace_result_t * result, uint64_t key, void * value) {
 	result->key = key;
 	result->value = value;
 }

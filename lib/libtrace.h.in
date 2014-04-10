@@ -195,8 +195,11 @@ typedef struct libtrace_t libtrace_t;
 /** Opaque structure holding information about a bpf filter */
 typedef struct libtrace_filter_t libtrace_filter_t;
 
-/** Opaque structure holding information about a result */
-typedef struct libtrace_result_t libtrace_result_t;
+/** Structure holding information about a result */
+typedef struct libtrace_result_t {
+	uint64_t key;
+	void * value;
+} libtrace_result_t;
 
 typedef struct libtrace_message_t libtrace_message_t;
 
@@ -3116,19 +3119,14 @@ DLLEXPORT int trace_pread_packet(libtrace_t *libtrace, libtrace_packet_t **packe
 DLLEXPORT int trace_ppause(libtrace_t *libtrace);
 DLLEXPORT int trace_pstop(libtrace_t *libtrace);
 DLLEXPORT void trace_join(libtrace_t * trace);
-DLLEXPORT inline void print_contention_stats (libtrace_t *libtrace);
+DLLEXPORT void print_contention_stats (libtrace_t *libtrace);
 DLLEXPORT libtrace_result_t *trace_create_result();
 
-typedef struct libtrace_result_t {
-	uint64_t key;
-	void * value;
-} libtrace_result_t;
-
-DLLEXPORT inline void libtrace_result_set_key(libtrace_result_t * result, uint64_t key);
-DLLEXPORT inline uint64_t libtrace_result_get_key(libtrace_result_t * result);
-DLLEXPORT inline void libtrace_result_set_value(libtrace_result_t * result, void * value);
-DLLEXPORT inline void* libtrace_result_get_value(libtrace_result_t * result);
-DLLEXPORT inline void libtrace_result_set_key_value(libtrace_result_t * result, uint64_t key, void * value);
+DLLEXPORT void libtrace_result_set_key(libtrace_result_t * result, uint64_t key);
+DLLEXPORT uint64_t libtrace_result_get_key(libtrace_result_t * result);
+DLLEXPORT void libtrace_result_set_value(libtrace_result_t * result, void * value);
+DLLEXPORT void* libtrace_result_get_value(libtrace_result_t * result);
+DLLEXPORT void libtrace_result_set_key_value(libtrace_result_t * result, uint64_t key, void * value);
 DLLEXPORT void trace_destroy_result(libtrace_result_t ** result);
 
 // Ways to access Global and TLS  storage that we provide the user
