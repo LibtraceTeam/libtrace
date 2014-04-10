@@ -2,27 +2,25 @@
 #include <pthread.h>
 #include <assert.h>
 
-#define TEST_SIZE 1000000
-#define RINGBUFFER_SIZE 10000
+#define TEST_SIZE ((char *) 1000000)
+#define RINGBUFFER_SIZE ((char *) 10000)
 
 static void * producer(void * a) {
 	libtrace_ringbuffer_t * rb = (libtrace_ringbuffer_t *) a;
-	int i;
-	void * value;
-	for (i = 0; i < TEST_SIZE; i++) {
-		value = (void *) i;
-		libtrace_ringbuffer_write(rb, value);
+	char * i;
+	for (i = NULL; i < TEST_SIZE; i++) {
+		libtrace_ringbuffer_write(rb, i);
 	}
 	return 0;
 }
 
 static void * consumer(void * a) {
 	libtrace_ringbuffer_t * rb = (libtrace_ringbuffer_t *) a;
-	int i;
-	void * value;
-	for (i = 0; i < TEST_SIZE; i++) {
+	char *i;
+	void *value;
+	for (i = NULL; i < TEST_SIZE; i++) {
 		value = libtrace_ringbuffer_read(rb);
-		assert(value == (void *) i);
+		assert(value == i);
 	}
 	return 0;
 }
@@ -33,18 +31,18 @@ static void * consumer(void * a) {
  * thread-safety test.
  */
 int main() {
-	int i;
+	char *i;
 	void *value;
 	pthread_t t[4];
 	libtrace_ringbuffer_t rb_block;
 	libtrace_ringbuffer_t rb_polling;
 
-	libtrace_ringbuffer_init(&rb_block, RINGBUFFER_SIZE, LIBTRACE_RINGBUFFER_BLOCKING);
-	libtrace_ringbuffer_init(&rb_polling, RINGBUFFER_SIZE, LIBTRACE_RINGBUFFER_BLOCKING);
+	libtrace_ringbuffer_init(&rb_block, (size_t) RINGBUFFER_SIZE, LIBTRACE_RINGBUFFER_BLOCKING);
+	libtrace_ringbuffer_init(&rb_polling, (size_t) RINGBUFFER_SIZE, LIBTRACE_RINGBUFFER_BLOCKING);
 	assert(libtrace_ringbuffer_is_empty(&rb_block));
 	assert(libtrace_ringbuffer_is_empty(&rb_polling));
 
-	for (i = 0; i < RINGBUFFER_SIZE; i++) {
+	for (i = NULL; i < RINGBUFFER_SIZE; i++) {
 		value = (void *) i;
 		libtrace_ringbuffer_write(&rb_block, value);
 		libtrace_ringbuffer_write(&rb_polling, value);
@@ -62,20 +60,20 @@ int main() {
 	assert(!libtrace_ringbuffer_try_swrite_bl(&rb_polling, value));
 
 	// Cycle the buffer a few times
-	for (i = 0; i < TEST_SIZE; i++) {
+	for (i = NULL; i < TEST_SIZE; i++) {
 		value = (void *) -1;
 		value = libtrace_ringbuffer_read(&rb_block);
 		assert(value == (void *) i);
 		value = (void *) -1;
 		value = libtrace_ringbuffer_read(&rb_polling);
 		assert(value == (void *) i);
-		value = (void *) (i + RINGBUFFER_SIZE);
+		value = (void *) (i + (size_t) RINGBUFFER_SIZE);
 		libtrace_ringbuffer_write(&rb_block, value);
 		libtrace_ringbuffer_write(&rb_polling, value);
 	}
 
 	// Empty it completely
-	for (i = TEST_SIZE; i < TEST_SIZE + RINGBUFFER_SIZE; i++) {
+	for (i = TEST_SIZE; i < TEST_SIZE + (size_t) RINGBUFFER_SIZE; i++) {
 		value = libtrace_ringbuffer_read(&rb_block);
 		assert(value == (void *) i);
 		value = libtrace_ringbuffer_read(&rb_polling);
