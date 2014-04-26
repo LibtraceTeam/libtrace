@@ -648,7 +648,7 @@ static inline int socket_to_packet_fanout(int fd,
 static int linuxnative_ppause_input(libtrace_t *libtrace)
 {
 	int i;
-	int tot = libtrace->mapper_thread_count;
+	int tot = libtrace->perpkt_thread_count;
 	printf("CAlling native pause packet\n");
 	
 	for (i = 0; i < tot; i++) {
@@ -689,7 +689,7 @@ static int linuxring_start_input(libtrace_t *libtrace)
 
 static int linuxnative_pstart_input(libtrace_t *libtrace) {
 	int i = 0;
-	int tot = libtrace->mapper_thread_count;
+	int tot = libtrace->perpkt_thread_count;
 	int iserror = 0;
 	// We store this here otherwise it will be leaked if the memory doesn't know
 	struct linux_per_thread_t *per_thread = NULL;
@@ -700,7 +700,7 @@ static int linuxnative_pstart_input(libtrace_t *libtrace) {
 	} else {
 		// Whats going on this might not work 100%
 		// We assume all sockets have been closed ;)
-		printf("Pause and then start called again lets hope that mapper_thread_count hasn't changed\n");
+		printf("Pause and then start called again lets hope that perpkt_thread_count hasn't changed\n");
 	}
 	
 	printf("Calling native pstart packet\n");

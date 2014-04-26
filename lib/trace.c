@@ -110,7 +110,7 @@ static struct libtrace_format_t *formats_list = NULL;
 int libtrace_halt = 0;
 
 /* Set once pstart is called used for backwards compatibility reasons */
-extern int libtrace_parallel = 0;
+int libtrace_parallel = 0;
 
 /* strncpy is not assured to copy the final \0, so we
  * will use our own one that does
@@ -262,9 +262,9 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 	/* Parallel inits */
 	// libtrace->libtrace_lock
 	// libtrace->perpkt_cond;
-	libtrace->perpkt_pausing = 0;
-	libtrace->mapper_queue_full = false;
-	libtrace->mappers_finishing = -1;
+	libtrace->perpkts_pausing = 0;
+	libtrace->perpkt_queue_full = false;
+	libtrace->perpkts_finishing = -1;
 	libtrace->reducer_flags = 0;
 	libtrace->joined = false;
 	libtrace->global_blob = NULL;
@@ -272,15 +272,15 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 	libtrace->reducer = NULL;
 	libtrace->hasher = NULL;
 	libtrace->packet_freelist_size = 0;
-	libtrace->mapper_buffer_size = 0;
+	libtrace->perpkt_buffer_size = 0;
 	libtrace->expected_key = 0;
 	libtrace_zero_ringbuffer(&libtrace->packet_freelist);
 	libtrace_zero_thread(&libtrace->hasher_thread);
 	libtrace_zero_thread(&libtrace->reducer_thread);
 	libtrace_zero_slidingwindow(&libtrace->sliding_window);
 	libtrace->reducer_thread.type = THREAD_EMPTY;
-	libtrace->mapper_thread_count = 0;
-	libtrace->mapper_threads = NULL;
+	libtrace->perpkt_thread_count = 0;
+	libtrace->perpkt_threads = NULL;
 
         /* Parse the URI to determine what sort of trace we are dealing with */
 	if ((uridata = trace_parse_uri(uri, &scan)) == 0) {
@@ -380,9 +380,9 @@ DLLEXPORT libtrace_t * trace_create_dead (const char *uri) {
 	/* Parallel inits */
 	// libtrace->libtrace_lock
 	// libtrace->perpkt_cond;
-	libtrace->perpkt_pausing = 0;
-	libtrace->mapper_queue_full = false;
-	libtrace->mappers_finishing = -1;
+	libtrace->perpkts_pausing = 0;
+	libtrace->perpkt_queue_full = false;
+	libtrace->perpkts_finishing = -1;
 	libtrace->reducer_flags = 0;
 	libtrace->joined = false;
 	libtrace->global_blob = NULL;
@@ -391,14 +391,14 @@ DLLEXPORT libtrace_t * trace_create_dead (const char *uri) {
 	libtrace->hasher = NULL;
 	libtrace->expected_key = 0;
 	libtrace->packet_freelist_size = 0;
-	libtrace->mapper_buffer_size = 0;
+	libtrace->perpkt_buffer_size = 0;
 	libtrace_zero_ringbuffer(&libtrace->packet_freelist);
 	libtrace_zero_thread(&libtrace->hasher_thread);
 	libtrace_zero_thread(&libtrace->reducer_thread);
 	libtrace_zero_slidingwindow(&libtrace->sliding_window);
 	libtrace->reducer_thread.type = THREAD_EMPTY;
-	libtrace->mapper_thread_count = 0;
-	libtrace->mapper_threads = NULL;
+	libtrace->perpkt_thread_count = 0;
+	libtrace->perpkt_threads = NULL;
 	
 	for(tmp=formats_list;tmp;tmp=tmp->next) {
                 if (strlen(scan) == strlen(tmp->name) &&
@@ -654,13 +654,13 @@ DLLEXPORT void trace_destroy(libtrace_t *libtrace) {
 	
 	libtrace_ringbuffer_destroy(&libtrace->packet_freelist);
 	
-	for (i = 0; i < libtrace->mapper_thread_count; ++i) {
-			assert (libtrace_vector_get_size(&libtrace->mapper_threads[i].vector) == 0);
-			libtrace_vector_destroy(&libtrace->mapper_threads[i].vector);
+	for (i = 0; i < libtrace->perpkt_thread_count; ++i) {
+		assert (libtrace_vector_get_size(&libtrace->perpkt_threads[i].vector) == 0);
+		libtrace_vector_destroy(&libtrace->perpkt_threads[i].vector);
 	}
-	free(libtrace->mapper_threads);
-	libtrace->mapper_threads = NULL;
-	libtrace->mapper_thread_count = 0;
+	free(libtrace->perpkt_threads);
+	libtrace->perpkt_threads = NULL;
+	libtrace->perpkt_thread_count = 0;
 	
 	if (libtrace->event.packet) {
 		/* Don't use trace_destroy_packet here - there is almost

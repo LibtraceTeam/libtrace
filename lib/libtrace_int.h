@@ -174,7 +174,7 @@ struct libtrace_event_status_t {
 enum thread_types {
 	THREAD_EMPTY,
 	THREAD_HASHER,
-	THREAD_MAPPER,
+	THREAD_PERPKT,
 	THREAD_REDUCER
 };
 
@@ -183,15 +183,6 @@ enum thread_states {
 	THREAD_FINISHING,
 	THREAD_FINISHED,
 	THREAD_PAUSED
-};
-
-enum hasher_types {
-	HASHER_BALANCE, /** Balance load across CPUs best as possible this is basically to say don't care about hash, but this might still might be implemented using a hash or round robin etc.. */
-	HASHER_BIDIRECTIONAL, /** Use a hash which is uni-directional for TCP flows (IP src dest,TCP port src dest), non TCP
-							Will be sent to the same place, with the exception of UDP which may or may not be sent to separate cores */
-	HASHER_UNIDIRECTIONAL, /** Use a hash which is uni-directional across TCP flow */
-	HASHER_CUSTOM, /** Always use the user supplied hasher */
-	HASHER_HARDWARE, /** Set by the format if the hashing is going to be done in hardware */
 };
 
 // Reduce expects sequential data
@@ -205,7 +196,7 @@ enum hasher_types {
 // Reduce reads all queues with same key
 #define REDUCE_STEPPING 0x10
 
-#define MAPPER_USE_SLIDING_WINDOW 0x20
+#define PERPKT_USE_SLIDING_WINDOW 0x20
 
 /**
  * Information of this thread
@@ -217,9 +208,9 @@ typedef struct libtrace_thread_t {
 	enum thread_states state;
 	void* user_data; // TLS for the user to use
 	pthread_t tid;
-	int map_num; // A number from 0-X that represents this mapper number
+	int perpkt_num; // A number from 0-X that represents this perpkt threads number
 				// in the table, intended to quickly identify this thread
-				// -1 represents NA (such as in the case this is not a mapper thread)
+				// -1 represents NA (such as the case this is not a perpkt thread)
 	libtrace_ringbuffer_t rbuffer; // Input
 	libtrace_vector_t vector; // Output
 	libtrace_queue_t deque; // Real Output type makes more sense
@@ -242,7 +233,7 @@ typedef struct libtrace_thread_t {
  */
 struct first_packets {
 	pthread_spinlock_t lock;
-	size_t count; // If == mappers we have all
+	size_t count; // If == perpkt_thread_count threads we have all
 	size_t first; // Valid if count != 0
 	struct __packet_storage_magic_type {
 		libtrace_packet_t * packet;
@@ -284,25 +275,25 @@ struct libtrace_t {
 	
 	/** Use to control pausing threads and finishing threads etc always used with libtrace_lock */
 	pthread_cond_t perpkt_cond;
-	/** Set to the number of mapper threads that are finishing (or have finished), or to -1 once all have been joined, 0 implies all are running */
-	int mappers_finishing;
-	/** A count of mappers that are pausing */
-	int perpkt_pausing;
+	/** Set to the number of perpkt threads that are finishing (or have finished), or to -1 once all have been joined, 0 implies all are running */
+	int perpkts_finishing;
+	/** A count of perpkt threads that are pausing */
+	int perpkts_pausing;
 	
 	/** For the sliding window hasher implementation */
 	pthread_rwlock_t window_lock;
 	/** Set once trace_join has been called */
 	bool joined;
-	/** Set to indicate a mappers queue is full and such the writing mapper cannot proceed */
-	bool mapper_queue_full;
+	/** Set to indicate a perpkt's queue is full as such the writing perpkt cannot proceed */
+	bool perpkt_queue_full;
 	/** Global storage for this trace, shared among all the threads  */
 	void* global_blob;
 	/** Requested size of the pkt buffer (currently only used if using dedicated hasher thread) */
 	int packet_freelist_size;
 	/** The actual freelist */
 	libtrace_ringbuffer_t packet_freelist;
-	/** The number of packets that can queue per mapper thread - XXX consider deadlocks with non malloc()'d packets that need to be released */
-	int mapper_buffer_size;
+	/** The number of packets that can queue per thread - XXX consider deadlocks with non malloc()'d packets that need to be released */
+	int perpkt_buffer_size;
 	/** The reducer flags */
 	int reducer_flags;
 	/** Used to track the next expected key */
@@ -319,8 +310,8 @@ struct libtrace_t {
 	
 	libtrace_thread_t hasher_thread;
 	libtrace_thread_t reducer_thread;
-	int mapper_thread_count;
-	libtrace_thread_t * mapper_threads; // All our mapper threads
+	int perpkt_thread_count;
+	libtrace_thread_t * perpkt_threads; // All our perpkt threads
 	libtrace_slidingwindow_t sliding_window;
 	sem_t sem;
 	// Used to keep track of the first packet seen on each thread
@@ -330,6 +321,9 @@ struct libtrace_t {
 
 inline void libtrace_zero_thread(libtrace_thread_t * t);
 inline void store_first_packet(libtrace_t *libtrace, libtrace_packet_t *packet, libtrace_thread_t *t);
+libtrace_thread_t * get_thread_table(libtrace_t *libtrace);
+int get_thread_table_num(libtrace_t *libtrace);
+
 
 /** A libtrace output trace
  * @internal

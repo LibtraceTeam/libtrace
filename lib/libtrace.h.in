@@ -3129,7 +3129,7 @@ DLLEXPORT void* libtrace_result_get_value(libtrace_result_t * result);
 DLLEXPORT void libtrace_result_set_key_value(libtrace_result_t * result, uint64_t key, void * value);
 DLLEXPORT void trace_destroy_result(libtrace_result_t ** result);
 
-// Ways to access Global and TLS  storage that we provide the user
+// Ways to access Global and TLS storage that we provide the user
 DLLEXPORT void * trace_get_global(libtrace_t *trace);
 DLLEXPORT void * trace_set_global(libtrace_t *trace, void * data);
 DLLEXPORT void * trace_set_tls(libtrace_thread_t *t, void * data);
@@ -3150,6 +3150,7 @@ DLLEXPORT uint64_t trace_packet_get_hash(libtrace_packet_t * packet);
 DLLEXPORT void trace_packet_set_order(libtrace_packet_t * packet, uint64_t order);
 DLLEXPORT void trace_packet_set_hash(libtrace_packet_t * packet, uint64_t hash);
 
+DLLEXPORT int retrive_first_packet(libtrace_t *libtrace, libtrace_packet_t **packet, struct timeval **tv);
 
 typedef enum {
 	/** 
@@ -3174,12 +3175,12 @@ typedef enum {
 	 * trace that manages its own packets.
 	 * A unblockable warning message will be printed to stderr in this case.
 	 */
-	TRACE_OPTION_SET_MAPPER_BUFFER_SIZE,
+	TRACE_OPTION_SET_PERPKT_BUFFER_SIZE,
 	
 	/**
-	 * Libtrace set mapper thread count
+	 * Libtrace set perpkt thread count
 	 */
-	TRACE_OPTION_SET_MAPPER_THREAD_COUNT,
+	TRACE_OPTION_SET_PERPKT_THREAD_COUNT,
 	
 	/**
 	 * Libtrace should expect sequential keys from the output to count
@@ -3219,18 +3220,29 @@ enum libtrace_messages {
 	MESSAGE_STOP,
 	MESSAGE_STOPPED,
 	MESSAGE_FIRST_PACKET,
-	MESSAGE_MAPPER_ENDED,
-	MESSAGE_MAPPER_RESUMED,
-	MESSAGE_MAPPER_PAUSED,
-	MESSAGE_MAPPER_EOF,
+	MESSAGE_PERPKT_ENDED,
+	MESSAGE_PERPKT_RESUMED,
+	MESSAGE_PERPKT_PAUSED,
+	MESSAGE_PERPKT_EOF,
 	MESSAGE_POST_REDUCE,
 	MESSAGE_POST_RANGE,
 	MESSAGE_USER
 };
 
+enum hasher_types {
+	HASHER_BALANCE, /** Balance load across CPUs best as possible this is basically to say don't care about hash, but this might still might be implemented using a hash or round robin etc.. */
+	HASHER_BIDIRECTIONAL, /** Use a hash which is uni-directional for TCP flows (IP src dest,TCP port src dest), non TCP
+							Will be sent to the same place, with the exception of UDP which may or may not be sent to separate cores */
+	HASHER_UNIDIRECTIONAL, /** Use a hash which is uni-directional across TCP flow */
+	HASHER_CUSTOM, /** Always use the user supplied hasher */
+	HASHER_HARDWARE, /** Set by the format if the hashing is going to be done in hardware */
+};
+
 DLLEXPORT int trace_parallel_config(libtrace_t *libtrace, trace_parallel_option_t option, void *value);
 DLLEXPORT libtrace_packet_t* trace_result_packet(libtrace_t * libtrace, libtrace_packet_t * packet);
 DLLEXPORT void trace_free_result_packet(libtrace_t * libtrace, libtrace_packet_t * packet);
+enum hasher_types;
+DLLEXPORT int trace_set_hasher(libtrace_t *trace, enum hasher_types type, fn_hasher hasher, void *data);
 
 #ifdef __cplusplus
 } /* extern "C" */

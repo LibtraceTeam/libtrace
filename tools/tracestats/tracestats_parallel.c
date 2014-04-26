@@ -214,7 +214,7 @@ static void run_trace(char *uri)
 	//trace_parallel_config(trace, TRACE_OPTION_USE_DEDICATED_HASHER, &option);
 	//trace_parallel_config(trace, TRACE_OPTION_USE_SLIDING_WINDOW_BUFFER, &option);
 	option = 2;
-	trace_parallel_config(trace, TRACE_OPTION_SET_MAPPER_THREAD_COUNT, &option);
+	trace_parallel_config(trace, TRACE_OPTION_SET_PERPKT_THREAD_COUNT, &option);
 	//trace_parallel_config(trace, TRACE_OPTION_SET_MAPPER_BUFFER_SIZE, &option);
 
 	/* OPTIONALLY SETUP CORES HERE BUT WE DON'T CARE ABOUT THAT YET XXX */

@@ -826,7 +826,6 @@ static int dpdk_start_port (struct dpdk_format_data_t * format_data, char *err, 
     
     return 0;
 }
-int mapper_start(void *data); // This actually a void*
 
 /* Attach memory to the port and start the port or restart the ports.
  */
@@ -966,7 +965,7 @@ static int dpdk_start_port_queues (libtrace_t *libtrace, struct dpdk_format_data
     
     // Can use remote launch for all
     /*RTE_LCORE_FOREACH_SLAVE(i) {
-		rte_eal_remote_launch(mapper_start, (void *)libtrace, i);
+		rte_eal_remote_launch(perpkt_threads_entry, (void *)libtrace, i);
 	}*/
     
     /* Wait for the link to come up */
@@ -995,10 +994,10 @@ static int dpdk_start_input (libtrace_t *libtrace) {
 static int dpdk_pstart_input (libtrace_t *libtrace) {
     char err[500];
     int enabled_lcore_count = 0, i=0;
-    int tot = libtrace->mapper_thread_count;
+    int tot = libtrace->perpkt_thread_count;
     err[0] = 0;
 	
-	libtrace->mapper_thread_count;
+	libtrace->perpkt_thread_count;
 	
 	for (i = 0; i < RTE_MAX_LCORE; i++)
 	{
@@ -1006,9 +1005,9 @@ static int dpdk_pstart_input (libtrace_t *libtrace) {
 			enabled_lcore_count++;
 	}
 	
-	tot = MIN(libtrace->mapper_thread_count, enabled_lcore_count);
+	tot = MIN(libtrace->perpkt_thread_count, enabled_lcore_count);
 	tot = MIN(tot, 8);
-	printf("Running pstart DPDK %d %d %d %d\n", tot, libtrace->mapper_thread_count, enabled_lcore_count, rte_lcore_count());
+	printf("Running pstart DPDK %d %d %d %d\n", tot, libtrace->perpkt_thread_count, enabled_lcore_count, rte_lcore_count());
 	
     if (dpdk_start_port_queues(libtrace, FORMAT(libtrace), err, sizeof(err), tot) != 0) {
         trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "%s", err);

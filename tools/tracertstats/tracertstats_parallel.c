@@ -160,7 +160,7 @@ static int reduce(libtrace_t* trace, void* global_blob, uint64_t *last_ts)
 		static result_t *  last_res = NULL;
 		assert(res != last_res);
 		last_res = res;
-		//printf("Mapper published %"PRIu64" - c=%"PRIu64"\n", ts, res->total.count);
+		//printf("Perpkt published %"PRIu64" - c=%"PRIu64"\n", ts, res->total.count);
 		while (*last_ts < ts) {
 			report_results((double) *last_ts * (double) packet_interval, count, bytes);
 			count = 0;
@@ -217,7 +217,7 @@ static int reduce_tracetime(libtrace_t* trace, void* global_blob, uint64_t *last
 		}
 		//assert(res != last_res);
 		last_res = res;
-		//printf("Mapper published %"PRIu64" - c=%"PRIu64"\n", ts, res->total.count);
+		//printf("Perpkt published %"PRIu64" - c=%"PRIu64"\n", ts, res->total.count);
 		/*while (*last_ts < ts) {
 			report_results((double) *last_ts * (double) packet_interval, count, bytes);
 			count = 0;

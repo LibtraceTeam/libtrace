@@ -351,11 +351,11 @@ int main(int argc, char *argv[])
 	 
 	int i = 1;
 	trace_parallel_config(trace, TRACE_OPTION_SEQUENTIAL, &i);
-	//trace_parallel_config(trace, TRACE_OPTION_SET_MAPPER_BUFFER_SIZE, &i);
+	//trace_parallel_config(trace, TRACE_OPTION_SET_PERPKT_BUFFER_SIZE, &i);
 	//trace_parallel_config(trace, TRACE_OPTION_USE_DEDICATED_HASHER, &i);
 	//trace_parallel_config(trace, TRACE_OPTION_USE_SLIDING_WINDOW_BUFFER, &i);
 	i = 2;
-	trace_parallel_config(trace, TRACE_OPTION_SET_MAPPER_THREAD_COUNT, &i);
+	trace_parallel_config(trace, TRACE_OPTION_SET_PERPKT_THREAD_COUNT, &i);
 	
 	if (trace_pstart(trace, NULL, &per_packet, NULL)==-1) {
 		trace_perror(trace,"trace_start");
