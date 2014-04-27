@@ -125,15 +125,15 @@ DLLEXPORT void print_contention_stats(libtrace_t *libtrace) {
 	int i;
 	struct multithreading_stats totals = {0};
 	for (i = 0; i < libtrace->perpkt_thread_count ; i++) {
-		printf("\nStats for perpkt thread#%d\n", i);
-		printf("\tfull_queue_hits: %"PRIu64"\n", contention_stats[i].full_queue_hits);
+		fprintf(stderr, "\nStats for perpkt thread#%d\n", i);
+		fprintf(stderr, "\tfull_queue_hits: %"PRIu64"\n", contention_stats[i].full_queue_hits);
 		totals.full_queue_hits += contention_stats[i].full_queue_hits;
-		printf("\twait_for_fill_complete_hits: %"PRIu64"\n", contention_stats[i].wait_for_fill_complete_hits);
+		fprintf(stderr, "\twait_for_fill_complete_hits: %"PRIu64"\n", contention_stats[i].wait_for_fill_complete_hits);
 		totals.wait_for_fill_complete_hits += contention_stats[i].wait_for_fill_complete_hits;
 	}
-	printf("\nTotals for perpkt threads\n");
-	printf("\tfull_queue_hits: %"PRIu64"\n", totals.full_queue_hits);
-	printf("\twait_for_fill_complete_hits: %"PRIu64"\n", totals.wait_for_fill_complete_hits);
+	fprintf(stderr, "\nTotals for perpkt threads\n");
+	fprintf(stderr, "\tfull_queue_hits: %"PRIu64"\n", totals.full_queue_hits);
+	fprintf(stderr, "\twait_for_fill_complete_hits: %"PRIu64"\n", totals.wait_for_fill_complete_hits);
 
 	return;
 }

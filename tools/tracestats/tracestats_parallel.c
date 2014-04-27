@@ -120,13 +120,13 @@ static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt, libtrace_mess
 		switch (mesg->code) {
 			case MESSAGE_STOPPED:
 				trace_publish_result(trace, 0, results); // Only ever using a single key 0
-				printf("Thread published resuslts WOWW \n");
+				fprintf(stderr, "Thread published resuslts WOWW \n");
 				break;
 			case MESSAGE_STARTED:
 				results = calloc(1, sizeof(statistics_t) * (filter_count + 1));
 				break;
 			case MESSAGE_PAUSE:
-				printf("GOT Asked to pause ahh\n");
+				fprintf(stderr, "GOT Asked to pause ahh\n");
 				break;
 		}
 	}
