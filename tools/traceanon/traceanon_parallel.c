@@ -12,11 +12,35 @@
 #include "ipenc.h"
 #include <data-struct/vector.h>
 #include <data-struct/message_queue.h>
+#include <signal.h>
 
 bool enc_source = false;
 bool enc_dest 	= false;
 enum enc_type_t enc_type = ENC_NONE;
 char *key = NULL;
+
+
+struct libtrace_t *trace = NULL;
+
+static void cleanup_signal(int signal)
+{
+	static int s = 0;
+	(void)signal;
+	// trace_interrupt();
+	// trace_pstop isn't really signal safe because its got lots of locks in it
+	// trace_pstop(trace);
+	if (s == 0) {
+		if (trace_ppause(trace) == -1)
+			trace_perror(trace, "Pause failed");
+	}
+	else {
+		if (trace_pstart(trace, NULL, NULL, NULL) == -1)
+			trace_perror(trace, "Start failed");
+	}
+	s = !s;
+}
+
+
 
 static void usage(char *argv0)
 {
@@ -165,7 +189,8 @@ static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt, libtrace_mess
 		// Arg don't copy packets
 		//libtrace_packet_t * packet_copy = trace_copy_packet(packet);
 		//libtrace_packet_t * packet_copy = trace_result_packet(trace, pkt);
-		trace_publish_result(trace, trace_packet_get_order(pkt), pkt);
+		//trace_publish_result(trace, trace_packet_get_order(pkt), pkt);
+		trace_publish_packet(trace, pkt);
 		//return ;
 	}
 	if (mesg) {
@@ -180,9 +205,10 @@ static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt, libtrace_mess
 
 int main(int argc, char *argv[]) 
 {
-	struct libtrace_t *trace = 0;
+	//struct libtrace_t *trace = 0;
 	struct libtrace_packet_t *packet/* = trace_create_packet()*/;
 	struct libtrace_out_t *writer = 0;
+	struct sigaction sigact;
 	char *output = 0;
 	int level = -1;
 	char *compress_type_str=NULL;
@@ -370,6 +396,13 @@ int main(int argc, char *argv[])
 		trace_destroy(trace);
                 return 1;
 	}
+
+	sigact.sa_handler = cleanup_signal;
+	sigemptyset(&sigact.sa_mask);
+	sigact.sa_flags = SA_RESTART;
+
+	sigaction(SIGINT, &sigact, NULL);
+	sigaction(SIGTERM, &sigact, NULL);
 	
 	// Read in the resulting packets and then free them when done
 	libtrace_vector_t res;

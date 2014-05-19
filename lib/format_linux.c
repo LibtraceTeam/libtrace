@@ -1201,7 +1201,7 @@ static int linuxnative_read_packet(libtrace_t *libtrace, libtrace_packet_t *pack
 static int linuxnative_pread_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 {
 	int fd = FORMAT(libtrace->format_data)->per_thread[get_thread_table_num(libtrace)].fd;
-	printf("Thread number is #%d point %p\n", get_thread_table_num(libtrace), FORMAT(libtrace->format_data)->per_thread);
+	//printf("Thread number is #%d point %p\n", get_thread_table_num(libtrace), FORMAT(libtrace->format_data)->per_thread);
 	return linuxnative_read_packet_fd(libtrace, packet, fd, 1);
 }
 

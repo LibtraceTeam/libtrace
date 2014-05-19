@@ -199,6 +199,7 @@ typedef struct libtrace_filter_t libtrace_filter_t;
 typedef struct libtrace_result_t {
 	uint64_t key;
 	void * value;
+	int is_packet;
 } libtrace_result_t;
 
 typedef struct libtrace_message_t libtrace_message_t;
@@ -3136,6 +3137,7 @@ DLLEXPORT void * trace_set_tls(libtrace_thread_t *t, void * data);
 DLLEXPORT void * trace_get_tls(libtrace_thread_t *t);
 
 DLLEXPORT void trace_publish_result(libtrace_t *libtrace, uint64_t key, void * value);
+DLLEXPORT void trace_publish_packet(libtrace_t *libtrace, libtrace_packet_t *packet);
 typedef struct libtrace_vector libtrace_vector_t;
 DLLEXPORT int trace_get_results(libtrace_t *libtrace, libtrace_vector_t * results);
 
@@ -3144,6 +3146,7 @@ DLLEXPORT int libtrace_thread_get_message_count(libtrace_t * libtrace);
 DLLEXPORT int libtrace_thread_get_message(libtrace_t * libtrace, libtrace_message_t * message);
 DLLEXPORT int libtrace_thread_try_get_message(libtrace_t * libtrace, libtrace_message_t * message);
 DLLEXPORT int trace_send_message_to_reducer(libtrace_t * libtrace, libtrace_message_t * message);
+DLLEXPORT int trace_send_message_to_perpkts(libtrace_t * libtrace, libtrace_message_t * message);
 DLLEXPORT int trace_finished(libtrace_t * libtrace);
 DLLEXPORT uint64_t trace_packet_get_order(libtrace_packet_t * packet);
 DLLEXPORT uint64_t trace_packet_get_hash(libtrace_packet_t * packet);
@@ -3216,8 +3219,10 @@ typedef enum {
 
 enum libtrace_messages {
 	MESSAGE_STARTED,
-	MESSAGE_PAUSE,
-	MESSAGE_STOP,
+	MESSAGE_DO_PAUSE,
+	MESSAGE_PAUSING,
+	MESSAGE_PAUSED,
+	MESSAGE_DO_STOP,
 	MESSAGE_STOPPED,
 	MESSAGE_FIRST_PACKET,
 	MESSAGE_PERPKT_ENDED,

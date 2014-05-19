@@ -112,11 +112,22 @@ DLLEXPORT void libtrace_zero_vector(libtrace_vector_t *v)
 	v->max_size = 0;
 	v->size = 0;
 	v->element_size = 0;
-	v->elements = NULL;	
+	v->elements = NULL;
 }
 
 DLLEXPORT void libtrace_vector_empty(libtrace_vector_t *v) {
 	assert(pthread_mutex_lock(&v->lock) == 0);
 	v->size = 0;
+	assert(pthread_mutex_unlock(&v->lock) == 0);
+}
+
+
+DLLEXPORT void libtrace_vector_apply_function(libtrace_vector_t *v, vector_data_fn fn)
+{
+	size_t cur;
+	assert(pthread_mutex_lock(&v->lock) == 0);
+	for (cur = 0; cur < v->size; cur++) {
+		(*fn)(&v->elements[cur*v->element_size]);
+	}
 	assert(pthread_mutex_unlock(&v->lock) == 0);
 }

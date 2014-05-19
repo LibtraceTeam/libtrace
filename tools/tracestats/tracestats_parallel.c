@@ -58,14 +58,24 @@
 #include "data-struct/message_queue.h"
 #include <pthread.h>
 
-struct libtrace_t *trace;
+struct libtrace_t *trace = NULL;
 
 static void cleanup_signal(int signal)
 {
+	static int s = 0;
 	(void)signal;
-	//trace_interrupt();
+	// trace_interrupt();
 	// trace_pstop isn't really signal safe because its got lots of locks in it
-	trace_pstop(trace);
+	// trace_pstop(trace);
+	if (s == 0) {
+		if (trace_ppause(trace) == -1)
+			trace_perror(trace, "Pause failed");
+	}
+	else {
+		if (trace_pstart(trace, NULL, NULL, NULL) == -1)
+			trace_perror(trace, "Start failed");
+	}
+	s = !s;
 }
 
 struct filter_t {
@@ -120,13 +130,19 @@ static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt, libtrace_mess
 		switch (mesg->code) {
 			case MESSAGE_STOPPED:
 				trace_publish_result(trace, 0, results); // Only ever using a single key 0
-				fprintf(stderr, "Thread published resuslts WOWW \n");
+				fprintf(stderr, "Thread published resuslts WOWW\n");
 				break;
 			case MESSAGE_STARTED:
 				results = calloc(1, sizeof(statistics_t) * (filter_count + 1));
 				break;
-			case MESSAGE_PAUSE:
+			case MESSAGE_DO_PAUSE:
 				fprintf(stderr, "GOT Asked to pause ahh\n");
+				break;
+			case MESSAGE_PAUSING:
+				fprintf(stderr, "Thread is pausing\n");
+				break;
+			case MESSAGE_PAUSED:
+				fprintf(stderr, "Thread has paused\n");
 				break;
 		}
 	}
@@ -188,11 +204,11 @@ static int reduce(libtrace_t* trace, void* global_blob)
 	return 0;
 }
 
-static uint64_t rand_hash(libtrace_packet_t * pkt) {
+static uint64_t rand_hash(libtrace_packet_t * pkt, void *data) {
 	return rand();
 }
 
-static uint64_t bad_hash(libtrace_packet_t * pkt) {
+static uint64_t bad_hash(libtrace_packet_t * pkt, void *data) {
 	return 0;
 }
 
@@ -211,7 +227,8 @@ static void run_trace(char *uri)
 	
 	int option = 2;
 	//option = 10000;
-	//trace_parallel_config(trace, TRACE_OPTION_USE_DEDICATED_HASHER, &option);
+	trace_parallel_config(trace, TRACE_OPTION_USE_DEDICATED_HASHER, &option);
+	trace_set_hasher(trace, HASHER_CUSTOM, &rand_hash, NULL);
 	//trace_parallel_config(trace, TRACE_OPTION_USE_SLIDING_WINDOW_BUFFER, &option);
 	option = 2;
 	trace_parallel_config(trace, TRACE_OPTION_SET_PERPKT_THREAD_COUNT, &option);

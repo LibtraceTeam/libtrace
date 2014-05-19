@@ -5,6 +5,7 @@
 #ifndef LIBTRACE_VECTOR_H
 #define LIBTRACE_VECTOR_H
 
+typedef void (*vector_data_fn)(void *data);
 typedef struct libtrace_vector {
 	size_t max_size;
 	size_t size;
@@ -22,4 +23,10 @@ DLLEXPORT void libtrace_vector_destroy(libtrace_vector_t *v);
 DLLEXPORT void libtrace_zero_vector(libtrace_vector_t *v);
 DLLEXPORT int libtrace_vector_remove_front(libtrace_vector_t *v);
 DLLEXPORT void libtrace_vector_empty(libtrace_vector_t *v);
+
+// For now this is a special case and this doesn't really belong
+// here, but to do this properly a full lock is required as 
+// multiple items are changed
+DLLEXPORT void libtrace_vector_apply_function(libtrace_vector_t *v, vector_data_fn fn);
+
 #endif

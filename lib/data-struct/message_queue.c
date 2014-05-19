@@ -17,6 +17,7 @@
  */
 inline void libtrace_message_queue_init(libtrace_message_queue_t *mq, size_t message_len)
 {
+	assert(message_len);
 	assert(pipe(mq->pipefd) != -1);
 	mq->message_count = 0;
 	if (message_len > PIPE_BUF)
@@ -42,6 +43,7 @@ inline void libtrace_message_queue_init(libtrace_message_queue_t *mq, size_t mes
 inline int libtrace_message_queue_put(libtrace_message_queue_t *mq, const void *message)
 {
 	int ret;
+	assert(mq->message_len);
 	assert(write(mq->pipefd[1], message, mq->message_len) == (int) mq->message_len);
 	// Update after we've written
 	pthread_spin_lock(&mq->spin);

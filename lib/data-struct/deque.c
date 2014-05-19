@@ -163,3 +163,15 @@ DLLEXPORT void libtrace_zero_deque(libtrace_queue_t *q)
 	q->head = q->tail = NULL;
 	q->size = q->element_size = 0;
 }
+
+DLLEXPORT void libtrace_deque_apply_function(libtrace_queue_t *q, deque_data_fn fn)
+{
+	list_node_t *n;
+	assert(q->element_size == sizeof(libtrace_result_t));
+	assert(pthread_mutex_lock(&q->lock) == 0);
+	n = q->head;
+	for (n = q->head; n != NULL; n = n->next) {
+		(*fn)(&n->data);
+	}
+	assert(pthread_mutex_unlock(&q->lock) == 0);
+}

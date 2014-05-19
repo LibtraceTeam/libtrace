@@ -262,6 +262,7 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 	/* Parallel inits */
 	// libtrace->libtrace_lock
 	// libtrace->perpkt_cond;
+	libtrace->state = STATE_NEW;
 	libtrace->perpkts_pausing = 0;
 	libtrace->perpkt_queue_full = false;
 	libtrace->perpkts_finishing = -1;
@@ -281,6 +282,7 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 	libtrace->reducer_thread.type = THREAD_EMPTY;
 	libtrace->perpkt_thread_count = 0;
 	libtrace->perpkt_threads = NULL;
+	libtrace->tracetime = 0;
 
         /* Parse the URI to determine what sort of trace we are dealing with */
 	if ((uridata = trace_parse_uri(uri, &scan)) == 0) {
@@ -380,6 +382,7 @@ DLLEXPORT libtrace_t * trace_create_dead (const char *uri) {
 	/* Parallel inits */
 	// libtrace->libtrace_lock
 	// libtrace->perpkt_cond;
+	libtrace->state = STATE_NEW; // TODO MAYBE DEAD
 	libtrace->perpkts_pausing = 0;
 	libtrace->perpkt_queue_full = false;
 	libtrace->perpkts_finishing = -1;
@@ -399,6 +402,7 @@ DLLEXPORT libtrace_t * trace_create_dead (const char *uri) {
 	libtrace->reducer_thread.type = THREAD_EMPTY;
 	libtrace->perpkt_thread_count = 0;
 	libtrace->perpkt_threads = NULL;
+	libtrace->tracetime = 0;
 	
 	for(tmp=formats_list;tmp;tmp=tmp->next) {
                 if (strlen(scan) == strlen(tmp->name) &&
@@ -782,7 +786,6 @@ void trace_fin_packet(libtrace_packet_t *packet) {
 
 		if (packet->buf_control != TRACE_CTRL_PACKET)
 		{
-			//packet->buf_control = 0; // Invalid value this should be fixed
 			packet->buffer = NULL;
 		}
 

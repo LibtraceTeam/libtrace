@@ -241,6 +241,30 @@ struct first_packets {
 	} * packets;
 };
 
+#define TRACE_STATES \
+	X(STATE_NEW) \
+	X(STATE_RUNNING) \
+	X(STATE_PAUSING) \
+	X(STATE_PAUSED) \
+	X(STATE_FINSHED) \
+	X(STATE_DESTROYED) \
+	X(STATE_ERROR) // Currently unused 
+
+#define X(a) a,
+enum trace_state {
+	TRACE_STATES
+};
+#undef X
+
+#define X(a) case a: return #a;
+static inline char *get_trace_state_name(enum trace_state ts){
+	switch(ts) {
+		TRACE_STATES
+		default:
+			return "UNKNOWN";
+	}
+}
+#undef X
 
 /** A libtrace input trace 
  * @internal
@@ -272,14 +296,15 @@ struct libtrace_t {
 	bool started;
 	/** Synchronise writes/reads across this format object and attached threads etc */
 	pthread_mutex_t libtrace_lock;
-	
+	/** State */
+	enum trace_state state;
 	/** Use to control pausing threads and finishing threads etc always used with libtrace_lock */
 	pthread_cond_t perpkt_cond;
 	/** Set to the number of perpkt threads that are finishing (or have finished), or to -1 once all have been joined, 0 implies all are running */
 	int perpkts_finishing;
 	/** A count of perpkt threads that are pausing */
 	int perpkts_pausing;
-	
+
 	/** For the sliding window hasher implementation */
 	pthread_rwlock_t window_lock;
 	/** Set once trace_join has been called */

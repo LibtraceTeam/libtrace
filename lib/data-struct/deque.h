@@ -5,6 +5,7 @@
 #define LIBTRACE_DEQUE_H
 
 typedef struct list_node list_node_t;
+typedef void (*deque_data_fn)(void *data);
 typedef struct libtrace_queue {
 	list_node_t * head;
 	list_node_t * tail;
@@ -23,5 +24,9 @@ DLLEXPORT int libtrace_deque_peek_tail(libtrace_queue_t *q, void *d);
 DLLEXPORT int libtrace_deque_pop_front(libtrace_queue_t *q, void *d);
 DLLEXPORT int libtrace_deque_pop_tail(libtrace_queue_t *q, void *d);
 DLLEXPORT void libtrace_zero_deque(libtrace_queue_t *q);
+
+// Apply a given function to every data item, while keeping the entire
+// structure locked from external modifications
+DLLEXPORT void libtrace_deque_apply_function(libtrace_queue_t *q, deque_data_fn fn);
 
 #endif
