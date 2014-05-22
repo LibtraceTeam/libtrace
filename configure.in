@@ -107,7 +107,7 @@ LIBWANDIO_LIBS=""
 # Set our C compiler flags based on the gcc version
 if test "$GCC" = "yes"; then
 	
-	gcc_version=`gcc -dumpversion`
+	gcc_version=`$CC -dumpversion`
 
 	# This is probably not the most reliable way to test whether our
 	# compiler supports visibility, but it's better than nothing
