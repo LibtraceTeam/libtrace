@@ -119,7 +119,7 @@ int main(int argc, char *argv[]) {
 		tv=trace_get_timeval(packet);
 		ts=trace_get_seconds(packet);
 		tsdiff = (tv.tv_sec+tv.tv_usec/1000000.0)-ts;
-		assert(tsdiff > -0.000001 && tsdiff < 0.000001);
+		assert(tsdiff > -0.001 && tsdiff < 0.001);
 
         }
 	trace_destroy_packet(packet);
