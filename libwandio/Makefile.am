@@ -2,8 +2,8 @@ lib_LTLIBRARIES=libwandio.la
 
 include_HEADERS=wandio.h
 
-AM_CFLAGS=@LIBCFLAGS@
-AM_CXXFLAGS=@LIBCXXFLAGS@
+AM_CFLAGS=@LIBCFLAGS@ @CFLAG_VISIBILITY@
+AM_CXXFLAGS=@LIBCXXFLAGS@ @CFLAG_VISIBILITY@
 
 if HAVE_ZLIB
 LIBTRACEIO_ZLIB=ior-zlib.c iow-zlib.c
@@ -24,7 +24,7 @@ LIBTRACEIO_LZO=
 endif
 
 libwandio_la_SOURCES=wandio.c ior-peek.c ior-stdio.c ior-thread.c \
-		iow-stdio.c iow-thread.c wandio.h \
+		iow-stdio.c iow-thread.c wandio.h wandio_internal.h \
 		$(LIBTRACEIO_ZLIB) $(LIBTRACEIO_BZLIB) $(LIBTRACEIO_LZO)
 
 INCLUDES = @ADD_INCLS@

@@ -31,6 +31,7 @@
  *
  */
 
+#include "libtrace_int.h"
 #include "libtrace.h"
 #include "protocols.h"
 #include <assert.h>

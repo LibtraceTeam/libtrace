@@ -32,6 +32,7 @@
  */
 
 
+#include "libtrace_int.h"
 #include "libtrace.h"
 #include "protocols.h"
 #include "checksum.h"

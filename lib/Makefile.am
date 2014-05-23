@@ -1,8 +1,8 @@
 lib_LTLIBRARIES = libtrace.la
 include_HEADERS = libtrace.h dagformat.h lt_inttypes.h daglegacy.h rt_protocol.h erftypes.h  
 
-AM_CFLAGS=@LIBCFLAGS@
-AM_CXXFLAGS=@LIBCXXFLAGS@
+AM_CFLAGS=@LIBCFLAGS@ @CFLAG_VISIBILITY@
+AM_CXXFLAGS=@LIBCXXFLAGS@ @CFLAG_VISIBILITY@
 
 extra_DIST = format_template.c
 NATIVEFORMATS=format_linux.c
