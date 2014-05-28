@@ -104,41 +104,13 @@ LIBTRACE_LIBS="-lwandio"
 TOOLS_LIBS=""
 LIBWANDIO_LIBS=""
 
-# Set our C compiler flags based on the gcc version
-if test "$GCC" = "yes"; then
+CFLAGS="$CFLAGS -Wall -Wmissing-prototypes -Wextra -DLT_BUILDING_DLL=1"
+CXXFLAGS="$CXXFLAGS -Wall -DLT_BUILDING_DLL=1"
+
+# Check for -fvisibility
+gl_VISIBILITY
+
 	
-	gcc_version=`$CC -dumpversion`
-
-	# This is probably not the most reliable way to test whether our
-	# compiler supports visibility, but it's better than nothing
-	#
-	# According to the gcc wiki - http://gcc.gnu.org/wiki/Visibility - 
-	# visibility is supported in gcc 4.0 or later, so we just need to
-	# check the major version number
-
-	major=$(echo $gcc_version | cut -d'.' -f1)
-
-	#major=${gcc_version%\.*\.*}
-
-	if test "$major" -lt 4; then
-		vis=no
-	else
-		vis=yes
-	fi
-	
-	CFLAGS="$CFLAGS -Wall -Wmissing-prototypes"
-	CXXFLAGS="$CXXFLAGS -Wall"
-	LIBCFLAGS="$CFLAGS"
-	LIBCFLAGS="$LIBCFLAGS -DLT_BUILDING_DLL=1"
-	LIBCXXFLAGS="$CXXFLAGS"
-	LIBCXXFLAGS="$CXXFLAGS -DLT_BUILDING_DLL=1"
-	
-	if test "$vis" = "yes"; then
-		LIBCFLAGS="$LIBCFLAGS -Wextra -fvisibility=hidden"
-		LIBCXXFLAGS="$CXXFLAGS -Wextra -fvisibility=hidden"
-	fi
-fi
-
 # Check for libtool
 AC_PROG_LIBTOOL
 

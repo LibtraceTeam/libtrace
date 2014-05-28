@@ -33,25 +33,23 @@
 
 #ifndef IO_H 
 #define IO_H 1 /**< Guard Define */
-#include "config.h"
 #include <sys/types.h>
 #include <stdio.h>
 #include <inttypes.h>
 #include <stdbool.h>
 
-#if __GNUC__ >= 4
-	#ifdef LT_BUILDING_DLL
-		#define DLLEXPORT __attribute__ ((visibility("default")))
-		#define DLLLOCAL __attribute__ ((visibility("hidden")))
-	#else
-		#define DLLEXPORT
-		#define DLLLOCAL
-	#endif
-#else
-	#define DLLEXPORT
-	#define DLLLOCAL
+
+#ifndef DLLEXPORT
+        #if HAVE_VISIBILITY && LT_BUILDING_DLL
+                #define DLLEXPORT __attribute__ ((visibility("default")))
+                #define DLLLOCAL __attribute__ ((visibility("hidden")))
+        #else
+                #define DLLEXPORT
+                #define DLLLOCAL
+        #endif
 #endif
 
+// TODO: Use a proper check for these attribute rather than gcc version check
 #if __GNUC__ >= 3 
 #  define DEPRECATED __attribute__((deprecated))
 #  define SIMPLE_FUNCTION __attribute__((pure))
@@ -328,15 +326,5 @@ off_t wandio_wwrite(iow_t *iow, const void *buffer, off_t len);
 void wandio_wdestroy(iow_t *iow);
 
 /** @} */
-
-/** @name libtraceio options 
- * @{ */
-extern int force_directio_read;
-extern int force_directio_write;
-extern uint64_t write_waits;
-extern uint64_t read_waits;
-extern unsigned int use_threads;
-extern unsigned int max_buffers;
-/* @} */
 
 #endif
