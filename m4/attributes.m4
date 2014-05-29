@@ -15,7 +15,7 @@ AC_DEFUN([check_WERROR],
     [lt_cv_werror_flag],
     [saved="$CFLAGS"
      CFLAGS="$CFLAGS -Werror"
-     AC_COMPILE_IFELSE([int a;],
+     AC_COMPILE_IFELSE([AC_LANG_SOURCE([int a;])],
        [eval lt_cv_werror_flag='yes'],
        [eval lt_cv_werror_flag='no'])
      CFLAGS="$saved"
@@ -33,8 +33,8 @@ AC_DEFUN([gcc_PACKED],
       [lt_cv_attribute_packed], 
       [saved="$CFLAGS"
        CFLAGS="$CFLAGS $errflag"
-       AC_COMPILE_IFELSE(
-         [struct s { char a; char b; int val; long val2; void *ptr;} __attribute__((packed));],
+       AC_COMPILE_IFELSE([AC_LANG_SOURCE(
+         [struct s { char a; char b; int val; long val2; void *ptr;} __attribute__((packed));])],
          [lt_cv_attribute_packed=yes],
          [lt_cv_attribute_packed=no]
        )
@@ -59,8 +59,8 @@ AC_DEFUN([gcc_UNUSED],
       [lt_cv_attribute_unused], 
       [saved="$CFLAGS"
        CFLAGS="$CFLAGS $errflag"
-       AC_COMPILE_IFELSE(
-         [void func(int a, __attribute__((unused)) int b);],
+       AC_COMPILE_IFELSE([AC_LANG_SOURCE(
+         [void func(int a, __attribute__((unused)) int b);])],
          [lt_cv_attribute_unused=yes],
          [lt_cv_attribute_unused=no]
        )
@@ -85,8 +85,8 @@ AC_DEFUN([gcc_DEPRECATED],
       [lt_cv_attribute_deprecated], 
       [saved="$CFLAGS"
        CFLAGS="$CFLAGS $errflag"
-       AC_COMPILE_IFELSE(
-         [void func(int a, int b) __attribute__((deprecated));],
+       AC_COMPILE_IFELSE([AC_LANG_SOURCE(
+         [void func(int a, int b) __attribute__((deprecated));])],
          [lt_cv_attribute_deprecated=yes],
          [lt_cv_attribute_deprecated=no]
        )
@@ -111,8 +111,8 @@ AC_DEFUN([gcc_FORMAT],
       [lt_cv_attribute_format], 
       [saved="$CFLAGS"
        CFLAGS="$CFLAGS $errflag"
-       AC_COMPILE_IFELSE(
-         [void __attribute__((format(printf, 1, 2))) foo(const char *fmt, ...);],
+       AC_COMPILE_IFELSE([AC_LANG_SOURCE(
+         [void __attribute__((format(printf, 1, 2))) foo(const char *fmt, ...);])],
          [lt_cv_attribute_format=yes],
          [lt_cv_attribute_format=no]
        )
@@ -137,8 +137,8 @@ AC_DEFUN([gcc_PURE],
       [lt_cv_attribute_pure], 
       [saved="$CFLAGS"
        CFLAGS="$CFLAGS $errflag"
-       AC_COMPILE_IFELSE(
-         [void func(int a, int b) __attribute__((pure));],
+       AC_COMPILE_IFELSE([AC_LANG_SOURCE(
+         [void func(int a, int b) __attribute__((pure));])],
          [lt_cv_attribute_pure=yes],
          [lt_cv_attribute_pure=no]
        )
