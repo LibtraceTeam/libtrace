@@ -18,7 +18,7 @@ fi
 
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR(lib/trace.c)
-AM_INIT_AUTOMAKE
+AM_INIT_AUTOMAKE([subdir-objects])
 
 # Make sure we use the relatively silent automake output
 m4_ifdef([AM_SILENT_RULES],[AM_SILENT_RULES([yes])])
@@ -110,6 +110,11 @@ CXXFLAGS="$CXXFLAGS -Wall -DLT_BUILDING_DLL=1"
 # Check for -fvisibility
 gl_VISIBILITY
 
+gcc_PACKED
+gcc_DEPRECATED
+gcc_UNUSED
+gcc_PURE
+gcc_FORMAT
 	
 # Check for libtool
 AC_PROG_LIBTOOL

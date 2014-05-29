@@ -50,20 +50,6 @@
 #endif
 
 // TODO: Use a proper check for these attribute rather than gcc version check
-#if __GNUC__ >= 3 
-#  define DEPRECATED __attribute__((deprecated))
-#  define SIMPLE_FUNCTION __attribute__((pure))
-#  define UNUSED __attribute__((unused))
-#  define PACKED __attribute__((packed))
-#  define PRINTF(formatpos,argpos) __attribute__((format(printf,formatpos,argpos)))
-#else
-#  define DEPRECATED
-#  define SIMPLE_FUNCTION
-#  define UNUSED
-#  define PACKED 
-#  define PRINTF(formatpos,argpos) 
-#endif
-
 
 /** @file
  *
