@@ -110,6 +110,11 @@ CXXFLAGS="$CXXFLAGS -Wall -DLT_BUILDING_DLL=1"
 # Check for -fvisibility
 gl_VISIBILITY
 
+gcc_PACKED
+gcc_DEPRECATED
+gcc_UNUSED
+gcc_PURE
+gcc_FORMAT
 	
 # Check for libtool
 AC_PROG_LIBTOOL
