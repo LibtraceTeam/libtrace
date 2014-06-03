@@ -175,7 +175,8 @@ enum thread_types {
 	THREAD_EMPTY,
 	THREAD_HASHER,
 	THREAD_PERPKT,
-	THREAD_REDUCER
+	THREAD_REDUCER,
+	THREAD_KEEPALIVE
 };
 
 enum thread_states {
@@ -335,6 +336,7 @@ struct libtrace_t {
 	
 	libtrace_thread_t hasher_thread;
 	libtrace_thread_t reducer_thread;
+	libtrace_thread_t keepalive_thread;
 	int perpkt_thread_count;
 	libtrace_thread_t * perpkt_threads; // All our perpkt threads
 	libtrace_slidingwindow_t sliding_window;
@@ -344,6 +346,7 @@ struct libtrace_t {
 	int tracetime;
 };
 
+void trace_fin_packet(libtrace_packet_t *packet);
 inline void libtrace_zero_thread(libtrace_thread_t * t);
 inline void store_first_packet(libtrace_t *libtrace, libtrace_packet_t *packet, libtrace_thread_t *t);
 libtrace_thread_t * get_thread_table(libtrace_t *libtrace);

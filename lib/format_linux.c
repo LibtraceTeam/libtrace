@@ -414,13 +414,13 @@ static inline void init_input(libtrace_t *libtrace){
 static int linuxring_init_input(libtrace_t *libtrace) 
 {	
 	init_input(libtrace);
-	FORMAT(libtrace->format_data)->format = TRACE_FORMAT_LINUX_RING;
+	FORMAT(libtrace->format_data)->format = TRACE_RT_DATA_LINUX_RING;
 	return 0;
 }
 static int linuxnative_init_input(libtrace_t *libtrace) 
 {
 	init_input(libtrace);
-	FORMAT(libtrace->format_data)->format = TRACE_FORMAT_LINUX_NATIVE;
+	FORMAT(libtrace->format_data)->format = TRACE_RT_DATA_LINUX_NATIVE;
 	return 0;
 }
 
@@ -706,7 +706,7 @@ static int linuxnative_pstart_input(libtrace_t *libtrace) {
 	printf("Calling native pstart packet\n");
 	for (i = 0; i < tot; ++i)
 	{
-		if (FORMAT(libtrace->format_data)->format == TRACE_FORMAT_LINUX_NATIVE) {
+		if (FORMAT(libtrace->format_data)->format == TRACE_RT_DATA_LINUX_NATIVE) {
 			if (linuxnative_start_input(libtrace) != 0) {
 				iserror = 1;
 				break;
@@ -729,7 +729,7 @@ static int linuxnative_pstart_input(libtrace_t *libtrace) {
 			break;
 		}
 		per_thread[i].fd = FORMAT(libtrace->format_data)->fd;
-		if (FORMAT(libtrace->format_data)->format == TRACE_FORMAT_LINUX_RING) {
+		if (FORMAT(libtrace->format_data)->format == TRACE_RT_DATA_LINUX_RING) {
 			per_thread[i].rxring_offset = FORMAT(libtrace->format_data)->rxring_offset;
 			per_thread[i].rx_ring = FORMAT(libtrace->format_data)->rx_ring;
 		}

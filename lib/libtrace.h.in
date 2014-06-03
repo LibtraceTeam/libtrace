@@ -3113,7 +3113,7 @@ DLLEXPORT bool trace_get_wireless_antenna(void *linkptr,
 
 typedef void* (*fn_per_pkt)(libtrace_t* trace, libtrace_packet_t *p, libtrace_message_t *m, libtrace_thread_t *thread);
 typedef void* (*fn_reducer)(libtrace_t* trace, void* global_blob);
-typedef uint64_t (*fn_hasher)(libtrace_packet_t* packet, void *data);
+typedef uint64_t (*fn_hasher)(const libtrace_packet_t* packet, void *data);
 
 DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob, fn_per_pkt per_pkt, fn_reducer reducer);
 DLLEXPORT int trace_pread_packet(libtrace_t *libtrace, libtrace_packet_t **packet);
@@ -3121,7 +3121,6 @@ DLLEXPORT int trace_ppause(libtrace_t *libtrace);
 DLLEXPORT int trace_pstop(libtrace_t *libtrace);
 DLLEXPORT void trace_join(libtrace_t * trace);
 DLLEXPORT void print_contention_stats (libtrace_t *libtrace);
-DLLEXPORT libtrace_result_t *trace_create_result();
 
 DLLEXPORT void libtrace_result_set_key(libtrace_result_t * result, uint64_t key);
 DLLEXPORT uint64_t libtrace_result_get_key(libtrace_result_t * result);
@@ -3136,24 +3135,47 @@ DLLEXPORT void * trace_set_global(libtrace_t *trace, void * data);
 DLLEXPORT void * trace_set_tls(libtrace_thread_t *t, void * data);
 DLLEXPORT void * trace_get_tls(libtrace_thread_t *t);
 
+
 DLLEXPORT void trace_publish_result(libtrace_t *libtrace, uint64_t key, void * value);
 DLLEXPORT void trace_publish_packet(libtrace_t *libtrace, libtrace_packet_t *packet);
 typedef struct libtrace_vector libtrace_vector_t;
 DLLEXPORT int trace_get_results(libtrace_t *libtrace, libtrace_vector_t * results);
 
-DLLEXPORT libtrace_result_t *trace_create_result();
+DLLEXPORT int trace_post_reduce(libtrace_t *libtrace);
 DLLEXPORT int libtrace_thread_get_message_count(libtrace_t * libtrace);
 DLLEXPORT int libtrace_thread_get_message(libtrace_t * libtrace, libtrace_message_t * message);
 DLLEXPORT int libtrace_thread_try_get_message(libtrace_t * libtrace, libtrace_message_t * message);
 DLLEXPORT int trace_send_message_to_reducer(libtrace_t * libtrace, libtrace_message_t * message);
 DLLEXPORT int trace_send_message_to_perpkts(libtrace_t * libtrace, libtrace_message_t * message);
+DLLEXPORT int trace_send_message_to_thread(libtrace_t * libtrace, libtrace_thread_t *t, libtrace_message_t * message);
 DLLEXPORT int trace_finished(libtrace_t * libtrace);
 DLLEXPORT uint64_t trace_packet_get_order(libtrace_packet_t * packet);
 DLLEXPORT uint64_t trace_packet_get_hash(libtrace_packet_t * packet);
 DLLEXPORT void trace_packet_set_order(libtrace_packet_t * packet, uint64_t order);
 DLLEXPORT void trace_packet_set_hash(libtrace_packet_t * packet, uint64_t hash);
+DLLEXPORT inline uint64_t tv_to_usec(struct timeval *tv);
 
 DLLEXPORT int retrive_first_packet(libtrace_t *libtrace, libtrace_packet_t **packet, struct timeval **tv);
+
+union libtrace_64byte_things {
+	void *ptr;
+	int64_t sint64;
+	uint64_t uint64;
+	uint32_t uint32s[2];
+	int32_t sint32s[2];
+	uint32_t uint32;
+	int32_t sint32;
+	int sint;
+	unsigned int uint;
+	char schars[8];
+	char uchars[8];
+};
+
+typedef struct libtrace_message_t {
+	int code;
+	union libtrace_64byte_things additional;
+	libtrace_thread_t *sender;
+} libtrace_message_t;
 
 typedef enum {
 	/** 
@@ -3231,6 +3253,7 @@ enum libtrace_messages {
 	MESSAGE_PERPKT_EOF,
 	MESSAGE_POST_REDUCE,
 	MESSAGE_POST_RANGE,
+	MESSAGE_TICK,
 	MESSAGE_USER
 };
 

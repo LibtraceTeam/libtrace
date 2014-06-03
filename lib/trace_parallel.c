@@ -255,7 +255,6 @@ static void* perpkt_threads_entry(void *data) {
 
 	message.code = MESSAGE_STARTED;
 	message.sender = t;
-	message.additional = NULL;
 
 	// Let the per_packet function know we have started
 	(*trace->per_pkt)(trace, NULL, &message, t);
@@ -329,7 +328,8 @@ stop:
 	/* ~~~~~~~~~~~~~~ Trace is finished do tear down ~~~~~~~~~~~~~~~~~~~~~ */
 	// Let the per_packet function know we have stopped
 	message.code = MESSAGE_STOPPED;
-	message.sender = message.additional = NULL;
+	message.sender = NULL;
+	message.additional.uint64 = 0;
 	(*trace->per_pkt)(trace, NULL, &message, t);
 
 	// And we're at the end free the memories
@@ -339,7 +339,7 @@ stop:
 
 	// Notify only after we've defiantly set the state to finished
 	message.code = MESSAGE_PERPKT_ENDED;
-	message.additional = NULL;
+	message.additional.uint64 = 0;
 	trace_send_message_to_reducer(trace, &message);
 
 	pthread_exit(NULL);
@@ -450,7 +450,7 @@ static void* hasher_start(void *data) {
 
 	// Notify only after we've defiantly set the state to finished
 	message.code = MESSAGE_PERPKT_ENDED;
-	message.additional = NULL;
+	message.additional.uint64 = 0;
 	trace_send_message_to_reducer(trace, &message);
 
 	// TODO remove from TTABLE t sometime
@@ -853,7 +853,6 @@ inline void store_first_packet(libtrace_t *libtrace, libtrace_packet_t *packet, 
 		assert(pthread_spin_unlock(&libtrace->first_packets.lock) == 0);
 		libtrace_message_t mesg = {0};
 		mesg.code = MESSAGE_FIRST_PACKET;
-		mesg.additional = NULL;
 		trace_send_message_to_reducer(libtrace, &mesg);
 		t->recorded_first = true;
 	}
@@ -873,7 +872,7 @@ DLLEXPORT int retrive_first_packet(libtrace_t *libtrace, libtrace_packet_t **pac
 	if (libtrace->first_packets.count) {
 		*packet = libtrace->first_packets.packets[libtrace->first_packets.first].packet;
 		*tv = &libtrace->first_packets.packets[libtrace->first_packets.first].tv;
-		if (libtrace->first_packets.count == libtrace->perpkt_thread_count) {
+		if (libtrace->first_packets.count == (size_t) libtrace->perpkt_thread_count) {
 			ret = 1;
 		} else {
 			struct timeval curr_tv;
@@ -907,6 +906,44 @@ inline static struct timeval usec_to_tv(uint64_t usec)
 	return tv;
 }
 
+/** Similar to delay_tracetime but send messages to all threads periodically */
+static void* keepalive_entry(void *data) {
+	struct timeval prev, next;
+	libtrace_message_t message = {0};
+	libtrace_t *trace = (libtrace_t *)data;
+	int delay_usec = 1000000; // ! second hard coded !!
+	uint64_t next_release;
+	fprintf(stderr, "keepalive thread is starting\n");
+	// TODO mark this thread as running against the libtrace object
+	gettimeofday(&prev, NULL);
+	message.code = MESSAGE_TICK;
+	while (trace->state != STATE_FINSHED) {
+		fd_set rfds;
+		next_release = tv_to_usec(&prev) + delay_usec;
+		gettimeofday(&next, NULL);
+		if (next_release > tv_to_usec(&next)) {
+			next = usec_to_tv(next_release - tv_to_usec(&next));
+			// Wait for timeout or a message
+			FD_ZERO(&rfds);
+    		FD_SET(libtrace_message_queue_get_fd(&trace->keepalive_thread.messages), &rfds);
+			if (select(libtrace_message_queue_get_fd(&trace->keepalive_thread.messages)+1, &rfds, NULL, NULL, &next) == 1) {
+				libtrace_message_t msg;
+				libtrace_message_queue_get(&trace->keepalive_thread.messages, &msg);
+				assert(msg.code == MESSAGE_DO_STOP);
+				goto done;
+			}
+		}
+		prev = usec_to_tv(next_release);
+		if (trace->state == STATE_RUNNING) {
+			message.additional.uint64 = tv_to_usec(&prev);
+			trace_send_message_to_perpkts(trace, &message);
+		}
+	}
+done:
+	fprintf(stderr, "keepalive thread is finishing\n");
+	trace->keepalive_thread.state = THREAD_FINISHED;
+	return NULL;
+}
 
 /**
  * Delays a packets playback so the playback will be in trace time
@@ -1073,7 +1110,7 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob, fn_per_pkt p
 	if (libtrace->state == STATE_PAUSED) {
 		assert (libtrace->perpkts_pausing != 0);
 		fprintf(stderr, "Restarting trace\n");
-		int err;
+		UNUSED int err;
 		if (libtrace->perpkt_thread_count > 1 && trace_supports_parallel(libtrace) && !trace_has_dedicated_hasher(libtrace)) {
 			printf("This format has direct support for p's\n");
 			err = libtrace->format->pstart_input(libtrace);
@@ -1098,7 +1135,6 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob, fn_per_pkt p
 	libtrace->per_pkt = per_pkt;
 	libtrace->reducer = reducer;
 	libtrace->perpkts_finishing = 0;
-	// libtrace->hasher = &rand_hash; /* Hasher now set via option */
 
 	assert(pthread_mutex_init(&libtrace->libtrace_lock, NULL) == 0);
 	assert(pthread_cond_init(&libtrace->perpkt_cond, NULL) == 0);
@@ -1196,6 +1232,10 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob, fn_per_pkt p
 	if (threads_started == 0)
 		threads_started = trace_start_perpkt_threads(libtrace);
 
+	libtrace->keepalive_thread.type = THREAD_KEEPALIVE;
+   	libtrace->keepalive_thread.state = THREAD_RUNNING;
+	libtrace_message_queue_init(&libtrace->keepalive_thread.messages, sizeof(libtrace_message_t));
+	assert(pthread_create(&libtrace->keepalive_thread.tid, NULL, keepalive_entry, (void *) libtrace) == 0);
 
 	// Revert back - Allow signals again
 	assert(pthread_sigmask(SIG_SETMASK, &sig_before, NULL) == 0);
@@ -1247,7 +1287,6 @@ DLLEXPORT int trace_ppause(libtrace_t *libtrace)
 		fprintf(stderr, "Hasher thread running we deal with this special!\n");
 		libtrace_message_t message = {0};
 		message.code = MESSAGE_DO_PAUSE;
-		message.additional = NULL;
 		trace_send_message_to_thread(libtrace, &libtrace->hasher_thread, &message);
 		// Wait for it to pause
 		assert(pthread_mutex_lock(&libtrace->libtrace_lock) == 0);
@@ -1264,7 +1303,6 @@ DLLEXPORT int trace_ppause(libtrace_t *libtrace)
 		if (&libtrace->perpkt_threads[i] != t) {
 			libtrace_message_t message = {0};
 			message.code = MESSAGE_DO_PAUSE;
-			message.additional = NULL;
 			trace_send_message_to_thread(libtrace, &libtrace->perpkt_threads[i], &message);
 			if(trace_has_dedicated_hasher(libtrace)) {
 				// The hasher has stopped and other threads have messages waiting therefore
@@ -1347,7 +1385,6 @@ DLLEXPORT int trace_pstop(libtrace_t *libtrace)
 	// This will be retrieved before trying to read another packet
 	
 	message.code = MESSAGE_DO_STOP;
-	message.additional = NULL;
 	trace_send_message_to_perpkts(libtrace, &message);
 	if (trace_has_dedicated_hasher(libtrace))
 		trace_send_message_to_thread(libtrace, &libtrace->hasher_thread, &message);
@@ -1404,12 +1441,12 @@ DLLEXPORT int trace_set_hasher(libtrace_t *trace, enum hasher_types type, fn_has
 				case HASHER_BALANCE:
 					return 0;
 				case HASHER_BIDIRECTIONAL:
-					trace->hasher = &toeplitz_hash_packet;
+					trace->hasher = (fn_hasher) toeplitz_hash_packet;
 					trace->hasher_data = calloc(1, sizeof(toeplitz_conf_t));
 					toeplitz_init_config(trace->hasher_data, 1);
 					return 0;
 				case HASHER_UNIDIRECTIONAL:
-					trace->hasher = &toeplitz_hash_packet;
+					trace->hasher = (fn_hasher) toeplitz_hash_packet;
 					trace->hasher_data = calloc(1, sizeof(toeplitz_conf_t));
 					toeplitz_init_config(trace->hasher_data, 0);
 					return 0;
@@ -1471,21 +1508,21 @@ DLLEXPORT void trace_join(libtrace_t *libtrace) {
 		}
 		// Cannot destroy vector yet, this happens with trace_destroy
 	}
+	libtrace->state = STATE_FINSHED;
+	// Wait for the ticker thread
+	
+	if (libtrace->keepalive_thread.state != THREAD_FINISHED) {
+		libtrace_message_t msg = {0};
+		msg.code = MESSAGE_DO_STOP;
+		fprintf(stderr, "Waiting to join with the keepalive\n");
+		trace_send_message_to_thread(libtrace, &libtrace->keepalive_thread, &msg);
+		pthread_join(libtrace->keepalive_thread.tid, NULL);
+	}
+	fprintf(stderr, "Joined with with the keepalive\n");
+	
 
 	// Lets mark this as done for now
 	libtrace->joined = true;
-}
-
-// Don't use extra overhead = :( directly place in storage structure using
-// post
-DLLEXPORT libtrace_result_t *trace_create_result()
-{
-	libtrace_result_t *result = malloc(sizeof(libtrace_result_t));
-	assert(result);
-	result->key = 0;
-	result->value = NULL;
-	// TODO automatically back with a free list!!
-	return result;
 }
 
 DLLEXPORT int libtrace_thread_get_message_count(libtrace_t * libtrace)
@@ -1516,7 +1553,6 @@ DLLEXPORT int trace_post_reduce(libtrace_t *libtrace)
 {
 	libtrace_message_t message = {0};
 	message.code = MESSAGE_POST_REDUCE;
-	message.additional = NULL;
 	message.sender = get_thread_descriptor(libtrace);
 	return libtrace_message_queue_put(&libtrace->reducer_thread.messages, (void *) &message);
 }
@@ -1609,54 +1645,6 @@ DLLEXPORT void * trace_set_tls(libtrace_thread_t *t, void * data)
 }
 
 /**
- * Note: This function grabs a lock and expects trace_update_inprogress_result
- * to be called to release the lock.
- *
- * Expected to be used in trace-time situations to allow a result to be pending
- * a publish that can be taken by the reducer before publish if it wants to
- * publish a result. Such as publish a result every second but a queue hasn't
- * processed a packet (or is overloaded) and hasn't published yet.
- *
- * Currently this only supports a single temporary result,
- * as such if a key is different to the current temporary result the existing
- * one will be published and NULL returned.
- */
-DLLEXPORT void * trace_retrive_inprogress_result(libtrace_t *libtrace, uint64_t key)
-{
-	int this_thread = get_thread_table_num(libtrace); // Could be worth caching ... ?
-	libtrace_thread_t * t = &libtrace->perpkt_threads[this_thread];
-
-	assert (pthread_spin_lock(&t->tmp_spinlock) == 0);
-	if (t->tmp_key != key) {
-		if (t->tmp_data) {
-			//printf("publising data key=%"PRIu64"\n", t->tmp_key);
-			trace_publish_result(libtrace, t->tmp_key, t->tmp_data);
-		}
-		t->tmp_data = NULL;
-		t->tmp_key = key;
-	}
-	return t->tmp_data;
-}
-
-/**
- * Updates a temporary result and releases the lock previously grabbed by trace_retrive_inprogress_result
- */
-DLLEXPORT void trace_update_inprogress_result(libtrace_t *libtrace, uint64_t key, void * value)
-{
-	int this_thread = get_thread_table_num(libtrace); // Could be worth caching ... ?
-	libtrace_thread_t * t = &libtrace->perpkt_threads[this_thread];
-	if (t->tmp_key != key) {
-		if (t->tmp_data) {
-			printf("BAD publihsing data key=%"PRIu64"\n", t->tmp_key);
-			trace_publish_result(libtrace, t->tmp_key, t->tmp_data);
-		}
-		t->tmp_key = key;
-	}
-	t->tmp_data = value;
-	assert (pthread_spin_unlock(&t->tmp_spinlock) == 0);
-}
-
-/**
  * Publish to the reduce queue, return
  */
 DLLEXPORT void trace_publish_result(libtrace_t *libtrace, uint64_t key, void * value) {
@@ -1666,7 +1654,7 @@ DLLEXPORT void trace_publish_result(libtrace_t *libtrace, uint64_t key, void * v
 	int this_thread = get_thread_table_num(libtrace); // Could be worth caching ... ?
 	libtrace_thread_t * t = &libtrace->perpkt_threads[this_thread];
 	// Now put it into my table
-	static __thread int count = 0;
+	UNUSED static __thread int count = 0;
 
 
 	libtrace_result_set_key_value(&res, key, value);
@@ -1703,7 +1691,7 @@ DLLEXPORT void trace_publish_packet(libtrace_t *libtrace, libtrace_packet_t *pac
 	int this_thread = get_thread_table_num(libtrace); // Could be worth caching ... ?
 	libtrace_thread_t * t = &libtrace->perpkt_threads[this_thread];
 	// Now put it into my table
-	static __thread int count = 0;
+	UNUSED static __thread int count = 0;
 
 	res.is_packet = 1;
 	libtrace_result_set_key_value(&res, trace_packet_get_order(packet), packet);
@@ -1743,46 +1731,6 @@ static int compareres(const void* p1, const void* p2)
 		return 0;
 	else
 		return 1;
-}
-
-/* Retrieves all results with the key requested from the temporary result
- * holding zone.
- */
-DLLEXPORT int trace_get_results_check_temp(libtrace_t *libtrace, libtrace_vector_t *results, uint64_t key)
-{
-	int i;
-
-	libtrace_vector_empty(results);
-	// Check all of the temp queues
-	for (i = 0; i < libtrace->perpkt_thread_count; ++i) {
-		libtrace_result_t r = {0,0};
-		assert (pthread_spin_lock(&libtrace->perpkt_threads[i].tmp_spinlock) == 0);
-		if (libtrace->perpkt_threads[i].tmp_key == key) {
-			libtrace_result_set_key_value(&r, key, libtrace->perpkt_threads[i].tmp_data);
-			libtrace->perpkt_threads[i].tmp_data = NULL;
-			printf("Found in temp queue\n");
-		}
-		assert (pthread_spin_unlock(&libtrace->perpkt_threads[i].tmp_spinlock) == 0);
-		if (libtrace_result_get_value(&r)) {
-			// Got a result still in temporary
-			printf("Publishing from temp queue\n");
-			libtrace_vector_push_back(results, &r);
-		} else {
-			// This might be waiting on the actual queue
-			libtrace_queue_t *v = &libtrace->perpkt_threads[i].deque;
-			if (libtrace_deque_peek_front(v, (void *) &r) &&
-					libtrace_result_get_value(&r)) {
-				assert (libtrace_deque_pop_front(&libtrace->perpkt_threads[i].deque, (void *) &r) == 1);
-				printf("Found in real queue\n");
-				libtrace_vector_push_back(results, &r);
-			} // else no data (probably means no packets)
-			else {
-				printf("Result missing in real queue\n");
-			}
-		}
-	}
-	//printf("Loop done yo, that means we've got #%d results to print fool!\n", libtrace_vector_get_size(results));
-	return libtrace_vector_get_size(results);
 }
 
 DLLEXPORT int trace_get_results(libtrace_t *libtrace, libtrace_vector_t * results) {
@@ -1907,7 +1855,7 @@ DLLEXPORT int trace_finished(libtrace_t * libtrace) {
 
 DLLEXPORT int trace_parallel_config(libtrace_t *libtrace, trace_parallel_option_t option, void *value)
 {
-	int ret = -1;
+	UNUSED int ret = -1;
 	switch (option) {
 		case TRACE_OPTION_SET_HASHER:
 			return trace_set_hasher(libtrace, (enum hasher_types) *((int *) value), NULL, NULL);

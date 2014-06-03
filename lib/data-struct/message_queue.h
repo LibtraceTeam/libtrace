@@ -13,12 +13,6 @@ typedef struct libtrace_message_queue_t {
 	pthread_spinlock_t spin;
 } libtrace_message_queue_t;
 
-typedef struct libtrace_message_t {
-	int code;
-	void *additional;
-	libtrace_thread_t *sender;
-} libtrace_message_t;
-
 inline void libtrace_message_queue_init(libtrace_message_queue_t *mq, size_t message_len);
 inline int libtrace_message_queue_put(libtrace_message_queue_t *mq, const void *message);
 inline int libtrace_message_queue_count(const libtrace_message_queue_t *mq);

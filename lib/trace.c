@@ -278,6 +278,7 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 	libtrace_zero_ringbuffer(&libtrace->packet_freelist);
 	libtrace_zero_thread(&libtrace->hasher_thread);
 	libtrace_zero_thread(&libtrace->reducer_thread);
+	libtrace_zero_thread(&libtrace->keepalive_thread);
 	libtrace_zero_slidingwindow(&libtrace->sliding_window);
 	libtrace->reducer_thread.type = THREAD_EMPTY;
 	libtrace->perpkt_thread_count = 0;
@@ -398,6 +399,7 @@ DLLEXPORT libtrace_t * trace_create_dead (const char *uri) {
 	libtrace_zero_ringbuffer(&libtrace->packet_freelist);
 	libtrace_zero_thread(&libtrace->hasher_thread);
 	libtrace_zero_thread(&libtrace->reducer_thread);
+	libtrace_zero_thread(&libtrace->keepalive_thread);
 	libtrace_zero_slidingwindow(&libtrace->sliding_window);
 	libtrace->reducer_thread.type = THREAD_EMPTY;
 	libtrace->perpkt_thread_count = 0;
@@ -769,7 +771,6 @@ DLLEXPORT void trace_destroy_packet(libtrace_packet_t *packet) {
  * This will not destroy a reusable good malloc'd buffer (TRACE_CTRL_PACKET)
  * use trace_destroy_packet() for those diabolical purposes.
  */
-void trace_fin_packet(libtrace_packet_t *packet);
 void trace_fin_packet(libtrace_packet_t *packet) {
 	if (packet)
 	{
