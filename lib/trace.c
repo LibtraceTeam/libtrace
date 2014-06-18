@@ -267,7 +267,6 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 	libtrace->perpkt_queue_full = false;
 	libtrace->perpkts_finishing = -1;
 	libtrace->reducer_flags = 0;
-	libtrace->joined = false;
 	libtrace->global_blob = NULL;
 	libtrace->per_pkt = NULL;
 	libtrace->reducer = NULL;
@@ -284,6 +283,7 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 	libtrace->perpkt_thread_count = 0;
 	libtrace->perpkt_threads = NULL;
 	libtrace->tracetime = 0;
+	libtrace->tick_interval = 0;
 
         /* Parse the URI to determine what sort of trace we are dealing with */
 	if ((uridata = trace_parse_uri(uri, &scan)) == 0) {
@@ -388,7 +388,6 @@ DLLEXPORT libtrace_t * trace_create_dead (const char *uri) {
 	libtrace->perpkt_queue_full = false;
 	libtrace->perpkts_finishing = -1;
 	libtrace->reducer_flags = 0;
-	libtrace->joined = false;
 	libtrace->global_blob = NULL;
 	libtrace->per_pkt = NULL;
 	libtrace->reducer = NULL;
@@ -405,6 +404,7 @@ DLLEXPORT libtrace_t * trace_create_dead (const char *uri) {
 	libtrace->perpkt_thread_count = 0;
 	libtrace->perpkt_threads = NULL;
 	libtrace->tracetime = 0;
+	libtrace->tick_interval = 0;
 	
 	for(tmp=formats_list;tmp;tmp=tmp->next) {
                 if (strlen(scan) == strlen(tmp->name) &&

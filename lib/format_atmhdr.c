@@ -230,12 +230,8 @@ static struct libtrace_format_t atmhdr = {
         NULL,                           /* get_fd */
         trace_event_trace,              /* trace_event */
         NULL,                 		/* help */
-	NULL, /* pstart_input */
-	NULL, /* pread_packet */
-	NULL, /* ppause_input */
-	NULL, /* pfin_input */
-	NULL, /* pconfig_input */
-        NULL                            /* next pointer */
+        NULL,                            /* next pointer */
+	NON_PARALLEL(false)
 };
 	
 

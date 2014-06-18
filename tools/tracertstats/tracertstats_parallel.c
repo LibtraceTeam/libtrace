@@ -157,6 +157,7 @@ static int reduce(libtrace_t* trace, void* global_blob, uint64_t *last_ts)
 		
 		result_t * res = libtrace_result_get_value(&result);
 		static result_t *  last_res = NULL;
+		// Memory manager might falsely trigger this
 		assert(res != last_res);
 		last_res = res;
 		//printf("Perpkt published %"PRIu64" - c=%"PRIu64"\n", ts, res->total.count);
@@ -206,7 +207,7 @@ static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt,
 
 		while (packet_interval != UINT64_MAX && last_ts<ts) {
 			// Publish and make a new one new
-			fprintf(stderr, "Publishing result %"PRIu64"\n", last_ts);
+			//fprintf(stderr, "Publishing result %"PRIu64"\n", last_ts);
 			trace_publish_result(trace, (uint64_t) last_ts, results);
 			trace_post_reduce(trace);
 			results = calloc(1, sizeof(result_t) + sizeof(statistic_t) * filter_count);
@@ -257,16 +258,16 @@ static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt,
 					uint64_t next_update_time;
 					next_update_time = (last_ts*packet_interval + packet_interval) * 1000000 + offset;
 					if (next_update_time <= mesg->additional.uint64) {
-						fprintf(stderr, "Got a tick and publishing early!!\n");
+						//fprintf(stderr, "Got a tick and publishing early!!\n");
 						trace_publish_result(trace, (uint64_t) last_ts, results);
 						trace_post_reduce(trace);
 						results = calloc(1, sizeof(result_t) + sizeof(statistic_t) * filter_count);
 						last_ts++;
 					} else {
-						fprintf(stderr, "Got a tick but no publish ...\n");
+						//fprintf(stderr, "Got a tick but no publish ...\n");
 					}
 				} else {
-					fprintf(stderr, "Got a tick but no packets seen yet!!!\n");
+					//fprintf(stderr, "Got a tick but no packets seen yet!!!\n");
 				}
 			}
 		}
@@ -308,13 +309,15 @@ static void run_trace(char *uri)
 	}*/
 	int i = 1;
 	trace_parallel_config(trace, TRACE_OPTION_ORDERED, &i);
-	trace_parallel_config(trace, TRACE_OPTION_TRACETIME, &i);
-	trace_set_hasher(trace, HASHER_CUSTOM, &bad_hash, NULL);
-#if TRACE_TIME
-	if (trace_pstart(trace, NULL, &per_packet_tracetime, NULL)==-1) {
-#else
+	/* trace_parallel_config(trace, TRACE_OPTION_TRACETIME, &i); */
+	//trace_set_hasher(trace, HASHER_CUSTOM, &bad_hash, NULL);
+
+	if (trace_get_information(trace)->live) {
+		i = (int) (packet_interval * 1000); // Every interval send a tick
+		trace_parallel_config(trace, TRACE_OPTION_TICK_INTERVAL, &i);
+	}
+
 	if (trace_pstart(trace, NULL, &per_packet, NULL)==-1) {
-#endif
 		trace_perror(trace,"Failed to start trace");
 		trace_destroy(trace);
 		if (!merge_inputs)
@@ -461,5 +464,5 @@ int main(int argc, char *argv[]) {
 	}
 
 
-        return 0;
+	return 0;
 }

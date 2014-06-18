@@ -249,7 +249,8 @@ struct first_packets {
 	X(STATE_PAUSED) \
 	X(STATE_FINSHED) \
 	X(STATE_DESTROYED) \
-	X(STATE_ERROR) // Currently unused 
+	X(STATE_JOINED) \
+	X(STATE_ERROR)
 
 #define X(a) a,
 enum trace_state {
@@ -322,6 +323,8 @@ struct libtrace_t {
 	int perpkt_buffer_size;
 	/** The reducer flags */
 	int reducer_flags;
+	/** The tick interval - in milliseconds (0 or -ve==disabled) */
+	int tick_interval;
 	/** Used to track the next expected key */
 	uint64_t expected_key;
 	/** User defined per_pkt function called when a pkt is ready */
@@ -458,8 +461,6 @@ typedef struct libtrace_pflog_header_t {
 	uint8_t	   dir;
 	uint8_t	   pad[3];
 } PACKED libtrace_pflog_header_t;
-
-
 
 /** A libtrace capture format module */
 /* All functions should return -1, or NULL on failure */
@@ -891,6 +892,13 @@ struct libtrace_format_t {
 	/** Prints some useful help information to standard output. */
 	void (*help)(void);
 	
+	/** Next pointer, should always be NULL - used by the format module
+	 * manager. */
+	struct libtrace_format_t *next;
+
+	/** Holds information about the trace format */
+	struct libtrace_info_t info;
+
 	/** Starts or unpauses an input trace in parallel mode - note that
 	 * this function is often the one that opens the file or device for
 	 * reading.
@@ -908,10 +916,16 @@ struct libtrace_format_t {
 	 * interrupted due to message waiting. */
 	int (*pread_packet)(libtrace_t *trace, libtrace_packet_t *packet);
 	
-	/** Pause a parallel trace */
+	/** Pause a parallel trace
+	 *
+	 * @param libtrace	The input trace to be paused
+	 */
 	int (*ppause_input)(libtrace_t *trace);
 	
-	/** Called after all threads have been paused, Finish (close) a parallel trace */
+	/** Called after all threads have been paused, Finish (close) a parallel trace
+     * 
+	 * @param libtrace	The input trace to be stopped
+	 */
 	int (*pfin_input)(libtrace_t *trace);
 	
 	/** Applies a configuration option to an input trace.
@@ -924,11 +938,17 @@ struct libtrace_format_t {
 	 * occurs
 	 */
 	int (*pconfig_input)(libtrace_t *libtrace,trace_parallel_option_t option,void *value);
-	
-	/** Next pointer, should always be NULL - used by the format module
-	 * manager. */
-	struct libtrace_format_t *next;
+		
 };
+
+/** Macro to zero out a single thread format */
+#define NON_PARALLEL(live) \
+{live, 1},		/* trace info */ \
+NULL,			/* pstart_input */ \
+NULL,			/* pread_packet */ \
+NULL,			/* ppause_input */ \
+NULL,			/* pfin_input */ \
+NULL,			/* pconfig_input */
 
 /** The list of registered capture formats */
 //extern struct libtrace_format_t *form;

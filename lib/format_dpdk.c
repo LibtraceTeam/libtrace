@@ -1594,7 +1594,7 @@ static void dpdk_help(void) {
     printf("\n");
 }
 
- static struct libtrace_format_t dpdk = {
+static struct libtrace_format_t dpdk = {
 	"dpdk",
 	"$Id: format_dpdk.c 1805 2013-03-08 02:01:35Z salcock $",
 	TRACE_FORMAT_DPDK,
@@ -1634,12 +1634,13 @@ static void dpdk_help(void) {
 	NULL,		            /* get_fd */
 	dpdk_trace_event,		/* trace_event */
     dpdk_help,              /* help */
+    NULL,                   /* next pointer */
+    {true, 8},              /* Live, NICs typically have 8 threads */
     dpdk_pstart_input, /* pstart_input */
 	dpdk_pread_packet, /* pread_packet */
 	dpdk_pause_input, /* ppause */
 	dpdk_fin_input, /* p_fin */
-	dpdk_pconfig_input, /* pconfig_input */
-	NULL
+	dpdk_pconfig_input /* pconfig_input */
 };
 
 void dpdk_constructor(void) {

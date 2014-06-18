@@ -800,12 +800,8 @@ static struct libtrace_format_t pcap = {
 	NULL,				/* get_fd */
 	trace_event_trace,		/* trace_event */
 	pcap_help,			/* help */
-	NULL, /* pstart_input */
-	NULL, /* pread_packet */
-	NULL, /* ppause_input */
-	NULL, /* pfin_input */
-	NULL, /* pconfig_input */
-	NULL				/* next pointer */
+	NULL,			/* next pointer */
+	NON_PARALLEL(false)
 };
 
 static struct libtrace_format_t pcapint = {
@@ -848,12 +844,8 @@ static struct libtrace_format_t pcapint = {
 	pcap_get_fd,			/* get_fd */
 	trace_event_device,		/* trace_event */
 	pcapint_help,			/* help */
-	NULL, /* pstart_input */
-	NULL, /* pread_packet */
-	NULL, /* ppause_input */
-	NULL, /* pfin_input */
-	NULL, /* pconfig_input */
-	NULL				/* next pointer */
+	NULL,			/* next pointer */
+	NON_PARALLEL(true)
 };
 
 void pcap_constructor(void) {

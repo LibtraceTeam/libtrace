@@ -857,12 +857,8 @@ static struct libtrace_format_t rt = {
         rt_get_fd,                	/* get_fd */
         trace_event_rt,             /* trace_event */
         rt_help,			/* help */
-	NULL, /* pstart_input */
-	NULL, /* pread_packet */
-	NULL, /* ppause_input */
-	NULL, /* pfin_input */
-	NULL, /* pconfig_input */
-	NULL				/* next pointer */
+	NULL,			/* next pointer */
+	NON_PARALLEL(true) /* This is normally live */
 };
 
 void rt_constructor(void) {

@@ -827,12 +827,8 @@ static struct libtrace_format_t erfformat = {
 	NULL,				/* get_fd */
 	erf_event,			/* trace_event */
 	erf_help,			/* help */
-	NULL, /* pstart_input */
-	NULL, /* pread_packet */
-	NULL, /* ppause_input */
-	NULL, /* pfin_input */
-	NULL, /* pconfig_input */
-	NULL				/* next pointer */
+	NULL,				/* next pointer */
+	NON_PARALLEL(false)
 };
 
 static struct libtrace_format_t rawerfformat = {
@@ -875,12 +871,8 @@ static struct libtrace_format_t rawerfformat = {
 	NULL,				/* get_fd */
 	erf_event,			/* trace_event */
 	erf_help,			/* help */
-	NULL, /* pstart_input */
-	NULL, /* pread_packet */
-	NULL, /* ppause_input */
-	NULL, /* pfin_input */
-	NULL, /* pconfig_input */
-	NULL				/* next pointer */
+	NULL,				/* next pointer */
+	NON_PARALLEL(false)
 };
 
 

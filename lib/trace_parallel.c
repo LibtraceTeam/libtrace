@@ -491,7 +491,8 @@ inline static int trace_pread_packet_first_in_first_served(libtrace_t *libtrace,
 	(*packet)->error = trace_read_packet(libtrace, *packet);
 	// Doing this inside the lock ensures the first packet is always
 	// recorded first
-	store_first_packet(libtrace, *packet, t);
+	if ((*packet)->error > 0)
+		store_first_packet(libtrace, *packet, t);
 
 	assert(pthread_mutex_unlock(&libtrace->libtrace_lock) == 0);
 	return (*packet)->error;
@@ -911,15 +912,14 @@ static void* keepalive_entry(void *data) {
 	struct timeval prev, next;
 	libtrace_message_t message = {0};
 	libtrace_t *trace = (libtrace_t *)data;
-	int delay_usec = 1000000; // ! second hard coded !!
 	uint64_t next_release;
 	fprintf(stderr, "keepalive thread is starting\n");
-	// TODO mark this thread as running against the libtrace object
+
 	gettimeofday(&prev, NULL);
 	message.code = MESSAGE_TICK;
 	while (trace->state != STATE_FINSHED) {
 		fd_set rfds;
-		next_release = tv_to_usec(&prev) + delay_usec;
+		next_release = tv_to_usec(&prev) + (trace->tick_interval * 1000);
 		gettimeofday(&next, NULL);
 		if (next_release > tv_to_usec(&next)) {
 			next = usec_to_tv(next_release - tv_to_usec(&next));
@@ -1164,7 +1164,7 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob, fn_per_pkt p
 	assert(pthread_sigmask(SIG_SETMASK, &sig_block_all, &sig_before) == 0);
 
 	// If we are using a hasher start it
-	if (libtrace->hasher && libtrace->hasher_thread.type == THREAD_HASHER) {
+	if (libtrace->hasher || libtrace->hasher_thread.type == THREAD_HASHER) {
 		libtrace_thread_t *t = &libtrace->hasher_thread;
 		t->trace = libtrace;
 		t->ret = NULL;
@@ -1232,10 +1232,12 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob, fn_per_pkt p
 	if (threads_started == 0)
 		threads_started = trace_start_perpkt_threads(libtrace);
 
-	libtrace->keepalive_thread.type = THREAD_KEEPALIVE;
-   	libtrace->keepalive_thread.state = THREAD_RUNNING;
-	libtrace_message_queue_init(&libtrace->keepalive_thread.messages, sizeof(libtrace_message_t));
-	assert(pthread_create(&libtrace->keepalive_thread.tid, NULL, keepalive_entry, (void *) libtrace) == 0);
+	if (libtrace->tick_interval > 0) {
+		libtrace->keepalive_thread.type = THREAD_KEEPALIVE;
+	   	libtrace->keepalive_thread.state = THREAD_RUNNING;
+		libtrace_message_queue_init(&libtrace->keepalive_thread.messages, sizeof(libtrace_message_t));
+		assert(pthread_create(&libtrace->keepalive_thread.tid, NULL, keepalive_entry, (void *) libtrace) == 0);
+	}
 
 	// Revert back - Allow signals again
 	assert(pthread_sigmask(SIG_SETMASK, &sig_before, NULL) == 0);
@@ -1509,20 +1511,18 @@ DLLEXPORT void trace_join(libtrace_t *libtrace) {
 		// Cannot destroy vector yet, this happens with trace_destroy
 	}
 	libtrace->state = STATE_FINSHED;
-	// Wait for the ticker thread
 	
-	if (libtrace->keepalive_thread.state != THREAD_FINISHED) {
+	// Wait for the tick (keepalive) thread if its been started
+	if (libtrace->keepalive_thread.type == THREAD_KEEPALIVE && libtrace->keepalive_thread.state == THREAD_RUNNING) {
 		libtrace_message_t msg = {0};
 		msg.code = MESSAGE_DO_STOP;
 		fprintf(stderr, "Waiting to join with the keepalive\n");
 		trace_send_message_to_thread(libtrace, &libtrace->keepalive_thread, &msg);
 		pthread_join(libtrace->keepalive_thread.tid, NULL);
+		fprintf(stderr, "Joined with with the keepalive\n");
 	}
-	fprintf(stderr, "Joined with with the keepalive\n");
-	
-
 	// Lets mark this as done for now
-	libtrace->joined = true;
+	libtrace->state = STATE_JOINED;
 }
 
 DLLEXPORT int libtrace_thread_get_message_count(libtrace_t * libtrace)
@@ -1771,7 +1771,7 @@ DLLEXPORT int trace_get_results(libtrace_t *libtrace, libtrace_vector_t * result
 		/* Now remove the smallest and loop - special case if all threads have joined we always flush whats left */
 		while ((live_count == libtrace->perpkt_thread_count) || (live_count &&
 				((flags & REDUCE_SEQUENTIAL && min_key == libtrace->expected_key) ||
-				libtrace->joined))) {
+				libtrace->state == STATE_JOINED))) {
 			/* Get the minimum queue and then do stuff */
 			libtrace_result_t r;
 
@@ -1857,6 +1857,9 @@ DLLEXPORT int trace_parallel_config(libtrace_t *libtrace, trace_parallel_option_
 {
 	UNUSED int ret = -1;
 	switch (option) {
+		case TRACE_OPTION_TICK_INTERVAL:
+			libtrace->tick_interval = *((int *) value);
+			return 1;
 		case TRACE_OPTION_SET_HASHER:
 			return trace_set_hasher(libtrace, (enum hasher_types) *((int *) value), NULL, NULL);
 		case TRACE_OPTION_SET_PERPKT_BUFFER_SIZE:
@@ -1927,4 +1930,11 @@ DLLEXPORT void trace_free_result_packet(libtrace_t * libtrace, libtrace_packet_t
 		//assert(1 == 90);
 		trace_destroy_packet(packet);
 	}
+}
+
+DLLEXPORT libtrace_info_t *trace_get_information(libtrace_t * libtrace) {
+	if (libtrace->format)
+		return &libtrace->format->info;
+	else
+		return NULL;
 }

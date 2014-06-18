@@ -1827,12 +1827,13 @@ static struct libtrace_format_t linuxnative = {
 	linuxnative_get_fd,		/* get_fd */
 	trace_event_device,		/* trace_event */
 	linuxnative_help,		/* help */
+	NULL,					/* next pointer */
+	{true, -1},              /* Live, no thread limit */
 	linuxnative_pstart_input,			/* pstart_input */
 	linuxnative_pread_packet,			/* pread_packet */
 	linuxnative_ppause_input,			/* ppause */
 	linuxnative_fin_input,				/* p_fin */
-	linuxnative_pconfig_input, 			/* pconfig input */ //int (*pconfig_input)(libtrace_t *libtrace,trace_option_t option,void *value);
-	NULL
+	linuxnative_pconfig_input			/* pconfig input */
 };
 
 static struct libtrace_format_t linuxring = {
@@ -1875,12 +1876,14 @@ static struct libtrace_format_t linuxring = {
 	linuxnative_get_fd,		/* get_fd */
 	linuxring_event,		/* trace_event */
 	linuxring_help,		/* help */
+	NULL,				/* next pointer */
+	{true, -1},              /* Live, no thread limit */
 	linuxnative_pstart_input,			/* pstart_input */
 	linuxring_pread_packet,			/* pread_packet */
 	linuxnative_ppause_input,			/* ppause */
 	linuxnative_fin_input,				/* p_fin */
-	linuxnative_pconfig_input,
-	NULL
+	linuxnative_pconfig_input
+	
 };
 #else
 static void linuxnative_help(void) {
@@ -1932,9 +1935,8 @@ static struct libtrace_format_t linuxnative = {
 	linuxnative_get_fd,		/* get_fd */
 	trace_event_device,		/* trace_event */
 	linuxnative_help,		/* help */
-	NULL,			/* pstart_input */
-	NULL,			/* pread_packet */
-	NULL
+	NULL,			/* next pointer */
+	NON_PARALLEL(true)
 };
 
 static struct libtrace_format_t linuxring = {
@@ -1977,9 +1979,8 @@ static struct libtrace_format_t linuxring = {
 	linuxnative_get_fd,		/* get_fd */
 	NULL,				/* trace_event */
 	linuxring_help,			/* help */
-	NULL,			/* pstart_input */
-	NULL,			/* pread_packet */
-	NULL
+	NULL,			/* next pointer */
+	NON_PARALLEL(true)
 };
 
 #endif /* HAVE_NETPACKET_PACKET_H */

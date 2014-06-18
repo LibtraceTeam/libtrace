@@ -1214,7 +1214,8 @@ static struct libtrace_format_t dag = {
         NULL, /* ppause_input */
         NULL, /* pfin_input */
         NULL, /* pconfig_input */
-        NULL                            /* next pointer */
+        NULL,                            /* next pointer */
+        NON_PARALLEL(true)
 };
 
 void dag_constructor(void) {
