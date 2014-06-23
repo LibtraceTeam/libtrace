@@ -139,7 +139,7 @@ DLLEXPORT void print_contention_stats(libtrace_t *libtrace) {
 	return;
 }
 
-inline void libtrace_zero_thread(libtrace_thread_t * t) {
+void libtrace_zero_thread(libtrace_thread_t * t) {
 	t->trace = NULL;
 	t->ret = NULL;
 	t->type = THREAD_EMPTY;
@@ -827,7 +827,7 @@ inline static int trace_pread_packet_sliding_window(libtrace_t *libtrace, libtra
  * in trace time. And can be used by real time applications to print
  * results out every XXX seconds.
  */
-inline void store_first_packet(libtrace_t *libtrace, libtrace_packet_t *packet, libtrace_thread_t *t)
+void store_first_packet(libtrace_t *libtrace, libtrace_packet_t *packet, libtrace_thread_t *t)
 {
 	if (!t->recorded_first) {
 		struct timeval tv;

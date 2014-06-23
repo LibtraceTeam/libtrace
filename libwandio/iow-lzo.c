@@ -40,6 +40,7 @@
  */
 
 #include <lzo/lzo1x.h>
+#include "wandio_internal.h"
 #include "wandio.h"
 #include "config.h"
 #include <sys/types.h>

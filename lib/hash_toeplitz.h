@@ -27,10 +27,10 @@ typedef struct toeplitz_conf {
 } toeplitz_conf_t;
 
 void toeplitz_hash_expand_key(toeplitz_conf_t *conf);
-inline uint32_t toeplitz_hash(const toeplitz_conf_t *tc, const uint8_t *data, size_t offset, size_t n, uint32_t result);
-inline uint32_t toeplitz_first_hash(const toeplitz_conf_t *tc, const uint8_t *data, size_t n);
-inline void toeplitz_init_config(toeplitz_conf_t *conf, bool bidirectional);
-inline uint64_t toeplitz_hash_packet(const libtrace_packet_t * pkt, const toeplitz_conf_t *cnf);
+uint32_t toeplitz_hash(const toeplitz_conf_t *tc, const uint8_t *data, size_t offset, size_t n, uint32_t result);
+uint32_t toeplitz_first_hash(const toeplitz_conf_t *tc, const uint8_t *data, size_t n);
+void toeplitz_init_config(toeplitz_conf_t *conf, bool bidirectional);
+uint64_t toeplitz_hash_packet(const libtrace_packet_t * pkt, const toeplitz_conf_t *cnf);
 void toeplitz_create_bikey(uint8_t *key);
 void toeplitz_create_unikey(uint8_t *key);
 
@@ -45,8 +45,5 @@ typedef struct ipv4_toeplitz_only {
 	uint8_t dest[4];
 } toeplitz_ipv4_only_t;
 #pragma pack(pop)   /* restore original alignment from stack */
-
-
-inline toeplitz_ipv4_only_t make_toeplitz_ipv4(uint8_t *src_ip4, uint8_t *dest_ip4);
 
 #endif

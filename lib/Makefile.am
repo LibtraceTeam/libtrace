@@ -1,8 +1,8 @@
 lib_LTLIBRARIES = libtrace.la
 include_HEADERS = libtrace.h dagformat.h lt_inttypes.h daglegacy.h rt_protocol.h erftypes.h  
 
-AM_CFLAGS=@LIBCFLAGS@ -pthread
-AM_CXXFLAGS=@LIBCXXFLAGS@ -pthread
+AM_CFLAGS=@LIBCFLAGS@ @CFLAG_VISIBILITY@ -pthread
+AM_CXXFLAGS=@LIBCXXFLAGS@ @CFLAG_VISIBILITY@ -pthread
 
 extra_DIST = format_template.c
 NATIVEFORMATS=format_linux.c
@@ -60,7 +60,7 @@ if DAG2_4
 nodist_libtrace_la_SOURCES = dagopts.c dagapi.c
 endif
 
-INCLUDES= @ADD_INCLS@ -I../libwandio
+AM_CPPFLAGS= @ADD_INCLS@ -I../libwandio
 libtrace_la_LIBADD = @LIBTRACE_LIBS@ @LTLIBOBJS@ $(DPDKLIBS)
 libtrace_la_LDFLAGS=-version-info @LIBTRACE_MAJOR@:@LIBTRACE_MINOR@:@LIBTRACE_MID@ @ADD_LDFLAGS@
 dagapi.c:

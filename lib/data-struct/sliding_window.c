@@ -13,7 +13,7 @@
  * 				becomes available. LIBTRACE_RINGBUFFER_BLOCKING or LIBTRACE_RINGBUFFER_POLLING.
  * 				NOTE: this mainly applies to the blocking functions
  */
-inline void libtrace_slidingwindow_init(libtrace_slidingwindow_t *sw, size_t size, uint64_t start_number) {
+void libtrace_slidingwindow_init(libtrace_slidingwindow_t *sw, size_t size, uint64_t start_number) {
 	sw->size = size; // All of this size can be used
 	sw->start = 0;
 	sw->elements = calloc(sw->size, sizeof(void*));
@@ -26,7 +26,7 @@ inline void libtrace_slidingwindow_init(libtrace_slidingwindow_t *sw, size_t siz
  * Destroys the ring buffer along with any memory allocated to it
  * @param rb The ringbuffer to destroy
  */
-inline void libtrace_slidingwindow_destroy(libtrace_slidingwindow_t *sw) {
+void libtrace_slidingwindow_destroy(libtrace_slidingwindow_t *sw) {
 	sw->size = 0;
 	sw->start = 0;
 	sw->start_number = 0;
@@ -45,7 +45,7 @@ inline void libtrace_slidingwindow_destroy(libtrace_slidingwindow_t *sw) {
  * @param value the value to store
  * @return 1 if a object was written otherwise 0.
  */
-inline int libtrace_slidingwindow_try_write(libtrace_slidingwindow_t *sw, uint64_t number, void* value) {
+int libtrace_slidingwindow_try_write(libtrace_slidingwindow_t *sw, uint64_t number, void* value) {
 	uint64_t adjusted_number = number - sw->start_number;
 	if (adjusted_number < sw->size) {
 		// Add it
@@ -61,7 +61,7 @@ static inline uint64_t libtrace_slidingwindow_get_min_number(libtrace_slidingwin
 	return sw->start_number;
 }
 
-inline uint64_t libtrace_slidingwindow_read_ready(libtrace_slidingwindow_t *sw) {
+uint64_t libtrace_slidingwindow_read_ready(libtrace_slidingwindow_t *sw) {
 	return sw->elements[sw->start] != NULL;
 }
 
@@ -73,7 +73,7 @@ inline uint64_t libtrace_slidingwindow_read_ready(libtrace_slidingwindow_t *sw) 
  * @param out a pointer to a memory address where the returned item would be placed
  * @return 1 if a object was received otherwise 0, in this case out remains unchanged
  */
-inline int libtrace_slidingwindow_try_read(libtrace_slidingwindow_t *sw, void ** value, uint64_t *number) {
+int libtrace_slidingwindow_try_read(libtrace_slidingwindow_t *sw, void ** value, uint64_t *number) {
 	if (sw->elements[sw->start]) {
 		*value = sw->elements[sw->start];
 		sw->elements[sw->start] = NULL;
@@ -87,7 +87,7 @@ inline int libtrace_slidingwindow_try_read(libtrace_slidingwindow_t *sw, void **
 	}
 }
 
-inline void libtrace_zero_slidingwindow(libtrace_slidingwindow_t * sw)
+void libtrace_zero_slidingwindow(libtrace_slidingwindow_t * sw)
 {
 	sw->start = 0;
 	sw->start_number = 0;

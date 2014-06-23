@@ -33,6 +33,7 @@
 
 #include "config.h"
 #include "wandio.h"
+#include "wandio_internal.h"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>

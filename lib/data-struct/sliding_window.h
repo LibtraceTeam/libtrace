@@ -17,7 +17,7 @@ typedef struct libtrace_slidingwindow {
 } libtrace_slidingwindow_t;
 
 void libtrace_slidingwindow_init(libtrace_slidingwindow_t * sw, size_t size, uint64_t start_number);
-inline void libtrace_zero_slidingwindow(libtrace_slidingwindow_t * sw);
+void libtrace_zero_slidingwindow(libtrace_slidingwindow_t * sw);
 void libtrace_slidingwindow_destroy(libtrace_slidingwindow_t * sw);
 
 /*
@@ -31,7 +31,7 @@ int libtrace_slidingwindow_try_write(libtrace_slidingwindow_t * sw, uint64_t num
 /*void* libtrace_slidingwindow_read(libtrace_slidingwindow_t *sw);*/
 int libtrace_slidingwindow_try_read(libtrace_slidingwindow_t *sw, void ** value, uint64_t *number);
 
-inline uint64_t libtrace_slidingwindow_read_ready(libtrace_slidingwindow_t *sw);
+uint64_t libtrace_slidingwindow_read_ready(libtrace_slidingwindow_t *sw);
 /*
 void libtrace_slidingwindow_swrite(libtrace_slidingwindow_t * sw, void* value);
 int libtrace_slidingwindow_try_swrite(libtrace_slidingwindow_t * sw, void* value);
