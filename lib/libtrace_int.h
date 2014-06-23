@@ -202,7 +202,7 @@ enum thread_states {
 /**
  * Information of this thread
  */
-typedef struct libtrace_thread_t {
+struct libtrace_thread_t {
 	libtrace_t * trace;
 	void* ret;
 	enum thread_types type;
@@ -224,7 +224,7 @@ typedef struct libtrace_thread_t {
 	bool recorded_first;
 	// For thread safety reason we actually must store this here
 	int64_t tracetime_offset_usec;
-} libtrace_thread_t;
+};
 
 /**
  * Storage to note time value against each.

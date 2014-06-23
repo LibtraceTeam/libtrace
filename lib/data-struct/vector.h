@@ -6,13 +6,13 @@
 #define LIBTRACE_VECTOR_H
 
 typedef void (*vector_data_fn)(void *data);
-typedef struct libtrace_vector {
+struct libtrace_vector {
 	size_t max_size;
 	size_t size;
 	size_t element_size;
 	char *elements; // Means we can use array indexing
 	pthread_mutex_t lock;
-} libtrace_vector_t;
+};
 
 DLLEXPORT void libtrace_vector_init(libtrace_vector_t *v, size_t element_size);
 DLLEXPORT void libtrace_vector_push_back(libtrace_vector_t *v, void *d);

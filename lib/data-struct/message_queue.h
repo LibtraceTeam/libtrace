@@ -5,7 +5,6 @@
 #define LIBTRACE_MESSAGE_QUEUE
 
 #define LIBTRACE_MQ_FAILED INT_MIN
-typedef struct libtrace_thread_t libtrace_thread_t;
 typedef struct libtrace_message_queue_t {
 	int pipefd[2];
 	volatile int message_count;
