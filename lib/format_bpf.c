@@ -599,7 +599,7 @@ static struct libtrace_format_t bpf = {
 	trace_event_device,	/* trace_event */
 	bpf_help,		/* help */
 	NULL,			/* next pointer */
-	NON_PARALLEL(false)
+	NON_PARALLEL(true)
 };
 #else 	/* HAVE_DECL_BIOCSETIF */
 /* Prints some slightly useful help text for the BPF capture format */
@@ -649,7 +649,7 @@ static struct libtrace_format_t bpf = {
 	NULL,			/* trace_event */
 	bpf_help,		/* help */
 	NULL,			/* next pointer */
-	NON_PARALLEL(false)
+	NON_PARALLEL(true)
 };
 #endif  /* HAVE_DECL_BIOCSETIF */
 
