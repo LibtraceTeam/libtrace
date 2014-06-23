@@ -3153,7 +3153,7 @@ DLLEXPORT uint64_t trace_packet_get_order(libtrace_packet_t * packet);
 DLLEXPORT uint64_t trace_packet_get_hash(libtrace_packet_t * packet);
 DLLEXPORT void trace_packet_set_order(libtrace_packet_t * packet, uint64_t order);
 DLLEXPORT void trace_packet_set_hash(libtrace_packet_t * packet, uint64_t hash);
-DLLEXPORT inline uint64_t tv_to_usec(struct timeval *tv);
+DLLEXPORT uint64_t tv_to_usec(struct timeval *tv);
 
 DLLEXPORT int retrive_first_packet(libtrace_t *libtrace, libtrace_packet_t **packet, struct timeval **tv);
 

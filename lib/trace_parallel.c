@@ -97,7 +97,7 @@
 
 #include <pthread.h>
 #include <signal.h>
-
+#include <unistd.h>
 
 extern int libtrace_parallel;
 
@@ -894,7 +894,7 @@ DLLEXPORT int retrive_first_packet(libtrace_t *libtrace, libtrace_packet_t **pac
 }
 
 
-DLLEXPORT inline uint64_t tv_to_usec(struct timeval *tv)
+DLLEXPORT uint64_t tv_to_usec(struct timeval *tv)
 {
 	return (uint64_t) tv->tv_sec*1000000ull + (uint64_t) tv->tv_usec;
 }
@@ -1145,8 +1145,13 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob, fn_per_pkt p
 	if (libtrace->perpkt_buffer_size <= 0)
 		libtrace->perpkt_buffer_size = 1000;
 
-	if (libtrace->perpkt_thread_count <= 0)
-		libtrace->perpkt_thread_count = 2; // XXX scale to system
+	if (libtrace->perpkt_thread_count <= 0) {
+		// TODO add BSD support
+		libtrace->perpkt_thread_count = sysconf(_SC_NPROCESSORS_ONLN);
+		if (libtrace->perpkt_thread_count <= 0)
+			// Lets just use one
+			libtrace->perpkt_thread_count = 1;
+	}
 
 	if(libtrace->packet_freelist_size <= 0)
 		libtrace->packet_freelist_size = (libtrace->perpkt_buffer_size + 1) * libtrace->perpkt_thread_count;

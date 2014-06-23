@@ -764,7 +764,7 @@ DLLEXPORT void trace_destroy_packet(libtrace_packet_t *packet) {
 				 * if this packet is ever reused
 				 */
 	free(packet);
-}	
+}
 
 /**
  * Removes any possible data stored againt the trace and releases any data.
