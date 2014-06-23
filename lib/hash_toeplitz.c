@@ -69,7 +69,7 @@ void toeplitz_create_bikey(uint8_t *key) {
 	}
 }
 
-inline void toeplitz_init_config(toeplitz_conf_t *conf, bool bidirectional)
+void toeplitz_init_config(toeplitz_conf_t *conf, bool bidirectional)
 {
 	if (bidirectional) {
 		toeplitz_create_bikey(conf->key);
@@ -82,7 +82,7 @@ inline void toeplitz_init_config(toeplitz_conf_t *conf, bool bidirectional)
 /**
  * n is bits
  */
-inline uint32_t toeplitz_hash(const toeplitz_conf_t *tc, const uint8_t *data, size_t offset, size_t n, uint32_t result)
+uint32_t toeplitz_hash(const toeplitz_conf_t *tc, const uint8_t *data, size_t offset, size_t n, uint32_t result)
 {
 	size_t byte;
 	size_t bit, i = 0;
@@ -96,12 +96,12 @@ inline uint32_t toeplitz_hash(const toeplitz_conf_t *tc, const uint8_t *data, si
 	return result;
 }
 
-inline uint32_t toeplitz_first_hash(const toeplitz_conf_t *tc, const uint8_t *data, size_t n)
+uint32_t toeplitz_first_hash(const toeplitz_conf_t *tc, const uint8_t *data, size_t n)
 {
 	return toeplitz_hash(tc, data, 0, n, 0);
 }
 
-inline uint64_t toeplitz_hash_packet(const libtrace_packet_t * pkt, const toeplitz_conf_t *cnf) {
+uint64_t toeplitz_hash_packet(const libtrace_packet_t * pkt, const toeplitz_conf_t *cnf) {
 	uint8_t proto;
 	uint16_t eth_type;
 	uint32_t remaining;

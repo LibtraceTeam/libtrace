@@ -350,8 +350,8 @@ struct libtrace_t {
 };
 
 void trace_fin_packet(libtrace_packet_t *packet);
-inline void libtrace_zero_thread(libtrace_thread_t * t);
-inline void store_first_packet(libtrace_t *libtrace, libtrace_packet_t *packet, libtrace_thread_t *t);
+void libtrace_zero_thread(libtrace_thread_t * t);
+void store_first_packet(libtrace_t *libtrace, libtrace_packet_t *packet, libtrace_thread_t *t);
 libtrace_thread_t * get_thread_table(libtrace_t *libtrace);
 int get_thread_table_num(libtrace_t *libtrace);
 
