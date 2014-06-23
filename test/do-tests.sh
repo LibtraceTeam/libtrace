@@ -76,7 +76,24 @@ echo \* Testing event framework
 do_test ./test-event
 
 echo \* Testing time conversions
-do_test ./test-time
+echo \* ERF
+do_test ./test-time erf
+echo \* pcapfile
+do_test ./test-time pcapfile
+echo \* pcapfilens
+do_test ./test-time pcapfilens
+echo \* legacyatm
+do_test ./test-time legacyatm
+echo \* legacypos
+do_test ./test-time legacypos
+echo \* legacyeth
+do_test ./test-time legacyeth
+echo \* pcap
+do_test ./test-time pcap
+echo \* rawerf
+do_test ./test-time rawerf
+echo \* tsh
+do_test ./test-time tsh
 
 echo \* Testing directions
 do_test ./test-dir

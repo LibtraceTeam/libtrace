@@ -33,6 +33,7 @@
 
 
 #include "config.h"
+#include "wandio_internal.h"
 #include "wandio.h"
 #include <stdlib.h>
 #include <assert.h>

@@ -50,6 +50,36 @@
 
 struct libtrace_t *trace;
 
+const char *lookup_uri(const char *type) {
+        if (strchr(type,':'))
+                return type;
+        if (!strcmp(type,"erf"))
+                return "erf:traces/100_packets.erf";
+        if (!strcmp(type,"rawerf"))
+                return "rawerf:traces/100_packets.erf";
+        if (!strcmp(type,"pcap"))
+                return "pcap:traces/100_packets.pcap";
+        if (!strcmp(type,"wtf"))
+                return "wtf:traces/wed.wtf";
+        if (!strcmp(type,"rtclient"))
+                return "rtclient:chasm";
+        if (!strcmp(type,"pcapfile"))
+                return "pcapfile:traces/100_packets.pcap";
+        if (!strcmp(type,"pcapfilens"))
+                return "pcapfile:traces/100_packetsns.pcap";
+        if (!strcmp(type, "duck"))
+                return "duck:traces/100_packets.duck";
+        if (!strcmp(type, "legacyatm"))
+                return "legacyatm:traces/legacyatm.gz";
+        if (!strcmp(type, "legacypos"))
+                return "legacypos:traces/legacypos.gz";
+        if (!strcmp(type, "legacyeth"))
+                return "legacyeth:traces/legacyeth.gz";
+        if (!strcmp(type, "tsh"))
+                return "tsh:traces/10_packets.tsh.gz";
+        return type;
+}
+
 void iferr(libtrace_t *trace)
 {
 	libtrace_err_t err = trace_get_err(trace);
@@ -60,7 +90,7 @@ void iferr(libtrace_t *trace)
 }
 
 int main(int argc, char *argv[]) {
-        char *uri = "erf:traces/100_packets.erf";
+        char *uri = lookup_uri(argv[1]);
         int psize = 0;
 	int error = 0;
 	int count = 0;
@@ -75,6 +105,7 @@ int main(int argc, char *argv[]) {
 	packet=trace_create_packet();
         for (;;) {
 		double ts;
+		double tsdiff;
 		struct timeval tv;
 		if ((psize = trace_read_packet(trace, packet)) <0) {
 			error = 1;
@@ -87,7 +118,9 @@ int main(int argc, char *argv[]) {
 		count ++;
 		tv=trace_get_timeval(packet);
 		ts=trace_get_seconds(packet);
-		assert((tv.tv_sec+tv.tv_usec/1000000.0)-ts<.000001);
+		tsdiff = (tv.tv_sec+tv.tv_usec/1000000.0)-ts;
+		assert(tsdiff > -0.001 && tsdiff < 0.001);
+
         }
 	trace_destroy_packet(packet);
 	if (error == 0) {

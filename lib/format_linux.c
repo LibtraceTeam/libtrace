@@ -1259,6 +1259,7 @@ inline static int linuxring_read_packet_fd(libtrace_t *libtrace, libtrace_packet
 
 	struct tpacket2_hdr *header;
 	int ret;
+	unsigned int snaplen;
 	
 	ring_release_frame(libtrace, packet);
 	
@@ -1309,6 +1310,15 @@ inline static int linuxring_read_packet_fd(libtrace_t *libtrace, libtrace_packet
 	}
 
 	packet->buffer = header;
+
+	/* If a snaplen was configured, automatically truncate the packet to
+	 * the desired length.
+	 */
+	snaplen=LIBTRACE_MIN(
+			(int)LIBTRACE_PACKET_BUFSIZE-(int)sizeof(*header),
+			(int)FORMAT(libtrace->format_data)->snaplen);
+	
+	TO_TP_HDR(packet->buffer)->tp_snaplen = LIBTRACE_MIN((unsigned int)snaplen, TO_TP_HDR(packet->buffer)->tp_len);
 
 	/* Move to next buffer */
   	(*rxring_offset)++;
