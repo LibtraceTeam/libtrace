@@ -17,14 +17,14 @@ BINS = test-pcap-bpf test-event test-time test-dir test-wireless test-errors \
 
 .PHONY: all clean distclean install depend test
 
-all: $(BINS) test-drops test-format test-decode test-decode2 test-write test-convert test-convert2
+all: $(BINS) test-drops test-format test-format-parallel test-decode test-decode2 test-write test-convert test-convert2
 
 clean:
-	$(RM) $(BINS) $(OBJS) test-format  test-decode test-convert \
+	$(RM) $(BINS) $(OBJS) test-format test-format-parallel test-decode test-convert \
 	test-decode2 test-write test-drops test-convert2
 
 distclean:
-	$(RM) $(BINS) $(OBJS) test-format test-decode test-convert test-drops test-convert2
+	$(RM) $(BINS) $(OBJS) test-format test-format-parallel test-decode test-convert test-drops test-convert2
 
 install:
 	@true
