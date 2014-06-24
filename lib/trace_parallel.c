@@ -221,7 +221,7 @@ static void trace_make_results_packets_safe(libtrace_t *trace) {
  * the condition mutex.
  */
 static void trace_thread_pause(libtrace_t *trace) {
-	printf("Pausing thread #%d\n", get_thread_table_num(trace));
+	//printf("Pausing thread #%d\n", get_thread_table_num(trace));
 	trace_make_results_packets_safe(trace);
 	assert(pthread_mutex_lock(&trace->libtrace_lock) == 0);
 	trace->perpkts_pausing++;
@@ -232,7 +232,7 @@ static void trace_thread_pause(libtrace_t *trace) {
 	trace->perpkts_pausing--;
 	pthread_cond_broadcast(&trace->perpkt_cond);
 	assert(pthread_mutex_unlock(&trace->libtrace_lock) == 0);
-	printf("Releasing thread #%d\n", get_thread_table_num(trace));
+	//printf("Releasing thread #%d\n", get_thread_table_num(trace));
 }
 
 /**
@@ -1067,9 +1067,7 @@ DLLEXPORT int trace_pread_packet(libtrace_t *libtrace, libtrace_packet_t **packe
 	} else if (!trace_has_dedicated_hasher(libtrace)) {
 		/* We don't care about which core a packet goes to */
 		ret = trace_pread_packet_first_in_first_served(libtrace, packet);
-	} /* else if (libtrace->reducer_flags & PERPKT_USE_SLIDING_WINDOW) {
-		ret = trace_pread_packet_sliding_window(libtrace, packet);
-	} else {
+	} /* else {
 		ret = trace_pread_packet_hash_locked(libtrace, packet);
 	}*/
 
@@ -1164,7 +1162,7 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob, fn_per_pkt p
 		(libtrace->perpkt_buffer_size + 1) * libtrace->perpkt_thread_count)
 		fprintf(stderr, "WARNING deadlocks may occur and extra memory allocating buffer sizes (packet_freelist_size) mismatched\n");
 
-	libtrace->started=true; // Before we start the threads otherwise we could have issues
+	libtrace->started = true; // Before we start the threads otherwise we could have issues
 	libtrace->state = STATE_RUNNING;
 	/* Disable signals - Pthread signal handling */
 
@@ -1502,7 +1500,7 @@ DLLEXPORT void trace_join(libtrace_t *libtrace) {
 	if (trace_has_dedicated_hasher(libtrace)) {
 		fprintf(stderr, "Waiting to join with the hasher\n");
 		pthread_join(libtrace->hasher_thread.tid, NULL);
-		fprintf(stderr, "Joined with with the hasher\n");
+		fprintf(stderr, "Joined with the hasher\n");
 		libtrace->hasher_thread.state = THREAD_FINISHED;
 	}
 

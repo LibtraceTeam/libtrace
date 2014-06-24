@@ -9,7 +9,8 @@
 #include <string.h>
 #include <stdlib.h>
 #include <time.h>
-
+#include <stdio.h>
+ 
 static inline uint8_t get_bit(uint8_t byte, size_t num) {
 	return byte & (0x80>>num);
 }
