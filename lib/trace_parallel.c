@@ -1173,7 +1173,8 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob, fn_per_pkt p
 	assert(pthread_sigmask(SIG_SETMASK, &sig_block_all, &sig_before) == 0);
 
 	// If we are using a hasher start it
-	if (libtrace->hasher || libtrace->hasher_thread.type == THREAD_HASHER) {
+	// If single threaded we don't need a hasher
+	if (libtrace->perpkt_thread_count > 1 && (libtrace->hasher || libtrace->hasher_thread.type == THREAD_HASHER)) {
 		libtrace_thread_t *t = &libtrace->hasher_thread;
 		t->trace = libtrace;
 		t->ret = NULL;
