@@ -197,8 +197,6 @@ enum thread_states {
 // Reduce reads all queues with same key
 #define REDUCE_STEPPING 0x10
 
-#define PERPKT_USE_SLIDING_WINDOW 0x20
-
 /**
  * Information of this thread
  */

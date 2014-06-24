@@ -228,7 +228,6 @@ static void run_trace(char *uri)
 	int option = 2;
 	//option = 10000;
 	trace_set_hasher(trace, HASHER_CUSTOM, &rand_hash, NULL);
-	//trace_parallel_config(trace, TRACE_OPTION_USE_SLIDING_WINDOW_BUFFER, &option);
 	option = 2;
 	trace_parallel_config(trace, TRACE_OPTION_SET_PERPKT_THREAD_COUNT, &option);
 	//trace_parallel_config(trace, TRACE_OPTION_SET_MAPPER_BUFFER_SIZE, &option);

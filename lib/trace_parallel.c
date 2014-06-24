@@ -1899,12 +1899,6 @@ DLLEXPORT int trace_parallel_config(libtrace_t *libtrace, trace_parallel_option_
 			else
 				libtrace->reducer_flags &= ~REDUCE_ORDERED;
 			return 1;
-		case TRACE_OPTION_USE_SLIDING_WINDOW_BUFFER:
-			if (*((int *) value))
-				libtrace->reducer_flags |= PERPKT_USE_SLIDING_WINDOW;
-			else
-				libtrace->reducer_flags &= ~PERPKT_USE_SLIDING_WINDOW;
-			return 1;
 		case TRACE_OPTION_TRACETIME:
 			if(*((int *) value))
 				libtrace->tracetime = 1;

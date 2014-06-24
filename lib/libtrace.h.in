@@ -3256,8 +3256,6 @@ typedef enum {
 	  * older result is available from another queue drop that packet
 	  */
 	  TRACE_DROP_OUT_OF_ORDER,
-	  
-	  TRACE_OPTION_USE_SLIDING_WINDOW_BUFFER,
 
 	  /**
 	   * Delays packets so they are played back in trace-time rather than as fast
