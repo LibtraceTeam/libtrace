@@ -1174,7 +1174,7 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob, fn_per_pkt p
 
 	// If we are using a hasher start it
 	// If single threaded we don't need a hasher
-	if (libtrace->perpkt_thread_count > 1 && (libtrace->hasher || libtrace->hasher_thread.type == THREAD_HASHER)) {
+	if (libtrace->perpkt_thread_count > 1 && libtrace->hasher && libtrace->hasher_type != HASHER_HARDWARE) {
 		libtrace_thread_t *t = &libtrace->hasher_thread;
 		t->trace = libtrace;
 		t->ret = NULL;
@@ -1898,12 +1898,6 @@ DLLEXPORT int trace_parallel_config(libtrace_t *libtrace, trace_parallel_option_
 				libtrace->reducer_flags |= REDUCE_ORDERED;
 			else
 				libtrace->reducer_flags &= ~REDUCE_ORDERED;
-			return 1;
-		case TRACE_OPTION_USE_DEDICATED_HASHER:
-			if (*((int *) value))
-				libtrace->hasher_thread.type = THREAD_HASHER;
-			else
-				libtrace->hasher_thread.type = THREAD_EMPTY;
 			return 1;
 		case TRACE_OPTION_USE_SLIDING_WINDOW_BUFFER:
 			if (*((int *) value))

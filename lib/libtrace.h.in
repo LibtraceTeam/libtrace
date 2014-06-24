@@ -3257,10 +3257,6 @@ typedef enum {
 	  */
 	  TRACE_DROP_OUT_OF_ORDER,
 	  
-	  /**
-	   * If set to true (i.e. 1) the trace starts a dedicated hasher thread
-	   */
-	  TRACE_OPTION_USE_DEDICATED_HASHER,
 	  TRACE_OPTION_USE_SLIDING_WINDOW_BUFFER,
 
 	  /**
