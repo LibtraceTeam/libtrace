@@ -3256,12 +3256,6 @@ typedef enum {
 	  * older result is available from another queue drop that packet
 	  */
 	  TRACE_DROP_OUT_OF_ORDER,
-	  
-	  /**
-	   * If set to true (i.e. 1) the trace starts a dedicated hasher thread
-	   */
-	  TRACE_OPTION_USE_DEDICATED_HASHER,
-	  TRACE_OPTION_USE_SLIDING_WINDOW_BUFFER,
 
 	  /**
 	   * Delays packets so they are played back in trace-time rather than as fast
