@@ -641,7 +641,18 @@ DLLEXPORT int trace_config_output(libtrace_out_t *libtrace,
  */
 DLLEXPORT void trace_destroy(libtrace_t *libtrace) {
     int i;
-        assert(libtrace);
+	assert(libtrace);
+
+	/* destroy any packet that are still around */
+	if (libtrace->first_packets.packets) {
+		for (i = 0; i < libtrace->perpkt_thread_count; ++i) {
+			if(libtrace->first_packets.packets[i].packet) {
+				trace_destroy_packet(libtrace->first_packets.packets[i].packet);
+			}
+		}
+		free(libtrace->first_packets.packets);
+	}
+
 	if (libtrace->format) {
 		if (libtrace->started && libtrace->format->pause_input)
 			libtrace->format->pause_input(libtrace);
@@ -680,7 +691,7 @@ DLLEXPORT void trace_destroy(libtrace_t *libtrace) {
 		 */
 		 free(libtrace->event.packet);
 	}
-        free(libtrace);
+	free(libtrace);
 }
 
 

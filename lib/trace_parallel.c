@@ -332,6 +332,10 @@ stop:
 	message.additional.uint64 = 0;
 	(*trace->per_pkt)(trace, NULL, &message, t);
 
+	// Free our last packet
+	if (packet)
+		trace_destroy_packet(packet);
+
 	// And we're at the end free the memories
 	assert(pthread_mutex_lock(&trace->libtrace_lock) == 0);
 	t->state = THREAD_FINISHED;
@@ -1181,7 +1185,7 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob, fn_per_pkt p
 		libtrace->hasher_thread.type = THREAD_EMPTY;
 	}
 	libtrace_ringbuffer_init(&libtrace->packet_freelist, libtrace->packet_freelist_size, LIBTRACE_RINGBUFFER_BLOCKING);
-	libtrace_slidingwindow_init(&libtrace->sliding_window, libtrace->packet_freelist_size, 0);
+	//libtrace_slidingwindow_init(&libtrace->sliding_window, libtrace->packet_freelist_size, 0);
 	assert(sem_init(&libtrace->sem, 0, libtrace->packet_freelist_size) == 0);
 	// This will be applied to every new thread that starts, i.e. they will block all signals
 	// Lets start a fixed number of reading threads
