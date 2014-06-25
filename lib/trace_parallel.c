@@ -99,6 +99,9 @@
 #include <signal.h>
 #include <unistd.h>
 
+
+#define VERBOSE_DEBBUGING 0
+
 extern int libtrace_parallel;
 
 struct multithreading_stats {
@@ -106,7 +109,75 @@ struct multithreading_stats {
 	uint64_t wait_for_fill_complete_hits;
 } contention_stats[1024];
 
-inline int trace_has_dedicated_hasher(libtrace_t * libtrace);
+/**
+ * True if the trace has dedicated hasher thread otherwise false,
+ * to be used after the trace is running
+ */
+static inline int trace_has_dedicated_hasher(libtrace_t * libtrace)
+{
+	assert(libtrace->state != STATE_NEW);
+	return libtrace->hasher_thread.type == THREAD_HASHER;
+}
+
+/**
+ * Changes a thread's state and broadcasts the condition variable. This
+ * should always be done when the lock is held. 
+ *
+ * Additionally for perpkt threads the state counts are updated.
+ *
+ * @param trace A pointer to the trace
+ * @param t A pointer to the thread to modify
+ * @param new_state The new state of the thread
+ * @param need_lock Set to true if libtrace_lock is not held, otherwise
+ *        false in the case the lock is currently held by this thread.
+ */
+static inline void thread_change_state(libtrace_t *trace, libtrace_thread_t *t,
+	const enum thread_states new_state, const bool need_lock)
+{
+	enum thread_states prev_state;
+	if (need_lock)
+		pthread_mutex_lock(&trace->libtrace_lock);
+	prev_state = t->state;
+	t->state = new_state;
+	if (t->type == THREAD_PERPKT) {
+		--trace->perpkt_thread_states[prev_state];
+		++trace->perpkt_thread_states[new_state];
+	}
+
+#if VERBOSE_DEBBUGING
+	fprintf(stderr, "Thread %d State changed from %d to %d\n", t->tid,
+		t->state, prev_state);
+#endif
+	if (need_lock)
+		pthread_mutex_unlock(&trace->libtrace_lock);
+	pthread_cond_broadcast(&trace->perpkt_cond);
+}
+
+/**
+ * Changes the overall traces state and signals the condition.
+ * 
+ * @param trace A pointer to the trace
+ * @param new_state The new state of the trace
+ * @param need_lock Set to true if libtrace_lock is not held, otherwise
+ *        false in the case the lock is currently held by this thread.
+ */
+static inline void libtrace_change_state(libtrace_t *trace, 
+	const enum trace_state new_state, const bool need_lock)
+{
+	enum trace_state prev_state;
+	if (need_lock)
+		pthread_mutex_lock(&trace->libtrace_lock);
+	prev_state = trace->state;
+	trace->state = new_state;
+#if VERBOSE_DEBBUGING
+	fprintf(stderr, "Trace(%s) state changed from %s to %s\n",
+		trace->uridata, get_trace_state_name(trace->state),
+		get_trace_state_name(prev_state));
+#endif
+	if (need_lock)
+		pthread_mutex_unlock(&trace->libtrace_lock);
+	pthread_cond_broadcast(&trace->perpkt_cond);
+}
 
 /**
  * @return True if the format supports parallel threads.
@@ -119,7 +190,6 @@ static inline bool trace_supports_parallel(libtrace_t *trace)
 		return true;
 	else
 		return false;
-	//return trace->format->pstart_input;
 }
 
 DLLEXPORT void print_contention_stats(libtrace_t *libtrace) {
@@ -220,19 +290,15 @@ static void trace_make_results_packets_safe(libtrace_t *trace) {
  * Holds threads in a paused state, until released by broadcasting
  * the condition mutex.
  */
-static void trace_thread_pause(libtrace_t *trace) {
-	//printf("Pausing thread #%d\n", get_thread_table_num(trace));
+static void trace_thread_pause(libtrace_t *trace, libtrace_thread_t *t) {
 	trace_make_results_packets_safe(trace);
 	assert(pthread_mutex_lock(&trace->libtrace_lock) == 0);
-	trace->perpkts_pausing++;
-	pthread_cond_broadcast(&trace->perpkt_cond);
+	thread_change_state(trace, t, THREAD_PAUSED, false);
 	while (trace->state == STATE_PAUSED || trace->state == STATE_PAUSING) {
 		assert(pthread_cond_wait(&trace->perpkt_cond, &trace->libtrace_lock) == 0);
 	}
-	trace->perpkts_pausing--;
-	pthread_cond_broadcast(&trace->perpkt_cond);
+	thread_change_state(trace, t, THREAD_RUNNING, false);
 	assert(pthread_mutex_unlock(&trace->libtrace_lock) == 0);
-	//printf("Releasing thread #%d\n", get_thread_table_num(trace));
 }
 
 /**
@@ -244,6 +310,8 @@ static void* perpkt_threads_entry(void *data) {
 	libtrace_message_t message = {0};
 	libtrace_packet_t *packet = NULL;
 
+
+	// Force this thread to wait until trace_pstart has been completed
 	assert(pthread_mutex_lock(&trace->libtrace_lock) == 0);
 	t = get_thread_table(trace);
 	assert(t);
@@ -286,7 +354,7 @@ static void* perpkt_threads_entry(void *data) {
 					message.code = MESSAGE_PAUSED;
 					(*trace->per_pkt)(trace, NULL, &message, t);
 					// Now we do the actual pause, this returns when we are done
-					trace_thread_pause(trace);
+					trace_thread_pause(trace, t);
 					// Check for new messages as soon as we return
 					continue;
 				case MESSAGE_DO_STOP: // This is internal
@@ -336,10 +404,8 @@ stop:
 	if (packet)
 		trace_destroy_packet(packet);
 
-	// And we're at the end free the memories
-	assert(pthread_mutex_lock(&trace->libtrace_lock) == 0);
-	t->state = THREAD_FINISHED;
-	assert(pthread_mutex_unlock(&trace->libtrace_lock) == 0);
+	
+	thread_change_state(trace, t, THREAD_FINISHED, true);
 
 	// Notify only after we've defiantly set the state to finished
 	message.code = MESSAGE_PERPKT_ENDED;
@@ -348,12 +414,6 @@ stop:
 
 	pthread_exit(NULL);
 };
-
-/** True if trace has dedicated hasher thread otherwise false */
-inline int trace_has_dedicated_hasher(libtrace_t * libtrace)
-{
-	return libtrace->hasher_thread.type == THREAD_HASHER;
-}
 
 /**
  * The start point for our single threaded hasher thread, this will read
@@ -389,17 +449,15 @@ static void* hasher_start(void *data) {
 		if (libtrace_message_queue_try_get(&t->messages, &message) != LIBTRACE_MQ_FAILED) {
 			switch(message.code) {
 				case MESSAGE_DO_PAUSE:
-					fprintf(stderr, "Pausing hasher thread\n");
 					assert(pthread_mutex_lock(&trace->libtrace_lock) == 0);
-					trace->perpkts_pausing++;
+					thread_change_state(trace, t, THREAD_PAUSED, false);
 					pthread_cond_broadcast(&trace->perpkt_cond);
 					while (trace->state == STATE_PAUSED || trace->state == STATE_PAUSING) {
 						assert(pthread_cond_wait(&trace->perpkt_cond, &trace->libtrace_lock) == 0);
 					}
-					// trace->perpkts_pausing--; // Don't do this the pausing thread will do this for us
+					thread_change_state(trace, t, THREAD_RUNNING, false);
 					pthread_cond_broadcast(&trace->perpkt_cond);
 					assert(pthread_mutex_unlock(&trace->libtrace_lock) == 0);
-					fprintf(stdout, "Mapper resuming\n");
 					break;
 				case MESSAGE_DO_STOP:
 					// Stop called after pause
@@ -447,10 +505,9 @@ static void* hasher_start(void *data) {
 			assert(pthread_mutex_unlock(&trace->libtrace_lock) == 0);
 		}
 	}
-	// We dont need to free packet
 
-	// And we're at the end free the memories
-	t->state = THREAD_FINISHED;
+	// We don't need to free the packet
+	thread_change_state(trace, t, THREAD_FINISHED, true);
 
 	// Notify only after we've defiantly set the state to finished
 	message.code = MESSAGE_PERPKT_ENDED;
@@ -478,7 +535,7 @@ static inline void swap_packets(libtrace_packet_t *dest, libtrace_packet_t *src)
 	src->trace = NULL;
 }
 
-/* Our simplest case when a thread becomes ready it can obtain a exclusive
+/* Our simplest case when a thread becomes ready it can obtain an exclusive
  * lock to read a packet from the underlying trace.
  */
 inline static int trace_pread_packet_first_in_first_served(libtrace_t *libtrace, libtrace_packet_t **packet)
@@ -567,7 +624,7 @@ inline static int trace_handle_finishing_perpkt(libtrace_t *libtrace, libtrace_p
 		assert(pthread_mutex_lock(&libtrace->libtrace_lock) == 0);
 
 		// Check before
-		if (libtrace->perpkts_finishing == libtrace->perpkt_thread_count) {
+		if (libtrace->perpkt_thread_states[THREAD_FINISHING] == libtrace->perpkt_thread_count) {
 			complete = true;
 			assert(pthread_mutex_unlock(&libtrace->libtrace_lock) == 0);
 			continue;
@@ -576,7 +633,7 @@ inline static int trace_handle_finishing_perpkt(libtrace_t *libtrace, libtrace_p
 		assert(pthread_cond_wait(&libtrace->perpkt_cond, &libtrace->libtrace_lock) == 0);
 
 		// Check after
-		if (libtrace->perpkts_finishing == libtrace->perpkt_thread_count) {
+		if (libtrace->perpkt_thread_states[THREAD_FINISHING] == libtrace->perpkt_thread_count) {
 			complete = true;
 			assert(pthread_mutex_unlock(&libtrace->libtrace_lock) == 0);
 			continue;
@@ -601,11 +658,7 @@ inline static int trace_handle_finishing_perpkt(libtrace_t *libtrace, libtrace_p
  */
 inline static int trace_finish_perpkt(libtrace_t *libtrace, libtrace_packet_t **packet, libtrace_thread_t * t)
 {
-	assert(pthread_mutex_lock(&libtrace->libtrace_lock) == 0);
-	t->state = THREAD_FINISHING;
-	libtrace->perpkts_finishing++;
-	pthread_cond_broadcast(&libtrace->perpkt_cond);
-	assert(pthread_mutex_unlock(&libtrace->libtrace_lock) == 0);
+	thread_change_state(libtrace, t, THREAD_FINISHING, true);
 	return trace_handle_finishing_perpkt(libtrace, packet, t);
 }
 
@@ -689,9 +742,9 @@ inline static int trace_pread_packet_hash_locked(libtrace_t *libtrace, libtrace_
 
 /**
  * This case is much like the dedicated hasher, except that we will become
- * hasher if we don't have a a packet waiting.
+ * hasher if we don't have a packet waiting.
  *
- * TODO: You can loose the tail of a trace if the final thread
+ * TODO: You can lose the tail of a trace if the final thread
  * fills its own queue and therefore breaks early and doesn't empty the sliding window.
  *
  * TODO: Can block on zero copy formats such as ring: and dpdk: if the
@@ -944,8 +997,8 @@ static void* keepalive_entry(void *data) {
 		}
 	}
 done:
-	fprintf(stderr, "keepalive thread is finishing\n");
-	trace->keepalive_thread.state = THREAD_FINISHED;
+
+	thread_change_state(trace, &trace->keepalive_thread, THREAD_FINISHED, true);
 	return NULL;
 }
 
@@ -1095,7 +1148,9 @@ static inline int trace_start_perpkt_threads (libtrace_t *libtrace) {
 	return libtrace->perpkt_thread_count;
 }
 
-/* Start an input trace in a parallel fashion.
+/* Start an input trace in a parallel fashion, or restart a paused trace.
+ *
+ * NOTE: libtrace lock is held for the majority of this function
  *
  * @param libtrace the input trace to start
  * @param global_blob some global data you can share with the new perpkt threads
@@ -1105,28 +1160,45 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob, fn_per_pkt p
 {
 	int i;
 	sigset_t sig_before, sig_block_all;
-
 	assert(libtrace);
-	if (trace_is_err(libtrace))
+	if (trace_is_err(libtrace)) {
 		return -1;
-	if (libtrace->state == STATE_PAUSED) {
-		assert (libtrace->perpkts_pausing != 0);
-		fprintf(stderr, "Restarting trace\n");
-		UNUSED int err;
+	}
+	// NOTE: Until the trace is started we wont have a libtrace_lock initialised
+	if (libtrace->state != STATE_NEW) {
+		int err = 0;
+		assert(pthread_mutex_lock(&libtrace->libtrace_lock) == 0);
+		if (libtrace->state != STATE_PAUSED) {
+			trace_set_err(libtrace, TRACE_ERR_BAD_STATE,
+				"The trace(%s) has already been started and is not paused!!", libtrace->uridata);
+			assert(pthread_mutex_unlock(&libtrace->libtrace_lock) == 0);
+			return -1;
+		}
+		
+		// Update the per_pkt function, or reuse the old one
+		if (per_pkt)
+			libtrace->per_pkt = per_pkt;
+
+		assert(libtrace_parallel);
+		assert(!libtrace->perpkt_thread_states[THREAD_RUNNING]);
+		assert(libtrace->per_pkt);
+		
 		if (libtrace->perpkt_thread_count > 1 && trace_supports_parallel(libtrace) && !trace_has_dedicated_hasher(libtrace)) {
-			printf("This format has direct support for p's\n");
+			fprintf(stderr, "Restarting trace pstart_input()\n");
 			err = libtrace->format->pstart_input(libtrace);
 		} else {
 			if (libtrace->format->start_input) {
+				fprintf(stderr, "Restarting trace start_input()\n");
 				err = libtrace->format->start_input(libtrace);
 			}
 		}
-		assert(pthread_mutex_lock(&libtrace->libtrace_lock) == 0);
-		libtrace->started = true;
-		libtrace->state = STATE_RUNNING;
-		assert(pthread_cond_broadcast(&libtrace->perpkt_cond) == 0);
+		
+		if (err == 0) {
+			libtrace->started = true;
+			libtrace_change_state(libtrace, STATE_RUNNING, false);
+		}
 		assert(pthread_mutex_unlock(&libtrace->libtrace_lock) == 0);
-		return 0;
+		return err;
 	}
 
 	assert(libtrace->state == STATE_NEW);
@@ -1136,11 +1208,11 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob, fn_per_pkt p
 	libtrace->global_blob = global_blob;
 	libtrace->per_pkt = per_pkt;
 	libtrace->reducer = reducer;
-	libtrace->perpkts_finishing = 0;
 
 	assert(pthread_mutex_init(&libtrace->libtrace_lock, NULL) == 0);
 	assert(pthread_cond_init(&libtrace->perpkt_cond, NULL) == 0);
 	assert(pthread_rwlock_init(&libtrace->window_lock, NULL) == 0);
+	// Grab the lock
 	assert(pthread_mutex_lock(&libtrace->libtrace_lock) == 0);
 
 	// Set default buffer sizes
@@ -1163,7 +1235,7 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob, fn_per_pkt p
 		fprintf(stderr, "WARNING deadlocks may occur and extra memory allocating buffer sizes (packet_freelist_size) mismatched\n");
 
 	libtrace->started = true; // Before we start the threads otherwise we could have issues
-	libtrace->state = STATE_RUNNING;
+	libtrace_change_state(libtrace, STATE_RUNNING, false);
 	/* Disable signals - Pthread signal handling */
 
 	sigemptyset(&sig_block_all);
@@ -1203,7 +1275,7 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob, fn_per_pkt p
 	libtrace->first_packets.packets = calloc(libtrace->perpkt_thread_count, sizeof(struct  __packet_storage_magic_type));
 
 
-	/* Start all of our perpkt threads */
+	/* Ready all of our perpkt threads - they are started later */
 	libtrace->perpkt_threads = calloc(sizeof(libtrace_thread_t), libtrace->perpkt_thread_count);
 	for (i = 0; i < libtrace->perpkt_thread_count; i++) {
 		libtrace_thread_t *t = &libtrace->perpkt_threads[i];
@@ -1247,6 +1319,11 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob, fn_per_pkt p
 		assert(pthread_create(&libtrace->keepalive_thread.tid, NULL, keepalive_entry, (void *) libtrace) == 0);
 	}
 
+	for (i = 0; i < THREAD_STATE_MAX; ++i) {
+		libtrace->perpkt_thread_states[i] = 0;
+	}
+	libtrace->perpkt_thread_states[THREAD_RUNNING] = threads_started;
+
 	// Revert back - Allow signals again
 	assert(pthread_sigmask(SIG_SETMASK, &sig_before, NULL) == 0);
 	assert(pthread_mutex_unlock(&libtrace->libtrace_lock) == 0);
@@ -1257,7 +1334,7 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob, fn_per_pkt p
 
 	// TODO fix these leaks etc
 	if (libtrace->perpkt_thread_count != threads_started)
-		printf("Warning started threads not equal requested s=%d r=%d", threads_started, libtrace->perpkt_thread_count);
+		fprintf(stderr, "Warning started threads not equal requested s=%d r=%d", threads_started, libtrace->perpkt_thread_count);
 
 
 	return 0;
@@ -1268,8 +1345,8 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob, fn_per_pkt p
  * 1. Set started = false 
  * 2. All perpkt threads are paused waiting on a condition var
  * 3. Then call ppause on the underlying format if found
- * 4. Return with perpkts_pausing set to perpkt_count (Used when restarting so we reuse the threads)
- * 
+ * 4. The traces state is paused
+ *
  * Once done you should be able to modify the trace setup and call pstart again
  * TODO handle changing thread numbers
  */
@@ -1278,18 +1355,18 @@ DLLEXPORT int trace_ppause(libtrace_t *libtrace)
 	libtrace_thread_t *t;
 	int i;
 	assert(libtrace);
+	
+	t = get_thread_table(libtrace);
+	// Check state from within the lock if we are going to change it
+	assert(pthread_mutex_lock(&libtrace->libtrace_lock) == 0);
 	if (!libtrace->started || libtrace->state != STATE_RUNNING) {
 		fprintf(stderr, "pause failed started=%d state=%s (%d)\n", libtrace->started, get_trace_state_name(libtrace->state), libtrace->state);
 		trace_set_err(libtrace,TRACE_ERR_BAD_STATE, "You must call trace_start() before calling trace_ppause()");
+		assert(pthread_mutex_unlock(&libtrace->libtrace_lock) == 0);
 		return -1;
 	}
 
-	t = get_thread_table(libtrace);
-
-	// Set pausing
-	assert(pthread_mutex_lock(&libtrace->libtrace_lock) == 0);
-	libtrace->state = STATE_PAUSING;
-	pthread_cond_broadcast(&libtrace->perpkt_cond);
+	libtrace_change_state(libtrace, STATE_PAUSING, false);
 	assert(pthread_mutex_unlock(&libtrace->libtrace_lock) == 0);
 
 	// Special case handle the hasher thread case
@@ -1300,15 +1377,14 @@ DLLEXPORT int trace_ppause(libtrace_t *libtrace)
 		trace_send_message_to_thread(libtrace, &libtrace->hasher_thread, &message);
 		// Wait for it to pause
 		assert(pthread_mutex_lock(&libtrace->libtrace_lock) == 0);
-		while (1 != libtrace->perpkts_pausing) {
+		while (libtrace->hasher_thread.state == THREAD_RUNNING) {
 			assert(pthread_cond_wait(&libtrace->perpkt_cond, &libtrace->libtrace_lock) == 0);
 		}
-		libtrace->perpkts_pausing--; // Do this on the hasher's behalf
 		assert(pthread_mutex_unlock(&libtrace->libtrace_lock) == 0);
 	}
 
 	fprintf(stderr, "Sending messages \n");
-	// Stop threads, skip this one if its a perpkt
+	// Stop threads, skip this one if it's a perpkt
 	for (i = 0; i < libtrace->perpkt_thread_count; i++) {
 		if (&libtrace->perpkt_threads[i] != t) {
 			libtrace_message_t message = {0};
@@ -1331,18 +1407,16 @@ DLLEXPORT int trace_ppause(libtrace_t *libtrace)
 	// followed by a blocking read. XXX STRIP THIS OUT
 
 	if (t) {
-		// A perpkt is doing the pausing interesting fake a extra thread paused
-		// We rely on the user to not return before starting the trace again
-		assert(pthread_mutex_lock(&libtrace->libtrace_lock) == 0);
-		libtrace->perpkts_pausing++;
-		assert(pthread_mutex_unlock(&libtrace->libtrace_lock) == 0);
+		// A perpkt is doing the pausing, interesting, fake an extra thread paused
+		// We rely on the user to *not* return before starting the trace again
+		thread_change_state(libtrace, t, THREAD_PAUSED, true);
 	}
 
 	fprintf(stderr, "Asking threads to pause\n");
 
 	// Wait for all threads to pause
 	assert(pthread_mutex_lock(&libtrace->libtrace_lock) == 0);
-	while (libtrace->perpkt_thread_count != libtrace->perpkts_pausing) {
+	while(libtrace->perpkt_thread_states[THREAD_RUNNING]) {
 		assert(pthread_cond_wait(&libtrace->perpkt_cond, &libtrace->libtrace_lock) == 0);
 	}
 	assert(pthread_mutex_unlock(&libtrace->libtrace_lock) == 0);
@@ -1364,9 +1438,7 @@ DLLEXPORT int trace_ppause(libtrace_t *libtrace)
 	}
 
 	// Only set as paused after the pause has been called on the trace
-	assert(pthread_mutex_lock(&libtrace->libtrace_lock) == 0);
-	libtrace->state = STATE_PAUSED;
-	assert(pthread_mutex_unlock(&libtrace->libtrace_lock) == 0);
+	libtrace_change_state(libtrace, STATE_PAUSED, true);
 	return 0;
 }
 
@@ -1375,21 +1447,20 @@ DLLEXPORT int trace_ppause(libtrace_t *libtrace)
  * This should only be called by the main thread
  * 1. Calls ppause
  * 2. Sends a message asking for threads to finish
- * 
+ * 3. Releases threads which will pause
  */
 DLLEXPORT int trace_pstop(libtrace_t *libtrace)
 {
-	int i;
+	int i, err;
 	libtrace_message_t message = {0};
 	assert(libtrace);
-	if (!libtrace->started) {
-		trace_set_err(libtrace,TRACE_ERR_BAD_STATE, "You must call trace_start() before calling trace_pstop()");
-		return -1;
-	}
 
 	// Ensure all threads have paused and the underlying trace format has
 	// been closed and all packets associated are cleaned up
-	trace_ppause(libtrace);
+	// Pause will do any state checks for us
+	err = trace_ppause(libtrace);
+	if (err)
+		return err;
 
 	// Now send a message asking the threads to stop
 	// This will be retrieved before trying to read another packet
@@ -1404,10 +1475,7 @@ DLLEXPORT int trace_pstop(libtrace_t *libtrace)
 	}
 
 	// Now release the threads and let them stop
-	assert(pthread_mutex_lock(&libtrace->libtrace_lock) == 0);
-	libtrace->state = STATE_FINSHED;
-	assert(pthread_cond_broadcast(&libtrace->perpkt_cond) == 0);
-	assert(pthread_mutex_unlock(&libtrace->libtrace_lock) == 0);
+	libtrace_change_state(libtrace, STATE_FINSHED, true);
 	return 0;
 }
 
@@ -1486,22 +1554,19 @@ DLLEXPORT void trace_join(libtrace_t *libtrace) {
 		// So we must do our best effort to empty the queue - so
 		// the producer (or any other threads) don't block.
 		libtrace_packet_t * packet;
-		// Mark that we are no longer accepting packets
-		assert(pthread_mutex_lock(&libtrace->libtrace_lock) == 0);
-		libtrace->perpkt_threads[i].state = THREAD_FINISHED; // Important we are finished before we empty the buffer
-		assert(pthread_mutex_unlock(&libtrace->libtrace_lock) == 0);
+		assert(libtrace->perpkt_threads[i].state == THREAD_FINISHED);
 		while(libtrace_ringbuffer_try_read(&libtrace->perpkt_threads[i].rbuffer, (void **) &packet))
 			if (packet) // This could be NULL iff the perpkt finishes early
 				trace_destroy_packet(packet);
 	}
 
 	/* Now the hasher */
-	// XXX signal it to stop
+	// XXX signal it to stop if it hasn't already we should never be in this situation!!
 	if (trace_has_dedicated_hasher(libtrace)) {
 		fprintf(stderr, "Waiting to join with the hasher\n");
 		pthread_join(libtrace->hasher_thread.tid, NULL);
 		fprintf(stderr, "Joined with the hasher\n");
-		libtrace->hasher_thread.state = THREAD_FINISHED;
+		assert(libtrace->hasher_thread.state == THREAD_FINISHED);
 	}
 
 	// Now that everything is finished nothing can be touching our
@@ -1518,10 +1583,11 @@ DLLEXPORT void trace_join(libtrace_t *libtrace) {
 		}
 		// Cannot destroy vector yet, this happens with trace_destroy
 	}
-	libtrace->state = STATE_FINSHED;
+	// TODO consider perpkt threads marking trace as finished before join is called
+	libtrace_change_state(libtrace, STATE_FINSHED, true);
 	
-	// Wait for the tick (keepalive) thread if its been started
-	if (libtrace->keepalive_thread.type == THREAD_KEEPALIVE && libtrace->keepalive_thread.state == THREAD_RUNNING) {
+	// Wait for the tick (keepalive) thread if it has been started
+	if (libtrace->keepalive_thread.type == THREAD_KEEPALIVE) {
 		libtrace_message_t msg = {0};
 		msg.code = MESSAGE_DO_STOP;
 		fprintf(stderr, "Waiting to join with the keepalive\n");
@@ -1529,8 +1595,8 @@ DLLEXPORT void trace_join(libtrace_t *libtrace) {
 		pthread_join(libtrace->keepalive_thread.tid, NULL);
 		fprintf(stderr, "Joined with with the keepalive\n");
 	}
-	// Lets mark this as done for now
-	libtrace->state = STATE_JOINED;
+	
+	libtrace_change_state(libtrace, STATE_JOINED, true);
 }
 
 DLLEXPORT int libtrace_thread_get_message_count(libtrace_t * libtrace)
@@ -1849,16 +1915,8 @@ DLLEXPORT void trace_packet_set_hash(libtrace_packet_t * packet, uint64_t hash) 
 }
 
 DLLEXPORT int trace_finished(libtrace_t * libtrace) {
-	int i;
-	int b = 0;
-	// TODO I don't like using this so much
-	//assert(pthread_mutex_lock(&libtrace->libtrace_lock) == 0);
-	for (i = 0; i < libtrace->perpkt_thread_count; i++) {
-		if (libtrace->perpkt_threads[i].state == THREAD_RUNNING)
-			b++;
-	}
-	//assert(pthread_mutex_unlock(&libtrace->libtrace_lock) == 0);
-	return !b;
+	// TODO I don't like using this so much, we could use state!!!
+	return !(libtrace->perpkt_thread_states[THREAD_RUNNING] || libtrace->perpkt_thread_states[THREAD_FINISHING]);
 }
 
 DLLEXPORT int trace_parallel_config(libtrace_t *libtrace, trace_parallel_option_t option, void *value)

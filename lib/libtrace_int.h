@@ -183,7 +183,8 @@ enum thread_states {
 	THREAD_RUNNING,
 	THREAD_FINISHING,
 	THREAD_FINISHED,
-	THREAD_PAUSED
+	THREAD_PAUSED,
+	THREAD_STATE_MAX
 };
 
 // Reduce expects sequential data
@@ -300,10 +301,8 @@ struct libtrace_t {
 	enum trace_state state;
 	/** Use to control pausing threads and finishing threads etc always used with libtrace_lock */
 	pthread_cond_t perpkt_cond;
-	/** Set to the number of perpkt threads that are finishing (or have finished), or to -1 once all have been joined, 0 implies all are running */
-	int perpkts_finishing;
-	/** A count of perpkt threads that are pausing */
-	int perpkts_pausing;
+	/* Keep track of counts of threads in any given state */
+	int perpkt_thread_states[THREAD_STATE_MAX]; 
 
 	/** For the sliding window hasher implementation */
 	pthread_rwlock_t window_lock;

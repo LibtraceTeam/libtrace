@@ -263,9 +263,7 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 	// libtrace->libtrace_lock
 	// libtrace->perpkt_cond;
 	libtrace->state = STATE_NEW;
-	libtrace->perpkts_pausing = 0;
 	libtrace->perpkt_queue_full = false;
-	libtrace->perpkts_finishing = -1;
 	libtrace->reducer_flags = 0;
 	libtrace->global_blob = NULL;
 	libtrace->per_pkt = NULL;
@@ -384,9 +382,7 @@ DLLEXPORT libtrace_t * trace_create_dead (const char *uri) {
 	// libtrace->libtrace_lock
 	// libtrace->perpkt_cond;
 	libtrace->state = STATE_NEW; // TODO MAYBE DEAD
-	libtrace->perpkts_pausing = 0;
 	libtrace->perpkt_queue_full = false;
-	libtrace->perpkts_finishing = -1;
 	libtrace->reducer_flags = 0;
 	libtrace->global_blob = NULL;
 	libtrace->per_pkt = NULL;
