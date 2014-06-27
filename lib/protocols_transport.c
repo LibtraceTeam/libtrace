@@ -381,8 +381,21 @@ DLLEXPORT uint16_t trace_get_source_port(const libtrace_packet_t *packet)
 {
 	uint32_t remaining;
 	uint8_t proto;
-	const struct ports_t *port = 
-		(const struct ports_t*)trace_get_transport((libtrace_packet_t*)packet,
+	struct ports_t *port;
+        uint16_t fragoff;
+        uint8_t more;
+
+        fragoff = trace_get_fragment_offset(packet, &more);
+
+        /* If we're not the first fragment, we're unlikely to be able
+         * to get any useful port numbers from this packet.
+         */
+        if (fragoff != 0)
+                return 0;
+        
+        
+        port = (struct ports_t*)trace_get_transport(
+                        (libtrace_packet_t*)packet,
 			&proto, &remaining);
 
 	/* Snapped too early */
@@ -404,8 +417,21 @@ DLLEXPORT uint16_t trace_get_destination_port(const libtrace_packet_t *packet)
 {
 	uint32_t remaining;
 	uint8_t proto;
-	struct ports_t *port = 
-		(struct ports_t*)trace_get_transport((libtrace_packet_t*)packet,
+	struct ports_t *port;
+        uint16_t fragoff;
+        uint8_t more;
+
+        fragoff = trace_get_fragment_offset(packet, &more);
+
+        /* If we're not the first fragment, we're unlikely to be able
+         * to get any useful port numbers from this packet.
+         */
+        if (fragoff != 0)
+                return 0;
+        
+        
+        port = (struct ports_t*)trace_get_transport(
+                        (libtrace_packet_t*)packet,
 			&proto, &remaining);
 	/* Snapped too early */
 	if (remaining<4)
