@@ -1778,6 +1778,26 @@ DLLEXPORT uint16_t *trace_checksum_layer3(libtrace_packet_t *packet,
 DLLEXPORT uint16_t *trace_checksum_transport(libtrace_packet_t *packet,
                 uint16_t *csum);
 
+/** Calculates the fragment offset in bytes for an IP packet
+ * @param packet        The libtrace packet to calculate the offset for
+ * @param[out] more     A boolean flag to indicate whether there are more
+ *                      fragments after the current packet.
+ * @return The fragment offset for the packet in bytes. If the packet is not
+ * an IP packet or the fragment offset is not present in packet, the return
+ * value will be 0.
+ *
+ * @note The value returned is in bytes, not 8-octet units as it is stored
+ * in the fragment offset field in the headers. In other words, libtrace
+ * automatically does the multiplication for you.
+ *
+ * The value passed in for 'more' does not matter; it will be overwritten
+ * with the value of the More Fragments flag from the IP header.
+ *
+ * New in libtrace 3.0.20
+ */
+DLLEXPORT uint16_t trace_get_fragment_offset(const libtrace_packet_t *packet,
+                uint8_t *more); 
+
 /** Gets a pointer to the transport layer header (if any)
  * @param packet   The libtrace packet to find the transport header for
  * @param[out] proto	The protocol present at the transport layer.

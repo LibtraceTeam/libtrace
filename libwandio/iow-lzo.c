@@ -273,7 +273,7 @@ static void *lzo_compress_thread(void *data)
 	return NULL;
 }
 
-iow_t *lzo_wopen(iow_t *child, int compress_level UNUSED)
+iow_t *lzo_wopen(iow_t *child, int compress_level)
 {
 	const int opt_filter = 0;
 	int flags;
@@ -289,6 +289,13 @@ iow_t *lzo_wopen(iow_t *child, int compress_level UNUSED)
 		/* Fail */
 		return NULL;
 	}
+
+        /* Compress level is useless for LZO, but getting UNUSED into here
+         * is more trouble than it is worth so this check will at least
+         * stop us from getting warnings about it.
+         */
+        if (compress_level < 0)
+                return NULL;
 
 	iow = malloc(sizeof(iow_t));
 	iow->source = &lzo_wsource;
