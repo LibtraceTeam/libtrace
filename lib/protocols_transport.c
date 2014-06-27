@@ -403,7 +403,7 @@ DLLEXPORT uint16_t trace_get_source_port(const libtrace_packet_t *packet)
 		return 0;
 
 	/* ICMP *technically* doesn't have ports */
-	if (proto == TRACE_IPPROTO_ICMP)
+	if (proto == TRACE_IPPROTO_ICMP || proto == TRACE_IPPROTO_ICMPV6)
 		return 0;
 
 	if (port)
@@ -438,7 +438,7 @@ DLLEXPORT uint16_t trace_get_destination_port(const libtrace_packet_t *packet)
 		return 0;
 	
 	/* ICMP *technically* doesn't have ports */
-	if (proto == TRACE_IPPROTO_ICMP)
+	if (proto == TRACE_IPPROTO_ICMP || proto == TRACE_IPPROTO_ICMPV6)
 		return 0;
 
 	if (port)
