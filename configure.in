@@ -579,6 +579,27 @@ AS_IF([test "x$have_lzo" = "xyes"], [
 	with_lzo=no]
 )
 
+AC_ARG_WITH([lzma],
+	AC_HELP_STRING([--with-lzma], [build with support for lzma compressed files]))
+
+AS_IF([test "x$with_lzma" != "xno"],
+	[
+	AC_CHECK_LIB(lzma, lzma_code, have_lzma=yes, have_lzma=no)
+	], [have_lzma=no])
+
+AS_IF([test "x$have_lzma" = "xyes"], [
+	if test "$ac_cv_lib_lzma_code" != "none required"; then
+		LIBWANDIO_LIBS="$LIBWANDIO_LIBS -llzma"
+	fi
+	AC_DEFINE(HAVE_LIBLZMA, 1, "Compiled with lzma support")
+	with_lzma=yes],
+
+	
+	[AS_IF([test "x$with_lzma" = "xyes"],
+		[AC_MSG_ERROR([lzma requested but not found])])
+	AC_DEFINE(HAVE_LIBLZMA, 0, "Compiled with lzma support")
+	with_lzma=no]
+)
 
 # Define automake conditionals for use in our Makefile.am files
 AM_CONDITIONAL([HAVE_BPF_CAPTURE], [test "$ac_cv_have_decl_BIOCSETIF" = yes ])
@@ -593,6 +614,7 @@ AM_CONDITIONAL([HAVE_NCURSES], [test "x$with_ncurses" != "xno"])
 AM_CONDITIONAL([HAVE_BZLIB], [test "x$with_bzip2" != "xno"])
 AM_CONDITIONAL([HAVE_ZLIB], [test "x$with_zlib" != "xno"])
 AM_CONDITIONAL([HAVE_LZO], [ test "x$with_lzo" != "xno"])
+AM_CONDITIONAL([HAVE_LZMA], [ test "x$with_lzma" != "xno"])
 
 # Check for miscellaneous programs
 AC_CHECK_PROG([libtrace_doxygen], [doxygen], [true], [false])
@@ -647,6 +669,7 @@ fi
 reportopt "Compiled with compressed trace (zlib) support" $with_zlib
 reportopt "Compiled with compressed trace (bz2) support" $with_bzip2
 reportopt "Compiled with compressed trace (lzo write only) support" $with_lzo
+reportopt "Compiled with compressed trace (lzma) support" $with_lzma
 if test x"$libtrace_dag" = xtrue; then
 	if test "$libtrace_dag_version" = 24; then
 		AC_MSG_NOTICE([Compiled with DAG live capture support: 2.4])
