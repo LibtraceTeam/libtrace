@@ -23,11 +23,23 @@ else
 LIBTRACEIO_LZO=
 endif
 
+if HAVE_LZMA
+LIBTRACEIO_LZMA=ior-lzma.c iow-lzma.c
+else
+LIBTRACEIO_LZMA=
+endif
+
 libwandio_la_SOURCES=wandio.c ior-peek.c ior-stdio.c ior-thread.c \
 		iow-stdio.c iow-thread.c wandio.h wandio_internal.h \
-		$(LIBTRACEIO_ZLIB) $(LIBTRACEIO_BZLIB) $(LIBTRACEIO_LZO)
+		$(LIBTRACEIO_ZLIB) $(LIBTRACEIO_BZLIB) $(LIBTRACEIO_LZO) \
+                $(LIBTRACEIO_LZMA)
 
 AM_CPPFLAGS = @ADD_INCLS@
 libwandio_la_LIBADD = @LIBWANDIO_LIBS@
 libwandio_la_LDFLAGS=-version-info 1:0:0 @ADD_LDFLAGS@
 
+bin_PROGRAMS = wandiocat
+wandiocat_SOURCES = wcat.c
+wandiocat_CFLAGS = -I"$(top_srcdir)/libwandio"
+wandiocat_CXXFLAGS = -I"$(top_srcdir)/libwandio"
+wandiocat_LDFLAGS = -L"$(top_srcdir)/libwandio" -lwandio

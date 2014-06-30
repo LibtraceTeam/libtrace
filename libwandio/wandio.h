@@ -65,7 +65,7 @@ typedef struct io_t io_t; /**< Opaque IO handle structure for reading */
 typedef struct iow_t iow_t; /**< Opaque IO handle structure for writing */
 
 /** Structure defining a supported compression method */
-struct compression_type {
+struct wandio_compression_type {
 	/** Name of the compression method */
 	const char *name;
 	/** Extension to add to the filename of files written using this 
@@ -76,7 +76,7 @@ struct compression_type {
 };
 
 /** The list of supported compression methods */
-extern struct compression_type compression_type[];
+extern struct wandio_compression_type compression_type[];
 
 /** Structure defining a libtrace IO reader module */
 typedef struct {
@@ -177,6 +177,8 @@ enum {
 	WANDIO_COMPRESS_BZ2	= 2,
 	/** LZO compression */
 	WANDIO_COMPRESS_LZO	= 3,
+        /** LZMA compression */
+        WANDIO_COMPRESS_LZMA    = 4,
 	/** All supported methods - used as a bitmask */
 	WANDIO_COMPRESS_MASK	= 7
 };
@@ -192,12 +194,14 @@ enum {
 io_t *bz_open(io_t *parent);
 io_t *zlib_open(io_t *parent);
 io_t *thread_open(io_t *parent);
+io_t *lzma_open(io_t *parent);
 io_t *peek_open(io_t *parent);
 io_t *stdio_open(const char *filename);
 
 iow_t *zlib_wopen(iow_t *child, int compress_level);
 iow_t *bz_wopen(iow_t *child, int compress_level);
 iow_t *lzo_wopen(iow_t *child, int compress_level);
+iow_t *lzma_wopen(iow_t *child, int compress_level);
 iow_t *thread_wopen(iow_t *child);
 iow_t *stdio_wopen(const char *filename, int fileflags);
 
@@ -210,6 +214,19 @@ iow_t *stdio_wopen(const char *filename, int fileflags);
  * and use files with the libtrace IO sub-system.
  *
  * @{ */
+
+/** Given a string describing the compression method, finds the internal
+  * data structure representing that method. This is mostly useful for
+  * nicely mapping a method name to the internal libwandio compression
+  * method enum when configuring an output file.
+  *
+  * @param name          The compression method name as a string, e.g. "gzip",
+  *                      "bzip2", "lzo" or "lzma".
+  * @return A pointer to the compression_type structure representing the
+  * compression method or NULL if no match can be found.
+  *
+  */
+struct wandio_compression_type *wandio_lookup_compression_type(const char *name);
 
 /** Creates a new libtrace IO reader and opens the provided file for reading.
  *
