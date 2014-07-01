@@ -350,7 +350,7 @@ static inline void dump_configuration()
     
     if (global_config != NULL) {
         int i;
-        printf("Intel DPDK setup\n"
+        fprintf(stderr, "Intel DPDK setup\n"
                "---Version      : %"PRIu32"\n"
                "---Magic        : %"PRIu32"\n"
                "---Master LCore : %"PRIu32"\n"
@@ -359,7 +359,7 @@ static inline void dump_configuration()
                global_config->master_lcore, global_config->lcore_count);
         
         for (i = 0 ; i < nb_cpu; i++) {
-            printf("   ---Core %d : %s\n", i, 
+            fprintf(stderr, "   ---Core %d : %s\n", i, 
                    global_config->lcore_role[i] == ROLE_RTE ? "on" : "off");
         }
         
@@ -380,7 +380,7 @@ static inline void dump_configuration()
             default:
                 proc_type = "something worse than invalid!!";
         }
-        printf("---Process Type : %s\n", proc_type);
+        fprintf(stderr, "---Process Type : %s\n", proc_type);
     }
     
 }
@@ -743,7 +743,7 @@ static int dpdk_start_port (struct dpdk_format_data_t * format_data, char *err, 
          * ring become available.
          */
 #if DEBUG
-    printf("Creating mempool named %s\n", format_data->mempool_name);
+    fprintf(stderr, "Creating mempool named %s\n", format_data->mempool_name);
 #endif
         format_data->pktmbuf_pool =
             rte_mempool_create(format_data->mempool_name,
@@ -824,7 +824,7 @@ static int dpdk_start_port (struct dpdk_format_data_t * format_data, char *err, 
     /* Wait for the link to come up */
     rte_eth_link_get(format_data->port, &link_info);
 #if DEBUG
-    printf("Link status is %d %d %d\n", (int) link_info.link_status,
+    fprintf(stderr, "Link status is %d %d %d\n", (int) link_info.link_status,
             (int) link_info.link_duplex, (int) link_info.link_speed);
 #endif
 
@@ -948,7 +948,7 @@ static int dpdk_start_port_queues (libtrace_t *libtrace, struct dpdk_format_data
     /* Start device */
     ret = rte_eth_dev_start(format_data->port);
 #if DEBUG
-    printf("Done start device\n");
+    fprintf(stderr, "Done start device\n");
 #endif	
     if (ret < 0) {
         snprintf(err, errlen, "Intel DPDK - rte_eth_dev_start failed : %s",
@@ -978,7 +978,7 @@ static int dpdk_start_port_queues (libtrace_t *libtrace, struct dpdk_format_data
     /* Wait for the link to come up */
     rte_eth_link_get(format_data->port, &link_info);
 #if DEBUG
-    printf("Link status is %d %d %d\n", (int) link_info.link_status,
+    fprintf(stderr, "Link status is %d %d %d\n", (int) link_info.link_status,
             (int) link_info.link_duplex, (int) link_info.link_speed);
 #endif
 
@@ -1014,7 +1014,7 @@ static int dpdk_pstart_input (libtrace_t *libtrace) {
 	
 	tot = MIN(libtrace->perpkt_thread_count, enabled_lcore_count);
 	tot = MIN(tot, 8);
-	printf("Running pstart DPDK %d %d %d %d\n", tot, libtrace->perpkt_thread_count, enabled_lcore_count, rte_lcore_count());
+	fprintf(stderr, "Running pstart DPDK %d %d %d %d\n", tot, libtrace->perpkt_thread_count, enabled_lcore_count, rte_lcore_count());
 	
     if (dpdk_start_port_queues(libtrace, FORMAT(libtrace), err, sizeof(err), tot) != 0) {
         trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "%s", err);
@@ -1045,7 +1045,7 @@ static int dpdk_pause_input(libtrace_t * libtrace){
     /* This stops the device, but can be restarted using rte_eth_dev_start() */
     if (FORMAT(libtrace)->paused == DPDK_RUNNING) {
 #if DEBUG      
-        printf("Pausing port\n");
+        fprintf(stderr, "Pausing port\n");
 #endif
         rte_eth_dev_stop(FORMAT(libtrace)->port);
         FORMAT(libtrace)->paused = DPDK_PAUSED;
@@ -1430,7 +1430,7 @@ static int dpdk_pread_packet (libtrace_t *libtrace, libtrace_packet_t *packet) {
         nb_rx = rte_eth_rx_burst(FORMAT(libtrace)->port,
                             get_thread_table_num(libtrace), pkts_burst, 1);
         if (nb_rx > 0) { /* Got a packet - otherwise we keep spining */
-			printf("Doing P READ PACKET port=%d q=%d\n", (int) FORMAT(libtrace)->port, (int) get_thread_table_num(libtrace));
+			//fprintf(stderr, "Doing P READ PACKET port=%d q=%d\n", (int) FORMAT(libtrace)->port, (int) get_thread_table_num(libtrace));
             return dpdk_ready_pkt(libtrace, packet, pkts_burst[0]);
         }
         // Check the message queue this could be (Well it shouldn't but anyway) be less than 0
