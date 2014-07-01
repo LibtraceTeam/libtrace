@@ -282,6 +282,9 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 	libtrace->perpkt_threads = NULL;
 	libtrace->tracetime = 0;
 	libtrace->tick_interval = 0;
+	libtrace->first_packets.first = 0;
+	libtrace->first_packets.count = 0;
+	libtrace->first_packets.packets = NULL;
 
         /* Parse the URI to determine what sort of trace we are dealing with */
 	if ((uridata = trace_parse_uri(uri, &scan)) == 0) {
@@ -640,13 +643,14 @@ DLLEXPORT void trace_destroy(libtrace_t *libtrace) {
 	assert(libtrace);
 
 	/* destroy any packet that are still around */
-	if (libtrace->first_packets.packets) {
+	if (libtrace->state != STATE_NEW && libtrace->first_packets.packets) {
 		for (i = 0; i < libtrace->perpkt_thread_count; ++i) {
 			if(libtrace->first_packets.packets[i].packet) {
 				trace_destroy_packet(libtrace->first_packets.packets[i].packet);
 			}
 		}
 		free(libtrace->first_packets.packets);
+		assert(pthread_spin_destroy(&libtrace->first_packets.lock) == 0);
 	}
 
 	if (libtrace->format) {
@@ -660,20 +664,21 @@ DLLEXPORT void trace_destroy(libtrace_t *libtrace) {
 		free(libtrace->uridata);
 	
 	/* Empty any packet memory */
-
-	libtrace_packet_t * packet;
-	while (libtrace_ringbuffer_try_read(&libtrace->packet_freelist,(void **) &packet))
-		trace_destroy_packet(packet);
-	
-	libtrace_ringbuffer_destroy(&libtrace->packet_freelist);
-	
-	for (i = 0; i < libtrace->perpkt_thread_count; ++i) {
-		assert (libtrace_vector_get_size(&libtrace->perpkt_threads[i].vector) == 0);
-		libtrace_vector_destroy(&libtrace->perpkt_threads[i].vector);
+	if (libtrace->state != STATE_NEW) {
+		libtrace_packet_t * packet;
+		while (libtrace_ringbuffer_try_read(&libtrace->packet_freelist,(void **) &packet))
+			trace_destroy_packet(packet);
+		
+		libtrace_ringbuffer_destroy(&libtrace->packet_freelist);
+		
+		for (i = 0; i < libtrace->perpkt_thread_count; ++i) {
+			assert (libtrace_vector_get_size(&libtrace->perpkt_threads[i].vector) == 0);
+			libtrace_vector_destroy(&libtrace->perpkt_threads[i].vector);
+		}
+		free(libtrace->perpkt_threads);
+		libtrace->perpkt_threads = NULL;
+		libtrace->perpkt_thread_count = 0;
 	}
-	free(libtrace->perpkt_threads);
-	libtrace->perpkt_threads = NULL;
-	libtrace->perpkt_thread_count = 0;
 	
 	if (libtrace->event.packet) {
 		/* Don't use trace_destroy_packet here - there is almost
