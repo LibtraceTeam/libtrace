@@ -36,7 +36,7 @@ libwandio_la_SOURCES=wandio.c ior-peek.c ior-stdio.c ior-thread.c \
 
 AM_CPPFLAGS = @ADD_INCLS@
 libwandio_la_LIBADD = @LIBWANDIO_LIBS@
-libwandio_la_LDFLAGS=-version-info 1:0:0 @ADD_LDFLAGS@
+libwandio_la_LDFLAGS=-version-info 1:1:0 @ADD_LDFLAGS@
 
 bin_PROGRAMS = wandiocat
 wandiocat_SOURCES = wcat.c
