@@ -226,6 +226,8 @@ echo " * format autodetection - gzip"
 do_test ./test-autodetect traces/5_packets.erf.gz
 echo " * format autodetection - bzip2"
 do_test ./test-autodetect traces/5_packets.erf.bz2
+echo " * format autodetection - lzma"
+do_test ./test-autodetect traces/5_packets.erf.xz
 
 echo
 echo "Tests passed: $OK"
