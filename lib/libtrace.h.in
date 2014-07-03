@@ -866,7 +866,7 @@ typedef struct libtrace_ospf_v2_t
 {
 	uint8_t ospf_v;		/**< OSPF Version, should be 2 */
 	uint8_t type;		/**< OSPF Packet Type */
-	uint16_t len;		/**< Packet length, including OSPF header */
+	uint16_t ospf_len;	/**< Packet length, including OSPF header */
 	struct in_addr router;	/**< Router ID of the packet source */
 	struct in_addr area;	/**< Area the packet belongs to */
 	uint16_t sum;		/**< Checksum */
