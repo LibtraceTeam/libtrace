@@ -1031,6 +1031,12 @@ static int dpdk_start_input (libtrace_t *libtrace) {
     return 0;
 }
 
+static inline size_t dpdk_get_max_rx_queues(uint8_t port_id) {
+    struct rte_eth_dev_info dev_info;
+    rte_eth_dev_info_get(0, &dev_info);
+    return dev_info.max_rx_queues;
+}
+
 static int dpdk_pstart_input (libtrace_t *libtrace) {
     char err[500];
     int enabled_lcore_count = 0, i=0;
@@ -1046,7 +1052,7 @@ static int dpdk_pstart_input (libtrace_t *libtrace) {
 	}
 	
 	tot = MIN(libtrace->perpkt_thread_count, enabled_lcore_count);
-	tot = MIN(tot, 8);
+	tot = MIN(tot, dpdk_get_max_rx_queues(FORMAT(libtrace)->port));
 	fprintf(stderr, "Running pstart DPDK %d %d %d %d\n", tot, libtrace->perpkt_thread_count, enabled_lcore_count, rte_lcore_count());
 	
     if (dpdk_start_port_queues(libtrace, FORMAT(libtrace), err, sizeof(err), tot) != 0) {
