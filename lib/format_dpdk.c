@@ -694,12 +694,45 @@ static const struct rte_eth_rxconf rx_conf = {
 
 static const struct rte_eth_txconf tx_conf = {
 	.tx_thresh = {
-		.pthresh = 36,/* TX_PTHRESH prefetch */
-		.hthresh = 0,/* TX_HTHRESH host */
-		.wthresh = 4,/* TX_WTHRESH writeback */
+        /**
+         * TX_PTHRESH prefetch
+         * Set on the NIC, if the number of unprocessed descriptors to queued on
+         * the card fall below this try grab at least hthresh more unprocessed
+         * descriptors.
+         */
+		.pthresh = 36,
+
+        /* TX_HTHRESH host
+         * Set on the NIC, the batch size to prefetch unprocessed tx descriptors.
+         */
+		.hthresh = 0,
+        
+        /* TX_WTHRESH writeback
+         * Set on the NIC, the number of sent descriptors before writing back
+         * status to confirm the transmission. This is done more efficiently as
+         * a bulk DMA-transfer rather than writing one at a time.
+         * Similar to tx_free_thresh however this is applied to the NIC, where
+         * as tx_free_thresh is when DPDK will check these. This is extended
+         * upon by tx_rs_thresh (10Gbit cards) which doesn't write all
+         * descriptors rather only every n'th item, reducing DMA memory bandwidth.
+         */
+		.wthresh = 4,
 	},
-	.tx_free_thresh = 0, /* Use PMD default values */
-	.tx_rs_thresh = 0, /* Use PMD default values */
+
+    /* Used internally by DPDK rather than passed to the NIC. The number of
+     * packet descriptors to send before checking for any responses written
+     * back (to confirm the transmission). Default = 32 if set to 0)
+     */
+	.tx_free_thresh = 0,
+
+    /* This is the Report Status threshold, used by 10Gbit cards,
+     * This signals the card to only write back status (such as 
+     * transmission successful) after this minimum number of transmit
+     * descriptors are seen. The default is 32 (if set to 0) however if set
+     * to greater than 1 TX wthresh must be set to zero, because this is kindof
+     * a replacement. See the dpdk programmers guide for more restrictions.
+     */
+	.tx_rs_thresh = 1,
 };
 
 /* Attach memory to the port and start the port or restart the port.
@@ -782,7 +815,7 @@ static int dpdk_start_port (struct dpdk_format_data_t * format_data, char *err, 
                             strerror(-ret));
         return -1;
     }
-    /* Initilise the TX queue a minimum value if using this port for
+    /* Initialise the TX queue a minimum value if using this port for
      * receiving. Otherwise a larger size if writing packets.
      */
     ret = rte_eth_tx_queue_setup(format_data->port, format_data->queue_id,
@@ -793,7 +826,7 @@ static int dpdk_start_port (struct dpdk_format_data_t * format_data, char *err, 
                             strerror(-ret));
         return -1;
     }
-    /* Initilise the RX queue with some packets from memory */
+    /* Initialise the RX queue with some packets from memory */
     ret = rte_eth_rx_queue_setup(format_data->port, format_data->queue_id,
                             format_data->nb_rx_buf, SOCKET_ID_ANY, 
                             &rx_conf, format_data->pktmbuf_pool);
@@ -828,7 +861,7 @@ static int dpdk_start_port (struct dpdk_format_data_t * format_data, char *err, 
             (int) link_info.link_duplex, (int) link_info.link_speed);
 #endif
 
-    /* We have now successfully started/unpased */
+    /* We have now successfully started/unpaused */
     format_data->paused = DPDK_RUNNING;
     
     return 0;
@@ -845,7 +878,7 @@ static int dpdk_start_port_queues (libtrace_t *libtrace, struct dpdk_format_data
         return 0;
 
     /* First time started we need to alloc our memory, doing this here 
-     * rather than in enviroment setup because we don't have snaplen then */
+     * rather than in environment setup because we don't have snaplen then */
     if (format_data->paused == DPDK_NEVER_STARTED) {
         if (format_data->snaplen == 0) {
             format_data->snaplen = RX_MBUF_SIZE;
@@ -914,7 +947,7 @@ static int dpdk_start_port_queues (libtrace_t *libtrace, struct dpdk_format_data
 #if DEBUG
     printf("Doing dev configure\n");
 #endif
-    /* Initilise the TX queue a minimum value if using this port for
+    /* Initialise the TX queue a minimum value if using this port for
      * receiving. Otherwise a larger size if writing packets.
      */
     ret = rte_eth_tx_queue_setup(format_data->port, format_data->queue_id,
@@ -930,7 +963,7 @@ static int dpdk_start_port_queues (libtrace_t *libtrace, struct dpdk_format_data
 #if DEBUG
     printf("Doing queue configure\n");
 #endif	
-		/* Initilise the RX queue with some packets from memory */
+		/* Initialise the RX queue with some packets from memory */
 		ret = rte_eth_rx_queue_setup(format_data->port, i,
 								format_data->nb_rx_buf, SOCKET_ID_ANY,
 								&rx_conf, format_data->pktmbuf_pool);
