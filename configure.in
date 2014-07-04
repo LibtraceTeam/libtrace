@@ -584,7 +584,7 @@ AC_ARG_WITH([lzma],
 
 AS_IF([test "x$with_lzma" != "xno"],
 	[
-	AC_CHECK_LIB(lzma, lzma_code, have_lzma=yes, have_lzma=no)
+	AC_CHECK_HEADER(lzma.h, have_lzma=yes, have_lzma=no)
 	], [have_lzma=no])
 
 AS_IF([test "x$have_lzma" = "xyes"], [
