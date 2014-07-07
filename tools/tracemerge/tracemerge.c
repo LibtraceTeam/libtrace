@@ -119,6 +119,8 @@ int main(int argc, char *argv[])
                 compress_type = TRACE_OPTION_COMPRESSTYPE_BZ2;
         } else if (strncmp(compress_type_str, "lzo", 3) == 0) {
                 compress_type = TRACE_OPTION_COMPRESSTYPE_LZO;
+        } else if (strncmp(compress_type_str, "xz", 2) == 0) {
+                compress_type = TRACE_OPTION_COMPRESSTYPE_LZMA;
         } else if (strncmp(compress_type_str, "no", 2) == 0) {
                 compress_type = TRACE_OPTION_COMPRESSTYPE_NONE;
         } else {

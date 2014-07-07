@@ -33,39 +33,23 @@
 
 #ifndef IO_H 
 #define IO_H 1 /**< Guard Define */
-#include "config.h"
 #include <sys/types.h>
 #include <stdio.h>
 #include <inttypes.h>
 #include <stdbool.h>
 
-#if __GNUC__ >= 4
-	#ifdef LT_BUILDING_DLL
-		#define DLLEXPORT __attribute__ ((visibility("default")))
-		#define DLLLOCAL __attribute__ ((visibility("hidden")))
-	#else
-		#define DLLEXPORT
-		#define DLLLOCAL
-	#endif
-#else
-	#define DLLEXPORT
-	#define DLLLOCAL
+
+#ifndef DLLEXPORT
+        #if HAVE_VISIBILITY && LT_BUILDING_DLL
+                #define DLLEXPORT __attribute__ ((visibility("default")))
+                #define DLLLOCAL __attribute__ ((visibility("hidden")))
+        #else
+                #define DLLEXPORT
+                #define DLLLOCAL
+        #endif
 #endif
 
-#if __GNUC__ >= 3 
-#  define DEPRECATED __attribute__((deprecated))
-#  define SIMPLE_FUNCTION __attribute__((pure))
-#  define UNUSED __attribute__((unused))
-#  define PACKED __attribute__((packed))
-#  define PRINTF(formatpos,argpos) __attribute__((format(printf,formatpos,argpos)))
-#else
-#  define DEPRECATED
-#  define SIMPLE_FUNCTION
-#  define UNUSED
-#  define PACKED 
-#  define PRINTF(formatpos,argpos) 
-#endif
-
+// TODO: Use a proper check for these attribute rather than gcc version check
 
 /** @file
  *
@@ -81,7 +65,7 @@ typedef struct io_t io_t; /**< Opaque IO handle structure for reading */
 typedef struct iow_t iow_t; /**< Opaque IO handle structure for writing */
 
 /** Structure defining a supported compression method */
-struct compression_type {
+struct wandio_compression_type {
 	/** Name of the compression method */
 	const char *name;
 	/** Extension to add to the filename of files written using this 
@@ -92,7 +76,7 @@ struct compression_type {
 };
 
 /** The list of supported compression methods */
-extern struct compression_type compression_type[];
+extern struct wandio_compression_type compression_type[];
 
 /** Structure defining a libtrace IO reader module */
 typedef struct {
@@ -193,6 +177,8 @@ enum {
 	WANDIO_COMPRESS_BZ2	= 2,
 	/** LZO compression */
 	WANDIO_COMPRESS_LZO	= 3,
+        /** LZMA compression */
+        WANDIO_COMPRESS_LZMA    = 4,
 	/** All supported methods - used as a bitmask */
 	WANDIO_COMPRESS_MASK	= 7
 };
@@ -208,12 +194,14 @@ enum {
 io_t *bz_open(io_t *parent);
 io_t *zlib_open(io_t *parent);
 io_t *thread_open(io_t *parent);
+io_t *lzma_open(io_t *parent);
 io_t *peek_open(io_t *parent);
 io_t *stdio_open(const char *filename);
 
 iow_t *zlib_wopen(iow_t *child, int compress_level);
 iow_t *bz_wopen(iow_t *child, int compress_level);
 iow_t *lzo_wopen(iow_t *child, int compress_level);
+iow_t *lzma_wopen(iow_t *child, int compress_level);
 iow_t *thread_wopen(iow_t *child);
 iow_t *stdio_wopen(const char *filename, int fileflags);
 
@@ -226,6 +214,19 @@ iow_t *stdio_wopen(const char *filename, int fileflags);
  * and use files with the libtrace IO sub-system.
  *
  * @{ */
+
+/** Given a string describing the compression method, finds the internal
+  * data structure representing that method. This is mostly useful for
+  * nicely mapping a method name to the internal libwandio compression
+  * method enum when configuring an output file.
+  *
+  * @param name          The compression method name as a string, e.g. "gzip",
+  *                      "bzip2", "lzo" or "lzma".
+  * @return A pointer to the compression_type structure representing the
+  * compression method or NULL if no match can be found.
+  *
+  */
+struct wandio_compression_type *wandio_lookup_compression_type(const char *name);
 
 /** Creates a new libtrace IO reader and opens the provided file for reading.
  *
@@ -328,15 +329,5 @@ off_t wandio_wwrite(iow_t *iow, const void *buffer, off_t len);
 void wandio_wdestroy(iow_t *iow);
 
 /** @} */
-
-/** @name libtraceio options 
- * @{ */
-extern int force_directio_read;
-extern int force_directio_write;
-extern uint64_t write_waits;
-extern uint64_t read_waits;
-extern unsigned int use_threads;
-extern unsigned int max_buffers;
-/* @} */
 
 #endif

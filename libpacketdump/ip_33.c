@@ -6,22 +6,6 @@
 #include <netinet/tcp.h>
 #include <netinet/in.h>
 
-#define STRUCT dccp
-
-#define SAFE(x) \
-	((unsigned int)len>=((char*)&STRUCT->x-(char*)STRUCT+sizeof(STRUCT->x))) 
-#define DISPLAY_EXP(x,fmt,exp) \
-	if (SAFE(x)) \
-		printf(fmt,exp); \
-	else \
-		return; 
-
-#define DISPLAY(x,fmt) DISPLAY_EXP(x,fmt,STRUCT->x)
-
-#define DISPLAYS(x,fmt) DISPLAY_EXP(x,fmt,htons(STRUCT->x))
-#define DISPLAYL(x,fmt) DISPLAY_EXP(x,fmt,htonl(STRUCT->x))
-#define DISPLAYIP(x,fmt) DISPLAY_EXP(x,fmt,inet_ntoa(*(struct in_addr*)&STRUCT->x))
-
 struct dccphdr {
 	uint16_t source;
 	uint16_t dest;
@@ -49,8 +33,8 @@ static char *dccp_types[]={
 DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len)
 {
 	struct dccphdr *dccp = (struct dccphdr*)packet;
-	DISPLAYS(source," DCCP: Source %i");
-	DISPLAYS(dest," Dest %i");
+	DISPLAYS(dccp, source," DCCP: Source %i");
+	DISPLAYS(dccp, dest," Dest %i");
 	if (len>4) {
 		printf("\n DCCP: Type %i",dccp->type);
 		if (dccp->type<sizeof(dccp_types)) {
@@ -68,13 +52,14 @@ DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len)
 		printf(" DCCP: Seq %u\n",dccp->seq); // htonwhat?
 	else
 		return;
-	DISPLAY(doff," DCCP: Dataoff: %i\n");
+	DISPLAY(dccp, doff," DCCP: Dataoff: %i\n");
 	if (len>9)
 		printf(" DCCP: NDP %i CsLen: %i\n",dccp->ndp,dccp->cslen);
 	else {
 		return;
 	}
-	DISPLAY(check," DCCP: Checksum: %i\n");
+	/* Should this be byteswapped??? */
+        DISPLAY(dccp, check," DCCP: Checksum: %i\n");
 	if (htons(dccp->source) < htons(dccp->dest)) 
 		decode_next(packet+dccp->doff*4,len-dccp->doff*4,"dccp",htons(dccp->source));
 	else

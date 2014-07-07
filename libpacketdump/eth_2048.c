@@ -9,17 +9,6 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 
-#define DISPLAY_EXP(x,fmt,exp) \
-	if ((unsigned int)len>=((char*)&ip->x-(char*)ip+sizeof(ip->x))) \
-		printf(fmt,exp); \
-	else \
-		return; 
-
-#define DISPLAY(x,fmt) DISPLAY_EXP(x,fmt,ip->x)
-
-#define DISPLAYS(x,fmt) DISPLAY_EXP(x,fmt,htons(ip->x))
-#define DISPLAYIP(x,fmt) DISPLAY_EXP(x,fmt,inet_ntoa(*(struct in_addr*)&ip->x))
-
 DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len)
 {
 	libtrace_ip_t *ip = (libtrace_ip_t*)packet;
@@ -28,11 +17,11 @@ DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len)
 		printf(" Ver %i",ip->ip_v);
 	}
 	//DISPLAY(ip_tos," TOS %02x")
-	DISPLAY_EXP(ip_tos," DSCP %02x",ip->ip_tos >> 2)
-	DISPLAY_EXP(ip_tos," ECN %x",ip->ip_tos & 0x2)
-	DISPLAYS(ip_len," Total Length %i")
+	DISPLAY_EXP(ip, ip_tos," DSCP %02x",ip->ip_tos >> 2);
+	DISPLAY_EXP(ip, ip_tos," ECN %x",ip->ip_tos & 0x2);
+	DISPLAYS(ip, ip_len," Total Length %i");
 	printf("\n IP:");
-	DISPLAYS(ip_id," Id %u");
+	DISPLAYS(ip, ip_id," Id %u");
 	
 	if ((unsigned int)len >= ((char *)&ip->ip_ttl - (char *)ip - 2)) {
 		printf(" Fragoff %i", ntohs(ip->ip_off) & 0x1FFF);
@@ -41,7 +30,7 @@ DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len)
 		if (ntohs(ip->ip_off) & 0x8000) printf(" RESV_FRAG");
 	}
 	//printf("\n IP:");
-	DISPLAY(ip_ttl,"\n IP: TTL %i");
+	DISPLAY(ip, ip_ttl,"\n IP: TTL %i");
 	if ((unsigned int)len>=((char*)&ip->ip_p-(char*)ip+sizeof(ip->ip_p))) {
 		struct protoent *ent=getprotobynumber(ip->ip_p);
 		if (ent) {
@@ -54,9 +43,9 @@ DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len)
 		printf("\n");
 		return;
 	}
-	DISPLAYS(ip_sum," Checksum %i\n");
-	DISPLAYIP(ip_src," IP: Source %s ");
-	DISPLAYIP(ip_dst,"Destination %s\n");
+	DISPLAYS(ip, ip_sum," Checksum %i\n");
+	DISPLAYIP(ip, ip_src," IP: Source %s ");
+	DISPLAYIP(ip, ip_dst,"Destination %s\n");
 	decode_next(packet+ip->ip_hl*4,len-ip->ip_hl*4,"ip",ip->ip_p);
 	return;
 }
