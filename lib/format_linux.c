@@ -213,7 +213,7 @@ struct linux_per_thread_t {
 	int fd;
 	// The flag layout should be the same for all (I Hope)
 	// max_order
-};
+} ALIGN_STRUCT(CACHE_LINE_SIZE);
 
 struct linux_format_data_t {
 	/* The file descriptor being used for the capture */
@@ -304,6 +304,7 @@ struct linux_output_format_data_t {
 	+ TPACKET_ALIGN(sizeof(struct tpacket2_hdr))))
 
 #define FORMAT(x) ((struct linux_format_data_t*)(x))
+#define PERPKT_FORMAT(x) ((struct linux_per_thread_t*)(x->format_data))
 #define DATAOUT(x) ((struct linux_output_format_data_t*)((x)->format_data))
 
 /* Get the start of the captured data. I'm not sure if tp_mac (link layer) is
@@ -695,7 +696,8 @@ static int linuxnative_pstart_input(libtrace_t *libtrace) {
 	struct linux_per_thread_t *per_thread = NULL;
 	
 	if (!FORMAT(libtrace->format_data)->per_thread) {
-		per_thread = calloc(tot, sizeof(struct linux_per_thread_t));
+		//per_thread = calloc(tot, sizeof(struct linux_per_thread_t));
+		posix_memalign((void **)&per_thread, CACHE_LINE_SIZE, tot*sizeof(struct linux_per_thread_t));
 		FORMAT(libtrace->format_data)->per_thread = per_thread;
 	} else {
 		// Whats going on this might not work 100%
@@ -747,6 +749,18 @@ static int linuxnative_pstart_input(libtrace_t *libtrace) {
 	}
 	
 	return 0;
+}
+
+static int linux_pregister_thread(libtrace_t *libtrace, libtrace_thread_t *t, bool reading) {
+	fprintf(stderr, "registering thread %d!!\n", t->perpkt_num);
+    if (reading) {
+        if(t->type == THREAD_PERPKT) {
+            t->format_data = &FORMAT(libtrace->format_data)->per_thread[t->perpkt_num];
+        } else {
+            t->format_data = &FORMAT(libtrace->format_data)->per_thread[0];
+        }
+    }
+    return 0;
 }
 
 static int linuxnative_start_output(libtrace_out_t *libtrace)
@@ -1095,7 +1109,7 @@ inline static int linuxnative_read_packet_fd(libtrace_t *libtrace, libtrace_pack
 	if (check_queue) {
 		// Check for a packet - TODO only Linux has MSG_DONTWAIT should use fctl O_NONBLOCK
 		hdr->wirelen = recvmsg(fd, &msghdr, MSG_DONTWAIT);
-		if ((unsigned) hdr->wirelen == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+		if ((int) hdr->wirelen == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
 			// Do message queue check or select
 			int ret;
 			fd_set rfds;
@@ -1198,10 +1212,10 @@ static int linuxnative_read_packet(libtrace_t *libtrace, libtrace_packet_t *pack
 	return linuxnative_read_packet_fd(libtrace, packet, fd, 0);
 }
 
-static int linuxnative_pread_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
+static int linuxnative_pread_packet(libtrace_t *libtrace, libtrace_thread_t *t, libtrace_packet_t *packet)
 {
-	int fd = FORMAT(libtrace->format_data)->per_thread[get_thread_table_num(libtrace)].fd;
-	//printf("Thread number is #%d point %p\n", get_thread_table_num(libtrace), FORMAT(libtrace->format_data)->per_thread);
+	int fd = FORMAT(libtrace->format_data)->fd;
+	fprintf(stderr, "Thread number is #%d\n", t->perpkt_num);
 	return linuxnative_read_packet_fd(libtrace, packet, fd, 1);
 }
 
@@ -1341,12 +1355,11 @@ static int linuxring_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet
 	return linuxring_read_packet_fd(libtrace, packet, fd, rxring_offset, rx_ring, 0);
 }
 
-static int linuxring_pread_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
-	int tnum = get_thread_table_num(libtrace);
-	int fd = FORMAT(libtrace->format_data)->per_thread[tnum].fd;
-	int *rxring_offset = &FORMAT(libtrace->format_data)->per_thread[tnum].rxring_offset;
-	char *rx_ring = FORMAT(libtrace->format_data)->per_thread[tnum].rx_ring;
-	printf("Thread number is #%d point %p\n", get_thread_table_num(libtrace), FORMAT(libtrace->format_data)->per_thread);
+static int linuxring_pread_packet(libtrace_t *libtrace, libtrace_thread_t *t, libtrace_packet_t *packet) {
+	fprintf(stderr, "Thread number is #%d\n", t->perpkt_num);
+	int fd = PERPKT_FORMAT(t)->fd;
+	int *rxring_offset = &PERPKT_FORMAT(t)->rxring_offset;
+	char *rx_ring = PERPKT_FORMAT(t)->rx_ring;
 	return linuxring_read_packet_fd(libtrace, packet, fd, rxring_offset, rx_ring, 1);
 }
 
@@ -1405,8 +1418,8 @@ static int linuxnative_write_packet(libtrace_out_t *trace,
 	}
 
 	return ret;
-
 }
+
 static int linuxring_write_packet(libtrace_out_t *trace, 
 		libtrace_packet_t *packet)
 {
@@ -1843,7 +1856,9 @@ static struct libtrace_format_t linuxnative = {
 	linuxnative_pread_packet,			/* pread_packet */
 	linuxnative_ppause_input,			/* ppause */
 	linuxnative_fin_input,				/* p_fin */
-	linuxnative_pconfig_input			/* pconfig input */
+	linuxnative_pconfig_input,			/* pconfig input */
+	linux_pregister_thread,
+	NULL
 };
 
 static struct libtrace_format_t linuxring = {
@@ -1892,8 +1907,9 @@ static struct libtrace_format_t linuxring = {
 	linuxring_pread_packet,			/* pread_packet */
 	linuxnative_ppause_input,			/* ppause */
 	linuxnative_fin_input,				/* p_fin */
-	linuxnative_pconfig_input
-	
+	linuxnative_pconfig_input,
+	linux_pregister_thread,
+	NULL
 };
 #else
 static void linuxnative_help(void) {
