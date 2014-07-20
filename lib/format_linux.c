@@ -1255,6 +1255,9 @@ inline static void ring_release_frame(libtrace_t *libtrace, libtrace_packet_t *p
  */
 static void linuxring_fin_packet(libtrace_packet_t *packet)
 {
+
+	if (packet->buffer == NULL)
+		return;
 	assert(packet->trace);
 	
 	// Started should always match the existence of the rx_ring
