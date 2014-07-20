@@ -526,7 +526,7 @@ static void* hasher_start(void *data) {
 	message.additional.uint64 = 0;
 	trace_send_message_to_reducer(trace, &message);
 	assert(pthread_mutex_lock(&trace->libtrace_lock) == 0);
-	if (trace->format->pregister_thread) {
+	if (trace->format->punregister_thread) {
 		trace->format->punregister_thread(trace, t);
 	}
 	assert(pthread_mutex_unlock(&trace->libtrace_lock) == 0);
