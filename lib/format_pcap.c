@@ -577,7 +577,11 @@ static libtrace_linktype_t pcap_get_link_type(const libtrace_packet_t *packet) {
 
 static libtrace_direction_t pcap_set_direction(libtrace_packet_t *packet,
 		libtrace_direction_t dir) {
-	
+
+	/* We only support tagging with IN or OUT return error for any others */
+	if(!(dir == TRACE_DIR_OUTGOING || dir == TRACE_DIR_INCOMING))
+		return -1;
+
 	/* PCAP doesn't have a direction field in the header, so we need to
 	 * promote to Linux SLL to tag it properly */
 	libtrace_sll_header_t *sll;
