@@ -1108,7 +1108,7 @@ inline static int linuxnative_read_packet_fd(libtrace_t *libtrace, libtrace_pack
 	
 	if (check_queue) {
 		// Check for a packet - TODO only Linux has MSG_DONTWAIT should use fctl O_NONBLOCK
-		hdr->wirelen = recvmsg(fd, &msghdr, MSG_DONTWAIT);
+		hdr->wirelen = recvmsg(fd, &msghdr, MSG_DONTWAIT | MSG_TRUNC);
 		if ((int) hdr->wirelen == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
 			// Do message queue check or select
 			int ret;
@@ -1135,7 +1135,7 @@ inline static int linuxnative_read_packet_fd(libtrace_t *libtrace, libtrace_pack
 			hdr->wirelen = recvmsg(fd, &msghdr, 0);
 		}
 	} else {
-		hdr->wirelen = recvmsg(fd, &msghdr, 0);
+		hdr->wirelen = recvmsg(fd, &msghdr, MSG_TRUNC);
 	}
 	
 	if (hdr->wirelen==~0U) {

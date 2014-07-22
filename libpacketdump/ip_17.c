@@ -7,28 +7,12 @@
 #include <netinet/in.h>
 #include <netdb.h>
 
-#define STRUCT udp
-
-#define SAFE(x) \
-	((unsigned int)len>=((char*)&STRUCT->x-(char*)STRUCT+sizeof(STRUCT->x))) 
-#define DISPLAY_EXP(x,fmt,exp) \
-	if (SAFE(x)) \
-		printf(fmt,exp); \
-	else \
-		return; 
-
-#define DISPLAY(x,fmt) DISPLAY_EXP(x,fmt,STRUCT->x)
-
-#define DISPLAYS(x,fmt) DISPLAY_EXP(x,fmt,htons(STRUCT->x))
-#define DISPLAYL(x,fmt) DISPLAY_EXP(x,fmt,htonl(STRUCT->x))
-#define DISPLAYIP(x,fmt) DISPLAY_EXP(x,fmt,inet_ntoa(*(struct in_addr*)&STRUCT->x))
-
 
 DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len)
 {
 	struct libtrace_udp *udp = (struct libtrace_udp*)packet;
 	printf(" UDP:");
-	if (SAFE(source)) {
+	if (SAFE(udp, source)) {
 		struct servent *ent=getservbyport(udp->source,"udp");
 		if(ent) {
 			printf(" Source %i (%s)",htons(udp->source),ent->s_name);
@@ -40,7 +24,7 @@ DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len)
 		printf("\n");
 		return;
 	}
-	if (SAFE(dest)) {
+	if (SAFE(udp, dest)) {
 		struct servent *ent=getservbyport(udp->dest,"udp");
 		if(ent) {
 			printf(" Dest %i (%s)",htons(udp->dest),ent->s_name);
@@ -53,8 +37,8 @@ DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len)
 		return;
 	}
 	printf("\n UDP:");
-	DISPLAYS(len," Len %u");
-	DISPLAYS(check," Checksum %u");
+	DISPLAYS(udp, len," Len %u");
+	DISPLAYS(udp, check," Checksum %u");
 	printf("\n");
 	if (htons(udp->source) < htons(udp->dest)) 
 		decode_next(packet+sizeof(*udp),len-sizeof(*udp),"udp",htons(udp->source));

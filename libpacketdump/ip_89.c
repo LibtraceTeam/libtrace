@@ -9,8 +9,8 @@
 
 static void dump_ospf_v2_header(libtrace_ospf_v2_t *hdr, unsigned len) {
 
-	printf(" OSPF Header: Version %u Type %u ",
-			hdr->ospf_v, hdr->type);
+	DISPLAY(hdr, ospf_v, " OSPF Header: Version %u");
+        DISPLAY(hdr, type, " Type %u ");
 	switch(hdr->type) {
 		case TRACE_OSPF_HELLO:
 			printf("(Hello)");
@@ -28,17 +28,16 @@ static void dump_ospf_v2_header(libtrace_ospf_v2_t *hdr, unsigned len) {
 			printf("(Link State Ack.)");
 			break;
 	}
+        printf("\n");
 
-	printf("\n OSPF Header: Length %u \n", ntohs(hdr->len));
-	printf(" OSPF Header: Router Id %s ", inet_ntoa(hdr->router));
-	printf("Area Id %s\n", inet_ntoa(hdr->area));
-	printf(" OSPF Header: Checksum %u Auth Type %u\n", ntohs(hdr->sum),
-			ntohs(hdr->au_type));
-
-	printf(" OSPF Header: Auth Key ID %u Auth Data Len %u\n", 
-			hdr->au_key_id, hdr->au_data_len);
-	printf(" OSPF Header: Auth Crypto Seq %u\n", ntohl(hdr->au_seq_num));
-
+	DISPLAYS(hdr, ospf_len, "OSPF Header: Length %u \n");
+        DISPLAYIP(hdr, router, " OSPF Header: Router Id %s ");
+        DISPLAYIP(hdr, area, "Area Id %s\n");
+	DISPLAYS(hdr, sum, " OSPF Header: Checksum %u ");
+        DISPLAYS(hdr, au_type, "Auth Type %u\n");
+        DISPLAY(hdr, au_key_id, " OSPF Header: Auth Key ID %u ");
+        DISPLAY(hdr, au_data_len, "Auth Data Len %u\n");
+        DISPLAYL(hdr, au_seq_num, " OSPF Header: Auth Crypto Seq %u\n");
 
 }
 
