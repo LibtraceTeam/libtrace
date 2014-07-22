@@ -207,6 +207,7 @@ struct libtrace_thread_t {
 	enum thread_types type;
 	enum thread_states state;
 	void* user_data; // TLS for the user to use
+	void* format_data; // TLS for the format to use
 	pthread_t tid;
 	int perpkt_num; // A number from 0-X that represents this perpkt threads number
 				// in the table, intended to quickly identify this thread
@@ -911,7 +912,7 @@ struct libtrace_format_t {
 	/** Read a packet in the new parallel mode 
 	 * @return same as read_packet, with the addition of return -2 to represent
 	 * interrupted due to message waiting. */
-	int (*pread_packet)(libtrace_t *trace, libtrace_packet_t *packet);
+	int (*pread_packet)(libtrace_t *trace, libtrace_thread_t *t, libtrace_packet_t *packet);
 	
 	/** Pause a parallel trace
 	 *
@@ -935,7 +936,31 @@ struct libtrace_format_t {
 	 * occurs
 	 */
 	int (*pconfig_input)(libtrace_t *libtrace,trace_parallel_option_t option,void *value);
-		
+
+	/**
+	 * Register a thread for use with the format or using the packets produced
+	 * by it. This is NOT only used for threads reading packets infact all
+	 * threads use this.
+	 *
+	 * Some use cases include setting up any thread local storage required for
+	 * to read packets and free packets. For DPDK we require any thread that
+	 * may release or read a packet to have have an internal number associated
+	 * with it.
+	 * 
+	 * The thread type can be used to see if this thread is going to be used
+	 * to read packets or otherwise.
+	 *
+	 * @return 0 if successful, -1 if the option is unsupported or an error
+	 * occurs (such as a maximum of threads being reached)
+	 */
+	int (*pregister_thread)(libtrace_t *libtrace, libtrace_thread_t *t, bool reader);
+
+	/**
+	 * If needed any memory allocated with pregister_thread can be released
+	 * in this function. The thread will be destroyed directly after this
+	 * function is called.
+	 */
+	void (*punregister_thread)(libtrace_t *libtrace, libtrace_thread_t *t);
 };
 
 /** Macro to zero out a single thread format */
@@ -945,7 +970,9 @@ NULL,			/* pstart_input */ \
 NULL,			/* pread_packet */ \
 NULL,			/* ppause_input */ \
 NULL,			/* pfin_input */ \
-NULL,			/* pconfig_input */
+NULL,			/* pconfig_input */ \
+NULL,			/* pregister_thread */ \
+NULL			/* punregister_thread */
 
 /** The list of registered capture formats */
 //extern struct libtrace_format_t *form;

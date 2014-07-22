@@ -45,10 +45,11 @@
  * modules should use to open, read from, write to, seek and close trace files.
  */
 
-struct compression_type compression_type[]  = {
-	{ "GZ",		"gz", 	WANDIO_COMPRESS_ZLIB 	},
-	{ "BZ2",	"bz2", 	WANDIO_COMPRESS_BZ2	},
-	{ "LZO",	"lzo",  WANDIO_COMPRESS_LZO	},
+struct wandio_compression_type compression_type[]  = {
+	{ "gzip",	"gz", 	WANDIO_COMPRESS_ZLIB 	},
+	{ "bzip2",      "bz2", 	WANDIO_COMPRESS_BZ2	},
+	{ "lzo",	"lzo",  WANDIO_COMPRESS_LZO	},
+	{ "lzma",	"xz",  WANDIO_COMPRESS_LZMA	},
 	{ "NONE",	"",	WANDIO_COMPRESS_NONE	}
 };
 
@@ -140,7 +141,7 @@ static io_t *create_io_reader(const char *filename, int autodetect)
 	DEBUG_PIPELINE("stdio");
 	DEBUG_PIPELINE("peek");
 	io_t *io = peek_open(stdio_open(filename));
-	char buffer[1024];
+	unsigned char buffer[1024];
 	int len;
 	if (!io)
 		return NULL;
@@ -150,7 +151,7 @@ static io_t *create_io_reader(const char *filename, int autodetect)
 	 */
 
 	if (autodetect) {
-		if (len>=3 && buffer[0] == '\037' && buffer[1] == '\213' &&
+		if (len>=3 && buffer[0] == 0x1f && buffer[1] == 0x8b &&
 				buffer[2] == 0x08) { 
 #if HAVE_LIBZ
 			DEBUG_PIPELINE("zlib");
@@ -161,7 +162,7 @@ static io_t *create_io_reader(const char *filename, int autodetect)
 #endif
 		}
 		/* Auto detect compress(1) compressed data (gzip can read this) */
-		if (len>=2 && buffer[0] == '\037' && buffer[1] == '\235') {
+		if (len>=2 && buffer[0] == 0x1f && buffer[1] == 0x9d) {
 #if HAVE_LIBZ
 			DEBUG_PIPELINE("zlib");
 			io = zlib_open(io);
@@ -181,6 +182,18 @@ static io_t *create_io_reader(const char *filename, int autodetect)
 			return NULL;
 #endif
 		}
+
+                if (len >=5 && buffer[0] == 0xfd && buffer[1] == '7' && 
+                                buffer[2] == 'z' && buffer[3] == 'X' &&
+                                buffer[4] == 'Z') {
+#if HAVE_LIBLZMA
+                        DEBUG_PIPELINE("lzma");
+                        io = lzma_open(io);
+#else
+                        fprintf(stderr, "File %s is lzma compressed but libtrace has not been built with lzma support!\n", filename);
+                        return NULL;
+#endif
+                }
 	}	
 	/* Now open a threaded, peekable reader using the appropriate module
 	 * to read the data */
@@ -192,6 +205,20 @@ static io_t *create_io_reader(const char *filename, int autodetect)
 	
 	DEBUG_PIPELINE("peek");
 	return peek_open(io);
+}
+
+DLLEXPORT struct wandio_compression_type *wandio_lookup_compression_type(
+        const char *name) {
+
+        struct wandio_compression_type *wct = compression_type;
+
+        while (strcmp(wct->name, "NONE") != 0) {
+                if (strcmp(wct->name, name) == 0)
+                        return wct;
+                wct++;
+        }
+
+        return NULL;
 }
 
 DLLEXPORT io_t *wandio_create(const char *filename) {
@@ -289,6 +316,12 @@ DLLEXPORT iow_t *wandio_wcreate(const char *filename, int compress_type, int com
 	    compress_type == WANDIO_COMPRESS_BZ2) {
 		iow = bz_wopen(iow,compression_level);
 	}
+#endif
+#if HAVE_LIBLZMA
+        else if (compression_level != 0 && 
+            compress_type == WANDIO_COMPRESS_LZMA) {
+                iow = lzma_wopen(iow,compression_level);
+        }
 #endif
 	/* Open a threaded writer */
 	if (use_threads)

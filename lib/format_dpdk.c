@@ -40,6 +40,8 @@
  * RT-speaking programs.
  */
 
+#define _GNU_SOURCE
+
 #include "config.h"
 #include "libtrace.h"
 #include "libtrace_int.h"
@@ -75,6 +77,7 @@
 #include <rte_launch.h>
 #include <rte_lcore.h>
 #include <rte_per_lcore.h>
+#include <pthread.h>
 
 /* The default size of memory buffers to use - This is the max size of standard 
  * ethernet packet less the size of the MAC CHECKSUM */
@@ -110,6 +113,8 @@
 /* Get the original placement of the packet data */
 #define MBUF_PKTDATA(x) ((char *) x + sizeof(struct rte_mbuf) + RTE_PKTMBUF_HEADROOM)
 #define FORMAT(x) ((struct dpdk_format_data_t*)(x->format_data))
+#define PERPKT_FORMAT(x) ((struct dpdk_per_lcore_t*)(x->format_data))
+
 #define TV_TO_NS(tv) ((uint64_t) tv.tv_sec*1000000000ull + \
                         (uint64_t) tv.tv_usec*1000ull)
 #define TS_TO_NS(ts) ((uint64_t) ts.tv_sec*1000000000ull + \
@@ -181,12 +186,11 @@ enum paused_state {
     DPDK_PAUSED,
 };
 
-struct per_lcore_t
+struct dpdk_per_lcore_t
 {
 	// TODO move time stamp stuff here
  	uint16_t queue_id;
  	uint8_t port;
- 	uint8_t enabled;
 };
 
 /* Used by both input and output however some fields are not used
@@ -212,8 +216,8 @@ struct dpdk_format_data_t {
     uint64_t ts_last_sys; /* System timestamp of our most recent packet in nanoseconds */
     uint32_t wrap_count; /* Number of times the NIC clock has wrapped around completely */
 #endif
-	// DPDK normally seems to have a limit of 
-	struct per_lcore_t per_lcore[RTE_MAX_LCORE];
+	// DPDK normally seems to have a limit of 8 queues for a given card
+	struct dpdk_per_lcore_t per_lcore[RTE_MAX_LCORE];
 };
 
 enum dpdk_addt_hdr_flags {
@@ -350,7 +354,7 @@ static inline void dump_configuration()
     
     if (global_config != NULL) {
         int i;
-        printf("Intel DPDK setup\n"
+        fprintf(stderr, "Intel DPDK setup\n"
                "---Version      : %"PRIu32"\n"
                "---Magic        : %"PRIu32"\n"
                "---Master LCore : %"PRIu32"\n"
@@ -359,7 +363,7 @@ static inline void dump_configuration()
                global_config->master_lcore, global_config->lcore_count);
         
         for (i = 0 ; i < nb_cpu; i++) {
-            printf("   ---Core %d : %s\n", i, 
+            fprintf(stderr, "   ---Core %d : %s\n", i, 
                    global_config->lcore_role[i] == ROLE_RTE ? "on" : "off");
         }
         
@@ -380,19 +384,72 @@ static inline void dump_configuration()
             default:
                 proc_type = "something worse than invalid!!";
         }
-        printf("---Process Type : %s\n", proc_type);
+        fprintf(stderr, "---Process Type : %s\n", proc_type);
     }
     
 }
 #endif
+
+/**
+ * Expects to be called from the master lcore and moves it to the given dpdk id
+ * @param core (zero indexed) If core is on the physical system affinity is bound otherwise
+ *               affinity is set to all cores. Must be less than RTE_MAX_LCORE
+ *               and not already in use.
+ * @return 0 is successful otherwise -1 on error.
+ */
+static inline int dpdk_move_master_lcore(size_t core) {
+    struct rte_config *cfg = rte_eal_get_configuration();
+    cpu_set_t cpuset;
+    int i;
+
+    assert (core < RTE_MAX_LCORE);
+    assert (rte_get_master_lcore() == rte_lcore_id());
+
+    if (core == rte_lcore_id())
+        return 0;
+
+    // Make sure we are not overwriting someone else
+    assert(!rte_lcore_is_enabled(core));
+
+    // Move the core
+    cfg->lcore_role[rte_lcore_id()] = ROLE_OFF;
+    cfg->lcore_role[core] = ROLE_RTE;
+    lcore_config[core].thread_id = lcore_config[rte_lcore_id()].thread_id;
+    rte_eal_get_configuration()->master_lcore = core;
+    RTE_PER_LCORE(_lcore_id) = core;
+
+    // Now change the affinity
+    CPU_ZERO(&cpuset);
+
+    if (lcore_config[core].detected) {
+        CPU_SET(core, &cpuset);
+    } else {
+        for (i = 0; i < RTE_MAX_LCORE; ++i) {
+            if (lcore_config[i].detected)
+                CPU_SET(i, &cpuset);
+        }
+    }
+
+    i = pthread_setaffinity_np(pthread_self(), sizeof(cpuset), &cpuset);
+    if (i != 0) {
+        // TODO proper libtrace style error here!!
+        fprintf(stderr, "pthread_setaffinity_np failed\n");
+        return -1;
+    }
+    return 0;
+}
+
 
 static inline int dpdk_init_enviroment(char * uridata, struct dpdk_format_data_t * format_data,
                                         char * err, int errlen) {
     int ret; /* Returned error codes */
     struct rte_pci_addr use_addr; /* The only address that we don't blacklist */   
     char cpu_number[10] = {0}; /* The CPU mask we want to bind to */
+    char mem_map[20] = {0}; /* The memory name */
     long nb_cpu; /* The number of CPUs in the system */
     long my_cpu; /* The CPU number we want to bind to */
+    int i;
+    struct rte_config *cfg = rte_eal_get_configuration();
     
 #if DEBUG
     rte_set_log_level(RTE_LOG_DEBUG);
@@ -400,15 +457,20 @@ static inline int dpdk_init_enviroment(char * uridata, struct dpdk_format_data_t
     rte_set_log_level(RTE_LOG_WARNING);
 #endif
     /* Using proc-type auto allows this to be either primary or secondary 
-     * Secondary allows two intances of libtrace to be used on different
+     * Secondary allows two instances of libtrace to be used on different
      * ports. However current version of DPDK doesn't support this on the
-     * same card (My understanding is this should work with two seperate
+     * same card (My understanding is this should work with two separate
      * cards).
+     * 
+     * Using unique file prefixes mean separate memory is used, unlinking
+     * the two processes. However be careful we still cannot access a 
+     * port that already in use.
      */
-    char* argv[] = {"libtrace", "-c", NULL, "-n", "1", "--proc-type", "auto", NULL};
+    char* argv[] = {"libtrace", "-c", cpu_number, "-n", "1", "--proc-type", "auto",
+		"--file-prefix", mem_map, "-m", "256", NULL};
     int argc = sizeof(argv) / sizeof(argv[0]) - 1;
     
-    /* This initilises the Enviroment Abstraction Layer (EAL)
+    /* This initialises the Environment Abstraction Layer (EAL)
      * If we had slave workers these are put into WAITING state
      * 
      * Basically binds this thread to a fixed core, which we choose as
@@ -450,10 +512,13 @@ static inline int dpdk_init_enviroment(char * uridata, struct dpdk_format_data_t
         return -1;
     }
 
-    /* Make our mask */ //  0x1 << (my_cpu - 1)
-    snprintf(cpu_number, sizeof(cpu_number), "%x", 0x3);
-    argv[2] = cpu_number;
+    /* Make our mask with all cores turned on this is so that DPDK to gets CPU
+       info older versions */
+    snprintf(cpu_number, sizeof(cpu_number), "%x", ~(UINT32_MAX<<MIN(31, nb_cpu)));
+    //snprintf(cpu_number, sizeof(cpu_number), "%x", 0x1 << (my_cpu - 1));
 
+	/* Give this a name */
+	snprintf(mem_map, sizeof(mem_map), "libtrace-%d", (int) getpid());
     /* rte_eal_init it makes a call to getopt so we need to reset the 
      * global optind variable of getopt otherwise this fails */
     optind = 1;
@@ -462,6 +527,20 @@ static inline int dpdk_init_enviroment(char * uridata, struct dpdk_format_data_t
           "Intel DPDK - Initialisation of EAL failed: %s", strerror(-ret));
         return -1;
     }
+
+    // These are still running but will never do anything with DPDK v1.7 we
+    // should remove this XXX in the future
+    for(i = 0; i < RTE_MAX_LCORE; ++i) {
+        if (rte_lcore_is_enabled(i) && i != rte_get_master_lcore()) {
+            cfg->lcore_role[i] = ROLE_OFF;
+            cfg->lcore_count--;
+        }
+    }
+    // Only the master should be running
+    assert(cfg->lcore_count == 1);
+
+    dpdk_move_master_lcore(my_cpu-1);
+
 #if DEBUG
     dump_configuration();
 #endif
@@ -504,7 +583,6 @@ static inline int dpdk_init_enviroment(char * uridata, struct dpdk_format_data_t
 static int dpdk_init_input (libtrace_t *libtrace) {
     char err[500];
     err[0] = 0;
-    int i;
     
     libtrace->format_data = (struct dpdk_format_data_t *)
                             malloc(sizeof(struct dpdk_format_data_t));
@@ -524,10 +602,6 @@ static int dpdk_init_input (libtrace_t *libtrace) {
     FORMAT(libtrace)->ts_last_sys = 0;
     FORMAT(libtrace)->wrap_count = 0;
 #endif
-	for (i = 0;i < RTE_MAX_LCORE; i++) {
-		// Disabled by default
-		FORMAT(libtrace)->per_lcore[i].enabled = 0;
-	}
 	
     if (dpdk_init_enviroment(libtrace->uridata, FORMAT(libtrace), err, sizeof(err)) != 0) {
         trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "%s", err);
@@ -590,6 +664,7 @@ static int dpdk_pconfig_input (libtrace_t *libtrace,
 					// We don't support these
 					return -1;
 			}
+        break;
 	}
 	return -1;
 }
@@ -687,12 +762,45 @@ static const struct rte_eth_rxconf rx_conf = {
 
 static const struct rte_eth_txconf tx_conf = {
 	.tx_thresh = {
-		.pthresh = 36,/* TX_PTHRESH prefetch */
-		.hthresh = 0,/* TX_HTHRESH host */
-		.wthresh = 4,/* TX_WTHRESH writeback */
+        /**
+         * TX_PTHRESH prefetch
+         * Set on the NIC, if the number of unprocessed descriptors to queued on
+         * the card fall below this try grab at least hthresh more unprocessed
+         * descriptors.
+         */
+		.pthresh = 36,
+
+        /* TX_HTHRESH host
+         * Set on the NIC, the batch size to prefetch unprocessed tx descriptors.
+         */
+		.hthresh = 0,
+        
+        /* TX_WTHRESH writeback
+         * Set on the NIC, the number of sent descriptors before writing back
+         * status to confirm the transmission. This is done more efficiently as
+         * a bulk DMA-transfer rather than writing one at a time.
+         * Similar to tx_free_thresh however this is applied to the NIC, where
+         * as tx_free_thresh is when DPDK will check these. This is extended
+         * upon by tx_rs_thresh (10Gbit cards) which doesn't write all
+         * descriptors rather only every n'th item, reducing DMA memory bandwidth.
+         */
+		.wthresh = 4,
 	},
-	.tx_free_thresh = 0, /* Use PMD default values */
-	.tx_rs_thresh = 0, /* Use PMD default values */
+
+    /* Used internally by DPDK rather than passed to the NIC. The number of
+     * packet descriptors to send before checking for any responses written
+     * back (to confirm the transmission). Default = 32 if set to 0)
+     */
+	.tx_free_thresh = 0,
+
+    /* This is the Report Status threshold, used by 10Gbit cards,
+     * This signals the card to only write back status (such as 
+     * transmission successful) after this minimum number of transmit
+     * descriptors are seen. The default is 32 (if set to 0) however if set
+     * to greater than 1 TX wthresh must be set to zero, because this is kindof
+     * a replacement. See the dpdk programmers guide for more restrictions.
+     */
+	.tx_rs_thresh = 1,
 };
 
 /* Attach memory to the port and start the port or restart the port.
@@ -736,7 +844,7 @@ static int dpdk_start_port (struct dpdk_format_data_t * format_data, char *err, 
          * ring become available.
          */
 #if DEBUG
-    printf("Creating mempool named %s\n", format_data->mempool_name);
+    fprintf(stderr, "Creating mempool named %s\n", format_data->mempool_name);
 #endif
         format_data->pktmbuf_pool =
             rte_mempool_create(format_data->mempool_name,
@@ -775,7 +883,7 @@ static int dpdk_start_port (struct dpdk_format_data_t * format_data, char *err, 
                             strerror(-ret));
         return -1;
     }
-    /* Initilise the TX queue a minimum value if using this port for
+    /* Initialise the TX queue a minimum value if using this port for
      * receiving. Otherwise a larger size if writing packets.
      */
     ret = rte_eth_tx_queue_setup(format_data->port, format_data->queue_id,
@@ -786,7 +894,7 @@ static int dpdk_start_port (struct dpdk_format_data_t * format_data, char *err, 
                             strerror(-ret));
         return -1;
     }
-    /* Initilise the RX queue with some packets from memory */
+    /* Initialise the RX queue with some packets from memory */
     ret = rte_eth_rx_queue_setup(format_data->port, format_data->queue_id,
                             format_data->nb_rx_buf, SOCKET_ID_ANY, 
                             &rx_conf, format_data->pktmbuf_pool);
@@ -817,19 +925,19 @@ static int dpdk_start_port (struct dpdk_format_data_t * format_data, char *err, 
     /* Wait for the link to come up */
     rte_eth_link_get(format_data->port, &link_info);
 #if DEBUG
-    printf("Link status is %d %d %d\n", (int) link_info.link_status,
+    fprintf(stderr, "Link status is %d %d %d\n", (int) link_info.link_status,
             (int) link_info.link_duplex, (int) link_info.link_speed);
 #endif
 
-    /* We have now successfully started/unpased */
+    /* We have now successfully started/unpaused */
     format_data->paused = DPDK_RUNNING;
     
     return 0;
 }
 
-/* Attach memory to the port and start the port or restart the ports.
+/* Attach memory to the port and start (or restart) the port/s.
  */
-static int dpdk_start_port_queues (libtrace_t *libtrace, struct dpdk_format_data_t * format_data, char *err, int errlen, uint16_t rx_queues){
+static int dpdk_start_port_queues (libtrace_t *libtrace, struct dpdk_format_data_t *format_data, char *err, int errlen, uint16_t rx_queues){
     int ret, i; /* Check return values for errors */
     struct rte_eth_link link_info; /* Wait for link */
     
@@ -838,7 +946,7 @@ static int dpdk_start_port_queues (libtrace_t *libtrace, struct dpdk_format_data
         return 0;
 
     /* First time started we need to alloc our memory, doing this here 
-     * rather than in enviroment setup because we don't have snaplen then */
+     * rather than in environment setup because we don't have snaplen then */
     if (format_data->paused == DPDK_NEVER_STARTED) {
         if (format_data->snaplen == 0) {
             format_data->snaplen = RX_MBUF_SIZE;
@@ -859,7 +967,7 @@ static int dpdk_start_port_queues (libtrace_t *libtrace, struct dpdk_format_data
 #endif
 
         /* Create the mbuf pool, which is the place our packets are allocated
-         * from - TODO figure out if there is is a free function (I cannot see one) 
+         * from - TODO figure out if there is is a free function (I cannot see one)
          * NOTE: RX queue requires nb_packets + 1 otherwise it fails to 
          * allocate however that extra 1 packet is not used. 
          * (I assume <= vs < error some where in DPDK code)
@@ -907,7 +1015,7 @@ static int dpdk_start_port_queues (libtrace_t *libtrace, struct dpdk_format_data
 #if DEBUG
     printf("Doing dev configure\n");
 #endif
-    /* Initilise the TX queue a minimum value if using this port for
+    /* Initialise the TX queue a minimum value if using this port for
      * receiving. Otherwise a larger size if writing packets.
      */
     ret = rte_eth_tx_queue_setup(format_data->port, format_data->queue_id,
@@ -923,10 +1031,14 @@ static int dpdk_start_port_queues (libtrace_t *libtrace, struct dpdk_format_data
 #if DEBUG
     printf("Doing queue configure\n");
 #endif	
-		/* Initilise the RX queue with some packets from memory */
+		/* Initialise the RX queue with some packets from memory */
 		ret = rte_eth_rx_queue_setup(format_data->port, i,
 								format_data->nb_rx_buf, SOCKET_ID_ANY,
 								&rx_conf, format_data->pktmbuf_pool);
+        /* Init per_thread data structures */
+        format_data->per_lcore[i].port = format_data->port;
+        format_data->per_lcore[i].queue_id = i;
+
 		if (ret < 0) {
 			snprintf(err, errlen, "Intel DPDK - Cannot configure RX queue on port"
 						" %"PRIu8" : %s", format_data->port,
@@ -936,12 +1048,12 @@ static int dpdk_start_port_queues (libtrace_t *libtrace, struct dpdk_format_data
 	}
     
 #if DEBUG
-    printf("Doing start device\n");
+    fprintf(stderr, "Doing start device\n");
 #endif	
     /* Start device */
     ret = rte_eth_dev_start(format_data->port);
 #if DEBUG
-    printf("Done start device\n");
+    fprintf(stderr, "Done start device\n");
 #endif	
     if (ret < 0) {
         snprintf(err, errlen, "Intel DPDK - rte_eth_dev_start failed : %s",
@@ -971,7 +1083,7 @@ static int dpdk_start_port_queues (libtrace_t *libtrace, struct dpdk_format_data
     /* Wait for the link to come up */
     rte_eth_link_get(format_data->port, &link_info);
 #if DEBUG
-    printf("Link status is %d %d %d\n", (int) link_info.link_status,
+    fprintf(stderr, "Link status is %d %d %d\n", (int) link_info.link_status,
             (int) link_info.link_duplex, (int) link_info.link_speed);
 #endif
 
@@ -991,23 +1103,50 @@ static int dpdk_start_input (libtrace_t *libtrace) {
     return 0;
 }
 
+static inline size_t dpdk_get_max_rx_queues (uint8_t port_id) {
+    struct rte_eth_dev_info dev_info;
+    rte_eth_dev_info_get(port_id, &dev_info);
+    return dev_info.max_rx_queues;
+}
+
+static inline size_t dpdk_processor_count () {
+    long nb_cpu = sysconf(_SC_NPROCESSORS_ONLN);
+    if (nb_cpu <= 0)
+        return 1;
+    else
+        return (size_t) nb_cpu;
+}
+
 static int dpdk_pstart_input (libtrace_t *libtrace) {
     char err[500];
-    int enabled_lcore_count = 0, i=0;
+    int i=0, phys_cores=0;
     int tot = libtrace->perpkt_thread_count;
     err[0] = 0;
-	
-	libtrace->perpkt_thread_count;
-	
-	for (i = 0; i < RTE_MAX_LCORE; i++)
-	{
-		if (rte_lcore_is_enabled(i))
-			enabled_lcore_count++;
-	}
-	
-	tot = MIN(libtrace->perpkt_thread_count, enabled_lcore_count);
-	tot = MIN(tot, 8);
-	printf("Running pstart DPDK %d %d %d %d\n", tot, libtrace->perpkt_thread_count, enabled_lcore_count, rte_lcore_count());
+
+    if (rte_lcore_id() != rte_get_master_lcore())
+        fprintf(stderr, "Warning dpdk_pstart_input should be called from the master DPDK thread!\n");
+
+    // If the master is not on the last thread we move it there
+    if (rte_get_master_lcore() != RTE_MAX_LCORE - 1) {
+        // Consider error handling here
+        dpdk_move_master_lcore(RTE_MAX_LCORE - 1) == -1;
+    }
+
+    // Don't exceed the number of cores in the system/detected by dpdk
+    // We don't have to force this but performance wont be good if we don't
+    for (i = 0; i < RTE_MAX_LCORE; ++i) {
+        if (lcore_config[i].detected) {
+            if (rte_lcore_is_enabled(i))
+                fprintf(stderr, "Found core %d already in use!\n", i);
+            else
+                phys_cores++;
+        }
+    }
+
+	tot = MIN(libtrace->perpkt_thread_count, dpdk_get_max_rx_queues(FORMAT(libtrace)->port));
+    tot = MIN(tot, phys_cores);
+
+	fprintf(stderr, "Running pstart DPDK tot=%d req=%d phys=%d\n", tot, libtrace->perpkt_thread_count, phys_cores);
 	
     if (dpdk_start_port_queues(libtrace, FORMAT(libtrace), err, sizeof(err), tot) != 0) {
         trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "%s", err);
@@ -1015,9 +1154,118 @@ static int dpdk_pstart_input (libtrace_t *libtrace) {
         libtrace->format_data = NULL;
         return -1;
     }
-    
+
+    // Make sure we only start the number that we should
+    libtrace->perpkt_thread_count = tot;
     return 0;
-    return tot;
+}
+
+
+/**
+ * Register a thread with the DPDK system,
+ * When we start DPDK in parallel libtrace we move the 'main thread' to the
+ * MAXIMUM CPU core slot (32) and remove any affinity restrictions DPDK
+ * gives it.
+ *
+ * We then allow a mapper thread to be started on every real core as DPDK would
+ * we also bind these to the corresponding CPU cores.
+ * 
+ * @param libtrace A pointer to the trace
+ * @param reading True if the thread will be used to read packets, i.e. will
+ *                call pread_packet(), false if thread used to process packet
+ *                in any other manner including statistics functions.
+ */
+static int dpdk_pregister_thread(libtrace_t *libtrace, libtrace_thread_t *t, bool reading)
+{
+    struct rte_config *cfg = rte_eal_get_configuration();
+    int i;
+    int new_id = -1;
+
+    // If 'reading packets' fill in cores from 0 up and bind affinity
+    // otherwise start from the MAX core (which is also the master) and work backwards
+    // in this case physical cores on the system will not exist so we don't bind
+    // these to any particular physical core
+    if (reading) {
+        for (i = 0; i < RTE_MAX_LCORE; ++i) {
+            if (!rte_lcore_is_enabled(i)) {
+                new_id = i;
+                if (!lcore_config[i].detected)
+                    fprintf(stderr, "Warning the number of 'reading' threads exceed cores on machine!!\n");
+                break;
+            }
+        }
+    } else {
+        for (i = RTE_MAX_LCORE-1; i >= 0; --i) {
+            if (!rte_lcore_is_enabled(i)) {
+                new_id = i;
+                break;
+            }
+        }
+    }
+
+    if (new_id == -1) {
+        assert(cfg->lcore_count == RTE_MAX_LCORE);
+        // TODO proper libtrace style error here!!
+        fprintf(stderr, "Too many threads for DPDK!!\n");
+        return -1;
+    }
+
+    // Enable the core in global DPDK structs
+    cfg->lcore_role[new_id] = ROLE_RTE;
+    cfg->lcore_count++;
+    // Set TLS to reflect our new number
+    assert(rte_lcore_id() == 0); // I think new threads are going get a default thread number of 0
+    fprintf(stderr, "original id%d", rte_lcore_id());
+    RTE_PER_LCORE(_lcore_id) = new_id;
+    fprintf(stderr, " new id%d\n", rte_lcore_id());
+
+    if (reading) {
+        // Set affinity bind to corresponding core
+        cpu_set_t cpuset;
+        CPU_ZERO(&cpuset);
+        CPU_SET(rte_lcore_id(), &cpuset);
+        i = pthread_setaffinity_np(pthread_self(), sizeof(cpuset), &cpuset);
+        if (i != 0) {
+            fprintf(stderr, "Warning pthread_setaffinity_np failed\n");
+            return -1;
+        }
+    }
+
+    // Map our TLS to the thread data
+    if (reading) {
+        if(t->type == THREAD_PERPKT) {
+            t->format_data = &FORMAT(libtrace)->per_lcore[t->perpkt_num];
+        } else {
+            t->format_data = &FORMAT(libtrace)->per_lcore[0];
+        }
+    }
+}
+
+
+/**
+ * Unregister a thread with the DPDK system.
+ * 
+ * Only previously registered threads should be calling this just before
+ * they are destroyed.
+ */
+static int dpdk_punregister_thread(libtrace_t libtrace, libtrace_thread_t *t UNUSED)
+{
+    struct rte_config *cfg = rte_eal_get_configuration();
+
+    assert(rte_lcore_id() >= 0 && rte_lcore_id() < RTE_MAX_LCORE);
+
+    // Skip if master!!
+    if (rte_lcore_id() == rte_get_master_lcore()) {
+        fprintf(stderr, "INFO: we are skipping unregistering the master lcore\n");
+        return 0;
+    }
+
+    // Disable this core in global DPDK structs
+    cfg->lcore_role[rte_lcore_id()] = ROLE_OFF;
+    cfg->lcore_count--;
+    RTE_PER_LCORE(_lcore_id) = -1; // Might make the world burn if used again
+    assert(cfg->lcore_count >= 1); // We cannot unregister the master LCORE!!
+    return 0;
 }
 
 static int dpdk_start_output(libtrace_out_t *libtrace)
@@ -1038,7 +1286,7 @@ static int dpdk_pause_input(libtrace_t * libtrace){
     /* This stops the device, but can be restarted using rte_eth_dev_start() */
     if (FORMAT(libtrace)->paused == DPDK_RUNNING) {
 #if DEBUG      
-        printf("Pausing port\n");
+        fprintf(stderr, "Pausing port\n");
 #endif
         rte_eth_dev_stop(FORMAT(libtrace)->port);
         FORMAT(libtrace)->paused = DPDK_PAUSED;
@@ -1395,15 +1643,15 @@ static int dpdk_read_packet (libtrace_t *libtrace, libtrace_packet_t *packet) {
     /* We'll never get here - but if we did it would be bad */
     return -1;
 }
-libtrace_thread_t * get_thread_table(libtrace_t *libtrace);
-static int dpdk_pread_packet (libtrace_t *libtrace, libtrace_packet_t *packet) {
+
+static int dpdk_pread_packet (libtrace_t *libtrace, libtrace_thread_t *t, libtrace_packet_t *packet) {
     int nb_rx; /* Number of rx packets we've recevied */
     struct rte_mbuf* pkts_burst[1]; /* Array of 1 pointer(s) */
 
     /* Free the last packet buffer */
     if (packet->buffer != NULL) {
         /* Buffer is owned by DPDK */
-        if ( packet->buf_control == TRACE_CTRL_EXTERNAL ) {
+        if ( packet->buf_control == TRACE_CTRL_EXTERNAL) {
             rte_pktmbuf_free(packet->buffer);
             packet->buffer = NULL;
         } else
@@ -1420,14 +1668,14 @@ static int dpdk_pread_packet (libtrace_t *libtrace, libtrace_packet_t *packet) {
     /* Wait for a packet */
     while (1) {
         /* Poll for a single packet */
-        nb_rx = rte_eth_rx_burst(FORMAT(libtrace)->port,
-                            get_thread_table_num(libtrace), pkts_burst, 1);
+        nb_rx = rte_eth_rx_burst(PERPKT_FORMAT(t)->port,
+                            PERPKT_FORMAT(t)->queue_id, pkts_burst, 1);
         if (nb_rx > 0) { /* Got a packet - otherwise we keep spining */
-			printf("Doing P READ PACKET port=%d q=%d\n", (int) FORMAT(libtrace)->port, (int) get_thread_table_num(libtrace));
+			//fprintf(stderr, "Doing P READ PACKET port=%d q=%d\n", (int) FORMAT(libtrace)->port, (int) get_thread_table_num(libtrace));
             return dpdk_ready_pkt(libtrace, packet, pkts_burst[0]);
         }
         // Check the message queue this could be (Well it shouldn't but anyway) be less than 0
-        if (libtrace_message_queue_count(&(get_thread_table(libtrace)->messages)) > 0) {
+        if (libtrace_message_queue_count(&t->messages) > 0) {
 			printf("Extra message yay");
 			return -2;
 		}
@@ -1640,7 +1888,9 @@ static struct libtrace_format_t dpdk = {
 	dpdk_pread_packet, /* pread_packet */
 	dpdk_pause_input, /* ppause */
 	dpdk_fin_input, /* p_fin */
-	dpdk_pconfig_input /* pconfig_input */
+	dpdk_pconfig_input, /* pconfig_input */
+    dpdk_pregister_thread, /* pregister_thread */
+    dpdk_punregister_thread /* unpregister_thread */
 };
 
 void dpdk_constructor(void) {

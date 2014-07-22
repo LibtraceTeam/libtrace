@@ -5,20 +5,6 @@
 #include <assert.h>
 #include <netdb.h>
 
-#define SAFE(x) \
-	((unsigned int)len>=((char*)&tcp->x-(char*)tcp+sizeof(tcp->x))) 
-#define DISPLAY_EXP(x,fmt,exp) \
-	if (SAFE(x)) \
-		printf(fmt,exp); \
-	else \
-		return; 
-
-#define DISPLAY(x,fmt) DISPLAY_EXP(x,fmt,tcp->x)
-
-#define DISPLAYS(x,fmt) DISPLAY_EXP(x,fmt,htons(tcp->x))
-#define DISPLAYL(x,fmt) DISPLAY_EXP(x,fmt,htonl(tcp->x))
-#define DISPLAYIP(x,fmt) DISPLAY_EXP(x,fmt,inet_ntoa(*(struct in_addr*)&tcp->x))
-
 DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len)
 {
 	unsigned char *pkt = NULL;
@@ -26,7 +12,7 @@ DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len)
 	int plen, i;
 	libtrace_tcp_t *tcp = (libtrace_tcp_t *)packet;
 	printf(" TCP:");
-	if (SAFE(source)) {
+	if (SAFE(tcp, source)) {
 		struct servent *ent=getservbyport(tcp->source,"tcp");
 		if(ent) {
 			printf(" Source %i (%s)",htons(tcp->source),ent->s_name);
@@ -38,7 +24,7 @@ DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len)
 		printf("\n");
 		return;
 	}
-	if (SAFE(dest)) {
+	if (SAFE(tcp, dest)) {
 		struct servent *ent=getservbyport(tcp->dest,"tcp");
 		if(ent) {
 			printf(" Dest %i (%s)",htons(tcp->dest),ent->s_name);
@@ -51,9 +37,9 @@ DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len)
 		return;
 	}
 	printf("\n TCP:");
-	DISPLAYL(seq," Seq %u");
+	DISPLAYL(tcp, seq," Seq %u");
 	printf("\n TCP:");
-	DISPLAYL(ack_seq," Ack %u");
+	DISPLAYL(tcp, ack_seq," Ack %u");
 	if ((char*)&tcp->window-(char *)tcp>len) {
 		printf("\n");
 		return;
@@ -70,10 +56,10 @@ DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len)
 	if (tcp->psh) printf(" PSH");
 	if (tcp->ack) printf(" ACK");
 	if (tcp->urg) printf(" URG");
-	DISPLAYS(window," Window %i");
+	DISPLAYS(tcp, window," Window %i");
 	printf("\n TCP:");
-	DISPLAYS(check," Checksum %i");
-	DISPLAYS(urg_ptr," Urgent %i");
+	DISPLAYS(tcp, check," Checksum %i");
+	DISPLAYS(tcp, urg_ptr," Urgent %i");
 	pkt = (unsigned char*)packet+sizeof(*tcp);
 	plen = (len-sizeof *tcp) < (tcp->doff*4-sizeof(*tcp))?(len-sizeof(*tcp)):(tcp->doff*4-sizeof *tcp);
 	while(trace_get_next_option(&pkt,&plen,&type,&optlen,&data)) {

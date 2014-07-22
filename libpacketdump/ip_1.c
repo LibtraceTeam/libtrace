@@ -3,22 +3,6 @@
 #include <dlfcn.h>
 #include "libpacketdump.h"
 
-#define STRUCT icmp
-
-#define SAFE(x) \
-	((unsigned int)len>=((char*)&STRUCT->x-(char*)STRUCT+sizeof(STRUCT->x))) 
-#define DISPLAY_EXP(x,fmt,exp) \
-	if (SAFE(x)) \
-		printf(fmt,exp); \
-	else \
-		return; 
-
-#define DISPLAY(x,fmt) DISPLAY_EXP(x,fmt,STRUCT->x)
-
-#define DISPLAYS(x,fmt) DISPLAY_EXP(x,fmt,htons(STRUCT->x))
-#define DISPLAYL(x,fmt) DISPLAY_EXP(x,fmt,htonl(STRUCT->x))
-#define DISPLAYIP(x,fmt) DISPLAY_EXP(x,fmt,inet_ntoa(*(struct in_addr*)&STRUCT->x))
-
 static char *unreach_types[]={
 	"Destination Network Unreachable",
 	"Destination Host Unreachable",

@@ -32,11 +32,15 @@ NATIVEFORMATS+= format_dpdk.c
 # doesn't exist currently
 export RTE_SDK=@RTE_SDK@
 export RTE_TARGET=@RTE_TARGET@
+export SAVED_CFLAGS:=$(CFLAGS)
+export SAVED_CXXFLAGS:=$(CXXFLAGS)
 include $(RTE_SDK)/mk/rte.vars.mk
 # We need to add -Wl before the linker otherwise this breaks our build
 # And include any libraries that DPDK might depend upon
 export DPDK_LIBTRACE_MK=dpdk_libtrace.mk
 include $(DPDK_LIBTRACE_MK)
+export CFLAGS += $(SAVED_CFLAGS)
+export CXXFLAGS += $(SAVED_CXXFLAGS)
 endif
 
 libtrace_la_SOURCES = trace.c trace_parallel.c common.h \

@@ -72,6 +72,12 @@ do_test ./test-pcap-bpf
 echo \* Testing payload length
 do_test ./test-plen
 
+echo \* Testing port numbers
+do_test ./test-ports
+
+echo \* Testing fragment parsing
+do_test ./test-fragment
+
 echo \* Testing event framework
 do_test ./test-event
 
@@ -220,6 +226,8 @@ echo " * format autodetection - gzip"
 do_test ./test-autodetect traces/5_packets.erf.gz
 echo " * format autodetection - bzip2"
 do_test ./test-autodetect traces/5_packets.erf.bz2
+echo " * format autodetection - lzma"
+do_test ./test-autodetect traces/5_packets.erf.xz
 
 echo
 echo "Tests passed: $OK"

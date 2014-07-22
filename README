@@ -3,7 +3,7 @@ This fork of Libtrace aims to support parallel packet processing.
 This is still work in progress and is full of bugs, some of the original
 Libtrace functions might not function correctly breaking the supplied tools.
 
-libtrace 3.0.19
+libtrace 3.0.20
 
 ---------------------------------------------------------------------------
 Copyright (c) 2007-2014 The University of Waikato, Hamilton, New Zealand.

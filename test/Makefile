@@ -17,7 +17,8 @@ BINS_PARALLEL = test-format-parallel test-format-parallel-hasher \
 	test-format-parallel-singlethreaded-hasher
 
 BINS = test-pcap-bpf test-event test-time test-dir test-wireless test-errors \
-	test-plen test-autodetect $(BINS_DATASTRUCT) $(BINS_PARALLEL)
+	test-plen test-autodetect test-ports test-fragment test-live test-live-snaplen \
+	$(BINS_DATASTRUCT) $(BINS_PARALLEL)
 
 .PHONY: all clean distclean install depend test
 
