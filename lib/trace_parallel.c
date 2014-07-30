@@ -278,6 +278,7 @@ void libtrace_zero_thread(libtrace_thread_t * t) {
 	libtrace_zero_deque(&t->deque);
 	t->recorded_first = false;
 	t->perpkt_num = -1;
+	t->accepted_packets = 0;
 }
 
 // Ints are aligned int is atomic so safe to read and write at same time
@@ -1247,8 +1248,12 @@ static inline int trace_pread_packet_wrapper(libtrace_t *libtrace, libtrace_thre
 				trace_set_capture_length(packet,
 						libtrace->snaplen);
 			}
-			trace_packet_set_order(packet, libtrace->accepted_packets);
-			++libtrace->accepted_packets;
+			
+			++t->accepted_packets;
+			// TODO look into this better
+			trace_packet_set_order(packet, trace_get_erf_timestamp(packet));
+			//trace_packet_set_order(packet, libtrace->accepted_packets);
+			//++libtrace->accepted_packets;
 			return ret;
 		} while(1);
 	}
@@ -1469,10 +1474,7 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob, fn_per_pkt p
 		libtrace_vector_init(&t->vector, sizeof(libtrace_result_t));
 		libtrace_deque_init(&t->deque, sizeof(libtrace_result_t));
 		libtrace_message_queue_init(&t->messages, sizeof(libtrace_message_t));
-		t->tmp_key = 0;
-		t->tmp_data = NULL;
 		t->recorded_first = false;
-		ASSERT_RET(pthread_spin_init(&t->tmp_spinlock, 0), == 0);
 		t->tracetime_offset_usec = 0;;
 	}
 
@@ -1601,6 +1603,14 @@ DLLEXPORT int trace_ppause(libtrace_t *libtrace)
 	fprintf(stderr, "Threads have paused\n");
 
 	if (trace_supports_parallel(libtrace) && !trace_has_dedicated_hasher(libtrace)) {
+		uint64_t tmp_stats;
+		libtrace->dropped_packets = trace_get_dropped_packets(libtrace);
+		libtrace->received_packets = trace_get_received_packets(libtrace);
+		if (libtrace->format->get_filtered_packets) {
+			if ((tmp_stats = libtrace->format->get_filtered_packets(libtrace)) != UINT64_MAX) {
+				libtrace->filtered_packets += tmp_stats;
+			}
+		}
 		libtrace->started = false;
 		if (libtrace->format->ppause_input)
 			libtrace->format->ppause_input(libtrace);

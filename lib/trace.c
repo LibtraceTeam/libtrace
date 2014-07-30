@@ -285,6 +285,8 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 	libtrace->first_packets.first = 0;
 	libtrace->first_packets.count = 0;
 	libtrace->first_packets.packets = NULL;
+	libtrace->dropped_packets = UINT64_MAX;
+	libtrace->accepted_packets = UINT64_MAX;
 
         /* Parse the URI to determine what sort of trace we are dealing with */
 	if ((uridata = trace_parse_uri(uri, &scan)) == 0) {
@@ -1939,10 +1941,14 @@ void trace_construct_packet(libtrace_packet_t *packet,
 uint64_t trace_get_received_packets(libtrace_t *trace)
 {
 	assert(trace);
+	uint64_t ret;
+
 	if (trace->format->get_received_packets) {
-		return trace->format->get_received_packets(trace);
+		if ((ret = trace->format->get_received_packets(trace)) != UINT64_MAX)
+			return ret;
 	}
-	return (uint64_t)-1;
+	// Read this cached value taken before the trace was closed
+	return trace->received_packets;
 }
 
 uint64_t trace_get_filtered_packets(libtrace_t *trace)
@@ -1966,16 +1972,25 @@ uint64_t trace_get_filtered_packets(libtrace_t *trace)
 uint64_t trace_get_dropped_packets(libtrace_t *trace)
 {
 	assert(trace);
+	uint64_t ret;
+
 	if (trace->format->get_dropped_packets) {
-		return trace->format->get_dropped_packets(trace);
+		if ((ret = trace->format->get_dropped_packets(trace)) != UINT64_MAX)
+			return ret;
 	}
-	return (uint64_t)-1;
+	// Read this cached value taken before the trace was closed
+	return trace->dropped_packets;
 }
 
 uint64_t trace_get_accepted_packets(libtrace_t *trace)
 {
 	assert(trace);
-	return trace->accepted_packets;
+	int i = 0;
+	uint64_t ret = trace->accepted_packets;
+	for (i = 0; i < trace->perpkt_thread_count; i++) {
+		ret += trace->perpkt_threads[i].accepted_packets;
+	}
+	return ret;
 }
 
 void trace_clear_cache(libtrace_packet_t *packet) {

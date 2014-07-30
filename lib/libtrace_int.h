@@ -203,28 +203,26 @@ enum thread_states {
  * Information of this thread
  */
 struct libtrace_thread_t {
-	libtrace_t * trace;
-	void* ret;
-	enum thread_types type;
-	enum thread_states state;
-	void* user_data; // TLS for the user to use
-	void* format_data; // TLS for the format to use
-	pthread_t tid;
-	int perpkt_num; // A number from 0-X that represents this perpkt threads number
-				// in the table, intended to quickly identify this thread
-				// -1 represents NA (such as the case this is not a perpkt thread)
-	libtrace_ringbuffer_t rbuffer; // Input
-	libtrace_vector_t vector; // Output
-	libtrace_queue_t deque; // Real Output type makes more sense
-	libtrace_message_queue_t messages; // Message handling
-	// Temp storage for time sensitive results
-	uint64_t tmp_key;
-	void *tmp_data;
-	pthread_spinlock_t tmp_spinlock;
+	int accepted_packets; // The number of packets accepted only used if pread
+	// is retreving packets
 	// Set to true once the first packet has been stored
 	bool recorded_first;
 	// For thread safety reason we actually must store this here
 	int64_t tracetime_offset_usec;
+	void* user_data; // TLS for the user to use
+	void* format_data; // TLS for the format to use
+	libtrace_message_queue_t messages; // Message handling
+	libtrace_ringbuffer_t rbuffer; // Input
+	libtrace_vector_t vector; // Output
+	libtrace_queue_t deque; // Real Output type makes more sense
+	libtrace_t * trace;
+	void* ret;
+	enum thread_types type;
+	enum thread_states state;
+	pthread_t tid;
+	int perpkt_num; // A number from 0-X that represents this perpkt threads number
+				// in the table, intended to quickly identify this thread
+				// -1 represents NA (such as the case this is not a perpkt thread)
 };
 
 /**
@@ -346,6 +344,13 @@ struct libtrace_t {
 	// Used to keep track of the first packet seen on each thread
 	struct first_packets first_packets;
 	int tracetime;
+
+	/*
+	 * Caches statistic counters in the case that our trace is
+	 * paused or stopped before this counter is taken
+	 */
+	uint64_t dropped_packets;
+	uint64_t received_packets; 
 };
 
 void trace_fin_packet(libtrace_packet_t *packet);
