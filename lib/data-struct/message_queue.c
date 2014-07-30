@@ -18,7 +18,7 @@
 void libtrace_message_queue_init(libtrace_message_queue_t *mq, size_t message_len)
 {
 	assert(message_len);
-	assert(pipe(mq->pipefd) != -1);
+	ASSERT_RET(pipe(mq->pipefd), != -1);
 	mq->message_count = 0;
 	if (message_len > PIPE_BUF)
 		fprintf(stderr, "Warning message queue wont be atomic (thread safe) message_len(%zu) > PIPE_BUF(%d)\n",
@@ -44,7 +44,7 @@ int libtrace_message_queue_put(libtrace_message_queue_t *mq, const void *message
 {
 	int ret;
 	assert(mq->message_len);
-	assert(write(mq->pipefd[1], message, mq->message_len) == (int) mq->message_len);
+	ASSERT_RET(write(mq->pipefd[1], message, mq->message_len), == (int) mq->message_len);
 	// Update after we've written
 	pthread_spin_lock(&mq->spin);
 	ret = ++mq->message_count; // Should be CAS!
@@ -72,7 +72,7 @@ int libtrace_message_queue_get(libtrace_message_queue_t *mq, void *message)
 	pthread_spin_lock(&mq->spin);
 	ret = mq->message_count--;
 	pthread_spin_unlock(&mq->spin);
-	assert(read(mq->pipefd[0], message, mq->message_len) == (int) mq->message_len);
+	ASSERT_RET(read(mq->pipefd[0], message, mq->message_len), == (int) mq->message_len);
 	return ret;
 }
 
@@ -101,7 +101,7 @@ int libtrace_message_queue_try_get(libtrace_message_queue_t *mq, void *message)
 	if (mq->message_count > 0) {
 		ret = --mq->message_count;
 		// :( read(...) needs to be done within the *spin* lock otherwise blocking might steal our read
-		assert(read(mq->pipefd[0], message, mq->message_len) == (int) mq->message_len);
+		ASSERT_RET(read(mq->pipefd[0], message, mq->message_len), == (int) mq->message_len);
 	} else {
 		ret = LIBTRACE_MQ_FAILED;
 	}

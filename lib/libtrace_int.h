@@ -148,6 +148,7 @@ int snprintf(char *str, size_t size, const char *format, ...);
 #endif
 
 #include "data-struct/ring_buffer.h"
+#include "data-struct/object_cache.h"
 #include "data-struct/vector.h"
 #include "data-struct/message_queue.h"
 #include "data-struct/deque.h"
@@ -316,7 +317,7 @@ struct libtrace_t {
 	/** Requested size of the pkt buffer (currently only used if using dedicated hasher thread) */
 	int packet_freelist_size;
 	/** The actual freelist */
-	libtrace_ringbuffer_t packet_freelist;
+	libtrace_ocache_t packet_freelist;
 	/** The number of packets that can queue per thread - XXX consider deadlocks with non malloc()'d packets that need to be released */
 	int perpkt_buffer_size;
 	/** The reducer flags */

@@ -272,7 +272,7 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 	libtrace->packet_freelist_size = 0;
 	libtrace->perpkt_buffer_size = 0;
 	libtrace->expected_key = 0;
-	libtrace_zero_ringbuffer(&libtrace->packet_freelist);
+	libtrace_zero_ocache(&libtrace->packet_freelist);
 	libtrace_zero_thread(&libtrace->hasher_thread);
 	libtrace_zero_thread(&libtrace->reducer_thread);
 	libtrace_zero_thread(&libtrace->keepalive_thread);
@@ -394,7 +394,7 @@ DLLEXPORT libtrace_t * trace_create_dead (const char *uri) {
 	libtrace->expected_key = 0;
 	libtrace->packet_freelist_size = 0;
 	libtrace->perpkt_buffer_size = 0;
-	libtrace_zero_ringbuffer(&libtrace->packet_freelist);
+	libtrace_zero_ocache(&libtrace->packet_freelist);
 	libtrace_zero_thread(&libtrace->hasher_thread);
 	libtrace_zero_thread(&libtrace->reducer_thread);
 	libtrace_zero_thread(&libtrace->keepalive_thread);
@@ -650,7 +650,7 @@ DLLEXPORT void trace_destroy(libtrace_t *libtrace) {
 			}
 		}
 		free(libtrace->first_packets.packets);
-		assert(pthread_spin_destroy(&libtrace->first_packets.lock) == 0);
+		ASSERT_RET(pthread_spin_destroy(&libtrace->first_packets.lock), == 0);
 	}
 
 	if (libtrace->format) {
@@ -665,11 +665,8 @@ DLLEXPORT void trace_destroy(libtrace_t *libtrace) {
 	
 	/* Empty any packet memory */
 	if (libtrace->state != STATE_NEW) {
-		libtrace_packet_t * packet;
-		while (libtrace_ringbuffer_try_read(&libtrace->packet_freelist,(void **) &packet))
-			trace_destroy_packet(packet);
-		
-		libtrace_ringbuffer_destroy(&libtrace->packet_freelist);
+		// This has all of our packets
+		libtrace_ocache_destroy(&libtrace->packet_freelist);
 		
 		for (i = 0; i < libtrace->perpkt_thread_count; ++i) {
 			assert (libtrace_vector_get_size(&libtrace->perpkt_threads[i].vector) == 0);
@@ -720,9 +717,9 @@ DLLEXPORT void trace_destroy_output(libtrace_out_t *libtrace)
 	free(libtrace);
 }
 
-DLLEXPORT libtrace_packet_t *trace_create_packet(void) 
+DLLEXPORT libtrace_packet_t *trace_create_packet(void)
 {
-	libtrace_packet_t *packet = 
+	libtrace_packet_t *packet =
 		(libtrace_packet_t*)calloc((size_t)1,sizeof(libtrace_packet_t));
 
 	packet->buf_control=TRACE_CTRL_PACKET;
@@ -1452,7 +1449,7 @@ DLLEXPORT int trace_apply_filter(libtrace_filter_t *filter,
 	/* If we're jitting, we may need to JIT the BPF code now too */
 #if HAVE_LLVM
 	if (!filter->jitfilter) {
-		assert(pthread_mutex_lock(&mutex) == 0);
+		ASSERT_RET(pthread_mutex_lock(&mutex), == 0);
 		/* Again double check here like the bpf filter */
 		if(filter->jitfilter) 
 			printf("Someone bet us to compile the JIT thingy\n");
@@ -1461,7 +1458,7 @@ DLLEXPORT int trace_apply_filter(libtrace_filter_t *filter,
 		 * however if this gets called twice we will leak this memory :(
 		 * as such lock here anyways */
 			filter->jitfilter = compile_program(filter->filter.bf_insns, filter->filter.bf_len);
-		assert(pthread_mutex_unlock(&mutex) == 0);
+		ASSERT_RET(pthread_mutex_unlock(&mutex), == 0);
 	}
 #endif
 

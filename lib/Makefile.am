@@ -57,7 +57,7 @@ libtrace_la_SOURCES = trace.c trace_parallel.c common.h \
 		$(BPFJITSOURCE) \
 		libtrace_arphrd.h \
 		data-struct/ring_buffer.c data-struct/vector.c data-struct/message_queue.c \
-		data-struct/deque.c data-struct/sliding_window.c \
+		data-struct/deque.c data-struct/sliding_window.c data-struct/object_cache.c \
 		hash_toeplitz.c
 
 if DAG2_4

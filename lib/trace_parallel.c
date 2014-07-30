@@ -102,12 +102,72 @@
 
 #define VERBOSE_DEBBUGING 0
 
+
+static size_t trace_pread_packet(libtrace_t *libtrace, libtrace_thread_t *t, libtrace_packet_t *packets[], size_t nb_packets);
+
 extern int libtrace_parallel;
 
 struct multithreading_stats {
 	uint64_t full_queue_hits;
 	uint64_t wait_for_fill_complete_hits;
 } contention_stats[1024];
+
+struct mem_stats {
+	struct memfail {
+	   uint64_t cache_hit;
+	   uint64_t ring_hit;
+	   uint64_t miss;
+	   uint64_t recycled;
+	} readbulk, read, write, writebulk;
+};
+
+// Grrr gcc wants this spelt out
+__thread struct mem_stats mem_hits = {{0},{0},{0},{0}};
+
+static void print_memory_stats() {
+	char t_name[50];
+	uint64_t total;
+	pthread_getname_np(pthread_self(), t_name, sizeof(t_name));
+
+	fprintf(stderr, "Thread ID#%d - %s\n", (int) pthread_self(), t_name);
+
+	total = mem_hits.read.cache_hit + mem_hits.read.ring_hit + mem_hits.read.miss;
+	if (total) {
+		fprintf(stderr, "\tRead:\n\t---CHits=%"PRIu64"\n\t---RHits=%"PRIu64"\n\t---Misses=%"PRIu64"\n\t---Recycled=%"PRIu64"\n",
+				mem_hits.read.cache_hit, mem_hits.read.ring_hit, mem_hits.read.miss, mem_hits.read.recycled);
+		fprintf(stderr, "\t---Total=%"PRIu64"\n\t---Miss %%=%f\n",
+				total, (double) mem_hits.read.miss / (double) total * 100.0);
+	}
+
+	total = mem_hits.readbulk.cache_hit + mem_hits.readbulk.ring_hit + mem_hits.readbulk.miss;
+	if (total) {
+		fprintf(stderr, "\tReadbulk:\n\t---CHits=%"PRIu64"\n\t---RHits=%"PRIu64"\n\t---Misses=%"PRIu64"\n\t---Recycled=%"PRIu64"\n",
+				mem_hits.readbulk.cache_hit, mem_hits.readbulk.ring_hit, mem_hits.readbulk.miss, mem_hits.readbulk.recycled);
+
+
+		fprintf(stderr, "\t---Total=%"PRIu64"\n\t---Miss %%=%f\n",
+				total, (double) mem_hits.readbulk.miss / (double) total * 100.0);
+	}
+
+	total = mem_hits.write.cache_hit + mem_hits.write.ring_hit + mem_hits.write.miss;
+	if (total) {
+		fprintf(stderr, "\tWrite:\n\t---CHits=%"PRIu64"\n\t---RHits=%"PRIu64"\n\t---Misses=%"PRIu64"\n\t---Recycled=%"PRIu64"\n",
+				mem_hits.write.cache_hit, mem_hits.write.ring_hit, mem_hits.write.miss, mem_hits.write.recycled);
+
+		fprintf(stderr, "\t---Total=%"PRIu64"\n\t---Miss %%=%f\n",
+				total, (double) mem_hits.write.miss / (double) total * 100.0);
+	}
+
+	total = mem_hits.writebulk.cache_hit + mem_hits.writebulk.ring_hit + mem_hits.writebulk.miss;
+	if (total) {
+		fprintf(stderr, "\tWritebulk:\n\t---CHits=%"PRIu64"\n\t---RHits=%"PRIu64"\n\t---Misses=%"PRIu64"\n\t---Recycled=%"PRIu64"\n",
+				mem_hits.writebulk.cache_hit, mem_hits.writebulk.ring_hit, mem_hits.writebulk.miss, mem_hits.writebulk.recycled);
+
+		fprintf(stderr, "\t---Total=%"PRIu64"\n\t---Miss %%=%f\n",
+				total, (double) mem_hits.writebulk.miss / (double) total * 100.0);
+	}
+
+}
 
 /**
  * True if the trace has dedicated hasher thread otherwise false,
@@ -164,7 +224,7 @@ static inline void thread_change_state(libtrace_t *trace, libtrace_thread_t *t,
 static inline void libtrace_change_state(libtrace_t *trace, 
 	const enum trace_state new_state, const bool need_lock)
 {
-	enum trace_state prev_state;
+	UNUSED enum trace_state prev_state;
 	if (need_lock)
 		pthread_mutex_lock(&trace->libtrace_lock);
 	prev_state = trace->state;
@@ -292,14 +352,16 @@ static void trace_make_results_packets_safe(libtrace_t *trace) {
  */
 static void trace_thread_pause(libtrace_t *trace, libtrace_thread_t *t) {
 	trace_make_results_packets_safe(trace);
-	assert(pthread_mutex_lock(&trace->libtrace_lock) == 0);
+	ASSERT_RET(pthread_mutex_lock(&trace->libtrace_lock), == 0);
 	thread_change_state(trace, t, THREAD_PAUSED, false);
 	while (trace->state == STATE_PAUSED || trace->state == STATE_PAUSING) {
-		assert(pthread_cond_wait(&trace->perpkt_cond, &trace->libtrace_lock) == 0);
+		ASSERT_RET(pthread_cond_wait(&trace->perpkt_cond, &trace->libtrace_lock), == 0);
 	}
 	thread_change_state(trace, t, THREAD_RUNNING, false);
-	assert(pthread_mutex_unlock(&trace->libtrace_lock) == 0);
+	ASSERT_RET(pthread_mutex_unlock(&trace->libtrace_lock), == 0);
 }
+
+#define PACKETQUEUES 10
 
 /**
  * The is the entry point for our packet processing threads.
@@ -308,18 +370,19 @@ static void* perpkt_threads_entry(void *data) {
 	libtrace_t *trace = (libtrace_t *)data;
 	libtrace_thread_t * t;
 	libtrace_message_t message = {0};
-	libtrace_packet_t *packet = NULL;
-
+	libtrace_packet_t *packets[PACKETQUEUES] = {NULL};
+	size_t nb_packets;
+	size_t i;
 
 	// Force this thread to wait until trace_pstart has been completed
-	assert(pthread_mutex_lock(&trace->libtrace_lock) == 0);
+	ASSERT_RET(pthread_mutex_lock(&trace->libtrace_lock), == 0);
 	t = get_thread_table(trace);
 	assert(t);
 	//printf("Yay Started perpkt thread #%d\n", (int) get_thread_table_num(trace));
 	if (trace->format->pregister_thread) {
 		trace->format->pregister_thread(trace, t, !trace_has_dedicated_hasher(trace));
 	}
-	assert(pthread_mutex_unlock(&trace->libtrace_lock) == 0);
+	ASSERT_RET(pthread_mutex_unlock(&trace->libtrace_lock), == 0);
 
 	/* ~~~~~~~~~~~ Setup complete now we loop ~~~~~~~~~~~~~~~ */
 	// Send a message to say we've started
@@ -332,7 +395,6 @@ static void* perpkt_threads_entry(void *data) {
 
 
 	for (;;) {
-		int psize;
 
 		if (libtrace_message_queue_try_get(&t->messages, &message) != LIBTRACE_MQ_FAILED) {
 			switch (message.code) {
@@ -345,11 +407,12 @@ static void* perpkt_threads_entry(void *data) {
 						fprintf(stderr, "Trace is using a hasher thread emptying queues\n");
 						// The hasher has stopped by this point, so the queue shouldn't be filling
 						while(!libtrace_ringbuffer_is_empty(&t->rbuffer)) {
-							psize = trace_pread_packet(trace, t, &packet);
-							if (psize > 0) {
-								packet = (*trace->per_pkt)(trace, packet, NULL, t);
+							nb_packets = trace_pread_packet(trace, t, packets, 1);
+							if (nb_packets == 1) {
+								if (packets[0]->error > 0)
+									packets[0] = (*trace->per_pkt)(trace, packets[0], NULL, t);
 							} else {
-								fprintf(stderr, "Psize=%d empty=%d this is probably EOF or message waiting, but if this continues we have a bug!!!\n", psize, libtrace_ringbuffer_is_empty(&t->rbuffer));
+								fprintf(stderr, "Psize=%d empty=%d this is probably EOF or message waiting, but if this continues we have a bug!!!\n", packets[0]->error, libtrace_ringbuffer_is_empty(&t->rbuffer));
 							}
 						}
 					}
@@ -368,30 +431,31 @@ static void* perpkt_threads_entry(void *data) {
 		}
 
 		if (trace->perpkt_thread_count == 1) {
-			if (!packet) {
-				if (!libtrace_ringbuffer_try_sread_bl(&trace->packet_freelist, (void **) &packet))
-					packet = trace_create_packet();
+			if (!packets[0]) {
+				libtrace_ocache_alloc(&trace->packet_freelist, (void **) &packets[0], 1, 1);
 			}
-			assert(packet);
-			if ((psize = trace_read_packet(trace, packet)) <1) {
-				break;
-			}
+			assert(packets[0]);
+			packets[0]->error = trace_read_packet(trace, packets[0]);
+			nb_packets = 1;
 		} else {
-			psize = trace_pread_packet(trace, t, &packet);
+			nb_packets = trace_pread_packet(trace, t, packets, PACKETQUEUES);
 		}
-
-		if (psize > 0) {
-			packet = (*trace->per_pkt)(trace, packet, NULL, t);
-			continue;
+		// Loop through the packets we just read
+		for (i = 0; i < nb_packets; ++i) {
+			
+			if (packets[i]->error > 0) {
+				packets[i] = (*trace->per_pkt)(trace, packets[i], NULL, t);
+			} else if (packets[i]->error != -2) {
+				// An error this should be the last packet we read
+				size_t z;
+				for (z = i ; z < nb_packets; ++z)
+					fprintf(stderr, "i=%d nb_packet=%d err=%d\n", (int) z, (int) nb_packets, packets[i]->error);
+				assert (i == nb_packets-1);
+				goto stop;
+			}
+			// -2 is a message its not worth checking now just finish this lot and we'll check
+			// when we loop next
 		}
-
-		if (psize == -2)
-			continue; // We have a message
-
-		if (psize < 1) { // consider sending a message
-			break;
-		}
-
 	}
 
 
@@ -403,9 +467,13 @@ stop:
 	message.additional.uint64 = 0;
 	(*trace->per_pkt)(trace, NULL, &message, t);
 
-	// Free our last packet
-	if (packet)
-		trace_destroy_packet(packet);
+	// Free any remaining packets
+	for (i = 0; i < PACKETQUEUES; i++) {
+		if (packets[i]) {
+			libtrace_ocache_free(&trace->packet_freelist, (void **) &packets[i], 1, 1);
+			packets[i] = NULL;
+		}
+	}
 
 	
 	thread_change_state(trace, t, THREAD_FINISHED, true);
@@ -415,11 +483,13 @@ stop:
 	message.additional.uint64 = 0;
 	trace_send_message_to_reducer(trace, &message);
 
-	assert(pthread_mutex_lock(&trace->libtrace_lock) == 0);
+	ASSERT_RET(pthread_mutex_lock(&trace->libtrace_lock), == 0);
 	if (trace->format->punregister_thread) {
 		trace->format->punregister_thread(trace, t);
 	}
-	assert(pthread_mutex_unlock(&trace->libtrace_lock) == 0);
+	print_memory_stats();
+
+	ASSERT_RET(pthread_mutex_unlock(&trace->libtrace_lock), == 0);
 
 	pthread_exit(NULL);
 };
@@ -438,20 +508,20 @@ static void* hasher_start(void *data) {
 
 	assert(trace_has_dedicated_hasher(trace));
 	/* Wait until all threads are started and objects are initialised (ring buffers) */
-	assert(pthread_mutex_lock(&trace->libtrace_lock) == 0);
+	ASSERT_RET(pthread_mutex_lock(&trace->libtrace_lock), == 0);
 	t = &trace->hasher_thread;
 	assert(t->type == THREAD_HASHER && pthread_equal(pthread_self(), t->tid));
 	printf("Hasher Thread started\n");
 	if (trace->format->pregister_thread) {
 		trace->format->pregister_thread(trace, t, true);
 	}
-	assert(pthread_mutex_unlock(&trace->libtrace_lock) == 0);
+	ASSERT_RET(pthread_mutex_unlock(&trace->libtrace_lock), == 0);
 	int pkt_skipped = 0;
 	/* Read all packets in then hash and queue against the correct thread */
 	while (1) {
 		int thread;
-		if (!pkt_skipped && !libtrace_ringbuffer_try_sread_bl(&trace->packet_freelist, (void **) &packet))
-			packet = trace_create_packet();
+		if (!pkt_skipped)
+			libtrace_ocache_alloc(&trace->packet_freelist, (void **) &packet, 1, 1);
 		assert(packet);
 
 		if (libtrace_halt) // Signal to die has been sent - TODO
@@ -461,15 +531,15 @@ static void* hasher_start(void *data) {
 		if (libtrace_message_queue_try_get(&t->messages, &message) != LIBTRACE_MQ_FAILED) {
 			switch(message.code) {
 				case MESSAGE_DO_PAUSE:
-					assert(pthread_mutex_lock(&trace->libtrace_lock) == 0);
+					ASSERT_RET(pthread_mutex_lock(&trace->libtrace_lock), == 0);
 					thread_change_state(trace, t, THREAD_PAUSED, false);
 					pthread_cond_broadcast(&trace->perpkt_cond);
 					while (trace->state == STATE_PAUSED || trace->state == STATE_PAUSING) {
-						assert(pthread_cond_wait(&trace->perpkt_cond, &trace->libtrace_lock) == 0);
+						ASSERT_RET(pthread_cond_wait(&trace->perpkt_cond, &trace->libtrace_lock), == 0);
 					}
 					thread_change_state(trace, t, THREAD_RUNNING, false);
 					pthread_cond_broadcast(&trace->perpkt_cond);
-					assert(pthread_mutex_unlock(&trace->libtrace_lock) == 0);
+					ASSERT_RET(pthread_mutex_unlock(&trace->libtrace_lock), == 0);
 					break;
 				case MESSAGE_DO_STOP:
 					// Stop called after pause
@@ -505,16 +575,16 @@ static void* hasher_start(void *data) {
 		if (i == trace->perpkt_thread_count - 1) {
 			bcast = packet;
 		} else {
-			bcast = trace_create_packet();
+			libtrace_ocache_alloc(&trace->packet_freelist, (void **) &bcast, 1, 1);
 			bcast->error = packet->error;
 		}
-		assert(pthread_mutex_lock(&trace->libtrace_lock) == 0);
+		ASSERT_RET(pthread_mutex_lock(&trace->libtrace_lock), == 0);
 		if (trace->perpkt_threads[i].state != THREAD_FINISHED) {
-			assert(pthread_mutex_unlock(&trace->libtrace_lock) == 0);
+			ASSERT_RET(pthread_mutex_unlock(&trace->libtrace_lock), == 0);
 			// Unlock early otherwise we could deadlock
 			libtrace_ringbuffer_write(&trace->perpkt_threads[i].rbuffer, bcast);
 		} else {
-			assert(pthread_mutex_unlock(&trace->libtrace_lock) == 0);
+			ASSERT_RET(pthread_mutex_unlock(&trace->libtrace_lock), == 0);
 		}
 	}
 
@@ -525,11 +595,12 @@ static void* hasher_start(void *data) {
 	message.code = MESSAGE_PERPKT_ENDED;
 	message.additional.uint64 = 0;
 	trace_send_message_to_reducer(trace, &message);
-	assert(pthread_mutex_lock(&trace->libtrace_lock) == 0);
+	ASSERT_RET(pthread_mutex_lock(&trace->libtrace_lock), == 0);
 	if (trace->format->punregister_thread) {
 		trace->format->punregister_thread(trace, t);
 	}
-	assert(pthread_mutex_unlock(&trace->libtrace_lock) == 0);
+	print_memory_stats();
+	ASSERT_RET(pthread_mutex_unlock(&trace->libtrace_lock), == 0);
 
 	// TODO remove from TTABLE t sometime
 	pthread_exit(NULL);
@@ -552,27 +623,81 @@ static inline void swap_packets(libtrace_packet_t *dest, libtrace_packet_t *src)
 	src->trace = NULL;
 }
 
-/* Our simplest case when a thread becomes ready it can obtain an exclusive
- * lock to read a packet from the underlying trace.
+/**
+ * @brief Move NULLs to the end of an array.
+ * @param values
+ * @param len
+ * @return The location the first NULL, aka the number of non NULL elements
  */
-inline static int trace_pread_packet_first_in_first_served(libtrace_t *libtrace, libtrace_thread_t *t, libtrace_packet_t **packet)
-{
-	// We need this to fill the 'first' packet table
-	if (!*packet) {
-		if (!libtrace_ringbuffer_try_sread_bl(&libtrace->packet_freelist, (void **) packet))
-			*packet = trace_create_packet();
+static inline size_t move_nulls_back(void *arr[], size_t len) {
+	size_t fr=0, en = len-1;
+	// Shift all non NULL elements to the front of the array, and NULLs to the
+	// end, traverses every element at most once
+	for (;fr < en; ++fr) {
+		if (arr[fr] == NULL) {
+			for (;en > fr; --en) {
+				if(arr[en]) {
+					arr[fr] = arr[en];
+					arr[en] = NULL;
+					break;
+				}
+			}
+		}
 	}
-	assert(*packet);
-	assert(pthread_mutex_lock(&libtrace->libtrace_lock) == 0);
-	/* Read a packet */
-	(*packet)->error = trace_read_packet(libtrace, *packet);
-	// Doing this inside the lock ensures the first packet is always
-	// recorded first
-	if ((*packet)->error > 0)
-		store_first_packet(libtrace, *packet, t);
+	// This is the index of the first NULL
+	en = MIN(fr, en);
+	// Or the end of the array if this special case
+	if (arr[en])
+		en++;
+	return en;
+}
 
-	assert(pthread_mutex_unlock(&libtrace->libtrace_lock) == 0);
-	return (*packet)->error;
+/** returns the number of packets successfully allocated in the final array
+ these will all be at the front of the array */
+inline static size_t fill_array_with_empty_packets(libtrace_t *libtrace, libtrace_packet_t *packets[], size_t nb_packets) {
+	size_t nb;
+	nb = move_nulls_back((void **) packets, nb_packets);
+	mem_hits.read.recycled += nb;
+	nb += libtrace_ocache_alloc(&libtrace->packet_freelist, (void **) &packets[nb], nb_packets - nb, nb_packets - nb);
+	assert(nb_packets == nb);
+	return nb;
+}
+
+
+inline static size_t empty_array_of_packets(libtrace_t *libtrace, libtrace_packet_t *packets[], size_t nb_packets) {
+	size_t nb;
+	nb = move_nulls_back((void **) packets, nb_packets);
+	mem_hits.write.recycled += nb_packets - nb;
+	nb += nb_packets - libtrace_ocache_free(&libtrace->packet_freelist, (void **)packets, nb, nb);
+	memset(packets, 0, nb); // XXX make better, maybe do this in ocache??
+	return nb;
+}
+
+/* Our simplest case when a thread becomes ready it can obtain an exclusive
+ * lock to read packets from the underlying trace.
+ */
+inline static size_t trace_pread_packet_first_in_first_served(libtrace_t *libtrace, libtrace_thread_t *t, libtrace_packet_t *packets[], size_t nb_packets)
+{
+	size_t i = 0;
+
+	nb_packets = fill_array_with_empty_packets(libtrace, packets, nb_packets);
+
+	ASSERT_RET(pthread_mutex_lock(&libtrace->libtrace_lock), == 0);
+	/* Read nb_packets */
+	for (i = 0; i < nb_packets; ++i) {
+		packets[i]->error = trace_read_packet(libtrace, packets[i]);
+		// Doing this inside the lock ensures the first packet is always
+		// recorded first
+		if (packets[i]->error <= 0) {
+			++i;
+			break;
+		}
+	}
+	if (packets[0]->error > 0) {
+		store_first_packet(libtrace, packets[0], t);
+	}
+	ASSERT_RET(pthread_mutex_unlock(&libtrace->libtrace_lock), == 0);
+	return i;
 }
 
 /**
@@ -580,14 +705,42 @@ inline static int trace_pread_packet_first_in_first_served(libtrace_t *libtrace,
  * 1. We read a packet from our buffer
  * 2. Move that into the packet provided (packet)
  */
-inline static int trace_pread_packet_hasher_thread(libtrace_t *libtrace, libtrace_thread_t *t, libtrace_packet_t **packet)
+inline static size_t trace_pread_packet_hasher_thread(libtrace_t *libtrace, libtrace_thread_t *t, libtrace_packet_t **packets, size_t nb_packets)
 {
-	if (*packet) // Recycle the old get the new
-		if (!libtrace_ringbuffer_try_swrite_bl(&libtrace->packet_freelist, (void *) *packet))
-			trace_destroy_packet(*packet);
-	*packet = libtrace_ringbuffer_read(&t->rbuffer);
+	size_t i;
 
-	if (*packet) {
+	// Always grab at least one
+	if (packets[0]) // Recycle the old get the new
+		libtrace_ocache_free(&libtrace->packet_freelist, (void **) packets, 1, 1);
+	packets[0] = libtrace_ringbuffer_read(&t->rbuffer);
+
+
+	if (packets[0] == NULL) {
+		libtrace_ocache_alloc(&libtrace->packet_freelist, (void **) packets, 1, 1);
+		packets[0]->error = -2;
+	}
+
+	if (packets[0]->error < 0)
+		return 1;
+
+	for (i = 1; i < nb_packets; i++) {
+		if (packets[i]) // Recycle the old get the new
+			libtrace_ocache_free(&libtrace->packet_freelist, (void **) &packets[i], 1, 1);
+		if (!libtrace_ringbuffer_try_read(&t->rbuffer, (void **) &packets[i])) {
+			packets[i] = NULL;
+			break;
+		}
+		// Message wating
+		if (packets[i] == NULL) {
+			libtrace_ocache_alloc(&libtrace->packet_freelist, (void **) &packets[i], 1, 1);
+			packets[i]->error = -2;
+			++i;
+			break;
+		}
+	}
+	
+	return i;
+	/*if (*packet) {
 		return (*packet)->error;
 	} else {
 		// This is how we do a notify, we send a message before hand to note that the trace is over etc.
@@ -596,7 +749,7 @@ inline static int trace_pread_packet_hasher_thread(libtrace_t *libtrace, libtrac
 		// having to be the end of the stream.
 		fprintf(stderr, "Got a NULL packet from hasher therefore message waiting\n");
 		return -2;
-	}
+	}*/
 }
 
 /**
@@ -612,8 +765,7 @@ static inline int try_waiting_queue(libtrace_t *libtrace, libtrace_thread_t * t,
 		assert(retrived_packet);
 
 		if (*packet) // Recycle the old get the new
-			if (!libtrace_ringbuffer_try_swrite_bl(&libtrace->packet_freelist, (void *) *packet))
-				trace_destroy_packet(*packet);
+			libtrace_ocache_free(&libtrace->packet_freelist, (void **) packet, 1, 1);
 		*packet = retrived_packet;
 		*ret = (*packet)->error;
 		return 1;
@@ -634,25 +786,25 @@ inline static int trace_handle_finishing_perpkt(libtrace_t *libtrace, libtrace_p
 
 	do {
 		// Wait for a thread to end
-		assert(pthread_mutex_lock(&libtrace->libtrace_lock) == 0);
+		ASSERT_RET(pthread_mutex_lock(&libtrace->libtrace_lock), == 0);
 
 		// Check before
 		if (libtrace->perpkt_thread_states[THREAD_FINISHING] == libtrace->perpkt_thread_count) {
 			complete = true;
-			assert(pthread_mutex_unlock(&libtrace->libtrace_lock) == 0);
+			ASSERT_RET(pthread_mutex_unlock(&libtrace->libtrace_lock), == 0);
 			continue;
 		}
 
-		assert(pthread_cond_wait(&libtrace->perpkt_cond, &libtrace->libtrace_lock) == 0);
+		ASSERT_RET(pthread_cond_wait(&libtrace->perpkt_cond, &libtrace->libtrace_lock), == 0);
 
 		// Check after
 		if (libtrace->perpkt_thread_states[THREAD_FINISHING] == libtrace->perpkt_thread_count) {
 			complete = true;
-			assert(pthread_mutex_unlock(&libtrace->libtrace_lock) == 0);
+			ASSERT_RET(pthread_mutex_unlock(&libtrace->libtrace_lock), == 0);
 			continue;
 		}
 
-		assert(pthread_mutex_unlock(&libtrace->libtrace_lock) == 0);
+		ASSERT_RET(pthread_mutex_unlock(&libtrace->libtrace_lock), == 0);
 
 		// Always trying to keep our buffer empty for the unlikely case more threads than buffer space want to write into our queue
 		if(try_waiting_queue(libtrace, t, packet, &ret))
@@ -695,31 +847,29 @@ inline static int trace_pread_packet_hash_locked(libtrace_t *libtrace, libtrace_
 		if(try_waiting_queue(libtrace, t, packet, &ret))
 			return ret;
 		// Can still block here if another thread is writing to a full queue
-		assert(pthread_mutex_lock(&libtrace->libtrace_lock) == 0);
+		ASSERT_RET(pthread_mutex_lock(&libtrace->libtrace_lock), == 0);
 
 		// Its impossible for our own queue to overfill, because no one can write
 		// when we are in the lock
 		if(try_waiting_queue(libtrace, t, packet, &ret)) {
-			assert(pthread_mutex_unlock(&libtrace->libtrace_lock) == 0);
+			ASSERT_RET(pthread_mutex_unlock(&libtrace->libtrace_lock), == 0);
 			return ret;
 		}
 
 		// Another thread cannot write a packet because a queue has filled up. Is it ours?
 		if (libtrace->perpkt_queue_full) {
 			contention_stats[t->perpkt_num].wait_for_fill_complete_hits++;
-			assert(pthread_mutex_unlock(&libtrace->libtrace_lock) == 0);
+			ASSERT_RET(pthread_mutex_unlock(&libtrace->libtrace_lock), == 0);
 			continue;
 		}
 
-		if (!*packet) {
-			if (!libtrace_ringbuffer_try_sread_bl(&libtrace->packet_freelist, (void **) packet))
-				*packet = trace_create_packet();
-		}
+		if (!*packet)
+			libtrace_ocache_alloc(&libtrace->packet_freelist, (void **) packet, 1, 1);
 		assert(*packet);
 
 		// If we fail here we can guarantee that our queue is empty (and no new data will be added because we hold the lock)
 		if (libtrace_halt || ((*packet)->error = trace_read_packet(libtrace, *packet)) <1 /*&& psize != LIBTRACE_MESSAGE_WAITING*/) {
-			assert(pthread_mutex_unlock(&libtrace->libtrace_lock) == 0);
+			ASSERT_RET(pthread_mutex_unlock(&libtrace->libtrace_lock), == 0);
 			if (libtrace_halt)
 				return 0;
 			else
@@ -730,16 +880,16 @@ inline static int trace_pread_packet_hash_locked(libtrace_t *libtrace, libtrace_
 		thread = trace_packet_get_hash(*packet) % libtrace->perpkt_thread_count;
 		if (thread == t->perpkt_num) {
 			// If it's this thread we must be in order because we checked the buffer once we got the lock
-			assert(pthread_mutex_unlock(&libtrace->libtrace_lock) == 0);
+			ASSERT_RET(pthread_mutex_unlock(&libtrace->libtrace_lock), == 0);
 			return (*packet)->error;
 		}
 
 		if (libtrace->perpkt_threads[thread].state != THREAD_FINISHED) {
 			while (!libtrace_ringbuffer_try_swrite_bl(&libtrace->perpkt_threads[thread].rbuffer, *packet)) {
 				libtrace->perpkt_queue_full = true;
-				assert(pthread_mutex_unlock(&libtrace->libtrace_lock) == 0);
+				ASSERT_RET(pthread_mutex_unlock(&libtrace->libtrace_lock), == 0);
 				contention_stats[t->perpkt_num].full_queue_hits++;
-				assert(pthread_mutex_lock(&libtrace->libtrace_lock) == 0);
+				ASSERT_RET(pthread_mutex_lock(&libtrace->libtrace_lock), == 0);
 			}
 			*packet = NULL;
 			libtrace->perpkt_queue_full = false;
@@ -747,7 +897,7 @@ inline static int trace_pread_packet_hash_locked(libtrace_t *libtrace, libtrace_
 			/* We can get here if the user closes the thread before natural completion/or error */
 			assert (!"packet_hash_locked() The user terminated the trace in a abnormal manner");
 		}
-		assert(pthread_mutex_unlock(&libtrace->libtrace_lock) == 0);
+		ASSERT_RET(pthread_mutex_unlock(&libtrace->libtrace_lock), == 0);
 	}
 }
 
@@ -778,62 +928,60 @@ inline static int trace_pread_packet_sliding_window(libtrace_t *libtrace, libtra
 
 		// We limit the number of packets we get to the size of the sliding window
 		// such that it is impossible for any given thread to fail to store a packet
-		assert(sem_wait(&libtrace->sem) == 0);
+		ASSERT_RET(sem_wait(&libtrace->sem), == 0);
 		/*~~~~Single threaded read of a packet~~~~*/
-		assert(pthread_mutex_lock(&libtrace->libtrace_lock) == 0);
+		ASSERT_RET(pthread_mutex_lock(&libtrace->libtrace_lock), == 0);
 
 		/* Re-check our queue things we might have data waiting */
 		if(try_waiting_queue(libtrace, t, packet, &ret)) {
-			assert(pthread_mutex_unlock(&libtrace->libtrace_lock) == 0);
-			assert(sem_post(&libtrace->sem) == 0);
+			ASSERT_RET(pthread_mutex_unlock(&libtrace->libtrace_lock), == 0);
+			ASSERT_RET(sem_post(&libtrace->sem), == 0);
 			return ret;
 		}
 
 		// TODO put on *proper* condition variable
 		if (libtrace->perpkt_queue_full) {
-			assert(pthread_mutex_unlock(&libtrace->libtrace_lock) == 0);
-			assert(sem_post(&libtrace->sem) == 0);
+			ASSERT_RET(pthread_mutex_unlock(&libtrace->libtrace_lock), == 0);
+			ASSERT_RET(sem_post(&libtrace->sem), == 0);
 			contention_stats[t->perpkt_num].wait_for_fill_complete_hits++;
 			continue;
 		}
 
-		if (!*packet) {
-			if (!libtrace_ringbuffer_try_sread_bl(&libtrace->packet_freelist, (void **) packet))
-				*packet = trace_create_packet();
-		}
+		if (!*packet)
+			libtrace_ocache_alloc(&libtrace->packet_freelist, (void **) packet, 1, 1);
 		assert(*packet);
 
 		if (libtrace_halt || ((*packet)->error = trace_read_packet(libtrace, *packet)) <1 /*&& psize != LIBTRACE_MESSAGE_WAITING*/) {
-			assert(pthread_mutex_unlock(&libtrace->libtrace_lock) == 0);
-			assert(sem_post(&libtrace->sem) == 0);
+			ASSERT_RET(pthread_mutex_unlock(&libtrace->libtrace_lock), == 0);
+			ASSERT_RET(sem_post(&libtrace->sem), == 0);
 			// Finish this thread ensuring that any data written later by another thread is retrieved also
 			if (libtrace_halt)
 				return 0;
 			else
 				return trace_finish_perpkt(libtrace, packet, t);
 		}
-		assert(pthread_mutex_unlock(&libtrace->libtrace_lock) == 0);
+		ASSERT_RET(pthread_mutex_unlock(&libtrace->libtrace_lock), == 0);
 
 		/* ~~~~Multiple threads can run the hasher~~~~ */
 		trace_packet_set_hash(*packet, (*libtrace->hasher)(*packet, libtrace->hasher_data));
 
 		/* Yes this is correct opposite read lock for a write operation */
-		assert(pthread_rwlock_rdlock(&libtrace->window_lock) == 0);
+		ASSERT_RET(pthread_rwlock_rdlock(&libtrace->window_lock), == 0);
 		if (!libtrace_slidingwindow_try_write(&libtrace->sliding_window, trace_packet_get_order(*packet), *packet))
 			assert(!"Semaphore should stop us from ever overfilling the sliding window");
-		assert(pthread_rwlock_unlock(&libtrace->window_lock) == 0);
+		ASSERT_RET(pthread_rwlock_unlock(&libtrace->window_lock), == 0);
 		*packet = NULL;
 
 		// Always try read any data from the sliding window
 		while (libtrace_slidingwindow_read_ready(&libtrace->sliding_window)) {
-			assert(pthread_rwlock_wrlock(&libtrace->window_lock) == 0);
+			ASSERT_RET(pthread_rwlock_wrlock(&libtrace->window_lock), == 0);
 			if (libtrace->perpkt_queue_full) {
 				// I might be the holdup in which case if I can read my queue I should do that and return
 				if(try_waiting_queue(libtrace, t, packet, &ret)) {
-					assert(pthread_rwlock_unlock(&libtrace->window_lock) == 0);
+					ASSERT_RET(pthread_rwlock_unlock(&libtrace->window_lock), == 0);
 					return ret;
 				}
-				assert(pthread_rwlock_unlock(&libtrace->window_lock) == 0);
+				ASSERT_RET(pthread_rwlock_unlock(&libtrace->window_lock), == 0);
 				continue;
 			}
 			// Read greedily as many as we can
@@ -850,8 +998,8 @@ inline static int trace_pread_packet_sliding_window(libtrace_t *libtrace, libtra
 							if(try_waiting_queue(libtrace, t, packet, &ret)) {
 								// We must be able to write this now 100% without fail
 								libtrace_ringbuffer_write(&libtrace->perpkt_threads[thread].rbuffer, *packet);
-								assert(sem_post(&libtrace->sem) == 0);
-								assert(pthread_rwlock_unlock(&libtrace->window_lock) == 0);
+								ASSERT_RET(sem_post(&libtrace->sem), == 0);
+								ASSERT_RET(pthread_rwlock_unlock(&libtrace->window_lock), == 0);
 								return ret;
 							} else {
 								assert(!"Our queue is full but I cannot read from it??");
@@ -859,18 +1007,18 @@ inline static int trace_pread_packet_sliding_window(libtrace_t *libtrace, libtra
 						}
 						// Not us we have to give the other threads a chance to write there packets then
 						libtrace->perpkt_queue_full = true;
-						assert(pthread_rwlock_unlock(&libtrace->window_lock) == 0);
+						ASSERT_RET(pthread_rwlock_unlock(&libtrace->window_lock), == 0);
 						for (i = 0; i < libtrace->perpkt_thread_count-1; i++) // Release all other threads to read there packets
-							assert(sem_post(&libtrace->sem) == 0);
+							ASSERT_RET(sem_post(&libtrace->sem), == 0);
 
 						contention_stats[t->perpkt_num].full_queue_hits++;
-						assert(pthread_rwlock_wrlock(&libtrace->window_lock) == 0);
+						ASSERT_RET(pthread_rwlock_wrlock(&libtrace->window_lock), == 0);
 						// Grab these back
 						for (i = 0; i < libtrace->perpkt_thread_count-1; i++) // Release all other threads to read there packets
-							assert(sem_wait(&libtrace->sem) == 0);
+							ASSERT_RET(sem_wait(&libtrace->sem), == 0);
 						libtrace->perpkt_queue_full = false;
 					}
-					assert(sem_post(&libtrace->sem) == 0);
+					ASSERT_RET(sem_post(&libtrace->sem), == 0);
 					*packet = NULL;
 				} else {
 					// Cannot write to a queue if no ones waiting (I think this is unreachable)
@@ -878,7 +1026,7 @@ inline static int trace_pread_packet_sliding_window(libtrace_t *libtrace, libtra
 					assert (!"unreachable code??");
 				}
 			}
-			assert(pthread_rwlock_unlock(&libtrace->window_lock) == 0);
+			ASSERT_RET(pthread_rwlock_unlock(&libtrace->window_lock), == 0);
 		}
 		// Now we go back to checking our queue anyways
 	}
@@ -901,7 +1049,7 @@ void store_first_packet(libtrace_t *libtrace, libtrace_packet_t *packet, libtrac
 		// For what it's worth we can call these outside of the lock
 		gettimeofday(&tv, NULL);
 		dup = trace_copy_packet(packet);
-		assert(pthread_spin_lock(&libtrace->first_packets.lock) == 0);
+		ASSERT_RET(pthread_spin_lock(&libtrace->first_packets.lock), == 0);
 		libtrace->first_packets.packets[t->perpkt_num].packet = dup;
 		//printf("Stored first packet time=%f\n", trace_get_seconds(dup));
 		memcpy(&libtrace->first_packets.packets[t->perpkt_num].tv, &tv, sizeof(tv));
@@ -917,7 +1065,7 @@ void store_first_packet(libtrace_t *libtrace, libtrace_packet_t *packet, libtrac
 				trace_get_seconds(libtrace->first_packets.packets[first].packet))
 				libtrace->first_packets.first = t->perpkt_num;
 		}
-		assert(pthread_spin_unlock(&libtrace->first_packets.lock) == 0);
+		ASSERT_RET(pthread_spin_unlock(&libtrace->first_packets.lock), == 0);
 		libtrace_message_t mesg = {0};
 		mesg.code = MESSAGE_FIRST_PACKET;
 		trace_send_message_to_reducer(libtrace, &mesg);
@@ -935,7 +1083,7 @@ void store_first_packet(libtrace_t *libtrace, libtrace_packet_t *packet, libtrac
 DLLEXPORT int retrive_first_packet(libtrace_t *libtrace, libtrace_packet_t **packet, struct timeval **tv)
 {
 	int ret = 0;
-	assert(pthread_spin_lock(&libtrace->first_packets.lock) == 0);
+	ASSERT_RET(pthread_spin_lock(&libtrace->first_packets.lock), == 0);
 	if (libtrace->first_packets.count) {
 		*packet = libtrace->first_packets.packets[libtrace->first_packets.first].packet;
 		*tv = &libtrace->first_packets.packets[libtrace->first_packets.first].tv;
@@ -955,7 +1103,7 @@ DLLEXPORT int retrive_first_packet(libtrace_t *libtrace, libtrace_packet_t **pac
 		*packet = NULL;
 		*tv = NULL;
 	}
-	assert(pthread_spin_unlock(&libtrace->first_packets.lock) == 0);
+	ASSERT_RET(pthread_spin_unlock(&libtrace->first_packets.lock), == 0);
 	return ret;
 }
 
@@ -1109,35 +1257,44 @@ static inline int trace_pread_packet_wrapper(libtrace_t *libtrace, libtrace_thre
 }
 
 /**
- * Read a packet from the parallel trace
+ * Read packets from the parallel trace
+ * @return the number of packets read, null packets indicate messages. Check packet->error before
+ * assuming a packet is valid.
  */
-DLLEXPORT int trace_pread_packet(libtrace_t *libtrace, libtrace_thread_t *t, libtrace_packet_t **packet)
+static size_t trace_pread_packet(libtrace_t *libtrace, libtrace_thread_t *t, libtrace_packet_t *packets[], size_t nb_packets)
 {
-	int ret;
+	size_t ret;
+	size_t i;
+	assert(nb_packets);
 
-	// Cleanup the packet passed back
-	if (*packet)
-		trace_fin_packet(*packet);
+	for (i = 0; i < nb_packets; i++) {
+		// Cleanup the packet passed back
+		if (packets[i])
+			trace_fin_packet(packets[i]);
+	}
 
 	if (trace_supports_parallel(libtrace) && !trace_has_dedicated_hasher(libtrace)) {
-		if (!*packet)
-			*packet = trace_create_packet();
-		ret = trace_pread_packet_wrapper(libtrace, t, *packet);
+		if (!packets[0])
+			libtrace_ocache_alloc(&libtrace->packet_freelist, (void **)packets, 1, 1);
+		packets[0]->error = trace_pread_packet_wrapper(libtrace, t, *packets);
+		ret = 1;
 	} else if (trace_has_dedicated_hasher(libtrace)) {
-		ret = trace_pread_packet_hasher_thread(libtrace, t, packet);
+		ret = trace_pread_packet_hasher_thread(libtrace, t, packets, nb_packets);
 	} else if (!trace_has_dedicated_hasher(libtrace)) {
 		/* We don't care about which core a packet goes to */
-		ret = trace_pread_packet_first_in_first_served(libtrace, t, packet);
+		ret = trace_pread_packet_first_in_first_served(libtrace, t, packets, nb_packets);
 	} /* else {
 		ret = trace_pread_packet_hash_locked(libtrace, packet);
 	}*/
 
 	// Formats can also optionally do this internally to ensure the first
 	// packet is always reported correctly
-	if (ret > 0) {
-		store_first_packet(libtrace, *packet, t);
+	assert(ret);
+	assert(ret <= nb_packets);
+	if (packets[0]->error > 0) {
+		store_first_packet(libtrace, packets[0], t);
 		if (libtrace->tracetime)
-			delay_tracetime(libtrace, *packet, t);
+			delay_tracetime(libtrace, packets[0], t);
 	}
 
 	return ret;
@@ -1148,10 +1305,12 @@ DLLEXPORT int trace_pread_packet(libtrace_t *libtrace, libtrace_thread_t *t, lib
  */
 static inline int trace_start_perpkt_threads (libtrace_t *libtrace) {
 	int i;
-
+	char name[16];
 	for (i = 0; i < libtrace->perpkt_thread_count; i++) {
 		libtrace_thread_t *t = &libtrace->perpkt_threads[i];
-		assert(pthread_create(&t->tid, NULL, perpkt_threads_entry, (void *) libtrace) == 0);
+		ASSERT_RET(pthread_create(&t->tid, NULL, perpkt_threads_entry, (void *) libtrace), == 0);
+		snprintf(name, 16, "perpkt-%d", i);
+		pthread_setname_np(t->tid, name);
 	}
 	return libtrace->perpkt_thread_count;
 }
@@ -1167,6 +1326,7 @@ static inline int trace_start_perpkt_threads (libtrace_t *libtrace) {
 DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob, fn_per_pkt per_pkt, fn_reducer reducer)
 {
 	int i;
+	char name[16];
 	sigset_t sig_before, sig_block_all;
 	assert(libtrace);
 	if (trace_is_err(libtrace)) {
@@ -1176,11 +1336,11 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob, fn_per_pkt p
 	// NOTE: Until the trace is started we wont have a libtrace_lock initialised
 	if (libtrace->state != STATE_NEW) {
 		int err = 0;
-		assert(pthread_mutex_lock(&libtrace->libtrace_lock) == 0);
+		ASSERT_RET(pthread_mutex_lock(&libtrace->libtrace_lock), == 0);
 		if (libtrace->state != STATE_PAUSED) {
 			trace_set_err(libtrace, TRACE_ERR_BAD_STATE,
 				"The trace(%s) has already been started and is not paused!!", libtrace->uridata);
-			assert(pthread_mutex_unlock(&libtrace->libtrace_lock) == 0);
+			ASSERT_RET(pthread_mutex_unlock(&libtrace->libtrace_lock), == 0);
 			return -1;
 		}
 		
@@ -1206,7 +1366,7 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob, fn_per_pkt p
 			libtrace->started = true;
 			libtrace_change_state(libtrace, STATE_RUNNING, false);
 		}
-		assert(pthread_mutex_unlock(&libtrace->libtrace_lock) == 0);
+		ASSERT_RET(pthread_mutex_unlock(&libtrace->libtrace_lock), == 0);
 		return err;
 	}
 
@@ -1218,11 +1378,11 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob, fn_per_pkt p
 	libtrace->per_pkt = per_pkt;
 	libtrace->reducer = reducer;
 
-	assert(pthread_mutex_init(&libtrace->libtrace_lock, NULL) == 0);
-	assert(pthread_cond_init(&libtrace->perpkt_cond, NULL) == 0);
-	assert(pthread_rwlock_init(&libtrace->window_lock, NULL) == 0);
+	ASSERT_RET(pthread_mutex_init(&libtrace->libtrace_lock, NULL), == 0);
+	ASSERT_RET(pthread_cond_init(&libtrace->perpkt_cond, NULL), == 0);
+	ASSERT_RET(pthread_rwlock_init(&libtrace->window_lock, NULL), == 0);
 	// Grab the lock
-	assert(pthread_mutex_lock(&libtrace->libtrace_lock) == 0);
+	ASSERT_RET(pthread_mutex_lock(&libtrace->libtrace_lock), == 0);
 
 	// Set default buffer sizes
 	if (libtrace->perpkt_buffer_size <= 0)
@@ -1249,7 +1409,7 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob, fn_per_pkt p
 
 	sigemptyset(&sig_block_all);
 
-	assert(pthread_sigmask(SIG_SETMASK, &sig_block_all, &sig_before) == 0);
+	ASSERT_RET(pthread_sigmask(SIG_SETMASK, &sig_block_all, &sig_before), == 0);
 
 	// If we are using a hasher start it
 	// If single threaded we don't need a hasher
@@ -1260,13 +1420,21 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob, fn_per_pkt p
 		t->type = THREAD_HASHER;
 		t->state = THREAD_RUNNING;
 		libtrace_message_queue_init(&t->messages, sizeof(libtrace_message_t));
-		assert(pthread_create(&t->tid, NULL, hasher_start, (void *) libtrace) == 0);
+		ASSERT_RET(pthread_create(&t->tid, NULL, hasher_start, (void *) libtrace), == 0);
+		snprintf(name, sizeof(name), "hasher-thread");
+		pthread_setname_np(t->tid, name);
 	} else {
 		libtrace->hasher_thread.type = THREAD_EMPTY;
 	}
-	libtrace_ringbuffer_init(&libtrace->packet_freelist, libtrace->packet_freelist_size, LIBTRACE_RINGBUFFER_BLOCKING);
+	//libtrace_ocache_init(&libtrace->packet_freelist, trace_create_packet, trace_destroy_packet, 64, libtrace->packet_freelist_size * 4, true);
+	libtrace_ocache_init(&libtrace->packet_freelist,
+						 (void* (*)()) trace_create_packet,
+						 (void (*)(void *))trace_destroy_packet,
+						 64,
+						 libtrace->packet_freelist_size * 4,
+						 true);
 	//libtrace_slidingwindow_init(&libtrace->sliding_window, libtrace->packet_freelist_size, 0);
-	assert(sem_init(&libtrace->sem, 0, libtrace->packet_freelist_size) == 0);
+	ASSERT_RET(sem_init(&libtrace->sem, 0, libtrace->packet_freelist_size), == 0);
 	// This will be applied to every new thread that starts, i.e. they will block all signals
 	// Lets start a fixed number of reading threads
 
@@ -1280,7 +1448,7 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob, fn_per_pkt p
 	/* Ready some storages */
 	libtrace->first_packets.first = 0;
 	libtrace->first_packets.count = 0;
-	assert(pthread_spin_init(&libtrace->first_packets.lock, 0) == 0);
+	ASSERT_RET(pthread_spin_init(&libtrace->first_packets.lock, 0), == 0);
 	libtrace->first_packets.packets = calloc(libtrace->perpkt_thread_count, sizeof(struct  __packet_storage_magic_type));
 
 
@@ -1296,7 +1464,7 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob, fn_per_pkt p
 		// t->tid DONE on create
 		t->perpkt_num = i;
 		if (libtrace->hasher)
-			libtrace_ringbuffer_init(&t->rbuffer, libtrace->perpkt_buffer_size, LIBTRACE_RINGBUFFER_BLOCKING);
+			libtrace_ringbuffer_init(&t->rbuffer, libtrace->perpkt_buffer_size, LIBTRACE_RINGBUFFER_POLLING);
 		// Depending on the mode vector or deque might be chosen
 		libtrace_vector_init(&t->vector, sizeof(libtrace_result_t));
 		libtrace_deque_init(&t->deque, sizeof(libtrace_result_t));
@@ -1304,7 +1472,7 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob, fn_per_pkt p
 		t->tmp_key = 0;
 		t->tmp_data = NULL;
 		t->recorded_first = false;
-		assert(pthread_spin_init(&t->tmp_spinlock, 0) == 0);
+		ASSERT_RET(pthread_spin_init(&t->tmp_spinlock, 0), == 0);
 		t->tracetime_offset_usec = 0;;
 	}
 
@@ -1325,7 +1493,7 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob, fn_per_pkt p
 		libtrace->keepalive_thread.type = THREAD_KEEPALIVE;
 	   	libtrace->keepalive_thread.state = THREAD_RUNNING;
 		libtrace_message_queue_init(&libtrace->keepalive_thread.messages, sizeof(libtrace_message_t));
-		assert(pthread_create(&libtrace->keepalive_thread.tid, NULL, keepalive_entry, (void *) libtrace) == 0);
+		ASSERT_RET(pthread_create(&libtrace->keepalive_thread.tid, NULL, keepalive_entry, (void *) libtrace), == 0);
 	}
 
 	for (i = 0; i < THREAD_STATE_MAX; ++i) {
@@ -1334,8 +1502,8 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob, fn_per_pkt p
 	libtrace->perpkt_thread_states[THREAD_RUNNING] = threads_started;
 
 	// Revert back - Allow signals again
-	assert(pthread_sigmask(SIG_SETMASK, &sig_before, NULL) == 0);
-	assert(pthread_mutex_unlock(&libtrace->libtrace_lock) == 0);
+	ASSERT_RET(pthread_sigmask(SIG_SETMASK, &sig_before, NULL), == 0);
+	ASSERT_RET(pthread_mutex_unlock(&libtrace->libtrace_lock), == 0);
 
 	if (threads_started < 0)
 		// Error
@@ -1367,16 +1535,16 @@ DLLEXPORT int trace_ppause(libtrace_t *libtrace)
 	
 	t = get_thread_table(libtrace);
 	// Check state from within the lock if we are going to change it
-	assert(pthread_mutex_lock(&libtrace->libtrace_lock) == 0);
+	ASSERT_RET(pthread_mutex_lock(&libtrace->libtrace_lock), == 0);
 	if (!libtrace->started || libtrace->state != STATE_RUNNING) {
 		fprintf(stderr, "pause failed started=%d state=%s (%d)\n", libtrace->started, get_trace_state_name(libtrace->state), libtrace->state);
 		trace_set_err(libtrace,TRACE_ERR_BAD_STATE, "You must call trace_start() before calling trace_ppause()");
-		assert(pthread_mutex_unlock(&libtrace->libtrace_lock) == 0);
+		ASSERT_RET(pthread_mutex_unlock(&libtrace->libtrace_lock), == 0);
 		return -1;
 	}
 
 	libtrace_change_state(libtrace, STATE_PAUSING, false);
-	assert(pthread_mutex_unlock(&libtrace->libtrace_lock) == 0);
+	ASSERT_RET(pthread_mutex_unlock(&libtrace->libtrace_lock), == 0);
 
 	// Special case handle the hasher thread case
 	if (trace_has_dedicated_hasher(libtrace)) {
@@ -1385,11 +1553,11 @@ DLLEXPORT int trace_ppause(libtrace_t *libtrace)
 		message.code = MESSAGE_DO_PAUSE;
 		trace_send_message_to_thread(libtrace, &libtrace->hasher_thread, &message);
 		// Wait for it to pause
-		assert(pthread_mutex_lock(&libtrace->libtrace_lock) == 0);
+		ASSERT_RET(pthread_mutex_lock(&libtrace->libtrace_lock), == 0);
 		while (libtrace->hasher_thread.state == THREAD_RUNNING) {
-			assert(pthread_cond_wait(&libtrace->perpkt_cond, &libtrace->libtrace_lock) == 0);
+			ASSERT_RET(pthread_cond_wait(&libtrace->perpkt_cond, &libtrace->libtrace_lock), == 0);
 		}
-		assert(pthread_mutex_unlock(&libtrace->libtrace_lock) == 0);
+		ASSERT_RET(pthread_mutex_unlock(&libtrace->libtrace_lock), == 0);
 	}
 
 	fprintf(stderr, "Sending messages \n");
@@ -1424,11 +1592,11 @@ DLLEXPORT int trace_ppause(libtrace_t *libtrace)
 	fprintf(stderr, "Asking threads to pause\n");
 
 	// Wait for all threads to pause
-	assert(pthread_mutex_lock(&libtrace->libtrace_lock) == 0);
+	ASSERT_RET(pthread_mutex_lock(&libtrace->libtrace_lock), == 0);
 	while(libtrace->perpkt_thread_states[THREAD_RUNNING]) {
-		assert(pthread_cond_wait(&libtrace->perpkt_cond, &libtrace->libtrace_lock) == 0);
+		ASSERT_RET(pthread_cond_wait(&libtrace->perpkt_cond, &libtrace->libtrace_lock), == 0);
 	}
-	assert(pthread_mutex_unlock(&libtrace->libtrace_lock) == 0);
+	ASSERT_RET(pthread_mutex_unlock(&libtrace->libtrace_lock), == 0);
 
 	fprintf(stderr, "Threads have paused\n");
 
@@ -1558,7 +1726,7 @@ DLLEXPORT void trace_join(libtrace_t *libtrace) {
 	 * user controlled */
 	for (i=0; i< libtrace->perpkt_thread_count; i++) {
 		//printf("Waiting to join with perpkt #%d\n", i);
-		assert(pthread_join(libtrace->perpkt_threads[i].tid, NULL) == 0);
+		ASSERT_RET(pthread_join(libtrace->perpkt_threads[i].tid, NULL), == 0);
 		//printf("Joined with perpkt #%d\n", i);
 		// So we must do our best effort to empty the queue - so
 		// the producer (or any other threads) don't block.
@@ -1606,6 +1774,7 @@ DLLEXPORT void trace_join(libtrace_t *libtrace) {
 	}
 	
 	libtrace_change_state(libtrace, STATE_JOINED, true);
+	print_memory_stats();
 }
 
 DLLEXPORT int libtrace_thread_get_message_count(libtrace_t * libtrace)
@@ -1976,23 +2145,18 @@ DLLEXPORT int trace_parallel_config(libtrace_t *libtrace, trace_parallel_option_
 
 DLLEXPORT libtrace_packet_t* trace_result_packet(libtrace_t * libtrace, libtrace_packet_t * packet) {
 	libtrace_packet_t* result;
-	if (!libtrace_ringbuffer_try_sread_bl(&libtrace->packet_freelist, (void **) &result))
-		result = trace_create_packet();
+	libtrace_ocache_alloc(&libtrace->packet_freelist, (void **) &result, 1, 1);
 	assert(result);
 	swap_packets(result, packet); // Move the current packet into our copy
 	return result;
 }
 
-DLLEXPORT void trace_free_result_packet(libtrace_t * libtrace, libtrace_packet_t * packet) {
+DLLEXPORT void trace_free_result_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	// Try write back the packet
 	assert(packet);
 	// Always release any resources this might be holding such as a slot in a ringbuffer
 	trace_fin_packet(packet);
-	if (!libtrace_ringbuffer_try_swrite_bl(&libtrace->packet_freelist, packet)) {
-		/* We couldn't, oh well lets just destroy it - XXX consider non managed formats i.e. rings buffers loosing packets and jamming up :( */
-		//assert(1 == 90);
-		trace_destroy_packet(packet);
-	}
+	libtrace_ocache_free(&libtrace->packet_freelist, (void **) &packet, 1, 1);
 }
 
 DLLEXPORT libtrace_info_t *trace_get_information(libtrace_t * libtrace) {

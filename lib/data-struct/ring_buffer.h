@@ -19,10 +19,14 @@ typedef struct libtrace_ringbuffer {
 	pthread_mutex_t rlock;
 	pthread_spinlock_t swlock;
 	pthread_spinlock_t srlock;
-	sem_t semrlock;
-	sem_t semwlock;
-	sem_t emptys;
-	sem_t fulls;
+	// We need to ensure that broadcasts dont get lost hence
+	// these locks below
+	// We avoid using semaphores since they don't allow
+	// multiple releases.
+	pthread_mutex_t empty_lock;
+	pthread_mutex_t full_lock;
+	pthread_cond_t empty_cond; // Signal when empties are ready
+	pthread_cond_t full_cond; // Signal when fulls are ready
 	// Aim to get this on a separate cache line to start - important if spinning
 	volatile size_t end;
 } libtrace_ringbuffer_t;
@@ -44,5 +48,12 @@ DLLEXPORT int libtrace_ringbuffer_try_read(libtrace_ringbuffer_t *rb, void ** va
 DLLEXPORT void * libtrace_ringbuffer_sread(libtrace_ringbuffer_t *rb);
 DLLEXPORT int libtrace_ringbuffer_try_sread(libtrace_ringbuffer_t *rb, void ** value);
 DLLEXPORT int libtrace_ringbuffer_try_sread_bl(libtrace_ringbuffer_t *rb, void ** value);
+
+
+
+DLLEXPORT size_t libtrace_ringbuffer_write_bulk(libtrace_ringbuffer_t *rb, void *values[], size_t nb_buffers, size_t min_nb_buffers);
+DLLEXPORT size_t libtrace_ringbuffer_read_bulk(libtrace_ringbuffer_t *rb, void *values[], size_t nb_buffers, size_t min_nb_buffers);
+DLLEXPORT size_t libtrace_ringbuffer_sread_bulk(libtrace_ringbuffer_t *rb, void *values[], size_t nb_buffers, size_t min_nb_buffers);
+DLLEXPORT size_t libtrace_ringbuffer_swrite_bulk(libtrace_ringbuffer_t *rb, void *values[], size_t nb_buffers, size_t min_nb_buffers);
 
 #endif

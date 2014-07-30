@@ -24,7 +24,7 @@ DLLEXPORT void libtrace_deque_init(libtrace_queue_t * q, size_t element_size)
 	q->tail = NULL;
 	q->size = 0;
 	q->element_size = element_size;
-	assert(pthread_mutex_init(&q->lock, NULL) == 0);
+	ASSERT_RET(pthread_mutex_init(&q->lock, NULL), == 0);
 }
 
 DLLEXPORT void libtrace_deque_push_back(libtrace_queue_t *q, void *d)
@@ -35,7 +35,7 @@ DLLEXPORT void libtrace_deque_push_back(libtrace_queue_t *q, void *d)
 	// Fill it
 	memcpy(&new_node->data, d, q->element_size);
 	// Only ->prev is unknown at this stage to be completed in lock
-	assert(pthread_mutex_lock(&q->lock) == 0);
+	ASSERT_RET(pthread_mutex_lock(&q->lock), == 0);
 	if (q->head == NULL) {
 		assert(q->tail == NULL && q->size == 0);
 		new_node->prev = NULL;
@@ -47,7 +47,7 @@ DLLEXPORT void libtrace_deque_push_back(libtrace_queue_t *q, void *d)
 		q->tail = new_node; // Relink tail
 	}
 	q->size++;
-	assert(pthread_mutex_unlock(&q->lock) == 0);
+	ASSERT_RET(pthread_mutex_unlock(&q->lock), == 0);
 }
 
 DLLEXPORT void libtrace_deque_push_front(libtrace_queue_t *q, void *d)
@@ -58,7 +58,7 @@ DLLEXPORT void libtrace_deque_push_front(libtrace_queue_t *q, void *d)
 	// Fill it
 	memcpy(&new_node->data, d, q->element_size);
 	// Only ->next is unknown at this stage to be completed in lock
-	assert(pthread_mutex_lock(&q->lock) == 0);
+	ASSERT_RET(pthread_mutex_lock(&q->lock), == 0);
 	if (q->head == NULL) {
 		assert(q->tail == NULL && q->size == 0);
 		new_node->next = NULL;
@@ -71,30 +71,30 @@ DLLEXPORT void libtrace_deque_push_front(libtrace_queue_t *q, void *d)
 		// Void out the other things
 	}
 	q->size++;
-	assert(pthread_mutex_unlock(&q->lock) == 0);
+	ASSERT_RET(pthread_mutex_unlock(&q->lock), == 0);
 }
 
 DLLEXPORT int libtrace_deque_peek_front(libtrace_queue_t *q, void *d)
 {
 	int ret = 1;
-	assert(pthread_mutex_lock(&q->lock) == 0);
+	ASSERT_RET(pthread_mutex_lock(&q->lock), == 0);
 	if (q->head == NULL)
 		ret = 0;
 	else
 		memcpy(d, &q->head->data, q->element_size);
-	assert(pthread_mutex_unlock(&q->lock) == 0);
+	ASSERT_RET(pthread_mutex_unlock(&q->lock), == 0);
 	return ret;
 }
 
 DLLEXPORT int libtrace_deque_peek_tail(libtrace_queue_t *q, void *d)
 {
 	int ret = 1;
-	assert(pthread_mutex_lock(&q->lock) == 0);
+	ASSERT_RET(pthread_mutex_lock(&q->lock), == 0);
 	if (q->tail == NULL)
 		ret = 0;
 	else
 		memcpy(d, &q->tail->data, q->element_size);
-	assert(pthread_mutex_unlock(&q->lock) == 0);
+	ASSERT_RET(pthread_mutex_unlock(&q->lock), == 0);
 	return ret;
 }
 
@@ -102,7 +102,7 @@ DLLEXPORT int libtrace_deque_pop_front(libtrace_queue_t *q, void *d)
 {
 	int ret = 0;
 	list_node_t * n = NULL;
-	assert(pthread_mutex_lock(&q->lock) == 0);
+	ASSERT_RET(pthread_mutex_lock(&q->lock), == 0);
 	if (q->head != NULL) {
 		n = q->head;
 		ret = 1;
@@ -113,7 +113,7 @@ DLLEXPORT int libtrace_deque_pop_front(libtrace_queue_t *q, void *d)
 		if (q->size <= 1) // Either 1 or 0 items
 			q->tail = q->head;
 	}
-	assert(pthread_mutex_unlock(&q->lock) == 0);
+	ASSERT_RET(pthread_mutex_unlock(&q->lock), == 0);
 	// Unlock once we've removed it :)
 	if (ret) {
 		memcpy(d, &n->data, q->element_size);
@@ -126,7 +126,7 @@ DLLEXPORT int libtrace_deque_pop_tail(libtrace_queue_t *q, void *d)
 {
 	int ret = 0;
 	list_node_t * n;
-	assert(pthread_mutex_lock(&q->lock) == 0);
+	ASSERT_RET(pthread_mutex_lock(&q->lock), == 0);
 	if (q->tail != NULL) {
 		n = q->tail;
 		ret = 1;
@@ -137,7 +137,7 @@ DLLEXPORT int libtrace_deque_pop_tail(libtrace_queue_t *q, void *d)
 		if (q->size <= 1) // Either 1 or 0 items
 			q->head = q->tail;
 	}
-	assert(pthread_mutex_unlock(&q->lock) == 0);
+	ASSERT_RET(pthread_mutex_unlock(&q->lock), == 0);
 	if (ret) {
 		memcpy(d, &n->data, q->element_size);
 		free(n);
@@ -149,9 +149,9 @@ DLLEXPORT size_t libtrace_deque_get_size(libtrace_queue_t *q)
 {
 #if RACE_SAFE
 	size_t ret;
-	assert(pthread_mutex_lock(&q->lock) == 0);
+	ASSERT_RET(pthread_mutex_lock(&q->lock), == 0);
 	ret = q->size;
-	assert(pthread_mutex_unlock(&q->lock) == 0);
+	ASSERT_RET(pthread_mutex_unlock(&q->lock), == 0);
 	return ret;
 #else
 	return q->size;
@@ -168,10 +168,10 @@ DLLEXPORT void libtrace_deque_apply_function(libtrace_queue_t *q, deque_data_fn 
 {
 	list_node_t *n;
 	assert(q->element_size == sizeof(libtrace_result_t));
-	assert(pthread_mutex_lock(&q->lock) == 0);
+	ASSERT_RET(pthread_mutex_lock(&q->lock), == 0);
 	n = q->head;
 	for (n = q->head; n != NULL; n = n->next) {
 		(*fn)(&n->data);
 	}
-	assert(pthread_mutex_unlock(&q->lock) == 0);
+	ASSERT_RET(pthread_mutex_unlock(&q->lock), == 0);
 }

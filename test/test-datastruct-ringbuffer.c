@@ -25,6 +25,27 @@ static void * consumer(void * a) {
 	return 0;
 }
 
+static void * producer_bulk(void * a) {
+	libtrace_ringbuffer_t * rb = (libtrace_ringbuffer_t *) a;
+	char * i;
+	for (i = NULL; i < TEST_SIZE; i++) {
+		assert(libtrace_ringbuffer_write_bulk(rb, (void **) &i, 1, 1) == 1);
+	}
+	return 0;
+}
+
+static void * consumer_bulk(void * a) {
+	libtrace_ringbuffer_t * rb = (libtrace_ringbuffer_t *) a;
+	char *i;
+	void *value;
+	for (i = NULL; i < TEST_SIZE; i++) {
+		assert (libtrace_ringbuffer_read_bulk(rb, &value, 1, 1) == 1);
+		assert(value == i);
+	}
+	return 0;
+}
+
+
 /**
  * Tests the ringbuffer data structure, first this establishes that single
  * threaded operations work correctly, then does a basic consumer producer
@@ -38,7 +59,7 @@ int main() {
 	libtrace_ringbuffer_t rb_polling;
 
 	libtrace_ringbuffer_init(&rb_block, (size_t) RINGBUFFER_SIZE, LIBTRACE_RINGBUFFER_BLOCKING);
-	libtrace_ringbuffer_init(&rb_polling, (size_t) RINGBUFFER_SIZE, LIBTRACE_RINGBUFFER_BLOCKING);
+	libtrace_ringbuffer_init(&rb_polling, (size_t) RINGBUFFER_SIZE, LIBTRACE_RINGBUFFER_POLLING);
 	assert(libtrace_ringbuffer_is_empty(&rb_block));
 	assert(libtrace_ringbuffer_is_empty(&rb_polling));
 
@@ -100,6 +121,18 @@ int main() {
 
 	pthread_create(&t[0], NULL, &producer, (void *) &rb_polling);
 	pthread_create(&t[1], NULL, &consumer, (void *) &rb_polling);
+	pthread_join(t[0], NULL);
+	pthread_join(t[1], NULL);
+	assert(libtrace_ringbuffer_is_empty(&rb_polling));
+
+	pthread_create(&t[0], NULL, &producer_bulk, (void *) &rb_block);
+	pthread_create(&t[1], NULL, &consumer_bulk, (void *) &rb_block);
+	pthread_join(t[0], NULL);
+	pthread_join(t[1], NULL);
+	assert(libtrace_ringbuffer_is_empty(&rb_block));
+
+	pthread_create(&t[0], NULL, &producer_bulk, (void *) &rb_polling);
+	pthread_create(&t[1], NULL, &consumer_bulk, (void *) &rb_polling);
 	pthread_join(t[0], NULL);
 	pthread_join(t[1], NULL);
 	assert(libtrace_ringbuffer_is_empty(&rb_polling));

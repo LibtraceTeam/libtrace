@@ -6,36 +6,31 @@
 
 #include <stdlib.h>
 #include <assert.h>
+#include <string.h>
+#include <stdio.h>
 
 #define LOCK_TYPE_MUTEX 0 // Default if not defined
 #define LOCK_TYPE_SPIN 1
-#define LOCK_TYPE_SEMAPHORE 2
-#define LOCK_TYPE_NONE 3
+#define LOCK_TYPE_NONE 2
 
 // No major difference noticed here between mutex and spin, both have there
 // downsides.
 
-#define USE_MODULUS 1
 #define USE_CHECK_EARLY 1
 
-#define USE_LOCK_TYPE LOCK_TYPE_SPIN
+#define USE_LOCK_TYPE LOCK_TYPE_MUTEX
 #if USE_LOCK_TYPE == LOCK_TYPE_SPIN
-#	define LOCK(dir) assert(pthread_spin_lock(&rb->s ## dir ## lock) == 0)
-#	define UNLOCK(dir) assert(pthread_spin_unlock(&rb->s ## dir ## lock) == 0)
+#	define LOCK(dir) ASSERT_RET(pthread_spin_lock(&rb->s ## dir ## lock), == 0)
+#	define UNLOCK(dir) ASSERT_RET(pthread_spin_unlock(&rb->s ## dir ## lock), == 0)
 #	define TRY_LOCK(dir, action) if(pthread_spin_lock(&rb->s ## dir ## lock) != 0) { \
-								action }
-#elif USE_LOCK_TYPE == LOCK_TYPE_SEMAPHORE
-#	define LOCK(dir) assert(sem_wait(&rb->sem ## dir ## lock) == 0)
-#	define UNLOCK(dir) assert(sem_post(&rb->sem ## dir ## lock) == 0)
-#	define TRY_LOCK(dir, action) if(sem_trywait(&rb->sem ## dir ## lock) != 0) { \
 								action }
 #elif USE_LOCK_TYPE == LOCK_TYPE_NONE
 #	define LOCK(dir) 
 #	define UNLOCK(dir)
 #	define TRY_LOCK(dir, action)
 #else // Mutex
-#	define LOCK(dir) assert(pthread_mutex_lock(&rb-> dir ## lock) == 0)
-#	define UNLOCK(dir) assert(pthread_mutex_unlock(&rb-> dir ## lock) == 0)
+#	define LOCK(dir) ASSERT_RET(pthread_mutex_lock(&rb-> dir ## lock), == 0)
+#	define UNLOCK(dir) ASSERT_RET(pthread_mutex_unlock(&rb-> dir ## lock), == 0)
 #	define TRY_LOCK(dir, action) if(pthread_mutex_lock(&rb-> dir ## lock) != 0) {\
 								action }
 #endif
@@ -63,23 +58,21 @@ DLLEXPORT void libtrace_ringbuffer_init(libtrace_ringbuffer_t * rb, size_t size,
 	rb->mode = mode;
 	if (mode == LIBTRACE_RINGBUFFER_BLOCKING) {
 		/* The signaling part - i.e. release when data's ready to read */
-		assert(sem_init(&rb->fulls, 0, 0) == 0);
-		assert(sem_init(&rb->emptys, 0, size - 1) == 0); // REMEMBER the -1 here :) very important
+		pthread_cond_init(&rb->full_cond, NULL);
+		pthread_cond_init(&rb->empty_cond, NULL);
+		ASSERT_RET(pthread_mutex_init(&rb->empty_lock, NULL), == 0);
+		ASSERT_RET(pthread_mutex_init(&rb->full_lock, NULL), == 0);
 	}
 	/* The mutual exclusion part */
 #if USE_LOCK_TYPE == LOCK_TYPE_SPIN
 #warning "using spinners"
-	assert(pthread_spin_init(&rb->swlock, 0) == 0);
-	assert(pthread_spin_init(&rb->srlock, 0) == 0);
-#elif USE_LOCK_TYPE == LOCK_TYPE_SEMAPHORE
-#warning "using semaphore"
-	assert(sem_init(&rb->semrlock, 0, 1) != -1);
-	assert(sem_init(&rb->semwlock, 0, 1) != -1);
+	ASSERT_RET(pthread_spin_init(&rb->swlock, 0), == 0);
+	ASSERT_RET(pthread_spin_init(&rb->srlock, 0), == 0);
 #elif USE_LOCK_TYPE == LOCK_TYPE_NONE
 #warning "No locking used"
-#else /* USE_LOCK_TYPE == LOCK_TYPE_MUTEX */
-	assert(pthread_mutex_init(&rb->wlock, NULL) == 0);
-	assert(pthread_mutex_init(&rb->rlock, NULL) == 0);
+#else
+	ASSERT_RET(pthread_mutex_init(&rb->wlock, NULL), == 0);
+	ASSERT_RET(pthread_mutex_init(&rb->rlock, NULL), == 0);
 #endif
 }
 
@@ -89,19 +82,15 @@ DLLEXPORT void libtrace_ringbuffer_init(libtrace_ringbuffer_t * rb, size_t size,
  */
 DLLEXPORT void libtrace_ringbuffer_destroy(libtrace_ringbuffer_t * rb) {
 #if USE_LOCK_TYPE == LOCK_TYPE_SPIN
-	assert(pthread_spin_destroy(&rb->swlock) == 0);
-	assert(pthread_spin_destroy(&rb->srlock) == 0);
-#elif USE_LOCK_TYPE == LOCK_TYPE_SEMAPHORE
-	assert(sem_destroy(&rb->semrlock) != -1);
-	assert(sem_destroy(&rb->semwlock) != -1);
+	ASSERT_RET(pthread_spin_destroy(&rb->swlock), == 0);
+	ASSERT_RET(pthread_spin_destroy(&rb->srlock), == 0);
 #elif USE_LOCK_TYPE == LOCK_TYPE_NONE
-#else /* USE_LOCK_TYPE == LOCK_TYPE_MUTEX */
-	assert(pthread_mutex_destroy(&rb->wlock) == 0);
-	assert(pthread_mutex_destroy(&rb->rlock) == 0);
 #endif
+	ASSERT_RET(pthread_mutex_destroy(&rb->wlock), == 0);
+	ASSERT_RET(pthread_mutex_destroy(&rb->rlock), == 0);
 	if (rb->mode == LIBTRACE_RINGBUFFER_BLOCKING) {
-		assert(sem_destroy(&rb->fulls) == 0);
-		assert(sem_destroy(&rb->emptys) == 0);
+		pthread_cond_destroy(&rb->full_cond);
+		pthread_cond_destroy(&rb->empty_cond);
 	}
 	rb->size = 0;
 	rb->start = 0;
@@ -125,11 +114,91 @@ DLLEXPORT int libtrace_ringbuffer_is_empty(const libtrace_ringbuffer_t * rb) {
  * write/read try instead.
  */
 DLLEXPORT int libtrace_ringbuffer_is_full(const libtrace_ringbuffer_t * rb) {
-#if USE_MODULUS
 	return rb->start == ((rb->end + 1) % rb->size);
-#else
-	return rb->start == ((rb->end + 1 < rb->size) ? rb->end + 1 : 0);
-#endif
+}
+
+static inline size_t libtrace_ringbuffer_nb_full(const libtrace_ringbuffer_t *rb) {
+	if (rb->end < rb->start)
+		return rb->end + rb->size - rb->start;
+	else
+		return rb->end - rb->start;
+	// return (rb->end + rb->size - rb->start) % rb->size;
+}
+
+static inline size_t libtrace_ringbuffer_nb_empty(const libtrace_ringbuffer_t *rb) {
+	if (rb->start <= rb->end)
+		return rb->start + rb->size - rb->end - 1;
+	else
+		return rb->start - rb->end - 1;
+	// return (rb->start + rb->size - rb->end - 1) % rb->size;
+}
+
+/**
+ * Waits for a empty slot, that we can write to.
+ * @param rb The ringbuffer
+ */
+static inline void wait_for_empty(libtrace_ringbuffer_t *rb) {
+	/* Need an empty to start with */
+	if (rb->mode == LIBTRACE_RINGBUFFER_BLOCKING) {
+		pthread_mutex_lock(&rb->empty_lock);
+		while (libtrace_ringbuffer_is_full(rb))
+			pthread_cond_wait(&rb->empty_cond, &rb->empty_lock);
+		pthread_mutex_unlock(&rb->empty_lock);
+	} else {
+		while (libtrace_ringbuffer_is_full(rb))
+			/* Yield our time, why?, we tried and failed to write an item
+			 * to the buffer - so we should give up our time in the hope
+			 * that the reader thread can empty the buffer giving us a good
+			 * burst to write without blocking */
+			sched_yield();//_mm_pause();
+	}
+}
+
+/**
+ * Waits for a full slot, that we read from.
+ * @param rb The ringbuffer
+ */
+static inline void wait_for_full(libtrace_ringbuffer_t *rb) {
+	/* Need an empty to start with */
+	if (rb->mode == LIBTRACE_RINGBUFFER_BLOCKING) {
+		pthread_mutex_lock(&rb->full_lock);
+		while (libtrace_ringbuffer_is_empty(rb))
+			pthread_cond_wait(&rb->full_cond, &rb->full_lock);
+		pthread_mutex_unlock(&rb->full_lock);
+	} else {
+		while (libtrace_ringbuffer_is_empty(rb))
+			/* Yield our time, why?, we tried and failed to write an item
+			 * to the buffer - so we should give up our time in the hope
+			 * that the reader thread can empty the buffer giving us a good
+			 * burst to write without blocking */
+			sched_yield();//_mm_pause();
+	}
+}
+
+/**
+ * Notifies we have created a full slot, after a write.
+ * @param rb The ringbuffer
+ */
+static inline void notify_full(libtrace_ringbuffer_t *rb) {
+	/* Need an empty to start with */
+	if (rb->mode == LIBTRACE_RINGBUFFER_BLOCKING) {
+		pthread_mutex_lock(&rb->full_lock);
+		pthread_cond_broadcast(&rb->full_cond);
+		pthread_mutex_unlock(&rb->full_lock);
+	}
+}
+
+/**
+ * Notifies we have created an empty slot, after a read.
+ * @param rb The ringbuffer
+ */
+static inline void notify_empty(libtrace_ringbuffer_t *rb) {
+	/* Need an empty to start with */
+	if (rb->mode == LIBTRACE_RINGBUFFER_BLOCKING) {
+		pthread_mutex_lock(&rb->empty_lock);
+		pthread_cond_broadcast(&rb->empty_cond);
+		pthread_mutex_unlock(&rb->empty_lock);
+	}
 }
 
 /**
@@ -144,29 +213,52 @@ DLLEXPORT int libtrace_ringbuffer_is_full(const libtrace_ringbuffer_t * rb) {
  */
 DLLEXPORT void libtrace_ringbuffer_write(libtrace_ringbuffer_t * rb, void* value) {
 	/* Need an empty to start with */
-	if (rb->mode == LIBTRACE_RINGBUFFER_BLOCKING)
-		assert(sem_wait(&rb->emptys) == 0);
-	else 
-		while (libtrace_ringbuffer_is_full(rb))
-			/* Yield our time, why?, we tried and failed to write an item
-			 * to the buffer - so we should give up our time in the hope
-			 * that the reader thread can empty the buffer giving us a good
-			 * burst to write without blocking */
-			sched_yield();//_mm_pause();
-
+	wait_for_empty(rb);
 	rb->elements[rb->end] = value;
-#if USE_MODULUS
 	rb->end = (rb->end + 1) % rb->size;
-#else
-	rb->end = (rb->end + 1 < rb->size) ? rb->end + 1 : 0;
-#endif
-	/* This check is bad we can easily lose our time slice, and the reader
-	 * can catch up before it should, in this case spin locking is used */
-	//if (libtrace_ringbuffer_is_empty(rb))
-	//	assert(0 == 1);
-	/* Now we've made another full */
-	if (rb->mode == LIBTRACE_RINGBUFFER_BLOCKING)
-		assert(sem_post(&rb->fulls) == 0);
+	notify_full(rb);
+}
+
+/**
+ * Performs a blocking write to the buffer, upon return the value will be
+ * stored. This will not clobber old values.
+ * 
+ * This assumes only one thread writing at once. Use 
+ * libtrace_ringbuffer_swrite for a thread safe version.
+ *
+ * Packets are written out from start to end in order, if only some packets are
+ * written those at the end of the array will be still be unwritten.
+ *
+ * @param rb a pointer to libtrace_ringbuffer structure
+ * @param values A pointer to a memory address read in
+ * @param nb_buffer The maximum buffers to write i.e. the length of values
+ * @param min_nb_buffers The minimum number of buffers to write
+ * @param value the value to store
+ */
+DLLEXPORT size_t libtrace_ringbuffer_write_bulk(libtrace_ringbuffer_t * rb, void *values[], size_t nb_buffers, size_t min_nb_buffers) {
+	size_t nb_ready;
+	size_t i = 0;
+	
+	assert(min_nb_buffers <= nb_buffers);
+	if (!min_nb_buffers && libtrace_ringbuffer_is_full(rb))
+		return 0;
+
+	do {
+		register size_t end;
+		wait_for_empty(rb);
+		nb_ready = libtrace_ringbuffer_nb_empty(rb);
+		nb_ready = MIN(nb_ready, nb_buffers-i);
+		nb_ready += i;
+		// TODO consider optimising into at most 2 memcpys??
+		end = rb->end;
+		for (; i < nb_ready; i++) {
+			rb->elements[end] = values[i];
+			end = (end + 1) % rb->size;
+		}
+		rb->end = end;
+		notify_full(rb);
+	} while (i < min_nb_buffers);
+	return i;
 }
 
 /**
@@ -197,27 +289,60 @@ DLLEXPORT void* libtrace_ringbuffer_read(libtrace_ringbuffer_t *rb) {
 	void* value;
 	
 	/* We need a full slot */
-	if (rb->mode == LIBTRACE_RINGBUFFER_BLOCKING)
-		assert(sem_wait(&rb->fulls) == 0);
-	else
-		while (libtrace_ringbuffer_is_empty(rb)) 
-			/* Yield our time, why?, we tried and failed to read an item
-			 * from the buffer - so we should give up our time in the hope
-			 * that the writer thread can fill the buffer giving us a good
-			 * burst to read without blocking etc */
-			sched_yield();//_mm_pause();
-	
+	wait_for_full(rb);
 	value = rb->elements[rb->start];
-#if USE_MODULUS
 	rb->start = (rb->start + 1) % rb->size;
-#else
-	rb->start = (rb->start + 1 < rb->size) ? rb->start + 1 : 0;
-#endif
-	/* Now that's a empty slot */
-	if (rb->mode == LIBTRACE_RINGBUFFER_BLOCKING)
-		assert(sem_post(&rb->emptys) == 0);
+	/* Now that's an empty slot */
+	notify_empty(rb);
 	return value;
 }
+
+/**
+ * Waits and reads from the supplied buffer, note this will block forever.
+ * Attempts to read the requested number of packets, however will return
+ * with only the number that are currently ready.
+ *
+ * Set min_nb_buffers to 0 to 'try' read packets.
+ *
+ * The buffer is filled from start to finish i.e. if 2 is returned [0] and [1]
+ * are valid.
+ * 
+ * @param rb a pointer to libtrace_ringbuffer structure
+ * @param values A pointer to a memory address where the returned item would be placed
+ * @param nb_buffer The maximum buffers to read i.e. the length of values
+ * @param min_nb_buffers The minimum number of buffers to read
+ * @return The number of packets read
+ */
+DLLEXPORT size_t libtrace_ringbuffer_read_bulk(libtrace_ringbuffer_t *rb, void *values[], size_t nb_buffers, size_t min_nb_buffers) {
+	size_t nb_ready;
+	size_t i = 0;
+	
+	assert(min_nb_buffers <= nb_buffers);
+
+	if (!min_nb_buffers && libtrace_ringbuffer_is_empty(rb))
+		return 0;
+
+	do {
+		register size_t start;
+		/* We need a full slot */
+		wait_for_full(rb);
+
+		nb_ready = libtrace_ringbuffer_nb_full(rb);
+		nb_ready = MIN(nb_ready, nb_buffers-i);
+		// Additional to the i we've already read
+		nb_ready += i;
+		start = rb->start;
+		for (; i < nb_ready; i++) {
+			values[i] = rb->elements[start];
+			start = (start + 1) % rb->size;
+		}
+		rb->start = start;
+		/* Now that's an empty slot */
+		notify_empty(rb);
+	} while (i < min_nb_buffers);
+	return i;
+}
+
 
 /**
  * Tries to read from the supplied buffer if it fails this and returns
@@ -241,6 +366,21 @@ DLLEXPORT void libtrace_ringbuffer_swrite(libtrace_ringbuffer_t * rb, void* valu
 	LOCK(w);
 	libtrace_ringbuffer_write(rb, value);
 	UNLOCK(w);
+}
+
+/**
+ * A thread safe version of libtrace_ringbuffer_write_bulk
+ */
+DLLEXPORT size_t libtrace_ringbuffer_swrite_bulk(libtrace_ringbuffer_t * rb, void *values[], size_t nb_buffers, size_t min_nb_buffers) {
+	size_t ret;
+#if USE_CHECK_EARLY
+	if (!min_nb_buffers && libtrace_ringbuffer_is_full(rb)) // Check early
+		return 0;
+#endif
+	LOCK(w);
+	ret = libtrace_ringbuffer_write_bulk(rb, values, nb_buffers, min_nb_buffers);
+	UNLOCK(w);
+	return ret;
 }
 
 /**
@@ -289,6 +429,21 @@ DLLEXPORT void * libtrace_ringbuffer_sread(libtrace_ringbuffer_t *rb) {
 }
 
 /**
+ * A thread safe version of libtrace_ringbuffer_read_bulk
+ */
+DLLEXPORT size_t libtrace_ringbuffer_sread_bulk(libtrace_ringbuffer_t * rb, void *values[], size_t nb_buffers, size_t min_nb_buffers) {
+	size_t ret;
+#if USE_CHECK_EARLY
+	if (!min_nb_buffers && libtrace_ringbuffer_is_empty(rb)) // Check early
+		return 0;
+#endif
+	LOCK(r);
+	ret = libtrace_ringbuffer_read_bulk(rb, values, nb_buffers, min_nb_buffers);
+	UNLOCK(r);
+	return ret;
+}
+
+/**
  * A thread safe version of libtrace_ringbuffer_try_write
  */
 DLLEXPORT int libtrace_ringbuffer_try_sread(libtrace_ringbuffer_t *rb, void ** value) {
@@ -329,3 +484,5 @@ DLLEXPORT void libtrace_zero_ringbuffer(libtrace_ringbuffer_t * rb)
 	rb->size = 0;
 	rb->elements = NULL;
 }
+
+
