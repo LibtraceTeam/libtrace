@@ -286,7 +286,6 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 	libtrace->first_packets.count = 0;
 	libtrace->first_packets.packets = NULL;
 	libtrace->dropped_packets = UINT64_MAX;
-	libtrace->accepted_packets = UINT64_MAX;
 
         /* Parse the URI to determine what sort of trace we are dealing with */
 	if ((uridata = trace_parse_uri(uri, &scan)) == 0) {

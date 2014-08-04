@@ -166,12 +166,12 @@ typedef enum { TS_NONE, TS_TIMEVAL, TS_TIMESPEC } timestamptype_t;
 #define PACKET_FANOUT_CPU               2
 // Something to do with fragmented packets and hashing problems !! TODO figure out if this needs to be on
 #define PACKET_FANOUT_FLAG_DEFRAG       0x8000
-/* Included but unused by libtrace since 3.10 */
+/* Included but unused by libtrace since Linux 3.10 */
 // if one socket if full roll over to the next
 #define PACKET_FANOUT_ROLLOVER          3
 // This flag makes any other system roll over
 #define PACKET_FANOUT_FLAG_ROLLOVER     0x1000
-/* Included but unused by libtrace since 3.12 */
+/* Included but unused by libtrace since Linux 3.12 */
 // schedule random
 #define PACKET_FANOUT_RND               4
 
@@ -1359,7 +1359,7 @@ static int linuxring_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet
 }
 
 static int linuxring_pread_packet(libtrace_t *libtrace, libtrace_thread_t *t, libtrace_packet_t *packet) {
-	fprintf(stderr, "Thread number is #%d\n", t->perpkt_num);
+	//fprintf(stderr, "Thread number is #%d\n", t->perpkt_num);
 	int fd = PERPKT_FORMAT(t)->fd;
 	int *rxring_offset = &PERPKT_FORMAT(t)->rxring_offset;
 	char *rx_ring = PERPKT_FORMAT(t)->rx_ring;
@@ -1734,6 +1734,8 @@ static uint64_t linuxnative_get_filtered_packets(libtrace_t *trace UNUSED) {
 
 /* Number of packets that passed filtering */
 static uint64_t linuxnative_get_captured_packets(libtrace_t *trace) {
+	struct tpacket_stats stats;
+
 	if (trace->format_data == NULL)
 		return UINT64_MAX;
 	if (FORMAT(trace->format_data)->fd == -1) {
@@ -1742,16 +1744,34 @@ static uint64_t linuxnative_get_captured_packets(libtrace_t *trace) {
 		return UINT64_MAX;
 	}
 
-#ifdef HAVE_NETPACKET_PACKET_H	
-	if ((FORMAT(trace->format_data)->stats_valid & 1) 
-			|| FORMAT(trace->format_data)->stats_valid == 0) {
-		socklen_t len = sizeof(FORMAT(trace->format_data)->stats);
-		getsockopt(FORMAT(trace->format_data)->fd, 
-				SOL_PACKET,
-				PACKET_STATISTICS,
-				&FORMAT(trace->format_data)->stats,
-				&len);
-		FORMAT(trace->format_data)->stats_valid |= 1;
+#ifdef HAVE_NETPACKET_PACKET_H
+
+	if ((FORMAT(trace->format_data)->stats_valid & 1)
+	        || FORMAT(trace->format_data)->stats_valid == 0) {
+		if (FORMAT(trace->format_data)->per_thread) {
+			size_t i;
+			FORMAT(trace->format_data)->stats.tp_drops = 0;
+			FORMAT(trace->format_data)->stats.tp_packets = 0;
+			for (i = 0; i < trace->perpkt_thread_count; ++i) {
+				socklen_t len = sizeof(stats);
+				getsockopt(FORMAT(trace->format_data)->per_thread[i].fd,
+				           SOL_PACKET,
+				           PACKET_STATISTICS,
+				           &stats,
+				           &len);
+				FORMAT(trace->format_data)->stats.tp_drops += stats.tp_drops;
+				FORMAT(trace->format_data)->stats.tp_packets += stats.tp_packets;
+			}
+			FORMAT(trace->format_data)->stats_valid |= 1;
+		} else {
+			socklen_t len = sizeof(FORMAT(trace->format_data)->stats);
+			getsockopt(FORMAT(trace->format_data)->fd,
+			           SOL_PACKET,
+			           PACKET_STATISTICS,
+			           &FORMAT(trace->format_data)->stats,
+			           &len);
+			FORMAT(trace->format_data)->stats_valid |= 1;
+		}
 	}
 
 	return FORMAT(trace->format_data)->stats.tp_packets;
@@ -1764,6 +1784,7 @@ static uint64_t linuxnative_get_captured_packets(libtrace_t *trace) {
  * of lack of space
  */
 static uint64_t linuxnative_get_dropped_packets(libtrace_t *trace) {
+	struct tpacket_stats stats;
 	if (trace->format_data == NULL)
 		return UINT64_MAX;
 	if (FORMAT(trace->format_data)->fd == -1) {
@@ -1771,17 +1792,34 @@ static uint64_t linuxnative_get_dropped_packets(libtrace_t *trace) {
 		 * the socket for drop counts, can we? */
 		return UINT64_MAX;
 	}
-	
+
 #ifdef HAVE_NETPACKET_PACKET_H	
 	if ((FORMAT(trace->format_data)->stats_valid & 2)
-			|| (FORMAT(trace->format_data)->stats_valid==0)) {
-		socklen_t len = sizeof(FORMAT(trace->format_data)->stats);
-		getsockopt(FORMAT(trace->format_data)->fd, 
-				SOL_PACKET,
-				PACKET_STATISTICS,
-				&FORMAT(trace->format_data)->stats,
-				&len);
-		FORMAT(trace->format_data)->stats_valid |= 2;
+	        || (FORMAT(trace->format_data)->stats_valid==0)) {
+		if (FORMAT(trace->format_data)->per_thread) {
+			size_t i;
+			FORMAT(trace->format_data)->stats.tp_drops = 0;
+			FORMAT(trace->format_data)->stats.tp_packets = 0;
+			for (i = 0; i < trace->perpkt_thread_count; ++i) {
+				socklen_t len = sizeof(stats);
+				getsockopt(FORMAT(trace->format_data)->per_thread[i].fd,
+				           SOL_PACKET,
+				           PACKET_STATISTICS,
+				           &stats,
+				           &len);
+				FORMAT(trace->format_data)->stats.tp_drops += stats.tp_drops;
+				FORMAT(trace->format_data)->stats.tp_packets += stats.tp_packets;
+			}
+			FORMAT(trace->format_data)->stats_valid |= 2;
+		} else {
+			socklen_t len = sizeof(FORMAT(trace->format_data)->stats);
+			getsockopt(FORMAT(trace->format_data)->fd,
+			           SOL_PACKET,
+			           PACKET_STATISTICS,
+			           &FORMAT(trace->format_data)->stats,
+			           &len);
+			FORMAT(trace->format_data)->stats_valid |= 2;
+		}
 	}
 
 	return FORMAT(trace->format_data)->stats.tp_drops;
