@@ -371,10 +371,10 @@ static inline size_t libtrace_ocache_free_cache(libtrace_ocache_t *oc, void *val
 		if (lc->used)
 			memmove(lc->cache, &lc->cache[lc->total - lc->used], sizeof(void *) * lc->used);
 
-		if (lc->used == lc->total)
-			mem_hits.writebulk.ring_hit += 1;
-		else
+		if (lc->used)
 			mem_hits.writebulk.miss += 1;
+		else
+			mem_hits.writebulk.ring_hit += 1;
 		mem_hits.write.ring_hit += lc->total - lc->used;
 	}
 
