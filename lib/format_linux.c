@@ -500,8 +500,14 @@ static int linuxnative_start_input(libtrace_t *libtrace)
 	 * pre-compiled.
 	 */
 	if (filter != NULL) {
-		assert(filter->flag == 1);
-		if (setsockopt(FORMAT(libtrace->format_data)->fd,
+                /* Check if the filter was successfully compiled. If not,
+                 * it is probably a bad filter and we should return an error
+                 * before the caller tries to read any packets */
+		if (filter->flag == 0) {
+                        return -1;
+                }
+                
+                if (setsockopt(FORMAT(libtrace->format_data)->fd,
 					SOL_SOCKET,
 					SO_ATTACH_FILTER,
 					&filter->filter,
@@ -745,16 +751,23 @@ static int linuxnative_configure_bpf(libtrace_t *libtrace,
 				FORMAT(libtrace->format_data)->snaplen);
 
 		if (pcap_compile(pcap, &f->filter, f->filterstring, 0, 0) == -1) {
-			perror("PCAP failed to compile the filterstring");
-			return -1;
-		}
+		        /* Filter didn't compile, set flag to 0 so we can
+                         * detect this when trace_start() is called and
+                         * produce a useful error
+                         */
+                        f->flag = 0;
+                        trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, 
+                                        "Failed to compile BPF filter (%s): %s",
+                                        f->filterstring, pcap_geterr(pcap));
+                } else {
+                        /* Set the "flag" to indicate that the filterstring 
+                         * has been compiled
+                         */
+                        f->flag = 1;
+                }
 
 		pcap_close(pcap);
 		
-		/* Set the "flag" to indicate that the filterstring has been
-		 * compiled
-		 */
-		f->flag = 1;
 	}
 	
 	if (FORMAT(libtrace->format_data)->filter != NULL)

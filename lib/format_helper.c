@@ -110,8 +110,7 @@ struct libtrace_eventobj_t trace_event_device(struct libtrace_t *trace,
 	} while (ret == -1);
 
 	if (FD_ISSET(event.fd, &rfds_param)) {
-		event.size = trace_read_packet(trace,packet);
-		
+                event.size = trace_read_packet(trace,packet);
 		if (event.size < 1) {
 			/* Covers error and EOF events - terminate rather 
 			 * than report a packet as available */
