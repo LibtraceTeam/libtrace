@@ -294,25 +294,54 @@ static int pcapint_start_input(libtrace_t *libtrace) {
 		return -1; /* failure */
 	}
 #endif
+#ifdef HAVE_PCAP_SETNONBLOCK
+	pcap_setnonblock(INPUT.pcap,0,errbuf);
+#endif
 	/* Set a filter if one is defined */
 	if (DATA(libtrace)->filter) {
-		if (DATA(libtrace)->filter->flag == 0) {
+		struct pcap_pkthdr *pcap_hdr = NULL;
+		u_char *pcap_payload = NULL;
+                int pcapret;
+		
+                if (DATA(libtrace)->filter->flag == 0) {
 			pcap_compile(INPUT.pcap, 
 					&DATA(libtrace)->filter->filter,
 					DATA(libtrace)->filter->filterstring, 
 					1, 0);
 			DATA(libtrace)->filter->flag = 1;
 		}
-		if (pcap_setfilter(INPUT.pcap,&DATA(libtrace)->filter->filter)
+                if (pcap_setfilter(INPUT.pcap,&DATA(libtrace)->filter->filter)
 			== -1) {
 			trace_set_err(libtrace,TRACE_ERR_INIT_FAILED,"%s",
 					pcap_geterr(INPUT.pcap));
 			return -1; /* failure */
 		}
+
+                /* Consume the first packet in the queue, as this may not
+                 * have had the filter applied to it.
+                 *
+                 * Otherwise we can get problems with the event API, where
+                 * select tells us that there is a packet available but
+                 * calling trace_read_packet will block forever because the
+                 * packet in the queue didn't match the filter so
+                 * pcap_next_ex returns "timed out".
+                 *
+                 * This does mean we may consume a legitimate packet, but
+                 * that's a pretty small downside compared with trace_event
+                 * getting stuck in an infinite loop because of pcap
+                 * wackiness. 
+                 *
+                 * For some reason, we only need to consume one packet for
+                 * this to work, so let's hope that holds in the future.
+                 */
+                do {
+        		pcapret = pcap_next_ex(INPUT.pcap, &pcap_hdr, 
+				(const u_char **)&pcap_payload);
+		} while (0);
+
+                if (pcapret < 0)
+                        return -1;
 	}
-#ifdef HAVE_PCAP_SETNONBLOCK
-	pcap_setnonblock(INPUT.pcap,0,errbuf);
-#endif
 	return 0; /* success */
 }
 
@@ -420,7 +449,7 @@ static int pcap_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 			case 0: 
 				if (libtrace_halt)
 					return 0;
-				continue; /* timeout expired */
+                                continue; /* timeout expired */
 			case -1: 
 				trace_set_err(libtrace,TRACE_ERR_BAD_PACKET,
 						"%s",pcap_geterr(INPUT.pcap));

@@ -97,7 +97,7 @@ struct libtrace_eventobj_t trace_event_device(struct libtrace_t *trace,
 	 * uses mmapped sockets by default, I've switched over to this 
 	 * solution. */
 
-	do {
+        do {
 		tv.tv_sec = 0;
 		tv.tv_usec = 0;
 		rfds_param = rfds;
