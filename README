@@ -8,6 +8,7 @@ This code has been developed by the University of Waikato WAND
 research group. For further information please see http://www.wand.net.nz/.
 ---------------------------------------------------------------------------
 
+See INSTALL for instructions on how to install libtrace.
 
 This directory contains source code for libtrace, a userspace library for 
 processing of network traffic capture from live interfaces or from offline
