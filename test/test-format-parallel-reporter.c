@@ -90,84 +90,52 @@ const char *lookup_uri(const char *type) {
 	return type;
 }
 
+int globalcount = 0;
 
-struct TLS {
-	bool seen_start_message;
-	bool seen_stop_message;
-	bool seen_resuming_message;
-	bool seen_pausing_message;
-	int count;
-};
-int x;
+static void* reporter(libtrace_t *libtrace, libtrace_result_t *res, libtrace_message_t *mesg) {
+	static uint64_t last = -1;
+	static int pktcount = 0;
+	if (res) {
+		libtrace_packet_t *packet =  (libtrace_packet_t *) libtrace_result_get_value(res);
+		assert(libtrace_result_get_key(res) == trace_packet_get_order(packet));
+		if(last == (uint64_t)-1) {
+			last = libtrace_result_get_key(res);
+		} else {
+		assert (last < libtrace_result_get_key(res));
+		last = libtrace_result_get_key(res);
+		}
+		pktcount++;
+		trace_free_result_packet(libtrace, packet);
+	} else {
+		// Mesg
+		switch (mesg->code) {
+		case MESSAGE_STOPPING:
+			globalcount = pktcount;
+		default:
+			break;
+		}
+	}
+	return NULL;
+}
 
 static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt, 
 						libtrace_message_t *mesg,
 						libtrace_thread_t *t) {
-	struct TLS *tls;
-	void* ret;
-	// Test internal TLS against __thread
-	static __thread bool seen_start_message = false;
-	static __thread bool seen_stop_message = false;
-	static __thread bool seen_paused_message = false;
-	static __thread bool seen_pausing_message = false;
-	static __thread count = 0;
-	tls = trace_get_tls(t);
-
+	UNUSED static __thread int x = 0;
 	if (pkt) {
 		int a,*b,c=0;
-		assert(tls != NULL);
-		assert(!seen_stop_message);
-		count++;
-		tls->count++;
-		if (count>100) {
-			fprintf(stderr, "Too many packets someone should stop me!!\n");
-			kill(getpid(), SIGTERM);
-		}
 		// Do some work to even out the load on cores
 		b = &c;
 		for (a = 0; a < 10000000; a++) {
 			c += a**b;
 		}
 		x = c;
+		trace_publish_result(trace, t, trace_packet_get_order(pkt), pkt, RESULT_PACKET);
+		return NULL;
 	}
 	else switch (mesg->code) {
-		case MESSAGE_STARTING:
-			assert(!seen_start_message || seen_paused_message);
-			assert(tls == NULL);
-			tls = calloc(sizeof(struct TLS), 1);
-			ret = trace_set_tls(t, tls);
-			assert(ret == NULL);
-			seen_start_message = true;
-			tls->seen_start_message = true;
-			break;
-		case MESSAGE_STOPPING:
-			assert(seen_start_message);
-			assert(tls != NULL);
-			assert(tls->seen_start_message);
-			assert(tls->count == count);
-			seen_stop_message = true;
-			tls->seen_stop_message = true;
-			free(tls);
-			trace_set_tls(t, NULL);
-
-			// All threads publish to verify the thread count
-			trace_publish_result(trace, t, (uint64_t) 0, (void *) count, RESULT_NORMAL);
-			trace_post_reporter(trace);
-			break;
-		case MESSAGE_TICK:
-			assert(seen_start_message);
-			fprintf(stderr, "Not expecting a tick packet\n");
-			kill(getpid(), SIGTERM);
-			break;
-		case MESSAGE_PAUSING:
-			assert(seen_start_message);
-			seen_pausing_message = true;
-			tls->seen_pausing_message = true;
-			break;
-		case MESSAGE_RESUMING:
-			assert(tls->seen_pausing_message  || tls->seen_start_message );
-			seen_paused_message = true;
-			tls->seen_resuming_message = true;
+		// We don't care we have no state
+		default:
 			break;
 	}
 	return pkt;
@@ -175,9 +143,7 @@ static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt,
 
 int main(int argc, char *argv[]) {
 	int error = 0;
-	int count = 0;
 	int expected = 100;
-	int i;
 	const char *tracename;
 	libtrace_t *trace;
 
@@ -193,7 +159,10 @@ int main(int argc, char *argv[]) {
 
 	if (strcmp(argv[1],"rtclient")==0) expected=101;
 
-	trace_pstart(trace, NULL, per_packet, NULL);
+	int i = 1;
+	trace_parallel_config(trace, TRACE_OPTION_SEQUENTIAL, &i);
+
+	trace_pstart(trace, NULL, per_packet, reporter);
 	iferr(trace,tracename);
 
 	/* Make sure traces survive a pause */
@@ -204,34 +173,17 @@ int main(int argc, char *argv[]) {
 
 	/* Wait for all threads to stop */
 	trace_join(trace);
-	libtrace_vector_t results;
-
-	/* Now lets check the results */
-	libtrace_vector_init(&results, sizeof(libtrace_result_t));
-	trace_get_results(trace, &results);
-	printf("\tLooks like %d threads were used!\n\tcounts(", libtrace_vector_get_size(&results));
-	for (i = 0; i < libtrace_vector_get_size(&results); i++) {
-		int ret;
-		libtrace_result_t result;
-		ret = libtrace_vector_get(&results, i, (void *) &result);
-		assert(ret == 1);
-		assert(libtrace_result_get_key(&result) == 0);
-		count += (int) libtrace_result_get_value(&result);
-		printf("%d,", (int) libtrace_result_get_value(&result));
-	}
-	printf(")\n");
-	libtrace_vector_destroy(&results);
 
 	if (error == 0) {
-		if (count == expected) {
+		if (globalcount == expected) {
 			printf("success: %d packets read\n",expected);
 		} else {
-			printf("failure: %d packets expected, %d seen\n",expected,count);
+			printf("failure: %d packets expected, %d seen\n",expected,globalcount);
 			error = 1;
 		}
 	} else {
 		iferr(trace,tracename);
 	}
-    trace_destroy(trace);
-    return error;
+	trace_destroy(trace);
+	return error;
 }

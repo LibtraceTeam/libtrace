@@ -243,8 +243,11 @@ typedef struct libtrace_filter_t libtrace_filter_t;
 typedef struct libtrace_result_t {
 	uint64_t key;
 	void * value;
-	int is_packet;
+	int type;
 } libtrace_result_t;
+#define RESULT_NORMAL 0
+#define RESULT_PACKET 1
+#define RESULT_TICK   2
 
 typedef struct libtrace_thread_t libtrace_thread_t;
 
@@ -3195,10 +3198,10 @@ typedef struct libtrace_message_t {
 } libtrace_message_t;
 
 typedef void* (*fn_per_pkt)(libtrace_t* trace, libtrace_packet_t *p, libtrace_message_t *m, libtrace_thread_t *thread);
-typedef void* (*fn_reducer)(libtrace_t* trace, void* global_blob);
+typedef void* (*fn_reporter)(libtrace_t* trace, libtrace_result_t *r, libtrace_message_t *m);
 typedef uint64_t (*fn_hasher)(const libtrace_packet_t* packet, void *data);
 
-DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob, fn_per_pkt per_pkt, fn_reducer reducer);
+DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob, fn_per_pkt per_pkt, fn_reporter reporter);
 DLLEXPORT int trace_ppause(libtrace_t *libtrace);
 DLLEXPORT int trace_pstop(libtrace_t *libtrace);
 DLLEXPORT void trace_join(libtrace_t * trace);
@@ -3218,16 +3221,15 @@ DLLEXPORT void * trace_set_tls(libtrace_thread_t *t, void * data);
 DLLEXPORT void * trace_get_tls(libtrace_thread_t *t);
 
 
-DLLEXPORT void trace_publish_result(libtrace_t *libtrace, uint64_t key, void * value);
-DLLEXPORT void trace_publish_packet(libtrace_t *libtrace, libtrace_packet_t *packet);
+DLLEXPORT void trace_publish_result(libtrace_t *libtrace, libtrace_thread_t *t, uint64_t key, void * value, int type);
 typedef struct libtrace_vector libtrace_vector_t;
 DLLEXPORT int trace_get_results(libtrace_t *libtrace, libtrace_vector_t * results);
 
-DLLEXPORT int trace_post_reduce(libtrace_t *libtrace);
+DLLEXPORT int trace_post_reporter(libtrace_t *libtrace);
 DLLEXPORT int libtrace_thread_get_message_count(libtrace_t * libtrace);
 DLLEXPORT int libtrace_thread_get_message(libtrace_t * libtrace, libtrace_message_t * message);
 DLLEXPORT int libtrace_thread_try_get_message(libtrace_t * libtrace, libtrace_message_t * message);
-DLLEXPORT int trace_send_message_to_reducer(libtrace_t * libtrace, libtrace_message_t * message);
+DLLEXPORT int trace_send_message_to_reporter(libtrace_t * libtrace, libtrace_message_t * message);
 DLLEXPORT int trace_send_message_to_perpkts(libtrace_t * libtrace, libtrace_message_t * message);
 DLLEXPORT int trace_send_message_to_thread(libtrace_t * libtrace, libtrace_thread_t *t, libtrace_message_t * message);
 DLLEXPORT int trace_finished(libtrace_t * libtrace);
@@ -3247,24 +3249,6 @@ typedef enum {
 	TRACE_OPTION_SET_HASHER,
 	
 	/**
-	 * See diagrams, this sets the maximum size of freelist used to 
-	 * maintain packets and there memory buffers.
-	 * NOTE setting this to less than recommend could cause deadlock a
-	 * trace that manages its own packets.
-	 * A unblockable error message will be printed.
-	 */
-	TRACE_OPTION_SET_PACKET_FREELIST_SIZE,
-	
-	/**
-	 * See diagrams, this sets the maximum size of buffers used between
-	 * the single hasher thread and the buffer.
-	 * NOTE setting this to less than recommend could cause deadlock a
-	 * trace that manages its own packets.
-	 * A unblockable warning message will be printed to stderr in this case.
-	 */
-	TRACE_OPTION_SET_PERPKT_BUFFER_SIZE,
-	
-	/**
 	 * Libtrace set perpkt thread count
 	 */
 	TRACE_OPTION_SET_PERPKT_THREAD_COUNT,
@@ -3281,7 +3265,7 @@ typedef enum {
 	 /**
 	  * Libtrace ordered results, results in each queue are ordered by key
 	  * however my not be sequential, a typically case is packet timestamps
-	  * the reducer will receive packets in order - note threasholds
+	  * the reporter will receive packets in order - note threasholds
 	  * will be used such that a empty queue wont break things
 	  */
 	 TRACE_OPTION_ORDERED,
@@ -3307,18 +3291,18 @@ typedef enum {
 } trace_parallel_option_t;
 
 enum libtrace_messages {
-	MESSAGE_STARTED,
-	MESSAGE_DO_PAUSE,
+	MESSAGE_STARTING,
+	MESSAGE_RESUMING,
+	MESSAGE_STOPPING,
 	MESSAGE_PAUSING,
-	MESSAGE_PAUSED,
+	MESSAGE_DO_PAUSE,
 	MESSAGE_DO_STOP,
-	MESSAGE_STOPPED,
 	MESSAGE_FIRST_PACKET,
 	MESSAGE_PERPKT_ENDED,
 	MESSAGE_PERPKT_RESUMED,
 	MESSAGE_PERPKT_PAUSED,
 	MESSAGE_PERPKT_EOF,
-	MESSAGE_POST_REDUCE,
+	MESSAGE_POST_REPORTER,
 	MESSAGE_POST_RANGE,
 	MESSAGE_TICK,
 	MESSAGE_USER
@@ -3384,6 +3368,51 @@ DLLEXPORT libtrace_packet_t* trace_result_packet(libtrace_t * libtrace, libtrace
 DLLEXPORT void trace_free_result_packet(libtrace_t * libtrace, libtrace_packet_t * packet);
 DLLEXPORT int trace_set_hasher(libtrace_t *trace, enum hasher_types type, fn_hasher hasher, void *data);
 DLLEXPORT libtrace_info_t *trace_get_information(libtrace_t * libtrace);
+
+/**
+ * Tuning the parallel sizes
+ */
+struct user_configuration {
+	// Packet memory cache settings (ocache_init) total
+	/**
+	 * See diagrams, this sets the maximum size of freelist used to
+	 * maintain packets and their memory buffers.
+	 * NOTE setting this to less than recommend could cause deadlock a
+	 * trace that manages its own packets.
+	 * A unblockable error message will be printed.
+	 */
+	size_t packet_global_cache_size;
+	// Per thread
+	size_t packet_thread_cache_size;
+	// Packet count limited
+	bool fixed_packet_count;
+	// Bursts/Batches of packets this size are combined, used in single thread mode
+	size_t burst_size;
+	// Each perpkt thread has a queue leading into the reporter
+	//size_t reporter_queue_size;
+	/** The tick interval - in milliseconds (0) */
+	size_t tick_interval;
+	// The tick interval for file based traces, in number of packets TODO implement this
+	size_t tick_count;
+
+	// The number of per packet threads requested
+	size_t perpkt_threads;
+
+	/**
+	 * See diagrams, this sets the maximum size of buffers used between
+	 * the single hasher thread and the buffer.
+	 * NOTE setting this to less than recommend could cause deadlock a
+	 * trace that manages its own packets.
+	 * A unblockable warning message will be printed to stderr in this case.
+	 */
+	/** The number of packets that can queue per thread from hasher thread */
+	size_t hasher_queue_size;
+
+	// Reporter threashold before results are sent
+	size_t reporter_thold;
+};
+
+#define ZERO_USER_CONFIG(config) memset(&config, 0, sizeof(struct user_configuration));
 
 #ifdef __cplusplus
 } /* extern "C" */

@@ -176,7 +176,7 @@ enum thread_types {
 	THREAD_EMPTY,
 	THREAD_HASHER,
 	THREAD_PERPKT,
-	THREAD_REDUCER,
+	THREAD_REPORTER,
 	THREAD_KEEPALIVE
 };
 
@@ -306,28 +306,20 @@ struct libtrace_t {
 
 	/** For the sliding window hasher implementation */
 	pthread_rwlock_t window_lock;
-	/** Set once trace_join has been called */
-	bool joined;
 	/** Set to indicate a perpkt's queue is full as such the writing perpkt cannot proceed */
 	bool perpkt_queue_full;
 	/** Global storage for this trace, shared among all the threads  */
 	void* global_blob;
-	/** Requested size of the pkt buffer (currently only used if using dedicated hasher thread) */
-	int packet_freelist_size;
 	/** The actual freelist */
 	libtrace_ocache_t packet_freelist;
-	/** The number of packets that can queue per thread - XXX consider deadlocks with non malloc()'d packets that need to be released */
-	int perpkt_buffer_size;
-	/** The reducer flags */
-	int reducer_flags;
-	/** The tick interval - in milliseconds (0 or -ve==disabled) */
-	int tick_interval;
+	/** The reporter flags */
+	int reporter_flags;
 	/** Used to track the next expected key */
 	uint64_t expected_key;
 	/** User defined per_pkt function called when a pkt is ready */
 	fn_per_pkt per_pkt;
-	/** User defined reducer function entry point XXX not hooked up */
-	fn_reducer reducer;
+	/** User defined reporter function entry point XXX not hooked up */
+	fn_reporter reporter;
 	/** The hasher function */
 	enum hasher_types hasher_type;
 	/** The hasher function - NULL implies they don't care or balance */
@@ -335,7 +327,7 @@ struct libtrace_t {
 	void *hasher_data;
 	
 	libtrace_thread_t hasher_thread;
-	libtrace_thread_t reducer_thread;
+	libtrace_thread_t reporter_thread;
 	libtrace_thread_t keepalive_thread;
 	int perpkt_thread_count;
 	libtrace_thread_t * perpkt_threads; // All our perpkt threads
@@ -350,7 +342,8 @@ struct libtrace_t {
 	 * paused or stopped before this counter is taken
 	 */
 	uint64_t dropped_packets;
-	uint64_t received_packets; 
+	uint64_t received_packets;
+	struct user_configuration config;
 };
 
 void trace_fin_packet(libtrace_packet_t *packet);

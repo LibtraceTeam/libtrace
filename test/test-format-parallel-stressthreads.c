@@ -94,7 +94,7 @@ const char *lookup_uri(const char *type) {
 struct TLS {
 	bool seen_start_message;
 	bool seen_stop_message;
-	bool seen_paused_message;
+	bool seen_resuming_message;
 	bool seen_pausing_message;
 	int count;
 };
@@ -124,22 +124,22 @@ static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt,
 		x = c;
 	}
 	else switch (mesg->code) {
-		case MESSAGE_STARTED:
+		case MESSAGE_STARTING:
 			assert(tls == NULL);
 			tls = calloc(sizeof(struct TLS), 1);
 			ret = trace_set_tls(t, tls);
 			assert(ret == NULL);
 			tls->seen_start_message = true;
 			break;
-		case MESSAGE_STOPPED:
+		case MESSAGE_STOPPING:
 			assert(tls->seen_start_message);
 			assert(tls != NULL);
 			tls->seen_stop_message = true;
 			trace_set_tls(t, NULL);
 
 			// All threads publish to verify the thread count
-			trace_publish_result(trace, (uint64_t) 0, (void *) tls->count);
-			trace_post_reduce(trace);
+			trace_publish_result(trace, t, (uint64_t) 0, (void *) tls->count, RESULT_NORMAL);
+			trace_post_reporter(trace);
 			free(tls);
 			break;
 		case MESSAGE_TICK:
@@ -151,9 +151,9 @@ static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt,
 			assert(tls->seen_start_message);
 			tls->seen_pausing_message = true;
 			break;
-		case MESSAGE_PAUSED:
-			assert(tls->seen_pausing_message);
-			tls->seen_paused_message = true;
+		case MESSAGE_RESUMING:
+			assert(tls->seen_pausing_message || tls->seen_start_message);
+			tls->seen_resuming_message = true;
 			break;
 	}
 	return pkt;

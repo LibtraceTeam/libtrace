@@ -264,28 +264,26 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 	// libtrace->perpkt_cond;
 	libtrace->state = STATE_NEW;
 	libtrace->perpkt_queue_full = false;
-	libtrace->reducer_flags = 0;
+	libtrace->reporter_flags = 0;
 	libtrace->global_blob = NULL;
 	libtrace->per_pkt = NULL;
-	libtrace->reducer = NULL;
+	libtrace->reporter = NULL;
 	libtrace->hasher = NULL;
-	libtrace->packet_freelist_size = 0;
-	libtrace->perpkt_buffer_size = 0;
 	libtrace->expected_key = 0;
 	libtrace_zero_ocache(&libtrace->packet_freelist);
 	libtrace_zero_thread(&libtrace->hasher_thread);
-	libtrace_zero_thread(&libtrace->reducer_thread);
+	libtrace_zero_thread(&libtrace->reporter_thread);
 	libtrace_zero_thread(&libtrace->keepalive_thread);
 	libtrace_zero_slidingwindow(&libtrace->sliding_window);
-	libtrace->reducer_thread.type = THREAD_EMPTY;
+	libtrace->reporter_thread.type = THREAD_EMPTY;
 	libtrace->perpkt_thread_count = 0;
 	libtrace->perpkt_threads = NULL;
 	libtrace->tracetime = 0;
-	libtrace->tick_interval = 0;
 	libtrace->first_packets.first = 0;
 	libtrace->first_packets.count = 0;
 	libtrace->first_packets.packets = NULL;
 	libtrace->dropped_packets = UINT64_MAX;
+	ZERO_USER_CONFIG(libtrace->config);
 
         /* Parse the URI to determine what sort of trace we are dealing with */
 	if ((uridata = trace_parse_uri(uri, &scan)) == 0) {
@@ -387,24 +385,22 @@ DLLEXPORT libtrace_t * trace_create_dead (const char *uri) {
 	// libtrace->perpkt_cond;
 	libtrace->state = STATE_NEW; // TODO MAYBE DEAD
 	libtrace->perpkt_queue_full = false;
-	libtrace->reducer_flags = 0;
+	libtrace->reporter_flags = 0;
 	libtrace->global_blob = NULL;
 	libtrace->per_pkt = NULL;
-	libtrace->reducer = NULL;
+	libtrace->reporter = NULL;
 	libtrace->hasher = NULL;
 	libtrace->expected_key = 0;
-	libtrace->packet_freelist_size = 0;
-	libtrace->perpkt_buffer_size = 0;
 	libtrace_zero_ocache(&libtrace->packet_freelist);
 	libtrace_zero_thread(&libtrace->hasher_thread);
-	libtrace_zero_thread(&libtrace->reducer_thread);
+	libtrace_zero_thread(&libtrace->reporter_thread);
 	libtrace_zero_thread(&libtrace->keepalive_thread);
 	libtrace_zero_slidingwindow(&libtrace->sliding_window);
-	libtrace->reducer_thread.type = THREAD_EMPTY;
+	libtrace->reporter_thread.type = THREAD_EMPTY;
 	libtrace->perpkt_thread_count = 0;
 	libtrace->perpkt_threads = NULL;
 	libtrace->tracetime = 0;
-	libtrace->tick_interval = 0;
+	ZERO_USER_CONFIG(libtrace->config);
 	
 	for(tmp=formats_list;tmp;tmp=tmp->next) {
                 if (strlen(scan) == strlen(tmp->name) &&

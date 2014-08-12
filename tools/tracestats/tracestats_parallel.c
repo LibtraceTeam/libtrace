@@ -66,15 +66,15 @@ static void cleanup_signal(int signal)
 	(void)signal;
 	// trace_interrupt();
 	// trace_pstop isn't really signal safe because its got lots of locks in it
-	// trace_pstop(trace);
-	if (s == 0) {
+    trace_pstop(trace);
+    /*if (s == 0) {
 		if (trace_ppause(trace) == -1)
 			trace_perror(trace, "Pause failed");
 	}
 	else {
 		if (trace_pstart(trace, NULL, NULL, NULL) == -1)
 			trace_perror(trace, "Start failed");
-	}
+    }*/
 	s = !s;
 }
 
@@ -128,11 +128,11 @@ static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt, libtrace_mess
 	if (mesg) {
 		// printf ("%d.%06d READ #%"PRIu64"\n", tv.tv_sec, tv.tv_usec, trace_packet_get(packet));
 		switch (mesg->code) {
-			case MESSAGE_STOPPED:
-				trace_publish_result(trace, 0, results); // Only ever using a single key 0
+			case MESSAGE_STOPPING:
+				trace_publish_result(trace, t, 0, results, RESULT_NORMAL); // Only ever using a single key 0
 				fprintf(stderr, "Thread published resuslts WOWW\n");
 				break;
-			case MESSAGE_STARTED:
+			case MESSAGE_STARTING:
 				results = calloc(1, sizeof(statistics_t) * (filter_count + 1));
 				break;
 			case MESSAGE_DO_PAUSE:
@@ -141,7 +141,7 @@ static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt, libtrace_mess
 			case MESSAGE_PAUSING:
 				fprintf(stderr, "Thread is pausing\n");
 				break;
-			case MESSAGE_PAUSED:
+			case MESSAGE_RESUMING:
 				fprintf(stderr, "Thread has paused\n");
 				break;
 		}
@@ -227,7 +227,7 @@ static void run_trace(char *uri)
 	
 	int option = 2;
 	//option = 10000;
-	trace_set_hasher(trace, HASHER_CUSTOM, &rand_hash, NULL);
+    //trace_set_hasher(trace, HASHER_CUSTOM, &rand_hash, NULL);
 	option = 2;
 	trace_parallel_config(trace, TRACE_OPTION_SET_PERPKT_THREAD_COUNT, &option);
 	//trace_parallel_config(trace, TRACE_OPTION_SET_MAPPER_BUFFER_SIZE, &option);
