@@ -208,8 +208,8 @@ static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt,
 		while (packet_interval != UINT64_MAX && last_ts<ts) {
 			// Publish and make a new one new
 			//fprintf(stderr, "Publishing result %"PRIu64"\n", last_ts);
-			trace_publish_result(trace, (uint64_t) last_ts, results);
-			trace_post_reduce(trace);
+			trace_publish_result(trace, t, (uint64_t) last_ts, results, RESULT_NORMAL);
+			trace_post_reporter(trace);
 			results = calloc(1, sizeof(result_t) + sizeof(statistic_t) * filter_count);
 			last_ts++;
 		}
@@ -233,14 +233,14 @@ static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt,
 	if (mesg) {
 		// printf ("%d.%06d READ #%"PRIu64"\n", tv.tv_sec, tv.tv_usec, trace_packet_get(packet));
 		switch (mesg->code) {
-			case MESSAGE_STARTED:
+			case MESSAGE_STARTING:
 				results = calloc(1, sizeof(result_t) + sizeof(statistic_t) * filter_count);
 				break;
-			case MESSAGE_STOPPED:
+			case MESSAGE_STOPPING:
 				// Should we always post this?
 				if (results->total.count) {
-					trace_publish_result(trace, (uint64_t) last_ts, results);
-					trace_post_reduce(trace);
+					trace_publish_result(trace, t, (uint64_t) last_ts, results, RESULT_NORMAL);
+					trace_post_reporter(trace);
 					results = NULL;
 				}
 				break;
@@ -259,8 +259,8 @@ static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt,
 					next_update_time = (last_ts*packet_interval + packet_interval) * 1000000 + offset;
 					if (next_update_time <= mesg->additional.uint64) {
 						//fprintf(stderr, "Got a tick and publishing early!!\n");
-						trace_publish_result(trace, (uint64_t) last_ts, results);
-						trace_post_reduce(trace);
+						trace_publish_result(trace, t, (uint64_t) last_ts, results, RESULT_NORMAL);
+						trace_post_reporter(trace);
 						results = calloc(1, sizeof(result_t) + sizeof(statistic_t) * filter_count);
 						last_ts++;
 					} else {

@@ -26,17 +26,17 @@ static void cleanup_signal(int signal)
 {
 	static int s = 0;
 	(void)signal;
-	// trace_interrupt();
+    //trace_interrupt();
 	// trace_pstop isn't really signal safe because its got lots of locks in it
-	// trace_pstop(trace);
-	if (s == 0) {
+    trace_pstop(trace);
+    /*if (s == 0) {
 		if (trace_ppause(trace) == -1)
 			trace_perror(trace, "Pause failed");
 	}
 	else {
 		if (trace_pstart(trace, NULL, NULL, NULL) == -1)
 			trace_perror(trace, "Start failed");
-	}
+    }*/
 	s = !s;
 }
 
@@ -140,21 +140,20 @@ static void encrypt_ips(struct libtrace_ip *ip,bool enc_source,bool enc_dest)
 }
 
 
-static uint64_t bad_hash(libtrace_packet_t * pkt)
+UNUSED static uint64_t bad_hash(UNUSED libtrace_packet_t * pkt)
 {
 	return 0;
 }
 
 
-static uint64_t rand_hash(libtrace_packet_t * pkt)
+UNUSED static uint64_t rand_hash(UNUSED libtrace_packet_t * pkt)
 {
 	return rand();
 }
 
 
-static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt, libtrace_message_t *mesg, libtrace_thread_t *t)
+static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt, libtrace_message_t *mesg, UNUSED libtrace_thread_t *t)
 {
-	int i;
 	
 	if (pkt) {
 		struct libtrace_ip *ipptr;
@@ -190,24 +189,39 @@ static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt, libtrace_mess
 		//libtrace_packet_t * packet_copy = trace_copy_packet(packet);
 		//libtrace_packet_t * packet_copy = trace_result_packet(trace, pkt);
 		//trace_publish_result(trace, trace_packet_get_order(pkt), pkt);
-		trace_publish_packet(trace, pkt);
+		trace_publish_result(trace, t, trace_packet_get_order(pkt), pkt, RESULT_PACKET);
 		//return ;
 	}
 	if (mesg) {
 		// printf ("%d.%06d READ #%"PRIu64"\n", tv.tv_sec, tv.tv_usec, trace_packet_get(packet));
 		switch (mesg->code) {
-			case MESSAGE_STARTED:
+			case MESSAGE_STARTING:
 				enc_init(enc_type,key);
 		}
 	}
 	return NULL;
 }
 
+struct libtrace_out_t *writer = 0;
+
+static void* write_out(libtrace_t *trace, libtrace_result_t *result, UNUSED libtrace_message_t *mesg) {
+	static uint64_t packet_count = 0; // TESTING PURPOSES, this is not going to work with a live format
+	if (result) {
+		libtrace_packet_t *packet = (libtrace_packet_t*) libtrace_result_get_value(result);
+		assert(libtrace_result_get_key(result) == packet_count++);
+		if (trace_write_packet(writer,packet)==-1) {
+			trace_perror_output(writer,"writer");
+			trace_interrupt();
+		}
+		trace_free_result_packet(trace, packet);
+	}
+	return NULL;
+}
+
+
 int main(int argc, char *argv[]) 
 {
 	//struct libtrace_t *trace = 0;
-	struct libtrace_packet_t *packet/* = trace_create_packet()*/;
-	struct libtrace_out_t *writer = 0;
 	struct sigaction sigact;
 	char *output = 0;
 	int level = -1;
@@ -379,9 +393,9 @@ int main(int argc, char *argv[])
 	trace_parallel_config(trace, TRACE_OPTION_SEQUENTIAL, &i);
 	//trace_parallel_config(trace, TRACE_OPTION_SET_PERPKT_BUFFER_SIZE, &i);
 	i = 2;
-	trace_parallel_config(trace, TRACE_OPTION_SET_PERPKT_THREAD_COUNT, &i);
+    trace_parallel_config(trace, TRACE_OPTION_SET_PERPKT_THREAD_COUNT, &i);
 	
-	if (trace_pstart(trace, NULL, &per_packet, NULL)==-1) {
+	if (trace_pstart(trace, NULL, &per_packet, &write_out)==-1) {
 		trace_perror(trace,"trace_start");
 		trace_destroy_output(writer);
 		trace_destroy(trace);
@@ -401,62 +415,9 @@ int main(int argc, char *argv[])
 
 	sigaction(SIGINT, &sigact, NULL);
 	sigaction(SIGTERM, &sigact, NULL);
-	
-	// Read in the resulting packets and then free them when done
-	libtrace_vector_t res;
-	int res_size = 0;
-	libtrace_vector_init(&res, sizeof(libtrace_result_t));
-	uint64_t packet_count = 0;
-	while (!trace_finished(trace)) {
-		// Read messages
-		libtrace_message_t message;
-		
-		// We just release and do work currently, maybe if something
-		// interesting comes through we'd deal with that
-		libtrace_thread_get_message(trace, &message);
-		
-		while (libtrace_thread_try_get_message(trace, &message) != LIBTRACE_MQ_FAILED) { }
-		
-		if ((res_size = trace_get_results(trace, &res)) == 0)
-			;/*sched_yield();*/
-		
-		for (i = 0 ; i < res_size ; i++) {
-			libtrace_result_t result;
-			assert(libtrace_vector_get(&res, i, (void *) &result) == 1);
-			packet = libtrace_result_get_value(&result);
-			assert(libtrace_result_get_key(&result) == packet_count);
-			packet_count++;
-			if (trace_write_packet(writer,packet)==-1) {
-				trace_perror_output(writer,"writer");
-				trace_interrupt();
-				break;
-			}
-			//trace_destroy_packet(packet);
-			trace_free_result_packet(trace, packet);
-		}
-	}
+
+	// Wait for the trace to finish
 	trace_join(trace);
-	
-	// Grab everything that's left here
-	res_size = trace_get_results(trace, &res);
-	
-	for (i = 0 ; i < res_size ; i++) {
-		libtrace_result_t result;
-		assert(libtrace_vector_get(&res, i, (void *) &result) == 1);
-		packet = libtrace_result_get_value(&result);
-		if (libtrace_result_get_key(&result) != packet_count)
-			printf ("Got a %"PRIu64" but expected a %"PRIu64" %d\n", libtrace_result_get_key(&result), packet_count, res_size);
-		assert(libtrace_result_get_key(&result) == packet_count);
-		
-		packet_count++;
-		if (trace_write_packet(writer,packet)==-1) {
-			trace_perror_output(writer,"writer");
-			trace_interrupt();
-			break;
-		}
-		trace_destroy_packet(packet);
-	}
-	libtrace_vector_destroy(&res);
 	
 	//trace_destroy_packet(packet);
 	//print_contention_stats(trace);

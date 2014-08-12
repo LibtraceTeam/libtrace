@@ -56,6 +56,9 @@ do_test ./test-format-parallel-singlethreaded-hasher erf
 echo \* Read stress testing with 100 threads
 do_test ./test-format-parallel-stressthreads erf
 
+echo \* Read stress testing with 100 threads
+do_test ./test-format-parallel-reporter erf
+
 echo
 echo "Tests passed: $OK"
 echo "Tests failed: $FAIL"
