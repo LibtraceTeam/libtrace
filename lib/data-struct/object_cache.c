@@ -270,7 +270,7 @@ static inline size_t libtrace_ocache_alloc_cache(libtrace_ocache_t *oc, void *va
 		if (i < min_nb_buffers)
 			lc->used = libtrace_ringbuffer_sread_bulk(rb, lc->cache, lc->total, min_nb_buffers - i);
 		else
-			lc->used = 0;
+			lc->used = libtrace_ringbuffer_sread_bulk(rb, lc->cache, lc->total, 0);
 
 		if (lc->used == lc->total)
 			mem_hits.readbulk.ring_hit += 1;
@@ -366,7 +366,11 @@ static inline size_t libtrace_ocache_free_cache(libtrace_ocache_t *oc, void *val
 		mem_hits.write.cache_hit += i;
 
 		// Make sure we still meet the minimum requirement
-		lc->used = lc->total - libtrace_ringbuffer_swrite_bulk(rb, lc->cache, lc->total, min_nb_buffers - i);
+		if (i < min_nb_buffers)
+			lc->used = lc->total - libtrace_ringbuffer_swrite_bulk(rb, lc->cache, lc->total, min_nb_buffers - i);
+		else
+			lc->used = lc->total - libtrace_ringbuffer_swrite_bulk(rb, lc->cache, lc->total, 0);
+
 		// Re originise fulls to the front
 		if (lc->used)
 			memmove(lc->cache, &lc->cache[lc->total - lc->used], sizeof(void *) * lc->used);
