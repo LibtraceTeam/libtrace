@@ -1509,12 +1509,14 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob, fn_per_pkt p
 	if (libtrace->config.hasher_queue_size <= 0)
 		libtrace->config.hasher_queue_size = 1000;
 
-	if (libtrace->perpkt_thread_count <= 0) {
+	if (libtrace->config.perpkt_threads <= 0) {
 		// TODO add BSD support
 		libtrace->perpkt_thread_count = sysconf(_SC_NPROCESSORS_ONLN);
 		if (libtrace->perpkt_thread_count <= 0)
 			// Lets just use one
 			libtrace->perpkt_thread_count = 1;
+	} else {
+		libtrace->perpkt_thread_count = libtrace->config.perpkt_threads;
 	}
 
 	if (libtrace->config.reporter_thold <= 0)
@@ -2064,6 +2066,7 @@ DLLEXPORT void trace_publish_result(libtrace_t *libtrace, libtrace_thread_t *t, 
 	res.type = type;
 
 	libtrace_result_set_key_value(&res, key, value);
+
 	/*
 	if (count == 1)
 		printf("My vector size is %d\n", libtrace_vector_get_size(&t->vector));
@@ -2073,6 +2076,7 @@ DLLEXPORT void trace_publish_result(libtrace_t *libtrace, libtrace_thread_t *t, 
 	/*if (count == 1)
 		printf("My vector size is %d\n", libtrace_deque_get_size(&t->deque));
 	count = (count+1)%1000;*/
+
 	if (libtrace->reporter_flags & (REDUCE_SEQUENTIAL | REDUCE_ORDERED)) {
 		if (libtrace_deque_get_size(&t->deque) >= libtrace->config.reporter_thold) {
 			trace_post_reporter(libtrace);
@@ -2139,7 +2143,7 @@ DLLEXPORT int trace_get_results(libtrace_t *libtrace, libtrace_vector_t * result
 		/* Now remove the smallest and loop - special case if all threads have joined we always flush whats left */
 		while ((live_count == libtrace->perpkt_thread_count) || (live_count &&
 				((flags & REDUCE_SEQUENTIAL && min_key == libtrace->expected_key) ||
-				libtrace->state == STATE_JOINED))) {
+				trace_finished(libtrace)))) {
 			/* Get the minimum queue and then do stuff */
 			libtrace_result_t r;
 
@@ -2223,7 +2227,7 @@ DLLEXPORT int trace_parallel_config(libtrace_t *libtrace, trace_parallel_option_
 		case TRACE_OPTION_SET_HASHER:
 			return trace_set_hasher(libtrace, (enum hasher_types) *((int *) value), NULL, NULL);
 		case TRACE_OPTION_SET_PERPKT_THREAD_COUNT:
-			libtrace->perpkt_thread_count = *((int *) value);
+			libtrace->config.perpkt_threads = *((int *) value);
 			return 1;
 		case TRACE_DROP_OUT_OF_ORDER:
 			if (*((int *) value))
