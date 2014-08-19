@@ -3287,7 +3287,9 @@ typedef enum {
 	   * Specifies the interval between tick packets in milliseconds, if 0
 	   * or less this is ignored.
 	   */
-	  TRACE_OPTION_TICK_INTERVAL
+	  TRACE_OPTION_TICK_INTERVAL,
+	TRACE_OPTION_GET_CONFIG,
+	TRACE_OPTION_SET_CONFIG
 } trace_parallel_option_t;
 
 enum libtrace_messages {
@@ -3381,21 +3383,51 @@ struct user_configuration {
 	 * trace that manages its own packets.
 	 * A unblockable error message will be printed.
 	 */
-	size_t packet_global_cache_size;
-	// Per thread
+	size_t packet_cache_size;
+	/**
+	 * Per thread local cache size for the packet freelist
+	 */
 	size_t packet_thread_cache_size;
-	// Packet count limited
+	/**
+	 * If true the total number of packets that can be created by a trace is limited
+	 * to the packet_cache_size, otherwise once packet_cache_size is exceeded alloc
+	 * and free will be used to create and free packets, this will be slower than
+	 * using the freelist and could run a machine out of memory.
+	 *
+	 * However this does make it easier to ensure that deadlocks will not occur
+	 * due to running out of packets
+	 */
 	bool fixed_packet_count;
-	// Bursts/Batches of packets this size are combined, used in single thread mode
+	/**
+	 * When reading from a single threaded input source to reduce
+	 * lock contention a 'burst' of packets is read per pkt thread
+	 * this determines the bursts size.
+	 */
 	size_t burst_size;
 	// Each perpkt thread has a queue leading into the reporter
 	//size_t reporter_queue_size;
-	/** The tick interval - in milliseconds (0) */
+
+	/**
+	 * The tick interval - in milliseconds
+	 * When a live trace is used messages are sent at the tick
+	 * interval to ensure that all perpkt threads receive data
+	 * this allows results to be printed in cases flows are
+	 * not being directed to a certian thread, while still
+	 * maintaining order.
+	 */
 	size_t tick_interval;
-	// The tick interval for file based traces, in number of packets TODO implement this
+
+	/**
+	 * Like the tick interval but used in the case of file format
+	 * This specifies the number of packets before inserting a tick to
+	 * every thread.
+	 */
 	size_t tick_count;
 
-	// The number of per packet threads requested
+	/**
+	 * The number of per packet threads requested, 0 means use default.
+	 * Default typically be the number of processor threads detected less one or two.
+	 */
 	size_t perpkt_threads;
 
 	/**
@@ -3408,9 +3440,40 @@ struct user_configuration {
 	/** The number of packets that can queue per thread from hasher thread */
 	size_t hasher_queue_size;
 
-	// Reporter threashold before results are sent
+	/**
+	 * If true use a polling hasher queue, that means that we will spin/or yeild
+	 * when rather than blocking on a lock. This applies to both the hasher thread
+	 * and perpkts reading the queues.
+	 */
+	bool hasher_polling;
+
+	/**
+	 * If true the reporter thread will continuously poll waiting for results
+	 * if false they are only checked when a message is received, this message
+	 * is controlled by reporter_thold.
+	 */
+	bool reporter_polling;
+
+	/**
+	 * Perpkt thread result queue size before triggering the reporter step to read results
+	 */
 	size_t reporter_thold;
+
+	/**
+	 * Prints a line to standard error for every state change
+	 * for both the trace as a whole and for each thread.
+	 */
+	bool debug_state;
 };
+#include <stdio.h>
+DLLEXPORT void parse_user_config(struct user_configuration* uc, char * str);
+DLLEXPORT void parse_user_config_file(struct user_configuration* uc, FILE *file);
+
+#define READ_EOF 0
+#define READ_ERROR -1
+#define READ_MESSAGE -2
+// Used for inband tick message
+#define READ_TICK -3
 
 #define ZERO_USER_CONFIG(config) memset(&config, 0, sizeof(struct user_configuration));
 

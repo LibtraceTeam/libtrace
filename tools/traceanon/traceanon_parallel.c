@@ -197,6 +197,9 @@ static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt, libtrace_mess
 		switch (mesg->code) {
 			case MESSAGE_STARTING:
 				enc_init(enc_type,key);
+			break;
+			case MESSAGE_TICK:
+				trace_publish_result(trace, t, mesg->additional.uint64, NULL, RESULT_TICK);
 		}
 	}
 	return NULL;
@@ -206,14 +209,21 @@ struct libtrace_out_t *writer = 0;
 
 static void* write_out(libtrace_t *trace, libtrace_result_t *result, UNUSED libtrace_message_t *mesg) {
 	static uint64_t packet_count = 0; // TESTING PURPOSES, this is not going to work with a live format
+
 	if (result) {
-		libtrace_packet_t *packet = (libtrace_packet_t*) libtrace_result_get_value(result);
-		assert(libtrace_result_get_key(result) == packet_count++);
-		if (trace_write_packet(writer,packet)==-1) {
-			trace_perror_output(writer,"writer");
-			trace_interrupt();
+		if (result->type == RESULT_PACKET) {
+			libtrace_packet_t *packet = (libtrace_packet_t*) libtrace_result_get_value(result);
+			assert(libtrace_result_get_key(result) == packet_count++);
+			if (trace_write_packet(writer,packet)==-1) {
+				trace_perror_output(writer,"writer");
+				trace_interrupt();
+			}
+			trace_free_result_packet(trace, packet);
+
+		} else {
+			assert(result->type == RESULT_TICK);
+			// Ignore it
 		}
-		trace_free_result_packet(trace, packet);
 	}
 	return NULL;
 }
@@ -227,7 +237,8 @@ int main(int argc, char *argv[])
 	int level = -1;
 	char *compress_type_str=NULL;
 	trace_option_compresstype_t compress_type = TRACE_OPTION_COMPRESSTYPE_NONE;
-
+	struct user_configuration uc;
+	ZERO_USER_CONFIG(uc);
 
 	if (argc<2)
 		usage(argv[0]);
@@ -243,10 +254,12 @@ int main(int argc, char *argv[])
 			{ "compress-level",	1, 0, 'z' },
 			{ "compress-type",	1, 0, 'Z' },
 			{ "libtrace-help", 	0, 0, 'H' },
+			{ "config",		1, 0, 'u' },
+		    { "config-file",		1, 0, 'U' },
 			{ NULL,			0, 0, 0   },
 		};
 
-		int c=getopt_long(argc, argv, "Z:z:sc:f:dp:H",
+		int c=getopt_long(argc, argv, "Z:z:sc:f:dp:Hu:U:",
 				long_options, &option_index);
 
 		if (c==-1)
@@ -296,6 +309,18 @@ int main(int argc, char *argv[])
 				  trace_help(); 
 				  exit(1); 
 				  break;
+			case 'u':
+				  parse_user_config(&uc, optarg);
+				  break;
+			case 'U':;
+				FILE * f = fopen(optarg, "r");
+				if (f != NULL) {
+					parse_user_config_file(&uc, f);
+				} else {
+					perror("Failed to open configuration file\n");
+					usage(argv[0]);
+				}
+				break;
 			default:
 				fprintf(stderr,"unknown option: %c\n",c);
 				usage(argv[0]);
@@ -390,10 +415,12 @@ int main(int argc, char *argv[])
 	 */
 	 
 	int i = 1;
-	trace_parallel_config(trace, TRACE_OPTION_SEQUENTIAL, &i);
+	trace_parallel_config(trace, TRACE_OPTION_ORDERED, &i);
 	//trace_parallel_config(trace, TRACE_OPTION_SET_PERPKT_BUFFER_SIZE, &i);
-	i = 2;
+	i = 6;
     trace_parallel_config(trace, TRACE_OPTION_SET_PERPKT_THREAD_COUNT, &i);
+	trace_parallel_config(trace, TRACE_OPTION_SET_CONFIG, &uc);
+	trace_set_hasher(trace, HASHER_CUSTOM, bad_hash, NULL);
 	
 	if (trace_pstart(trace, NULL, &per_packet, &write_out)==-1) {
 		trace_perror(trace,"trace_start");

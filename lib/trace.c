@@ -918,7 +918,7 @@ int trace_prepare_packet(libtrace_t *trace, libtrace_packet_t *packet,
  */
 DLLEXPORT int trace_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *packet) {
 	assert(libtrace);
-	assert(packet);	
+	assert(packet);
 	/* Verify the packet is valid */
 	if (!libtrace->started) {
 		trace_set_err_out(libtrace,TRACE_ERR_BAD_STATE,
