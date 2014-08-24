@@ -1817,14 +1817,6 @@ uint64_t trace_get_filtered_packets(libtrace_t *trace)
 		return trace->format->get_filtered_packets(trace)+
 			trace->filtered_packets;
 	}
-	if (trace->format->get_received_packets
-		&& trace->format->get_dropped_packets) {
-		return 
-			((trace_get_received_packets(trace)
-			-trace_get_accepted_packets(trace))
-			-trace_get_dropped_packets(trace))
-			+trace->filtered_packets;
-	}
 	return trace->filtered_packets;
 }
 
