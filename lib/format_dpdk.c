@@ -1271,9 +1271,11 @@ static libtrace_eventobj_t dpdk_trace_event(libtrace_t *trace,
             if (trace->filter) {
                 if (!trace_apply_filter(trace->filter, packet)) {
                     /* Failed the filter so we loop for another packet */
+                    trace->filtered_packets ++;
                     continue;
                 }
             }
+            trace->accepted_packets ++;
         } else {
             /* We only want to sleep for a very short time - we are non-blocking */
             event.type = TRACE_EVENT_SLEEP;

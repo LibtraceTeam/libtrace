@@ -1133,6 +1133,7 @@ static libtrace_eventobj_t trace_event_dag(libtrace_t *trace,
 				 * one - we definitely DO NOT want to return
 				 * a sleep event in this case, like we used to
 				 * do! */
+                                trace->filtered_packets ++;
 				trace_clear_cache(packet);
 				continue;
 			}
@@ -1143,6 +1144,7 @@ static libtrace_eventobj_t trace_event_dag(libtrace_t *trace,
 		if (trace->snaplen > 0) {
 			trace_set_capture_length(packet, trace->snaplen);
 		}
+                trace->accepted_packets ++;
 		break;
 	} while (1);
 

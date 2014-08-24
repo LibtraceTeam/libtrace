@@ -1118,10 +1118,11 @@ DLLEXPORT libtrace_eventobj_t trace_event(libtrace_t *trace,
 	packet->trace = trace;
 
 	if (packet->trace->format->trace_event) {
-		event=packet->trace->format->trace_event(trace,packet);
-                if (event.type == TRACE_EVENT_PACKET) {
-			++trace->accepted_packets;
-		}
+		/* Note: incrementing accepted, filtered etc. packet
+                 * counters is handled by the format-specific 
+                 * function so don't increment them here.
+                 */
+                event=packet->trace->format->trace_event(trace,packet);
 	}
 	return event;
 

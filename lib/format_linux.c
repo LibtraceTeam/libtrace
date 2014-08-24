@@ -1098,7 +1098,7 @@ static libtrace_eventobj_t linuxring_event(libtrace_t *libtrace, libtrace_packet
 	header = GET_CURRENT_BUFFER(libtrace);
 	if(header->tp_status & TP_STATUS_USER){
 		/* We have a frame waiting */
-		event.size = linuxring_read_packet(libtrace, packet);
+		event.size = trace_read_packet(libtrace, packet);
 		event.type = TRACE_EVENT_PACKET;
 	} else {
 		/* Ok we don't have a packet waiting */
