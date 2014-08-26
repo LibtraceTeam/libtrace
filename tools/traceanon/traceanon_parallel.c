@@ -407,6 +407,13 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
+	if (trace_start_output(writer)==-1) {
+		trace_perror_output(writer,"trace_start_output");
+		trace_destroy_output(writer);
+		trace_destroy(trace);
+                return 1;
+	}
+
 	// OK parallel changes start here
 
 	/* Set a special mode flag that means the output is timestamped
@@ -416,24 +423,14 @@ int main(int argc, char *argv[])
 	 
 	int i = 1;
 	trace_parallel_config(trace, TRACE_OPTION_ORDERED, &i);
-	//trace_parallel_config(trace, TRACE_OPTION_SET_PERPKT_BUFFER_SIZE, &i);
-	i = 6;
-    trace_parallel_config(trace, TRACE_OPTION_SET_PERPKT_THREAD_COUNT, &i);
 	trace_parallel_config(trace, TRACE_OPTION_SET_CONFIG, &uc);
-	trace_set_hasher(trace, HASHER_CUSTOM, bad_hash, NULL);
+	//trace_set_hasher(trace, HASHER_CUSTOM, rand_hash, NULL);
 	
 	if (trace_pstart(trace, NULL, &per_packet, &write_out)==-1) {
 		trace_perror(trace,"trace_start");
 		trace_destroy_output(writer);
 		trace_destroy(trace);
 		return 1;
-	}
-	
-	if (trace_start_output(writer)==-1) {
-		trace_perror_output(writer,"trace_start_output");
-		trace_destroy_output(writer);
-		trace_destroy(trace);
-                return 1;
 	}
 
 	sigact.sa_handler = cleanup_signal;
