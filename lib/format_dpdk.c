@@ -445,6 +445,34 @@ static inline void dump_configuration()
 }
 #endif
 
+/**
+ * XXX This is very bad XXX
+ * But we have to do something to allow getopts nesting
+ * Luckly normally the format is last so it doesn't matter
+ * DPDK only supports modern systems so hopefully this
+ * will continue to work
+ */
+struct saved_getopts {
+	char *optarg;
+	int optind;
+	int opterr;
+	int optopt;
+};
+
+static void save_getopts(struct saved_getopts *opts) {
+	opts->optarg = optarg;
+	opts->optind = optind;
+	opts->opterr = opterr;
+	opts->optopt = optopt;
+}
+
+static void restore_getopts(struct saved_getopts *opts) {
+	optarg = opts->optarg;
+	optind = opts->optind;
+	opterr = opts->opterr;
+	optopt = opts->optopt;
+}
+
 static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_t * format_data,
                                         char * err, int errlen) {
     int ret; /* Returned error codes */
@@ -453,6 +481,7 @@ static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_
     char mem_map[20] = {0}; /* The memory name */
     long nb_cpu; /* The number of CPUs in the system */
     long my_cpu; /* The CPU number we want to bind to */
+	struct saved_getopts save_opts;
     
 #if DEBUG
     rte_set_log_level(RTE_LOG_DEBUG);
@@ -518,12 +547,15 @@ static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_
 	snprintf(mem_map, sizeof(mem_map), "libtrace-%d", (int) getpid());
     /* rte_eal_init it makes a call to getopt so we need to reset the 
      * global optind variable of getopt otherwise this fails */
+	save_getopts(&save_opts);
     optind = 1;
     if ((ret = rte_eal_init(argc, argv)) < 0) {
         snprintf(err, errlen, 
           "Intel DPDK - Initialisation of EAL failed: %s", strerror(-ret));
         return -1;
     }
+	restore_getopts(&save_opts);
+
 #if DEBUG
     dump_configuration();
 #endif
