@@ -376,6 +376,7 @@ static inline int dpdk_init_enviroment(char * uridata, struct dpdk_format_data_t
     int ret; /* Returned error codes */
     struct rte_pci_addr use_addr; /* The only address that we don't blacklist */   
     char cpu_number[10] = {0}; /* The CPU mask we want to bind to */
+    char mem_map[20] = {0}; /* The memory name */
     long nb_cpu; /* The number of CPUs in the system */
     long my_cpu; /* The CPU number we want to bind to */
     
@@ -384,13 +385,13 @@ static inline int dpdk_init_enviroment(char * uridata, struct dpdk_format_data_t
 #else 
     rte_set_log_level(RTE_LOG_WARNING);
 #endif
-    /* Using proc-type auto allows this to be either primary or secondary 
-     * Secondary allows two intances of libtrace to be used on different
-     * ports. However current version of DPDK doesn't support this on the
-     * same card (My understanding is this should work with two seperate
-     * cards).
+    /*
+     * Using unique file prefixes mean separate memory is used, unlinking
+     * the two processes. However be careful we still cannot access a 
+     * port that already in use.
      */
-    char* argv[] = {"libtrace", "-c", NULL, "-n", "1", "--proc-type", "auto", NULL};
+    char* argv[] = {"libtrace", "-c", cpu_number, "-n", "1", "--proc-type", "auto",
+		"--file-prefix", mem_map, "-m", "256", NULL};
     int argc = sizeof(argv) / sizeof(argv[0]) - 1;
     
     /* This initilises the Enviroment Abstraction Layer (EAL)
@@ -437,8 +438,10 @@ static inline int dpdk_init_enviroment(char * uridata, struct dpdk_format_data_t
 
     /* Make our mask */
     snprintf(cpu_number, sizeof(cpu_number), "%x", 0x1 << (my_cpu - 1));
-    argv[2] = cpu_number;
 
+
+	/* Give the memory map a unique name */
+	snprintf(mem_map, sizeof(mem_map), "libtrace-%d", (int) getpid());
     /* rte_eal_init it makes a call to getopt so we need to reset the 
      * global optind variable of getopt otherwise this fails */
     optind = 1;
