@@ -1,4 +1,4 @@
-libtrace 3.0.20
+libtrace 3.0.21
 
 ---------------------------------------------------------------------------
 Copyright (c) 2007-2014 The University of Waikato, Hamilton, New Zealand.
@@ -20,13 +20,15 @@ and has been since extended to a range of other trace and interface formats.
 
 Further information about libtrace see 
 http://research.wand.net.nz/software/libtrace.php
-Bugs should be reported in trac at http://www.wand.net.nz/trac/libtrace
+
+Bugs should be reported by either emailing contact@wand.net.nz or filing
+an issue at https://github.com/wanduow/libtrace
 
 It is licensed under the GNU General Public License (GPL) version 2. Please
 see the included file GPL for details of this license.
 
 A detailed ChangeLog can be found on the libtrace wiki: 
-https://secure.wand.net.nz/trac/libtrace/wiki/ChangeLog
+https://github.com/wanduow/libtrace/wiki/ChangeLog
 
 Documentation, usage instructions and a detailed tutorial can also found
 on the libtrace wiki.
