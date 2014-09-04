@@ -56,6 +56,58 @@
 #include <assert.h>
 #include <unistd.h>
 #include <endian.h>
+#include <string.h>
+
+/* We can deal with any minor differences by checking the RTE VERSION
+ * Typically DPDK backports some fixes (typically for building against
+ * newer kernels) to the older version of DPDK.
+ *
+ * These get released with the rX suffix. The following macros where added
+ * in these new releases.
+ *
+ * Below this is a log of version that required changes to the libtrace
+ * code (that we still attempt to support).
+ *
+ * Currently 1.5 to 1.7 is supported.
+ */
+#include <rte_version.h>
+#ifndef RTE_VERSION_NUM
+#	define RTE_VERSION_NUM(a,b,c,d) ((a) << 24 | (b) << 16 | (c) << 8 | (d))
+#endif
+#ifndef RTE_VER_PATCH_RELEASE
+#	define RTE_VER_PATCH_RELEASE 0
+#endif
+#ifndef RTE_VERSION
+#	define RTE_VERSION RTE_VERSION_NUM(RTE_VER_MAJOR,RTE_VER_MINOR, \
+	RTE_VER_PATCH_LEVEL, RTE_VER_PATCH_RELEASE)
+#endif
+
+/* 1.6.0r2 :
+ *	rte_eal_pci_set_blacklist() is removed
+ *	device_list is renamed ot pci_device_list
+ *
+ * Replaced by:
+ *	rte_devargs (we can simply whitelist)
+ */
+#if RTE_VERSION <= RTE_VERSION_NUM(1, 6, 0, 1)
+#	define DPDK_USE_BLACKLIST 1
+#else
+#	define DPDK_USE_BLACKLIST 0
+#endif
+
+/*
+ * 1.7.0 :
+ *	rte_pmd_init_all is removed
+ *
+ * Replaced by:
+ *	Nothing, no longer needed
+ */
+#if RTE_VERSION < RTE_VERSION_NUM(1, 7, 0, 0)
+#	define DPDK_USE_PMD_INIT 1
+#else
+#	define DPDK_USE_PMD_INIT 0
+#endif
+
 #include <rte_eal.h>
 #include <rte_per_lcore.h>
 #include <rte_debug.h>
@@ -190,9 +242,11 @@ struct dpdk_format_data_t {
     int nb_rx_buf; /* The number of packet buffers in the rx ring */
     int nb_tx_buf; /* The number of packet buffers in the tx ring */
     struct rte_mempool * pktmbuf_pool; /* Our packet memory pool */
+#if DPDK_USE_BLACKLIST
     struct rte_pci_addr blacklist[BLACK_LIST_SIZE]; /* Holds our device blacklist */
+	unsigned int nb_blacklist; /* Number of blacklist items in are valid */
+#endif
     char mempool_name[MEMPOOL_NAME_LEN]; /* The name of the mempool that we are using */
-    unsigned int nb_blacklist; /* Number of blacklist items in are valid */
 #if HAS_HW_TIMESTAMPS_82580
     /* Timestamping only relevent to RX */
     uint64_t ts_first_sys; /* Sytem timestamp of the first packet in nanoseconds */
@@ -242,8 +296,11 @@ struct dpdk_addt_hdr {
  * 
  * So blacklist all devices except the one that we wish to use so that 
  * the others can still be used as standard ethernet ports.
+ *
+ * @return 0 if successful, otherwise -1 on error.
  */
-static void blacklist_devices(struct dpdk_format_data_t *format_data, struct rte_pci_addr *whitelist)
+#if DPDK_USE_BLACKLIST
+static int blacklist_devices(struct dpdk_format_data_t *format_data, struct rte_pci_addr *whitelist)
 {
 	struct rte_pci_device *dev = NULL;
 	format_data->nb_blacklist = 0;
@@ -267,7 +324,24 @@ static void blacklist_devices(struct dpdk_format_data_t *format_data, struct rte
 	}
 
 	rte_eal_pci_set_blacklist(format_data->blacklist, format_data->nb_blacklist);
+	return 0;
 }
+#else /* DPDK_USE_BLACKLIST */
+#include <rte_devargs.h>
+static int blacklist_devices(struct dpdk_format_data_t *format_data UNUSED, struct rte_pci_addr *whitelist)
+{
+	char pci_str[20] = {0};
+	snprintf(pci_str, sizeof(pci_str), PCI_PRI_FMT,
+	         whitelist->domain,
+	         whitelist->bus,
+	         whitelist->devid,
+	         whitelist->function);
+	if (rte_eal_devargs_add(RTE_DEVTYPE_WHITELISTED_PCI, pci_str) < 0) {
+		return -1;
+	}
+	return 0;
+}
+#endif
 
 /**
  * Parse the URI format as a pci address
@@ -374,7 +448,7 @@ static inline void dump_configuration()
 static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_t * format_data,
                                         char * err, int errlen) {
     int ret; /* Returned error codes */
-    struct rte_pci_addr use_addr; /* The only address that we don't blacklist */   
+    struct rte_pci_addr use_addr; /* The only address that we don't blacklist */
     char cpu_number[10] = {0}; /* The CPU mask we want to bind to */
     char mem_map[20] = {0}; /* The memory name */
     long nb_cpu; /* The number of CPUs in the system */
@@ -393,8 +467,7 @@ static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_
     char* argv[] = {"libtrace", "-c", cpu_number, "-n", "1", "--proc-type", "auto",
 		"--file-prefix", mem_map, "-m", "256", NULL};
     int argc = sizeof(argv) / sizeof(argv[0]) - 1;
-    
-    /* This initialises the Environment Abstraction Layer (EAL)
+
     /* This initialises the Environment Abstraction Layer (EAL)
      * If we had slave workers these are put into WAITING state
      * 
@@ -454,6 +527,8 @@ static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_
 #if DEBUG
     dump_configuration();
 #endif
+
+#if DPDK_USE_PMD_INIT
     /* This registers all available NICs with Intel DPDK
      * These are not loaded until rte_eal_pci_probe() is called.
      */
@@ -462,9 +537,14 @@ static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_
           "Intel DPDK - rte_pmd_init_all failed: %s", strerror(-ret));
         return -1;
     }
+#endif
 
-    /* Black list all ports besides the one that we want to use */
-    blacklist_devices(format_data, &use_addr);
+    /* Blacklist all ports besides the one that we want to use */
+	if ((ret = blacklist_devices(format_data, &use_addr)) < 0) {
+		snprintf(err, errlen, "Intel DPDK - Whitelisting PCI device failed,"
+		         " are you sure the address is correct?: %s", strerror(-ret));
+		return -1;
+	}
 
     /* This loads DPDK drivers against all ports that are not blacklisted */
 	if ((ret = rte_eal_pci_probe()) < 0) {
@@ -499,7 +579,9 @@ static int dpdk_init_input (libtrace_t *libtrace) {
     FORMAT(libtrace)->nb_tx_buf = MIN_NB_BUF;
     FORMAT(libtrace)->promisc = -1;
     FORMAT(libtrace)->pktmbuf_pool = NULL;
+#if DPDK_USE_BLACKLIST
     FORMAT(libtrace)->nb_blacklist = 0;
+#endif
     FORMAT(libtrace)->paused = DPDK_NEVER_STARTED;
     FORMAT(libtrace)->mempool_name[0] = 0;
 #if HAS_HW_TIMESTAMPS_82580
@@ -532,7 +614,9 @@ static int dpdk_init_output(libtrace_out_t *libtrace)
     FORMAT(libtrace)->nb_tx_buf = NB_TX_MBUF;
     FORMAT(libtrace)->promisc = -1;
     FORMAT(libtrace)->pktmbuf_pool = NULL;
+#if DPDK_USE_BLACKLIST
     FORMAT(libtrace)->nb_blacklist = 0;
+#endif
     FORMAT(libtrace)->paused = DPDK_NEVER_STARTED;
     FORMAT(libtrace)->mempool_name[0] = 0;
 #if HAS_HW_TIMESTAMPS_82580
