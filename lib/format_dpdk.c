@@ -70,6 +70,7 @@
  *
  * Currently 1.5 to 1.7 is supported.
  */
+#include <rte_eal.h>
 #include <rte_version.h>
 #ifndef RTE_VERSION_NUM
 #	define RTE_VERSION_NUM(a,b,c,d) ((a) << 24 | (b) << 16 | (c) << 8 | (d))
@@ -108,7 +109,6 @@
 #	define DPDK_USE_PMD_INIT 0
 #endif
 
-#include <rte_eal.h>
 #include <rte_per_lcore.h>
 #include <rte_debug.h>
 #include <rte_errno.h>
