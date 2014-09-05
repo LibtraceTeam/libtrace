@@ -17,7 +17,7 @@ endif
 else
 DAGSOURCE=
 endif
-EXTRA_DIST=format_dag24.c format_dag25.c
+EXTRA_DIST=format_dag24.c format_dag25.c dpdk_libtrace.mk
 
 if HAVE_LLVM
 BPFJITSOURCE=bpf-jit/bpf-jit.cc 
