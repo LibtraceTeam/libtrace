@@ -12,6 +12,7 @@ Optional:
 
 Installing libtrace:
 
+./bootstrap.sh (only if you've cloned the source from GitHub)
 ./configure
 make
 make install
@@ -35,8 +36,9 @@ it in a non-standard location please use LDFLAGS to specify the location of
 the library"?
 
 A. You need to install the development version of the pcap library. 
-For example, Ubuntu/Debian users will need to install the libpcap0.8-dev package 
-in addition to the libpcap0.8 package.
+For example, Ubuntu/Debian users will need to install the libpcap0.8-dev 
+package in addition to the libpcap0.8 package.
+
 
 ----------------------------------
 Using libtrace:

@@ -472,6 +472,7 @@ static libtrace_eventobj_t trace_event_dag(libtrace_t *trace,
                                 event.type = TRACE_EVENT_PACKET;
                         } else {
                                 /* Do not sleep - try to read another packet */
+                                trace->filtered_packets ++;
 				continue;
                         }
                 } else {
@@ -482,7 +483,7 @@ static libtrace_eventobj_t trace_event_dag(libtrace_t *trace,
                 if (trace->snaplen > 0) {
                         trace_set_capture_length(packet, trace->snaplen);
                 }
-
+                trace->accepted_packets ++;
                 return event;
         } while (1);
 

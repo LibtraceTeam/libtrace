@@ -500,8 +500,14 @@ static int linuxnative_start_input(libtrace_t *libtrace)
 	 * pre-compiled.
 	 */
 	if (filter != NULL) {
-		assert(filter->flag == 1);
-		if (setsockopt(FORMAT(libtrace->format_data)->fd,
+                /* Check if the filter was successfully compiled. If not,
+                 * it is probably a bad filter and we should return an error
+                 * before the caller tries to read any packets */
+		if (filter->flag == 0) {
+                        return -1;
+                }
+                
+                if (setsockopt(FORMAT(libtrace->format_data)->fd,
 					SOL_SOCKET,
 					SO_ATTACH_FILTER,
 					&filter->filter,
@@ -745,16 +751,23 @@ static int linuxnative_configure_bpf(libtrace_t *libtrace,
 				FORMAT(libtrace->format_data)->snaplen);
 
 		if (pcap_compile(pcap, &f->filter, f->filterstring, 0, 0) == -1) {
-			perror("PCAP failed to compile the filterstring");
-			return -1;
-		}
+		        /* Filter didn't compile, set flag to 0 so we can
+                         * detect this when trace_start() is called and
+                         * produce a useful error
+                         */
+                        f->flag = 0;
+                        trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, 
+                                        "Failed to compile BPF filter (%s): %s",
+                                        f->filterstring, pcap_geterr(pcap));
+                } else {
+                        /* Set the "flag" to indicate that the filterstring 
+                         * has been compiled
+                         */
+                        f->flag = 1;
+                }
 
 		pcap_close(pcap);
 		
-		/* Set the "flag" to indicate that the filterstring has been
-		 * compiled
-		 */
-		f->flag = 1;
 	}
 	
 	if (FORMAT(libtrace->format_data)->filter != NULL)
@@ -879,6 +892,9 @@ static int linuxnative_read_packet(libtrace_t *libtrace, libtrace_packet_t *pack
 	struct cmsghdr *cmsg;
 	int snaplen;
 	uint32_t flags = 0;
+        fd_set readfds;
+        struct timeval tout;
+        int ret;
 	
 	if (!packet->buffer || packet->buf_control == TRACE_CTRL_EXTERNAL) {
 		packet->buffer = malloc((size_t)LIBTRACE_PACKET_BUFSIZE);
@@ -914,7 +930,38 @@ static int linuxnative_read_packet(libtrace_t *libtrace, libtrace_packet_t *pack
 	iovec.iov_base = (void*)(packet->buffer+sizeof(*hdr));
 	iovec.iov_len = snaplen;
 
-	hdr->wirelen = recvmsg(FORMAT(libtrace->format_data)->fd, &msghdr, 0);
+        /* Use select to allow us to time out occasionally to check if someone
+         * has hit Ctrl-C or otherwise wants us to stop reading and return
+         * so they can exit their program.
+         */
+
+        while (1) {
+                tout.tv_sec = 0;
+                tout.tv_usec = 500000;
+                FD_ZERO(&readfds);
+                FD_SET(FORMAT(libtrace->format_data)->fd, &readfds);
+
+                ret = select(FORMAT(libtrace->format_data)->fd + 1, &readfds,
+                                NULL, NULL, &tout);
+                if (ret < 0 && errno != EINTR) {
+                        trace_set_err(libtrace, errno, "select");
+                        return -1;
+                } else if (ret < 0) {
+                        continue;
+                } 
+                
+                if (FD_ISSET(FORMAT(libtrace->format_data)->fd, &readfds)) {
+                        /* There's something available for us to read */
+                        break;
+                }
+
+                
+                /* If we get here, we timed out -- check if we should halt */
+                if (libtrace_halt)
+                        return 0;
+        }
+
+        hdr->wirelen = recvmsg(FORMAT(libtrace->format_data)->fd, &msghdr, MSG_TRUNC);
 
 	if (hdr->wirelen==~0U) {
 		trace_set_err(libtrace,errno,"recvmsg");
@@ -1030,21 +1077,29 @@ static int linuxring_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet
 	header = GET_CURRENT_BUFFER(libtrace);
 	assert((((unsigned long) header) & (pagesize - 1)) == 0);
 
-	/* TP_STATUS_USER means that we can use the frame.
-	 * When a slot does not have this flag set, the frame is not
-	 * ready for consumption.
-	 */
-	while (!(header->tp_status & TP_STATUS_USER)) {
+	while (1) {
 		pollset.fd = FORMAT(libtrace->format_data)->fd;
 		pollset.events = POLLIN;
 		pollset.revents = 0;
 		/* Wait for more data */
-		ret = poll(&pollset, 1, -1);
+		ret = poll(&pollset, 1, 500);
 		if (ret < 0) {
 			if (errno != EINTR)
 				trace_set_err(libtrace,errno,"poll()");
 			return -1;
-		}
+		} else if (ret == 0) {
+                        /* Poll timed out - check if we should exit */
+                        if (libtrace_halt)
+                                return 0;
+                        continue;
+                }
+
+                /* TP_STATUS_USER means that we can use the frame.
+                 * When a slot does not have this flag set, the frame is not
+                 * ready for consumption.
+                 */
+                if (header->tp_status & TP_STATUS_USER)
+                        break;
 	}
 
 	packet->buffer = header;
@@ -1085,7 +1140,7 @@ static libtrace_eventobj_t linuxring_event(libtrace_t *libtrace, libtrace_packet
 	header = GET_CURRENT_BUFFER(libtrace);
 	if(header->tp_status & TP_STATUS_USER){
 		/* We have a frame waiting */
-		event.size = linuxring_read_packet(libtrace, packet);
+		event.size = trace_read_packet(libtrace, packet);
 		event.type = TRACE_EVENT_PACKET;
 	} else {
 		/* Ok we don't have a packet waiting */

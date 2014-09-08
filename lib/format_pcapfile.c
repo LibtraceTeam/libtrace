@@ -712,7 +712,7 @@ static struct libtrace_eventobj_t pcapfile_event(libtrace_t *libtrace, libtrace_
 	 * we just need to read and return the next packet in the trace */
 
 	if (IN_OPTIONS.real_time) {
-		event.size = pcapfile_read_packet(libtrace, packet);
+		event.size = trace_read_packet(libtrace, packet);
 		if (event.size < 1)
 			event.type = TRACE_EVENT_TERMINATE;
 		else

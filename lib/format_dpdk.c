@@ -56,7 +56,59 @@
 #include <assert.h>
 #include <unistd.h>
 #include <endian.h>
+#include <string.h>
+
+/* We can deal with any minor differences by checking the RTE VERSION
+ * Typically DPDK backports some fixes (typically for building against
+ * newer kernels) to the older version of DPDK.
+ *
+ * These get released with the rX suffix. The following macros where added
+ * in these new releases.
+ *
+ * Below this is a log of version that required changes to the libtrace
+ * code (that we still attempt to support).
+ *
+ * Currently 1.5 to 1.7 is supported.
+ */
 #include <rte_eal.h>
+#include <rte_version.h>
+#ifndef RTE_VERSION_NUM
+#	define RTE_VERSION_NUM(a,b,c,d) ((a) << 24 | (b) << 16 | (c) << 8 | (d))
+#endif
+#ifndef RTE_VER_PATCH_RELEASE
+#	define RTE_VER_PATCH_RELEASE 0
+#endif
+#ifndef RTE_VERSION
+#	define RTE_VERSION RTE_VERSION_NUM(RTE_VER_MAJOR,RTE_VER_MINOR, \
+	RTE_VER_PATCH_LEVEL, RTE_VER_PATCH_RELEASE)
+#endif
+
+/* 1.6.0r2 :
+ *	rte_eal_pci_set_blacklist() is removed
+ *	device_list is renamed ot pci_device_list
+ *
+ * Replaced by:
+ *	rte_devargs (we can simply whitelist)
+ */
+#if RTE_VERSION <= RTE_VERSION_NUM(1, 6, 0, 1)
+#	define DPDK_USE_BLACKLIST 1
+#else
+#	define DPDK_USE_BLACKLIST 0
+#endif
+
+/*
+ * 1.7.0 :
+ *	rte_pmd_init_all is removed
+ *
+ * Replaced by:
+ *	Nothing, no longer needed
+ */
+#if RTE_VERSION < RTE_VERSION_NUM(1, 7, 0, 0)
+#	define DPDK_USE_PMD_INIT 1
+#else
+#	define DPDK_USE_PMD_INIT 0
+#endif
+
 #include <rte_per_lcore.h>
 #include <rte_debug.h>
 #include <rte_errno.h>
@@ -190,9 +242,11 @@ struct dpdk_format_data_t {
     int nb_rx_buf; /* The number of packet buffers in the rx ring */
     int nb_tx_buf; /* The number of packet buffers in the tx ring */
     struct rte_mempool * pktmbuf_pool; /* Our packet memory pool */
+#if DPDK_USE_BLACKLIST
     struct rte_pci_addr blacklist[BLACK_LIST_SIZE]; /* Holds our device blacklist */
+	unsigned int nb_blacklist; /* Number of blacklist items in are valid */
+#endif
     char mempool_name[MEMPOOL_NAME_LEN]; /* The name of the mempool that we are using */
-    unsigned int nb_blacklist; /* Number of blacklist items in are valid */
 #if HAS_HW_TIMESTAMPS_82580
     /* Timestamping only relevent to RX */
     uint64_t ts_first_sys; /* Sytem timestamp of the first packet in nanoseconds */
@@ -242,8 +296,11 @@ struct dpdk_addt_hdr {
  * 
  * So blacklist all devices except the one that we wish to use so that 
  * the others can still be used as standard ethernet ports.
+ *
+ * @return 0 if successful, otherwise -1 on error.
  */
-static void blacklist_devices(struct dpdk_format_data_t *format_data, struct rte_pci_addr *whitelist)
+#if DPDK_USE_BLACKLIST
+static int blacklist_devices(struct dpdk_format_data_t *format_data, struct rte_pci_addr *whitelist)
 {
 	struct rte_pci_device *dev = NULL;
 	format_data->nb_blacklist = 0;
@@ -267,7 +324,24 @@ static void blacklist_devices(struct dpdk_format_data_t *format_data, struct rte
 	}
 
 	rte_eal_pci_set_blacklist(format_data->blacklist, format_data->nb_blacklist);
+	return 0;
 }
+#else /* DPDK_USE_BLACKLIST */
+#include <rte_devargs.h>
+static int blacklist_devices(struct dpdk_format_data_t *format_data UNUSED, struct rte_pci_addr *whitelist)
+{
+	char pci_str[20] = {0};
+	snprintf(pci_str, sizeof(pci_str), PCI_PRI_FMT,
+	         whitelist->domain,
+	         whitelist->bus,
+	         whitelist->devid,
+	         whitelist->function);
+	if (rte_eal_devargs_add(RTE_DEVTYPE_WHITELISTED_PCI, pci_str) < 0) {
+		return -1;
+	}
+	return 0;
+}
+#endif
 
 /**
  * Parse the URI format as a pci address
@@ -335,7 +409,7 @@ static inline void dump_configuration()
     
     if (global_config != NULL) {
         int i;
-        printf("Intel DPDK setup\n"
+        fprintf(stderr, "Intel DPDK setup\n"
                "---Version      : %"PRIu32"\n"
                "---Magic        : %"PRIu32"\n"
                "---Master LCore : %"PRIu32"\n"
@@ -344,7 +418,7 @@ static inline void dump_configuration()
                global_config->master_lcore, global_config->lcore_count);
         
         for (i = 0 ; i < nb_cpu; i++) {
-            printf("   ---Core %d : %s\n", i, 
+            fprintf(stderr, "   ---Core %d : %s\n", i, 
                    global_config->lcore_role[i] == ROLE_RTE ? "on" : "off");
         }
         
@@ -365,40 +439,70 @@ static inline void dump_configuration()
             default:
                 proc_type = "something worse than invalid!!";
         }
-        printf("---Process Type : %s\n", proc_type);
+        fprintf(stderr, "---Process Type : %s\n", proc_type);
     }
     
 }
 #endif
 
-static inline int dpdk_init_enviroment(char * uridata, struct dpdk_format_data_t * format_data,
+/**
+ * XXX This is very bad XXX
+ * But we have to do something to allow getopts nesting
+ * Luckly normally the format is last so it doesn't matter
+ * DPDK only supports modern systems so hopefully this
+ * will continue to work
+ */
+struct saved_getopts {
+	char *optarg;
+	int optind;
+	int opterr;
+	int optopt;
+};
+
+static void save_getopts(struct saved_getopts *opts) {
+	opts->optarg = optarg;
+	opts->optind = optind;
+	opts->opterr = opterr;
+	opts->optopt = optopt;
+}
+
+static void restore_getopts(struct saved_getopts *opts) {
+	optarg = opts->optarg;
+	optind = opts->optind;
+	opterr = opts->opterr;
+	optopt = opts->optopt;
+}
+
+static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_t * format_data,
                                         char * err, int errlen) {
     int ret; /* Returned error codes */
-    struct rte_pci_addr use_addr; /* The only address that we don't blacklist */   
+    struct rte_pci_addr use_addr; /* The only address that we don't blacklist */
     char cpu_number[10] = {0}; /* The CPU mask we want to bind to */
+    char mem_map[20] = {0}; /* The memory name */
     long nb_cpu; /* The number of CPUs in the system */
     long my_cpu; /* The CPU number we want to bind to */
+	struct saved_getopts save_opts;
     
 #if DEBUG
     rte_set_log_level(RTE_LOG_DEBUG);
 #else 
     rte_set_log_level(RTE_LOG_WARNING);
 #endif
-    /* Using proc-type auto allows this to be either primary or secondary 
-     * Secondary allows two intances of libtrace to be used on different
-     * ports. However current version of DPDK doesn't support this on the
-     * same card (My understanding is this should work with two seperate
-     * cards).
+    /*
+     * Using unique file prefixes mean separate memory is used, unlinking
+     * the two processes. However be careful we still cannot access a 
+     * port that already in use.
      */
-    char* argv[] = {"libtrace", "-c", NULL, "-n", "1", "--proc-type", "auto", NULL};
+    char* argv[] = {"libtrace", "-c", cpu_number, "-n", "1", "--proc-type", "auto",
+		"--file-prefix", mem_map, "-m", "256", NULL};
     int argc = sizeof(argv) / sizeof(argv[0]) - 1;
-    
-    /* This initilises the Enviroment Abstraction Layer (EAL)
+
+    /* This initialises the Environment Abstraction Layer (EAL)
      * If we had slave workers these are put into WAITING state
      * 
      * Basically binds this thread to a fixed core, which we choose as
      * the last core on the machine (assuming fewer interrupts mapped here).
-     * "-c" controls the cpu mask 0x1=1st core 0x2=2nd 0x4=3rd and so om
+     * "-c" controls the cpu mask 0x1=1st core 0x2=2nd 0x4=3rd and so on
      * "-n" the number of memory channels into the CPU (hardware specific)
      *      - Most likely to be half the number of ram slots in your machine.
      *        We could count ram slots by "dmidecode -t 17 | grep -c 'Size:'"
@@ -437,19 +541,26 @@ static inline int dpdk_init_enviroment(char * uridata, struct dpdk_format_data_t
 
     /* Make our mask */
     snprintf(cpu_number, sizeof(cpu_number), "%x", 0x1 << (my_cpu - 1));
-    argv[2] = cpu_number;
 
+
+	/* Give the memory map a unique name */
+	snprintf(mem_map, sizeof(mem_map), "libtrace-%d", (int) getpid());
     /* rte_eal_init it makes a call to getopt so we need to reset the 
      * global optind variable of getopt otherwise this fails */
+	save_getopts(&save_opts);
     optind = 1;
     if ((ret = rte_eal_init(argc, argv)) < 0) {
         snprintf(err, errlen, 
           "Intel DPDK - Initialisation of EAL failed: %s", strerror(-ret));
         return -1;
     }
+	restore_getopts(&save_opts);
+
 #if DEBUG
     dump_configuration();
 #endif
+
+#if DPDK_USE_PMD_INIT
     /* This registers all available NICs with Intel DPDK
      * These are not loaded until rte_eal_pci_probe() is called.
      */
@@ -458,9 +569,14 @@ static inline int dpdk_init_enviroment(char * uridata, struct dpdk_format_data_t
           "Intel DPDK - rte_pmd_init_all failed: %s", strerror(-ret));
         return -1;
     }
+#endif
 
-    /* Black list all ports besides the one that we want to use */
-    blacklist_devices(format_data, &use_addr);
+    /* Blacklist all ports besides the one that we want to use */
+	if ((ret = blacklist_devices(format_data, &use_addr)) < 0) {
+		snprintf(err, errlen, "Intel DPDK - Whitelisting PCI device failed,"
+		         " are you sure the address is correct?: %s", strerror(-ret));
+		return -1;
+	}
 
     /* This loads DPDK drivers against all ports that are not blacklisted */
 	if ((ret = rte_eal_pci_probe()) < 0) {
@@ -495,7 +611,9 @@ static int dpdk_init_input (libtrace_t *libtrace) {
     FORMAT(libtrace)->nb_tx_buf = MIN_NB_BUF;
     FORMAT(libtrace)->promisc = -1;
     FORMAT(libtrace)->pktmbuf_pool = NULL;
+#if DPDK_USE_BLACKLIST
     FORMAT(libtrace)->nb_blacklist = 0;
+#endif
     FORMAT(libtrace)->paused = DPDK_NEVER_STARTED;
     FORMAT(libtrace)->mempool_name[0] = 0;
 #if HAS_HW_TIMESTAMPS_82580
@@ -504,7 +622,7 @@ static int dpdk_init_input (libtrace_t *libtrace) {
     FORMAT(libtrace)->wrap_count = 0;
 #endif
 
-    if (dpdk_init_enviroment(libtrace->uridata, FORMAT(libtrace), err, sizeof(err)) != 0) {
+    if (dpdk_init_environment(libtrace->uridata, FORMAT(libtrace), err, sizeof(err)) != 0) {
         trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "%s", err);
         free(libtrace->format_data);
         libtrace->format_data = NULL;
@@ -528,7 +646,9 @@ static int dpdk_init_output(libtrace_out_t *libtrace)
     FORMAT(libtrace)->nb_tx_buf = NB_TX_MBUF;
     FORMAT(libtrace)->promisc = -1;
     FORMAT(libtrace)->pktmbuf_pool = NULL;
+#if DPDK_USE_BLACKLIST
     FORMAT(libtrace)->nb_blacklist = 0;
+#endif
     FORMAT(libtrace)->paused = DPDK_NEVER_STARTED;
     FORMAT(libtrace)->mempool_name[0] = 0;
 #if HAS_HW_TIMESTAMPS_82580
@@ -537,7 +657,7 @@ static int dpdk_init_output(libtrace_out_t *libtrace)
     FORMAT(libtrace)->wrap_count = 0;
 #endif
 
-    if (dpdk_init_enviroment(libtrace->uridata, FORMAT(libtrace), err, sizeof(err)) != 0) {
+    if (dpdk_init_environment(libtrace->uridata, FORMAT(libtrace), err, sizeof(err)) != 0) {
         trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED, "%s", err);
         free(libtrace->format_data);
         libtrace->format_data = NULL;
@@ -633,12 +753,45 @@ static const struct rte_eth_rxconf rx_conf = {
 
 static const struct rte_eth_txconf tx_conf = {
 	.tx_thresh = {
-		.pthresh = 36,/* TX_PTHRESH prefetch */
-		.hthresh = 0,/* TX_HTHRESH host */
-		.wthresh = 4,/* TX_WTHRESH writeback */
+        /**
+         * TX_PTHRESH prefetch
+         * Set on the NIC, if the number of unprocessed descriptors to queued on
+         * the card fall below this try grab at least hthresh more unprocessed
+         * descriptors.
+         */
+		.pthresh = 36,
+
+        /* TX_HTHRESH host
+         * Set on the NIC, the batch size to prefetch unprocessed tx descriptors.
+         */
+		.hthresh = 0,
+        
+        /* TX_WTHRESH writeback
+         * Set on the NIC, the number of sent descriptors before writing back
+         * status to confirm the transmission. This is done more efficiently as
+         * a bulk DMA-transfer rather than writing one at a time.
+         * Similar to tx_free_thresh however this is applied to the NIC, where
+         * as tx_free_thresh is when DPDK will check these. This is extended
+         * upon by tx_rs_thresh (10Gbit cards) which doesn't write all
+         * descriptors rather only every n'th item, reducing DMA memory bandwidth.
+         */
+		.wthresh = 4,
 	},
-	.tx_free_thresh = 0, /* Use PMD default values */
-	.tx_rs_thresh = 0, /* Use PMD default values */
+
+    /* Used internally by DPDK rather than passed to the NIC. The number of
+     * packet descriptors to send before checking for any responses written
+     * back (to confirm the transmission). Default = 32 if set to 0)
+     */
+	.tx_free_thresh = 0,
+
+    /* This is the Report Status threshold, used by 10Gbit cards,
+     * This signals the card to only write back status (such as 
+     * transmission successful) after this minimum number of transmit
+     * descriptors are seen. The default is 32 (if set to 0) however if set
+     * to greater than 1 TX wthresh must be set to zero, because this is kindof
+     * a replacement. See the dpdk programmers guide for more restrictions.
+     */
+	.tx_rs_thresh = 1,
 };
 
 /* Attach memory to the port and start the port or restart the port.
@@ -652,7 +805,7 @@ static int dpdk_start_port (struct dpdk_format_data_t * format_data, char *err, 
         return 0;
 
     /* First time started we need to alloc our memory, doing this here 
-     * rather than in enviroment setup because we don't have snaplen then */
+     * rather than in environment setup because we don't have snaplen then */
     if (format_data->paused == DPDK_NEVER_STARTED) {
         if (format_data->snaplen == 0) {
             format_data->snaplen = RX_MBUF_SIZE;
@@ -682,7 +835,7 @@ static int dpdk_start_port (struct dpdk_format_data_t * format_data, char *err, 
          * ring become available.
          */
 #if DEBUG
-    printf("Creating mempool named %s\n", format_data->mempool_name);
+    fprintf(stderr, "Creating mempool named %s\n", format_data->mempool_name);
 #endif
         format_data->pktmbuf_pool =
             rte_mempool_create(format_data->mempool_name,
@@ -718,7 +871,7 @@ static int dpdk_start_port (struct dpdk_format_data_t * format_data, char *err, 
                             strerror(-ret));
         return -1;
     }
-    /* Initilise the TX queue a minimum value if using this port for
+    /* Initialise the TX queue a minimum value if using this port for
      * receiving. Otherwise a larger size if writing packets.
      */
     ret = rte_eth_tx_queue_setup(format_data->port, format_data->queue_id,
@@ -729,7 +882,7 @@ static int dpdk_start_port (struct dpdk_format_data_t * format_data, char *err, 
                             strerror(-ret));
         return -1;
     }
-    /* Initilise the RX queue with some packets from memory */
+    /* Initialise the RX queue with some packets from memory */
     ret = rte_eth_rx_queue_setup(format_data->port, format_data->queue_id,
                             format_data->nb_rx_buf, SOCKET_ID_ANY, 
                             &rx_conf, format_data->pktmbuf_pool);
@@ -760,11 +913,11 @@ static int dpdk_start_port (struct dpdk_format_data_t * format_data, char *err, 
     /* Wait for the link to come up */
     rte_eth_link_get(format_data->port, &link_info);
 #if DEBUG
-    printf("Link status is %d %d %d\n", (int) link_info.link_status,
+    fprintf(stderr, "Link status is %d %d %d\n", (int) link_info.link_status,
             (int) link_info.link_duplex, (int) link_info.link_speed);
 #endif
 
-    /* We have now successfully started/unpased */
+    /* We have now successfully started/unpaused */
     format_data->paused = DPDK_RUNNING;
     
     return 0;
@@ -801,7 +954,7 @@ static int dpdk_pause_input(libtrace_t * libtrace){
     /* This stops the device, but can be restarted using rte_eth_dev_start() */
     if (FORMAT(libtrace)->paused == DPDK_RUNNING) {
 #if DEBUG      
-        printf("Pausing port\n");
+        fprintf(stderr, "Pausing port\n");
 #endif
         rte_eth_dev_stop(FORMAT(libtrace)->port);
         FORMAT(libtrace)->paused = DPDK_PAUSED;
@@ -1271,9 +1424,11 @@ static libtrace_eventobj_t dpdk_trace_event(libtrace_t *trace,
             if (trace->filter) {
                 if (!trace_apply_filter(trace->filter, packet)) {
                     /* Failed the filter so we loop for another packet */
+                    trace->filtered_packets ++;
                     continue;
                 }
             }
+            trace->accepted_packets ++;
         } else {
             /* We only want to sleep for a very short time - we are non-blocking */
             event.type = TRACE_EVENT_SLEEP;
