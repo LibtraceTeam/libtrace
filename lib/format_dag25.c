@@ -585,7 +585,7 @@ static int dag_start_input(libtrace_t *libtrace) {
 	top = bottom = NULL;
 
 	zero.tv_sec = 0;
-        zero.tv_usec = 0;
+        zero.tv_usec = 10000;
         nopoll = zero;
 
 	/* Attach and start the DAG stream */
@@ -991,7 +991,7 @@ static int dag_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *packet)
 
 		/* Flags. Can't do this */
 		memset(&erfhdr.flags,1,sizeof(erfhdr.flags));
-		if (trace_get_direction(packet)!=~0U)
+		if (trace_get_direction(packet)!=(int)~0U)
 			erfhdr.flags.iface = trace_get_direction(packet);
 
 		erfhdr.type = erf_type;
@@ -1034,6 +1034,13 @@ static int dag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
         dag_record_t *erfptr = NULL;
 	int numbytes = 0;
 	uint32_t flags = 0;
+	struct timeval maxwait;
+	struct timeval pollwait;
+
+	pollwait.tv_sec = 0;
+	pollwait.tv_usec = 10000;
+	maxwait.tv_sec = 0;
+	maxwait.tv_usec = 250000;
 
         /* Check if we're due for a DUCK report */
 	if (DUCK.last_pkt - DUCK.last_duck > DUCK.duck_freq &&
@@ -1056,15 +1063,27 @@ static int dag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
                 free(packet->buffer);
                 packet->buffer = 0;
         }
+	
+	if (dag_set_stream_poll(FORMAT_DATA->device->fd, 
+			FORMAT_DATA->dagstream, sizeof(dag_record_t), &maxwait, 
+			&pollwait) == -1)
+	{
+		trace_set_err(libtrace, errno, "dag_set_stream_poll");
+		return -1;
+	}
+
 
 	/* Grab a full ERF record */
 	do {
 		numbytes = dag_available(libtrace);
 		if (numbytes < 0)
 			return numbytes;
-		if (numbytes < dag_record_size)
+		if (numbytes < dag_record_size) {
+			if (libtrace_halt)
+				return 0;
 			/* Block until we see a packet */
 			continue;
+		}
 		erfptr = dag_get_record(libtrace);
 	} while (erfptr == NULL);
 
@@ -1085,12 +1104,25 @@ static int dag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
  * packet is available, we will return a packet event. Otherwise we will
  * return a SLEEP event (as we cannot select on the DAG file descriptor).
  */
-static libtrace_eventobj_t trace_event_dag(libtrace_t *trace,
+static libtrace_eventobj_t trace_event_dag(libtrace_t *libtrace,
                                         libtrace_packet_t *packet) {
         libtrace_eventobj_t event = {0,0,0.0,0};
 	dag_record_t *erfptr = NULL;
 	int numbytes;
 	uint32_t flags = 0;
+	struct timeval minwait;
+	
+	minwait.tv_sec = 0;
+	minwait.tv_usec = 10000;
+	
+	if (dag_set_stream_poll(FORMAT_DATA->device->fd, 
+			FORMAT_DATA->dagstream, 0, &minwait, 
+			&minwait) == -1)
+	{
+		trace_set_err(libtrace, errno, "dag_set_stream_poll");
+		event.type = TRACE_EVENT_TERMINATE;
+		return event;
+	}
 
 	do {
 		erfptr = NULL;
@@ -1098,19 +1130,23 @@ static libtrace_eventobj_t trace_event_dag(libtrace_t *trace,
 	
 		/* Need to call dag_available so that the top pointer will get
 		 * updated, otherwise we'll never see any data! */
-		numbytes = dag_available(trace);
+		numbytes = dag_available(libtrace);
 
 		/* May as well not bother calling dag_get_record if 
 		 * dag_available suggests that there's no data */
 		if (numbytes != 0)
-			erfptr = dag_get_record(trace);
+			erfptr = dag_get_record(libtrace);
 		if (erfptr == NULL) {
 			/* No packet available - sleep for a very short time */
-			event.type = TRACE_EVENT_SLEEP;
-			event.seconds = 0.0001;
+			if (libtrace_halt) {
+				event.type = TRACE_EVENT_TERMINATE;
+			} else {			
+				event.type = TRACE_EVENT_SLEEP;
+				event.seconds = 0.0001;
+			}
 			break;
 		}
-		if (dag_prepare_packet(trace, packet, erfptr, 
+		if (dag_prepare_packet(libtrace, packet, erfptr, 
 					TRACE_RT_DATA_ERF, flags)) {
 			event.type = TRACE_EVENT_TERMINATE;
 			break;
@@ -1124,27 +1160,36 @@ static libtrace_eventobj_t trace_event_dag(libtrace_t *trace,
 		 * config options for us, but this function is called via
 		 * trace_event() so we have to do it ourselves */
 
-		if (trace->filter) {
-			if (trace_apply_filter(trace->filter, packet)) {
-				event.type = TRACE_EVENT_PACKET;
-			} else {
+		if (libtrace->filter) {
+			int filtret = trace_apply_filter(libtrace->filter, 
+					packet);
+			if (filtret == -1) {
+				trace_set_err(libtrace, TRACE_ERR_BAD_FILTER,
+						"Bad BPF Filter");
+				event.type = TRACE_EVENT_TERMINATE;
+				break;
+			}
+
+			if (filtret == 0) {
 				/* This packet isn't useful so we want to
 				 * immediately see if there is another suitable
 				 * one - we definitely DO NOT want to return
 				 * a sleep event in this case, like we used to
 				 * do! */
-                                trace->filtered_packets ++;
+                                libtrace->filtered_packets ++;
 				trace_clear_cache(packet);
 				continue;
 			}
+				
+			event.type = TRACE_EVENT_PACKET;
 		} else {
 			event.type = TRACE_EVENT_PACKET;
 		}
 
-		if (trace->snaplen > 0) {
-			trace_set_capture_length(packet, trace->snaplen);
+		if (libtrace->snaplen > 0) {
+			trace_set_capture_length(packet, libtrace->snaplen);
 		}
-                trace->accepted_packets ++;
+                libtrace->accepted_packets ++;
 		break;
 	} while (1);
 
