@@ -38,7 +38,7 @@
 #include <math.h>
 #include <signal.h>
 #include <unistd.h>
-
+#include <stdint.h>
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/tcp.h>
