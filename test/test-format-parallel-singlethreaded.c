@@ -98,8 +98,31 @@ struct TLS {
 	bool seen_pausing_message;
 	int count;
 };
-int x;
 
+static int totalpkts = 0;
+static void report_result(libtrace_t *trace, libtrace_result_t *result, libtrace_message_t *mesg) {
+	static int totalthreads = 0;
+	if (result) {
+		assert(libtrace_result_get_key(result) == 0);
+		printf("%d,", (int) libtrace_result_get_value(result));
+		totalthreads++;
+		totalpkts += (int) libtrace_result_get_value(result);
+	} else {
+		switch(mesg->code) {
+			case MESSAGE_STARTING:
+				// Should have a single thread here
+				assert(libtrace_get_perpkt_count(trace) == 1);
+				printf("\tLooks like %d threads are being used!\n\tcounts(", libtrace_get_perpkt_count(trace));
+				break;
+			case MESSAGE_STOPPING:
+				printf(")\n");
+				assert(totalthreads == libtrace_get_perpkt_count(trace));
+				break;
+		}
+	}
+}
+
+static int x;
 static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt, 
 						libtrace_message_t *mesg,
 						libtrace_thread_t *t) {
@@ -166,7 +189,6 @@ static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt,
 int test_single_threaded(const char *tracename, int expected) {
 	libtrace_t *trace;
 	int error = 0;
-	int count = 0;
 	int i;
 	printf("Testing single threaded\n");
 
@@ -179,7 +201,7 @@ int test_single_threaded(const char *tracename, int expected) {
 	trace_parallel_config(trace, TRACE_OPTION_SET_PERPKT_THREAD_COUNT, &i);
 
 	// Start it
-	trace_pstart(trace, NULL, per_packet, NULL);
+	trace_pstart(trace, NULL, per_packet, report_result);
 	iferr(trace,tracename);
 
 	/* Make sure traces survive a pause and restart */
@@ -190,30 +212,13 @@ int test_single_threaded(const char *tracename, int expected) {
 
 	/* Wait for all threads to stop */
 	trace_join(trace);
-	libtrace_vector_t results;
 
-	/* Now lets check the results */
-	libtrace_vector_init(&results, sizeof(libtrace_result_t));
-	trace_get_results(trace, &results);
-	// Should have one result/thread here
-	assert(libtrace_vector_get_size(&results) == 1);
-	for (i = 0; i < libtrace_vector_get_size(&results); i++) {
-		int ret;
-		libtrace_result_t result;
-		ret = libtrace_vector_get(&results, i, (void *) &result);
-		assert(ret == 1);
-		assert(libtrace_result_get_key(&result) == 0);
-		count += (int) libtrace_result_get_value(&result);
-		printf("%d,", (int) libtrace_result_get_value(&result));
-	}
-	printf(")\n");
-	libtrace_vector_destroy(&results);
-
+	/* Now check we have all received all the packets */
 	if (error == 0) {
-		if (count == expected) {
+		if (totalpkts == expected) {
 			printf("success: %d packets read\n",expected);
 		} else {
-			printf("failure: %d packets expected, %d seen\n",expected,count);
+			printf("failure: %d packets expected, %d seen\n",expected,totalpkts);
 			error = 1;
 		}
 	} else {

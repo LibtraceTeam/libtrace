@@ -29,4 +29,6 @@ DLLEXPORT void libtrace_vector_empty(libtrace_vector_t *v);
 // multiple items are changed
 DLLEXPORT void libtrace_vector_apply_function(libtrace_vector_t *v, vector_data_fn fn);
 
+// Sort the vector using qsort
+DLLEXPORT void libtrace_vector_qsort(libtrace_vector_t *v, int (*compar)(const void *, const void*));
 #endif

@@ -213,8 +213,6 @@ struct libtrace_thread_t {
 	void* format_data; // TLS for the format to use
 	libtrace_message_queue_t messages; // Message handling
 	libtrace_ringbuffer_t rbuffer; // Input
-	libtrace_vector_t vector; // Output
-	libtrace_queue_t deque; // Real Output type makes more sense
 	libtrace_t * trace;
 	void* ret;
 	enum thread_types type;
@@ -344,6 +342,7 @@ struct libtrace_t {
 	uint64_t dropped_packets;
 	uint64_t received_packets;
 	struct user_configuration config;
+	libtrace_combine_t combiner;
 };
 
 void trace_fin_packet(libtrace_packet_t *packet);

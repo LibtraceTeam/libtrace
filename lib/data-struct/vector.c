@@ -58,7 +58,7 @@ DLLEXPORT int libtrace_vector_remove_front(libtrace_vector_t *v) {
 		return 0;
 	}
 	v->size--;
-	// Of coarse this is mega slow 
+	// Of course this is mega slow
 	for (i = 0; i < v->size * v->element_size; i++)
 		v->elements[i] = v->elements[i+v->element_size];
 	ASSERT_RET(pthread_mutex_unlock(&v->lock), == 0);
@@ -129,5 +129,11 @@ DLLEXPORT void libtrace_vector_apply_function(libtrace_vector_t *v, vector_data_
 	for (cur = 0; cur < v->size; cur++) {
 		(*fn)(&v->elements[cur*v->element_size]);
 	}
+	ASSERT_RET(pthread_mutex_unlock(&v->lock), == 0);
+}
+
+DLLEXPORT void libtrace_vector_qsort(libtrace_vector_t *v, int (*compar)(const void *, const void*)) {
+	ASSERT_RET(pthread_mutex_lock(&v->lock), == 0);
+	qsort(v->elements, v->element_size, v->element_size, compar);
 	ASSERT_RET(pthread_mutex_unlock(&v->lock), == 0);
 }

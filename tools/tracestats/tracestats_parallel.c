@@ -149,21 +149,15 @@ static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt, libtrace_mess
 	return pkt;
 }
 
-static int reduce(libtrace_t* trace, void* global_blob)
-{
-	int i,j;
-	uint64_t count=0, bytes=0;
-	libtrace_vector_t results;
-	libtrace_vector_init(&results, sizeof(libtrace_result_t));
-	trace_get_results(trace, &results);
+static void report_result(libtrace_t *trace UNUSED, libtrace_result_t *result, libtrace_message_t *mesg) {
+	static uint64_t count=0, bytes=0;
 	uint64_t packets;
-	
-	/* Get the results from each core and sum 'em up */
-	for (i = 0 ; i < libtrace_vector_get_size(&results) ; i++) {
-		libtrace_result_t result;
-		assert(libtrace_vector_get(&results, i, (void *) &result) == 1);
-		assert(libtrace_result_get_key(&result) == 0);
-		statistics_t * res = libtrace_result_get_value(&result);
+	int i;
+	if (result) {
+		int j;
+		/* Get the results from each core and sum 'em up */
+		assert(libtrace_result_get_key(result) == 0);
+		statistics_t * res = libtrace_result_get_value(result);
 		count += res[0].count;
 		bytes += res[0].bytes;
 		for (j = 0; j < filter_count; j++) {
@@ -171,37 +165,34 @@ static int reduce(libtrace_t* trace, void* global_blob)
 			filters[j].bytes += res[j+1].bytes;
 		}
 		free(res);
+	} else switch (mesg->code) {
+		case MESSAGE_STOPPING:
+			printf("%-30s\t%12s\t%12s\t%7s\n","filter","count","bytes","%");
+			for(i=0;i<filter_count;++i) {
+				printf("%30s:\t%12"PRIu64"\t%12"PRIu64"\t%7.03f\n",filters[i].expr,filters[i].count,filters[i].bytes,filters[i].count*100.0/count);
+				filters[i].bytes=0;
+				filters[i].count=0;
+			}
+			packets=trace_get_received_packets(trace);
+			if (packets!=UINT64_MAX)
+				fprintf(stderr,"%30s:\t%12" PRIu64"\n",
+						"Input packets", packets);
+			packets=trace_get_filtered_packets(trace);
+			if (packets!=UINT64_MAX)
+				fprintf(stderr,"%30s:\t%12" PRIu64"\n",
+						"Filtered packets", packets);
+			packets=trace_get_dropped_packets(trace);
+			if (packets!=UINT64_MAX)
+				fprintf(stderr,"%30s:\t%12" PRIu64"\n",
+						"Dropped packets",packets);
+			packets=trace_get_accepted_packets(trace);
+			if (packets!=UINT64_MAX)
+				fprintf(stderr,"%30s:\t%12" PRIu64 "\n",
+						"Accepted Packets",packets);
+			printf("%30s:\t%12"PRIu64"\t%12" PRIu64 "\n","Total",count,bytes);
+			totcount+=count;
+			totbytes+=bytes;
 	}
-	// Done with these results - Free internally and externally
-	libtrace_vector_destroy(&results);
-
-    printf("%-30s\t%12s\t%12s\t%7s\n","filter","count","bytes","%");
-	for(i=0;i<filter_count;++i) {
-		printf("%30s:\t%12"PRIu64"\t%12"PRIu64"\t%7.03f\n",filters[i].expr,filters[i].count,filters[i].bytes,filters[i].count*100.0/count);
-		filters[i].bytes=0;
-		filters[i].count=0;
-	}
-	packets=trace_get_received_packets(trace);
-	if (packets!=UINT64_MAX)
-		fprintf(stderr,"%30s:\t%12" PRIu64"\n", 
-				"Input packets", packets);
-	packets=trace_get_filtered_packets(trace);
-	if (packets!=UINT64_MAX)
-		fprintf(stderr,"%30s:\t%12" PRIu64"\n", 
-				"Filtered packets", packets);
-	packets=trace_get_dropped_packets(trace);
-	if (packets!=UINT64_MAX)
-		fprintf(stderr,"%30s:\t%12" PRIu64"\n",
-				"Dropped packets",packets);
-	packets=trace_get_accepted_packets(trace);
-	if (packets!=UINT64_MAX)
-		fprintf(stderr,"%30s:\t%12" PRIu64 "\n",
-				"Accepted Packets",packets);
-	printf("%30s:\t%12"PRIu64"\t%12" PRIu64 "\n","Total",count,bytes);
-	totcount+=count;
-	totbytes+=bytes;
-	
-	return 0;
 }
 
 static uint64_t rand_hash(libtrace_packet_t * pkt, void *data) {
@@ -211,6 +202,9 @@ static uint64_t rand_hash(libtrace_packet_t * pkt, void *data) {
 static uint64_t bad_hash(libtrace_packet_t * pkt, void *data) {
 	return 0;
 }
+
+struct user_configuration uc;
+
 
 /* Process a trace, counting packets that match filter(s) */
 static void run_trace(char *uri) 
@@ -229,7 +223,10 @@ static void run_trace(char *uri)
 	//option = 10000;
     //trace_set_hasher(trace, HASHER_CUSTOM, &rand_hash, NULL);
 	option = 2;
-	trace_parallel_config(trace, TRACE_OPTION_SET_PERPKT_THREAD_COUNT, &option);
+	//trace_parallel_config(trace, TRACE_OPTION_SET_PERPKT_THREAD_COUNT, &option);
+	trace_parallel_config(trace, TRACE_OPTION_SET_CONFIG, &uc);
+	trace_parallel_config(trace, TRACE_OPTION_ORDERED, &uc);
+
 	//trace_parallel_config(trace, TRACE_OPTION_SET_MAPPER_BUFFER_SIZE, &option);
 
 	/* OPTIONALLY SETUP CORES HERE BUT WE DON'T CARE ABOUT THAT YET XXX */
@@ -241,14 +238,13 @@ static void run_trace(char *uri)
 	global_blob_t blob;
 
 
-	if (trace_pstart(trace, (void *)&blob, &per_packet, NULL)==-1) {
+	if (trace_pstart(trace, (void *)&blob, &per_packet, report_result)==-1) {
 		trace_perror(trace,"Failed to start trace");
 		return;
 	}
 
 	// Wait for all threads to stop
 	trace_join(trace);
-	reduce(trace, NULL);
 
 	//map_pair_iterator_t * results = NULL;
 	//trace_get_results(trace, &results);
@@ -272,16 +268,18 @@ int main(int argc, char *argv[]) {
 
 	int i;
 	struct sigaction sigact;
-
+	ZERO_USER_CONFIG(uc);
 	while(1) {
 		int option_index;
 		struct option long_options[] = {
 			{ "filter",	   1, 0, 'f' },
 			{ "libtrace-help", 0, 0, 'H' },
+			{ "config",		1, 0, 'u' },
+			{ "config-file",		1, 0, 'U' },
 			{ NULL, 	   0, 0, 0   },
 		};
 
-		int c=getopt_long(argc, argv, "f:H",
+		int c=getopt_long(argc, argv, "f:Hu:U:",
 				long_options, &option_index);
 
 		if (c==-1)
@@ -299,6 +297,18 @@ int main(int argc, char *argv[]) {
 			case 'H':
 				trace_help();
 				exit(1);
+				break;
+			case 'u':
+				  parse_user_config(&uc, optarg);
+				  break;
+			case 'U':;
+				FILE * f = fopen(optarg, "r");
+				if (f != NULL) {
+					parse_user_config_file(&uc, f);
+				} else {
+					perror("Failed to open configuration file\n");
+					usage(argv[0]);
+				}
 				break;
 			default:
 				fprintf(stderr,"Unknown option: %c\n",c);

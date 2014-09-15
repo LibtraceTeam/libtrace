@@ -58,7 +58,7 @@ libtrace_la_SOURCES = trace.c trace_parallel.c common.h \
 		libtrace_arphrd.h \
 		data-struct/ring_buffer.c data-struct/vector.c data-struct/message_queue.c \
 		data-struct/deque.c data-struct/sliding_window.c data-struct/object_cache.c \
-		hash_toeplitz.c
+		hash_toeplitz.c combiner_ordered.c combiner_sorted.c combiner_unordered.c
 
 if DAG2_4
 nodist_libtrace_la_SOURCES = dagopts.c dagapi.c

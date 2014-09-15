@@ -207,7 +207,7 @@ static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt, libtrace_mess
 
 struct libtrace_out_t *writer = 0;
 
-static void* write_out(libtrace_t *trace, libtrace_result_t *result, UNUSED libtrace_message_t *mesg) {
+static void write_out(libtrace_t *trace, libtrace_result_t *result, UNUSED libtrace_message_t *mesg) {
 	static uint64_t packet_count = 0; // TESTING PURPOSES, this is not going to work with a live format
 
 	if (result) {
@@ -225,7 +225,6 @@ static void* write_out(libtrace_t *trace, libtrace_result_t *result, UNUSED libt
 			// Ignore it
 		}
 	}
-	return NULL;
 }
 
 

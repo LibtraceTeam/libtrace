@@ -664,11 +664,8 @@ DLLEXPORT void trace_destroy(libtrace_t *libtrace) {
 	if (libtrace->state != STATE_NEW) {
 		// This has all of our packets
 		libtrace_ocache_destroy(&libtrace->packet_freelist);
-		
-		for (i = 0; i < libtrace->perpkt_thread_count; ++i) {
-			assert (libtrace_vector_get_size(&libtrace->perpkt_threads[i].vector) == 0);
-			libtrace_vector_destroy(&libtrace->perpkt_threads[i].vector);
-		}
+		if (libtrace->combiner.destroy)
+			libtrace->combiner.destroy(libtrace, &libtrace->combiner);
 		free(libtrace->perpkt_threads);
 		libtrace->perpkt_threads = NULL;
 		libtrace->perpkt_thread_count = 0;

@@ -1749,7 +1749,7 @@ static uint64_t linuxnative_get_captured_packets(libtrace_t *trace) {
 	if ((FORMAT(trace->format_data)->stats_valid & 1)
 	        || FORMAT(trace->format_data)->stats_valid == 0) {
 		if (FORMAT(trace->format_data)->per_thread) {
-			size_t i;
+			int i;
 			FORMAT(trace->format_data)->stats.tp_drops = 0;
 			FORMAT(trace->format_data)->stats.tp_packets = 0;
 			for (i = 0; i < trace->perpkt_thread_count; ++i) {
@@ -1797,7 +1797,7 @@ static uint64_t linuxnative_get_dropped_packets(libtrace_t *trace) {
 	if ((FORMAT(trace->format_data)->stats_valid & 2)
 	        || (FORMAT(trace->format_data)->stats_valid==0)) {
 		if (FORMAT(trace->format_data)->per_thread) {
-			size_t i;
+			int i;
 			FORMAT(trace->format_data)->stats.tp_drops = 0;
 			FORMAT(trace->format_data)->stats.tp_packets = 0;
 			for (i = 0; i < trace->perpkt_thread_count; ++i) {

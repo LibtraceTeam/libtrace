@@ -94,6 +94,7 @@
 #include "format_helper.h"
 #include "rt_protocol.h"
 #include "hash_toeplitz.h"
+#include "combiners.h"
 
 #include <pthread.h>
 #include <signal.h>
@@ -184,6 +185,18 @@ static inline int trace_has_dedicated_reporter(libtrace_t * libtrace)
 {
 	assert(libtrace->state != STATE_NEW);
 	return libtrace->reporter_thread.type == THREAD_REPORTER && libtrace->reporter;
+}
+
+/**
+ * When running the number of perpkt threads in use.
+ * TODO what if the trace is not running yet, or has finished??
+ *
+ * @brief libtrace_perpkt_thread_nb
+ * @param t The trace
+ * @return
+ */
+DLLEXPORT int libtrace_get_perpkt_count(libtrace_t * t) {
+	return t->perpkt_thread_count;
 }
 
 /**
@@ -282,8 +295,6 @@ void libtrace_zero_thread(libtrace_thread_t * t) {
 	t->ret = NULL;
 	t->type = THREAD_EMPTY;
 	libtrace_zero_ringbuffer(&t->rbuffer);
-	libtrace_zero_vector(&t->vector);
-	libtrace_zero_deque(&t->deque);
 	t->recorded_first = false;
 	t->perpkt_num = -1;
 	t->accepted_packets = 0;
@@ -327,7 +338,7 @@ static libtrace_thread_t * get_thread_descriptor(libtrace_t *libtrace) {
 	return ret;
 }
 
-/** Used below in trace_make_results_packets_safe*/
+/** Used below in trace_make_results_packets_safe */
 static void do_copy_result_packet(void *data)
 {
 	libtrace_result_t *res = (libtrace_result_t *)data;
@@ -343,24 +354,10 @@ static void do_copy_result_packet(void *data)
 }
 
 /**
- * Make a safe replacement copy of any result packets that are owned
- * by the format in the result queue. Used when pausing traces.
- */ 
-static void trace_make_results_packets_safe(libtrace_t *trace) {
-	libtrace_thread_t *t = get_thread_descriptor(trace);
-	if (trace->reporter_flags & (REDUCE_SEQUENTIAL | REDUCE_ORDERED))
-		libtrace_deque_apply_function(&t->deque, &do_copy_result_packet);
-	else 
-		libtrace_vector_apply_function(&t->vector, &do_copy_result_packet);
-}
-
-/**
  * Holds threads in a paused state, until released by broadcasting
  * the condition mutex.
  */
 static void trace_thread_pause(libtrace_t *trace, libtrace_thread_t *t) {
-	if (t->type == THREAD_PERPKT)
-		trace_make_results_packets_safe(trace);
 	ASSERT_RET(pthread_mutex_lock(&trace->libtrace_lock), == 0);
 	thread_change_state(trace, t, THREAD_PAUSED, false);
 	while (trace->state == STATE_PAUSED || trace->state == STATE_PAUSING) {
@@ -1173,12 +1170,9 @@ static void* reporter_entry(void *data) {
 	libtrace_message_t message = {0};
 	libtrace_t *trace = (libtrace_t *)data;
 	libtrace_thread_t *t = &trace->reporter_thread;
-	size_t res_size;
 	libtrace_vector_t results;
 	libtrace_vector_init(&results, sizeof(libtrace_result_t));
 	fprintf(stderr, "Reporter thread starting\n");
-	libtrace_result_t result;
-	size_t i;
 
 	message.code = MESSAGE_STARTING;
 	message.sender = t;
@@ -1196,13 +1190,11 @@ static void* reporter_entry(void *data) {
 		switch (message.code) {
 			// Check for results
 			case MESSAGE_POST_REPORTER:
-				res_size = trace_get_results(trace, &results);
-				for (i = 0; i < res_size; i++) {
-					ASSERT_RET(libtrace_vector_get(&results, i, (void *) &result), == 1);
-					(*trace->reporter)(trace, &result, NULL);
-				}
+				trace->combiner.read(trace, &trace->combiner);
 				break;
 			case MESSAGE_DO_PAUSE:
+				assert(trace->combiner.pause);
+				trace->combiner.pause(trace, &trace->combiner);
 				message.code = MESSAGE_PAUSING;
 				message.sender = t;
 				(*trace->reporter)(trace, NULL, &message);
@@ -1216,12 +1208,7 @@ static void* reporter_entry(void *data) {
 	}
 
 	// Flush out whats left now all our threads have finished
-	res_size = trace_get_results(trace, &results);
-	for (i = 0; i < res_size; i++) {
-		ASSERT_RET(libtrace_vector_get(&results, i, (void *) &result), == 1);
-		(*trace->reporter)(trace, &result, NULL);
-	}
-	libtrace_vector_destroy(&results);
+	trace->combiner.read_final(trace, &trace->combiner);
 
 	// GOODBYE
 	message.code = MESSAGE_PAUSING;
@@ -1590,9 +1577,6 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob, fn_per_pkt p
 		if (libtrace->hasher)
 			libtrace_ringbuffer_init(&t->rbuffer, libtrace->config.hasher_queue_size,
 			                         libtrace->config.hasher_polling?LIBTRACE_RINGBUFFER_POLLING:0);
-		// Depending on the mode vector or deque might be chosen
-		libtrace_vector_init(&t->vector, sizeof(libtrace_result_t));
-		libtrace_deque_init(&t->deque, sizeof(libtrace_result_t));
 		libtrace_message_queue_init(&t->messages, sizeof(libtrace_message_t));
 		t->recorded_first = false;
 		t->tracetime_offset_usec = 0;;
@@ -1610,6 +1594,13 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob, fn_per_pkt p
 	}
 	if (threads_started == 0)
 		threads_started = trace_start_perpkt_threads(libtrace);
+
+	// No combiner set, use a default to reduce the chance of this breaking
+	if (libtrace->combiner.initialise == NULL && libtrace->combiner.publish == NULL)
+		libtrace->combiner = combiner_unordered;
+
+	if (libtrace->combiner.initialise)
+		libtrace->combiner.initialise(libtrace, &libtrace->combiner);
 
 	libtrace->reporter_thread.type = THREAD_REPORTER;
 	libtrace->reporter_thread.state = THREAD_RUNNING;
@@ -2057,143 +2048,17 @@ DLLEXPORT void * trace_set_tls(libtrace_thread_t *t, void * data)
 }
 
 /**
- * Publish to the reduce queue, return
+ * Publishes a result to the reduce queue
  * Should only be called by a perpkt thread, i.e. from a perpkt handler
  */
 DLLEXPORT void trace_publish_result(libtrace_t *libtrace, libtrace_thread_t *t, uint64_t key, void * value, int type) {
 	libtrace_result_t res;
-	UNUSED static __thread int count = 0;
 	res.type = type;
-
-	libtrace_result_set_key_value(&res, key, value);
-
-	/*
-	if (count == 1)
-		printf("My vector size is %d\n", libtrace_vector_get_size(&t->vector));
-	count = (count+1) %1000;
-	libtrace_vector_push_back(&t->vector, &res); // Automatically locking for us :)
-	*/
-	/*if (count == 1)
-		printf("My vector size is %d\n", libtrace_deque_get_size(&t->deque));
-	count = (count+1)%1000;*/
-
-	if (libtrace->reporter_flags & (REDUCE_SEQUENTIAL | REDUCE_ORDERED)) {
-		if (libtrace_deque_get_size(&t->deque) >= libtrace->config.reporter_thold) {
-			trace_post_reporter(libtrace);
-		}
-		//while (libtrace_deque_get_size(&t->deque) >= 1000)
-		//	sched_yield();
-		libtrace_deque_push_back(&t->deque, &res); // Automatically locking for us :)
-	} else {
-		//while (libtrace_vector_get_size(&t->vector) >= 1000)
-		//	sched_yield();
-
-		if (libtrace_vector_get_size(&t->vector) >= libtrace->config.reporter_thold) {
-			trace_post_reporter(libtrace);
-		}
-		libtrace_vector_push_back(&t->vector, &res); // Automatically locking for us :)
-	}
-}
-
-static int compareres(const void* p1, const void* p2)
-{
-	if (libtrace_result_get_key((libtrace_result_t *) p1) < libtrace_result_get_key((libtrace_result_t *) p2))
-		return -1;
-	if (libtrace_result_get_key((libtrace_result_t *) p1) == libtrace_result_get_key((libtrace_result_t *) p2))
-		return 0;
-	else
-		return 1;
-}
-
-DLLEXPORT int trace_get_results(libtrace_t *libtrace, libtrace_vector_t * results) {
-	int i;
-	int flags = libtrace->reporter_flags; // Hint these aren't a changing
-
-	libtrace_vector_empty(results);
-
-	/* Here we assume queues are in order ascending order and they want
-	 * the smallest result first. If they are not in order the results
-	 * may not be in order.
-	 */
-	if (flags & (REDUCE_SEQUENTIAL | REDUCE_ORDERED)) {
-		int live_count = 0;
-		bool live[libtrace->perpkt_thread_count]; // Set if a trace is alive
-		uint64_t key[libtrace->perpkt_thread_count]; // Cached keys
-		uint64_t min_key = UINT64_MAX; // XXX use max int here stdlimit.h?
-		int min_queue = -1;
-
-		/* Loop through check all are alive (have data) and find the smallest */
-		for (i = 0; i < libtrace->perpkt_thread_count; ++i) {
-			libtrace_queue_t *v = &libtrace->perpkt_threads[i].deque;
-			if (libtrace_deque_get_size(v) != 0) {
-				libtrace_result_t r;
-				libtrace_deque_peek_front(v, (void *) &r);
-				live_count++;
-				live[i] = 1;
-				key[i] = libtrace_result_get_key(&r);
-				if (i==0 || min_key > key[i]) {
-					min_key = key[i];
-					min_queue = i;
-				}
-			} else {
-				live[i] = 0;
-			}
-		}
-
-		/* Now remove the smallest and loop - special case if all threads have joined we always flush whats left */
-		while ((live_count == libtrace->perpkt_thread_count) || (live_count &&
-				((flags & REDUCE_SEQUENTIAL && min_key == libtrace->expected_key) ||
-				trace_finished(libtrace)))) {
-			/* Get the minimum queue and then do stuff */
-			libtrace_result_t r;
-
-			assert (libtrace_deque_pop_front(&libtrace->perpkt_threads[min_queue].deque, (void *) &r) == 1);
-			libtrace_vector_push_back(results, &r);
-
-			// We expect the key we read +1 now
-			libtrace->expected_key = key[min_queue] + 1;
-
-			// Now update the one we just removed
-			if (libtrace_deque_get_size(&libtrace->perpkt_threads[min_queue].deque) )
-			{
-				libtrace_deque_peek_front(&libtrace->perpkt_threads[min_queue].deque, (void *) &r);
-				key[min_queue] = libtrace_result_get_key(&r);
-				if (key[min_queue] <= min_key) {
-					// We are still the smallest, might be out of order though :(
-					min_key = key[min_queue];
-				} else {
-					min_key = key[min_queue]; // Update our minimum
-					// Check all find the smallest again - all are alive
-					for (i = 0; i < libtrace->perpkt_thread_count; ++i) {
-						if (live[i] && min_key > key[i]) {
-							min_key = key[i];
-							min_queue = i;
-						}
-					}
-				}
-			} else {
-				live[min_queue] = 0;
-				live_count--;
-				min_key = UINT64_MAX; // Update our minimum
-				// Check all find the smallest again - all are alive
-				for (i = 0; i < libtrace->perpkt_thread_count; ++i) {
-					// Still not 100% TODO (what if order is wrong or not increasing)
-					if (live[i] && min_key >= key[i]) {
-						min_key = key[i];
-						min_queue = i;
-					}
-				}
-			}
-		}
-	} else { // Queues are not in order - return all results in the queue
-		for (i = 0; i < libtrace->perpkt_thread_count; i++) {
-			libtrace_vector_append(results, &libtrace->perpkt_threads[i].vector);
-		}
-		if (flags & REDUCE_SORT) {
-			qsort(results->elements, results->size, results->element_size, &compareres);
-		}
-	}
-	return libtrace_vector_get_size(results);
+	res.key = key;
+	res.value = value;
+	assert(libtrace->combiner.publish);
+	libtrace->combiner.publish(libtrace, t->perpkt_num, &libtrace->combiner, &res);
+	return;
 }
 
 DLLEXPORT uint64_t trace_packet_get_order(libtrace_packet_t * packet) {
@@ -2236,12 +2101,14 @@ DLLEXPORT int trace_parallel_config(libtrace_t *libtrace, trace_parallel_option_
 				libtrace->reporter_flags &= ~REDUCE_DROP_OOO;
 			return 1;
 		case TRACE_OPTION_SEQUENTIAL:
+			libtrace->combiner = combiner_ordered;
 			if (*((int *) value))
 				libtrace->reporter_flags |= REDUCE_SEQUENTIAL;
 			else
 				libtrace->reporter_flags &= ~REDUCE_SEQUENTIAL;
 			return 1;
 		case TRACE_OPTION_ORDERED:
+			libtrace->combiner = combiner_ordered;
 			if (*((int *) value))
 				libtrace->reporter_flags |= REDUCE_ORDERED;
 			else

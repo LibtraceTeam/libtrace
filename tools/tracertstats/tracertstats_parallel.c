@@ -135,41 +135,25 @@ typedef struct result {
 	struct statistic filters[0];
 } result_t;
 
-
-static int reduce(libtrace_t* trace, void* global_blob, uint64_t *last_ts)
-{       
-	int i,j;
-	//uint64_t count=0, bytes=0;
+static uint64_t last_ts = 0;
+static void process_result(libtrace_t *trace UNUSED, libtrace_result_t *result, libtrace_message_t *mesg UNUSED)  {
 	static uint64_t ts = 0;
-	libtrace_vector_t results;
-	libtrace_vector_init(&results, sizeof(libtrace_result_t));
-	trace_get_results(trace, &results);
-	//uint64_t packets;
-	
-	/* Get the results from each core and sum 'em up */
-	for (i = 0 ; i < libtrace_vector_get_size(&results) ; i++) {
-		libtrace_result_t result;
-		
-		assert(libtrace_vector_get(&results, i, (void *) &result) == 1);
-		ts = libtrace_result_get_key(&result);
-		if (*last_ts == 0)
-			*last_ts = ts;
-		
-		result_t * res = libtrace_result_get_value(&result);
-		static result_t *  last_res = NULL;
-		// Memory manager might falsely trigger this
-		assert(res != last_res);
-		last_res = res;
-		//printf("Perpkt published %"PRIu64" - c=%"PRIu64"\n", ts, res->total.count);
-		while (*last_ts < ts) {
-			report_results((double) *last_ts * (double) packet_interval, count, bytes);
+
+	if (result) {
+		int j;
+		result_t *res;
+		ts = libtrace_result_get_key(result);
+		res = libtrace_result_get_value(result);
+		if (last_ts == 0)
+			last_ts = ts;
+		while (last_ts < ts) {
+			report_results((double) last_ts * (double) packet_interval, count, bytes);
 			count = 0;
 			bytes = 0;
 			for (j = 0; j < filter_count; j++)
 				filters[j].count = filters[j].bytes = 0;
-			(*last_ts)++;
+			last_ts++;
 		}
-		
 		count += res->total.count;
 		bytes += res->total.bytes;
 		for (j = 0; j < filter_count; j++) {
@@ -178,10 +162,6 @@ static int reduce(libtrace_t* trace, void* global_blob, uint64_t *last_ts)
 		}
 		free(res);
 	}
-	// Done with these results - Free internally and externally
-	libtrace_vector_destroy(&results);
-	
-	return 0;
 }
 
 typedef struct timestamp_sync {
@@ -275,7 +255,7 @@ static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt,
 	return pkt;
 }
 
-static uint64_t bad_hash(const libtrace_packet_t * pkt, void *data) {
+static uint64_t bad_hash(const libtrace_packet_t * pkt UNUSED, void *data UNUSED) {
 	return 0;
 }
 
@@ -283,7 +263,6 @@ static uint64_t bad_hash(const libtrace_packet_t * pkt, void *data) {
 static void run_trace(char *uri)
 {
 	int j;
-	uint64_t last_ts = 0;
 
 	if (!merge_inputs) 
 		create_output(uri);
@@ -317,7 +296,7 @@ static void run_trace(char *uri)
 		trace_parallel_config(trace, TRACE_OPTION_TICK_INTERVAL, &i);
 	}
 
-	if (trace_pstart(trace, NULL, &per_packet, NULL)==-1) {
+	if (trace_pstart(trace, NULL, &per_packet, process_result)==-1) {
 		trace_perror(trace,"Failed to start trace");
 		trace_destroy(trace);
 		if (!merge_inputs)
@@ -326,23 +305,9 @@ static void run_trace(char *uri)
 	}
 
 
-	// reduce
-	while (!trace_finished(trace)) {
-		// Read messages
-		libtrace_message_t message;
-		
-		// We just release and do work currently, maybe if something
-		// interesting comes through we'd deal with that
-		libtrace_thread_get_message(trace, &message);
-		
-		while (libtrace_thread_try_get_message(trace, &message) != LIBTRACE_MQ_FAILED) { }
-		reduce(trace, NULL, &last_ts);
-	}
-
 	// Wait for all threads to stop
 	trace_join(trace);
 	
-	reduce(trace, NULL, &last_ts);
 	// Flush the last one out
 	report_results((double) last_ts * (double) packet_interval, count, bytes);
 	//count = 0;
