@@ -50,6 +50,7 @@
 #include "dagformat.h"
 #include "libtrace.h"
 #include "data-struct/vector.h"
+#include "combiners.h"
 
 void iferr(libtrace_t *trace,const char *msg)
 {
@@ -92,11 +93,11 @@ const char *lookup_uri(const char *type) {
 
 int globalcount = 0;
 
-static void* reporter(libtrace_t *libtrace, libtrace_result_t *res, libtrace_message_t *mesg) {
+static void reporter(libtrace_t *libtrace, libtrace_result_t *res, libtrace_message_t *mesg) {
 	static uint64_t last = -1;
 	static int pktcount = 0;
 	if (res) {
-		libtrace_packet_t *packet =  (libtrace_packet_t *) libtrace_result_get_value(res);
+		libtrace_packet_t *packet = libtrace_result_get_value(res).pkt;
 		assert(libtrace_result_get_key(res) == trace_packet_get_order(packet));
 		if(last == (uint64_t)-1) {
 			last = libtrace_result_get_key(res);
@@ -115,7 +116,6 @@ static void* reporter(libtrace_t *libtrace, libtrace_result_t *res, libtrace_mes
 			break;
 		}
 	}
-	return NULL;
 }
 
 static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt, 
@@ -130,7 +130,7 @@ static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt,
 			c += a**b;
 		}
 		x = c;
-		trace_publish_result(trace, t, trace_packet_get_order(pkt), pkt, RESULT_PACKET);
+		trace_publish_result(trace, t, trace_packet_get_order(pkt), (libtrace_generic_types_t){.pkt=pkt}, RESULT_PACKET);
 		return NULL;
 	}
 	else switch (mesg->code) {
@@ -159,8 +159,7 @@ int main(int argc, char *argv[]) {
 
 	if (strcmp(argv[1],"rtclient")==0) expected=101;
 
-	int i = 1;
-	trace_parallel_config(trace, TRACE_OPTION_SEQUENTIAL, &i);
+	trace_set_combiner(trace, &combiner_ordered, (libtrace_generic_types_t){0});
 
 	trace_pstart(trace, NULL, per_packet, reporter);
 	iferr(trace,tracename);

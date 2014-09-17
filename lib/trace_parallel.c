@@ -338,18 +338,34 @@ static libtrace_thread_t * get_thread_descriptor(libtrace_t *libtrace) {
 	return ret;
 }
 
-/** Used below in trace_make_results_packets_safe */
-static void do_copy_result_packet(void *data)
-{
-	libtrace_result_t *res = (libtrace_result_t *)data;
+/** Makes a packet safe, a packet may become invaild after a
+ * pause (or stop/destroy) of a trace. This copies a packet
+ * in such a way that it will be able to survive a pause.
+ *
+ * However this will not allow the packet to be used after
+ * the format is destroyed. Or while the trace is still paused.
+ */
+DLLEXPORT void libtrace_make_packet_safe(libtrace_packet_t *pkt) {
+	// Duplicate the packet in standard malloc'd memory and free the
+	// original, This is a 1:1 exchange so is ocache count remains unchanged.
+	if (pkt->buf_control != TRACE_CTRL_PACKET) {
+		libtrace_packet_t *dup;
+		dup = trace_copy_packet(pkt);
+		/* Release the external buffer */
+		trace_fin_packet(pkt);
+		/* Copy the duplicated packet over the existing */
+		memcpy(pkt, dup, sizeof(libtrace_packet_t));
+	}
+}
+
+/**
+ * Makes a libtrace_result_t safe, used when pausing a trace.
+ * This will call libtrace_make_packet_safe if the result is
+ * a packet.
+ */
+DLLEXPORT void libtrace_make_result_safe(libtrace_result_t *res) {
 	if (res->type == RESULT_PACKET) {
-		// Duplicate the packet in standard malloc'd memory and free the
-		// original, This is a 1:1 exchange so is ocache count remains unchanged.
-		libtrace_packet_t *oldpkt, *dup;
-		oldpkt = (libtrace_packet_t *) res->value;
-		dup = trace_copy_packet(oldpkt);
-		res->value = (void *)dup;
-		trace_destroy_packet(oldpkt);
+		libtrace_make_packet_safe(res->value.pkt);
 	}
 }
 
@@ -1997,13 +2013,13 @@ DLLEXPORT void libtrace_result_set_key(libtrace_result_t * result, uint64_t key)
 DLLEXPORT uint64_t libtrace_result_get_key(libtrace_result_t * result) {
 	return result->key;
 }
-DLLEXPORT void libtrace_result_set_value(libtrace_result_t * result, void * value) {
+DLLEXPORT void libtrace_result_set_value(libtrace_result_t * result, libtrace_generic_types_t value) {
 	result->value = value;
 }
-DLLEXPORT void* libtrace_result_get_value(libtrace_result_t * result) {
+DLLEXPORT libtrace_generic_types_t libtrace_result_get_value(libtrace_result_t * result) {
 	return result->value;
 }
-DLLEXPORT void libtrace_result_set_key_value(libtrace_result_t * result, uint64_t key, void * value) {
+DLLEXPORT void libtrace_result_set_key_value(libtrace_result_t * result, uint64_t key, libtrace_generic_types_t value) {
 	result->key = key;
 	result->value = value;
 }
@@ -2051,7 +2067,7 @@ DLLEXPORT void * trace_set_tls(libtrace_thread_t *t, void * data)
  * Publishes a result to the reduce queue
  * Should only be called by a perpkt thread, i.e. from a perpkt handler
  */
-DLLEXPORT void trace_publish_result(libtrace_t *libtrace, libtrace_thread_t *t, uint64_t key, void * value, int type) {
+DLLEXPORT void trace_publish_result(libtrace_t *libtrace, libtrace_thread_t *t, uint64_t key, libtrace_generic_types_t value, int type) {
 	libtrace_result_t res;
 	res.type = type;
 	res.key = key;
@@ -2059,6 +2075,19 @@ DLLEXPORT void trace_publish_result(libtrace_t *libtrace, libtrace_thread_t *t, 
 	assert(libtrace->combiner.publish);
 	libtrace->combiner.publish(libtrace, t->perpkt_num, &libtrace->combiner, &res);
 	return;
+}
+
+/**
+ * Sets a combiner function against the trace.
+ */
+DLLEXPORT void trace_set_combiner(libtrace_t *trace, const libtrace_combine_t *combiner, libtrace_generic_types_t config){
+	if (combiner) {
+		trace->combiner = *combiner;
+		trace->combiner.configuration = config;
+	} else {
+		// No combiner, so don't try use it
+		memset(&trace->combiner, 0, sizeof(trace->combiner));
+	}
 }
 
 DLLEXPORT uint64_t trace_packet_get_order(libtrace_packet_t * packet) {
@@ -2093,26 +2122,6 @@ DLLEXPORT int trace_parallel_config(libtrace_t *libtrace, trace_parallel_option_
 			return trace_set_hasher(libtrace, (enum hasher_types) *((int *) value), NULL, NULL);
 		case TRACE_OPTION_SET_PERPKT_THREAD_COUNT:
 			libtrace->config.perpkt_threads = *((int *) value);
-			return 1;
-		case TRACE_DROP_OUT_OF_ORDER:
-			if (*((int *) value))
-				libtrace->reporter_flags |= REDUCE_DROP_OOO;
-			else
-				libtrace->reporter_flags &= ~REDUCE_DROP_OOO;
-			return 1;
-		case TRACE_OPTION_SEQUENTIAL:
-			libtrace->combiner = combiner_ordered;
-			if (*((int *) value))
-				libtrace->reporter_flags |= REDUCE_SEQUENTIAL;
-			else
-				libtrace->reporter_flags &= ~REDUCE_SEQUENTIAL;
-			return 1;
-		case TRACE_OPTION_ORDERED:
-			libtrace->combiner = combiner_ordered;
-			if (*((int *) value))
-				libtrace->reporter_flags |= REDUCE_ORDERED;
-			else
-				libtrace->reporter_flags &= ~REDUCE_ORDERED;
 			return 1;
 		case TRACE_OPTION_TRACETIME:
 			if(*((int *) value))

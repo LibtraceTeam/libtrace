@@ -264,12 +264,10 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 	// libtrace->perpkt_cond;
 	libtrace->state = STATE_NEW;
 	libtrace->perpkt_queue_full = false;
-	libtrace->reporter_flags = 0;
 	libtrace->global_blob = NULL;
 	libtrace->per_pkt = NULL;
 	libtrace->reporter = NULL;
 	libtrace->hasher = NULL;
-	libtrace->expected_key = 0;
 	libtrace_zero_ocache(&libtrace->packet_freelist);
 	libtrace_zero_thread(&libtrace->hasher_thread);
 	libtrace_zero_thread(&libtrace->reporter_thread);
@@ -385,12 +383,10 @@ DLLEXPORT libtrace_t * trace_create_dead (const char *uri) {
 	// libtrace->perpkt_cond;
 	libtrace->state = STATE_NEW; // TODO MAYBE DEAD
 	libtrace->perpkt_queue_full = false;
-	libtrace->reporter_flags = 0;
 	libtrace->global_blob = NULL;
 	libtrace->per_pkt = NULL;
 	libtrace->reporter = NULL;
 	libtrace->hasher = NULL;
-	libtrace->expected_key = 0;
 	libtrace_zero_ocache(&libtrace->packet_freelist);
 	libtrace_zero_thread(&libtrace->hasher_thread);
 	libtrace_zero_thread(&libtrace->reporter_thread);
@@ -740,6 +736,8 @@ DLLEXPORT libtrace_packet_t *trace_copy_packet(const libtrace_packet_t *packet) 
 	dest->type=packet->type;
 	dest->buf_control=TRACE_CTRL_PACKET;
 	dest->order = packet->order;
+	dest->hash = packet->hash;
+	dest->error = packet->error;
 	/* Reset the cache - better to recalculate than try to convert
 	 * the values over to the new packet */
 	trace_clear_cache(dest);	

@@ -90,7 +90,6 @@ const char *lookup_uri(const char *type) {
 	return type;
 }
 
-
 struct TLS {
 	bool seen_start_message;
 	bool seen_stop_message;
@@ -105,11 +104,11 @@ static void report_result(libtrace_t *trace, libtrace_result_t *result, libtrace
 	static int totalthreads = 0;
 	if (result) {
 		assert(libtrace_result_get_key(result) == 0);
-		printf("%d,", (int) libtrace_result_get_value(result));
+		printf("%d,", libtrace_result_get_value(result).sint);
 		totalthreads++;
-		totalpkts += (int) libtrace_result_get_value(result);
-		assert(libtrace_result_get_value(result) == 25 ||
-			libtrace_result_get_value(result) == expected - 25);
+		totalpkts += libtrace_result_get_value(result).sint;
+		assert(libtrace_result_get_value(result).sint == 25 ||
+			libtrace_result_get_value(result).sint == expected - 25);
 	} else {
 		switch(mesg->code) {
 			case MESSAGE_STARTING:
@@ -164,7 +163,7 @@ static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt,
 			trace_set_tls(t, NULL);
 
 			// All threads publish to verify the thread count
-			trace_publish_result(trace, t, (uint64_t) 0, (void *) tls->count, RESULT_NORMAL);
+			trace_publish_result(trace, t, (uint64_t) 0, (libtrace_generic_types_t){.sint=tls->count}, RESULT_NORMAL);
 			trace_post_reporter(trace);
 			free(tls);
 			break;

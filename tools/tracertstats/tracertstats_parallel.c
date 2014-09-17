@@ -58,6 +58,7 @@
 
 #include "data-struct/vector.h"
 #include "data-struct/message_queue.h"
+#include "combiners.h"
 
 #ifndef UINT32_MAX
 	#define UINT32_MAX      0xffffffffU
@@ -143,7 +144,7 @@ static void process_result(libtrace_t *trace UNUSED, libtrace_result_t *result, 
 		int j;
 		result_t *res;
 		ts = libtrace_result_get_key(result);
-		res = libtrace_result_get_value(result);
+		res = libtrace_result_get_value(result).ptr;
 		if (last_ts == 0)
 			last_ts = ts;
 		while (last_ts < ts) {
@@ -176,7 +177,6 @@ static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt,
 	int i;
 	static __thread uint64_t last_ts = 0, ts = 0;
 	static __thread result_t * results = NULL;
-	
 	// Unsure when we would hit this case but the old code had it, I 
 	// guess we should keep it
 	if (pkt && trace_get_packet_buffer(pkt,NULL,NULL) != NULL) {
@@ -188,7 +188,7 @@ static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt,
 		while (packet_interval != UINT64_MAX && last_ts<ts) {
 			// Publish and make a new one new
 			//fprintf(stderr, "Publishing result %"PRIu64"\n", last_ts);
-			trace_publish_result(trace, t, (uint64_t) last_ts, results, RESULT_NORMAL);
+			trace_publish_result(trace, t, (uint64_t) last_ts, (libtrace_generic_types_t){.ptr = results}, RESULT_NORMAL);
 			trace_post_reporter(trace);
 			results = calloc(1, sizeof(result_t) + sizeof(statistic_t) * filter_count);
 			last_ts++;
@@ -219,7 +219,7 @@ static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt,
 			case MESSAGE_STOPPING:
 				// Should we always post this?
 				if (results->total.count) {
-					trace_publish_result(trace, t, (uint64_t) last_ts, results, RESULT_NORMAL);
+					trace_publish_result(trace, t, (uint64_t) last_ts, (libtrace_generic_types_t){.ptr = results}, RESULT_NORMAL);
 					trace_post_reporter(trace);
 					results = NULL;
 				}
@@ -239,7 +239,7 @@ static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt,
 					next_update_time = (last_ts*packet_interval + packet_interval) * 1000000 + offset;
 					if (next_update_time <= mesg->additional.uint64) {
 						//fprintf(stderr, "Got a tick and publishing early!!\n");
-						trace_publish_result(trace, t, (uint64_t) last_ts, results, RESULT_NORMAL);
+						trace_publish_result(trace, t, (uint64_t) last_ts, (libtrace_generic_types_t){.ptr = NULL}, RESULT_NORMAL);
 						trace_post_reporter(trace);
 						results = calloc(1, sizeof(result_t) + sizeof(statistic_t) * filter_count);
 						last_ts++;
@@ -287,7 +287,7 @@ static void run_trace(char *uri)
 		return;
 	}*/
 	int i = 1;
-	trace_parallel_config(trace, TRACE_OPTION_ORDERED, &i);
+	trace_set_combiner(trace, &combiner_ordered, (libtrace_generic_types_t){0});
 	/* trace_parallel_config(trace, TRACE_OPTION_TRACETIME, &i); */
 	//trace_set_hasher(trace, HASHER_CUSTOM, &bad_hash, NULL);
 

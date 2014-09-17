@@ -188,17 +188,6 @@ enum thread_states {
 	THREAD_STATE_MAX
 };
 
-// Reduce expects sequential data
-#define REDUCE_SEQUENTIAL 0x1
-// Reduce is working on ordered data
-#define REDUCE_ORDERED 0x2
-// Reduce should sort the data
-#define REDUCE_SORT 0x4
-// Drop out of order valid with
-#define REDUCE_DROP_OOO 0x8
-// Reduce reads all queues with same key
-#define REDUCE_STEPPING 0x10
-
 /**
  * Information of this thread
  */
@@ -310,10 +299,6 @@ struct libtrace_t {
 	void* global_blob;
 	/** The actual freelist */
 	libtrace_ocache_t packet_freelist;
-	/** The reporter flags */
-	int reporter_flags;
-	/** Used to track the next expected key */
-	uint64_t expected_key;
 	/** User defined per_pkt function called when a pkt is ready */
 	fn_per_pkt per_pkt;
 	/** User defined reporter function entry point XXX not hooked up */

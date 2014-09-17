@@ -50,7 +50,7 @@ static void destroy(libtrace_t *trace, libtrace_combine_t *c) {
 	queues = NULL;
 }
 
-const libtrace_combine_t combiner_unordered = {
+DLLEXPORT const libtrace_combine_t combiner_unordered = {
     init_combiner,	/* initialise */
 	destroy,		/* destroy */
 	publish,		/* publish */
@@ -58,5 +58,5 @@ const libtrace_combine_t combiner_unordered = {
     read,			/* read_final */
     read,			/* pause */
     NULL,			/* queues */
-    0				/* opts */
+    {0}				/* opts */
 };

@@ -56,6 +56,7 @@
 #include "lt_inttypes.h"
 #include "data-struct/vector.h"
 #include "data-struct/message_queue.h"
+#include "combiners.h"
 #include <pthread.h>
 
 struct libtrace_t *trace = NULL;
@@ -129,7 +130,7 @@ static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt, libtrace_mess
 		// printf ("%d.%06d READ #%"PRIu64"\n", tv.tv_sec, tv.tv_usec, trace_packet_get(packet));
 		switch (mesg->code) {
 			case MESSAGE_STOPPING:
-				trace_publish_result(trace, t, 0, results, RESULT_NORMAL); // Only ever using a single key 0
+				trace_publish_result(trace, t, 0, (libtrace_generic_types_t){.ptr = results}, RESULT_NORMAL); // Only ever using a single key 0
 				fprintf(stderr, "Thread published resuslts WOWW\n");
 				break;
 			case MESSAGE_STARTING:
@@ -157,7 +158,7 @@ static void report_result(libtrace_t *trace UNUSED, libtrace_result_t *result, l
 		int j;
 		/* Get the results from each core and sum 'em up */
 		assert(libtrace_result_get_key(result) == 0);
-		statistics_t * res = libtrace_result_get_value(result);
+		statistics_t * res = libtrace_result_get_value(result).ptr;
 		count += res[0].count;
 		bytes += res[0].bytes;
 		for (j = 0; j < filter_count; j++) {
@@ -222,10 +223,9 @@ static void run_trace(char *uri)
 	int option = 2;
 	//option = 10000;
     //trace_set_hasher(trace, HASHER_CUSTOM, &rand_hash, NULL);
-	option = 2;
 	//trace_parallel_config(trace, TRACE_OPTION_SET_PERPKT_THREAD_COUNT, &option);
 	trace_parallel_config(trace, TRACE_OPTION_SET_CONFIG, &uc);
-	trace_parallel_config(trace, TRACE_OPTION_ORDERED, &uc);
+	trace_set_combiner(trace, &combiner_ordered, (libtrace_generic_types_t){0});
 
 	//trace_parallel_config(trace, TRACE_OPTION_SET_MAPPER_BUFFER_SIZE, &option);
 

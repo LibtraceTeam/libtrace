@@ -4,6 +4,8 @@
 #include <assert.h>
 #include <stdlib.h>
 
+/* TODO hook up configuration option for sequentual packets again */
+
 static int init_combiner(libtrace_t *t, libtrace_combine_t *c) {
 	int i = 0;
 	assert(libtrace_get_perpkt_count(t) > 0);
@@ -26,9 +28,8 @@ static void publish(libtrace_t *trace, int t_id, libtrace_combine_t *c, libtrace
 	libtrace_deque_push_back(queue, res); // Automatically locking for us :)
 }
 
-static void inline read_internal(libtrace_t *trace, libtrace_queue_t *queues, bool final){
+inline static void read_internal(libtrace_t *trace, libtrace_queue_t *queues, const bool final){
 	int i;
-	int flags = trace->reporter_flags; // Hint these aren't changing
 	int live_count = 0;
 	bool live[libtrace_get_perpkt_count(trace)]; // Set if a trace is alive
 	uint64_t key[libtrace_get_perpkt_count(trace)]; // Cached keys
@@ -54,9 +55,8 @@ static void inline read_internal(libtrace_t *trace, libtrace_queue_t *queues, bo
 	}
 
 	/* Now remove the smallest and loop - special case if all threads have joined we always flush what's left */
-	while ((live_count == libtrace_get_perpkt_count(trace)) || (live_count &&
-			((flags & REDUCE_SEQUENTIAL && min_key == trace->expected_key) ||
-			final))) {
+	while ((live_count == libtrace_get_perpkt_count(trace)) || (live_count && final)) {
+		// || (live_count && ((flags & REDUCE_SEQUENTIAL && min_key == trace->expected_key)))
 		/* Get the minimum queue and then do stuff */
 		libtrace_result_t r;
 
@@ -64,7 +64,7 @@ static void inline read_internal(libtrace_t *trace, libtrace_queue_t *queues, bo
 		trace->reporter(trace, &r, NULL);
 
 		// We expect the key we read +1 now , todo put expected in our storage area
-		trace->expected_key = key[min_queue] + 1;
+		//trace->expected_key = key[min_queue] + 1;
 
 		// Now update the one we just removed
 		if (libtrace_deque_get_size(&queues[min_queue]) )
@@ -119,30 +119,16 @@ static void destroy(libtrace_t *trace, libtrace_combine_t *c) {
 	queues = NULL;
 }
 
-/** Used below in trace_make_results_packets_safe*/
-static void do_copy_result_packet(void *data)
-{
-	libtrace_result_t *res = (libtrace_result_t *)data;
-	if (res->type == RESULT_PACKET) {
-		// Duplicate the packet in standard malloc'd memory and free the
-		// original, This is a 1:1 exchange so is ocache count remains unchanged.
-		libtrace_packet_t *oldpkt, *dup;
-		oldpkt = (libtrace_packet_t *) res->value;
-		dup = trace_copy_packet(oldpkt);
-		res->value = (void *)dup;
-		trace_destroy_packet(oldpkt);
-	}
-}
 
 static void pause(libtrace_t *trace, libtrace_combine_t *c) {
 	libtrace_queue_t *queues = c->queues;
 	int i;
 	for (i = 0; i < libtrace_get_perpkt_count(trace); i++) {
-		libtrace_deque_apply_function(&queues[i], &do_copy_result_packet);
+		libtrace_deque_apply_function(&queues[i], (deque_data_fn) libtrace_make_result_safe);
 	}
 }
 
-const libtrace_combine_t combiner_ordered = {
+DLLEXPORT const libtrace_combine_t combiner_ordered = {
     init_combiner,	/* initialise */
 	destroy,		/* destroy */
 	publish,		/* publish */
@@ -150,5 +136,5 @@ const libtrace_combine_t combiner_ordered = {
     read_final,		/* read_final */
     pause,			/* pause */
     NULL,			/* queues */
-    0				/* opts */
+    {0}				/* opts */
 };

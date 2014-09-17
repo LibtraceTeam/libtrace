@@ -35,27 +35,11 @@ static int compare_result(const void* p1, const void* p2)
 		return 1;
 }
 
-
-/** Used below in trace_make_results_packets_safe*/
-static void do_copy_result_packet(void *data)
-{
-	libtrace_result_t *res = (libtrace_result_t *)data;
-	if (res->type == RESULT_PACKET) {
-		// Duplicate the packet in standard malloc'd memory and free the
-		// original, This is a 1:1 exchange so is ocache count remains unchanged.
-		libtrace_packet_t *oldpkt, *dup;
-		oldpkt = (libtrace_packet_t *) res->value;
-		dup = trace_copy_packet(oldpkt);
-		res->value = (void *)dup;
-		trace_destroy_packet(oldpkt);
-	}
-}
-
 static void pause(libtrace_t *trace, libtrace_combine_t *c) {
 	libtrace_vector_t *queues = c->queues;
 	int i;
 	for (i = 0; i < libtrace_get_perpkt_count(trace); ++i) {
-		libtrace_vector_apply_function(&queues[i], &do_copy_result_packet);
+		libtrace_vector_apply_function(&queues[i], (vector_data_fn) libtrace_make_result_safe);
 	}
 }
 
@@ -91,7 +75,7 @@ static void destroy(libtrace_t *trace, libtrace_combine_t *c) {
 	queues = NULL;
 }
 
-const libtrace_combine_t combiner_sorted = {
+DLLEXPORT const libtrace_combine_t combiner_sorted = {
     init_combiner,	/* initialise */
 	destroy,		/* destroy */
 	publish,		/* publish */
@@ -99,5 +83,5 @@ const libtrace_combine_t combiner_sorted = {
     read_final,			/* read_final */
     pause,			/* pause */
     NULL,			/* queues */
-    0				/* opts */
+    {0}				/* opts */
 };

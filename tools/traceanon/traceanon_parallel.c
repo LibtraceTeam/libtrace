@@ -1,5 +1,8 @@
 #define _GNU_SOURCE
 #include "libtrace.h"
+#include "data-struct/vector.h"
+#include "data-struct/message_queue.h"
+#include "combiners.h"
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -10,8 +13,6 @@
 #include <time.h>
 #include <assert.h>
 #include "ipenc.h"
-#include <data-struct/vector.h>
-#include <data-struct/message_queue.h>
 #include <signal.h>
 
 bool enc_source = false;
@@ -154,7 +155,6 @@ UNUSED static uint64_t rand_hash(UNUSED libtrace_packet_t * pkt)
 
 static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt, libtrace_message_t *mesg, UNUSED libtrace_thread_t *t)
 {
-	
 	if (pkt) {
 		struct libtrace_ip *ipptr;
 		libtrace_udp_t *udp = NULL;
@@ -189,7 +189,8 @@ static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt, libtrace_mess
 		//libtrace_packet_t * packet_copy = trace_copy_packet(packet);
 		//libtrace_packet_t * packet_copy = trace_result_packet(trace, pkt);
 		//trace_publish_result(trace, trace_packet_get_order(pkt), pkt);
-		trace_publish_result(trace, t, trace_packet_get_order(pkt), pkt, RESULT_PACKET);
+
+		trace_publish_result(trace, t, trace_packet_get_order(pkt), (libtrace_generic_types_t){.pkt=pkt}, RESULT_PACKET);
 		//return ;
 	}
 	if (mesg) {
@@ -199,7 +200,7 @@ static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt, libtrace_mess
 				enc_init(enc_type,key);
 			break;
 			case MESSAGE_TICK:
-				trace_publish_result(trace, t, mesg->additional.uint64, NULL, RESULT_TICK);
+				trace_publish_result(trace, t, mesg->additional.uint64, (libtrace_generic_types_t){.pkt=NULL}, RESULT_TICK);
 		}
 	}
 	return NULL;
@@ -212,7 +213,7 @@ static void write_out(libtrace_t *trace, libtrace_result_t *result, UNUSED libtr
 
 	if (result) {
 		if (result->type == RESULT_PACKET) {
-			libtrace_packet_t *packet = (libtrace_packet_t*) libtrace_result_get_value(result);
+			libtrace_packet_t *packet = (libtrace_packet_t*) libtrace_result_get_value(result).pkt;
 			assert(libtrace_result_get_key(result) == packet_count++);
 			if (trace_write_packet(writer,packet)==-1) {
 				trace_perror_output(writer,"writer");
@@ -421,8 +422,9 @@ int main(int argc, char *argv[])
 	 */
 	 
 	int i = 1;
-	trace_parallel_config(trace, TRACE_OPTION_ORDERED, &i);
+	trace_set_combiner(trace, &combiner_ordered, (libtrace_generic_types_t){0});
 	trace_parallel_config(trace, TRACE_OPTION_SET_CONFIG, &uc);
+
 	//trace_set_hasher(trace, HASHER_CUSTOM, rand_hash, NULL);
 	
 	if (trace_pstart(trace, NULL, &per_packet, &write_out)==-1) {

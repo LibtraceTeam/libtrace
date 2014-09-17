@@ -240,16 +240,6 @@ typedef struct libtrace_t libtrace_t;
 /** Opaque structure holding information about a bpf filter */
 typedef struct libtrace_filter_t libtrace_filter_t;
 
-/** Structure holding information about a result */
-typedef struct libtrace_result_t {
-	uint64_t key;
-	void * value;
-	int type;
-} libtrace_result_t;
-#define RESULT_NORMAL 0
-#define RESULT_PACKET 1
-#define RESULT_TICK   2
-
 typedef struct libtrace_thread_t libtrace_thread_t;
 
 /** If the packet has allocated its own memory the buffer_control should be
@@ -3178,25 +3168,70 @@ DLLEXPORT bool trace_get_wireless_antenna(void *linkptr,
 
 /*@}*/
 
-union libtrace_64byte_things {
+/**
+ * A collection of types for convenience used in place of a
+ * simple void* to allow a any type of data to be stored.
+ *
+ * This is expected to be 8 bytes in length.
+ */
+typedef union {
+	/* Pointers */
 	void *ptr;
+	libtrace_packet_t *pkt;
+
+	/* C99 Integer types */
+	/* NOTE: Standard doesn't require 64-bit
+     * but x32 and x64 gcc does */
 	int64_t sint64;
 	uint64_t uint64;
+
 	uint32_t uint32s[2];
 	int32_t sint32s[2];
 	uint32_t uint32;
 	int32_t sint32;
+
+	uint16_t uint16s[4];
+	int16_t sint16s[4];
+	uint16_t uint16;
+	int16_t sint16;
+
+	uint8_t uint8s[8];
+	int8_t sint8s[8];
+	uint8_t uint8;
+	int8_t sint8;
+
+	size_t size;
+
+	/* C basic types - we cannot be certian of the size */
 	int sint;
 	unsigned int uint;
-	char schars[8];
-	char uchars[8];
-};
+
+	signed char schars[8];
+	unsigned char uchars[8];
+	signed char schar;
+	unsigned char uchar;
+
+	/* Real numbers */
+	float rfloat;
+	double rdouble;
+} libtrace_generic_types_t;
 
 typedef struct libtrace_message_t {
 	int code;
-	union libtrace_64byte_things additional;
+	libtrace_generic_types_t additional;
 	libtrace_thread_t *sender;
 } libtrace_message_t;
+
+/** Structure holding information about a result */
+typedef struct libtrace_result_t {
+	uint64_t key;
+	libtrace_generic_types_t value;
+	int type;
+} libtrace_result_t;
+#define RESULT_NORMAL 0
+#define RESULT_PACKET 1
+#define RESULT_TICK   2
+
 
 typedef void* (*fn_per_pkt)(libtrace_t* trace, libtrace_packet_t *p, libtrace_message_t *m, libtrace_thread_t *thread);
 typedef void (*fn_reporter)(libtrace_t* trace, libtrace_result_t *r, libtrace_message_t *m);
@@ -3210,9 +3245,9 @@ DLLEXPORT void print_contention_stats (libtrace_t *libtrace);
 
 DLLEXPORT void libtrace_result_set_key(libtrace_result_t * result, uint64_t key);
 DLLEXPORT uint64_t libtrace_result_get_key(libtrace_result_t * result);
-DLLEXPORT void libtrace_result_set_value(libtrace_result_t * result, void * value);
-DLLEXPORT void* libtrace_result_get_value(libtrace_result_t * result);
-DLLEXPORT void libtrace_result_set_key_value(libtrace_result_t * result, uint64_t key, void * value);
+DLLEXPORT void libtrace_result_set_value(libtrace_result_t * result, libtrace_generic_types_t value);
+DLLEXPORT libtrace_generic_types_t libtrace_result_get_value(libtrace_result_t * result);
+DLLEXPORT void libtrace_result_set_key_value(libtrace_result_t * result, uint64_t key, libtrace_generic_types_t value);
 DLLEXPORT void trace_destroy_result(libtrace_result_t ** result);
 
 // Ways to access Global and TLS storage that we provide the user
@@ -3222,7 +3257,7 @@ DLLEXPORT void * trace_set_tls(libtrace_thread_t *t, void * data);
 DLLEXPORT void * trace_get_tls(libtrace_thread_t *t);
 
 
-DLLEXPORT void trace_publish_result(libtrace_t *libtrace, libtrace_thread_t *t, uint64_t key, void * value, int type);
+DLLEXPORT void trace_publish_result(libtrace_t *libtrace, libtrace_thread_t *t, uint64_t key, libtrace_generic_types_t value, int type);
 typedef struct libtrace_vector libtrace_vector_t;
 
 DLLEXPORT int trace_post_reporter(libtrace_t *libtrace);
@@ -3241,6 +3276,9 @@ DLLEXPORT uint64_t tv_to_usec(struct timeval *tv);
 
 DLLEXPORT int retrive_first_packet(libtrace_t *libtrace, libtrace_packet_t **packet, struct timeval **tv);
 
+DLLEXPORT void libtrace_make_packet_safe(libtrace_packet_t *pkt);
+DLLEXPORT void libtrace_make_result_safe(libtrace_result_t *res);
+
 typedef enum {
 	/** 
 	 * Sets the hasher function, if NULL(default) no hashing is used a
@@ -3254,40 +3292,16 @@ typedef enum {
 	TRACE_OPTION_SET_PERPKT_THREAD_COUNT,
 	
 	/**
-	 * Libtrace should expect sequential keys from the output to count
-	 * up starting numbered from 1, 2, 3 ... 
-	 * such as is the case with numbered packets.
-	 * 
-	 * ALSO consider - TRACE_OPTIONS_ORDERED_RESULTS suitable for live formats
+	 * Delays packets so they are played back in trace-time rather than as fast
+	 * as possible.
 	 */
-	 TRACE_OPTION_SEQUENTIAL,
-	 
-	 /**
-	  * Libtrace ordered results, results in each queue are ordered by key
-	  * however my not be sequential, a typically case is packet timestamps
-	  * the reporter will receive packets in order - note threasholds
-	  * will be used such that a empty queue wont break things
-	  */
-	 TRACE_OPTION_ORDERED,
-	 
-	 
-	 /**
-	  * When accepting ordered results if a threashold is meet before an
-	  * older result is available from another queue drop that packet
-	  */
-	  TRACE_DROP_OUT_OF_ORDER,
+	TRACE_OPTION_TRACETIME,
 
-	  /**
-	   * Delays packets so they are played back in trace-time rather than as fast
-	   * as possible.
-	   */
-	  TRACE_OPTION_TRACETIME,
-
-	  /**
-	   * Specifies the interval between tick packets in milliseconds, if 0
-	   * or less this is ignored.
-	   */
-	  TRACE_OPTION_TICK_INTERVAL,
+	/**
+	 * Specifies the interval between tick packets in milliseconds, if 0
+	 * or less this is ignored.
+	 */
+	TRACE_OPTION_TICK_INTERVAL,
 	TRACE_OPTION_GET_CONFIG,
 	TRACE_OPTION_SET_CONFIG
 } trace_parallel_option_t;
@@ -3545,13 +3559,13 @@ struct libtrace_combine {
 	void *queues;
 
 	/**
-	 * XXX - todo make a union of useful types
-	 * Configuration options what this does is upto the combiner
-	 * choosen.
+	 * Configuration options, what this does is upto the combiner
+	 * chosen.
 	 */
-	int configuration;
+	libtrace_generic_types_t configuration;
 };
 
+DLLEXPORT void trace_set_combiner(libtrace_t *trace, const libtrace_combine_t *combiner, libtrace_generic_types_t config);
 
 #define READ_EOF 0
 #define READ_ERROR -1
