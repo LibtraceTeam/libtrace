@@ -824,6 +824,7 @@ DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 	if (libtrace->format->read_packet) {
 		do {
 			size_t ret;
+			int filtret;
 			/* Finalise the packet, freeing any resources the format module
 			 * may have allocated it and zeroing all data associated with it.
 			 */
@@ -839,7 +840,13 @@ DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 				/* If the filter doesn't match, read another
 				 * packet
 				 */
-				if (!trace_apply_filter(libtrace->filter,packet)){
+                                filtret = trace_apply_filter(libtrace->filter, packet);
+                                if (filtret == -1) {
+                                        /* Error compiling filter, probably */
+                                        return ~0U;
+                                }
+                                
+                                if (filtret == 0) {
 					++libtrace->filtered_packets;
 					continue;
 				}
@@ -1219,11 +1226,12 @@ DLLEXPORT libtrace_eventobj_t trace_event(libtrace_t *trace,
 	packet->trace = trace;
 
 	if (packet->trace->format->trace_event) {
+		/* Note: incrementing accepted, filtered etc. packet
+                 * counters is handled by the format-specific 
+                 * function so don't increment them here.
+                 */
 		event=packet->trace->format->trace_event(trace,packet);
-		if (event.type == TRACE_EVENT_PACKET) {
-			++trace->accepted_packets;
 		}
-	}
 	return event;
 
 }
@@ -1947,14 +1955,6 @@ uint64_t trace_get_filtered_packets(libtrace_t *trace)
 	if (trace->format->get_filtered_packets) {
 		return trace->format->get_filtered_packets(trace)+
 			trace->filtered_packets;
-	}
-	if (trace->format->get_received_packets
-		&& trace->format->get_dropped_packets) {
-		return 
-			((trace_get_received_packets(trace)
-			-trace_get_accepted_packets(trace))
-			-trace_get_dropped_packets(trace))
-			+trace->filtered_packets;
 	}
 	return trace->filtered_packets;
 }

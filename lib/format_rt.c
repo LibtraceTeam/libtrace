@@ -779,22 +779,26 @@ static libtrace_eventobj_t trace_event_rt(libtrace_t *trace,
 			 * no more packets. */
 			if (packet->type == TRACE_RT_END_DATA)
 				event.type = TRACE_EVENT_TERMINATE;
-			else
+			else {
 				/* Since several RT messages can have zero-byte
 				 * length (once the framing is removed), an 
 				 * event size of zero can still indicate a 
 				 * PACKET event */
 				event.type = TRACE_EVENT_PACKET;
+                                trace->accepted_packets ++;
+                        }
 
 		}	
 		else {
 			event.type = TRACE_EVENT_PACKET;
+                        trace->accepted_packets ++;
 		}
 
 		if (trace->filter && event.type == TRACE_EVENT_PACKET) {
 			if (!trace_apply_filter(trace->filter, packet)) {
 				trace_clear_cache(packet);
-				continue;
+				trace->filtered_packets ++;
+                                continue;
 			}
 		}
 

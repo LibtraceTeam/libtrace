@@ -421,13 +421,6 @@ static int bpf_prepare_packet(libtrace_t *libtrace UNUSED,
 	/* TODO: Pcap deals with a padded FDDI linktype here */
 	packet->payload=(char *)buffer + BPFHDR(packet)->bh_hdrlen;
 
-	/*
-	if (libtrace->format_data == NULL) {
-		if (bpf_init_input(libtrace))
-			return -1;
-	}
-	*/
-
 	return 0;
 }
 
@@ -438,32 +431,54 @@ static int bpf_prepare_packet(libtrace_t *libtrace UNUSED,
 static int bpf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) 
 {
 	uint32_t flags = 0;
+	fd_set readfds;
+	struct timeval tout;
+	int ret;
 
 	packet->type = bpf_linktype_to_rt(FORMATIN(libtrace)->linktype);
-	
-	/* Read from the BPF interface into our capture buffer */
-	if (FORMATIN(libtrace)->remaining<=0) {
-		int ret;
 
-		ret=read(FORMATIN(libtrace)->fd,
-			FORMATIN(libtrace)->buffer,
-			FORMATIN(libtrace)->buffersize);
+	while (FORMATIN(libtrace)->remaining <= 0) {
+		tout.tv_sec = 0;
+		tout.tv_usec = 500000;
+		FD_ZERO(&readfds);
+		FD_SET(FORMATIN(libtrace)->fd, &readfds);
 
-		if (ret == -1) {
-			trace_set_err(libtrace,errno,"Failed to read");
+		ret = select(FORMATIN(libtrace)->fd + 1, &readfds, NULL,
+				NULL, &tout);
+		if (ret < 0 && errno != EINTR) {
+			trace_set_err(libtrace, errno, "select");
 			return -1;
+		} else if (ret < 0) {
+			continue;
 		}
 
-		if (ret == 0) {
-			/* EOF */
+		if (FD_ISSET(FORMATIN(libtrace)->fd, &readfds)) {
+			/* Packets are available, read into buffer */
+			ret=read(FORMATIN(libtrace)->fd,
+				FORMATIN(libtrace)->buffer,
+				FORMATIN(libtrace)->buffersize);
+
+			if (ret == -1) {
+				trace_set_err(libtrace,errno,"Failed to read");
+				return -1;
+			}
+
+			if (ret == 0) {
+				/* EOF */
+				return 0;
+			}
+
+			FORMATIN(libtrace)->remaining=ret;
+			FORMATIN(libtrace)->bufptr=
+					FORMATIN(libtrace)->buffer;
+			break;
+		}
+
+		/* Timed out -- check if we should halt */
+		if (libtrace_halt)
 			return 0;
-		}
-
-		FORMATIN(libtrace)->remaining=ret;
-		FORMATIN(libtrace)->bufptr=
-				FORMATIN(libtrace)->buffer;
 	}
-
+	
 	/* We do NOT want anything trying to free the memory the packet is
 	 * stored in */
 	flags |= TRACE_PREP_DO_NOT_OWN_BUFFER;

@@ -1,3 +1,5 @@
+SUBDIRS = . tools/wandiocat
+
 lib_LTLIBRARIES=libwandio.la
 
 include_HEADERS=wandio.h
@@ -38,8 +40,3 @@ AM_CPPFLAGS = @ADD_INCLS@
 libwandio_la_LIBADD = @LIBWANDIO_LIBS@
 libwandio_la_LDFLAGS=-version-info 1:1:0 @ADD_LDFLAGS@
 
-bin_PROGRAMS = wandiocat
-wandiocat_SOURCES = wcat.c
-wandiocat_CFLAGS = -I"$(top_srcdir)/libwandio"
-wandiocat_CXXFLAGS = -I"$(top_srcdir)/libwandio"
-wandiocat_LDFLAGS = -L"$(top_srcdir)/libwandio" -lwandio

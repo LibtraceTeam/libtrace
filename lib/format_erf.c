@@ -745,7 +745,7 @@ static struct libtrace_eventobj_t erf_event(struct libtrace_t *libtrace, struct 
 	/* If we are being told to replay packets as fast as possible, then
 	 * we just need to read and return the next packet in the trace */
 	if (IN_OPTIONS.real_time) {
-		event.size = erf_read_packet(libtrace, packet);
+		event.size = trace_read_packet(libtrace, packet);
 		if (event.size < 1)
 			event.type = TRACE_EVENT_TERMINATE;
 		else

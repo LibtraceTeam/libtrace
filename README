@@ -3,7 +3,7 @@ This fork of Libtrace aims to support parallel packet processing.
 This is still work in progress and is full of bugs, some of the original
 Libtrace functions might not function correctly breaking the supplied tools.
 
-libtrace 3.0.20
+libtrace 3.0.21
 
 ---------------------------------------------------------------------------
 Copyright (c) 2007-2014 The University of Waikato, Hamilton, New Zealand.
@@ -13,6 +13,7 @@ This code has been developed by the University of Waikato WAND
 research group. For further information please see http://www.wand.net.nz/.
 ---------------------------------------------------------------------------
 
+See INSTALL for instructions on how to install libtrace.
 
 This directory contains source code for libtrace, a userspace library for 
 processing of network traffic capture from live interfaces or from offline
@@ -24,13 +25,15 @@ and has been since extended to a range of other trace and interface formats.
 
 Further information about libtrace see 
 http://research.wand.net.nz/software/libtrace.php
-Bugs should be reported in trac at http://www.wand.net.nz/trac/libtrace
+
+Bugs should be reported by either emailing contact@wand.net.nz or filing
+an issue at https://github.com/wanduow/libtrace
 
 It is licensed under the GNU General Public License (GPL) version 2. Please
 see the included file GPL for details of this license.
 
 A detailed ChangeLog can be found on the libtrace wiki: 
-https://secure.wand.net.nz/trac/libtrace/wiki/ChangeLog
+https://github.com/wanduow/libtrace/wiki/ChangeLog
 
 Documentation, usage instructions and a detailed tutorial can also found
 on the libtrace wiki.

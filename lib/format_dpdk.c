@@ -59,7 +59,59 @@
 #include <assert.h>
 #include <unistd.h>
 #include <endian.h>
+#include <string.h>
+
+/* We can deal with any minor differences by checking the RTE VERSION
+ * Typically DPDK backports some fixes (typically for building against
+ * newer kernels) to the older version of DPDK.
+ *
+ * These get released with the rX suffix. The following macros where added
+ * in these new releases.
+ *
+ * Below this is a log of version that required changes to the libtrace
+ * code (that we still attempt to support).
+ *
+ * Currently 1.5 to 1.7 is supported.
+ */
 #include <rte_eal.h>
+#include <rte_version.h>
+#ifndef RTE_VERSION_NUM
+#	define RTE_VERSION_NUM(a,b,c,d) ((a) << 24 | (b) << 16 | (c) << 8 | (d))
+#endif
+#ifndef RTE_VER_PATCH_RELEASE
+#	define RTE_VER_PATCH_RELEASE 0
+#endif
+#ifndef RTE_VERSION
+#	define RTE_VERSION RTE_VERSION_NUM(RTE_VER_MAJOR,RTE_VER_MINOR, \
+	RTE_VER_PATCH_LEVEL, RTE_VER_PATCH_RELEASE)
+#endif
+
+/* 1.6.0r2 :
+ *	rte_eal_pci_set_blacklist() is removed
+ *	device_list is renamed ot pci_device_list
+ *
+ * Replaced by:
+ *	rte_devargs (we can simply whitelist)
+ */
+#if RTE_VERSION <= RTE_VERSION_NUM(1, 6, 0, 1)
+#	define DPDK_USE_BLACKLIST 1
+#else
+#	define DPDK_USE_BLACKLIST 0
+#endif
+
+/*
+ * 1.7.0 :
+ *	rte_pmd_init_all is removed
+ *
+ * Replaced by:
+ *	Nothing, no longer needed
+ */
+#if RTE_VERSION < RTE_VERSION_NUM(1, 7, 0, 0)
+#	define DPDK_USE_PMD_INIT 1
+#else
+#	define DPDK_USE_PMD_INIT 0
+#endif
+
 #include <rte_per_lcore.h>
 #include <rte_debug.h>
 #include <rte_errno.h>
@@ -206,9 +258,11 @@ struct dpdk_format_data_t {
     int nb_rx_buf; /* The number of packet buffers in the rx ring */
     int nb_tx_buf; /* The number of packet buffers in the tx ring */
     struct rte_mempool * pktmbuf_pool; /* Our packet memory pool */
+#if DPDK_USE_BLACKLIST
     struct rte_pci_addr blacklist[BLACK_LIST_SIZE]; /* Holds our device blacklist */
+	unsigned int nb_blacklist; /* Number of blacklist items in are valid */
+#endif
     char mempool_name[MEMPOOL_NAME_LEN]; /* The name of the mempool that we are using */
-    unsigned int nb_blacklist; /* Number of blacklist items in are valid */
     uint8_t rss_key[40]; // This is the RSS KEY
 #if HAS_HW_TIMESTAMPS_82580
     /* Timestamping only relevent to RX */
@@ -261,8 +315,11 @@ struct dpdk_addt_hdr {
  * 
  * So blacklist all devices except the one that we wish to use so that 
  * the others can still be used as standard ethernet ports.
+ *
+ * @return 0 if successful, otherwise -1 on error.
  */
-static void blacklist_devices(struct dpdk_format_data_t *format_data, struct rte_pci_addr *whitelist)
+#if DPDK_USE_BLACKLIST
+static int blacklist_devices(struct dpdk_format_data_t *format_data, struct rte_pci_addr *whitelist)
 {
 	struct rte_pci_device *dev = NULL;
 	format_data->nb_blacklist = 0;
@@ -286,7 +343,24 @@ static void blacklist_devices(struct dpdk_format_data_t *format_data, struct rte
 	}
 
 	rte_eal_pci_set_blacklist(format_data->blacklist, format_data->nb_blacklist);
+	return 0;
 }
+#else /* DPDK_USE_BLACKLIST */
+#include <rte_devargs.h>
+static int blacklist_devices(struct dpdk_format_data_t *format_data UNUSED, struct rte_pci_addr *whitelist)
+{
+	char pci_str[20] = {0};
+	snprintf(pci_str, sizeof(pci_str), PCI_PRI_FMT,
+	         whitelist->domain,
+	         whitelist->bus,
+	         whitelist->devid,
+	         whitelist->function);
+	if (rte_eal_devargs_add(RTE_DEVTYPE_WHITELISTED_PCI, pci_str) < 0) {
+		return -1;
+	}
+	return 0;
+}
+#endif
 
 /**
  * Parse the URI format as a pci address
@@ -440,7 +514,35 @@ static inline int dpdk_move_master_lcore(size_t core) {
 }
 
 
-static inline int dpdk_init_enviroment(char * uridata, struct dpdk_format_data_t * format_data,
+/**
+ * XXX This is very bad XXX
+ * But we have to do something to allow getopts nesting
+ * Luckly normally the format is last so it doesn't matter
+ * DPDK only supports modern systems so hopefully this
+ * will continue to work
+ */
+struct saved_getopts {
+	char *optarg;
+	int optind;
+	int opterr;
+	int optopt;
+};
+
+static void save_getopts(struct saved_getopts *opts) {
+	opts->optarg = optarg;
+	opts->optind = optind;
+	opts->opterr = opterr;
+	opts->optopt = optopt;
+}
+
+static void restore_getopts(struct saved_getopts *opts) {
+	optarg = opts->optarg;
+	optind = opts->optind;
+	opterr = opts->opterr;
+	optopt = opts->optopt;
+}
+
+static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_t * format_data,
                                         char * err, int errlen) {
     int ret; /* Returned error codes */
     struct rte_pci_addr use_addr; /* The only address that we don't blacklist */   
@@ -450,17 +552,17 @@ static inline int dpdk_init_enviroment(char * uridata, struct dpdk_format_data_t
     long my_cpu; /* The CPU number we want to bind to */
     int i;
     struct rte_config *cfg = rte_eal_get_configuration();
+	struct saved_getopts save_opts;
     
 #if DEBUG
     rte_set_log_level(RTE_LOG_DEBUG);
 #else 
     rte_set_log_level(RTE_LOG_WARNING);
 #endif
-    /* Using proc-type auto allows this to be either primary or secondary 
-     * Secondary allows two instances of libtrace to be used on different
-     * ports. However current version of DPDK doesn't support this on the
-     * same card (My understanding is this should work with two separate
-     * cards).
+    /*
+     * Using unique file prefixes mean separate memory is used, unlinking
+     * the two processes. However be careful we still cannot access a 
+     * port that already in use.
      * 
      * Using unique file prefixes mean separate memory is used, unlinking
      * the two processes. However be careful we still cannot access a 
@@ -517,17 +619,19 @@ static inline int dpdk_init_enviroment(char * uridata, struct dpdk_format_data_t
     snprintf(cpu_number, sizeof(cpu_number), "%x", ~(UINT32_MAX<<MIN(31, nb_cpu)));
     //snprintf(cpu_number, sizeof(cpu_number), "%x", 0x1 << (my_cpu - 1));
 
-	/* Give this a name */
+
+	/* Give the memory map a unique name */
 	snprintf(mem_map, sizeof(mem_map), "libtrace-%d", (int) getpid());
     /* rte_eal_init it makes a call to getopt so we need to reset the 
      * global optind variable of getopt otherwise this fails */
+	save_getopts(&save_opts);
     optind = 1;
     if ((ret = rte_eal_init(argc, argv)) < 0) {
         snprintf(err, errlen, 
           "Intel DPDK - Initialisation of EAL failed: %s", strerror(-ret));
         return -1;
     }
-
+	restore_getopts(&save_opts);
     // These are still running but will never do anything with DPDK v1.7 we
     // should remove this XXX in the future
     for(i = 0; i < RTE_MAX_LCORE; ++i) {
@@ -544,6 +648,8 @@ static inline int dpdk_init_enviroment(char * uridata, struct dpdk_format_data_t
 #if DEBUG
     dump_configuration();
 #endif
+
+#if DPDK_USE_PMD_INIT
     /* This registers all available NICs with Intel DPDK
      * These are not loaded until rte_eal_pci_probe() is called.
      */
@@ -552,9 +658,14 @@ static inline int dpdk_init_enviroment(char * uridata, struct dpdk_format_data_t
           "Intel DPDK - rte_pmd_init_all failed: %s", strerror(-ret));
         return -1;
     }
+#endif
 
     /* Black list all ports besides the one that we want to use */
-    blacklist_devices(format_data, &use_addr);
+	if ((ret = blacklist_devices(format_data, &use_addr)) < 0) {
+		snprintf(err, errlen, "Intel DPDK - Whitelisting PCI device failed,"
+		         " are you sure the address is correct?: %s", strerror(-ret));
+		return -1;
+	}
 
     /* This loads DPDK drivers against all ports that are not blacklisted */
 	if ((ret = rte_eal_pci_probe()) < 0) {
@@ -594,7 +705,9 @@ static int dpdk_init_input (libtrace_t *libtrace) {
     FORMAT(libtrace)->nb_tx_buf = MIN_NB_BUF;
     FORMAT(libtrace)->promisc = -1;
     FORMAT(libtrace)->pktmbuf_pool = NULL;
+#if DPDK_USE_BLACKLIST
     FORMAT(libtrace)->nb_blacklist = 0;
+#endif
     FORMAT(libtrace)->paused = DPDK_NEVER_STARTED;
     FORMAT(libtrace)->mempool_name[0] = 0;
 #if HAS_HW_TIMESTAMPS_82580
@@ -603,7 +716,7 @@ static int dpdk_init_input (libtrace_t *libtrace) {
     FORMAT(libtrace)->wrap_count = 0;
 #endif
 	
-    if (dpdk_init_enviroment(libtrace->uridata, FORMAT(libtrace), err, sizeof(err)) != 0) {
+    if (dpdk_init_environment(libtrace->uridata, FORMAT(libtrace), err, sizeof(err)) != 0) {
         trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "%s", err);
         free(libtrace->format_data);
         libtrace->format_data = NULL;
@@ -627,7 +740,9 @@ static int dpdk_init_output(libtrace_out_t *libtrace)
     FORMAT(libtrace)->nb_tx_buf = NB_TX_MBUF;
     FORMAT(libtrace)->promisc = -1;
     FORMAT(libtrace)->pktmbuf_pool = NULL;
+#if DPDK_USE_BLACKLIST
     FORMAT(libtrace)->nb_blacklist = 0;
+#endif
     FORMAT(libtrace)->paused = DPDK_NEVER_STARTED;
     FORMAT(libtrace)->mempool_name[0] = 0;
 #if HAS_HW_TIMESTAMPS_82580
@@ -636,7 +751,7 @@ static int dpdk_init_output(libtrace_out_t *libtrace)
     FORMAT(libtrace)->wrap_count = 0;
 #endif
 
-    if (dpdk_init_enviroment(libtrace->uridata, FORMAT(libtrace), err, sizeof(err)) != 0) {
+    if (dpdk_init_environment(libtrace->uridata, FORMAT(libtrace), err, sizeof(err)) != 0) {
         trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED, "%s", err);
         free(libtrace->format_data);
         libtrace->format_data = NULL;
@@ -814,7 +929,7 @@ static int dpdk_start_port (struct dpdk_format_data_t * format_data, char *err, 
         return 0;
 
     /* First time started we need to alloc our memory, doing this here 
-     * rather than in enviroment setup because we don't have snaplen then */
+     * rather than in environment setup because we don't have snaplen then */
     if (format_data->paused == DPDK_NEVER_STARTED) {
         if (format_data->snaplen == 0) {
             format_data->snaplen = RX_MBUF_SIZE;
@@ -1806,9 +1921,11 @@ static libtrace_eventobj_t dpdk_trace_event(libtrace_t *trace,
             if (trace->filter) {
                 if (!trace_apply_filter(trace->filter, packet)) {
                     /* Failed the filter so we loop for another packet */
+                    trace->filtered_packets ++;
                     continue;
                 }
             }
+            trace->accepted_packets ++;
         } else {
             /* We only want to sleep for a very short time - we are non-blocking */
             event.type = TRACE_EVENT_SLEEP;

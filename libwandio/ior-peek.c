@@ -61,8 +61,8 @@
 struct peek_t {
 	io_t *child;
 	char *buffer;
-	int length; /* Length of buffer */
-	int offset; /* Offset into buffer */
+	off_t length; /* Length of buffer */
+	off_t offset; /* Offset into buffer */
 };
 
 extern io_source_t peek_source;

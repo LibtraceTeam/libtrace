@@ -3,11 +3,11 @@
 # Now you only need to update the version number in two places - below,
 # and in the README
 
-AC_INIT([libtrace],[3.0.20],[contact@wand.net.nz],[libtrace])
+AC_INIT([libtrace],[3.0.21],[contact@wand.net.nz],[libtrace])
 
 LIBTRACE_MAJOR=3
 LIBTRACE_MID=0
-LIBTRACE_MINOR=20
+LIBTRACE_MINOR=21
 
 # OpenSolaris hides libraries like libncurses in /usr/gnu/lib, which is not
 # searched by default - add it to LDFLAGS so we at least have a chance of 
@@ -40,7 +40,7 @@ AC_CONFIG_FILES([Makefile lib/Makefile docs/Makefile libpacketdump/Makefile
 	examples/Makefile examples/skeleton/Makefile examples/rate/Makefile
 	examples/stats/Makefile examples/tutorial/Makefile
 	docs/libtrace.doxygen 
-	lib/libtrace.h libwandio/Makefile
+	lib/libtrace.h libwandio/Makefile libwandio/tools/wandiocat/Makefile
 	])
 
 
@@ -385,7 +385,7 @@ if test "$want_dpdk" != no; then
 		AC_SUBST([RTE_TARGET])
         AC_SUBST([RTE_SDK])
         # Force dpdk library to be statically linked to allow compiler optimisations
-        LIBTRACE_LIBS="$LIBTRACE_LIBS -l:libintel_dpdk.a"
+        LIBTRACE_LIBS="$LIBTRACE_LIBS -Wl,--whole-archive -Wl,-l:libintel_dpdk.a -Wl,--no-whole-archive -Wl,-lm"
 		AC_DEFINE(HAVE_DPDK,1,[conditional for building with DPDK live capture support])
 		libtrace_dpdk=true
 	fi

@@ -97,7 +97,7 @@ struct libtrace_eventobj_t trace_event_device(struct libtrace_t *trace,
 	 * uses mmapped sockets by default, I've switched over to this 
 	 * solution. */
 
-	do {
+        do {
 		tv.tv_sec = 0;
 		tv.tv_usec = 0;
 		rfds_param = rfds;
@@ -110,8 +110,7 @@ struct libtrace_eventobj_t trace_event_device(struct libtrace_t *trace,
 	} while (ret == -1);
 
 	if (FD_ISSET(event.fd, &rfds_param)) {
-		event.size = trace_read_packet(trace,packet);
-		
+                event.size = trace_read_packet(trace,packet);
 		if (event.size < 1) {
 			/* Covers error and EOF events - terminate rather 
 			 * than report a packet as available */
