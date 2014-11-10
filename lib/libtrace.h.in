@@ -108,9 +108,11 @@
 #define LIBTRACE_API_VERSION \
             ((@LIBTRACE_MAJOR@<<16)|(@LIBTRACE_MID@<<8)|(@LIBTRACE_MINOR@))
 
-/** Replaced with the current SVN revision number when 'make dist' is invoked
- *  to create a distributable tarball */
-#define LIBTRACE_SVN_REVISION 0
+/** This used to be replaced with the current SVN revision number when 
+ * 'make dist' was invoked to create a distributable tarball. We don't use
+ * SVN anymore and there probably isn't any need to know the exact revision
+ * number either these days. */
+#define LIBTRACE_SVN_REVISION LIBTRACE_API_VERSION
 
 /** DAG driver version installed on the current system */
 #define DAG_DRIVER_V "@DAG_VERSION_NUM@"
