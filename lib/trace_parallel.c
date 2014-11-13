@@ -1347,7 +1347,7 @@ static inline int trace_pread_packet_wrapper(libtrace_t *libtrace, libtrace_thre
 			 * structure */
 			packet->trace = libtrace;
 			ret=libtrace->format->pread_packet(libtrace, t, packet);
-			if (ret <= 0) {
+			if (ret==(size_t)-1 || ret==(size_t)-2 || ret==0) {
 				return ret;
 			}
 			if (libtrace->filter) {
