@@ -429,11 +429,10 @@ static inline void dump_configuration()
     if (global_config != NULL) {
         int i;
         fprintf(stderr, "Intel DPDK setup\n"
-               "---Version      : %"PRIu32"\n"
-               "---Magic        : %"PRIu32"\n"
+               "---Version      : %s\n"
                "---Master LCore : %"PRIu32"\n"
                "---LCore Count  : %"PRIu32"\n",
-               global_config->version, global_config->magic, 
+               rte_version(),
                global_config->master_lcore, global_config->lcore_count);
         
         for (i = 0 ; i < nb_cpu; i++) {
