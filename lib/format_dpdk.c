@@ -88,7 +88,10 @@
 
 /* 1.6.0r2 :
  *	rte_eal_pci_set_blacklist() is removed
- *	device_list is renamed ot pci_device_list
+ *	device_list is renamed to pci_device_list
+ *	In the 1.7.0 release rte_eal_pci_probe is called by rte_eal_init
+ *	as such we do apply the whitelist before rte_eal_init.
+ *	This also works correctly with DPDK 1.6.0r2.
  *
  * Replaced by:
  *	rte_devargs (we can simply whitelist)
@@ -347,7 +350,7 @@ static int blacklist_devices(struct dpdk_format_data_t *format_data, struct rte_
 }
 #else /* DPDK_USE_BLACKLIST */
 #include <rte_devargs.h>
-static int blacklist_devices(struct dpdk_format_data_t *format_data UNUSED, struct rte_pci_addr *whitelist)
+static int whitelist_device(struct dpdk_format_data_t *format_data UNUSED, struct rte_pci_addr *whitelist)
 {
 	char pci_str[20] = {0};
 	snprintf(pci_str, sizeof(pci_str), PCI_PRI_FMT,
@@ -618,6 +621,14 @@ static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_
     snprintf(cpu_number, sizeof(cpu_number), "%x", ~(UINT32_MAX<<MIN(31, nb_cpu)));
     //snprintf(cpu_number, sizeof(cpu_number), "%x", 0x1 << (my_cpu - 1));
 
+#if !DPDK_USE_BLACKLIST
+    /* Black list all ports besides the one that we want to use */
+	if ((ret = whitelist_devices(format_data, &use_addr)) < 0) {
+		snprintf(err, errlen, "Intel DPDK - Whitelisting PCI device failed,"
+		         " are you sure the address is correct?: %s", strerror(-ret));
+		return -1;
+	}
+#endif
 
 	/* Give the memory map a unique name */
 	snprintf(mem_map, sizeof(mem_map), "libtrace-%d", (int) getpid());
@@ -659,12 +670,14 @@ static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_
     }
 #endif
 
+#if DPDK_USE_BLACKLIST
     /* Black list all ports besides the one that we want to use */
 	if ((ret = blacklist_devices(format_data, &use_addr)) < 0) {
 		snprintf(err, errlen, "Intel DPDK - Whitelisting PCI device failed,"
 		         " are you sure the address is correct?: %s", strerror(-ret));
 		return -1;
 	}
+#endif
 
     /* This loads DPDK drivers against all ports that are not blacklisted */
 	if ((ret = rte_eal_pci_probe()) < 0) {
