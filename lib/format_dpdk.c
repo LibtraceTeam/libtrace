@@ -374,43 +374,14 @@ static int whitelist_device(struct dpdk_format_data_t *format_data UNUSED, struc
  * or ./libtrace dpdk:0:1:0.1-2 -> 0:1:0.1 (Using CPU core #2) 
  */
 static int parse_pciaddr(char * str, struct rte_pci_addr * addr, long * core) {
-    char * wrkstr;
-    char * pch;
+    int matches;
     assert(str);
-    wrkstr = strdup(str);
-    
-    pch = strtok(wrkstr,":");
-    if (pch == NULL || pch[0] == 0) {
-        free(wrkstr); return -1;
+    matches = sscanf(str, "%4"SCNx16":%2"SCNx8":%2"SCNx8".%2"SCNx8"-%d", &addr->domain, &addr->bus, &addr->devid, &addr->function, core);
+    if (matches >= 4) {
+        return 0;
+    } else {
+        return -1;
     }
-    addr->domain = (uint16_t) atoi(pch);
-
-    pch = strtok(NULL,":");
-    if (pch == NULL || pch[0] == 0) {
-        free(wrkstr); return -1;
-    }
-    addr->bus = (uint8_t) atoi(pch);
-
-    pch = strtok(NULL,".");
-    if (pch == NULL || pch[0] == 0) {
-        free(wrkstr); return -1;
-    }
-    addr->devid = (uint8_t) atoi(pch);
-
-    pch = strtok(NULL,"-"); /* Might not find the '-' it's optional */
-    if (pch == NULL || pch[0] == 0) {
-        free(wrkstr); return -1;
-    }
-    addr->function = (uint8_t) atoi(pch);
-
-    pch = strtok(NULL, ""); /* Find end of string */
-    
-    if (pch != NULL && pch[0] != 0) {
-        *core = (long) atoi(pch);
-    }
-
-    free(wrkstr);
-    return 0;
 }
 
 #if DEBUG
@@ -623,7 +594,7 @@ static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_
 
 #if !DPDK_USE_BLACKLIST
     /* Black list all ports besides the one that we want to use */
-	if ((ret = whitelist_devices(format_data, &use_addr)) < 0) {
+	if ((ret = whitelist_device(format_data, &use_addr)) < 0) {
 		snprintf(err, errlen, "Intel DPDK - Whitelisting PCI device failed,"
 		         " are you sure the address is correct?: %s", strerror(-ret));
 		return -1;
