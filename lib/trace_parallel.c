@@ -123,6 +123,7 @@ struct mem_stats {
 __thread struct mem_stats mem_hits = {{0},{0},{0},{0}};
 
 static void print_memory_stats() {
+#if 0
 	char t_name[50];
 	uint64_t total;
 	pthread_getname_np(pthread_self(), t_name, sizeof(t_name));
@@ -164,7 +165,7 @@ static void print_memory_stats() {
 		fprintf(stderr, "\t---Total=%"PRIu64"\n\t---Miss %%=%f\n",
 				total, (double) mem_hits.writebulk.miss / (double) total * 100.0);
 	}
-
+#endif
 }
 
 /**
@@ -1336,7 +1337,7 @@ static inline int trace_pread_packet_wrapper(libtrace_t *libtrace, libtrace_thre
 	}
 	assert(packet);
 
-	if (libtrace->format->read_packet) {
+	if (libtrace->format->pread_packet) {
 		do {
 			size_t ret;
 			/* Finalise the packet, freeing any resources the format module
@@ -2197,7 +2198,6 @@ DLLEXPORT void parse_user_config(struct user_configuration* uc, char * str) {
 	char value[100];
 	assert(str);
 	assert(uc);
-	printf ("Splitting string \"%s\" into tokens:\n",str);
 	pch = strtok (str," ,.-");
 	while (pch != NULL)
 	{
