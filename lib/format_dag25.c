@@ -123,6 +123,7 @@ struct dag_per_thread_t {
 	uint8_t *top; /* Pointer to the last unread byte in the DAG memory */
 	uint8_t *bottom; /* Pointer to the first unread byte in the DAG memory */
 	uint32_t processed; /* Amount of data processed from the bottom pointer */
+	uint64_t pkt_count; /* Number of packets seen by the thread */
 };
 
 /* "Global" data that is stored for each DAG input trace */
@@ -156,7 +157,7 @@ struct dag_format_data_t {
 	/* The number of packets that have been dropped */
 	uint64_t drops;
 	/* When running in parallel mode this is malloc'd with an array of thread
-	 * structures */
+	 * structures. Most of the stuff above doesn't get used in parallel mode. */
 	struct dag_per_thread_t *per_thread;
 };
 
@@ -1385,6 +1386,11 @@ static int dag_pread_packet(libtrace_t *libtrace, libtrace_thread_t *t,
 		if (numbytes < dag_record_size) {
 			if (libtrace_halt)
 				return 0;
+
+			/* Check message queue to see if we should abort early */
+			if (libtrace_message_queue_count(&t->messages) > 0)
+				return -2;
+
 			/* Keep trying until we see a packet */
 			continue;
 		}
@@ -1397,24 +1403,59 @@ static int dag_pread_packet(libtrace_t *libtrace, libtrace_thread_t *t,
 						   flags))
 		return -1;
 
+	PERPKT_DATA(t)->pkt_count++;
+
 	return packet->payload ? htons(erfptr->rlen) :
 		erf_get_framing_length(packet);
 }
 
 static int dag_ppause_input(libtrace_t *libtrace) {
-	fprintf(stderr, "Assuming threads will pause when unregistered!\n");
+	int i, tot = libtrace->perpkt_thread_count;
+	struct dag_per_thread_t *t_data;
+
+	/* Stop and detach all the streams */
+	printf("Stopping and detaching all streams\n");
+	for (i = 0; i < tot; i++) {
+		t_data = &FORMAT_DATA->per_thread[i];
+
+		if (dag_stop_stream(t_data->device->fd,
+							t_data->stream) < 0) {
+			trace_set_err(libtrace, errno, "can't stop DAG stream #%u",
+						  t_data->stream);
+			return -1;
+		}
+
+		if (dag_detach_stream(t_data->device->fd,
+							  t_data->stream) < 0) {
+			trace_set_err(libtrace, errno, "can't detach DAG stream #%u",
+						  t_data->stream);
+			return -1;
+		}
+	}
+
+	/* Free up the per_thread array */
+	free(FORMAT_DATA->per_thread);
+	FORMAT_DATA->per_thread = NULL;
+
 	return 0;
-}
-
-static int dag_pfin_input(libtrace_t *libtrace) {
-	assert(0 && "dag_pfin_input not implemented");
-
-	return -1;
 }
 
 static int dag_pconfig_input(libtrace_t *libtrace,
 							 trace_parallel_option_t option, void *value) {
-	assert(0 && "dag_pconfig_input not implemented");
+
+	/* We don't support any of these! Normally you configure the DAG card
+	 * externally. */
+	switch(option) {
+	case TRACE_OPTION_SET_HASHER:
+	case TRACE_OPTION_SET_PERPKT_THREAD_COUNT:
+	case TRACE_OPTION_TRACETIME:
+	case TRACE_OPTION_TICK_INTERVAL:
+	case TRACE_OPTION_GET_CONFIG:
+	case TRACE_OPTION_SET_CONFIG:
+		return -1;
+	}
+	/* We don't provide a default option to ensure that future options will
+	 * generate a compiler warning. */
 
 	return -1;
 }
@@ -1423,15 +1464,20 @@ static int dag_pregister_thread(libtrace_t *libtrace, libtrace_thread_t *t,
 								bool reader) {
 	/* XXX: This function gets run sequentially for all
 	 * threads. Should investigate making it parallel as draining the
-	 * memory could be needlessly time consuming
+	 * memory could be needlessly time consuming.
 	 */
 	uint8_t *top, *bottom;
 	uint8_t diff = 0; /* XXX: Investigate this type, as I would assume the value
 					   * could be larger than 255 */
+	struct timeval zero, nopoll;
 
 	top = bottom = NULL;
 
-	fprintf(stderr, "t%u: registering thread\n", t->perpkt_num);
+	/* Minimum delay is 10mS */
+	zero.tv_sec = 0;
+	zero.tv_usec = 10000;
+	nopoll = zero;
+
 	if (reader) {
 		if (t->type == THREAD_PERPKT) {
 			/* Pass the per thread data to the thread */
@@ -1453,48 +1499,35 @@ static int dag_pregister_thread(libtrace_t *libtrace, libtrace_thread_t *t,
 				return -1;
 			}
 
+			/* Ensure that dag_advance_stream will return without blocking */
+			if(dag_set_stream_poll(PERPKT_DATA(t)->device->fd,
+								   PERPKT_DATA(t)->stream, 0, &zero,
+								   &nopoll) < 0) {
+				trace_set_err(libtrace, errno, "dag_set_stream_poll failed!");
+				return -1;
+			}
+
 			/* Clear all the data from the memory hole */
 			do {
 				top = dag_advance_stream(PERPKT_DATA(t)->device->fd,
 										 PERPKT_DATA(t)->stream,
 										 &bottom);
+
 				assert(top && bottom);
 				diff = top - bottom;
 				bottom -= diff;
 			} while (diff != 0);
 
-			/* Clear the pointers */
 			PERPKT_DATA(t)->top = NULL;
 			PERPKT_DATA(t)->bottom = NULL;
+			PERPKT_DATA(t)->pkt_count = 0;
 		} else {
 			/* TODO: Figure out why we need this */
 			t->format_data = &FORMAT_DATA->per_thread[0];
 		}
 	}
 
-	return 0;
-}
-
-static void dag_punregister_thread(libtrace_t *libtrace, libtrace_thread_t *t) {
-	if (t->type == THREAD_PERPKT) {
-		fprintf(stderr, "t%u: stopping and detaching stream %u\n",
-				t->perpkt_num, PERPKT_DATA(t)->stream);
-
-		/* Stop and detach the DAG stream */
-		if (dag_stop_stream(PERPKT_DATA(t)->device->fd,
-							PERPKT_DATA(t)->stream) < 0) {
-			trace_set_err(libtrace, errno, "can't stop DAG stream #%u",
-						  PERPKT_DATA(t)->stream);
-			return -1;
-		}
-
-		if (dag_detach_stream(PERPKT_DATA(t)->device->fd,
-							  PERPKT_DATA(t)->stream) < 0) {
-			trace_set_err(libtrace, errno, "can't detach DAG stream #%u",
-						  PERPKT_DATA(t)->stream);
-			return -1;
-		}
-	}
+	fprintf(stderr, "t%u: registered thread\n", t->perpkt_num);
 
 	return 0;
 }
@@ -1544,10 +1577,10 @@ static struct libtrace_format_t dag = {
 		dag_pstart_input,
 		dag_pread_packet,
 		dag_ppause_input,
-		dag_pfin_input,
+		NULL,
 		dag_pconfig_input,
 		dag_pregister_thread,
-		dag_punregister_thread
+		NULL
 };
 
 void dag_constructor(void) {
