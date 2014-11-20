@@ -124,6 +124,7 @@ struct dag_per_thread_t {
 	uint8_t *bottom; /* Pointer to the first unread byte in the DAG memory */
 	uint32_t processed; /* Amount of data processed from the bottom pointer */
 	uint64_t pkt_count; /* Number of packets seen by the thread */
+	uint64_t drops;
 };
 
 /* "Global" data that is stored for each DAG input trace */
@@ -816,6 +817,7 @@ static int dag_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
 		void *buffer, libtrace_rt_types_t rt_type, uint32_t flags) {
 
 	dag_record_t *erfptr;
+	libtrace_thread_t *t;
 	
 	/* If the packet previously owned a buffer that is not the buffer
          * that contains the new packet data, we're going to need to free the
@@ -851,19 +853,24 @@ static int dag_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
 		dag_init_format_data(libtrace);
 	}
 
-	/* TODO: This isn't thread safe */
-#if 0
 	/* Update the dropped packets counter */
-
 	/* No loss counter for DSM coloured records - have to use
 	 * some other API */
+	/* Adding multithread support for this isn't actually that useful for the
+	 * DAG7.5G2, as there's no way to use multiple receive streams without DSM */
 	if (erfptr->type == TYPE_DSM_COLOR_ETH) {
 		/* TODO */
 	} else {
 		/* Use the ERF loss counter */
-		DATA(libtrace)->drops += ntohs(erfptr->lctr);
+		if (DATA(libtrace)->per_thread) {
+			t = get_thread_table(libtrace);
+			PERPKT_DATA(t)->drops += ntohs(erfptr->lctr);
+		} else {
+			printf("DROP!\n");
+			DATA(libtrace)->drops += ntohs(erfptr->lctr);
+		}
 	}
-#endif
+
 
 	return 0;
 }
@@ -1218,9 +1225,25 @@ static libtrace_eventobj_t trace_event_dag(libtrace_t *libtrace,
 
 /* Gets the number of dropped packets */
 static uint64_t dag_get_dropped_packets(libtrace_t *trace) {
+	uint64_t sum = 0;
+	int i, tot;
+
 	if (trace->format_data == NULL)
 		return (uint64_t)-1;
-	return DATA(trace)->drops;
+
+	if (DATA(trace)->per_thread) {
+		tot = trace->perpkt_thread_count;
+
+		for (i = 0; i < tot; i++) {
+			printf("t%d: drops %" PRIu64 "\n",
+				   DATA(trace)->per_thread[i].drops);
+			sum += DATA(trace)->per_thread[i].drops;
+		}
+	}
+
+	sum += DATA(trace)->drops;
+
+	return sum;
 }
 
 /* Prints some semi-useful help text about the DAG format module */
@@ -1521,6 +1544,7 @@ static int dag_pregister_thread(libtrace_t *libtrace, libtrace_thread_t *t,
 			PERPKT_DATA(t)->top = NULL;
 			PERPKT_DATA(t)->bottom = NULL;
 			PERPKT_DATA(t)->pkt_count = 0;
+			PERPKT_DATA(t)->drops = 0;
 		} else {
 			/* TODO: Figure out why we need this */
 			t->format_data = &FORMAT_DATA->per_thread[0];
