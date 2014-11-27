@@ -20,11 +20,10 @@ typedef struct libtrace_ocache {
 } libtrace_ocache_t;
 
 DLLEXPORT void libtrace_ocache_init(libtrace_ocache_t *oc, void *(*alloc)(void), void (*free)(void*),
-									  size_t thread_cache_size, size_t buffer_size, bool limit_size);
+                                    size_t thread_cache_size, size_t buffer_size, bool limit_size);
 DLLEXPORT int libtrace_ocache_destroy(libtrace_ocache_t *oc);
 DLLEXPORT size_t libtrace_ocache_alloc(libtrace_ocache_t *oc, void *values[], size_t nb_buffers, size_t min_nb_buffers);
 DLLEXPORT size_t libtrace_ocache_free(libtrace_ocache_t *oc, void *values[], size_t nb_buffers, size_t min_nb_buffers);
 DLLEXPORT void libtrace_zero_ocache(libtrace_ocache_t *oc);
+DLLEXPORT void libtrace_ocache_unregister_thread(libtrace_ocache_t *oc);
 #endif // LIBTRACE_OBJECT_CACHE_H
-
-

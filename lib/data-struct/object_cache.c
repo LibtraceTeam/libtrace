@@ -1,4 +1,3 @@
-
 #include "object_cache.h"
 #include <assert.h>
 #include <stdio.h>
@@ -33,7 +32,7 @@ static pthread_key_t memory_destructor_key;
 static pthread_once_t memory_destructor_once = PTHREAD_ONCE_INIT;
 
 /**
- * @brief free_array assumes we DONT hold spin
+ * @brief unregister_thread assumes we DONT hold spin
  */
 static inline void unregister_thread(struct local_cache *lc) {
 	size_t i;
@@ -70,7 +69,7 @@ static inline void unregister_thread(struct local_cache *lc) {
 }
 
 /**
- * @brief free_array assumes we hold spin!!!
+ * @brief register_thread assumes we DONT hold spin
  */
 static inline void register_thread(libtrace_ocache_t *oc, struct local_cache *lc) {
 	lc->invalid = false;
@@ -428,3 +427,25 @@ DLLEXPORT void libtrace_zero_ocache(libtrace_ocache_t *oc) {
 	oc->thread_list = NULL;
 }
 
+/**
+ * @brief ocache_unregister_thread removes a thread from an ocache.
+ * @param The ocache to remove this thread, this will free any packets in the TLS cache
+ */
+DLLEXPORT void libtrace_ocache_unregister_thread(libtrace_ocache_t *oc) {
+	size_t i;
+	struct local_cache *lc = find_cache(oc);
+
+	if (lc) {
+		for (i = 0; i < t_mem_caches_used; ++i) {
+			if (&t_mem_caches[i] == lc) {
+				// Free the cache against the ocache
+				unregister_thread(&t_mem_caches[i]);
+				free(t_mem_caches[i].cache);
+				// And remove it from the thread itself
+				--t_mem_caches_used;
+				t_mem_caches[i] = t_mem_caches[t_mem_caches_used];
+				memset(&t_mem_caches[t_mem_caches_used], 0, sizeof(struct local_cache));
+			}
+		}
+	}
+}
