@@ -388,19 +388,22 @@ static void trace_thread_pause(libtrace_t *trace, libtrace_thread_t *t) {
 
 /**
  * Dispatches packets to their correct place and applies any translations
- * as needed
+ * as needed.
+ *
  * @param trace
  * @param t
  * @param packet (in, out) this will be set to NULL if the user doesn't return the packet for reuse
- * @return -1 if an error or EOF has occured and the trace should end otherwise 0 to continue as normal
+ * @return -1 if an error or EOF has occured and the trace should end, otherwise a postive number (or 0)
+ * representing the number of packets returned, these will be at the beginning of the array.
  */
 static inline int dispatch_packets(libtrace_t *trace, libtrace_thread_t *t, libtrace_packet_t **packets,
                                    size_t nb_packets) {
 	libtrace_message_t message;
-	size_t i;
+	size_t i, empty = 0;
 	for (i = 0; i < nb_packets; ++i) {
 		if (packets[i]->error > 0) {
 			packets[i] = (*trace->per_pkt)(trace, packets[i], NULL, t);
+			trace_fin_packet(packets[i]);
 		} else if (packets[i]->error == READ_TICK) {
 			message.code = MESSAGE_TICK;
 			message.additional.uint64 = trace_packet_get_order(packets[i]);
@@ -416,8 +419,31 @@ static inline int dispatch_packets(libtrace_t *trace, libtrace_thread_t *t, libt
 			}
 			return -1;
 		}
-		// -2 is a message its not worth checking now just finish this lot and we'll check
-		// when we loop next
+		if (packets[i]) {
+			// Move full slots to front
+			if (empty != i) {
+				packets[empty] = packets[i];
+				packets[i] = NULL;
+			}
+			++empty;
+			// Finish packets while still in CPU cache
+		}
+	}
+	return empty;
+}
+
+static inline int dispatch_packet(libtrace_t *trace, libtrace_thread_t *t, libtrace_packet_t **packet) {
+	libtrace_message_t message;
+	if ((*packet)->error > 0) {
+		*packet = (*trace->per_pkt)(trace, *packet, NULL, t);
+		trace_fin_packet(*packet);
+	} else if ((*packet)->error == READ_TICK) {
+		message.code = MESSAGE_TICK;
+		message.additional.uint64 = trace_packet_get_order(*packet);
+		message.sender = t;
+		(*trace->per_pkt)(trace, NULL, &message, t);
+	} else if ((*packet)->error != READ_MESSAGE) {
+		return -1;
 	}
 	return 0;
 }
@@ -432,8 +458,12 @@ static void* perpkt_threads_entry(void *data) {
 	libtrace_packet_t *packets[trace->config.burst_size];
 	size_t nb_packets;
 	size_t i;
+	int ret;
 
+	/* Fill it with empty packets */
 	memset(&packets, 0, sizeof(void*) * trace->config.burst_size);
+	libtrace_ocache_alloc(&trace->packet_freelist, (void **) packets, trace->config.burst_size, trace->config.burst_size);
+
 	// Force this thread to wait until trace_pstart has been completed
 	ASSERT_RET(pthread_mutex_lock(&trace->libtrace_lock), == 0);
 	t = get_thread_table(trace);
@@ -495,18 +525,25 @@ static void* perpkt_threads_entry(void *data) {
 		}
 
 		if (trace->perpkt_thread_count == 1) {
+			assert(packets[0]);
+			packets[0]->error = trace_read_packet(trace, packets[0]);
+			if (dispatch_packet(trace, t, &packets[0]) != 0)
+				break;
 			if (!packets[0]) {
 				libtrace_ocache_alloc(&trace->packet_freelist, (void **) &packets[0], 1, 1);
 			}
-			assert(packets[0]);
-			packets[0]->error = trace_read_packet(trace, packets[0]);
-			nb_packets = 1;
 		} else {
 			nb_packets = trace_pread_packet(trace, t, packets, trace->config.burst_size);
+			// Loop through the packets we just read and refill
+			ret = dispatch_packets(trace, t, packets, nb_packets);
+			if (ret == -1)
+				break;
+			else if (ret != nb_packets) {
+				// Refill the empty packets
+				printf("Refilling packets ret=%d nb_packets=%z\n", ret, nb_packets);
+				libtrace_ocache_alloc(&trace->packet_freelist, (void **) &packets[ret], nb_packets - ret, nb_packets - ret);
+			}
 		}
-		// Loop through the packets we just read
-		if (dispatch_packets(trace, t, packets, nb_packets) == -1)
-			break;
 	}
 
 
@@ -753,9 +790,7 @@ inline static size_t empty_array_of_packets(libtrace_t *libtrace, libtrace_packe
 inline static size_t trace_pread_packet_first_in_first_served(libtrace_t *libtrace, libtrace_thread_t *t, libtrace_packet_t *packets[], size_t nb_packets)
 {
 	size_t i = 0;
-	bool tick_hit = false;
-
-	nb_packets = fill_array_with_empty_packets(libtrace, packets, nb_packets);
+	//bool tick_hit = false;
 
 	ASSERT_RET(pthread_mutex_lock(&libtrace->libtrace_lock), == 0);
 	/* Read nb_packets */
@@ -1319,16 +1354,19 @@ static inline void delay_tracetime(libtrace_t *libtrace, libtrace_packet_t *pack
 /* Read one packet from the trace into a buffer. Note that this function will
  * block until a packet is read (or EOF is reached).
  *
- * @param libtrace 	the libtrace opaque pointer
- * @param packet  	the packet opaque pointer
- * @returns 0 on EOF, negative value on error
+ * @param libtrace 	the trace
+ * @param t	The thread
+ * @param packets  	an array of packets
+ * @param nb_packets
+ * @returns The number of packets read or 0 on EOF, negative value on error
  *
  * Note this is identical to read_packet but calls pread_packet instead of
  * read packet in the format.
  *
  */
-static inline int trace_pread_packet_wrapper(libtrace_t *libtrace, libtrace_thread_t *t, libtrace_packet_t *packet) {
-
+static inline int trace_pread_packet_wrapper(libtrace_t *libtrace, libtrace_thread_t *t, libtrace_packet_t **packets, size_t nb_packets) {
+	size_t i;
+	assert(nb_packets);
 	assert(libtrace && "You called trace_read_packet() with a NULL libtrace parameter!\n");
 	if (trace_is_err(libtrace))
 		return -1;
@@ -1336,45 +1374,67 @@ static inline int trace_pread_packet_wrapper(libtrace_t *libtrace, libtrace_thre
 		trace_set_err(libtrace,TRACE_ERR_BAD_STATE,"You must call libtrace_start() before trace_read_packet()\n");
 		return -1;
 	}
-	if (!(packet->buf_control==TRACE_CTRL_PACKET || packet->buf_control==TRACE_CTRL_EXTERNAL)) {
-		trace_set_err(libtrace,TRACE_ERR_BAD_STATE,"Packet passed to trace_read_packet() is invalid\n");
-		return -1;
-	}
-	assert(packet);
 
-	if (libtrace->format->pread_packet) {
-		do {
-			size_t ret;
-			/* Finalise the packet, freeing any resources the format module
+
+	if (libtrace->format->pread_packets) {
+		for (i = 0; i < nb_packets; ++i) {
+			assert(packets[i]);
+			if (!(packets[i]->buf_control==TRACE_CTRL_PACKET || packets[i]->buf_control==TRACE_CTRL_EXTERNAL)) {
+				trace_set_err(libtrace,TRACE_ERR_BAD_STATE,"Packet passed to trace_read_packet() is invalid\n");
+				return -1;
+			}
+			/* Finalise the packets, freeing any resources the format module
 			 * may have allocated it and zeroing all data associated with it.
-			 */
-			trace_fin_packet(packet);
+			 *./
+			//trace_fin_packet(packets[i]);
 			/* Store the trace we are reading from into the packet opaque
 			 * structure */
-			packet->trace = libtrace;
-			ret=libtrace->format->pread_packet(libtrace, t, packet);
-			if (ret==(size_t)-1 || ret==(size_t)-2 || ret==0) {
+			packets[i]->trace = libtrace;
+		}
+		do {
+			int ret;
+			ret=libtrace->format->pread_packets(libtrace, t, packets, nb_packets);
+			if (ret <= 0) {
 				return ret;
 			}
 			if (libtrace->filter) {
-				/* If the filter doesn't match, read another
-				 * packet
+				/*
+				 * Discard packets that don't match the filter
+				 * If that is all of the packets then pread again
 				 */
-				if (!trace_apply_filter(libtrace->filter,packet)){
-					++libtrace->filtered_packets;
-					continue;
+				int nb_filtered = 0;
+				libtrace_packet_t *filtered_pkts[ret];
+				int offset;
+				for (i = 0; i < ret; ++i) {
+					if (!trace_apply_filter(libtrace->filter, packets[i])){
+						trace_fin_packet(packets[i]);
+						packets[i]->trace = libtrace;
+						filtered_pkts[nb_filtered++] = packets[i];
+						packets[i] = NULL;
+					} else if (libtrace->snaplen>0) {
+						/* Snap the packet */
+						trace_set_capture_length(packets[i],
+								libtrace->snaplen);
+						trace_packet_set_order(packets[i], trace_get_erf_timestamp(packets[i]));
+					}
+				}
+				// TODO this aint thread safe
+				libtrace->filtered_packets += nb_filtered;
+				for (i = 0, offset = 0; i < ret; ++i) {
+					if (packets[i])
+						packets[offset++] = packets[i];
+				}
+				assert (ret - offset == nb_filtered);
+				memcpy(&packets[offset], filtered_pkts, nb_filtered * sizeof(libtrace_packet_t *));
+				t->accepted_packets -= nb_filtered;
+			} else {
+				for (i = 0; i < ret; ++i) {
+					trace_set_capture_length(packets[i],
+							libtrace->snaplen);
+					trace_packet_set_order(packets[i], trace_get_erf_timestamp(packets[i]));
 				}
 			}
-			if (libtrace->snaplen>0) {
-				/* Snap the packet */
-				trace_set_capture_length(packet,
-						libtrace->snaplen);
-			}
-
-			++t->accepted_packets;
-			// TODO look into this better
-			trace_packet_set_order(packet, trace_get_erf_timestamp(packet));
-			//trace_packet_set_order(packet, libtrace->accepted_packets);
+			t->accepted_packets += ret;
 			//++libtrace->accepted_packets;
 			return ret;
 		} while(1);
@@ -1384,7 +1444,14 @@ static inline int trace_pread_packet_wrapper(libtrace_t *libtrace, libtrace_thre
 }
 
 /**
- * Read packets from the parallel trace
+ * Selects the correct source for packets, either a parallel source
+ * or internal splitting
+ *
+ * @param libtrace
+ * @param t
+ * @param packets An array pre-filled with empty finilised packets
+ * @param nb_packets The number of packets in the array
+ *
  * @return the number of packets read, null packets indicate messages. Check packet->error before
  * assuming a packet is valid.
  */
@@ -1394,17 +1461,13 @@ static size_t trace_pread_packet(libtrace_t *libtrace, libtrace_thread_t *t, lib
 	size_t i;
 	assert(nb_packets);
 
-	for (i = 0; i < nb_packets; i++) {
-		// Cleanup the packet passed back
-		if (packets[i])
-			trace_fin_packet(packets[i]);
-	}
-
 	if (trace_supports_parallel(libtrace) && !trace_has_dedicated_hasher(libtrace)) {
-		if (!packets[0])
-			libtrace_ocache_alloc(&libtrace->packet_freelist, (void **)packets, 1, 1);
-		packets[0]->error = trace_pread_packet_wrapper(libtrace, t, *packets);
-		ret = 1;
+		ret = trace_pread_packet_wrapper(libtrace, t, packets, nb_packets);
+		/* Put the error into the first packet */
+		if ((int) ret <= 0) {
+			packets[0]->error = ret;
+			ret = 1;
+		}
 	} else if (trace_has_dedicated_hasher(libtrace)) {
 		ret = trace_pread_packet_hasher_thread(libtrace, t, packets, nb_packets);
 	} else if (!trace_has_dedicated_hasher(libtrace)) {

@@ -391,6 +391,9 @@ if test "$want_dpdk" != no; then
 	fi
 fi
 
+# If we use DPDK we might be able to use libnuma
+AC_CHECK_LIB(numa, numa_node_to_cpus, have_numa=1, have_numa=0)
+
 # Checks for various "optional" libraries
 AC_CHECK_LIB(pthread, pthread_create, have_pthread=1, have_pthread=0)
 
@@ -410,6 +413,15 @@ LIBS=
 # Check for clock_gettime
 AC_CHECK_LIB(rt, clock_gettime, have_clock_gettime=1, have_clock_gettime=0)
 LIBS=
+
+if test "$have_numa" = 1; then
+	LIBTRACE_LIBS="$LIBTRACE_LIBS -lnuma"
+	AC_DEFINE(HAVE_LIBNUMA, 1, [Set to 1 if libnuma is found supported])
+	with_numa=yes
+else
+	AC_DEFINE(HAVE_LIBNUMA, 0, [Set to 1 if libnuma is found supported])
+	with_numa=no
+fi
 
 if test "$dlfound" = 0; then
 	AC_MSG_ERROR("Unable to find dlopen. Please use LDFLAGS to specify the location of libdl and re-run configure")
@@ -684,6 +696,7 @@ fi
 
 if test x"$libtrace_dpdk" = xtrue; then
     AC_MSG_NOTICE([Compiled with DPDK live capture support: Yes])
+    reportopt "Compiled with DPDK trace NUMA support" $with_numa
 elif test x"$want_dpdk" != "xno"; then
 #   We don't officially support DPDK so only report failure if the user
 #   explicitly asked for DPDK. That way, we can hopefully keep it hidden

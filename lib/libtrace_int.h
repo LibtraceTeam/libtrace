@@ -892,10 +892,20 @@ struct libtrace_format_t {
 	 */
 	int (*pstart_input)(libtrace_t *trace);
 	
-	/** Read a packet in the new parallel mode 
-	 * @return same as read_packet, with the addition of return -2 to represent
-	 * interrupted due to message waiting. */
-	int (*pread_packet)(libtrace_t *trace, libtrace_thread_t *t, libtrace_packet_t *packet);
+	/**
+	 * Read a batch of packets from the input stream related to thread.
+	 * At most read nb_packets, however should return with less if packets
+	 * are not waiting. However still must return at least 1, 0 still indicates
+	 * EOF.
+	 *
+	 * @param libtrace	The input trace
+	 * @param t	The thread
+	 * @param packets	An array of packets
+	 * @param nb_packets	The number of packets in the array (the maximum to read)
+	 * @return The number of packets read, or 0 in the case of EOF or -1 in error or -2 to represent
+	 * interrupted due to message waiting before packets had been read.
+	 */
+	int (*pread_packets)(libtrace_t *trace, libtrace_thread_t *t, libtrace_packet_t **packets, size_t nb_packets);
 	
 	/** Pause a parallel trace
 	 *
@@ -904,7 +914,7 @@ struct libtrace_format_t {
 	int (*ppause_input)(libtrace_t *trace);
 	
 	/** Called after all threads have been paused, Finish (close) a parallel trace
-     * 
+	 *
 	 * @param libtrace	The input trace to be stopped
 	 */
 	int (*pfin_input)(libtrace_t *trace);
@@ -963,7 +973,7 @@ NULL			/* punregister_thread */
 /** Specifies whether any blocking packet readers should cease reading 
  * immediately
  */
-extern int libtrace_halt;
+extern volatile int libtrace_halt;
 
 /** Registers a new capture format module.
  *
