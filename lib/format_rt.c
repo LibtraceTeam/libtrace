@@ -456,7 +456,7 @@ static int rt_set_format(libtrace_t *libtrace, libtrace_packet_t *packet)
 				RT_INFO->dummy_ring = trace_create_dead("ring:");
 				/* This may fail on a non-Linux machine */
 				if (trace_is_err(RT_INFO->dummy_ring)) {
-					trace_perror(RT_INFO->dummy_ring, "Creating dead int trace");
+					trace_perror(RT_INFO->dummy_ring, "Creating dead ring trace");
 					return -1;
 				}
 			}
