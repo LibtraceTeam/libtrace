@@ -1103,7 +1103,6 @@ inline static int linuxnative_read_packet_fd(libtrace_t *libtrace, libtrace_pack
 	snaplen=LIBTRACE_MIN(
 			(int)LIBTRACE_PACKET_BUFSIZE-(int)sizeof(*hdr),
 			(int)FORMAT(libtrace->format_data)->snaplen);
-
 	/* Prepare the msghdr and iovec for the kernel to write the
 	 * captured packet into. The msghdr will point to the part of our
 	 * buffer reserved for sll header, while the iovec will point at
@@ -1183,8 +1182,6 @@ inline static int linuxnative_read_packet_fd(libtrace_t *libtrace, libtrace_pack
         hdr->wirelen = recvmsg(FORMAT(libtrace->format_data)->fd, &msghdr, MSG_TRUNC);
 	}
 
-			
-			
 	
 	if (hdr->wirelen==~0U) {
 		trace_set_err(libtrace,errno,"recvmsg");
@@ -1310,21 +1307,21 @@ inline static void ring_release_frame(libtrace_t *libtrace, libtrace_packet_t *p
  */
 static void linuxring_fin_packet(libtrace_packet_t *packet)
 {
-
 	if (packet->buffer == NULL)
 		return;
 	assert(packet->trace);
 	
-	// Started should always match the existence of the rx_ring
-	assert(!!FORMAT(packet->trace->format_data)->rx_ring == !!packet->trace->started);
-	
-	// Our packets are always under our control
-	assert(packet->buf_control == TRACE_CTRL_EXTERNAL);
-	
-	if (FORMAT(packet->trace->format_data)->rx_ring) // If we don't have a ring its already been destroyed or paused
-		ring_release_frame(packet->trace, packet);
-	else
-		packet->buffer = NULL;
+	/* If we own the packet (i.e. it's not a copy), we need to free it */
+	if (packet->buf_control == TRACE_CTRL_EXTERNAL) {
+		/* Started should always match the existence of the rx_ring */
+		assert(!!FORMAT(packet->trace->format_data)->rx_ring ==
+		       !!packet->trace->started);
+		/* If we don't have a ring its already been destroyed */
+		if (FORMAT(packet->trace->format_data)->rx_ring)
+			ring_release_frame(packet->trace, packet);
+		else
+			packet->buffer = NULL;
+	}
 }
 
 inline static int linuxring_read_packet_fd(libtrace_t *libtrace, libtrace_packet_t *packet, int fd, int *rxring_offset, char *rx_ring, int message) {
