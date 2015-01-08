@@ -540,7 +540,7 @@ static void* perpkt_threads_entry(void *data) {
 				break;
 			else if (ret != nb_packets) {
 				// Refill the empty packets
-				printf("Refilling packets ret=%d nb_packets=%z\n", ret, nb_packets);
+				printf("Refilling packets ret=%d nb_packets=%zd\n", ret, nb_packets);
 				libtrace_ocache_alloc(&trace->packet_freelist, (void **) &packets[ret], nb_packets - ret, nb_packets - ret);
 			}
 		}
@@ -1385,7 +1385,7 @@ static inline int trace_pread_packet_wrapper(libtrace_t *libtrace, libtrace_thre
 			}
 			/* Finalise the packets, freeing any resources the format module
 			 * may have allocated it and zeroing all data associated with it.
-			 *./
+			 */
 			//trace_fin_packet(packets[i]);
 			/* Store the trace we are reading from into the packet opaque
 			 * structure */
@@ -1411,10 +1411,11 @@ static inline int trace_pread_packet_wrapper(libtrace_t *libtrace, libtrace_thre
 						packets[i]->trace = libtrace;
 						filtered_pkts[nb_filtered++] = packets[i];
 						packets[i] = NULL;
-					} else if (libtrace->snaplen>0) {
-						/* Snap the packet */
-						trace_set_capture_length(packets[i],
-								libtrace->snaplen);
+					} else {
+						if (libtrace->snaplen>0)
+							/* Snap the packet */
+							trace_set_capture_length(packets[i],
+									libtrace->snaplen);
 						trace_packet_set_order(packets[i], trace_get_erf_timestamp(packets[i]));
 					}
 				}
@@ -1429,8 +1430,9 @@ static inline int trace_pread_packet_wrapper(libtrace_t *libtrace, libtrace_thre
 				t->accepted_packets -= nb_filtered;
 			} else {
 				for (i = 0; i < ret; ++i) {
-					trace_set_capture_length(packets[i],
-							libtrace->snaplen);
+					if (libtrace->snaplen>0)
+						trace_set_capture_length(packets[i],
+								libtrace->snaplen);
 					trace_packet_set_order(packets[i], trace_get_erf_timestamp(packets[i]));
 				}
 			}
