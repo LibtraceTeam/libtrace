@@ -1147,7 +1147,7 @@ inline static int linuxnative_read_packet_fd(libtrace_t *libtrace, libtrace_pack
 				return -2;
 			}
 			// Otherwise we must have a packet
-			hdr->wirelen = recvmsg(fd, &msghdr, 0);
+			hdr->wirelen = recvmsg(fd, &msghdr, MSG_TRUNC);
 		}
 	} else {
         /* Use select to allow us to time out occasionally to check if someone
@@ -1260,11 +1260,18 @@ static int linuxnative_read_packet(libtrace_t *libtrace, libtrace_packet_t *pack
 	return linuxnative_read_packet_fd(libtrace, packet, fd, 0);
 }
 
-static int linuxnative_pread_packet(libtrace_t *libtrace, libtrace_thread_t *t, libtrace_packet_t *packet)
-{
+static int linuxnative_pread_packets(libtrace_t *libtrace,
+                                     libtrace_thread_t *t,
+                                     libtrace_packet_t **packets,
+                                     UNUSED size_t nb_packets) {
+	/* For now just read one packet */
 	int fd = PERPKT_FORMAT(t)->fd;
-	//fprintf(stderr, "Thread number is #%d fd=%d\n", t->perpkt_num, PERPKT_FORMAT(t)->fd);
-	return linuxnative_read_packet_fd(libtrace, packet, fd, 1);
+	packets[0]->error = linuxnative_read_packet_fd(libtrace, packets[0],
+	                                               fd, 1);
+	if (packets[0]->error >= 1)
+		return 1;
+	else
+		return packets[0]->error;
 }
 
 #define LIBTRACE_BETWEEN(test,a,b) ((test) >= (a) && (test) < (b))
@@ -1414,12 +1421,20 @@ static int linuxring_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet
 	return linuxring_read_packet_fd(libtrace, packet, fd, rxring_offset, rx_ring, 0);
 }
 
-static int linuxring_pread_packet(libtrace_t *libtrace, libtrace_thread_t *t, libtrace_packet_t *packet) {
+static int linuxring_pread_packets(libtrace_t *libtrace,
+                                   libtrace_thread_t *t,
+                                   libtrace_packet_t **packets,
+                                   UNUSED size_t nb_packets) {
 	//fprintf(stderr, "Thread number is #%d\n", t->perpkt_num);
 	int fd = PERPKT_FORMAT(t)->fd;
 	int *rxring_offset = &PERPKT_FORMAT(t)->rxring_offset;
 	char *rx_ring = PERPKT_FORMAT(t)->rx_ring;
-	return linuxring_read_packet_fd(libtrace, packet, fd, rxring_offset, rx_ring, 1);
+	packets[0]->error = linuxring_read_packet_fd(libtrace, packets[0], fd,
+	                                             rxring_offset, rx_ring, 1);
+	if (packets[0]->error >= 1)
+		return 1;
+	else
+		return packets[0]->error;
 }
 
 /* Non-blocking read */
@@ -1950,7 +1965,7 @@ static struct libtrace_format_t linuxnative = {
 	NULL,					/* next pointer */
 	{true, -1},              /* Live, no thread limit */
 	linuxnative_pstart_input,			/* pstart_input */
-	linuxnative_pread_packet,			/* pread_packet */
+	linuxnative_pread_packets,			/* pread_packets */
 	linuxnative_ppause_input,			/* ppause */
 	linuxnative_fin_input,				/* p_fin */
 	linuxnative_pconfig_input,			/* pconfig input */
@@ -2001,7 +2016,7 @@ static struct libtrace_format_t linuxring = {
 	NULL,				/* next pointer */
 	{true, -1},              /* Live, no thread limit */
 	linuxnative_pstart_input,			/* pstart_input */
-	linuxring_pread_packet,			/* pread_packet */
+	linuxring_pread_packets,			/* pread_packets */
 	linuxnative_ppause_input,			/* ppause */
 	linuxnative_fin_input,				/* p_fin */
 	linuxnative_pconfig_input,
