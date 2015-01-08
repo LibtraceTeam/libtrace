@@ -910,6 +910,9 @@ static struct rte_eth_conf port_conf = {
 			.rss_hf = ETH_RSS_IPV4_UDP | ETH_RSS_IPV6 | ETH_RSS_IPV4 | ETH_RSS_IPV4_TCP | ETH_RSS_IPV6_TCP | ETH_RSS_IPV6_UDP,
 		},
 	},
+	.intr_conf = {
+		.lsc = 1
+	}
 };
 
 static const struct rte_eth_rxconf rx_conf = {
@@ -964,6 +967,58 @@ static const struct rte_eth_txconf tx_conf = {
      */
 	.tx_rs_thresh = 1,
 };
+
+/**
+ * A callback for a link state change (LSC).
+ *
+ * Packets may be received before this notification. In fact the DPDK IGXBE
+ * driver likes to put a delay upto 5sec before sending this.
+ *
+ * We use this to ensure the link speed is correct for our timestamp
+ * calculations. Because packets might be received before the link up we still
+ * update this when the packet is received.
+ *
+ * @param port The DPDK port
+ * @param event The TYPE of event (expected to be RTE_ETH_EVENT_INTR_LSC)
+ * @param cb_arg The dpdk_format_data_t structure associated with the format
+ */
+static void dpdk_lsc_callback(uint8_t port, enum rte_eth_event_type event,
+                              void *cb_arg) {
+	struct dpdk_format_data_t * format_data = cb_arg;
+	struct rte_eth_link link_info;
+	assert(event == RTE_ETH_EVENT_INTR_LSC);
+	assert(port == format_data->port);
+
+	rte_eth_link_get_nowait(port, &link_info);
+
+	if (link_info.link_status)
+		format_data->link_speed = link_info.link_speed;
+	else
+		format_data->link_speed = 0;
+
+#if DEBUG
+	fprintf(stderr, "LSC - link status is %s %s speed=%d\n",
+	        link_info.link_status ? "up" : "down",
+	        (link_info.link_duplex == ETH_LINK_FULL_DUPLEX) ?
+	                                  "full-duplex" : "half-duplex",
+	        (int) link_info.link_speed);
+#endif
+
+	/* Turns out DPDK drivers might not come back up if the link speed
+	 * changes. So we reset the autoneg procedure. This is very unsafe
+	 * we have have threads reading packets and we stop the port. */
+#if 0
+	if (!link_info.link_status) {
+		int ret;
+		rte_eth_dev_stop(port);
+		ret = rte_eth_dev_start(port);
+		if (ret < 0) {
+			fprintf(stderr, "Resetting the DPDK port failed : %s\n",
+			        strerror(-ret));
+		}
+	}
+#endif
+}
 
 /* Attach memory to the port and start the port or restart the port.
  */
@@ -1085,8 +1140,19 @@ static int dpdk_start_port (struct dpdk_format_data_t * format_data, char *err, 
     else
 	rte_eth_promiscuous_disable(format_data->port);
 
-    /* Wait for the link to come up */
-    rte_eth_link_get(format_data->port, &link_info);
+	/* Register a callback for link state changes */
+	ret = rte_eth_dev_callback_register(format_data->port,
+	                                    RTE_ETH_EVENT_INTR_LSC,
+	                                    dpdk_lsc_callback,
+	                                    format_data);
+	/* If this fails it is not a show stopper */
+#if DEBUG
+	fprintf(stderr, "rte_eth_dev_callback_register failed %d : %s\n",
+	        ret, strerror(-ret));
+#endif
+
+    /* Get the current link status */
+    rte_eth_link_get_nowait(format_data->port, &link_info);
     format_data->link_speed = link_info.link_speed;
 #if DEBUG
     fprintf(stderr, "Link status is %d %d %d\n", (int) link_info.link_status,
@@ -1244,8 +1310,19 @@ static int dpdk_start_port_queues (struct dpdk_format_data_t *format_data, char 
 		rte_eal_remote_launch(perpkt_threads_entry, (void *)libtrace, i);
 	}*/
 
-    /* Wait for the link to come up */
-    rte_eth_link_get(format_data->port, &link_info);
+    /* Register a callback for link state changes */
+    ret = rte_eth_dev_callback_register(format_data->port,
+                                        RTE_ETH_EVENT_INTR_LSC,
+                                        dpdk_lsc_callback,
+                                        format_data);
+    /* If this fails it is not a show stopper */
+#if DEBUG
+    fprintf(stderr, "rte_eth_dev_callback_register failed %d : %s\n",
+            ret, strerror(-ret));
+#endif
+
+    /* Get the current link status */
+    rte_eth_link_get_nowait(format_data->port, &link_info);
     format_data->link_speed = link_info.link_speed;
 #if DEBUG
     fprintf(stderr, "Link status is %d %d %d\n", (int) link_info.link_status,
@@ -1530,8 +1607,12 @@ static int dpdk_fin_input(libtrace_t * libtrace) {
     if (libtrace->format_data != NULL) {
 	/* Close the device completely, device cannot be restarted */
 	if (FORMAT(libtrace)->port != 0xFF)
-	    rte_eth_dev_close(FORMAT(libtrace)->port);
-	/* filter here if we used it */
+		rte_eth_dev_callback_unregister(FORMAT(libtrace)->port,
+		                                RTE_ETH_EVENT_INTR_LSC,
+		                                dpdk_lsc_callback,
+		                                FORMAT(libtrace));
+		rte_eth_dev_close(FORMAT(libtrace)->port);
+		/* filter here if we used it */
 		free(libtrace->format_data);
 	}
 
