@@ -792,10 +792,9 @@ void trace_fin_packet(libtrace_packet_t *packet) {
 			packet->buffer = NULL;
 		}
 
-		packet->trace = NULL;
+		trace_clear_cache(packet);
 		packet->hash = 0;
 		packet->order = 0;
-		trace_clear_cache(packet);
 	}
 }
 
