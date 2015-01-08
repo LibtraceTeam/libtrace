@@ -1342,7 +1342,11 @@ inline static int linuxring_read_packet_fd(libtrace_t *libtrace, libtrace_packet
 	header = ((void*) rx_ring) + *rxring_offset * FORMAT(libtrace->format_data)->req.tp_frame_size; // GET_CURRENT_BUFFER(libtrace);
 	assert((((unsigned long) header) & (pagesize - 1)) == 0);
 
-	while (1) {
+	/* TP_STATUS_USER means that we can use the frame.
+	 * When a slot does not have this flag set, the frame is not
+	 * ready for consumption.
+	 */
+	while (!(header->tp_status & TP_STATUS_USER)) {
 		if (message) {
 			struct pollfd pollset[2];
 			pollset[0].fd = fd;
@@ -1358,7 +1362,7 @@ inline static int linuxring_read_packet_fd(libtrace_t *libtrace, libtrace_packet
 					trace_set_err(libtrace,errno,"poll()");
 				return -1;
 			}
-			// Check for a message otherwise loop
+			/* A message is ready */
 			if (pollset[1].revents)
 				return -2;
 		} else {
@@ -1368,24 +1372,17 @@ inline static int linuxring_read_packet_fd(libtrace_t *libtrace, libtrace_packet
 			pollset.revents = 0;
 
 			/* Wait for more data or a message*/
-		ret = poll(&pollset, 1, 500);
+			ret = poll(&pollset, 1, 500);
 			if (ret < 0) {
 				if (errno != EINTR)
 					trace_set_err(libtrace,errno,"poll()");
 				return -1;
-		} else if (ret == 0) {
-                        /* Poll timed out - check if we should exit */
-                        if (libtrace_halt)
-                                return 0;
-                        continue;
-                }
-
-                /* TP_STATUS_USER means that we can use the frame.
-                 * When a slot does not have this flag set, the frame is not
-                 * ready for consumption.
-                 */
-                if (header->tp_status & TP_STATUS_USER)
-                        break;
+			} else if (ret == 0) {
+				/* Poll timed out - check if we should exit */
+				if (libtrace_halt)
+					return 0;
+				continue;
+			}
 		}
 	}
 
