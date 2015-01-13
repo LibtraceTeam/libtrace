@@ -107,7 +107,7 @@
 
 static struct libtrace_format_t *formats_list = NULL;
 
-int libtrace_halt = 0;
+volatile int libtrace_halt = 0;
 
 /* Set once pstart is called used for backwards compatibility reasons */
 int libtrace_parallel = 0;
