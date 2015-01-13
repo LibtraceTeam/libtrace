@@ -18,7 +18,7 @@ static size_t strlcpy(char *dest, const char *src, size_t size)
 }
 #endif
 
-static enum enc_type_t enc_type = ENC_NONE;
+static __thread enum enc_type_t enc_type = ENC_NONE;
 
 static uint32_t masks[33] = {
 		0x00000000, 0x80000000, 0xC0000000, 0xe0000000, 0xf0000000,
@@ -30,8 +30,8 @@ static uint32_t masks[33] = {
 		0xfffffffC, 0xfffffffe, 0xffffffff,
 };
 
-static uint32_t prefix;
-static uint32_t netmask;
+static __thread uint32_t prefix;
+static __thread uint32_t netmask;
 static void init_prefix(const char *key)
 {
 	int a,b,c,d;

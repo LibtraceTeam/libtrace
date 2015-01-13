@@ -49,13 +49,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-static State     m_state;
-static Mode      m_mode;
-static Direction m_direction;
-static UINT8     m_initVector[MAX_IV_SIZE];
-static UINT32    m_uRounds;
-static UINT8     m_expandedKey[_MAX_ROUNDS+1][4][4];
-
+static __thread State     m_state;
+static __thread Mode      m_mode;
+static __thread Direction m_direction;
+static __thread UINT8     m_initVector[MAX_IV_SIZE];
+static __thread UINT32    m_uRounds;
+static __thread UINT8     m_expandedKey[_MAX_ROUNDS+1][4][4];
 
 static UINT8 S[256]=
 {
