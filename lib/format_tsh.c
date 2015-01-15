@@ -147,6 +147,11 @@ static int tsh_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 		return 0;
 	}
 
+        if (numbytes < (int)sizeof(tsh_pkt_header_t)) {
+                trace_set_err(libtrace, errno, "Incomplete TSH header");
+                return -1;
+        }
+
 	buffer2 = (char*)buffer2 + numbytes;
 
 	/* Read the IP header */

@@ -209,13 +209,17 @@ static int pcapfile_start_input(libtrace_t *libtrace)
 		assert(sizeof(DATA(libtrace)->header) > 0);
 		
 		if (err<1) {
-			if (err == 0) {
-				trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
-						"Reading pcap file header\n");
-			}
+			trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
+				"Error while reading pcap file header\n");
 			return -1;
 		}
-		
+	
+                if (err != (int)sizeof(DATA(libtrace)->header)) {
+                        trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
+                                "Incomplete pcap file header");
+                        return -1;
+                }
+        	
 		if (!header_is_magic(&(DATA(libtrace)->header))) {
 			trace_set_err(libtrace,TRACE_ERR_INIT_FAILED,
 					"Not a pcap tracefile (magic=%08x)\n",swapl(libtrace,DATA(libtrace)->header.magic_number));
@@ -358,7 +362,6 @@ static int pcapfile_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 	err=wandio_read(libtrace->io,
 			packet->buffer,
 			sizeof(libtrace_pcapfile_pkt_hdr_t));
-
 	if (err<0) {
 		trace_set_err(libtrace,errno,"reading packet");
 		return -1;
@@ -367,6 +370,11 @@ static int pcapfile_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 		/* EOF */
 		return 0;
 	}
+
+        if (err < (int)sizeof(libtrace_pcapfile_pkt_hdr_t)) {
+                trace_set_err(libtrace, errno, "Incomplete pcap packet header");
+                return -1;
+        }
 
 	bytes_to_read = swapl(libtrace,((libtrace_pcapfile_pkt_hdr_t*)packet->buffer)->caplen);
 
@@ -390,7 +398,6 @@ static int pcapfile_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 			(size_t)swapl(libtrace,((libtrace_pcapfile_pkt_hdr_t*)packet->buffer)->caplen)
 			);
 
-	
 	if (err<0) {
 		trace_set_err(libtrace,errno,"reading packet");
 		return -1;
@@ -398,6 +405,11 @@ static int pcapfile_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 	if (err==0) {
 		return 0;
 	}
+
+        if (err < (int)bytes_to_read) {
+                trace_set_err(libtrace, errno, "Incomplete pcap packet body");
+                return -1;
+        }
 
 	if (pcapfile_prepare_packet(libtrace, packet, packet->buffer,
 				packet->type, flags)) {

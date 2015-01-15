@@ -160,6 +160,8 @@ struct dag_format_data_t {
 	/* When running in parallel mode this is malloc'd with an array of thread
 	 * structures. Most of the stuff above doesn't get used in parallel mode. */
 	struct dag_per_thread_t *per_thread;
+
+	uint8_t seeninterface[4];
 };
 
 /* To be thread-safe, we're going to need a mutex for operating on the list
@@ -240,6 +242,7 @@ static void dag_init_format_data(libtrace_t *libtrace) {
 	FORMAT_DATA->processed = 0;
 	FORMAT_DATA->bottom = NULL;
 	FORMAT_DATA->top = NULL;
+	memset(FORMAT_DATA->seeninterface, 0, sizeof(FORMAT_DATA->seeninterface));
 }
 
 /* Determines if there is already an entry for the given DAG device in the
@@ -289,7 +292,7 @@ static void dag_close_device(struct dag_dev_t *dev) {
 
 	dag_close(dev->fd);
 	if (dev->dev_name)
-	free(dev->dev_name);
+		free(dev->dev_name);
 	free(dev);
 }
 
@@ -574,7 +577,7 @@ static int dag_start_output(libtrace_out_t *libtrace) {
 	/* Attach and start the DAG stream */
 
 	if (dag_attach_stream(FORMAT_DATA_OUT->device->fd,
-			FORMAT_DATA_OUT->dagstream, 0, 1048576) < 0) {
+			FORMAT_DATA_OUT->dagstream, 0, 4 * 1024 * 1024) < 0) {
 		trace_set_err_out(libtrace, errno, "Cannot attach DAG stream");
 		return -1;
 	}
@@ -598,8 +601,8 @@ static int dag_start_output(libtrace_out_t *libtrace) {
 /* Starts a DAG input trace */
 static int dag_start_input(libtrace_t *libtrace) {
         struct timeval zero, nopoll;
-        uint8_t *top, *bottom;
-	uint8_t diff = 0;
+        uint8_t *top, *bottom, *starttop;
+	uint64_t diff = 0;
 	top = bottom = NULL;
 
 	zero.tv_sec = 0;
@@ -625,17 +628,19 @@ static int dag_start_input(libtrace_t *libtrace) {
 				FORMAT_DATA->dagstream, 0, &zero,
 				&nopoll);
 
+	starttop = dag_advance_stream(FORMAT_DATA->device->fd,
+                                        FORMAT_DATA->dagstream,
+                                        &bottom);
+
 	/* Should probably flush the memory hole now */
-	do {
+	while (starttop - bottom > 0) {
+		bottom += (starttop - bottom);
 		top = dag_advance_stream(FORMAT_DATA->device->fd,
 					FORMAT_DATA->dagstream,
 					&bottom);
-		assert(top && bottom);
-		diff = top - bottom;
-		bottom -= diff;
-	} while (diff != 0);
-	FORMAT_DATA->top = NULL;
-	FORMAT_DATA->bottom = NULL;
+	}
+	FORMAT_DATA->top = top;
+	FORMAT_DATA->bottom = bottom;
 	FORMAT_DATA->processed = 0;
 	FORMAT_DATA->drops = 0;
 
@@ -866,8 +871,11 @@ static int dag_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
 			t = get_thread_table(libtrace);
 			PERPKT_DATA(t)->drops += ntohs(erfptr->lctr);
 		} else {
-			printf("DROP!\n");
-			DATA(libtrace)->drops += ntohs(erfptr->lctr);
+			if (FORMAT_DATA->seeninterface[erfptr->flags.iface] == 0) {
+				FORMAT_DATA->seeninterface[erfptr->flags.iface] = 1;
+			} else {
+				FORMAT_DATA->drops += ntohs(erfptr->lctr);
+			}
 		}
 	}
 

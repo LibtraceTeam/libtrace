@@ -479,14 +479,18 @@ static int erf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	if ((numbytes=wandio_read(libtrace->io,
 					packet->buffer,
 					(size_t)dag_record_size)) == -1) {
-		trace_set_err(libtrace,errno,"read(%s)",
-				libtrace->uridata);
+		trace_set_err(libtrace,errno,"reading ERF file");
 		return -1;
 	}
 	/* EOF */
 	if (numbytes == 0) {
 		return 0;
 	}
+
+        if (numbytes < (int)dag_record_size) {
+                trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Incomplete ERF header");
+                return -1;
+        }
 
 	rlen = ntohs(((dag_record_t *)packet->buffer)->rlen);
 	buffer2 = (char*)packet->buffer + dag_record_size;
@@ -521,6 +525,11 @@ static int erf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 		/* Failed to read the full packet?  must be EOF */
 		return -1;
 	}
+
+        if (numbytes < (int)size) {
+                trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Incomplete ERF record");
+                return -1;
+        }
 	
 	if (erf_prepare_packet(libtrace, packet, packet->buffer, 
 				TRACE_RT_DATA_ERF, flags))
