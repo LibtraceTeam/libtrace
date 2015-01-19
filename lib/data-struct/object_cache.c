@@ -174,17 +174,19 @@ static inline struct local_cache * find_cache(libtrace_ocache_t *oc) {
   * @param limit_size If true no more objects than buffer_size will be allocated,
   *		reads will block (free never should).Otherwise packets can be freely
   *     allocated upon requested and are free'd if there is not enough space for them.
-  * @return Returns The number of packets outstanding, or extra object recevied
-  *		Ideally this should be zero (0) otherwise some form of memory leak
-  *		is likely present.
+  * @return If successful returns 0 otherwise -1.
   */
-DLLEXPORT void libtrace_ocache_init(libtrace_ocache_t *oc, void *(*alloc)(void), void (*free)(void *),
-									  size_t thread_cache_size, size_t buffer_size, bool limit_size) {
+DLLEXPORT int libtrace_ocache_init(libtrace_ocache_t *oc, void *(*alloc)(void),
+                                    void (*free)(void *),
+                                    size_t thread_cache_size,
+                                    size_t buffer_size, bool limit_size) {
 
 	assert(buffer_size);
 	assert(alloc);
 	assert(free);
-	libtrace_ringbuffer_init(&oc->rb, buffer_size, LIBTRACE_RINGBUFFER_BLOCKING);
+	if (libtrace_ringbuffer_init(&oc->rb, buffer_size, LIBTRACE_RINGBUFFER_BLOCKING) != 0) {
+		return -1;
+	}
 	oc->alloc = alloc;
 	oc->free = free;
 	oc->current_allocations = 0;
@@ -192,11 +194,16 @@ DLLEXPORT void libtrace_ocache_init(libtrace_ocache_t *oc, void *(*alloc)(void),
 	oc->nb_thread_list = 0;
 	oc->max_nb_thread_list = 0x10;
 	oc->thread_list = calloc(0x10, sizeof(void*));
+	if (oc->thread_list == NULL) {
+		libtrace_ringbuffer_destroy(&oc->rb);
+		return -1;
+	}
 	pthread_spin_init(&oc->spin, 0);
 	if (limit_size)
 		oc->max_allocations = buffer_size;
 	else
 		oc->max_allocations = 0;
+	return 0;
 }
 
 /**

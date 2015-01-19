@@ -291,8 +291,6 @@ struct libtrace_t {
 	/* Keep track of counts of threads in any given state */
 	int perpkt_thread_states[THREAD_STATE_MAX]; 
 
-	/** For the sliding window hasher implementation */
-	pthread_rwlock_t window_lock;
 	/** Set to indicate a perpkt's queue is full as such the writing perpkt cannot proceed */
 	bool perpkt_queue_full;
 	/** Global storage for this trace, shared among all the threads  */
@@ -314,8 +312,6 @@ struct libtrace_t {
 	libtrace_thread_t keepalive_thread;
 	int perpkt_thread_count;
 	libtrace_thread_t * perpkt_threads; // All our perpkt threads
-	libtrace_slidingwindow_t sliding_window;
-	sem_t sem;
 	// Used to keep track of the first packet seen on each thread
 	struct first_packets first_packets;
 	int tracetime;
@@ -880,14 +876,14 @@ struct libtrace_format_t {
 	/** Holds information about the trace format */
 	struct libtrace_info_t info;
 
-	/** Starts or unpauses an input trace in parallel mode - note that
+	/**
+	 * Starts or unpauses an input trace in parallel mode - note that
 	 * this function is often the one that opens the file or device for
 	 * reading.
 	 *
 	 * @param libtrace	The input trace to be started or unpaused
-	 * @return If successful the number of threads started, 0 indicates
-	 * 		   no threads started and this should be done automatically.
-	 * 		   Otherwise in event of an error -1 is returned.
+	 * @return 0 upon success.
+	 *         Otherwise in event of an error -1 is returned.
 	 * 
 	 */
 	int (*pstart_input)(libtrace_t *trace);
