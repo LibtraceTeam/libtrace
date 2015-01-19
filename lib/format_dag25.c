@@ -652,7 +652,8 @@ static int dag_start_input(libtrace_t *libtrace)
 				      &bottom);
 
 	/* Should probably flush the memory hole now */
-	while (starttop - bottom > 0) {
+	top = starttop;
+        while (starttop - bottom > 0) {
 		bottom += (starttop - bottom);
 		top = dag_advance_stream(FORMAT_DATA->device->fd,
 					 FORMAT_DATA->dagstream,
