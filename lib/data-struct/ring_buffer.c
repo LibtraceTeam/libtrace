@@ -46,18 +46,21 @@
  * @param mode The mode allows selection to use semaphores to signal when data
  * 				becomes available. LIBTRACE_RINGBUFFER_BLOCKING or LIBTRACE_RINGBUFFER_POLLING.
  * 				NOTE: this mainly applies to the blocking functions
+ * @return If successful returns 0 otherwise -1 upon failure.
  */
-DLLEXPORT void libtrace_ringbuffer_init(libtrace_ringbuffer_t * rb, size_t size, int mode) {
+DLLEXPORT int libtrace_ringbuffer_init(libtrace_ringbuffer_t * rb, size_t size, int mode) {
 	size = size + 1;
-	assert (size > 1);
-	rb->size = size; // Only this -1 actually usable :)
+	if (!(size > 1))
+		return -1;
+	rb->size = size;
 	rb->start = 0;
 	rb->end = 0;
 	rb->elements = calloc(rb->size, sizeof(void*));
-	assert(rb->elements);
+	if (!rb->elements)
+		return -1;
 	rb->mode = mode;
 	if (mode == LIBTRACE_RINGBUFFER_BLOCKING) {
-		/* The signaling part - i.e. release when data's ready to read */
+		/* The signaling part - i.e. release when data is ready to read */
 		pthread_cond_init(&rb->full_cond, NULL);
 		pthread_cond_init(&rb->empty_cond, NULL);
 		ASSERT_RET(pthread_mutex_init(&rb->empty_lock, NULL), == 0);
@@ -74,6 +77,7 @@ DLLEXPORT void libtrace_ringbuffer_init(libtrace_ringbuffer_t * rb, size_t size,
 	ASSERT_RET(pthread_mutex_init(&rb->wlock, NULL), == 0);
 	ASSERT_RET(pthread_mutex_init(&rb->rlock, NULL), == 0);
 #endif
+	return 0;
 }
 
 /**

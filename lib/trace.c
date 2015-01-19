@@ -260,8 +260,8 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 	libtrace->accepted_packets = 0;
 	
 	/* Parallel inits */
-	// libtrace->libtrace_lock
-	// libtrace->perpkt_cond;
+	ASSERT_RET(pthread_mutex_init(&libtrace->libtrace_lock, NULL), == 0);
+	ASSERT_RET(pthread_cond_init(&libtrace->perpkt_cond, NULL), == 0);
 	libtrace->state = STATE_NEW;
 	libtrace->perpkt_queue_full = false;
 	libtrace->global_blob = NULL;
@@ -272,7 +272,6 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 	libtrace_zero_thread(&libtrace->hasher_thread);
 	libtrace_zero_thread(&libtrace->reporter_thread);
 	libtrace_zero_thread(&libtrace->keepalive_thread);
-	libtrace_zero_slidingwindow(&libtrace->sliding_window);
 	libtrace->reporter_thread.type = THREAD_EMPTY;
 	libtrace->perpkt_thread_count = 0;
 	libtrace->perpkt_threads = NULL;
@@ -380,8 +379,8 @@ DLLEXPORT libtrace_t * trace_create_dead (const char *uri) {
 	libtrace->filtered_packets = 0;
 	
 	/* Parallel inits */
-	// libtrace->libtrace_lock
-	// libtrace->perpkt_cond;
+	ASSERT_RET(pthread_mutex_init(&libtrace->libtrace_lock, NULL), == 0);
+	ASSERT_RET(pthread_cond_init(&libtrace->perpkt_cond, NULL), == 0);
 	libtrace->state = STATE_NEW; // TODO MAYBE DEAD
 	libtrace->perpkt_queue_full = false;
 	libtrace->global_blob = NULL;
@@ -392,7 +391,6 @@ DLLEXPORT libtrace_t * trace_create_dead (const char *uri) {
 	libtrace_zero_thread(&libtrace->hasher_thread);
 	libtrace_zero_thread(&libtrace->reporter_thread);
 	libtrace_zero_thread(&libtrace->keepalive_thread);
-	libtrace_zero_slidingwindow(&libtrace->sliding_window);
 	libtrace->reporter_thread.type = THREAD_EMPTY;
 	libtrace->perpkt_thread_count = 0;
 	libtrace->perpkt_threads = NULL;
@@ -633,10 +631,13 @@ DLLEXPORT int trace_config_output(libtrace_out_t *libtrace,
  *
  */
 DLLEXPORT void trace_destroy(libtrace_t *libtrace) {
-    int i;
+	int i;
 	assert(libtrace);
 
-	/* destroy any packet that are still around */
+	ASSERT_RET(pthread_mutex_destroy(&libtrace->libtrace_lock), == 0);
+	ASSERT_RET(pthread_cond_destroy(&libtrace->perpkt_cond), == 0);
+
+	/* destroy any packets that are still around */
 	if (libtrace->state != STATE_NEW && libtrace->first_packets.packets) {
 		for (i = 0; i < libtrace->perpkt_thread_count; ++i) {
 			if(libtrace->first_packets.packets[i].packet) {
@@ -686,6 +687,9 @@ DLLEXPORT void trace_destroy(libtrace_t *libtrace) {
 
 DLLEXPORT void trace_destroy_dead(libtrace_t *libtrace) {
 	assert(libtrace);
+
+	ASSERT_RET(pthread_mutex_destroy(&libtrace->libtrace_lock), == 0);
+	ASSERT_RET(pthread_cond_destroy(&libtrace->perpkt_cond), == 0);
 
 	/* Don't call pause_input or fin_input, because we should never have
 	 * used this trace to do any reading anyway. Do make sure we free

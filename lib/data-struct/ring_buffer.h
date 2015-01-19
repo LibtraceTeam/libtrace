@@ -31,7 +31,7 @@ typedef struct libtrace_ringbuffer {
 	volatile size_t end;
 } libtrace_ringbuffer_t;
 
-DLLEXPORT void libtrace_ringbuffer_init(libtrace_ringbuffer_t * rb, size_t size, int mode);
+DLLEXPORT int libtrace_ringbuffer_init(libtrace_ringbuffer_t * rb, size_t size, int mode);
 DLLEXPORT void libtrace_zero_ringbuffer(libtrace_ringbuffer_t * rb);
 DLLEXPORT void libtrace_ringbuffer_destroy(libtrace_ringbuffer_t * rb);
 DLLEXPORT int libtrace_ringbuffer_is_empty(const libtrace_ringbuffer_t * rb);
