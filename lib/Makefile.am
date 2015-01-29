@@ -20,7 +20,7 @@ endif
 EXTRA_DIST=format_dag24.c format_dag25.c dpdk_libtrace.mk
 
 if HAVE_LLVM
-BPFJITSOURCE=bpf-jit/bpf-jit.cc 
+BPFJITSOURCE=bpf-jit/bpf-jit.cc
 else
 BPFJITSOURCE=
 endif
@@ -56,9 +56,11 @@ libtrace_la_SOURCES = trace.c trace_parallel.c common.h \
 		$(DAGSOURCE) format_erf.h \
 		$(BPFJITSOURCE) \
 		libtrace_arphrd.h \
-		data-struct/ring_buffer.c data-struct/vector.c data-struct/message_queue.c \
-		data-struct/deque.c data-struct/sliding_window.c data-struct/object_cache.c \
-		hash_toeplitz.c combiner_ordered.c combiner_sorted.c combiner_unordered.c
+		data-struct/ring_buffer.c data-struct/vector.c \
+		data-struct/message_queue.c data-struct/deque.c \
+		data-struct/sliding_window.c data-struct/object_cache.c \
+		data-struct/linked_list.c hash_toeplitz.c combiner_ordered.c \
+		combiner_sorted.c combiner_unordered.c
 
 if DAG2_4
 nodist_libtrace_la_SOURCES = dagopts.c dagapi.c

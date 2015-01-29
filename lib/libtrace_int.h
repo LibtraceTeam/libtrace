@@ -152,6 +152,7 @@ int snprintf(char *str, size_t size, const char *format, ...);
 #include "data-struct/vector.h"
 #include "data-struct/message_queue.h"
 #include "data-struct/deque.h"
+#include "data-struct/linked_list.h"
 #include "data-struct/sliding_window.h"
 
 //#define RP_BUFSIZE 65536U
