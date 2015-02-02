@@ -807,6 +807,35 @@ typedef struct libtrace_pppoe
  uint16_t length;		/**< Total Length of the PPP packet */
 } PACKED libtrace_pppoe_t;
 
+/** Libtrace local definition of GRE (Generalised Routing Protocol) header
+ * RFC2890
+ */
+typedef struct libtrace_gre_t
+{
+    uint16_t flags;         /**< Flags and version */
+    uint16_t ethertype;     /**< Payload ethertype */
+    uint16_t checksum;      /**< Optional checksum */
+    uint16_t reserved1;     /**< Optional reserved */
+    uint16_t key;           /**< Optional key (or Tenant Network ID) */
+    uint16_t seq;           /**< Optional sequence number */
+} PACKED libtrace_gre_t;
+
+#define LIBTRACE_GRE_FLAG_CHECKSUM 0x8000
+#define LIBTRACE_GRE_FLAG_KEY      0x2000
+#define LIBTRACE_GRE_FLAG_SEQ      0x1000
+#define LIBTRACE_GRE_FLAG_VERMASK  0x0007
+
+/** Libtrace local definition of VXLAN Header
+ * (draft-mahalingam-dutt-dcops-vxlan)
+ */
+typedef struct libtrace_vxlan_t
+{
+    uint8_t flags;          /**< Flags */
+    uint8_t reserved1[3];   /**< Reserved */
+    uint8_t vni[3];         /**< VXLAN Network Identifier (VNI) */
+    uint8_t reserved2;
+} PACKED libtrace_vxlan_t;
+
 /** 802.11 header */
 typedef struct libtrace_80211_t {
 #if __BYTE_ORDER == __LITTLE_ENDIAN
@@ -2069,6 +2098,58 @@ DLLEXPORT void *trace_get_payload_from_icmp(libtrace_icmp_t *icmp,
  */
 DLLEXPORT void *trace_get_payload_from_icmp6(libtrace_icmp6_t *icmp, 
 		uint32_t *remaining);
+
+/** Gets a pointer to the payload following a GRE header
+ * @param         gre       A pointer to the beginning of the GRE header.
+ * @param[in,out] remaining Updated with the number of captured bytes remaining.
+ *
+ * @return A pointer to the GRE payload, or NULL if the GRE header is truncated.
+ *
+ * When calling this function, remaining must contain the number of captured
+ * bytes remaining in the packet starting from the GRE header (including the
+ * GRE header itself). remaining will be updated to contain the number of
+ * bytes remaining after the GRE header has been skipped.
+ *
+ * If the GRE header is complete but there are zero bytes of payload after 
+ * the header, a pointer to where the payload would be is returned and 
+ * remaining will be set to 0.  If the GRE header is incomplete, NULL will be 
+ * returned and remaining will be set to 0. Therefore, it is important to check
+ * the value of remaining after calling this function.
+ */
+DLLEXPORT void *trace_get_payload_from_gre(libtrace_gre_t *gre,
+                uint32_t *remaining);
+
+/** Gets a pointer to the payload following a VXLAN header
+ * @param         udp       A pointer to the beginning of the UDP header.
+ * @param[in,out] remaining Updated with the number of captured bytes remaining.
+ *
+ * @return A pointer to the beginning of the VXLAN header, or NULL if the UDP
+ * header is truncated, or this is not a VXLAN packet.
+ *
+ */
+DLLEXPORT libtrace_vxlan_t *trace_get_vxlan_from_udp(libtrace_udp_t *udp,
+                uint32_t *remaining);
+
+/** Gets a pointer to the payload following a VXLAN header
+ * @param         vxlan       A pointer to the beginning of the VXLAN header.
+ * @param[in,out] remaining Updated with the number of captured bytes remaining.
+ *
+ * @return A pointer to the VXLAN payload, or NULL if the VXLAN header is
+ * truncated.
+ *
+ * When calling this function, remaining must contain the number of captured
+ * bytes remaining in the packet starting from the VXLAN header (including the
+ * VXLAN header itself). remaining will be updated to contain the number of
+ * bytes remaining after the VXLAN header has been skipped.
+ *
+ * If the VXLAN header is complete but there are zero bytes of payload after
+ * the header, a pointer to where the payload would be is returned and
+ * remaining will be set to 0.  If the VXLAN header is incomplete, NULL will be
+ * returned and remaining will be set to 0. Therefore, it is important to check
+ * the value of remaining after calling this function.
+ */
+DLLEXPORT void *trace_get_payload_from_vxlan(libtrace_vxlan_t *vxlan,
+                uint32_t *remaining);
 
 /** Get a pointer to the TCP header (if present)
  * @param packet  	The packet to get the TCP header from

@@ -20,7 +20,7 @@ endif
 EXTRA_DIST=format_dag24.c format_dag25.c dpdk_libtrace.mk
 
 if HAVE_LLVM
-BPFJITSOURCE=bpf-jit/bpf-jit.cc 
+BPFJITSOURCE=bpf-jit/bpf-jit.cc
 else
 BPFJITSOURCE=
 endif
@@ -53,6 +53,7 @@ libtrace_la_SOURCES = trace.c common.h \
 		checksum.c checksum.h \
 		protocols_pktmeta.c protocols_l2.c protocols_l3.c \
 		protocols_transport.c protocols.h protocols_ospf.c \
+		protocols_application.c \
 		$(DAGSOURCE) format_erf.h \
 		$(BPFJITSOURCE) \
 		libtrace_arphrd.h
