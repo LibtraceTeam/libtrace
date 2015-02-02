@@ -103,6 +103,8 @@ struct dag_dev_t {
 
 /* "Global" data that is stored for each DAG output trace */
 struct dag_format_data_out_t {
+        /* String containing the DAG device name */
+	char *device_name;
 	/* The DAG device being used for writing */
 	struct dag_dev_t *device;
 	/* The DAG stream that is being written on */
@@ -131,7 +133,9 @@ struct dag_format_data_t {
                 libtrace_t *dummy_duck;
         } duck;
 
-	/* The DAG device that we are reading from */
+        /* String containing the DAG device name */
+	char *device_name;
+        /* The DAG device that we are reading from */
 	struct dag_dev_t *device;
 	/* The DAG stream that we are reading from */
 	unsigned int dagstream;
@@ -207,6 +211,7 @@ static void dag_init_format_out_data(libtrace_out_t *libtrace) {
 	// no DUCK on output
 	FORMAT_DATA_OUT->stream_attached = 0;
 	FORMAT_DATA_OUT->device = NULL;
+	FORMAT_DATA_OUT->device_name = NULL;
 	FORMAT_DATA_OUT->dagstream = 0;
 	FORMAT_DATA_OUT->waiting = 0;
 
@@ -222,6 +227,7 @@ static void dag_init_format_data(libtrace_t *libtrace) {
         DUCK.dummy_duck = NULL;
 	FORMAT_DATA->stream_attached = 0;
 	FORMAT_DATA->drops = 0;
+	FORMAT_DATA->device_name = NULL;
 	FORMAT_DATA->device = NULL;
 	FORMAT_DATA->dagstream = 0;
 	FORMAT_DATA->processed = 0;
@@ -391,7 +397,6 @@ static struct dag_dev_t *dag_open_device(libtrace_t *libtrace, char *dev_name) {
 
 /* Creates and initialises a DAG output trace */
 static int dag_init_output(libtrace_out_t *libtrace) {
-	char *dag_dev_name = NULL;
 	char *scan = NULL;
 	struct dag_dev_t *dag_device = NULL;
 	int stream = 1;
@@ -414,30 +419,29 @@ static int dag_init_output(libtrace_out_t *libtrace) {
 	 *
 	 * If no stream is specified, we will write using stream 1 */
 	if ((scan = strchr(libtrace->uridata,',')) == NULL) {
-		dag_dev_name = strdup(libtrace->uridata);
+		FORMAT_DATA_OUT->device_name = strdup(libtrace->uridata);
 	} else {
-		dag_dev_name = (char *)strndup(libtrace->uridata,
+		FORMAT_DATA_OUT->device_name = 
+                                (char *)strndup(libtrace->uridata,
 				(size_t)(scan - libtrace->uridata));
 		stream = atoi(++scan);
 	}
 	FORMAT_DATA_OUT->dagstream = stream;
 
 	/* See if our DAG device is already open */
-	dag_device = dag_find_open_device(dag_dev_name);
+	dag_device = dag_find_open_device(FORMAT_DATA_OUT->device_name);
 
 	if (dag_device == NULL) {
 		/* Device not yet opened - open it ourselves */
-		dag_device = dag_open_output_device(libtrace, dag_dev_name);
-	} else {
-		/* Otherwise, just use the existing one */
-		free(dag_dev_name);
-		dag_dev_name = NULL;
+		dag_device = dag_open_output_device(libtrace, 
+                                FORMAT_DATA_OUT->device_name);
 	}
 
 	/* Make sure we have successfully opened a DAG device */
 	if (dag_device == NULL) {
-		if (dag_dev_name) {
-			free(dag_dev_name);
+		if (FORMAT_DATA_OUT->device_name) {
+			free(FORMAT_DATA_OUT->device_name);
+                        FORMAT_DATA_OUT->device_name = NULL;
 		}
 		pthread_mutex_unlock(&open_dag_mutex);
 		return -1;
@@ -450,7 +454,6 @@ static int dag_init_output(libtrace_out_t *libtrace) {
 
 /* Creates and initialises a DAG input trace */
 static int dag_init_input(libtrace_t *libtrace) {
-        char *dag_dev_name = NULL;
 	char *scan = NULL;
 	int stream = 0;
 	struct dag_dev_t *dag_device = NULL;
@@ -466,9 +469,9 @@ static int dag_init_input(libtrace_t *libtrace) {
 	 *
 	 * If no stream is specified, we will read from stream 0 */
 	if ((scan = strchr(libtrace->uridata,',')) == NULL) {
-		dag_dev_name = strdup(libtrace->uridata);
+		FORMAT_DATA->device_name = strdup(libtrace->uridata);
 	} else {
-		dag_dev_name = (char *)strndup(libtrace->uridata,
+		FORMAT_DATA->device_name = (char *)strndup(libtrace->uridata,
 				(size_t)(scan - libtrace->uridata));
 		stream = atoi(++scan);
 	}
@@ -476,22 +479,18 @@ static int dag_init_input(libtrace_t *libtrace) {
 	FORMAT_DATA->dagstream = stream;
 
 	/* See if our DAG device is already open */
-	dag_device = dag_find_open_device(dag_dev_name);
+	dag_device = dag_find_open_device(FORMAT_DATA->device_name);
 
 	if (dag_device == NULL) {
 		/* Device not yet opened - open it ourselves */
-		dag_device = dag_open_device(libtrace, dag_dev_name);
-	} else {
-		/* Otherwise, just use the existing one */
-		free(dag_dev_name);
-		dag_dev_name = NULL;
+		dag_device=dag_open_device(libtrace, FORMAT_DATA->device_name);
 	}
 
 	/* Make sure we have successfully opened a DAG device */
 	if (dag_device == NULL) {
-		if (dag_dev_name)
-			free(dag_dev_name);
-		dag_dev_name = NULL;
+		if (FORMAT_DATA->device_name)
+			free(FORMAT_DATA->device_name);
+		FORMAT_DATA->device_name = NULL;
 		pthread_mutex_unlock(&open_dag_mutex);
 		return -1;
 	}
@@ -681,6 +680,8 @@ static int dag_fin_input(libtrace_t *libtrace) {
 		dag_close_device(FORMAT_DATA->device);
 	if (DUCK.dummy_duck)
 		trace_destroy_dead(DUCK.dummy_duck);
+        if (FORMAT_DATA->device_name)
+                free(FORMAT_DATA->device_name);
 	free(libtrace->format_data);
 	pthread_mutex_unlock(&open_dag_mutex);
         return 0; /* success */
@@ -714,6 +715,8 @@ static int dag_fin_output(libtrace_out_t *libtrace) {
 	/* Close the DAG device if there are no more references to it */
 	if (FORMAT_DATA_OUT->device->ref_count == 0)
 		dag_close_device(FORMAT_DATA_OUT->device);
+        if (FORMAT_DATA_OUT->device_name)
+                free(FORMAT_DATA_OUT->device_name);
 	free(libtrace->format_data);
 	pthread_mutex_unlock(&open_dag_mutex);
 	return 0; /* success */
