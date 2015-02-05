@@ -142,6 +142,7 @@ static void trace_init(void)
 		tsh_constructor();
 		legacy_constructor();
 		atmhdr_constructor();
+		linuxring_constructor();
 		linuxnative_constructor();
 #ifdef HAVE_LIBPCAP
 		pcap_constructor();
