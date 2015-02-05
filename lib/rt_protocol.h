@@ -248,6 +248,29 @@ typedef struct duck2_5 {
         uint64_t        Last_TSC;
 } PACKED duck2_5_t;
 
+typedef struct duck5_0 {
+        int64_t         Phase_Correction;
+        uint64_t        Last_Ticks;
+        uint64_t        Last_TSC;
+	/* XXX Stat_Start and Stat_End are time_t in dagioctl.h, which means 
+	 * they could in theory be 32 or 64 bit depending on the architecture 
+	 * when capturing. I'm going to assume 5.0 era DAG captures are taking
+	 * place on a 64 bit arch, rather than have to deal with the varying
+	 * sizes (especially given nobody really uses DUCK these days).
+	 */
+        uint64_t        Stat_Start, Stat_End;
+        uint32_t        Crystal_Freq;
+        uint32_t        Synth_Freq;
+        uint32_t        Resyncs;
+        uint32_t        Bad_Pulses;
+        uint32_t        Worst_Freq_Err, Worst_Phase_Err;
+        uint32_t        Health_Thresh;
+        uint32_t        Pulses, Single_Pulses_Missing, Longest_Pulse_Missing;
+        uint32_t        Health, Sickness;
+        int32_t         Freq_Err, Phase_Err;
+        uint32_t        Set_Duck_Field;
+} PACKED duck5_0_t;
+
 /*
 typedef struct rt_duck_2_4 {
 	duck2_4_t duck;
