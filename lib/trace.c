@@ -281,6 +281,7 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 	libtrace->first_packets.packets = NULL;
 	libtrace->dropped_packets = UINT64_MAX;
 	libtrace->received_packets = UINT64_MAX;
+	libtrace->pread = NULL;
 	ZERO_USER_CONFIG(libtrace->config);
 
         /* Parse the URI to determine what sort of trace we are dealing with */
@@ -395,6 +396,7 @@ DLLEXPORT libtrace_t * trace_create_dead (const char *uri) {
 	libtrace->perpkt_thread_count = 0;
 	libtrace->perpkt_threads = NULL;
 	libtrace->tracetime = 0;
+	libtrace->pread = NULL;
 	ZERO_USER_CONFIG(libtrace->config);
 	
 	for(tmp=formats_list;tmp;tmp=tmp->next) {
