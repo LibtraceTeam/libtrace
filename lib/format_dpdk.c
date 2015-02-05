@@ -200,8 +200,8 @@
  * obvious in the DPDK documentation.
  */
 
-/* Print verbose messages to stdout */
-#define DEBUG 1
+/* Print verbose messages to stderr */
+#define DEBUG 0
 
 /* Use clock_gettime() for nanosecond resolution rather than gettimeofday()
  * only turn on if you know clock_gettime is a vsyscall on your system
@@ -350,7 +350,7 @@ static int blacklist_devices(struct dpdk_format_data_t *format_data, struct rte_
 	    continue;
 		if (format_data->nb_blacklist >= sizeof (format_data->blacklist)
 				/ sizeof (format_data->blacklist[0])) {
-			printf("Warning: too many devices to blacklist consider"
+			fprintf(stderr, "Warning: too many devices to blacklist consider"
 					" increasing BLACK_LIST_SIZE");
 			break;
 		}
@@ -624,7 +624,7 @@ static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_
 	format_data->nic_numa_node = pci_to_numa(&use_addr);
 	if (my_cpu < 0) {
 		/* If we can assign to a core on the same numa node */
-		printf("Using pci card on numa_node%d\n", format_data->nic_numa_node);
+		fprintf(stderr, "Using pci card on numa_node%d\n", format_data->nic_numa_node);
 		if(format_data->nic_numa_node >= 0) {
 			int max_node_cpu = -1;
 			struct bitmask *mask = numa_allocate_cpumask();
@@ -734,7 +734,7 @@ static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_
 
     struct rte_eth_dev_info dev_info;
     rte_eth_dev_info_get(0, &dev_info);
-    printf("Device port=0\n\tmin_rx_bufsize=%d\n\tmax_rx_pktlen=%d\n\tmax rx queues=%d\n\tmax tx queues=%d",
+    fprintf(stderr, "Device port=0\n\tmin_rx_bufsize=%d\n\tmax_rx_pktlen=%d\n\tmax rx queues=%d\n\tmax tx queues=%d",
 		(int) dev_info.min_rx_bufsize, (int) dev_info.max_rx_pktlen, (int) dev_info.max_rx_queues, (int) dev_info.max_tx_queues);
 
     return 0;
@@ -1205,7 +1205,7 @@ static int dpdk_start_port_queues (struct dpdk_format_data_t *format_data, char 
 	 * ring become available.
 	 */
 #if DEBUG
-    printf("Creating mempool named %s\n", format_data->mempool_name);
+    fprintf(stderr, "Creating mempool named %s\n", format_data->mempool_name);
 #endif
     format_data->pktmbuf_pool =
 	    rte_mempool_create(format_data->mempool_name,
@@ -1242,7 +1242,7 @@ static int dpdk_start_port_queues (struct dpdk_format_data_t *format_data, char 
 	return -1;
     }
 #if DEBUG
-    printf("Doing dev configure\n");
+    fprintf(stderr, "Doing dev configure\n");
 #endif
     /* Initialise the TX queue a minimum value if using this port for
      * receiving. Otherwise a larger size if writing packets.
@@ -1258,7 +1258,7 @@ static int dpdk_start_port_queues (struct dpdk_format_data_t *format_data, char 
 
     for (i=0; i < rx_queues; i++) {
 #if DEBUG
-    printf("Doing queue configure\n");
+    fprintf(stderr, "Doing queue configure\n");
 #endif
 
 		/* Initialise the RX queue with some packets from memory */
