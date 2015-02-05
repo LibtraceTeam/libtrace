@@ -292,6 +292,7 @@ DLLEXPORT void print_contention_stats(libtrace_t *libtrace) {
 
 void libtrace_zero_thread(libtrace_thread_t * t) {
 	t->accepted_packets = 0;
+	t->filtered_packets = 0;
 	t->recorded_first = false;
 	t->tracetime_offset_usec = 0;
 	t->user_data = 0;
@@ -1254,97 +1255,103 @@ static inline void delay_tracetime(libtrace_t *libtrace, libtrace_packet_t *pack
 	}
 }
 
-/* Read one packet from the trace into a buffer. Note that this function will
- * block until a packet is read (or EOF is reached).
+/* Discards packets that don't match the filter.
+ * Discarded packets are emptied and then moved to the end of the packet list.
  *
- * @param libtrace 	the trace
- * @param t	The thread
- * @param packets  	an array of packets
- * @param nb_packets
- * @returns The number of packets read or 0 on EOF, negative value on error
+ * @param trace       The trace format, containing the filter
+ * @param packets     An array of packets
+ * @param nb_packets  The number of valid items in packets
  *
- * Note this is identical to read_packet but calls pread_packet instead of
- * read packet in the format.
- *
+ * @return The number of packets that passed the filter, which are moved to
+ *          the start of the packets array
  */
-static inline int trace_pread_packet_wrapper(libtrace_t *libtrace, libtrace_thread_t *t, libtrace_packet_t **packets, size_t nb_packets) {
+static inline size_t filter_packets(libtrace_t *trace,
+                                    libtrace_packet_t **packets,
+                                    size_t nb_packets) {
+	size_t offset = 0;
 	size_t i;
+
+	for (i = 0; i < nb_packets; ++i) {
+		// The filter needs the trace attached to receive the link type
+		packets[i]->trace = trace;
+		if (trace_apply_filter(trace->filter, packets[i])) {
+			libtrace_packet_t *tmp;
+			tmp = packets[offset];
+			packets[offset++] = packets[i];
+			packets[i] = tmp;
+		} else {
+			trace_fin_packet(packets[i]);
+		}
+	}
+
+	return offset;
+}
+
+/* Read a batch of packets from the trace into a buffer.
+ * Note that this function will block until a packet is read (or EOF is reached)
+ *
+ * @param libtrace    The trace
+ * @param t           The thread
+ * @param packets     An array of packets
+ * @param nb_packets  The number of empty packets in packets
+ * @return The number of packets read, 0 on EOF (or an error/message -1,-2).
+ */
+static int trace_pread_packet_wrapper(libtrace_t *libtrace,
+                                      libtrace_thread_t *t,
+                                      libtrace_packet_t *packets[],
+                                      size_t nb_packets) {
+	int i;
 	assert(nb_packets);
-	assert(libtrace && "You called trace_read_packet() with a NULL libtrace parameter!\n");
+	assert(libtrace && "libtrace is NULL in trace_read_packet()");
 	if (trace_is_err(libtrace))
 		return -1;
 	if (!libtrace->started) {
-		trace_set_err(libtrace,TRACE_ERR_BAD_STATE,"You must call libtrace_start() before trace_read_packet()\n");
+		trace_set_err(libtrace, TRACE_ERR_BAD_STATE,
+		              "You must call libtrace_start() before trace_read_packet()\n");
 		return -1;
 	}
 
-
 	if (libtrace->format->pread_packets) {
-		for (i = 0; i < nb_packets; ++i) {
-			assert(packets[i]);
-			if (!(packets[i]->buf_control==TRACE_CTRL_PACKET || packets[i]->buf_control==TRACE_CTRL_EXTERNAL)) {
-				trace_set_err(libtrace,TRACE_ERR_BAD_STATE,"Packet passed to trace_read_packet() is invalid\n");
+		int ret;
+		for (i = 0; i < (int) nb_packets; ++i) {
+			assert(i[packets]);
+			if (!(packets[i]->buf_control==TRACE_CTRL_PACKET ||
+			      packets[i]->buf_control==TRACE_CTRL_EXTERNAL)) {
+				trace_set_err(libtrace,TRACE_ERR_BAD_STATE,
+				              "Packet passed to trace_read_packet() is invalid\n");
 				return -1;
 			}
-			/* Finalise the packets, freeing any resources the format module
-			 * may have allocated it and zeroing all data associated with it.
-			 */
-			//trace_fin_packet(packets[i]);
-			/* Store the trace we are reading from into the packet opaque
-			 * structure */
-			packets[i]->trace = libtrace;
 		}
 		do {
-			int ret;
-			ret=libtrace->format->pread_packets(libtrace, t, packets, nb_packets);
+			ret=libtrace->format->pread_packets(libtrace, t,
+			                                    packets,
+			                                    nb_packets);
+			/* Error, EOF or message? */
 			if (ret <= 0) {
 				return ret;
 			}
+
 			if (libtrace->filter) {
-				/*
-				 * Discard packets that don't match the filter
-				 * If that is all of the packets then pread again
-				 */
-				int nb_filtered = 0;
-				libtrace_packet_t *filtered_pkts[ret];
-				int offset;
-				for (i = 0; i < ret; ++i) {
-					if (!trace_apply_filter(libtrace->filter, packets[i])){
-						trace_fin_packet(packets[i]);
-						packets[i]->trace = libtrace;
-						filtered_pkts[nb_filtered++] = packets[i];
-						packets[i] = NULL;
-					} else {
-						if (libtrace->snaplen>0)
-							/* Snap the packet */
-							trace_set_capture_length(packets[i],
-									libtrace->snaplen);
-						trace_packet_set_order(packets[i], trace_get_erf_timestamp(packets[i]));
-					}
-				}
-				// TODO this aint thread safe
-				libtrace->filtered_packets += nb_filtered;
-				for (i = 0, offset = 0; i < ret; ++i) {
-					if (packets[i])
-						packets[offset++] = packets[i];
-				}
-				assert (ret - offset == nb_filtered);
-				memcpy(&packets[offset], filtered_pkts, nb_filtered * sizeof(libtrace_packet_t *));
-				t->accepted_packets -= nb_filtered;
-			} else {
-				for (i = 0; i < ret; ++i) {
-					if (libtrace->snaplen>0)
-						trace_set_capture_length(packets[i],
-								libtrace->snaplen);
-					trace_packet_set_order(packets[i], trace_get_erf_timestamp(packets[i]));
-				}
+				int remaining;
+				remaining = filter_packets(libtrace,
+				                           packets, ret);
+				t->filtered_packets += ret - remaining;
+				ret = remaining;
+			}
+			for (i = 0; i < ret; ++i) {
+				packets[i]->trace = libtrace;
+				/* TODO IN FORMAT?? Like traditional libtrace */
+				if (libtrace->snaplen>0)
+					trace_set_capture_length(packets[i],
+							libtrace->snaplen);
+				trace_packet_set_order(packets[i], trace_get_erf_timestamp(packets[i]));
 			}
 			t->accepted_packets += ret;
-			//++libtrace->accepted_packets;
-			return ret;
-		} while(1);
+		} while(ret == 0);
+		return ret;
 	}
-	trace_set_err(libtrace,TRACE_ERR_UNSUPPORTED,"This format does not support reading packets\n");
+	trace_set_err(libtrace, TRACE_ERR_UNSUPPORTED,
+	              "This format does not support reading packets\n");
 	return ~0U;
 }
 

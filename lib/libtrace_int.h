@@ -192,7 +192,8 @@ enum thread_states {
  * Information of this thread
  */
 struct libtrace_thread_t {
-	int accepted_packets; // The number of packets accepted only used if pread
+	uint64_t accepted_packets; // The number of packets accepted only used if pread
+	uint64_t filtered_packets;
 	// is retreving packets
 	// Set to true once the first packet has been stored
 	bool recorded_first;

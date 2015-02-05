@@ -1956,11 +1956,16 @@ uint64_t trace_get_received_packets(libtrace_t *trace)
 uint64_t trace_get_filtered_packets(libtrace_t *trace)
 {
 	assert(trace);
+	int i = 0;
+	uint64_t ret = trace->filtered_packets;
+	for (i = 0; i < trace->perpkt_thread_count; i++) {
+		ret += trace->perpkt_threads[i].filtered_packets;
+	}
 	if (trace->format->get_filtered_packets) {
 		return trace->format->get_filtered_packets(trace)+
-			trace->filtered_packets;
+			ret;
 	}
-	return trace->filtered_packets;
+	return ret;
 }
 
 uint64_t trace_get_dropped_packets(libtrace_t *trace)
