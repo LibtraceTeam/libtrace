@@ -745,7 +745,7 @@ struct libtrace_format_t {
 /** Specifies whether any blocking packet readers should cease reading 
  * immediately
  */
-extern int libtrace_halt;
+extern volatile int libtrace_halt;
 
 /** Registers a new capture format module.
  *
