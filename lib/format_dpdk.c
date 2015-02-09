@@ -397,31 +397,30 @@ static inline void dump_configuration()
 {
     struct rte_config * global_config;
     long nb_cpu = sysconf(_SC_NPROCESSORS_ONLN);
-    
+
     if (nb_cpu <= 0) {
         perror("sysconf(_SC_NPROCESSORS_ONLN) failed. Falling back to the first core.");
         nb_cpu = 1; /* fallback to just 1 core */
     }
     if (nb_cpu > RTE_MAX_LCORE)
         nb_cpu = RTE_MAX_LCORE;
-    
+
     global_config = rte_eal_get_configuration();
-    
+
     if (global_config != NULL) {
         int i;
         fprintf(stderr, "Intel DPDK setup\n"
-               "---Version      : %"PRIu32"\n"
-               "---Magic        : %"PRIu32"\n"
+               "---Version      : %s\n"
                "---Master LCore : %"PRIu32"\n"
                "---LCore Count  : %"PRIu32"\n",
-               global_config->version, global_config->magic, 
+               rte_version(),
                global_config->master_lcore, global_config->lcore_count);
-        
+
         for (i = 0 ; i < nb_cpu; i++) {
-            fprintf(stderr, "   ---Core %d : %s\n", i, 
+            fprintf(stderr, "   ---Core %d : %s\n", i,
                    global_config->lcore_role[i] == ROLE_RTE ? "on" : "off");
         }
-        
+
         const char * proc_type;
         switch (global_config->process_type) {
             case RTE_PROC_AUTO:
@@ -441,7 +440,7 @@ static inline void dump_configuration()
         }
         fprintf(stderr, "---Process Type : %s\n", proc_type);
     }
-    
+
 }
 #endif
 
