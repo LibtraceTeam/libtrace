@@ -828,7 +828,7 @@ static int dpdk_start_port (struct dpdk_format_data_t * format_data, char *err, 
                                         + RTE_PKTMBUF_HEADROOM,
                        8, sizeof(struct rte_pktmbuf_pool_private),
                        rte_pktmbuf_pool_init, NULL, rte_pktmbuf_init, NULL,
-                       0, MEMPOOL_F_SP_PUT | MEMPOOL_F_SC_GET);
+                       rte_socket_id(), MEMPOOL_F_SP_PUT | MEMPOOL_F_SC_GET);
 
         if (format_data->pktmbuf_pool == NULL) {
             snprintf(err, errlen, "Intel DPDK - Initialisation of mbuf "
@@ -859,7 +859,7 @@ static int dpdk_start_port (struct dpdk_format_data_t * format_data, char *err, 
      * receiving. Otherwise a larger size if writing packets.
      */
     ret = rte_eth_tx_queue_setup(format_data->port, format_data->queue_id,
-                        format_data->nb_tx_buf, SOCKET_ID_ANY, &tx_conf);
+                        format_data->nb_tx_buf, rte_socket_id(), &tx_conf);
     if (ret < 0) {
         snprintf(err, errlen, "Intel DPDK - Cannot configure TX queue on port"
                             " %"PRIu8" : %s", format_data->port,
@@ -868,7 +868,7 @@ static int dpdk_start_port (struct dpdk_format_data_t * format_data, char *err, 
     }
     /* Initialise the RX queue with some packets from memory */
     ret = rte_eth_rx_queue_setup(format_data->port, format_data->queue_id,
-                            format_data->nb_rx_buf, SOCKET_ID_ANY, 
+                            format_data->nb_rx_buf, rte_socket_id(),
                             &rx_conf, format_data->pktmbuf_pool);
     if (ret < 0) {
         snprintf(err, errlen, "Intel DPDK - Cannot configure RX queue on port"
