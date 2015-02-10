@@ -85,7 +85,10 @@
 
 /* 1.6.0r2 :
  *	rte_eal_pci_set_blacklist() is removed
- *	device_list is renamed ot pci_device_list
+ *	device_list is renamed to pci_device_list
+ *	In the 1.7.0 release rte_eal_pci_probe is called by rte_eal_init
+ *	as such we do apply the whitelist before rte_eal_init.
+ *	This also works correctly with DPDK 1.6.0r2.
  *
  * Replaced by:
  *	rte_devargs (we can simply whitelist)
@@ -328,7 +331,7 @@ static int blacklist_devices(struct dpdk_format_data_t *format_data, struct rte_
 }
 #else /* DPDK_USE_BLACKLIST */
 #include <rte_devargs.h>
-static int blacklist_devices(struct dpdk_format_data_t *format_data UNUSED, struct rte_pci_addr *whitelist)
+static int whitelist_device(struct dpdk_format_data_t *format_data UNUSED, struct rte_pci_addr *whitelist)
 {
 	char pci_str[20] = {0};
 	snprintf(pci_str, sizeof(pci_str), PCI_PRI_FMT,
@@ -352,43 +355,15 @@ static int blacklist_devices(struct dpdk_format_data_t *format_data UNUSED, stru
  * or ./libtrace dpdk:0:1:0.1-2 -> 0:1:0.1 (Using CPU core #2) 
  */
 static int parse_pciaddr(char * str, struct rte_pci_addr * addr, long * core) {
-    char * wrkstr;
-    char * pch;
+    int matches;
     assert(str);
-    wrkstr = strdup(str);
-    
-    pch = strtok(wrkstr,":");
-    if (pch == NULL || pch[0] == 0) {
-        free(wrkstr); return -1;
+    matches = sscanf(str, "%4"SCNx16":%2"SCNx8":%2"SCNx8".%2"SCNx8"-%ld",
+                     &addr->domain, &addr->bus, &addr->devid, &addr->function, core);
+    if (matches >= 4) {
+        return 0;
+    } else {
+        return -1;
     }
-    addr->domain = (uint16_t) atoi(pch);
-
-    pch = strtok(NULL,":");
-    if (pch == NULL || pch[0] == 0) {
-        free(wrkstr); return -1;
-    }
-    addr->bus = (uint8_t) atoi(pch);
-
-    pch = strtok(NULL,".");
-    if (pch == NULL || pch[0] == 0) {
-        free(wrkstr); return -1;
-    }
-    addr->devid = (uint8_t) atoi(pch);
-
-    pch = strtok(NULL,"-"); /* Might not find the '-' it's optional */
-    if (pch == NULL || pch[0] == 0) {
-        free(wrkstr); return -1;
-    }
-    addr->function = (uint8_t) atoi(pch);
-
-    pch = strtok(NULL, ""); /* Find end of string */
-    
-    if (pch != NULL && pch[0] != 0) {
-        *core = (long) atoi(pch);
-    }
-
-    free(wrkstr);
-    return 0;
 }
 
 #if DEBUG
@@ -397,31 +372,30 @@ static inline void dump_configuration()
 {
     struct rte_config * global_config;
     long nb_cpu = sysconf(_SC_NPROCESSORS_ONLN);
-    
+
     if (nb_cpu <= 0) {
         perror("sysconf(_SC_NPROCESSORS_ONLN) failed. Falling back to the first core.");
         nb_cpu = 1; /* fallback to just 1 core */
     }
     if (nb_cpu > RTE_MAX_LCORE)
         nb_cpu = RTE_MAX_LCORE;
-    
+
     global_config = rte_eal_get_configuration();
-    
+
     if (global_config != NULL) {
         int i;
         fprintf(stderr, "Intel DPDK setup\n"
-               "---Version      : %"PRIu32"\n"
-               "---Magic        : %"PRIu32"\n"
+               "---Version      : %s\n"
                "---Master LCore : %"PRIu32"\n"
                "---LCore Count  : %"PRIu32"\n",
-               global_config->version, global_config->magic, 
+               rte_version(),
                global_config->master_lcore, global_config->lcore_count);
-        
+
         for (i = 0 ; i < nb_cpu; i++) {
-            fprintf(stderr, "   ---Core %d : %s\n", i, 
+            fprintf(stderr, "   ---Core %d : %s\n", i,
                    global_config->lcore_role[i] == ROLE_RTE ? "on" : "off");
         }
-        
+
         const char * proc_type;
         switch (global_config->process_type) {
             case RTE_PROC_AUTO:
@@ -441,7 +415,7 @@ static inline void dump_configuration()
         }
         fprintf(stderr, "---Process Type : %s\n", proc_type);
     }
-    
+
 }
 #endif
 
@@ -542,6 +516,14 @@ static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_
     /* Make our mask */
     snprintf(cpu_number, sizeof(cpu_number), "%x", 0x1 << (my_cpu - 1));
 
+#if !DPDK_USE_BLACKLIST
+    /* Black list all ports besides the one that we want to use */
+    if ((ret = whitelist_device(format_data, &use_addr)) < 0) {
+        snprintf(err, errlen, "Intel DPDK - Whitelisting PCI device failed,"
+                 " are you sure the address is correct?: %s", strerror(-ret));
+        return -1;
+    }
+#endif
 
 	/* Give the memory map a unique name */
 	snprintf(mem_map, sizeof(mem_map), "libtrace-%d", (int) getpid());
@@ -571,12 +553,14 @@ static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_
     }
 #endif
 
+#if DPDK_USE_BLACKLIST
     /* Blacklist all ports besides the one that we want to use */
 	if ((ret = blacklist_devices(format_data, &use_addr)) < 0) {
 		snprintf(err, errlen, "Intel DPDK - Whitelisting PCI device failed,"
 		         " are you sure the address is correct?: %s", strerror(-ret));
 		return -1;
 	}
+#endif
 
     /* This loads DPDK drivers against all ports that are not blacklisted */
 	if ((ret = rte_eal_pci_probe()) < 0) {
@@ -844,7 +828,7 @@ static int dpdk_start_port (struct dpdk_format_data_t * format_data, char *err, 
                                         + RTE_PKTMBUF_HEADROOM,
                        8, sizeof(struct rte_pktmbuf_pool_private),
                        rte_pktmbuf_pool_init, NULL, rte_pktmbuf_init, NULL,
-                       0, MEMPOOL_F_SP_PUT | MEMPOOL_F_SC_GET);
+                       rte_socket_id(), MEMPOOL_F_SP_PUT | MEMPOOL_F_SC_GET);
 
         if (format_data->pktmbuf_pool == NULL) {
             snprintf(err, errlen, "Intel DPDK - Initialisation of mbuf "
@@ -875,7 +859,7 @@ static int dpdk_start_port (struct dpdk_format_data_t * format_data, char *err, 
      * receiving. Otherwise a larger size if writing packets.
      */
     ret = rte_eth_tx_queue_setup(format_data->port, format_data->queue_id,
-                        format_data->nb_tx_buf, SOCKET_ID_ANY, &tx_conf);
+                        format_data->nb_tx_buf, rte_socket_id(), &tx_conf);
     if (ret < 0) {
         snprintf(err, errlen, "Intel DPDK - Cannot configure TX queue on port"
                             " %"PRIu8" : %s", format_data->port,
@@ -884,7 +868,7 @@ static int dpdk_start_port (struct dpdk_format_data_t * format_data, char *err, 
     }
     /* Initialise the RX queue with some packets from memory */
     ret = rte_eth_rx_queue_setup(format_data->port, format_data->queue_id,
-                            format_data->nb_rx_buf, SOCKET_ID_ANY, 
+                            format_data->nb_rx_buf, rte_socket_id(),
                             &rx_conf, format_data->pktmbuf_pool);
     if (ret < 0) {
         snprintf(err, errlen, "Intel DPDK - Cannot configure RX queue on port"
@@ -1293,9 +1277,12 @@ static int dpdk_read_packet (libtrace_t *libtrace, libtrace_packet_t *packet) {
     while (1) {
         /* Poll for a single packet */
         nb_rx = rte_eth_rx_burst(FORMAT(libtrace)->port,
-                            FORMAT(libtrace)->queue_id, pkts_burst, 1);        
+                            FORMAT(libtrace)->queue_id, pkts_burst, 1);
         if (nb_rx > 0) { /* Got a packet - otherwise we keep spining */
             return dpdk_ready_pkt(libtrace, packet, pkts_burst[0]);
+        }
+        if (libtrace_halt) {
+            return 0;
         }
     }
     

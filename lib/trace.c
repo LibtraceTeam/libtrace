@@ -104,7 +104,7 @@
 
 static struct libtrace_format_t *formats_list = NULL;
 
-int libtrace_halt = 0;
+volatile int libtrace_halt = 0;
 
 /* strncpy is not assured to copy the final \0, so we
  * will use our own one that does

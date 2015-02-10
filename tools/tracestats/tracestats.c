@@ -156,7 +156,7 @@ static void run_trace(char *uri)
 	totbytes+=bytes;
 
 	if (trace_is_err(trace))
-		trace_perror(trace,"%s",uri);
+		trace_perror(trace,"Processing trace");
 
         trace_destroy(trace);
 }

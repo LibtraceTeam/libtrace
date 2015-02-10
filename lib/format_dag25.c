@@ -103,6 +103,8 @@ struct dag_dev_t {
 
 /* "Global" data that is stored for each DAG output trace */
 struct dag_format_data_out_t {
+        /* String containing the DAG device name */
+	char *device_name;
 	/* The DAG device being used for writing */
 	struct dag_dev_t *device;
 	/* The DAG stream that is being written on */
@@ -131,7 +133,9 @@ struct dag_format_data_t {
                 libtrace_t *dummy_duck;
         } duck;
 
-	/* The DAG device that we are reading from */
+        /* String containing the DAG device name */
+	char *device_name;
+        /* The DAG device that we are reading from */
 	struct dag_dev_t *device;
 	/* The DAG stream that we are reading from */
 	unsigned int dagstream;
@@ -145,6 +149,8 @@ struct dag_format_data_t {
 	uint32_t processed;
 	/* The number of packets that have been dropped */
 	uint64_t drops;
+
+	uint8_t seeninterface[4];
 };
 
 /* To be thread-safe, we're going to need a mutex for operating on the list
@@ -205,6 +211,7 @@ static void dag_init_format_out_data(libtrace_out_t *libtrace) {
 	// no DUCK on output
 	FORMAT_DATA_OUT->stream_attached = 0;
 	FORMAT_DATA_OUT->device = NULL;
+	FORMAT_DATA_OUT->device_name = NULL;
 	FORMAT_DATA_OUT->dagstream = 0;
 	FORMAT_DATA_OUT->waiting = 0;
 
@@ -220,11 +227,13 @@ static void dag_init_format_data(libtrace_t *libtrace) {
         DUCK.dummy_duck = NULL;
 	FORMAT_DATA->stream_attached = 0;
 	FORMAT_DATA->drops = 0;
+	FORMAT_DATA->device_name = NULL;
 	FORMAT_DATA->device = NULL;
 	FORMAT_DATA->dagstream = 0;
 	FORMAT_DATA->processed = 0;
 	FORMAT_DATA->bottom = NULL;
 	FORMAT_DATA->top = NULL;
+	memset(FORMAT_DATA->seeninterface, 0, sizeof(FORMAT_DATA->seeninterface));
 }
 
 /* Determines if there is already an entry for the given DAG device in the
@@ -274,7 +283,7 @@ static void dag_close_device(struct dag_dev_t *dev) {
 
 	dag_close(dev->fd);
 	if (dev->dev_name)
-	free(dev->dev_name);
+		free(dev->dev_name);
 	free(dev);
 }
 
@@ -388,7 +397,6 @@ static struct dag_dev_t *dag_open_device(libtrace_t *libtrace, char *dev_name) {
 
 /* Creates and initialises a DAG output trace */
 static int dag_init_output(libtrace_out_t *libtrace) {
-	char *dag_dev_name = NULL;
 	char *scan = NULL;
 	struct dag_dev_t *dag_device = NULL;
 	int stream = 1;
@@ -411,30 +419,29 @@ static int dag_init_output(libtrace_out_t *libtrace) {
 	 *
 	 * If no stream is specified, we will write using stream 1 */
 	if ((scan = strchr(libtrace->uridata,',')) == NULL) {
-		dag_dev_name = strdup(libtrace->uridata);
+		FORMAT_DATA_OUT->device_name = strdup(libtrace->uridata);
 	} else {
-		dag_dev_name = (char *)strndup(libtrace->uridata,
+		FORMAT_DATA_OUT->device_name = 
+                                (char *)strndup(libtrace->uridata,
 				(size_t)(scan - libtrace->uridata));
 		stream = atoi(++scan);
 	}
 	FORMAT_DATA_OUT->dagstream = stream;
 
 	/* See if our DAG device is already open */
-	dag_device = dag_find_open_device(dag_dev_name);
+	dag_device = dag_find_open_device(FORMAT_DATA_OUT->device_name);
 
 	if (dag_device == NULL) {
 		/* Device not yet opened - open it ourselves */
-		dag_device = dag_open_output_device(libtrace, dag_dev_name);
-	} else {
-		/* Otherwise, just use the existing one */
-		free(dag_dev_name);
-		dag_dev_name = NULL;
+		dag_device = dag_open_output_device(libtrace, 
+                                FORMAT_DATA_OUT->device_name);
 	}
 
 	/* Make sure we have successfully opened a DAG device */
 	if (dag_device == NULL) {
-		if (dag_dev_name) {
-			free(dag_dev_name);
+		if (FORMAT_DATA_OUT->device_name) {
+			free(FORMAT_DATA_OUT->device_name);
+                        FORMAT_DATA_OUT->device_name = NULL;
 		}
 		pthread_mutex_unlock(&open_dag_mutex);
 		return -1;
@@ -447,7 +454,6 @@ static int dag_init_output(libtrace_out_t *libtrace) {
 
 /* Creates and initialises a DAG input trace */
 static int dag_init_input(libtrace_t *libtrace) {
-        char *dag_dev_name = NULL;
 	char *scan = NULL;
 	int stream = 0;
 	struct dag_dev_t *dag_device = NULL;
@@ -463,9 +469,9 @@ static int dag_init_input(libtrace_t *libtrace) {
 	 *
 	 * If no stream is specified, we will read from stream 0 */
 	if ((scan = strchr(libtrace->uridata,',')) == NULL) {
-		dag_dev_name = strdup(libtrace->uridata);
+		FORMAT_DATA->device_name = strdup(libtrace->uridata);
 	} else {
-		dag_dev_name = (char *)strndup(libtrace->uridata,
+		FORMAT_DATA->device_name = (char *)strndup(libtrace->uridata,
 				(size_t)(scan - libtrace->uridata));
 		stream = atoi(++scan);
 	}
@@ -473,22 +479,18 @@ static int dag_init_input(libtrace_t *libtrace) {
 	FORMAT_DATA->dagstream = stream;
 
 	/* See if our DAG device is already open */
-	dag_device = dag_find_open_device(dag_dev_name);
+	dag_device = dag_find_open_device(FORMAT_DATA->device_name);
 
 	if (dag_device == NULL) {
 		/* Device not yet opened - open it ourselves */
-		dag_device = dag_open_device(libtrace, dag_dev_name);
-	} else {
-		/* Otherwise, just use the existing one */
-		free(dag_dev_name);
-		dag_dev_name = NULL;
+		dag_device=dag_open_device(libtrace, FORMAT_DATA->device_name);
 	}
 
 	/* Make sure we have successfully opened a DAG device */
 	if (dag_device == NULL) {
-		if (dag_dev_name)
-			free(dag_dev_name);
-		dag_dev_name = NULL;
+		if (FORMAT_DATA->device_name)
+			free(FORMAT_DATA->device_name);
+		FORMAT_DATA->device_name = NULL;
 		pthread_mutex_unlock(&open_dag_mutex);
 		return -1;
 	}
@@ -520,7 +522,7 @@ static int dag_config_input(libtrace_t *libtrace, trace_option_t option,
                 case TRACE_OPTION_META_FREQ:
 			/* This option is used to specify the frequency of DUCK
 			 * updates */
-                        DUCK.duck_freq = *(int *)data;
+			DUCK.duck_freq = *(int *)data;
                         return 0;
                 case TRACE_OPTION_SNAPLEN:
 			/* Tell the card our new snap length */
@@ -556,7 +558,7 @@ static int dag_start_output(libtrace_out_t *libtrace) {
 	/* Attach and start the DAG stream */
 
 	if (dag_attach_stream(FORMAT_DATA_OUT->device->fd,
-			FORMAT_DATA_OUT->dagstream, 0, 1048576) < 0) {
+			FORMAT_DATA_OUT->dagstream, 0, 4 * 1024 * 1024) < 0) {
 		trace_set_err_out(libtrace, errno, "Cannot attach DAG stream");
 		return -1;
 	}
@@ -580,8 +582,7 @@ static int dag_start_output(libtrace_out_t *libtrace) {
 /* Starts a DAG input trace */
 static int dag_start_input(libtrace_t *libtrace) {
         struct timeval zero, nopoll;
-        uint8_t *top, *bottom;
-	uint8_t diff = 0;
+        uint8_t *top, *bottom, *starttop;
 	top = bottom = NULL;
 
 	zero.tv_sec = 0;
@@ -607,17 +608,20 @@ static int dag_start_input(libtrace_t *libtrace) {
 				FORMAT_DATA->dagstream, 0, &zero,
 				&nopoll);
 
+	starttop = dag_advance_stream(FORMAT_DATA->device->fd,
+                                        FORMAT_DATA->dagstream,
+                                        &bottom);
+
 	/* Should probably flush the memory hole now */
-	do {
+	top = starttop;
+        while (starttop - bottom > 0) {
+		bottom += (starttop - bottom);
 		top = dag_advance_stream(FORMAT_DATA->device->fd,
 					FORMAT_DATA->dagstream,
 					&bottom);
-		assert(top && bottom);
-		diff = top - bottom;
-		bottom -= diff;
-	} while (diff != 0);
-	FORMAT_DATA->top = NULL;
-	FORMAT_DATA->bottom = NULL;
+	}
+	FORMAT_DATA->top = top;
+	FORMAT_DATA->bottom = bottom;
 	FORMAT_DATA->processed = 0;
 	FORMAT_DATA->drops = 0;
 
@@ -675,6 +679,8 @@ static int dag_fin_input(libtrace_t *libtrace) {
 		dag_close_device(FORMAT_DATA->device);
 	if (DUCK.dummy_duck)
 		trace_destroy_dead(DUCK.dummy_duck);
+        if (FORMAT_DATA->device_name)
+                free(FORMAT_DATA->device_name);
 	free(libtrace->format_data);
 	pthread_mutex_unlock(&open_dag_mutex);
         return 0; /* success */
@@ -708,14 +714,41 @@ static int dag_fin_output(libtrace_out_t *libtrace) {
 	/* Close the DAG device if there are no more references to it */
 	if (FORMAT_DATA_OUT->device->ref_count == 0)
 		dag_close_device(FORMAT_DATA_OUT->device);
+        if (FORMAT_DATA_OUT->device_name)
+                free(FORMAT_DATA_OUT->device_name);
 	free(libtrace->format_data);
 	pthread_mutex_unlock(&open_dag_mutex);
 	return 0; /* success */
 }
 
+#ifdef DAGIOC_CARD_DUCK
+#define LIBTRACE_DUCK_IOCTL DAGIOC_CARD_DUCK
+#define LIBTRACE_DUCK_VERSION TRACE_RT_DUCK_5_0
+#else 
+#ifdef DAGIOCDUCK
+#define LIBTRACE_DUCK_IOCTL DAGIOCDUCK
+#define LIBTRACE_DUCK_VERSION TRACE_RT_DUCK_2_5
+#else
+#warning "DAG appears to be missing DUCK support"
+#endif
+#endif
+
 /* Extracts DUCK information from the DAG card and produces a DUCK packet */
 static int dag_get_duckinfo(libtrace_t *libtrace,
                                 libtrace_packet_t *packet) {
+
+	if (DUCK.duck_freq == 0)
+		return 0;
+
+#ifndef LIBTRACE_DUCK_IOCTL
+	trace_set_err(libtrace, errno, 
+		"Requested DUCK information but unable to determine the correct ioctl for DUCK");
+	DUCK.duck_freq = 0;
+	return -1;
+#endif
+
+	if (DUCK.last_pkt - DUCK.last_duck < DUCK.duck_freq)
+		return 0;
 
 	/* Allocate memory for the DUCK data */
         if (packet->buf_control == TRACE_CTRL_EXTERNAL ||
@@ -735,20 +768,22 @@ static int dag_get_duckinfo(libtrace_t *libtrace,
 
         /* No need to check if we can get DUCK or not - we're modern
          * enough so just grab the DUCK info */
-        if ((ioctl(FORMAT_DATA->device->fd, DAGIOCDUCK,
+        if ((ioctl(FORMAT_DATA->device->fd, LIBTRACE_DUCK_IOCTL,
 					(duckinf_t *)packet->payload) < 0)) {
-                trace_set_err(libtrace, errno, "Error using DAGIOCDUCK");
+                trace_set_err(libtrace, errno, "Error using DUCK ioctl");
+		DUCK.duck_freq = 0;
                 return -1;
         }
 
-        packet->type = TRACE_RT_DUCK_2_5;
+        packet->type = LIBTRACE_DUCK_VERSION;
 
-	/* Set the packet's tracce to point at a DUCK trace, so that the
+	/* Set the packet's trace to point at a DUCK trace, so that the
 	 * DUCK format functions will be called on the packet rather than the
 	 * DAG ones */
         if (!DUCK.dummy_duck)
-                DUCK.dummy_duck = trace_create_dead("rt:localhost:3434");
+                DUCK.dummy_duck = trace_create_dead("duck:dummy");
         packet->trace = DUCK.dummy_duck;
+        DUCK.last_duck = DUCK.last_pkt;
         return sizeof(duckinf_t);
 }
 
@@ -842,7 +877,11 @@ static int dag_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
 		/* TODO */
 	} else {
 		/* Use the ERF loss counter */
-		DATA(libtrace)->drops += ntohs(erfptr->lctr);
+		if (FORMAT_DATA->seeninterface[erfptr->flags.iface] == 0) {
+			FORMAT_DATA->seeninterface[erfptr->flags.iface] = 1;
+		} else {
+			FORMAT_DATA->drops += ntohs(erfptr->lctr);
+		}
 	}
 
 	return 0;
@@ -1043,16 +1082,11 @@ static int dag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	maxwait.tv_usec = 250000;
 
         /* Check if we're due for a DUCK report */
-	if (DUCK.last_pkt - DUCK.last_duck > DUCK.duck_freq &&
-                        DUCK.duck_freq != 0) {
-                size = dag_get_duckinfo(libtrace, packet);
-                DUCK.last_duck = DUCK.last_pkt;
-                if (size != 0) {
-                        return size;
-                }
-                /* No DUCK support, so don't waste our time anymore */
-                DUCK.duck_freq = 0;
-        }
+	size = dag_get_duckinfo(libtrace, packet);
+
+	if (size != 0)
+		return size;
+
 
 	/* Don't let anyone try to free our DAG memory hole! */
 	flags |= TRACE_PREP_DO_NOT_OWN_BUFFER;
@@ -1110,10 +1144,20 @@ static libtrace_eventobj_t trace_event_dag(libtrace_t *libtrace,
 	dag_record_t *erfptr = NULL;
 	int numbytes;
 	uint32_t flags = 0;
-	struct timeval minwait;
+	struct timeval minwait, tv;
 	
 	minwait.tv_sec = 0;
 	minwait.tv_usec = 10000;
+
+	/* Check if we're meant to provide a DUCK update */
+	numbytes = dag_get_duckinfo(libtrace, packet);
+	if (numbytes < 0) {
+		event.type = TRACE_EVENT_TERMINATE;
+		return event;
+	} else if (numbytes > 0) {
+		event.type = TRACE_EVENT_PACKET;
+		return event;
+	}
 	
 	if (dag_set_stream_poll(FORMAT_DATA->device->fd, 
 			FORMAT_DATA->dagstream, 0, &minwait, 
@@ -1186,6 +1230,10 @@ static libtrace_eventobj_t trace_event_dag(libtrace_t *libtrace,
 			event.type = TRACE_EVENT_PACKET;
 		}
 
+		/* Update the DUCK timer */
+		tv = trace_get_timeval(packet);
+		DUCK.last_pkt = tv.tv_sec;
+		
 		if (libtrace->snaplen > 0) {
 			trace_set_capture_length(packet, libtrace->snaplen);
 		}

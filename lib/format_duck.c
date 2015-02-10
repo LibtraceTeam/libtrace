@@ -215,6 +215,9 @@ static int duck_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	} else if (DATA(libtrace)->dag_version == TRACE_RT_DUCK_2_5) {
 		duck_size = sizeof(duck2_5_t);
 		packet->type = TRACE_RT_DUCK_2_5;
+	} else if (DATA(libtrace)->dag_version == TRACE_RT_DUCK_5_0) {
+		duck_size = sizeof(duck5_0_t);
+		packet->type = TRACE_RT_DUCK_5_0;
 	} else {
 		trace_set_err(libtrace, TRACE_ERR_BAD_PACKET,
 				"Unrecognised DUCK version %i", 
@@ -251,7 +254,8 @@ static int duck_write_packet(libtrace_out_t *libtrace,
 	uint32_t duck_version;
 
 	if (packet->type != TRACE_RT_DUCK_2_4 
-			&& packet->type != TRACE_RT_DUCK_2_5) {
+			&& packet->type != TRACE_RT_DUCK_2_5 &&
+			packet->type != TRACE_RT_DUCK_5_0) {
 		trace_set_err_out(libtrace, TRACE_ERR_BAD_PACKET,
 				"Only DUCK packets may be written to a DUCK file");
 		return -1;
@@ -286,6 +290,8 @@ static int duck_get_capture_length(const libtrace_packet_t *packet) {
 			return sizeof(duck2_4_t);
 		case TRACE_RT_DUCK_2_5:
 			return sizeof(duck2_5_t);
+		case TRACE_RT_DUCK_5_0:
+			return sizeof(duck5_0_t);
 		default:
 			trace_set_err(packet->trace,TRACE_ERR_BAD_PACKET,
 					"Not a duck packet");

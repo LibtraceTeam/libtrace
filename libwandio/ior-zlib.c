@@ -55,6 +55,7 @@ struct zlib_t {
 	io_t *parent;
 	int outoffset;
 	enum err_t err;
+        size_t sincelastend;
 };
 
 
@@ -82,6 +83,7 @@ io_t *zlib_open(io_t *parent)
 	DATA(io)->strm.zfree = Z_NULL;
 	DATA(io)->strm.opaque = NULL;
 	DATA(io)->err = ERR_OK;
+        DATA(io)->sincelastend = 1;
 
 	inflateInit2(&DATA(io)->strm, 15 | 32);
 
@@ -107,9 +109,22 @@ static off_t zlib_read(io_t *io, void *buffer, off_t len)
 				(char*)DATA(io)->inbuff,
 				sizeof(DATA(io)->inbuff));
 			if (bytes_read == 0) {
-				/* EOF */
+                                /* If we get EOF immediately after a 
+                                 * Z_STREAM_END, then we assume we've reached 
+                                 * the end of the file. If there was data 
+                                 * between the Z_STREAM_END and the EOF, the
+                                 * file has more likely been truncated.
+                                 */
+                                if (DATA(io)->sincelastend > 0) {
+                                        fprintf(stderr, "Unexpected EOF while reading compressed file -- file is probably incomplete\n");
+                                        errno = EIO;
+                                        DATA(io)->err = ERR_ERROR;
+                                        return -1;
+                                }
+
+                                /* EOF */
 				if (DATA(io)->strm.avail_out == (uint32_t)len) {
-					DATA(io)->err = ERR_EOF;
+                                        DATA(io)->err = ERR_EOF;
 					return 0;
 				}
 				/* Return how much data we've managed to read so far. */
@@ -127,6 +142,7 @@ static off_t zlib_read(io_t *io, void *buffer, off_t len)
 			}
 			DATA(io)->strm.next_in = DATA(io)->inbuff;
 			DATA(io)->strm.avail_in = bytes_read;
+                        DATA(io)->sincelastend += bytes_read;
 		}
 		/* Decompress some data into the output buffer */
 		int err=inflate(&DATA(io)->strm, 0);
@@ -143,6 +159,7 @@ static off_t zlib_read(io_t *io, void *buffer, off_t len)
 				inflateEnd(&DATA(io)->strm);
 				inflateInit2(&DATA(io)->strm, 15 | 32);
 				DATA(io)->err = ERR_OK;
+                                DATA(io)->sincelastend = 0;
 				break;
 			default:
 				errno=EIO;
