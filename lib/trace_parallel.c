@@ -525,10 +525,11 @@ static void* perpkt_threads_entry(void *data) {
 		pthread_exit(NULL);
 	}
 	//printf("Yay Started perpkt thread #%d\n", (int) get_thread_table_num(trace));
+	ASSERT_RET(pthread_mutex_unlock(&trace->libtrace_lock), == 0);
+
 	if (trace->format->pregister_thread) {
 		trace->format->pregister_thread(trace, t, !trace_has_dedicated_hasher(trace));
 	}
-	ASSERT_RET(pthread_mutex_unlock(&trace->libtrace_lock), == 0);
 
 	/* Fill our buffer with empty packets */
 	memset(&packets, 0, sizeof(void*) * trace->config.burst_size);
@@ -695,6 +696,7 @@ static void* hasher_entry(void *data) {
 	int i;
 	libtrace_packet_t * packet;
 	libtrace_message_t message = {0};
+	int pkt_skipped = 0;
 
 	assert(trace_has_dedicated_hasher(trace));
 	/* Wait until all threads are started and objects are initialised (ring buffers) */
@@ -708,11 +710,12 @@ static void* hasher_entry(void *data) {
 	}
 
 	printf("Hasher Thread started\n");
+	ASSERT_RET(pthread_mutex_unlock(&trace->libtrace_lock), == 0);
+
 	if (trace->format->pregister_thread) {
 		trace->format->pregister_thread(trace, t, true);
 	}
-	ASSERT_RET(pthread_mutex_unlock(&trace->libtrace_lock), == 0);
-	int pkt_skipped = 0;
+
 	/* Read all packets in then hash and queue against the correct thread */
 	while (1) {
 		int thread;

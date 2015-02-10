@@ -931,8 +931,11 @@ struct libtrace_format_t {
 
 	/**
 	 * Register a thread for use with the format or using the packets produced
-	 * by it. This is NOT only used for threads reading packets infact all
+	 * by it. This is NOT only used for threads reading packets in fact all
 	 * threads use this.
+	 *
+	 * The libtrace lock is not held by this format but can be aquired
+	 * by the format.
 	 *
 	 * Some use cases include setting up any thread local storage required for
 	 * to read packets and free packets. For DPDK we require any thread that

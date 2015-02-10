@@ -1418,7 +1418,7 @@ static int dpdk_pstart_input (libtrace_t *libtrace) {
  * MAXIMUM CPU core slot (32) and remove any affinity restrictions DPDK
  * gives it.
  *
- * We then allow a mapper thread to be started on every real core as DPDK would
+ * We then allow a mapper thread to be started on every real core as DPDK would,
  * we also bind these to the corresponding CPU cores.
  *
  * @param libtrace A pointer to the trace
@@ -1436,6 +1436,7 @@ static int dpdk_pregister_thread(libtrace_t *libtrace, libtrace_thread_t *t, boo
     // otherwise start from the MAX core (which is also the master) and work backwards
     // in this case physical cores on the system will not exist so we don't bind
     // these to any particular physical core
+    pthread_mutex_lock(&libtrace->libtrace_lock);
     if (reading) {
 #if HAVE_LIBNUMA
 	for (i = 0; i < RTE_MAX_LCORE; ++i) {
@@ -1471,6 +1472,7 @@ static int dpdk_pregister_thread(libtrace_t *libtrace, libtrace_thread_t *t, boo
 	assert(cfg->lcore_count == RTE_MAX_LCORE);
 	// TODO proper libtrace style error here!!
 	fprintf(stderr, "Too many threads for DPDK!!\n");
+	pthread_mutex_unlock(&libtrace->libtrace_lock);
 	return -1;
     }
 
@@ -1495,6 +1497,7 @@ static int dpdk_pregister_thread(libtrace_t *libtrace, libtrace_thread_t *t, boo
 	i = pthread_setaffinity_np(pthread_self(), sizeof(cpuset), &cpuset);
 	if (i != 0) {
 	    fprintf(stderr, "Warning pthread_setaffinity_np failed\n");
+	    pthread_mutex_unlock(&libtrace->libtrace_lock);
 	    return -1;
 	}
     }
@@ -1507,6 +1510,7 @@ static int dpdk_pregister_thread(libtrace_t *libtrace, libtrace_thread_t *t, boo
 	    t->format_data = &FORMAT(libtrace)->per_lcore[0];
 	}
     }
+    pthread_mutex_unlock(&libtrace->libtrace_lock);
     return 0;
 }
 
@@ -1522,10 +1526,11 @@ static void dpdk_punregister_thread(libtrace_t *libtrace UNUSED, libtrace_thread
     struct rte_config *cfg = rte_eal_get_configuration();
 
     assert(rte_lcore_id() < RTE_MAX_LCORE);
-
+    pthread_mutex_lock(&libtrace->libtrace_lock);
     // Skip if master!!
     if (rte_lcore_id() == rte_get_master_lcore()) {
 	fprintf(stderr, "INFO: we are skipping unregistering the master lcore\n");
+	pthread_mutex_unlock(&libtrace->libtrace_lock);
 	return;
     }
 
@@ -1534,6 +1539,7 @@ static void dpdk_punregister_thread(libtrace_t *libtrace UNUSED, libtrace_thread
     cfg->lcore_count--;
     RTE_PER_LCORE(_lcore_id) = -1; // Might make the world burn if used again
     assert(cfg->lcore_count >= 1); // We cannot unregister the master LCORE!!
+    pthread_mutex_unlock(&libtrace->libtrace_lock);
     return;
 }
 
