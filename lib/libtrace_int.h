@@ -192,7 +192,8 @@ enum thread_states {
  * Information of this thread
  */
 struct libtrace_thread_t {
-	int accepted_packets; // The number of packets accepted only used if pread
+	uint64_t accepted_packets; // The number of packets accepted only used if pread
+	uint64_t filtered_packets;
 	// is retreving packets
 	// Set to true once the first packet has been stored
 	bool recorded_first;
@@ -306,7 +307,9 @@ struct libtrace_t {
 	/** The hasher function - NULL implies they don't care or balance */
 	fn_hasher hasher; // If valid using a separate thread
 	void *hasher_data;
-	
+	/** The pread_packet choosen path for the configuration */
+	int (*pread)(libtrace_t *, libtrace_thread_t *, libtrace_packet_t **, size_t);
+
 	libtrace_thread_t hasher_thread;
 	libtrace_thread_t reporter_thread;
 	libtrace_thread_t keepalive_thread;
@@ -928,8 +931,11 @@ struct libtrace_format_t {
 
 	/**
 	 * Register a thread for use with the format or using the packets produced
-	 * by it. This is NOT only used for threads reading packets infact all
+	 * by it. This is NOT only used for threads reading packets in fact all
 	 * threads use this.
+	 *
+	 * The libtrace lock is not held by this format but can be aquired
+	 * by the format.
 	 *
 	 * Some use cases include setting up any thread local storage required for
 	 * to read packets and free packets. For DPDK we require any thread that
