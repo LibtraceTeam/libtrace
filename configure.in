@@ -417,6 +417,9 @@ fi
 
 if test "$ac_cv_search_dlopen" != "none required"; then 
 	LIBPKTDUMP_LIBS="$LIBPKTDUMP_LIBS $ac_cv_search_dlopen"
+	if test "$dpdk_found" = 1; then
+		LIBTRACE_LIBS="$LIBTRACE_LIBS -Wl,$ac_cv_search_dlopen"
+	fi
 fi
 
 if test "$have_pthread" = 1; then
