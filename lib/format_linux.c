@@ -71,7 +71,7 @@ static int linuxnative_probe_filename(const char *filename)
 
 static int linuxnative_init_input(libtrace_t *libtrace)
 {
-	struct linux_per_stream_t stream_data;
+	struct linux_per_stream_t stream_data= ZERO_LINUX_STREAM;
 
 	libtrace->format_data = (struct linux_format_data_t *)
 		malloc(sizeof(struct linux_format_data_t));
@@ -81,12 +81,8 @@ static int linuxnative_init_input(libtrace_t *libtrace)
 		libtrace_list_init(sizeof(stream_data));
 	assert(FORMAT_DATA->per_stream != NULL);
 
-	/* We'll start with just one instance of stream_data, and we'll
-	 * add more later if we need them */
-	memset(&stream_data, 0, sizeof(stream_data));
 	libtrace_list_push_back(FORMAT_DATA->per_stream, &stream_data);
 
-	FORMAT_DATA_FIRST->fd = -1;
 	FORMAT_DATA->promisc = -1;
 	FORMAT_DATA->snaplen = LIBTRACE_PACKET_BUFSIZE;
 	FORMAT_DATA->filter = NULL;
@@ -102,8 +98,8 @@ static int linuxnative_init_input(libtrace_t *libtrace)
 
 static int linuxnative_init_output(libtrace_out_t *libtrace)
 {
-	libtrace->format_data = (struct linux_output_format_data_t*)
-		malloc(sizeof(struct linux_output_format_data_t));
+	libtrace->format_data = (struct linux_format_data_out_t*)
+		malloc(sizeof(struct linux_format_data_out_t));
 	assert(libtrace->format_data != NULL);
 
 	FORMAT_DATA_OUT->fd = -1;
@@ -116,20 +112,35 @@ static int linuxnative_init_output(libtrace_out_t *libtrace)
 	return 0;
 }
 
-static int linuxnative_start_input(libtrace_t *libtrace)
+/* Close an input stream, this is safe to be called part way through
+ * initilisation as a cleanup function assuming streams were set to
+ * ZERO_LINUX_STREAM to begin with.
+ */
+static inline void linuxnative_close_input_stream(libtrace_t *libtrace,
+                                                  struct linux_per_stream_t *stream) {
+	if (stream->fd != -1)
+		close(stream->fd);
+	stream->fd = -1;
+	/* TODO maybe store size against stream XXX */
+	if (stream->rx_ring)
+		munmap(stream->rx_ring,
+		       FORMAT_DATA->req.tp_block_size *
+		       FORMAT_DATA->req.tp_block_nr);
+	stream->rx_ring = NULL;
+}
+
+static inline int linuxnative_start_input_stream(libtrace_t *libtrace,
+                                                 struct linux_per_stream_t *stream)
 {
 	struct sockaddr_ll addr;
-	int one = 1;
+	const int one = 1;
 	memset(&addr,0,sizeof(addr));
 	libtrace_filter_t *filter = FORMAT_DATA->filter;
 
 	/* Create a raw socket for reading packets on */
-	FORMAT_DATA_FIRST->fd =
-		socket(PF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
-	if (FORMAT_DATA_FIRST->fd==-1) {
+	stream->fd = socket(PF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
+	if (stream->fd==-1) {
 		trace_set_err(libtrace, errno, "Could not create raw socket");
-		free(libtrace->format_data);
-		libtrace->format_data = NULL;
 		return -1;
 	}
 
@@ -139,22 +150,19 @@ static int linuxnative_start_input(libtrace_t *libtrace)
 	if (strlen(libtrace->uridata)) {
 		addr.sll_ifindex = if_nametoindex(libtrace->uridata);
 		if (addr.sll_ifindex == 0) {
-			close(FORMAT_DATA_FIRST->fd);
+			linuxnative_close_input_stream(libtrace, stream);
 			trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
 				      "Failed to find interface %s",
 				      libtrace->uridata);
-			free(libtrace->format_data);
-			libtrace->format_data = NULL;
 			return -1;
 		}
 	} else {
 		addr.sll_ifindex = 0;
 	}
-	if (bind(FORMAT_DATA_FIRST->fd,
-		 (struct sockaddr*)&addr,
-		 (socklen_t)sizeof(addr))==-1) {
-		free(libtrace->format_data);
-		libtrace->format_data = NULL;
+	if (bind(stream->fd,
+	         (struct sockaddr*)&addr,
+	         (socklen_t)sizeof(addr))==-1) {
+		linuxnative_close_input_stream(libtrace, stream);
 		trace_set_err(libtrace, errno,
 			      "Failed to bind to interface %s",
 			      libtrace->uridata);
@@ -179,7 +187,7 @@ static int linuxnative_start_input(libtrace_t *libtrace)
 		memset(&mreq,0,sizeof(mreq));
 		mreq.mr_ifindex = addr.sll_ifindex;
 		mreq.mr_type = PACKET_MR_PROMISC;
-		if (setsockopt(FORMAT_DATA_FIRST->fd,
+		if (setsockopt(stream->fd,
 			       SOL_PACKET,
 			       PACKET_ADD_MEMBERSHIP,
 			       &mreq,
@@ -191,7 +199,7 @@ static int linuxnative_start_input(libtrace_t *libtrace)
 	/* Set the timestamp option on the socket - aim for the most detailed
 	 * clock resolution possible */
 #ifdef SO_TIMESTAMPNS
-	if (setsockopt(FORMAT_DATA_FIRST->fd,
+	if (setsockopt(stream->fd,
 		       SOL_SOCKET,
 		       SO_TIMESTAMPNS,
 		       &one,
@@ -202,7 +210,7 @@ static int linuxnative_start_input(libtrace_t *libtrace)
 	/* DANGER: This is a dangling else to only do the next setsockopt()
 	 * if we fail the first! */
 #endif
-		if (setsockopt(FORMAT_DATA_FIRST->fd,
+		if (setsockopt(stream->fd,
 			       SOL_SOCKET,
 			       SO_TIMESTAMP,
 			       &one,
@@ -217,14 +225,18 @@ static int linuxnative_start_input(libtrace_t *libtrace)
 	 * pre-compiled.
 	 */
 	if (filter != NULL) {
-                /* Check if the filter was successfully compiled. If not,
-                 * it is probably a bad filter and we should return an error
-                 * before the caller tries to read any packets */
+		/* Check if the filter was successfully compiled. If not,
+		 * it is probably a bad filter and we should return an error
+		 * before the caller tries to read any packets */
 		if (filter->flag == 0) {
-                        return -1;
-                }
+			linuxnative_close_input_stream(libtrace, stream);
+			trace_set_err(libtrace, TRACE_ERR_BAD_FILTER,
+				      "Cannot attach a bad filter to %s",
+				      libtrace->uridata);
+			return -1;
+		}
 
-		if (setsockopt(FORMAT_DATA_FIRST->fd,
+		if (setsockopt(stream->fd,
 			       SOL_SOCKET,
 			       SO_ATTACH_FILTER,
 			       &filter->filter,
@@ -236,7 +248,7 @@ static int linuxnative_start_input(libtrace_t *libtrace)
 			 * between opening the socket and applying the filter.
 			 */
 			void *buf = malloc((size_t)LIBTRACE_PACKET_BUFSIZE);
-			while(recv(FORMAT_DATA_FIRST->fd,
+			while(recv(stream->fd,
 				   buf,
 				   (size_t)LIBTRACE_PACKET_BUFSIZE,
 				   MSG_DONTWAIT) != -1) { }
@@ -249,6 +261,17 @@ static int linuxnative_start_input(libtrace_t *libtrace)
 	return 0;
 }
 
+static int linuxnative_start_input(libtrace_t *libtrace)
+{
+	int ret = linuxnative_start_input_stream(libtrace, FORMAT_DATA_FIRST);
+	if (ret != 0) {
+		libtrace_list_deinit(FORMAT_DATA->per_stream);
+		free(libtrace->format_data);
+		libtrace->format_data = NULL;
+	}
+	return ret;
+}
+
 /**
  * Converts a socket, either packet_mmap or standard raw socket into a
  * fanout socket.
@@ -257,13 +280,15 @@ static int linuxnative_start_input(libtrace_t *libtrace)
  *
  * @return 0 success, -1 error
  */
-static inline int socket_to_packet_fanout(int fd,
-					  uint16_t fanout_flags,
-					  uint16_t fanout_group)
+static inline int linuxnative_socket_to_packet_fanout(libtrace_t *libtrace,
+                                                      struct linux_per_stream_t *stream)
 {
-	int fanout_opt = ((int)fanout_flags << 16) | (int)fanout_group;
-	if (setsockopt(fd, SOL_PACKET, PACKET_FANOUT,
+	int fanout_opt = ((int)FORMAT_DATA->fanout_flags << 16) | (int)FORMAT_DATA->fanout_group;
+	if (setsockopt(stream->fd, SOL_PACKET, PACKET_FANOUT,
 			&fanout_opt, sizeof(fanout_opt)) == -1) {
+		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
+		              "Converting the fd to a socket fanout failed %s",
+		              libtrace->uridata);
 		return -1;
 	}
 	return 0;
@@ -274,58 +299,50 @@ static int linuxnative_pstart_input(libtrace_t *libtrace) {
 	int tot = libtrace->perpkt_thread_count;
 	int iserror = 0;
 	// We store this here otherwise it will be leaked if the memory doesn't know
-	struct linux_per_thread_t *per_thread = NULL;
-	
-	if (!FORMAT(libtrace->format_data)->per_thread) {
-		//per_thread = calloc(tot, sizeof(struct linux_per_thread_t));
-		posix_memalign((void **)&per_thread, CACHE_LINE_SIZE, tot*sizeof(struct linux_per_thread_t));
-		FORMAT(libtrace->format_data)->per_thread = per_thread;
-	} else {
-		// Whats going on this might not work 100%
-		// We assume all sockets have been closed ;)
-		printf("Pause and then start called again lets hope that perpkt_thread_count hasn't changed\n");
-	}
-	
+	struct linux_per_stream_t empty_stream = ZERO_LINUX_STREAM;
+
 	printf("Calling native pstart packet\n");
 	for (i = 0; i < tot; ++i)
 	{
-		if (FORMAT(libtrace->format_data)->format == TRACE_RT_DATA_LINUX_NATIVE) {
-			if (linuxnative_start_input(libtrace) != 0) {
+		struct linux_per_stream_t *stream;
+		/* Add storage for another stream */
+		if (libtrace_list_get_size(FORMAT_DATA->per_stream) <= (size_t) i)
+			libtrace_list_push_back(FORMAT_DATA->per_stream, &empty_stream);
+
+		stream = libtrace_list_get_index(FORMAT_DATA->per_stream, i)->data;
+		if (FORMAT_DATA->format == TRACE_RT_DATA_LINUX_NATIVE) {
+			if (linuxnative_start_input_stream(libtrace, stream) != 0) {
 				iserror = 1;
 				break;
 			}
 		} else {
+			perror("BAD CODE XXX TODO PUT CODE HERE!!");
 			// This must be ring
+			/*
 			if (linuxring_start_input(libtrace) != 0) {
 				iserror = 1;
 				break;
-			}
+			}*/
 		}
-		if (socket_to_packet_fanout(FORMAT(libtrace->format_data)->fd, FORMAT(libtrace->format_data)->fanout_flags, FORMAT(libtrace->format_data)->fanout_group) != 0)
+		if (linuxnative_socket_to_packet_fanout(libtrace, stream) != 0)
 		{
 			iserror = 1;
-			// Clean up here to keep consistent with every one else
-			trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Converting the fd to a socket fanout failed");
-			close(FORMAT(libtrace->format_data)->fd);
-			free(libtrace->format_data);
-			libtrace->format_data = NULL;
+			close(stream->fd);
+			stream->fd = -1;
 			break;
-		}
-		per_thread[i].fd = FORMAT(libtrace->format_data)->fd;
-		if (FORMAT(libtrace->format_data)->format == TRACE_RT_DATA_LINUX_RING) {
-			per_thread[i].rxring_offset = FORMAT(libtrace->format_data)->rxring_offset;
-			per_thread[i].rx_ring = FORMAT(libtrace->format_data)->rx_ring;
 		}
 	}
 	
-	// Roll back those that failed - by this point in time the format_data
-	// has been freed
+	// Roll back those that failed
 	if (iserror) {
 		for (i = i - 1; i >= 0; i--) {
-			close(per_thread[i].fd);
+			struct linux_per_stream_t *stream;
+			stream = libtrace_list_get_index(FORMAT_DATA->per_stream, i)->data;
+			linuxnative_close_input_stream(libtrace, stream);
 		}
-		free(per_thread);
-		per_thread = NULL;
+		libtrace_list_deinit(FORMAT_DATA->per_stream);
+		free(libtrace->format_data);
+		libtrace->format_data = NULL;
 		return -1;
 	}
 	
@@ -334,21 +351,29 @@ static int linuxnative_pstart_input(libtrace_t *libtrace) {
 
 static int linux_pregister_thread(libtrace_t *libtrace, libtrace_thread_t *t, bool reading) {
 	fprintf(stderr, "registering thread %d!!\n", t->perpkt_num);
-    if (reading) {
-        if(t->type == THREAD_PERPKT) {
-            t->format_data = &FORMAT(libtrace->format_data)->per_thread[t->perpkt_num];
-        } else {
-            t->format_data = &FORMAT(libtrace->format_data)->per_thread[0];
-        }
-    }
-    return 0;
+	if (reading) {
+		/* XXX TODO remove this oneday make sure hasher thread still works */
+		struct linux_per_stream_t *stream;
+		stream = libtrace_list_get_index(FORMAT_DATA->per_stream,
+		                                 t->perpkt_num)->data;
+		t->format_data = stream;
+		if (!stream) {
+			/* This should never happen and indicates an
+			 * internal libtrace bug */
+			trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
+				      "Failed to attached thread %d to a stream",
+				      t->perpkt_num);
+			return -1;
+		}
+	}
+	return 0;
 }
 
 static int linuxnative_start_output(libtrace_out_t *libtrace)
 {
-	DATAOUT(libtrace)->fd =	socket(PF_PACKET, SOCK_RAW, 0);
-	if (DATAOUT(libtrace)->fd==-1) {
-		free(DATAOUT(libtrace));
+	FORMAT_DATA_OUT->fd = socket(PF_PACKET, SOCK_RAW, 0);
+	if (FORMAT_DATA_OUT->fd==-1) {
+		free(FORMAT_DATA_OUT);
 		return -1;
 	}
 
@@ -358,12 +383,13 @@ static int linuxnative_start_output(libtrace_out_t *libtrace)
 
 static int linuxnative_pause_input(libtrace_t *libtrace)
 {
-	libtrace_list_node_t *tmp = FORMAT_DATA_HEAD;
+	size_t i;
 
 	/* Stop and detach each stream */
-	while (tmp != NULL) {
-		close(STREAM_DATA(tmp)->fd);
-		tmp = tmp->next;
+	for (i = 0; i < libtrace_list_get_size(FORMAT_DATA->per_stream); ++i) {
+		struct linux_per_stream_t *stream;
+		stream = libtrace_list_get_index(FORMAT_DATA->per_stream, i)->data;
+		linuxnative_close_input_stream(libtrace, stream);
 	}
 
 	return 0;
@@ -386,8 +412,8 @@ static int linuxnative_fin_input(libtrace_t *libtrace)
 
 static int linuxnative_fin_output(libtrace_out_t *libtrace)
 {
-	close(DATAOUT(libtrace)->fd);
-	DATAOUT(libtrace)->fd=-1;
+	close(FORMAT_DATA_OUT->fd);
+	FORMAT_DATA_OUT->fd=-1;
 	free(libtrace->format_data);
 	return 0;
 }
@@ -430,7 +456,7 @@ static int linuxnative_configure_bpf(libtrace_t *libtrace,
 		dlt = libtrace_to_pcap_dlt(arphrd_type_to_libtrace(arphrd));
 
 		pcap = pcap_open_dead(dlt, 
-				FORMAT(libtrace->format_data)->snaplen);
+				FORMAT_DATA->snaplen);
 
 		if (pcap_compile(pcap, &f->filter, f->filterstring, 0, 0) == -1) {
 		        /* Filter didn't compile, set flag to 0 so we can
@@ -452,10 +478,10 @@ static int linuxnative_configure_bpf(libtrace_t *libtrace,
 		
 	}
 	
-	if (FORMAT(libtrace->format_data)->filter != NULL)
-		free(FORMAT(libtrace->format_data)->filter);
+	if (FORMAT_DATA->filter != NULL)
+		free(FORMAT_DATA->filter);
 	
-	FORMAT(libtrace->format_data)->filter = f;
+	FORMAT_DATA->filter = f;
 	
 	return 0;
 #else
@@ -468,10 +494,10 @@ static int linuxnative_config_input(libtrace_t *libtrace,
 {
 	switch(option) {
 		case TRACE_OPTION_SNAPLEN:
-			FORMAT(libtrace->format_data)->snaplen=*(int*)data;
+			FORMAT_DATA->snaplen=*(int*)data;
 			return 0;
 		case TRACE_OPTION_PROMISC:
-			FORMAT(libtrace->format_data)->promisc=*(int*)data;
+			FORMAT_DATA->promisc=*(int*)data;
 			return 0;
 		case TRACE_OPTION_FILTER:
 		 	return linuxnative_configure_bpf(libtrace, 
@@ -504,12 +530,12 @@ static int linuxnative_pconfig_input(libtrace_t *libtrace,
 			switch (*((enum hasher_types *)data)) {
 				case HASHER_BALANCE:
 					// Do fanout
-					FORMAT(libtrace->format_data)->fanout_flags = PACKET_FANOUT_LB;
+					FORMAT_DATA->fanout_flags = PACKET_FANOUT_LB;
 					// Or we could balance to the CPU
 					return 0;
 				case HASHER_BIDIRECTIONAL:
 				case HASHER_UNIDIRECTIONAL:
-					FORMAT(libtrace->format_data)->fanout_flags = PACKET_FANOUT_HASH;
+					FORMAT_DATA->fanout_flags = PACKET_FANOUT_HASH;
 					return 0;
 				case HASHER_CUSTOM:
 				case HASHER_HARDWARE:
@@ -532,19 +558,19 @@ static int linuxnative_prepare_packet(libtrace_t *libtrace UNUSED,
 		libtrace_packet_t *packet, void *buffer, 
 		libtrace_rt_types_t rt_type, uint32_t flags) {
 
-        if (packet->buffer != buffer &&
-                        packet->buf_control == TRACE_CTRL_PACKET) {
-                free(packet->buffer);
-        }
+	if (packet->buffer != buffer &&
+	    packet->buf_control == TRACE_CTRL_PACKET) {
+		free(packet->buffer);
+	}
 
-        if ((flags & TRACE_PREP_OWN_BUFFER) == TRACE_PREP_OWN_BUFFER) {
-                packet->buf_control = TRACE_CTRL_PACKET;
-        } else
-                packet->buf_control = TRACE_CTRL_EXTERNAL;
+	if ((flags & TRACE_PREP_OWN_BUFFER) == TRACE_PREP_OWN_BUFFER) {
+		packet->buf_control = TRACE_CTRL_PACKET;
+	} else
+		packet->buf_control = TRACE_CTRL_EXTERNAL;
 
 
-        packet->buffer = buffer;
-        packet->header = buffer;
+	packet->buffer = buffer;
+	packet->header = buffer;
 	packet->payload = (char *)buffer + 
 		sizeof(struct libtrace_linuxnative_header);
 	packet->type = rt_type;
@@ -566,8 +592,10 @@ static int linuxnative_prepare_packet(libtrace_t *libtrace UNUSED,
 #define CMSG_BUF_SIZE 128
 
 #ifdef HAVE_NETPACKET_PACKET_H
-libtrace_thread_t * get_thread_table(libtrace_t *libtrace) ;
-inline static int linuxnative_read_packet_fd(libtrace_t *libtrace, libtrace_packet_t *packet, int fd, const int check_queue) 
+inline static int linuxnative_read_stream(libtrace_t *libtrace,
+                                          libtrace_packet_t *packet,
+                                          struct linux_per_stream_t *stream,
+                                          libtrace_message_queue_t *queue)
 {
 	struct libtrace_linuxnative_header *hdr;
 	struct msghdr msghdr;
@@ -577,9 +605,9 @@ inline static int linuxnative_read_packet_fd(libtrace_t *libtrace, libtrace_pack
 	int snaplen;
 
 	uint32_t flags = 0;
-        fd_set readfds;
-        struct timeval tout;
-        int ret;
+	fd_set readfds;
+	struct timeval tout;
+	int ret;
 	
 	if (!packet->buffer || packet->buf_control == TRACE_CTRL_EXTERNAL) {
 		packet->buffer = malloc((size_t)LIBTRACE_PACKET_BUFSIZE);
@@ -595,7 +623,7 @@ inline static int linuxnative_read_packet_fd(libtrace_t *libtrace, libtrace_pack
 	hdr=(struct libtrace_linuxnative_header*)packet->buffer;
 	snaplen=LIBTRACE_MIN(
 			(int)LIBTRACE_PACKET_BUFSIZE-(int)sizeof(*hdr),
-			(int)FORMAT(libtrace->format_data)->snaplen);
+			(int)FORMAT_DATA->snaplen);
 	/* Prepare the msghdr and iovec for the kernel to write the
 	 * captured packet into. The msghdr will point to the part of our
 	 * buffer reserved for sll header, while the iovec will point at
@@ -613,69 +641,58 @@ inline static int linuxnative_read_packet_fd(libtrace_t *libtrace, libtrace_pack
 
 	iovec.iov_base = (void*)(packet->buffer+sizeof(*hdr));
 	iovec.iov_len = snaplen;
-	
-	if (check_queue) {
-		// Check for a packet - TODO only Linux has MSG_DONTWAIT should use fctl O_NONBLOCK
-		hdr->wirelen = recvmsg(fd, &msghdr, MSG_DONTWAIT | MSG_TRUNC);
-		if ((int) hdr->wirelen == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
-			// Do message queue check or select
-			int ret;
-			fd_set rfds;
-			FD_ZERO(&rfds);
-			FD_SET(fd, &rfds);
-			FD_SET(get_thread_table(libtrace)->messages.pipefd[0], &rfds);
-			int largestfd = fd > get_thread_table(libtrace)->messages.pipefd[0] ? fd : get_thread_table(libtrace)->messages.pipefd[0];
-			do {
-				ret = select(largestfd+1, &rfds, NULL, NULL, NULL);
-				if (ret == -1 && errno != EINTR)
-					perror("Select() failed");
-			}
-			while (ret == -1);
-			
-			assert (ret == 1 || ret == 2); // No timeout 0 is not an option
-			
-			if (FD_ISSET(get_thread_table(libtrace)->messages.pipefd[0], &rfds)) {
-				// Not an error but check the message queue we have something
-				return -2;
-			}
-			// Otherwise we must have a packet
-			hdr->wirelen = recvmsg(fd, &msghdr, MSG_TRUNC);
+
+	// Check for a packet - TODO only Linux has MSG_DONTWAIT should use fctl O_NONBLOCK
+	/* Try check ahead this should be fast if something is waiting  */
+	hdr->wirelen = recvmsg(stream->fd, &msghdr, MSG_DONTWAIT | MSG_TRUNC);
+
+	/* No data was waiting */
+	if ((int) hdr->wirelen == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+		/* Do message queue check or select */
+		int message_fd;
+		int largestfd = stream->fd;
+
+		/* Also check the message queue */
+		if (queue) {
+			message_fd = libtrace_message_queue_get_fd(queue);
+			if (message_fd > largestfd)
+				largestfd = message_fd;
 		}
-	} else {
-        /* Use select to allow us to time out occasionally to check if someone
-         * has hit Ctrl-C or otherwise wants us to stop reading and return
-         * so they can exit their program.
-         */
+		do {
+			/* Use select to allow us to time out occasionally to check if someone
+			 * has hit Ctrl-C or otherwise wants us to stop reading and return
+			 * so they can exit their program.
+			 */
+			tout.tv_sec = 0;
+			tout.tv_usec = 500000;
+			/* Make sure we reset these each loop */
+			FD_ZERO(&readfds);
+			FD_SET(stream->fd, &readfds);
+			if (queue)
+				FD_SET(message_fd, &readfds);
 
-        while (1) {
-                tout.tv_sec = 0;
-                tout.tv_usec = 500000;
-                FD_ZERO(&readfds);
-                FD_SET(FORMAT(libtrace->format_data)->fd, &readfds);
+			ret = select(largestfd+1, &readfds, NULL, NULL, &tout);
+			if (ret >= 1) {
+				/* A file descriptor triggered */
+				break;
+			} else if (ret < 0 && errno != EINTR) {
+				trace_set_err(libtrace, errno, "select");
+				return -1;
+			} else {
+				if (libtrace_halt)
+					return READ_EOF;
+			}
+		}
+		while (ret <= 0);
 
-                ret = select(FORMAT(libtrace->format_data)->fd + 1, &readfds,
-                                NULL, NULL, &tout);
-                if (ret < 0 && errno != EINTR) {
-                        trace_set_err(libtrace, errno, "select");
-                        return -1;
-                } else if (ret < 0) {
-                        continue;
-                } 
-                
-                if (FD_ISSET(FORMAT(libtrace->format_data)->fd, &readfds)) {
-                        /* There's something available for us to read */
-                        break;
-                }
+		/* Message waiting? */
+		if (queue && FD_ISSET(message_fd, &readfds))
+			return READ_MESSAGE;
 
-                
-                /* If we get here, we timed out -- check if we should halt */
-                if (libtrace_halt)
-                        return 0;
-        }
-        hdr->wirelen = recvmsg(FORMAT(libtrace->format_data)->fd, &msghdr, MSG_TRUNC);
+		/* We must have a packet */
+		hdr->wirelen = recvmsg(stream->fd, &msghdr, MSG_TRUNC);
 	}
 
-	
 	if (hdr->wirelen==~0U) {
 		trace_set_err(libtrace,errno,"recvmsg");
 		return -1;
@@ -723,7 +740,7 @@ inline static int linuxnative_read_packet_fd(libtrace_t *libtrace, libtrace_pack
 	 * file descriptor directly */
 	if (cmsg == NULL) {
 		struct timeval tv;
-		if (ioctl(fd, SIOCGSTAMP,&tv)==0) {
+		if (ioctl(stream->fd, SIOCGSTAMP,&tv)==0) {
 			hdr->tv.tv_sec = tv.tv_sec;
 			hdr->tv.tv_usec = tv.tv_usec;
 			hdr->timestamptype = TS_TIMEVAL;
@@ -746,8 +763,7 @@ inline static int linuxnative_read_packet_fd(libtrace_t *libtrace, libtrace_pack
 
 static int linuxnative_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) 
 {
-	int fd = FORMAT(libtrace->format_data)->fd;
-	return linuxnative_read_packet_fd(libtrace, packet, fd, 0);
+	return linuxnative_read_stream(libtrace, packet, FORMAT_DATA_FIRST, NULL);
 }
 
 static int linuxnative_pread_packets(libtrace_t *libtrace,
@@ -755,16 +771,15 @@ static int linuxnative_pread_packets(libtrace_t *libtrace,
                                      libtrace_packet_t **packets,
                                      UNUSED size_t nb_packets) {
 	/* For now just read one packet */
-	int fd = PERPKT_FORMAT(t)->fd;
-	packets[0]->error = linuxnative_read_packet_fd(libtrace, packets[0],
-	                                               fd, 1);
+	packets[0]->error = linuxnative_read_stream(libtrace, packets[0],
+	                                               t->format_data, &t->messages);
 	if (packets[0]->error >= 1)
 		return 1;
 	else
 		return packets[0]->error;
 }
 
-static int linuxnative_write_packet(libtrace_out_t *trace, 
+static int linuxnative_write_packet(libtrace_out_t *libtrace,
 		libtrace_packet_t *packet) 
 {
 	struct sockaddr_ll hdr;
@@ -775,7 +790,7 @@ static int linuxnative_write_packet(libtrace_out_t *trace,
 
 	hdr.sll_family = AF_PACKET;
 	hdr.sll_protocol = 0;
-	hdr.sll_ifindex = if_nametoindex(trace->uridata);
+	hdr.sll_ifindex = if_nametoindex(libtrace->uridata);
 	hdr.sll_hatype = 0;
 	hdr.sll_pkttype = 0;
 	hdr.sll_halen = htons(6); /* FIXME */
@@ -783,14 +798,14 @@ static int linuxnative_write_packet(libtrace_out_t *trace,
 
 	/* This is pretty easy, just send the payload using sendto() (after
 	 * setting up the sll header properly, of course) */
-	ret = sendto(DATAOUT(trace)->fd,
+	ret = sendto(FORMAT_DATA_OUT->fd,
 			packet->payload,
 			trace_get_capture_length(packet),
 			0,
 			(struct sockaddr*)&hdr, (socklen_t)sizeof(hdr));
 
 	if (ret < 0) {
-		trace_set_err_out(trace, errno, "sendto failed");
+		trace_set_err_out(libtrace, errno, "sendto failed");
 	}
 
 	return ret;
@@ -895,10 +910,10 @@ static size_t linuxnative_set_capture_length(libtrace_packet_t *packet,
 	return trace_get_capture_length(packet);
 }
 
-static int linuxnative_get_fd(const libtrace_t *trace) {
-	if (trace->format_data == NULL)
+static int linuxnative_get_fd(const libtrace_t *libtrace) {
+	if (libtrace->format_data == NULL)
 		return -1;
-	return FORMAT(trace->format_data)->fd;
+	return FORMAT_DATA_FIRST->fd;
 }
 
 /* Linux doesn't keep track how many packets were seen before filtering
@@ -912,97 +927,80 @@ static uint64_t linuxnative_get_filtered_packets(libtrace_t *trace UNUSED) {
 	return UINT64_MAX;
 }
 
-/* Number of packets that passed filtering */
-static uint64_t linuxnative_get_captured_packets(libtrace_t *trace) {
+#ifdef HAVE_NETPACKET_PACKET_H
+static void linuxnative_update_statistics(libtrace_t *libtrace) {
 	struct tpacket_stats stats;
+	size_t i;
+	socklen_t len = sizeof(stats);
 
-	if (trace->format_data == NULL)
+	for (i = 0; i < libtrace_list_get_size(FORMAT_DATA->per_stream); ++i) {
+		struct linux_per_stream_t *stream;
+		stream = libtrace_list_get_index(FORMAT_DATA->per_stream, i)->data;
+		if (stream->fd != -1) {
+			if (getsockopt(stream->fd,
+			           SOL_PACKET,
+			           PACKET_STATISTICS,
+			           &stats,
+			           &len) == 0) {
+				if (FORMAT_DATA->stats_valid==0) {
+					FORMAT_DATA->stats.tp_drops = stats.tp_drops;
+					FORMAT_DATA->stats.tp_packets = stats.tp_packets;
+					FORMAT_DATA->stats_valid = 1;
+				} else {
+					FORMAT_DATA->stats.tp_drops += stats.tp_drops;
+					FORMAT_DATA->stats.tp_drops += stats.tp_packets;
+				}
+			} else {
+				perror("getsockopt PACKET_STATISTICS failed");
+			}
+		}
+	}
+}
+#endif
+
+/* Number of packets that passed filtering */
+static uint64_t linuxnative_get_captured_packets(libtrace_t *libtrace) {
+	if (libtrace->format_data == NULL)
 		return UINT64_MAX;
-	if (FORMAT(trace->format_data)->fd == -1) {
+	if (FORMAT_DATA_FIRST->fd == -1) {
 		/* This is probably a 'dead' trace so obviously we can't query
 		 * the socket for capture counts, can we? */
 		return UINT64_MAX;
 	}
 
 #ifdef HAVE_NETPACKET_PACKET_H
-
-	if ((FORMAT(trace->format_data)->stats_valid & 1)
-	        || FORMAT(trace->format_data)->stats_valid == 0) {
-		if (FORMAT(trace->format_data)->per_thread) {
-			int i;
-			FORMAT(trace->format_data)->stats.tp_drops = 0;
-			FORMAT(trace->format_data)->stats.tp_packets = 0;
-			for (i = 0; i < trace->perpkt_thread_count; ++i) {
-				socklen_t len = sizeof(stats);
-				getsockopt(FORMAT(trace->format_data)->per_thread[i].fd,
-				           SOL_PACKET,
-				           PACKET_STATISTICS,
-				           &stats,
-				           &len);
-				FORMAT(trace->format_data)->stats.tp_drops += stats.tp_drops;
-				FORMAT(trace->format_data)->stats.tp_packets += stats.tp_packets;
-			}
-			FORMAT(trace->format_data)->stats_valid |= 1;
-		} else {
-			socklen_t len = sizeof(FORMAT(trace->format_data)->stats);
-			getsockopt(FORMAT(trace->format_data)->fd,
-			           SOL_PACKET,
-			           PACKET_STATISTICS,
-			           &FORMAT(trace->format_data)->stats,
-			           &len);
-			FORMAT(trace->format_data)->stats_valid |= 1;
-		}
-	}
-
-	return FORMAT(trace->format_data)->stats.tp_packets;
+	linuxnative_update_statistics(libtrace);
+	if (FORMAT_DATA->stats_valid)
+		return FORMAT_DATA->stats.tp_packets;
+	else
+		return UINT64_MAX;
 #else
 	return UINT64_MAX;
 #endif
 }
 
+
 /* Number of packets that got past filtering and were then dropped because
- * of lack of space
+ * of lack of space.
+ *
+ * We could also try read from /sys/class/net/ethX/statistics/ to get
+ * real drop counters and stuff.
  */
-static uint64_t linuxnative_get_dropped_packets(libtrace_t *trace) {
-	struct tpacket_stats stats;
-	if (trace->format_data == NULL)
+static uint64_t linuxnative_get_dropped_packets(libtrace_t *libtrace) {
+	if (libtrace->format_data == NULL)
 		return UINT64_MAX;
-	if (FORMAT(trace->format_data)->fd == -1) {
+	if (FORMAT_DATA_FIRST->fd == -1) {
 		/* This is probably a 'dead' trace so obviously we can't query
 		 * the socket for drop counts, can we? */
 		return UINT64_MAX;
 	}
 
-#ifdef HAVE_NETPACKET_PACKET_H	
-	if ((FORMAT(trace->format_data)->stats_valid & 2)
-	        || (FORMAT(trace->format_data)->stats_valid==0)) {
-		if (FORMAT(trace->format_data)->per_thread) {
-			int i;
-			FORMAT(trace->format_data)->stats.tp_drops = 0;
-			FORMAT(trace->format_data)->stats.tp_packets = 0;
-			for (i = 0; i < trace->perpkt_thread_count; ++i) {
-				socklen_t len = sizeof(stats);
-				getsockopt(FORMAT(trace->format_data)->per_thread[i].fd,
-				           SOL_PACKET,
-				           PACKET_STATISTICS,
-				           &stats,
-				           &len);
-				FORMAT(trace->format_data)->stats.tp_drops += stats.tp_drops;
-				FORMAT(trace->format_data)->stats.tp_packets += stats.tp_packets;
-			}
-			FORMAT(trace->format_data)->stats_valid |= 2;
-		} else {
-			socklen_t len = sizeof(FORMAT(trace->format_data)->stats);
-			getsockopt(FORMAT(trace->format_data)->fd,
-			           SOL_PACKET,
-			           PACKET_STATISTICS,
-			           &FORMAT(trace->format_data)->stats,
-			           &len);
-			FORMAT(trace->format_data)->stats_valid |= 2;
-		}
-	}
-
-	return FORMAT(trace->format_data)->stats.tp_drops;
+#ifdef HAVE_NETPACKET_PACKET_H
+	linuxnative_update_statistics(libtrace);
+	if (FORMAT_DATA->stats_valid)
+		return FORMAT_DATA->stats.tp_drops;
+	else
+		return UINT64_MAX;
 #else
 	return UINT64_MAX;
 #endif
@@ -1064,7 +1062,7 @@ static struct libtrace_format_t linuxnative = {
 	{true, -1},              /* Live, no thread limit */
 	linuxnative_pstart_input,			/* pstart_input */
 	linuxnative_pread_packets,			/* pread_packets */
-	linuxnative_ppause_input,			/* ppause */
+	linuxnative_pause_input,			/* ppause */
 	linuxnative_fin_input,				/* p_fin */
 	linuxnative_pconfig_input,			/* pconfig input */
 	linux_pregister_thread,

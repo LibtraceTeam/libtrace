@@ -243,6 +243,9 @@ struct linux_per_stream_t {
 	int rxring_offset;
 } ALIGN_STRUCT(CACHE_LINE_SIZE);
 
+#define ZERO_LINUX_STREAM {-1, NULL, 0}
+
+
 /* Format header for encapsulating packets captured using linux native */
 struct libtrace_linuxnative_header {
 	/* Timestamp of the packet, as a timeval */
