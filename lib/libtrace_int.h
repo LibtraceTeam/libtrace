@@ -152,6 +152,7 @@ int snprintf(char *str, size_t size, const char *format, ...);
 #include "data-struct/vector.h"
 #include "data-struct/message_queue.h"
 #include "data-struct/deque.h"
+#include "data-struct/linked_list.h"
 #include "data-struct/sliding_window.h"
 
 //#define RP_BUFSIZE 65536U
@@ -1172,6 +1173,8 @@ void tsh_constructor(void);
 void legacy_constructor(void);
 /** Constructor for the Linux Native format module */
 void linuxnative_constructor(void);
+/** Constructor for the Linux Ring format module */
+void linuxring_constructor(void);
 /** Constructor for the PCAP format module */
 void pcap_constructor(void);
 /** Constructor for the PCAP File format module */

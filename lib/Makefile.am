@@ -5,7 +5,7 @@ AM_CFLAGS=@LIBCFLAGS@ @CFLAG_VISIBILITY@ -pthread
 AM_CXXFLAGS=@LIBCXXFLAGS@ @CFLAG_VISIBILITY@ -pthread
 
 extra_DIST = format_template.c
-NATIVEFORMATS=format_linux.c
+NATIVEFORMATS=format_linux_common.c format_linux_ring.c format_linux_int.c format_linux_common.h
 BPFFORMATS=format_bpf.c
 
 if HAVE_DAG
@@ -20,7 +20,7 @@ endif
 EXTRA_DIST=format_dag24.c format_dag25.c dpdk_libtrace.mk
 
 if HAVE_LLVM
-BPFJITSOURCE=bpf-jit/bpf-jit.cc 
+BPFJITSOURCE=bpf-jit/bpf-jit.cc
 else
 BPFJITSOURCE=
 endif
@@ -28,7 +28,7 @@ endif
 if HAVE_DPDK
 NATIVEFORMATS+= format_dpdk.c
 # So we also make libtrace.mk in dpdk otherwise automake tries to expand
-# it to early which I cannot seem to stop unless we use a path that
+# it too early which I cannot seem to stop unless we use a path that
 # doesn't exist currently
 export RTE_SDK=@RTE_SDK@
 export RTE_TARGET=@RTE_TARGET@
@@ -56,9 +56,11 @@ libtrace_la_SOURCES = trace.c trace_parallel.c common.h \
 		$(DAGSOURCE) format_erf.h \
 		$(BPFJITSOURCE) \
 		libtrace_arphrd.h \
-		data-struct/ring_buffer.c data-struct/vector.c data-struct/message_queue.c \
-		data-struct/deque.c data-struct/sliding_window.c data-struct/object_cache.c \
-		hash_toeplitz.c combiner_ordered.c combiner_sorted.c combiner_unordered.c
+		data-struct/ring_buffer.c data-struct/vector.c \
+		data-struct/message_queue.c data-struct/deque.c \
+		data-struct/sliding_window.c data-struct/object_cache.c \
+		data-struct/linked_list.c hash_toeplitz.c combiner_ordered.c \
+		combiner_sorted.c combiner_unordered.c
 
 if DAG2_4
 nodist_libtrace_la_SOURCES = dagopts.c dagapi.c
