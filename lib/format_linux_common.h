@@ -5,6 +5,9 @@
  * example.
  */
 
+#ifndef FORMAT_LINUX_COMMON_H
+#define FORMAT_LINUX_COMMON_H
+
 #include "libtrace.h"
 #include "libtrace_int.h"
 
@@ -22,19 +25,11 @@
 
 #include <fcntl.h>
 
-/* MAX_ORDER is defined in linux/mmzone.h. 10 is default for 2.4 kernel.
+/* MAX_ORDER is defined in linux/mmzone.h. 11 is default for 3.0 kernels.
  * max_order will be decreased by one if the ring buffer fails to allocate.
- * Used to get correct sized buffers from the kernel.
+ * Used to get the correct sized buffers from the kernel.
  */
-/* TODO: This is set to 11 in atleast the 3.x kernels. We should investigate
- * setting this higher to see if it improves performance. If not, then I guess
- * we can just leave it.
- */
-#define MAX_ORDER 10
-
-/* Cached page size, the page size shouldn't be changing */
-static int pagesize = 0;
-
+#define MAX_ORDER 11
 /* Number of frames in the ring used by both TX and TR rings. More frames 
  * hopefully means less packet loss, especially if traffic comes in bursts.
  */
@@ -194,8 +189,6 @@ struct linux_format_data_t {
 	struct tpacket_stats stats;
 	/* Flag indicating whether the statistics are current or not */
 	int stats_valid;
-	/* The actual format being used - ring vs int */
-	libtrace_rt_types_t format;
 	/* The current ring buffer layout */
 	struct tpacket_req req;
 	/* Used to determine buffer size for the ring buffer */
@@ -205,8 +198,6 @@ struct linux_format_data_t {
 	/* The group lets Linux know which sockets to group together
 	 * so we use a random here to try avoid collisions */
 	uint16_t fanout_group;
-	/* Parent format so we can call parent functions */
-	struct libtrace_format_t *parent_format;
 	/* When running in parallel mode this is malloc'd with an array
 	 * file descriptors from packet fanout will use, here we assume/hope
 	 * that every ring can get setup the same */
@@ -230,8 +221,6 @@ struct linux_format_data_out_t {
 	libtrace_rt_types_t format;
 	/* Used to determine buffer size for the ring buffer */
 	uint32_t max_order;
-	/* Parent format so we can call parent functions */
-	struct libtrace_format_t *parent_format;
 };
 
 struct linux_per_stream_t {
@@ -243,7 +232,7 @@ struct linux_per_stream_t {
 	int rxring_offset;
 } ALIGN_STRUCT(CACHE_LINE_SIZE);
 
-#define ZERO_LINUX_STREAM {-1, NULL, 0}
+#define ZERO_LINUX_STREAM {-1, MAP_FAILED, 0}
 
 
 /* Format header for encapsulating packets captured using linux native */
@@ -276,9 +265,6 @@ struct libtrace_linuxnative_header {
 #define FORMAT_DATA DATA(libtrace)
 #define FORMAT_DATA_OUT DATA_OUT(libtrace)
 
-#define PARENT FORMAT_DATA->parent_format
-#define PARENT_OUT FORMAT_DATA_OUT->parent_format
-
 #define FORMAT_DATA_HEAD FORMAT_DATA->per_stream->head
 #define FORMAT_DATA_FIRST ((struct linux_per_stream_t *)FORMAT_DATA_HEAD->data)
 
@@ -286,61 +272,39 @@ struct libtrace_linuxnative_header {
 #define GET_SOCKADDR_HDR(x)  ((struct sockaddr_ll *) (((char *) (x))\
 	+ TPACKET_ALIGN(sizeof(struct tpacket2_hdr))))
 
-/* TODO: Decide if inheritance is how we want to do this. Basically, ring is
- * a subclass of native and so it makes sense to reuse the native code where
- * possible. Moving ring into a new file really helps with readability, and
- * also helps us not carry so much ring data around in the native format. */
-struct libtrace_format_t *get_native_format(void);
+/* Common functions */
+#ifdef HAVE_NETPACKET_PACKET_H
+int linuxcommon_init_input(libtrace_t *libtrace);
+int linuxcommon_init_output(libtrace_out_t *libtrace);
+int linuxcommon_probe_filename(const char *filename);
+int linuxcommon_config_input(libtrace_t *libtrace, trace_option_t option,
+                             void *data);
+void linuxcommon_close_input_stream(libtrace_t *libtrace,
+                                    struct linux_per_stream_t *stream);
+int linuxcommon_start_input_stream(libtrace_t *libtrace,
+                                   struct linux_per_stream_t *stream);
+inline int linuxcommon_to_packet_fanout(libtrace_t *libtrace,
+                                        struct linux_per_stream_t *stream);
+int linuxcommon_pause_input(libtrace_t *libtrace);
+int linuxcommon_get_fd(const libtrace_t *libtrace);
+int linuxcommon_fin_input(libtrace_t *libtrace);
+int linuxcommon_pconfig_input(libtrace_t *libtrace,
+                              trace_parallel_option_t option,
+                              void *data);
+int linuxcommon_pregister_thread(libtrace_t *libtrace,
+                                 libtrace_thread_t *t,
+                                 bool reading);
+int linuxcommon_pstart_input(libtrace_t *libtrace,
+                             int (*start_stream)(libtrace_t *, struct linux_per_stream_t*));
+#endif /* HAVE_NETPACKET_PACKET_H */
 
-static inline libtrace_linktype_t get_libtrace_link_type(uint16_t linktype)
-{
-	/* Convert the ARPHRD type into an appropriate libtrace link type */
-	switch (linktype) {
-		case LIBTRACE_ARPHRD_ETHER:
-		case LIBTRACE_ARPHRD_LOOPBACK:
-			return TRACE_TYPE_ETH;
-		case LIBTRACE_ARPHRD_PPP:
-			return TRACE_TYPE_NONE;
-		case LIBTRACE_ARPHRD_IEEE80211_RADIOTAP:
-			return TRACE_TYPE_80211_RADIO;
-		case LIBTRACE_ARPHRD_IEEE80211:
-			return TRACE_TYPE_80211;
-		case LIBTRACE_ARPHRD_SIT:
-		case LIBTRACE_ARPHRD_NONE:
-			return TRACE_TYPE_NONE;
-		default: /* shrug, beyond me! */
-			printf("unknown Linux ARPHRD type 0x%04x\n",linktype);
-			return (libtrace_linktype_t)~0U;
-	}
-}
+uint64_t linuxcommon_get_captured_packets(libtrace_t *libtrace);
+uint64_t linuxcommon_get_filtered_packets(libtrace_t *libtrace);
+uint64_t linuxcommon_get_dropped_packets(libtrace_t *libtrace);
+inline libtrace_direction_t linuxcommon_get_direction(uint8_t pkttype);
+inline libtrace_direction_t linuxcommon_set_direction(struct sockaddr_ll * skadr,
+                                                 libtrace_direction_t direction);
+inline libtrace_linktype_t linuxcommon_get_link_type(uint16_t linktype);
 
-static inline libtrace_direction_t get_libtrace_direction(uint8_t pkttype)
-{
-	switch (pkttype) {
-		case PACKET_OUTGOING:
-		case PACKET_LOOPBACK:
-			return TRACE_DIR_OUTGOING;
-		case PACKET_OTHERHOST:
-			return TRACE_DIR_OTHER;
-		default:
-			return TRACE_DIR_INCOMING;
-	}
-}
 
-static libtrace_direction_t set_direction(struct sockaddr_ll * skadr,
-					  libtrace_direction_t direction)
-{
-	switch (direction) {
-		case TRACE_DIR_OUTGOING:
-			skadr->sll_pkttype = PACKET_OUTGOING;
-			return TRACE_DIR_OUTGOING;
-		case TRACE_DIR_INCOMING:
-			skadr->sll_pkttype = PACKET_HOST;
-			return TRACE_DIR_INCOMING;
-		case TRACE_DIR_OTHER:
-			skadr->sll_pkttype = PACKET_OTHERHOST;
-			return TRACE_DIR_OTHER;
-		default:
-			return -1;
-	}
-}
+#endif /* FORMAT_LINUX_COMMON_H */

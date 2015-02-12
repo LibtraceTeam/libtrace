@@ -1167,6 +1167,8 @@ void tsh_constructor(void);
 void legacy_constructor(void);
 /** Constructor for the Linux Native format module */
 void linuxnative_constructor(void);
+/** Constructor for the Linux Ring format module */
+void linuxring_constructor(void);
 /** Constructor for the PCAP format module */
 void pcap_constructor(void);
 /** Constructor for the PCAP File format module */

@@ -60,13 +60,13 @@
 # error "Can't find inttypes.h"
 #endif
 
-#include "format_linux.h"
+#include "format_linux_common.h"
 
 #ifdef HAVE_NETPACKET_PACKET_H
 /* Get current frame in the ring buffer*/
-#define GET_CURRENT_BUFFER(libtrace) \
-	((void *)FORMAT_DATA_FIRST->rx_ring +				\
-	 (FORMAT_DATA_FIRST->rxring_offset *				\
+#define GET_CURRENT_BUFFER(libtrace, stream) \
+	((void *)stream->rx_ring +				\
+	 (stream->rxring_offset *				\
 	  FORMAT_DATA->req.tp_frame_size))
 #endif
 
@@ -75,6 +75,8 @@
  */
 #define TP_TRACE_START(mac, net, hdrend) \
 	((mac) > (hdrend) && (mac) < (net) ? (mac) : (net))
+/* Cached page size, the page size shouldn't be changing */
+static int pagesize = 0;
 
 /*
  * Try figure out the best sizes for the ring buffer. Ensure that:
@@ -150,7 +152,7 @@ static void calculate_buffers(struct tpacket_req * req, int fd, char * uri,
 	assert(req->tp_block_size % req->tp_frame_size == 0);
 }
 
-static inline int socket_to_packetmmap(	char * uridata, int ring_type,
+static inline int socket_to_packetmmap(char * uridata, int ring_type,
 					int fd,
 					struct tpacket_req * req,
 					char ** ring_location,
@@ -175,6 +177,7 @@ static inline int socket_to_packetmmap(	char * uridata, int ring_type,
 	 * retry.
 	 */
 	while(1) {
+		fprintf(stderr, "max_order=%d\n", *max_order);
 		if (*max_order <= 0) {
 			strncpy(error,
 				"Cannot allocate enough memory for ring buffer",
@@ -198,6 +201,7 @@ static inline int socket_to_packetmmap(	char * uridata, int ring_type,
 
 		} else break;
 	}
+	fprintf(stderr, "max_order=%d\n", *max_order);
 
 	/* Map the ring buffer into userspace */
 	*ring_location = mmap(NULL,
@@ -213,7 +217,7 @@ static inline int socket_to_packetmmap(	char * uridata, int ring_type,
 
 /* Release a frame back to the kernel or free() if it's a malloc'd buffer
  */
-inline static void ring_release_frame(libtrace_t *libtrace,
+inline static void ring_release_frame(libtrace_t *libtrace UNUSED,
 				      libtrace_packet_t *packet)
 {
 	/* Free the old packet */
@@ -226,8 +230,7 @@ inline static void ring_release_frame(libtrace_t *libtrace,
 	}
 
 	if(packet->buf_control == TRACE_CTRL_EXTERNAL) {
-		struct linux_format_data_t *ftd = FORMAT_DATA;
-
+		//struct linux_format_data_t *ftd = FORMAT_DATA;
 		/* Check it's within our buffer first - consider the pause
 		 * resume case it might have already been free'd lets hope we
 		 * get another buffer */
@@ -243,45 +246,28 @@ inline static void ring_release_frame(libtrace_t *libtrace,
 	}
 }
 
-static int linuxring_init_input(libtrace_t *libtrace)
-{
-	/* Used to bootstrap the format data. We also save it later as it's very
-	 * useful to us. */
-	struct libtrace_format_t *parent = get_native_format();
+static inline int linuxring_start_input_stream(libtrace_t *libtrace,
+                                               struct linux_per_stream_t *stream) {
+	char error[2048];
 
-	/* This function will allocate the format data memory as well as
-	 * initialising all the native relevant fields. Anything native doesn't
-	 * touch will be touched here. */
-	parent->init_input(libtrace);
+	/* We set the socket up the same and then convert it to PACKET_MMAP */
+	if (linuxcommon_start_input_stream(libtrace, stream) < 0)
+		return -1;
 
-	FORMAT_DATA->format = TRACE_RT_DATA_LINUX_RING;
-	FORMAT_DATA->parent_format = parent;
+	strncpy(error, "No known error", 2048);
 
-	FORMAT_DATA_FIRST->rx_ring = NULL;
-	FORMAT_DATA_FIRST->rxring_offset = 0;
-	FORMAT_DATA->max_order = MAX_ORDER;
-
-	/* If we haven't already, we need to update all the fields in our
-	 * format to point to the relevant fields in the parent format */
-	if (libtrace->format->get_filtered_packets == NULL) {
-#ifdef HAVE_NETPACKET_PACKET_H
-		libtrace->format->probe_filename = parent->probe_filename;
-		libtrace->format->config_input = parent->config_input;
-		libtrace->format->fin_input = parent->fin_input;
-
-		libtrace->format->pstart_input = parent->pstart_input;
-		libtrace->format->ppause_input = parent->ppause_input;
-		libtrace->format->pfin_input = parent->fin_input;
-		libtrace->format->pconfig_input = parent->pconfig_input;
-		libtrace->format->pregister_thread = parent->pregister_thread;
-#endif
-		libtrace->format->get_filtered_packets =
-			parent->get_filtered_packets;
-		libtrace->format->get_dropped_packets =
-			parent->get_dropped_packets;
-		libtrace->format->get_captured_packets =
-			parent->get_captured_packets;
-		libtrace->format->get_fd = parent->get_fd;
+	/* Make it a packetmmap */
+	if(socket_to_packetmmap(libtrace->uridata, PACKET_RX_RING,
+	                        stream->fd,
+	                        &FORMAT_DATA->req,
+	                        &stream->rx_ring,
+	                        &FORMAT_DATA->max_order,
+	                        error) != 0) {
+		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
+		              "Initialisation of packet MMAP failed: %s",
+		              error);
+		linuxcommon_close_input_stream(libtrace, stream);
+		return -1;
 	}
 
 	return 0;
@@ -289,88 +275,28 @@ static int linuxring_init_input(libtrace_t *libtrace)
 
 static int linuxring_start_input(libtrace_t *libtrace)
 {
-	char error[2048];
-
-	/* We set the socket up the same and then convert it to PACKET_MMAP */
-	if(PARENT->start_input(libtrace) != 0)
-		return -1;
-
-	strncpy(error, "No known error", 2048);
-
-	/* Make it a packetmmap */
-	if(socket_to_packetmmap(libtrace->uridata, PACKET_RX_RING,
-				FORMAT_DATA_FIRST->fd,
-				&FORMAT_DATA->req,
-				&FORMAT_DATA_FIRST->rx_ring,
-				&FORMAT_DATA->max_order,
-				error) != 0) {
-		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
-			      "Initialisation of packet MMAP failed: %s",
-			      error);
-		close(FORMAT_DATA_FIRST->fd);
+	int ret = linuxring_start_input_stream(libtrace, FORMAT_DATA_FIRST);
+	if (ret != 0) {
+		libtrace_list_deinit(FORMAT_DATA->per_stream);
 		free(libtrace->format_data);
 		libtrace->format_data = NULL;
-		return -1;
 	}
-
-	return 0;
+	return ret;
 }
 
-static int linuxring_pause_input(libtrace_t *libtrace)
-{
-	munmap(FORMAT_DATA_FIRST->rx_ring,
-	       FORMAT_DATA->req.tp_block_size *
-	       FORMAT_DATA->req.tp_block_nr);
-	FORMAT_DATA_FIRST->rx_ring = NULL;
-	return PARENT->pause_input(libtrace);
-}
-
-static int linuxring_init_output(libtrace_out_t *libtrace)
-{
-	/* Used to bootstrap the format data. We also save it later as it's very
-	 * useful to us. */
-	struct libtrace_format_t *parent = get_native_format();
-
-	/* This function will allocate the format data memory as well as
-	 * initialising all the native relevant fields. Anything native doesn't
-	 * touch will be touched here. */
-	parent->init_output(libtrace);
-
-	FORMAT_DATA_OUT->format = TRACE_FORMAT_LINUX_RING;
-	FORMAT_DATA_OUT->parent_format = parent;
-
-	/* If we haven't already, we need to update all the fields in our
-	 * format to point to the relevant fields in the parent format */
-	if (libtrace->format->get_filtered_packets == NULL) {
-#ifdef HAVE_NETPACKET_PACKET_H
-		libtrace->format->probe_filename = parent->probe_filename;
-		libtrace->format->config_input = parent->config_input;
-		libtrace->format->fin_input = parent->fin_input;
-
-		libtrace->format->pstart_input = parent->pstart_input;
-		libtrace->format->ppause_input = parent->ppause_input;
-		libtrace->format->pfin_input = parent->fin_input;
-		libtrace->format->pconfig_input = parent->pconfig_input;
-		libtrace->format->pregister_thread = parent->pregister_thread;
-#endif
-		libtrace->format->get_filtered_packets =
-			parent->get_filtered_packets;
-		libtrace->format->get_dropped_packets =
-			parent->get_dropped_packets;
-		libtrace->format->get_captured_packets =
-			parent->get_captured_packets;
-		libtrace->format->get_fd = parent->get_fd;
-	}
-
-	return 0;
+static int linuxring_pstart_input(libtrace_t *libtrace) {
+	return linuxcommon_pstart_input(libtrace, linuxring_start_input_stream);
 }
 
 static int linuxring_start_output(libtrace_out_t *libtrace)
 {
 	char error[2048];
-	/* We set the socket up the same and then convert it to PACKET_MMAP */
-	if (PARENT_OUT->start_output(libtrace) != 0)
+	FORMAT_DATA_OUT->fd = socket(PF_PACKET, SOCK_RAW, 0);
+	if (FORMAT_DATA_OUT->fd==-1) {
+		free(FORMAT_DATA_OUT);
+		trace_set_err_out(libtrace, errno, "Failed to create raw socket");
 		return -1;
+	}
 
 	/* Make it a packetmmap */
 	if(socket_to_packetmmap(libtrace->uridata, PACKET_TX_RING,
@@ -415,161 +341,88 @@ static int linuxring_fin_output(libtrace_out_t *libtrace)
 	       FORMAT_DATA_OUT->req.tp_block_size *
 	       FORMAT_DATA_OUT->req.tp_block_nr);
 
-	return PARENT_OUT->fin_output(libtrace);
+	/* Free the socket */
+	close(FORMAT_DATA_OUT->fd);
+	FORMAT_DATA_OUT->fd=-1;
+	free(libtrace->format_data);
+	return 0;
 }
 
-static int linuxring_read_packet(libtrace_t *libtrace,
-				 libtrace_packet_t *packet)
+static libtrace_linktype_t
+linuxring_get_link_type(const struct libtrace_packet_t *packet)
 {
-	/* Read a single packet from the ring at FORMAT_DATA_FIRST */
-	return -1;
+	uint16_t linktype = GET_SOCKADDR_HDR(packet->buffer)->sll_hatype;
+	return linuxcommon_get_link_type(linktype);
 }
 
-static int linuxring_pread_packets(libtrace_t *libtrace,
-				   libtrace_thread_t *t,
-				   libtrace_packet_t **packets,
-				   size_t nb_packets)
+static libtrace_direction_t
+linuxring_get_direction(const struct libtrace_packet_t *packet) {
+	return linuxcommon_get_direction(GET_SOCKADDR_HDR(packet->buffer)->
+	                                 sll_pkttype);
+}
+
+static libtrace_direction_t
+linuxring_set_direction(libtrace_packet_t *packet,
+			libtrace_direction_t direction) {
+	return linuxcommon_set_direction(GET_SOCKADDR_HDR(packet->buffer), direction);
+}
+
+static struct timeval linuxring_get_timeval(const libtrace_packet_t *packet)
 {
-	struct linux_per_stream_t *stream_data =
-		(struct linux_per_stream_t *)t->format_data;
-	return -1;
+	struct timeval tv;
+	tv.tv_sec = TO_TP_HDR2(packet->buffer)->tp_sec;
+	tv.tv_usec = TO_TP_HDR2(packet->buffer)->tp_nsec / 1000;
+	return tv;
 }
 
-#if 0
-/* This is the way we used to do it. Might be useful to copy some of this
- * into the new code */
-inline static int linuxring_read_packet_fd(libtrace_t *libtrace, libtrace_packet_t *packet, int fd, int *rxring_offset, char *rx_ring, int message) {
+static struct timespec linuxring_get_timespec(const libtrace_packet_t *packet)
+{
+	struct timespec ts;
+	ts.tv_sec = TO_TP_HDR2(packet->buffer)->tp_sec;
+	ts.tv_nsec = TO_TP_HDR2(packet->buffer)->tp_nsec;
+	return ts;
+}
 
-	struct tpacket2_hdr *header;
-	int ret;
-	unsigned int snaplen;
-	
-	ring_release_frame(libtrace, packet);
-	
-	packet->buf_control = TRACE_CTRL_EXTERNAL;
-	packet->type = TRACE_RT_DATA_LINUX_RING;
-	
-	/* Fetch the current frame */
-	header = ((void*) rx_ring) + *rxring_offset * FORMAT(libtrace->format_data)->req.tp_frame_size; // GET_CURRENT_BUFFER(libtrace);
-	assert((((unsigned long) header) & (pagesize - 1)) == 0);
+static int linuxring_get_capture_length(const libtrace_packet_t *packet)
+{
+	return TO_TP_HDR2(packet->buffer)->tp_snaplen;
+}
 
-	/* TP_STATUS_USER means that we can use the frame.
-	 * When a slot does not have this flag set, the frame is not
-	 * ready for consumption.
+static int linuxring_get_wire_length(const libtrace_packet_t *packet)
+{
+	int wirelen = TO_TP_HDR2(packet->buffer)->tp_len;
+
+	/* Include the missing FCS */
+	if (trace_get_link_type(packet) == TRACE_TYPE_ETH)
+		wirelen += 4;
+
+	return wirelen;
+}
+
+static int linuxring_get_framing_length(const libtrace_packet_t *packet)
+{
+	/*
+	 * Need to make frame_length + capture_length = complete capture length
+	 * so include alignment whitespace. So reverse calculate from packet.
 	 */
-	while (!(header->tp_status & TP_STATUS_USER)) {
-		if (message) {
-			struct pollfd pollset[2];
-			pollset[0].fd = fd;
-			pollset[0].events = POLLIN;
-			pollset[0].revents = 0;
-			pollset[1].fd = libtrace_message_queue_get_fd(&get_thread_table(libtrace)->messages);
-			pollset[1].events = POLLIN;
-			pollset[1].revents = 0;
-			/* Wait for more data or a message*/
-			ret = poll(pollset, 2, -1);
-			if (ret < 0) {
-				if (errno != EINTR)
-					trace_set_err(libtrace,errno,"poll()");
-				return -1;
-			}
-			/* A message is ready */
-			if (pollset[1].revents)
-				return -2;
-		} else {
-			struct pollfd pollset;
-			pollset.fd = fd;
-			pollset.events = POLLIN;
-			pollset.revents = 0;
+	return (char *)packet->payload - (char *)packet->buffer;
+}
 
-			/* Wait for more data or a message*/
-			ret = poll(&pollset, 1, 500);
-			if (ret < 0) {
-				if (errno != EINTR)
-					trace_set_err(libtrace,errno,"poll()");
-				return -1;
-			} else if (ret == 0) {
-				/* Poll timed out - check if we should exit */
-				if (libtrace_halt)
-					return 0;
-				continue;
-			}
-		}
+static size_t linuxring_set_capture_length(libtrace_packet_t *packet,
+					   size_t size)
+{
+	assert(packet);
+	if (size > trace_get_capture_length(packet)) {
+		/* We should avoid making a packet larger */
+		return trace_get_capture_length(packet);
 	}
 
-	packet->buffer = header;
+	/* Reset the cached capture length */
+	packet->capture_length = -1;
 
-	/* If a snaplen was configured, automatically truncate the packet to
-	 * the desired length.
-	 */
-	snaplen=LIBTRACE_MIN(
-			(int)LIBTRACE_PACKET_BUFSIZE-(int)sizeof(*header),
-			(int)FORMAT(libtrace->format_data)->snaplen);
-	
-	TO_TP_HDR2(packet->buffer)->tp_snaplen = LIBTRACE_MIN((unsigned int)snaplen, TO_TP_HDR2(packet->buffer)->tp_len);
+	TO_TP_HDR2(packet->buffer)->tp_snaplen = size;
 
-	/* Move to next buffer */
-  	(*rxring_offset)++;
-	*rxring_offset %= FORMAT(libtrace->format_data)->req.tp_frame_nr;
-
-	/* We just need to get prepare_packet to set all our packet pointers
-	 * appropriately */
-	if (linuxring_prepare_packet(libtrace, packet, packet->buffer,
-				packet->type, 0))
-		return -1;
-	return  linuxring_get_framing_length(packet) + 
-				linuxring_get_capture_length(packet);
-
-}
-
-static int linuxring_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
-	int fd = FORMAT(libtrace->format_data)->fd;
-	int *rxring_offset = &FORMAT(libtrace->format_data)->rxring_offset;
-	char *rx_ring = FORMAT(libtrace->format_data)->rx_ring;
-	return linuxring_read_packet_fd(libtrace, packet, fd, rxring_offset, rx_ring, 0);
-}
-
-static int linuxring_pread_packets(libtrace_t *libtrace,
-                                   libtrace_thread_t *t,
-                                   libtrace_packet_t **packets,
-                                   UNUSED size_t nb_packets) {
-	//fprintf(stderr, "Thread number is #%d\n", t->perpkt_num);
-	int fd = PERPKT_FORMAT(t)->fd;
-	int *rxring_offset = &PERPKT_FORMAT(t)->rxring_offset;
-	char *rx_ring = PERPKT_FORMAT(t)->rx_ring;
-	packets[0]->error = linuxring_read_packet_fd(libtrace, packets[0], fd,
-	                                             rxring_offset, rx_ring, 1);
-	if (packets[0]->error >= 1)
-		return 1;
-	else
-		return packets[0]->error;
-}
-#endif /* 0 */
-
-/* Non-blocking read */
-static libtrace_eventobj_t linuxring_event(libtrace_t *libtrace,
-					   libtrace_packet_t *packet)
-{
-	struct tpacket2_hdr *header;
-	libtrace_eventobj_t event = {0,0,0.0,0};
-
-	/* We must free the old packet, otherwise select() will instantly
-	 * return */
-	ring_release_frame(libtrace, packet);
-
-	/* Fetch the current frame */
-	header = GET_CURRENT_BUFFER(libtrace);
-	if (header->tp_status & TP_STATUS_USER) {
-		/* We have a frame waiting */
-		event.size = trace_read_packet(libtrace, packet);
-		event.type = TRACE_EVENT_PACKET;
-	} else {
-		/* Ok we don't have a packet waiting */
-		event.type = TRACE_EVENT_IOWAIT;
-		event.fd = FORMAT_DATA_FIRST->fd;
-	}
-
-	return event;
+	return trace_get_capture_length(packet);
 }
 
 static int linuxring_prepare_packet(libtrace_t *libtrace UNUSED,
@@ -597,6 +450,125 @@ static int linuxring_prepare_packet(libtrace_t *libtrace UNUSED,
 
 	return 0;
 }
+#define LIBTRACE_MIN(a,b) ((a)<(b) ? (a) : (b))
+inline static int linuxring_read_stream(libtrace_t *libtrace,
+                                        libtrace_packet_t *packet,
+                                        struct linux_per_stream_t *stream,
+                                        libtrace_message_queue_t *queue) {
+
+	struct tpacket2_hdr *header;
+	int ret;
+	unsigned int snaplen;
+	struct pollfd pollset[2];
+
+	ring_release_frame(libtrace, packet);
+	
+	packet->buf_control = TRACE_CTRL_EXTERNAL;
+	packet->type = TRACE_RT_DATA_LINUX_RING;
+	
+	/* Fetch the current frame */
+	header = GET_CURRENT_BUFFER(libtrace, stream);
+	assert((((unsigned long) header) & (pagesize - 1)) == 0);
+
+	/* TP_STATUS_USER means that we can use the frame.
+	 * When a slot does not have this flag set, the frame is not
+	 * ready for consumption.
+	 */
+	while (!(header->tp_status & TP_STATUS_USER)) {
+		pollset[0].fd = stream->fd;
+		pollset[0].events = POLLIN;
+		pollset[0].revents = 0;
+		if (queue) {
+			pollset[1].fd = libtrace_message_queue_get_fd(queue);
+			pollset[1].events = POLLIN;
+			pollset[1].revents = 0;
+		}
+		/* Wait for more data or a message*/
+		ret = poll(pollset, (queue ? 2 : 1), -1);
+		if (ret > 0) {
+			if (pollset[0].revents)
+				continue;
+			else
+				return READ_MESSAGE;
+		} else if (ret < 0) {
+			if (errno != EINTR)
+			trace_set_err(libtrace,errno,"poll()");
+			return -1;
+		} else {
+			/* Poll timed out - check if we should exit */
+			if (libtrace_halt)
+				return 0;
+			continue;
+		}
+	}
+
+	packet->buffer = header;
+
+	/* If a snaplen was configured, automatically truncate the packet to
+	 * the desired length.
+	 */
+	snaplen=LIBTRACE_MIN(
+			(int)LIBTRACE_PACKET_BUFSIZE-(int)sizeof(*header),
+			(int)FORMAT_DATA->snaplen);
+	
+	TO_TP_HDR2(packet->buffer)->tp_snaplen = LIBTRACE_MIN((unsigned int)snaplen, TO_TP_HDR2(packet->buffer)->tp_len);
+
+	/* Move to next buffer */
+  	stream->rxring_offset++;
+	stream->rxring_offset %= FORMAT_DATA->req.tp_frame_nr;
+
+	/* We just need to get prepare_packet to set all our packet pointers
+	 * appropriately */
+	if (linuxring_prepare_packet(libtrace, packet, packet->buffer,
+				packet->type, 0))
+		return -1;
+	return  linuxring_get_framing_length(packet) + 
+				linuxring_get_capture_length(packet);
+
+}
+
+static int linuxring_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
+	return linuxring_read_stream(libtrace, packet, FORMAT_DATA_FIRST, NULL);
+}
+
+static int linuxring_pread_packets(libtrace_t *libtrace,
+                                   libtrace_thread_t *t,
+                                   libtrace_packet_t *packets[],
+                                   UNUSED size_t nb_packets) {
+	/* For now just read one packet */
+	packets[0]->error = linuxring_read_stream(libtrace, packets[0],
+	                                          t->format_data, &t->messages);
+	if (packets[0]->error >= 1)
+		return 1;
+	else
+		return packets[0]->error;
+}
+
+/* Non-blocking read */
+static libtrace_eventobj_t linuxring_event(libtrace_t *libtrace,
+					   libtrace_packet_t *packet)
+{
+	struct tpacket2_hdr *header;
+	libtrace_eventobj_t event = {0,0,0.0,0};
+
+	/* We must free the old packet, otherwise select() will instantly
+	 * return */
+	ring_release_frame(libtrace, packet);
+
+	/* Fetch the current frame */
+	header = GET_CURRENT_BUFFER(libtrace, FORMAT_DATA_FIRST);
+	if (header->tp_status & TP_STATUS_USER) {
+		/* We have a frame waiting */
+		event.size = trace_read_packet(libtrace, packet);
+		event.type = TRACE_EVENT_PACKET;
+	} else {
+		/* Ok we don't have a packet waiting */
+		event.type = TRACE_EVENT_IOWAIT;
+		event.fd = FORMAT_DATA_FIRST->fd;
+	}
+
+	return event;
+}
 
 /**
  * Free any resources being kept for this packet, Note: libtrace
@@ -612,11 +584,12 @@ static void linuxring_fin_packet(libtrace_packet_t *packet)
 
 	/* If we own the packet (i.e. it's not a copy), we need to free it */
 	if (packet->buf_control == TRACE_CTRL_EXTERNAL) {
-		/* Started should always match the existence of the rx_ring */
+		/* Started should always match the existence of the rx_ring
+		 * in the parallel case still just check the first ring */
 		assert(!!FORMAT_DATA_FIRST->rx_ring ==
 		       !!packet->trace->started);
 		/* If we don't have a ring its already been destroyed */
-		if (FORMAT_DATA_FIRST->rx_ring)
+		if (FORMAT_DATA_FIRST->rx_ring != MAP_FAILED)
 			ring_release_frame(packet->trace, packet);
 		else
 			packet->buffer = NULL;
@@ -705,83 +678,6 @@ static int linuxring_write_packet(libtrace_out_t *libtrace,
 
 }
 
-static libtrace_linktype_t
-linuxring_get_link_type(const struct libtrace_packet_t *packet)
-{
-	uint16_t linktype = GET_SOCKADDR_HDR(packet->buffer)->sll_hatype;
-	return get_libtrace_link_type(linktype);
-}
-
-static libtrace_direction_t
-linuxring_get_direction(const struct libtrace_packet_t *packet) {
-	return get_libtrace_direction(GET_SOCKADDR_HDR(packet->buffer)->
-				      sll_pkttype);
-}
-
-static libtrace_direction_t
-linuxring_set_direction(libtrace_packet_t *packet,
-			libtrace_direction_t direction) {
-	return set_direction(GET_SOCKADDR_HDR(packet->buffer), direction);
-}
-
-static struct timeval linuxring_get_timeval(const libtrace_packet_t *packet)
-{
-	struct timeval tv;
-	tv.tv_sec = TO_TP_HDR2(packet->buffer)->tp_sec;
-	tv.tv_usec = TO_TP_HDR2(packet->buffer)->tp_nsec / 1000;
-	return tv;
-}
-
-static struct timespec linuxring_get_timespec(const libtrace_packet_t *packet)
-{
-	struct timespec ts;
-	ts.tv_sec = TO_TP_HDR2(packet->buffer)->tp_sec;
-	ts.tv_nsec = TO_TP_HDR2(packet->buffer)->tp_nsec;
-	return ts;
-}
-
-static int linuxring_get_capture_length(const libtrace_packet_t *packet)
-{
-	return TO_TP_HDR2(packet->buffer)->tp_snaplen;
-}
-
-static int linuxring_get_wire_length(const libtrace_packet_t *packet)
-{
-	int wirelen = TO_TP_HDR2(packet->buffer)->tp_len;
-
-	/* Include the missing FCS */
-	if (trace_get_link_type(packet) == TRACE_TYPE_ETH)
-		wirelen += 4;
-
-	return wirelen;
-}
-
-static int linuxring_get_framing_length(const libtrace_packet_t *packet)
-{
-	/*
-	 * Need to make frame_length + capture_length = complete capture length
-	 * so include alligment whitespace. So reverse calculate from packet.
-	 */
-	return (char *)packet->payload - (char *)packet->buffer;
-}
-
-static size_t linuxring_set_capture_length(libtrace_packet_t *packet,
-					   size_t size)
-{
-	assert(packet);
-	if (size > trace_get_capture_length(packet)) {
-		/* We should avoid making a packet larger */
-		return trace_get_capture_length(packet);
-	}
-
-	/* Reset the cached capture length */
-	packet->capture_length = -1;
-
-	TO_TP_HDR2(packet->buffer)->tp_snaplen = size;
-
-	return trace_get_capture_length(packet);
-}
-
 #ifdef HAVE_NETPACKET_PACKET_H
 
 static void linuxring_help(void)
@@ -800,16 +696,16 @@ static struct libtrace_format_t linuxring = {
 	"ring",
 	"$Id$",
 	TRACE_FORMAT_LINUX_RING,
-	NULL,				/* probe filename */
+	linuxcommon_probe_filename,	/* probe filename */
 	NULL,				/* probe magic */
-	linuxring_init_input,	 	/* init_input */
-	NULL,				/* config_input */
+	linuxcommon_init_input,	 	/* init_input */
+	linuxcommon_config_input,	/* config_input */
 	linuxring_start_input,		/* start_input */
-	linuxring_pause_input,		/* pause_input */
-	linuxring_init_output,		/* init_output */
+	linuxcommon_pause_input,	/* pause_input */
+	linuxcommon_init_output,	/* init_output */
 	NULL,				/* config_output */
 	linuxring_start_output,		/* start_ouput */
-	NULL,				/* fin_input */
+	linuxcommon_fin_input,		/* fin_input */
 	linuxring_fin_output,		/* fin_output */
 	linuxring_read_packet,		/* read_packet */
 	linuxring_prepare_packet,	/* prepare_packet */
@@ -830,20 +726,20 @@ static struct libtrace_format_t linuxring = {
 	linuxring_get_framing_length,	/* get_framing_length */
 	linuxring_set_capture_length,	/* set_capture_length */
 	NULL,				/* get_received_packets */
-	NULL,				/* get_filtered_packets */
-	NULL,				/* get_dropped_packets */
-	NULL,				/* get_captured_packets */
-	NULL,				/* get_fd */
+	linuxcommon_get_filtered_packets,/* get_filtered_packets */
+	linuxcommon_get_dropped_packets,/* get_dropped_packets */
+	linuxcommon_get_captured_packets,/* get_captured_packets */
+	linuxcommon_get_fd,		/* get_fd */
 	linuxring_event,		/* trace_event */
-	linuxring_help,		       	/* help */
+	linuxring_help,			/* help */
 	NULL,				/* next pointer */
 	{true, -1},			/* Live, no thread limit */
-	NULL,				/* pstart_input */
+	linuxring_pstart_input,		/* pstart_input */
 	linuxring_pread_packets,	/* pread_packets */
-	NULL,				/* ppause */
-	NULL,				/* p_fin */
-	NULL,
-	NULL,
+	linuxcommon_pause_input,	/* ppause */
+	linuxcommon_fin_input,		/* p_fin */
+        linuxcommon_pconfig_input,	/* pconfig input */
+	linuxcommon_pregister_thread,
 	NULL
 };
 #else

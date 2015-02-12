@@ -5,7 +5,7 @@ AM_CFLAGS=@LIBCFLAGS@ @CFLAG_VISIBILITY@ -pthread
 AM_CXXFLAGS=@LIBCXXFLAGS@ @CFLAG_VISIBILITY@ -pthread
 
 extra_DIST = format_template.c
-NATIVEFORMATS=format_linux_ring.c format_linux.c
+NATIVEFORMATS=format_linux_common.c format_linux_ring.c format_linux_int.c format_linux_common.h
 BPFFORMATS=format_bpf.c
 
 if HAVE_DAG
