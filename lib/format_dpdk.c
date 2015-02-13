@@ -1,3 +1,4 @@
+
 /*
  * This file is part of libtrace
  *
@@ -75,7 +76,8 @@
  * Below this is a log of version that required changes to the libtrace
  * code (that we still attempt to support).
  *
- * Currently 1.5 to 1.7 is supported.
+ * DPDK v1.7.1 is recommended.
+ * However 1.5 to 1.8 are likely supported.
  */
 #include <rte_eal.h>
 #include <rte_version.h>
@@ -117,6 +119,28 @@
 #	define DPDK_USE_PMD_INIT 1
 #else
 #	define DPDK_USE_PMD_INIT 0
+#endif
+
+/* 1.7.0-rc3 :
+ *
+ * Since 1.7.0-rc3 rte_eal_pci_probe is called as part of rte_eal_init.
+ * Somewhere between 1.7 and 1.8 calling it twice broke so we should not call
+ * it twice.
+ */
+#if RTE_VERSION < RTE_VERSION_NUM(1, 7, 0, 3)
+#	define DPDK_USE_PCI_PROBE 1
+#else
+#	define DPDK_USE_PCI_PROBE 0
+#endif
+
+/* 1.8.0-rc1 :
+ * LOG LEVEL is a command line option which overrides what
+ * we previously set it to.
+ */
+#if RTE_VERSION >= RTE_VERSION_NUM(1, 8, 0, 1)
+#	define DPDK_USE_LOG_LEVEL 1
+#else
+#	define DPDK_USE_LOG_LEVEL 0
 #endif
 
 #include <rte_per_lcore.h>
@@ -389,11 +413,12 @@ static int whitelist_device(struct dpdk_format_data_t *format_data UNUSED, struc
 static int parse_pciaddr(char * str, struct rte_pci_addr * addr, long * core) {
     int matches;
     assert(str);
-    matches = sscanf(str, "%4"SCNx16":%2"SCNx8":%2"SCNx8".%2"SCNx8"-%ld", &addr->domain, &addr->bus, &addr->devid, &addr->function, core);
+    matches = sscanf(str, "%4"SCNx16":%2"SCNx8":%2"SCNx8".%2"SCNx8"-%ld",
+                     &addr->domain, &addr->bus, &addr->devid, &addr->function, core);
     if (matches >= 4) {
-	return 0;
+        return 0;
     } else {
-	return -1;
+        return -1;
     }
 }
 
@@ -583,8 +608,20 @@ static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_
      * the two processes. However be careful we still cannot access a
      * port that already in use.
      */
-    char* argv[] = {"libtrace", "-c", cpu_number, "-n", "1", "--proc-type", "auto",
-		"--file-prefix", mem_map, "-m", "980", NULL};
+    char* argv[] = {"libtrace",
+                    "-c", cpu_number,
+                    "-n", "1",
+                    "--proc-type", "auto",
+                    "--file-prefix", mem_map,
+                    "-m", "256",
+#if DPDK_USE_LOG_LEVEL
+#	if DEBUG
+                    "--log-level", "8", /* RTE_LOG_DEBUG */
+#	else
+                    "--log-level", "5", /* RTE_LOG_WARNING */
+#	endif
+#endif
+                    NULL};
     int argc = sizeof(argv) / sizeof(argv[0]) - 1;
 
     /* This initialises the Environment Abstraction Layer (EAL)
@@ -708,7 +745,7 @@ static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_
 #endif
 
 #if DPDK_USE_BLACKLIST
-    /* Black list all ports besides the one that we want to use */
+    /* Blacklist all ports besides the one that we want to use */
 	if ((ret = blacklist_devices(format_data, &use_addr)) < 0) {
 		snprintf(err, errlen, "Intel DPDK - Whitelisting PCI device failed,"
 			 " are you sure the address is correct?: %s", strerror(-ret));
@@ -716,12 +753,14 @@ static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_
 	}
 #endif
 
+#if DPDK_USE_PCI_PROBE
     /* This loads DPDK drivers against all ports that are not blacklisted */
 	if ((ret = rte_eal_pci_probe()) < 0) {
 	snprintf(err, errlen,
 	    "Intel DPDK - rte_eal_pci_probe failed: %s", strerror(-ret));
 	return -1;
     }
+#endif
 
     format_data->nb_ports = rte_eth_dev_count();
 
@@ -1842,10 +1881,17 @@ static inline void dpdk_ready_pkts(struct dpdk_format_data_t *format_data, struc
 		memset(hdr, 0, sizeof(struct dpdk_addt_hdr));
 
 #if GET_MAC_CRC_CHECKSUM
+<<<<<<< HEAD
 		/* Add back in the CRC sum */
 		pkts[i]->pkt.pkt_len += ETHER_CRC_LEN;
 		pkts[i]->pkt.data_len += ETHER_CRC_LEN;
 		hdr->flags |= INCLUDES_CHECKSUM;
+=======
+    /* Add back in the CRC sum */
+    rte_pktmbuf_pkt_len(pkt) += ETHER_CRC_LEN;
+    rte_pktmbuf_data_len(pkt) += ETHER_CRC_LEN;
+    hdr->flags |= INCLUDES_CHECKSUM;
+>>>>>>> master
 #endif
 
 		hdr->cap_len = rte_pktmbuf_pkt_len(pkts[i]);

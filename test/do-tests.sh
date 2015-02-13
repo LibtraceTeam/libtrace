@@ -229,6 +229,9 @@ do_test ./test-autodetect traces/5_packets.erf.bz2
 echo " * format autodetection - lzma"
 do_test ./test-autodetect traces/5_packets.erf.xz
 
+echo " * VXLan decode"
+do_test ./test-vxlan
+
 echo
 echo "Tests passed: $OK"
 echo "Tests failed: $FAIL"

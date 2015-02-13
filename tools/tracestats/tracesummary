@@ -17,4 +17,4 @@ exec tracestats --filter 'not ether proto \ip and not ether proto 0x86dd' \
 		--filter 'tcp and port imap or imaps' \
 		--filter 'port domain' \
 		--filter 'icmp[icmptype]=icmp-echoreply' \
-		$@
+		"$@"
