@@ -171,6 +171,30 @@ struct tpacket_req {
 	unsigned int tp_frame_nr;    /* Total number of frames */
 };
 
+
+/* A structure we use to hold statistic counters from the network cards
+ * as accessed via the /proc/net/dev
+ */
+struct linux_dev_stats {
+	char if_name[IF_NAMESIZE];
+	uint64_t rx_bytes;
+	uint64_t rx_packets;
+	uint64_t rx_errors;
+	uint64_t rx_drops;
+	uint64_t rx_fifo;
+	uint64_t rx_frame;
+	uint64_t rx_compressed;
+	uint64_t rx_multicast;
+	uint64_t tx_bytes;
+	uint64_t tx_packets;
+	uint64_t tx_errors;
+	uint64_t tx_drops;
+	uint64_t tx_fifo;
+	uint64_t tx_colls;
+	uint64_t tx_carrier;
+	uint64_t tx_compressed;
+};
+
 /* Note that this structure is passed over the wire in rt encapsulation, and
  * thus we need to be careful with data sizes.  timeval's and timespec's
  * can also change their size on 32/64 machines.
@@ -187,6 +211,8 @@ struct linux_format_data_t {
 	libtrace_filter_t *filter;
 	/* Statistics for the capture process, e.g. dropped packet counts */
 	struct tpacket_stats stats;
+	/* Statistics for the NIC rather than the socket */
+	struct linux_dev_stats dev_stats;
 	/* Flag indicating whether the statistics are current or not */
 	int stats_valid;
 	/* The current ring buffer layout */

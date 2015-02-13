@@ -224,6 +224,59 @@ void linuxcommon_close_input_stream(libtrace_t *libtrace,
 		       FORMAT_DATA->req.tp_block_size *
 		       FORMAT_DATA->req.tp_block_nr);
 	stream->rx_ring = MAP_FAILED;
+	FORMAT_DATA->dev_stats.if_name[0] = 0;
+}
+
+#define REPEAT_16(x) x x x x x x x x x x x x x x x x
+#define xstr(s) str(s)
+#define str(s) #s
+
+/* These don't typically reset however an interface does exist to reset them */
+static int linuxcommon_get_dev_statisitics(libtrace_t *libtrace, struct linux_dev_stats *stats) {
+	FILE *file;
+	char line[1024];
+	struct linux_dev_stats tmp_stats;
+
+	file = fopen("/proc/net/dev","r");
+	if (file == NULL) {
+		return -1;
+	}
+
+	/* Skip 2 header lines */
+	fgets(line, sizeof(line), file);
+	fgets(line, sizeof(line), file);
+
+	while (!(feof(file)||ferror(file))) {
+		int tot;
+		fgets(line, sizeof(line), file);
+		tot = sscanf(line, " %"xstr(IF_NAMESIZE)"[^:]:" REPEAT_16(" %"SCNd64),
+		             tmp_stats.if_name,
+		             &tmp_stats.rx_bytes,
+		             &tmp_stats.rx_bytes,
+		             &tmp_stats.rx_errors,
+		             &tmp_stats.rx_drops,
+		             &tmp_stats.rx_fifo,
+		             &tmp_stats.rx_frame,
+		             &tmp_stats.rx_compressed,
+		             &tmp_stats.rx_multicast,
+		             &tmp_stats.tx_bytes,
+		             &tmp_stats.tx_packets,
+		             &tmp_stats.tx_errors,
+		             &tmp_stats.tx_drops,
+		             &tmp_stats.tx_fifo,
+		             &tmp_stats.tx_colls,
+		             &tmp_stats.tx_carrier,
+		             &tmp_stats.tx_compressed);
+		if (tot != 17)
+			continue;
+		if (strncmp(tmp_stats.if_name, libtrace->uridata, IF_NAMESIZE) == 0) {
+			*stats = tmp_stats;
+			fclose(file);
+			return 0;
+		}
+	}
+	fclose(file);
+	return -1;
 }
 
 /* Start an input stream
@@ -363,6 +416,10 @@ int linuxcommon_start_input_stream(libtrace_t *libtrace,
 	}
 
 	FORMAT_DATA->stats_valid = 0;
+	if (linuxcommon_get_dev_statisitics(libtrace, &FORMAT_DATA->dev_stats) != 0) {
+		/* Mark this as bad */
+		FORMAT_DATA->dev_stats.if_name[0] = 0;
+	}
 
 	return 0;
 }
@@ -473,7 +530,8 @@ int linuxcommon_pconfig_input(libtrace_t *libtrace,
 	return -1;
 }
 
-static void linuxcommon_update_statistics(libtrace_t *libtrace) {
+/* These counters reset with each read */
+static void linuxcommon_update_socket_statistics(libtrace_t *libtrace) {
 	struct tpacket_stats stats;
 	size_t i;
 	socklen_t len = sizeof(stats);
@@ -493,7 +551,7 @@ static void linuxcommon_update_statistics(libtrace_t *libtrace) {
 					FORMAT_DATA->stats_valid = 1;
 				} else {
 					FORMAT_DATA->stats.tp_drops += stats.tp_drops;
-					FORMAT_DATA->stats.tp_drops += stats.tp_packets;
+					FORMAT_DATA->stats.tp_packets += stats.tp_packets;
 				}
 			} else {
 				perror("getsockopt PACKET_STATISTICS failed");
@@ -511,7 +569,7 @@ uint64_t linuxcommon_get_captured_packets(libtrace_t *libtrace) {
 		 * the socket for capture counts, can we? */
 		return UINT64_MAX;
 	}
-	linuxcommon_update_statistics(libtrace);
+	linuxcommon_update_socket_statistics(libtrace);
 	if (FORMAT_DATA->stats_valid)
 		return FORMAT_DATA->stats.tp_packets;
 	else
@@ -525,6 +583,8 @@ uint64_t linuxcommon_get_captured_packets(libtrace_t *libtrace) {
  * real drop counters and stuff.
  */
 uint64_t linuxcommon_get_dropped_packets(libtrace_t *libtrace) {
+	struct linux_dev_stats dev_stats;
+	uint64_t adjustment = 0;
 	if (libtrace->format_data == NULL)
 		return UINT64_MAX;
 	if (FORMAT_DATA_FIRST->fd == -1) {
@@ -532,9 +592,15 @@ uint64_t linuxcommon_get_dropped_packets(libtrace_t *libtrace) {
 		 * the socket for drop counts, can we? */
 		return UINT64_MAX;
 	}
-	linuxcommon_update_statistics(libtrace);
+	// Do we have starting stats to compare to?
+	if (FORMAT_DATA->dev_stats.if_name[0] != 0) {
+		if (linuxcommon_get_dev_statisitics(libtrace, &dev_stats) == 0) {
+			adjustment = dev_stats.rx_drops - FORMAT_DATA->dev_stats.rx_drops;
+		}
+	}
+	linuxcommon_update_socket_statistics(libtrace);
 	if (FORMAT_DATA->stats_valid)
-		return FORMAT_DATA->stats.tp_drops;
+		return FORMAT_DATA->stats.tp_drops + adjustment;
 	else
 		return UINT64_MAX;
 }
