@@ -483,17 +483,31 @@ inline static int linuxring_read_stream(libtrace_t *libtrace,
 			pollset[1].events = POLLIN;
 			pollset[1].revents = 0;
 		}
-		/* Wait for more data or a message*/
-		ret = poll(pollset, (queue ? 2 : 1), -1);
+		/* Wait for more data or a message */
+		ret = poll(pollset, (queue ? 2 : 1), 500);
 		if (ret > 0) {
-			if (pollset[0].revents)
+			if (pollset[0].revents == POLLIN)
 				continue;
-			else
+			else if (queue && pollset[1].revents == POLLIN)
 				return READ_MESSAGE;
+			else if (queue && pollset[1].revents) {
+				/* Internal error */
+				trace_set_err(libtrace,TRACE_ERR_BAD_STATE,
+				              "Message queue error %d poll()",
+				              pollset[1].revents);
+				return READ_ERROR;
+			} else {
+				/* I've only seen this when the network was down */
+				trace_set_err(libtrace,ENETDOWN,
+				              "Socket error revents=%d poll()",
+				              pollset[0].revents);
+				return READ_ERROR;
+			}
 		} else if (ret < 0) {
-			if (errno != EINTR)
-			trace_set_err(libtrace,errno,"poll()");
-			return -1;
+			if (errno != EINTR) {
+				trace_set_err(libtrace,errno,"poll()");
+				return -1;
+			}
 		} else {
 			/* Poll timed out - check if we should exit */
 			if (libtrace_halt)
