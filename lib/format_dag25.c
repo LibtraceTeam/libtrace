@@ -889,28 +889,28 @@ static int dag_get_duckinfo(libtrace_t *libtrace,
 	}
 
 	/* DUCK doesn't have a format header */
-        packet->header = 0;
-        packet->payload = packet->buffer;
+	packet->header = 0;
+	packet->payload = packet->buffer;
 
-        /* No need to check if we can get DUCK or not - we're modern
-         * enough so just grab the DUCK info */
-        if ((ioctl(FORMAT_DATA->device->fd, LIBTRACE_DUCK_IOCTL,
-					(duckinf_t *)packet->payload) < 0)) {
-                trace_set_err(libtrace, errno, "Error using DUCK ioctl");
+	/* No need to check if we can get DUCK or not - we're modern
+	 * enough so just grab the DUCK info */
+	if ((ioctl(FORMAT_DATA_FIRST->device->fd, LIBTRACE_DUCK_IOCTL,
+	           (duckinf_t *)packet->payload) < 0)) {
+		trace_set_err(libtrace, errno, "Error using DUCK ioctl");
 		DUCK.duck_freq = 0;
-                return -1;
-        }
+		return -1;
+	}
 
-        packet->type = LIBTRACE_DUCK_VERSION;
+	packet->type = LIBTRACE_DUCK_VERSION;
 
 	/* Set the packet's trace to point at a DUCK trace, so that the
 	 * DUCK format functions will be called on the packet rather than the
 	 * DAG ones */
-        if (!DUCK.dummy_duck)
-                DUCK.dummy_duck = trace_create_dead("duck:dummy");
-        packet->trace = DUCK.dummy_duck;
-        DUCK.last_duck = DUCK.last_pkt;
-        return sizeof(duckinf_t);
+	if (!DUCK.dummy_duck)
+		DUCK.dummy_duck = trace_create_dead("duck:dummy");
+	packet->trace = DUCK.dummy_duck;
+	DUCK.last_duck = DUCK.last_pkt;
+	return sizeof(duckinf_t);
 }
 
 /* Determines the amount of data available to read from the DAG card */
@@ -1216,6 +1216,7 @@ static int dag_read_packet_real(libtrace_t *libtrace,
 				libtrace_thread_t *t, /* Optional */
 				libtrace_packet_t *packet)
 {
+	int size = 0;
 	dag_record_t *erfptr = NULL;
 	int numbytes = 0;
 	uint32_t flags = 0;
@@ -1226,7 +1227,7 @@ static int dag_read_packet_real(libtrace_t *libtrace,
 	maxwait.tv_sec = 0;
 	maxwait.tv_usec = 250000;
 
-        /* Check if we're due for a DUCK report */
+	/* Check if we're due for a DUCK report */
 	size = dag_get_duckinfo(libtrace, packet);
 
 	if (size != 0)
