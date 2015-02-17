@@ -497,8 +497,12 @@ inline static int linuxring_read_stream(libtrace_t *libtrace,
 				              pollset[1].revents);
 				return READ_ERROR;
 			} else {
-				/* I've only seen this when the network was down */
-				trace_set_err(libtrace,ENETDOWN,
+				/* Try get the error from the socket */
+				int err = ENETDOWN;
+				socklen_t len = sizeof(err);
+				getsockopt(stream->fd, SOL_SOCKET, SO_ERROR,
+				           &err, &len);
+				trace_set_err(libtrace, err,
 				              "Socket error revents=%d poll()",
 				              pollset[0].revents);
 				return READ_ERROR;
