@@ -83,7 +83,7 @@ static void run_trace(char *uri)
 	int i;
 	uint64_t count = 0;
 	uint64_t bytes = 0;
-	uint64_t packets;
+	libtrace_stat_t *stats;
 
 	fprintf(stderr,"%s:\n",uri);
 
@@ -127,7 +127,9 @@ static void run_trace(char *uri)
 
 		++count;
 		bytes+=wlen;
-        }
+	}
+
+	stats = trace_get_statistics(trace, NULL);
 
 	printf("%-30s\t%12s\t%12s\t%7s\n","filter","count","bytes","%");
 	for(i=0;i<filter_count;++i) {
@@ -135,22 +137,21 @@ static void run_trace(char *uri)
 		filters[i].bytes=0;
 		filters[i].count=0;
 	}
-	packets=trace_get_received_packets(trace);
-	if (packets!=UINT64_MAX)
+	if (stats->received_valid)
 		fprintf(stderr,"%30s:\t%12" PRIu64"\n", 
-				"Input packets", packets);
-	packets=trace_get_filtered_packets(trace);
-	if (packets!=UINT64_MAX)
+				"Input packets", stats->received);
+	if (stats->filtered_valid)
 		fprintf(stderr,"%30s:\t%12" PRIu64"\n", 
-				"Filtered packets", packets);
-	packets=trace_get_dropped_packets(trace);
-	if (packets!=UINT64_MAX)
+				"Filtered packets", stats->filtered);
+	if (stats->dropped_valid)
 		fprintf(stderr,"%30s:\t%12" PRIu64"\n",
-				"Dropped packets",packets);
-	packets=trace_get_accepted_packets(trace);
-	if (packets!=UINT64_MAX)
+				"Dropped packets",stats->dropped);
+	if (stats->accepted_valid)
 		fprintf(stderr,"%30s:\t%12" PRIu64 "\n",
-				"Accepted Packets",packets);
+				"Accepted packets", stats->accepted);
+	if (stats->errors_valid)
+		fprintf(stderr,"%30s:\t%12" PRIu64 "\n",
+				"Erred packets", stats->errors);
 	printf("%30s:\t%12"PRIu64"\t%12" PRIu64 "\n","Total",count,bytes);
 	totcount+=count;
 	totbytes+=bytes;

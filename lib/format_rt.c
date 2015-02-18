@@ -858,7 +858,7 @@ static struct libtrace_format_t rt = {
 	NULL,				/* get_received_packets */
 	NULL,				/* get_filtered_packets */
 	NULL,				/* get_dropped_packets */
-	NULL,				/* get_captured_packets */
+	NULL,				/* get_statistics */
         rt_get_fd,                	/* get_fd */
         trace_event_rt,             /* trace_event */
         rt_help,			/* help */

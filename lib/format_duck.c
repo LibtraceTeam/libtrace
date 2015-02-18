@@ -361,7 +361,7 @@ static struct libtrace_format_t duck = {
 	NULL,				/* get_received_packets */
 	NULL,				/* get_filtered_packets */
 	NULL,				/* get_dropped_packets */
-	NULL,				/* get_captured_packets */
+	NULL,				/* get_statistics */
         NULL,                           /* get_fd */
         NULL,              		/* trace_event */
         duck_help,                     	/* help */

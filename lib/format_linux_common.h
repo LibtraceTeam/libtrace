@@ -324,9 +324,7 @@ int linuxcommon_pstart_input(libtrace_t *libtrace,
                              int (*start_stream)(libtrace_t *, struct linux_per_stream_t*));
 #endif /* HAVE_NETPACKET_PACKET_H */
 
-uint64_t linuxcommon_get_captured_packets(libtrace_t *libtrace);
-uint64_t linuxcommon_get_filtered_packets(libtrace_t *libtrace);
-uint64_t linuxcommon_get_dropped_packets(libtrace_t *libtrace);
+void linuxcommon_get_statistics(libtrace_t *libtrace, libtrace_stat_t *stat);
 inline libtrace_direction_t linuxcommon_get_direction(uint8_t pkttype);
 inline libtrace_direction_t linuxcommon_set_direction(struct sockaddr_ll * skadr,
                                                  libtrace_direction_t direction);

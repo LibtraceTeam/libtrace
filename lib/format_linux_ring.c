@@ -744,9 +744,9 @@ static struct libtrace_format_t linuxring = {
 	linuxring_get_framing_length,	/* get_framing_length */
 	linuxring_set_capture_length,	/* set_capture_length */
 	NULL,				/* get_received_packets */
-	linuxcommon_get_filtered_packets,/* get_filtered_packets */
-	linuxcommon_get_dropped_packets,/* get_dropped_packets */
-	linuxcommon_get_captured_packets,/* get_captured_packets */
+	NULL,				/* get_filtered_packets */
+	NULL,				/* get_dropped_packets */
+	linuxcommon_get_statistics,	/* get_statistics */
 	linuxcommon_get_fd,		/* get_fd */
 	linuxring_event,		/* trace_event */
 	linuxring_help,			/* help */
@@ -756,9 +756,10 @@ static struct libtrace_format_t linuxring = {
 	linuxring_pread_packets,	/* pread_packets */
 	linuxcommon_pause_input,	/* ppause */
 	linuxcommon_fin_input,		/* p_fin */
-        linuxcommon_pconfig_input,	/* pconfig input */
-	linuxcommon_pregister_thread,
-	NULL
+	linuxcommon_pconfig_input,	/* pconfig input */
+	linuxcommon_pregister_thread,	/* register thread */
+	NULL,				/* unregister thread */
+	NULL				/* get thread stats */
 };
 #else
 
@@ -804,7 +805,7 @@ static struct libtrace_format_t linuxring = {
 	NULL,				/* get_received_packets */
 	NULL,				/* get_filtered_packets */
 	NULL,				/* get_dropped_packets */
-	NULL,				/* get_captured_packets */
+	linuxcommon_get_statistics,	/* get_statistics */
 	NULL,				/* get_fd */
 	NULL,				/* trace_event */
 	linuxring_help,			/* help */

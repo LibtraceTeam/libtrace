@@ -269,7 +269,7 @@ static struct libtrace_format_t tshformat = {
 	NULL,				/* get_received_packets */
 	NULL,				/* get_filtered_packets */
 	NULL,				/* get_dropped_packets */
-	NULL,				/* get_captured_packets */
+	NULL,				/* get_statistics */
 	NULL,				/* get_fd */
 	trace_event_trace,		/* trace_event */
 	tsh_help,			/* help */
@@ -318,7 +318,7 @@ static struct libtrace_format_t frplusformat = {
 	NULL,				/* get_received_packets */
 	NULL,				/* get_filtered_packets */
 	NULL,				/* get_dropped_packets */
-	NULL,				/* get_captured_packets */
+	NULL,				/* get_statistics */
 	NULL,				/* get_fd */
 	trace_event_trace,		/* trace_event */
 	tsh_help,			/* help */

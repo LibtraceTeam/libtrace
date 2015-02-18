@@ -507,21 +507,22 @@ static struct libtrace_format_t linuxnative = {
 	linuxnative_get_framing_length,	/* get_framing_length */
 	linuxnative_set_capture_length,	/* set_capture_length */
 	NULL,				/* get_received_packets */
-	linuxcommon_get_filtered_packets,/* get_filtered_packets */
-	linuxcommon_get_dropped_packets,/* get_dropped_packets */
-	linuxcommon_get_captured_packets,/* get_captured_packets */
+	NULL,				/* get_filtered_packets */
+	NULL,				/* get_dropped_packets */
+	linuxcommon_get_statistics,	/* get_statistics */
 	linuxcommon_get_fd,		/* get_fd */
 	trace_event_device,		/* trace_event */
 	linuxnative_help,		/* help */
-	NULL,					/* next pointer */
-	{true, -1},              /* Live, no thread limit */
-	linuxnative_pstart_input,			/* pstart_input */
-	linuxnative_pread_packets,			/* pread_packets */
-	linuxcommon_pause_input,			/* ppause */
-	linuxcommon_fin_input,				/* p_fin */
-	linuxcommon_pconfig_input,			/* pconfig input */
-	linuxcommon_pregister_thread,
-	NULL
+	NULL,				/* next pointer */
+	{true, -1},			/* Live, no thread limit */
+	linuxnative_pstart_input,	/* pstart_input */
+	linuxnative_pread_packets,	/* pread_packets */
+	linuxcommon_pause_input,	/* ppause */
+	linuxcommon_fin_input,		/* p_fin */
+	linuxcommon_pconfig_input,	/* pconfig input */
+	linuxcommon_pregister_thread,	/* register thread */
+	NULL,				/* unregister thread */
+	NULL				/* get thread stats */
 };
 #else
 static void linuxnative_help(void) {
@@ -563,9 +564,9 @@ static struct libtrace_format_t linuxnative = {
 	linuxnative_get_framing_length,	/* get_framing_length */
 	linuxnative_set_capture_length,	/* set_capture_length */
 	NULL,				/* get_received_packets */
-	linuxnative_get_filtered_packets,/* get_filtered_packets */
-	linuxnative_get_dropped_packets,/* get_dropped_packets */
-	linuxnative_get_captured_packets,/* get_captured_packets */
+	NULL,				/* get_filtered_packets */
+	NULL,				/* get_dropped_packets */
+	linuxcommon_get_statistics,	/* get_statistics */
 	linuxnative_get_fd,		/* get_fd */
 	trace_event_device,		/* trace_event */
 	linuxnative_help,		/* help */

@@ -2167,18 +2167,6 @@ static uint64_t dpdk_get_dropped_packets (libtrace_t *trace) {
     return (uint64_t) stats.ierrors;
 }
 
-static uint64_t dpdk_get_captured_packets (libtrace_t *trace) {
-    struct rte_eth_stats stats = {0};
-
-    if (trace->format_data == NULL || FORMAT(trace)->port == 0xFF)
-	return UINT64_MAX;
-    /* Grab the current stats */
-    rte_eth_stats_get(FORMAT(trace)->port, &stats);
-
-    /* Get the drop counter */
-    return (uint64_t) stats.ipackets;
-}
-
 /*
  * This is the number of packets filtered by the NIC
  * and maybe ahead of number read using libtrace.
@@ -2314,19 +2302,20 @@ static struct libtrace_format_t dpdk = {
 	NULL,				    /* get_received_packets */
 	dpdk_get_filtered_packets,/* get_filtered_packets */
 	dpdk_get_dropped_packets,/* get_dropped_packets */
-    dpdk_get_captured_packets,/* get_captured_packets */
+	NULL,			/* get_statistics */
 	NULL,		            /* get_fd */
 	dpdk_trace_event,		/* trace_event */
-    dpdk_help,              /* help */
-    NULL,                   /* next pointer */
-    {true, 8},              /* Live, NICs typically have 8 threads */
-    dpdk_pstart_input, /* pstart_input */
+	dpdk_help,              /* help */
+	NULL,                   /* next pointer */
+	{true, 8},              /* Live, NICs typically have 8 threads */
+	dpdk_pstart_input, /* pstart_input */
 	dpdk_pread_packets, /* pread_packets */
 	dpdk_pause_input, /* ppause */
 	dpdk_fin_input, /* p_fin */
 	dpdk_pconfig_input, /* pconfig_input */
-    dpdk_pregister_thread, /* pregister_thread */
-    dpdk_punregister_thread /* unpregister_thread */
+	dpdk_pregister_thread, /* pregister_thread */
+	dpdk_punregister_thread, /* punregister_thread */
+	NULL				/* get thread stats */
 };
 
 void dpdk_constructor(void) {

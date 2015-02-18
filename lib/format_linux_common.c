@@ -185,6 +185,8 @@ int linuxcommon_init_input(libtrace_t *libtrace)
 	FORMAT_DATA->snaplen = LIBTRACE_PACKET_BUFSIZE;
 	FORMAT_DATA->filter = NULL;
 	FORMAT_DATA->stats_valid = 0;
+	FORMAT_DATA->stats.tp_drops = 0;
+	FORMAT_DATA->stats.tp_packets = 0;
 	FORMAT_DATA->max_order = MAX_ORDER;
 	FORMAT_DATA->fanout_flags = PACKET_FANOUT_LB;
 	/* Some examples use pid for the group however that would limit a single
@@ -252,7 +254,7 @@ static int linuxcommon_get_dev_statisitics(libtrace_t *libtrace, struct linux_de
 		tot = sscanf(line, " %"xstr(IF_NAMESIZE)"[^:]:" REPEAT_16(" %"SCNd64),
 		             tmp_stats.if_name,
 		             &tmp_stats.rx_bytes,
-		             &tmp_stats.rx_bytes,
+		             &tmp_stats.rx_packets,
 		             &tmp_stats.rx_errors,
 		             &tmp_stats.rx_drops,
 		             &tmp_stats.rx_fifo,
@@ -401,21 +403,32 @@ int linuxcommon_start_input_stream(libtrace_t *libtrace,
 			       &filter->filter,
 			       sizeof(filter->filter)) == -1) {
 			perror("setsockopt(SO_ATTACH_FILTER)");
-		} else {
-			/* The socket accepted the filter, so we need to
-			 * consume any buffered packets that were received
-			 * between opening the socket and applying the filter.
-			 */
-			void *buf = malloc((size_t)LIBTRACE_PACKET_BUFSIZE);
-			while(recv(stream->fd,
-				   buf,
-				   (size_t)LIBTRACE_PACKET_BUFSIZE,
-				   MSG_DONTWAIT) != -1) { }
-			free(buf);
 		}
 	}
 
-	FORMAT_DATA->stats_valid = 0;
+	/* Consume any buffered packets that were received before the socket
+	 * was properly setup, including those which missed the filter and
+	 * bind()ing to an interface.
+	 *
+	 * If packet rate is high this could therotically hang forever. 4K
+	 * should be a large enough limit.
+	 */
+	int count = 0;
+	void *buf = malloc((size_t)LIBTRACE_PACKET_BUFSIZE);
+	while(count < 4096 &&
+		recv(stream->fd,
+		   buf,
+		   (size_t)LIBTRACE_PACKET_BUFSIZE,
+		   MSG_DONTWAIT) != -1) { count++; }
+	free(buf);
+	fprintf(stderr, "set offset %d", count);
+
+	/* Mark that the stats are valid and apply an offset */
+	FORMAT_DATA->stats_valid = 1;
+	/* Offset by number we ate for each stream */
+	FORMAT_DATA->stats.tp_packets -= count;
+
+
 	if (linuxcommon_get_dev_statisitics(libtrace, &FORMAT_DATA->dev_stats) != 0) {
 		/* Mark this as bad */
 		FORMAT_DATA->dev_stats.if_name[0] = 0;
@@ -560,60 +573,70 @@ static void linuxcommon_update_socket_statistics(libtrace_t *libtrace) {
 	}
 }
 
-/* Number of packets that passed filtering */
-uint64_t linuxcommon_get_captured_packets(libtrace_t *libtrace) {
+#define DEV_DIFF(x) (dev_stats.x - FORMAT_DATA->dev_stats.x)
+/* Note these statistics come from two different sources, the socket itself and
+ * the linux device. As such this means it is highly likely that their is some
+ * margin of error in the returned statisitics, we perform basic sanitising so
+ * that these are not too noticable.
+ */
+void linuxcommon_get_statistics(libtrace_t *libtrace, libtrace_stat_t *stat) {
+	struct linux_dev_stats dev_stats;
 	if (libtrace->format_data == NULL)
-		return UINT64_MAX;
+		return;
+	/* Do we need to consider the case after the trace is closed? */
 	if (FORMAT_DATA_FIRST->fd == -1) {
 		/* This is probably a 'dead' trace so obviously we can't query
 		 * the socket for capture counts, can we? */
-		return UINT64_MAX;
+		return;
+	}
+
+	dev_stats.if_name[0] = 0; /* This will be set if we retrive valid stats */
+	/* Do we have starting stats to compare to? */
+	if (FORMAT_DATA->dev_stats.if_name[0] != 0) {
+		linuxcommon_get_dev_statisitics(libtrace, &dev_stats);
 	}
 	linuxcommon_update_socket_statistics(libtrace);
-	if (FORMAT_DATA->stats_valid)
-		return FORMAT_DATA->stats.tp_packets;
-	else
-		return UINT64_MAX;
-}
 
-/* Number of packets that got past filtering and were then dropped because
- * of lack of space.
- *
- * We could also try read from /sys/class/net/ethX/statistics/ to get
- * real drop counters and stuff.
- */
-uint64_t linuxcommon_get_dropped_packets(libtrace_t *libtrace) {
-	struct linux_dev_stats dev_stats;
-	uint64_t adjustment = 0;
-	if (libtrace->format_data == NULL)
-		return UINT64_MAX;
-	if (FORMAT_DATA_FIRST->fd == -1) {
-		/* This is probably a 'dead' trace so obviously we can't query
-		 * the socket for drop counts, can we? */
-		return UINT64_MAX;
-	}
-	// Do we have starting stats to compare to?
-	if (FORMAT_DATA->dev_stats.if_name[0] != 0) {
-		if (linuxcommon_get_dev_statisitics(libtrace, &dev_stats) == 0) {
-			adjustment = dev_stats.rx_drops - FORMAT_DATA->dev_stats.rx_drops;
+	/* filtered count == dev received - socket received */
+	if (FORMAT_DATA->filter == NULL) {
+		stat->filtered_valid = 1;
+		stat->filtered = 0;
+	} else if (FORMAT_DATA->stats_valid && dev_stats.if_name[0]) {
+		stat->filtered_valid = 1;
+		stat->filtered = DEV_DIFF(rx_packets) -
+		                 FORMAT_DATA->stats.tp_packets;
+		if (stat->filtered > UINT64_MAX - 100000) {
+			stat->filtered = 0;
 		}
 	}
-	linuxcommon_update_socket_statistics(libtrace);
-	if (FORMAT_DATA->stats_valid)
-		return FORMAT_DATA->stats.tp_drops + adjustment;
-	else
-		return UINT64_MAX;
-}
 
-/* Linux doesn't keep track how many packets were seen before filtering
- * so we can't tell how many packets were filtered.  Bugger.  So annoying.
- *
- * Since we tell libtrace that we do support filtering, if we don't declare
- * this here as failing, libtrace will happily report for us that it didn't
- * filter any packets, so don't lie -- return that we don't know.
- */
-uint64_t linuxcommon_get_filtered_packets(libtrace_t *trace UNUSED) {
-	return UINT64_MAX;
+	/* dropped count == socket dropped + dev dropped */
+	if (FORMAT_DATA->stats_valid) {
+		stat->dropped_valid = 1;
+		stat->dropped = FORMAT_DATA->stats.tp_drops;
+		if (dev_stats.if_name[0]) {
+			stat->dropped += DEV_DIFF(rx_drops);
+		}
+	}
+
+	/* received count - All good packets even those dropped or filtered */
+	if (dev_stats.if_name[0]) {
+		stat->received_valid = 1;
+		stat->received = DEV_DIFF(rx_packets) + DEV_DIFF(rx_drops);
+	}
+
+	/* captured count - received and but not dropped */
+	if (dev_stats.if_name[0] && FORMAT_DATA->stats_valid) {
+		stat->captured_valid = 1;
+		stat->captured = DEV_DIFF(rx_packets) - FORMAT_DATA->stats.tp_drops;
+	}
+
+	/* errors */
+	if (dev_stats.if_name[0]) {
+		stat->errors_valid = 1;
+		stat->errors = DEV_DIFF(rx_errors);
+	}
+
 }
 
 int linuxcommon_get_fd(const libtrace_t *libtrace) {
@@ -670,16 +693,9 @@ int linuxcommon_pstart_input(libtrace_t *libtrace,
 #else /* HAVE_NETPACKET_PACKET_H */
 
 /* No NETPACKET - So this format is not live */
-uint64_t linuxcommon_get_filtered_packets(libtrace_t *trace UNUSED) {
-	return UINT64_MAX;
-}
-
-uint64_t linuxcommon_get_captured_packets(libtrace_t *trace UNUSED) {
-	return UINT64_MAX;
-}
-
-uint64_t linuxcommon_get_dropped_packets(libtrace_t *trace UNUSED) {
-	return UINT64_MAX;
+void linuxcommon_get_statistics(libtrace_t *libtrace UNUSED,
+                                libtrace_stat_t *stat UNUSED) {
+	return;
 }
 
 #endif /* HAVE_NETPACKET_PACKET_H */

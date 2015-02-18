@@ -324,11 +324,12 @@ struct libtrace_t {
 	 * Caches statistic counters in the case that our trace is
 	 * paused or stopped before this counter is taken
 	 */
-	uint64_t dropped_packets;
-	uint64_t received_packets;
+	libtrace_stat_t *stats;
 	struct user_configuration config;
 	libtrace_combine_t combiner;
 };
+
+#define LIBTRACE_STAT_MAGIC 0x41
 
 void trace_fin_packet(libtrace_packet_t *packet);
 void libtrace_zero_thread(libtrace_thread_t * t);
@@ -456,12 +457,12 @@ struct libtrace_format_t {
 
 
 	/** Given a filename, return if this is the most likely capture format
- 	 * (used for devices). Used to "guess" the capture format when the
+	 * (used for devices). Used to "guess" the capture format when the
 	 * URI is not fully specified.
 	 *
 	 * @param fname 	The name of the device or file to examine
 	 * @return 1 if the name matches the capture format, 0 otherwise
- 	 */
+	 */
 	int (*probe_filename)(const char *fname);
 	
 	/** Given a file, looks at the start of the file to determine if this
@@ -833,19 +834,14 @@ struct libtrace_format_t {
 	 *
 	 */
 	uint64_t (*get_dropped_packets)(libtrace_t *trace);
-	
-	/** Returns the number of packets captured and returned by an input 
-	 * trace.
+
+	/** Returns statistics about a trace. Flags are all set to 0 when
+	 * invoked.
 	 *
-	 * @param trace		The input trace to get the capture count for
-	 * @return The number of packets returned to the libtrace user, or
-	 * UINT64_MAX if the number is unknown
-	 *
-	 * This is the number of packets that have been successfully returned
-	 * to the libtrace user via the read_packet() function.
-	 *
+	 * @param trace The libtrace object
+	 * @param stat A zeroed structure ready to be filled.
 	 */
-	uint64_t (*get_captured_packets)(libtrace_t *trace);
+	void (*get_statistics)(libtrace_t *trace, libtrace_stat_t *stat);
 	
 	/** Returns the file descriptor used by the input trace.
 	 *
@@ -957,18 +953,26 @@ struct libtrace_format_t {
 	 * function is called.
 	 */
 	void (*punregister_thread)(libtrace_t *libtrace, libtrace_thread_t *t);
+
+	/**
+	 * Return statistics for a single thread.
+	 */
+	void (*get_thread_statistics)(libtrace_t *libtrace,
+	                              libtrace_thread_t *t,
+	                              libtrace_stat_t *stat);
 };
 
 /** Macro to zero out a single thread format */
 #define NON_PARALLEL(live) \
-{live, 1},		/* trace info */ \
-NULL,			/* pstart_input */ \
-NULL,			/* pread_packet */ \
-NULL,			/* ppause_input */ \
-NULL,			/* pfin_input */ \
-NULL,			/* pconfig_input */ \
-NULL,			/* pregister_thread */ \
-NULL			/* punregister_thread */
+	{live, 1},		/* trace info */ \
+	NULL,			/* pstart_input */ \
+	NULL,			/* pread_packet */ \
+	NULL,			/* ppause_input */ \
+	NULL,			/* pfin_input */ \
+	NULL,			/* pconfig_input */ \
+	NULL,			/* pregister_thread */ \
+	NULL,			/* punregister_thread */ \
+	NULL,			/* get_thread_statistics */
 
 /** The list of registered capture formats */
 //extern struct libtrace_format_t *form;

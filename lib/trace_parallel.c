@@ -1905,14 +1905,10 @@ DLLEXPORT int trace_ppause(libtrace_t *libtrace)
 	}
 
 	/* Cache values before we pause */
-	libtrace->dropped_packets = trace_get_dropped_packets(libtrace);
-	libtrace->received_packets = trace_get_received_packets(libtrace);
-	uint64_t tmp_stats;
-	if (libtrace->format->get_filtered_packets) {
-		if ((tmp_stats = libtrace->format->get_filtered_packets(libtrace)) != UINT64_MAX) {
-			libtrace->filtered_packets += tmp_stats;
-		}
-	}
+	if (libtrace->stats == NULL)
+		libtrace->stats = trace_create_statistics();
+	// Save the statistics against the trace
+	trace_get_statistics(libtrace, NULL);
 	if (trace_supports_parallel(libtrace) && !trace_has_dedicated_hasher(libtrace) && libtrace->perpkt_thread_count > 1) {
 		libtrace->started = false;
 		if (libtrace->format->ppause_input)

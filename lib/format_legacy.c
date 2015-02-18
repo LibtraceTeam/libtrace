@@ -547,7 +547,7 @@ static struct libtrace_format_t legacyatm = {
 	NULL,				/* get_received_packets */
 	NULL,				/* get_filtered_packets */
 	NULL,				/* get_dropped_packets */
-	NULL,				/* get_captured_packets */
+	NULL,				/* get_statistics */
 	NULL,				/* get_fd */
 	trace_event_trace,		/* trace_event */
 	legacyatm_help,			/* help */
@@ -591,7 +591,7 @@ static struct libtrace_format_t legacyeth = {
 	NULL,				/* get_received_packets */
 	NULL,				/* get_filtered_packets */
 	NULL,				/* get_dropped_packets */
-	NULL,				/* get_captured_packets */
+	NULL,				/* get_statistics */
 	NULL,				/* get_fd */
 	trace_event_trace,		/* trace_event */
 	legacyeth_help,			/* help */
@@ -635,7 +635,7 @@ static struct libtrace_format_t legacypos = {
 	NULL,				/* get_received_packets */
 	NULL,				/* get_filtered_packets */
 	NULL,				/* get_dropped_packets */
-	NULL,				/* get_captured_packets */
+	NULL,				/* get_statistics */
 	NULL,				/* get_fd */
 	trace_event_trace,		/* trace_event */
 	legacypos_help,			/* help */
@@ -679,7 +679,7 @@ static struct libtrace_format_t legacynzix = {
 	NULL,				/* get_received_packets */
 	NULL,				/* get_filtered_packets */
 	NULL,				/* get_dropped_packets */
-	NULL,				/* get_captured_packets */
+	NULL,				/* get_statistics */
 	NULL,				/* get_fd */
 	trace_event_trace,		/* trace_event */
 	legacynzix_help,		/* help */

@@ -1594,7 +1594,7 @@ static struct libtrace_format_t dag = {
 	NULL,				/* get_received_packets */
 	NULL,				/* get_filtered_packets */
 	dag_get_dropped_packets,	/* get_dropped_packets */
-	NULL,				/* get_captured_packets */
+	NULL,				/* get_statistics */
 	NULL,                           /* get_fd */
 	trace_event_dag,                /* trace_event */
 	dag_help,                       /* help */
@@ -1606,7 +1606,8 @@ static struct libtrace_format_t dag = {
 	NULL,
 	dag_pconfig_input,
 	dag_pregister_thread,
-	NULL
+	NULL,
+	NULL				/* get thread stats */
 };
 
 void dag_constructor(void)

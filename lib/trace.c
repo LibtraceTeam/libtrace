@@ -279,8 +279,7 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 	libtrace->first_packets.first = 0;
 	libtrace->first_packets.count = 0;
 	libtrace->first_packets.packets = NULL;
-	libtrace->dropped_packets = UINT64_MAX;
-	libtrace->received_packets = UINT64_MAX;
+	libtrace->stats = NULL;
 	libtrace->pread = NULL;
 	ZERO_USER_CONFIG(libtrace->config);
 
@@ -396,6 +395,7 @@ DLLEXPORT libtrace_t * trace_create_dead (const char *uri) {
 	libtrace->perpkt_thread_count = 0;
 	libtrace->perpkt_threads = NULL;
 	libtrace->tracetime = 0;
+	libtrace->stats = NULL;
 	libtrace->pread = NULL;
 	ZERO_USER_CONFIG(libtrace->config);
 	
@@ -659,6 +659,9 @@ DLLEXPORT void trace_destroy(libtrace_t *libtrace) {
 	/* Need to free things! */
 	if (libtrace->uridata)
 		free(libtrace->uridata);
+
+	if (libtrace->stats)
+		free(libtrace->stats);
 	
 	/* Empty any packet memory */
 	if (libtrace->state != STATE_NEW) {
@@ -1950,24 +1953,50 @@ uint64_t trace_get_received_packets(libtrace_t *trace)
 	if (trace->format->get_received_packets) {
 		if ((ret = trace->format->get_received_packets(trace)) != UINT64_MAX)
 			return ret;
+	} else if (trace->format->get_statistics) {
+		struct libtrace_stat_t stat;
+		stat.magic = LIBTRACE_STAT_MAGIC;
+		trace_get_statistics(trace, &stat);
+		if (stat.received_valid)
+			return stat.received;
 	}
-	// Read this cached value taken before the trace was closed
-	return trace->received_packets;
+
+	// Read the cached value taken before the trace was paused/closed
+	if(trace->stats && trace->stats->received_valid)
+		return trace->stats->received;
+	else
+		return UINT64_MAX;
 }
 
 uint64_t trace_get_filtered_packets(libtrace_t *trace)
 {
 	assert(trace);
 	int i = 0;
-	uint64_t ret = trace->filtered_packets;
+	uint64_t lib_filtered = trace->filtered_packets;
 	for (i = 0; i < trace->perpkt_thread_count; i++) {
-		ret += trace->perpkt_threads[i].filtered_packets;
+		lib_filtered += trace->perpkt_threads[i].filtered_packets;
 	}
 	if (trace->format->get_filtered_packets) {
-		return trace->format->get_filtered_packets(trace)+
-			ret;
+		uint64_t trace_filtered = trace->format->get_filtered_packets(trace);
+		if (trace_filtered == UINT64_MAX)
+			return UINT64_MAX;
+		else
+			return trace_filtered + lib_filtered;
+	} else if (trace->format->get_statistics) {
+		struct libtrace_stat_t stat;
+		stat.magic = LIBTRACE_STAT_MAGIC;
+		trace_get_statistics(trace, &stat);
+		if (stat.filtered_valid)
+			return lib_filtered + stat.filtered;
+		else
+			return UINT64_MAX;
 	}
-	return ret;
+
+	// Read the cached value taken before the trace was paused/closed
+	if(trace->stats && trace->stats->filtered_valid)
+		return trace->stats->filtered + lib_filtered;
+	else
+		return lib_filtered;
 }
 
 uint64_t trace_get_dropped_packets(libtrace_t *trace)
@@ -1978,9 +2007,19 @@ uint64_t trace_get_dropped_packets(libtrace_t *trace)
 	if (trace->format->get_dropped_packets) {
 		if ((ret = trace->format->get_dropped_packets(trace)) != UINT64_MAX)
 			return ret;
+	} else if (trace->format->get_statistics) {
+		struct libtrace_stat_t stat;
+		stat.magic = LIBTRACE_STAT_MAGIC;
+		trace_get_statistics(trace, &stat);
+		if (stat.dropped_valid)
+			return stat.dropped;
 	}
-	// Read this cached value taken before the trace was closed
-	return trace->dropped_packets;
+
+	// Read the cached value taken before the trace was paused/closed
+	if(trace->stats && trace->stats->dropped_valid)
+		return trace->stats->dropped;
+	else
+		return UINT64_MAX;
 }
 
 uint64_t trace_get_accepted_packets(libtrace_t *trace)
@@ -1993,6 +2032,162 @@ uint64_t trace_get_accepted_packets(libtrace_t *trace)
 	}
 	return ret;
 }
+
+libtrace_stat_t *trace_get_statistics(libtrace_t *trace, libtrace_stat_t *stat)
+{
+	uint64_t ret;
+	int i;
+	assert(trace);
+	if (stat == NULL) {
+		if (trace->stats == NULL)
+			trace->stats = trace_create_statistics();
+		stat = trace->stats;
+	}
+	assert(stat->magic == LIBTRACE_STAT_MAGIC && "Please use"
+	       "trace_create_statistics() to allocate statistics");
+	stat->reserved1 = 0;
+	stat->reserved2 = 0;
+#define X(x) stat->x ##_valid = 0;
+	LIBTRACE_STAT_FIELDS;
+#undef X
+	if (trace->state == STATE_PAUSED ||
+	    trace->state == STATE_FINSHED ||
+	    trace->state == STATE_JOINED) {
+		if (trace->stats && trace->stats != stat)
+			*stat = *trace->stats;
+		return stat;
+	} else if (trace->format->get_statistics) {
+		trace->format->get_statistics(trace, stat);
+		ret = trace_get_accepted_packets(trace);
+		if (ret != UINT64_MAX) {
+			stat->accepted_valid = 1;
+			stat->accepted = ret;
+		}
+		/* Now add on any library filtered packets */
+		if (stat->filtered_valid) {
+			stat->filtered += trace->filtered_packets;
+			for (i = 0; i < trace->perpkt_thread_count; i++) {
+				stat->filtered += trace->perpkt_threads[i].filtered_packets;
+			}
+		}
+		return stat;
+	}
+	ret = trace_get_accepted_packets(trace);
+	if (ret != UINT64_MAX) {
+		stat->accepted_valid = 1;
+		stat->accepted = ret;
+	}
+	ret = trace_get_received_packets(trace);
+	if (ret != UINT64_MAX) {
+		stat->received_valid = 1;
+		stat->received = ret;
+	}
+	/* Fallback to the old way */
+	ret = trace_get_dropped_packets(trace);
+	if (ret != UINT64_MAX) {
+		stat->dropped_valid = 1;
+		stat->dropped = ret;
+	}
+	ret = trace_get_filtered_packets(trace);
+	if (ret != UINT64_MAX) {
+		stat->filtered_valid = 1;
+		stat->filtered = ret;
+	}
+	return stat;
+}
+
+void trace_get_thread_statistics(libtrace_t *trace, libtrace_thread_t *t,
+                                 libtrace_stat_t *stat)
+{
+	assert(trace && stat);
+	assert(stat->magic == LIBTRACE_STAT_MAGIC && "Please use"
+	       "trace_create_statistics() to allocate statistics");
+	stat->reserved1 = 0;
+	stat->reserved2 = 0;
+#define X(x) stat->x ##_valid= 0;
+	LIBTRACE_STAT_FIELDS;
+#undef X
+	if (trace->format->get_thread_statistics) {
+		trace->format->get_thread_statistics(trace, t, stat);
+	}
+	if (t->accepted_packets != UINT64_MAX) {
+		stat->accepted_valid = 1;
+		stat->accepted = t->accepted_packets;
+	}
+	/* Now add on any library filtered packets */
+	if (stat->filtered_valid) {
+		stat->filtered += t->filtered_packets;
+	}
+	return;
+}
+
+libtrace_stat_t *trace_create_statistics(void) {
+	libtrace_stat_t *ret;
+	ret = malloc(sizeof(libtrace_stat_t));
+	if (ret) {
+		memset(ret, 0, sizeof(libtrace_stat_t));
+		ret->magic = LIBTRACE_STAT_MAGIC;
+	}
+	return ret;
+}
+
+void trace_subtract_statistics(const libtrace_stat_t *a, const libtrace_stat_t *b,
+                         libtrace_stat_t *c) {
+	assert(a->magic == LIBTRACE_STAT_MAGIC && "Please use"
+	       "trace_create_statistics() to allocate statistics");
+	assert(b->magic == LIBTRACE_STAT_MAGIC && "Please use"
+	       "trace_create_statistics() to allocate statistics");
+	assert(c->magic == LIBTRACE_STAT_MAGIC && "Please use"
+	       "trace_create_statistics() to allocate statistics");
+
+#define X(x) \
+	if (a->x ##_valid && b->x ##_valid) { \
+		c->x ##_valid = 1; \
+		c->x = a->x - b->x; \
+	} else {\
+		c->x ##_valid = 0;\
+	}
+	LIBTRACE_STAT_FIELDS
+#undef X
+}
+
+void trace_add_statistics(const libtrace_stat_t *a, const libtrace_stat_t *b,
+                         libtrace_stat_t *c) {
+	assert(a->magic == LIBTRACE_STAT_MAGIC && "Please use"
+	       "trace_create_statistics() to allocate statistics");
+	assert(b->magic == LIBTRACE_STAT_MAGIC && "Please use"
+	       "trace_create_statistics() to allocate statistics");
+	assert(c->magic == LIBTRACE_STAT_MAGIC && "Please use"
+	       "trace_create_statistics() to allocate statistics");
+
+#define X(x) \
+	if (a->x ##_valid&& b->x ##_valid) { \
+		c->x ##_valid = 1; \
+		c->x = a->x + b->x; \
+	} else {\
+		c->x ##_valid = 0;\
+	}
+	LIBTRACE_STAT_FIELDS
+#undef X
+}
+
+int trace_print_statistics(const libtrace_stat_t *s, FILE *f, const char *format) {
+	assert(s->magic == LIBTRACE_STAT_MAGIC && "Please use"
+	       "trace_create_statistics() to allocate statistics");
+	if (format == NULL)
+		format = "%s: %"PRIu64"\n";
+#define xstr(s) str(s)
+#define str(s) #s
+#define X(x) \
+	if (s->x ##_valid) { \
+		if (fprintf(f, format, xstr(x), s->x) < 0) \
+			return -1; \
+	}
+	LIBTRACE_STAT_FIELDS
+#undef X
+	return 0;
+}
+
 
 void trace_clear_cache(libtrace_packet_t *packet) {
 
