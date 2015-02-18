@@ -1179,7 +1179,6 @@ static void* reporter_entry(void *data) {
 	libtrace_message_t message = {0};
 	libtrace_t *trace = (libtrace_t *)data;
 	libtrace_thread_t *t = &trace->reporter_thread;
-	libtrace_vector_t results;
 
 	fprintf(stderr, "Reporter thread starting\n");
 
@@ -1191,8 +1190,6 @@ static void* reporter_entry(void *data) {
 		pthread_exit(NULL);
 	}
 	ASSERT_RET(pthread_mutex_unlock(&trace->libtrace_lock), == 0);
-
-	libtrace_vector_init(&results, sizeof(libtrace_result_t));
 
 	message.code = MESSAGE_STARTING;
 	message.sender = t;
