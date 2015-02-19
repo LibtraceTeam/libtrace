@@ -215,8 +215,6 @@ struct linux_format_data_t {
 	struct linux_dev_stats dev_stats;
 	/* Flag indicating whether the statistics are current or not */
 	int stats_valid;
-	/* The current ring buffer layout */
-	struct tpacket_req req;
 	/* Used to determine buffer size for the ring buffer */
 	uint32_t max_order;
 	/* Used for the parallel case, fanout is the mode */
@@ -256,9 +254,11 @@ struct linux_per_stream_t {
 	char *rx_ring;
 	/* Offset within the mapped buffer */
 	int rxring_offset;
+	/* The ring buffer layout */
+	struct tpacket_req req;
 } ALIGN_STRUCT(CACHE_LINE_SIZE);
 
-#define ZERO_LINUX_STREAM {-1, MAP_FAILED, 0}
+#define ZERO_LINUX_STREAM {-1, MAP_FAILED, 0, {0}}
 
 
 /* Format header for encapsulating packets captured using linux native */

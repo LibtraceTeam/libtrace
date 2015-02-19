@@ -220,11 +220,10 @@ void linuxcommon_close_input_stream(libtrace_t *libtrace,
 	if (stream->fd != -1)
 		close(stream->fd);
 	stream->fd = -1;
-	/* TODO maybe store size against stream XXX */
 	if (stream->rx_ring != MAP_FAILED)
 		munmap(stream->rx_ring,
-		       FORMAT_DATA->req.tp_block_size *
-		       FORMAT_DATA->req.tp_block_nr);
+		       stream->req.tp_block_size *
+		       stream->req.tp_block_nr);
 	stream->rx_ring = MAP_FAILED;
 	FORMAT_DATA->dev_stats.if_name[0] = 0;
 }
@@ -421,7 +420,6 @@ int linuxcommon_start_input_stream(libtrace_t *libtrace,
 		   (size_t)LIBTRACE_PACKET_BUFSIZE,
 		   MSG_DONTWAIT) != -1) { count++; }
 	free(buf);
-	fprintf(stderr, "set offset %d", count);
 
 	/* Mark that the stats are valid and apply an offset */
 	FORMAT_DATA->stats_valid = 1;
@@ -492,7 +490,6 @@ int linuxcommon_fin_input(libtrace_t *libtrace)
 int linuxcommon_pregister_thread(libtrace_t *libtrace,
                                  libtrace_thread_t *t,
                                  bool reading) {
-	fprintf(stderr, "registering thread %d!!\n", t->perpkt_num);
 	if (reading) {
 		/* XXX TODO remove this oneday make sure hasher thread still works */
 		struct linux_per_stream_t *stream;

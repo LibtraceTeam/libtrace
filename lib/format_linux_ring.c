@@ -64,10 +64,10 @@
 
 #ifdef HAVE_NETPACKET_PACKET_H
 /* Get current frame in the ring buffer*/
-#define GET_CURRENT_BUFFER(libtrace, stream) \
+#define GET_CURRENT_BUFFER(stream) \
 	((void *)stream->rx_ring +				\
 	 (stream->rxring_offset *				\
-	  FORMAT_DATA->req.tp_frame_size))
+	  stream->req.tp_frame_size))
 #endif
 
 /* Get the start of the captured data. I'm not sure if tp_mac (link layer) is
@@ -119,6 +119,11 @@ static void calculate_buffers(struct tpacket_req * req, int fd, char * uri,
 
 	/* Calculate block size */
 	req->tp_block_size = pagesize << max_order;
+	/* If max order is too high this might become 0 */
+	if (req->tp_block_size == 0) {
+		calculate_buffers(req, fd, uri, max_order-1);
+		return;
+	}
 	do {
 		req->tp_block_size >>= 1;
 	} while ((CONF_RING_FRAMES * req->tp_frame_size) <= req->tp_block_size);
@@ -177,7 +182,6 @@ static inline int socket_to_packetmmap(char * uridata, int ring_type,
 	 * retry.
 	 */
 	while(1) {
-		fprintf(stderr, "max_order=%d\n", *max_order);
 		if (*max_order <= 0) {
 			strncpy(error,
 				"Cannot allocate enough memory for ring buffer",
@@ -201,7 +205,6 @@ static inline int socket_to_packetmmap(char * uridata, int ring_type,
 
 		} else break;
 	}
-	fprintf(stderr, "max_order=%d\n", *max_order);
 
 	/* Map the ring buffer into userspace */
 	*ring_location = mmap(NULL,
@@ -259,7 +262,7 @@ static inline int linuxring_start_input_stream(libtrace_t *libtrace,
 	/* Make it a packetmmap */
 	if(socket_to_packetmmap(libtrace->uridata, PACKET_RX_RING,
 	                        stream->fd,
-	                        &FORMAT_DATA->req,
+	                        &stream->req,
 	                        &stream->rx_ring,
 	                        &FORMAT_DATA->max_order,
 	                        error) != 0) {
@@ -467,7 +470,7 @@ inline static int linuxring_read_stream(libtrace_t *libtrace,
 	packet->type = TRACE_RT_DATA_LINUX_RING;
 	
 	/* Fetch the current frame */
-	header = GET_CURRENT_BUFFER(libtrace, stream);
+	header = GET_CURRENT_BUFFER(stream);
 	assert((((unsigned long) header) & (pagesize - 1)) == 0);
 
 	/* TP_STATUS_USER means that we can use the frame.
@@ -533,7 +536,7 @@ inline static int linuxring_read_stream(libtrace_t *libtrace,
 
 	/* Move to next buffer */
   	stream->rxring_offset++;
-	stream->rxring_offset %= FORMAT_DATA->req.tp_frame_nr;
+	stream->rxring_offset %= stream->req.tp_frame_nr;
 
 	/* We just need to get prepare_packet to set all our packet pointers
 	 * appropriately */
@@ -574,7 +577,7 @@ static libtrace_eventobj_t linuxring_event(libtrace_t *libtrace,
 	ring_release_frame(libtrace, packet);
 
 	/* Fetch the current frame */
-	header = GET_CURRENT_BUFFER(libtrace, FORMAT_DATA_FIRST);
+	header = GET_CURRENT_BUFFER(FORMAT_DATA_FIRST);
 	if (header->tp_status & TP_STATUS_USER) {
 		/* We have a frame waiting */
 		event.size = trace_read_packet(libtrace, packet);

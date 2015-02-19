@@ -132,7 +132,6 @@ static int linuxnative_prepare_packet(libtrace_t *libtrace UNUSED,
 	
 }
 
-
 #define LIBTRACE_MIN(a,b) ((a)<(b) ? (a) : (b))
 
 /* 20 isn't enough on x86_64 */
@@ -456,10 +455,6 @@ static size_t linuxnative_set_capture_length(libtrace_packet_t *packet,
 	linux_hdr->caplen = size;
 	return trace_get_capture_length(packet);
 }
-
-
-
-
 
 #ifdef HAVE_NETPACKET_PACKET_H
 static void linuxnative_help(void) {
