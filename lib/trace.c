@@ -2045,18 +2045,22 @@ libtrace_stat_t *trace_get_statistics(libtrace_t *trace, libtrace_stat_t *stat)
 	}
 	assert(stat->magic == LIBTRACE_STAT_MAGIC && "Please use"
 	       "trace_create_statistics() to allocate statistics");
-	stat->reserved1 = 0;
-	stat->reserved2 = 0;
-#define X(x) stat->x ##_valid = 0;
-	LIBTRACE_STAT_FIELDS;
-#undef X
+
+	/* If the trace has paused or finished get the cached results */
 	if (trace->state == STATE_PAUSED ||
 	    trace->state == STATE_FINSHED ||
 	    trace->state == STATE_JOINED) {
 		if (trace->stats && trace->stats != stat)
 			*stat = *trace->stats;
 		return stat;
-	} else if (trace->format->get_statistics) {
+	}
+
+	stat->reserved1 = 0;
+	stat->reserved2 = 0;
+#define X(x) stat->x ##_valid = 0;
+	LIBTRACE_STAT_FIELDS;
+#undef X
+	if (trace->format->get_statistics) {
 		trace->format->get_statistics(trace, stat);
 		ret = trace_get_accepted_packets(trace);
 		if (ret != UINT64_MAX) {

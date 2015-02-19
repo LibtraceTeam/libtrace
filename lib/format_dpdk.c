@@ -1366,15 +1366,6 @@ static int dpdk_start_port_queues (struct dpdk_format_data_t *format_data, char 
 #if DEBUG
     fprintf(stderr, "Link status is %d %d %d\n", (int) link_info.link_status,
 	    (int) link_info.link_duplex, (int) link_info.link_speed);
-	struct rte_eth_rss_reta reta_conf = {0};
-	reta_conf.mask_lo = ~reta_conf.mask_lo;
-	reta_conf.mask_hi = ~reta_conf.mask_hi;
-	int qew = rte_eth_dev_rss_reta_query(format_data->port, &reta_conf);
-	fprintf(stderr, "err=%d", qew);
-	for (i = 0; i < ETH_RSS_RETA_NUM_ENTRIES; i++) {
-		fprintf(stderr, "[%d] = %d\n", i, (int)reta_conf.reta[i]);
-	}
-
 #endif
 
     return 0;
