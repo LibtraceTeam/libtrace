@@ -1214,7 +1214,7 @@ static int dag_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *packet)
  *
  * If DUCK reporting is enabled, the packet returned may be a DUCK update
  */
-static int dag_read_packet_real(libtrace_t *libtrace,
+static int dag_read_packet_stream(libtrace_t *libtrace,
 				struct dag_per_stream_t *stream_data,
 				libtrace_thread_t *t, /* Optional */
 				libtrace_packet_t *packet)
@@ -1284,7 +1284,7 @@ static int dag_read_packet_real(libtrace_t *libtrace,
 
 static int dag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 {
-	return dag_read_packet_real(libtrace, FORMAT_DATA_FIRST, NULL, packet);
+	return dag_read_packet_stream(libtrace, FORMAT_DATA_FIRST, NULL, packet);
 }
 
 static int dag_pread_packets(libtrace_t *libtrace, libtrace_thread_t *t,
@@ -1299,7 +1299,7 @@ static int dag_pread_packets(libtrace_t *libtrace, libtrace_thread_t *t,
 
 	/* Read as many packets as we can, but read atleast one packet */
 	do {
-		ret = dag_read_packet_real(libtrace, stream_data, t,
+		ret = dag_read_packet_stream(libtrace, stream_data, t,
 					   packets[read_packets]);
 		if (ret < 0)
 			return ret;
@@ -1426,19 +1426,36 @@ static libtrace_eventobj_t trace_event_dag(libtrace_t *libtrace,
 	return event;
 }
 
-/* Gets the number of dropped packets */
-static uint64_t dag_get_dropped_packets(libtrace_t *libtrace)
+static void dag_get_statistics(libtrace_t *libtrace, libtrace_stat_t *stat)
 {
-	uint64_t sum = 0;
-	libtrace_list_node_t *tmp = FORMAT_DATA_HEAD;
+	libtrace_list_node_t *tmp;
+	assert(stat && libtrace);
+	tmp = FORMAT_DATA_HEAD;
 
-	/* Sum the drop counter for all the packets */
+	/* We don't filter packets on the card itself */
+	stat->filtered_valid = 1;
+	stat->filtered = 0;
+
+	/* Dropped, filtered the  */
+	stat->dropped_valid = 1;
+	stat->dropped = 0;
 	while (tmp != NULL) {
-		sum += STREAM_DATA(tmp)->drops;
+		stat->dropped += STREAM_DATA(tmp)->drops;
 		tmp = tmp->next;
 	}
 
-	return sum;
+}
+
+static void dag_get_thread_statisitics(libtrace_t *libtrace, libtrace_thread_t *t,
+                                       libtrace_stat_t *stat) {
+	struct dag_per_stream_t *stream_data = t->format_data;
+	assert(stat && libtrace);
+
+	stat->dropped_valid = 1;
+	stat->dropped = stream_data->drops;
+
+	stat->filtered_valid = 1;
+	stat->filtered = 0;
 }
 
 /* Prints some semi-useful help text about the DAG format module */
@@ -1478,13 +1495,20 @@ static int dag_pregister_thread(libtrace_t *libtrace, libtrace_thread_t *t,
 				bool reader)
 {
 	struct dag_per_stream_t *stream_data;
+	libtrace_list_node_t *node;
 
 	if (reader) {
 		if (t->type == THREAD_PERPKT) {
-			stream_data =
-				(struct dag_per_stream_t *)
-				libtrace_list_get_index(FORMAT_DATA->per_stream,
-							t->perpkt_num)->data;
+
+			node = libtrace_list_get_index(FORMAT_DATA->per_stream,
+							t->perpkt_num);
+			if (node == NULL) {
+				trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
+				              "Too few streams supplied for the"
+				              " number of threads lanuched");
+				return -1;
+			}
+			stream_data = node->data;
 
 			/* Pass the per thread data to the thread */
 			t->format_data = stream_data;
@@ -1541,8 +1565,8 @@ static struct libtrace_format_t dag = {
 	erf_set_capture_length,         /* set_capture_length */
 	NULL,				/* get_received_packets */
 	NULL,				/* get_filtered_packets */
-	dag_get_dropped_packets,	/* get_dropped_packets */
-	NULL,				/* get_statistics */
+	NULL,				/* get_dropped_packets */
+	dag_get_statistics,		/* get_statistics */
 	NULL,                           /* get_fd */
 	trace_event_dag,                /* trace_event */
 	dag_help,                       /* help */
@@ -1555,7 +1579,7 @@ static struct libtrace_format_t dag = {
 	dag_pconfig_input,
 	dag_pregister_thread,
 	NULL,
-	NULL				/* get thread stats */
+	dag_get_thread_statisitics	/* get thread stats */
 };
 
 void dag_constructor(void)
