@@ -642,6 +642,10 @@ static void* perpkt_threads_entry(void *data) {
 
 error:
 	fprintf(stderr, "An error occured in trace\n");
+	message.code = MESSAGE_DO_STOP;
+	message.sender = t;
+	message.additional.uint64 = 0;
+	trace_send_message_to_perpkts(trace, &message);
 eof:
 	fprintf(stderr, "An eof occured in trace\n");
 	/* ~~~~~~~~~~~~~~ Trace is finished do tear down ~~~~~~~~~~~~~~~~~~~~~ */
