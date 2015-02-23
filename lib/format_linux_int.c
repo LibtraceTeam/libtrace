@@ -299,7 +299,7 @@ inline static int linuxnative_read_stream(libtrace_t *libtrace,
 	/* Buffer contains all of our packet (including our custom header) so
 	 * we just need to get prepare_packet to set all our packet pointers
 	 * appropriately */
-	
+	packet->trace = libtrace;
 	if (linuxnative_prepare_packet(libtrace, packet, packet->buffer,
 				packet->type, flags))
 		return -1;

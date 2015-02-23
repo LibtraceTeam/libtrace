@@ -141,9 +141,19 @@ struct dag_per_stream_t {
 
 /* "Global" data that is stored for each DAG input trace */
 struct dag_format_data_t {
-	/* Data required for regular DUCK reporting */
-	/* TODO: This doesn't work with the 10X2S card! I don't know how
-	 * DUCK stuff works and don't know how to fix it */
+	/* DAG device */
+	struct dag_dev_t *device;
+	/* Boolean flag indicating whether the trace is currently attached */
+	int stream_attached;
+	/* Data stored against each DAG input stream */
+	libtrace_list_t *per_stream;
+
+	/* Data required for regular DUCK reporting.
+	 * We put this on a new cache line otherwise we have a lot of false
+	 * sharing caused by updating the last_pkt.
+	 * This should only ever be accessed by the first thread stream,
+	 * that includes both read and write operations.
+	 */
 	struct {
 		/* Timestamp of the last DUCK report */
 		uint32_t last_duck;
@@ -154,13 +164,7 @@ struct dag_format_data_t {
 		/* Dummy trace to ensure DUCK packets are dealt with using the
 		 * DUCK format functions */
 		libtrace_t *dummy_duck;
-	} duck;
-	/* DAG device */
-	struct dag_dev_t *device;
-	/* Boolean flag indicating whether the trace is currently attached */
-	int stream_attached;
-	/* Data stored against each DAG input stream */
-	libtrace_list_t *per_stream;
+	} duck ALIGN_STRUCT(CACHE_LINE_SIZE);
 };
 
 /* To be thread-safe, we're going to need a mutex for operating on the list
@@ -913,6 +917,7 @@ static int dag_get_duckinfo(libtrace_t *libtrace,
 		DUCK.dummy_duck = trace_create_dead("duck:dummy");
 	packet->trace = DUCK.dummy_duck;
 	DUCK.last_duck = DUCK.last_pkt;
+	packet->error = sizeof(duckinf_t);
 	return sizeof(duckinf_t);
 }
 
@@ -966,11 +971,11 @@ static dag_record_t *dag_get_record(struct dag_per_stream_t *stream_data)
 
 /* Converts a buffer containing a recently read DAG packet record into a
  * libtrace packet */
-static int dag_prepare_packet_real(libtrace_t *libtrace,
-				   struct dag_per_stream_t *stream_data,
-				   libtrace_packet_t *packet,
-				   void *buffer, libtrace_rt_types_t rt_type,
-				   uint32_t flags)
+static int dag_prepare_packet_stream(libtrace_t *libtrace,
+                                     struct dag_per_stream_t *stream_data,
+                                     libtrace_packet_t *packet,
+                                     void *buffer, libtrace_rt_types_t rt_type,
+                                     uint32_t flags)
 {
 	dag_record_t *erfptr;
 
@@ -1024,8 +1029,6 @@ static int dag_prepare_packet_real(libtrace_t *libtrace,
 		}
 	}
 
-	packet->error = 1;
-
 	return 0;
 }
 
@@ -1033,7 +1036,7 @@ static int dag_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
 			      void *buffer, libtrace_rt_types_t rt_type,
 			      uint32_t flags)
 {
-	return dag_prepare_packet_real(libtrace, FORMAT_DATA_FIRST, packet,
+	return dag_prepare_packet_stream(libtrace, FORMAT_DATA_FIRST, packet,
 				       buffer, rt_type, flags);
 }
 
@@ -1221,6 +1224,7 @@ static int dag_read_packet_stream(libtrace_t *libtrace,
 {
 	int size = 0;
 	dag_record_t *erfptr = NULL;
+	struct timeval tv;
 	int numbytes = 0;
 	uint32_t flags = 0;
 	struct timeval maxwait, pollwait;
@@ -1230,11 +1234,13 @@ static int dag_read_packet_stream(libtrace_t *libtrace,
 	maxwait.tv_sec = 0;
 	maxwait.tv_usec = 250000;
 
-	/* Check if we're due for a DUCK report */
-	size = dag_get_duckinfo(libtrace, packet);
+	/* Check if we're due for a DUCK report - only report on the first thread */
+	if (stream_data == FORMAT_DATA_FIRST) {
+		size = dag_get_duckinfo(libtrace, packet);
+		if (size != 0)
+			return size;
+	}
 
-	if (size != 0)
-		return size;
 
 	/* Don't let anyone try to free our DAG memory hole! */
 	flags |= TRACE_PREP_DO_NOT_OWN_BUFFER;
@@ -1274,12 +1280,20 @@ static int dag_read_packet_stream(libtrace_t *libtrace,
 
 	packet->trace = libtrace;
 	/* Prepare the libtrace packet */
-	if (dag_prepare_packet_real(libtrace, stream_data, packet, erfptr,
+	if (dag_prepare_packet_stream(libtrace, stream_data, packet, erfptr,
 				    TRACE_RT_DATA_ERF, flags))
 		return -1;
 
-	return packet->payload ? htons(erfptr->rlen) :
-		erf_get_framing_length(packet);
+	/* Update the DUCK timer - don't re-order this check (false-sharing) */
+	if (stream_data == FORMAT_DATA_FIRST && DUCK.duck_freq != 0) {
+		tv = trace_get_timeval(packet);
+		DUCK.last_pkt = tv.tv_sec;
+	}
+
+	packet->error = packet->payload ? htons(erfptr->rlen) :
+	                                  erf_get_framing_length(packet);
+
+	return packet->error;
 }
 
 static int dag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
@@ -1372,7 +1386,7 @@ static libtrace_eventobj_t trace_event_dag(libtrace_t *libtrace,
 			}
 			break;
 		}
-		if (dag_prepare_packet_real(libtrace, FORMAT_DATA_FIRST, packet,
+		if (dag_prepare_packet_stream(libtrace, FORMAT_DATA_FIRST, packet,
 					    erfptr, TRACE_RT_DATA_ERF, flags)) {
 			event.type = TRACE_EVENT_TERMINATE;
 			break;

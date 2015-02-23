@@ -306,7 +306,7 @@ struct libtrace_t {
 	/** The hasher function */
 	enum hasher_types hasher_type;
 	/** The hasher function - NULL implies they don't care or balance */
-	fn_hasher hasher; // If valid using a separate thread
+	fn_hasher hasher;
 	void *hasher_data;
 	/** The pread_packet choosen path for the configuration */
 	int (*pread)(libtrace_t *, libtrace_thread_t *, libtrace_packet_t **, size_t);

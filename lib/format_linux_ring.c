@@ -524,6 +524,7 @@ inline static int linuxring_read_stream(libtrace_t *libtrace,
 	}
 
 	packet->buffer = header;
+	packet->trace = libtrace;
 
 	/* If a snaplen was configured, automatically truncate the packet to
 	 * the desired length.

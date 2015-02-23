@@ -1823,8 +1823,9 @@ retry_calc_wiretime:
  * @param nb_pkts The number of packets in pkts and optionally packets
  * @param packets Optional - If not null nb_pkts of libtrace packets which will be prepared
  */
-static inline void dpdk_ready_pkts(struct dpdk_format_data_t *format_data, struct dpdk_per_lcore_t *plc,
+static inline void dpdk_ready_pkts(libtrace_t *libtrace, struct dpdk_per_lcore_t *plc,
                                    struct rte_mbuf **pkts, size_t nb_pkts, libtrace_packet_t **packets) {
+	struct dpdk_format_data_t *format_data = FORMAT(libtrace);
 	struct dpdk_addt_hdr *hdr;
 	size_t i;
 	uint64_t cur_sys_time_ns;
@@ -1864,7 +1865,7 @@ static inline void dpdk_ready_pkts(struct dpdk_format_data_t *format_data, struc
 	}
 #endif
 
-	assert(RTE_PKTMBUF_HEADROOM >= sizeof(struct dpdk_addt_hdr)); // TODO static compile time assert sometime??
+	ct_assert(RTE_PKTMBUF_HEADROOM >= sizeof(struct dpdk_addt_hdr));
 	for (i = 0 ; i < nb_pkts ; ++i) {
 
 		/* We put our header straight after the dpdk header */
@@ -1872,17 +1873,10 @@ static inline void dpdk_ready_pkts(struct dpdk_format_data_t *format_data, struc
 		memset(hdr, 0, sizeof(struct dpdk_addt_hdr));
 
 #if GET_MAC_CRC_CHECKSUM
-<<<<<<< HEAD
 		/* Add back in the CRC sum */
-		pkts[i]->pkt.pkt_len += ETHER_CRC_LEN;
-		pkts[i]->pkt.data_len += ETHER_CRC_LEN;
+		rte_pktmbuf_pkt_len(pkt) += ETHER_CRC_LEN;
+		rte_pktmbuf_data_len(pkt) += ETHER_CRC_LEN;
 		hdr->flags |= INCLUDES_CHECKSUM;
-=======
-    /* Add back in the CRC sum */
-    rte_pktmbuf_pkt_len(pkt) += ETHER_CRC_LEN;
-    rte_pktmbuf_data_len(pkt) += ETHER_CRC_LEN;
-    hdr->flags |= INCLUDES_CHECKSUM;
->>>>>>> master
 #endif
 
 		hdr->cap_len = rte_pktmbuf_pkt_len(pkts[i]);
@@ -1981,6 +1975,7 @@ static inline void dpdk_ready_pkts(struct dpdk_format_data_t *format_data, struc
 		if(packets) {
 			packets[i]->buffer = pkts[i];
 			packets[i]->header = pkts[i];
+			packets[i]->trace = libtrace;
 #if HAS_HW_TIMESTAMPS_82580
 			packets[i]->payload = (char *) pkts[i] + sizeof(struct rte_mbuf) +
 			                      RTE_PKTMBUF_HEADROOM + sizeof(struct hw_timestamp_82580);
@@ -2041,7 +2036,7 @@ static int dpdk_read_packet (libtrace_t *libtrace, libtrace_packet_t *packet) {
 	if (nb_rx > 0) { /* Got a packet - otherwise we keep spining */
 		FORMAT(libtrace)->burst_size = nb_rx;
 		FORMAT(libtrace)->burst_offset = 1;
-		dpdk_ready_pkts(FORMAT(libtrace), &FORMAT(libtrace)->per_lcore[0], FORMAT(libtrace)->burst_pkts, nb_rx, NULL);
+		dpdk_ready_pkts(libtrace, &FORMAT(libtrace)->per_lcore[0], FORMAT(libtrace)->burst_pkts, nb_rx, NULL);
 		packet->buffer = FORMAT(libtrace)->burst_pkts[0];
 		dpdk_prepare_packet(libtrace, packet, packet->buffer, packet->type, 0);
 		return 1; // TODO should be bytes read, which essentially useless anyway
@@ -2089,7 +2084,7 @@ static int dpdk_pread_packets (libtrace_t *libtrace, libtrace_thread_t *t, libtr
 	if (nb_rx > 0) {
 		/* Got some packets - otherwise we keep spining */
 		//fprintf(stderr, "Doing P READ PACKET port=%d q=%d\n", (int) FORMAT(libtrace)->port, (int) get_thread_table_num(libtrace));
-		dpdk_ready_pkts(FORMAT(libtrace), PERPKT_FORMAT(t), pkts_burst, nb_rx, packets);
+		dpdk_ready_pkts(libtrace, PERPKT_FORMAT(t), pkts_burst, nb_rx, packets);
 		return nb_rx;
 	}
 	// Check the message queue this could be (Well it shouldn't but anyway) be less than 0
@@ -2211,7 +2206,7 @@ static libtrace_eventobj_t dpdk_trace_event(libtrace_t *trace,
 	    packet->buf_control = TRACE_CTRL_EXTERNAL;
 	    packet->type = TRACE_RT_DATA_DPDK;
 	    event.type = TRACE_EVENT_PACKET;
-	    dpdk_ready_pkts(FORMAT(trace), &FORMAT(trace)->per_lcore[0], pkts_burst, 1, &packet);
+	    dpdk_ready_pkts(trace, &FORMAT(trace)->per_lcore[0], pkts_burst, 1, &packet);
 	    event.size = 1; // TODO should be bytes read, which essentially useless anyway
 
 	    /* XXX - Check this passes the filter trace_read_packet normally

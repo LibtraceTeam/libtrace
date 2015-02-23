@@ -167,10 +167,12 @@ static void print_memory_stats() {
 }
 
 /**
- * True if the trace has dedicated hasher thread otherwise false.
- * This can be used once the hasher thread has been started.
+ * This can be used once the hasher thread has been started and internally after
+ * verfiy_configuration.
+ *
+ * @return true if the trace has dedicated hasher thread otherwise false.
  */
-static inline int trace_has_dedicated_hasher(libtrace_t * libtrace)
+static inline bool trace_has_dedicated_hasher(libtrace_t * libtrace)
 {
 	return libtrace->hasher_thread.type == THREAD_HASHER;
 }
@@ -259,6 +261,8 @@ static inline void libtrace_change_state(libtrace_t *trace,
 }
 
 /**
+ * This is valid once a trace is initialised
+ *
  * @return True if the format supports parallel threads.
  */
 static inline bool trace_supports_parallel(libtrace_t *trace)
@@ -1428,7 +1432,10 @@ static int trace_pread_packet_wrapper(libtrace_t *libtrace,
 				ret = remaining;
 			}
 			for (i = 0; i < ret; ++i) {
-				packets[i]->trace = libtrace;
+				/* We do not mark the packet against the trace,
+				 * before hand or after. After breaks DAG meta
+				 * packets and before is inefficient */
+				//packets[i]->trace = libtrace;
 				/* TODO IN FORMAT?? Like traditional libtrace */
 				if (libtrace->snaplen>0)
 					trace_set_capture_length(packets[i],
@@ -1496,6 +1503,12 @@ static int trace_prestart(libtrace_t * libtrace, void *global_blob,
  * @return
  */
 static void verify_configuration(libtrace_t *libtrace) {
+	bool require_hasher = false;
+
+	/* Might we need a dedicated hasher thread? */
+	if (libtrace->hasher && libtrace->hasher_type != HASHER_HARDWARE) {
+		require_hasher = true;
+	}
 
 	if (libtrace->config.hasher_queue_size <= 0)
 		libtrace->config.hasher_queue_size = 1000;
@@ -1525,6 +1538,12 @@ static void verify_configuration(libtrace_t *libtrace) {
 
 	if (libtrace->combiner.initialise == NULL && libtrace->combiner.publish == NULL)
 		libtrace->combiner = combiner_unordered;
+
+
+	/* Figure out if we are using a dedicated hasher thread? */
+	if (require_hasher && libtrace->config.perpkt_threads > 1) {
+		libtrace->hasher_thread.type = THREAD_HASHER;
+	}
 }
 
 /**
@@ -1629,20 +1648,22 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob,
 
 	verify_configuration(libtrace);
 
-	/* Try start the format */
-	if (libtrace->perpkt_thread_count > 1 &&
-	    trace_supports_parallel(libtrace) &&
+	/* Try start the format - we prefer parallel over single threaded, as
+	 * these formats should support messages better */
+	if (trace_supports_parallel(libtrace) &&
 	    !trace_has_dedicated_hasher(libtrace)) {
-		printf("This format has direct support for p's\n");
+		printf("Using the parallel trace format\n");
 		ret = libtrace->format->pstart_input(libtrace);
 		libtrace->pread = trace_pread_packet_wrapper;
 	} else {
+		printf("Using single threaded interface\n");
 		if (libtrace->format->start_input) {
 			ret = libtrace->format->start_input(libtrace);
 		}
 		if (libtrace->perpkt_thread_count > 1)
 			libtrace->pread = trace_pread_packet_first_in_first_served;
 		else
+			/* Use standard read_packet */
 			libtrace->pread = NULL;
 	}
 
@@ -1658,8 +1679,7 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob,
 	/* If we need a hasher thread start it
 	 * Special Case: If single threaded we don't need a hasher
 	 */
-	if (libtrace->perpkt_thread_count > 1 && libtrace->hasher
-	    && libtrace->hasher_type != HASHER_HARDWARE) {
+	if (trace_has_dedicated_hasher(libtrace)) {
 		ret = trace_start_thread(libtrace, &libtrace->hasher_thread,
 		                   THREAD_HASHER, hasher_entry, -1,
 		                   "hasher-thread");
@@ -1730,10 +1750,6 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob,
 		              "failed to allocate memory.");
 		goto cleanup_threads;
 	}
-
-	/*trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "trace_pstart "
-	              "failed to allocate ocache.");
-	goto cleanup_threads;*/
 
 	if (libtrace_ocache_init(&libtrace->packet_freelist,
 	                     (void* (*)()) trace_create_packet,
@@ -1989,7 +2005,6 @@ DLLEXPORT int trace_set_hasher(libtrace_t *trace, enum hasher_types type, fn_has
 		trace->hasher_data = data;
 	} else {
 		trace->hasher = NULL;
-		// TODO consider how to handle freeing this
 		trace->hasher_data = NULL;
 	}
 
