@@ -167,7 +167,7 @@ static int verify_counters(libtrace_t *trace_read)
 				trace_get_filtered_packets(trace_read));
 		}
 	}
-	if (trace_get_received_packets(trace_read) != 0) {
+	if (trace_get_received_packets(trace_read) != 100) {
 		if (trace_get_received_packets(trace_read) == UINT64_MAX) {
 			printf("\tInfo: trace does not support received counter\n");
 		} else {
