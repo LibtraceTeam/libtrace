@@ -595,15 +595,14 @@ void linuxcommon_get_statistics(libtrace_t *libtrace, libtrace_stat_t *stat) {
 	linuxcommon_update_socket_statistics(libtrace);
 
 	/* filtered count == dev received - socket received */
-	if (FORMAT_DATA->filter == NULL) {
-		stat->filtered_valid = 1;
-		stat->filtered = 0;
-	} else if (FORMAT_DATA->stats_valid && dev_stats.if_name[0]) {
-		stat->filtered_valid = 1;
-		stat->filtered = DEV_DIFF(rx_packets) -
-		                 FORMAT_DATA->stats.tp_packets;
-		if (stat->filtered > UINT64_MAX - 100000) {
-			stat->filtered = 0;
+	if (FORMAT_DATA->filter != NULL &&
+	    FORMAT_DATA->stats_valid &&
+	    dev_stats.if_name[0]) {
+		uint64_t filtered = DEV_DIFF(rx_packets) -
+		                    FORMAT_DATA->stats.tp_packets;
+		/* Check the value is sane, due to timing it could be below 0 */
+		if (filtered < UINT64_MAX - 100000) {
+			stat->filtered += filtered;
 		}
 	}
 

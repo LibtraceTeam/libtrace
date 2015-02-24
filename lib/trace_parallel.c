@@ -172,7 +172,7 @@ static void print_memory_stats() {
  *
  * @return true if the trace has dedicated hasher thread otherwise false.
  */
-static inline bool trace_has_dedicated_hasher(libtrace_t * libtrace)
+inline bool trace_has_dedicated_hasher(libtrace_t * libtrace)
 {
 	return libtrace->hasher_thread.type == THREAD_HASHER;
 }
@@ -411,6 +411,7 @@ static inline int dispatch_packet(libtrace_t *trace,
 			if (delay_tracetime(trace, packet[0], t) == READ_MESSAGE)
 				return READ_MESSAGE;
 		}
+		t->accepted_packets++;
 		*packet = (*trace->per_pkt)(trace, *packet, NULL, t);
 		trace_fin_packet(*packet);
 	} else {
@@ -731,8 +732,10 @@ static void* hasher_entry(void *data) {
 			libtrace_ocache_alloc(&trace->packet_freelist, (void **) &packet, 1, 1);
 		assert(packet);
 
-		if (libtrace_halt) // Signal to die has been sent - TODO
+		if (libtrace_halt) {
+			packet->error = 0;
 			break;
+		}
 
 		// Check for messages that we expect MESSAGE_DO_PAUSE, (internal messages only)
 		if (libtrace_message_queue_try_get(&t->messages, &message) != LIBTRACE_MQ_FAILED) {
@@ -749,9 +752,10 @@ static void* hasher_entry(void *data) {
 					ASSERT_RET(pthread_mutex_unlock(&trace->libtrace_lock), == 0);
 					break;
 				case MESSAGE_DO_STOP:
-					// Stop called after pause
 					assert(trace->started == false);
 					assert(trace->state == STATE_FINSHED);
+					/* Mark the current packet as EOF */
+					packet->error = 0;
 					break;
 				default:
 					fprintf(stderr, "Hasher thread didn't expect message code=%d\n", message.code);
@@ -760,7 +764,7 @@ static void* hasher_entry(void *data) {
 			continue;
 		}
 
-		if ((packet->error = trace_read_packet(trace, packet)) <1 /*&& psize != LIBTRACE_MESSAGE_WAITING*/) {
+		if ((packet->error = trace_read_packet(trace, packet)) <1) {
 			break; /* We are EOF or error'd either way we stop  */
 		}
 
@@ -1442,7 +1446,6 @@ static int trace_pread_packet_wrapper(libtrace_t *libtrace,
 							libtrace->snaplen);
 				trace_packet_set_order(packets[i], trace_get_erf_timestamp(packets[i]));
 			}
-			t->accepted_packets += ret;
 		} while(ret == 0);
 		return ret;
 	}
@@ -1680,6 +1683,7 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob,
 	 * Special Case: If single threaded we don't need a hasher
 	 */
 	if (trace_has_dedicated_hasher(libtrace)) {
+		libtrace->hasher_thread.type = THREAD_EMPTY;
 		ret = trace_start_thread(libtrace, &libtrace->hasher_thread,
 		                   THREAD_HASHER, hasher_entry, -1,
 		                   "hasher-thread");

@@ -248,6 +248,7 @@ typedef struct libtrace_t libtrace_t;
 /** Opaque structure holding information about a bpf filter */
 typedef struct libtrace_filter_t libtrace_filter_t;
 
+/** Opaque structure holding information about libtrace thread */
 typedef struct libtrace_thread_t libtrace_thread_t;
 
 /** If the packet has allocated its own memory the buffer_control should be

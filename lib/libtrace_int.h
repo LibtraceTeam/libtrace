@@ -835,11 +835,17 @@ struct libtrace_format_t {
 	 */
 	uint64_t (*get_dropped_packets)(libtrace_t *trace);
 
-	/** Returns statistics about a trace. Flags are all set to 0 when
-	 * invoked.
+	/** Returns statistics about a trace.
 	 *
 	 * @param trace The libtrace object
-	 * @param stat A zeroed structure ready to be filled.
+	 * @param stat [in,out] A statistics structure ready to be filled
+	 *
+	 * The filtered and accepted statistics will be set to the values
+	 * stored in the library. All other statistics are not set.
+	 *
+	 * @note If filtering of packets is performed by a trace and the number
+	 * of filtered packets is unknown this should be marked as invalid by
+	 * the format.
 	 */
 	void (*get_statistics)(libtrace_t *trace, libtrace_stat_t *stat);
 	
@@ -954,8 +960,18 @@ struct libtrace_format_t {
 	 */
 	void (*punregister_thread)(libtrace_t *libtrace, libtrace_thread_t *t);
 
-	/**
-	 * Return statistics for a single thread.
+	/** Returns statistics for a single thread.
+	 *
+	 * @param trace The libtrace object
+	 * @param t The thread to return statistics for
+	 * @param stat [in,out] A statistics structure ready to be filled
+	 *
+	 * The filtered and accepted statistics will be set to the values
+	 * stored in the library. All other statistics are not set.
+	 *
+	 * @note If filtering of packets is performed by a trace and the number
+	 * of filtered packets is unknown this should be marked as invalid by
+	 * the format.
 	 */
 	void (*get_thread_statistics)(libtrace_t *libtrace,
 	                              libtrace_thread_t *t,

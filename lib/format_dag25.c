@@ -1446,11 +1446,7 @@ static void dag_get_statistics(libtrace_t *libtrace, libtrace_stat_t *stat)
 	assert(stat && libtrace);
 	tmp = FORMAT_DATA_HEAD;
 
-	/* We don't filter packets on the card itself */
-	stat->filtered_valid = 1;
-	stat->filtered = 0;
-
-	/* Dropped, filtered the  */
+	/* Dropped packets */
 	stat->dropped_valid = 1;
 	stat->dropped = 0;
 	while (tmp != NULL) {
@@ -1511,32 +1507,26 @@ static int dag_pregister_thread(libtrace_t *libtrace, libtrace_thread_t *t,
 	struct dag_per_stream_t *stream_data;
 	libtrace_list_node_t *node;
 
-	if (reader) {
-		if (t->type == THREAD_PERPKT) {
-
-			node = libtrace_list_get_index(FORMAT_DATA->per_stream,
-							t->perpkt_num);
-			if (node == NULL) {
-				trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
-				              "Too few streams supplied for the"
-				              " number of threads lanuched");
-				return -1;
-			}
-			stream_data = node->data;
-
-			/* Pass the per thread data to the thread */
-			t->format_data = stream_data;
-
-			/* Attach and start the DAG stream */
-			printf("t%u: starting and attaching stream #%u\n",
-			       t->perpkt_num, stream_data->dagstream);
-			if (dag_start_input_stream(libtrace, stream_data) < 0)
-				return -1;
-		} else {
-			/* TODO: Figure out why t->type != THREAD_PERPKT in
-			 * order to figure out what this line does */
-			t->format_data = FORMAT_DATA_FIRST;
+	if (reader && t->type == THREAD_PERPKT) {
+		fprintf(stderr, "t%u: registered reader thread", t->perpkt_num);
+		node = libtrace_list_get_index(FORMAT_DATA->per_stream,
+						t->perpkt_num);
+		if (node == NULL) {
+			trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
+				      "Too few streams supplied for the"
+				      " number of threads lanuched");
+			return -1;
 		}
+		stream_data = node->data;
+
+		/* Pass the per thread data to the thread */
+		t->format_data = stream_data;
+
+		/* Attach and start the DAG stream */
+		printf("t%u: starting and attaching stream #%u\n",
+		       t->perpkt_num, stream_data->dagstream);
+		if (dag_start_input_stream(libtrace, stream_data) < 0)
+			return -1;
 	}
 
 	fprintf(stderr, "t%u: registered thread\n", t->perpkt_num);
