@@ -393,15 +393,14 @@ static void trace_thread_pause(libtrace_t *trace, libtrace_thread_t *t) {
 /**
  * Sends a packet to the user, expects either a valid packet or a TICK packet.
  *
- * Note READ_MESSAGE will only be returned if tracetime is true.
- *
- * @brief dispatch_packet
- * @param trace
- * @param t
+ * @param trace The trace
+ * @param t The current thread
  * @param packet A pointer to the packet storage, which may be set to null upon
  *               return, or a packet to be finished.
  * @return 0 is successful, otherwise if playing back in tracetime
  *         READ_MESSAGE(-2) can be returned in which case the packet is not sent.
+ *
+ * @note READ_MESSAGE will only be returned if tracetime is true.
  */
 static inline int dispatch_packet(libtrace_t *trace,
                                   libtrace_thread_t *t,
@@ -427,6 +426,49 @@ static inline int dispatch_packet(libtrace_t *trace,
 }
 
 /**
+ * Sends a batch of packets to the user, expects either a valid packet or a
+ * TICK packet.
+ *
+ * @param trace The trace
+ * @param t The current thread
+ * @param packets [in,out] An array of packets, these may be null upon return
+ * @param nb_packets The total number of packets in the list
+ * @param empty [in,out] A pointer to an integer storing the first empty slot,
+ * upon return this is updated
+ * @param offset [in,out] The offset into the array, upon return this is updated
+ * @return 0 is successful, otherwise if playing back in tracetime
+ *         READ_MESSAGE(-2) can be returned in which case the packet is not sent.
+ *
+ * @note READ_MESSAGE will only be returned if tracetime is true.
+ */
+static inline int dispatch_packets(libtrace_t *trace,
+                                  libtrace_thread_t *t,
+                                  libtrace_packet_t *packets[],
+                                  int nb_packets, int *empty, int *offset,
+                                  bool tracetime) {
+	for (;*offset < nb_packets; ++*offset) {
+		int ret;
+		ret = dispatch_packet(trace, t, &packets[*offset], tracetime);
+		if (ret == 0) {
+			/* Move full slots to front as we go */
+			if (packets[*offset]) {
+				if (*empty != *offset) {
+					packets[*empty] = packets[*offset];
+					packets[*offset] = NULL;
+				}
+				++*empty;
+			}
+		} else {
+			/* Break early */
+			assert(ret == READ_MESSAGE);
+			return READ_MESSAGE;
+		}
+	}
+
+	return 0;
+}
+
+/**
  * Pauses a per packet thread, messages will not be processed when the thread
  * is paused.
  *
@@ -440,7 +482,7 @@ static inline int dispatch_packet(libtrace_t *trace,
  */
 static int trace_perpkt_thread_pause(libtrace_t *trace, libtrace_thread_t *t,
                                      libtrace_packet_t *packets[],
-                                     int *nb_packets, int *empty, int *offset) {
+                                     int nb_packets, int *empty, int *offset) {
 	libtrace_message_t message = {0};
 	libtrace_packet_t * packet = NULL;
 
@@ -453,17 +495,8 @@ static int trace_perpkt_thread_pause(libtrace_t *trace, libtrace_thread_t *t,
 
 	/* First send those packets already read, as fast as possible
 	 * This should never fail or check for messages etc. */
-	for (;*offset < *nb_packets; ++*offset) {
-		ASSERT_RET(dispatch_packet(trace, t, &packets[*offset], false), == 0);
-		/* Move full slots to front as we go */
-		if (packets[*offset]) {
-			if (*empty != *offset) {
-				packets[*empty] = packets[*offset];
-				packets[*offset] = NULL;
-			}
-			++*empty;
-		}
-	}
+	ASSERT_RET(dispatch_packets(trace, t, packets, nb_packets, empty,
+	                            offset, false), == 0);
 
 	libtrace_ocache_alloc(&trace->packet_freelist, (void **) &packet, 1, 1);
 	/* If a hasher thread is running, empty input queues so we don't lose data */
@@ -544,9 +577,8 @@ static void* perpkt_threads_entry(void *data) {
 	                      trace->config.burst_size);
 
 	/* ~~~~~~~~~~~ Setup complete now we loop ~~~~~~~~~~~~~~~ */
-	// Send a message to say we've started
 
-	// Let the per_packet function know we have started
+	/* Let the per_packet function know we have started */
 	message.code = MESSAGE_STARTING;
 	message.sender = t;
 	(*trace->per_pkt)(trace, NULL, &message, t);
@@ -560,7 +592,8 @@ static void* perpkt_threads_entry(void *data) {
 			int ret;
 			switch (message.code) {
 				case MESSAGE_DO_PAUSE: // This is internal
-					ret = trace_perpkt_thread_pause(trace, t, packets, &nb_packets, &empty, &offset);
+					ret = trace_perpkt_thread_pause(trace, t,
+					      packets, nb_packets, &empty, &offset);
 					if (ret == READ_EOF) {
 						fprintf(stderr, "PAUSE stop eof!!\n");
 						goto eof;
@@ -609,24 +642,8 @@ static void* perpkt_threads_entry(void *data) {
 			if (packets[0]->error > 0) {
 				store_first_packet(trace, packets[0], t);
 			}
-			for (;offset < nb_packets; ++offset) {
-				int ret;
-				ret = dispatch_packet(trace, t, &packets[offset], trace->tracetime);
-				if (ret == 0) {
-					/* Move full slots to front as we go */
-					if (packets[offset]) {
-						if (empty != offset) {
-							packets[empty] = packets[offset];
-							packets[offset] = NULL;
-						}
-						++empty;
-					}
-				} else {
-					assert(ret == READ_MESSAGE);
-					/* Loop around and process the message, note */
-					continue;
-				}
-			}
+			dispatch_packets(trace, t, packets, nb_packets, &empty,
+			                 &offset, trace->tracetime);
 		} else {
 			switch (nb_packets) {
 			case READ_EOF:
@@ -671,7 +688,6 @@ eof:
 			packets[i] = NULL;
 		}
 	}
-
 
 	thread_change_state(trace, t, THREAD_FINISHED, true);
 
@@ -864,6 +880,9 @@ static int trace_pread_packet_first_in_first_served(libtrace_t *libtrace,
 	ASSERT_RET(pthread_mutex_lock(&libtrace->libtrace_lock), == 0);
 	/* Read nb_packets */
 	for (i = 0; i < nb_packets; ++i) {
+		if (libtrace_halt) {
+			break;
+		}
 		packets[i]->error = trace_read_packet(libtrace, packets[i]);
 
 		if (packets[i]->error <= 0) {
