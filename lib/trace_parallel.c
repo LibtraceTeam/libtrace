@@ -99,6 +99,7 @@
 #include <pthread.h>
 #include <signal.h>
 #include <unistd.h>
+#include <ctype.h>
 
 static inline int delay_tracetime(libtrace_t *libtrace, libtrace_packet_t *packet, libtrace_thread_t *t);
 extern int libtrace_parallel;
@@ -403,9 +404,9 @@ static void trace_thread_pause(libtrace_t *trace, libtrace_thread_t *t) {
  *         READ_MESSAGE(-2) can be returned in which case the packet is not sent.
  */
 static inline int dispatch_packet(libtrace_t *trace,
-                                                 libtrace_thread_t *t,
-                                                 libtrace_packet_t **packet,
-                                                 bool tracetime) {
+                                  libtrace_thread_t *t,
+                                  libtrace_packet_t **packet,
+                                  bool tracetime) {
 	if ((*packet)->error > 0) {
 		if (tracetime) {
 			if (delay_tracetime(trace, packet[0], t) == READ_MESSAGE)
@@ -901,9 +902,9 @@ static int trace_pread_packet_first_in_first_served(libtrace_t *libtrace,
  * 2. Move that into the packet provided (packet)
  */
 inline static int trace_pread_packet_hasher_thread(libtrace_t *libtrace,
-                                                      libtrace_thread_t *t,
-                                                      libtrace_packet_t *packets[],
-                                                      size_t nb_packets) {
+                                                   libtrace_thread_t *t,
+                                                   libtrace_packet_t *packets[],
+                                                   size_t nb_packets) {
 	size_t i;
 
 	/* We store the last error message here */
@@ -1544,7 +1545,7 @@ static void verify_configuration(libtrace_t *libtrace) {
 
 
 	/* Figure out if we are using a dedicated hasher thread? */
-	if (require_hasher && libtrace->config.perpkt_threads > 1) {
+	if (require_hasher && libtrace->perpkt_thread_count > 1) {
 		libtrace->hasher_thread.type = THREAD_HASHER;
 	}
 }
@@ -1595,6 +1596,82 @@ static int trace_start_thread(libtrace_t *trace,
 		pthread_setname_np(t->tid, name);
 	t->perpkt_num = perpkt_num;
 	return 0;
+}
+
+/** Parses the environment variable LIBTRACE_CONF into the supplied
+ * configuration structure.
+ *
+ * @param libtrace The trace from which we determine the URI
+ * @param uc A configuration structure to be configured.
+ *
+ * We search for 3 environment variables and apply them to the config in the
+ * following order. Such that the first has the lowest priority.
+ *
+ * 1. LIBTRACE_CONF, The global environment configuration
+ * 2. LIBTRACE_CONF_<FORMAT>, Applied to a given format
+ * 3. LIBTRACE_CONF_<FORMAT_URI>, Applied the specified trace
+ *
+ * E.g.
+ * - int:eth0 would match LIBTRACE_CONF, LIBTRACE_CONF_INT, LIBTRACE_CONF_INT_ETH0
+ * - dag:/dev/dag0,0 would match LIBTRACE_CONF, LIBTRACE_CONF_DAG, LIBTRACE_CONF_DAG__DEV_DAG0_0
+ * - test.erf would match LIBTRACE_CONF, LIBTRACE_CONF_ERF, LIBTRACE_CONF_ERF_TEST_ERF
+ *
+ * @note All enironment variables names MUST only contian
+ * [A-Z], [0-9] and [_] (underscore) and not start with a number. Any characters
+ * outside of this range should be captilised if possible or replaced with an
+ * underscore.
+ */
+static void parse_env_config (libtrace_t *libtrace, struct user_configuration* uc) {
+	char env_name[1024] = "LIBTRACE_CONF_";
+	size_t len = strlen(env_name);
+	size_t mark = 0;
+	size_t i;
+	char * env;
+
+	/* Make our compound string */
+	strncpy(&env_name[len], libtrace->format->name, sizeof(env_name) - len);
+	len += strlen(libtrace->format->name);
+	strncpy(&env_name[len], ":", sizeof(env_name) - len);
+	len += 1;
+	strncpy(&env_name[len], libtrace->uridata, sizeof(env_name) - len);
+
+	/* env names are allowed to be A-Z (CAPS) 0-9 and _ */
+	for (i = 0; env_name[i] != 0; ++i) {
+		env_name[i] = toupper(env_name[i]);
+		if(env_name[i] == ':') {
+			mark = i;
+		}
+		if (!( (env_name[i] >= 'A' && env_name[i] <= 'Z') ||
+		       (env_name[i] >= '0' && env_name[i] <= '9') )) {
+			env_name[i] = '_';
+		}
+	}
+
+	/* First apply global env settings LIBTRACE_CONF */
+	env = getenv("LIBTRACE_CONF");
+	if (env)
+	{
+		printf("Got env %s", env);
+		parse_user_config(uc, env);
+	}
+
+	/* Then format settings LIBTRACE_CONF_<FORMAT> */
+	if (mark != 0) {
+		env_name[mark] = 0;
+		env = getenv(env_name);
+		if (env) {
+			printf("Got %s=%s", env_name, env);
+			parse_user_config(uc, env);
+		}
+		env_name[mark] = '_';
+	}
+
+	/* Finally this specific trace LIBTRACE_CONF_<FORMAT_URI> */
+	env = getenv(env_name);
+	if (env) {
+		printf("Got %s=%s", env_name, env);
+		parse_user_config(uc, env);
+	}
 }
 
 /* Start an input trace in the parallel libtrace framework.
@@ -1649,6 +1726,8 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob,
 	 * for backwards compatability due to changes when destroying packets */
 	libtrace_parallel = 1;
 
+	/* Parses configuration passed through environment variables */
+	parse_env_config(libtrace, &libtrace->config);
 	verify_configuration(libtrace);
 
 	/* Try start the format - we prefer parallel over single threaded, as
