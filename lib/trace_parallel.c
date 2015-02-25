@@ -104,11 +104,6 @@
 static inline int delay_tracetime(libtrace_t *libtrace, libtrace_packet_t *packet, libtrace_thread_t *t);
 extern int libtrace_parallel;
 
-struct multithreading_stats {
-	uint64_t full_queue_hits;
-	uint64_t wait_for_fill_complete_hits;
-} contention_stats[1024];
-
 struct mem_stats {
 	struct memfail {
 	   uint64_t cache_hit;
@@ -274,23 +269,6 @@ static inline bool trace_supports_parallel(libtrace_t *trace)
 		return true;
 	else
 		return false;
-}
-
-DLLEXPORT void print_contention_stats(libtrace_t *libtrace) {
-	int i;
-	struct multithreading_stats totals = {0};
-	for (i = 0; i < libtrace->perpkt_thread_count ; i++) {
-		fprintf(stderr, "\nStats for perpkt thread#%d\n", i);
-		fprintf(stderr, "\tfull_queue_hits: %"PRIu64"\n", contention_stats[i].full_queue_hits);
-		totals.full_queue_hits += contention_stats[i].full_queue_hits;
-		fprintf(stderr, "\twait_for_fill_complete_hits: %"PRIu64"\n", contention_stats[i].wait_for_fill_complete_hits);
-		totals.wait_for_fill_complete_hits += contention_stats[i].wait_for_fill_complete_hits;
-	}
-	fprintf(stderr, "\nTotals for perpkt threads\n");
-	fprintf(stderr, "\tfull_queue_hits: %"PRIu64"\n", totals.full_queue_hits);
-	fprintf(stderr, "\twait_for_fill_complete_hits: %"PRIu64"\n", totals.wait_for_fill_complete_hits);
-
-	return;
 }
 
 void libtrace_zero_thread(libtrace_thread_t * t) {
@@ -967,155 +945,6 @@ inline static int trace_pread_packet_hasher_thread(libtrace_t *libtrace,
 	}
 
 	return i;
-}
-
-/**
- * Tries to read from our queue and returns 1 if a packet was retrieved
- */
-static inline int try_waiting_queue(libtrace_t *libtrace, libtrace_thread_t * t, libtrace_packet_t **packet, int * ret)
-{
-	libtrace_packet_t* retrived_packet;
-
-	/* Lets see if we have one waiting */
-	if (libtrace_ringbuffer_try_read(&t->rbuffer, (void **) &retrived_packet)) {
-		/* Copy paste from trace_pread_packet_hasher_thread() except that we try read (non-blocking) */
-		assert(retrived_packet);
-
-		if (*packet) // Recycle the old get the new
-			libtrace_ocache_free(&libtrace->packet_freelist, (void **) packet, 1, 1);
-		*packet = retrived_packet;
-		*ret = (*packet)->error;
-		return 1;
-	}
-	return 0;
-}
-
-/**
- * Allows us to ensure all threads are finished writing to our threads ring_buffer
- * before returning EOF/error.
- */
-inline static int trace_handle_finishing_perpkt(libtrace_t *libtrace, libtrace_packet_t **packet, libtrace_thread_t * t)
-{
-	/* We are waiting for the condition that another thread ends to check
-	 * our queue for new data, once all threads end we can go to finished */
-	bool complete = false;
-	int ret;
-
-	do {
-		// Wait for a thread to end
-		ASSERT_RET(pthread_mutex_lock(&libtrace->libtrace_lock), == 0);
-
-		// Check before
-		if (libtrace->perpkt_thread_states[THREAD_FINISHING] == libtrace->perpkt_thread_count) {
-			complete = true;
-			ASSERT_RET(pthread_mutex_unlock(&libtrace->libtrace_lock), == 0);
-			continue;
-		}
-
-		ASSERT_RET(pthread_cond_wait(&libtrace->perpkt_cond, &libtrace->libtrace_lock), == 0);
-
-		// Check after
-		if (libtrace->perpkt_thread_states[THREAD_FINISHING] == libtrace->perpkt_thread_count) {
-			complete = true;
-			ASSERT_RET(pthread_mutex_unlock(&libtrace->libtrace_lock), == 0);
-			continue;
-		}
-
-		ASSERT_RET(pthread_mutex_unlock(&libtrace->libtrace_lock), == 0);
-
-		// Always trying to keep our buffer empty for the unlikely case more threads than buffer space want to write into our queue
-		if(try_waiting_queue(libtrace, t, packet, &ret))
-			return ret;
-	} while (!complete);
-
-	// We can only end up here once all threads complete
-	try_waiting_queue(libtrace, t, packet, &ret);
-
-	return ret;
-	// TODO rethink this logic fix bug here
-}
-
-/**
- * Expects the libtrace_lock to not be held
- */
-inline static int trace_finish_perpkt(libtrace_t *libtrace, libtrace_packet_t **packet, libtrace_thread_t * t)
-{
-	thread_change_state(libtrace, t, THREAD_FINISHING, true);
-	return trace_handle_finishing_perpkt(libtrace, packet, t);
-}
-
-/**
- * This case is much like the dedicated hasher, except that we will become
- * hasher if we don't have a a packet waiting.
- *
- * Note: This is only every used if we have are doing hashing.
- *
- * TODO: Can block on zero copy formats such as ring: and dpdk: if the
- * queue sizes in total are larger than the ring size.
- *
- * 1. We read a packet from our buffer
- * 2. Move that into the packet provided (packet)
- */
-inline static int trace_pread_packet_hash_locked(libtrace_t *libtrace, libtrace_thread_t *t, libtrace_packet_t **packet)
-{
-	int thread, ret/*, psize*/;
-
-	while (1) {
-		if(try_waiting_queue(libtrace, t, packet, &ret))
-			return ret;
-		// Can still block here if another thread is writing to a full queue
-		ASSERT_RET(pthread_mutex_lock(&libtrace->libtrace_lock), == 0);
-
-		// Its impossible for our own queue to overfill, because no one can write
-		// when we are in the lock
-		if(try_waiting_queue(libtrace, t, packet, &ret)) {
-			ASSERT_RET(pthread_mutex_unlock(&libtrace->libtrace_lock), == 0);
-			return ret;
-		}
-
-		// Another thread cannot write a packet because a queue has filled up. Is it ours?
-		if (libtrace->perpkt_queue_full) {
-			contention_stats[t->perpkt_num].wait_for_fill_complete_hits++;
-			ASSERT_RET(pthread_mutex_unlock(&libtrace->libtrace_lock), == 0);
-			continue;
-		}
-
-		if (!*packet)
-			libtrace_ocache_alloc(&libtrace->packet_freelist, (void **) packet, 1, 1);
-		assert(*packet);
-
-		// If we fail here we can guarantee that our queue is empty (and no new data will be added because we hold the lock)
-		if (libtrace_halt || ((*packet)->error = trace_read_packet(libtrace, *packet)) <1 /*&& psize != LIBTRACE_MESSAGE_WAITING*/) {
-			ASSERT_RET(pthread_mutex_unlock(&libtrace->libtrace_lock), == 0);
-			if (libtrace_halt)
-				return 0;
-			else
-				return (*packet)->error;
-		}
-
-		trace_packet_set_hash(*packet, (*libtrace->hasher)(*packet, libtrace->hasher_data));
-		thread = trace_packet_get_hash(*packet) % libtrace->perpkt_thread_count;
-		if (thread == t->perpkt_num) {
-			// If it's this thread we must be in order because we checked the buffer once we got the lock
-			ASSERT_RET(pthread_mutex_unlock(&libtrace->libtrace_lock), == 0);
-			return (*packet)->error;
-		}
-
-		if (libtrace->perpkt_threads[thread].state != THREAD_FINISHED) {
-			while (!libtrace_ringbuffer_try_swrite_bl(&libtrace->perpkt_threads[thread].rbuffer, *packet)) {
-				libtrace->perpkt_queue_full = true;
-				ASSERT_RET(pthread_mutex_unlock(&libtrace->libtrace_lock), == 0);
-				contention_stats[t->perpkt_num].full_queue_hits++;
-				ASSERT_RET(pthread_mutex_lock(&libtrace->libtrace_lock), == 0);
-			}
-			*packet = NULL;
-			libtrace->perpkt_queue_full = false;
-		} else {
-			/* We can get here if the user closes the thread before natural completion/or error */
-			assert (!"packet_hash_locked() The user terminated the trace in a abnormal manner");
-		}
-		ASSERT_RET(pthread_mutex_unlock(&libtrace->libtrace_lock), == 0);
-	}
 }
 
 /**

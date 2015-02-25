@@ -3533,7 +3533,6 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob, fn_per_pkt p
 DLLEXPORT int trace_ppause(libtrace_t *libtrace);
 DLLEXPORT int trace_pstop(libtrace_t *libtrace);
 DLLEXPORT void trace_join(libtrace_t * trace);
-DLLEXPORT void print_contention_stats (libtrace_t *libtrace);
 
 DLLEXPORT void libtrace_result_set_key(libtrace_result_t * result, uint64_t key);
 DLLEXPORT uint64_t libtrace_result_get_key(libtrace_result_t * result);

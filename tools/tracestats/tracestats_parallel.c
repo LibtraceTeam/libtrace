@@ -256,7 +256,6 @@ static void run_trace(char *uri)
 	if (trace_is_err(trace))
 		trace_perror(trace,"%s",uri);
 
-	print_contention_stats(trace);
 	trace_destroy(trace);
 }
 
