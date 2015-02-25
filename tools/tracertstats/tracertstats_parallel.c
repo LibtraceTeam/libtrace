@@ -239,7 +239,7 @@ static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt,
 					next_update_time = (last_ts*packet_interval + packet_interval) * 1000000 + offset;
 					if (next_update_time <= mesg->additional.uint64) {
 						//fprintf(stderr, "Got a tick and publishing early!!\n");
-						trace_publish_result(trace, t, (uint64_t) last_ts, (libtrace_generic_types_t){.ptr = NULL}, RESULT_NORMAL);
+						trace_publish_result(trace, t, (uint64_t) last_ts, (libtrace_generic_types_t){.ptr = results}, RESULT_NORMAL);
 						trace_post_reporter(trace);
 						results = calloc(1, sizeof(result_t) + sizeof(statistic_t) * filter_count);
 						last_ts++;
