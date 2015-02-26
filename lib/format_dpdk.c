@@ -1996,39 +1996,32 @@ static libtrace_direction_t dpdk_set_direction(libtrace_packet_t *packet, libtra
 	return (libtrace_direction_t) hdr->direction;
 }
 
-/*
- * NOTE: Drops could occur for other reasons than running out of buffer
- * space. Such as failed MAC checksums and oversized packets.
- */
-static uint64_t dpdk_get_dropped_packets (libtrace_t *trace) {
-	struct rte_eth_stats stats = {0};
+static void dpdk_get_stats(libtrace_t *trace, libtrace_stat_t *stats) {
+	struct rte_eth_stats dev_stats = {0};
 
 	if (trace->format_data == NULL || FORMAT(trace)->port == 0xFF)
-		return UINT64_MAX;
+		return;
+
 	/* Grab the current stats */
-	rte_eth_stats_get(FORMAT(trace)->port, &stats);
+	rte_eth_stats_get(FORMAT(trace)->port, &dev_stats);
 
-	/* Get the drop counter */
-	return (uint64_t) stats.ierrors;
-}
+	stats->captured_valid = true;
+	stats->captured = dev_stats.ipackets;
 
-/*
- * This is the number of packets filtered by the NIC
- * and maybe ahead of number read using libtrace.
- *
- * XXX we are yet to implement any filtering, but if it was this should
- * get the result. So this will just return 0 for now.
- */
-static uint64_t dpdk_get_filtered_packets (libtrace_t *trace) {
-	struct rte_eth_stats stats = {0};
+	/* Not that we support adding filters but if we did this
+	 * would work */
+	stats->filtered += dev_stats.fdirmiss;
 
-	if (trace->format_data == NULL || FORMAT(trace)->port == 0xFF)
-		return UINT64_MAX;
-	/* Grab the current stats */
-	rte_eth_stats_get(FORMAT(trace)->port, &stats);
+	stats->dropped_valid = true;
+	stats->dropped = dev_stats.imissed;
 
-	/* Get the drop counter */
-	return (uint64_t) stats.fdirmiss;
+	/* DPDK errors includes drops */
+	stats->errors_valid = true;
+	stats->errors = dev_stats.ierrors - dev_stats.imissed;
+
+	stats->received_valid = true;
+	stats->received = dev_stats.ipackets + dev_stats.imissed;
+
 }
 
 /* Attempts to read a packet in a non-blocking fashion. If one is not
@@ -2109,54 +2102,54 @@ static void dpdk_help(void) {
 
 static struct libtrace_format_t dpdk = {
 	"dpdk",
-	"$Id: format_dpdk.c 1805 2013-03-08 02:01:35Z salcock $",
+	"$Id$",
 	TRACE_FORMAT_DPDK,
-	NULL,	                /* probe filename */
-	NULL,				    /* probe magic */
-	dpdk_init_input,	    /* init_input */
-	dpdk_config_input,	    /* config_input */
-	dpdk_start_input,	    /* start_input */
-	dpdk_pause_input,	    /* pause_input */
-	dpdk_init_output,	    /* init_output */
-	NULL,				    /* config_output */
-	dpdk_start_output,	    /* start_ouput */
-	dpdk_fin_input,		    /* fin_input */
-	dpdk_fin_output,        /* fin_output */
-	dpdk_read_packet,	    /* read_packet */
-	dpdk_prepare_packet,    /* prepare_packet */
-	dpdk_fin_packet,				    /* fin_packet */
-	dpdk_write_packet,	    /* write_packet */
-	dpdk_get_link_type,	    /* get_link_type */
-	dpdk_get_direction,	    /* get_direction */
-	dpdk_set_direction,	    /* set_direction */
-	NULL,				    /* get_erf_timestamp */
-	dpdk_get_timeval,	    /* get_timeval */
-	dpdk_get_timespec,	    /* get_timespec */
-	NULL,				    /* get_seconds */
-	NULL,				    /* seek_erf */
-	NULL,				    /* seek_timeval */
-	NULL,				    /* seek_seconds */
-	dpdk_get_capture_length,/* get_capture_length */
-	dpdk_get_wire_length,	/* get_wire_length */
-	dpdk_get_framing_length,/* get_framing_length */
-	dpdk_set_capture_length,/* set_capture_length */
-	NULL,				    /* get_received_packets */
-	dpdk_get_filtered_packets,/* get_filtered_packets */
-	dpdk_get_dropped_packets,/* get_dropped_packets */
-	NULL,			/* get_statistics */
-	NULL,		            /* get_fd */
-	dpdk_trace_event,		/* trace_event */
-	dpdk_help,              /* help */
-	NULL,                   /* next pointer */
-	{true, 8},              /* Live, NICs typically have 8 threads */
-	dpdk_pstart_input, /* pstart_input */
-	dpdk_pread_packets, /* pread_packets */
-	dpdk_pause_input, /* ppause */
-	dpdk_fin_input, /* p_fin */
-	dpdk_pconfig_input, /* pconfig_input */
-	dpdk_pregister_thread, /* pregister_thread */
-	dpdk_punregister_thread, /* punregister_thread */
-	NULL				/* get thread stats */
+	NULL,                               /* probe filename */
+	NULL,                               /* probe magic */
+	dpdk_init_input,                    /* init_input */
+	dpdk_config_input,                  /* config_input */
+	dpdk_start_input,                   /* start_input */
+	dpdk_pause_input,                   /* pause_input */
+	dpdk_init_output,                   /* init_output */
+	NULL,                               /* config_output */
+	dpdk_start_output,                  /* start_ouput */
+	dpdk_fin_input,                     /* fin_input */
+	dpdk_fin_output,                    /* fin_output */
+	dpdk_read_packet,                   /* read_packet */
+	dpdk_prepare_packet,                /* prepare_packet */
+	dpdk_fin_packet,                    /* fin_packet */
+	dpdk_write_packet,                  /* write_packet */
+	dpdk_get_link_type,                 /* get_link_type */
+	dpdk_get_direction,                 /* get_direction */
+	dpdk_set_direction,                 /* set_direction */
+	NULL,                               /* get_erf_timestamp */
+	dpdk_get_timeval,                   /* get_timeval */
+	dpdk_get_timespec,                  /* get_timespec */
+	NULL,                               /* get_seconds */
+	NULL,                               /* seek_erf */
+	NULL,                               /* seek_timeval */
+	NULL,                               /* seek_seconds */
+	dpdk_get_capture_length,            /* get_capture_length */
+	dpdk_get_wire_length,               /* get_wire_length */
+	dpdk_get_framing_length,            /* get_framing_length */
+	dpdk_set_capture_length,            /* set_capture_length */
+	NULL,                               /* get_received_packets */
+	NULL,                               /* get_filtered_packets */
+	NULL,                               /* get_dropped_packets */
+	dpdk_get_stats,                     /* get_statistics */
+	NULL,                               /* get_fd */
+	dpdk_trace_event,                   /* trace_event */
+	dpdk_help,                          /* help */
+	NULL,                               /* next pointer */
+	{true, 8},                          /* Live, NICs typically have 8 threads */
+	dpdk_pstart_input,                  /* pstart_input */
+	dpdk_pread_packets,                 /* pread_packets */
+	dpdk_pause_input,                   /* ppause */
+	dpdk_fin_input,                     /* p_fin */
+	dpdk_pconfig_input,                 /* pconfig_input */
+	dpdk_pregister_thread,              /* pregister_thread */
+	dpdk_punregister_thread,            /* punregister_thread */
+	NULL                                /* get thread stats */
 };
 
 void dpdk_constructor(void) {
