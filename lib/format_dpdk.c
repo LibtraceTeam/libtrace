@@ -236,12 +236,12 @@
  * vsyscall also if it's not you should seriously consider updating your
  * kernel.
  */
-#ifdef HAVE_LIBRT
+#ifdef HAVE_CLOCK_GETTIME
 /* You can turn this on (set to 1) to prefer clock_gettime */
 #define USE_CLOCK_GETTIME 1
 #else
-/* DONT CHANGE THIS !!! */
-#define USE_CLOCK_GETTIME 1
+/* DON'T CHANGE THIS !!! */
+#define USE_CLOCK_GETTIME 0
 #endif
 
 /* This is fairly safe to turn on - currently there appears to be a 'bug'
