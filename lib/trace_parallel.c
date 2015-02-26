@@ -678,13 +678,10 @@ eof:
 	// because this might(it does in DPDK) unlink the formats mempool
 	// causing destroy/finish packet to fail.
 	libtrace_ocache_unregister_thread(&trace->packet_freelist);
-	ASSERT_RET(pthread_mutex_lock(&trace->libtrace_lock), == 0);
 	if (trace->format->punregister_thread) {
 		trace->format->punregister_thread(trace, t);
 	}
 	print_memory_stats();
-
-	ASSERT_RET(pthread_mutex_unlock(&trace->libtrace_lock), == 0);
 
 	pthread_exit(NULL);
 };
@@ -817,12 +814,10 @@ static void* hasher_entry(void *data) {
 	message.additional.uint64 = 0;
 	trace_send_message_to_reporter(trace, &message);
 	libtrace_ocache_unregister_thread(&trace->packet_freelist);
-	ASSERT_RET(pthread_mutex_lock(&trace->libtrace_lock), == 0);
 	if (trace->format->punregister_thread) {
 		trace->format->punregister_thread(trace, t);
 	}
 	print_memory_stats();
-	ASSERT_RET(pthread_mutex_unlock(&trace->libtrace_lock), == 0);
 
 	// TODO remove from TTABLE t sometime
 	pthread_exit(NULL);

@@ -1227,8 +1227,8 @@ DLLEXPORT libtrace_eventobj_t trace_event(libtrace_t *trace,
 	assert(trace);
 	assert(packet);
 
-	/* Clear the packet cache */
-	trace_clear_cache(packet);
+	/* Free the last packet */
+	trace_fin_packet(packet);
 	
 	/* Store the trace we are reading from into the packet opaque
 	 * structure */
