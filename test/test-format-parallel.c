@@ -120,21 +120,22 @@ static void report_result(libtrace_t *trace, libtrace_result_t *result, libtrace
 }
 
 int x;
-static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt,
-						libtrace_message_t *mesg,
-						libtrace_thread_t *t) {
+static void* per_packet(libtrace_t *trace, libtrace_thread_t *t,
+                        int mesg, libtrace_generic_t data,
+                        libtrace_thread_t *sender UNUSED) {
 	struct TLS *tls;
 	void* ret;
+	int a,*b,c=0;
 	// Test internal TLS against __thread
 	static __thread bool seen_start_message = false;
 	static __thread bool seen_stop_message = false;
-	static __thread bool seen_paused_message = false;
+	static __thread bool seen_resuming_message = false;
 	static __thread bool seen_pausing_message = false;
 	static __thread int count = 0;
 	tls = trace_get_tls(t);
 
-	if (pkt) {
-		int a,*b,c=0;
+	switch (mesg) {
+	case MESSAGE_PACKET:
 		assert(tls != NULL);
 		assert(!seen_stop_message);
 		count++;
@@ -149,48 +150,47 @@ static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt,
 			c += a**b;
 		}
 		x = c;
-	}
-	else switch (mesg->code) {
-		case MESSAGE_STARTING:
-			assert(!seen_start_message || seen_paused_message);
-			assert(tls == NULL);
-			tls = calloc(sizeof(struct TLS), 1);
-			ret = trace_set_tls(t, tls);
-			assert(ret == NULL);
-			seen_start_message = true;
-			tls->seen_start_message = true;
-			break;
-		case MESSAGE_STOPPING:
-			assert(seen_start_message);
-			assert(tls != NULL);
-			assert(tls->seen_start_message);
-			assert(tls->count == count);
-			seen_stop_message = true;
-			tls->seen_stop_message = true;
-			free(tls);
-			trace_set_tls(t, NULL);
+		return data.pkt;
+	case MESSAGE_STARTING:
+		assert(!seen_start_message || seen_resuming_message);
+		assert(tls == NULL);
+		tls = calloc(sizeof(struct TLS), 1);
+		ret = trace_set_tls(t, tls);
+		assert(ret == NULL);
+		seen_start_message = true;
+		tls->seen_start_message = true;
+		break;
+	case MESSAGE_STOPPING:
+		assert(seen_start_message);
+		assert(tls != NULL);
+		assert(tls->seen_start_message);
+		assert(tls->count == count);
+		seen_stop_message = true;
+		tls->seen_stop_message = true;
+		free(tls);
+		trace_set_tls(t, NULL);
 
-			// All threads publish to verify the thread count
-			trace_publish_result(trace, t, (uint64_t) 0, (libtrace_generic_t){.sint = count}, RESULT_NORMAL);
-			trace_post_reporter(trace);
-			break;
-		case MESSAGE_TICK:
-			assert(seen_start_message);
-			fprintf(stderr, "Not expecting a tick packet\n");
-			kill(getpid(), SIGTERM);
-			break;
-		case MESSAGE_PAUSING:
-			assert(seen_start_message);
-			seen_pausing_message = true;
-			tls->seen_pausing_message = true;
-			break;
-		case MESSAGE_RESUMING:
-			assert(tls->seen_pausing_message  || tls->seen_start_message );
-			seen_paused_message = true;
-			tls->seen_resuming_message = true;
-			break;
+		// All threads publish to verify the thread count
+		trace_publish_result(trace, t, (uint64_t) 0, (libtrace_generic_t){.sint = count}, RESULT_NORMAL);
+		trace_post_reporter(trace);
+		break;
+	case MESSAGE_TICK:
+		assert(seen_start_message);
+		fprintf(stderr, "Not expecting a tick packet\n");
+		kill(getpid(), SIGTERM);
+		break;
+	case MESSAGE_PAUSING:
+		assert(seen_start_message);
+		seen_pausing_message = true;
+		tls->seen_pausing_message = true;
+		break;
+	case MESSAGE_RESUMING:
+		assert(tls->seen_pausing_message  || tls->seen_start_message );
+		seen_resuming_message = true;
+		tls->seen_resuming_message = true;
+		break;
 	}
-	return pkt;
+	return NULL;
 }
 
 int main(int argc, char *argv[]) {

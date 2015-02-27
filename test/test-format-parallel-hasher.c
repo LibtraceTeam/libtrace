@@ -125,15 +125,16 @@ static void report_result(libtrace_t *trace, libtrace_result_t *result, libtrace
 }
 
 static int x;
-static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt, 
-						libtrace_message_t *mesg,
-						libtrace_thread_t *t) {
+static void* per_packet(libtrace_t *trace, libtrace_thread_t *t,
+                        int mesg, libtrace_generic_t data,
+                        libtrace_thread_t *sender UNUSED) {
 	struct TLS *tls;
 	void* ret;
 	tls = trace_get_tls(t);
+	int a,*b,c=0;
 
-	if (pkt) {
-		int a,*b,c=0;
+	switch (mesg) {
+	case MESSAGE_PACKET:
 		assert(tls != NULL);
 		assert(!(tls->seen_stop_message));
 		tls->count++;
@@ -147,42 +148,41 @@ static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt,
 			c += a**b;
 		}
 		x = c;
-	}
-	else switch (mesg->code) {
-		case MESSAGE_STARTING:
-			assert(tls == NULL);
-			tls = calloc(sizeof(struct TLS), 1);
-			ret = trace_set_tls(t, tls);
-			assert(ret == NULL);
-			tls->seen_start_message = true;
-			break;
-		case MESSAGE_STOPPING:
-			assert(tls->seen_start_message);
-			assert(tls != NULL);
-			tls->seen_stop_message = true;
-			trace_set_tls(t, NULL);
+		return data.pkt;
+	case MESSAGE_STARTING:
+		assert(tls == NULL);
+		tls = calloc(sizeof(struct TLS), 1);
+		ret = trace_set_tls(t, tls);
+		assert(ret == NULL);
+		tls->seen_start_message = true;
+		break;
+	case MESSAGE_STOPPING:
+		assert(tls->seen_start_message);
+		assert(tls != NULL);
+		tls->seen_stop_message = true;
+		trace_set_tls(t, NULL);
 
-			// All threads publish to verify the thread count
-			assert(tls->count == 25 || tls->count == 75);
-			trace_publish_result(trace, t, (uint64_t) 0, (libtrace_generic_t){.sint=tls->count}, RESULT_NORMAL);
-			trace_post_reporter(trace);
-			free(tls);
-			break;
-		case MESSAGE_TICK:
-			assert(tls->seen_start_message );
-			fprintf(stderr, "Not expecting a tick packet\n");
-			kill(getpid(), SIGTERM);
-			break;
-		case MESSAGE_PAUSING:
-			assert(tls->seen_start_message);
-			tls->seen_pausing_message = true;
-			break;
-		case MESSAGE_RESUMING:
-			assert(tls->seen_pausing_message  || tls->seen_start_message);
-			tls->seen_resumed_message = true;
-			break;
+		// All threads publish to verify the thread count
+		assert(tls->count == 25 || tls->count == 75);
+		trace_publish_result(trace, t, (uint64_t) 0, (libtrace_generic_t){.sint=tls->count}, RESULT_NORMAL);
+		trace_post_reporter(trace);
+		free(tls);
+		break;
+	case MESSAGE_TICK:
+		assert(tls->seen_start_message );
+		fprintf(stderr, "Not expecting a tick packet\n");
+		kill(getpid(), SIGTERM);
+		break;
+	case MESSAGE_PAUSING:
+		assert(tls->seen_start_message);
+		tls->seen_pausing_message = true;
+		break;
+	case MESSAGE_RESUMING:
+		assert(tls->seen_pausing_message  || tls->seen_start_message);
+		tls->seen_resumed_message = true;
+		break;
 	}
-	return pkt;
+	return NULL;
 }
 
 
@@ -191,7 +191,7 @@ static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt,
  * This is based on a few internal workings assumptions, which
  * might change and still be valid even if this test fails!!.
  */
-uint64_t hash25_75(const libtrace_packet_t* packet, void *data) {
+uint64_t hash25_75(const libtrace_packet_t* packet UNUSED, void *data) {
 	int *count = (int *) data;
 	*count += 1;
 	if (*count <= 25)

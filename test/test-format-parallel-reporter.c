@@ -118,11 +118,12 @@ static void reporter(libtrace_t *libtrace, libtrace_result_t *res, libtrace_mess
 	}
 }
 
-static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt, 
-						libtrace_message_t *mesg,
-						libtrace_thread_t *t) {
+static void* per_packet(libtrace_t *trace, libtrace_thread_t *t,
+                        int mesg, libtrace_generic_t data,
+                        libtrace_thread_t *sender UNUSED) {
 	UNUSED static __thread int x = 0;
-	if (pkt) {
+
+	if (mesg == MESSAGE_PACKET) {
 		int a,*b,c=0;
 		// Do some work to even out the load on cores
 		b = &c;
@@ -130,15 +131,9 @@ static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt,
 			c += a**b;
 		}
 		x = c;
-		trace_publish_result(trace, t, trace_packet_get_order(pkt), (libtrace_generic_t){.pkt=pkt}, RESULT_PACKET);
-		return NULL;
+		trace_publish_result(trace, t, trace_packet_get_order(data.pkt), (libtrace_generic_t){.pkt=data.pkt}, RESULT_PACKET);
 	}
-	else switch (mesg->code) {
-		// We don't care we have no state
-		default:
-			break;
-	}
-	return pkt;
+	return NULL;
 }
 
 int main(int argc, char *argv[]) {
