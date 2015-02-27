@@ -170,89 +170,92 @@ typedef struct timestamp_sync {
 	uint64_t first_interval_number;
 } timestamp_sync_t;
 
-static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt, 
-						libtrace_message_t *mesg,
-						libtrace_thread_t *t)
+static void* per_packet(libtrace_t *trace, libtrace_thread_t *t,
+                        int mesg, libtrace_generic_t data,
+                        libtrace_thread_t *sender UNUSED)
 {
 	int i;
 	static __thread uint64_t last_ts = 0, ts = 0;
 	static __thread result_t * results = NULL;
-	// Unsure when we would hit this case but the old code had it, I 
-	// guess we should keep it
-	if (pkt && trace_get_packet_buffer(pkt,NULL,NULL) != NULL) {
-		//fprintf(stderr, "Got packet t=%x\n", t);
-		ts = trace_get_seconds(pkt) / packet_interval;
+
+	switch(mesg) {
+	case MESSAGE_PACKET:
+		// Unsure when we would hit this case but the old code had it, I
+		// guess we should keep it
+		assert(trace_get_packet_buffer(pkt,NULL,NULL) != NULL);
+		ts = trace_get_seconds(data.pkt) / packet_interval;
 		if (last_ts == 0)
 			last_ts = ts;
 
 		while (packet_interval != UINT64_MAX && last_ts<ts) {
+			libtrace_generic_t tmp = {.ptr = results};
 			// Publish and make a new one new
 			//fprintf(stderr, "Publishing result %"PRIu64"\n", last_ts);
-			trace_publish_result(trace, t, (uint64_t) last_ts, (libtrace_generic_types_t){.ptr = results}, RESULT_NORMAL);
+			trace_publish_result(trace, t, (uint64_t) last_ts, tmp, RESULT_NORMAL);
 			trace_post_reporter(trace);
 			results = calloc(1, sizeof(result_t) + sizeof(statistic_t) * filter_count);
 			last_ts++;
 		}
-		
+
 		for(i=0;i<filter_count;++i) {
-			if(trace_apply_filter(filters[i].filter, pkt)) {
+			if(trace_apply_filter(filters[i].filter, data.pkt)) {
 				results->filters[i].count++;
-				results->filters[i].bytes+=trace_get_wire_length(pkt);
+				results->filters[i].bytes+=trace_get_wire_length(data.pkt);
 			}
 		}
-		
+
 		results->total.count++;
-		results->total.bytes +=trace_get_wire_length(pkt);
+		results->total.bytes +=trace_get_wire_length(data.pkt);
 		/*if (count >= packet_count) {
 			report_results(ts,count,bytes);
 			count=0;
 			bytes=0;
 		}*/ // TODO what was happening here doesn't match up with any of the documentations!!!
-	}
-	
-	if (mesg) {
-		// printf ("%d.%06d READ #%"PRIu64"\n", tv.tv_sec, tv.tv_usec, trace_packet_get(packet));
-		switch (mesg->code) {
-			case MESSAGE_STARTING:
-				results = calloc(1, sizeof(result_t) + sizeof(statistic_t) * filter_count);
-				break;
-			case MESSAGE_STOPPING:
-				// Should we always post this?
-				if (results->total.count) {
-					trace_publish_result(trace, t, (uint64_t) last_ts, (libtrace_generic_types_t){.ptr = results}, RESULT_NORMAL);
+		return data.pkt;
+
+	case MESSAGE_STARTING:
+		results = calloc(1, sizeof(result_t) + sizeof(statistic_t) * filter_count);
+		break;
+
+	case MESSAGE_STOPPING:
+		// Should we always post this?
+		if (results->total.count) {
+			libtrace_generic_t tmp = {.ptr = results};
+			trace_publish_result(trace, t, (uint64_t) last_ts, tmp, RESULT_NORMAL);
+			trace_post_reporter(trace);
+			results = NULL;
+		}
+		break;
+
+		case MESSAGE_TICK:
+		{
+			int64_t offset;
+			struct timeval *tv, tv_real;
+			libtrace_packet_t *first_packet = NULL;
+			retrive_first_packet(trace, &first_packet, &tv);
+			if (first_packet != NULL) {
+				// So figure out our running offset
+				tv_real = trace_get_timeval(first_packet);
+				offset = tv_to_usec(tv) - tv_to_usec(&tv_real);
+				// Get time of day and do this stuff
+				uint64_t next_update_time;
+				next_update_time = (last_ts*packet_interval + packet_interval) * 1000000 + offset;
+				if (next_update_time <= data.uint64) {
+					libtrace_generic_t tmp = {.ptr = results};
+					//fprintf(stderr, "Got a tick and publishing early!!\n");
+					trace_publish_result(trace, t, (uint64_t) last_ts, tmp, RESULT_NORMAL);
 					trace_post_reporter(trace);
-					results = NULL;
-				}
-				break;
-			case MESSAGE_TICK:
-			{
-				int64_t offset;
-				struct timeval *tv, tv_real;
-				libtrace_packet_t *first_packet = NULL;
-				retrive_first_packet(trace, &first_packet, &tv);
-				if (first_packet != NULL) {
-					// So figure out our running offset
-					tv_real = trace_get_timeval(first_packet);
-					offset = tv_to_usec(tv) - tv_to_usec(&tv_real);
-					// Get time of day and do this stuff
-					uint64_t next_update_time;
-					next_update_time = (last_ts*packet_interval + packet_interval) * 1000000 + offset;
-					if (next_update_time <= mesg->additional.uint64) {
-						//fprintf(stderr, "Got a tick and publishing early!!\n");
-						trace_publish_result(trace, t, (uint64_t) last_ts, (libtrace_generic_types_t){.ptr = results}, RESULT_NORMAL);
-						trace_post_reporter(trace);
-						results = calloc(1, sizeof(result_t) + sizeof(statistic_t) * filter_count);
-						last_ts++;
-					} else {
-						//fprintf(stderr, "Got a tick but no publish ...\n");
-					}
+					results = calloc(1, sizeof(result_t) + sizeof(statistic_t) * filter_count);
+					last_ts++;
 				} else {
-					//fprintf(stderr, "Got a tick but no packets seen yet!!!\n");
+					//fprintf(stderr, "Got a tick but no publish ...\n");
 				}
+			} else {
+				//fprintf(stderr, "Got a tick but no packets seen yet!!!\n");
 			}
 		}
 	}
-	return pkt;
+	return NULL;
 }
 
 static uint64_t bad_hash(const libtrace_packet_t * pkt UNUSED, void *data UNUSED) {

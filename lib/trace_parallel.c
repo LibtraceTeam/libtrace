@@ -384,21 +384,20 @@ static inline int dispatch_packet(libtrace_t *trace,
                                   libtrace_thread_t *t,
                                   libtrace_packet_t **packet,
                                   bool tracetime) {
+
 	if ((*packet)->error > 0) {
 		if (tracetime) {
 			if (delay_tracetime(trace, packet[0], t) == READ_MESSAGE)
 				return READ_MESSAGE;
 		}
 		t->accepted_packets++;
-		*packet = (*trace->per_pkt)(trace, *packet, NULL, t);
+		libtrace_generic_t data = {.pkt = *packet};
+		*packet = (*trace->per_pkt)(trace, t, MESSAGE_PACKET, data, t);
 		trace_fin_packet(*packet);
 	} else {
-		libtrace_message_t message;
 		assert((*packet)->error == READ_TICK);
-		message.code = MESSAGE_TICK;
-		message.additional.uint64 = trace_packet_get_order(*packet);
-		message.sender = t;
-		(*trace->per_pkt)(trace, NULL, &message, t);
+		libtrace_generic_t data = {.uint64 = trace_packet_get_order(*packet)};
+		(*trace->per_pkt)(trace, t, MESSAGE_TICK, data, t);
 	}
 	return 0;
 }
@@ -461,13 +460,10 @@ static inline int dispatch_packets(libtrace_t *trace,
 static int trace_perpkt_thread_pause(libtrace_t *trace, libtrace_thread_t *t,
                                      libtrace_packet_t *packets[],
                                      int nb_packets, int *empty, int *offset) {
-	libtrace_message_t message = {0};
 	libtrace_packet_t * packet = NULL;
 
 	/* Let the user thread know we are going to pause */
-	message.code = MESSAGE_PAUSING;
-	message.sender = t;
-	(*trace->per_pkt)(trace, NULL, &message, t);
+	(*trace->per_pkt)(trace, t, MESSAGE_PAUSING, (libtrace_generic_t){0}, t);
 
 	/* Send through any remaining packets (or messages) without delay */
 
@@ -510,8 +506,7 @@ static int trace_perpkt_thread_pause(libtrace_t *trace, libtrace_thread_t *t,
 
 	/* Now we do the actual pause, this returns when we resumed */
 	trace_thread_pause(trace, t);
-	message.code = MESSAGE_RESUMING;
-	(*trace->per_pkt)(trace, NULL, &message, t);
+	(*trace->per_pkt)(trace, t, MESSAGE_RESUMING, (libtrace_generic_t){0}, t);
 	return 1;
 }
 
@@ -557,12 +552,8 @@ static void* perpkt_threads_entry(void *data) {
 	/* ~~~~~~~~~~~ Setup complete now we loop ~~~~~~~~~~~~~~~ */
 
 	/* Let the per_packet function know we have started */
-	message.code = MESSAGE_STARTING;
-	message.sender = t;
-	(*trace->per_pkt)(trace, NULL, &message, t);
-	message.code = MESSAGE_RESUMING;
-	(*trace->per_pkt)(trace, NULL, &message, t);
-
+	(*trace->per_pkt)(trace, t, MESSAGE_STARTING, (libtrace_generic_t){0}, t);
+	(*trace->per_pkt)(trace, t, MESSAGE_RESUMING, (libtrace_generic_t){0}, t);
 
 	for (;;) {
 
@@ -585,7 +576,7 @@ static void* perpkt_threads_entry(void *data) {
 					fprintf(stderr, "DO_STOP stop!!\n");
 					goto eof;
 			}
-			(*trace->per_pkt)(trace, NULL, &message, t);
+			(*trace->per_pkt)(trace, t, message.code, message.additional, message.sender);
 			/* Continue and the empty messages out before packets */
 			continue;
 		}
@@ -652,12 +643,8 @@ eof:
 	/* ~~~~~~~~~~~~~~ Trace is finished do tear down ~~~~~~~~~~~~~~~~~~~~~ */
 
 	// Let the per_packet function know we have stopped
-	message.code = MESSAGE_PAUSING;
-	message.sender = t;
-	(*trace->per_pkt)(trace, NULL, &message, t);
-	message.code = MESSAGE_STOPPING;
-	message.additional.uint64 = 0;
-	(*trace->per_pkt)(trace, NULL, &message, t);
+	(*trace->per_pkt)(trace, t, MESSAGE_PAUSING, (libtrace_generic_t){0}, t);
+	(*trace->per_pkt)(trace, t, MESSAGE_STOPPING, (libtrace_generic_t){0}, t);
 
 	// Free any remaining packets
 	for (i = 0; i < trace->config.burst_size; i++) {
@@ -2100,13 +2087,13 @@ DLLEXPORT void libtrace_result_set_key(libtrace_result_t * result, uint64_t key)
 DLLEXPORT uint64_t libtrace_result_get_key(libtrace_result_t * result) {
 	return result->key;
 }
-DLLEXPORT void libtrace_result_set_value(libtrace_result_t * result, libtrace_generic_types_t value) {
+DLLEXPORT void libtrace_result_set_value(libtrace_result_t * result, libtrace_generic_t value) {
 	result->value = value;
 }
-DLLEXPORT libtrace_generic_types_t libtrace_result_get_value(libtrace_result_t * result) {
+DLLEXPORT libtrace_generic_t libtrace_result_get_value(libtrace_result_t * result) {
 	return result->value;
 }
-DLLEXPORT void libtrace_result_set_key_value(libtrace_result_t * result, uint64_t key, libtrace_generic_types_t value) {
+DLLEXPORT void libtrace_result_set_key_value(libtrace_result_t * result, uint64_t key, libtrace_generic_t value) {
 	result->key = key;
 	result->value = value;
 }
@@ -2154,7 +2141,7 @@ DLLEXPORT void * trace_set_tls(libtrace_thread_t *t, void * data)
  * Publishes a result to the reduce queue
  * Should only be called by a perpkt thread, i.e. from a perpkt handler
  */
-DLLEXPORT void trace_publish_result(libtrace_t *libtrace, libtrace_thread_t *t, uint64_t key, libtrace_generic_types_t value, int type) {
+DLLEXPORT void trace_publish_result(libtrace_t *libtrace, libtrace_thread_t *t, uint64_t key, libtrace_generic_t value, int type) {
 	libtrace_result_t res;
 	res.type = type;
 	res.key = key;
@@ -2167,7 +2154,7 @@ DLLEXPORT void trace_publish_result(libtrace_t *libtrace, libtrace_thread_t *t, 
 /**
  * Sets a combiner function against the trace.
  */
-DLLEXPORT void trace_set_combiner(libtrace_t *trace, const libtrace_combine_t *combiner, libtrace_generic_types_t config){
+DLLEXPORT void trace_set_combiner(libtrace_t *trace, const libtrace_combine_t *combiner, libtrace_generic_t config){
 	if (combiner) {
 		trace->combiner = *combiner;
 		trace->combiner.configuration = config;

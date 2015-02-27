@@ -171,7 +171,7 @@ static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt,
 			trace_set_tls(t, NULL);
 
 			// All threads publish to verify the thread count
-			trace_publish_result(trace, t, (uint64_t) 0, (libtrace_generic_types_t){.sint = count}, RESULT_NORMAL);
+			trace_publish_result(trace, t, (uint64_t) 0, (libtrace_generic_t){.sint = count}, RESULT_NORMAL);
 			trace_post_reporter(trace);
 			break;
 		case MESSAGE_TICK:

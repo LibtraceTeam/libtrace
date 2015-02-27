@@ -101,18 +101,25 @@ typedef struct statistics {
 } statistics_t;
 
 
-static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt, libtrace_message_t *mesg, libtrace_thread_t *t)
+//libtrace_message_t mesg
+static void* per_packet(libtrace_t *trace, libtrace_thread_t *t,
+                        int mesg, libtrace_generic_t data,
+                        libtrace_thread_t *sender)
 {
 	// Using first entry as total and those after for filter counts
 	static __thread statistics_t * results = NULL;
-	int i;
-	
-	if (pkt) {
-		int wlen = trace_get_wire_length(pkt);
+	int i, wlen;
+	libtrace_stat_t *stats;
+
+
+	// printf ("%d.%06d READ #%"PRIu64"\n", tv.tv_sec, tv.tv_usec, trace_packet_get(packet));
+	switch (mesg) {
+	case MESSAGE_PACKET:
+		wlen = trace_get_wire_length(data.pkt);
 		for(i=0;i<filter_count;++i) {
 			if (filters[i].filter == NULL)
 				continue;
-			if(trace_apply_filter(filters[i].filter,pkt) > 0) {
+			if(trace_apply_filter(filters[i].filter,data.pkt) > 0) {
 				results[i+1].count++;
 				results[i+1].bytes+=wlen;
 			}
@@ -125,29 +132,29 @@ static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt, libtrace_mess
 		}
 		results[0].count++;
 		results[0].bytes +=wlen;
+		return data.pkt;
+	case MESSAGE_STOPPING:
+		stats = trace_create_statistics();
+		trace_get_thread_statistics(trace, t, stats);
+		trace_print_statistics(stats, stderr, NULL);
+		free(stats);
+		trace_publish_result(trace, t, 0, (libtrace_generic_t){.ptr = results}, RESULT_NORMAL); // Only ever using a single key 0
+		//fprintf(stderr, "tracestats_parallel:\t Stopping thread - publishing results\n");
+		break;
+	case MESSAGE_STARTING:
+		results = calloc(1, sizeof(statistics_t) * (filter_count + 1));
+		break;
+	case MESSAGE_DO_PAUSE:
+		assert(!"GOT Asked to pause!!!\n");
+		break;
+	case MESSAGE_PAUSING:
+		//fprintf(stderr, "tracestats_parallel:\t pausing thread\n");
+		break;
+	case MESSAGE_RESUMING:
+		//fprintf(stderr, "tracestats_parallel:\t resuming thread\n");
+		break;
 	}
-	if (mesg) {
-		// printf ("%d.%06d READ #%"PRIu64"\n", tv.tv_sec, tv.tv_usec, trace_packet_get(packet));
-		switch (mesg->code) {
-			case MESSAGE_STOPPING:
-				trace_publish_result(trace, t, 0, (libtrace_generic_types_t){.ptr = results}, RESULT_NORMAL); // Only ever using a single key 0
-				//fprintf(stderr, "tracestats_parallel:\t Stopping thread - publishing results\n");
-				break;
-			case MESSAGE_STARTING:
-				results = calloc(1, sizeof(statistics_t) * (filter_count + 1));
-				break;
-			case MESSAGE_DO_PAUSE:
-				assert(!"GOT Asked to pause!!!\n");
-				break;
-			case MESSAGE_PAUSING:
-				//fprintf(stderr, "tracestats_parallel:\t pausing thread\n");
-				break;
-			case MESSAGE_RESUMING:
-				//fprintf(stderr, "tracestats_parallel:\t resuming thread\n");
-				break;
-		}
-	}
-	return pkt;
+	return NULL;
 }
 
 static void report_result(libtrace_t *trace UNUSED, libtrace_result_t *result, libtrace_message_t *mesg) {

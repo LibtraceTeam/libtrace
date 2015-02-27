@@ -153,14 +153,17 @@ UNUSED static uint64_t rand_hash(UNUSED libtrace_packet_t * pkt)
 }
 
 
-static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt, libtrace_message_t *mesg, UNUSED libtrace_thread_t *t)
+static void* per_packet(libtrace_t *trace, libtrace_thread_t *t,
+                        int mesg, libtrace_generic_t data,
+                        libtrace_thread_t *sender UNUSED)
 {
-	if (pkt) {
-		struct libtrace_ip *ipptr;
-		libtrace_udp_t *udp = NULL;
-		libtrace_tcp_t *tcp = NULL;
+	struct libtrace_ip *ipptr;
+	libtrace_udp_t *udp = NULL;
+	libtrace_tcp_t *tcp = NULL;
 
-		ipptr = trace_get_ip(pkt);
+	switch (mesg) {
+	case MESSAGE_PACKET:
+		ipptr = trace_get_ip(data.pkt);
 
 		if (ipptr && (enc_source || enc_dest)) {
 			encrypt_ips(ipptr,enc_source,enc_dest);
@@ -172,12 +175,12 @@ static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt, libtrace_mess
 
 		/* XXX replace with nice use of trace_get_transport() */
 
-		udp = trace_get_udp(pkt);
+		udp = trace_get_udp(data.pkt);
 		if (udp && (enc_source || enc_dest)) {
 			udp->check = 0;
 		} 
 
-		tcp = trace_get_tcp(pkt);
+		tcp = trace_get_tcp(data.pkt);
 		if (tcp && (enc_source || enc_dest)) {
 			tcp->check = 0;
 		}
@@ -190,18 +193,14 @@ static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt, libtrace_mess
 		//libtrace_packet_t * packet_copy = trace_result_packet(trace, pkt);
 		//trace_publish_result(trace, trace_packet_get_order(pkt), pkt);
 
-		trace_publish_result(trace, t, trace_packet_get_order(pkt), (libtrace_generic_types_t){.pkt=pkt}, RESULT_PACKET);
-		//return ;
-	}
-	if (mesg) {
-		// printf ("%d.%06d READ #%"PRIu64"\n", tv.tv_sec, tv.tv_usec, trace_packet_get(packet));
-		switch (mesg->code) {
-			case MESSAGE_STARTING:
-				enc_init(enc_type,key);
-			break;
-			case MESSAGE_TICK:
-				trace_publish_result(trace, t, mesg->additional.uint64, (libtrace_generic_types_t){.pkt=NULL}, RESULT_TICK);
-		}
+		trace_publish_result(trace, t, trace_packet_get_order(data.pkt), data, RESULT_PACKET);
+		break;
+	case MESSAGE_STARTING:
+		enc_init(enc_type,key);
+		break;
+	case MESSAGE_TICK:
+		trace_publish_result(trace, t, data.uint64, (libtrace_generic_t){0}, RESULT_TICK);
+		break;
 	}
 	return NULL;
 }
@@ -422,7 +421,7 @@ int main(int argc, char *argv[])
 	 */
 	 
 	int i = 1;
-	trace_set_combiner(trace, &combiner_ordered, (libtrace_generic_types_t){0});
+	trace_set_combiner(trace, &combiner_ordered, (libtrace_generic_t){0});
 	trace_parallel_config(trace, TRACE_OPTION_SET_CONFIG, &uc);
 
 	//trace_set_hasher(trace, HASHER_CUSTOM, rand_hash, NULL);

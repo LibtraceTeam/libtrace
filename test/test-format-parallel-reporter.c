@@ -130,7 +130,7 @@ static void* per_packet(libtrace_t *trace, libtrace_packet_t *pkt,
 			c += a**b;
 		}
 		x = c;
-		trace_publish_result(trace, t, trace_packet_get_order(pkt), (libtrace_generic_types_t){.pkt=pkt}, RESULT_PACKET);
+		trace_publish_result(trace, t, trace_packet_get_order(pkt), (libtrace_generic_t){.pkt=pkt}, RESULT_PACKET);
 		return NULL;
 	}
 	else switch (mesg->code) {
@@ -159,7 +159,7 @@ int main(int argc, char *argv[]) {
 
 	if (strcmp(argv[1],"rtclient")==0) expected=101;
 
-	trace_set_combiner(trace, &combiner_ordered, (libtrace_generic_types_t){0});
+	trace_set_combiner(trace, &combiner_ordered, (libtrace_generic_t){0});
 
 	trace_pstart(trace, NULL, per_packet, reporter);
 	iferr(trace,tracename);
