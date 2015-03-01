@@ -182,7 +182,7 @@ static void* per_packet(libtrace_t *trace, libtrace_thread_t *t,
 	case MESSAGE_PACKET:
 		// Unsure when we would hit this case but the old code had it, I
 		// guess we should keep it
-		assert(trace_get_packet_buffer(pkt,NULL,NULL) != NULL);
+		assert(trace_get_packet_buffer(data.pkt,NULL,NULL) != NULL);
 		ts = trace_get_seconds(data.pkt) / packet_interval;
 		if (last_ts == 0)
 			last_ts = ts;
