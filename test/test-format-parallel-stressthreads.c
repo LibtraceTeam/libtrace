@@ -132,6 +132,7 @@ static void* per_packet(libtrace_t *trace, libtrace_thread_t *t,
 	tls = trace_get_tls(t);
 
 	switch (mesg) {
+	case MESSAGE_PACKET:
 		assert(tls != NULL);
 		assert(!(tls->seen_stop_message));
 		tls->count++;
