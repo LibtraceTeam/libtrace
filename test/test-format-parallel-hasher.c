@@ -100,27 +100,28 @@ struct TLS {
 
 static int totalpkts = 0;
 static int expected;
-static void report_result(libtrace_t *trace, libtrace_result_t *result, libtrace_message_t *mesg) {
+static void report_result(libtrace_t *trace UNUSED, int mesg,
+                          libtrace_generic_t data,
+                          libtrace_thread_t *sender UNUSED) {
 	static int totalthreads = 0;
-	if (result) {
-		assert(libtrace_result_get_key(result) == 0);
-		printf("%d,", libtrace_result_get_value(result).sint);
+	switch (mesg) {
+	case MESSAGE_RESULT:
+		assert(libtrace_result_get_key(data.res) == 0);
+		printf("%d,", libtrace_result_get_value(data.res).sint);
 		totalthreads++;
-		totalpkts += libtrace_result_get_value(result).sint;
-		assert(libtrace_result_get_value(result).sint == 25 ||
-			libtrace_result_get_value(result).sint == expected - 25);
-	} else {
-		switch(mesg->code) {
-			case MESSAGE_STARTING:
-				// Should have two threads here
-				assert(libtrace_get_perpkt_count(trace) == 2);
-				printf("\tLooks like %d threads are being used!\n\tcounts(", libtrace_get_perpkt_count(trace));
-				break;
-			case MESSAGE_STOPPING:
-				printf(")\n");
-				assert(totalthreads == libtrace_get_perpkt_count(trace));
-				break;
-		}
+		totalpkts += libtrace_result_get_value(data.res).sint;
+		assert(libtrace_result_get_value(data.res).sint == 25 ||
+			libtrace_result_get_value(data.res).sint == expected - 25);
+		break;
+	case MESSAGE_STARTING:
+		// Should have two threads here
+		assert(libtrace_get_perpkt_count(trace) == 2);
+		printf("\tLooks like %d threads are being used!\n\tcounts(", libtrace_get_perpkt_count(trace));
+		break;
+	case MESSAGE_STOPPING:
+		printf(")\n");
+		assert(totalthreads == libtrace_get_perpkt_count(trace));
+		break;
 	}
 }
 

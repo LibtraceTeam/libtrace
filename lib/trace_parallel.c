@@ -1034,11 +1034,8 @@ static void* reporter_entry(void *data) {
 	}
 	ASSERT_RET(pthread_mutex_unlock(&trace->libtrace_lock), == 0);
 
-	message.code = MESSAGE_STARTING;
-	message.sender = t;
-	(*trace->reporter)(trace, NULL, &message);
-	message.code = MESSAGE_RESUMING;
-	(*trace->reporter)(trace, NULL, &message);
+	(*trace->reporter)(trace, MESSAGE_STARTING, (libtrace_generic_t) {0}, t);
+	(*trace->reporter)(trace, MESSAGE_RESUMING, (libtrace_generic_t) {0}, t);
 
 	while (!trace_finished(trace)) {
 		if (trace->config.reporter_polling) {
@@ -1055,15 +1052,12 @@ static void* reporter_entry(void *data) {
 			case MESSAGE_DO_PAUSE:
 				assert(trace->combiner.pause);
 				trace->combiner.pause(trace, &trace->combiner);
-				message.code = MESSAGE_PAUSING;
-				message.sender = t;
-				(*trace->reporter)(trace, NULL, &message);
+				(*trace->reporter)(trace, MESSAGE_PAUSING, (libtrace_generic_t) {0}, t);
 				trace_thread_pause(trace, t);
-				message.code = MESSAGE_RESUMING;
-				(*trace->reporter)(trace, NULL, &message);
+				(*trace->reporter)(trace, MESSAGE_RESUMING, (libtrace_generic_t) {0}, t);
 				break;
-			default:
-				(*trace->reporter)(trace, NULL, &message);
+		default:
+			(*trace->reporter)(trace, message.code, message.additional, message.sender);
 		}
 	}
 
@@ -1071,11 +1065,8 @@ static void* reporter_entry(void *data) {
 	trace->combiner.read_final(trace, &trace->combiner);
 
 	// GOODBYE
-	message.code = MESSAGE_PAUSING;
-	message.sender = t;
-	(*trace->reporter)(trace, NULL, &message);
-	message.code = MESSAGE_STOPPING;
-	(*trace->reporter)(trace, NULL, &message);
+	(*trace->reporter)(trace, MESSAGE_PAUSING, (libtrace_generic_t) {0}, t);
+	(*trace->reporter)(trace, MESSAGE_STOPPING, (libtrace_generic_t) {0}, t);
 
 	thread_change_state(trace, &trace->reporter_thread, THREAD_FINISHED, true);
 	print_memory_stats();

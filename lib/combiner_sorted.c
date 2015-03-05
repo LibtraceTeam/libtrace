@@ -57,8 +57,9 @@ static void read_final(libtrace_t *trace, libtrace_combine_t *c) {
 
 	for (a = 0; a < libtrace_vector_get_size(&queues[0]); ++a) {
 		libtrace_result_t r;
-		ASSERT_RET (libtrace_vector_get(&queues[0], a,  (void *) &r), == 1);
-		trace->reporter(trace, &r, NULL);
+		libtrace_generic_t gt = {.res = &r};
+		ASSERT_RET (libtrace_vector_get(&queues[0], a, (void *) &r), == 1);
+		trace->reporter(trace, MESSAGE_RESULT, gt, &trace->reporter_thread);
 	}
 	libtrace_vector_empty(&queues[0]);
 }

@@ -3460,6 +3460,7 @@ DLLEXPORT bool trace_get_wireless_antenna(void *linkptr,
 
 /*@}*/
 
+typedef struct libtrace_result_t libtrace_result_t;
 /**
  * A collection of types for convenience used in place of a
  * simple void* to allow a any type of data to be stored.
@@ -3470,6 +3471,7 @@ typedef union {
 	/* Pointers */
 	void *ptr;
 	libtrace_packet_t *pkt;
+	libtrace_result_t *res;
 
 	/* C99 Integer types */
 	/* NOTE: Standard doesn't require 64-bit
@@ -3516,11 +3518,11 @@ typedef struct libtrace_message_t {
 } libtrace_message_t;
 
 /** Structure holding information about a result */
-typedef struct libtrace_result_t {
+struct libtrace_result_t {
 	uint64_t key;
 	libtrace_generic_t value;
 	int type;
-} libtrace_result_t;
+};
 #define RESULT_NORMAL 0
 #define RESULT_PACKET 1
 #define RESULT_TICK   2
@@ -3545,7 +3547,10 @@ typedef void* (*fn_per_pkt)(libtrace_t* trace,
                             int mesg_code,
                             libtrace_generic_t data,
                             libtrace_thread_t *sender);
-typedef void (*fn_reporter)(libtrace_t* trace, libtrace_result_t *r, libtrace_message_t *m);
+typedef void (*fn_reporter)(libtrace_t* trace,
+                            int mesg_code,
+                            libtrace_generic_t data,
+                            libtrace_thread_t *sender);
 typedef uint64_t (*fn_hasher)(const libtrace_packet_t* packet, void *data);
 
 DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob, fn_per_pkt per_pkt, fn_reporter reporter);
@@ -3618,6 +3623,7 @@ typedef enum {
 
 enum libtrace_messages {
 	MESSAGE_PACKET,
+	MESSAGE_RESULT,
 	MESSAGE_STARTING,
 	MESSAGE_RESUMING,
 	MESSAGE_STOPPING,

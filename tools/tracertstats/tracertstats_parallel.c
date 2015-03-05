@@ -137,14 +137,17 @@ typedef struct result {
 } result_t;
 
 static uint64_t last_ts = 0;
-static void process_result(libtrace_t *trace UNUSED, libtrace_result_t *result, libtrace_message_t *mesg UNUSED)  {
+static void process_result(libtrace_t *trace UNUSED, int mesg,
+                           libtrace_generic_t data,
+                           libtrace_thread_t *sender UNUSED) {
 	static uint64_t ts = 0;
+	int j;
+	result_t *res;
 
-	if (result) {
-		int j;
-		result_t *res;
-		ts = libtrace_result_get_key(result);
-		res = libtrace_result_get_value(result).ptr;
+	switch (mesg) {
+		case MESSAGE_RESULT:
+		ts = libtrace_result_get_key(data.res);
+		res = libtrace_result_get_value(data.res).ptr;
 		if (last_ts == 0)
 			last_ts = ts;
 		while (last_ts < ts) {
@@ -273,7 +276,7 @@ static void run_trace(char *uri)
 	if (output == NULL)
 		return;
 
-        trace = trace_create(uri);
+	trace = trace_create(uri);
 	if (trace_is_err(trace)) {
 		trace_perror(trace,"trace_create");
 		trace_destroy(trace);
@@ -290,7 +293,7 @@ static void run_trace(char *uri)
 		return;
 	}*/
 	int i = 1;
-	trace_set_combiner(trace, &combiner_ordered, (libtrace_generic_types_t){0});
+	trace_set_combiner(trace, &combiner_ordered, (libtrace_generic_t){0});
 	/* trace_parallel_config(trace, TRACE_OPTION_TRACETIME, &i); */
 	//trace_set_hasher(trace, HASHER_CUSTOM, &bad_hash, NULL);
 

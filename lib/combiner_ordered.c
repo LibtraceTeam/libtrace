@@ -59,9 +59,10 @@ inline static void read_internal(libtrace_t *trace, libtrace_queue_t *queues, co
 		// || (live_count && ((flags & REDUCE_SEQUENTIAL && min_key == trace->expected_key)))
 		/* Get the minimum queue and then do stuff */
 		libtrace_result_t r;
+		libtrace_generic_t gt = {.res = &r};
 
 		ASSERT_RET (libtrace_deque_pop_front(&queues[min_queue], (void *) &r), == 1);
-		trace->reporter(trace, &r, NULL);
+		trace->reporter(trace, MESSAGE_RESULT, gt, &trace->reporter_thread);
 
 		// We expect the key we read +1 now , todo put expected in our storage area
 		//trace->expected_key = key[min_queue] + 1;

@@ -93,28 +93,28 @@ const char *lookup_uri(const char *type) {
 
 int globalcount = 0;
 
-static void reporter(libtrace_t *libtrace, libtrace_result_t *res, libtrace_message_t *mesg) {
+static void reporter(libtrace_t *libtrace UNUSED, int mesg,
+                     libtrace_generic_t data,
+                     libtrace_thread_t *sender UNUSED) {
 	static uint64_t last = -1;
 	static int pktcount = 0;
-	if (res) {
-		libtrace_packet_t *packet = libtrace_result_get_value(res).pkt;
-		assert(libtrace_result_get_key(res) == trace_packet_get_order(packet));
+	libtrace_packet_t *packet;
+	switch (mesg) {
+	case MESSAGE_RESULT:
+		packet = libtrace_result_get_value(data.res).pkt;
+		assert(libtrace_result_get_key(data.res) == trace_packet_get_order(packet));
 		if(last == (uint64_t)-1) {
-			last = libtrace_result_get_key(res);
+			last = libtrace_result_get_key(data.res);
 		} else {
-		assert (last < libtrace_result_get_key(res));
-		last = libtrace_result_get_key(res);
+		assert (last < libtrace_result_get_key(data.res));
+		last = libtrace_result_get_key(data.res);
 		}
 		pktcount++;
 		trace_free_result_packet(libtrace, packet);
-	} else {
-		// Mesg
-		switch (mesg->code) {
-		case MESSAGE_STOPPING:
-			globalcount = pktcount;
-		default:
-			break;
-		}
+		break;
+	case MESSAGE_STOPPING:
+		globalcount = pktcount;
+		break;
 	}
 }
 

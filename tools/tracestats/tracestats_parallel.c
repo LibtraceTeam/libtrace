@@ -104,7 +104,7 @@ typedef struct statistics {
 //libtrace_message_t mesg
 static void* per_packet(libtrace_t *trace, libtrace_thread_t *t,
                         int mesg, libtrace_generic_t data,
-                        libtrace_thread_t *sender)
+                        libtrace_thread_t *sender UNUSED)
 {
 	// Using first entry as total and those after for filter counts
 	static __thread statistics_t * results = NULL;
@@ -157,58 +157,60 @@ static void* per_packet(libtrace_t *trace, libtrace_thread_t *t,
 	return NULL;
 }
 
-static void report_result(libtrace_t *trace UNUSED, libtrace_result_t *result, libtrace_message_t *mesg) {
+static void report_result(libtrace_t *trace UNUSED, int mesg,
+                          libtrace_generic_t data,
+                          libtrace_thread_t *sender UNUSED) {
 	static uint64_t count=0, bytes=0;
-	uint64_t packets;
 	int i;
-	if (result) {
-		int j;
+	libtrace_stat_t *stats;
+
+	switch (mesg) {
+	case MESSAGE_RESULT:
 		/* Get the results from each core and sum 'em up */
-		assert(libtrace_result_get_key(result) == 0);
-		statistics_t * res = libtrace_result_get_value(result).ptr;
+		assert(libtrace_result_get_key(data.res) == 0);
+		statistics_t * res = libtrace_result_get_value(data.res).ptr;
 		count += res[0].count;
 		bytes += res[0].bytes;
-		for (j = 0; j < filter_count; j++) {
-			filters[j].count += res[j+1].count;
-			filters[j].bytes += res[j+1].bytes;
+		for (i = 0; i < filter_count; i++) {
+			filters[i].count += res[i+1].count;
+			filters[i].bytes += res[i+1].bytes;
 		}
 		free(res);
-	} else switch (mesg->code) {
-		libtrace_stat_t *stats;
-		case MESSAGE_STOPPING:
-			stats = trace_get_statistics(trace, NULL);
-			printf("%-30s\t%12s\t%12s\t%7s\n","filter","count","bytes","%");
-			for(i=0;i<filter_count;++i) {
-				printf("%30s:\t%12"PRIu64"\t%12"PRIu64"\t%7.03f\n",filters[i].expr,filters[i].count,filters[i].bytes,filters[i].count*100.0/count);
-				filters[i].bytes=0;
-				filters[i].count=0;
-			}
-			if (stats->received_valid)
-				fprintf(stderr,"%30s:\t%12" PRIu64"\n",
-						"Input packets", stats->received);
-			if (stats->filtered_valid)
-				fprintf(stderr,"%30s:\t%12" PRIu64"\n",
-						"Filtered packets", stats->filtered);
-			if (stats->dropped_valid)
-				fprintf(stderr,"%30s:\t%12" PRIu64"\n",
-						"Dropped packets",stats->dropped);
-			if (stats->accepted_valid)
-				fprintf(stderr,"%30s:\t%12" PRIu64 "\n",
-						"Accepted packets", stats->accepted);
-			if (stats->errors_valid)
-				fprintf(stderr,"%30s:\t%12" PRIu64 "\n",
-						"Erred packets", stats->errors);
-			printf("%30s:\t%12"PRIu64"\t%12" PRIu64 "\n","Total",count,bytes);
-			totcount+=count;
-			totbytes+=bytes;
+		break;
+	case MESSAGE_STOPPING:
+		stats = trace_get_statistics(trace, NULL);
+		printf("%-30s\t%12s\t%12s\t%7s\n","filter","count","bytes","%");
+		for(i=0;i<filter_count;++i) {
+			printf("%30s:\t%12"PRIu64"\t%12"PRIu64"\t%7.03f\n",filters[i].expr,filters[i].count,filters[i].bytes,filters[i].count*100.0/count);
+			filters[i].bytes=0;
+			filters[i].count=0;
+		}
+		if (stats->received_valid)
+			fprintf(stderr,"%30s:\t%12" PRIu64"\n",
+				"Input packets", stats->received);
+		if (stats->filtered_valid)
+			fprintf(stderr,"%30s:\t%12" PRIu64"\n",
+				"Filtered packets", stats->filtered);
+		if (stats->dropped_valid)
+			fprintf(stderr,"%30s:\t%12" PRIu64"\n",
+				"Dropped packets",stats->dropped);
+		if (stats->accepted_valid)
+			fprintf(stderr,"%30s:\t%12" PRIu64 "\n",
+				"Accepted packets", stats->accepted);
+		if (stats->errors_valid)
+			fprintf(stderr,"%30s:\t%12" PRIu64 "\n",
+				"Erred packets", stats->errors);
+		printf("%30s:\t%12"PRIu64"\t%12" PRIu64 "\n","Total",count,bytes);
+		totcount+=count;
+		totbytes+=bytes;
 	}
 }
 
-static uint64_t rand_hash(libtrace_packet_t * pkt, void *data) {
+static uint64_t rand_hash(libtrace_packet_t * pkt UNUSED, void *data UNUSED) {
 	return rand();
 }
 
-static uint64_t bad_hash(libtrace_packet_t * pkt, void *data) {
+static uint64_t bad_hash(libtrace_packet_t * pkt UNUSED, void *data UNUSED) {
 	return 0;
 }
 
@@ -233,7 +235,7 @@ static void run_trace(char *uri)
     //trace_set_hasher(trace, HASHER_CUSTOM, &rand_hash, NULL);
 	//trace_parallel_config(trace, TRACE_OPTION_SET_PERPKT_THREAD_COUNT, &option);
 	trace_parallel_config(trace, TRACE_OPTION_SET_CONFIG, &uc);
-	trace_set_combiner(trace, &combiner_ordered, (libtrace_generic_types_t){0});
+	trace_set_combiner(trace, &combiner_ordered, (libtrace_generic_t){0});
 
 	//trace_parallel_config(trace, TRACE_OPTION_SET_MAPPER_BUFFER_SIZE, &option);
 

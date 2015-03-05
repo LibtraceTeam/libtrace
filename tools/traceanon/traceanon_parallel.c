@@ -207,13 +207,16 @@ static void* per_packet(libtrace_t *trace, libtrace_thread_t *t,
 
 struct libtrace_out_t *writer = 0;
 
-static void write_out(libtrace_t *trace, libtrace_result_t *result, UNUSED libtrace_message_t *mesg) {
+static void write_out(libtrace_t *trace UNUSED, int mesg,
+                      libtrace_generic_t data,
+                      libtrace_thread_t *sender UNUSED) {
 	static uint64_t packet_count = 0; // TESTING PURPOSES, this is not going to work with a live format
 
-	if (result) {
-		if (result->type == RESULT_PACKET) {
-			libtrace_packet_t *packet = (libtrace_packet_t*) libtrace_result_get_value(result).pkt;
-			assert(libtrace_result_get_key(result) == packet_count++);
+	switch (mesg) {
+	case MESSAGE_RESULT:
+		if (data.res->type == RESULT_PACKET) {
+			libtrace_packet_t *packet = (libtrace_packet_t*) libtrace_result_get_value(data.res).pkt;
+			assert(libtrace_result_get_key(data.res) == packet_count++);
 			if (trace_write_packet(writer,packet)==-1) {
 				trace_perror_output(writer,"writer");
 				trace_interrupt();
@@ -221,7 +224,7 @@ static void write_out(libtrace_t *trace, libtrace_result_t *result, UNUSED libtr
 			trace_free_result_packet(trace, packet);
 
 		} else {
-			assert(result->type == RESULT_TICK);
+			assert(data.res->type == RESULT_TICK);
 			// Ignore it
 		}
 	}

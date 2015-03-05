@@ -33,8 +33,9 @@ static void read(libtrace_t *trace, libtrace_combine_t *c){
 		libtrace_queue_t *v = &queues[i];
 		while (libtrace_deque_get_size(v) != 0) {
 			libtrace_result_t r;
+			libtrace_generic_t gt = {.res = &r};
 			ASSERT_RET (libtrace_deque_pop_front(v, (void *) &r), == 1);
-			trace->reporter(trace, &r, NULL);
+			trace->reporter(trace, MESSAGE_RESULT, gt, &trace->reporter_thread);
 		}
 	}
 }
