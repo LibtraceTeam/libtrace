@@ -2101,14 +2101,12 @@ DLLEXPORT void * trace_get_global(libtrace_t *trace)
 
 DLLEXPORT void * trace_set_global(libtrace_t *trace, void * data)
 {
-	if (trace->global_blob && trace->global_blob != data) {
-		void * ret = trace->global_blob;
-		trace->global_blob = data;
-		return ret;
-	} else {
-		trace->global_blob = data;
-		return NULL;
-	}
+	void *ret;
+	pthread_mutex_lock(trace->libtrace_lock);
+	ret = trace->global_blob;
+	trace->global_blob = data;
+	pthread_mutex_unlock(trace->libtrace_lock);
+	return ret;
 }
 
 DLLEXPORT void * trace_get_tls(libtrace_thread_t *t)
