@@ -52,7 +52,7 @@
 #include <inttypes.h>
 #include <signal.h>
 
-#include "libtrace.h"
+#include "libtrace_parallel.h"
 #include "lt_inttypes.h"
 #include "data-struct/vector.h"
 #include "data-struct/message_queue.h"

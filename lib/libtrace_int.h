@@ -56,7 +56,7 @@ extern "C" {
 
 #include "config.h"
 #include "common.h"
-#include "libtrace.h"
+#include "libtrace_parallel.h"
 #include "wandio.h"
 #include "lt_bswap.h"
 
@@ -255,6 +255,12 @@ static inline char *get_trace_state_name(enum trace_state ts){
 	}
 }
 #undef X
+
+#define READ_EOF 0
+#define READ_ERROR -1
+#define READ_MESSAGE -2
+// Used for inband tick message
+#define READ_TICK -3
 
 /** A libtrace input trace 
  * @internal

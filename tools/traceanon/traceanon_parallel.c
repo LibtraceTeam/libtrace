@@ -1,5 +1,5 @@
 #define _GNU_SOURCE
-#include "libtrace.h"
+#include "libtrace_parallel.h"
 #include "data-struct/vector.h"
 #include "data-struct/message_queue.h"
 #include "combiners.h"

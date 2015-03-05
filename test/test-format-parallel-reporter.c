@@ -48,7 +48,7 @@
 #include <unistd.h>
 
 #include "dagformat.h"
-#include "libtrace.h"
+#include "libtrace_parallel.h"
 #include "data-struct/vector.h"
 #include "combiners.h"
 
@@ -106,8 +106,8 @@ static void reporter(libtrace_t *libtrace UNUSED, int mesg,
 		if(last == (uint64_t)-1) {
 			last = libtrace_result_get_key(data.res);
 		} else {
-		assert (last < libtrace_result_get_key(data.res));
-		last = libtrace_result_get_key(data.res);
+			assert (last < libtrace_result_get_key(data.res));
+			last = libtrace_result_get_key(data.res);
 		}
 		pktcount++;
 		trace_free_result_packet(libtrace, packet);

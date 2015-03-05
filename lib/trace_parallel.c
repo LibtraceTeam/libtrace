@@ -1325,7 +1325,6 @@ static int trace_prestart(libtrace_t * libtrace, void *global_blob,
 /**
  * Verifies the configuration and sets default values for any values not
  * specified by the user.
- * @return
  */
 static void verify_configuration(libtrace_t *libtrace) {
 	bool require_hasher = false;
@@ -1495,15 +1494,6 @@ static void parse_env_config (libtrace_t *libtrace, struct user_configuration* u
 	}
 }
 
-/* Start an input trace in the parallel libtrace framework.
- * This can also be used to restart an existing parallel.
- *
- * NOTE: libtrace lock is held for the majority of this function
- *
- * @param libtrace the input trace to start
- * @param global_blob some global data you can share with the new perpkt threads
- * @returns 0 on success, otherwise -1 to indicate an error has occured
- */
 DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob,
                            fn_per_pkt per_pkt, fn_reporter reporter) {
 	int i;
@@ -2094,18 +2084,18 @@ DLLEXPORT void trace_destroy_result(libtrace_result_t ** result) {
 	// TODO automatically back with a free list!!
 }
 
-DLLEXPORT void * trace_get_global(libtrace_t *trace)
+DLLEXPORT void * trace_get_local(libtrace_t *trace)
 {
 	return trace->global_blob;
 }
 
-DLLEXPORT void * trace_set_global(libtrace_t *trace, void * data)
+DLLEXPORT void * trace_set_local(libtrace_t *trace, void * data)
 {
 	void *ret;
-	pthread_mutex_lock(trace->libtrace_lock);
+	pthread_mutex_lock(&trace->libtrace_lock);
 	ret = trace->global_blob;
 	trace->global_blob = data;
-	pthread_mutex_unlock(trace->libtrace_lock);
+	pthread_mutex_unlock(&trace->libtrace_lock);
 	return ret;
 }
 
@@ -2116,14 +2106,9 @@ DLLEXPORT void * trace_get_tls(libtrace_thread_t *t)
 
 DLLEXPORT void * trace_set_tls(libtrace_thread_t *t, void * data)
 {
-	if(t->user_data && t->user_data != data) {
-		void *ret = t->user_data;
-		t->user_data = data;
-		return ret;
-	} else {
-		t->user_data = data;
-		return NULL;
-	}
+	void *ret = t->user_data;
+	t->user_data = data;
+	return ret;
 }
 
 /**
@@ -2140,9 +2125,6 @@ DLLEXPORT void trace_publish_result(libtrace_t *libtrace, libtrace_thread_t *t, 
 	return;
 }
 
-/**
- * Sets a combiner function against the trace.
- */
 DLLEXPORT void trace_set_combiner(libtrace_t *trace, const libtrace_combine_t *combiner, libtrace_generic_t config){
 	if (combiner) {
 		trace->combiner = *combiner;

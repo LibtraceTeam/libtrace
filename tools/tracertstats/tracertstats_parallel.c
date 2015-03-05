@@ -51,7 +51,7 @@
 #include <inttypes.h>
 #include <lt_inttypes.h>
 
-#include "libtrace.h"
+#include "libtrace_parallel.h"
 #include "output.h"
 #include "rt_protocol.h"
 #include "dagformat.h"

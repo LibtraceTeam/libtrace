@@ -48,7 +48,7 @@
 #include <unistd.h>
 
 #include "dagformat.h"
-#include "libtrace.h"
+#include "libtrace_parallel.h"
 #include "data-struct/vector.h"
 
 void iferr(libtrace_t *trace,const char *msg)
@@ -111,7 +111,7 @@ static void report_result(libtrace_t *trace UNUSED, int mesg,
 		totalthreads++;
 		totalpkts += libtrace_result_get_value(data.res).sint;
 		assert(libtrace_result_get_value(data.res).sint == 25 ||
-			libtrace_result_get_value(data.res).sint == expected - 25);
+		       libtrace_result_get_value(data.res).sint == expected - 25);
 		break;
 	case MESSAGE_STARTING:
 		// Should have two threads here
