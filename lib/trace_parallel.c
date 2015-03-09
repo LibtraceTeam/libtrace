@@ -1034,6 +1034,10 @@ static void* reporter_entry(void *data) {
 	}
 	ASSERT_RET(pthread_mutex_unlock(&trace->libtrace_lock), == 0);
 
+	if (trace->format->pregister_thread) {
+		trace->format->pregister_thread(trace, t, false);
+	}
+
 	(*trace->reporter)(trace, MESSAGE_STARTING, (libtrace_generic_t) {0}, t);
 	(*trace->reporter)(trace, MESSAGE_RESUMING, (libtrace_generic_t) {0}, t);
 
