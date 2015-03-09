@@ -265,6 +265,10 @@
 #define WITHIN_VARIANCE(v1,v2,var) (((v1) - (var) < (v2)) && ((v1) + (var) > (v2)))
 #endif
 
+static pthread_mutex_t dpdk_lock = PTHREAD_MUTEX_INITIALIZER;
+/* Memory pools Per NUMA node */
+static struct rte_mempool * mem_pools[4][RTE_MAX_LCORE] = {{0}};
+
 /* As per Intel 82580 specification - mismatch in 82580 datasheet
  * it states ts is stored in Big Endian, however its actually Little */
 struct hw_timestamp_82580 {
@@ -282,6 +286,8 @@ struct dpdk_per_stream_t
 {
 	uint16_t queue_id;
 	uint64_t ts_last_sys; /* System timestamp of our most recent packet in nanoseconds */
+	struct rte_mempool *mempool;
+	int lcore;
 #if HAS_HW_TIMESTAMPS_82580
 	/* Timestamping only relevent to RX */
 	uint64_t ts_first_sys; /* Sytem timestamp of the first packet in nanoseconds */
@@ -1066,6 +1072,195 @@ static void dpdk_lsc_callback(uint8_t port, enum rte_eth_event_type event,
 #endif
 }
 
+/** Reserve a DPDK lcore ID for a thread globally.
+ *
+ * @param real If true allocate a real lcore, otherwise allocate a core which
+ * does not exist on the local machine.
+ * @param socket the prefered NUMA socket - only used if a real core is requested
+ * @return a valid core, which can later be used with dpdk_register_lcore() or a
+ * -1 if have run out of cores.
+ *
+ * If any thread is reading or freeing packets we need to register it here
+ * due to TLS caches in the memory pools.
+ */
+static int dpdk_reserve_lcore(bool real, int socket) {
+	int new_id = -1;
+	int i;
+	struct rte_config *cfg = rte_eal_get_configuration();
+
+	pthread_mutex_lock(&dpdk_lock);
+	/* If 'reading packets' fill in cores from 0 up and bind affinity
+	 * otherwise start from the MAX core (which is also the master) and work backwards
+	 * in this case physical cores on the system will not exist so we don't bind
+	 * these to any particular physical core */
+	if (real) {
+#if HAVE_LIBNUMA
+		for (i = 0; i < RTE_MAX_LCORE; ++i) {
+			if (!rte_lcore_is_enabled(i) && numa_node_of_cpu(i) == socket) {
+				new_id = i;
+				if (!lcore_config[i].detected)
+					new_id = -1;
+				break;
+			}
+		}
+#endif
+		/* Retry without the the numa restriction */
+		if (new_id == -1) {
+			for (i = 0; i < RTE_MAX_LCORE; ++i) {
+				if (!rte_lcore_is_enabled(i)) {
+					new_id = i;
+					if (!lcore_config[i].detected)
+						fprintf(stderr, "Warning the"
+						        " number of 'reading' "
+						        "threads exceed cores\n");
+					break;
+				}
+			}
+		}
+	} else {
+		for (i = RTE_MAX_LCORE-1; i >= 0; --i) {
+			if (!rte_lcore_is_enabled(i)) {
+				new_id = i;
+				break;
+			}
+		}
+	}
+
+	if (new_id != -1) {
+		/* Enable the core in global DPDK structs */
+		cfg->lcore_role[new_id] = ROLE_RTE;
+		cfg->lcore_count++;
+	}
+
+	pthread_mutex_unlock(&dpdk_lock);
+	return new_id;
+}
+
+/** Register a thread as a lcore
+ * @param libtrace any error is set against libtrace on exit
+ * @param real If this is a true lcore we will bind its affinty to the
+ * requested core.
+ * @param lcore The lcore as retrieved from dpdk_reserve_lcore()
+ * @return 0, if successful otherwise -1 if an error occured (details are stored
+ * in libtrace)
+ *
+ * @note This must be called from the thread being registered.
+ */
+static int dpdk_register_lcore(libtrace_t *libtrace, bool real, int lcore) {
+	int ret;
+	RTE_PER_LCORE(_lcore_id) = lcore;
+
+	/* Set affinity bind to corresponding core */
+	if (real) {
+		cpu_set_t cpuset;
+		CPU_ZERO(&cpuset);
+		CPU_SET(rte_lcore_id(), &cpuset);
+		ret = pthread_setaffinity_np(pthread_self(), sizeof(cpuset), &cpuset);
+		if (ret != 0) {
+			trace_set_err(libtrace, errno, "Warning "
+			              "pthread_setaffinity_np failed");
+			return -1;
+		}
+	}
+
+	return 0;
+}
+
+/** Allocates a new dpdk packet buffer memory pool.
+ *
+ * @param n The number of threads
+ * @param pkt_size The packet size we need ot store
+ * @param socket_id The NUMA socket id
+ * @param A new mempool, if NULL query the DPDK library for the error code
+ * see rte_mempool_create() documentation.
+ *
+ * This allocates a new pool or recycles an existing memory pool.
+ * Call dpdk_free_memory() to free the memory.
+ * We cannot delete memory so instead we store the pools, allowing them to be
+ * re-used.
+ */
+static struct rte_mempool *dpdk_alloc_memory(unsigned n,
+                                             unsigned pkt_size,
+                                             int socket_id) {
+	struct rte_mempool *ret;
+	size_t j,k;
+	char name[MEMPOOL_NAME_LEN];
+
+	/* Add on packet size overheads */
+	pkt_size += sizeof(struct rte_mbuf) + RTE_PKTMBUF_HEADROOM;
+
+	pthread_mutex_lock(&dpdk_lock);
+
+	if (socket_id == SOCKET_ID_ANY || socket_id > 4) {
+		/* Best guess go for zero */
+		socket_id = 0;
+	}
+
+	/* Find a valid pool */
+	for (j = 0; j < RTE_MAX_LCORE && mem_pools[socket_id][j]; ++j) {
+		if (mem_pools[socket_id][j]->size >= n &&
+		    mem_pools[socket_id][j]->elt_size >= pkt_size) {
+			break;
+		}
+	}
+
+	/* Find the end (+1) of the list */
+	for (k = j; k < RTE_MAX_LCORE && mem_pools[socket_id][k]; ++k) {}
+
+	if (mem_pools[socket_id][j]) {
+		ret = mem_pools[socket_id][j];
+		mem_pools[socket_id][j] = mem_pools[socket_id][k-1];
+		mem_pools[socket_id][k-1] = NULL;
+		mem_pools[socket_id][j] = NULL;
+	} else {
+		static uint32_t test = 10;
+		test++;
+		snprintf(name, MEMPOOL_NAME_LEN,
+		         "libtrace_pool_%"PRIu32, test);
+
+		ret = rte_mempool_create(name, n, pkt_size,
+		                         128, sizeof(struct rte_pktmbuf_pool_private),
+		                         rte_pktmbuf_pool_init, NULL,
+		                         rte_pktmbuf_init, NULL,
+		                         socket_id, 0);
+	}
+
+	pthread_mutex_unlock(&dpdk_lock);
+	return ret;
+}
+
+/** Stores the memory against the DPDK library.
+ *
+ * @param mempool The mempool to free
+ * @param socket_id The NUMA socket this mempool was allocated upon.
+ *
+ * Because we cannot free a memory pool, we verify it's full (i.e. unused) and
+ * store the memory shared globally against the format.
+ */
+static void dpdk_free_memory(struct rte_mempool *mempool, int socket_id) {
+	size_t i;
+	pthread_mutex_lock(&dpdk_lock);
+
+	/* We should have all entries back in the mempool */
+	rte_mempool_audit(mempool);
+	if (!rte_mempool_full(mempool)) {
+		fprintf(stderr, "DPDK memory pool not empty %d of %d, please "
+		        "free all packets before finishing a trace\n",
+		        rte_mempool_count(mempool), mempool->size);
+	}
+
+	/* Find the end (+1) of the list */
+	for (i = 0; i < RTE_MAX_LCORE && mem_pools[socket_id][i]; ++i) {}
+
+	if (i >= RTE_MAX_LCORE) {
+		fprintf(stderr, "Too many memory pools, dropping this one\n");
+	} else {
+		mem_pools[socket_id][i] = mempool;
+	}
+
+	pthread_mutex_unlock(&dpdk_lock);
+}
+
 /* Attach memory to the port and start (or restart) the port/s.
  */
 static int dpdk_start_streams(struct dpdk_format_data_t *format_data,
@@ -1111,14 +1306,9 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data,
 #if DEBUG
 		fprintf(stderr, "Creating mempool named %s\n", format_data->mempool_name);
 #endif
-		format_data->pktmbuf_pool =
-		                rte_mempool_create(format_data->mempool_name,
-		                                   (format_data->nb_rx_buf * rx_queues + format_data->nb_tx_buf + 1)*2,
-		                                   format_data->snaplen + sizeof(struct rte_mbuf)
-		                                   + RTE_PKTMBUF_HEADROOM,
-		                                   128, sizeof(struct rte_pktmbuf_pool_private),
-		                                   rte_pktmbuf_pool_init, NULL, rte_pktmbuf_init, NULL,
-		                                   format_data->nic_numa_node, 0);
+		format_data->pktmbuf_pool = dpdk_alloc_memory(format_data->nb_tx_buf*2,
+		                                              format_data->snaplen,
+		                                              format_data->nic_numa_node);
 
 		if (format_data->pktmbuf_pool == NULL) {
 			snprintf(err, errlen, "Intel DPDK - Initialisation of mbuf "
@@ -1165,17 +1355,39 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data,
 
 	/* Attach memory to our RX queues */
 	for (i=0; i < rx_queues; i++) {
+		dpdk_per_stream_t *stream;
 #if DEBUG
-		fprintf(stderr, "Doing queue configure %d\n", i);
+		fprintf(stderr, "Configuring queue %d\n", i);
 #endif
 
-		dpdk_per_stream_t *stream;
 		/* Add storage for the stream */
 		if (libtrace_list_get_size(format_data->per_stream) <= (size_t) i)
 			libtrace_list_push_back(format_data->per_stream, &empty_stream);
-
 		stream = libtrace_list_get_index(format_data->per_stream, i)->data;
 		stream->queue_id = i;
+
+		/* TODO we don't use this in the single threaded framework -
+		 * So we should not reserve this */
+		stream->lcore = dpdk_reserve_lcore(true, format_data->nic_numa_node);
+
+		if (stream->lcore == -1) {
+			snprintf(err, errlen, "Intel DPDK - Failed to reserve a lcore"
+			         ". Too many threads?");
+			return -1;
+		}
+
+		if (stream->mempool == NULL) {
+			stream->mempool = dpdk_alloc_memory(
+			                          format_data->nb_rx_buf*2,
+			                          format_data->snaplen,
+			                          rte_lcore_to_socket_id(stream->lcore));
+
+			if (stream->mempool == NULL) {
+				snprintf(err, errlen, "Intel DPDK - Initialisation of mbuf "
+				         "pool failed: %s", strerror(rte_errno));
+				return -1;
+			}
+		}
 
 		/* Initialise the RX queue with some packets from memory */
 		ret = rte_eth_rx_queue_setup(format_data->port,
@@ -1183,7 +1395,7 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data,
 		                             format_data->nb_rx_buf,
 		                             format_data->nic_numa_node,
 		                             &rx_conf,
-		                             format_data->pktmbuf_pool);
+		                             stream->mempool);
 		if (ret < 0) {
 			snprintf(err, errlen, "Intel DPDK - Cannot configure"
 			         " RX queue on port %"PRIu8" : %s",
@@ -1330,85 +1542,14 @@ static int dpdk_pstart_input (libtrace_t *libtrace) {
  */
 static int dpdk_pregister_thread(libtrace_t *libtrace, libtrace_thread_t *t, bool reading)
 {
-	struct rte_config *cfg = rte_eal_get_configuration();
-	int i;
-	int new_id = -1;
-
-	/* If 'reading packets' fill in cores from 0 up and bind affinity
-	 * otherwise start from the MAX core (which is also the master) and work backwards
-	 * in this case physical cores on the system will not exist so we don't bind
-	 * these to any particular physical core */
-	pthread_mutex_lock(&libtrace->libtrace_lock);
-	if (reading) {
-#if HAVE_LIBNUMA
-		for (i = 0; i < RTE_MAX_LCORE; ++i) {
-			if (!rte_lcore_is_enabled(i) && numa_node_of_cpu(i) == FORMAT(libtrace)->nic_numa_node) {
-				new_id = i;
-				if (!lcore_config[i].detected)
-					new_id = -1;
-				break;
-			}
-		}
-#endif
-		/* Retry without the the numa restriction */
-		if (new_id == -1) {
-			for (i = 0; i < RTE_MAX_LCORE; ++i) {
-				if (!rte_lcore_is_enabled(i)) {
-					new_id = i;
-					if (!lcore_config[i].detected)
-						fprintf(stderr, "Warning the"
-						        " number of 'reading' "
-						        "threads exceed cores\n");
-					break;
-				}
-			}
-		}
-	} else {
-		for (i = RTE_MAX_LCORE-1; i >= 0; --i) {
-			if (!rte_lcore_is_enabled(i)) {
-				new_id = i;
-				break;
-			}
-		}
-	}
-
-	if (new_id == -1) {
-		assert(cfg->lcore_count == RTE_MAX_LCORE);
-		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Too many threads"
-		              " for DPDK");
-		pthread_mutex_unlock(&libtrace->libtrace_lock);
-		return -1;
-	}
-
-	/* Enable the core in global DPDK structs */
-	cfg->lcore_role[new_id] = ROLE_RTE;
-	cfg->lcore_count++;
-	 /* I think new threads are going get a default thread number of 0 */
-	assert(rte_lcore_id() == 0);
-	fprintf(stderr, "original id%d", rte_lcore_id());
-	RTE_PER_LCORE(_lcore_id) = new_id;
+#if DEBUG
 	char name[99];
 	pthread_getname_np(pthread_self(),
 	                   name, sizeof(name));
-
-	fprintf(stderr, "%s new id%d\n", name, rte_lcore_id());
-
+#endif
 	if (reading) {
-		/* Set affinity bind to corresponding core */
-		cpu_set_t cpuset;
-		CPU_ZERO(&cpuset);
-		CPU_SET(rte_lcore_id(), &cpuset);
-		i = pthread_setaffinity_np(pthread_self(), sizeof(cpuset), &cpuset);
-		if (i != 0) {
-			trace_set_err(libtrace, errno, "Warning "
-			              "pthread_setaffinity_np failed");
-			pthread_mutex_unlock(&libtrace->libtrace_lock);
-			return -1;
-		}
-	}
-
-	/* Map our TLS to the thread data */
-	if (reading) {
+		dpdk_per_stream_t *stream;
+		/* Attach our thread */
 		if(t->type == THREAD_PERPKT) {
 			t->format_data = libtrace_list_get_index(FORMAT(libtrace)->per_stream, t->perpkt_num)->data;
 			if (t->format_data == NULL) {
@@ -1419,8 +1560,24 @@ static int dpdk_pregister_thread(libtrace_t *libtrace, libtrace_thread_t *t, boo
 		} else {
 			t->format_data = FORMAT_DATA_FIRST(libtrace);
 		}
+		stream = t->format_data;
+#if DEBUG
+		fprintf(stderr, "%s new id memory:%s cpu-core:%d\n", name, stream->mempool->name, rte_lcore_id());
+#endif
+		return dpdk_register_lcore(libtrace, true, stream->lcore);
+	} else {
+		int lcore = dpdk_reserve_lcore(reading, 0);
+		if (lcore == -1) {
+			trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Too many threads"
+			              " for DPDK");
+			return -1;
+		}
+#if DEBUG
+		fprintf(stderr, "%s new id cpu-core:%d\n", name, rte_lcore_id());
+#endif
+		return dpdk_register_lcore(libtrace, false, lcore);
 	}
-	pthread_mutex_unlock(&libtrace->libtrace_lock);
+
 	return 0;
 }
 
@@ -1435,11 +1592,11 @@ static void dpdk_punregister_thread(libtrace_t *libtrace UNUSED, libtrace_thread
 	struct rte_config *cfg = rte_eal_get_configuration();
 
 	assert(rte_lcore_id() < RTE_MAX_LCORE);
-	pthread_mutex_lock(&libtrace->libtrace_lock);
+	pthread_mutex_lock(&dpdk_lock);
 	/* Skip if master */
 	if (rte_lcore_id() == rte_get_master_lcore()) {
 		fprintf(stderr, "INFO: we are skipping unregistering the master lcore\n");
-		pthread_mutex_unlock(&libtrace->libtrace_lock);
+		pthread_mutex_unlock(&dpdk_lock);
 		return;
 	}
 
@@ -1448,7 +1605,7 @@ static void dpdk_punregister_thread(libtrace_t *libtrace UNUSED, libtrace_thread
 	cfg->lcore_count--;
 	RTE_PER_LCORE(_lcore_id) = -1; // Might make the world burn if used again
 	assert(cfg->lcore_count >= 1); // We cannot unregister the master LCORE!!
-	pthread_mutex_unlock(&libtrace->libtrace_lock);
+	pthread_mutex_unlock(&dpdk_lock);
 	return;
 }
 
@@ -1522,15 +1679,28 @@ static int dpdk_write_packet(libtrace_out_t *trace,
 }
 
 static int dpdk_fin_input(libtrace_t * libtrace) {
+	libtrace_list_node_t * n;
 	/* Free our memory structures */
 	if (libtrace->format_data != NULL) {
-		/* Close the device completely, device cannot be restarted */
+
 		if (FORMAT(libtrace)->port != 0xFF)
 			rte_eth_dev_callback_unregister(FORMAT(libtrace)->port,
 			                                RTE_ETH_EVENT_INTR_LSC,
 			                                dpdk_lsc_callback,
 			                                FORMAT(libtrace));
+		/* Close the device completely, device cannot be restarted */
 		rte_eth_dev_close(FORMAT(libtrace)->port);
+
+		dpdk_free_memory(FORMAT(libtrace)->pktmbuf_pool,
+		                 FORMAT(libtrace)->nic_numa_node);
+
+		for (n = FORMAT(libtrace)->per_stream->head; n ; n = n->next) {
+			dpdk_per_stream_t * stream = n->data;
+			if (stream->mempool)
+				dpdk_free_memory(stream->mempool,
+				                 rte_lcore_to_socket_id(stream->lcore));
+		}
+
 		libtrace_list_deinit(FORMAT(libtrace)->per_stream);
 		/* filter here if we used it */
 		free(libtrace->format_data);
@@ -1903,7 +2073,7 @@ static int dpdk_pread_packets (libtrace_t *libtrace,
                                     size_t nb_packets) {
 	int nb_rx; /* Number of rx packets we've recevied */
 	struct rte_mbuf* pkts_burst[nb_packets]; /* Array of pointer(s) */
-	size_t i;
+	int i;
 	dpdk_per_stream_t *stream = t->format_data;
 
 	nb_rx = dpdk_read_packet_stream (libtrace, stream, &t->messages,
