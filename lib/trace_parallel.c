@@ -375,6 +375,7 @@ static void trace_thread_pause(libtrace_t *trace, libtrace_thread_t *t) {
  * @param t The current thread
  * @param packet A pointer to the packet storage, which may be set to null upon
  *               return, or a packet to be finished.
+ * @param tracetime If true packets are delayed to match with tracetime
  * @return 0 is successful, otherwise if playing back in tracetime
  *         READ_MESSAGE(-2) can be returned in which case the packet is not sent.
  *
@@ -413,6 +414,7 @@ static inline int dispatch_packet(libtrace_t *trace,
  * @param empty [in,out] A pointer to an integer storing the first empty slot,
  * upon return this is updated
  * @param offset [in,out] The offset into the array, upon return this is updated
+ * @param tracetime If true packets are delayed to match with tracetime
  * @return 0 is successful, otherwise if playing back in tracetime
  *         READ_MESSAGE(-2) can be returned in which case the packet is not sent.
  *
@@ -483,7 +485,7 @@ static int trace_perpkt_thread_pause(libtrace_t *trace, libtrace_thread_t *t,
 				if (packet->error > 0) {
 					store_first_packet(trace, packet, t);
 				}
-				ASSERT_RET(dispatch_packet(trace, t, &packet, 1), == 0);
+				ASSERT_RET(dispatch_packet(trace, t, &packet, false), == 0);
 				if (packet == NULL)
 					libtrace_ocache_alloc(&trace->packet_freelist, (void **) &packet, 1, 1);
 			} else if (ret != READ_MESSAGE) {
