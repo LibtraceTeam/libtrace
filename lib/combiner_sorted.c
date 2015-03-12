@@ -27,9 +27,11 @@ static void read(libtrace_t *trace UNUSED, libtrace_combine_t *c UNUSED){
 
 static int compare_result(const void* p1, const void* p2)
 {
-	if (libtrace_result_get_key((libtrace_result_t *) p1) < libtrace_result_get_key((libtrace_result_t *) p2))
+	const libtrace_result_t * r1 = p1;
+	const libtrace_result_t * r2 = p2;
+	if (r1->key < r2->key)
 		return -1;
-	if (libtrace_result_get_key((libtrace_result_t *) p1) == libtrace_result_get_key((libtrace_result_t *) p2))
+	if (r1->key == r2->key)
 		return 0;
 	else
 		return 1;

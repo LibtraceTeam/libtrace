@@ -44,7 +44,7 @@ inline static void read_internal(libtrace_t *trace, libtrace_queue_t *queues, co
 			libtrace_deque_peek_front(v, (void *) &r);
 			live_count++;
 			live[i] = true;
-			key[i] = libtrace_result_get_key(&r);
+			key[i] = r.key;
 			if (i==0 || min_key > key[i]) {
 				min_key = key[i];
 				min_queue = i;
@@ -71,7 +71,7 @@ inline static void read_internal(libtrace_t *trace, libtrace_queue_t *queues, co
 		if (libtrace_deque_get_size(&queues[min_queue]) )
 		{
 			libtrace_deque_peek_front(&queues[min_queue], (void *) &r);
-			key[min_queue] = libtrace_result_get_key(&r);
+			key[min_queue] = r.key;
 			if (key[min_queue] <= min_key) {
 				// We are still the smallest, might be out of order though :(
 				min_key = key[min_queue];
@@ -130,12 +130,12 @@ static void pause(libtrace_t *trace, libtrace_combine_t *c) {
 }
 
 DLLEXPORT const libtrace_combine_t combiner_ordered = {
-    init_combiner,	/* initialise */
+	init_combiner,	/* initialise */
 	destroy,		/* destroy */
 	publish,		/* publish */
-    read,			/* read */
-    read_final,		/* read_final */
-    pause,			/* pause */
-    NULL,			/* queues */
-    {0}				/* opts */
+	read,			/* read */
+	read_final,		/* read_final */
+	pause,			/* pause */
+	NULL,			/* queues */
+	{0}				/* opts */
 };

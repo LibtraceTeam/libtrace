@@ -146,8 +146,8 @@ static void process_result(libtrace_t *trace UNUSED, int mesg,
 
 	switch (mesg) {
 		case MESSAGE_RESULT:
-		ts = libtrace_result_get_key(data.res);
-		res = libtrace_result_get_value(data.res).ptr;
+		ts = data.res->key;
+		res = data.res->value.ptr;
 		if (last_ts == 0)
 			last_ts = ts;
 		while (last_ts < ts) {
@@ -194,7 +194,7 @@ static void* per_packet(libtrace_t *trace, libtrace_thread_t *t,
 			libtrace_generic_t tmp = {.ptr = results};
 			// Publish and make a new one new
 			//fprintf(stderr, "Publishing result %"PRIu64"\n", last_ts);
-			trace_publish_result(trace, t, (uint64_t) last_ts, tmp, RESULT_NORMAL);
+			trace_publish_result(trace, t, (uint64_t) last_ts, tmp, RESULT_USER);
 			trace_post_reporter(trace);
 			results = calloc(1, sizeof(result_t) + sizeof(statistic_t) * filter_count);
 			last_ts++;
@@ -224,18 +224,19 @@ static void* per_packet(libtrace_t *trace, libtrace_thread_t *t,
 		// Should we always post this?
 		if (results->total.count) {
 			libtrace_generic_t tmp = {.ptr = results};
-			trace_publish_result(trace, t, (uint64_t) last_ts, tmp, RESULT_NORMAL);
+			trace_publish_result(trace, t, (uint64_t) last_ts, tmp, RESULT_USER);
 			trace_post_reporter(trace);
 			results = NULL;
 		}
 		break;
 
-		case MESSAGE_TICK:
+	case MESSAGE_TICK_INTERVAL:
+	case MESSAGE_TICK_COUNT:
 		{
 			int64_t offset;
 			struct timeval *tv, tv_real;
 			libtrace_packet_t *first_packet = NULL;
-			retrive_first_packet(trace, &first_packet, &tv);
+			trace_get_first_packet(trace, NULL, &first_packet, &tv);
 			if (first_packet != NULL) {
 				// So figure out our running offset
 				tv_real = trace_get_timeval(first_packet);
@@ -246,7 +247,7 @@ static void* per_packet(libtrace_t *trace, libtrace_thread_t *t,
 				if (next_update_time <= data.uint64) {
 					libtrace_generic_t tmp = {.ptr = results};
 					//fprintf(stderr, "Got a tick and publishing early!!\n");
-					trace_publish_result(trace, t, (uint64_t) last_ts, tmp, RESULT_NORMAL);
+					trace_publish_result(trace, t, (uint64_t) last_ts, tmp, RESULT_USER);
 					trace_post_reporter(trace);
 					results = calloc(1, sizeof(result_t) + sizeof(statistic_t) * filter_count);
 					last_ts++;

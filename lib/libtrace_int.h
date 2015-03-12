@@ -224,7 +224,7 @@ struct first_packets {
 	pthread_spinlock_t lock;
 	size_t count; // If == perpkt_thread_count threads we have all
 	size_t first; // Valid if count != 0
-	struct __packet_storage_magic_type {
+	struct {
 		libtrace_packet_t * packet;
 		struct timeval tv;
 	} * packets;

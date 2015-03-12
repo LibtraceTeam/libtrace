@@ -2022,7 +2022,6 @@ static inline void dpdk_ready_pkts(libtrace_t *libtrace,
 	}
 
 	plc->ts_last_sys = cur_sys_time_ns;
-
 	return;
 }
 

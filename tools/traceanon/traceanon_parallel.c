@@ -160,7 +160,7 @@ static void* per_packet(libtrace_t *trace, libtrace_thread_t *t,
 	struct libtrace_ip *ipptr;
 	libtrace_udp_t *udp = NULL;
 	libtrace_tcp_t *tcp = NULL;
-
+	libtrace_stat_t *stats = NULL;
 	switch (mesg) {
 	case MESSAGE_PACKET:
 		ipptr = trace_get_ip(data.pkt);
@@ -198,8 +198,20 @@ static void* per_packet(libtrace_t *trace, libtrace_thread_t *t,
 	case MESSAGE_STARTING:
 		enc_init(enc_type,key);
 		break;
-	case MESSAGE_TICK:
-		trace_publish_result(trace, t, data.uint64, (libtrace_generic_t){0}, RESULT_TICK);
+	case MESSAGE_TICK_INTERVAL:
+		trace_publish_result(trace, t, data.uint64, (libtrace_generic_t){0}, RESULT_TICK_INTERVAL);
+		break;
+	case MESSAGE_TICK_COUNT:
+		trace_publish_result(trace, t, data.uint64, (libtrace_generic_t){0}, RESULT_TICK_COUNT);
+		break;
+	case MESSAGE_STOPPING:
+		stats = trace_create_statistics();
+		trace_get_thread_statistics(trace, t, stats);
+		trace_print_statistics(stats, stderr, NULL);
+		free(stats);
+		stats = trace_get_statistics(trace, NULL);
+		trace_print_statistics(stats, stderr, NULL);
+		//fprintf(stderr, "tracestats_parallel:\t Stopping thread - publishing results\n");
 		break;
 	}
 	return NULL;
@@ -215,16 +227,17 @@ static void write_out(libtrace_t *trace UNUSED, int mesg,
 	switch (mesg) {
 	case MESSAGE_RESULT:
 		if (data.res->type == RESULT_PACKET) {
-			libtrace_packet_t *packet = (libtrace_packet_t*) libtrace_result_get_value(data.res).pkt;
-			assert(libtrace_result_get_key(data.res) == packet_count++);
+			libtrace_packet_t *packet = (libtrace_packet_t*) data.res->value.pkt;
+			assert(data.res->key >= packet_count);
+			packet_count = data.res->key;
 			if (trace_write_packet(writer,packet)==-1) {
 				trace_perror_output(writer,"writer");
 				trace_interrupt();
 			}
-			trace_free_result_packet(trace, packet);
+			trace_free_packet(trace, packet);
 
 		} else {
-			assert(data.res->type == RESULT_TICK);
+			assert(data.res->type == RESULT_TICK_COUNT || data.res->type == RESULT_TICK_INTERVAL);
 			// Ignore it
 		}
 	}

@@ -138,7 +138,7 @@ static void* per_packet(libtrace_t *trace, libtrace_thread_t *t,
 		trace_get_thread_statistics(trace, t, stats);
 		trace_print_statistics(stats, stderr, NULL);
 		free(stats);
-		trace_publish_result(trace, t, 0, (libtrace_generic_t){.ptr = results}, RESULT_NORMAL); // Only ever using a single key 0
+		trace_publish_result(trace, t, 0, (libtrace_generic_t){.ptr = results}, RESULT_USER); // Only ever using a single key 0
 		//fprintf(stderr, "tracestats_parallel:\t Stopping thread - publishing results\n");
 		break;
 	case MESSAGE_STARTING:
@@ -167,8 +167,8 @@ static void report_result(libtrace_t *trace UNUSED, int mesg,
 	switch (mesg) {
 	case MESSAGE_RESULT:
 		/* Get the results from each core and sum 'em up */
-		assert(libtrace_result_get_key(data.res) == 0);
-		statistics_t * res = libtrace_result_get_value(data.res).ptr;
+		assert(data.res->key == 0);
+		statistics_t * res = data.res->value.ptr;
 		count += res[0].count;
 		bytes += res[0].bytes;
 		for (i = 0; i < filter_count; i++) {

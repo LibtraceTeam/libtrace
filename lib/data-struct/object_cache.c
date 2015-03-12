@@ -229,12 +229,9 @@ DLLEXPORT int libtrace_ocache_destroy(libtrace_ocache_t *oc) {
 	}
 	pthread_spin_unlock(&oc->spin);
 
-	// Make sure we haven't lost too many packets
 	if (oc->current_allocations)
-		fprintf(stderr, "!!OCache closing lost, %d packets!!\n", (int) oc->current_allocations);
-	else
-		/* This is clearly a bug, but I don't know what to replace it with... */
-		fprintf(stderr, "!!OCache closing lost, %d packets!!\n", (int) oc->current_allocations);
+		fprintf(stderr, "OCache destroyed, leaking %d packets!!\n", (int) oc->current_allocations);
+
 	libtrace_ringbuffer_destroy(&oc->rb);
 	pthread_spin_destroy(&oc->spin);
 	free(oc->thread_list);

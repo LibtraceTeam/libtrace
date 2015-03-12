@@ -106,12 +106,12 @@ static void report_result(libtrace_t *trace UNUSED, int mesg,
 	static int totalthreads = 0;
 	switch (mesg) {
 	case MESSAGE_RESULT:
-		assert(libtrace_result_get_key(data.res) == 0);
-		printf("%d,", libtrace_result_get_value(data.res).sint);
+		assert(data.res->key == 0);
+		printf("%d,", data.res->value.sint);
 		totalthreads++;
-		totalpkts += libtrace_result_get_value(data.res).sint;
-		assert(libtrace_result_get_value(data.res).sint == 25 ||
-		       libtrace_result_get_value(data.res).sint == expected - 25);
+		totalpkts += data.res->value.sint;
+		assert(data.res->value.sint == 25 ||
+		       data.res->value.sint == expected - 25);
 		break;
 	case MESSAGE_STARTING:
 		// Should have two threads here
@@ -165,11 +165,12 @@ static void* per_packet(libtrace_t *trace, libtrace_thread_t *t,
 
 		// All threads publish to verify the thread count
 		assert(tls->count == 25 || tls->count == 75);
-		trace_publish_result(trace, t, (uint64_t) 0, (libtrace_generic_t){.sint=tls->count}, RESULT_NORMAL);
+		trace_publish_result(trace, t, (uint64_t) 0, (libtrace_generic_t){.sint=tls->count}, RESULT_USER);
 		trace_post_reporter(trace);
 		free(tls);
 		break;
-	case MESSAGE_TICK:
+	case MESSAGE_TICK_INTERVAL:
+	case MESSAGE_TICK_COUNT:
 		assert(tls->seen_start_message );
 		fprintf(stderr, "Not expecting a tick packet\n");
 		kill(getpid(), SIGTERM);

@@ -101,16 +101,16 @@ static void reporter(libtrace_t *libtrace UNUSED, int mesg,
 	libtrace_packet_t *packet;
 	switch (mesg) {
 	case MESSAGE_RESULT:
-		packet = libtrace_result_get_value(data.res).pkt;
-		assert(libtrace_result_get_key(data.res) == trace_packet_get_order(packet));
+		packet = data.res->value.pkt;
+		assert(data.res->key == trace_packet_get_order(packet));
 		if(last == (uint64_t)-1) {
-			last = libtrace_result_get_key(data.res);
+			last = data.res->key;
 		} else {
-			assert (last < libtrace_result_get_key(data.res));
-			last = libtrace_result_get_key(data.res);
+			assert (last < data.res->key);
+			last = data.res->key;
 		}
 		pktcount++;
-		trace_free_result_packet(libtrace, packet);
+		trace_free_packet(libtrace, packet);
 		break;
 	case MESSAGE_STOPPING:
 		globalcount = pktcount;
