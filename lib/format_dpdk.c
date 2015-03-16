@@ -295,6 +295,12 @@ struct dpdk_per_stream_t
 #endif
 } ALIGN_STRUCT(CACHE_LINE_SIZE);
 
+#if HAS_HW_TIMESTAMPS_82580
+#define DPDK_EMPTY_STREAM {-1, 0, NULL, -1, 0, 0}
+#else
+#define DPDK_EMPTY_STREAM {-1, 0, NULL, -1}
+#endif
+
 typedef struct dpdk_per_stream_t dpdk_per_stream_t;
 
 /* Used by both input and output however some fields are not used
@@ -788,7 +794,7 @@ static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_
 }
 
 static int dpdk_init_input (libtrace_t *libtrace) {
-	dpdk_per_stream_t stream = {0};
+	dpdk_per_stream_t stream = DPDK_EMPTY_STREAM;
 	char err[500];
 	err[0] = 0;
 
@@ -1267,7 +1273,7 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data,
                               char *err, int errlen, uint16_t rx_queues) {
 	int ret, i;
 	struct rte_eth_link link_info; /* Wait for link */
-	dpdk_per_stream_t empty_stream = {0};
+	dpdk_per_stream_t empty_stream = DPDK_EMPTY_STREAM;
 
 	/* Already started */
 	if (format_data->paused == DPDK_RUNNING)
@@ -1366,9 +1372,8 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data,
 		stream = libtrace_list_get_index(format_data->per_stream, i)->data;
 		stream->queue_id = i;
 
-		/* TODO we don't use this in the single threaded framework -
-		 * So we should not reserve this */
-		stream->lcore = dpdk_reserve_lcore(true, format_data->nic_numa_node);
+		if (stream->lcore == -1)
+			stream->lcore = dpdk_reserve_lcore(true, format_data->nic_numa_node);
 
 		if (stream->lcore == -1) {
 			snprintf(err, errlen, "Intel DPDK - Failed to reserve a lcore"
@@ -1408,6 +1413,7 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data,
 #if DEBUG
 	fprintf(stderr, "Doing start device\n");
 #endif
+	rte_eth_stats_reset(format_data->port);
 	/* Start device */
 	ret = rte_eth_dev_start(format_data->port);
 	if (ret < 0) {
@@ -1455,6 +1461,9 @@ static int dpdk_start_input (libtrace_t *libtrace) {
 	char err[500];
 	err[0] = 0;
 
+	/* Make sure we don't reserve an extra thread for this */
+	FORMAT_DATA_FIRST(libtrace)->queue_id = rte_lcore_id();
+
 	if (dpdk_start_streams(FORMAT(libtrace), err, sizeof(err), 1) != 0) {
 		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "%s", err);
 		free(libtrace->format_data);
@@ -1482,6 +1491,7 @@ static int dpdk_pstart_input (libtrace_t *libtrace) {
 	char err[500];
 	int i=0, phys_cores=0;
 	int tot = libtrace->perpkt_thread_count;
+	libtrace_list_node_t *n;
 	err[0] = 0;
 
 	if (rte_lcore_id() != rte_get_master_lcore())
@@ -1498,11 +1508,21 @@ static int dpdk_pstart_input (libtrace_t *libtrace) {
 	 * We don't have to force this but performance wont be good if we don't */
 	for (i = 0; i < RTE_MAX_LCORE; ++i) {
 		if (lcore_config[i].detected) {
-			if (rte_lcore_is_enabled(i))
+			if (rte_lcore_is_enabled(i)) {
+#if DEBUG
 				fprintf(stderr, "Found core %d already in use!\n", i);
-			else
+#endif
+			} else {
 				phys_cores++;
+			}
 		}
+	}
+	/* If we are restarting we have already allocated some threads as such
+	 * we add these back to the count for this calculation */
+	for (n = FORMAT_DATA_HEAD(libtrace); n; n = n->next) {
+		dpdk_per_stream_t * stream = n->data;
+		if (stream->lcore != -1)
+			phys_cores++;
 	}
 
 	tot = MIN(libtrace->perpkt_thread_count,
