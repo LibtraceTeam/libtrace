@@ -225,6 +225,7 @@ void linuxcommon_close_input_stream(libtrace_t *libtrace,
 		       stream->req.tp_block_size *
 		       stream->req.tp_block_nr);
 	stream->rx_ring = MAP_FAILED;
+	stream->rxring_offset = 0;
 	FORMAT_DATA->dev_stats.if_name[0] = 0;
 }
 
@@ -423,9 +424,9 @@ int linuxcommon_start_input_stream(libtrace_t *libtrace,
 
 	/* Mark that the stats are valid and apply an offset */
 	FORMAT_DATA->stats_valid = 1;
-	/* Offset by number we ate for each stream */
-	FORMAT_DATA->stats.tp_packets -= count;
-
+	/* Offset by number we ate for each stream and reset stats after pause */
+	FORMAT_DATA->stats.tp_packets = -count;
+	FORMAT_DATA->stats.tp_drops = 0;
 
 	if (linuxcommon_get_dev_statisitics(libtrace, &FORMAT_DATA->dev_stats) != 0) {
 		/* Mark this as bad */
