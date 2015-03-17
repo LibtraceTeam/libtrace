@@ -59,6 +59,9 @@ do_test ./test-format-parallel-stressthreads erf
 echo \* Read stress testing with 100 threads
 do_test ./test-format-parallel-reporter erf
 
+echo \* Testing Trace-Time Playback
+do_test ./test-tracetime-parallel
+
 echo
 echo "Tests passed: $OK"
 echo "Tests failed: $FAIL"
