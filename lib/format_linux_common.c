@@ -526,7 +526,6 @@ int linuxcommon_pconfig_input(libtrace_t *libtrace,
 					FORMAT_DATA->fanout_flags = PACKET_FANOUT_HASH;
 					return 0;
 				case HASHER_CUSTOM:
-				case HASHER_HARDWARE:
 					return -1;
 			}
 			break;

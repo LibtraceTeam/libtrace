@@ -283,39 +283,39 @@ enum libtrace_messages {
 	MESSAGE_USER = 1000
 };
 
+/** The hasher types avaliable to libtrace application.
+ * These can be selected using trace_set_hasher().
+ */
 enum hasher_types {
-	/**
-	 * Balance load across CPUs best as possible, this is basically to say do
-	 * not care about hash. This might still might be implemented
-	 * using a hash or round robin etc. under the hood depending on the format
+	/** Balance load across per-packet threads as best as possible, this is
+	 * basically to say I do not care about where packets are sent. This
+	 * might still might be implemented using a hash or round robin etc.
+	 * depending on the format and libtrace configuration.
 	 */
 	HASHER_BALANCE,
 
-	/** Use a hash which is bi-directional for TCP flows, that is packets with
-	 * the same hash are sent to the same thread. All non TCP packets will be
-	 * sent to the same thread. UDP may or may not be sent to separate
-	 * threads like TCP, this depends on the format support.
+	/** Use a hash which is bi-directional for TCP and UDP flows, that is
+	 * packets with the same 5-tuple are sent to the same per-packet thread.
+	 * All non TCP/UDP packets will be sent to the same thread.
+	 *
+	 * @note it is possible that UDP packets may not be spread across
+	 * per-packet threads, depending upon the format support. In this case
+	 * they would be directed to a single per-packet thread.
 	 */
 	HASHER_BIDIRECTIONAL,
 
-	/**
-	 * Use a hash which is uni-directional across TCP flows, that means the
-	 * opposite directions of the same 5 tuple might end up on separate cores.
-	 * Otherwise is identical to HASHER_BIDIRECTIONAL
+	/** Use a hash which is uni-directional across TCP and UDP flows, this
+	 * means the opposing directions of the same 5-tuple might end up on
+	 * different per-packet threads.
+	 * Otherwise this is identical to HASHER_BIDIRECTIONAL
 	 */
 	HASHER_UNIDIRECTIONAL,
 
 	/**
-	 * Always use the user supplied hasher, this currently disables native
-	 * support and is likely significantly slower.
+	 * Always use the user supplied hasher, this disables native
+	 * support in and is likely significantly slower.
 	 */
-	HASHER_CUSTOM,
-
-	/**
-	 * This is not a valid option, used internally only!!! TODO remove
-	 * Set by the format if the hashing is going to be done in hardware
-	 */
-	HASHER_HARDWARE
+	HASHER_CUSTOM
 };
 
 typedef struct libtrace_info_t {
@@ -675,8 +675,32 @@ DLLEXPORT void * trace_set_tls(libtrace_thread_t *thread, void * data);
 
 /// @}
 
-
-/** TODO DOXS
+/** Set the hasher function for a parallel trace.
+ *
+ * @param[in] trace The parallel trace to apply the hasher to
+ * @param[in] type The type of hashing to apply, see enum hasher_types
+ * @param[in] hasher A hasher function to use [Optional]
+ * @param[in] data Data passed to the hasher function [Optional]
+ *
+ * @return 0 if successful otherwise -1 on error
+ *
+ * The hasher function in a parallel trace can be used to control which
+ * per-packet thread a packets is processed by.
+ *
+ * HASHER_BALANCE is the default and will dispatch packets as fast as possible
+ * to all threads arbitrarily. As such when called the hasher and
+ * data parameters must be set to NULL.
+ *
+ * HASHER_CUSTOM will force the libtrace to use the user defined function. As
+ * such the hasher parameter must be supplied.
+ *
+ * With other defined hasher types we will try to push the hashing into the format
+ * by default. In this case the hasher parameter is optional and will be
+ * preferred over the default supplied by libtrace.
+ *
+ * @note When supplying a hasher function it should be thread-safe as it could
+ * be run in parallel by libtrace. Ideally this should rely upon no state, other
+ * than some form of seed value supplied in data.
  */
 DLLEXPORT int trace_set_hasher(libtrace_t *trace, enum hasher_types type, fn_hasher hasher, void *data);
 
@@ -684,7 +708,7 @@ DLLEXPORT int trace_set_hasher(libtrace_t *trace, enum hasher_types type, fn_has
  * Some result types require special handling by combiners
  * as such making use of built-in types is important.
  *
- * User specific results should be defined as values greater than RESULT_USER(1000)
+ * Custom result types users should be defined as RESULT_USER(1000) or greater.
  *
  */
 enum result_types {
@@ -730,9 +754,11 @@ DLLEXPORT void trace_publish_result(libtrace_t *libtrace,
                                     libtrace_generic_t value,
                                     int type);
 
-/** Check if a dedicated hasher thread is being used
+/** Check if a dedicated hasher thread is being used.
  *
  * @return True if the trace has dedicated hasher thread otherwise false.
+ *
+ * This is valid once the trace is running after calling trace_pstart().
  */
 DLLEXPORT bool trace_has_dedicated_hasher(libtrace_t * libtrace);
 

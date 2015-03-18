@@ -656,7 +656,7 @@ eof:
 	print_memory_stats();
 
 	pthread_exit(NULL);
-};
+}
 
 /**
  * The start point for our single threaded hasher thread, this will read
@@ -1313,23 +1313,24 @@ static int trace_prestart(libtrace_t * libtrace, void *global_blob,
 }
 
 /**
+ * @return the number of CPU cores on the machine. -1 if unknown.
+ */
+SIMPLE_FUNCTION static int get_nb_cores() {
+	// TODO add BSD support
+	return sysconf(_SC_NPROCESSORS_ONLN);
+}
+
+/**
  * Verifies the configuration and sets default values for any values not
  * specified by the user.
  */
 static void verify_configuration(libtrace_t *libtrace) {
-	bool require_hasher = false;
-
-	/* Might we need a dedicated hasher thread? */
-	if (libtrace->hasher && libtrace->hasher_type != HASHER_HARDWARE) {
-		require_hasher = true;
-	}
 
 	if (libtrace->config.hasher_queue_size <= 0)
 		libtrace->config.hasher_queue_size = 1000;
 
 	if (libtrace->config.perpkt_threads <= 0) {
-		// TODO add BSD support
-		libtrace->perpkt_thread_count = sysconf(_SC_NPROCESSORS_ONLN);
+		libtrace->perpkt_thread_count = get_nb_cores();
 		if (libtrace->perpkt_thread_count <= 0)
 			// Lets just use one
 			libtrace->perpkt_thread_count = 1;
@@ -1353,9 +1354,8 @@ static void verify_configuration(libtrace_t *libtrace) {
 	if (libtrace->combiner.initialise == NULL && libtrace->combiner.publish == NULL)
 		libtrace->combiner = combiner_unordered;
 
-
 	/* Figure out if we are using a dedicated hasher thread? */
-	if (require_hasher && libtrace->perpkt_thread_count > 1) {
+	if (libtrace->hasher && libtrace->perpkt_thread_count > 1) {
 		libtrace->hasher_thread.type = THREAD_HASHER;
 	}
 }
@@ -1381,17 +1381,27 @@ static int trace_start_thread(libtrace_t *trace,
                        void *(*start_routine) (void *),
                        int perpkt_num,
                        const char *name) {
-	int ret;
+	pthread_attr_t attrib;
+	cpu_set_t cpus;
+	int ret, i;
 	assert(t->type == THREAD_EMPTY);
 	t->trace = trace;
 	t->ret = NULL;
 	t->user_data = NULL;
 	t->type = type;
 	t->state = THREAD_RUNNING;
-	ret = pthread_create(&t->tid, NULL, start_routine, (void *) trace);
+
+	CPU_ZERO(&cpus);
+	for (i = 0; i < get_nb_cores(); i++)
+		CPU_SET(i, &cpus);
+	pthread_attr_init(&attrib);
+	pthread_attr_setaffinity_np(&attrib, sizeof(cpus), &cpus);
+
+	ret = pthread_create(&t->tid, &attrib, start_routine, (void *) trace);
+	pthread_attr_destroy(&attrib);
 	if (ret != 0) {
 		libtrace_zero_thread(t);
-		trace_set_err(trace, ret, "Failed to create a thread");
+		trace_set_err(trace, ret, "Failed to create a thread of type=%d\n", type);
 		return -1;
 	}
 	libtrace_message_queue_init(&t->messages, sizeof(libtrace_message_t));
@@ -1567,11 +1577,8 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob,
 		ret = trace_start_thread(libtrace, &libtrace->hasher_thread,
 		                   THREAD_HASHER, hasher_entry, -1,
 		                   "hasher-thread");
-		if (ret != 0) {
-			trace_set_err(libtrace, errno, "trace_pstart "
-			              "failed to start a hasher thread.");
+		if (ret != 0)
 			goto cleanup_started;
-		}
 		libtrace->pread = trace_pread_packet_hasher_thread;
 	} else {
 		libtrace->hasher_thread.type = THREAD_EMPTY;
@@ -1591,11 +1598,8 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob,
 		ret = trace_start_thread(libtrace, &libtrace->perpkt_threads[i],
 		                   THREAD_PERPKT, perpkt_threads_entry, i,
 		                   name);
-		if (ret != 0) {
-			trace_set_err(libtrace, errno, "trace_pstart "
-			              "failed to start a perpkt thread.");
+		if (ret != 0)
 			goto cleanup_threads;
-		}
 	}
 
 	/* Start the reporter thread */
@@ -1605,11 +1609,8 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob,
 		ret = trace_start_thread(libtrace, &libtrace->reporter_thread,
 		                   THREAD_REPORTER, reporter_entry, -1,
 		                   "reporter_thread");
-		if (ret != 0) {
-			trace_set_err(libtrace, errno, "trace_pstart "
-			              "failed to start reporter thread.");
+		if (ret != 0)
 			goto cleanup_threads;
-		}
 	}
 
 	/* Start the keepalive thread */
@@ -1617,11 +1618,8 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob,
 		ret = trace_start_thread(libtrace, &libtrace->keepalive_thread,
 		                   THREAD_KEEPALIVE, keepalive_entry, -1,
 		                   "keepalive_thread");
-		if (ret != 0) {
-			trace_set_err(libtrace, errno, "trace_pstart "
-			              "failed to start keepalive thread.");
+		if (ret != 0)
 			goto cleanup_threads;
-		}
 	}
 
 	/* Init other data structures */
@@ -1759,7 +1757,7 @@ DLLEXPORT int trace_ppause(libtrace_t *libtrace)
 		if (&libtrace->perpkt_threads[i] != t) {
 			libtrace_message_t message = {0};
 			message.code = MESSAGE_DO_PAUSE;
-			trace_message_thread(libtrace, &libtrace->perpkt_threads[i], &message);
+			ASSERT_RET(trace_message_thread(libtrace, &libtrace->perpkt_threads[i], &message), != -1);
 			if(trace_has_dedicated_hasher(libtrace)) {
 				// The hasher has stopped and other threads have messages waiting therefore
 				// If the queues are empty the other threads would have no data
@@ -1869,16 +1867,9 @@ DLLEXPORT int trace_pstop(libtrace_t *libtrace)
 	return 0;
 }
 
-/**
- * Set the hasher type along with a selected function, if hardware supports
- * that generic type of hashing it will be used otherwise the supplied
- * hasher function will be used and passed data when called.
- *
- * @return 0 if successful otherwise -1 on error
- */
 DLLEXPORT int trace_set_hasher(libtrace_t *trace, enum hasher_types type, fn_hasher hasher, void *data) {
 	int ret = -1;
-	if (type == HASHER_HARDWARE || (type == HASHER_CUSTOM && !hasher) || (type == HASHER_BALANCE && hasher)) {
+	if ((type == HASHER_CUSTOM && !hasher) || (type == HASHER_BALANCE && hasher)) {
 		return -1;
 	}
 
@@ -1899,8 +1890,7 @@ DLLEXPORT int trace_set_hasher(libtrace_t *trace, enum hasher_types type, fn_has
 		ret = trace->format->pconfig_input(trace, TRACE_OPTION_SET_HASHER, &type);
 
 	if (ret == -1) {
-		// We have to deal with this ourself
-		// This most likely means single threaded reading of the trace
+		/* We have to deal with this ourself */
 		if (!hasher) {
 			switch (type)
 			{
@@ -1917,14 +1907,14 @@ DLLEXPORT int trace_set_hasher(libtrace_t *trace, enum hasher_types type, fn_has
 					trace->hasher_data = calloc(1, sizeof(toeplitz_conf_t));
 					toeplitz_init_config(trace->hasher_data, 0);
 					return 0;
-				case HASHER_HARDWARE:
-					return -1;
 			}
 			return -1;
 		}
 	} else {
-		// The hardware is dealing with this yay
-		trace->hasher_type = HASHER_HARDWARE;
+		/* If the hasher is hardware we zero out the hasher and hasher
+		 * data fields - only if we need a hasher do we do this */
+		trace->hasher = NULL;
+		trace->hasher_data = NULL;
 	}
 
 	return 0;
@@ -2056,7 +2046,7 @@ DLLEXPORT int trace_post_reporter(libtrace_t *libtrace)
 DLLEXPORT int trace_message_perpkts(libtrace_t * libtrace, libtrace_message_t * message)
 {
 	int i;
-	int missed;
+	int missed = 0;
 	if (message->sender == NULL)
 		message->sender = get_thread_descriptor(libtrace);
 	for (i = 0; i < libtrace->perpkt_thread_count; i++) {

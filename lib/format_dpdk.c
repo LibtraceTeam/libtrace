@@ -878,7 +878,6 @@ static int dpdk_pconfig_input (libtrace_t *libtrace,
 		case HASHER_BIDIRECTIONAL:
 			toeplitz_create_bikey(FORMAT(libtrace)->rss_key);
 			return 0;
-		case HASHER_HARDWARE:
 		case HASHER_CUSTOM:
 			// We don't support these
 			return -1;
