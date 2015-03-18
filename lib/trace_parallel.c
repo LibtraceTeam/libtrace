@@ -1273,7 +1273,7 @@ static int trace_pread_packet_wrapper(libtrace_t *libtrace,
  */
 static int trace_prestart(libtrace_t * libtrace, void *global_blob,
                           fn_per_pkt per_pkt, fn_reporter reporter) {
-	int err = 0;
+	int i, err = 0;
 	if (libtrace->state != STATE_PAUSED) {
 		trace_set_err(libtrace, TRACE_ERR_BAD_STATE,
 			"trace(%s) is not currently paused",
@@ -1281,17 +1281,47 @@ static int trace_prestart(libtrace_t * libtrace, void *global_blob,
 		return -1;
 	}
 
+	assert(libtrace_parallel);
+	assert(!libtrace->perpkt_thread_states[THREAD_RUNNING]);
+
+	/* Reset first packets */
+	pthread_spin_lock(&libtrace->first_packets.lock);
+	for (i = 0; i < libtrace->perpkt_thread_count; ++i) {
+		assert(!!libtrace->perpkt_threads[i].recorded_first == !!libtrace->first_packets.packets[i].packet);
+		if (libtrace->first_packets.packets[i].packet) {
+			trace_destroy_packet(libtrace->first_packets.packets[i].packet);
+			libtrace->first_packets.packets[i].packet = NULL;
+			libtrace->first_packets.packets[i].tv.tv_sec = 0;
+			libtrace->first_packets.packets[i].tv.tv_usec = 0;
+			libtrace->first_packets.count--;
+			libtrace->perpkt_threads[i].recorded_first = false;
+		}
+	}
+	assert(libtrace->first_packets.count == 0);
+	libtrace->first_packets.first = 0;
+	pthread_spin_unlock(&libtrace->first_packets.lock);
+
+	/* Reset delay */
+	for (i = 0; i < libtrace->perpkt_thread_count; ++i) {
+		libtrace->perpkt_threads[i].tracetime_offset_usec = 0;
+	}
+
+	/* Reset statistics */
+	for (i = 0; i < libtrace->perpkt_thread_count; ++i) {
+		libtrace->perpkt_threads[i].accepted_packets = 0;
+		libtrace->perpkt_threads[i].filtered_packets = 0;
+	}
+	libtrace->accepted_packets = 0;
+	libtrace->filtered_packets = 0;
+
 	/* Update functions if requested */
 	if (per_pkt)
 		libtrace->per_pkt = per_pkt;
+	assert(libtrace->per_pkt);
 	if (reporter)
 		libtrace->reporter = reporter;
 	if(global_blob)
 		libtrace->global_blob = global_blob;
-
-	assert(libtrace_parallel);
-	assert(!libtrace->perpkt_thread_states[THREAD_RUNNING]);
-	assert(libtrace->per_pkt);
 
 	if (libtrace->perpkt_thread_count > 1 &&
 	    trace_supports_parallel(libtrace) &&
