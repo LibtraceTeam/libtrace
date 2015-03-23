@@ -1277,7 +1277,11 @@ typedef enum {
 
 	/** If enabled, the libtrace event API will ignore time gaps between
 	 * packets when reading from a trace file */
-	TRACE_OPTION_EVENT_REALTIME
+	TRACE_OPTION_EVENT_REALTIME,
+
+	/** The hasher function for a parallel libtrace. It is recommended to
+	 * access this option via trace_set_hasher(). */
+	TRACE_OPTION_HASHER
 } trace_option_t;
 
 /** Sets an input config option
@@ -1285,11 +1289,56 @@ typedef enum {
  * @param option	The option to set
  * @param value		The value to set the option to
  * @return -1 if option configuration failed, 0 otherwise
- * This should be called after trace_create, and before trace_start
+ *
+ * This should be called after trace_create(), and before trace_start()
+ *
+ * @note Please consider using the newer trace_set_X() functions to access
+ * this function.
  */
 DLLEXPORT int trace_config(libtrace_t *libtrace,
 		trace_option_t option,
 		void *value);
+
+/** Maximum number of bytes to be captured for any given packet
+ *
+ * @param libtrace The trace object to apply the option to
+ * @param snaplen The snap length to set
+ * @return -1 if option configuration failed, 0 otherwise
+ */
+DLLEXPORT int trace_set_snaplen(libtrace_t *trace, int snaplen);
+
+/** If enabled, places a live capture interface into promiscuous mode
+ *
+ * @param libtrace The trace object to apply the option to
+ * @param promisc
+ * @return -1 if option configuration failed, 0 otherwise
+ */
+DLLEXPORT int trace_set_promisc(libtrace_t *trace, bool promisc);
+
+/** Apply this filter to all packets read from this trace
+ *
+ * @param libtrace The trace object to apply the option to
+ * @param filter The filter to apply
+ * @return -1 if option configuration failed, 0 otherwise
+ */
+DLLEXPORT int trace_set_filter(libtrace_t *trace, libtrace_filter_t *filter);
+
+/** Defines the frequency of meta-data reporting, e.g. DUCK packets
+ *
+ * @param libtrace The trace object to apply the option to
+ * @param freq The meta data frequency
+ * @return -1 if option configuration failed, 0 otherwise
+ */
+DLLEXPORT int trace_set_meta_freq(libtrace_t *trace, int freq);
+
+/** If enabled, the libtrace event API will ignore time gaps between
+ * packets when reading from a trace file.
+ *
+ * @param libtrace The trace object to apply the option to
+ * @param realtime True ignores gaps
+ * @return -1 if option configuration failed, 0 otherwise
+ */
+DLLEXPORT int trace_set_event_realtime(libtrace_t *trace, bool realtime);
 
 /** Valid compression types 
  * Note, this must be kept in sync with WANDIO_COMPRESS_* numbers in wandio.h

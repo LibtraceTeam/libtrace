@@ -1372,12 +1372,12 @@ static void verify_configuration(libtrace_t *libtrace) {
 		libtrace->config.reporter_thold = 100;
 	if (libtrace->config.burst_size <= 0)
 		libtrace->config.burst_size = 10;
-	if (libtrace->config.packet_thread_cache_size <= 0)
-		libtrace->config.packet_thread_cache_size = 20;
-	if (libtrace->config.packet_cache_size <= 0)
-		libtrace->config.packet_cache_size = (libtrace->config.hasher_queue_size + 1) * libtrace->perpkt_thread_count;
+	if (libtrace->config.thread_cache_size <= 0)
+		libtrace->config.thread_cache_size = 20;
+	if (libtrace->config.cache_size <= 0)
+		libtrace->config.cache_size = (libtrace->config.hasher_queue_size + 1) * libtrace->perpkt_thread_count;
 
-	if (libtrace->config.packet_cache_size <
+	if (libtrace->config.cache_size <
 		(libtrace->config.hasher_queue_size + 1) * libtrace->perpkt_thread_count)
 		fprintf(stderr, "WARNING deadlocks may occur and extra memory allocating buffer sizes (packet_freelist_size) mismatched\n");
 
@@ -1451,8 +1451,8 @@ static int trace_start_thread(libtrace_t *trace,
 /** Parses the environment variable LIBTRACE_CONF into the supplied
  * configuration structure.
  *
- * @param libtrace The trace from which we determine the URI
- * @param uc A configuration structure to be configured.
+ * @param[in,out] libtrace The trace from which we determine the URI and set
+ * the configuration.
  *
  * We search for 3 environment variables and apply them to the config in the
  * following order. Such that the first has the lowest priority.
@@ -1466,12 +1466,12 @@ static int trace_start_thread(libtrace_t *trace,
  * - dag:/dev/dag0,0 would match LIBTRACE_CONF, LIBTRACE_CONF_DAG, LIBTRACE_CONF_DAG__DEV_DAG0_0
  * - test.erf would match LIBTRACE_CONF, LIBTRACE_CONF_ERF, LIBTRACE_CONF_ERF_TEST_ERF
  *
- * @note All enironment variables names MUST only contian
+ * @note All environment variables names MUST only contian
  * [A-Z], [0-9] and [_] (underscore) and not start with a number. Any characters
  * outside of this range should be captilised if possible or replaced with an
  * underscore.
  */
-static void parse_env_config (libtrace_t *libtrace, struct user_configuration* uc) {
+static void parse_env_config (libtrace_t *libtrace) {
 	char env_name[1024] = "LIBTRACE_CONF_";
 	size_t len = strlen(env_name);
 	size_t mark = 0;
@@ -1502,7 +1502,7 @@ static void parse_env_config (libtrace_t *libtrace, struct user_configuration* u
 	if (env)
 	{
 		printf("Got env %s", env);
-		parse_user_config(uc, env);
+		trace_set_configuration(libtrace, env);
 	}
 
 	/* Then format settings LIBTRACE_CONF_<FORMAT> */
@@ -1511,7 +1511,7 @@ static void parse_env_config (libtrace_t *libtrace, struct user_configuration* u
 		env = getenv(env_name);
 		if (env) {
 			printf("Got %s=%s", env_name, env);
-			parse_user_config(uc, env);
+			trace_set_configuration(libtrace, env);
 		}
 		env_name[mark] = '_';
 	}
@@ -1520,7 +1520,7 @@ static void parse_env_config (libtrace_t *libtrace, struct user_configuration* u
 	env = getenv(env_name);
 	if (env) {
 		printf("Got %s=%s", env_name, env);
-		parse_user_config(uc, env);
+		trace_set_configuration(libtrace, env);
 	}
 }
 
@@ -1568,7 +1568,7 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob,
 	libtrace_parallel = 1;
 
 	/* Parses configuration passed through environment variables */
-	parse_env_config(libtrace, &libtrace->config);
+	parse_env_config(libtrace);
 	verify_configuration(libtrace);
 
 	/* Try start the format - we prefer parallel over single threaded, as
@@ -1666,9 +1666,9 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob,
 	if (libtrace_ocache_init(&libtrace->packet_freelist,
 	                     (void* (*)()) trace_create_packet,
 	                     (void (*)(void *))trace_destroy_packet,
-	                     libtrace->config.packet_thread_cache_size,
-	                     libtrace->config.packet_cache_size * 4,
-	                     libtrace->config.fixed_packet_count) != 0) {
+	                     libtrace->config.thread_cache_size,
+	                     libtrace->config.cache_size * 4,
+	                     libtrace->config.fixed_count) != 0) {
 		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "trace_pstart "
 		              "failed to allocate ocache.");
 		goto cleanup_threads;
@@ -1916,8 +1916,8 @@ DLLEXPORT int trace_set_hasher(libtrace_t *trace, enum hasher_types type, fn_has
 	// Try push this to hardware - NOTE hardware could do custom if
 	// there is a more efficient way to apply it, in this case
 	// it will simply grab the function out of libtrace_t
-	if (trace->format->pconfig_input)
-		ret = trace->format->pconfig_input(trace, TRACE_OPTION_SET_HASHER, &type);
+	if (trace->format->config_input)
+		ret = trace->format->config_input(trace, TRACE_OPTION_HASHER, &type);
 
 	if (ret == -1) {
 		/* We have to deal with this ourself */
@@ -2161,31 +2161,112 @@ DLLEXPORT bool trace_has_finished(libtrace_t * libtrace) {
 	return libtrace->state == STATE_FINSHED || libtrace->state == STATE_JOINED;
 }
 
-DLLEXPORT int trace_parallel_config(libtrace_t *libtrace, trace_parallel_option_t option, void *value)
-{
-	UNUSED int ret = -1;
-	switch (option) {
-		case TRACE_OPTION_TICK_INTERVAL:
-			libtrace->config.tick_interval = *((int *) value);
-			return 1;
-		case TRACE_OPTION_SET_HASHER:
-			return trace_set_hasher(libtrace, (enum hasher_types) *((int *) value), NULL, NULL);
-		case TRACE_OPTION_SET_PERPKT_THREAD_COUNT:
-			libtrace->config.perpkt_threads = *((int *) value);
-			return 1;
-		case TRACE_OPTION_TRACETIME:
-			if(*((int *) value))
-				libtrace->tracetime = 1;
-			else
-				libtrace->tracetime = 0;
-			return 0;
-		case TRACE_OPTION_SET_CONFIG:
-			libtrace->config = *((struct user_configuration *) value);
-		case TRACE_OPTION_GET_CONFIG:
-			*((struct user_configuration *) value) = libtrace->config;
+/**
+ * @return True if the trace is not running such that it can be configured
+ */
+static inline bool trace_is_configurable(libtrace_t *trace) {
+	return trace->state == STATE_NEW ||
+	                trace->state == STATE_PAUSED;
+}
+
+DLLEXPORT int trace_set_perpkt_threads(libtrace_t *trace, int nb) {
+	if (!trace_is_configurable(trace)) return -1;
+
+	/* TODO consider allowing an offset from the total number of cores i.e.
+	 * -1 reserve 1 core */
+	if (nb >= 0) {
+		trace->config.perpkt_threads = nb;
+		return 0;
+	} else {
+		return -1;
 	}
+}
+
+DLLEXPORT int trace_set_tick_interval(libtrace_t *trace, size_t interval) {
+	if (!trace_is_configurable(trace)) return -1;
+
+	trace->config.tick_interval = interval;
 	return 0;
 }
+
+DLLEXPORT int trace_set_tick_count(libtrace_t *trace, size_t count) {
+	if (!trace_is_configurable(trace)) return -1;
+
+	trace->config.tick_count = count;
+	return 0;
+}
+
+DLLEXPORT int trace_set_tracetime(libtrace_t *trace, bool tracetime) {
+	if (!trace_is_configurable(trace)) return -1;
+
+	trace->tracetime = tracetime;
+	return 0;
+}
+
+DLLEXPORT int trace_set_cache_size(libtrace_t *trace, size_t size) {
+	if (!trace_is_configurable(trace)) return -1;
+
+	trace->config.cache_size = size;
+	return 0;
+}
+
+DLLEXPORT int trace_set_thread_cache_size(libtrace_t *trace, size_t size) {
+	if (!trace_is_configurable(trace)) return -1;
+
+	trace->config.thread_cache_size = size;
+	return 0;
+}
+
+DLLEXPORT int trace_set_fixed_count(libtrace_t *trace, bool fixed) {
+	if (!trace_is_configurable(trace)) return -1;
+
+	trace->config.fixed_count = fixed;
+	return 0;
+}
+
+DLLEXPORT int trace_set_burst_size(libtrace_t *trace, size_t size) {
+	if (!trace_is_configurable(trace)) return -1;
+
+	trace->config.burst_size = size;
+	return 0;
+}
+
+DLLEXPORT int trace_set_hasher_queue_size(libtrace_t *trace, size_t size) {
+	if (!trace_is_configurable(trace)) return -1;
+
+	trace->config.hasher_queue_size = size;
+	return 0;
+}
+
+DLLEXPORT int trace_set_hasher_polling(libtrace_t *trace, bool polling) {
+	if (!trace_is_configurable(trace)) return -1;
+
+	trace->config.hasher_polling = polling;
+	return 0;
+}
+
+DLLEXPORT int trace_set_reporter_polling(libtrace_t *trace, bool polling) {
+	if (!trace_is_configurable(trace)) return -1;
+
+	trace->config.reporter_polling = polling;
+	return 0;
+}
+
+DLLEXPORT int trace_set_reporter_thold(libtrace_t *trace, size_t thold) {
+	if (!trace_is_configurable(trace)) return -1;
+
+	trace->config.reporter_thold = thold;
+	return 0;
+}
+
+DLLEXPORT int trace_set_debug_state(libtrace_t *trace, bool debug_state) {
+	if (!trace_is_configurable(trace)) return -1;
+
+	trace->config.debug_state = debug_state;
+	return 0;
+}
+
+
 
 static bool config_bool_parse(char *value, size_t nvalue) {
 	if (strncmp(value, "true", nvalue) == 0)
@@ -2196,19 +2277,20 @@ static bool config_bool_parse(char *value, size_t nvalue) {
 		return strtoll(value, NULL, 10) != 0;
 }
 
+/* Note update documentation on trace_set_configuration */
 static void config_string(struct user_configuration *uc, char *key, size_t nkey, char *value, size_t nvalue) {
 	assert(key);
 	assert(value);
 	assert(uc);
-	if (strncmp(key, "packet_cache_size", nkey) == 0
-	    || strncmp(key, "pcs", nkey) == 0) {
-		uc->packet_cache_size = strtoll(value, NULL, 10);
-	} else if (strncmp(key, "packet_thread_cache_size", nkey) == 0
-	           || strncmp(key, "ptcs", nkey) == 0) {
-		uc->packet_thread_cache_size = strtoll(value, NULL, 10);
-	} else if (strncmp(key, "fixed_packet_count", nkey) == 0
-	           || strncmp(key, "fpc", nkey) == 0) {
-		uc->fixed_packet_count = config_bool_parse(value, nvalue);
+	if (strncmp(key, "cache_size", nkey) == 0
+	    || strncmp(key, "cs", nkey) == 0) {
+		uc->cache_size = strtoll(value, NULL, 10);
+	} else if (strncmp(key, "thread_cache_size", nkey) == 0
+	           || strncmp(key, "tcs", nkey) == 0) {
+		uc->thread_cache_size = strtoll(value, NULL, 10);
+	} else if (strncmp(key, "fixed_count", nkey) == 0
+	           || strncmp(key, "fc", nkey) == 0) {
+		uc->fixed_count = config_bool_parse(value, nvalue);
 	} else if (strncmp(key, "burst_size", nkey) == 0
 	           || strncmp(key, "bs", nkey) == 0) {
 		uc->burst_size = strtoll(value, NULL, 10);
@@ -2241,30 +2323,45 @@ static void config_string(struct user_configuration *uc, char *key, size_t nkey,
 	}
 }
 
-DLLEXPORT void parse_user_config(struct user_configuration* uc, char * str) {
+DLLEXPORT int trace_set_configuration(libtrace_t *trace, const char *str) {
 	char *pch;
 	char key[100];
 	char value[100];
+	char *dup;
 	assert(str);
-	assert(uc);
-	pch = strtok (str," ,.-");
+	assert(trace);
+
+	if (!trace_is_configurable(trace)) return -1;
+
+	dup = strdup(str);
+	pch = strtok (dup," ,.-");
 	while (pch != NULL)
 	{
 		if (sscanf(pch, "%99[^=]=%99s", key, value) == 2) {
-			config_string(uc, key, sizeof(key), value, sizeof(value));
+			config_string(&trace->config, key, sizeof(key), value, sizeof(value));
 		} else {
 			fprintf(stderr, "Error parsing %s\n", pch);
 		}
 		pch = strtok (NULL," ,.-");
 	}
+	free(dup);
+
+	return 0;
 }
 
-DLLEXPORT void parse_user_config_file(struct user_configuration* uc, FILE *file) {
+DLLEXPORT int trace_set_configuration_file(libtrace_t *trace, FILE *file) {
 	char line[1024];
+	if (!trace_is_configurable(trace)) return -1;
+
 	while (fgets(line, sizeof(line), file) != NULL)
 	{
-		parse_user_config(uc, line);
+		trace_set_configuration(trace, line);
 	}
+
+	if(ferror(file))
+		return -1;
+	else
+		return 0;
 }
 
 DLLEXPORT void trace_free_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {

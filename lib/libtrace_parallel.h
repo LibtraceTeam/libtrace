@@ -84,7 +84,7 @@ typedef union {
 
 	size_t size;
 
-	/* C basic types - we cannot be certian of the size */
+	/* C basic types - we cannot be certain of the size */
 	int sint;
 	unsigned int uint;
 
@@ -111,33 +111,6 @@ struct libtrace_result_t {
 	libtrace_generic_t value;
 	int type;
 };
-
-typedef enum {
-	/**
-	 * Sets the hasher function, if NULL(default) no hashing is used a
-	 * cores will get packets on a first in first served basis
-	 */
-	TRACE_OPTION_SET_HASHER,
-
-	/**
-	 * Libtrace set perpkt thread count
-	 */
-	TRACE_OPTION_SET_PERPKT_THREAD_COUNT,
-
-	/**
-	 * Delays packets so they are played back in trace-time rather than as fast
-	 * as possible.
-	 */
-	TRACE_OPTION_TRACETIME,
-
-	/**
-	 * Specifies the interval between tick packets in milliseconds, if 0
-	 * or less this is ignored.
-	 */
-	TRACE_OPTION_TICK_INTERVAL,
-	TRACE_OPTION_GET_CONFIG,
-	TRACE_OPTION_SET_CONFIG
-} trace_parallel_option_t;
 
 /** The libtrace_messages enum
  * All libtrace messages are defined and documented here.
@@ -255,14 +228,14 @@ enum libtrace_messages {
 	 */
 	MESSAGE_POST_REPORTER,
 
-	/** Sent to per-packet threads perodically after the configured time
+	/** Sent to per-packet threads periodically after the configured time
 	 * interval has passed.
 	 *
 	 * This is sent out-of-band with respect to packets and as a result
-	 * can appear after a packet with an later timestamp, or before one
-	 * with an earlier timestamp.
+	 * can appear after a packet with an later time-stamp, or before one
+	 * with an earlier time-stamp.
 	 *
-	 * @param data data.uint64_t holds the system timestamp in the
+	 * @param data data.uint64_t holds the system time-stamp in the
 	 * erf format
 	 * @param sender should be ignored
 	 */
@@ -279,11 +252,11 @@ enum libtrace_messages {
 	 */
 	MESSAGE_TICK_COUNT,
 
-	/** For specific user defined messages use codes above MESSAGE_USER. */
+	/** For specific user defined messages use codes of MESSAGE_USER or above. */
 	MESSAGE_USER = 1000
 };
 
-/** The hasher types avaliable to libtrace application.
+/** The hasher types available to libtrace application.
  * These can be selected using trace_set_hasher().
  */
 enum hasher_types {
@@ -320,7 +293,7 @@ enum hasher_types {
 
 typedef struct libtrace_info_t {
 	/**
-	 * True if a live format (i.e. packets have to be tracetime).
+	 * True if a live format (i.e. packets have to be trace-time).
 	 * Otherwise false, indicating packets can be read as fast
 	 * as possible from the format.
 	 */
@@ -338,116 +311,20 @@ typedef struct libtrace_info_t {
 	/* TODO consider time/clock details?? */
 } libtrace_info_t;
 
-
-/**
- * Tuning the parallel sizes
- */
-struct user_configuration {
-	// Packet memory cache settings (ocache_init) total
-	/**
-	 * See diagrams, this sets the maximum size of freelist used to
-	 * maintain packets and their memory buffers.
-	 * NOTE setting this to less than recommend could cause deadlock a
-	 * trace that manages its own packets.
-	 * A unblockable error message will be printed.
-	 */
-	size_t packet_cache_size;
-	/**
-	 * Per thread local cache size for the packet freelist
-	 */
-	size_t packet_thread_cache_size;
-	/**
-	 * If true the total number of packets that can be created by a trace is limited
-	 * to the packet_cache_size, otherwise once packet_cache_size is exceeded alloc
-	 * and free will be used to create and free packets, this will be slower than
-	 * using the freelist and could run a machine out of memory.
-	 *
-	 * However this does make it easier to ensure that deadlocks will not occur
-	 * due to running out of packets
-	 */
-	bool fixed_packet_count;
-	/**
-	 * When reading from a single threaded input source to reduce
-	 * lock contention a 'burst' of packets is read per pkt thread
-	 * this determines the bursts size.
-	 */
-	size_t burst_size;
-	// Each perpkt thread has a queue leading into the reporter
-	//size_t reporter_queue_size;
-
-	/**
-	 * The tick interval - in milliseconds
-	 * When a live trace is used messages are sent at the tick
-	 * interval to ensure that all perpkt threads receive data
-	 * this allows results to be printed in cases flows are
-	 * not being directed to a certian thread, while still
-	 * maintaining order.
-	 */
-	size_t tick_interval;
-
-	/**
-	 * Like the tick interval but used in the case of file format
-	 * This specifies the number of packets before inserting a tick to
-	 * every thread.
-	 */
-	size_t tick_count;
-
-	/**
-	 * The number of per packet threads requested, 0 means use default.
-	 * Default typically be the number of processor threads detected less one or two.
-	 */
-	size_t perpkt_threads;
-
-	/**
-	 * See diagrams, this sets the maximum size of buffers used between
-	 * the single hasher thread and the buffer.
-	 * NOTE setting this to less than recommend could cause deadlock a
-	 * trace that manages its own packets.
-	 * A unblockable warning message will be printed to stderr in this case.
-	 */
-	/** The number of packets that can queue per thread from hasher thread */
-	size_t hasher_queue_size;
-
-	/**
-	 * If true use a polling hasher queue, that means that we will spin/or yeild
-	 * when rather than blocking on a lock. This applies to both the hasher thread
-	 * and perpkts reading the queues.
-	 */
-	bool hasher_polling;
-
-	/**
-	 * If true the reporter thread will continuously poll waiting for results
-	 * if false they are only checked when a message is received, this message
-	 * is controlled by reporter_thold.
-	 */
-	bool reporter_polling;
-
-	/**
-	 * Perpkt thread result queue size before triggering the reporter step to read results
-	 */
-	size_t reporter_thold;
-
-	/**
-	 * Prints a line to standard error for every state change
-	 * for both the trace as a whole and for each thread.
-	 */
-	bool debug_state;
-};
-
 /**
  * The methods we use to combine multiple outputs into a single output
  * This is not considered a stable API however is public.
- * Where possible use built in combiners
+ * Where possible use built in combiners.
  *
- * NOTE this structure is duplicated per trace and as such can
+ * @note this structure is duplicated per trace and as such can
  * have functions rewritten, and in fact should if possible.
  */
 typedef struct libtrace_combine libtrace_combine_t;
 struct libtrace_combine {
 
 	/**
-	 * Called at the start of the trace to allow datastructures
-	 * to be initilised and allow functions to be swapped if approriate.
+	 * Called at the start of the trace to allow data-structures
+	 * to be initialised and allow functions to be swapped if appropriate.
 	 *
 	 * Also factors such as whether the trace is live or not can
 	 * be used to determine the functions used.
@@ -473,7 +350,7 @@ struct libtrace_combine {
 
 	/**
 	 * Read as many results as possible from the trace.
-	 * Directy calls the users code to handle results from here.
+	 * Directly calls the users code to handle results from here.
 	 *
 	 * THIS SHOULD BE NON-BLOCKING AND READ AS MANY AS POSSIBLE
 	 * If publish is NULL, this probably should be NULL also otherwise
@@ -511,7 +388,7 @@ struct libtrace_combine {
 	void *queues;
 
 	/**
-	 * Configuration options, what this does is upto the combiner
+	 * Configuration options, what this does is up to the combiner
 	 * chosen.
 	 */
 	libtrace_generic_t configuration;
@@ -573,11 +450,11 @@ typedef uint64_t (*fn_hasher)(const libtrace_packet_t* packet, void *data);
 /** Start or restart an input trace in the parallel libtrace framework.
  *
  * @param libtrace The input trace to start
- * @param global_blob Global data related to this trace accessable using trace_get_global()
+ * @param global_blob Global data related to this trace accessible using trace_get_global()
  * @param per_pkt A user supplied function called when a packet is ready
  * @param reporter A user supplied function called when a result is ready.
  * Optional if NULL the reporter thread will not be started.
- * @return 0 on success, otherwise -1 to indicate an error has occured
+ * @return 0 on success, otherwise -1 to indicate an error has occurred
  *
  * This can also be used to restart an existing parallel trace,
  * that has previously been paused using trace_ppause().
@@ -591,17 +468,17 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob,
 /** Pauses a trace previously started with trace_pstart()
  *
  * @param libtrace The parallel trace to be paused
- * @return 0 on success, otherwise -1 to indicate an error has occured
+ * @return 0 on success, otherwise -1 to indicate an error has occurred
  *
  */
 DLLEXPORT int trace_ppause(libtrace_t *libtrace);
 
 /** Stops a parallel trace, causing all threads to exit as if an EOF
- * has occured. This replaces trace_interrupt(), allowing
+ * has occurred. This replaces trace_interrupt(), allowing
  * a specified trace to be stopped.
  *
  * @param libtrace The parallel trace to be stopped
- * @return 0 on success, otherwise -1 to indicate an error has occured
+ * @return 0 on success, otherwise -1 to indicate an error has occurred
  *
  * This should only be called by the main thread.
  *
@@ -613,7 +490,7 @@ DLLEXPORT int trace_pstop(libtrace_t *libtrace);
  * @param trace The parallel trace
  *
  * Waits for a trace to finish, whether this be due to
- * an error occuring, an EOF or trace_pstop.
+ * an error occurring, an EOF or trace_pstop.
  *
  */
 DLLEXPORT void trace_join(libtrace_t * trace);
@@ -621,11 +498,11 @@ DLLEXPORT void trace_join(libtrace_t * trace);
 /**
  * @name User Data Storage
  *
- * These method provide a way for users to store data agaist a trace or
+ * These method provide a way for users to store data against a trace or
  * a thread.
  *
  * Alternatively one could use global variables and thread local
- * storage (__thread), respectively, which in many cases could be simplier.
+ * storage (__thread), respectively, which in many cases could be simpler.
  *
  * @note We do not lock on reads, instead we rely on the
  * processor making any writes appear atomically.
@@ -644,7 +521,7 @@ DLLEXPORT void * trace_get_local(libtrace_t *trace);
  * using trace_get_global().
  *
  * @param trace The parallel trace.
- * @param data The new value to save agaisnt the trace
+ * @param data The new value to save against the trace
  * @return The previously stored value
  *
  * The update to the previous value is atomic and thread-safe.
@@ -665,15 +542,226 @@ DLLEXPORT void * trace_get_tls(libtrace_thread_t *thread);
 /** Store data against a thread.
  *
  * @param The parallel trace.
- * @param data The new value to save agaisnt the trace
+ * @param data The new value to save against the trace
  * @return The previously stored value
  *
- * This function is not thread-safe and is intented only to be
+ * This function is not thread-safe and is intended only to be
  * called on the currently running thread.
  */
 DLLEXPORT void * trace_set_tls(libtrace_thread_t *thread, void * data);
 
 /// @}
+
+
+/**
+ * @name Parallel Configuration
+ *
+ * These methods provide a way to configure the parallel libtrace library.
+ *
+ * Many of these options are typically unneeded by most applications as they
+ * control tuning aspects of the library and are more useful to the
+ * end user.
+ *
+ * To allow the end user to change this configuration libtrace will search for
+ * three environment variables and apply them to the configuration in the
+ * following order. Such that the first has the lowest priority.
+ *
+ * 1. LIBTRACE_CONF, The global environment configuration
+ * 2. LIBTRACE_CONF_<FORMAT>, Applied to a given format
+ * 3. LIBTRACE_CONF_<FORMAT_URI>, Applied the specified trace
+ *
+ * E.g.
+ * - int:eth0 would match LIBTRACE_CONF, LIBTRACE_CONF_INT, LIBTRACE_CONF_INT_ETH0
+ * - dag:/dev/dag0,0 would match LIBTRACE_CONF, LIBTRACE_CONF_DAG, LIBTRACE_CONF_DAG__DEV_DAG0_0
+ * - test.erf would match LIBTRACE_CONF, LIBTRACE_CONF_ERF, LIBTRACE_CONF_ERF_TEST_ERF
+ *
+ * @note All environment variables names MUST only contain
+ * [A-Z], [0-9] and [_] (underscore). Any characters
+ * outside of this range should be capitalised if possible or replaced with an
+ * underscore.
+ * @{
+ */
+
+/** Set the maximum number of perpkt threads to use in a trace.
+ *
+ * @param[in] trace The parallel input trace
+ * @param[in] nb The number of threads to use. If 0 use default.
+ * @return 0 if successful otherwise -1
+ */
+DLLEXPORT int trace_set_perpkt_threads(libtrace_t *trace, int nb);
+
+/** Set the interval between tick messages in milliseconds.
+ *
+ * @param[in] trace The parallel input trace
+ * @param[in] interval The interval in milliseconds. If 0 this is disabled [default].
+ * @return 0 if successful otherwise -1
+ *
+ * When a underlying parallel live trace is used MESSAGE_TICK_INTERVAL is sent
+ * every tick interval to all per-packet threads to ensure data is received.
+ * This allows results to be printed even in cases flows are not being directed
+ * to a per-packet thread, while still maintaining order etc.
+ *
+ * @note Tick count is preferred over tick interval and will be used rather
+ * than tick interval if possible.
+ * @see MESSAGE_TICK_INTERVAL, trace_set_tick_count()
+ */
+DLLEXPORT int trace_set_tick_interval(libtrace_t *trace, size_t interval);
+
+/** Set the count between tick messages.
+ *
+ * @param[in] trace The parallel input trace
+ * @param[in] count The tick count.  If 0 this is disabled [default].
+ * @return 0 if successful otherwise -1
+ *
+ * When an underlying trace is accessed internally by libtrace in a
+ * single-threaded manner MESSAGE_TICK_COUNT is sent to all per-packet threads
+ * after every count packets have been seen in the trace. This allows results
+ * to be printed even in cases flows are not being directed to a per-packet
+ * thread, while still maintaining order etc.
+ *
+ * @see MESSAGE_TICK_COUNT, trace_set_tick_interval()
+ */
+DLLEXPORT int trace_set_tick_count(libtrace_t *trace, size_t count);
+
+/**
+ * Delays packets so they are played back in trace-time rather than as fast
+ * as possible (real-time).
+ *
+ * @param A parallel input trace
+ * @param tracetime If true packets are released with time intervals matching
+ * the original trace. Otherwise packets are read as fast as possible.
+ * @return 0 if successful otherwise -1
+ */
+DLLEXPORT int trace_set_tracetime(libtrace_t *trace, bool tracetime);
+
+/** This sets the maximum size of the freelist used to store empty packets
+ * and their memory buffers.
+ *
+ * @param trace A parallel input trace
+ * @param size The number of empty packets to cache in memory. Set to the
+ * default, 0, to autoconfigure this value.
+ * @return 0 if successful otherwise -1
+ *
+ * Internally libtrace maintains a buffer of packet structures, this buffer
+ * includes a cache per thread and a shared main pool. This configures
+ * the size of the main pool. If an application is not passing packets
+ * through to the reducer step --- that is to say returns packets from
+ * the perpkt function --- this buffer will not need to be used.
+ *
+ * @note Setting this too low could cause performance issues or a deadlock. An
+ * unblockable warning will be printed.
+ *
+ * @see trace_set_thread_cache_size(), trace_set_fixed_count()
+ */
+DLLEXPORT int trace_set_cache_size(libtrace_t *trace, size_t size);
+
+/** This sets the maximum size of the freelist thread cache's used to provide
+ * faster access than the main shared pool.
+ *
+ * @param trace A parallel input trace
+ * @param size The number of empty packets to cache in memory. Set to the
+ * default, 0, to autoconfigure this value.
+ * @return 0 if successful otherwise -1
+ *
+ * @see trace_set_cache_size(), trace_set_fixed_count()
+ */
+DLLEXPORT int trace_set_thread_cache_size(libtrace_t *trace, size_t size);
+
+/** If true the total number of packets that can be created by a trace is limited
+ * to that set by trace_set_cache_size(), otherwise once exceeded malloc
+ * and free will be used to create and free packets, this will be slower than
+ * using the freelist and could run a machine out of memory.
+ *
+ * @param trace A parallel input trace
+ * @param fixed If true the total number of packets is limited, otherwise
+ * it is not. Defaults to false.
+ * @return 0 if successful otherwise -1
+ *
+ * @see trace_set_thread_cache_size(), trace_set_cache_size()
+ */
+DLLEXPORT int trace_set_fixed_count(libtrace_t *trace, bool fixed);
+
+/** The number of packets to batch together for processing internally
+ * by libtrace.
+ *
+ * @param trace A parallel input trace
+ * @param size The total number of packets to batch together. Set to the
+ * default, 0, to autoconfigure this value.
+ * @return 0 if successful otherwise -1
+ *
+ * Internally libtrace will attempt to read up to this number of packets from
+ * a format typically values of 10 will get good performance and increasing
+ * beyond that will should little difference.
+ *
+ * @note We still pass a single packet at a time to the perpkt function
+ */
+DLLEXPORT int trace_set_burst_size(libtrace_t *trace, size_t size);
+
+/**
+ * See diagrams, this sets the maximum size of buffers used between
+ * the single hasher thread and the buffer.
+ * NOTE setting this to less than recommend could cause deadlock a
+ * trace that manages its own packets.
+ * A unblockable warning message will be printed to stderr in this case.
+ */
+/** The number of packets that can queue per thread from hasher thread */
+DLLEXPORT int trace_set_hasher_queue_size(libtrace_t *trace, size_t size);
+
+/** If true use a polling hasher queue, that means that we will spin/or yield
+ * when data is not available rather than blocking on a condition.
+ *
+ * @param trace A parallel input trace
+ * @param polling If true the hasher will poll waiting for data, otherwise
+ * it is not. Defaults to false.
+ *
+ * We note this is likely to waste many CPU cycles and could even decrease
+ * performance.
+ *
+ * @return 0 if successful otherwise -1
+ */
+DLLEXPORT int trace_set_hasher_polling(libtrace_t *trace, bool polling);
+
+/** If true the reporter thread will continuously poll waiting for results
+ * if false they are only checked when a message is received, this message
+ * is controlled by reporter_thold.
+ *
+ * @param trace A parallel input trace
+ * @param polling If true the reporter will poll waiting for data, otherwise
+ * it is not. Defaults to false.
+ * @return 0 if successful otherwise -1
+ *
+ * We note this is likely to waste many CPU cycles and could even decrease
+ * performance.
+ *
+ * @note This setting could be ignored by some reporters.
+ */
+DLLEXPORT int trace_set_reporter_polling(libtrace_t *trace, bool polling);
+
+/** Set the perpkt thread result queue size before triggering the reporter
+ * to read results.
+ *
+ * @param trace A parallel input trace
+ * @param thold The threshold on the number of results to enqueue before
+ * notifying the reporter thread to read them.
+ * @return 0 if successful otherwise -1
+ *
+ *
+ * @note This setting is generally ignored if trace_set_reporter_polling() is
+ * set however some combiner functions might ignore trace_set_reporter_polling()
+ * and still require this to be set.
+ * @see trace_publish_result(), trace_post_reporter()
+ */
+DLLEXPORT int trace_set_reporter_thold(libtrace_t *trace, size_t thold);
+
+/** Prints a line to standard error for every state change
+ * for both the trace as a whole and for each thread.
+ *
+ * @param trace A parallel input trace
+ * @param debug_state If true debug is printed. Defaults false.
+ * @return 0 if successful otherwise -1.
+ *
+ */
+DLLEXPORT int trace_set_debug_state(libtrace_t *trace, bool debug_state);
 
 /** Set the hasher function for a parallel trace.
  *
@@ -698,11 +786,15 @@ DLLEXPORT void * trace_set_tls(libtrace_thread_t *thread, void * data);
  * by default. In this case the hasher parameter is optional and will be
  * preferred over the default supplied by libtrace.
  *
- * @note When supplying a hasher function it should be thread-safe as it could
+ * @note When supplying a hasher function it should be thread-safe so it can
  * be run in parallel by libtrace. Ideally this should rely upon no state, other
  * than some form of seed value supplied in data.
  */
-DLLEXPORT int trace_set_hasher(libtrace_t *trace, enum hasher_types type, fn_hasher hasher, void *data);
+DLLEXPORT int trace_set_hasher(libtrace_t *trace, enum hasher_types type,
+                               fn_hasher hasher, void *data);
+
+/// @}
+
 
 /** Types of results.
  * Some result types require special handling by combiners
@@ -723,7 +815,7 @@ enum result_types {
 
 	/** The result is a tick message
 	 *
-	 * @param key The erf timestamp of the tick
+	 * @param key The erf time-stamp of the tick
 	 */
 	RESULT_TICK_INTERVAL,
 
@@ -742,11 +834,11 @@ enum result_types {
 
 /** Publish a result for to the combiner destined for the reporter thread
  *
- * @param libtrace[in] The parallel input trace
- * @param t[in] The current per-packet thread
- * @param key[in] The key of the result (used for sorting by the combiner)
- * @param value[in] The value of the result
- * @param type[in] The type of result see the documentation for the result_types enum
+ * @param[in] libtrace The parallel input trace
+ * @param[in] t The current per-packet thread
+ * @param[in] key The key of the result (used for sorting by the combiner)
+ * @param[in] value The value of the result
+ * @param[in] type The type of result see the documentation for the result_types enum
  */
 DLLEXPORT void trace_publish_result(libtrace_t *libtrace,
                                     libtrace_thread_t *t,
@@ -796,7 +888,7 @@ DLLEXPORT int libtrace_thread_get_message_count(libtrace_t * libtrace,
  * @param[in] libtrace The input trace
  * @param[in] t The thread to check, if NULL the current thread will be used [Optional]
  * @param[out] message A pointer to libtrace_message_t structure which will be
- * filled with the retrived message.
+ * filled with the retrieved message.
  *
  * @return The number of messages remaining otherwise -1 upon error.
  *
@@ -813,7 +905,7 @@ DLLEXPORT int libtrace_thread_get_message(libtrace_t * libtrace,
  * @param[in] libtrace The input trace
  * @param[in] t The thread to check, if NULL the current thread will be used [Optional]
  * @param[out] message A pointer to libtrace_message_t structure which will be
- * filled with the retrived message.
+ * filled with the retrieved message.
  *
  * @return 0 if successful otherwise -1 upon error or if no packets were available.
  *
@@ -922,10 +1014,10 @@ DLLEXPORT uint64_t tv_to_usec(struct timeval *tv);
  * restarted.
  *
  * @param[in] libtrace the parallel input trace
- * @param[in] t Either a per packet thread or NULL to retrive the first packet
+ * @param[in] t Either a per packet thread or NULL to retrieve the first packet
  * of across all per packet threads.
  * @param[out] packet A pointer to the first packet in the trace. [Optional]
- * @param[out] tv The system timestamp when this packet was received. [Optional]
+ * @param[out] tv The system time-stamp when this packet was received. [Optional]
  * @return 1 if we are confident this is the first packet. Otherwise 0 if this
  * is a best guess (this is only possible int the case t=NULL)
  * in which case we recommend calling this at a later time.
@@ -939,10 +1031,10 @@ DLLEXPORT int trace_get_first_packet(libtrace_t *libtrace,
                                      libtrace_packet_t **packet,
                                      struct timeval **tv);
 
-/** Makes a packet safe, a packet will become invaild after a
+/** Makes a packet safe, a packet will become invalid after a
  * pausing a trace.
  *
- * @param pkt[in,out] The packet to make safe
+ * @param[in,out] pkt The packet to make safe
  *
  * This copies a packet in such a way that it will be able to survive a pause.
  * However this will not allow the packet to be used after
@@ -952,15 +1044,12 @@ DLLEXPORT void libtrace_make_packet_safe(libtrace_packet_t *pkt);
 
 /** Makes a result safe if a result contains a packet.
  *
- * @param res[in,out] The result to make safe.
+ * @param[in,out] res The result to make safe.
  *
  * This ensures the internal content of a result is safe to survive a pause.
  * See libtrace_make_packet_safe().
  */
 DLLEXPORT void libtrace_make_result_safe(libtrace_result_t *res);
-
-
-DLLEXPORT int trace_parallel_config(libtrace_t *libtrace, trace_parallel_option_t option, void *value);
 
 /** In a parallel trace, free a packet back to libtrace.
  *
@@ -975,9 +1064,54 @@ DLLEXPORT void trace_free_packet(libtrace_t * libtrace, libtrace_packet_t * pack
 
 
 DLLEXPORT libtrace_info_t *trace_get_information(libtrace_t * libtrace);
-DLLEXPORT void parse_user_config(struct user_configuration* uc, char * str);
-DLLEXPORT void parse_user_config_file(struct user_configuration* uc, FILE *file);
-DLLEXPORT int libtrace_get_perpkt_count(libtrace_t* t);
+
+/** Sets the configuration of a trace based upon a comma separated list of
+ * key value pairs.
+ *
+ * @param trace A parallel trace which is not running or destroyed
+ * @param str A comma separated list of key=value pairs.
+ * E.g. \em "burst_size=20,perpkt_threads=2,fixed_count=true"
+ * @return 0 if successful otherwise -1. If bad options are passed we will
+ * print the error to stderr but still return successful.
+ *
+ * List of keys:
+ * * \b cache_size,\b cs see trace_set_cache_size() [size_t]
+ * * \b thread_cache_size,\b tcs see trace_set_thread_cache_size() [size_t]
+ * * \b fixed_count,\b fc see trace_set_fixed_count() [bool]
+ * * \b burst_size,\b bs see trace_set_burst_size() [size_t]
+ * * \b tick_interval,\b ti see trace_set_tick_interval() [size_t]
+ * * \b tick_count,\b tc see trace_set_tick_count() [size_t]
+ * * \b perpkt_threads,\b pt see trace_set_perpkt_threads() [XXX TBA XXX]
+ * * \b hasher_queue_size,\b hqs see trace_set_hasher_queue_size() [size_t]
+ * * \b hasher_polling,\b hp see trace_set_hasher_polling() [bool]
+ * * \b reporter_polling,\b rp see trace_set_reporter_polling() [bool]
+ * * \b reporter_thold,\b rt see trace_set_reporter_thold() [size_t]
+ * * \b debug_state,\b ds see trace_set_debug_state() [bool]
+ *
+ * Booleans can be set as 0/1 or false/true.
+ *
+ * @note a environment variable interface is provided by default to users via
+ * LIBTRACE_CONFIG, see Parallel Configuration for more information.
+ *
+ * @note this interface is provided to allow a user to configure an application
+ * if a libtrace applicate wishes to configure a setting it should use a
+ * trace_set_*() function with the same name.
+ */
+DLLEXPORT int trace_set_configuration(libtrace_t *trace, const char * str);
+
+/** Sets configuration from a file. This reads every line from the file and
+ * interprets each line with trace_set_configuration().
+ *
+ * @param trace A parallel trace which is not running or destroyed
+ * @param file A file pointer which we read each line from
+ * @return 0 if successful otherwise -1. If bad options are passed we will
+ * print the error to stderr but still return successful.
+ *
+ * @note We do not close the file pointer upon completion
+ */
+DLLEXPORT int trace_set_configuration_file(libtrace_t *trace, FILE *file);
+
+DLLEXPORT int libtrace_get_perpkt_count(libtrace_t* t); // TODO MATCH WITH THE SET_PERPKT
 
 /**
  * Sets a combiner function against the trace.
@@ -990,7 +1124,5 @@ DLLEXPORT int libtrace_get_perpkt_count(libtrace_t* t);
  * non-started or paused trace.
  */
 DLLEXPORT void trace_set_combiner(libtrace_t *trace, const libtrace_combine_t *combiner, libtrace_generic_t config);
-
-#define ZERO_USER_CONFIG(config) memset(&config, 0, sizeof(struct user_configuration));
 
 #endif // LIBTRACE_PARALLEL_H

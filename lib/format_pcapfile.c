@@ -263,6 +263,7 @@ static int pcapfile_config_input(libtrace_t *libtrace,
 		case TRACE_OPTION_SNAPLEN:
 		case TRACE_OPTION_PROMISC:
 		case TRACE_OPTION_FILTER:
+		case TRACE_OPTION_HASHER:
 			/* All these are either unsupported or handled
 			 * by trace_config */
 			break;

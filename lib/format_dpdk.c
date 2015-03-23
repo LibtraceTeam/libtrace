@@ -864,29 +864,6 @@ static int dpdk_init_output(libtrace_out_t *libtrace)
 	return 0;
 }
 
-static int dpdk_pconfig_input (libtrace_t *libtrace,
-                               trace_parallel_option_t option,
-                               void *data) {
-	switch (option) {
-	case TRACE_OPTION_SET_HASHER:
-		switch (*((enum hasher_types *) data))
-		{
-		case HASHER_BALANCE:
-		case HASHER_UNIDIRECTIONAL:
-			toeplitz_create_unikey(FORMAT(libtrace)->rss_key);
-			return 0;
-		case HASHER_BIDIRECTIONAL:
-			toeplitz_create_bikey(FORMAT(libtrace)->rss_key);
-			return 0;
-		case HASHER_CUSTOM:
-			// We don't support these
-			return -1;
-		}
-		break;
-	}
-	return -1;
-}
-
 /**
  * Note here snaplen excludes the MAC checksum. Packets over
  * the requested snaplen will be dropped. (Excluding MAC checksum)
@@ -912,11 +889,24 @@ static int dpdk_config_input (libtrace_t *libtrace,
 	case TRACE_OPTION_PROMISC:
 		FORMAT(libtrace)->promisc=*(int*)data;
 		return 0;
+	case TRACE_OPTION_HASHER:
+		switch (*((enum hasher_types *) data))
+		{
+		case HASHER_BALANCE:
+		case HASHER_UNIDIRECTIONAL:
+			toeplitz_create_unikey(FORMAT(libtrace)->rss_key);
+			return 0;
+		case HASHER_BIDIRECTIONAL:
+			toeplitz_create_bikey(FORMAT(libtrace)->rss_key);
+			return 0;
+		case HASHER_CUSTOM:
+			// We don't support these
+			return -1;
+		}
+		break;
 	case TRACE_OPTION_FILTER:
 		/* TODO filtering */
-		break;
 	case TRACE_OPTION_META_FREQ:
-		break;
 	case TRACE_OPTION_EVENT_REALTIME:
 		break;
 	/* Avoid default: so that future options will cause a warning
@@ -2334,7 +2324,6 @@ static struct libtrace_format_t dpdk = {
 	dpdk_pread_packets,                 /* pread_packets */
 	dpdk_pause_input,                   /* ppause */
 	dpdk_fin_input,                     /* p_fin */
-	dpdk_pconfig_input,                 /* pconfig_input */
 	dpdk_pregister_thread,              /* pregister_thread */
 	dpdk_punregister_thread,            /* punregister_thread */
 	NULL                                /* get thread stats */

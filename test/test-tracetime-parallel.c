@@ -68,7 +68,6 @@ static int expected;
 libtrace_t *trace = NULL;
 static void signal_handler(int signal)
 {
-	int i = 0;
 	if (signal == SIGALRM) {
 		trace_ppause(trace);
 
@@ -76,7 +75,7 @@ static void signal_handler(int signal)
 		assert(check_range_jitter(10.0, (double) totalpkts, 1.0));
 
 		/* Now fullspeed it */
-		trace_parallel_config(trace, TRACE_OPTION_TRACETIME, &i);
+		trace_set_tracetime(trace, false);
 
 		/* And restart */
 		trace_pstart(trace, NULL, NULL, NULL);
@@ -154,7 +153,6 @@ static void* per_packet(libtrace_t *trace, libtrace_thread_t *t,
  */
 int test_tracetime(const char *tracename) {
 	int error = 0;
-	int i;
 	struct timeval tv;
 	double start, end;
 	gettimeofday(&tv, NULL);
@@ -166,10 +164,8 @@ int test_tracetime(const char *tracename) {
 	iferr(trace,tracename);
 
 	// Always use 2 threads for simplicity
-	i = 2;
-	trace_parallel_config(trace, TRACE_OPTION_SET_PERPKT_THREAD_COUNT, &i);
-	i = 1;
-	trace_parallel_config(trace, TRACE_OPTION_TRACETIME, &i);
+	trace_set_perpkt_threads(trace, 2);
+	trace_set_tracetime(trace, true);
 
 	// Start it
 	trace_pstart(trace, NULL, per_packet, report_result);

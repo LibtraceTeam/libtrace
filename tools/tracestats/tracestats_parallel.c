@@ -214,11 +214,8 @@ static uint64_t bad_hash(libtrace_packet_t * pkt UNUSED, void *data UNUSED) {
 	return 0;
 }
 
-struct user_configuration uc;
-
-
 /* Process a trace, counting packets that match filter(s) */
-static void run_trace(char *uri) 
+static void run_trace(char *uri, char *config, char *config_file)
 {
 
 	fprintf(stderr,"%s:\n",uri);
@@ -229,12 +226,31 @@ static void run_trace(char *uri)
 		trace_perror(trace,"Failed to create trace");
 		return;
 	}
-	
-	int option = 2;
+
+	//libtrace_filter_t *f = trace_create_filter("udp");
+	//trace_config(trace, TRACE_OPTION_FILTER, f);
+
+	//trace_config(trace, TRACE_OPTION_META_FREQ, &option);
 	//option = 10000;
-    //trace_set_hasher(trace, HASHER_CUSTOM, &rand_hash, NULL);
+	trace_set_hasher(trace, HASHER_CUSTOM, &rand_hash, NULL);
 	//trace_parallel_config(trace, TRACE_OPTION_SET_PERPKT_THREAD_COUNT, &option);
-	trace_parallel_config(trace, TRACE_OPTION_SET_CONFIG, &uc);
+
+	/* Apply config */
+	if (config) {
+		trace_set_configuration(trace, config);
+	}
+
+	if (config_file) {
+		FILE * f = fopen(optarg, "r");
+		if (f != NULL) {
+			trace_set_configuration_file(trace, f);
+			fclose(f);
+		} else {
+			perror("Failed to open configuration file\n");
+			exit(-1);
+		}
+	}
+
 	trace_set_combiner(trace, &combiner_ordered, (libtrace_generic_t){0});
 
 	//trace_parallel_config(trace, TRACE_OPTION_SET_MAPPER_BUFFER_SIZE, &option);
@@ -277,7 +293,9 @@ int main(int argc, char *argv[]) {
 
 	int i;
 	struct sigaction sigact;
-	ZERO_USER_CONFIG(uc);
+	char *config = NULL;
+	char *config_file = NULL;
+
 	while(1) {
 		int option_index;
 		struct option long_options[] = {
@@ -308,16 +326,10 @@ int main(int argc, char *argv[]) {
 				exit(1);
 				break;
 			case 'u':
-				  parse_user_config(&uc, optarg);
-				  break;
-			case 'U':;
-				FILE * f = fopen(optarg, "r");
-				if (f != NULL) {
-					parse_user_config_file(&uc, f);
-				} else {
-					perror("Failed to open configuration file\n");
-					usage(argv[0]);
-				}
+				config = optarg;
+				break;
+			case 'U':
+				config_file = optarg;
 				break;
 			default:
 				fprintf(stderr,"Unknown option: %c\n",c);
@@ -332,9 +344,9 @@ int main(int argc, char *argv[]) {
 
 	sigaction(SIGINT, &sigact, NULL);
 	sigaction(SIGTERM, &sigact, NULL);
-	
+
 	for(i=optind;i<argc;++i) {
-		run_trace(argv[i]);
+		run_trace(argv[i], config, config_file);
 	}
 	if (optind+1<argc) {
 		printf("Grand total:\n");

@@ -760,7 +760,6 @@ static struct libtrace_format_t linuxring = {
 	linuxring_pread_packets,	/* pread_packets */
 	linuxcommon_pause_input,	/* ppause */
 	linuxcommon_fin_input,		/* p_fin */
-	linuxcommon_pconfig_input,	/* pconfig input */
 	linuxcommon_pregister_thread,	/* register thread */
 	NULL,				/* unregister thread */
 	NULL				/* get thread stats */

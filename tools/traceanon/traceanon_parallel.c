@@ -252,8 +252,8 @@ int main(int argc, char *argv[])
 	int level = -1;
 	char *compress_type_str=NULL;
 	trace_option_compresstype_t compress_type = TRACE_OPTION_COMPRESSTYPE_NONE;
-	struct user_configuration uc;
-	ZERO_USER_CONFIG(uc);
+	char *config = NULL;
+	char *config_file = NULL;
 
 	if (argc<2)
 		usage(argv[0]);
@@ -325,16 +325,10 @@ int main(int argc, char *argv[])
 				  exit(1); 
 				  break;
 			case 'u':
-				  parse_user_config(&uc, optarg);
-				  break;
-			case 'U':;
-				FILE * f = fopen(optarg, "r");
-				if (f != NULL) {
-					parse_user_config_file(&uc, f);
-				} else {
-					perror("Failed to open configuration file\n");
-					usage(argv[0]);
-				}
+				config = optarg;
+				break;
+			case 'U':
+				config_file = optarg;
 				break;
 			default:
 				fprintf(stderr,"unknown option: %c\n",c);
@@ -371,9 +365,6 @@ int main(int argc, char *argv[])
                         compress_type_str);
                 return 1;
         }
-	
-
-	
 
 	/* open input uri */
 	trace = trace_create(argv[optind]);
@@ -426,7 +417,7 @@ int main(int argc, char *argv[])
 		trace_perror_output(writer,"trace_start_output");
 		trace_destroy_output(writer);
 		trace_destroy(trace);
-                return 1;
+		return 1;
 	}
 
 	// OK parallel changes start here
@@ -435,10 +426,24 @@ int main(int argc, char *argv[])
 	 * and ordered before its read into reduce. Seems like a good
 	 * special case to have.
 	 */
-	 
-	int i = 1;
+
+	/* Apply config */
+	if (config) {
+		trace_set_configuration(trace, config);
+	}
+
+	if (config_file) {
+		FILE * f = fopen(optarg, "r");
+		if (f != NULL) {
+			trace_set_configuration_file(trace, f);
+			fclose(f);
+		} else {
+			perror("Failed to open configuration file\n");
+			usage(argv[0]);
+		}
+	}
+
 	trace_set_combiner(trace, &combiner_ordered, (libtrace_generic_t){0});
-	trace_parallel_config(trace, TRACE_OPTION_SET_CONFIG, &uc);
 
 	//trace_set_hasher(trace, HASHER_CUSTOM, rand_hash, NULL);
 	

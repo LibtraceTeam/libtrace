@@ -150,6 +150,21 @@ int linuxcommon_config_input(libtrace_t *libtrace,
 		case TRACE_OPTION_FILTER:
 		 	return linuxnative_configure_bpf(libtrace,
 					(libtrace_filter_t *) data);
+		case TRACE_OPTION_HASHER:
+			switch (*((enum hasher_types *)data)) {
+				case HASHER_BALANCE:
+					// Do fanout
+					FORMAT_DATA->fanout_flags = PACKET_FANOUT_LB;
+					// Or we could balance to the CPU
+					return 0;
+				case HASHER_BIDIRECTIONAL:
+				case HASHER_UNIDIRECTIONAL:
+					FORMAT_DATA->fanout_flags = PACKET_FANOUT_HASH;
+					return 0;
+				case HASHER_CUSTOM:
+					return -1;
+			}
+			break;
 		case TRACE_OPTION_META_FREQ:
 			/* No meta-data for this format */
 			break;
@@ -507,37 +522,6 @@ int linuxcommon_pregister_thread(libtrace_t *libtrace,
 		}
 	}
 	return 0;
-}
-
-int linuxcommon_pconfig_input(libtrace_t *libtrace,
-                              trace_parallel_option_t option,
-                              void *data)
-{
-	switch(option) {
-		case TRACE_OPTION_SET_HASHER:
-			switch (*((enum hasher_types *)data)) {
-				case HASHER_BALANCE:
-					// Do fanout
-					FORMAT_DATA->fanout_flags = PACKET_FANOUT_LB;
-					// Or we could balance to the CPU
-					return 0;
-				case HASHER_BIDIRECTIONAL:
-				case HASHER_UNIDIRECTIONAL:
-					FORMAT_DATA->fanout_flags = PACKET_FANOUT_HASH;
-					return 0;
-				case HASHER_CUSTOM:
-					return -1;
-			}
-			break;
-		/* Avoid default: so that future options will cause a warning
-		 * here to remind us to implement it, or flag it as
-		 * unimplementable
-		 */
-	}
-
-	/* Don't set an error - trace_config will try to deal with the
-	 * option and will set an error if it fails */
-	return -1;
 }
 
 /* These counters reset with each read */

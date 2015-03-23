@@ -262,6 +262,26 @@ static inline char *get_trace_state_name(enum trace_state ts){
 // Used for inband tick message
 #define READ_TICK -3
 
+/**
+ * Tuning the parallel sizes
+ * See the user documentation trace_set_x
+ */
+struct user_configuration {
+	size_t cache_size;
+	size_t thread_cache_size;
+	bool fixed_count;
+	size_t burst_size;
+	size_t tick_interval;
+	size_t tick_count;
+	size_t perpkt_threads;
+	size_t hasher_queue_size;
+	bool hasher_polling;
+	bool reporter_polling;
+	size_t reporter_thold;
+	bool debug_state;
+};
+#define ZERO_USER_CONFIG(config) memset(&config, 0, sizeof(struct user_configuration));
+
 /** A libtrace input trace 
  * @internal
  */
@@ -926,17 +946,6 @@ struct libtrace_format_t {
 	 * @param libtrace	The input trace to be stopped
 	 */
 	int (*pfin_input)(libtrace_t *trace);
-	
-	/** Applies a configuration option to an input trace.
-	 *
-	 * @param libtrace	The input trace to apply the option to
-	 * @param option	The option that is being configured
-	 * @param value		A pointer to the value that the option is to be
-	 * 			set to
-	 * @return 0 if successful, -1 if the option is unsupported or an error
-	 * occurs
-	 */
-	int (*pconfig_input)(libtrace_t *libtrace,trace_parallel_option_t option,void *value);
 
 	/**
 	 * Register a thread for use with the format or using the packets produced
@@ -991,7 +1000,6 @@ struct libtrace_format_t {
 	NULL,			/* pread_packet */ \
 	NULL,			/* ppause_input */ \
 	NULL,			/* pfin_input */ \
-	NULL,			/* pconfig_input */ \
 	NULL,			/* pregister_thread */ \
 	NULL,			/* punregister_thread */ \
 	NULL,			/* get_thread_statistics */

@@ -128,6 +128,7 @@ static void run_trace(char *uri)
 		++count;
 		bytes+=wlen;
 	}
+	trace_destroy_packet(packet);
 
 	stats = trace_get_statistics(trace, NULL);
 

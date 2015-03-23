@@ -555,7 +555,12 @@ DLLEXPORT int trace_config(libtrace_t *libtrace,
 	if (trace_is_err(libtrace)) {
 		return -1;
 	}
-	
+
+	if (option == TRACE_OPTION_HASHER)
+		return trace_set_hasher(libtrace,
+		                        (enum hasher_types) *((int *) value),
+		                        NULL, NULL);
+
 	/* If the capture format supports configuration, try using their
 	 * native configuration first */
 	if (libtrace->format->config_input) {
@@ -607,6 +612,9 @@ DLLEXPORT int trace_config(libtrace_t *libtrace,
 						"This format does not support realtime events");
 			}
 			return -1;
+		case TRACE_OPTION_HASHER:
+			/* Dealt with earlier */
+			return -1;
 			
 	}
 	if (!trace_is_err(libtrace)) {
@@ -614,6 +622,28 @@ DLLEXPORT int trace_config(libtrace_t *libtrace,
 			"Unknown option %i", option);
 	}
 	return -1;
+}
+
+DLLEXPORT int trace_set_snaplen(libtrace_t *trace, int snaplen) {
+	return trace_config(trace, TRACE_OPTION_SNAPLEN, &snaplen);
+}
+
+DLLEXPORT int trace_set_promisc(libtrace_t *trace, bool promisc) {
+	int tmp = promisc;
+	return trace_config(trace, TRACE_OPTION_PROMISC, &tmp);
+}
+
+DLLEXPORT int trace_set_filter(libtrace_t *trace, libtrace_filter_t *filter) {
+	return trace_config(trace, TRACE_OPTION_FILTER, filter);
+}
+
+DLLEXPORT int trace_set_meta_freq(libtrace_t *trace, int freq) {
+	return trace_config(trace, TRACE_OPTION_META_FREQ, &freq);
+}
+
+DLLEXPORT int trace_set_event_realtime(libtrace_t *trace, bool realtime) {
+	int tmp = realtime;
+	return trace_config(trace, TRACE_OPTION_EVENT_REALTIME, &tmp);
 }
 
 DLLEXPORT int trace_config_output(libtrace_out_t *libtrace, 

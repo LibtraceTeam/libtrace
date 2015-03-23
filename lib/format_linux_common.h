@@ -314,9 +314,6 @@ inline int linuxcommon_to_packet_fanout(libtrace_t *libtrace,
 int linuxcommon_pause_input(libtrace_t *libtrace);
 int linuxcommon_get_fd(const libtrace_t *libtrace);
 int linuxcommon_fin_input(libtrace_t *libtrace);
-int linuxcommon_pconfig_input(libtrace_t *libtrace,
-                              trace_parallel_option_t option,
-                              void *data);
 int linuxcommon_pregister_thread(libtrace_t *libtrace,
                                  libtrace_thread_t *t,
                                  bool reading);

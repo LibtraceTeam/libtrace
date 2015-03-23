@@ -205,7 +205,6 @@ uint64_t hash25_75(const libtrace_packet_t* packet UNUSED, void *data) {
 int test_hasher_singlethreaded(const char *tracename) {
 	libtrace_t *trace;
 	int error = 0;
-	int i;
 	int hashercount = 0;
 	printf("Testing hasher singlethreaded function\n");
 
@@ -214,8 +213,7 @@ int test_hasher_singlethreaded(const char *tracename) {
 	iferr(trace,tracename);
 
 	// Use 1 thread with a hasher
-	i = 1;
-	trace_parallel_config(trace, TRACE_OPTION_SET_PERPKT_THREAD_COUNT, &i);
+	trace_set_perpkt_threads(trace, 1);
 	trace_set_hasher(trace, HASHER_CUSTOM, &hash25_75, &hashercount);
 
 	// Start it

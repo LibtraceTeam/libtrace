@@ -582,6 +582,10 @@ static int dag_config_input(libtrace_t *libtrace, trace_option_t option,
 	case TRACE_OPTION_EVENT_REALTIME:
 		/* Live capture is always going to be realtime */
 		return -1;
+	case TRACE_OPTION_HASHER:
+		/* Lets just say we did this, it's currently still up to
+		 * the user to configure this correctly. */
+		return 0;
 	}
 	return -1;
 }
@@ -1481,26 +1485,6 @@ static void dag_help(void) {
 	printf("\n");
 }
 
-static int dag_pconfig_input(UNUSED libtrace_t *libtrace,
-			     trace_parallel_option_t option, UNUSED void *value)
-{
-	/* We don't support any of these! Normally you configure the DAG card
-	 * externally. */
-	switch(option) {
-	case TRACE_OPTION_SET_HASHER:
-	case TRACE_OPTION_SET_PERPKT_THREAD_COUNT:
-	case TRACE_OPTION_TRACETIME:
-	case TRACE_OPTION_TICK_INTERVAL:
-	case TRACE_OPTION_GET_CONFIG:
-	case TRACE_OPTION_SET_CONFIG:
-		return -1;
-	}
-	/* We don't provide a default option to ensure that future options will
-	 * generate a compiler warning. */
-
-	return -1;
-}
-
 static int dag_pregister_thread(libtrace_t *libtrace, libtrace_thread_t *t,
 				bool reader)
 {
@@ -1580,7 +1564,6 @@ static struct libtrace_format_t dag = {
 	dag_pread_packets,
 	dag_pause_input,
 	NULL,
-	dag_pconfig_input,
 	dag_pregister_thread,
 	NULL,
 	dag_get_thread_statisitics	/* get thread stats */

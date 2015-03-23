@@ -191,7 +191,6 @@ static void* per_packet(libtrace_t *trace, libtrace_thread_t *t,
 int test_100_threads(const char *tracename, int expected) {
 	libtrace_t *trace;
 	int error = 0;
-	int i;
 	printf("Testing single threaded\n");
 
 	// Create the trace
@@ -199,8 +198,7 @@ int test_100_threads(const char *tracename, int expected) {
 	iferr(trace,tracename);
 
 	// Enable the single threaded fallback codepath
-	i = 100;
-	trace_parallel_config(trace, TRACE_OPTION_SET_PERPKT_THREAD_COUNT, &i);
+	trace_set_perpkt_threads(trace, 100);
 
 	// Start it
 	trace_pstart(trace, NULL, per_packet, report_result);

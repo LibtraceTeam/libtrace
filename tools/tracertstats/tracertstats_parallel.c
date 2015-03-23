@@ -293,14 +293,13 @@ static void run_trace(char *uri)
 			output_destroy(output);
 		return;
 	}*/
-	int i = 1;
 	trace_set_combiner(trace, &combiner_ordered, (libtrace_generic_t){0});
-	/* trace_parallel_config(trace, TRACE_OPTION_TRACETIME, &i); */
+	trace_set_tracetime(trace, true);
+
 	//trace_set_hasher(trace, HASHER_CUSTOM, &bad_hash, NULL);
 
 	if (trace_get_information(trace)->live) {
-		i = (int) (packet_interval * 1000); // Every interval send a tick
-		trace_parallel_config(trace, TRACE_OPTION_TICK_INTERVAL, &i);
+		trace_set_tick_interval(trace, (int) (packet_interval * 1000));
 	}
 
 	if (trace_pstart(trace, NULL, &per_packet, process_result)==-1) {
