@@ -118,11 +118,15 @@ __thread struct mem_stats mem_hits = {{0},{0},{0},{0}};
 
 static void print_memory_stats() {
 #if 0
-	char t_name[50];
 	uint64_t total;
+#ifdef __linux__
+	char t_name[50];
 	pthread_getname_np(pthread_self(), t_name, sizeof(t_name));
 
 	fprintf(stderr, "Thread ID#%d - %s\n", (int) pthread_self(), t_name);
+#else
+	fprintf(stderr, "Thread ID#%d\n", (int) pthread_self());
+#endif
 
 	total = mem_hits.read.cache_hit + mem_hits.read.ring_hit + mem_hits.read.miss;
 	if (total) {
@@ -164,7 +168,7 @@ static void print_memory_stats() {
 
 /*
  * This can be used once the hasher thread has been started and internally after
- * verfiy_configuration.
+ * verify_configuration.
  */
 DLLEXPORT bool trace_has_dedicated_hasher(libtrace_t * libtrace)
 {
@@ -1346,8 +1350,19 @@ static int trace_prestart(libtrace_t * libtrace, void *global_blob,
  * @return the number of CPU cores on the machine. -1 if unknown.
  */
 SIMPLE_FUNCTION static int get_nb_cores() {
-	// TODO add BSD support
-	return sysconf(_SC_NPROCESSORS_ONLN);
+	int numCPU;
+#ifdef _SC_NPROCESSORS_ONLN
+	/* Most systems do this now */
+	numCPU = sysconf(_SC_NPROCESSORS_ONLN);
+
+#else
+	int mib[] = {CTL_HW, HW_AVAILCPU};
+	size_t len = sizeof(numCPU);
+
+	/* get the number of CPUs from the system */
+	sysctl(mib, 2, &numCPU, &len, NULL, 0);
+#endif
+	return numCPU <= 0 ? 1 : numCPU;
 }
 
 /**
@@ -1411,8 +1426,10 @@ static int trace_start_thread(libtrace_t *trace,
                        void *(*start_routine) (void *),
                        int perpkt_num,
                        const char *name) {
+#ifdef __linux__
 	pthread_attr_t attrib;
 	cpu_set_t cpus;
+#endif
 	int ret, i;
 	assert(t->type == THREAD_EMPTY);
 	t->trace = trace;
@@ -1421,14 +1438,17 @@ static int trace_start_thread(libtrace_t *trace,
 	t->type = type;
 	t->state = THREAD_RUNNING;
 
+#ifdef __linux__
 	CPU_ZERO(&cpus);
 	for (i = 0; i < get_nb_cores(); i++)
 		CPU_SET(i, &cpus);
 	pthread_attr_init(&attrib);
 	pthread_attr_setaffinity_np(&attrib, sizeof(cpus), &cpus);
-
 	ret = pthread_create(&t->tid, &attrib, start_routine, (void *) trace);
 	pthread_attr_destroy(&attrib);
+#else
+	ret = pthread_create(&t->tid, NULL, start_routine, (void *) trace);
+#endif
 	if (ret != 0) {
 		libtrace_zero_thread(t);
 		trace_set_err(trace, ret, "Failed to create a thread of type=%d\n", type);
@@ -1442,8 +1462,10 @@ static int trace_start_thread(libtrace_t *trace,
 		                                 LIBTRACE_RINGBUFFER_POLLING:
 		                                 LIBTRACE_RINGBUFFER_BLOCKING);
 	}
+#ifdef __linux__
 	if(name)
 		pthread_setname_np(t->tid, name);
+#endif
 	t->perpkt_num = perpkt_num;
 	return 0;
 }

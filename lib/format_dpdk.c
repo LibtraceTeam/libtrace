@@ -162,6 +162,10 @@
 #include <rte_per_lcore.h>
 #include <rte_cycles.h>
 #include <pthread.h>
+#ifdef __FreeBSD__
+#include <pthread_np.h>
+#endif
+
 
 /* The default size of memory buffers to use - This is the max size of standard
  * ethernet packet less the size of the MAC CHECKSUM */
