@@ -204,7 +204,9 @@ static void guess_format(libtrace_t *libtrace, const char *filename)
 		}
 	}
 	
-	/* Oh well */
+        /* No formats matched -- make sure we clean up the IO object we
+         * used to probe the file magic */
+        wandio_destroy(libtrace->io);
 	return;
 }
 
