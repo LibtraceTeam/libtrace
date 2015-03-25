@@ -62,19 +62,19 @@
 
 #include "format_linux_common.h"
 
+/* Get the start of the captured data. I'm not sure if tp_mac (link layer) is
+ * always guaranteed. If it's not there then just use tp_net.
+ */
+#define TP_TRACE_START(mac, net, hdrend) \
+	((mac) > (hdrend) && (mac) < (net) ? (mac) : (net))
+
 #ifdef HAVE_NETPACKET_PACKET_H
 /* Get current frame in the ring buffer*/
 #define GET_CURRENT_BUFFER(stream) \
 	((void *)stream->rx_ring +				\
 	 (stream->rxring_offset *				\
 	  stream->req.tp_frame_size))
-#endif
 
-/* Get the start of the captured data. I'm not sure if tp_mac (link layer) is
- * always guaranteed. If it's not there then just use tp_net.
- */
-#define TP_TRACE_START(mac, net, hdrend) \
-	((mac) > (hdrend) && (mac) < (net) ? (mac) : (net))
 /* Cached page size, the page size shouldn't be changing */
 static int pagesize = 0;
 
@@ -350,6 +350,7 @@ static int linuxring_fin_output(libtrace_out_t *libtrace)
 	free(libtrace->format_data);
 	return 0;
 }
+#endif /* HAVE_NETPACKET_PACKET_H */
 
 static libtrace_linktype_t
 linuxring_get_link_type(const struct libtrace_packet_t *packet)
@@ -453,6 +454,8 @@ static int linuxring_prepare_packet(libtrace_t *libtrace UNUSED,
 
 	return 0;
 }
+
+#ifdef HAVE_NETPACKET_PACKET_H
 #define LIBTRACE_MIN(a,b) ((a)<(b) ? (a) : (b))
 inline static int linuxring_read_stream(libtrace_t *libtrace,
                                         libtrace_packet_t *packet,
@@ -700,8 +703,6 @@ static int linuxring_write_packet(libtrace_out_t *libtrace,
 
 }
 
-#ifdef HAVE_NETPACKET_PACKET_H
-
 static void linuxring_help(void)
 {
 	printf("linuxring format module: $Revision: 1793 $\n");
@@ -764,7 +765,7 @@ static struct libtrace_format_t linuxring = {
 	NULL,				/* unregister thread */
 	NULL				/* get thread stats */
 };
-#else
+#else /* HAVE_NETPACKET_PACKET_H */
 
 static void linuxring_help(void)
 {
@@ -815,7 +816,7 @@ static struct libtrace_format_t linuxring = {
 	NULL,				/* next pointer */
 	NON_PARALLEL(true)
 };
-#endif
+#endif /* HAVE_NETPACKET_PACKET_H */
 
 /* TODO: Figure out how to give this format preference over the linux native
  * formate if the user only specifies an interface */

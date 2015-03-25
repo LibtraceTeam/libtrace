@@ -325,10 +325,59 @@ int linuxcommon_pstart_input(libtrace_t *libtrace,
 #endif /* HAVE_NETPACKET_PACKET_H */
 
 void linuxcommon_get_statistics(libtrace_t *libtrace, libtrace_stat_t *stat);
-inline libtrace_direction_t linuxcommon_get_direction(uint8_t pkttype);
-inline libtrace_direction_t linuxcommon_set_direction(struct sockaddr_ll * skadr,
-                                                 libtrace_direction_t direction);
-inline libtrace_linktype_t linuxcommon_get_link_type(uint16_t linktype);
 
+static inline libtrace_direction_t linuxcommon_get_direction(uint8_t pkttype)
+{
+	switch (pkttype) {
+		case PACKET_OUTGOING:
+		case PACKET_LOOPBACK:
+			return TRACE_DIR_OUTGOING;
+		case PACKET_OTHERHOST:
+			return TRACE_DIR_OTHER;
+		default:
+			return TRACE_DIR_INCOMING;
+	}
+}
+
+static inline libtrace_direction_t
+linuxcommon_set_direction(struct sockaddr_ll * skadr,
+                          libtrace_direction_t direction)
+{
+	switch (direction) {
+		case TRACE_DIR_OUTGOING:
+			skadr->sll_pkttype = PACKET_OUTGOING;
+			return TRACE_DIR_OUTGOING;
+		case TRACE_DIR_INCOMING:
+			skadr->sll_pkttype = PACKET_HOST;
+			return TRACE_DIR_INCOMING;
+		case TRACE_DIR_OTHER:
+			skadr->sll_pkttype = PACKET_OTHERHOST;
+			return TRACE_DIR_OTHER;
+		default:
+			return -1;
+	}
+}
+
+static inline libtrace_linktype_t linuxcommon_get_link_type(uint16_t linktype)
+{
+	/* Convert the ARPHRD type into an appropriate libtrace link type */
+	switch (linktype) {
+		case LIBTRACE_ARPHRD_ETHER:
+		case LIBTRACE_ARPHRD_LOOPBACK:
+			return TRACE_TYPE_ETH;
+		case LIBTRACE_ARPHRD_PPP:
+			return TRACE_TYPE_NONE;
+		case LIBTRACE_ARPHRD_IEEE80211_RADIOTAP:
+			return TRACE_TYPE_80211_RADIO;
+		case LIBTRACE_ARPHRD_IEEE80211:
+			return TRACE_TYPE_80211;
+		case LIBTRACE_ARPHRD_SIT:
+		case LIBTRACE_ARPHRD_NONE:
+			return TRACE_TYPE_NONE;
+		default: /* shrug, beyond me! */
+			printf("unknown Linux ARPHRD type 0x%04x\n",linktype);
+			return (libtrace_linktype_t)~0U;
+	}
+}
 
 #endif /* FORMAT_LINUX_COMMON_H */
