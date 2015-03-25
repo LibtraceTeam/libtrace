@@ -593,7 +593,7 @@ DLLEXPORT int trace_set_perpkt_threads(libtrace_t *trace, int nb);
 /** Set the interval between tick messages in milliseconds.
  *
  * @param[in] trace The parallel input trace
- * @param[in] interval The interval in milliseconds. If 0 this is disabled [default].
+ * @param[in] millisec The interval in milliseconds. If 0 this is disabled [default].
  * @return 0 if successful otherwise -1
  *
  * When a underlying parallel live trace is used MESSAGE_TICK_INTERVAL is sent
@@ -605,7 +605,7 @@ DLLEXPORT int trace_set_perpkt_threads(libtrace_t *trace, int nb);
  * than tick interval if possible.
  * @see MESSAGE_TICK_INTERVAL, trace_set_tick_count()
  */
-DLLEXPORT int trace_set_tick_interval(libtrace_t *trace, size_t interval);
+DLLEXPORT int trace_set_tick_interval(libtrace_t *trace, size_t millisec);
 
 /** Set the count between tick messages.
  *
@@ -1007,7 +1007,7 @@ DLLEXPORT void trace_packet_set_order(libtrace_packet_t * packet, uint64_t order
 DLLEXPORT void trace_packet_set_hash(libtrace_packet_t * packet, uint64_t hash);
 
 /** TODO WHAT TO DO WITH THIS ? */
-DLLEXPORT uint64_t tv_to_usec(struct timeval *tv);
+DLLEXPORT uint64_t tv_to_usec(const struct timeval *tv);
 
 
 /** Returns the first packet of a parallel trace since it was started or
@@ -1023,13 +1023,13 @@ DLLEXPORT uint64_t tv_to_usec(struct timeval *tv);
  * in which case we recommend calling this at a later time.
  * -1 is returned if an error occurs, such as supplied a invalid thread.
  *
- * The packet returned by this function is shared by all threads and remains
- * valid until MESSAGE_PAUSING is received.
+ * The packet and timeval returned by this function is shared by all threads
+ * and remain valid until MESSAGE_PAUSING is received.
  */
 DLLEXPORT int trace_get_first_packet(libtrace_t *libtrace,
                                      libtrace_thread_t *t,
-                                     libtrace_packet_t **packet,
-                                     struct timeval **tv);
+                                     const libtrace_packet_t **packet,
+                                     const struct timeval **tv);
 
 /** Makes a packet safe, a packet will become invalid after a
  * pausing a trace.
@@ -1091,7 +1091,7 @@ DLLEXPORT libtrace_info_t *trace_get_information(libtrace_t * libtrace);
  * Booleans can be set as 0/1 or false/true.
  *
  * @note a environment variable interface is provided by default to users via
- * LIBTRACE_CONFIG, see Parallel Configuration for more information.
+ * LIBTRACE_CONF, see Parallel Configuration for more information.
  *
  * @note this interface is provided to allow a user to configure an application
  * if a libtrace applicate wishes to configure a setting it should use a

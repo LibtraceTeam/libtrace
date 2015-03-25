@@ -943,8 +943,8 @@ void store_first_packet(libtrace_t *libtrace, libtrace_packet_t *packet, libtrac
 
 DLLEXPORT int trace_get_first_packet(libtrace_t *libtrace,
                                      libtrace_thread_t *t,
-                                     libtrace_packet_t **packet,
-                                     struct timeval **tv)
+                                     const libtrace_packet_t **packet,
+                                     const struct timeval **tv)
 {
 	void * tmp;
 	int ret = 0;
@@ -956,9 +956,9 @@ DLLEXPORT int trace_get_first_packet(libtrace_t *libtrace,
 
 	/* Throw away these which we don't use */
 	if (!packet)
-		packet = (libtrace_packet_t **) &tmp;
+		packet = (const libtrace_packet_t **) &tmp;
 	if (!tv)
-		tv = (struct timeval **) &tmp;
+		tv = (const struct timeval **) &tmp;
 
 	ASSERT_RET(pthread_spin_lock(&libtrace->first_packets.lock), == 0);
 	if (t) {
@@ -990,7 +990,7 @@ DLLEXPORT int trace_get_first_packet(libtrace_t *libtrace,
 }
 
 
-DLLEXPORT uint64_t tv_to_usec(struct timeval *tv)
+DLLEXPORT uint64_t tv_to_usec(const struct timeval *tv)
 {
 	return (uint64_t) tv->tv_sec*1000000ull + (uint64_t) tv->tv_usec;
 }
@@ -1130,8 +1130,8 @@ static inline int delay_tracetime(libtrace_t *libtrace, libtrace_packet_t *packe
 	uint64_t curr_usec;
 
 	if (!t->tracetime_offset_usec) {
-		libtrace_packet_t *first_pkt;
-		struct timeval *sys_tv;
+		const libtrace_packet_t *first_pkt;
+		const struct timeval *sys_tv;
 		int64_t initial_offset;
 		int stable = trace_get_first_packet(libtrace, NULL, &first_pkt, &sys_tv);
 		assert(first_pkt);
@@ -2204,10 +2204,10 @@ DLLEXPORT int trace_set_perpkt_threads(libtrace_t *trace, int nb) {
 	}
 }
 
-DLLEXPORT int trace_set_tick_interval(libtrace_t *trace, size_t interval) {
+DLLEXPORT int trace_set_tick_interval(libtrace_t *trace, size_t millisec) {
 	if (!trace_is_configurable(trace)) return -1;
 
-	trace->config.tick_interval = interval;
+	trace->config.tick_interval = millisec;
 	return 0;
 }
 

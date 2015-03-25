@@ -235,7 +235,7 @@ static void* per_packet(libtrace_t *trace, libtrace_thread_t *t,
 		{
 			int64_t offset;
 			struct timeval *tv, tv_real;
-			libtrace_packet_t *first_packet = NULL;
+			const libtrace_packet_t *first_packet = NULL;
 			trace_get_first_packet(trace, NULL, &first_packet, &tv);
 			if (first_packet != NULL) {
 				// So figure out our running offset
