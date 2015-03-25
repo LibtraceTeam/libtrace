@@ -215,8 +215,9 @@ extern "C" {
 #  define PRINTF(formatpos, argpos)
 #endif
 
-// Used to fight against false sharing
+#ifndef CACHE_LINE_SIZE
 #define CACHE_LINE_SIZE 64
+#endif
 #define ALIGN_STRUCT(x) __attribute__((aligned(x)))
 
 #ifdef _MSC_VER

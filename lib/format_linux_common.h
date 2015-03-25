@@ -171,6 +171,9 @@ struct tpacket_req {
 	unsigned int tp_frame_nr;    /* Total number of frames */
 };
 
+#ifndef IF_NAMESIZE
+#define IF_NAMESIZE 16
+#endif
 
 /* A structure we use to hold statistic counters from the network cards
  * as accessed via the /proc/net/dev
