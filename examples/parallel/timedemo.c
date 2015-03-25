@@ -137,7 +137,7 @@ static void* per_packet(libtrace_t *trace UNUSED, libtrace_thread_t *t UNUSED,
 
 /* Every time a result (published using trace_publish_result()) becomes ready
  * this function will be called. It will also be called when messages from the
- *library is received. This function is only run on a single thread */
+ * library is received. This function is only run on a single thread
  */
 static void report_results(libtrace_t *trace UNUSED, int mesg,
                            libtrace_generic_t data,
