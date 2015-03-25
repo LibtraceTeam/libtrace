@@ -1557,8 +1557,11 @@ static int dpdk_pregister_thread(libtrace_t *libtrace, libtrace_thread_t *t, boo
 {
 #if DEBUG
 	char name[99];
+	name[0] = 0;
+#if HAVE_PTHREAD_SETNAME_NP
 	pthread_getname_np(pthread_self(),
 	                   name, sizeof(name));
+#endif
 #endif
 	if (reading) {
 		dpdk_per_stream_t *stream;

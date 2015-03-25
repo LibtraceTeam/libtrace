@@ -397,6 +397,8 @@ AC_CHECK_LIB(numa, numa_node_to_cpus, have_numa=1, have_numa=0)
 # Checks for various "optional" libraries
 AC_CHECK_LIB(pthread, pthread_create, have_pthread=1, have_pthread=0)
 
+AC_CHECK_LIB(pthread, pthread_setname_np, have_pthread_setname_np=1, have_pthread_setname_np=0)
+
 # Check for ncurses
 
 # These libraries have to be explicitly linked in OpenSolaris
@@ -437,6 +439,10 @@ fi
 if test "$have_pthread" = 1; then
 	LIBWANDIO_LIBS="$LIBWANDIO_LIBS -lpthread"
 	AC_DEFINE(HAVE_LIBPTHREAD, 1, [Set to 1 if pthreads are supported])
+fi
+
+if test "$have_pthread_setname_np" = 1; then
+	AC_DEFINE(HAVE_PTHREAD_SETNAME_NP, 1, [Set to 1 if pthread_setname_np is found])
 fi
 
 
