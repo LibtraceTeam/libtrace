@@ -38,7 +38,7 @@ AC_CONFIG_FILES([Makefile lib/Makefile docs/Makefile libpacketdump/Makefile
 	tools/tracereplay/Makefile tools/tracediff/Makefile
 	tools/traceends/Makefile
 	examples/Makefile examples/skeleton/Makefile examples/rate/Makefile
-	examples/stats/Makefile examples/tutorial/Makefile
+	examples/stats/Makefile examples/tutorial/Makefile examples/parallel/Makefile
 	docs/libtrace.doxygen 
 	lib/libtrace.h libwandio/Makefile libwandio/tools/wandiocat/Makefile
 	])
