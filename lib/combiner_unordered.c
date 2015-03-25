@@ -18,10 +18,11 @@ static int init_combiner(libtrace_t *t, libtrace_combine_t *c) {
 
 static void publish(libtrace_t *trace, int t_id, libtrace_combine_t *c, libtrace_result_t *res) {
 	libtrace_queue_t *queue = &((libtrace_queue_t*)c->queues)[t_id];
+	libtrace_deque_push_back(queue, res); // Automatically locking for us :)
+
 	if (libtrace_deque_get_size(queue) >= trace->config.reporter_thold) {
 		trace_post_reporter(trace);
 	}
-	libtrace_deque_push_back(queue, res); // Automatically locking for us :)
 }
 
 static void read(libtrace_t *trace, libtrace_combine_t *c){

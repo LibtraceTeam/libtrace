@@ -20,12 +20,13 @@ static int init_combiner(libtrace_t *t, libtrace_combine_t *c) {
 
 static void publish(libtrace_t *trace, int t_id, libtrace_combine_t *c, libtrace_result_t *res) {
 	libtrace_queue_t *queue = &((libtrace_queue_t*)c->queues)[t_id];
-	if (libtrace_deque_get_size(queue) >= trace->config.reporter_thold) {
-		trace_post_reporter(trace);
-	}
 	//while (libtrace_deque_get_size(&t->deque) >= 1000)
 	//	sched_yield();
 	libtrace_deque_push_back(queue, res); // Automatically locking for us :)
+
+	if (libtrace_deque_get_size(queue) >= trace->config.reporter_thold) {
+		trace_post_reporter(trace);
+	}
 }
 
 inline static void read_internal(libtrace_t *trace, libtrace_queue_t *queues, const bool final){
@@ -34,6 +35,7 @@ inline static void read_internal(libtrace_t *trace, libtrace_queue_t *queues, co
 	bool live[libtrace_get_perpkt_count(trace)]; // Set if a trace is alive
 	uint64_t key[libtrace_get_perpkt_count(trace)]; // Cached keys
 	uint64_t min_key = UINT64_MAX;
+	uint64_t prev_min = 0;
 	int min_queue = -1;
 
 	/* Loop through check all are alive (have data) and find the smallest */
@@ -54,18 +56,17 @@ inline static void read_internal(libtrace_t *trace, libtrace_queue_t *queues, co
 		}
 	}
 
-	/* Now remove the smallest and loop - special case if all threads have joined we always flush what's left */
-	while ((live_count == libtrace_get_perpkt_count(trace)) || (live_count && final)) {
-		// || (live_count && ((flags & REDUCE_SEQUENTIAL && min_key == trace->expected_key)))
+	/* Now remove the smallest and loop - special case if all threads have
+	 * joined we always flush what's left. Or the next smallest is the same
+	 * value or less than the previous */
+	while ((live_count == libtrace_get_perpkt_count(trace)) || (live_count && final)
+	       || (live_count && prev_min >= min_key)) {
 		/* Get the minimum queue and then do stuff */
 		libtrace_result_t r;
 		libtrace_generic_t gt = {.res = &r};
 
 		ASSERT_RET (libtrace_deque_pop_front(&queues[min_queue], (void *) &r), == 1);
 		trace->reporter(trace, MESSAGE_RESULT, gt, &trace->reporter_thread);
-
-		// We expect the key we read +1 now , todo put expected in our storage area
-		//trace->expected_key = key[min_queue] + 1;
 
 		// Now update the one we just removed
 		if (libtrace_deque_get_size(&queues[min_queue]) )
@@ -88,10 +89,10 @@ inline static void read_internal(libtrace_t *trace, libtrace_queue_t *queues, co
 		} else {
 			live[min_queue] = false;
 			live_count--;
+			prev_min = min_key;
 			min_key = UINT64_MAX; // Update our minimum
 			// Check all find the smallest again - all are alive
 			for (i = 0; i < libtrace_get_perpkt_count(trace); ++i) {
-				// Still not 100% TODO (what if order is wrong or not increasing)
 				if (live[i] && min_key >= key[i]) {
 					min_key = key[i];
 					min_queue = i;
