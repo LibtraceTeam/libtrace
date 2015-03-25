@@ -1938,7 +1938,7 @@ DLLEXPORT int trace_set_hasher(libtrace_t *trace, enum hasher_types type, fn_has
 	// Try push this to hardware - NOTE hardware could do custom if
 	// there is a more efficient way to apply it, in this case
 	// it will simply grab the function out of libtrace_t
-	if (trace->format->config_input)
+	if (trace_supports_parallel(trace) && trace->format->config_input)
 		ret = trace->format->config_input(trace, TRACE_OPTION_HASHER, &type);
 
 	if (ret == -1) {
