@@ -561,8 +561,8 @@ static struct libtrace_format_t linuxnative = {
 	NULL,				/* get_filtered_packets */
 	NULL,				/* get_dropped_packets */
 	linuxcommon_get_statistics,	/* get_statistics */
-	linuxnative_get_fd,		/* get_fd */
-	trace_event_device,		/* trace_event */
+	NULL,				/* get_fd */
+	NULL,				/* trace_event */
 	linuxnative_help,		/* help */
 	NULL,			/* next pointer */
 	NON_PARALLEL(true)
