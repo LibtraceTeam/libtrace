@@ -284,6 +284,7 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 	libtrace->stats = NULL;
 	libtrace->pread = NULL;
 	ZERO_USER_CONFIG(libtrace->config);
+	memset(&libtrace->combiner, 0, sizeof(libtrace->combiner));
 
         /* Parse the URI to determine what sort of trace we are dealing with */
 	if ((uridata = trace_parse_uri(uri, &scan)) == 0) {
@@ -400,6 +401,7 @@ DLLEXPORT libtrace_t * trace_create_dead (const char *uri) {
 	libtrace->stats = NULL;
 	libtrace->pread = NULL;
 	ZERO_USER_CONFIG(libtrace->config);
+	memset(&libtrace->combiner, 0, sizeof(libtrace->combiner));
 	
 	for(tmp=formats_list;tmp;tmp=tmp->next) {
                 if (strlen(scan) == strlen(tmp->name) &&
