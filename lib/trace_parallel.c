@@ -2004,7 +2004,7 @@ DLLEXPORT void trace_join(libtrace_t *libtrace) {
 		libtrace_packet_t * packet;
 		while(libtrace_ringbuffer_try_read(&libtrace->perpkt_threads[i].rbuffer, (void **) &packet))
 			trace_destroy_packet(packet);
-		if (libtrace->hasher) {
+		if (trace_has_dedicated_hasher(libtrace)) {
 			assert(libtrace_ringbuffer_is_empty(&libtrace->perpkt_threads[i].rbuffer));
 			libtrace_ringbuffer_destroy(&libtrace->perpkt_threads[i].rbuffer);
 		}
