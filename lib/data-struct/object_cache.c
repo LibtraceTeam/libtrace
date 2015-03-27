@@ -7,6 +7,8 @@
 
 // pthread tls is most likely slower than __thread, but they have destructors so
 // we use a combination of the two here!!
+// Note Apples implementation of TLS means that memory is not available / has
+// been zeroed by the time the pthread destructor is called.
 struct local_cache {
 	libtrace_ocache_t *oc;
 	size_t total;
@@ -25,11 +27,16 @@ struct mem_stats {
 };
 
 extern __thread struct mem_stats mem_hits;
-static __thread size_t t_mem_caches_used = 0;
-static __thread size_t t_mem_caches_total = 0;
-static __thread struct local_cache *t_mem_caches = NULL;
+
+struct local_caches {
+	size_t t_mem_caches_used;
+	size_t t_mem_caches_total;
+	struct local_cache *t_mem_caches;
+};
+
 static pthread_key_t memory_destructor_key;
 static pthread_once_t memory_destructor_once = PTHREAD_ONCE_INIT;
+static inline struct local_caches *get_local_caches();
 
 /**
  * @brief unregister_thread assumes we DONT hold spin
@@ -50,7 +57,8 @@ static inline void unregister_thread(struct local_cache *lc) {
 		}
 	}
 	if (i != ~0U) {
-		fprintf(stderr, "Umm this wasn't registered with us in the first place!!!!IGNORGING!!!!ANGRY\n");
+		fprintf(stderr, "Attempted to unregistered a thread with an"
+		         " ocache that had never registered this thread. Ignoring.\n");
 		pthread_spin_unlock(&lc->oc->spin);
 		return;
 	}
@@ -83,46 +91,65 @@ static inline void register_thread(libtrace_ocache_t *oc, struct local_cache *lc
 	pthread_spin_unlock(&oc->spin);
 }
 
-static void destroy_memory_cache(void *tlsaddr) {
-	assert(tlsaddr == t_mem_caches);
+static void destroy_memory_caches(void *tlsaddr) {
 	size_t a;
+	struct local_caches *lcs = tlsaddr;
 
-	for (a = 0; a < t_mem_caches_used; ++a) {
-		unregister_thread(&t_mem_caches[a]);
+	for (a = 0; a < lcs->t_mem_caches_used; ++a) {
+		unregister_thread(&lcs->t_mem_caches[a]);
 		// Write these all back to the main buffer, this might have issues we would want to free these
-		free(t_mem_caches[a].cache);
+		free(lcs->t_mem_caches[a].cache);
 	}
-	free(t_mem_caches);
-	t_mem_caches = NULL;
+	free(lcs->t_mem_caches);
+	lcs->t_mem_caches = NULL;
+	free(lcs);
+
 }
 
 static void once_memory_cache_key_init() {
-	ASSERT_RET(pthread_key_create(&memory_destructor_key, &destroy_memory_cache), == 0);
+	ASSERT_RET(pthread_key_create(&memory_destructor_key, &destroy_memory_caches), == 0);
 }
 
 /**
  * Adds more space to our mem_caches
  */
-static void resize_memory_caches() {
-	if (t_mem_caches == NULL) {
-		pthread_once(&memory_destructor_once, &once_memory_cache_key_init);
-		t_mem_caches_total = 0x10;
-		t_mem_caches = calloc(0x10, sizeof(struct local_cache));
-		pthread_setspecific(memory_destructor_key, (void *) t_mem_caches);
+static void resize_memory_caches(struct local_caches *lcs) {
+	assert (lcs->t_mem_caches_total > 0);
+	lcs->t_mem_caches += 0x10;
+	lcs->t_mem_caches = realloc(lcs->t_mem_caches,
+	                            lcs->t_mem_caches_total * sizeof(struct local_cache));
+}
+
+/* Get TLS for the list of local_caches */
+static inline struct local_caches *get_local_caches() {
+	static __thread struct local_caches *lcs = NULL;
+	if (lcs) {
+		return lcs;
 	} else {
-		t_mem_caches += 0x10;
-		t_mem_caches = realloc(t_mem_caches, t_mem_caches_total * sizeof(struct local_cache));
-		pthread_setspecific(memory_destructor_key, t_mem_caches);
+		/* This thread has not been used with a memory pool before */
+		/* Allocate our TLS */
+		assert(lcs == NULL);
+		lcs = calloc(1, sizeof (struct local_caches));
+		assert(lcs);
+		/* Hook into pthreads to destroy this when the thread ends */
+		pthread_once(&memory_destructor_once, &once_memory_cache_key_init);
+		pthread_setspecific(memory_destructor_key, (void *) lcs);
+		lcs->t_mem_caches_total = 0x10;
+		lcs->t_mem_caches = calloc(0x10, sizeof(struct local_cache));
+		assert(lcs);
+		assert(lcs->t_mem_caches);
+		return lcs;
 	}
 }
 
 static inline struct local_cache * find_cache(libtrace_ocache_t *oc) {
-	struct local_cache *lc = NULL;
 	size_t i;
+	struct local_cache *lc = NULL;
+	struct local_caches *lcs = get_local_caches();
 
-	for (i = 0; i < t_mem_caches_used; ++i) {
-		if (t_mem_caches[i].oc == oc) {
-			lc = &t_mem_caches[i];
+	for (i = 0; i < lcs->t_mem_caches_used; ++i) {
+		if (lcs->t_mem_caches[i].oc == oc) {
+			lc = &lcs->t_mem_caches[i];
 			break;
 		}
 	}
@@ -132,17 +159,17 @@ static inline struct local_cache * find_cache(libtrace_ocache_t *oc) {
 
 	// Create a cache
 	if (!lc) {
-		if (t_mem_caches_used == t_mem_caches_total)
-			resize_memory_caches();
-		t_mem_caches[t_mem_caches_used].oc = oc;
-		t_mem_caches[t_mem_caches_used].used = 0;
-		t_mem_caches[t_mem_caches_used].total = oc->thread_cache_size;
-		t_mem_caches[t_mem_caches_used].cache = malloc(sizeof(void*) * oc->thread_cache_size);
-		t_mem_caches[t_mem_caches_used].invalid = false;
-		lc = &t_mem_caches[t_mem_caches_used];
+		if (lcs->t_mem_caches_used == lcs->t_mem_caches_total)
+			resize_memory_caches(lcs);
+		lcs->t_mem_caches[lcs->t_mem_caches_used].oc = oc;
+		lcs->t_mem_caches[lcs->t_mem_caches_used].used = 0;
+		lcs->t_mem_caches[lcs->t_mem_caches_used].total = oc->thread_cache_size;
+		lcs->t_mem_caches[lcs->t_mem_caches_used].cache = malloc(sizeof(void*) * oc->thread_cache_size);
+		lcs->t_mem_caches[lcs->t_mem_caches_used].invalid = false;
+		lc = &lcs->t_mem_caches[lcs->t_mem_caches_used];
 		// Register it with the underlying ring_buffer
 		register_thread(lc->oc, lc);
-		++t_mem_caches_used;
+		++lcs->t_mem_caches_used;
 	}
 
 	assert(!lc->invalid);
@@ -437,18 +464,19 @@ DLLEXPORT void libtrace_zero_ocache(libtrace_ocache_t *oc) {
  */
 DLLEXPORT void libtrace_ocache_unregister_thread(libtrace_ocache_t *oc) {
 	size_t i;
+	struct local_caches *lcs = get_local_caches();
 	struct local_cache *lc = find_cache(oc);
 
 	if (lc) {
-		for (i = 0; i < t_mem_caches_used; ++i) {
-			if (&t_mem_caches[i] == lc) {
+		for (i = 0; i < lcs->t_mem_caches_used; ++i) {
+			if (&lcs->t_mem_caches[i] == lc) {
 				// Free the cache against the ocache
-				unregister_thread(&t_mem_caches[i]);
-				free(t_mem_caches[i].cache);
+				unregister_thread(&lcs->t_mem_caches[i]);
+				free(lcs->t_mem_caches[i].cache);
 				// And remove it from the thread itself
-				--t_mem_caches_used;
-				t_mem_caches[i] = t_mem_caches[t_mem_caches_used];
-				memset(&t_mem_caches[t_mem_caches_used], 0, sizeof(struct local_cache));
+				--lcs->t_mem_caches_used;
+				lcs->t_mem_caches[i] = lcs->t_mem_caches[lcs->t_mem_caches_used];
+				memset(&lcs->t_mem_caches[lcs->t_mem_caches_used], 0, sizeof(struct local_cache));
 			}
 		}
 	}
