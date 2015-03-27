@@ -1121,8 +1121,31 @@ DLLEXPORT int libtrace_get_perpkt_count(libtrace_t* t); // TODO MATCH WITH THE S
  * @config config Configuration information. Dependent upon the combiner in use
  *
  * Sets a combiner against a trace, this should only be called on a
- * non-started or paused trace.
+ * non-started or paused trace.  By default combiner_unordered
+ * will be used.
  */
 DLLEXPORT void trace_set_combiner(libtrace_t *trace, const libtrace_combine_t *combiner, libtrace_generic_t config);
+
+/**
+ * Takes unordered (or ordered) input and produces unordered output.
+ * Basically you get the result quickly but in no particular order.
+ */
+extern const libtrace_combine_t combiner_unordered;
+
+/**
+ * Takes ordered input and produces ordered output. Perpkt threads
+ * the output results must be ordered for this to work correctly!!
+ */
+extern const libtrace_combine_t combiner_ordered;
+
+/**
+ * Like classic Google Map/Reduce, the results are sorted
+ * in ascending order, this is only done when the trace finishes.
+ *
+ * This only works with a limited number of results, otherwise
+ * we will just run out of memory and crash!! You should always
+ * use combiner_ordered if you can.
+ */
+extern const libtrace_combine_t combiner_sorted;
 
 #endif // LIBTRACE_PARALLEL_H

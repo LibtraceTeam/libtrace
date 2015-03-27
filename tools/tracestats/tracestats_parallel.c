@@ -54,9 +54,6 @@
 
 #include "libtrace_parallel.h"
 #include "lt_inttypes.h"
-#include "data-struct/vector.h"
-#include "data-struct/message_queue.h"
-#include "combiners.h"
 #include <pthread.h>
 
 struct libtrace_t *trace = NULL;

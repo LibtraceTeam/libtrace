@@ -49,8 +49,6 @@
 
 #include "dagformat.h"
 #include "libtrace_parallel.h"
-#include "data-struct/vector.h"
-#include "combiners.h"
 
 void iferr(libtrace_t *trace,const char *msg)
 {

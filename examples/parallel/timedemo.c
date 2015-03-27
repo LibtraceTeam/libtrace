@@ -11,7 +11,6 @@
  * This example is based upon examples/tutorial/timedemo.c
  */
 #include "libtrace_parallel.h"
-#include "combiners.h"
 #include <stdio.h>
 #include <inttypes.h>
 #include <assert.h>

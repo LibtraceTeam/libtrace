@@ -94,7 +94,6 @@
 #include "format_helper.h"
 #include "rt_protocol.h"
 #include "hash_toeplitz.h"
-#include "combiners.h"
 
 #include <pthread.h>
 #include <signal.h>

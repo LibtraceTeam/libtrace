@@ -56,10 +56,6 @@
 #include "rt_protocol.h"
 #include "dagformat.h"
 
-#include "data-struct/vector.h"
-#include "data-struct/message_queue.h"
-#include "combiners.h"
-
 #ifndef UINT32_MAX
 	#define UINT32_MAX      0xffffffffU
 #endif
