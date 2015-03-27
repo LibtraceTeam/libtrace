@@ -29,14 +29,9 @@
  *
  */
 
-#ifndef __PTHREAD_SPINLOCK_H
-#define __PTHREAD_SPINLOCK_H
-
 #ifdef __APPLE__
 
 #include "pthread_spinlock.h"
-
-typedef OSSpinLock pthread_spinlock_t;
 
 int pthread_spin_lock(pthread_spinlock_t *lock) {
 	if (lock == NULL)
@@ -78,4 +73,3 @@ int pthread_spin_init(pthread_spinlock_t *lock, int pshared) {
 }
 
 #endif /* __APPLE__ */
-#endif /* __PTHREAD_SPINLOCK_H */
