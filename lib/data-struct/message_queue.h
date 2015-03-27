@@ -1,6 +1,7 @@
 #include <pthread.h>
 #include <limits.h>
 #include "../libtrace.h"
+#include "../pthread_spinlock.h"
 
 #ifndef LIBTRACE_MESSAGE_QUEUE
 #define LIBTRACE_MESSAGE_QUEUE

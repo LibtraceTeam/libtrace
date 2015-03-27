@@ -61,7 +61,8 @@ libtrace_la_SOURCES = trace.c trace_parallel.c common.h \
 		data-struct/message_queue.c data-struct/deque.c \
 		data-struct/sliding_window.c data-struct/object_cache.c \
 		data-struct/linked_list.c hash_toeplitz.c combiner_ordered.c \
-		combiner_sorted.c combiner_unordered.c
+		combiner_sorted.c combiner_unordered.c \
+		pthread_spinlock.c pthread_spinlock.h
 
 if DAG2_4
 nodist_libtrace_la_SOURCES = dagopts.c dagapi.c

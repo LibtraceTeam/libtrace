@@ -154,6 +154,7 @@ int snprintf(char *str, size_t size, const char *format, ...);
 #include "data-struct/deque.h"
 #include "data-struct/linked_list.h"
 #include "data-struct/sliding_window.h"
+#include "pthread_spinlock.h"
 
 //#define RP_BUFSIZE 65536U
 
