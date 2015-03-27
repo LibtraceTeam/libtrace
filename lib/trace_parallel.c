@@ -119,7 +119,7 @@ __thread struct mem_stats mem_hits = {{0},{0},{0},{0}};
 static void print_memory_stats() {
 #if 0
 	uint64_t total;
-#ifdef HAVE_PTHREAD_SETNAME_NP
+#if defined(HAVE_PTHREAD_SETNAME_NP) && defined(__linux__)
 	char t_name[50];
 	pthread_getname_np(pthread_self(), t_name, sizeof(t_name));
 
@@ -1462,7 +1462,7 @@ static int trace_start_thread(libtrace_t *trace,
 		                                 LIBTRACE_RINGBUFFER_POLLING:
 		                                 LIBTRACE_RINGBUFFER_BLOCKING);
 	}
-#if HAVE_PTHREAD_SETNAME_NP
+#if defined(HAVE_PTHREAD_SETNAME_NP) && defined(__linux__)
 	if(name)
 		pthread_setname_np(t->tid, name);
 #endif

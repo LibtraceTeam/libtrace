@@ -1558,7 +1558,7 @@ static int dpdk_pregister_thread(libtrace_t *libtrace, libtrace_thread_t *t, boo
 #if DEBUG
 	char name[99];
 	name[0] = 0;
-#if HAVE_PTHREAD_SETNAME_NP
+#if defined(HAVE_PTHREAD_SETNAME_NP) && defined(__linux__)
 	pthread_getname_np(pthread_self(),
 	                   name, sizeof(name));
 #endif
