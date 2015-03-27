@@ -1385,8 +1385,6 @@ typedef enum {
  *       This allows us to extend the structure in the future.
  */
 typedef struct libtrace_stat_t {
-	// Align to 64 bits, because the compiler is likely to do this anyway.
-#if __BYTE_ORDER == __LITTLE_ENDIAN
 #define X(name) LT_BITFIELD64 name ##_valid : 1;
 	LIBTRACE_STAT_FIELDS
 #undef X
@@ -1397,15 +1395,7 @@ typedef struct libtrace_stat_t {
 	LT_BITFIELD64 reserved2: 24; /**< Bits reserved for future fields */
 	LT_BITFIELD64 magic: 8; /**< A number stored against the format to
 				  ensure the struct was allocated correctly */
-#else
-	LT_BITFIELD64 magic: 8;
-	LT_BITFIELD64 reserved2: 24;
-	LT_BITFIELD64 reserved1: 26;
-	LT_BITFIELD64 dropped_valid: 1;
-	LT_BITFIELD64 received_valid: 1;
-	LT_BITFIELD64 filtered_valid: 1;
-	LT_BITFIELD64 accepted_valid: 1;
-#endif
+
 	/* These must all be uint64_t's, match this order with the X macro */
 	uint64_t accepted;
 	/**< The number of packets that have been read from the input trace
