@@ -300,9 +300,11 @@ struct libtrace_t {
 	 * used only if the capture format does not support snapping natively */
 	size_t snaplen;			
 	/** Count of the number of packets returned to the libtrace user */
-	uint64_t accepted_packets;	
+	uint64_t accepted_packets;
 	/** Count of the number of packets filtered by libtrace */
-	uint64_t filtered_packets;	
+	uint64_t filtered_packets;
+	/** The sequence is like accepted_packets but we don't reset this after a pause. */
+	uint64_t sequence_number;
 	/** The filename from the uri for the trace */
 	char *uridata;
 	/** The libtrace IO reader for this trace (if applicable) */
@@ -317,7 +319,7 @@ struct libtrace_t {
 	enum trace_state state;
 	/** Use to control pausing threads and finishing threads etc always used with libtrace_lock */
 	pthread_cond_t perpkt_cond;
-	/* Keep track of counts of threads in any given state */
+	/** Keeps track of counts of threads in any given state */
 	int perpkt_thread_states[THREAD_STATE_MAX]; 
 
 	/** Set to indicate a perpkt's queue is full as such the writing perpkt cannot proceed */

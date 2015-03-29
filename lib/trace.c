@@ -283,6 +283,7 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 	libtrace->first_packets.packets = NULL;
 	libtrace->stats = NULL;
 	libtrace->pread = NULL;
+	libtrace->sequence_number = 0;
 	ZERO_USER_CONFIG(libtrace->config);
 	memset(&libtrace->combiner, 0, sizeof(libtrace->combiner));
 
@@ -400,6 +401,7 @@ DLLEXPORT libtrace_t * trace_create_dead (const char *uri) {
 	libtrace->tracetime = 0;
 	libtrace->stats = NULL;
 	libtrace->pread = NULL;
+	libtrace->sequence_number = 0;
 	ZERO_USER_CONFIG(libtrace->config);
 	memset(&libtrace->combiner, 0, sizeof(libtrace->combiner));
 	
@@ -899,8 +901,9 @@ DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 				trace_set_capture_length(packet,
 						libtrace->snaplen);
 			}
-			trace_packet_set_order(packet, libtrace->accepted_packets);
+			trace_packet_set_order(packet, libtrace->sequence_number);
 			++libtrace->accepted_packets;
+			++libtrace->sequence_number;
 			return ret;
 		} while(1);
 	}
