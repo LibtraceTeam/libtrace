@@ -58,22 +58,10 @@
 
 struct libtrace_t *trace = NULL;
 
-static void cleanup_signal(int signal)
+static void cleanup_signal(int signal UNUSED)
 {
-	static int s = 0;
-	(void)signal;
-	// trace_interrupt();
-	// trace_pstop isn't really signal safe because its got lots of locks in it
-    trace_pstop(trace);
-    /*if (s == 0) {
-		if (trace_ppause(trace) == -1)
-			trace_perror(trace, "Pause failed");
-	}
-	else {
-		if (trace_pstart(trace, NULL, NULL, NULL) == -1)
-			trace_perror(trace, "Start failed");
-    }*/
-	s = !s;
+	if (trace)
+		trace_pstop(trace);
 }
 
 struct filter_t {
@@ -98,20 +86,19 @@ typedef struct statistics {
 } statistics_t;
 
 
-//libtrace_message_t mesg
 static void* per_packet(libtrace_t *trace, libtrace_thread_t *t,
                         int mesg, libtrace_generic_t data,
                         libtrace_thread_t *sender UNUSED)
 {
-	// Using first entry as total and those after for filter counts
+	/* Using first entry as total and those after for filter counts */
 	static __thread statistics_t * results = NULL;
 	int i, wlen;
 	libtrace_stat_t *stats;
+	libtrace_generic_t gen;
 
-
-	// printf ("%d.%06d READ #%"PRIu64"\n", tv.tv_sec, tv.tv_usec, trace_packet_get(packet));
 	switch (mesg) {
 	case MESSAGE_PACKET:
+		/* Apply filters to every packet note the result */
 		wlen = trace_get_wire_length(data.pkt);
 		for(i=0;i<filter_count;++i) {
 			if (filters[i].filter == NULL)
@@ -123,38 +110,30 @@ static void* per_packet(libtrace_t *trace, libtrace_thread_t *t,
 			if (trace_is_err(trace)) {
 				trace_perror(trace, "trace_apply_filter");
 				fprintf(stderr, "Removing filter from filterlist\n");
-				// XXX might be a problem across threads below
+				/* This is a race, but will be atomic */
 				filters[i].filter = NULL;
 			}
 		}
 		results[0].count++;
 		results[0].bytes +=wlen;
 		return data.pkt;
-	case MESSAGE_STOPPING:
-		stats = trace_create_statistics();
-		trace_get_thread_statistics(trace, t, stats);
-		trace_print_statistics(stats, stderr, NULL);
-		free(stats);
-		trace_publish_result(trace, t, 0, (libtrace_generic_t){.ptr = results}, RESULT_USER); // Only ever using a single key 0
-		//fprintf(stderr, "tracestats_parallel:\t Stopping thread - publishing results\n");
-		break;
 	case MESSAGE_STARTING:
+		/* Allocate space to hold a total count and one for each filter */
 		results = calloc(1, sizeof(statistics_t) * (filter_count + 1));
 		break;
-	case MESSAGE_DO_PAUSE:
-		assert(!"GOT Asked to pause!!!\n");
+	case MESSAGE_STOPPING:
+		/* We only output one result per thread with the key 0 when the
+		 * trace is over. */
+		gen.ptr = results;
+		trace_publish_result(trace, t, 0, gen, RESULT_USER);
 		break;
-	case MESSAGE_PAUSING:
-		//fprintf(stderr, "tracestats_parallel:\t pausing thread\n");
-		break;
-	case MESSAGE_RESUMING:
-		//fprintf(stderr, "tracestats_parallel:\t resuming thread\n");
+	default:
 		break;
 	}
 	return NULL;
 }
 
-static void report_result(libtrace_t *trace UNUSED, int mesg,
+static void report_result(libtrace_t *trace, int mesg,
                           libtrace_generic_t data,
                           libtrace_thread_t *sender UNUSED) {
 	static uint64_t count=0, bytes=0;
@@ -175,6 +154,7 @@ static void report_result(libtrace_t *trace UNUSED, int mesg,
 		free(res);
 		break;
 	case MESSAGE_STOPPING:
+		/* We are done, print out results */
 		stats = trace_get_statistics(trace, NULL);
 		printf("%-30s\t%12s\t%12s\t%7s\n","filter","count","bytes","%");
 		for(i=0;i<filter_count;++i) {
@@ -203,14 +183,6 @@ static void report_result(libtrace_t *trace UNUSED, int mesg,
 	}
 }
 
-static uint64_t rand_hash(libtrace_packet_t * pkt UNUSED, void *data UNUSED) {
-	return rand();
-}
-
-static uint64_t bad_hash(libtrace_packet_t * pkt UNUSED, void *data UNUSED) {
-	return 0;
-}
-
 /* Process a trace, counting packets that match filter(s) */
 static void run_trace(char *uri, char *config, char *config_file)
 {
@@ -223,14 +195,6 @@ static void run_trace(char *uri, char *config, char *config_file)
 		trace_perror(trace,"Failed to create trace");
 		return;
 	}
-
-	//libtrace_filter_t *f = trace_create_filter("udp");
-	//trace_config(trace, TRACE_OPTION_FILTER, f);
-
-	//trace_config(trace, TRACE_OPTION_META_FREQ, &option);
-	//option = 10000;
-	trace_set_hasher(trace, HASHER_CUSTOM, &rand_hash, NULL);
-	//trace_parallel_config(trace, TRACE_OPTION_SET_PERPKT_THREAD_COUNT, &option);
 
 	/* Apply config */
 	if (config) {
@@ -248,33 +212,15 @@ static void run_trace(char *uri, char *config, char *config_file)
 		}
 	}
 
-	trace_set_combiner(trace, &combiner_ordered, (libtrace_generic_t){0});
-
-	//trace_parallel_config(trace, TRACE_OPTION_SET_MAPPER_BUFFER_SIZE, &option);
-
-	/* OPTIONALLY SETUP CORES HERE BUT WE DON'T CARE ABOUT THAT YET XXX */
-
-	/*if (trace_start(trace)==-1) {
-	trace_perror(trace,"Failed to start trace");
-	return;
-	}*/
-	global_blob_t blob;
-
-
-	if (trace_pstart(trace, (void *)&blob, &per_packet, report_result)==-1) {
+	/* Start the trace as a parallel trace */
+	if (trace_pstart(trace, NULL, &per_packet, report_result)==-1) {
 		trace_perror(trace,"Failed to start trace");
 		return;
 	}
 
-	// Wait for all threads to stop
+	/* Wait for all threads to stop */
 	trace_join(trace);
 
-	//map_pair_iterator_t * results = NULL;
-	//trace_get_results(trace, &results);
-
-	//if (results != NULL) {
-	//      reduce(trace, global_blob, results);
-	//}
 	if (trace_is_err(trace))
 		trace_perror(trace,"%s",uri);
 
