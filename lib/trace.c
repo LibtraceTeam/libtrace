@@ -2090,7 +2090,8 @@ libtrace_stat_t *trace_get_statistics(libtrace_t *trace, libtrace_stat_t *stat)
 
 	/* If the trace has paused or finished get the cached results */
 	if (trace->state == STATE_PAUSED ||
-	    trace->state == STATE_FINSHED ||
+	    trace->state == STATE_FINISHED ||
+	    trace->state == STATE_FINISHING ||
 	    trace->state == STATE_JOINED) {
 		if (trace->stats && trace->stats != stat)
 			*stat = *trace->stats;

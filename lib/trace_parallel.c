@@ -249,7 +249,7 @@ static inline void thread_change_state(libtrace_t *trace, libtrace_thread_t *t,
 		        (int) t->tid, prev_state, t->state);
 
 	if (trace->perpkt_thread_states[THREAD_FINISHED] == trace->perpkt_thread_count)
-		libtrace_change_state(trace, STATE_FINSHED, false);
+		libtrace_change_state(trace, STATE_FINISHED, false);
 
 	pthread_cond_broadcast(&trace->perpkt_cond);
 	if (need_lock)
@@ -721,7 +721,7 @@ static void* hasher_entry(void *data) {
 					break;
 				case MESSAGE_DO_STOP:
 					assert(trace->started == false);
-					assert(trace->state == STATE_FINSHED);
+					assert(trace->state == STATE_FINISHED);
 					/* Mark the current packet as EOF */
 					packet->error = 0;
 					break;
@@ -1084,7 +1084,7 @@ static void* keepalive_entry(void *data) {
 	gettimeofday(&prev, NULL);
 	message.code = MESSAGE_TICK_INTERVAL;
 
-	while (trace->state != STATE_FINSHED) {
+	while (trace->state != STATE_FINISHED) {
 		fd_set rfds;
 		next_release = tv_to_usec(&prev) + (trace->config.tick_interval * 1000);
 		gettimeofday(&next, NULL);
@@ -1913,8 +1913,9 @@ DLLEXPORT int trace_pstop(libtrace_t *libtrace)
 		trace_message_thread(libtrace, &libtrace->perpkt_threads[i], &message);
 	}
 
-	// Now release the threads and let them stop
-	libtrace_change_state(libtrace, STATE_FINSHED, true);
+	/* Now release the threads and let them stop - when the threads finish
+	 * the state will be set to finished */
+	libtrace_change_state(libtrace, STATE_FINISHING, true);
 	return 0;
 }
 
@@ -2179,7 +2180,7 @@ DLLEXPORT void trace_packet_set_hash(libtrace_packet_t * packet, uint64_t hash) 
 }
 
 DLLEXPORT bool trace_has_finished(libtrace_t * libtrace) {
-	return libtrace->state == STATE_FINSHED || libtrace->state == STATE_JOINED;
+	return libtrace->state == STATE_FINISHED || libtrace->state == STATE_JOINED;
 }
 
 /**
