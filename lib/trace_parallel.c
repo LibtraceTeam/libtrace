@@ -298,16 +298,6 @@ libtrace_thread_t * get_thread_table(libtrace_t *libtrace) {
 	return NULL;
 }
 
-int get_thread_table_num(libtrace_t *libtrace) {
-	int i = 0;
-	pthread_t tid = pthread_self();
-	for (;i<libtrace->perpkt_thread_count; ++i) {
-		if (pthread_equal(tid, libtrace->perpkt_threads[i].tid))
-			return i;
-	}
-	return -1;
-}
-
 static libtrace_thread_t * get_thread_descriptor(libtrace_t *libtrace) {
 	libtrace_thread_t *ret;
 	if (!(ret = get_thread_table(libtrace))) {
