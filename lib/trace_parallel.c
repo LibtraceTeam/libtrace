@@ -460,7 +460,6 @@ static int trace_perpkt_thread_pause(libtrace_t *trace, libtrace_thread_t *t,
 	libtrace_ocache_alloc(&trace->packet_freelist, (void **) &packet, 1, 1);
 	/* If a hasher thread is running, empty input queues so we don't lose data */
 	if (trace_has_dedicated_hasher(trace)) {
-		fprintf(stderr, "Trace is using a hasher thread emptying queues\n");
 		// The hasher has stopped by this point, so the queue shouldn't be filling
 		while(!libtrace_ringbuffer_is_empty(&t->rbuffer) || t->format_data) {
 			int ret = trace->pread(trace, t, &packet, 1);
@@ -481,7 +480,6 @@ static int trace_perpkt_thread_pause(libtrace_t *trace, libtrace_thread_t *t,
 					// No packets after this should have any data in them
 					assert(packet->error <= 0);
 				}
-				fprintf(stderr, "PREAD_FAILED %d\n", ret);
 				libtrace_ocache_free(&trace->packet_freelist, (void **) &packet, 1, 1);
 				return -1;
 			}
@@ -521,7 +519,6 @@ static void* perpkt_threads_entry(void *data) {
 		ASSERT_RET(pthread_mutex_unlock(&trace->libtrace_lock), == 0);
 		pthread_exit(NULL);
 	}
-	//printf("Yay Started perpkt thread #%d\n", (int) get_thread_table_num(trace));
 	ASSERT_RET(pthread_mutex_unlock(&trace->libtrace_lock), == 0);
 
 	if (trace->format->pregister_thread) {
@@ -556,7 +553,6 @@ static void* perpkt_threads_entry(void *data) {
 					assert(ret == 1);
 					continue;
 				case MESSAGE_DO_STOP: // This is internal
-					fprintf(stderr, "DO_STOP stop!!\n");
 					goto eof;
 			}
 			(*trace->per_pkt)(trace, t, message.code, message.data, message.sender);
@@ -674,8 +670,6 @@ static void* hasher_entry(void *data) {
 		ASSERT_RET(pthread_mutex_unlock(&trace->libtrace_lock), == 0);
 		pthread_exit(NULL);
 	}
-
-	printf("Hasher Thread started\n");
 	ASSERT_RET(pthread_mutex_unlock(&trace->libtrace_lock), == 0);
 
 	/* We are reading but it is not the parallel API */
@@ -754,7 +748,6 @@ static void* hasher_entry(void *data) {
 	/* Broadcast our last failed read to all threads */
 	for (i = 0; i < trace->perpkt_thread_count; i++) {
 		libtrace_packet_t * bcast;
-		fprintf(stderr, "Broadcasting error/EOF now the trace is over\n");
 		if (i == trace->perpkt_thread_count - 1) {
 			bcast = packet;
 		} else {
@@ -765,8 +758,6 @@ static void* hasher_entry(void *data) {
 		if (trace->perpkt_threads[i].state != THREAD_FINISHED) {
 			// Unlock early otherwise we could deadlock
 			libtrace_ringbuffer_write(&trace->perpkt_threads[i].rbuffer, bcast);
-		} else {
-			fprintf(stderr, "SKIPPING THREAD !!!%d!!!/n", (int) i);
 		}
 		ASSERT_RET(pthread_mutex_unlock(&trace->libtrace_lock), == 0);
 	}
@@ -845,8 +836,6 @@ inline static int trace_pread_packet_hasher_thread(libtrace_t *libtrace,
 
 	/* We store the last error message here */
 	if (t->format_data) {
-		fprintf(stderr, "Hit me, ohh yeah got error %d\n",
-		        ((libtrace_packet_t *)t->format_data)->error);
 		return ((libtrace_packet_t *)t->format_data)->error;
 	}
 
@@ -856,7 +845,6 @@ inline static int trace_pread_packet_hasher_thread(libtrace_t *libtrace,
 	packets[0] = libtrace_ringbuffer_read(&t->rbuffer);
 
 	if (packets[0]->error <= 0 && packets[0]->error != READ_TICK) {
-		fprintf(stderr, "Hit me, ohh yeah returning error %d\n", packets[0]->error);
 		return packets[0]->error;
 	}
 
@@ -876,8 +864,6 @@ inline static int trace_pread_packet_hasher_thread(libtrace_t *libtrace,
 			if (packets[i]->error != READ_MESSAGE) {
 				assert(t->format_data == NULL);
 				t->format_data = packets[i];
-				fprintf(stderr, "Hit me, ohh yeah set error %d\n",
-				        ((libtrace_packet_t *)t->format_data)->error);
 			}
 			break;
 		}
@@ -998,8 +984,6 @@ static void* reporter_entry(void *data) {
 	libtrace_t *trace = (libtrace_t *)data;
 	libtrace_thread_t *t = &trace->reporter_thread;
 
-	fprintf(stderr, "Reporter thread starting\n");
-
 	/* Wait until all threads are started */
 	ASSERT_RET(pthread_mutex_lock(&trace->libtrace_lock), == 0);
 	if (trace->state == STATE_ERROR) {
@@ -1059,8 +1043,6 @@ static void* keepalive_entry(void *data) {
 	libtrace_t *trace = (libtrace_t *)data;
 	uint64_t next_release;
 	libtrace_thread_t *t = &trace->keepalive_thread;
-
-	fprintf(stderr, "keepalive thread is starting\n");
 
 	/* Wait until all threads are started */
 	ASSERT_RET(pthread_mutex_lock(&trace->libtrace_lock), == 0);
@@ -1143,15 +1125,13 @@ static inline int delay_tracetime(libtrace_t *libtrace, libtrace_packet_t *packe
 		FD_ZERO(&rfds);
 		FD_SET(mesg_fd, &rfds);
 		// We need to wait
-
-		//printf("WAITING for %d.%d next=%"PRIu64" curr=%"PRIu64" seconds packettime %f\n", delay_tv.tv_sec, delay_tv.tv_usec, next_release, curr_usec, trace_get_seconds(packet));
 		ret = select(mesg_fd+1, &rfds, NULL, NULL, &delay_tv);
 		if (ret == 0) {
 			return 0;
 		} else if (ret > 0) {
 			return READ_MESSAGE;
 		} else {
-			fprintf(stderr, "I thnik we broke select\n");
+			assert(!"trace_delay_packet: Unexpected return from select");
 		}
 	}
 	return 0;
@@ -1319,11 +1299,9 @@ static int trace_prestart(libtrace_t * libtrace, void *global_blob,
 	if (libtrace->perpkt_thread_count > 1 &&
 	    trace_supports_parallel(libtrace) &&
 	    !trace_has_dedicated_hasher(libtrace)) {
-		fprintf(stderr, "Restarting trace pstart_input()\n");
 		err = libtrace->format->pstart_input(libtrace);
 	} else {
 		if (libtrace->format->start_input) {
-			fprintf(stderr, "Restarting trace start_input()\n");
 			err = libtrace->format->start_input(libtrace);
 		}
 	}
@@ -1521,7 +1499,6 @@ static void parse_env_config (libtrace_t *libtrace) {
 		env_name[mark] = 0;
 		env = getenv(env_name);
 		if (env) {
-			printf("Got %s=%s", env_name, env);
 			trace_set_configuration(libtrace, env);
 		}
 		env_name[mark] = '_';
@@ -1530,7 +1507,6 @@ static void parse_env_config (libtrace_t *libtrace) {
 	/* Finally this specific trace LIBTRACE_CONF_<FORMAT_URI> */
 	env = getenv(env_name);
 	if (env) {
-		printf("Got %s=%s", env_name, env);
 		trace_set_configuration(libtrace, env);
 	}
 }
@@ -1586,11 +1562,9 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob,
 	 * these formats should support messages better */
 	if (trace_supports_parallel(libtrace) &&
 	    !trace_has_dedicated_hasher(libtrace)) {
-		printf("Using the parallel trace format\n");
 		ret = libtrace->format->pstart_input(libtrace);
 		libtrace->pread = trace_pread_packet_wrapper;
 	} else {
-		printf("Using single threaded interface\n");
 		if (libtrace->format->start_input) {
 			ret = libtrace->format->start_input(libtrace);
 		}
@@ -1765,7 +1739,6 @@ DLLEXPORT int trace_ppause(libtrace_t *libtrace)
 	// Check state from within the lock if we are going to change it
 	ASSERT_RET(pthread_mutex_lock(&libtrace->libtrace_lock), == 0);
 	if (!libtrace->started || libtrace->state != STATE_RUNNING) {
-		fprintf(stderr, "pause failed started=%d state=%s (%d)\n", libtrace->started, get_trace_state_name(libtrace->state), libtrace->state);
 		trace_set_err(libtrace,TRACE_ERR_BAD_STATE, "You must call trace_start() before calling trace_ppause()");
 		ASSERT_RET(pthread_mutex_unlock(&libtrace->libtrace_lock), == 0);
 		return -1;
@@ -1859,7 +1832,6 @@ DLLEXPORT int trace_ppause(libtrace_t *libtrace)
 		// TODO What happens if we don't have pause input??
 	} else {
 		int err;
-		fprintf(stderr, "Trace is not parallel so we are doing a normal pause %s\n", libtrace->uridata);
 		err = trace_pause(libtrace);
 		// We should handle this a bit better
 		if (err)
@@ -1969,9 +1941,7 @@ DLLEXPORT void trace_join(libtrace_t *libtrace) {
 	/* Firstly wait for the perpkt threads to finish, since these are
 	 * user controlled */
 	for (i=0; i< libtrace->perpkt_thread_count; i++) {
-		//printf("Waiting to join with perpkt #%d\n", i);
 		ASSERT_RET(pthread_join(libtrace->perpkt_threads[i].tid, NULL), == 0);
-		//printf("Joined with perpkt #%d\n", i);
 		// So we must do our best effort to empty the queue - so
 		// the producer (or any other threads) don't block.
 		libtrace_packet_t * packet;
@@ -2331,7 +2301,7 @@ static void config_string(struct user_configuration *uc, char *key, size_t nkey,
 	           || strncmp(key, "ds", nkey) == 0) {
 		uc->debug_state = config_bool_parse(value, nvalue);
 	} else {
-		fprintf(stderr, "No matching value %s(=%s)\n", key, value);
+		fprintf(stderr, "No matching option %s(=%s), ignoring\n", key, value);
 	}
 }
 
@@ -2352,7 +2322,7 @@ DLLEXPORT int trace_set_configuration(libtrace_t *trace, const char *str) {
 		if (sscanf(pch, "%99[^=]=%99s", key, value) == 2) {
 			config_string(&trace->config, key, sizeof(key), value, sizeof(value));
 		} else {
-			fprintf(stderr, "Error parsing %s\n", pch);
+			fprintf(stderr, "Error parsing option %s\n", pch);
 		}
 		pch = strtok (NULL," ,.-");
 	}

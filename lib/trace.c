@@ -823,8 +823,6 @@ void trace_fin_packet(libtrace_packet_t *packet) {
 	{
 		if (packet->trace && packet->trace->format->fin_packet) {
 			packet->trace->format->fin_packet(packet);
-			//gettimeofday(&tv, NULL);
-			//printf ("%d.%06d DESTROYED #%"PRIu64"\n", tv.tv_sec, tv.tv_usec, trace_packet_get(packet));
 		}
 
 		// No matter what we remove the header and link pointers
@@ -1390,7 +1388,6 @@ static int trace_bpf_compile(libtrace_filter_t *filter,
 		assert (pthread_mutex_lock(&mutex) == 0);
 		/* Make sure not one bet us to this */
 		if (filter->flag) {
-			printf("Someone bet us to compile the filter\n");
 			assert (pthread_mutex_unlock(&mutex) == 0);
 			return 1;
 		}
@@ -1497,9 +1494,7 @@ DLLEXPORT int trace_apply_filter(libtrace_filter_t *filter,
 	if (!filter->jitfilter) {
 		ASSERT_RET(pthread_mutex_lock(&mutex), == 0);
 		/* Again double check here like the bpf filter */
-		if(filter->jitfilter) 
-			printf("Someone bet us to compile the JIT thingy\n");
-		else
+		if(!filter->jitfilter)
 		/* Looking at compile_program source this appears to be thread safe 
 		 * however if this gets called twice we will leak this memory :(
 		 * as such lock here anyways */

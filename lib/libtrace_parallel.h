@@ -848,6 +848,7 @@ DLLEXPORT void trace_publish_result(libtrace_t *libtrace,
 
 /** Check if a dedicated hasher thread is being used.
  *
+ * @param[in] libtrace The parallel input trace
  * @return True if the trace has dedicated hasher thread otherwise false.
  *
  * This is valid once the trace is running after calling trace_pstart().
@@ -856,7 +857,7 @@ DLLEXPORT bool trace_has_dedicated_hasher(libtrace_t * libtrace);
 
 /** Checks if a trace is using a reporter
  *
- * @param[in] The parallel input trace
+ * @param[in] libtrace The parallel input trace
  * @return True if the trace is using a reporter otherwise false
  */
 DLLEXPORT bool trace_has_reporter(libtrace_t * libtrace);
