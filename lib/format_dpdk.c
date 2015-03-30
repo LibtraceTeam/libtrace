@@ -677,8 +677,10 @@ static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_
 #if HAVE_LIBNUMA
 	format_data->nic_numa_node = pci_to_numa(&use_addr);
 	if (my_cpu < 0) {
+#if DEBUG
 		/* If we can assign to a core on the same numa node */
 		fprintf(stderr, "Using pci card on numa_node%d\n", format_data->nic_numa_node);
+#endif
 		if(format_data->nic_numa_node >= 0) {
 			int max_node_cpu = -1;
 			struct bitmask *mask = numa_allocate_cpumask();
@@ -707,8 +709,8 @@ static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_
 		return -1;
 	}
 
-	/* Make our mask with all cores turned on this is so that DPDK to
-	 * gets CPU info older versions */
+	/* Make our mask with all cores turned on this is so that DPDK
+	 * gets all CPU info in older versions */
 	snprintf(cpu_number, sizeof(cpu_number), "%x", ~(UINT32_MAX<<MIN(31, nb_cpu)));
 	//snprintf(cpu_number, sizeof(cpu_number), "%x", 0x1 << (my_cpu - 1));
 
@@ -788,11 +790,6 @@ static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_
 		         format_data->nb_ports);
 		return -1;
 	}
-
-	struct rte_eth_dev_info dev_info;
-	rte_eth_dev_info_get(0, &dev_info);
-	fprintf(stderr, "Device port=0\n\tmin_rx_bufsize=%d\n\tmax_rx_pktlen=%d\n\tmax rx queues=%d\n\tmax tx queues=%d",
-	        (int) dev_info.min_rx_bufsize, (int) dev_info.max_rx_pktlen, (int) dev_info.max_rx_queues, (int) dev_info.max_tx_queues);
 
 	return 0;
 }

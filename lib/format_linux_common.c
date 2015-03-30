@@ -632,7 +632,6 @@ int linuxcommon_pstart_input(libtrace_t *libtrace,
 	int iserror = 0;
 	struct linux_per_stream_t empty_stream = ZERO_LINUX_STREAM;
 
-	printf("Calling native pstart packet\n");
 	for (i = 0; i < tot; ++i)
 	{
 		struct linux_per_stream_t *stream;
