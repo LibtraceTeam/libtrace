@@ -230,7 +230,8 @@ static void* per_packet(libtrace_t *trace, libtrace_thread_t *t,
 	case MESSAGE_TICK_COUNT:
 		{
 			int64_t offset;
-			struct timeval *tv, tv_real;
+			const struct timeval *tv;
+			struct timeval tv_real;
 			const libtrace_packet_t *first_packet = NULL;
 			trace_get_first_packet(trace, NULL, &first_packet, &tv);
 			if (first_packet != NULL) {
