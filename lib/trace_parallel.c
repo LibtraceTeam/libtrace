@@ -376,7 +376,10 @@ static inline int dispatch_packet(libtrace_t *trace,
 		}
 		t->accepted_packets++;
 		libtrace_generic_t data = {.pkt = *packet};
-		*packet = (*trace->per_pkt)(trace, t, MESSAGE_PACKET, data, t);
+		if (trace->callbacks.message_packet)
+			*packet = (*trace->callbacks.message_packet)(trace, t, data, trace->global_blob, t->user_data);
+		else
+			*packet = (*trace->per_pkt)(trace, t, MESSAGE_PACKET, data, t);
 		trace_fin_packet(*packet);
 	} else {
 		assert((*packet)->error == READ_TICK);
@@ -534,8 +537,15 @@ static void* perpkt_threads_entry(void *data) {
 	/* ~~~~~~~~~~~ Setup complete now we loop ~~~~~~~~~~~~~~~ */
 
 	/* Let the per_packet function know we have started */
-	(*trace->per_pkt)(trace, t, MESSAGE_STARTING, (libtrace_generic_t){0}, t);
-	(*trace->per_pkt)(trace, t, MESSAGE_RESUMING, (libtrace_generic_t){0}, t);
+	if (trace->callbacks.message_starting)
+		(*trace->callbacks.message_starting)(trace, t, (libtrace_generic_t){0}, trace->global_blob, t->user_data);
+	else
+		(*trace->per_pkt)(trace, t, MESSAGE_STARTING, (libtrace_generic_t){0}, t);
+
+	if (trace->callbacks.message_resuming)
+		(*trace->callbacks.message_resuming)(trace, t, (libtrace_generic_t){0}, trace->global_blob, t->user_data);
+	else
+		(*trace->per_pkt)(trace, t, MESSAGE_RESUMING, (libtrace_generic_t){0}, t);
 
 	for (;;) {
 
@@ -618,8 +628,15 @@ eof:
 	/* ~~~~~~~~~~~~~~ Trace is finished do tear down ~~~~~~~~~~~~~~~~~~~~~ */
 
 	// Let the per_packet function know we have stopped
-	(*trace->per_pkt)(trace, t, MESSAGE_PAUSING, (libtrace_generic_t){0}, t);
-	(*trace->per_pkt)(trace, t, MESSAGE_STOPPING, (libtrace_generic_t){0}, t);
+	if (trace->callbacks.message_pausing)
+		(*trace->callbacks.message_pausing)(trace, t, (libtrace_generic_t){0}, trace->global_blob, t->user_data);
+	else
+		(*trace->per_pkt)(trace, t, MESSAGE_PAUSING, (libtrace_generic_t){0}, t);
+	if (trace->callbacks.message_stopping)
+		(*trace->callbacks.message_stopping)(trace, t, (libtrace_generic_t){0}, trace->global_blob, t->user_data);
+	else
+		(*trace->per_pkt)(trace, t, MESSAGE_STOPPING, (libtrace_generic_t){0}, t);
+
 
 	// Free any remaining packets
 	for (i = 0; i < trace->config.burst_size; i++) {
@@ -1718,6 +1735,30 @@ cleanup_none:
 	ASSERT_RET(pthread_mutex_unlock(&libtrace->libtrace_lock), == 0);
 	return ret;
 }
+
+DLLEXPORT int trace_set_handler(libtrace_t *libtrace, enum libtrace_messages message, fn_handler handler) {
+	switch (message) {
+	case MESSAGE_STARTING:
+		libtrace->callbacks.message_starting = handler;
+		return 0;
+	case MESSAGE_STOPPING:
+		libtrace->callbacks.message_stopping = handler;
+		return 0;
+	case MESSAGE_RESUMING:
+		libtrace->callbacks.message_resuming = handler;
+		return 0;
+	case MESSAGE_PAUSING:
+		libtrace->callbacks.message_pausing = handler;
+		return 0;
+	case MESSAGE_PACKET:
+		libtrace->callbacks.message_packet = handler;
+		return 0;
+	default:
+		return -1;
+	}
+	return -1;
+}
+
 
 /*
  * Pauses a trace, this should only be called by the main thread

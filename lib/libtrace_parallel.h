@@ -465,6 +465,31 @@ typedef uint64_t (*fn_hasher)(const libtrace_packet_t* packet, void *data);
 DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob,
                            fn_per_pkt per_pkt, fn_reporter reporter);
 
+
+/**
+ * @param libtrace The parallel trace
+ * @param t The thread
+ * @param data The data associated with the message
+ * @param global The global storage
+ * @param tls The thread local storage
+ */
+typedef void* (*fn_handler)(libtrace_t *libtrace,
+                               libtrace_thread_t *t,
+                               libtrace_generic_t data,
+                               void *global,
+                               void *tls);
+
+/** Registers a built-in message with a handler.
+ * Note we do not include the sending thread as an argument to the reporter.
+ * If set to NULL, the message will be sent to default perpkt handler.
+ *
+ * @param libtrace The input trace to start
+ * @param message The message to intercept
+ * @param handler the handler to be called when the message is received
+ * @return 0 if successful otherwise -1.
+ */
+DLLEXPORT int trace_set_handler(libtrace_t *libtrace, enum libtrace_messages message, fn_handler handler);
+
 /** Pauses a trace previously started with trace_pstart()
  *
  * @param libtrace The parallel trace to be paused

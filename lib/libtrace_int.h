@@ -357,6 +357,13 @@ struct libtrace_t {
 	libtrace_stat_t *stats;
 	struct user_configuration config;
 	libtrace_combine_t combiner;
+	struct {
+		fn_handler message_starting;
+		fn_handler message_stopping;
+		fn_handler message_resuming;
+		fn_handler message_pausing;
+		fn_handler message_packet;
+	} callbacks;
 };
 
 #define LIBTRACE_STAT_MAGIC 0x41
