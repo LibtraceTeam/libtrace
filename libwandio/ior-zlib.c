@@ -32,6 +32,7 @@
  */
 
 
+#include "config.h"
 #include "wandio.h"
 #include <zlib.h>
 #include <sys/types.h>

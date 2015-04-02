@@ -39,10 +39,10 @@
  * get compression for the absolute least amount of walltime while capturing.
  */
 
+#include "config.h"
 #include <lzo/lzo1x.h>
 #include "wandio_internal.h"
 #include "wandio.h"
-#include "config.h"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
