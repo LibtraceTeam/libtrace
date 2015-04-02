@@ -43,6 +43,7 @@
 #include <string.h>
 #include <stdbool.h>
 #include <errno.h>
+#include <signal.h>
 #ifdef HAVE_SYS_PRCTL_H
 #include <sys/prctl.h>
 #endif
@@ -166,12 +167,14 @@ static void *thread_producer(void* userdata)
 io_t *thread_open(io_t *parent)
 {
 	io_t *state;
+	sigset_t set;
+	int s;
 
 	if (!parent) {
 		return NULL;
 	}
 	
-
+	sigfillset(&set);
 	state = malloc(sizeof(io_t));
 	state->data = calloc(1,sizeof(struct state_t));
 	state->source = &thread_source;
@@ -188,7 +191,10 @@ io_t *thread_open(io_t *parent)
 	DATA(state)->closing = false;
 
 	/* Create the reading thread */
+	s = pthread_sigmask(SIG_SETMASK, &set, NULL);
 	pthread_create(&DATA(state)->producer,NULL,thread_producer,state);
+	sigemptyset(&set);
+	s = pthread_sigmask(SIG_SETMASK, &set, NULL);
 
 	return state;
 }
