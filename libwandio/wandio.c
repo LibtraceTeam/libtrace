@@ -40,6 +40,7 @@
 #include <errno.h>
 #include <inttypes.h>
 #include <string.h>
+#include <ctype.h>
 
 /* This file contains the implementation of the libtrace IO API, which format
  * modules should use to open, read from, write to, seek and close trace files.
@@ -133,14 +134,37 @@ static void parse_env(void)
 
 static io_t *create_io_reader(const char *filename, int autodetect)
 {
-
+        io_t *io;
 	/* Use a peeking reader to look at the start of the trace file and
 	 * determine what type of compression may have been used to write
 	 * the file */
 
-	DEBUG_PIPELINE("stdio");
+        /* should we use http to read this file? */
+        int stdfile = 1;
+        const char *p, *q;
+        p = strstr(filename, "://");
+	if (p && *p) {
+                /* ensure the protocol is sane */
+		for (q = filename; q != p; ++q)
+			if (!isalnum(*q)) break;
+		if (q == p) stdfile = 0;
+	}
+        if (stdfile) {
+                DEBUG_PIPELINE("stdio");
+                io = stdio_open(filename);
+        }
+        else {
+#if HAVE_HTTP
+                DEBUG_PIPELINE("http");
+                io = http_open(filename);
+#else
+                fprintf(stderr, "%s appears to be an HTTP URI but libtrace has not been built with http (libcurl) support!\n", filename);
+                return NULL;
+#endif
+        }
+
 	DEBUG_PIPELINE("peek");
-	io_t *io = peek_open(stdio_open(filename));
+	io = peek_open(io);
 	unsigned char buffer[1024];
 	int len;
 	if (!io)

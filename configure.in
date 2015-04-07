@@ -604,6 +604,29 @@ AS_IF([test "x$have_lzma" = "xyes"], [
 	with_lzma=no]
 )
 
+AC_ARG_WITH([http],
+        AC_HELP_STRING([--with-http], [build with support for reading files over http (using libcurl)]))
+
+AS_IF([test "x$with_http" != "xno"],
+        [
+        # we need curl_easy_pause which was added in 7.18.0
+        AC_CHECK_LIB(curl, curl_easy_pause, have_curl=yes, have_curl=no)
+	], [have_curl=no])
+
+AS_IF([test "x$have_curl" = "xyes"], [
+        if test "$ac_cv_lib_curl_curl_easy_pause" != "none required"; then
+                LIBWANDIO_LIBS="$LIBWANDIO_LIBS -lcurl"
+        fi
+        AC_DEFINE(HAVE_HTTP, 1, "Compiled with http support")
+        with_http=yes],
+
+
+        [AS_IF([test "x$with_http" = "xyes"],
+                [AC_MSG_ERROR([http requested but libcurl (> 7.18.0) not found])])
+        AC_DEFINE(HAVE_HTTP, 0, "Compiled with http support")
+        with_http=no]
+)
+
 # Define automake conditionals for use in our Makefile.am files
 AM_CONDITIONAL([HAVE_BPF_CAPTURE], [test "$ac_cv_have_decl_BIOCSETIF" = yes ])
 AM_CONDITIONAL([HAVE_DAG], [test "$libtrace_dag" = true])
@@ -618,6 +641,7 @@ AM_CONDITIONAL([HAVE_BZLIB], [test "x$with_bzip2" != "xno"])
 AM_CONDITIONAL([HAVE_ZLIB], [test "x$with_zlib" != "xno"])
 AM_CONDITIONAL([HAVE_LZO], [ test "x$with_lzo" != "xno"])
 AM_CONDITIONAL([HAVE_LZMA], [ test "x$with_lzma" != "xno"])
+AM_CONDITIONAL([HAVE_HTTP], [ test "x$with_http" != "xno"])
 
 # Check for miscellaneous programs
 AC_CHECK_PROG([libtrace_doxygen], [doxygen], [true], [false])
@@ -673,6 +697,7 @@ reportopt "Compiled with compressed trace (zlib) support" $with_zlib
 reportopt "Compiled with compressed trace (bz2) support" $with_bzip2
 reportopt "Compiled with compressed trace (lzo write only) support" $with_lzo
 reportopt "Compiled with compressed trace (lzma) support" $with_lzma
+reportopt "Compiled with http read support" $with_http
 if test x"$libtrace_dag" = xtrue; then
 	if test "$libtrace_dag_version" = 24; then
 		AC_MSG_NOTICE([Compiled with DAG live capture support: 2.4])
