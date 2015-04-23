@@ -31,7 +31,7 @@
  *
  */
 
-
+#include "config.h"
 #include "wandio.h"
 #include <lzma.h>
 #include <sys/types.h>
