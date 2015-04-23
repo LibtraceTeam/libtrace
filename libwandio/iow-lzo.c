@@ -206,14 +206,26 @@ static int lzo_wwrite_block(const char *buffer, off_t len, struct buffer_t *outb
 	}
 
 	write32(outbuf, len); /* Original length */
-	write32(outbuf, min((uint32_t)len,(uint32_t)dst_len));
+	
+	assert(len > 0);
+
+	/* If the compression actually makes the block bigger, we should write out the
+	 * block uncompressed. */
+	if (dst_len < (uint32_t)len)
+		write32(outbuf, (uint32_t)dst_len);
+	else
+		write32(outbuf, len);
 	/* CRC32 of the uncompressed buffer */
 #if 0
 	write32(outbuf, lzo_crc32(CRC32_INIT_VALUE, (void*)buffer, len));
 #endif
 	write32(outbuf, 
 		lzo_adler32(ADLER32_INIT_VALUE, (const void*)buffer, len));
-	write_buf(outbuf, b2, dst_len);
+	
+	if (dst_len < (uint32_t)len)
+		write_buf(outbuf, b2, dst_len);
+	else
+		write_buf(outbuf, buffer, len);
 
 	/* Return the number of bytes compressed */
 	return len;
@@ -423,6 +435,7 @@ static off_t lzo_wwrite(iow_t *iow, const char *buffer, off_t len)
 			if (get_next_thread(iow)->state == FULL) {
 				assert(get_next_thread(iow)->outbuf.offset 
 						< sizeof(get_next_thread(iow)->outbuf.buffer));
+				
 				wandio_wwrite(DATA(iow)->child,
 						get_next_thread(iow)->outbuf.buffer,
 						get_next_thread(iow)->outbuf.offset);
@@ -451,7 +464,7 @@ static off_t lzo_wwrite(iow_t *iow, const char *buffer, off_t len)
 			 */
 			if (get_next_thread(iow)->inbuf.offset >= sizeof(get_next_thread(iow)->inbuf.buffer)
 			  ||get_next_thread(iow)->inbuf.offset >= MAX_BLOCK_SIZE) {
-			  	assert(get_next_thread(iow)->state == EMPTY);
+				assert(get_next_thread(iow)->state == EMPTY);
 				get_next_thread(iow)->state = WAITING;
 				pthread_cond_signal(&get_next_thread(iow)->in_ready);
 
