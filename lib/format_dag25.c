@@ -282,8 +282,6 @@ static void dag_close_device(struct dag_dev_t *dev) {
 	}
 
 	dag_close(dev->fd);
-	if (dev->dev_name)
-		free(dev->dev_name);
 	free(dev);
 }
 
