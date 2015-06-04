@@ -75,6 +75,8 @@ from /dev/urandom.
 .PD
 .BI \-\^\-filter=expr
 Discard all packets that do not match the BPF expression specified in 'expr'.
+Filtering is applied *before* any anonymisation occurs, so IP address filters
+will attempt to match against the original unencrypted addresses.
 
 
 .TP
