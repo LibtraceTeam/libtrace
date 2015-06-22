@@ -36,6 +36,7 @@
 #include "protocols.h"
 #include <assert.h>
 #include <stdlib.h>
+#include <string.h>
 
 
 /* This file contains all the protocol decoding functions for layer 2 
@@ -96,6 +97,114 @@ void *trace_get_payload_from_vlan(void *ethernet, uint16_t *type,
 		*type = ntohs(vlanhdr->vlan_ether_type);
 
 	return (void*)((char *)ethernet + sizeof(*vlanhdr));
+
+}
+
+libtrace_packet_t *trace_strip_packet(libtrace_packet_t *packet, 
+                int stripopts) {
+
+        libtrace_ether_t *ethernet;
+        libtrace_linktype_t linktype;
+        uint16_t ethertype;
+        uint32_t remaining;
+        libtrace_packet_t *copy;
+        void *payload;
+        uint16_t finalethertype = 0;
+        uint16_t caplen, removed = 0;
+        char *dest;
+        uint8_t done = 0;
+        uint32_t oldrem;
+
+        /* For now, this will just work for Ethernet packets. */
+        ethernet = (libtrace_ether_t *)trace_get_layer2(packet, 
+                        &linktype, &remaining);
+
+        if (linktype != TRACE_TYPE_ETH) {
+                return packet;
+        }
+
+        /* No headers to strip, return the original packet */
+        if (ethernet->ether_type == TRACE_ETHERTYPE_IP ||
+                        ethernet->ether_type == TRACE_ETHERTYPE_IPV6) {
+                return packet;
+        }
+
+        /* Copy the packet as we need to be sure that the packet
+         * payload is contiguous. This won't be guaranteed for live
+         * formats, for instance.
+         */
+        if (packet->buf_control == TRACE_CTRL_EXTERNAL) {
+                copy = trace_copy_packet(packet);
+                trace_destroy_packet(packet);
+                packet = copy;
+
+                /* Re-grab the ethernet header from the copy */
+                ethernet = (libtrace_ether_t *)trace_get_layer2(packet,
+                        &linktype, &remaining);
+
+        }
+
+        payload = trace_get_payload_from_layer2(ethernet, linktype,
+                        &ethertype, &remaining);
+
+        dest = ((char *)ethernet) + sizeof(libtrace_ether_t);
+        caplen = trace_get_capture_length(packet);
+        while (!done) {
+
+                if (payload == NULL || remaining == 0)
+                        break;
+
+                oldrem = remaining;
+                switch (ethertype) {
+
+                case TRACE_ETHERTYPE_8021Q:
+                        payload = (void *)trace_get_payload_from_vlan(payload,
+                                        &ethertype, &remaining);
+                        if (stripopts == 0 || (stripopts & TRACE_STRIP_VLAN))
+                        {
+                                removed += (oldrem - remaining);
+                                memmove(dest, payload, remaining);
+                                payload = dest;
+
+                        } else {
+                                if (finalethertype == 0) {
+                                        finalethertype = TRACE_ETHERTYPE_8021Q;
+                                }
+                                dest = payload;
+                        }
+                        break;
+
+                case TRACE_ETHERTYPE_MPLS:
+                        payload = (void *)trace_get_payload_from_mpls(payload,
+                                        &ethertype, &remaining);
+                        if (stripopts == 0 || (stripopts & TRACE_STRIP_MPLS))
+                        {
+                                removed += (oldrem - remaining);
+                                memmove(dest, payload, remaining);
+                                payload = dest;
+
+                        } else {
+                                if (finalethertype == 0) {
+                                        finalethertype = TRACE_ETHERTYPE_MPLS;
+                                }
+                                dest = payload;
+                        }
+                        break;
+
+                case TRACE_ETHERTYPE_IP:
+                case TRACE_ETHERTYPE_IPV6:
+                default:
+                        if (finalethertype == 0)
+                                finalethertype = ethertype;
+                        done = true;
+                        break;
+                }
+        }
+
+        /* Update the preceding headers to match the new packet contents */
+        ethernet->ether_type = ntohs(finalethertype);
+        trace_set_capture_length(packet, caplen - removed);
+        return packet;
 
 }
 
