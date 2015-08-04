@@ -108,7 +108,7 @@ libtrace_packet_t *trace_strip_packet(libtrace_packet_t *packet,
         uint16_t ethertype;
         uint32_t remaining;
         libtrace_packet_t *copy;
-        void *payload;
+        char *payload;
         uint16_t finalethertype = 0;
         uint16_t caplen, removed = 0;
         char *dest;
@@ -144,11 +144,29 @@ libtrace_packet_t *trace_strip_packet(libtrace_packet_t *packet,
 
         }
 
+        payload = (char *)trace_get_layer3(packet, &ethertype, &remaining);
+        caplen = trace_get_capture_length(packet);
+        dest = ((char *)ethernet) + sizeof(libtrace_ether_t);
+
+        if (payload == NULL || remaining == 0)
+                return packet;
+
+        if (payload == dest)
+                return packet;
+
+        ethernet->ether_type = ntohs(ethertype);
+        trace_set_capture_length(packet, caplen - (payload - dest));
+        memmove(payload - (dest - (char *)packet->payload), packet->payload, 
+                        (dest - (char *)packet->payload));
+        packet->payload = payload - (dest - (char *)packet->payload);
+        packet->l2_header = NULL;
+        packet->l3_header = NULL;
+        packet->l4_header = NULL;
+        
+        /*
         payload = trace_get_payload_from_layer2(ethernet, linktype,
                         &ethertype, &remaining);
 
-        dest = ((char *)ethernet) + sizeof(libtrace_ether_t);
-        caplen = trace_get_capture_length(packet);
         while (!done) {
 
                 if (payload == NULL || remaining == 0)
@@ -163,14 +181,14 @@ libtrace_packet_t *trace_strip_packet(libtrace_packet_t *packet,
                         if (stripopts == 0 || (stripopts & TRACE_STRIP_VLAN))
                         {
                                 removed += (oldrem - remaining);
-                                memmove(dest, payload, remaining);
-                                payload = dest;
+                                //memmove(dest, payload, remaining);
+                                //payload = dest;
 
                         } else {
                                 if (finalethertype == 0) {
                                         finalethertype = TRACE_ETHERTYPE_8021Q;
                                 }
-                                dest = payload;
+                                //dest = payload;
                         }
                         break;
 
@@ -180,14 +198,14 @@ libtrace_packet_t *trace_strip_packet(libtrace_packet_t *packet,
                         if (stripopts == 0 || (stripopts & TRACE_STRIP_MPLS))
                         {
                                 removed += (oldrem - remaining);
-                                memmove(dest, payload, remaining);
-                                payload = dest;
+                                //memmove(dest, payload, remaining);
+                                //payload = dest;
 
                         } else {
                                 if (finalethertype == 0) {
                                         finalethertype = TRACE_ETHERTYPE_MPLS;
                                 }
-                                dest = payload;
+                                //dest = payload;
                         }
                         break;
 
@@ -200,10 +218,8 @@ libtrace_packet_t *trace_strip_packet(libtrace_packet_t *packet,
                         break;
                 }
         }
-
+                */
         /* Update the preceding headers to match the new packet contents */
-        ethernet->ether_type = ntohs(finalethertype);
-        trace_set_capture_length(packet, caplen - removed);
         return packet;
 
 }
