@@ -100,15 +100,13 @@ void *trace_get_payload_from_vlan(void *ethernet, uint16_t *type,
 
 }
 
-libtrace_packet_t *trace_strip_packet(libtrace_packet_t *packet, 
-                int stripopts) {
+libtrace_packet_t *trace_strip_packet(libtrace_packet_t *packet) {
 
         libtrace_ether_t *ethernet;
         libtrace_linktype_t linktype;
         uint16_t ethertype;
         uint32_t remaining;
-        libtrace_packet_t *copy;
-        char *payload;
+        char *nextpayload;
         uint16_t finalethertype = 0;
         uint16_t caplen, removed = 0;
         char *dest;
@@ -129,84 +127,48 @@ libtrace_packet_t *trace_strip_packet(libtrace_packet_t *packet,
                 return packet;
         }
 
-        /* Copy the packet as we need to be sure that the packet
-         * payload is contiguous. This won't be guaranteed for live
-         * formats, for instance.
-         */
-        if (packet->buf_control == TRACE_CTRL_EXTERNAL) {
-                copy = trace_copy_packet(packet);
-                trace_destroy_packet(packet);
-                packet = copy;
+        if (remaining <= sizeof(libtrace_ether_t))
+                return packet;
 
-                /* Re-grab the ethernet header from the copy */
-                ethernet = (libtrace_ether_t *)trace_get_layer2(packet,
-                        &linktype, &remaining);
-
-        }
-
-        payload = (char *)trace_get_layer3(packet, &ethertype, &remaining);
         caplen = trace_get_capture_length(packet);
+        ethertype = ntohs(ethernet->ether_type);
         dest = ((char *)ethernet) + sizeof(libtrace_ether_t);
+        nextpayload = dest;
+        remaining -= sizeof(libtrace_ether_t);
 
-        if (payload == NULL || remaining == 0)
-                return packet;
-
-        if (payload == dest)
-                return packet;
-
-        ethernet->ether_type = ntohs(ethertype);
-        trace_set_capture_length(packet, caplen - (payload - dest));
-        memmove(payload - (dest - (char *)packet->payload), packet->payload, 
-                        (dest - (char *)packet->payload));
-        packet->payload = payload - (dest - (char *)packet->payload);
-        packet->l2_header = NULL;
-        packet->l3_header = NULL;
-        packet->l4_header = NULL;
-        
-        /*
-        payload = trace_get_payload_from_layer2(ethernet, linktype,
-                        &ethertype, &remaining);
-
+        /* I'd normally use trace_get_layer3 here, but it works out faster
+         * to do it this way (mostly less function call overhead).
+         *
+         * XXX This approach is going to just strip everything between the
+         * Ethernet and IP headers -- is there a use case where someone
+         * might want to selectively strip headers?
+         */
         while (!done) {
 
-                if (payload == NULL || remaining == 0)
+                if (nextpayload == NULL || remaining == 0)
                         break;
 
                 oldrem = remaining;
                 switch (ethertype) {
 
                 case TRACE_ETHERTYPE_8021Q:
-                        payload = (void *)trace_get_payload_from_vlan(payload,
+                        nextpayload = (char *)trace_get_payload_from_vlan(
+                                        nextpayload,
                                         &ethertype, &remaining);
-                        if (stripopts == 0 || (stripopts & TRACE_STRIP_VLAN))
-                        {
-                                removed += (oldrem - remaining);
-                                //memmove(dest, payload, remaining);
-                                //payload = dest;
-
-                        } else {
-                                if (finalethertype == 0) {
-                                        finalethertype = TRACE_ETHERTYPE_8021Q;
-                                }
-                                //dest = payload;
-                        }
+                        removed += (oldrem - remaining);
                         break;
 
                 case TRACE_ETHERTYPE_MPLS:
-                        payload = (void *)trace_get_payload_from_mpls(payload,
+                        nextpayload = (char *)trace_get_payload_from_mpls(
+                                        nextpayload,
                                         &ethertype, &remaining);
-                        if (stripopts == 0 || (stripopts & TRACE_STRIP_MPLS))
-                        {
-                                removed += (oldrem - remaining);
-                                //memmove(dest, payload, remaining);
-                                //payload = dest;
-
-                        } else {
-                                if (finalethertype == 0) {
-                                        finalethertype = TRACE_ETHERTYPE_MPLS;
-                                }
-                                //dest = payload;
-                        }
+                        removed += (oldrem - remaining);
+                        break;
+                case TRACE_ETHERTYPE_PPP_SES:
+                        nextpayload = (char *)trace_get_payload_from_pppoe(
+                                        nextpayload,
+                                        &ethertype, &remaining);
+                        removed += (oldrem - remaining);
                         break;
 
                 case TRACE_ETHERTYPE_IP:
@@ -218,8 +180,19 @@ libtrace_packet_t *trace_strip_packet(libtrace_packet_t *packet,
                         break;
                 }
         }
-                */
-        /* Update the preceding headers to match the new packet contents */
+
+        if (nextpayload != NULL) {
+
+                ethernet->ether_type = ntohs(finalethertype);
+                trace_set_capture_length(packet, caplen - removed);
+                memmove(nextpayload - (dest - (char *)packet->payload), 
+                        packet->payload, 
+                        (dest - (char *)packet->payload));
+                packet->payload = nextpayload - (dest - (char *)packet->payload);
+                packet->l2_header = NULL;
+                packet->link_type = finalethertype;
+        }
+        
         return packet;
 
 }
