@@ -1,7 +1,6 @@
 LIBPACKETDUMP_DIR = libpacketdump
 TOOLS_DIR = tools
-WANDIO_DIR=libwandio
-SUBDIRS = $(WANDIO_DIR) lib $(LIBPACKETDUMP_DIR) $(TOOLS_DIR) docs examples
+SUBDIRS = lib $(LIBPACKETDUMP_DIR) $(TOOLS_DIR) docs examples
 
 ACLOCAL_AMFLAGS = -I m4
 AUTOMAKE_OPTIONS = 1.9 foreign

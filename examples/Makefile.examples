@@ -1,7 +1,4 @@
-AM_CFLAGS=-I"$(top_srcdir)/lib" -I"$(top_srcdir)/libpacketdump" \
-        -I"$(top_srcdir)/libwandio"
-AM_CXXFLAGS=-I"$(top_srcdir)/lib" -I"$(top_srcdir)/libpacketdump" \
-        -I"$(top_srcdir)/libwandio"
-
+AM_CFLAGS=-I"$(top_srcdir)/lib" -I"$(top_srcdir)/libpacketdump"
+AM_CXXFLAGS=-I"$(top_srcdir)/lib" -I"$(top_srcdir)/libpacketdump"
 AM_LDFLAGS=-L"$(top_srcdir)/lib" -L"$(top_srcdir)/libpacketdump" \
-        -L"$(top_srcdir)/libwandio" -ltrace -lwandio
+        -ltrace -lwandio

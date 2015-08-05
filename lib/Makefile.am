@@ -62,7 +62,7 @@ if DAG2_4
 nodist_libtrace_la_SOURCES = dagopts.c dagapi.c
 endif
 
-AM_CPPFLAGS= @ADD_INCLS@ -I../libwandio
+AM_CPPFLAGS= @ADD_INCLS@
 libtrace_la_LIBADD = @LIBTRACE_LIBS@ @LTLIBOBJS@ $(DPDKLIBS)
 libtrace_la_LDFLAGS=-version-info @LIBTRACE_MAJOR@:@LIBTRACE_MINOR@:@LIBTRACE_MID@ @ADD_LDFLAGS@
 dagapi.c:
