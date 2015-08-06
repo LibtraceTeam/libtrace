@@ -200,7 +200,7 @@ AC_CHECK_HEADER(gdc.h,AC_DEFINE(HAVE_LIBGDC,1,[has gdc.h]))
 # Check for libwandio (no longer bundled with libtrace)
 AC_CHECK_LIB(wandio,wandio_create,wandiofound=1,wandiofound=0)
 if test "$wandiofound" = 0; then
-	AC_MSG_ERROR(libwandio is required to compile libtrace. If you have installed it in a non-standard location please use LDFLAGS to specify the location of the library. WANDIO can be obtained from XXX: add download url)
+	AC_MSG_ERROR(libwandio is required to compile libtrace. If you have installed it in a non-standard location please use LDFLAGS to specify the location of the library. WANDIO can be obtained from http://research.wand.net.nz/software/libwandio.php)
 else
 	LIBTRACE_LIBS="$LIBTRACE_LIBS -lwandio"
         TOOLS_LIBS="$TOOLS_LIBS -lwandio"
