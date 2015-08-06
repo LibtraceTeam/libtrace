@@ -49,6 +49,7 @@
 #include <string.h>
 #include <stdlib.h>
 
+
 #ifdef WIN32
 #  include <io.h>
 #  include <share.h>
@@ -134,7 +135,7 @@ static int erf_get_padding(const libtrace_packet_t *packet)
 {
 	if (packet->trace->format->type==TRACE_FORMAT_ERF) {
 		dag_record_t *erfptr = (dag_record_t *)packet->header;
-		switch(erfptr->type) {
+		switch((erfptr->type & 0x7f)) {
 			case TYPE_ETH: 		
 			case TYPE_DSM_COLOR_ETH:
 				return 2;
@@ -151,7 +152,25 @@ static int erf_get_padding(const libtrace_packet_t *packet)
 
 int erf_get_framing_length(const libtrace_packet_t *packet)
 {
-	return dag_record_size + erf_get_padding(packet);
+        uint16_t extsize = 0;
+	dag_record_t *erfptr = NULL;
+        uint64_t *exthdr = NULL;
+	
+        erfptr = (dag_record_t *)packet->header;
+        if ((erfptr->type & 0x80) == 0x80) {
+                /* Extension headers are present */
+                exthdr = (uint64_t *)((char *)packet->header + dag_record_size);
+                extsize += 8;
+
+                while (*exthdr < (1UL << 31)) {
+                        extsize += 8;
+                        exthdr ++;
+                        assert(extsize <= ntohs(erfptr->rlen));
+                }
+        }
+        
+
+	return dag_record_size + extsize + erf_get_padding(packet);
 }
 
 /* Attempts to determine whether a given trace file is using the ERF format
@@ -185,7 +204,7 @@ static int erf_probe_magic(io_t *io)
 		return 0;
 	}
 	/* Is this a proper typed packet */
-	if (erf->type > TYPE_AAL2) {
+	if ((erf->type & 0x7f) > TYPE_AAL2) {
 		return 0;
 	}
 	/* We should put some more tests in here. */
@@ -447,7 +466,7 @@ static int erf_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
 	}
 
 	/* Check for loss */
-	if (erfptr->type == TYPE_DSM_COLOR_ETH) {
+	if ((erfptr->type & 0x7f) == TYPE_DSM_COLOR_ETH) {
 		/* No idea how we get this yet */
 
 	} else if (erfptr->lctr) {
@@ -504,7 +523,7 @@ static int erf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	}
 
 	/* Unknown/corrupt */
-	if (((dag_record_t *)packet->buffer)->type >= TYPE_RAW_LINK) {
+	if ((((dag_record_t *)packet->buffer)->type & 0x7f) >= TYPE_RAW_LINK) {
 		trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, 
 				"Corrupt or Unknown ERF type");
 		return -1;
@@ -683,8 +702,12 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 libtrace_linktype_t erf_get_link_type(const libtrace_packet_t *packet) {
 	dag_record_t *erfptr = 0;
 	erfptr = (dag_record_t *)packet->header;
-	if (erfptr->type != TYPE_LEGACY)
-		return erf_type_to_libtrace(erfptr->type);
+        uint8_t type = (erfptr->type & 0x7f);
+	if (type != TYPE_LEGACY) {
+		/* The top-most bit is now used to indicate the presence of
+                 * extension headers :/ */
+                return erf_type_to_libtrace(type);
+        }
 	else {
 		/* Sigh, lets start wildly guessing */
 		if (((char*)packet->payload)[4]==0x45)
