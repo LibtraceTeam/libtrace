@@ -81,6 +81,7 @@ void output_destroy(struct output_data_t *out)
 	}
 	free(out->data);
 	free(out->labels);
+	free(out->title);
 	free(out);
 }
 

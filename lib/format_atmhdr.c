@@ -226,11 +226,12 @@ static struct libtrace_format_t atmhdr = {
 	NULL,				/* get_received_packets */
 	NULL,				/* get_filtered_packets */
 	NULL,				/* get_dropped_packets */
-	NULL,				/* get_captured_packets */
+	NULL,				/* get_statistics */
         NULL,                           /* get_fd */
         trace_event_trace,              /* trace_event */
         NULL,                 		/* help */
-        NULL                            /* next pointer */
+        NULL,                            /* next pointer */
+	NON_PARALLEL(false)
 };
 	
 

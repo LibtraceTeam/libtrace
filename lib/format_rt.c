@@ -457,7 +457,7 @@ static int rt_set_format(libtrace_t *libtrace, libtrace_packet_t *packet)
 				RT_INFO->dummy_ring = trace_create_dead("ring:");
 				/* This may fail on a non-Linux machine */
 				if (trace_is_err(RT_INFO->dummy_ring)) {
-					trace_perror(RT_INFO->dummy_ring, "Creating dead int trace");
+					trace_perror(RT_INFO->dummy_ring, "Creating dead ring trace");
 					return -1;
 				}
 			}
@@ -858,11 +858,12 @@ static struct libtrace_format_t rt = {
 	NULL,				/* get_received_packets */
 	NULL,				/* get_filtered_packets */
 	NULL,				/* get_dropped_packets */
-	NULL,				/* get_captured_packets */
+	NULL,				/* get_statistics */
         rt_get_fd,                	/* get_fd */
         trace_event_rt,             /* trace_event */
         rt_help,			/* help */
-	NULL				/* next pointer */
+	NULL,			/* next pointer */
+	NON_PARALLEL(true) /* This is normally live */
 };
 
 void rt_constructor(void) {

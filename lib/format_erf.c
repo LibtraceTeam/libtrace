@@ -855,11 +855,12 @@ static struct libtrace_format_t erfformat = {
 	NULL,				/* get_received_packets */
 	NULL,				/* get_filtered_packets */
 	erf_get_dropped_packets,	/* get_dropped_packets */
-	NULL,				/* get_captured_packets */
+	NULL,				/* get_statistics */
 	NULL,				/* get_fd */
 	erf_event,			/* trace_event */
 	erf_help,			/* help */
-	NULL				/* next pointer */
+	NULL,				/* next pointer */
+	NON_PARALLEL(false)
 };
 
 static struct libtrace_format_t rawerfformat = {
@@ -898,11 +899,12 @@ static struct libtrace_format_t rawerfformat = {
 	NULL,				/* get_received_packets */
 	NULL,				/* get_filtered_packets */
 	erf_get_dropped_packets,	/* get_dropped_packets */
-	NULL,				/* get_captured_packets */
+	NULL,				/* get_statistics */
 	NULL,				/* get_fd */
 	erf_event,			/* trace_event */
 	erf_help,			/* help */
-	NULL				/* next pointer */
+	NULL,				/* next pointer */
+	NON_PARALLEL(false)
 };
 
 

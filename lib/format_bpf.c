@@ -609,11 +609,12 @@ static struct libtrace_format_t bpf = {
 	bpf_get_received_packets,/* get_received_packets */
 	NULL,			/* get_filtered_packets */
 	bpf_get_dropped_packets,/* get_dropped_packets */
-	NULL,			/* get_captured_packets */
+	NULL,			/* get_statistics */
 	bpf_get_fd,		/* get_fd */
 	trace_event_device,	/* trace_event */
 	bpf_help,		/* help */
-	NULL
+	NULL,			/* next pointer */
+	NON_PARALLEL(true)
 };
 #else 	/* HAVE_DECL_BIOCSETIF */
 /* Prints some slightly useful help text for the BPF capture format */
@@ -655,14 +656,15 @@ static struct libtrace_format_t bpf = {
 	bpf_get_wire_length,	/* get_wire_length */
 	bpf_get_framing_length,	/* get_framing_length */
 	NULL,			/* set_capture_length */
-	NULL,/* get_received_packets */
+	NULL,			/* get_received_packets */
 	NULL,			/* get_filtered_packets */
-	NULL,/* get_dropped_packets */
-	NULL,			/* get_captured_packets */
+	NULL,			/* get_dropped_packets */
+	NULL,			/* get_statistics */
 	NULL,			/* get_fd */
 	NULL,			/* trace_event */
 	bpf_help,		/* help */
-	NULL
+	NULL,			/* next pointer */
+	NON_PARALLEL(true)
 };
 #endif  /* HAVE_DECL_BIOCSETIF */
 

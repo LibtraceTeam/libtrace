@@ -547,11 +547,12 @@ static struct libtrace_format_t legacyatm = {
 	NULL,				/* get_received_packets */
 	NULL,				/* get_filtered_packets */
 	NULL,				/* get_dropped_packets */
-	NULL,				/* get_captured_packets */
+	NULL,				/* get_statistics */
 	NULL,				/* get_fd */
 	trace_event_trace,		/* trace_event */
 	legacyatm_help,			/* help */
-	NULL				/* next pointer */
+	NULL,				/* next pointer */
+	NON_PARALLEL(false)
 };
 
 static struct libtrace_format_t legacyeth = {
@@ -590,11 +591,12 @@ static struct libtrace_format_t legacyeth = {
 	NULL,				/* get_received_packets */
 	NULL,				/* get_filtered_packets */
 	NULL,				/* get_dropped_packets */
-	NULL,				/* get_captured_packets */
+	NULL,				/* get_statistics */
 	NULL,				/* get_fd */
 	trace_event_trace,		/* trace_event */
 	legacyeth_help,			/* help */
-	NULL				/* next pointer */
+	NULL,				/* next pointer */
+	NON_PARALLEL(false)
 };
 
 static struct libtrace_format_t legacypos = {
@@ -633,11 +635,12 @@ static struct libtrace_format_t legacypos = {
 	NULL,				/* get_received_packets */
 	NULL,				/* get_filtered_packets */
 	NULL,				/* get_dropped_packets */
-	NULL,				/* get_captured_packets */
+	NULL,				/* get_statistics */
 	NULL,				/* get_fd */
 	trace_event_trace,		/* trace_event */
 	legacypos_help,			/* help */
 	NULL,				/* next pointer */
+	NON_PARALLEL(false)
 };
 
 static struct libtrace_format_t legacynzix = {
@@ -676,11 +679,12 @@ static struct libtrace_format_t legacynzix = {
 	NULL,				/* get_received_packets */
 	NULL,				/* get_filtered_packets */
 	NULL,				/* get_dropped_packets */
-	NULL,				/* get_captured_packets */
+	NULL,				/* get_statistics */
 	NULL,				/* get_fd */
 	trace_event_trace,		/* trace_event */
 	legacynzix_help,		/* help */
 	NULL,				/* next pointer */
+	NON_PARALLEL(false)
 };
 	
 void legacy_constructor(void) {
