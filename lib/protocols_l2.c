@@ -190,7 +190,6 @@ libtrace_packet_t *trace_strip_packet(libtrace_packet_t *packet) {
                         (dest - (char *)packet->payload));
                 packet->payload = nextpayload - (dest - (char *)packet->payload);
                 packet->l2_header = NULL;
-                packet->link_type = finalethertype;
         }
         
         return packet;
