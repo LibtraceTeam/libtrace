@@ -26,7 +26,9 @@ struct mem_stats {
 	} readbulk, read, write, writebulk;
 };
 
+#ifdef ENABLE_MEM_STATS
 extern __thread struct mem_stats mem_hits;
+#endif
 
 struct local_caches {
 	size_t t_mem_caches_used;
@@ -122,10 +124,19 @@ static void resize_memory_caches(struct local_caches *lcs) {
 
 /* Get TLS for the list of local_caches */
 static inline struct local_caches *get_local_caches() {
+#if HAVE_TLS
 	static __thread struct local_caches *lcs = NULL;
 	if (lcs) {
 		return lcs;
-	} else {
+	}
+#else
+	struct local_caches *lcs;
+	pthread_once(&memory_destructor_once, &once_memory_cache_key_init);
+	if ((lcs=pthread_getspecific(memory_destructor_key)) != 0) {
+		return lcs;
+	}
+#endif
+	else {
 		/* This thread has not been used with a memory pool before */
 		/* Allocate our TLS */
 		assert(lcs == NULL);
@@ -279,35 +290,42 @@ static inline size_t libtrace_ocache_alloc_cache(libtrace_ocache_t *oc, void *va
 		// Copy all from cache
 		memcpy(values, &lc->cache[lc->used - nb_buffers], sizeof(void *) * nb_buffers);
 		lc->used -= nb_buffers;
+#ifdef ENABLE_MEM_STATS
 		mem_hits.read.cache_hit += nb_buffers;
 		mem_hits.readbulk.cache_hit += 1;
+#endif
 		return nb_buffers;
 	}
 	// Cache is not big enough try read all from ringbuffer
 	else if (nb_buffers > lc->total) {
 		i = libtrace_ringbuffer_sread_bulk(rb, values, nb_buffers, min_nb_buffers);
+#ifdef ENABLE_MEM_STATS
 		if (i)
 			mem_hits.readbulk.ring_hit += 1;
 		else
 			mem_hits.readbulk.miss += 1;
 		mem_hits.read.ring_hit += i;
+#endif
 	} else { // Not enough cached
 		// Empty the cache and re-fill it and then see what we're left with
 		i = lc->used;
 		memcpy(values, lc->cache, sizeof(void *) * lc->used);
+#ifdef ENABLE_MEM_STATS
 		mem_hits.read.cache_hit += i;
+#endif
 
 		// Make sure we still meet the minimum requirement
 		if (i < min_nb_buffers)
 			lc->used = libtrace_ringbuffer_sread_bulk(rb, lc->cache, lc->total, min_nb_buffers - i);
 		else
 			lc->used = libtrace_ringbuffer_sread_bulk(rb, lc->cache, lc->total, 0);
-
+#ifdef ENABLE_MEM_STATS
 		if (lc->used == lc->total)
 			mem_hits.readbulk.ring_hit += 1;
 		else
 			mem_hits.readbulk.miss += 1;
 		mem_hits.read.ring_hit += lc->used;
+#endif
 	}
 
 	// Try fill the remaining
@@ -318,7 +336,9 @@ static inline size_t libtrace_ocache_alloc_cache(libtrace_ocache_t *oc, void *va
 		lc->used -= remaining;
 		i += remaining;
 	}
+#ifdef ENABLE_MEM_STATS
 	mem_hits.read.miss += nb_buffers - i;
+#endif
 	assert(i >= min_nb_buffers);
 	return i;
 }
@@ -378,23 +398,29 @@ static inline size_t libtrace_ocache_free_cache(libtrace_ocache_t *oc, void *val
 		// Copy all to the cache
 		memcpy(&lc->cache[lc->used], values, sizeof(void *) * nb_buffers);
 		lc->used += nb_buffers;
+#ifdef ENABLE_MEM_STATS
 		mem_hits.write.cache_hit += nb_buffers;
 		mem_hits.writebulk.cache_hit += 1;
+#endif
 		return nb_buffers;
 	}
 	// Cache is not big enough try write all to the ringbuffer
 	else if (nb_buffers > lc->total) {
 		i = libtrace_ringbuffer_swrite_bulk(rb, values, nb_buffers, min_nb_buffers);
+#ifdef ENABLE_MEM_STATS
 		if (i)
 			mem_hits.writebulk.ring_hit += 1;
 		else
 			mem_hits.writebulk.miss += 1;
 		mem_hits.write.ring_hit += i;
+#endif
 	} else { // Not enough cache space but there might later
 		// Fill the cache and empty it and then see what we're left with
 		i = (lc->total - lc->used);
 		memcpy(&lc->cache[lc->used], values, sizeof(void *) * i);
+#ifdef ENABLE_MEM_STATS
 		mem_hits.write.cache_hit += i;
+#endif
 
 		// Make sure we still meet the minimum requirement
 		if (i < min_nb_buffers)
@@ -406,11 +432,13 @@ static inline size_t libtrace_ocache_free_cache(libtrace_ocache_t *oc, void *val
 		if (lc->used)
 			memmove(lc->cache, &lc->cache[lc->total - lc->used], sizeof(void *) * lc->used);
 
+#ifdef ENABLE_MEM_STATS
 		if (lc->used)
 			mem_hits.writebulk.miss += 1;
 		else
 			mem_hits.writebulk.ring_hit += 1;
 		mem_hits.write.ring_hit += lc->total - lc->used;
+#endif
 	}
 
 	// Try empty the remaining
@@ -421,7 +449,9 @@ static inline size_t libtrace_ocache_free_cache(libtrace_ocache_t *oc, void *val
 		lc->used += remaining;
 		i += remaining;
 	}
+#ifdef ENABLE_MEM_STATS
 	mem_hits.write.miss += nb_buffers - i;
+#endif
 	return i;
 }
 

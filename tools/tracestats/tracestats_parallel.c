@@ -144,37 +144,33 @@ static void report_result(libtrace_t *trace, int mesg,
 }
 
 
-static void* fn_starting(libtrace_t *trace UNUSED, libtrace_thread_t *t,
-                     libtrace_generic_t data UNUSED, void *global UNUSED, void*tls UNUSED) {
+static void* fn_starting(libtrace_t *trace UNUSED, libtrace_thread_t *t UNUSED, void *global UNUSED) {
 	/* Allocate space to hold a total count and one for each filter */
-	statistics_t *results = calloc(1, sizeof(statistics_t) * (filter_count + 1));
-	trace_set_tls(t, results);
-	return NULL;
+	return calloc(1, sizeof(statistics_t) * (filter_count + 1));
 }
 
 
-static void* fn_stopping(libtrace_t *trace, libtrace_thread_t *t UNUSED,
-                     libtrace_generic_t data UNUSED, void *global UNUSED, void*tls) {
+static void fn_stopping(libtrace_t *trace, libtrace_thread_t *t UNUSED,
+                        void *global UNUSED, void*tls) {
 	statistics_t *results = tls;
 	libtrace_generic_t gen;
 	/* We only output one result per thread with the key 0 when the
 	 * trace is over. */
 	gen.ptr = results;
 	trace_publish_result(trace, t, 0, gen, RESULT_USER);
-	return NULL;
 }
 
-static void* fn_packet(libtrace_t *trace, libtrace_thread_t *t UNUSED,
-                   libtrace_generic_t data, void *global UNUSED, void*tls) {
+static libtrace_packet_t* fn_packet(libtrace_t *trace, libtrace_thread_t *t UNUSED,
+                   void *global UNUSED, void*tls, libtrace_packet_t *pkt) {
 	statistics_t *results = tls;
 	int i, wlen;
 
 	/* Apply filters to every packet note the result */
-	wlen = trace_get_wire_length(data.pkt);
+	wlen = trace_get_wire_length(pkt);
 	for(i=0;i<filter_count;++i) {
 		if (filters[i].filter == NULL)
 			continue;
-		if(trace_apply_filter(filters[i].filter,data.pkt) > 0) {
+		if(trace_apply_filter(filters[i].filter,pkt) > 0) {
 			results[i+1].count++;
 			results[i+1].bytes+=wlen;
 		}
@@ -187,7 +183,7 @@ static void* fn_packet(libtrace_t *trace, libtrace_thread_t *t UNUSED,
 	}
 	results[0].count++;
 	results[0].bytes +=wlen;
-	return data.pkt;
+	return pkt;
 }
 
 /* Process a trace, counting packets that match filter(s) */
@@ -219,9 +215,9 @@ static void run_trace(char *uri, char *config, char *config_file)
 		}
 	}
 
-	trace_set_handler(trace, MESSAGE_PACKET, fn_packet);
-	trace_set_handler(trace, MESSAGE_STARTING, fn_starting);
-	trace_set_handler(trace, MESSAGE_STOPPING, fn_stopping);
+	trace_cb_packet(trace, fn_packet);
+	trace_cb_starting(trace, fn_starting);
+	trace_cb_stopping(trace, fn_stopping);
 
 	/* Start the trace as a parallel trace */
 	if (trace_pstart(trace, NULL, &per_packet, report_result)==-1) {
