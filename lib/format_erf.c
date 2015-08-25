@@ -658,6 +658,7 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 	} else {
 		dag_record_t erfhdr;
 		int rlen;
+                int framing;
 		/* convert format - build up a new erf header */
 		/* Timestamp */
 		erfhdr.ts = bswap_host_to_le64(trace_get_erf_timestamp(packet));
@@ -678,11 +679,14 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 		/* Packet length (rlen includes format overhead) */
 		assert(trace_get_capture_length(packet)>0 
 				&& trace_get_capture_length(packet)<=65536);
-		assert(erf_get_framing_length(packet)>0 
-				&& trace_get_framing_length(packet)<=65536);
-
-		rlen = trace_get_capture_length(packet) + 
-				erf_get_framing_length(packet);
+		assert(trace_get_framing_length(packet)<=65536);
+               
+                if (erfhdr.type == TYPE_ETH)
+                        framing = dag_record_size + 2;
+                else
+                        framing = dag_record_size;
+               
+		rlen = trace_get_capture_length(packet) + framing;
 		assert(rlen > 0 && rlen <= 65536);
 		erfhdr.rlen = htons(rlen);
 		/* loss counter. Can't do this */
