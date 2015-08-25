@@ -115,6 +115,9 @@ gcc_DEPRECATED
 gcc_UNUSED
 gcc_PURE
 gcc_FORMAT
+
+# Check for gcc style TLS (__thread)
+gcc_TLS
 	
 # Check for libtool
 AC_PROG_LIBTOOL
@@ -207,6 +210,14 @@ AC_CHECK_DECLS([BIOCSETIF],,,[
 #include <sys/ioctl.h>
 #include <net/bpf.h>
 ])
+
+AC_ARG_ENABLE(memory-debugging,
+                AS_HELP_STRING(--enable-memory-debugging, prints internal memory statistics),[
+                if test "$HAVE_TLS" = 1
+                then
+                    AC_DEFINE([ENABLE_MEM_STATS], 1, [print debug memory statistics])
+                fi
+],[])
 
 # Configure options for man pages
 AC_ARG_WITH(man,

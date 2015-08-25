@@ -153,4 +153,25 @@ AC_DEFUN([gcc_PURE],
     [Define to 1 or 0, depending on whether the compiler supports the pure attribute.])
 ])
 
+AC_DEFUN([gcc_TLS],
+[
+  HAVE_TLS=0
+  if test -n "$CC"; then
+    AC_CACHE_CHECK([if compiler supports TLS __thread],
+      [lt_cv_attribute_tls],
+      [
+       AC_COMPILE_IFELSE([AC_LANG_SOURCE(
+         [static __thread int apples;])],
+         [lt_cv_attribute_tls=yes],
+         [lt_cv_attribute_tls=no]
+       )
+      ])
+    if test x$lt_cv_attribute_tls = xyes; then
+      HAVE_TLS=1
+    fi
+  fi
+  AC_SUBST([HAVE_TLS])
+  AC_DEFINE_UNQUOTED([HAVE_TLS], [$HAVE_TLS],
+    [Define to 1 or 0, depending on whether the compiler supports tls via __thread.])
+])
 

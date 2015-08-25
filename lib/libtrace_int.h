@@ -329,8 +329,8 @@ struct libtrace_t {
 	void* global_blob;
 	/** The actual freelist */
 	libtrace_ocache_t packet_freelist;
-	/** User defined per_pkt function called when a pkt is ready */
-	fn_per_pkt per_pkt;
+	/** User defined per_msg function called when a message is ready */
+	fn_cb_msg per_msg;
 	/** User defined reporter function entry point XXX not hooked up */
 	fn_reporter reporter;
 	/** The hasher function */
@@ -357,6 +357,16 @@ struct libtrace_t {
 	libtrace_stat_t *stats;
 	struct user_configuration config;
 	libtrace_combine_t combiner;
+	struct {
+		fn_cb_starting message_starting;
+		fn_cb_dataless message_stopping;
+		fn_cb_dataless message_resuming;
+		fn_cb_dataless message_pausing;
+		fn_cb_packet message_packet;
+		fn_cb_first_packet message_first_packet;
+		fn_cb_tick message_tick_count;
+		fn_cb_tick message_tick_interval;
+	} callbacks;
 };
 
 #define LIBTRACE_STAT_MAGIC 0x41
