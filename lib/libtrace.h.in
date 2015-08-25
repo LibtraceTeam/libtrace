@@ -1872,6 +1872,31 @@ DLLEXPORT void *trace_get_packet_buffer(const libtrace_packet_t *packet,
 DLLEXPORT SIMPLE_FUNCTION DEPRECATED
 void *trace_get_link(const libtrace_packet_t *packet);
 
+/** Strips layer 2.5 headers from a given packet.
+ * @param packet        The packet to strip headers from.
+ *
+ * @return The packet with the requested headers removed (if they were
+ * present).
+ *
+ * This function is intended for removing those pesky layer 2.5 headers
+ * that are not supported by other packet analysis applications, e.g. VLAN
+ * and MPLS headers. If successful, the resulting packet will be a simple
+ * Ethernet-IP-Transport packet that just about anything should be able to
+ * parse without difficulty.
+ *
+ * If this function encounters a layer 2 or 2.5 header that it does not
+ * support, stripping will cease and the packet returning will be stripped
+ * up to but not including the unsupported header.
+ *
+ * New in libtrace 4.0.0
+ *
+ * @note This function only supports stripping headers from Ethernet packets
+ * for now. Passing in packets of other link types will simply result in
+ * the original packet being returned unmodified.
+ *
+ */
+DLLEXPORT libtrace_packet_t *trace_strip_packet(libtrace_packet_t *packet);
+
 /** Get a pointer to the IPv4 header (if any) for a given packet
  * @param packet  	The packet to get the IPv4 header for
  *

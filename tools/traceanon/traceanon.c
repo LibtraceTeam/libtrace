@@ -8,8 +8,8 @@
 #include <stddef.h>
 #include <string.h>
 #include <time.h>
+#include <signal.h>
 #include "ipenc.h"
-
 
 static void usage(char *argv0)
 {
@@ -19,14 +19,25 @@ static void usage(char *argv0)
 	"-d --encrypt-dest	Encrypt the destination addresses\n"
 	"-c --cryptopan=key	Encrypt the addresses with the cryptopan\n"
 	"			prefix preserving\n"
-	"-f --keyfile=file      A file containing the cryptopan key\n"
+	"-F --keyfile=file	A file containing the cryptopan key\n"
+	"-f --filter=expr	Discard all packets that do not match the\n"
+	"			provided BPF expression\n"
 	"-p --prefix=C.I.D.R/bits Substitute the prefix of the address\n"
 	"-H --libtrace-help	Print libtrace runtime documentation\n"
 	"-z --compress-level	Compress the output trace at the specified level\n"
-	"-Z --compress-type 	Compress the output trace using the specified"
+	"-Z --compress-type 	Compress the output trace using the specified\n"
 	"			compression algorithm\n"
 	,argv0);
 	exit(1);
+}
+
+volatile int done=0;
+
+static void cleanup_signal(int sig)
+{
+        (void)sig;
+        done=1;
+        trace_interrupt();
 }
 
 /* Incrementally update a checksum */
@@ -115,16 +126,25 @@ int main(int argc, char *argv[])
 	struct libtrace_t *trace = 0;
 	struct libtrace_packet_t *packet = trace_create_packet();
 	struct libtrace_out_t *writer = 0;
+	struct libtrace_filter_t *filter = NULL;
 	bool enc_source = false;
 	bool enc_dest 	= false;
 	char *output = 0;
 	int level = -1;
+	char *filterstring = NULL;
 	char *compress_type_str=NULL;
 	trace_option_compresstype_t compress_type = TRACE_OPTION_COMPRESSTYPE_NONE;
-
+	struct sigaction sigact;
 
 	if (argc<2)
 		usage(argv[0]);
+
+	sigact.sa_handler = cleanup_signal;
+        sigemptyset(&sigact.sa_mask);
+        sigact.sa_flags = SA_RESTART;
+
+	signal(SIGINT,&cleanup_signal);
+	signal(SIGTERM,&cleanup_signal);
 
 	while (1) {
 		int option_index;
@@ -132,7 +152,8 @@ int main(int argc, char *argv[])
 			{ "encrypt-source", 	0, 0, 's' },
 			{ "encrypt-dest",	0, 0, 'd' },
 			{ "cryptopan",		1, 0, 'c' },
-			{ "cryptopan-file",	1, 0, 'f' },
+			{ "cryptopan-file",	1, 0, 'F' },
+			{ "filter",		1, 0, 'f' },
 			{ "prefix",		1, 0, 'p' },
 			{ "compress-level",	1, 0, 'z' },
 			{ "compress-type",	1, 0, 'Z' },
@@ -151,6 +172,7 @@ int main(int argc, char *argv[])
 			case 'z': level = atoi(optarg); break;
 			case 's': enc_source=true; break;
 			case 'd': enc_dest  =true; break;
+			case 'f': filterstring = optarg; break;
 			case 'c': 
 				  if (key!=NULL) {
 					  fprintf(stderr,"You can only have one encryption type and one key\n");
@@ -159,7 +181,7 @@ int main(int argc, char *argv[])
 				  key=strdup(optarg);
 				  enc_type = ENC_CRYPTOPAN;
 				  break;
-		        case 'f':
+		        case 'F':
 			          if(key != NULL) {
 				    fprintf(stderr,"You can only have one encryption type and one key\n");
 				    usage(argv[0]);
@@ -229,6 +251,10 @@ int main(int argc, char *argv[])
         }
 	
 
+	if (filterstring) {
+	    filter = trace_create_filter(filterstring);
+	}
+
 	enc_init(enc_type,key);
 
 	/* open input uri */
@@ -278,6 +304,13 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
+	if (filter && trace_config(trace, TRACE_OPTION_FILTER, filter) == -1) {
+		trace_perror(trace, "Configuring input filter");
+		trace_destroy_output(writer);
+		trace_destroy(trace);
+		return 1;
+	}
+
 	if (trace_start(trace)==-1) {
 		trace_perror(trace,"trace_start");
 		trace_destroy_output(writer);
@@ -297,11 +330,7 @@ int main(int argc, char *argv[])
 
 		int psize;
 		psize = trace_read_packet(trace, packet);
-		if (psize == 0) {
-			break;
-		}
-		if (psize < 0) {
-			trace_perror(trace,"read_packet");
+		if (psize <= 0) {
 			break;
 		}
 
@@ -333,7 +362,17 @@ int main(int argc, char *argv[])
 			trace_perror_output(writer,"writer");
 			break;
 		}
+
+		if (done)
+		    break;
 	}
+	if (trace_is_err(trace)) {
+	    trace_perror(trace,"read_packet");
+	}
+
+	if (filter)
+	    trace_destroy_filter(filter);
+	
 	trace_destroy_packet(packet);
 	trace_destroy(trace);
 	trace_destroy_output(writer);

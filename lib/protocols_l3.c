@@ -244,7 +244,13 @@ DLLEXPORT void *trace_get_layer3(const libtrace_packet_t *packet,
 		return packet->l3_header;
 	}
 
-	link = trace_get_layer2(packet,&linktype,remaining);
+        if (packet->l2_header) {
+                link = packet->l2_header;
+                linktype = packet->link_type;
+                *remaining = packet->l2_remaining;
+        } else {
+        	link = trace_get_layer2(packet,&linktype,remaining);
+        }
 	iphdr = trace_get_payload_from_layer2(
 			link,
 			linktype,

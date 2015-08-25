@@ -7,7 +7,8 @@ traceanon \- anonymise ip addresses of traces
 [ \-d | \-\^\-encrypt-dest ]
 [ \-p prefix | \-\^\-prefix=prefix ]
 [ \-c key | \-\^\-cryptopan=key ]
-[ \-f key-file | \-\^\-keyfile=file ]
+[ \-F key-file | \-\^\-keyfile=file ]
+[ \-f expr | \-\^\-filter=expr ]
 [ \-z level | \-\^\-compress-level=level ]
 [ \-Z method | \-\^\-compress-type=method ]
 sourceuri
@@ -58,7 +59,7 @@ NULL characters.
 
 .TP
 .PD 0
-.BI \-f
+.BI \-F
 .TP
 .PD
 .BI \-\^\-keyfile=file
@@ -66,6 +67,16 @@ encrypt the IP addresses using the prefix-preserving cryptopan method using
 the key specified in the file "file".  The key must be 32 bytes
 long. A suitable method of generating a key is by using the command dd to read
 from /dev/urandom.
+
+.TP
+.PD 0
+.BI \-f
+.TP
+.PD
+.BI \-\^\-filter=expr
+Discard all packets that do not match the BPF expression specified in 'expr'.
+Filtering is applied *before* any anonymisation occurs, so IP address filters
+will attempt to match against the original unencrypted addresses.
 
 
 .TP

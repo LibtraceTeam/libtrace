@@ -40,7 +40,7 @@ AC_CONFIG_FILES([Makefile lib/Makefile docs/Makefile libpacketdump/Makefile
 	examples/Makefile examples/skeleton/Makefile examples/rate/Makefile
 	examples/stats/Makefile examples/tutorial/Makefile examples/parallel/Makefile
 	docs/libtrace.doxygen 
-	lib/libtrace.h libwandio/Makefile libwandio/tools/wandiocat/Makefile
+	lib/libtrace.h
 	])
 
 
@@ -99,10 +99,9 @@ AC_HEADER_TIME
 AC_SYS_LARGEFILE
 
 LIBPKTDUMP_LIBS="-ltrace "
-ADD_LDFLAGS="$ADD_LDFLAGS -L\$(abs_top_srcdir)/libwandio -L\$(abs_top_srcdir)/lib" 
-LIBTRACE_LIBS="-lwandio"
+ADD_LDFLAGS="$ADD_LDFLAGS -L\$(abs_top_srcdir)/lib"
+LIBTRACE_LIBS=""
 TOOLS_LIBS=""
-LIBWANDIO_LIBS=""
 
 CFLAGS="$CFLAGS -Wall -Wmissing-prototypes -Wextra -DLT_BUILDING_DLL=1"
 CXXFLAGS="$CXXFLAGS -Wall -DLT_BUILDING_DLL=1"
@@ -200,6 +199,16 @@ AC_CHECK_HEADER(net/bpf.h)
 
 # Checking for libgdc
 AC_CHECK_HEADER(gdc.h,AC_DEFINE(HAVE_LIBGDC,1,[has gdc.h]))
+
+# Check for libwandio (no longer bundled with libtrace)
+AC_CHECK_LIB(wandio,wandio_create,wandiofound=1,wandiofound=0)
+if test "$wandiofound" = 0; then
+	AC_MSG_ERROR(libwandio is required to compile libtrace. If you have installed it in a non-standard location please use LDFLAGS to specify the location of the library. WANDIO can be obtained from http://research.wand.net.nz/software/libwandio.php)
+else
+	LIBTRACE_LIBS="$LIBTRACE_LIBS -lwandio"
+        TOOLS_LIBS="$TOOLS_LIBS -lwandio"
+	AC_DEFINE([HAVE_LIBWANDIO],1,[compile with libwandio support])
+fi
 
 # Check for libpcap
 AC_CHECK_LIB(pcap,pcap_next_ex,pcapfound=1,pcapfound=0)
@@ -448,7 +457,6 @@ if test "$ac_cv_search_dlopen" != "none required"; then
 fi
 
 if test "$have_pthread" = 1; then
-	LIBWANDIO_LIBS="$LIBWANDIO_LIBS -lpthread"
 	AC_DEFINE(HAVE_LIBPTHREAD, 1, [Set to 1 if pthreads are supported])
 fi
 
@@ -550,93 +558,6 @@ AS_IF([test "x$have_ncurses" = "xyes"], [
 	AC_DEFINE(HAVE_NCURSES, 0, "Compiled with ncurses support")
 	with_ncurses=no]
 )
-			
-AC_ARG_WITH([bzip2],
-	AC_HELP_STRING([--with-bzip2], [build with support for bzip2 compressed files]))
-
-AS_IF([test "x$with_bzip2" != "xno"],
-	[
-	AC_CHECK_LIB(bz2, BZ2_bzDecompressInit, have_bzip=yes, have_bzip=no)
-	], [have_bzip=no])
-
-AS_IF([test "x$have_bzip" = "xyes"], [
-	if test "$ac_cv_lib_bz2_BZ2_bzDecompressInit" != "none required"; then
-		LIBWANDIO_LIBS="$LIBWANDIO_LIBS -lbz2"
-	fi
-	with_bzip2=yes
-	AC_DEFINE(HAVE_LIBBZ2, 1, "Compiled with bzip2 support")],
-	
-	[AS_IF([test "x$with_bzip2" = "xyes"],
-		[AC_MSG_ERROR([bzip2 requested but not found])])
-	AC_DEFINE(HAVE_LIBBZ2, 0, "Compiled with bzip2 support")
-	with_bzip2=no]
-)
-
-AC_ARG_WITH([zlib],
-	AC_HELP_STRING([--with-zlib], [build with support for zlib compressed files]))
-
-AS_IF([test "x$with_zlib" != "xno"],
-	[
-	AC_CHECK_LIB(z, deflate, have_zlib=yes, have_zlib=no)
-	], [have_zlib=no])
-
-AS_IF([test "x$have_zlib" = "xyes"], [
-	if test "$ac_cv_lib_z_deflate" != "none required"; then
-		LIBWANDIO_LIBS="$LIBWANDIO_LIBS -lz"
-	fi
-	AC_DEFINE(HAVE_LIBZ, 1, "Compiled with zlib support")
-	with_zlib=yes],
-
-	
-	[AS_IF([test "x$with_zlib" = "xyes"],
-		[AC_MSG_ERROR([zlib requested but not found])])
-	AC_DEFINE(HAVE_LIBZ, 0, "Compiled with zlib support")
-	with_zlib=no]
-)
-
-AC_ARG_WITH([lzo],
-	AC_HELP_STRING([--with-lzo], [build with support for writing lzo compressed files]))
-
-AS_IF([test "x$with_lzo" != "xno"],
-	[
-	AC_CHECK_LIB(lzo2, lzo1x_1_compress, have_lzo=yes, have_lzo=no)
-	], [have_lzo=no])
-
-AS_IF([test "x$have_lzo" = "xyes"], [
-	if test "$ac_cv_lib_lzo2_lzo1x_1_compress" != "none required"; then
-		LIBWANDIO_LIBS="$LIBWANDIO_LIBS -llzo2"
-	fi
-	AC_DEFINE(HAVE_LIBLZO2, 1, "Compiled with lzo2 support")
-	with_lzo=yes],
-
-	
-	[AS_IF([test "x$with_lzo" = "xyes"],
-		[AC_MSG_ERROR([lzo requested but not found])])
-	AC_DEFINE(HAVE_LIBLZO2, 0, "Compiled with lzo2 support")
-	with_lzo=no]
-)
-
-AC_ARG_WITH([lzma],
-	AC_HELP_STRING([--with-lzma], [build with support for lzma compressed files]))
-
-AS_IF([test "x$with_lzma" != "xno"],
-	[
-	AC_CHECK_HEADER(lzma.h, have_lzma=yes, have_lzma=no)
-	], [have_lzma=no])
-
-AS_IF([test "x$have_lzma" = "xyes"], [
-	if test "$ac_cv_lib_lzma_code" != "none required"; then
-		LIBWANDIO_LIBS="$LIBWANDIO_LIBS -llzma"
-	fi
-	AC_DEFINE(HAVE_LIBLZMA, 1, "Compiled with lzma support")
-	with_lzma=yes],
-
-	
-	[AS_IF([test "x$with_lzma" = "xyes"],
-		[AC_MSG_ERROR([lzma requested but not found])])
-	AC_DEFINE(HAVE_LIBLZMA, 0, "Compiled with lzma support")
-	with_lzma=no]
-)
 
 # Define automake conditionals for use in our Makefile.am files
 AM_CONDITIONAL([HAVE_BPF_CAPTURE], [test "$ac_cv_have_decl_BIOCSETIF" = yes ])
@@ -648,10 +569,6 @@ AM_CONDITIONAL([HAVE_NETPACKET_PACKET_H], [test "$libtrace_netpacket_packet_h" =
 AM_CONDITIONAL([HAVE_LIBGDC], [test "$ac_cv_header_gdc_h" = yes])
 AM_CONDITIONAL([HAVE_LLVM], [test "x$JIT" != "xno" ])
 AM_CONDITIONAL([HAVE_NCURSES], [test "x$with_ncurses" != "xno"])
-AM_CONDITIONAL([HAVE_BZLIB], [test "x$with_bzip2" != "xno"])
-AM_CONDITIONAL([HAVE_ZLIB], [test "x$with_zlib" != "xno"])
-AM_CONDITIONAL([HAVE_LZO], [ test "x$with_lzo" != "xno"])
-AM_CONDITIONAL([HAVE_LZMA], [ test "x$with_lzma" != "xno"])
 
 # Check for miscellaneous programs
 AC_CHECK_PROG([libtrace_doxygen], [doxygen], [true], [false])
@@ -661,7 +578,6 @@ AM_CONDITIONAL(HAS_DOXYGEN, [test x"$libtrace_doxygen" = xtrue])
 # Set all our output variables
 AC_SUBST([LIBTRACE_LIBS])
 AC_SUBST([LIBPKTDUMP_LIBS])
-AC_SUBST([LIBWANDIO_LIBS])
 AC_SUBST([TOOLS_LIBS])
 #AC_SUBST([ADD_LIBS])
 AC_SUBST([ADD_LDFLAGS])
@@ -703,10 +619,6 @@ else
 	AC_MSG_NOTICE([Compiled with PCAP support: < 1.0])
 fi
 
-reportopt "Compiled with compressed trace (zlib) support" $with_zlib
-reportopt "Compiled with compressed trace (bz2) support" $with_bzip2
-reportopt "Compiled with compressed trace (lzo write only) support" $with_lzo
-reportopt "Compiled with compressed trace (lzma) support" $with_lzma
 if test x"$libtrace_dag" = xtrue; then
 	if test "$libtrace_dag_version" = 24; then
 		AC_MSG_NOTICE([Compiled with DAG live capture support: 2.4])
