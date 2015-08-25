@@ -306,6 +306,9 @@ struct libtrace_t {
 	uint64_t filtered_packets;
 	/** The sequence is like accepted_packets but we don't reset this after a pause. */
 	uint64_t sequence_number;
+	/** The packet read out by the trace, backwards compatibility to allow us to finalise
+	 * a packet when the trace is destroyed */
+	libtrace_packet_t *last_packet;
 	/** The filename from the uri for the trace */
 	char *uridata;
 	/** The libtrace IO reader for this trace (if applicable) */
