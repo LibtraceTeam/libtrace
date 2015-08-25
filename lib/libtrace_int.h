@@ -331,7 +331,7 @@ struct libtrace_t {
 	libtrace_ocache_t packet_freelist;
 	/** User defined per_msg function called when a message is ready */
 	fn_cb_msg per_msg;
-	/** User defined reporter function entry point XXX not hooked up */
+	/** User defined reporter function entry point */
 	fn_reporter reporter;
 	/** The hasher function */
 	enum hasher_types hasher_type;

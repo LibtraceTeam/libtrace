@@ -536,7 +536,6 @@ typedef libtrace_packet_t* (*fn_cb_packet)(libtrace_t *libtrace,
  * If set to NULL, the message will be sent to default perpkt handler.
  *
  * @param libtrace The input trace to start
- * @param message The message to intercept
  * @param handler the handler to be called when the message is received
  * @return 0 if successful otherwise -1.
  */
@@ -626,8 +625,8 @@ DLLEXPORT void * trace_get_tls(libtrace_thread_t *thread);
 
 /** Store data against a thread.
  *
- * @param The parallel trace.
- * @param data The new value to save against the trace
+ * @param thread The thread
+ * @param data The new value to save against the thread
  * @return The previously stored value
  *
  * This function is not thread-safe and is intended only to be
@@ -712,7 +711,7 @@ DLLEXPORT int trace_set_tick_count(libtrace_t *trace, size_t count);
  * Delays packets so they are played back in trace-time rather than as fast
  * as possible (real-time).
  *
- * @param A parallel input trace
+ * @param trace A parallel input trace
  * @param tracetime If true packets are released with time intervals matching
  * the original trace. Otherwise packets are read as fast as possible.
  * @return 0 if successful otherwise -1
@@ -894,7 +893,6 @@ enum result_types {
 	 * to be performed. As such packets should always be published as so.
 	 *
 	 * @param key (Typically) The packets order, see trace_packet_get_order()
-	 * @param
 	 */
 	RESULT_PACKET,
 
@@ -1050,6 +1048,31 @@ DLLEXPORT int trace_message_thread(libtrace_t * libtrace,
  * @note This returns true even if all results have not yet been processed.
  */
 DLLEXPORT bool trace_has_finished(libtrace_t * libtrace);
+
+
+/** Check if libtrace is directly reading from multiple queues
+ * from the format (such as a NICs hardware queues).
+ *
+ * When a parallel trace is running, or if checked after its completion
+ * this returns true if a trace was able to run natively parallel
+ * from the format. Otherwise false is returned, meaning libtrace is
+ * distibuting packets across multiple threads from a single source.
+ *
+ * Factors that may stop this happening despite the format supporting
+ * native parallel reads include: the choice of hasher function,
+ * the number of threads choosen (such as 1 or more than the trace supports)
+ * or another error when trying to start the parallel format.
+ *
+ * If this is called before the trace is started. I.e. before pstart
+ * this returns an indication that the trace has the possiblity to support
+ * native parallel reads. After trace pstart is called this should be
+ * checked again to confirm this has happened.
+ *
+ *
+ * @return true if the trace is parallel or false if the library is splitting
+ * the trace into multiple threads.
+ */
+DLLEXPORT bool trace_is_parallel(libtrace_t * libtrace);
 
 /** Returns either the sequence number or erf timestamp of a packet.
  *

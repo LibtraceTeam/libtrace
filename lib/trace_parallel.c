@@ -364,9 +364,11 @@ static libtrace_thread_t * get_thread_descriptor(libtrace_t *libtrace) {
 	if (!(ret = get_thread_table(libtrace))) {
 		pthread_t tid = pthread_self();
 		// Check if we are reporter or something else
-		if (pthread_equal(tid, libtrace->reporter_thread.tid))
+		if (libtrace->hasher_thread.type == THREAD_REPORTER &&
+				pthread_equal(tid, libtrace->reporter_thread.tid))
 			ret = &libtrace->reporter_thread;
-		else if (pthread_equal(tid, libtrace->hasher_thread.tid))
+		else if (libtrace->hasher_thread.type == THREAD_HASHER &&
+		         pthread_equal(tid, libtrace->hasher_thread.tid))
 			ret = &libtrace->hasher_thread;
 		else
 			ret = NULL;
@@ -588,7 +590,7 @@ static void* perpkt_threads_entry(void *data) {
 	ASSERT_RET(pthread_mutex_unlock(&trace->libtrace_lock), == 0);
 
 	if (trace->format->pregister_thread) {
-		trace->format->pregister_thread(trace, t, !trace_has_dedicated_hasher(trace));
+		trace->format->pregister_thread(trace, t, trace_is_parallel(trace));
 	}
 
 	/* Fill our buffer with empty packets */
@@ -1363,9 +1365,7 @@ static int trace_prestart(libtrace_t * libtrace, void *global_blob,
 	if(global_blob)
 		libtrace->global_blob = global_blob;
 
-	if (libtrace->perpkt_thread_count > 1 &&
-	    trace_supports_parallel(libtrace) &&
-	    !trace_has_dedicated_hasher(libtrace)) {
+	if (trace_is_parallel(libtrace)) {
 		err = libtrace->format->pstart_input(libtrace);
 	} else {
 		if (libtrace->format->start_input) {
@@ -1578,6 +1578,12 @@ static void parse_env_config (libtrace_t *libtrace) {
 	}
 }
 
+DLLEXPORT bool trace_is_parallel(libtrace_t * libtrace) {
+	if (libtrace->state == STATE_NEW)
+		return trace_supports_parallel(libtrace);
+	return libtrace->pread == trace_pread_packet_wrapper;
+}
+
 DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob,
                            fn_cb_msg per_msg, fn_reporter reporter) {
 	int i;
@@ -1625,13 +1631,15 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob,
 	parse_env_config(libtrace);
 	verify_configuration(libtrace);
 
+	ret = -1;
 	/* Try start the format - we prefer parallel over single threaded, as
 	 * these formats should support messages better */
 	if (trace_supports_parallel(libtrace) &&
 	    !trace_has_dedicated_hasher(libtrace)) {
 		ret = libtrace->format->pstart_input(libtrace);
 		libtrace->pread = trace_pread_packet_wrapper;
-	} else {
+	}
+	if (ret != 0) {
 		if (libtrace->format->start_input) {
 			ret = libtrace->format->start_input(libtrace);
 		}
@@ -1769,9 +1777,7 @@ cleanup_threads:
 	assert(libtrace->perpkt_thread_states[THREAD_RUNNING] == 0);
 	libtrace->perpkt_thread_states[THREAD_FINISHED] = 0;
 cleanup_started:
-	if (trace_supports_parallel(libtrace) &&
-	    !trace_has_dedicated_hasher(libtrace)
-	    && libtrace->perpkt_thread_count > 1) {
+	if (libtrace->pread == trace_pread_packet_wrapper) {
 		if (libtrace->format->ppause_input)
 			libtrace->format->ppause_input(libtrace);
 	} else {
@@ -1932,7 +1938,7 @@ DLLEXPORT int trace_ppause(libtrace_t *libtrace)
 		libtrace->stats = trace_create_statistics();
 	// Save the statistics against the trace
 	trace_get_statistics(libtrace, NULL);
-	if (trace_supports_parallel(libtrace) && !trace_has_dedicated_hasher(libtrace) && libtrace->perpkt_thread_count > 1) {
+	if (trace_is_parallel(libtrace)) {
 		libtrace->started = false;
 		if (libtrace->format->ppause_input)
 			libtrace->format->ppause_input(libtrace);
@@ -2354,8 +2360,6 @@ DLLEXPORT int trace_set_debug_state(libtrace_t *trace, bool debug_state) {
 	trace->config.debug_state = debug_state;
 	return 0;
 }
-
-
 
 static bool config_bool_parse(char *value, size_t nvalue) {
 	if (strncmp(value, "true", nvalue) == 0)
