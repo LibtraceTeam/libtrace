@@ -260,6 +260,7 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 	libtrace->io = NULL;
 	libtrace->filtered_packets = 0;
 	libtrace->accepted_packets = 0;
+	libtrace->last_packet = NULL;
 	
 	/* Parallel inits */
 	ASSERT_RET(pthread_mutex_init(&libtrace->libtrace_lock, NULL), == 0);
@@ -267,7 +268,7 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 	libtrace->state = STATE_NEW;
 	libtrace->perpkt_queue_full = false;
 	libtrace->global_blob = NULL;
-	libtrace->per_pkt = NULL;
+	libtrace->per_msg = NULL;
 	libtrace->reporter = NULL;
 	libtrace->hasher = NULL;
 	libtrace_zero_ocache(&libtrace->packet_freelist);
@@ -286,6 +287,7 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 	libtrace->sequence_number = 0;
 	ZERO_USER_CONFIG(libtrace->config);
 	memset(&libtrace->combiner, 0, sizeof(libtrace->combiner));
+	memset(&libtrace->callbacks, 0, sizeof(libtrace->callbacks));
 
         /* Parse the URI to determine what sort of trace we are dealing with */
 	if ((uridata = trace_parse_uri(uri, &scan)) == 0) {
@@ -381,6 +383,8 @@ DLLEXPORT libtrace_t * trace_create_dead (const char *uri) {
 	libtrace->uridata = NULL;
 	libtrace->io = NULL;
 	libtrace->filtered_packets = 0;
+	libtrace->accepted_packets = 0;
+	libtrace->last_packet = NULL;
 	
 	/* Parallel inits */
 	ASSERT_RET(pthread_mutex_init(&libtrace->libtrace_lock, NULL), == 0);
@@ -388,7 +392,7 @@ DLLEXPORT libtrace_t * trace_create_dead (const char *uri) {
 	libtrace->state = STATE_NEW; // TODO MAYBE DEAD
 	libtrace->perpkt_queue_full = false;
 	libtrace->global_blob = NULL;
-	libtrace->per_pkt = NULL;
+	libtrace->per_msg = NULL;
 	libtrace->reporter = NULL;
 	libtrace->hasher = NULL;
 	libtrace_zero_ocache(&libtrace->packet_freelist);
@@ -404,6 +408,7 @@ DLLEXPORT libtrace_t * trace_create_dead (const char *uri) {
 	libtrace->sequence_number = 0;
 	ZERO_USER_CONFIG(libtrace->config);
 	memset(&libtrace->combiner, 0, sizeof(libtrace->combiner));
+	memset(&libtrace->callbacks, 0, sizeof(libtrace->callbacks));
 	
 	for(tmp=formats_list;tmp;tmp=tmp->next) {
                 if (strlen(scan) == strlen(tmp->name) &&
@@ -546,8 +551,15 @@ DLLEXPORT int trace_pause(libtrace_t *libtrace)
 		trace_set_err(libtrace,TRACE_ERR_BAD_STATE, "You must call trace_start() before calling trace_pause()");
 		return -1;
 	}
+
+	/* Finish the last packet we read - for backwards compatibility */
+	if (libtrace->last_packet)
+		trace_fin_packet(libtrace->last_packet);
+	assert(libtrace->last_packet == NULL);
+
 	if (libtrace->format->pause_input)
 		libtrace->format->pause_input(libtrace);
+
 	libtrace->started=false;
 	return 0;
 }
@@ -686,6 +698,11 @@ DLLEXPORT void trace_destroy(libtrace_t *libtrace) {
 		ASSERT_RET(pthread_spin_destroy(&libtrace->first_packets.lock), == 0);
 	}
 
+	/* Finish any the last packet we read - for backwards compatibility */
+	if (libtrace->last_packet)
+		trace_fin_packet(libtrace->last_packet);
+	assert(libtrace->last_packet == NULL);
+
 	if (libtrace->format) {
 		if (libtrace->started && libtrace->format->pause_input)
 			libtrace->format->pause_input(libtrace);
@@ -802,6 +819,8 @@ DLLEXPORT void trace_destroy_packet(libtrace_packet_t *packet) {
 	if (libtrace_parallel && packet->trace && packet->trace->format->fin_packet) {
 		packet->trace->format->fin_packet(packet);
 	}
+	if (packet->trace && packet->trace->last_packet == packet)
+		packet->trace->last_packet = NULL;
 	
 	if (packet->buf_control == TRACE_CTRL_PACKET && packet->buffer) {
 		free(packet->buffer);
@@ -824,6 +843,8 @@ void trace_fin_packet(libtrace_packet_t *packet) {
 		if (packet->trace && packet->trace->format->fin_packet) {
 			packet->trace->format->fin_packet(packet);
 		}
+		if (packet->trace && packet->trace->last_packet == packet)
+			packet->trace->last_packet = NULL;
 
 		// No matter what we remove the header and link pointers
 		packet->trace = NULL;
@@ -902,6 +923,7 @@ DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 			trace_packet_set_order(packet, libtrace->sequence_number);
 			++libtrace->accepted_packets;
 			++libtrace->sequence_number;
+			libtrace->last_packet = packet;
 			return ret;
 		} while(1);
 	}

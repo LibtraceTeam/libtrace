@@ -153,6 +153,8 @@ enum libtrace_messages {
 	 *
 	 * @param data unused, do not use this
 	 * @param sender The sender will be set as the current thread
+	 * @return When using a function callback for starting, the returned
+	 * value is stored against the thread tls. Otherwise the return is ignored.
 	 */
 	MESSAGE_STARTING,
 
@@ -210,7 +212,7 @@ enum libtrace_messages {
 	 * @note Upon pausing and restarting a trace this will be reset and
 	 * sent once a new packet is encountered
 	 *
-	 * @
+	 * @see trace_get_first_packet()
 	 */
 	MESSAGE_FIRST_PACKET,
 
@@ -224,7 +226,6 @@ enum libtrace_messages {
 	 * @note This message should not be sent directly instead call
 	 * trace_post_reporter()
 	 *
-	 * @see trace_get_first_packet()
 	 */
 	MESSAGE_POST_REPORTER,
 
@@ -235,7 +236,7 @@ enum libtrace_messages {
 	 * can appear after a packet with an later time-stamp, or before one
 	 * with an earlier time-stamp.
 	 *
-	 * @param data data.uint64_t holds the system time-stamp in the
+	 * @param data data.uint64 holds the system time-stamp in the
 	 * erf format
 	 * @param sender should be ignored
 	 */
@@ -247,7 +248,7 @@ enum libtrace_messages {
 	 * This are sent in-band with respect to packets such that all
 	 * threads will see it between the same packets.
 	 *
-	 * @param data The number of packets seen so far across all threads
+	 * @param data data.uint64 holds the number of packets seen so far across all threads
 	 * @param sender Set to the current per-packet thread
 	 */
 	MESSAGE_TICK_COUNT,
@@ -396,7 +397,7 @@ struct libtrace_combine {
 
 /**
  * The definition for the main function that the user supplies to process
- * packets.
+ * messages.
  *
  * @param trace The trace the packet is related to.
  * @param thread The thread identifier.
@@ -411,11 +412,11 @@ struct libtrace_combine {
  * The values of data and sender depend upon the mesg_code. Please see the
  * documentation for the message as to what value these will contain.
  */
-typedef void* (*fn_per_pkt)(libtrace_t* trace,
-                            libtrace_thread_t *thread,
-                            int mesg_code,
-                            libtrace_generic_t data,
-                            libtrace_thread_t *sender);
+typedef void* (*fn_cb_msg)(libtrace_t* trace,
+                           libtrace_thread_t *thread,
+                           int mesg_code,
+                           libtrace_generic_t data,
+                           libtrace_thread_t *sender);
 
 /**
  * The definition for the main function that the user supplies to process
@@ -451,19 +452,102 @@ typedef uint64_t (*fn_hasher)(const libtrace_packet_t* packet, void *data);
  *
  * @param libtrace The input trace to start
  * @param global_blob Global data related to this trace accessible using trace_get_global()
- * @param per_pkt A user supplied function called when a packet is ready
+ * @param per_msg A user supplied function called when a message is ready
  * @param reporter A user supplied function called when a result is ready.
  * Optional if NULL the reporter thread will not be started.
  * @return 0 on success, otherwise -1 to indicate an error has occurred
  *
  * This can also be used to restart an existing parallel trace,
  * that has previously been paused using trace_ppause().
- * In this case global_blob,per_pkt and reporter will only be updated
+ * In this case global_blob,per_msg and reporter will only be updated
  * if they are non-null. Otherwise their previous values will be maintained.
  *
  */
 DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob,
-                           fn_per_pkt per_pkt, fn_reporter reporter);
+                           fn_cb_msg per_msg, fn_reporter reporter);
+
+/**
+ *
+ * @param libtrace The parallel trace
+ * @param t The thread that is running
+ * @param global The global storage
+ * @return The returned value is stored against the threads tls.
+ *         This is typically passed as tls argument to other messages.
+ */
+typedef void* (*fn_cb_starting)(libtrace_t *libtrace,
+                                     libtrace_thread_t *t,
+                                     void *global);
+
+/**
+ * @param libtrace The parallel trace
+ * @param t The thread that is running
+ * @param global The global storage
+ * @param tls The thread local storage
+ */
+typedef void (*fn_cb_dataless)(libtrace_t *libtrace,
+                                    libtrace_thread_t *t,
+                                    void *global,
+                                    void *tls);
+
+/**
+ * @param libtrace The parallel trace
+ * @param t The thread that is running
+ * @param global The global storage
+ * @param tls The thread local storage
+ */
+typedef void (*fn_cb_first_packet)(libtrace_t *libtrace,
+                                   libtrace_thread_t *t,
+                                   void *global,
+                                   void *tls,
+                                   libtrace_packet_t *first_packet,
+                                   libtrace_thread_t *sender);
+
+/**
+ * @param libtrace The parallel trace
+ * @param t The thread that is running
+ * @param global The global storage
+ * @param tls The thread local storage
+ * @param uint64_t Either the timestamp or packet count depending on message type
+ */
+typedef void (*fn_cb_tick)(libtrace_t *libtrace,
+                           libtrace_thread_t *t,
+                           void *global,
+                           void *tls,
+                           uint64_t order);
+
+/**
+ * @param libtrace The parallel trace
+ * @param t The thread
+ * @param packet The packet associated with the message
+ * @param global The global storage
+ * @param tls The thread local storage
+ *
+ * @return optionally a packet which is handed back to the library,
+ *         typically this is the packet supplied. Otherwise NULL.
+ */
+typedef libtrace_packet_t* (*fn_cb_packet)(libtrace_t *libtrace,
+                                           libtrace_thread_t *t,
+                                           void *global,
+                                           void *tls,
+                                           libtrace_packet_t *packet);
+
+/** Registers a built-in message with a handler.
+ * Note we do not include the sending thread as an argument to the reporter.
+ * If set to NULL, the message will be sent to default perpkt handler.
+ *
+ * @param libtrace The input trace to start
+ * @param handler the handler to be called when the message is received
+ * @return 0 if successful otherwise -1.
+ */
+
+DLLEXPORT int trace_cb_starting(libtrace_t *libtrace, fn_cb_starting handler);
+DLLEXPORT int trace_cb_stopping(libtrace_t *libtrace, fn_cb_dataless handler);
+DLLEXPORT int trace_cb_resuming(libtrace_t *libtrace, fn_cb_dataless handler);
+DLLEXPORT int trace_cb_pausing(libtrace_t *libtrace, fn_cb_dataless handler);
+DLLEXPORT int trace_cb_packet(libtrace_t *libtrace, fn_cb_packet handler);
+DLLEXPORT int trace_cb_first_packet(libtrace_t *libtrace, fn_cb_first_packet handler);
+DLLEXPORT int trace_cb_tick_count(libtrace_t *libtrace, fn_cb_tick handler);
+DLLEXPORT int trace_cb_tick_interval(libtrace_t *libtrace, fn_cb_tick handler);
 
 /** Pauses a trace previously started with trace_pstart()
  *
@@ -541,8 +625,8 @@ DLLEXPORT void * trace_get_tls(libtrace_thread_t *thread);
 
 /** Store data against a thread.
  *
- * @param The parallel trace.
- * @param data The new value to save against the trace
+ * @param thread The thread
+ * @param data The new value to save against the thread
  * @return The previously stored value
  *
  * This function is not thread-safe and is intended only to be
@@ -627,7 +711,7 @@ DLLEXPORT int trace_set_tick_count(libtrace_t *trace, size_t count);
  * Delays packets so they are played back in trace-time rather than as fast
  * as possible (real-time).
  *
- * @param A parallel input trace
+ * @param trace A parallel input trace
  * @param tracetime If true packets are released with time intervals matching
  * the original trace. Otherwise packets are read as fast as possible.
  * @return 0 if successful otherwise -1
@@ -809,7 +893,6 @@ enum result_types {
 	 * to be performed. As such packets should always be published as so.
 	 *
 	 * @param key (Typically) The packets order, see trace_packet_get_order()
-	 * @param
 	 */
 	RESULT_PACKET,
 
@@ -965,6 +1048,31 @@ DLLEXPORT int trace_message_thread(libtrace_t * libtrace,
  * @note This returns true even if all results have not yet been processed.
  */
 DLLEXPORT bool trace_has_finished(libtrace_t * libtrace);
+
+
+/** Check if libtrace is directly reading from multiple queues
+ * from the format (such as a NICs hardware queues).
+ *
+ * When a parallel trace is running, or if checked after its completion
+ * this returns true if a trace was able to run natively parallel
+ * from the format. Otherwise false is returned, meaning libtrace is
+ * distibuting packets across multiple threads from a single source.
+ *
+ * Factors that may stop this happening despite the format supporting
+ * native parallel reads include: the choice of hasher function,
+ * the number of threads choosen (such as 1 or more than the trace supports)
+ * or another error when trying to start the parallel format.
+ *
+ * If this is called before the trace is started. I.e. before pstart
+ * this returns an indication that the trace has the possiblity to support
+ * native parallel reads. After trace pstart is called this should be
+ * checked again to confirm this has happened.
+ *
+ *
+ * @return true if the trace is parallel or false if the library is splitting
+ * the trace into multiple threads.
+ */
+DLLEXPORT bool trace_is_parallel(libtrace_t * libtrace);
 
 /** Returns either the sequence number or erf timestamp of a packet.
  *

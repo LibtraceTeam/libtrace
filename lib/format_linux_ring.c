@@ -279,11 +279,6 @@ static inline int linuxring_start_input_stream(libtrace_t *libtrace,
 static int linuxring_start_input(libtrace_t *libtrace)
 {
 	int ret = linuxring_start_input_stream(libtrace, FORMAT_DATA_FIRST);
-	if (ret != 0) {
-		libtrace_list_deinit(FORMAT_DATA->per_stream);
-		free(libtrace->format_data);
-		libtrace->format_data = NULL;
-	}
 	return ret;
 }
 

@@ -660,9 +660,6 @@ int linuxcommon_pstart_input(libtrace_t *libtrace,
 			stream = libtrace_list_get_index(FORMAT_DATA->per_stream, i)->data;
 			linuxcommon_close_input_stream(libtrace, stream);
 		}
-		libtrace_list_deinit(FORMAT_DATA->per_stream);
-		free(libtrace->format_data);
-		libtrace->format_data = NULL;
 		return -1;
 	}
 

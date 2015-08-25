@@ -51,7 +51,7 @@ void libtrace_list_push_front(libtrace_list_t *l, void *item)
 	assert(new->data != NULL);
 
 	new->prev = NULL;
-	memcpy(&new->data, item, l->element_size);
+	memcpy(new->data, item, l->element_size);
 
 	if (l->head == NULL) {
 		assert(l->tail == NULL && l->size == 0);
