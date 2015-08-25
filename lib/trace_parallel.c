@@ -376,7 +376,7 @@ static libtrace_thread_t * get_thread_descriptor(libtrace_t *libtrace) {
 
 DLLEXPORT void libtrace_make_packet_safe(libtrace_packet_t *pkt) {
 	// Duplicate the packet in standard malloc'd memory and free the
-	// original, This is a 1:1 exchange so is ocache count remains unchanged.
+	// original, This is a 1:1 exchange so the ocache count remains unchanged.
 	if (pkt->buf_control != TRACE_CTRL_PACKET) {
 		libtrace_packet_t *dup;
 		dup = trace_copy_packet(pkt);
@@ -384,6 +384,8 @@ DLLEXPORT void libtrace_make_packet_safe(libtrace_packet_t *pkt) {
 		trace_fin_packet(pkt);
 		/* Copy the duplicated packet over the existing */
 		memcpy(pkt, dup, sizeof(libtrace_packet_t));
+		/* Free the packet structure */
+		free(dup);
 	}
 }
 
