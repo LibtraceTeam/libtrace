@@ -819,6 +819,8 @@ DLLEXPORT void trace_destroy_packet(libtrace_packet_t *packet) {
 	if (libtrace_parallel && packet->trace && packet->trace->format->fin_packet) {
 		packet->trace->format->fin_packet(packet);
 	}
+	if (packet->trace && packet->trace->last_packet == packet)
+		packet->trace->last_packet = NULL;
 	
 	if (packet->buf_control == TRACE_CTRL_PACKET && packet->buffer) {
 		free(packet->buffer);
