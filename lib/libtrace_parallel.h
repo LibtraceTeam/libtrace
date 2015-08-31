@@ -47,6 +47,10 @@
 #include "libtrace.h"
 #include <stdio.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct libtrace_result_t libtrace_result_t;
 
 /**
@@ -1256,5 +1260,9 @@ extern const libtrace_combine_t combiner_ordered;
  * use combiner_ordered if you can.
  */
 extern const libtrace_combine_t combiner_sorted;
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // LIBTRACE_PARALLEL_H
