@@ -25,6 +25,7 @@ static char *unreach_types[]={
 DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len)
 {
 	libtrace_icmp_t *icmp = (libtrace_icmp_t*)packet;
+        int ippresent = 0;
 	if (len<1)
 		return;
 	printf(" ICMP:");
@@ -47,10 +48,7 @@ DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len)
 			else {
 				printf(" ICMP: Code: %i (Unknown)\n",icmp->code);
 			}
-			// Pretend that this was just passed up from ethernet
-			decode_next(packet+8,len-8,
-					"eth",0x0800);
-
+                        ippresent = 1;
 			break;
 		case 8:
 			printf(" Type: 8 (ICMP Echo Request) Sequence: ");
@@ -61,8 +59,7 @@ DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len)
 			break;
 		case 11:
 			printf(" Type: 11 (ICMP TTL Exceeded)\n");
-			decode_next(packet+8,len-8,
-					"eth",0x0800);
+                        ippresent = 1;
 			break;
 		default:
 			printf(" Type: %i (Unknown)\n",icmp->type);
@@ -74,6 +71,11 @@ DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len)
 		printf("(Truncated)\n");
 	else
 		printf("%u\n", ntohs(icmp->checksum));
+
+        if (ippresent) {
+                decode_next(packet+8,len-8,
+                                "eth",0x0800);
+        }
 
 
 	return;
