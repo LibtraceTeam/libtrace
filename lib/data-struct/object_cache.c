@@ -1,3 +1,4 @@
+#include "config.h"
 #include "object_cache.h"
 #include <assert.h>
 #include <stdio.h>
