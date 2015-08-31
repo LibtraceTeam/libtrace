@@ -504,6 +504,7 @@ static struct libtrace_format_t linuxnative = {
 	trace_event_device,		/* trace_event */
 	linuxnative_help,		/* help */
 	NULL,				/* next pointer */
+#ifdef HAVE_PACKET_FANOUT
 	{true, -1},			/* Live, no thread limit */
 	linuxnative_pstart_input,	/* pstart_input */
 	linuxnative_pread_packets,	/* pread_packets */
@@ -512,6 +513,9 @@ static struct libtrace_format_t linuxnative = {
 	linuxcommon_pregister_thread,	/* register thread */
 	NULL,				/* unregister thread */
 	NULL				/* get thread stats */
+#else
+        NON_PARALLEL(true)
+#endif
 };
 #else
 static void linuxnative_help(void) {

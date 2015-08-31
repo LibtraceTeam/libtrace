@@ -411,6 +411,13 @@ if test "$want_dpdk" != no; then
 	fi
 fi
 
+# Check for PACKET_FANOUT (borrowed from Suricata)
+AC_CHECK_DECL([PACKET_FANOUT_QM],
+        AC_DEFINE([HAVE_PACKET_FANOUT],[1],
+        [Recent packet fanout support is available]),
+        [],
+        [[#include <linux/if_packet.h>]])
+
 # If we use DPDK we might be able to use libnuma
 AC_CHECK_LIB(numa, numa_node_to_cpus, have_numa=1, have_numa=0)
 

@@ -751,6 +751,7 @@ static struct libtrace_format_t linuxring = {
 	linuxring_event,		/* trace_event */
 	linuxring_help,			/* help */
 	NULL,				/* next pointer */
+#ifdef HAVE_PACKET_FANOUT
 	{true, -1},			/* Live, no thread limit */
 	linuxring_pstart_input,		/* pstart_input */
 	linuxring_pread_packets,	/* pread_packets */
@@ -759,6 +760,9 @@ static struct libtrace_format_t linuxring = {
 	linuxcommon_pregister_thread,	/* register thread */
 	NULL,				/* unregister thread */
 	NULL				/* get thread stats */
+#else
+        NON_PARALLEL(true)
+#endif
 };
 #else /* HAVE_NETPACKET_PACKET_H */
 
