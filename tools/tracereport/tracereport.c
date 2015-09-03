@@ -127,6 +127,7 @@ static void run_trace(char *uri, libtrace_filter_t *filter, int count)
 	}
 	if (reports_required & REPORT_TYPE_DROPS)
 		drops_per_trace(trace);
+        trace_destroy_packet(packet);
 	trace_destroy(trace);
 }
 
