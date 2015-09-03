@@ -153,6 +153,27 @@ static int rt_connect(libtrace_t *libtrace) {
 				RT_INFO->hostname);
 		return -1;
 	}
+
+        if (ntohl(connect_msg.type) == TRACE_RT_HELLO) {
+
+                if (connect_msg.length != sizeof(rt_hello_t)) {
+                        trace_set_err(libtrace, 
+                                        TRACE_ERR_INIT_FAILED,
+                                        "RT version mismatch: we are version 3, server is >= 4");
+                        return -1;
+                }
+        }
+
+        if (ntohl(connect_msg.type) == TRACE_RT_DENY_CONN) {
+
+                if (connect_msg.length != sizeof(rt_deny_conn_t)) {
+                        trace_set_err(libtrace, 
+                                        TRACE_ERR_INIT_FAILED,
+                                        "RT version mismatch: we are version 3, server is >= 4");
+                        return -1;
+                }
+        }
+
 	
 	switch (connect_msg.type) {
 		case TRACE_RT_DENY_CONN:
