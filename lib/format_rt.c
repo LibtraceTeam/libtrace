@@ -97,6 +97,8 @@ struct rt_format_data_t {
 
 	/* Header for the packet currently being received */
 	rt_header_t rt_hdr;
+
+        int unacked;
 	
 	/* Dummy traces that can be assigned to the received packets to ensure
 	 * that the appropriate functions can be used to process them */
@@ -154,7 +156,22 @@ static int rt_connect(libtrace_t *libtrace) {
 		return -1;
 	}
 	
-	switch (connect_msg.type) {
+        if (connect_msg.magic != LIBTRACE_RT_MAGIC) {
+                trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
+                        "RT version mismatch: magic byte is incorrect");
+                return -1;
+        }
+
+        if (connect_msg.version != LIBTRACE_RT_VERSION) {
+                trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
+                        "RT version mismatch: version is incorrect (expected %d, got %d",
+                        LIBTRACE_RT_VERSION, connect_msg.version);
+                return -1;
+        }
+
+                
+	
+        switch (ntohl(connect_msg.type)) {
 		case TRACE_RT_DENY_CONN:
 			/* Connection was denied */
 			
@@ -163,7 +180,7 @@ static int rt_connect(libtrace_t *libtrace) {
 						0) != sizeof(rt_deny_conn_t)) {
 				reason = 0;
 			}	
-			reason = deny_hdr.reason;
+			reason = ntohl(deny_hdr.reason);
 			trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
 				"Connection attempt is denied: %s",
 				rt_deny_reason(reason));	
@@ -178,8 +195,10 @@ static int rt_connect(libtrace_t *libtrace) {
 					"Failed to receive TRACE_RT_HELLO options");
 				return -1;
 			}
-			RT_INFO->reliable = hello_opts.reliable;
 			
+                        
+                        RT_INFO->reliable = hello_opts.reliable;
+			RT_INFO->unacked = 0;
 			return 0;
 		default:
 			trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
@@ -206,6 +225,7 @@ static void rt_init_format_data(libtrace_t *libtrace) {
 	RT_INFO->buf_filled = 0;
 	RT_INFO->hostname = NULL;
 	RT_INFO->port = 0;
+	RT_INFO->unacked = 0;
 }
 
 static int rt_init_input(libtrace_t *libtrace) {
@@ -244,7 +264,7 @@ static int rt_init_input(libtrace_t *libtrace) {
 static int rt_start_input(libtrace_t *libtrace) {
 	rt_header_t start_msg;
 
-	start_msg.type = TRACE_RT_START;
+	start_msg.type = htonl(TRACE_RT_START);
 	start_msg.length = 0; 
 
 	if (rt_connect(libtrace) == -1)
@@ -264,7 +284,7 @@ static int rt_start_input(libtrace_t *libtrace) {
 static int rt_pause_input(libtrace_t *libtrace) {
         rt_header_t close_msg;
 
-	close_msg.type = TRACE_RT_CLOSE;
+	close_msg.type = htonl(TRACE_RT_CLOSE);
 	close_msg.length = 0; 
 	
 	/* Send a close message to the server */
@@ -501,12 +521,12 @@ static int rt_send_ack(libtrace_t *libtrace,
 	hdr = (rt_header_t *) ack_buffer;
 	ack_hdr = (rt_ack_t *) (ack_buffer + sizeof(rt_header_t));
 	
-	hdr->type = TRACE_RT_ACK;
-	hdr->length = sizeof(rt_ack_t);
+	hdr->type = htonl(TRACE_RT_ACK);
+	hdr->length = htons(sizeof(rt_ack_t));
 
-	ack_hdr->sequence = seqno;
+	ack_hdr->sequence = htonl(seqno);
 	
-	to_write = hdr->length + sizeof(rt_header_t);
+	to_write = sizeof(rt_ack_t) + sizeof(rt_header_t);
 	buf_ptr = ack_buffer;
 
 	/* Keep trying until we write the entire ACK */
@@ -574,8 +594,13 @@ static int rt_read_data_packet(libtrace_t *libtrace,
 
 	/* Send an ACK if required */
         if (RT_INFO->reliable > 0 && packet->type >= TRACE_RT_DATA_SIMPLE) {
-		if (rt_send_ack(libtrace, RT_INFO->rt_hdr.sequence) == -1)
+		RT_INFO->unacked ++;
+                if (RT_INFO->unacked >= RT_ACK_FREQUENCY) {
+                        if (rt_send_ack(libtrace, RT_INFO->rt_hdr.sequence) 
+                                        == -1)
                                	return -1;
+                        RT_INFO->unacked = 0;
+                }
 	}
 	
 	/* Convert to the original capture format */
@@ -621,9 +646,9 @@ static int rt_read_packet_versatile(libtrace_t *libtrace,
 		
 		/* Need to store these in case the next rt_read overwrites 
 		 * the buffer they came from! */
-		RT_INFO->rt_hdr.type = pkt_hdr->type;
-		RT_INFO->rt_hdr.length = pkt_hdr->length;
-		RT_INFO->rt_hdr.sequence = pkt_hdr->sequence;
+		RT_INFO->rt_hdr.type = ntohl(pkt_hdr->type);
+		RT_INFO->rt_hdr.length = ntohs(pkt_hdr->length);
+		RT_INFO->rt_hdr.sequence = ntohl(pkt_hdr->sequence);
 	}
 	packet->type = RT_INFO->rt_hdr.type;
 	

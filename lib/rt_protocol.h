@@ -49,8 +49,10 @@
 
 /** Maximum size for the RT header */
 #define RT_MAX_HDR_SIZE 256
-/** Maximum sequence number for the RT protocol */
-#define MAX_SEQUENCE 2147483647 
+
+#define RT_ACK_FREQUENCY (10)
+#define LIBTRACE_RT_VERSION (0x04)
+#define LIBTRACE_RT_MAGIC (0x5a)
 
 /* Procedure for adding new RT control types
  * -------------------------------------------
@@ -83,17 +85,22 @@ typedef struct fifo_info {
         uint64_t ack;		/**< The offset for the fifo ACK pointer */
         uint64_t length;	/**< The total length of the fifo */
         uint64_t used;		/**< The amount of fifo space in use */
-} fifo_info_t;
+} PACKED fifo_info_t;
 
 /** RT packet header */
 typedef struct rt_header {
 	/** The type of RT packet */
-	libtrace_rt_types_t type;	
-	/** The length of the packet (not including the RT header */
+	uint32_t type;	
+	
+        uint8_t magic;
+
+        uint8_t version;
+
+        /** The length of the packet (not including the RT header */
 	uint16_t length;		
 	/** The sequence number of the packet */
 	uint32_t sequence;
-} rt_header_t;
+} PACKED rt_header_t;
 
 /* TODO: Reorganise this struct once more hello info is added */
 
@@ -102,7 +109,7 @@ typedef struct rt_hello {
 	/** Indicates whether the sender is acting in a reliable fashion, 
 	 *  i.e. expecting acknowledgements */
 	uint8_t reliable;	
-} rt_hello_t;
+} PACKED rt_hello_t ;
 
 #if 0
 typedef struct rt_start {
@@ -114,13 +121,13 @@ typedef struct rt_start {
 typedef struct rt_ack {
 	/** The sequence number of the last received RT packet */
 	uint32_t sequence;
-} rt_ack_t;
+} PACKED rt_ack_t;
 
 /** RT Status sub-header */
 typedef struct rt_status {
 	/** Statistics describing the current status of the sender fifo */
 	fifo_info_t fifo_status;
-} rt_status_t;
+} PACKED rt_status_t;
 
 #if 0
 typedef struct rt_duck {
@@ -153,8 +160,8 @@ enum rt_conn_denied_t {
 /** RT Denied Connection sub-header */
 typedef struct rt_deny_conn {
 	/** The reason that the connection was denied */
-	enum rt_conn_denied_t reason;
-} rt_deny_conn_t;
+	uint32_t reason;
+} PACKED rt_deny_conn_t;
 
 #if 0
 typedef struct rt_pause {
@@ -186,7 +193,7 @@ typedef struct rt_metadata {
 	uint32_t label_len;
 	/** Length of the value string that follows the header */
 	uint32_t value_len;
-} rt_metadata_t ;
+} PACKED rt_metadata_t;
 
 /** Specifications of duck structures - duck2_4 and duck2_5 match Endace's
  * duck_inf and duckinf_t respectively. Unfortunately, Endace don't exactly
