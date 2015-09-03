@@ -923,7 +923,8 @@ DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 			trace_packet_set_order(packet, libtrace->sequence_number);
 			++libtrace->accepted_packets;
 			++libtrace->sequence_number;
-			libtrace->last_packet = packet;
+			if (packet->trace == libtrace)
+                                libtrace->last_packet = packet;
 			return ret;
 		} while(1);
 	}
@@ -964,6 +965,7 @@ int trace_prepare_packet(libtrace_t *trace, libtrace_packet_t *packet,
 	}
 	
 	packet->trace = trace;
+        trace->last_packet = packet;
 	
 	/* Clear packet cache */
 	trace_clear_cache(packet);
