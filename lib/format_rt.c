@@ -337,7 +337,7 @@ static int rt_fin_input(libtrace_t *libtrace) {
 #define RT_BUF_SIZE (LIBTRACE_PACKET_BUFSIZE * 2)
 
 /* Receives data from an RT server */
-static int rt_read(libtrace_t *libtrace, void **buffer, size_t len, int block) 
+static int rt_read(libtrace_t *libtrace, void *buffer, size_t len, int block) 
 {
         int numbytes;
 	
@@ -406,7 +406,7 @@ static int rt_read(libtrace_t *libtrace, void **buffer, size_t len, int block)
 		}
 
         }
-	*buffer = RT_INFO->buf_current;
+        memcpy(buffer, RT_INFO->buf_current, len);
 	RT_INFO->buf_current += len;
 	RT_INFO->buf_filled -= len;
         return len;
@@ -584,10 +584,10 @@ static int rt_read_data_packet(libtrace_t *libtrace,
 		libtrace_packet_t *packet, int blocking) {
 	uint32_t prep_flags = 0;
 
-	prep_flags |= TRACE_PREP_DO_NOT_OWN_BUFFER;
+	prep_flags |= TRACE_PREP_OWN_BUFFER;
 
 	/* The stored RT header will tell us how much data we need to read */
-	if (rt_read(libtrace, &packet->buffer, (size_t)RT_INFO->rt_hdr.length, 
+	if (rt_read(libtrace, packet->buffer, (size_t)RT_INFO->rt_hdr.length, 
 				blocking) != RT_INFO->rt_hdr.length) {
 		return -1;
 	}
@@ -622,35 +622,39 @@ static int rt_read_data_packet(libtrace_t *libtrace,
  * set to 1, otherwise will return if insufficient data is available */
 static int rt_read_packet_versatile(libtrace_t *libtrace,
 		libtrace_packet_t *packet,int blocking) {
+        rt_header_t hdr;
 	rt_header_t *pkt_hdr = NULL;
 	void *void_hdr;
 	libtrace_rt_types_t switch_type;
 	
-	if (packet->buf_control == TRACE_CTRL_PACKET) {
-		packet->buf_control = TRACE_CTRL_EXTERNAL;
-		free(packet->buffer);
-		packet->buffer = NULL;
-	}
-
 	/* RT_LAST indicates that we need to read the RT header for the next
 	 * packet. This is a touch hax, I admit */
 	if (RT_INFO->rt_hdr.type == TRACE_RT_LAST) {
-		void_hdr = (void *)pkt_hdr;
 		/* FIXME: Better error handling required */
-		if (rt_read(libtrace, &void_hdr, 
+		if (rt_read(libtrace, (void *)&hdr, 
 				sizeof(rt_header_t),blocking) !=
 				sizeof(rt_header_t)) {
 			return -1;
 		}
-		pkt_hdr = (rt_header_t *)void_hdr;
-		
 		/* Need to store these in case the next rt_read overwrites 
 		 * the buffer they came from! */
-		RT_INFO->rt_hdr.type = ntohl(pkt_hdr->type);
-		RT_INFO->rt_hdr.length = ntohs(pkt_hdr->length);
-		RT_INFO->rt_hdr.sequence = ntohl(pkt_hdr->sequence);
+		RT_INFO->rt_hdr.type = ntohl(hdr.type);
+		RT_INFO->rt_hdr.length = ntohs(hdr.length);
+		RT_INFO->rt_hdr.sequence = ntohl(hdr.sequence);
 	}
-	packet->type = RT_INFO->rt_hdr.type;
+
+        if (packet->buf_control == TRACE_CTRL_PACKET) {
+                if (packet->buffer == NULL) {
+                        packet->buffer = malloc(RT_INFO->rt_hdr.length + sizeof(rt_header_t));
+
+                } else if (RT_INFO->rt_hdr.length > sizeof(packet->buffer)) {
+                        packet->buffer = realloc(packet->buffer, RT_INFO->rt_hdr.length + sizeof(rt_header_t));
+                }
+        }
+	
+        packet->type = RT_INFO->rt_hdr.type;
+        packet->payload = packet->buffer;
+        
 	
 	/* All data-bearing packets (as opposed to RT internal messages) 
 	 * should be treated the same way when it comes to reading the rest
@@ -667,7 +671,7 @@ static int rt_read_packet_versatile(libtrace_t *libtrace,
 		case TRACE_RT_DUCK_2_5:
 		case TRACE_RT_STATUS:
 		case TRACE_RT_METADATA:
-			if (rt_read_data_packet(libtrace, packet, blocking))
+                        if (rt_read_data_packet(libtrace, packet, blocking))
 				return -1;
 			break;
 		case TRACE_RT_END_DATA:
@@ -676,6 +680,14 @@ static int rt_read_packet_versatile(libtrace_t *libtrace,
 		case TRACE_RT_CLIENTDROP:
 		case TRACE_RT_SERVERSTART:
 			/* All these have no payload */
+                        packet->header = packet->buffer;
+                        packet->payload = ((char *)packet->buffer + sizeof(rt_header_t));
+                        pkt_hdr = (rt_header_t *)packet->header;
+                        pkt_hdr->type = ntohl(RT_INFO->rt_hdr.type);
+                        pkt_hdr->length = ntohs(RT_INFO->rt_hdr.length);
+                        pkt_hdr->sequence = ntohl(RT_INFO->rt_hdr.sequence);
+
+                        /* XXX Do we need to save the other crap? */
 			break;
 		case TRACE_RT_PAUSE_ACK:
 			/* XXX: Add support for this */
@@ -688,10 +700,8 @@ static int rt_read_packet_versatile(libtrace_t *libtrace,
 					switch_type);
 			return -1;
 	}
-				
-			
-		
-	/* Return the number of bytes read from the stream */
+	
+        /* Return the number of bytes read from the stream */
 	RT_INFO->rt_hdr.type = TRACE_RT_LAST;
 	return RT_INFO->rt_hdr.length + sizeof(rt_header_t);
 }
