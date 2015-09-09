@@ -34,8 +34,20 @@ static void read(libtrace_t *trace, libtrace_combine_t *c){
 		libtrace_queue_t *v = &queues[i];
 		while (libtrace_deque_get_size(v) != 0) {
 			libtrace_result_t r;
-			libtrace_generic_t gt = {.res = &r};
+                        libtrace_generic_t gt = {.res = &r};
 			ASSERT_RET (libtrace_deque_pop_front(v, (void *) &r), == 1);
+                        /* Ignore any ticks that we've already seen */
+                        if (r.type == RESULT_TICK_INTERVAL) {
+                                if (r.key <= c->last_ts_tick)
+                                        continue;
+                                c->last_ts_tick = r.key;
+                        }
+
+                        if (r.type == RESULT_TICK_COUNT) {
+                                if (r.key <= c->last_count_tick)
+                                        continue;
+                                c->last_count_tick = r.key;
+                        }
 			trace->reporter(trace, MESSAGE_RESULT, gt, &trace->reporter_thread);
 		}
 	}
@@ -60,5 +72,7 @@ DLLEXPORT const libtrace_combine_t combiner_unordered = {
     read,			/* read_final */
     read,			/* pause */
     NULL,			/* queues */
+    0,                          /* last_count_tick */
+    0,                          /* last_ts_tick */
     {0}				/* opts */
 };

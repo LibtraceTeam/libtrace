@@ -392,6 +392,9 @@ struct libtrace_combine {
 	 */
 	void *queues;
 
+        uint64_t last_count_tick;
+        uint64_t last_ts_tick;
+
 	/**
 	 * Configuration options, what this does is up to the combiner
 	 * chosen.

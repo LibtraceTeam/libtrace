@@ -61,7 +61,12 @@ static void read_final(libtrace_t *trace, libtrace_combine_t *c) {
 		libtrace_result_t r;
 		libtrace_generic_t gt = {.res = &r};
 		ASSERT_RET (libtrace_vector_get(&queues[0], a, (void *) &r), == 1);
-		trace->reporter(trace, MESSAGE_RESULT, gt, &trace->reporter_thread);
+		if (r.type == RESULT_TICK_INTERVAL ||
+                                r.type == RESULT_TICK_COUNT) {
+                        /* Ticks are essentially useless for this combiner? */
+                        continue;
+                }
+                trace->reporter(trace, MESSAGE_RESULT, gt, &trace->reporter_thread);
 	}
 	libtrace_vector_empty(&queues[0]);
 }
@@ -86,5 +91,7 @@ DLLEXPORT const libtrace_combine_t combiner_sorted = {
     read_final,			/* read_final */
     pause,			/* pause */
     NULL,			/* queues */
+    0,                          /* last_count_tick */
+    0,                          /* last_ts_tick */
     {0}				/* opts */
 };
