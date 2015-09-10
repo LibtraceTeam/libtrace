@@ -66,6 +66,7 @@ struct libtrace_t *trace;
 char *output_format=NULL;
 
 int merge_inputs = 0;
+int threadcount = 4;
 
 struct filter_t {
 	char *expr;
@@ -261,6 +262,7 @@ static void run_trace(char *uri)
 	}*/
 	trace_set_combiner(trace, &combiner_ordered, (libtrace_generic_t){0});
 	trace_set_tracetime(trace, true);
+        trace_set_perpkt_threads(trace, threadcount);
 
 	//trace_set_hasher(trace, HASHER_CUSTOM, &bad_hash, NULL);
 
@@ -298,6 +300,7 @@ static void usage(char *argv0)
 	"%s flags libtraceuri [libtraceuri...]\n"
        	"-i --interval=seconds	Duration of reporting interval in seconds\n"
 	"-c --count=packets	Exit after count packets received\n"
+	"-t --threads=max	Create 'max' processing threads (default: 4)\n"
 	"-o --output-format=txt|csv|html|png Reporting output format\n"
 	"-f --filter=bpf	Apply BPF filter. Can be specified multiple times\n"
 	"-m --merge-inputs	Do not create separate outputs for each input trace\n"
@@ -318,10 +321,11 @@ int main(int argc, char *argv[]) {
 			{ "output-format",	1, 0, 'o' },
 			{ "libtrace-help",	0, 0, 'H' },
 			{ "merge-inputs",	0, 0, 'm' },
+			{ "threads",	        1, 0, 't' },
 			{ NULL, 		0, 0, 0   },
 		};
 
-		int c=getopt_long(argc, argv, "c:f:i:o:Hm",
+		int c=getopt_long(argc, argv, "c:f:i:o:t:Hm",
 				long_options, &option_index);
 
 		if (c==-1)
@@ -336,6 +340,11 @@ int main(int argc, char *argv[]) {
 				filters[filter_count-1].count=0;
 				filters[filter_count-1].bytes=0;
 				break;
+                        case 't':
+                                threadcount = atoi(optarg);
+                                if (threadcount <= 0)
+                                        threadcount = 1;
+                                break;
 			case 'i':
 				packet_interval=atof(optarg);
 				break;
