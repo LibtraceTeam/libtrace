@@ -1851,9 +1851,14 @@ DLLEXPORT int trace_ppause(libtrace_t *libtrace)
 	t = get_thread_table(libtrace);
 	// Check state from within the lock if we are going to change it
 	ASSERT_RET(pthread_mutex_lock(&libtrace->libtrace_lock), == 0);
+
+        /* If we are already paused, just treat this as a NOOP */
+        if (libtrace->state == STATE_PAUSED) {
+		ASSERT_RET(pthread_mutex_unlock(&libtrace->libtrace_lock), == 0);
+                return 0;
+        }
 	if (!libtrace->started || libtrace->state != STATE_RUNNING) {
 		trace_set_err(libtrace,TRACE_ERR_BAD_STATE, "You must call trace_start() before calling trace_ppause()");
-		ASSERT_RET(pthread_mutex_unlock(&libtrace->libtrace_lock), == 0);
 		return -1;
 	}
 
@@ -1920,15 +1925,21 @@ DLLEXPORT int trace_ppause(libtrace_t *libtrace)
 	if (trace_has_reporter(libtrace)) {
 		if (libtrace->config.debug_state)
 			fprintf(stderr, "Reporter thread is running, asking it to pause ...");
-		libtrace_message_t message = {0};
-		message.code = MESSAGE_DO_PAUSE;
-		trace_message_thread(libtrace, &libtrace->reporter_thread, &message);
-		// Wait for it to pause
-		ASSERT_RET(pthread_mutex_lock(&libtrace->libtrace_lock), == 0);
-		while (libtrace->reporter_thread.state == THREAD_RUNNING) {
-			ASSERT_RET(pthread_cond_wait(&libtrace->perpkt_cond, &libtrace->libtrace_lock), == 0);
-		}
-		ASSERT_RET(pthread_mutex_unlock(&libtrace->libtrace_lock), == 0);
+		if (pthread_equal(pthread_self(), libtrace->reporter_thread.tid)) {
+                        libtrace->combiner.pause(libtrace, &libtrace->combiner);
+                        thread_change_state(libtrace, &libtrace->reporter_thread, THREAD_PAUSED, true);
+                
+                } else {
+                        libtrace_message_t message = {0};
+                        message.code = MESSAGE_DO_PAUSE;
+                        trace_message_thread(libtrace, &libtrace->reporter_thread, &message);
+                        // Wait for it to pause
+                        ASSERT_RET(pthread_mutex_lock(&libtrace->libtrace_lock), == 0);
+                        while (libtrace->reporter_thread.state == THREAD_RUNNING) {
+                                ASSERT_RET(pthread_cond_wait(&libtrace->perpkt_cond, &libtrace->libtrace_lock), == 0);
+                        }
+                        ASSERT_RET(pthread_mutex_unlock(&libtrace->libtrace_lock), == 0);
+                }
 		if (libtrace->config.debug_state)
 			fprintf(stderr, " DONE\n");
 	}
