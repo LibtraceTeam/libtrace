@@ -79,6 +79,9 @@ double packet_interval=UINT32_MAX;
 
 struct output_data_t *output = NULL;
 
+uint64_t count;
+uint64_t bytes;
+
 static void report_results(double ts,uint64_t count,uint64_t bytes)
 {
 	int i=0;
@@ -114,9 +117,6 @@ static void create_output(char *title) {
 	output_flush_headings(output);
 
 }
-
-uint64_t count;
-uint64_t bytes;
 
 typedef struct statistic {
 	uint64_t count;
@@ -302,7 +302,7 @@ static void usage(char *argv0)
 	"-o --output-format=txt|csv|html|png Reporting output format\n"
 	"-f --filter=bpf	Apply BPF filter. Can be specified multiple times\n"
 	"-m --merge-inputs	Do not create separate outputs for each input trace\n"
-	"-H --libtrace-help	Print libtrace runtime documentation\n"
+	"-h --help	Print this usage statement\n"
 	,argv0);
 }
 
@@ -317,13 +317,13 @@ int main(int argc, char *argv[]) {
 			{ "interval",		1, 0, 'i' },
 			{ "count",		1, 0, 'c' },
 			{ "output-format",	1, 0, 'o' },
-			{ "libtrace-help",	0, 0, 'H' },
+			{ "help",	        0, 0, 'h' },
 			{ "merge-inputs",	0, 0, 'm' },
 			{ "threads",	        1, 0, 't' },
 			{ NULL, 		0, 0, 0   },
 		};
 
-		int c=getopt_long(argc, argv, "c:f:i:o:t:Hm",
+		int c=getopt_long(argc, argv, "c:f:i:o:t:hm",
 				long_options, &option_index);
 
 		if (c==-1)
@@ -356,10 +356,9 @@ int main(int argc, char *argv[]) {
 			case 'm':
 				merge_inputs = 1;
 				break;
-			case 'H': 
-				  trace_help(); 
-				  exit(1); 
-				  break;	
+			case 'h':
+				  usage(argv[0]);
+				  return 1;
 			default:
 				fprintf(stderr,"Unknown option: %c\n",c);
 				usage(argv[0]);
@@ -368,7 +367,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	if (packet_count == UINT64_MAX && packet_interval == UINT32_MAX) {
-		packet_interval = 300; /* every 5 minutes */
+		packet_interval = 60; /* every minute */
 	}
 
 	if (optind >= argc)
