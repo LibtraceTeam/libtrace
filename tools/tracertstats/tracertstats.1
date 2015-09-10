@@ -5,6 +5,7 @@ tracertstats \- perform simple filter based analysis on a trace
 .B tracertstats 
 [ -f | --filter bpf ]
 [ -i | --interval interval ]
+[ -t | --threads max ]
 [ -c | --count count ]
 [ -o | --output-format csv,txt,png,html ]
 [ -m | --merge-inputs ]
@@ -33,11 +34,21 @@ Output results every \fIinterval\fR seconds.
 
 .TP
 .PD 0
+.BI \-t " max"
+.TP
+.PD
+.BI \-\^\-threads " max"
+Use \fImax\fR packet processing threads. The default is 4 threads, but adding
+more or less threads may improve performance.
+
+.TP
+.PD 0
 .BI \-c " count"
 .TP
 .PD
 .BI \-\^\-count " count"
-Output results every \fIcount\fR packets.
+Stop after processing this amount of packets. Note that this is only a
+lower bound as this is only evaluated once per thread per interval.
 
 .TP
 .PD 0

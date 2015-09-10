@@ -62,11 +62,10 @@
 
 #define DEFAULT_OUTPUT_FMT "txt"
 
-struct libtrace_t *trace;
 char *output_format=NULL;
-
 int merge_inputs = 0;
 int threadcount = 4;
+int filter_count=0;
 
 struct filter_t {
 	char *expr;
@@ -74,13 +73,9 @@ struct filter_t {
 	uint64_t count;
 	uint64_t bytes;
 } *filters = NULL;
-int filter_count=0;
-uint64_t totcount;
-uint64_t totbytes;
 
 uint64_t packet_count=UINT64_MAX;
 double packet_interval=UINT32_MAX;
-
 
 struct output_data_t *output = NULL;
 
@@ -134,12 +129,17 @@ typedef struct result {
 } result_t;
 
 static uint64_t glob_last_ts = 0;
-static void process_result(libtrace_t *trace UNUSED, int mesg,
+static void process_result(libtrace_t *trace, int mesg,
                            libtrace_generic_t data,
                            libtrace_thread_t *sender UNUSED) {
-	static uint64_t ts = 0;
+	uint64_t ts = 0;
+        static bool stopped = false;
+        static uint64_t packets_seen = 0;
 	int j;
 	result_t *res;
+
+        if (stopped)
+                return;
 
 	switch (mesg) {
 		case MESSAGE_RESULT:
@@ -156,6 +156,7 @@ static void process_result(libtrace_t *trace UNUSED, int mesg,
 			glob_last_ts = ts;
 		}
 		count += res->total.count;
+                packets_seen += res->total.count;
 		bytes += res->total.bytes;
 		for (j = 0; j < filter_count; j++) {
 			filters[j].count += res->filters[j].count;
@@ -163,6 +164,12 @@ static void process_result(libtrace_t *trace UNUSED, int mesg,
 		}
 		free(res);
 	}
+
+        /* Be careful to only call pstop once from within this thread! */
+        if (packets_seen > packet_count) {
+                trace_pstop(trace);
+                stopped = true;
+        }
 }
 
 typedef struct timestamp_sync {
@@ -213,7 +220,6 @@ static void* per_packet(libtrace_t *trace, libtrace_thread_t *t,
 			libtrace_generic_t tmp = {.ptr = results};
 			trace_publish_result(trace, t, last_key, tmp, RESULT_USER);
 			trace_post_reporter(trace);
-                        free(results);
 			results = NULL;
 		}
 		break;
@@ -238,6 +244,7 @@ static void* per_packet(libtrace_t *trace, libtrace_thread_t *t,
 /* Process a trace, counting packets that match filter(s) */
 static void run_trace(char *uri)
 {
+        libtrace_t *trace = NULL;
 	if (!merge_inputs) 
 		create_output(uri);
 
@@ -252,19 +259,9 @@ static void run_trace(char *uri)
 			output_destroy(output);
 		return;
 	}
-	/*
-	if (trace_start(trace)==-1) {
-		trace_perror(trace,"trace_start");
-		trace_destroy(trace);
-		if (!merge_inputs)
-			output_destroy(output);
-		return;
-	}*/
 	trace_set_combiner(trace, &combiner_ordered, (libtrace_generic_t){0});
 	trace_set_tracetime(trace, true);
         trace_set_perpkt_threads(trace, threadcount);
-
-	//trace_set_hasher(trace, HASHER_CUSTOM, &bad_hash, NULL);
 
 	if (trace_get_information(trace)->live) {
                 trace_set_tick_interval(trace, (int) (packet_interval * 1000));
@@ -293,13 +290,14 @@ static void run_trace(char *uri)
 		output_destroy(output);
        
 }
+
 // TODO Decide what to do with -c option
 static void usage(char *argv0)
 {
 	fprintf(stderr,"Usage:\n"
 	"%s flags libtraceuri [libtraceuri...]\n"
        	"-i --interval=seconds	Duration of reporting interval in seconds\n"
-	"-c --count=packets	Exit after count packets received\n"
+	"-c --count=packets	Exit after count packets have been processed\n"
 	"-t --threads=max	Create 'max' processing threads (default: 4)\n"
 	"-o --output-format=txt|csv|html|png Reporting output format\n"
 	"-f --filter=bpf	Apply BPF filter. Can be specified multiple times\n"
@@ -349,7 +347,7 @@ int main(int argc, char *argv[]) {
 				packet_interval=atof(optarg);
 				break;
 			case 'c':
-				packet_count=atoi(optarg);
+				packet_count=strtoul(optarg, NULL, 10);
 				break;
 			case 'o':
 				if (output_format) free(output_format);
