@@ -51,7 +51,7 @@
 #include <inttypes.h>
 #include <lt_inttypes.h>
 
-#include "libtrace_parallel.h"
+#include "libtrace.h"
 #include "output.h"
 #include "rt_protocol.h"
 #include "dagformat.h"
@@ -66,7 +66,6 @@ struct libtrace_t *trace;
 char *output_format=NULL;
 
 int merge_inputs = 0;
-int threadcount = 4;
 
 struct filter_t {
 	char *expr;
@@ -120,170 +119,78 @@ static void create_output(char *title) {
 
 }
 
-uint64_t count;
-uint64_t bytes;
-
-typedef struct statistic {
-	uint64_t count;
-	uint64_t bytes;
-} statistic_t;
-
-typedef struct result {
-	struct statistic total;
-	struct statistic filters[0];
-} result_t;
-
-static uint64_t glob_last_ts = 0;
-static void process_result(libtrace_t *trace UNUSED, int mesg,
-                           libtrace_generic_t data,
-                           libtrace_thread_t *sender UNUSED) {
-	static uint64_t ts = 0;
-	int j;
-	result_t *res;
-
-	switch (mesg) {
-		case MESSAGE_RESULT:
-		ts = data.res->key;
-		res = data.res->value.ptr;
-		if (glob_last_ts == 0)
-			glob_last_ts = ts;
-		while ((glob_last_ts >> 32) < (ts >> 32)) {
-			report_results(glob_last_ts >> 32, count, bytes);
-			count = 0;
-			bytes = 0;
-			for (j = 0; j < filter_count; j++)
-				filters[j].count = filters[j].bytes = 0;
-			glob_last_ts = ts;
-		}
-		count += res->total.count;
-		bytes += res->total.bytes;
-		for (j = 0; j < filter_count; j++) {
-			filters[j].count += res->filters[j].count;
-			filters[j].bytes += res->filters[j].bytes;
-		}
-		free(res);
-	}
-}
-
-typedef struct timestamp_sync {
-	int64_t difference_usecs;
-	uint64_t first_interval_number;
-} timestamp_sync_t;
-
-static void* per_packet(libtrace_t *trace, libtrace_thread_t *t,
-                        int mesg, libtrace_generic_t data,
-                        libtrace_thread_t *sender UNUSED)
-{
-	int i;
-	static __thread result_t * results = NULL;
-        uint64_t key;
-        static __thread uint64_t last_key = 0;
-
-	switch(mesg) {
-	case MESSAGE_PACKET:
-                key = trace_get_erf_timestamp(data.pkt);
-                if ((key >> 32) > (last_key >> 32) + packet_interval) {
-                        libtrace_generic_t tmp = {.ptr = results};
-                        trace_publish_result(trace, t, key, 
-                                        tmp, RESULT_USER);
-                        trace_post_reporter(trace);
-                        last_key = key;
-                        results = calloc(1, sizeof(result_t) + sizeof(statistic_t) * filter_count);
-
-                }
-
-		for(i=0;i<filter_count;++i) {
-			if(trace_apply_filter(filters[i].filter, data.pkt)) {
-				results->filters[i].count++;
-				results->filters[i].bytes+=trace_get_wire_length(data.pkt);
-			}
-		}
-
-		results->total.count++;
-		results->total.bytes +=trace_get_wire_length(data.pkt);
-		return data.pkt;
-
-	case MESSAGE_STARTING:
-		results = calloc(1, sizeof(result_t) + sizeof(statistic_t) * filter_count);
-		break;
-
-	case MESSAGE_STOPPING:
-		// Should we always post this?
-		if (results->total.count) {
-			libtrace_generic_t tmp = {.ptr = results};
-			trace_publish_result(trace, t, last_key, tmp, RESULT_USER);
-			trace_post_reporter(trace);
-                        free(results);
-			results = NULL;
-		}
-		break;
-
-	case MESSAGE_TICK_INTERVAL:
-	case MESSAGE_TICK_COUNT:
-		{
-                        if (data.uint64 > last_key) {
-                                libtrace_generic_t tmp = {.ptr = results};
-			        trace_publish_result(trace, t, data.uint64, 
-                                                tmp, RESULT_USER);
-                                trace_post_reporter(trace);
-                                last_key = data.uint64;
-		                results = calloc(1, sizeof(result_t) + sizeof(statistic_t) * filter_count);
-                        }
-                        break;
-		}
-	}
-	return NULL;
-}
-
 /* Process a trace, counting packets that match filter(s) */
-static void run_trace(char *uri)
+static void run_trace(char *uri) 
 {
+	struct libtrace_packet_t *packet = trace_create_packet();
+	int i;
+	uint64_t count = 0;
+	uint64_t bytes = 0;
+	double last_ts = 0;
+	double ts = 0;
+
 	if (!merge_inputs) 
 		create_output(uri);
 
 	if (output == NULL)
 		return;
 
-	trace = trace_create(uri);
+        trace = trace_create(uri);
 	if (trace_is_err(trace)) {
 		trace_perror(trace,"trace_create");
 		trace_destroy(trace);
 		if (!merge_inputs)
 			output_destroy(output);
-		return;
+		return; 
 	}
-	/*
 	if (trace_start(trace)==-1) {
 		trace_perror(trace,"trace_start");
 		trace_destroy(trace);
 		if (!merge_inputs)
 			output_destroy(output);
 		return;
-	}*/
-	trace_set_combiner(trace, &combiner_ordered, (libtrace_generic_t){0});
-	trace_set_tracetime(trace, true);
-        trace_set_perpkt_threads(trace, threadcount);
-
-	//trace_set_hasher(trace, HASHER_CUSTOM, &bad_hash, NULL);
-
-	if (trace_get_information(trace)->live) {
-                trace_set_tick_interval(trace, (int) (packet_interval * 1000));
 	}
 
-	if (trace_pstart(trace, NULL, &per_packet, process_result)==-1) {
-		trace_perror(trace,"Failed to start trace");
-		trace_destroy(trace);
-		if (!merge_inputs)
-			output_destroy(output);
-		return;
-	}
+        for (;;) {
+		int psize;
+                if ((psize = trace_read_packet(trace, packet)) <1) {
+                        break;
+                }
+		
+		if (trace_get_packet_buffer(packet,NULL,NULL) == NULL) {
+			continue;
+		}
+		
+		ts = trace_get_seconds(packet);
+
+		if (last_ts == 0)
+			last_ts = ts;
+
+		while (packet_interval != UINT64_MAX && last_ts<ts) {
+			report_results(last_ts,count,bytes);
+			count=0;
+			bytes=0;
+			last_ts+=packet_interval;
+		}
+		for(i=0;i<filter_count;++i) {
+			if(trace_apply_filter(filters[i].filter,packet)) {
+				++filters[i].count;
+				filters[i].bytes+=trace_get_wire_length(packet);
+			}
+		}
+
+		++count;
+		bytes+=trace_get_wire_length(packet);
 
 
-	// Wait for all threads to stop
-	trace_join(trace);
-	
-	// Flush the last one out
-	report_results((glob_last_ts >> 32), count, bytes);
+		if (count >= packet_count) {
+			report_results(ts,count,bytes);
+			count=0;
+			bytes=0;
+		}
+        }
+	report_results(ts,count,bytes);
+
 	if (trace_is_err(trace))
 		trace_perror(trace,"%s",uri);
 
@@ -291,16 +198,16 @@ static void run_trace(char *uri)
 
 	if (!merge_inputs)
 		output_destroy(output);
-       
+
+	trace_destroy_packet(packet);
 }
-// TODO Decide what to do with -c option
+
 static void usage(char *argv0)
 {
 	fprintf(stderr,"Usage:\n"
 	"%s flags libtraceuri [libtraceuri...]\n"
        	"-i --interval=seconds	Duration of reporting interval in seconds\n"
 	"-c --count=packets	Exit after count packets received\n"
-	"-t --threads=max	Create 'max' processing threads (default: 4)\n"
 	"-o --output-format=txt|csv|html|png Reporting output format\n"
 	"-f --filter=bpf	Apply BPF filter. Can be specified multiple times\n"
 	"-m --merge-inputs	Do not create separate outputs for each input trace\n"
@@ -321,11 +228,10 @@ int main(int argc, char *argv[]) {
 			{ "output-format",	1, 0, 'o' },
 			{ "libtrace-help",	0, 0, 'H' },
 			{ "merge-inputs",	0, 0, 'm' },
-			{ "threads",	        1, 0, 't' },
 			{ NULL, 		0, 0, 0   },
 		};
 
-		int c=getopt_long(argc, argv, "c:f:i:o:t:Hm",
+		int c=getopt_long(argc, argv, "c:f:i:o:Hm",
 				long_options, &option_index);
 
 		if (c==-1)
@@ -340,11 +246,6 @@ int main(int argc, char *argv[]) {
 				filters[filter_count-1].count=0;
 				filters[filter_count-1].bytes=0;
 				break;
-                        case 't':
-                                threadcount = atoi(optarg);
-                                if (threadcount <= 0)
-                                        threadcount = 1;
-                                break;
 			case 'i':
 				packet_interval=atof(optarg);
 				break;
@@ -382,6 +283,7 @@ int main(int argc, char *argv[]) {
 		fprintf(stderr,"output format: '%s'\n", DEFAULT_OUTPUT_FMT);
 	
 	
+
 	if (merge_inputs) {
 		/* If we're merging the inputs, we only want to create all
 		 * the column headers etc. once rather than doing them once
@@ -392,6 +294,7 @@ int main(int argc, char *argv[]) {
 		create_output(argv[optind]);
 		if (output == NULL)
 			return 0;
+
 	}
 		
 	for(i=optind;i<argc;++i) {
@@ -404,5 +307,5 @@ int main(int argc, char *argv[]) {
 	}
 
 
-	return 0;
+        return 0;
 }
