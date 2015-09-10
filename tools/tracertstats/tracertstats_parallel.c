@@ -132,7 +132,7 @@ typedef struct result {
 	struct statistic filters[0];
 } result_t;
 
-static uint64_t last_ts = 0;
+static uint64_t glob_last_ts = 0;
 static void process_result(libtrace_t *trace UNUSED, int mesg,
                            libtrace_generic_t data,
                            libtrace_thread_t *sender UNUSED) {
@@ -144,15 +144,15 @@ static void process_result(libtrace_t *trace UNUSED, int mesg,
 		case MESSAGE_RESULT:
 		ts = data.res->key;
 		res = data.res->value.ptr;
-		if (last_ts == 0)
-			last_ts = ts;
-		while (last_ts < ts) {
-			report_results((double) last_ts * (double) packet_interval, count, bytes);
+		if (glob_last_ts == 0)
+			glob_last_ts = ts;
+		while ((glob_last_ts >> 32) < (ts >> 32)) {
+			report_results(glob_last_ts >> 32, count, bytes);
 			count = 0;
 			bytes = 0;
 			for (j = 0; j < filter_count; j++)
 				filters[j].count = filters[j].bytes = 0;
-			last_ts++;
+			glob_last_ts = ts;
 		}
 		count += res->total.count;
 		bytes += res->total.bytes;
@@ -174,27 +174,22 @@ static void* per_packet(libtrace_t *trace, libtrace_thread_t *t,
                         libtrace_thread_t *sender UNUSED)
 {
 	int i;
-	static __thread uint64_t last_ts = 0, ts = 0;
 	static __thread result_t * results = NULL;
+        uint64_t key;
+        static __thread uint64_t last_key = 0;
 
 	switch(mesg) {
 	case MESSAGE_PACKET:
-		// Unsure when we would hit this case but the old code had it, I
-		// guess we should keep it
-		assert(trace_get_packet_buffer(data.pkt,NULL,NULL) != NULL);
-		ts = trace_get_seconds(data.pkt) / packet_interval;
-		if (last_ts == 0)
-			last_ts = ts;
+                key = trace_get_erf_timestamp(data.pkt);
+                if ((key >> 32) > (last_key >> 32) + packet_interval) {
+                        libtrace_generic_t tmp = {.ptr = results};
+                        trace_publish_result(trace, t, key, 
+                                        tmp, RESULT_USER);
+                        trace_post_reporter(trace);
+                        last_key = key;
+                        results = calloc(1, sizeof(result_t) + sizeof(statistic_t) * filter_count);
 
-		while (packet_interval != UINT64_MAX && last_ts<ts) {
-			libtrace_generic_t tmp = {.ptr = results};
-			// Publish and make a new one new
-			//fprintf(stderr, "Publishing result %"PRIu64"\n", last_ts);
-			trace_publish_result(trace, t, (uint64_t) last_ts, tmp, RESULT_USER);
-			trace_post_reporter(trace);
-			results = calloc(1, sizeof(result_t) + sizeof(statistic_t) * filter_count);
-			last_ts++;
-		}
+                }
 
 		for(i=0;i<filter_count;++i) {
 			if(trace_apply_filter(filters[i].filter, data.pkt)) {
@@ -205,11 +200,6 @@ static void* per_packet(libtrace_t *trace, libtrace_thread_t *t,
 
 		results->total.count++;
 		results->total.bytes +=trace_get_wire_length(data.pkt);
-		/*if (count >= packet_count) {
-			report_results(ts,count,bytes);
-			count=0;
-			bytes=0;
-		}*/ // TODO what was happening here doesn't match up with any of the documentations!!!
 		return data.pkt;
 
 	case MESSAGE_STARTING:
@@ -220,8 +210,9 @@ static void* per_packet(libtrace_t *trace, libtrace_thread_t *t,
 		// Should we always post this?
 		if (results->total.count) {
 			libtrace_generic_t tmp = {.ptr = results};
-			trace_publish_result(trace, t, (uint64_t) last_ts, tmp, RESULT_USER);
+			trace_publish_result(trace, t, last_key, tmp, RESULT_USER);
 			trace_post_reporter(trace);
+                        free(results);
 			results = NULL;
 		}
 		break;
@@ -229,45 +220,23 @@ static void* per_packet(libtrace_t *trace, libtrace_thread_t *t,
 	case MESSAGE_TICK_INTERVAL:
 	case MESSAGE_TICK_COUNT:
 		{
-			int64_t offset;
-			const struct timeval *tv;
-			struct timeval tv_real;
-			const libtrace_packet_t *first_packet = NULL;
-			trace_get_first_packet(trace, NULL, &first_packet, &tv);
-			if (first_packet != NULL) {
-				// So figure out our running offset
-				tv_real = trace_get_timeval(first_packet);
-				offset = tv_to_usec(tv) - tv_to_usec(&tv_real);
-				// Get time of day and do this stuff
-				uint64_t next_update_time;
-				next_update_time = (last_ts*packet_interval + packet_interval) * 1000000 + offset;
-				if (next_update_time <= data.uint64) {
-					libtrace_generic_t tmp = {.ptr = results};
-					//fprintf(stderr, "Got a tick and publishing early!!\n");
-					trace_publish_result(trace, t, (uint64_t) last_ts, tmp, RESULT_USER);
-					trace_post_reporter(trace);
-					results = calloc(1, sizeof(result_t) + sizeof(statistic_t) * filter_count);
-					last_ts++;
-				} else {
-					//fprintf(stderr, "Got a tick but no publish ...\n");
-				}
-			} else {
-				//fprintf(stderr, "Got a tick but no packets seen yet!!!\n");
-			}
+                        if (data.uint64 > last_key) {
+                                libtrace_generic_t tmp = {.ptr = results};
+			        trace_publish_result(trace, t, data.uint64, 
+                                                tmp, RESULT_USER);
+                                trace_post_reporter(trace);
+                                last_key = data.uint64;
+		                results = calloc(1, sizeof(result_t) + sizeof(statistic_t) * filter_count);
+                        }
+                        break;
 		}
 	}
 	return NULL;
 }
 
-static uint64_t bad_hash(const libtrace_packet_t * pkt UNUSED, void *data UNUSED) {
-	return 0;
-}
-
 /* Process a trace, counting packets that match filter(s) */
 static void run_trace(char *uri)
 {
-	int j;
-
 	if (!merge_inputs) 
 		create_output(uri);
 
@@ -296,7 +265,7 @@ static void run_trace(char *uri)
 	//trace_set_hasher(trace, HASHER_CUSTOM, &bad_hash, NULL);
 
 	if (trace_get_information(trace)->live) {
-		trace_set_tick_interval(trace, (int) (packet_interval * 1000));
+                trace_set_tick_interval(trace, (int) (packet_interval * 1000));
 	}
 
 	if (trace_pstart(trace, NULL, &per_packet, process_result)==-1) {
@@ -312,13 +281,7 @@ static void run_trace(char *uri)
 	trace_join(trace);
 	
 	// Flush the last one out
-	report_results((double) last_ts * (double) packet_interval, count, bytes);
-	//count = 0;
-	//bytes = 0;
-	for (j = 0; j < filter_count; j++)
-		filters[j].count = filters[j].bytes = 0;
-	(last_ts)++;
-	
+	report_results((glob_last_ts >> 32), count, bytes);
 	if (trace_is_err(trace))
 		trace_perror(trace,"%s",uri);
 
