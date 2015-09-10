@@ -172,73 +172,73 @@ static void process_result(libtrace_t *trace, int mesg,
         }
 }
 
-typedef struct timestamp_sync {
-	int64_t difference_usecs;
-	uint64_t first_interval_number;
-} timestamp_sync_t;
+typedef struct threadlocal {
+        result_t *results;
+        uint64_t last_key;
+} thread_data_t;
 
-static void* per_packet(libtrace_t *trace, libtrace_thread_t *t,
-                        int mesg, libtrace_generic_t data,
-                        libtrace_thread_t *sender UNUSED)
+static void *cb_starting(libtrace_t *trace UNUSED,
+        libtrace_thread_t *t UNUSED, void *global UNUSED)
 {
-	int i;
-	static __thread result_t * results = NULL;
+        thread_data_t *td = calloc(1, sizeof(thread_data_t));
+	td->results = calloc(1, sizeof(result_t) +
+                        sizeof(statistic_t) * filter_count);
+        return td;
+}
+
+static libtrace_packet_t *cb_packet(libtrace_t *trace, libtrace_thread_t *t,
+                void *global UNUSED, void *tls, libtrace_packet_t *packet) {
+
         uint64_t key;
-        static __thread uint64_t last_key = 0;
+        thread_data_t *td = (thread_data_t *)tls;
+        int i;
 
-	switch(mesg) {
-	case MESSAGE_PACKET:
-                key = trace_get_erf_timestamp(data.pkt);
-                if ((key >> 32) > (last_key >> 32) + packet_interval) {
-                        libtrace_generic_t tmp = {.ptr = results};
-                        trace_publish_result(trace, t, key, 
-                                        tmp, RESULT_USER);
-                        trace_post_reporter(trace);
-                        last_key = key;
-                        results = calloc(1, sizeof(result_t) + sizeof(statistic_t) * filter_count);
-
+        key = trace_get_erf_timestamp(packet);
+        if ((key >> 32) > (td->last_key >> 32) + packet_interval) {
+                libtrace_generic_t tmp = {.ptr = td->results};
+                trace_publish_result(trace, t, key,
+                                tmp, RESULT_USER);
+                trace_post_reporter(trace);
+                td->last_key = key;
+                td->results = calloc(1, sizeof(result_t) +
+                                sizeof(statistic_t) * filter_count);
+        }
+        for(i=0;i<filter_count;++i) {
+                if(trace_apply_filter(filters[i].filter, packet)) {
+                        td->results->filters[i].count++;
+                        td->results->filters[i].bytes+=trace_get_wire_length(packet);
                 }
+        }
 
-		for(i=0;i<filter_count;++i) {
-			if(trace_apply_filter(filters[i].filter, data.pkt)) {
-				results->filters[i].count++;
-				results->filters[i].bytes+=trace_get_wire_length(data.pkt);
-			}
-		}
+        td->results->total.count++;
+        td->results->total.bytes +=trace_get_wire_length(packet);
+        return packet;
+}
 
-		results->total.count++;
-		results->total.bytes +=trace_get_wire_length(data.pkt);
-		return data.pkt;
+static void cb_stopping(libtrace_t *trace, libtrace_thread_t *t,
+                void *global UNUSED, void *tls) {
 
-	case MESSAGE_STARTING:
-		results = calloc(1, sizeof(result_t) + sizeof(statistic_t) * filter_count);
-		break;
+        thread_data_t *td = (thread_data_t *)tls;
+        if (td->results->total.count) {
+                libtrace_generic_t tmp = {.ptr = td->results};
+                trace_publish_result(trace, t, td->last_key, tmp, RESULT_USER);
+                trace_post_reporter(trace);
+                td->results = NULL;
+        }
+}
 
-	case MESSAGE_STOPPING:
-		// Should we always post this?
-		if (results->total.count) {
-			libtrace_generic_t tmp = {.ptr = results};
-			trace_publish_result(trace, t, last_key, tmp, RESULT_USER);
-			trace_post_reporter(trace);
-			results = NULL;
-		}
-		break;
+static void cb_tick(libtrace_t *trace, libtrace_thread_t *t,
+                void *global UNUSED, void *tls, uint64_t order) {
 
-	case MESSAGE_TICK_INTERVAL:
-	case MESSAGE_TICK_COUNT:
-		{
-                        if (data.uint64 > last_key) {
-                                libtrace_generic_t tmp = {.ptr = results};
-			        trace_publish_result(trace, t, data.uint64, 
-                                                tmp, RESULT_USER);
-                                trace_post_reporter(trace);
-                                last_key = data.uint64;
-		                results = calloc(1, sizeof(result_t) + sizeof(statistic_t) * filter_count);
-                        }
-                        break;
-		}
-	}
-	return NULL;
+        thread_data_t *td = (thread_data_t *)tls;
+        if (order > td->last_key) {
+                libtrace_generic_t tmp = {.ptr = td->results};
+                trace_publish_result(trace, t, order, tmp, RESULT_USER);
+                trace_post_reporter(trace);
+                td->last_key = order;
+                td->results = calloc(1, sizeof(result_t) +
+                                sizeof(statistic_t) * filter_count);
+        }
 }
 
 /* Process a trace, counting packets that match filter(s) */
@@ -267,7 +267,13 @@ static void run_trace(char *uri)
                 trace_set_tick_interval(trace, (int) (packet_interval * 1000));
 	}
 
-	if (trace_pstart(trace, NULL, &per_packet, process_result)==-1) {
+        trace_cb_starting(trace, cb_starting);
+        trace_cb_stopping(trace, cb_stopping);
+        trace_cb_packet(trace, cb_packet);
+        trace_cb_tick_count(trace, cb_tick);
+        trace_cb_tick_interval(trace, cb_tick);
+
+	if (trace_pstart(trace, NULL, NULL, process_result)==-1) {
 		trace_perror(trace,"Failed to start trace");
 		trace_destroy(trace);
 		if (!merge_inputs)
