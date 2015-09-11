@@ -66,7 +66,8 @@ static void read_final(libtrace_t *trace, libtrace_combine_t *c) {
                         /* Ticks are essentially useless for this combiner? */
                         continue;
                 }
-                trace->reporter(trace, MESSAGE_RESULT, gt, &trace->reporter_thread);
+                send_message(trace, &trace->reporter_thread, MESSAGE_RESULT,
+                                gt, NULL);
 	}
 	libtrace_vector_empty(&queues[0]);
 }

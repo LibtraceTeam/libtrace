@@ -79,7 +79,7 @@
 #endif
 
 #include "libtrace.h"
-#include "libtrace_int.h"
+#include "libtrace_parallel.h"
 
 #ifdef HAVE_PCAP_BPF_H
 #  include <pcap-bpf.h>
@@ -172,58 +172,94 @@ static void print_memory_stats() {}
 static const libtrace_generic_t gen_zero = {0};
 
 /* This should optimise away the switch to nothing in the explict cases */
-static inline void send_message(libtrace_t *trace, libtrace_thread_t *thread, const enum libtrace_messages type,
-				libtrace_generic_t data, libtrace_thread_t *sender) {
+inline void send_message(libtrace_t *trace, libtrace_thread_t *thread,
+                const enum libtrace_messages type,
+		libtrace_generic_t data, libtrace_thread_t *sender) {
+
 	fn_cb_dataless fn = NULL;
-	switch (type) {
+        enum libtrace_messages switchtype;
+        libtrace_callback_set_t *cbs = NULL;
+
+        if (thread == &trace->reporter_thread) {
+                cbs = trace->reporter_cbs;
+        } else {
+                cbs = trace->perpkt_cbs;
+        }
+
+        if (cbs == NULL)
+                return;
+
+        if (type >= MESSAGE_USER)
+                switchtype = MESSAGE_USER;
+        else
+                switchtype = (enum libtrace_messages) type;
+
+	switch (switchtype) {
 	case MESSAGE_STARTING:
-		if (trace->callbacks.message_starting)
-			thread->user_data = (*trace->callbacks.message_starting)(trace, thread, trace->global_blob);
-		else if (trace->per_msg)
-			(*trace->per_msg)(trace, thread, type, data, sender);
+		if (cbs->message_starting)
+			thread->user_data = (*cbs->message_starting)(trace,
+                                        thread, trace->global_blob);
 		return;
 	case MESSAGE_FIRST_PACKET:
-		if (trace->callbacks.message_first_packet)
-			(*trace->callbacks.message_first_packet)(trace, thread, trace->global_blob, thread->user_data, data.pkt, sender);
-		else if (trace->per_msg)
-			(*trace->per_msg)(trace, thread, type, data, sender);
+		if (cbs->message_first_packet)
+			        (*cbs->message_first_packet)(trace, thread,
+                                trace->global_blob, thread->user_data,
+                                data.pkt, sender);
 		return;
 	case MESSAGE_TICK_COUNT:
-		if (trace->callbacks.message_tick_count)
-			(*trace->callbacks.message_tick_count)(trace, thread, trace->global_blob, thread->user_data, data.uint64);
-		else if (trace->per_msg)
-			(*trace->per_msg)(trace, thread, type, data, sender);
+		if (cbs->message_tick_count)
+			(*cbs->message_tick_count)(trace, thread,
+                                        trace->global_blob, thread->user_data,
+                                        data.uint64);
 		return;
 	case MESSAGE_TICK_INTERVAL:
-		if (trace->callbacks.message_tick_interval)
-			(*trace->callbacks.message_tick_interval)(trace, thread, trace->global_blob, thread->user_data,  data.uint64);
-		else if (trace->per_msg)
-			(*trace->per_msg)(trace, thread, type, data, sender);
+		if (cbs->message_tick_interval)
+			(*cbs->message_tick_interval)(trace, thread,
+                                        trace->global_blob, thread->user_data,
+                                        data.uint64);
 		return;
 	case MESSAGE_STOPPING:
-		fn = trace->callbacks.message_stopping;
+		fn = cbs->message_stopping;
 		break;
 	case MESSAGE_RESUMING:
-		fn = trace->callbacks.message_resuming;
+		fn = cbs->message_resuming;
 		break;
 	case MESSAGE_PAUSING:
-		fn = trace->callbacks.message_pausing;
+		fn = cbs->message_pausing;
 		break;
+	case MESSAGE_USER:
+		if (cbs->message_user)
+			(*cbs->message_user)(trace, thread, trace->global_blob,
+                                        thread->user_data, type, data);
+		return;
+	case MESSAGE_RESULT:
+                if (cbs->message_result)
+                        (*cbs->message_result)(trace, thread,
+                                        trace->global_blob, thread->user_data,
+                                        data.res);
 
 	/* These should be unused */
 	case MESSAGE_DO_PAUSE:
 	case MESSAGE_DO_STOP:
 	case MESSAGE_POST_REPORTER:
-	case MESSAGE_RESULT:
 	case MESSAGE_PACKET:
 		return;
-	case MESSAGE_USER:
-		break;
 	}
+
 	if (fn)
 		(*fn)(trace, thread, trace->global_blob, thread->user_data);
-	else if (trace->per_msg)
-		(*trace->per_msg)(trace, thread, type, data, sender);
+}
+
+DLLEXPORT libtrace_callback_set_t *trace_create_callback_set() {
+        libtrace_callback_set_t *cbset;
+
+        cbset = (libtrace_callback_set_t *)malloc(sizeof(libtrace_callback_set_t));
+        memset(cbset, 0, sizeof(libtrace_callback_set_t));
+        return cbset;
+}
+
+DLLEXPORT void trace_destroy_callback_set(libtrace_callback_set_t *cbset) {
+        free(cbset);
 }
 
 /*
@@ -238,7 +274,7 @@ DLLEXPORT bool trace_has_dedicated_hasher(libtrace_t * libtrace)
 DLLEXPORT bool trace_has_reporter(libtrace_t * libtrace)
 {
 	assert(libtrace->state != STATE_NEW);
-	return libtrace->reporter_thread.type == THREAD_REPORTER && libtrace->reporter;
+	return libtrace->reporter_thread.type == THREAD_REPORTER && libtrace->reporter_cbs;
 }
 
 /**
@@ -440,11 +476,8 @@ static inline int dispatch_packet(libtrace_t *trace,
 				return READ_MESSAGE;
 		}
 		t->accepted_packets++;
-		libtrace_generic_t data = {.pkt = *packet};
-		if (trace->callbacks.message_packet)
-			*packet = (*trace->callbacks.message_packet)(trace, t, trace->global_blob, t->user_data, *packet);
-		else if (trace->per_msg)
-			*packet = (*trace->per_msg)(trace, t, MESSAGE_PACKET, data, t);
+		if (trace->perpkt_cbs->message_packet)
+			*packet = (*trace->perpkt_cbs->message_packet)(trace, t, trace->global_blob, t->user_data, *packet);
 		trace_fin_packet(*packet);
 	} else {
 		assert((*packet)->error == READ_TICK);
@@ -623,8 +656,8 @@ static void* perpkt_threads_entry(void *data) {
 				case MESSAGE_DO_STOP: // This is internal
 					goto eof;
 			}
-			(*trace->per_msg)(trace, t, message.code, message.data, message.sender);
-			(*trace->per_msg)(trace, t, message.code, message.data, message.sender);
+                        send_message(trace, t, message.code, message.data, 
+                                        message.sender);
 			/* Continue and the empty messages out before packets */
 			continue;
 		}
@@ -1066,8 +1099,8 @@ static void* reporter_entry(void *data) {
 		trace->format->pregister_thread(trace, t, false);
 	}
 
-	(*trace->reporter)(trace, MESSAGE_STARTING, (libtrace_generic_t) {0}, t);
-	(*trace->reporter)(trace, MESSAGE_RESUMING, (libtrace_generic_t) {0}, t);
+	send_message(trace, t, MESSAGE_STARTING, (libtrace_generic_t){0}, t);
+	send_message(trace, t, MESSAGE_RESUMING, (libtrace_generic_t){0}, t);
 
 	while (!trace_has_finished(trace)) {
 		if (trace->config.reporter_polling) {
@@ -1084,12 +1117,15 @@ static void* reporter_entry(void *data) {
 			case MESSAGE_DO_PAUSE:
 				assert(trace->combiner.pause);
 				trace->combiner.pause(trace, &trace->combiner);
-				(*trace->reporter)(trace, MESSAGE_PAUSING, (libtrace_generic_t) {0}, t);
+				send_message(trace, t, MESSAGE_PAUSING,
+                                                (libtrace_generic_t) {0}, t);
 				trace_thread_pause(trace, t);
-				(*trace->reporter)(trace, MESSAGE_RESUMING, (libtrace_generic_t) {0}, t);
+				send_message(trace, t, MESSAGE_RESUMING,
+                                                (libtrace_generic_t) {0}, t);
 				break;
 		default:
-			(*trace->reporter)(trace, message.code, message.data, message.sender);
+                        send_message(trace, t, message.code, message.data,
+                                        message.sender);
 		}
 	}
 
@@ -1097,8 +1133,8 @@ static void* reporter_entry(void *data) {
 	trace->combiner.read_final(trace, &trace->combiner);
 
 	// GOODBYE
-	(*trace->reporter)(trace, MESSAGE_PAUSING, (libtrace_generic_t) {0}, t);
-	(*trace->reporter)(trace, MESSAGE_STOPPING, (libtrace_generic_t) {0}, t);
+        send_message(trace, t, MESSAGE_PAUSING,(libtrace_generic_t) {0}, t);
+        send_message(trace, t, MESSAGE_STOPPING,(libtrace_generic_t) {0}, t);
 
 	thread_change_state(trace, &trace->reporter_thread, THREAD_FINISHED, true);
 	print_memory_stats();
@@ -1314,7 +1350,8 @@ static int trace_pread_packet_wrapper(libtrace_t *libtrace,
  * killed rather.
  */
 static int trace_prestart(libtrace_t * libtrace, void *global_blob,
-                          fn_cb_msg per_msg, fn_reporter reporter) {
+                          libtrace_callback_set_t *per_packet_cbs, 
+                          libtrace_callback_set_t *reporter_cbs) {
 	int i, err = 0;
 	if (libtrace->state != STATE_PAUSED) {
 		trace_set_err(libtrace, TRACE_ERR_BAD_STATE,
@@ -1357,13 +1394,25 @@ static int trace_prestart(libtrace_t * libtrace, void *global_blob,
 	libtrace->filtered_packets = 0;
 
 	/* Update functions if requested */
-	if (per_msg)
-		libtrace->per_msg = per_msg;
-	assert(libtrace->per_msg);
-	if (reporter)
-		libtrace->reporter = reporter;
 	if(global_blob)
 		libtrace->global_blob = global_blob;
+
+        if (per_packet_cbs) {
+                if (libtrace->perpkt_cbs)
+                        trace_destroy_callback_set(libtrace->perpkt_cbs);
+                libtrace->perpkt_cbs = trace_create_callback_set();
+                memcpy(libtrace->perpkt_cbs, per_packet_cbs, 
+                                sizeof(libtrace_callback_set_t));
+        }
+
+        if (reporter_cbs) {
+                if (libtrace->reporter_cbs)
+                        trace_destroy_callback_set(libtrace->reporter_cbs);
+
+                libtrace->reporter_cbs = trace_create_callback_set();
+                memcpy(libtrace->reporter_cbs, reporter_cbs, 
+                                sizeof(libtrace_callback_set_t));
+        }
 
 	if (trace_is_parallel(libtrace)) {
 		err = libtrace->format->pstart_input(libtrace);
@@ -1585,7 +1634,8 @@ DLLEXPORT bool trace_is_parallel(libtrace_t * libtrace) {
 }
 
 DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob,
-                           fn_cb_msg per_msg, fn_reporter reporter) {
+                           libtrace_callback_set_t *per_packet_cbs,
+                           libtrace_callback_set_t *reporter_cbs) {
 	int i;
 	int ret = -1;
 	char name[16];
@@ -1598,7 +1648,8 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob,
 	}
 
 	if (libtrace->state == STATE_PAUSED) {
-		ret = trace_prestart(libtrace, global_blob, per_msg, reporter);
+		ret = trace_prestart(libtrace, global_blob, per_packet_cbs, 
+                                reporter_cbs);
 		ASSERT_RET(pthread_mutex_unlock(&libtrace->libtrace_lock), == 0);
 		return ret;
 	}
@@ -1613,8 +1664,35 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob,
 
 	/* Store the user defined things against the trace */
 	libtrace->global_blob = global_blob;
-	libtrace->per_msg = per_msg;
-	libtrace->reporter = reporter;
+
+        /* Save a copy of the callbacks in case the user tries to change them
+         * on us later */
+        if (!per_packet_cbs) {
+                trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "trace_pstart "
+                                "requires a non-NULL set of per packet "
+                                "callbacks.");
+                goto cleanup_none;
+        }
+
+        if (per_packet_cbs->message_packet == NULL) {
+                trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "The per "
+                                "packet callbacks must include a handler "
+                                "for a packet. Please set this using "
+                                "trace_set_packet_cb().");
+                goto cleanup_none;
+        }
+
+        libtrace->perpkt_cbs = trace_create_callback_set();
+        memcpy(libtrace->perpkt_cbs, per_packet_cbs, sizeof(libtrace_callback_set_t));
+        
+        if (reporter_cbs) {
+                libtrace->reporter_cbs = trace_create_callback_set();
+                memcpy(libtrace->reporter_cbs, reporter_cbs, sizeof(libtrace_callback_set_t));
+        }
+
+        
+
+
 	/* And zero other fields */
 	for (i = 0; i < THREAD_STATE_MAX; ++i) {
 		libtrace->perpkt_thread_states[i] = 0;
@@ -1693,7 +1771,7 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob,
 	}
 
 	/* Start the reporter thread */
-	if (reporter) {
+	if (reporter_cbs) {
 		if (libtrace->combiner.initialise)
 			libtrace->combiner.initialise(libtrace, &libtrace->combiner);
 		ret = trace_start_thread(libtrace, &libtrace->reporter_thread,
@@ -1792,43 +1870,63 @@ cleanup_none:
 	return ret;
 }
 
-DLLEXPORT int trace_cb_starting(libtrace_t *libtrace, fn_cb_starting handler) {
-	libtrace->callbacks.message_starting = handler;
+DLLEXPORT int trace_set_starting_cb(libtrace_callback_set_t *cbset,
+                fn_cb_starting handler) {
+	cbset->message_starting = handler;
 	return 0;
 }
 
-DLLEXPORT int trace_cb_pausing(libtrace_t *libtrace, fn_cb_dataless handler) {
-	libtrace->callbacks.message_pausing = handler;
+DLLEXPORT int trace_set_pausing_cb(libtrace_callback_set_t *cbset,
+                fn_cb_dataless handler) {
+	cbset->message_pausing = handler;
 	return 0;
 }
 
-DLLEXPORT int trace_cb_resuming(libtrace_t *libtrace, fn_cb_dataless handler) {
-	libtrace->callbacks.message_resuming = handler;
+DLLEXPORT int trace_set_resuming_cb(libtrace_callback_set_t *cbset,
+                fn_cb_dataless handler) {
+	cbset->message_resuming = handler;
 	return 0;
 }
 
-DLLEXPORT int trace_cb_stopping(libtrace_t *libtrace, fn_cb_dataless handler) {
-	libtrace->callbacks.message_stopping = handler;
+DLLEXPORT int trace_set_stopping_cb(libtrace_callback_set_t *cbset,
+                fn_cb_dataless handler) {
+	cbset->message_stopping = handler;
 	return 0;
 }
 
-DLLEXPORT int trace_cb_packet(libtrace_t *libtrace, fn_cb_packet handler) {
-	libtrace->callbacks.message_packet = handler;
+DLLEXPORT int trace_set_packet_cb(libtrace_callback_set_t *cbset,
+                fn_cb_packet handler) {
+	cbset->message_packet = handler;
 	return 0;
 }
 
-DLLEXPORT int trace_cb_first_packet(libtrace_t *libtrace, fn_cb_first_packet handler) {
-	libtrace->callbacks.message_first_packet = handler;
+DLLEXPORT int trace_set_first_packet_cb(libtrace_callback_set_t *cbset,
+                fn_cb_first_packet handler) {
+	cbset->message_first_packet = handler;
 	return 0;
 }
 
-DLLEXPORT int trace_cb_tick_count(libtrace_t *libtrace, fn_cb_tick handler) {
-	libtrace->callbacks.message_tick_count = handler;
+DLLEXPORT int trace_set_tick_count_cb(libtrace_callback_set_t *cbset,
+                fn_cb_tick handler) {
+	cbset->message_tick_count = handler;
 	return 0;
 }
 
-DLLEXPORT int trace_cb_tick_interval(libtrace_t *libtrace, fn_cb_tick handler) {
-	libtrace->callbacks.message_tick_interval = handler;
+DLLEXPORT int trace_set_tick_interval_cb(libtrace_callback_set_t *cbset,
+                fn_cb_tick handler) {
+	cbset->message_tick_interval = handler;
+	return 0;
+}
+
+DLLEXPORT int trace_set_result_cb(libtrace_callback_set_t *cbset,
+                fn_cb_result handler) {
+	cbset->message_result = handler;
+	return 0;
+}
+
+DLLEXPORT int trace_set_user_message_cb(libtrace_callback_set_t *cbset,
+                fn_cb_usermessage handler) {
+	cbset->message_user = handler;
 	return 0;
 }
 

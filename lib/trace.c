@@ -268,8 +268,6 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 	libtrace->state = STATE_NEW;
 	libtrace->perpkt_queue_full = false;
 	libtrace->global_blob = NULL;
-	libtrace->per_msg = NULL;
-	libtrace->reporter = NULL;
 	libtrace->hasher = NULL;
 	libtrace_zero_ocache(&libtrace->packet_freelist);
 	libtrace_zero_thread(&libtrace->hasher_thread);
@@ -287,7 +285,8 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 	libtrace->sequence_number = 0;
 	ZERO_USER_CONFIG(libtrace->config);
 	memset(&libtrace->combiner, 0, sizeof(libtrace->combiner));
-	memset(&libtrace->callbacks, 0, sizeof(libtrace->callbacks));
+        libtrace->perpkt_cbs = NULL;
+        libtrace->reporter_cbs = NULL;
 
         /* Parse the URI to determine what sort of trace we are dealing with */
 	if ((uridata = trace_parse_uri(uri, &scan)) == 0) {
@@ -392,8 +391,6 @@ DLLEXPORT libtrace_t * trace_create_dead (const char *uri) {
 	libtrace->state = STATE_NEW; // TODO MAYBE DEAD
 	libtrace->perpkt_queue_full = false;
 	libtrace->global_blob = NULL;
-	libtrace->per_msg = NULL;
-	libtrace->reporter = NULL;
 	libtrace->hasher = NULL;
 	libtrace_zero_ocache(&libtrace->packet_freelist);
 	libtrace_zero_thread(&libtrace->hasher_thread);
@@ -408,7 +405,8 @@ DLLEXPORT libtrace_t * trace_create_dead (const char *uri) {
 	libtrace->sequence_number = 0;
 	ZERO_USER_CONFIG(libtrace->config);
 	memset(&libtrace->combiner, 0, sizeof(libtrace->combiner));
-	memset(&libtrace->callbacks, 0, sizeof(libtrace->callbacks));
+        libtrace->perpkt_cbs = NULL;
+        libtrace->reporter_cbs = NULL;
 	
 	for(tmp=formats_list;tmp;tmp=tmp->next) {
                 if (strlen(scan) == strlen(tmp->name) &&
@@ -720,12 +718,19 @@ DLLEXPORT void trace_destroy(libtrace_t *libtrace) {
 	if (libtrace->state != STATE_NEW) {
 		// This has all of our packets
 		libtrace_ocache_destroy(&libtrace->packet_freelist);
-		if (libtrace->combiner.destroy && libtrace->reporter)
+		if (libtrace->combiner.destroy && libtrace->reporter_cbs)
 			libtrace->combiner.destroy(libtrace, &libtrace->combiner);
 		free(libtrace->perpkt_threads);
 		libtrace->perpkt_threads = NULL;
 		libtrace->perpkt_thread_count = 0;
+
 	}
+
+        if (libtrace->perpkt_cbs)
+                trace_destroy_callback_set(libtrace->perpkt_cbs);
+        if (libtrace->reporter_cbs)
+                trace_destroy_callback_set(libtrace->reporter_cbs);
+
 	
 	if (libtrace->event.packet) {
 		/* Don't use trace_destroy_packet here - there is almost

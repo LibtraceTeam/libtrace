@@ -129,9 +129,9 @@ typedef struct result {
 } result_t;
 
 static uint64_t glob_last_ts = 0;
-static void process_result(libtrace_t *trace, int mesg,
-                           libtrace_generic_t data,
-                           libtrace_thread_t *sender UNUSED) {
+static void cb_result(libtrace_t *trace, libtrace_thread_t *sender UNUSED,
+                void *global UNUSED, void *tls UNUSED,
+                libtrace_result_t *result) {
 	uint64_t ts = 0;
         static bool stopped = false;
         static uint64_t packets_seen = 0;
@@ -141,29 +141,26 @@ static void process_result(libtrace_t *trace, int mesg,
         if (stopped)
                 return;
 
-	switch (mesg) {
-		case MESSAGE_RESULT:
-		ts = data.res->key;
-		res = data.res->value.ptr;
-		if (glob_last_ts == 0)
-			glob_last_ts = ts;
-		while ((glob_last_ts >> 32) < (ts >> 32)) {
-			report_results(glob_last_ts >> 32, count, bytes);
-			count = 0;
-			bytes = 0;
-			for (j = 0; j < filter_count; j++)
-				filters[j].count = filters[j].bytes = 0;
-			glob_last_ts = ts;
-		}
-		count += res->total.count;
-                packets_seen += res->total.count;
-		bytes += res->total.bytes;
-		for (j = 0; j < filter_count; j++) {
-			filters[j].count += res->filters[j].count;
-			filters[j].bytes += res->filters[j].bytes;
-		}
-		free(res);
-	}
+        ts = result->key;
+        res = result->value.ptr;
+        if (glob_last_ts == 0)
+                glob_last_ts = ts;
+        while ((glob_last_ts >> 32) < (ts >> 32)) {
+                report_results(glob_last_ts >> 32, count, bytes);
+                count = 0;
+                bytes = 0;
+                for (j = 0; j < filter_count; j++)
+                        filters[j].count = filters[j].bytes = 0;
+                glob_last_ts = ts;
+        }
+        count += res->total.count;
+        packets_seen += res->total.count;
+        bytes += res->total.bytes;
+        for (j = 0; j < filter_count; j++) {
+                filters[j].count += res->filters[j].count;
+                filters[j].bytes += res->filters[j].bytes;
+        }
+        free(res);
 
         /* Be careful to only call pstop once from within this thread! */
         if (packets_seen > packet_count) {
@@ -245,7 +242,9 @@ static void cb_tick(libtrace_t *trace, libtrace_thread_t *t,
 static void run_trace(char *uri)
 {
         libtrace_t *trace = NULL;
-	if (!merge_inputs) 
+	libtrace_callback_set_t *pktcbs, *repcbs;
+
+        if (!merge_inputs) 
 		create_output(uri);
 
 	if (output == NULL)
@@ -267,15 +266,21 @@ static void run_trace(char *uri)
                 trace_set_tick_interval(trace, (int) (packet_interval * 1000));
 	}
 
-        trace_cb_starting(trace, cb_starting);
-        trace_cb_stopping(trace, cb_stopping);
-        trace_cb_packet(trace, cb_packet);
-        trace_cb_tick_count(trace, cb_tick);
-        trace_cb_tick_interval(trace, cb_tick);
+        pktcbs = trace_create_callback_set();
+        trace_set_starting_cb(pktcbs, cb_starting);
+        trace_set_stopping_cb(pktcbs, cb_stopping);
+        trace_set_packet_cb(pktcbs, cb_packet);
+        trace_set_tick_count_cb(pktcbs, cb_tick);
+        trace_set_tick_interval_cb(pktcbs, cb_tick);
 
-	if (trace_pstart(trace, NULL, NULL, process_result)==-1) {
+        repcbs = trace_create_callback_set();
+        trace_set_result_cb(repcbs, cb_result);
+
+	if (trace_pstart(trace, NULL, pktcbs, repcbs)==-1) {
 		trace_perror(trace,"Failed to start trace");
 		trace_destroy(trace);
+                trace_destroy_callback_set(pktcbs);
+                trace_destroy_callback_set(repcbs);
 		if (!merge_inputs)
 			output_destroy(output);
 		return;
@@ -291,6 +296,8 @@ static void run_trace(char *uri)
 		trace_perror(trace,"%s",uri);
 
         trace_destroy(trace);
+        trace_destroy_callback_set(pktcbs);
+        trace_destroy_callback_set(repcbs);
 
 	if (!merge_inputs)
 		output_destroy(output);

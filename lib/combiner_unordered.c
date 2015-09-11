@@ -48,7 +48,8 @@ static void read(libtrace_t *trace, libtrace_combine_t *c){
                                         continue;
                                 c->last_count_tick = r.key;
                         }
-			trace->reporter(trace, MESSAGE_RESULT, gt, &trace->reporter_thread);
+			send_message(trace, &trace->reporter_thread,
+                                MESSAGE_RESULT, gt, NULL);
 		}
 	}
 }

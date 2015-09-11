@@ -459,19 +459,21 @@ typedef uint64_t (*fn_hasher)(const libtrace_packet_t* packet, void *data);
  *
  * @param libtrace The input trace to start
  * @param global_blob Global data related to this trace accessible using trace_get_global()
- * @param per_msg A user supplied function called when a message is ready
- * @param reporter A user supplied function called when a result is ready.
+ * @param per_packet_cbs A set of user supplied functions to be called in response to events being observed by the per_pkt threads.
+ * @param reporter_cbs A set of user supplied functions to be called in response to events / results being seen by the reporter thread.
  * Optional if NULL the reporter thread will not be started.
  * @return 0 on success, otherwise -1 to indicate an error has occurred
  *
  * This can also be used to restart an existing parallel trace,
  * that has previously been paused using trace_ppause().
- * In this case global_blob,per_msg and reporter will only be updated
- * if they are non-null. Otherwise their previous values will be maintained.
+ * In this case global_blob, per_packet_cbs and reporter_cbs will only be
+ * updated if they are non-null. Otherwise their previous values will be
+ * maintained.
  *
  */
 DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob,
-                           fn_cb_msg per_msg, fn_reporter reporter);
+                           libtrace_callback_set_t *per_packet_cbs,
+                           libtrace_callback_set_t *reporter_cbs);
 
 /**
  *
@@ -538,6 +540,36 @@ typedef libtrace_packet_t* (*fn_cb_packet)(libtrace_t *libtrace,
                                            void *tls,
                                            libtrace_packet_t *packet);
 
+/**
+ * Callback for handling a result message. Should only be required by the
+ * reporter thread.
+ *
+ * @param libtrace The parallel trace
+ * @param sender The thread that generated this result
+ * @param global The global storage
+ * @param tls The thread local storage
+ * @param result The result associated with the message
+ *
+ */
+typedef void (*fn_cb_result)(libtrace_t *libtrace, libtrace_thread_t *sender,
+                void *global, void *tls, libtrace_result_t *result);
+
+
+/**
+ * Callback for handling any user-defined message types. This will handle
+ * any messages with a type >= MESSAGE_USER.
+ *
+ * @param libtrace The parallel trace
+ * @param t The thread
+ * @param global The global storage
+ * @param tls The thread local storage
+ * @param mesg The code identifying the message type
+ * @param data The data associated with the message
+ *
+ */
+typedef void (*fn_cb_usermessage) (libtrace_t *libtrace, libtrace_thread_t *t,
+                void *global, void *tls, int mesg, libtrace_generic_t data);
+
 /** Registers a built-in message with a handler.
  * Note we do not include the sending thread as an argument to the reporter.
  * If set to NULL, the message will be sent to default perpkt handler.
@@ -547,14 +579,35 @@ typedef libtrace_packet_t* (*fn_cb_packet)(libtrace_t *libtrace,
  * @return 0 if successful otherwise -1.
  */
 
-DLLEXPORT int trace_cb_starting(libtrace_t *libtrace, fn_cb_starting handler);
-DLLEXPORT int trace_cb_stopping(libtrace_t *libtrace, fn_cb_dataless handler);
-DLLEXPORT int trace_cb_resuming(libtrace_t *libtrace, fn_cb_dataless handler);
-DLLEXPORT int trace_cb_pausing(libtrace_t *libtrace, fn_cb_dataless handler);
-DLLEXPORT int trace_cb_packet(libtrace_t *libtrace, fn_cb_packet handler);
-DLLEXPORT int trace_cb_first_packet(libtrace_t *libtrace, fn_cb_first_packet handler);
-DLLEXPORT int trace_cb_tick_count(libtrace_t *libtrace, fn_cb_tick handler);
-DLLEXPORT int trace_cb_tick_interval(libtrace_t *libtrace, fn_cb_tick handler);
+DLLEXPORT int trace_set_starting_cb(libtrace_callback_set_t *cbset,
+                fn_cb_starting handler);
+
+DLLEXPORT int trace_set_stopping_cb(libtrace_callback_set_t *cbset,
+                fn_cb_dataless handler);
+
+DLLEXPORT int trace_set_resuming_cb(libtrace_callback_set_t *cbset,
+                fn_cb_dataless handler);
+
+DLLEXPORT int trace_set_pausing_cb(libtrace_callback_set_t *cbset,
+                fn_cb_dataless handler);
+
+DLLEXPORT int trace_set_packet_cb(libtrace_callback_set_t *cbset,
+                fn_cb_packet handler);
+
+DLLEXPORT int trace_set_first_packet_cb(libtrace_callback_set_t *cbset,
+                fn_cb_first_packet handler);
+
+DLLEXPORT int trace_set_result_cb(libtrace_callback_set_t *cbset,
+                fn_cb_result handler);
+
+DLLEXPORT int trace_set_tick_count_cb(libtrace_callback_set_t *cbset,
+                fn_cb_tick handler);
+
+DLLEXPORT int trace_set_tick_interval_cb(libtrace_callback_set_t *cbset,
+                fn_cb_tick handler);
+
+DLLEXPORT int trace_set_user_message_cb(libtrace_callback_set_t *cbset,
+                fn_cb_usermessage handler);
 
 /** Pauses a trace previously started with trace_pstart()
  *

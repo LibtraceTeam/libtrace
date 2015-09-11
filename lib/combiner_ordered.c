@@ -64,7 +64,9 @@ inline static int peek_queue(libtrace_t *trace, libtrace_combine_t *c,
                                 /* Pass straight to reporter */
                                 libtrace_generic_t gt = {.res = &r};
                                 ASSERT_RET (libtrace_deque_pop_front(v, (void *) &r), == 1);
-                                trace->reporter(trace, MESSAGE_RESULT, gt, &trace->reporter_thread);
+                                send_message(trace, &trace->reporter_thread,
+                                                MESSAGE_RESULT, gt,
+                                                &trace->reporter_thread);
                                 return 0;
                         }
                         /* Tick matches packet order */
@@ -87,7 +89,9 @@ inline static int peek_queue(libtrace_t *trace, libtrace_combine_t *c,
                                 /* Pass straight to reporter */
                                 libtrace_generic_t gt = {.res = &r};
                                 ASSERT_RET (libtrace_deque_pop_front(v, (void *) &r), == 1);
-                                trace->reporter(trace, MESSAGE_RESULT, gt, &trace->reporter_thread);
+                                send_message(trace, &trace->reporter_thread,
+                                                MESSAGE_RESULT, gt,
+                                                &trace->reporter_thread);
                                 return 0;
                         }
                         /* Tick matches packet order */
@@ -151,7 +155,9 @@ inline static void read_internal(libtrace_t *trace, libtrace_combine_t *c, const
 		libtrace_generic_t gt = {.res = &r};
 
 		ASSERT_RET (libtrace_deque_pop_front(&queues[min_queue], (void *) &r), == 1);
-		trace->reporter(trace, MESSAGE_RESULT, gt, &trace->reporter_thread);
+                send_message(trace, &trace->reporter_thread,
+                                MESSAGE_RESULT, gt,
+                                NULL);
 
 		// Now update the one we just removed
                 peeked = next_message(&queues[min_queue]);

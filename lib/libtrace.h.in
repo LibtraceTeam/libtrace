@@ -252,6 +252,9 @@ typedef struct libtrace_filter_t libtrace_filter_t;
 /** Opaque structure holding information about libtrace thread */
 typedef struct libtrace_thread_t libtrace_thread_t;
 
+/** Opaque structure holding callback functions for libtrace threads */
+typedef struct callback_set libtrace_callback_set_t;
+
 /** If the packet has allocated its own memory the buffer_control should be
  * set to TRACE_CTRL_PACKET, so that the memory will be freed when the packet
  * is destroyed. If the packet has been zerocopied out of memory owned by
@@ -1478,6 +1481,20 @@ DLLEXPORT void trace_destroy_dead(libtrace_t *trace);
  * @param trace		The output trace to be destroyed
  */
 DLLEXPORT void trace_destroy_output(libtrace_out_t *trace);
+
+/** Create a callback set that can be used to define callbacks for parallel
+  * libtrace threads.
+  *
+  * @return A pointer to a freshly allocated callback set.
+  */
+DLLEXPORT libtrace_callback_set_t *trace_create_callback_set();
+
+/** Destroys a callback set, freeing up an resources it was using.
+ *
+ * @param cbset         The callback set to be destroyed.
+ */
+DLLEXPORT void trace_destroy_callback_set(libtrace_callback_set_t *cbset);
+
 
 /** Check (and clear) the current error state of an input trace
  * @param trace		The input trace to check the error state on

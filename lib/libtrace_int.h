@@ -284,6 +284,20 @@ struct user_configuration {
 };
 #define ZERO_USER_CONFIG(config) memset(&config, 0, sizeof(struct user_configuration));
 
+struct callback_set {
+
+        fn_cb_starting message_starting;
+        fn_cb_dataless message_stopping;
+        fn_cb_dataless message_resuming;
+        fn_cb_dataless message_pausing;
+        fn_cb_packet message_packet;
+        fn_cb_result message_result;
+        fn_cb_first_packet message_first_packet;
+        fn_cb_tick message_tick_count;
+        fn_cb_tick message_tick_interval;
+        fn_cb_usermessage message_user;
+};
+
 /** A libtrace input trace 
  * @internal
  */
@@ -332,10 +346,6 @@ struct libtrace_t {
 	void* global_blob;
 	/** The actual freelist */
 	libtrace_ocache_t packet_freelist;
-	/** User defined per_msg function called when a message is ready */
-	fn_cb_msg per_msg;
-	/** User defined reporter function entry point */
-	fn_reporter reporter;
 	/** The hasher function */
 	enum hasher_types hasher_type;
 	/** The hasher function - NULL implies they don't care or balance */
@@ -360,16 +370,13 @@ struct libtrace_t {
 	libtrace_stat_t *stats;
 	struct user_configuration config;
 	libtrace_combine_t combiner;
-	struct {
-		fn_cb_starting message_starting;
-		fn_cb_dataless message_stopping;
-		fn_cb_dataless message_resuming;
-		fn_cb_dataless message_pausing;
-		fn_cb_packet message_packet;
-		fn_cb_first_packet message_first_packet;
-		fn_cb_tick message_tick_count;
-		fn_cb_tick message_tick_interval;
-	} callbacks;
+	
+        /* Set of callbacks to be executed by per packet threads in response
+         * to various messages. */
+        struct callback_set *perpkt_cbs;
+        /* Set of callbacks to be executed by the reporter thread in response
+         * to various messages. */
+        struct callback_set *reporter_cbs;
 };
 
 #define LIBTRACE_STAT_MAGIC 0x41
@@ -379,6 +386,10 @@ void libtrace_zero_thread(libtrace_thread_t * t);
 void store_first_packet(libtrace_t *libtrace, libtrace_packet_t *packet, libtrace_thread_t *t);
 libtrace_thread_t * get_thread_table(libtrace_t *libtrace);
 
+
+void send_message(libtrace_t *trace, libtrace_thread_t *target,
+                const enum libtrace_messages type,
+                libtrace_generic_t data, libtrace_thread_t *sender);
 
 /** A libtrace output trace
  * @internal
