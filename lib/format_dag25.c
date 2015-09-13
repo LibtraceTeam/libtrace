@@ -693,16 +693,16 @@ static int dag_pstart_input(libtrace_t *libtrace)
 	max_streams = dag_rx_get_stream_count(FORMAT_DATA->device->fd);
 	if (libtrace->perpkt_thread_count > max_streams) {
 		trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT,
-			      "trying to create too many threads (max is %u)",
+			      "WARNING: DAG has only %u streams available, "
+                              "capping total number of threads at this value.",
 			      max_streams);
-		iserror = 1;
-		goto cleanup;
-	}
+	        libtrace->perpkt_thread_count = max_streams;
+        }
 
 	/* Get the stream names from the uri */
 	if ((scan = strchr(libtrace->uridata, ',')) == NULL) {
 		trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT,
-			      "format uri doesn't specify the DAG streams");
+			      "Format uri doesn't specify the DAG streams");
 		iserror = 1;
 		goto cleanup;
 	}
@@ -714,11 +714,12 @@ static int dag_pstart_input(libtrace_t *libtrace)
 		/* Ensure we haven't specified too many streams */
 		if (stream_count >= libtrace->perpkt_thread_count) {
 			trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT,
-				      "format uri specifies too many streams. "
-				      "Max is %u", max_streams);
-			iserror = 1;
-			goto cleanup;
-		}
+				      "WARNING: Format uri specifies too many "
+                                      "streams. Maximum is %u, so only using "
+                                      "the first %u from the uri.",
+                                      max_streams);
+		        break;
+                }
 
 		/* Save the stream details */
 		if (stream_count == 0) {
