@@ -558,28 +558,29 @@ static int erf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 }
 
 static int erf_dump_packet(libtrace_out_t *libtrace,
-		dag_record_t *erfptr, unsigned int pad, void *buffer) {
+		dag_record_t *erfptr, int framinglen, void *buffer,
+                int caplen) {
 	int numbytes = 0;
 	int size;
 
 	if ((numbytes = 
 		wandio_wwrite(OUTPUT->file, 
 				erfptr,
-				(size_t)(dag_record_size + pad))) 
-			!= (int)(dag_record_size+pad)) {
+				(size_t)(framinglen))) 
+			!= (int)(framinglen)) {
 		trace_set_err_out(libtrace,errno,
 				"write(%s)",libtrace->uridata);
 		return -1;
 	}
 
-	size=ntohs(erfptr->rlen)-(dag_record_size+pad);
-	numbytes=wandio_wwrite(OUTPUT->file, buffer, (size_t)size);
+	size=caplen-(framinglen);
+        numbytes=wandio_wwrite(OUTPUT->file, buffer, (size_t)size);
 	if (numbytes != size) {
 		trace_set_err_out(libtrace,errno,
 				"write(%s)",libtrace->uridata);
 		return -1;
 	}
-	return numbytes + pad + dag_record_size;
+	return numbytes + framinglen;
 }
 
 static int erf_start_output(libtrace_out_t *libtrace)
@@ -652,8 +653,9 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 	if (packet->type == TRACE_RT_DATA_ERF) {
 			numbytes = erf_dump_packet(libtrace,
 				(dag_record_t *)packet->header,
-				pad,
-				payload
+				trace_get_framing_length(packet),
+				payload,
+                                trace_get_capture_length(packet)
 				);
 	} else {
 		dag_record_t erfhdr;
@@ -697,8 +699,9 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 		/* Write it out */
 		numbytes = erf_dump_packet(libtrace,
 				&erfhdr,
-				pad,
-				payload);
+				framing,
+				payload,
+                                trace_get_capture_length(packet));
 	}
 	return numbytes;
 }
