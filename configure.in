@@ -210,6 +210,8 @@ else
 	AC_DEFINE([HAVE_LIBWANDIO],1,[compile with libwandio support])
 fi
 
+AC_CHECK_LIB(crypto, EVP_EncryptInit_ex, cryptofound=1, cryptofound=0)
+
 # Check for libpcap
 AC_CHECK_LIB(pcap,pcap_next_ex,pcapfound=1,pcapfound=0)
 AC_CHECK_LIB(pcap,pcap_create,pcapcreate=1,pcapcreate=0)
@@ -471,6 +473,13 @@ if test "$have_pthread_setname_np" = 1; then
 	AC_DEFINE(HAVE_PTHREAD_SETNAME_NP, 1, [Set to 1 if pthread_setname_np is found])
 fi
 
+if test "$cryptofound" = 1; then
+        AC_DEFINE(HAVE_LIBCRYPTO, 1, [Set to 1 if libcrypto is available])
+        TOOLS_LIBS="$TOOLS_LIBS -lcrypto"
+        have_crypto=yes
+else
+        have_crypto=no
+fi
 
 if test "$have_nsl" = 1; then
 	if test "$ac_cv_search_inet_ntop" != "none required"; then
@@ -653,6 +662,7 @@ fi
 reportopt "Compiled with LLVM BPF JIT support" $JIT
 reportopt "Building man pages/documentation" $libtrace_doxygen
 reportopt "Building tracetop (requires libncurses)" $with_ncurses
+reportopt "Building traceanon with CryptoPan (requires libcrypto)" $have_crypto
 
 # Report any errors relating to missing bison, flex, etc.
 echo 
