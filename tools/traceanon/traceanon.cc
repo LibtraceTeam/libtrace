@@ -1,4 +1,5 @@
-#define _GNU_SOURCE
+#include "config.h"
+#include "Anon.h"
 #include "libtrace_parallel.h"
 #include <stdio.h>
 #include <unistd.h>
@@ -17,25 +18,16 @@ bool enc_dest 	= false;
 enum enc_type_t enc_type = ENC_NONE;
 char *key = NULL;
 
+int level = -1;
+trace_option_compresstype_t compress_type = TRACE_OPTION_COMPRESSTYPE_NONE;
 
 struct libtrace_t *trace = NULL;
 
 static void cleanup_signal(int signal)
 {
-	static int s = 0;
 	(void)signal;
-    //trace_interrupt();
 	// trace_pstop isn't really signal safe because its got lots of locks in it
-    trace_pstop(trace);
-    /*if (s == 0) {
-		if (trace_ppause(trace) == -1)
-			trace_perror(trace, "Pause failed");
-	}
-	else {
-		if (trace_pstart(trace, NULL, NULL, NULL) == -1)
-			trace_perror(trace, "Start failed");
-    }*/
-	s = !s;
+        trace_pstop(trace);
 }
 
 
@@ -48,30 +40,32 @@ static void usage(char *argv0)
 	"-d --encrypt-dest	Encrypt the destination addresses\n"
 	"-c --cryptopan=key	Encrypt the addresses with the cryptopan\n"
 	"			prefix preserving\n"
-	"-f --keyfile=file      A file containing the cryptopan key\n"
+	"-F --keyfile=file      A file containing the cryptopan key\n"
 	"-p --prefix=C.I.D.R/bits Substitute the prefix of the address\n"
-	"-H --libtrace-help	Print libtrace runtime documentation\n"
+	"-h --help	        Print this usage information\n"
 	"-z --compress-level	Compress the output trace at the specified level\n"
 	"-Z --compress-type 	Compress the output trace using the specified"
 	"			compression algorithm\n"
+        "-t --threads=max       Use this number of threads for packet processing\n"
 	,argv0);
 	exit(1);
 }
 
 /* Incrementally update a checksum */
-static void update_in_cksum(uint16_t *csum, uint16_t old, uint16_t new)
+static void update_in_cksum(uint16_t *csum, uint16_t old, uint16_t newval)
 {
-	uint32_t sum = (~htons(*csum) & 0xFFFF) 
-		     + (~htons(old) & 0xFFFF) 
-		     + htons(new);
+	uint32_t sum = (~htons(*csum) & 0xFFFF)
+		     + (~htons(old) & 0xFFFF)
+		     + htons(newval);
 	sum = (sum & 0xFFFF) + (sum >> 16);
 	*csum = htons(~(sum + (sum >> 16)));
 }
 
-static void update_in_cksum32(uint16_t *csum, uint32_t old, uint32_t new)
+UNUSED static void update_in_cksum32(uint16_t *csum, uint32_t old,
+                uint32_t newval)
 {
-	update_in_cksum(csum,(uint16_t)(old>>16),(uint16_t)(new>>16));
-	update_in_cksum(csum,(uint16_t)(old&0xFFFF),(uint16_t)(new&0xFFFF));
+	update_in_cksum(csum,(uint16_t)(old>>16),(uint16_t)(newval>>16));
+	update_in_cksum(csum,(uint16_t)(old&0xFFFF),(uint16_t)(newval&0xFFFF));
 }
 
 /* Ok this is remarkably complicated
@@ -84,35 +78,18 @@ static void update_in_cksum32(uint16_t *csum, uint32_t old, uint32_t new)
  * the opposite direction so we need to encrypt the destination and
  * source instead of the source and destination!
  */
-static void encrypt_ips(struct libtrace_ip *ip,bool enc_source,bool enc_dest)
+static void encrypt_ips(Anonymiser *anon, struct libtrace_ip *ip,
+                bool enc_source,bool enc_dest)
 {
-	struct libtrace_tcp *tcp;
-	struct libtrace_udp *udp;
-	struct libtrace_icmp *icmp;
-
-	tcp=trace_get_tcp_from_ip(ip,NULL);
-	udp=trace_get_udp_from_ip(ip,NULL);
-	icmp=trace_get_icmp_from_ip(ip,NULL);
+	libtrace_icmp_t *icmp=trace_get_icmp_from_ip(ip,NULL);
 
 	if (enc_source) {
-		uint32_t old_ip=ip->ip_src.s_addr;
-		uint32_t new_ip=htonl(enc_ip(
-					htonl(ip->ip_src.s_addr)
-					));
-		update_in_cksum32(&ip->ip_sum,old_ip,new_ip);
-		if (tcp) update_in_cksum32(&tcp->check,old_ip,new_ip);
-		if (udp) update_in_cksum32(&udp->check,old_ip,new_ip);
+		uint32_t new_ip=htonl(anon->anonIPv4(ntohl(ip->ip_src.s_addr)));
 		ip->ip_src.s_addr = new_ip;
 	}
 
 	if (enc_dest) {
-		uint32_t old_ip=ip->ip_dst.s_addr;
-		uint32_t new_ip=htonl(enc_ip(
-					htonl(ip->ip_dst.s_addr)
-					));
-		update_in_cksum32(&ip->ip_sum,old_ip,new_ip);
-		if (tcp) update_in_cksum32(&tcp->check,old_ip,new_ip);
-		if (udp) update_in_cksum32(&udp->check,old_ip,new_ip);
+		uint32_t new_ip=htonl(anon->anonIPv4(ntohl(ip->ip_dst.s_addr)));
 		ip->ip_dst.s_addr = new_ip;
 	}
 
@@ -125,7 +102,7 @@ static void encrypt_ips(struct libtrace_ip *ip,bool enc_source,bool enc_dest)
 				|| icmp->type == 5 
 				|| icmp->type == 11) {
 			char *ptr = (char *)icmp;
-			encrypt_ips(
+			encrypt_ips(anon,
 				(struct libtrace_ip*)(ptr+
 					sizeof(struct libtrace_icmp)),
 				enc_dest,
@@ -137,120 +114,177 @@ static void encrypt_ips(struct libtrace_ip *ip,bool enc_source,bool enc_dest)
 	}
 }
 
+static void encrypt_ipv6(Anonymiser *anon, libtrace_ip6_t *ip6,
+                bool enc_source, bool enc_dest) {
 
-UNUSED static uint64_t bad_hash(UNUSED libtrace_packet_t * pkt)
-{
-	return 0;
+        uint8_t previp[16];
+
+	if (enc_source) {
+                memcpy(previp, &(ip6->ip_src.s6_addr), 16);
+		anon->anonIPv6(previp, (uint8_t *)&(ip6->ip_src.s6_addr));
+	}
+
+	if (enc_dest) {
+                memcpy(previp, &(ip6->ip_dst.s6_addr), 16);
+		anon->anonIPv6(previp, (uint8_t *)&(ip6->ip_dst.s6_addr));
+	}
+
 }
 
 
-UNUSED static uint64_t rand_hash(UNUSED libtrace_packet_t * pkt)
-{
-	return rand();
-}
+static libtrace_packet_t *per_packet(libtrace_t *trace, libtrace_thread_t *t,
+        void *global, void *tls, libtrace_packet_t *packet) {
 
-
-static void* per_packet(libtrace_t *trace, libtrace_thread_t *t,
-                        int mesg, libtrace_generic_t data,
-                        libtrace_thread_t *sender UNUSED)
-{
 	struct libtrace_ip *ipptr;
+        libtrace_ip6_t *ip6;
 	libtrace_udp_t *udp = NULL;
 	libtrace_tcp_t *tcp = NULL;
-	libtrace_stat_t *stats = NULL;
-	switch (mesg) {
-	case MESSAGE_PACKET:
-		ipptr = trace_get_ip(data.pkt);
+        libtrace_icmp6_t *icmp6 = NULL;
+        Anonymiser *anon = (Anonymiser *)tls;
+        libtrace_generic_t result;
 
-		if (ipptr && (enc_source || enc_dest)) {
-			encrypt_ips(ipptr,enc_source,enc_dest);
-			ipptr->ip_sum = 0;
-		}
+        ipptr = trace_get_ip(packet);
+        ip6 = trace_get_ip6(packet);
 
-		/* Replace checksums so that IP encryption cannot be
-		 * reversed */
+        if (ipptr && (enc_source || enc_dest)) {
+                encrypt_ips(anon, ipptr,enc_source,enc_dest);
+                ipptr->ip_sum = 0;
+        } else if (ip6 && (enc_source || enc_dest)) {
+                encrypt_ipv6(anon, ip6, enc_source, enc_dest);
+        }
 
-		/* XXX replace with nice use of trace_get_transport() */
 
-		udp = trace_get_udp(data.pkt);
-		if (udp && (enc_source || enc_dest)) {
-			udp->check = 0;
-		} 
+        /* Replace checksums so that IP encryption cannot be
+         * reversed -- TODO allow checksums to be updated and remain valid
+         * for the new addresses */
 
-		tcp = trace_get_tcp(data.pkt);
-		if (tcp && (enc_source || enc_dest)) {
-			tcp->check = 0;
-		}
+        /* XXX replace with nice use of trace_get_transport() */
 
-		/* TODO: Encrypt IP's in ARP packets */
-		
-		// Send our result keyed with the time
-		// Arg don't copy packets
-		//libtrace_packet_t * packet_copy = trace_copy_packet(packet);
-		//libtrace_packet_t * packet_copy = trace_result_packet(trace, pkt);
-		//trace_publish_result(trace, trace_packet_get_order(pkt), pkt);
+        udp = trace_get_udp(packet);
+        if (udp && (enc_source || enc_dest)) {
+                udp->check = 0;
+        }
 
-		trace_publish_result(trace, t, trace_packet_get_order(data.pkt), data, RESULT_PACKET);
-		break;
-	case MESSAGE_STARTING:
-		enc_init(enc_type,key);
-		break;
-	case MESSAGE_TICK_INTERVAL:
-		trace_publish_result(trace, t, data.uint64, (libtrace_generic_t){0}, RESULT_TICK_INTERVAL);
-		break;
-	case MESSAGE_TICK_COUNT:
-		trace_publish_result(trace, t, data.uint64, (libtrace_generic_t){0}, RESULT_TICK_COUNT);
-		break;
-	case MESSAGE_STOPPING:
-		stats = trace_create_statistics();
-		trace_get_thread_statistics(trace, t, stats);
-		trace_print_statistics(stats, stderr, NULL);
-		free(stats);
-		stats = trace_get_statistics(trace, NULL);
-		trace_print_statistics(stats, stderr, NULL);
-		//fprintf(stderr, "tracestats_parallel:\t Stopping thread - publishing results\n");
-		break;
-	}
-	return NULL;
+        tcp = trace_get_tcp(packet);
+        if (tcp && (enc_source || enc_dest)) {
+                tcp->check = 0;
+        }
+
+        icmp6 = trace_get_icmp6(packet);
+        if (icmp6 && (enc_source || enc_dest)) {
+                icmp6->checksum = 0;
+        }
+
+        /* TODO: Encrypt IP's in ARP packets */
+        result.pkt = packet;
+        trace_publish_result(trace, t, trace_packet_get_order(packet), result, RESULT_PACKET);
+
+        return NULL;
 }
 
-struct libtrace_out_t *writer = 0;
+static void *start_anon(libtrace_t *trace, libtrace_thread_t *t, void *global)
+{
+        if (enc_type == ENC_PREFIX_SUBSTITUTION) {
+                PrefixSub *sub = new PrefixSub(key, NULL);
+                return sub;
+        }
 
-static void write_out(libtrace_t *trace UNUSED, int mesg,
-                      libtrace_generic_t data,
-                      libtrace_thread_t *sender UNUSED) {
-	static uint64_t packet_count = 0; // TESTING PURPOSES, this is not going to work with a live format
+        if (enc_type == ENC_CRYPTOPAN) {
+#ifdef HAVE_LIBCRYPTO                
+                CryptoAnon *anon = new CryptoAnon((uint8_t *)key,
+                        (uint8_t)strlen(key), 20);
+                return anon;
+#else
+                /* TODO nicer way of exiting? */
+                fprintf(stderr, "Error: requested CryptoPan anonymisation but "
+                        "libtrace was built without libcrypto support!\n");
+                exit(1);
+#endif
+        }
 
-	switch (mesg) {
-	case MESSAGE_RESULT:
-		if (data.res->type == RESULT_PACKET) {
-			libtrace_packet_t *packet = (libtrace_packet_t*) data.res->value.pkt;
-			assert(data.res->key >= packet_count);
-			packet_count = data.res->key;
-			if (trace_write_packet(writer,packet)==-1) {
-				trace_perror_output(writer,"writer");
-				trace_interrupt();
-			}
-			trace_free_packet(trace, packet);
-
-		} else {
-			assert(data.res->type == RESULT_TICK_COUNT || data.res->type == RESULT_TICK_INTERVAL);
-			// Ignore it
-		}
-	}
+        return NULL;
 }
 
+static void end_anon(libtrace_t *trace, libtrace_thread_t *t, void *global,
+                void *tls) {
+        Anonymiser *anon = (Anonymiser *)tls;
+        delete(anon);
+
+}
+
+static void *init_output(libtrace_t *trace, libtrace_thread_t *t, void *global)
+{
+        libtrace_out_t *writer = NULL;
+        char *outputname = (char *)global;
+	
+        writer = trace_create_output(outputname);
+
+        if (trace_is_err_output(writer)) {
+		trace_perror_output(writer,"trace_create_output");
+		trace_destroy_output(writer);
+		return NULL;
+	}
+	
+	/* Hopefully this will deal nicely with people who want to crank the
+	 * compression level up to 11 :) */
+	if (level > 9) {
+		fprintf(stderr, "WARNING: Compression level > 9 specified, setting to 9 instead\n");
+		level = 9;
+	}
+
+	if (level >= 0 && trace_config_output(writer, 
+			TRACE_OPTION_OUTPUT_COMPRESS, &level) == -1) {
+		trace_perror_output(writer, "Configuring compression level");
+		trace_destroy_output(writer);
+		return NULL;
+	}
+
+	if (trace_config_output(writer, TRACE_OPTION_OUTPUT_COMPRESSTYPE,
+				&compress_type) == -1) {
+		trace_perror_output(writer, "Configuring compression type");
+		trace_destroy_output(writer);
+		return NULL;
+	}
+
+	if (trace_start_output(writer)==-1) {
+		trace_perror_output(writer,"trace_start_output");
+		trace_destroy_output(writer);
+		return NULL;
+	}
+
+        return writer;
+
+}
+
+static void write_packet(libtrace_t *trace, libtrace_thread_t *sender,
+                      void *global, void *tls, libtrace_result_t *result) {
+	libtrace_packet_t *packet = (libtrace_packet_t*) result->value.pkt;
+        libtrace_out_t *writer = (libtrace_out_t *)tls;
+
+        if (writer != NULL && trace_write_packet(writer,packet)==-1) {
+                trace_perror_output(writer,"writer");
+                trace_interrupt();
+        }
+        trace_free_packet(trace, packet);
+}
+
+static void end_output(libtrace_t *trace, libtrace_thread_t *t, void *global,
+                void *tls) {
+        libtrace_out_t *writer = (libtrace_out_t *)tls;
+
+        trace_destroy_output(writer);
+}
 
 int main(int argc, char *argv[]) 
 {
 	//struct libtrace_t *trace = 0;
 	struct sigaction sigact;
 	char *output = 0;
-	int level = -1;
 	char *compress_type_str=NULL;
-	trace_option_compresstype_t compress_type = TRACE_OPTION_COMPRESSTYPE_NONE;
-	char *config = NULL;
-	char *config_file = NULL;
+        int maxthreads = 4;
+        libtrace_callback_set_t *pktcbs = NULL;
+        libtrace_callback_set_t *repcbs = NULL;
+        int exitcode = 0;
 
 	if (argc<2)
 		usage(argv[0]);
@@ -261,17 +295,16 @@ int main(int argc, char *argv[])
 			{ "encrypt-source", 	0, 0, 's' },
 			{ "encrypt-dest",	0, 0, 'd' },
 			{ "cryptopan",		1, 0, 'c' },
-			{ "cryptopan-file",	1, 0, 'f' },
+			{ "cryptopan-file",	1, 0, 'F' },
 			{ "prefix",		1, 0, 'p' },
+			{ "threads",		1, 0, 't' },
 			{ "compress-level",	1, 0, 'z' },
 			{ "compress-type",	1, 0, 'Z' },
-			{ "libtrace-help", 	0, 0, 'H' },
-			{ "config",		1, 0, 'u' },
-		    { "config-file",		1, 0, 'U' },
+			{ "help",        	0, 0, 'h' },
 			{ NULL,			0, 0, 0   },
 		};
 
-		int c=getopt_long(argc, argv, "Z:z:sc:f:dp:Hu:U:",
+		int c=getopt_long(argc, argv, "Z:z:sc:f:dp:ht:",
 				long_options, &option_index);
 
 		if (c==-1)
@@ -290,7 +323,7 @@ int main(int argc, char *argv[])
 				  key=strdup(optarg);
 				  enc_type = ENC_CRYPTOPAN;
 				  break;
-		        case 'f':
+		        case 'F': {
 			          if(key != NULL) {
 				    fprintf(stderr,"You can only have one encryption type and one key\n");
 				    usage(argv[0]);
@@ -309,6 +342,7 @@ int main(int argc, char *argv[])
 				  fclose(infile);
 				  enc_type = ENC_CRYPTOPAN;
 				  break;
+                        }
 		        case 'p':
 				  if (key!=NULL) {
 					  fprintf(stderr,"You can only have one encryption type and one key\n");
@@ -317,16 +351,13 @@ int main(int argc, char *argv[])
 				  key=strdup(optarg);
 				  enc_type = ENC_PREFIX_SUBSTITUTION;
 				  break;
-			case 'H': 
-				  trace_help(); 
-				  exit(1); 
-				  break;
-			case 'u':
-				config = optarg;
-				break;
-			case 'U':
-				config_file = optarg;
-				break;
+			case 'h': 
+                                  usage(argv[0]);
+                        case 't':
+                                  maxthreads=atoi(optarg);
+                                  if (maxthreads <= 0)
+                                          maxthreads = 1;
+                                  break;
 			default:
 				fprintf(stderr,"unknown option: %c\n",c);
 				usage(argv[0]);
@@ -367,8 +398,8 @@ int main(int argc, char *argv[])
 	trace = trace_create(argv[optind]);
 	if (trace_is_err(trace)) {
 		trace_perror(trace,"trace_create");
-		trace_destroy(trace);
-		return 1;
+		exitcode = 1;
+                goto exitanon;
 	}
 
 	if (optind +1>= argc) {
@@ -376,79 +407,33 @@ int main(int argc, char *argv[])
 		 * stdout 
 		 */
 		output = strdup("erf:-");
-		writer = trace_create_output(output);
 	} else {
-		writer = trace_create_output(argv[optind +1]);
+		output = argv[optind +1];
 	}
-	if (trace_is_err_output(writer)) {
-		trace_perror_output(writer,"trace_create_output");
-		trace_destroy_output(writer);
-		trace_destroy(trace);
-		return 1;
-	}
-	
-	/* Hopefully this will deal nicely with people who want to crank the
-	 * compression level up to 11 :) */
-	if (level > 9) {
-		fprintf(stderr, "WARNING: Compression level > 9 specified, setting to 9 instead\n");
-		level = 9;
-	}
-
-	if (level >= 0 && trace_config_output(writer, 
-			TRACE_OPTION_OUTPUT_COMPRESS, &level) == -1) {
-		trace_perror_output(writer, "Configuring compression level");
-		trace_destroy_output(writer);
-		trace_destroy(trace);
-		return 1;
-	}
-
-	if (trace_config_output(writer, TRACE_OPTION_OUTPUT_COMPRESSTYPE,
-				&compress_type) == -1) {
-		trace_perror_output(writer, "Configuring compression type");
-		trace_destroy_output(writer);
-		trace_destroy(trace);
-		return 1;
-	}
-
-	if (trace_start_output(writer)==-1) {
-		trace_perror_output(writer,"trace_start_output");
-		trace_destroy_output(writer);
-		trace_destroy(trace);
-		return 1;
-	}
-
 	// OK parallel changes start here
 
 	/* Set a special mode flag that means the output is timestamped
 	 * and ordered before its read into reduce. Seems like a good
 	 * special case to have.
 	 */
-
-	/* Apply config */
-	if (config) {
-		trace_set_configuration(trace, config);
-	}
-
-	if (config_file) {
-		FILE * f = fopen(optarg, "r");
-		if (f != NULL) {
-			trace_set_configuration_file(trace, f);
-			fclose(f);
-		} else {
-			perror("Failed to open configuration file\n");
-			usage(argv[0]);
-		}
-	}
-
 	trace_set_combiner(trace, &combiner_ordered, (libtrace_generic_t){0});
 
-	//trace_set_hasher(trace, HASHER_CUSTOM, rand_hash, NULL);
-	
-	if (trace_pstart(trace, NULL, &per_packet, &write_out)==-1) {
+        pktcbs = trace_create_callback_set();
+        trace_set_packet_cb(pktcbs, per_packet);
+        trace_set_stopping_cb(pktcbs, end_anon);
+        trace_set_starting_cb(pktcbs, start_anon);
+
+        repcbs = trace_create_callback_set();
+        trace_set_result_cb(repcbs, write_packet);
+        trace_set_stopping_cb(repcbs, end_output);
+        trace_set_starting_cb(repcbs, init_output);
+
+        trace_set_perpkt_threads(trace, maxthreads);
+
+	if (trace_pstart(trace, output, pktcbs, repcbs)==-1) {
 		trace_perror(trace,"trace_start");
-		trace_destroy_output(writer);
-		trace_destroy(trace);
-		return 1;
+		exitcode = 1;
+                goto exitanon;
 	}
 
 	sigact.sa_handler = cleanup_signal;
@@ -460,10 +445,13 @@ int main(int argc, char *argv[])
 
 	// Wait for the trace to finish
 	trace_join(trace);
-	
-	//trace_destroy_packet(packet);
-	//print_contention_stats(trace);
-	trace_destroy(trace);
-	trace_destroy_output(writer);
-	return 0;
+
+exitanon:
+        if (pktcbs)
+                trace_destroy_callback_set(pktcbs);
+        if (repcbs)
+                trace_destroy_callback_set(repcbs);
+        if (trace)
+        	trace_destroy(trace);
+	return exitcode;
 }
