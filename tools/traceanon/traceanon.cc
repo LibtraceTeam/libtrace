@@ -47,6 +47,8 @@ static void usage(char *argv0)
 	"-Z --compress-type 	Compress the output trace using the specified"
 	"			compression algorithm\n"
         "-t --threads=max       Use this number of threads for packet processing\n"
+        "-f --filter=expr       Discard all packets that do not match the\n"
+        "                       provided BPF expression\n"
 	,argv0);
 	exit(1);
 }
@@ -285,6 +287,8 @@ int main(int argc, char *argv[])
         libtrace_callback_set_t *pktcbs = NULL;
         libtrace_callback_set_t *repcbs = NULL;
         int exitcode = 0;
+        char *filterstring = NULL;
+        libtrace_filter_t *filter = NULL;
 
 	if (argc<2)
 		usage(argv[0]);
@@ -298,13 +302,14 @@ int main(int argc, char *argv[])
 			{ "cryptopan-file",	1, 0, 'F' },
 			{ "prefix",		1, 0, 'p' },
 			{ "threads",		1, 0, 't' },
+			{ "filter",		1, 0, 'f' },
 			{ "compress-level",	1, 0, 'z' },
 			{ "compress-type",	1, 0, 'Z' },
 			{ "help",        	0, 0, 'h' },
 			{ NULL,			0, 0, 0   },
 		};
 
-		int c=getopt_long(argc, argv, "Z:z:sc:f:dp:ht:",
+		int c=getopt_long(argc, argv, "Z:z:sc:f:dp:ht:f:",
 				long_options, &option_index);
 
 		if (c==-1)
@@ -343,6 +348,9 @@ int main(int argc, char *argv[])
 				  enc_type = ENC_CRYPTOPAN;
 				  break;
                         }
+                        case 'f':
+                                  filterstring = optarg;
+                                  break;
 		        case 'p':
 				  if (key!=NULL) {
 					  fprintf(stderr,"You can only have one encryption type and one key\n");
@@ -429,6 +437,17 @@ int main(int argc, char *argv[])
         trace_set_starting_cb(repcbs, init_output);
 
         trace_set_perpkt_threads(trace, maxthreads);
+
+        if (filterstring) {
+                filter = trace_create_filter(filterstring);
+        }
+
+        if (filter && trace_config(trace, TRACE_OPTION_FILTER, filter) == -1)
+        {
+                trace_perror(trace, "Configuring input filter");
+                exitcode = 1;
+                goto exitanon;
+        }
 
 	if (trace_pstart(trace, output, pktcbs, repcbs)==-1) {
 		trace_perror(trace,"trace_start");
