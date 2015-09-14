@@ -458,6 +458,8 @@ static int erf_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
 	} else {
 		packet->payload = (char*)packet->buffer + erf_get_framing_length(packet);
 	}
+
+        assert(erfptr->rlen != 0);
 	
 	if (libtrace->format_data == NULL) {
 		/* Allocates the format_data structure */
@@ -561,7 +563,6 @@ static int erf_dump_packet(libtrace_out_t *libtrace,
 		dag_record_t *erfptr, int framinglen, void *buffer,
                 int caplen) {
 	int numbytes = 0;
-	int size;
 
 	if ((numbytes = 
 		wandio_wwrite(OUTPUT->file, 
@@ -573,9 +574,8 @@ static int erf_dump_packet(libtrace_out_t *libtrace,
 		return -1;
 	}
 
-	size=caplen-(framinglen);
-        numbytes=wandio_wwrite(OUTPUT->file, buffer, (size_t)size);
-	if (numbytes != size) {
+        numbytes=wandio_wwrite(OUTPUT->file, buffer, (size_t)caplen);
+	if (numbytes != caplen) {
 		trace_set_err_out(libtrace,errno,
 				"write(%s)",libtrace->uridata);
 		return -1;
