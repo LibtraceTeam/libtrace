@@ -237,6 +237,7 @@ inline void send_message(libtrace_t *trace, libtrace_thread_t *thread,
                         (*cbs->message_result)(trace, thread,
                                         trace->global_blob, thread->user_data,
                                         data.res);
+                return;
 
 	/* These should be unused */
 	case MESSAGE_DO_PAUSE:
