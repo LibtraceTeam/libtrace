@@ -564,6 +564,9 @@ static int erf_dump_packet(libtrace_out_t *libtrace,
                 int caplen) {
 	int numbytes = 0;
 
+        if (caplen + framinglen != ntohs(erfptr->rlen))
+                erfptr->rlen = htons(caplen + framinglen);
+
 	if ((numbytes = 
 		wandio_wwrite(OUTPUT->file, 
 				erfptr,
