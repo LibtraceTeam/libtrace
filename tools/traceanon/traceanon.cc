@@ -10,7 +10,6 @@
 #include <string.h>
 #include <time.h>
 #include <assert.h>
-#include "ipenc.h"
 #include <signal.h>
 
 bool enc_source = false;
