@@ -265,7 +265,10 @@ static int rt_start_input(libtrace_t *libtrace) {
 	rt_header_t start_msg;
 
 	start_msg.type = htonl(TRACE_RT_START);
-	start_msg.length = 0; 
+	start_msg.length = 0;
+        start_msg.sequence = 0;
+        start_msg.version = LIBTRACE_RT_VERSION;
+        start_msg.magic = LIBTRACE_RT_MAGIC; 
 
 	if (rt_connect(libtrace) == -1)
 		return -1;
