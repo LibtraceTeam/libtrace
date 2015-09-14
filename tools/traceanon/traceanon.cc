@@ -12,6 +12,12 @@
 #include <assert.h>
 #include <signal.h>
 
+enum enc_type_t {
+        ENC_NONE,
+        ENC_CRYPTOPAN,
+        ENC_PREFIX_SUBSTITUTION
+};
+
 bool enc_source = false;
 bool enc_dest 	= false;
 enum enc_type_t enc_type = ENC_NONE;
@@ -28,8 +34,6 @@ static void cleanup_signal(int signal)
 	// trace_pstop isn't really signal safe because its got lots of locks in it
         trace_pstop(trace);
 }
-
-
 
 static void usage(char *argv0)
 {
