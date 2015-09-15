@@ -1,12 +1,13 @@
-/* A parallel libtrace program that prints a count of packets observered
- * after a 10 seconds of the trace running.
+/* A parallel libtrace program that prints a count of packets observed
+ * every 10 seconds.
  *
- * Using this approach allows results to be reported quickly for trracetime
- * formats, even if data is not arriving on a given thread. While maintaining
- * a consistant output when run on a file etc.
+ * Using this approach allows results to be reported promptly for live
+ * formats, even if data is not arriving on a given thread. This method also
+ * works perfectly fine when run against a trace file.
  *
- * Designed to demonstrate the correct usage of TICK_INTERVAL. Also note
- * TICK_COUNT is not needed for this example.
+ * Designed to demonstrate the correct usage of TICK_INTERVAL. TICK_COUNT can
+ * be used instead, which will trigger the result reporting based on seeing
+ * a fixed number of packets.
  *
  * This example is based upon examples/tutorial/timedemo.c
  */
@@ -15,17 +16,25 @@
 #include <inttypes.h>
 #include <assert.h>
 #include <getopt.h>
+#include <stdlib.h>
 
 #define SECONDS_TO_ERF(sec) (((uint64_t)sec)<<32)
 #define ERF_TO_SECONDS(erf) (((uint64_t)erf)>>32)
 #define USEC_TO_ERF(usec) ((uint64_t)usec * 0xFFFFFFFFull)
 #define TV_TO_ERF(tv) ((((uint64_t)(tv).tv_sec) << 32) + ((((uint64_t)(tv).tv_usec)<< 32)/1000000))
 
+struct localdata {
+        uint64_t nextreport;
+        uint64_t count;
+};
+
 /* Due to the amount of error checking required in our main function, it
  * is a lot simpler and tidier to place all the calls to various libtrace
  * destroy functions into a separate function.
  */
-static void libtrace_cleanup(libtrace_t *trace) {
+static void libtrace_cleanup(libtrace_t *trace,
+                libtrace_callback_set_t *processing,
+                libtrace_callback_set_t *reporter) {
 
 	/* It's very important to ensure that we aren't trying to destroy
 	 * a NULL structure, so each of the destroy calls will only occur
@@ -33,149 +42,190 @@ static void libtrace_cleanup(libtrace_t *trace) {
 	if (trace)
 		trace_destroy(trace);
 
+        if (processing)
+                trace_destroy_callback_set(processing);
+
+        if (reporter)
+                trace_destroy_callback_set(reporter);
+
 }
 
-/* Every time a packet becomes ready this function will be called. It will also
- * be called when messages from the library is received. This function
- * is run in parallel.
- */
-static void* per_packet(libtrace_t *trace UNUSED, libtrace_thread_t *t UNUSED,
-                        int mesg, libtrace_generic_t data,
-                        libtrace_thread_t *sender UNUSED)
-{
-	/* __thread, says make this unique per each thread */
-	static __thread uint64_t count = 0; /* The number of packets in this 10sec interval */
-	static __thread uint64_t next_report = 0; /* The start of the next interval */
-	static __thread uint64_t offset = 0; /* Offset between trace time and system time */
-	uint64_t ts; /* The timestamp of the current packet */
+/* Creates a localdata structure for a processing thread */
+static void *init_local(libtrace_t *trace UNUSED, libtrace_thread_t *t UNUSED,
+                void *global UNUSED) {
 
-	switch (mesg) {
-	case MESSAGE_PACKET:
-		/* Get the timestamp for the current packet */
-		ts = trace_get_erf_timestamp(data.pkt);
+        struct localdata *local = (struct localdata *)malloc(sizeof(struct
+                        localdata));
+        local->nextreport = 0;
+        local->count = 0;
 
-		/* Check whether we need to report a packet count or not.
-		 *
-		 * If the timestamp for the current packet is beyond the time when the
-		 * next report was due then we have to output our current count and
-		 * reset it to zero.
-		 *
-		 * Note that I use a while loop here to ensure that we correctly deal
-		 * with periods in which no packets are observed. This can still
-		 * happen because TICK_INTERVAL is not used for realtime playback
-		 * such as a file.
-		 */
-		while (next_report && ts > next_report) {
-			libtrace_generic_t c;
-			c.uint64 = count;
-			/* Report the result for the current time interval
-			 * Each thread will report once for each given time
-			 * interval */
-			trace_publish_result(trace, t, next_report, c, RESULT_USER);
+        return local;
 
-			/* Reset the counter */
-			count = 0;
-			/* Determine when the next report is due */
-			next_report += SECONDS_TO_ERF(10);
-		}
-
-		/* No matter what else happens during this function call, we still
-		 * need to increment our counter */
-		count += 1;
-
-		/* We have finished processing this packet return it */
-		return data.pkt;
-	case MESSAGE_TICK_INTERVAL:
-
-		 /* If we are a second passed when we should have reported last
-		  * we will do it now. We would be in this situation if we
-		  * haven't been receiving packets.
-		  * Make sure we dont report until we have seen the first packet
-		  */
-		while (next_report &&
-		       (data.uint64 - offset - SECONDS_TO_ERF(1) > next_report)) {
-			libtrace_generic_t c;
-			c.uint64 = count;
-			/* Report the result for the current time interval */
-			trace_publish_result(trace, t, next_report, c, RESULT_USER);
-
-			/* Reset the counter */
-			count = 0;
-			/* Determine when the next report is due */
-			next_report += SECONDS_TO_ERF(10);
-		}
-
-	/* !!! Fall through to check if we have the first packet yet !!! */
-	case MESSAGE_FIRST_PACKET: /* Some thread has seen its first packet */
-
-		if (next_report == 0) {
-			uint64_t first_ts;
-			/* Try get the timestamp of the first packet across all threads*/
-			const libtrace_packet_t * tmp = NULL;
-			const struct timeval *tv;
-
-			/* Get the first packet across all threads */
-			if (trace_get_first_packet(trace, NULL, &tmp, &tv) == 1) {
-				/* We know this is the first packet across all threads */
-
-				first_ts = trace_get_erf_timestamp(tmp);
-				/* There might be a difference between system time
-				 * and packet times. We need to account for this
-				 * when interpreting TICK_INTERVAL messages */
-				offset = TV_TO_ERF(*tv) - first_ts;
-				/* We know our first reporting time now */
-				next_report = first_ts + SECONDS_TO_ERF(10);
-			}
-		}
-		return NULL;
-	default:
-		return NULL;
-	}
-	return NULL;
 }
 
-/* Every time a result (published using trace_publish_result()) becomes ready
- * this function will be called. It will also be called when messages from the
- * library is received. This function is only run on a single thread
- */
-static void report_results(libtrace_t *trace UNUSED, int mesg,
-                           libtrace_generic_t data,
-                           libtrace_thread_t *sender UNUSED) {
-	static uint64_t count = 0; /* The count for the current interval */
-	static int reported = 0; /* The number of threads that have reported results for the interval */
-	static uint64_t currentkey = 0; /* The key, which is next_report from perpkt */
+/* Frees the localdata associated with a processing thread */
+static void fin_local(libtrace_t *trace UNUSED, libtrace_thread_t *t UNUSED,
+                void *global UNUSED, void *tls) {
 
-	switch (mesg) {
-	case MESSAGE_RESULT:
-		if (data.res->type == RESULT_USER) {
-			/* We should always get a result from each thread */
-			if (currentkey)
-				assert(data.res->key == currentkey);
+        free(tls);
+}
 
-			currentkey = data.res->key;
-			reported++;
-			/* Add on the packets */
-			count += data.res->value.uint64;
+static libtrace_packet_t *per_packet(libtrace_t *trace, libtrace_thread_t *t,
+                void *global UNUSED, void *tls, libtrace_packet_t *packet) {
 
-			if (reported == libtrace_get_perpkt_count(trace)) {
-				/* Print a timestamp for the report and the packet count */
-				printf("%u \t%" PRIu64 "\n", (int) ERF_TO_SECONDS(data.res->key), count);
-				/* Reset ready for the next batch of results */
-				count = reported = 0;
-				currentkey = data.res->key + SECONDS_TO_ERF(10);
-			}
-		}
-		break;
-	case MESSAGE_STARTING:
-		/* Print heading when first started */
-		printf("Time\t\tPackets\n");
-		break;
-	}
+        uint64_t ts;
+        /* Cast our thread local storage to the right type */
+        struct localdata *local = (struct localdata *)tls;
+
+        /* Get the timestamp for the current packet */
+        ts = trace_get_erf_timestamp(packet);
+
+        /* Check whether we need to report a packet count or not.
+         *
+         * If the timestamp for the current packet is beyond the time when the
+         * next report was due then we have to output our current count and
+         * reset it to zero.
+         *
+         * Note that I use a while loop here to ensure that we correctly deal
+         * with periods in which no packets are observed. This can still
+         * happen because TICK_INTERVAL is not used for realtime playback
+         * such as a file.
+         */
+        while (local->nextreport && ts > local->nextreport) {
+                libtrace_generic_t c;
+                c.uint64 = local->count;
+                /* Report the result for the current time interval.
+                 * Each thread will report once for each given time
+                 * interval */
+                trace_publish_result(trace, t, local->nextreport, c,
+                                RESULT_USER);
+
+                /* Reset the counter */
+                local->count = 0;
+                /* Determine when the next report is due */
+                local->nextreport += SECONDS_TO_ERF(10);
+        }
+
+        /* No matter what else happens during this function call, we still
+         * need to increment our counter */
+        local->count += 1;
+
+        /* We have finished processing this packet so return it */
+        return packet;
+
+}
+
+/* As soon as any thread has seen a packet, we need to initialise the
+ * next reporting time for each of our processing threads */
+static void first_packet(libtrace_t *trace, libtrace_thread_t *t UNUSED,
+                void *global UNUSED, void *tls,
+                libtrace_thread_t *sender UNUSED) {
+
+        /* Cast our thread local storage to the right type */
+        struct localdata *local = (struct localdata *)tls;
+
+        if (local->nextreport == 0) {
+                uint64_t first_ts;
+                /* Get the timestamp of the first packet across all threads */
+                const libtrace_packet_t * tmp = NULL;
+                const struct timeval *tv;
+
+                /* Get the first packet across all threads */
+                if (trace_get_first_packet(trace, NULL, &tmp, &tv) == 1) {
+                        first_ts = trace_get_erf_timestamp(tmp);
+                        /* We know our first reporting time now */
+                        local->nextreport = first_ts + SECONDS_TO_ERF(10);
+                }
+        }
+}
+
+static void process_tick(libtrace_t *trace, libtrace_thread_t *t,
+                void *global UNUSED, void *tls, uint64_t tick) {
+
+        struct localdata *local = (struct localdata *)tls;
+
+        while (local->nextreport && tick > local->nextreport) {
+                libtrace_generic_t c;
+                c.uint64 = local->count;
+                /* If the tick is past the time that our next report is
+                 * due, flush our current counter to the reporting
+                 * thread. This ensures that we keep sending results even
+                 * if this thread receives no new packets
+                 */
+                trace_publish_result(trace, t, local->nextreport, c,
+                        RESULT_USER);
+
+                /* Reset the counter */
+                local->count = 0;
+                /* Determine when the next report is due */
+                local->nextreport += SECONDS_TO_ERF(10);
+        }
+
+}
+
+static inline void dump_results(struct localdata *local, uint64_t key) {
+
+        /* Using a while loop here, so that we can correctly handle any
+         * 10 second intervals where no packets were counted.
+         */
+        while (key >= local->nextreport) {
+                printf("%u \t%" PRIu64 "\n",
+                                (int) ERF_TO_SECONDS(local->nextreport),
+                                local->count);
+                local->count = 0;
+                local->nextreport += SECONDS_TO_ERF(10);
+        }
+}
+
+/* Process results sent to the reporter thread */
+static void report_results(libtrace_t *trace,
+                libtrace_thread_t *sender UNUSED,
+                void *global UNUSED, void *tls, libtrace_result_t *result) {
+
+        static __thread int reported = 0;
+        struct localdata *local = (struct localdata *)tls;
+
+
+        /* Set the initial reporting time and print the heading
+         * Note: we could do these in starting and first_packet callbacks
+         * but there is only one reporting thread so we can get away
+         * with this. */
+        if (local->nextreport == 0) {
+                printf("Time\t\tPackets\n");
+                local->nextreport = result->key;
+        }
+        assert(result->key == local->nextreport);
+
+        reported ++;
+        if (reported == trace_get_perpkt_threads(trace)) {
+                dump_results(local, result->key);
+                reported = 0;
+        }
+
+        local->count += result->value.uint64;
+
+}
+
+/* Dump the final value for the counter and free up our local data struct */
+static void end_reporter(libtrace_t *trace UNUSED, libtrace_thread_t *t UNUSED,
+                void *global UNUSED, void *tls) {
+
+        struct localdata *local = (struct localdata *)tls;
+
+        /* If we have any counted packets that haven't been reported, do
+         * so now.
+         */
+        if (local->count > 0)
+                dump_results(local, local->nextreport + 1);
+
+        free(local);
 }
 
 int main(int argc, char *argv[])
 {
 	libtrace_t *trace = NULL;
+        libtrace_callback_set_t *processing = NULL;
+        libtrace_callback_set_t *reporter = NULL;
 
 	/* Ensure we have at least one argument after the program name */
 	if (argc < 2) {
@@ -187,14 +237,15 @@ int main(int argc, char *argv[])
 
 	if (trace_is_err(trace)) {
 		trace_perror(trace,"Opening trace file");
-		libtrace_cleanup(trace);
+		libtrace_cleanup(trace, processing, reporter);
 		return 1;
 	}
 
-	/* We want to push through results ASAP */
+	/* Send every result to the reporter immediately, i.e. do not buffer
+         * them. */
 	trace_set_reporter_thold(trace, 1);
 
-	/* If the trace is live send a tick message every second */
+	/* Sends a tick message once per second */
 	trace_set_tick_interval(trace, 1000);
 
 	/* The combiner sits between trace_publish_result() and the reporter
@@ -203,13 +254,33 @@ int main(int argc, char *argv[])
 	 * Our results are ordered by timestamp and we want them to be returned
 	 * in order so we use combiner_ordered.
 	 *
-	 * This typically the most usefull combiner to use.
+	 * This is typically the most useful combiner to use.
 	 */
 	trace_set_combiner(trace, &combiner_ordered, (libtrace_generic_t){0});
 
-	if (trace_pstart(trace, NULL, per_packet, report_results) == -1) {
+        /* Limit to 4 processing threads */
+        trace_set_perpkt_threads(trace, 4);
+
+        /* Set up our processing callbacks */
+        processing = trace_create_callback_set();
+        trace_set_starting_cb(processing, init_local);
+        trace_set_first_packet_cb(processing, first_packet);
+        trace_set_stopping_cb(processing, fin_local);
+        trace_set_packet_cb(processing, per_packet);
+        trace_set_tick_interval_cb(processing, process_tick);
+
+        /* Set up our reporting callbacks -- note that we re-use the init_local
+         * callback */
+        reporter = trace_create_callback_set();
+        trace_set_starting_cb(reporter, init_local);
+        trace_set_result_cb(reporter, report_results);
+        trace_set_stopping_cb(reporter, end_reporter);
+
+        /* Start everything going -- no global data required so set that
+         * to NULL */
+	if (trace_pstart(trace, NULL, processing, reporter) == -1) {
 		trace_perror(trace,"Starting trace");
-		libtrace_cleanup(trace);
+		libtrace_cleanup(trace, processing, reporter);
 		return 1;
 	}
 
@@ -217,10 +288,10 @@ int main(int argc, char *argv[])
 	trace_join(trace);
 	if (trace_is_err(trace)) {
 		trace_perror(trace,"Reading packets");
-		libtrace_cleanup(trace);
+		libtrace_cleanup(trace, processing, reporter);
 		return 1;
 	}
 
-	libtrace_cleanup(trace);
+	libtrace_cleanup(trace, processing, reporter);
 	return 0;
 }
