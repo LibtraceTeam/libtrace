@@ -1,6 +1,13 @@
 /* Network Capture
  *
- * Creates a file per stream and writes the result to disk
+ * Creates a file per stream and writes the result to disk. These files can
+ * later be merged using tracemerge to create a single ordered trace file.
+ *
+ * An alternative approach if we want a single output file is to use the
+ * ordered combiner and publish the packets through to a reporter thread that
+ * does the writing to disk.
+ *
+ * Defaults to using 4 threads, but this can be changed using the -t option.
  */
 /* Note we include libtrace_parallel.h rather then libtrace.h */
 #include "libtrace_parallel.h"
@@ -43,7 +50,7 @@ static void usage(char *argv0)
 	exit(1);
 }
 
-
+/* Creates an output trace and configures it according to our preferences */
 static libtrace_out_t *create_output(int my_id) {
 	libtrace_out_t *out = NULL;
 	char name[1024];
@@ -87,45 +94,45 @@ static libtrace_out_t *create_output(int my_id) {
 	return out;
 }
 
-/* Every time a packet becomes ready this function will be called. It will also
- * be called when messages from the library are received. This function
- * is run in parallel.
- */
-static void* per_packet(libtrace_t *trace, libtrace_thread_t *t,
-                        int mesg, libtrace_generic_t data,
-                        libtrace_thread_t *sender UNUSED)
-{
-	static __thread libtrace_out_t * out;
-	static __thread int my_id;
-	libtrace_stat_t *stats;
 
-	switch (mesg) {
-	case MESSAGE_PACKET:
-		trace_write_packet(out, data.pkt);
-		/* If we have finished processing this packet return it */
-		return data.pkt;
-	case MESSAGE_STARTING:
-		pthread_mutex_lock(&lock);
-		my_id = ++count;
-		pthread_mutex_unlock(&lock);
-		out = create_output(my_id);
-		break;
-	case MESSAGE_STOPPING:
-		stats = trace_create_statistics();
-		trace_get_thread_statistics(trace, t, stats);
+static libtrace_packet_t *per_packet(libtrace_t *trace UNUSED,
+                libtrace_thread_t *t UNUSED,
+                void *global UNUSED, void *tls, libtrace_packet_t *packet) {
 
-		pthread_mutex_lock(&lock);
-		fprintf(stderr, "Thread #%d statistics\n", my_id);
-		trace_print_statistics(stats, stderr, "\t%s: %"PRIu64"\n");
-		pthread_mutex_unlock(&lock);
+        /* Retrieve our output trace from the thread local storage */
+        libtrace_out_t *output = (libtrace_out_t *)tls;
 
-		free(stats);
-		trace_destroy_output(out);
-		break;
-	default:
-		return NULL;
-	}
-	return NULL;
+        /* Write the packet to disk */
+        trace_write_packet(output, packet);
+
+        /* Return the packet as we are finished with it */
+        return packet;
+
+}
+
+/* Creates an output file for this thread */
+static void *init_process(libtrace_t *trace UNUSED, libtrace_thread_t *t UNUSED,
+                void *global UNUSED) {
+
+        int my_id = 0;
+        libtrace_out_t *out;
+
+        pthread_mutex_lock(&lock);
+        my_id = ++count;
+        pthread_mutex_unlock(&lock);
+        out = create_output(my_id);
+
+        return out;
+}
+
+/* Closes the output file for this thread */
+static void stop_process(libtrace_t *trace UNUSED, libtrace_thread_t *t UNUSED,
+                void *global UNUSED, void *tls) {
+
+        /* Retrieve our output trace from the thread local storage */
+        libtrace_out_t *output = (libtrace_out_t *)tls;
+
+        trace_destroy_output(output);
 }
 
 int main(int argc, char *argv[])
@@ -133,8 +140,9 @@ int main(int argc, char *argv[])
 	struct sigaction sigact;
 	libtrace_stat_t *stats;
 	int snaplen = -1;
-	int nb_threads = -1;
+	int nb_threads = 4;     
 	char *compress_type_str=NULL;
+        libtrace_callback_set_t *processing = NULL;
 
 	sigact.sa_handler = stop;
 	sigemptyset(&sigact.sa_mask);
@@ -232,16 +240,23 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
+        /* Set up our callbacks */
+        processing = trace_create_callback_set();
+        trace_set_starting_cb(processing, init_process);
+        trace_set_stopping_cb(processing, stop_process);
+        trace_set_packet_cb(processing, per_packet);
+
 	if (snaplen != -1)
 		trace_set_snaplen(trace, snaplen);
 	if(nb_threads != -1)
-		trace_set_tick_count(trace, (size_t) nb_threads);
+		trace_set_perpkt_threads(trace, nb_threads);
 
 	/* We use a new version of trace_start(), trace_pstart()
 	 * The reporter function argument is optional and can be NULL */
-	if (trace_pstart(trace, NULL, per_packet, NULL)) {
+	if (trace_pstart(trace, NULL, processing, NULL)) {
 		trace_perror(trace,"Starting trace");
 		trace_destroy(trace);
+                trace_destroy_callback_set(processing);
 		return 1;
 	}
 
@@ -251,6 +266,7 @@ int main(int argc, char *argv[])
 	if (trace_is_err(trace)) {
 		trace_perror(trace,"Reading packets");
 		trace_destroy(trace);
+                trace_destroy_callback_set(processing);
 		return 1;
 	}
 
@@ -259,6 +275,7 @@ int main(int argc, char *argv[])
 	fprintf(stderr, "Overall statistics\n");
 	trace_print_statistics(stats, stderr, "\t%s: %"PRIu64"\n");
 
+        trace_destroy_callback_set(processing);
 	trace_destroy(trace);
 	return 0;
 }
