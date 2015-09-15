@@ -190,7 +190,7 @@ inline static int linuxnative_read_stream(libtrace_t *libtrace,
 	/* No data was waiting */
 	if ((int) hdr->wirelen == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
 		/* Do message queue check or select */
-		int message_fd;
+		int message_fd = 0;
 		int largestfd = stream->fd;
 
 		/* Also check the message queue */

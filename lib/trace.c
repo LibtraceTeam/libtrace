@@ -2101,7 +2101,7 @@ uint64_t trace_get_accepted_packets(libtrace_t *trace)
 
 libtrace_stat_t *trace_get_statistics(libtrace_t *trace, libtrace_stat_t *stat)
 {
-	uint64_t ret;
+	uint64_t ret = 0;
 	int i;
 	assert(trace);
 	if (stat == NULL) {
@@ -2128,11 +2128,18 @@ libtrace_stat_t *trace_get_statistics(libtrace_t *trace, libtrace_stat_t *stat)
 	LIBTRACE_STAT_FIELDS;
 #undef X
 	/* Both accepted and filtered are stored against in the library */
-	ret = trace_get_accepted_packets(trace);
-	if (ret != UINT64_MAX) {
-		stat->accepted_valid = 1;
-		stat->accepted = ret;
+
+        /* We always add to a thread's accepted count before dispatching the
+	 * packet to the user. However if the underlying trace is single
+	 * threaded it will also be increasing the global count. So if we
+	 * find perpkt ignore the global count.
+	 */
+	for (i = 0; i < trace->perpkt_thread_count; i++) {
+		ret += trace->perpkt_threads[i].accepted_packets;
 	}
+
+        stat->accepted_valid = 1;
+	stat->accepted = ret ? ret : trace->accepted_packets;
 
 	stat->filtered_valid = 1;
 	stat->filtered = trace->filtered_packets;
@@ -2142,18 +2149,6 @@ libtrace_stat_t *trace_get_statistics(libtrace_t *trace, libtrace_stat_t *stat)
 
 	if (trace->format->get_statistics) {
 		trace->format->get_statistics(trace, stat);
-	} else {
-		/* Fallback to the old way */
-		ret = trace_get_received_packets(trace);
-		if (ret != UINT64_MAX) {
-			stat->received_valid = 1;
-			stat->received = ret;
-		}
-		ret = trace_get_dropped_packets(trace);
-		if (ret != UINT64_MAX) {
-			stat->dropped_valid = 1;
-			stat->dropped = ret;
-		}
 	}
 	return stat;
 }

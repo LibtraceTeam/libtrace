@@ -21,9 +21,10 @@
  *   tls -- a pointer to the thread local storage for this thread
  *   packet -- the packet itself
  */
-static libtrace_packet_t *process_packet(libtrace_t *trace,
-                libtrace_thread_t *t,
-                void *global, void *tls, libtrace_packet_t *packet) {
+static libtrace_packet_t *process_packet(libtrace_t *trace UNUSED,
+                libtrace_thread_t *t UNUSED,
+                void *global UNUSED, void *tls UNUSED,
+                libtrace_packet_t *packet) {
 
         /* Note that in this example, global and tls will both be NULL.
          * global is NULL because we passed NULL as the second argument

@@ -315,6 +315,22 @@ static uint64_t bpf_get_dropped_packets(libtrace_t *trace)
 	return FORMATIN(trace)->stats.bs_drop;
 }
 
+static void bpf_get_statistics(libtrace_t *trace, libtrace_stat_t *stat) {
+        uint64_t dropped = bpf_get_dropped_packets(trace);
+        uint64_t received = bpf_get_received_packets(trace);
+
+        if (dropped != (uint64_t)-1) {
+                stat->dropped_valid = 1;
+                stat->dropped = dropped;
+        }
+
+        if (received != (uint64_t) -1) {
+                stat->received_valid = 1;
+                stat->received = received;
+        }
+
+}
+
 /* Pauses a BPF input trace */
 static int bpf_pause_input(libtrace_t *libtrace)
 {
@@ -606,10 +622,10 @@ static struct libtrace_format_t bpf = {
 	bpf_get_wire_length,	/* get_wire_length */
 	bpf_get_framing_length,	/* get_framing_length */
 	NULL,			/* set_capture_length */
-	bpf_get_received_packets,/* get_received_packets */
+	NULL,                   /* get_received_packets */
 	NULL,			/* get_filtered_packets */
-	bpf_get_dropped_packets,/* get_dropped_packets */
-	NULL,			/* get_statistics */
+	NULL,                   /* get_dropped_packets */
+	bpf_get_statistics,	/* get_statistics */
 	bpf_get_fd,		/* get_fd */
 	trace_event_device,	/* trace_event */
 	bpf_help,		/* help */

@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <time.h>
 #include <string.h>
+#include <stdlib.h>
 #include "libtrace.h"
 #include "tracereport.h"
 #include "report.h"
@@ -19,31 +20,32 @@ static bool has_accepted=false;
 
 void drops_per_trace(libtrace_t *trace)
 {
-	uint64_t packets;
+	libtrace_stat_t *stat;
 
-	packets = trace_get_received_packets(trace);
-	if (packets != UINT64_MAX) {
-		received_packets+=packets;
+        stat = trace_create_statistics();
+
+        trace_get_statistics(trace, stat);
+
+	if (stat->received_valid) {
+		received_packets+=stat->received;
 		has_received=true;
 	}
 
-	packets = trace_get_filtered_packets(trace);
-	if (packets != UINT64_MAX) {
-		filtered_packets+=packets;
+	if (stat->filtered_valid) {
+		filtered_packets+=stat->filtered;
 		has_filtered=true;
 	}
 
-	packets = trace_get_dropped_packets(trace);
-	if (packets != UINT64_MAX) {
-		dropped_packets+=packets;
+	if (stat->dropped_valid) {
+		dropped_packets+=stat->dropped;
 		has_dropped=true;
 	}
 
-	packets = trace_get_accepted_packets(trace);
-	if (packets != UINT64_MAX) {
-		accepted_packets+=packets;
+	if (stat->accepted_valid) {
+		accepted_packets+=stat->accepted;
 		has_accepted=true;
 	}
+        free(stat);
 }
 
 

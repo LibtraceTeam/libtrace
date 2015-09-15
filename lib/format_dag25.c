@@ -1459,7 +1459,7 @@ static void dag_get_statistics(libtrace_t *libtrace, libtrace_stat_t *stat)
 
 }
 
-static void dag_get_thread_statisitics(libtrace_t *libtrace, libtrace_thread_t *t,
+static void dag_get_thread_statistics(libtrace_t *libtrace, libtrace_thread_t *t,
                                        libtrace_stat_t *stat) {
 	struct dag_per_stream_t *stream_data = t->format_data;
 	assert(stat && libtrace);
@@ -1565,7 +1565,7 @@ static struct libtrace_format_t dag = {
 	NULL,
 	dag_pregister_thread,
 	NULL,
-	dag_get_thread_statisitics	/* get thread stats */
+	dag_get_thread_statistics	/* get thread stats */
 };
 
 void dag_constructor(void)

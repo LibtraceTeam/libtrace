@@ -1482,20 +1482,6 @@ DLLEXPORT void trace_destroy_dead(libtrace_t *trace);
  */
 DLLEXPORT void trace_destroy_output(libtrace_out_t *trace);
 
-/** Create a callback set that can be used to define callbacks for parallel
-  * libtrace threads.
-  *
-  * @return A pointer to a freshly allocated callback set.
-  */
-DLLEXPORT libtrace_callback_set_t *trace_create_callback_set();
-
-/** Destroys a callback set, freeing up an resources it was using.
- *
- * @param cbset         The callback set to be destroyed.
- */
-DLLEXPORT void trace_destroy_callback_set(libtrace_callback_set_t *cbset);
-
-
 /** Check (and clear) the current error state of an input trace
  * @param trace		The input trace to check the error state on
  * @return The current error status and message

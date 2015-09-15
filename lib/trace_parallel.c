@@ -251,16 +251,16 @@ inline void send_message(libtrace_t *trace, libtrace_thread_t *thread,
 		(*fn)(trace, thread, trace->global_blob, thread->user_data);
 }
 
+DLLEXPORT void trace_destroy_callback_set(libtrace_callback_set_t *cbset) {
+        free(cbset);
+}
+
 DLLEXPORT libtrace_callback_set_t *trace_create_callback_set() {
         libtrace_callback_set_t *cbset;
 
         cbset = (libtrace_callback_set_t *)malloc(sizeof(libtrace_callback_set_t));
         memset(cbset, 0, sizeof(libtrace_callback_set_t));
         return cbset;
-}
-
-DLLEXPORT void trace_destroy_callback_set(libtrace_callback_set_t *cbset) {
-        free(cbset);
 }
 
 /*

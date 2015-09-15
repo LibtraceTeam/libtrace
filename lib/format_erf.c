@@ -801,11 +801,12 @@ static struct libtrace_eventobj_t erf_event(struct libtrace_t *libtrace, struct 
 	
 }
 
-static uint64_t erf_get_dropped_packets(libtrace_t *trace)
-{
-	if (trace->format_data == NULL)
-		return (uint64_t)-1;
-	return DATA(trace)->drops;
+static void erf_get_statistics(libtrace_t *trace, libtrace_stat_t *stat) {
+
+        if (trace->format_data) {
+                stat->dropped_valid = 1;
+                stat->dropped = DATA(trace)->drops;
+        }
 }
 
 static void erf_help(void) {
@@ -864,8 +865,8 @@ static struct libtrace_format_t erfformat = {
 	erf_set_capture_length,		/* set_capture_length */
 	NULL,				/* get_received_packets */
 	NULL,				/* get_filtered_packets */
-	erf_get_dropped_packets,	/* get_dropped_packets */
-	NULL,				/* get_statistics */
+	NULL,	                        /* get_dropped_packets */
+	erf_get_statistics,		/* get_statistics */
 	NULL,				/* get_fd */
 	erf_event,			/* trace_event */
 	erf_help,			/* help */
@@ -908,8 +909,8 @@ static struct libtrace_format_t rawerfformat = {
 	erf_set_capture_length,		/* set_capture_length */
 	NULL,				/* get_received_packets */
 	NULL,				/* get_filtered_packets */
-	erf_get_dropped_packets,	/* get_dropped_packets */
-	NULL,				/* get_statistics */
+	NULL,	                        /* get_dropped_packets */
+	erf_get_statistics,		/* get_statistics */
 	NULL,				/* get_fd */
 	erf_event,			/* trace_event */
 	erf_help,			/* help */

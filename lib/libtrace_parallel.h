@@ -608,6 +608,20 @@ DLLEXPORT int trace_set_tick_interval_cb(libtrace_callback_set_t *cbset,
 DLLEXPORT int trace_set_user_message_cb(libtrace_callback_set_t *cbset,
                 fn_cb_usermessage handler);
 
+/** Create a callback set that can be used to define callbacks for parallel
+  * libtrace threads.
+  *
+  * @return A pointer to a freshly allocated callback set.
+  */
+DLLEXPORT libtrace_callback_set_t *trace_create_callback_set(void);
+
+/** Destroys a callback set, freeing up an resources it was using.
+ *
+ * @param cbset         The callback set to be destroyed.
+ */
+DLLEXPORT void trace_destroy_callback_set(libtrace_callback_set_t *cbset);
+
+
 /** Pauses a trace previously started with trace_pstart()
  *
  * @param libtrace The parallel trace to be paused

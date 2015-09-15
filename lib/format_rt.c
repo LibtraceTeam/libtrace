@@ -627,7 +627,6 @@ static int rt_read_packet_versatile(libtrace_t *libtrace,
 		libtrace_packet_t *packet,int blocking) {
         rt_header_t hdr;
 	rt_header_t *pkt_hdr = NULL;
-	void *void_hdr;
 	libtrace_rt_types_t switch_type;
 	
 	/* RT_LAST indicates that we need to read the RT header for the next
