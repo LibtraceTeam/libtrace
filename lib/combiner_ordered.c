@@ -8,11 +8,11 @@
 
 static int init_combiner(libtrace_t *t, libtrace_combine_t *c) {
 	int i = 0;
-	assert(libtrace_get_perpkt_count(t) > 0);
+	assert(trace_get_perpkt_threads(t) > 0);
 	libtrace_queue_t *queues;
-	c->queues = calloc(sizeof(libtrace_queue_t), libtrace_get_perpkt_count(t));
+	c->queues = calloc(sizeof(libtrace_queue_t), trace_get_perpkt_threads(t));
 	queues = c->queues;
-	for (i = 0; i < libtrace_get_perpkt_count(t); ++i) {
+	for (i = 0; i < trace_get_perpkt_threads(t); ++i) {
 		libtrace_deque_init(&queues[i], sizeof(libtrace_result_t));
 	}
 	return 0;
@@ -115,15 +115,15 @@ inline static void read_internal(libtrace_t *trace, libtrace_combine_t *c, const
 	int live_count = 0;
         libtrace_queue_t *queues = c->queues;
 	bool allactive = true;
-        bool live[libtrace_get_perpkt_count(trace)]; // Set if a trace is alive
-	uint64_t key[libtrace_get_perpkt_count(trace)]; // Cached keys
+        bool live[trace_get_perpkt_threads(trace)]; // Set if a trace is alive
+	uint64_t key[trace_get_perpkt_threads(trace)]; // Cached keys
 	uint64_t min_key = UINT64_MAX;
 	uint64_t prev_min = 0;
         uint64_t peeked = 0;
 	int min_queue = -1;
 
 	/* Loop through check all are alive (have data) and find the smallest */
-        for (i = 0; i < libtrace_get_perpkt_count(trace); ++i) {
+        for (i = 0; i < trace_get_perpkt_threads(trace); ++i) {
 		libtrace_queue_t *v = &queues[i];
 		if (libtrace_deque_get_size(v) != 0) {
                         if (peek_queue(trace, c, v, &peeked)) {
@@ -171,7 +171,7 @@ inline static void read_internal(libtrace_t *trace, libtrace_combine_t *c, const
                         } else {
                                 min_key = key[min_queue]; // Update our minimum
                                 // Check all find the smallest again - all are alive
-                                for (i = 0; i < libtrace_get_perpkt_count(trace); ++i) {
+                                for (i = 0; i < trace_get_perpkt_threads(trace); ++i) {
                                         if (live[i] && min_key >= key[i]) {
                                                 min_key = key[i];
                                                 min_queue = i;
@@ -185,7 +185,7 @@ inline static void read_internal(libtrace_t *trace, libtrace_combine_t *c, const
 			prev_min = min_key;
 			min_key = UINT64_MAX; // Update our minimum
 			// Check all find the smallest again - all are alive
-			for (i = 0; i < libtrace_get_perpkt_count(trace); ++i) {
+			for (i = 0; i < trace_get_perpkt_threads(trace); ++i) {
 				if (live[i] && min_key >= key[i]) {
 					min_key = key[i];
 					min_queue = i;
@@ -206,19 +206,19 @@ static void read_final(libtrace_t *trace, libtrace_combine_t *c) {
         do {
                 read_internal(trace, c, true);
                 empty = 0;
-		for (i = 0; i < libtrace_get_perpkt_count(trace); ++i) {
+		for (i = 0; i < trace_get_perpkt_threads(trace); ++i) {
                         if (libtrace_deque_get_size(&q[i]) == 0)
                                 empty ++;
                 }
         }
-        while (empty < libtrace_get_perpkt_count(trace));
+        while (empty < trace_get_perpkt_threads(trace));
 }
 
 static void destroy(libtrace_t *trace, libtrace_combine_t *c) {
 	int i;
 	libtrace_queue_t *queues = c->queues;
 
-	for (i = 0; i < libtrace_get_perpkt_count(trace); i++) {
+	for (i = 0; i < trace_get_perpkt_threads(trace); i++) {
 		assert(libtrace_deque_get_size(&queues[i]) == 0);
 	}
 	free(queues);
@@ -229,7 +229,7 @@ static void destroy(libtrace_t *trace, libtrace_combine_t *c) {
 static void pause(libtrace_t *trace, libtrace_combine_t *c) {
 	libtrace_queue_t *queues = c->queues;
 	int i;
-	for (i = 0; i < libtrace_get_perpkt_count(trace); i++) {
+	for (i = 0; i < trace_get_perpkt_threads(trace); i++) {
 		libtrace_deque_apply_function(&queues[i], (deque_data_fn) libtrace_make_result_safe);
 	}
 }

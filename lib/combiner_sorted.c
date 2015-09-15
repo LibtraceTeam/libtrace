@@ -6,11 +6,11 @@
 
 static int init_combiner(libtrace_t *t, libtrace_combine_t *c) {
 	int i = 0;
-	assert(libtrace_get_perpkt_count(t) > 0);
+	assert(trace_get_perpkt_threads(t) > 0);
 	libtrace_vector_t *queues;
-	c->queues = calloc(sizeof(libtrace_vector_t), libtrace_get_perpkt_count(t));
+	c->queues = calloc(sizeof(libtrace_vector_t), trace_get_perpkt_threads(t));
 	queues = c->queues;
-	for (i = 0; i < libtrace_get_perpkt_count(t); ++i) {
+	for (i = 0; i < trace_get_perpkt_threads(t); ++i) {
 		libtrace_vector_init(&queues[i], sizeof(libtrace_result_t));
 	}
 	return 0;
@@ -40,7 +40,7 @@ static int compare_result(const void* p1, const void* p2)
 static void pause(libtrace_t *trace, libtrace_combine_t *c) {
 	libtrace_vector_t *queues = c->queues;
 	int i;
-	for (i = 0; i < libtrace_get_perpkt_count(trace); ++i) {
+	for (i = 0; i < trace_get_perpkt_threads(trace); ++i) {
 		libtrace_vector_apply_function(&queues[i], (vector_data_fn) libtrace_make_result_safe);
 	}
 }
@@ -50,7 +50,7 @@ static void read_final(libtrace_t *trace, libtrace_combine_t *c) {
 	int i;
 	size_t a;
 	// Combine all results into queue 1
-	for (i = 1; i < libtrace_get_perpkt_count(trace); ++i)
+	for (i = 1; i < trace_get_perpkt_threads(trace); ++i)
 	{
 		libtrace_vector_append(&queues[0],&queues[i]);
 	}
@@ -76,7 +76,7 @@ static void destroy(libtrace_t *trace, libtrace_combine_t *c) {
 	int i;
 	libtrace_vector_t *queues = c->queues;
 
-	for (i = 0; i < libtrace_get_perpkt_count(trace); i++) {
+	for (i = 0; i < trace_get_perpkt_threads(trace); i++) {
 		assert(libtrace_vector_get_size(&queues[i]) == 0);
 		libtrace_vector_destroy(&queues[i]);
 	}

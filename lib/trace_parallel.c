@@ -204,7 +204,7 @@ inline void send_message(libtrace_t *trace, libtrace_thread_t *thread,
 		if (cbs->message_first_packet)
 			        (*cbs->message_first_packet)(trace, thread,
                                 trace->global_blob, thread->user_data,
-                                data.pkt, sender);
+                                sender);
 		return;
 	case MESSAGE_TICK_COUNT:
 		if (cbs->message_tick_count)
@@ -286,7 +286,7 @@ DLLEXPORT bool trace_has_reporter(libtrace_t * libtrace)
  * @param t The trace
  * @return
  */
-DLLEXPORT int libtrace_get_perpkt_count(libtrace_t * t) {
+DLLEXPORT int trace_get_perpkt_threads(libtrace_t * t) {
 	return t->perpkt_thread_count;
 }
 

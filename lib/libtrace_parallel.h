@@ -508,7 +508,6 @@ typedef void (*fn_cb_first_packet)(libtrace_t *libtrace,
                                    libtrace_thread_t *t,
                                    void *global,
                                    void *tls,
-                                   libtrace_packet_t *first_packet,
                                    libtrace_thread_t *sender);
 
 /**
@@ -1280,7 +1279,7 @@ DLLEXPORT int trace_set_configuration(libtrace_t *trace, const char * str);
  */
 DLLEXPORT int trace_set_configuration_file(libtrace_t *trace, FILE *file);
 
-DLLEXPORT int libtrace_get_perpkt_count(libtrace_t* t); // TODO MATCH WITH THE SET_PERPKT
+DLLEXPORT int trace_get_perpkt_threads(libtrace_t* t); 
 
 /**
  * Sets a combiner function against the trace.
