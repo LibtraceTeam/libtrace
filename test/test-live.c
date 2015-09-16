@@ -149,37 +149,38 @@ static void dumparray(unsigned char *arr, size_t len)
 static int verify_counters(libtrace_t *trace_read)
 {
 	int err = 0;
+        libtrace_stat_t *stat;
+
+        stat = trace_create_statistics();
+
+        trace_get_statistics(trace_read, stat);
 	// Assume no loss here, if not the case we would of hung in reading loop
 	// anyway
-	if (trace_get_dropped_packets(trace_read) != 0) {
-		if (trace_get_dropped_packets(trace_read) == UINT64_MAX) {
-			printf("\tInfo: trace does not support drop counter\n");
-		} else {
-			ERROR("Trace dropped %zu packets\n",
-				trace_get_dropped_packets(trace_read));
-		}
+        if (!stat->dropped_valid) {
+		printf("\tInfo: trace does not support drop counter\n");
+        } else if (stat->dropped != 0) {
+		ERROR("Trace dropped %zu packets\n", stat->dropped);
 	}
-	if (trace_get_filtered_packets(trace_read) != 0) {
-		if (trace_get_filtered_packets(trace_read) == UINT64_MAX) {
-			printf("\tInfo: trace does not support filter counter\n");
-		} else {
-			ERROR("Trace dropped %zu packets\n",
-				trace_get_filtered_packets(trace_read));
-		}
+
+        if (!stat->filtered_valid) {
+		printf("\tInfo: trace does not support filter counter\n");
+        } else if (stat->filtered != 0) {
+		ERROR("Trace filtered %zu packets\n", stat->filtered);
 	}
-	if (trace_get_received_packets(trace_read) != 100) {
-		if (trace_get_received_packets(trace_read) == UINT64_MAX) {
-			printf("\tInfo: trace does not support received counter\n");
-		} else {
-			ERROR("Trace received %zu packets\n",
-				trace_get_received_packets(trace_read));
-		}
-	}
-	if (trace_get_accepted_packets(trace_read) != (size_t) test_size) {
-		// This would more likely be a libtrace issue rather than format specific
-		ERROR("Trace only accepted %zu packets\n",
-			trace_get_accepted_packets(trace_read));
-	}
+
+        if (!stat->received_valid) {
+		printf("\tInfo: trace does not support received counter\n");
+        } else if (stat->received != 100) {
+		ERROR("Trace received %zu/100 packets\n", stat->received);
+        }
+
+        if (!stat->accepted_valid) {
+		printf("\tInfo: trace does not support accepted counter\n");
+        } else if (stat->accepted != (uint32_t) test_size) {
+		ERROR("Trace only accepted %zu/%u packets\n", stat->accepted,
+                                (uint32_t)test_size);
+        }
+
 	return err;
 }
 

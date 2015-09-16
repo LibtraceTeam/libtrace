@@ -61,18 +61,16 @@ static bool check_range_jitter(double test, double target, double jit) {
 }
 
 
-static int totalpkts = 0;
-static int skippedpkts = 0;
-static int expected;
-
 libtrace_t *trace = NULL;
+int total = 0;
+
 static void signal_handler(int signal)
 {
 	if (signal == SIGALRM) {
 		trace_ppause(trace);
 
 		/* check within 10 seconds we got 9-11 packets */
-		assert(check_range_jitter(10.0, (double) totalpkts, 1.0));
+		assert(check_range_jitter(10.0, (double) total, 1.0));
 
 		/* Now fullspeed it */
 		trace_set_tracetime(trace, false);
@@ -82,67 +80,116 @@ static void signal_handler(int signal)
 	}
 }
 
-static void report_result(libtrace_t *trace UNUSED, int mesg,
-                          libtrace_generic_t data,
-                          libtrace_thread_t *sender UNUSED) {
+struct counter {
+        int total;
+        int skipped;
+};
 
-	switch (mesg) {
-	case MESSAGE_STARTING:
-		break;
-	case MESSAGE_RESULT:
-		switch (data.res->type) {
-		case RESULT_USER:
-			totalpkts++;
-			break;
-		case RESULT_USER+1:
-			skippedpkts++;
-			break;
-		}
-		break;
-	}
+static void *start_report(libtrace_t *trace UNUSED,
+                libtrace_thread_t *t UNUSED, void *global UNUSED) {
+        
+        struct counter *c = (struct counter *)malloc(sizeof(struct counter));
+        c->total = 0;
+        c->skipped = 0;
+        return c;
+
 }
 
-static void* per_packet(libtrace_t *trace, libtrace_thread_t *t,
-                        int mesg, libtrace_generic_t data,
-                        libtrace_thread_t *sender UNUSED) {
+static void stop_report(libtrace_t *trace UNUSED,
+                libtrace_thread_t *t UNUSED, void *global UNUSED, void *tls) {
+
+        struct counter *c = (struct counter *)tls;
+
+        assert(c->skipped <= 20);
+        assert(c->skipped + c->total == 100);
+
+        free(c);
+}
+
+static void report_cb(libtrace_t *trace UNUSED,
+                libtrace_thread_t *sender UNUSED, void *global UNUSED,
+                void *tls, libtrace_result_t *result) {
+
+        struct counter *c = (struct counter *)tls;
+        if (result->type == RESULT_USER)
+                c->total ++;
+        if (result->type == RESULT_USER + 1)
+                c->skipped ++;
+
+        total = c->total;
+
+}
+
+static void *start_process(libtrace_t *trace UNUSED,
+                libtrace_thread_t *t UNUSED, void *global UNUSED) {
+
+        bool *accepting = (bool *)malloc(sizeof(bool));
+        *accepting = true;
+        return accepting;
+
+}
+
+static void stop_process(libtrace_t *trace UNUSED,
+                libtrace_thread_t *t UNUSED, void *global UNUSED, void *tls) {
+        bool *accepting = (bool *)tls;
+        free(accepting);
+}
+
+static void pause_process(libtrace_t *trace UNUSED,
+                libtrace_thread_t *t UNUSED, void *global UNUSED, void *tls) {
+        bool *accepting = (bool *)tls;
+        *accepting = false;
+}
+
+static void resume_process(libtrace_t *trace UNUSED,
+                libtrace_thread_t *t UNUSED, void *global UNUSED, void *tls) {
+        bool *accepting = (bool *)tls;
+        *accepting = true;
+}
+
+static void user_message(libtrace_t *trace UNUSED,
+                libtrace_thread_t *t UNUSED, void *global UNUSED,
+                void *tls UNUSED, int msg UNUSED, libtrace_generic_t ts) {
+
 	struct timeval tv;
 	double time;
-	libtrace_message_t message;
-	static __thread bool accepting = true;
 
 	gettimeofday(&tv, NULL);
 	time = timeval_to_seconds(tv);
 
-	switch (mesg) {
-	case MESSAGE_PACKET:
-		/* In order to instantly pause a trace we don't delay any buffered packets
-		 * These are sent after MESSAGE_PAUSING has been received */
-		if (accepting) {
-			fprintf(stderr, ".");
-			trace_publish_result(trace, t, (uint64_t) time, (libtrace_generic_t){.rdouble = time}, RESULT_USER);
-
-			/* Check that we are not blocking regular message delivery */
-			message.code = MESSAGE_USER;
-			message.sender = t;
-			message.data.rdouble = time;
-			trace_message_perpkts(trace, &message);
-		} else {
-			trace_publish_result(trace, t, (uint64_t) time, (libtrace_generic_t){.rdouble = time}, RESULT_USER+1);
-		}
-		return data.pkt;
-	case MESSAGE_USER:
-		assert (check_range_jitter(data.rdouble, time, 0.01));
-		break;
-	case MESSAGE_RESUMING:
-		accepting = true;
-		break;
-	case MESSAGE_PAUSING:
-		accepting = false;
-		break;
-	}
-	return NULL;
+        assert(check_range_jitter(ts.rdouble, time, 0.01));
 }
 
+static libtrace_packet_t *per_packet(libtrace_t *trace, libtrace_thread_t *t,
+                void *global UNUSED, void *tls, libtrace_packet_t *packet) {
+
+	struct timeval tv;
+	double time;
+	libtrace_message_t message;
+        bool *accepting = (bool *)tls;
+
+	gettimeofday(&tv, NULL);
+	time = timeval_to_seconds(tv);
+
+        if (*accepting) {
+                fprintf(stderr, ".");
+                trace_publish_result(trace, t, (uint64_t)time,
+                                (libtrace_generic_t){.rdouble = time},
+                                RESULT_USER);
+                /* Test that we are not interfering with message delivery */
+                message.code = MESSAGE_USER;
+                message.sender = t;
+                message.data.rdouble = time;
+                trace_message_perpkts(trace, &message);
+        } else {
+                trace_publish_result(trace, t, (uint64_t)time,
+                                (libtrace_generic_t){.rdouble = time},
+                                RESULT_USER+1);
+
+        }
+        return packet;
+
+}
 /**
  * Test that tracetime playback functions.
  * Including:
@@ -155,7 +202,10 @@ int test_tracetime(const char *tracename) {
 	int error = 0;
 	struct timeval tv;
 	double start, end;
-	gettimeofday(&tv, NULL);
+	libtrace_callback_set_t *processing;
+        libtrace_callback_set_t *reporter;
+
+        gettimeofday(&tv, NULL);
 	start = timeval_to_seconds(tv);
 	printf("Testing delay\n");
 
@@ -167,8 +217,23 @@ int test_tracetime(const char *tracename) {
 	trace_set_perpkt_threads(trace, 2);
 	trace_set_tracetime(trace, true);
 
+        processing = trace_create_callback_set();
+        trace_set_starting_cb(processing, start_process);
+        trace_set_stopping_cb(processing, stop_process);
+        trace_set_pausing_cb(processing, pause_process);
+        trace_set_resuming_cb(processing, resume_process);
+        trace_set_packet_cb(processing, per_packet);
+        trace_set_user_message_cb(processing, user_message);
+
+        reporter = trace_create_callback_set();
+        trace_set_starting_cb(reporter, start_report);
+        trace_set_stopping_cb(reporter, stop_report);
+        trace_set_result_cb(reporter, report_cb);
+
+        trace_set_reporter_thold(trace, 1);
+
 	// Start it
-	trace_pstart(trace, NULL, per_packet, report_result);
+	trace_pstart(trace, NULL, processing, reporter);
 	iferr(trace,tracename);
 	fprintf(stderr, "Running in tracetime (Will take about 10 seconds)\t");
 
@@ -178,16 +243,7 @@ int test_tracetime(const char *tracename) {
 	/* Wait for all threads to stop */
 	trace_join(trace);
 
-	/* Now check we have all received all the packets */
-	assert(skippedpkts <= 20); /* Note this is hard coded to the default burst_sizeX2 */
-	if (error == 0) {
-		if (totalpkts + skippedpkts == expected) {
-			printf("success: %d packets read\n",expected);
-		} else {
-			printf("failure: %d packets expected, %d seen\n",expected,totalpkts);
-			error = 1;
-		}
-	} else {
+	if (error != 0) {
 		iferr(trace,tracename);
 	}
 	/* The whole test should take about 10 seconds */
@@ -201,13 +257,12 @@ int test_tracetime(const char *tracename) {
 int main() {
 	int error = 0;
 	const char *tracename;
-	expected = 100;
 
 	signal(SIGALRM, signal_handler);
 
 	tracename = "pcapfile:traces/100_seconds.pcap";
 
 	error = test_tracetime(tracename);
-
+        fprintf(stderr, "\n");
 	return error;
 }

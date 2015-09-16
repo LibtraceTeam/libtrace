@@ -90,7 +90,6 @@ const char *lookup_uri(const char *type) {
 	return type;
 }
 
-
 struct TLS {
 	bool seen_start_message;
 	bool seen_stop_message;
@@ -99,139 +98,184 @@ struct TLS {
 	int count;
 };
 
-static int totalpkts = 0;
-static void report_result(libtrace_t *trace UNUSED, int mesg,
-                          libtrace_generic_t data,
-                          libtrace_thread_t *sender UNUSED) {
-	static int totalthreads = 0;
-	switch (mesg) {
-	case MESSAGE_RESULT:
-		assert(data.res->key == 0);
-		printf("%d,", data.res->value.sint);
-		totalthreads++;
-		totalpkts += data.res->value.sint;
-		break;
-	case MESSAGE_STARTING:
-		// Should have a single thread here
-		assert(libtrace_get_perpkt_count(trace) == 1);
-		printf("\tLooks like %d threads are being used!\n\tcounts(", libtrace_get_perpkt_count(trace));
-		break;
-	case MESSAGE_STOPPING:
-		printf(")\n");
-		assert(totalthreads == libtrace_get_perpkt_count(trace));
-		break;
-	}
+struct final {
+        int threads;
+        int packets;
+};
+
+static void *report_start(libtrace_t *trace UNUSED,
+                libtrace_thread_t *t UNUSED,
+                void *global) {
+        uint32_t *magic = (uint32_t *)global;
+        struct final *threadcounter =
+                        (struct final *)malloc(sizeof(struct final));
+
+        assert(*magic == 0xabcdef);
+
+        threadcounter->threads = 0;
+        threadcounter->packets = 0;
+        return threadcounter;
 }
 
-static int x;
-static void* per_packet(libtrace_t *trace, libtrace_thread_t *t,
-                        int mesg, libtrace_generic_t data,
-                        libtrace_thread_t *sender UNUSED) {
-	struct TLS *tls;
-	void* ret;
+static void report_cb(libtrace_t *trace UNUSED,
+                libtrace_thread_t *sender UNUSED,
+                void *global, void *tls, libtrace_result_t *res) {
+
+        uint32_t *magic = (uint32_t *)global;
+        struct final *threadcounter = (struct final *)tls;
+
+        assert(*magic == 0xabcdef);
+        assert(res->key == 0);
+
+        threadcounter->threads ++;
+        threadcounter->packets += res->value.sint;
+        printf("%d\n", res->value.sint);
+}
+
+static void report_end(libtrace_t *trace, libtrace_thread_t *t UNUSED,
+                void *global, void *tls) {
+
+        uint32_t *magic = (uint32_t *)global;
+        struct final *threadcounter = (struct final *)tls;
+
+        assert(*magic == 0xabcdef);
+        assert(threadcounter->threads == trace_get_perpkt_threads(trace));
+        assert(threadcounter->packets == 100);
+
+        free(threadcounter);
+}
+
+static libtrace_packet_t *per_packet(libtrace_t *trace UNUSED,
+                libtrace_thread_t *t UNUSED,
+                void *global, void *tls, libtrace_packet_t *packet) {
+        struct TLS *storage = (struct TLS *)tls;
+        uint32_t *magic = (uint32_t *)global;
+        static __thread int count = 0;
 	int a,*b,c=0;
-	tls = trace_get_tls(t);
 
-	switch (mesg) {
-	case MESSAGE_PACKET:
-		assert(tls != NULL);
-		assert(!(tls->seen_stop_message));
-		tls->count++;
-		if (tls->count>100) {
-			fprintf(stderr, "Too many packets someone should stop me!!\n");
-			kill(getpid(), SIGTERM);
-		}
-		// Do some work to even out the load on cores
-		b = &c;
-		for (a = 0; a < 10000000; a++) {
-			c += a**b;
-		}
-		x = c;
-		return data.pkt;
-	case MESSAGE_STARTING:
-		assert(tls == NULL);
-		tls = calloc(sizeof(struct TLS), 1);
-		ret = trace_set_tls(t, tls);
-		assert(ret == NULL);
-		tls->seen_start_message = true;
-		break;
-	case MESSAGE_STOPPING:
-		assert(tls->seen_start_message);
-		assert(tls != NULL);
-		tls->seen_stop_message = true;
-		trace_set_tls(t, NULL);
+        assert(storage != NULL);
+        assert(!storage->seen_stop_message);
 
-		// All threads publish to verify the thread count
-		trace_publish_result(trace, t, (uint64_t) 0, (libtrace_generic_t){.sint=tls->count}, RESULT_USER);
-		trace_post_reporter(trace);
-		free(tls);
-		break;
-	case MESSAGE_TICK_INTERVAL:
-	case MESSAGE_TICK_COUNT:
-		assert(tls->seen_start_message );
-		fprintf(stderr, "Not expecting a tick packet\n");
-		kill(getpid(), SIGTERM);
-		break;
-	case MESSAGE_PAUSING:
-		assert(tls->seen_start_message);
-		tls->seen_pausing_message = true;
-		break;
-	case MESSAGE_RESUMING:
-		assert(tls->seen_pausing_message || tls->seen_start_message);
-		tls->seen_resuming_message = true;
-		break;
-	}
-	return NULL;
+        if (storage->seen_pausing_message)
+                assert(storage->seen_resuming_message);
+
+        assert(*magic == 0xabcdef);
+
+        storage->count ++;
+        count ++;
+
+        assert(count == storage->count);
+
+        if (count > 100) {
+                fprintf(stderr, "Too many packets -- someone should stop me!\n");
+                kill(getpid(), SIGTERM);
+        }
+
+        // Do some work to even out the load on cores
+        b = &c;
+        for (a = 0; a < 10000000; a++) {
+                c += a**b;
+        }
+
+        return packet;
 }
 
+static void *start_processing(libtrace_t *trace, libtrace_thread_t *t UNUSED,
+                void *global) {
 
-/**
- * Test that the single threaded fallback works
- */
-int test_single_threaded(const char *tracename, int expected) {
-	libtrace_t *trace;
-	int error = 0;
-	printf("Testing single threaded\n");
+        static __thread bool seen_start_message = false;
+        uint32_t *magic = (uint32_t *)global;
+        struct TLS *storage = NULL;
+        assert(*magic == 0xabcdef);
 
-	// Create the trace
-	trace = trace_create(tracename);
-	iferr(trace,tracename);
+        assert(!seen_start_message);
+        assert(trace);
 
-	// Enable the single threaded fallback codepath
-	trace_set_perpkt_threads(trace, 1);
+        storage = (struct TLS *)malloc(sizeof(struct TLS));
+        storage->seen_start_message = true;
+        storage->seen_stop_message = false;
+        storage->seen_resuming_message = false;
+        storage->seen_pausing_message = false;
+        storage->count = 0;
 
-	// Start it
-	trace_pstart(trace, NULL, per_packet, report_result);
-	iferr(trace,tracename);
+        seen_start_message = true;
 
-	/* Make sure traces survive a pause and restart */
-	trace_ppause(trace);
-	iferr(trace,tracename);
-	trace_pstart(trace, NULL, NULL, NULL);
-	iferr(trace,tracename);
+        return storage;
+}
 
-	/* Wait for all threads to stop */
-	trace_join(trace);
+static void stop_processing(libtrace_t *trace, libtrace_thread_t *t,
+                void *global, void *tls) {
 
-	/* Now check we have all received all the packets */
-	if (error == 0) {
-		if (totalpkts == expected) {
-			printf("success: %d packets read\n",expected);
-		} else {
-			printf("failure: %d packets expected, %d seen\n",expected,totalpkts);
-			error = 1;
-		}
-	} else {
-		iferr(trace,tracename);
-	}
-    trace_destroy(trace);
-    return error;
+        static __thread bool seen_stop_message = false;
+        struct TLS *storage = (struct TLS *)tls;
+        uint32_t *magic = (uint32_t *)global;
+
+        assert(storage != NULL);
+        assert(!storage->seen_stop_message);
+        assert(!seen_stop_message);
+        assert(storage->seen_start_message);
+        assert(*magic == 0xabcdef);
+
+        seen_stop_message = true;
+        storage->seen_stop_message = true;
+
+	trace_publish_result(trace, t, (uint64_t) 0, (libtrace_generic_t){.sint = storage->count}, RESULT_USER);
+        trace_post_reporter(trace);
+        free(storage);
+}
+
+static void process_tick(libtrace_t *trace UNUSED, libtrace_thread_t *t UNUSED,
+                void *global UNUSED, void *tls UNUSED, uint64_t tick UNUSED) {
+
+        fprintf(stderr, "Not expecting a tick packet\n");
+        kill(getpid(), SIGTERM);
+}
+
+static void pause_processing(libtrace_t *trace UNUSED,
+                libtrace_thread_t *t UNUSED,
+                void *global, void *tls) {
+
+        static __thread bool seen_pause_message = false;
+        struct TLS *storage = (struct TLS *)tls;
+        uint32_t *magic = (uint32_t *)global;
+
+        assert(storage != NULL);
+        assert(!storage->seen_stop_message);
+        assert(storage->seen_start_message);
+        assert(*magic == 0xabcdef);
+
+        assert(seen_pause_message == storage->seen_pausing_message);
+
+        seen_pause_message = true;
+        storage->seen_pausing_message = true;
+}
+
+static void resume_processing(libtrace_t *trace UNUSED,
+                libtrace_thread_t *t UNUSED,
+                void *global, void *tls) {
+
+        static __thread bool seen_resume_message = false;
+        struct TLS *storage = (struct TLS *)tls;
+        uint32_t *magic = (uint32_t *)global;
+
+        assert(storage != NULL);
+        assert(!storage->seen_stop_message);
+        assert(storage->seen_start_message);
+        assert(*magic == 0xabcdef);
+
+        assert(seen_resume_message == storage->seen_resuming_message);
+
+        seen_resume_message = true;
+        storage->seen_resuming_message = true;
 }
 
 int main(int argc, char *argv[]) {
 	int error = 0;
-	int expected = 100;
 	const char *tracename;
+	libtrace_t *trace;
+        libtrace_callback_set_t *processing = NULL;
+        libtrace_callback_set_t *reporter = NULL;
+        uint32_t global = 0xabcdef;
 
 	if (argc<2) {
 		fprintf(stderr,"usage: %s type\n",argv[0]);
@@ -240,8 +284,47 @@ int main(int argc, char *argv[]) {
 
 	tracename = lookup_uri(argv[1]);
 
-	if (strcmp(argv[1],"rtclient")==0) expected=101;
+	trace = trace_create(tracename);
+	iferr(trace,tracename);
 
-	error = test_single_threaded(tracename, expected);
-    return error;
+        processing = trace_create_callback_set();
+        trace_set_starting_cb(processing, start_processing);
+        trace_set_stopping_cb(processing, stop_processing);
+        trace_set_packet_cb(processing, per_packet);
+        trace_set_pausing_cb(processing, pause_processing);
+        trace_set_resuming_cb(processing, resume_processing);
+        trace_set_tick_count_cb(processing, process_tick);
+        trace_set_tick_interval_cb(processing, process_tick);
+
+        reporter = trace_create_callback_set();
+        trace_set_starting_cb(reporter, report_start);
+        trace_set_stopping_cb(reporter, report_end);
+        trace_set_result_cb(reporter, report_cb);
+
+        /* Limit this to just one thread */
+        trace_set_perpkt_threads(trace, 1);
+
+	trace_pstart(trace, &global, processing, reporter);
+	iferr(trace,tracename);
+
+	/* Make sure traces survive a pause */
+	trace_ppause(trace);
+	iferr(trace,tracename);
+	trace_pstart(trace, NULL, NULL, NULL);
+	iferr(trace,tracename);
+
+	/* Wait for all threads to stop */
+	trace_join(trace);
+
+        global = 0xffffffff;
+
+	/* Now check we have all received all the packets */
+	if (error != 0) {
+		iferr(trace,tracename);
+	}
+
+        trace_destroy(trace);
+        trace_destroy_callback_set(processing);
+        trace_destroy_callback_set(reporter);
+        return error;
 }
