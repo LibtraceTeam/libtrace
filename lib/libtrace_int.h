@@ -1045,6 +1045,13 @@ extern volatile int libtrace_halt;
  */
 void register_format(struct libtrace_format_t *format);
 
+/** Converts a timeval into a timestamp in microseconds since the epoch.
+ *
+ * @param tv    The timeval to be converted.
+ * @return A 64 bit timestamp in microseconds since the epoch.
+ */
+uint64_t tv_to_usec(const struct timeval *tv);
+
 /** Converts a PCAP DLT into a libtrace link type.
  *
  * @param linktype	The PCAP DLT to be converted

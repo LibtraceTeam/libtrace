@@ -2295,33 +2295,6 @@ DLLEXPORT int trace_message_perpkts(libtrace_t * libtrace, libtrace_message_t * 
 	return -missed;
 }
 
-DLLEXPORT void * trace_get_local(libtrace_t *trace)
-{
-	return trace->global_blob;
-}
-
-DLLEXPORT void * trace_set_local(libtrace_t *trace, void * data)
-{
-	void *ret;
-	pthread_mutex_lock(&trace->libtrace_lock);
-	ret = trace->global_blob;
-	trace->global_blob = data;
-	pthread_mutex_unlock(&trace->libtrace_lock);
-	return ret;
-}
-
-DLLEXPORT void * trace_get_tls(libtrace_thread_t *t)
-{
-	return t->user_data;
-}
-
-DLLEXPORT void * trace_set_tls(libtrace_thread_t *t, void * data)
-{
-	void *ret = t->user_data;
-	t->user_data = data;
-	return ret;
-}
-
 /**
  * Publishes a result to the reduce queue
  * Should only be called by a perpkt thread, i.e. from a perpkt handler

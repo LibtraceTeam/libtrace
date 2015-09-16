@@ -262,7 +262,7 @@ static void run_trace(char *uri)
 	trace_set_tracetime(trace, true);
         trace_set_perpkt_threads(trace, threadcount);
 
-	if (trace_get_information(trace)->live) {
+	if (trace_is_parallel(trace)) {
                 trace_set_tick_interval(trace, (int) (packet_interval * 1000));
 	}
 
