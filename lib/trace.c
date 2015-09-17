@@ -731,6 +731,8 @@ DLLEXPORT void trace_destroy(libtrace_t *libtrace) {
         if (libtrace->reporter_cbs)
                 trace_destroy_callback_set(libtrace->reporter_cbs);
 
+        if (libtrace->hasher_data)
+                free(libtrace->hasher_data);
 	
 	if (libtrace->event.packet) {
 		/* Don't use trace_destroy_packet here - there is almost
