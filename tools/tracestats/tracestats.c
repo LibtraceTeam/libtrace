@@ -231,7 +231,7 @@ int main(int argc, char *argv[]) {
 
 	int i;
 	struct sigaction sigact;
-        int threadcount = 4;
+        int threadcount = 1;
 
 	while(1) {
 		int option_index;

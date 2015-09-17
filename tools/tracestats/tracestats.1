@@ -2,8 +2,8 @@
 .SH NAME
 tracestats \- perform simple analysis on a trace
 .SH SYNOPSIS
-.B tracestats 
-[ -f | --filter bpf ]... inputuri...
+.B tracestats
+[ -f | --filter bpf ] [ -t | --threads count ] ... inputuri...
 .SH DESCRPTION
 tracestats reads one or more traces and outputs summaries for each trace of
 how many packets/bytes match each bpf filter, as well as totals.  If instead
@@ -16,6 +16,14 @@ tracertstats(1) instead.
 .PD
 .BI \-\^\-filter " bpf-filter"
 Add another bpf filter
+
+.TP
+.PD 0
+.BI \-t " count"
+.TP
+.PD
+.BI \-\^\-threads " count"
+Use 'count' threads for processing packets. Defaults to a single thread.
 
 .SH EXAMPLES
 .nf
