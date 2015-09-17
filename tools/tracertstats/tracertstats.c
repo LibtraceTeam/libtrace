@@ -191,7 +191,7 @@ static libtrace_packet_t *cb_packet(libtrace_t *trace, libtrace_thread_t *t,
         int i;
 
         key = trace_get_erf_timestamp(packet);
-        if ((key >> 32) > (td->last_key >> 32) + packet_interval) {
+        if ((key >> 32) >= (td->last_key >> 32) + packet_interval) {
                 libtrace_generic_t tmp = {.ptr = td->results};
                 trace_publish_result(trace, t, key,
                                 tmp, RESULT_USER);
@@ -262,7 +262,7 @@ static void run_trace(char *uri)
 	trace_set_tracetime(trace, true);
         trace_set_perpkt_threads(trace, threadcount);
 
-	if (trace_is_parallel(trace)) {
+	if (trace_get_information(trace)->live) {
                 trace_set_tick_interval(trace, (int) (packet_interval * 1000));
 	}
 
