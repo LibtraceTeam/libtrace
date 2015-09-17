@@ -1,16 +1,17 @@
 /*
  * This file is part of libtrace
  *
- * Copyright (c) 2007,2008,2009,2010 The University of Waikato, Hamilton, 
+ * Copyright (c) 2007-2015 The University of Waikato, Hamilton,
  * New Zealand.
  *
- * Authors: Daniel Lawson 
+ * Authors: Daniel Lawson
  *          Perry Lorier
- *          Shane Alcock 
- *          
+ *          Shane Alcock
+ *          Richard Sanger
+ *
  * All rights reserved.
  *
- * This code has been developed by the University of Waikato WAND 
+ * This code has been developed by the University of Waikato WAND
  * research group. For further information please see http://www.wand.net.nz/
  *
  * libtrace is free software; you can redistribute it and/or modify
@@ -41,23 +42,24 @@
  * @author Daniel Lawson
  * @author Perry Lorier
  * @author Shane Alcock
+ * @author Richard Sanger
  *
  * @version $Id$
  *
- * This library provides a per packet interface into a trace file, or a live 
+ * This library provides a per packet interface into a trace file, or a live
  * captures.  It supports ERF, DAG cards, PCAP, Linux and BSD native sockets,
  * legacy ERF formats etc.
  *
  * @par Usage
- * See the example/ directory in the source distribution for some simple 
+ * See the example/ directory in the source distribution for some simple
  * examples
  *
  * @par Linking
  * To use this library you need to link against libtrace by passing -ltrace
- * to your linker. You may also need to link against a version of libpcap 
- * and of zlib which are compiled for largefile support (if you wish to access
- * traces larger than 2 GB). This is left as an exercise for the reader. Debian
- * Woody, at least, does not support large file offsets.
+ * to your linker.
+ *
+ * See libtrace_parallel.h for a description of the parallel API that allows
+ * programmers to spread packet processing across multiple threads.
  *
  */
 
@@ -239,13 +241,13 @@ extern "C" {
     #endif
 #endif
 
-	
+
 /** Opaque structure holding information about an output trace */
 typedef struct libtrace_out_t libtrace_out_t;
-	
+
 /** Opaque structure holding information about a trace */
 typedef struct libtrace_t libtrace_t;
-        
+
 /** Opaque structure holding information about a bpf filter */
 typedef struct libtrace_filter_t libtrace_filter_t;
 
@@ -311,22 +313,23 @@ typedef enum {
 	/* Special value used to indicate a failure to convert to libtrace
          * DLT */
         TRACE_DLT_ERROR = -1,
-	
-	/** pcap documents this as having the Address Family value in host byte order as the 
- 	  * framing.  Ugly? Yes.
+
+	/** pcap documents this as having the Address Family value in host 
+          * byte order as the framing.  Ugly? Yes.
  	  */
 	TRACE_DLT_NULL = 0, 
 	TRACE_DLT_EN10MB = 1,
 	TRACE_DLT_PPP = 9,
 	TRACE_DLT_ATM_RFC1483 = 11,
-	
-	/** Ok, so OpenBSD has a different value for DLT_RAW as the rest of the planet, so detect
-          * this.  When reading to/from files we should be using TRACE_DLT_LINKTYPE_RAW instead.
-          * When talking about DLT's inside libtrace tho, we should be using /these/ DLT's.
-          */
+
+	/** Ok, so OpenBSD has a different value for DLT_RAW as the rest of
+         * the planet, so detect this.  When reading to/from files we should
+         * be using TRACE_DLT_LINKTYPE_RAW instead. When talking about DLT's
+         * inside libtrace tho, we should be using /these/ DLT's.
+         */
 #ifdef __OpenBSD__
 	TRACE_DLT_OPENBSD_LOOP=12,
-	TRACE_DLT_RAW = 14,	
+	TRACE_DLT_RAW = 14
 #else
 	TRACE_DLT_RAW = 12,
 	TRACE_DLT_OPENBSD_LOOP = 108,
@@ -624,6 +627,7 @@ typedef struct libtrace_ip6_ext
 	uint8_t len;	/**< Length of the current header */
 } PACKED libtrace_ip6_ext_t;
 
+/** IPv6 fragmentation header */
 typedef struct libtrace_ip6_frag 
 {
 	uint8_t nxt;	/**< Next header */
@@ -716,6 +720,7 @@ typedef struct libtrace_icmp
   } un;				/**< Union for Payloads of Various ICMP Codes */
 } PACKED libtrace_icmp_t;
 
+/** Generic ICMPv6 header structure */
 typedef struct libtrace_icmp6 {
   uint8_t type;		/**< Message Type */
   uint8_t code;		/**< Type Sub-code */
@@ -1090,6 +1095,7 @@ typedef struct libtrace_ospf_router_lsa_t
 	uint16_t num_links;	/**< Number of links in LSA */
 } PACKED libtrace_ospf_router_lsa_v2_t;
 
+/** OSPF message types */
 typedef enum {
 	TRACE_OSPF_HELLO = 1,		/**< OSPF Hello */
 	TRACE_OSPF_DATADESC = 2,	/**< OSPF Database Description */
@@ -1098,6 +1104,7 @@ typedef enum {
 	TRACE_OSPF_LSACK = 5		/**< OSPF Link State Acknowledgement */
 } libtrace_ospf_types_t;
 
+/** OSPF link state acknowledgement types */
 typedef enum {
         TRACE_OSPF_LS_ROUTER = 1,	/**< OSPF Router LSA */
         TRACE_OSPF_LS_NETWORK = 2,	/**< OSPF Network LSA */
@@ -1190,7 +1197,7 @@ DLLEXPORT const char *trace_parse_uri(const char *uri, char **format);
  * Some valid URI's are:
  *  - erf:/path/to/erf/file
  *  - erf:-  (stdin)
- *  - dag:/dev/dagcard                  
+ *  - dag:/dev/dagcard
  *  - pcapint:pcapinterface                (eg: pcap:eth0)
  *  - pcap:/path/to/pcap/file
  *  - pcap:-
@@ -1382,7 +1389,8 @@ typedef enum {
 /**
  * Statistic counters are cumulative from the time the trace is started.
  * Trace pause will reset the counters, to zero.
- * Always check \a{field}_valid is set before attempting to read the stored value.
+ * Always check \a{field}_valid is set before attempting to read the stored
+ * value.
  *
  * @note Always allocate this structure using trace_create_statistics().
  *       This allows us to extend the structure in the future.
@@ -1400,8 +1408,7 @@ typedef struct libtrace_stat_t {
 				  ensure the struct was allocated correctly */
 
 	/* These must all be uint64_t's, match this order with the X macro */
-	uint64_t accepted;
-	/**< The number of packets that have been read from the input trace
+	/** The number of packets that have been read from the input trace
 	 * using trace_read_packet(). In the parallel framework this may include
 	 * some packets waiting in a batch yet to be seen by the user's
 	 * application.
@@ -1411,14 +1418,16 @@ typedef struct libtrace_stat_t {
 	 *
 	 * @note This field replaces trace_get_accepted_packets()
 	 */
-	uint64_t filtered;
-	/**< The number of packets that were captured, but discarded for not
+	uint64_t accepted;
+
+	/** The number of packets that were captured, but discarded for not
 	 * matching a provided filter.
 	 *
 	 * @note This field replaces trace_get_filtered_packets()
 	 */
-	uint64_t received;
-	/**< The total number of good packets which have been recevied. Including
+	uint64_t filtered;
+
+	/** The total number of good packets which have been recevied. Including
 	 * those which are dropped and filtered. This does not include errors.
 	 *
 	 * @note This may include a small number of buffered packets
@@ -1426,15 +1435,17 @@ typedef struct libtrace_stat_t {
 	 *
 	 * @note This field replaces trace_get_received_packets()
 	 */
-	uint64_t dropped;
-	/**< The number of packets that have been dropped on an input trace
+	uint64_t received;
+
+	/** The number of packets that have been dropped on an input trace
 	 * due to lack of buffer space on the capturing device. This does not
 	 * included errored packets which are dropped directly by the card.
 	 *
 	 * @note This field replaces trace_get_dropped_packets()
 	 */
-	uint64_t captured;
-	/**< The number of received packets that have not been dropped. This
+	uint64_t dropped;
+
+	/** The number of received packets that have not been dropped. This
 	 * includes filtered packets.
 	 *
 	 * This is equivalent to received-dropped.
@@ -1442,11 +1453,13 @@ typedef struct libtrace_stat_t {
 	 * @note This may include a small number of buffered packets
 	 *       not yet included in accepted.
 	 */
-	uint64_t errors;
-	/**< The number of packets that have been discarded by the network card
+        uint64_t captured;
+
+	/** The number of packets that have been discarded by the network card
 	 * because they are invalid. That includes FCS mismatches, incorrect
 	 * packet lengths etc.
 	 */
+	uint64_t errors;
 } libtrace_stat_t;
 
 ct_assert(offsetof(libtrace_stat_t, accepted) == 8);
