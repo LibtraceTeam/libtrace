@@ -230,7 +230,7 @@ inline void send_message(libtrace_t *trace, libtrace_thread_t *thread,
 	case MESSAGE_USER:
 		if (cbs->message_user)
 			(*cbs->message_user)(trace, thread, trace->global_blob,
-                                        thread->user_data, type, data);
+                                        thread->user_data, type, data, sender);
 		return;
 	case MESSAGE_RESULT:
                 if (cbs->message_result)

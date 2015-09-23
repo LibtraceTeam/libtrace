@@ -550,7 +550,8 @@ typedef void (*fn_cb_result)(libtrace_t *libtrace, libtrace_thread_t *sender,
  *
  */
 typedef void (*fn_cb_usermessage) (libtrace_t *libtrace, libtrace_thread_t *t,
-                void *global, void *tls, int mesg, libtrace_generic_t data);
+                void *global, void *tls, int mesg, libtrace_generic_t data,
+                libtrace_thread_t *sender);
 
 
 /**

@@ -1,8 +1,3 @@
-This fork of Libtrace aims to support parallel packet processing.
-
-This is still work in progress and is full of bugs, some of the original
-Libtrace functions might not function correctly breaking the supplied tools.
-
 libtrace 4.0.0
 
 ---------------------------------------------------------------------------
@@ -23,7 +18,11 @@ libtrace was primarily designed for use with the real-time interface to the
 Waikato DAG Capture Point software running at The University of Waikato, 
 and has been since extended to a range of other trace and interface formats.
 
-Further information about libtrace see 
+In version 4.0, we have introduced an API for processing packets in parallel
+using multiple threads. See libtrace_parallel.h for a detailed description
+of the API.
+
+Further information about libtrace, see
 http://research.wand.net.nz/software/libtrace.php
 
 Bugs should be reported by either emailing contact@wand.net.nz or filing
@@ -32,11 +31,11 @@ an issue at https://github.com/wanduow/libtrace
 It is licensed under the GNU General Public License (GPL) version 2. Please
 see the included file GPL for details of this license.
 
-A detailed ChangeLog can be found on the libtrace wiki: 
+A detailed ChangeLog can be found on the libtrace wiki:
 https://github.com/wanduow/libtrace/wiki/ChangeLog
 
 Documentation, usage instructions and a detailed tutorial can also found
 on the libtrace wiki.
 
-For further information, please contact the WAND group. See 
-http://www.wand.net.nz/ for details. 
+For further information, please contact the WAND group. See
+http://www.wand.net.nz/ for details.

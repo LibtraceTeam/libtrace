@@ -199,7 +199,8 @@ static void resume_processing(libtrace_t *trace,
 }
 
 static void custom_msg(libtrace_t *trace, libtrace_thread_t *t, void *global,
-                void *tls, int mesg, libtrace_generic_t data) {
+                void *tls, int mesg, libtrace_generic_t data,
+                libtrace_thread_t *sender) {
 
         struct pstorage *ps = (struct pstorage *)tls;
         assert(trace);
@@ -209,6 +210,8 @@ static void custom_msg(libtrace_t *trace, libtrace_thread_t *t, void *global,
 
         assert(mesg >= MESSAGE_USER);
         assert(sizeof(data) == 8);
+
+        assert(sender || sender == NULL);
 }
 
 static void usage(char *prog) {
