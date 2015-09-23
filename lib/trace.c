@@ -269,6 +269,7 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 	libtrace->perpkt_queue_full = false;
 	libtrace->global_blob = NULL;
 	libtrace->hasher = NULL;
+        libtrace->hasher_data = NULL;
 	libtrace_zero_ocache(&libtrace->packet_freelist);
 	libtrace_zero_thread(&libtrace->hasher_thread);
 	libtrace_zero_thread(&libtrace->reporter_thread);
@@ -899,7 +900,8 @@ DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 			/* Finalise the packet, freeing any resources the format module
 			 * may have allocated it and zeroing all data associated with it.
 			 */
-			trace_fin_packet(packet);
+                        if (packet->trace == libtrace)
+        			trace_fin_packet(packet);
 			/* Store the trace we are reading from into the packet opaque 
 			 * structure */
 			packet->trace = libtrace;
