@@ -312,8 +312,6 @@ void linuxcommon_close_input_stream(libtrace_t *libtrace,
                                     struct linux_per_stream_t *stream);
 int linuxcommon_start_input_stream(libtrace_t *libtrace,
                                    struct linux_per_stream_t *stream);
-inline int linuxcommon_to_packet_fanout(libtrace_t *libtrace,
-                                        struct linux_per_stream_t *stream);
 int linuxcommon_pause_input(libtrace_t *libtrace);
 int linuxcommon_get_fd(const libtrace_t *libtrace);
 int linuxcommon_fin_input(libtrace_t *libtrace);
@@ -379,5 +377,29 @@ static inline libtrace_linktype_t linuxcommon_get_link_type(uint16_t linktype)
 			return (libtrace_linktype_t)~0U;
 	}
 }
+
+/**
+ * Converts a socket, either packet_mmap or standard raw socket into a
+ * fanout socket.
+ * NOTE: This means we can read from the socket with multiple queues,
+ * each must be setup (identically) and then this called upon them
+ *
+ * @return 0 success, -1 error
+ */
+static inline int linuxcommon_to_packet_fanout(libtrace_t *libtrace,
+                                        struct linux_per_stream_t *stream)
+{
+        int fanout_opt = ((int)FORMAT_DATA->fanout_flags << 16) |
+                         (int)FORMAT_DATA->fanout_group;
+        if (setsockopt(stream->fd, SOL_PACKET, PACKET_FANOUT,
+                        &fanout_opt, sizeof(fanout_opt)) == -1) {
+                trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
+                              "Converting the fd to a socket fanout failed %s",
+                              libtrace->uridata);
+                return -1;
+        }
+        return 0;
+}
+
 
 #endif /* FORMAT_LINUX_COMMON_H */

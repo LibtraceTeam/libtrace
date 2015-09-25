@@ -174,8 +174,8 @@ DLLEXPORT void *trace_get_payload_from_meta(const void *meta,
 		uint32_t *remaining)
 {
 	void *nexthdr; 
-	uint16_t arphrd;
-	uint16_t next;
+	uint16_t arphrd = 0;
+	uint16_t next = 0;
 	
 	assert(meta != NULL);
 	assert(linktype != NULL);
