@@ -378,6 +378,7 @@ static inline libtrace_linktype_t linuxcommon_get_link_type(uint16_t linktype)
 	}
 }
 
+#ifdef HAVE_NETPACKET_PACKET_H
 /**
  * Converts a socket, either packet_mmap or standard raw socket into a
  * fanout socket.
@@ -400,6 +401,7 @@ static inline int linuxcommon_to_packet_fanout(libtrace_t *libtrace,
         }
         return 0;
 }
+#endif /* HAVE_NETPACKET_PACKET_H */
 
 
 #endif /* FORMAT_LINUX_COMMON_H */
