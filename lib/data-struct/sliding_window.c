@@ -57,9 +57,11 @@ int libtrace_slidingwindow_try_write(libtrace_slidingwindow_t *sw, uint64_t numb
 	}
 }
 
+/* 
 static inline uint64_t libtrace_slidingwindow_get_min_number(libtrace_slidingwindow_t *sw) {
 	return sw->start_number;
 }
+*/
 
 uint64_t libtrace_slidingwindow_read_ready(libtrace_slidingwindow_t *sw) {
 	return sw->elements[sw->start] != NULL;

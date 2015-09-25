@@ -81,11 +81,11 @@
 #include "libtrace.h"
 #include "libtrace_parallel.h"
 
-#ifdef HAVE_PCAP_BPF_H
-#  include <pcap-bpf.h>
+#ifdef HAVE_NET_BPF_H
+#  include <net/bpf.h>
 #else
-#  ifdef HAVE_NET_BPF_H
-#    include <net/bpf.h>
+#  ifdef HAVE_PCAP_BPF_H
+#    include <pcap-bpf.h>
 #  endif
 #endif
 
@@ -601,7 +601,7 @@ static int trace_perpkt_thread_pause(libtrace_t *trace, libtrace_thread_t *t,
 static void* perpkt_threads_entry(void *data) {
 	libtrace_t *trace = (libtrace_t *)data;
 	libtrace_thread_t *t;
-	libtrace_message_t message = {0};
+	libtrace_message_t message = {0, {.uint64=0}, NULL};
 	libtrace_packet_t *packets[trace->config.burst_size];
 	size_t i;
 	//int ret;
@@ -760,7 +760,7 @@ static void* hasher_entry(void *data) {
 	libtrace_thread_t * t;
 	int i;
 	libtrace_packet_t * packet;
-	libtrace_message_t message = {0};
+	libtrace_message_t message = {0, {.uint64=0}, NULL};
 	int pkt_skipped = 0;
 
 	assert(trace_has_dedicated_hasher(trace));
@@ -986,7 +986,7 @@ inline static int trace_pread_packet_hasher_thread(libtrace_t *libtrace,
 void store_first_packet(libtrace_t *libtrace, libtrace_packet_t *packet, libtrace_thread_t *t)
 {
 	if (!t->recorded_first) {
-		libtrace_message_t mesg = {0};
+		libtrace_message_t mesg = {0, {.uint64=0}, NULL};
 		struct timeval tv;
 		libtrace_packet_t * dup;
 
@@ -1083,7 +1083,7 @@ inline static struct timeval usec_to_tv(uint64_t usec)
 
 /** Similar to delay_tracetime but send messages to all threads periodically */
 static void* reporter_entry(void *data) {
-	libtrace_message_t message = {0};
+	libtrace_message_t message = {0, {.uint64=0}, NULL};
 	libtrace_t *trace = (libtrace_t *)data;
 	libtrace_thread_t *t = &trace->reporter_thread;
 
@@ -1145,7 +1145,7 @@ static void* reporter_entry(void *data) {
 /** Similar to delay_tracetime but send messages to all threads periodically */
 static void* keepalive_entry(void *data) {
 	struct timeval prev, next;
-	libtrace_message_t message = {0};
+	libtrace_message_t message = {0, {.uint64=0}, NULL};
 	libtrace_t *trace = (libtrace_t *)data;
 	uint64_t next_release;
 	libtrace_thread_t *t = &trace->keepalive_thread;
@@ -1513,14 +1513,17 @@ static int trace_start_thread(libtrace_t *trace,
 #ifdef __linux__
 	pthread_attr_t attrib;
 	cpu_set_t cpus;
+	int i;
 #endif
-	int ret, i;
+	int ret;
 	assert(t->type == THREAD_EMPTY);
 	t->trace = trace;
 	t->ret = NULL;
 	t->user_data = NULL;
 	t->type = type;
 	t->state = THREAD_RUNNING;
+
+	assert(name);
 
 #ifdef __linux__
 	CPU_ZERO(&cpus);
@@ -1968,7 +1971,7 @@ DLLEXPORT int trace_ppause(libtrace_t *libtrace)
 	if (trace_has_dedicated_hasher(libtrace)) {
 		if (libtrace->config.debug_state)
 			fprintf(stderr, "Hasher thread is running, asking it to pause ...");
-		libtrace_message_t message = {0};
+		libtrace_message_t message = {0, {.uint64=0}, NULL};
 		message.code = MESSAGE_DO_PAUSE;
 		trace_message_thread(libtrace, &libtrace->hasher_thread, &message);
 		// Wait for it to pause
@@ -1986,7 +1989,7 @@ DLLEXPORT int trace_ppause(libtrace_t *libtrace)
 	// Stop threads, skip this one if it's a perpkt
 	for (i = 0; i < libtrace->perpkt_thread_count; i++) {
 		if (&libtrace->perpkt_threads[i] != t) {
-			libtrace_message_t message = {0};
+			libtrace_message_t message = {0, {.uint64=0}, NULL};
 			message.code = MESSAGE_DO_PAUSE;
 			ASSERT_RET(trace_message_thread(libtrace, &libtrace->perpkt_threads[i], &message), != -1);
 			if(trace_has_dedicated_hasher(libtrace)) {
@@ -2029,7 +2032,7 @@ DLLEXPORT int trace_ppause(libtrace_t *libtrace)
                         thread_change_state(libtrace, &libtrace->reporter_thread, THREAD_PAUSED, true);
                 
                 } else {
-                        libtrace_message_t message = {0};
+			libtrace_message_t message = {0, {.uint64=0}, NULL};
                         message.code = MESSAGE_DO_PAUSE;
                         trace_message_thread(libtrace, &libtrace->reporter_thread, &message);
                         // Wait for it to pause
@@ -2076,7 +2079,7 @@ DLLEXPORT int trace_ppause(libtrace_t *libtrace)
 DLLEXPORT int trace_pstop(libtrace_t *libtrace)
 {
 	int i, err;
-	libtrace_message_t message = {0};
+	libtrace_message_t message = {0, {.uint64=0}, NULL};
 	assert(libtrace);
 
 	// Ensure all threads have paused and the underlying trace format has
@@ -2202,7 +2205,7 @@ DLLEXPORT void trace_join(libtrace_t *libtrace) {
 
 	// Wait for the tick (keepalive) thread if it has been started
 	if (libtrace->keepalive_thread.type == THREAD_KEEPALIVE) {
-		libtrace_message_t msg = {0};
+		libtrace_message_t msg = {0, {.uint64=0}, NULL};
 		msg.code = MESSAGE_DO_STOP;
 		trace_message_thread(libtrace, &libtrace->keepalive_thread, &msg);
 		pthread_join(libtrace->keepalive_thread.tid, NULL);
@@ -2273,7 +2276,7 @@ DLLEXPORT int trace_message_reporter(libtrace_t * libtrace, libtrace_message_t *
 
 DLLEXPORT int trace_post_reporter(libtrace_t *libtrace)
 {
-	libtrace_message_t message = {0};
+	libtrace_message_t message = {0, {.uint64=0}, NULL};
 	message.code = MESSAGE_POST_REPORTER;
 	return trace_message_reporter(libtrace, (void *) &message);
 }

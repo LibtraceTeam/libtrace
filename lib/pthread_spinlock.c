@@ -69,6 +69,7 @@ int pthread_spin_init(pthread_spinlock_t *lock, int pshared) {
 	if (lock == NULL)
 		return EINVAL;
 	*lock = OS_SPINLOCK_INIT;
+	(void)pshared;
 	return 0;
 }
 

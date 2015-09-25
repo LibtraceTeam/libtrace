@@ -16,7 +16,6 @@
 #include <pthread.h>
 #include <inttypes.h>
 #include <signal.h>
-#include <malloc.h>
 #include <getopt.h>
 #include <stdlib.h>
 #include <string.h>
