@@ -1,4 +1,4 @@
-#include "../libtrace.h"
+#include "libtrace.h"
 
 #ifndef LIBTRACE_LIST_H
 #define LIBTRACE_LIST_H

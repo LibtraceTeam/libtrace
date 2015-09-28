@@ -118,6 +118,7 @@ int libtrace_list_pop_front(libtrace_list_t *l, void *item)
 	 * node */
 	if (ret) {
 		memcpy(item, n->data, l->element_size);
+                free(n->data);
 		free(n);
 	}
 
@@ -149,6 +150,7 @@ int libtrace_list_pop_back(libtrace_list_t *l, void *item)
 	 * node */
 	if (ret) {
 		memcpy(item, n->data, l->element_size);
+                free(n->data);
 		free(n);
 	}
 
