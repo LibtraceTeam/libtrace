@@ -4,7 +4,8 @@ include_HEADERS = libtrace.h dagformat.h lt_inttypes.h daglegacy.h \
         data-struct/ring_buffer.h data-struct/object_cache.h \
         data-struct/vector.h data-struct/message_queue.h \
         data-struct/deque.h data-struct/linked_list.h \
-        data-struct/sliding_window.h hash_toeplitz.h
+        data-struct/sliding_window.h hash_toeplitz.h \
+        data-struct/buckets.h
 
 AM_CFLAGS=@LIBCFLAGS@ @CFLAG_VISIBILITY@ -pthread
 AM_CXXFLAGS=@LIBCXXFLAGS@ @CFLAG_VISIBILITY@ -pthread
@@ -66,6 +67,7 @@ libtrace_la_SOURCES = trace.c trace_parallel.c common.h \
 		data-struct/message_queue.c data-struct/deque.c \
 		data-struct/sliding_window.c data-struct/object_cache.c \
 		data-struct/linked_list.c hash_toeplitz.c combiner_ordered.c \
+                data-struct/buckets.c \
 		combiner_sorted.c combiner_unordered.c \
 		pthread_spinlock.c pthread_spinlock.h
 
