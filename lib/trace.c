@@ -787,7 +787,7 @@ DLLEXPORT libtrace_packet_t *trace_create_packet(void)
 
 DLLEXPORT libtrace_packet_t *trace_copy_packet(const libtrace_packet_t *packet) {
 	libtrace_packet_t *dest = 
-		(libtrace_packet_t *)malloc(sizeof(libtrace_packet_t));
+		(libtrace_packet_t *)calloc((size_t)1, sizeof(libtrace_packet_t));
 	if (!dest) {
 		printf("Out of memory constructing packet\n");
 		abort();
@@ -848,8 +848,16 @@ void trace_fin_packet(libtrace_packet_t *packet) {
 		if (packet->trace && packet->trace->format->fin_packet) {
 			packet->trace->format->fin_packet(packet);
 		}
+
+                if (packet->srcbucket && packet->internalid != 0) {
+                        libtrace_bucket_t *b = (libtrace_bucket_t *)packet->srcbucket;
+                        libtrace_release_bucket_id(b, packet->internalid);
+                }
+
+                pthread_mutex_lock(&packet->trace->libtrace_lock);
 		if (packet->trace && packet->trace->last_packet == packet)
 			packet->trace->last_packet = NULL;
+                pthread_mutex_unlock(&packet->trace->libtrace_lock);
 
 		// No matter what we remove the header and link pointers
 		packet->trace = NULL;
@@ -971,7 +979,9 @@ int trace_prepare_packet(libtrace_t *trace, libtrace_packet_t *packet,
 	}
 	
 	packet->trace = trace;
+        pthread_mutex_lock(&trace->libtrace_lock);
         trace->last_packet = packet;
+        pthread_mutex_unlock(&trace->libtrace_lock);
 	
 	/* Clear packet cache */
 	trace_clear_cache(packet);

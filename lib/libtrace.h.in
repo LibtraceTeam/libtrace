@@ -547,6 +547,8 @@ typedef struct libtrace_packet_t {
 	uint64_t order; /**< Notes the order of this packet in relation to the input */
 	uint64_t hash; /**< A hash of the packet as supplied by the user */
 	int error; /**< The error status of pread_packet */
+        uint64_t internalid;            /** Internal indentifier for the pkt */
+        void *srcbucket;
 } libtrace_packet_t;
 
 

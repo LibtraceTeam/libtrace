@@ -163,7 +163,8 @@ DLLEXPORT void libtrace_release_bucket_id(libtrace_bucket_t *b, uint64_t id) {
                 bnode->activemembers -= 1;
         }
 
-        while (libtrace_list_get_size(b->nodelist) > 0) {
+
+        while (libtrace_list_get_size(b->nodelist) > 1) {
                 lnode = libtrace_list_get_index(b->nodelist, 0);
 
                 front = *(libtrace_bucket_node_t **)lnode->data;
@@ -173,6 +174,7 @@ DLLEXPORT void libtrace_release_bucket_id(libtrace_bucket_t *b, uint64_t id) {
                 if (front == b->node)
                         break;
 
+                assert(lnode->next != NULL);
                 for (i = 0; i < front->slots; i++) {
                         if (front->released[i] == 2) {
                                 int index = i + front->startindex;

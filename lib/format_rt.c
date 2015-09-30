@@ -41,6 +41,8 @@
 #include "format_helper.h"
 #include "rt_protocol.h"
 
+#include "data-struct/buckets.h"
+
 #include <sys/stat.h>
 #include <assert.h>
 #include <errno.h>
@@ -85,18 +87,15 @@ struct rt_format_data_t {
 	/* Buffer to store received packets into */
 	char *pkt_buffer;
 	/* Pointer to the next packet to be read from the buffer */
-	char *buf_current;
-	/* Amount of buffer space used */
-	size_t buf_filled;
+	char *buf_read;
+	/* Pointer to the next unused byte in the buffer */
+	char *buf_write;
 	/* The port to connect to */
 	int port;
 	/* The file descriptor for the RT connection */
 	int input_fd;
 	/* Flag indicating whether the server is doing reliable RT */
 	int reliable;
-
-	/* Header for the packet currently being received */
-	rt_header_t rt_hdr;
 
         int unacked;
 	
@@ -108,6 +107,10 @@ struct rt_format_data_t {
 	libtrace_t *dummy_linux;
 	libtrace_t *dummy_ring;
 	libtrace_t *dummy_bpf;
+
+        /* Bucket structure for storing read packets until the user is
+         * done with them. */
+        libtrace_bucket_t *bucket;
 };
 
 /* Connects to an RT server 
@@ -221,11 +224,13 @@ static void rt_init_format_data(libtrace_t *libtrace) {
 	RT_INFO->dummy_ring = NULL;
 	RT_INFO->dummy_bpf = NULL;
 	RT_INFO->pkt_buffer = NULL;
-	RT_INFO->buf_current = NULL;
-	RT_INFO->buf_filled = 0;
+	RT_INFO->buf_read = NULL;
+	RT_INFO->buf_write = NULL;
 	RT_INFO->hostname = NULL;
 	RT_INFO->port = 0;
 	RT_INFO->unacked = 0;
+
+        RT_INFO->bucket = libtrace_bucket_init();
 }
 
 static int rt_init_input(libtrace_t *libtrace) {
@@ -279,7 +284,6 @@ static int rt_start_input(libtrace_t *libtrace) {
 		printf("Failed to send start message to server\n");
 		return -1;
 	}
-	RT_INFO->rt_hdr.type = TRACE_RT_LAST;
 
 	return 0;
 }
@@ -304,117 +308,80 @@ static int rt_pause_input(libtrace_t *libtrace) {
 
 static int rt_fin_input(libtrace_t *libtrace) {
 	/* Make sure we clean up any dummy traces that we have been using */
-	
+
 	if (RT_INFO->dummy_duck)
 		trace_destroy_dead(RT_INFO->dummy_duck);
 
-	if (RT_INFO->dummy_erf) 
+	if (RT_INFO->dummy_erf)
 		trace_destroy_dead(RT_INFO->dummy_erf);
-		
+
 	if (RT_INFO->dummy_pcap)
 		trace_destroy_dead(RT_INFO->dummy_pcap);
 
 	if (RT_INFO->dummy_linux)
 		trace_destroy_dead(RT_INFO->dummy_linux);
-	
+
 	if (RT_INFO->dummy_ring)
 		trace_destroy_dead(RT_INFO->dummy_ring);
 
 	if (RT_INFO->dummy_bpf)
 		trace_destroy_dead(RT_INFO->dummy_bpf);
+
+        if (RT_INFO->bucket)
+                libtrace_bucket_destroy(RT_INFO->bucket);
 	free(libtrace->format_data);
         return 0;
 }
 
-
-/* I've upped this to 10K to deal with jumbo-grams that have not been snapped
- * in any way. This means we have a much larger memory overhead per packet
- * (which won't be used in the vast majority of cases), so we may want to think
- * about doing something smarter, e.g. allocate a smaller block of memory and
- * only increase it as required.
- *
- * XXX Capturing off int: can still lead to packets that are larger than 10K,
- * in instances where the fragmentation is done magically by the NIC. This
- * is pretty nasty, but also very rare.
- */
-#define RT_BUF_SIZE (LIBTRACE_PACKET_BUFSIZE * 2)
-
-/* Receives data from an RT server */
-static int rt_read(libtrace_t *libtrace, void *buffer, size_t len, int block) 
-{
-        int numbytes;
+/* Sends an RT ACK to the server to acknowledge receipt of packets */
+static int rt_send_ack(libtrace_t *libtrace, 
+		uint32_t seqno)  {
 	
-	assert(len <= RT_BUF_SIZE);
+	static char *ack_buffer = 0;
+	char *buf_ptr;
+	int numbytes = 0;
+	size_t to_write = 0;
+	rt_header_t *hdr;
+	rt_ack_t *ack_hdr;
 	
-	if (!RT_INFO->pkt_buffer) {
-		RT_INFO->pkt_buffer = (char*)malloc((size_t)RT_BUF_SIZE);
-		RT_INFO->buf_current = RT_INFO->pkt_buffer;
-		RT_INFO->buf_filled = 0;
+	if (!ack_buffer) {
+		ack_buffer = (char*)malloc(sizeof(rt_header_t) 
+							+ sizeof(rt_ack_t));
+	}
+	
+	hdr = (rt_header_t *) ack_buffer;
+	ack_hdr = (rt_ack_t *) (ack_buffer + sizeof(rt_header_t));
+	
+	hdr->type = htonl(TRACE_RT_ACK);
+	hdr->length = htons(sizeof(rt_ack_t));
+
+	ack_hdr->sequence = htonl(seqno);
+	
+	to_write = sizeof(rt_ack_t) + sizeof(rt_header_t);
+	buf_ptr = ack_buffer;
+
+	/* Keep trying until we write the entire ACK */
+	while (to_write > 0) {
+		numbytes = send(RT_INFO->input_fd, buf_ptr, to_write, 0); 
+		if (numbytes == -1) {
+			if (errno == EINTR || errno == EAGAIN) {
+				continue;
+			}
+			else {
+				printf("Error sending ack\n");
+				perror("send");
+				trace_set_err(libtrace, TRACE_ERR_RT_FAILURE, 
+						"Error sending ack");
+				return -1;
+			}
+		}
+		to_write = to_write - numbytes;
+		buf_ptr = buf_ptr + to_write;
+		
 	}
 
-#ifndef MSG_DONTWAIT
-#define MSG_DONTWAIT 0
-#endif
-
-	if (block)
-		block=0;
-	else
-		block=MSG_DONTWAIT;
-
-	/* If we don't have enough buffer space for the amount we want to
-	 * read, move the current buffer contents to the front of the buffer
-	 * to make room */
-	if (len > RT_INFO->buf_filled) {
-		memcpy(RT_INFO->pkt_buffer, RT_INFO->buf_current, 
-				RT_INFO->buf_filled);
-		RT_INFO->buf_current = RT_INFO->pkt_buffer;
-#ifndef MSG_NOSIGNAL
-#  define MSG_NOSIGNAL 0
-#endif
-		/* Loop as long as we don't have all the data that we were
-		 * asked for */
-		while (len > RT_INFO->buf_filled) {
-                	if ((numbytes = recv(RT_INFO->input_fd,
-                                                RT_INFO->buf_current + 
-						RT_INFO->buf_filled,
-                                                RT_BUF_SIZE-RT_INFO->buf_filled,
-                                                MSG_NOSIGNAL|block)) <= 0) {
-				if (numbytes == 0) {
-					trace_set_err(libtrace, TRACE_ERR_RT_FAILURE, 
-							"No data received");
-					return -1;
-				}
-				
-                	        if (errno == EINTR) {
-                	                /* ignore EINTR in case
-                	                 * a caller is using signals
-					 */
-                	                continue;
-                	        }
-				if (errno == EAGAIN) {
-					/* We asked for non-blocking mode, so
-					 * we need to return now */
-					trace_set_err(libtrace,
-							EAGAIN,
-							"EAGAIN");
-					return -1;
-				}
-				
-                        	perror("recv");
-				trace_set_err(libtrace, errno,
-						"Failed to read data into rt recv buffer");
-                        	return -1;
-                	}
-			RT_INFO->buf_filled+=numbytes;
-		}
-
-        }
-        memcpy(buffer, RT_INFO->buf_current, len);
-	RT_INFO->buf_current += len;
-	RT_INFO->buf_filled -= len;
-        return len;
+	return 1;
 }
-
 
 /* Sets the trace format for the packet to match the format it was originally
  * captured in, rather than the RT format */
@@ -505,54 +472,187 @@ static int rt_set_format(libtrace_t *libtrace, libtrace_packet_t *packet)
 	return 0; /* success */
 }		
 
-/* Sends an RT ACK to the server to acknowledge receipt of packets */
-static int rt_send_ack(libtrace_t *libtrace, 
-		uint32_t seqno)  {
-	
-	static char *ack_buffer = 0;
-	char *buf_ptr;
-	int numbytes = 0;
-	size_t to_write = 0;
-	rt_header_t *hdr;
-	rt_ack_t *ack_hdr;
-	
-	if (!ack_buffer) {
-		ack_buffer = (char*)malloc(sizeof(rt_header_t) 
-							+ sizeof(rt_ack_t));
-	}
-	
-	hdr = (rt_header_t *) ack_buffer;
-	ack_hdr = (rt_ack_t *) (ack_buffer + sizeof(rt_header_t));
-	
-	hdr->type = htonl(TRACE_RT_ACK);
-	hdr->length = htons(sizeof(rt_ack_t));
 
-	ack_hdr->sequence = htonl(seqno);
-	
-	to_write = sizeof(rt_ack_t) + sizeof(rt_header_t);
-	buf_ptr = ack_buffer;
+/* I've upped this to 10K to deal with jumbo-grams that have not been snapped
+ * in any way. This means we have a much larger memory overhead per packet
+ * (which won't be used in the vast majority of cases), so we may want to think
+ * about doing something smarter, e.g. allocate a smaller block of memory and
+ * only increase it as required.
+ *
+ * XXX Capturing off int: can still lead to packets that are larger than 10K,
+ * in instances where the fragmentation is done magically by the NIC. This
+ * is pretty nasty, but also very rare.
+ */
+#define RT_BUF_SIZE (LIBTRACE_PACKET_BUFSIZE * 2)
 
-	/* Keep trying until we write the entire ACK */
-	while (to_write > 0) {
-		numbytes = send(RT_INFO->input_fd, buf_ptr, to_write, 0); 
-		if (numbytes == -1) {
-			if (errno == EINTR || errno == EAGAIN) {
-				continue;
-			}
-			else {
-				printf("Error sending ack\n");
-				perror("send");
-				trace_set_err(libtrace, TRACE_ERR_RT_FAILURE, 
-						"Error sending ack");
-				return -1;
-			}
-		}
-		to_write = to_write - numbytes;
-		buf_ptr = buf_ptr + to_write;
-		
+static int rt_process_data_packet(libtrace_t *libtrace,
+                libtrace_packet_t *packet) {
+
+        uint32_t prep_flags = TRACE_PREP_DO_NOT_OWN_BUFFER;
+        rt_header_t *hdr = (rt_header_t *)packet->header;
+
+        /* Send an ACK if required */
+        if (RT_INFO->reliable > 0 && packet->type >= TRACE_RT_DATA_SIMPLE) {
+		RT_INFO->unacked ++;
+                if (RT_INFO->unacked >= RT_ACK_FREQUENCY) {
+                        if (rt_send_ack(libtrace, hdr->sequence) == -1)
+                               	return -1;
+                        RT_INFO->unacked = 0;
+                }
 	}
 
-	return 1;
+	/* Convert to the original capture format */
+	if (rt_set_format(libtrace, packet) < 0) {
+		return -1;
+        }
+
+	/* Update payload pointers and packet type to match the original
+	 * format */
+	if (trace_prepare_packet(packet->trace, packet, packet->payload,
+				packet->type, prep_flags)) {
+		return -1;
+	}
+
+        return 1;
+
+}
+
+/* Receives data from an RT server */
+static int rt_read(libtrace_t *libtrace, int block) {
+        int numbytes;
+
+	if (!RT_INFO->pkt_buffer) {
+		RT_INFO->pkt_buffer = (char*)malloc((size_t)RT_BUF_SIZE);
+		RT_INFO->buf_write = RT_INFO->pkt_buffer;
+                RT_INFO->buf_read = RT_INFO->pkt_buffer;
+                libtrace_create_new_bucket(RT_INFO->bucket, RT_INFO->pkt_buffer);
+	}
+
+#ifndef MSG_DONTWAIT
+#define MSG_DONTWAIT 0
+#endif
+#ifndef MSG_NOSIGNAL
+#  define MSG_NOSIGNAL 0
+#endif
+
+	if (block)
+		block=0;
+	else
+		block=MSG_DONTWAIT;
+
+        /* If the current buffer has plenty of space left, we can continue to 
+         * read into it, otherwise create a new buffer and move anything in
+         * the old buffer over to it */
+        if (RT_INFO->buf_write - RT_INFO->pkt_buffer > RT_BUF_SIZE / 2) {
+                char *newbuf = (char*)malloc((size_t)RT_BUF_SIZE);
+
+                memcpy(newbuf, RT_INFO->buf_read, RT_INFO->buf_write - RT_INFO->buf_read);
+                RT_INFO->buf_write = newbuf + (RT_INFO->buf_write - RT_INFO->buf_read);
+                RT_INFO->buf_read = newbuf;
+                RT_INFO->pkt_buffer = newbuf;
+                libtrace_create_new_bucket(RT_INFO->bucket, newbuf);
+
+        }
+
+        /* Attempt to fill the buffer as much as we can */
+        if ((numbytes = recv(RT_INFO->input_fd, RT_INFO->buf_write,
+                        RT_BUF_SIZE - (RT_INFO->buf_write-RT_INFO->pkt_buffer),
+                        MSG_NOSIGNAL | block)) <= 0) {
+
+                if (numbytes == 0) {
+                        trace_set_err(libtrace, TRACE_ERR_RT_FAILURE,
+                                        "No data received by RT client");
+                        return -1;
+                }
+
+                if (errno == EINTR) {
+                        /* Ignore EINTR in case a caller is using signals */
+                        return 0;
+                }
+
+                if (errno == EAGAIN) {
+                        /* No data available and we are non-blocking */
+                        trace_set_err(libtrace, EAGAIN, "EAGAIN");
+                        return -1;
+                }
+
+                trace_set_err(libtrace, TRACE_ERR_RT_FAILURE,
+                                "Error reading from RT socket: %s",
+                                strerror(errno));
+                return -1;
+        }
+
+        RT_INFO->buf_write += numbytes;
+        return (RT_INFO->buf_write - RT_INFO->buf_read);
+
+}
+
+
+static int rt_get_next_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
+                int block) {
+
+        rt_header_t *rthdr;
+
+        if (packet->buffer && packet->buf_control == TRACE_CTRL_PACKET)
+                free(packet->buffer);
+
+        while (RT_INFO->buf_write - RT_INFO->buf_read <
+                                (uint32_t)sizeof(rt_header_t)) {
+                if (rt_read(libtrace, block) == -1)
+                        return -1;
+        }
+
+        rthdr = (rt_header_t *)RT_INFO->buf_read;
+
+        /* Check if we have enough payload */
+        while (RT_INFO->buf_write - (RT_INFO->buf_read + sizeof(rt_header_t))
+                        < ntohs(rthdr->length)) {
+                if (rt_read(libtrace, block) == -1)
+                        return -1;
+                rthdr = (rt_header_t *)RT_INFO->buf_read;
+        }
+
+
+        packet->buffer = RT_INFO->buf_read;
+        packet->header = RT_INFO->buf_read;
+        packet->type = ntohl(((rt_header_t *)packet->header)->type);
+        packet->payload = RT_INFO->buf_read + sizeof(rt_header_t);
+        packet->internalid = libtrace_push_into_bucket(RT_INFO->bucket);
+        assert(packet->internalid != 0);
+        packet->srcbucket = RT_INFO->bucket;
+        packet->buf_control = TRACE_CTRL_EXTERNAL;
+
+        RT_INFO->buf_read += ntohs(rthdr->length) + sizeof(rt_header_t);
+
+        if (packet->type >= TRACE_RT_DATA_SIMPLE) {
+                rt_process_data_packet(libtrace, packet);
+        } else {
+                switch(packet->type) {
+                        case TRACE_RT_DUCK_2_4:
+                        case TRACE_RT_DUCK_2_5:
+                        case TRACE_RT_STATUS:
+                        case TRACE_RT_METADATA:
+                                if (rt_process_data_packet(libtrace, packet) < 0)
+                                        return -1;
+                                break;
+                        case TRACE_RT_END_DATA:
+                        case TRACE_RT_KEYCHANGE:
+                        case TRACE_RT_LOSTCONN:
+                        case TRACE_RT_CLIENTDROP:
+                        case TRACE_RT_SERVERSTART:
+                                break;
+                        case TRACE_RT_PAUSE_ACK:
+                        case TRACE_RT_OPTION:
+                                break;
+                        default:
+                                fprintf(stderr, "Bad RT type for client: %d\n",
+                                                packet->type);
+                                return -1;
+                }
+        }
+
+        return ntohs(rthdr->length);
+
 }
 
 /* Shouldn't need to call this too often */
@@ -582,136 +682,10 @@ static int rt_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
 	return 0;
 }	
 
-/* Reads the body of an RT packet from the network */
-static int rt_read_data_packet(libtrace_t *libtrace,
-		libtrace_packet_t *packet, int blocking) {
-	uint32_t prep_flags = 0;
-
-	prep_flags |= TRACE_PREP_OWN_BUFFER;
-
-	/* The stored RT header will tell us how much data we need to read */
-	if (rt_read(libtrace, packet->buffer, (size_t)RT_INFO->rt_hdr.length, 
-				blocking) != RT_INFO->rt_hdr.length) {
-		return -1;
-	}
-
-	/* Send an ACK if required */
-        if (RT_INFO->reliable > 0 && packet->type >= TRACE_RT_DATA_SIMPLE) {
-		RT_INFO->unacked ++;
-                if (RT_INFO->unacked >= RT_ACK_FREQUENCY) {
-                        if (rt_send_ack(libtrace, RT_INFO->rt_hdr.sequence) 
-                                        == -1)
-                               	return -1;
-                        RT_INFO->unacked = 0;
-                }
-	}
-	
-	/* Convert to the original capture format */
-	if (rt_set_format(libtrace, packet) < 0) {
-		return -1;
-        }
-               	
-	/* Update payload pointers and packet type to match the original
-	 * format */
-	if (trace_prepare_packet(packet->trace, packet, packet->buffer,
-				packet->type, prep_flags)) {
-		return -1;
-	}
-
-	return 0;
-}
-
-/* Reads an RT packet from the network. Will block if the "blocking" flag is
- * set to 1, otherwise will return if insufficient data is available */
-static int rt_read_packet_versatile(libtrace_t *libtrace,
-		libtrace_packet_t *packet,int blocking) {
-        rt_header_t hdr;
-	rt_header_t *pkt_hdr = NULL;
-	libtrace_rt_types_t switch_type;
-	
-	/* RT_LAST indicates that we need to read the RT header for the next
-	 * packet. This is a touch hax, I admit */
-	if (RT_INFO->rt_hdr.type == TRACE_RT_LAST) {
-		/* FIXME: Better error handling required */
-		if (rt_read(libtrace, (void *)&hdr, 
-				sizeof(rt_header_t),blocking) !=
-				sizeof(rt_header_t)) {
-			return -1;
-		}
-		/* Need to store these in case the next rt_read overwrites 
-		 * the buffer they came from! */
-		RT_INFO->rt_hdr.type = ntohl(hdr.type);
-		RT_INFO->rt_hdr.length = ntohs(hdr.length);
-		RT_INFO->rt_hdr.sequence = ntohl(hdr.sequence);
-	}
-
-        if (packet->buf_control == TRACE_CTRL_PACKET) {
-                if (packet->buffer == NULL) {
-                        packet->buffer = malloc(RT_INFO->rt_hdr.length + sizeof(rt_header_t));
-
-                } else if (RT_INFO->rt_hdr.length > sizeof(packet->buffer)) {
-                        packet->buffer = realloc(packet->buffer, RT_INFO->rt_hdr.length + sizeof(rt_header_t));
-                }
-        }
-	
-        packet->type = RT_INFO->rt_hdr.type;
-        packet->payload = packet->buffer;
-        
-	
-	/* All data-bearing packets (as opposed to RT internal messages) 
-	 * should be treated the same way when it comes to reading the rest
-	 * of the packet */
-	if (packet->type >= TRACE_RT_DATA_SIMPLE) {
-		switch_type = TRACE_RT_DATA_SIMPLE;
-	} else {
-		switch_type = packet->type;
-	}
-
-	switch(switch_type) {
-		case TRACE_RT_DATA_SIMPLE:
-		case TRACE_RT_DUCK_2_4:
-		case TRACE_RT_DUCK_2_5:
-		case TRACE_RT_STATUS:
-		case TRACE_RT_METADATA:
-                        if (rt_read_data_packet(libtrace, packet, blocking))
-				return -1;
-			break;
-		case TRACE_RT_END_DATA:
-		case TRACE_RT_KEYCHANGE:
-		case TRACE_RT_LOSTCONN:
-		case TRACE_RT_CLIENTDROP:
-		case TRACE_RT_SERVERSTART:
-			/* All these have no payload */
-                        packet->header = packet->buffer;
-                        packet->payload = ((char *)packet->buffer + sizeof(rt_header_t));
-                        pkt_hdr = (rt_header_t *)packet->header;
-                        pkt_hdr->type = ntohl(RT_INFO->rt_hdr.type);
-                        pkt_hdr->length = ntohs(RT_INFO->rt_hdr.length);
-                        pkt_hdr->sequence = ntohl(RT_INFO->rt_hdr.sequence);
-
-                        /* XXX Do we need to save the other crap? */
-			break;
-		case TRACE_RT_PAUSE_ACK:
-			/* XXX: Add support for this */
-			break;
-		case TRACE_RT_OPTION:
-			/* XXX: Add support for this */
-			break;
-		default:
-			printf("Bad rt type for client receipt: %d\n",
-					switch_type);
-			return -1;
-	}
-	
-        /* Return the number of bytes read from the stream */
-	RT_INFO->rt_hdr.type = TRACE_RT_LAST;
-	return RT_INFO->rt_hdr.length + sizeof(rt_header_t);
-}
-
 /* Reads the next available packet in a blocking fashion */
 static int rt_read_packet(libtrace_t *libtrace,
 		libtrace_packet_t *packet) {
-	return rt_read_packet_versatile(libtrace,packet,1);
+	return rt_get_next_packet(libtrace,packet,1);
 }
 
 
@@ -800,7 +774,7 @@ static libtrace_eventobj_t trace_event_rt(libtrace_t *trace,
 
 	do {
 
-		event.size = rt_read_packet_versatile(trace, packet, 0);
+		event.size = rt_get_next_packet(trace, packet, 0);
 		if (event.size == -1) {
 			read_err = trace_get_err(trace);
 			if (read_err.err_num == EAGAIN) {
@@ -876,7 +850,7 @@ static struct libtrace_format_t rt = {
         NULL,                           /* fin_output */
         rt_read_packet,           	/* read_packet */
 	rt_prepare_packet,		/* prepare_packet */
-	NULL,				/* fin_packet */
+	NULL,   			/* fin_packet */
         NULL,                           /* write_packet */
         rt_get_link_type,	        /* get_link_type */
         NULL,  		            	/* get_direction */
