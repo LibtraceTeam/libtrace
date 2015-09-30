@@ -854,10 +854,12 @@ void trace_fin_packet(libtrace_packet_t *packet) {
                         libtrace_release_bucket_id(b, packet->internalid);
                 }
 
-                pthread_mutex_lock(&packet->trace->libtrace_lock);
-		if (packet->trace && packet->trace->last_packet == packet)
-			packet->trace->last_packet = NULL;
-                pthread_mutex_unlock(&packet->trace->libtrace_lock);
+                if (packet->trace) {
+                        pthread_mutex_lock(&packet->trace->libtrace_lock);
+        		if (packet->trace->last_packet == packet)
+	        		packet->trace->last_packet = NULL;
+                        pthread_mutex_unlock(&packet->trace->libtrace_lock);
+                }
 
 		// No matter what we remove the header and link pointers
 		packet->trace = NULL;
@@ -872,6 +874,7 @@ void trace_fin_packet(libtrace_packet_t *packet) {
 		trace_clear_cache(packet);
 		packet->hash = 0;
 		packet->order = 0;
+                packet->srcbucket = NULL;
 	}
 }
 
@@ -899,14 +902,14 @@ DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 	assert(packet);
 
 	if (libtrace->format->read_packet) {
+                /* Finalise the packet, freeing any resources the format module
+                 * may have allocated it and zeroing all data associated with it.
+                 */
+                if (packet->trace == libtrace)
+                        trace_fin_packet(packet);
 		do {
 			size_t ret;
 			int filtret;
-			/* Finalise the packet, freeing any resources the format module
-			 * may have allocated it and zeroing all data associated with it.
-			 */
-                        if (packet->trace == libtrace)
-        			trace_fin_packet(packet);
 			/* Store the trace we are reading from into the packet opaque 
 			 * structure */
 			packet->trace = libtrace;
@@ -914,7 +917,7 @@ DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 			if (ret==(size_t)-1 || ret==0) {
 				return ret;
 			}
-			if (libtrace->filter) {
+                        if (libtrace->filter) {
 				/* If the filter doesn't match, read another
 				 * packet
 				 */
@@ -923,10 +926,11 @@ DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
                                         /* Error compiling filter, probably */
                                         return ~0U;
                                 }
-                                
+
                                 if (filtret == 0) {
 					++libtrace->filtered_packets;
-					continue;
+					trace_fin_packet(packet);
+                                        continue;
 				}
 			}
 			if (libtrace->snaplen>0) {
@@ -939,6 +943,7 @@ DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 			++libtrace->sequence_number;
 			if (packet->trace == libtrace)
                                 libtrace->last_packet = packet;
+
 			return ret;
 		} while(1);
 	}

@@ -149,6 +149,7 @@ DLLEXPORT void libtrace_release_bucket_id(libtrace_bucket_t *b, uint64_t id) {
         bnode = b->packets[id];
         assert(bnode != NULL);
 
+
         /* Find the right slot */
         if (id < bnode->startindex) {
                 s = (MAX_OUTSTANDING - bnode->startindex) + id - 1;
@@ -157,20 +158,31 @@ DLLEXPORT void libtrace_release_bucket_id(libtrace_bucket_t *b, uint64_t id) {
         }
         assert(s < bnode->slots);
         assert(bnode->released[s] != 0);
+       
 
         if (bnode->released[s] == 1) {
-                bnode->released[s] = 2;
+                uint64_t previd = b->nextid - 1;
+                if (b->nextid == 1)
+                        previd = MAX_OUTSTANDING - 1;
+
+                if (bnode == b->node && id == previd) {
+                        b->packets[id] = NULL;
+                        b->nextid = previd;
+                        bnode->released[s] = 0;
+                } else {
+                        bnode->released[s] = 2;
+                }
                 bnode->activemembers -= 1;
         }
-
 
         while (libtrace_list_get_size(b->nodelist) > 1) {
                 lnode = libtrace_list_get_index(b->nodelist, 0);
 
                 front = *(libtrace_bucket_node_t **)lnode->data;
 
-                if (front->activemembers > 0)
+                if (front->activemembers > 0) {
                         break;
+                }
                 if (front == b->node)
                         break;
 
