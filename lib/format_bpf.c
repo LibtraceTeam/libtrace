@@ -116,6 +116,8 @@ struct libtrace_format_data_t {
 	struct bpf_stat stats;
 	/* A boolean flag indicating whether the statistics are up-to-date */
 	int stats_valid;
+        /* Bucket data structure for safely storing buffers of packets */
+        libtrace_bucket_t *bucket;
 };
 
 #define FORMATIN(x) ((struct libtrace_format_data_t*)((x->format_data)))
@@ -138,6 +140,7 @@ static int bpf_init_input(libtrace_t *libtrace)
 	FORMATIN(libtrace)->promisc = 0;
 	FORMATIN(libtrace)->snaplen = 65536;
 	FORMATIN(libtrace)->stats_valid = 0;
+        FORMATIN(libtrace)->bucket = libtrace_bucket_init();
 
 	return 0;
 }
@@ -202,8 +205,8 @@ static int bpf_start_input(libtrace_t *libtrace)
 		return -1;
 	}
 
-	FORMATIN(libtrace)->buffer = malloc(FORMATIN(libtrace)->buffersize);
-	FORMATIN(libtrace)->bufptr = FORMATIN(libtrace)->buffer;
+	FORMATIN(libtrace)->buffer = NULL;
+	FORMATIN(libtrace)->bufptr = NULL;
 	FORMATIN(libtrace)->remaining = 0;
 
 	/* Attach to the device */
@@ -343,7 +346,8 @@ static int bpf_pause_input(libtrace_t *libtrace)
 /* Closes a BPF input trace */
 static int bpf_fin_input(libtrace_t *libtrace) 
 {
-	free(libtrace->format_data);
+	libtrace_bucket_destroy(FORMATIN(libtrace)->bucket);
+        free(libtrace->format_data);
 	return 0;
 }
 
@@ -456,7 +460,13 @@ static int bpf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 
 	packet->type = bpf_linktype_to_rt(FORMATIN(libtrace)->linktype);
 
+        if (FORMATIN(libtrace)->remaining <= 0) {
+                FORMATIN(libtrace)->buffer = malloc(FORMATIN(libtrace)->buffer_size);
+                libtrace_create_new_bucket(FORMATIN(libtrace)->bucket, FORMATIN(libtrace)->buffer);
+        }
+
 	while (FORMATIN(libtrace)->remaining <= 0) {
+
 		tout.tv_sec = 0;
 		tout.tv_usec = 500000;
 		FD_ZERO(&readfds);
@@ -502,7 +512,7 @@ static int bpf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 	 * stored in */
 	flags |= TRACE_PREP_DO_NOT_OWN_BUFFER;
 
-	if (packet->buf_control == TRACE_CTRL_PACKET)
+	if (packet->buffer && packet->buf_control == TRACE_CTRL_PACKET)
 		free(packet->buffer);
 
 	/* Update 'packet' to point to the first packet in our capture
@@ -511,9 +521,11 @@ static int bpf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 			packet->type, flags)) {
 		return -1;
 	}
-	
 
-	/* Skip past the packet record we're going to return, making sure
+        packet->internalid = libtrace_push_into_bucket(FORMATIN(libtrace)->bucket);
+        packet->srcbucket = FORMATIN(libtrace)->bucket;
+
+        /* Skip past the packet record we're going to return, making sure
 	 * that we deal with padding correctly */
 	FORMATIN(libtrace)->bufptr+=
 		BPF_WORDALIGN(BPFHDR(packet)->bh_hdrlen
