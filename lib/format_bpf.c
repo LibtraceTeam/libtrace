@@ -461,7 +461,7 @@ static int bpf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 	packet->type = bpf_linktype_to_rt(FORMATIN(libtrace)->linktype);
 
         if (FORMATIN(libtrace)->remaining <= 0) {
-                FORMATIN(libtrace)->buffer = malloc(FORMATIN(libtrace)->buffer_size);
+                FORMATIN(libtrace)->buffer = malloc(FORMATIN(libtrace)->buffersize);
                 libtrace_create_new_bucket(FORMATIN(libtrace)->bucket, FORMATIN(libtrace)->buffer);
         }
 
