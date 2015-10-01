@@ -129,7 +129,7 @@ static void report_cb(libtrace_t *trace UNUSED,
 
         threadcounter->threads ++;
         threadcounter->packets += res->value.sint;
-        printf("%d\n", res->value.sint);
+        //printf("%d\n", res->value.sint);
 }
 
 static void report_end(libtrace_t *trace, libtrace_thread_t *t UNUSED,
@@ -161,6 +161,8 @@ static libtrace_packet_t *per_packet(libtrace_t *trace UNUSED,
 
         assert(*magic == 0xabcdef);
 
+	if (storage->count == 0)
+		usleep(100000);
         storage->count ++;
         count ++;
 

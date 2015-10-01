@@ -153,7 +153,7 @@ static libtrace_packet_t *per_packet(libtrace_t *trace UNUSED,
         struct TLS *storage = (struct TLS *)tls;
         uint32_t *magic = (uint32_t *)global;
         static __thread int count = 0;
-	int a,*b,c=0;
+	int a,*b,c=10;
 
         assert(storage != NULL);
         assert(!storage->seen_stop_message);
@@ -163,6 +163,8 @@ static libtrace_packet_t *per_packet(libtrace_t *trace UNUSED,
 
         assert(*magic == 0xabcdef);
 
+	if (storage->count == 0)
+		usleep(100000);
         storage->count ++;
         count ++;
 
@@ -175,7 +177,7 @@ static libtrace_packet_t *per_packet(libtrace_t *trace UNUSED,
 
         // Do some work to even out the load on cores
         b = &c;
-        for (a = 0; a < 10000000; a++) {
+        for (a = 0; a < 50000000; a++) {
                 c += a**b;
         }
 

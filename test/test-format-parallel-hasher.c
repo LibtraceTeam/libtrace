@@ -163,6 +163,8 @@ static libtrace_packet_t *per_packet(libtrace_t *trace UNUSED,
 
         assert(*magic == 0xabcdef);
 
+	if (storage->count == 0)
+		usleep(100000);
         storage->count ++;
         count ++;
 
