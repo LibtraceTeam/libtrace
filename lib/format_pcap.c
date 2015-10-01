@@ -267,6 +267,13 @@ static int pcapint_start_input(libtrace_t *libtrace) {
 		return -1; /* failure */
 	}
 
+#ifdef HAVE_PCAP_IMMEDIATE
+        if ((pcap_set_immediate_mode(INPUT.pcap, 1) == PCAP_ERROR_ACTIVATED)) {
+		trace_set_err(libtrace,TRACE_ERR_INIT_FAILED,"%s",errbuf);
+		return -1; /* failure */
+	}
+#endif
+
 	if ((ret = pcap_activate(INPUT.pcap)) != 0) {
 		if (ret == PCAP_WARNING_PROMISC_NOTSUP) {
 			trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,"Promiscuous mode unsupported");
