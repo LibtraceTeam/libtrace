@@ -66,6 +66,7 @@ char *output_format=NULL;
 int merge_inputs = 0;
 int threadcount = 4;
 int filter_count=0;
+int burstsize=10;
 
 struct filter_t {
 	char *expr;
@@ -193,7 +194,7 @@ static libtrace_packet_t *cb_packet(libtrace_t *trace, libtrace_thread_t *t,
         key = trace_get_erf_timestamp(packet);
         if ((key >> 32) >= (td->last_key >> 32) + packet_interval) {
                 libtrace_generic_t tmp = {.ptr = td->results};
-                trace_publish_result(trace, t, key,
+		trace_publish_result(trace, t, key,
                                 tmp, RESULT_USER);
                 trace_post_reporter(trace);
                 td->last_key = key;
@@ -229,7 +230,7 @@ static void cb_tick(libtrace_t *trace, libtrace_thread_t *t,
 
         thread_data_t *td = (thread_data_t *)tls;
         if (order > td->last_key) {
-                libtrace_generic_t tmp = {.ptr = td->results};
+		libtrace_generic_t tmp = {.ptr = td->results};
                 trace_publish_result(trace, t, order, tmp, RESULT_USER);
                 trace_post_reporter(trace);
                 td->last_key = order;
@@ -261,6 +262,7 @@ static void run_trace(char *uri)
 	trace_set_combiner(trace, &combiner_ordered, (libtrace_generic_t){0});
 	trace_set_tracetime(trace, true);
         trace_set_perpkt_threads(trace, threadcount);
+	trace_set_burst_size(trace, burstsize);
 
 	if (trace_get_information(trace)->live) {
                 trace_set_tick_interval(trace, (int) (packet_interval * 1000));
@@ -315,6 +317,8 @@ static void usage(char *argv0)
 	"-o --output-format=txt|csv|html|png Reporting output format\n"
 	"-f --filter=bpf	Apply BPF filter. Can be specified multiple times\n"
 	"-m --merge-inputs	Do not create separate outputs for each input trace\n"
+	"-N --nobuffer		Disable packet buffering within libtrace to force faster\n"
+	"			updates at very low traffic rates\n"
 	"-h --help	Print this usage statement\n"
 	,argv0);
 }
@@ -333,16 +337,20 @@ int main(int argc, char *argv[]) {
 			{ "help",	        0, 0, 'h' },
 			{ "merge-inputs",	0, 0, 'm' },
 			{ "threads",	        1, 0, 't' },
+			{ "nobuffer",	        0, 0, 'N' },
 			{ NULL, 		0, 0, 0   },
 		};
 
-		int c=getopt_long(argc, argv, "c:f:i:o:t:hm",
+		int c=getopt_long(argc, argv, "c:f:i:o:t:hmN",
 				long_options, &option_index);
 
 		if (c==-1)
 			break;
 
 		switch (c) {
+			case 'N':
+				burstsize = 1;
+				break;
 			case 'f': 
 				++filter_count;
 				filters=realloc(filters,filter_count*sizeof(struct filter_t));

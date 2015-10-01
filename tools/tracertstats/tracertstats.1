@@ -9,6 +9,7 @@ tracertstats \- perform simple filter based analysis on a trace
 [ -c | --count count ]
 [ -o | --output-format csv,txt,png,html ]
 [ -m | --merge-inputs ]
+[ -N | --nobuffer ]
 inputuri...
 .P
 .B tracertstats 
@@ -59,6 +60,17 @@ lower bound as this is only evaluated once per thread per interval.
 Treats all inputs as a single input, resulting a single unified output rather
 than an output for each input. Works best with traces that are consecutive to
 create a single CSV, for instance.
+
+.TP
+.PD 0
+.BI \-N
+.TP
+.PD
+.BI \-\^\-nobuffer
+Disable internal packet buffering in libtrace. If the packet rate is very low
+(i.e. < 10 packets per interval), set this to ensure that tracertstats is more
+likely to print results in time with the interval rather than producing bursts
+of output for multiple intervals at a time.
 
 .TP
 .PD 0
