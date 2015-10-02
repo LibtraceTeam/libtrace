@@ -624,7 +624,11 @@ static void* perpkt_threads_entry(void *data) {
 	ASSERT_RET(pthread_mutex_unlock(&trace->libtrace_lock), == 0);
 
 	if (trace->format->pregister_thread) {
-		trace->format->pregister_thread(trace, t, trace_is_parallel(trace));
+		if (trace->format->pregister_thread(trace, t, 
+				trace_is_parallel(trace)) < 0) {
+			thread_change_state(trace, t, THREAD_FINISHED, false);
+			pthread_exit(NULL);
+		}
 	}
 
 	/* Fill our buffer with empty packets */

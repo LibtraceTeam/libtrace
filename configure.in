@@ -313,7 +313,12 @@ if test "$with_dag" != no; then
 		
 		AC_DEFINE(DAG_VERSION,25,[defines the DAG driver version])
 		libtrace_dag_version=25
-	fi
+
+		AC_CHECK_HEADERS(dag_config_api.h,[csapi_found=1],,)
+		if test "$csapi_found" = 1; then
+			LIBTRACE_LIBS="$LIBTRACE_LIBS -ldagconf"
+		fi
+	fi	
 fi
 
 # TODO: turn the test part of the next block into a function, so it can be 

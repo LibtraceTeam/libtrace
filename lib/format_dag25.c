@@ -54,6 +54,10 @@
 #include <pthread.h>
 
 
+#ifdef HAVE_DAG_CONFIG_API_H
+#include <dag_config_api.h>
+#endif
+
 #ifdef WIN32
 #  include <io.h>
 #  include <share.h>
@@ -548,11 +552,34 @@ static int dag_init_input(libtrace_t *libtrace) {
 	return 0;
 }
 
+#ifdef HAVE_DAG_CONFIG_API_H
+static int dag_csapi_set_snaplen(libtrace_t *libtrace, int slen) {
+	dag_card_ref_t card_ref = NULL;
+	dag_component_t root = NULL;
+	attr_uuid_t uuid = 0;
+
+	if (slen < 0)
+		slen = 0; 
+
+	card_ref = dag_config_init(FORMAT_DATA->device->dev_name);
+	root = dag_config_get_root_component(card_ref);
+	
+	uuid = dag_component_get_config_attribute_uuid(root, kBooleanAttributeVarlen);
+	dag_config_set_boolean_attribute(card_ref, uuid, true);
+
+	uuid = dag_component_get_config_attribute_uuid(root, kUint32AttributeSnaplength);
+	dag_config_set_uint32_attribute(card_ref, uuid, (uint32_t)slen);
+
+	return 0;
+	
+
+} 
+#endif /* HAVE_DAG_CONFIG_API_H */
+
 /* Configures a DAG input trace */
 static int dag_config_input(libtrace_t *libtrace, trace_option_t option,
 			    void *data)
 {
-	char conf_str[4096];
 	switch(option) {
 	case TRACE_OPTION_META_FREQ:
 		/* This option is used to specify the frequency of DUCK
@@ -560,7 +587,12 @@ static int dag_config_input(libtrace_t *libtrace, trace_option_t option,
 		DUCK.duck_freq = *(int *)data;
 		return 0;
 	case TRACE_OPTION_SNAPLEN:
+#ifdef HAVE_DAG_CONFIG_API_H
+		return dag_csapi_set_snaplen(libtrace, *(int *)data);
+#else
 		/* Tell the card our new snap length */
+	{
+		char conf_str[4096];
 		snprintf(conf_str, 4096, "varlen slen=%i", *(int *)data);
 		if (dag_configure(FORMAT_DATA->device->fd,
 				  conf_str) != 0) {
@@ -569,6 +601,9 @@ static int dag_config_input(libtrace_t *libtrace, trace_option_t option,
 				      libtrace->uridata);
 			return -1;
 		}
+	}
+#endif /* HAVE_DAG_CONFIG_API_H */
+
 		return 0;
 	case TRACE_OPTION_PROMISC:
 		/* DAG already operates in a promisc fashion */
@@ -692,7 +727,7 @@ static int dag_pstart_input(libtrace_t *libtrace)
 	 * handle */
 	max_streams = dag_rx_get_stream_count(FORMAT_DATA->device->fd);
 	if (libtrace->perpkt_thread_count > max_streams) {
-		trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT,
+		fprintf(stderr,
 			      "WARNING: DAG has only %u streams available, "
                               "capping total number of threads at this value.",
 			      max_streams);
@@ -713,11 +748,12 @@ static int dag_pstart_input(libtrace_t *libtrace)
 	while (tok != NULL) {
 		/* Ensure we haven't specified too many streams */
 		if (stream_count >= libtrace->perpkt_thread_count) {
-			trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT,
+			fprintf(stderr,
 				      "WARNING: Format uri specifies too many "
                                       "streams. Maximum is %u, so only using "
                                       "the first %u from the uri.",
-                                      max_streams);
+                                      libtrace->perpkt_thread_count, 
+				      libtrace->perpkt_thread_count);
 		        break;
                 }
 
@@ -737,6 +773,10 @@ static int dag_pstart_input(libtrace_t *libtrace)
 		tok = strtok(NULL, ",");
 	}
 
+	if (stream_count < libtrace->perpkt_thread_count) {
+		libtrace->perpkt_thread_count = stream_count;
+	}
+	
 	FORMAT_DATA->stream_attached = 1;
 
  cleanup:
@@ -1491,13 +1531,9 @@ static int dag_pregister_thread(libtrace_t *libtrace, libtrace_thread_t *t,
 	libtrace_list_node_t *node;
 
 	if (reader && t->type == THREAD_PERPKT) {
-		fprintf(stderr, "t%u: registered reader thread", t->perpkt_num);
 		node = libtrace_list_get_index(FORMAT_DATA->per_stream,
 						t->perpkt_num);
 		if (node == NULL) {
-			trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
-				      "Too few streams supplied for the"
-				      " number of threads lanuched");
 			return -1;
 		}
 		stream_data = node->data;
@@ -1506,13 +1542,9 @@ static int dag_pregister_thread(libtrace_t *libtrace, libtrace_thread_t *t,
 		t->format_data = stream_data;
 
 		/* Attach and start the DAG stream */
-		printf("t%u: starting and attaching stream #%u\n",
-		       t->perpkt_num, stream_data->dagstream);
 		if (dag_start_input_stream(libtrace, stream_data) < 0)
 			return -1;
 	}
-
-	fprintf(stderr, "t%u: registered thread\n", t->perpkt_num);
 
 	return 0;
 }
