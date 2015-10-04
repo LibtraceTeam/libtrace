@@ -817,14 +817,12 @@ static int dag_pause_input(libtrace_t *libtrace)
 				    STREAM_DATA(tmp)->dagstream) < 0) {
 			trace_set_err(libtrace, errno,
 				      "Could not stop DAG stream");
-			printf("Count not stop DAG stream\n");
 			return -1;
 		}
 		if (dag_detach_stream(FORMAT_DATA->device->fd,
 				      STREAM_DATA(tmp)->dagstream) < 0) {
 			trace_set_err(libtrace, errno,
 				      "Could not detach DAG stream");
-			printf("Count not detach DAG stream\n");
 			return -1;
 		}
 
