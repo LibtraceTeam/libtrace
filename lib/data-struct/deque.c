@@ -125,7 +125,7 @@ DLLEXPORT int libtrace_deque_pop_front(libtrace_queue_t *q, void *d)
 DLLEXPORT int libtrace_deque_pop_tail(libtrace_queue_t *q, void *d)
 {
 	int ret = 0;
-	list_node_t * n;
+	list_node_t * n=NULL;
 	ASSERT_RET(pthread_mutex_lock(&q->lock), == 0);
 	if (q->tail != NULL) {
 		n = q->tail;

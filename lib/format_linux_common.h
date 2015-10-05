@@ -261,7 +261,7 @@ struct linux_per_stream_t {
 	struct tpacket_req req;
 } ALIGN_STRUCT(CACHE_LINE_SIZE);
 
-#define ZERO_LINUX_STREAM {-1, MAP_FAILED, 0, {0}}
+#define ZERO_LINUX_STREAM {-1, MAP_FAILED, 0, {0,0,0,0}}
 
 
 /* Format header for encapsulating packets captured using linux native */

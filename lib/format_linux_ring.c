@@ -282,9 +282,11 @@ static int linuxring_start_input(libtrace_t *libtrace)
 	return ret;
 }
 
+#ifdef HAVE_PACKET_FANOUT
 static int linuxring_pstart_input(libtrace_t *libtrace) {
 	return linuxcommon_pstart_input(libtrace, linuxring_start_input_stream);
 }
+#endif
 
 static int linuxring_start_output(libtrace_out_t *libtrace)
 {
@@ -551,6 +553,7 @@ static int linuxring_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet
 	return linuxring_read_stream(libtrace, packet, FORMAT_DATA_FIRST, NULL);
 }
 
+#ifdef HAVE_PACKET_FANOUT
 static int linuxring_pread_packets(libtrace_t *libtrace,
                                    libtrace_thread_t *t,
                                    libtrace_packet_t *packets[],
@@ -563,6 +566,7 @@ static int linuxring_pread_packets(libtrace_t *libtrace,
 	else
 		return packets[0]->error;
 }
+#endif
 
 /* Non-blocking read */
 static libtrace_eventobj_t linuxring_event(libtrace_t *libtrace,

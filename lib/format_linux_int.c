@@ -71,9 +71,11 @@ static int linuxnative_start_input(libtrace_t *libtrace)
 	return ret;
 }
 
+#ifdef HAVE_PACKET_FANOUT
 static int linuxnative_pstart_input(libtrace_t *libtrace) {
 	return linuxcommon_pstart_input(libtrace, linuxcommon_start_input_stream);
 }
+#endif
 
 static int linuxnative_start_output(libtrace_out_t *libtrace)
 {
@@ -307,6 +309,7 @@ static int linuxnative_read_packet(libtrace_t *libtrace, libtrace_packet_t *pack
 	return linuxnative_read_stream(libtrace, packet, FORMAT_DATA_FIRST, NULL);
 }
 
+#ifdef HAVE_PACKET_FANOUT
 static int linuxnative_pread_packets(libtrace_t *libtrace,
                                      libtrace_thread_t *t,
                                      libtrace_packet_t *packets[],
@@ -319,6 +322,7 @@ static int linuxnative_pread_packets(libtrace_t *libtrace,
 	else
 		return packets[0]->error;
 }
+#endif
 
 static int linuxnative_write_packet(libtrace_out_t *libtrace,
 		libtrace_packet_t *packet) 
