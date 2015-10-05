@@ -2,7 +2,7 @@
 /*
  * This file is part of libtrace
  *
- * Copyright (c) 2007,2008,2009,2010 The University of Waikato, Hamilton,
+ * Copyright (c) 2007-2015 The University of Waikato, Hamilton,
  * New Zealand.
  *
  * Author: Richard Sanger
