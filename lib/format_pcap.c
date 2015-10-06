@@ -810,7 +810,7 @@ static struct libtrace_format_t pcap = {
 	pcap_init_input,		/* init_input */
 	pcap_config_input,		/* config_input */
 	pcap_start_input,		/* start_input */
-	NULL,				/* pause_input */
+        pcap_pause_input,		/* pause_input */
 	pcap_init_output,		/* init_output */
 	NULL,				/* config_output */
 	NULL,				/* start_output */
