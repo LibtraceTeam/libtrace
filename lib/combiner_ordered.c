@@ -29,23 +29,14 @@ static void publish(libtrace_t *trace, int t_id, libtrace_combine_t *c, libtrace
 	}
 }
 
-inline static uint64_t next_message(libtrace_queue_t *v) {
-
-        libtrace_result_t r;
-        if (libtrace_deque_peek_front(v, (void *) &r) == 0)
-                return 0;
-
-        if (r.type == RESULT_TICK_INTERVAL || r.type == RESULT_TICK_COUNT)
-                return 0;
-
-        return r.key;
-}
-
 inline static int peek_queue(libtrace_t *trace, libtrace_combine_t *c,
-                libtrace_queue_t *v, uint64_t *key) {
+                libtrace_queue_t *v, uint64_t *key, libtrace_result_t *peeked) {
 
         libtrace_result_t r;
-        libtrace_deque_peek_front(v, (void *) &r);
+        if (!peeked) {
+                libtrace_deque_peek_front(v, (void *) &r);
+                peeked = &r;
+        }
 
         /* Ticks are a bit tricky, because we can get TS
          * ticks in amongst packets indexed by their cardinal
@@ -55,60 +46,76 @@ inline static int peek_queue(libtrace_t *trace, libtrace_combine_t *c,
          * thread.
          */
 
-        if (r.type == RESULT_TICK_INTERVAL) {
-                if (r.key > c->last_ts_tick) {
-                        c->last_ts_tick = r.key;
+        if (peeked->type == RESULT_TICK_INTERVAL) {
+                if (peeked->key > c->last_ts_tick) {
+                        c->last_ts_tick = peeked->key;
 
                         /* Tick doesn't match packet order */
                         if (!trace_is_parallel(trace)) {
                                 /* Pass straight to reporter */
-                                libtrace_generic_t gt = {.res = &r};
-                                ASSERT_RET (libtrace_deque_pop_front(v, (void *) &r), == 1);
+                                libtrace_generic_t gt = {.res = peeked};
+                                ASSERT_RET (libtrace_deque_pop_front(v, (void *) peeked), == 1);
                                 send_message(trace, &trace->reporter_thread,
                                                 MESSAGE_RESULT, gt,
                                                 &trace->reporter_thread);
                                 return 0;
                         }
                         /* Tick matches packet order */
-                        *key = r.key;
+                        *key = peeked->key;
                         return 1;
 
                 } else {
                         /* Duplicate -- pop it */
-                        ASSERT_RET (libtrace_deque_pop_front(v, (void *) &r), == 1);
+                        ASSERT_RET (libtrace_deque_pop_front(v, (void *) peeked), == 1);
                         return 0;
                 }
         }
 
-        if (r.type == RESULT_TICK_COUNT) {
-                if (r.key > c->last_count_tick) {
-                        c->last_count_tick = r.key;
+        if (peeked->type == RESULT_TICK_COUNT) {
+                if (peeked->key > c->last_count_tick) {
+                        c->last_count_tick = peeked->key;
 
                         /* Tick doesn't match packet order */
                         if (trace_is_parallel(trace)) {
                                 /* Pass straight to reporter */
-                                libtrace_generic_t gt = {.res = &r};
-                                ASSERT_RET (libtrace_deque_pop_front(v, (void *) &r), == 1);
+                                libtrace_generic_t gt = {.res = peeked};
+                                ASSERT_RET (libtrace_deque_pop_front(v, (void *) peeked), == 1);
                                 send_message(trace, &trace->reporter_thread,
                                                 MESSAGE_RESULT, gt,
                                                 &trace->reporter_thread);
                                 return 0;
                         }
                         /* Tick matches packet order */
-                        *key = r.key;
+                        *key = peeked->key;
                         return 1;
 
                         /* Tick doesn't match packet order */
                 } else {
                         /* Duplicate -- pop it */
-                        ASSERT_RET (libtrace_deque_pop_front(v, (void *) &r), == 1);
+                        ASSERT_RET (libtrace_deque_pop_front(v, (void *) peeked), == 1);
                         return 0;
                 }
         }
-        
-        *key = r.key;
+
+        *key = peeked->key;
         return 1;
 }
+
+inline static uint64_t next_message(libtrace_t *trace, libtrace_combine_t *c,
+                libtrace_queue_t *v) {
+
+        libtrace_result_t r;
+        uint64_t nextkey = 0;
+
+        do {
+                if (libtrace_deque_peek_front(v, (void *) &r) == 0) {
+                        return 0;
+                }
+        } while (peek_queue(trace, c, v, &nextkey, &r) == 0);
+
+        return nextkey;
+}
+
 
 inline static void read_internal(libtrace_t *trace, libtrace_combine_t *c, const bool final){
 	int i;
@@ -125,18 +132,14 @@ inline static void read_internal(libtrace_t *trace, libtrace_combine_t *c, const
 	/* Loop through check all are alive (have data) and find the smallest */
         for (i = 0; i < trace_get_perpkt_threads(trace); ++i) {
 		libtrace_queue_t *v = &queues[i];
-		if (libtrace_deque_get_size(v) != 0) {
-                        if (peek_queue(trace, c, v, &peeked)) {
-                                live_count ++;
-                                live[i] = true;
-                                key[i] = peeked;
-                                if (i == 0 || min_key > peeked) {
-                                        min_key = peeked;
-                                        min_queue = i;
-                                }
-                        } else {
-                                live[i] = false;
-                                key[i] = 0;
+		if (libtrace_deque_get_size(v) != 0 &&
+                                peek_queue(trace, c, v, &peeked, NULL)) {
+                        live_count ++;
+                        live[i] = true;
+                        key[i] = peeked;
+                        if (i == 0 || min_key > peeked) {
+                                min_key = peeked;
+                                min_queue = i;
                         }
                 } else {
                         allactive = false;
@@ -148,21 +151,20 @@ inline static void read_internal(libtrace_t *trace, libtrace_combine_t *c, const
 	/* Now remove the smallest and loop - special case if all threads have
 	 * joined we always flush what's left. Or the next smallest is the same
 	 * value or less than the previous */
-	while ((allactive && min_queue != -1) || (live_count && final)
-	       || (live_count && prev_min >= min_key)) {
+        while (allactive || (live_count && final)) {
 		/* Get the minimum queue and then do stuff */
 		libtrace_result_t r;
 		libtrace_generic_t gt = {.res = &r};
 
 		ASSERT_RET (libtrace_deque_pop_front(&queues[min_queue], (void *) &r), == 1);
+
                 send_message(trace, &trace->reporter_thread,
                                 MESSAGE_RESULT, gt,
                                 NULL);
 
 		// Now update the one we just removed
-                peeked = next_message(&queues[min_queue]);
-		if (libtrace_deque_get_size(&queues[min_queue]) &&
-                                peeked != 0) {
+                peeked = next_message(trace, c, &queues[min_queue]);
+                if (peeked != 0) {
 
                         key[min_queue] = peeked;
                         // We are still the smallest, might be out of order :(
@@ -181,9 +183,11 @@ inline static void read_internal(libtrace_t *trace, libtrace_combine_t *c, const
 		} else {
 			allactive = false;
                         live[min_queue] = false;
+                        key[min_queue] = 0;
 			live_count--;
 			prev_min = min_key;
 			min_key = UINT64_MAX; // Update our minimum
+                        min_queue = -1;
 			// Check all find the smallest again - all are alive
 			for (i = 0; i < trace_get_perpkt_threads(trace); ++i) {
 				if (live[i] && min_key >= key[i]) {
