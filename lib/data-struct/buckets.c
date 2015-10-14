@@ -51,8 +51,22 @@ DLLEXPORT void libtrace_bucket_destroy(libtrace_bucket_t *b) {
 
 DLLEXPORT void libtrace_create_new_bucket(libtrace_bucket_t *b, void *buffer) {
 
+        libtrace_bucket_node_t tmp;
         libtrace_bucket_node_t *bnode = (libtrace_bucket_node_t *)malloc(
                         sizeof(libtrace_bucket_node_t));
+
+        /* If the last node was never used, i.e. all packets within that node
+         * buffer were filtered, we need to make sure we free the buffer
+         * before we lose track of it.
+         */
+        pthread_mutex_lock(&b->lock);
+        if (b->node && b->node->startindex == 0) {
+                clear_bucket_node(b->node);
+                libtrace_list_pop_back(b->nodelist, &tmp);
+                free(b->node);
+        }
+        pthread_mutex_unlock(&b->lock);
+
 
         bnode->startindex = 0;
         bnode->buffer = buffer;
@@ -158,7 +172,7 @@ DLLEXPORT void libtrace_release_bucket_id(libtrace_bucket_t *b, uint64_t id) {
         }
         assert(s < bnode->slots);
         assert(bnode->released[s] != 0);
-       
+
 
         if (bnode->released[s] == 1) {
                 uint64_t previd = b->nextid - 1;
@@ -169,6 +183,8 @@ DLLEXPORT void libtrace_release_bucket_id(libtrace_bucket_t *b, uint64_t id) {
                         b->packets[id] = NULL;
                         b->nextid = previd;
                         bnode->released[s] = 0;
+                        if (id == bnode->startindex)
+                                bnode->startindex = 0;
                 } else {
                         bnode->released[s] = 2;
                 }

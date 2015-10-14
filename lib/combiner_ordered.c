@@ -125,14 +125,13 @@ inline static void read_internal(libtrace_t *trace, libtrace_combine_t *c, const
         bool live[trace_get_perpkt_threads(trace)]; // Set if a trace is alive
 	uint64_t key[trace_get_perpkt_threads(trace)]; // Cached keys
 	uint64_t min_key = UINT64_MAX;
-	uint64_t prev_min = 0;
         uint64_t peeked = 0;
 	int min_queue = -1;
 
 	/* Loop through check all are alive (have data) and find the smallest */
         for (i = 0; i < trace_get_perpkt_threads(trace); ++i) {
 		libtrace_queue_t *v = &queues[i];
-		if (libtrace_deque_get_size(v) != 0 &&
+                if (libtrace_deque_get_size(v) != 0 &&
                                 peek_queue(trace, c, v, &peeked, NULL)) {
                         live_count ++;
                         live[i] = true;
@@ -185,7 +184,6 @@ inline static void read_internal(libtrace_t *trace, libtrace_combine_t *c, const
                         live[min_queue] = false;
                         key[min_queue] = 0;
 			live_count--;
-			prev_min = min_key;
 			min_key = UINT64_MAX; // Update our minimum
                         min_queue = -1;
 			// Check all find the smallest again - all are alive
