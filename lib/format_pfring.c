@@ -135,10 +135,19 @@ struct libtrace_pfring_extend {
 	struct parsing_info parsed;
 };
 
+struct local_pfring_header {
+	struct timeval ts;
+	uint32_t caplen;
+	uint32_t wlen;
+	struct libtrace_pfring_extend ext;	
+	
+};
+
+
 struct libtrace_pfring_header {
 	struct {
-		uint32_t tv_sec;
-		uint32_t tv_usec;
+		uint64_t tv_sec;
+		uint64_t tv_usec;
 	} ts;
 	uint32_t caplen;
 	uint32_t wlen;
@@ -333,6 +342,7 @@ static int pfring_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 
 	struct pfring_per_stream_t *stream = FORMAT_DATA_FIRST;
 	struct libtrace_pfring_header *hdr;
+	struct local_pfring_header local;
 	int rc;
 
 	if (packet->buf_control == TRACE_CTRL_EXTERNAL || !packet->buffer) {
@@ -346,26 +356,28 @@ static int pfring_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 
 	hdr = (struct libtrace_pfring_header *)packet->buffer;
 	if ((rc = pfring_recv(stream->pd, (u_char **)&packet->payload, 
-			0, (struct pfring_pkthdr *)hdr, 1)) == -1)
+			0, (struct pfring_pkthdr *)&local, 1)) == -1)
 	{
 		trace_set_err(libtrace, errno, "Failed to read packet from pfring:");
 		return -1;
 	}
 
 	/* Convert the header fields to network byte order so we can
-         * export them over RT safely */
-
-	/* TODO: Deal with 32 vs 64 bit timestamps */
-	hdr->caplen = ntohl(hdr->caplen);
-	hdr->wlen = ntohl(hdr->wlen);
-	hdr->ts.tv_sec = ntohl(hdr->ts.tv_sec);
-	hdr->ts.tv_usec = ntohl(hdr->ts.tv_usec);
-	hdr->ext.ts_ns = bswap_host_to_le64(hdr->ext.ts_ns);
-	hdr->ext.flags = ntohl(hdr->ext.flags);
-	hdr->ext.if_index = ntohl(hdr->ext.if_index);
-	hdr->ext.hash = ntohl(hdr->ext.hash);
-	hdr->ext.tx.bounce_iface = ntohl(hdr->ext.tx.bounce_iface);
-	hdr->ext.parsed_hdr_len = ntohs(hdr->ext.parsed_hdr_len);
+         * export them over RT safely. Also deal with 32 vs 64 bit
+	 * timevals! */
+	hdr->ts.tv_sec = bswap_host_to_le64((uint64_t)local.ts.tv_sec);
+	hdr->ts.tv_usec = bswap_host_to_le64((uint64_t)local.ts.tv_usec);
+	hdr->caplen = htonl(local.caplen);
+	hdr->wlen = htonl(local.wlen);
+	hdr->ts.tv_sec = htonl(local.ts.tv_sec);
+	hdr->ts.tv_usec = htonl(local.ts.tv_usec);
+	hdr->ext.ts_ns = bswap_host_to_le64(local.ext.ts_ns);
+	hdr->ext.flags = htonl(local.ext.flags);
+	hdr->ext.if_index = htonl(local.ext.if_index);
+	hdr->ext.hash = htonl(local.ext.hash);
+	hdr->ext.tx.bounce_iface = htonl(local.ext.tx.bounce_iface);
+	hdr->ext.parsed_hdr_len = htons(local.ext.parsed_hdr_len);
+	hdr->ext.direction = local.ext.direction;
 
 	/* I think we can ignore parsed as it will only be populated if
 	 * we call pfring_parse_pkt (?)
@@ -373,7 +385,8 @@ static int pfring_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 
 	packet->trace = libtrace;
 	packet->type = TRACE_RT_DATA_PFRING;
-	
+	packet->header = packet->buffer;
+
 	return pfring_get_capture_length(packet) + 
 			pfring_get_framing_length(packet);
 
