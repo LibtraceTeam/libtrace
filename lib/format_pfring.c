@@ -337,7 +337,8 @@ static int pfring_prepare_packet(libtrace_t *libtrace UNUSED,
 	return 0;
 }
 
-static int pfring_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
+static int pfring_read_generic(libtrace_t *libtrace, libtrace_packet_t *packet,
+		uint8_t block)
 {
 
 	struct pfring_per_stream_t *stream = FORMAT_DATA_FIRST;
@@ -356,11 +357,15 @@ static int pfring_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 
 	hdr = (struct libtrace_pfring_header *)packet->buffer;
 	if ((rc = pfring_recv(stream->pd, (u_char **)&packet->payload, 
-			0, (struct pfring_pkthdr *)&local, 1)) == -1)
+			0, (struct pfring_pkthdr *)&local, block)) == -1)
 	{
 		trace_set_err(libtrace, errno, "Failed to read packet from pfring:");
 		return -1;
 	}
+
+	/* We were asked not to block and there are no packets available */
+	if (rc == 0)
+		return 0;
 
 	/* Convert the header fields to network byte order so we can
          * export them over RT safely. Also deal with 32 vs 64 bit
@@ -390,6 +395,11 @@ static int pfring_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 	return pfring_get_capture_length(packet) + 
 			pfring_get_framing_length(packet);
 
+}
+
+static int pfring_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
+{
+	return pfring_read_generic(libtrace, packet, 1);
 }
 
 static libtrace_linktype_t pfring_get_link_type(const libtrace_packet_t *packet UNUSED)
@@ -480,13 +490,27 @@ static void pfring_get_statistics(libtrace_t *libtrace, libtrace_stat_t *stat) {
 
 }
 
-static libtrace_eventobj_t pfring_event(libtrace_t *libtrace UNUSED,  
-		libtrace_packet_t *packet UNUSED) {
+static libtrace_eventobj_t pfring_event(libtrace_t *libtrace,  
+		libtrace_packet_t *packet) {
 
 	libtrace_eventobj_t event = {0,0,0.0,0};
+	int rc;
 
-	/* TODO */
-	event.type = TRACE_EVENT_TERMINATE;
+	rc = pfring_read_generic(libtrace, packet, 0);
+	
+	if (rc > 0) {
+		event.size = rc;
+		event.type = TRACE_EVENT_PACKET;
+	} else if (rc == 0) {
+		if (libtrace_halt) {
+			event.type = TRACE_EVENT_TERMINATE;
+		} else {
+			event.type = TRACE_EVENT_SLEEP;
+			event.seconds = 0.0001;
+		}
+	} else {
+		event.type = TRACE_EVENT_TERMINATE;
+	}
 	return event;
 }
 
