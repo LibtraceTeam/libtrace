@@ -135,6 +135,10 @@ static char *xstrndup(const char *src,size_t n)
 /* call all the constructors if they haven't yet all been called */
 static void trace_init(void)
 {
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+        srand(tv.tv_sec);
+
 	if (!formats_list) {
 		duck_constructor();
 		erf_constructor();
