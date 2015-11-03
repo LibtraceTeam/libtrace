@@ -50,19 +50,13 @@ inline static int peek_queue(libtrace_t *trace, libtrace_combine_t *c,
                 if (peeked->key > c->last_ts_tick) {
                         c->last_ts_tick = peeked->key;
 
-                        /* Tick doesn't match packet order */
-                        if (!trace_is_parallel(trace)) {
-                                /* Pass straight to reporter */
-                                libtrace_generic_t gt = {.res = peeked};
-                                ASSERT_RET (libtrace_deque_pop_front(v, (void *) peeked), == 1);
-                                send_message(trace, &trace->reporter_thread,
-                                                MESSAGE_RESULT, gt,
-                                                &trace->reporter_thread);
-                                return 0;
-                        }
-                        /* Tick matches packet order */
-                        *key = peeked->key;
-                        return 1;
+                        /* Pass straight to reporter */
+                        libtrace_generic_t gt = {.res = peeked};
+                        ASSERT_RET (libtrace_deque_pop_front(v, (void *) peeked), == 1);
+                        send_message(trace, &trace->reporter_thread,
+                                        MESSAGE_RESULT, gt,
+                                        &trace->reporter_thread);
+                        return 0;
 
                 } else {
                         /* Duplicate -- pop it */
@@ -156,6 +150,8 @@ inline static void read_internal(libtrace_t *trace, libtrace_combine_t *c, const
 		libtrace_generic_t gt = {.res = &r};
 
 		ASSERT_RET (libtrace_deque_pop_front(&queues[min_queue], (void *) &r), == 1);
+
+                //printf("%lu %lu %lu %lu %d\n", key[0], key[1], key[2], key[3], min_queue);
 
                 send_message(trace, &trace->reporter_thread,
                                 MESSAGE_RESULT, gt,
