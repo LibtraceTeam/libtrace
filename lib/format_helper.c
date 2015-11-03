@@ -45,6 +45,11 @@
 #include <errno.h>
 #include <time.h>
 #include "format_helper.h"
+#include <unistd.h>
+#ifndef _SC_NPROCESSORS_ONLN
+#include <sys/param.h>
+#include <sys/sysctl.h>
+#endif
 
 #include <assert.h>
 #include <stdarg.h>
@@ -329,4 +334,28 @@ void trace_set_err_out(libtrace_out_t *trace,int errcode,const char *msg,...)
 				msg,va);
 	}
 	va_end(va);
+}
+
+uint32_t trace_get_number_of_cores(void) {
+
+	uint32_t t = 0;
+#ifdef _SC_NPROCESSORS_ONLN
+	t = sysconf(_SC_NPROCESSORS_ONLN);
+	if (t < 1 || t > ((uint32_t)1 << 31))
+		t = sysconf(_SC_NPROCESSORS_CONF);
+#else
+	int nm[2];
+	size_t len = 4;
+	
+	nm[0] = CTL_HW; nm[1] = HW_AVAILCPU;
+	sysctl(nm, 2, &t, &len, NULL, 0);
+	
+	if (t < 1) {
+		nm[1] = HW_NCPU;
+		sysctl(nm, 2, &t, &len, NULL, 0);
+	}
+#endif
+	if (t < 1 || t > ((uint32_t)1 << 31))
+		t = 4;
+	return t;
 }

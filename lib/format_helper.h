@@ -94,4 +94,10 @@ iow_t *trace_open_file_out(libtrace_out_t *libtrace,
 		int compress_type,
 		int level,
 		int filemode);
+
+/** Determines the number of cores available on the host.
+ *
+ * @return The number of cores detected by this function.
+ */
+uint32_t trace_get_number_of_cores(void);
 #endif /* FORMAT_HELPER_H */

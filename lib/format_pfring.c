@@ -27,6 +27,7 @@
  *
  */
 
+#define _GNU_SOURCE
 #include "config.h"
 #include "libtrace.h"
 #include "libtrace_int.h"
@@ -185,29 +186,113 @@ static inline int pfring_start_input_stream(libtrace_t *libtrace,
 
 }
 
-static int pfring_start_input(libtrace_t *libtrace) {
-	struct pfring_per_stream_t *stream = FORMAT_DATA_FIRST;
-	if (libtrace->uridata == NULL) {
-		trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT, 
-				"Missing interface name from pfring: URI");
-		return -1;
-	}
+static inline uint32_t pfring_flags(libtrace_t *libtrace) {
 	uint32_t flags = PF_RING_TIMESTAMP | PF_RING_LONG_HEADER;
 	flags |= PF_RING_HW_TIMESTAMP;
 
 	if (FORMAT_DATA->promisc > 0) 
 		flags |= PF_RING_PROMISC;
-	
+	return flags;
+}	
+
+static int pfring_start_input(libtrace_t *libtrace) {
+	struct pfring_per_stream_t *stream = FORMAT_DATA_FIRST;
+	int rc = 0;
+
+	if (libtrace->uridata == NULL) {
+		trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT, 
+				"Missing interface name from pfring: URI");
+		return -1;
+	}
 	if (FORMAT_DATA->ringenabled) {
 		trace_set_err(libtrace, TRACE_ERR_BAD_STATE,
 			"Attempted to start a pfring: input that was already started!");
 		return -1;
 	}
 
-	stream->pd = pfring_open(libtrace->uridata, FORMAT_DATA->snaplen, flags);
+	stream->pd = pfring_open(libtrace->uridata, FORMAT_DATA->snaplen, 
+		pfring_flags(libtrace));
+	if (stream->pd == NULL) {
+		trace_set_err(libtrace, errno, "pfring_open failed: %s",
+				strerror(errno));
+		return -1;
+	}
 
-	return pfring_start_input_stream(libtrace, FORMAT_DATA_FIRST);
+	rc = pfring_start_input_stream(libtrace, FORMAT_DATA_FIRST);
+	if (rc < 0)
+		return rc;	
+	FORMAT_DATA->ringenabled = 1;
+	return rc;
 }
+
+static int pfring_pstart_input(libtrace_t *libtrace) {
+	pfring *ring[MAX_NUM_RX_CHANNELS];
+	uint8_t channels;
+	struct pfring_per_stream_t empty = ZERO_PFRING_STREAM;
+	int i, iserror = 0;
+	
+	if (libtrace->uridata == NULL) {
+		trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT, 
+				"Missing interface name from pfring: URI");
+		return -1;
+	}
+	if (FORMAT_DATA->ringenabled) {
+		trace_set_err(libtrace, TRACE_ERR_BAD_STATE,
+			"Attempted to start a pfring: input that was already started!");
+		return -1;
+	}
+
+	channels = pfring_open_multichannel(libtrace->uridata, 
+			FORMAT_DATA->snaplen, pfring_flags(libtrace), ring);
+	if (channels <= 0) {
+		trace_set_err(libtrace, errno, 
+				"pfring_open_multichannel failed: %s",
+				strerror(errno));
+		return -1;
+	}
+
+	printf("got %u channels\n", channels);
+
+	if (libtrace->perpkt_thread_count < channels) {
+		fprintf(stderr, "WARNING: pfring interface has %u channels, "
+				"but this libtrace program has only enough "
+				"threads to read the first %u channels.",
+				channels, libtrace->perpkt_thread_count);
+	}
+
+	if (channels < libtrace->perpkt_thread_count)
+		libtrace->perpkt_thread_count = channels;
+	
+
+	for (i = 0; i < channels; i++) {
+		struct pfring_per_stream_t *stream;
+		if (libtrace_list_get_size(FORMAT_DATA->per_stream)<=(size_t)i)
+			libtrace_list_push_back(FORMAT_DATA->per_stream, &empty);
+
+		stream = libtrace_list_get_index(FORMAT_DATA->per_stream, i)->data;
+		stream->pd = ring[i];
+		if (pfring_start_input_stream(libtrace, stream) != 0) {
+			iserror = 1;
+			break;
+		}
+	}
+
+	if (iserror) {
+		/* Error state: free any streams we managed to create */
+		for (i = i - 1; i >= 0; i--) {
+			struct pfring_per_stream_t *stream;
+			stream = libtrace_list_get_index(FORMAT_DATA->per_stream, i)->data;
+
+			pfring_disable_ring(stream->pd);	
+			pfring_remove_bpf_filter(stream->pd);
+			pfring_close(stream->pd);
+		}
+		return -1;
+	}
+	FORMAT_DATA->ringenabled = 1;
+	return 0;
+}
+
 
 static int pfring_init_input(libtrace_t *libtrace) {
 
@@ -338,10 +423,10 @@ static int pfring_prepare_packet(libtrace_t *libtrace UNUSED,
 }
 
 static int pfring_read_generic(libtrace_t *libtrace, libtrace_packet_t *packet,
-		uint8_t block)
+		struct pfring_per_stream_t *stream, uint8_t block, 
+		libtrace_message_queue_t *queue)
 {
 
-	struct pfring_per_stream_t *stream = FORMAT_DATA_FIRST;
 	struct libtrace_pfring_header *hdr;
 	struct local_pfring_header local;
 	int rc;
@@ -354,16 +439,24 @@ static int pfring_read_generic(libtrace_t *libtrace, libtrace_packet_t *packet,
 			return -1;
 		}
 	}
-
+	
 	hdr = (struct libtrace_pfring_header *)packet->buffer;
-	if ((rc = pfring_recv(stream->pd, (u_char **)&packet->payload, 
-			0, (struct pfring_pkthdr *)&local, block)) == -1)
-	{
-		trace_set_err(libtrace, errno, "Failed to read packet from pfring:");
-		return -1;
+	while (block) {
+		if ((rc = pfring_recv(stream->pd, (u_char **)&packet->payload, 
+			0, (struct pfring_pkthdr *)&local, 0)) == -1)
+		{
+			trace_set_err(libtrace, errno, "Failed to read packet from pfring:");
+			return -1;
+		}
+
+		if (rc == 0) {
+			if (queue && libtrace_message_queue_count(queue) > 0)
+				return READ_MESSAGE;
+			continue;
+		}
+		break;
 	}
 
-	/* We were asked not to block and there are no packets available */
 	if (rc == 0)
 		return 0;
 
@@ -391,6 +484,7 @@ static int pfring_read_generic(libtrace_t *libtrace, libtrace_packet_t *packet,
 	packet->trace = libtrace;
 	packet->type = TRACE_RT_DATA_PFRING;
 	packet->header = packet->buffer;
+	packet->error = 1;
 
 	return pfring_get_capture_length(packet) + 
 			pfring_get_framing_length(packet);
@@ -399,7 +493,7 @@ static int pfring_read_generic(libtrace_t *libtrace, libtrace_packet_t *packet,
 
 static int pfring_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 {
-	return pfring_read_generic(libtrace, packet, 1);
+	return pfring_read_generic(libtrace, packet, FORMAT_DATA_FIRST, 1, NULL);
 }
 
 static libtrace_linktype_t pfring_get_link_type(const libtrace_packet_t *packet UNUSED)
@@ -496,7 +590,7 @@ static libtrace_eventobj_t pfring_event(libtrace_t *libtrace,
 	libtrace_eventobj_t event = {0,0,0.0,0};
 	int rc;
 
-	rc = pfring_read_generic(libtrace, packet, 0);
+	rc = pfring_read_generic(libtrace, packet, FORMAT_DATA_FIRST, 0, NULL);
 	
 	if (rc > 0) {
 		event.size = rc;
@@ -514,20 +608,86 @@ static libtrace_eventobj_t pfring_event(libtrace_t *libtrace,
 	return event;
 }
 
-static int pfring_pstart_input(libtrace_t *libtrace) {
-	trace_set_err(libtrace, TRACE_ERR_UNSUPPORTED, "Haven't implemented parallel support for pfring yet!");
-	return -1;
-}
-
 static int pfring_pread_packets(libtrace_t *libtrace,
-		libtrace_thread_t *t UNUSED, libtrace_packet_t *packets[] UNUSED,
-		UNUSED size_t nb_packets) {
+		libtrace_thread_t *t, 
+		libtrace_packet_t *packets[],
+		size_t nb_packets) {
 
-	trace_set_err(libtrace, TRACE_ERR_UNSUPPORTED, "Haven't implemented parallel support for pfring yet!");
-	return -1;
+	size_t readpackets = 0;
+	int rc = 0;
+	struct pfring_per_stream_t *stream = (struct pfring_per_stream_t *)t->format_data;
+	uint8_t block = 1;
+
+	/* Block for the first packet, then read up to nb_packets if they
+         * are available. */
+	do {
+		rc = pfring_read_generic(libtrace, packets[readpackets], 
+			stream, block, &t->messages);
+		if (rc == READ_MESSAGE) {
+			if (readpackets == 0) {
+				return rc;
+			}
+			break;
+		}
+				
+		if (rc == READ_ERROR)
+			return rc;
+
+		if (rc == 0)
+			continue;
+		
+		block = 0;
+		readpackets ++;
+		if (readpackets >= nb_packets)
+			break;
+
+	} while (rc != 0);
+
+	return readpackets;
 }
 
+static int pfring_pregister_thread(libtrace_t *libtrace, libtrace_thread_t *t,
+		bool reading) {
 
+	uint32_t cpus = trace_get_number_of_cores();
+
+	if (reading) {
+		struct pfring_per_stream_t *stream;
+		int tid = 0;
+		if (t->type == THREAD_PERPKT) {
+			t->format_data = libtrace_list_get_index(FORMAT_DATA->per_stream, t->perpkt_num)->data;
+			if (t->format_data == NULL) {
+				trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
+						"Too many threads registered");
+				return -1;
+			}
+			tid = t->perpkt_num;
+		} else {
+			t->format_data = FORMAT_DATA_FIRST;
+		}
+
+		stream = t->format_data;
+		if (cpus > 1) {
+			cpu_set_t cpuset;
+			uint32_t coreid;
+			int s;
+
+			coreid = (tid + 1) % cpus;
+			CPU_ZERO(&cpuset);
+			CPU_SET(coreid, &cpuset);
+			if ((s = pthread_setaffinity_np(pthread_self(), sizeof(cpuset), &cpuset)) != 0) {
+				trace_set_err(libtrace, errno, "Warning "
+						"failed to set affinity for "
+						"pfring thread");
+				return -1;
+			}
+			stream->affinity = coreid;
+		}
+	}
+
+	return 0;		
+
+}
 
 static struct libtrace_format_t pfringformat = {
 	"pfring",
@@ -570,12 +730,12 @@ static struct libtrace_format_t pfringformat = {
         pfring_event,              /* trace_event */
         NULL,                      /* help */
         NULL,                   /* next pointer */
-	{true, -1},                     /* Live, no thread limit */
+	{true, MAX_NUM_RX_CHANNELS},         /* Live, with thread limit */
         pfring_pstart_input,         /* pstart_input */
         pfring_pread_packets,        /* pread_packets */
         pfring_pause_input,        /* ppause */
         pfring_fin_input,          /* p_fin */
-        NULL,   		/* register thread XXX */ 
+        pfring_pregister_thread,  	/* register thread */ 
         NULL,                           /* unregister thread */
         NULL                            /* get thread stats */
 
