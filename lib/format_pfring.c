@@ -144,8 +144,18 @@ struct local_pfring_header {
 	
 };
 
+#define PFRING_BYTEORDER_BIGENDIAN 0
+#define PFRING_BYTEORDER_LITTLEENDIAN 1
+
+#if __BYTE_ORDER == __BIG_ENDIAN
+#define PFRING_MY_BYTEORDER PFRING_BYTEORDER_BIGENDIAN
+#else
+#define PFRING_MY_BYTEORDER PFRING_BYTEORDER_LITTLEENDIAN
+#endif
+
 
 struct libtrace_pfring_header {
+	uint8_t byteorder;
 	struct {
 		uint64_t tv_sec;
 		uint64_t tv_usec;
@@ -379,20 +389,33 @@ static int pfring_fin_input(libtrace_t *libtrace) {
 
 static int pfring_get_capture_length(const libtrace_packet_t *packet) {
 	struct libtrace_pfring_header *phdr;
+	uint32_t wlen, caplen;
 	phdr = (struct libtrace_pfring_header *)packet->header;
 
 	if (packet->payload == NULL)
 		return 0;
-	if (ntohl(phdr->wlen) < ntohl(phdr->caplen))
-		return ntohl(phdr->wlen);
-	return ntohl(phdr->caplen);
+
+	if (phdr->byteorder != PFRING_MY_BYTEORDER) {
+		wlen = byteswap32(phdr->wlen);
+		caplen = byteswap32(phdr->caplen);
+	} else {
+		wlen = phdr->wlen;
+		caplen = phdr->caplen;
+	}
+
+	if (wlen < caplen)
+		return wlen;
+	return caplen;
 	
 }
 
 static int pfring_get_wire_length(const libtrace_packet_t *packet) {
 	struct libtrace_pfring_header *phdr;
 	phdr = (struct libtrace_pfring_header *)packet->header;
-	return ntohl(phdr->wlen);
+	if (phdr->byteorder != PFRING_MY_BYTEORDER) {
+		return byteswap32(phdr->wlen);
+	}
+	return phdr->wlen;
 }
 
 static int pfring_get_framing_length(UNUSED const libtrace_packet_t *packet) {
@@ -442,7 +465,7 @@ static int pfring_read_generic(libtrace_t *libtrace, libtrace_packet_t *packet,
 	}
 	
 	hdr = (struct libtrace_pfring_header *)packet->buffer;
-	while (block) {
+	do {
 		if ((rc = pfring_recv(stream->pd, (u_char **)&packet->payload, 
 			0, (struct pfring_pkthdr *)&local, 0)) == -1)
 		{
@@ -456,7 +479,7 @@ static int pfring_read_generic(libtrace_t *libtrace, libtrace_packet_t *packet,
 			continue;
 		}
 		break;
-	}
+	} while (block);
 
 	if (rc == 0)
 		return 0;
@@ -464,19 +487,34 @@ static int pfring_read_generic(libtrace_t *libtrace, libtrace_packet_t *packet,
 	/* Convert the header fields to network byte order so we can
          * export them over RT safely. Also deal with 32 vs 64 bit
 	 * timevals! */
-	hdr->ts.tv_sec = bswap_host_to_le64((uint64_t)local.ts.tv_sec);
-	hdr->ts.tv_usec = bswap_host_to_le64((uint64_t)local.ts.tv_usec);
+	//hdr->ts.tv_sec = bswap_host_to_le64((uint64_t)local.ts.tv_sec);
+	//hdr->ts.tv_usec = bswap_host_to_le64((uint64_t)local.ts.tv_usec);
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+	hdr->byteorder = PFRING_BYTEORDER_LITTLEENDIAN;
+#else
+	hdr->byteorder = PFRING_BYTEORDER_BIGENDIAN;
+#endif
+
+/*
 	hdr->caplen = htonl(local.caplen);
 	hdr->wlen = htonl(local.wlen);
-	hdr->ts.tv_sec = htonl(local.ts.tv_sec);
-	hdr->ts.tv_usec = htonl(local.ts.tv_usec);
 	hdr->ext.ts_ns = bswap_host_to_le64(local.ext.ts_ns);
 	hdr->ext.flags = htonl(local.ext.flags);
 	hdr->ext.if_index = htonl(local.ext.if_index);
 	hdr->ext.hash = htonl(local.ext.hash);
 	hdr->ext.tx.bounce_iface = htonl(local.ext.tx.bounce_iface);
 	hdr->ext.parsed_hdr_len = htons(local.ext.parsed_hdr_len);
+*/
+	hdr->caplen = (local.caplen);
+	hdr->wlen = (local.wlen);
+	hdr->ext.ts_ns = (local.ext.ts_ns);
+	hdr->ext.flags = (local.ext.flags);
+	hdr->ext.if_index = (local.ext.if_index);
+	hdr->ext.hash = (local.ext.hash);
+	hdr->ext.tx.bounce_iface = (local.ext.tx.bounce_iface);
+	hdr->ext.parsed_hdr_len = (local.ext.parsed_hdr_len);
 	hdr->ext.direction = local.ext.direction;
+
 
 	/* I think we can ignore parsed as it will only be populated if
 	 * we call pfring_parse_pkt (?)
@@ -526,13 +564,26 @@ static uint64_t pfring_get_erf_timestamp(const libtrace_packet_t *packet) {
 	phdr = (struct libtrace_pfring_header *)packet->header;
 
 	if (phdr->ext.ts_ns) {
-		uint64_t tns = bswap_le_to_host64(phdr->ext.ts_ns);
+		uint64_t tns;
+		if (phdr->byteorder == PFRING_MY_BYTEORDER)
+			tns = phdr->ext.ts_ns;
+		else
+			tns = byteswap64(phdr->ext.ts_ns);
 
 		ts = ((tns / 1000000000) << 32);
 		ts += ((tns % 1000000000) << 32) / 1000000000;
 	} else {
-		ts = (((uint64_t)ntohl(phdr->ts.tv_sec)) << 32);
-		ts += (((uint64_t)(ntohl(phdr->ts.tv_usec)) << 32)/1000000);
+		uint64_t sec, usec;
+		if (phdr->byteorder == PFRING_MY_BYTEORDER) {
+			sec = (uint64_t)(phdr->ts.tv_sec);
+			usec = (uint64_t)(phdr->ts.tv_usec);
+		} else {
+			sec = (uint64_t)byteswap32(phdr->ts.tv_sec);
+			usec = (uint64_t)byteswap32(phdr->ts.tv_usec);
+		}
+
+		ts = (sec << 32);
+		ts += ((usec << 32)/1000000);
 	}
 	return ts;
 		
@@ -549,7 +600,11 @@ static size_t pfring_set_capture_length(libtrace_packet_t *packet, size_t size)
 	}
 
 	packet->capture_length = -1;
-	phdr->caplen = htonl(size);
+	if (phdr->byteorder != PFRING_MY_BYTEORDER) {
+		phdr->caplen = byteswap32(size);
+	} else {
+		phdr->caplen = size;
+	}
 	return trace_get_capture_length(packet);
 }
 
@@ -600,8 +655,8 @@ static libtrace_eventobj_t pfring_event(libtrace_t *libtrace,
 		if (libtrace_halt) {
 			event.type = TRACE_EVENT_TERMINATE;
 		} else {
-			event.type = TRACE_EVENT_SLEEP;
-			event.seconds = 0.0001;
+			event.type = TRACE_EVENT_IOWAIT;
+			event.fd = pfring_get_selectable_fd(FORMAT_DATA_FIRST->pd);
 		}
 	} else {
 		event.type = TRACE_EVENT_TERMINATE;
