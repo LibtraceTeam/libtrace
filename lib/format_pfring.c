@@ -189,6 +189,7 @@ static inline int pfring_start_input_stream(libtrace_t *libtrace,
 static inline uint32_t pfring_flags(libtrace_t *libtrace) {
 	uint32_t flags = PF_RING_TIMESTAMP | PF_RING_LONG_HEADER;
 	flags |= PF_RING_HW_TIMESTAMP;
+	flags |= PF_RING_DO_NOT_PARSE;
 
 	if (FORMAT_DATA->promisc > 0) 
 		flags |= PF_RING_PROMISC;
