@@ -556,7 +556,7 @@ DLLEXPORT int trace_pause(libtrace_t *libtrace)
 
 	/* Finish the last packet we read - for backwards compatibility */
 	if (libtrace->last_packet)
-		trace_fin_packet(libtrace->last_packet);
+		trace_fin_packet(libtrace->last_packet, 1);
 	assert(libtrace->last_packet == NULL);
 
 	if (libtrace->format->pause_input)
@@ -702,7 +702,7 @@ DLLEXPORT void trace_destroy(libtrace_t *libtrace) {
 
 	/* Finish any the last packet we read - for backwards compatibility */
 	if (libtrace->last_packet)
-		trace_fin_packet(libtrace->last_packet);
+		trace_fin_packet(libtrace->last_packet, 1);
 	assert(libtrace->last_packet == NULL);
 
 	if (libtrace->format) {
@@ -853,7 +853,7 @@ DLLEXPORT void trace_destroy_packet(libtrace_packet_t *packet) {
  * This will not destroy a reusable good malloc'd buffer (TRACE_CTRL_PACKET)
  * use trace_destroy_packet() for those diabolical purposes.
  */
-void trace_fin_packet(libtrace_packet_t *packet) {
+void trace_fin_packet(libtrace_packet_t *packet, int updatetrace) {
 	if (packet)
 	{
 		if (packet->trace && packet->trace->format->fin_packet) {
@@ -865,7 +865,7 @@ void trace_fin_packet(libtrace_packet_t *packet) {
                         libtrace_release_bucket_id(b, packet->internalid);
                 }
 
-                if (packet->trace) {
+                if (updatetrace && packet->trace) {
                         pthread_mutex_lock(&packet->trace->libtrace_lock);
         		if (packet->trace->last_packet == packet)
 	        		packet->trace->last_packet = NULL;
@@ -917,7 +917,7 @@ DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
                  * may have allocated it and zeroing all data associated with it.
                  */
                 if (packet->trace == libtrace)
-                        trace_fin_packet(packet);
+                        trace_fin_packet(packet, 0);
 		do {
 			size_t ret;
 			int filtret;
@@ -940,7 +940,7 @@ DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 
                                 if (filtret == 0) {
 					++libtrace->filtered_packets;
-					trace_fin_packet(packet);
+					trace_fin_packet(packet, 0);
                                         continue;
 				}
 			}
@@ -1319,7 +1319,7 @@ DLLEXPORT libtrace_eventobj_t trace_event(libtrace_t *trace,
 	assert(packet);
 
 	/* Free the last packet */
-	trace_fin_packet(packet);
+	trace_fin_packet(packet, 0);
 	
 	/* Store the trace we are reading from into the packet opaque
 	 * structure */

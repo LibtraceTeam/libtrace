@@ -420,7 +420,7 @@ DLLEXPORT void libtrace_make_packet_safe(libtrace_packet_t *pkt) {
 		libtrace_packet_t *dup;
 		dup = trace_copy_packet(pkt);
 		/* Release the external buffer */
-		trace_fin_packet(pkt);
+		trace_fin_packet(pkt, 1);
 		/* Copy the duplicated packet over the existing */
 		memcpy(pkt, dup, sizeof(libtrace_packet_t));
 		/* Free the packet structure */
@@ -479,7 +479,7 @@ static inline int dispatch_packet(libtrace_t *trace,
 		t->accepted_packets++;
 		if (trace->perpkt_cbs->message_packet)
 			*packet = (*trace->perpkt_cbs->message_packet)(trace, t, trace->global_blob, t->user_data, *packet);
-		trace_fin_packet(*packet);
+		trace_fin_packet(*packet, 0);
 	} else {
 		assert((*packet)->error == READ_TICK);
 		libtrace_generic_t data = {.uint64 = trace_packet_get_order(*packet)};
@@ -1272,7 +1272,7 @@ static inline size_t filter_packets(libtrace_t *trace,
 			packets[offset++] = packets[i];
 			packets[i] = tmp;
 		} else {
-			trace_fin_packet(packets[i]);
+			trace_fin_packet(packets[i], 0);
 		}
 	}
 
@@ -1305,6 +1305,7 @@ static int trace_pread_packet_wrapper(libtrace_t *libtrace,
 
 	if (libtrace->format->pread_packets) {
 		int ret;
+		/*
 		for (i = 0; i < (int) nb_packets; ++i) {
 			assert(i[packets]);
 			if (!(packets[i]->buf_control==TRACE_CTRL_PACKET ||
@@ -1314,6 +1315,7 @@ static int trace_pread_packet_wrapper(libtrace_t *libtrace,
 				return -1;
 			}
 		}
+		*/
 		do {
 			ret=libtrace->format->pread_packets(libtrace, t,
 			                                    packets,
@@ -2550,7 +2552,7 @@ DLLEXPORT int trace_set_configuration_file(libtrace_t *trace, FILE *file) {
 DLLEXPORT void trace_free_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	assert(packet);
 	/* Always release any resources this might be holding */
-	trace_fin_packet(packet);
+	trace_fin_packet(packet, 0);
 	libtrace_ocache_free(&libtrace->packet_freelist, (void **) &packet, 1, 1);
 }
 

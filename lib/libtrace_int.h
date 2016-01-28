@@ -382,7 +382,7 @@ struct libtrace_t {
 
 #define LIBTRACE_STAT_MAGIC 0x41
 
-void trace_fin_packet(libtrace_packet_t *packet);
+void trace_fin_packet(libtrace_packet_t *packet, int updatetrace);
 void libtrace_zero_thread(libtrace_thread_t * t);
 void store_first_packet(libtrace_t *libtrace, libtrace_packet_t *packet, libtrace_thread_t *t);
 libtrace_thread_t * get_thread_table(libtrace_t *libtrace);
