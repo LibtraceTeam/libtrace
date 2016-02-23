@@ -1780,21 +1780,26 @@ void trace_construct_packet(libtrace_packet_t *packet,
 	hdr.wirelen=len;
 
 	/* Now fill in the libtrace packet itself */
+        assert(deadtrace);
 	packet->trace=deadtrace;
 	size=len+sizeof(hdr);
+        if (size < LIBTRACE_PACKET_BUFSIZE)
+            size = LIBTRACE_PACKET_BUFSIZE;
 	if (packet->buf_control==TRACE_CTRL_PACKET) {
-		packet->buffer=realloc(packet->buffer,size);
+            packet->buffer = realloc(packet->buffer, size);
 	}
 	else {
-		packet->buffer=malloc(size);
+		packet->buffer = malloc(size);
 	}
 	packet->buf_control=TRACE_CTRL_PACKET;
 	packet->header=packet->buffer;
 	packet->payload=(void*)((char*)packet->buffer+sizeof(hdr));
-	
-	/* Ugh, memcpy - sadly necessary */
-	memcpy(packet->header,&hdr,sizeof(hdr));
-	memcpy(packet->payload,data,(size_t)len);
+
+	/* Ugh, memmove - sadly necessary, also beware that we might be
+         * moving data around within this packet, so ordering is important.
+         */
+	memmove(packet->payload, data, (size_t)len);
+	memmove(packet->header, &hdr, sizeof(hdr));
 	packet->type=pcap_linktype_to_rt(libtrace_to_pcap_linktype(linktype));
 
 	trace_clear_cache(packet);
