@@ -33,6 +33,7 @@
 
 
 #define _GNU_SOURCE 1
+#include "config.h"
 #include "wandio_internal.h"
 #include "wandio.h"
 #include <sys/types.h>

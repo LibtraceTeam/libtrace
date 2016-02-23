@@ -69,7 +69,7 @@ int main(int argc, char *argv[]) {
     (void)argc;
     (void)argv;
 
-    trace = trace_create("pcapfile:vxlan.pcap");
+    trace = trace_create("pcapfile:traces/vxlan.pcap");
     iferr(trace);
 
     trace_start(trace);

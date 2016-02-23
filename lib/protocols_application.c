@@ -24,10 +24,10 @@
  * along with libtrace; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
+#include <stdlib.h>
 #include "libtrace.h"
 
-DLLEXPORT void *trace_get_payload_from_vxlan(libtrace_vxlan_t *vxlan,
-                                            uint32_t *remaining)
+void *trace_get_payload_from_vxlan(libtrace_vxlan_t *vxlan, uint32_t *remaining)
 {
     if (remaining) {
         if (*remaining < sizeof(*vxlan)) {
@@ -42,8 +42,8 @@ DLLEXPORT void *trace_get_payload_from_vxlan(libtrace_vxlan_t *vxlan,
 }
 
 
-DLLEXPORT libtrace_vxlan_t *trace_get_vxlan_from_udp(libtrace_udp_t *udp,
-                uint32_t *remaining)
+libtrace_vxlan_t *trace_get_vxlan_from_udp(libtrace_udp_t *udp,
+        uint32_t *remaining)
 {
     if (udp->dest != htons(4789)) { /* UDP port number for vxlan */
         return NULL; /* Not a vxlan packet. */

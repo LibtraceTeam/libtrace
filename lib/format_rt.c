@@ -429,6 +429,7 @@ static int rt_set_format(libtrace_t *libtrace, libtrace_packet_t *packet)
 	switch (packet->type) {
 		case TRACE_RT_DUCK_2_4:
 		case TRACE_RT_DUCK_2_5:
+		case TRACE_RT_DUCK_5_0:
 			if (!RT_INFO->dummy_duck) {
 				RT_INFO->dummy_duck = trace_create_dead("duck:dummy");
 			}
