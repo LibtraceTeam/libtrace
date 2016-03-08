@@ -1424,7 +1424,8 @@ uint64_t trace_get_accepted_packets(libtrace_t *trace);
 
 /** Create a new packet object
  *
- * @return A pointer to an initialised libtrace_packet_t object
+ * @return A pointer to an initialised libtrace_packet_t object, or NULL if
+ * libtrace is unable to allocate space for a new packet.
  */
 DLLEXPORT libtrace_packet_t *trace_create_packet(void);
 

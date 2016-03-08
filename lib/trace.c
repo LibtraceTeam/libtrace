@@ -637,6 +637,9 @@ DLLEXPORT libtrace_packet_t *trace_create_packet(void)
 	libtrace_packet_t *packet =
 		(libtrace_packet_t*)calloc((size_t)1,sizeof(libtrace_packet_t));
 
+        if (packet == NULL)
+                return NULL;
+
 	packet->buf_control=TRACE_CTRL_PACKET;
 	trace_clear_cache(packet);
 	return packet;
