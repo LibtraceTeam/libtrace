@@ -38,11 +38,15 @@ For example, Ubuntu/Debian users will need to install the libpcap0.8-dev
 package in addition to the libpcap0.8 package.
 
 
+Q. What operating systems do you support?
+
+A. Linux, FreeBSD, Mac OS X and OpenBSD. Windows is not supported.
+
 ----------------------------------
 Using libtrace:
 
 The best source of information on how to use libtrace and the tools that come
 with it is the libtrace wiki located at 
-http://www.wand.net.nz/trac/libtrace/wiki
+http://www.github.com/wanduow/libtrace/wiki
 
 
