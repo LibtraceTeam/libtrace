@@ -27,7 +27,7 @@ static inline void print_mac(uint8_t *mac) {
  * using the common string representation for that address type */
 static inline void print_ip(struct sockaddr *ip) {
 
-	char str[20];
+	char str[40];
 	
 	/* Check the sockaddr family so we can cast it to the appropriate
 	 * address type, IPv4 or IPv6 */
