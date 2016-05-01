@@ -36,7 +36,7 @@ static inline void print_ip(struct sockaddr *ip) {
 		struct sockaddr_in *v4 = (struct sockaddr_in *)ip;
 		/* Use inet_ntop to convert the address into a string using
 		 * dotted decimal notation */
-		printf("%s ", inet_ntop(AF_INET, &(v4->sin_addr), str, 20));
+		printf("%s ", inet_ntop(AF_INET, &(v4->sin_addr), str, sizeof(str)));
 	}
 
 	if (ip->sa_family == AF_INET6) {
@@ -44,7 +44,7 @@ static inline void print_ip(struct sockaddr *ip) {
 		struct sockaddr_in6 *v6 = (struct sockaddr_in6 *)ip;
 		/* Use inet_ntop to convert the address into a string using
 		 * IPv6 address notation */
-		printf("%s ", inet_ntop(AF_INET6, &(v6->sin6_addr), str, 20));
+		printf("%s ", inet_ntop(AF_INET6, &(v6->sin6_addr), str, sizeof(str)));
 	}
 
 
