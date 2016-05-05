@@ -136,6 +136,17 @@
 #	define DPDK_USE_LOG_LEVEL 0
 #endif
 
+/* 1.8.0-rc2
+ * rx/tx_conf thresholds can be set to NULL in rte_eth_rx/tx_queue_setup
+ * this uses the default values, which are better tuned per device
+ * See issue #26
+ */
+#if RTE_VERSION >= RTE_VERSION_NUM(1, 8, 0, 2)
+#	define DPDK_USE_NULL_QUEUE_CONFIG 1
+#else
+#	define DPDK_USE_NULL_QUEUE_CONFIG 0
+#endif
+
 #include <rte_per_lcore.h>
 #include <rte_debug.h>
 #include <rte_errno.h>
@@ -897,7 +908,8 @@ static int dpdk_start_port (struct dpdk_format_data_t * format_data, char *err, 
      * receiving. Otherwise a larger size if writing packets.
      */
     ret = rte_eth_tx_queue_setup(format_data->port, format_data->queue_id,
-                        format_data->nb_tx_buf, rte_socket_id(), &tx_conf);
+                        format_data->nb_tx_buf, rte_socket_id(),
+                        DPDK_USE_NULL_QUEUE_CONFIG ? NULL : &tx_conf);
     if (ret < 0) {
         snprintf(err, errlen, "Intel DPDK - Cannot configure TX queue on port"
                             " %"PRIu8" : %s", format_data->port,
@@ -907,7 +919,8 @@ static int dpdk_start_port (struct dpdk_format_data_t * format_data, char *err, 
     /* Initialise the RX queue with some packets from memory */
     ret = rte_eth_rx_queue_setup(format_data->port, format_data->queue_id,
                             format_data->nb_rx_buf, rte_socket_id(),
-                            &rx_conf, format_data->pktmbuf_pool);
+                            DPDK_USE_NULL_QUEUE_CONFIG ? NULL : &rx_conf,
+                            format_data->pktmbuf_pool);
     if (ret < 0) {
         snprintf(err, errlen, "Intel DPDK - Cannot configure RX queue on port"
                     " %"PRIu8" : %s", format_data->port,
