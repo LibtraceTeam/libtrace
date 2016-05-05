@@ -46,7 +46,7 @@ DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len)
 	if ( (rtap_pres) & (1 << TRACE_RADIOTAP_EXT) ) 
 		printf("  extended fields:");
 	
-	while( (rtap_pres) & (1 << TRACE_RADIOTAP_EXT) ) {
+	while( (bswap_le_to_host32(*ptr)) & (1 << TRACE_RADIOTAP_EXT) ) {
 		rtap_real_len += sizeof (uint32_t);
 		ptr++;
 		printf(" %#08x", bswap_le_to_host32(*ptr));	
