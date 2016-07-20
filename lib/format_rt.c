@@ -158,7 +158,7 @@ static int rt_connect(libtrace_t *libtrace) {
 				RT_INFO->hostname);
 		return -1;
 	}
-	
+
         if (connect_msg.magic != LIBTRACE_RT_MAGIC) {
                 trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
                         "RT version mismatch: magic byte is incorrect");

@@ -10,6 +10,8 @@
 #include "libpacketdump.h"
 #include "lt_bswap.h"
 
+#define ALIGN_NATURAL_64(_p,_s,_c) \
+	while ( (_p - _s) % sizeof(uint64_t)) {_p++; _c++;}
 #define ALIGN_NATURAL_32(_p,_s,_c) \
 	while ( (_p - _s) % sizeof(uint32_t)) {_p++; _c++;}
 #define ALIGN_NATURAL_16(_p,_s,_c) \
@@ -46,17 +48,21 @@ DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len)
 	if ( (rtap_pres) & (1 << TRACE_RADIOTAP_EXT) ) 
 		printf("  extended fields:");
 	
-	while( (rtap_pres) & (1 << TRACE_RADIOTAP_EXT) ) {
+	while( (bswap_le_to_host32(*ptr)) & (1 << TRACE_RADIOTAP_EXT) ) {
 		rtap_real_len += sizeof (uint32_t);
 		ptr++;
 		printf(" %#08x", bswap_le_to_host32(*ptr));	
 	}
 
+        if ( (rtap_pres) & (1 << TRACE_RADIOTAP_EXT) )
+                printf("\n");
 
 	/* make p point to the first data field */
-	s = p = (uint8_t *) ++ptr;
+	s = (uint8_t *) rtap;
+        p = (uint8_t *) ++ptr;
 
 	if (rtap_pres & (1 << TRACE_RADIOTAP_TSFT)) {
+		ALIGN_NATURAL_64(p,s,rtap_real_len);
 		printf(" Radiotap: TSFT = %" PRIu64 " microseconds\n", bswap_le_to_host64(*((uint64_t *)p)));
 		p += sizeof (uint64_t);
 		rtap_real_len += sizeof (uint64_t);

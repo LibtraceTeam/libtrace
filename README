@@ -12,7 +12,7 @@ See INSTALL for instructions on how to install libtrace.
 
 This directory contains source code for libtrace, a userspace library for 
 processing of network traffic capture from live interfaces or from offline
-traces.
+traces. 
 
 libtrace was primarily designed for use with the real-time interface to the 
 Waikato DAG Capture Point software running at The University of Waikato, 

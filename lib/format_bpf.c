@@ -429,7 +429,7 @@ static int bpf_prepare_packet(libtrace_t *libtrace UNUSED,
 		
 		ptr = ((struct local_bpf_hdr *)(packet->header));
 		replace = ((struct libtrace_bpf_hdr *)(packet->header));
-		orig = *ptr;
+		memcpy(&orig, ptr, sizeof(struct local_bpf_hdr));
 
 		replace->bh_tstamp.tv_sec = (uint32_t) (orig.bh_tstamp.tv_sec & 0xffffffff);
 		replace->bh_tstamp.tv_usec = (uint32_t) (orig.bh_tstamp.tv_usec & 0xffffffff);

@@ -1712,7 +1712,8 @@ int trace_print_statistics(const libtrace_stat_t *s, FILE *f,
 
 /** Create a new packet object
  *
- * @return A pointer to an initialised libtrace_packet_t object
+ * @return A pointer to an initialised libtrace_packet_t object, or NULL if
+ * libtrace is unable to allocate space for a new packet.
  */
 DLLEXPORT libtrace_packet_t *trace_create_packet(void);
 
