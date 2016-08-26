@@ -650,7 +650,7 @@ static int linuxring_write_packet(libtrace_out_t *libtrace,
 			perror("poll");
 			return -1;
 		}
-		if(ret == 0)
+		if(ret == 0) {
 			/* Timeout something has gone wrong - maybe the queue is
 			 * to large so try issue another send command
 			 */
@@ -666,6 +666,7 @@ static int linuxring_write_packet(libtrace_out_t *libtrace,
 						  "failed");
 				return -1;
 			}
+                }
 	}
 
 	header->tp_len = trace_get_capture_length(packet);
