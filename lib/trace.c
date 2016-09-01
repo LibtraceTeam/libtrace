@@ -693,8 +693,9 @@ DLLEXPORT void trace_destroy(libtrace_t *libtrace) {
 	}
 
 	/* Finish any the last packet we read - for backwards compatibility */
-	if (libtrace->last_packet)
+	if (libtrace->last_packet) {
 		trace_fin_packet(libtrace->last_packet);
+        }
 	assert(libtrace->last_packet == NULL);
 
 	if (libtrace->format) {
@@ -747,6 +748,7 @@ DLLEXPORT void trace_destroy(libtrace_t *libtrace) {
 		 */
 		 free(libtrace->event.packet);
 	}
+
 	free(libtrace);
 }
 
@@ -912,8 +914,9 @@ DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
                 /* Finalise the packet, freeing any resources the format module
                  * may have allocated it and zeroing all data associated with it.
                  */
-                if (packet->trace == libtrace)
+                if (packet->trace == libtrace) {
                         trace_fin_packet(packet);
+                }
 		do {
 			size_t ret;
 			int filtret;
@@ -922,6 +925,7 @@ DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 			packet->trace = libtrace;
 			ret=libtrace->format->read_packet(libtrace,packet);
 			if (ret==(size_t)-1 || ret==0) {
+                                packet->trace = NULL;
 				return ret;
 			}
                         if (libtrace->filter) {
