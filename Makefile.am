@@ -8,8 +8,8 @@ AUTOMAKE_OPTIONS = 1.9 foreign
 if HAS_DOXYGEN
 man_MANS = docs/doxygen/man/man3/trace*.3 docs/doxygen/man/man3/libtrace*.3 
 endif
-EXTRA_DIST=libtrace.sln libtrace.vcproj test-convert.vcproj \
-		   test-format.vcproj test-pcap-bpf.vcproj
+#EXTRA_DIST=libtrace.sln libtrace.vcproj test-convert.vcproj \
+#		   test-format.vcproj test-pcap-bpf.vcproj
 
 .PHONY: docs
 
