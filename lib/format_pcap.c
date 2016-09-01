@@ -346,14 +346,14 @@ static int pcapint_start_input(libtrace_t *libtrace) {
 
 static int pcap_pause_input(libtrace_t *libtrace)
 {
-	pcap_close(INPUT.pcap);
-	INPUT.pcap=NULL;
 	return 0; /* success */
 }
 
 
 static int pcap_fin_input(libtrace_t *libtrace) 
 {
+	pcap_close(INPUT.pcap);
+	INPUT.pcap=NULL;
 	free(libtrace->format_data);
 	return 0; /* success */
 }
