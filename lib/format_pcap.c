@@ -344,7 +344,7 @@ static int pcapint_start_input(libtrace_t *libtrace) {
 	return 0; /* success */
 }
 
-static int pcap_pause_input(libtrace_t *libtrace)
+static int pcap_pause_input(libtrace_t *libtrace UNUSED)
 {
 	return 0; /* success */
 }

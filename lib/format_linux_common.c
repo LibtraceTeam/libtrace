@@ -241,7 +241,7 @@ void linuxcommon_close_input_stream(libtrace_t *libtrace,
 #define str(s) #s
 
 /* These don't typically reset however an interface does exist to reset them */
-static int linuxcommon_get_dev_statisitics(libtrace_t *libtrace, struct linux_dev_stats *stats) {
+static int linuxcommon_get_dev_statistics(libtrace_t *libtrace, struct linux_dev_stats *stats) {
 	FILE *file;
 	char line[1024];
 	struct linux_dev_stats tmp_stats;
@@ -252,12 +252,21 @@ static int linuxcommon_get_dev_statisitics(libtrace_t *libtrace, struct linux_de
 	}
 
 	/* Skip 2 header lines */
-	fgets(line, sizeof(line), file);
-	fgets(line, sizeof(line), file);
+	if (fgets(line, sizeof(line), file) == NULL) {
+                fclose(file);
+                return -1;
+        }
+
+	if (fgets(line, sizeof(line), file) == NULL) {
+                fclose(file);
+                return -1;
+        }
 
 	while (!(feof(file)||ferror(file))) {
 		int tot;
-		fgets(line, sizeof(line), file);
+		if (fgets(line, sizeof(line), file) == NULL)
+                        break;
+
 		tot = sscanf(line, " %"xstr(IF_NAMESIZE)"[^:]:" REPEAT_16(" %"SCNd64),
 		             tmp_stats.if_name,
 		             &tmp_stats.rx_bytes,
@@ -435,7 +444,7 @@ int linuxcommon_start_input_stream(libtrace_t *libtrace,
 	FORMAT_DATA->stats.tp_packets = -count;
 	FORMAT_DATA->stats.tp_drops = 0;
 
-	if (linuxcommon_get_dev_statisitics(libtrace, &FORMAT_DATA->dev_stats) != 0) {
+	if (linuxcommon_get_dev_statistics(libtrace, &FORMAT_DATA->dev_stats) != 0) {
 		/* Mark this as bad */
 		FORMAT_DATA->dev_stats.if_name[0] = 0;
 	}
@@ -526,7 +535,7 @@ static void linuxcommon_update_socket_statistics(libtrace_t *libtrace) {
 #define DEV_DIFF(x) (dev_stats.x - FORMAT_DATA->dev_stats.x)
 /* Note these statistics come from two different sources, the socket itself and
  * the linux device. As such this means it is highly likely that their is some
- * margin of error in the returned statisitics, we perform basic sanitising so
+ * margin of error in the returned statistics, we perform basic sanitising so
  * that these are not too noticable.
  */
 void linuxcommon_get_statistics(libtrace_t *libtrace, libtrace_stat_t *stat) {
@@ -543,7 +552,7 @@ void linuxcommon_get_statistics(libtrace_t *libtrace, libtrace_stat_t *stat) {
 	dev_stats.if_name[0] = 0; /* This will be set if we retrive valid stats */
 	/* Do we have starting stats to compare to? */
 	if (FORMAT_DATA->dev_stats.if_name[0] != 0) {
-		linuxcommon_get_dev_statisitics(libtrace, &dev_stats);
+		linuxcommon_get_dev_statistics(libtrace, &dev_stats);
 	}
 	linuxcommon_update_socket_statistics(libtrace);
 
