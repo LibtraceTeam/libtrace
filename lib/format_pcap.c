@@ -1,36 +1,28 @@
 /*
- * This file is part of libtrace
  *
- * Copyright (c) 2007,2008,2009,2010 The University of Waikato, Hamilton, 
- * New Zealand.
- *
- * Authors: Daniel Lawson 
- *          Perry Lorier
- *          Shane Alcock 
- *          
+ * Copyright (c) 2007-2016 The University of Waikato, Hamilton, New Zealand.
  * All rights reserved.
  *
- * This code has been developed by the University of Waikato WAND 
+ * This file is part of libtrace.
+ *
+ * This code has been developed by the University of Waikato WAND
  * research group. For further information please see http://www.wand.net.nz/
  *
  * libtrace is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * libtrace is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with libtrace; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
- * $Id$
  *
  */
-
 #include "common.h"
 #include "config.h"
 #include "libtrace.h"
@@ -267,6 +259,13 @@ static int pcapint_start_input(libtrace_t *libtrace) {
 		return -1; /* failure */
 	}
 
+#ifdef HAVE_PCAP_IMMEDIATE
+        if ((pcap_set_immediate_mode(INPUT.pcap, 1) == PCAP_ERROR_ACTIVATED)) {
+		trace_set_err(libtrace,TRACE_ERR_INIT_FAILED,"%s",errbuf);
+		return -1; /* failure */
+	}
+#endif
+
 	if ((ret = pcap_activate(INPUT.pcap)) != 0) {
 		if (ret == PCAP_WARNING_PROMISC_NOTSUP) {
 			trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,"Promiscuous mode unsupported");
@@ -345,16 +344,16 @@ static int pcapint_start_input(libtrace_t *libtrace) {
 	return 0; /* success */
 }
 
-static int pcap_pause_input(libtrace_t *libtrace)
+static int pcap_pause_input(libtrace_t *libtrace UNUSED)
 {
-	pcap_close(INPUT.pcap);
-	INPUT.pcap=NULL;
 	return 0; /* success */
 }
 
 
 static int pcap_fin_input(libtrace_t *libtrace) 
 {
+	pcap_close(INPUT.pcap);
+	INPUT.pcap=NULL;
 	free(libtrace->format_data);
 	return 0; /* success */
 }
@@ -754,18 +753,19 @@ static int pcap_get_fd(const libtrace_t *trace) {
 	return pcap_fileno(DATA(trace)->input.pcap);
 }
 
-static uint64_t pcap_get_dropped_packets(libtrace_t *trace)
-{
-	struct pcap_stat stats;
-	if (pcap_stats(DATA(trace)->input.pcap,&stats)==-1) {
+static void pcap_get_statistics(libtrace_t *trace, libtrace_stat_t *stat) {
+
+	struct pcap_stat pcapstats;
+	if (pcap_stats(DATA(trace)->input.pcap,&pcapstats)==-1) {
 		char *errmsg = pcap_geterr(DATA(trace)->input.pcap);
 		trace_set_err(trace,TRACE_ERR_UNSUPPORTED,
-				"Failed to retreive stats: %s\n",
+				"Failed to retrieve stats: %s\n",
 				errmsg ? errmsg : "Unknown pcap error");
-		return ~0;
+		return;
 	}
 
-	return stats.ps_drop;
+        stat->dropped_valid = 1;
+        stat->dropped = pcapstats.ps_drop;
 }
 
 static void pcap_help(void) {
@@ -802,7 +802,7 @@ static struct libtrace_format_t pcap = {
 	pcap_init_input,		/* init_input */
 	pcap_config_input,		/* config_input */
 	pcap_start_input,		/* start_input */
-	NULL,				/* pause_input */
+        pcap_pause_input,		/* pause_input */
 	pcap_init_output,		/* init_output */
 	NULL,				/* config_output */
 	NULL,				/* start_output */
@@ -829,11 +829,12 @@ static struct libtrace_format_t pcap = {
 	NULL,				/* get_received_packets */
 	NULL,				/* get_filtered_packets */
 	NULL,				/* get_dropped_packets */
-	NULL,				/* get_captured_packets */
+	NULL,				/* get_statistics */
 	NULL,				/* get_fd */
 	trace_event_trace,		/* trace_event */
 	pcap_help,			/* help */
-	NULL				/* next pointer */
+	NULL,			/* next pointer */
+	NON_PARALLEL(false)
 };
 
 static struct libtrace_format_t pcapint = {
@@ -871,12 +872,13 @@ static struct libtrace_format_t pcapint = {
 	pcap_set_capture_length,	/* set_capture_length */
 	NULL,				/* get_received_packets */
 	NULL,				/* get_filtered_packets */
-	pcap_get_dropped_packets,	/* get_dropped_packets */
-	NULL,				/* get_captured_packets */
+	NULL,	                        /* get_dropped_packets */
+	pcap_get_statistics,		/* get_statistics */
 	pcap_get_fd,			/* get_fd */
 	trace_event_device,		/* trace_event */
 	pcapint_help,			/* help */
-	NULL				/* next pointer */
+	NULL,			/* next pointer */
+	NON_PARALLEL(true)
 };
 
 void pcap_constructor(void) {

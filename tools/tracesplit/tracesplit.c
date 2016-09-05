@@ -1,3 +1,30 @@
+/*
+ *
+ * Copyright (c) 2007-2016 The University of Waikato, Hamilton, New Zealand.
+ * All rights reserved.
+ *
+ * This file is part of libtrace.
+ *
+ * This code has been developed by the University of Waikato WAND
+ * research group. For further information please see http://www.wand.net.nz/
+ *
+ * libtrace is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * libtrace is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *
+ */
+
+
 #include <libtrace.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -484,20 +511,25 @@ int main(int argc, char *argv[])
 	}
 
 	if (verbose) {
-		uint64_t f;
-		f=trace_get_received_packets(input);
-		if (f!=UINT64_MAX)
-			fprintf(stderr,"%" PRIu64 " packets on input\n",f);
-		f=trace_get_filtered_packets(input);
-		if (f!=UINT64_MAX)
-			fprintf(stderr,"%" PRIu64 " packets filtered\n",f);
-		f=trace_get_dropped_packets(input);
-		if (f!=UINT64_MAX)
-			fprintf(stderr,"%" PRIu64 " packets dropped\n",f);
-		f=trace_get_accepted_packets(input);
-		if (f!=UINT64_MAX)
-			fprintf(stderr,"%" PRIu64 " packets accepted\n",f);
-	}
+                libtrace_stat_t *stat;
+                
+                stat = trace_create_statistics();
+                trace_get_statistics(input, stat);
+
+                if (stat->received_valid)
+			fprintf(stderr,"%" PRIu64 " packets on input\n",
+                                        stat->received);
+		if (stat->filtered_valid)
+			fprintf(stderr,"%" PRIu64 " packets filtered\n",
+                                        stat->filtered);
+		if (stat->dropped_valid)
+			fprintf(stderr,"%" PRIu64 " packets dropped\n",
+                                        stat->dropped);
+		if (stat->accepted_valid)
+			fprintf(stderr,"%" PRIu64 " packets accepted\n",
+                                        stat->accepted);
+	        free(stat);
+        }
 	
 	if (output)
 		trace_destroy_output(output);

@@ -1,36 +1,28 @@
 /*
- * This file is part of libtrace
  *
- * Copyright (c) 2007,2008,2009,2010 The University of Waikato, Hamilton, 
- * New Zealand.
- *
- * Authors: Daniel Lawson 
- *          Perry Lorier
- *          Shane Alcock 
- *          
+ * Copyright (c) 2007-2016 The University of Waikato, Hamilton, New Zealand.
  * All rights reserved.
  *
- * This code has been developed by the University of Waikato WAND 
+ * This file is part of libtrace.
+ *
+ * This code has been developed by the University of Waikato WAND
  * research group. For further information please see http://www.wand.net.nz/
  *
  * libtrace is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * libtrace is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with libtrace; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
- * $Id$
  *
  */
-
 /** @file
  *
  * @brief Header file containing definitions for structures and functions that
@@ -56,7 +48,7 @@ extern "C" {
 
 #include "config.h"
 #include "common.h"
-#include "libtrace.h"
+#include "libtrace_parallel.h"
 #include "wandio.h"
 #include "lt_bswap.h"
 
@@ -147,6 +139,15 @@ int snprintf(char *str, size_t size, const char *format, ...);
 #include "bpf-jit/bpf-jit.h"
 #endif
 
+#include "data-struct/ring_buffer.h"
+#include "data-struct/object_cache.h"
+#include "data-struct/vector.h"
+#include "data-struct/message_queue.h"
+#include "data-struct/deque.h"
+#include "data-struct/linked_list.h"
+#include "data-struct/sliding_window.h"
+#include "data-struct/buckets.h"
+#include "pthread_spinlock.h"
 
 //#define RP_BUFSIZE 65536U
 
@@ -166,6 +167,130 @@ struct libtrace_event_status_t {
 	bool waiting;
 };
 
+enum thread_types {
+	THREAD_EMPTY,
+	THREAD_HASHER,
+	THREAD_PERPKT,
+	THREAD_REPORTER,
+	THREAD_KEEPALIVE
+};
+
+enum thread_states {
+	THREAD_RUNNING,
+	THREAD_FINISHING,
+	THREAD_FINISHED,
+	THREAD_PAUSED,
+	THREAD_STATE_MAX
+};
+
+/**
+ * Information of this thread
+ */
+struct libtrace_thread_t {
+	uint64_t accepted_packets; // The number of packets accepted only used if pread
+	uint64_t filtered_packets;
+	// is retreving packets
+	// Set to true once the first packet has been stored
+	bool recorded_first;
+	// For thread safety reason we actually must store this here
+	int64_t tracetime_offset_usec;
+	void* user_data; // TLS for the user to use
+	void* format_data; // TLS for the format to use
+	libtrace_message_queue_t messages; // Message handling
+	libtrace_ringbuffer_t rbuffer; // Input
+	libtrace_t * trace;
+	void* ret;
+	enum thread_types type;
+	enum thread_states state;
+	pthread_t tid;
+	int perpkt_num; // A number from 0-X that represents this perpkt threads number
+				// in the table, intended to quickly identify this thread
+				// -1 represents NA (such as the case this is not a perpkt thread)
+} ALIGN_STRUCT(CACHE_LINE_SIZE);
+
+/**
+ * Storage to note time value against each.
+ * Used both internally to do trace time playback
+ * and can be used externally to assist applications which need
+ * a trace starting time such as tracertstats.
+ */
+struct first_packets {
+	pthread_spinlock_t lock;
+	size_t count; // If == perpkt_thread_count threads we have all
+	size_t first; // Valid if count != 0
+	struct {
+		libtrace_packet_t * packet;
+		struct timeval tv;
+	} * packets;
+};
+
+#define TRACE_STATES \
+	X(STATE_NEW) \
+	X(STATE_RUNNING) \
+	X(STATE_PAUSING) \
+	X(STATE_PAUSED) \
+	X(STATE_FINISHED) \
+	X(STATE_FINISHING) \
+	X(STATE_DESTROYED) \
+	X(STATE_JOINED) \
+	X(STATE_ERROR)
+
+#define X(a) a,
+enum trace_state {
+	TRACE_STATES
+};
+#undef X
+
+#define X(a) case a: return #a;
+static inline char *get_trace_state_name(enum trace_state ts){
+	switch(ts) {
+		TRACE_STATES
+		default:
+			return "UNKNOWN";
+	}
+}
+#undef X
+
+#define READ_EOF 0
+#define READ_ERROR -1
+#define READ_MESSAGE -2
+// Used for inband tick message
+#define READ_TICK -3
+
+/**
+ * Tuning the parallel sizes
+ * See the user documentation trace_set_x
+ */
+struct user_configuration {
+	size_t cache_size;
+	size_t thread_cache_size;
+	bool fixed_count;
+	size_t burst_size;
+	size_t tick_interval;
+	size_t tick_count;
+	size_t perpkt_threads;
+	size_t hasher_queue_size;
+	bool hasher_polling;
+	bool reporter_polling;
+	size_t reporter_thold;
+	bool debug_state;
+};
+#define ZERO_USER_CONFIG(config) memset(&config, 0, sizeof(struct user_configuration));
+
+struct callback_set {
+
+        fn_cb_starting message_starting;
+        fn_cb_dataless message_stopping;
+        fn_cb_dataless message_resuming;
+        fn_cb_dataless message_pausing;
+        fn_cb_packet message_packet;
+        fn_cb_result message_result;
+        fn_cb_first_packet message_first_packet;
+        fn_cb_tick message_tick_count;
+        fn_cb_tick message_tick_interval;
+        fn_cb_usermessage message_user;
+};
+
 /** A libtrace input trace 
  * @internal
  */
@@ -183,25 +308,88 @@ struct libtrace_t {
 	 * used only if the capture format does not support snapping natively */
 	size_t snaplen;			
 	/** Count of the number of packets returned to the libtrace user */
-	uint64_t accepted_packets;	
+	uint64_t accepted_packets;
 	/** Count of the number of packets filtered by libtrace */
-	uint64_t filtered_packets;	
+	uint64_t filtered_packets;
+	/** The sequence is like accepted_packets but we don't reset this after a pause. */
+	uint64_t sequence_number;
+	/** The packet read out by the trace, backwards compatibility to allow us to finalise
+	 * a packet when the trace is destroyed */
+	libtrace_packet_t *last_packet;
 	/** The filename from the uri for the trace */
-	char *uridata;			
+	char *uridata;
 	/** The libtrace IO reader for this trace (if applicable) */
-	io_t *io;			
+	io_t *io;
 	/** Error information for the trace */
-	libtrace_err_t err;		
+	libtrace_err_t err;
 	/** Boolean flag indicating whether the trace has been started */
-	bool started;			
+	bool started;
+	/** Synchronise writes/reads across this format object and attached threads etc */
+	pthread_mutex_t libtrace_lock;
+	/** State */
+	enum trace_state state;
+	/** Use to control pausing threads and finishing threads etc always used with libtrace_lock */
+	pthread_cond_t perpkt_cond;
+	/** Keeps track of counts of threads in any given state */
+	int perpkt_thread_states[THREAD_STATE_MAX]; 
+
+	/** Set to indicate a perpkt's queue is full as such the writing perpkt cannot proceed */
+	bool perpkt_queue_full;
+	/** Global storage for this trace, shared among all the threads  */
+	void* global_blob;
+	/** The actual freelist */
+	libtrace_ocache_t packet_freelist;
+	/** The hasher function */
+	enum hasher_types hasher_type;
+	/** The hasher function - NULL implies they don't care or balance */
+	fn_hasher hasher;
+	void *hasher_data;
+	/** The pread_packet choosen path for the configuration */
+	int (*pread)(libtrace_t *, libtrace_thread_t *, libtrace_packet_t **, size_t);
+
+	libtrace_thread_t hasher_thread;
+	libtrace_thread_t reporter_thread;
+	libtrace_thread_t keepalive_thread;
+	int perpkt_thread_count;
+	libtrace_thread_t * perpkt_threads; // All our perpkt threads
+	// Used to keep track of the first packet seen on each thread
+	struct first_packets first_packets;
+	int tracetime;
+
+	/*
+	 * Caches statistic counters in the case that our trace is
+	 * paused or stopped before this counter is taken
+	 */
+	libtrace_stat_t *stats;
+	struct user_configuration config;
+	libtrace_combine_t combiner;
+	
+        /* Set of callbacks to be executed by per packet threads in response
+         * to various messages. */
+        struct callback_set *perpkt_cbs;
+        /* Set of callbacks to be executed by the reporter thread in response
+         * to various messages. */
+        struct callback_set *reporter_cbs;
 };
+
+#define LIBTRACE_STAT_MAGIC 0x41
+
+void trace_fin_packet(libtrace_packet_t *packet);
+void libtrace_zero_thread(libtrace_thread_t * t);
+void store_first_packet(libtrace_t *libtrace, libtrace_packet_t *packet, libtrace_thread_t *t);
+libtrace_thread_t * get_thread_table(libtrace_t *libtrace);
+
+
+void send_message(libtrace_t *trace, libtrace_thread_t *target,
+                const enum libtrace_messages type,
+                libtrace_generic_t data, libtrace_thread_t *sender);
 
 /** A libtrace output trace
  * @internal
  */
 struct libtrace_out_t {
 	/** The capture format for the output trace */
-        struct libtrace_format_t *format;
+	struct libtrace_format_t *format;
 	/** Pointer to the "global" data for the capture format module */
 	void *format_data; 		
 	/** The filename for the uri for the output trace */
@@ -209,7 +397,7 @@ struct libtrace_out_t {
 	/** Error information for the output trace */
 	libtrace_err_t err;
 	/** Boolean flag indicating whether the trace has been started */
-	bool started;			
+	bool started;
 };
 
 /** Sets the error status on an input trace
@@ -302,8 +490,6 @@ typedef struct libtrace_pflog_header_t {
 	uint8_t	   pad[3];
 } PACKED libtrace_pflog_header_t;
 
-
-
 /** A libtrace capture format module */
 /* All functions should return -1, or NULL on failure */
 struct libtrace_format_t {
@@ -317,12 +503,12 @@ struct libtrace_format_t {
 
 
 	/** Given a filename, return if this is the most likely capture format
- 	 * (used for devices). Used to "guess" the capture format when the
+	 * (used for devices). Used to "guess" the capture format when the
 	 * URI is not fully specified.
 	 *
 	 * @param fname 	The name of the device or file to examine
 	 * @return 1 if the name matches the capture format, 0 otherwise
- 	 */
+	 */
 	int (*probe_filename)(const char *fname);
 	
 	/** Given a file, looks at the start of the file to determine if this
@@ -694,19 +880,20 @@ struct libtrace_format_t {
 	 *
 	 */
 	uint64_t (*get_dropped_packets)(libtrace_t *trace);
-	
-	/** Returns the number of packets captured and returned by an input 
-	 * trace.
+
+	/** Returns statistics about a trace.
 	 *
-	 * @param trace		The input trace to get the capture count for
-	 * @return The number of packets returned to the libtrace user, or
-	 * UINT64_MAX if the number is unknown
+	 * @param trace The libtrace object
+	 * @param stat [in,out] A statistics structure ready to be filled
 	 *
-	 * This is the number of packets that have been successfully returned
-	 * to the libtrace user via the read_packet() function.
+	 * The filtered and accepted statistics will be set to the values
+	 * stored in the library. All other statistics are not set.
 	 *
+	 * @note If filtering of packets is performed by a trace and the number
+	 * of filtered packets is unknown this should be marked as invalid by
+	 * the format.
 	 */
-	uint64_t (*get_captured_packets)(libtrace_t *trace);
+	void (*get_statistics)(libtrace_t *trace, libtrace_stat_t *stat);
 	
 	/** Returns the file descriptor used by the input trace.
 	 *
@@ -733,11 +920,109 @@ struct libtrace_format_t {
 
 	/** Prints some useful help information to standard output. */
 	void (*help)(void);
-
+	
 	/** Next pointer, should always be NULL - used by the format module
 	 * manager. */
 	struct libtrace_format_t *next;
+
+	/** Holds information about the trace format */
+	struct libtrace_info_t info;
+
+	/**
+	 * Starts or unpauses an input trace in parallel mode - note that
+	 * this function is often the one that opens the file or device for
+	 * reading.
+	 *
+	 * @param libtrace	The input trace to be started or unpaused
+	 * @return 0 upon success.
+	 *         Otherwise in event of an error -1 is returned.
+	 * 
+	 */
+	int (*pstart_input)(libtrace_t *trace);
+	
+	/**
+	 * Read a batch of packets from the input stream related to thread.
+	 * At most read nb_packets, however should return with less if packets
+	 * are not waiting. However still must return at least 1, 0 still indicates
+	 * EOF.
+	 *
+	 * @param libtrace	The input trace
+	 * @param t	The thread
+	 * @param packets	An array of packets
+	 * @param nb_packets	The number of packets in the array (the maximum to read)
+	 * @return The number of packets read, or 0 in the case of EOF or -1 in error or -2 to represent
+	 * interrupted due to message waiting before packets had been read.
+	 */
+	int (*pread_packets)(libtrace_t *trace, libtrace_thread_t *t, libtrace_packet_t **packets, size_t nb_packets);
+	
+	/** Pause a parallel trace
+	 *
+	 * @param libtrace	The input trace to be paused
+	 */
+	int (*ppause_input)(libtrace_t *trace);
+	
+	/** Called after all threads have been paused, Finish (close) a parallel trace
+	 *
+	 * @param libtrace	The input trace to be stopped
+	 */
+	int (*pfin_input)(libtrace_t *trace);
+
+	/**
+	 * Register a thread for use with the format or using the packets produced
+	 * by it. This is NOT only used for threads reading packets in fact all
+	 * threads use this.
+	 *
+	 * The libtrace lock is not held by this format but can be aquired
+	 * by the format.
+	 *
+	 * Some use cases include setting up any thread local storage required for
+	 * to read packets and free packets. For DPDK we require any thread that
+	 * may release or read a packet to have have an internal number associated
+	 * with it.
+	 * 
+	 * The thread type can be used to see if this thread is going to be used
+	 * to read packets or otherwise.
+	 *
+	 * @return 0 if successful, -1 if the option is unsupported or an error
+	 * occurs (such as a maximum of threads being reached)
+	 */
+	int (*pregister_thread)(libtrace_t *libtrace, libtrace_thread_t *t, bool reader);
+
+	/**
+	 * If needed any memory allocated with pregister_thread can be released
+	 * in this function. The thread will be destroyed directly after this
+	 * function is called.
+	 */
+	void (*punregister_thread)(libtrace_t *libtrace, libtrace_thread_t *t);
+
+	/** Returns statistics for a single thread.
+	 *
+	 * @param trace The libtrace object
+	 * @param t The thread to return statistics for
+	 * @param stat [in,out] A statistics structure ready to be filled
+	 *
+	 * The filtered and accepted statistics will be set to the values
+	 * stored in the library. All other statistics are not set.
+	 *
+	 * @note If filtering of packets is performed by a trace and the number
+	 * of filtered packets is unknown this should be marked as invalid by
+	 * the format.
+	 */
+	void (*get_thread_statistics)(libtrace_t *libtrace,
+	                              libtrace_thread_t *t,
+	                              libtrace_stat_t *stat);
 };
+
+/** Macro to zero out a single thread format */
+#define NON_PARALLEL(live) \
+	{live, 1},		/* trace info */ \
+	NULL,			/* pstart_input */ \
+	NULL,			/* pread_packet */ \
+	NULL,			/* ppause_input */ \
+	NULL,			/* pfin_input */ \
+	NULL,			/* pregister_thread */ \
+	NULL,			/* punregister_thread */ \
+	NULL,			/* get_thread_statistics */
 
 /** The list of registered capture formats */
 //extern struct libtrace_format_t *form;
@@ -752,6 +1037,13 @@ extern volatile int libtrace_halt;
  * @param format	The format module to be registered
  */
 void register_format(struct libtrace_format_t *format);
+
+/** Converts a timeval into a timestamp in microseconds since the epoch.
+ *
+ * @param tv    The timeval to be converted.
+ * @return A 64 bit timestamp in microseconds since the epoch.
+ */
+uint64_t tv_to_usec(const struct timeval *tv);
 
 /** Converts a PCAP DLT into a libtrace link type.
  *
@@ -942,6 +1234,8 @@ void tsh_constructor(void);
 void legacy_constructor(void);
 /** Constructor for the Linux Native format module */
 void linuxnative_constructor(void);
+/** Constructor for the Linux Ring format module */
+void linuxring_constructor(void);
 /** Constructor for the PCAP format module */
 void pcap_constructor(void);
 /** Constructor for the PCAP File format module */

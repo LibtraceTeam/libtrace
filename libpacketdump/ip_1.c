@@ -1,3 +1,28 @@
+/*
+ *
+ * Copyright (c) 2007-2016 The University of Waikato, Hamilton, New Zealand.
+ * All rights reserved.
+ *
+ * This file is part of libtrace.
+ *
+ * This code has been developed by the University of Waikato WAND
+ * research group. For further information please see http://www.wand.net.nz/
+ *
+ * libtrace is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * libtrace is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *
+ */
 #include <stdio.h>
 #include <inttypes.h>
 #include <dlfcn.h>
@@ -25,6 +50,7 @@ static char *unreach_types[]={
 DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len)
 {
 	libtrace_icmp_t *icmp = (libtrace_icmp_t*)packet;
+        int ippresent = 0;
 	if (len<1)
 		return;
 	printf(" ICMP:");
@@ -47,10 +73,7 @@ DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len)
 			else {
 				printf(" ICMP: Code: %i (Unknown)\n",icmp->code);
 			}
-			// Pretend that this was just passed up from ethernet
-			decode_next(packet+8,len-8,
-					"eth",0x0800);
-
+                        ippresent = 1;
 			break;
 		case 8:
 			printf(" Type: 8 (ICMP Echo Request) Sequence: ");
@@ -61,8 +84,7 @@ DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len)
 			break;
 		case 11:
 			printf(" Type: 11 (ICMP TTL Exceeded)\n");
-			decode_next(packet+8,len-8,
-					"eth",0x0800);
+                        ippresent = 1;
 			break;
 		default:
 			printf(" Type: %i (Unknown)\n",icmp->type);
@@ -74,6 +96,11 @@ DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len)
 		printf("(Truncated)\n");
 	else
 		printf("%u\n", ntohs(icmp->checksum));
+
+        if (ippresent) {
+                decode_next(packet+8,len-8,
+                                "eth",0x0800);
+        }
 
 
 	return;

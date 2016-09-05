@@ -1,36 +1,28 @@
 /*
- * This file is part of libtrace
  *
- * Copyright (c) 2007,2008,2009,2010 The University of Waikato, Hamilton, 
- * New Zealand.
- *
- * Authors: Daniel Lawson 
- *          Perry Lorier
- *          Shane Alcock 
- *          
+ * Copyright (c) 2007-2016 The University of Waikato, Hamilton, New Zealand.
  * All rights reserved.
  *
- * This code has been developed by the University of Waikato WAND 
+ * This file is part of libtrace.
+ *
+ * This code has been developed by the University of Waikato WAND
  * research group. For further information please see http://www.wand.net.nz/
  *
  * libtrace is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * libtrace is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with libtrace; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
- * $Id$
  *
  */
-
 #include "libtrace.h"
 #include "libtrace_int.h"
 #include "format_helper.h"
@@ -116,6 +108,8 @@ struct libtrace_format_data_t {
 	struct bpf_stat stats;
 	/* A boolean flag indicating whether the statistics are up-to-date */
 	int stats_valid;
+        /* Bucket data structure for safely storing buffers of packets */
+        libtrace_bucket_t *bucket;
 };
 
 #define FORMATIN(x) ((struct libtrace_format_data_t*)((x->format_data)))
@@ -138,6 +132,7 @@ static int bpf_init_input(libtrace_t *libtrace)
 	FORMATIN(libtrace)->promisc = 0;
 	FORMATIN(libtrace)->snaplen = 65536;
 	FORMATIN(libtrace)->stats_valid = 0;
+        FORMATIN(libtrace)->bucket = libtrace_bucket_init();
 
 	return 0;
 }
@@ -202,8 +197,8 @@ static int bpf_start_input(libtrace_t *libtrace)
 		return -1;
 	}
 
-	FORMATIN(libtrace)->buffer = malloc(FORMATIN(libtrace)->buffersize);
-	FORMATIN(libtrace)->bufptr = FORMATIN(libtrace)->buffer;
+	FORMATIN(libtrace)->buffer = NULL;
+	FORMATIN(libtrace)->bufptr = NULL;
 	FORMATIN(libtrace)->remaining = 0;
 
 	/* Attach to the device */
@@ -315,6 +310,22 @@ static uint64_t bpf_get_dropped_packets(libtrace_t *trace)
 	return FORMATIN(trace)->stats.bs_drop;
 }
 
+static void bpf_get_statistics(libtrace_t *trace, libtrace_stat_t *stat) {
+        uint64_t dropped = bpf_get_dropped_packets(trace);
+        uint64_t received = bpf_get_received_packets(trace);
+
+        if (dropped != (uint64_t)-1) {
+                stat->dropped_valid = 1;
+                stat->dropped = dropped;
+        }
+
+        if (received != (uint64_t) -1) {
+                stat->received_valid = 1;
+                stat->received = received;
+        }
+
+}
+
 /* Pauses a BPF input trace */
 static int bpf_pause_input(libtrace_t *libtrace)
 {
@@ -327,7 +338,8 @@ static int bpf_pause_input(libtrace_t *libtrace)
 /* Closes a BPF input trace */
 static int bpf_fin_input(libtrace_t *libtrace) 
 {
-	free(libtrace->format_data);
+	libtrace_bucket_destroy(FORMATIN(libtrace)->bucket);
+        free(libtrace->format_data);
 	return 0;
 }
 
@@ -354,6 +366,9 @@ static int bpf_config_input(libtrace_t *libtrace,
 			break;
 		case TRACE_OPTION_EVENT_REALTIME:
 			/* Captures are always realtime */
+			break;
+		case TRACE_OPTION_HASHER:
+			/* TODO investigate hashing in BSD? */
 			break;
 
 		/* Avoid default: so that future options will cause a warning
@@ -406,7 +421,7 @@ static int bpf_prepare_packet(libtrace_t *libtrace UNUSED,
 		
 		ptr = ((struct local_bpf_hdr *)(packet->header));
 		replace = ((struct libtrace_bpf_hdr *)(packet->header));
-		orig = *ptr;
+		memcpy(&orig, ptr, sizeof(struct local_bpf_hdr));
 
 		replace->bh_tstamp.tv_sec = (uint32_t) (orig.bh_tstamp.tv_sec & 0xffffffff);
 		replace->bh_tstamp.tv_usec = (uint32_t) (orig.bh_tstamp.tv_usec & 0xffffffff);
@@ -437,7 +452,13 @@ static int bpf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 
 	packet->type = bpf_linktype_to_rt(FORMATIN(libtrace)->linktype);
 
+        if (FORMATIN(libtrace)->remaining <= 0) {
+                FORMATIN(libtrace)->buffer = malloc(FORMATIN(libtrace)->buffersize);
+                libtrace_create_new_bucket(FORMATIN(libtrace)->bucket, FORMATIN(libtrace)->buffer);
+        }
+
 	while (FORMATIN(libtrace)->remaining <= 0) {
+
 		tout.tv_sec = 0;
 		tout.tv_usec = 500000;
 		FD_ZERO(&readfds);
@@ -483,7 +504,7 @@ static int bpf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 	 * stored in */
 	flags |= TRACE_PREP_DO_NOT_OWN_BUFFER;
 
-	if (packet->buf_control == TRACE_CTRL_PACKET)
+	if (packet->buffer && packet->buf_control == TRACE_CTRL_PACKET)
 		free(packet->buffer);
 
 	/* Update 'packet' to point to the first packet in our capture
@@ -492,9 +513,11 @@ static int bpf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 			packet->type, flags)) {
 		return -1;
 	}
-	
 
-	/* Skip past the packet record we're going to return, making sure
+        packet->internalid = libtrace_push_into_bucket(FORMATIN(libtrace)->bucket);
+        packet->srcbucket = FORMATIN(libtrace)->bucket;
+
+        /* Skip past the packet record we're going to return, making sure
 	 * that we deal with padding correctly */
 	FORMATIN(libtrace)->bufptr+=
 		BPF_WORDALIGN(BPFHDR(packet)->bh_hdrlen
@@ -606,14 +629,15 @@ static struct libtrace_format_t bpf = {
 	bpf_get_wire_length,	/* get_wire_length */
 	bpf_get_framing_length,	/* get_framing_length */
 	NULL,			/* set_capture_length */
-	bpf_get_received_packets,/* get_received_packets */
+	NULL,                   /* get_received_packets */
 	NULL,			/* get_filtered_packets */
-	bpf_get_dropped_packets,/* get_dropped_packets */
-	NULL,			/* get_captured_packets */
+	NULL,                   /* get_dropped_packets */
+	bpf_get_statistics,	/* get_statistics */
 	bpf_get_fd,		/* get_fd */
 	trace_event_device,	/* trace_event */
 	bpf_help,		/* help */
-	NULL
+	NULL,			/* next pointer */
+	NON_PARALLEL(true)
 };
 #else 	/* HAVE_DECL_BIOCSETIF */
 /* Prints some slightly useful help text for the BPF capture format */
@@ -655,14 +679,15 @@ static struct libtrace_format_t bpf = {
 	bpf_get_wire_length,	/* get_wire_length */
 	bpf_get_framing_length,	/* get_framing_length */
 	NULL,			/* set_capture_length */
-	NULL,/* get_received_packets */
+	NULL,			/* get_received_packets */
 	NULL,			/* get_filtered_packets */
-	NULL,/* get_dropped_packets */
-	NULL,			/* get_captured_packets */
+	NULL,			/* get_dropped_packets */
+	NULL,			/* get_statistics */
 	NULL,			/* get_fd */
 	NULL,			/* trace_event */
 	bpf_help,		/* help */
-	NULL
+	NULL,			/* next pointer */
+	NON_PARALLEL(true)
 };
 #endif  /* HAVE_DECL_BIOCSETIF */
 

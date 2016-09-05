@@ -1,41 +1,34 @@
 /*
- * This file is part of libtrace
  *
- * Copyright (c) 2007,2008,2009,2010 The University of Waikato, Hamilton, 
- * New Zealand.
- *
- * Authors: Daniel Lawson 
- *          Perry Lorier
- *          Shane Alcock 
- *          
+ * Copyright (c) 2007-2016 The University of Waikato, Hamilton, New Zealand.
  * All rights reserved.
  *
- * This code has been developed by the University of Waikato WAND 
+ * This file is part of libtrace.
+ *
+ * This code has been developed by the University of Waikato WAND
  * research group. For further information please see http://www.wand.net.nz/
  *
  * libtrace is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * libtrace is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with libtrace; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
- * $Id$
  *
  */
-
 #include "libtrace_int.h"
 #include "libtrace.h"
 #include "protocols.h"
 #include <assert.h>
 #include <stdlib.h>
+#include <string.h>
 
 
 /* This file contains all the protocol decoding functions for layer 2 
@@ -96,6 +89,102 @@ void *trace_get_payload_from_vlan(void *ethernet, uint16_t *type,
 		*type = ntohs(vlanhdr->vlan_ether_type);
 
 	return (void*)((char *)ethernet + sizeof(*vlanhdr));
+
+}
+
+libtrace_packet_t *trace_strip_packet(libtrace_packet_t *packet) {
+
+        libtrace_ether_t *ethernet;
+        libtrace_linktype_t linktype;
+        uint16_t ethertype;
+        uint32_t remaining;
+        char *nextpayload;
+        uint16_t finalethertype = 0;
+        uint16_t caplen, removed = 0;
+        char *dest;
+        uint8_t done = 0;
+        uint32_t oldrem;
+
+        /* For now, this will just work for Ethernet packets. */
+        ethernet = (libtrace_ether_t *)trace_get_layer2(packet, 
+                        &linktype, &remaining);
+
+        if (linktype != TRACE_TYPE_ETH) {
+                return packet;
+        }
+
+        /* No headers to strip, return the original packet */
+        if (ethernet->ether_type == TRACE_ETHERTYPE_IP ||
+                        ethernet->ether_type == TRACE_ETHERTYPE_IPV6) {
+                return packet;
+        }
+
+        if (remaining <= sizeof(libtrace_ether_t))
+                return packet;
+
+        caplen = trace_get_capture_length(packet);
+        ethertype = ntohs(ethernet->ether_type);
+        dest = ((char *)ethernet) + sizeof(libtrace_ether_t);
+        nextpayload = dest;
+        remaining -= sizeof(libtrace_ether_t);
+
+        /* I'd normally use trace_get_layer3 here, but it works out faster
+         * to do it this way (mostly less function call overhead).
+         *
+         * XXX This approach is going to just strip everything between the
+         * Ethernet and IP headers -- is there a use case where someone
+         * might want to selectively strip headers?
+         */
+        while (!done) {
+
+                if (nextpayload == NULL || remaining == 0)
+                        break;
+
+                oldrem = remaining;
+                switch (ethertype) {
+
+                case TRACE_ETHERTYPE_8021Q:
+                        nextpayload = (char *)trace_get_payload_from_vlan(
+                                        nextpayload,
+                                        &ethertype, &remaining);
+                        removed += (oldrem - remaining);
+                        break;
+
+                case TRACE_ETHERTYPE_MPLS:
+                        nextpayload = (char *)trace_get_payload_from_mpls(
+                                        nextpayload,
+                                        &ethertype, &remaining);
+                        removed += (oldrem - remaining);
+                        break;
+                case TRACE_ETHERTYPE_PPP_SES:
+                        nextpayload = (char *)trace_get_payload_from_pppoe(
+                                        nextpayload,
+                                        &ethertype, &remaining);
+                        removed += (oldrem - remaining);
+                        break;
+
+                case TRACE_ETHERTYPE_IP:
+                case TRACE_ETHERTYPE_IPV6:
+                default:
+                        if (finalethertype == 0)
+                                finalethertype = ethertype;
+                        done = true;
+                        break;
+                }
+        }
+
+        if (nextpayload != NULL) {
+
+                ethernet->ether_type = ntohs(finalethertype);
+                trace_set_capture_length(packet, caplen - removed);
+                memmove(nextpayload - (dest - (char *)packet->payload), 
+                        packet->payload, 
+                        (dest - (char *)packet->payload));
+                packet->payload = nextpayload - (dest - (char *)packet->payload);
+                packet->l2_header = NULL;
+        }
+        
+        return packet;
 
 }
 
