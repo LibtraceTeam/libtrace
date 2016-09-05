@@ -1,16 +1,17 @@
 /*
  * This file is part of libtrace
  *
- * Copyright (c) 2007,2008,2009,2010 The University of Waikato, Hamilton, 
+ * Copyright (c) 2007-2015 The University of Waikato, Hamilton,
  * New Zealand.
  *
- * Authors: Daniel Lawson 
+ * Authors: Daniel Lawson
  *          Perry Lorier
- *          Shane Alcock 
- *          
+ *          Shane Alcock
+ *          Richard Sanger
+ *
  * All rights reserved.
  *
- * This code has been developed by the University of Waikato WAND 
+ * This code has been developed by the University of Waikato WAND
  * research group. For further information please see http://www.wand.net.nz/
  *
  * libtrace is free software; you can redistribute it and/or modify
@@ -41,27 +42,34 @@
  * @author Daniel Lawson
  * @author Perry Lorier
  * @author Shane Alcock
+ * @author Richard Sanger
  *
  * @version $Id$
  *
- * This library provides a per packet interface into a trace file, or a live 
+ * This library provides a per packet interface into a trace file, or a live
  * captures.  It supports ERF, DAG cards, PCAP, Linux and BSD native sockets,
  * legacy ERF formats etc.
  *
  * @par Usage
- * See the example/ directory in the source distribution for some simple 
+ * See the example/ directory in the source distribution for some simple
  * examples
  *
  * @par Linking
  * To use this library you need to link against libtrace by passing -ltrace
- * to your linker. You may also need to link against a version of libpcap 
- * and of zlib which are compiled for largefile support (if you wish to access
- * traces larger than 2 GB). This is left as an exercise for the reader. Debian
- * Woody, at least, does not support large file offsets.
+ * to your linker.
+ *
+ * See libtrace_parallel.h for a description of the parallel API that allows
+ * programmers to spread packet processing across multiple threads.
  *
  */
 
 #include <sys/types.h>
+#include <stddef.h>
+#include <stdio.h>
+/* Compile time assertion. Sourced from:
+ * http://www.pixelbeat.org/programming/gcc/static_assert.html */
+#define ct_assert(e) extern char (*ct_assert(void)) [sizeof(char[1 - 2*!(e)])]
+
 #ifndef WIN32
 #include <sys/time.h>
 #endif
@@ -116,6 +124,19 @@
 
 /** DAG driver version installed on the current system */
 #define DAG_DRIVER_V "@DAG_VERSION_NUM@"
+
+/**
+  * A version of assert that always runs the first argument even
+  * when not debugging, however only asserts the condition if debugging
+  * Intended for use mainly with pthread locks etc. which have error
+  * returns but *should* never actually fail.
+  */
+#ifdef NDEBUG
+#define ASSERT_RET(run, cond) run
+#else
+#define ASSERT_RET(run, cond) assert(run cond)
+//#define ASSERT_RET(run, cond) run
+#endif
     
 #ifdef __cplusplus 
 extern "C" { 
@@ -196,6 +217,11 @@ extern "C" {
 #  define PRINTF(formatpos, argpos)
 #endif
 
+#ifndef CACHE_LINE_SIZE
+#define CACHE_LINE_SIZE 64
+#endif
+#define ALIGN_STRUCT(x) __attribute__((aligned(x)))
+
 #ifdef _MSC_VER
     #ifdef LT_BUILDING_DLL
         #define DLLEXPORT __declspec(dllexport)
@@ -215,15 +241,21 @@ extern "C" {
     #endif
 #endif
 
-	
+
 /** Opaque structure holding information about an output trace */
 typedef struct libtrace_out_t libtrace_out_t;
-	
+
 /** Opaque structure holding information about a trace */
 typedef struct libtrace_t libtrace_t;
-        
+
 /** Opaque structure holding information about a bpf filter */
 typedef struct libtrace_filter_t libtrace_filter_t;
+
+/** Opaque structure holding information about libtrace thread */
+typedef struct libtrace_thread_t libtrace_thread_t;
+
+/** Opaque structure holding callback functions for libtrace threads */
+typedef struct callback_set libtrace_callback_set_t;
 
 /** If the packet has allocated its own memory the buffer_control should be
  * set to TRACE_CTRL_PACKET, so that the memory will be freed when the packet
@@ -281,22 +313,23 @@ typedef enum {
 	/* Special value used to indicate a failure to convert to libtrace
          * DLT */
         TRACE_DLT_ERROR = -1,
-	
-	/** pcap documents this as having the Address Family value in host byte order as the 
- 	  * framing.  Ugly? Yes.
+
+	/** pcap documents this as having the Address Family value in host 
+          * byte order as the framing.  Ugly? Yes.
  	  */
 	TRACE_DLT_NULL = 0, 
 	TRACE_DLT_EN10MB = 1,
 	TRACE_DLT_PPP = 9,
 	TRACE_DLT_ATM_RFC1483 = 11,
-	
-	/** Ok, so OpenBSD has a different value for DLT_RAW as the rest of the planet, so detect
-          * this.  When reading to/from files we should be using TRACE_DLT_LINKTYPE_RAW instead.
-          * When talking about DLT's inside libtrace tho, we should be using /these/ DLT's.
-          */
+
+	/** Ok, so OpenBSD has a different value for DLT_RAW as the rest of
+         * the planet, so detect this.  When reading to/from files we should
+         * be using TRACE_DLT_LINKTYPE_RAW instead. When talking about DLT's
+         * inside libtrace tho, we should be using /these/ DLT's.
+         */
 #ifdef __OpenBSD__
 	TRACE_DLT_OPENBSD_LOOP=12,
-	TRACE_DLT_RAW = 14,	
+	TRACE_DLT_RAW = 14
 #else
 	TRACE_DLT_RAW = 12,
 	TRACE_DLT_OPENBSD_LOOP = 108,
@@ -511,6 +544,11 @@ typedef struct libtrace_packet_t {
 	void *l4_header;		/**< Cached transport header */
 	uint8_t transport_proto;	/**< Cached transport protocol */
 	uint32_t l4_remaining;		/**< Cached transport remaining */
+	uint64_t order; /**< Notes the order of this packet in relation to the input */
+	uint64_t hash; /**< A hash of the packet as supplied by the user */
+	int error; /**< The error status of pread_packet */
+        uint64_t internalid;            /** Internal indentifier for the pkt */
+        void *srcbucket;
 } libtrace_packet_t;
 
 
@@ -591,6 +629,7 @@ typedef struct libtrace_ip6_ext
 	uint8_t len;	/**< Length of the current header */
 } PACKED libtrace_ip6_ext_t;
 
+/** IPv6 fragmentation header */
 typedef struct libtrace_ip6_frag 
 {
 	uint8_t nxt;	/**< Next header */
@@ -683,6 +722,7 @@ typedef struct libtrace_icmp
   } un;				/**< Union for Payloads of Various ICMP Codes */
 } PACKED libtrace_icmp_t;
 
+/** Generic ICMPv6 header structure */
 typedef struct libtrace_icmp6 {
   uint8_t type;		/**< Message Type */
   uint8_t code;		/**< Type Sub-code */
@@ -1057,6 +1097,7 @@ typedef struct libtrace_ospf_router_lsa_t
 	uint16_t num_links;	/**< Number of links in LSA */
 } PACKED libtrace_ospf_router_lsa_v2_t;
 
+/** OSPF message types */
 typedef enum {
 	TRACE_OSPF_HELLO = 1,		/**< OSPF Hello */
 	TRACE_OSPF_DATADESC = 2,	/**< OSPF Database Description */
@@ -1065,6 +1106,7 @@ typedef enum {
 	TRACE_OSPF_LSACK = 5		/**< OSPF Link State Acknowledgement */
 } libtrace_ospf_types_t;
 
+/** OSPF link state acknowledgement types */
 typedef enum {
         TRACE_OSPF_LS_ROUTER = 1,	/**< OSPF Router LSA */
         TRACE_OSPF_LS_NETWORK = 2,	/**< OSPF Network LSA */
@@ -1157,7 +1199,7 @@ DLLEXPORT const char *trace_parse_uri(const char *uri, char **format);
  * Some valid URI's are:
  *  - erf:/path/to/erf/file
  *  - erf:-  (stdin)
- *  - dag:/dev/dagcard                  
+ *  - dag:/dev/dagcard
  *  - pcapint:pcapinterface                (eg: pcap:eth0)
  *  - pcap:/path/to/pcap/file
  *  - pcap:-
@@ -1248,7 +1290,11 @@ typedef enum {
 
 	/** If enabled, the libtrace event API will ignore time gaps between
 	 * packets when reading from a trace file */
-	TRACE_OPTION_EVENT_REALTIME
+	TRACE_OPTION_EVENT_REALTIME,
+
+	/** The hasher function for a parallel libtrace. It is recommended to
+	 * access this option via trace_set_hasher(). */
+	TRACE_OPTION_HASHER
 } trace_option_t;
 
 /** Sets an input config option
@@ -1256,11 +1302,56 @@ typedef enum {
  * @param option	The option to set
  * @param value		The value to set the option to
  * @return -1 if option configuration failed, 0 otherwise
- * This should be called after trace_create, and before trace_start
+ *
+ * This should be called after trace_create(), and before trace_start()
+ *
+ * @note Please consider using the newer trace_set_X() functions to access
+ * this function.
  */
 DLLEXPORT int trace_config(libtrace_t *libtrace,
 		trace_option_t option,
 		void *value);
+
+/** Maximum number of bytes to be captured for any given packet
+ *
+ * @param libtrace The trace object to apply the option to
+ * @param snaplen The snap length to set
+ * @return -1 if option configuration failed, 0 otherwise
+ */
+DLLEXPORT int trace_set_snaplen(libtrace_t *trace, int snaplen);
+
+/** If enabled, places a live capture interface into promiscuous mode
+ *
+ * @param libtrace The trace object to apply the option to
+ * @param promisc
+ * @return -1 if option configuration failed, 0 otherwise
+ */
+DLLEXPORT int trace_set_promisc(libtrace_t *trace, bool promisc);
+
+/** Apply this filter to all packets read from this trace
+ *
+ * @param libtrace The trace object to apply the option to
+ * @param filter The filter to apply
+ * @return -1 if option configuration failed, 0 otherwise
+ */
+DLLEXPORT int trace_set_filter(libtrace_t *trace, libtrace_filter_t *filter);
+
+/** Defines the frequency of meta-data reporting, e.g. DUCK packets
+ *
+ * @param libtrace The trace object to apply the option to
+ * @param freq The meta data frequency
+ * @return -1 if option configuration failed, 0 otherwise
+ */
+DLLEXPORT int trace_set_meta_freq(libtrace_t *trace, int freq);
+
+/** If enabled, the libtrace event API will ignore time gaps between
+ * packets when reading from a trace file.
+ *
+ * @param libtrace The trace object to apply the option to
+ * @param realtime True ignores gaps
+ * @return -1 if option configuration failed, 0 otherwise
+ */
+DLLEXPORT int trace_set_event_realtime(libtrace_t *trace, bool realtime);
 
 /** Valid compression types 
  * Note, this must be kept in sync with WANDIO_COMPRESS_* numbers in wandio.h
@@ -1284,6 +1375,96 @@ typedef enum {
 	/** Compression type, see trace_option_compresstype_t */
 	TRACE_OPTION_OUTPUT_COMPRESSTYPE
 } trace_option_output_t;
+
+/* To add a new stat field update this list, and the relevent places in
+ * libtrace_stat_t structure.
+ */
+/** An X Macro set for libtrace stat fields */
+#define LIBTRACE_STAT_FIELDS \
+	X(accepted) \
+	X(filtered) \
+	X(received) \
+	X(dropped) \
+	X(captured) \
+	X(errors)
+
+/**
+ * Statistic counters are cumulative from the time the trace is started.
+ * Trace pause will reset the counters, to zero.
+ * Always check \a{field}_valid is set before attempting to read the stored
+ * value.
+ *
+ * @note Always allocate this structure using trace_create_statistics().
+ *       This allows us to extend the structure in the future.
+ */
+typedef struct libtrace_stat_t {
+#define X(name) LT_BITFIELD64 name ##_valid : 1;
+	LIBTRACE_STAT_FIELDS
+#undef X
+	/* We use the remaining space as magic to ensure the structure
+	 * was alloc'd by us. We can easily decrease the no. bits without
+	 * problems as long as we update any asserts as needed */
+	LT_BITFIELD64 reserved1: 26; /**< Bits reserved for future fields */
+	LT_BITFIELD64 reserved2: 24; /**< Bits reserved for future fields */
+	LT_BITFIELD64 magic: 8; /**< A number stored against the format to
+				  ensure the struct was allocated correctly */
+
+	/* These must all be uint64_t's, match this order with the X macro */
+	/** The number of packets that have been read from the input trace
+	 * using trace_read_packet(). In the parallel framework this may include
+	 * some packets waiting in a batch yet to be seen by the user's
+	 * application.
+	 *
+	 * This does not include filtered packets because these do not make it
+	 * to trace_read_packet().
+	 *
+	 * @note This field replaces trace_get_accepted_packets()
+	 */
+	uint64_t accepted;
+
+	/** The number of packets that were captured, but discarded for not
+	 * matching a provided filter.
+	 *
+	 * @note This field replaces trace_get_filtered_packets()
+	 */
+	uint64_t filtered;
+
+	/** The total number of good packets which have been recevied. Including
+	 * those which are dropped and filtered. This does not include errors.
+	 *
+	 * @note This may include a small number of buffered packets
+	 *       not yet included in accepted.
+	 *
+	 * @note This field replaces trace_get_received_packets()
+	 */
+	uint64_t received;
+
+	/** The number of packets that have been dropped on an input trace
+	 * due to lack of buffer space on the capturing device. This does not
+	 * included errored packets which are dropped directly by the card.
+	 *
+	 * @note This field replaces trace_get_dropped_packets()
+	 */
+	uint64_t dropped;
+
+	/** The number of received packets that have not been dropped. This
+	 * includes filtered packets.
+	 *
+	 * This is equivalent to received-dropped.
+	 *
+	 * @note This may include a small number of buffered packets
+	 *       not yet included in accepted.
+	 */
+        uint64_t captured;
+
+	/** The number of packets that have been discarded by the network card
+	 * because they are invalid. That includes FCS mismatches, incorrect
+	 * packet lengths etc.
+	 */
+	uint64_t errors;
+} libtrace_stat_t;
+
+ct_assert(offsetof(libtrace_stat_t, accepted) == 8);
 
 /** Sets an output config option
  *
@@ -1376,8 +1557,11 @@ DLLEXPORT void trace_perror_output(libtrace_out_t *trace, const char *msg,...)
  * @returns The number of packets seen at the capture point before filtering.
  *
  * If the number is not known, this function will return UINT64_MAX
+ *
+ * @deprecated This function is deprecated: Use trace_get_statistics(), this
+ *             allows all statistic counters to be read in an atomic manner.
  */
-DLLEXPORT
+DLLEXPORT DEPRECATED
 uint64_t trace_get_received_packets(libtrace_t *trace);
 
 /** Returns the number of packets that were captured, but discarded for not
@@ -1387,8 +1571,11 @@ uint64_t trace_get_received_packets(libtrace_t *trace);
  * @returns The number of packets that were successfully captured, but filtered
  *
  * If the number is not known, this function will return UINT64_MAX
+ *
+ * @deprecated This function is deprecated: Use trace_get_statistics(), this
+ *             allows all statistic counters to be read in an atomic manner.
  */
-DLLEXPORT
+DLLEXPORT DEPRECATED
 uint64_t trace_get_filtered_packets(libtrace_t *trace);
 
 /** Returns the number of packets that have been dropped on an input trace due 
@@ -1398,8 +1585,11 @@ uint64_t trace_get_filtered_packets(libtrace_t *trace);
  * @returns The number of packets captured, but dropped due to buffer overruns
  *
  * If the number is not known, this function will return UINT64_MAX
+ *
+ * @deprecated This function is deprecated: Use trace_get_statistics(), this
+ *             allows all statistic counters to be read in an atomic manner.
  */
-DLLEXPORT
+DLLEXPORT DEPRECATED
 uint64_t trace_get_dropped_packets(libtrace_t *trace);
 
 /** Returns the number of packets that have been read from the input trace using
@@ -1409,9 +1599,107 @@ uint64_t trace_get_dropped_packets(libtrace_t *trace);
  * @returns The number of packets that have been read by the libtrace user.
  *
  * If the number is not known, this function will return UINT64_MAX
+ *
+ * @deprecated This function is deprecated: Use trace_get_statistics(), this
+ *             allows all statistic counters to be read in an atomic manner.
+ */
+DLLEXPORT DEPRECATED
+uint64_t trace_get_accepted_packets(libtrace_t *trace);
+
+/**
+ * Returns statistic counters for a trace, for a parallel trace this is a
+ * combined total.
+ * Where possible these are retrived atomically, however this behaviour depends
+ * on the underlying trace format.
+ *
+ * @param trace The input trace to examine.
+ * @param stats Optional, Filled upon return with statistics about the trace,
+ *              check the flags included to see if a given statistic is valid.
+ *              If NULL a statistic structure owned by libtrace is returned, this
+ *              should not be free'd and will become invalid if the trace is
+ *              destroyed.
+ *
+ * @return A pointer to the statistics structure.
+ * @note Use trace_create_stat() to create the stats object, this way future
+ *       versions of libtrace can add to the structure without breaking existing
+ *       code.
  */
 DLLEXPORT
-uint64_t trace_get_accepted_packets(libtrace_t *trace);
+libtrace_stat_t *trace_get_statistics(libtrace_t *trace, libtrace_stat_t *stats);
+
+
+/**
+ * Returns statistic counters for a single thread of a trace.
+ * Where possible these are retrived atomically, however this behaviour depends
+ * on the underlying trace format.
+ *
+ * @param trace The input trace to examine.
+ * @param t An optional thread to received stats for or NULL to retrive stats
+ *          for the current thread
+ * @param stats Filled upon return with statistics about the trace, check the
+ *              flags included to see if a given statistic is valid.
+ *
+ * @note Use trace_create_stat() to create the stats object, this way future
+ *       versions of libtrace can add to the structure without breaking existing
+ *       code.
+ */
+DLLEXPORT
+void trace_get_thread_statistics(libtrace_t *trace, libtrace_thread_t *t,
+                                 libtrace_stat_t *stats);
+
+/**
+ * Creates and returns a zeroed libtrace_stat_t structure.
+ *
+ * This allows us to add extra fields increasing the size of the structure
+ * without breaking existing libtrace applications.
+ *
+ * This structure should be free'd using free().
+ *
+ * @return A valid pointer to a libtrace_stat_t struct otherwise NULL if
+ *         memory was not available.
+ */
+DLLEXPORT libtrace_stat_t* trace_create_statistics(void);
+
+/**
+ * Performs the operation c=a-b accounting for valid fields.
+ * c is allowed to be a or b.
+ *
+ * @param a The minuend
+ * @param b The subtrahend
+ * @param c The resulting difference
+ */
+DLLEXPORT
+void trace_subtract_statistics(const libtrace_stat_t *a,
+                               const libtrace_stat_t *b, libtrace_stat_t *c);
+
+/**
+ * Performs operation c=a+b accounting for valid fields.
+ * c is allowed to be a or b.
+ *
+ * @param a The first operand
+ * @param b The second operand
+ * @param c The result
+ */
+DLLEXPORT
+void trace_add_statistics(const libtrace_stat_t *a,
+                          const libtrace_stat_t *b, libtrace_stat_t *c);
+
+/**
+ * Prints all valid stats to a file stream, (which could be stdout/err).
+ * By default the format "name: value" is used.
+ *
+ * @param s The statistic structure to print
+ * @param f The output file stream
+ * @param format An optional format string such as the default ("%s: %"PRIu64"\n")
+ *               This is passed to fprintf and called with two arguments
+ *               first a char* (%s) and second a uint64_t (%PRIu64).
+ *
+ * @return -1 if an error occurs when writing to the file stream, check errno.
+ *         Otherwise 0.
+ */
+DLLEXPORT
+int trace_print_statistics(const libtrace_stat_t *s, FILE *f,
+                           const char *format);
 
 
 /*@}*/

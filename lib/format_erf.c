@@ -1,36 +1,28 @@
 /*
- * This file is part of libtrace
  *
- * Copyright (c) 2007,2008,2009,2010 The University of Waikato, Hamilton, 
- * New Zealand.
- *
- * Authors: Daniel Lawson 
- *          Perry Lorier
- *          Shane Alcock 
- *          
+ * Copyright (c) 2007-2016 The University of Waikato, Hamilton, New Zealand.
  * All rights reserved.
  *
- * This code has been developed by the University of Waikato WAND 
+ * This file is part of libtrace.
+ *
+ * This code has been developed by the University of Waikato WAND
  * research group. For further information please see http://www.wand.net.nz/
  *
  * libtrace is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * libtrace is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with libtrace; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
- * $Id$
  *
  */
-
 
 #define _GNU_SOURCE
 
@@ -458,6 +450,8 @@ static int erf_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
 	} else {
 		packet->payload = (char*)packet->buffer + erf_get_framing_length(packet);
 	}
+
+        assert(erfptr->rlen != 0);
 	
 	if (libtrace->format_data == NULL) {
 		/* Allocates the format_data structure */
@@ -558,28 +552,30 @@ static int erf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 }
 
 static int erf_dump_packet(libtrace_out_t *libtrace,
-		dag_record_t *erfptr, unsigned int pad, void *buffer) {
+		dag_record_t *erfptr, int framinglen, void *buffer,
+                int caplen) {
 	int numbytes = 0;
-	int size;
+
+        if (caplen + framinglen != ntohs(erfptr->rlen))
+                erfptr->rlen = htons(caplen + framinglen);
 
 	if ((numbytes = 
 		wandio_wwrite(OUTPUT->file, 
 				erfptr,
-				(size_t)(dag_record_size + pad))) 
-			!= (int)(dag_record_size+pad)) {
+				(size_t)(framinglen))) 
+			!= (int)(framinglen)) {
 		trace_set_err_out(libtrace,errno,
 				"write(%s)",libtrace->uridata);
 		return -1;
 	}
 
-	size=ntohs(erfptr->rlen)-(dag_record_size+pad);
-	numbytes=wandio_wwrite(OUTPUT->file, buffer, (size_t)size);
-	if (numbytes != size) {
+        numbytes=wandio_wwrite(OUTPUT->file, buffer, (size_t)caplen);
+	if (numbytes != caplen) {
 		trace_set_err_out(libtrace,errno,
 				"write(%s)",libtrace->uridata);
 		return -1;
 	}
-	return numbytes + pad + dag_record_size;
+	return numbytes + framinglen;
 }
 
 static int erf_start_output(libtrace_out_t *libtrace)
@@ -652,8 +648,9 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 	if (packet->type == TRACE_RT_DATA_ERF) {
 			numbytes = erf_dump_packet(libtrace,
 				(dag_record_t *)packet->header,
-				pad,
-				payload
+				trace_get_framing_length(packet),
+				payload,
+                                trace_get_capture_length(packet)
 				);
 	} else {
 		dag_record_t erfhdr;
@@ -697,8 +694,9 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 		/* Write it out */
 		numbytes = erf_dump_packet(libtrace,
 				&erfhdr,
-				pad,
-				payload);
+				framing,
+				payload,
+                                trace_get_capture_length(packet));
 	}
 	return numbytes;
 }
@@ -795,11 +793,12 @@ static struct libtrace_eventobj_t erf_event(struct libtrace_t *libtrace, struct 
 	
 }
 
-static uint64_t erf_get_dropped_packets(libtrace_t *trace)
-{
-	if (trace->format_data == NULL)
-		return (uint64_t)-1;
-	return DATA(trace)->drops;
+static void erf_get_statistics(libtrace_t *trace, libtrace_stat_t *stat) {
+
+        if (trace->format_data) {
+                stat->dropped_valid = 1;
+                stat->dropped = DATA(trace)->drops;
+        }
 }
 
 static void erf_help(void) {
@@ -858,12 +857,13 @@ static struct libtrace_format_t erfformat = {
 	erf_set_capture_length,		/* set_capture_length */
 	NULL,				/* get_received_packets */
 	NULL,				/* get_filtered_packets */
-	erf_get_dropped_packets,	/* get_dropped_packets */
-	NULL,				/* get_captured_packets */
+	NULL,	                        /* get_dropped_packets */
+	erf_get_statistics,		/* get_statistics */
 	NULL,				/* get_fd */
 	erf_event,			/* trace_event */
 	erf_help,			/* help */
-	NULL				/* next pointer */
+	NULL,				/* next pointer */
+	NON_PARALLEL(false)
 };
 
 static struct libtrace_format_t rawerfformat = {
@@ -901,12 +901,13 @@ static struct libtrace_format_t rawerfformat = {
 	erf_set_capture_length,		/* set_capture_length */
 	NULL,				/* get_received_packets */
 	NULL,				/* get_filtered_packets */
-	erf_get_dropped_packets,	/* get_dropped_packets */
-	NULL,				/* get_captured_packets */
+	NULL,	                        /* get_dropped_packets */
+	erf_get_statistics,		/* get_statistics */
 	NULL,				/* get_fd */
 	erf_event,			/* trace_event */
 	erf_help,			/* help */
-	NULL				/* next pointer */
+	NULL,				/* next pointer */
+	NON_PARALLEL(false)
 };
 
 

@@ -1,2 +1,2 @@
 
-SUBDIRS=skeleton rate stats tutorial
+SUBDIRS=skeleton rate stats tutorial parallel

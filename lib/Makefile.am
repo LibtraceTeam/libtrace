@@ -1,11 +1,17 @@
 lib_LTLIBRARIES = libtrace.la
-include_HEADERS = libtrace.h dagformat.h lt_inttypes.h daglegacy.h rt_protocol.h erftypes.h  
+include_HEADERS = libtrace.h dagformat.h lt_inttypes.h daglegacy.h \
+        rt_protocol.h erftypes.h libtrace_parallel.h \
+        data-struct/ring_buffer.h data-struct/object_cache.h \
+        data-struct/vector.h data-struct/message_queue.h \
+        data-struct/deque.h data-struct/linked_list.h \
+        data-struct/sliding_window.h hash_toeplitz.h \
+        data-struct/buckets.h
 
-AM_CFLAGS=@LIBCFLAGS@ @CFLAG_VISIBILITY@
-AM_CXXFLAGS=@LIBCXXFLAGS@ @CFLAG_VISIBILITY@
+AM_CFLAGS=@LIBCFLAGS@ @CFLAG_VISIBILITY@ -pthread
+AM_CXXFLAGS=@LIBCXXFLAGS@ @CFLAG_VISIBILITY@ -pthread
 
 extra_DIST = format_template.c
-NATIVEFORMATS=format_linux.c
+NATIVEFORMATS=format_linux_common.c format_linux_ring.c format_linux_int.c format_linux_common.h
 BPFFORMATS=format_bpf.c
 
 if HAVE_DAG
@@ -28,7 +34,7 @@ endif
 if HAVE_DPDK
 NATIVEFORMATS+= format_dpdk.c
 # So we also make libtrace.mk in dpdk otherwise automake tries to expand
-# it to early which I cannot seem to stop unless we use a path that
+# it too early which I cannot seem to stop unless we use a path that
 # doesn't exist currently
 export RTE_SDK=@RTE_SDK@
 export RTE_TARGET=@RTE_TARGET@
@@ -43,7 +49,7 @@ export CFLAGS += $(SAVED_CFLAGS)
 export CXXFLAGS += $(SAVED_CXXFLAGS)
 endif
 
-libtrace_la_SOURCES = trace.c common.h \
+libtrace_la_SOURCES = trace.c trace_parallel.c common.h \
 		format_erf.c format_pcap.c format_legacy.c \
 		format_rt.c format_helper.c format_helper.h format_pcapfile.c \
 		format_duck.c format_tsh.c $(NATIVEFORMATS) $(BPFFORMATS) \
@@ -56,7 +62,14 @@ libtrace_la_SOURCES = trace.c common.h \
 		protocols_application.c \
 		$(DAGSOURCE) format_erf.h \
 		$(BPFJITSOURCE) \
-		libtrace_arphrd.h
+		libtrace_arphrd.h \
+		data-struct/ring_buffer.c data-struct/vector.c \
+		data-struct/message_queue.c data-struct/deque.c \
+		data-struct/sliding_window.c data-struct/object_cache.c \
+		data-struct/linked_list.c hash_toeplitz.c combiner_ordered.c \
+                data-struct/buckets.c \
+		combiner_sorted.c combiner_unordered.c \
+		pthread_spinlock.c pthread_spinlock.h
 
 if DAG2_4
 nodist_libtrace_la_SOURCES = dagopts.c dagapi.c

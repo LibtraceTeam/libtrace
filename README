@@ -1,7 +1,7 @@
-libtrace 3.0.22
+libtrace 4.0.0
 
 ---------------------------------------------------------------------------
-Copyright (c) 2007-2015 The University of Waikato, Hamilton, New Zealand.
+Copyright (c) 2007-2016 The University of Waikato, Hamilton, New Zealand.
 All rights reserved.
 
 This code has been developed by the University of Waikato WAND
@@ -10,30 +10,33 @@ research group. For further information please see http://www.wand.net.nz/.
 
 See INSTALL for instructions on how to install libtrace.
 
-This directory contains source code for libtrace, a userspace library for 
+This directory contains source code for libtrace, a userspace library for
 processing of network traffic capture from live interfaces or from offline
-traces. 
+traces.
 
-libtrace was primarily designed for use with the real-time interface to the 
-Waikato DAG Capture Point software running at The University of Waikato, 
+libtrace was primarily designed for use with the real-time interface to the
+Waikato DAG Capture Point software running at The University of Waikato,
 and has been since extended to a range of other trace and interface formats.
 
-Libtrace should build and run on Linux, Mac OS X, FreeBSD and OpenBSD systems.
+In version 4.0, we have introduced an API for processing packets in parallel
+using multiple threads. See libtrace_parallel.h for a detailed description
+of the API.
 
-Further information about libtrace see 
+Further information about libtrace, see
 http://research.wand.net.nz/software/libtrace.php
 
 Bugs should be reported by either emailing contact@wand.net.nz or filing
 an issue at https://github.com/wanduow/libtrace
 
-It is licensed under the GNU General Public License (GPL) version 2. Please
-see the included file GPL for details of this license.
+It is licensed under the GNU Lesser General Public License (GPL) version 3.
+Please see the included files COPYING and COPYING.LESSER for details of this
+license.
 
-A detailed ChangeLog can be found on the libtrace wiki: 
+A detailed ChangeLog can be found on the libtrace wiki:
 https://github.com/wanduow/libtrace/wiki/ChangeLog
 
 Documentation, usage instructions and a detailed tutorial can also found
 on the libtrace wiki.
 
-For further information, please contact the WAND group. See 
-http://www.wand.net.nz/ for details. 
+For further information, please contact the WAND group. See
+http://www.wand.net.nz/ for details.

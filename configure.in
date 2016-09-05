@@ -3,11 +3,11 @@
 # Now you only need to update the version number in two places - below,
 # and in the README
 
-AC_INIT([libtrace],[3.0.22],[contact@wand.net.nz],[libtrace])
+AC_INIT([libtrace],[4.0.0],[contact@wand.net.nz],[libtrace])
 
-LIBTRACE_MAJOR=3
+LIBTRACE_MAJOR=4
 LIBTRACE_MID=0
-LIBTRACE_MINOR=22
+LIBTRACE_MINOR=0
 
 # OpenSolaris hides libraries like libncurses in /usr/gnu/lib, which is not
 # searched by default - add it to LDFLAGS so we at least have a chance of 
@@ -38,7 +38,7 @@ AC_CONFIG_FILES([Makefile lib/Makefile docs/Makefile libpacketdump/Makefile
 	tools/tracereplay/Makefile tools/tracediff/Makefile
 	tools/traceends/Makefile
 	examples/Makefile examples/skeleton/Makefile examples/rate/Makefile
-	examples/stats/Makefile examples/tutorial/Makefile
+	examples/stats/Makefile examples/tutorial/Makefile examples/parallel/Makefile
 	docs/libtrace.doxygen 
 	lib/libtrace.h
 	])
@@ -114,6 +114,9 @@ gcc_DEPRECATED
 gcc_UNUSED
 gcc_PURE
 gcc_FORMAT
+
+# Check for gcc style TLS (__thread)
+gcc_TLS
 	
 # Check for libtool
 AC_PROG_LIBTOOL
@@ -207,15 +210,26 @@ else
 	AC_DEFINE([HAVE_LIBWANDIO],1,[compile with libwandio support])
 fi
 
+AC_CHECK_LIB(crypto, EVP_EncryptInit_ex, cryptofound=1, cryptofound=0)
+
 # Check for libpcap
 AC_CHECK_LIB(pcap,pcap_next_ex,pcapfound=1,pcapfound=0)
 AC_CHECK_LIB(pcap,pcap_create,pcapcreate=1,pcapcreate=0)
+AC_CHECK_LIB(pcap,pcap_set_immediate_mode,pcapimmediate=1,pcapimmediate=0)
 AC_CHECK_DECLS([BIOCSETIF],,,[
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/ioctl.h>
 #include <net/bpf.h>
 ])
+
+AC_ARG_ENABLE(memory-debugging,
+                AS_HELP_STRING(--enable-memory-debugging, prints internal memory statistics),[
+                if test "$HAVE_TLS" = 1
+                then
+                    AC_DEFINE([ENABLE_MEM_STATS], 1, [print debug memory statistics])
+                fi
+],[])
 
 # Configure options for man pages
 AC_ARG_WITH(man,
@@ -246,6 +260,10 @@ fi
 if test "$pcapcreate" = 1; then
 	AC_DEFINE([HAVE_PCAP_CREATE],1,[compile with libpcap 1.0 support])
 fi
+
+if test "$pcapimmediate" = 1; then
+        AC_DEFINE([HAVE_PCAP_IMMEDIATE],1,[able to use pcap_set_immediate_mode])
+fi        
 
 # Configure options for use of DAG cards
 # Originally borrowed from libpcap, but extended quite a bit :)
@@ -295,7 +313,12 @@ if test "$with_dag" != no; then
 		
 		AC_DEFINE(DAG_VERSION,25,[defines the DAG driver version])
 		libtrace_dag_version=25
-	fi
+
+		AC_CHECK_HEADERS(dag_config_api.h,[csapi_found=1],,)
+		if test "$csapi_found" = 1; then
+			LIBTRACE_LIBS="$LIBTRACE_LIBS -ldagconf"
+		fi
+	fi	
 fi
 
 # TODO: turn the test part of the next block into a function, so it can be 
@@ -400,8 +423,20 @@ if test "$want_dpdk" != no; then
 	fi
 fi
 
+# Check for PACKET_FANOUT (borrowed from Suricata)
+AC_CHECK_DECL([PACKET_FANOUT],
+        AC_DEFINE([HAVE_PACKET_FANOUT],[1],
+        [Recent packet fanout support is available]),
+        [],
+        [[#include <linux/if_packet.h>]])
+
+# If we use DPDK we might be able to use libnuma
+AC_CHECK_LIB(numa, numa_node_to_cpus, have_numa=1, have_numa=0)
+
 # Checks for various "optional" libraries
 AC_CHECK_LIB(pthread, pthread_create, have_pthread=1, have_pthread=0)
+
+AC_CHECK_LIB(pthread, pthread_setname_np, have_pthread_setname_np=1, have_pthread_setname_np=0)
 
 # Check for ncurses
 
@@ -420,6 +455,15 @@ LIBS=
 AC_CHECK_LIB(rt, clock_gettime, have_clock_gettime=1, have_clock_gettime=0)
 LIBS=
 
+if test "$have_numa" = 1; then
+	LIBTRACE_LIBS="$LIBTRACE_LIBS -lnuma"
+	AC_DEFINE(HAVE_LIBNUMA, 1, [Set to 1 if libnuma is supported])
+	with_numa=yes
+else
+	AC_DEFINE(HAVE_LIBNUMA, 0, [Set to 1 if libnuma is supported])
+	with_numa=no
+fi
+
 if test "$dlfound" = 0; then
 	AC_MSG_ERROR("Unable to find dlopen. Please use LDFLAGS to specify the location of libdl and re-run configure")
 fi
@@ -435,6 +479,17 @@ if test "$have_pthread" = 1; then
 	AC_DEFINE(HAVE_LIBPTHREAD, 1, [Set to 1 if pthreads are supported])
 fi
 
+if test "$have_pthread_setname_np" = 1; then
+	AC_DEFINE(HAVE_PTHREAD_SETNAME_NP, 1, [Set to 1 if pthread_setname_np is found])
+fi
+
+if test "$cryptofound" = 1; then
+        AC_DEFINE(HAVE_LIBCRYPTO, 1, [Set to 1 if libcrypto is available])
+        TOOLS_LIBS="$TOOLS_LIBS -lcrypto"
+        have_crypto=yes
+else
+        have_crypto=no
+fi
 
 if test "$have_nsl" = 1; then
 	if test "$ac_cv_search_inet_ntop" != "none required"; then
@@ -452,7 +507,12 @@ fi
 
 
 if test "$have_clock_gettime" = 1; then
-    LIBTRACE_LIBS="$LIBTRACE_LIBS -lrt"
+	LIBTRACE_LIBS="$LIBTRACE_LIBS -lrt"
+	AC_DEFINE(HAVE_CLOCK_GETTIME, 1, [Set to 1 if clock_gettime is supported])
+	with_clock_gettime=yes
+else
+	AC_DEFINE(HAVE_CLOCK_GETTIME, 0, [Set to 1 if clock_gettime is supported])
+	with_clock_gettime=no
 fi
 
 
@@ -598,18 +658,21 @@ else
 fi
 
 if test x"$libtrace_dpdk" = xtrue; then
-    AC_MSG_NOTICE([Compiled with DPDK live capture support: Yes])
+	AC_MSG_NOTICE([Compiled with DPDK live capture support: Yes])
+	reportopt "Compiled with DPDK trace NUMA support" $with_numa
+	reportopt "Compiled with clock_gettime support" $with_clock_gettime
 elif test x"$want_dpdk" != "xno"; then
 #   We don't officially support DPDK so only report failure if the user
 #   explicitly asked for DPDK. That way, we can hopefully keep it hidden
 #   from most users for now...
-	
-    AC_MSG_NOTICE([Compiled with DPDK live capture support: No])
-    AC_MSG_NOTICE([Note: Requires DPDK v1.5 or newer])
+
+	AC_MSG_NOTICE([Compiled with DPDK live capture support: No])
+	AC_MSG_NOTICE([Note: Requires DPDK v1.5 or newer])
 fi
 reportopt "Compiled with LLVM BPF JIT support" $JIT
 reportopt "Building man pages/documentation" $libtrace_doxygen
 reportopt "Building tracetop (requires libncurses)" $with_ncurses
+reportopt "Building traceanon with CryptoPan (requires libcrypto)" $have_crypto
 
 # Report any errors relating to missing bison, flex, etc.
 echo 
