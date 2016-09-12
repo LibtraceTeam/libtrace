@@ -14,6 +14,7 @@ useful to a broad community, so thanks very much.
 In no particular order, we would like to recognise:
 
  * Matt Brown for getting us into Debian and keeping us up to date.
+ * Brad Cowie for packaging libtrace4 for Debian and Ubuntu
  * Alistair King for reporting and suggesting fixes for numerous bugs, 
    particularly in libwandio
  * Simon Wadsworth for writing the original version of most of the OSPF code
