@@ -211,6 +211,7 @@ libtrace_linktype_t arphrd_type_to_libtrace(unsigned int arphrd) {
 		case LIBTRACE_ARPHRD_IEEE80211_RADIOTAP: return TRACE_TYPE_80211_RADIO;
 		case LIBTRACE_ARPHRD_PPP: return TRACE_TYPE_NONE;
 		case LIBTRACE_ARPHRD_LOOPBACK: return TRACE_TYPE_ETH;
+		case LIBTRACE_ARPHRD_SIT: return TRACE_TYPE_ETH;
 		case LIBTRACE_ARPHRD_NONE: return TRACE_TYPE_NONE;
 	}
 	printf("Unknown ARPHRD %08x\n",arphrd);
