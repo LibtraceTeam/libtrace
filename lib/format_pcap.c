@@ -764,6 +764,8 @@ static void pcap_get_statistics(libtrace_t *trace, libtrace_stat_t *stat) {
 		return;
 	}
 
+        stat->received_valid = 1;
+        stat->received = pcapstats.ps_recv;
         stat->dropped_valid = 1;
         stat->dropped = pcapstats.ps_drop;
 }
