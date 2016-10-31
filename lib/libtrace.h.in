@@ -1661,6 +1661,15 @@ void trace_get_thread_statistics(libtrace_t *trace, libtrace_thread_t *t,
 DLLEXPORT libtrace_stat_t* trace_create_statistics(void);
 
 /**
+ * Clear all fields of given statistic.
+ * This api doesn't verify the magic field unlike other stat apis.
+ *
+ * @param s The statistic structure to clear
+ */
+DLLEXPORT
+void trace_clear_statistics(libtrace_stat_t *s);
+
+/**
  * Performs the operation c=a-b accounting for valid fields.
  * c is allowed to be a or b.
  *
