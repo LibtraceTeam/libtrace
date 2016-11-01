@@ -2213,6 +2213,11 @@ libtrace_stat_t *trace_create_statistics(void) {
 	return ret;
 }
 
+void trace_clear_statistics(libtrace_stat_t *s) {
+	memset(s, 0, sizeof(libtrace_stat_t));
+	s->magic = LIBTRACE_STAT_MAGIC;
+}
+
 void trace_subtract_statistics(const libtrace_stat_t *a, const libtrace_stat_t *b,
                          libtrace_stat_t *c) {
 	assert(a->magic == LIBTRACE_STAT_MAGIC && "Please use"
