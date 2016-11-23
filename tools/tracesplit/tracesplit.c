@@ -159,8 +159,7 @@ static libtrace_packet_t *perform_jump(libtrace_packet_t *packet, int jump)
                 if (remaining < sizeof(libtrace_gre_t)) {
                     return NULL;
                 }
-                ethertype = ((libtrace_gre_t *)offset)->ethertype;
-                offset = trace_get_payload_from_gre(offset, &remaining);
+                offset = trace_get_payload_from_gre(offset, &ethertype, &remaining);
                 continue;
             case TRACE_IPPROTO_UDP:
                 offset = trace_get_vxlan_from_udp(offset, &remaining);
