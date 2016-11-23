@@ -868,6 +868,10 @@ typedef struct libtrace_gre_t
 #define LIBTRACE_GRE_FLAG_SEQ      0x1000
 #define LIBTRACE_GRE_FLAG_VERMASK  0x0007
 
+/* PPTP GRE(RFC2637) */
+#define LIBTRACE_GRE_FLAG_ACK      0x0080
+#define LIBTRACE_GRE_PPTP_VERSION  0x0001
+
 /** Libtrace local definition of VXLAN Header
  * (draft-mahalingam-dutt-dcops-vxlan)
  */
@@ -2427,6 +2431,7 @@ DLLEXPORT void *trace_get_payload_from_icmp6(libtrace_icmp6_t *icmp,
 
 /** Gets a pointer to the payload following a GRE header
  * @param         gre       A pointer to the beginning of the GRE header.
+ * @param[out] ethertype    The ethertype of the inner layer
  * @param[in,out] remaining Updated with the number of captured bytes remaining.
  *
  * @return A pointer to the GRE payload, or NULL if the GRE header is truncated.
@@ -2443,7 +2448,7 @@ DLLEXPORT void *trace_get_payload_from_icmp6(libtrace_icmp6_t *icmp,
  * the value of remaining after calling this function.
  */
 DLLEXPORT void *trace_get_payload_from_gre(libtrace_gre_t *gre,
-                uint32_t *remaining);
+                uint16_t *ethertype, uint32_t *remaining);
 
 /** Gets a pointer to the payload following a VXLAN header
  * @param         udp       A pointer to the beginning of the UDP header.
