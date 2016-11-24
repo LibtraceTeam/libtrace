@@ -22,7 +22,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  *
- */
+ *
  * Kit capture format.
  *
  * Intel Data Plane Development Kit is a LIVE capture format.
@@ -68,8 +68,8 @@
  * Below this is a log of version that required changes to the libtrace
  * code (that we still attempt to support).
  *
- * DPDK v1.7.1 is recommended.
- * However 1.5 to 1.8 are likely supported.
+ * DPDK 16.04 or newer is recommended.
+ * However 1.6 and newer are still likely supported.
  */
 #include <rte_eal.h>
 #include <rte_version.h>
@@ -146,6 +146,27 @@
 #	define DPDK_USE_NULL_QUEUE_CONFIG 0
 #endif
 
+/* 2.0.0-rc1
+ * Unifies RSS hash between cards
+ */
+#if RTE_VERSION >= RTE_VERSION_NUM(2, 0, 0, 1)
+#	define RX_RSS_FLAGS (ETH_RSS_IP | ETH_RSS_UDP | ETH_RSS_TCP | \
+		             ETH_RSS_SCTP)
+#else
+#	define RX_RSS_FLAGS (ETH_RSS_IPV4_UDP | ETH_RSS_IPV6 | ETH_RSS_IPV4 | \
+	                     ETH_RSS_IPV4_TCP | ETH_RSS_IPV6_TCP |\
+	                     ETH_RSS_IPV6_UDP)
+#endif
+
+/* v16.07-rc1 - deprecated
+ * rte_mempool_avail_count to replace rte_mempool_count
+ * rte_mempool_in_use_count to replace rte_mempool_free_count
+ */
+#if RTE_VERSION < RTE_VERSION_NUM(16, 7, 0, 1)
+#define rte_mempool_avail_count rte_mempool_count
+#define rte_mempool_in_use_count rte_mempool_free_count
+#endif
+
 #include <rte_per_lcore.h>
 #include <rte_debug.h>
 #include <rte_errno.h>
@@ -169,23 +190,36 @@
 #include <pthread_np.h>
 #endif
 
+/* 16.04-rc3 ETH_LINK_SPEED_X are replaced with ETH_SPEED_NUM_X.
+ * ETH_LINK_SPEED_ are reused as flags, ugly.
+ * We use the new way in this code.
+ */
+#ifndef ETH_SPEED_NUM_1G
+	#define ETH_SPEED_NUM_1G ETH_LINK_SPEED_1000
+	#define ETH_SPEED_NUM_10G ETH_LINK_SPEED_10G
+	#define ETH_SPEED_NUM_20G ETH_LINK_SPEED_20G
+	#define ETH_SPEED_NUM_40G ETH_LINK_SPEED_40G
+#endif
 
 /* The default size of memory buffers to use - This is the max size of standard
  * ethernet packet less the size of the MAC CHECKSUM */
 #define RX_MBUF_SIZE 1514
 
-/* The minimum number of memory buffers per queue tx or rx. Search for
- * _MIN_RING_DESC in DPDK. The largest minimum is 64 for 10GBit cards.
+/* The minimum number of memory buffers per queue tx or rx. Based on
+ * the requirement of the memory pool with 128 per thread buffers, needing
+ * at least 128*1.5 = 192 buffers. Our code allocates 128*2 to be safe.
  */
-#define MIN_NB_BUF 64
+#define MIN_NB_BUF 128
 
 /* Number of receive memory buffers to use
  * By default this is limited by driver to 4k and must be a multiple of 128.
  * A modification can be made to the driver to remove this limit.
  * This can be increased in the driver and here.
  * Should be at least MIN_NB_BUF.
+ * We choose 2K rather than 4K because it enables the usage of sse vector
+ * drivers which are significantly faster than using the larger buffer.
  */
-#define NB_RX_MBUF 4096
+#define NB_RX_MBUF (4096/2)
 
 /* Number of send memory buffers to use.
  * Same limits apply as those to NB_TX_MBUF.
@@ -228,18 +262,18 @@
  * THESE MAY REQUIRE MODIFICATIONS TO INTEL DPDK
  *
  * Make sure you understand what these are doing before enabling them.
- * They might make traces incompatable with other builds etc.
+ * They might make traces incompatible with other builds etc.
  *
  * These are also included to show how to do somethings which aren't
  * obvious in the DPDK documentation.
  */
 
 /* Print verbose messages to stderr */
-#define DEBUG 0
+#define DEBUG 1
 
 /* Use clock_gettime() for nanosecond resolution rather than gettimeofday()
  * only turn on if you know clock_gettime is a vsyscall on your system
- * overwise could be a large overhead. Again gettimeofday() should be
+ * otherwise could be a large overhead. Again gettimeofday() should be
  * vsyscall also if it's not you should seriously consider updating your
  * kernel.
  */
@@ -296,7 +330,7 @@ struct dpdk_per_stream_t
 	struct rte_mempool *mempool;
 	int lcore;
 #if HAS_HW_TIMESTAMPS_82580
-	/* Timestamping only relevent to RX */
+	/* Timestamping only relevant to RX */
 	uint64_t ts_first_sys; /* Sytem timestamp of the first packet in nanoseconds */
 	uint32_t wrap_count; /* Number of times the NIC clock has wrapped around completely */
 #endif
@@ -958,7 +992,7 @@ static struct rte_eth_conf port_conf = {
 	.rx_adv_conf = {
 		.rss_conf = {
 			// .rss_key = &rss_key, // We set this per format
-			.rss_hf = ETH_RSS_IPV4_UDP | ETH_RSS_IPV6 | ETH_RSS_IPV4 | ETH_RSS_IPV4_TCP | ETH_RSS_IPV6_TCP | ETH_RSS_IPV6_UDP,
+			.rss_hf = RX_RSS_FLAGS,
 		},
 	},
 	.intr_conf = {
@@ -1086,6 +1120,7 @@ static int dpdk_reserve_lcore(bool real, int socket) {
 	int new_id = -1;
 	int i;
 	struct rte_config *cfg = rte_eal_get_configuration();
+	(void) socket;
 
 	pthread_mutex_lock(&dpdk_lock);
 	/* If 'reading packets' fill in cores from 0 up and bind affinity
@@ -1245,7 +1280,7 @@ static void dpdk_free_memory(struct rte_mempool *mempool, int socket_id) {
 	if (!rte_mempool_full(mempool)) {
 		fprintf(stderr, "DPDK memory pool not empty %d of %d, please "
 		        "free all packets before finishing a trace\n",
-		        rte_mempool_count(mempool), mempool->size);
+		        rte_mempool_avail_count(mempool), mempool->size);
 	}
 
 	/* Find the end (+1) of the list */
@@ -1841,17 +1876,17 @@ static inline uint32_t calculate_wire_time(struct dpdk_format_data_t* format_dat
 	 */
 retry_calc_wiretime:
 	switch (format_data->link_speed) {
-	case ETH_LINK_SPEED_40G:
-		wire_time /=  ETH_LINK_SPEED_40G;
+	case ETH_SPEED_NUM_40G:
+		wire_time /=  ETH_SPEED_NUM_40G;
 		break;
-	case ETH_LINK_SPEED_20G:
-		wire_time /= ETH_LINK_SPEED_20G;
+	case ETH_SPEED_NUM_20G:
+		wire_time /= ETH_SPEED_NUM_20G;
 		break;
-	case ETH_LINK_SPEED_10G:
-		wire_time /= ETH_LINK_SPEED_10G;
+	case ETH_SPEED_NUM_10G:
+		wire_time /= ETH_SPEED_NUM_10G;
 		break;
-	case ETH_LINK_SPEED_1000:
-		wire_time /= ETH_LINK_SPEED_1000;
+	case ETH_SPEED_NUM_1G:
+		wire_time /= ETH_SPEED_NUM_1G;
 		break;
 	case 0:
 		{
@@ -2193,17 +2228,19 @@ static void dpdk_get_stats(libtrace_t *trace, libtrace_stat_t *stats) {
 	stats->captured_valid = true;
 	stats->captured = dev_stats.ipackets;
 
-	/* Not that we support adding filters but if we did this
-	 * would work */
-	stats->filtered += dev_stats.fdirmiss;
-
 	stats->dropped_valid = true;
 	stats->dropped = dev_stats.imissed;
 
+#if RTE_VERSION >= RTE_VERSION_NUM(16, 4, 0, 2)
+	/* DPDK commit 86057c fixes ensures missed does not get counted as
+	 * errors */
+	stats->errors_valid = true;
+	stats->errors = dev_stats.ierrors;
+#else
 	/* DPDK errors includes drops */
 	stats->errors_valid = true;
 	stats->errors = dev_stats.ierrors - dev_stats.imissed;
-
+#endif
 	stats->received_valid = true;
 	stats->received = dev_stats.ipackets + dev_stats.imissed;
 

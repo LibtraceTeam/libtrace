@@ -1470,9 +1470,9 @@ static void verify_configuration(libtrace_t *libtrace) {
 	if (libtrace->config.reporter_thold <= 0)
 		libtrace->config.reporter_thold = 100;
 	if (libtrace->config.burst_size <= 0)
-		libtrace->config.burst_size = 10;
+		libtrace->config.burst_size = 32;
 	if (libtrace->config.thread_cache_size <= 0)
-		libtrace->config.thread_cache_size = 20;
+		libtrace->config.thread_cache_size = 64;
 	if (libtrace->config.cache_size <= 0)
 		libtrace->config.cache_size = (libtrace->config.hasher_queue_size + 1) * libtrace->perpkt_thread_count;
 
