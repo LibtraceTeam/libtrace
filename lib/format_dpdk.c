@@ -269,7 +269,7 @@
  */
 
 /* Print verbose messages to stderr */
-#define DEBUG 1
+#define DEBUG 0
 
 /* Use clock_gettime() for nanosecond resolution rather than gettimeofday()
  * only turn on if you know clock_gettime is a vsyscall on your system
