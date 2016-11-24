@@ -920,6 +920,8 @@ DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 		do {
 			size_t ret;
 			int filtret;
+			if (libtrace_halt)
+				return 0;
 			/* Store the trace we are reading from into the packet opaque 
 			 * structure */
 			packet->trace = libtrace;

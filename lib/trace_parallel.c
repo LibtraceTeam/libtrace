@@ -787,11 +787,6 @@ static void* hasher_entry(void *data) {
 			libtrace_ocache_alloc(&trace->packet_freelist, (void **) &packet, 1, 1);
 		assert(packet);
 
-		if (libtrace_halt) {
-			packet->error = 0;
-			break;
-		}
-
 		// Check for messages that we expect MESSAGE_DO_PAUSE, (internal messages only)
 		if (libtrace_message_queue_try_get(&t->messages, &message) != LIBTRACE_MQ_FAILED) {
 			switch(message.code) {
@@ -891,9 +886,6 @@ static int trace_pread_packet_first_in_first_served(libtrace_t *libtrace,
 	ASSERT_RET(pthread_mutex_lock(&libtrace->libtrace_lock), == 0);
 	/* Read nb_packets */
 	for (i = 0; i < nb_packets; ++i) {
-		if (libtrace_halt) {
-			break;
-		}
 		packets[i]->error = trace_read_packet(libtrace, packets[i]);
 
 		if (packets[i]->error <= 0) {
@@ -1706,7 +1698,7 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob,
 	libtrace->first_packets.packets = NULL;
 	libtrace->perpkt_threads = NULL;
 	/* Set a global which says we are using a parallel trace. This is
-	 * for backwards compatability due to changes when destroying packets */
+	 * for backwards compatibility due to changes when destroying packets */
 	libtrace_parallel = 1;
 
 	/* Parses configuration passed through environment variables */
