@@ -2313,7 +2313,7 @@ static libtrace_eventobj_t dpdk_trace_event(libtrace_t *trace,
 }
 
 static void dpdk_help(void) {
-	printf("dpdk format module: $Revision: 1752 $\n");
+	printf("dpdk format module: %s (%d) \n", rte_version(), RTE_VERSION);
 	printf("Supported input URIs:\n");
 	printf("\tdpdk:<domain:bus:devid.func>-<coreid>\n");
 	printf("\tThe -<coreid> is optional \n");
