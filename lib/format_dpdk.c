@@ -236,7 +236,7 @@
 
 /* For single threaded libtrace we read packets as a batch/burst
  * this is the maximum size of said burst */
-#define BURST_SIZE 50
+#define BURST_SIZE 32
 
 #define MBUF(x) ((struct rte_mbuf *) x)
 /* Get the original placement of the packet data */
@@ -2253,17 +2253,25 @@ static void dpdk_get_stats(libtrace_t *trace, libtrace_stat_t *stats) {
 static libtrace_eventobj_t dpdk_trace_event(libtrace_t *trace,
                                             libtrace_packet_t *packet) {
 	libtrace_eventobj_t event = {0,0,0.0,0};
-	int nb_rx; /* Number of receive packets we've read */
-	struct rte_mbuf* pkts_burst[1]; /* Array of 1 pointer(s) to rx buffers */
+	size_t nb_rx; /* Number of received packets we've read */
 
 	do {
 
-		/* See if we already have a packet waiting */
-		nb_rx = rte_eth_rx_burst(FORMAT(trace)->port,
-		                         FORMAT_DATA_FIRST(trace)->queue_id,
-		                         pkts_burst, 1);
+		/* No packets waiting in our buffer? Try and read some more */
+		if (FORMAT(trace)->burst_size == FORMAT(trace)->burst_offset) {
+			nb_rx = rte_eth_rx_burst(FORMAT(trace)->port,
+			                         FORMAT_DATA_FIRST(trace)->queue_id,
+			                         FORMAT(trace)->burst_pkts, BURST_SIZE);
+			if (nb_rx > 0) {
+				dpdk_ready_pkts(trace, FORMAT_DATA_FIRST(trace),
+				                FORMAT(trace)->burst_pkts, nb_rx);
+				FORMAT(trace)->burst_size = nb_rx;
+				FORMAT(trace)->burst_offset = 0;
+			}
+		}
 
-		if (nb_rx > 0) {
+		/* Now do we have packets waiting? */
+		if (FORMAT(trace)->burst_size != FORMAT(trace)->burst_offset) {
 			/* Free the last packet buffer */
 			if (packet->buffer != NULL) {
 				/* The packet should always be finished */
@@ -2275,8 +2283,8 @@ static libtrace_eventobj_t dpdk_trace_event(libtrace_t *trace,
 			packet->buf_control = TRACE_CTRL_EXTERNAL;
 			packet->type = TRACE_RT_DATA_DPDK;
 			event.type = TRACE_EVENT_PACKET;
-			dpdk_ready_pkts(trace, FORMAT_DATA_FIRST(trace), pkts_burst, 1);
-			packet->buffer = FORMAT(trace)->burst_pkts[0];
+			packet->buffer = FORMAT(trace)->burst_pkts[
+			                     FORMAT(trace)->burst_offset++];
 			dpdk_prepare_packet(trace, packet, packet->buffer, packet->type, 0);
 			event.size = 1; // TODO should be bytes read, which essentially useless anyway
 
