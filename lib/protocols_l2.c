@@ -312,6 +312,7 @@ static void *trace_get_payload_from_ppp(void *link,
 	if (type) {
 		switch(ntohs(ppp->protocol)) {
 			case 0x0021: *type = TRACE_ETHERTYPE_IP; break;
+			case 0x0057: *type = TRACE_ETHERTYPE_IPV6; break;				
 			/* If it isn't IP, then it is probably PPP control and
 			 * I can't imagine anyone caring about that too much
 			 */
@@ -394,6 +395,9 @@ static void *trace_get_payload_from_ppp_hdlc(void *link,
 		switch(ntohs(ppp_hdlc->protocol)) {
 			case 0x0021: /* IP */
 				*type = TRACE_ETHERTYPE_IP;
+				break;
+			case 0x0057: /* IPV6 */
+				*type = TRACE_ETHERTYPE_IPV6;
 				break;
 			case 0xc021: /* Link Control Protocol */
 				*type = 0; /* No ethertype for this */
