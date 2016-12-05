@@ -1303,8 +1303,8 @@ static int dag_read_packet_stream(libtrace_t *libtrace,
 			    libtrace_message_queue_count(&t->messages) > 0)
 				return -2;
 
-			if (libtrace_halt)
-				return 0;
+			if ((numbytes=is_halted(libtrace)) != -1)
+				return numbytes;
 			/* Block until we see a packet */
 			continue;
 		}

@@ -496,8 +496,8 @@ static int bpf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 		}
 
 		/* Timed out -- check if we should halt */
-		if (libtrace_halt)
-			return 0;
+		if ((ret=is_halted(libtrace)) != -1)
+			return ret;
 	}
 	
 	/* We do NOT want anything trying to free the memory the packet is

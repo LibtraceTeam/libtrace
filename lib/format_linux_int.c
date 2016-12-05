@@ -214,8 +214,8 @@ inline static int linuxnative_read_stream(libtrace_t *libtrace,
 				trace_set_err(libtrace, errno, "select");
 				return -1;
 			} else {
-				if (libtrace_halt)
-					return READ_EOF;
+				if ((ret=is_halted(libtrace)) != -1)
+					return ret;
 			}
 		}
 		while (ret <= 0);

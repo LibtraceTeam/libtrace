@@ -815,7 +815,12 @@ static void* hasher_entry(void *data) {
 		}
 
 		if ((packet->error = trace_read_packet(trace, packet)) <1) {
-			break; /* We are EOF or error'd either way we stop  */
+			if (packet->error == READ_MESSAGE) {
+				pkt_skipped = 1;
+				continue;
+			} else {
+				break; /* We are EOF or error'd either way we stop  */
+			}
 		}
 
 		/* We are guaranteed to have a hash function i.e. != NULL */
@@ -883,15 +888,23 @@ static int trace_pread_packet_first_in_first_served(libtrace_t *libtrace,
 	size_t i = 0;
 	//bool tick_hit = false;
 
-	ASSERT_RET(pthread_mutex_lock(&libtrace->libtrace_lock), == 0);
+	ASSERT_RET(pthread_mutex_lock(&libtrace->read_packet_lock), == 0);
 	/* Read nb_packets */
 	for (i = 0; i < nb_packets; ++i) {
+		if (libtrace_message_queue_count(&t->messages) > 0) {
+			if ( i==0 ) {
+				ASSERT_RET(pthread_mutex_unlock(&libtrace->read_packet_lock), == 0);
+				return READ_MESSAGE;
+			} else {
+				break;
+			}
+		}
 		packets[i]->error = trace_read_packet(libtrace, packets[i]);
 
 		if (packets[i]->error <= 0) {
 			/* We'll catch this next time if we have already got packets */
 			if ( i==0 ) {
-				ASSERT_RET(pthread_mutex_unlock(&libtrace->libtrace_lock), == 0);
+				ASSERT_RET(pthread_mutex_unlock(&libtrace->read_packet_lock), == 0);
 				return packets[i]->error;
 			} else {
 				break;
@@ -907,7 +920,7 @@ static int trace_pread_packet_first_in_first_served(libtrace_t *libtrace,
 	if (packets[0]->error > 0) {
 		store_first_packet(libtrace, packets[0], t);
 	}
-	ASSERT_RET(pthread_mutex_unlock(&libtrace->libtrace_lock), == 0);
+	ASSERT_RET(pthread_mutex_unlock(&libtrace->read_packet_lock), == 0);
 	/* XXX TODO this needs to be inband with packets, or we don't bother in this case
 	if (tick_hit) {
 		libtrace_message_t tick;

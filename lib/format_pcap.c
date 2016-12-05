@@ -446,8 +446,8 @@ static int pcap_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 		switch(ret) {
 			case 1: break; /* no error */
 			case 0: 
-				if (libtrace_halt)
-					return 0;
+				if ((ret=is_halted(libtrace)) != -1)
+					return ret;
                                 continue; /* timeout expired */
 			case -1: 
 				trace_set_err(libtrace,TRACE_ERR_BAD_PACKET,

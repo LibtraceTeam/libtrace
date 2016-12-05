@@ -326,6 +326,8 @@ struct libtrace_t {
 	bool started;
 	/** Synchronise writes/reads across this format object and attached threads etc */
 	pthread_mutex_t libtrace_lock;
+	/** Packet read lock, seperate from libtrace_lock as to not block while reading a burst */
+	pthread_mutex_t read_packet_lock;
 	/** State */
 	enum trace_state state;
 	/** Use to control pausing threads and finishing threads etc always used with libtrace_lock */
@@ -605,7 +607,7 @@ struct libtrace_format_t {
 	 * @param packet	The libtrace packet to read into
 	 * @return The size of the packet read (in bytes) including the capture
 	 * framing header, or -1 if an error occurs. 0 is returned in the
-	 * event of an EOF. 
+	 * event of an EOF or -2 in the case of interrupting the parallel API.
 	 *
 	 * If no packets are available for reading, this function should block
 	 * until one appears or return 0 if the end of a trace file has been
@@ -1031,6 +1033,24 @@ struct libtrace_format_t {
  * immediately
  */
 extern volatile int libtrace_halt;
+
+/**
+ * Used by a format to check if trace_interrupt or if a trace_pause/stop has
+ * been called. Provides backwards compatibility with traditional read
+ * functions when trace_read_packet() is used by the parallel API.
+ *
+ * Returns -1 if not halting otherwise returns the code that the read
+ * operation should pass on.
+ */
+static inline int is_halted(libtrace_t *trace) {
+	if (!(libtrace_halt || trace->state == STATE_PAUSING)) {
+		return -1;
+	} else if (libtrace_halt) {
+		return READ_EOF;
+	} else {
+		return READ_MESSAGE;
+	}
+}
 
 /** Registers a new capture format module.
  *

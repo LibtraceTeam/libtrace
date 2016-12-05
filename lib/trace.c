@@ -260,6 +260,7 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 	
 	/* Parallel inits */
 	ASSERT_RET(pthread_mutex_init(&libtrace->libtrace_lock, NULL), == 0);
+	ASSERT_RET(pthread_mutex_init(&libtrace->read_packet_lock, NULL), == 0);
 	ASSERT_RET(pthread_cond_init(&libtrace->perpkt_cond, NULL), == 0);
 	libtrace->state = STATE_NEW;
 	libtrace->perpkt_queue_full = false;
@@ -384,6 +385,7 @@ DLLEXPORT libtrace_t * trace_create_dead (const char *uri) {
 	
 	/* Parallel inits */
 	ASSERT_RET(pthread_mutex_init(&libtrace->libtrace_lock, NULL), == 0);
+	ASSERT_RET(pthread_mutex_init(&libtrace->read_packet_lock, NULL), == 0);
 	ASSERT_RET(pthread_cond_init(&libtrace->perpkt_cond, NULL), == 0);
 	libtrace->state = STATE_NEW; // TODO MAYBE DEAD
 	libtrace->perpkt_queue_full = false;
@@ -679,6 +681,7 @@ DLLEXPORT void trace_destroy(libtrace_t *libtrace) {
 	assert(libtrace);
 
 	ASSERT_RET(pthread_mutex_destroy(&libtrace->libtrace_lock), == 0);
+	ASSERT_RET(pthread_mutex_destroy(&libtrace->read_packet_lock), == 0);
 	ASSERT_RET(pthread_cond_destroy(&libtrace->perpkt_cond), == 0);
 
 	/* destroy any packets that are still around */
@@ -757,6 +760,7 @@ DLLEXPORT void trace_destroy_dead(libtrace_t *libtrace) {
 	assert(libtrace);
 
 	ASSERT_RET(pthread_mutex_destroy(&libtrace->libtrace_lock), == 0);
+	ASSERT_RET(pthread_mutex_destroy(&libtrace->read_packet_lock), == 0);
 	ASSERT_RET(pthread_cond_destroy(&libtrace->perpkt_cond), == 0);
 
 	/* Don't call pause_input or fin_input, because we should never have
@@ -920,13 +924,14 @@ DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 		do {
 			size_t ret;
 			int filtret;
-			if (libtrace_halt)
-				return 0;
+			if ((ret=is_halted(libtrace)) != (size_t)-1)
+				return ret;
 			/* Store the trace we are reading from into the packet opaque 
 			 * structure */
 			packet->trace = libtrace;
 			ret=libtrace->format->read_packet(libtrace,packet);
-			if (ret==(size_t)-1 || ret==0) {
+			if (ret==(size_t)READ_MESSAGE ||
+                            ret==(size_t)-1 || ret==0) {
                                 packet->trace = NULL;
 				return ret;
 			}

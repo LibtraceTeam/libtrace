@@ -509,8 +509,8 @@ inline static int linuxring_read_stream(libtrace_t *libtrace,
 			}
 		} else {
 			/* Poll timed out - check if we should exit */
-			if (libtrace_halt)
-				return 0;
+			if ((ret=is_halted(libtrace)) != -1)
+				return ret;
 			continue;
 		}
 	}
