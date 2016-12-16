@@ -363,7 +363,7 @@ struct dpdk_format_data_t {
 	unsigned int nb_blacklist; /* Number of blacklist items in are valid */
 #endif
 	char mempool_name[MEMPOOL_NAME_LEN]; /* The name of the mempool that we are using */
-	uint8_t rss_key[40]; // This is the RSS KEY
+	enum hasher_types hasher_type;
 	/* To improve single-threaded performance we always batch reading
 	 * packets, in a burst, otherwise the parallel library does this for us */
 	struct rte_mbuf* burst_pkts[BURST_SIZE];
@@ -855,6 +855,7 @@ static int dpdk_init_input (libtrace_t *libtrace) {
 	       sizeof(FORMAT(libtrace)->burst_pkts[0]) * BURST_SIZE);
 	FORMAT(libtrace)->burst_size = 0;
 	FORMAT(libtrace)->burst_offset = 0;
+	FORMAT(libtrace)->hasher_type = HASHER_BALANCE;
 
 	/* Make our first stream */
 	FORMAT(libtrace)->per_stream = libtrace_list_init(sizeof(struct dpdk_per_stream_t));
@@ -928,20 +929,8 @@ static int dpdk_config_input (libtrace_t *libtrace,
 		FORMAT(libtrace)->promisc=*(int*)data;
 		return 0;
 	case TRACE_OPTION_HASHER:
-		switch (*((enum hasher_types *) data))
-		{
-		case HASHER_BALANCE:
-		case HASHER_UNIDIRECTIONAL:
-			toeplitz_create_unikey(FORMAT(libtrace)->rss_key);
-			return 0;
-		case HASHER_BIDIRECTIONAL:
-			toeplitz_create_bikey(FORMAT(libtrace)->rss_key);
-			return 0;
-		case HASHER_CUSTOM:
-			// We don't support these
-			return -1;
-		}
-		break;
+		FORMAT(libtrace)->hasher_type=*(enum hasher_types*)data;
+		return 0;
 	case TRACE_OPTION_FILTER:
 		/* TODO filtering */
 	case TRACE_OPTION_META_FREQ:
@@ -991,7 +980,6 @@ static struct rte_eth_conf port_conf = {
 	},
 	.rx_adv_conf = {
 		.rss_conf = {
-			// .rss_key = &rss_key, // We set this per format
 			.rss_hf = RX_RSS_FLAGS,
 		},
 	},
@@ -1349,6 +1337,25 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data,
 			         "pool failed: %s", strerror(rte_errno));
 			return -1;
 		}
+	}
+
+	// for symmetric rss, repeat 2 bytes
+	// otherwise, use default rss key in drivers
+	uint8_t rss_key[52]; // 52 for i40e, 40 for others
+	if (format_data->hasher_type == HASHER_BIDIRECTIONAL) {
+#if RTE_VERSION >= RTE_VERSION_NUM(2, 1, 0, 0)
+		struct rte_eth_dev_info dev_info;
+		rte_eth_dev_info_get(format_data->port, &dev_info);
+		port_conf.rx_adv_conf.rss_conf.rss_key_len = dev_info.hash_key_size;
+#else
+		port_conf.rx_adv_conf.rss_conf.rss_key_len = sizeof(rss_key);
+#endif
+		// first 2 bytes of rss_intel_key from drivers/net/e1000/igb_rxtx.c
+		static uint8_t rss_key_2bytes[] = {0x6D, 0x5A};
+		int i;
+		for (i=0; i<port_conf.rx_adv_conf.rss_conf.rss_key_len; i += sizeof(rss_key_2bytes))
+			memcpy(rss_key + i, rss_key_2bytes, sizeof(rss_key_2bytes));
+		port_conf.rx_adv_conf.rss_conf.rss_key = rss_key;
 	}
 
 	/* ----------- Now do the setup for the port mapping ------------ */
