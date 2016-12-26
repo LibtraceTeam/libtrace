@@ -1011,8 +1011,9 @@ void store_first_packet(libtrace_t *libtrace, libtrace_packet_t *packet, libtrac
 		} else {
 			/* Check if we are newer than the previous 'first' packet */
 			size_t first = libtrace->first_packets.first;
-			if (trace_get_seconds(dup) <
-				trace_get_seconds(libtrace->first_packets.packets[first].packet))
+			struct timeval cur_ts = trace_get_timeval(dup);
+			struct timeval first_ts = trace_get_timeval(libtrace->first_packets.packets[first].packet);
+			if (timercmp(&cur_ts, &first_ts, <))
 				libtrace->first_packets.first = t->perpkt_num;
 		}
 		ASSERT_RET(pthread_spin_unlock(&libtrace->first_packets.lock), == 0);
