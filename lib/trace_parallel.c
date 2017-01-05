@@ -1732,6 +1732,12 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob,
 		}
 		if (libtrace->perpkt_thread_count > 1)
 			libtrace->pread = trace_pread_packet_first_in_first_served;
+			/* Don't wait for a burst of packets if the format is
+			 * live as this could block ring based formats and
+			 * introduces delay. */
+			if (libtrace->format->info.live) {
+				libtrace->config.burst_size = 1;
+			}
 		else
 			/* Use standard read_packet */
 			libtrace->pread = NULL;
