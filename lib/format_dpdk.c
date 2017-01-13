@@ -2134,7 +2134,7 @@ static inline int dpdk_read_packet_stream (libtrace_t *libtrace,
 		/* Check the message queue this could be less than 0 */
 		if (mesg && libtrace_message_queue_count(mesg) > 0)
 			return READ_MESSAGE;
-		if ((nb_rx=is_halted(libtrace)) != -1)
+		if ((nb_rx=is_halted(libtrace)) != (size_t) -1)
 			return nb_rx;
 		/* Wait a while, polling on memory degrades performance
 		 * This relieves the pressure on memory allowing the NIC to DMA */
