@@ -364,6 +364,7 @@ struct dpdk_format_data_t {
 #endif
 	char mempool_name[MEMPOOL_NAME_LEN]; /* The name of the mempool that we are using */
 	enum hasher_types hasher_type;
+	uint8_t *rss_key;
 	/* To improve single-threaded performance we always batch reading
 	 * packets, in a burst, otherwise the parallel library does this for us */
 	struct rte_mbuf* burst_pkts[BURST_SIZE];
@@ -856,6 +857,7 @@ static int dpdk_init_input (libtrace_t *libtrace) {
 	FORMAT(libtrace)->burst_size = 0;
 	FORMAT(libtrace)->burst_offset = 0;
 	FORMAT(libtrace)->hasher_type = HASHER_BALANCE;
+	FORMAT(libtrace)->rss_key = NULL;
 
 	/* Make our first stream */
 	FORMAT(libtrace)->per_stream = libtrace_list_init(sizeof(struct dpdk_per_stream_t));
@@ -929,8 +931,21 @@ static int dpdk_config_input (libtrace_t *libtrace,
 		FORMAT(libtrace)->promisc=*(int*)data;
 		return 0;
 	case TRACE_OPTION_HASHER:
-		FORMAT(libtrace)->hasher_type=*(enum hasher_types*)data;
-		return 0;
+		switch (*((enum hasher_types *) data))
+		{
+		case HASHER_BALANCE:
+		case HASHER_UNIDIRECTIONAL:
+		case HASHER_BIDIRECTIONAL:
+			FORMAT(libtrace)->hasher_type = *(enum hasher_types*)data;
+			if (FORMAT(libtrace)->rss_key)
+				free(FORMAT(libtrace)->rss_key);
+			FORMAT(libtrace)->rss_key = NULL;
+			return 0;
+		case HASHER_CUSTOM:
+			// Let libtrace do this
+			return -1;
+		}
+		break;
 	case TRACE_OPTION_FILTER:
 		/* TODO filtering */
 	case TRACE_OPTION_META_FREQ:
@@ -1339,23 +1354,27 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data,
 		}
 	}
 
-	// for symmetric rss, repeat 2 bytes
-	// otherwise, use default rss key in drivers
-	uint8_t rss_key[52]; // 52 for i40e, 40 for others
-	if (format_data->hasher_type == HASHER_BIDIRECTIONAL) {
+	/* Generate the hash key, based on the device */
+	uint8_t rss_size = 52; // 52 for i40e, 40 for others, use the largest by default
+	// In new versions DPDK we can query the size
 #if RTE_VERSION >= RTE_VERSION_NUM(2, 1, 0, 0)
-		struct rte_eth_dev_info dev_info;
-		rte_eth_dev_info_get(format_data->port, &dev_info);
-		port_conf.rx_adv_conf.rss_conf.rss_key_len = dev_info.hash_key_size;
-#else
-		port_conf.rx_adv_conf.rss_conf.rss_key_len = sizeof(rss_key);
+	struct rte_eth_dev_info dev_info;
+	rte_eth_dev_info_get(format_data->port, &dev_info);
+	rss_size = dev_info.hash_key_size;
 #endif
-		// first 2 bytes of rss_intel_key from drivers/net/e1000/igb_rxtx.c
-		static uint8_t rss_key_2bytes[] = {0x6D, 0x5A};
-		int i;
-		for (i=0; i<port_conf.rx_adv_conf.rss_conf.rss_key_len; i += sizeof(rss_key_2bytes))
-			memcpy(rss_key + i, rss_key_2bytes, sizeof(rss_key_2bytes));
-		port_conf.rx_adv_conf.rss_conf.rss_key = rss_key;
+	if (rss_size != 0) {
+		format_data->rss_key = malloc(rss_size);
+		if (format_data->hasher_type == HASHER_BIDIRECTIONAL) {
+			toeplitz_ncreate_bikey(format_data->rss_key, rss_size);
+		} else {
+			toeplitz_ncreate_unikey(format_data->rss_key, rss_size);
+		}
+		port_conf.rx_adv_conf.rss_conf.rss_key = format_data->rss_key;
+#if RTE_VERSION >= RTE_VERSION_NUM(1, 7, 0, 1)
+		port_conf.rx_adv_conf.rss_conf.rss_key_len = rss_size;
+#endif
+	} else {
+		fprintf(stderr, "DPDK couldn't configure RSS hashing!");
 	}
 
 	/* ----------- Now do the setup for the port mapping ------------ */
@@ -1761,6 +1780,8 @@ static int dpdk_fin_input(libtrace_t * libtrace) {
 
 		libtrace_list_deinit(FORMAT(libtrace)->per_stream);
 		/* filter here if we used it */
+		if (FORMAT(libtrace)->rss_key)
+			free(FORMAT(libtrace)->rss_key);
 		free(libtrace->format_data);
 	}
 

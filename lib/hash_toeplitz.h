@@ -57,7 +57,9 @@ uint32_t toeplitz_hash(const toeplitz_conf_t *tc, const uint8_t *data, size_t of
 uint32_t toeplitz_first_hash(const toeplitz_conf_t *tc, const uint8_t *data, size_t n);
 void toeplitz_init_config(toeplitz_conf_t *conf, bool bidirectional);
 uint64_t toeplitz_hash_packet(const libtrace_packet_t * pkt, const toeplitz_conf_t *cnf);
+void toeplitz_ncreate_bikey(uint8_t *key, size_t num);
 void toeplitz_create_bikey(uint8_t *key);
+void toeplitz_ncreate_unikey(uint8_t *key, size_t num);
 void toeplitz_create_unikey(uint8_t *key);
 
 
