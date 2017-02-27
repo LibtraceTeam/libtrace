@@ -170,8 +170,9 @@ static int verify_counters(libtrace_t *trace_read)
 
         if (!stat->received_valid) {
 		printf("\tInfo: trace does not support received counter\n");
-        } else if (stat->received != 100) {
-		ERROR("Trace received %zu/100 packets\n", stat->received);
+        } else if (stat->received != (uint32_t) test_size) {
+		ERROR("Trace received %zu/%u packets\n", stat->received,
+				(uint32_t)test_size);
         }
 
         if (!stat->accepted_valid) {
