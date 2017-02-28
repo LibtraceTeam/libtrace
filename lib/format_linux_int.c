@@ -214,8 +214,8 @@ inline static int linuxnative_read_stream(libtrace_t *libtrace,
 				trace_set_err(libtrace, errno, "select");
 				return -1;
 			} else {
-				if (libtrace_halt)
-					return READ_EOF;
+				if ((ret=is_halted(libtrace)) != -1)
+					return ret;
 			}
 		}
 		while (ret <= 0);
@@ -285,6 +285,7 @@ inline static int linuxnative_read_stream(libtrace_t *libtrace,
 		}
 	}
 
+
 	/* Buffer contains all of our packet (including our custom header) so
 	 * we just need to get prepare_packet to set all our packet pointers
 	 * appropriately */
@@ -293,6 +294,22 @@ inline static int linuxnative_read_stream(libtrace_t *libtrace,
 				packet->type, flags))
 		return -1;
 	
+	if (hdr->timestamptype == TS_TIMEVAL) {
+		packet->order = (((uint64_t)hdr->tv.tv_sec) << 32)
+        	            + ((((uint64_t)hdr->tv.tv_usec) << 32) /1000000);
+	} else if (hdr->timestamptype == TS_TIMESPEC) {
+		packet->order = (((uint64_t)hdr->ts.tv_sec) << 32)
+        	            + ((((uint64_t)hdr->ts.tv_nsec) << 32) /1000000000);
+	} else {
+		packet->order = 0;
+	}
+
+        if (packet->order <= stream->last_timestamp) {
+                packet->order = stream->last_timestamp + 1;
+        }
+
+        stream->last_timestamp = packet->order;
+
 	return hdr->wirelen+sizeof(*hdr);
 }
 

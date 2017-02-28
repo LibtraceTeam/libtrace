@@ -22,7 +22,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  *
- */
+ *
  * Kit capture format.
  *
  * Intel Data Plane Development Kit is a LIVE capture format.
@@ -68,8 +68,8 @@
  * Below this is a log of version that required changes to the libtrace
  * code (that we still attempt to support).
  *
- * DPDK v1.7.1 is recommended.
- * However 1.5 to 1.8 are likely supported.
+ * DPDK 16.04 or newer is recommended.
+ * However 1.6 and newer are still likely supported.
  */
 #include <rte_eal.h>
 #include <rte_version.h>
@@ -146,6 +146,27 @@
 #	define DPDK_USE_NULL_QUEUE_CONFIG 0
 #endif
 
+/* 2.0.0-rc1
+ * Unifies RSS hash between cards
+ */
+#if RTE_VERSION >= RTE_VERSION_NUM(2, 0, 0, 1)
+#	define RX_RSS_FLAGS (ETH_RSS_IP | ETH_RSS_UDP | ETH_RSS_TCP | \
+		             ETH_RSS_SCTP)
+#else
+#	define RX_RSS_FLAGS (ETH_RSS_IPV4_UDP | ETH_RSS_IPV6 | ETH_RSS_IPV4 | \
+	                     ETH_RSS_IPV4_TCP | ETH_RSS_IPV6_TCP |\
+	                     ETH_RSS_IPV6_UDP)
+#endif
+
+/* v16.07-rc1 - deprecated
+ * rte_mempool_avail_count to replace rte_mempool_count
+ * rte_mempool_in_use_count to replace rte_mempool_free_count
+ */
+#if RTE_VERSION < RTE_VERSION_NUM(16, 7, 0, 1)
+#define rte_mempool_avail_count rte_mempool_count
+#define rte_mempool_in_use_count rte_mempool_free_count
+#endif
+
 #include <rte_per_lcore.h>
 #include <rte_debug.h>
 #include <rte_errno.h>
@@ -169,23 +190,36 @@
 #include <pthread_np.h>
 #endif
 
+/* 16.04-rc3 ETH_LINK_SPEED_X are replaced with ETH_SPEED_NUM_X.
+ * ETH_LINK_SPEED_ are reused as flags, ugly.
+ * We use the new way in this code.
+ */
+#ifndef ETH_SPEED_NUM_1G
+	#define ETH_SPEED_NUM_1G ETH_LINK_SPEED_1000
+	#define ETH_SPEED_NUM_10G ETH_LINK_SPEED_10G
+	#define ETH_SPEED_NUM_20G ETH_LINK_SPEED_20G
+	#define ETH_SPEED_NUM_40G ETH_LINK_SPEED_40G
+#endif
 
 /* The default size of memory buffers to use - This is the max size of standard
  * ethernet packet less the size of the MAC CHECKSUM */
 #define RX_MBUF_SIZE 1514
 
-/* The minimum number of memory buffers per queue tx or rx. Search for
- * _MIN_RING_DESC in DPDK. The largest minimum is 64 for 10GBit cards.
+/* The minimum number of memory buffers per queue tx or rx. Based on
+ * the requirement of the memory pool with 128 per thread buffers, needing
+ * at least 128*1.5 = 192 buffers. Our code allocates 128*2 to be safe.
  */
-#define MIN_NB_BUF 64
+#define MIN_NB_BUF 128
 
 /* Number of receive memory buffers to use
  * By default this is limited by driver to 4k and must be a multiple of 128.
  * A modification can be made to the driver to remove this limit.
  * This can be increased in the driver and here.
  * Should be at least MIN_NB_BUF.
+ * We choose 2K rather than 4K because it enables the usage of sse vector
+ * drivers which are significantly faster than using the larger buffer.
  */
-#define NB_RX_MBUF 4096
+#define NB_RX_MBUF (4096/2)
 
 /* Number of send memory buffers to use.
  * Same limits apply as those to NB_TX_MBUF.
@@ -202,7 +236,7 @@
 
 /* For single threaded libtrace we read packets as a batch/burst
  * this is the maximum size of said burst */
-#define BURST_SIZE 50
+#define BURST_SIZE 32
 
 #define MBUF(x) ((struct rte_mbuf *) x)
 /* Get the original placement of the packet data */
@@ -228,7 +262,7 @@
  * THESE MAY REQUIRE MODIFICATIONS TO INTEL DPDK
  *
  * Make sure you understand what these are doing before enabling them.
- * They might make traces incompatable with other builds etc.
+ * They might make traces incompatible with other builds etc.
  *
  * These are also included to show how to do somethings which aren't
  * obvious in the DPDK documentation.
@@ -239,7 +273,7 @@
 
 /* Use clock_gettime() for nanosecond resolution rather than gettimeofday()
  * only turn on if you know clock_gettime is a vsyscall on your system
- * overwise could be a large overhead. Again gettimeofday() should be
+ * otherwise could be a large overhead. Again gettimeofday() should be
  * vsyscall also if it's not you should seriously consider updating your
  * kernel.
  */
@@ -296,7 +330,7 @@ struct dpdk_per_stream_t
 	struct rte_mempool *mempool;
 	int lcore;
 #if HAS_HW_TIMESTAMPS_82580
-	/* Timestamping only relevent to RX */
+	/* Timestamping only relevant to RX */
 	uint64_t ts_first_sys; /* Sytem timestamp of the first packet in nanoseconds */
 	uint32_t wrap_count; /* Number of times the NIC clock has wrapped around completely */
 #endif
@@ -329,7 +363,8 @@ struct dpdk_format_data_t {
 	unsigned int nb_blacklist; /* Number of blacklist items in are valid */
 #endif
 	char mempool_name[MEMPOOL_NAME_LEN]; /* The name of the mempool that we are using */
-	uint8_t rss_key[40]; // This is the RSS KEY
+	enum hasher_types hasher_type;
+	uint8_t *rss_key;
 	/* To improve single-threaded performance we always batch reading
 	 * packets, in a burst, otherwise the parallel library does this for us */
 	struct rte_mbuf* burst_pkts[BURST_SIZE];
@@ -821,6 +856,8 @@ static int dpdk_init_input (libtrace_t *libtrace) {
 	       sizeof(FORMAT(libtrace)->burst_pkts[0]) * BURST_SIZE);
 	FORMAT(libtrace)->burst_size = 0;
 	FORMAT(libtrace)->burst_offset = 0;
+	FORMAT(libtrace)->hasher_type = HASHER_BALANCE;
+	FORMAT(libtrace)->rss_key = NULL;
 
 	/* Make our first stream */
 	FORMAT(libtrace)->per_stream = libtrace_list_init(sizeof(struct dpdk_per_stream_t));
@@ -898,13 +935,14 @@ static int dpdk_config_input (libtrace_t *libtrace,
 		{
 		case HASHER_BALANCE:
 		case HASHER_UNIDIRECTIONAL:
-			toeplitz_create_unikey(FORMAT(libtrace)->rss_key);
-			return 0;
 		case HASHER_BIDIRECTIONAL:
-			toeplitz_create_bikey(FORMAT(libtrace)->rss_key);
+			FORMAT(libtrace)->hasher_type = *(enum hasher_types*)data;
+			if (FORMAT(libtrace)->rss_key)
+				free(FORMAT(libtrace)->rss_key);
+			FORMAT(libtrace)->rss_key = NULL;
 			return 0;
 		case HASHER_CUSTOM:
-			// We don't support these
+			// Let libtrace do this
 			return -1;
 		}
 		break;
@@ -957,8 +995,7 @@ static struct rte_eth_conf port_conf = {
 	},
 	.rx_adv_conf = {
 		.rss_conf = {
-			// .rss_key = &rss_key, // We set this per format
-			.rss_hf = ETH_RSS_IPV4_UDP | ETH_RSS_IPV6 | ETH_RSS_IPV4 | ETH_RSS_IPV4_TCP | ETH_RSS_IPV6_TCP | ETH_RSS_IPV6_UDP,
+			.rss_hf = RX_RSS_FLAGS,
 		},
 	},
 	.intr_conf = {
@@ -1086,6 +1123,7 @@ static int dpdk_reserve_lcore(bool real, int socket) {
 	int new_id = -1;
 	int i;
 	struct rte_config *cfg = rte_eal_get_configuration();
+	(void) socket;
 
 	pthread_mutex_lock(&dpdk_lock);
 	/* If 'reading packets' fill in cores from 0 up and bind affinity
@@ -1245,7 +1283,7 @@ static void dpdk_free_memory(struct rte_mempool *mempool, int socket_id) {
 	if (!rte_mempool_full(mempool)) {
 		fprintf(stderr, "DPDK memory pool not empty %d of %d, please "
 		        "free all packets before finishing a trace\n",
-		        rte_mempool_count(mempool), mempool->size);
+		        rte_mempool_avail_count(mempool), mempool->size);
 	}
 
 	/* Find the end (+1) of the list */
@@ -1314,6 +1352,29 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data,
 			         "pool failed: %s", strerror(rte_errno));
 			return -1;
 		}
+	}
+
+	/* Generate the hash key, based on the device */
+	uint8_t rss_size = 52; // 52 for i40e, 40 for others, use the largest by default
+	// In new versions DPDK we can query the size
+#if RTE_VERSION >= RTE_VERSION_NUM(2, 1, 0, 0)
+	struct rte_eth_dev_info dev_info;
+	rte_eth_dev_info_get(format_data->port, &dev_info);
+	rss_size = dev_info.hash_key_size;
+#endif
+	if (rss_size != 0) {
+		format_data->rss_key = malloc(rss_size);
+		if (format_data->hasher_type == HASHER_BIDIRECTIONAL) {
+			toeplitz_ncreate_bikey(format_data->rss_key, rss_size);
+		} else {
+			toeplitz_ncreate_unikey(format_data->rss_key, rss_size);
+		}
+		port_conf.rx_adv_conf.rss_conf.rss_key = format_data->rss_key;
+#if RTE_VERSION >= RTE_VERSION_NUM(1, 7, 0, 1)
+		port_conf.rx_adv_conf.rss_conf.rss_key_len = rss_size;
+#endif
+	} else {
+		fprintf(stderr, "DPDK couldn't configure RSS hashing!");
 	}
 
 	/* ----------- Now do the setup for the port mapping ------------ */
@@ -1719,6 +1780,8 @@ static int dpdk_fin_input(libtrace_t * libtrace) {
 
 		libtrace_list_deinit(FORMAT(libtrace)->per_stream);
 		/* filter here if we used it */
+		if (FORMAT(libtrace)->rss_key)
+			free(FORMAT(libtrace)->rss_key);
 		free(libtrace->format_data);
 	}
 
@@ -1841,17 +1904,17 @@ static inline uint32_t calculate_wire_time(struct dpdk_format_data_t* format_dat
 	 */
 retry_calc_wiretime:
 	switch (format_data->link_speed) {
-	case ETH_LINK_SPEED_40G:
-		wire_time /=  ETH_LINK_SPEED_40G;
+	case ETH_SPEED_NUM_40G:
+		wire_time /=  ETH_SPEED_NUM_40G;
 		break;
-	case ETH_LINK_SPEED_20G:
-		wire_time /= ETH_LINK_SPEED_20G;
+	case ETH_SPEED_NUM_20G:
+		wire_time /= ETH_SPEED_NUM_20G;
 		break;
-	case ETH_LINK_SPEED_10G:
-		wire_time /= ETH_LINK_SPEED_10G;
+	case ETH_SPEED_NUM_10G:
+		wire_time /= ETH_SPEED_NUM_10G;
 		break;
-	case ETH_LINK_SPEED_1000:
-		wire_time /= ETH_LINK_SPEED_1000;
+	case ETH_SPEED_NUM_1G:
+		wire_time /= ETH_SPEED_NUM_1G;
 		break;
 	case 0:
 		{
@@ -2071,8 +2134,8 @@ static inline int dpdk_read_packet_stream (libtrace_t *libtrace,
 		/* Check the message queue this could be less than 0 */
 		if (mesg && libtrace_message_queue_count(mesg) > 0)
 			return READ_MESSAGE;
-		if (libtrace_halt)
-			return READ_EOF;
+		if ((nb_rx=is_halted(libtrace)) != (size_t) -1)
+			return nb_rx;
 		/* Wait a while, polling on memory degrades performance
 		 * This relieves the pressure on memory allowing the NIC to DMA */
 		rte_delay_us(10);
@@ -2090,6 +2153,7 @@ static int dpdk_pread_packets (libtrace_t *libtrace,
 	struct rte_mbuf* pkts_burst[nb_packets]; /* Array of pointer(s) */
 	int i;
 	dpdk_per_stream_t *stream = t->format_data;
+	struct dpdk_addt_hdr * hdr;
 
 	nb_rx = dpdk_read_packet_stream (libtrace, stream, &t->messages,
 	                                 pkts_burst, nb_packets);
@@ -2106,6 +2170,9 @@ static int dpdk_pread_packets (libtrace_t *libtrace,
 			packets[i]->buffer = pkts_burst[i];
 			packets[i]->trace = libtrace;
 			packets[i]->error = 1;
+			hdr = (struct dpdk_addt_hdr *) 
+					((struct rte_mbuf*) pkts_burst[i] + 1);
+			packets[i]->order = hdr->timestamp;
 			dpdk_prepare_packet(libtrace, packets[i], packets[i]->buffer, packets[i]->type, 0);
 		}
 	}
@@ -2193,17 +2260,19 @@ static void dpdk_get_stats(libtrace_t *trace, libtrace_stat_t *stats) {
 	stats->captured_valid = true;
 	stats->captured = dev_stats.ipackets;
 
-	/* Not that we support adding filters but if we did this
-	 * would work */
-	stats->filtered += dev_stats.fdirmiss;
-
 	stats->dropped_valid = true;
 	stats->dropped = dev_stats.imissed;
 
+#if RTE_VERSION >= RTE_VERSION_NUM(16, 4, 0, 2)
+	/* DPDK commit 86057c fixes ensures missed does not get counted as
+	 * errors */
+	stats->errors_valid = true;
+	stats->errors = dev_stats.ierrors;
+#else
 	/* DPDK errors includes drops */
 	stats->errors_valid = true;
 	stats->errors = dev_stats.ierrors - dev_stats.imissed;
-
+#endif
 	stats->received_valid = true;
 	stats->received = dev_stats.ipackets + dev_stats.imissed;
 
@@ -2216,17 +2285,25 @@ static void dpdk_get_stats(libtrace_t *trace, libtrace_stat_t *stats) {
 static libtrace_eventobj_t dpdk_trace_event(libtrace_t *trace,
                                             libtrace_packet_t *packet) {
 	libtrace_eventobj_t event = {0,0,0.0,0};
-	int nb_rx; /* Number of receive packets we've read */
-	struct rte_mbuf* pkts_burst[1]; /* Array of 1 pointer(s) to rx buffers */
+	size_t nb_rx; /* Number of received packets we've read */
 
 	do {
 
-		/* See if we already have a packet waiting */
-		nb_rx = rte_eth_rx_burst(FORMAT(trace)->port,
-		                         FORMAT_DATA_FIRST(trace)->queue_id,
-		                         pkts_burst, 1);
+		/* No packets waiting in our buffer? Try and read some more */
+		if (FORMAT(trace)->burst_size == FORMAT(trace)->burst_offset) {
+			nb_rx = rte_eth_rx_burst(FORMAT(trace)->port,
+			                         FORMAT_DATA_FIRST(trace)->queue_id,
+			                         FORMAT(trace)->burst_pkts, BURST_SIZE);
+			if (nb_rx > 0) {
+				dpdk_ready_pkts(trace, FORMAT_DATA_FIRST(trace),
+				                FORMAT(trace)->burst_pkts, nb_rx);
+				FORMAT(trace)->burst_size = nb_rx;
+				FORMAT(trace)->burst_offset = 0;
+			}
+		}
 
-		if (nb_rx > 0) {
+		/* Now do we have packets waiting? */
+		if (FORMAT(trace)->burst_size != FORMAT(trace)->burst_offset) {
 			/* Free the last packet buffer */
 			if (packet->buffer != NULL) {
 				/* The packet should always be finished */
@@ -2238,8 +2315,8 @@ static libtrace_eventobj_t dpdk_trace_event(libtrace_t *trace,
 			packet->buf_control = TRACE_CTRL_EXTERNAL;
 			packet->type = TRACE_RT_DATA_DPDK;
 			event.type = TRACE_EVENT_PACKET;
-			dpdk_ready_pkts(trace, FORMAT_DATA_FIRST(trace), pkts_burst, 1);
-			packet->buffer = FORMAT(trace)->burst_pkts[0];
+			packet->buffer = FORMAT(trace)->burst_pkts[
+			                     FORMAT(trace)->burst_offset++];
 			dpdk_prepare_packet(trace, packet, packet->buffer, packet->type, 0);
 			event.size = 1; // TODO should be bytes read, which essentially useless anyway
 
@@ -2268,7 +2345,7 @@ static libtrace_eventobj_t dpdk_trace_event(libtrace_t *trace,
 }
 
 static void dpdk_help(void) {
-	printf("dpdk format module: $Revision: 1752 $\n");
+	printf("dpdk format module: %s (%d) \n", rte_version(), RTE_VERSION);
 	printf("Supported input URIs:\n");
 	printf("\tdpdk:<domain:bus:devid.func>-<coreid>\n");
 	printf("\tThe -<coreid> is optional \n");

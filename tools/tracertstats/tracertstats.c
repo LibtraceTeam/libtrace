@@ -257,12 +257,13 @@ static void run_trace(char *uri)
 		return;
 	}
 	trace_set_combiner(trace, &combiner_ordered, (libtrace_generic_t){0});
-	trace_set_tracetime(trace, true);
         trace_set_perpkt_threads(trace, threadcount);
 	trace_set_burst_size(trace, burstsize);
 
 	if (trace_get_information(trace)->live) {
                 trace_set_tick_interval(trace, (int) (packet_interval * 1000));
+	} else {
+		trace_set_tracetime(trace, true);
 	}
 
         pktcbs = trace_create_callback_set();

@@ -1,11 +1,12 @@
 lib_LTLIBRARIES = libtrace.la
-include_HEADERS = libtrace.h dagformat.h lt_inttypes.h daglegacy.h \
-        rt_protocol.h erftypes.h libtrace_parallel.h \
+include_HEADERS = libtrace.h libtrace_parallel.h
+pkginclude_HEADERS = dagformat.h lt_inttypes.h daglegacy.h \
+        rt_protocol.h erftypes.h \
         data-struct/ring_buffer.h data-struct/object_cache.h \
-        data-struct/vector.h data-struct/message_queue.h \
+        data-struct/vector.h \
         data-struct/deque.h data-struct/linked_list.h \
-        data-struct/sliding_window.h hash_toeplitz.h \
-        data-struct/buckets.h
+        data-struct/buckets.h data-struct/sliding_window.h \
+	data-struct/message_queue.h hash_toeplitz.h
 
 AM_CFLAGS=@LIBCFLAGS@ @CFLAG_VISIBILITY@ -pthread
 AM_CXXFLAGS=@LIBCXXFLAGS@ @CFLAG_VISIBILITY@ -pthread

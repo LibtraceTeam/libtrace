@@ -1,0 +1,2 @@
+usr/lib/libpacketdump*.so.*
+usr/lib/libpacketdump/*.protocol

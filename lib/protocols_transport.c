@@ -548,22 +548,35 @@ DLLEXPORT uint16_t *trace_checksum_transport(libtrace_packet_t *packet,
 DLLEXPORT void *trace_get_payload_from_gre(libtrace_gre_t *gre,
         uint32_t *remaining)
 {
+    uint8_t flags = ntohs(gre->flags);
     uint32_t size = 4; /* GRE is 4 bytes long by default */
     if (remaining && *remaining < size) {
         *remaining = 0;
         return NULL;
     }
 
-    if ((ntohs(gre->flags) & LIBTRACE_GRE_FLAG_CHECKSUM) != 0) {
-        size += 4;  /* An extra 4 bytes. */
-    }
+    if((flags & LIBTRACE_GRE_FLAG_VERMASK) == LIBTRACE_GRE_PPTP_VERSION) {
+        size += 4;
 
-    if ((ntohs(gre->flags) & LIBTRACE_GRE_FLAG_KEY) != 0) {
-        size += 4;  /* An extra 4 bytes. */
-    }
+        if ((flags & LIBTRACE_GRE_FLAG_SEQ) != 0) {
+            size += 4;
+        }
+        if ((flags & LIBTRACE_GRE_FLAG_ACK) != 0) {
+            size += 4;
+        }
+    } else {
 
-    if ((ntohs(gre->flags) & LIBTRACE_GRE_FLAG_SEQ) != 0) {
-        size += 4;  /* An extra 4 bytes. */
+        if ((ntohs(gre->flags) & LIBTRACE_GRE_FLAG_CHECKSUM) != 0) {
+            size += 4;  /* An extra 4 bytes. */
+        }
+
+        if ((ntohs(gre->flags) & LIBTRACE_GRE_FLAG_KEY) != 0) {
+           size += 4;  /* An extra 4 bytes. */
+        }
+
+        if ((ntohs(gre->flags) & LIBTRACE_GRE_FLAG_SEQ) != 0) {
+            size += 4;  /* An extra 4 bytes. */
+        }
     }
 
     if (remaining) {

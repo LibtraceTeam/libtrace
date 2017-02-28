@@ -446,6 +446,10 @@ static int linuxring_prepare_packet(libtrace_t *libtrace UNUSED,
 
 #ifdef HAVE_NETPACKET_PACKET_H
 #define LIBTRACE_MIN(a,b) ((a)<(b) ? (a) : (b))
+/* We use TP_STATUS_LIBTRACE to ensure we don't loop back on ourself
+ * and read the same packet twice if an old packet has not yet been freed */
+#define TP_STATUS_LIBTRACE 0xFFFFFFFF
+
 inline static int linuxring_read_stream(libtrace_t *libtrace,
                                         libtrace_packet_t *packet,
                                         struct linux_per_stream_t *stream,
@@ -469,7 +473,10 @@ inline static int linuxring_read_stream(libtrace_t *libtrace,
 	 * When a slot does not have this flag set, the frame is not
 	 * ready for consumption.
 	 */
-	while (!(header->tp_status & TP_STATUS_USER)) {
+	while (!(header->tp_status & TP_STATUS_USER) ||
+	       header->tp_status == TP_STATUS_LIBTRACE) {
+		if ((ret=is_halted(libtrace)) != -1)
+			return ret;
 		pollset[0].fd = stream->fd;
 		pollset[0].events = POLLIN;
 		pollset[0].revents = 0;
@@ -508,15 +515,14 @@ inline static int linuxring_read_stream(libtrace_t *libtrace,
 				return -1;
 			}
 		} else {
-			/* Poll timed out - check if we should exit */
-			if (libtrace_halt)
-				return 0;
+			/* Poll timed out - check if we should exit on next loop */
 			continue;
 		}
 	}
-
 	packet->buffer = header;
 	packet->trace = libtrace;
+	
+	header->tp_status = TP_STATUS_LIBTRACE;
 
 	/* If a snaplen was configured, automatically truncate the packet to
 	 * the desired length.
@@ -530,6 +536,17 @@ inline static int linuxring_read_stream(libtrace_t *libtrace,
 	/* Move to next buffer */
   	stream->rxring_offset++;
 	stream->rxring_offset %= stream->req.tp_frame_nr;
+
+	packet->order = (((uint64_t)TO_TP_HDR2(packet->buffer)->tp_sec) << 32)
+			+ ((((uint64_t)TO_TP_HDR2(packet->buffer)->tp_nsec)
+			<< 32) / 1000000000);
+
+	if (packet->order <= stream->last_timestamp) {
+		packet->order = stream->last_timestamp + 1;
+	}
+
+	stream->last_timestamp = packet->order;
+		
 
 	/* We just need to get prepare_packet to set all our packet pointers
 	 * appropriately */
@@ -573,7 +590,8 @@ static libtrace_eventobj_t linuxring_event(libtrace_t *libtrace,
 
 	/* Fetch the current frame */
 	header = GET_CURRENT_BUFFER(FORMAT_DATA_FIRST);
-	if (header->tp_status & TP_STATUS_USER) {
+	if (header->tp_status & TP_STATUS_USER &&
+	    header->tp_status != TP_STATUS_LIBTRACE) {
 		/* We have a frame waiting */
 		event.size = trace_read_packet(libtrace, packet);
 		event.type = TRACE_EVENT_PACKET;

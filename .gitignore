@@ -80,6 +80,8 @@ test/test-tracetime-parallel
 test/test-vxlan
 test/test-wireless
 test/test-write
+test/DPDK_source/
+test/DPDK_builds/
 tools/traceanon/traceanon
 tools/traceanon/traceanon_parallel
 tools/tracediff/tracediff

@@ -231,6 +231,7 @@ int test_tracetime(const char *tracename) {
         trace_set_result_cb(reporter, report_cb);
 
         trace_set_reporter_thold(trace, 1);
+	trace_set_burst_size(trace, 10);
 
 	// Start it
 	trace_pstart(trace, NULL, processing, reporter);

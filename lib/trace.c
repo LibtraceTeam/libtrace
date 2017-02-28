@@ -260,6 +260,7 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 	
 	/* Parallel inits */
 	ASSERT_RET(pthread_mutex_init(&libtrace->libtrace_lock, NULL), == 0);
+	ASSERT_RET(pthread_mutex_init(&libtrace->read_packet_lock, NULL), == 0);
 	ASSERT_RET(pthread_cond_init(&libtrace->perpkt_cond, NULL), == 0);
 	libtrace->state = STATE_NEW;
 	libtrace->perpkt_queue_full = false;
@@ -384,6 +385,7 @@ DLLEXPORT libtrace_t * trace_create_dead (const char *uri) {
 	
 	/* Parallel inits */
 	ASSERT_RET(pthread_mutex_init(&libtrace->libtrace_lock, NULL), == 0);
+	ASSERT_RET(pthread_mutex_init(&libtrace->read_packet_lock, NULL), == 0);
 	ASSERT_RET(pthread_cond_init(&libtrace->perpkt_cond, NULL), == 0);
 	libtrace->state = STATE_NEW; // TODO MAYBE DEAD
 	libtrace->perpkt_queue_full = false;
@@ -547,7 +549,7 @@ DLLEXPORT int trace_pause(libtrace_t *libtrace)
 	}
 
 	/* Finish the last packet we read - for backwards compatibility */
-	if (libtrace->last_packet)
+	if (!libtrace_parallel && libtrace->last_packet)
 		trace_fin_packet(libtrace->last_packet);
 	assert(libtrace->last_packet == NULL);
 
@@ -679,6 +681,7 @@ DLLEXPORT void trace_destroy(libtrace_t *libtrace) {
 	assert(libtrace);
 
 	ASSERT_RET(pthread_mutex_destroy(&libtrace->libtrace_lock), == 0);
+	ASSERT_RET(pthread_mutex_destroy(&libtrace->read_packet_lock), == 0);
 	ASSERT_RET(pthread_cond_destroy(&libtrace->perpkt_cond), == 0);
 
 	/* destroy any packets that are still around */
@@ -693,7 +696,7 @@ DLLEXPORT void trace_destroy(libtrace_t *libtrace) {
 	}
 
 	/* Finish any the last packet we read - for backwards compatibility */
-	if (libtrace->last_packet) {
+	if (!libtrace_parallel && libtrace->last_packet) {
 		trace_fin_packet(libtrace->last_packet);
         }
 	assert(libtrace->last_packet == NULL);
@@ -757,6 +760,7 @@ DLLEXPORT void trace_destroy_dead(libtrace_t *libtrace) {
 	assert(libtrace);
 
 	ASSERT_RET(pthread_mutex_destroy(&libtrace->libtrace_lock), == 0);
+	ASSERT_RET(pthread_mutex_destroy(&libtrace->read_packet_lock), == 0);
 	ASSERT_RET(pthread_cond_destroy(&libtrace->perpkt_cond), == 0);
 
 	/* Don't call pause_input or fin_input, because we should never have
@@ -832,8 +836,10 @@ DLLEXPORT void trace_destroy_packet(libtrace_packet_t *packet) {
 	if (libtrace_parallel && packet->trace && packet->trace->format->fin_packet) {
 		packet->trace->format->fin_packet(packet);
 	}
-	if (packet->trace && packet->trace->last_packet == packet)
+	if (!libtrace_parallel && packet->trace &&
+	     packet->trace->last_packet == packet) {
 		packet->trace->last_packet = NULL;
+	}
 	
 	if (packet->buf_control == TRACE_CTRL_PACKET && packet->buffer) {
 		free(packet->buffer);
@@ -863,10 +869,8 @@ void trace_fin_packet(libtrace_packet_t *packet) {
                 }
 
                 if (packet->trace) {
-                        pthread_mutex_lock(&packet->trace->libtrace_lock);
-        		if (packet->trace->last_packet == packet)
-	        		packet->trace->last_packet = NULL;
-                        pthread_mutex_unlock(&packet->trace->libtrace_lock);
+			if (!libtrace_parallel && packet->trace->last_packet == packet)
+				packet->trace->last_packet = NULL;
                 }
 
 		// No matter what we remove the header and link pointers
@@ -920,11 +924,14 @@ DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 		do {
 			size_t ret;
 			int filtret;
+			if ((ret=is_halted(libtrace)) != (size_t)-1)
+				return ret;
 			/* Store the trace we are reading from into the packet opaque 
 			 * structure */
 			packet->trace = libtrace;
 			ret=libtrace->format->read_packet(libtrace,packet);
-			if (ret==(size_t)-1 || ret==0) {
+			if (ret==(size_t)READ_MESSAGE ||
+                            ret==(size_t)-1 || ret==0) {
                                 packet->trace = NULL;
 				return ret;
 			}
@@ -952,7 +959,7 @@ DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 			trace_packet_set_order(packet, libtrace->sequence_number);
 			++libtrace->accepted_packets;
 			++libtrace->sequence_number;
-			if (packet->trace == libtrace)
+			if (!libtrace_parallel && packet->trace == libtrace)
                                 libtrace->last_packet = packet;
 
 			return ret;
@@ -995,9 +1002,8 @@ int trace_prepare_packet(libtrace_t *trace, libtrace_packet_t *packet,
 	}
 
 	packet->trace = trace;
-        pthread_mutex_lock(&trace->libtrace_lock);
-        trace->last_packet = packet;
-        pthread_mutex_unlock(&trace->libtrace_lock);
+	if (!libtrace_parallel)
+	        trace->last_packet = packet;
 	/* Clear packet cache */
 	trace_clear_cache(packet);
 

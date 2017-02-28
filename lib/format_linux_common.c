@@ -314,6 +314,8 @@ int linuxcommon_start_input_stream(libtrace_t *libtrace,
 	memset(&addr,0,sizeof(addr));
 	libtrace_filter_t *filter = FORMAT_DATA->filter;
 
+	stream->last_timestamp = 0;
+
 	/* Create a raw socket for reading packets on */
 	stream->fd = socket(PF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
 	if (stream->fd==-1) {

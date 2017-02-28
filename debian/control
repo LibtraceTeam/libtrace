@@ -1,0 +1,92 @@
+Source: libtrace4
+Priority: optional
+Maintainer: Matt Brown <mattb@debian.org>
+Build-Depends: debhelper (>= 5.0.0), dpkg-dev (>= 1.16.1~), dh-autoreconf,
+ libpcap0.8-dev, zlib1g-dev, flex, bison, doxygen, liblzma-dev, graphviz,
+ libncurses5-dev, libbz2-dev, libssl-dev, libwandio1-dev
+Standards-Version: 3.9.6
+Section: libs
+Homepage: http://research.wand.net.nz/software/libtrace.php
+
+Package: libtrace4-dev
+Section: libdevel
+Architecture: any
+Depends: libtrace4 (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
+Provides: libtrace-dev
+Conflicts: libtrace-dev, libpacketdump3-dev
+Replaces: libtrace-dev
+Description: development headers for the libtrace network processing library
+ This package contains development headers and other ancillary files for
+ the libtrace library.
+ .
+ libtrace is a library for trace processing. It supports multiple input
+ methods, including device capture, raw and gz-compressed trace, and sockets;
+ and multiple input formats, including pcap and DAG.
+ .
+ libtrace is developed by the WAND Network Research Group at Waikato
+ University in New Zealand.
+
+Package: libtrace4
+Section: libs
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Provides: libtrace
+Conflicts: libtrace, libtrace3
+Replaces: libtrace3
+Description: network trace processing library supporting many input formats
+ libtrace is a library for trace processing. It supports multiple input
+ methods, including device capture, raw and gz-compressed trace, and sockets;
+ and multiple input formats.
+ .
+ libtrace is developed by the WAND Network Research Group at Waikato 
+ University in New Zealand.
+
+Package: libpacketdump4-dev
+Section: libdevel
+Architecture: any
+Depends: libpacketdump4 (= ${binary:Version}), ${misc:Depends},
+ ${shlibs:Depends}
+Provides: libpacketdump-dev
+Conflicts: libpacketdump-dev
+Replaces: libpacketdump-dev
+Description: development headers for the libpacketdump library
+ This package contains development headers and other ancillary files for
+ the libpacketdump library.
+ .
+ libpacketdump provides a library which can parse packets and display the 
+ packet contents in a nice human-readable form. The output is similar to that
+ produced by tcpdump, although the formatting is somewhat more verbose.
+ .
+ libpacketdump is developed by the WAND Network Research Group at Waikato
+ University in New Zealand.
+
+Package: libpacketdump4
+Section: libs
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Provides: libpacketdump
+Conflicts: libpacketdump, libpacketdump3
+Replaces: libpacketdump3
+Description: network packet parsing and human-readable display library
+ libpacketdump provides a library which can parse packets and display the
+ packet contents in a nice human-readable form. The output is similar to that
+ produced by tcpdump, although the formatting is somewhat more verbose.
+ .
+ libpacketdump is developed by the WAND Network Research Group at Waikato 
+ University in New Zealand.
+
+Package: libtrace4-tools
+Section: net
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Conflicts: libtrace-tools
+Replaces: libtrace-tools
+Description: helper utilities for use with the libtrace process library
+ libtrace is a library for trace processing. These tools perform many common
+ tasks that are required when analysing and manipulating network traces.
+ .
+ Multiple input methods and formats are supported including device capture, 
+ raw and gz-compressed traces, and sockets.
+ . 
+ libtrace is developed by the WAND Network Research Group at Waikato 
+ University in New Zealand.
