@@ -2153,6 +2153,7 @@ static int dpdk_pread_packets (libtrace_t *libtrace,
 	struct rte_mbuf* pkts_burst[nb_packets]; /* Array of pointer(s) */
 	int i;
 	dpdk_per_stream_t *stream = t->format_data;
+	struct dpdk_addt_hdr * hdr;
 
 	nb_rx = dpdk_read_packet_stream (libtrace, stream, &t->messages,
 	                                 pkts_burst, nb_packets);
@@ -2169,6 +2170,9 @@ static int dpdk_pread_packets (libtrace_t *libtrace,
 			packets[i]->buffer = pkts_burst[i];
 			packets[i]->trace = libtrace;
 			packets[i]->error = 1;
+			hdr = (struct dpdk_addt_hdr *) 
+					((struct rte_mbuf*) pkts_burst[i] + 1);
+			packets[i]->order = hdr->timestamp;
 			dpdk_prepare_packet(libtrace, packets[i], packets[i]->buffer, packets[i]->type, 0);
 		}
 	}

@@ -519,9 +519,9 @@ inline static int linuxring_read_stream(libtrace_t *libtrace,
 			continue;
 		}
 	}
-
 	packet->buffer = header;
 	packet->trace = libtrace;
+	
 	header->tp_status = TP_STATUS_LIBTRACE;
 
 	/* If a snaplen was configured, automatically truncate the packet to
@@ -536,6 +536,17 @@ inline static int linuxring_read_stream(libtrace_t *libtrace,
 	/* Move to next buffer */
   	stream->rxring_offset++;
 	stream->rxring_offset %= stream->req.tp_frame_nr;
+
+	packet->order = (((uint64_t)TO_TP_HDR2(packet->buffer)->tp_sec) << 32)
+			+ ((((uint64_t)TO_TP_HDR2(packet->buffer)->tp_nsec)
+			<< 32) / 1000000000);
+
+	if (packet->order <= stream->last_timestamp) {
+		packet->order = stream->last_timestamp + 1;
+	}
+
+	stream->last_timestamp = packet->order;
+		
 
 	/* We just need to get prepare_packet to set all our packet pointers
 	 * appropriately */

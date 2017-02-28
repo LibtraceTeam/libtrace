@@ -256,6 +256,7 @@ struct linux_format_data_t {
 	 * file descriptors from packet fanout will use, here we assume/hope
 	 * that every ring can get setup the same */
 	libtrace_list_t *per_stream;
+
 };
 
 struct linux_format_data_out_t {
@@ -286,9 +287,10 @@ struct linux_per_stream_t {
 	int rxring_offset;
 	/* The ring buffer layout */
 	struct tpacket_req req;
+	uint64_t last_timestamp;
 } ALIGN_STRUCT(CACHE_LINE_SIZE);
 
-#define ZERO_LINUX_STREAM {-1, MAP_FAILED, 0, {0,0,0,0}}
+#define ZERO_LINUX_STREAM {-1, MAP_FAILED, 0, {0,0,0,0}, 0}
 
 
 /* Format header for encapsulating packets captured using linux native */

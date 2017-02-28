@@ -676,7 +676,9 @@ static void* perpkt_threads_entry(void *data) {
 			}
 			if (!trace->pread) {
 				assert(packets[0]);
+				ASSERT_RET(pthread_mutex_lock(&trace->libtrace_lock), == 0);
 				nb_packets = trace_read_packet(trace, packets[0]);
+				ASSERT_RET(pthread_mutex_unlock(&trace->libtrace_lock), == 0);
 				packets[0]->error = nb_packets;
 				if (nb_packets > 0)
 					nb_packets = 1;
@@ -1341,7 +1343,6 @@ static int trace_pread_packet_wrapper(libtrace_t *libtrace,
 				if (libtrace->snaplen>0)
 					trace_set_capture_length(packets[i],
 							libtrace->snaplen);
-				trace_packet_set_order(packets[i], trace_get_erf_timestamp(packets[i]));
 			}
 		} while(ret == 0);
 		return ret;
