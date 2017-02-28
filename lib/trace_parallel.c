@@ -1343,7 +1343,6 @@ static int trace_pread_packet_wrapper(libtrace_t *libtrace,
 				if (libtrace->snaplen>0)
 					trace_set_capture_length(packets[i],
 							libtrace->snaplen);
-				trace_packet_set_order(packets[i], trace_get_erf_timestamp(packets[i]));
 			}
 		} while(ret == 0);
 		return ret;

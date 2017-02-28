@@ -1312,6 +1312,7 @@ static int dag_read_packet_stream(libtrace_t *libtrace,
 	} while (erfptr == NULL);
 
 	packet->trace = libtrace;
+
 	/* Prepare the libtrace packet */
 	if (dag_prepare_packet_stream(libtrace, stream_data, packet, erfptr,
 				    TRACE_RT_DATA_ERF, flags))
@@ -1323,6 +1324,7 @@ static int dag_read_packet_stream(libtrace_t *libtrace,
 		DUCK.last_pkt = tv.tv_sec;
 	}
 
+	packet->order = erf_get_erf_timestamp(packet);
 	packet->error = packet->payload ? htons(erfptr->rlen) :
 	                                  erf_get_framing_length(packet);
 
