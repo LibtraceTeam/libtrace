@@ -6,7 +6,7 @@ pkginclude_HEADERS = dagformat.h lt_inttypes.h daglegacy.h \
         data-struct/vector.h \
         data-struct/deque.h data-struct/linked_list.h \
         data-struct/buckets.h data-struct/sliding_window.h \
-	data-struct/message_queue.h
+	data-struct/message_queue.h hash_toeplitz.h
 
 AM_CFLAGS=@LIBCFLAGS@ @CFLAG_VISIBILITY@ -pthread
 AM_CXXFLAGS=@LIBCXXFLAGS@ @CFLAG_VISIBILITY@ -pthread
