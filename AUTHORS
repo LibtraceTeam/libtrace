@@ -27,6 +27,10 @@ In no particular order, we would like to recognise:
  * Kaio Rafael and Diógenes Freitas for patching in support for OpenBSD loopback
  * Robert Edmonds for tidying up the libpacketdump plugin install
  * Martin Bligh for patching in support for nanosecond pcap traces
+ * Teemu Rytilahti for adding support for SIT
+ * "EaseTheWorld" for their work with improving the packet statistics API, as
+   well as reporting several bugs
+ * Richard Cziva for contributing to the DPDK support
  * Jamie Curtis for fixing a couple of bugs many many years ago
  * Brendon Jones for creating the original Windows DLLs and writing bits of
    code here and there
