@@ -868,6 +868,11 @@ typedef struct libtrace_gre_t
 #define LIBTRACE_GRE_FLAG_SEQ      0x1000
 #define LIBTRACE_GRE_FLAG_VERMASK  0x0007
 
+
+/* PPTP GRE (RFC2637) */
+#define LIBTRACE_GRE_FLAG_ACK 	   0x0080
+#define LIBTRACE_GRE_PPTP_VERSION  0x0001
+
 /** Libtrace local definition of VXLAN Header
  * (draft-mahalingam-dutt-dcops-vxlan)
  */
