@@ -85,7 +85,7 @@ private:
 
     uint32_t recent_ipv4_cache[2][2];
     const EVP_CIPHER *cipher;
-    EVP_CIPHER_CTX ctx;
+    EVP_CIPHER_CTX *ctx;
 
     uint32_t encrypt32Bits(uint32_t orig, uint8_t start, uint8_t stop,
             uint32_t res);
