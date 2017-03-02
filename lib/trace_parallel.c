@@ -1732,7 +1732,7 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob,
 		if (libtrace->format->start_input) {
 			ret = libtrace->format->start_input(libtrace);
 		}
-		if (libtrace->perpkt_thread_count > 1)
+		if (libtrace->perpkt_thread_count > 1) {
 			libtrace->pread = trace_pread_packet_first_in_first_served;
 			/* Don't wait for a burst of packets if the format is
 			 * live as this could block ring based formats and
@@ -1740,9 +1740,11 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob,
 			if (libtrace->format->info.live) {
 				libtrace->config.burst_size = 1;
 			}
-		else
+		}
+		else {
 			/* Use standard read_packet */
 			libtrace->pread = NULL;
+		}
 	}
 
 	if (ret != 0) {

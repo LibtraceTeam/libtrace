@@ -106,9 +106,10 @@ CryptoAnon::CryptoAnon(uint8_t *key, uint8_t len, uint8_t cachebits) :
     memcpy(this->padding, key + 16, 16);
 
     this->cipher = EVP_aes_128_ecb();
-    EVP_CIPHER_CTX_init(&this->ctx);
+    this->ctx = EVP_CIPHER_CTX_new();
+    EVP_CIPHER_CTX_init(this->ctx);
 
-    EVP_EncryptInit_ex(&this->ctx, this->cipher, NULL, this->key, NULL);
+    EVP_EncryptInit_ex(this->ctx, this->cipher, NULL, this->key, NULL);
 
     this->cachebits = cachebits;
 
@@ -124,7 +125,8 @@ CryptoAnon::CryptoAnon(uint8_t *key, uint8_t len, uint8_t cachebits) :
 
 CryptoAnon::~CryptoAnon() {
     delete(this->ipv4_cache);
-    EVP_CIPHER_CTX_cleanup(&this->ctx);
+    EVP_CIPHER_CTX_cleanup(this->ctx);
+    EVP_CIPHER_CTX_free(this->ctx);
 }
 
 static inline uint32_t generateFirstPad(uint8_t *pad) {
@@ -254,7 +256,7 @@ uint32_t CryptoAnon::encrypt32Bits(uint32_t orig, uint8_t start, uint8_t stop,
         /* Encryption: we're using AES as a pseudorandom function. For each
          * bit in the original address, we use the first bit of the resulting
          * encrypted output as part of an XOR mask */
-        EVP_EncryptUpdate(&this->ctx, (unsigned char *)rin_output, &outl, 
+        EVP_EncryptUpdate(this->ctx, (unsigned char *)rin_output, &outl, 
                 (unsigned char *)rin_input, 16);
 
         /* Put the first bit of the output into the right slot of our mask */
@@ -289,7 +291,7 @@ uint64_t CryptoAnon::encrypt64Bits(uint64_t orig) {
 
         memcpy(rin_input, &input, 8);
 
-        EVP_EncryptUpdate(&this->ctx, (unsigned char *)rin_output, &outl,
+        EVP_EncryptUpdate(this->ctx, (unsigned char *)rin_output, &outl,
                 (unsigned char *)rin_input, 16);
 
         result |= ((((uint64_t)rin_output[0]) >> 7) << (63 - pos));
