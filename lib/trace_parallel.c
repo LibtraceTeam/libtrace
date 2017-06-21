@@ -804,11 +804,11 @@ static void* hasher_entry(void *data) {
 					ASSERT_RET(pthread_mutex_unlock(&trace->libtrace_lock), == 0);
 					break;
 				case MESSAGE_DO_STOP:
+					/* Either FINISHED or FINISHING */
 					assert(trace->started == false);
-					assert(trace->state == STATE_FINISHED);
 					/* Mark the current packet as EOF */
 					packet->error = 0;
-					break;
+					goto hasher_eof;
 				default:
 					fprintf(stderr, "Hasher thread didn't expect message code=%d\n", message.code);
 			}
@@ -849,7 +849,7 @@ static void* hasher_entry(void *data) {
 			pkt_skipped = 1; // Reuse that packet no one read it
 		}
 	}
-
+hasher_eof:
 	/* Broadcast our last failed read to all threads */
 	for (i = 0; i < trace->perpkt_thread_count; i++) {
 		libtrace_packet_t * bcast;
@@ -861,8 +861,9 @@ static void* hasher_entry(void *data) {
 		}
 		ASSERT_RET(pthread_mutex_lock(&trace->libtrace_lock), == 0);
 		if (trace->perpkt_threads[i].state != THREAD_FINISHED) {
-			// Unlock early otherwise we could deadlock
 			libtrace_ringbuffer_write(&trace->perpkt_threads[i].rbuffer, bcast);
+		} else {
+			libtrace_ocache_free(&trace->packet_freelist, (void **) &bcast, 1, 1);
 		}
 		ASSERT_RET(pthread_mutex_unlock(&trace->libtrace_lock), == 0);
 	}
