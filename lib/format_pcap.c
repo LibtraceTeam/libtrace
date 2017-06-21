@@ -127,6 +127,7 @@ static int pcap_start_input(libtrace_t *libtrace) {
 	}
 
 	/* If a filter has been configured, compile and apply it */
+#ifdef HAVE_BPF
 	if (DATA(libtrace)->filter) {
 		if (DATA(libtrace)->filter->flag == 0) {
 			pcap_compile(INPUT.pcap, 
@@ -142,6 +143,7 @@ static int pcap_start_input(libtrace_t *libtrace) {
 			return -1;
 		}
 	}
+#endif
 	return 0;
 }
 
@@ -151,8 +153,12 @@ static int pcap_config_input(libtrace_t *libtrace,
 {
 	switch(option) {
 		case TRACE_OPTION_FILTER:
+#ifdef HAVE_BPF
 			DATA(libtrace)->filter=data;
 			return 0;
+#else
+			return -1;
+#endif
 		case TRACE_OPTION_SNAPLEN:
 			/* Snapping isn't supported directly, so fall thru
 			 * and let libtrace deal with it
@@ -210,8 +216,12 @@ static int pcapint_config_input(libtrace_t *libtrace,
 {
 	switch(option) {
 		case TRACE_OPTION_FILTER:
+#ifdef HAVE_BPF
 			DATA(libtrace)->filter=(libtrace_filter_t*)data;
 			return 0;
+#else
+			return -1;
+#endif
 		case TRACE_OPTION_SNAPLEN:
 			DATA(libtrace)->snaplen=*(int*)data;
 			return 0;
@@ -297,6 +307,7 @@ static int pcapint_start_input(libtrace_t *libtrace) {
 	pcap_setnonblock(INPUT.pcap,0,errbuf);
 #endif
 	/* Set a filter if one is defined */
+#ifdef HAVE_BPF
 	if (DATA(libtrace)->filter) {
 		struct pcap_pkthdr *pcap_hdr = NULL;
 		u_char *pcap_payload = NULL;
@@ -341,6 +352,7 @@ static int pcapint_start_input(libtrace_t *libtrace) {
                 if (pcapret < 0)
                         return -1;
 	}
+#endif
 	return 0; /* success */
 }
 
