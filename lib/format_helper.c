@@ -322,3 +322,84 @@ void trace_set_err_out(libtrace_out_t *trace,int errcode,const char *msg,...)
 	}
 	va_end(va);
 }
+
+/** Attempts to determine the direction for a pcap (or pcapng) packet.
+ *
+ * @param packet        The packet in question.
+ * @return A valid libtrace_direction_t describing the direction that the
+ *         packet was travelling, if direction can be determined. Otherwise
+ *         returns TRACE_DIR_UNKNOWN.
+ * @internal
+ *
+ * Note that we can determine the direction for only certain types of packets
+ * if they are captured using pcap/pcapng, specifically SLL and PFLOG captures.
+ */
+libtrace_direction_t pcap_get_direction(const libtrace_packet_t *packet) {
+        libtrace_direction_t direction  = -1;
+        switch(pcap_linktype_to_libtrace(rt_to_pcap_linktype(packet->type))) {
+                /* We can only get the direction for PCAP packets that have
+                 * been encapsulated in Linux SLL or PFLOG */
+                case TRACE_TYPE_LINUX_SLL:
+                {
+                        libtrace_sll_header_t *sll;
+                        libtrace_linktype_t linktype;
+
+                        sll = (libtrace_sll_header_t*)trace_get_packet_buffer(
+                                        packet,
+                                        &linktype,
+                                        NULL);
+                        if (!sll) {
+                                trace_set_err(packet->trace,
+                                        TRACE_ERR_BAD_PACKET,
+                                                "Bad or missing packet");
+                                return -1;
+                        }
+                        /* 0 == LINUX_SLL_HOST */
+                        /* the Waikato Capture point defines "packets
+                         * originating locally" (ie, outbound), with a
+                         * direction of 0, and "packets destined locally"
+                         * (ie, inbound), with a direction of 1.
+                         * This is kind-of-opposite to LINUX_SLL.
+                         * We return consistent values here, however
+                         *
+                         * Note that in recent versions of pcap, you can
+                         * use "inbound" and "outbound" on ppp in linux
+                         */
+                        if (ntohs(sll->pkttype == 0)) {
+                                direction = TRACE_DIR_INCOMING;
+                        } else {
+                                direction = TRACE_DIR_OUTGOING;
+                        }
+                        break;
+
+                }
+               case TRACE_TYPE_PFLOG:
+                {
+                        libtrace_pflog_header_t *pflog;
+                        libtrace_linktype_t linktype;
+
+                        pflog=(libtrace_pflog_header_t*)trace_get_packet_buffer(
+                                        packet,&linktype,NULL);
+                        if (!pflog) {
+                                trace_set_err(packet->trace,
+                                                TRACE_ERR_BAD_PACKET,
+                                                "Bad or missing packet");
+                                return -1;
+                        }
+                        /* enum    { PF_IN=0, PF_OUT=1 }; */
+                        if (ntohs(pflog->dir==0)) {
+
+                                direction = TRACE_DIR_INCOMING;
+                        }
+                        else {
+                                direction = TRACE_DIR_OUTGOING;
+                        }
+                        break;
+                }
+                default:
+                        break;
+        }       
+        return direction;
+}
+
+

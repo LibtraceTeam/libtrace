@@ -86,4 +86,20 @@ iow_t *trace_open_file_out(libtrace_out_t *libtrace,
 		int compress_type,
 		int level,
 		int filemode);
+
+
+/** Attempts to determine the direction for a pcap (or pcapng) packet.
+ *
+ * @param packet        The packet in question.
+ * @return A valid libtrace_direction_t describing the direction that the
+ *         packet was travelling, if direction can be determined. Otherwise
+ *         returns TRACE_DIR_UNKNOWN.
+ *
+ * Note that we can determine the direction for only certain types of packets
+ * if they are captured using pcap/pcapng, specifically SLL and PFLOG captures.
+ */
+libtrace_direction_t pcap_get_direction(const libtrace_packet_t *packet);
+
+
+
 #endif /* FORMAT_HELPER_H */
