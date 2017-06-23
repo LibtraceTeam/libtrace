@@ -1349,7 +1349,7 @@ DLLEXPORT libtrace_eventobj_t trace_event(libtrace_t *trace,
 DLLEXPORT libtrace_filter_t *
 trace_create_filter_from_bytecode(void *bf_insns, unsigned int bf_len)
 {
-#ifndef HAVE_BPF_FILTER
+#ifndef HAVE_BPF
 	fprintf(stderr, "This version of libtrace does not have BPF support\n");
 	return NULL;
 #else
@@ -1376,7 +1376,7 @@ trace_create_filter_from_bytecode(void *bf_insns, unsigned int bf_len)
  * @returns opaque pointer pointer to a libtrace_filter_t object
  */
 DLLEXPORT libtrace_filter_t *trace_create_filter(const char *filterstring) {
-#ifdef HAVE_BPF_FILTER
+#ifdef HAVE_BPF
 	libtrace_filter_t *filter = (libtrace_filter_t*)
 				malloc(sizeof(libtrace_filter_t));
 	filter->filterstring = strdup(filterstring);
@@ -1391,7 +1391,7 @@ DLLEXPORT libtrace_filter_t *trace_create_filter(const char *filterstring) {
 
 DLLEXPORT void trace_destroy_filter(libtrace_filter_t *filter)
 {
-#ifdef HAVE_BPF_FILTER
+#ifdef HAVE_BPF
 	free(filter->filterstring);
 	if (filter->flag)
 		pcap_freecode(&filter->filter);
@@ -1416,7 +1416,7 @@ static int trace_bpf_compile(libtrace_filter_t *filter,
 		const libtrace_packet_t *packet,
 		void *linkptr,
 		libtrace_linktype_t linktype	) {
-#ifdef HAVE_BPF_FILTER
+#ifdef HAVE_BPF
 	/* It just so happens that the underlying libs used by pthread arn't
 	 * thread safe, namely lex/flex thingys, so single threaded compile
 	 * multi threaded running should be safe.
@@ -1480,7 +1480,7 @@ static int trace_bpf_compile(libtrace_filter_t *filter,
 
 DLLEXPORT int trace_apply_filter(libtrace_filter_t *filter,
 			const libtrace_packet_t *packet) {
-#ifdef HAVE_BPF_FILTER
+#ifdef HAVE_BPF
 	void *linkptr = 0;
 	uint32_t clen = 0;
 	bool free_packet_needed = false;

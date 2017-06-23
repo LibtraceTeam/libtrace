@@ -60,7 +60,7 @@ int linuxcommon_probe_filename(const char *filename)
 /* Compiles a libtrace BPF filter for use with a linux native socket */
 static int linuxnative_configure_bpf(libtrace_t *libtrace,
 		libtrace_filter_t *filter) {
-#ifdef HAVE_LIBPCAP
+#if defined(HAVE_LIBPCAP) && defined(HAVE_BPF)
 	struct ifreq ifr;
 	unsigned int arphrd;
 	libtrace_dlt_t dlt;
@@ -124,7 +124,7 @@ static int linuxnative_configure_bpf(libtrace_t *libtrace,
 
 	return 0;
 #else
-	return -1
+	return -1;
 #endif
 }
 
@@ -403,6 +403,7 @@ int linuxcommon_start_input_stream(libtrace_t *libtrace,
 	 * that the filterstring has been compiled, or the filter was supplied
 	 * pre-compiled.
 	 */
+#ifdef HAVE_BPF
 	if (filter != NULL) {
 		/* Check if the filter was successfully compiled. If not,
 		 * it is probably a bad filter and we should return an error
@@ -423,6 +424,7 @@ int linuxcommon_start_input_stream(libtrace_t *libtrace,
 			perror("setsockopt(SO_ATTACH_FILTER)");
 		}
 	}
+#endif
 
 	/* Consume any buffered packets that were received before the socket
 	 * was properly setup, including those which missed the filter and
