@@ -573,7 +573,7 @@ static int pcap_write_packet(libtrace_out_t *libtrace,
 
 		pcap_dump((u_char*)OUTPUT.trace.dump, &pcap_pkt_hdr, packet->payload);
 	}
-	return 0;
+	return remaining;
 }
 
 static int pcapint_write_packet(libtrace_out_t *libtrace,
