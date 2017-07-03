@@ -138,23 +138,9 @@ static int time_changed(libtrace_packet_t *packet,
 static int length_changed(libtrace_packet_t *packet, 
 		libtrace_packet_t *packet2) {
 
-	uint16_t cap_len_1 = trace_get_capture_length(packet);
-	uint16_t cap_len_2 = trace_get_capture_length(packet2);
 	uint16_t wlen_1 = trace_get_wire_length(packet);
 	uint16_t wlen_2 = trace_get_wire_length(packet2);
 
-	/* Special case where we demoted a packet */
-	if (trace_get_link_type(packet) == TRACE_TYPE_LINUX_SLL && 
-			trace_get_link_type(packet2) != TRACE_TYPE_LINUX_SLL) {
-		
-		if (cap_len_2 != cap_len_1 - sizeof(libtrace_sll_header_t))
-			return true;
-	} else {
-
-		if (cap_len_1 != cap_len_2 && cap_len_2 != wlen_2)
-			return true;
-	}
-	
 	if (wlen_1 != wlen_2)
 		return true;
 
@@ -168,7 +154,6 @@ int main(int argc, char *argv[]) {
 	int count = 0;
 	int level = 0;
 	int expected = 100;
-	int tcpcount = 0;
 	libtrace_t *trace,*trace2;
 	libtrace_out_t *outtrace;
 	libtrace_packet_t *packet,*packet2;
@@ -205,6 +190,8 @@ int main(int argc, char *argv[]) {
 			error = 0;
 			break;
 		}
+
+                trace_set_capture_length(packet, 32);
 		if (trace_write_packet(outtrace,packet) > 0)
 		        count ++;
 		iferrout(outtrace);
@@ -239,7 +226,6 @@ int main(int argc, char *argv[]) {
 	packet=trace_create_packet();
 	packet2=trace_create_packet();
 	count=0;
-	tcpcount=0;
 	while(trace_read_packet(trace,packet)>0) {
 		int err;
 
@@ -257,6 +243,16 @@ int main(int argc, char *argv[]) {
                 } while (IS_LIBTRACE_META_PACKET(packet2));
 
 		/* The capture length might be snapped down to the wire length */
+                if (trace_get_capture_length(packet) == 32) {
+                        printf("original packet has been snapped?!\n");
+                        abort();
+                }
+
+                if (trace_get_capture_length(packet2) != 32) {
+                        printf("failed to properly snap packet\n");
+                        abort();
+                }
+
 		if (length_changed(packet, packet2)) {
 			printf("\t%s\t%s\n",
 				trace1name,
@@ -274,25 +270,10 @@ int main(int argc, char *argv[]) {
 				trace_get_link_type(packet2));
 			abort();
 		}
-		
+
 		if (time_changed(packet, packet2)) {
 			error = 1;
 			break;
-		}
-	
-		if (trace_get_tcp(packet)) {
-			if (!trace_get_tcp(packet2)) {
-				printf("trace corrupt -- expected tcp\n");
-				error=1;
-				break;
-			}
-			++tcpcount;
-		} else {
-			if (trace_get_tcp(packet2)) {
-				printf("trace corrupt: unexpected tcp\n");
-				error=1;
-				break;
-			}
 		}
 
 	}
@@ -305,7 +286,7 @@ int main(int argc, char *argv[]) {
 	trace_destroy_packet(packet);
 	trace_destroy_packet(packet2);
 
-	printf("tcpcount=%i\n",tcpcount);
+        printf("snapped %d packets\n", count);
 
         return error;
 }
