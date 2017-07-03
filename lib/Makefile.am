@@ -54,7 +54,7 @@ libtrace_la_SOURCES = trace.c trace_parallel.c common.h \
 		format_erf.c format_pcap.c format_legacy.c \
 		format_rt.c format_helper.c format_helper.h format_pcapfile.c \
 		format_duck.c format_tsh.c $(NATIVEFORMATS) $(BPFFORMATS) \
-		format_atmhdr.c \
+		format_atmhdr.c format_pcapng.c \
 		libtrace_int.h lt_inttypes.h lt_bswap.h \
 		linktypes.c link_wireless.c byteswap.c \
 		checksum.c checksum.h \

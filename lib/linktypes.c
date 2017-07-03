@@ -138,19 +138,26 @@ libtrace_rt_types_t bpf_linktype_to_rt(libtrace_dlt_t linktype) {
 
 }
 
+libtrace_rt_types_t pcapng_linktype_to_rt(libtrace_dlt_t linktype) {
+
+        return TRACE_RT_DATA_PCAPNG + pcap_dlt_to_pcap_linktype(linktype);
+}
+
 libtrace_dlt_t rt_to_pcap_linktype(libtrace_rt_types_t rt_type)
 {
-	
+
 	if (rt_type >= TRACE_RT_DATA_DLT && rt_type < TRACE_RT_DATA_DLT_END) {
 		/* RT type is in the pcap range */
 		return rt_type - TRACE_RT_DATA_DLT;
-	} 
+	}
 	else if (rt_type >= TRACE_RT_DATA_BPF && rt_type < TRACE_RT_DATA_BPF_END) {
 		return rt_type - TRACE_RT_DATA_BPF;
-	}
-	
+	} else if (rt_type >= TRACE_RT_DATA_PCAPNG && rt_type < TRACE_RT_DATA_PCAPNG_END) {
+                return rt_type - TRACE_RT_DATA_PCAPNG;
+        }
+
 	fprintf(stderr, "Error: RT type %u cannot be converted to a pcap DLT\n", rt_type);
-	assert(rt_type >= TRACE_RT_DATA_DLT && rt_type < TRACE_RT_DATA_BPF_END);
+	assert(false);
 	return 0;	/* satisfy warnings */
 }
 

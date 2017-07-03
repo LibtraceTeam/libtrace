@@ -144,7 +144,8 @@ static void trace_init(void)
 #endif
 		bpf_constructor();
 		pcapfile_constructor();
-		rt_constructor();
+		pcapng_constructor();
+                rt_constructor();
 #ifdef HAVE_DAG
 		dag_constructor();
 #endif
@@ -956,9 +957,11 @@ DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 				trace_set_capture_length(packet,
 						libtrace->snaplen);
 			}
+                        if (!IS_LIBTRACE_META_PACKET(packet)) {
+        			++libtrace->accepted_packets;
+                        }
 			trace_packet_set_order(packet, libtrace->sequence_number);
-			++libtrace->accepted_packets;
-			++libtrace->sequence_number;
+	        	++libtrace->sequence_number;
 			if (!libtrace_parallel && packet->trace == libtrace)
                                 libtrace->last_packet = packet;
 
@@ -1032,6 +1035,12 @@ DLLEXPORT int trace_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *pa
 			"Trace is not started before trace_write_packet");
 		return -1;
 	}
+
+        /* Don't try to convert meta-packets across formats */
+        if (strcmp(libtrace->format->name, packet->trace->format->name) != 0 &&
+                        IS_LIBTRACE_META_PACKET(packet)) {
+                return 0;
+        }
 
 	if (libtrace->format->write_packet) {
 		return libtrace->format->write_packet(libtrace, packet);
