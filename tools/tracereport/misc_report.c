@@ -45,9 +45,9 @@ static uint64_t capture_bytes = 0;
 void misc_per_packet(struct libtrace_packet_t *packet)
 {
 	double ts = trace_get_seconds(packet);
-	if (!has_starttime || starttime > ts)
+	if (ts != 0 && (!has_starttime || starttime > ts))
 		starttime = ts;
-	if (!has_endtime || endtime < ts)
+	if (ts != 0 && (!has_endtime || endtime < ts))
 		endtime = ts;
 	has_starttime = has_endtime = true;
 	++packets;

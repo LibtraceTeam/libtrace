@@ -175,6 +175,9 @@ static libtrace_packet_t *per_packet(libtrace_t *trace, libtrace_thread_t *t,
         Anonymiser *anon = (Anonymiser *)tls;
         libtrace_generic_t result;
 
+        if (IS_LIBTRACE_META_PACKET(packet))
+                return packet;
+
         ipptr = trace_get_ip(packet);
         ip6 = trace_get_ip6(packet);
 
