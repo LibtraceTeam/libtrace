@@ -390,7 +390,8 @@ enum base_format_t {
 	TRACE_FORMAT_LEGACY_NZIX  =14,	/**< Legacy format used for NZIX traces */
 	TRACE_FORMAT_LINUX_RING	  =15,	/**< Linux native interface capture PACKET_MMAP */
 	TRACE_FORMAT_RAWERF	  =16,	/**< Special format for reading uncompressed ERF traces without checking for compression */
-    TRACE_FORMAT_DPDK     =17, /**< The Intel Data Plane Development Kit format */
+        TRACE_FORMAT_DPDK     =17, /**< The Intel Data Plane Development Kit format */
+        TRACE_FORMAT_PCAPNG     =18,    /**< PCAP-NG trace file */
 };
 
 /** RT protocol packet types */
@@ -416,6 +417,7 @@ typedef enum {
 	TRACE_RT_CLIENTDROP	=17,/**< Reliable client was lost */
 	TRACE_RT_METADATA	=18,/**< Packet contains server meta-data */
 	TRACE_RT_DUCK_5_0 	=19,/**< Dag 5.0 Duck */
+        TRACE_RT_PCAPNG_META    =20,/**< Metadata for a PCAP NG input source */
 
 	/** Not actually used - all DATA types begin from this value */
 	TRACE_RT_DATA_SIMPLE	= 1000, 
@@ -479,9 +481,12 @@ typedef enum {
 	TRACE_RT_BPF_ATM_RFC1483 	=TRACE_RT_DATA_BPF+TRACE_DLT_ATM_RFC1483,
 
 	TRACE_RT_DATA_BPF_END		= 3999,
+
+        TRACE_RT_DATA_PCAPNG            = 4000,
+	TRACE_RT_DATA_PCAPNG_END        = 4499,
 	/** Unused value marking the end of the valid range for all RT packet
 	 * types */
-	TRACE_RT_LAST			= 4000
+	TRACE_RT_LAST			= 4500
 } libtrace_rt_types_t;
 
 /** IP Protocol values */
@@ -550,6 +555,8 @@ typedef struct libtrace_packet_t {
         uint64_t internalid;            /** Internal identifier for the pkt */
         void *srcbucket;
 } libtrace_packet_t;
+
+#define IS_LIBTRACE_META_PACKET(packet) (packet->type < TRACE_RT_DATA_SIMPLE)
 
 
 /** Trace directions. 

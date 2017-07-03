@@ -188,6 +188,10 @@ static libtrace_packet_t *cb_packet(libtrace_t *trace, libtrace_thread_t *t,
         thread_data_t *td = (thread_data_t *)tls;
         int i;
 
+        if (IS_LIBTRACE_META_PACKET(packet)) {
+                return packet;
+        }
+
         key = trace_get_erf_timestamp(packet);
         if ((key >> 32) >= (td->last_key >> 32) + packet_interval) {
                 libtrace_generic_t tmp = {.ptr = td->results};

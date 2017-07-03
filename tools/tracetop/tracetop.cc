@@ -260,6 +260,9 @@ static void per_packet(libtrace_packet_t *packet)
 	flowkey_t flowkey;
 	flows_t::iterator it;
 
+        if (IS_LIBTRACE_META_PACKET(packet))
+                return;
+
 	if (trace_get_source_address(packet,(struct sockaddr*)&flowkey.sip)==NULL)
 		flowkey.sip.ss_family = AF_UNSPEC;
 
@@ -466,7 +469,6 @@ static void run_trace(libtrace_t *trace)
 					break;
 				if (trace_get_seconds(packet) - last_report >= interval) {
 					do_report();
-						
 					last_report=trace_get_seconds(packet);
 				}
 				if (trace_read_packet(trace,packet) <= 0) {

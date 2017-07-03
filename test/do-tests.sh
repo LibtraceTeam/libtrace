@@ -65,6 +65,10 @@ echo \* Read rawerf
 do_test ./test-format rawerf 
 do_test ./test-decode rawerf
 
+echo \* Read pcapng
+do_test ./test-format pcapng
+do_test ./test-decode pcapng
+
 
 echo \* Testing pcap-bpf
 do_test ./test-pcap-bpf
@@ -100,6 +104,8 @@ echo \* rawerf
 do_test ./test-time rawerf
 echo \* tsh
 do_test ./test-time tsh
+echo \* pcapng
+do_test ./test-time pcapng
 
 echo \* Testing directions
 do_test ./test-dir
@@ -181,6 +187,14 @@ echo " * erf -> pcapfile"
 rm -f traces/*.out.*
 do_test ./test-convert erf pcapfile
 
+echo " * pcapng -> pcapfile"
+rm -f traces/*.out.*
+do_test ./test-convert pcapng pcapfile
+
+echo " * pcapng -> erf"
+rm -f traces/*.out.*
+do_test ./test-convert pcapng erf
+
 echo " * pcap (sll) -> erf    raw IP"
 rm -f traces/*.out.*
 do_test ./test-convert sll1 erf
@@ -208,9 +222,11 @@ echo " * legacypos -> pcapfile"
 rm -f traces/*.out.*
 do_test ./test-convert legacypos pcapfile
 
-echo " * duck -> duck"
-rm -f traces/*.out.*
-do_test ./test-convert duck duck
+# Don't bother with this anymore -- DUCK qualifies as 'meta' so
+# doesn't get written at the moment.
+#echo " * duck -> duck"
+#rm -f traces/*.out.*
+#do_test ./test-convert duck duck
 
 echo " * tsh -> pcapfile"
 rm -f traces/*.out.*
@@ -219,6 +235,29 @@ do_test ./test-convert tsh pcapfile
 echo " * tsh -> pcap"
 rm -f traces/*.out.*
 do_test ./test-convert tsh pcap
+
+echo \* Testing packet truncation
+echo " * pcap "
+rm -f traces/*.out.*
+do_test ./test-setcaplen pcap pcapfile
+
+echo " * pcapfile "
+rm -f traces/*.out.*
+do_test ./test-setcaplen pcapfile pcapfile
+
+echo " * erf "
+rm -f traces/*.out.*
+do_test ./test-setcaplen erf erf
+
+echo " * pcapng "
+rm -f traces/*.out.*
+do_test ./test-setcaplen pcapng pcapfile
+
+echo " * pcapfilens "
+rm -f traces/*.out.*
+do_test ./test-setcaplen pcapfilens pcapfile
+
+
 
 echo " * format autodetection - uncompressed"
 do_test ./test-autodetect traces/5_packets.erf

@@ -154,6 +154,9 @@ static libtrace_packet_t* fn_packet(libtrace_t *trace,
 	statistics_t *results = (statistics_t *)tls;
 	int i, wlen;
 
+        if (IS_LIBTRACE_META_PACKET(pkt))
+                return pkt;
+
 	/* Apply filters to every packet note the result */
 	wlen = trace_get_wire_length(pkt);
 	for(i=0;i<filter_count;++i) {

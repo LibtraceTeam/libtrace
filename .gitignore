@@ -75,6 +75,7 @@ test/test-live-snaplen
 test/test-pcap-bpf
 test/test-plen
 test/test-ports
+test/test-setcaplen
 test/test-time
 test/test-tracetime-parallel
 test/test-vxlan

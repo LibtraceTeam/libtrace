@@ -573,7 +573,7 @@ static int pcap_write_packet(libtrace_out_t *libtrace,
 
 		pcap_dump((u_char*)OUTPUT.trace.dump, &pcap_pkt_hdr, packet->payload);
 	}
-	return 0;
+	return remaining;
 }
 
 static int pcapint_write_packet(libtrace_out_t *libtrace,
@@ -639,67 +639,9 @@ static libtrace_direction_t pcap_set_direction(libtrace_packet_t *packet,
 	return dir;
 }
 
-static libtrace_direction_t pcap_get_direction(const libtrace_packet_t *packet) {
-	libtrace_direction_t direction  = -1;
-	switch(pcap_get_link_type(packet)) {
-		/* Only packets encapsulated in Linux SLL or PFLOG have any
-		 * direction information */
-
-		case TRACE_TYPE_LINUX_SLL:
-		{
-			libtrace_sll_header_t *sll;
-			sll = trace_get_packet_buffer(packet, NULL, NULL);
-			/* TODO: should check remaining>=sizeof(*sll) */
-			if (!sll) {
-				trace_set_err(packet->trace,
-					TRACE_ERR_BAD_PACKET,
-						"Bad or missing packet");
-				return -1;
-			}
-			/* 0 == LINUX_SLL_HOST */
-			/* the Waikato Capture point defines "packets
-			 * originating locally" (ie, outbound), with a
-			 * direction of 0, and "packets destined locally"
-			 * (ie, inbound), with a direction of 1.
-			 * This is kind-of-opposite to LINUX_SLL.
-			 * We return consistent values here, however
-			 *
-			 * Note that in recent versions of pcap, you can
-			 * use "inbound" and "outbound" on ppp in linux
-			 */
-			if (sll->pkttype == TRACE_SLL_OUTGOING) {
-				direction = TRACE_DIR_OUTGOING;
-			} else {
-				direction = TRACE_DIR_INCOMING;
-			}
-			break;
-
-		}
-		case TRACE_TYPE_PFLOG:
-		{
-			libtrace_pflog_header_t *pflog;
-			pflog = trace_get_packet_buffer(packet, NULL, NULL);
-			/* TODO: should check remaining >= sizeof(*pflog) */
-			if (!pflog) {
-				trace_set_err(packet->trace,
-						TRACE_ERR_BAD_PACKET,
-						"Bad or missing packet");
-				return -1;
-			}
-			/* enum    { PF_IN=0, PF_OUT=1 }; */
-			if (ntohs(pflog->dir==0)) {
-
-				direction = TRACE_DIR_INCOMING;
-			}
-			else {
-				direction = TRACE_DIR_OUTGOING;
-			}
-			break;
-		}
-		default:
-			break;
-	}	
-	return direction;
+static libtrace_direction_t pcapint_get_direction(const libtrace_packet_t *packet) {
+        /* This function is defined in format_helper.c */
+        return pcap_get_direction(packet);
 }
 
 
@@ -827,7 +769,7 @@ static struct libtrace_format_t pcap = {
 	NULL,				/* fin_packet */
 	pcap_write_packet,		/* write_packet */
 	pcap_get_link_type,		/* get_link_type */
-	pcap_get_direction,		/* get_direction */
+	pcapint_get_direction,		/* get_direction */
 	pcap_set_direction,		/* set_direction */
 	NULL,				/* get_erf_timestamp */
 	pcap_get_timeval,		/* get_timeval */
@@ -871,7 +813,7 @@ static struct libtrace_format_t pcapint = {
 	NULL,				/* fin_packet */
 	pcapint_write_packet,		/* write_packet */
 	pcap_get_link_type,		/* get_link_type */
-	pcap_get_direction,		/* get_direction */
+	pcapint_get_direction,		/* get_direction */
 	pcap_set_direction,		/* set_direction */
 	NULL,				/* get_erf_timestamp */
 	pcap_get_timeval,		/* get_timeval */
