@@ -637,10 +637,9 @@ static inline int read_required(streamsock_t ssock) {
 static int receive_from_sockets(recvstream_t *rt) {
 
         fd_set allgroups;
-        int maxfd, i, ret, readybufs;
+        int maxfd, i, ret, readybufs, availsocks;
         struct timeval timeout;
 
-        FD_ZERO(&allgroups);
         maxfd = 0;
         timeout.tv_sec = 0;
         timeout.tv_usec = 10000;
@@ -650,22 +649,41 @@ static int receive_from_sockets(recvstream_t *rt) {
          * port.
          */
 
+        readybufs = 0;
+        availsocks = 0;
+
         for (i = 0; i < rt->sourcecount; i ++) {
                 if (read_required(rt->sources[i])) {
                         FD_SET(rt->sources[i].sock, &allgroups);
                         if (rt->sources[i].sock > maxfd) {
                                 maxfd = rt->sources[i].sock;
                         }
+                        availsocks += 1;
+                } else if (rt->sources[i].sock != -1) {
+                        readybufs += 1;
+                        availsocks += 1;
                 }
         }
 
+        /* If all of our sockets already have data sitting in their
+         * buffers then we can save ourselves some 'select'ing.
+         */
+        if (availsocks == readybufs) {
+                return readybufs;
+        }
+
+        /* Otherwise, at least one active socket has an empty buffer so
+         * we better try to read some data from those sockets (just in
+         * case the correct 'next' packet is waiting on one of those
+         * sockets.
+         */
+        FD_ZERO(&allgroups);
         if (select(maxfd + 1, &allgroups, NULL, NULL, &timeout) < 0) {
                 fprintf(stderr, "Error waiting to receive records: %s\n",
                                 strerror(errno));
                 return -1;
         }
 
-        readybufs = 0;
 
         for (i = 0; i < rt->sourcecount; i ++) {
                 if (!read_required(rt->sources[i])) {
