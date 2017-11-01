@@ -652,6 +652,7 @@ static int receive_from_sockets(recvstream_t *rt) {
         readybufs = 0;
         availsocks = 0;
 
+        FD_ZERO(&allgroups);
         for (i = 0; i < rt->sourcecount; i ++) {
                 if (read_required(rt->sources[i])) {
                         FD_SET(rt->sources[i].sock, &allgroups);
@@ -677,7 +678,6 @@ static int receive_from_sockets(recvstream_t *rt) {
          * case the correct 'next' packet is waiting on one of those
          * sockets.
          */
-        FD_ZERO(&allgroups);
         if (select(maxfd + 1, &allgroups, NULL, NULL, &timeout) < 0) {
                 fprintf(stderr, "Error waiting to receive records: %s\n",
                                 strerror(errno));
@@ -744,7 +744,8 @@ static int receive_from_sockets(recvstream_t *rt) {
                 if (rt->sources[i].expectedseq != 0) {
                         if (ntohl(rt->sources[i].encaphdr->seqno) !=
                                         rt->sources[i].expectedseq) {
-                                rt->missing_records += 1;
+                                /* TODO deal with wrapping */
+                                rt->missing_records += (ntohl(rt->sources[i].encaphdr->seqno) - rt->sources[i].expectedseq);
                         }
                 }
                 rt->sources[i].expectedseq =
