@@ -751,7 +751,7 @@ DLLEXPORT uint16_t trace_get_fragment_offset(const libtrace_packet_t *packet,
 
         if (ethertype == TRACE_ETHERTYPE_IPV6) {
                 libtrace_ip6_t *ip6 = (libtrace_ip6_t *)l3;
-                void *payload = ip6++;
+                void *payload = ip6 + 1;
                 uint8_t nxt = ip6->nxt;
                 uint16_t len;
                 
