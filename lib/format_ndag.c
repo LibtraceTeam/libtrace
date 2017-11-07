@@ -22,6 +22,7 @@
 
 #include "format_ndag.h"
 
+#define NDAG_IDLE_TIMEOUT (600)
 #define ENCAP_BUFSIZE (10000)
 #define CTRL_BUF_SIZE (10000)
 #define ENCAP_BUFFERS (100)
@@ -52,6 +53,7 @@ typedef struct streamsock {
         int nextreadind;
         int nextwriteind;
         int savedsize[ENCAP_BUFFERS];
+        uint32_t startidle;
         uint64_t recordcount;
 
 } streamsock_t;
@@ -614,6 +616,11 @@ static int add_new_streamsock(recvstream_t *rt, streamsource_t src) {
         streamsock_t *ssock = NULL;
         int i;
 
+        /* TODO consider replacing this with a list or vector so we can
+         * easily remove sources that are no longer in use, rather than
+         * just setting the sock to -1 and having to check them every
+         * time we want to read a packet.
+         */
         if (rt->sourcecount == 0) {
                 rt->sources = (streamsock_t *)malloc(sizeof(streamsock_t) * 10);
         } else if ((rt->sourcecount % 10) == 0) {
@@ -635,7 +642,7 @@ static int add_new_streamsock(recvstream_t *rt, streamsource_t src) {
         ssock->expectedseq = 0;
         ssock->monitorid = src.monitor;
         ssock->saved = (char **)malloc(sizeof(char *) * ENCAP_BUFFERS);
-
+        ssock->startidle = 0;
 
         for (i = 0; i < ENCAP_BUFFERS; i++) {
                 ssock->saved[i] = (char *)malloc(ENCAP_BUFSIZE);
@@ -707,38 +714,12 @@ static inline int read_required(streamsock_t ssock) {
 
 static int receive_from_sockets(recvstream_t *rt) {
 
-        int i, ret, readybufs, availsocks, successrecv;
-
-        /* TODO maybe need a way to tidy up "dead" sockets and signal back
-         * to the control thread that we've killed the socket for a particular
-         * port.
-         */
+        int i, ret, readybufs, gottime;
+        struct timeval tv;
 
         readybufs = 0;
-        availsocks = 0;
-        successrecv = 0;
+        gottime = 0;
 
-        for (i = 0; i < rt->sourcecount; i ++) {
-                if (read_required(rt->sources[i])) {
-                        availsocks += 1;
-                } else if (rt->sources[i].sock != -1) {
-                        readybufs += 1;
-                        availsocks += 1;
-                }
-        }
-
-        /* If all of our sockets already have data sitting in their
-         * buffers then we can save ourselves some 'select'ing.
-         */
-        if (availsocks == readybufs) {
-                return readybufs;
-        }
-
-        /* Otherwise, at least one active socket has an empty buffer so
-         * we better try to read some data from those sockets (just in
-         * case the correct 'next' packet is waiting on one of those
-         * sockets.
-         */
         for (i = 0; i < rt->sourcecount; i ++) {
                 int nw;
                 ndag_encap_t *encaphdr;
@@ -763,6 +744,19 @@ static int receive_from_sockets(recvstream_t *rt) {
                                 if (readable_data(rt->sources[i])) {
                                         readybufs ++;
                                 }
+                                if (!gottime) {
+                                        gettimeofday(&tv, NULL);
+                                }
+                                if (rt->sources[i].startidle == 0) {
+                                        rt->sources[i].startidle = tv.tv_sec;
+                                } else if (tv.tv_sec - rt->sources[i].startidle > NDAG_IDLE_TIMEOUT) {
+                                        fprintf(stderr, "Closing channel %s:%u due to inactivity.\n",
+                                                        rt->sources[i].groupaddr,
+                                                        rt->sources[i].port);
+
+                                        close(rt->sources[i].sock);
+                                        rt->sources[i].sock = -1;
+                                }
                                 continue;
                         }
 
@@ -775,20 +769,7 @@ static int receive_from_sockets(recvstream_t *rt) {
                         rt->sources[i].sock = -1;
                         continue;
                 }
-
-                if (ret == 0) {
-                        fprintf(stderr, "Received zero bytes on the channel for %s:%u.\n",
-                                        rt->sources[i].groupaddr,
-                                        rt->sources[i].port);
-                        close(rt->sources[i].sock);
-                        rt->sources[i].sock = -1;
-                        continue;
-                }
-
-                rt->sources[i].savedsize[nw] = ret;
-                rt->sources[i].nextwriteind =
-                                (rt->sources[i].nextwriteind + 1) % ENCAP_BUFFERS;
-                successrecv ++;
+                rt->sources[i].startidle = 0;
 
                 /* Check that we have a valid nDAG encap record */
                 if (check_ndag_header(rt->sources[i].saved[nw], ret) !=
@@ -800,6 +781,10 @@ static int receive_from_sockets(recvstream_t *rt) {
                         rt->sources[i].sock = -1;
                         continue;
                 }
+
+                rt->sources[i].savedsize[nw] = ret;
+                rt->sources[i].nextwriteind =
+                                (rt->sources[i].nextwriteind + 1) % ENCAP_BUFFERS;
 
                 /* Save the useful info from the encap header */
                 encaphdr = (ndag_encap_t *)(rt->sources[i].saved[nw] +
