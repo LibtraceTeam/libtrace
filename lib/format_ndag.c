@@ -88,6 +88,17 @@ typedef struct ndagreadermessage {
 } ndag_internal_message_t;
 
 
+static inline int seq_cmp(uint32_t seq_a, uint32_t seq_b) {
+
+        /* Calculate seq_a - seq_b, taking wraparound into account */
+        if (seq_a == seq_b) return 0;
+
+        if (seq_a > seq_b) {
+                return (int) (seq_a - seq_b);
+        }
+        return (int) (0xffffffff - ((seq_b - seq_a) - 1));
+}
+
 static inline uint8_t check_ndag_header(char *msgbuf, uint32_t msgsize) {
         ndag_common_t *header = (ndag_common_t *)msgbuf;
 
@@ -122,6 +133,7 @@ static int join_multicast_group(char *groupaddr, char *localiface,
         unsigned int interface;
         char pstr[16];
         struct group_req greq;
+        int bufsize;
 
         int sock;
 
@@ -181,6 +193,18 @@ static int join_multicast_group(char *groupaddr, char *localiface,
                         sizeof(greq)) < 0) {
                 fprintf(stderr,
                         "Failed to join multicast group %s:%s -- %s\n",
+                                groupaddr, portstr, strerror(errno));
+                close(sock);
+                sock = -1;
+                goto sockcreateover;
+        }
+
+        bufsize = 16 * 1024 * 1024;
+        if (setsockopt(sock, SOL_SOCKET, SO_RCVBUF, &bufsize,
+                                (socklen_t)sizeof(int)) < 0) {
+
+                fprintf(stderr,
+                        "Failed to increase buffer size for multicast group %s:%s -- %s\n",
                                 groupaddr, portstr, strerror(errno));
                 close(sock);
                 sock = -1;
@@ -636,13 +660,7 @@ static inline int read_required(streamsock_t ssock) {
 
 static int receive_from_sockets(recvstream_t *rt) {
 
-        fd_set allgroups;
-        int maxfd, i, ret, readybufs, availsocks;
-        struct timeval timeout;
-
-        maxfd = 0;
-        timeout.tv_sec = 0;
-        timeout.tv_usec = 10000;
+        int i, ret, readybufs, availsocks, successrecv;
 
         /* TODO maybe need a way to tidy up "dead" sockets and signal back
          * to the control thread that we've killed the socket for a particular
@@ -651,14 +669,10 @@ static int receive_from_sockets(recvstream_t *rt) {
 
         readybufs = 0;
         availsocks = 0;
+        successrecv = 0;
 
-        FD_ZERO(&allgroups);
         for (i = 0; i < rt->sourcecount; i ++) {
                 if (read_required(rt->sources[i])) {
-                        FD_SET(rt->sources[i].sock, &allgroups);
-                        if (rt->sources[i].sock > maxfd) {
-                                maxfd = rt->sources[i].sock;
-                        }
                         availsocks += 1;
                 } else if (rt->sources[i].sock != -1) {
                         readybufs += 1;
@@ -678,13 +692,6 @@ static int receive_from_sockets(recvstream_t *rt) {
          * case the correct 'next' packet is waiting on one of those
          * sockets.
          */
-        if (select(maxfd + 1, &allgroups, NULL, NULL, &timeout) < 0) {
-                fprintf(stderr, "Error waiting to receive records: %s\n",
-                                strerror(errno));
-                return -1;
-        }
-
-
         for (i = 0; i < rt->sourcecount; i ++) {
                 if (!read_required(rt->sources[i])) {
                         if (rt->sources[i].sock != -1) {
@@ -696,17 +703,17 @@ static int receive_from_sockets(recvstream_t *rt) {
                 rt->sources[i].savedsize = 0;
                 rt->sources[i].nextread = rt->sources[i].saved;
 
-                if (!FD_ISSET(rt->sources[i].sock, &allgroups)) {
-                        continue;
-                }
-
                 ret = recvfrom(rt->sources[i].sock, rt->sources[i].saved,
-                                ENCAP_BUFSIZE, 0,
+                                ENCAP_BUFSIZE, MSG_DONTWAIT,
                                 rt->sources[i].srcaddr->ai_addr,
                                 &(rt->sources[i].srcaddr->ai_addrlen));
                 if (ret < 0) {
+                        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                                continue;
+                        }
+
                         fprintf(stderr,
-                                        "Error receiving encapsulated records from %s:%u -- %s\n",
+                                        "Error receiving encapsulated records from %s:%u -- %s \n",
                                         rt->sources[i].groupaddr,
                                         rt->sources[i].port,
                                         strerror(errno));
@@ -725,6 +732,7 @@ static int receive_from_sockets(recvstream_t *rt) {
                 }
 
                 rt->sources[i].savedsize = ret;
+                successrecv ++;
 
                 /* Check that we have a valid nDAG encap record */
                 if (check_ndag_header(rt->sources[i].saved, ret) !=
@@ -742,11 +750,9 @@ static int receive_from_sockets(recvstream_t *rt) {
                                 (rt->sources[i].saved + sizeof(ndag_common_t));
 
                 if (rt->sources[i].expectedseq != 0) {
-                        if (ntohl(rt->sources[i].encaphdr->seqno) !=
-                                        rt->sources[i].expectedseq) {
-                                /* TODO deal with wrapping */
-                                rt->missing_records += (ntohl(rt->sources[i].encaphdr->seqno) - rt->sources[i].expectedseq);
-                        }
+                        rt->missing_records += seq_cmp(
+                                        ntohl(rt->sources[i].encaphdr->seqno),
+                                        rt->sources[i].expectedseq);
                 }
                 rt->sources[i].expectedseq =
                                 ntohl(rt->sources[i].encaphdr->seqno) + 1;
@@ -808,6 +814,13 @@ static int receive_encap_records(libtrace_t *libtrace, recvstream_t *rt,
                         break;
                 }
 
+                /* None of our sources have anything available, we can take
+                 * a short break rather than immediately trying again.
+                 */
+                if (block && iserr == 0) {
+                        usleep(100);
+                }
+
         } while (block);
 
         return iserr;
@@ -825,7 +838,7 @@ static streamsock_t *select_next_packet(recvstream_t *rt) {
                         continue;
                 }
 
-                daghdr = (dag_record_t *)rt->sources[i].nextread;
+                daghdr = (dag_record_t *)(rt->sources[i].nextread);
                 currentts = bswap_le_to_host64(daghdr->ts);
 
                 if (earliest == 0 || earliest > currentts) {
