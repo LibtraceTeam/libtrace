@@ -716,6 +716,7 @@ static int receive_from_sockets(recvstream_t *rt) {
 
         int i, ret, readybufs, gottime;
         struct timeval tv;
+        uint8_t rectype;
 
         readybufs = 0;
         gottime = 0;
@@ -772,8 +773,14 @@ static int receive_from_sockets(recvstream_t *rt) {
                 rt->sources[i].startidle = 0;
 
                 /* Check that we have a valid nDAG encap record */
-                if (check_ndag_header(rt->sources[i].saved[nw], ret) !=
-                                        NDAG_PKT_ENCAPERF) {
+                rectype = check_ndag_header(rt->sources[i].saved[nw], ret);
+
+                if (rectype == NDAG_PKT_KEEPALIVE) {
+                        /* Keep-alive, reset startidle and carry on. Don't
+                         * change nextwrite -- we want to overwrite the
+                         * keep-alive with usable content. */
+                        continue;
+                } else if (rectype != NDAG_PKT_ENCAPERF) {
                         fprintf(stderr, "Received invalid record on the channel for %s:%u.\n",
                                         rt->sources[i].groupaddr,
                                         rt->sources[i].port);
@@ -786,7 +793,7 @@ static int receive_from_sockets(recvstream_t *rt) {
                 rt->sources[i].nextwriteind =
                                 (rt->sources[i].nextwriteind + 1) % ENCAP_BUFFERS;
 
-                /* Save the useful info from the encap header */
+                /* Get the useful info from the encap header */
                 encaphdr = (ndag_encap_t *)(rt->sources[i].saved[nw] +
                                 sizeof(ndag_common_t));
 
@@ -797,8 +804,9 @@ static int receive_from_sockets(recvstream_t *rt) {
                 }
                 rt->sources[i].expectedseq = ntohl(encaphdr->seqno) + 1;
 
-                /* If all good, skip past the nDAG headers */
                 if (rt->sources[i].nextread == NULL) {
+                        /* If this is our first read, set up 'nextread'
+                         * by skipping past the nDAG headers */
                         rt->sources[i].nextread = rt->sources[i].saved[0] +
                                         sizeof(ndag_common_t) + sizeof(ndag_encap_t);
                 }

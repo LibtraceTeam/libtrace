@@ -14,6 +14,7 @@ enum {
         NDAG_PKT_ENCAPERF = 0x02,
         NDAG_PKT_RESTARTED = 0x03,
         NDAG_PKT_ENCAPRT = 0x04,
+        NDAG_PKT_KEEPALIVE = 0x05
 };
 
 /* == Protocol header structures == */
