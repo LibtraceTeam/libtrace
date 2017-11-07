@@ -103,7 +103,7 @@ static inline int seq_cmp(uint32_t seq_a, uint32_t seq_b) {
         return (int) (0xffffffff - ((seq_b - seq_a) - 1));
 }
 
-static inline uint8_t check_ndag_header(char *msgbuf, uint32_t msgsize) {
+static uint8_t check_ndag_header(char *msgbuf, uint32_t msgsize) {
         ndag_common_t *header = (ndag_common_t *)msgbuf;
 
         if (msgsize < sizeof(ndag_common_t)) {
@@ -257,7 +257,7 @@ static int ndag_init_input(libtrace_t *libtrace) {
         return 0;
 }
 
-static inline void new_group_alert(libtrace_t *libtrace, uint16_t threadid,
+static void new_group_alert(libtrace_t *libtrace, uint16_t threadid,
                 uint16_t portnum, uint16_t monid) {
 
         ndag_internal_message_t alert;
@@ -429,7 +429,7 @@ static void *ndag_controller_run(void *tdata) {
         pthread_exit(NULL);
 }
 
-static inline int ndag_start_threads(libtrace_t *libtrace, uint32_t maxthreads)
+static int ndag_start_threads(libtrace_t *libtrace, uint32_t maxthreads)
 {
         int ret;
         uint32_t i;
@@ -684,33 +684,22 @@ static int receiver_read_messages(recvstream_t *rt) {
 
 }
 
-static inline int readable_data(streamsock_t ssock) {
+static inline int readable_data(streamsock_t *ssock) {
 
-        if (ssock.sock == -1) {
+        if (ssock->sock == -1) {
                 return 0;
         }
-        if (ssock.savedsize[ssock.nextreadind] == 0) {
+        if (ssock->savedsize[ssock->nextreadind] == 0) {
                 return 0;
         }
-        if (ssock.nextread - ssock.saved[ssock.nextreadind] >=
-                        ssock.savedsize[ssock.nextreadind]) {
+        if (ssock->nextread - ssock->saved[ssock->nextreadind] >=
+                        ssock->savedsize[ssock->nextreadind]) {
                 return 0;
         }
         return 1;
 
 
 }
-
-static inline int read_required(streamsock_t ssock) {
-        if (ssock.sock == -1)
-                return 0;
-        if (ssock.savedsize[ssock.nextwriteind] == 0)
-                return 1;
-        //if (ssock.nextread - ssock.saved >= ssock.savedsize)
-        //        return 1;
-        return 0;
-}
-
 
 static int receive_from_sockets(recvstream_t *rt) {
 
@@ -725,10 +714,10 @@ static int receive_from_sockets(recvstream_t *rt) {
                 int nw;
                 ndag_encap_t *encaphdr;
 
-                if (!read_required(rt->sources[i])) {
-                        if (rt->sources[i].sock != -1) {
-                                readybufs ++;
-                        }
+                if (rt->sources[i].sock == -1) {
+                        continue;
+                } else if (rt->sources[i].savedsize[rt->sources[i].nextwriteind] != 0) {
+                        readybufs ++;
                         continue;
                 }
 
@@ -742,7 +731,7 @@ static int receive_from_sockets(recvstream_t *rt) {
                         /* Nothing to receive right now, but we should still
                          * count as 'ready' if at least one buffer is full */
                         if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                                if (readable_data(rt->sources[i])) {
+                                if (readable_data(&(rt->sources[i]))) {
                                         readybufs ++;
                                 }
                                 if (!gottime) {
@@ -811,7 +800,7 @@ static int receive_from_sockets(recvstream_t *rt) {
                                         sizeof(ndag_common_t) + sizeof(ndag_encap_t);
                 }
 
-                readybufs += 1;
+                readybufs ++;
         }
 
         return readybufs;
@@ -884,7 +873,7 @@ static streamsock_t *select_next_packet(recvstream_t *rt) {
         dag_record_t *daghdr;
 
         for (i = 0; i < rt->sourcecount; i ++) {
-                if (!readable_data(rt->sources[i])) {
+                if (!readable_data(&(rt->sources[i]))) {
                         continue;
                 }
 
