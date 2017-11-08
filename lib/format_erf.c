@@ -125,7 +125,9 @@ typedef struct erf_index_t {
  */
 static int erf_get_padding(const libtrace_packet_t *packet)
 {
-	if (packet->trace->format->type==TRACE_FORMAT_ERF) {
+	if (packet->trace->format->type==TRACE_FORMAT_ERF ||
+                        packet->trace->format->type == TRACE_FORMAT_NDAG ||
+                        packet->trace->format->type == TRACE_FORMAT_RAWERF) {
 		dag_record_t *erfptr = (dag_record_t *)packet->header;
 		switch((erfptr->type & 0x7f)) {
 			case TYPE_ETH: 		
