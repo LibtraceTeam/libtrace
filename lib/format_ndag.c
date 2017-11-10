@@ -886,11 +886,13 @@ static int receive_encap_records(libtrace_t *libtrace, recvstream_t *rt,
                         return iserr;
                 }
 
-                /* First, check for any messages from the control thread */
-                iserr = receiver_read_messages(rt);
+                /* Check for any messages from the control thread */
+                if (block) {
+                        iserr = receiver_read_messages(rt);
 
-                if (iserr <= 0) {
-                        return iserr;
+                        if (iserr <= 0) {
+                                return iserr;
+                        }
                 }
 
                 /* If non-blocking and there are no sources, just break */
@@ -990,6 +992,12 @@ static int ndag_pread_packets(libtrace_t *libtrace, libtrace_thread_t *t,
 
         rt = (recvstream_t *)t->format_data;
 
+        /* Only check for messages once per batch */
+        rem = receiver_read_messages(rt);
+        if (rem <= 0) {
+                return rem;
+        }
+
         do {
                 rem = receive_encap_records(libtrace, rt,
                                 packets[read_packets],
@@ -1028,6 +1036,13 @@ static libtrace_eventobj_t trace_event_ndag(libtrace_t *libtrace,
         libtrace_eventobj_t event = {0,0,0.0,0};
         int rem;
         streamsock_t *nextavail = NULL;
+
+        /* Only check for messages once per batch */
+        rem = receiver_read_messages(&(FORMAT_DATA->receivers[0]));
+        if (rem <= 0) {
+                event.type = TRACE_EVENT_TERMINATE;
+                return event;
+        }
 
         do {
                 rem = receive_encap_records(libtrace,
