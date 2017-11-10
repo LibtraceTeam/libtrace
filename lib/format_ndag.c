@@ -33,6 +33,12 @@ static struct libtrace_format_t ndag;
 
 volatile int ndag_paused = 0;
 
+typedef struct monitor {
+        uint16_t monitorid;
+        uint64_t laststart;
+} ndag_monitor_t;
+
+
 typedef struct streamsource {
         uint16_t monitor;
         char *groupaddr;
@@ -46,8 +52,7 @@ typedef struct streamsock {
         struct addrinfo *srcaddr;
         uint16_t port;
         uint32_t expectedseq;
-        uint16_t monitorid;
-
+        ndag_monitor_t *monitorptr;
         char **saved;
         char *nextread;
         int nextreadind;
@@ -63,6 +68,8 @@ typedef struct recvstream {
         uint16_t sourcecount;
         libtrace_message_queue_t mqueue;
         int threadindex;
+        ndag_monitor_t *knownmonitors;
+        uint16_t monitorcount;
 
         uint64_t dropped_upstream;
         uint64_t missing_records;
@@ -82,7 +89,7 @@ typedef struct ndag_format_data {
 
 enum {
         NDAG_CLIENT_HALT = 0x01,
-        NDAG_CLIENT_RESTARTED = 0x02,
+        NDAG_CLIENT_RESTARTED = 0x02,   // redundant
         NDAG_CLIENT_NEWGROUP = 0x03
 };
 
@@ -100,7 +107,9 @@ static inline int seq_cmp(uint32_t seq_a, uint32_t seq_b) {
         if (seq_a > seq_b) {
                 return (int) (seq_a - seq_b);
         }
-        return (int) (0xffffffff - ((seq_b - seq_a) - 1));
+
+        /* -1 for the wrap and another -1 because we don't use zero */
+        return (int) (0xffffffff - ((seq_b - seq_a) - 2));
 }
 
 static uint8_t check_ndag_header(char *msgbuf, uint32_t msgsize) {
@@ -328,20 +337,6 @@ static int ndag_parse_control_message(libtrace_t *libtrace, char *msgbuf,
 
                         ptr ++;
                 }
-        } else if (msgtype == NDAG_PKT_RESTARTED) {
-                /* If message is a restart, push that to all active message
-                 * queues. */
-                ndag_internal_message_t alert;
-                alert.type = NDAG_CLIENT_RESTARTED;
-                alert.contents.monitor = ntohs(ndaghdr->monitorid);
-                alert.contents.groupaddr = NULL;
-                alert.contents.localiface = NULL;
-                alert.contents.port = 0;
-                for (i = 0; i < libtrace->perpkt_thread_count; i++) {
-                        libtrace_message_queue_put(
-                                        &(FORMAT_DATA->receivers[i].mqueue),
-                                        (void *)&alert);
-                }
         } else {
                 fprintf(stderr,
                         "Unexpected message type on control channel: %u\n",
@@ -445,6 +440,8 @@ static int ndag_start_threads(libtrace_t *libtrace, uint32_t maxthreads)
         for (i = 0; i < maxthreads; i++) {
                 FORMAT_DATA->receivers[i].sources = NULL;
                 FORMAT_DATA->receivers[i].sourcecount = 0;
+                FORMAT_DATA->receivers[i].knownmonitors = NULL;
+                FORMAT_DATA->receivers[i].monitorcount = 0;
                 FORMAT_DATA->receivers[i].threadindex = i;
                 FORMAT_DATA->receivers[i].dropped_upstream = 0;
                 FORMAT_DATA->receivers[i].received_packets = 0;
@@ -494,6 +491,10 @@ static void halt_ndag_receiver(recvstream_t *receiver) {
                 }
                 close(src.sock);
         }
+        if (receiver->knownmonitors) {
+                free(receiver->knownmonitors);
+        }
+
         if (receiver->sources) {
                 free(receiver->sources);
         }
@@ -611,9 +612,31 @@ static int ndag_prepare_packet(libtrace_t *libtrace UNUSED,
 
 }
 
+static ndag_monitor_t *add_new_knownmonitor(recvstream_t *rt, uint16_t monid) {
+
+        ndag_monitor_t *mon;
+
+        if (rt->monitorcount == 0) {
+                rt->knownmonitors = (ndag_monitor_t *)
+                                malloc(sizeof(ndag_monitor_t) * 5);
+        } else {
+                rt->knownmonitors = (ndag_monitor_t *)
+                            realloc(rt->knownmonitors,
+                            sizeof(ndag_monitor_t) * (rt->monitorcount * 5));
+        }
+
+        mon = &(rt->knownmonitors[rt->monitorcount]);
+        mon->monitorid = monid;
+        mon->laststart = 0;
+
+        rt->monitorcount ++;
+        return mon;
+}
+
 static int add_new_streamsock(recvstream_t *rt, streamsource_t src) {
 
         streamsock_t *ssock = NULL;
+        ndag_monitor_t *mon = NULL;
         int i;
 
         /* TODO consider replacing this with a list or vector so we can
@@ -637,10 +660,21 @@ static int add_new_streamsock(recvstream_t *rt, streamsource_t src) {
                 return -1;
         }
 
+        for (i = 0; i < rt->monitorcount; i++) {
+                if (rt->knownmonitors[i].monitorid == src.monitor) {
+                        mon = &(rt->knownmonitors[i]);
+                        break;
+                }
+        }
+
+        if (mon == NULL) {
+                mon = add_new_knownmonitor(rt, src.monitor);
+        }
+
         ssock->port = src.port;
         ssock->groupaddr = src.groupaddr;
         ssock->expectedseq = 0;
-        ssock->monitorid = src.monitor;
+        ssock->monitorptr = mon;
         ssock->saved = (char **)malloc(sizeof(char *) * ENCAP_BUFFERS);
         ssock->startidle = 0;
 
@@ -672,10 +706,6 @@ static int receiver_read_messages(recvstream_t *rt) {
                                         return -1;
                                 }
                                 break;
-                        case NDAG_CLIENT_RESTARTED:
-                                /* TODO */
-
-                                break;
                         case NDAG_CLIENT_HALT:
                                 return 0;
                 }
@@ -701,6 +731,17 @@ static inline int readable_data(streamsock_t *ssock) {
 
 }
 
+static inline void reset_expected_seqs(recvstream_t *rt, ndag_monitor_t *mon) {
+
+        int i;
+        for (i = 0; i < rt->sourcecount; i++) {
+                if (rt->sources[i].monitorptr == mon) {
+                        rt->sources[i].expectedseq = 0;
+                }
+        }
+
+}
+
 static int receive_from_sockets(recvstream_t *rt) {
 
         int i, ret, readybufs, gottime;
@@ -713,6 +754,7 @@ static int receive_from_sockets(recvstream_t *rt) {
         for (i = 0; i < rt->sourcecount; i ++) {
                 int nw;
                 ndag_encap_t *encaphdr;
+                ndag_monitor_t *mon;
 
                 if (rt->sources[i].sock == -1) {
                         continue;
@@ -786,12 +828,32 @@ static int receive_from_sockets(recvstream_t *rt) {
                 encaphdr = (ndag_encap_t *)(rt->sources[i].saved[nw] +
                                 sizeof(ndag_common_t));
 
+                mon = rt->sources[i].monitorptr;
+                assert(mon);
+
+                if (mon->laststart == 0) {
+                        mon->laststart = bswap_be_to_host64(encaphdr->started);
+                } else if (mon->laststart != bswap_be_to_host64(encaphdr->started)) {
+                        mon->laststart = bswap_be_to_host64(encaphdr->started);
+                        reset_expected_seqs(rt, mon);
+
+                        /* TODO what is a good way to indicate this to clients?
+                         * set the loss counter in the ERF header? a bit rude?
+                         * use another bit in the ERF header?
+                         * add a queryable flag to libtrace_packet_t?
+                         */
+
+                }
+
                 if (rt->sources[i].expectedseq != 0) {
                         rt->missing_records += seq_cmp(
                                         ntohl(encaphdr->seqno),
                                         rt->sources[i].expectedseq);
                 }
                 rt->sources[i].expectedseq = ntohl(encaphdr->seqno) + 1;
+                if (rt->sources[i].expectedseq == 0) {
+                        rt->sources[i].expectedseq ++;
+                }
 
                 if (rt->sources[i].nextread == NULL) {
                         /* If this is our first read, set up 'nextread'

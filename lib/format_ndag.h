@@ -38,6 +38,7 @@ typedef struct ndag_common_header {
 
 /* Encapsulation header -- used by both ENCAPERF and ENCAPRT records */
 typedef struct ndag_encap {
+        uint64_t started;
         uint32_t seqno;
         uint16_t streamid;
         uint16_t recordcount; /* acts as RT type for ENCAPRT records */
