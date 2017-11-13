@@ -63,6 +63,8 @@ typedef struct streamsock {
         uint32_t startidle;
         uint64_t recordcount;
 
+        int bufavail;
+
         struct mmsghdr mmsgbufs[RECV_BATCH_SIZE];
 } streamsock_t;
 
@@ -597,6 +599,9 @@ static int ndag_prepare_packet_stream(libtrace_t *libtrace,
                 /* Read everything from this buffer, mark as empty and
                  * move on. */
                 ssock->savedsize[nr] = 0;
+                ssock->bufavail ++;
+
+                assert(ssock->bufavail > 0 && ssock->bufavail <= ENCAP_BUFFERS);
                 nr ++;
                 if (nr == ENCAP_BUFFERS) {
                         nr = 0;
@@ -687,6 +692,7 @@ static int add_new_streamsock(recvstream_t *rt, streamsource_t src) {
         ssock->expectedseq = 0;
         ssock->monitorptr = mon;
         ssock->saved = (char **)malloc(sizeof(char *) * ENCAP_BUFFERS);
+        ssock->bufavail = ENCAP_BUFFERS;
         ssock->startidle = 0;
 
         for (i = 0; i < ENCAP_BUFFERS; i++) {
@@ -766,12 +772,16 @@ static inline void reset_expected_seqs(recvstream_t *rt, ndag_monitor_t *mon) {
 
 }
 
-static void init_receivers(streamsock_t *ssock, int required) {
+static int init_receivers(streamsock_t *ssock, int required) {
 
         int wind = ssock->nextwriteind;
         int i;
 
         for (i = 0; i < required; i++) {
+                if (i >= RECV_BATCH_SIZE) {
+                        break;
+                }
+
                 ssock->mmsgbufs[i].msg_len = 0;
                 ssock->mmsgbufs[i].msg_hdr.msg_iov->iov_base = ssock->saved[wind];
                 ssock->mmsgbufs[i].msg_hdr.msg_iov->iov_len = ENCAP_BUFSIZE;
@@ -779,29 +789,8 @@ static void init_receivers(streamsock_t *ssock, int required) {
 
                 wind ++;
         }
-}
 
-static int count_receivers(streamsock_t *ssock) {
-
-        int wind = ssock->nextwriteind;
-        int i;
-        int avail = 0;
-
-        for (i = 0; i < RECV_BATCH_SIZE; i++) {
-                if (wind == ENCAP_BUFFERS) {
-                        wind = 0;
-                }
-
-                if (ssock->savedsize[wind] != 0) {
-                        /* No more empty buffers */
-                        break;
-                }
-
-                avail ++;
-                wind ++;
-        }
-
-        return avail;
+        return i;
 }
 
 static int check_ndag_received(streamsock_t *ssock, int index,
@@ -829,6 +818,9 @@ static int check_ndag_received(streamsock_t *ssock, int index,
 
         ssock->savedsize[index] = msglen;
         ssock->nextwriteind ++;
+        ssock->bufavail --;
+
+        assert(ssock->bufavail >= 0);
 
         if (ssock->nextwriteind >= ENCAP_BUFFERS) {
                 ssock->nextwriteind = 0;
@@ -875,26 +867,24 @@ static int check_ndag_received(streamsock_t *ssock, int index,
 static int receive_from_single_socket(streamsock_t *ssock, struct timeval *tv,
                 int *gottime, recvstream_t *rt) {
 
-        int avail, ret, ndagstat, i;
+        int ret, ndagstat, i, avail;
         int toret = 0;
 
         if (ssock->sock == -1) {
                 return 0;
         }
 
-        avail = count_receivers(ssock);
-
-        if (avail == 0) {
+        if (ssock->bufavail == 0) {
                 /* All buffers were full, so something must be
                  * available. */
                 return 1;
         }
 
-        if (avail < RECV_BATCH_SIZE / 2) {
+        if (ssock->bufavail < RECV_BATCH_SIZE / 2) {
                 return 1;
         }
 
-        init_receivers(ssock, avail);
+        avail = init_receivers(ssock, ssock->bufavail);
 
         ret = recvmmsg(ssock->sock, ssock->mmsgbufs, avail,
                         MSG_DONTWAIT, NULL);
