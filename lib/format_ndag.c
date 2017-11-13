@@ -25,9 +25,9 @@
 #define NDAG_IDLE_TIMEOUT (600)
 #define ENCAP_BUFSIZE (10000)
 #define CTRL_BUF_SIZE (10000)
-#define ENCAP_BUFFERS (100)
+#define ENCAP_BUFFERS (1000)
 
-#define RECV_BATCH_SIZE (20)
+#define RECV_BATCH_SIZE (50)
 
 #define FORMAT_DATA ((ndag_format_data_t *)libtrace->format_data)
 
@@ -597,7 +597,10 @@ static int ndag_prepare_packet_stream(libtrace_t *libtrace,
                 /* Read everything from this buffer, mark as empty and
                  * move on. */
                 ssock->savedsize[nr] = 0;
-                nr = (nr + 1) % ENCAP_BUFFERS;
+                nr ++;
+                if (nr == ENCAP_BUFFERS) {
+                        nr = 0;
+                }
                 ssock->nextread = ssock->saved[nr] + sizeof(ndag_common_t) +
                                 sizeof(ndag_encap_t);
                 ssock->nextreadind = nr;
@@ -873,6 +876,10 @@ static int receive_from_single_socket(streamsock_t *ssock, struct timeval *tv,
         if (avail == 0) {
                 /* All buffers were full, so something must be
                  * available. */
+                return 1;
+        }
+
+        if (avail < RECV_BATCH_SIZE / 2) {
                 return 1;
         }
 
