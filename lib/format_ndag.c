@@ -697,6 +697,12 @@ static int add_new_streamsock(recvstream_t *rt, streamsource_t src) {
         for (i = 0; i < RECV_BATCH_SIZE; i++) {
                 ssock->mmsgbufs[i].msg_hdr.msg_iov = (struct iovec *)
                                 malloc(sizeof(struct iovec));
+                ssock->mmsgbufs[i].msg_hdr.msg_name = ssock->srcaddr->ai_addr;
+                ssock->mmsgbufs[i].msg_hdr.msg_namelen = ssock->srcaddr->ai_addrlen;
+                ssock->mmsgbufs[i].msg_hdr.msg_control = NULL;
+                ssock->mmsgbufs[i].msg_hdr.msg_controllen = 0;
+                ssock->mmsgbufs[i].msg_hdr.msg_flags = 0;
+                ssock->mmsgbufs[i].msg_len = 1;
         }
 
         ssock->nextread = NULL;;
@@ -760,7 +766,22 @@ static inline void reset_expected_seqs(recvstream_t *rt, ndag_monitor_t *mon) {
 
 }
 
-static int init_receivers(streamsock_t *ssock) {
+static void init_receivers(streamsock_t *ssock, int required) {
+
+        int wind = ssock->nextwriteind;
+        int i;
+
+        for (i = 0; i < required; i++) {
+                ssock->mmsgbufs[i].msg_len = 0;
+                ssock->mmsgbufs[i].msg_hdr.msg_iov->iov_base = ssock->saved[wind];
+                ssock->mmsgbufs[i].msg_hdr.msg_iov->iov_len = ENCAP_BUFSIZE;
+                ssock->mmsgbufs[i].msg_hdr.msg_iovlen = 1;
+
+                wind ++;
+        }
+}
+
+static int count_receivers(streamsock_t *ssock) {
 
         int wind = ssock->nextwriteind;
         int i;
@@ -775,16 +796,6 @@ static int init_receivers(streamsock_t *ssock) {
                         /* No more empty buffers */
                         break;
                 }
-
-                ssock->mmsgbufs[i].msg_len = 0;
-                ssock->mmsgbufs[i].msg_hdr.msg_name = ssock->srcaddr->ai_addr;
-                ssock->mmsgbufs[i].msg_hdr.msg_namelen = ssock->srcaddr->ai_addrlen;
-                ssock->mmsgbufs[i].msg_hdr.msg_iov->iov_base = ssock->saved[wind];
-                ssock->mmsgbufs[i].msg_hdr.msg_iov->iov_len = ENCAP_BUFSIZE;
-                ssock->mmsgbufs[i].msg_hdr.msg_iovlen = 1;
-                ssock->mmsgbufs[i].msg_hdr.msg_control = NULL;
-                ssock->mmsgbufs[i].msg_hdr.msg_controllen = 0;
-                ssock->mmsgbufs[i].msg_hdr.msg_flags = 0;
 
                 avail ++;
                 wind ++;
@@ -871,7 +882,7 @@ static int receive_from_single_socket(streamsock_t *ssock, struct timeval *tv,
                 return 0;
         }
 
-        avail = init_receivers(ssock);
+        avail = count_receivers(ssock);
 
         if (avail == 0) {
                 /* All buffers were full, so something must be
@@ -882,6 +893,8 @@ static int receive_from_single_socket(streamsock_t *ssock, struct timeval *tv,
         if (avail < RECV_BATCH_SIZE / 2) {
                 return 1;
         }
+
+        init_receivers(ssock, avail);
 
         ret = recvmmsg(ssock->sock, ssock->mmsgbufs, avail,
                         MSG_DONTWAIT, NULL);
