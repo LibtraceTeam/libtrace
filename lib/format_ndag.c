@@ -27,6 +27,8 @@
 #define CTRL_BUF_SIZE (10000)
 #define ENCAP_BUFFERS (100)
 
+#define RECV_BATCH_SIZE (20)
+
 #define FORMAT_DATA ((ndag_format_data_t *)libtrace->format_data)
 
 static struct libtrace_format_t ndag;
@@ -61,6 +63,7 @@ typedef struct streamsock {
         uint32_t startidle;
         uint64_t recordcount;
 
+        struct mmsghdr mmsgbufs[RECV_BATCH_SIZE];
 } streamsock_t;
 
 typedef struct recvstream {
@@ -489,6 +492,11 @@ static void halt_ndag_receiver(recvstream_t *receiver) {
                         }
                         free(src.saved);
                 }
+                for (j = 0; j < RECV_BATCH_SIZE; j++) {
+                        if (src.mmsgbufs[j].msg_hdr.msg_iov) {
+                                free(src.mmsgbufs[j].msg_hdr.msg_iov);
+                        }
+                }
                 close(src.sock);
         }
         if (receiver->knownmonitors) {
@@ -683,6 +691,11 @@ static int add_new_streamsock(recvstream_t *rt, streamsource_t src) {
                 ssock->savedsize[i] = 0;
         }
 
+        for (i = 0; i < RECV_BATCH_SIZE; i++) {
+                ssock->mmsgbufs[i].msg_hdr.msg_iov = (struct iovec *)
+                                malloc(sizeof(struct iovec));
+        }
+
         ssock->nextread = NULL;;
         ssock->nextreadind = 0;
         ssock->recordcount = 0;
@@ -742,127 +755,198 @@ static inline void reset_expected_seqs(recvstream_t *rt, ndag_monitor_t *mon) {
 
 }
 
+static int init_receivers(streamsock_t *ssock) {
+
+        int wind = ssock->nextwriteind;
+        int i;
+        int avail = 0;
+
+        for (i = 0; i < RECV_BATCH_SIZE; i++) {
+                if (wind == ENCAP_BUFFERS) {
+                        wind = 0;
+                }
+
+                if (ssock->savedsize[wind] != 0) {
+                        /* No more empty buffers */
+                        break;
+                }
+
+                ssock->mmsgbufs[i].msg_len = 0;
+                ssock->mmsgbufs[i].msg_hdr.msg_name = ssock->srcaddr->ai_addr;
+                ssock->mmsgbufs[i].msg_hdr.msg_namelen = ssock->srcaddr->ai_addrlen;
+                ssock->mmsgbufs[i].msg_hdr.msg_iov->iov_base = ssock->saved[wind];
+                ssock->mmsgbufs[i].msg_hdr.msg_iov->iov_len = ENCAP_BUFSIZE;
+                ssock->mmsgbufs[i].msg_hdr.msg_iovlen = 1;
+                ssock->mmsgbufs[i].msg_hdr.msg_control = NULL;
+                ssock->mmsgbufs[i].msg_hdr.msg_controllen = 0;
+                ssock->mmsgbufs[i].msg_hdr.msg_flags = 0;
+
+                avail ++;
+                wind ++;
+        }
+
+        return avail;
+}
+
+static int check_ndag_received(streamsock_t *ssock, int index,
+                unsigned int msglen, recvstream_t *rt) {
+
+        ndag_encap_t *encaphdr;
+        ndag_monitor_t *mon;
+        uint8_t rectype;
+
+        /* Check that we have a valid nDAG encap record */
+        rectype = check_ndag_header(ssock->saved[index], (uint32_t)msglen);
+
+        if (rectype == NDAG_PKT_KEEPALIVE) {
+                /* Keep-alive, reset startidle and carry on. Don't
+                 * change nextwrite -- we want to overwrite the
+                 * keep-alive with usable content. */
+                return 0;
+        } else if (rectype != NDAG_PKT_ENCAPERF) {
+                fprintf(stderr, "Received invalid record on the channel for %s:%u.\n",
+                                ssock->groupaddr, ssock->port);
+                close(ssock->sock);
+                ssock->sock = -1;
+                return -1;
+        }
+
+        ssock->savedsize[index] = msglen;
+        ssock->nextwriteind ++;
+
+        if (ssock->nextwriteind >= ENCAP_BUFFERS) {
+                ssock->nextwriteind = 0;
+        }
+
+        /* Get the useful info from the encap header */
+        encaphdr=(ndag_encap_t *)(ssock->saved[index] + sizeof(ndag_common_t));
+
+        mon = ssock->monitorptr;
+
+        if (mon->laststart == 0) {
+                mon->laststart = bswap_be_to_host64(encaphdr->started);
+        } else if (mon->laststart != bswap_be_to_host64(encaphdr->started)) {
+                mon->laststart = bswap_be_to_host64(encaphdr->started);
+                reset_expected_seqs(rt, mon);
+
+                /* TODO what is a good way to indicate this to clients?
+                 * set the loss counter in the ERF header? a bit rude?
+                 * use another bit in the ERF header?
+                 * add a queryable flag to libtrace_packet_t?
+                 */
+
+        }
+
+        if (ssock->expectedseq != 0) {
+                rt->missing_records += seq_cmp(
+                                ntohl(encaphdr->seqno), ssock->expectedseq);
+        }
+        ssock->expectedseq = ntohl(encaphdr->seqno) + 1;
+        if (ssock->expectedseq == 0) {
+                ssock->expectedseq ++;
+        }
+
+        if (ssock->nextread == NULL) {
+                /* If this is our first read, set up 'nextread'
+                 * by skipping past the nDAG headers */
+                ssock->nextread = ssock->saved[0] +
+                        sizeof(ndag_common_t) + sizeof(ndag_encap_t);
+        }
+        return 1;
+
+}
+
+static int receive_from_single_socket(streamsock_t *ssock, struct timeval *tv,
+                int *gottime, recvstream_t *rt) {
+
+        int avail, ret, ndagstat, i;
+        int toret = 0;
+        struct timespec ts;
+
+        if (ssock->sock == -1) {
+                return 0;
+        }
+
+        avail = init_receivers(ssock);
+
+        if (avail == 0) {
+                /* All buffers were full, so something must be
+                 * available. */
+                return 1;
+        }
+
+        ts.tv_sec = 0;
+        ts.tv_nsec = 10000;
+
+        ret = recvmmsg(ssock->sock, ssock->mmsgbufs, avail,
+                        MSG_DONTWAIT, &ts);
+
+        /*
+           ret = recvfrom(rt->sources[i].sock, rt->sources[i].saved[nw],
+           ENCAP_BUFSIZE, MSG_DONTWAIT,
+           rt->sources[i].srcaddr->ai_addr,
+           &(rt->sources[i].srcaddr->ai_addrlen));
+         */
+        if (ret < 0) {
+                /* Nothing to receive right now, but we should still
+                 * count as 'ready' if at least one buffer is full */
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                        if (readable_data(ssock)) {
+                                toret = 1;
+                        }
+                        if (!(*gottime)) {
+                                gettimeofday(tv, NULL);
+                                *gottime = 1;
+                        }
+                        if (ssock->startidle == 0) {
+                                ssock->startidle = tv->tv_sec;
+                        } else if (tv->tv_sec - ssock->startidle > NDAG_IDLE_TIMEOUT) {
+                                fprintf(stderr,
+                                        "Closing channel %s:%u due to inactivity.\n",
+                                        ssock->groupaddr,
+                                        ssock->port);
+
+                                close(ssock->sock);
+                                ssock->sock = -1;
+                        }
+                } else {
+
+                        fprintf(stderr,
+                                "Error receiving encapsulated records from %s:%u -- %s \n",
+                                ssock->groupaddr, ssock->port,
+                                strerror(errno));
+                        close(ssock->sock);
+                        ssock->sock = -1;
+                }
+                return toret;
+        }
+        ssock->startidle = 0;
+        for (i = 0; i < ret; i++) {
+                ndagstat = check_ndag_received(ssock, ssock->nextwriteind,
+                                ssock->mmsgbufs[i].msg_len, rt);
+                if (ndagstat == -1) {
+                        break;
+                }
+
+                if (ndagstat == 1) {
+                        toret = 1;
+                }
+        }
+
+        return toret;
+}
+
 static int receive_from_sockets(recvstream_t *rt) {
 
-        int i, ret, readybufs, gottime;
+        int i, readybufs, gottime;
         struct timeval tv;
-        uint8_t rectype;
 
         readybufs = 0;
         gottime = 0;
 
         for (i = 0; i < rt->sourcecount; i ++) {
-                int nw;
-                ndag_encap_t *encaphdr;
-                ndag_monitor_t *mon;
-
-                if (rt->sources[i].sock == -1) {
-                        continue;
-                } else if (rt->sources[i].savedsize[rt->sources[i].nextwriteind] != 0) {
-                        readybufs ++;
-                        continue;
-                }
-
-                nw = rt->sources[i].nextwriteind;
-
-                ret = recvfrom(rt->sources[i].sock, rt->sources[i].saved[nw],
-                                ENCAP_BUFSIZE, MSG_DONTWAIT,
-                                rt->sources[i].srcaddr->ai_addr,
-                                &(rt->sources[i].srcaddr->ai_addrlen));
-                if (ret < 0) {
-                        /* Nothing to receive right now, but we should still
-                         * count as 'ready' if at least one buffer is full */
-                        if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                                if (readable_data(&(rt->sources[i]))) {
-                                        readybufs ++;
-                                }
-                                if (!gottime) {
-                                        gettimeofday(&tv, NULL);
-                                }
-                                if (rt->sources[i].startidle == 0) {
-                                        rt->sources[i].startidle = tv.tv_sec;
-                                } else if (tv.tv_sec - rt->sources[i].startidle > NDAG_IDLE_TIMEOUT) {
-                                        fprintf(stderr, "Closing channel %s:%u due to inactivity.\n",
-                                                        rt->sources[i].groupaddr,
-                                                        rt->sources[i].port);
-
-                                        close(rt->sources[i].sock);
-                                        rt->sources[i].sock = -1;
-                                }
-                                continue;
-                        }
-
-                        fprintf(stderr,
-                                        "Error receiving encapsulated records from %s:%u -- %s \n",
-                                        rt->sources[i].groupaddr,
-                                        rt->sources[i].port,
-                                        strerror(errno));
-                        close(rt->sources[i].sock);
-                        rt->sources[i].sock = -1;
-                        continue;
-                }
-                rt->sources[i].startidle = 0;
-
-                /* Check that we have a valid nDAG encap record */
-                rectype = check_ndag_header(rt->sources[i].saved[nw], ret);
-
-                if (rectype == NDAG_PKT_KEEPALIVE) {
-                        /* Keep-alive, reset startidle and carry on. Don't
-                         * change nextwrite -- we want to overwrite the
-                         * keep-alive with usable content. */
-                        continue;
-                } else if (rectype != NDAG_PKT_ENCAPERF) {
-                        fprintf(stderr, "Received invalid record on the channel for %s:%u.\n",
-                                        rt->sources[i].groupaddr,
-                                        rt->sources[i].port);
-                        close(rt->sources[i].sock);
-                        rt->sources[i].sock = -1;
-                        continue;
-                }
-
-                rt->sources[i].savedsize[nw] = ret;
-                rt->sources[i].nextwriteind =
-                                (rt->sources[i].nextwriteind + 1) % ENCAP_BUFFERS;
-
-                /* Get the useful info from the encap header */
-                encaphdr = (ndag_encap_t *)(rt->sources[i].saved[nw] +
-                                sizeof(ndag_common_t));
-
-                mon = rt->sources[i].monitorptr;
-                assert(mon);
-
-                if (mon->laststart == 0) {
-                        mon->laststart = bswap_be_to_host64(encaphdr->started);
-                } else if (mon->laststart != bswap_be_to_host64(encaphdr->started)) {
-                        mon->laststart = bswap_be_to_host64(encaphdr->started);
-                        reset_expected_seqs(rt, mon);
-
-                        /* TODO what is a good way to indicate this to clients?
-                         * set the loss counter in the ERF header? a bit rude?
-                         * use another bit in the ERF header?
-                         * add a queryable flag to libtrace_packet_t?
-                         */
-
-                }
-
-                if (rt->sources[i].expectedseq != 0) {
-                        rt->missing_records += seq_cmp(
-                                        ntohl(encaphdr->seqno),
-                                        rt->sources[i].expectedseq);
-                }
-                rt->sources[i].expectedseq = ntohl(encaphdr->seqno) + 1;
-                if (rt->sources[i].expectedseq == 0) {
-                        rt->sources[i].expectedseq ++;
-                }
-
-                if (rt->sources[i].nextread == NULL) {
-                        /* If this is our first read, set up 'nextread'
-                         * by skipping past the nDAG headers */
-                        rt->sources[i].nextread = rt->sources[i].saved[0] +
-                                        sizeof(ndag_common_t) + sizeof(ndag_encap_t);
-                }
-
-                readybufs ++;
+                readybufs += receive_from_single_socket(&(rt->sources[i]),
+                                &tv, &gottime, rt);
         }
 
         return readybufs;
