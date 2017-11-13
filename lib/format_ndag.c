@@ -735,10 +735,12 @@ static inline int readable_data(streamsock_t *ssock) {
         if (ssock->savedsize[ssock->nextreadind] == 0) {
                 return 0;
         }
+        /*
         if (ssock->nextread - ssock->saved[ssock->nextreadind] >=
                         ssock->savedsize[ssock->nextreadind]) {
                 return 0;
         }
+        */
         return 1;
 
 
@@ -861,7 +863,6 @@ static int receive_from_single_socket(streamsock_t *ssock, struct timeval *tv,
 
         int avail, ret, ndagstat, i;
         int toret = 0;
-        struct timespec ts;
 
         if (ssock->sock == -1) {
                 return 0;
@@ -875,18 +876,9 @@ static int receive_from_single_socket(streamsock_t *ssock, struct timeval *tv,
                 return 1;
         }
 
-        ts.tv_sec = 0;
-        ts.tv_nsec = 10000;
-
         ret = recvmmsg(ssock->sock, ssock->mmsgbufs, avail,
-                        MSG_DONTWAIT, &ts);
+                        MSG_DONTWAIT, NULL);
 
-        /*
-           ret = recvfrom(rt->sources[i].sock, rt->sources[i].saved[nw],
-           ENCAP_BUFSIZE, MSG_DONTWAIT,
-           rt->sources[i].srcaddr->ai_addr,
-           &(rt->sources[i].srcaddr->ai_addrlen));
-         */
         if (ret < 0) {
                 /* Nothing to receive right now, but we should still
                  * count as 'ready' if at least one buffer is full */
@@ -954,8 +946,8 @@ static int receive_from_sockets(recvstream_t *rt) {
 }
 
 
-static int receive_encap_records(libtrace_t *libtrace, recvstream_t *rt,
-                libtrace_packet_t *packet, int block) {
+static int receive_encap_records_block(libtrace_t *libtrace, recvstream_t *rt,
+                libtrace_packet_t *packet) {
 
         int iserr = 0;
 
@@ -971,24 +963,16 @@ static int receive_encap_records(libtrace_t *libtrace, recvstream_t *rt,
                 }
 
                 /* Check for any messages from the control thread */
-                if (block) {
-                        iserr = receiver_read_messages(rt);
+                iserr = receiver_read_messages(rt);
 
-                        if (iserr <= 0) {
-                                return iserr;
-                        }
-                }
-
-                /* If non-blocking and there are no sources, just break */
-                if (!block && rt->sourcecount == 0) {
-                        iserr = 0;
-                        break;
+                if (iserr <= 0) {
+                        return iserr;
                 }
 
                 /* If blocking and no sources, sleep for a bit and then try
                  * checking for messages again.
                  */
-                if (block && rt->sourcecount == 0) {
+                if (rt->sourcecount == 0) {
                         usleep(10000);
                         continue;
                 }
@@ -1004,13 +988,36 @@ static int receive_encap_records(libtrace_t *libtrace, recvstream_t *rt,
                 /* None of our sources have anything available, we can take
                  * a short break rather than immediately trying again.
                  */
-                if (block && iserr == 0) {
+                if (iserr == 0) {
                         usleep(100);
                 }
 
-        } while (block);
+        } while (1);
 
         return iserr;
+}
+
+static int receive_encap_records_nonblock(libtrace_t *libtrace, recvstream_t *rt,
+                libtrace_packet_t *packet) {
+
+        int iserr = 0;
+
+        if (packet->buf_control == TRACE_CTRL_PACKET) {
+                free(packet->buffer);
+                packet->buffer = NULL;
+        }
+
+        /* Make sure we shouldn't be halting */
+        if ((iserr = is_halted(libtrace)) != -1) {
+                return iserr;
+        }
+
+        /* If non-blocking and there are no sources, just break */
+        if (rt->sourcecount == 0) {
+                return 0;
+        }
+
+        return receive_from_sockets(rt);
 }
 
 static streamsock_t *select_next_packet(recvstream_t *rt) {
@@ -1046,8 +1053,8 @@ static int ndag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 
         int rem;
         streamsock_t *nextavail = NULL;
-        rem = receive_encap_records(libtrace, &(FORMAT_DATA->receivers[0]),
-                        packet, 1);
+        rem = receive_encap_records_block(libtrace, &(FORMAT_DATA->receivers[0]),
+                        packet);
 
         if (rem <= 0) {
                 return rem;
@@ -1076,16 +1083,17 @@ static int ndag_pread_packets(libtrace_t *libtrace, libtrace_thread_t *t,
 
         rt = (recvstream_t *)t->format_data;
 
-        /* Only check for messages once per batch */
-        rem = receiver_read_messages(rt);
-        if (rem <= 0) {
-                return rem;
-        }
 
         do {
-                rem = receive_encap_records(libtrace, rt,
-                                packets[read_packets],
-                                read_packets == 0 ? 1 : 0);
+                /* Only check for messages once per batch */
+                if (read_packets == 0) {
+                        rem = receive_encap_records_block(libtrace, rt,
+                                packets[read_packets]);
+                } else {
+                        rem = receive_encap_records_nonblock(libtrace, rt,
+                                packets[read_packets]);
+                }
+
                 if (rem < 0) {
                         return rem;
                 }
@@ -1121,7 +1129,7 @@ static libtrace_eventobj_t trace_event_ndag(libtrace_t *libtrace,
         int rem;
         streamsock_t *nextavail = NULL;
 
-        /* Only check for messages once per batch */
+        /* Only check for messages once per call */
         rem = receiver_read_messages(&(FORMAT_DATA->receivers[0]));
         if (rem <= 0) {
                 event.type = TRACE_EVENT_TERMINATE;
@@ -1129,8 +1137,8 @@ static libtrace_eventobj_t trace_event_ndag(libtrace_t *libtrace,
         }
 
         do {
-                rem = receive_encap_records(libtrace,
-                                &(FORMAT_DATA->receivers[0]), packet, 0);
+                rem = receive_encap_records_nonblock(libtrace,
+                                &(FORMAT_DATA->receivers[0]), packet);
 
                 if (rem < 0) {
                         trace_set_err(libtrace, TRACE_ERR_BAD_PACKET,
