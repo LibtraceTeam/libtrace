@@ -18,7 +18,7 @@ if [[ -z "$GOT_NETNS" ]]; then
 fi
 
 libdir=../lib/.libs:../libpacketdump/.libs
-export LD_LIBRARY_PATH="$libdir"
+export LD_LIBRARY_PATH="$libdir:/usr/local/lib/"
 export DYLD_LIBRARY_PATH="${libdir}"
 
 declare -a formats=("pcapint" "int" "ring")
