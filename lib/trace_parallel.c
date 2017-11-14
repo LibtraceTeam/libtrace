@@ -1672,7 +1672,7 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob,
                            libtrace_callback_set_t *reporter_cbs) {
 	int i;
 	int ret = -1;
-	char name[16];
+	char name[24];
 	sigset_t sig_before, sig_block_all;
 	assert(libtrace);
 
