@@ -392,6 +392,7 @@ enum base_format_t {
 	TRACE_FORMAT_RAWERF	  =16,	/**< Special format for reading uncompressed ERF traces without checking for compression */
         TRACE_FORMAT_DPDK     =17, /**< The Intel Data Plane Development Kit format */
         TRACE_FORMAT_PCAPNG     =18,    /**< PCAP-NG trace file */
+        TRACE_FORMAT_NDAG       =19,    /**< DAG multicast over a network */
 };
 
 /** RT protocol packet types */
@@ -1398,6 +1399,7 @@ typedef enum {
 	X(received) \
 	X(dropped) \
 	X(captured) \
+        X(missing) \
 	X(errors)
 
 /**
@@ -1416,7 +1418,7 @@ typedef struct libtrace_stat_t {
 	/* We use the remaining space as magic to ensure the structure
 	 * was alloc'd by us. We can easily decrease the no. bits without
 	 * problems as long as we update any asserts as needed */
-	LT_BITFIELD64 reserved1: 26; /**< Bits reserved for future fields */
+	LT_BITFIELD64 reserved1: 25; /**< Bits reserved for future fields */
 	LT_BITFIELD64 reserved2: 24; /**< Bits reserved for future fields */
 	LT_BITFIELD64 magic: 8; /**< A number stored against the format to
 				  ensure the struct was allocated correctly */
@@ -1468,6 +1470,16 @@ typedef struct libtrace_stat_t {
 	 *       not yet included in accepted.
 	 */
         uint64_t captured;
+
+        /** The number of packets (or aggregated records) that have been
+         *  lost between the original capture device and the current input
+         *  trace.
+         *
+         *  @note Only relevant for input formats that use a network to
+         *  transfer live captured packets from one host to another (e.g.
+         *  nDAG).
+         */
+        uint64_t missing;
 
 	/** The number of packets that have been discarded by the network card
 	 * because they are invalid. That includes FCS mismatches, incorrect

@@ -1746,6 +1746,7 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob,
 	ret = -1;
 	/* Try start the format - we prefer parallel over single threaded, as
 	 * these formats should support messages better */
+
 	if (trace_supports_parallel(libtrace) &&
 	    !trace_has_dedicated_hasher(libtrace)) {
 		ret = libtrace->format->pstart_input(libtrace);

@@ -61,7 +61,7 @@ libtrace_la_SOURCES = trace.c trace_parallel.c common.h \
 		protocols_pktmeta.c protocols_l2.c protocols_l3.c \
 		protocols_transport.c protocols.h protocols_ospf.c \
 		protocols_application.c \
-		$(DAGSOURCE) format_erf.h \
+		$(DAGSOURCE) format_erf.h format_ndag.c format_ndag.h \
 		$(BPFJITSOURCE) \
 		libtrace_arphrd.h \
 		data-struct/ring_buffer.c data-struct/vector.c \

@@ -1275,6 +1275,8 @@ void rt_constructor(void);
 void duck_constructor(void);
 /** Constructor for the ATM Header format module */
 void atmhdr_constructor(void);
+/** Constructor for the network DAG format module */
+void ndag_constructor(void);
 #ifdef HAVE_BPF
 /** Constructor for the BPF format module */
 void bpf_constructor(void);
