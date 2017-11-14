@@ -32,7 +32,7 @@
 
 DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len) {
 	unsigned char *link_ptr = NULL;
-        libtrace_ospf_link_v2_t *link;
+        libtrace_ospf_link_v2_t *link = NULL;
         uint32_t link_len;
         libtrace_ospf_router_lsa_v2_t *hdr;
 
@@ -57,6 +57,9 @@ DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len) {
 	if (!link_ptr || len == 0)
 		return;
 	while (trace_get_next_ospf_link_v2(&link_ptr, &link, &len, &link_len) > 0) {
+		if (!link) {
+			break;
+		}
 		printf(" OSPF Router Link: Id %s ", inet_ntoa(link->link_id));
 		printf("Data %s\n", inet_ntoa(link->link_data));
 		printf(" OSPF Router Link: Type %u TOS %u Metric %u\n",
