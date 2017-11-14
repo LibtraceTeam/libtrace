@@ -708,7 +708,7 @@ static int add_new_streamsock(recvstream_t *rt, streamsource_t src) {
                 ssock->mmsgbufs[i].msg_hdr.msg_control = NULL;
                 ssock->mmsgbufs[i].msg_hdr.msg_controllen = 0;
                 ssock->mmsgbufs[i].msg_hdr.msg_flags = 0;
-                ssock->mmsgbufs[i].msg_len = 1;
+                ssock->mmsgbufs[i].msg_len = 0;
         }
 
         ssock->nextread = NULL;;
@@ -780,6 +780,10 @@ static int init_receivers(streamsock_t *ssock, int required) {
         for (i = 0; i < required; i++) {
                 if (i >= RECV_BATCH_SIZE) {
                         break;
+                }
+
+                if (wind >= ENCAP_BUFFERS) {
+                        wind = 0;
                 }
 
                 ssock->mmsgbufs[i].msg_len = 0;
@@ -874,12 +878,7 @@ static int receive_from_single_socket(streamsock_t *ssock, struct timeval *tv,
                 return 0;
         }
 
-        if (ssock->bufavail == 0) {
-                /* All buffers were full, so something must be
-                 * available. */
-                return 1;
-        }
-
+        /* Plenty of full buffers, just use the packets in those */
         if (ssock->bufavail < RECV_BATCH_SIZE / 2) {
                 return 1;
         }
