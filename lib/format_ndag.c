@@ -487,7 +487,7 @@ static void halt_ndag_receiver(recvstream_t *receiver) {
         for (i = 0; i < receiver->sourcecount; i++) {
                 streamsock_t src = receiver->sources[i];
                 if (src.saved) {
-                        for (j = 0; i < ENCAP_BUFFERS; j++) {
+                        for (j = 0; j < ENCAP_BUFFERS; j++) {
                                 if (src.saved[j]) {
                                         free(src.saved[j]);
                                 }
