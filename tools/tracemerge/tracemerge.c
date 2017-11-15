@@ -212,6 +212,7 @@ int main(int argc, char *argv[])
 
 	while(1) {
 		uint64_t oldest_ts=0;
+                uint64_t this_ts = 0;
 		int oldest=-1;
 		int curr_dir;
 		if (done)
@@ -233,12 +234,14 @@ int main(int argc, char *argv[])
 				else
 					live[i]=true;
 			}
-			if (live[i] && 
-				(oldest==-1 || 
-				 oldest_ts>trace_get_erf_timestamp(packet[i]))) {
-				oldest=i;
-				oldest_ts=trace_get_erf_timestamp(packet[i]);
-			}
+			if (live[i]) {
+                                this_ts = trace_get_erf_timestamp(packet[i]);
+				if (this_ts != 0 && (oldest==-1 ||
+				                oldest_ts>this_ts)) {
+        				oldest=i;
+	        			oldest_ts=this_ts;
+			        }
+                        }
 		}
 		/* We have run out of packets! */
 		if (oldest==-1) {

@@ -46,7 +46,7 @@ extern "C" {
 
 #define DISPLAYS(hdr,x,fmt) DISPLAY_EXP(hdr,x,fmt,htons(hdr->x))
 #define DISPLAYL(hdr,x,fmt) DISPLAY_EXP(hdr,x,fmt,htonl(hdr->x))
-#define DISPLAYIP(hdr,x,fmt) DISPLAY_EXP(hdr,x,fmt,inet_ntoa(*(struct in_addr*)&hdr->x))
+#define DISPLAYIP(hdr,x,fmt) DISPLAY_EXP(hdr,x,fmt,inet_ntoa(*(struct in_addr*)(void *)(&hdr->x)))
 
 
 void trace_hexdump_packet(libtrace_packet_t *packet);

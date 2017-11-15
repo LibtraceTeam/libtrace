@@ -447,7 +447,7 @@ DLLEXPORT uint16_t *trace_checksum_transport(libtrace_packet_t *packet,
 	uint32_t remaining;
 	uint32_t sum = 0;
 	uint8_t proto = 0;
-	uint16_t *csum_ptr = NULL;
+	char *csum_ptr = NULL;
 	int plen = 0;
 
 	uint8_t safety[65536];
@@ -482,7 +482,7 @@ DLLEXPORT uint16_t *trace_checksum_transport(libtrace_packet_t *packet,
 		libtrace_tcp_t *tcp = (libtrace_tcp_t *)header;
 		header = trace_get_payload_from_tcp(tcp, &remaining);
 		
-		csum_ptr = &tcp->check;
+		csum_ptr = (char *)(&tcp->check);
 
 		memcpy(ptr, tcp, tcp->doff * 4);
 
@@ -497,7 +497,7 @@ DLLEXPORT uint16_t *trace_checksum_transport(libtrace_packet_t *packet,
 		libtrace_udp_t *udp = (libtrace_udp_t *)header;
 		header = trace_get_payload_from_udp(udp, &remaining);
 		
-		csum_ptr = &udp->check;
+		csum_ptr = (char *)(&udp->check);
 		memcpy(ptr, udp, sizeof(libtrace_udp_t));
 
 		udp = (libtrace_udp_t *)ptr;
@@ -513,7 +513,7 @@ DLLEXPORT uint16_t *trace_checksum_transport(libtrace_packet_t *packet,
 		libtrace_icmp_t *icmp = (libtrace_icmp_t *)header;
 		header = trace_get_payload_from_icmp(icmp, &remaining);
 		
-		csum_ptr = &icmp->checksum;
+		csum_ptr = (char *)(&icmp->checksum);
 		memcpy(ptr, icmp, sizeof(libtrace_icmp_t));
 
 		icmp = (libtrace_icmp_t *)ptr;
@@ -542,7 +542,7 @@ DLLEXPORT uint16_t *trace_checksum_transport(libtrace_packet_t *packet,
 	*csum = ntohs(finish_checksum(sum));
 	//assert(0);
 	
-	return csum_ptr;
+	return (uint16_t *)csum_ptr;
 }
 
 DLLEXPORT void *trace_get_payload_from_gre(libtrace_gre_t *gre,

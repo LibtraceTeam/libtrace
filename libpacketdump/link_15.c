@@ -68,7 +68,7 @@ DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len)
 			rtap_len, rtap_pres);
 	
 	/* Check for extended bitmasks */
-	ptr = (uint32_t *) &(rtap->it_present);
+	ptr = (uint32_t *) (char *)(&(rtap->it_present));
 	
 	if ( (rtap_pres) & (1 << TRACE_RADIOTAP_EXT) ) 
 		printf("  extended fields:");

@@ -189,6 +189,9 @@ static libtrace_packet_t *perform_jump(libtrace_packet_t *packet, int jump)
  *  -1 = stop reading packets, we've got an error
  */
 static int per_packet(libtrace_packet_t **packet) {
+        if (IS_LIBTRACE_META_PACKET((*packet))) {
+                return 1;
+        }
 
 	if (trace_get_link_type(*packet) == -1) {
 		fprintf(stderr, "Halted due to being unable to determine linktype - input trace may be corrupt.\n");
@@ -209,10 +212,10 @@ static int per_packet(libtrace_packet_t **packet) {
 
 	if (firsttime==0) {
 		time_t now = trace_get_seconds(*packet);
-		if (starttime != 0) {
+		if (now != 0 && starttime != 0) {
 			firsttime=now-((now - starttime)%interval);
 		}
-		else {
+		else if (now != 0) {
 			firsttime=now;
 		}
 	}

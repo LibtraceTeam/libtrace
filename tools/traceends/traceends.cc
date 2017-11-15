@@ -308,7 +308,8 @@ static void update_ipv4(libtrace_ip_t *ip, uint16_t ip_len, uint32_t rem,
 	c->src_pkts ++;
 	c->src_pbytes += plen;
 	c->src_bytes += ip->ip_len;
-	c->last_active = ts;
+        if (ts != 0)
+        	c->last_active = ts;
 	
 	key = ip->ip_dst.s_addr;
 	
@@ -323,7 +324,8 @@ static void update_ipv4(libtrace_ip_t *ip, uint16_t ip_len, uint32_t rem,
 	c->dst_pkts ++;
 	c->dst_pbytes += plen;
 	c->dst_bytes += ip_len;
-	c->last_active = ts;
+        if (ts != 0)
+        	c->last_active = ts;
 }
 
 static int per_packet(libtrace_packet_t *packet) {
@@ -454,6 +456,8 @@ int main(int argc, char *argv[]) {
                 }
 
 		while (trace_read_packet(input,packet)>0) {
+                        if (IS_LIBTRACE_META_PACKET(packet))
+                                continue;
                         if (per_packet(packet) < 1)
                                 done = 1;
                         if (done)

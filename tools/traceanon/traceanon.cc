@@ -175,6 +175,9 @@ static libtrace_packet_t *per_packet(libtrace_t *trace, libtrace_thread_t *t,
         Anonymiser *anon = (Anonymiser *)tls;
         libtrace_generic_t result;
 
+        if (IS_LIBTRACE_META_PACKET(packet))
+                return packet;
+
         ipptr = trace_get_ip(packet);
         ip6 = trace_get_ip6(packet);
 
@@ -222,6 +225,11 @@ static void *start_anon(libtrace_t *trace, libtrace_thread_t *t, void *global)
         }
 
         if (enc_type == ENC_CRYPTOPAN) {
+		if (strlen(key) < 32) {
+			fprintf(stderr, "ERROR: Key must be at least 32 "
+			"characters long for CryptoPan anonymisation.\n");
+			exit(1);
+		}
 #ifdef HAVE_LIBCRYPTO                
                 CryptoAnon *anon = new CryptoAnon((uint8_t *)key,
                         (uint8_t)strlen(key), 20);

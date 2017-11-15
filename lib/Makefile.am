@@ -54,14 +54,14 @@ libtrace_la_SOURCES = trace.c trace_parallel.c common.h \
 		format_erf.c format_pcap.c format_legacy.c \
 		format_rt.c format_helper.c format_helper.h format_pcapfile.c \
 		format_duck.c format_tsh.c $(NATIVEFORMATS) $(BPFFORMATS) \
-		format_atmhdr.c \
+		format_atmhdr.c format_pcapng.c \
 		libtrace_int.h lt_inttypes.h lt_bswap.h \
 		linktypes.c link_wireless.c byteswap.c \
 		checksum.c checksum.h \
 		protocols_pktmeta.c protocols_l2.c protocols_l3.c \
 		protocols_transport.c protocols.h protocols_ospf.c \
 		protocols_application.c \
-		$(DAGSOURCE) format_erf.h \
+		$(DAGSOURCE) format_erf.h format_ndag.c format_ndag.h \
 		$(BPFJITSOURCE) \
 		libtrace_arphrd.h \
 		data-struct/ring_buffer.c data-struct/vector.c \

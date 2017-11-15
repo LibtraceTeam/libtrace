@@ -75,11 +75,13 @@ test/test-live-snaplen
 test/test-pcap-bpf
 test/test-plen
 test/test-ports
+test/test-setcaplen
 test/test-time
 test/test-tracetime-parallel
 test/test-vxlan
 test/test-wireless
 test/test-write
+test/*.dSYM/
 test/DPDK_source/
 test/DPDK_builds/
 tools/traceanon/traceanon

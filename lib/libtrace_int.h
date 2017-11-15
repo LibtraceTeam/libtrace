@@ -1080,6 +1080,13 @@ libtrace_linktype_t pcap_linktype_to_libtrace(libtrace_dlt_t linktype);
  */
 libtrace_rt_types_t pcap_linktype_to_rt(libtrace_dlt_t linktype);
 
+/** Converts a PCAP-NG DLT into an RT protocol type.
+ *
+ * @param linktype	The PCAP DLT to be converted
+ * @return The RT type that is equivalent to the provided DLT
+ */
+libtrace_rt_types_t pcapng_linktype_to_rt(libtrace_dlt_t linktype);
+
 /** Converts a libtrace link type into a PCAP linktype.
  *
  * @param type		The libtrace link type to be converted
@@ -1260,12 +1267,16 @@ void linuxring_constructor(void);
 void pcap_constructor(void);
 /** Constructor for the PCAP File format module */
 void pcapfile_constructor(void);
+/** Constructor for the PCAP-NG File format module */
+void pcapng_constructor(void);
 /** Constructor for the RT format module */
 void rt_constructor(void);
 /** Constructor for the DUCK format module */
 void duck_constructor(void);
 /** Constructor for the ATM Header format module */
 void atmhdr_constructor(void);
+/** Constructor for the network DAG format module */
+void ndag_constructor(void);
 #ifdef HAVE_BPF
 /** Constructor for the BPF format module */
 void bpf_constructor(void);

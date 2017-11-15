@@ -92,6 +92,9 @@ static void run_trace(char *uri, libtrace_filter_t *filter, int count)
 		if ((psize = trace_read_packet(trace, packet)) <1) {
 			break;
 		}
+                if (IS_LIBTRACE_META_PACKET(packet))
+                        continue;
+
 		if (reports_required & REPORT_TYPE_MISC)
 			misc_per_packet(packet);
 		if (reports_required & REPORT_TYPE_ERROR)

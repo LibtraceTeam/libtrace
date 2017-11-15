@@ -681,7 +681,7 @@ DLLEXPORT uint16_t *trace_checksum_layer3(libtrace_packet_t *packet,
 	void *l3;
 	uint16_t ethertype;
 	uint32_t remaining;
-	uint16_t *csum_ptr;
+	char *csum_ptr;
 
 	uint8_t safety[65536];
 
@@ -698,7 +698,7 @@ DLLEXPORT uint16_t *trace_checksum_layer3(libtrace_packet_t *packet,
 		if (remaining < sizeof(libtrace_ip_t))
 			return NULL;
 
-		csum_ptr = &ip->ip_sum;
+		csum_ptr = (char *)(&ip->ip_sum);
 
 		/* I hate memcpys, but this is the only truly safe way to
 		 * do this without modifying the packet. I'm trying to be
@@ -715,7 +715,7 @@ DLLEXPORT uint16_t *trace_checksum_layer3(libtrace_packet_t *packet,
 		/* Remember to byteswap appropriately */
 		*csum = ntohs(*csum);
 		
-		return csum_ptr;
+		return (uint16_t *)csum_ptr;
 	}
 
 	return NULL;
@@ -751,7 +751,7 @@ DLLEXPORT uint16_t trace_get_fragment_offset(const libtrace_packet_t *packet,
 
         if (ethertype == TRACE_ETHERTYPE_IPV6) {
                 libtrace_ip6_t *ip6 = (libtrace_ip6_t *)l3;
-                void *payload = ip6++;
+                void *payload = ip6 + 1;
                 uint8_t nxt = ip6->nxt;
                 uint16_t len;
                 

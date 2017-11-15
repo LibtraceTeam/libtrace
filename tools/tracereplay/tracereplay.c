@@ -95,6 +95,9 @@ static libtrace_packet_t * per_packet(libtrace_packet_t *packet) {
 	libtrace_ether_t * ether_header;
 	int i;
 
+        if (IS_LIBTRACE_META_PACKET(packet))
+                return NULL;
+
 	pkt_buffer = trace_get_packet_buffer(packet,&linktype,&remaining);
 	remaining = 0;
 	new_packet = trace_create_packet();
@@ -305,6 +308,9 @@ int main(int argc, char *argv[]) {
 
 		/* Got a packet - let's do something with it */
 		new = per_packet(packet);
+
+                if (!new)
+                        continue;
 
 		if (trace_write_packet(output, new) < 0) {
 			trace_perror_output(output, "Writing packet");
