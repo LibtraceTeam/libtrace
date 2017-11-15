@@ -268,7 +268,7 @@ static int legacy_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 						buffer,
 						(size_t)64)) != 64) {
 			if (numbytes < 0) {
-				trace_set_err(libtrace,errno,"read(%s)",libtrace->uridata);
+				trace_set_err(libtrace,TRACE_ERR_WANDIO_FAILED,"read(%s)",libtrace->uridata);
 			} else if (numbytes > 0) {
 				
 				continue;
@@ -309,7 +309,7 @@ static int legacynzix_read_packet(libtrace_t *libtrace, libtrace_packet_t *packe
 		if ((numbytes = wandio_read(libtrace->io, buffer,
 						(size_t)68)) != 68) {
 			if (numbytes < 0) {
-				trace_set_err(libtrace,errno,"read(%s)",libtrace->uridata);
+				trace_set_err(libtrace,TRACE_ERR_WANDIO_FAILED,"read(%s)",libtrace->uridata);
 			} else if (numbytes > 0)
 				continue;
 			return numbytes;

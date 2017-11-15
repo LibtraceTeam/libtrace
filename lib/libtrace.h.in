@@ -304,7 +304,9 @@ enum {
 	/** RT communication breakdown */
 	TRACE_ERR_RT_FAILURE    = -10,
 	/** Compression format unsupported */
-	TRACE_ERR_UNSUPPORTED_COMPRESS 	= -11
+	TRACE_ERR_UNSUPPORTED_COMPRESS 	= -11,
+        /** Wandio has returned an error */
+        TRACE_ERR_WANDIO_FAILED = -12  
 };
 
 /** Enumeration of DLTs supported by libtrace 
