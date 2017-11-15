@@ -125,7 +125,7 @@ AC_PROG_LIBTOOL
 AC_PROG_GCC_TRADITIONAL
 
 # Fail if any of these functions are missing
-AC_CHECK_FUNCS(socket strdup strlcpy strcasecmp strncasecmp snprintf vsnprintf)
+AC_CHECK_FUNCS(socket strdup strlcpy strcasecmp strncasecmp snprintf vsnprintf recvmmsg)
 
 AC_CHECK_SIZEOF([long int])
 
