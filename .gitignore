@@ -81,6 +81,7 @@ test/test-tracetime-parallel
 test/test-vxlan
 test/test-wireless
 test/test-write
+test/*.dSYM/
 test/DPDK_source/
 test/DPDK_builds/
 tools/traceanon/traceanon
