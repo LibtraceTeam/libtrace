@@ -13,7 +13,7 @@ $@"
 }
 
 libdir=../lib/.libs:../libpacketdump/.libs
-export LD_LIBRARY_PATH="$libdir"
+export LD_LIBRARY_PATH="$libdir:/usr/local/lib/"
 export DYLD_LIBRARY_PATH="${libdir}"
 echo SLL Decoder 
 do_test ./test-decode2 pcap:traces/100_sll.pcap

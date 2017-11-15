@@ -65,7 +65,12 @@ typedef struct streamsock {
 
         int bufavail;
 
+#if HAVE_RECVMMSG
         struct mmsghdr mmsgbufs[RECV_BATCH_SIZE];
+#else
+	struct msghdr singlemsg;
+#endif
+
 } streamsock_t;
 
 typedef struct recvstream {
@@ -487,18 +492,24 @@ static void halt_ndag_receiver(recvstream_t *receiver) {
         for (i = 0; i < receiver->sourcecount; i++) {
                 streamsock_t src = receiver->sources[i];
                 if (src.saved) {
-                        for (j = 0; i < ENCAP_BUFFERS; j++) {
+                        for (j = 0; j < ENCAP_BUFFERS; j++) {
                                 if (src.saved[j]) {
                                         free(src.saved[j]);
                                 }
                         }
                         free(src.saved);
                 }
+
+#if HAVE_RECVMMSG
                 for (j = 0; j < RECV_BATCH_SIZE; j++) {
                         if (src.mmsgbufs[j].msg_hdr.msg_iov) {
                                 free(src.mmsgbufs[j].msg_hdr.msg_iov);
                         }
                 }
+#else
+		free(src.singlemsg.msg_iov);
+#endif
+
                 close(src.sock);
         }
         if (receiver->knownmonitors) {
@@ -700,6 +711,7 @@ static int add_new_streamsock(recvstream_t *rt, streamsource_t src) {
                 ssock->savedsize[i] = 0;
         }
 
+#if HAVE_RECVMMSG
         for (i = 0; i < RECV_BATCH_SIZE; i++) {
                 ssock->mmsgbufs[i].msg_hdr.msg_iov = (struct iovec *)
                                 malloc(sizeof(struct iovec));
@@ -710,6 +722,9 @@ static int add_new_streamsock(recvstream_t *rt, streamsource_t src) {
                 ssock->mmsgbufs[i].msg_hdr.msg_flags = 0;
                 ssock->mmsgbufs[i].msg_len = 0;
         }
+#else
+	ssock->singlemsg.msg_iov = (struct iovec *) malloc(sizeof(struct iovec));
+#endif
 
         ssock->nextread = NULL;;
         ssock->nextreadind = 0;
@@ -775,8 +790,9 @@ static inline void reset_expected_seqs(recvstream_t *rt, ndag_monitor_t *mon) {
 static int init_receivers(streamsock_t *ssock, int required) {
 
         int wind = ssock->nextwriteind;
-        int i;
+        int i = 1;
 
+#if HAVE_RECVMMSG
         for (i = 0; i < required; i++) {
                 if (i >= RECV_BATCH_SIZE) {
                         break;
@@ -793,7 +809,12 @@ static int init_receivers(streamsock_t *ssock, int required) {
 
                 wind ++;
         }
-
+#else
+	assert(required > 0);
+	ssock->singlemsg.msg_iov->iov_base = ssock->saved[wind];
+	ssock->singlemsg.msg_iov->iov_len = ENCAP_BUFSIZE;
+	ssock->singlemsg.msg_iovlen = 1;
+#endif
         return i;
 }
 
@@ -871,23 +892,36 @@ static int check_ndag_received(streamsock_t *ssock, int index,
 static int receive_from_single_socket(streamsock_t *ssock, struct timeval *tv,
                 int *gottime, recvstream_t *rt) {
 
-        int ret, ndagstat, i, avail;
+        int ret, ndagstat, avail;
         int toret = 0;
+
+#if HAVE_RECVMMSG
+	int i;
+#endif
 
         if (ssock->sock == -1) {
                 return 0;
         }
 
+#if HAVE_RECVMMSG
         /* Plenty of full buffers, just use the packets in those */
         if (ssock->bufavail < RECV_BATCH_SIZE / 2) {
                 return 1;
         }
+#else
+	if (ssock->bufavail == 0) {
+		return 1;
+	}
+#endif
 
         avail = init_receivers(ssock, ssock->bufavail);
 
+#if HAVE_RECVMMSG
         ret = recvmmsg(ssock->sock, ssock->mmsgbufs, avail,
                         MSG_DONTWAIT, NULL);
-
+#else
+	ret = recvmsg(ssock->sock, &(ssock->singlemsg), MSG_DONTWAIT);
+#endif
         if (ret < 0) {
                 /* Nothing to receive right now, but we should still
                  * count as 'ready' if at least one buffer is full */
@@ -921,7 +955,10 @@ static int receive_from_single_socket(streamsock_t *ssock, struct timeval *tv,
                 }
                 return toret;
         }
+
         ssock->startidle = 0;
+
+#if HAVE_RECVMMSG
         for (i = 0; i < ret; i++) {
                 ndagstat = check_ndag_received(ssock, ssock->nextwriteind,
                                 ssock->mmsgbufs[i].msg_len, rt);
@@ -933,6 +970,14 @@ static int receive_from_single_socket(streamsock_t *ssock, struct timeval *tv,
                         toret = 1;
                 }
         }
+#else
+	ndagstat = check_ndag_received(ssock, ssock->nextwriteind, ret, rt);
+	if (ndagstat <= 0) {
+		toret = 0;
+	} else {
+		toret = 1;
+	}
+#endif
 
         return toret;
 }

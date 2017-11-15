@@ -33,14 +33,14 @@
 
 DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len) {
 	libtrace_ospf_ls_update_t *update = (libtrace_ospf_ls_update_t *)packet;
-	unsigned char *lsa_ptr;
-	uint8_t lsa_type;
-	libtrace_ospf_lsa_v2_t *lsa_hdr;
-	unsigned char *lsa_body;
+	unsigned char *lsa_ptr = NULL;
+	uint8_t lsa_type = 0;
+	libtrace_ospf_lsa_v2_t *lsa_hdr = NULL;
+	unsigned char *lsa_body = NULL;
 	int i = 0;
 	int max_lsas = 0;
 	uint32_t rem = len;
-	uint16_t lsa_length;
+	uint16_t lsa_length = 0;
 
 
 	if (len < 4)
