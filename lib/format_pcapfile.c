@@ -356,7 +356,7 @@ static int pcapfile_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 			packet->buffer,
 			sizeof(libtrace_pcapfile_pkt_hdr_t));
 	if (err<0) {
-		trace_set_err(libtrace,errno,"reading packet");
+		trace_set_err(libtrace,TRACE_ERR_WANDIO_FAILED,"reading packet");
 		return -1;
 	}
 	if (err==0) {
@@ -365,7 +365,7 @@ static int pcapfile_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 	}
 
         if (err < (int)sizeof(libtrace_pcapfile_pkt_hdr_t)) {
-                trace_set_err(libtrace, errno, "Incomplete pcap packet header");
+                trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Incomplete pcap packet header");
                 return -1;
         }
 
@@ -392,7 +392,7 @@ static int pcapfile_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 			);
 
 	if (err<0) {
-		trace_set_err(libtrace,errno,"reading packet");
+		trace_set_err(libtrace,TRACE_ERR_WANDIO_FAILED,"reading packet");
 		return -1;
 	}
 	if (err==0) {
@@ -400,7 +400,7 @@ static int pcapfile_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 	}
 
         if (err < (int)bytes_to_read) {
-                trace_set_err(libtrace, errno, "Incomplete pcap packet body");
+                trace_set_err(libtrace, TRACE_ERR_WANDIO_FAILED, "Incomplete pcap packet body");
                 return -1;
         }
 

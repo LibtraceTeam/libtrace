@@ -136,7 +136,7 @@ static int atmhdr_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	if ((numbytes=wandio_read(libtrace->io, buffer, (size_t)12)) != 12)
 	{
 		if (numbytes != 0) {
-			trace_set_err(libtrace,errno,"read(%s)",libtrace->uridata);
+			trace_set_err(libtrace,TRACE_ERR_WANDIO_FAILED,"read(%s)",libtrace->uridata);
 		}
 		return numbytes;
 	}
