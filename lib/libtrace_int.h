@@ -1241,6 +1241,8 @@ void duck_constructor(void);
 void atmhdr_constructor(void);
 /** Constructor for the network DAG format module */
 void ndag_constructor(void);
+/** Constructor for the live ETSI over TCP format module */
+void etsilive_constructor(void);
 #ifdef HAVE_BPF
 /** Constructor for the BPF format module */
 void bpf_constructor(void);

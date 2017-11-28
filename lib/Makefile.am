@@ -6,7 +6,8 @@ pkginclude_HEADERS = dagformat.h lt_inttypes.h daglegacy.h \
         data-struct/vector.h \
         data-struct/deque.h data-struct/linked_list.h \
         data-struct/buckets.h data-struct/sliding_window.h \
-	data-struct/message_queue.h hash_toeplitz.h
+	data-struct/message_queue.h hash_toeplitz.h \
+        data-struct/simple_circular_buffer.h
 
 AM_CFLAGS=@LIBCFLAGS@ @CFLAG_VISIBILITY@ -pthread
 AM_CXXFLAGS=@LIBCXXFLAGS@ @CFLAG_VISIBILITY@ -pthread
@@ -54,7 +55,7 @@ libtrace_la_SOURCES = trace.c trace_parallel.c common.h \
 		format_erf.c format_pcap.c format_legacy.c \
 		format_rt.c format_helper.c format_helper.h format_pcapfile.c \
 		format_duck.c format_tsh.c $(NATIVEFORMATS) $(BPFFORMATS) \
-		format_atmhdr.c format_pcapng.c \
+		format_atmhdr.c format_pcapng.c format_etsilive.c \
 		libtrace_int.h lt_inttypes.h lt_bswap.h \
 		linktypes.c link_wireless.c byteswap.c \
 		checksum.c checksum.h \
@@ -68,7 +69,7 @@ libtrace_la_SOURCES = trace.c trace_parallel.c common.h \
 		data-struct/message_queue.c data-struct/deque.c \
 		data-struct/sliding_window.c data-struct/object_cache.c \
 		data-struct/linked_list.c hash_toeplitz.c combiner_ordered.c \
-                data-struct/buckets.c \
+                data-struct/buckets.c data-struct/simple_circular_buffer.c \
 		combiner_sorted.c combiner_unordered.c \
 		pthread_spinlock.c pthread_spinlock.h
 
