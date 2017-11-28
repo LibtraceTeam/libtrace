@@ -426,48 +426,6 @@ void trace_set_err_out(libtrace_out_t *trace, int errcode, const char *msg,...)
  */
 void trace_clear_cache(libtrace_packet_t *packet);
 
-/** Converts the data provided in buffer into a valid libtrace packet
- *
- * @param trace		An input trace of the same format as the "packet" 
- * 			contained in the buffer
- * @param packet	The libtrace packet to prepare
- * @param buffer	A buffer containing the packet data, including the
- * 			capture format header
- * @param rt_type	The RT type for the packet that is being prepared
- * @param flags		Used to specify options for the preparation function,
- * 			e.g. who owns the packet buffer
- *
- * @return -1 if an error occurs, 0 otherwise 
- *
- * Packet preparation is a tricky concept - the idea is to take the data
- * pointed to by 'buffer' and treat it as a packet record of the same capture
- * format as that used by the input trace. The provided libtrace packet then
- * has its internal pointers and values set to describe the packet record in
- * the buffer. 
- *
- * The primary use of this function is to allow the RT packet reader to 
- * easily and safely convert packets from the RT format back into the format
- * that they were originally captured with., essentially removing the RT
- * encapsulation.
- *
- * We've decided not to make this function available via the exported API 
- * because there are several issues that can arise if it is not used very
- * carefully and it is not very useful outside of internal contexts anyway.
- */
-int trace_prepare_packet(libtrace_t *trace, libtrace_packet_t *packet,
-		void *buffer, libtrace_rt_types_t rt_type, uint32_t flags);
-
-/** Flags for prepare_packet functions */
-enum {
-	/** The buffer memory has been allocated by libtrace and should be
-	 * freed when the packet is destroyed. */
-	TRACE_PREP_OWN_BUFFER		=1,
-	
-	/** The buffer memory is externally-owned and must not be freed by 
-	 * libtrace when the packet is destroyed. */
-	TRACE_PREP_DO_NOT_OWN_BUFFER	=0
-};
-
 
 #ifndef PF_RULESET_NAME_SIZE
 #define PF_RULESET_NAME_SIZE 16
