@@ -754,6 +754,7 @@ static int add_new_streamsock(recvstream_t *rt, streamsource_t src) {
 
         ssock->nextread = NULL;;
         ssock->nextreadind = 0;
+        ssock->nextwriteind = 0;
         ssock->recordcount = 0;
         rt->sourcecount += 1;
 
