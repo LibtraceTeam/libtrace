@@ -246,7 +246,7 @@ AC_ARG_WITH(man,
 if test "$pcapfound" = 0; then
 	AC_MSG_ERROR(libpcap0.8 or greater is required to compile libtrace. If you have installed it in a non-standard location please use LDFLAGS to specify the location of the library)
 else
-	TOOL_LIBS="$TOOL_LIBS -lpcap"
+	TOOLS_LIBS="$TOOLS_LIBS -lpcap"
 	LIBTRACE_LIBS="$LIBTRACE_LIBS -lpcap"
 	AC_DEFINE([HAVE_LIBPCAP],1,[compile with libpcap support])
 
