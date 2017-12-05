@@ -13,6 +13,9 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
 
 #include "format_dpdk.h"
 #include "format_ndag.h"
@@ -49,8 +52,7 @@ typedef struct perthread {
 typedef struct dpdkndag_format_data {
         libtrace_t *dpdkrecv;
 
-        char *multicastgroup;
-        uint16_t beaconport;
+        struct addrinfo *multicastgroup;
         char *localiface;
 
 	perthread_t *threaddatas;
@@ -78,12 +80,11 @@ static int dpdkndag_init_input(libtrace_t *libtrace) {
 	char *scan = NULL;
 	char *next = NULL;
 	char dpdkuri[1280];
+        struct addrinfo hints, *result;
 
         libtrace->format_data = (dpdkndag_format_data_t *)malloc(
                         sizeof(dpdkndag_format_data_t));
 
-        FORMAT_DATA->multicastgroup = NULL;
-        FORMAT_DATA->beaconport = 9001;
         FORMAT_DATA->localiface = NULL;
         FORMAT_DATA->threaddatas = NULL;
         FORMAT_DATA->dpdkrecv = NULL;
@@ -91,21 +92,27 @@ static int dpdkndag_init_input(libtrace_t *libtrace) {
         scan = strchr(libtrace->uridata, ',');
         if (scan == NULL) {
                 trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT,
-                        "Bad ndag URI. Should be ndag:<interface>,<multicast group>,<port number>");
+                        "Bad dpdkndag URI. Should be dpdkndag:<interface>,<multicast group>");
                 return -1;
         }
         FORMAT_DATA->localiface = strndup(libtrace->uridata,
                         (size_t)(scan - libtrace->uridata));
         next = scan + 1;
 
-        scan = strchr(next, ',');
-        if (scan == NULL) {
-                FORMAT_DATA->multicastgroup = strdup(next);
-        } else {
-                FORMAT_DATA->multicastgroup = strndup(next, (size_t)(scan - next));
+        memset(&hints, 0, sizeof(struct addrinfo));
+        hints.ai_family = AF_UNSPEC;
+        hints.ai_socktype = SOCK_DGRAM;
+        hints.ai_flags = AI_PASSIVE;
+        hints.ai_protocol = 0;
 
-                FORMAT_DATA->beaconport = strtoul(scan + 1, NULL, 0);
+        if (getaddrinfo(next, NULL, &hints, &result) != 0) {
+                perror("getaddrinfo");
+                trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT,
+                        "Invalid multicast address: %s", next);
+                return -1;
         }
+
+        FORMAT_DATA->multicastgroup = result;
 
 	snprintf(dpdkuri, 1279, "dpdk:%s", FORMAT_DATA->localiface);
 	FORMAT_DATA->dpdkrecv = trace_create(dpdkuri);
@@ -226,7 +233,7 @@ static int dpdkndag_fin_input(libtrace_t *libtrace) {
 	}
 
 	if (FORMAT_DATA->multicastgroup) {
-		free(FORMAT_DATA->multicastgroup);
+		freeaddrinfo(FORMAT_DATA->multicastgroup);
 	}
 
 	free(FORMAT_DATA);
@@ -337,16 +344,45 @@ static int is_ndag_packet(libtrace_packet_t *packet, perthread_t *pt) {
 
 }
 
-static int process_fresh_packet(perthread_t *pt, char *expectedaddr) {
+static int sockaddr_same(struct sockaddr *a, struct sockaddr *b) {
+
+        if (a->sa_family != b->sa_family) {
+                return 0;
+        }
+
+        if (a->sa_family == AF_INET) {
+                struct sockaddr_in *ain = (struct sockaddr_in *)a;
+                struct sockaddr_in *bin = (struct sockaddr_in *)b;
+
+                if (ain->sin_addr.s_addr != bin->sin_addr.s_addr) {
+                        return 0;
+                }
+                return 1;
+        } else if (a->sa_family == AF_INET6) {
+                struct sockaddr_in6 *ain6 = (struct sockaddr_in6 *)a;
+                struct sockaddr_in6 *bin6 = (struct sockaddr_in6 *)b;
+
+                if (memcmp(ain6->sin6_addr.s6_addr, bin6->sin6_addr.s6_addr,
+                                sizeof(ain6->sin6_addr.s6_addr)) != 0) {
+                        return 0;
+                }
+                return 1;
+        }
+        return 0;
+}
+
+static int process_fresh_packet(perthread_t *pt, struct addrinfo *expectedaddr) {
 
         ndag_common_t *header = (ndag_common_t *)pt->ndagheader;
         ndag_encap_t *encaphdr = (ndag_encap_t *)(pt->ndagheader +
                         sizeof(ndag_common_t));
         uint16_t targetport;
-        char targetaddr[INET6_ADDRSTRLEN];
+        struct sockaddr_storage targetaddr;
+        struct sockaddr *p;
         capstream_t *cap = NULL;
         int i;
 
+        memset((&targetaddr), 0, sizeof(targetaddr));
         if (header->type != NDAG_PKT_ENCAPERF) {
                 pt->nextrec = NULL;
                 pt->ndagsize = 0;
@@ -354,23 +390,22 @@ static int process_fresh_packet(perthread_t *pt, char *expectedaddr) {
                 return 1;
         }
 
-        /* TODO check for missing records */
+        if ((p = trace_get_destination_address(pt->dpdkpkt,
+                        (struct sockaddr *)(&targetaddr))) == NULL) {
+                pt->nextrec = NULL;
+                pt->ndagsize = 0;
+                pt->ndagheader = NULL;
+                return 1;
+        }
+
+        if (!(sockaddr_same(p, expectedaddr->ai_addr))) {
+                pt->nextrec = NULL;
+                pt->ndagsize = 0;
+                pt->ndagheader = NULL;
+                return 1;
+        }
+
         targetport = trace_get_destination_port(pt->dpdkpkt);
-        if (trace_get_destination_address_string(pt->dpdkpkt, targetaddr,
-                        INET6_ADDRSTRLEN) == NULL) {
-                pt->nextrec = NULL;
-                pt->ndagsize = 0;
-                pt->ndagheader = NULL;
-                return 1;
-        }
-
-        if (strcmp(targetaddr, expectedaddr) != 0) {
-                pt->nextrec = NULL;
-                pt->ndagsize = 0;
-                pt->ndagheader = NULL;
-                return 1;
-        }
-
         if (pt->streamcount == 0) {
                 pt->capstreams = (capstream_t *)malloc(sizeof(capstream_t));
                 pt->streamcount = 1;
