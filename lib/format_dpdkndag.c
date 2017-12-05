@@ -442,6 +442,7 @@ static int process_fresh_packet(perthread_t *pt, struct addrinfo *expectedaddr) 
         if (cap->expectedseq == 0) {
                 cap->expectedseq ++;
         }
+        cap->recordcount ++;
 
         pt->nextrec = ((char *)header) + sizeof(ndag_common_t) +
                         sizeof(ndag_encap_t);
