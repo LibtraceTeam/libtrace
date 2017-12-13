@@ -293,11 +293,13 @@ static int per_packet(libtrace_packet_t **packet) {
 			}
 		}
 
-		if (trace_config_output(output,
-					TRACE_OPTION_OUTPUT_COMPRESSTYPE,
-					&compress_type) == -1) {
-			trace_perror_output(output, "Unable to set compression type");
-		}
+                if (compress_type != TRACE_OPTION_COMPRESSTYPE_NONE) {
+                        if (trace_config_output(output,
+                                                TRACE_OPTION_OUTPUT_COMPRESSTYPE,
+                                                &compress_type) == -1) {
+                                trace_perror_output(output, "Unable to set compression type");
+                        }
+                }
 
 		trace_start_output(output);
 		if (trace_is_err_output(output)) {
