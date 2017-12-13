@@ -54,6 +54,7 @@
 #include <unistd.h>
 #include <endian.h>
 #include <string.h>
+#include <math.h>
 
 #if HAVE_LIBNUMA
 #include <numa.h>
@@ -1058,9 +1059,25 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data,
 			port_conf.rxmode.jumbo_frame = 0;
 			port_conf.rxmode.max_rx_pkt_len = 0;
 		} else {
+                        double expn;
+
 			/* Use jumbo frames */
 			port_conf.rxmode.jumbo_frame = 1;
 			port_conf.rxmode.max_rx_pkt_len = format_data->snaplen;
+
+                        /* Use less buffers if we're supporting jumbo frames
+                         * otherwise we won't be able to allocate memory.
+                         */
+                        if (format_data->snaplen > 1500) {
+                                format_data->nb_rx_buf /= 2;
+                        }
+
+                        /* snaplen should be rounded up to next power of two
+                         * to ensure enough memory is allocated for each
+                         * mbuf :(
+                         */
+                        expn = ceil(log2((double)(format_data->snaplen)));
+                        format_data->snaplen = pow(2, (int)expn);
 		}
 
 #if GET_MAC_CRC_CHECKSUM
@@ -1588,7 +1605,7 @@ static int dpdk_get_wire_length (const libtrace_packet_t *packet) {
 	}
 }
 
-static int dpdk_get_framing_length (const libtrace_packet_t *packet) {
+int dpdk_get_framing_length (const libtrace_packet_t *packet) {
 	struct dpdk_addt_hdr * hdr = get_addt_hdr(packet);
 	if (hdr->flags & INCLUDES_HW_TIMESTAMP)
 		return sizeof(struct rte_mbuf) + RTE_PKTMBUF_HEADROOM +
@@ -1990,7 +2007,7 @@ static libtrace_direction_t dpdk_set_direction(libtrace_packet_t *packet, libtra
 	return (libtrace_direction_t) hdr->direction;
 }
 
-static void dpdk_get_stats(libtrace_t *trace, libtrace_stat_t *stats) {
+void dpdk_get_stats(libtrace_t *trace, libtrace_stat_t *stats) {
 	struct rte_eth_stats dev_stats = {0};
 
 	if (trace->format_data == NULL || FORMAT(trace)->port == 0xFF)

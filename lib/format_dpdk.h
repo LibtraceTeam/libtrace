@@ -283,6 +283,8 @@ int dpdk_read_packet (libtrace_t *libtrace, libtrace_packet_t *packet);
 int dpdk_pregister_thread(libtrace_t *libtrace, libtrace_thread_t *t,
                 bool reading);
 void dpdk_punregister_thread(libtrace_t *libtrace, libtrace_thread_t *t);
+void dpdk_get_stats(libtrace_t *trace, libtrace_stat_t *stats);
+int dpdk_get_framing_length (const libtrace_packet_t *packet) ;
 int dpdk_read_packet_stream (libtrace_t *libtrace,
                 dpdk_per_stream_t *stream,
                 libtrace_message_queue_t *mesg,
