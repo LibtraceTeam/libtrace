@@ -46,8 +46,9 @@
 #include <sys/socket.h>
 #include <getopt.h>
 #include <inttypes.h>
-#include <lt_inttypes.h>
+#include <signal.h>
 
+#include <lt_inttypes.h>
 #include "libtrace_parallel.h"
 #include "output.h"
 #include "rt_protocol.h"
@@ -79,6 +80,14 @@ struct output_data_t *output = NULL;
 
 uint64_t count;
 uint64_t bytes;
+
+struct libtrace_t *currenttrace;
+
+static void cleanup_signal(int signal UNUSED) {
+        if (currenttrace) {
+                trace_pstop(currenttrace);
+        }
+}
 
 static void report_results(double ts,uint64_t count,uint64_t bytes)
 {
@@ -280,6 +289,7 @@ static void run_trace(char *uri)
         repcbs = trace_create_callback_set();
         trace_set_result_cb(repcbs, cb_result);
 
+        currenttrace = trace;
 	if (trace_pstart(trace, NULL, pktcbs, repcbs)==-1) {
 		trace_perror(trace,"Failed to start trace");
 		trace_destroy(trace);
@@ -328,6 +338,7 @@ static void usage(char *argv0)
 int main(int argc, char *argv[]) {
 
 	int i;
+        struct sigaction sigact;
 	
 	while(1) {
 		int option_index;
@@ -413,7 +424,15 @@ int main(int argc, char *argv[]) {
 		if (output == NULL)
 			return 0;
 	}
-		
+	
+        sigact.sa_handler = cleanup_signal;
+        sigemptyset(&sigact.sa_mask);
+        sigact.sa_flags = SA_RESTART;
+
+        sigaction(SIGINT, &sigact, NULL);
+        sigaction(SIGTERM, &sigact, NULL);
+
+
 	for(i=optind;i<argc;++i) {
 		run_trace(argv[i]);
 	}
