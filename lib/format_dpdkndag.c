@@ -41,10 +41,11 @@ typedef struct perthread {
         char *nextrec;
         uint32_t ndagsize;
 
+        pthread_mutex_t ndag_lock;
 	dpdk_per_stream_t *dpdkstreamdata;
         int burstsize;
         int burstoffset;
-        struct rte_mbuf* burstspace[20];
+        struct rte_mbuf* burstspace[40];
 
 } perthread_t;
 
@@ -155,12 +156,30 @@ static int dpdkndag_init_threads(libtrace_t *libtrace, uint32_t maxthreads) {
 		FORMAT_DATA->threaddatas[i].burstsize = 0;
 		FORMAT_DATA->threaddatas[i].burstoffset = 0;
                 memset(FORMAT_DATA->threaddatas[i].burstspace, 0,
-                                sizeof(struct rte_mbuf *) * 20);
+                                sizeof(struct rte_mbuf *) * 40);
+                pthread_mutex_init(&(FORMAT_DATA->threaddatas[i].ndag_lock),
+                                NULL);
 	}
 	return maxthreads;
 }
 
 static int dpdkndag_start_input(libtrace_t *libtrace) {
+        enum hasher_types hash = HASHER_UNIDIRECTIONAL;
+        int snaplen = 9000;
+
+        if (dpdk_config_input(FORMAT_DATA->dpdkrecv, TRACE_OPTION_HASHER,
+                                &hash) == -1) {
+		libtrace_err_t err = trace_get_err(FORMAT_DATA->dpdkrecv);
+		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "%s", err.problem);
+		return -1;
+	}
+
+        if (dpdk_config_input(FORMAT_DATA->dpdkrecv, TRACE_OPTION_SNAPLEN,
+                                &snaplen) == -1) {
+		libtrace_err_t err = trace_get_err(FORMAT_DATA->dpdkrecv);
+		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "%s", err.problem);
+		return -1;
+	}
 
 	if (dpdk_start_input(FORMAT_DATA->dpdkrecv) == -1) {
 		libtrace_err_t err = trace_get_err(FORMAT_DATA->dpdkrecv);
@@ -175,7 +194,22 @@ static int dpdkndag_start_input(libtrace_t *libtrace) {
 
 static int dpdkndag_pstart_input(libtrace_t *libtrace) {
 
+        enum hasher_types hash = HASHER_UNIDIRECTIONAL;
+        int snaplen = 9000;
         FORMAT_DATA->dpdkrecv->perpkt_thread_count = libtrace->perpkt_thread_count;
+        if (dpdk_config_input(FORMAT_DATA->dpdkrecv, TRACE_OPTION_HASHER,
+                                &hash) == -1) {
+		libtrace_err_t err = trace_get_err(FORMAT_DATA->dpdkrecv);
+		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "%s", err.problem);
+		return -1;
+	}
+
+        if (dpdk_config_input(FORMAT_DATA->dpdkrecv, TRACE_OPTION_SNAPLEN,
+                                &snaplen) == -1) {
+		libtrace_err_t err = trace_get_err(FORMAT_DATA->dpdkrecv);
+		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "%s", err.problem);
+		return -1;
+	}
 	if (dpdk_pstart_input(FORMAT_DATA->dpdkrecv) == -1) {
 		libtrace_err_t err = trace_get_err(FORMAT_DATA->dpdkrecv);
 		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "%s", err.problem);
@@ -198,11 +232,12 @@ static void clear_threaddata(perthread_t *pt) {
 	        free(pt->capstreams);
         }
 
-        for (i = 0; i < 20; i++) {
+        for (i = 0; i < 40; i++) {
                 if (pt->burstspace[i]) {
                         rte_pktmbuf_free(pt->burstspace[i]);
                 }
         }
+        pthread_mutex_destroy(&(pt->ndag_lock));
 }
 
 static int dpdkndag_pause_input(libtrace_t *libtrace) {
@@ -291,6 +326,8 @@ static void dpdkndag_get_thread_stats(libtrace_t *libtrace, libtrace_thread_t *t
 static void dpdkndag_get_statistics(libtrace_t *libtrace, libtrace_stat_t *stat) {
         int i;
 
+        libtrace_stat_t *dpdkstat;
+
         stat->dropped_valid = 1;
         stat->dropped = 0;
         stat->received_valid = 1;
@@ -298,12 +335,23 @@ static void dpdkndag_get_statistics(libtrace_t *libtrace, libtrace_stat_t *stat)
         stat->missing_valid = 1;
         stat->missing = 0;
 
+        dpdkstat = trace_create_statistics();
+        dpdk_get_stats(FORMAT_DATA->dpdkrecv, dpdkstat);
+
+        if (dpdkstat->dropped_valid) {
+                stat->errors_valid = 1;
+                stat->errors = dpdkstat->dropped;
+        }
+
         /* TODO Is this thread safe? */
         for (i = 0; i < libtrace->perpkt_thread_count; i++) {
+                pthread_mutex_lock(&(FORMAT_DATA->threaddatas[i].ndag_lock));
                 stat->dropped += FORMAT_DATA->threaddatas[i].dropped_upstream;
                 stat->received += FORMAT_DATA->threaddatas[i].received_packets;
                 stat->missing += FORMAT_DATA->threaddatas[i].missing_records;
+                pthread_mutex_unlock(&(FORMAT_DATA->threaddatas[i].ndag_lock));
         }
+        free(dpdkstat);
 }
 
 static int is_ndag_packet(libtrace_packet_t *packet, perthread_t *pt) {
@@ -433,10 +481,11 @@ static int process_fresh_packet(perthread_t *pt, struct addrinfo *expectedaddr) 
                         cap = &(pt->capstreams[next]);
                 }
         }
-
         if (cap->expectedseq != 0) {
+                pthread_mutex_lock(&pt->ndag_lock);
                 pt->missing_records += seq_cmp(
                                 ntohl(encaphdr->seqno), cap->expectedseq);
+                pthread_mutex_unlock(&pt->ndag_lock);
         }
         cap->expectedseq = ntohl(encaphdr->seqno) + 1;
         if (cap->expectedseq == 0) {
@@ -489,12 +538,16 @@ static int ndagrec_to_libtrace_packet(libtrace_t *libtrace, perthread_t *pt,
         if (erfptr->type == TYPE_DSM_COLOR_ETH) {
                 /* TODO */
         } else {
+                pthread_mutex_lock(&(pt->ndag_lock));
                 if (pt->received_packets > 0) {
                         pt->dropped_upstream += ntohs(erfptr->lctr);
                 }
+                pthread_mutex_unlock(&(pt->ndag_lock));
         }
 
+        pthread_mutex_lock(&(pt->ndag_lock));
 	pt->received_packets ++;
+        pthread_mutex_unlock(&(pt->ndag_lock));
 	encaphdr = (ndag_encap_t *)(pt->ndagheader + sizeof(ndag_common_t));
 
 	if ((ntohs(encaphdr->recordcount) & 0x8000) != 0) {
@@ -541,10 +594,11 @@ static int dpdkndag_pread_packets(libtrace_t *libtrace,
                                         pt->dpdkstreamdata,
                                         &t->messages,
                                         pt->burstspace,
-                                        20);
+                                        40);
                         if (ret <= 0) {
                                 return ret;
                         }
+
                         pt->dpdkpkt->buffer = pt->burstspace[0];
                         pt->dpdkpkt->trace = FORMAT_DATA->dpdkrecv;
                         dpdk_prepare_packet(FORMAT_DATA->dpdkrecv, pt->dpdkpkt,
