@@ -615,6 +615,7 @@ int dpdk_init_input (libtrace_t *libtrace) {
 
 static int dpdk_init_output(libtrace_out_t *libtrace)
 {
+	dpdk_per_stream_t stream = DPDK_EMPTY_STREAM;
 	char err[500];
 	err[0] = 0;
 
@@ -636,6 +637,9 @@ static int dpdk_init_output(libtrace_out_t *libtrace)
 	memset(FORMAT(libtrace)->burst_pkts, 0, sizeof(FORMAT(libtrace)->burst_pkts[0]) * BURST_SIZE);
 	FORMAT(libtrace)->burst_size = 0;
 	FORMAT(libtrace)->burst_offset = 0;
+
+	FORMAT(libtrace)->per_stream = libtrace_list_init(sizeof(struct dpdk_per_stream_t));
+	libtrace_list_push_back(FORMAT(libtrace)->per_stream, &stream);
 
 	if (dpdk_init_environment(libtrace->uridata, FORMAT(libtrace), err, sizeof(err)) != 0) {
 		trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED, "%s", err);
