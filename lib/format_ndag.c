@@ -230,7 +230,6 @@ static int join_multicast_group(char *groupaddr, char *localiface,
                 fprintf(stderr,
                         "Failed to bind to multicast socket %s:%s -- %s\n",
                                 groupaddr, portstr, strerror(errno));
-                close(sock);
                 sock = -1;
                 goto sockcreateover;
         }
@@ -405,6 +404,7 @@ static void *ndag_controller_run(void *tdata) {
                 trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
                         "Unable to join multicast group for nDAG control channel");
                 trace_interrupt();
+                pthread_exit(NULL);
         }
 
         ndag_paused = 0;

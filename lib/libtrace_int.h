@@ -1242,6 +1242,10 @@ void bpf_constructor(void);
 #if HAVE_DPDK
 /** Constructor for Intels DPDK format module */
 void dpdk_constructor(void);
+
+/** Constructor for receiving network DAG via Intels DPDK format module */
+void dpdkndag_constructor(void);
+
 #endif
 
 /** Extracts the RadioTap flags from a wireless link header

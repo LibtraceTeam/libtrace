@@ -395,6 +395,7 @@ enum base_format_t {
         TRACE_FORMAT_DPDK     =17, /**< The Intel Data Plane Development Kit format */
         TRACE_FORMAT_PCAPNG     =18,    /**< PCAP-NG trace file */
         TRACE_FORMAT_NDAG       =19,    /**< DAG multicast over a network */
+        TRACE_FORMAT_DPDK_NDAG       =20,    /**< DAG multicast over a network, received via DPDK */
 };
 
 /** RT protocol packet types */

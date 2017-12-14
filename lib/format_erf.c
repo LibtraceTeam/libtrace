@@ -123,11 +123,12 @@ typedef struct erf_index_t {
 /* Ethernet packets have a 2 byte padding before the packet
  * so that the IP header is aligned on a 32 bit boundary.
  */
-static int erf_get_padding(const libtrace_packet_t *packet)
+static inline int erf_get_padding(const libtrace_packet_t *packet)
 {
 	if (packet->trace->format->type==TRACE_FORMAT_ERF ||
                         packet->trace->format->type == TRACE_FORMAT_NDAG ||
-                        packet->trace->format->type == TRACE_FORMAT_RAWERF) {
+                        packet->trace->format->type == TRACE_FORMAT_RAWERF ||
+                        packet->trace->format->type == TRACE_FORMAT_DPDK_NDAG) {
 		dag_record_t *erfptr = (dag_record_t *)packet->header;
 		switch((erfptr->type & 0x7f)) {
 			case TYPE_ETH: 		
