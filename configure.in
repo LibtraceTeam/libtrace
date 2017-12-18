@@ -458,6 +458,9 @@ AC_CHECK_DECL([PACKET_FANOUT],
 # If we use DPDK we might be able to use libnuma
 AC_CHECK_LIB(numa, numa_node_to_cpus, have_numa=1, have_numa=0)
 
+# Need libwandder for ETSI live decoding
+AC_CHECK_LIB(wandder, init_wandder_decoder, have_wandder=1, have_wandder=0)
+
 # Checks for various "optional" libraries
 AC_CHECK_LIB(pthread, pthread_create, have_pthread=1, have_pthread=0)
 
@@ -489,6 +492,15 @@ else
 	with_numa=no
 fi
 
+if test "$have_wandder" = 1; then
+        LIBTRACE_LIBS="$LIBTRACE_LIBS -lwandder"
+        AC_DEFINE(HAVE_WANDDER, 1, [Set to 1 if libwandder is available])
+        wandder_avail=yes
+else
+        AC_DEFINE(HAVE_WANDDER, 0, [Set to 1 if libwandder is available])
+        wandder_avail=no
+fi
+
 if test "$dlfound" = 0; then
 	AC_MSG_ERROR("Unable to find dlopen. Please use LDFLAGS to specify the location of libdl and re-run configure")
 fi
@@ -514,15 +526,6 @@ if test "$cryptofound" = 1; then
         have_crypto=yes
 else
         have_crypto=no
-fi
-
-if test "$asn1found" = 1; then
-        AC_DEFINE(HAVE_LIBTASN1, 1, [Set to 1 if libtasn1 is available])
-	LIBTRACE_LIBS="$LIBTRACE_LIBS -ltasn1"
-        TOOLS_LIBS="$TOOLS_LIBS -ltasn1"
-        have_asn1=yes
-else
-        have_asn1=no
 fi
 
 if test "$have_nsl" = 1; then
@@ -623,6 +626,7 @@ AS_IF([test "x$have_ncurses" = "xyes"], [
 AM_CONDITIONAL([HAVE_BPF_CAPTURE], [test "$ac_cv_have_decl_BIOCSETIF" = yes ])
 AM_CONDITIONAL([HAVE_DAG], [test "$libtrace_dag" = true])
 AM_CONDITIONAL([HAVE_DPDK], [test "$libtrace_dpdk" = true])
+AM_CONDITIONAL([HAVE_WANDDER], [test "x$wandder_avail" = "xyes"])
 AM_CONDITIONAL([DAG2_4], [test "$libtrace_dag_version" = 24])
 AM_CONDITIONAL([DAG2_5], [test "$libtrace_dag_version" = 25])
 AM_CONDITIONAL([HAVE_NETPACKET_PACKET_H], [test "$libtrace_netpacket_packet_h" = true])
@@ -704,7 +708,7 @@ elif test x"$want_dpdk" != "xno"; then
 	AC_MSG_NOTICE([Note: Requires DPDK v1.5 or newer])
 fi
 reportopt "Compiled with LLVM BPF JIT support" $JIT
-reportopt "Compiled with live ETSI LI support (requires libtasn1)" $have_asn1
+reportopt "Compiled with live ETSI LI support (requires libwandder)" $wandder_avail
 reportopt "Building man pages/documentation" $libtrace_doxygen
 reportopt "Building tracetop (requires libncurses)" $with_ncurses
 reportopt "Building traceanon with CryptoPan (requires libcrypto and openssl/evp.h)" $have_crypto

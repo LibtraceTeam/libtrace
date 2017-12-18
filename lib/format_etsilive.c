@@ -33,7 +33,8 @@
 #include "format_helper.h"
 #include "data-struct/simple_circular_buffer.h"
 
-#include "etsiasn1tab.h"
+#include <libwandder.h>
+#include <libwandder_etsili.h>
 
 #include <assert.h>
 #include <errno.h>
@@ -42,7 +43,6 @@
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <libtasn1.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netdb.h>
@@ -54,8 +54,6 @@
 typedef struct etsipktcache {
 
         uint64_t timestamp;
-        uint8_t *ccptr;
-        uint8_t *iriptr;
         uint16_t length;
 
 } etsi_packet_cache_t;
@@ -83,7 +81,6 @@ typedef struct etsilive_format_data {
         pthread_t listenthread;
         etsithread_t *receivers;
         int nextthreadid;
-        ASN1_TYPE etsidef;
 } etsilive_format_data_t;
 
 typedef struct newsendermessage {
@@ -209,8 +206,6 @@ listenshutdown:
 
 static int etsilive_init_input(libtrace_t *libtrace) {
         char *scan = NULL;
-        char errordesc[ASN1_MAX_ERROR_DESCRIPTION_SIZE];
-
         libtrace->format_data = (etsilive_format_data_t *)malloc(
                         sizeof(etsilive_format_data_t));
 
@@ -229,13 +224,6 @@ static int etsilive_init_input(libtrace_t *libtrace) {
                         (size_t)(scan - libtrace->uridata));
         FORMAT_DATA->listenport = strdup(scan + 1);
 
-        if (asn1_array2tree(etsili_asn1tab, &(FORMAT_DATA->etsidef),
-                                errordesc) != ASN1_SUCCESS) {
-                trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT,
-                        "Failed to parse ETSI ASN.1 array: %s", errordesc);
-                return -1;
-        }
-
         return 0;
 }
 
@@ -250,7 +238,6 @@ static int etsilive_fin_input(libtrace_t *libtrace) {
         if (FORMAT_DATA->listenport) {
                 free(FORMAT_DATA->listenport);
         }
-        asn1_delete_structure(&(FORMAT_DATA->etsidef));
         free(libtrace->format_data);
         return 0;
 }
@@ -338,8 +325,6 @@ static int receiver_read_message(etsithread_t *et) {
                                 et->threadindex);
                 esock->cached.timestamp = 0;
                 esock->cached.length = 0;
-                esock->cached.iriptr = NULL;
-                esock->cached.ccptr = NULL;
 
                 et->sourcecount += 1;
 
@@ -405,17 +390,15 @@ static int receive_etsi_sockets(libtrace_t *libtrace, etsithread_t *et) {
 
 static etsisocket_t *select_next_packet(etsithread_t *et, libtrace_t *libtrace) {
 
-        int i, asnret;
+        int i;
         etsisocket_t *esock = NULL;
-        char errordesc[ASN1_MAX_ERROR_DESCRIPTION_SIZE];
-        char readstring[100];
         uint64_t earliest = 0;
-        uint64_t currentts = 0;
+        uint64_t current;
+        struct timeval tv;
         uint32_t available;
         uint8_t *ptr = NULL;
-        ASN1_TYPE psheader;
-        int ider_len;
-        int readlen;
+        wandder_decoder_t dec;
+        uint32_t reclen = 0;
 
         for (i = 0; i < et->sourcecount; i++) {
                 if (et->sources[i].sock == -1) {
@@ -425,10 +408,10 @@ static etsisocket_t *select_next_packet(etsithread_t *et, libtrace_t *libtrace) 
                  * just use whatever we cached last time.
                  */
                 if (et->sources[i].cached.timestamp != 0) {
-                        currentts = et->sources[i].cached.timestamp;
+                        current = et->sources[i].cached.timestamp;
 
-                        if (earliest == 0 || earliest > currentts) {
-                                earliest = currentts;
+                        if (earliest == 0 || earliest > current) {
+                                earliest = current;
                                 esock = &(et->sources[i]);
                         }
                         continue;
@@ -437,75 +420,50 @@ static etsisocket_t *select_next_packet(etsithread_t *et, libtrace_t *libtrace) 
                 ptr = libtrace_scb_get_read(&(et->sources[i].recvbuffer),
                                 &available);
 
-                if (available == 0) {
+                if (available == 0 || ptr == NULL) {
                         continue;
                 }
 
-                /* Try to decode whatever is at the front of the buffer. */
-                asnret = asn1_create_element(FORMAT_DATA->etsidef,
-                                "LI-PS-PDU.PSHeader", &psheader);
-                if (asnret != ASN1_SUCCESS) {
-                        fprintf(stderr, "failed to create asn1 element\n");
-                        asn1_delete_structure(&psheader);
-                        continue;
-                }
-
-                ider_len = (int)available;
-                asnret = asn1_der_decoding2(&psheader, ptr, &ider_len, 0, errordesc);
-
-                /* Failed? Must not have the whole packet... */
-                if (asnret != ASN1_SUCCESS) {
-                        int j;
-                        for (j = 0; j < available; j++) {
-                                printf("%02x ", ptr[j]);
-                                if (j % 16 == 15 && j > 0) {
-                                        printf("\n");
-                                }
-                                if (j >= 16 * 16)
-                                        break;
-                        }
-                        fprintf(stderr, "%d failed to decode asn1 content: %s\n",
-                                        available, errordesc);
-                        assert(0);
-                        asn1_delete_structure(&psheader);
-                        continue;
-                }
-
-                readlen = sizeof(readstring);
-                asnret = asn1_read_value(psheader, "timeStamp", readstring, &readlen);
-
-                if (asnret == ASN1_SUCCESS) {
-                        fprintf(stderr, "timeStamp=%s\n", readstring);
-                        /* TODO turn to 64 bit timestamp */
+                init_wandder_decoder(&dec, ptr, available, false);
+                if (et->sources[i].cached.length != 0) {
+                        reclen = et->sources[i].cached.length;
                 } else {
-                        int msts_sec;
-                        int msts_ms;
+                        reclen = wandder_etsili_get_pdu_length(&dec);
 
-                        readlen = sizeof(int);
-                        asnret = asn1_read_value(psheader, "microSecondTimeStamp.seconds", &msts_sec, &readlen);
-
-                        if (asnret != ASN1_SUCCESS) {
-                                fprintf(stderr, "no microSecondTimeStamp.seconds\n");
+                        if (reclen == 0) {
+                                free_wandder_decoder(&dec);
                                 continue;
                         }
-
-                        readlen = sizeof(int);
-                        asnret = asn1_read_value(psheader, "microSecondTimeStamp.microSeconds", &msts_ms, &readlen);
-
-                        if (asnret != ASN1_SUCCESS) {
-                                fprintf(stderr, "no microSecondTimeStamp.microSeconds?\n");
-                                continue;
-                        }
-                        fprintf(stderr, "microSecondTimeStamp=%d.%d\n", msts_sec, msts_ms);
                 }
-                assert(0);
+
+                if (available < reclen) {
+                        /* Don't have the whole PDU yet */
+                        free_wandder_decoder(&dec);
+                        continue;
+                }
+
+                /* Get the timestamp */
+
+                tv = wandder_etsili_get_header_timestamp(&dec);
+                if (tv.tv_sec == 0) {
+                        free_wandder_decoder(&dec);
+                        continue;
+                }
+                current = ((((uint64_t)tv.tv_sec) << 32) +
+                                (((uint64_t)tv.tv_usec << 32)/1000000)); 
+
                 /* Success, cache everything we used so we don't have to
                  * decode this packet again.
                  */
+                et->sources[i].cached.timestamp = current;
+                et->sources[i].cached.length = reclen;
 
-                /* Advance the read pointer for this buffer */
 
                 /* Don't forget to update earliest and esock... */
+                if (current < earliest || earliest == 0) {
+                        esock = &(et->sources[i]);
+                        earliest = current;
+                }
 
         }
         return esock;
@@ -513,6 +471,30 @@ static etsisocket_t *select_next_packet(etsithread_t *et, libtrace_t *libtrace) 
 
 static int etsilive_prepare_received(libtrace_t *libtrace, etsithread_t *et,
                 etsisocket_t *esock, libtrace_packet_t *packet) {
+
+        uint32_t available = 0;
+
+        packet->trace = libtrace;
+        packet->buffer = libtrace_scb_get_read(&(esock->recvbuffer),
+                                        &available);
+        packet->buf_control = TRACE_CTRL_EXTERNAL;
+        packet->header = NULL;          // Check this is ok to do
+        packet->payload = packet->buffer;
+        packet->type = TRACE_RT_DATA_ETSILI;
+        packet->order = esock->cached.timestamp;
+        packet->error = esock->cached.length;
+
+        packet->wire_length = esock->cached.length;
+        packet->capture_length = esock->cached.length;
+
+        /* Advance the read pointer for this buffer
+         * TODO should really do this in fin_packet, but will need a ref
+         * to esock to do this properly */
+        libtrace_scb_advance_read(&(esock->recvbuffer), esock->cached.length);
+        esock->cached.length = 0;
+        esock->cached.timestamp = 0;
+
+
         return 1;
 }
 
@@ -561,8 +543,46 @@ static int etsilive_prepare_packet(libtrace_t *libtrace UNUSED,
         return 0;
 }
 
+static int etsilive_get_pdu_length(const libtrace_packet_t *packet) {
 
+        /* Should never get here because cache is set when packet is read */
+        wandder_decoder_t dec;
+        size_t reclen;
 
+        /* 0 should be ok here for quickly evaluating the first length
+         * field... */
+        init_wandder_decoder(&dec, packet->buffer, 0, false);
+        reclen = (size_t)wandder_etsili_get_pdu_length(&dec);
+
+        free_wandder_decoder(&dec);
+
+        return reclen;
+}
+
+static int etsilive_get_framing_length(const libtrace_packet_t *packet) {
+
+        return 0;
+}
+
+static struct timeval etsilive_get_timeval(const libtrace_packet_t *packet) {
+        /* TODO add cached timestamps to libtrace so we don't have to look
+         * this up again. */
+        struct timeval tv;
+        wandder_decoder_t dec;
+
+        tv.tv_sec = 0;
+        tv.tv_usec = 0;
+
+        init_wandder_decoder(&dec, packet->buffer, 0, false);
+        tv = wandder_etsili_get_header_timestamp(&dec);
+        free_wandder_decoder(&dec);
+        return tv;
+}
+
+static libtrace_linktype_t etsilive_get_link_type(
+                const libtrace_packet_t *packet) {
+        return TRACE_TYPE_ETSILI;
+}
 
 static struct libtrace_format_t etsilive = {
         "etsilive",
@@ -583,19 +603,19 @@ static struct libtrace_format_t etsilive = {
         etsilive_prepare_packet,        /* prepare_packet */
         NULL,                           /* fin_packet */
         NULL,                           /* write_packet */
-        NULL, //etsilive_get_link_type,         /* get_link_type */
+        etsilive_get_link_type,         /* get_link_type */
         NULL,                           /* get_direction */
         NULL,                           /* set_direction */
         NULL,                           /* get_erf_timestamp */
-        NULL,                           /* get_timeval */
+        etsilive_get_timeval,           /* get_timeval */
         NULL,                           /* get_timespec */
         NULL,                           /* get_seconds */
         NULL,                           /* seek_erf */
         NULL,                           /* seek_timeval */
         NULL,                           /* seek_seconds */
-        NULL, //etsilive_get_capture_length,    /* get_capture_length */
-        NULL, //etsilive_get_wire_length,       /* get_wire_length */
-        NULL, //etsilive_get_framing_length,    /* get_framing_length */
+        etsilive_get_pdu_length,       /* get_capture_length */
+        etsilive_get_pdu_length,       /* get_wire_length */
+        etsilive_get_framing_length,    /* get_framing_length */
         NULL,                           /* set_capture_length */
         NULL,                           /* get_received_packets */
         NULL,                           /* get_filtered_packets */
