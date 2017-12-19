@@ -72,6 +72,7 @@ typedef struct etsithread {
         etsisocket_t *sources;
         uint16_t sourcecount;
         int threadindex;
+        wandder_etsispec_t *etsidec;
 } etsithread_t;
 
 typedef struct etsilive_format_data {
@@ -262,6 +263,8 @@ static int etsilive_start_threads(libtrace_t *libtrace, uint32_t maxthreads) {
                 FORMAT_DATA->receivers[i].sources = NULL;
                 FORMAT_DATA->receivers[i].sourcecount = 0;
                 FORMAT_DATA->receivers[i].threadindex = i;
+                FORMAT_DATA->receivers[i].etsidec =
+                                wandder_create_etsili_decoder();
 
         }
 
@@ -290,6 +293,7 @@ static void halt_etsi_thread(etsithread_t *receiver) {
                 libtrace_scb_destroy(&(src.recvbuffer));
                 close(src.sock);
         }
+        wandder_free_etsili_decoder(receiver->etsidec);
         free(receiver->sources);
 }
 
@@ -424,29 +428,26 @@ static etsisocket_t *select_next_packet(etsithread_t *et, libtrace_t *libtrace) 
                         continue;
                 }
 
-                init_wandder_decoder(&dec, ptr, available, false);
+                wandder_attach_etsili_buffer(et->etsidec, ptr, available, false);
                 if (et->sources[i].cached.length != 0) {
                         reclen = et->sources[i].cached.length;
                 } else {
-                        reclen = wandder_etsili_get_pdu_length(&dec);
+                        reclen = wandder_etsili_get_pdu_length(et->etsidec);
 
                         if (reclen == 0) {
-                                free_wandder_decoder(&dec);
                                 continue;
                         }
                 }
 
                 if (available < reclen) {
                         /* Don't have the whole PDU yet */
-                        free_wandder_decoder(&dec);
                         continue;
                 }
 
                 /* Get the timestamp */
 
-                tv = wandder_etsili_get_header_timestamp(&dec);
+                tv = wandder_etsili_get_header_timestamp(et->etsidec);
                 if (tv.tv_sec == 0) {
-                        free_wandder_decoder(&dec);
                         continue;
                 }
                 current = ((((uint64_t)tv.tv_sec) << 32) +
@@ -486,6 +487,14 @@ static int etsilive_prepare_received(libtrace_t *libtrace, etsithread_t *et,
 
         packet->wire_length = esock->cached.length;
         packet->capture_length = esock->cached.length;
+
+        /*
+        for (j = 0; j < packet->wire_length; j++) {
+                printf("%02x ", *(((uint8_t *)packet->buffer) + j));
+                if ((j % 16) == 15) printf("\n");
+        }
+        printf("\n");
+        */
 
         /* Advance the read pointer for this buffer
          * TODO should really do this in fin_packet, but will need a ref
@@ -546,15 +555,15 @@ static int etsilive_prepare_packet(libtrace_t *libtrace UNUSED,
 static int etsilive_get_pdu_length(const libtrace_packet_t *packet) {
 
         /* Should never get here because cache is set when packet is read */
-        wandder_decoder_t dec;
+        wandder_etsispec_t *dec;
         size_t reclen;
 
         /* 0 should be ok here for quickly evaluating the first length
          * field... */
-        init_wandder_decoder(&dec, packet->buffer, 0, false);
-        reclen = (size_t)wandder_etsili_get_pdu_length(&dec);
-
-        free_wandder_decoder(&dec);
+        dec = wandder_create_etsili_decoder();
+        wandder_attach_etsili_buffer(dec, packet->buffer, 0, false);
+        reclen = (size_t)wandder_etsili_get_pdu_length(dec);
+        wandder_free_etsili_decoder(dec);
 
         return reclen;
 }
@@ -568,14 +577,16 @@ static struct timeval etsilive_get_timeval(const libtrace_packet_t *packet) {
         /* TODO add cached timestamps to libtrace so we don't have to look
          * this up again. */
         struct timeval tv;
-        wandder_decoder_t dec;
+        wandder_etsispec_t *dec;
 
         tv.tv_sec = 0;
         tv.tv_usec = 0;
 
-        init_wandder_decoder(&dec, packet->buffer, 0, false);
-        tv = wandder_etsili_get_header_timestamp(&dec);
-        free_wandder_decoder(&dec);
+
+        dec = wandder_create_etsili_decoder();
+        wandder_attach_etsili_buffer(dec, packet->buffer, 0, false);
+        tv = wandder_etsili_get_header_timestamp(dec);
+        wandder_free_etsili_decoder(dec);
         return tv;
 }
 
