@@ -25,8 +25,8 @@
  */
 #include <pthread.h>
 #include <semaphore.h>
-#include "../libtrace.h"
-#include "../pthread_spinlock.h"
+#include "libtrace.h"
+#include "pthread_spinlock.h"
 
 #ifndef LIBTRACE_RINGBUFFER_H
 #define LIBTRACE_RINGBUFFER_H
