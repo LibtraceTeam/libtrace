@@ -369,7 +369,8 @@ typedef enum {
        TRACE_TYPE_METADATA = 18,     	/**< WDCAP-style meta-data */
        TRACE_TYPE_NONDATA = 19,		/**< Not a data packet */
        TRACE_TYPE_OPENBSD_LOOP = 20,	/**< OpenBSD loopback */
-       TRACE_TYPE_ERF_META = 21 /**< ERF Provenance metadata record */
+       TRACE_TYPE_ERF_META = 21, /**< ERF Provenance metadata record */
+       TRACE_TYPE_ETSILI = 22	/**< ETSI Lawful Intercept */
 } libtrace_linktype_t;
 
 /** RT protocol base format identifiers.
@@ -452,6 +453,8 @@ typedef enum {
 	TRACE_RT_DATA_LINUX_RING=TRACE_RT_DATA_SIMPLE+TRACE_FORMAT_LINUX_RING,
     /** RT is encapsulating a Intel DPDK capture record */
 	TRACE_RT_DATA_DPDK=TRACE_RT_DATA_SIMPLE+TRACE_FORMAT_DPDK,
+
+        TRACE_RT_DATA_ETSILI = TRACE_RT_DATA_SIMPLE + TRACE_FORMAT_ETSILIVE,
 
 	/** As PCAP does not store the linktype with the packet, we need to 
 	 * create a separate RT type for each supported DLT, starting from
