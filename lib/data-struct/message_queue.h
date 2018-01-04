@@ -39,12 +39,16 @@ typedef struct libtrace_message_queue_t {
 	pthread_spinlock_t spin;
 } libtrace_message_queue_t;
 
-void libtrace_message_queue_init(libtrace_message_queue_t *mq, size_t message_len);
-int libtrace_message_queue_put(libtrace_message_queue_t *mq, const void *message);
-int libtrace_message_queue_count(const libtrace_message_queue_t *mq);
-int libtrace_message_queue_get(libtrace_message_queue_t *mq, void *message);
-int libtrace_message_queue_try_get(libtrace_message_queue_t *mq, void *message);
-void libtrace_message_queue_destroy(libtrace_message_queue_t *mq);
-int libtrace_message_queue_get_fd(libtrace_message_queue_t *mq);
+DLLEXPORT void libtrace_message_queue_init(libtrace_message_queue_t *mq,
+        size_t message_len);
+DLLEXPORT int libtrace_message_queue_put(libtrace_message_queue_t *mq,
+        const void *message);
+DLLEXPORT int libtrace_message_queue_count(const libtrace_message_queue_t *mq);
+DLLEXPORT int libtrace_message_queue_get(libtrace_message_queue_t *mq,
+        void *message);
+DLLEXPORT int libtrace_message_queue_try_get(libtrace_message_queue_t *mq,
+        void *message);
+DLLEXPORT void libtrace_message_queue_destroy(libtrace_message_queue_t *mq);
+DLLEXPORT int libtrace_message_queue_get_fd(libtrace_message_queue_t *mq);
 
 #endif
