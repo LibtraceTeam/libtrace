@@ -90,6 +90,7 @@ typedef struct streamsock {
         uint64_t recordcount;
 
         int bufavail;
+	int bufwaiting;
 
 #if HAVE_RECVMMSG
         struct mmsghdr mmsgbufs[RECV_BATCH_SIZE];
@@ -632,13 +633,14 @@ static int ndag_prepare_packet_stream(libtrace_t *libtrace,
         }
         ssock->nextread += ntohs(erfptr->rlen);
 
+	assert(ssock->nextread - ssock->saved[nr] <= ssock->savedsize[nr]);
+
         if (ssock->nextread - ssock->saved[nr] >= ssock->savedsize[nr]) {
                 /* Read everything from this buffer, mark as empty and
                  * move on. */
                 ssock->savedsize[nr] = 0;
-                ssock->bufavail ++;
+                ssock->bufwaiting ++;
 
-                assert(ssock->bufavail > 0 && ssock->bufavail <= ENCAP_BUFFERS);
                 nr ++;
                 if (nr == ENCAP_BUFFERS) {
                         nr = 0;
@@ -651,7 +653,6 @@ static int ndag_prepare_packet_stream(libtrace_t *libtrace,
         packet->order = erf_get_erf_timestamp(packet);
         packet->error = packet->payload ? ntohs(erfptr->rlen) :
                         erf_get_framing_length(packet);
-
         return ntohs(erfptr->rlen);
 }
 
@@ -730,6 +731,7 @@ static int add_new_streamsock(recvstream_t *rt, streamsource_t src) {
         ssock->monitorptr = mon;
         ssock->saved = (char **)malloc(sizeof(char *) * ENCAP_BUFFERS);
         ssock->bufavail = ENCAP_BUFFERS;
+	ssock->bufwaiting = 0;
         ssock->startidle = 0;
 
         for (i = 0; i < ENCAP_BUFFERS; i++) {
@@ -900,6 +902,7 @@ static int check_ndag_received(streamsock_t *ssock, int index,
         if (ssock->expectedseq != 0) {
                 rt->missing_records += seq_cmp(
                                 ntohl(encaphdr->seqno), ssock->expectedseq);
+
         }
         ssock->expectedseq = ntohl(encaphdr->seqno) + 1;
         if (ssock->expectedseq == 0) {
@@ -1120,19 +1123,13 @@ static streamsock_t *select_next_packet(recvstream_t *rt) {
                         earliest = currentts;
                         ssock = &(rt->sources[i]);
                 }
-                /*
-                fprintf(stderr, "%d %d %lu %lu %lu\n", rt->threadindex,
-                                i, currentts,
-                                rt->sources[i].recordcount, 
-                                rt->missing_records);
-                */
         }
         return ssock;
 }
 
 static int ndag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 
-        int rem;
+        int rem, ret;
         streamsock_t *nextavail = NULL;
         rem = receive_encap_records_block(libtrace, &(FORMAT_DATA->receivers[0]),
                         packet);
@@ -1149,16 +1146,19 @@ static int ndag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
         /* nextread should point at an ERF header, so prepare 'packet' to be
          * a libtrace ERF packet. */
 
-        return ndag_prepare_packet_stream(libtrace,
+        ret = ndag_prepare_packet_stream(libtrace,
                         &(FORMAT_DATA->receivers[0]), nextavail,
                         packet, TRACE_PREP_DO_NOT_OWN_BUFFER);
+	nextavail->bufavail += nextavail->bufwaiting;
+	nextavail->bufwaiting = 0;
+	return ret;
 }
 
 static int ndag_pread_packets(libtrace_t *libtrace, libtrace_thread_t *t,
                 libtrace_packet_t **packets, size_t nb_packets) {
 
         recvstream_t *rt;
-        int rem;
+        int rem, i;
         size_t read_packets = 0;
         streamsock_t *nextavail = NULL;
 
@@ -1198,6 +1198,14 @@ static int ndag_pread_packets(libtrace_t *libtrace, libtrace_thread_t *t,
                 }
         } while (1);
 
+	
+        for (i = 0; i < rt->sourcecount; i++) {
+                streamsock_t *src = &(rt->sources[i]);
+		src->bufavail += src->bufwaiting;
+		src->bufwaiting = 0;
+		assert(src->bufavail >= 0 && src->bufavail <= ENCAP_BUFFERS);
+	}
+
         return read_packets;
 
 }
@@ -1207,7 +1215,7 @@ static libtrace_eventobj_t trace_event_ndag(libtrace_t *libtrace,
 
 
         libtrace_eventobj_t event = {0,0,0.0,0};
-        int rem;
+        int rem, i;
         streamsock_t *nextavail = NULL;
 
         /* Only check for messages once per call */
@@ -1279,6 +1287,13 @@ static libtrace_eventobj_t trace_event_ndag(libtrace_t *libtrace,
                 libtrace->accepted_packets ++;
                 break;
         } while (1);
+
+        for (i = 0; i < FORMAT_DATA->receivers[0].sourcecount; i++) {
+                streamsock_t *src = &(FORMAT_DATA->receivers[0].sources[i]);
+		src->bufavail += src->bufwaiting;
+		src->bufwaiting = 0;
+		assert(src->bufavail >= 0 && src->bufavail <= ENCAP_BUFFERS);
+	}
 
         return event;
 }
