@@ -112,6 +112,9 @@ typedef struct recvstream {
         uint64_t dropped_upstream;
         uint64_t missing_records;
         uint64_t received_packets;
+
+	fd_set allsocks;
+	int maxfd;
 } recvstream_t;
 
 typedef struct ndag_format_data {
@@ -318,7 +321,7 @@ static void new_group_alert(libtrace_t *libtrace, uint16_t threadid,
                         (void *)&alert);
 
 }
-        
+
 static int ndag_parse_control_message(libtrace_t *libtrace, char *msgbuf,
                 int msgsize, uint16_t *ptmap) {
 
@@ -484,6 +487,8 @@ static int ndag_start_threads(libtrace_t *libtrace, uint32_t maxthreads)
                 FORMAT_DATA->receivers[i].dropped_upstream = 0;
                 FORMAT_DATA->receivers[i].received_packets = 0;
                 FORMAT_DATA->receivers[i].missing_records = 0;
+		FD_ZERO(&(FORMAT_DATA->receivers[i].allsocks));
+		FORMAT_DATA->receivers[i].maxfd = -1;
 
                 libtrace_message_queue_init(&(FORMAT_DATA->receivers[i].mqueue),
                                 sizeof(ndag_internal_message_t));
@@ -765,6 +770,10 @@ static int add_new_streamsock(recvstream_t *rt, streamsource_t src) {
         ssock->nextwriteind = 0;
         ssock->recordcount = 0;
         rt->sourcecount += 1;
+	FD_SET(ssock->sock, &(rt->allsocks));
+	if (ssock->sock > rt->maxfd) {
+		rt->maxfd = ssock->sock;
+	}
 
         fprintf(stderr, "Added new stream %s:%u to thread %d\n",
                         ssock->groupaddr, ssock->port, rt->threadindex);
@@ -871,6 +880,7 @@ static int check_ndag_received(streamsock_t *ssock, int index,
         } else if (rectype != NDAG_PKT_ENCAPERF) {
                 fprintf(stderr, "Received invalid record on the channel for %s:%u.\n",
                                 ssock->groupaddr, ssock->port);
+		FD_CLR(ssock->sock, &(rt->allsocks));
                 close(ssock->sock);
                 ssock->sock = -1;
                 return -1;
@@ -976,6 +986,7 @@ static int receive_from_single_socket(streamsock_t *ssock, struct timeval *tv,
                                         ssock->groupaddr,
                                         ssock->port);
 
+				FD_CLR(ssock->sock, &(rt->allsocks));
                                 close(ssock->sock);
                                 ssock->sock = -1;
                         }
@@ -985,6 +996,7 @@ static int receive_from_single_socket(streamsock_t *ssock, struct timeval *tv,
                                 "Error receiving encapsulated records from %s:%u -- %s \n",
                                 ssock->groupaddr, ssock->port,
                                 strerror(errno));
+			FD_CLR(ssock->sock, &(rt->allsocks));
                         close(ssock->sock);
                         ssock->sock = -1;
                 }
@@ -1021,11 +1033,30 @@ static int receive_from_sockets(recvstream_t *rt) {
 
         int i, readybufs, gottime;
         struct timeval tv;
+	fd_set fds;
+	struct timeval zerotv;
 
         readybufs = 0;
         gottime = 0;
 
-        for (i = 0; i < rt->sourcecount; i ++) {
+	fds = rt->allsocks;
+
+	if (rt->maxfd == -1) {
+		return 0;
+	}
+
+	zerotv.tv_sec = 0;
+	zerotv.tv_usec = 0;
+
+	if (select(rt->maxfd + 1, &fds, NULL, NULL, &zerotv) == -1) {
+		/* log the error? XXX */
+		return -1;
+	}
+
+	for (i = 0; i < rt->sourcecount; i++) {
+		if (!FD_ISSET(rt->sources[i].sock, &fds)) {
+			continue;
+		}
                 readybufs += receive_from_single_socket(&(rt->sources[i]),
                                 &tv, &gottime, rt);
         }
@@ -1124,7 +1155,7 @@ static streamsock_t *select_next_packet(recvstream_t *rt) {
 			return &(rt->sources[0]);
 		}
 		return NULL;
-	}	
+	}
 
 
         for (i = 0; i < rt->sourcecount; i ++) {
@@ -1219,7 +1250,6 @@ static int ndag_pread_packets(libtrace_t *libtrace, libtrace_thread_t *t,
                 }
         } while (1);
 
-	
         for (i = 0; i < rt->sourcecount; i++) {
                 streamsock_t *src = &(rt->sources[i]);
 		src->bufavail += src->bufwaiting;
