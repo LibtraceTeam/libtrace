@@ -86,6 +86,7 @@ typedef struct streamsock {
         int nextreadind;
         int nextwriteind;
         int savedsize[ENCAP_BUFFERS];
+	uint64_t nextts;
         uint32_t startidle;
         uint64_t recordcount;
 
@@ -586,6 +587,7 @@ static int ndag_prepare_packet_stream(libtrace_t *libtrace,
         ndag_encap_t *encaphdr;
         uint16_t ndag_reccount = 0;
         int nr;
+	uint16_t rlen;
 
         if ((flags & TRACE_PREP_OWN_BUFFER) == TRACE_PREP_OWN_BUFFER) {
                 packet->buf_control = TRACE_CTRL_PACKET;
@@ -628,10 +630,14 @@ static int ndag_prepare_packet_stream(libtrace_t *libtrace,
         ndag_reccount = ntohs(encaphdr->recordcount);
         if ((ndag_reccount & 0x8000) != 0) {
                 /* Record was truncated -- update rlen appropriately */
-                erfptr->rlen = htons(ssock->savedsize[nr] -
-                                (ssock->nextread - ssock->saved[nr]));
-        }
-        ssock->nextread += ntohs(erfptr->rlen);
+                rlen = ssock->savedsize[nr] -
+                                (ssock->nextread - ssock->saved[nr]);
+		erfptr->rlen = htons(rlen);
+        } else {
+		rlen = ntohs(erfptr->rlen);
+	}
+        ssock->nextread += rlen;
+	ssock->nextts = 0;
 
 	assert(ssock->nextread - ssock->saved[nr] <= ssock->savedsize[nr]);
 
@@ -651,9 +657,8 @@ static int ndag_prepare_packet_stream(libtrace_t *libtrace,
         }
 
         packet->order = erf_get_erf_timestamp(packet);
-        packet->error = packet->payload ? ntohs(erfptr->rlen) :
-                        erf_get_framing_length(packet);
-        return ntohs(erfptr->rlen);
+        packet->error = rlen;
+        return rlen;
 }
 
 static int ndag_prepare_packet(libtrace_t *libtrace UNUSED,
@@ -733,6 +738,7 @@ static int add_new_streamsock(recvstream_t *rt, streamsource_t src) {
         ssock->bufavail = ENCAP_BUFFERS;
 	ssock->bufwaiting = 0;
         ssock->startidle = 0;
+	ssock->nextts = 0;
 
         for (i = 0; i < ENCAP_BUFFERS; i++) {
                 ssock->saved[i] = (char *)malloc(ENCAP_BUFSIZE);
@@ -875,8 +881,7 @@ static int check_ndag_received(streamsock_t *ssock, int index,
         ssock->bufavail --;
 
         assert(ssock->bufavail >= 0);
-
-        if (ssock->nextwriteind >= ENCAP_BUFFERS) {
+	if (ssock->nextwriteind >= ENCAP_BUFFERS) {
                 ssock->nextwriteind = 0;
         }
 
@@ -1111,13 +1116,29 @@ static streamsock_t *select_next_packet(recvstream_t *rt) {
         uint64_t currentts = 0;
         dag_record_t *daghdr;
 
+	/* If we only have one source, then no need to do any
+         * timestamp parsing or byteswapping.
+	 */
+	if (rt->sourcecount == 1) {
+		if (readable_data(&(rt->sources[0]))) {
+			return &(rt->sources[0]);
+		}
+		return NULL;
+	}	
+
+
         for (i = 0; i < rt->sourcecount; i ++) {
                 if (!readable_data(&(rt->sources[i]))) {
                         continue;
                 }
 
-                daghdr = (dag_record_t *)(rt->sources[i].nextread);
-                currentts = bswap_le_to_host64(daghdr->ts);
+		if (rt->sources[i].nextts == 0) {
+               		daghdr = (dag_record_t *)(rt->sources[i].nextread);
+	                currentts = bswap_le_to_host64(daghdr->ts);
+			rt->sources[i].nextts = currentts;
+		} else {
+			currentts = rt->sources[i].nextts;
+		}
 
                 if (earliest == 0 || earliest > currentts) {
                         earliest = currentts;
