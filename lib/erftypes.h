@@ -161,10 +161,22 @@
 #define TYPE_RAW_LINK		24
 #endif
 
+/** Provenance Metadata Record */
+#ifndef ERF_TYPE_META
+#define ERF_TYPE_META   27
+#endif
+/* TODO: Endace has deprecated TYPE_* in favour of ERF_TYPE_*. New types do not have TYPE_* aliases. */
+#ifndef TYPE_META
+#define TYPE_META       ERF_TYPE_META
+#endif
+
 /** Padding record */
 #ifndef TYPE_PAD
 #define TYPE_PAD		48
 #endif
 
+#ifndef ERF_TYPE_MAX
+#define ERF_TYPE_MAX    TYPE_PAD
+#endif
 
 #endif /* _ERFTYPES_H_ */

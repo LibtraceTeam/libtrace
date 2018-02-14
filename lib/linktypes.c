@@ -101,6 +101,8 @@ libtrace_dlt_t libtrace_to_pcap_dlt(libtrace_linktype_t type)
 		case TRACE_TYPE_DUCK:
 		/* Used for test traces within WAND */
 		case TRACE_TYPE_80211_PRISM: 	
+		/* Could use DLT_ERF, but would only really make sense with PCAP-NG */
+		case TRACE_TYPE_ERF_META:
 		/* Probably == PPP */
 		/* TODO: We haven't researched these yet */
 		case TRACE_TYPE_AAL5:
@@ -168,9 +170,12 @@ libtrace_linktype_t erf_type_to_libtrace(uint8_t erf)
 		case TYPE_ETH:		return TRACE_TYPE_ETH;
 		case TYPE_ATM:		return TRACE_TYPE_ATM;
 		case TYPE_AAL5:		return TRACE_TYPE_AAL5;
+		case TYPE_COLOR_ETH:return TRACE_TYPE_ETH;
 		case TYPE_DSM_COLOR_ETH:return TRACE_TYPE_ETH;
+		case TYPE_COLOR_HASH_ETH:return TRACE_TYPE_ETH;
 		case TYPE_IPV4:		return TRACE_TYPE_NONE;
 		case TYPE_IPV6:		return TRACE_TYPE_NONE;
+		case TYPE_META:		return TRACE_TYPE_ERF_META;
 	}
 	return ~0U;
 }
@@ -182,6 +187,7 @@ uint8_t libtrace_to_erf_type(libtrace_linktype_t linktype)
 		case TRACE_TYPE_ETH:	return TYPE_ETH;
 		case TRACE_TYPE_ATM:	return TYPE_ATM;
 		case TRACE_TYPE_AAL5:	return TYPE_AAL5;
+		case TRACE_TYPE_ERF_META: return TYPE_META;
 		
 		/* Not technically correct! Could be IPv6 packet 
 		 *

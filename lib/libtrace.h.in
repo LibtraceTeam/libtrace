@@ -368,7 +368,8 @@ typedef enum {
        TRACE_TYPE_PPP = 17,	     /**< PPP frames */
        TRACE_TYPE_METADATA = 18,     	/**< WDCAP-style meta-data */
        TRACE_TYPE_NONDATA = 19,		/**< Not a data packet */
-       TRACE_TYPE_OPENBSD_LOOP = 20	/**< OpenBSD loopback */
+       TRACE_TYPE_OPENBSD_LOOP = 20,	/**< OpenBSD loopback */
+       TRACE_TYPE_ERF_META = 21 /**< ERF Provenance metadata record */
 } libtrace_linktype_t;
 
 /** RT protocol base format identifiers.
