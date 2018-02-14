@@ -52,5 +52,6 @@ uint64_t erf_get_erf_timestamp(const libtrace_packet_t *packet);
 int erf_get_capture_length(const libtrace_packet_t *packet);
 int erf_get_wire_length(const libtrace_packet_t *packet);
 size_t erf_set_capture_length(libtrace_packet_t *packet, size_t size);
+int erf_is_color_type(uint8_t erf_type);
 
 #endif

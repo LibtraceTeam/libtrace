@@ -186,7 +186,9 @@ static int dag_get_padding(const libtrace_packet_t *packet)
 		dag_record_t *erfptr = (dag_record_t *)packet->header;
 		switch(erfptr->type) {
 			case TYPE_ETH:
+			case TYPE_COLOR_ETH:
 			case TYPE_DSM_COLOR_ETH:
+			case TYPE_COLOR_HASH_ETH:
 				return 2;
 			default: 		return 0;
 		}
@@ -1049,7 +1051,7 @@ static int dag_prepare_packet_stream(libtrace_t *libtrace,
 	/* Update the dropped packets counter */
 	/* No loss counter for DSM coloured records - have to use some
 	 * other API */
-	if (erfptr->type == TYPE_DSM_COLOR_ETH) {
+	if (erf_is_color_type(erfptr->type)) {
 		/* TODO */
 	} else {
 		/* Use the ERF loss counter */
