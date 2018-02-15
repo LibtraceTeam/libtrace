@@ -1509,7 +1509,7 @@ DLLEXPORT int trace_apply_filter(libtrace_filter_t *filter,
 	 * through to the caller */
 	linktype = trace_get_link_type(packet);
 
-	if (linktype == TRACE_TYPE_NONDATA)
+	if (linktype == TRACE_TYPE_NONDATA || linktype == TRACE_TYPE_ERF_META)
 		return 1;
 
 	if (libtrace_to_pcap_dlt(linktype)==TRACE_DLT_ERROR) {
