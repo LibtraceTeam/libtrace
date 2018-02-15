@@ -481,6 +481,7 @@ DLLEXPORT void *trace_get_layer2(const libtrace_packet_t *packet,
 		case TRACE_TYPE_80211_RADIO:
 		case TRACE_TYPE_80211_PRISM:
 		case TRACE_TYPE_PFLOG:
+		case TRACE_TYPE_ERF_META:
 			break;
 		case TRACE_TYPE_UNKNOWN:
 			return NULL;
@@ -516,6 +517,7 @@ DLLEXPORT void *trace_get_layer2(const libtrace_packet_t *packet,
 				case TRACE_TYPE_80211_RADIO:
 				case TRACE_TYPE_80211_PRISM:
 				case TRACE_TYPE_PFLOG:
+				case TRACE_TYPE_ERF_META:
 					break;
 				case TRACE_TYPE_UNKNOWN:
 					return NULL;
@@ -582,6 +584,7 @@ DLLEXPORT void *trace_get_payload_from_layer2(void *link,
 		   */
 		case TRACE_TYPE_METADATA:
 		case TRACE_TYPE_NONDATA:
+		case TRACE_TYPE_ERF_META:
 		case TRACE_TYPE_UNKNOWN:
 			return NULL;
 
@@ -684,6 +687,7 @@ DLLEXPORT uint8_t *trace_get_source_mac(libtrace_packet_t *packet) {
                 case TRACE_TYPE_PPP:
 		case TRACE_TYPE_NONDATA:
 		case TRACE_TYPE_OPENBSD_LOOP:
+		case TRACE_TYPE_ERF_META:
 		case TRACE_TYPE_UNKNOWN:
                         return NULL;
 
@@ -733,6 +737,7 @@ DLLEXPORT uint8_t *trace_get_destination_mac(libtrace_packet_t *packet)
 		case TRACE_TYPE_PPP:	
 		case TRACE_TYPE_NONDATA:
 		case TRACE_TYPE_OPENBSD_LOOP:
+		case TRACE_TYPE_ERF_META:
 		case TRACE_TYPE_UNKNOWN:
                         /* No MAC address */
                         return NULL;

@@ -119,7 +119,6 @@ typedef struct erf_index_t {
 	uint64_t offset; 
 } erf_index_t;
 
-
 /* Ethernet packets have a 2 byte padding before the packet
  * so that the IP header is aligned on a 32 bit boundary.
  */
@@ -130,8 +129,10 @@ static int erf_get_padding(const libtrace_packet_t *packet)
                         packet->trace->format->type == TRACE_FORMAT_RAWERF) {
 		dag_record_t *erfptr = (dag_record_t *)packet->header;
 		switch((erfptr->type & 0x7f)) {
-			case TYPE_ETH: 		
+			case TYPE_ETH:
+			case TYPE_COLOR_ETH:
 			case TYPE_DSM_COLOR_ETH:
+			case TYPE_COLOR_HASH_ETH:
 				return 2;
 			default: 		return 0;
 		}
@@ -142,6 +143,21 @@ static int erf_get_padding(const libtrace_packet_t *packet)
 			default:		return 0;
 		}
 	}
+}
+
+int erf_is_color_type(uint8_t erf_type)
+{
+	switch(erf_type & 0x7f) {
+		case TYPE_COLOR_HDLC_POS:
+		case TYPE_DSM_COLOR_HDLC_POS:
+		case TYPE_COLOR_ETH:
+		case TYPE_DSM_COLOR_ETH:
+		case TYPE_COLOR_HASH_POS:
+		case TYPE_COLOR_HASH_ETH:
+			return 1;
+	}
+
+	return 0;
 }
 
 int erf_get_framing_length(const libtrace_packet_t *packet)
@@ -198,7 +214,7 @@ static int erf_probe_magic(io_t *io)
 		return 0;
 	}
 	/* Is this a proper typed packet */
-	if ((erf->type & 0x7f) > TYPE_AAL2) {
+	if ((erf->type & 0x7f) > ERF_TYPE_MAX) {
 		return 0;
 	}
 	/* We should put some more tests in here. */
@@ -462,7 +478,7 @@ static int erf_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
 	}
 
 	/* Check for loss */
-	if ((erfptr->type & 0x7f) == TYPE_DSM_COLOR_ETH) {
+	if (erf_is_color_type(erfptr->type)) {
 		/* No idea how we get this yet */
 
 	} else if (erfptr->lctr) {
@@ -519,7 +535,7 @@ static int erf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	}
 
 	/* Unknown/corrupt */
-	if ((((dag_record_t *)packet->buffer)->type & 0x7f) >= TYPE_RAW_LINK) {
+	if ((((dag_record_t *)packet->buffer)->type & 0x7f) > ERF_TYPE_MAX) {
 		trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, 
 				"Corrupt or Unknown ERF type");
 		return -1;
@@ -756,21 +772,27 @@ int erf_get_capture_length(const libtrace_packet_t *packet) {
 int erf_get_wire_length(const libtrace_packet_t *packet) {
 	dag_record_t *erfptr = 0;
 	erfptr = (dag_record_t *)packet->header;
+
+	if ((erfptr->type & 0x7f) == TYPE_META)
+		return 0;
+
 	return ntohs(erfptr->wlen);
 }
 
 size_t erf_set_capture_length(libtrace_packet_t *packet, size_t size) {
 	dag_record_t *erfptr = 0;
 	assert(packet);
-	if(size  > trace_get_capture_length(packet)) {
+	erfptr = (dag_record_t *)packet->header;
+
+	if(size > trace_get_capture_length(packet) || (erfptr->type & 0x7f) == TYPE_META) {
 		/* Can't make a packet larger */
 		return trace_get_capture_length(packet);
 	}
+
 	/* Reset cached capture length - otherwise we will both return the
 	 * wrong value here and subsequent get_capture_length() calls will
 	 * return the wrong value. */
 	packet->capture_length = -1;
-	erfptr = (dag_record_t *)packet->header;
 	erfptr->rlen = htons(size + erf_get_framing_length(packet));
 	return trace_get_capture_length(packet);
 }
