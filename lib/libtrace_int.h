@@ -183,6 +183,11 @@ enum thread_states {
 	THREAD_STATE_MAX
 };
 
+enum hash_owner {
+        HASH_OWNED_LIBTRACE,
+        HASH_OWNED_EXTERNAL,
+};
+
 /**
  * Information of this thread
  */
@@ -346,6 +351,7 @@ struct libtrace_t {
 	/** The hasher function - NULL implies they don't care or balance */
 	fn_hasher hasher;
 	void *hasher_data;
+        enum hash_owner hasher_owner;
 	/** The pread_packet choosen path for the configuration */
 	int (*pread)(libtrace_t *, libtrace_thread_t *, libtrace_packet_t **, size_t);
 

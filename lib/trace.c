@@ -270,6 +270,7 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 	libtrace->global_blob = NULL;
 	libtrace->hasher = NULL;
         libtrace->hasher_data = NULL;
+        libtrace->hasher_owner = HASH_OWNED_EXTERNAL;
 	libtrace_zero_ocache(&libtrace->packet_freelist);
 	libtrace_zero_thread(&libtrace->hasher_thread);
 	libtrace_zero_thread(&libtrace->reporter_thread);
@@ -736,6 +737,13 @@ DLLEXPORT void trace_destroy(libtrace_t *libtrace) {
 		libtrace->perpkt_thread_count = 0;
 
 	}
+
+        if (libtrace->hasher_owner == HASH_OWNED_LIBTRACE) {
+                if (libtrace->hasher_data) {
+                        free(libtrace->hasher_data);
+                }
+        }
+
 
         if (libtrace->perpkt_cbs)
                 trace_destroy_callback_set(libtrace->perpkt_cbs);
