@@ -286,6 +286,10 @@ DLLEXPORT int trace_get_perpkt_threads(libtrace_t * t) {
 	return t->perpkt_thread_count;
 }
 
+DLLEXPORT int trace_get_perpkt_thread_id(libtrace_thread_t *thread) {
+        return thread->perpkt_num;
+}
+
 /**
  * Changes the overall traces state and signals the condition.
  *
