@@ -166,21 +166,22 @@ int erf_get_framing_length(const libtrace_packet_t *packet)
         uint16_t extsize = 0;
 	dag_record_t *erfptr = NULL;
         uint64_t *exthdr = NULL;
-	
+        uint8_t *firstbyte;
+
         erfptr = (dag_record_t *)packet->header;
         if ((erfptr->type & 0x80) == 0x80) {
                 /* Extension headers are present */
                 exthdr = (uint64_t *)((char *)packet->header + dag_record_size);
                 extsize += 8;
 
-                while (*exthdr < (1UL << 31)) {
+                firstbyte = (uint8_t *)exthdr;
+                while ((*firstbyte & 0x80) == 0x80) {
                         extsize += 8;
                         exthdr ++;
+                        firstbyte = (uint8_t *)exthdr;
                         assert(extsize <= ntohs(erfptr->rlen));
                 }
         }
-        
-
 	return dag_record_size + extsize + erf_get_padding(packet);
 }
 
@@ -448,7 +449,7 @@ static int erf_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
 		void *buffer, libtrace_rt_types_t rt_type, uint32_t flags) {
 	
 	dag_record_t *erfptr;
-	
+
 	if (packet->buffer != buffer && 
 		packet->buf_control == TRACE_CTRL_PACKET) {
 		free(packet->buffer);
