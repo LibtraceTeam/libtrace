@@ -196,6 +196,7 @@ static libtrace_packet_t *cb_packet(libtrace_t *trace, libtrace_thread_t *t,
         uint64_t key;
         thread_data_t *td = (thread_data_t *)tls;
         int i;
+        size_t wlen;
 
         if (IS_LIBTRACE_META_PACKET(packet)) {
                 return packet;
@@ -211,15 +212,20 @@ static libtrace_packet_t *cb_packet(libtrace_t *trace, libtrace_thread_t *t,
                 td->results = calloc(1, sizeof(result_t) +
                                 sizeof(statistic_t) * filter_count);
         }
+        wlen = trace_get_wire_length(packet);
+        if (wlen == 0) {
+                /* Don't count ERF provenance and similar packets */
+                return packet;
+        }
         for(i=0;i<filter_count;++i) {
                 if(trace_apply_filter(filters[i].filter, packet)) {
                         td->results->filters[i].count++;
-                        td->results->filters[i].bytes+=trace_get_wire_length(packet);
+                        td->results->filters[i].bytes+=wlen;
                 }
         }
 
         td->results->total.count++;
-        td->results->total.bytes +=trace_get_wire_length(packet);
+        td->results->total.bytes += wlen;
         return packet;
 }
 
