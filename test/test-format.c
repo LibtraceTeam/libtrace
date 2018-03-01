@@ -86,6 +86,8 @@ const char *lookup_uri(const char *type) {
 		return "legacyeth:traces/legacyeth.gz";
 	if (!strcmp(type, "tsh"))
 		return "tsh:traces/10_packets.tsh.gz";
+	if (!strcmp(type, "erfprov"))
+		return "erf:traces/provenance.erf";
 	return type;
 }
 

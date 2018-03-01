@@ -33,6 +33,9 @@ echo \* Read erf
 do_test ./test-format erf
 do_test ./test-decode erf
 
+echo \* Read erf provenance
+do_test ./test-format erfprov
+
 echo \* Read pcap
 do_test ./test-format pcap
 do_test ./test-decode pcap
