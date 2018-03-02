@@ -213,7 +213,7 @@ static int whitelist_device(struct dpdk_format_data_t *format_data UNUSED, struc
 static int parse_pciaddr(char * str, struct rte_pci_addr * addr, long * core) {
 	int matches;
 	assert(str);
-	matches = sscanf(str, "%4"SCNx16":%2"SCNx8":%2"SCNx8".%2"SCNx8"-%ld",
+	matches = sscanf(str, "%8"SCNx32":%2"SCNx8":%2"SCNx8".%2"SCNx8"-%ld",
 	                 &addr->domain, &addr->bus, &addr->devid,
 	                 &addr->function, core);
 	if (matches >= 4) {
@@ -427,9 +427,9 @@ static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_
 	int argc = sizeof(argv) / sizeof(argv[0]) - 1;
 
 #if DEBUG
-	rte_set_log_level(RTE_LOG_DEBUG);
+	rte_log_set_global_level(RTE_LOG_DEBUG);
 #else
-	rte_set_log_level(RTE_LOG_WARNING);
+	rte_log_set_global_level(RTE_LOG_WARNING);
 #endif
 
 	/* Get the number of cpu cores in the system and use the last core
@@ -815,8 +815,8 @@ static const struct rte_eth_txconf tx_conf = {
  * @param event The TYPE of event (expected to be RTE_ETH_EVENT_INTR_LSC)
  * @param cb_arg The dpdk_format_data_t structure associated with the format
  */
-static void dpdk_lsc_callback(uint8_t port, enum rte_eth_event_type event,
-                              void *cb_arg) {
+static int dpdk_lsc_callback(uint16_t port, enum rte_eth_event_type event,
+                              void *cb_arg, void *retparam UNUSED) {
 	struct dpdk_format_data_t * format_data = cb_arg;
 	struct rte_eth_link link_info;
 	assert(event == RTE_ETH_EVENT_INTR_LSC);
@@ -851,6 +851,7 @@ static void dpdk_lsc_callback(uint8_t port, enum rte_eth_event_type event,
 		}
 	}
 #endif
+        return 0;
 }
 
 /** Reserve a DPDK lcore ID for a thread globally.
