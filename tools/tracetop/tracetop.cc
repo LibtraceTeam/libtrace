@@ -407,12 +407,12 @@ static void do_report()
 		}
 		switch (display_as) {
 			case BYTES:
-				printw("%7"PRIu64"\t%7"PRIu64"\n",
+				printw("%7" PRIu64 "\t%7" PRIu64 "\n",
 						pq.top().bytes,
 						pq.top().packets);
 				break;
 			case BITS_PER_SEC:
-				printw("%14.03f\t%"PRIu64"\n",
+				printw("%14.03f\t%" PRIu64 "\n",
 						8.0*pq.top().bytes/interval,
 						pq.top().packets);
 				break;
