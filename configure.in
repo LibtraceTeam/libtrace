@@ -211,6 +211,9 @@ else
 fi
 
 AC_CHECK_LIB(crypto, EVP_EncryptInit_ex, cryptofound=1, cryptofound=0)
+if test "$cryptofound" = 1; then
+	AC_CHECK_HEADER(openssl/evp.h, cryptofound=1, cryptofound=0)
+fi
 
 # Check for libpcap
 AC_CHECK_LIB(pcap,pcap_next_ex,pcapfound=1,pcapfound=0)
@@ -693,7 +696,7 @@ fi
 reportopt "Compiled with LLVM BPF JIT support" $JIT
 reportopt "Building man pages/documentation" $libtrace_doxygen
 reportopt "Building tracetop (requires libncurses)" $with_ncurses
-reportopt "Building traceanon with CryptoPan (requires libcrypto)" $have_crypto
+reportopt "Building traceanon with CryptoPan (requires libcrypto and openssl/evp.h)" $have_crypto
 
 # Report any errors relating to missing bison, flex, etc.
 echo 
