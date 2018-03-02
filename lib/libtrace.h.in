@@ -331,7 +331,7 @@ typedef enum {
          */
 #ifdef __OpenBSD__
 	TRACE_DLT_OPENBSD_LOOP=12,
-	TRACE_DLT_RAW = 14
+	TRACE_DLT_RAW = 14,
 #else
 	TRACE_DLT_RAW = 12,
 	TRACE_DLT_OPENBSD_LOOP = 108,
