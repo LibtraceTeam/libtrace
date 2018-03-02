@@ -393,6 +393,7 @@ static inline libtrace_linktype_t linuxcommon_get_link_type(uint16_t linktype)
 		case LIBTRACE_ARPHRD_LOOPBACK:
 			return TRACE_TYPE_ETH;
 		case LIBTRACE_ARPHRD_PPP:
+		case LIBTRACE_ARPHRD_IPGRE:
 			return TRACE_TYPE_NONE;
 		case LIBTRACE_ARPHRD_IEEE80211_RADIOTAP:
 			return TRACE_TYPE_80211_RADIO;

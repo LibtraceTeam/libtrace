@@ -186,7 +186,9 @@ static int dag_get_padding(const libtrace_packet_t *packet)
 		dag_record_t *erfptr = (dag_record_t *)packet->header;
 		switch(erfptr->type) {
 			case TYPE_ETH:
+			case TYPE_COLOR_ETH:
 			case TYPE_DSM_COLOR_ETH:
+			case TYPE_COLOR_HASH_ETH:
 				return 2;
 			default: 		return 0;
 		}
@@ -625,7 +627,7 @@ static int dag_start_output(libtrace_out_t *libtrace)
 	nopoll = zero;
 
 	/* Attach and start the DAG stream */
-	if (dag_attach_stream(FORMAT_DATA_OUT->device->fd,
+	if (dag_attach_stream64(FORMAT_DATA_OUT->device->fd,
 			FORMAT_DATA_OUT->dagstream, 0, 4 * 1024 * 1024) < 0) {
 		trace_set_err_out(libtrace, errno, "Cannot attach DAG stream");
 		return -1;
@@ -639,7 +641,7 @@ static int dag_start_output(libtrace_out_t *libtrace)
 	FORMAT_DATA_OUT->stream_attached = 1;
 
 	/* We don't want the dag card to do any sleeping */
-	dag_set_stream_poll(FORMAT_DATA_OUT->device->fd,
+	dag_set_stream_poll64(FORMAT_DATA_OUT->device->fd,
 			FORMAT_DATA_OUT->dagstream, 0, &zero,
 			&nopoll);
 
@@ -657,7 +659,7 @@ static int dag_start_input_stream(libtrace_t *libtrace,
 	nopoll = zero;
 
 	/* Attach and start the DAG stream */
-	if (dag_attach_stream(FORMAT_DATA->device->fd,
+	if (dag_attach_stream64(FORMAT_DATA->device->fd,
 			      stream->dagstream, 0, 0) < 0) {
 		trace_set_err(libtrace, errno, "Cannot attach DAG stream #%u",
 		              stream->dagstream);
@@ -673,7 +675,7 @@ static int dag_start_input_stream(libtrace_t *libtrace,
 	FORMAT_DATA->stream_attached = 1;
 
 	/* We don't want the dag card to do any sleeping */
-	if (dag_set_stream_poll(FORMAT_DATA->device->fd,
+	if (dag_set_stream_poll64(FORMAT_DATA->device->fd,
 			    stream->dagstream, 0, &zero,
 			    &nopoll) < 0) {
 		trace_set_err(libtrace, errno,
@@ -865,10 +867,10 @@ static int dag_fin_output(libtrace_out_t *libtrace)
 
 	/* Wait until the buffer is nearly clear before exiting the program,
 	 * as we will lose packets otherwise */
-	dag_tx_get_stream_space
+	dag_tx_get_stream_space64
 		(FORMAT_DATA_OUT->device->fd,
 		 FORMAT_DATA_OUT->dagstream,
-		 dag_get_stream_buffer_size(FORMAT_DATA_OUT->device->fd,
+		 dag_get_stream_buffer_size64(FORMAT_DATA_OUT->device->fd,
 					    FORMAT_DATA_OUT->dagstream) - 8);
 
 	/* Need the lock, since we're going to be handling the device list */
@@ -1049,7 +1051,7 @@ static int dag_prepare_packet_stream(libtrace_t *libtrace,
 	/* Update the dropped packets counter */
 	/* No loss counter for DSM coloured records - have to use some
 	 * other API */
-	if (erfptr->type == TYPE_DSM_COLOR_ETH) {
+	if (erf_is_color_type(erfptr->type)) {
 		/* TODO */
 	} else {
 		/* Use the ERF loss counter */
@@ -1099,7 +1101,7 @@ static int dag_dump_packet(libtrace_out_t *libtrace,
 	 */
 	if (FORMAT_DATA_OUT->waiting == 0) {
 		FORMAT_DATA_OUT->txbuffer =
-			dag_tx_get_stream_space(FORMAT_DATA_OUT->device->fd,
+			dag_tx_get_stream_space64(FORMAT_DATA_OUT->device->fd,
 						FORMAT_DATA_OUT->dagstream,
 						16908288);
 	}
@@ -1285,7 +1287,7 @@ static int dag_read_packet_stream(libtrace_t *libtrace,
 		packet->buffer = 0;
 	}
 
-	if (dag_set_stream_poll(FORMAT_DATA->device->fd, stream_data->dagstream,
+	if (dag_set_stream_poll64(FORMAT_DATA->device->fd, stream_data->dagstream,
 				sizeof(dag_record_t), &maxwait,
 				&pollwait) == -1) {
 		trace_set_err(libtrace, errno, "dag_set_stream_poll");
@@ -1391,7 +1393,7 @@ static libtrace_eventobj_t trace_event_dag(libtrace_t *libtrace,
 		return event;
 	}
 	
-	if (dag_set_stream_poll(FORMAT_DATA->device->fd,
+	if (dag_set_stream_poll64(FORMAT_DATA->device->fd,
 				FORMAT_DATA_FIRST->dagstream, 0, &minwait,
 				&minwait) == -1) {
 		trace_set_err(libtrace, errno, "dag_set_stream_poll");

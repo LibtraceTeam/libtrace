@@ -329,7 +329,7 @@ static inline int skip_block(libtrace_t *libtrace, uint32_t toread) {
 
                 err = wandio_read(libtrace->io, buf, nextread);
                 if (err < 0) {
-                        trace_set_err(libtrace, errno,
+                        trace_set_err(libtrace, TRACE_ERR_WANDIO_FAILED,
                                 "Reading section header options");
                         return -1;
                 }
@@ -350,7 +350,7 @@ static inline int pcapng_read_body(libtrace_t *libtrace, char *body,
 
         err = wandio_read(libtrace->io, body, to_read);
         if (err < 0) {
-                trace_set_err(libtrace, errno,
+                trace_set_err(libtrace, TRACE_ERR_WANDIO_FAILED,
                         "Failed to read pcapng interface options");
                 return err;
         }
@@ -443,7 +443,7 @@ static int pcapng_read_section(libtrace_t *libtrace,
         sechdr = (pcapng_sec_t *)packet->buffer;
 
         if (err < 0) {
-                trace_set_err(libtrace, errno,
+                trace_set_err(libtrace, TRACE_ERR_WANDIO_FAILED,
                         "Reading pcapng section header block");
                 return -1;
         }
@@ -518,7 +518,7 @@ static int pcapng_read_interface(libtrace_t *libtrace,
         err = wandio_read(libtrace->io, packet->buffer, sizeof(pcapng_int_t));
 
         if (err < 0) {
-                trace_set_err(libtrace, errno,
+                trace_set_err(libtrace, TRACE_ERR_WANDIO_FAILED,
                         "Reading pcapng interface header block");
                 return -1;
         }
@@ -625,7 +625,7 @@ static int pcapng_read_nrb(libtrace_t *libtrace, libtrace_packet_t *packet,
         err = wandio_read(libtrace->io, packet->buffer, sizeof(pcapng_nrb_t));
 
         if (err < 0) {
-                trace_set_err(libtrace, errno, "reading pcapng name resolution block");
+                trace_set_err(libtrace, TRACE_ERR_WANDIO_FAILED, "reading pcapng name resolution block");
                 return -1;
         }
 
@@ -681,7 +681,7 @@ static int pcapng_read_custom(libtrace_t *libtrace, libtrace_packet_t *packet,
         err = wandio_read(libtrace->io, packet->buffer, sizeof(pcapng_custom_t));
 
         if (err < 0) {
-                trace_set_err(libtrace, errno, "reading pcapng custom block");
+                trace_set_err(libtrace, TRACE_ERR_WANDIO_FAILED, "reading pcapng custom block");
                 return -1;
         }
 
@@ -739,7 +739,7 @@ static int pcapng_read_stats(libtrace_t *libtrace, libtrace_packet_t *packet,
         err = wandio_read(libtrace->io, packet->buffer, sizeof(pcapng_stats_t));
 
         if (err < 0) {
-                trace_set_err(libtrace, errno, "reading pcapng interface stats");
+                trace_set_err(libtrace, TRACE_ERR_WANDIO_FAILED, "reading pcapng interface stats");
                 return -1;
         }
 
@@ -860,7 +860,7 @@ static int pcapng_read_simple(libtrace_t *libtrace, libtrace_packet_t *packet,
         err = wandio_read(libtrace->io, packet->buffer, sizeof(pcapng_spkt_t));
 
         if (err < 0) {
-                trace_set_err(libtrace, errno, "reading pcapng simple packet");
+                trace_set_err(libtrace, TRACE_ERR_WANDIO_FAILED, "reading pcapng simple packet");
                 return -1;
         }
 
@@ -929,7 +929,7 @@ static int pcapng_read_enhanced(libtrace_t *libtrace, libtrace_packet_t *packet,
         err = wandio_read(libtrace->io, packet->buffer, sizeof(pcapng_epkt_t));
 
         if (err < 0) {
-                trace_set_err(libtrace, errno, "reading pcapng enhanced packet");
+                trace_set_err(libtrace, TRACE_ERR_WANDIO_FAILED, "reading pcapng enhanced packet");
                 return -1;
         }
 
@@ -1038,7 +1038,7 @@ static int pcapng_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 
                 err = wandio_peek(libtrace->io, &peeker, sizeof(peeker));
                 if (err < 0) {
-                        trace_set_err(libtrace, errno, "reading pcapng packet");
+                        trace_set_err(libtrace, TRACE_ERR_WANDIO_FAILED, "reading pcapng packet");
                         return -1;
                 }
 
@@ -1047,7 +1047,7 @@ static int pcapng_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
                 }
 
                 if (err < (int)sizeof(struct pcapng_peeker)) {
-                        trace_set_err(libtrace, errno, "Incomplete pcapng block");
+                        trace_set_err(libtrace, TRACE_ERR_WANDIO_FAILED, "Incomplete pcapng block");
                         return -1;
                 }
 

@@ -1,7 +1,7 @@
 lib_LTLIBRARIES = libtrace.la
 include_HEADERS = libtrace.h libtrace_parallel.h
 pkginclude_HEADERS = dagformat.h lt_inttypes.h daglegacy.h \
-        rt_protocol.h erftypes.h \
+        rt_protocol.h erftypes.h pthread_spinlock.h \
         data-struct/ring_buffer.h data-struct/object_cache.h \
         data-struct/vector.h \
         data-struct/deque.h data-struct/linked_list.h \
@@ -33,7 +33,7 @@ BPFJITSOURCE=
 endif
 
 if HAVE_DPDK
-NATIVEFORMATS+= format_dpdk.c
+NATIVEFORMATS+= format_dpdk.c format_dpdkndag.c
 # So we also make libtrace.mk in dpdk otherwise automake tries to expand
 # it too early which I cannot seem to stop unless we use a path that
 # doesn't exist currently

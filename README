@@ -1,7 +1,7 @@
-libtrace 4.0.2
+libtrace 4.0.3
 
 ---------------------------------------------------------------------------
-Copyright (c) 2007-2017 The University of Waikato, Hamilton, New Zealand.
+Copyright (c) 2007-2018 The University of Waikato, Hamilton, New Zealand.
 All rights reserved.
 
 This code has been developed by the University of Waikato WAND
@@ -26,14 +26,14 @@ Further information about libtrace, see
 http://research.wand.net.nz/software/libtrace.php
 
 Bugs should be reported by either emailing contact@wand.net.nz or filing
-an issue at https://github.com/wanduow/libtrace
+an issue at https://github.com/LibtraceTeam/libtrace
 
 It is licensed under the GNU Lesser General Public License (GPL) version 3.
 Please see the included files COPYING and COPYING.LESSER for details of this
 license.
 
 A detailed ChangeLog can be found on the libtrace wiki:
-https://github.com/wanduow/libtrace/wiki/ChangeLog
+https://github.com/LibtraceTeam/libtrace/wiki/ChangeLog
 
 Documentation, usage instructions and a detailed tutorial can also found
 on the libtrace wiki.

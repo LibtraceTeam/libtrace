@@ -20,6 +20,9 @@ rm -f traces/*.out.*
 echo \* Read erf
 do_test ./test-format-parallel erf
 
+echo \* Read erf provenance
+do_test ./test-format-parallel erfprov
+
 echo \* Read pcap
 do_test ./test-format-parallel pcap
 

@@ -1336,6 +1336,14 @@ DLLEXPORT int trace_set_configuration_file(libtrace_t *trace, FILE *file);
  */
 DLLEXPORT int trace_get_perpkt_threads(libtrace_t* t); 
 
+/** Returns the internal unique ID for a packet processing thread.
+ *
+ * @param thread The thread being queried.
+ * @return The ID number of the thread or -1 if the thread is not a processing
+ * thread or is otherwise invalid.
+ */
+DLLEXPORT int trace_get_perpkt_thread_id(libtrace_thread_t *thread);
+
 /**
  * Sets a combiner function for an input trace.
  *

@@ -286,6 +286,10 @@ DLLEXPORT int trace_get_perpkt_threads(libtrace_t * t) {
 	return t->perpkt_thread_count;
 }
 
+DLLEXPORT int trace_get_perpkt_thread_id(libtrace_thread_t *thread) {
+        return thread->perpkt_num;
+}
+
 /**
  * Changes the overall traces state and signals the condition.
  *
@@ -2155,11 +2159,18 @@ DLLEXPORT int trace_set_hasher(libtrace_t *trace, enum hasher_types type, fn_has
 	// Save the requirements
 	trace->hasher_type = type;
 	if (hasher) {
+                if (trace->hasher_owner == HASH_OWNED_LIBTRACE) {
+                        if (trace->hasher_data) {
+                                free(trace->hasher_data);
+                        }
+                }
 		trace->hasher = hasher;
 		trace->hasher_data = data;
+                trace->hasher_owner = HASH_OWNED_EXTERNAL;
 	} else {
 		trace->hasher = NULL;
 		trace->hasher_data = NULL;
+                trace->hasher_owner = HASH_OWNED_LIBTRACE;
 	}
 
 	// Try push this to hardware - NOTE hardware could do custom if

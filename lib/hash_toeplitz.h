@@ -27,6 +27,7 @@
 /**
  * toeplitz hashing - see microsoft rss code
  */
+#include "config.h"
 #include <stdint.h>
 #include <stddef.h>
 #include <libtrace.h>
@@ -52,15 +53,15 @@ typedef struct toeplitz_conf {
 	uint32_t key_cache[320];
 } toeplitz_conf_t;
 
-void toeplitz_hash_expand_key(toeplitz_conf_t *conf);
-uint32_t toeplitz_hash(const toeplitz_conf_t *tc, const uint8_t *data, size_t offset, size_t n, uint32_t result);
-uint32_t toeplitz_first_hash(const toeplitz_conf_t *tc, const uint8_t *data, size_t n);
-void toeplitz_init_config(toeplitz_conf_t *conf, bool bidirectional);
-uint64_t toeplitz_hash_packet(const libtrace_packet_t * pkt, const toeplitz_conf_t *cnf);
-void toeplitz_ncreate_bikey(uint8_t *key, size_t num);
-void toeplitz_create_bikey(uint8_t *key);
-void toeplitz_ncreate_unikey(uint8_t *key, size_t num);
-void toeplitz_create_unikey(uint8_t *key);
+DLLEXPORT void toeplitz_hash_expand_key(toeplitz_conf_t *conf);
+DLLEXPORT uint32_t toeplitz_hash(const toeplitz_conf_t *tc, const uint8_t *data, size_t offset, size_t n, uint32_t result);
+DLLEXPORT uint32_t toeplitz_first_hash(const toeplitz_conf_t *tc, const uint8_t *data, size_t n);
+DLLEXPORT void toeplitz_init_config(toeplitz_conf_t *conf, bool bidirectional);
+DLLEXPORT uint64_t toeplitz_hash_packet(const libtrace_packet_t * pkt, const toeplitz_conf_t *cnf);
+DLLEXPORT void toeplitz_ncreate_bikey(uint8_t *key, size_t num);
+DLLEXPORT void toeplitz_create_bikey(uint8_t *key);
+DLLEXPORT void toeplitz_ncreate_unikey(uint8_t *key, size_t num);
+DLLEXPORT void toeplitz_create_unikey(uint8_t *key);
 
 
 /* IPv4 Only (Input[8] = @12-15, @16-19) src dst */

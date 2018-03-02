@@ -130,7 +130,7 @@ static int tsh_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	if ((numbytes=wandio_read(libtrace->io,
 					buffer2,
 					(size_t)sizeof(tsh_pkt_header_t))) == -1) {
-		trace_set_err(libtrace,errno,"read(%s)",
+		trace_set_err(libtrace,TRACE_ERR_WANDIO_FAILED,"read(%s)",
 				libtrace->uridata);
 		return -1;
 	}
@@ -140,7 +140,7 @@ static int tsh_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	}
 
         if (numbytes < (int)sizeof(tsh_pkt_header_t)) {
-                trace_set_err(libtrace, errno, "Incomplete TSH header");
+                trace_set_err(libtrace, TRACE_ERR_WANDIO_FAILED, "Incomplete TSH header");
                 return -1;
         }
 
@@ -151,7 +151,7 @@ static int tsh_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 				buffer2,
 				(size_t)sizeof(libtrace_ip_t)+16))  /* 16 bytes of transport header */
 			!= sizeof(libtrace_ip_t)+16) {
-		trace_set_err(libtrace,errno,"read(%s)",
+		trace_set_err(libtrace,TRACE_ERR_WANDIO_FAILED,"read(%s)",
 				libtrace->uridata);
 		return -1;
 	}
@@ -166,7 +166,7 @@ static int tsh_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	if ((numbytes=wandio_read(libtrace->io,
 				buffer2,
 				16)) != 16) {
-		trace_set_err(libtrace,errno,"read(%s)",
+		trace_set_err(libtrace,TRACE_ERR_WANDIO_FAILED,"read(%s)",
 				libtrace->uridata);
 		return -1;
 	}

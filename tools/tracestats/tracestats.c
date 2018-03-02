@@ -104,11 +104,17 @@ static void fn_print_results(libtrace_t *trace,
 	statistics_t *counters = (statistics_t *)tls;
         libtrace_stat_t *stats = NULL;
         int i;
+        double pct;
 
         stats = trace_get_statistics(trace, NULL);
-        printf("%-30s\t%12s\t%12s\t%7s\n","filter","count","bytes","%");
+        printf("%-30s\t%12s\t%12s\t%7s\n","filter","count","bytes","% count");
         for(i=0;i<filter_count;++i) {
-                printf("%30s:\t%12"PRIu64"\t%12"PRIu64"\t%7.03f\n",filters[i].expr,counters[i+1].count,counters[i+1].bytes,counters[i+1].count*100.0/counters[0].count);
+                if (counters[0].count == 0) {
+                        pct = 0.0;
+                } else {
+                        pct = counters[i+1].count*100.0/counters[0].count;
+                }
+                printf("%30s:\t%12"PRIu64"\t%12"PRIu64"\t%7.03f\n",filters[i].expr,counters[i+1].count,counters[i+1].bytes,pct);
         }
         if (stats->received_valid)
                 fprintf(stderr,"%30s:\t%12" PRIu64"\n",
@@ -159,6 +165,10 @@ static libtrace_packet_t* fn_packet(libtrace_t *trace,
 
 	/* Apply filters to every packet note the result */
 	wlen = trace_get_wire_length(pkt);
+        if (wlen == 0) {
+                /* Don't count ERF provenance etc. */
+                return pkt;
+        }
 	for(i=0;i<filter_count;++i) {
 		if (filters[i].filter == NULL)
 			continue;

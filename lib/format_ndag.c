@@ -1,3 +1,29 @@
+/*
+ *
+ * Copyright (c) 2007-2017 The University of Waikato, Hamilton, New Zealand.
+ * All rights reserved.
+ *
+ * This file is part of libtrace.
+ *
+ * This code has been developed by the University of Waikato WAND
+ * research group. For further information please see http://www.wand.net.nz/
+ *
+ * libtrace is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * libtrace is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *
+ */
+
 
 #define _GNU_SOURCE
 
@@ -60,10 +86,12 @@ typedef struct streamsock {
         int nextreadind;
         int nextwriteind;
         int savedsize[ENCAP_BUFFERS];
+	uint64_t nextts;
         uint32_t startidle;
         uint64_t recordcount;
 
         int bufavail;
+	int bufwaiting;
 
 #if HAVE_RECVMMSG
         struct mmsghdr mmsgbufs[RECV_BATCH_SIZE];
@@ -84,6 +112,9 @@ typedef struct recvstream {
         uint64_t dropped_upstream;
         uint64_t missing_records;
         uint64_t received_packets;
+
+	fd_set allsocks;
+	int maxfd;
 } recvstream_t;
 
 typedef struct ndag_format_data {
@@ -204,7 +235,6 @@ static int join_multicast_group(char *groupaddr, char *localiface,
                 fprintf(stderr,
                         "Failed to bind to multicast socket %s:%s -- %s\n",
                                 groupaddr, portstr, strerror(errno));
-                close(sock);
                 sock = -1;
                 goto sockcreateover;
         }
@@ -291,7 +321,7 @@ static void new_group_alert(libtrace_t *libtrace, uint16_t threadid,
                         (void *)&alert);
 
 }
-        
+
 static int ndag_parse_control_message(libtrace_t *libtrace, char *msgbuf,
                 int msgsize, uint16_t *ptmap) {
 
@@ -379,6 +409,7 @@ static void *ndag_controller_run(void *tdata) {
                 trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
                         "Unable to join multicast group for nDAG control channel");
                 trace_interrupt();
+                pthread_exit(NULL);
         }
 
         ndag_paused = 0;
@@ -456,6 +487,8 @@ static int ndag_start_threads(libtrace_t *libtrace, uint32_t maxthreads)
                 FORMAT_DATA->receivers[i].dropped_upstream = 0;
                 FORMAT_DATA->receivers[i].received_packets = 0;
                 FORMAT_DATA->receivers[i].missing_records = 0;
+		FD_ZERO(&(FORMAT_DATA->receivers[i].allsocks));
+		FORMAT_DATA->receivers[i].maxfd = -1;
 
                 libtrace_message_queue_init(&(FORMAT_DATA->receivers[i].mqueue),
                                 sizeof(ndag_internal_message_t));
@@ -559,6 +592,7 @@ static int ndag_prepare_packet_stream(libtrace_t *libtrace,
         ndag_encap_t *encaphdr;
         uint16_t ndag_reccount = 0;
         int nr;
+	uint16_t rlen;
 
         if ((flags & TRACE_PREP_OWN_BUFFER) == TRACE_PREP_OWN_BUFFER) {
                 packet->buf_control = TRACE_CTRL_PACKET;
@@ -601,18 +635,23 @@ static int ndag_prepare_packet_stream(libtrace_t *libtrace,
         ndag_reccount = ntohs(encaphdr->recordcount);
         if ((ndag_reccount & 0x8000) != 0) {
                 /* Record was truncated -- update rlen appropriately */
-                erfptr->rlen = htons(ssock->savedsize[nr] -
-                                (ssock->nextread - ssock->saved[nr]));
-        }
-        ssock->nextread += ntohs(erfptr->rlen);
+                rlen = ssock->savedsize[nr] -
+                                (ssock->nextread - ssock->saved[nr]);
+		erfptr->rlen = htons(rlen);
+        } else {
+		rlen = ntohs(erfptr->rlen);
+	}
+        ssock->nextread += rlen;
+	ssock->nextts = 0;
+
+	assert(ssock->nextread - ssock->saved[nr] <= ssock->savedsize[nr]);
 
         if (ssock->nextread - ssock->saved[nr] >= ssock->savedsize[nr]) {
                 /* Read everything from this buffer, mark as empty and
                  * move on. */
                 ssock->savedsize[nr] = 0;
-                ssock->bufavail ++;
+                ssock->bufwaiting ++;
 
-                assert(ssock->bufavail > 0 && ssock->bufavail <= ENCAP_BUFFERS);
                 nr ++;
                 if (nr == ENCAP_BUFFERS) {
                         nr = 0;
@@ -623,10 +662,8 @@ static int ndag_prepare_packet_stream(libtrace_t *libtrace,
         }
 
         packet->order = erf_get_erf_timestamp(packet);
-        packet->error = packet->payload ? ntohs(erfptr->rlen) :
-                        erf_get_framing_length(packet);
-
-        return ntohs(erfptr->rlen);
+        packet->error = rlen;
+        return rlen;
 }
 
 static int ndag_prepare_packet(libtrace_t *libtrace UNUSED,
@@ -704,7 +741,9 @@ static int add_new_streamsock(recvstream_t *rt, streamsource_t src) {
         ssock->monitorptr = mon;
         ssock->saved = (char **)malloc(sizeof(char *) * ENCAP_BUFFERS);
         ssock->bufavail = ENCAP_BUFFERS;
+	ssock->bufwaiting = 0;
         ssock->startidle = 0;
+	ssock->nextts = 0;
 
         for (i = 0; i < ENCAP_BUFFERS; i++) {
                 ssock->saved[i] = (char *)malloc(ENCAP_BUFSIZE);
@@ -728,8 +767,13 @@ static int add_new_streamsock(recvstream_t *rt, streamsource_t src) {
 
         ssock->nextread = NULL;;
         ssock->nextreadind = 0;
+        ssock->nextwriteind = 0;
         ssock->recordcount = 0;
         rt->sourcecount += 1;
+	FD_SET(ssock->sock, &(rt->allsocks));
+	if (ssock->sock > rt->maxfd) {
+		rt->maxfd = ssock->sock;
+	}
 
         fprintf(stderr, "Added new stream %s:%u to thread %d\n",
                         ssock->groupaddr, ssock->port, rt->threadindex);
@@ -836,6 +880,7 @@ static int check_ndag_received(streamsock_t *ssock, int index,
         } else if (rectype != NDAG_PKT_ENCAPERF) {
                 fprintf(stderr, "Received invalid record on the channel for %s:%u.\n",
                                 ssock->groupaddr, ssock->port);
+		FD_CLR(ssock->sock, &(rt->allsocks));
                 close(ssock->sock);
                 ssock->sock = -1;
                 return -1;
@@ -846,8 +891,7 @@ static int check_ndag_received(streamsock_t *ssock, int index,
         ssock->bufavail --;
 
         assert(ssock->bufavail >= 0);
-
-        if (ssock->nextwriteind >= ENCAP_BUFFERS) {
+	if (ssock->nextwriteind >= ENCAP_BUFFERS) {
                 ssock->nextwriteind = 0;
         }
 
@@ -873,6 +917,7 @@ static int check_ndag_received(streamsock_t *ssock, int index,
         if (ssock->expectedseq != 0) {
                 rt->missing_records += seq_cmp(
                                 ntohl(encaphdr->seqno), ssock->expectedseq);
+
         }
         ssock->expectedseq = ntohl(encaphdr->seqno) + 1;
         if (ssock->expectedseq == 0) {
@@ -941,6 +986,7 @@ static int receive_from_single_socket(streamsock_t *ssock, struct timeval *tv,
                                         ssock->groupaddr,
                                         ssock->port);
 
+				FD_CLR(ssock->sock, &(rt->allsocks));
                                 close(ssock->sock);
                                 ssock->sock = -1;
                         }
@@ -950,6 +996,7 @@ static int receive_from_single_socket(streamsock_t *ssock, struct timeval *tv,
                                 "Error receiving encapsulated records from %s:%u -- %s \n",
                                 ssock->groupaddr, ssock->port,
                                 strerror(errno));
+			FD_CLR(ssock->sock, &(rt->allsocks));
                         close(ssock->sock);
                         ssock->sock = -1;
                 }
@@ -986,11 +1033,30 @@ static int receive_from_sockets(recvstream_t *rt) {
 
         int i, readybufs, gottime;
         struct timeval tv;
+	fd_set fds;
+	struct timeval zerotv;
 
         readybufs = 0;
         gottime = 0;
 
-        for (i = 0; i < rt->sourcecount; i ++) {
+	fds = rt->allsocks;
+
+	if (rt->maxfd == -1) {
+		return 0;
+	}
+
+	zerotv.tv_sec = 0;
+	zerotv.tv_usec = 0;
+
+	if (select(rt->maxfd + 1, &fds, NULL, NULL, &zerotv) == -1) {
+		/* log the error? XXX */
+		return -1;
+	}
+
+	for (i = 0; i < rt->sourcecount; i++) {
+		if (!FD_ISSET(rt->sources[i].sock, &fds)) {
+			continue;
+		}
                 readybufs += receive_from_single_socket(&(rt->sources[i]),
                                 &tv, &gottime, rt);
         }
@@ -1081,31 +1147,41 @@ static streamsock_t *select_next_packet(recvstream_t *rt) {
         uint64_t currentts = 0;
         dag_record_t *daghdr;
 
+	/* If we only have one source, then no need to do any
+         * timestamp parsing or byteswapping.
+	 */
+	if (rt->sourcecount == 1) {
+		if (readable_data(&(rt->sources[0]))) {
+			return &(rt->sources[0]);
+		}
+		return NULL;
+	}
+
+
         for (i = 0; i < rt->sourcecount; i ++) {
                 if (!readable_data(&(rt->sources[i]))) {
                         continue;
                 }
 
-                daghdr = (dag_record_t *)(rt->sources[i].nextread);
-                currentts = bswap_le_to_host64(daghdr->ts);
+		if (rt->sources[i].nextts == 0) {
+               		daghdr = (dag_record_t *)(rt->sources[i].nextread);
+	                currentts = bswap_le_to_host64(daghdr->ts);
+			rt->sources[i].nextts = currentts;
+		} else {
+			currentts = rt->sources[i].nextts;
+		}
 
                 if (earliest == 0 || earliest > currentts) {
                         earliest = currentts;
                         ssock = &(rt->sources[i]);
                 }
-                /*
-                fprintf(stderr, "%d %d %lu %lu %lu\n", rt->threadindex,
-                                i, currentts,
-                                rt->sources[i].recordcount, 
-                                rt->missing_records);
-                */
         }
         return ssock;
 }
 
 static int ndag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 
-        int rem;
+        int rem, ret;
         streamsock_t *nextavail = NULL;
         rem = receive_encap_records_block(libtrace, &(FORMAT_DATA->receivers[0]),
                         packet);
@@ -1122,16 +1198,19 @@ static int ndag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
         /* nextread should point at an ERF header, so prepare 'packet' to be
          * a libtrace ERF packet. */
 
-        return ndag_prepare_packet_stream(libtrace,
+        ret = ndag_prepare_packet_stream(libtrace,
                         &(FORMAT_DATA->receivers[0]), nextavail,
                         packet, TRACE_PREP_DO_NOT_OWN_BUFFER);
+	nextavail->bufavail += nextavail->bufwaiting;
+	nextavail->bufwaiting = 0;
+	return ret;
 }
 
 static int ndag_pread_packets(libtrace_t *libtrace, libtrace_thread_t *t,
                 libtrace_packet_t **packets, size_t nb_packets) {
 
         recvstream_t *rt;
-        int rem;
+        int rem, i;
         size_t read_packets = 0;
         streamsock_t *nextavail = NULL;
 
@@ -1171,6 +1250,13 @@ static int ndag_pread_packets(libtrace_t *libtrace, libtrace_thread_t *t,
                 }
         } while (1);
 
+        for (i = 0; i < rt->sourcecount; i++) {
+                streamsock_t *src = &(rt->sources[i]);
+		src->bufavail += src->bufwaiting;
+		src->bufwaiting = 0;
+		assert(src->bufavail >= 0 && src->bufavail <= ENCAP_BUFFERS);
+	}
+
         return read_packets;
 
 }
@@ -1180,7 +1266,7 @@ static libtrace_eventobj_t trace_event_ndag(libtrace_t *libtrace,
 
 
         libtrace_eventobj_t event = {0,0,0.0,0};
-        int rem;
+        int rem, i;
         streamsock_t *nextavail = NULL;
 
         /* Only check for messages once per call */
@@ -1252,6 +1338,13 @@ static libtrace_eventobj_t trace_event_ndag(libtrace_t *libtrace,
                 libtrace->accepted_packets ++;
                 break;
         } while (1);
+
+        for (i = 0; i < FORMAT_DATA->receivers[0].sourcecount; i++) {
+                streamsock_t *src = &(FORMAT_DATA->receivers[0].sources[i]);
+		src->bufavail += src->bufwaiting;
+		src->bufwaiting = 0;
+		assert(src->bufavail >= 0 && src->bufavail <= ENCAP_BUFFERS);
+	}
 
         return event;
 }

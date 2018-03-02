@@ -137,6 +137,7 @@ DLLEXPORT void *trace_get_packet_meta(const libtrace_packet_t *packet,
 		case TRACE_TYPE_LINUX_SLL:
 		case TRACE_TYPE_80211_RADIO:
 		case TRACE_TYPE_80211_PRISM:
+		case TRACE_TYPE_ERF_META:
 			return pktbuf;
 		/* Non metadata packets */
 		case TRACE_TYPE_HDLC_POS:
@@ -210,6 +211,7 @@ DLLEXPORT void *trace_get_payload_from_meta(const void *meta,
 		case TRACE_TYPE_METADATA:
 		case TRACE_TYPE_NONDATA:
 		case TRACE_TYPE_OPENBSD_LOOP:
+		case TRACE_TYPE_ERF_META:
 		case TRACE_TYPE_UNKNOWN:
 			/* In this case, the pointer passed in does not point
 			 * to a metadata header and so we cannot get the

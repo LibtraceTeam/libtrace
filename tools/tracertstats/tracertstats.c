@@ -46,8 +46,9 @@
 #include <sys/socket.h>
 #include <getopt.h>
 #include <inttypes.h>
-#include <lt_inttypes.h>
+#include <signal.h>
 
+#include <lt_inttypes.h>
 #include "libtrace_parallel.h"
 #include "output.h"
 #include "rt_protocol.h"
@@ -79,6 +80,14 @@ struct output_data_t *output = NULL;
 
 uint64_t count;
 uint64_t bytes;
+
+struct libtrace_t *currenttrace;
+
+static void cleanup_signal(int signal UNUSED) {
+        if (currenttrace) {
+                trace_pstop(currenttrace);
+        }
+}
 
 static void report_results(double ts,uint64_t count,uint64_t bytes)
 {
@@ -187,6 +196,7 @@ static libtrace_packet_t *cb_packet(libtrace_t *trace, libtrace_thread_t *t,
         uint64_t key;
         thread_data_t *td = (thread_data_t *)tls;
         int i;
+        size_t wlen;
 
         if (IS_LIBTRACE_META_PACKET(packet)) {
                 return packet;
@@ -202,15 +212,20 @@ static libtrace_packet_t *cb_packet(libtrace_t *trace, libtrace_thread_t *t,
                 td->results = calloc(1, sizeof(result_t) +
                                 sizeof(statistic_t) * filter_count);
         }
+        wlen = trace_get_wire_length(packet);
+        if (wlen == 0) {
+                /* Don't count ERF provenance and similar packets */
+                return packet;
+        }
         for(i=0;i<filter_count;++i) {
                 if(trace_apply_filter(filters[i].filter, packet)) {
                         td->results->filters[i].count++;
-                        td->results->filters[i].bytes+=trace_get_wire_length(packet);
+                        td->results->filters[i].bytes+=wlen;
                 }
         }
 
         td->results->total.count++;
-        td->results->total.bytes +=trace_get_wire_length(packet);
+        td->results->total.bytes += wlen;
         return packet;
 }
 
@@ -280,6 +295,7 @@ static void run_trace(char *uri)
         repcbs = trace_create_callback_set();
         trace_set_result_cb(repcbs, cb_result);
 
+        currenttrace = trace;
 	if (trace_pstart(trace, NULL, pktcbs, repcbs)==-1) {
 		trace_perror(trace,"Failed to start trace");
 		trace_destroy(trace);
@@ -328,6 +344,7 @@ static void usage(char *argv0)
 int main(int argc, char *argv[]) {
 
 	int i;
+        struct sigaction sigact;
 	
 	while(1) {
 		int option_index;
@@ -413,7 +430,15 @@ int main(int argc, char *argv[]) {
 		if (output == NULL)
 			return 0;
 	}
-		
+	
+        sigact.sa_handler = cleanup_signal;
+        sigemptyset(&sigact.sa_mask);
+        sigact.sa_flags = SA_RESTART;
+
+        sigaction(SIGINT, &sigact, NULL);
+        sigaction(SIGTERM, &sigact, NULL);
+
+
 	for(i=optind;i<argc;++i) {
 		run_trace(argv[i]);
 	}
