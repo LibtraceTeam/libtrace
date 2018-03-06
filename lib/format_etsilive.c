@@ -89,6 +89,7 @@ typedef struct newsendermessage {
         struct sockaddr *recvaddr;
 } newsend_message_t;
 
+static int send_etsili_keepalive_response(int fd, int64_t seqno);
 
 static void *etsi_listener(void *tdata) {
         libtrace_t *libtrace = (libtrace_t *)tdata;
@@ -291,7 +292,12 @@ static void halt_etsi_thread(etsithread_t *receiver) {
         for (i = 0; i < receiver->sourcecount; i++) {
                 etsisocket_t src = receiver->sources[i];
                 libtrace_scb_destroy(&(src.recvbuffer));
-                close(src.sock);
+                if (src.srcaddr) {
+                        free(src.srcaddr);
+                }
+                if (src.sock != -1) {
+                        close(src.sock);
+                }
         }
         wandder_free_etsili_decoder(receiver->etsidec);
         free(receiver->sources);
@@ -392,80 +398,107 @@ static int receive_etsi_sockets(libtrace_t *libtrace, etsithread_t *et) {
 
 }
 
+static inline void inspect_next_packet(etsisocket_t *sock,
+                etsisocket_t **earliestsock, uint64_t *earliesttime,
+                wandder_etsispec_t *dec) {
+
+
+        struct timeval tv;
+        uint32_t available;
+        uint8_t *ptr = NULL;
+        uint32_t reclen = 0;
+        uint64_t current;
+
+        if (sock->sock == -1) {
+                return;
+        }
+        /* Have we already successfully decoded this? Cool,
+         * just use whatever we cached last time.
+         */
+        if (sock->cached.timestamp != 0) {
+                current = sock->cached.timestamp;
+
+                if (*earliesttime == 0 || *earliesttime > current) {
+                        *earliesttime = current;
+                        *earliestsock = sock;
+                }
+                return;
+        }
+
+        ptr = libtrace_scb_get_read(&(sock->recvbuffer), &available);
+
+        if (available == 0 || ptr == NULL) {
+                return;
+        }
+
+        wandder_attach_etsili_buffer(dec, ptr, available, false);
+        if (sock->cached.length != 0) {
+                reclen = sock->cached.length;
+        } else {
+                reclen = wandder_etsili_get_pdu_length(dec);
+
+                if (reclen == 0) {
+                        return;
+                }
+        }
+
+        if (available < reclen) {
+                /* Don't have the whole PDU yet */
+                return;
+        }
+
+        if (wandder_etsili_is_keepalive(dec)) {
+                int64_t kaseq = wandder_etsili_get_sequence_number(dec);
+                if (kaseq < 0) {
+                        fprintf(stderr, "bogus sequence number in ETSILI keep alive.\n");
+                        close(sock->sock);
+                        sock->sock = -1;
+                        return;
+                }
+                /* Send keep alive response */
+                if (send_etsili_keepalive_response(sock->sock, kaseq) < 0) {
+                        fprintf(stderr, "error sending response to ETSILI keep alive: %s.\n", strerror(errno));
+                        close(sock->sock);
+                        sock->sock = -1;
+                        return;
+                }
+                /* Skip past KA */
+                libtrace_scb_advance_read(&(sock->recvbuffer), reclen);
+                return;
+        }
+
+        /* Get the timestamp */
+
+        tv = wandder_etsili_get_header_timestamp(dec);
+        if (tv.tv_sec == 0) {
+                return;
+        }
+        current = ((((uint64_t)tv.tv_sec) << 32) +
+                        (((uint64_t)tv.tv_usec << 32)/1000000)); 
+
+        /* Success, cache everything we used so we don't have to
+         * decode this packet again.
+         */
+        sock->cached.timestamp = current;
+        sock->cached.length = reclen;
+
+
+        /* Don't forget to update earliest and esock... */
+        if (current < *earliesttime || *earliesttime == 0) {
+                *earliestsock = sock;
+                *earliesttime = current;
+        }
+}
+
 static etsisocket_t *select_next_packet(etsithread_t *et, libtrace_t *libtrace) {
 
         int i;
         etsisocket_t *esock = NULL;
         uint64_t earliest = 0;
-        uint64_t current;
-        struct timeval tv;
-        uint32_t available;
-        uint8_t *ptr = NULL;
-        wandder_decoder_t dec;
-        uint32_t reclen = 0;
 
         for (i = 0; i < et->sourcecount; i++) {
-                if (et->sources[i].sock == -1) {
-                        continue;
-                }
-                /* Have we already successfully decoded this? Cool,
-                 * just use whatever we cached last time.
-                 */
-                if (et->sources[i].cached.timestamp != 0) {
-                        current = et->sources[i].cached.timestamp;
-
-                        if (earliest == 0 || earliest > current) {
-                                earliest = current;
-                                esock = &(et->sources[i]);
-                        }
-                        continue;
-                }
-
-                ptr = libtrace_scb_get_read(&(et->sources[i].recvbuffer),
-                                &available);
-
-                if (available == 0 || ptr == NULL) {
-                        continue;
-                }
-
-                wandder_attach_etsili_buffer(et->etsidec, ptr, available, false);
-                if (et->sources[i].cached.length != 0) {
-                        reclen = et->sources[i].cached.length;
-                } else {
-                        reclen = wandder_etsili_get_pdu_length(et->etsidec);
-
-                        if (reclen == 0) {
-                                continue;
-                        }
-                }
-
-                if (available < reclen) {
-                        /* Don't have the whole PDU yet */
-                        continue;
-                }
-
-                /* Get the timestamp */
-
-                tv = wandder_etsili_get_header_timestamp(et->etsidec);
-                if (tv.tv_sec == 0) {
-                        continue;
-                }
-                current = ((((uint64_t)tv.tv_sec) << 32) +
-                                (((uint64_t)tv.tv_usec << 32)/1000000)); 
-
-                /* Success, cache everything we used so we don't have to
-                 * decode this packet again.
-                 */
-                et->sources[i].cached.timestamp = current;
-                et->sources[i].cached.length = reclen;
-
-
-                /* Don't forget to update earliest and esock... */
-                if (current < earliest || earliest == 0) {
-                        esock = &(et->sources[i]);
-                        earliest = current;
-                }
-
+                inspect_next_packet(&(et->sources[i]), &esock, &earliest,
+                        et->etsidec);
         }
         return esock;
 }
@@ -603,11 +636,11 @@ static struct libtrace_format_t etsilive = {
         NULL,                           /* probe magic */
         etsilive_init_input,            /* init_input */
         NULL,                           /* config_input */
-        etsilive_start_input,           /* staetsilive_input */
+        etsilive_start_input,           /* start_input */
         etsilive_pause_input,           /* pause */
         NULL,                           /* init_output */
         NULL,                           /* config_output */
-        NULL,                           /* staetsilive_output */
+        NULL,                           /* start_output */
         etsilive_fin_input,             /* fin_input */
         NULL,                           /* fin_output */
         etsilive_read_packet,           /* read_packet */
@@ -643,3 +676,93 @@ static struct libtrace_format_t etsilive = {
 void etsilive_constructor(void) {
         register_format(&etsilive);
 }
+
+
+#define ENC_USEQUENCE(enc) wandder_encode_next(enc, WANDDER_TAG_SEQUENCE, \
+        WANDDER_CLASS_UNIVERSAL_CONSTRUCT, WANDDER_TAG_SEQUENCE, NULL, 0)
+
+#define ENC_CSEQUENCE(enc, x) wandder_encode_next(enc, WANDDER_TAG_SEQUENCE, \
+        WANDDER_CLASS_CONTEXT_CONSTRUCT, x, NULL, 0)
+
+#define LT_ETSI_LIID "none"
+#define LT_ETSI_NA "NA"
+#define LT_ETSI_OPERATOR "libtrace"
+
+static int send_etsili_keepalive_response(int fd, int64_t seqno) {
+
+        wandder_encoder_t *encoder;
+        uint8_t *tosend;
+        uint32_t tosendlen;
+        int ret = 0;
+        uint64_t zero = 0;
+        struct timeval tv;
+
+        encoder = init_wandder_encoder();
+
+        ENC_USEQUENCE(encoder);             // starts outermost sequence
+
+        ENC_CSEQUENCE(encoder, 1);
+        wandder_encode_next(encoder, WANDDER_TAG_OID,
+                        WANDDER_CLASS_CONTEXT_PRIMITIVE, 0,
+                        WANDDER_ETSILI_PSDOMAINID,
+                        sizeof(WANDDER_ETSILI_PSDOMAINID));
+        wandder_encode_next(encoder, WANDDER_TAG_OCTETSTRING,
+                        WANDDER_CLASS_CONTEXT_PRIMITIVE, 1, LT_ETSI_LIID,
+                        strlen(LT_ETSI_LIID));
+        wandder_encode_next(encoder, WANDDER_TAG_PRINTABLE,
+                        WANDDER_CLASS_CONTEXT_PRIMITIVE, 2, LT_ETSI_NA,
+                        strlen(LT_ETSI_NA));
+
+        ENC_CSEQUENCE(encoder, 3);
+
+        ENC_CSEQUENCE(encoder, 0);
+        wandder_encode_next(encoder, WANDDER_TAG_OCTETSTRING,
+                        WANDDER_CLASS_CONTEXT_PRIMITIVE, 0, LT_ETSI_OPERATOR,
+                        strlen(LT_ETSI_OPERATOR));
+
+        wandder_encode_next(encoder, WANDDER_TAG_OCTETSTRING,
+                        WANDDER_CLASS_CONTEXT_PRIMITIVE, 1, LT_ETSI_OPERATOR,
+                        strlen(LT_ETSI_OPERATOR));
+        wandder_encode_endseq(encoder);
+
+        wandder_encode_next(encoder, WANDDER_TAG_INTEGER,
+                        WANDDER_CLASS_CONTEXT_PRIMITIVE, 1, &(zero),
+                        sizeof(zero));
+        wandder_encode_next(encoder, WANDDER_TAG_PRINTABLE,
+                        WANDDER_CLASS_CONTEXT_PRIMITIVE, 2, LT_ETSI_NA,
+                        strlen(LT_ETSI_NA));
+        wandder_encode_endseq(encoder);
+
+        wandder_encode_next(encoder, WANDDER_TAG_INTEGER,
+                        WANDDER_CLASS_CONTEXT_PRIMITIVE, 4, &(seqno),
+                        sizeof(seqno));
+
+        gettimeofday(&tv, NULL);
+        wandder_encode_next(encoder, WANDDER_TAG_GENERALTIME,
+                        WANDDER_CLASS_CONTEXT_PRIMITIVE, 5, &tv,
+                        sizeof(struct timeval));
+
+        wandder_encode_endseq(encoder);
+
+        ENC_CSEQUENCE(encoder, 2);          // Payload
+        ENC_CSEQUENCE(encoder, 2);          // TRIPayload
+        wandder_encode_next(encoder, WANDDER_TAG_NULL,
+                        WANDDER_CLASS_CONTEXT_PRIMITIVE, 4, NULL, 0);
+        wandder_encode_endseq(encoder);     // End TRIPayload
+        wandder_encode_endseq(encoder);     // End Payload
+        wandder_encode_endseq(encoder);     // End Outermost Sequence
+
+        tosend = wandder_encode_finish(encoder, &tosendlen);
+
+        if (tosend != NULL) {
+                /* Will block, but hopefully we shouldn't be doing much
+                 * sending.
+                 */
+                ret = send(fd, tosend, tosendlen, 0);
+        }
+
+        free_wandder_encoder(encoder);
+        return ret;
+}
+
+
