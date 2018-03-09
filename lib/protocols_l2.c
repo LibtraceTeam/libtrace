@@ -518,11 +518,8 @@ DLLEXPORT void *trace_get_layer2(const libtrace_packet_t *packet,
 				case TRACE_TYPE_80211_RADIO:
 				case TRACE_TYPE_80211_PRISM:
 				case TRACE_TYPE_PFLOG:
-<<<<<<< HEAD
 				case TRACE_TYPE_ERF_META:
-=======
                                 case TRACE_TYPE_ETSILI:
->>>>>>> etsilive format is now functional (for single-threaded only).
 					break;
 				case TRACE_TYPE_UNKNOWN:
 					return NULL;
