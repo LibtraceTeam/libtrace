@@ -1271,6 +1271,32 @@ DLLEXPORT void libtrace_make_result_safe(libtrace_result_t *res);
  */
 DLLEXPORT void trace_free_packet(libtrace_t * libtrace, libtrace_packet_t * packet);
 
+/** Increments the internal reference counter for a packet.
+ * @param packet        The packet opaque pointer
+ *
+ * You may wish to use this function (and its decrementing counterpart)
+ * in situations where you are retaining multiple references to a packet
+ * outside of the core packet processing function. This will ensure that
+ * the packet is not released until there are no more outstanding references
+ * to the packet anywhere in your program.
+ */
+DLLEXPORT void trace_increment_packet_refcount(libtrace_packet_t *packet);
+
+/** Decrements the internal reference counter for a packet.
+ * @param packet        The packet opaque pointer
+ *
+ * If the reference counter goes below one, trace_fin_packet() will be
+ * called on the packet.
+ *
+ * You may wish to use this function (and its incrementing counterpart)
+ * in situations where you are retaining multiple references to a packet
+ * outside of the core packet processing function. This will ensure that
+ * the packet is not released until there are no more outstanding references
+ * to the packet anywhere in your program.
+ */
+DLLEXPORT void trace_decrement_packet_refcount(libtrace_packet_t *packet);
+
+
 /** Provides some basic information about a trace based on its input format.
  *
  * @param libtrace  The trace that is being inquired about.

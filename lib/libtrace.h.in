@@ -559,6 +559,10 @@ typedef struct libtrace_packet_t {
 	int error; /**< The error status of pread_packet */
         uint64_t internalid;            /** Internal identifier for the pkt */
         void *srcbucket;
+
+        pthread_mutex_t ref_lock;       /**< Lock for reference counter */
+        int refcount;                 /**< Reference counter */
+
 } libtrace_packet_t;
 
 #define IS_LIBTRACE_META_PACKET(packet) (packet->type < TRACE_RT_DATA_SIMPLE)
@@ -1773,7 +1777,6 @@ DLLEXPORT libtrace_packet_t *trace_copy_packet(const libtrace_packet_t *packet);
  *
  */
 DLLEXPORT void trace_destroy_packet(libtrace_packet_t *packet);
-
 
 /** Read the next packet from an input trace 
  *

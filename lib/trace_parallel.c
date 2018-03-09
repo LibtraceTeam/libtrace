@@ -2600,6 +2600,27 @@ DLLEXPORT void trace_free_packet(libtrace_t *libtrace, libtrace_packet_t *packet
 	libtrace_ocache_free(&libtrace->packet_freelist, (void **) &packet, 1, 1);
 }
 
+DLLEXPORT void trace_increment_packet_refcount(libtrace_packet_t *packet) {
+        pthread_mutex_lock(&(packet->ref_lock));
+        if (packet->refcount < 0) {
+                packet->refcount = 1;
+        } else {
+                packet->refcount ++;
+        }
+        pthread_mutex_unlock(&(packet->ref_lock));
+}
+
+DLLEXPORT void trace_decrement_packet_refcount(libtrace_packet_t *packet) {
+        pthread_mutex_lock(&(packet->ref_lock));
+        packet->refcount --;
+
+        if (packet->refcount <= 0) {
+                trace_free_packet(packet->trace, packet);
+        }
+        pthread_mutex_unlock(&(packet->ref_lock));
+}
+
+
 DLLEXPORT libtrace_info_t *trace_get_information(libtrace_t * libtrace) {
 	if (libtrace->format)
 		return &libtrace->format->info;
