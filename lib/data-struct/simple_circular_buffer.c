@@ -10,7 +10,8 @@
 
 #include "simple_circular_buffer.h"
 
-void libtrace_scb_init(libtrace_scb_t *buf, uint32_t size, uint16_t id) {
+DLLEXPORT void libtrace_scb_init(libtrace_scb_t *buf, uint32_t size,
+                uint16_t id) {
 
         char anonname[32];
 
@@ -33,11 +34,12 @@ void libtrace_scb_init(libtrace_scb_t *buf, uint32_t size, uint16_t id) {
         buf->count_bytes = size;
 }
 
-void libtrace_scb_destroy(libtrace_scb_t *buf) {
+DLLEXPORT void libtrace_scb_destroy(libtrace_scb_t *buf) {
         munmap(buf->address, buf->count_bytes * 2);
 }
 
-int libtrace_scb_recv_sock(libtrace_scb_t *buf, int sock, int recvflags) {
+DLLEXPORT int libtrace_scb_recv_sock(libtrace_scb_t *buf, int sock,
+                int recvflags) {
         int space = buf->count_bytes - (buf->write_offset - buf->read_offset);
         int ret;
 
@@ -53,13 +55,15 @@ int libtrace_scb_recv_sock(libtrace_scb_t *buf, int sock, int recvflags) {
         return (buf->write_offset - buf->read_offset);
 }
 
-uint8_t *libtrace_scb_get_read(libtrace_scb_t *buf, uint32_t *available) {
+DLLEXPORT uint8_t *libtrace_scb_get_read(libtrace_scb_t *buf,
+                uint32_t *available) {
 
         *available = buf->write_offset - buf->read_offset;
         return buf->address + buf->read_offset;
 }
 
-void libtrace_scb_advance_read(libtrace_scb_t *buf, uint32_t forward) {
+DLLEXPORT void libtrace_scb_advance_read(libtrace_scb_t *buf,
+                uint32_t forward) {
 
         buf->read_offset += forward;
         if (buf->read_offset >= buf->count_bytes) {
