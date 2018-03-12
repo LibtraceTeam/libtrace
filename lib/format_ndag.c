@@ -113,7 +113,6 @@ typedef struct recvstream {
         uint64_t missing_records;
         uint64_t received_packets;
 
-	fd_set allsocks;
 	int maxfd;
 } recvstream_t;
 
@@ -487,7 +486,6 @@ static int ndag_start_threads(libtrace_t *libtrace, uint32_t maxthreads)
                 FORMAT_DATA->receivers[i].dropped_upstream = 0;
                 FORMAT_DATA->receivers[i].received_packets = 0;
                 FORMAT_DATA->receivers[i].missing_records = 0;
-		FD_ZERO(&(FORMAT_DATA->receivers[i].allsocks));
 		FORMAT_DATA->receivers[i].maxfd = -1;
 
                 libtrace_message_queue_init(&(FORMAT_DATA->receivers[i].mqueue),
@@ -770,7 +768,6 @@ static int add_new_streamsock(recvstream_t *rt, streamsource_t src) {
         ssock->nextwriteind = 0;
         ssock->recordcount = 0;
         rt->sourcecount += 1;
-	FD_SET(ssock->sock, &(rt->allsocks));
 	if (ssock->sock > rt->maxfd) {
 		rt->maxfd = ssock->sock;
 	}
@@ -880,7 +877,6 @@ static int check_ndag_received(streamsock_t *ssock, int index,
         } else if (rectype != NDAG_PKT_ENCAPERF) {
                 fprintf(stderr, "Received invalid record on the channel for %s:%u.\n",
                                 ssock->groupaddr, ssock->port);
-		FD_CLR(ssock->sock, &(rt->allsocks));
                 close(ssock->sock);
                 ssock->sock = -1;
                 return -1;
@@ -944,21 +940,6 @@ static int receive_from_single_socket(streamsock_t *ssock, struct timeval *tv,
 	int i;
 #endif
 
-        if (ssock->sock == -1) {
-                return 0;
-        }
-
-#if HAVE_RECVMMSG
-        /* Plenty of full buffers, just use the packets in those */
-        if (ssock->bufavail < RECV_BATCH_SIZE / 2) {
-                return 1;
-        }
-#else
-	if (ssock->bufavail == 0) {
-		return 1;
-	}
-#endif
-
         avail = init_receivers(ssock, ssock->bufavail);
 
 #if HAVE_RECVMMSG
@@ -986,7 +967,6 @@ static int receive_from_single_socket(streamsock_t *ssock, struct timeval *tv,
                                         ssock->groupaddr,
                                         ssock->port);
 
-				FD_CLR(ssock->sock, &(rt->allsocks));
                                 close(ssock->sock);
                                 ssock->sock = -1;
                         }
@@ -996,7 +976,6 @@ static int receive_from_single_socket(streamsock_t *ssock, struct timeval *tv,
                                 "Error receiving encapsulated records from %s:%u -- %s \n",
                                 ssock->groupaddr, ssock->port,
                                 strerror(errno));
-			FD_CLR(ssock->sock, &(rt->allsocks));
                         close(ssock->sock);
                         ssock->sock = -1;
                 }
@@ -1034,12 +1013,13 @@ static int receive_from_sockets(recvstream_t *rt) {
         int i, readybufs, gottime;
         struct timeval tv;
 	fd_set fds;
+        int maxfd = 0;
 	struct timeval zerotv;
 
         readybufs = 0;
         gottime = 0;
 
-	fds = rt->allsocks;
+        FD_ZERO(&fds);
 
 	if (rt->maxfd == -1) {
 		return 0;
@@ -1048,13 +1028,44 @@ static int receive_from_sockets(recvstream_t *rt) {
 	zerotv.tv_sec = 0;
 	zerotv.tv_usec = 0;
 
-	if (select(rt->maxfd + 1, &fds, NULL, NULL, &zerotv) == -1) {
+	for (i = 0; i < rt->sourcecount; i++) {
+                if (rt->sources[i].sock == -1) {
+                        continue;
+                }
+
+#if HAVE_RECVMMSG
+                /* Plenty of full buffers, just use the packets in those */
+                if (rt->sources[i].bufavail < RECV_BATCH_SIZE / 2) {
+                        readybufs ++;
+                        continue;
+                }
+#else
+                if (rt->sources[i].bufavail == 0) {
+                        readybufs ++;
+                        continue;
+                }
+#endif
+                FD_SET(rt->sources[i].sock, &fds);
+                if (maxfd < rt->sources[i].sock) {
+                        maxfd = rt->sources[i].sock;
+                }
+        }
+
+
+        if (maxfd <= 0) {
+                return readybufs;
+        }
+
+	if (select(maxfd + 1, &fds, NULL, NULL, &zerotv) == -1) {
 		/* log the error? XXX */
 		return -1;
 	}
 
 	for (i = 0; i < rt->sourcecount; i++) {
 		if (!FD_ISSET(rt->sources[i].sock, &fds)) {
+			if (rt->sources[i].bufavail < ENCAP_BUFFERS) {
+				readybufs ++;
+			}
 			continue;
 		}
                 readybufs += receive_from_single_socket(&(rt->sources[i]),
