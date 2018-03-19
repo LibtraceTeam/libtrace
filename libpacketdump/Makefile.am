@@ -60,8 +60,8 @@ BIN_PROTOCOLS+=link_15.la
 # 17: PPP
 TXT_PROTOCOLS+=link_17.protocol
 
-# 21: ETSI LI
-BIN_PROTOCOLS+=link_21.la
+# 22: ETSI LI
+BIN_PROTOCOLS+=link_22.la
 
 # Decoders for various ethertypes (in decimal)
 # IPv4
@@ -137,7 +137,7 @@ link_9_la_LDFLAGS=$(modflags)
 link_10_la_LDFLAGS=$(modflags)
 link_11_la_LDFLAGS=$(modflags)
 link_15_la_LDFLAGS=$(modflags) 
-link_21_la_LDFLAGS=$(modflags) 
+link_22_la_LDFLAGS=$(modflags) 
 eth_0_la_LDFLAGS=$(modflags)
 eth_2048_la_LDFLAGS=$(modflags)
 eth_2054_la_LDFLAGS=$(modflags)
