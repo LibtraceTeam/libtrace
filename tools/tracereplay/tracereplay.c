@@ -97,6 +97,8 @@ static libtrace_packet_t * per_packet(libtrace_packet_t *packet) {
 
         if (IS_LIBTRACE_META_PACKET(packet))
                 return NULL;
+        if (trace_get_wire_length(packet) == 0)
+                return NULL;
 
 	pkt_buffer = trace_get_packet_buffer(packet,&linktype,&remaining);
 	remaining = 0;
