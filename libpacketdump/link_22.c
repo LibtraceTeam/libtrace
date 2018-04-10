@@ -6,8 +6,11 @@
 DLLEXPORT void decode(int link_type UNUSED, const char *packet, unsigned len) {
 
         char linespace[4096];
+        char namesp[1024];
         int i;
         uint8_t *cchdr = NULL;
+        uint8_t *iricontents = NULL;
+        uint8_t ident;
         uint32_t rem = len;
         wandder_etsispec_t *dec;
         wandder_decoder_t *basedec = NULL;
@@ -24,15 +27,44 @@ DLLEXPORT void decode(int link_type UNUSED, const char *packet, unsigned len) {
                 printf("%s\n", linespace);
         }
 
-        cchdr = wandder_etsili_get_cc_contents(dec, &rem);
-
-        wandder_free_etsili_decoder(dec);
+        cchdr = wandder_etsili_get_cc_contents(dec, &rem, namesp, 1024);
 
         if (cchdr) {
+                printf(" ETSILI: ");
+                for (i = 0; i < wandder_get_level(basedec); i++) {
+                        printf("  ");
+                }
+                printf("%s: ...\n", namesp);
+                wandder_free_etsili_decoder(dec);
                 /* XXX What if there is an IPv7?? */
                 decode_next((const char *)cchdr, rem, "eth",
                                 ((*cchdr) & 0xf0) == 0x40 ? TRACE_ETHERTYPE_IP :
                                 TRACE_ETHERTYPE_IPV6);
+                return;
         }
+
+        iricontents = wandder_etsili_get_iri_contents(dec, &rem, &ident,
+                        namesp, 1024);
+        if (iricontents) {
+                printf(" ETSILI: ");
+                /* hard-coded indentation, but easier than introducing
+                 * yet another parameter to get_iri_contents()
+                 */
+                for (i = 0; i < 7; i++) {
+                        printf("  ");
+                }
+                printf("%s: ...\n", namesp);
+                wandder_free_etsili_decoder(dec);
+                if (ident == WANDDER_IRI_CONTENT_IP) {
+                        decode_next((const char *)iricontents, rem, "eth",
+                                        ((*iricontents) & 0xf0) == 0x40 ?
+                                        TRACE_ETHERTYPE_IP :
+                                        TRACE_ETHERTYPE_IPV6);
+                } else if (ident == WANDDER_IRI_CONTENT_SIP) {
+                        decode_next((const char *)iricontents, rem, "udp",
+                                        5060);
+                }
+        }
+
         return;
 }
