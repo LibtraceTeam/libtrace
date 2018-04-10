@@ -1545,7 +1545,7 @@ DLLEXPORT int trace_apply_filter(libtrace_filter_t *filter,
 			if (!demote_packet(packet_copy)) {
 				trace_set_err(packet->trace,
 						TRACE_ERR_NO_CONVERSION,
-						"pcap does not support this format");
+						"pcap does not support this linktype so cannot apply BPF filters");
 				if (free_packet_needed) {
 					trace_destroy_packet(packet_copy);
 				}
