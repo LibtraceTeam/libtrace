@@ -134,7 +134,7 @@ static void *trace_get_payload_from_etsili(const void *link,
         /* XXX Bit annoying to be creating and freeing this every time */
         dec = wandder_create_etsili_decoder();
         wandder_attach_etsili_buffer(dec, (uint8_t *)link, *remaining, false);
-        ccptr = wandder_etsili_get_cc_contents(dec, remaining);
+        ccptr = wandder_etsili_get_cc_contents(dec, remaining, NULL, 0);
         /* Assuming all CCs are IP for now */
         *type = TRACE_TYPE_NONE;
         wandder_free_etsili_decoder(dec);
