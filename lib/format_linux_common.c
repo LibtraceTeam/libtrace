@@ -163,6 +163,8 @@ int linuxcommon_config_input(libtrace_t *libtrace,
 		case TRACE_OPTION_EVENT_REALTIME:
 			/* Live captures are always going to be in trace time */
 			break;
+                case TRACE_OPTION_REPLAY_SPEEDUP:
+                        break;
 		/* Avoid default: so that future options will cause a warning
 		 * here to remind us to implement it, or flag it as
 		 * unimplementable

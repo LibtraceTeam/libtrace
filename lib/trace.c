@@ -250,13 +250,14 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 	libtrace->err.err_num = TRACE_ERR_NOERROR;
 	libtrace->format=NULL;
 
-	libtrace->event.tdelta = 0.0;
 	libtrace->event.packet = NULL;
 	libtrace->event.psize = 0;
-	libtrace->event.trace_last_ts = 0.0;
+	libtrace->event.first_ts = 0.0;
+	libtrace->event.first_now = 0.0;
 	libtrace->event.waiting = false;
 	libtrace->filter = NULL;
 	libtrace->snaplen = 0;
+	libtrace->replayspeedup = 1;
 	libtrace->started=false;
 	libtrace->uridata = NULL;
 	libtrace->io = NULL;
@@ -377,10 +378,10 @@ DLLEXPORT libtrace_t * trace_create_dead (const char *uri) {
 	libtrace->err.err_num = TRACE_ERR_NOERROR;
 	libtrace->format=NULL;
 
-	libtrace->event.tdelta = 0.0;
 	libtrace->event.packet = NULL;
 	libtrace->event.psize = 0;
-	libtrace->event.trace_last_ts = 0.0;
+        libtrace->event.first_ts = 0;
+        libtrace->event.first_now = 0;
 	libtrace->filter = NULL;
 	libtrace->snaplen = 0;
 	libtrace->started=false;
@@ -594,6 +595,19 @@ DLLEXPORT int trace_config(libtrace_t *libtrace,
 	 * format did not support configuration. However, libtrace can
 	 * deal with some options itself, so give that a go */
 	switch(option) {
+                case TRACE_OPTION_REPLAY_SPEEDUP:
+			/* Clear the error if there was one */
+			if (trace_is_err(libtrace)) {
+				trace_get_err(libtrace);
+			}
+			if (*(int*)value<1
+				|| *(int*)value>LIBTRACE_MAX_REPLAY_SPEEDUP) {
+				trace_set_err(libtrace,TRACE_ERR_BAD_STATE,
+					"Invalid replay speed");
+			}
+			libtrace->replayspeedup=*(int*)value;
+			return 0;
+
 		case TRACE_OPTION_SNAPLEN:
 			/* Clear the error if there was one */
 			if (trace_is_err(libtrace)) {

@@ -1319,7 +1319,10 @@ typedef enum {
 
 	/** The hasher function for a parallel libtrace. It is recommended to
 	 * access this option via trace_set_hasher(). */
-	TRACE_OPTION_HASHER
+	TRACE_OPTION_HASHER,
+
+        /** Speed up trace file replays (via trace_event()) by this factor */
+        TRACE_OPTION_REPLAY_SPEEDUP,
 } trace_option_t;
 
 /** Sets an input config option

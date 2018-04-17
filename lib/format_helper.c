@@ -126,6 +126,9 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 	struct libtrace_eventobj_t event = {0,0,0.0,0};
 	double ts;
 	double now;
+        double sincebeginnow = 0;
+        double sincebegintrace = 0;
+
 #ifdef WIN32
 	struct __timeb64 tstruct;
 #else
@@ -181,17 +184,16 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 #endif
 
 	
-	if (fabs(trace->event.tdelta)>1e-9) {
-		/* Subtract the tdelta from the walltime to get a suitable
+	if (fabs(trace->event.first_now)>1e-9) {
+		/* Subtract the tdelta from the starting times to get a suitable
 		 * "relative" time */
-		now -= trace->event.tdelta; 
+                sincebeginnow = (now - trace->event.first_now);
+                sincebegintrace = (ts - trace->event.first_ts);
 
 		/* If the trace timestamp is still in the future, return a 
 		 * SLEEP event, otherwise return the packet */
-		if (ts > now) {
-			event.seconds = ts - 
-				trace->event.trace_last_ts;
-			trace->event.trace_last_ts = ts;
+                if (sincebeginnow <= sincebegintrace / trace->replayspeedup) {
+			event.seconds = ((sincebegintrace / trace->replayspeedup) - sincebeginnow);
 			event.type = TRACE_EVENT_SLEEP;
 			trace->event.waiting = true;
 			return event;
@@ -203,7 +205,8 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 		 * into a timeline that is relative to the timestamps in the
 		 * trace file.
 		 */
-		trace->event.tdelta = now - ts;
+                trace->event.first_now = now;
+                trace->event.first_ts = ts;
 	}
 
 	/* The packet that we had read earlier is now ready to be returned
@@ -218,7 +221,6 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 
 	event.type = TRACE_EVENT_PACKET;
 
-	trace->event.trace_last_ts = ts;
 	trace->event.waiting = false;
 
 	return event;

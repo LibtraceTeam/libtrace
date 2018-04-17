@@ -259,6 +259,7 @@ static int pcapng_config_input(libtrace_t *libtrace, trace_option_t option,
                 case TRACE_OPTION_PROMISC:
                 case TRACE_OPTION_FILTER:
                 case TRACE_OPTION_HASHER:
+                case TRACE_OPTION_REPLAY_SPEEDUP:
                         break;
         }
 

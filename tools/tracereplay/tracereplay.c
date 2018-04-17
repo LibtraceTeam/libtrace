@@ -208,6 +208,7 @@ int main(int argc, char *argv[]) {
 	char *uri = 0;
 	libtrace_packet_t * new;
 	int snaplen = 0;
+        int speedup = 1;
 
 
 	while(1) {
