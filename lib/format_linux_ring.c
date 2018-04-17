@@ -460,8 +460,6 @@ inline static int linuxring_read_stream(libtrace_t *libtrace,
 	unsigned int snaplen;
 	struct pollfd pollset[2];
 
-	ring_release_frame(libtrace, packet);
-	
 	packet->buf_control = TRACE_CTRL_EXTERNAL;
 	packet->type = TRACE_RT_DATA_LINUX_RING;
 	
