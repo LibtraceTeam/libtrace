@@ -1545,7 +1545,6 @@ static int trace_start_thread(libtrace_t *trace,
                        int perpkt_num,
                        const char *name) {
 #ifdef __linux__
-	pthread_attr_t attrib;
 	cpu_set_t cpus;
 	int i;
 #endif
@@ -1563,10 +1562,12 @@ static int trace_start_thread(libtrace_t *trace,
 	CPU_ZERO(&cpus);
 	for (i = 0; i < get_nb_cores(); i++)
 		CPU_SET(i, &cpus);
-	pthread_attr_init(&attrib);
-	pthread_attr_setaffinity_np(&attrib, sizeof(cpus), &cpus);
-	ret = pthread_create(&t->tid, &attrib, start_routine, (void *) trace);
-	pthread_attr_destroy(&attrib);
+
+	ret = pthread_create(&t->tid, NULL, start_routine, (void *) trace);
+	if( ret == 0 ) {
+		ret = pthread_setaffinity_np(t->tid, sizeof(cpus), &cpus);
+	}
+
 #else
 	ret = pthread_create(&t->tid, NULL, start_routine, (void *) trace);
 #endif
