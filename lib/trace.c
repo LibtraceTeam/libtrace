@@ -723,11 +723,14 @@ DLLEXPORT void trace_destroy(libtrace_t *libtrace) {
 		// This has all of our packets
 		libtrace_ocache_destroy(&libtrace->packet_freelist);
 		for (i = 0; i < libtrace->perpkt_thread_count; ++i) {
-                        libtrace_message_queue_destroy(&libtrace->perpkt_threads[i].messages);
-                }
-                libtrace_message_queue_destroy(&libtrace->hasher_thread.messages);
-                libtrace_message_queue_destroy(&libtrace->keepalive_thread.messages);
-                libtrace_message_queue_destroy(&libtrace->reporter_thread.messages);
+			libtrace_message_queue_destroy(&libtrace->perpkt_threads[i].messages);
+		}
+		if (libtrace->hasher_thread.type == THREAD_HASHER)
+			libtrace_message_queue_destroy(&libtrace->hasher_thread.messages);
+		if (libtrace->keepalive_thread.type == THREAD_KEEPALIVE)
+			libtrace_message_queue_destroy(&libtrace->keepalive_thread.messages);
+		if (libtrace->reporter_thread.type == THREAD_REPORTER)
+			libtrace_message_queue_destroy(&libtrace->reporter_thread.messages);
 
 
 		if (libtrace->combiner.destroy && libtrace->reporter_cbs)
