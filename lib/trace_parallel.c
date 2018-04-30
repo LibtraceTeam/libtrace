@@ -2402,7 +2402,8 @@ static inline bool trace_is_configurable(libtrace_t *trace) {
 }
 
 DLLEXPORT int trace_set_perpkt_threads(libtrace_t *trace, int nb) {
-	if (!trace_is_configurable(trace)) return -1;
+	// Only supported on new traces not paused traces
+	if (trace->state != STATE_NEW) return -1;
 
 	/* TODO consider allowing an offset from the total number of cores i.e.
 	 * -1 reserve 1 core */

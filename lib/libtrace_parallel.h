@@ -730,6 +730,9 @@ DLLEXPORT void trace_join(libtrace_t * trace);
 
 /** Set the maximum number of perpkt threads to use in a trace.
  *
+ * Only valid on a new trace, that has not be started. Once started
+ * the number of threads cannot be changed without destroying the trace.
+ *
  * @param[in] trace The parallel input trace
  * @param[in] nb The number of threads to use. If set to 0, libtrace will
  *    try to auto-detect how many threads it can use.
