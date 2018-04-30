@@ -89,9 +89,9 @@ static struct rte_mempool * mem_pools[4][RTE_MAX_LCORE] = {{0}};
  * for output */
 struct dpdk_format_data_t {
 	int8_t promisc; /* promiscuous mode - RX only */
-	uint8_t port; /* Always 0 we only whitelist a single port - Shared TX & RX */
-	uint8_t nb_ports; /* Total number of usable ports on system should be 1 */
 	uint8_t paused; /* See paused_state */
+	portid_t port; /* Always 0 we only whitelist a single port - Shared TX & RX */
+	portid_t nb_ports; /* Total number of usable ports on system should be 1 */
 	uint16_t link_speed; /* Link speed 10,100,1000,10000 etc. */
 	int snaplen; /* The snap length for the capture - RX only */
 	/* We always have to setup both rx and tx queues even if we don't want them */
@@ -213,9 +213,15 @@ static int whitelist_device(struct dpdk_format_data_t *format_data UNUSED, struc
 static int parse_pciaddr(char * str, struct rte_pci_addr * addr, long * core) {
 	int matches;
 	assert(str);
+#if RTE_VERSION >= RTE_VERSION_NUM(17, 8, 0, 1)
 	matches = sscanf(str, "%8"SCNx32":%2"SCNx8":%2"SCNx8".%2"SCNx8"-%ld",
 	                 &addr->domain, &addr->bus, &addr->devid,
 	                 &addr->function, core);
+#else
+	matches = sscanf(str, "%4"SCNx16":%2"SCNx8":%2"SCNx8".%2"SCNx8"-%ld",
+	                 &addr->domain, &addr->bus, &addr->devid,
+	                 &addr->function, core);
+#endif
 	if (matches >= 4) {
 		return 0;
 	} else {
@@ -815,8 +821,13 @@ static const struct rte_eth_txconf tx_conf = {
  * @param event The TYPE of event (expected to be RTE_ETH_EVENT_INTR_LSC)
  * @param cb_arg The dpdk_format_data_t structure associated with the format
  */
-static int dpdk_lsc_callback(uint16_t port, enum rte_eth_event_type event,
+#if RTE_VERSION >= RTE_VERSION_NUM(17, 8, 0, 1)
+static int dpdk_lsc_callback(portid_t port, enum rte_eth_event_type event,
                               void *cb_arg, void *retparam UNUSED) {
+#else
+static void dpdk_lsc_callback(portid_t port, enum rte_eth_event_type event,
+                              void *cb_arg) {
+#endif
 	struct dpdk_format_data_t * format_data = cb_arg;
 	struct rte_eth_link link_info;
 	assert(event == RTE_ETH_EVENT_INTR_LSC);
@@ -851,7 +862,9 @@ static int dpdk_lsc_callback(uint16_t port, enum rte_eth_event_type event,
 		}
 	}
 #endif
+#if RTE_VERSION >= RTE_VERSION_NUM(17, 8, 0, 1)
         return 0;
+#endif
 }
 
 /** Reserve a DPDK lcore ID for a thread globally.
@@ -1170,7 +1183,7 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data,
 	                             DPDK_USE_NULL_QUEUE_CONFIG ? NULL : &tx_conf);
 	if (ret < 0) {
 		snprintf(err, errlen, "Intel DPDK - Cannot configure TX queue"
-		         " on port %"PRIu8" : %s", format_data->port,
+		         " on port %d : %s", (int)format_data->port,
 		         strerror(-ret));
 		return -1;
 	}
@@ -1219,8 +1232,8 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data,
 		                             stream->mempool);
 		if (ret < 0) {
 			snprintf(err, errlen, "Intel DPDK - Cannot configure"
-			         " RX queue on port %"PRIu8" : %s",
-			         format_data->port,
+			         " RX queue on port %d : %s",
+			         (int)format_data->port,
 			         strerror(-ret));
 			return -1;
 		}
@@ -1289,7 +1302,7 @@ int dpdk_start_input (libtrace_t *libtrace) {
 	return 0;
 }
 
-static inline size_t dpdk_get_max_rx_queues (uint8_t port_id) {
+static inline size_t dpdk_get_max_rx_queues (portid_t port_id) {
 	struct rte_eth_dev_info dev_info;
 	rte_eth_dev_info_get(port_id, &dev_info);
 	return dev_info.max_rx_queues;
@@ -1510,7 +1523,7 @@ static int dpdk_write_packet(libtrace_out_t *trace,
 		int ret;
 		memcpy(rte_pktmbuf_append(m_buff[0], caplen), packet->payload, caplen);
 		do {
-			ret = rte_eth_tx_burst(0 /*queue TODO*/, FORMAT(trace)->port, m_buff, 1);
+			ret = rte_eth_tx_burst(FORMAT(trace)->port, 0 /*queue TODO*/, m_buff, 1);
 		} while (ret != 1);
 	}
 
