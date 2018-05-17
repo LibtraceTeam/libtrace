@@ -184,7 +184,7 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 #endif
 
 	
-	if (fabs(trace->event.first_now)>1e-9) {
+	if (fabs(trace->event.first_ts)>1e-9) {
 		/* Subtract the tdelta from the starting times to get a suitable
 		 * "relative" time */
                 sincebeginnow = (now - trace->event.first_now);
@@ -192,8 +192,8 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 
 		/* If the trace timestamp is still in the future, return a 
 		 * SLEEP event, otherwise return the packet */
-                if (sincebeginnow <= sincebegintrace / trace->replayspeedup) {
-			event.seconds = ((sincebegintrace / trace->replayspeedup) - sincebeginnow);
+                if (sincebeginnow <= sincebegintrace / (double)trace->replayspeedup) {
+			event.seconds = ((sincebegintrace / (double)trace->replayspeedup) - sincebeginnow);
 			event.type = TRACE_EVENT_SLEEP;
 			trace->event.waiting = true;
 			return event;
@@ -205,8 +205,8 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 		 * into a timeline that is relative to the timestamps in the
 		 * trace file.
 		 */
-                trace->event.first_now = now;
-                trace->event.first_ts = ts;
+                trace->event.first_now = (double)now;
+                trace->event.first_ts = (double)ts;
 	}
 
 	/* The packet that we had read earlier is now ready to be returned
