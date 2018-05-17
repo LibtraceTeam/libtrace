@@ -704,7 +704,7 @@ static int send_etsili_keepalive_response(int fd, int64_t seqno) {
         ENC_CSEQUENCE(encoder, 1);
         wandder_encode_next(encoder, WANDDER_TAG_OID,
                         WANDDER_CLASS_CONTEXT_PRIMITIVE, 0,
-                        WANDDER_ETSILI_PSDOMAINID,
+                        (void *)(WANDDER_ETSILI_PSDOMAINID),
                         sizeof(WANDDER_ETSILI_PSDOMAINID));
         wandder_encode_next(encoder, WANDDER_TAG_OCTETSTRING,
                         WANDDER_CLASS_CONTEXT_PRIMITIVE, 1, LT_ETSI_LIID,
