@@ -1194,7 +1194,8 @@ static struct timespec pcapng_get_timespec(const libtrace_packet_t *packet) {
         }
 
         ts.tv_sec = (timestamp / interface->tsresol);
-        ts.tv_nsec = (uint64_t)(timestamp - (ts.tv_sec * interface->tsresol)) / interface->tsresol * 1000000000;
+        ts.tv_nsec = (uint64_t)(timestamp - (ts.tv_sec * interface->tsresol))
+                        / ((double)interface->tsresol) * 1000000000;
 
         return ts;
 
