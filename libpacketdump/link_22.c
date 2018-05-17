@@ -1,3 +1,4 @@
+#include <assert.h>
 #include "libtrace.h"
 #include "libpacketdump.h"
 
@@ -14,6 +15,7 @@ DLLEXPORT void decode(int link_type UNUSED, const char *packet, unsigned len) {
         uint32_t rem = len;
         wandder_etsispec_t *dec;
         wandder_decoder_t *basedec = NULL;
+        int lastlevel = 0;
 
         dec = wandder_create_etsili_decoder();
         wandder_attach_etsili_buffer(dec, (uint8_t *)packet, len, false);
@@ -23,6 +25,7 @@ DLLEXPORT void decode(int link_type UNUSED, const char *packet, unsigned len) {
                 printf(" ETSILI: ");
                 for (i = 0; i < wandder_get_level(basedec); i++) {
                         printf("  ");
+                        lastlevel = i + 1;
                 }
                 printf("%s\n", linespace);
         }
@@ -31,7 +34,7 @@ DLLEXPORT void decode(int link_type UNUSED, const char *packet, unsigned len) {
 
         if (cchdr) {
                 printf(" ETSILI: ");
-                for (i = 0; i < wandder_get_level(basedec); i++) {
+                for (i = 0; i < lastlevel + 1; i++) {
                         printf("  ");
                 }
                 printf("%s: ...\n", namesp);
