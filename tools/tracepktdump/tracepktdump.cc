@@ -112,6 +112,9 @@ int main(int argc,char **argv)
 			if (packet->type < TRACE_RT_DATA_SIMPLE)
 				/* Ignore RT messages */
 				continue;
+                        if (trace_is_err(trace)) {
+                                break;
+                        }
 			trace_dump_packet(packet);
 
 			if(count) {

@@ -28,6 +28,10 @@
 #include "protocols.h"
 #include <assert.h>
 
+#ifdef HAVE_WANDDER
+#include <libwandder_etsili.h>
+#endif
+
 /* This file contains all the protocol decoding functions for the meta-data
  * headers that may be prepended to captured packets.
  *
@@ -120,6 +124,29 @@ static void *trace_get_payload_from_radiotap (const void *link,
 	return (void*) ((char*)link + rtaplen);
 }
 
+static void *trace_get_payload_from_etsili(const void *link,
+                libtrace_linktype_t *type, uint32_t *remaining) {
+
+#ifdef HAVE_WANDDER
+        wandder_etsispec_t *dec;
+        uint8_t *ccptr;
+
+        /* XXX Bit annoying to be creating and freeing this every time */
+        dec = wandder_create_etsili_decoder();
+        wandder_attach_etsili_buffer(dec, (uint8_t *)link, *remaining, false);
+        ccptr = wandder_etsili_get_cc_contents(dec, remaining, NULL, 0);
+        /* Assuming all CCs are IP for now */
+        *type = TRACE_TYPE_NONE;
+        wandder_free_etsili_decoder(dec);
+        return ccptr;
+
+#else
+        *remaining = NULL;
+        return NULL;
+#endif
+
+}
+
 DLLEXPORT void *trace_get_packet_meta(const libtrace_packet_t *packet, 
 		libtrace_linktype_t *linktype,
 		uint32_t *remaining)
@@ -138,6 +165,7 @@ DLLEXPORT void *trace_get_packet_meta(const libtrace_packet_t *packet,
 		case TRACE_TYPE_80211_RADIO:
 		case TRACE_TYPE_80211_PRISM:
 		case TRACE_TYPE_ERF_META:
+                case TRACE_TYPE_ETSILI:
 			return pktbuf;
 		/* Non metadata packets */
 		case TRACE_TYPE_HDLC_POS:
@@ -198,6 +226,11 @@ DLLEXPORT void *trace_get_payload_from_meta(const void *meta,
 			nexthdr = trace_get_payload_from_pflog(meta,
 					linktype, remaining);
 			return nexthdr;
+                case TRACE_TYPE_ETSILI:
+                        nexthdr = trace_get_payload_from_etsili(meta,
+                                        linktype, remaining);
+                        return nexthdr;
+
 		case TRACE_TYPE_HDLC_POS:
 		case TRACE_TYPE_ETH:
 		case TRACE_TYPE_ATM:

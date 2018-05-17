@@ -369,7 +369,8 @@ typedef enum {
        TRACE_TYPE_METADATA = 18,     	/**< WDCAP-style meta-data */
        TRACE_TYPE_NONDATA = 19,		/**< Not a data packet */
        TRACE_TYPE_OPENBSD_LOOP = 20,	/**< OpenBSD loopback */
-       TRACE_TYPE_ERF_META = 21 /**< ERF Provenance metadata record */
+       TRACE_TYPE_ERF_META = 21, /**< ERF Provenance metadata record */
+       TRACE_TYPE_ETSILI = 22	/**< ETSI Lawful Intercept */
 } libtrace_linktype_t;
 
 /** RT protocol base format identifiers.
@@ -397,6 +398,7 @@ enum base_format_t {
         TRACE_FORMAT_PCAPNG     =18,    /**< PCAP-NG trace file */
         TRACE_FORMAT_NDAG       =19,    /**< DAG multicast over a network */
         TRACE_FORMAT_DPDK_NDAG       =20,    /**< DAG multicast over a network, received via DPDK */
+        TRACE_FORMAT_ETSILIVE     =21,  /**< ETSI LI over a network */
 };
 
 /** RT protocol packet types */
@@ -451,6 +453,8 @@ typedef enum {
 	TRACE_RT_DATA_LINUX_RING=TRACE_RT_DATA_SIMPLE+TRACE_FORMAT_LINUX_RING,
     /** RT is encapsulating a Intel DPDK capture record */
 	TRACE_RT_DATA_DPDK=TRACE_RT_DATA_SIMPLE+TRACE_FORMAT_DPDK,
+
+        TRACE_RT_DATA_ETSILI = TRACE_RT_DATA_SIMPLE + TRACE_FORMAT_ETSILIVE,
 
 	/** As PCAP does not store the linktype with the packet, we need to 
 	 * create a separate RT type for each supported DLT, starting from
@@ -1315,7 +1319,10 @@ typedef enum {
 
 	/** The hasher function for a parallel libtrace. It is recommended to
 	 * access this option via trace_set_hasher(). */
-	TRACE_OPTION_HASHER
+	TRACE_OPTION_HASHER,
+
+        /** Speed up trace file replays (via trace_event()) by this factor */
+        TRACE_OPTION_REPLAY_SPEEDUP,
 } trace_option_t;
 
 /** Sets an input config option

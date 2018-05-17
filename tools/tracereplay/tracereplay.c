@@ -97,6 +97,8 @@ static libtrace_packet_t * per_packet(libtrace_packet_t *packet) {
 
         if (IS_LIBTRACE_META_PACKET(packet))
                 return NULL;
+        if (trace_get_wire_length(packet) == 0)
+                return NULL;
 
 	pkt_buffer = trace_get_packet_buffer(packet,&linktype,&remaining);
 	remaining = 0;
@@ -193,6 +195,9 @@ static void usage(char * argv) {
 	fprintf(stderr, " -b\n");
 	fprintf(stderr, " --broadcast\n");
 	fprintf(stderr, "\t\tSend ethernet frames to broadcast address\n");
+	fprintf(stderr, " -X\n");
+	fprintf(stderr, " --speedup\n");
+	fprintf(stderr, "\t\tSpeed up replay by a factor of <speedup>\n");
 
 }
 
@@ -206,6 +211,7 @@ int main(int argc, char *argv[]) {
 	char *uri = 0;
 	libtrace_packet_t * new;
 	int snaplen = 0;
+        int speedup = 1;
 
 
 	while(1) {
@@ -215,10 +221,11 @@ int main(int argc, char *argv[]) {
 			{ "help",	0, 0, 'h'},
 			{ "snaplen",	1, 0, 's'},
 			{ "broadcast",	0, 0, 'b'},
+			{ "speedup",	1, 0, 'X'},
 			{ NULL,		0, 0, 0}
 		};
 
-		int c = getopt_long(argc, argv, "bhs:f:",
+		int c = getopt_long(argc, argv, "bhs:f:X:",
 				long_options, &option_index);
 
 		if(c == -1)
@@ -231,7 +238,9 @@ int main(int argc, char *argv[]) {
 			case 's':
 				snaplen = atoi(optarg);
 				break;
-
+                        case 'X':
+                                speedup = atoi(optarg);
+                                break;
 			case 'b':
 				broadcast = 1;
 				break;
@@ -256,6 +265,10 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
+        if (speedup < 1) {
+                speedup = 1;
+        }
+
 	uri = strdup(argv[optind]);
 
 	/* Create the trace */
@@ -278,6 +291,11 @@ int main(int argc, char *argv[]) {
 			trace_perror(trace, "ignoring: ");
 		}
 	}
+
+        if (trace_config(trace, TRACE_OPTION_REPLAY_SPEEDUP, &speedup)) {
+                trace_perror(trace, "error setting replay speedup factor");
+                return 1;
+        }
 
 	/* Starting the trace */
 	if (trace_start(trace) != 0) {

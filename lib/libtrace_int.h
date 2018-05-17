@@ -151,15 +151,19 @@ int snprintf(char *str, size_t size, const char *format, ...);
 
 //#define RP_BUFSIZE 65536U
 
+#define LIBTRACE_MAX_REPLAY_SPEEDUP 1000
+
 /** Data about the most recent event from a trace file */
 struct libtrace_event_status_t {
 	/** A libtrace packet to store the packet when a PACKET event occurs */
 	libtrace_packet_t *packet;
-	/** Time between the timestamp for the current packet and the current 
-	 * walltime */
-	double tdelta;
-	/** The timestamp of the previous PACKET event */
-	double trace_last_ts;
+
+        /* The walltime when we processed the first packet from the trace */
+        double first_now;
+
+        /* The tracetime of the first packet in the trace */
+        double first_ts;
+
 	/** The size of the current PACKET event */
 	int psize;
 	/** Whether there is a packet stored in *packet above waiting for an
@@ -312,6 +316,9 @@ struct libtrace_t {
 	/** The snap length to be applied to all packets read by the trace - 
 	 * used only if the capture format does not support snapping natively */
 	size_t snaplen;			
+        /** Speed up the packet rate when using trace_event() to process trace
+         * files by this factor. */
+        int replayspeedup;
 	/** Count of the number of packets returned to the libtrace user */
 	uint64_t accepted_packets;
 	/** Count of the number of packets filtered by libtrace */
@@ -1241,6 +1248,8 @@ void duck_constructor(void);
 void atmhdr_constructor(void);
 /** Constructor for the network DAG format module */
 void ndag_constructor(void);
+/** Constructor for the live ETSI over TCP format module */
+void etsilive_constructor(void);
 #ifdef HAVE_BPF
 /** Constructor for the BPF format module */
 void bpf_constructor(void);

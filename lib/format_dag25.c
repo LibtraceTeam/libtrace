@@ -607,6 +607,7 @@ static int dag_config_input(libtrace_t *libtrace, trace_option_t option,
 		 * cards */
 		return -1;
 	case TRACE_OPTION_EVENT_REALTIME:
+        case TRACE_OPTION_REPLAY_SPEEDUP:
 		/* Live capture is always going to be realtime */
 		return -1;
 	case TRACE_OPTION_HASHER:
