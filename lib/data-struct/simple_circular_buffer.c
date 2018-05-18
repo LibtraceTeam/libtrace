@@ -6,6 +6,8 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <sys/syscall.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include <sys/socket.h>
 
 #include "simple_circular_buffer.h"
@@ -20,7 +22,11 @@ DLLEXPORT void libtrace_scb_init(libtrace_scb_t *buf, uint32_t size,
         }
 
         snprintf(anonname, 32, "lt_scb_%u", id);
+#ifdef HAVE_MEMFD_CREATE
         buf->fd = syscall(__NR_memfd_create, anonname, 0);
+#else
+        buf->fd = shm_open(anonname, O_RDWR | O_CREAT, 0600);
+#endif
         ftruncate(buf->fd, size);
 
         buf->address = mmap(NULL, 2 * size, PROT_NONE,
@@ -35,7 +41,10 @@ DLLEXPORT void libtrace_scb_init(libtrace_scb_t *buf, uint32_t size,
 }
 
 DLLEXPORT void libtrace_scb_destroy(libtrace_scb_t *buf) {
+        /* TODO shm_unlink the file name if we used shm_open? */
+
         munmap(buf->address, buf->count_bytes * 2);
+        close(buf->fd);
 }
 
 DLLEXPORT int libtrace_scb_recv_sock(libtrace_scb_t *buf, int sock,

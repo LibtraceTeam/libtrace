@@ -553,6 +553,19 @@ else
 fi
 
 
+have_memfd_create=no
+AC_RUN_IFELSE([AC_LANG_PROGRAM([
+#include <sys/syscall.h>
+],[
+#ifndef __NR_memfd_create
+exit(1)
+#endif
+])], [have_memfd_create=yes])
+
+if test "$have_memfd_create" = "yes"; then
+        AC_DEFINE(HAVE_MEMFD_CREATE, 1, [Set to 1 if kernel supports memfd_create syscall])
+fi
+
 # Stupid AC_SEARCH_LIB appends stuff to LIBS even when I don't want it to, so
 # just set libs to null here to avoid linking against them by default
 LIBS=
