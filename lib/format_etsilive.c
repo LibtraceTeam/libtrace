@@ -490,7 +490,7 @@ static inline void inspect_next_packet(etsisocket_t *sock,
         }
 }
 
-static etsisocket_t *select_next_packet(etsithread_t *et, libtrace_t *libtrace) {
+static etsisocket_t *select_next_packet(etsithread_t *et) {
 
         int i;
         etsisocket_t *esock = NULL;
@@ -503,7 +503,8 @@ static etsisocket_t *select_next_packet(etsithread_t *et, libtrace_t *libtrace) 
         return esock;
 }
 
-static int etsilive_prepare_received(libtrace_t *libtrace, etsithread_t *et,
+static int etsilive_prepare_received(libtrace_t *libtrace,
+                etsithread_t *et UNUSED,
                 etsisocket_t *esock, libtrace_packet_t *packet) {
 
         uint32_t available = 0;
@@ -556,8 +557,7 @@ static int etsilive_read_packet(libtrace_t *libtrace,
                         return ret;
                 }
 
-                nextavail = select_next_packet(&(FORMAT_DATA->receivers[0]),
-                                libtrace);
+                nextavail = select_next_packet(&(FORMAT_DATA->receivers[0]));
                 if (nextavail == NULL) {
                         /* No complete packets available, take a short
                          * break before trying again. */
@@ -601,7 +601,7 @@ static int etsilive_get_pdu_length(const libtrace_packet_t *packet) {
         return reclen;
 }
 
-static int etsilive_get_framing_length(const libtrace_packet_t *packet) {
+static int etsilive_get_framing_length(const libtrace_packet_t *packet UNUSED) {
 
         return 0;
 }
@@ -624,7 +624,7 @@ static struct timeval etsilive_get_timeval(const libtrace_packet_t *packet) {
 }
 
 static libtrace_linktype_t etsilive_get_link_type(
-                const libtrace_packet_t *packet) {
+                const libtrace_packet_t *packet UNUSED) {
         return TRACE_TYPE_ETSILI;
 }
 
@@ -691,8 +691,7 @@ void etsilive_constructor(void) {
 static int send_etsili_keepalive_response(int fd, int64_t seqno) {
 
         wandder_encoder_t *encoder;
-        uint8_t *tosend;
-        uint32_t tosendlen;
+        wandder_encoded_result_t *tosend;
         int ret = 0;
         uint64_t zero = 0;
         struct timeval tv;
@@ -752,15 +751,16 @@ static int send_etsili_keepalive_response(int fd, int64_t seqno) {
         wandder_encode_endseq(encoder);     // End Payload
         wandder_encode_endseq(encoder);     // End Outermost Sequence
 
-        tosend = wandder_encode_finish(encoder, &tosendlen);
+        tosend = wandder_encode_finish(encoder);
 
         if (tosend != NULL) {
                 /* Will block, but hopefully we shouldn't be doing much
                  * sending.
                  */
-                ret = send(fd, tosend, tosendlen, 0);
+                ret = send(fd, tosend->encoded, tosend->len, 0);
         }
 
+        wandder_release_encoded_result(encoder, tosend);
         free_wandder_encoder(encoder);
         return ret;
 }
