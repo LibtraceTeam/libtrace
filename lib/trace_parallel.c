@@ -2004,6 +2004,7 @@ DLLEXPORT int trace_ppause(libtrace_t *libtrace)
                 return 0;
         }
 	if (!libtrace->started || libtrace->state != STATE_RUNNING) {
+		ASSERT_RET(pthread_mutex_unlock(&libtrace->libtrace_lock), == 0);
 		trace_set_err(libtrace,TRACE_ERR_BAD_STATE, "You must call trace_start() before calling trace_ppause()");
 		return -1;
 	}
