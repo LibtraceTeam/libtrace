@@ -420,16 +420,24 @@ static inline libtrace_linktype_t linuxcommon_get_link_type(uint16_t linktype)
 static inline int linuxcommon_to_packet_fanout(libtrace_t *libtrace,
                                         struct linux_per_stream_t *stream)
 {
-        int fanout_opt = ((int)FORMAT_DATA->fanout_flags << 16) |
-                         (int)FORMAT_DATA->fanout_group;
-        if (setsockopt(stream->fd, SOL_PACKET, PACKET_FANOUT,
-                        &fanout_opt, sizeof(fanout_opt)) == -1) {
-                trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
+        int fanout_opt;
+        int attempts = 0;
+        while (attempts < 5) {
+                fanout_opt = ((int)FORMAT_DATA->fanout_flags << 16) |
+                                 (int)FORMAT_DATA->fanout_group;
+
+                if (setsockopt(stream->fd, SOL_PACKET, PACKET_FANOUT,
+                                &fanout_opt, sizeof(fanout_opt)) == -1) {
+                        trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
                               "Converting the fd to a socket fanout failed %s",
                               libtrace->uridata);
-                return -1;
+                        FORMAT_DATA->fanout_group ++;
+                        attempts ++;
+                        continue;
+                }
+                return 0;
         }
-        return 0;
+        return -1;
 }
 #endif /* HAVE_NETPACKET_PACKET_H */
 

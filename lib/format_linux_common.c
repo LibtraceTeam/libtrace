@@ -49,6 +49,8 @@
 
 #include "format_linux_common.h"
 
+unsigned int rand_seedp = 0;
+
 #ifdef HAVE_NETPACKET_PACKET_H
 
 int linuxcommon_probe_filename(const char *filename)
@@ -200,7 +202,7 @@ int linuxcommon_init_input(libtrace_t *libtrace)
 	FORMAT_DATA->fanout_flags = PACKET_FANOUT_LB;
 	/* Some examples use pid for the group however that would limit a single
 	 * application to use only int/ring format, instead using rand */
-	FORMAT_DATA->fanout_group = (uint16_t) rand();
+	FORMAT_DATA->fanout_group = (uint16_t) (rand_r(&rand_seedp) % 65536);
 	return 0;
 }
 
