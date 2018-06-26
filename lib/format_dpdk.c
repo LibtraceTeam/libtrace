@@ -2158,6 +2158,7 @@ static struct libtrace_format_t dpdk = {
 	dpdk_prepare_packet,                /* prepare_packet */
 	dpdk_fin_packet,                    /* fin_packet */
 	dpdk_write_packet,                  /* write_packet */
+	NULL,                               /* flush_output */
 	dpdk_get_link_type,                 /* get_link_type */
 	dpdk_get_direction,                 /* get_direction */
 	dpdk_set_direction,                 /* set_direction */

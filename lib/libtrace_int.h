@@ -623,6 +623,13 @@ struct libtrace_format_t {
 	 * @return The number of bytes written, or -1 if an error occurs
 	 */
 	int (*write_packet)(libtrace_out_t *libtrace, libtrace_packet_t *packet);
+
+        /** Flush any buffered output for an output trace.
+         *
+         * @param libtrace      The output trace to be flushed
+         */
+        int (*flush_output)(libtrace_out_t *libtrace);
+
 	/** Returns the libtrace link type for a packet.
 	 *
 	 * @param packet 	The packet to get the link type for
