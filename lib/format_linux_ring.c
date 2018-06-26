@@ -70,6 +70,8 @@
 /* Cached page size, the page size shouldn't be changing */
 static int pagesize = 0;
 
+static pthread_mutex_t pagesize_mutex;
+
 /*
  * Try figure out the best sizes for the ring buffer. Ensure that:
  * - max(Block_size) == page_size << max_order
@@ -87,7 +89,11 @@ static void calculate_buffers(struct tpacket_req * req, int fd, char * uri,
 {
 	struct ifreq ifr;
 	unsigned max_frame = LIBTRACE_PACKET_BUFSIZE;
-	pagesize = getpagesize();
+        pthread_mutex_lock(&pagesize_mutex);
+        if (pagesize == 0) {
+        	pagesize = getpagesize();
+        }
+        pthread_mutex_unlock(&pagesize_mutex);
 
 	strcpy(ifr.ifr_name, uri);
 	/* Don't bother trying to set frame size above mtu linux will drop
@@ -834,5 +840,6 @@ static struct libtrace_format_t linuxring = {
  * formate if the user only specifies an interface */
 void linuxring_constructor(void)
 {
+        pthread_mutex_init(&pagesize_mutex, NULL);
 	register_format(&linuxring);
 }
