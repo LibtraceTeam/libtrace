@@ -495,6 +495,7 @@ static struct libtrace_format_t linuxnative = {
 	linuxnative_prepare_packet,	/* prepare_packet */
 	NULL,				/* fin_packet */
 	linuxnative_write_packet,	/* write_packet */
+	NULL,				/* flush_output */
 	linuxnative_get_link_type,	/* get_link_type */
 	linuxnative_get_direction,	/* get_direction */
 	linuxnative_set_direction,	/* set_direction */
@@ -555,6 +556,7 @@ static struct libtrace_format_t linuxnative = {
 	linuxnative_prepare_packet,	/* prepare_packet */
 	NULL,				/* fin_packet */
 	NULL,				/* write_packet */
+	NULL,				/* flush_output */
 	linuxnative_get_link_type,	/* get_link_type */
 	linuxnative_get_direction,	/* get_direction */
 	linuxnative_set_direction,	/* set_direction */

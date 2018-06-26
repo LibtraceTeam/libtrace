@@ -844,6 +844,7 @@ static struct libtrace_format_t rt = {
 	rt_prepare_packet,		/* prepare_packet */
 	NULL,   			/* fin_packet */
         NULL,                           /* write_packet */
+        NULL,                           /* flush_output */
         rt_get_link_type,	        /* get_link_type */
         NULL,  		            	/* get_direction */
         NULL,              		/* set_direction */

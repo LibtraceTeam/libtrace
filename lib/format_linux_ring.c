@@ -550,7 +550,6 @@ inline static int linuxring_read_stream(libtrace_t *libtrace,
 	}
 
 	stream->last_timestamp = packet->order;
-		
 
 	/* We just need to get prepare_packet to set all our packet pointers
 	 * appropriately */
@@ -748,6 +747,7 @@ static struct libtrace_format_t linuxring = {
 	linuxring_prepare_packet,	/* prepare_packet */
 	linuxring_fin_packet,		/* fin_packet */
 	linuxring_write_packet,		/* write_packet */
+	NULL,				/* flush_output */
 	linuxring_get_link_type,	/* get_link_type */
 	linuxring_get_direction,	/* get_direction */
 	linuxring_set_direction,	/* set_direction */
@@ -810,6 +810,7 @@ static struct libtrace_format_t linuxring = {
 	linuxring_prepare_packet,	/* prepare_packet */
 	NULL,				/* fin_packet */
 	NULL,				/* write_packet */
+	NULL,				/* flush_output */
 	linuxring_get_link_type,	/* get_link_type */
 	linuxring_get_direction,	/* get_direction */
 	linuxring_set_direction,	/* set_direction */
