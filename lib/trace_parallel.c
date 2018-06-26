@@ -1047,6 +1047,7 @@ void store_first_packet(libtrace_t *libtrace, libtrace_packet_t *packet, libtrac
         }
         ASSERT_RET(pthread_spin_unlock(&libtrace->first_packets.lock), == 0);
 
+        memset(&mesg, 0, sizeof(libtrace_message_t));
         mesg.code = MESSAGE_FIRST_PACKET;
         trace_message_reporter(libtrace, &mesg);
         trace_message_perpkts(libtrace, &mesg);
@@ -1194,6 +1195,7 @@ static void* keepalive_entry(void *data) {
 	ASSERT_RET(pthread_mutex_unlock(&trace->libtrace_lock), == 0);
 
 	gettimeofday(&prev, NULL);
+        memset(&message, 0, sizeof(libtrace_message_t));
 	message.code = MESSAGE_TICK_INTERVAL;
 
 	while (trace->state != STATE_FINISHED) {
