@@ -815,6 +815,16 @@ DLLEXPORT void trace_destroy_output(libtrace_out_t *libtrace)
 	free(libtrace);
 }
 
+DLLEXPORT int trace_flush_output(libtrace_out_t *libtrace) {
+        if (!libtrace) {
+                return -1;
+        }
+        if (libtrace->format && libtrace->format->flush_output) {
+                return libtrace->format->flush_output(libtrace);
+        }
+        return 0;
+}
+
 DLLEXPORT libtrace_packet_t *trace_create_packet(void)
 {
 	libtrace_packet_t *packet =

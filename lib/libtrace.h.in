@@ -1536,6 +1536,11 @@ DLLEXPORT void trace_destroy_dead(libtrace_t *trace);
  */
 DLLEXPORT void trace_destroy_output(libtrace_out_t *trace);
 
+/** Flush an output trace, forcing any buffered packets to be written
+ * @param libtrace      The output trace to be flushed
+ */
+DLLEXPORT int trace_flush_output(libtrace_out_t *libtrace);
+
 /** Check (and clear) the current error state of an input trace
  * @param trace		The input trace to check the error state on
  * @return The current error status and message

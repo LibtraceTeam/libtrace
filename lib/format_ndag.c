@@ -1433,6 +1433,7 @@ static struct libtrace_format_t ndag = {
         ndag_prepare_packet,    /* prepare_packet */
         NULL,                   /* fin_packet */
         NULL,                   /* write_packet */
+        NULL,                   /* flush_output */
         erf_get_link_type,      /* get_link_type */
         erf_get_direction,      /* get_direction */
         erf_set_direction,      /* set_direction */
