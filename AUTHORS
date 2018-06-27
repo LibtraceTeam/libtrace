@@ -35,6 +35,7 @@ In no particular order, we would like to recognise:
  * Robert Zeh for resolving some wandio errors that were causing crashes
  * Anthony Coddington for adding ERF provenance support and fixing a number
    of other ERF/DAG issues
+ * Tim Dawson for fixing issues with building against musl libc
  * Hendrik Leppelsack for reporting and fixing some errors in the tool manpages
  * Jamie Curtis for fixing a couple of bugs many many years ago
  * Brendon Jones for creating the original Windows DLLs and writing bits of
