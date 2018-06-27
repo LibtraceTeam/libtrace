@@ -9,10 +9,11 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <sys/socket.h>
+#include <errno.h>
 
 #include "simple_circular_buffer.h"
 
-DLLEXPORT void libtrace_scb_init(libtrace_scb_t *buf, uint32_t size,
+DLLEXPORT int libtrace_scb_init(libtrace_scb_t *buf, uint32_t size,
                 uint16_t id) {
 
         char anonname[32];
@@ -27,30 +28,48 @@ DLLEXPORT void libtrace_scb_init(libtrace_scb_t *buf, uint32_t size,
 #else
         buf->fd = shm_open(anonname, O_RDWR | O_CREAT, 0600);
 #endif
-        ftruncate(buf->fd, size);
-
-        buf->address = mmap(NULL, 2 * size, PROT_NONE,
-                        MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-        mmap(buf->address, size, PROT_READ | PROT_WRITE,
-                        MAP_SHARED | MAP_FIXED, buf->fd, 0);
-        mmap(buf->address + size, size, PROT_READ | PROT_WRITE,
-                        MAP_SHARED | MAP_FIXED, buf->fd, 0);
+        if (ftruncate(buf->fd, size) < 0) {
+                perror("ftruncate in libtrace_scb_init");
+                close(buf->fd);
+                buf->fd = -1;
+                buf->address = NULL;
+        } else {
+                buf->address = mmap(NULL, 2 * size, PROT_NONE,
+                                MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+                mmap(buf->address, size, PROT_READ | PROT_WRITE,
+                                MAP_SHARED | MAP_FIXED, buf->fd, 0);
+                mmap(buf->address + size, size, PROT_READ | PROT_WRITE,
+                                MAP_SHARED | MAP_FIXED, buf->fd, 0);
+        }
         buf->read_offset = 0;
         buf->write_offset = 0;
         buf->count_bytes = size;
+
+        if (buf->address) {
+                return 0;
+        }
+        return -1;
 }
 
 DLLEXPORT void libtrace_scb_destroy(libtrace_scb_t *buf) {
         /* TODO shm_unlink the file name if we used shm_open? */
 
-        munmap(buf->address, buf->count_bytes * 2);
-        close(buf->fd);
+        if (buf->address) {
+                munmap(buf->address, buf->count_bytes * 2);
+        }
+        if (buf->fd != -1) {
+                close(buf->fd);
+        }
 }
 
 DLLEXPORT int libtrace_scb_recv_sock(libtrace_scb_t *buf, int sock,
                 int recvflags) {
         int space = buf->count_bytes - (buf->write_offset - buf->read_offset);
         int ret;
+
+        if (buf->address == NULL) {
+                return -1;
+        }
 
         if (space == 0) {
                 return buf->count_bytes;
@@ -67,6 +86,9 @@ DLLEXPORT int libtrace_scb_recv_sock(libtrace_scb_t *buf, int sock,
 DLLEXPORT uint8_t *libtrace_scb_get_read(libtrace_scb_t *buf,
                 uint32_t *available) {
 
+        if (buf->address == NULL) {
+                return NULL;
+        }
         *available = buf->write_offset - buf->read_offset;
         return buf->address + buf->read_offset;
 }

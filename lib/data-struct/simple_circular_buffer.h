@@ -12,7 +12,7 @@ typedef struct libtracescb {
 } libtrace_scb_t;
 
 
-DLLEXPORT void libtrace_scb_init(libtrace_scb_t *buf, uint32_t size,
+DLLEXPORT int libtrace_scb_init(libtrace_scb_t *buf, uint32_t size,
                 uint16_t id);
 DLLEXPORT void libtrace_scb_destroy(libtrace_scb_t *buf);
 DLLEXPORT int libtrace_scb_recv_sock(libtrace_scb_t *buf, int sock,
