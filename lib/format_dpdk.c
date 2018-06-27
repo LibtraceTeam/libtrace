@@ -56,7 +56,7 @@
 #include <string.h>
 #include <math.h>
 
-#if HAVE_LIBNUMA
+#ifdef HAVE_LIBNUMA
 #include <numa.h>
 #endif
 
@@ -459,7 +459,7 @@ static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_
 		return -1;
 	}
 
-#if HAVE_LIBNUMA
+#ifdef HAVE_LIBNUMA
 	format_data->nic_numa_node = pci_to_numa(&use_addr);
 	if (my_cpu < 0) {
 #if DEBUG
@@ -890,7 +890,7 @@ static int dpdk_reserve_lcore(bool real, int socket) {
 	 * in this case physical cores on the system will not exist so we don't bind
 	 * these to any particular physical core */
 	if (real) {
-#if HAVE_LIBNUMA
+#ifdef HAVE_LIBNUMA
 		for (i = 0; i < RTE_MAX_LCORE; ++i) {
 			if (!rte_lcore_is_enabled(i) && numa_node_of_cpu(i) == socket) {
 				new_id = i;
