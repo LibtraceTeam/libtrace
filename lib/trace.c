@@ -106,10 +106,15 @@ int libtrace_parallel = 0;
 /* strncpy is not assured to copy the final \0, so we
  * will use our own one that does
  */
-static void xstrncpy(char *dest, const char *src, size_t n)
+static inline void xstrncpy(char *dest, const char *src, size_t n,
+                size_t destlen)
 {
-        strncpy(dest,src,n);
-        dest[n]='\0';
+        size_t slen = destlen - 1;
+        if (n < slen) {
+                slen = n;
+        }
+        strncpy(dest,src,slen);
+        dest[slen]='\0';
 }
 
 static char *xstrndup(const char *src,size_t n)
@@ -119,7 +124,7 @@ static char *xstrndup(const char *src,size_t n)
 		fprintf(stderr,"Out of memory");
 		exit(EXIT_FAILURE);
 	}
-        xstrncpy(ret,src,n);
+        xstrncpy(ret,src,n,n+1);
         return ret;
 }
 
@@ -370,9 +375,9 @@ DLLEXPORT libtrace_t * trace_create_dead (const char *uri) {
 	libtrace->err.err_num = TRACE_ERR_NOERROR;
 
 	if((uridata = strchr(uri,':')) == NULL) {
-		xstrncpy(scan, uri, strlen(uri));
+		xstrncpy(scan, uri, strlen(uri), URI_PROTO_LINE);
 	} else {
-		xstrncpy(scan,uri, (size_t)(uridata - uri));
+		xstrncpy(scan,uri, (size_t)(uridata - uri), URI_PROTO_LINE);
 	}
 
 	libtrace->err.err_num = TRACE_ERR_NOERROR;

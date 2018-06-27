@@ -66,7 +66,7 @@ static char *ts_to_date(double ts)
 static char *duration(double ts)
 {
 	static char ret[1024];
-	char tmp[1024];
+	char tmp[128];
 	ret[0]='\0';
 	if (ts == 0) 
 		return "0 seconds";

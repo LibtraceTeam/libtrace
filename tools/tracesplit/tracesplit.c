@@ -60,8 +60,9 @@ char *output_base = NULL;
 
 static char *strdupcat(char *str,char *app)
 {
-	str=realloc(str,strlen(str)+strlen(app)+1);
-	strncat(str,app,strlen(str) + strlen(app));
+        int newsize = strlen(str)+strlen(app)+1;
+	str=realloc(str,newsize);
+	strncat(str,app,newsize - strlen(str) - 1);
 	return str;
 }
 

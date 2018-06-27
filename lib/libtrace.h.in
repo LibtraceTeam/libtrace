@@ -276,7 +276,7 @@ typedef enum {
 /** Libtrace error information */
 typedef struct trace_err_t{
 	int err_num; 		/**< error code */
-	char problem[255];	/**< the format, uri etc that caused the error for reporting purposes */
+	char problem[1024];	/**< the format, uri etc that caused the error for reporting purposes */
 } libtrace_err_t;
 
 /** Enumeration of error codes */

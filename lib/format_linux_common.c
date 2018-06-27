@@ -86,7 +86,7 @@ static int linuxnative_configure_bpf(libtrace_t *libtrace,
 	if (f->flag == 0) {
 		sock = socket(PF_INET, SOCK_STREAM, 0);
 		memset(&ifr, 0, sizeof(struct ifreq));
-		strncpy(ifr.ifr_name, libtrace->uridata, IF_NAMESIZE);
+		strncpy(ifr.ifr_name, libtrace->uridata, IF_NAMESIZE - 1);
 		if (ioctl(sock, SIOCGIFHWADDR, &ifr) != 0) {
 			perror("Can't get HWADDR for interface");
 			return -1;
