@@ -488,7 +488,6 @@ if test "$have_numa" = 1; then
 	AC_DEFINE(HAVE_LIBNUMA, 1, [Set to 1 if libnuma is supported])
 	with_numa=yes
 else
-	AC_DEFINE(HAVE_LIBNUMA, 0, [Set to 1 if libnuma is supported])
 	with_numa=no
 fi
 
@@ -497,7 +496,6 @@ if test "$have_wandder" = 1; then
         AC_DEFINE(HAVE_WANDDER, 1, [Set to 1 if libwandder is available])
         wandder_avail=yes
 else
-        AC_DEFINE(HAVE_WANDDER, 0, [Set to 1 if libwandder is available])
         wandder_avail=no
 fi
 
@@ -548,7 +546,6 @@ if test "$have_clock_gettime" = 1; then
 	AC_DEFINE(HAVE_CLOCK_GETTIME, 1, [Set to 1 if clock_gettime is supported])
 	with_clock_gettime=yes
 else
-	AC_DEFINE(HAVE_CLOCK_GETTIME, 0, [Set to 1 if clock_gettime is supported])
 	with_clock_gettime=no
 fi
 
