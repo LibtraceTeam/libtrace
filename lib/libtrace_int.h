@@ -98,11 +98,11 @@ extern "C" {
 #  include <zlib.h>
 #endif
 
-#ifndef HAVE_STRNDUP
+#if !HAVE_DECL_STRNDUP
 char *strndup(const char *s, size_t size);
 #endif
 
-#ifndef HAVE_STRNCASECMP
+#if !HAVE_DECL_STRNCASECMP
 # ifndef HAVE__STRNICMP
 /** A local implementation of strncasecmp (as some systems do not have it) */
 int strncasecmp(const char *str1, const char *str2, size_t n);
@@ -111,7 +111,7 @@ int strncasecmp(const char *str1, const char *str2, size_t n);
 # endif
 #endif
 
-#ifndef HAVE_SNPRINTF
+#if !HAVE_DECL_SNPRINTF
 # ifndef HAVE_SPRINTF_S
 /** A local implementation of snprintf (as some systems do not have it) */
 int snprintf(char *str, size_t size, const char *format, ...);
