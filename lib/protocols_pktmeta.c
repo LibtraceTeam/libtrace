@@ -141,7 +141,9 @@ static void *trace_get_payload_from_etsili(const void *link,
         return ccptr;
 
 #else
-        *remaining = NULL;
+	(void)link;
+	(void)type;
+        *remaining = 0;
         return NULL;
 #endif
 
