@@ -60,6 +60,8 @@
 #define TP_TRACE_START(mac, net, hdrend) \
 	((mac) > (hdrend) && (mac) < (net) ? (mac) : (net))
 
+static pthread_mutex_t pagesize_mutex;
+
 #ifdef HAVE_NETPACKET_PACKET_H
 /* Get current frame in the ring buffer*/
 #define GET_CURRENT_BUFFER(stream) \
@@ -69,8 +71,6 @@
 
 /* Cached page size, the page size shouldn't be changing */
 static int pagesize = 0;
-
-static pthread_mutex_t pagesize_mutex;
 
 /*
  * Try figure out the best sizes for the ring buffer. Ensure that:
