@@ -370,7 +370,8 @@ static int bpf_config_input(libtrace_t *libtrace,
 		case TRACE_OPTION_HASHER:
 			/* TODO investigate hashing in BSD? */
 			break;
-
+		case TRACE_OPTION_REPLAY_SPEEDUP:
+			break;
 		/* Avoid default: so that future options will cause a warning
 		 * here to remind us to implement it, or flag it as
 		 * unimplementable
@@ -615,6 +616,7 @@ static struct libtrace_format_t bpf = {
 	bpf_prepare_packet, 	/* prepare_packet */
 	NULL,			/* fin_packet */
 	NULL,			/* write_packet */
+	NULL,			/* flush_output */
 	bpf_get_link_type,	/* get_link_type */
 	bpf_get_direction,	/* get_direction */
 	NULL,			/* set_direction */
