@@ -590,8 +590,7 @@ static int pcapng_read_interface(libtrace_t *libtrace,
                         DATA(libtrace)->interfaces,
                         DATA(libtrace)->allocatedinterfaces * sizeof(
                                 pcapng_interface_t *));
-
-                /* Could memset the new memory to zero, if required */
+                memset(&DATA(libtrace)->interfaces[DATA(libtrace)->nextintid], 0, sizeof(void *) * 10);
         }
 
         DATA(libtrace)->interfaces[newint->id] = newint;
