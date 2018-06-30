@@ -689,9 +689,7 @@ static void* perpkt_threads_entry(void *data) {
 			}
 			if (!trace->pread) {
 				assert(packets[0]);
-				ASSERT_RET(pthread_mutex_lock(&trace->libtrace_lock), == 0);
 				nb_packets = trace_read_packet(trace, packets[0]);
-				ASSERT_RET(pthread_mutex_unlock(&trace->libtrace_lock), == 0);
 				packets[0]->error = nb_packets;
 				if (nb_packets > 0)
 					nb_packets = 1;
