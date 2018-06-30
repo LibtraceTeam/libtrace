@@ -453,7 +453,7 @@ static int pcapng_read_section(libtrace_t *libtrace,
                 return 0;
         }
 
-        if (err < (int)(sizeof(sechdr))) {
+        if (err < (int)(sizeof(pcapng_sec_t))) {
                 trace_set_err(libtrace, TRACE_ERR_BAD_PACKET,
                         "Incomplete pcapng section header block");
                 return -1;
@@ -528,7 +528,7 @@ static int pcapng_read_interface(libtrace_t *libtrace,
                 return 0;
         }
 
-        if (err < (int)sizeof(inthdr)) {
+        if (err < (int)sizeof(pcapng_int_t)) {
                 trace_set_err(libtrace, TRACE_ERR_BAD_PACKET,
                         "Incomplete pcapng interface header block");
                 return -1;
