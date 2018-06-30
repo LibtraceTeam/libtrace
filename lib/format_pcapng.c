@@ -172,6 +172,8 @@ struct pcapng_peeker {
         uint32_t blocklen;
 };
 
+typedef struct pcapng_peeker pcapng_hdr_t;
+
 
 #define DATA(x) ((struct pcapng_format_data_t *)((x)->format_data))
 
@@ -286,12 +288,31 @@ static int pcapng_fin_input(libtrace_t *libtrace) {
 }
 
 static char *pcapng_parse_next_option(libtrace_t *libtrace, char **pktbuf,
-                uint16_t *code, uint16_t *length) {
+                uint16_t *code, uint16_t *length, pcapng_hdr_t *blockhdr) {
 
         struct pcapng_optheader *opthdr = (struct pcapng_optheader *)*pktbuf;
         int to_skip;
         int padding = 0;
+        char *eob; //end of block
         char *optval;
+        if (DATA(libtrace)->byteswapped) {
+                eob = ((char *) blockhdr) + byteswap32(blockhdr->blocklen);
+        } else {
+                eob = ((char *) blockhdr) + blockhdr->blocklen;
+        }
+
+        assert((char *)blockhdr < *pktbuf);
+        // Check if we have reached the end of the block, +4 for trailing block-size
+        // We cannot assume a endofopt, so we add one
+        if (eob == (*pktbuf) + 4) {
+                *code = 0;
+                *length = 0;
+                return *pktbuf;
+        }
+        // If there is not enough space for another header we've encountered an error
+        if (eob < (*pktbuf) + 4 + sizeof(struct pcapng_optheader)) {
+                return NULL;
+        }
 
         if (DATA(libtrace)->byteswapped) {
                 *code = byteswap16(opthdr->optcode);
@@ -310,6 +331,10 @@ static char *pcapng_parse_next_option(libtrace_t *libtrace, char **pktbuf,
         }
 
         to_skip = (*length) + padding;
+        // Check the value we return is within the block length
+        if (eob < optval + to_skip + 4) {
+                return NULL;
+        }
         *pktbuf = optval + to_skip;
 
         return optval;
@@ -587,7 +612,7 @@ static int pcapng_read_interface(libtrace_t *libtrace,
 
         do {
                 optval = pcapng_parse_next_option(libtrace, &bodyptr,
-                                &optcode, &optlen);
+                                &optcode, &optlen, (pcapng_hdr_t *) packet->buffer);
                 if (optval == NULL) {
                         trace_set_err(libtrace, TRACE_ERR_BAD_PACKET,
                                 "Failed to read options for pcapng interface");
@@ -798,7 +823,7 @@ static int pcapng_read_stats(libtrace_t *libtrace, libtrace_packet_t *packet,
 
         do {
                 optval = pcapng_parse_next_option(packet->trace, &bodyptr,
-                                &optcode, &optlen);
+                                &optcode, &optlen, (pcapng_hdr_t *) packet->buffer);
                 if (optval == NULL) {
                         trace_set_err(libtrace, TRACE_ERR_BAD_PACKET,
                                 "Failed to read options for pcapng enhanced packet");
@@ -991,7 +1016,7 @@ static int pcapng_read_enhanced(libtrace_t *libtrace, libtrace_packet_t *packet,
 
         do {
                 optval = pcapng_parse_next_option(packet->trace, &bodyptr,
-                                &optcode, &optlen);
+                                &optcode, &optlen, (pcapng_hdr_t *) packet->buffer);
                 if (optval == NULL) {
                         trace_set_err(libtrace, TRACE_ERR_BAD_PACKET,
                                 "Failed to read options for pcapng enhanced packet");
@@ -1054,8 +1079,18 @@ static int pcapng_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 
                 if (DATA(libtrace)->byteswapped) {
                         btype = byteswap32(peeker.blocktype);
+                        to_read = byteswap32(peeker.blocklen);
                 } else {
                         btype = peeker.blocktype;
+                        to_read = peeker.blocklen;
+                }
+
+                // Check we won't read off the end of the packet buffer. Assuming corruption.
+                // Exclude the SECTION header, as this is used to identify the byteorder
+                if (to_read > LIBTRACE_PACKET_BUFSIZE && btype != PCAPNG_SECTION_TYPE) {
+                        trace_set_err(libtrace, TRACE_ERR_BAD_PACKET,
+                                      "Oversized pcapng block found, is the trace corrupted?");
+                        return -1;
                 }
 
                 switch (btype) {
@@ -1105,11 +1140,6 @@ static int pcapng_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 
                         /* Everything else -- don't care, skip it */
                         default:
-                                if (DATA(libtrace)->byteswapped) {
-                                        to_read = byteswap32(peeker.blocklen);
-                                } else {
-                                        to_read = peeker.blocklen;
-                                }
                                 err = skip_block(libtrace, to_read);
                                 break;
                 }
