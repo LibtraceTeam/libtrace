@@ -729,7 +729,7 @@ static int pcapng_read_custom(libtrace_t *libtrace, libtrace_packet_t *packet,
                         byteswap32(hdr->blocktype) == PCAPNG_CUSTOM_NONCOPY_TYPE);
                 to_read = byteswap32(hdr->blocklen) - sizeof(pcapng_custom_t);
         } else {
-                assert(hdr->blocktype == PCAPNG_NAME_RESOLUTION_TYPE ||
+                assert(hdr->blocktype == PCAPNG_CUSTOM_TYPE ||
                         hdr->blocktype == PCAPNG_CUSTOM_NONCOPY_TYPE);
                 to_read = hdr->blocklen - sizeof(pcapng_custom_t);
         }
@@ -826,7 +826,7 @@ static int pcapng_read_stats(libtrace_t *libtrace, libtrace_packet_t *packet,
                                 &optcode, &optlen, (pcapng_hdr_t *) packet->buffer);
                 if (optval == NULL) {
                         trace_set_err(libtrace, TRACE_ERR_BAD_PACKET,
-                                "Failed to read options for pcapng enhanced packet");
+                                "Failed to read options for pcapng interface stats");
                         return -1;
                 }
 
@@ -1077,6 +1077,7 @@ static int pcapng_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
                         return -1;
                 }
 
+                // Warning: the byteorder might not be set yet, the section header sets this
                 if (DATA(libtrace)->byteswapped) {
                         btype = byteswap32(peeker.blocktype);
                         to_read = byteswap32(peeker.blocklen);
