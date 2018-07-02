@@ -23,7 +23,8 @@
  *
  *
  */
-#ifndef HAVE_STRNDUP
+#include "config.h"
+#if !HAVE_DECL_STRNDUP
 
 #include <stdlib.h>
 #include <errno.h>
