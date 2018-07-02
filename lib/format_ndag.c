@@ -93,7 +93,7 @@ typedef struct streamsock {
         int bufavail;
 	int bufwaiting;
 
-#if HAVE_RECVMMSG
+#if HAVE_DECL_RECVMMSG
         struct mmsghdr mmsgbufs[RECV_BATCH_SIZE];
 #else
 	struct msghdr singlemsg;
@@ -531,7 +531,7 @@ static void halt_ndag_receiver(recvstream_t *receiver) {
                         free(src.saved);
                 }
 
-#if HAVE_RECVMMSG
+#if HAVE_DECL_RECVMMSG
                 for (j = 0; j < RECV_BATCH_SIZE; j++) {
                         if (src.mmsgbufs[j].msg_hdr.msg_iov) {
                                 free(src.mmsgbufs[j].msg_hdr.msg_iov);
@@ -748,7 +748,7 @@ static int add_new_streamsock(recvstream_t *rt, streamsource_t src) {
                 ssock->savedsize[i] = 0;
         }
 
-#if HAVE_RECVMMSG
+#if HAVE_DECL_RECVMMSG
         for (i = 0; i < RECV_BATCH_SIZE; i++) {
                 ssock->mmsgbufs[i].msg_hdr.msg_iov = (struct iovec *)
                                 malloc(sizeof(struct iovec));
@@ -833,7 +833,7 @@ static int init_receivers(streamsock_t *ssock, int required) {
         int wind = ssock->nextwriteind;
         int i = 1;
 
-#if HAVE_RECVMMSG
+#if HAVE_DECL_RECVMMSG
         for (i = 0; i < required; i++) {
                 if (i >= RECV_BATCH_SIZE) {
                         break;
@@ -936,13 +936,13 @@ static int receive_from_single_socket(streamsock_t *ssock, struct timeval *tv,
         int ret, ndagstat, avail;
         int toret = 0;
 
-#if HAVE_RECVMMSG
+#if HAVE_DECL_RECVMMSG
 	int i;
 #endif
 
         avail = init_receivers(ssock, ssock->bufavail);
 
-#if HAVE_RECVMMSG
+#if HAVE_DECL_RECVMMSG
         ret = recvmmsg(ssock->sock, ssock->mmsgbufs, avail,
                         MSG_DONTWAIT, NULL);
 #else
@@ -984,7 +984,7 @@ static int receive_from_single_socket(streamsock_t *ssock, struct timeval *tv,
 
         ssock->startidle = 0;
 
-#if HAVE_RECVMMSG
+#if HAVE_DECL_RECVMMSG
         for (i = 0; i < ret; i++) {
                 ndagstat = check_ndag_received(ssock, ssock->nextwriteind,
                                 ssock->mmsgbufs[i].msg_len, rt);
@@ -1033,7 +1033,7 @@ static int receive_from_sockets(recvstream_t *rt) {
                         continue;
                 }
 
-#if HAVE_RECVMMSG
+#if HAVE_DECL_RECVMMSG
                 /* Plenty of full buffers, just use the packets in those */
                 if (rt->sources[i].bufavail < RECV_BATCH_SIZE / 2) {
                         readybufs ++;
