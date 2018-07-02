@@ -46,7 +46,8 @@
  */
 static char *format_hrd(const struct arphdr *arp, const char *hrd) {
 	static char buffer[1024] = {0,};
-	int i;
+	int i, ret;
+        size_t bufused;
 
 	if (!hrd) {
 		strncpy(buffer, "(Truncated)", sizeof(buffer));
@@ -58,9 +59,18 @@ static char *format_hrd(const struct arphdr *arp, const char *hrd) {
 			trace_ether_ntoa((const unsigned char *)hrd, buffer);
 			break;
 		default:
+                        bufused = 0;
 			for (i=0;i<arp->ar_hln;i++) {
-				snprintf(buffer,sizeof(buffer),"%s %02x",
-						buffer,(unsigned char)hrd[i]);
+                                if (bufused >= sizeof(buffer)) {
+                                        break;
+                                }
+                                ret = snprintf(buffer + bufused,
+                                                sizeof(buffer) - bufused,
+                                                "%02x ",
+                                                (unsigned char)hrd[i]);
+                                if (ret > 0) {
+                                        bufused += ret;
+                                }
 			}
 			break;
 	}
@@ -76,7 +86,8 @@ static char *format_hrd(const struct arphdr *arp, const char *hrd) {
  */
 static char *format_pro(const struct arphdr *arp, const char *pro) {
 	static char buffer[1024] = {0,};
-	int i;
+	int i, ret;
+        size_t bufused;
 	
 	if (!pro) {
 		strncpy(buffer, "(Truncated)", sizeof(buffer));
@@ -90,11 +101,24 @@ static char *format_pro(const struct arphdr *arp, const char *pro) {
 			break;
 		default:
 			snprintf(buffer, sizeof(buffer), "%s", " (");
+                        bufused = 2;
 			for (i=0;i<arp->ar_pln;i++) {
-				snprintf(buffer,sizeof(buffer),"%s %02x",
-						buffer,(unsigned char)pro[i]);
+                                if (bufused >= sizeof(buffer)) {
+                                        break;
+                                }
+                                ret = snprintf(buffer + bufused,
+                                                sizeof(buffer) - bufused,
+                                                "%02x ",
+                                                (unsigned char)pro[i]);
+                                if (ret > 0) {
+                                        bufused += ret;
+                                }
 			}
-			strncat(buffer,")",sizeof(buffer) - strlen(buffer) - 1);
+                        if (bufused < sizeof(buffer)) {
+                                snprintf(buffer + bufused,
+                                                sizeof(buffer) - bufused,
+                                                ")");
+                        }
 			break;
 	}
 	return buffer;

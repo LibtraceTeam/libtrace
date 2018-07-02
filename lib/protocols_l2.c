@@ -482,6 +482,7 @@ DLLEXPORT void *trace_get_layer2(const libtrace_packet_t *packet,
 		case TRACE_TYPE_80211_PRISM:
 		case TRACE_TYPE_PFLOG:
 		case TRACE_TYPE_ERF_META:
+                case TRACE_TYPE_ETSILI:
 			break;
 		case TRACE_TYPE_UNKNOWN:
 			return NULL;
@@ -518,6 +519,7 @@ DLLEXPORT void *trace_get_layer2(const libtrace_packet_t *packet,
 				case TRACE_TYPE_80211_PRISM:
 				case TRACE_TYPE_PFLOG:
 				case TRACE_TYPE_ERF_META:
+                                case TRACE_TYPE_ETSILI:
 					break;
 				case TRACE_TYPE_UNKNOWN:
 					return NULL;
@@ -573,6 +575,7 @@ DLLEXPORT void *trace_get_payload_from_layer2(void *link,
 		case TRACE_TYPE_80211_RADIO:
 		case TRACE_TYPE_PFLOG:
 		case TRACE_TYPE_LINUX_SLL:
+                case TRACE_TYPE_ETSILI:
 			return NULL;
 
 		/* duck packets have no payload! */
@@ -695,6 +698,7 @@ DLLEXPORT uint8_t *trace_get_source_mac(libtrace_packet_t *packet) {
                 case TRACE_TYPE_LINUX_SLL:
                 case TRACE_TYPE_80211_PRISM:
                 case TRACE_TYPE_80211_RADIO:
+                case TRACE_TYPE_ETSILI:
                         assert(!"Metadata headers should already be skipped");
                         break;
         }
@@ -745,6 +749,7 @@ DLLEXPORT uint8_t *trace_get_destination_mac(libtrace_packet_t *packet)
                 case TRACE_TYPE_LINUX_SLL:
                 case TRACE_TYPE_80211_PRISM:
                 case TRACE_TYPE_80211_RADIO:
+                case TRACE_TYPE_ETSILI:
                         assert(!"Metadata headers should already be skipped");
                         break;
         }

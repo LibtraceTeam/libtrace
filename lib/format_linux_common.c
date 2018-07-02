@@ -49,6 +49,8 @@
 
 #include "format_linux_common.h"
 
+unsigned int rand_seedp = 0;
+
 #ifdef HAVE_NETPACKET_PACKET_H
 
 int linuxcommon_probe_filename(const char *filename)
@@ -84,7 +86,7 @@ static int linuxnative_configure_bpf(libtrace_t *libtrace,
 	if (f->flag == 0) {
 		sock = socket(PF_INET, SOCK_STREAM, 0);
 		memset(&ifr, 0, sizeof(struct ifreq));
-		strncpy(ifr.ifr_name, libtrace->uridata, IF_NAMESIZE);
+		strncpy(ifr.ifr_name, libtrace->uridata, IF_NAMESIZE - 1);
 		if (ioctl(sock, SIOCGIFHWADDR, &ifr) != 0) {
 			perror("Can't get HWADDR for interface");
 			return -1;
@@ -163,6 +165,8 @@ int linuxcommon_config_input(libtrace_t *libtrace,
 		case TRACE_OPTION_EVENT_REALTIME:
 			/* Live captures are always going to be in trace time */
 			break;
+                case TRACE_OPTION_REPLAY_SPEEDUP:
+                        break;
 		/* Avoid default: so that future options will cause a warning
 		 * here to remind us to implement it, or flag it as
 		 * unimplementable
@@ -198,7 +202,7 @@ int linuxcommon_init_input(libtrace_t *libtrace)
 	FORMAT_DATA->fanout_flags = PACKET_FANOUT_LB;
 	/* Some examples use pid for the group however that would limit a single
 	 * application to use only int/ring format, instead using rand */
-	FORMAT_DATA->fanout_group = (uint16_t) rand();
+	FORMAT_DATA->fanout_group = (uint16_t) (rand_r(&rand_seedp) % 65536);
 	return 0;
 }
 

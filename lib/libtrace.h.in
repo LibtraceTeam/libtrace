@@ -276,7 +276,7 @@ typedef enum {
 /** Libtrace error information */
 typedef struct trace_err_t{
 	int err_num; 		/**< error code */
-	char problem[255];	/**< the format, uri etc that caused the error for reporting purposes */
+	char problem[1024];	/**< the format, uri etc that caused the error for reporting purposes */
 } libtrace_err_t;
 
 /** Enumeration of error codes */
@@ -369,7 +369,8 @@ typedef enum {
        TRACE_TYPE_METADATA = 18,     	/**< WDCAP-style meta-data */
        TRACE_TYPE_NONDATA = 19,		/**< Not a data packet */
        TRACE_TYPE_OPENBSD_LOOP = 20,	/**< OpenBSD loopback */
-       TRACE_TYPE_ERF_META = 21 /**< ERF Provenance metadata record */
+       TRACE_TYPE_ERF_META = 21, /**< ERF Provenance metadata record */
+       TRACE_TYPE_ETSILI = 22	/**< ETSI Lawful Intercept */
 } libtrace_linktype_t;
 
 /** RT protocol base format identifiers.
@@ -397,6 +398,7 @@ enum base_format_t {
         TRACE_FORMAT_PCAPNG     =18,    /**< PCAP-NG trace file */
         TRACE_FORMAT_NDAG       =19,    /**< DAG multicast over a network */
         TRACE_FORMAT_DPDK_NDAG       =20,    /**< DAG multicast over a network, received via DPDK */
+        TRACE_FORMAT_ETSILIVE     =21,  /**< ETSI LI over a network */
 };
 
 /** RT protocol packet types */
@@ -451,6 +453,8 @@ typedef enum {
 	TRACE_RT_DATA_LINUX_RING=TRACE_RT_DATA_SIMPLE+TRACE_FORMAT_LINUX_RING,
     /** RT is encapsulating a Intel DPDK capture record */
 	TRACE_RT_DATA_DPDK=TRACE_RT_DATA_SIMPLE+TRACE_FORMAT_DPDK,
+
+        TRACE_RT_DATA_ETSILI = TRACE_RT_DATA_SIMPLE + TRACE_FORMAT_ETSILIVE,
 
 	/** As PCAP does not store the linktype with the packet, we need to 
 	 * create a separate RT type for each supported DLT, starting from
@@ -559,6 +563,10 @@ typedef struct libtrace_packet_t {
 	int error; /**< The error status of pread_packet */
         uint64_t internalid;            /** Internal identifier for the pkt */
         void *srcbucket;
+
+        pthread_mutex_t ref_lock;       /**< Lock for reference counter */
+        int refcount;                 /**< Reference counter */
+
 } libtrace_packet_t;
 
 #define IS_LIBTRACE_META_PACKET(packet) (packet->type < TRACE_RT_DATA_SIMPLE)
@@ -1311,7 +1319,10 @@ typedef enum {
 
 	/** The hasher function for a parallel libtrace. It is recommended to
 	 * access this option via trace_set_hasher(). */
-	TRACE_OPTION_HASHER
+	TRACE_OPTION_HASHER,
+
+        /** Speed up trace file replays (via trace_event()) by this factor */
+        TRACE_OPTION_REPLAY_SPEEDUP,
 } trace_option_t;
 
 /** Sets an input config option
@@ -1524,6 +1535,11 @@ DLLEXPORT void trace_destroy_dead(libtrace_t *trace);
  * @param trace		The output trace to be destroyed
  */
 DLLEXPORT void trace_destroy_output(libtrace_out_t *trace);
+
+/** Flush an output trace, forcing any buffered packets to be written
+ * @param libtrace      The output trace to be flushed
+ */
+DLLEXPORT int trace_flush_output(libtrace_out_t *libtrace);
 
 /** Check (and clear) the current error state of an input trace
  * @param trace		The input trace to check the error state on
@@ -1773,7 +1789,6 @@ DLLEXPORT libtrace_packet_t *trace_copy_packet(const libtrace_packet_t *packet);
  *
  */
 DLLEXPORT void trace_destroy_packet(libtrace_packet_t *packet);
-
 
 /** Read the next packet from an input trace 
  *

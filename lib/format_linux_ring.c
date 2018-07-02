@@ -60,6 +60,7 @@
 #define TP_TRACE_START(mac, net, hdrend) \
 	((mac) > (hdrend) && (mac) < (net) ? (mac) : (net))
 
+static pthread_mutex_t pagesize_mutex;
 #ifdef HAVE_NETPACKET_PACKET_H
 /* Get current frame in the ring buffer*/
 #define GET_CURRENT_BUFFER(stream) \
@@ -69,6 +70,7 @@
 
 /* Cached page size, the page size shouldn't be changing */
 static int pagesize = 0;
+
 
 /*
  * Try figure out the best sizes for the ring buffer. Ensure that:
@@ -87,7 +89,11 @@ static void calculate_buffers(struct tpacket_req * req, int fd, char * uri,
 {
 	struct ifreq ifr;
 	unsigned max_frame = LIBTRACE_PACKET_BUFSIZE;
-	pagesize = getpagesize();
+        pthread_mutex_lock(&pagesize_mutex);
+        if (pagesize == 0) {
+        	pagesize = getpagesize();
+        }
+        pthread_mutex_unlock(&pagesize_mutex);
 
 	strcpy(ifr.ifr_name, uri);
 	/* Don't bother trying to set frame size above mtu linux will drop
@@ -460,8 +466,6 @@ inline static int linuxring_read_stream(libtrace_t *libtrace,
 	unsigned int snaplen;
 	struct pollfd pollset[2];
 
-	ring_release_frame(libtrace, packet);
-	
 	packet->buf_control = TRACE_CTRL_EXTERNAL;
 	packet->type = TRACE_RT_DATA_LINUX_RING;
 	
@@ -546,7 +550,6 @@ inline static int linuxring_read_stream(libtrace_t *libtrace,
 	}
 
 	stream->last_timestamp = packet->order;
-		
 
 	/* We just need to get prepare_packet to set all our packet pointers
 	 * appropriately */
@@ -744,6 +747,7 @@ static struct libtrace_format_t linuxring = {
 	linuxring_prepare_packet,	/* prepare_packet */
 	linuxring_fin_packet,		/* fin_packet */
 	linuxring_write_packet,		/* write_packet */
+	NULL,				/* flush_output */
 	linuxring_get_link_type,	/* get_link_type */
 	linuxring_get_direction,	/* get_direction */
 	linuxring_set_direction,	/* set_direction */
@@ -806,6 +810,7 @@ static struct libtrace_format_t linuxring = {
 	linuxring_prepare_packet,	/* prepare_packet */
 	NULL,				/* fin_packet */
 	NULL,				/* write_packet */
+	NULL,				/* flush_output */
 	linuxring_get_link_type,	/* get_link_type */
 	linuxring_get_direction,	/* get_direction */
 	linuxring_set_direction,	/* set_direction */
@@ -836,5 +841,6 @@ static struct libtrace_format_t linuxring = {
  * formate if the user only specifies an interface */
 void linuxring_constructor(void)
 {
+        pthread_mutex_init(&pagesize_mutex, NULL);
 	register_format(&linuxring);
 }

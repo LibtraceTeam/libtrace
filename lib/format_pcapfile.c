@@ -256,6 +256,7 @@ static int pcapfile_config_input(libtrace_t *libtrace,
 		case TRACE_OPTION_PROMISC:
 		case TRACE_OPTION_FILTER:
 		case TRACE_OPTION_HASHER:
+                case TRACE_OPTION_REPLAY_SPEEDUP:
 			/* All these are either unsupported or handled
 			 * by trace_config */
 			break;
@@ -532,6 +533,11 @@ static int pcapfile_write_packet(libtrace_out_t *out,
 	return numbytes+ret;
 }
 
+static int pcapfile_flush_output(libtrace_out_t *out) {
+
+        return wandio_wflush(DATAOUT(out)->file);
+}
+
 static libtrace_linktype_t pcapfile_get_link_type(
 		const libtrace_packet_t *packet) 
 {
@@ -694,6 +700,7 @@ static struct libtrace_format_t pcapfile = {
 	pcapfile_prepare_packet,	/* prepare_packet */
 	NULL,				/* fin_packet */
 	pcapfile_write_packet,		/* write_packet */
+        pcapfile_flush_output,          /* flush_output */
 	pcapfile_get_link_type,		/* get_link_type */
 	pcapfile_get_direction,		/* get_direction */
 	NULL,				/* set_direction */

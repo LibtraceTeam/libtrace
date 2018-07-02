@@ -106,10 +106,15 @@ int libtrace_parallel = 0;
 /* strncpy is not assured to copy the final \0, so we
  * will use our own one that does
  */
-static void xstrncpy(char *dest, const char *src, size_t n)
+static inline void xstrncpy(char *dest, const char *src, size_t n,
+                size_t destlen)
 {
-        strncpy(dest,src,n);
-        dest[n]='\0';
+        size_t slen = destlen - 1;
+        if (n < slen) {
+                slen = n;
+        }
+        strncpy(dest,src,slen);
+        dest[slen]='\0';
 }
 
 static char *xstrndup(const char *src,size_t n)
@@ -119,7 +124,7 @@ static char *xstrndup(const char *src,size_t n)
 		fprintf(stderr,"Out of memory");
 		exit(EXIT_FAILURE);
 	}
-        xstrncpy(ret,src,n);
+        xstrncpy(ret,src,n,n+1);
         return ret;
 }
 
@@ -147,6 +152,9 @@ static void trace_init(void)
 		pcapng_constructor();
                 rt_constructor();
                 ndag_constructor();
+#ifdef HAVE_WANDDER
+                etsilive_constructor();
+#endif
 #ifdef HAVE_DAG
 		dag_constructor();
 #endif
@@ -247,13 +255,14 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 	libtrace->err.err_num = TRACE_ERR_NOERROR;
 	libtrace->format=NULL;
 
-	libtrace->event.tdelta = 0.0;
 	libtrace->event.packet = NULL;
 	libtrace->event.psize = 0;
-	libtrace->event.trace_last_ts = 0.0;
+	libtrace->event.first_ts = 0.0;
+	libtrace->event.first_now = 0.0;
 	libtrace->event.waiting = false;
 	libtrace->filter = NULL;
 	libtrace->snaplen = 0;
+	libtrace->replayspeedup = 1;
 	libtrace->started=false;
 	libtrace->uridata = NULL;
 	libtrace->io = NULL;
@@ -366,18 +375,18 @@ DLLEXPORT libtrace_t * trace_create_dead (const char *uri) {
 	libtrace->err.err_num = TRACE_ERR_NOERROR;
 
 	if((uridata = strchr(uri,':')) == NULL) {
-		xstrncpy(scan, uri, strlen(uri));
+		xstrncpy(scan, uri, strlen(uri), URI_PROTO_LINE);
 	} else {
-		xstrncpy(scan,uri, (size_t)(uridata - uri));
+		xstrncpy(scan,uri, (size_t)(uridata - uri), URI_PROTO_LINE);
 	}
 
 	libtrace->err.err_num = TRACE_ERR_NOERROR;
 	libtrace->format=NULL;
 
-	libtrace->event.tdelta = 0.0;
 	libtrace->event.packet = NULL;
 	libtrace->event.psize = 0;
-	libtrace->event.trace_last_ts = 0.0;
+        libtrace->event.first_ts = 0;
+        libtrace->event.first_now = 0;
 	libtrace->filter = NULL;
 	libtrace->snaplen = 0;
 	libtrace->started=false;
@@ -591,6 +600,19 @@ DLLEXPORT int trace_config(libtrace_t *libtrace,
 	 * format did not support configuration. However, libtrace can
 	 * deal with some options itself, so give that a go */
 	switch(option) {
+                case TRACE_OPTION_REPLAY_SPEEDUP:
+			/* Clear the error if there was one */
+			if (trace_is_err(libtrace)) {
+				trace_get_err(libtrace);
+			}
+			if (*(int*)value<1
+				|| *(int*)value>LIBTRACE_MAX_REPLAY_SPEEDUP) {
+				trace_set_err(libtrace,TRACE_ERR_BAD_STATE,
+					"Invalid replay speed");
+			}
+			libtrace->replayspeedup=*(int*)value;
+			return 0;
+
 		case TRACE_OPTION_SNAPLEN:
 			/* Clear the error if there was one */
 			if (trace_is_err(libtrace)) {
@@ -723,11 +745,14 @@ DLLEXPORT void trace_destroy(libtrace_t *libtrace) {
 		// This has all of our packets
 		libtrace_ocache_destroy(&libtrace->packet_freelist);
 		for (i = 0; i < libtrace->perpkt_thread_count; ++i) {
-                        libtrace_message_queue_destroy(&libtrace->perpkt_threads[i].messages);
-                }
-                libtrace_message_queue_destroy(&libtrace->hasher_thread.messages);
-                libtrace_message_queue_destroy(&libtrace->keepalive_thread.messages);
-                libtrace_message_queue_destroy(&libtrace->reporter_thread.messages);
+			libtrace_message_queue_destroy(&libtrace->perpkt_threads[i].messages);
+		}
+		if (libtrace->hasher_thread.type == THREAD_HASHER)
+			libtrace_message_queue_destroy(&libtrace->hasher_thread.messages);
+		if (libtrace->keepalive_thread.type == THREAD_KEEPALIVE)
+			libtrace_message_queue_destroy(&libtrace->keepalive_thread.messages);
+		if (libtrace->reporter_thread.type == THREAD_REPORTER)
+			libtrace_message_queue_destroy(&libtrace->reporter_thread.messages);
 
 
 		if (libtrace->combiner.destroy && libtrace->reporter_cbs)
@@ -795,6 +820,16 @@ DLLEXPORT void trace_destroy_output(libtrace_out_t *libtrace)
 	free(libtrace);
 }
 
+DLLEXPORT int trace_flush_output(libtrace_out_t *libtrace) {
+        if (!libtrace) {
+                return -1;
+        }
+        if (libtrace->format && libtrace->format->flush_output) {
+                return libtrace->format->flush_output(libtrace);
+        }
+        return 0;
+}
+
 DLLEXPORT libtrace_packet_t *trace_create_packet(void)
 {
 	libtrace_packet_t *packet =
@@ -804,6 +839,7 @@ DLLEXPORT libtrace_packet_t *trace_create_packet(void)
                 return NULL;
 
 	packet->buf_control=TRACE_CTRL_PACKET;
+        pthread_mutex_init(&(packet->ref_lock), NULL);
 	trace_clear_cache(packet);
 	return packet;
 }
@@ -855,6 +891,7 @@ DLLEXPORT void trace_destroy_packet(libtrace_packet_t *packet) {
 	if (packet->buf_control == TRACE_CTRL_PACKET && packet->buffer) {
 		free(packet->buffer);
 	}
+        pthread_mutex_destroy(&(packet->ref_lock));
 	packet->buf_control=(buf_control_t)'\0';
 				/* A "bad" value to force an assert
 				 * if this packet is ever reused
@@ -1537,7 +1574,7 @@ DLLEXPORT int trace_apply_filter(libtrace_filter_t *filter,
 			if (!demote_packet(packet_copy)) {
 				trace_set_err(packet->trace,
 						TRACE_ERR_NO_CONVERSION,
-						"pcap does not support this format");
+						"pcap does not support this linktype so cannot apply BPF filters");
 				if (free_packet_needed) {
 					trace_destroy_packet(packet_copy);
 				}
@@ -2315,6 +2352,7 @@ void trace_clear_cache(libtrace_packet_t *packet) {
 	packet->l2_remaining = 0;
 	packet->l3_remaining = 0;
 	packet->l4_remaining = 0;
+        packet->refcount = 0;
 
 }
 

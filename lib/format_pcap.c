@@ -582,6 +582,10 @@ static int pcap_write_packet(libtrace_out_t *libtrace,
 	return remaining;
 }
 
+static int pcap_flush_output(libtrace_out_t *libtrace) {
+        return pcap_dump_flush(OUTPUT.trace.dump);
+}
+
 static int pcapint_write_packet(libtrace_out_t *libtrace,
 		libtrace_packet_t *packet) 
 {
@@ -778,6 +782,7 @@ static struct libtrace_format_t pcap = {
 	pcap_prepare_packet,		/* prepare_packet */
 	NULL,				/* fin_packet */
 	pcap_write_packet,		/* write_packet */
+        pcap_flush_output,              /* flush_output */
 	pcap_get_link_type,		/* get_link_type */
 	pcapint_get_direction,		/* get_direction */
 	pcap_set_direction,		/* set_direction */
@@ -822,6 +827,7 @@ static struct libtrace_format_t pcapint = {
 	pcap_prepare_packet,		/* prepare_packet */
 	NULL,				/* fin_packet */
 	pcapint_write_packet,		/* write_packet */
+	NULL,		                /* flush_output */
 	pcap_get_link_type,		/* get_link_type */
 	pcapint_get_direction,		/* get_direction */
 	pcap_set_direction,		/* set_direction */

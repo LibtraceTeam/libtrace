@@ -689,9 +689,7 @@ static void* perpkt_threads_entry(void *data) {
 			}
 			if (!trace->pread) {
 				assert(packets[0]);
-				ASSERT_RET(pthread_mutex_lock(&trace->libtrace_lock), == 0);
 				nb_packets = trace_read_packet(trace, packets[0]);
-				ASSERT_RET(pthread_mutex_unlock(&trace->libtrace_lock), == 0);
 				packets[0]->error = nb_packets;
 				if (nb_packets > 0)
 					nb_packets = 1;
@@ -1047,6 +1045,7 @@ void store_first_packet(libtrace_t *libtrace, libtrace_packet_t *packet, libtrac
         }
         ASSERT_RET(pthread_spin_unlock(&libtrace->first_packets.lock), == 0);
 
+        memset(&mesg, 0, sizeof(libtrace_message_t));
         mesg.code = MESSAGE_FIRST_PACKET;
         trace_message_reporter(libtrace, &mesg);
         trace_message_perpkts(libtrace, &mesg);
@@ -1194,6 +1193,7 @@ static void* keepalive_entry(void *data) {
 	ASSERT_RET(pthread_mutex_unlock(&trace->libtrace_lock), == 0);
 
 	gettimeofday(&prev, NULL);
+        memset(&message, 0, sizeof(libtrace_message_t));
 	message.code = MESSAGE_TICK_INTERVAL;
 
 	while (trace->state != STATE_FINISHED) {
@@ -1545,7 +1545,6 @@ static int trace_start_thread(libtrace_t *trace,
                        int perpkt_num,
                        const char *name) {
 #ifdef __linux__
-	pthread_attr_t attrib;
 	cpu_set_t cpus;
 	int i;
 #endif
@@ -1563,10 +1562,12 @@ static int trace_start_thread(libtrace_t *trace,
 	CPU_ZERO(&cpus);
 	for (i = 0; i < get_nb_cores(); i++)
 		CPU_SET(i, &cpus);
-	pthread_attr_init(&attrib);
-	pthread_attr_setaffinity_np(&attrib, sizeof(cpus), &cpus);
-	ret = pthread_create(&t->tid, &attrib, start_routine, (void *) trace);
-	pthread_attr_destroy(&attrib);
+
+	ret = pthread_create(&t->tid, NULL, start_routine, (void *) trace);
+	if( ret == 0 ) {
+		ret = pthread_setaffinity_np(t->tid, sizeof(cpus), &cpus);
+	}
+
 #else
 	ret = pthread_create(&t->tid, NULL, start_routine, (void *) trace);
 #endif
@@ -2003,6 +2004,7 @@ DLLEXPORT int trace_ppause(libtrace_t *libtrace)
                 return 0;
         }
 	if (!libtrace->started || libtrace->state != STATE_RUNNING) {
+		ASSERT_RET(pthread_mutex_unlock(&libtrace->libtrace_lock), == 0);
 		trace_set_err(libtrace,TRACE_ERR_BAD_STATE, "You must call trace_start() before calling trace_ppause()");
 		return -1;
 	}
@@ -2401,7 +2403,8 @@ static inline bool trace_is_configurable(libtrace_t *trace) {
 }
 
 DLLEXPORT int trace_set_perpkt_threads(libtrace_t *trace, int nb) {
-	if (!trace_is_configurable(trace)) return -1;
+	// Only supported on new traces not paused traces
+	if (trace->state != STATE_NEW) return -1;
 
 	/* TODO consider allowing an offset from the total number of cores i.e.
 	 * -1 reserve 1 core */
@@ -2599,6 +2602,27 @@ DLLEXPORT void trace_free_packet(libtrace_t *libtrace, libtrace_packet_t *packet
 	trace_fin_packet(packet);
 	libtrace_ocache_free(&libtrace->packet_freelist, (void **) &packet, 1, 1);
 }
+
+DLLEXPORT void trace_increment_packet_refcount(libtrace_packet_t *packet) {
+        pthread_mutex_lock(&(packet->ref_lock));
+        if (packet->refcount < 0) {
+                packet->refcount = 1;
+        } else {
+                packet->refcount ++;
+        }
+        pthread_mutex_unlock(&(packet->ref_lock));
+}
+
+DLLEXPORT void trace_decrement_packet_refcount(libtrace_packet_t *packet) {
+        pthread_mutex_lock(&(packet->ref_lock));
+        packet->refcount --;
+
+        if (packet->refcount <= 0) {
+                trace_free_packet(packet->trace, packet);
+        }
+        pthread_mutex_unlock(&(packet->ref_lock));
+}
+
 
 DLLEXPORT libtrace_info_t *trace_get_information(libtrace_t * libtrace) {
 	if (libtrace->format)

@@ -607,6 +607,7 @@ static int dag_config_input(libtrace_t *libtrace, trace_option_t option,
 		 * cards */
 		return -1;
 	case TRACE_OPTION_EVENT_REALTIME:
+        case TRACE_OPTION_REPLAY_SPEEDUP:
 		/* Live capture is always going to be realtime */
 		return -1;
 	case TRACE_OPTION_HASHER:
@@ -1562,6 +1563,7 @@ static struct libtrace_format_t dag = {
 	dag_prepare_packet,		/* prepare_packet */
 	NULL,                           /* fin_packet */
 	dag_write_packet,               /* write_packet */
+	NULL,                           /* flush_output */
 	erf_get_link_type,              /* get_link_type */
 	erf_get_direction,              /* get_direction */
 	erf_set_direction,              /* set_direction */

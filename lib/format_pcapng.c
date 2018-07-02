@@ -172,6 +172,8 @@ struct pcapng_peeker {
         uint32_t blocklen;
 };
 
+typedef struct pcapng_peeker pcapng_hdr_t;
+
 
 #define DATA(x) ((struct pcapng_format_data_t *)((x)->format_data))
 
@@ -259,6 +261,7 @@ static int pcapng_config_input(libtrace_t *libtrace, trace_option_t option,
                 case TRACE_OPTION_PROMISC:
                 case TRACE_OPTION_FILTER:
                 case TRACE_OPTION_HASHER:
+                case TRACE_OPTION_REPLAY_SPEEDUP:
                         break;
         }
 
@@ -285,12 +288,31 @@ static int pcapng_fin_input(libtrace_t *libtrace) {
 }
 
 static char *pcapng_parse_next_option(libtrace_t *libtrace, char **pktbuf,
-                uint16_t *code, uint16_t *length) {
+                uint16_t *code, uint16_t *length, pcapng_hdr_t *blockhdr) {
 
         struct pcapng_optheader *opthdr = (struct pcapng_optheader *)*pktbuf;
         int to_skip;
         int padding = 0;
+        char *eob; //end of block
         char *optval;
+        if (DATA(libtrace)->byteswapped) {
+                eob = ((char *) blockhdr) + byteswap32(blockhdr->blocklen);
+        } else {
+                eob = ((char *) blockhdr) + blockhdr->blocklen;
+        }
+
+        assert((char *)blockhdr < *pktbuf);
+        // Check if we have reached the end of the block, +4 for trailing block-size
+        // We cannot assume a endofopt, so we add one
+        if (eob == (*pktbuf) + 4) {
+                *code = 0;
+                *length = 0;
+                return *pktbuf;
+        }
+        // If there is not enough space for another header we've encountered an error
+        if (eob < (*pktbuf) + 4 + sizeof(struct pcapng_optheader)) {
+                return NULL;
+        }
 
         if (DATA(libtrace)->byteswapped) {
                 *code = byteswap16(opthdr->optcode);
@@ -309,38 +331,13 @@ static char *pcapng_parse_next_option(libtrace_t *libtrace, char **pktbuf,
         }
 
         to_skip = (*length) + padding;
+        // Check the value we return is within the block length
+        if (eob < optval + to_skip + 4) {
+                return NULL;
+        }
         *pktbuf = optval + to_skip;
 
         return optval;
-}
-
-static inline int skip_block(libtrace_t *libtrace, uint32_t toread) {
-        int err;
-
-        while (toread > 0) {
-                char buf[4096];
-                int nextread;
-
-                if (toread < 4096) {
-                        nextread = toread;
-                } else {
-                        nextread = 4096;
-                }
-
-                err = wandio_read(libtrace->io, buf, nextread);
-                if (err < 0) {
-                        trace_set_err(libtrace, TRACE_ERR_WANDIO_FAILED,
-                                "Reading section header options");
-                        return -1;
-                }
-                if (err == 0) {
-                        return 0;
-                }
-                toread -= err;
-        }
-
-        return 1;
-
 }
 
 static inline int pcapng_read_body(libtrace_t *libtrace, char *body,
@@ -351,7 +348,7 @@ static inline int pcapng_read_body(libtrace_t *libtrace, char *body,
         err = wandio_read(libtrace->io, body, to_read);
         if (err < 0) {
                 trace_set_err(libtrace, TRACE_ERR_WANDIO_FAILED,
-                        "Failed to read pcapng interface options");
+                        "Failed reading pcapng block");
                 return err;
         }
 
@@ -361,7 +358,7 @@ static inline int pcapng_read_body(libtrace_t *libtrace, char *body,
 
         if (err < (int)to_read) {
                 trace_set_err(libtrace, TRACE_ERR_BAD_PACKET,
-                        "Incomplete pcapng interface header block");
+                        "Incomplete pcapng block");
                 return -1;
         }
 
@@ -452,7 +449,7 @@ static int pcapng_read_section(libtrace_t *libtrace,
                 return 0;
         }
 
-        if (err < (int)(sizeof(sechdr))) {
+        if (err < (int)(sizeof(pcapng_sec_t))) {
                 trace_set_err(libtrace, TRACE_ERR_BAD_PACKET,
                         "Incomplete pcapng section header block");
                 return -1;
@@ -489,7 +486,7 @@ static int pcapng_read_section(libtrace_t *libtrace,
 
         /* Read all of the options etc. -- we don't need them for now, but
          * we have to skip forward to the next useful header. */
-        bodyptr = packet->buffer + sizeof(pcapng_sec_t);
+        bodyptr = (char *) packet->buffer + sizeof(pcapng_sec_t);
         err = pcapng_read_body(libtrace, bodyptr, to_read);
         if (err <= 0) {
                 return err;
@@ -505,29 +502,15 @@ static int pcapng_read_section(libtrace_t *libtrace,
 }
 
 static int pcapng_read_interface(libtrace_t *libtrace,
-                libtrace_packet_t *packet, uint32_t flags) {
+                libtrace_packet_t *packet, uint32_t blocklen, uint32_t flags) {
 
         pcapng_int_t *inthdr;
-        int err;
-        uint32_t to_read;
         pcapng_interface_t *newint;
         uint16_t optcode, optlen;
         char *optval = NULL;
         char *bodyptr = NULL;
 
-        err = wandio_read(libtrace->io, packet->buffer, sizeof(pcapng_int_t));
-
-        if (err < 0) {
-                trace_set_err(libtrace, TRACE_ERR_WANDIO_FAILED,
-                        "Reading pcapng interface header block");
-                return -1;
-        }
-
-        if (err == 0) {
-                return 0;
-        }
-
-        if (err < (int)sizeof(inthdr)) {
+        if (blocklen < sizeof(pcapng_int_t) + 4) {
                 trace_set_err(libtrace, TRACE_ERR_BAD_PACKET,
                         "Incomplete pcapng interface header block");
                 return -1;
@@ -550,12 +533,10 @@ static int pcapng_read_interface(libtrace_t *libtrace,
                 assert(byteswap32(inthdr->blocktype) == PCAPNG_INTERFACE_TYPE);
                 newint->snaplen = byteswap32(inthdr->snaplen);
                 newint->linktype = byteswap16(inthdr->linktype);
-                to_read = byteswap32(inthdr->blocklen) - sizeof(pcapng_int_t);
         } else {
                 assert(inthdr->blocktype == PCAPNG_INTERFACE_TYPE);
                 newint->snaplen = inthdr->snaplen;
                 newint->linktype = inthdr->linktype;
-                to_read = inthdr->blocklen - sizeof(pcapng_int_t);
         }
 
         if (DATA(libtrace)->nextintid == DATA(libtrace)->allocatedinterfaces) {
@@ -564,18 +545,13 @@ static int pcapng_read_interface(libtrace_t *libtrace,
                         DATA(libtrace)->interfaces,
                         DATA(libtrace)->allocatedinterfaces * sizeof(
                                 pcapng_interface_t *));
-
-                /* Could memset the new memory to zero, if required */
+                memset(&DATA(libtrace)->interfaces[DATA(libtrace)->nextintid], 0, sizeof(void *) * 10);
         }
 
         DATA(libtrace)->interfaces[newint->id] = newint;
         DATA(libtrace)->nextintid += 1;
 
-        bodyptr = packet->buffer + sizeof(pcapng_int_t);
-        err = pcapng_read_body(libtrace, bodyptr, to_read);
-        if (err <= 0) {
-                return err;
-        }
+        bodyptr = (char *) packet->buffer + sizeof(pcapng_int_t);
 
         packet->type = TRACE_RT_PCAPNG_META;
 
@@ -586,7 +562,7 @@ static int pcapng_read_interface(libtrace_t *libtrace,
 
         do {
                 optval = pcapng_parse_next_option(libtrace, &bodyptr,
-                                &optcode, &optlen);
+                                &optcode, &optlen, (pcapng_hdr_t *) packet->buffer);
                 if (optval == NULL) {
                         trace_set_err(libtrace, TRACE_ERR_BAD_PACKET,
                                 "Failed to read options for pcapng interface");
@@ -606,34 +582,20 @@ static int pcapng_read_interface(libtrace_t *libtrace,
 
         } while (optcode != 0);
 
-        return 1;
+        return (int) blocklen;
 
 }
 
 static int pcapng_read_nrb(libtrace_t *libtrace, libtrace_packet_t *packet,
-                uint32_t flags) {
+                uint32_t blocklen, uint32_t flags) {
 
         /* Just read the NR records and pass them off to the caller. If
          * they want to do anything with them, they can parse the records
          * themselves.
          */
         pcapng_nrb_t *hdr = NULL;
-        int err;
-        uint32_t to_read;
-        char *bodyptr;
 
-        err = wandio_read(libtrace->io, packet->buffer, sizeof(pcapng_nrb_t));
-
-        if (err < 0) {
-                trace_set_err(libtrace, TRACE_ERR_WANDIO_FAILED, "reading pcapng name resolution block");
-                return -1;
-        }
-
-        if (err == 0) {
-                return 0;
-        }
-
-        if (err < (int)sizeof(pcapng_nrb_t)) {
+        if (blocklen < sizeof(pcapng_nrb_t) + 4) {
                 trace_set_err(libtrace, TRACE_ERR_BAD_PACKET,
                                 "Incomplete pcapng name resolution block");
                 return -1;
@@ -644,16 +606,8 @@ static int pcapng_read_nrb(libtrace_t *libtrace, libtrace_packet_t *packet,
         /* Read the rest of the packet into the buffer */
         if (DATA(libtrace)->byteswapped) {
                 assert(byteswap32(hdr->blocktype) == PCAPNG_NAME_RESOLUTION_TYPE);
-                to_read = byteswap32(hdr->blocklen) - sizeof(pcapng_nrb_t);
         } else {
                 assert(hdr->blocktype == PCAPNG_NAME_RESOLUTION_TYPE);
-                to_read = hdr->blocklen - sizeof(pcapng_nrb_t);
-        }
-
-        bodyptr = packet->buffer + sizeof(pcapng_nrb_t);
-        err = pcapng_read_body(libtrace, bodyptr, to_read);
-        if (err <= 0) {
-                return err;
         }
 
         packet->type = TRACE_RT_PCAPNG_META;
@@ -662,34 +616,20 @@ static int pcapng_read_nrb(libtrace_t *libtrace, libtrace_packet_t *packet,
                 return -1;
         }
 
-        return sizeof(pcapng_nrb_t) + to_read;
+        return (int) blocklen;
 
 }
 
 static int pcapng_read_custom(libtrace_t *libtrace, libtrace_packet_t *packet,
-                uint32_t flags) {
+                uint32_t blocklen, uint32_t flags) {
 
         /* Just read the custom records and pass them off to the caller. If
          * they want to do anything with them, they can parse the records
          * themselves.
          */
         pcapng_custom_t *hdr = NULL;
-        int err;
-        uint32_t to_read;
-        char *bodyptr;
 
-        err = wandio_read(libtrace->io, packet->buffer, sizeof(pcapng_custom_t));
-
-        if (err < 0) {
-                trace_set_err(libtrace, TRACE_ERR_WANDIO_FAILED, "reading pcapng custom block");
-                return -1;
-        }
-
-        if (err == 0) {
-                return 0;
-        }
-
-        if (err < (int)sizeof(pcapng_custom_t)) {
+        if (blocklen < sizeof(pcapng_custom_t) + 4) {
                 trace_set_err(libtrace, TRACE_ERR_BAD_PACKET,
                                 "Incomplete pcapng custom block");
                 return -1;
@@ -701,17 +641,9 @@ static int pcapng_read_custom(libtrace_t *libtrace, libtrace_packet_t *packet,
         if (DATA(libtrace)->byteswapped) {
                 assert(byteswap32(hdr->blocktype) == PCAPNG_CUSTOM_TYPE ||
                         byteswap32(hdr->blocktype) == PCAPNG_CUSTOM_NONCOPY_TYPE);
-                to_read = byteswap32(hdr->blocklen) - sizeof(pcapng_custom_t);
         } else {
-                assert(hdr->blocktype == PCAPNG_NAME_RESOLUTION_TYPE ||
+                assert(hdr->blocktype == PCAPNG_CUSTOM_TYPE ||
                         hdr->blocktype == PCAPNG_CUSTOM_NONCOPY_TYPE);
-                to_read = hdr->blocklen - sizeof(pcapng_custom_t);
-        }
-
-        bodyptr = packet->buffer + sizeof(pcapng_custom_t);
-        err = pcapng_read_body(libtrace, bodyptr, to_read);
-        if (err <= 0) {
-                return err;
         }
 
         packet->type = TRACE_RT_PCAPNG_META;
@@ -720,15 +652,13 @@ static int pcapng_read_custom(libtrace_t *libtrace, libtrace_packet_t *packet,
                 return -1;
         }
 
-        return sizeof(pcapng_custom_t) + to_read;
+        return (int) blocklen;
 
 }
 
 static int pcapng_read_stats(libtrace_t *libtrace, libtrace_packet_t *packet,
-                uint32_t flags) {
+                uint32_t blocklen, uint32_t flags) {
         pcapng_stats_t *hdr = NULL;
-        int err;
-        uint32_t to_read;
         uint32_t ifaceid;
         uint64_t timestamp;
         pcapng_interface_t *interface;
@@ -736,18 +666,7 @@ static int pcapng_read_stats(libtrace_t *libtrace, libtrace_packet_t *packet,
         char *optval;
         char *bodyptr;
 
-        err = wandio_read(libtrace->io, packet->buffer, sizeof(pcapng_stats_t));
-
-        if (err < 0) {
-                trace_set_err(libtrace, TRACE_ERR_WANDIO_FAILED, "reading pcapng interface stats");
-                return -1;
-        }
-
-        if (err == 0) {
-                return 0;
-        }
-
-        if (err < (int)sizeof(pcapng_stats_t)) {
+        if (blocklen < sizeof(pcapng_stats_t) + 4) {
                 trace_set_err(libtrace, TRACE_ERR_BAD_PACKET,
                                 "Incomplete pcapng interface stats header");
                 return -1;
@@ -758,21 +677,13 @@ static int pcapng_read_stats(libtrace_t *libtrace, libtrace_packet_t *packet,
         /* Read the rest of the packet into the buffer */
         if (DATA(libtrace)->byteswapped) {
                 assert(byteswap32(hdr->blocktype) == PCAPNG_INTERFACE_STATS_TYPE);
-                to_read = byteswap32(hdr->blocklen) - sizeof(pcapng_stats_t);
                 ifaceid = byteswap32(hdr->interfaceid);
                 timestamp = ((uint64_t)(byteswap32(hdr->timestamp_high)) << 32) + byteswap32(hdr->timestamp_low);
         } else {
                 assert(hdr->blocktype == PCAPNG_INTERFACE_STATS_TYPE);
-                to_read = hdr->blocklen - sizeof(pcapng_stats_t);
                 ifaceid = hdr->interfaceid;
                 timestamp = ((uint64_t)(hdr->timestamp_high) << 32) +
                                 hdr->timestamp_low;
-        }
-
-        bodyptr = packet->buffer + sizeof(pcapng_stats_t);
-        err = pcapng_read_body(libtrace, bodyptr, to_read);
-        if (err <= 0) {
-                return err;
         }
 
         /* Set packet type based on interface linktype */
@@ -789,7 +700,7 @@ static int pcapng_read_stats(libtrace_t *libtrace, libtrace_packet_t *packet,
         }
 
         if (timestamp < interface->laststats) {
-                return sizeof(pcapng_stats_t) + to_read;
+                return (int) blocklen;
         }
 
         /* All of the stats are stored as options */
@@ -797,10 +708,10 @@ static int pcapng_read_stats(libtrace_t *libtrace, libtrace_packet_t *packet,
 
         do {
                 optval = pcapng_parse_next_option(packet->trace, &bodyptr,
-                                &optcode, &optlen);
+                                &optcode, &optlen, (pcapng_hdr_t *) packet->buffer);
                 if (optval == NULL) {
                         trace_set_err(libtrace, TRACE_ERR_BAD_PACKET,
-                                "Failed to read options for pcapng enhanced packet");
+                                "Failed to read options for pcapng interface stats");
                         return -1;
                 }
 
@@ -843,32 +754,18 @@ static int pcapng_read_stats(libtrace_t *libtrace, libtrace_packet_t *packet,
         } while (optcode != 0);
         interface->laststats = timestamp;
 
-        return sizeof(pcapng_stats_t) + to_read;
+        return (int) blocklen;
 
 }
 
 static int pcapng_read_simple(libtrace_t *libtrace, libtrace_packet_t *packet,
-                uint32_t flags) {
+                uint32_t blocklen, uint32_t flags) {
 
-        int err;
-        uint32_t to_read;
         uint32_t caplen;
         pcapng_spkt_t *hdr = NULL;
         pcapng_interface_t *interface;
-        char *bodyptr;
 
-        err = wandio_read(libtrace->io, packet->buffer, sizeof(pcapng_spkt_t));
-
-        if (err < 0) {
-                trace_set_err(libtrace, TRACE_ERR_WANDIO_FAILED, "reading pcapng simple packet");
-                return -1;
-        }
-
-        if (err == 0) {
-                return 0;
-        }
-
-        if (err < (int)sizeof(pcapng_spkt_t)) {
+        if (blocklen < sizeof(pcapng_spkt_t) + 4) {
                 trace_set_err(libtrace, TRACE_ERR_BAD_PACKET,
                                 "Incomplete pcapng simple packet header");
                 return -1;
@@ -879,18 +776,12 @@ static int pcapng_read_simple(libtrace_t *libtrace, libtrace_packet_t *packet,
         /* Read the rest of the packet into the buffer */
         if (DATA(libtrace)->byteswapped) {
                 assert(byteswap32(hdr->blocktype) == PCAPNG_SIMPLE_PACKET_TYPE);
-                to_read = byteswap32(hdr->blocklen) - sizeof(pcapng_spkt_t);
-                caplen = to_read - 4;   /* account for trailing length field */
+                caplen = byteswap32(hdr->blocklen) - sizeof(pcapng_spkt_t) - 4;
+                         /* account for trailing length field */
         } else {
                 assert(hdr->blocktype == PCAPNG_SIMPLE_PACKET_TYPE);
-                to_read = hdr->blocklen - sizeof(pcapng_spkt_t);
-                caplen = to_read - 4; /* account for trailing length field */
-        }
-
-        bodyptr = packet->buffer + sizeof(pcapng_spkt_t);
-        err = pcapng_read_body(libtrace, bodyptr, to_read);
-        if (err <= 0) {
-                return err;
+                caplen = hdr->blocklen - sizeof(pcapng_spkt_t) - 4;
+                         /* account for trailing length field */
         }
 
         /* Set packet type based on interface linktype.
@@ -910,15 +801,13 @@ static int pcapng_read_simple(libtrace_t *libtrace, libtrace_packet_t *packet,
                         packet->type, flags)) {
                 return -1;
         }
-        return sizeof(pcapng_spkt_t) + to_read;
+        return (int) blocklen;
 
 }
 
 static int pcapng_read_enhanced(libtrace_t *libtrace, libtrace_packet_t *packet,
-                uint32_t flags) {
+                uint32_t blocklen, uint32_t flags) {
         pcapng_epkt_t *hdr = NULL;
-        int err;
-        uint32_t to_read;
         uint32_t caplen;
         uint32_t ifaceid;
         pcapng_interface_t *interface;
@@ -926,18 +815,7 @@ static int pcapng_read_enhanced(libtrace_t *libtrace, libtrace_packet_t *packet,
         char *optval;
         char *bodyptr;
 
-        err = wandio_read(libtrace->io, packet->buffer, sizeof(pcapng_epkt_t));
-
-        if (err < 0) {
-                trace_set_err(libtrace, TRACE_ERR_WANDIO_FAILED, "reading pcapng enhanced packet");
-                return -1;
-        }
-
-        if (err == 0) {
-                return 0;
-        }
-
-        if (err < (int)sizeof(pcapng_epkt_t)) {
+        if (blocklen < (int)sizeof(pcapng_epkt_t) + 4) {
                 trace_set_err(libtrace, TRACE_ERR_BAD_PACKET,
                                 "Incomplete pcapng enhanced packet header");
                 return -1;
@@ -949,20 +827,14 @@ static int pcapng_read_enhanced(libtrace_t *libtrace, libtrace_packet_t *packet,
         if (DATA(libtrace)->byteswapped) {
                 assert(byteswap32(hdr->blocktype) == PCAPNG_ENHANCED_PACKET_TYPE);
                 caplen = byteswap32(hdr->caplen);
-                to_read = byteswap32(hdr->blocklen) - sizeof(pcapng_epkt_t);
                 ifaceid = byteswap32(hdr->interfaceid);
         } else {
                 assert(hdr->blocktype == PCAPNG_ENHANCED_PACKET_TYPE);
                 caplen = hdr->caplen;
-                to_read = hdr->blocklen - sizeof(pcapng_epkt_t);
                 ifaceid = hdr->interfaceid;
         }
 
-        bodyptr = packet->buffer + sizeof(pcapng_epkt_t);
-        err = pcapng_read_body(libtrace, bodyptr, to_read);
-        if (err <= 0) {
-                return err;
-        }
+        bodyptr = (char *) packet->buffer + sizeof(pcapng_epkt_t);
 
         /* Set packet type based on interface linktype */
         interface = lookup_interface(libtrace, ifaceid);
@@ -983,14 +855,20 @@ static int pcapng_read_enhanced(libtrace_t *libtrace, libtrace_packet_t *packet,
 
         /* Make sure to parse any useful options */
         if ((caplen % 4) == 0) {
-                bodyptr = packet->payload + caplen;
+                bodyptr = (char *) packet->payload + caplen;
         } else {
-                bodyptr = packet->payload + caplen + (4 - (caplen % 4));
+                bodyptr = (char *) packet->payload + caplen + (4 - (caplen % 4));
+        }
+        // Check the packet caplen actually fits within the block we read
+        if ((char *) packet->buffer + blocklen < bodyptr + 4) {
+                trace_set_err(libtrace, TRACE_ERR_BAD_PACKET,
+                                "Incomplete pcapng enhanced packet header");
+                return -1;
         }
 
         do {
                 optval = pcapng_parse_next_option(packet->trace, &bodyptr,
-                                &optcode, &optlen);
+                                &optcode, &optlen, (pcapng_hdr_t *) packet->buffer);
                 if (optval == NULL) {
                         trace_set_err(libtrace, TRACE_ERR_BAD_PACKET,
                                 "Failed to read options for pcapng enhanced packet");
@@ -1007,7 +885,7 @@ static int pcapng_read_enhanced(libtrace_t *libtrace, libtrace_packet_t *packet,
                 }
 
         } while (optcode != 0);
-        return sizeof(pcapng_epkt_t) + to_read;
+        return (int) blocklen;
 
 }
 
@@ -1051,10 +929,34 @@ static int pcapng_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
                         return -1;
                 }
 
+                // Warning: the byteorder might not be set yet, the section header sets this
                 if (DATA(libtrace)->byteswapped) {
                         btype = byteswap32(peeker.blocktype);
+                        to_read = byteswap32(peeker.blocklen);
                 } else {
                         btype = peeker.blocktype;
+                        to_read = peeker.blocklen;
+                }
+
+                // Check we won't read off the end of the packet buffer. Assuming corruption.
+                // Exclude the SECTION header, as this is used to identify the byteorder
+                if (to_read > LIBTRACE_PACKET_BUFSIZE && btype != PCAPNG_SECTION_TYPE) {
+                        trace_set_err(libtrace, TRACE_ERR_BAD_PACKET,
+                                      "Oversized pcapng block found, is the trace corrupted?");
+                        return -1;
+                }
+                if (btype != PCAPNG_SECTION_TYPE) {
+                        // Read the entire block, unless it is a section as our byte ordering has
+                        // not been set yet.
+                        err = pcapng_read_body(libtrace, packet->buffer, to_read);
+                        if (err <= 0) {
+                                return err;
+                        }
+                        if (*((uint32_t *)((char *)packet->buffer+to_read-4)) != peeker.blocklen) {
+                                trace_set_err(libtrace, TRACE_ERR_BAD_PACKET,
+                                              "Mismatched pcapng block sizes found, trace is invalid.");
+                                return -1;
+                        }
                 }
 
                 switch (btype) {
@@ -1066,35 +968,35 @@ static int pcapng_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 
                         /* Interface Header */
                         case PCAPNG_INTERFACE_TYPE:
-                                err = pcapng_read_interface(libtrace, packet, flags);
+                                err = pcapng_read_interface(libtrace, packet, to_read, flags);
                                 gotpacket = 1;
                                 break;
 
 
                         case PCAPNG_ENHANCED_PACKET_TYPE:
                                 err = pcapng_read_enhanced(libtrace, packet,
-                                                flags);
+                                                to_read, flags);
                                 gotpacket = 1;
                                 break;
 
                         case PCAPNG_SIMPLE_PACKET_TYPE:
-                                err = pcapng_read_simple(libtrace, packet, flags);
+                                err = pcapng_read_simple(libtrace, packet, to_read, flags);
                                 gotpacket = 1;
                                 break;
 
                         case PCAPNG_INTERFACE_STATS_TYPE:
-                                err = pcapng_read_stats(libtrace, packet, flags);
+                                err = pcapng_read_stats(libtrace, packet, to_read, flags);
                                 gotpacket = 1;
                                 break;
 
                         case PCAPNG_NAME_RESOLUTION_TYPE:
-                                err = pcapng_read_nrb(libtrace, packet, flags);
+                                err = pcapng_read_nrb(libtrace, packet, to_read, flags);
                                 gotpacket = 1;
                                 break;
 
                         case PCAPNG_CUSTOM_TYPE:
                         case PCAPNG_CUSTOM_NONCOPY_TYPE:
-                                err = pcapng_read_custom(libtrace, packet, flags);
+                                err = pcapng_read_custom(libtrace, packet, to_read, flags);
                                 gotpacket = 1;
                                 break;
 
@@ -1104,12 +1006,6 @@ static int pcapng_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 
                         /* Everything else -- don't care, skip it */
                         default:
-                                if (DATA(libtrace)->byteswapped) {
-                                        to_read = byteswap32(peeker.blocklen);
-                                } else {
-                                        to_read = peeker.blocklen;
-                                }
-                                err = skip_block(libtrace, to_read);
                                 break;
                 }
         }
@@ -1193,7 +1089,8 @@ static struct timespec pcapng_get_timespec(const libtrace_packet_t *packet) {
         }
 
         ts.tv_sec = (timestamp / interface->tsresol);
-        ts.tv_nsec = (uint64_t)(timestamp - (ts.tv_sec * interface->tsresol)) / interface->tsresol * 1000000000;
+        ts.tv_nsec = (uint64_t)(timestamp - (ts.tv_sec * interface->tsresol))
+                        / ((double)interface->tsresol) * 1000000000;
 
         return ts;
 
@@ -1467,6 +1364,7 @@ static struct libtrace_format_t pcapng = {
         pcapng_prepare_packet,          /* prepare_packet */
         NULL,                           /* fin_packet */
         NULL,                           /* write_packet */
+        NULL,                           /* flush_output */
         pcapng_get_link_type,           /* get_link_type */
         pcapng_get_direction,           /* get_direction */
         NULL,                           /* set_direction */

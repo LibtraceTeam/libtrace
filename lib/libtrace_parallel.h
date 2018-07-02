@@ -730,6 +730,9 @@ DLLEXPORT void trace_join(libtrace_t * trace);
 
 /** Set the maximum number of perpkt threads to use in a trace.
  *
+ * Only valid on a new trace, that has not be started. Once started
+ * the number of threads cannot be changed without destroying the trace.
+ *
  * @param[in] trace The parallel input trace
  * @param[in] nb The number of threads to use. If set to 0, libtrace will
  *    try to auto-detect how many threads it can use.
@@ -1270,6 +1273,32 @@ DLLEXPORT void libtrace_make_result_safe(libtrace_result_t *res);
  * @note All packets should be free'd before a trace is destroyed.
  */
 DLLEXPORT void trace_free_packet(libtrace_t * libtrace, libtrace_packet_t * packet);
+
+/** Increments the internal reference counter for a packet.
+ * @param packet        The packet opaque pointer
+ *
+ * You may wish to use this function (and its decrementing counterpart)
+ * in situations where you are retaining multiple references to a packet
+ * outside of the core packet processing function. This will ensure that
+ * the packet is not released until there are no more outstanding references
+ * to the packet anywhere in your program.
+ */
+DLLEXPORT void trace_increment_packet_refcount(libtrace_packet_t *packet);
+
+/** Decrements the internal reference counter for a packet.
+ * @param packet        The packet opaque pointer
+ *
+ * If the reference counter goes below one, trace_fin_packet() will be
+ * called on the packet.
+ *
+ * You may wish to use this function (and its incrementing counterpart)
+ * in situations where you are retaining multiple references to a packet
+ * outside of the core packet processing function. This will ensure that
+ * the packet is not released until there are no more outstanding references
+ * to the packet anywhere in your program.
+ */
+DLLEXPORT void trace_decrement_packet_refcount(libtrace_packet_t *packet);
+
 
 /** Provides some basic information about a trace based on its input format.
  *

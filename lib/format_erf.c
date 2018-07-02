@@ -598,6 +598,10 @@ static int erf_dump_packet(libtrace_out_t *libtrace,
 	return numbytes + framinglen;
 }
 
+static int erf_flush_output(libtrace_out_t *libtrace) {
+        return wandio_wflush(OUTPUT->file);
+}
+
 static int erf_start_output(libtrace_out_t *libtrace)
 {
 	OUTPUT->file = trace_open_file_out(libtrace,
@@ -867,6 +871,7 @@ static struct libtrace_format_t erfformat = {
 	erf_prepare_packet,		/* prepare_packet */
 	NULL,				/* fin_packet */
 	erf_write_packet,		/* write_packet */
+	erf_flush_output,		/* flush_output */
 	erf_get_link_type,		/* get_link_type */
 	erf_get_direction,		/* get_direction */
 	erf_set_direction,		/* set_direction */
@@ -911,6 +916,7 @@ static struct libtrace_format_t rawerfformat = {
 	erf_prepare_packet,		/* prepare_packet */
 	NULL,				/* fin_packet */
 	erf_write_packet,		/* write_packet */
+	erf_flush_output,		/* flush_output */
 	erf_get_link_type,		/* get_link_type */
 	erf_get_direction,		/* get_direction */
 	erf_set_direction,		/* set_direction */

@@ -113,6 +113,22 @@
 #define rte_mempool_in_use_count rte_mempool_free_count
 #endif
 
+/* 17.05-rc1 deprecated, 17.08 removed
+ * rte_set_log_level -> rte_log_set_global_level
+ */
+#if RTE_VERSION < RTE_VERSION_NUM(17, 5, 0, 1)
+#define rte_log_set_global_level rte_set_log_level
+#endif
+
+/* 17.11-rc1 increases port size from 8 to 16bits
+ */
+#if RTE_VERSION >= RTE_VERSION_NUM(17, 11, 0, 1)
+typedef uint16_t portid_t;
+#else
+typedef uint8_t portid_t;
+#endif
+
+
 #include <rte_per_lcore.h>
 #include <rte_debug.h>
 #include <rte_errno.h>
