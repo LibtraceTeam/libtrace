@@ -411,6 +411,9 @@ if test "$want_dpdk" != no; then
 	if test "$dpdk_found" = 0 -a "$RTE_SDK" != ""; then
 		AC_CHECK_FILE("$RTE_SDK/$RTE_TARGET/lib/libdpdk.so", dpdk_found="dpdk", dpdk_found=0)
 	fi
+	if test "$dpdk_found" = 0 -a "$RTE_SDK" != ""; then
+		AC_CHECK_LIB(dpdk, rte_eth_dev_configure, dpdk_found="dpdk", dpdk_found=0)
+	fi
 	if test "$dpdk_found" != 0 -a "$RTE_SDK" != ""; then
 		# Save these now so that they can be re-exported later
 		AC_SUBST([RTE_TARGET])
@@ -423,23 +426,22 @@ if test "$want_dpdk" != no; then
 	if test "$RTE_SDK" = ""; then
 		AC_MSG_NOTICE([No RTE_SDK given, checking for system dpdk-dev package])
 		# Search the system, maybe it is installed? Ethdev is one of the main libraries
-		AC_CHECK_LIB(ethdev, rte_eth_dev_configure, dpdk_found="system", dpdk_found=0)
+		# On Ubuntu and Debian we can simply check for dpdk.so
+		AC_CHECK_LIB(dpdk, rte_eth_dev_configure, dpdk_found="system", dpdk_found=0)
 		# We also need to check that rte.vars.mk is installed from dpdk-dev (as well as libdpdk-dev)
 		if test "$dpdk_found" != 0 -a -e /usr/share/dpdk/mk/rte.vars.mk ; then
-			RTE_TARGET="x86_64-default-linuxapp-gcc"
+			RTE_TARGET="$(uname -m)-default-linuxapp-gcc"
 			RTE_SDK="/usr/share/dpdk/"
 			RTE_INCLUDE="/usr/include/dpdk"
 			AC_SUBST([RTE_TARGET])
 			AC_SUBST([RTE_SDK])
 			AC_SUBST([RTE_INCLUDE])
-			# include libethdev this is part of DPDK
-			LIBTRACE_LIBS="$LIBTRACE_LIBS -lethdev"
-			# Include all rte libs note we need to escape '[' and ']'
-			LIBTRACE_LIBS="$LIBTRACE_LIBS $(ldconfig -p | sed 's/.*lib\([[^.]]*\).*/-l\1/' | grep rte_ | tr '\n' ' ')"
+			LIBTRACE_LIBS="$LIBTRACE_LIBS -ldpdk"
 			AC_MSG_NOTICE([Building against system DPDK])
 
 			AC_DEFINE(HAVE_DPDK,1,[conditional for building with DPDK live capture support])
 			libtrace_dpdk=true
+			dpdk_found=system
 		fi
 	fi
 fi
