@@ -20,23 +20,18 @@ else
 endif
 
 
-libtrace_backup.h:
-	# libtrace.h is modified by the build, so back it up so it can be restored
-	# by the clean target
-	cp lib/libtrace.h libtrace_backup.h
-
 configure:
 
-configure-stamp: configure libtrace_backup.h
+configure-stamp: configure
 	dh_testdir
-	
+
 	dh_autoreconf
-	
+
 	./configure $(CONFFLAGS) \
 		   --prefix=/usr \
 		   --mandir=\$${prefix}/share/man \
 		   --infodir=\$${prefix}/share/info
-	
+
 	touch configure-stamp
 
 build: build-arch build-indep
@@ -57,21 +52,19 @@ clean:
 
 	[ ! -f Makefile ] || $(MAKE) clean
 	[ ! -f Makefile ] || $(MAKE) distclean
-	[ ! -f libtrace_backup.h ] || mv libtrace_backup.h lib/libtrace.h
 	rm -rf docs/doxygen
-	
+
 	dh_autoreconf_clean
-	dh_clean 
+	dh_clean
 
 install: build
 	dh_testdir
 	dh_testroot
-	dh_clean -k 
+	dh_clean -k
 	dh_installdirs
 
 	# Add here commands to install the package into debian/tmp
 	$(MAKE) install DESTDIR=$(CURDIR)/debian/tmp
-
 
 # Build architecture-independent files here.
 binary-indep: build install
@@ -99,4 +92,4 @@ binary-arch: build install
 	dh_builddeb
 
 binary: binary-indep binary-arch
-.PHONY: build clean binary-indep binary-arch binary install 
+.PHONY: build clean binary-indep binary-arch binary install

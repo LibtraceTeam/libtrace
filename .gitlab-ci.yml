@@ -1,0 +1,113 @@
+stages:
+  - build
+  - deploy
+
+build-debian-jessie:
+  stage: build
+  image: debian:jessie
+  script:
+    - ./gitlab-build.sh
+    - mkdir -p built-packages/debian_jessie/
+    - mv ../*.deb built-packages/debian_jessie/
+  artifacts:
+    paths:
+      - built-packages/*
+    expire_in: 1 day
+  only:
+    - tags
+
+build-debian-stretch:
+  stage: build
+  image: debian:stretch
+  script:
+    - ./gitlab-build.sh
+    - mkdir -p built-packages/debian_stretch/
+    - mv ../*.deb built-packages/debian_stretch/
+  artifacts:
+    paths:
+      - built-packages/*
+    expire_in: 1 day
+  only:
+    - tags
+
+build-debian-buster:
+  stage: build
+  image: debian:buster
+  script:
+    - ./gitlab-build.sh
+    - mkdir -p built-packages/debian_buster/
+    - mv ../*.deb built-packages/debian_buster/
+  artifacts:
+    paths:
+      - built-packages/*
+    expire_in: 1 day
+  only:
+    - tags
+
+build-debian-sid:
+  stage: build
+  image: debian:sid
+  script:
+    - ./gitlab-build.sh
+    - mkdir -p built-packages/debian_sid/
+    - mv ../*.deb built-packages/debian_sid/
+  artifacts:
+    paths:
+      - built-packages/*
+    expire_in: 1 day
+  only:
+    - tags
+
+build-ubuntu-xenial:
+  stage: build
+  image: ubuntu:xenial
+  script:
+    - ./gitlab-build.sh
+    - mkdir -p built-packages/ubuntu_xenial/
+    - mv ../*.deb built-packages/ubuntu_xenial/
+  artifacts:
+    paths:
+      - built-packages/*
+    expire_in: 1 day
+  only:
+    - tags
+
+build-ubuntu-artful:
+  stage: build
+  image: ubuntu:artful
+  script:
+    - ./gitlab-build.sh
+    - mkdir -p built-packages/ubuntu_artful/
+    - mv ../*.deb built-packages/ubuntu_artful/
+  artifacts:
+    paths:
+      - built-packages/*
+    expire_in: 1 day
+  only:
+    - tags
+
+build-ubuntu-bionic:
+  stage: build
+  image: ubuntu:bionic
+  script:
+    - ./gitlab-build.sh
+    - mkdir -p built-packages/ubuntu_bionic/
+    - mv ../*.deb built-packages/ubuntu_bionic/
+  artifacts:
+    paths:
+      - built-packages/*
+    expire_in: 1 day
+  only:
+    - tags
+
+deploy-packages:
+  stage: deploy
+  image: ubuntu:bionic
+  script:
+    - ls built-packages/
+  artifacts:
+    paths:
+      - built-packages/*
+    expire_in: 1 month
+  only:
+    - tags
