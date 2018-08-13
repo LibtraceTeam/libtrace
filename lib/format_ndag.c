@@ -186,7 +186,7 @@ static int join_multicast_group(char *groupaddr, char *localiface,
         unsigned int interface;
         char pstr[16];
         struct group_req greq;
-        int bufsize;
+        int bufsize, val;
 
         int sock;
 
@@ -225,6 +225,14 @@ static int join_multicast_group(char *groupaddr, char *localiface,
         if (sock < 0) {
                 fprintf(stderr,
                         "Failed to create multicast socket for %s:%s -- %s\n",
+                                groupaddr, portstr, strerror(errno));
+                goto sockcreateover;
+        }
+
+        val = 1;
+        if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val)) < 0) {
+                fprintf(stderr,
+                        "Failed to set REUSEADDR socket option for %s:%s -- %s\n",
                                 groupaddr, portstr, strerror(errno));
                 goto sockcreateover;
         }
@@ -760,7 +768,7 @@ static int add_new_streamsock(recvstream_t *rt, streamsource_t src) {
                 ssock->mmsgbufs[i].msg_len = 0;
         }
 #else
-	ssock->singlemsg.msg_iov = (struct iovec *) malloc(sizeof(struct iovec));
+	ssock->singlemsg.msg_iov = (struct iovec *) calloc(1, sizeof(struct iovec));
 #endif
 
         ssock->nextread = NULL;;
