@@ -82,6 +82,7 @@ typedef struct etsilive_format_data {
         pthread_t listenthread;
         etsithread_t *receivers;
         int nextthreadid;
+        wandder_etsispec_t *shareddec;
 } etsilive_format_data_t;
 
 typedef struct newsendermessage {
@@ -226,6 +227,8 @@ static int etsilive_init_input(libtrace_t *libtrace) {
                         (size_t)(scan - libtrace->uridata));
         FORMAT_DATA->listenport = strdup(scan + 1);
 
+        FORMAT_DATA->shareddec = wandder_create_etsili_decoder();
+
         return 0;
 }
 
@@ -239,6 +242,9 @@ static int etsilive_fin_input(libtrace_t *libtrace) {
         }
         if (FORMAT_DATA->listenport) {
                 free(FORMAT_DATA->listenport);
+        }
+        if (FORMAT_DATA->shareddec) {
+                wandder_free_etsili_decoder(FORMAT_DATA->shareddec);
         }
         free(libtrace->format_data);
         return 0;
@@ -588,15 +594,18 @@ static int etsilive_prepare_packet(libtrace_t *libtrace UNUSED,
 static int etsilive_get_pdu_length(const libtrace_packet_t *packet) {
 
         /* Should never get here because cache is set when packet is read */
-        wandder_etsispec_t *dec;
         size_t reclen;
+        libtrace_t *libtrace = packet->trace;
+
+        assert(libtrace);
+        assert(FORMAT_DATA->shareddec);
 
         /* 0 should be ok here for quickly evaluating the first length
          * field... */
-        dec = wandder_create_etsili_decoder();
-        wandder_attach_etsili_buffer(dec, packet->buffer, 0, false);
-        reclen = (size_t)wandder_etsili_get_pdu_length(dec);
-        wandder_free_etsili_decoder(dec);
+        wandder_attach_etsili_buffer(FORMAT_DATA->shareddec, packet->buffer,
+                        0, false);
+        reclen = (size_t)wandder_etsili_get_pdu_length(
+                        FORMAT_DATA->shareddec);
 
         return reclen;
 }
@@ -610,16 +619,17 @@ static struct timeval etsilive_get_timeval(const libtrace_packet_t *packet) {
         /* TODO add cached timestamps to libtrace so we don't have to look
          * this up again. */
         struct timeval tv;
-        wandder_etsispec_t *dec;
 
         tv.tv_sec = 0;
         tv.tv_usec = 0;
 
+        libtrace_t *libtrace = packet->trace;
 
-        dec = wandder_create_etsili_decoder();
-        wandder_attach_etsili_buffer(dec, packet->buffer, 0, false);
-        tv = wandder_etsili_get_header_timestamp(dec);
-        wandder_free_etsili_decoder(dec);
+        assert(libtrace);
+        assert(FORMAT_DATA->shareddec);
+        wandder_attach_etsili_buffer(FORMAT_DATA->shareddec, packet->buffer,
+                        0, false);
+        tv = wandder_etsili_get_header_timestamp(FORMAT_DATA->shareddec);
         return tv;
 }
 
