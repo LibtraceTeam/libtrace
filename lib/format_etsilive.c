@@ -527,7 +527,6 @@ static int etsilive_prepare_received(libtrace_t *libtrace,
 
         packet->wire_length = esock->cached.length;
         packet->capture_length = esock->cached.length;
-
         /*
         for (j = 0; j < packet->wire_length; j++) {
                 printf("%02x ", *(((uint8_t *)packet->buffer) + j));
@@ -615,22 +614,8 @@ static int etsilive_get_framing_length(const libtrace_packet_t *packet UNUSED) {
         return 0;
 }
 
-static struct timeval etsilive_get_timeval(const libtrace_packet_t *packet) {
-        /* TODO add cached timestamps to libtrace so we don't have to look
-         * this up again. */
-        struct timeval tv;
-
-        tv.tv_sec = 0;
-        tv.tv_usec = 0;
-
-        libtrace_t *libtrace = packet->trace;
-
-        assert(libtrace);
-        assert(FORMAT_DATA->shareddec);
-        wandder_attach_etsili_buffer(FORMAT_DATA->shareddec, packet->buffer,
-                        0, false);
-        tv = wandder_etsili_get_header_timestamp(FORMAT_DATA->shareddec);
-        return tv;
+static uint64_t etsilive_get_erf_timestamp(const libtrace_packet_t *packet) {
+        return packet->order;
 }
 
 static libtrace_linktype_t etsilive_get_link_type(
@@ -661,8 +646,8 @@ static struct libtrace_format_t etsilive = {
         etsilive_get_link_type,         /* get_link_type */
         NULL,                           /* get_direction */
         NULL,                           /* set_direction */
-        NULL,                           /* get_erf_timestamp */
-        etsilive_get_timeval,           /* get_timeval */
+        etsilive_get_erf_timestamp,     /* get_erf_timestamp */
+        NULL,                           /* get_timeval */
         NULL,                           /* get_timespec */
         NULL,                           /* get_seconds */
         NULL,                           /* seek_erf */
