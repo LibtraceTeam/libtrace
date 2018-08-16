@@ -527,13 +527,6 @@ static int etsilive_prepare_received(libtrace_t *libtrace,
 
         packet->wire_length = esock->cached.length;
         packet->capture_length = esock->cached.length;
-        /*
-        for (j = 0; j < packet->wire_length; j++) {
-                printf("%02x ", *(((uint8_t *)packet->buffer) + j));
-                if ((j % 16) == 15) printf("\n");
-        }
-        printf("\n");
-        */
 
         /* Advance the read pointer for this buffer
          * TODO should really do this in fin_packet, but will need a ref
