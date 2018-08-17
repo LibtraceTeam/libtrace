@@ -1007,7 +1007,9 @@ DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
                         if (!IS_LIBTRACE_META_PACKET(packet)) {
         			++libtrace->accepted_packets;
                         }
-			trace_packet_set_order(packet, libtrace->sequence_number);
+                        if (packet->order == 0) {
+        			trace_packet_set_order(packet, libtrace->sequence_number);
+                        }
 	        	++libtrace->sequence_number;
 			if (!libtrace_parallel && packet->trace == libtrace)
                                 libtrace->last_packet = packet;

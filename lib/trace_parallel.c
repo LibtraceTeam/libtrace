@@ -1776,7 +1776,7 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob,
 		}
 	}
 
-	if (ret != 0) {
+	if (ret < 0) {
 		goto cleanup_none;
 	}
 
