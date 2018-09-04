@@ -231,13 +231,17 @@ void linuxcommon_close_input_stream(libtrace_t *libtrace,
 	if (stream->fd != -1)
 		close(stream->fd);
 	stream->fd = -1;
-	if (stream->rx_ring != MAP_FAILED)
-		munmap(stream->rx_ring,
-		       stream->req.tp_block_size *
-		       stream->req.tp_block_nr);
-	stream->rx_ring = MAP_FAILED;
-	stream->rxring_offset = 0;
 	FORMAT_DATA->dev_stats.if_name[0] = 0;
+
+        /* Don't munmap the rx_ring here -- keep it around as long as
+         * possible to ensure that any packets that the user is still
+         * holding references to remain valid.
+         *
+         * Don't worry, linuxring will munmap the rx_ring as soon as
+         * someone either destroys or restarts the trace. At that point,
+         * any remaining packets from the old ring will be recognisable
+         * as invalid.
+         */
 }
 
 #define REPEAT_16(x) x x x x x x x x x x x x x x x x
