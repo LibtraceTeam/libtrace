@@ -1620,7 +1620,6 @@ DLLEXPORT int trace_apply_filter(libtrace_filter_t *filter,
 				if (free_packet_needed) {
 					trace_destroy_packet(packet_copy);
 				}
-                                printf("x\n");
 				return -1;
 			}
 			linktype = trace_get_link_type(packet_copy);
@@ -1644,7 +1643,6 @@ DLLEXPORT int trace_apply_filter(libtrace_filter_t *filter,
 		if (free_packet_needed) {
 			trace_destroy_packet(packet_copy);
 		}
-                printf("xx\n");
 		return -1;
 	}
 
@@ -1674,9 +1672,6 @@ DLLEXPORT int trace_apply_filter(libtrace_filter_t *filter,
 	if (free_packet_needed) {
 		trace_destroy_packet(packet_copy);
 	}
-        if (ret < 0) {
-                printf("xxx\n");
-        }
 	return ret;
 #else
 	fprintf(stderr,"This version of libtrace does not have bpf filter support\n");
