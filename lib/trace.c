@@ -1113,14 +1113,23 @@ DLLEXPORT void *trace_get_packet_buffer(const libtrace_packet_t *packet,
 		libtrace_linktype_t *linktype, uint32_t *remaining) {
 	int cap_len;
 	int wire_len;
+        libtrace_linktype_t ltype;
 
 	assert(packet != NULL);
-	if (linktype) *linktype = trace_get_link_type(packet);
-	if (remaining) {
-                if (linktype && *linktype == TRACE_TYPE_CONTENT_INVALID) {
-                        return (void *)packet->payload;
-                }
+        ltype = trace_get_link_type(packet);
 
+        if (linktype) {
+                *linktype = ltype;
+        }
+
+        if (ltype == TRACE_TYPE_CONTENT_INVALID) {
+                if (remaining) {
+                        *remaining = 0;
+                }
+                return NULL;
+        }
+
+	if (remaining) {
 		/* I think we should choose the minimum of the capture and
 		 * wire lengths to be the "remaining" value. If the packet has
 		 * been padded to increase the capture length, we don't want
