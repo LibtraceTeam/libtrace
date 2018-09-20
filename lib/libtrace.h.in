@@ -346,7 +346,8 @@ typedef enum {
 } libtrace_dlt_t ;
 
 /** Enumeration of link layer types supported by libtrace */
-typedef enum { 
+typedef enum {
+       TRACE_TYPE_CONTENT_INVALID = -2, /**< Packet contents are not valid */
        TRACE_TYPE_UNKNOWN = -1,		/**< Unable to determine link type */
     /* TRACE_TYPE_LEGACY = 0 		Obsolete */
        TRACE_TYPE_HDLC_POS = 1, 	/**< HDLC over POS */
@@ -566,6 +567,7 @@ typedef struct libtrace_packet_t {
 
         pthread_mutex_t ref_lock;       /**< Lock for reference counter */
         int refcount;                 /**< Reference counter */
+        int which_trace_start;          /**< Used to match packet to a started instance of the parent trace */
 
 } libtrace_packet_t;
 

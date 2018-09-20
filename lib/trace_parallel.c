@@ -1344,6 +1344,7 @@ static int trace_pread_packet_wrapper(libtrace_t *libtrace,
 				              "Packet passed to trace_read_packet() is invalid\n");
 				return -1;
 			}
+                        packets[i]->which_trace_start = libtrace->startcount;
 		}
 		do {
 			ret=libtrace->format->pread_packets(libtrace, t,
@@ -1459,6 +1460,7 @@ static int trace_prestart(libtrace_t * libtrace, void *global_blob,
 
 	if (err == 0) {
 		libtrace->started = true;
+                libtrace->startcount ++;
 		libtrace_change_state(libtrace, STATE_RUNNING, false);
 	}
 	return err;
@@ -1862,6 +1864,7 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob,
 
 	/* Threads don't start */
 	libtrace->started = true;
+        libtrace->startcount ++;
 	libtrace_change_state(libtrace, STATE_RUNNING, false);
 
 	ret = 0;

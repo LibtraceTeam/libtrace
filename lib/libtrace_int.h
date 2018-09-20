@@ -336,6 +336,8 @@ struct libtrace_t {
 	libtrace_err_t err;
 	/** Boolean flag indicating whether the trace has been started */
 	bool started;
+        /** Number of times this trace has been started */
+        int startcount;
 	/** Synchronise writes/reads across this format object and attached threads etc */
 	pthread_mutex_t libtrace_lock;
 	/** Packet read lock, seperate from libtrace_lock as to not block while reading a burst */

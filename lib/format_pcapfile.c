@@ -431,7 +431,7 @@ static int pcapfile_write_packet(libtrace_out_t *out,
 	
 	/* Silently discard RT metadata packets and packets with an
 	 * unknown linktype. */
-	if (linktype == TRACE_TYPE_NONDATA || linktype == TRACE_TYPE_UNKNOWN || linktype == TRACE_TYPE_ERF_META) {
+	if (linktype == TRACE_TYPE_NONDATA || linktype == TRACE_TYPE_UNKNOWN || linktype == TRACE_TYPE_ERF_META || linktype == TRACE_TYPE_CONTENT_INVALID) {
 		return 0;
 	}
 
