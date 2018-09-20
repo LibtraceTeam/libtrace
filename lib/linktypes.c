@@ -413,7 +413,6 @@ bool demote_packet(libtrace_packet_t *packet)
 			trace_clear_cache(packet);
 			break;
 		default:
-                        assert(0);
 			return false;
 	}
 
