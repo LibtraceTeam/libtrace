@@ -549,7 +549,9 @@ static void halt_ndag_receiver(recvstream_t *receiver) {
 		free(src.singlemsg.msg_iov);
 #endif
 
-                close(src.sock);
+                if (src.sock != -1) {
+                        close(src.sock);
+                }
         }
         if (receiver->knownmonitors) {
                 free(receiver->knownmonitors);
@@ -723,13 +725,6 @@ static int add_new_streamsock(recvstream_t *rt, streamsource_t src) {
 
         ssock = &(rt->sources[rt->sourcecount]);
 
-        ssock->sock = join_multicast_group(src.groupaddr, src.localiface,
-                        NULL, src.port, &(ssock->srcaddr));
-
-        if (ssock->sock < 0) {
-                return -1;
-        }
-
         for (i = 0; i < rt->monitorcount; i++) {
                 if (rt->knownmonitors[i].monitorid == src.monitor) {
                         mon = &(rt->knownmonitors[i]);
@@ -776,6 +771,14 @@ static int add_new_streamsock(recvstream_t *rt, streamsource_t src) {
         ssock->nextwriteind = 0;
         ssock->recordcount = 0;
         rt->sourcecount += 1;
+
+        ssock->sock = join_multicast_group(src.groupaddr, src.localiface,
+                        NULL, src.port, &(ssock->srcaddr));
+
+        if (ssock->sock < 0) {
+                return -1;
+        }
+
 	if (ssock->sock > rt->maxfd) {
 		rt->maxfd = ssock->sock;
 	}
