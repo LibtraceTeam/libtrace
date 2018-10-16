@@ -173,7 +173,7 @@ libtrace_packet_t *trace_strip_packet(libtrace_packet_t *packet) {
                 }
         }
 
-        if (nextpayload != NULL) {
+        if (nextpayload != NULL && removed > 0) {
 
                 ethernet->ether_type = ntohs(finalethertype);
                 trace_set_capture_length(packet, caplen - removed);
