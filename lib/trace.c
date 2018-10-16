@@ -1381,8 +1381,14 @@ size_t trace_get_framing_length(const libtrace_packet_t *packet) {
                 return ~0U;
         }
 
+        if (packet->framing_length >= 0) {
+                return packet->framing_length;
+        }
+
 	if (packet->trace->format->get_framing_length) {
-		return packet->trace->format->get_framing_length(packet);
+		((libtrace_packet_t *)packet)->framing_length =
+                       packet->trace->format->get_framing_length(packet);
+                return packet->framing_length;
 	}
 	return ~0U;
 }
@@ -2402,6 +2408,7 @@ void trace_clear_cache(libtrace_packet_t *packet) {
 	packet->transport_proto = 0;
 	packet->capture_length = -1;
 	packet->wire_length = -1;
+	packet->framing_length = -1;
 	packet->payload_length = -1;
 	packet->l2_remaining = 0;
 	packet->l3_remaining = 0;
