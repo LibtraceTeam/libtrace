@@ -319,6 +319,9 @@ static int linuxring_start_input(libtrace_t *libtrace)
 
 #ifdef HAVE_PACKET_FANOUT
 static int linuxring_pstart_input(libtrace_t *libtrace) {
+        /* Only because our pread is hard-coded to only do one
+         * packet at a time anyway */
+        libtrace->config.burst_size = 1;
 	return linuxcommon_pstart_input(libtrace, linuxring_start_input_stream);
 }
 #endif
@@ -608,6 +611,9 @@ static int linuxring_pread_packets(libtrace_t *libtrace,
                                    libtrace_packet_t *packets[],
                                    UNUSED size_t nb_packets) {
 	/* For now just read one packet */
+        /* If we change this to actually read nb_packets, make sure
+         * we remove the burst_size override in linuxring_pstart_input()
+         */
 	packets[0]->error = linuxring_read_stream(libtrace, packets[0],
 	                                          t->format_data, &t->messages);
 	if (packets[0]->error >= 1)
