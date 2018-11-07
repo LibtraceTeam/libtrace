@@ -34,6 +34,7 @@ configure-stamp: configure libtrace_backup.h
 	
 	./configure $(CONFFLAGS) \
 		   --prefix=/usr \
+                   --with-dpdk=yes \
 		   --mandir=\$${prefix}/share/man \
 		   --infodir=\$${prefix}/share/info
 	
