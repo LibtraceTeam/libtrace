@@ -944,19 +944,23 @@ static int check_ndag_received(streamsock_t *ssock, int index,
 static int receive_from_single_socket(streamsock_t *ssock, struct timeval *tv,
                 int *gottime, recvstream_t *rt) {
 
-        int ret, ndagstat;
+        int ret, ndagstat, avail;
         int toret = 0;
 
 #if HAVE_DECL_RECVMMSG
-	int i, avail;
+	int i;
 #endif
 
+        avail = init_receivers(ssock, ssock->bufavail);
 
 #if HAVE_DECL_RECVMMSG
-        avail = init_receivers(ssock, ssock->bufavail);
         ret = recvmmsg(ssock->sock, ssock->mmsgbufs, avail,
                         MSG_DONTWAIT, NULL);
 #else
+        if (avail != 1) {
+                return 0;
+        }
+
 	ret = recvmsg(ssock->sock, &(ssock->singlemsg), MSG_DONTWAIT);
 #endif
         if (ret < 0) {
