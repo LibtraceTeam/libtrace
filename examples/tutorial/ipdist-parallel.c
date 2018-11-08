@@ -40,8 +40,10 @@ struct network {
 	uint32_t network;
 };
 
-/* interval between outputs */
+/* interval between outputs in seconds */
 uint64_t tickrate;
+/* The octet which to plot results for */
+int octet = 0;
 
 static void per_tick(libtrace_t *trace, libtrace_thread_t *thread, void *global, void *tls, uint64_t tick) {
 
@@ -118,18 +120,18 @@ static void process_ip(struct sockaddr *ip, struct addr_local *local, struct exc
                 if(network_excluded(address, exclude) == 0) {
 
                         /* Split the IPv4 address into each octet */
-                        uint8_t octet[4];
-                        octet[0] = (address & 0xff000000) >> 24;
-                        octet[1] = (address & 0x00ff0000) >> 16;
-                        octet[2] = (address & 0x0000ff00) >> 8;
-                        octet[3] = (address & 0x000000ff);
+                        uint8_t octets[4];
+                        octets[0] = (address & 0xff000000) >> 24;
+                        octets[1] = (address & 0x00ff0000) >> 16;
+                        octets[2] = (address & 0x0000ff00) >> 8;
+                        octets[3] = (address & 0x000000ff);
 
                         /* check if the supplied address was a source or destination,
                            increment the correct one */
                         if(srcaddr) {
-                                local->src[octet[0]]++;
+                                local->src[octets[octet]]++;
                         } else {
-                                local->dst[octet[0]]++;
+                                local->dst[octets[octet]]++;
                         }
                 }
         }
@@ -176,8 +178,8 @@ static libtrace_packet_t *per_packet(libtrace_t *trace, libtrace_thread_t *threa
 		uint64_t timestamp = trace_get_erf_timestamp(packet);
 
 		/* We only want to call per_tick if we are due to output something
-		 * Right shifting these converts them to seconds */
-		if((timestamp >> 32) >= (local->lastkey >> 32) + (tickrate/1000)) {
+		 * Right shifting these converts them to seconds, tickrate is in seconds */
+		if((timestamp >> 32) >= (local->lastkey >> 32) + tickrate) {
 			per_tick(trace, thread,global, local, timestamp);
 			local->lastkey = timestamp;
 		}
@@ -294,7 +296,7 @@ static void per_result(libtrace_t *trace, libtrace_thread_t *sender, void *globa
 	tally->packets += results->packets;
 
 	/* If the current timestamp is greater than the last printed plus the interval, output a result */
-	if((key >> 32) >= (tally->lastkey >> 32) + (tickrate/1000)) {
+	if((key >> 32) >= (tally->lastkey >> 32) + tickrate) {
 
 		/* update last key */
                 tally->lastkey = key;
@@ -328,6 +330,49 @@ static void stop_reporter(libtrace_t *trace, libtrace_thread_t *thread, void *gl
 	free(tally);
 }
 
+static void libtrace_cleanup(libtrace_t *trace, libtrace_callback_set_t *processing,
+	libtrace_callback_set_t *reporting) {
+	/* Only destroy if the structure exists */
+	if(trace) {
+		trace_destroy(trace);
+	}
+	if(processing) {
+		trace_destroy_callback_set(processing);
+	}
+	if(reporting) {
+		trace_destroy_callback_set(reporting);
+	}
+}
+
+/* Converts a string representation eg 1.2.3.4/24 into a network structure */
+static int get_network(char *network_string, struct network *network) {
+
+	char delim[] = "/";
+	/* Split the address and mask portion of the string */
+	char *address = strtok(network_string, delim);
+	char *mask = strtok(NULL, delim);
+
+	/* Check the subnet mask is valid */
+	if(atoi(mask) == 0 || atoi(mask) > 32 || atoi(mask) < 0) {
+		return 1;
+        }
+        /* right shift so netmask is in network byte order */
+        network->mask = 0xffffffff << (32 - atoi(mask));
+
+        struct in_addr addr;
+        /* Convert address string into uint32_t and check its valid */
+        if(inet_aton(address, &addr) == 0) {
+        	return 2;
+        }
+        /* Ensure its saved in network byte order */
+        network->address = htonl(addr.s_addr);
+
+       	/* Calculate the network address */
+        network->network = network->address & network->mask;
+
+	return 0;
+}
+
 int main(int argc, char *argv[]) {
 
 	libtrace_t *trace;
@@ -336,11 +381,11 @@ int main(int argc, char *argv[]) {
 
 	/* Ensure the input URI was supplied */
         if(argc < 3) {
-                fprintf(stderr, "Usage: %s inputURI outputInterval [excluded networks]\n", argv[0]);
-                fprintf(stderr, "       eg. ./ipdist input.erf 10000 210.10.3.0/24 70.5.0.0/16\n");
+                fprintf(stderr, "Usage: %s inputURI [outputInterval (Seconds)] [excluded networks]\n", argv[0]);
+                fprintf(stderr, "       eg. ./ipdist input.erf 60 210.10.3.0/24 70.5.0.0/16\n");
                 return 1;
         }
-	/* Convert tick into correct format */
+	/* Convert tick into an int */
 	tickrate = atoi(argv[2]);
 
 	/* Create the trace */
@@ -372,7 +417,8 @@ int main(int argc, char *argv[]) {
 
 	/* Set the tick interval only if this is a live capture */
 	if(trace_get_information(trace)->live) {
-		trace_set_tick_interval(trace, tickrate);
+		/* tickrate is in seconds but tick_interval expects milliseconds */
+		trace_set_tick_interval(trace, tickrate*1000);
 	}
 	/* Do not buffer the reports */
 	trace_set_reporter_thold(trace, 1);
@@ -383,43 +429,23 @@ int main(int argc, char *argv[]) {
 	exclude->networks = malloc(sizeof(struct network)*(argc-3));
 	if(exclude == NULL || exclude->networks == NULL) {
 		fprintf(stderr, "Unable to allocate memory");
+		libtrace_cleanup(trace, processing, reporter);
 		return 1;
 	}
 	exclude->count = 0;
 
-	char delim[] = "/";
 	int i;
 	for(i=0;i<argc-3;i++) {
-		char *address = strtok(argv[i+3], delim);
-		char *mask = strtok(NULL, delim);
-
-		/* Check the subnet mask is valid */
-		if(atoi(mask) == 0 || atoi(mask) > 32 || atoi(mask) < 0) {
-			fprintf(stderr, "Invalid subnet mask: %s\n", mask);
-                        return 1;
-		}
-		/* right shift so netmask is in network byte order */
-        	exclude->networks[i].mask = 0xffffffff << (32 - atoi(mask));
-
-        	struct in_addr addr;
-        	/* Convert address string into uint32_t and check its valid */
-        	if(inet_aton(address, &addr) == 0) {
-			fprintf(stderr, "Invalid exclude address: %s\n", address);
-			return 1;
-		}
-		/* Ensure its saved in network byte order */
-        	exclude->networks[i].address = htonl(addr.s_addr);
-
-		/* Calculate the network address */
-		exclude->networks[i].network = exclude->networks[i].address & exclude->networks[i].mask;
-
-		/* Increment counter of excluded networks */
+		/* convert the network string into a network structure */
+		get_network(argv[i+3], &exclude->networks[i]);
+		/* increment the count of excluded networks */
 		exclude->count += 1;
 	}
 
 	/* Start the trace, if it errors return */
 	if(trace_pstart(trace, exclude, processing, reporter)) {
 		trace_perror(trace, "Starting parallel trace");
+		libtrace_cleanup(trace, processing, reporter);
 		return 1;
 	}
 
@@ -429,9 +455,7 @@ int main(int argc, char *argv[]) {
 	/* Clean up everything */
 	free(exclude->networks);
 	free(exclude);
-	trace_destroy(trace);
-	trace_destroy_callback_set(processing);
-	trace_destroy_callback_set(reporter);
+	libtrace_cleanup(trace, processing, reporter);
 
 	return 0;
 }
