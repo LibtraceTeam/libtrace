@@ -9,22 +9,8 @@
 
 /* Structure to hold the counters each thread has its own one of these */
 struct addr_local {
-	uint64_t src[256];
-	uint64_t dst[256];
-	uint64_t lastkey;
-	uint64_t packets;
-};
-/* Structure to hold the result from a processing thread */
-struct addr_result {
-	uint64_t src[256];
-	uint64_t dst[256];
-	uint64_t packets;
-};
-/* Structure to hold counters the report has one of these, it combines
- * the the counters of each threads local storage used by the reporter thread */
-struct addr_tally {
-	uint64_t src[256];
-	uint64_t dst[256];
+	uint64_t src[4][256];
+	uint64_t dst[4][256];
 	uint64_t lastkey;
 	uint64_t packets;
 };
@@ -42,24 +28,23 @@ struct network {
 
 /* interval between outputs in seconds */
 uint64_t tickrate;
-/* The octet which to plot results for */
-int octet = 0;
 
 static void per_tick(libtrace_t *trace, libtrace_thread_t *thread, void *global, void *tls, uint64_t tick) {
 
-	struct addr_result *result = (struct addr_result *)malloc(sizeof(struct addr_result));
+	struct addr_local *result = (struct addr_local *)malloc(sizeof(struct addr_local));
 	/* Proccessing thread local storage */
 	struct addr_local *local = (struct addr_local *)tls;
 
 	/* Populate the result structure from the threads local storage and clear threads local storage*/
-	int i;
-	for(i=0;i<256;i++) {
-		/* Populate results */
-		result->src[i] = local->src[i];
-		result->dst[i] = local->dst[i];
-		/* Clear local storage */
-		local->src[i] = 0;
-		local->dst[i] = 0;
+	int i, j;
+	for(i=0;i<4;i++) {
+		for(j=0;j<256;j++) {
+			result->src[i][j] = local->src[i][j];
+			result->dst[i][j] = local->dst[i][j];
+			/* clear local storage */
+			local->src[i][j] = 0;
+			local->dst[i][j] = 0;
+		}
 	}
 	result->packets = local->packets;
 	local->packets = 0;
@@ -73,10 +58,12 @@ static void *start_callback(libtrace_t *trace, libtrace_thread_t *thread, void *
 
         /* Create and initialize the local counter struct */
         struct addr_local *local = (struct addr_local *)malloc(sizeof(struct addr_local));
-        int i;
-        for(i=0;i<256;i++) {
-                local->src[i] = 0;
-                local->dst[i] = 0;
+        int i, j;
+        for(i=0;i<4;i++) {
+		for(j=0;j<256;j++) {
+			local->src[i][j] = 0;
+			local->dst[i][j] = 0;
+		}
         }
 	local->lastkey = 0;
 	local->packets = 0;
@@ -120,18 +107,24 @@ static void process_ip(struct sockaddr *ip, struct addr_local *local, struct exc
                 if(network_excluded(address, exclude) == 0) {
 
                         /* Split the IPv4 address into each octet */
-                        uint8_t octets[4];
-                        octets[0] = (address & 0xff000000) >> 24;
-                        octets[1] = (address & 0x00ff0000) >> 16;
-                        octets[2] = (address & 0x0000ff00) >> 8;
-                        octets[3] = (address & 0x000000ff);
+                        uint8_t octet[4];
+                        octet[0] = (address & 0xff000000) >> 24;
+                        octet[1] = (address & 0x00ff0000) >> 16;
+                        octet[2] = (address & 0x0000ff00) >> 8;
+                        octet[3] = (address & 0x000000ff);
 
                         /* check if the supplied address was a source or destination,
                            increment the correct one */
                         if(srcaddr) {
-                                local->src[octets[octet]]++;
+				int i;
+				for(i=0;i<4;i++) {
+					local->src[i][octet[i]] += 1;
+				}
                         } else {
-                                local->dst[octets[octet]]++;
+                                int i;
+                                for(i=0;i<4;i++) {
+                                        local->dst[i][octet[i]] += 1;
+                                }
                         }
                 }
         }
@@ -195,13 +188,15 @@ static void stop_processing(libtrace_t *trace, libtrace_thread_t *thread, void *
 	/* cast the local storage structure */
 	struct addr_local *local = (struct addr_local *)tls;
 	/* Create structure to store the result */
-	struct addr_result *result = (struct addr_result *)malloc(sizeof(struct addr_result));
+	struct addr_local *result = (struct addr_local *)malloc(sizeof(struct addr_local));
 
 	/* Populate the result */
-	int i;
-	for(i=0;i<256;i++) {
-		result->src[i] = local->src[i];
-		result->dst[i] = local->dst[i];
+	int i, j;
+	for(i=0;i<4;i++) {
+		for(j=0;j<256;j++) {
+			result->src[i][j] = local->src[i][j];
+			result->dst[i][j] = local->dst[i][j];
+		}
 	}
 	result->packets = local->packets;
 
@@ -215,13 +210,15 @@ static void stop_processing(libtrace_t *trace, libtrace_thread_t *thread, void *
 /* Starting callback for reporter thread */
 static void *start_reporter(libtrace_t *trace, libtrace_thread_t *thread, void *global) {
         /* Create tally structure */
-        struct addr_tally *tally = (struct addr_tally *)malloc(sizeof(struct addr_tally));
+        struct addr_local *tally = (struct addr_local *)malloc(sizeof(struct addr_local));
 
         /* Initialize the tally structure */
-        int i;
-        for(i=0;i<256;i++) {
-                tally->src[i] = 0;
-                tally->dst[i] = 0;
+        int i, j;
+        for(i=0;i<4;i++) {
+		for(j=0;j<256;j++) {
+                	tally->src[i][j] = 0;
+                	tally->dst[i][j] = 0;
+		}
         }
 	tally->lastkey = 0;
 	tally->packets = 0;
@@ -229,7 +226,7 @@ static void *start_reporter(libtrace_t *trace, libtrace_thread_t *thread, void *
         return tally;
 }
 
-static void plot_results(struct addr_tally *tally, uint64_t tick) {
+static void plot_results(struct addr_local *tally, uint64_t tick) {
 
         /* Get the current time */
         time_t current_time = time(NULL);
@@ -241,9 +238,15 @@ static void plot_results(struct addr_tally *tally, uint64_t tick) {
 
 	/* Push all data into data file */
 	FILE *tmp = fopen(outputfile, "w");
-        int i;
-        for(i=0;i<255;i++) {
-                fprintf(tmp, "%d %d %d\n", i, tally->src[i], tally->dst[i]);
+        int i, j;
+	fprintf(tmp, "#num\toctet1\t\toctet2\t\toctet3\t\toctet4\n");
+	fprintf(tmp, "#\tsrc\tdst\tsrc\tdst\tsrc\tdst\tsrc\tdst\n");
+        for(i=0;i<256;i++) {
+		fprintf(tmp, "%d", i);
+		for(j=0;j<4;j++) {
+			fprintf(tmp, "\t%d\t%d", tally->src[j][i], tally->dst[j][i]);
+		}
+		fprintf(tmp, "\n");
         }
         fclose(tmp);
 	printf("wrote out to file %s\n", outputfile);
@@ -257,6 +260,7 @@ static void plot_results(struct addr_tally *tally, uint64_t tick) {
 	fprintf(gnuplot, "set xlabel 'Prefix'\n");
 	fprintf(gnuplot, "set ylabel 'Hits'\n");
 	fprintf(gnuplot, "set xtics 0,10,255\n");
+	//fprintf(gnuplot, "set datafile commentschars '#!%'");
 	fprintf(gnuplot, "set output '%s'\n", outputplot);
 	fprintf(gnuplot, "plot '%s' using 1:2 title 'Source address' with boxes, '%s' using 1:3 title 'Destination address' with boxes\n", outputfile, outputfile);
 	fprintf(gnuplot, "replot");
@@ -268,8 +272,8 @@ static void plot_results(struct addr_tally *tally, uint64_t tick) {
 static void per_result(libtrace_t *trace, libtrace_thread_t *sender, void *global,
         void *tls, libtrace_result_t *result) {
 
-        struct addr_result *results;
-        struct addr_tally *tally;
+        struct addr_local *results;
+        struct addr_local *tally;
 	uint64_t key;
 
         /* We only want to handle results containing our user-defined structure  */
@@ -282,16 +286,18 @@ static void per_result(libtrace_t *trace, libtrace_thread_t *sender, void *globa
         key = result->key;
 
         /* result->value is a libtrace_generic_t that was passed into trace_publish_results() */
-        results = (struct addr_result *)result->value.ptr;
+        results = (struct addr_local *)result->value.ptr;
 
         /* Grab our tally out of thread local storage */
-        tally = (struct addr_tally *)tls;
+        tally = (struct addr_local *)tls;
 
 	/* Add all the results to the tally */
-	int i;
-	for(i=0;i<256;i++) {
-		tally->src[i] += results->src[i];
-		tally->dst[i] += results->dst[i];
+	int i, j;
+	for(i=0;i<4;i++) {
+		for(j=0;j<256;j++) {
+			tally->src[i][j] += results->src[i][j];
+			tally->dst[i][j] += results->dst[i][j];
+		}
 	}
 	tally->packets += results->packets;
 
@@ -305,9 +311,11 @@ static void per_result(libtrace_t *trace, libtrace_thread_t *sender, void *globa
                 plot_results(tally, key >> 32);
 
                 /* clear the tally */
-                for(i=0;i<256;i++) {
-                        tally->src[i] = 0;
-                        tally->dst[i] = 0;
+                for(i=0;i<4;i++) {
+			for(j=0;j<256;j++) {
+                        	tally->src[i][j] = 0;
+                        	tally->dst[i][j] = 0;
+			}
                 }
 		tally->packets = 0;
         }
@@ -320,7 +328,7 @@ static void per_result(libtrace_t *trace, libtrace_thread_t *sender, void *globa
 static void stop_reporter(libtrace_t *trace, libtrace_thread_t *thread, void *global, void *tls) {
 
         /* Get the tally from the thread local storage */
-        struct addr_tally *tally = (struct addr_tally *)tls;
+        struct addr_local *tally = (struct addr_local *)tls;
 
 	/* If there is any remaining data in the tally plot it */
 	if(tally->packets > 0) {
@@ -379,6 +387,7 @@ int main(int argc, char *argv[]) {
 	/* Callbacks for processing and reporting threads */
 	libtrace_callback_set_t *processing, *reporter;
 
+
 	/* Ensure the input URI was supplied */
         if(argc < 3) {
                 fprintf(stderr, "Usage: %s inputURI [outputInterval (Seconds)] [excluded networks]\n", argv[0]);
@@ -387,6 +396,7 @@ int main(int argc, char *argv[]) {
         }
 	/* Convert tick into an int */
 	tickrate = atoi(argv[2]);
+
 
 	/* Create the trace */
         trace = trace_create(argv[1]);
@@ -433,14 +443,17 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 	exclude->count = 0;
-
 	int i;
 	for(i=0;i<argc-3;i++) {
 		/* convert the network string into a network structure */
-		get_network(argv[i+3], &exclude->networks[i]);
+		if(get_network(argv[i+3], &exclude->networks[i]) != 0) {
+			fprintf(stderr, "Error creating excluded network");
+			return 1;
+		}
 		/* increment the count of excluded networks */
 		exclude->count += 1;
 	}
+
 
 	/* Start the trace, if it errors return */
 	if(trace_pstart(trace, exclude, processing, reporter)) {
