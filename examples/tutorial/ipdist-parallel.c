@@ -142,6 +142,11 @@ static libtrace_packet_t *per_packet(libtrace_t *trace, libtrace_thread_t *threa
         /* Regain access to the address counter structure */
         struct addr_local *local = (struct addr_local *)tls;
 
+	/* If this is the first packet set the lastkey to the packets timestamp */
+	if(local->lastkey == 0) {
+		local->lastkey = trace_get_erf_timestamp(packet);
+	}
+
 	/* Increment the packet count */
 	local->packets += 1;
 
@@ -170,7 +175,8 @@ static libtrace_packet_t *per_packet(libtrace_t *trace, libtrace_thread_t *threa
 		/* get the current packets timestamp */
 		uint64_t timestamp = trace_get_erf_timestamp(packet);
 
-		/* We only want to call per_tick if we are due to output something */
+		/* We only want to call per_tick if we are due to output something
+		 * Right shifting these converts them to seconds */
 		if((timestamp >> 32) >= (local->lastkey >> 32) + (tickrate/1000)) {
 			per_tick(trace, thread,global, local, timestamp);
 			local->lastkey = timestamp;
@@ -193,12 +199,11 @@ static void stop_processing(libtrace_t *trace, libtrace_thread_t *thread, void *
 	int i;
 	for(i=0;i<256;i++) {
 		result->src[i] = local->src[i];
-		result->src[i] = local->src[i];
+		result->dst[i] = local->dst[i];
 	}
 	result->packets = local->packets;
 
-	/* This will not cause the result to be printed but will atleast end up going into our tally
-	 * The reporter thread can then deal with it when it closes */
+	/* Send the final results to the combiner */
 	trace_publish_result(trace, thread, 0, (libtrace_generic_t){.ptr=result}, RESULT_USER);
 
 	/* Cleanup the local storage */
@@ -317,7 +322,7 @@ static void stop_reporter(libtrace_t *trace, libtrace_thread_t *thread, void *gl
 
 	/* If there is any remaining data in the tally plot it */
 	if(tally->packets > 0) {
-		plot_results(tally, (tally->lastkey >> 32) + tickrate);
+		plot_results(tally, (tally->lastkey >> 32) + 1);
 	}
 	/* Cleanup tally results*/
 	free(tally);
