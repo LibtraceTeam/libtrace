@@ -751,6 +751,17 @@ static int add_new_streamsock(recvstream_t *rt, streamsource_t src) {
                 ssock->savedsize[i] = 0;
         }
 
+        ssock->sock = join_multicast_group(src.groupaddr, src.localiface,
+                        NULL, src.port, &(ssock->srcaddr));
+
+        if (ssock->sock < 0) {
+                return -1;
+        }
+
+	if (ssock->sock > rt->maxfd) {
+		rt->maxfd = ssock->sock;
+	}
+
 #if HAVE_DECL_RECVMMSG
         for (i = 0; i < RECV_BATCH_SIZE; i++) {
                 ssock->mmsgbufs[i].msg_hdr.msg_iov = (struct iovec *)
@@ -771,17 +782,6 @@ static int add_new_streamsock(recvstream_t *rt, streamsource_t src) {
         ssock->nextwriteind = 0;
         ssock->recordcount = 0;
         rt->sourcecount += 1;
-
-        ssock->sock = join_multicast_group(src.groupaddr, src.localiface,
-                        NULL, src.port, &(ssock->srcaddr));
-
-        if (ssock->sock < 0) {
-                return -1;
-        }
-
-	if (ssock->sock > rt->maxfd) {
-		rt->maxfd = ssock->sock;
-	}
 
         fprintf(stderr, "Added new stream %s:%u to thread %d\n",
                         ssock->groupaddr, ssock->port, rt->threadindex);
