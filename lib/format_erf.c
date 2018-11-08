@@ -468,7 +468,7 @@ static int erf_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
 	if (erfptr->flags.rxerror == 1) {
 		packet->payload = NULL;
 	} else {
-		packet->payload = (char*)packet->buffer + trace_get_framing_length(packet);
+		packet->payload = ((char*)packet->buffer) + trace_get_framing_length(packet);
 	}
 
         assert(erfptr->rlen != 0);
