@@ -130,6 +130,7 @@ static char *xstrndup(const char *src,size_t n)
 
 
 /* call all the constructors if they haven't yet all been called */
+__attribute__((constructor))
 static void trace_init(void)
 {
         struct timeval tv;
