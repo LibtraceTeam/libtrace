@@ -1,6 +1,3 @@
-/* Program reads a trace file and counts the first octet of the source and destination
- * address and plots them on a graph using gnuplot.
- */
 #include "libtrace_parallel.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -43,7 +40,31 @@ struct network {
 	uint32_t network;
 };
 
+/* interval between outputs */
 uint64_t tickrate;
+
+static void per_tick(libtrace_t *trace, libtrace_thread_t *thread, void *global, void *tls, uint64_t tick) {
+
+	struct addr_result *result = (struct addr_result *)malloc(sizeof(struct addr_result));
+	/* Proccessing thread local storage */
+	struct addr_local *local = (struct addr_local *)tls;
+
+	/* Populate the result structure from the threads local storage and clear threads local storage*/
+	int i;
+	for(i=0;i<256;i++) {
+		/* Populate results */
+		result->src[i] = local->src[i];
+		result->dst[i] = local->dst[i];
+		/* Clear local storage */
+		local->src[i] = 0;
+		local->dst[i] = 0;
+	}
+	result->packets = local->packets;
+	local->packets = 0;
+
+	/* Push result to the combiner */
+	trace_publish_result(trace, thread, tick, (libtrace_generic_t){.ptr=result}, RESULT_USER);
+}
 
 /* Start callback function - This is run for each thread when it starts */
 static void *start_callback(libtrace_t *trace, libtrace_thread_t *thread, void *global) {
@@ -121,9 +142,6 @@ static libtrace_packet_t *per_packet(libtrace_t *trace, libtrace_thread_t *threa
         /* Regain access to the address counter structure */
         struct addr_local *local = (struct addr_local *)tls;
 
-	/* Store the timestamp of the last packet in erf format
-	 * We use the timestamp in the packet for processing non live traces */
-	local->lastkey = trace_get_erf_timestamp(packet);
 	/* Increment the packet count */
 	local->packets += 1;
 
@@ -146,6 +164,18 @@ static libtrace_packet_t *per_packet(libtrace_t *trace, libtrace_thread_t *threa
         if(ip != NULL) {
                 process_ip(ip, local, exclude, 0);
         }
+
+	/* If this trace is not live we will manually call "per tick" */
+	if(!trace_get_information(trace)->live) {
+		/* get the current packets timestamp */
+		uint64_t timestamp = trace_get_erf_timestamp(packet);
+
+		/* We only want to call per_tick if we are due to output something */
+		if((timestamp >> 32) >= (local->lastkey >> 32) + (tickrate/1000)) {
+			per_tick(trace, thread,global, local, timestamp);
+			local->lastkey = timestamp;
+		}
+	}
 
         /* Return the packet to libtrace */
         return packet;
@@ -240,7 +270,8 @@ static void per_result(libtrace_t *trace, libtrace_thread_t *sender, void *globa
                 return;
         }
 
-        /* This key is the key that was passed into trace_publish_results */
+        /* This key is the key that was passed into trace_publish_results
+	 * this will contain the erf timestamp for the packet */
         key = result->key;
 
         /* result->value is a libtrace_generic_t that was passed into trace_publish_results() */
@@ -292,36 +323,6 @@ static void stop_reporter(libtrace_t *trace, libtrace_thread_t *thread, void *gl
 	free(tally);
 }
 
-static void per_tick(libtrace_t *trace, libtrace_thread_t *thread, void *global, void *tls, uint64_t tick) {
-
-	struct addr_result *result = (struct addr_result *)malloc(sizeof(struct addr_result));
-	/* Proccessing thread local storage */
-	struct addr_local *local = (struct addr_local *)tls;
-
-	/* Populate the result structure from the threads local storage and clear threads local storage*/
-	int i;
-	for(i=0;i<256;i++) {
-		/* Populate results */
-		result->src[i] = local->src[i];
-		result->dst[i] = local->dst[i];
-		/* Clear local storage */
-		local->src[i] = 0;
-		local->dst[i] = 0;
-	}
-	result->packets = local->packets;
-
-	/* only use the tick timestamp if running against a live capture */
-	uint64_t key;
-	if(trace_get_information(trace)->live) {
-		key = tick;
-	} else {
-		key = local->lastkey;
-	}
-
-	/* Push result to the combiner */
-	trace_publish_result(trace, thread, key, (libtrace_generic_t){.ptr=result}, RESULT_USER);
-}
-
 int main(int argc, char *argv[]) {
 
 	libtrace_t *trace;
@@ -364,8 +365,10 @@ int main(int argc, char *argv[]) {
 	/* Try to balance the load across all processing threads */
 	trace_set_hasher(trace, HASHER_BALANCE, NULL, NULL);
 
-	/* Set the tick interval */
-	trace_set_tick_interval(trace, tickrate);
+	/* Set the tick interval only if this is a live capture */
+	if(trace_get_information(trace)->live) {
+		trace_set_tick_interval(trace, tickrate);
+	}
 	/* Do not buffer the reports */
 	trace_set_reporter_thold(trace, 1);
 
