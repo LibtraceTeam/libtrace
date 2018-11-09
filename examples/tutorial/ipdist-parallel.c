@@ -9,10 +9,17 @@
 
 /* Structure to hold the counters each thread has its own one of these */
 struct addr_local {
+	/* Holds the counts of each number occurance per octet, These are cleared after every output. */
 	uint64_t src[4][256];
 	uint64_t dst[4][256];
+	/* Maintains a running average over. Only used within the tally */
+	uint64_t src_lastoutput[4][256];
+	uint64_t dst_lastoutput[4][256];
+	/* Holds the timestamp */
 	uint64_t lastkey;
+	/* Is the count of the number of packets processed, This is cleared after every output. */
 	uint64_t packets;
+	uint64_t output_count;
 };
 
 /* Structure to hold excluded networks */
@@ -173,7 +180,7 @@ static libtrace_packet_t *per_packet(libtrace_t *trace, libtrace_thread_t *threa
 		/* We only want to call per_tick if we are due to output something
 		 * Right shifting these converts them to seconds, tickrate is in seconds */
 		if((timestamp >> 32) >= (local->lastkey >> 32) + tickrate) {
-			per_tick(trace, thread,global, local, timestamp);
+			per_tick(trace, thread, global, local, timestamp);
 			local->lastkey = timestamp;
 		}
 	}
@@ -218,18 +225,18 @@ static void *start_reporter(libtrace_t *trace, libtrace_thread_t *thread, void *
 		for(j=0;j<256;j++) {
                 	tally->src[i][j] = 0;
                 	tally->dst[i][j] = 0;
+			tally->src_lastoutput[i][j] = 0;
+			tally->dst_lastoutput[i][j] = 0;
 		}
         }
 	tally->lastkey = 0;
 	tally->packets = 0;
+	tally->output_count = 0;
 
         return tally;
 }
 
 static void plot_results(struct addr_local *tally, uint64_t tick) {
-
-        /* Get the current time */
-        time_t current_time = time(NULL);
 
 	char outputfile[255];
 	char outputplot[255];
@@ -239,17 +246,32 @@ static void plot_results(struct addr_local *tally, uint64_t tick) {
 	/* Push all data into data file */
 	FILE *tmp = fopen(outputfile, "w");
         int i, j;
-	fprintf(tmp, "#num\toctet1\t\toctet2\t\toctet3\t\toctet4\n");
-	fprintf(tmp, "#\tsrc\tdst\tsrc\tdst\tsrc\tdst\tsrc\tdst\n");
+	fprintf(tmp, "#Hits\t\t\t\t\t\t\t\t\tPercentage Change\n");
+	fprintf(tmp, "#num\toctet1\t\toctet2\t\toctet3\t\toctet4\t\toctet1\t\toctet2\t\toctet3\t\toctet4\n");
+	fprintf(tmp, "#\tsrc\tdst\tsrc\tdst\tsrc\tdst\tsrc\tdst\tsrc\tdst\tsrc\tdst\tsrc\tdst\tsrc\tdst\n");
         for(i=0;i<256;i++) {
 		fprintf(tmp, "%d", i);
 		for(j=0;j<4;j++) {
 			fprintf(tmp, "\t%d\t%d", tally->src[j][i], tally->dst[j][i]);
 		}
+
+		/* Calculates the percentage change from the last output */
+		for(j=0;j<4;j++) {
+			float src_inc = 0;
+			float dst_inc = 0;
+			if(tally->src[j][i] != 0) {
+				src_inc = (((float)tally->src[j][i] - (float)tally->src_lastoutput[j][i]) / (float)tally->src[j][i]) * 100;
+			}
+			if(tally->dst[j][i] != 0) {
+				dst_inc = (((float)tally->dst[j][i] - (float)tally->dst_lastoutput[j][i]) / (float)tally->dst[j][i]) * 100;
+			}
+			fprintf(tmp, "\t%.0f\t%.0f", src_inc, dst_inc);
+		}
+
 		fprintf(tmp, "\n");
         }
         fclose(tmp);
-	printf("wrote out to file %s\n", outputfile);
+	printf("Ouput data file %s and plot %s\n", outputfile, outputplot);
 
         /* Open pipe to gnuplot */
         FILE *gnuplot = popen("gnuplot -persistent", "w");
@@ -259,10 +281,29 @@ static void plot_results(struct addr_local *tally, uint64_t tick) {
 	fprintf(gnuplot, "set xrange[0:255]\n");
 	fprintf(gnuplot, "set xlabel 'Prefix'\n");
 	fprintf(gnuplot, "set ylabel 'Hits'\n");
+	fprintf(gnuplot, "set y2label 'Percentage Change'\n");
 	fprintf(gnuplot, "set xtics 0,10,255\n");
-	//fprintf(gnuplot, "set datafile commentschars '#!%'");
+	fprintf(gnuplot, "set y2range[-100:100]\n");
+	//fprintf(gnuplot, "set ytics nomirror\n");
+	//fprintf(gnuplot, "set y2tics\n");
+	//fprintf(gnuplot, "set tics out\n");
 	fprintf(gnuplot, "set output '%s'\n", outputplot);
-	fprintf(gnuplot, "plot '%s' using 1:2 title 'Source address' with boxes, '%s' using 1:3 title 'Destination address' with boxes\n", outputfile, outputfile);
+	fprintf(gnuplot, "plot '%s' using 1:2 title 'Source octet 1' axes x1y1 with boxes,", outputfile);
+	fprintf(gnuplot, "'%s' using 1:3 title 'Destination octet 1' axes x1y1 with boxes,", outputfile);
+	//fprintf(gnuplot, "'%s' using 1:4 title 'Source octet 2' axes x1y1 with boxes,", outputfile);
+	//fprintf(gnuplot, "'%s' using 1:5 title 'Destination octet 2' axes x1y1 with boxes,", outputfile);
+	//fprintf(gnuplot, "'%s' using 1:6 title 'Source octet 3' axes x1y1 with boxes,", outputfile);
+	//fprintf(gnuplot, "'%s' using 1:7 title 'Destination octet 3' axes x1y1 with boxes,", outputfile);
+	//fprintf(gnuplot, "'%s' using 1:8 title 'Source octet 4' axes x1y1 with boxes,", outputfile);
+	//fprintf(gnuplot, "'%s' using 1:9 title 'Destination octet 4' axes x1y1 with boxes,", outputfile);
+	fprintf(gnuplot, "'%s' using 1:10 title 'Octet 1 source change' axes x1y2 with lines,", outputfile);
+	fprintf(gnuplot, "'%s' using 1:11 title 'Octet 1 destination change' axes x1y2 with lines\n", outputfile);
+	//fprintf(gnuplot, "'%s' using 1:12 title 'Octet 2 source change' axes x1y2 with lines,", outputfile);
+	//fprintf(gnuplot, "'%s' using 1:13 title 'Octet 2 destination change' axes x1y2 with lines,", outputfile);
+	//fprintf(gnuplot, "'%s' using 1:14 title 'Octet 3 source change' axes x1y2 with lines,", outputfile);
+	//fprintf(gnuplot, "'%s' using 1:15 title 'Octet 3 destination change' axes x1y2 with lines,", outputfile);
+	//fprintf(gnuplot, "'%s' using 1:16 title 'Octet 4 source change' axes x1y2 with lines,", outputfile);
+	//fprintf(gnuplot, "'%s' using 1:17 title 'Octet 4 destination change' axes x1y2 with lines\n", outputfile);
 	fprintf(gnuplot, "replot");
         pclose(gnuplot);
 }
@@ -307,12 +348,27 @@ static void per_result(libtrace_t *trace, libtrace_thread_t *sender, void *globa
 		/* update last key */
                 tally->lastkey = key;
 
-                /* Plot the result with the key in epoch seconds*/
+		/* Need to initialise lastoutput values on first pass */
+		if(tally->output_count == 0) {
+			for(i=0;i<4;i++) {
+				for(j=0;j<256;j++) {
+					tally->src_lastoutput[i][j] = tally->src[i][j];
+                        	        tally->dst_lastoutput[i][j] = tally->dst[i][j];
+				}
+			}
+		}
+
+		/* Plot the result with the key in epoch seconds*/
                 plot_results(tally, key >> 32);
 
-                /* clear the tally */
+		/* increment the output counter */
+		tally->output_count++;
+
+                /* clear the tally but copy old values over first*/
                 for(i=0;i<4;i++) {
 			for(j=0;j<256;j++) {
+				tally->src_lastoutput[i][j] = tally->src[i][j];
+				tally->dst_lastoutput[i][j] = tally->dst[i][j];
                         	tally->src[i][j] = 0;
                         	tally->dst[i][j] = 0;
 			}
