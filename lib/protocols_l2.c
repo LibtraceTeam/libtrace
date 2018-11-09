@@ -173,7 +173,7 @@ libtrace_packet_t *trace_strip_packet(libtrace_packet_t *packet) {
                 }
         }
 
-        if (nextpayload != NULL) {
+        if (nextpayload != NULL && removed > 0) {
 
                 ethernet->ether_type = ntohs(finalethertype);
                 trace_set_capture_length(packet, caplen - removed);
@@ -485,6 +485,7 @@ DLLEXPORT void *trace_get_layer2(const libtrace_packet_t *packet,
                 case TRACE_TYPE_ETSILI:
 			break;
 		case TRACE_TYPE_UNKNOWN:
+		case TRACE_TYPE_CONTENT_INVALID:
 			return NULL;
 	}
 
@@ -522,6 +523,7 @@ DLLEXPORT void *trace_get_layer2(const libtrace_packet_t *packet,
                                 case TRACE_TYPE_ETSILI:
 					break;
 				case TRACE_TYPE_UNKNOWN:
+		                case TRACE_TYPE_CONTENT_INVALID:
 					return NULL;
 			}
 			
@@ -564,7 +566,8 @@ DLLEXPORT void *trace_get_payload_from_layer2(void *link,
 {
 	void *l;
 
-	if (linktype == TRACE_TYPE_UNKNOWN) {
+	if (linktype == TRACE_TYPE_UNKNOWN ||
+                        linktype == TRACE_TYPE_CONTENT_INVALID) {
 		fprintf(stderr, "Unable to determine linktype for packet\n");
 		return NULL;
 	}
@@ -588,6 +591,7 @@ DLLEXPORT void *trace_get_payload_from_layer2(void *link,
 		case TRACE_TYPE_METADATA:
 		case TRACE_TYPE_NONDATA:
 		case TRACE_TYPE_ERF_META:
+		case TRACE_TYPE_CONTENT_INVALID:
 		case TRACE_TYPE_UNKNOWN:
 			return NULL;
 
@@ -692,6 +696,7 @@ DLLEXPORT uint8_t *trace_get_source_mac(libtrace_packet_t *packet) {
 		case TRACE_TYPE_OPENBSD_LOOP:
 		case TRACE_TYPE_ERF_META:
 		case TRACE_TYPE_UNKNOWN:
+		case TRACE_TYPE_CONTENT_INVALID:
                         return NULL;
 
                 /* Metadata headers should already be skipped */
@@ -743,6 +748,7 @@ DLLEXPORT uint8_t *trace_get_destination_mac(libtrace_packet_t *packet)
 		case TRACE_TYPE_OPENBSD_LOOP:
 		case TRACE_TYPE_ERF_META:
 		case TRACE_TYPE_UNKNOWN:
+		case TRACE_TYPE_CONTENT_INVALID:
                         /* No MAC address */
                         return NULL;
                 /* Metadata headers should already be skipped */

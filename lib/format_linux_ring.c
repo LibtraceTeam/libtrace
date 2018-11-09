@@ -251,6 +251,15 @@ static inline int linuxring_start_input_stream(libtrace_t *libtrace,
                                                struct linux_per_stream_t *stream) {
 	char error[2048];
 
+        /* Unmap any previous ring buffers associated with this stream. */
+        if (stream->rx_ring != MAP_FAILED) {
+                munmap(stream->rx_ring, stream->req.tp_block_size *
+                                stream->req.tp_block_nr);
+                stream->rx_ring = MAP_FAILED;
+                stream->rxring_offset = 0;
+        }
+
+
 	/* We set the socket up the same and then convert it to PACKET_MMAP */
 	if (linuxcommon_start_input_stream(libtrace, stream) < 0)
 		return -1;
@@ -273,6 +282,34 @@ static inline int linuxring_start_input_stream(libtrace_t *libtrace,
 
 	return 0;
 }
+
+static int linuxring_fin_input(libtrace_t *libtrace) {
+	size_t i;
+
+	if (libtrace->format_data) {
+		for (i = 0; i < libtrace_list_get_size(FORMAT_DATA->per_stream); ++i) {
+			struct linux_per_stream_t *stream;
+	                stream = libtrace_list_get_index(
+				FORMAT_DATA->per_stream, i)->data;
+			if (stream->rx_ring != MAP_FAILED) {
+				munmap(stream->rx_ring,
+						stream->req.tp_block_size *
+						stream->req.tp_block_nr);
+			}
+		}
+
+                if (FORMAT_DATA->filter != NULL)
+                        free(FORMAT_DATA->filter);
+
+                if (FORMAT_DATA->per_stream)
+                        libtrace_list_deinit(FORMAT_DATA->per_stream);
+
+                free(libtrace->format_data);
+        }
+
+        return 0;
+}
+
 
 static int linuxring_start_input(libtrace_t *libtrace)
 {
@@ -621,10 +658,6 @@ static void linuxring_fin_packet(libtrace_packet_t *packet)
 
 	/* If we own the packet (i.e. it's not a copy), we need to free it */
 	if (packet->buf_control == TRACE_CTRL_EXTERNAL) {
-		/* Started should always match the existence of the rx_ring
-		 * in the parallel case still just check the first ring */
-		assert(!!FORMAT_DATA_FIRST->rx_ring ==
-		       !!packet->trace->started);
 		/* If we don't have a ring its already been destroyed */
 		if (FORMAT_DATA_FIRST->rx_ring != MAP_FAILED)
 			ring_release_frame(packet->trace, packet);
@@ -741,7 +774,7 @@ static struct libtrace_format_t linuxring = {
 	linuxcommon_init_output,	/* init_output */
 	NULL,				/* config_output */
 	linuxring_start_output,		/* start_ouput */
-	linuxcommon_fin_input,		/* fin_input */
+	linuxring_fin_input,		/* fin_input */
 	linuxring_fin_output,		/* fin_output */
 	linuxring_read_packet,		/* read_packet */
 	linuxring_prepare_packet,	/* prepare_packet */

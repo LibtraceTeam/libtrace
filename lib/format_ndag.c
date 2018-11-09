@@ -186,7 +186,7 @@ static int join_multicast_group(char *groupaddr, char *localiface,
         unsigned int interface;
         char pstr[16];
         struct group_req greq;
-        int bufsize;
+        int bufsize, val;
 
         int sock;
 
@@ -225,6 +225,14 @@ static int join_multicast_group(char *groupaddr, char *localiface,
         if (sock < 0) {
                 fprintf(stderr,
                         "Failed to create multicast socket for %s:%s -- %s\n",
+                                groupaddr, portstr, strerror(errno));
+                goto sockcreateover;
+        }
+
+        val = 1;
+        if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val)) < 0) {
+                fprintf(stderr,
+                        "Failed to set REUSEADDR socket option for %s:%s -- %s\n",
                                 groupaddr, portstr, strerror(errno));
                 goto sockcreateover;
         }
@@ -541,7 +549,9 @@ static void halt_ndag_receiver(recvstream_t *receiver) {
 		free(src.singlemsg.msg_iov);
 #endif
 
-                close(src.sock);
+                if (src.sock != -1) {
+                        close(src.sock);
+                }
         }
         if (receiver->knownmonitors) {
                 free(receiver->knownmonitors);
@@ -715,13 +725,6 @@ static int add_new_streamsock(recvstream_t *rt, streamsource_t src) {
 
         ssock = &(rt->sources[rt->sourcecount]);
 
-        ssock->sock = join_multicast_group(src.groupaddr, src.localiface,
-                        NULL, src.port, &(ssock->srcaddr));
-
-        if (ssock->sock < 0) {
-                return -1;
-        }
-
         for (i = 0; i < rt->monitorcount; i++) {
                 if (rt->knownmonitors[i].monitorid == src.monitor) {
                         mon = &(rt->knownmonitors[i]);
@@ -748,6 +751,17 @@ static int add_new_streamsock(recvstream_t *rt, streamsource_t src) {
                 ssock->savedsize[i] = 0;
         }
 
+        ssock->sock = join_multicast_group(src.groupaddr, src.localiface,
+                        NULL, src.port, &(ssock->srcaddr));
+
+        if (ssock->sock < 0) {
+                return -1;
+        }
+
+	if (ssock->sock > rt->maxfd) {
+		rt->maxfd = ssock->sock;
+	}
+
 #if HAVE_DECL_RECVMMSG
         for (i = 0; i < RECV_BATCH_SIZE; i++) {
                 ssock->mmsgbufs[i].msg_hdr.msg_iov = (struct iovec *)
@@ -760,7 +774,7 @@ static int add_new_streamsock(recvstream_t *rt, streamsource_t src) {
                 ssock->mmsgbufs[i].msg_len = 0;
         }
 #else
-	ssock->singlemsg.msg_iov = (struct iovec *) malloc(sizeof(struct iovec));
+	ssock->singlemsg.msg_iov = (struct iovec *) calloc(1, sizeof(struct iovec));
 #endif
 
         ssock->nextread = NULL;;
@@ -768,9 +782,6 @@ static int add_new_streamsock(recvstream_t *rt, streamsource_t src) {
         ssock->nextwriteind = 0;
         ssock->recordcount = 0;
         rt->sourcecount += 1;
-	if (ssock->sock > rt->maxfd) {
-		rt->maxfd = ssock->sock;
-	}
 
         fprintf(stderr, "Added new stream %s:%u to thread %d\n",
                         ssock->groupaddr, ssock->port, rt->threadindex);
@@ -946,6 +957,10 @@ static int receive_from_single_socket(streamsock_t *ssock, struct timeval *tv,
         ret = recvmmsg(ssock->sock, ssock->mmsgbufs, avail,
                         MSG_DONTWAIT, NULL);
 #else
+        if (avail != 1) {
+                return 0;
+        }
+
 	ret = recvmsg(ssock->sock, &(ssock->singlemsg), MSG_DONTWAIT);
 #endif
         if (ret < 0) {

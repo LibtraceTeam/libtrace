@@ -29,6 +29,7 @@ configure-stamp: configure
 
 	./configure $(CONFFLAGS) \
 		   --prefix=/usr \
+                   --with-dpdk=yes \
 		   --mandir=\$${prefix}/share/man \
 		   --infodir=\$${prefix}/share/info
 
