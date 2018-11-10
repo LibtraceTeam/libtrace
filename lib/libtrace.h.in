@@ -306,7 +306,9 @@ enum {
 	/** Compression format unsupported */
 	TRACE_ERR_UNSUPPORTED_COMPRESS 	= -11,
         /** Wandio has returned an error */
-        TRACE_ERR_WANDIO_FAILED = -12  
+        TRACE_ERR_WANDIO_FAILED = -12,
+	/** Input URI (file) not found */
+        TRACE_ERR_URI_NOT_FOUND = -13  
 };
 
 /** Enumeration of DLTs supported by libtrace 

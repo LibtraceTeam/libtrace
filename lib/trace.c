@@ -304,7 +304,14 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 		/* Could not parse the URI nicely */
 		guess_format(libtrace,uri);
 		if (!libtrace->format) {
-			trace_set_err(libtrace,TRACE_ERR_BAD_FORMAT,"Unable to guess format (%s)",uri);
+			/* Check if the file exists */
+			FILE *file;
+			if(!(file=fopen(uri, "r"))) {
+				trace_set_err(libtrace,TRACE_ERR_URI_NOT_FOUND,"Unable to find URI (%s)",uri);
+			} else {
+				fclose(file);
+				trace_set_err(libtrace,TRACE_ERR_BAD_FORMAT,"Unable to guess format (%s)",uri);
+			}
 			return libtrace;
 		}
 	}
