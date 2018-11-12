@@ -53,7 +53,7 @@ struct network {
 /* interval between outputs in seconds */
 uint64_t tickrate;
 
-char *stats_outputdir = "/home/jcv9/output/";
+char *stats_outputdir = "";
 /* Calculate and plot the percentage change from the previous plot */
 int stats_percentage_change = 1;
 int stats_ranking = 1;
@@ -339,6 +339,8 @@ static void *start_reporter(libtrace_t *trace, libtrace_thread_t *thread, void *
 
 static void plot_results(struct addr_local *tally, uint64_t tick) {
 
+	int i, j;
+
 	/* Calculations before reporting the results */
 	/* Need to initialise lastoutput values on first pass,
 	 * this is so we have a base line for percentage changed */
@@ -360,7 +362,6 @@ static void plot_results(struct addr_local *tally, uint64_t tick) {
 	char outputfile[255];
 	snprintf(outputfile, sizeof(outputfile), "%sipdist-%u.data", stats_outputdir, tick);
 	FILE *tmp = fopen(outputfile, "w");
-        int i, j;
 	fprintf(tmp, "#\tHits");
 	if(stats_percentage_change) {
 		fprintf(tmp, "\t\t\t\t\t\t\t\tPercentage");
