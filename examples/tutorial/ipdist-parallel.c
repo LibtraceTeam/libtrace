@@ -12,7 +12,7 @@ struct addr_local {
 	/* Holds the counts of each number occurance per octet, These are cleared after every output. */
 	uint64_t src[4][256];
 	uint64_t dst[4][256];
-	/* Maintains a running average over. Only used within the tally */
+	/* Holds the results from the previous output */
 	uint64_t src_lastoutput[4][256];
 	uint64_t dst_lastoutput[4][256];
 	/* Holds the timestamp */
@@ -20,6 +20,23 @@ struct addr_local {
 	/* Is the count of the number of packets processed, This is cleared after every output. */
 	uint64_t packets;
 	uint64_t output_count;
+	/* Pointer to stats structure */
+	struct addr_stats *stats;
+
+};
+struct addr_stats {
+	/* Holds the percentage change compared to the previous output */
+	float src[4][256];
+	float dst[4][256];
+	struct addr_rank *rank_src[4];
+	struct addr_rank *rank_dst[4];
+};
+struct addr_rank {
+	uint8_t addr;
+	/* count is the priority */
+	uint64_t count;
+	/* pointer to next ranking item */
+	struct addr_rank* next;
 };
 
 /* Structure to hold excluded networks */
@@ -35,6 +52,87 @@ struct network {
 
 /* interval between outputs in seconds */
 uint64_t tickrate;
+
+char *stats_outputdir = "/home/jcv9/output/";
+/* Calculate and plot the percentage change from the previous plot */
+int stats_percentage_change = 1;
+int stats_ranking = 1;
+
+
+/*************************************************************************
+Priority queue linked list */
+
+static struct addr_rank *rank_new(uint8_t addr, uint64_t count) {
+	struct addr_rank *tmp = malloc(sizeof(struct addr_rank));
+	tmp->addr = addr;
+	tmp->count = count;
+	tmp->next = NULL;
+
+	return tmp;
+}
+static uint8_t peak(struct addr_rank **head) {
+	return (*head)->addr;
+}
+static void pop(struct addr_rank **head) {
+	struct addr_rank* tmp = *head;
+	(*head) = (*head)->next;
+	free(tmp);
+}
+static void push(struct addr_rank **head, uint8_t addr, uint64_t count) {
+	struct addr_rank *curr = (*head);
+	struct addr_rank *tmp = rank_new(addr, count);
+
+	/* Check if the new node has a greater priority than the head */
+	if((*head)->count < count) {
+		tmp->next = *head;
+		(*head) = tmp;
+	} else {
+		/* Jump through the list until we find the correct position */
+		while (curr->next != NULL && curr->next->count > count) {
+			curr = curr->next;
+		}
+
+		tmp->next = curr->next;
+		curr->next = tmp;
+	}
+}
+/*************************************************************************/
+
+
+static void compute_stats(struct addr_local *tally) {
+	int i, j;
+
+	/* Calculates the percentage change from the last output. NEED TO MAKE THIS WEIGHTED */
+        if(stats_percentage_change) {
+		for(i=0;i<256;i++) {
+        		for(j=0;j<4;j++) {
+                		tally->stats->src[j][i] = 0;
+                        	tally->stats->dst[j][i] = 0;
+                        	if(tally->src[j][i] != 0) {
+                        		tally->stats->src[j][i] = (((float)tally->src[j][i] - (float)tally->src_lastoutput[j][i]) / (float)tally->src[j][i]) * 100;
+                        	}
+                        	if(tally->dst[j][i] != 0) {
+                        		tally->stats->dst[j][i] = (((float)tally->dst[j][i] - (float)tally->dst_lastoutput[j][i]) / (float)tally->dst[j][i]) * 100;
+                        	}
+			}
+                }
+        }
+
+	/* RANKING SYSTEM */
+	if(stats_ranking) {
+		for(i=0;i<4;i++) {
+			tally->stats->rank_src[i] = rank_new(0, tally->src[i][0]);
+			tally->stats->rank_dst[i] = rank_new(0, tally->dst[i][0]);
+
+			for(j=1;j<256;j++) {
+				/* Push everything into the priority queue
+				 * each item will be popped off in the correct order */
+				push(&tally->stats->rank_src[i], j, tally->src[i][j]);
+				push(&tally->stats->rank_dst[i], j, tally->dst[i][j]);
+			}
+		}
+	}
+}
 
 static void per_tick(libtrace_t *trace, libtrace_thread_t *thread, void *global, void *tls, uint64_t tick) {
 
@@ -218,6 +316,7 @@ static void stop_processing(libtrace_t *trace, libtrace_thread_t *thread, void *
 static void *start_reporter(libtrace_t *trace, libtrace_thread_t *thread, void *global) {
         /* Create tally structure */
         struct addr_local *tally = (struct addr_local *)malloc(sizeof(struct addr_local));
+	tally->stats = malloc(sizeof(struct addr_stats));
 
         /* Initialize the tally structure */
         int i, j;
@@ -227,6 +326,8 @@ static void *start_reporter(libtrace_t *trace, libtrace_thread_t *thread, void *
                 	tally->dst[i][j] = 0;
 			tally->src_lastoutput[i][j] = 0;
 			tally->dst_lastoutput[i][j] = 0;
+			tally->stats->src[i][j] = 0;
+			tally->stats->dst[i][j] = 0;
 		}
         }
 	tally->lastkey = 0;
@@ -238,74 +339,112 @@ static void *start_reporter(libtrace_t *trace, libtrace_thread_t *thread, void *
 
 static void plot_results(struct addr_local *tally, uint64_t tick) {
 
-	char outputfile[255];
-	char outputplot[255];
-	snprintf(outputfile, sizeof(outputfile), "ipdist-%u.data", tick);
-	snprintf(outputplot, sizeof(outputplot), "ipdist-%u.png", tick);
+	/* Calculations before reporting the results */
+	/* Need to initialise lastoutput values on first pass,
+	 * this is so we have a base line for percentage changed */
+        if(tally->output_count == 0) {
+                for(i=0;i<4;i++) {
+                       	for(j=0;j<256;j++) {
+                                tally->src_lastoutput[i][j] = tally->src[i][j];
+                        	tally->dst_lastoutput[i][j] = tally->dst[i][j];
+                	}
+        	}
+         }
+	/* Compute the stats */
+        compute_stats(tally);
 
-	/* Push all data into data file */
+	/* Finaly output the results */
+	printf("Generating output \"%sipdist-%u\"\n", stats_outputdir, tick);
+
+	/* Output the results */
+	char outputfile[255];
+	snprintf(outputfile, sizeof(outputfile), "%sipdist-%u.data", stats_outputdir, tick);
 	FILE *tmp = fopen(outputfile, "w");
         int i, j;
-	fprintf(tmp, "#Hits\t\t\t\t\t\t\t\t\tPercentage Change\n");
-	fprintf(tmp, "#num\toctet1\t\toctet2\t\toctet3\t\toctet4\t\toctet1\t\toctet2\t\toctet3\t\toctet4\n");
-	fprintf(tmp, "#\tsrc\tdst\tsrc\tdst\tsrc\tdst\tsrc\tdst\tsrc\tdst\tsrc\tdst\tsrc\tdst\tsrc\tdst\n");
+	fprintf(tmp, "#\tHits");
+	if(stats_percentage_change) {
+		fprintf(tmp, "\t\t\t\t\t\t\t\tPercentage");
+	}
+	if(stats_ranking) {
+		fprintf(tmp, "\t\t\t\t\t\t\t\tRanking");
+	}
+	fprintf(tmp, "\n");
+	fprintf(tmp, "#num\toctet1\t\toctet2\t\toctet3\t\toctet4");
+	if(stats_percentage_change) {
+		fprintf(tmp, "\t\toctet1\t\toctet2\t\toctet3\t\toctet4");
+	}
+	if(stats_ranking) {
+                fprintf(tmp, "\t\toctet1\t\toctet2\t\toctet3\t\toctet4");
+        }
+	fprintf(tmp, "\n");
+	fprintf(tmp, "#\tsrc\tdst\tsrc\tdst\tsrc\tdst\tsrc\tdst");
+	if(stats_percentage_change) {
+		fprintf(tmp, "\tsrc\tdst\tsrc\tdst\tsrc\tdst\tsrc\tdst");
+	}
+	if(stats_ranking) {
+		fprintf(tmp, "\tsrc\tdst\tsrc\tdst\tsrc\tdst\tsrc\tdst");
+	}
+	fprintf(tmp, "\n");
         for(i=0;i<256;i++) {
 		fprintf(tmp, "%d", i);
 		for(j=0;j<4;j++) {
 			fprintf(tmp, "\t%d\t%d", tally->src[j][i], tally->dst[j][i]);
 		}
-
-		/* Calculates the percentage change from the last output */
-		for(j=0;j<4;j++) {
-			float src_inc = 0;
-			float dst_inc = 0;
-			if(tally->src[j][i] != 0) {
-				src_inc = (((float)tally->src[j][i] - (float)tally->src_lastoutput[j][i]) / (float)tally->src[j][i]) * 100;
+		if(stats_percentage_change) {
+			for(j=0;j<4;j++) {
+                                fprintf(tmp, "\t%.0f\t%.0f", tally->stats->src[j][i], tally->stats->dst[j][i]);
 			}
-			if(tally->dst[j][i] != 0) {
-				dst_inc = (((float)tally->dst[j][i] - (float)tally->dst_lastoutput[j][i]) / (float)tally->dst[j][i]) * 100;
-			}
-			fprintf(tmp, "\t%.0f\t%.0f", src_inc, dst_inc);
 		}
-
+		if(stats_ranking) {
+			for(j=0;j<4;j++) {
+				/* Get the highest ranking to lowest ranking octets */
+				fprintf(tmp, "\t%d", peak(&tally->stats->rank_src[j]));
+				fprintf(tmp, "\t%d", peak(&tally->stats->rank_dst[j]));
+				pop(&tally->stats->rank_src[j]);
+				pop(&tally->stats->rank_dst[j]);
+			}
+		}
 		fprintf(tmp, "\n");
         }
         fclose(tmp);
-	printf("Ouput data file %s and plot %s\n", outputfile, outputplot);
 
-        /* Open pipe to gnuplot */
-        FILE *gnuplot = popen("gnuplot -persistent", "w");
-        /* send all commands to gnuplot */
-        fprintf(gnuplot, "set term png size 1280,960 \n");
-	fprintf(gnuplot, "set title 'IP Distribution'\n");
-	fprintf(gnuplot, "set xrange[0:255]\n");
-	fprintf(gnuplot, "set xlabel 'Prefix'\n");
-	fprintf(gnuplot, "set ylabel 'Hits'\n");
-	fprintf(gnuplot, "set y2label 'Percentage Change'\n");
-	fprintf(gnuplot, "set xtics 0,10,255\n");
-	fprintf(gnuplot, "set y2range[-100:100]\n");
-	//fprintf(gnuplot, "set ytics nomirror\n");
-	//fprintf(gnuplot, "set y2tics\n");
-	//fprintf(gnuplot, "set tics out\n");
-	fprintf(gnuplot, "set output '%s'\n", outputplot);
-	fprintf(gnuplot, "plot '%s' using 1:2 title 'Source octet 1' axes x1y1 with boxes,", outputfile);
-	fprintf(gnuplot, "'%s' using 1:3 title 'Destination octet 1' axes x1y1 with boxes,", outputfile);
-	//fprintf(gnuplot, "'%s' using 1:4 title 'Source octet 2' axes x1y1 with boxes,", outputfile);
-	//fprintf(gnuplot, "'%s' using 1:5 title 'Destination octet 2' axes x1y1 with boxes,", outputfile);
-	//fprintf(gnuplot, "'%s' using 1:6 title 'Source octet 3' axes x1y1 with boxes,", outputfile);
-	//fprintf(gnuplot, "'%s' using 1:7 title 'Destination octet 3' axes x1y1 with boxes,", outputfile);
-	//fprintf(gnuplot, "'%s' using 1:8 title 'Source octet 4' axes x1y1 with boxes,", outputfile);
-	//fprintf(gnuplot, "'%s' using 1:9 title 'Destination octet 4' axes x1y1 with boxes,", outputfile);
-	fprintf(gnuplot, "'%s' using 1:10 title 'Octet 1 source change' axes x1y2 with lines,", outputfile);
-	fprintf(gnuplot, "'%s' using 1:11 title 'Octet 1 destination change' axes x1y2 with lines\n", outputfile);
-	//fprintf(gnuplot, "'%s' using 1:12 title 'Octet 2 source change' axes x1y2 with lines,", outputfile);
-	//fprintf(gnuplot, "'%s' using 1:13 title 'Octet 2 destination change' axes x1y2 with lines,", outputfile);
-	//fprintf(gnuplot, "'%s' using 1:14 title 'Octet 3 source change' axes x1y2 with lines,", outputfile);
-	//fprintf(gnuplot, "'%s' using 1:15 title 'Octet 3 destination change' axes x1y2 with lines,", outputfile);
-	//fprintf(gnuplot, "'%s' using 1:16 title 'Octet 4 source change' axes x1y2 with lines,", outputfile);
-	//fprintf(gnuplot, "'%s' using 1:17 title 'Octet 4 destination change' axes x1y2 with lines\n", outputfile);
-	fprintf(gnuplot, "replot");
-        pclose(gnuplot);
+	if(stats_ranking) {
+		for(i=0;i<4;i++) {
+			free(tally->stats->rank_src[i]);
+			free(tally->stats->rank_dst[i]);
+		}
+	}
+
+	/* Plot the results */
+	for(i=0;i<4;i++) {
+		char outputplot[255];
+		snprintf(outputplot, sizeof(outputplot), "%sipdist-%u-octet%d.png", stats_outputdir, tick, i+1);
+
+        	/* Open pipe to gnuplot */
+        	FILE *gnuplot = popen("gnuplot -persistent", "w");
+        	/* send all commands to gnuplot */
+        	fprintf(gnuplot, "set term png size 1280,960 \n");
+		fprintf(gnuplot, "set title 'IP Distribution - Octet %d'\n", i+1);
+		fprintf(gnuplot, "set xrange[0:255]\n");
+		fprintf(gnuplot, "set xlabel 'Prefix'\n");
+		fprintf(gnuplot, "set ylabel 'Hits'\n");
+		fprintf(gnuplot, "set xtics 0,10,255\n");
+		fprintf(gnuplot, "set output '%s'\n", outputplot);
+		if(stats_percentage_change) {
+			fprintf(gnuplot, "set y2label 'Percentage Change'\n");
+                        fprintf(gnuplot, "set y2range[-100:100]\n");
+			fprintf(gnuplot, "set ytics nomirror\n");
+			fprintf(gnuplot, "plot '%s' using 1:%d title 'Source octet %d' axes x1y1 with boxes,", outputfile, i+2, i+1);
+			fprintf(gnuplot, "'%s' using 1:%d title 'Destination octet %d' axes x1y1 with boxes,", outputfile, i+3, i+1);
+			fprintf(gnuplot, "'%s' using 1:%d title 'Octet %d source change' axes x1y2 with lines,", outputfile, i+10, i+1);
+			fprintf(gnuplot, "'%s' using 1:%d title 'Octet %d destination change' axes x1y2 with lines\n", outputfile, i+11, i+1);
+		} else {
+			fprintf(gnuplot, "plot '%s' using 1:%d title 'Source octet %d' axes x1y1 with boxes,", outputfile, i+2, i+1);
+			fprintf(gnuplot, "'%s' using 1:%d title 'Destination octet %d' axes x1y1 with boxes\n", outputfile, i+3, i+1);
+		}
+		fprintf(gnuplot, "replot");
+        	pclose(gnuplot);
+	}
 }
 
 
@@ -348,16 +487,6 @@ static void per_result(libtrace_t *trace, libtrace_thread_t *sender, void *globa
 		/* update last key */
                 tally->lastkey = key;
 
-		/* Need to initialise lastoutput values on first pass */
-		if(tally->output_count == 0) {
-			for(i=0;i<4;i++) {
-				for(j=0;j<256;j++) {
-					tally->src_lastoutput[i][j] = tally->src[i][j];
-                        	        tally->dst_lastoutput[i][j] = tally->dst[i][j];
-				}
-			}
-		}
-
 		/* Plot the result with the key in epoch seconds*/
                 plot_results(tally, key >> 32);
 
@@ -374,6 +503,7 @@ static void per_result(libtrace_t *trace, libtrace_thread_t *sender, void *globa
 			}
                 }
 		tally->packets = 0;
+
         }
 
         /* Cleanup the thread results */
@@ -388,6 +518,7 @@ static void stop_reporter(libtrace_t *trace, libtrace_thread_t *thread, void *gl
 
 	/* If there is any remaining data in the tally plot it */
 	if(tally->packets > 0) {
+		/* Then plot the results */
 		plot_results(tally, (tally->lastkey >> 32) + 1);
 	}
 	/* Cleanup tally results*/
