@@ -6,6 +6,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <time.h>
+#include <math.h>
 
 /* Structure to hold the counters each thread has its own one of these */
 struct addr_local {
@@ -22,12 +23,19 @@ struct addr_local {
 	uint64_t output_count;
 	/* Pointer to stats structure */
 	struct addr_stats *stats;
-
 };
 struct addr_stats {
 	/* Holds the percentage change compared to the previous output */
 	float src[4][256];
 	float dst[4][256];
+	double mean_src[4];
+	double mean_dst[4];
+	double stdev_src[4];
+	double stdev_dst[4];
+	double variance_src[4];
+	double variance_dst[4];
+	double variation_src[4];
+	double variation_dst[4];
 	struct addr_rank *rank_src[4];
 	struct addr_rank *rank_dst[4];
 };
@@ -53,9 +61,9 @@ struct network {
 /* interval between outputs in seconds */
 uint64_t tickrate;
 
-char *stats_outputdir = "";
+char *stats_outputdir = "/home/jcv9/output/";
 /* Calculate and plot the percentage change from the previous plot */
-int stats_percentage_change = 1;
+int stats_percentage_change = 0;
 int stats_ranking = 1;
 
 
@@ -71,7 +79,10 @@ static struct addr_rank *rank_new(uint8_t addr, uint64_t count) {
 	return tmp;
 }
 static uint8_t peak(struct addr_rank **head) {
-	return (*head)->addr;
+        return (*head)->addr;
+}
+static uint64_t peak_count(struct addr_rank **head) {
+	return (*head)->count;
 }
 static void pop(struct addr_rank **head) {
 	struct addr_rank* tmp = *head;
@@ -100,7 +111,7 @@ static void push(struct addr_rank **head, uint8_t addr, uint64_t count) {
 
 
 static void compute_stats(struct addr_local *tally) {
-	int i, j;
+	int i, j, k;
 
 	/* Calculates the percentage change from the last output. NEED TO MAKE THIS WEIGHTED */
         if(stats_percentage_change) {
@@ -132,6 +143,54 @@ static void compute_stats(struct addr_local *tally) {
 			}
 		}
 	}
+
+
+/* This will all result in overflows, needs to be a rolling average?? stdev etc */
+	/* Calculate mean */
+//	for(i=0;i<4;i++) {
+//		uint64_t count_src = 0;
+//		uint64_t count_dst = 0;
+//		uint64_t tmp_src = 0;
+//		uint64_t tmp_dst = 0;
+//		for(j=0;j<256;j++) {
+//			tmp_src += (j * tally->src[i][j]);
+//			count_src += tally->src[i][j];
+//			tmp_dst += (j * tally->dst[i][j]);
+//			count_dst += tally->dst[i][j];
+//		}
+//
+//		tally->stats->mean_src[i] = tmp_src / count_src;
+//		tally->stats->mean_dst[i] = tmp_dst / count_dst;
+//	}
+//	printf("mean: %f\n", tally->stats->mean_src[0]);
+//
+//
+//	/* Calculate variance, standard deviation and variation*/
+//	for(i=0;i<4;i++) {
+//		uint64_t count_src = 0;
+//		uint64_t count_dst = 0;
+//		uint64_t tmp_src = 0;
+//		uint64_t tmp_dst = 0;
+//		for(j=0;j<256;j++) {
+//			tmp_src += (j * pow((tally->src[i][j] - tally->stats->mean_src[i]), 2));
+//			count_src += tally->src[i][j];
+//			tmp_dst += (j * pow((tally->dst[i][j] - tally->stats->mean_dst[i]), 2));
+//			count_dst += tally->dst[i][j];
+//		}
+//		//printf("total: %u count: %u dd: %f\n", tmp_src, count_src, tmp_src/count_src);
+//		tally->stats->variance_src[i] = (double)tmp_src / (double)count_src;
+//		tally->stats->variance_dst[i] = (double)tmp_dst / (double)count_dst;
+//		tally->stats->stdev_src[i] = sqrt(tally->stats->variance_src[i]);
+//		tally->stats->stdev_dst[i] = sqrt(tally->stats->variance_dst[i]);
+//
+//		/* Calculate coefficient of variation */
+//		tally->stats->variation_src[i] = tally->stats->stdev_src[i] / tally->stats->mean_src[i];
+//		tally->stats->variation_dst[i] = tally->stats->stdev_dst[i] / tally->stats->mean_dst[i];
+//	}
+//
+//
+//	printf("stdev: %f variance: %f variation: %f\n", tally->stats->stdev_src[0], tally->stats->variance_src[0], tally->stats->variation_src[0]);
+
 }
 
 static void per_tick(libtrace_t *trace, libtrace_thread_t *thread, void *global, void *tls, uint64_t tick) {
@@ -329,6 +388,15 @@ static void *start_reporter(libtrace_t *trace, libtrace_thread_t *thread, void *
 			tally->stats->src[i][j] = 0;
 			tally->stats->dst[i][j] = 0;
 		}
+		/* Stats related varibles */
+		tally->stats->mean_src[i] = 0;
+		tally->stats->mean_dst[i] = 0;
+		tally->stats->stdev_src[i] = 0;
+		tally->stats->stdev_dst[i] = 0;
+		tally->stats->variance_src[i] = 0;
+		tally->stats->variance_dst[i] = 0;
+		tally->stats->variation_src[i] = 0;
+		tally->stats->variation_dst[i] = 0;
         }
 	tally->lastkey = 0;
 	tally->packets = 0;
@@ -339,7 +407,7 @@ static void *start_reporter(libtrace_t *trace, libtrace_thread_t *thread, void *
 
 static void plot_results(struct addr_local *tally, uint64_t tick) {
 
-	int i, j;
+	int i, j, k;
 
 	/* Calculations before reporting the results */
 	/* Need to initialise lastoutput values on first pass,
@@ -362,89 +430,112 @@ static void plot_results(struct addr_local *tally, uint64_t tick) {
 	char outputfile[255];
 	snprintf(outputfile, sizeof(outputfile), "%sipdist-%u.data", stats_outputdir, tick);
 	FILE *tmp = fopen(outputfile, "w");
-	fprintf(tmp, "#\tHits");
-	if(stats_percentage_change) {
-		fprintf(tmp, "\t\t\t\t\t\t\t\tPercentage");
-	}
-	if(stats_ranking) {
-		fprintf(tmp, "\t\t\t\t\t\t\t\tRanking");
-	}
-	fprintf(tmp, "\n");
-	fprintf(tmp, "#num\toctet1\t\toctet2\t\toctet3\t\toctet4");
-	if(stats_percentage_change) {
-		fprintf(tmp, "\t\toctet1\t\toctet2\t\toctet3\t\toctet4");
-	}
-	if(stats_ranking) {
-                fprintf(tmp, "\t\toctet1\t\toctet2\t\toctet3\t\toctet4");
-        }
-	fprintf(tmp, "\n");
-	fprintf(tmp, "#\tsrc\tdst\tsrc\tdst\tsrc\tdst\tsrc\tdst");
-	if(stats_percentage_change) {
-		fprintf(tmp, "\tsrc\tdst\tsrc\tdst\tsrc\tdst\tsrc\tdst");
-	}
-	if(stats_ranking) {
-		fprintf(tmp, "\tsrc\tdst\tsrc\tdst\tsrc\tdst\tsrc\tdst");
-	}
-	fprintf(tmp, "\n");
-        for(i=0;i<256;i++) {
-		fprintf(tmp, "%d", i);
+	fprintf(tmp, "#time\t\trank\toctet1\t\t\t\toctet2\t\t\t\toctet3\t\t\t\toctet4\n");
+	fprintf(tmp, "#\t\t\tsrc\thits\tdst\thits\tsrc\thits\tdst\thits\tsrc\thits\tdst\thits\tsrc\thits\tdst\thits\n");
+	for(i=0;i<256;i++) {
+		fprintf(tmp, "%d\t%d", tick, i+1);
 		for(j=0;j<4;j++) {
-			fprintf(tmp, "\t%d\t%d", tally->src[j][i], tally->dst[j][i]);
-		}
-		if(stats_percentage_change) {
-			for(j=0;j<4;j++) {
-                                fprintf(tmp, "\t%.0f\t%.0f", tally->stats->src[j][i], tally->stats->dst[j][i]);
-			}
-		}
-		if(stats_ranking) {
-			for(j=0;j<4;j++) {
-				/* Get the highest ranking to lowest ranking octets */
-				fprintf(tmp, "\t%d", peak(&tally->stats->rank_src[j]));
-				fprintf(tmp, "\t%d", peak(&tally->stats->rank_dst[j]));
-				pop(&tally->stats->rank_src[j]);
-				pop(&tally->stats->rank_dst[j]);
-			}
+			/* Get the highest ranking to lowest ranking octets */
+			fprintf(tmp, "\t%d", peak(&tally->stats->rank_src[j]));
+			fprintf(tmp, "\t%d", peak_count(&tally->stats->rank_src[j]));
+			fprintf(tmp, "\t%d", peak(&tally->stats->rank_dst[j]));
+			fprintf(tmp, "\t%d", peak_count(&tally->stats->rank_dst[j]));
+			pop(&tally->stats->rank_src[j]);
+			pop(&tally->stats->rank_dst[j]);
 		}
 		fprintf(tmp, "\n");
-        }
+	}
         fclose(tmp);
 
-	if(stats_ranking) {
-		for(i=0;i<4;i++) {
-			free(tally->stats->rank_src[i]);
-			free(tally->stats->rank_dst[i]);
-		}
+	/* Puts data into timeseries files that gnuplot likes */
+	char outputfile2[255];
+	for(k=0;k<2;k++) {
+		for(j=0;j<4;j++) {
+			/* If k is 0 we are doing src else dst */
+			if(k) {
+				snprintf(outputfile2, sizeof(outputfile2), "%sipdist-timeseries-dst-octet%d.data", stats_outputdir, j+1);
+			} else {
+				snprintf(outputfile2, sizeof(outputfile2), "%sipdist-timeseries-src-octet%d.data", stats_outputdir, j+1);
+			}
+			if(tally->output_count == 0) {
+				tmp = fopen(outputfile2, "w");
+				fprintf(tmp, "prefix\t");
+				for(i=0;i<256;i++) {
+					fprintf(tmp, "%d\t", i);
+				}
+				fprintf(tmp, "\n");
+			} else {
+				tmp = fopen(outputfile2, "a");
+			}
+			fprintf(tmp, "%d\t", tick);
+			for(i=0;i<256;i++) {
+				if(k) {
+					fprintf(tmp, "%d\t", tally->dst[j][i]);
+				} else {
+					fprintf(tmp, "%d\t", tally->src[j][i]);
+				}
+			}
+			fprintf(tmp, "\n");
+			fclose(tmp);
+        	}
 	}
 
 	/* Plot the results */
 	for(i=0;i<4;i++) {
 		char outputplot[255];
 		snprintf(outputplot, sizeof(outputplot), "%sipdist-%u-octet%d.png", stats_outputdir, tick, i+1);
-
-        	/* Open pipe to gnuplot */
-        	FILE *gnuplot = popen("gnuplot -persistent", "w");
+       		/* Open pipe to gnuplot */
+		FILE *gnuplot = popen("gnuplot -persistent", "w");
         	/* send all commands to gnuplot */
-        	fprintf(gnuplot, "set term png size 1280,960 \n");
+        	fprintf(gnuplot, "set term pngcairo size 1280,960 \n");
 		fprintf(gnuplot, "set title 'IP Distribution - Octet %d'\n", i+1);
 		fprintf(gnuplot, "set xrange[0:255]\n");
 		fprintf(gnuplot, "set xlabel 'Prefix'\n");
 		fprintf(gnuplot, "set ylabel 'Hits'\n");
 		fprintf(gnuplot, "set xtics 0,10,255\n");
+		//fprintf(gnuplot, "set y2tics\n");
 		fprintf(gnuplot, "set output '%s'\n", outputplot);
-		if(stats_percentage_change) {
-			fprintf(gnuplot, "set y2label 'Percentage Change'\n");
-                        fprintf(gnuplot, "set y2range[-100:100]\n");
-			fprintf(gnuplot, "set ytics nomirror\n");
-			fprintf(gnuplot, "plot '%s' using 1:%d title 'Source octet %d' axes x1y1 with boxes,", outputfile, i+2, i+1);
-			fprintf(gnuplot, "'%s' using 1:%d title 'Destination octet %d' axes x1y1 with boxes,", outputfile, i+3, i+1);
-			fprintf(gnuplot, "'%s' using 1:%d title 'Octet %d source change' axes x1y2 with lines,", outputfile, i+10, i+1);
-			fprintf(gnuplot, "'%s' using 1:%d title 'Octet %d destination change' axes x1y2 with lines\n", outputfile, i+11, i+1);
-		} else {
-			fprintf(gnuplot, "plot '%s' using 1:%d title 'Source octet %d' axes x1y1 with boxes,", outputfile, i+2, i+1);
-			fprintf(gnuplot, "'%s' using 1:%d title 'Destination octet %d' axes x1y1 with boxes\n", outputfile, i+3, i+1);
-		}
+		//if(stats_percentage_change) {
+		//	fprintf(gnuplot, "set y2label 'Percentage Change'\n");
+                //        fprintf(gnuplot, "set y2range[-100:100]\n");
+		//	fprintf(gnuplot, "set ytics nomirror\n");
+		//	fprintf(gnuplot, "set y2tics\n");
+		//	fprintf(gnuplot, "plot '%s' using 1:%d title 'Source octet %d' axes x1y1 with boxes,", outputfile, i+2, i+1);
+		//	fprintf(gnuplot, "'%s' using 1:%d title 'Destination octet %d' axes x1y1 with boxes,", outputfile, i+3, i+1);
+		//	fprintf(gnuplot, "'%s' using 1:%d title 'Octet %d source change' axes x1y2 with lines,", outputfile, i+10, i+1);
+		//	fprintf(gnuplot, "'%s' using 1:%d title 'Octet %d destination change' axes x1y2 with lines\n", outputfile, i+11, i+1);
+
+		//} else {
+		fprintf(gnuplot, "plot '%s' using %d:%d title 'Source octet %d' smooth unique with boxes,", outputfile, (i*4)+3,(i*4)+4, i+1);
+		fprintf(gnuplot, "'%s' using %d:%d title 'Destination octet %d' smooth unique with boxes\n", outputfile, (i*4)+5, (i*4)+6, i+1);
+		//}
 		fprintf(gnuplot, "replot");
         	pclose(gnuplot);
+	}
+
+	/* Plot time series */
+	for(k=0;k<2;k++) {
+		for(i=0;i<4;i++) {
+			char outputplot2[255];
+			if(k) {
+				snprintf(outputplot2, sizeof(outputplot2), "%sipdist-timeseries-dst-octet%i.png", stats_outputdir, i+1);
+			} else {
+				snprintf(outputplot2, sizeof(outputplot2), "%sipdist-timeseries-src-octet%i.png", stats_outputdir, i+1);
+			}
+			FILE *gnuplot = popen("gnuplot -persistent", "w");
+			fprintf(gnuplot, "set term pngcairo size 1280,960 \n");
+			fprintf(gnuplot, "set output '%s'\n", outputplot2);
+			fprintf(gnuplot, "set key off\n");
+			//fprintf(gnuplot, "set xdata time\n");
+			//fprintf(gnuplot, "set timefmt '%s'\n");
+			if(k) {
+				fprintf(gnuplot, "plot '%sipdist-timeseries-dst-octet%d.data' using 2:xtic(1) with lines title columnheader(2), for[i=2:257] '' using i with lines title columnheader(i)\n", stats_outputdir, i+1);
+			} else {
+				fprintf(gnuplot, "plot '%sipdist-timeseries-src-octet%d.data' using 2:xtic(1) with lines title columnheader(2), for[i=2:257] '' using i with lines title columnheader(i)\n", stats_outputdir, i+1);
+			}
+			fprintf(gnuplot, "replot");
+			pclose(gnuplot);
+		}
 	}
 }
 
@@ -502,7 +593,23 @@ static void per_result(libtrace_t *trace, libtrace_thread_t *sender, void *globa
                         	tally->src[i][j] = 0;
                         	tally->dst[i][j] = 0;
 			}
+			/* Clear all stats related data */
+			tally->stats->mean_src[i] = 0;
+			tally->stats->mean_dst[i] = 0;
+			tally->stats->stdev_src[i] = 0;
+			tally->stats->stdev_dst[i] = 0;
+			tally->stats->variance_src[i] = 0;
+			tally->stats->variance_dst[i] = 0;
+			tally->stats->variation_src[i] = 0;
+			tally->stats->variation_dst[i] = 0;
+
                 }
+		/* free the priority queue */
+		for(i=0;i<4;i++) {
+			free(tally->stats->rank_src[i]);
+			free(tally->stats->rank_dst[i]);
+		}
+
 		tally->packets = 0;
 
         }
