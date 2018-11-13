@@ -34,7 +34,7 @@ BPFJITSOURCE=
 endif
 
 if HAVE_DPDK
-NATIVEFORMATS+= format_dpdk.c format_dpdkndag.c
+NATIVEFORMATS+= format_dpdk.c format_dpdkndag.c format_dpdk.h
 # So we also make libtrace.mk in dpdk otherwise automake tries to expand
 # it too early which I cannot seem to stop unless we use a path that
 # doesn't exist currently

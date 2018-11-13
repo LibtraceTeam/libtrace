@@ -130,6 +130,7 @@ static char *xstrndup(const char *src,size_t n)
 
 
 /* call all the constructors if they haven't yet all been called */
+__attribute__((constructor))
 static void trace_init(void)
 {
         struct timeval tv;
@@ -264,6 +265,7 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 	libtrace->snaplen = 0;
 	libtrace->replayspeedup = 1;
 	libtrace->started=false;
+	libtrace->startcount=0;
 	libtrace->uridata = NULL;
 	libtrace->io = NULL;
 	libtrace->filtered_packets = 0;
@@ -540,7 +542,7 @@ DLLEXPORT int trace_start(libtrace_t *libtrace)
 			return ret;
 		}
 	}
-
+        libtrace->startcount ++;
 	libtrace->started=true;
 	return 0;
 }
@@ -846,14 +848,20 @@ DLLEXPORT libtrace_packet_t *trace_create_packet(void)
                 return NULL;
 
 	packet->buf_control=TRACE_CTRL_PACKET;
+        packet->which_trace_start = 0;
         pthread_mutex_init(&(packet->ref_lock), NULL);
 	trace_clear_cache(packet);
 	return packet;
 }
 
 DLLEXPORT libtrace_packet_t *trace_copy_packet(const libtrace_packet_t *packet) {
-	libtrace_packet_t *dest = 
-		(libtrace_packet_t *)calloc((size_t)1, sizeof(libtrace_packet_t));
+	libtrace_packet_t *dest;
+
+        if (packet->which_trace_start != packet->trace->startcount) {
+                return NULL;
+        }
+
+        dest = (libtrace_packet_t *)calloc((size_t)1, sizeof(libtrace_packet_t));
 	if (!dest) {
 		printf("Out of memory constructing packet\n");
 		abort();
@@ -872,6 +880,7 @@ DLLEXPORT libtrace_packet_t *trace_copy_packet(const libtrace_packet_t *packet) 
 	dest->order = packet->order;
 	dest->hash = packet->hash;
 	dest->error = packet->error;
+        dest->which_trace_start = packet->which_trace_start;
 	/* Reset the cache - better to recalculate than try to convert
 	 * the values over to the new packet */
 	trace_clear_cache(dest);
@@ -984,6 +993,7 @@ DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 			/* Store the trace we are reading from into the packet opaque 
 			 * structure */
 			packet->trace = libtrace;
+                        packet->which_trace_start = libtrace->startcount;
 			ret=libtrace->format->read_packet(libtrace,packet);
 			if (ret==(size_t)READ_MESSAGE ||
                             ret==(size_t)-1 || ret==0) {
@@ -1014,7 +1024,9 @@ DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
                         if (!IS_LIBTRACE_META_PACKET(packet)) {
         			++libtrace->accepted_packets;
                         }
-			trace_packet_set_order(packet, libtrace->sequence_number);
+                        if (packet->order == 0) {
+        			trace_packet_set_order(packet, libtrace->sequence_number);
+                        }
 	        	++libtrace->sequence_number;
 			if (!libtrace_parallel && packet->trace == libtrace)
                                 libtrace->last_packet = packet;
@@ -1109,9 +1121,22 @@ DLLEXPORT void *trace_get_packet_buffer(const libtrace_packet_t *packet,
 		libtrace_linktype_t *linktype, uint32_t *remaining) {
 	int cap_len;
 	int wire_len;
+        libtrace_linktype_t ltype;
 
 	assert(packet != NULL);
-	if (linktype) *linktype = trace_get_link_type(packet);
+        ltype = trace_get_link_type(packet);
+
+        if (linktype) {
+                *linktype = ltype;
+        }
+
+        if (ltype == TRACE_TYPE_CONTENT_INVALID) {
+                if (remaining) {
+                        *remaining = 0;
+                }
+                return NULL;
+        }
+
 	if (remaining) {
 		/* I think we should choose the minimum of the capture and
 		 * wire lengths to be the "remaining" value. If the packet has
@@ -1164,6 +1189,10 @@ DLLEXPORT void *trace_get_link(const libtrace_packet_t *packet) {
  * past 1970-01-01, the lower 32bits are partial seconds)
  */
 DLLEXPORT uint64_t trace_get_erf_timestamp(const libtrace_packet_t *packet) {
+        if (packet->which_trace_start != packet->trace->startcount) {
+                return (uint64_t)0;
+        }
+
 	if (packet->trace->format->get_erf_timestamp) {
 		/* timestamp -> timestamp */
 		return packet->trace->format->get_erf_timestamp(packet);
@@ -1200,7 +1229,11 @@ DLLEXPORT uint64_t trace_get_erf_timestamp(const libtrace_packet_t *packet) {
 DLLEXPORT struct timeval trace_get_timeval(const libtrace_packet_t *packet) {
         struct timeval tv;
 	uint64_t ts = 0;
-	if (packet->trace->format->get_timeval) {
+
+        if (packet->which_trace_start != packet->trace->startcount) {
+		tv.tv_sec=-1;
+		tv.tv_usec=-1;
+        } else if (packet->trace->format->get_timeval) {
 		/* timeval -> timeval */
 		tv = packet->trace->format->get_timeval(packet);
 	} else if (packet->trace->format->get_erf_timestamp) {
@@ -1233,7 +1266,10 @@ DLLEXPORT struct timeval trace_get_timeval(const libtrace_packet_t *packet) {
 DLLEXPORT struct timespec trace_get_timespec(const libtrace_packet_t *packet) {
 	struct timespec ts;
 
-	if (packet->trace->format->get_timespec) {
+        if (packet->which_trace_start != packet->trace->startcount) {
+		ts.tv_sec=-1;
+		ts.tv_nsec=-1;
+	} else if (packet->trace->format->get_timespec) {
 		return packet->trace->format->get_timespec(packet);
 	} else if (packet->trace->format->get_erf_timestamp) {
 		/* timestamp -> timeval */
@@ -1244,25 +1280,22 @@ DLLEXPORT struct timespec trace_get_timespec(const libtrace_packet_t *packet) {
 		        ts.tv_nsec -= 1000000000;
 		        ts.tv_sec += 1;
 		}
-		return ts;
 	} else if (packet->trace->format->get_timeval) {
 		/* timeval -> timespec */
 		struct timeval tv = packet->trace->format->get_timeval(packet);
 		ts.tv_sec = tv.tv_sec;
 		ts.tv_nsec = tv.tv_usec*1000;
-		return ts;
 	} else if (packet->trace->format->get_seconds) {
 		/* seconds -> timespec */
 		double seconds = packet->trace->format->get_seconds(packet);
 		ts.tv_sec = (uint32_t)seconds;
 		ts.tv_nsec = (long)(((seconds - ts.tv_sec) * 1000000000)/UINT_MAX);
-		return ts;
 	}
 	else {
 		ts.tv_sec=-1;
 		ts.tv_nsec=-1;
-		return ts;
 	}
+        return ts;
 }
 
 
@@ -1272,6 +1305,10 @@ DLLEXPORT struct timespec trace_get_timespec(const libtrace_packet_t *packet) {
  */
 DLLEXPORT double trace_get_seconds(const libtrace_packet_t *packet) {
 	double seconds = 0.0;
+
+        if (packet->which_trace_start != packet->trace->startcount) {
+                return 0.0;
+        }
 
 	if (packet->trace->format->get_seconds) {
 		/* seconds->seconds */
@@ -1299,6 +1336,9 @@ DLLEXPORT double trace_get_seconds(const libtrace_packet_t *packet) {
 DLLEXPORT size_t trace_get_capture_length(const libtrace_packet_t *packet)
 {
 	/* Cache the capture length */
+        if (packet->which_trace_start != packet->trace->startcount) {
+                return ~0U;
+        }
 	if (packet->capture_length == -1) {
 		if (!packet->trace->format->get_capture_length)
 			return ~0U;
@@ -1321,6 +1361,10 @@ DLLEXPORT size_t trace_get_capture_length(const libtrace_packet_t *packet)
  */
 DLLEXPORT size_t trace_get_wire_length(const libtrace_packet_t *packet){
 
+        if (packet->which_trace_start != packet->trace->startcount) {
+                return ~0U;
+        }
+
 	if (packet->wire_length == -1) {
 		if (!packet->trace->format->get_wire_length)
 			return ~0U;
@@ -1341,8 +1385,18 @@ DLLEXPORT size_t trace_get_wire_length(const libtrace_packet_t *packet){
  */
 DLLEXPORT SIMPLE_FUNCTION
 size_t trace_get_framing_length(const libtrace_packet_t *packet) {
+        if (packet->which_trace_start != packet->trace->startcount) {
+                return ~0U;
+        }
+
+        if (packet->framing_length >= 0) {
+                return packet->framing_length;
+        }
+
 	if (packet->trace->format->get_framing_length) {
-		return packet->trace->format->get_framing_length(packet);
+		((libtrace_packet_t *)packet)->framing_length =
+                       packet->trace->format->get_framing_length(packet);
+                return packet->framing_length;
 	}
 	return ~0U;
 }
@@ -1353,6 +1407,10 @@ size_t trace_get_framing_length(const libtrace_packet_t *packet) {
  * @returns libtrace_linktype_t
  */
 DLLEXPORT libtrace_linktype_t trace_get_link_type(const libtrace_packet_t *packet ) {
+
+        if (packet->which_trace_start != packet->trace->startcount) {
+                return TRACE_TYPE_CONTENT_INVALID;
+        }
 
 	if (packet->link_type == 0) {
 		if (!packet->trace->format->get_link_type)
@@ -1670,6 +1728,9 @@ DLLEXPORT libtrace_direction_t trace_set_direction(libtrace_packet_t *packet,
 DLLEXPORT libtrace_direction_t trace_get_direction(const libtrace_packet_t *packet)
 {
 	assert(packet);
+        if (packet->which_trace_start != packet->trace->startcount) {
+                return (libtrace_direction_t)~0U;
+        }
 	if (packet->trace->format->get_direction) {
 		return packet->trace->format->get_direction(packet);
 	}
@@ -2355,12 +2416,12 @@ void trace_clear_cache(libtrace_packet_t *packet) {
 	packet->transport_proto = 0;
 	packet->capture_length = -1;
 	packet->wire_length = -1;
+	packet->framing_length = -1;
 	packet->payload_length = -1;
 	packet->l2_remaining = 0;
 	packet->l3_remaining = 0;
 	packet->l4_remaining = 0;
         packet->refcount = 0;
-
 }
 
 void trace_interrupt(void) {

@@ -468,7 +468,7 @@ static int erf_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
 	if (erfptr->flags.rxerror == 1) {
 		packet->payload = NULL;
 	} else {
-		packet->payload = (char*)packet->buffer + erf_get_framing_length(packet);
+		packet->payload = ((char*)packet->buffer) + trace_get_framing_length(packet);
 	}
 
         assert(erfptr->rlen != 0);
@@ -764,15 +764,22 @@ uint64_t erf_get_erf_timestamp(const libtrace_packet_t *packet) {
 int erf_get_capture_length(const libtrace_packet_t *packet) {
 	dag_record_t *erfptr = 0;
 	int caplen;
-	if (packet->payload == NULL)
-		return 0; 
-	
-	erfptr = (dag_record_t *)packet->header;
-	caplen = ntohs(erfptr->rlen) - erf_get_framing_length(packet);
-	if (ntohs(erfptr->wlen) < caplen)
-		return ntohs(erfptr->wlen);
+        size_t framinglen;
+        uint16_t wlen, rlen;
 
-	return (ntohs(erfptr->rlen) - erf_get_framing_length(packet));
+	if (packet->payload == NULL)
+		return 0;
+
+	erfptr = (dag_record_t *)packet->header;
+        framinglen = trace_get_framing_length(packet);
+        rlen = ntohs(erfptr->rlen);
+        wlen = ntohs(erfptr->wlen);
+
+	caplen = rlen - framinglen;
+	if (wlen < caplen)
+		return wlen;
+
+        return caplen;
 }
 
 int erf_get_wire_length(const libtrace_packet_t *packet) {
@@ -787,6 +794,8 @@ int erf_get_wire_length(const libtrace_packet_t *packet) {
 
 size_t erf_set_capture_length(libtrace_packet_t *packet, size_t size) {
 	dag_record_t *erfptr = 0;
+        uint16_t wlen;
+
 	assert(packet);
 	erfptr = (dag_record_t *)packet->header;
 
@@ -799,8 +808,14 @@ size_t erf_set_capture_length(libtrace_packet_t *packet, size_t size) {
 	 * wrong value here and subsequent get_capture_length() calls will
 	 * return the wrong value. */
 	packet->capture_length = -1;
-	erfptr->rlen = htons(size + erf_get_framing_length(packet));
-	return trace_get_capture_length(packet);
+	erfptr->rlen = htons(size + trace_get_framing_length(packet));
+        wlen = ntohs(erfptr->wlen);
+
+        if (wlen < size) {
+                return wlen;
+        }
+
+	return size;
 }
 
 static struct libtrace_eventobj_t erf_event(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {

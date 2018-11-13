@@ -499,7 +499,7 @@ static int pcap_write_packet(libtrace_out_t *libtrace,
 
 	/* Silently discard RT metadata packets and packets with an
 	 * unknown linktype. */
-	if (linktype == TRACE_TYPE_NONDATA || linktype == TRACE_TYPE_UNKNOWN || linktype == TRACE_TYPE_ERF_META) {
+	if (linktype == TRACE_TYPE_NONDATA || linktype == TRACE_TYPE_UNKNOWN || linktype == TRACE_TYPE_ERF_META || linktype == TRACE_TYPE_CONTENT_INVALID) {
 		return 0;
 	}
 
@@ -594,7 +594,7 @@ static int pcapint_write_packet(libtrace_out_t *libtrace,
 
 	/* Silently discard RT metadata packets and packets with an
 	 * unknown linktype. */
-	if (linktype == TRACE_TYPE_NONDATA || linktype == TRACE_TYPE_UNKNOWN || linktype == TRACE_TYPE_ERF_META) {
+	if (linktype == TRACE_TYPE_NONDATA || linktype == TRACE_TYPE_UNKNOWN || linktype == TRACE_TYPE_ERF_META || linktype == TRACE_TYPE_CONTENT_INVALID) {
 		return 0;
 	}
 
