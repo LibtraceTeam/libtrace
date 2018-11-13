@@ -1,3 +1,2 @@
 usr/include/libpacketdump*
 usr/lib/libpacketdump*.so
-usr/lib/libpacketdump/*.so
