@@ -127,7 +127,7 @@ static void compute_stats(struct addr_local *tally) {
                 }
         }
 
-	/* RANKING SYSTEM */
+	/* To get ranking we push everything into the priority queue at pop things off 1 by one which returns them in high to lowest priority */
 	for(i=0;i<4;i++) {
 		tally->stats->rank_src[i] = rank_new(0, tally->src[i][0]);
 		tally->stats->rank_dst[i] = rank_new(0, tally->dst[i][0]);
@@ -489,22 +489,9 @@ static void plot_results(struct addr_local *tally, uint64_t tick) {
 		fprintf(gnuplot, "set xlabel 'Prefix'\n");
 		fprintf(gnuplot, "set ylabel 'Hits'\n");
 		fprintf(gnuplot, "set xtics 0,10,255\n");
-		//fprintf(gnuplot, "set y2tics\n");
 		fprintf(gnuplot, "set output '%s'\n", outputplot);
-		//if(stats_percentage_change) {
-		//	fprintf(gnuplot, "set y2label 'Percentage Change'\n");
-                //        fprintf(gnuplot, "set y2range[-100:100]\n");
-		//	fprintf(gnuplot, "set ytics nomirror\n");
-		//	fprintf(gnuplot, "set y2tics\n");
-		//	fprintf(gnuplot, "plot '%s' using 1:%d title 'Source octet %d' axes x1y1 with boxes,", outputfile, i+2, i+1);
-		//	fprintf(gnuplot, "'%s' using 1:%d title 'Destination octet %d' axes x1y1 with boxes,", outputfile, i+3, i+1);
-		//	fprintf(gnuplot, "'%s' using 1:%d title 'Octet %d source change' axes x1y2 with lines,", outputfile, i+10, i+1);
-		//	fprintf(gnuplot, "'%s' using 1:%d title 'Octet %d destination change' axes x1y2 with lines\n", outputfile, i+11, i+1);
-
-		//} else {
 		fprintf(gnuplot, "plot '%s' using %d:%d title 'Source octet %d' smooth unique with boxes,", outputfile, (i*4)+3,(i*4)+4, i+1);
 		fprintf(gnuplot, "'%s' using %d:%d title 'Destination octet %d' smooth unique with boxes\n", outputfile, (i*4)+5, (i*4)+6, i+1);
-		//}
 		fprintf(gnuplot, "replot");
         	pclose(gnuplot);
 	}
@@ -521,13 +508,21 @@ static void plot_results(struct addr_local *tally, uint64_t tick) {
 			FILE *gnuplot = popen("gnuplot -persistent", "w");
 			fprintf(gnuplot, "set term pngcairo size 1280,960 \n");
 			fprintf(gnuplot, "set output '%s'\n", outputplot2);
+			if(k) {
+				fprintf(gnuplot, "set title 'Timeseries Dst Octet %i'\n", i+1);
+			} else {
+				fprintf(gnuplot, "set title 'Timeseries Src Octet %i'\n", i+1);
+			}
+			fprintf(gnuplot, "set xtics rotate\n");
 			fprintf(gnuplot, "set key off\n");
 			//fprintf(gnuplot, "set xdata time\n");
-			//fprintf(gnuplot, "set timefmt '%s'\n");
+			//fprintf(gnuplot, "set timefmt '%%s'\n");
+			//fprintf(gnuplot, "set format x '%%m/%%d/%%Y %%H:%%M:%%S'\n");
+			fprintf(gnuplot, "set autoscale xy\n");
 			if(k) {
-				fprintf(gnuplot, "plot '%sipdist-timeseries-dst-octet%d.data' using 2:xtic(1) with lines title columnheader(2), for[i=2:257] '' using i with lines title columnheader(i)\n", stats_outputdir, i+1);
+				fprintf(gnuplot, "plot '%sipdist-timeseries-dst-octet%d.data' using 2:xtic(1) with lines title columnheader(2), for[i=3:257] '' using i with lines title columnheader(i)\n", stats_outputdir, i+1);
 			} else {
-				fprintf(gnuplot, "plot '%sipdist-timeseries-src-octet%d.data' using 2:xtic(1) with lines title columnheader(2), for[i=2:257] '' using i with lines title columnheader(i)\n", stats_outputdir, i+1);
+				fprintf(gnuplot, "plot '%sipdist-timeseries-src-octet%d.data' using 2:xtic(1) with lines title columnheader(2), for[i=3:257] '' using i with lines title columnheader(i)\n", stats_outputdir, i+1);
 			}
 			fprintf(gnuplot, "replot");
 			pclose(gnuplot);
