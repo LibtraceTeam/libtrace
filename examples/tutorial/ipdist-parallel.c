@@ -28,14 +28,14 @@ struct addr_stats {
 	/* Holds the percentage change compared to the previous output */
 	float src[4][256];
 	float dst[4][256];
-	double mean_src[4];
-	double mean_dst[4];
-	double stdev_src[4];
-	double stdev_dst[4];
-	double variance_src[4];
-	double variance_dst[4];
-	double variation_src[4];
-	double variation_dst[4];
+	//double mean_src[4];
+	//double mean_dst[4];
+	//double stdev_src[4];
+	//double stdev_dst[4];
+	//double variance_src[4];
+	//double variance_dst[4];
+	//double variation_src[4];
+	//double variation_dst[4];
 	struct addr_rank *rank_src[4];
 	struct addr_rank *rank_dst[4];
 };
@@ -61,11 +61,9 @@ struct network {
 /* interval between outputs in seconds */
 uint64_t tickrate;
 
-char *stats_outputdir = "/home/jcv9/output/";
+char *stats_outputdir = "";
 /* Calculate and plot the percentage change from the previous plot */
 int stats_percentage_change = 0;
-int stats_ranking = 1;
-
 
 /*************************************************************************
 Priority queue linked list */
@@ -130,22 +128,20 @@ static void compute_stats(struct addr_local *tally) {
         }
 
 	/* RANKING SYSTEM */
-	if(stats_ranking) {
-		for(i=0;i<4;i++) {
-			tally->stats->rank_src[i] = rank_new(0, tally->src[i][0]);
-			tally->stats->rank_dst[i] = rank_new(0, tally->dst[i][0]);
-
-			for(j=1;j<256;j++) {
-				/* Push everything into the priority queue
-				 * each item will be popped off in the correct order */
-				push(&tally->stats->rank_src[i], j, tally->src[i][j]);
-				push(&tally->stats->rank_dst[i], j, tally->dst[i][j]);
-			}
+	for(i=0;i<4;i++) {
+		tally->stats->rank_src[i] = rank_new(0, tally->src[i][0]);
+		tally->stats->rank_dst[i] = rank_new(0, tally->dst[i][0]);
+		for(j=1;j<256;j++) {
+			/* Push everything into the priority queue
+			 * each item will be popped off in the correct order */
+			push(&tally->stats->rank_src[i], j, tally->src[i][j]);
+			push(&tally->stats->rank_dst[i], j, tally->dst[i][j]);
 		}
 	}
 
 
-/* This will all result in overflows, needs to be a rolling average?? stdev etc */
+
+	/* This will all result in overflows, needs to be a rolling average?? stdev etc */
 	/* Calculate mean */
 //	for(i=0;i<4;i++) {
 //		uint64_t count_src = 0;
@@ -389,14 +385,14 @@ static void *start_reporter(libtrace_t *trace, libtrace_thread_t *thread, void *
 			tally->stats->dst[i][j] = 0;
 		}
 		/* Stats related varibles */
-		tally->stats->mean_src[i] = 0;
-		tally->stats->mean_dst[i] = 0;
-		tally->stats->stdev_src[i] = 0;
-		tally->stats->stdev_dst[i] = 0;
-		tally->stats->variance_src[i] = 0;
-		tally->stats->variance_dst[i] = 0;
-		tally->stats->variation_src[i] = 0;
-		tally->stats->variation_dst[i] = 0;
+		//tally->stats->mean_src[i] = 0;
+		//tally->stats->mean_dst[i] = 0;
+		//tally->stats->stdev_src[i] = 0;
+		//tally->stats->stdev_dst[i] = 0;
+		//tally->stats->variance_src[i] = 0;
+		//tally->stats->variance_dst[i] = 0;
+		//tally->stats->variation_src[i] = 0;
+		//tally->stats->variation_dst[i] = 0;
         }
 	tally->lastkey = 0;
 	tally->packets = 0;
@@ -594,14 +590,14 @@ static void per_result(libtrace_t *trace, libtrace_thread_t *sender, void *globa
                         	tally->dst[i][j] = 0;
 			}
 			/* Clear all stats related data */
-			tally->stats->mean_src[i] = 0;
-			tally->stats->mean_dst[i] = 0;
-			tally->stats->stdev_src[i] = 0;
-			tally->stats->stdev_dst[i] = 0;
-			tally->stats->variance_src[i] = 0;
-			tally->stats->variance_dst[i] = 0;
-			tally->stats->variation_src[i] = 0;
-			tally->stats->variation_dst[i] = 0;
+			//tally->stats->mean_src[i] = 0;
+			//tally->stats->mean_dst[i] = 0;
+			//tally->stats->stdev_src[i] = 0;
+			//tally->stats->stdev_dst[i] = 0;
+			//tally->stats->variance_src[i] = 0;
+			//tally->stats->variance_dst[i] = 0;
+			//tally->stats->variation_src[i] = 0;
+			//tally->stats->variation_dst[i] = 0;
 
                 }
 		/* free the priority queue */
