@@ -61,7 +61,7 @@ struct network {
 /* interval between outputs in seconds */
 uint64_t tickrate;
 
-char *stats_outputdir = "";
+char *stats_outputdir = "/home/jcv9/output-spectre/";
 /* Calculate and plot the percentage change from the previous plot */
 int stats_percentage_change = 0;
 
@@ -483,15 +483,23 @@ static void plot_results(struct addr_local *tally, uint64_t tick) {
        		/* Open pipe to gnuplot */
 		FILE *gnuplot = popen("gnuplot -persistent", "w");
         	/* send all commands to gnuplot */
-        	fprintf(gnuplot, "set term pngcairo size 1280,960 \n");
-		fprintf(gnuplot, "set title 'IP Distribution - Octet %d'\n", i+1);
+        	fprintf(gnuplot, "set term pngcairo dashed enhanced size 1280,960\n");
+		fprintf(gnuplot, "set output '%s'\n", outputplot);
+		fprintf(gnuplot, "set multiplot layout 2,1\n");
+		fprintf(gnuplot, "set title 'IP Distribution'\n");
 		fprintf(gnuplot, "set xrange[0:255]\n");
 		fprintf(gnuplot, "set xlabel 'Prefix'\n");
 		fprintf(gnuplot, "set ylabel 'Hits'\n");
 		fprintf(gnuplot, "set xtics 0,10,255\n");
-		fprintf(gnuplot, "set output '%s'\n", outputplot);
 		fprintf(gnuplot, "plot '%s' using %d:%d title 'Source octet %d' smooth unique with boxes,", outputfile, (i*4)+3,(i*4)+4, i+1);
 		fprintf(gnuplot, "'%s' using %d:%d title 'Destination octet %d' smooth unique with boxes\n", outputfile, (i*4)+5, (i*4)+6, i+1);
+		fprintf(gnuplot, "set title 'Zipf Distribution'\n");
+		fprintf(gnuplot, "set xlabel 'Rank'\n");
+		fprintf(gnuplot, "set ylabel 'Frequency'\n");
+		fprintf(gnuplot, "set xrange[1:255]\n");
+		fprintf(gnuplot, "set logscale xy 10\n");
+		fprintf(gnuplot, "plot '%s' using 2:%d title 'Source octet %d',", outputfile, (i*4)+4, i+1);
+		fprintf(gnuplot, "'%s' using 2:%d title 'Destination octet %d'\n", outputfile, (i*4)+6, i+1);
 		fprintf(gnuplot, "replot");
         	pclose(gnuplot);
 	}
@@ -514,7 +522,8 @@ static void plot_results(struct addr_local *tally, uint64_t tick) {
 				fprintf(gnuplot, "set title 'Timeseries Src Octet %i'\n", i+1);
 			}
 			fprintf(gnuplot, "set xtics rotate\n");
-			fprintf(gnuplot, "set key off\n");
+			fprintf(gnuplot, "set key out vert\n");
+			fprintf(gnuplot, "set key right\n");
 			//fprintf(gnuplot, "set xdata time\n");
 			//fprintf(gnuplot, "set timefmt '%%s'\n");
 			//fprintf(gnuplot, "set format x '%%m/%%d/%%Y %%H:%%M:%%S'\n");
