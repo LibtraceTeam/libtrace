@@ -28,14 +28,16 @@ struct addr_stats {
 	/* Holds the percentage change compared to the previous output */
 	float src[4][256];
 	float dst[4][256];
-	//double mean_src[4];
-	//double mean_dst[4];
-	//double stdev_src[4];
-	//double stdev_dst[4];
-	//double variance_src[4];
-	//double variance_dst[4];
-	//double variation_src[4];
-	//double variation_dst[4];
+	double mode_src[4];
+	double mode_dst[4];
+	double mean_src[4];
+	double mean_dst[4];
+	double stddev_src[4];
+	double stddev_dst[4];
+	double variance_src[4];
+	double variance_dst[4];
+	double skewness_src[4];
+	double skewness_dst[4];
 	struct addr_rank *rank_src[4];
 	struct addr_rank *rank_dst[4];
 };
@@ -139,53 +141,53 @@ static void compute_stats(struct addr_local *tally) {
 		}
 	}
 
+	/* Calculate mean, variance and standard deviation */
+	for(k=0;k<4;k++) {
 
+		double ex = 0;
+	        double ex2 = 0;
+	        double n = 0;
+	        double m = 0;
+		for(i=0;i<256;i++) {
+			for(j=0;j<tally->src[k][i];j++) {
+				if(n == 0) {
+					m = i;
+				}
+				n += 1;
+				ex += (i - m);
+				ex2 += ((i - m) * (i - m));
+			}
+		}
+		tally->stats->mean_src[k] = (k + (ex / n));
+		tally->stats->variance_src[k] = ((ex2 - (ex*ex)/n) / n);
+		tally->stats->stddev_src[k] = sqrt(tally->stats->variance_src[k]);
 
-	/* This will all result in overflows, needs to be a rolling average?? stdev etc */
-	/* Calculate mean */
-//	for(i=0;i<4;i++) {
-//		uint64_t count_src = 0;
-//		uint64_t count_dst = 0;
-//		uint64_t tmp_src = 0;
-//		uint64_t tmp_dst = 0;
-//		for(j=0;j<256;j++) {
-//			tmp_src += (j * tally->src[i][j]);
-//			count_src += tally->src[i][j];
-//			tmp_dst += (j * tally->dst[i][j]);
-//			count_dst += tally->dst[i][j];
-//		}
-//
-//		tally->stats->mean_src[i] = tmp_src / count_src;
-//		tally->stats->mean_dst[i] = tmp_dst / count_dst;
-//	}
-//	printf("mean: %f\n", tally->stats->mean_src[0]);
-//
-//
-//	/* Calculate variance, standard deviation and variation*/
-//	for(i=0;i<4;i++) {
-//		uint64_t count_src = 0;
-//		uint64_t count_dst = 0;
-//		uint64_t tmp_src = 0;
-//		uint64_t tmp_dst = 0;
-//		for(j=0;j<256;j++) {
-//			tmp_src += (j * pow((tally->src[i][j] - tally->stats->mean_src[i]), 2));
-//			count_src += tally->src[i][j];
-//			tmp_dst += (j * pow((tally->dst[i][j] - tally->stats->mean_dst[i]), 2));
-//			count_dst += tally->dst[i][j];
-//		}
-//		//printf("total: %u count: %u dd: %f\n", tmp_src, count_src, tmp_src/count_src);
-//		tally->stats->variance_src[i] = (double)tmp_src / (double)count_src;
-//		tally->stats->variance_dst[i] = (double)tmp_dst / (double)count_dst;
-//		tally->stats->stdev_src[i] = sqrt(tally->stats->variance_src[i]);
-//		tally->stats->stdev_dst[i] = sqrt(tally->stats->variance_dst[i]);
-//
-//		/* Calculate coefficient of variation */
-//		tally->stats->variation_src[i] = tally->stats->stdev_src[i] / tally->stats->mean_src[i];
-//		tally->stats->variation_dst[i] = tally->stats->stdev_dst[i] / tally->stats->mean_dst[i];
-//	}
-//
-//
-//	printf("stdev: %f variance: %f variation: %f\n", tally->stats->stdev_src[0], tally->stats->variance_src[0], tally->stats->variation_src[0]);
+		ex = 0;
+		ex2 = 0;
+		n = 0;
+		m = 0;
+		for(i=0;i<256;i++) {
+                        for(j=0;j<tally->dst[k][i];j++) {
+                                if(n == 0) {
+                                        m = i;
+                                }
+                                n += 1;
+                                ex += (i - m);
+                                ex2 += ((i - m) * (i - m));
+                        }
+                }
+		tally->stats->mean_dst[k] = (k + (ex / n));
+                tally->stats->variance_dst[k] = ((ex2 - (ex*ex)/n) / n);
+                tally->stats->stddev_dst[k] = sqrt(tally->stats->variance_dst[k]);
+
+		tally->stats->mode_src[k] = peak(&tally->stats->rank_src[k]);
+		tally->stats->mode_dst[k] = peak(&tally->stats->rank_src[k]);
+		/* Calculate skewness using pearsons mode method. This is accurate with large amounts of data */
+                tally->stats->skewness_src[k] = (tally->stats->mean_src[k] - tally->stats->mode_src[k]) / tally->stats->stddev_src[k];
+                tally->stats->skewness_dst[k] = (tally->stats->mean_dst[k] - tally->stats->mode_dst[k]) / tally->stats->stddev_dst[k];
+	}
+
+	printf("skewnesss: %f\n", tally->stats->skewness_dst[1]);
 
 }
 
@@ -385,14 +387,16 @@ static void *start_reporter(libtrace_t *trace, libtrace_thread_t *thread, void *
 			tally->stats->dst[i][j] = 0;
 		}
 		/* Stats related varibles */
-		//tally->stats->mean_src[i] = 0;
-		//tally->stats->mean_dst[i] = 0;
-		//tally->stats->stdev_src[i] = 0;
-		//tally->stats->stdev_dst[i] = 0;
-		//tally->stats->variance_src[i] = 0;
-		//tally->stats->variance_dst[i] = 0;
-		//tally->stats->variation_src[i] = 0;
-		//tally->stats->variation_dst[i] = 0;
+		tally->stats->mode_src[i] = 0;
+		tally->stats->mode_dst[i] = 0;
+		tally->stats->mean_src[i] = 0;
+		tally->stats->mean_dst[i] = 0;
+		tally->stats->stddev_src[i] = 0;
+		tally->stats->stddev_dst[i] = 0;
+		tally->stats->variance_src[i] = 0;
+		tally->stats->variance_dst[i] = 0;
+		tally->stats->skewness_src[i] = 0;
+		tally->stats->skewness_dst[i] = 0;
         }
 	tally->lastkey = 0;
 	tally->packets = 0;
@@ -441,6 +445,18 @@ static void plot_results(struct addr_local *tally, uint64_t tick) {
 		}
 		fprintf(tmp, "\n");
 	}
+	fclose(tmp);
+
+	char outputfile_stats[255];
+	snprintf(outputfile_stats, sizeof(outputfile_stats), "%sipdist-%u.stats", stats_outputdir, tick);
+	tmp = fopen(outputfile_stats, "w");
+	/* append stats data to end of file */
+	fprintf(tmp, "#\tmean\tstddev\tvariance\tmode\tskewness\n");
+	for(i=0;i<4;i++) {
+		fprintf(tmp, "src%d\t%0.f\t%0.f\t%0.f\t\t%0.f\t%f\n", i+1, tally->stats->mean_src[i], tally->stats->stddev_src[i], tally->stats->variance_src[i], tally->stats->mode_src[i], tally->stats->skewness_src[i]);
+		fprintf(tmp, "dst%d\t%0.f\t%0.f\t%0.f\t\t%0.f\t%f\n", i+1, tally->stats->mean_dst[i], tally->stats->stddev_dst[i], tally->stats->variance_dst[i], tally->stats->mode_dst[i], tally->stats->skewness_dst[i]);
+		fprintf(tmp, "\n\n");
+	}
         fclose(tmp);
 
 	/* Puts data into timeseries files that gnuplot likes */
@@ -483,7 +499,7 @@ static void plot_results(struct addr_local *tally, uint64_t tick) {
        		/* Open pipe to gnuplot */
 		FILE *gnuplot = popen("gnuplot -persistent", "w");
         	/* send all commands to gnuplot */
-        	fprintf(gnuplot, "set term pngcairo dashed enhanced size 1280,960\n");
+        	fprintf(gnuplot, "set term pngcairo enhanced size 1280,960\n");
 		fprintf(gnuplot, "set output '%s'\n", outputplot);
 		fprintf(gnuplot, "set multiplot layout 2,1\n");
 		fprintf(gnuplot, "set title 'IP Distribution'\n");
@@ -491,15 +507,37 @@ static void plot_results(struct addr_local *tally, uint64_t tick) {
 		fprintf(gnuplot, "set xlabel 'Prefix'\n");
 		fprintf(gnuplot, "set ylabel 'Hits'\n");
 		fprintf(gnuplot, "set xtics 0,10,255\n");
-		fprintf(gnuplot, "plot '%s' using %d:%d title 'Source octet %d' smooth unique with boxes,", outputfile, (i*4)+3,(i*4)+4, i+1);
-		fprintf(gnuplot, "'%s' using %d:%d title 'Destination octet %d' smooth unique with boxes\n", outputfile, (i*4)+5, (i*4)+6, i+1);
+		/* Setup labels that hold mean, standard deviation and variance */
+		fprintf(gnuplot, "stats '%s' index %d every ::0::0 using 2 name 'SOURCEMEAN' nooutput\n", outputfile_stats, i);
+		//fprintf(gnuplot, "set label 1 gprintf(\"Source Mean %u\", SOURCEMEAN_min) at graph 0.02, 0.95\n");
+		fprintf(gnuplot, "stats '%s' index %d every ::1::1 using 2 name 'DESTMEAN' nooutput\n", outputfile_stats, i);
+                //fprintf(gnuplot, "set label 2 gprintf(\"Destination Mean: %f\", DESTMEAN_min) at graph 0.02, 0.90\n");
+		//fprintf(gnuplot, "stats '%s' index %d every ::0::0 using 3 name 'SOURCESTDDEV' nooutput\n", outputfile_stats, i);
+                //fprintf(gnuplot, "set label 3 sprintf('Source Standard Deviation: %f', SOURCESTDDEV_min) at graph 0.24, 0.95\n");
+                //fprintf(gnuplot, "stats '%s' index %d every ::1::1 using 3 name 'DESTSTDDEV' nooutput\n", outputfile_stats, i);
+                //fprintf(gnuplot, "set label 4 sprintf('Destination Standard Deviation: %f', DESTSTDDEV_min) at graph 0.24, 0.90\n");
+		//fprintf(gnuplot, "stats '%s' index %d every ::0::0 using 4 name 'SOURCEVAR' nooutput\n", outputfile_stats, i);
+                //fprintf(gnuplot, "set label 5 sprintf('Source Variance: %f', SOURCEVAR_min) at graph 0.55, 0.95\n");
+                //fprintf(gnuplot, "stats '%s' index %d every ::1::1 using 4 name 'DESTVAR' nooutput\n", outputfile_stats, i);
+                //fprintf(gnuplot, "set label 6 sprintf('Destination Variance: %f', DESTVAR_min) at graph 0.55, 0.90\n");
+		/* Plot the first graph of the multiplot */
+		fprintf(gnuplot, "set arrow from SOURCEMEAN_min, graph 0 to SOURCEMEAN_min, graph 1 nohead lt 1\n");
+		fprintf(gnuplot, "set arrow from DESTMEAN_min, graph 0 to DESTMEAN_min, graph 1 nohead lt 2\n");
+		fprintf(gnuplot, "plot '%s' using %d:%d index 0 title 'Source octet %d' smooth unique with boxes,", outputfile, (i*4)+3,(i*4)+4, i+1);
+		fprintf(gnuplot, "'%s' using %d:%d index 0 title 'Destination octet %d' smooth unique with boxes,", outputfile, (i*4)+5, (i*4)+6, i+1);
+		fprintf(gnuplot, "1/0 t 'Source mean' lt 1,");
+		fprintf(gnuplot, "1/0 t 'Destination mean' lt 2\n");
+		/* Unset labels for next plot */
+		fprintf(gnuplot, "unset arrow\n");
+		fprintf(gnuplot, "unset label 1\nunset label 2\nunset label 3\nunset label 4\nunset label 5\nunset label 6\n");
 		fprintf(gnuplot, "set title 'Zipf Distribution'\n");
 		fprintf(gnuplot, "set xlabel 'Rank'\n");
 		fprintf(gnuplot, "set ylabel 'Frequency'\n");
 		fprintf(gnuplot, "set xrange[1:255]\n");
 		fprintf(gnuplot, "set logscale xy 10\n");
-		fprintf(gnuplot, "plot '%s' using 2:%d title 'Source octet %d',", outputfile, (i*4)+4, i+1);
-		fprintf(gnuplot, "'%s' using 2:%d title 'Destination octet %d'\n", outputfile, (i*4)+6, i+1);
+		/* Plot the second graph of the multiplot */
+		fprintf(gnuplot, "plot '%s' using 2:%d index 0 title 'Source octet %d',", outputfile, (i*4)+4, i+1);
+		fprintf(gnuplot, "'%s' using 2:%d index 0 title 'Destination octet %d'\n", outputfile, (i*4)+6, i+1);
 		fprintf(gnuplot, "replot");
         	pclose(gnuplot);
 	}
@@ -593,16 +631,6 @@ static void per_result(libtrace_t *trace, libtrace_thread_t *sender, void *globa
                         	tally->src[i][j] = 0;
                         	tally->dst[i][j] = 0;
 			}
-			/* Clear all stats related data */
-			//tally->stats->mean_src[i] = 0;
-			//tally->stats->mean_dst[i] = 0;
-			//tally->stats->stdev_src[i] = 0;
-			//tally->stats->stdev_dst[i] = 0;
-			//tally->stats->variance_src[i] = 0;
-			//tally->stats->variance_dst[i] = 0;
-			//tally->stats->variation_src[i] = 0;
-			//tally->stats->variation_dst[i] = 0;
-
                 }
 		/* free the priority queue */
 		for(i=0;i<4;i++) {
