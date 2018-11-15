@@ -649,6 +649,19 @@ static void per_result(libtrace_t *trace, libtrace_thread_t *sender, void *globa
                         	tally->src[i][j] = 0;
                         	tally->dst[i][j] = 0;
 			}
+			/* Clear all the stats data */
+			tally->stats->mode_src[i] = 0;
+                	tally->stats->mode_dst[i] = 0;
+                	tally->stats->mean_src[i] = 0;
+                	tally->stats->mean_dst[i] = 0;
+                	tally->stats->median_src[i] = 0;
+                	tally->stats->median_dst[i] = 0;
+                	tally->stats->stddev_src[i] = 0;
+                	tally->stats->stddev_dst[i] = 0;
+                	tally->stats->variance_src[i] = 0;
+        	        tally->stats->variance_dst[i] = 0;
+       	        	tally->stats->skewness_src[i] = 0;
+	                tally->stats->skewness_dst[i] = 0;
                 }
 		/* free the priority queue */
 		for(i=0;i<4;i++) {
