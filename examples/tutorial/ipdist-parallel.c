@@ -442,22 +442,22 @@ static void plot_results(struct addr_local *tally, uint64_t tick) {
         compute_stats(tally);
 
 	/* Finaly output the results */
-	printf("Generating output \"%sipdist-%u\"\n", stats_outputdir, tick);
+	printf("Generating output \"%sipdist-%lu\"\n", stats_outputdir, tick);
 
 	/* Output the results */
 	char outputfile[255];
-	snprintf(outputfile, sizeof(outputfile), "%sipdist-%u.data", stats_outputdir, tick);
+	snprintf(outputfile, sizeof(outputfile), "%sipdist-%lu.data", stats_outputdir, tick);
 	FILE *tmp = fopen(outputfile, "w");
 	fprintf(tmp, "#time\t\trank\toctet1\t\t\t\toctet2\t\t\t\toctet3\t\t\t\toctet4\n");
 	fprintf(tmp, "#\t\t\tsrc\thits\tdst\thits\tsrc\thits\tdst\thits\tsrc\thits\tdst\thits\tsrc\thits\tdst\thits\n");
 	for(i=0;i<256;i++) {
-		fprintf(tmp, "%d\t%d", tick, i+1);
+		fprintf(tmp, "%lu\t%d", tick, i+1);
 		for(j=0;j<4;j++) {
 			/* Get the highest ranking to lowest ranking octets */
-			fprintf(tmp, "\t%d", peak(&tally->stats->rank_src[j]));
-			fprintf(tmp, "\t%d", peak_count(&tally->stats->rank_src[j]));
-			fprintf(tmp, "\t%d", peak(&tally->stats->rank_dst[j]));
-			fprintf(tmp, "\t%d", peak_count(&tally->stats->rank_dst[j]));
+			fprintf(tmp, "\t%u", peak(&tally->stats->rank_src[j]));
+			fprintf(tmp, "\t%lu", peak_count(&tally->stats->rank_src[j]));
+			fprintf(tmp, "\t%u", peak(&tally->stats->rank_dst[j]));
+			fprintf(tmp, "\t%lu", peak_count(&tally->stats->rank_dst[j]));
 			pop(&tally->stats->rank_src[j]);
 			pop(&tally->stats->rank_dst[j]);
 		}
@@ -466,7 +466,7 @@ static void plot_results(struct addr_local *tally, uint64_t tick) {
 	fclose(tmp);
 
 	char outputfile_stats[255];
-	snprintf(outputfile_stats, sizeof(outputfile_stats), "%sipdist-%u.stats", stats_outputdir, tick);
+	snprintf(outputfile_stats, sizeof(outputfile_stats), "%sipdist-%lu.stats", stats_outputdir, tick);
 	tmp = fopen(outputfile_stats, "w");
 	/* append stats data to end of file */
 	fprintf(tmp, "#\tmean\tstddev\tvariance\tmedian\tmode\tskewness\n");
@@ -497,12 +497,12 @@ static void plot_results(struct addr_local *tally, uint64_t tick) {
 			} else {
 				tmp = fopen(outputfile2, "a");
 			}
-			fprintf(tmp, "%d\t", tick);
+			fprintf(tmp, "%lu\t", tick);
 			for(i=0;i<256;i++) {
 				if(k) {
-					fprintf(tmp, "%d\t", tally->dst[j][i]);
+					fprintf(tmp, "%lu\t", tally->dst[j][i]);
 				} else {
-					fprintf(tmp, "%d\t", tally->src[j][i]);
+					fprintf(tmp, "%lu\t", tally->src[j][i]);
 				}
 			}
 			fprintf(tmp, "\n");
@@ -513,7 +513,7 @@ static void plot_results(struct addr_local *tally, uint64_t tick) {
 	/* Plot the results */
 	for(i=0;i<4;i++) {
 		char outputplot[255];
-		snprintf(outputplot, sizeof(outputplot), "%sipdist-%u-octet%d.png", stats_outputdir, tick, i+1);
+		snprintf(outputplot, sizeof(outputplot), "%sipdist-%lu-octet%d.png", stats_outputdir, tick, i+1);
        		/* Open pipe to gnuplot */
 		FILE *gnuplot = popen("gnuplot -persistent", "w");
         	/* send all commands to gnuplot */
