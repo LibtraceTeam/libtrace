@@ -65,7 +65,7 @@ struct network {
 /* interval between outputs in seconds */
 uint64_t tickrate;
 
-char *stats_outputdir = "";
+char *stats_outputdir = "/home/jcv9/output-spectre/";
 /* Calculate and plot the percentage change from the previous plot */
 int stats_percentage_change = 0;
 
@@ -489,7 +489,7 @@ static void plot_results(struct addr_local *tally, uint64_t tick) {
 			}
 			if(tally->output_count == 0) {
 				tmp = fopen(outputfile2, "w");
-				fprintf(tmp, "prefix\t");
+				fprintf(tmp, "timestamp\t");
 				for(i=0;i<256;i++) {
 					fprintf(tmp, "%d\t", i);
 				}
@@ -509,6 +509,17 @@ static void plot_results(struct addr_local *tally, uint64_t tick) {
 			fclose(tmp);
         	}
 	}
+
+
+	/* Get the version of gnuplot */
+	//char delim[] = " ";
+	//char gnuplot_result[256];
+	//double gnuplot_version = 0;
+	//FILE *gnuplot = popen("gnuplot --version", "r");
+	//fgets(gnuplot_result, sizeof(gnuplot_result)-1, gnuplot);
+	//strtok(gnuplot_result, delim);
+	//gnuplot_version = atof(strtok(NULL, delim));
+	//pclose(gnuplot);
 
 	/* Plot the results */
 	for(i=0;i<4;i++) {
@@ -551,12 +562,13 @@ static void plot_results(struct addr_local *tally, uint64_t tick) {
 		fprintf(gnuplot, "set title 'Zipf Distribution'\n");
 		fprintf(gnuplot, "set xlabel 'Rank'\n");
 		fprintf(gnuplot, "set ylabel 'Frequency'\n");
-		fprintf(gnuplot, "set xrange[1:255]\n");
 		fprintf(gnuplot, "set logscale xy 10\n");
+		fprintf(gnuplot, "set xrange[1:255]\n");
+		fprintf(gnuplot, "set xtics 0,10,255\n");
 		/* Plot the second graph of the multiplot */
 		fprintf(gnuplot, "plot '%s' using 2:%d index 0 title 'Source octet %d',", outputfile, (i*4)+4, i+1);
 		fprintf(gnuplot, "'%s' using 2:%d index 0 title 'Destination octet %d'\n", outputfile, (i*4)+6, i+1);
-		fprintf(gnuplot, "replot");
+		fprintf(gnuplot, "unset multiplot\n");
         	pclose(gnuplot);
 	}
 
@@ -573,21 +585,29 @@ static void plot_results(struct addr_local *tally, uint64_t tick) {
 			fprintf(gnuplot, "set term pngcairo size 1280,960 \n");
 			fprintf(gnuplot, "set output '%s'\n", outputplot2);
 			if(k) {
-				fprintf(gnuplot, "set title 'Timeseries Dst Octet %i'\n", i+1);
+				fprintf(gnuplot, "set title 'Timeseries Dst Octet %i - Cumulative'\n", i+1);
 			} else {
-				fprintf(gnuplot, "set title 'Timeseries Src Octet %i'\n", i+1);
+				fprintf(gnuplot, "set title 'Timeseries Src Octet %i - Cumulative'\n", i+1);
 			}
 			fprintf(gnuplot, "set xtics rotate\n");
-			fprintf(gnuplot, "set key out vert\n");
-			fprintf(gnuplot, "set key right\n");
+			//fprintf(gnuplot, "set key out vert\n");
+			fprintf(gnuplot, "set key off\n");
 			//fprintf(gnuplot, "set xdata time\n");
 			//fprintf(gnuplot, "set timefmt '%%s'\n");
 			//fprintf(gnuplot, "set format x '%%m/%%d/%%Y %%H:%%M:%%S'\n");
 			fprintf(gnuplot, "set autoscale xy\n");
 			if(k) {
-				fprintf(gnuplot, "plot '%sipdist-timeseries-dst-octet%d.data' using 2:xtic(1) with lines title columnheader(2), for[i=3:257] '' using i with lines title columnheader(i)\n", stats_outputdir, i+1);
+				//if(gnuplot_version < 5) {
+					fprintf(gnuplot, "plot '%sipdist-timeseries-dst-octet%d.data' using 2:xtic(1) with lines title columnheader(2) smooth cumulative, for[i=3:257] '' using i with lines title columnheader(i) smooth cumulative\n", stats_outputdir, i+1);
+				//} else {
+				//	fprintf(gnuplot, "plot '%sipdist-timeseries-dst-octet%d.data' using 2:xtic(1) with lines title columnheader(2) at end smooth cumulative, for[i=3:257] '' using i with lines title columnheader(i) at end smooth cumulative\n", stats_outputdir, i+1);
+				//}
 			} else {
-				fprintf(gnuplot, "plot '%sipdist-timeseries-src-octet%d.data' using 2:xtic(1) with lines title columnheader(2), for[i=3:257] '' using i with lines title columnheader(i)\n", stats_outputdir, i+1);
+				//if(gnuplot_version < 5) {
+					fprintf(gnuplot, "plot '%sipdist-timeseries-src-octet%d.data' using 2:xtic(1) with lines title columnheader(2) smooth cumulative, for[i=3:257] '' using i with lines title columnheader(i) smooth cumulative\n", stats_outputdir, i+1);
+				//} else {
+				//	fprintf(gnuplot, "plot '%sipdist-timeseries-src-octet%d.data' using 2:xtic(1) with lines title columnheader(2) at end smooth cumulative, for[i=3:257] '' using i with lines title columnheader(i) at end smooth cumulative\n", stats_outputdir, i+1);
+				//}
 			}
 			fprintf(gnuplot, "replot");
 			pclose(gnuplot);
