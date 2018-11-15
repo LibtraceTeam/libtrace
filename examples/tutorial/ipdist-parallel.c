@@ -32,6 +32,8 @@ struct addr_stats {
 	double mode_dst[4];
 	double mean_src[4];
 	double mean_dst[4];
+	double median_src[4];
+	double median_dst[4];
 	double stddev_src[4];
 	double stddev_dst[4];
 	double variance_src[4];
@@ -63,7 +65,7 @@ struct network {
 /* interval between outputs in seconds */
 uint64_t tickrate;
 
-char *stats_outputdir = "/home/jcv9/output-spectre/";
+char *stats_outputdir = "";
 /* Calculate and plot the percentage change from the previous plot */
 int stats_percentage_change = 0;
 
@@ -158,6 +160,7 @@ static void compute_stats(struct addr_local *tally) {
 				ex2 += ((i - m) * (i - m));
 			}
 		}
+
 		tally->stats->mean_src[k] = (k + (ex / n));
 		tally->stats->variance_src[k] = ((ex2 - (ex*ex)/n) / n);
 		tally->stats->stddev_src[k] = sqrt(tally->stats->variance_src[k]);
@@ -179,15 +182,28 @@ static void compute_stats(struct addr_local *tally) {
 		tally->stats->mean_dst[k] = (k + (ex / n));
                 tally->stats->variance_dst[k] = ((ex2 - (ex*ex)/n) / n);
                 tally->stats->stddev_dst[k] = sqrt(tally->stats->variance_dst[k]);
-
+		/* Get the median */
+		int c = (n/2) - tally->src[k][0];
+		int c2 = 0;
+		while(c > 0) {
+			c2 += 1;
+			c -= tally->src[k][c2];
+		}
+		tally->stats->median_src[k] = c2;
+		c = (n/2) - tally->dst[k][0];
+		c2 = 0;
+		while(c > 0) {
+			c2 += 1;
+			c -= tally->dst[k][c2];
+		}
+		tally->stats->median_dst[k] = c2;
+		/* Get the mode which is the first item in the priority queue */
 		tally->stats->mode_src[k] = peak(&tally->stats->rank_src[k]);
 		tally->stats->mode_dst[k] = peak(&tally->stats->rank_src[k]);
-		/* Calculate skewness using pearsons mode method. This is accurate with large amounts of data */
-                tally->stats->skewness_src[k] = (tally->stats->mean_src[k] - tally->stats->mode_src[k]) / tally->stats->stddev_src[k];
-                tally->stats->skewness_dst[k] = (tally->stats->mean_dst[k] - tally->stats->mode_dst[k]) / tally->stats->stddev_dst[k];
+		/* Calculate skewness */
+                tally->stats->skewness_src[k] = (tally->stats->mean_src[k] - tally->stats->median_src[k]) / tally->stats->stddev_src[k];
+                tally->stats->skewness_dst[k] = (tally->stats->mean_dst[k] - tally->stats->median_dst[k]) / tally->stats->stddev_dst[k];
 	}
-
-	printf("skewnesss: %f\n", tally->stats->skewness_dst[1]);
 
 }
 
@@ -391,6 +407,8 @@ static void *start_reporter(libtrace_t *trace, libtrace_thread_t *thread, void *
 		tally->stats->mode_dst[i] = 0;
 		tally->stats->mean_src[i] = 0;
 		tally->stats->mean_dst[i] = 0;
+		tally->stats->median_src[i] = 0;
+		tally->stats->median_dst[i] = 0;
 		tally->stats->stddev_src[i] = 0;
 		tally->stats->stddev_dst[i] = 0;
 		tally->stats->variance_src[i] = 0;
@@ -451,10 +469,10 @@ static void plot_results(struct addr_local *tally, uint64_t tick) {
 	snprintf(outputfile_stats, sizeof(outputfile_stats), "%sipdist-%u.stats", stats_outputdir, tick);
 	tmp = fopen(outputfile_stats, "w");
 	/* append stats data to end of file */
-	fprintf(tmp, "#\tmean\tstddev\tvariance\tmode\tskewness\n");
+	fprintf(tmp, "#\tmean\tstddev\tvariance\tmedian\tmode\tskewness\n");
 	for(i=0;i<4;i++) {
-		fprintf(tmp, "src%d\t%0.f\t%0.f\t%0.f\t\t%0.f\t%f\n", i+1, tally->stats->mean_src[i], tally->stats->stddev_src[i], tally->stats->variance_src[i], tally->stats->mode_src[i], tally->stats->skewness_src[i]);
-		fprintf(tmp, "dst%d\t%0.f\t%0.f\t%0.f\t\t%0.f\t%f\n", i+1, tally->stats->mean_dst[i], tally->stats->stddev_dst[i], tally->stats->variance_dst[i], tally->stats->mode_dst[i], tally->stats->skewness_dst[i]);
+		fprintf(tmp, "src%d\t%0.f\t%0.f\t%0.f\t\t%0.f\t%0.f\t%f\n", i+1, tally->stats->mean_src[i], tally->stats->stddev_src[i], tally->stats->variance_src[i], tally->stats->median_src[i], tally->stats->mode_src[i], tally->stats->skewness_src[i]);
+		fprintf(tmp, "dst%d\t%0.f\t%0.f\t%0.f\t\t%0.f\t%0.f\t%f\n", i+1, tally->stats->mean_dst[i], tally->stats->stddev_dst[i], tally->stats->variance_dst[i], tally->stats->median_src[i], tally->stats->mode_dst[i], tally->stats->skewness_dst[i]);
 		fprintf(tmp, "\n\n");
 	}
         fclose(tmp);
