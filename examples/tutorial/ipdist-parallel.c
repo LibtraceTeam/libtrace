@@ -20,6 +20,7 @@ struct addr_local {
 	uint64_t lastkey;
 	/* Is the count of the number of packets processed, This is cleared after every output. */
 	uint64_t packets;
+	/* Total number an output has been generated */
 	uint64_t output_count;
 	/* Pointer to stats structure */
 	struct addr_stats *stats;
@@ -28,6 +29,7 @@ struct addr_stats {
 	/* Holds the percentage change compared to the previous output */
 	float src[4][256];
 	float dst[4][256];
+	/* Stats calculated independently per output */
 	double mode_src[4];
 	double mode_dst[4];
 	double mean_src[4];
@@ -40,6 +42,10 @@ struct addr_stats {
 	double variance_dst[4];
 	double skewness_src[4];
 	double skewness_dst[4];
+	/* Stats calculated over entire trace */
+	double total_skewness_src[4];
+	double total_skewness_dst[4];
+
 	struct addr_rank *rank_src[4];
 	struct addr_rank *rank_dst[4];
 };
@@ -203,6 +209,10 @@ static void compute_stats(struct addr_local *tally) {
 		/* Calculate skewness */
                 tally->stats->skewness_src[k] = (tally->stats->mean_src[k] - tally->stats->median_src[k]) / tally->stats->stddev_src[k];
                 tally->stats->skewness_dst[k] = (tally->stats->mean_dst[k] - tally->stats->median_dst[k]) / tally->stats->stddev_dst[k];
+
+		/* Increment total skew */
+		tally->stats->total_skewness_src[k] += tally->stats->skewness_src[k];
+		tally->stats->total_skewness_dst[k] += tally->stats->skewness_dst[k];
 	}
 
 }
@@ -415,6 +425,9 @@ static void *start_reporter(libtrace_t *trace, libtrace_thread_t *thread, void *
 		tally->stats->variance_dst[i] = 0;
 		tally->stats->skewness_src[i] = 0;
 		tally->stats->skewness_dst[i] = 0;
+
+		tally->stats->total_skewness_src[i] = 0;
+		tally->stats->total_skewness_dst[i] = 0;
         }
 	tally->lastkey = 0;
 	tally->packets = 0;
@@ -477,6 +490,21 @@ static void plot_results(struct addr_local *tally, uint64_t tick) {
 	}
         fclose(tmp);
 
+	char outputfile_stats_timeseries[255];
+	snprintf(outputfile_stats_timeseries, sizeof(outputfile_stats_timeseries), "%sipdist-timeseries-skewness.stats", stats_outputdir);
+	if(tally->output_count == 0) {
+		tmp = fopen(outputfile_stats_timeseries, "w");
+		fprintf(tmp, "timestamp\tsrc1\t\tdst1\t\tsrc2\t\tdst2\t\tsrc3\t\tdst3\t\tsrc4\t\tdst4");
+	} else {
+		tmp = fopen(outputfile_stats_timeseries, "a");
+	}
+	fprintf(tmp, "\n%lu\t", tick);
+	for(k=0;k<4;k++) {
+		fprintf(tmp, "%f\t", tally->stats->total_skewness_src[k] / (tally->output_count+1));
+		fprintf(tmp, "%f\t", tally->stats->total_skewness_dst[k] / (tally->output_count+1));
+	}
+	fclose(tmp);
+
 	/* Puts data into timeseries files that gnuplot likes */
 	char outputfile2[255];
 	for(k=0;k<2;k++) {
@@ -531,10 +559,13 @@ static void plot_results(struct addr_local *tally, uint64_t tick) {
         	fprintf(gnuplot, "set term pngcairo enhanced size 1280,960\n");
 		fprintf(gnuplot, "set output '%s'\n", outputplot);
 		fprintf(gnuplot, "set multiplot layout 2,1\n");
-		fprintf(gnuplot, "set title 'IP Distribution'\n");
+		fprintf(gnuplot, "set title 'IP Distribution - %lu'\n", tick);
 		fprintf(gnuplot, "set xrange[0:255]\n");
+		fprintf(gnuplot, "set y2range[-1:1]\n");
+		fprintf(gnuplot, "set y2tics\n");
 		fprintf(gnuplot, "set xlabel 'Prefix'\n");
 		fprintf(gnuplot, "set ylabel 'Hits'\n");
+		fprintf(gnuplot, "set y2label 'Skewness'\n");
 		fprintf(gnuplot, "set xtics 0,10,255\n");
 		/* Setup labels that hold mean, standard deviation and variance */
 		fprintf(gnuplot, "stats '%s' index %d every ::0::0 using 2 name 'SOURCEMEAN' nooutput\n", outputfile_stats, i);
@@ -549,14 +580,20 @@ static void plot_results(struct addr_local *tally, uint64_t tick) {
                 //fprintf(gnuplot, "set label 5 sprintf('Source Variance: %f', SOURCEVAR_min) at graph 0.55, 0.95\n");
                 //fprintf(gnuplot, "stats '%s' index %d every ::1::1 using 4 name 'DESTVAR' nooutput\n", outputfile_stats, i);
                 //fprintf(gnuplot, "set label 6 sprintf('Destination Variance: %f', DESTVAR_min) at graph 0.55, 0.90\n");
+		fprintf(gnuplot, "stats '%s' index %d every ::0::0 using 7 name 'SOURCESKEW' nooutput\n", outputfile_stats, i);
+		fprintf(gnuplot, "stats '%s' index %d every ::1::1 using 7 name 'DESTSKEW' nooutput\n", outputfile_stats, i);
 		/* Plot the first graph of the multiplot */
 		fprintf(gnuplot, "set arrow from SOURCEMEAN_min, graph 0 to SOURCEMEAN_min, graph 1 nohead lt 1\n");
 		fprintf(gnuplot, "set arrow from DESTMEAN_min, graph 0 to DESTMEAN_min, graph 1 nohead lt 2\n");
 		fprintf(gnuplot, "plot '%s' using %d:%d index 0 title 'Source octet %d' smooth unique with boxes,", outputfile, (i*4)+3,(i*4)+4, i+1);
 		fprintf(gnuplot, "'%s' using %d:%d index 0 title 'Destination octet %d' smooth unique with boxes,", outputfile, (i*4)+5, (i*4)+6, i+1);
 		fprintf(gnuplot, "1/0 t 'Source mean' lt 1,");
-		fprintf(gnuplot, "1/0 t 'Destination mean' lt 2\n");
+		fprintf(gnuplot, "1/0 t 'Destination mean' lt 2,");
+		fprintf(gnuplot, "SOURCESKEW_min title 'Source Skewness' axes x1y2,");
+		fprintf(gnuplot, "DESTSKEW_min title 'Destination Skewness' axes x1y2\n");
 		/* Unset labels for next plot */
+		fprintf(gnuplot, "unset y2tics\n");
+		fprintf(gnuplot, "unset y2label\n");
 		fprintf(gnuplot, "unset arrow\n");
 		fprintf(gnuplot, "unset label 1\nunset label 2\nunset label 3\nunset label 4\nunset label 5\nunset label 6\n");
 		fprintf(gnuplot, "set title 'Zipf Distribution'\n");
@@ -584,12 +621,16 @@ static void plot_results(struct addr_local *tally, uint64_t tick) {
 			FILE *gnuplot = popen("gnuplot -persistent", "w");
 			fprintf(gnuplot, "set term pngcairo size 1280,960 \n");
 			fprintf(gnuplot, "set output '%s'\n", outputplot2);
+			fprintf(gnuplot, "set multiplot layout 2,1\n");
 			if(k) {
-				fprintf(gnuplot, "set title 'Timeseries Dst Octet %i - Cumulative'\n", i+1);
+				fprintf(gnuplot, "set title 'Timeseries Dst Octet %i'\n", i+1);
 			} else {
-				fprintf(gnuplot, "set title 'Timeseries Src Octet %i - Cumulative'\n", i+1);
+				fprintf(gnuplot, "set title 'Timeseries Src Octet %i'\n", i+1);
 			}
 			fprintf(gnuplot, "set xtics rotate\n");
+			fprintf(gnuplot, "set y2tics\n");
+			fprintf(gnuplot, "set xlabel 'Timestamp'\n");
+			fprintf(gnuplot, "set ylabel 'Cumulative hits'\n");
 			//fprintf(gnuplot, "set key out vert\n");
 			fprintf(gnuplot, "set key off\n");
 			//fprintf(gnuplot, "set xdata time\n");
@@ -597,19 +638,17 @@ static void plot_results(struct addr_local *tally, uint64_t tick) {
 			//fprintf(gnuplot, "set format x '%%m/%%d/%%Y %%H:%%M:%%S'\n");
 			fprintf(gnuplot, "set autoscale xy\n");
 			if(k) {
-				//if(gnuplot_version < 5) {
-					fprintf(gnuplot, "plot '%sipdist-timeseries-dst-octet%d.data' using 2:xtic(1) with lines title columnheader(2) smooth cumulative, for[i=3:257] '' using i with lines title columnheader(i) smooth cumulative\n", stats_outputdir, i+1);
-				//} else {
-				//	fprintf(gnuplot, "plot '%sipdist-timeseries-dst-octet%d.data' using 2:xtic(1) with lines title columnheader(2) at end smooth cumulative, for[i=3:257] '' using i with lines title columnheader(i) at end smooth cumulative\n", stats_outputdir, i+1);
-				//}
+				fprintf(gnuplot, "plot '%sipdist-timeseries-dst-octet%d.data' using 2:xtic(1) with lines title columnheader(2) smooth cumulative, for[i=3:257] '' using i with lines title columnheader(i) smooth cumulative\n", stats_outputdir, i+1);
 			} else {
-				//if(gnuplot_version < 5) {
-					fprintf(gnuplot, "plot '%sipdist-timeseries-src-octet%d.data' using 2:xtic(1) with lines title columnheader(2) smooth cumulative, for[i=3:257] '' using i with lines title columnheader(i) smooth cumulative\n", stats_outputdir, i+1);
-				//} else {
-				//	fprintf(gnuplot, "plot '%sipdist-timeseries-src-octet%d.data' using 2:xtic(1) with lines title columnheader(2) at end smooth cumulative, for[i=3:257] '' using i with lines title columnheader(i) at end smooth cumulative\n", stats_outputdir, i+1);
-				//}
+				fprintf(gnuplot, "plot '%sipdist-timeseries-src-octet%d.data' using 2:xtic(1) with lines title columnheader(2) smooth cumulative, for[i=3:257] '' using i with lines title columnheader(i) smooth cumulative\n", stats_outputdir, i+1);
 			}
-			fprintf(gnuplot, "replot");
+			/* Draw the mean skewness line */
+			fprintf(gnuplot, "set title 'Timeseries mean skewness\n");
+			fprintf(gnuplot, "set yrange[-1:1]\n");
+			fprintf(gnuplot, "set xlabel 'Timestamp'\n");
+			fprintf(gnuplot, "set ylabel 'Skewness'\n");
+			fprintf(gnuplot, "plot '%sipdist-timeseries-skewness.stats' using %d:xtic(1) with lines title columnheader(%d)\n", stats_outputdir, (i*2)+2+k);
+			fprintf(gnuplot, "unset multiplot");
 			pclose(gnuplot);
 		}
 	}
