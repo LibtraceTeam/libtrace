@@ -7,6 +7,7 @@
 #include <arpa/inet.h>
 #include <time.h>
 #include <math.h>
+#include <getopt.h>
 
 /* Structure to hold the counters each thread has its own one of these */
 struct addr_local {
@@ -68,12 +69,8 @@ struct network {
 	uint32_t network;
 };
 
-/* interval between outputs in seconds */
 uint64_t tickrate;
-
-char *stats_outputdir = "/home/jcv9/output-spectre/";
-/* Calculate and plot the percentage change from the previous plot */
-int stats_percentage_change = 0;
+char *stats_outputdir = "";
 
 /*************************************************************************
 Priority queue linked list */
@@ -120,22 +117,6 @@ static void push(struct addr_rank **head, uint8_t addr, uint64_t count) {
 
 static void compute_stats(struct addr_local *tally) {
 	int i, j, k;
-
-	/* Calculates the percentage change from the last output. NEED TO MAKE THIS WEIGHTED */
-        if(stats_percentage_change) {
-		for(i=0;i<256;i++) {
-        		for(j=0;j<4;j++) {
-                		tally->stats->src[j][i] = 0;
-                        	tally->stats->dst[j][i] = 0;
-                        	if(tally->src[j][i] != 0) {
-                        		tally->stats->src[j][i] = (((float)tally->src[j][i] - (float)tally->src_lastoutput[j][i]) / (float)tally->src[j][i]) * 100;
-                        	}
-                        	if(tally->dst[j][i] != 0) {
-                        		tally->stats->dst[j][i] = (((float)tally->dst[j][i] - (float)tally->dst_lastoutput[j][i]) / (float)tally->dst[j][i]) * 100;
-                        	}
-			}
-                }
-        }
 
 	/* To get ranking we push everything into the priority queue at pop things off 1 by one which returns them in high to lowest priority */
 	for(i=0;i<4;i++) {
@@ -538,17 +519,6 @@ static void plot_results(struct addr_local *tally, uint64_t tick) {
         	}
 	}
 
-
-	/* Get the version of gnuplot */
-	//char delim[] = " ";
-	//char gnuplot_result[256];
-	//double gnuplot_version = 0;
-	//FILE *gnuplot = popen("gnuplot --version", "r");
-	//fgets(gnuplot_result, sizeof(gnuplot_result)-1, gnuplot);
-	//strtok(gnuplot_result, delim);
-	//gnuplot_version = atof(strtok(NULL, delim));
-	//pclose(gnuplot);
-
 	/* Plot the results */
 	for(i=0;i<4;i++) {
 		char outputplot[255];
@@ -794,25 +764,90 @@ static int get_network(char *network_string, struct network *network) {
 	return 0;
 }
 
+static void usage(char *argv0) {
+	fprintf(stderr, "Usage:\n"
+	"%s inputURI output-interval\n"
+	"-i [inputURI] --set-uri [inputURI]\n"
+	"-o [output-interval] --output-interval [output-interval]\n"
+	"	Output statistical information every x seconds\n"
+	"-t [threads] --threads [threads]\n"
+	"-e [excluded-network] --exclude-network [excluded-network]\n"
+	"	Network to exclude from results\n"
+	"	e.g. -e 192.168.0.0/16 -e 10.0.0.0/8\n"
+	"-d [output-directory] --output-dir [output-directory]\n"
+	, argv0);
+	exit(1);
+}
+
 int main(int argc, char *argv[]) {
+
+	char *inputURI = NULL;
+	int threads = 4;
+	tickrate = 300;
+	struct exclude_networks *exclude = malloc(sizeof(struct exclude_networks));
+	exclude->count = 0;
+
+	while(1) {
+		int option_index;
+		struct option long_options[] = {
+			{ "set-uri",		1, 0, 'i' },
+			{ "output-interval",	1, 0, 'o' },
+			{ "threads",		1, 0, 't' },
+			{ "exclude-network",	1, 0, 'e' },
+			{ "output-dir",		1, 0, 'd' },
+			{ NULL,			0, 0,  0  }
+		};
+
+		int c = getopt_long(argc, argv, "i:o:t:e:d:", long_options, &option_index);
+
+		if(c==-1) {
+			break;
+		}
+
+		switch(c) {
+			case 'i':
+				inputURI = optarg;
+				break;
+			case 'o':
+				tickrate = atoi(optarg);
+				break;
+			case 't':
+				threads = atoi(optarg);
+				break;
+			case 'e':
+				exclude->count += 1;
+				if(exclude->count > 1) {
+					exclude->networks = realloc(exclude->networks, sizeof(struct network)*exclude->count);
+				} else {
+					exclude->networks = malloc(sizeof(struct network));
+				}
+				if(get_network(optarg, &exclude->networks[exclude->count-1])) {
+					fprintf(stderr, "Error excluding network %s\n", optarg);
+                        		return 1;
+				}
+				break;
+			case 'd':
+				stats_outputdir = optarg;
+				strcat(stats_outputdir, "/");
+			case '?':
+				break;
+			default:
+				fprintf(stderr, "Unknown option: %c\n", c);
+				usage(argv[0]);
+		}
+	}
 
 	libtrace_t *trace;
 	/* Callbacks for processing and reporting threads */
 	libtrace_callback_set_t *processing, *reporter;
 
-
 	/* Ensure the input URI was supplied */
-        if(argc < 3) {
-                fprintf(stderr, "Usage: %s inputURI [outputInterval (Seconds)] [excluded networks]\n", argv[0]);
-                fprintf(stderr, "       eg. ./ipdist input.erf 60 210.10.3.0/24 70.5.0.0/16\n");
-                return 1;
+        if(inputURI == NULL) {
+                usage(argv[0]);
         }
-	/* Convert tick into an int */
-	tickrate = atoi(argv[2]);
-
 
 	/* Create the trace */
-        trace = trace_create(argv[1]);
+        trace = trace_create(inputURI);
         /* Ensure no error has occured creating the trace */
         if(trace_is_err(trace)) {
                 trace_perror(trace, "Creating trace");
@@ -832,7 +867,7 @@ int main(int argc, char *argv[]) {
 	trace_set_stopping_cb(reporter, stop_reporter);
 
 	/* Parallel specific configuration MUST BE PERFORMED AFTER TRACE IS CREATED */
-	trace_set_perpkt_threads(trace, 4);
+	trace_set_perpkt_threads(trace, threads);
 	/* Order the results by timestamp */
 	trace_set_combiner(trace, &combiner_ordered, (libtrace_generic_t){0});
 	/* Try to balance the load across all processing threads */
@@ -845,28 +880,6 @@ int main(int argc, char *argv[]) {
 	}
 	/* Do not buffer the reports */
 	trace_set_reporter_thold(trace, 1);
-
-
-	/* Setup excluded networks if any were supplied */
-	struct exclude_networks *exclude = malloc(sizeof(struct exclude_networks));
-	exclude->networks = malloc(sizeof(struct network)*(argc-3));
-	if(exclude == NULL || exclude->networks == NULL) {
-		fprintf(stderr, "Unable to allocate memory");
-		libtrace_cleanup(trace, processing, reporter);
-		return 1;
-	}
-	exclude->count = 0;
-	int i;
-	for(i=0;i<argc-3;i++) {
-		/* convert the network string into a network structure */
-		if(get_network(argv[i+3], &exclude->networks[i]) != 0) {
-			fprintf(stderr, "Error creating excluded network");
-			return 1;
-		}
-		/* increment the count of excluded networks */
-		exclude->count += 1;
-	}
-
 
 	/* Start the trace, if it errors return */
 	if(trace_pstart(trace, exclude, processing, reporter)) {
