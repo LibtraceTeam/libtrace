@@ -319,9 +319,6 @@ static int linuxring_start_input(libtrace_t *libtrace)
 
 #ifdef HAVE_PACKET_FANOUT
 static int linuxring_pstart_input(libtrace_t *libtrace) {
-        /* Only because our pread is hard-coded to only do one
-         * packet at a time anyway */
-        libtrace->config.burst_size = 1;
 	return linuxcommon_pstart_input(libtrace, linuxring_start_input_stream);
 }
 #endif
