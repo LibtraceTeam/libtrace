@@ -71,6 +71,8 @@ typedef struct etsithread {
         libtrace_message_queue_t mqueue;
         etsisocket_t *sources;
         uint16_t sourcecount;
+        uint16_t sourcealloc;
+        uint16_t activesources;
         int threadindex;
         wandder_etsispec_t *etsidec;
 } etsithread_t;
@@ -268,7 +270,9 @@ static int etsilive_start_threads(libtrace_t *libtrace, uint32_t maxthreads) {
                                 sizeof(newsend_message_t));
 
                 FORMAT_DATA->receivers[i].sources = NULL;
+                FORMAT_DATA->receivers[i].sourcealloc = 0;
                 FORMAT_DATA->receivers[i].sourcecount = 0;
+                FORMAT_DATA->receivers[i].activesources = 0;
                 FORMAT_DATA->receivers[i].threadindex = i;
                 FORMAT_DATA->receivers[i].etsidec =
                                 wandder_create_etsili_decoder();
@@ -325,16 +329,39 @@ static int receiver_read_message(etsithread_t *et) {
         while (libtrace_message_queue_try_get(&(et->mqueue), (void *)&msg)
                         != LIBTRACE_MQ_FAILED) {
                 etsisocket_t *esock = NULL;
+                int i;
 
                 if (et->sourcecount == 0) {
                         et->sources = (etsisocket_t *)malloc(
                                         sizeof(etsisocket_t) * 10);
-                } else if ((et->sourcecount % 10) == 0) {
-                        et->sources = (etsisocket_t *)realloc(et->sources,
-                                sizeof(etsisocket_t) * (et->sourcecount + 10));
+                        et->sourcealloc = 10;
+
+                        for (i = 0; i < et->sourcealloc; i++) {
+                                et->sources[i].sock = -1;
+                                et->sources[i].srcaddr = NULL;
+                        }
+
+                        esock = &(et->sources[0]);
+                        et->sourcecount = 1;
+                } else {
+                        for (i = 0; i < et->sourcealloc; i++) {
+                                if (et->sources[i].sock == -1) {
+                                        esock = &(et->sources[i]);
+                                        break;
+                                }
+                        }
                 }
 
-                esock = &(et->sources[et->sourcecount]);
+                if (esock == NULL) {
+                        et->sources = (etsisocket_t *)realloc(et->sources,
+                                sizeof(etsisocket_t) * (et->sourcealloc + 10));
+
+                        esock = &(et->sources[et->sourcealloc]);
+                        et->sourcealloc += 10;
+                        et->sourcecount += 1;
+
+                }
+
                 esock->sock = msg.recvsock;
                 esock->srcaddr = msg.recvaddr;
                 libtrace_scb_init(&(esock->recvbuffer), ETSI_RECVBUF_SIZE,
@@ -342,15 +369,15 @@ static int receiver_read_message(etsithread_t *et) {
                 esock->cached.timestamp = 0;
                 esock->cached.length = 0;
 
-                et->sourcecount += 1;
+                et->activesources += 1;
 
                 fprintf(stderr, "Thread %d is now handling %u sources.\n",
-                                et->threadindex, et->sourcecount);
+                                et->threadindex, et->activesources);
         }
         return 1;
 }
 
-static void receive_from_single_socket(etsisocket_t *esock) {
+static void receive_from_single_socket(etsisocket_t *esock, etsithread_t *et) {
 
         int ret = 0;
 
@@ -360,7 +387,7 @@ static void receive_from_single_socket(etsisocket_t *esock) {
 
         ret = libtrace_scb_recv_sock(&(esock->recvbuffer), esock->sock,
                         MSG_DONTWAIT);
-        if (ret == -1) {
+        if (ret < 0) {
                 if (errno == EAGAIN || errno == EWOULDBLOCK) {
                         /* Would have blocked, nothing available */
                         return;
@@ -369,12 +396,14 @@ static void receive_from_single_socket(etsisocket_t *esock) {
                                 esock->sock, strerror(errno));
                 close(esock->sock);
                 esock->sock = -1;
+                et->activesources -= 1;
         }
 
         if (ret == 0) {
                 fprintf(stderr, "Socket %d has disconnected\n", esock->sock);
                 close(esock->sock);
                 esock->sock = -1;
+                et->activesources -= 1;
         }
 
 }
@@ -393,12 +422,12 @@ static int receive_etsi_sockets(libtrace_t *libtrace, etsithread_t *et) {
                 return iserr;
         }
 
-        if (et->sourcecount == 0) {
+        if (et->activesources == 0) {
                 return 1;
         }
 
         for (i = 0; i < et->sourcecount; i++) {
-                receive_from_single_socket(&(et->sources[i]));
+                receive_from_single_socket(&(et->sources[i]), et);
         }
         return 1;
 
@@ -406,7 +435,7 @@ static int receive_etsi_sockets(libtrace_t *libtrace, etsithread_t *et) {
 
 static inline void inspect_next_packet(etsisocket_t *sock,
                 etsisocket_t **earliestsock, uint64_t *earliesttime,
-                wandder_etsispec_t *dec) {
+                wandder_etsispec_t *dec, etsithread_t *et) {
 
 
         struct timeval tv;
@@ -459,6 +488,7 @@ static inline void inspect_next_packet(etsisocket_t *sock,
                         fprintf(stderr, "bogus sequence number in ETSILI keep alive.\n");
                         close(sock->sock);
                         sock->sock = -1;
+                        et->activesources -= 1;
                         return;
                 }
                 /* Send keep alive response */
@@ -466,6 +496,7 @@ static inline void inspect_next_packet(etsisocket_t *sock,
                         fprintf(stderr, "error sending response to ETSILI keep alive: %s.\n", strerror(errno));
                         close(sock->sock);
                         sock->sock = -1;
+                        et->activesources -= 1;
                         return;
                 }
                 /* Skip past KA */
@@ -504,7 +535,7 @@ static etsisocket_t *select_next_packet(etsithread_t *et) {
 
         for (i = 0; i < et->sourcecount; i++) {
                 inspect_next_packet(&(et->sources[i]), &esock, &earliest,
-                        et->etsidec);
+                        et->etsidec, et);
         }
         return esock;
 }
