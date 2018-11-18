@@ -608,7 +608,7 @@ inline static int linuxring_read_stream(libtrace_t *libtrace,
 }
 
 static int linuxring_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
-	return linuxring_read_stream(libtrace, packet, FORMAT_DATA_FIRST, NULL);
+	return linuxring_read_stream(libtrace, packet, FORMAT_DATA_FIRST, NULL, 1);
 }
 
 #ifdef HAVE_PACKET_FANOUT
