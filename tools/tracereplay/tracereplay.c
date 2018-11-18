@@ -95,10 +95,12 @@ static libtrace_packet_t * per_packet(libtrace_packet_t *packet) {
 	libtrace_ether_t * ether_header;
 	int i;
 
-        if (IS_LIBTRACE_META_PACKET(packet))
+        if (IS_LIBTRACE_META_PACKET(packet)) {
                 return NULL;
-        if (trace_get_wire_length(packet) == 0)
+        }
+        if (trace_get_wire_length(packet) == 0) {
                 return NULL;
+        }
 
 	pkt_buffer = trace_get_packet_buffer(packet,&linktype,&remaining);
 	remaining = 0;
@@ -113,7 +115,6 @@ static libtrace_packet_t * per_packet(libtrace_packet_t *packet) {
 	}
 
 	trace_construct_packet(new_packet,linktype,pkt_buffer,wire_length);
-
 
 	if(broadcast) {
 		l2_header = trace_get_layer2(new_packet,&linktype,&remaining);
@@ -168,8 +169,9 @@ static uint32_t event_read_packet(libtrace_t *trace, libtrace_packet_t *packet)
 				/* We've got a packet! */
 			case TRACE_EVENT_PACKET:
 				/* Check for error first */
-				if (obj.size == -1)
+				if (obj.size == -1) {
 					return -1;
+                                }
 				return 1;
 
 				/* End of trace has been reached */
