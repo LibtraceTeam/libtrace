@@ -499,7 +499,8 @@ static int linuxring_prepare_packet(libtrace_t *libtrace UNUSED,
 inline static int linuxring_read_stream(libtrace_t *libtrace,
                                         libtrace_packet_t *packet,
                                         struct linux_per_stream_t *stream,
-                                        libtrace_message_queue_t *queue) {
+                                        libtrace_message_queue_t *queue,
+                                        uint8_t block) {
 
 	struct tpacket2_hdr *header;
 	int ret;
@@ -511,16 +512,24 @@ inline static int linuxring_read_stream(libtrace_t *libtrace,
 	
 	/* Fetch the current frame */
 	header = GET_CURRENT_BUFFER(stream);
-	assert((((unsigned long) header) & (pagesize - 1)) == 0);
+	if ((((unsigned long) header) & (pagesize - 1)) != 0) {
+                trace_set_err(libtrace, TRACE_ERR_BAD_PACKET,
+                        "ring frame size is not a multiple of the page size");
+                return -1;
+        }
 
 	/* TP_STATUS_USER means that we can use the frame.
 	 * When a slot does not have this flag set, the frame is not
 	 * ready for consumption.
 	 */
 	while (!(header->tp_status & TP_STATUS_USER) ||
-	       header->tp_status == TP_STATUS_LIBTRACE) {
-		if ((ret=is_halted(libtrace)) != -1)
-			return ret;
+	                header->tp_status == TP_STATUS_LIBTRACE) {
+                if ((ret=is_halted(libtrace)) != -1)
+                        return ret;
+                if (!block) {
+                        return 0;
+                }
+
 		pollset[0].fd = stream->fd;
 		pollset[0].events = POLLIN;
 		pollset[0].revents = 0;
@@ -609,17 +618,27 @@ static int linuxring_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet
 static int linuxring_pread_packets(libtrace_t *libtrace,
                                    libtrace_thread_t *t,
                                    libtrace_packet_t *packets[],
-                                   UNUSED size_t nb_packets) {
-	/* For now just read one packet */
-        /* If we change this to actually read nb_packets, make sure
-         * we remove the burst_size override in linuxring_pstart_input()
-         */
-	packets[0]->error = linuxring_read_stream(libtrace, packets[0],
-	                                          t->format_data, &t->messages);
-	if (packets[0]->error >= 1)
-		return 1;
-	else
-		return packets[0]->error;
+                                   size_t nb_packets) {
+        size_t i;
+        int ret;
+
+        for (i = 0; i < nb_packets; i++) {
+	        ret = linuxring_read_stream(libtrace, packets[i],
+	                        t->format_data, &t->messages, i == 0 ? 1 : 0);
+                packets[i]->error = ret;
+                if (ret < 0) {
+                        return ret;
+                }
+
+                if (ret == 0) {
+                        if (is_halted(libtrace) == READ_EOF) {
+                                return READ_EOF;
+                        }
+                        return i;
+                }
+        }
+
+        return nb_packets;
 }
 #endif
 
@@ -660,7 +679,9 @@ static void linuxring_fin_packet(libtrace_packet_t *packet)
 
 	if (packet->buffer == NULL)
 		return;
-	assert(packet->trace);
+	if (!libtrace) {
+                return;
+        }
 
 	/* If we own the packet (i.e. it's not a copy), we need to free it */
 	if (packet->buf_control == TRACE_CTRL_EXTERNAL) {
