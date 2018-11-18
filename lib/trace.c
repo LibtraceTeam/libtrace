@@ -2150,7 +2150,11 @@ void trace_construct_packet(libtrace_packet_t *packet,
 	/* Ugh, memmove - sadly necessary, also beware that we might be
          * moving data around within this packet, so ordering is important.
          */
-	memmove(packet->payload, data, (size_t)len);
+        if (data != NULL) {
+        	memmove(packet->payload, data, (size_t)len);
+        } else {
+                packet->payload = NULL;
+        }
 	memmove(packet->header, &hdr, sizeof(hdr));
 	packet->type=pcap_linktype_to_rt(libtrace_to_pcap_linktype(linktype));
 
