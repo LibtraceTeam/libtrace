@@ -219,6 +219,8 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 	packet->buffer = trace->event.packet->buffer;
 	packet->buf_control = trace->event.packet->buf_control;
 
+        packet->which_trace_start = trace->event.packet->which_trace_start;
+
 	event.type = TRACE_EVENT_PACKET;
 
 	trace->event.waiting = false;
