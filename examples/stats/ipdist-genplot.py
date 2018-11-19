@@ -3,11 +3,10 @@
 import sys
 import subprocess
 import os
-import re
 
 # Ensure a data directory was supplied
 if len(sys.argv) != 2:
-	print("Usage: python3 data-directory")
+	print("Usage: python data-directory")
 	sys.exit()
 
 dir = sys.argv[1]
