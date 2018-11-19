@@ -43,10 +43,6 @@ struct addr_stats {
 	double variance_dst[4];
 	double skewness_src[4];
 	double skewness_dst[4];
-	/* Stats calculated over entire trace */
-	double total_skewness_src[4];
-	double total_skewness_dst[4];
-
 	struct addr_rank *rank_src[4];
 	struct addr_rank *rank_dst[4];
 };
@@ -190,10 +186,6 @@ static void compute_stats(struct addr_local *tally) {
 		/* Calculate skewness */
                 tally->stats->skewness_src[k] = (tally->stats->mean_src[k] - tally->stats->median_src[k]) / tally->stats->stddev_src[k];
                 tally->stats->skewness_dst[k] = (tally->stats->mean_dst[k] - tally->stats->median_dst[k]) / tally->stats->stddev_dst[k];
-
-		/* Increment total skew */
-		tally->stats->total_skewness_src[k] += tally->stats->skewness_src[k];
-		tally->stats->total_skewness_dst[k] += tally->stats->skewness_dst[k];
 	}
 
 }
@@ -406,9 +398,6 @@ static void *start_reporter(libtrace_t *trace, libtrace_thread_t *thread, void *
 		tally->stats->variance_dst[i] = 0;
 		tally->stats->skewness_src[i] = 0;
 		tally->stats->skewness_dst[i] = 0;
-
-		tally->stats->total_skewness_src[i] = 0;
-		tally->stats->total_skewness_dst[i] = 0;
         }
 	tally->lastkey = 0;
 	tally->packets = 0;
@@ -419,7 +408,7 @@ static void *start_reporter(libtrace_t *trace, libtrace_thread_t *thread, void *
 
 static void output_results(struct addr_local *tally, uint64_t tick) {
 
-	int i, j, k;
+	int i, j;
 
 	/* Calculations before reporting the results */
 	/* Need to initialise lastoutput values on first pass,
@@ -470,54 +459,6 @@ static void output_results(struct addr_local *tally, uint64_t tick) {
 		fprintf(tmp, "\n\n");
 	}
         fclose(tmp);
-
-	char outputfile_stats_timeseries[255];
-	snprintf(outputfile_stats_timeseries, sizeof(outputfile_stats_timeseries), "%sipdist-timeseries-skewness.stats", stats_outputdir);
-	if(tally->output_count == 0) {
-		tmp = fopen(outputfile_stats_timeseries, "w");
-		fprintf(tmp, "timestamp\tsrc1\t\tdst1\t\tsrc2\t\tdst2\t\tsrc3\t\tdst3\t\tsrc4\t\tdst4");
-	} else {
-		tmp = fopen(outputfile_stats_timeseries, "a");
-	}
-	fprintf(tmp, "\n%lu\t", tick);
-	for(k=0;k<4;k++) {
-		fprintf(tmp, "%f\t", tally->stats->total_skewness_src[k] / (tally->output_count+1));
-		fprintf(tmp, "%f\t", tally->stats->total_skewness_dst[k] / (tally->output_count+1));
-	}
-	fclose(tmp);
-
-	/* Puts data into timeseries files that gnuplot likes */
-	char outputfile2[255];
-	for(k=0;k<2;k++) {
-		for(j=0;j<4;j++) {
-			/* If k is 0 we are doing src else dst */
-			if(k) {
-				snprintf(outputfile2, sizeof(outputfile2), "%sipdist-dst-octet%d.timeseries", stats_outputdir, j+1);
-			} else {
-				snprintf(outputfile2, sizeof(outputfile2), "%sipdist-src-octet%d.timeseries", stats_outputdir, j+1);
-			}
-			if(tally->output_count == 0) {
-				tmp = fopen(outputfile2, "w");
-				fprintf(tmp, "timestamp\t");
-				for(i=0;i<256;i++) {
-					fprintf(tmp, "%d\t", i);
-				}
-				fprintf(tmp, "\n");
-			} else {
-				tmp = fopen(outputfile2, "a");
-			}
-			fprintf(tmp, "%lu\t", tick);
-			for(i=0;i<256;i++) {
-				if(k) {
-					fprintf(tmp, "%lu\t", tally->dst[j][i]);
-				} else {
-					fprintf(tmp, "%lu\t", tally->src[j][i]);
-				}
-			}
-			fprintf(tmp, "\n");
-			fclose(tmp);
-        	}
-	}
 }
 
 

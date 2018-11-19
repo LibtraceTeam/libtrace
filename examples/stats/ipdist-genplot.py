@@ -3,22 +3,27 @@
 import sys
 import subprocess
 import os
+import re
 
 # Ensure a data directory was supplied
 if len(sys.argv) != 2:
-	print("Usage: python data-directory")
+	print("Usage: python3 data-directory")
 	sys.exit()
 
 dir = sys.argv[1]
 dataFiles = []
-statsFiles = []
+
+# Stats
+total_skew_src = [0, 0, 0, 0]
+total_skew_dst = [0, 0, 0, 0]
 
 # Get all data/stats files contained within the directory
 for file in os.listdir(dir):
 	if file.endswith(".data"):
 		dataFiles.append(file)
-	if file.endswith(".stats"):
-		statsFiles.append(file)
+
+# sort the datafiles list so they are read in the correct order
+dataFiles.sort()
 
 # Every datafile should have a corresponding stats file
 # Iterate over every dataFile
@@ -29,6 +34,76 @@ for i in range(len(dataFiles)):
 	tick = filename.split("-")
 	tick = tick[1]
 
+	# Open the current stats file
+	lines = []
+	with open(dir + "/" + statsFile, "r") as tmp:
+		lines = tmp.readlines()
+	# increment the total skew counters
+	for x in range(4):
+		total_skew_src[x] += float(lines[(4*x)+1].split()[6])
+		total_skew_dst[x] += float(lines[(4*x)+2].split()[6])
+
+	# Create/append to timeseries stats file
+	# the file needs to be created on the first pass
+	if i == 0:
+		tmp = open(dir + "/ipdist-timeseries-skewness.stats", "w")
+		tmp.write("timestamp\tsrc1\t\tdst1\t\tsrc2\t\tdst2\t\tsrc3\t\tdst3\t\tsrc4\t\tdst4\n")
+	else:
+		tmp = open(dir + "/ipdist-timeseries-skewness.stats", "a")
+	tmp.write(tick)
+	for x in range(4):
+		tmp.write("\t" + str(total_skew_src[x]/(i+1)) + "\t" + str(total_skew_dst[x]/(i+1)))
+	tmp.write("\n")
+	tmp.close()
+
+
+
+	# open data file to read from and count all occurances
+	with open(dir + "/" + dataFile, "r") as tmp:
+		lines = tmp.readlines()
+	tmp.close()
+	# Count up all octet count in current data file
+	count_src = [0] * 4
+	count_dst = [0] * 4
+	# initialize the array
+	for x in range(4):
+		count_src[x] = [0] * 256
+		count_dst[x] = [0] * 256
+	# count all occurances
+	for x in range(256):
+		for k in range(4):
+			count_src[k][int(lines[x+2].split()[(k*4)+2])] = int(lines[x+2].split()[(k*4)+3])
+			count_dst[k][int(lines[x+2].split()[(k*4)+4])] = int(lines[x+2].split()[(k*4)+5])
+	# output the results to the timeseries file
+	tmp_src = []
+	tmp_dst = []
+	if i == 0:
+		for x in range(4):
+			tmp_src.append(open(dir + "/ipdist-src-octet" + str(x+1) + ".timeseries", "w"))
+			tmp_dst.append(open(dir + "/ipdist-dst-octet" + str(x+1) + ".timeseries", "w"))
+			tmp_src[x].write("timestamp")
+			tmp_dst[x].write("timestamp")
+			for k in range(256):
+				tmp_src[x].write("\t" + str(k))
+				tmp_dst[x].write("\t" + str(k))
+	else:
+		for x in range(4):
+			tmp_src.append(open(dir + "/ipdist-src-octet" + str(x+1) + ".timeseries", "a"))
+                        tmp_dst.append(open(dir + "/ipdist-dst-octet" + str(x+1) + ".timeseries", "a"))
+	# print data into file
+	for x in range(4):
+		tmp_src[x].write("\n" + tick)
+		tmp_dst[x].write("\n" + tick)
+		for k in range(256):
+			tmp_src[x].write("\t" + str(count_src[x][k]))
+			tmp_dst[x].write("\t" + str(count_dst[x][k]))
+	# close all files
+	for x in range(4):
+		tmp_src[x].close()
+		tmp_dst[x].close()
+
+
+	# create interval plots
 	for x in range(4):
 		plot = subprocess.Popen(['gnuplot -persistent','-p'],
 					shell=True,
