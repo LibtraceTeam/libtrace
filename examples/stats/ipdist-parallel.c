@@ -425,11 +425,11 @@ static void output_results(struct addr_local *tally, uint64_t tick) {
         compute_stats(tally);
 
 	/* Finaly output the results */
-	printf("Generating output \"%sipdist-%lu\"\n", stats_outputdir, tick);
+	printf("Generating output \"%s/ipdist-%lu\"\n", stats_outputdir, tick);
 
 	/* Output the results */
 	char outputfile[255];
-	snprintf(outputfile, sizeof(outputfile), "%sipdist-%lu.data", stats_outputdir, tick);
+	snprintf(outputfile, sizeof(outputfile), "%s/ipdist-%lu.data", stats_outputdir, tick);
 	FILE *tmp = fopen(outputfile, "w");
 	fprintf(tmp, "#time\t\trank\toctet1\t\t\t\toctet2\t\t\t\toctet3\t\t\t\toctet4\n");
 	fprintf(tmp, "#\t\t\tsrc\thits\tdst\thits\tsrc\thits\tdst\thits\tsrc\thits\tdst\thits\tsrc\thits\tdst\thits\n");
@@ -449,7 +449,7 @@ static void output_results(struct addr_local *tally, uint64_t tick) {
 	fclose(tmp);
 
 	char outputfile_stats[255];
-	snprintf(outputfile_stats, sizeof(outputfile_stats), "%sipdist-%lu.stats", stats_outputdir, tick);
+	snprintf(outputfile_stats, sizeof(outputfile_stats), "%s/ipdist-%lu.stats", stats_outputdir, tick);
 	tmp = fopen(outputfile_stats, "w");
 	/* append stats data to end of file */
 	fprintf(tmp, "#\tmean\tstddev\tvariance\tmedian\tmode\tskewness\n");
@@ -631,7 +631,7 @@ int main(int argc, char *argv[]) {
 	exclude->count = 0;
 
 	while(1) {
-		int option_index;
+		int option_index = 0;
 		struct option long_options[] = {
 			{ "set-uri",		1, 0, 'i' },
 			{ "output-interval",	1, 0, 'o' },
@@ -671,7 +671,7 @@ int main(int argc, char *argv[]) {
 				break;
 			case 'd':
 				stats_outputdir = optarg;
-				strcat(stats_outputdir, "/");
+				break;
 			case '?':
 				break;
 			default:
