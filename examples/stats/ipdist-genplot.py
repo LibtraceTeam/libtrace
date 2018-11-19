@@ -4,6 +4,10 @@ import sys
 import subprocess
 import os
 
+def normalise(min, max, value):
+        return ((value - min) / float((max - min)))
+
+
 # Ensure a data directory was supplied
 if len(sys.argv) != 2:
 	print("Usage: python data-directory")
@@ -73,7 +77,7 @@ for i in range(len(dataFiles)):
 		for k in range(4):
 			count_src[k][int(lines[x+2].split()[(k*4)+2])] = int(lines[x+2].split()[(k*4)+3])
 			count_dst[k][int(lines[x+2].split()[(k*4)+4])] = int(lines[x+2].split()[(k*4)+5])
-	# output the results to the timeseries file
+	# output the results to the timeseries files
 	tmp_src = []
 	tmp_dst = []
 	if i == 0:
@@ -101,6 +105,33 @@ for i in range(len(dataFiles)):
 		tmp_src[x].close()
 		tmp_dst[x].close()
 
+	# create tmp file for cdf plots
+	with open(dir + "/ipdist-" + tick + ".tmp", "w") as tmp:
+		for x in range(4):
+			total_src = 0
+			total_dst = 0
+			min_src = 0
+			min_dst = 0
+			max_src = 0
+			max_dst = 0
+
+			# work out min and max needed to normalise the data for CDF
+			for i in range(256):
+				curr_src = count_src[x][i]
+				curr_dst = count_dst[x][i]
+				if curr_src < min_src or i == 0:
+					min_src = 0
+				if curr_dst < min_dst or i == 0:
+					min_dst = 0
+				# cumulative count
+				max_src = max_src + curr_src
+				max_dst = max_dst + curr_dst
+
+			for i in range(256):
+				total_src = total_src + count_src[x][i]
+				total_dst = total_dst + count_dst[x][i]
+				tmp.write(str(normalise(min_src, max_src, total_src)) + "\t" + str(i) + "\t" + str(normalise(min_dst, max_dst, total_dst)) + "\t" + str(i) + "\n")
+			tmp.write("\n\n")
 
 	# create interval plots
 	for x in range(4):
@@ -110,7 +141,7 @@ for i in range(len(dataFiles)):
 
 		plot.stdin.write("set term pngcairo enhanced size 1280,960\n")
 		plot.stdin.write("set output '" + dir + "/" + filename + "-octet" + str(x+1) + ".png'\n")
-		plot.stdin.write("set multiplot layout 2,1\n")
+		plot.stdin.write("set multiplot layout 3,1\n")
 		plot.stdin.write("set title 'IP Distribution - " + tick + "'\n")
 		plot.stdin.write("set xrange[0:255]\n")
 		plot.stdin.write("set y2range[-1:1]\n")
@@ -131,21 +162,32 @@ for i in range(len(dataFiles)):
 		plot.stdin.write("1/0 t 'Destination mean' lt 2,")
 		plot.stdin.write("SOURCESKEW_min title 'Source Skewness' axes x1y2,")
 		plot.stdin.write("DESTSKEW_min title 'Destination Skewness' axes x1y2\n")
+		plot.stdin.write("unset xrange\n")
+		plot.stdin.write("unset y2range\n")
 		plot.stdin.write("unset y2tics\n")
 		plot.stdin.write("unset y2label\n")
+		plot.stdin.write("unset ylabel\n")
 		plot.stdin.write("unset arrow\n")
 		plot.stdin.write("unset label 1\nunset label 2\nunset label 3\nunset label 4\nunset label 5\nunset label 6\n")
+		plot.stdin.write("set title 'CDF distribution'\n")
+		plot.stdin.write("set ylabel 'Cumulative %'\n")
+                plot.stdin.write("set xlabel 'Prefix'\n")
+		plot.stdin.write("set key right bottom\n")
+                plot.stdin.write("plot '" + dir + "/ipdist-" + tick + ".tmp' using 2:1 index " + str(x) + " with lines title 'Source octet " + str(x+1) + "',")
+                plot.stdin.write("'" + dir + "/ipdist-" + tick + ".tmp' using 4:3 index " + str(x) + " with lines title 'Destination octet " + str(x+1) + "'\n")
 		plot.stdin.write("set title 'Zipf Distribution'\n")
 		plot.stdin.write("set xlabel 'Rank'\n")
+		plot.stdin.write("set xrange [1:255]\n")
 		plot.stdin.write("set ylabel 'Frequency'\n")
 		plot.stdin.write("set logscale xy 10\n")
-		plot.stdin.write("set xrange[1:255]\n")
-		plot.stdin.write("set xtics 0,10,255\n")
+		plot.stdin.write("set key top right\n")
 		plot.stdin.write("plot '" + dir + "/" + dataFile + "' using 2:" + str((x*4)+4) + " index 0 title 'Source octet " + str(x+1) + "',")
 		plot.stdin.write("'' using 2:" + str((x*4)+6) + " index 0 title 'Destination octet " + str(x+1) + "'\n")
 		plot.stdin.flush()
 		plot.communicate()
 
+	# cleanup the temp file
+	os.remove(dir + "/ipdist-" + tick + ".tmp")
 
 # Generate plots for the timeseries data captured over the entire trace
 for i in range(4):
@@ -178,4 +220,3 @@ for i in range(4):
 		plot.stdin.write("unset multiplot\n")
 		plot.stdin.flush()
 		plot.communicate()
-
