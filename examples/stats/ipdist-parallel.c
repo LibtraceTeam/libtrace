@@ -144,8 +144,8 @@ static void compute_stats(struct addr_local *tally) {
 				ex2 += ((i - m) * (i - m));
 			}
 		}
-
-		tally->stats->mean_src[k] = (k + (ex / n));
+		// tally->stats->mean_src[k] = (k + (ex / n));
+		tally->stats->mean_src[k] = (m + (ex / n));
 		tally->stats->variance_src[k] = ((ex2 - (ex*ex)/n) / n);
 		tally->stats->stddev_src[k] = sqrt(tally->stats->variance_src[k]);
 
@@ -163,9 +163,11 @@ static void compute_stats(struct addr_local *tally) {
                                 ex2 += ((i - m) * (i - m));
                         }
                 }
-		tally->stats->mean_dst[k] = (k + (ex / n));
+		// tally->stats->mean_dst[k] = (k + (ex / n));
+		tally->stats->mean_dst[k] = (m + (ex / n));
                 tally->stats->variance_dst[k] = ((ex2 - (ex*ex)/n) / n);
                 tally->stats->stddev_dst[k] = sqrt(tally->stats->variance_dst[k]);
+
 		/* Get the median */
 		int c = (n/2) - tally->src[k][0];
 		int c2 = 0;
@@ -181,9 +183,11 @@ static void compute_stats(struct addr_local *tally) {
 			c -= tally->dst[k][c2];
 		}
 		tally->stats->median_dst[k] = c2;
+
 		/* Get the mode which is the first item in the priority queue */
 		tally->stats->mode_src[k] = peak(&tally->stats->rank_src[k]);
 		tally->stats->mode_dst[k] = peak(&tally->stats->rank_src[k]);
+
 		/* Calculate skewness */
                 tally->stats->skewness_src[k] = (tally->stats->mean_src[k] - tally->stats->median_src[k]) / tally->stats->stddev_src[k];
                 tally->stats->skewness_dst[k] = (tally->stats->mean_dst[k] - tally->stats->median_dst[k]) / tally->stats->stddev_dst[k];
