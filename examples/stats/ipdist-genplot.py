@@ -46,6 +46,7 @@ for i in range(len(dataFiles)):
 		total_skew_src[x] += float(lines[(4*x)+1].split()[6])
 		total_skew_dst[x] += float(lines[(4*x)+2].split()[6])
 
+
 	# Create/append to timeseries stats file
 	# the file needs to be created on the first pass
 	if i == 0:
@@ -60,15 +61,14 @@ for i in range(len(dataFiles)):
 	tmp.close()
 
 
-
 	# open data file to read from and count all occurances
 	with open(dir + "/" + dataFile, "r") as tmp:
 		lines = tmp.readlines()
 	tmp.close()
-	# Count up all octet count in current data file
+	# create arrays to hold counts
 	count_src = [0] * 4
 	count_dst = [0] * 4
-	# initialize the array
+	# count all octet counts in the current data file
 	for x in range(4):
 		count_src[x] = [0] * 256
 		count_dst[x] = [0] * 256
@@ -77,33 +77,7 @@ for i in range(len(dataFiles)):
 		for k in range(4):
 			count_src[k][int(lines[x+2].split()[(k*4)+2])] = int(lines[x+2].split()[(k*4)+3])
 			count_dst[k][int(lines[x+2].split()[(k*4)+4])] = int(lines[x+2].split()[(k*4)+5])
-	# output the results to the timeseries files
-	tmp_src = []
-	tmp_dst = []
-	if i == 0:
-		for x in range(4):
-			tmp_src.append(open(dir + "/ipdist-src-octet" + str(x+1) + ".timeseries", "w"))
-			tmp_dst.append(open(dir + "/ipdist-dst-octet" + str(x+1) + ".timeseries", "w"))
-			tmp_src[x].write("timestamp")
-			tmp_dst[x].write("timestamp")
-			for k in range(256):
-				tmp_src[x].write("\t" + str(k))
-				tmp_dst[x].write("\t" + str(k))
-	else:
-		for x in range(4):
-			tmp_src.append(open(dir + "/ipdist-src-octet" + str(x+1) + ".timeseries", "a"))
-                        tmp_dst.append(open(dir + "/ipdist-dst-octet" + str(x+1) + ".timeseries", "a"))
-	# print data into file
-	for x in range(4):
-		tmp_src[x].write("\n" + tick)
-		tmp_dst[x].write("\n" + tick)
-		for k in range(256):
-			tmp_src[x].write("\t" + str(count_src[x][k]))
-			tmp_dst[x].write("\t" + str(count_dst[x][k]))
-	# close all files
-	for x in range(4):
-		tmp_src[x].close()
-		tmp_dst[x].close()
+
 
 	# create tmp file for cdf plots
 	with open(dir + "/ipdist-" + tick + ".tmp", "w") as tmp:
@@ -132,6 +106,7 @@ for i in range(len(dataFiles)):
 				total_dst = total_dst + count_dst[x][i]
 				tmp.write(str(normalise(min_src, max_src, total_src)) + "\t" + str(i) + "\t" + str(normalise(min_dst, max_dst, total_dst)) + "\t" + str(i) + "\n")
 			tmp.write("\n\n")
+
 
 	# create interval plots
 	for x in range(4):
@@ -185,6 +160,7 @@ for i in range(len(dataFiles)):
 		plot.stdin.write("'' using 2:" + str((x*4)+6) + " index 0 title 'Destination octet " + str(x+1) + "'\n")
 		plot.stdin.flush()
 		plot.communicate()
+
 
 # Generate plots for the timeseries data captured over the entire trace
 for i in range(4):
@@ -256,7 +232,3 @@ for x in range(len(dataFiles)):
 	os.remove(dir + "/ipdist-" + tick + ".tmp")
 # skew file
 os.remove(dir + "/ipdist-timeseries-skewness.stats")
-# timeseries files
-for x in range(4):
-	os.remove(dir + "/ipdist-dst-octet" + str(x+1) + ".timeseries")
-	os.remove(dir + "/ipdist-src-octet" + str(x+1) + ".timeseries")
