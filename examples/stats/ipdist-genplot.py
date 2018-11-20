@@ -186,37 +186,75 @@ for i in range(len(dataFiles)):
 		plot.stdin.flush()
 		plot.communicate()
 
-	# cleanup the temp file
-	os.remove(dir + "/ipdist-" + tick + ".tmp")
-
 # Generate plots for the timeseries data captured over the entire trace
 for i in range(4):
-	for x in range(2):
-		plot = subprocess.Popen(['gnuplot -persistent','-p'],
-                                        shell=True,
-                                        stdin=subprocess.PIPE,)
-		plot.stdin.write("set term pngcairo size 1280,960\n")
+	plot = subprocess.Popen(['gnuplot -persistent','-p'],
+                                shell=True,
+                                stdin=subprocess.PIPE,)
+	plot.stdin.write("set term pngcairo size 1280,960\n")
+	plot.stdin.write("set output '" + dir + "/ipdist-octet" + str(i+1) + ".png'\n")
+	plot.stdin.write("set multiplot layout 3,1\n")
+
+	plot.stdin.write("set title 'CDF source octet " + str(i+1) + "'\n")
+	plot.stdin.write("set xlabel 'Prefix'\n")
+	plot.stdin.write("set ylabel 'Cumulative %'\n")
+	plot.stdin.write("set xrange[0:255]\n")
+	plot.stdin.write("set key off\n")
+	for x in range(len(dataFiles)):
+                dataFile = dataFiles[x]
+                filename,extension = dataFiles[x].split(".")
+                tick = filename.split("-")
+                tick = tick[1]
+
 		if x == 0:
-			plot.stdin.write("set output '" + dir + "/ipdist-timeseries-src-octet" + str(i+1) + ".png'\n")
-			plot.stdin.write("set title 'Timeseries src octet " + str(i+1) + "'\n")
+			plot.stdin.write("plot '" + dir + "/ipdist-" + tick + ".tmp' using 2:1 index " + str(i) + " title '" + tick + "' with lines,")
 		else:
-			plot.stdin.write("set output '" + dir + "/ipdist-timeseries-dst-octet" + str(i+1) + ".png'\n")
-			plot.stdin.write("set title 'Timeseries dst octet " + str(i+1) + "'\n")
-		plot.stdin.write("set multiplot layout 2,1\n")
-		plot.stdin.write("set xtics rotate\n")
-		plot.stdin.write("set ytics\n")
-		plot.stdin.write("set xlabel 'Timestamp'\n")
-		plot.stdin.write("set key off\n")
-		plot.stdin.write("set autoscale xy\n")
+			plot.stdin.write(" '" + dir + "/ipdist-" + tick + ".tmp' using 2:1 index " + str(i) + " title '" + tick + "' with lines,")
+	plot.stdin.write("\n")
+
+	plot.stdin.write("set title 'CDF destination octet " + str(i+1) + "'\n")
+	plot.stdin.write("set xlabel 'Prefix'\n")
+        plot.stdin.write("set ylabel 'Cumulative %'\n")
+	plot.stdin.write("set xrange[0:255]\n")
+	plot.stdin.write("set key off\n")
+	for x in range(len(dataFiles)):
+		dataFile = dataFiles[x]
+                filename,extension = dataFiles[x].split(".")
+                tick = filename.split("-")
+                tick = tick[1]
+
 		if x == 0:
-			plot.stdin.write("plot '" + dir + "/ipdist-src-octet" + str(i+1) + ".timeseries' using 2:xtic(1) with lines title columnheader(2) at end smooth cumulative, for[i=3:257] '' using i with lines title columnheader(i) at end smooth cumulative\n")
+			plot.stdin.write("plot '" + dir + "/ipdist-" + tick + ".tmp' using 4:3 index " + str(i) + " title '" + tick + "' with lines,")
 		else:
-			plot.stdin.write("plot '" + dir + "/ipdist-dst-octet" + str(i+1) + ".timeseries' using 2:xtic(1) with lines title columnheader(2) at end smooth cumulative, for[i=3:257] '' using i with lines title columnheader(i) at end smooth cumulative\n")
-		plot.stdin.write("set title 'Timeseries mean skewness'\n")
-		plot.stdin.write("set yrange[-1:1]\n")
-		plot.stdin.write("set xlabel 'Timestamp'\n")
-		plot.stdin.write("set ylabel 'Skewness'\n")
-		plot.stdin.write("plot '" + dir + "/ipdist-timeseries-skewness.stats' using " + str((i*2)+2+x) + ":xtic(1) with lines\n")
-		plot.stdin.write("unset multiplot\n")
-		plot.stdin.flush()
-		plot.communicate()
+			plot.stdin.write(" '" + dir + "/ipdist-" + tick + ".tmp' using 4:3 index " + str(i) + " title '" + tick + "' with lines,")
+	plot.stdin.write("\n")
+
+	plot.stdin.write("set title 'Timeseries mean skewness'\n")
+	plot.stdin.write("set yrange[-1:1]\n")
+	plot.stdin.write("set xlabel 'Timestamp'\n")
+	plot.stdin.write("set ylabel 'Skewness'\n")
+	plot.stdin.write("set autoscale x\n")
+	plot.stdin.write("set key top right\n")
+	plot.stdin.write("unset xtics\n")
+	plot.stdin.write("plot '" + dir + "/ipdist-timeseries-skewness.stats' using " + str((i*2)+2) + ":xtic(1) title 'Source' with lines,")
+	plot.stdin.write("'' using " + str((i*2)+3) + ":xtic(1) title 'Destination' with lines\n")
+	plot.stdin.write("unset multiplot\n")
+	plot.stdin.flush()
+	plot.communicate()
+
+
+# cleanup all tmp files
+# tmp files created for CDF plots
+for x in range(len(dataFiles)):
+	dataFile = dataFiles[x]
+        filename,extension = dataFiles[x].split(".")
+        tick = filename.split("-")
+        tick = tick[1]
+
+	os.remove(dir + "/ipdist-" + tick + ".tmp")
+# skew file
+os.remove(dir + "/ipdist-timeseries-skewness.stats")
+# timeseries files
+for x in range(4):
+	os.remove(dir + "/ipdist-dst-octet" + str(x+1) + ".timeseries")
+	os.remove(dir + "/ipdist-src-octet" + str(x+1) + ".timeseries")
