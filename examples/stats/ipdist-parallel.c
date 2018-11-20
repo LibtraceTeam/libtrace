@@ -25,6 +25,7 @@ struct addr_local {
 	uint64_t output_count;
 	/* Pointer to stats structure */
 	struct addr_stats *stats;
+	uint64_t lost_packets;
 };
 struct addr_stats {
 	/* Holds the percentage change compared to the previous output */
@@ -399,6 +400,7 @@ static void *start_reporter(libtrace_t *trace, libtrace_thread_t *thread, void *
 		tally->stats->skewness_src[i] = 0;
 		tally->stats->skewness_dst[i] = 0;
         }
+	tally->lost_packets = 0;
 	tally->lastkey = 0;
 	tally->packets = 0;
 	tally->output_count = 0;
@@ -425,7 +427,7 @@ static void output_results(struct addr_local *tally, uint64_t tick) {
         compute_stats(tally);
 
 	/* Finaly output the results */
-	printf("Generating output \"%s/ipdist-%lu\"\n", stats_outputdir, tick);
+	printf("Generating output \"%s/ipdist-%lu\" Packets lost: %lu\n", stats_outputdir, tick, tally->lost_packets);
 
 	/* Output the results */
 	char outputfile[255];
@@ -494,6 +496,13 @@ static void per_result(libtrace_t *trace, libtrace_thread_t *sender, void *globa
 		}
 	}
 	tally->packets += results->packets;
+
+	/* Increment lost packets counter */
+	struct libtrace_stat_t *statistics = trace_get_statistics(trace, NULL);
+	if(statistics->dropped > tally->lost_packets) {
+		/* update lost packets to the new number of dropped packets */
+		tally->lost_packets = statistics->dropped;
+	}
 
 	/* If the current timestamp is greater than the last printed plus the interval, output a result */
 	if((key >> 32) >= (tally->lastkey >> 32) + tickrate) {

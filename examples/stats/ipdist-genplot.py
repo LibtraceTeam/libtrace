@@ -199,6 +199,7 @@ for i in range(4):
 	plot.stdin.write("set xlabel 'Prefix'\n")
 	plot.stdin.write("set ylabel 'Cumulative %'\n")
 	plot.stdin.write("set xrange[0:255]\n")
+	plot.stdin.write("set xtics 0,10,255\n")
 	plot.stdin.write("set key off\n")
 	for x in range(len(dataFiles)):
                 dataFile = dataFiles[x]
@@ -216,6 +217,7 @@ for i in range(4):
 	plot.stdin.write("set xlabel 'Prefix'\n")
         plot.stdin.write("set ylabel 'Cumulative %'\n")
 	plot.stdin.write("set xrange[0:255]\n")
+	plot.stdin.write("set xtics 0,10,255\n")
 	plot.stdin.write("set key off\n")
 	for x in range(len(dataFiles)):
 		dataFile = dataFiles[x]
@@ -229,9 +231,9 @@ for i in range(4):
 			plot.stdin.write(" '" + dir + "/ipdist-" + tick + ".tmp' using 4:3 index " + str(i) + " title '" + tick + "' with lines,")
 	plot.stdin.write("\n")
 
-	plot.stdin.write("set title 'Timeseries mean skewness'\n")
+	plot.stdin.write("set title 'Skew octet " + str(i+1) + "'\n")
 	plot.stdin.write("set yrange[-1:1]\n")
-	plot.stdin.write("set xlabel 'Timestamp'\n")
+	plot.stdin.write("set xlabel 'Time'\n")
 	plot.stdin.write("set ylabel 'Skewness'\n")
 	plot.stdin.write("set autoscale x\n")
 	plot.stdin.write("set key top right\n")
