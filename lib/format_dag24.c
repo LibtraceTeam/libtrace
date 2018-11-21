@@ -178,7 +178,7 @@ static int dag_init_input(libtrace_t *libtrace) {
 		free(dag_dev_name);
                 return -1;
         }
-	
+
 	dag_init_format_data(libtrace);
 	if (S_ISCHR(buf.st_mode)) {
                 /* DEVICE */

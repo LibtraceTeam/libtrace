@@ -217,8 +217,8 @@ static int pcapng_probe_magic(io_t *io) {
 
 static int pcapng_init_input(libtrace_t *libtrace) {
         libtrace->format_data = malloc(sizeof(struct pcapng_format_data_t));
-        if (libtrace->format_data == NULL) {
-                trace_set_err(libtrace, ENOMEM, "Out of memory!");
+        if (!libtrace->format_data) {
+                trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory pcapng_init_input()");
                 return -1;
         }
 

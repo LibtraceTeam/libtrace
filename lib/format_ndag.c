@@ -285,6 +285,11 @@ static int ndag_init_input(libtrace_t *libtrace) {
         libtrace->format_data = (ndag_format_data_t *)malloc(
                         sizeof(ndag_format_data_t));
 
+	if (!libtrace->format_data) {
+		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory ndag_init_input()");
+		return -1;
+	}
+
         FORMAT_DATA->multicastgroup = NULL;
         FORMAT_DATA->portstr = NULL;
         FORMAT_DATA->localiface = NULL;

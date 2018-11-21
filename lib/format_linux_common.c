@@ -184,11 +184,21 @@ int linuxcommon_init_input(libtrace_t *libtrace)
 
 	libtrace->format_data = (struct linux_format_data_t *)
 		malloc(sizeof(struct linux_format_data_t));
-	assert(libtrace->format_data != NULL);
+
+	/*assert(libtrace->format_data != NULL);*/
+	if (!libtrace->format_data) {
+		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory linuxcommon_init_input()");
+		return -1;
+	}
 
 	FORMAT_DATA->per_stream =
 		libtrace_list_init(sizeof(stream_data));
-	assert(FORMAT_DATA->per_stream != NULL);
+
+	/*assert(FORMAT_DATA->per_stream != NULL);*/
+	if (!FORMAT_DATA->per_stream) {
+		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to create list for stream data linuxcommon_init_input()");
+		return -1;
+	}
 
 	libtrace_list_push_back(FORMAT_DATA->per_stream, &stream_data);
 
@@ -210,7 +220,12 @@ int linuxcommon_init_output(libtrace_out_t *libtrace)
 {
 	libtrace->format_data = (struct linux_format_data_out_t*)
 		malloc(sizeof(struct linux_format_data_out_t));
-	assert(libtrace->format_data != NULL);
+
+	/*assert(libtrace->format_data != NULL);*/
+	if (!libtrace->format_data) {
+		trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory linuxcommon_init_output()");
+		return -1;
+	}
 
 	FORMAT_DATA_OUT->fd = -1;
 	FORMAT_DATA_OUT->tx_ring = NULL;

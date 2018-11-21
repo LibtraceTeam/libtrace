@@ -124,9 +124,8 @@ static int pcapfile_probe_magic(io_t *io)
 
 static int pcapfile_init_input(libtrace_t *libtrace) {
 	libtrace->format_data = malloc(sizeof(struct pcapfile_format_data_t));
-
-	if (libtrace->format_data == NULL) {
-		trace_set_err(libtrace,ENOMEM,"Out of memory");
+	if (!libtrace->format_data) {
+		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory pcapfile_init_input()");
 		return -1;
 	}
 
@@ -138,6 +137,10 @@ static int pcapfile_init_input(libtrace_t *libtrace) {
 static int pcapfile_init_output(libtrace_out_t *libtrace) {
 	libtrace->format_data = 
 		malloc(sizeof(struct pcapfile_format_data_out_t));
+	if (!libtrace->format_data) {
+		trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory pcapfile_init_output()");
+		return -1;
+	}
 
 	DATAOUT(libtrace)->file=NULL;
 	DATAOUT(libtrace)->compress_type=TRACE_OPTION_COMPRESSTYPE_NONE;

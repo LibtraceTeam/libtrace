@@ -586,6 +586,12 @@ int dpdk_init_input (libtrace_t *libtrace) {
 
 	libtrace->format_data = (struct dpdk_format_data_t *)
 	                        malloc(sizeof(struct dpdk_format_data_t));
+
+	if (!libtrace->format_data) {
+		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory dpdk_init_input()");
+		return 1;
+	}
+
 	FORMAT(libtrace)->port = 0; /* Always assume 1 port loaded */
 	FORMAT(libtrace)->nb_ports = 0;
 	FORMAT(libtrace)->snaplen = 0; /* Use default */
@@ -627,6 +633,11 @@ static int dpdk_init_output(libtrace_out_t *libtrace)
 
 	libtrace->format_data = (struct dpdk_format_data_t *)
 	                        malloc(sizeof(struct dpdk_format_data_t));
+
+	if (!libtrace->format_data) {
+		trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory dpdk_init_output()");
+		return -1;
+	}
 	FORMAT(libtrace)->port = 0; /* Always assume 1 port loaded */
 	FORMAT(libtrace)->nb_ports = 0;
 	FORMAT(libtrace)->snaplen = 0; /* Use default */

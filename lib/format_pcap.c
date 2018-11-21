@@ -101,6 +101,11 @@ struct pcap_format_data_out_t {
 static int pcap_init_input(libtrace_t *libtrace) {
 	libtrace->format_data = malloc(sizeof(struct pcap_format_data_t));
 
+	if (!libtrace->format_data) {
+		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory pcap_init_input()");
+		return -1;
+	}
+
 	INPUT.pcap = NULL;
 	DATA(libtrace)->filter = NULL;
 	DATA(libtrace)->snaplen = LIBTRACE_PACKET_BUFSIZE;
@@ -177,6 +182,11 @@ static int pcap_config_input(libtrace_t *libtrace,
 
 static int pcap_init_output(libtrace_out_t *libtrace) {
 	libtrace->format_data = malloc(sizeof(struct pcap_format_data_out_t));
+	if (!libtrace->format_data) {
+		trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory pcap_init_output()");
+		return -1;
+	}
+
 	OUTPUT.trace.pcap = NULL;
 	OUTPUT.trace.dump = NULL;
 	return 0;
@@ -185,6 +195,11 @@ static int pcap_init_output(libtrace_out_t *libtrace) {
 static int pcapint_init_output(libtrace_out_t *libtrace) {
 #ifdef HAVE_PCAP_INJECT
 	libtrace->format_data = malloc(sizeof(struct pcap_format_data_out_t));
+	if (!libtrace->format_data) {
+                trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory pcapint_init_output()");
+                return -1;
+        }
+
 	OUTPUT.trace.pcap = NULL;
 	OUTPUT.trace.dump = NULL;
 	return 0;
@@ -204,6 +219,11 @@ static int pcapint_init_output(libtrace_out_t *libtrace) {
 
 static int pcapint_init_input(libtrace_t *libtrace) {
 	libtrace->format_data = malloc(sizeof(struct pcap_format_data_t));
+	if (!libtrace->format_data) {
+		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory pcapint_init_input()");
+		return -1;
+	}
+
 	DATA(libtrace)->filter = NULL;
 	DATA(libtrace)->snaplen = LIBTRACE_PACKET_BUFSIZE;
 	DATA(libtrace)->promisc = 0;

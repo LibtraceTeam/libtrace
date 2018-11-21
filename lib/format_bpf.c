@@ -122,11 +122,15 @@ static int bpf_probe_filename(const char *filename)
 }
 
 /* Initialises a BPF input trace */
-static int bpf_init_input(libtrace_t *libtrace) 
-{
+static int bpf_init_input(libtrace_t *libtrace) {
 	libtrace->format_data = (struct libtrace_format_data_t *)
 		malloc(sizeof(struct libtrace_format_data_t));
-	
+
+	if (!libtrace->format_data) {
+		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory bpf_init_input()");
+		return -1;
+	}
+
 	/* Throw some default values into the format data */
 	FORMATIN(libtrace)->fd = -1;
 	FORMATIN(libtrace)->promisc = 0;

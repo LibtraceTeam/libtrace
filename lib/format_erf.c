@@ -224,13 +224,17 @@ static int erf_probe_magic(io_t *io)
 	return 1;
 }
 
-static int erf_init_input(libtrace_t *libtrace) 
-{
+static int erf_init_input(libtrace_t *libtrace) {
 	libtrace->format_data = malloc(sizeof(struct erf_format_data_t));
-	
+
+	if (!libtrace->format_data) {
+		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory erf_init_input()");
+		return -1;
+	}
+
 	IN_OPTIONS.real_time = 0;
 	DATA(libtrace)->drops = 0;
-	
+
 	return 0; /* success */
 }
 
@@ -399,6 +403,11 @@ static int erf_seek_erf(libtrace_t *libtrace,uint64_t erfts)
 
 static int erf_init_output(libtrace_out_t *libtrace) {
 	libtrace->format_data = malloc(sizeof(struct erf_format_data_out_t));
+
+	if (!libtrace->format_data) {
+		trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory erf_init_output()");
+		return -1;
+	}
 
 	OUT_OPTIONS.level = 0;
 	OUT_OPTIONS.compress_type = TRACE_OPTION_COMPRESSTYPE_NONE;

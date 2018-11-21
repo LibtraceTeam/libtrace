@@ -212,6 +212,11 @@ static int etsilive_init_input(libtrace_t *libtrace) {
         libtrace->format_data = (etsilive_format_data_t *)malloc(
                         sizeof(etsilive_format_data_t));
 
+	if (!libtrace->format) {
+		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory etsilive_init_input()");
+		return 1;
+	}
+
         FORMAT_DATA->receivers = NULL;
         FORMAT_DATA->nextthreadid = 0;
         FORMAT_DATA->listenaddr = NULL;

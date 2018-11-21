@@ -316,7 +316,11 @@ enum {
 	/** Unable to finish last packet in trace_pause **/
 	TRACE_ERR_PAUSE_FIN = -16,
 	/** Packet is NULL **/
-	TRACE_ERR_NULL_PACKET = -17
+	TRACE_ERR_NULL_PACKET = -17,
+	/** Filter is NULL **/
+	TRACE_ERR_NULL_FILTER = -18,
+	/** Unable to lock/unlock mutex **/
+	TRACE_ERR_MUTEX = -19
 };
 
 /** Enumeration of DLTs supported by libtrace 

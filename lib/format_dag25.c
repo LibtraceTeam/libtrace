@@ -521,6 +521,7 @@ static int dag_init_input(libtrace_t *libtrace) {
 			free(dag_dev_name);
 		dag_dev_name = NULL;
 		pthread_mutex_unlock(&open_dag_mutex);
+		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to open DAG device %s", dag_dev_name);
 		return -1;
 	}
 

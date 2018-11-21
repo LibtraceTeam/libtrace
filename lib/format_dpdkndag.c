@@ -86,12 +86,18 @@ static int dpdkndag_init_input(libtrace_t *libtrace) {
         libtrace->format_data = (dpdkndag_format_data_t *)malloc(
                         sizeof(dpdkndag_format_data_t));
 
+	if (!libtrace->format_data) {
+		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory dpdknday_init_input()");
+		return 1;
+	}
+
         FORMAT_DATA->localiface = NULL;
         FORMAT_DATA->threaddatas = NULL;
         FORMAT_DATA->dpdkrecv = NULL;
 
         scan = strchr(libtrace->uridata, ',');
         if (scan == NULL) {
+		free(libtrace->format_data);
                 trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT,
                         "Bad dpdkndag URI. Should be dpdkndag:<interface>,<multicast group>");
                 return -1;
@@ -108,6 +114,7 @@ static int dpdkndag_init_input(libtrace_t *libtrace) {
 
         if (getaddrinfo(next, NULL, &hints, &result) != 0) {
                 perror("getaddrinfo");
+		free(libtrace->format_data);
                 trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT,
                         "Invalid multicast address: %s", next);
                 return -1;

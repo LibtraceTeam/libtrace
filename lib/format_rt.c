@@ -232,7 +232,7 @@ static int rt_init_input(libtrace_t *libtrace) {
 	rt_init_format_data(libtrace);
 
 	/* If the user specifies "rt:" then assume localhost and the default
-	 * port */	
+	 * port */
         if (strlen(uridata) == 0) {
                 RT_INFO->hostname =
                         strdup("localhost");
