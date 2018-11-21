@@ -246,11 +246,15 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 
 	trace_init();
 
-	assert(uri && "Passing NULL to trace_create makes me a very sad program");
-
 	if (!libtrace) {
-		/* Out of memory */
-		return NULL;
+                /* Out of memory */
+                return NULL;
+        }
+
+	/*assert(uri && "Passing NULL to trace_create makes me a very sad program");*/
+	if(!uri) {
+		trace_set_err(libtrace, TRACE_ERR_URI_NULL, "Passing NULL to trace_create makes me a very sad program");
+		return libtrace;
 	}
 
 	libtrace->err.err_num = TRACE_ERR_NOERROR;
@@ -533,7 +537,11 @@ DLLEXPORT libtrace_out_t *trace_create_output(const char *uri) {
  */
 DLLEXPORT int trace_start(libtrace_t *libtrace)
 {
-	assert(libtrace);
+	/*assert(libtrace);*/
+	if(!libtrace) {
+		return TRACE_ERR_NULL_TRACE;
+	}
+
 	if (trace_is_err(libtrace))
 		return -1;
 	if (libtrace->format->start_input) {
@@ -550,7 +558,10 @@ DLLEXPORT int trace_start(libtrace_t *libtrace)
 /* Start an output trace */
 DLLEXPORT int trace_start_output(libtrace_out_t *libtrace)
 {
-	assert(libtrace);
+	/*assert(libtrace);*/
+	if(!libtrace) {
+		return TRACE_ERR_NULL_TRACE;
+	}
 	if (libtrace->format->start_output) {
 		int ret=libtrace->format->start_output(libtrace);
 		if (ret < 0) {
@@ -564,7 +575,10 @@ DLLEXPORT int trace_start_output(libtrace_out_t *libtrace)
 
 DLLEXPORT int trace_pause(libtrace_t *libtrace)
 {
-	assert(libtrace);
+	/*assert(libtrace);*/
+	if(!libtrace) {
+		return TRACE_ERR_NULL_TRACE;
+	}
 	if (!libtrace->started) {
 		trace_set_err(libtrace,TRACE_ERR_BAD_STATE, "You must call trace_start() before calling trace_pause()");
 		return -1;
@@ -573,7 +587,11 @@ DLLEXPORT int trace_pause(libtrace_t *libtrace)
 	/* Finish the last packet we read - for backwards compatibility */
 	if (!libtrace_parallel && libtrace->last_packet)
 		trace_fin_packet(libtrace->last_packet);
-	assert(libtrace->last_packet == NULL);
+	/*assert(libtrace->last_packet == NULL);*/
+	if(libtrace->last_packet != NULL) {
+		trace_set_err(libtrace, TRACE_ERR_PAUSE_FIN, "Unable to remove all data stored against the trace in trace_pause()");
+		return -1;
+	}
 
 	if (libtrace->format->pause_input)
 		libtrace->format->pause_input(libtrace);
@@ -711,9 +729,13 @@ DLLEXPORT int trace_config_output(libtrace_out_t *libtrace,
 /* Close an input trace file, freeing up any resources it may have been using
  *
  */
-DLLEXPORT void trace_destroy(libtrace_t *libtrace) {
+DLLEXPORT int trace_destroy(libtrace_t *libtrace) {
 	int i;
-	assert(libtrace);
+
+	/*assert(libtrace);*/
+	if(!libtrace) {
+		return TRACE_ERR_NULL_TRACE;
+	}
 
 	ASSERT_RET(pthread_mutex_destroy(&libtrace->libtrace_lock), == 0);
 	ASSERT_RET(pthread_mutex_destroy(&libtrace->read_packet_lock), == 0);
@@ -798,11 +820,16 @@ DLLEXPORT void trace_destroy(libtrace_t *libtrace) {
 	}
 
 	free(libtrace);
+
+	return 0;
 }
 
 
-DLLEXPORT void trace_destroy_dead(libtrace_t *libtrace) {
-	assert(libtrace);
+DLLEXPORT int trace_destroy_dead(libtrace_t *libtrace) {
+	/*assert(libtrace);*/
+	if(!libtrace) {
+		return TRACE_ERR_NULL_TRACE;
+	}
 
 	ASSERT_RET(pthread_mutex_destroy(&libtrace->libtrace_lock), == 0);
 	ASSERT_RET(pthread_mutex_destroy(&libtrace->read_packet_lock), == 0);
@@ -814,24 +841,30 @@ DLLEXPORT void trace_destroy_dead(libtrace_t *libtrace) {
 	if (libtrace->format_data)
 		free(libtrace->format_data);
 	free(libtrace);
+
+	return 0;
 }
 /* Close an output trace file, freeing up any resources it may have been using
  *
  * @param libtrace	the output trace file to be destroyed
  */
-DLLEXPORT void trace_destroy_output(libtrace_out_t *libtrace)
-{
-	assert(libtrace);
+DLLEXPORT int trace_destroy_output(libtrace_out_t *libtrace) {
+	/*assert(libtrace);*/
+	if(!libtrace) {
+		return TRACE_ERR_NULL_TRACE;
+	}
 	if (libtrace->format && libtrace->format->fin_output)
 		libtrace->format->fin_output(libtrace);
 	if (libtrace->uridata)
 		free(libtrace->uridata);
 	free(libtrace);
+
+	return 0;
 }
 
 DLLEXPORT int trace_flush_output(libtrace_out_t *libtrace) {
         if (!libtrace) {
-                return -1;
+                return TRACE_ERR_NULL_TRACE;
         }
         if (libtrace->format && libtrace->format->flush_output) {
                 return libtrace->format->flush_output(libtrace);
@@ -903,7 +936,7 @@ DLLEXPORT void trace_destroy_packet(libtrace_packet_t *packet) {
 	     packet->trace->last_packet == packet) {
 		packet->trace->last_packet = NULL;
 	}
-	
+
 	if (packet->buf_control == TRACE_CTRL_PACKET && packet->buffer) {
 		free(packet->buffer);
 	}
@@ -964,7 +997,10 @@ void trace_fin_packet(libtrace_packet_t *packet) {
  */
 DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 
-	assert(libtrace && "You called trace_read_packet() with a NULL libtrace parameter!\n");
+	/*assert(libtrace && "You called trace_read_packet() with a NULL libtrace parameter!\n");*/
+	if (!libtrace) {
+		return TRACE_ERR_NULL_TRACE;
+	}
 	if (trace_is_err(libtrace))
 		return -1;
 	if (!libtrace->started) {
@@ -976,7 +1012,10 @@ DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 		trace_set_err(libtrace,TRACE_ERR_BAD_STATE,"Packet passed to trace_read_packet() is invalid\n");
 		return -1;
 	}
-	assert(packet);
+	/*assert(packet);*/
+	if (!packet) {
+		return TRACE_ERR_NULL_PACKET;
+	}
 
 	if (libtrace->format->read_packet) {
                 /* Finalise the packet, freeing any resources the format module
@@ -1058,8 +1097,14 @@ DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 int trace_prepare_packet(libtrace_t *trace, libtrace_packet_t *packet,
 		void *buffer, libtrace_rt_types_t rt_type, uint32_t flags) {
 
-	assert(packet);
-	assert(trace);
+	/*assert(packet);*/
+	if (!packet) {
+		return TRACE_ERR_NULL_PACKET;
+	}
+	/*assert(trace);*/
+	if (!trace) {
+		return TRACE_ERR_NULL_TRACE;
+	}
 
 	/* XXX Proper error handling?? */
 	if (buffer == NULL)
@@ -1093,12 +1138,18 @@ int trace_prepare_packet(libtrace_t *trace, libtrace_packet_t *packet,
  * @returns the number of bytes written, -1 if write failed
  */
 DLLEXPORT int trace_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *packet) {
-	assert(libtrace);
-	assert(packet);
+	/*assert(libtrace);*/
+	if (!libtrace) {
+		return TRACE_ERR_NULL_TRACE;
+	}
+	/*assert(packet);*/
+	if (!packet) {
+		return TRACE_ERR_NULL_PACKET;
+	}
 	/* Verify the packet is valid */
 	if (!libtrace->started) {
 		trace_set_err_out(libtrace,TRACE_ERR_BAD_STATE,
-			"Trace is not started before trace_write_packet");
+			"You must call trace_start() before calling trace_write_packet()");
 		return -1;
 	}
 
@@ -1123,7 +1174,10 @@ DLLEXPORT void *trace_get_packet_buffer(const libtrace_packet_t *packet,
 	int wire_len;
         libtrace_linktype_t ltype;
 
-	assert(packet != NULL);
+	/*assert(packet != NULL);*/
+	if (!packet) {
+		return NULL;
+	}
         ltype = trace_get_link_type(packet);
 
         if (linktype) {

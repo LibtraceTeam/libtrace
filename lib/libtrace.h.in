@@ -308,7 +308,15 @@ enum {
         /** Wandio has returned an error */
         TRACE_ERR_WANDIO_FAILED = -12,
 	/** Input URI (file) not found */
-        TRACE_ERR_URI_NOT_FOUND = -13  
+        TRACE_ERR_URI_NOT_FOUND = -13,
+	/** NULL passed to create trace **/
+	TRACE_ERR_URI_NULL = -14,
+	/** NULL trace passed to trace_start **/
+	TRACE_ERR_NULL_TRACE = -15,
+	/** Unable to finish last packet in trace_pause **/
+	TRACE_ERR_PAUSE_FIN = -16,
+	/** Packet is NULL **/
+	TRACE_ERR_NULL_PACKET = -17
 };
 
 /** Enumeration of DLTs supported by libtrace 
