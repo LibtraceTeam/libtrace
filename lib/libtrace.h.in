@@ -323,6 +323,8 @@ enum {
 	TRACE_ERR_NULL_BUFFER = -19,
 	/** Trace err stat **/
 	TRACE_ERR_STAT = -20,
+	/** Unable to create deadtrace **/
+	TRACE_ERR_CREATE_DEADTRACE = -21,
 };
 
 /** Enumeration of DLTs supported by libtrace 
@@ -1543,17 +1545,17 @@ DLLEXPORT int trace_config_output(libtrace_out_t *libtrace,
  * @param trace 	The input trace to be destroyed
  *
  */
-DLLEXPORT void trace_destroy(libtrace_t *trace);
+DLLEXPORT int trace_destroy(libtrace_t *trace);
 
 /** Close a dummy trace file, freeing up any resources it may have been using
  * @param trace		The dummy trace to be destroyed
  */
-DLLEXPORT void trace_destroy_dead(libtrace_t *trace);
+DLLEXPORT int trace_destroy_dead(libtrace_t *trace);
 
 /** Close an output trace, freeing up any resources it may have been using
  * @param trace		The output trace to be destroyed
  */
-DLLEXPORT void trace_destroy_output(libtrace_out_t *trace);
+DLLEXPORT int trace_destroy_output(libtrace_out_t *trace);
 
 /** Flush an output trace, forcing any buffered packets to be written
  * @param libtrace      The output trace to be flushed
@@ -1707,7 +1709,7 @@ libtrace_stat_t *trace_get_statistics(libtrace_t *trace, libtrace_stat_t *stats)
  *       code.
  */
 DLLEXPORT
-void trace_get_thread_statistics(libtrace_t *trace, libtrace_thread_t *t,
+int trace_get_thread_statistics(libtrace_t *trace, libtrace_thread_t *t,
                                  libtrace_stat_t *stats);
 
 /**
@@ -1741,7 +1743,7 @@ void trace_clear_statistics(libtrace_stat_t *s);
  * @param c The resulting difference
  */
 DLLEXPORT
-void trace_subtract_statistics(const libtrace_stat_t *a,
+int trace_subtract_statistics(const libtrace_stat_t *a,
                                const libtrace_stat_t *b, libtrace_stat_t *c);
 
 /**
@@ -1753,7 +1755,7 @@ void trace_subtract_statistics(const libtrace_stat_t *a,
  * @param c The result
  */
 DLLEXPORT
-void trace_add_statistics(const libtrace_stat_t *a,
+int trace_add_statistics(const libtrace_stat_t *a,
                           const libtrace_stat_t *b, libtrace_stat_t *c);
 
 /**
@@ -1941,7 +1943,7 @@ enum base_format_t trace_get_format(struct libtrace_packet_t *packet);
  * (or a metadata header, if desired).
  */
 DLLEXPORT
-void trace_construct_packet(libtrace_packet_t *packet,
+int trace_construct_packet(libtrace_packet_t *packet,
 		libtrace_linktype_t linktype, const void *data, uint16_t len);
 
 /*@}*/

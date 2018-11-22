@@ -730,13 +730,13 @@ DLLEXPORT int trace_config_output(libtrace_out_t *libtrace,
 /* Close an input trace file, freeing up any resources it may have been using
  *
  */
-DLLEXPORT void trace_destroy(libtrace_t *libtrace) {
+DLLEXPORT int trace_destroy(libtrace_t *libtrace) {
 	int i;
 
-	assert(libtrace);
-	//if(!libtrace) {
-	//	return TRACE_ERR_NULL_TRACE;
-	//}
+	/*assert(libtrace);*/
+	if(!libtrace) {
+		return TRACE_ERR_NULL_TRACE;
+	}
 
 	ASSERT_RET(pthread_mutex_destroy(&libtrace->libtrace_lock), == 0);
 	ASSERT_RET(pthread_mutex_destroy(&libtrace->read_packet_lock), == 0);
@@ -757,11 +757,11 @@ DLLEXPORT void trace_destroy(libtrace_t *libtrace) {
 	if (!libtrace_parallel && libtrace->last_packet) {
 		trace_fin_packet(libtrace->last_packet);
         }
-	assert(libtrace->last_packet == NULL);
-	//if (libtrace->last_packet != NULL) {
-	//	trace_set_err(libtrace, TRACE_ERR_PAUSE_FIN, "Unable to remove all data stored against trace in trace_destroy()");
-	//	return -1;
-	//}
+	/*assert(libtrace->last_packet == NULL);*/
+	if (libtrace->last_packet != NULL) {
+		trace_set_err(libtrace, TRACE_ERR_PAUSE_FIN, "Unable to remove all data stored against trace in trace_destroy()");
+		return -1;
+	}
 
 	if (libtrace->format) {
 		if (libtrace->started && libtrace->format->pause_input)
@@ -825,14 +825,16 @@ DLLEXPORT void trace_destroy(libtrace_t *libtrace) {
 	}
 
 	free(libtrace);
+
+	return 0;
 }
 
 
-DLLEXPORT void trace_destroy_dead(libtrace_t *libtrace) {
-	assert(libtrace);
-	//if(!libtrace) {
-	//	return TRACE_ERR_NULL_TRACE;
-	//}
+DLLEXPORT int trace_destroy_dead(libtrace_t *libtrace) {
+	/*assert(libtrace);*/
+	if(!libtrace) {
+		return TRACE_ERR_NULL_TRACE;
+	}
 
 	ASSERT_RET(pthread_mutex_destroy(&libtrace->libtrace_lock), == 0);
 	ASSERT_RET(pthread_mutex_destroy(&libtrace->read_packet_lock), == 0);
@@ -844,21 +846,25 @@ DLLEXPORT void trace_destroy_dead(libtrace_t *libtrace) {
 	if (libtrace->format_data)
 		free(libtrace->format_data);
 	free(libtrace);
+
+	return 0;
 }
 /* Close an output trace file, freeing up any resources it may have been using
  *
  * @param libtrace	the output trace file to be destroyed
  */
-DLLEXPORT void trace_destroy_output(libtrace_out_t *libtrace) {
-	assert(libtrace);
-	//if(!libtrace) {
-	//	return TRACE_ERR_NULL_TRACE;
-	//}
+DLLEXPORT int trace_destroy_output(libtrace_out_t *libtrace) {
+	/*assert(libtrace);*/
+	if(!libtrace) {
+		return TRACE_ERR_NULL_TRACE;
+	}
 	if (libtrace->format && libtrace->format->fin_output)
 		libtrace->format->fin_output(libtrace);
 	if (libtrace->uridata)
 		free(libtrace->uridata);
 	free(libtrace);
+
+	return 0;
 }
 
 DLLEXPORT int trace_flush_output(libtrace_out_t *libtrace) {
@@ -2220,11 +2226,15 @@ DLLEXPORT uint8_t *trace_ether_aton(const char *buf, uint8_t *addr)
  *
  */
 DLLEXPORT
-void trace_construct_packet(libtrace_packet_t *packet,
+int trace_construct_packet(libtrace_packet_t *packet,
 		libtrace_linktype_t linktype,
 		const void *data,
-		uint16_t len)
-{
+		uint16_t len) {
+
+	if (!packet) {
+		return TRACE_ERR_NULL_PACKET;
+	}
+
 	size_t size;
 	static libtrace_t *deadtrace=NULL;
 	libtrace_pcapfile_pkt_hdr_t hdr;
@@ -2254,7 +2264,10 @@ void trace_construct_packet(libtrace_packet_t *packet,
 	hdr.wirelen=len;
 
 	/* Now fill in the libtrace packet itself */
-        assert(deadtrace);
+        /*assert(deadtrace);*/
+	if (!deadtrace) {
+		return TRACE_ERR_CREATE_DEADTRACE;
+	}
 	packet->trace=deadtrace;
 	size=len+sizeof(hdr);
         if (size < LIBTRACE_PACKET_BUFSIZE)
@@ -2277,6 +2290,8 @@ void trace_construct_packet(libtrace_packet_t *packet,
 	packet->type=pcap_linktype_to_rt(libtrace_to_pcap_linktype(linktype));
 
 	trace_clear_cache(packet);
+
+	return 0;
 }
 
 
@@ -2427,12 +2442,24 @@ libtrace_stat_t *trace_get_statistics(libtrace_t *trace, libtrace_stat_t *stat)
 	return stat;
 }
 
-void trace_get_thread_statistics(libtrace_t *trace, libtrace_thread_t *t,
+int trace_get_thread_statistics(libtrace_t *trace, libtrace_thread_t *t,
                                  libtrace_stat_t *stat)
 {
-	assert(trace && stat);
-	assert(stat->magic == LIBTRACE_STAT_MAGIC && "Please use"
-	       "trace_create_statistics() to allocate statistics");
+	/*assert(trace && stat);*/
+	if (!trace) {
+		return TRACE_ERR_NULL_TRACE;
+	}
+	if (!stat) {
+		trace_set_err(trace, TRACE_ERR_STAT, "Stat is NULL trace_get_thread_statistics()");
+		return -1;
+	}
+	/*assert(stat->magic == LIBTRACE_STAT_MAGIC && "Please use"
+	       "trace_create_statistics() to allocate statistics");*/
+	if (!(stat->magic == LIBTRACE_STAT_MAGIC)) {
+		trace_set_err(trace, TRACE_ERR_STAT,
+			"Use trace_create_statistics() to allocate statistics in trave_get_thread_statistics()");
+		return -1;
+	}
 	stat->reserved1 = 0;
 	stat->reserved2 = 0;
 #define X(x) stat->x ##_valid= 0;
@@ -2445,7 +2472,8 @@ void trace_get_thread_statistics(libtrace_t *trace, libtrace_thread_t *t,
 	if (!trace_has_dedicated_hasher(trace) && trace->format->get_thread_statistics) {
 		trace->format->get_thread_statistics(trace, t, stat);
 	}
-	return;
+
+	return 0;
 }
 
 libtrace_stat_t *trace_create_statistics(void) {
@@ -2463,14 +2491,21 @@ void trace_clear_statistics(libtrace_stat_t *s) {
 	s->magic = LIBTRACE_STAT_MAGIC;
 }
 
-void trace_subtract_statistics(const libtrace_stat_t *a, const libtrace_stat_t *b,
+int trace_subtract_statistics(const libtrace_stat_t *a, const libtrace_stat_t *b,
                          libtrace_stat_t *c) {
-	assert(a->magic == LIBTRACE_STAT_MAGIC && "Please use"
+
+	if (!(a->magic == LIBTRACE_STAT_MAGIC)
+		|| !(b->magic == LIBTRACE_STAT_MAGIC)
+		|| !(c->magic == LIBTRACE_STAT_MAGIC)) {
+		return TRACE_ERR_STAT;
+	}
+
+	/*assert(a->magic == LIBTRACE_STAT_MAGIC && "Please use"
 	       "trace_create_statistics() to allocate statistics");
 	assert(b->magic == LIBTRACE_STAT_MAGIC && "Please use"
 	       "trace_create_statistics() to allocate statistics");
 	assert(c->magic == LIBTRACE_STAT_MAGIC && "Please use"
-	       "trace_create_statistics() to allocate statistics");
+	       "trace_create_statistics() to allocate statistics");*/
 
 #define X(x) \
 	if (a->x ##_valid && b->x ##_valid) { \
@@ -2481,16 +2516,23 @@ void trace_subtract_statistics(const libtrace_stat_t *a, const libtrace_stat_t *
 	}
 	LIBTRACE_STAT_FIELDS
 #undef X
+	return 0;
 }
 
-void trace_add_statistics(const libtrace_stat_t *a, const libtrace_stat_t *b,
+int trace_add_statistics(const libtrace_stat_t *a, const libtrace_stat_t *b,
                          libtrace_stat_t *c) {
-	assert(a->magic == LIBTRACE_STAT_MAGIC && "Please use"
+	if (!(a->magic == LIBTRACE_STAT_MAGIC)
+                || !(b->magic == LIBTRACE_STAT_MAGIC)
+                || !(c->magic == LIBTRACE_STAT_MAGIC)) {
+                return TRACE_ERR_STAT;
+        }
+
+	/*assert(a->magic == LIBTRACE_STAT_MAGIC && "Please use"
 	       "trace_create_statistics() to allocate statistics");
 	assert(b->magic == LIBTRACE_STAT_MAGIC && "Please use"
 	       "trace_create_statistics() to allocate statistics");
 	assert(c->magic == LIBTRACE_STAT_MAGIC && "Please use"
-	       "trace_create_statistics() to allocate statistics");
+	       "trace_create_statistics() to allocate statistics");*/
 
 #define X(x) \
 	if (a->x ##_valid&& b->x ##_valid) { \
@@ -2501,6 +2543,7 @@ void trace_add_statistics(const libtrace_stat_t *a, const libtrace_stat_t *b,
 	}
 	LIBTRACE_STAT_FIELDS
 #undef X
+	return 0;
 }
 
 int trace_print_statistics(const libtrace_stat_t *s, FILE *f, const char *format) {
