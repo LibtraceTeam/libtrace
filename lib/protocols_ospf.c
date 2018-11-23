@@ -40,7 +40,15 @@ DLLEXPORT void *trace_get_ospf_header(libtrace_packet_t *packet,
         if (!remaining)
                 remaining = &dummy_rem;
 
-        assert(version != NULL && "version may not be NULL when calling trace_get_ospf_header!");
+	if (!packet) {
+		fprintf(stderr, "NULL packet passed into trace_get_ospf_version()\n");
+		return NULL;
+	}
+        /*assert(version != NULL && "version may not be NULL when calling trace_get_ospf_header!");*/
+	if (!version) {
+		fprintf(stderr, "NULL version passed into trace_get_ospf_version()\n");
+		return NULL;
+	}
 
         ospf = trace_get_transport(packet, &proto, remaining);
 
@@ -61,14 +69,23 @@ DLLEXPORT void *trace_get_ospf_contents_v2(libtrace_ospf_v2_t *header,
         uint8_t dummy_type;
         char *ptr;
 
-        assert(remaining != NULL && "remaining may not be NULL when calling trace_get_ospf_contents!");
+        /*assert(remaining != NULL && "remaining may not be NULL when calling trace_get_ospf_contents!");*/
+	if (!remaining) {
+		fprintf(stderr, "Remaining may not be NULL when calling trace_get_ospf_contents()\n");
+		return NULL;
+	}
+	if (!header) {
+		fprintf(stderr, "Header may not be NULL when calling trace_get_ospf_contents()\n");
+		return NULL;
+	}
 
         if (!ospf_type)
                 ospf_type = &dummy_type;
 
-        if (!header || *remaining < sizeof(libtrace_ospf_v2_t)) {
+        if (*remaining < sizeof(libtrace_ospf_v2_t)) {
                 *ospf_type = 0;
                 *remaining = 0;
+		fprintf(stderr, "Remaining may not be less than the size of libtrace_ospf_v2_t when calling trace_get_ospf_contents()\n");
                 return NULL;
         }
 
@@ -86,10 +103,19 @@ DLLEXPORT unsigned char *trace_get_first_ospf_link_from_router_lsa_v2(
                 uint32_t *remaining) {
 
         unsigned char *link_ptr = NULL;
-        assert(remaining != NULL && "remaining may not be NULL when calling trace_get_first_link_from_router_lsa_v2!");
+        /*assert(remaining != NULL && "remaining may not be NULL when calling trace_get_first_link_from_router_lsa_v2!");*/
+	if (!remaining) {
+		fprintf(stderr, "Remaining may not be NULL when calling trace_get_first_link_from_router_lsa_v2()\n");
+		return NULL;
+	}
+	if (!lsa) {
+		fprintf(stderr, "NULL lsa passed into trace_get_first_link_from_router_lsa_v2()\n");
+		return NULL;
+	}
 
-        if (!lsa || *remaining < sizeof(libtrace_ospf_router_lsa_v2_t)) {
+        if (*remaining < sizeof(libtrace_ospf_router_lsa_v2_t)) {
                 *remaining = 0;
+		fprintf(stderr, "Remaining may not be less than the size of libtrace_ospf_router_lsa_v2_t when calling trace_get_first_ospf_link_from_router_lsa_v2()\n");
                 return NULL;
         }
 
@@ -105,10 +131,19 @@ DLLEXPORT unsigned char *trace_get_first_ospf_lsa_from_db_desc_v2(
 
         unsigned char *lsa_ptr = NULL;
 
-        assert(remaining != NULL && "remaining may not be NULL when calling trace_get_first_ospf_v2_lsa!");
+        /*assert(remaining != NULL && "remaining may not be NULL when calling trace_get_first_ospf_v2_lsa!");*/
+	if (!remaining) {
+		fprintf(stderr, "Remaining may not be NULL when calling trace_get_first_ospf_v2_lsa()\n");
+		return NULL;
+	}
+	if (!db_desc) {
+		fprintf(stderr, "db_desc may not be NULL when calling trace_get_first_ospf_v2_lsa()\n");
+		return NULL;
+	}
 
-        if (!db_desc || *remaining < sizeof(libtrace_ospf_db_desc_v2_t)) {
+        if (*remaining < sizeof(libtrace_ospf_db_desc_v2_t)) {
                 *remaining = 0;
+		fprintf(stderr, "Remaining may not be less than the size of libtrace_ospf_db_desc_v2_t when calling trace_get_first_ospf_lsa_from_db_desc_v2()\n");
                 return NULL;
         }
 
@@ -124,10 +159,19 @@ DLLEXPORT unsigned char *trace_get_first_ospf_lsa_from_update_v2(
 
         unsigned char *lsa_ptr = NULL;
 
-        assert(remaining != NULL && "remaining may not be NULL when calling trace_get_first_ospf_v2_lsa!");
+        /*assert(remaining != NULL && "remaining may not be NULL when calling trace_get_first_ospf_v2_lsa!");*/
+	if (!remaining) {
+		fprintf(stderr, "Remaining may not be NULL when calling trace_get_first_ospf_v2_lsa()\n");
+		return NULL;
+	}
+	if (!ls_update) {
+		fprintf(stderr, "ls_update may not be NULL when calling trace_get_first_ospf_v2_lsa()\n");
+		return NULL;
+	}
 
-        if (!ls_update || *remaining < sizeof(libtrace_ospf_ls_update_t)) {
+        if (*remaining < sizeof(libtrace_ospf_ls_update_t)) {
                 *remaining = 0;
+		fprintf(stderr, "Remaining may not be less than the size of an ls_update when calling trace_get_first_ospf_v2_lsa()\n");
                 return NULL;
         }
 
@@ -142,7 +186,11 @@ DLLEXPORT uint32_t trace_get_ospf_metric_from_as_external_lsa_v2(
 
         uint32_t metric = 0;
 
-        assert(as_lsa);
+        /*assert(as_lsa);*/
+	if (!as_lsa) {
+		fprintf(stderr, "NULL as_lsa passed into trace_get_ospf_metric_from_as_external_lsa_v2()\n");
+		return;
+	}
 
         metric = as_lsa->metric_a << 16;
         metric |= (as_lsa->metric_b << 8);
@@ -156,7 +204,11 @@ DLLEXPORT uint32_t trace_get_ospf_metric_from_summary_lsa_v2(
 
         uint32_t metric = 0;
 
-        assert(sum_lsa);
+        /*assert(sum_lsa);*/
+	if (!sum_lsa) {
+		fprintf(stderr, "NULL sum_lsa passed into trace_get_ospf_metric_from_summary_lsa_v2()\n");
+		return;
+	}
 
         metric = sum_lsa->metric_a << 16;
         metric |= (sum_lsa->metric_b << 8);

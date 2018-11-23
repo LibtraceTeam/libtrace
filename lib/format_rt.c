@@ -610,7 +610,11 @@ static int rt_get_next_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
         packet->type = ntohl(((rt_header_t *)packet->header)->type);
         packet->payload = RT_INFO->buf_read + sizeof(rt_header_t);
         packet->internalid = libtrace_push_into_bucket(RT_INFO->bucket);
-        assert(packet->internalid != 0);
+        /*assert(packet->internalid != 0);*/
+	if (!packet->internalid) {
+		trace_set_err(libtrace, TRACE_ERR_RT_FAILURE, "packet->internalid is 0 in rt_get_next_packet()");
+		return -1;
+	}
         packet->srcbucket = RT_INFO->bucket;
         packet->buf_control = TRACE_CTRL_EXTERNAL;
 
@@ -755,9 +759,17 @@ static libtrace_eventobj_t trace_event_rt(libtrace_t *trace,
 	libtrace_eventobj_t event = {0,0,0.0,0};
 	libtrace_err_t read_err;
 
-	assert(trace);
-	assert(packet);
-	
+	/*assert(trace);*/
+	if (!trace) {
+		fprintf(stderr, "NULL trace passed into trace_event_rt()\n");
+		return;
+	}
+	/*assert(packet);*/
+	if (!packet) {
+		trace_set_err(trace, TRACE_ERR_NULL_PACKET, "NULL packet passed into trace_event_rt()");
+		return;
+	}
+
 	if (trace->format->get_fd) {
 		event.fd = trace->format->get_fd(trace);
 	} else {

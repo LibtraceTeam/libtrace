@@ -257,7 +257,9 @@ static int legacy_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 			packet->type = TRACE_RT_DATA_LEGACY_ETH;
 			break;
 		default:
-			assert(0);
+			/*assert(0);*/
+			trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT, "Invalid trace format type in legacy_read_packet()");
+			return -1;
 	}
 
 	/* This is going to block until we either get an entire record
@@ -391,7 +393,11 @@ static int legacynzix_get_capture_length(const libtrace_packet_t *packet UNUSED)
 
 static int legacypos_get_wire_length(const libtrace_packet_t *packet) {
 	legacy_pos_t *lpos = (legacy_pos_t *)packet->header;
-	assert(ntohl(lpos->wlen)>0);
+	/*assert(ntohl(lpos->wlen)>0);*/
+	if (ntohl(lpos->wlen) <= 0) {
+		trace_set_err(packet->trace, TRACE_ERR_BAD_PACKET, "Packet wire length is less than 0 in legacypos_get_wire_length()");
+		return -1;
+	}
 	return ntohl(lpos->wlen);
 }
 

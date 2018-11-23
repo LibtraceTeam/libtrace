@@ -155,12 +155,20 @@ DLLEXPORT void *trace_get_packet_meta(const libtrace_packet_t *packet,
 {
 	uint32_t dummyrem;
 	void *pktbuf = NULL;
-	assert(packet != NULL);
-	assert(linktype != NULL);
-	
-	if (remaining == NULL) 
+	/*assert(packet != NULL);*/
+	if (!packet) {
+		fprintf(stderr, "NULL packet passed into trace_get_packet_meta()");
+		return NULL;
+	}
+	/*assert(linktype != NULL);*/
+	if (!linktype) {
+		fprintf(stderr, "NULL linkype passed into trace_get_packet_meta()");
+		return NULL;
+	}
+
+	if (remaining == NULL)
 		remaining = &dummyrem;
-	
+
 	pktbuf = trace_get_packet_buffer(packet, linktype, remaining);
 	switch (*linktype) {
 		case TRACE_TYPE_LINUX_SLL:
@@ -197,14 +205,26 @@ DLLEXPORT void *trace_get_payload_from_meta(const void *meta,
 		libtrace_linktype_t *linktype,
 		uint32_t *remaining)
 {
-	void *nexthdr; 
+	void *nexthdr;
 	uint16_t arphrd = 0;
 	uint16_t next = 0;
-	
-	assert(meta != NULL);
-	assert(linktype != NULL);
-	assert(remaining != NULL);
-	
+
+	/*assert(meta != NULL);*/
+	if (!meta) {
+		fprintf(stderr, "NULL meta passed into trace_get_payload_from_meta()");
+		return NULL;
+	}
+	/*assert(linktype != NULL);*/
+	if (!linktype) {
+		fprintf(stderr, "NULL linktype passed into trace_get_payload_from_meta()");
+		return NULL;
+	}
+	/*assert(remaining != NULL);*/
+	if (!remaining) {
+		fprintf(stderr, "NULL remaining passed into trace_get_payload_from_meta()");
+		return NULL;
+	}
+
 	switch(*linktype) {
 		case TRACE_TYPE_LINUX_SLL:
 			nexthdr = trace_get_payload_from_linux_sll(meta,

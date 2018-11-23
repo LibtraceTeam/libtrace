@@ -325,6 +325,12 @@ enum {
 	TRACE_ERR_STAT = -20,
 	/** Unable to create deadtrace **/
 	TRACE_ERR_CREATE_DEADTRACE = -21,
+	/** Bad linktype **/
+	TRACE_ERR_BAD_LINKTYPE = -22,
+	/** Bad IO for the trace **/
+	TRACE_ERR_BAD_IO = -23,
+	/** Trace has bad header **/
+	TRACE_ERR_BAD_HEADER = -24,
 };
 
 /** Enumeration of DLTs supported by libtrace 
@@ -418,6 +424,7 @@ enum base_format_t {
         TRACE_FORMAT_NDAG       =19,    /**< DAG multicast over a network */
         TRACE_FORMAT_DPDK_NDAG       =20,    /**< DAG multicast over a network, received via DPDK */
         TRACE_FORMAT_ETSILIVE     =21,  /**< ETSI LI over a network */
+	TRACE_FORMAT_UNKNOWN      =22,  /** Unknown format */
 };
 
 /** RT protocol packet types */
@@ -1545,17 +1552,17 @@ DLLEXPORT int trace_config_output(libtrace_out_t *libtrace,
  * @param trace 	The input trace to be destroyed
  *
  */
-DLLEXPORT int trace_destroy(libtrace_t *trace);
+DLLEXPORT void trace_destroy(libtrace_t *trace);
 
 /** Close a dummy trace file, freeing up any resources it may have been using
  * @param trace		The dummy trace to be destroyed
  */
-DLLEXPORT int trace_destroy_dead(libtrace_t *trace);
+DLLEXPORT void trace_destroy_dead(libtrace_t *trace);
 
 /** Close an output trace, freeing up any resources it may have been using
  * @param trace		The output trace to be destroyed
  */
-DLLEXPORT int trace_destroy_output(libtrace_out_t *trace);
+DLLEXPORT void trace_destroy_output(libtrace_out_t *trace);
 
 /** Flush an output trace, forcing any buffered packets to be written
  * @param libtrace      The output trace to be flushed

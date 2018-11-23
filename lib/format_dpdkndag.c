@@ -88,7 +88,7 @@ static int dpdkndag_init_input(libtrace_t *libtrace) {
 
 	if (!libtrace->format_data) {
 		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory dpdknday_init_input()");
-		return 1;
+		return -1;
 	}
 
         FORMAT_DATA->localiface = NULL;

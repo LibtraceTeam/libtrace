@@ -68,9 +68,17 @@ struct libtrace_eventobj_t trace_event_device(struct libtrace_t *trace,
 	int max_fd;
 	struct timeval tv;
 
-	assert(trace != NULL);
-	assert(packet != NULL);
-	
+	/*assert(trace != NULL);*/
+	if (!trace) {
+		fprintf(stderr, "NULL trace passed into trace_event_device()\n");
+		return;
+	}
+	/*assert(packet != NULL);*/
+	if (!packet) {
+		trace_set_err(trace, TRACE_ERR_NULL_PACKET, "NULL packet passed into trace_event_device()");
+		return;
+	}
+
 	FD_ZERO(&rfds);
 	FD_ZERO(&rfds_param);
 
@@ -289,7 +297,11 @@ void trace_set_err(libtrace_t *trace,int errcode,const char *msg,...)
 	char buf[256];
 	va_list va;
 	va_start(va,msg);
-	assert(errcode != 0 && "An error occurred, but it is unknown what it is");
+	/*assert(errcode != 0 && "An error occurred, but it is unknown what it is");*/
+	if (errcode == 0) {
+		fprintf(stderr, "An error occurred, but it is unknown what it is");
+		return;
+	}
 	trace->err.err_num=errcode;
 	if (errcode>0) {
 		vsnprintf(buf,sizeof(buf),msg,va);
@@ -312,7 +324,11 @@ void trace_set_err_out(libtrace_out_t *trace,int errcode,const char *msg,...)
 	char buf[256];
 	va_list va;
 	va_start(va,msg);
-	assert(errcode != 0 && "An error occurred, but it is unknown what it is");
+	/*assert(errcode != 0 && "An error occurred, but it is unknown what it is");*/
+	if (errcode == 0) {
+		fprintf(stderr, "An error occurred, but is is unknown what is is");
+		return;
+	}
 	trace->err.err_num=errcode;
 	if (errcode>0) {
 		vsnprintf(buf,sizeof(buf),msg,va);
