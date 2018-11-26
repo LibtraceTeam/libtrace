@@ -189,7 +189,8 @@ DLLEXPORT uint32_t trace_get_ospf_metric_from_as_external_lsa_v2(
         /*assert(as_lsa);*/
 	if (!as_lsa) {
 		fprintf(stderr, "NULL as_lsa passed into trace_get_ospf_metric_from_as_external_lsa_v2()\n");
-		return;
+		/* Return metric of 0 on error? */
+		return metric;
 	}
 
         metric = as_lsa->metric_a << 16;
@@ -207,7 +208,8 @@ DLLEXPORT uint32_t trace_get_ospf_metric_from_summary_lsa_v2(
         /*assert(sum_lsa);*/
 	if (!sum_lsa) {
 		fprintf(stderr, "NULL sum_lsa passed into trace_get_ospf_metric_from_summary_lsa_v2()\n");
-		return;
+		/* Return metric of 0 on error? */
+		return metric;
 	}
 
         metric = sum_lsa->metric_a << 16;

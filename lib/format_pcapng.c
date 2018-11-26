@@ -1117,12 +1117,14 @@ static struct timespec pcapng_get_timespec(const libtrace_packet_t *packet) {
 
 	if (!packet) {
 		fprintf(stderr, "NULL packet passed into pcapng_get_timespec()");
-		return;
+		/* Return default timespec on error? */
+		return ts;
 	}
         /*assert(packet->header);*/
 	if (!packet->header) {
 		trace_set_err(packet->trace, TRACE_ERR_BAD_PACKET, "NULL header in packet in pcapng_get_timespec()");
-		return;
+		/* Return default timespec on error? */
+		return ts;
 	}
 
         ts.tv_sec = 0;

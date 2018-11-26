@@ -271,7 +271,7 @@ DLLEXPORT bool trace_has_dedicated_hasher(libtrace_t * libtrace)
 DLLEXPORT bool trace_has_reporter(libtrace_t * libtrace)
 {
 	/*assert(libtrace->state != STATE_NEW);*/
-	if (!(libtrace->stats != STATE_NEW)) {
+	if (!(libtrace->state != STATE_NEW)) {
 		trace_set_err(libtrace, TRACE_ERR_BAD_STATE, "Cannot check reporter for the current state in trace_has_reporter()");
 		return false;
 	}

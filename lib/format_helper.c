@@ -71,12 +71,14 @@ struct libtrace_eventobj_t trace_event_device(struct libtrace_t *trace,
 	/*assert(trace != NULL);*/
 	if (!trace) {
 		fprintf(stderr, "NULL trace passed into trace_event_device()\n");
-		return;
+		/* Return empty event on error? */
+		return event;
 	}
 	/*assert(packet != NULL);*/
 	if (!packet) {
 		trace_set_err(trace, TRACE_ERR_NULL_PACKET, "NULL packet passed into trace_event_device()");
-		return;
+		/* Return empty event on error? */
+		return event;
 	}
 
 	FD_ZERO(&rfds);

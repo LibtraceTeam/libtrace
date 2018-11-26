@@ -321,7 +321,7 @@ enum {
 	TRACE_ERR_NULL_FILTER = -18,
 	/** Buffer is NULL **/
 	TRACE_ERR_NULL_BUFFER = -19,
-	/** Trace err stat **/
+	/** Trace stats err **/
 	TRACE_ERR_STAT = -20,
 	/** Unable to create deadtrace **/
 	TRACE_ERR_CREATE_DEADTRACE = -21,
@@ -331,6 +331,20 @@ enum {
 	TRACE_ERR_BAD_IO = -23,
 	/** Trace has bad header **/
 	TRACE_ERR_BAD_HEADER = -24,
+	/** Trace err seeking by erf **/
+	TRACE_ERR_SEEK_ERF = -25,
+	/** Trace err combiner **/
+	TRACE_ERR_COMBINER = -26,
+	/** Error pausing processing thread **/
+	TRACE_ERR_PAUSE_PTHREAD = -27,
+	/** Error with trace thread **/
+	TRACE_ERR_THREAD = -28,
+	/** Thread in unexpecting state **/
+	TRACE_ERR_THREAD_STATE = -29,
+	/** Trace configuration error **/
+	TRACE_ERR_CONFIG = -30,
+	/** NULL passed misc **/
+	TRACE_ERR_NULL = -31,
 };
 
 /** Enumeration of DLTs supported by libtrace 
@@ -1716,7 +1730,7 @@ libtrace_stat_t *trace_get_statistics(libtrace_t *trace, libtrace_stat_t *stats)
  *       code.
  */
 DLLEXPORT
-int trace_get_thread_statistics(libtrace_t *trace, libtrace_thread_t *t,
+void trace_get_thread_statistics(libtrace_t *trace, libtrace_thread_t *t,
                                  libtrace_stat_t *stats);
 
 /**
@@ -1750,7 +1764,7 @@ void trace_clear_statistics(libtrace_stat_t *s);
  * @param c The resulting difference
  */
 DLLEXPORT
-int trace_subtract_statistics(const libtrace_stat_t *a,
+void trace_subtract_statistics(const libtrace_stat_t *a,
                                const libtrace_stat_t *b, libtrace_stat_t *c);
 
 /**
@@ -1762,7 +1776,7 @@ int trace_subtract_statistics(const libtrace_stat_t *a,
  * @param c The result
  */
 DLLEXPORT
-int trace_add_statistics(const libtrace_stat_t *a,
+void trace_add_statistics(const libtrace_stat_t *a,
                           const libtrace_stat_t *b, libtrace_stat_t *c);
 
 /**
@@ -1950,7 +1964,7 @@ enum base_format_t trace_get_format(struct libtrace_packet_t *packet);
  * (or a metadata header, if desired).
  */
 DLLEXPORT
-int trace_construct_packet(libtrace_packet_t *packet,
+void trace_construct_packet(libtrace_packet_t *packet,
 		libtrace_linktype_t linktype, const void *data, uint16_t len);
 
 /*@}*/

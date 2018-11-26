@@ -762,12 +762,14 @@ static libtrace_eventobj_t trace_event_rt(libtrace_t *trace,
 	/*assert(trace);*/
 	if (!trace) {
 		fprintf(stderr, "NULL trace passed into trace_event_rt()\n");
-		return;
+		/* Return empty event on error? */
+		return event;
 	}
 	/*assert(packet);*/
 	if (!packet) {
 		trace_set_err(trace, TRACE_ERR_NULL_PACKET, "NULL packet passed into trace_event_rt()");
-		return;
+		/* Return empty event on error? */
+		return event;
 	}
 
 	if (trace->format->get_fd) {

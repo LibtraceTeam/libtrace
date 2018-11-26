@@ -778,8 +778,10 @@ static int pcap_get_fd(const libtrace_t *trace) {
 	}
 	/*assert(trace->format_data);*/
 	if (!trace->format_data) {
-		trace_set_err(trace, TRACE_ERR_BAD_FORMAT, "Trace format data missing, call init_input() before calling pcap_get_fd()");
-		return -1;
+		/* cant do this because trace is a const? */
+		/*trace_set_err(trace, TRACE_ERR_BAD_FORMAT, "Trace format data missing, call init_input() before calling pcap_get_fd()");*/
+		fprintf(stderr, "Trace format data missing, call init_input() before calling pcap_get_fd()\n");
+		return TRACE_ERR_BAD_FORMAT;
 	}
 	return pcap_fileno(DATA(trace)->input.pcap);
 }

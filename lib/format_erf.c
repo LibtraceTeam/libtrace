@@ -179,7 +179,11 @@ int erf_get_framing_length(const libtrace_packet_t *packet)
                         extsize += 8;
                         exthdr ++;
                         firstbyte = (uint8_t *)exthdr;
-                        assert(extsize <= ntohs(erfptr->rlen));
+                        /*assert(extsize <= ntohs(erfptr->rlen));*/
+			if (extsize > ntohs(erfptr->rlen)) {
+				trace_set_err(packet->trace, TRACE_ERR_BAD_PACKET, "Extension size is greater than dag record record length in erf_get_framing_length()");
+				return -1;
+			}
                 }
         }
 	return dag_record_size + extsize + erf_get_padding(packet);
@@ -383,7 +387,9 @@ static int erf_seek_erf(libtrace_t *libtrace,uint64_t erfts)
 			erf_slow_seek_start(libtrace,erfts);
 			break;
 		case INDEX_UNKNOWN:
-			assert(0);
+			/*assert(0);*/
+			trace_set_err(libtrace, TRACE_ERR_SEEK_ERF, "Cannot seek to erf timestamp with unknown index in erf_seek_erf()");
+			return -1;
 			break;
 	}
 
@@ -480,8 +486,12 @@ static int erf_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
 		packet->payload = ((char*)packet->buffer) + trace_get_framing_length(packet);
 	}
 
-        assert(erfptr->rlen != 0);
-	
+        /*assert(erfptr->rlen != 0);*/
+	if (erfptr->rlen == 0) {
+		trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Packet is empty in erf_prepare_packet()\n");
+		return -1;
+	}
+
 	if (libtrace->format_data == NULL) {
 		/* Allocates the format_data structure */
 		if (erf_init_input(libtrace)) 
@@ -657,7 +667,11 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 	dag_record_t *dag_hdr = (dag_record_t *)packet->header;
 	void *payload = packet->payload;
 
-	assert(OUTPUT->file);
+	/*assert(OUTPUT->file);*/
+	if (!OUTPUT->file) {
+		trace_set_err_out(libtrace, TRACE_ERR_BAD_IO, "Call init_output before write_packet() in erf_write_packet()");
+		return -1;
+	}
 
 	if (trace_get_link_type(packet) == TRACE_TYPE_NONDATA)
 		return 0;
@@ -707,17 +721,33 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 		erfhdr.type = libtrace_to_erf_type(trace_get_link_type(packet));
 
 		/* Packet length (rlen includes format overhead) */
-		assert(trace_get_capture_length(packet)>0 
-				&& trace_get_capture_length(packet)<=65536);
-		assert(trace_get_framing_length(packet)<=65536);
-               
+		/*assert(trace_get_capture_length(packet)>0
+				&& trace_get_capture_length(packet)<=65536);*/
+		if (!(trace_get_capture_length(packet) > 0
+			&& trace_get_capture_length(packet) <= 65536)) {
+			trace_set_err_out(libtrace, TRACE_ERR_BAD_PACKET,
+				"Capture length is out of range in erf_write_packet()");
+			return -1;
+		}
+		/*assert(trace_get_framing_length(packet)<=65536);*/
+		if (trace_get_framing_length(packet) > 65536) {
+			trace_set_err_out(libtrace, TRACE_ERR_BAD_PACKET,
+				"Framing length is to large in erf_write_packet()");
+			return -1;
+		}
+
                 if (erfhdr.type == TYPE_ETH)
                         framing = dag_record_size + 2;
                 else
                         framing = dag_record_size;
-               
+
 		rlen = trace_get_capture_length(packet) + framing;
-		assert(rlen > 0 && rlen <= 65536);
+		/*assert(rlen > 0 && rlen <= 65536);*/
+		if (!(rlen > 0 && rlen <= 65536)) {
+			trace_set_err_out(libtrace, TRACE_ERR_BAD_PACKET,
+				"Capture + framing length is out of range in erf_write_packet()");
+			return -1;
+		}
 		erfhdr.rlen = htons(rlen);
 		/* loss counter. Can't do this */
 		erfhdr.lctr = 0;
@@ -805,7 +835,11 @@ size_t erf_set_capture_length(libtrace_packet_t *packet, size_t size) {
 	dag_record_t *erfptr = 0;
         uint16_t wlen;
 
-	assert(packet);
+	/*assert(packet);*/
+	if (!packet) {
+		fprintf(stderr, "NULL packet passed to erf_set_capture_length()\n");
+		return ~0U;
+	}
 	erfptr = (dag_record_t *)packet->header;
 
 	if(size > trace_get_capture_length(packet) || (erfptr->type & 0x7f) == TYPE_META) {

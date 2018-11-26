@@ -1527,12 +1527,14 @@ DLLEXPORT libtrace_eventobj_t trace_event(libtrace_t *trace,
 	/*assert(trace && "You called trace_event() with a NULL trace object!");*/
 	if (!trace) {
 		fprintf(stderr, "NULL trace passed into trace_event()");
-		return;
+		/* Return default event on error? */
+		return event;
 	}
 	/*assert(packet && "You called trace_event() with a NULL packet object!");*/
 	if (!packet) {
 		trace_set_err(trace, TRACE_ERR_NULL_PACKET, "NULL packet passed into trace_event()");
-		return;
+		/* Return default event on error? */
+		return event;
 	}
 
 	/* Free the last packet */
@@ -2247,14 +2249,10 @@ DLLEXPORT uint8_t *trace_ether_aton(const char *buf, uint8_t *addr)
  *
  */
 DLLEXPORT
-int trace_construct_packet(libtrace_packet_t *packet,
+void trace_construct_packet(libtrace_packet_t *packet,
 		libtrace_linktype_t linktype,
 		const void *data,
 		uint16_t len) {
-
-	if (!packet) {
-		return TRACE_ERR_NULL_PACKET;
-	}
 
 	size_t size;
 	static libtrace_t *deadtrace=NULL;
@@ -2288,7 +2286,7 @@ int trace_construct_packet(libtrace_packet_t *packet,
         /*assert(deadtrace);*/
 	if (!deadtrace) {
 		fprintf(stderr, "Unable to create dead trace trace_construct_packet()\n");
-		return TRACE_ERR_CREATE_DEADTRACE;
+		return;
 	}
 	packet->trace=deadtrace;
 	size=len+sizeof(hdr);
@@ -2312,8 +2310,6 @@ int trace_construct_packet(libtrace_packet_t *packet,
 	packet->type=pcap_linktype_to_rt(libtrace_to_pcap_linktype(linktype));
 
 	trace_clear_cache(packet);
-
-	return 0;
 }
 
 
@@ -2490,24 +2486,24 @@ libtrace_stat_t *trace_get_statistics(libtrace_t *trace, libtrace_stat_t *stat)
 	return stat;
 }
 
-int trace_get_thread_statistics(libtrace_t *trace, libtrace_thread_t *t,
+void trace_get_thread_statistics(libtrace_t *trace, libtrace_thread_t *t,
                                  libtrace_stat_t *stat)
 {
 	/*assert(trace && stat);*/
 	if (!trace) {
 		fprintf(stderr, "NULL trace passed into trace_get_thread_statistics()\n");
-		return TRACE_ERR_NULL_TRACE;
+		return;
 	}
 	if (!stat) {
 		trace_set_err(trace, TRACE_ERR_STAT, "Stat is NULL trace_get_thread_statistics()");
-		return -1;
+		return;
 	}
 	/*assert(stat->magic == LIBTRACE_STAT_MAGIC && "Please use"
 	       "trace_create_statistics() to allocate statistics");*/
 	if (!(stat->magic == LIBTRACE_STAT_MAGIC)) {
 		trace_set_err(trace, TRACE_ERR_STAT,
 			"Use trace_create_statistics() to allocate statistics in trace_get_thread_statistics()");
-		return -1;
+		return;
 	}
 	stat->reserved1 = 0;
 	stat->reserved2 = 0;
@@ -2521,8 +2517,6 @@ int trace_get_thread_statistics(libtrace_t *trace, libtrace_thread_t *t,
 	if (!trace_has_dedicated_hasher(trace) && trace->format->get_thread_statistics) {
 		trace->format->get_thread_statistics(trace, t, stat);
 	}
-
-	return 0;
 }
 
 libtrace_stat_t *trace_create_statistics(void) {
@@ -2540,14 +2534,14 @@ void trace_clear_statistics(libtrace_stat_t *s) {
 	s->magic = LIBTRACE_STAT_MAGIC;
 }
 
-int trace_subtract_statistics(const libtrace_stat_t *a, const libtrace_stat_t *b,
+void trace_subtract_statistics(const libtrace_stat_t *a, const libtrace_stat_t *b,
                          libtrace_stat_t *c) {
 
 	if (!(a->magic == LIBTRACE_STAT_MAGIC)
 		|| !(b->magic == LIBTRACE_STAT_MAGIC)
 		|| !(c->magic == LIBTRACE_STAT_MAGIC)) {
 		fprintf(stderr, "Use trace_create_statistics() to allocate statistics in trace_subtract_statistics()\n");
-		return TRACE_ERR_STAT;
+		return;
 	}
 
 	/*assert(a->magic == LIBTRACE_STAT_MAGIC && "Please use"
@@ -2566,16 +2560,15 @@ int trace_subtract_statistics(const libtrace_stat_t *a, const libtrace_stat_t *b
 	}
 	LIBTRACE_STAT_FIELDS
 #undef X
-	return 0;
 }
 
-int trace_add_statistics(const libtrace_stat_t *a, const libtrace_stat_t *b,
+void trace_add_statistics(const libtrace_stat_t *a, const libtrace_stat_t *b,
                          libtrace_stat_t *c) {
 	if (!(a->magic == LIBTRACE_STAT_MAGIC)
                 || !(b->magic == LIBTRACE_STAT_MAGIC)
                 || !(c->magic == LIBTRACE_STAT_MAGIC)) {
 		fprintf(stderr, "Use trace_create_statistics() to allocate statistics in trace_add_statistics()\n");
-                return TRACE_ERR_STAT;
+                return;
         }
 
 	/*assert(a->magic == LIBTRACE_STAT_MAGIC && "Please use"
@@ -2594,7 +2587,6 @@ int trace_add_statistics(const libtrace_stat_t *a, const libtrace_stat_t *b,
 	}
 	LIBTRACE_STAT_FIELDS
 #undef X
-	return 0;
 }
 
 int trace_print_statistics(const libtrace_stat_t *s, FILE *f, const char *format) {

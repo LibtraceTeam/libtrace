@@ -453,7 +453,8 @@ static size_t linuxnative_set_capture_length(libtrace_packet_t *packet,
 	/*assert(packet);*/
 	if (!packet) {
 		fprintf(stderr, "NULL packet passed into linuxnative_set_capture_length()\n");
-		return;
+		/* Return -1 on error? */
+		return ~0U;
 	}
 	if (size > trace_get_capture_length(packet)) {
 		/* We should avoid making a packet larger */

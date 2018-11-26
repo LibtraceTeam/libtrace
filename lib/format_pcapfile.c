@@ -575,12 +575,14 @@ static struct timeval pcapfile_get_timeval(
 
 	if (!packet) {
 		fprintf(stderr, "NULL packet passed to pcapfile_get_timeval()\n");
-		return;
+		/* Return default timeval on error? */
+		return ts;
 	}
 	/*assert(packet->header);*/
 	if (!packet->header) {
 		trace_set_err(packet->trace, TRACE_ERR_BAD_HEADER, "Trace with NULL header passed to pcapfile_get_timeval()");
-		return;
+		/* Return default timeval on error? */
+		return ts;
 	}
 
 	hdr = (libtrace_pcapfile_pkt_hdr_t*)packet->header;
@@ -601,12 +603,14 @@ static struct timespec pcapfile_get_timespec(
 
 	if (!packet) {
 		fprintf(stderr, "NULL packet passed to pcapfile_get_timespec()");
-		return;
+		/* Return default timespec on error? */
+		return ts;
 	}
 	/*assert(packet->header);*/
 	if (!packet->header) {
                 trace_set_err(packet->trace, TRACE_ERR_BAD_HEADER, "Trace with NULL header passed to pcapfile_get_timespec()");
-                return;
+		/* Return fefault timespec on error? */
+                return ts;
         }
 
 	hdr = (libtrace_pcapfile_pkt_hdr_t*)packet->header;
@@ -690,12 +694,14 @@ static size_t pcapfile_set_capture_length(libtrace_packet_t *packet,size_t size)
 	/*assert(packet);*/
 	if (!packet) {
 		fprintf(stderr, "NULL packet passed into pcapfile_set_capture_length\n");
-		return;
+		/* Return -1 on error? */
+		return ~0U;
 	}
 	/*assert(packet->header);*/
 	if (!packet->header) {
 		trace_set_err(packet->trace, TRACE_ERR_BAD_HEADER, "Trace with NULL header passed to pcapfile_set_capture_length()");
-		return;
+		/* Return -1 on error? */
+		return ~0U;
 	}
 	if (size > trace_get_capture_length(packet)) {
 		/* Can't make a packet larger */
