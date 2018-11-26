@@ -182,11 +182,19 @@ DLLEXPORT void libtrace_release_bucket_id(libtrace_bucket_t *b, uint64_t id) {
         libtrace_list_node_t *lnode;
         libtrace_bucket_node_t tmp;
 
-        assert(id != 0);
+        /*assert(id != 0);*/
+	if (id == 0) {
+		fprintf(stderr, "bucket ID cannot be 0 in libtrace_release_bucket_id()\n");
+		return;
+	}
 
         pthread_mutex_lock(&b->lock);
         bnode = b->packets[id];
-        assert(bnode != NULL);
+        /*assert(bnode != NULL);*/
+	if (bnode == NULL) {
+		fprintf(stderr, "bucket ID %lu is NULL in libtrace_release_bucket_id()\n", id);
+		return;
+	}
 
 
         /* Find the right slot */
@@ -195,8 +203,16 @@ DLLEXPORT void libtrace_release_bucket_id(libtrace_bucket_t *b, uint64_t id) {
         } else {
                 s = id - bnode->startindex;
         }
-        assert(s < bnode->slots);
-        assert(bnode->released[s] != 0);
+        /*assert(s < bnode->slots);*/
+	if (s >= bnode->slots) {
+		fprintf(stderr, "Error in libtrace_release_bucket_id()\n");
+		return;
+	}
+        /*assert(bnode->released[s] != 0);*/
+	if (bnode->released[s] == 0) {
+		fprintf(stderr, "Error in libtrace_release_bucket_id()\n");
+		return;
+	}
 
 
         if (bnode->released[s] == 1) {
@@ -227,7 +243,11 @@ DLLEXPORT void libtrace_release_bucket_id(libtrace_bucket_t *b, uint64_t id) {
                 if (front == b->node)
                         break;
 
-                assert(lnode->next != NULL);
+                /*assert(lnode->next != NULL);*/
+		if (lnode->next == NULL) {
+			fprintf(stderr, "Error in libtrace_release_bucket_id()\n");
+			return;
+		}
                 for (i = 0; i < front->slots; i++) {
                         if (front->released[i] == 2) {
                                 int index = i + front->startindex;
