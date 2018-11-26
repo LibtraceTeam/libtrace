@@ -1521,7 +1521,7 @@ static void dag_get_statistics(libtrace_t *libtrace, libtrace_stat_t *stat)
 		return;
 	}
 	if (!stat) {
-		trace_set_err, TRACE_ERR_STAT, "NULL stat passed into dag_get_statistics()");
+		trace_set_err(libtrace, TRACE_ERR_STAT, "NULL stat passed into dag_get_statistics()");
 		return;
 	}
 	tmp = FORMAT_DATA_HEAD;
@@ -1545,7 +1545,7 @@ static void dag_get_thread_statistics(libtrace_t *libtrace, libtrace_thread_t *t
                 return;
         }
         if (!stat) {
-                trace_set_err, TRACE_ERR_STAT, "NULL stat passed into dag_get_thread_statistics()");
+                trace_set_err(libtrace, TRACE_ERR_STAT, "NULL stat passed into dag_get_thread_statistics()");
                 return;
         }
 	stat->dropped_valid = 1;

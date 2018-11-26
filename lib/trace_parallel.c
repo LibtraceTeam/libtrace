@@ -2516,7 +2516,11 @@ DLLEXPORT void trace_publish_result(libtrace_t *libtrace, libtrace_thread_t *t, 
 	res.type = type;
 	res.key = key;
 	res.value = value;
-	assert(libtrace->combiner.publish);
+	/*assert(libtrace->combiner.publish);*/
+	if (!libtrace->combiner.publish) {
+		fprintf(stderr, "Unable to publish result in trace_publish_result()\n");
+		return;
+	}
 	libtrace->combiner.publish(libtrace, t->perpkt_num, &libtrace->combiner, &res);
 	return;
 }

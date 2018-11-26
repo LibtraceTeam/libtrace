@@ -144,7 +144,8 @@ static void once_memory_cache_key_init() {
 static void resize_memory_caches(struct local_caches *lcs) {
 	/*assert (lcs->t_mem_caches_total > 0);*/
 	if (lcs->t_mem_caches_total <= 0) {
-
+		fprintf(stderr, "Expected lcs->t_mem_caches_total to be greater or equal to 0 in resize_memory_caches()\n");
+		return;
 	}
 	lcs->t_mem_caches += 0x10;
 	lcs->t_mem_caches = realloc(lcs->t_mem_caches,
@@ -266,7 +267,7 @@ DLLEXPORT int libtrace_ocache_init(libtrace_ocache_t *oc, void *(*alloc)(void),
 
 	/*assert(buffer_size);*/
 	if (!buffer_size) {
-		fprintf(stderr, "NULL bugger_size passed into libtrace_ocache_init()\n");
+		fprintf(stderr, "NULL buffer_size passed into libtrace_ocache_init()\n");
 		return -1;
 	}
 	/*assert(alloc);*/

@@ -1008,7 +1008,6 @@ DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 	}
 
 	if (trace_is_err(libtrace))
-		/*trace_set_err(libtrace, TRACE_ERR_BAD_STATE, "Trace is in an error state trace_read_packet()");*/
 		return -1;
 
 	if (!libtrace->started) {
