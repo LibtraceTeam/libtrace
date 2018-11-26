@@ -73,6 +73,12 @@ int libtrace_message_queue_put(libtrace_message_queue_t *mq, const void *message
 {
 	int ret;
 	/*assert(mq->message_len);*/
+	//if (!mq->message_len) {
+	//	fprintf(stderr, "Message queue must be initialised with libtrace_message_queue_init()"
+	//		"before inserting messages in libtrace_message_queue_put()\n");
+	//	/* Can we return -1 here as this could imply threads are waiting */
+	//	return -1;
+	//}
 	ASSERT_RET(write(mq->pipefd[1], message, mq->message_len), == (int) mq->message_len);
 	// Update after we've written
 	pthread_spin_lock(&mq->spin);

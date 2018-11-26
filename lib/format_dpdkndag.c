@@ -97,7 +97,6 @@ static int dpdkndag_init_input(libtrace_t *libtrace) {
 
         scan = strchr(libtrace->uridata, ',');
         if (scan == NULL) {
-		free(libtrace->format_data);
                 trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT,
                         "Bad dpdkndag URI. Should be dpdkndag:<interface>,<multicast group>");
                 return -1;
@@ -114,7 +113,6 @@ static int dpdkndag_init_input(libtrace_t *libtrace) {
 
         if (getaddrinfo(next, NULL, &hints, &result) != 0) {
                 perror("getaddrinfo");
-		free(libtrace->format_data);
                 trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT,
                         "Invalid multicast address: %s", next);
                 return -1;

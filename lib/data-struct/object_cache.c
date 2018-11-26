@@ -142,7 +142,10 @@ static void once_memory_cache_key_init() {
  * Adds more space to our mem_caches
  */
 static void resize_memory_caches(struct local_caches *lcs) {
-	assert (lcs->t_mem_caches_total > 0);
+	/*assert (lcs->t_mem_caches_total > 0);*/
+	if (lcs->t_mem_caches_total <= 0) {
+
+	}
 	lcs->t_mem_caches += 0x10;
 	lcs->t_mem_caches = realloc(lcs->t_mem_caches,
 	                            lcs->t_mem_caches_total * sizeof(struct local_cache));
@@ -165,16 +168,28 @@ static inline struct local_caches *get_local_caches() {
 	else {
 		/* This thread has not been used with a memory pool before */
 		/* Allocate our TLS */
-		assert(lcs == NULL);
+		/*assert(lcs == NULL);*/
+		if (lcs) {
+			fprintf(stderr, "Expected lcs to be NULL in get_local_caches()\n");
+			return NULL;
+		}
 		lcs = calloc(1, sizeof (struct local_caches));
-		assert(lcs);
+		/*assert(lcs);*/
+		if (!lcs) {
+			fprintf(stderr, "Unable to allocate memory for lcs in get_local_caches()\n");
+			return NULL;
+		}
 		/* Hook into pthreads to destroy this when the thread ends */
 		pthread_once(&memory_destructor_once, &once_memory_cache_key_init);
 		pthread_setspecific(memory_destructor_key, (void *) lcs);
 		lcs->t_mem_caches_total = 0x10;
 		lcs->t_mem_caches = calloc(0x10, sizeof(struct local_cache));
-		assert(lcs);
-		assert(lcs->t_mem_caches);
+		/*assert(lcs);*/
+		/*assert(lcs->t_mem_caches);*/
+		if (!lcs->t_mem_caches) {
+			fprintf(stderr, "Unable to allocate memory for lcs->t_mem_caches in get_local_cahces()\n");
+			return NULL;
+		}
 		return lcs;
 	}
 }
@@ -209,7 +224,11 @@ static inline struct local_cache * find_cache(libtrace_ocache_t *oc) {
 		++lcs->t_mem_caches_used;
 	}
 
-	assert(!lc->invalid);
+	/*assert(!lc->invalid);*/
+	if (lc->invalid) {
+		fprintf(stderr, "lc cache is invalid in find_cache()\n");
+		return NULL;
+	}
 	return lc;
 }
 
@@ -245,9 +264,21 @@ DLLEXPORT int libtrace_ocache_init(libtrace_ocache_t *oc, void *(*alloc)(void),
                                     size_t thread_cache_size,
                                     size_t buffer_size, bool limit_size) {
 
-	assert(buffer_size);
-	assert(alloc);
-	assert(free);
+	/*assert(buffer_size);*/
+	if (!buffer_size) {
+		fprintf(stderr, "NULL bugger_size passed into libtrace_ocache_init()\n");
+		return -1;
+	}
+	/*assert(alloc);*/
+	if (!alloc) {
+		fprintf(stderr, "NULL alloc passed into libtrace_ocache_init()\n");
+		return -1;
+	}
+	/*assert(free);*/
+	if (!free) {
+		fprintf(stderr, "NULL free method passed into libtrace_ocache_init()\n");
+		return -1;
+	}
 	if (libtrace_ringbuffer_init(&oc->rb, buffer_size, LIBTRACE_RINGBUFFER_BLOCKING) != 0) {
 		return -1;
 	}
@@ -365,7 +396,11 @@ static inline size_t libtrace_ocache_alloc_cache(libtrace_ocache_t *oc, void *va
 #ifdef ENABLE_MEM_STATS
 	mem_hits.read.miss += nb_buffers - i;
 #endif
-	assert(i >= min_nb_buffers);
+	/*assert(i >= min_nb_buffers);*/
+	if (i < min_nb_buffers) {
+		fprintf(stderr, "Unable to fill remaining cache in libtrace_ocache_alloc_cache()\n");
+		return ~0U;
+	}
 	return i;
 }
 
@@ -398,9 +433,17 @@ DLLEXPORT size_t libtrace_ocache_alloc(libtrace_ocache_t *oc, void *values[], si
 
 		for (;i < nb; ++i) {
 			values[i] = (*oc->alloc)();
-			assert(values[i]);
+			/*assert(values[i]);*/
+			if (!values[i]) {
+				fprintf(stderr, "Unable to alloc memory for values[%zu] in libtrace_ocache_alloc()\n", i);
+				return ~0U;
+			}
 		}
-		assert (i == nb);
+		/*assert (i == nb);*/
+		if (i != nb) {
+			fprintf(stderr, "Expected i == nb in libtrace_ocache_alloc()\n");
+			return ~0U;
+		}
 		// Still got to wait for more
 		if (nb < min_nb_buffers) {
 			if (lc)
@@ -409,7 +452,11 @@ DLLEXPORT size_t libtrace_ocache_alloc(libtrace_ocache_t *oc, void *values[], si
 				i += libtrace_ringbuffer_sread_bulk(&oc->rb, &values[nb], nb_buffers - nb, min_nb_buffers - nb);
 		}
 	}
-	assert(i >= min_nb_buffers);
+	/*assert(i >= min_nb_buffers);*/
+	if (i < min_nb_buffers) {
+		fprintf(stderr, "Expected min_nb_buffers to be equal or less than i in libtrace_ocache_alloc()\n");
+		return ~0U;
+	}
 	return i;
 }
 
