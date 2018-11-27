@@ -2253,6 +2253,16 @@ void trace_construct_packet(libtrace_packet_t *packet,
 		const void *data,
 		uint16_t len) {
 
+	if (!packet) {
+                fprintf(stderr, "NULL packet passed into trace_contruct_packet()\n");
+                return;
+        }
+        /* Check a valid linktype was supplied */
+        if (linktype == TRACE_TYPE_UNKNOWN || linktype == TRACE_TYPE_CONTENT_INVALID) {
+                fprintf(stderr, "Unknown or invalid linktype passed into trace_construct_packet()\n");
+                return;
+        }
+
 	size_t size;
 	static libtrace_t *deadtrace=NULL;
 	libtrace_pcapfile_pkt_hdr_t hdr;
