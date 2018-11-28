@@ -26,7 +26,6 @@
 #include "libtrace_int.h"
 #include "libtrace.h"
 #include "protocols.h"
-#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -195,7 +194,6 @@ libtrace_packet_t *trace_strip_packet(libtrace_packet_t *packet) {
 void *trace_get_payload_from_mpls(void *ethernet, uint16_t *type, 
 		uint32_t *remaining) {
 	/* Ensure supplied type is not NULL */
-	/*assert(type);*/
 	if (!type) {
 		fprintf(stderr, "NULL type passed into trace_get_payload_from_mpls()\n");
 		return NULL;
@@ -331,7 +329,6 @@ static void *trace_get_payload_from_ppp(void *link,
 void *trace_get_payload_from_pppoe(void *link, uint16_t *type, 
 		uint32_t *remaining) {
 	/* Ensure type supplied is not NULL */
-	/*assert(type);*/
 	if (!type) {
 		fprintf(stderr, "NULL type passed into trace_get_payload_from_pppoe()\n");
 		return NULL;
@@ -446,12 +443,10 @@ DLLEXPORT void *trace_get_layer2(const libtrace_packet_t *packet,
 	uint32_t dummyrem;
 	void *meta = NULL;
 
-	/*assert(packet != NULL);*/
 	if (!packet) {
 		fprintf(stderr, "NULL packet passed into trace_get_layer2()\n");
 		return NULL;
 	}
-	/*assert(linktype != NULL);*/
 	if (!linktype) {
 		fprintf(stderr, "NULL linktype passed into trace_get_layer2()\n");
 		return NULL;
@@ -726,12 +721,10 @@ DLLEXPORT uint8_t *trace_get_source_mac(libtrace_packet_t *packet) {
                 case TRACE_TYPE_80211_PRISM:
                 case TRACE_TYPE_80211_RADIO:
                 case TRACE_TYPE_ETSILI:
-                        /*assert(!"Metadata headers should already be skipped");*/
 			fprintf(stderr, "Metadata headers should already be skipped in trace_get_source_mac()\n");
 			return NULL;
         }
         fprintf(stderr,"%s not implemented for linktype %i\n", __func__, linktype);
-        /*assert(0);*/
         return NULL;
 }
 
@@ -784,12 +777,10 @@ DLLEXPORT uint8_t *trace_get_destination_mac(libtrace_packet_t *packet) {
                 case TRACE_TYPE_80211_PRISM:
                 case TRACE_TYPE_80211_RADIO:
                 case TRACE_TYPE_ETSILI:
-                        /*assert(!"Metadata headers should already be skipped");*/
 			fprintf(stderr, "Metadata headers should already be skipped in trace_get_destination_mac()\n");
 			return NULL;
         }
         fprintf(stderr,"Not implemented\n");
-        /*assert(0);*/
         return NULL;
 }
 

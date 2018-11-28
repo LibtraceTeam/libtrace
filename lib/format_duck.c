@@ -32,7 +32,6 @@
 #include "rt_protocol.h"
 
 #include <errno.h>
-#include <assert.h>
 #include <stdio.h>
 #include <fcntl.h>
 
@@ -69,7 +68,8 @@ static int duck_init_input(libtrace_t *libtrace) {
 	libtrace->format_data = malloc(sizeof(struct duck_format_data_t));
 
 	if (!libtrace->format_data) {
-		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory duck_init_input()");
+		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory for "
+			"format data inside duck_init_input()");
 		return 1;
 	}
 
@@ -81,7 +81,8 @@ static int duck_init_output(libtrace_out_t *libtrace) {
 	libtrace->format_data = malloc(sizeof(struct duck_format_data_out_t));
 
 	if (!libtrace->format_data) {
-		trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory duck_init_output()");
+		trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory for "
+			"format data inside duck_init_output()");
 		return -1;
 	}
 
@@ -111,7 +112,6 @@ static int duck_config_output(libtrace_out_t *libtrace,
 					"Unknown option");
 			return -1;
 	}
-	/*assert(0);*/
 	trace_set_err_out(libtrace, TRACE_ERR_UNKNOWN_OPTION,
 		"Unknown option in duck_config_output()");
 	return -1;
@@ -266,10 +266,10 @@ static int duck_write_packet(libtrace_out_t *libtrace,
 		return -1;
 	}
 
-	/*assert(OUTPUT->file);*/
 	if (!OUTPUT->file) {
 		trace_set_err_out(libtrace, TRACE_ERR_BAD_IO,
-			"Call init_output before write_packets() in duck_write_packet()");
+			"Attempted to write DUCK packets to a closed file, must call "
+				"trace_create_output() before calling trace_write_output()");
 		return -1;
 	}
 

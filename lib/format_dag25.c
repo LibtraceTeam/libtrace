@@ -32,7 +32,6 @@
 #include "format_helper.h"
 #include "format_erf.h"
 
-#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -244,7 +243,6 @@ static void dag_init_format_data(libtrace_t *libtrace)
 
 	FORMAT_DATA->per_stream =
 		libtrace_list_init(sizeof(stream_data));
-	/*assert(FORMAT_DATA->per_stream != NULL);*/
 	if (FORMAT_DATA->per_stream == NULL) {
 		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
 			"Unable to create list for stream in dag_init_format_data()");
@@ -288,7 +286,6 @@ static struct dag_dev_t *dag_find_open_device(char *dev_name)
 static void dag_close_device(struct dag_dev_t *dev)
 {
 	/* Need to remove from the device list */
-	/*assert(dev->ref_count == 0);*/
 	if (dev->ref_count != 0) {
 		fprintf(stderr, "Cannot close DAG device with non zero reference in dag_close_device()\n");
 		return;
@@ -1004,9 +1001,9 @@ static dag_record_t *dag_get_record(struct dag_per_stream_t *stream_data)
 		return NULL;
 
 	size = ntohs(erfptr->rlen);
-	/*assert( size >= dag_record_size );*/
 	if (size < dag_record_size) {
-		fprintf(stderr, "Incorrect dag record size in dag_get_record()\n");
+		fprintf(stderr, "DAG2.5 rlen is invalid (rlen %u, must be at least %u\n",
+			size, dag_record_size);
 		return NULL;
 	}
 
@@ -1238,30 +1235,22 @@ static int dag_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *packet)
 		erfhdr.type = erf_type;
 
 		/* Packet length (rlen includes format overhead) */
-		/*assert(trace_get_capture_length(packet) > 0
-		       && trace_get_capture_length(packet) <= 65536);*/
-		if (!(trace_get_capture_length(packet) > 0
-                       && trace_get_capture_length(packet) <= 65536)) {
+		if (trace_get_capture_length(packet) <= 0
+                       || trace_get_capture_length(packet) > 65536) {
 			trace_set_err(libtrace, TRACE_ERR_BAD_PACKET,
 				"Capture length is out of range in dag_write_packet()");
 			return -1;
 		}
-		/*assert(erf_get_framing_length(packet) > 0
-		       && trace_get_framing_length(packet) <= 65536);*/
-		if (!(erf_get_framing_length(packet) > 0
-                       && trace_get_framing_length(packet) <= 65536)) {
+		if (erf_get_framing_length(packet) <= 0
+                       || trace_get_framing_length(packet) > 65536) {
 			trace_set_err(libtrace, TRACE_ERR_BAD_PACKET,
 				"Framing length is out of range in dag_write_packet()");
 			return -1;
 		}
-		/*assert(trace_get_capture_length(packet) +
-		       erf_get_framing_length(packet) > 0
-		       && trace_get_capture_length(packet) +
-		       erf_get_framing_length(packet) <= 65536);*/
-		if (!(trace_get_capture_length(packet) +
-                       erf_get_framing_length(packet) > 0
-                       && trace_get_capture_length(packet) +
-                       erf_get_framing_length(packet) <= 65536)) {
+		if (trace_get_capture_length(packet) +
+                       erf_get_framing_length(packet) <= 0
+                       || trace_get_capture_length(packet) +
+                       erf_get_framing_length(packet) > 65536) {
 			trace_set_err(libtrace, TRACE_ERR_BAD_PACKET,
 				"Capture + framing length is out of range in dag_write_packet()");
 			return -1;
@@ -1515,7 +1504,6 @@ static libtrace_eventobj_t trace_event_dag(libtrace_t *libtrace,
 static void dag_get_statistics(libtrace_t *libtrace, libtrace_stat_t *stat)
 {
 	libtrace_list_node_t *tmp;
-	/*assert(stat && libtrace);*/
 	if (!libtrace) {
 		fprintf(stderr, "NULL trace passed into dag_get_statistics()\n");
 		return;
@@ -1539,7 +1527,6 @@ static void dag_get_statistics(libtrace_t *libtrace, libtrace_stat_t *stat)
 static void dag_get_thread_statistics(libtrace_t *libtrace, libtrace_thread_t *t,
                                        libtrace_stat_t *stat) {
 	struct dag_per_stream_t *stream_data = t->format_data;
-	/*assert(stat && libtrace);*/
 	if (!libtrace) {
                 fprintf(stderr, "NULL trace passed into dag_get_thread_statistics()\n");
                 return;

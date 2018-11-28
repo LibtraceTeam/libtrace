@@ -43,7 +43,6 @@
 #include <errno.h>
 #include <unistd.h>
 #include <string.h>
-#include <assert.h>
 
 #ifdef HAVE_INTTYPES_H
 #  include <inttypes.h>
@@ -450,7 +449,6 @@ static size_t linuxnative_set_capture_length(libtrace_packet_t *packet,
 		size_t size) {
 
 	struct libtrace_linuxnative_header *linux_hdr = NULL;
-	/*assert(packet);*/
 	if (!packet) {
 		fprintf(stderr, "NULL packet passed into linuxnative_set_capture_length()\n");
 		/* Return -1 on error? */

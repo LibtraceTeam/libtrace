@@ -32,7 +32,6 @@
 #include "format_helper.h"
 #include "format_erf.h"
 
-#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -325,9 +324,9 @@ static dag_record_t *dag_get_record(libtrace_t *libtrace) {
 	if (!erfptr)
                 return NULL;
         size = ntohs(erfptr->rlen);
-        /*assert( size >= dag_record_size );*/
 	if (size < dag_record_size) {
-                fprintf(stderr, "Incorrect dag record size in dag_get_record()\n");
+                fprintf(stderr, "DAG2.4 rlen is invalid (rlen = %u, must be at least %u)\n",
+			size, dag_record_size);
                 return NULL;
         }
         FORMAT_DATA->offset += size;
@@ -483,13 +482,6 @@ static libtrace_eventobj_t trace_event_dag(libtrace_t *trace,
                 return event;
         } while (1);
 
-
-	/* We only want to sleep for a very short time */
-        /*assert(data == 0);*/
-	if (!data != 0) {
-		trace_set_err(trace, TRACE_ERR_BAD_PACKET, "Unexpected data from trace event in trace_event_dag()");
-		return NULL;
-	}
         event.type = TRACE_EVENT_SLEEP;
         event.seconds = 0.0001;
         event.size = 0;

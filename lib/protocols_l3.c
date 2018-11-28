@@ -28,7 +28,6 @@
 #include "libtrace.h"
 #include "protocols.h"
 #include "checksum.h"
-#include <assert.h>
 #include <stdlib.h>
 #include <arpa/inet.h>
 
@@ -102,7 +101,6 @@ DLLEXPORT void *trace_get_payload_from_ip(libtrace_ip_t *ipptr, uint8_t *prot,
 {
         void *trans_ptr = 0;
 
-        /*assert(ipptr != NULL);*/
 	if (!ipptr) {
 		fprintf(stderr, "NULL libtrace_ip_t pointer passed into trace_get_payload_from_ip()\n");
 		return NULL;
@@ -145,7 +143,6 @@ void *trace_get_payload_from_ip6(libtrace_ip6_t *ipptr, uint8_t *prot,
 	uint8_t nxt;
 	uint16_t len;
 
-	/*assert (ipptr != NULL);*/
 	if (!ipptr) {
 		fprintf(stderr, "NULL libtrace_ip6_t passed into trace_get_payload_from_ip6()\n");
 		return NULL;
@@ -349,24 +346,21 @@ DLLEXPORT int trace_get_next_option(unsigned char **ptr,int *len,
 				return 0;
 			return 1;
 	}
-	/*assert(0);*/
 }
 
 static char *sockaddr_to_string(struct sockaddr *addrptr, char *space,
 		int spacelen) {
 
-	/*assert(addrptr && space);*/
 	if (!addrptr) {
 		fprintf(stderr, "NULL sockaddr passed into sockaddr_to_string()\n");
 		return NULL;
 	}
 	if (!space) {
-		fprintf(stderr, "NULL space passed into sockaddr_to_string()\n");
+		fprintf(stderr, "NULL buffer space passed into sockaddr_to_string()\n");
 		return NULL;
 	}
-	/*assert(spacelen > 0);*/
 	if (spacelen <= 0) {
-		fprintf(stderr, "Spacelen must be greater than 0 when passed into sockaddr_to_string()\n");
+		fprintf(stderr, "Buffer size must be greater than 0 when passed into sockaddr_to_string()\n");
 		return NULL;
 	}
 

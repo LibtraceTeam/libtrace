@@ -200,8 +200,10 @@ static void guess_format(libtrace_t *libtrace, const char *filename)
 	}
 
 	libtrace->io = wandio_create(filename);
-	if (!libtrace->io)
+	if (!libtrace->io) {
+		trace_set_err(libtrace,TRACE_ERR_URI_NOT_FOUND,"Unable to find URI (%s)", filename);
 		return;
+	}
 
 	/* Try and guess based on file magic */
 	for(tmp = formats_list; tmp; tmp=tmp->next) {
@@ -215,6 +217,7 @@ static void guess_format(libtrace_t *libtrace, const char *filename)
         /* No formats matched -- make sure we clean up the IO object we
          * used to probe the file magic */
         wandio_destroy(libtrace->io);
+	trace_set_err(libtrace,TRACE_ERR_BAD_FORMAT,"Unable to guess format (%s)", filename);
 	return;
 }
 
@@ -251,7 +254,6 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
                 return NULL;
         }
 
-	/*assert(uri && "Passing NULL to trace_create makes me a very sad program");*/
 	if(!uri) {
 		trace_set_err(libtrace, TRACE_ERR_URI_NULL, "NULL uri passed to trace_create()");
 		return libtrace;
@@ -309,15 +311,7 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 	if ((uridata = trace_parse_uri(uri, &scan)) == 0) {
 		/* Could not parse the URI nicely */
 		guess_format(libtrace,uri);
-		if (!libtrace->format) {
-			/* Check if the file exists */
-			FILE *file;
-			if(!(file=fopen(uri, "r"))) {
-				trace_set_err(libtrace,TRACE_ERR_URI_NOT_FOUND,"Unable to find URI (%s)",uri);
-			} else {
-				fclose(file);
-				trace_set_err(libtrace,TRACE_ERR_BAD_FORMAT,"Unable to guess format (%s)",uri);
-			}
+		if (trace_is_err(libtrace)) {
 			return libtrace;
 		}
 	}
@@ -349,7 +343,6 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 	/* Call the init_input function for the matching capture format */
 	if (libtrace->format->init_input) {
 		int err=libtrace->format->init_input(libtrace);
-		/*assert (err==-1 || err==0);*/
 		if (err==-1) {
                         /* init_input should call trace_set_err to set the
                          * error message
@@ -535,7 +528,6 @@ DLLEXPORT libtrace_out_t *trace_create_output(const char *uri) {
  */
 DLLEXPORT int trace_start(libtrace_t *libtrace)
 {
-	/*assert(libtrace);*/
 	if(!libtrace) {
 		fprintf(stderr, "NULL trace passed to trace_start()\n");
 		return TRACE_ERR_NULL_TRACE;
@@ -557,7 +549,6 @@ DLLEXPORT int trace_start(libtrace_t *libtrace)
 /* Start an output trace */
 DLLEXPORT int trace_start_output(libtrace_out_t *libtrace)
 {
-	/*assert(libtrace);*/
 	if(!libtrace) {
 		fprintf(stderr, "NULL trace passed to trace_start_output()\n");
 		return TRACE_ERR_NULL_TRACE;
@@ -575,7 +566,6 @@ DLLEXPORT int trace_start_output(libtrace_out_t *libtrace)
 
 DLLEXPORT int trace_pause(libtrace_t *libtrace)
 {
-	/*assert(libtrace);*/
 	if(!libtrace) {
 		fprintf(stderr, "NULL trace passed to trace_pause()\n");
 		return TRACE_ERR_NULL_TRACE;
@@ -588,7 +578,6 @@ DLLEXPORT int trace_pause(libtrace_t *libtrace)
 	/* Finish the last packet we read - for backwards compatibility */
 	if (!libtrace_parallel && libtrace->last_packet)
 		trace_fin_packet(libtrace->last_packet);
-	/*assert(libtrace->last_packet == NULL);*/
 	if(libtrace->last_packet != NULL) {
 		trace_set_err(libtrace, TRACE_ERR_PAUSE_FIN, "Unable to remove all data stored against trace in trace_pause()");
 		return -1;
@@ -733,9 +722,8 @@ DLLEXPORT int trace_config_output(libtrace_out_t *libtrace,
 DLLEXPORT void trace_destroy(libtrace_t *libtrace) {
 	int i;
 
-	/*assert(libtrace);*/
 	if(!libtrace) {
-		fprintf(stderr, "NULL trace passed to trace_destory()\n");
+		fprintf(stderr, "NULL trace passed to trace_destroy()\n");
 		return;
 	}
 
@@ -758,7 +746,6 @@ DLLEXPORT void trace_destroy(libtrace_t *libtrace) {
 	if (!libtrace_parallel && libtrace->last_packet) {
 		trace_fin_packet(libtrace->last_packet);
         }
-	/*assert(libtrace->last_packet == NULL);*/
 	if (libtrace->last_packet != NULL) {
 		trace_set_err(libtrace, TRACE_ERR_PAUSE_FIN, "Unable to remove all data stored against trace in trace_destroy()");
 		return;
@@ -830,9 +817,8 @@ DLLEXPORT void trace_destroy(libtrace_t *libtrace) {
 
 
 DLLEXPORT void trace_destroy_dead(libtrace_t *libtrace) {
-	/*assert(libtrace);*/
 	if(!libtrace) {
-		fprintf(stderr, "NULL trace passed to trace_destory_dead()\n");
+		fprintf(stderr, "NULL trace passed to trace_destroy_dead()\n");
 		return;
 	}
 
@@ -852,7 +838,6 @@ DLLEXPORT void trace_destroy_dead(libtrace_t *libtrace) {
  * @param libtrace	the output trace file to be destroyed
  */
 DLLEXPORT void trace_destroy_output(libtrace_out_t *libtrace) {
-	/*assert(libtrace);*/
 	if(!libtrace) {
 		fprintf(stderr, "NULL trace passed to trace_destroy_output()\n");
 		return;
@@ -1001,7 +986,6 @@ void trace_fin_packet(libtrace_packet_t *packet) {
  */
 DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 
-	/*assert(libtrace && "You called trace_read_packet() with a NULL libtrace parameter!\n");*/
 	if (!libtrace) {
 		fprintf(stderr, "NULL trace passed to trace_read_packet()\n");
 		return TRACE_ERR_NULL_TRACE;
@@ -1015,7 +999,6 @@ DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 		return -1;
 	}
 
-	/*assert(packet);*/
         if (!packet) {
 		trace_set_err(libtrace, TRACE_ERR_NULL_PACKET, "NULL packet passed into trace_read_packet()");
                 return -1;
@@ -1107,13 +1090,11 @@ DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 int trace_prepare_packet(libtrace_t *trace, libtrace_packet_t *packet,
 		void *buffer, libtrace_rt_types_t rt_type, uint32_t flags) {
 
-	/*assert(trace);*/
 	if (!trace) {
 		fprintf(stderr, "NULL trace passed into trace_prepare_packet()\n");
 		return TRACE_ERR_NULL_TRACE;
 	}
 
-	/*assert(packet);*/
 	if (!packet) {
 		trace_set_err(trace, TRACE_ERR_NULL_TRACE, "NULL packet passed into trace_prepare_packet()");
 		return -1;
@@ -1152,12 +1133,11 @@ int trace_prepare_packet(libtrace_t *trace, libtrace_packet_t *packet,
  * @returns the number of bytes written, -1 if write failed
  */
 DLLEXPORT int trace_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *packet) {
-	/*assert(libtrace);*/
+
 	if (!libtrace) {
 		fprintf(stderr, "NULL trace passed into trace_write_packet()\n");
 		return TRACE_ERR_NULL_TRACE;
 	}
-	/*assert(packet);*/
 	if (!packet) {
 		trace_set_err_out(libtrace, TRACE_ERR_NULL_PACKET, "NULL trace passed into trace_write_packet()");
 		return -1;
@@ -1165,7 +1145,7 @@ DLLEXPORT int trace_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *pa
 	/* Verify the packet is valid */
 	if (!libtrace->started) {
 		trace_set_err_out(libtrace,TRACE_ERR_BAD_STATE,
-			"You must call trace_start() before calling trace_write_packet()");
+			"You must call trace_start_output() before calling trace_write_packet()");
 		return -1;
 	}
 
@@ -1190,7 +1170,6 @@ DLLEXPORT void *trace_get_packet_buffer(const libtrace_packet_t *packet,
 	int wire_len;
         libtrace_linktype_t ltype;
 
-	/*assert(packet != NULL);*/
 	if (!packet) {
 		fprintf(stderr, "NULL packet passed into trace_get_packet_buffer()\n");
 		return NULL;
@@ -1226,7 +1205,6 @@ DLLEXPORT void *trace_get_packet_buffer(const libtrace_packet_t *packet,
 		cap_len = trace_get_capture_length(packet);
 		wire_len = trace_get_wire_length(packet);
 
-		/*assert(cap_len >= 0);*/
 		if (!(cap_len >= 0)) {
 			fprintf(stderr, "Was expecting capture length of atleast 0 in trace_get_packet_buffer()\n");
 			return NULL;
@@ -1422,7 +1400,6 @@ DLLEXPORT size_t trace_get_capture_length(const libtrace_packet_t *packet)
 			packet->trace->format->get_capture_length(packet);
 	}
 
-	/*assert(packet->capture_length < LIBTRACE_PACKET_BUFSIZE);*/
 	if (!(packet->capture_length < LIBTRACE_PACKET_BUFSIZE)) {
 		fprintf(stderr, "Capture length is greater than the buffer size in trace_get_capture_length()\n");
 		return 0;
@@ -1452,7 +1429,6 @@ DLLEXPORT size_t trace_get_wire_length(const libtrace_packet_t *packet){
 			packet->trace->format->get_wire_length(packet);
 	}
 
-	/*assert(packet->wire_length < LIBTRACE_PACKET_BUFSIZE);*/
 	if (!(packet->wire_length < LIBTRACE_PACKET_BUFSIZE)) {
 		fprintf(stderr, "Wire length is greater than the buffer size in trace_get_wire_length()\n");
 		return 0;
@@ -1522,14 +1498,11 @@ DLLEXPORT libtrace_eventobj_t trace_event(libtrace_t *trace,
 		libtrace_packet_t *packet) {
 	libtrace_eventobj_t event = {TRACE_EVENT_IOWAIT,0,0.0,0};
 
-
-	/*assert(trace && "You called trace_event() with a NULL trace object!");*/
 	if (!trace) {
 		fprintf(stderr, "NULL trace passed into trace_event()");
 		/* Return default event on error? */
 		return event;
 	}
-	/*assert(packet && "You called trace_event() with a NULL packet object!");*/
 	if (!packet) {
 		trace_set_err(trace, TRACE_ERR_NULL_PACKET, "NULL packet passed into trace_event()");
 		/* Return default event on error? */
@@ -1642,7 +1615,6 @@ static int trace_bpf_compile(libtrace_filter_t *filter,
 		return TRACE_ERR_NULL_PACKET;
 	}
 
-	/*assert(filter && "You called trace_bpf_compile() with a NULL filter");*/
 	if (!filter) {
 		trace_set_err(packet->trace,
 				TRACE_ERR_NULL_FILTER, "Filter is NULL trace_bpf_compile()");
@@ -1669,11 +1641,9 @@ static int trace_bpf_compile(libtrace_filter_t *filter,
 					"Unknown pcap equivalent linktype");
 			return -1;
 		}
-		/*assert (pthread_mutex_lock(&mutex) == 0);*/
 		pthread_mutex_lock(&mutex);
 		/* Make sure not one bet us to this */
 		if (filter->flag) {
-			/*assert (pthread_mutex_unlock(&mutex) == 0);*/
 			pthread_mutex_unlock(&mutex);
 			return -1;
 		}
@@ -1681,7 +1651,6 @@ static int trace_bpf_compile(libtrace_filter_t *filter,
 				(int)libtrace_to_pcap_dlt(linktype),
 				1500U);
 		/* build filter */
-		/*assert(pcap && "Unable to open pcap_t for compiling filters trace_bpf_compile()");*/
 		if (!pcap) {
 			trace_set_err(packet->trace, TRACE_ERR_BAD_FILTER,
 						"Unable to open pcap_t for compiling filters trace_bpf_compile()");
@@ -1694,18 +1663,15 @@ static int trace_bpf_compile(libtrace_filter_t *filter,
 					filter->filterstring,
 					pcap_geterr(pcap));
 			pcap_close(pcap);
-			/*assert (pthread_mutex_unlock(&mutex) == 0);*/
 			pthread_mutex_unlock(&mutex);
 			return -1;
 		}
 		pcap_close(pcap);
 		filter->flag=1;
-		/*assert (pthread_mutex_unlock(&mutex) == 0);*/
 		pthread_mutex_unlock(&mutex);
 	}
 	return 0;
 #else
-	/*assert(!"Internal bug: This should never be called when BPF not enabled");*/
 	trace_set_err(packet->trace,TRACE_ERR_OPTION_UNAVAIL,
 				"Feature unavailable");
 	return -1;
@@ -1725,12 +1691,10 @@ DLLEXPORT int trace_apply_filter(libtrace_filter_t *filter,
 	static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 #endif
 
-	/*assert(packet && "You called trace_apply_filter() with a NULL packet");*/
 	if (!packet) {
 		fprintf(stderr, "NULL packet passed into trace_apply_filter()\n");
 		return TRACE_ERR_NULL_PACKET;
 	}
-	/*assert(filter && "You called trace_apply_filter() with a NULL filter");*/
 	if (!filter) {
 		trace_set_err(packet->trace, TRACE_ERR_NULL_FILTER,
 			"NULL filter passed into trace_apply_filter()");
@@ -1805,7 +1769,6 @@ DLLEXPORT int trace_apply_filter(libtrace_filter_t *filter,
 	}
 #endif
 
-	/*assert(filter->flag);*/
 	if (!filter->flag) {
 		trace_set_err(packet->trace, TRACE_ERR_BAD_FILTER,
 			"Bad filter passed into trace_apply_filter()");
@@ -1837,7 +1800,6 @@ DLLEXPORT int trace_apply_filter(libtrace_filter_t *filter,
 DLLEXPORT libtrace_direction_t trace_set_direction(libtrace_packet_t *packet,
 		libtrace_direction_t direction)
 {
-	/*assert(packet);*/
 	if (!packet) {
 		fprintf(stderr, "NULL packet passed into trace_set_direction()\n");
 		return (libtrace_direction_t)~0U;
@@ -1858,7 +1820,6 @@ DLLEXPORT libtrace_direction_t trace_set_direction(libtrace_packet_t *packet,
  */
 DLLEXPORT libtrace_direction_t trace_get_direction(const libtrace_packet_t *packet)
 {
-	/*assert(packet);*/
 	if (!packet) {
 		fprintf(stderr, "NULL packet passed into trace_set_direction()\n");
 		return (libtrace_direction_t)~0U;
@@ -1999,7 +1960,6 @@ DLLEXPORT int8_t trace_get_server_port(UNUSED uint8_t protocol,
  * original size is returned and the packet is left unchanged.
  */
 DLLEXPORT size_t trace_set_capture_length(libtrace_packet_t *packet, size_t size) {
-	/*assert(packet);*/
 	if (!packet) {
 		fprintf(stderr, "NULL packet passed into trace_set_capture_length()\n");
 		return ~0U;
@@ -2044,8 +2004,6 @@ DLLEXPORT const char * trace_parse_uri(const char *uri, char **format) {
 }
 
 enum base_format_t trace_get_format(libtrace_packet_t *packet) {
-	/* Not sure what to do here, can we add a new trace_format for errors? */
-	/*assert(packet);*/
 	if (!packet) {
 		fprintf(stderr, "NULL packet passed into trace_get_format()\n");
 		return TRACE_FORMAT_UNKNOWN;
@@ -2292,9 +2250,8 @@ void trace_construct_packet(libtrace_packet_t *packet,
 	hdr.wirelen=len;
 
 	/* Now fill in the libtrace packet itself */
-        /*assert(deadtrace);*/
 	if (!deadtrace) {
-		fprintf(stderr, "Unable to create dead trace trace_construct_packet()\n");
+		fprintf(stderr, "Unable to create dummy trace for use within trace_construct_packet()\n");
 		return;
 	}
 	packet->trace=deadtrace;
@@ -2326,7 +2283,6 @@ uint64_t trace_get_received_packets(libtrace_t *trace)
 {
 	uint64_t ret;
 
-	/*assert(trace);*/
 	if (!trace) {
 		fprintf(stderr, "NULL trace passed to trace_get_received_packets()\n");
 		/* When the number of received packets is not known we return UINT64_MAX */
@@ -2353,7 +2309,6 @@ uint64_t trace_get_received_packets(libtrace_t *trace)
 
 uint64_t trace_get_filtered_packets(libtrace_t *trace)
 {
-	/*assert(trace);*/
 	if (!trace) {
 		fprintf(stderr, "NULL trace passed to trace_get_filtered_packets()\n");
 		return UINT64_MAX;
@@ -2388,7 +2343,6 @@ uint64_t trace_get_filtered_packets(libtrace_t *trace)
 
 uint64_t trace_get_dropped_packets(libtrace_t *trace)
 {
-	/*assert(trace);*/
 	if (!trace) {
 		fprintf(stderr, "NULL trace passed into trace_get_dropped_packets()\n");
 		return UINT64_MAX;
@@ -2415,7 +2369,6 @@ uint64_t trace_get_dropped_packets(libtrace_t *trace)
 
 uint64_t trace_get_accepted_packets(libtrace_t *trace)
 {
-	/*assert(trace);*/
 	if (!trace) {
 		fprintf(stderr, "NULL trace passed into trace_get_accepted_packets()\n");
 		return UINT64_MAX;
@@ -2437,7 +2390,6 @@ libtrace_stat_t *trace_get_statistics(libtrace_t *trace, libtrace_stat_t *stat)
 {
 	uint64_t ret = 0;
 	int i;
-	/*assert(trace);*/
 	if (!trace) {
 		fprintf(stderr, "NULL trace passed into trace_get_statistics()\n");
 		return NULL;
@@ -2447,10 +2399,9 @@ libtrace_stat_t *trace_get_statistics(libtrace_t *trace, libtrace_stat_t *stat)
 			trace->stats = trace_create_statistics();
 		stat = trace->stats;
 	}
-	/*assert(stat->magic == LIBTRACE_STAT_MAGIC && "Please use"
-	       "trace_create_statistics() to allocate statistics");*/
-	if (!(stat->magic == LIBTRACE_STAT_MAGIC)) {
-		trace_set_err(trace, TRACE_ERR_STAT, "Use trace_create_statistics() to allocate statistics in trace_get_statistics()");
+	if (stat->magic != LIBTRACE_STAT_MAGIC) {
+		trace_set_err(trace, TRACE_ERR_STAT, "Use trace_create_statistics() to allocate "
+			"statistics prior to calling trace_get_statistics()");
 		return NULL;
 	}
 
@@ -2498,20 +2449,18 @@ libtrace_stat_t *trace_get_statistics(libtrace_t *trace, libtrace_stat_t *stat)
 void trace_get_thread_statistics(libtrace_t *trace, libtrace_thread_t *t,
                                  libtrace_stat_t *stat)
 {
-	/*assert(trace && stat);*/
 	if (!trace) {
 		fprintf(stderr, "NULL trace passed into trace_get_thread_statistics()\n");
 		return;
 	}
 	if (!stat) {
-		trace_set_err(trace, TRACE_ERR_STAT, "Stat is NULL trace_get_thread_statistics()");
+		trace_set_err(trace, TRACE_ERR_STAT, "NULL statistics structure passed into "
+			"trace_get_thread_statistics()");
 		return;
 	}
-	/*assert(stat->magic == LIBTRACE_STAT_MAGIC && "Please use"
-	       "trace_create_statistics() to allocate statistics");*/
-	if (!(stat->magic == LIBTRACE_STAT_MAGIC)) {
-		trace_set_err(trace, TRACE_ERR_STAT,
-			"Use trace_create_statistics() to allocate statistics in trace_get_thread_statistics()");
+	if (stat->magic != LIBTRACE_STAT_MAGIC) {
+		trace_set_err(trace, TRACE_ERR_STAT, "Use trace_create_statistics() to "
+			"allocate statistics prior to calling trace_get_thread_statistics()");
 		return;
 	}
 	stat->reserved1 = 0;
@@ -2546,19 +2495,13 @@ void trace_clear_statistics(libtrace_stat_t *s) {
 void trace_subtract_statistics(const libtrace_stat_t *a, const libtrace_stat_t *b,
                          libtrace_stat_t *c) {
 
-	if (!(a->magic == LIBTRACE_STAT_MAGIC)
-		|| !(b->magic == LIBTRACE_STAT_MAGIC)
-		|| !(c->magic == LIBTRACE_STAT_MAGIC)) {
-		fprintf(stderr, "Use trace_create_statistics() to allocate statistics in trace_subtract_statistics()\n");
+	if (a->magic != LIBTRACE_STAT_MAGIC
+		|| b->magic != LIBTRACE_STAT_MAGIC
+		|| c->magic != LIBTRACE_STAT_MAGIC) {
+		fprintf(stderr, "Use trace_create_statistics() to allocate statistics prior to "
+			"calling trace_subtract_statistics()\n");
 		return;
 	}
-
-	/*assert(a->magic == LIBTRACE_STAT_MAGIC && "Please use"
-	       "trace_create_statistics() to allocate statistics");
-	assert(b->magic == LIBTRACE_STAT_MAGIC && "Please use"
-	       "trace_create_statistics() to allocate statistics");
-	assert(c->magic == LIBTRACE_STAT_MAGIC && "Please use"
-	       "trace_create_statistics() to allocate statistics");*/
 
 #define X(x) \
 	if (a->x ##_valid && b->x ##_valid) { \
@@ -2573,19 +2516,13 @@ void trace_subtract_statistics(const libtrace_stat_t *a, const libtrace_stat_t *
 
 void trace_add_statistics(const libtrace_stat_t *a, const libtrace_stat_t *b,
                          libtrace_stat_t *c) {
-	if (!(a->magic == LIBTRACE_STAT_MAGIC)
-                || !(b->magic == LIBTRACE_STAT_MAGIC)
-                || !(c->magic == LIBTRACE_STAT_MAGIC)) {
-		fprintf(stderr, "Use trace_create_statistics() to allocate statistics in trace_add_statistics()\n");
+	if (a->magic != LIBTRACE_STAT_MAGIC
+                || b->magic != LIBTRACE_STAT_MAGIC
+                || c->magic != LIBTRACE_STAT_MAGIC) {
+		fprintf(stderr, "Use trace_create_statistics() to allocate statistics prior to "
+			"calling trace_add_statistics()\n");
                 return;
         }
-
-	/*assert(a->magic == LIBTRACE_STAT_MAGIC && "Please use"
-	       "trace_create_statistics() to allocate statistics");
-	assert(b->magic == LIBTRACE_STAT_MAGIC && "Please use"
-	       "trace_create_statistics() to allocate statistics");
-	assert(c->magic == LIBTRACE_STAT_MAGIC && "Please use"
-	       "trace_create_statistics() to allocate statistics");*/
 
 #define X(x) \
 	if (a->x ##_valid&& b->x ##_valid) { \
@@ -2599,10 +2536,9 @@ void trace_add_statistics(const libtrace_stat_t *a, const libtrace_stat_t *b,
 }
 
 int trace_print_statistics(const libtrace_stat_t *s, FILE *f, const char *format) {
-	/*assert(s->magic == LIBTRACE_STAT_MAGIC && "Please use"
-	       "trace_create_statistics() to allocate statistics");*/
-	if (!(s->magic == LIBTRACE_STAT_MAGIC)) {
-		fprintf(stderr, "Use trace_create_statistics() to allocate statistics in trace_print_statistics\n");
+	if (s->magic != LIBTRACE_STAT_MAGIC) {
+		fprintf(stderr, "Use trace_create_statistics() to allocate statistics prior to "
+			"calling trace_print_statistics\n");
 		return TRACE_ERR_STAT;
 	}
 	if (format == NULL)
@@ -2643,8 +2579,7 @@ void trace_interrupt(void) {
 }
 
 void register_format(struct libtrace_format_t *f) {
-	/*assert(f->next==NULL);*/ /* Can't register a format twice */
-	if (!(f->next==NULL)) {
+	if (f->next != NULL) {
 		fprintf(stderr, "You cannot register a format twice in register_format()");
 		return;
 	}

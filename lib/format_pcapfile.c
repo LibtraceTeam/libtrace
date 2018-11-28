@@ -30,7 +30,6 @@
 #include "format_helper.h"
 
 #include <sys/stat.h>
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -125,7 +124,8 @@ static int pcapfile_probe_magic(io_t *io)
 static int pcapfile_init_input(libtrace_t *libtrace) {
 	libtrace->format_data = malloc(sizeof(struct pcapfile_format_data_t));
 	if (!libtrace->format_data) {
-		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory pcapfile_init_input()");
+		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory for "
+			"format data inside pcapfile_init_input()");
 		return -1;
 	}
 
@@ -138,7 +138,8 @@ static int pcapfile_init_output(libtrace_out_t *libtrace) {
 	libtrace->format_data = 
 		malloc(sizeof(struct pcapfile_format_data_out_t));
 	if (!libtrace->format_data) {
-		trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory pcapfile_init_output()");
+		trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory for "
+			"format data inside pcapfile_init_output()");
 		return -1;
 	}
 
@@ -203,7 +204,6 @@ static int pcapfile_start_input(libtrace_t *libtrace)
 				sizeof(DATA(libtrace)->header));
 
 		DATA(libtrace)->started = true;
-		/*assert(sizeof(DATA(libtrace)->header) > 0);*/
 		if (!(sizeof(DATA(libtrace)->header) > 0)) {
 			trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Trace is missing header in pcapfile_start_input()");
 			return -1;
@@ -351,10 +351,9 @@ static int pcapfile_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 	uint32_t flags = 0;
 	size_t bytes_to_read = 0;
 
-	/*assert(libtrace->format_data);*/
 	if (!libtrace->format_data) {
-		trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT,
-			"Trace format data missing, call init_input() before calling pcapfile_read_packet()");
+		trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT, "Trace format data missing, "
+			"call trace_create() before calling trace_read_packet()");
 		return -1;
 	}
 
@@ -455,7 +454,6 @@ static int pcapfile_write_packet(libtrace_out_t *out,
 			trace_set_err_out(out, 
 				TRACE_ERR_NO_CONVERSION,
 				"pcap does not support this format");
-			/*assert(0);*/
 			return -1;
 		}
 
@@ -496,7 +494,6 @@ static int pcapfile_write_packet(libtrace_out_t *out,
 	hdr.ts_sec = (uint32_t)tv.tv_sec;
 	hdr.ts_usec = (uint32_t)tv.tv_usec;
 	hdr.caplen = trace_get_capture_length(packet);
-	/*assert(hdr.caplen < LIBTRACE_PACKET_BUFSIZE);*/
 	if (hdr.caplen >= LIBTRACE_PACKET_BUFSIZE) {
 		trace_set_err_out(out, TRACE_ERR_BAD_PACKET, "Capture length is greater than buffer size in pcap_write_packet()");
 		return -1;
@@ -578,9 +575,10 @@ static struct timeval pcapfile_get_timeval(
 		/* Return default timeval on error? */
 		return ts;
 	}
-	/*assert(packet->header);*/
+
 	if (!packet->header) {
-		trace_set_err(packet->trace, TRACE_ERR_BAD_HEADER, "Trace with NULL header passed to pcapfile_get_timeval()");
+		trace_set_err(packet->trace, TRACE_ERR_BAD_HEADER, "pcap packet with NULL header passed to "
+			"pcapfile_get_timeval()");
 		/* Return default timeval on error? */
 		return ts;
 	}
@@ -606,9 +604,10 @@ static struct timespec pcapfile_get_timespec(
 		/* Return default timespec on error? */
 		return ts;
 	}
-	/*assert(packet->header);*/
+
 	if (!packet->header) {
-                trace_set_err(packet->trace, TRACE_ERR_BAD_HEADER, "Trace with NULL header passed to pcapfile_get_timespec()");
+                trace_set_err(packet->trace, TRACE_ERR_BAD_HEADER, "pcap packet with NULL header passed to "
+			"pcapfile_get_timespec()");
 		/* Return fefault timespec on error? */
                 return ts;
         }
@@ -631,9 +630,10 @@ static int pcapfile_get_capture_length(const libtrace_packet_t *packet) {
 		fprintf(stderr, "NULL packet passed to pcapfile_get_capture_length()\n");
 		return TRACE_ERR_NULL_PACKET;
 	}
-	/*assert(packet->header);*/
+
 	if (!packet->header) {
-		trace_set_err(packet->trace, TRACE_ERR_BAD_HEADER, "Trace with NULL header passed to pcapfile_get_capture_length()");
+		trace_set_err(packet->trace, TRACE_ERR_BAD_HEADER, "pcap packet with NULL header passed to "
+			"pcapfile_get_capture_length()");
                 return -1;
 	}
 	pcapptr = (libtrace_pcapfile_pkt_hdr_t *)packet->header;
@@ -648,9 +648,10 @@ static int pcapfile_get_wire_length(const libtrace_packet_t *packet) {
 		fprintf(stderr, "NULL packet passed to pcapfile_get_wire_length()\n");
 		return TRACE_ERR_NULL_PACKET;
 	}
-	/*assert(packet->header); */
+
 	if (!packet->header) {
-                trace_set_err(packet->trace, TRACE_ERR_BAD_HEADER, "Trace with NULL header passed to pcapfile_get_wire_length()");
+                trace_set_err(packet->trace, TRACE_ERR_BAD_HEADER, "pcap packet with NULL header passed to "
+			"pcapfile_get_wire_length()");
                 return -1;
         }
 
@@ -691,15 +692,16 @@ static int pcapfile_get_framing_length(const libtrace_packet_t *packet UNUSED) {
 
 static size_t pcapfile_set_capture_length(libtrace_packet_t *packet,size_t size) {
 	libtrace_pcapfile_pkt_hdr_t *pcapptr = 0;
-	/*assert(packet);*/
+
 	if (!packet) {
 		fprintf(stderr, "NULL packet passed into pcapfile_set_capture_length\n");
 		/* Return -1 on error? */
 		return ~0U;
 	}
-	/*assert(packet->header);*/
+
 	if (!packet->header) {
-		trace_set_err(packet->trace, TRACE_ERR_BAD_HEADER, "Trace with NULL header passed to pcapfile_set_capture_length()");
+		trace_set_err(packet->trace, TRACE_ERR_BAD_HEADER, "pcap packet with NULL header passed to "
+			"pcapfile_set_capture_length()");
 		/* Return -1 on error? */
 		return ~0U;
 	}

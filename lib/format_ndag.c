@@ -34,7 +34,6 @@
 #include "format_helper.h"
 #include "format_erf.h"
 
-#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -286,7 +285,8 @@ static int ndag_init_input(libtrace_t *libtrace) {
                         sizeof(ndag_format_data_t));
 
 	if (!libtrace->format_data) {
-		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory ndag_init_input()");
+		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory for "
+			"format data inside ndag_init_input()");
 		return -1;
 	}
 
@@ -657,9 +657,9 @@ static int ndag_prepare_packet_stream(libtrace_t *libtrace,
         ssock->nextread += rlen;
 	ssock->nextts = 0;
 
-	/*assert(ssock->nextread - ssock->saved[nr] <= ssock->savedsize[nr]);*/
 	if (ssock->nextread - ssock->saved[nr] > ssock->savedsize[nr]) {
-		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Failed to prepare packet stream in ndag_prepare_packet_stream()");
+		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Walked past the end of the "
+			"nDAG receive buffer, probably due to a invalid rlen, in ndag_prepare_packet_stream()");
 		return -1;
 	}
 
@@ -688,7 +688,6 @@ static int ndag_prepare_packet(libtrace_t *libtrace UNUSED,
                 void *buffer UNUSED, libtrace_rt_types_t rt_type UNUSED,
                 uint32_t flags UNUSED) {
 
-        /*assert(0 && "Sending nDAG records over RT doesn't make sense! Please stop.");*/
 	fprintf(stderr, "Sending nDAG records over RT doesn't make sense! Please stop\n");
         return 0;
 
@@ -872,9 +871,8 @@ static int init_receivers(streamsock_t *ssock, int required) {
                 wind ++;
         }
 #else
-	/*assert(required > 0);*/
 	if (required <= 0) {
-		fprintf(stderr, "You are required to have atleast 1 receiver in init_reveivers\n");
+		fprintf(stderr, "You are required to have atleast 1 receiver in init_receivers\n");
 		return TRACE_ERR_INIT_FAILED;
 	}
 	ssock->singlemsg.msg_iov->iov_base = ssock->saved[wind];
@@ -911,7 +909,6 @@ static int check_ndag_received(streamsock_t *ssock, int index,
         ssock->nextwriteind ++;
         ssock->bufavail --;
 
-        /*assert(ssock->bufavail >= 0);*/
 	if (ssock->bufavail < 0) {
 		fprintf(stderr, "No space in buffer in check_ndag_received()\n");
 		return -1;
@@ -1298,8 +1295,7 @@ static int ndag_pread_packets(libtrace_t *libtrace, libtrace_thread_t *t,
                 streamsock_t *src = &(rt->sources[i]);
 		src->bufavail += src->bufwaiting;
 		src->bufwaiting = 0;
-		/*assert(src->bufavail >= 0 && src->bufavail <= ENCAP_BUFFERS);*/
-		if (src->bufavail < 0 && src->bufavail > ENCAP_BUFFERS) {
+		if (src->bufavail < 0 || src->bufavail > ENCAP_BUFFERS) {
 			trace_set_err(libtrace, TRACE_ERR_BAD_IO, "Not enough buffer space in ndag_pread_packets()");
 			return -1;
 		}
@@ -1391,10 +1387,9 @@ static libtrace_eventobj_t trace_event_ndag(libtrace_t *libtrace,
                 streamsock_t *src = &(FORMAT_DATA->receivers[0].sources[i]);
 		src->bufavail += src->bufwaiting;
 		src->bufwaiting = 0;
-		/*assert(src->bufavail >= 0 && src->bufavail <= ENCAP_BUFFERS);*/
-		if (src->bufavail < 0 && src->bufavail > ENCAP_BUFFERS) {
+		if (src->bufavail < 0 || src->bufavail > ENCAP_BUFFERS) {
 			trace_set_err(libtrace, TRACE_ERR_BAD_IO, "Not enough buffer space in trace_event_ndag()");
-			break; /* breaking here cause error above also does? */
+			break;
 		}
 	}
 

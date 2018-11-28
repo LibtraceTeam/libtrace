@@ -50,7 +50,6 @@
 #endif
 
 #include <stdlib.h>
-#include <assert.h>
 #include <unistd.h>
 #include <endian.h>
 #include <string.h>
@@ -212,7 +211,11 @@ static int whitelist_device(struct dpdk_format_data_t *format_data UNUSED, struc
  */
 static int parse_pciaddr(char * str, struct rte_pci_addr * addr, long * core) {
 	int matches;
-	assert(str);
+
+	if (!str) {
+		fprintf(stderr, "NULL str passed into parse_pciaddr()\n");
+		return -1;
+	}
 #if RTE_VERSION >= RTE_VERSION_NUM(17, 8, 0, 1)
 	matches = sscanf(str, "%8"SCNx32":%2"SCNx8":%2"SCNx8".%2"SCNx8"-%ld",
 	                 &addr->domain, &addr->bus, &addr->devid,
@@ -324,14 +327,24 @@ static inline int dpdk_move_master_lcore(libtrace_t *libtrace, size_t core) {
 	cpu_set_t cpuset;
 	int i;
 
-	assert (core < RTE_MAX_LCORE);
-	assert (rte_get_master_lcore() == rte_lcore_id());
+	if (core >= RTE_MAX_LCORE) {
+		fprintf(stderr, "Core must be a value less than the number of cores "
+			"in dpdk_move_master_lcore()\n");
+		return -1;
+	}
+	if (rte_get_master_lcore() != rte_lcore_id()) {
+		fprintf(stderr, "Master core not equal to core id in dpdk_move_master_lcore()\n");
+		return -1;
+	}
 
 	if (core == rte_lcore_id())
 		return 0;
 
 	/* Make sure we are not overwriting someone else */
-	assert(!rte_lcore_is_enabled(core));
+	if (rte_lcore_is_enabled(core)) {
+		fprintf(stderr, "Cannot override another core in dpdk_move_master_lcore()\n");
+		return -1;
+	}
 
 	/* Move the core */
 	cfg->lcore_role[rte_lcore_id()] = ROLE_OFF;
@@ -469,7 +482,10 @@ static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_
 		if(format_data->nic_numa_node >= 0) {
 			int max_node_cpu = -1;
 			struct bitmask *mask = numa_allocate_cpumask();
-			assert(mask);
+			if (!mask) {
+				fprintf(stderr, "Unable to allocate cpu mask in dpdk_init_environment()\n");
+				return -1;
+			}
 			numa_node_to_cpus(format_data->nic_numa_node, mask);
 			for (i = 0 ; i < nb_cpu; ++i) {
 				if (numa_bitmask_isbitset(mask,i))
@@ -529,7 +545,10 @@ static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_
 		}
 	}
 	// Only the master should be running
-	assert(cfg->lcore_count == 1);
+	if (cfg->lcore_count != 1) {
+		fprintf(stderr, "Expected only the master core to be running in dpdk_init_environment()\n");
+		return -1;
+	}
 
 	// TODO XXX TODO
 	dpdk_move_master_lcore(NULL, my_cpu-1);
@@ -588,7 +607,8 @@ int dpdk_init_input (libtrace_t *libtrace) {
 	                        malloc(sizeof(struct dpdk_format_data_t));
 
 	if (!libtrace->format_data) {
-		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory dpdk_init_input()");
+		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory for "
+			"format data inside dpdk_init_input()");
 		return 1;
 	}
 
@@ -635,7 +655,8 @@ static int dpdk_init_output(libtrace_out_t *libtrace)
 	                        malloc(sizeof(struct dpdk_format_data_t));
 
 	if (!libtrace->format_data) {
-		trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory dpdk_init_output()");
+		trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory for "
+			"format data inside dpdk_init_output()");
 		return -1;
 	}
 	FORMAT(libtrace)->port = 0; /* Always assume 1 port loaded */
@@ -842,8 +863,18 @@ static void dpdk_lsc_callback(portid_t port, enum rte_eth_event_type event,
 #endif
 	struct dpdk_format_data_t * format_data = cb_arg;
 	struct rte_eth_link link_info;
-	assert(event == RTE_ETH_EVENT_INTR_LSC);
-	assert(port == format_data->port);
+	if (event != RTE_ETH_EVENT_INTR_LSC) {
+		fprintf(stderr, "Received unexpected event in dpdk_lsc_callback()\n");
+		#if RTE_VERSION >= RTE_VERSION_NUM(17, 8, 0, 1)
+		return -1;
+		#else
+		return;
+		#endif
+	}
+	if (port != format_data->port) {
+		fprintf(stderr, "Port does not match port in format data in dpdk_lsc_callback()\n");
+		return -1;
+	}
 
 	rte_eth_link_get_nowait(port, &link_info);
 
@@ -1455,7 +1486,11 @@ void dpdk_punregister_thread(libtrace_t *libtrace UNUSED, libtrace_thread_t *t U
 {
 	struct rte_config *cfg = rte_eal_get_configuration();
 
-	assert(rte_lcore_id() < RTE_MAX_LCORE);
+	if (rte_lcore_id() >= RTE_MAX_LCORE) {
+		fprintf(stderr, "Expected core id less than or equal to RTE_MAX_LCORE in "
+			"dpdk_punregister_thread()\n");
+		return;
+	}
 	pthread_mutex_lock(&dpdk_lock);
 	/* Skip if master */
 	if (rte_lcore_id() == rte_get_master_lcore()) {
@@ -1468,7 +1503,10 @@ void dpdk_punregister_thread(libtrace_t *libtrace UNUSED, libtrace_thread_t *t U
 	cfg->lcore_role[rte_lcore_id()] = ROLE_OFF;
 	cfg->lcore_count--;
 	RTE_PER_LCORE(_lcore_id) = -1; // Might make the world burn if used again
-	assert(cfg->lcore_count >= 1); // We cannot unregister the master LCORE!!
+	if (cfg->lcore_count < 1) {
+		fprintf(stderr, "You cannot unregister the master lcore in dpdk_punregister_thread()\n");
+		return;
+	}
 	pthread_mutex_unlock(&dpdk_lock);
 	return;
 }
@@ -1594,8 +1632,14 @@ static int dpdk_fin_output(libtrace_out_t * libtrace) {
  * Get the start of the additional header that we added to a packet.
  */
 static inline struct dpdk_addt_hdr * get_addt_hdr (const libtrace_packet_t *packet) {
-	assert(packet);
-	assert(packet->buffer);
+	if (!packet) {
+		fprintf(stderr, "NULL packet passed into dpdk_addt_hdr()\n");
+		return NULL;
+	}
+	if (!packet->buffer) {
+		fprintf(stderr, "NULL packet buffer passed into dpdk_addt_hdr()\n");
+		return NULL;
+	}
 	/* Our header sits straight after the mbuf header */
 	return (struct dpdk_addt_hdr *) ((struct rte_mbuf*) packet->buffer + 1);
 }
@@ -1647,7 +1691,10 @@ int dpdk_get_framing_length (const libtrace_packet_t *packet) {
 int dpdk_prepare_packet(libtrace_t *libtrace UNUSED,
                                libtrace_packet_t *packet, void *buffer,
                                libtrace_rt_types_t rt_type, uint32_t flags) {
-	assert(packet);
+	if (!packet) {
+		fprintf(stderr, "NULL packet passed into dpdk_prepare_packet()\n");
+		return TRACE_ERR_NULL_PACKET;
+	}
 	if (packet->buffer != buffer &&
 	    packet->buf_control == TRACE_CTRL_PACKET) {
 		free(packet->buffer);
@@ -1949,7 +1996,11 @@ static int dpdk_pread_packets (libtrace_t *libtrace,
 		for (i = 0; i < nb_rx; ++i) {
 			if (packets[i]->buffer != NULL) {
 				/* The packet should always be finished */
-				assert(packets[i]->buf_control == TRACE_CTRL_PACKET);
+				if (packets[i]->buf_control != TRACE_CTRL_PACKET) {
+					trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Expected packet buffer "
+						"to be empty in dpdk_pread_packets()\n");
+					return -1;
+				}
 				free(packets[i]->buffer);
 			}
 			packets[i]->buf_control = TRACE_CTRL_EXTERNAL;
@@ -1974,7 +2025,11 @@ int dpdk_read_packet (libtrace_t *libtrace, libtrace_packet_t *packet) {
 	/* Free the last packet buffer */
 	if (packet->buffer != NULL) {
 		/* The packet should always be finished */
-		assert(packet->buf_control == TRACE_CTRL_PACKET);
+		if (packet->buf_control != TRACE_CTRL_PACKET) {
+			trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Expected packet buffer to be "
+				"empty in dpdk_read_packet()\n");
+			return -1;
+		}
 		free(packet->buffer);
 		packet->buffer = NULL;
 	}
@@ -2096,7 +2151,11 @@ libtrace_eventobj_t dpdk_trace_event(libtrace_t *trace,
 			/* Free the last packet buffer */
 			if (packet->buffer != NULL) {
 				/* The packet should always be finished */
-				assert(packet->buf_control == TRACE_CTRL_PACKET);
+				if (packet->buf_control != TRACE_CTRL_PACKET) {
+					trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Expected packet "
+						"buffer to be empty in dpdk_trace_event()\n");
+					return -1;
+				}
 				free(packet->buffer);
 				packet->buffer = NULL;
 			}

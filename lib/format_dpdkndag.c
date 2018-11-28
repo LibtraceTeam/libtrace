@@ -6,7 +6,6 @@
 #include "format_helper.h"
 #include "format_erf.h"
 
-#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -87,7 +86,8 @@ static int dpdkndag_init_input(libtrace_t *libtrace) {
                         sizeof(dpdkndag_format_data_t));
 
 	if (!libtrace->format_data) {
-		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory dpdknday_init_input()");
+		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory for "
+			"format data inside dpdknday_init_input()");
 		return -1;
 	}
 

@@ -27,7 +27,6 @@
 #include "libtrace.h"
 
 #include "rt_protocol.h"
-#include <assert.h>
 #include "libtrace_int.h"
 #include <stdlib.h>
 #include <string.h>
@@ -161,7 +160,6 @@ libtrace_dlt_t rt_to_pcap_linktype(libtrace_rt_types_t rt_type)
         }
 
 	fprintf(stderr, "Error: RT type %u cannot be converted to a pcap DLT\n", rt_type);
-	/*assert(false);*/
 	return 0;	/* satisfy warnings */
 }
 

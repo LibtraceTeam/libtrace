@@ -26,7 +26,6 @@
 #include "libtrace_int.h"
 #include "libtrace.h"
 #include "protocols.h"
-#include <assert.h>
 
 #ifdef HAVE_WANDDER
 #include <libwandder_etsili.h>
@@ -155,12 +154,10 @@ DLLEXPORT void *trace_get_packet_meta(const libtrace_packet_t *packet,
 {
 	uint32_t dummyrem;
 	void *pktbuf = NULL;
-	/*assert(packet != NULL);*/
 	if (!packet) {
 		fprintf(stderr, "NULL packet passed into trace_get_packet_meta()");
 		return NULL;
 	}
-	/*assert(linktype != NULL);*/
 	if (!linktype) {
 		fprintf(stderr, "NULL linkype passed into trace_get_packet_meta()");
 		return NULL;
@@ -209,17 +206,14 @@ DLLEXPORT void *trace_get_payload_from_meta(const void *meta,
 	uint16_t arphrd = 0;
 	uint16_t next = 0;
 
-	/*assert(meta != NULL);*/
 	if (!meta) {
 		fprintf(stderr, "NULL meta passed into trace_get_payload_from_meta()");
 		return NULL;
 	}
-	/*assert(linktype != NULL);*/
 	if (!linktype) {
 		fprintf(stderr, "NULL linktype passed into trace_get_payload_from_meta()");
 		return NULL;
 	}
-	/*assert(remaining != NULL);*/
 	if (!remaining) {
 		fprintf(stderr, "NULL remaining passed into trace_get_payload_from_meta()");
 		return NULL;

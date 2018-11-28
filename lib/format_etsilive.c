@@ -36,7 +36,6 @@
 #include <libwandder.h>
 #include <libwandder_etsili.h>
 
-#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -213,7 +212,8 @@ static int etsilive_init_input(libtrace_t *libtrace) {
                         sizeof(etsilive_format_data_t));
 
 	if (!libtrace->format) {
-		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory etsilive_init_input()");
+		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory for "
+			"format data inside etsilive_init_input()");
 		return 1;
 	}
 
@@ -594,12 +594,10 @@ static int etsilive_get_pdu_length(const libtrace_packet_t *packet) {
         size_t reclen;
         libtrace_t *libtrace = packet->trace;
 
-        /*assert(libtrace);*/
 	if (!libtrace) {
 		fprintf(stderr, "Packet is not associated with a trace in etsilive_get_pdu_length()\n");
 		return TRACE_ERR_NULL_TRACE;
 	}
-        /*assert(FORMAT_DATA->shareddec);*/
 	if (!FORMAT_DATA->shareddec) {
 		trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT, "Etsilive format data shareddec is NULL in etsilive_get_pdu_length()\n");
 		return -1;

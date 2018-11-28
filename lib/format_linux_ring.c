@@ -44,7 +44,6 @@
 #include <errno.h>
 #include <unistd.h>
 #include <string.h>
-#include <assert.h>
 
 #ifdef HAVE_INTTYPES_H
 #  include <inttypes.h>
@@ -148,25 +147,20 @@ static void calculate_buffers(struct tpacket_req * req, int fd, char * uri,
 	*/
 
 	/* In case we have some silly values*/
-	/*assert(req->tp_block_size);*/
 	if (!req->tp_block_size) {
-		fprintf(stderr, "Unexpected value req->tp_block_size in calculate_buffers()\n");
+		fprintf(stderr, "Unexpected value of zero for req->tp_block_size in calculate_buffers()\n");
 	}
-	/*assert(req->tp_block_nr);*/
 	if (!req->tp_block_nr) {
-		fprintf(stderr, "Unexpected value req->tp_block_nr in calculate_buffers()\n");
+		fprintf(stderr, "Unexpected value of zero for req->tp_block_nr in calculate_buffers()\n");
 	}
-	/*assert(req->tp_frame_size);*/
 	if (!req->tp_frame_size) {
-		fprintf(stderr, "Unexpected value req->tp_frame_size in calculate_buffers()\n");
+		fprintf(stderr, "Unexpected value of zero for req->tp_frame_size in calculate_buffers()\n");
 	}
-	/*assert(req->tp_frame_nr);*/
 	if (!req->tp_frame_nr) {
-		fprintf(stderr, "Unexpected value req->tp_frame_nr in calculate_buffers()\n");
+		fprintf(stderr, "Unexpected value of zero for req->tp_frame_nr in calculate_buffers()\n");
 	}
-	/*assert(req->tp_block_size % req->tp_frame_size == 0);*/
 	if (req->tp_block_size % req->tp_frame_size != 0) {
-		fprintf(stderr, "Unexpected value req->tp_block_size %% req->tp_frame_size in calculate_buffers()\n");
+		fprintf(stderr, "Unexpected value of zero for req->tp_block_size %% req->tp_frame_size in calculate_buffers()\n");
 	}
 }
 
@@ -462,7 +456,6 @@ static int linuxring_get_framing_length(const libtrace_packet_t *packet)
 static size_t linuxring_set_capture_length(libtrace_packet_t *packet,
 					   size_t size)
 {
-	/*assert(packet);*/
 	if (!packet) {
 		fprintf(stderr, "NULL packet passed into linuxring_set_capture_length()\n");
 		/* Return -1 on error? */
@@ -528,9 +521,9 @@ inline static int linuxring_read_stream(libtrace_t *libtrace,
 
 	/* Fetch the current frame */
 	header = GET_CURRENT_BUFFER(stream);
-	/*assert((((unsigned long) header) & (pagesize - 1)) == 0);*/
 	if ((((unsigned long) header) & (pagesize - 1)) != 0) {
-		trace_set_err(libtrace, TRACE_ERR_BAD_IO, "Header of pagesize-1 is not zero in linux_read_string()");
+		trace_set_err(libtrace, TRACE_ERR_BAD_IO, "Linux ring packet is not correctly "
+			"aligned to page size in linux_read_string()");
 		return -1;
 	}
 
@@ -678,9 +671,9 @@ static void linuxring_fin_packet(libtrace_packet_t *packet)
 
 	if (packet->buffer == NULL)
 		return;
-	/*assert(packet->trace);*/
 	if (!packet->trace) {
-		fprintf(stderr, "Packet contains a NULL trace in linuxring_fin_packet()\n");
+		fprintf(stderr, "Linux ring packet is not attached to a valid "
+			"trace, Unable to release it, in linuxring_fin_packet()\n");
 		return;
 	}
 

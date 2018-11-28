@@ -34,7 +34,6 @@
 #include "format_erf.h"
 #include "wandio.h"
 
-#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -179,7 +178,6 @@ int erf_get_framing_length(const libtrace_packet_t *packet)
                         extsize += 8;
                         exthdr ++;
                         firstbyte = (uint8_t *)exthdr;
-                        /*assert(extsize <= ntohs(erfptr->rlen));*/
 			if (extsize > ntohs(erfptr->rlen)) {
 				trace_set_err(packet->trace, TRACE_ERR_BAD_PACKET, "Extension size is greater than dag record record length in erf_get_framing_length()");
 				return -1;
@@ -232,7 +230,8 @@ static int erf_init_input(libtrace_t *libtrace) {
 	libtrace->format_data = malloc(sizeof(struct erf_format_data_t));
 
 	if (!libtrace->format_data) {
-		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory erf_init_input()");
+		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory for "
+			"format data inside erf_init_input()");
 		return -1;
 	}
 
@@ -387,7 +386,6 @@ static int erf_seek_erf(libtrace_t *libtrace,uint64_t erfts)
 			erf_slow_seek_start(libtrace,erfts);
 			break;
 		case INDEX_UNKNOWN:
-			/*assert(0);*/
 			trace_set_err(libtrace, TRACE_ERR_SEEK_ERF, "Cannot seek to erf timestamp with unknown index in erf_seek_erf()");
 			return -1;
 			break;
@@ -411,7 +409,8 @@ static int erf_init_output(libtrace_out_t *libtrace) {
 	libtrace->format_data = malloc(sizeof(struct erf_format_data_out_t));
 
 	if (!libtrace->format_data) {
-		trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory erf_init_output()");
+		trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory for "
+			"format data inside erf_init_output()");
 		return -1;
 	}
 
@@ -474,8 +473,7 @@ static int erf_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
 		packet->buf_control = TRACE_CTRL_PACKET;
 	} else
 	        packet->buf_control = TRACE_CTRL_EXTERNAL;
-	
-	
+
 	packet->type = rt_type;
 	packet->buffer = buffer;
 	packet->header = buffer;
@@ -486,9 +484,9 @@ static int erf_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
 		packet->payload = ((char*)packet->buffer) + trace_get_framing_length(packet);
 	}
 
-        /*assert(erfptr->rlen != 0);*/
 	if (erfptr->rlen == 0) {
-		trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Packet is empty in erf_prepare_packet()\n");
+		trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "ERF packet has an invalid record "
+			"length: zero, in erf_prepare_packet()\n");
 		return -1;
 	}
 
@@ -667,9 +665,9 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 	dag_record_t *dag_hdr = (dag_record_t *)packet->header;
 	void *payload = packet->payload;
 
-	/*assert(OUTPUT->file);*/
 	if (!OUTPUT->file) {
-		trace_set_err_out(libtrace, TRACE_ERR_BAD_IO, "Call init_output before write_packet() in erf_write_packet()");
+		trace_set_err_out(libtrace, TRACE_ERR_BAD_IO, "Attempted to write ERF packets to a "
+			"closed file, must call trace_create_output() before calling trace_write_output()");
 		return -1;
 	}
 
@@ -721,15 +719,12 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 		erfhdr.type = libtrace_to_erf_type(trace_get_link_type(packet));
 
 		/* Packet length (rlen includes format overhead) */
-		/*assert(trace_get_capture_length(packet)>0
-				&& trace_get_capture_length(packet)<=65536);*/
-		if (!(trace_get_capture_length(packet) > 0
-			&& trace_get_capture_length(packet) <= 65536)) {
+		if (trace_get_capture_length(packet) <= 0
+			|| trace_get_capture_length(packet) > 65536) {
 			trace_set_err_out(libtrace, TRACE_ERR_BAD_PACKET,
 				"Capture length is out of range in erf_write_packet()");
 			return -1;
 		}
-		/*assert(trace_get_framing_length(packet)<=65536);*/
 		if (trace_get_framing_length(packet) > 65536) {
 			trace_set_err_out(libtrace, TRACE_ERR_BAD_PACKET,
 				"Framing length is to large in erf_write_packet()");
@@ -742,8 +737,7 @@ static int erf_write_packet(libtrace_out_t *libtrace,
                         framing = dag_record_size;
 
 		rlen = trace_get_capture_length(packet) + framing;
-		/*assert(rlen > 0 && rlen <= 65536);*/
-		if (!(rlen > 0 && rlen <= 65536)) {
+		if (rlen <= 0 || rlen > 65536) {
 			trace_set_err_out(libtrace, TRACE_ERR_BAD_PACKET,
 				"Capture + framing length is out of range in erf_write_packet()");
 			return -1;
@@ -835,7 +829,6 @@ size_t erf_set_capture_length(libtrace_packet_t *packet, size_t size) {
 	dag_record_t *erfptr = 0;
         uint16_t wlen;
 
-	/*assert(packet);*/
 	if (!packet) {
 		fprintf(stderr, "NULL packet passed to erf_set_capture_length()\n");
 		return ~0U;

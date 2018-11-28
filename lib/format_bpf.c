@@ -127,7 +127,8 @@ static int bpf_init_input(libtrace_t *libtrace) {
 		malloc(sizeof(struct libtrace_format_data_t));
 
 	if (!libtrace->format_data) {
-		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory bpf_init_input()");
+		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory "
+			"for format data inside bpf_init_input()");
 		return -1;
 	}
 
