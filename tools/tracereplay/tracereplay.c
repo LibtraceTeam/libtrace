@@ -103,7 +103,6 @@ static libtrace_packet_t * per_packet(libtrace_packet_t *packet) {
 	pkt_buffer = trace_get_packet_buffer(packet,&linktype,&remaining);
 	/* Check if the linktype was found, if not skip this packet */
 	if (linktype == TRACE_TYPE_UNKNOWN || linktype == TRACE_TYPE_CONTENT_INVALID) {
-		fprintf(stderr, "Encountered packet with unknown linktype, Skipping it\n");
 		return NULL;
 	}
 
