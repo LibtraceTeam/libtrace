@@ -396,6 +396,7 @@ DLLEXPORT libtrace_t * trace_create_dead (const char *uri) {
 	libtrace->filter = NULL;
 	libtrace->snaplen = 0;
 	libtrace->started=false;
+	libtrace->startcount = 0;
 	libtrace->uridata = NULL;
 	libtrace->io = NULL;
 	libtrace->filtered_packets = 0;
