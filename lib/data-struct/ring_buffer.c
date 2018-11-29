@@ -267,8 +267,11 @@ DLLEXPORT void libtrace_ringbuffer_write(libtrace_ringbuffer_t * rb, void* value
 DLLEXPORT size_t libtrace_ringbuffer_write_bulk(libtrace_ringbuffer_t * rb, void *values[], size_t nb_buffers, size_t min_nb_buffers) {
 	size_t nb_ready;
 	size_t i = 0;
-	
-	assert(min_nb_buffers <= nb_buffers);
+
+	if (min_nb_buffers > nb_buffers) {
+		fprintf(stderr, "min_nb_buffers must be greater than or equal to nb_buffers in libtrace_ringbuffer_write_bulk()\n");
+		return ~0U;
+	}
 	if (!min_nb_buffers && libtrace_ringbuffer_is_full(rb))
 		return 0;
 
@@ -345,8 +348,11 @@ DLLEXPORT void* libtrace_ringbuffer_read(libtrace_ringbuffer_t *rb) {
 DLLEXPORT size_t libtrace_ringbuffer_read_bulk(libtrace_ringbuffer_t *rb, void *values[], size_t nb_buffers, size_t min_nb_buffers) {
 	size_t nb_ready;
 	size_t i = 0;
-	
-	assert(min_nb_buffers <= nb_buffers);
+
+	if (min_nb_buffers > nb_buffers) {
+                fprintf(stderr, "min_nb_buffers must be greater than or equal to nb_buffers in libtrace_ringbuffer_write_bulk()\n");
+                return ~0U;
+        }
 
 	if (!min_nb_buffers && libtrace_ringbuffer_is_empty(rb))
 		return 0;

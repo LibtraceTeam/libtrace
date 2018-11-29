@@ -26,9 +26,9 @@
 #include "sliding_window.h"
 
 #include <stdlib.h>
-#include <assert.h>
 #include <string.h>
 
+#include <stdio.h>
 /**
  * Implements a sliding window via a ring buffer, this is a fixed size.
  * 
@@ -42,7 +42,10 @@ void libtrace_slidingwindow_init(libtrace_slidingwindow_t *sw, size_t size, uint
 	sw->size = size; // All of this size can be used
 	sw->start = 0;
 	sw->elements = calloc(sw->size, sizeof(void*));
-	assert(sw->elements);
+	if (!sw->elements) {
+		fprintf(stderr, "Unable to allocate memory for sw->elements in libtrace_slidingwindow_init()\n");
+		return;
+	}
 	memset((void *) sw->elements, 0, sizeof(void*) * sw->size);
 	sw->start_number = start_number;
 }
