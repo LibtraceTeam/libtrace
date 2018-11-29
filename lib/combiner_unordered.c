@@ -33,7 +33,10 @@
 
 static int init_combiner(libtrace_t *t, libtrace_combine_t *c) {
 	int i = 0;
-	assert(trace_get_perpkt_threads(t) > 0);
+	if (trace_get_perpkt_threads(t) <= 0) {
+		trace_set_err(t, TRACE_ERR_INIT_FAILED, "You must have atleast 1 processing thread");
+		return -1;
+	}
 	libtrace_queue_t *queues;
 	c->queues = calloc(sizeof(libtrace_queue_t), trace_get_perpkt_threads(t));
 	queues = c->queues;
@@ -86,7 +89,11 @@ static void destroy(libtrace_t *trace, libtrace_combine_t *c) {
 	libtrace_queue_t *queues = c->queues;
 
 	for (i = 0; i < trace_get_perpkt_threads(trace); i++) {
-		assert(libtrace_deque_get_size(&queues[i]) == 0);
+		if (libtrace_deque_get_size(&queues[i]) != 0) {
+			trace_set_err(trace, TRACE_ERR_COMBINER,
+				"Failed to destroy queues, A thread still has data in destroy()");
+			return;
+		}
 	}
 	free(queues);
 	queues = NULL;

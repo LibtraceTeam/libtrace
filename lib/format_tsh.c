@@ -30,7 +30,6 @@
 #include "libtrace_int.h"
 #include "format_helper.h"
 
-#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>

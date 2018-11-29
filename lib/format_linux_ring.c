@@ -44,7 +44,6 @@
 #include <errno.h>
 #include <unistd.h>
 #include <string.h>
-#include <assert.h>
 
 #ifdef HAVE_INTTYPES_H
 #  include <inttypes.h>
@@ -148,11 +147,21 @@ static void calculate_buffers(struct tpacket_req * req, int fd, char * uri,
 	*/
 
 	/* In case we have some silly values*/
-	assert(req->tp_block_size);
-	assert(req->tp_block_nr);
-	assert(req->tp_frame_size);
-	assert(req->tp_frame_nr);
-	assert(req->tp_block_size % req->tp_frame_size == 0);
+	if (!req->tp_block_size) {
+		fprintf(stderr, "Unexpected value of zero for req->tp_block_size in calculate_buffers()\n");
+	}
+	if (!req->tp_block_nr) {
+		fprintf(stderr, "Unexpected value of zero for req->tp_block_nr in calculate_buffers()\n");
+	}
+	if (!req->tp_frame_size) {
+		fprintf(stderr, "Unexpected value of zero for req->tp_frame_size in calculate_buffers()\n");
+	}
+	if (!req->tp_frame_nr) {
+		fprintf(stderr, "Unexpected value of zero for req->tp_frame_nr in calculate_buffers()\n");
+	}
+	if (req->tp_block_size % req->tp_frame_size != 0) {
+		fprintf(stderr, "Unexpected value of zero for req->tp_block_size %% req->tp_frame_size in calculate_buffers()\n");
+	}
 }
 
 static inline int socket_to_packetmmap(char * uridata, int ring_type,
@@ -447,7 +456,11 @@ static int linuxring_get_framing_length(const libtrace_packet_t *packet)
 static size_t linuxring_set_capture_length(libtrace_packet_t *packet,
 					   size_t size)
 {
-	assert(packet);
+	if (!packet) {
+		fprintf(stderr, "NULL packet passed into linuxring_set_capture_length()\n");
+		/* Return -1 on error? */
+		return ~0U;
+	}
 	if (size > trace_get_capture_length(packet)) {
 		/* We should avoid making a packet larger */
 		return trace_get_capture_length(packet);
@@ -506,14 +519,14 @@ inline static int linuxring_read_stream(libtrace_t *libtrace,
 
 	packet->buf_control = TRACE_CTRL_EXTERNAL;
 	packet->type = TRACE_RT_DATA_LINUX_RING;
-	
+
 	/* Fetch the current frame */
 	header = GET_CURRENT_BUFFER(stream);
 	if ((((unsigned long) header) & (pagesize - 1)) != 0) {
-                trace_set_err(libtrace, TRACE_ERR_BAD_PACKET,
-                        "ring frame size is not a multiple of the page size");
-                return -1;
-        }
+		trace_set_err(libtrace, TRACE_ERR_BAD_IO, "Linux ring packet is not correctly "
+			"aligned to page size in linux_read_string()");
+		return -1;
+	}
 
 	/* TP_STATUS_USER means that we can use the frame.
 	 * When a slot does not have this flag set, the frame is not
@@ -676,9 +689,17 @@ static void linuxring_fin_packet(libtrace_packet_t *packet)
 
 	if (packet->buffer == NULL)
 		return;
+<<<<<<< HEAD
 	if (!libtrace) {
                 return;
         }
+=======
+	if (!packet->trace) {
+		fprintf(stderr, "Linux ring packet is not attached to a valid "
+			"trace, Unable to release it, in linuxring_fin_packet()\n");
+		return;
+	}
+>>>>>>> fdf23b83dbe8088f53ec27af98ec6ed7b71cc34d
 
 	/* If we own the packet (i.e. it's not a copy), we need to free it */
 	if (packet->buf_control == TRACE_CTRL_EXTERNAL) {

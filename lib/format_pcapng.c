@@ -30,7 +30,6 @@
 #include "format_helper.h"
 
 #include <sys/stat.h>
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -217,8 +216,9 @@ static int pcapng_probe_magic(io_t *io) {
 
 static int pcapng_init_input(libtrace_t *libtrace) {
         libtrace->format_data = malloc(sizeof(struct pcapng_format_data_t));
-        if (libtrace->format_data == NULL) {
-                trace_set_err(libtrace, ENOMEM, "Out of memory!");
+        if (!libtrace->format_data) {
+                trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory for "
+			"format data inside pcapng_init_input()");
                 return -1;
         }
 
@@ -301,7 +301,9 @@ static char *pcapng_parse_next_option(libtrace_t *libtrace, char **pktbuf,
                 eob = ((char *) blockhdr) + blockhdr->blocklen;
         }
 
-        assert((char *)blockhdr < *pktbuf);
+	if ((char *)blockhdr >= *pktbuf) {
+		return NULL;
+	}
         // Check if we have reached the end of the block, +4 for trailing block-size
         // We cannot assume a endofopt, so we add one
         if (eob == (*pktbuf) + 4) {
@@ -455,7 +457,10 @@ static int pcapng_read_section(libtrace_t *libtrace,
                 return -1;
         }
 
-        assert(sechdr->blocktype == PCAPNG_SECTION_TYPE);
+	if (sechdr->blocktype != PCAPNG_SECTION_TYPE) {
+		trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Invalid block type in pcapng section block");
+		return -1;
+	}
 
         if (sechdr->ordering == 0x1A2B3C4D) {
                 DATA(libtrace)->byteswapped = false;
@@ -530,11 +535,17 @@ static int pcapng_read_interface(libtrace_t *libtrace,
         newint->tsresol = 1000000;
 
         if (DATA(libtrace)->byteswapped) {
-                assert(byteswap32(inthdr->blocktype) == PCAPNG_INTERFACE_TYPE);
+		if (byteswap32(inthdr->blocktype) != PCAPNG_INTERFACE_TYPE) {
+			trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Invalid block type in pcapng interface");
+			return -1;
+		}
                 newint->snaplen = byteswap32(inthdr->snaplen);
                 newint->linktype = byteswap16(inthdr->linktype);
         } else {
-                assert(inthdr->blocktype == PCAPNG_INTERFACE_TYPE);
+		if (inthdr->blocktype != PCAPNG_INTERFACE_TYPE) {
+			trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Invalid block type in pcapng interface");
+			return -1;
+		}
                 newint->snaplen = inthdr->snaplen;
                 newint->linktype = inthdr->linktype;
         }
@@ -605,9 +616,17 @@ static int pcapng_read_nrb(libtrace_t *libtrace, libtrace_packet_t *packet,
 
         /* Read the rest of the packet into the buffer */
         if (DATA(libtrace)->byteswapped) {
-                assert(byteswap32(hdr->blocktype) == PCAPNG_NAME_RESOLUTION_TYPE);
+		if (byteswap32(hdr->blocktype) != PCAPNG_NAME_RESOLUTION_TYPE) {
+			trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Invalid block type in pcapng name "
+				"resolution block");
+			return -1;
+		}
         } else {
-                assert(hdr->blocktype == PCAPNG_NAME_RESOLUTION_TYPE);
+		if (hdr->blocktype != PCAPNG_NAME_RESOLUTION_TYPE) {
+			trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Invalid block type in pcapng name "
+				"resolution block");
+			return -1;
+		}
         }
 
         packet->type = TRACE_RT_PCAPNG_META;
@@ -639,11 +658,19 @@ static int pcapng_read_custom(libtrace_t *libtrace, libtrace_packet_t *packet,
 
         /* Read the rest of the packet into the buffer */
         if (DATA(libtrace)->byteswapped) {
-                assert(byteswap32(hdr->blocktype) == PCAPNG_CUSTOM_TYPE ||
-                        byteswap32(hdr->blocktype) == PCAPNG_CUSTOM_NONCOPY_TYPE);
+		if (byteswap32(hdr->blocktype) != PCAPNG_CUSTOM_TYPE ||
+                        byteswap32(hdr->blocktype) != PCAPNG_CUSTOM_NONCOPY_TYPE) {
+			trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Invalid blocktype "
+				"in pcapng custom block");
+			return -1;
+		}
         } else {
-                assert(hdr->blocktype == PCAPNG_CUSTOM_TYPE ||
-                        hdr->blocktype == PCAPNG_CUSTOM_NONCOPY_TYPE);
+		if (hdr->blocktype != PCAPNG_CUSTOM_TYPE ||
+                        hdr->blocktype != PCAPNG_CUSTOM_NONCOPY_TYPE) {
+			trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Invalid blocktype "
+				"in pcapng custom block");
+			return -1;
+		}
         }
 
         packet->type = TRACE_RT_PCAPNG_META;
@@ -676,11 +703,19 @@ static int pcapng_read_stats(libtrace_t *libtrace, libtrace_packet_t *packet,
 
         /* Read the rest of the packet into the buffer */
         if (DATA(libtrace)->byteswapped) {
-                assert(byteswap32(hdr->blocktype) == PCAPNG_INTERFACE_STATS_TYPE);
+		if (byteswap32(hdr->blocktype) != PCAPNG_INTERFACE_STATS_TYPE) {
+			trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Invalid block type "
+				"in pcapng statistics block");
+			return -1;
+		}
                 ifaceid = byteswap32(hdr->interfaceid);
                 timestamp = ((uint64_t)(byteswap32(hdr->timestamp_high)) << 32) + byteswap32(hdr->timestamp_low);
         } else {
-                assert(hdr->blocktype == PCAPNG_INTERFACE_STATS_TYPE);
+             	if (hdr->blocktype != PCAPNG_INTERFACE_STATS_TYPE) {
+			trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Invalid block type "
+				"in pcapng statistics block");
+			return -1;
+		}
                 ifaceid = hdr->interfaceid;
                 timestamp = ((uint64_t)(hdr->timestamp_high) << 32) +
                                 hdr->timestamp_low;
@@ -775,11 +810,19 @@ static int pcapng_read_simple(libtrace_t *libtrace, libtrace_packet_t *packet,
 
         /* Read the rest of the packet into the buffer */
         if (DATA(libtrace)->byteswapped) {
-                assert(byteswap32(hdr->blocktype) == PCAPNG_SIMPLE_PACKET_TYPE);
+		if (byteswap32(hdr->blocktype) != PCAPNG_SIMPLE_PACKET_TYPE) {
+			trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Invalid block type in "
+				"pcapng simple packet block");
+			return -1;
+		}
                 caplen = byteswap32(hdr->blocklen) - sizeof(pcapng_spkt_t) - 4;
                          /* account for trailing length field */
         } else {
-                assert(hdr->blocktype == PCAPNG_SIMPLE_PACKET_TYPE);
+		if (hdr->blocktype != PCAPNG_SIMPLE_PACKET_TYPE) {
+			trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Invalid block type in "
+				"pcapng simple packet block");
+			return -1;
+		}
                 caplen = hdr->blocklen - sizeof(pcapng_spkt_t) - 4;
                          /* account for trailing length field */
         }
@@ -825,11 +868,19 @@ static int pcapng_read_enhanced(libtrace_t *libtrace, libtrace_packet_t *packet,
 
         /* Read the rest of the packet into the buffer */
         if (DATA(libtrace)->byteswapped) {
-                assert(byteswap32(hdr->blocktype) == PCAPNG_ENHANCED_PACKET_TYPE);
+		if (byteswap32(hdr->blocktype) != PCAPNG_ENHANCED_PACKET_TYPE) {
+			trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Invalid block type in "
+				"pcapng enhanced packet block");
+			return -1;
+		}
                 caplen = byteswap32(hdr->caplen);
                 ifaceid = byteswap32(hdr->interfaceid);
         } else {
-                assert(hdr->blocktype == PCAPNG_ENHANCED_PACKET_TYPE);
+		if (hdr->blocktype != PCAPNG_ENHANCED_PACKET_TYPE) {
+			trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Invalid block type in "
+				"pcapng enhanced packet block");
+			return -1;
+		}
                 caplen = hdr->caplen;
                 ifaceid = hdr->interfaceid;
         }
@@ -898,9 +949,28 @@ static int pcapng_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
         uint32_t btype = 0;
         int gotpacket = 0;
 
+	/* Ensure trace and packet are not NULL */
+	if (!libtrace) {
+		fprintf(stderr, "NULL trace passed into pcapng_read_packet()\n");
+		return TRACE_ERR_NULL_TRACE;
+	}
+	if (!packet) {
+		trace_set_err(libtrace, TRACE_ERR_NULL_PACKET, "NULL packet passed into "
+			"pcapng_read_packet()\n");
+		return -1;
+	}
+
         /* Peek to get next block type */
-        assert(libtrace->format_data);
-        assert(libtrace->io);
+	if (!libtrace->format_data) {
+		trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT, "Trace has no format data in "
+			"pcapng_read_packet()");
+		return -1;
+	}
+	if (!libtrace->io) {
+		trace_set_err(libtrace, TRACE_ERR_BAD_IO, "Trace has no valid file handle "
+			"attached to it in pcapng_read_packet()");
+		return -1;
+	}
 
         if (!packet->buffer || packet->buf_control == TRACE_CTRL_EXTERNAL) {
                 packet->buffer = malloc((size_t)LIBTRACE_PACKET_BUFSIZE);
@@ -1041,7 +1111,16 @@ static struct timespec pcapng_get_timespec(const libtrace_packet_t *packet) {
         uint32_t interfaceid = 0;
         pcapng_interface_t *interface;
 
-        assert(packet->header);
+	if (!packet) {
+		fprintf(stderr, "NULL packet passed into pcapng_get_timespec()");
+		/* Return default timespec on error? */
+		return ts;
+	}
+	if (!packet->header) {
+		trace_set_err(packet->trace, TRACE_ERR_BAD_PACKET, "NULL header in packet in pcapng_get_timespec()");
+		/* Return default timespec on error? */
+		return ts;
+	}
 
         ts.tv_sec = 0;
         ts.tv_nsec = 0;

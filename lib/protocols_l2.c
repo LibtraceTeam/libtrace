@@ -26,7 +26,6 @@
 #include "libtrace_int.h"
 #include "libtrace.h"
 #include "protocols.h"
-#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -193,10 +192,13 @@ libtrace_packet_t *trace_strip_packet(libtrace_packet_t *packet) {
  * return a type of 0x0000.
  */
 void *trace_get_payload_from_mpls(void *ethernet, uint16_t *type, 
-		uint32_t *remaining)
-{
-	
-	assert(type);
+		uint32_t *remaining) {
+	/* Ensure supplied type is not NULL */
+	if (!type) {
+		fprintf(stderr, "NULL type passed into trace_get_payload_from_mpls()\n");
+		return NULL;
+	}
+
 	if ((((char*)ethernet)[2]&0x01)==0) {
 		/* The MPLS Stack bit is set */
 		*type = TRACE_ETHERTYPE_MPLS;
@@ -326,8 +328,12 @@ static void *trace_get_payload_from_ppp(void *link,
 
 void *trace_get_payload_from_pppoe(void *link, uint16_t *type, 
 		uint32_t *remaining) {
-	assert(type);
-	
+	/* Ensure type supplied is not NULL */
+	if (!type) {
+		fprintf(stderr, "NULL type passed into trace_get_payload_from_pppoe()\n");
+		return NULL;
+	}
+
 	if (remaining) {
 		if (*remaining < sizeof(libtrace_pppoe_t)) {
 			*remaining = 0;
@@ -436,9 +442,15 @@ DLLEXPORT void *trace_get_layer2(const libtrace_packet_t *packet,
 {
 	uint32_t dummyrem;
 	void *meta = NULL;
-	
-	assert(packet != NULL);
-	assert(linktype != NULL);
+
+	if (!packet) {
+		fprintf(stderr, "NULL packet passed into trace_get_layer2()\n");
+		return NULL;
+	}
+	if (!linktype) {
+		fprintf(stderr, "NULL linktype passed into trace_get_layer2()\n");
+		return NULL;
+	}
 
 	if (remaining == NULL)
 		remaining = &dummyrem;
@@ -667,10 +679,15 @@ uint8_t *get_source_mac_from_wifi(void *wifi) {
 }
 
 DLLEXPORT uint8_t *trace_get_source_mac(libtrace_packet_t *packet) {
+	/* Ensure the supplied packet is not NULL */
+	if (!packet) {
+		fprintf(stderr, "NULL packet passed into trace_get_source_mac()\n");
+		return NULL;
+	}
+
         void *link;
         uint32_t remaining;
         libtrace_linktype_t linktype;
-        assert(packet);
         link = trace_get_layer2(packet,&linktype,&remaining);
 
         if (!link)
@@ -704,16 +721,20 @@ DLLEXPORT uint8_t *trace_get_source_mac(libtrace_packet_t *packet) {
                 case TRACE_TYPE_80211_PRISM:
                 case TRACE_TYPE_80211_RADIO:
                 case TRACE_TYPE_ETSILI:
-                        assert(!"Metadata headers should already be skipped");
-                        break;
+			fprintf(stderr, "Metadata headers should already be skipped in trace_get_source_mac()\n");
+			return NULL;
         }
         fprintf(stderr,"%s not implemented for linktype %i\n", __func__, linktype);
-        assert(0);
         return NULL;
 }
 
-DLLEXPORT uint8_t *trace_get_destination_mac(libtrace_packet_t *packet)
-{
+DLLEXPORT uint8_t *trace_get_destination_mac(libtrace_packet_t *packet) {
+	/* Ensure the supplied packet is not NULL */
+	if (!packet) {
+		fprintf(stderr, "NULL packet passed into trace_get_destination_mac()\n");
+		return NULL;
+	}
+
         void *link;
         libtrace_linktype_t linktype;
         uint32_t remaining;
@@ -756,11 +777,10 @@ DLLEXPORT uint8_t *trace_get_destination_mac(libtrace_packet_t *packet)
                 case TRACE_TYPE_80211_PRISM:
                 case TRACE_TYPE_80211_RADIO:
                 case TRACE_TYPE_ETSILI:
-                        assert(!"Metadata headers should already be skipped");
-                        break;
+			fprintf(stderr, "Metadata headers should already be skipped in trace_get_destination_mac()\n");
+			return NULL;
         }
         fprintf(stderr,"Not implemented\n");
-        assert(0);
         return NULL;
 }
 

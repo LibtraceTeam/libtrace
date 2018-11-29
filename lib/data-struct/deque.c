@@ -62,11 +62,17 @@ DLLEXPORT void libtrace_deque_push_back(libtrace_queue_t *q, void *d)
 	// Only ->prev is unknown at this stage to be completed in lock
 	ASSERT_RET(pthread_mutex_lock(&q->lock), == 0);
 	if (q->head == NULL) {
-		assert(q->tail == NULL && q->size == 0);
+		if (q->tail != NULL || q->size != 0) {
+			fprintf(stderr, "Error deque head cannot be NULL with a non NULL tail and size of more than 0 in libtrace_deque_push_back()\n");
+			return;
+		}
 		new_node->prev = NULL;
 		q->head = q->tail = new_node;
 	} else {
-		assert (q->tail != NULL);
+		if (q->tail == NULL) {
+			fprintf(stderr, "Error deque tail cannot be NULL if it contains a head in libtrace_deque_push_back()\n");
+			return;
+		}
 		q->tail->next = new_node;
 		new_node->prev = q->tail; // Done the double link
 		q->tail = new_node; // Relink tail
@@ -85,11 +91,13 @@ DLLEXPORT void libtrace_deque_push_front(libtrace_queue_t *q, void *d)
 	// Only ->next is unknown at this stage to be completed in lock
 	ASSERT_RET(pthread_mutex_lock(&q->lock), == 0);
 	if (q->head == NULL) {
-		assert(q->tail == NULL && q->size == 0);
+		if (q->tail != NULL || q->size != 0) {
+			fprintf(stderr, "Error deque head cannot be NULL with a non NULL tail and size of more than 0 in libtrace_deque_push_front()\n");
+			return;
+		}
 		new_node->next = NULL;
 		q->head = q->tail = new_node;
 	} else {
-		assert (q->head != NULL);
 		q->head->prev = new_node;
 		new_node->next = q->head; // Done the double link
 		q->head = new_node; // Relink head

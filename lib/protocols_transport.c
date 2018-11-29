@@ -28,7 +28,6 @@
 #include "libtrace.h"
 #include "protocols.h"
 #include "checksum.h"
-#include <assert.h>
 #include <stdlib.h>
 #include <stdio.h> // fprintf
 #include <string.h>
@@ -567,8 +566,7 @@ DLLEXPORT uint16_t *trace_checksum_transport(libtrace_packet_t *packet,
 
 	sum += add_checksum(header, (uint16_t)plen);
 	*csum = ntohs(finish_checksum(sum));
-	//assert(0);
-	
+
 	return (uint16_t *)csum_ptr;
 }
 

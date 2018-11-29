@@ -306,7 +306,45 @@ enum {
 	/** Compression format unsupported */
 	TRACE_ERR_UNSUPPORTED_COMPRESS 	= -11,
         /** Wandio has returned an error */
-        TRACE_ERR_WANDIO_FAILED = -12  
+        TRACE_ERR_WANDIO_FAILED = -12,
+	/** Input URI (file) not found */
+        TRACE_ERR_URI_NOT_FOUND = -13,
+	/** NULL passed to create trace **/
+	TRACE_ERR_URI_NULL = -14,
+	/** NULL trace passed to trace_start **/
+	TRACE_ERR_NULL_TRACE = -15,
+	/** Unable to finish last packet in trace_pause **/
+	TRACE_ERR_PAUSE_FIN = -16,
+	/** Packet is NULL **/
+	TRACE_ERR_NULL_PACKET = -17,
+	/** Filter is NULL **/
+	TRACE_ERR_NULL_FILTER = -18,
+	/** Buffer is NULL **/
+	TRACE_ERR_NULL_BUFFER = -19,
+	/** Trace stats err **/
+	TRACE_ERR_STAT = -20,
+	/** Unable to create deadtrace **/
+	TRACE_ERR_CREATE_DEADTRACE = -21,
+	/** Bad linktype **/
+	TRACE_ERR_BAD_LINKTYPE = -22,
+	/** Bad IO for the trace **/
+	TRACE_ERR_BAD_IO = -23,
+	/** Trace has bad header **/
+	TRACE_ERR_BAD_HEADER = -24,
+	/** Trace err seeking by erf **/
+	TRACE_ERR_SEEK_ERF = -25,
+	/** Trace err combiner **/
+	TRACE_ERR_COMBINER = -26,
+	/** Error pausing processing thread **/
+	TRACE_ERR_PAUSE_PTHREAD = -27,
+	/** Error with trace thread **/
+	TRACE_ERR_THREAD = -28,
+	/** Thread in unexpecting state **/
+	TRACE_ERR_THREAD_STATE = -29,
+	/** Trace configuration error **/
+	TRACE_ERR_CONFIG = -30,
+	/** NULL passed misc **/
+	TRACE_ERR_NULL = -31,
 };
 
 /** Enumeration of DLTs supported by libtrace 
@@ -400,6 +438,7 @@ enum base_format_t {
         TRACE_FORMAT_NDAG       =19,    /**< DAG multicast over a network */
         TRACE_FORMAT_DPDK_NDAG       =20,    /**< DAG multicast over a network, received via DPDK */
         TRACE_FORMAT_ETSILIVE     =21,  /**< ETSI LI over a network */
+	TRACE_FORMAT_UNKNOWN      =22,  /** Unknown format */
 };
 
 /** RT protocol packet types */
