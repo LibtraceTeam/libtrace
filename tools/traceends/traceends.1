@@ -1,10 +1,13 @@
-.TH TRACEENDS "1" "September 2011" "traceends (libtrace)" "User Commands"
+.TH TRACEENDS "1" "December 2018" "traceends (libtrace)" "User Commands"
 .SH NAME
 traceends \- summarise traffic done by every endpoint observed in a trace
 .SH SYNOPSIS
-.B tracetopends
-[ \fB-f \fRbpf | \fB--filter=\fRbpf]
-[ \fB-a \fRaddrtype | \fB--address=\fRaddrtype]
+.B traceends
+[ \fB-t \fRthreads | \fB--threads=\fRthreads ]
+[ \fB-f \fRbpf | \fB--filter=\fRbpf ]
+[ \fB-a \fRaddrtype | \fB--address=\fRaddrtype ]
+[ \fB-S \fR| \fB--ignore-source\fR ]
+[ \fB-D \fR| \fB--ignore-dest\fR ]
 [ \fB-H | \fB--help]
 
 inputuri [inputuri ...] 
@@ -13,15 +16,30 @@ traceends reports the number of bytes and packets sent and received by each
 endpoint observed in the input trace(s). Usually, you don't want to run this
 program directly \-\- see \fBtracetopends\fR instead.
 
+.SH OPTIONS
+.TP
+\fB\-t\fR threads
+Use the given number of threads for packet processing. Defaults to 1 thread.
+
 .TP
 \fB\-f\fR bpf filter
-output only packets that match tcpdump style bpf filter
+Ignore packets that do not match this tcpdump style bpf filter.
 
 .TP
 \fB\-A\fR address type
 Specifies how an endpoint should be defined. Suitable options are "mac", "v4" 
 and "v6" which will report endpoint stats for each observed MAC address, IPv4
 address and IPv6 address respectively.
+
+.TP
+\fB\-S, --ignore-source\fR
+Do not track endpoints which are sending traffic. Mutually exclusive with the
+\fBignore-dest\fR option.
+
+.TP
+\fB\-D, --ignore-dest\fR
+Do not track endpoints which are receiving traffic. Mutually exclusive with the
+\fBignore-source\fR option.
 
 .SH OUTPUT
 Output is written to stdout in columns separated by blank space. 
