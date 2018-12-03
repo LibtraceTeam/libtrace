@@ -689,17 +689,11 @@ static void linuxring_fin_packet(libtrace_packet_t *packet)
 
 	if (packet->buffer == NULL)
 		return;
-<<<<<<< HEAD
-	if (!libtrace) {
-                return;
-        }
-=======
 	if (!packet->trace) {
 		fprintf(stderr, "Linux ring packet is not attached to a valid "
 			"trace, Unable to release it, in linuxring_fin_packet()\n");
 		return;
 	}
->>>>>>> fdf23b83dbe8088f53ec27af98ec6ed7b71cc34d
 
 	/* If we own the packet (i.e. it's not a copy), we need to free it */
 	if (packet->buf_control == TRACE_CTRL_EXTERNAL) {
