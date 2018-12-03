@@ -1,4 +1,4 @@
-W/*
+/*
  *
  * Copyright (c) 2007-2016 The University of Waikato, Hamilton, New Zealand.
  * All rights reserved.
@@ -1135,7 +1135,7 @@ static int dag_dump_packet(libtrace_out_t *libtrace,
 	/* Ensure size is padded to 8bytes */
 	if (size - (size % 8) != size) {
 		size = size - (size % 8);
-		erfptr->rlen = htons(size + (dag_record_size + pad);
+		erfptr->rlen = htons(size + (dag_record_size + pad));
 	}
 
 	memcpy(FORMAT_DATA_OUT->txbuffer + FORMAT_DATA_OUT->waiting, buffer,
