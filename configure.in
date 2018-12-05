@@ -601,7 +601,7 @@ if (test "$use_llvm" != "no"); then
 		JIT=no
 	else
 		LIBCXXFLAGS="`$LLVM_CONFIG --cxxflags` $CXXFLAGS"
-		LIBTRACE_LIBS="$LIBRACE_LIBS `$LLVM_CONFIG --libs all`";
+		LIBTRACE_LIBS="$LIBTRACE_LIBS `$LLVM_CONFIG --libs all`";
 		LDFLAGS="`$LLVM_CONFIG --ldflags` $LDFLAGS";
 		JIT=yes
 		AC_DEFINE(HAVE_LLVM, 1, [Set to 1 if you have LLVM installed])
