@@ -325,18 +325,25 @@ static int per_packet(libtrace_packet_t **packet) {
         /* Support "jump"ping to the nth IP header. */
         if (jump) {
             /* Skip headers */
-            void *newpacket = perform_jump(*packet, jump);
+            struct libtrace_packet_t *newpacket = perform_jump(*packet, jump);
             if (newpacket) {
-                trace_destroy_packet(*packet);
-                *packet = newpacket;
+		/* If an IP header was found on the nth layer down
+		 * write out the packet  */
+	        if (trace_write_packet(output, newpacket)==-1) {
+                    trace_perror_output(output,"write_packet");
+                    return -1;
+        	}
+		/* Then destroy the packet */
+		trace_destroy_packet(newpacket);
             }
-            else /* Skip packet */
+            else /* Skip packet - Payload ran out before getting to nth layer */
                 return 1;
-        }
+        } else {
 
-	if (trace_write_packet(output, *packet)==-1) {
+	    if (trace_write_packet(output, *packet)==-1) {
 		trace_perror_output(output,"write_packet");
 		return -1;
+	    }
 	}
 
 	return 1;
