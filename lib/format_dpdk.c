@@ -2152,9 +2152,10 @@ libtrace_eventobj_t dpdk_trace_event(libtrace_t *trace,
 			if (packet->buffer != NULL) {
 				/* The packet should always be finished */
 				if (packet->buf_control != TRACE_CTRL_PACKET) {
-					trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Expected packet "
+					trace_set_err(trace, TRACE_ERR_BAD_PACKET, "Expected packet "
 						"buffer to be empty in dpdk_trace_event()\n");
-					return -1;
+					event.type = TRACE_EVENT_TERMINATE;
+					return event;
 				}
 				free(packet->buffer);
 				packet->buffer = NULL;
