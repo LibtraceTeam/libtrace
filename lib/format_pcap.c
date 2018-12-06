@@ -399,7 +399,9 @@ static int pcap_fin_output(libtrace_out_t *libtrace)
 		pcap_dump_flush(OUTPUT.trace.dump);
 		pcap_dump_close(OUTPUT.trace.dump);
 	}
-	pcap_close(OUTPUT.trace.pcap);
+	if (OUTPUT.trace.pcap) {
+		pcap_close(OUTPUT.trace.pcap);
+	}
 	free(libtrace->format_data);
 	return 0;
 }
