@@ -1049,8 +1049,6 @@ static int receive_from_sockets(recvstream_t *rt) {
         readybufs = 0;
         gottime = 0;
 
-        FD_ZERO(&fds);
-
 	if (rt->maxfd == -1) {
 		return 0;
 	}
@@ -1075,6 +1073,9 @@ static int receive_from_sockets(recvstream_t *rt) {
                         continue;
                 }
 #endif
+                if (maxfd == 0) {
+                        FD_ZERO(&fds);
+                }
                 FD_SET(rt->sources[i].sock, &fds);
                 if (maxfd < rt->sources[i].sock) {
                         maxfd = rt->sources[i].sock;
