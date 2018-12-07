@@ -409,7 +409,7 @@ libtrace_thread_t * get_thread_table(libtrace_t *libtrace) {
 		if (pthread_equal(tid, libtrace->perpkt_threads[i].tid))
 			return &libtrace->perpkt_threads[i];
 	}
-	pthread_exit(NULL);
+	return NULL;
 }
 
 static libtrace_thread_t * get_thread_descriptor(libtrace_t *libtrace) {
@@ -652,6 +652,7 @@ static void* perpkt_threads_entry(void *data) {
 	t = get_thread_table(trace);
 	if (!t) {
 		trace_set_err(trace, TRACE_ERR_THREAD, "Unable to get thread table in perpkt_threads_entry()");
+		ASSERT_RET(pthread_mutex_unlock(&trace->libtrace_lock), == 0);
 		pthread_exit(NULL);
 	}
 	if (trace->state == STATE_ERROR) {
@@ -2230,7 +2231,6 @@ DLLEXPORT int trace_pstop(libtrace_t *libtrace)
 
 	// Now send a message asking the threads to stop
 	// This will be retrieved before trying to read another packet
-
 	message.code = MESSAGE_DO_STOP;
 	trace_message_perpkts(libtrace, &message);
 	if (trace_has_dedicated_hasher(libtrace))
