@@ -123,26 +123,31 @@ typedef struct erf_index_t {
  */
 static inline int erf_get_padding(const libtrace_packet_t *packet)
 {
-	if (packet->trace->format->type==TRACE_FORMAT_ERF ||
-                        packet->trace->format->type == TRACE_FORMAT_NDAG ||
-                        packet->trace->format->type == TRACE_FORMAT_RAWERF ||
-                        packet->trace->format->type == TRACE_FORMAT_DPDK_NDAG) {
-		dag_record_t *erfptr = (dag_record_t *)packet->header;
-		switch((erfptr->type & 0x7f)) {
-			case TYPE_ETH:
-			case TYPE_COLOR_ETH:
-			case TYPE_DSM_COLOR_ETH:
-			case TYPE_COLOR_HASH_ETH:
-				return 2;
-			default: 		return 0;
-		}
+        dag_record_t *erfptr = (dag_record_t *)packet->header;
+
+        switch(packet->trace->format->type) {
+                case TRACE_FORMAT_ERF:
+                case TRACE_FORMAT_NDAG:
+                case TRACE_FORMAT_RAWERF:
+                case TRACE_FORMAT_DPDK_NDAG:
+                        switch((erfptr->type & 0x7f)) {
+                                case TYPE_ETH:
+                                case TYPE_COLOR_ETH:
+                                case TYPE_DSM_COLOR_ETH:
+                                case TYPE_COLOR_HASH_ETH:
+                                        return 2;
+                                default:
+                                        return 0;
+                        }
+                        break;
+                default:
+                        switch(trace_get_link_type(packet)) {
+                                case TRACE_TYPE_ETH:	return 2;
+                                default:		return 0;
+                        }
+                        break;
 	}
-	else {
-		switch(trace_get_link_type(packet)) {
-			case TRACE_TYPE_ETH:	return 2;
-			default:		return 0;
-		}
-	}
+        return 0;
 }
 
 int erf_is_color_type(uint8_t erf_type)
