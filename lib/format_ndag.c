@@ -1053,9 +1053,6 @@ static int receive_from_sockets(recvstream_t *rt) {
 		return 0;
 	}
 
-	zerotv.tv_sec = 0;
-	zerotv.tv_usec = 0;
-
 	for (i = 0; i < rt->sourcecount; i++) {
                 if (rt->sources[i].sock == -1) {
                         continue;
@@ -1087,6 +1084,8 @@ static int receive_from_sockets(recvstream_t *rt) {
                 return readybufs;
         }
 
+        zerotv.tv_sec = 0;
+        zerotv.tv_usec = 0;
 	if (select(maxfd + 1, &fds, NULL, NULL, &zerotv) == -1) {
 		/* log the error? XXX */
 		return -1;
@@ -1258,23 +1257,18 @@ static int ndag_pread_packets(libtrace_t *libtrace, libtrace_thread_t *t,
 
         rt = (recvstream_t *)t->format_data;
 
-
         do {
                 /* Only check for messages once per batch */
                 if (read_packets == 0) {
                         rem = receive_encap_records_block(libtrace, rt,
                                 packets[read_packets]);
-                } else {
-                        rem = receive_encap_records_nonblock(libtrace, rt,
-                                packets[read_packets]);
-                }
+                        if (rem < 0) {
+                                return rem;
+                        }
 
-                if (rem < 0) {
-                        return rem;
-                }
-
-                if (rem == 0) {
-                        break;
+                        if (rem == 0) {
+                                break;
+                        }
                 }
 
                 nextavail = select_next_packet(rt);
