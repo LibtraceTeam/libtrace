@@ -561,8 +561,8 @@ static int etsilive_prepare_received(libtrace_t *libtrace,
         packet->order = esock->cached.timestamp;
         packet->error = esock->cached.length;
 
-        packet->wire_length = esock->cached.length;
-        packet->capture_length = esock->cached.length;
+        packet->cached.wire_length = esock->cached.length;
+        packet->cached.capture_length = esock->cached.length;
 
         /* Advance the read pointer for this buffer
          * TODO should really do this in fin_packet, but will need a ref
