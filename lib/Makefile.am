@@ -9,8 +9,8 @@ pkginclude_HEADERS = dagformat.h lt_inttypes.h daglegacy.h \
 	data-struct/message_queue.h hash_toeplitz.h \
         data-struct/simple_circular_buffer.h
 
-AM_CFLAGS=@LIBCFLAGS@ @CFLAG_VISIBILITY@ -pthread
-AM_CXXFLAGS=@LIBCXXFLAGS@ @CFLAG_VISIBILITY@ -pthread
+AM_CFLAGS=@LIBCFLAGS@ @CFLAG_VISIBILITY@ -pthread -std=gnu99
+AM_CXXFLAGS=@LIBCXXFLAGS@ @CFLAG_VISIBILITY@ -pthread -std=gnu99
 
 extra_DIST = format_template.c
 NATIVEFORMATS=format_linux_common.c format_linux_ring.c format_linux_int.c format_linux_common.h
