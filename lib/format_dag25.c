@@ -622,6 +622,8 @@ static int dag_config_input(libtrace_t *libtrace, trace_option_t option,
 		 * the user to configure this correctly. */
 		return 0;
 	}
+        case TRACE_OPTION_CONSTANT_ERF_FRAMING:
+                return -1;
 	return -1;
 }
 

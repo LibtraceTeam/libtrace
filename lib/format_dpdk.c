@@ -734,6 +734,7 @@ int dpdk_config_input (libtrace_t *libtrace,
 	case TRACE_OPTION_META_FREQ:
 	case TRACE_OPTION_EVENT_REALTIME:
         case TRACE_OPTION_REPLAY_SPEEDUP:
+        case TRACE_OPTION_CONSTANT_ERF_FRAMING:
 		break;
 	/* Avoid default: so that future options will cause a warning
 	 * here to remind us to implement it, or flag it as

@@ -377,6 +377,8 @@ static int bpf_config_input(libtrace_t *libtrace,
 			break;
 		case TRACE_OPTION_REPLAY_SPEEDUP:
 			break;
+		case TRACE_OPTION_CONSTANT_ERF_FRAMING:
+			break;
 		/* Avoid default: so that future options will cause a warning
 		 * here to remind us to implement it, or flag it as
 		 * unimplementable

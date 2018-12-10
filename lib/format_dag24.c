@@ -229,6 +229,8 @@ static int dag_config_input(libtrace_t *libtrace, trace_option_t option,
 		case TRACE_OPTION_EVENT_REALTIME:
 			/* Live capture is always going to be realtime */
 			return -1;
+                case TRACE_OPTION_CONSTANT_ERF_FRAMING:
+                        return -1;
         }
 	return -1;
 }
