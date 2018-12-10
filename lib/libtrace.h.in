@@ -1365,6 +1365,10 @@ typedef enum {
 
         /** Speed up trace file replays (via trace_event()) by this factor */
         TRACE_OPTION_REPLAY_SPEEDUP,
+
+        /** Always assume ERF framing length is the given value, rather than
+         *  trying to calculate it from the packet type. */
+        TRACE_OPTION_CONSTANT_ERF_FRAMING,
 } trace_option_t;
 
 /** Sets an input config option

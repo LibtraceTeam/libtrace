@@ -673,6 +673,14 @@ DLLEXPORT int trace_config(libtrace_t *libtrace,
 		case TRACE_OPTION_HASHER:
 			/* Dealt with earlier */
 			return -1;
+                case TRACE_OPTION_CONSTANT_ERF_FRAMING:
+                        if (!trace_is_err(libtrace)) {
+                                trace_set_err(libtrace,
+                                                TRACE_ERR_OPTION_UNAVAIL,
+						"This format does not feature an ERF header or does not support bypassing the framing length calculation");
+                        }
+                        return -1;
+
 
 	}
 	if (!trace_is_err(libtrace)) {

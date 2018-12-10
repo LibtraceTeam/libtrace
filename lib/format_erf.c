@@ -253,6 +253,10 @@ static int erf_config_input(libtrace_t *libtrace, trace_option_t option,
 		case TRACE_OPTION_EVENT_REALTIME:
 			IN_OPTIONS.real_time = *(int *)value;
 			return 0;
+                case TRACE_OPTION_CONSTANT_ERF_FRAMING:
+                        trace_set_err(libtrace, TRACE_ERR_OPTION_UNAVAIL,
+                                        "Setting constant framing length is not supported for %s:", libtrace->format->name);
+                        return -1;
 		case TRACE_OPTION_SNAPLEN:
 		case TRACE_OPTION_PROMISC:
 		case TRACE_OPTION_FILTER:
@@ -666,7 +670,6 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 		libtrace_packet_t *packet) 
 {
 	int numbytes = 0;
-	unsigned int pad = 0;
 	dag_record_t *dag_hdr = (dag_record_t *)packet->header;
 	void *payload = packet->payload;
 
@@ -683,7 +686,6 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 		return -1;
 	}
 	
-	pad = erf_get_padding(packet);
 
 	/* If we've had an rxerror, we have no payload to write - fix
 	 * rlen to be the correct length 
@@ -691,6 +693,8 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 	/* I Think this is bogus, we should somehow figure out
 	 * a way to write out the payload even if it is gibberish -- Perry */
 	if (payload == NULL) {
+	        unsigned int pad = 0;
+	        pad = erf_get_padding(packet);
 		dag_hdr->rlen = htons(dag_record_size + pad);
 		
 	} 
@@ -719,7 +723,6 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 			return -1;
 
 		payload=packet->payload;
-		pad = erf_get_padding(packet);
 
 		erfhdr.type = libtrace_to_erf_type(trace_get_link_type(packet));
 

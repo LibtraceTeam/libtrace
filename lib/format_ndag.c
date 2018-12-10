@@ -124,6 +124,7 @@ typedef struct ndag_format_data {
 
         pthread_t controlthread;
         libtrace_message_queue_t controlqueue;
+        int consterfframing;
 } ndag_format_data_t;
 
 enum {
@@ -295,6 +296,7 @@ static int ndag_init_input(libtrace_t *libtrace) {
         FORMAT_DATA->localiface = NULL;
         FORMAT_DATA->nextthreadid = 0;
         FORMAT_DATA->receivers = NULL;
+        FORMAT_DATA->consterfframing = -1;
 
         scan = strchr(libtrace->uridata, ',');
         if (scan == NULL) {
@@ -315,6 +317,27 @@ static int ndag_init_input(libtrace_t *libtrace) {
 
                 FORMAT_DATA->portstr = strdup(scan + 1);
         }
+        return 0;
+}
+
+static int ndag_config_input(libtrace_t *libtrace, trace_option_t option,
+                void *value) {
+
+        switch(option) {
+                case TRACE_OPTION_CONSTANT_ERF_FRAMING:
+                        FORMAT_DATA->consterfframing = *(int *)value;
+                        break;
+                case TRACE_OPTION_EVENT_REALTIME:
+                case TRACE_OPTION_SNAPLEN:
+                case TRACE_OPTION_PROMISC:
+                case TRACE_OPTION_FILTER:
+                case TRACE_OPTION_META_FREQ:
+                default:
+                        trace_set_err(libtrace, TRACE_ERR_OPTION_UNAVAIL,
+                                        "Unsupported option");
+                        return -1;
+        }
+
         return 0;
 }
 
@@ -596,10 +619,25 @@ static int ndag_fin_input(libtrace_t *libtrace) {
         return 0;
 }
 
-static int ndag_prepare_packet_stream(libtrace_t *libtrace,
-                recvstream_t *rt,
-                streamsock_t *ssock, libtrace_packet_t *packet,
-                uint32_t flags) {
+static int ndag_get_framing_length(const libtrace_packet_t *packet) {
+
+        libtrace_t *libtrace = packet->trace;
+
+        if (FORMAT_DATA->consterfframing >= 0) {
+                return FORMAT_DATA->consterfframing;
+        }
+        return erf_get_framing_length(packet);
+}
+
+static int ndag_prepare_packet_stream(libtrace_t *restrict libtrace,
+                recvstream_t *restrict rt,
+                streamsock_t *restrict ssock,
+                libtrace_packet_t *restrict packet,
+                uint32_t flags UNUSED) {
+
+        /* XXX flags is constant, so we can tell the compiler to not
+         * bother copying over the parameter
+         */
 
         dag_record_t *erfptr;
         ndag_encap_t *encaphdr;
@@ -607,11 +645,14 @@ static int ndag_prepare_packet_stream(libtrace_t *libtrace,
         int nr;
 	uint16_t rlen;
 
+        /*
         if ((flags & TRACE_PREP_OWN_BUFFER) == TRACE_PREP_OWN_BUFFER) {
                 packet->buf_control = TRACE_CTRL_PACKET;
         } else {
                 packet->buf_control = TRACE_CTRL_EXTERNAL;
         }
+        */
+        packet->buf_control = TRACE_CTRL_EXTERNAL;
 
         packet->trace = libtrace;
         packet->buffer = ssock->nextread;
@@ -622,10 +663,19 @@ static int ndag_prepare_packet_stream(libtrace_t *libtrace,
 
         if (erfptr->flags.rxerror == 1) {
                 packet->payload = NULL;
-                erfptr->rlen = htons(erf_get_framing_length(packet));
+                if (FORMAT_DATA->consterfframing >= 0) {
+                        erfptr->rlen = htons(FORMAT_DATA->consterfframing & 0xffff);
+                } else {
+                        erfptr->rlen = htons(erf_get_framing_length(packet));
+                }
         } else {
-                packet->payload = (char *)packet->buffer +
+                if (FORMAT_DATA->consterfframing >= 0) {
+                        packet->payload = (char *)packet->buffer +
+                                FORMAT_DATA->consterfframing;
+                } else {
+                        packet->payload = (char *)packet->buffer +
                                 erf_get_framing_length(packet);
+                }
         }
 
         /* Update upstream drops using lctr */
@@ -1452,7 +1502,7 @@ static struct libtrace_format_t ndag = {
         NULL,                   /* probe filename */
         NULL,                   /* probe magic */
         ndag_init_input,        /* init_input */
-        NULL,                   /* config_input */
+        ndag_config_input,      /* config_input */
         ndag_start_input,       /* start_input */
         ndag_pause_input,       /* pause_input */
         NULL,                   /* init_output */
@@ -1477,7 +1527,7 @@ static struct libtrace_format_t ndag = {
         NULL,                   /* seek_seconds */
         erf_get_capture_length, /* get_capture_length */
         erf_get_wire_length,    /* get_wire_length */
-        erf_get_framing_length, /* get_framing_length */
+        ndag_get_framing_length, /* get_framing_length */
         erf_set_capture_length, /* set_capture_length */
         NULL,                   /* get_received_packets */
         NULL,                   /* get_filtered_packets */
