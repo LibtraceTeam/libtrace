@@ -460,7 +460,7 @@ static size_t linuxnative_set_capture_length(libtrace_packet_t *packet,
 	}
 	
 	/* Reset the cached capture length */
-	packet->capture_length = -1;
+	packet->cached.capture_length = -1;
 
 	linux_hdr = (struct libtrace_linuxnative_header *)packet->header;
 	linux_hdr->caplen = size;

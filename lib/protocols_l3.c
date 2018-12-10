@@ -225,7 +225,7 @@ DLLEXPORT void *trace_get_layer3(const libtrace_packet_t *packet,
 	if (!remaining) remaining=&dummy_remaining;
 
 	/* use l3 cache */
-	if (packet->l3_header)
+	if (packet->cached.l3_header)
 	{
 		/*
 		link = trace_get_packet_buffer(packet,&linktype,remaining);
@@ -234,17 +234,17 @@ DLLEXPORT void *trace_get_layer3(const libtrace_packet_t *packet,
 			return NULL;
 		*/
 
-		*ethertype = packet->l3_ethertype;
-		/* *remaining -= (packet->l3_header - link); */
-		*remaining = packet->l3_remaining;
+		*ethertype = packet->cached.l3_ethertype;
+		/* *remaining -= (packet->cached.l3_header - link); */
+		*remaining = packet->cached.l3_remaining;
 
-		return packet->l3_header;
+		return packet->cached.l3_header;
 	}
 
-        if (packet->l2_header) {
-                link = packet->l2_header;
-                linktype = packet->link_type;
-                *remaining = packet->l2_remaining;
+        if (packet->cached.l2_header) {
+                link = packet->cached.l2_header;
+                linktype = packet->cached.link_type;
+                *remaining = packet->cached.l2_remaining;
         } else {
         	link = trace_get_layer2(packet,&linktype,remaining);
         }
@@ -287,9 +287,9 @@ DLLEXPORT void *trace_get_layer3(const libtrace_packet_t *packet,
 
 	/* Store values in the cache for later */
 	/* Cast away constness, nasty, but this is just a cache */
-	((libtrace_packet_t*)packet)->l3_ethertype = *ethertype;
-	((libtrace_packet_t*)packet)->l3_header = iphdr;
-	((libtrace_packet_t*)packet)->l3_remaining = *remaining;
+	((libtrace_packet_t*)packet)->cached.l3_ethertype = *ethertype;
+	((libtrace_packet_t*)packet)->cached.l3_header = iphdr;
+	((libtrace_packet_t*)packet)->cached.l3_remaining = *remaining;
 
 	return iphdr;
 }

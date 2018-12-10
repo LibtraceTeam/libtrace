@@ -467,7 +467,7 @@ static size_t linuxring_set_capture_length(libtrace_packet_t *packet,
 	}
 
 	/* Reset the cached capture length */
-	packet->capture_length = -1;
+	packet->cached.capture_length = -1;
 
 	TO_TP_HDR2(packet->buffer)->tp_snaplen = size;
 

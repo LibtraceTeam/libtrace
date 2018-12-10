@@ -851,7 +851,7 @@ size_t erf_set_capture_length(libtrace_packet_t *packet, size_t size) {
 	/* Reset cached capture length - otherwise we will both return the
 	 * wrong value here and subsequent get_capture_length() calls will
 	 * return the wrong value. */
-	packet->capture_length = -1;
+	packet->cached.capture_length = -1;
 	erfptr->rlen = htons(size + trace_get_framing_length(packet));
         wlen = ntohs(erfptr->wlen);
 

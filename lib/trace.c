@@ -103,6 +103,9 @@ volatile int libtrace_halt = 0;
 /* Set once pstart is called used for backwards compatibility reasons */
 int libtrace_parallel = 0;
 
+static const libtrace_packet_cache_t clearcache = {
+        -1, -1, -1, -1, NULL, 0, 0, NULL, 0, 0, NULL, 0, 0};
+
 /* strncpy is not assured to copy the final \0, so we
  * will use our own one that does
  */
@@ -1401,21 +1404,21 @@ DLLEXPORT size_t trace_get_capture_length(const libtrace_packet_t *packet)
         if (packet->which_trace_start != packet->trace->startcount) {
                 return ~0U;
         }
-	if (packet->capture_length == -1) {
+	if (packet->cached.capture_length == -1) {
 		if (!packet->trace->format->get_capture_length)
 			return ~0U;
 		/* Cast away constness because this is "just" a cache */
-		((libtrace_packet_t*)packet)->capture_length =
+		((libtrace_packet_t*)packet)->cached.capture_length =
 			packet->trace->format->get_capture_length(packet);
 	}
 
-	if (!(packet->capture_length < LIBTRACE_PACKET_BUFSIZE)) {
+	if (!(packet->cached.capture_length < LIBTRACE_PACKET_BUFSIZE)) {
 		fprintf(stderr, "Capture length is greater than the buffer size in trace_get_capture_length()\n");
 		return 0;
 		/* should we be returning ~OU here? */
 	}
 
-	return packet->capture_length;
+	return packet->cached.capture_length;
 }
 
 /* Get the size of the packet as it was seen on the wire.
@@ -1431,19 +1434,19 @@ DLLEXPORT size_t trace_get_wire_length(const libtrace_packet_t *packet){
                 return ~0U;
         }
 
-	if (packet->wire_length == -1) {
+	if (packet->cached.wire_length == -1) {
 		if (!packet->trace->format->get_wire_length)
 			return ~0U;
-		((libtrace_packet_t *)packet)->wire_length =
+		((libtrace_packet_t *)packet)->cached.wire_length =
 			packet->trace->format->get_wire_length(packet);
 	}
 
-	if (!(packet->wire_length < LIBTRACE_PACKET_BUFSIZE)) {
+	if (!(packet->cached.wire_length < LIBTRACE_PACKET_BUFSIZE)) {
 		fprintf(stderr, "Wire length is greater than the buffer size in trace_get_wire_length()\n");
 		return 0;
 		/* should we be returning ~OU here? */
 	}
-	return packet->wire_length;
+	return packet->cached.wire_length;
 
 }
 
@@ -1459,14 +1462,14 @@ size_t trace_get_framing_length(const libtrace_packet_t *packet) {
                 return ~0U;
         }
 
-        if (packet->framing_length >= 0) {
-                return packet->framing_length;
+        if (packet->cached.framing_length >= 0) {
+                return packet->cached.framing_length;
         }
 
 	if (packet->trace->format->get_framing_length) {
-		((libtrace_packet_t *)packet)->framing_length =
+		((libtrace_packet_t *)packet)->cached.framing_length =
                        packet->trace->format->get_framing_length(packet);
-                return packet->framing_length;
+                return packet->cached.framing_length;
 	}
 	return ~0U;
 }
@@ -1482,14 +1485,14 @@ DLLEXPORT libtrace_linktype_t trace_get_link_type(const libtrace_packet_t *packe
                 return TRACE_TYPE_CONTENT_INVALID;
         }
 
-	if (packet->link_type == 0) {
+	if (packet->cached.link_type == 0) {
 		if (!packet->trace->format->get_link_type)
 			return TRACE_TYPE_UNKNOWN;
-		((libtrace_packet_t *)packet)->link_type =
+		((libtrace_packet_t *)packet)->cached.link_type =
 			packet->trace->format->get_link_type(packet);
 	}
 
-	return packet->link_type;
+	return packet->cached.link_type;
 }
 
 /* process a libtrace event
@@ -1975,8 +1978,8 @@ DLLEXPORT size_t trace_set_capture_length(libtrace_packet_t *packet, size_t size
 	}
 
 	if (packet->trace->format->set_capture_length) {
-		packet->capture_length = packet->trace->format->set_capture_length(packet,size);
-		return packet->capture_length;
+		packet->cached.capture_length = packet->trace->format->set_capture_length(packet,size);
+		return packet->cached.capture_length;
 	}
 
 	return ~0U;
@@ -2569,22 +2572,9 @@ int trace_print_statistics(const libtrace_stat_t *s, FILE *f, const char *format
 }
 
 
-void trace_clear_cache(libtrace_packet_t *packet) {
+inline void trace_clear_cache(libtrace_packet_t *packet) {
 
-	packet->l2_header = NULL;
-	packet->l3_header = NULL;
-	packet->l4_header = NULL;
-	packet->link_type = 0;
-	packet->l3_ethertype = 0;
-	packet->transport_proto = 0;
-	packet->capture_length = -1;
-	packet->wire_length = -1;
-	packet->framing_length = -1;
-	packet->payload_length = -1;
-	packet->l2_remaining = 0;
-	packet->l3_remaining = 0;
-	packet->l4_remaining = 0;
-        packet->refcount = 0;
+        packet->cached = clearcache;
 }
 
 void trace_interrupt(void) {

@@ -576,16 +576,7 @@ typedef enum {
 	TRACE_ETHERTYPE_PPP_SES = 0x8864	/**< PPPoE Session Messages */
 } libtrace_ethertype_t;
 
-/** The libtrace packet structure. Applications shouldn't be 
- * meddling around in here 
- */
-typedef struct libtrace_packet_t {
-	struct libtrace_t *trace; 	/**< Pointer to the trace */
-	void *header;			/**< Pointer to the framing header */
-	void *payload;			/**< Pointer to the link layer */
-	void *buffer;			/**< Allocated buffer */
-	libtrace_rt_types_t  type; 	/**< RT protocol type for the packet */
-	buf_control_t buf_control; 	/**< Describes memory ownership */
+typedef struct libtrace_packet_cache {
 	int capture_length;		/**< Cached capture length */
 	int wire_length;		/**< Cached wire length */
 	int payload_length;		/**< Cached payload length */
@@ -599,6 +590,19 @@ typedef struct libtrace_packet_t {
 	void *l4_header;		/**< Cached transport header */
 	uint8_t transport_proto;	/**< Cached transport protocol */
 	uint32_t l4_remaining;		/**< Cached transport remaining */
+} libtrace_packet_cache_t;
+
+/** The libtrace packet structure. Applications shouldn't be 
+ * meddling around in here 
+ */
+typedef struct libtrace_packet_t {
+	struct libtrace_t *trace; 	/**< Pointer to the trace */
+	void *header;			/**< Pointer to the framing header */
+	void *payload;			/**< Pointer to the link layer */
+	void *buffer;			/**< Allocated buffer */
+	libtrace_rt_types_t  type; 	/**< RT protocol type for the packet */
+	buf_control_t buf_control; 	/**< Describes memory ownership */
+        libtrace_packet_cache_t cached; /**< Cached packet properties / headers */
 	uint64_t order; /**< Notes the order of this packet in relation to the input */
 	uint64_t hash; /**< A hash of the packet as supplied by the user */
 	int error; /**< The error status of pread_packet */

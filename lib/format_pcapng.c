@@ -839,7 +839,7 @@ static int pcapng_read_simple(libtrace_t *libtrace, libtrace_packet_t *packet,
 
         /* May as well cache the capture length now, since we've
          * already got it in the right byte order */
-        packet->capture_length = caplen;
+        packet->cached.capture_length = caplen;
 
         if (pcapng_prepare_packet(libtrace, packet, packet->buffer,
                         packet->type, flags)) {
@@ -898,7 +898,7 @@ static int pcapng_read_enhanced(libtrace_t *libtrace, libtrace_packet_t *packet,
 
         /* May as well cache the capture length now, since we've
          * already got it in the right byte order */
-        packet->capture_length = caplen;
+        packet->cached.capture_length = caplen;
 
         if (pcapng_prepare_packet(libtrace, packet, packet->buffer,
                         packet->type, flags)) {
@@ -1348,7 +1348,7 @@ static size_t pcapng_set_capture_length(libtrace_packet_t *packet,
                         ehdr->caplen = size;
                 }
         }
-        packet->capture_length = -1;
+        packet->cached.capture_length = -1;
         return trace_get_capture_length(packet);
 }
 

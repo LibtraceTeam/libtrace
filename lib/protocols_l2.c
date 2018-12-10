@@ -180,7 +180,7 @@ libtrace_packet_t *trace_strip_packet(libtrace_packet_t *packet) {
                         packet->payload, 
                         (dest - (char *)packet->payload));
                 packet->payload = nextpayload - (dest - (char *)packet->payload);
-                packet->l2_header = NULL;
+                packet->cached.l2_header = NULL;
         }
         
         return packet;
@@ -455,11 +455,11 @@ DLLEXPORT void *trace_get_layer2(const libtrace_packet_t *packet,
 	if (remaining == NULL)
 		remaining = &dummyrem;
 
-	if (packet->l2_header) {
+	if (packet->cached.l2_header) {
 		/* Use cached values */
-		*linktype = packet->link_type;
-		*remaining = packet->l2_remaining;
-		return packet->l2_header;
+		*linktype = packet->cached.link_type;
+		*remaining = packet->cached.l2_remaining;
+		return packet->cached.l2_header;
 	}
 
 	/* Code looks a bit inefficient, but I'm actually trying to avoid
@@ -486,8 +486,8 @@ DLLEXPORT void *trace_get_layer2(const libtrace_packet_t *packet,
 		case TRACE_TYPE_METADATA:
 		case TRACE_TYPE_NONDATA:
 		case TRACE_TYPE_OPENBSD_LOOP:
-			((libtrace_packet_t*)packet)->l2_header = meta;
-			((libtrace_packet_t*)packet)->l2_remaining = *remaining;
+			((libtrace_packet_t*)packet)->cached.l2_header = meta;
+			((libtrace_packet_t*)packet)->cached.l2_remaining = *remaining;
 			return meta;
 		case TRACE_TYPE_LINUX_SLL:
 		case TRACE_TYPE_80211_RADIO:
@@ -524,8 +524,8 @@ DLLEXPORT void *trace_get_layer2(const libtrace_packet_t *packet,
 				case TRACE_TYPE_METADATA:
 				case TRACE_TYPE_NONDATA:
 				case TRACE_TYPE_OPENBSD_LOOP:
-					((libtrace_packet_t*)packet)->l2_header = meta;
-					((libtrace_packet_t*)packet)->l2_remaining = *remaining;
+					((libtrace_packet_t*)packet)->cached.l2_header = meta;
+					((libtrace_packet_t*)packet)->cached.l2_remaining = *remaining;
 					return meta;
 				case TRACE_TYPE_LINUX_SLL:
 				case TRACE_TYPE_80211_RADIO:

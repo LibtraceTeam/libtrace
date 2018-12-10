@@ -764,7 +764,7 @@ static size_t pcap_set_capture_length(libtrace_packet_t *packet,size_t size) {
 		return trace_get_capture_length(packet);
 	}
 	/* Reset the cached capture length */
-	packet->capture_length = -1;
+	packet->cached.capture_length = -1;
 	pcapptr = (struct pcap_pkthdr *)packet->header;
 	pcapptr->caplen = size;
 	return trace_get_capture_length(packet);

@@ -424,7 +424,7 @@ static int pcapfile_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 
 	/* We may as well cache this value now, seeing as we already had to 
 	 * look it up */
-	packet->capture_length = bytes_to_read;	
+	packet->cached.capture_length = bytes_to_read;	
 	return sizeof(libtrace_pcapfile_pkt_hdr_t) + bytes_to_read;
 }
 
@@ -711,7 +711,7 @@ static size_t pcapfile_set_capture_length(libtrace_packet_t *packet,size_t size)
 		return trace_get_capture_length(packet);
 	}
 	/* Reset the cached capture length */
-	packet->capture_length = -1;
+	packet->cached.capture_length = -1;
 	pcapptr = (libtrace_pcapfile_pkt_hdr_t *)packet->header;
 	pcapptr->caplen = swapl(packet->trace,(uint32_t)size);
 	return trace_get_capture_length(packet);
