@@ -1658,7 +1658,7 @@ static size_t dpdk_set_capture_length(libtrace_packet_t *packet, size_t size) {
 	}
 
 	/* Reset the cached capture length first*/
-	packet->capture_length = -1;
+	packet->cached.capture_length = -1;
 	hdr->cap_len = (uint32_t) size;
 	return trace_get_capture_length(packet);
 }
