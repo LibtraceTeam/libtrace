@@ -246,7 +246,7 @@ static void dag_init_format_data(libtrace_t *libtrace)
 	if (FORMAT_DATA->per_stream == NULL) {
 		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
 			"Unable to create list for stream in dag_init_format_data()");
-		return -1;
+		return;
 	}
 
 	/* We'll start with just one instance of stream_data, and we'll
@@ -621,9 +621,9 @@ static int dag_config_input(libtrace_t *libtrace, trace_option_t option,
 		/* Lets just say we did this, it's currently still up to
 		 * the user to configure this correctly. */
 		return 0;
-	}
         case TRACE_OPTION_CONSTANT_ERF_FRAMING:
                 return -1;
+	}
 	return -1;
 }
 
@@ -1239,13 +1239,13 @@ static int dag_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *packet)
 		/* Packet length (rlen includes format overhead) */
 		if (trace_get_capture_length(packet) <= 0
                        || trace_get_capture_length(packet) > 65536) {
-			trace_set_err(libtrace, TRACE_ERR_BAD_PACKET,
+			trace_set_err_out(libtrace, TRACE_ERR_BAD_PACKET,
 				"Capture length is out of range in dag_write_packet()");
 			return -1;
 		}
 		if (erf_get_framing_length(packet) <= 0
                        || trace_get_framing_length(packet) > 65536) {
-			trace_set_err(libtrace, TRACE_ERR_BAD_PACKET,
+			trace_set_err_out(libtrace, TRACE_ERR_BAD_PACKET,
 				"Framing length is out of range in dag_write_packet()");
 			return -1;
 		}
@@ -1253,7 +1253,7 @@ static int dag_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *packet)
                        erf_get_framing_length(packet) <= 0
                        || trace_get_capture_length(packet) +
                        erf_get_framing_length(packet) > 65536) {
-			trace_set_err(libtrace, TRACE_ERR_BAD_PACKET,
+			trace_set_err_out(libtrace, TRACE_ERR_BAD_PACKET,
 				"Capture + framing length is out of range in dag_write_packet()");
 			return -1;
 		}
