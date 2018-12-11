@@ -345,6 +345,8 @@ enum {
 	TRACE_ERR_CONFIG = -30,
 	/** NULL passed misc **/
 	TRACE_ERR_NULL = -31,
+	/** Err with trace output file **/
+	TRACE_ERR_OUTPUT_FILE = -32,
 };
 
 /** Enumeration of DLTs supported by libtrace 
