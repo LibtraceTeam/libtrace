@@ -557,7 +557,8 @@ static int pcapng_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *pack
 	libtrace_linktype_t linktype;
 
 	linktype = trace_get_link_type(packet);
-	/* discard meta packets from other capture types and unknown packets */
+	/* discard meta packets from other capture types and unknown packets
+	 * could try to convert erf meta packets? */
         if (linktype == TRACE_TYPE_NONDATA || linktype == TRACE_TYPE_UNKNOWN
                 || linktype == TRACE_TYPE_ERF_META || linktype == TRACE_TYPE_CONTENT_INVALID) {
                 return 0;
@@ -570,7 +571,7 @@ static int pcapng_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *pack
 			DATAOUT(libtrace)->compress_level,
 			DATAOUT(libtrace)->flag);
 	}
-
+	fprintf(stderr, "switch\n");
 	/* If the packet is already encapsulated in a pcapng frame just output it */
 	switch (pcapng_get_header_type(packet)) {
 		case PCAPNG_SECTION_TYPE: {
