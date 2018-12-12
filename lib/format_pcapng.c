@@ -368,6 +368,7 @@ static int pcapng_init_output(libtrace_out_t *libtrace) {
 	DATAOUT(libtrace)->byteswapped = false;
 
 	DATAOUT(libtrace)->nextintid = 0;
+	DATAOUT(libtrace)->lastdlt = 0;
 
 	return 0;
 }
