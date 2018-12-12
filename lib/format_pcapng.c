@@ -174,11 +174,12 @@ struct pcapng_format_data_out_t {
 	int flag;
 
 	/* Section data */
+	uint16_t sechdr_count;
 	bool byteswapped;
 
 	/* Interface data */
 	uint16_t nextintid;
-	libtrace_dlt_t lastdlt;
+	libtrace_linktype_t lastdlt;
 };
 
 struct pcapng_optheader {
@@ -219,9 +220,26 @@ static inline uint32_t pcapng_get_record_type(const libtrace_packet_t *packet) {
 
 static inline uint32_t pcapng_get_header_type(const libtrace_packet_t *packet) {
 	uint32_t *type = (uint32_t *)packet->buffer;
-	if (DATAOUT(packet->trace)->byteswapped)
-		return byteswap32(*type);
-	return *type;
+
+	/* Section blocks, interface blocks, name resolution blocks, stats blocks and
+	 * Custom blocks are all of type trace_type_pcapng_meta */
+	if (trace_get_link_type(packet) == TRACE_TYPE_PCAPNG_META) {
+		if (DATAOUT(packet->trace)->byteswapped) {
+                	return byteswap32(*type);
+		} else {
+        		return *type;
+		}
+	/* Only check for enhanced or simple packet blocks */
+	} else {
+		if (DATAOUT(packet->trace)->byteswapped) {
+			*type = byteswap32(*type);
+		}
+		if (*type == 0x00000006 || *type == 0x00000003) {
+			return *type;
+		}
+	}
+	/* not a pcapng header type */
+	return 0;
 }
 static inline uint32_t pcapng_get_blocklen(const libtrace_packet_t *packet) {
 	struct pcapng_peeker *hdr = (struct pcapng_peeker *)packet->buffer;
@@ -346,10 +364,10 @@ static int pcapng_init_output(libtrace_out_t *libtrace) {
 	DATAOUT(libtrace)->compress_type = TRACE_OPTION_COMPRESSTYPE_NONE;
 	DATAOUT(libtrace)->flag = O_CREAT|O_WRONLY;
 
+	DATAOUT(libtrace)->sechdr_count = 0;
 	DATAOUT(libtrace)->byteswapped = false;
 
 	DATAOUT(libtrace)->nextintid = 0;
-	DATAOUT(libtrace)->lastdlt = 0;
 
 	return 0;
 }
@@ -535,27 +553,29 @@ static int pcapng_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *pack
 		return -1;
 	}
 
-	uint32_t blocklen;
 	libtrace_linktype_t linktype;
-	uint32_t remaining;
-	void *link;
 
-	/* If the file is not open, open it. First item must be SBH header */
+	linktype = trace_get_link_type(packet);
+	/* discard meta packets from other capture types and unknown packets */
+        if (linktype == TRACE_TYPE_NONDATA || linktype == TRACE_TYPE_UNKNOWN
+                || linktype == TRACE_TYPE_ERF_META || linktype == TRACE_TYPE_CONTENT_INVALID) {
+                return 0;
+        }
+
+	/* If the file is not open, open it */
 	if (!DATAOUT(libtrace)->file) {
-		/* open output file */
 		DATAOUT(libtrace)->file = trace_open_file_out(libtrace,
-					DATAOUT(libtrace)->compress_type,
-					DATAOUT(libtrace)->compress_level,
-					DATAOUT(libtrace)->flag);
+			DATAOUT(libtrace)->compress_type,
+			DATAOUT(libtrace)->compress_level,
+			DATAOUT(libtrace)->flag);
+	}
 
-		/* If packet is a section block header just output it */
-		pcapng_sec_t *hdr = (pcapng_sec_t *)packet->buffer;
-		if (hdr->blocktype == PCAPNG_SECTION_TYPE) {
-
+	/* If the packet is already encapsulated in a pcapng frame just output it */
+	switch (pcapng_get_header_type(packet)) {
+		case PCAPNG_SECTION_TYPE: {
+			/* If we get a section header we need to calculate the
+			 * the byte ordering */
 			pcapng_sec_t *sechdr = (pcapng_sec_t *)packet->buffer;
-
-			/* now we need to determine the byte ordering so we know
-			 * how much to write out */
 			if (sechdr->ordering == 0x1A2B3C4D) {
 				DATAOUT(libtrace)->byteswapped = false;
 			} else if (sechdr->ordering == 0x4D3C2B1A) {
@@ -565,91 +585,125 @@ static int pcapng_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *pack
 			wandio_wwrite(DATAOUT(libtrace)->file, packet->buffer,
 				pcapng_get_blocklen(packet));
 
-			return 0;
+			DATAOUT(libtrace)->sechdr_count += 1;
+
+			return pcapng_get_blocklen(packet);
 		}
-
-		/* Create section block */
-		pcapng_sec_t sechdr;
-		sechdr.blocktype = PCAPNG_SECTION_TYPE;
-		sechdr.blocklen = 28;
-		sechdr.ordering = 0x1A2B3C4D;
-		sechdr.majorversion = 1;
-		sechdr.minorversion = 0;
-		sechdr.sectionlen = 0xFFFFFFFFFFFFFFFF;
-
-		wandio_wwrite(DATAOUT(libtrace)->file, &sechdr, sizeof(sechdr));
-		wandio_wwrite(DATAOUT(libtrace)->file, &sechdr.blocklen, sizeof(sechdr.blocklen));
-
-	}
-
-	/* Output interface type if we have not already */
-	if (DATAOUT(libtrace)->nextintid == 0) {
-
-		if (pcapng_get_header_type(packet) == PCAPNG_INTERFACE_TYPE) {
+		case PCAPNG_INTERFACE_TYPE: {
 			wandio_wwrite(DATAOUT(libtrace)->file, packet->buffer,
 				pcapng_get_blocklen(packet));
-			/* increment the interface counter */
- 	               	DATAOUT(libtrace)->nextintid += 1;
-			return 0;
+
+			/* increment the interface id */
+			DATAOUT(libtrace)->nextintid += 1;
+
+			return pcapng_get_blocklen(packet);
 		}
-
-		/* Create interface block*/
-		pcapng_int_t inthdr;
-		inthdr.blocktype = PCAPNG_INTERFACE_TYPE;
-		inthdr.blocklen = 20;
-		inthdr.linktype = libtrace_to_pcap_dlt(trace_get_link_type(packet));
-		inthdr.reserved = 0;
-		inthdr.snaplen = 0;
-
-		wandio_wwrite(DATAOUT(libtrace)->file, &inthdr, sizeof(inthdr));
-		wandio_wwrite(DATAOUT(libtrace)->file, &inthdr.blocklen, sizeof(inthdr.blocklen));
-
-		/* increment the interface counter */
-                DATAOUT(libtrace)->nextintid += 1;
-	}
-
-	switch (pcapng_get_header_type(packet)) {
 		case PCAPNG_OLD_PACKET_TYPE: {
 			wandio_wwrite(DATAOUT(libtrace)->file, packet->buffer,
 				pcapng_get_blocklen(packet));
-			return 0;
+
+			return pcapng_get_blocklen(packet);
 		}
 		case PCAPNG_SIMPLE_PACKET_TYPE: {
+			if (DATAOUT(libtrace)->nextintid == 0) {
+				trace_set_err_out(libtrace, TRACE_ERR_BAD_PACKET,
+					"Cannot output simple packet before a interface "
+					"block has been output in pcapng_write_packet()\n");
+				return -1;
+			}
 			wandio_wwrite(DATAOUT(libtrace)->file, packet->buffer,
 	        	        pcapng_get_blocklen(packet));
-	                return 0;
+
+	                return pcapng_get_blocklen(packet);
 		}
 		case PCAPNG_NAME_RESOLUTION_TYPE: {
 			wandio_wwrite(DATAOUT(libtrace)->file, packet->buffer,
                                 pcapng_get_blocklen(packet));
-			return 0;
+
+			return pcapng_get_blocklen(packet);
 		}
 		case PCAPNG_INTERFACE_STATS_TYPE: {
+			if (DATAOUT(libtrace)->nextintid == 0) {
+				trace_set_err_out(libtrace, TRACE_ERR_BAD_PACKET,
+					"Cannot output a interface statistics block before a "
+					"interface block has been output in pcapng_write_packet()\n");
+				return -1;
+			}
 			wandio_wwrite(DATAOUT(libtrace)->file, packet->buffer,
                        	        pcapng_get_blocklen(packet));
-                       	return 0;
+
+                       	return pcapng_get_blocklen(packet);
 		}
 		case PCAPNG_ENHANCED_PACKET_TYPE: {
+			if (DATAOUT(libtrace)->nextintid == 0) {
+				trace_set_err_out(libtrace, TRACE_ERR_BAD_PACKET,
+					"Cannot output enhanced packet before a interface "
+					"block has been output in pcapng_write_packet()\n");
+				return -1;
+			}
 			wandio_wwrite(DATAOUT(libtrace)->file, packet->buffer,
 				pcapng_get_blocklen(packet));
-	                return 0;
+
+	                return pcapng_get_blocklen(packet);
 		}
 		case PCAPNG_CUSTOM_TYPE: {
 			wandio_wwrite(DATAOUT(libtrace)->file, packet->buffer,
 	                        pcapng_get_blocklen(packet));
-			return 0;
+
+			return pcapng_get_blocklen(packet);
 		}
 		default: {
-			/* not a pcapng format libtrace knows */
+
+			/* create section header if not already */
+			if (DATAOUT(libtrace)->sechdr_count == 0) {
+				/* Create section block */
+		                pcapng_sec_t sechdr;
+		                sechdr.blocktype = PCAPNG_SECTION_TYPE;
+		                sechdr.blocklen = 28;
+		                sechdr.ordering = 0x1A2B3C4D;
+		                sechdr.majorversion = 1;
+		                sechdr.minorversion = 0;
+		                sechdr.sectionlen = 0xFFFFFFFFFFFFFFFF;
+
+	        	        wandio_wwrite(DATAOUT(libtrace)->file, &sechdr, sizeof(sechdr));
+		                wandio_wwrite(DATAOUT(libtrace)->file, &sechdr.blocklen, sizeof(sechdr.blocklen));
+
+				DATAOUT(libtrace)->sechdr_count += 1;
+			}
+
+			/* create interface header if not already or if the linktype has changed */
+			if (DATAOUT(libtrace)->nextintid == 0
+				|| DATAOUT(libtrace)->lastdlt != linktype) {
+				/* Create interface block*/
+		                pcapng_int_t inthdr;
+		                inthdr.blocktype = PCAPNG_INTERFACE_TYPE;
+		                inthdr.blocklen = 20;
+		                inthdr.linktype = libtrace_to_pcap_dlt(linktype);
+		                inthdr.reserved = 0;
+		                inthdr.snaplen = 0;
+
+		                wandio_wwrite(DATAOUT(libtrace)->file, &inthdr, sizeof(inthdr));
+		                wandio_wwrite(DATAOUT(libtrace)->file, &inthdr.blocklen, sizeof(inthdr.blocklen));
+
+		                /* increment the interface counter */
+		                DATAOUT(libtrace)->nextintid += 1;
+				/* update the last linktype */
+				DATAOUT(libtrace)->lastdlt = linktype;
+			}
 			break;
 		}
 	}
 
-	/* If we made it this far constuct a enhanced packet */
-	link = trace_get_packet_buffer(packet, &linktype, &remaining);
-
-	/* convert packet into enhanced packet */
+	/* If we get this far the packet is not a pcapng type so we need to encapsulate it
+	 * within a enhanced pcapng packet */
+	uint32_t remaining;
+        void *link;
+	uint32_t blocklen;
+	uint32_t padding;
+	void *padding_data;
 	pcapng_epkt_t epkthdr;
+
+	link = trace_get_packet_buffer(packet, &linktype, &remaining);
 
 	epkthdr.wlen = trace_get_wire_length(packet);
 	epkthdr.caplen = trace_get_capture_length(packet);
@@ -660,9 +714,9 @@ static int pcapng_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *pack
 	}
 
 	/* calculate padding to 32bits */
-	uint32_t padding = epkthdr.caplen % 4;
+	padding = epkthdr.caplen % 4;
 	if (padding) { padding = 4 - padding; }
-	void *padding_data = calloc(1, padding);
+	padding_data = calloc(1, padding);
 
 	/* calculate the block length */
 	blocklen = sizeof(epkthdr) + sizeof(epkthdr.blocklen) + epkthdr.caplen + padding;
@@ -688,7 +742,7 @@ static int pcapng_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *pack
 	/* release padding memory */
 	free(padding_data);
 
-	return 0;
+	return blocklen;
 }
 
 static int pcapng_flush_output(libtrace_out_t *libtrace) {
@@ -762,7 +816,7 @@ static int pcapng_read_section(libtrace_t *libtrace,
                 return err;
         }
 
-        packet->type = TRACE_RT_PCAPNG_META;
+        packet->type = pcapng_linktype_to_rt(TRACE_RT_PCAPNG_META);
         if (pcapng_prepare_packet(libtrace, packet, packet->buffer,
                         packet->type, flags)) {
                 return -1;
@@ -829,7 +883,7 @@ static int pcapng_read_interface(libtrace_t *libtrace,
 
         bodyptr = (char *) packet->buffer + sizeof(pcapng_int_t);
 
-        packet->type = TRACE_RT_PCAPNG_META;
+        packet->type = pcapng_linktype_to_rt(TRACE_RT_PCAPNG_META);
 
         if (pcapng_prepare_packet(libtrace, packet, packet->buffer,
                         packet->type, flags)) {
@@ -894,7 +948,7 @@ static int pcapng_read_nrb(libtrace_t *libtrace, libtrace_packet_t *packet,
 		}
         }
 
-        packet->type = TRACE_RT_PCAPNG_META;
+        packet->type = pcapng_linktype_to_rt(TRACE_RT_PCAPNG_META);
         if (pcapng_prepare_packet(libtrace, packet, packet->buffer,
                         packet->type, flags)) {
                 return -1;
@@ -938,7 +992,7 @@ static int pcapng_read_custom(libtrace_t *libtrace, libtrace_packet_t *packet,
 		}
         }
 
-        packet->type = TRACE_RT_PCAPNG_META;
+        packet->type = pcapng_linktype_to_rt(TRACE_RT_PCAPNG_META);
         if (pcapng_prepare_packet(libtrace, packet, packet->buffer,
                         packet->type, flags)) {
                 return -1;
@@ -1355,11 +1409,19 @@ static int pcapng_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 
 }
 
-static libtrace_linktype_t pcapng_get_link_type(const libtrace_packet_t *packet)
-{
+static libtrace_linktype_t pcapng_get_link_type(const libtrace_packet_t *packet) {
+
+	struct pcapng_peeker *hdr = (struct pcapng_peeker *)packet->buffer;
+
+	if (hdr->blocktype == PCAPNG_SECTION_TYPE
+		|| hdr->blocktype == PCAPNG_INTERFACE_TYPE
+		|| hdr->blocktype == PCAPNG_NAME_RESOLUTION_TYPE
+		|| hdr->blocktype == PCAPNG_INTERFACE_STATS_TYPE
+		|| hdr->blocktype == PCAPNG_CUSTOM_TYPE) {
+		return TRACE_TYPE_PCAPNG_META;
+	}
 
         return pcap_linktype_to_libtrace(rt_to_pcap_linktype(packet->type));
-
 }
 
 static libtrace_direction_t pcapng_get_direction(const libtrace_packet_t
