@@ -247,9 +247,7 @@ int main(int argc, char *argv[])
 					if (trace_read_packet(input[i],packet[i])>0) {
                                         	live[i] = true;
                                 	} else { break; }
-					//fprintf(stderr, "get timestamp\n");
 					this_ts = trace_get_erf_timestamp(packet[i]);
-					//fprintf(stderr, "got timestamp\n");
 				}
 
 				if (this_ts != 0 && (oldest==-1 ||
