@@ -242,11 +242,14 @@ int main(int argc, char *argv[])
 				 * and read new packets until we get one that has a ts */
 				while (this_ts == 0 && IS_LIBTRACE_META_PACKET(packet[i])) {
 					trace_write_packet(output,packet[i]);
-					/* read another packet */
+
+					/* read another packet, break if reached EOF */
 					if (trace_read_packet(input[i],packet[i])>0) {
                                         	live[i] = true;
-                                	}
+                                	} else { break; }
+					//fprintf(stderr, "get timestamp\n");
 					this_ts = trace_get_erf_timestamp(packet[i]);
+					//fprintf(stderr, "got timestamp\n");
 				}
 
 				if (this_ts != 0 && (oldest==-1 ||
