@@ -47,13 +47,22 @@
 #define PCAPNG_ENHANCED_PACKET_TYPE 0x00000006
 #define PCAPNG_CUSTOM_TYPE 0x00000BAD
 #define PCAPNG_CUSTOM_NONCOPY_TYPE 0x40000BAD
+#define PCAPNG_DECRYPTION_SECRETS_TYPE 0x0000000A
+
+#define PCAPNG_NRB_RECORD_END 0x0000
+#define PCAPNG_NRB_RECORD_IP4 0x0001
+#define PCAPNG_NRB_RECORD_IP6 0x0002
+
+#define PCAPNG_CUSTOM_OPTION_UTF8 0xBAC
+#define PCAPNG_CUSTOM_OPTION_BIN 0xBAD
+#define PCAPNG_CUSTOM_OPTION_UTF8_NONCOPY 0x4BAC
+#define PCAPNG_CUSTOM_OPTION_BIN_NONCOPY 0x4BAD
 
 #define PACKET_IS_ENHANCED (pcapng_get_record_type(packet) == PCAPNG_ENHANCED_PACKET_TYPE)
 
 #define PACKET_IS_SIMPLE (pcapng_get_record_type(packet) == PCAPNG_SIMPLE_PACKET_TYPE)
 
 #define PACKET_IS_OLD (pcapng_get_record_type(packet) == PCAPNG_OLD_PACKET_TYPE)
-
 
 #define PCAPNG_IFOPT_TSRESOL 9
 
@@ -187,6 +196,15 @@ struct pcapng_optheader {
         uint16_t optlen;
 };
 
+struct pcapng_custom_optheader {
+	uint16_t optcode;
+	uint16_t optlen;
+	uint32_t pen;
+};
+struct pcapng_nrb_record {
+	uint16_t recordtype;
+	uint16_t recordlen;
+};
 struct pcapng_peeker {
         uint32_t blocktype;
         uint32_t blocklen;
@@ -196,6 +214,9 @@ typedef struct pcapng_peeker pcapng_hdr_t;
 
 #define DATA(x) ((struct pcapng_format_data_t *)((x)->format_data))
 #define DATAOUT(x) ((struct pcapng_format_data_out_t*)((x)->format_data))
+
+static char *pcapng_parse_next_option(libtrace_t *libtrace, char **pktbuf,
+                uint16_t *code, uint16_t *length, pcapng_hdr_t *blockhdr);
 
 static bool pcapng_can_write(libtrace_packet_t *packet) {
 	/* Get the linktype */
@@ -227,6 +248,7 @@ static pcapng_interface_t *lookup_interface(libtrace_t *libtrace,
 static inline uint32_t pcapng_get_record_type(const libtrace_packet_t *packet) {
         uint32_t *btype = (uint32_t *)packet->header;
 
+	/* Can be NULL if trace is a dead trace */
 	if (DATA(packet->trace) == NULL) {
 		return *btype;
 	}
@@ -237,10 +259,6 @@ static inline uint32_t pcapng_get_record_type(const libtrace_packet_t *packet) {
 }
 
 static inline uint32_t pcapng_swap32(libtrace_out_t *libtrace, uint32_t value) {
-	if (DATAOUT(libtrace) == NULL) {
-		return value;
-	}
-
 	if (DATAOUT(libtrace)->byteswapped) {
 		return byteswap32(value);
 	} else {
@@ -248,10 +266,6 @@ static inline uint32_t pcapng_swap32(libtrace_out_t *libtrace, uint32_t value) {
 	}
 }
 static inline uint32_t pcapng_swap16(libtrace_out_t *libtrace, uint32_t value) {
-	if (DATAOUT(libtrace) == NULL) {
-		return value;
-	}
-
 	if (DATAOUT(libtrace)->byteswapped) {
 		return byteswap16(value);
 	} else {
@@ -259,17 +273,405 @@ static inline uint32_t pcapng_swap16(libtrace_out_t *libtrace, uint32_t value) {
 	}
 }
 static inline uint32_t pcapng_get_blocklen(const libtrace_packet_t *packet) {
-	struct pcapng_peeker *hdr = (struct pcapng_peeker *)packet->buffer;
+        struct pcapng_peeker *hdr = (struct pcapng_peeker *)packet->buffer;
 
-	if (DATA(packet->trace) == NULL) {
-		return hdr->blocklen;
-	}
+	/* Can be NULL is trace is dead trace */
+        if (DATA(packet->trace) == NULL) {
+                return hdr->blocklen;
+        }
+
+        if (DATA(packet->trace)->byteswapped) {
+                return byteswap32(hdr->blocklen);
+        } else {
+                return hdr->blocklen;
+        }
+}
+static inline uint16_t pcapng_get_customdata_len(libtrace_packet_t *packet, char *ptr) {
+	struct pcapng_custom_optheader *hdr = (struct pcapng_custom_optheader *)ptr;
 
 	if (DATA(packet->trace)->byteswapped) {
-		return byteswap32(hdr->blocklen);
+		return byteswap16(hdr->optlen);
 	} else {
-		return hdr->blocklen;
+		return hdr->optlen;
 	}
+}
+static inline uint16_t pcapng_get_customdata_optcode(libtrace_packet_t *packet, char *ptr) {
+	struct pcapng_custom_optheader *hdr = (struct pcapng_custom_optheader *)ptr;
+
+	if (DATA(packet->trace)->byteswapped) {
+		return byteswap16(hdr->optcode);
+	} else {
+		return hdr->optcode;
+	}
+}
+static inline uint16_t pcapng_get_nrb_record_type(libtrace_packet_t *packet, char *ptr) {
+	struct pcapng_nrb_record *hdr = (struct pcapng_nrb_record *)ptr;
+	if (DATA(packet->trace)->byteswapped) {
+		return byteswap16(hdr->recordtype);
+	} else {
+		return hdr->recordtype;
+	}
+}
+static inline uint16_t pcapng_get_nrb_record_len(libtrace_packet_t *packet, char *ptr) {
+	struct pcapng_nrb_record *hdr = (struct pcapng_nrb_record *)ptr;
+	if (DATA(packet->trace)->byteswapped) {
+		return byteswap16(hdr->recordlen);
+	} else {
+		return hdr->recordlen;
+	}
+}
+static uint32_t pcapng_output_options(libtrace_out_t *libtrace, libtrace_packet_t *packet,
+	char *ptr) {
+
+	struct pcapng_optheader opthdr;
+	uint16_t optcode, optlen;
+        char *optval = NULL;
+	char *bodyptr = NULL;
+        int padding;
+        void *padding_data;
+	uint32_t len = 0;
+	int options = 0;
+
+	bodyptr = ptr;
+
+	while ((optval = pcapng_parse_next_option(packet->trace, &bodyptr,
+                        &optcode, &optlen, (pcapng_hdr_t *) packet->buffer))) {
+
+                opthdr.optcode = byteswap16(optcode);
+                /* optlen contains the length of the option value without any padding bits,
+                 * it needs to be padded to 32 bits */
+                opthdr.optlen = byteswap16(optlen);
+
+                wandio_wwrite(DATAOUT(libtrace)->file, &opthdr, sizeof(opthdr));
+                wandio_wwrite(DATAOUT(libtrace)->file, optval, optlen);
+
+                /* calculate any required padding */
+                padding = optlen % 4;
+                if (padding) { padding = 4 - padding; }
+                padding_data = calloc(1, padding);
+                /* output the padding */
+                wandio_wwrite(DATAOUT(libtrace)->file, padding_data, padding);
+                free(padding_data);
+
+		len += sizeof(opthdr) + optlen;
+		options = 1;
+        }
+
+        if (options) {
+                struct pcapng_optheader optftr;
+                optftr.optcode = 0;
+                optftr.optlen = 0;
+                wandio_wwrite(DATAOUT(libtrace)->file, &optftr, sizeof(optftr));
+		len += sizeof(optftr);
+        }
+
+	return len;
+}
+static uint32_t pcapng_output_interface_packet(libtrace_out_t *libtrace, libtrace_packet_t *packet) {
+	pcapng_int_t *cur = (pcapng_int_t *)packet->header;
+	pcapng_int_t hdr;
+	char *bodyptr = NULL;
+
+	/* If trace is deadtrace or the byte ordering is the same just output it */
+	if ((DATA(packet->trace) == NULL) ||
+		(DATA(packet->trace)->byteswapped == DATAOUT(libtrace)->byteswapped)) {
+		uint32_t len = pcapng_get_blocklen(packet);
+                wandio_wwrite(DATAOUT(libtrace)->file, packet->buffer, len);
+                return len;
+	}
+
+	/* Byteswap the headers */
+	hdr.blocktype = byteswap32(cur->blocktype);
+	hdr.blocklen = byteswap32(cur->blocklen);
+	hdr.linktype = byteswap16(cur->linktype);
+	hdr.reserved = byteswap16(cur->reserved);
+	hdr.snaplen = byteswap32(cur->snaplen);
+
+	wandio_wwrite(DATAOUT(libtrace)->file, &hdr, sizeof(hdr));
+	/* output any options */
+	bodyptr = (char *)packet->buffer + sizeof(hdr);
+	pcapng_output_options(libtrace, packet, bodyptr);
+	wandio_wwrite(DATAOUT(libtrace)->file, &hdr.blocklen, sizeof(hdr.blocklen));
+
+	return hdr.blocklen;
+}
+static uint32_t pcapng_output_simple_packet(libtrace_out_t *libtrace, libtrace_packet_t *packet) {
+	pcapng_spkt_t *cur = (pcapng_spkt_t *)packet->header;
+	pcapng_spkt_t hdr;
+	uint32_t len;
+	char *bodyptr = NULL;
+
+	/* If trace is deadtrace or the byte ordering is the same just output it */
+        if ((DATA(packet->trace) == NULL) ||
+                (DATA(packet->trace)->byteswapped == DATAOUT(libtrace)->byteswapped)) {
+		len = pcapng_get_blocklen(packet);
+                wandio_wwrite(DATAOUT(libtrace)->file, packet->buffer, len);
+                return len;
+	}
+
+	hdr.blocktype = byteswap32(cur->blocktype);
+	hdr.blocklen = byteswap32(cur->blocklen);
+	hdr.wlen = byteswap32(cur->wlen);
+
+	wandio_wwrite(DATAOUT(libtrace)->file, &hdr, sizeof(hdr));
+
+	/* output the packet payload */
+        bodyptr = (char *)packet->buffer + sizeof(hdr);
+        len = pcapng_get_blocklen(packet) - sizeof(hdr) - sizeof(hdr.blocklen);
+        wandio_wwrite(DATAOUT(libtrace)->file, bodyptr, len);
+
+	wandio_wwrite(DATAOUT(libtrace)->file, &hdr.blocklen, sizeof(hdr.blocklen));
+
+	return hdr.blocklen;
+}
+static uint32_t pcapng_output_old_packet(libtrace_out_t *libtrace, libtrace_packet_t *packet) {
+	pcapng_opkt_t *cur = (pcapng_opkt_t *)packet->header;
+	pcapng_opkt_t hdr;
+	uint32_t len;
+	char *bodyptr = NULL;
+
+	/* If trace is deadtrace or the byte ordering is the same just output it */
+        if ((DATA(packet->trace) == NULL) ||
+                (DATA(packet->trace)->byteswapped == DATAOUT(libtrace)->byteswapped)) {
+                len = pcapng_get_blocklen(packet);
+                wandio_wwrite(DATAOUT(libtrace)->file, packet->buffer, len);
+                return len;
+        }
+
+	hdr.blocktype = byteswap32(cur->blocktype);
+        hdr.blocklen = byteswap32(cur->blocklen);
+        hdr.interfaceid = byteswap16(cur->interfaceid);
+	hdr.drops = byteswap16(cur->drops);
+	hdr.timestamp_high = byteswap32(cur->timestamp_high);
+	hdr.timestamp_low = byteswap32(cur->timestamp_low);
+	hdr.caplen = byteswap32(cur->caplen);
+	hdr.wlen = byteswap32(cur->wlen);
+
+	wandio_wwrite(DATAOUT(libtrace)->file, &hdr, sizeof(hdr));
+
+	/* output the packet payload */
+        bodyptr = (char *)packet->buffer + sizeof(hdr);
+        len = pcapng_get_blocklen(packet) - sizeof(hdr) - sizeof(hdr.blocklen);
+        wandio_wwrite(DATAOUT(libtrace)->file, bodyptr, len);
+
+	/* output any options if present */
+	pcapng_output_options(libtrace, packet, bodyptr);
+
+	wandio_wwrite(DATAOUT(libtrace)->file, &hdr.blocklen, sizeof(hdr.blocklen));
+
+
+	return hdr.blocklen;
+}
+static uint32_t pcapng_output_nameresolution_packet(libtrace_out_t *libtrace, libtrace_packet_t *packet) {
+	pcapng_nrb_t *cur = (pcapng_nrb_t *)packet->buffer;
+	pcapng_nrb_t hdr;
+	char *bodyptr = NULL;
+	int padding;
+	void *padding_data;
+
+	/* If trace is deadtrace or the byte ordering is the same just output it */
+        if ((DATA(packet->trace) == NULL) ||
+                (DATA(packet->trace)->byteswapped == DATAOUT(libtrace)->byteswapped)) {
+                uint32_t len = pcapng_get_blocklen(packet);
+                wandio_wwrite(DATAOUT(libtrace)->file, packet->buffer, len);
+                return len;
+        }
+
+	hdr.blocktype = byteswap32(cur->blocktype);
+	hdr.blocklen = byteswap32(cur->blocklen);
+
+	/* output the header */
+	wandio_wwrite(DATAOUT(libtrace)->file, &hdr, sizeof(hdr));
+	bodyptr = (char *)packet->buffer + sizeof(hdr);
+
+	struct pcapng_nrb_record *nrbr = (struct pcapng_nrb_record *)bodyptr;
+
+	uint16_t record_type = pcapng_get_nrb_record_type(packet, bodyptr);
+	while (record_type == PCAPNG_NRB_RECORD_IP4 ||
+		record_type == PCAPNG_NRB_RECORD_IP6) {
+
+		struct pcapng_nrb_record nrb;
+
+		/* recordlen contains the total size of the record block */
+		uint16_t recordlen = pcapng_get_nrb_record_len(packet, bodyptr);
+
+		nrb.recordtype = byteswap16(nrbr->recordtype);
+		nrb.recordlen = byteswap16(nrbr->recordlen);
+
+		/* output the record header */
+		wandio_wwrite(DATAOUT(libtrace)->file, &nrb, sizeof(nrb));
+		bodyptr += sizeof(nrb);
+
+		/* output the record data */
+		wandio_wwrite(DATAOUT(libtrace)->file, bodyptr, recordlen - sizeof(nrb));
+		bodyptr += recordlen - sizeof(nrb);
+
+		/* calculate any required padding. record also contains the 8 byte header
+                 * but we dont need to subtract it because it will be removed with % 4 */
+                padding = recordlen % 4;
+                if (padding) { padding = 4 - padding; }
+                padding_data = calloc(1, padding);
+                /* output the padding */
+                wandio_wwrite(DATAOUT(libtrace)->file, padding_data, padding);
+                free(padding_data);
+
+		/* get the next record if it exists */
+		nrbr = (struct pcapng_nrb_record *)bodyptr;
+		record_type = pcapng_get_nrb_record_type(packet, bodyptr);
+	}
+
+	/* output nrb record end block */
+	struct pcapng_nrb_record nrbftr;
+	nrbftr.recordtype = PCAPNG_NRB_RECORD_END;
+	nrbftr.recordlen = 0;
+	wandio_wwrite(DATAOUT(libtrace)->file, &nrbftr, sizeof(nrbftr));
+
+	/* output any options if present */
+        pcapng_output_options(libtrace, packet, bodyptr);
+
+        /* and print out rest of the header */
+        wandio_wwrite(DATAOUT(libtrace)->file, &hdr.blocklen, sizeof(hdr.blocklen));
+
+	return hdr.blocklen;
+}
+static uint32_t pcapng_output_custom_packet(libtrace_out_t *libtrace, libtrace_packet_t *packet) {
+	pcapng_custom_t *cur = (pcapng_custom_t *)packet->buffer;
+	pcapng_custom_t hdr;
+	char *bodyptr = (char *)packet->buffer;
+	int padding;
+        void *padding_data;
+
+	/* If trace is deadtrace or the byte ordering is the same just output it */
+        if ((DATA(packet->trace) == NULL) ||
+                (DATA(packet->trace)->byteswapped == DATAOUT(libtrace)->byteswapped)) {
+                uint32_t len = pcapng_get_blocklen(packet);
+                wandio_wwrite(DATAOUT(libtrace)->file, packet->buffer, len);
+                return len;
+        }
+
+	hdr.blocktype = byteswap32(cur->blocktype);
+	hdr.blocklen = byteswap32(cur->blocklen);
+	hdr.pen = byteswap32(cur->blocklen);
+
+	/* output the header */
+	wandio_wwrite(DATAOUT(libtrace)->file, &hdr, sizeof(hdr));
+	bodyptr += sizeof(hdr);
+
+	/* get header for custom data ? if it exists */
+	struct pcapng_custom_optheader *copt = (struct pcapng_custom_optheader *)bodyptr;
+
+	uint16_t optcode = pcapng_get_customdata_optcode(packet, bodyptr);
+	while (optcode == PCAPNG_CUSTOM_OPTION_UTF8 || optcode == PCAPNG_CUSTOM_OPTION_BIN ||
+		optcode == PCAPNG_CUSTOM_OPTION_UTF8_NONCOPY ||
+		optcode == PCAPNG_CUSTOM_OPTION_BIN_NONCOPY) {
+
+		struct pcapng_custom_optheader opt;
+		/* get the true value for the custom datas length */
+		uint16_t optlen = pcapng_get_customdata_len(packet, bodyptr);
+
+		opt.optcode = byteswap16(copt->optcode);
+		opt.optlen = byteswap16(copt->optlen);
+		opt.pen = byteswap32(copt->pen);
+
+		/* output the header */
+		wandio_wwrite(DATAOUT(libtrace)->file, &opt, sizeof(opt));
+		bodyptr += sizeof(copt);
+
+		/* output the custom data */
+		wandio_wwrite(DATAOUT(libtrace)->file, bodyptr, optlen - sizeof(opt.pen));
+		/* oplen includes length of pen but we have already accounted for it so we need
+		 * remove it from the bodyptr */
+		bodyptr += optlen - sizeof(opt.pen);
+
+		/* calculate any required padding. optlen also contains the 4 bytes for pen
+		 * but we dont need to subtract them cause they will be removed with % 4 */
+                padding = optlen % 4;
+                if (padding) { padding = 4 - padding; }
+                padding_data = calloc(1, padding);
+                /* output the padding */
+                wandio_wwrite(DATAOUT(libtrace)->file, padding_data, padding);
+                free(padding_data);
+
+		/* get the next custom data? */
+		copt = (struct pcapng_custom_optheader *)bodyptr;
+		/* get the next opcode */
+		optcode = pcapng_get_customdata_optcode(packet, bodyptr);
+	}
+
+	/* now print out any options */
+	pcapng_output_options(libtrace, packet, bodyptr);
+
+	/* and print out rest of the header */
+	wandio_wwrite(DATAOUT(libtrace)->file, &hdr.blocklen, sizeof(hdr.blocklen));
+
+	return hdr.blocklen;
+}
+static uint32_t pcapng_output_enhanced_packet(libtrace_out_t *libtrace, libtrace_packet_t *packet) {
+	pcapng_epkt_t *cur = (pcapng_epkt_t *)packet->buffer;
+	pcapng_epkt_t hdr;
+	char *bodyptr = NULL;
+	uint32_t len;
+
+	/* If trace is deadtrace or the byte ordering is the same just output it */
+        if ((DATA(packet->trace) == NULL) ||
+                (DATA(packet->trace)->byteswapped == DATAOUT(libtrace)->byteswapped)) {
+                len = pcapng_get_blocklen(packet);
+                wandio_wwrite(DATAOUT(libtrace)->file, packet->buffer, len);
+                return len;
+        }
+
+	hdr.blocktype = byteswap32(cur->blocktype);
+	hdr.blocklen = byteswap32(cur->blocklen);
+	hdr.interfaceid = byteswap32(cur->interfaceid);
+	hdr.timestamp_high = byteswap32(cur->timestamp_high);
+	hdr.timestamp_low = byteswap32(cur->timestamp_low);
+	hdr.caplen = byteswap32(cur->caplen);
+	hdr.wlen = byteswap32(cur->wlen);
+
+	/* output beginning of header */
+	wandio_wwrite(DATAOUT(libtrace)->file, &hdr, sizeof(hdr));
+
+	/* output the packet payload */
+	bodyptr = (char *)packet->buffer + sizeof(hdr);
+	len = pcapng_get_blocklen(packet) - sizeof(hdr) - sizeof(hdr.blocklen);
+	wandio_wwrite(DATAOUT(libtrace)->file, bodyptr, len);
+
+	/* output any options */
+	pcapng_output_options(libtrace, packet, bodyptr);
+
+	/* output end of header */
+	wandio_wwrite(DATAOUT(libtrace)->file, &hdr.blocklen, sizeof(hdr.blocklen));
+
+	return hdr.blocklen;
+}
+static uint32_t pcapng_output_interfacestats_packet(libtrace_out_t *libtrace, libtrace_packet_t *packet) {
+	pcapng_stats_t *cur = (pcapng_stats_t *)packet->header;
+	pcapng_stats_t hdr;
+	char *bodyptr = NULL;
+
+	/* If trace is deadtrace or the byte ordering is the same just output it */
+        if ((DATA(packet->trace) == NULL) ||
+                (DATA(packet->trace)->byteswapped == DATAOUT(libtrace)->byteswapped)) {
+                uint32_t len = pcapng_get_blocklen(packet);
+                wandio_wwrite(DATAOUT(libtrace)->file, packet->buffer, len);
+                return len;
+        }
+
+	hdr.blocktype = byteswap32(cur->blocktype);
+	hdr.blocklen = byteswap32(cur->blocklen);
+	hdr.interfaceid = byteswap32(cur->interfaceid);
+	hdr.timestamp_high = byteswap32(cur->timestamp_high);
+	hdr.timestamp_low = byteswap32(cur->timestamp_low);
+
+	/* output interface stats header */
+	wandio_wwrite(DATAOUT(libtrace)->file, &hdr, sizeof(hdr));
+	/* output any options if present */
+	bodyptr = (char *)packet->buffer + sizeof(hdr);
+	pcapng_output_options(libtrace, packet, bodyptr);
+	/* output rest of interface stats header */
+	wandio_wwrite(DATAOUT(libtrace)->file, &hdr.blocklen, sizeof(hdr.blocklen));
+
+	return hdr.blocklen;
 }
 
 static int pcapng_probe_magic(io_t *io) {
@@ -596,7 +998,7 @@ static int pcapng_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *pack
 			/* If the section header passed in is byteswapped, everything we output
 			 * till the next section header needs to be byteswapped. The next header
 			 * will determine if we need to continue swapping bytes */
-			if (DATA(libtrace)->byteswapped) {
+			if (DATA(packet->trace)->byteswapped) {
 				DATAOUT(libtrace)->byteswapped = true;
 			} else {
 				DATAOUT(libtrace)->byteswapped = false;
@@ -610,19 +1012,13 @@ static int pcapng_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *pack
 			return pcapng_get_blocklen(packet);
 		}
 		case PCAPNG_INTERFACE_TYPE: {
-			wandio_wwrite(DATAOUT(libtrace)->file, packet->buffer,
-				pcapng_get_blocklen(packet));
-
 			/* increment the interface id */
-			DATAOUT(libtrace)->nextintid += 1;
+        		DATAOUT(libtrace)->nextintid += 1;
 
-			return pcapng_get_blocklen(packet);
+			return pcapng_output_interface_packet(libtrace, packet);
 		}
 		case PCAPNG_OLD_PACKET_TYPE: {
-			wandio_wwrite(DATAOUT(libtrace)->file, packet->buffer,
-				pcapng_get_blocklen(packet));
-
-			return pcapng_get_blocklen(packet);
+			return pcapng_output_old_packet(libtrace, packet);
 		}
 		case PCAPNG_SIMPLE_PACKET_TYPE: {
 			if (DATAOUT(libtrace)->nextintid == 0) {
@@ -631,17 +1027,10 @@ static int pcapng_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *pack
 					"block has been output in pcapng_write_packet()\n");
 				return -1;
 			}
-
-			wandio_wwrite(DATAOUT(libtrace)->file, packet->buffer,
-	        		pcapng_get_blocklen(packet));
-
-	                return pcapng_get_blocklen(packet);
+			return pcapng_output_simple_packet(libtrace, packet);
 		}
 		case PCAPNG_NAME_RESOLUTION_TYPE: {
-			wandio_wwrite(DATAOUT(libtrace)->file, packet->buffer,
-                                pcapng_get_blocklen(packet));
-
-			return pcapng_get_blocklen(packet);
+			return pcapng_output_nameresolution_packet(libtrace, packet);
 		}
 		case PCAPNG_INTERFACE_STATS_TYPE: {
 			if (DATAOUT(libtrace)->nextintid == 0) {
@@ -650,11 +1039,7 @@ static int pcapng_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *pack
 					"interface block has been output in pcapng_write_packet()\n");
 				return -1;
 			}
-
-			wandio_wwrite(DATAOUT(libtrace)->file, packet->buffer,
-	                       	pcapng_get_blocklen(packet));
-
-                       	return pcapng_get_blocklen(packet);
+                       	return pcapng_output_interfacestats_packet(libtrace, packet);
 		}
 		case PCAPNG_ENHANCED_PACKET_TYPE: {
 			if (DATAOUT(libtrace)->nextintid == 0) {
@@ -663,21 +1048,15 @@ static int pcapng_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *pack
 					"block has been output in pcapng_write_packet()\n");
 				return -1;
 			}
-
-			wandio_wwrite(DATAOUT(libtrace)->file, packet->buffer,
-				pcapng_get_blocklen(packet));
-
-	                return pcapng_get_blocklen(packet);
+	                return pcapng_output_enhanced_packet(libtrace, packet);
 		}
 		case PCAPNG_CUSTOM_TYPE: {
-			if (DATA(libtrace)->byteswapped == DATAOUT(libtrace)->byteswapped) {
-				wandio_wwrite(DATAOUT(libtrace)->file, packet->buffer,
-	                	        pcapng_get_blocklen(packet));
-			} else {
-
-			}
-
-			return pcapng_get_blocklen(packet);
+			return pcapng_output_custom_packet(libtrace, packet);
+		}
+		case PCAPNG_DECRYPTION_SECRETS_TYPE: {
+			/* Silently discard these until they are supported */
+			struct pcapng_peeker *hdr = (struct pcapng_peeker *)packet->header;
+			return hdr->blocklen;
 		}
 		default: {
 
