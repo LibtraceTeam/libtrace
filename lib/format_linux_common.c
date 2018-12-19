@@ -65,8 +65,15 @@ static int linuxnative_configure_bpf(libtrace_t *libtrace,
 	struct ifreq ifr;
 	unsigned int arphrd;
 	libtrace_dlt_t dlt;
+	libtrace_filter_t *f;
 	int sock;
 	pcap_t *pcap;
+
+	/* Take a copy of the filter structure to prevent against
+         * deletion causing the filter to no longer work */
+        f = (libtrace_filter_t *) malloc(sizeof(libtrace_filter_t));
+        memcpy(f, filter, sizeof(libtrace_filter_t));
+        f->filterstring = strdup(filter->filterstring);
 
 	/* If we are passed a filter with "flag" set to zero, then we must
 	 * compile the filterstring before continuing. This involves
@@ -77,7 +84,7 @@ static int linuxnative_configure_bpf(libtrace_t *libtrace,
 	 * trace_create_filter_from_bytecode() and so we don't need to do
 	 * anything (we've just copied it above).
 	 */
-	if (filter->flag == 0) {
+	if (f->flag == 0) {
 		sock = socket(PF_INET, SOCK_STREAM, 0);
 		memset(&ifr, 0, sizeof(struct ifreq));
 		strncpy(ifr.ifr_name, libtrace->uridata, IF_NAMESIZE - 1);
@@ -93,25 +100,28 @@ static int linuxnative_configure_bpf(libtrace_t *libtrace,
 		pcap = pcap_open_dead(dlt,
 				FORMAT_DATA->snaplen);
 
-		if (pcap_compile(pcap, &filter->filter, filter->filterstring, 0, 0) == -1) {
+		if (pcap_compile(pcap, &f->filter, f->filterstring, 0, 0) == -1) {
 			/* Filter didn't compile, set flag to 0 so we can
 			 * detect this when trace_start() is called and
 			 * produce a useful error
 			 */
-			filter->flag = 0;
+			f->flag = 0;
 			trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
 			              "Failed to compile BPF filter (%s): %s",
-			              filter->filterstring, pcap_geterr(pcap));
+			              f->filterstring, pcap_geterr(pcap));
 		} else {
 			/* Set the "flag" to indicate that the filterstring
 			 * has been compiled
 			 */
-			filter->flag = 1;
+			f->flag = 1;
 		}
 
 		pcap_close(pcap);
 
 	}
+
+	if (FORMAT_DATA->filter != NULL)
+                trace_destroy_filter(FORMAT_DATA->filter);
 
 	FORMAT_DATA->filter = filter;
 
@@ -488,6 +498,8 @@ int linuxcommon_pause_input(libtrace_t *libtrace)
 int linuxcommon_fin_input(libtrace_t *libtrace)
 {
 	if (libtrace->format_data) {
+		if (FORMAT_DATA->filter != NULL)
+                	trace_destroy_filter(FORMAT_DATA->filter);
 
 		if (FORMAT_DATA->per_stream)
 			libtrace_list_deinit(FORMAT_DATA->per_stream);

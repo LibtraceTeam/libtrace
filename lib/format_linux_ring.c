@@ -307,6 +307,9 @@ static int linuxring_fin_input(libtrace_t *libtrace) {
 			}
 		}
 
+		if (FORMAT_DATA->filter != NULL)
+                	trace_destroy_filter(FORMAT_DATA->filter);
+
                 if (FORMAT_DATA->per_stream)
                         libtrace_list_deinit(FORMAT_DATA->per_stream);
 
