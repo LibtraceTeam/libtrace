@@ -123,7 +123,7 @@ static int linuxnative_configure_bpf(libtrace_t *libtrace,
 	if (FORMAT_DATA->filter != NULL)
                 trace_destroy_filter(FORMAT_DATA->filter);
 
-	FORMAT_DATA->filter = filter;
+	FORMAT_DATA->filter = f;
 
 	return 0;
 #else
