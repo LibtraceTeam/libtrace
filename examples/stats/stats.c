@@ -200,6 +200,8 @@ int main(int argc, char *argv[])
 
 		trace_destroy(trace);
 	}
-
+        if (filter) {
+                trace_destroy_filter(filter);
+        }
 	return 0;
 }
