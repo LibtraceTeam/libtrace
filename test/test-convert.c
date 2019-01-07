@@ -111,6 +111,8 @@ char *lookup_out_uri(const char *type) {
 		return "wtf:traces/wed.out.wtf";
 	if (!strcmp(type,"duck"))
 		return "duck:traces/100_packets.out.duck";
+	if (!strcmp(type,"pcapng"))
+		return "pcapng:traces/100_packets.out.pcapng";
 	return "unknown";
 }
 
@@ -197,16 +199,20 @@ int main(int argc, char *argv[]) {
 	
 	packet=trace_create_packet();
         for (;;) {
+
 		if ((psize = trace_read_packet(trace, packet)) <0) {
 			error = 1;
 			break;
 		}
+
 		if (psize == 0) {
 			error = 0;
 			break;
 		}
 		if (trace_write_packet(outtrace,packet) > 0)
-		        count ++;
+			if (!IS_LIBTRACE_META_PACKET(packet)) {
+	        		count ++;
+			}
 		iferrout(outtrace);
 		if (count>100)
 			break;
@@ -240,6 +246,7 @@ int main(int argc, char *argv[]) {
 	packet2=trace_create_packet();
 	count=0;
 	tcpcount=0;
+
 	while(trace_read_packet(trace,packet)>0) {
 		int err;
 
@@ -258,6 +265,7 @@ int main(int argc, char *argv[]) {
 
 		/* The capture length might be snapped down to the wire length */
 		if (length_changed(packet, packet2)) {
+
 			printf("\t%s\t%s\n",
 				trace1name,
 				trace2name);
@@ -274,12 +282,12 @@ int main(int argc, char *argv[]) {
 				trace_get_link_type(packet2));
 			abort();
 		}
-		
+
 		if (time_changed(packet, packet2)) {
 			error = 1;
 			break;
 		}
-	
+
 		if (trace_get_tcp(packet)) {
 			if (!trace_get_tcp(packet2)) {
 				printf("trace corrupt -- expected tcp\n");

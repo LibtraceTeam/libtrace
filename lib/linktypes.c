@@ -109,6 +109,7 @@ libtrace_dlt_t libtrace_to_pcap_dlt(libtrace_linktype_t type)
 		case TRACE_TYPE_NONDATA:
                 case TRACE_TYPE_ETSILI:
 			break;
+		case TRACE_TYPE_PCAPNG_META:
 		case TRACE_TYPE_UNKNOWN:
                 case TRACE_TYPE_CONTENT_INVALID:
 			break;
@@ -211,6 +212,7 @@ uint8_t libtrace_to_erf_type(libtrace_linktype_t linktype)
 		case TRACE_TYPE_NONDATA:
 		case TRACE_TYPE_OPENBSD_LOOP:
                 case TRACE_TYPE_ETSILI:
+		case TRACE_TYPE_PCAPNG_META:
 		case TRACE_TYPE_UNKNOWN:
 		case TRACE_TYPE_CONTENT_INVALID:
 			break;

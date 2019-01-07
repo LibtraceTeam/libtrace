@@ -160,11 +160,34 @@ rm -f traces/*.out.*
 do_test ./test-convert erf erf
 
 echo " * erf -> pcap"
+rm -f traces/*.out.*
 do_test ./test-convert erf pcap
+
+echo " * erf -> pcapfile"
+rm -f traces/*.out.*
+do_test ./test-convert erf pcapfile
+
+echo " * erf -> pcapng"
+rm -f traces/*.out.*
+do_test ./test-convert erf pcapng
+
+
+echo " * pcap -> pcap"
+rm -f traces/*.out.*
+do_test ./test-convert pcap pcap
 
 echo " * pcap -> erf"
 rm -f traces/*.out.*
 do_test ./test-convert pcap erf
+
+echo " * pcap -> pcapfile"
+rm -f traces/*.out.*
+do_test ./test-convert pcap pcapfile
+
+echo " * pcap -> pcapng"
+rm -f traces/*.out.*
+do_test ./test-convert pcap pcapng
+
 
 echo " * pcapfile -> erf"
 rm -f traces/*.out.*
@@ -174,6 +197,15 @@ echo " * pcapfile -> pcapfile"
 rm -f traces/*.out.*
 do_test ./test-convert pcapfile pcapfile
 
+echo " * pcapfile -> pcap"
+rm -f traces/*.out.*
+do_test ./test-convert pcapfile pcap
+
+echo " * pcapfile -> pcapng"
+rm -f traces/*.out.*
+do_test ./test-convert pcapfile pcapng
+
+
 echo " * pcapfilens -> pcapfile"
 rm -f traces/*.out.*
 do_test ./test-convert pcapfilens pcapfile
@@ -182,13 +214,6 @@ echo " * pcapfilens -> erf"
 rm -f traces/*.out.*
 do_test ./test-convert pcapfilens erf
 
-echo " * pcap -> pcapfile"
-rm -f traces/*.out.*
-do_test ./test-convert pcap pcapfile
-
-echo " * erf -> pcapfile"
-rm -f traces/*.out.*
-do_test ./test-convert erf pcapfile
 
 echo " * pcapng -> pcapfile"
 rm -f traces/*.out.*
@@ -197,6 +222,15 @@ do_test ./test-convert pcapng pcapfile
 echo " * pcapng -> erf"
 rm -f traces/*.out.*
 do_test ./test-convert pcapng erf
+
+echo " * pcapng -> pcap"
+rm -f traces/*.out.*
+do_test ./test-convert pcapng pcap
+
+echo " * pcapng -> pcapng"
+rm -f traces/*.out.*
+do_test ./test-convert pcapng pcapng
+
 
 echo " * pcap (sll) -> erf    raw IP"
 rm -f traces/*.out.*

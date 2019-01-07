@@ -174,6 +174,19 @@ pthread_mutex_t open_dag_mutex;
  * many times or close a device that we're still using */
 struct dag_dev_t *open_dags = NULL;
 
+static bool dag_can_write(libtrace_packet_t *packet) {
+	/* Get the linktype */
+        libtrace_linktype_t ltype = trace_get_link_type(packet);
+
+        if (ltype == TRACE_TYPE_ERF_META
+                || ltype == TRACE_TYPE_NONDATA) {
+
+                return false;
+        }
+
+        return true;
+}
+
 /* Returns the amount of padding between the ERF header and the start of the
  * captured packet data */
 static int dag_get_padding(const libtrace_packet_t *packet)
@@ -1185,6 +1198,11 @@ static bool find_compatible_linktype(libtrace_out_t *libtrace,
 /* Writes a packet to the provided DAG output trace */
 static int dag_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *packet)
 {
+	/* Check dag can write this type of packet */
+	if (!dag_can_write(packet)) {
+		return 0;
+	}
+
 	/* This is heavily borrowed from erf_write_packet(). Yes, CnP
 	 * coding sucks, sorry about that.
 	 */
@@ -1199,9 +1217,6 @@ static int dag_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *packet)
 		 * erf_write_packet(). */
 		return -1;
 	}
-
-	if (trace_get_link_type(packet) == TRACE_TYPE_NONDATA)
-		return 0;
 
 	pad = dag_get_padding(packet);
 
