@@ -60,6 +60,7 @@
  *
  */
 
+#define ERF_META_TYPE 27
 
 static struct libtrace_format_t erfformat;
 
@@ -535,7 +536,7 @@ static int erf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	void *buffer2 = packet->buffer;
 	unsigned int rlen;
 	uint32_t flags = 0;
-	
+	libtrace_rt_types_t linktype;
 	
 	if (!packet->buffer || packet->buf_control == TRACE_CTRL_EXTERNAL) {
 		packet->buffer = malloc((size_t)LIBTRACE_PACKET_BUFSIZE);
@@ -602,9 +603,15 @@ static int erf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
                 trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Incomplete ERF record");
                 return -1;
         }
-	
+
+	/* If a provenance packet make sure correct rt linktype is set.
+	 * Only bits 0-6 are used for the type */
+	if ((((dag_record_t *)packet->buffer)->type & 127) == ERF_META_TYPE) {
+		linktype = TRACE_RT_ERF_META;
+	} else { linktype = TRACE_RT_DATA_ERF; }
+
 	if (erf_prepare_packet(libtrace, packet, packet->buffer, 
-				TRACE_RT_DATA_ERF, flags))
+				linktype, flags))
 		return -1;
 	
 	return rlen;

@@ -468,6 +468,7 @@ typedef enum {
 	TRACE_RT_METADATA	=18,/**< Packet contains server meta-data */
 	TRACE_RT_DUCK_5_0 	=19,/**< Dag 5.0 Duck */
         TRACE_RT_PCAPNG_META    =20,/**< Metadata for a PCAP NG input source */
+	TRACE_RT_ERF_META	=21,/**< Metadata for a ERF input source */
 
 	/** Not actually used - all DATA types begin from this value */
 	TRACE_RT_DATA_SIMPLE	= 1000, 
