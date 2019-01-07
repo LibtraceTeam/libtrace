@@ -334,7 +334,8 @@ static int ndag_config_input(libtrace_t *libtrace, trace_option_t option,
                 case TRACE_OPTION_META_FREQ:
                 default:
                         trace_set_err(libtrace, TRACE_ERR_OPTION_UNAVAIL,
-                                        "Unsupported option");
+                                        "Unsupported option %d",
+                                        option);
                         return -1;
         }
 
