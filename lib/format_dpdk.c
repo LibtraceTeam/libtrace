@@ -145,6 +145,15 @@ struct dpdk_addt_hdr {
 };
 
 static bool dpdk_can_write(libtrace_packet_t *packet) {
+        libtrace_linktype_t ltype = trace_get_link_type(packet);
+
+        if (ltype == TRACE_TYPE_CONTENT_INVALID) {
+                return false;
+        }
+        if (ltype == TRACE_TYPE_NONDATA || ltype == TRACE_TYPE_ERF_META ||
+                        ltype == TRACE_TYPE_PCAPNG_META) {
+                return false;
+        }
 	return true;
 }
 

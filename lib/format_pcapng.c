@@ -224,6 +224,7 @@ static bool pcapng_can_write(libtrace_packet_t *packet) {
 	/* Get the linktype */
         libtrace_linktype_t ltype = trace_get_link_type(packet);
 
+        /* TODO convert erf meta to pcapng meta? */
         if (ltype == TRACE_TYPE_CONTENT_INVALID
                 || ltype == TRACE_TYPE_UNKNOWN
                 || ltype == TRACE_TYPE_ERF_META

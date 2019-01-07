@@ -74,7 +74,16 @@ static bool linuxring_can_write(libtrace_packet_t *packet) {
 	/* Get the linktype */
         libtrace_linktype_t ltype = trace_get_link_type(packet);
 
+        if (ltype == TRACE_TYPE_CONTENT_INVALID) {
+                return false;
+        }
         if (ltype == TRACE_TYPE_NONDATA) {
+                return false;
+        }
+        if (ltype == TRACE_TYPE_PCAPNG_META) {
+                return false;
+        }
+        if (ltype == TRACE_TYPE_ERF_META) {
                 return false;
         }
 

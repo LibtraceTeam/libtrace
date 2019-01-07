@@ -178,9 +178,15 @@ static bool dag_can_write(libtrace_packet_t *packet) {
 	/* Get the linktype */
         libtrace_linktype_t ltype = trace_get_link_type(packet);
 
-        if (ltype == TRACE_TYPE_ERF_META
-                || ltype == TRACE_TYPE_NONDATA) {
+        if (ltype == TRACE_TYPE_CONTENT_INVALID) {
+                return false;
+        }
 
+        /* TODO erf meta should definitely be writable, pcapng meta
+         * could probably be converted into erf meta */
+        if (ltype == TRACE_TYPE_ERF_META
+                        || ltype == TRACE_TYPE_NONDATA
+                        || ltype == TRACE_TYPE_PCAPNG_META) {
                 return false;
         }
 
