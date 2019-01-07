@@ -293,6 +293,7 @@ struct callback_set {
         fn_cb_dataless message_resuming;
         fn_cb_dataless message_pausing;
         fn_cb_packet message_packet;
+	fn_cb_packet message_meta_packet;
         fn_cb_result message_result;
         fn_cb_first_packet message_first_packet;
         fn_cb_tick message_tick_count;
