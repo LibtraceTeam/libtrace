@@ -144,6 +144,10 @@ struct dpdk_addt_hdr {
 	uint32_t cap_len; /* The size to say the capture is */
 };
 
+static bool dpdk_can_write(libtrace_packet_t *packet) {
+	return true;
+}
+
 /**
  * We want to blacklist all devices except those on the whitelist
  * (I say list, but yes it is only the one).
@@ -1556,6 +1560,12 @@ int dpdk_pause_input(libtrace_t * libtrace) {
 
 static int dpdk_write_packet(libtrace_out_t *trace,
                              libtrace_packet_t *packet){
+
+	/* Check dpdk can write this type of packet */
+	if (!dpdk_can_write(packet)) {
+		return 0;
+	}
+
 	struct rte_mbuf* m_buff[1];
 
 	int wirelen = trace_get_wire_length(packet);

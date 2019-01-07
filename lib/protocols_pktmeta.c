@@ -190,6 +190,7 @@ DLLEXPORT void *trace_get_packet_meta(const libtrace_packet_t *packet,
 		case TRACE_TYPE_NONDATA:
 		case TRACE_TYPE_OPENBSD_LOOP:
 		case TRACE_TYPE_UNKNOWN:
+		case TRACE_TYPE_PCAPNG_META:
 		case TRACE_TYPE_CONTENT_INVALID:
 			return NULL;
 	}
@@ -248,6 +249,7 @@ DLLEXPORT void *trace_get_payload_from_meta(const void *meta,
                                         linktype, remaining);
                         return nexthdr;
 
+		case TRACE_TYPE_PCAPNG_META:
 		case TRACE_TYPE_HDLC_POS:
 		case TRACE_TYPE_ETH:
 		case TRACE_TYPE_ATM:

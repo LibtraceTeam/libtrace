@@ -97,6 +97,22 @@ struct pcap_format_data_out_t {
 	} output;
 };
 
+static bool pcap_can_write(libtrace_packet_t *packet) {
+	/* Get the linktype */
+        libtrace_linktype_t ltype = trace_get_link_type(packet);
+
+        if (ltype == TRACE_TYPE_PCAPNG_META
+                || ltype == TRACE_TYPE_CONTENT_INVALID
+                || ltype == TRACE_TYPE_UNKNOWN
+                || ltype == TRACE_TYPE_ERF_META
+                || ltype == TRACE_TYPE_NONDATA) {
+
+                return false;
+        }
+
+        return true;
+}
+
 static int pcap_init_input(libtrace_t *libtrace) {
 	libtrace->format_data = malloc(sizeof(struct pcap_format_data_t));
 
@@ -520,6 +536,11 @@ static int pcap_write_packet(libtrace_out_t *libtrace,
 		libtrace_packet_t *packet) 
 {
 
+	/* Check pcap can write this type of packet */
+        if (!pcap_can_write(packet)) {
+                return 0;
+        }
+
 	if (!libtrace) {
 		fprintf(stderr, "NULL trace passed into pcap_write_packet()\n");
 		return TRACE_ERR_NULL_TRACE;
@@ -535,12 +556,6 @@ static int pcap_write_packet(libtrace_out_t *libtrace,
 	uint32_t remaining;
 
 	link = trace_get_packet_buffer(packet,&linktype,&remaining);
-
-	/* Silently discard RT metadata packets and packets with an
-	 * unknown linktype. */
-	if (linktype == TRACE_TYPE_NONDATA || linktype == TRACE_TYPE_UNKNOWN || linktype == TRACE_TYPE_ERF_META || linktype == TRACE_TYPE_CONTENT_INVALID) {
-		return 0;
-	}
 
 	/* We may have to convert this packet into a suitable PCAP packet */
 
