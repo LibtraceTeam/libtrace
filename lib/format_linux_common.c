@@ -72,6 +72,7 @@ static int linuxnative_configure_bpf(libtrace_t *libtrace,
 	/* Take a copy of the filter structure to prevent against
          * deletion causing the filter to no longer work */
         f = (libtrace_filter_t *) malloc(sizeof(libtrace_filter_t));
+        memset(f, 0, sizeof(libtrace_filter_t));
         memcpy(f, filter, sizeof(libtrace_filter_t));
         f->filterstring = strdup(filter->filterstring);
 

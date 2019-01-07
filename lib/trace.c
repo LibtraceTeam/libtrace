@@ -1553,7 +1553,7 @@ trace_create_filter_from_bytecode(void *bf_insns, unsigned int bf_len)
 	return NULL;
 #else
 	struct libtrace_filter_t *filter = (struct libtrace_filter_t *)
-		malloc(sizeof(struct libtrace_filter_t));
+		calloc(1, sizeof(struct libtrace_filter_t));
 	filter->filter.bf_insns = (struct bpf_insn *)
 		malloc(sizeof(struct bpf_insn) * bf_len);
 
@@ -1577,7 +1577,7 @@ trace_create_filter_from_bytecode(void *bf_insns, unsigned int bf_len)
 DLLEXPORT libtrace_filter_t *trace_create_filter(const char *filterstring) {
 #ifdef HAVE_BPF
 	libtrace_filter_t *filter = (libtrace_filter_t*)
-				malloc(sizeof(libtrace_filter_t));
+				calloc(1, sizeof(libtrace_filter_t));
 	filter->filterstring = strdup(filterstring);
 	filter->jitfilter = NULL;
 	filter->flag = 0;
