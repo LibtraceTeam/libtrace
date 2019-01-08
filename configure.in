@@ -403,14 +403,14 @@ libtrace_dpdk=false
 if test "$want_dpdk" != no; then
 	# So instead simply check for existence
 	if test "$RTE_SDK" != ""; then
+		AC_CHECK_FILE("$RTE_SDK/$RTE_TARGET/lib/libdpdk.so", dpdk_found="dpdk", dpdk_found=0)
+	fi
+	if test "$dpdk_found" = 0 -a "$RTE_SDK" != ""; then
 		AC_CHECK_FILE("$RTE_SDK/$RTE_TARGET/lib/libintel_dpdk.a", dpdk_found=":libintel_dpdk.a", dpdk_found=0)
 	fi
 	# DPDK 2.1.0+ renames this to libdpdk from libintel_dpdk
 	if test "$dpdk_found" = 0 -a "$RTE_SDK" != ""; then
 		AC_CHECK_FILE("$RTE_SDK/$RTE_TARGET/lib/libdpdk.a", dpdk_found=":libdpdk.a", dpdk_found=0)
-	fi
-	if test "$dpdk_found" = 0 -a "$RTE_SDK" != ""; then
-		AC_CHECK_FILE("$RTE_SDK/$RTE_TARGET/lib/libdpdk.so", dpdk_found="dpdk", dpdk_found=0)
 	fi
 	if test "$dpdk_found" = 0 -a "$RTE_SDK" != ""; then
 		AC_CHECK_LIB(dpdk, rte_eth_dev_configure, dpdk_found="dpdk", dpdk_found=0)
