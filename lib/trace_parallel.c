@@ -2276,7 +2276,7 @@ DLLEXPORT int trace_set_hasher(libtrace_t *trace, enum hasher_types type, fn_has
 		ret = trace->format->config_input(trace, TRACE_OPTION_HASHER, &type);
 
 	if (ret == -1) {
-                libtrace_err_t err;
+                libtrace_err_t err UNUSED;
 
 		/* We have to deal with this ourself */
                 /* If we succeed, clear any error state otherwise our caller
