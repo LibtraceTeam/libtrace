@@ -1430,6 +1430,8 @@ DLLEXPORT size_t trace_get_capture_length(const libtrace_packet_t *packet)
  */
 DLLEXPORT size_t trace_get_wire_length(const libtrace_packet_t *packet){
 
+        size_t wiresub = 0;
+
         if (packet->which_trace_start != packet->trace->startcount) {
                 return ~0U;
         }
@@ -1441,9 +1443,25 @@ DLLEXPORT size_t trace_get_wire_length(const libtrace_packet_t *packet){
 			packet->trace->format->get_wire_length(packet);
 	}
 
-	if (!(packet->cached.wire_length < LIBTRACE_PACKET_BUFSIZE)) {
-		fprintf(stderr, "Wire length is greater than the buffer size in trace_get_wire_length()\n");
-		return 0;
+        if (packet->type >= TRACE_RT_DATA_DLT && packet->type <=
+                        TRACE_RT_DATA_DLT_END) {
+
+                /* pcap wire lengths in libtrace include an extra four bytes
+                 * for the FCS (to be consistent with other formats that do
+                 * capture the FCS), but these bytes don't actually exist on
+                 * the wire. Therefore, we shouldn't get upset if our "wire"
+                 * length exceeds the max buffer size by four bytes or less.
+                 */
+                wiresub = 4;
+        } else {
+                wiresub = 0;
+        }
+
+	if (!(packet->cached.wire_length - wiresub < LIBTRACE_PACKET_BUFSIZE)) {
+		fprintf(stderr, "Wire length %zu exceeds expected maximum packet size of %d -- packet is likely corrupt.\n",
+                                packet->cached.wire_length - wiresub,
+                                LIBTRACE_PACKET_BUFSIZE);
+
 		/* should we be returning ~OU here? */
 	}
 	return packet->cached.wire_length;
