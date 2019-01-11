@@ -788,7 +788,13 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 libtrace_linktype_t erf_get_link_type(const libtrace_packet_t *packet) {
 	dag_record_t *erfptr = 0;
 	erfptr = (dag_record_t *)packet->header;
-        uint8_t type = (erfptr->type & 0x7f);
+        uint8_t type;
+
+        if (packet->header == NULL) {
+                return ~0;
+        }
+
+        type = (erfptr->type & 0x7f);
 	if (type != TYPE_LEGACY) {
 		/* The top-most bit is now used to indicate the presence of
                  * extension headers :/ */
@@ -805,12 +811,19 @@ libtrace_linktype_t erf_get_link_type(const libtrace_packet_t *packet) {
 libtrace_direction_t erf_get_direction(const libtrace_packet_t *packet) {
 	dag_record_t *erfptr = 0;
 	erfptr = (dag_record_t *)packet->header;
-	return erfptr->flags.iface;
+        if (packet->header) {
+        	return erfptr->flags.iface;
+        }
+        return TRACE_DIR_UNKNOWN;
 }
 
 libtrace_direction_t erf_set_direction(libtrace_packet_t *packet, libtrace_direction_t direction) {
 	dag_record_t *erfptr = 0;
 	erfptr = (dag_record_t *)packet->header;
+
+        if (packet->header == NULL) {
+                return TRACE_DIR_UNKNOWN;
+        }
 	erfptr->flags.iface = direction;
 	return erfptr->flags.iface;
 }
@@ -818,6 +831,10 @@ libtrace_direction_t erf_set_direction(libtrace_packet_t *packet, libtrace_direc
 uint64_t erf_get_erf_timestamp(const libtrace_packet_t *packet) {
 	dag_record_t *erfptr = 0;
 	erfptr = (dag_record_t *)packet->header;
+
+        if (erfptr == NULL) {
+                return 0;
+        }
 	return bswap_le_to_host64(erfptr->ts);
 }
 
@@ -827,7 +844,7 @@ int erf_get_capture_length(const libtrace_packet_t *packet) {
         size_t framinglen;
         uint16_t wlen, rlen;
 
-	if (packet->payload == NULL)
+	if (packet->payload == NULL || packet->header == NULL)
 		return 0;
 
 	erfptr = (dag_record_t *)packet->header;
@@ -846,6 +863,10 @@ int erf_get_wire_length(const libtrace_packet_t *packet) {
 	dag_record_t *erfptr = 0;
 	erfptr = (dag_record_t *)packet->header;
 
+        if (packet->header == NULL) {
+                return 0;
+        }
+
 	if ((erfptr->type & 0x7f) == TYPE_META)
 		return 0;
 
@@ -861,6 +882,10 @@ size_t erf_set_capture_length(libtrace_packet_t *packet, size_t size) {
 		return ~0U;
 	}
 	erfptr = (dag_record_t *)packet->header;
+
+        if (packet->header == NULL) {
+                return ~0U;
+        }
 
 	if(size > trace_get_capture_length(packet) || (erfptr->type & 0x7f) == TYPE_META) {
 		/* Can't make a packet larger */
