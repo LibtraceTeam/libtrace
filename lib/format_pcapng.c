@@ -346,8 +346,10 @@ static uint32_t pcapng_output_options(libtrace_out_t *libtrace, libtrace_packet_
                 wandio_wwrite(DATAOUT(libtrace)->file, &opthdr, sizeof(opthdr));
 
 		/* If this is a custom option */
-		if (optcode == PCAPNG_CUSTOM_OPTION_UTF8 || PCAPNG_CUSTOM_OPTION_BIN
-			|| PCAPNG_CUSTOM_OPTION_UTF8_NONCOPY || PCAPNG_CUSTOM_OPTION_BIN_NONCOPY) {
+		if (optcode == PCAPNG_CUSTOM_OPTION_UTF8 ||
+                        optcode == PCAPNG_CUSTOM_OPTION_BIN ||
+			optcode == PCAPNG_CUSTOM_OPTION_UTF8_NONCOPY ||
+                        optcode == PCAPNG_CUSTOM_OPTION_BIN_NONCOPY) {
 			/* flip the pen and output the option value */
 			//uint32_t pen = byteswap32((uint32_t)*optval);
 			wandio_wwrite(DATAOUT(libtrace)->file, optval, sizeof(uint32_t));
