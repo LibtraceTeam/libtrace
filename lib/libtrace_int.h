@@ -722,6 +722,11 @@ struct libtrace_format_t {
 	 */
 	double (*get_seconds)(const libtrace_packet_t *packet);
 	
+	/**
+	 */
+	void *(*get_meta_data)(libtrace_packet_t *packet, uint32_t section_type,
+		uint16_t section);
+
 	/** Moves the read pointer to a certain ERF timestamp within an input 
 	 * trace file.
 	 *
@@ -1200,7 +1205,6 @@ void *trace_get_payload_from_linux_sll(const void *link,
  */	
 DLLEXPORT void *trace_get_payload_from_atm(void *link, uint8_t *type, 
 		uint32_t *remaining);
-
 
 #ifdef HAVE_BPF
 /* A type encapsulating a bpf filter

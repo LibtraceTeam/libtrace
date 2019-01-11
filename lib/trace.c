@@ -946,6 +946,16 @@ DLLEXPORT void trace_destroy_packet(libtrace_packet_t *packet) {
 				/* A "bad" value to force an assert
 				 * if this packet is ever reused
 				 */
+	/* free meta fields */
+	if (packet->meta.interface_name != NULL)
+		free(packet->meta.interface_name);
+	if (packet->meta.interface_mac != NULL)
+		free(packet->meta.interface_mac);
+	if (packet->meta.interface_ipv6 != NULL)
+		free(packet->meta.interface_ipv6);
+	if (packet->meta.interface_description != NULL)
+		free(packet->meta.interface_description);
+
 	free(packet);
 }
 

@@ -580,6 +580,20 @@ typedef enum {
 	TRACE_ETHERTYPE_PPP_SES = 0x8864	/**< PPPoE Session Messages */
 } libtrace_ethertype_t;
 
+typedef struct libtrace_meta_result {
+	uint16_t type;
+	uint16_t len;
+} libtrace_meta_result_t;
+
+typedef struct libtrace_meta {
+        char *interface_name;		/**< Interface name packet was captured on */
+        char *interface_mac;		/**< Interface MAC address packet was captured on */
+        uint64_t interface_speed;	/**< Interface speed packet was captured on */
+	uint32_t interface_ipv4;	/**< Interface IP4 address packet was captured on */
+	char *interface_ipv6;		/**< Interface IP6 address packet was captured on */
+	char *interface_description;	/**< Interface description */
+} libtrace_meta_t;
+
 typedef struct libtrace_packet_cache {
 	int capture_length;		/**< Cached capture length */
 	int wire_length;		/**< Cached wire length */
@@ -617,6 +631,7 @@ typedef struct libtrace_packet_t {
         int refcount;                 /**< Reference counter */
         int which_trace_start;          /**< Used to match packet to a started instance of the parent trace */
 
+	libtrace_meta_t meta;           /**< Meta data for the packet */
 } libtrace_packet_t;
 
 #define IS_LIBTRACE_META_PACKET(packet) (packet->type < TRACE_RT_DATA_SIMPLE)
@@ -3697,4 +3712,18 @@ DLLEXPORT bool trace_get_wireless_antenna(void *linkptr,
 #ifdef __cplusplus
 } /* extern "C" */
 #endif /* #ifdef __cplusplus */
+
+char *trace_get_interface_name(libtrace_packet_t *packet);
+char *trace_get_interface_mac(libtrace_packet_t *packet);
+uint64_t trace_get_interface_speed(libtrace_packet_t *packet);
+uint32_t trace_get_interface_ip4(libtrace_packet_t *packet);
+uint32_t trace_get_interface_ipv4(libtrace_packet_t *packet);
+char *trace_get_interface_ip6(libtrace_packet_t *packet);
+char *trace_get_interface_ipv6(libtrace_packet_t *packet);
+char *trace_get_interface_description(libtrace_packet_t *packet);
+libtrace_meta_result_t *trace_get_interface_num(libtrace_packet_t *packet);
+libtrace_meta_result_t *trace_get_host_os(libtrace_packet_t *packet);
+libtrace_meta_result_t *trace_get_tzone(libtrace_packet_t *packet);
+libtrace_meta_result_t *trace_get_app_name(libtrace_packet_t *packet);
+
 #endif /* LIBTRACE_H_ */

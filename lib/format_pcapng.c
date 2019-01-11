@@ -28,6 +28,7 @@
 #include "libtrace.h"
 #include "libtrace_int.h"
 #include "format_helper.h"
+#include "format_pcapng.h"
 
 #include <sys/stat.h>
 #include <stdio.h>
@@ -37,46 +38,6 @@
 #include <fcntl.h>
 #include <stdbool.h>
 #include <math.h>
-
-#define PCAPNG_SECTION_TYPE 0x0A0D0D0A
-#define PCAPNG_INTERFACE_TYPE 0x00000001
-#define PCAPNG_OLD_PACKET_TYPE 0x00000002
-#define PCAPNG_SIMPLE_PACKET_TYPE 0x00000003
-#define PCAPNG_NAME_RESOLUTION_TYPE 0x00000004
-#define PCAPNG_INTERFACE_STATS_TYPE 0x00000005
-#define PCAPNG_ENHANCED_PACKET_TYPE 0x00000006
-#define PCAPNG_CUSTOM_TYPE 0x00000BAD
-#define PCAPNG_CUSTOM_NONCOPY_TYPE 0x40000BAD
-#define PCAPNG_DECRYPTION_SECRETS_TYPE 0x0000000A
-
-#define PCAPNG_NRB_RECORD_END 0x0000
-#define PCAPNG_NRB_RECORD_IP4 0x0001
-#define PCAPNG_NRB_RECORD_IP6 0x0002
-
-#define PCAPNG_CUSTOM_OPTION_UTF8 0xBAC
-#define PCAPNG_CUSTOM_OPTION_BIN 0xBAD
-#define PCAPNG_CUSTOM_OPTION_UTF8_NONCOPY 0x4BAC
-#define PCAPNG_CUSTOM_OPTION_BIN_NONCOPY 0x4BAD
-
-#define PCAPNG_OPTION_END 0x0000
-
-#define PACKET_IS_ENHANCED (pcapng_get_record_type(packet) == PCAPNG_ENHANCED_PACKET_TYPE)
-
-#define PACKET_IS_SIMPLE (pcapng_get_record_type(packet) == PCAPNG_SIMPLE_PACKET_TYPE)
-
-#define PACKET_IS_OLD (pcapng_get_record_type(packet) == PCAPNG_OLD_PACKET_TYPE)
-
-#define PCAPNG_IFOPT_TSRESOL 9
-
-#define PCAPNG_PKTOPT_DROPCOUNT 4
-
-#define PCAPNG_STATOPT_START 2
-#define PCAPNG_STATOPT_END 3
-#define PCAPNG_STATOPT_IFRECV 4
-#define PCAPNG_STATOPT_IFDROP 5
-#define PCAPNG_STATOPT_FILTERACCEPT 6
-#define PCAPNG_STATOPT_OSDROP 7
-#define PCAPNG_STATOPT_USRDELIV 8
 
 typedef struct pcagng_section_header_t {
         uint32_t blocktype;
@@ -2131,6 +2092,80 @@ static void pcapng_get_statistics(libtrace_t *trace, libtrace_stat_t *stat) {
 
 }
 
+void *pcapng_get_meta_data(libtrace_packet_t *packet, uint32_t section_type,
+	uint16_t section) {
+
+	struct pcapng_peeker *hdr;
+	void *ptr;
+	uint32_t blocktype;
+	uint16_t optcode;
+
+	hdr = (struct pcapng_peeker *)packet->header;
+	ptr = packet->header;
+
+	if (DATA(packet->trace)->byteswapped) {
+		blocktype = byteswap32(hdr->blocktype);
+	} else {
+		blocktype = hdr->blocktype;
+	}
+
+	/* Just return if data we want is not in this block */
+	if (blocktype != section_type) {
+		return NULL;
+	}
+
+	/* Skip x bytes to the options depending on what kind of packet this is */
+	if (section_type == PCAPNG_SECTION_TYPE) { ptr += sizeof(pcapng_sec_t); }
+	if (section_type == PCAPNG_INTERFACE_TYPE) { ptr += sizeof(pcapng_int_t); }
+	if (section_type == PCAPNG_OLD_PACKET_TYPE) { ptr += sizeof(pcapng_opkt_t); }
+	if (section_type == PCAPNG_SIMPLE_PACKET_TYPE) { ptr += sizeof(pcapng_spkt_t); }
+	if (section_type == PCAPNG_NAME_RESOLUTION_TYPE) {
+		/* look into this more */
+		return NULL;
+	}
+	if (section_type == PCAPNG_INTERFACE_STATS_TYPE) { ptr += sizeof(pcapng_stats_t); }
+	if (section_type == PCAPNG_ENHANCED_PACKET_TYPE) { ptr += sizeof(pcapng_epkt_t); }
+
+	/* Skip over the options till a match is found or they run out */
+	struct pcapng_optheader *opthdr = ptr;
+	if (DATA(packet->trace)->byteswapped) {
+		optcode = byteswap16(opthdr->optcode);
+	} else {
+		optcode = opthdr->optcode;
+	}
+	while ((optcode != section) && (optcode != PCAPNG_OPTION_END)) {
+		uint16_t len;
+
+		if (DATA(packet->trace)->byteswapped) {
+			len = byteswap16(opthdr->optlen);
+		} else {
+			len = opthdr->optlen;
+		}
+
+		/* work out any padding */
+		if ((len % 4) != 0) {
+			ptr += len + (4 - (len % 4)) + sizeof(struct pcapng_optheader);
+		} else {
+			ptr += len + sizeof(struct pcapng_optheader);
+		}
+
+		/* get the next option */
+		opthdr = (struct pcapng_optheader *)ptr;
+		if (DATA(packet->trace)->byteswapped) {
+			optcode = byteswap16(opthdr->optcode);
+		} else {
+			optcode = opthdr->optcode;
+		}
+	}
+
+	/* either a option was found or they ran out */
+	if (opthdr->optcode == section) {
+		return ptr;
+	} else {
+		return NULL;
+	}
+}
+
 static void pcapng_help(void) {
         printf("pcapng format module: \n");
         printf("Supported input URIs:\n");
@@ -2168,6 +2203,7 @@ static struct libtrace_format_t pcapng = {
         NULL,                           /* get_timeval */
         pcapng_get_timespec,            /* get_timespec */
         NULL,                           /* get_seconds */
+	pcapng_get_meta_data,           /* get_meta_data */
         NULL,                           /* seek_erf */
         NULL,                           /* seek_timeval */
         NULL,                           /* seek_seconds */

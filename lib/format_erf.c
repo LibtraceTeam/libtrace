@@ -913,6 +913,58 @@ static void erf_get_statistics(libtrace_t *trace, libtrace_stat_t *stat) {
         }
 }
 
+/* Returns a pointer to the beginning of the section or NULL if not found */
+void *erf_get_meta_data(libtrace_packet_t *packet, uint32_t section_type, uint16_t section) {
+
+	uint32_t remaining;
+	void *bodyptr;
+	dag_sec_t *sec;
+	dag_record_t *hdr;
+	uint16_t curr_sec;
+
+	hdr = (dag_record_t *)packet->header;
+	bodyptr = (char *)packet->payload;
+	remaining = ntohs(hdr->rlen) - 24;
+
+	/* ensure this is a meta packet */
+	/* the type only uses bits 0-6 */
+	if ((hdr->type & 127) != 27) { return NULL; }
+
+	sec = (dag_sec_t *)bodyptr;
+	/* loop till we find the correct section within the correct section type
+	 * and enough payload is remaining */
+	while (((ntohs(sec->type) != section) || (section_type != curr_sec))
+		&& (remaining > sizeof(dag_sec_t))) {
+
+		if (ntohs(sec->type) == ERF_PROV_SECTION_CAPTURE
+			|| ntohs(sec->type) == ERF_PROV_SECTION_HOST
+			|| ntohs(sec->type) == ERF_PROV_SECTION_MODULE
+			|| ntohs(sec->type) == ERF_PROV_SECTION_INTERFACE) {
+
+			curr_sec = ntohs(sec->type);
+		}
+
+		/* jump over any padding (padded to 32bits/4bytes) */
+		if ((ntohs(sec->len) % 4) != 0) {
+			remaining -= ntohs(sec->len) + (4 - (ntohs(sec->len) % 4));
+			bodyptr += ntohs(sec->len) + (4 - (ntohs(sec->len) % 4));
+		} else {
+			remaining -= ntohs(sec->len);
+			bodyptr += ntohs(sec->len);
+		}
+		remaining -= sizeof(dag_sec_t);
+		bodyptr += sizeof(dag_sec_t);
+
+		sec = (dag_sec_t *)bodyptr;
+	}
+	/* if found return pointer to the beginning of the section */
+	if (ntohs(sec->type) == section && curr_sec == section_type) {
+		return (void *)bodyptr;
+	} else {
+		return NULL;
+	}
+}
+
 static void erf_help(void) {
 	printf("erf format module: $Revision: 1752 $\n");
 	printf("Supported input URIs:\n");
@@ -931,7 +983,7 @@ static void erf_help(void) {
 	printf("\te.g.: erf:/tmp/trace\n");
 	printf("\n");
 
-	
+
 }
 
 static struct libtrace_format_t erfformat = {
@@ -961,6 +1013,7 @@ static struct libtrace_format_t erfformat = {
 	NULL,				/* get_timeval */
 	NULL,				/* get_timespec */
 	NULL,				/* get_seconds */
+	erf_get_meta_data,		/* get_meta_data */
 	erf_seek_erf,			/* seek_erf */
 	NULL,				/* seek_timeval */
 	NULL,				/* seek_seconds */
@@ -1006,6 +1059,7 @@ static struct libtrace_format_t rawerfformat = {
 	NULL,				/* get_timeval */
 	NULL,				/* get_timespec */
 	NULL,				/* get_seconds */
+	erf_get_meta_data,		/* get_meta_data */
 	erf_seek_erf,			/* seek_erf */
 	NULL,				/* seek_timeval */
 	NULL,				/* seek_seconds */

@@ -362,6 +362,7 @@ static struct libtrace_format_t duck = {
         NULL,                           /* get_timeval */
 	NULL,				/* get_timespec */
         NULL,                           /* get_seconds */
+	NULL,                           /* get_meta_data */
         NULL,                   	/* seek_erf */
         NULL,                           /* seek_timeval */
         NULL,                           /* seek_seconds */

@@ -251,6 +251,7 @@ static struct libtrace_format_t tshformat = {
 	tsh_get_timeval,		/* get_timeval */
 	NULL,				/* get_timespec */
 	NULL,				/* get_seconds */
+	NULL,                           /* get_meta_data */
 	NULL,				/* seek_erf */
 	NULL,				/* seek_timeval */
 	NULL,				/* seek_seconds */
@@ -301,6 +302,7 @@ static struct libtrace_format_t frplusformat = {
 	tsh_get_timeval,		/* get_timeval */
 	NULL,				/* get_timespec */
 	NULL,				/* get_seconds */
+	NULL,                           /* get_meta_data */
 	NULL,				/* seek_erf */
 	NULL,				/* seek_timeval */
 	NULL,				/* seek_seconds */
