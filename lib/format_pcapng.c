@@ -1829,6 +1829,8 @@ static struct timespec pcapng_get_timespec(const libtrace_packet_t *packet) {
         uint32_t interfaceid = 0;
         pcapng_interface_t *interface;
 
+        memset(&ts, 0, sizeof(struct timespec));
+
 	if (!packet) {
 		fprintf(stderr, "NULL packet passed into pcapng_get_timespec()");
 		/* Return default timespec on error? */

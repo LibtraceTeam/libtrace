@@ -588,6 +588,8 @@ static struct timeval pcapfile_get_timeval(
 	libtrace_pcapfile_pkt_hdr_t *hdr;
 	struct timeval ts;
 
+        memset(&ts, 0, sizeof(struct timeval));
+
 	if (!packet) {
 		fprintf(stderr, "NULL packet passed to pcapfile_get_timeval()\n");
 		/* Return default timeval on error? */
@@ -617,6 +619,7 @@ static struct timespec pcapfile_get_timespec(
 	libtrace_pcapfile_pkt_hdr_t *hdr;
 	struct timespec ts;
 
+        memset(&ts, 0, sizeof(struct timespec));
 	if (!packet) {
 		fprintf(stderr, "NULL packet passed to pcapfile_get_timespec()");
 		/* Return default timespec on error? */
