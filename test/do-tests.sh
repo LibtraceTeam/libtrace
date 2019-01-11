@@ -79,6 +79,28 @@ do_test ./test-pcap-bpf
 echo \* Testing payload length
 do_test ./test-plen
 
+echo \* Testing wire length
+echo \* ERF
+do_test ./test-wlen erf
+echo \* pcapfile
+do_test ./test-wlen pcapfile
+echo \* pcapfilens
+do_test ./test-wlen pcapfilens
+echo \* legacyatm
+do_test ./test-wlen legacyatm
+echo \* legacypos
+do_test ./test-wlen legacypos
+echo \* legacyeth
+do_test ./test-wlen legacyeth
+echo \* rawerf
+do_test ./test-wlen rawerf
+echo \* pcap
+do_test ./test-wlen pcap
+echo \* tsh
+do_test ./test-wlen tsh
+echo \* pcapng
+do_test ./test-wlen pcapng
+
 echo \* Testing port numbers
 do_test ./test-ports
 
