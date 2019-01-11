@@ -284,6 +284,8 @@ static inline uint32_t pcapng_get_blocklen(const libtrace_packet_t *packet) {
 	return hdr->blocklen;
 
 }
+
+#if 0
 static inline uint16_t pcapng_get_customdata_len(libtrace_packet_t *packet, char *ptr) {
 	struct pcapng_custom_optheader *hdr = (struct pcapng_custom_optheader *)ptr;
 
@@ -302,6 +304,8 @@ static inline uint16_t pcapng_get_customdata_optcode(libtrace_packet_t *packet, 
 		return hdr->optcode;
 	}
 }
+#endif
+
 static inline uint16_t pcapng_get_nrb_record_type(libtrace_packet_t *packet, char *ptr) {
 	struct pcapng_nrb_record *hdr = (struct pcapng_nrb_record *)ptr;
 	if (DATA(packet->trace)->byteswapped) {
