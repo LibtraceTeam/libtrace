@@ -267,7 +267,9 @@ static int pci_to_numa(struct rte_pci_addr * dev_addr) {
 
 	if((file = fopen(path, "r")) != NULL) {
 		int numa_node = -1;
-		fscanf(file, "%d", &numa_node);
+		if (fscanf(file, "%d", &numa_node) != 1) {
+                        numa_node = -1;
+                }
 		fclose(file);
 		return numa_node;
 	}
@@ -887,7 +889,11 @@ static void dpdk_lsc_callback(portid_t port, enum rte_eth_event_type event,
 	}
 	if (port != format_data->port) {
 		fprintf(stderr, "Port does not match port in format data in dpdk_lsc_callback()\n");
+		#if RTE_VERSION >= RTE_VERSION_NUM(17, 8, 0, 1)
 		return -1;
+		#else
+		return;
+		#endif
 	}
 
 	rte_eth_link_get_nowait(port, &link_info);
