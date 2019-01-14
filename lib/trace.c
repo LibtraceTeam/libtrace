@@ -1452,7 +1452,11 @@ DLLEXPORT size_t trace_get_wire_length(const libtrace_packet_t *packet){
                  * the wire. Therefore, we shouldn't get upset if our "wire"
                  * length exceeds the max buffer size by four bytes or less.
                  */
-                wiresub = 4;
+                if (packet->cached.wire_length >= 4) {
+                        wiresub = 4;
+                } else {
+                        wiresub = packet->cached.wire_length;
+                }
         } else {
                 wiresub = 0;
         }
