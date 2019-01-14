@@ -587,7 +587,11 @@ DLLEXPORT void *trace_get_payload_from_layer2(void *link,
 		fprintf(stderr, "Unable to determine linktype for packet\n");
 		return NULL;
 	}
-	
+
+        if (link == NULL) {
+                return NULL;
+        }
+
 	switch(linktype) {
 		/* Packet Metadata headers, not layer2 headers */
 		case TRACE_TYPE_80211_PRISM:
@@ -617,10 +621,16 @@ DLLEXPORT void *trace_get_payload_from_layer2(void *link,
 		case TRACE_TYPE_ETH:
 			return trace_get_payload_from_ethernet(link,ethertype,remaining);
 		case TRACE_TYPE_NONE:
+                        if (*remaining == 0) {
+                                return NULL;
+                        }
+
 			if ((*(char*)link&0xF0) == 0x40)
 				*ethertype=TRACE_ETHERTYPE_IP;	 /* IPv4 */
 			else if ((*(char*)link&0xF0) == 0x60)
 				*ethertype=TRACE_ETHERTYPE_IPV6; /* IPv6 */
+                        else
+                                return NULL;            /* No idea */
 			return link; /* I love the simplicity */
 		case TRACE_TYPE_PPP:
 			return trace_get_payload_from_ppp(link,ethertype,remaining);
@@ -645,11 +655,16 @@ DLLEXPORT void *trace_get_payload_from_layer2(void *link,
 			return NULL;
 
 		case TRACE_TYPE_OPENBSD_LOOP:
+                        if (*remaining <= 4) {
+                                return NULL;
+                        }
 			link = link + 4; /* Loopback header is 4 bytes */
 			if ((*(char*)link&0xF0) == 0x40)
 				*ethertype=TRACE_ETHERTYPE_IP;	 /* IPv4 */
 			else if ((*(char*)link&0xF0) == 0x60)
 				*ethertype=TRACE_ETHERTYPE_IPV6; /* IPv6 */
+                        else
+                                return NULL;
 			return link; /* I love the simplicity */
 		
 
