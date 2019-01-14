@@ -676,6 +676,10 @@ static int pcapfile_get_wire_length(const libtrace_packet_t *packet) {
                 return -1;
         }
 
+        if (packet->payload == NULL) {
+                return 0;
+        }
+
 	pcapptr	= (libtrace_pcapfile_pkt_hdr_t *)packet->header;
 	if (packet->type==pcap_linktype_to_rt(TRACE_DLT_EN10MB))
 		/* Include the missing FCS */
