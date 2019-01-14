@@ -2106,14 +2106,19 @@ void *pcapng_get_meta_data(libtrace_packet_t *packet, uint32_t section_type,
 	void *ptr;
 	uint32_t blocktype;
 	uint16_t optcode;
+	int remaining;
+
+	if (packet->buffer == NULL) { return NULL; }
 
 	hdr = (struct pcapng_peeker *)packet->buffer;
 	ptr = packet->buffer;
 
 	if (DATA(packet->trace)->byteswapped) {
 		blocktype = byteswap32(hdr->blocktype);
+		remaining = byteswap32(hdr->blocklen);
 	} else {
 		blocktype = hdr->blocktype;
+		remaining = hdr->blocklen;
 	}
 
 	/* If the data we want is not within this blocktype just return */
@@ -2159,6 +2164,9 @@ void *pcapng_get_meta_data(libtrace_packet_t *packet, uint32_t section_type,
 	}
 	else { return NULL; }
 
+	/* update remaining to account for header and any payload */
+	remaining -= ptr - packet->buffer;
+
 	/* Skip over the options till a match is found or they run out */
 	struct pcapng_optheader *opthdr = ptr;
 	if (DATA(packet->trace)->byteswapped) {
@@ -2166,7 +2174,9 @@ void *pcapng_get_meta_data(libtrace_packet_t *packet, uint32_t section_type,
 	} else {
 		optcode = opthdr->optcode;
 	}
-	while ((optcode != section) && (optcode != PCAPNG_OPTION_END)) {
+	while ((optcode != section) && (optcode != PCAPNG_OPTION_END) &&
+		(remaining > 0)) {
+
 		uint16_t len;
 
 		if (DATA(packet->trace)->byteswapped) {
@@ -2189,6 +2199,10 @@ void *pcapng_get_meta_data(libtrace_packet_t *packet, uint32_t section_type,
 		} else {
 			optcode = opthdr->optcode;
 		}
+
+		/* update remaining */
+		remaining -= (ptr-packet->buffer);
+
 	}
 
 	/* either a option was found or they ran out */

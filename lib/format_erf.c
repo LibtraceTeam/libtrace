@@ -922,8 +922,11 @@ void *erf_get_meta_data(libtrace_packet_t *packet, uint32_t section_type, uint16
 	dag_record_t *hdr;
 	uint16_t curr_sec;
 
-	hdr = (dag_record_t *)packet->header;
+	if (packet->buffer == NULL) { return NULL; }
+
+	hdr = (dag_record_t *)packet->buffer;
 	bodyptr = (char *)packet->payload;
+	/* 24 is size of the ERF header */
 	remaining = ntohs(hdr->rlen) - 24;
 
 	/* ensure this is a meta packet */
