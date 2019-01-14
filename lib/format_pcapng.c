@@ -1157,7 +1157,7 @@ static int pcapng_read_section(libtrace_t *libtrace,
 
         pcapng_sec_t *sechdr;
         int err;
-        uint32_t to_read;
+        uint32_t to_read, blocklen;
         char *bodyptr = NULL;
 
         err = wandio_read(libtrace->io, packet->buffer, sizeof(pcapng_sec_t));
@@ -1201,16 +1201,23 @@ static int pcapng_read_section(libtrace_t *libtrace,
                                 "Parsing pcapng version numbers");
                         return -1;
                 }
-                to_read = byteswap32(sechdr->blocklen) - sizeof(pcapng_sec_t);
+                blocklen = byteswap32(sechdr->blocklen);
+
         } else {
                 if (sechdr->majorversion != 1 && sechdr->minorversion != 0) {
                         trace_set_err(libtrace, TRACE_ERR_BAD_PACKET,
                                 "Parsing pcapng version numbers");
                         return -1;
                 }
-                to_read = sechdr->blocklen - sizeof(pcapng_sec_t);
+                blocklen = sechdr->blocklen;
         }
 
+        if (blocklen < sizeof(pcapng_sec_t)) {
+                trace_set_err(libtrace, TRACE_ERR_BAD_PACKET,
+                                "Block length in pcapng section header is invalid.");
+                return -1;
+        }
+        to_read = blocklen - sizeof(pcapng_sec_t);
         /* Read all of the options etc. -- we don't need them for now, but
          * we have to skip forward to the next useful header. */
         bodyptr = (char *) packet->buffer + sizeof(pcapng_sec_t);
