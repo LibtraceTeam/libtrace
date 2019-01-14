@@ -465,8 +465,10 @@ DLLEXPORT void *trace_get_layer2(const libtrace_packet_t *packet,
 	/* Code looks a bit inefficient, but I'm actually trying to avoid
 	 * calling trace_get_packet_buffer more than once like we used to.
 	 */
-	
 	meta = trace_get_packet_buffer(packet, linktype, remaining);
+        if (meta == NULL) {
+                return NULL;
+        }
 
 	/* If there are no meta-data headers, we just return the start of the
 	 * packet buffer, along with the linktype, etc.
