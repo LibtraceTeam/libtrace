@@ -499,14 +499,18 @@ static inline int dispatch_packet(libtrace_t *trace,
 
 		/* If packet is meta call the meta callback */
 		if (IS_LIBTRACE_META_PACKET((*packet))) {
+			/* Pass to meta callback if defined else pass to packet callback */
 			if (trace->perpkt_cbs->message_meta_packet) {
-				*packet = (*trace->perpkt_cbs->message_meta_packet)(trace, t, trace->global_blob,
-					t->user_data, *packet);
+				*packet = (*trace->perpkt_cbs->message_meta_packet)(trace, t,
+					trace->global_blob, t->user_data, *packet);
+			} else if (trace->perpkt_cbs->message_packet) {
+				*packet = (*trace->perpkt_cbs->message_packet)(trace, t,
+					trace->global_blob, t->user_data, *packet);
 			}
 		} else {
 			if (trace->perpkt_cbs->message_packet) {
-				*packet = (*trace->perpkt_cbs->message_packet)(trace, t, trace->global_blob, t->user_data,
-					*packet);
+				*packet = (*trace->perpkt_cbs->message_packet)(trace, t,
+					trace->global_blob, t->user_data, *packet);
 			}
 		}
 		trace_fin_packet(*packet);
