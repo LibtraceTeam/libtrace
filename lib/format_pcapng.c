@@ -1221,6 +1221,13 @@ static int pcapng_read_section(libtrace_t *libtrace,
         /* Read all of the options etc. -- we don't need them for now, but
          * we have to skip forward to the next useful header. */
         bodyptr = (char *) packet->buffer + sizeof(pcapng_sec_t);
+
+        if (to_read > LIBTRACE_PACKET_BUFSIZE) {
+                trace_set_err(libtrace, TRACE_ERR_BAD_PACKET,
+                                "Excessively large section header contents of %u bytes, likely a corrupt trace.", to_read);
+                return -1;
+        }
+
         err = pcapng_read_body(libtrace, bodyptr, to_read);
         if (err <= 0) {
                 return err;
