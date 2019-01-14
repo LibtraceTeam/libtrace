@@ -8,22 +8,38 @@
 #include <string.h>
 
 
+/* Internal Meta functions */
+
+static int trace_meta_check_input(libtrace_packet_t *packet, char *input_func) {
+	if (packet == NULL) {
+                fprintf(stderr, "NULL packet passed into %s\n", input_func);
+                return -1;
+        }
+        if (packet->trace == NULL) {
+                fprintf(stderr, "Packet contains NULL trace in %s\n", input_func);
+                return -1;
+        }
+	return 1;
+}
+
 /* API functions to retrieve interface related packet data */
-
-
 
 /* Reads the interface name for a packet
  *
  * @params libtrace_packet_t packet
- * @returns pointer to NULL terminated string containing the interface name
+ * @returns A pointer to a NULL terminated string containing the interface name or NULL
  */
-
 char *trace_get_interface_name(libtrace_packet_t *packet) {
+	if (trace_meta_check_input(packet, "trace_get_interface_name()")<0) {
+		return NULL;
+	}
+
 	void *ptr = NULL;
 
-	/* find the result if we havnt already */
+	/* cleanup any old results */
 	if (packet->meta.interface_name != NULL) {
-		return packet->meta.interface_name;
+		free(packet->meta.interface_name);
+		packet->meta.interface_name = NULL;
 	}
 
 	/* get the result */
@@ -57,14 +73,14 @@ char *trace_get_interface_name(libtrace_packet_t *packet) {
 /* Gets the interface MAC address from a meta packet
  *
  * @params libtrace_packet_t packet
- * @returns A pointer to a MAC address
+ * @returns A pointer to a MAC address within the packet or NULL
  */
-char *trace_get_interface_mac(libtrace_packet_t *packet) {
-	void *ptr = NULL;
+void *trace_get_interface_mac(libtrace_packet_t *packet) {
+	if (trace_meta_check_input(packet, "trace_get_interface_mac()")<0) {
+                return NULL;
+        }
 
-	if (packet->meta.interface_mac != NULL) {
-		return packet->meta.interface_mac;
-	}
+	void *ptr = NULL;
 
 	if (packet->trace->format->type == TRACE_FORMAT_ERF) {
 		ptr = packet->trace->format->get_meta_data(packet,
@@ -76,12 +92,7 @@ char *trace_get_interface_mac(libtrace_packet_t *packet) {
 	}
 
 	if (ptr != NULL) {
-		/* allocate memory within the packet to store the result
-		 * exclude any padding that could be included */
-		packet->meta.interface_mac = malloc(6);
-		/* copy result over */
-		memcpy(packet->meta.interface_mac, ptr+sizeof(libtrace_meta_result_t), 6);
-
+		packet->meta.interface_mac = ptr+sizeof(libtrace_meta_result_t);
 		return packet->meta.interface_mac;
 	}
 
@@ -91,65 +102,118 @@ char *trace_get_interface_mac(libtrace_packet_t *packet) {
 /* Gets the interface speed from a meta packet
  *
  * @params libtrace_packet_t packet
- * @returns uint64_t containing the interface speed or 0 if not found.
+ * @returns A pointer to the uint64_t interface speed within the packet or NULL
  */
-uint64_t trace_get_interface_speed(libtrace_packet_t *packet) {
-	/* Get the result */
-	void *ptr = packet->trace->format->get_meta_data(packet,
-                ERF_PROV_SECTION_INTERFACE, ERF_PROV_IF_SPEED);
+uint64_t *trace_get_interface_speed(libtrace_packet_t *packet) {
+	if (trace_meta_check_input(packet, "trace_get_interface_speed()")<0) {
+                return NULL;
+        }
 
-	/* If a result was found */
-	if (ptr != NULL) {
-		uint64_t *result = (uint64_t *)(ptr+sizeof(libtrace_meta_result_t));
-		packet->meta.interface_speed = *result;
+	void *ptr = NULL;
 
-		return packet->meta.interface_speed;
+	if (packet->trace->format->type == TRACE_FORMAT_ERF) {
+		ptr = packet->trace->format->get_meta_data(packet,
+                	ERF_PROV_SECTION_INTERFACE, ERF_PROV_IF_SPEED);
+	}
+	if (packet->trace->format->type == TRACE_FORMAT_PCAPNG) {
+		ptr = packet->trace->format->get_meta_data(packet,
+                        PCAPNG_INTERFACE_TYPE, PCAPNG_META_IF_SPEED);
 	}
 
-	return 0;
+	if (ptr != NULL) {
+		uint64_t *intspeed = (uint64_t *)(ptr+sizeof(libtrace_meta_result_t));
+		packet->meta.interface_speed = *intspeed;
+		return &packet->meta.interface_speed;
+	}
+
+	return NULL;
 }
 
 /* Gets the interface ipv4 address from a meta packet
  *
  * @params libtrace_packet_t packet
- * @returns A pointer to the IP4 address field within the packet
+ * @returns A pointer to the IP4 address field within the packet or NULL
  */
-uint32_t trace_get_interface_ip4(libtrace_packet_t *packet) {
-	void *ptr = packet->trace->format->get_meta_data(packet,
-		ERF_PROV_SECTION_INTERFACE, ERF_PROV_IF_IPV4);
+uint32_t *trace_get_interface_ip4(libtrace_packet_t *packet) {
+	if (trace_meta_check_input(packet, "trace_get_interface_ip4()")<0) {
+                return NULL;
+        }
 
-	if (ptr != NULL) {
-		uint32_t *result = (uint32_t *)(ptr+sizeof(libtrace_meta_result_t));
-		packet->meta.interface_ipv4 = *result;
+	void *ptr = NULL;
 
-		return packet->meta.interface_ipv4;
+	if (packet->trace->format->type == TRACE_FORMAT_ERF) {
+		ptr = packet->trace->format->get_meta_data(packet,
+			ERF_PROV_SECTION_INTERFACE, ERF_PROV_IF_IPV4);
+	}
+	if (packet->trace->format->type == TRACE_FORMAT_PCAPNG) {
+		ptr = packet->trace->format->get_meta_data(packet,
+                        PCAPNG_INTERFACE_TYPE, PCAPNG_META_IF_IP4);
 	}
 
-	return 0;
+	if (ptr != NULL) {
+		uint32_t *intip4 = (uint32_t *)(ptr+sizeof(libtrace_meta_result_t));
+		packet->meta.interface_ipv4 = *intip4;
+		return &packet->meta.interface_ipv4;
+	}
+
+	return NULL;
 }
-uint32_t trace_get_interface_ipv4(libtrace_packet_t *packet) {
+uint32_t *trace_get_interface_ipv4(libtrace_packet_t *packet) {
 	return trace_get_interface_ip4(packet);
 }
 
-char *trace_get_interface_ip6(libtrace_packet_t *packet UNUSED) {
+void *trace_get_interface_ip6(libtrace_packet_t *packet) {
+	if (trace_meta_check_input(packet, "trace_get_interface_ip6()")<0) {
+                return NULL;
+        }
+
+	void *ptr = NULL;
+
+	if (packet->trace->format->type == TRACE_FORMAT_ERF) {
+                ptr = packet->trace->format->get_meta_data(packet,
+                        ERF_PROV_SECTION_INTERFACE, ERF_PROV_IF_IPV4);
+        }
+        if (packet->trace->format->type == TRACE_FORMAT_PCAPNG) {
+                ptr = packet->trace->format->get_meta_data(packet,
+                        PCAPNG_INTERFACE_TYPE, PCAPNG_META_IF_IP4);
+        }
+
+	if (ptr != NULL) {
+		packet->meta.interface_ipv6 = ptr+sizeof(libtrace_meta_result_t);
+		return packet->meta.interface_ipv6;
+	}
+
 	return NULL;
 }
-char *trace_get_interface_ipv6(libtrace_packet_t *packet) {
+void *trace_get_interface_ipv6(libtrace_packet_t *packet) {
 	return trace_get_interface_ip6(packet);
 }
 
 /* Gets the interface description for a packet
  *
  * @params libtrace_packet_t packet
- * @returns A char* to a NULL terminated interface description
+ * @returns A pointer to a NULL terminated interface description string or NULL
  */
 char *trace_get_interface_description(libtrace_packet_t *packet) {
+	if (trace_meta_check_input(packet, "trace_get_interface_description()")<0) {
+                return NULL;
+        }
+
 	if (packet->meta.interface_description != NULL) {
-		return packet->meta.interface_description;
+		free(packet->meta.interface_description);
+		packet->meta.interface_description = NULL;
 	}
 
-	void *ptr = packet->trace->format->get_meta_data(packet,
-		ERF_PROV_SECTION_INTERFACE, ERF_PROV_DESCR);
+	void *ptr = NULL;
+
+	if (packet->trace->format->type == TRACE_FORMAT_ERF) {
+		ptr = packet->trace->format->get_meta_data(packet,
+			ERF_PROV_SECTION_INTERFACE, ERF_PROV_DESCR);
+	}
+	if (packet->trace->format->type == TRACE_FORMAT_PCAPNG) {
+		ptr = packet->trace->format->get_meta_data(packet,
+                        PCAPNG_INTERFACE_TYPE, PCAPNG_META_IF_DESCR);
+	}
 
 	if (ptr != NULL) {
 		libtrace_meta_result_t *result = (libtrace_meta_result_t *)ptr;
@@ -164,20 +228,205 @@ char *trace_get_interface_description(libtrace_packet_t *packet) {
 	return NULL;
 }
 
-libtrace_meta_result_t *trace_get_interface_num(libtrace_packet_t *packet) {
-	libtrace_meta_result_t *result = packet->trace->format->get_meta_data(packet,
-		ERF_PROV_SECTION_INTERFACE, ERF_PROV_IF_NUM);
-	return result;
-}
+/* Gets the interface number for the packet
+ *
+ * @params libtrace_packet_t packet
+ * @returns A void pointer to the beginning of a uint32_t interface number;
+ */
+uint32_t *trace_get_interface_num(libtrace_packet_t *packet) {
+	if (trace_meta_check_input(packet, "trace_get_interface_num()")<0) {
+                return NULL;
+        }
 
-libtrace_meta_result_t *trace_get_host_os(libtrace_packet_t *packet UNUSED) {
+	void *ptr = NULL;
+
+	if (packet->trace->format->type == TRACE_FORMAT_ERF) {
+		ptr = packet->trace->format->get_meta_data(packet,
+			ERF_PROV_SECTION_INTERFACE, ERF_PROV_IF_NUM);
+	}
+	/* Note: pcapng doesnt provide this */
+
+	if (ptr != NULL) {
+		uint32_t *intnum = (uint32_t *)(ptr+sizeof(libtrace_meta_result_t));
+		packet->meta.interface_num = *intnum;
+		return &packet->meta.interface_num;
+	}
+
 	return NULL;
 }
 
-libtrace_meta_result_t *trace_get_tzone(libtrace_packet_t *packet UNUSED) {
+/* Gets the host OS from a packets originating interface
+ *
+ * @params libtrace_packet_t packet
+ * @returns A pointer to a NULL terminated string or NULL
+ */
+char *trace_get_host_os(libtrace_packet_t *packet) {
+	if (trace_meta_check_input(packet, "trace_get_host_os()")<0) {
+                return NULL;
+        }
+
+	if (packet->meta.host_os != NULL) {
+		free(packet->meta.host_os);
+		packet->meta.host_os = NULL;
+	}
+
+	void *ptr = NULL;
+
+	if (packet->trace->format->type == TRACE_FORMAT_ERF) {
+		ptr = packet->trace->format->get_meta_data(packet,
+                        ERF_PROV_SECTION_HOST, ERF_PROV_OS);
+	}
+	if (packet->trace->format->type == TRACE_FORMAT_PCAPNG) {
+		ptr = packet->trace->format->get_meta_data(packet,
+                        PCAPNG_INTERFACE_TYPE, PCAPNG_META_IF_OS);
+	}
+
+	if (ptr != NULL) {
+		libtrace_meta_result_t *result = (libtrace_meta_result_t *)ptr;
+                packet->meta.host_os = malloc(ntohs(result->len)+1);
+                packet->meta.host_os[ntohs(result->len)] = '\0';
+                memcpy(packet->meta.host_os, ptr+sizeof(libtrace_meta_result_t),
+                        ntohs(result->len));
+
+		return packet->meta.host_os;
+	}
+
 	return NULL;
 }
 
-libtrace_meta_result_t *trace_get_app_name(libtrace_packet_t *packet UNUSED) {
+/* Gets the frame check sequence length from a packets originating interface
+ *
+ * @params libtrace_packet_t packet
+ * @returns A uint32_t pointer containing the fcslen or NULL
+ */
+uint32_t *trace_get_interface_frame_check_sequence_length(libtrace_packet_t *packet) {
+	if (trace_meta_check_input(packet, "trace_get_interface_frame_check_sequence_length()")<0) {
+                return NULL;
+        }
+
+	void *ptr = NULL;
+
+	if (packet->trace->format->type == TRACE_FORMAT_ERF) {
+		ptr = packet->trace->format->get_meta_data(packet,
+                        ERF_PROV_SECTION_INTERFACE, ERF_PROV_FCS_LEN);
+	}
+	if (packet->trace->format->type == TRACE_FORMAT_PCAPNG) {
+		ptr = packet->trace->format->get_meta_data(packet,
+                        PCAPNG_INTERFACE_TYPE, PCAPNG_META_IF_FCSLEN);
+	}
+
+	if (ptr != NULL) {
+
+		if (packet->trace->format->type == TRACE_FORMAT_ERF) {
+			uint32_t *val = (uint32_t *)(ptr+sizeof(libtrace_meta_result_t));
+			packet->meta.interface_fcslen = *val;
+		} else if (packet->trace->format->type == TRACE_FORMAT_PCAPNG) {
+			uint8_t *val = (uint8_t *)(ptr+sizeof(libtrace_meta_result_t));
+			packet->meta.interface_fcslen = *val;
+		}
+		return &packet->meta.interface_fcslen;
+	}
+
 	return NULL;
 }
+
+char *trace_get_interface_hardware_description(libtrace_packet_t *packet) {
+	if (trace_meta_check_input(packet, "trace_get_interface_hardware_description()")<0) {
+                return NULL;
+        }
+
+	if (packet->meta.interface_hardware_desc != NULL) {
+		free(packet->meta.interface_hardware_desc);
+		packet->meta.interface_hardware_desc = NULL;
+	}
+
+	void *ptr = NULL;
+
+        if (packet->trace->format->type == TRACE_FORMAT_PCAPNG) {
+                ptr = packet->trace->format->get_meta_data(packet,
+                        PCAPNG_INTERFACE_TYPE, PCAPNG_META_IF_HARDWARE);
+        }
+	/* Posibly can get ERF interface model here?? */
+
+	if (ptr != NULL) {
+		libtrace_meta_result_t *result = (libtrace_meta_result_t *)ptr;
+                packet->meta.interface_hardware_desc = malloc(ntohs(result->len)+1);
+                packet->meta.interface_hardware_desc[ntohs(result->len)] = '\0';
+                memcpy(packet->meta.interface_hardware_desc, ptr+sizeof(libtrace_meta_result_t),
+                        ntohs(result->len));
+
+                return packet->meta.interface_hardware_desc;
+	}
+
+	return NULL;
+}
+
+char *trace_get_interface_comment(libtrace_packet_t *packet) {
+	if (trace_meta_check_input(packet, "trace_get_interface_comment()")<0) {
+                return NULL;
+        }
+
+	if (packet->meta.interface_comment != NULL) {
+		free(packet->meta.interface_comment);
+		packet->meta.interface_comment = NULL;
+	}
+
+	void *ptr = NULL;
+
+	if (packet->trace->format->type == TRACE_FORMAT_ERF) {
+		ptr = packet->trace->format->get_meta_data(packet,
+			ERF_PROV_SECTION_INTERFACE, ERF_PROV_COMMENT);
+	}
+	if (packet->trace->format->type == TRACE_FORMAT_PCAPNG) {
+		ptr = packet->trace->format->get_meta_data(packet,
+			PCAPNG_INTERFACE_TYPE, PCAPNG_OPTION_COMMENT);
+	}
+
+	if (ptr != NULL) {
+		libtrace_meta_result_t *result = (libtrace_meta_result_t *)ptr;
+                packet->meta.interface_comment = malloc(ntohs(result->len)+1);
+                packet->meta.interface_comment[ntohs(result->len)] = '\0';
+                memcpy(packet->meta.interface_comment, ptr+sizeof(libtrace_meta_result_t),
+                        ntohs(result->len));
+
+                return packet->meta.interface_comment;
+	}
+
+	return NULL;
+}
+
+char *trace_get_capture_application(libtrace_packet_t *packet) {
+	if (trace_meta_check_input(packet, "trace_get_interface_comment()")<0) {
+                return NULL;
+        }
+
+	if (packet->meta.capture_application != NULL) {
+		free(packet->meta.capture_application);
+		packet->meta.capture_application = NULL;
+	}
+
+	void *ptr = NULL;
+
+	if (packet->trace->format->type == TRACE_FORMAT_ERF) {
+                ptr = packet->trace->format->get_meta_data(packet,
+                        ERF_PROV_SECTION_CAPTURE, ERF_PROV_APP_NAME);
+        }
+        if (packet->trace->format->type == TRACE_FORMAT_PCAPNG) {
+                ptr = packet->trace->format->get_meta_data(packet,
+                        PCAPNG_SECTION_TYPE, PCAPNG_META_SHB_USERAPPL);
+        }
+
+	if (ptr != NULL) {
+                libtrace_meta_result_t *result = (libtrace_meta_result_t *)ptr;
+                packet->meta.capture_application = malloc(ntohs(result->len)+1);
+                packet->meta.capture_application[ntohs(result->len)] = '\0';
+                memcpy(packet->meta.capture_application, ptr+sizeof(libtrace_meta_result_t),
+                        ntohs(result->len));
+
+                return packet->meta.capture_application;
+        }
+
+        return NULL;
+}
+
+

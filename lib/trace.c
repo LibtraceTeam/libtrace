@@ -949,12 +949,16 @@ DLLEXPORT void trace_destroy_packet(libtrace_packet_t *packet) {
 	/* free meta fields */
 	if (packet->meta.interface_name != NULL)
 		free(packet->meta.interface_name);
-	if (packet->meta.interface_mac != NULL)
-		free(packet->meta.interface_mac);
-	if (packet->meta.interface_ipv6 != NULL)
-		free(packet->meta.interface_ipv6);
 	if (packet->meta.interface_description != NULL)
 		free(packet->meta.interface_description);
+	if (packet->meta.host_os != NULL)
+		free(packet->meta.host_os);
+	if (packet->meta.interface_hardware_desc != NULL)
+		free(packet->meta.interface_hardware_desc);
+	if (packet->meta.interface_comment != NULL)
+                free(packet->meta.interface_comment);
+	if (packet->meta.capture_application != NULL)
+                free(packet->meta.capture_application);
 
 	free(packet);
 }

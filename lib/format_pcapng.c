@@ -96,6 +96,13 @@ typedef struct pcapng_stats_header_t {
         uint32_t timestamp_low;
 } pcapng_stats_t;
 
+typedef struct pcapng_decryption_secrets_header_t {
+        uint32_t blocktype;
+        uint32_t blocklen;
+        uint32_t secrets_type;
+        uint32_t secrets_len;
+} pcapng_secrets_t;
+
 typedef struct pcapng_custom_header_t {
         uint32_t blocktype;
         uint32_t blocklen;
@@ -2100,8 +2107,8 @@ void *pcapng_get_meta_data(libtrace_packet_t *packet, uint32_t section_type,
 	uint32_t blocktype;
 	uint16_t optcode;
 
-	hdr = (struct pcapng_peeker *)packet->header;
-	ptr = packet->header;
+	hdr = (struct pcapng_peeker *)packet->buffer;
+	ptr = packet->buffer;
 
 	if (DATA(packet->trace)->byteswapped) {
 		blocktype = byteswap32(hdr->blocktype);
@@ -2109,22 +2116,48 @@ void *pcapng_get_meta_data(libtrace_packet_t *packet, uint32_t section_type,
 		blocktype = hdr->blocktype;
 	}
 
-	/* Just return if data we want is not in this block */
+	/* If the data we want is not within this blocktype just return */
 	if (blocktype != section_type) {
 		return NULL;
 	}
 
 	/* Skip x bytes to the options depending on what kind of packet this is */
 	if (section_type == PCAPNG_SECTION_TYPE) { ptr += sizeof(pcapng_sec_t); }
-	if (section_type == PCAPNG_INTERFACE_TYPE) { ptr += sizeof(pcapng_int_t); }
-	if (section_type == PCAPNG_OLD_PACKET_TYPE) { ptr += sizeof(pcapng_opkt_t); }
-	if (section_type == PCAPNG_SIMPLE_PACKET_TYPE) { ptr += sizeof(pcapng_spkt_t); }
-	if (section_type == PCAPNG_NAME_RESOLUTION_TYPE) {
-		/* look into this more */
-		return NULL;
+	else if (section_type == PCAPNG_INTERFACE_TYPE) { ptr += sizeof(pcapng_int_t); }
+	else if (section_type == PCAPNG_OLD_PACKET_TYPE) { ptr += sizeof(pcapng_opkt_t); }
+	else if (section_type == PCAPNG_NAME_RESOLUTION_TYPE) { ptr += sizeof(pcapng_epkt_t); }
+	else if (section_type == PCAPNG_INTERFACE_STATS_TYPE) { ptr += sizeof(pcapng_stats_t); }
+	else if (section_type == PCAPNG_ENHANCED_PACKET_TYPE) {
+		/* jump over the the enchanced packet header and data to the options */
+		pcapng_epkt_t *epkthdr = (pcapng_epkt_t *)ptr;
+		uint32_t seclen;
+		if (DATA(packet->trace)->byteswapped) {
+			seclen = byteswap32(epkthdr->caplen);
+		} else {
+			seclen = epkthdr->caplen;
+		}
+		if ((seclen % 4) != 0) {
+                        ptr += seclen + (4 -(seclen % 4)) + sizeof(pcapng_secrets_t);
+                } else {
+                        ptr += seclen + sizeof(pcapng_secrets_t);
+                }
 	}
-	if (section_type == PCAPNG_INTERFACE_STATS_TYPE) { ptr += sizeof(pcapng_stats_t); }
-	if (section_type == PCAPNG_ENHANCED_PACKET_TYPE) { ptr += sizeof(pcapng_epkt_t); }
+	else if (section_type == PCAPNG_DECRYPTION_SECRETS_TYPE) {
+		/* jump over the decryption secrets header and data to the options */
+		pcapng_secrets_t *sechdr = (pcapng_secrets_t *)ptr;
+		uint32_t seclen;
+		if (DATA(packet->trace)->byteswapped) {
+			seclen = byteswap32(sechdr->secrets_len);
+		} else {
+			seclen = sechdr->secrets_len;
+		}
+		if ((seclen % 4) != 0) {
+			ptr += seclen + (4 -(seclen % 4)) + sizeof(pcapng_secrets_t);
+		} else {
+			ptr += seclen + sizeof(pcapng_secrets_t);
+		}
+	}
+	else { return NULL; }
 
 	/* Skip over the options till a match is found or they run out */
 	struct pcapng_optheader *opthdr = ptr;
