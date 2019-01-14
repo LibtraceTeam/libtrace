@@ -346,7 +346,10 @@ char *trace_get_interface_hardware_description(libtrace_packet_t *packet) {
                 ptr = packet->trace->format->get_meta_data(packet,
                         PCAPNG_INTERFACE_TYPE, PCAPNG_META_IF_HARDWARE);
         }
-	/* Posibly can get ERF interface model here?? */
+	if (packet->trace->format->type == TRACE_FORMAT_ERF) {
+		ptr = packet->trace->format->get_meta_data(packet,
+			ERF_PROV_SECTION_MODULE, ERF_PROV_MODEL);
+	}
 
 	if (ptr != NULL) {
 		libtrace_meta_result_t *result = (libtrace_meta_result_t *)ptr;
