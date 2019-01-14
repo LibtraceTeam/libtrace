@@ -801,6 +801,11 @@ libtrace_linktype_t erf_get_link_type(const libtrace_packet_t *packet) {
                 return erf_type_to_libtrace(type);
         }
 	else {
+                if (trace_get_capture_length(packet) < 5 ||
+                                packet->payload == NULL) {
+                        return ~0;
+                }
+
 		/* Sigh, lets start wildly guessing */
 		if (((char*)packet->payload)[4]==0x45)
 			return TRACE_TYPE_PPP;
