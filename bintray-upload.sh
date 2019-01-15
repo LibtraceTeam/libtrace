@@ -8,6 +8,9 @@ ARCH=amd64
 
 APIKEY=${BINTRAY_API_KEY}
 
+apt-get update
+apt-get install -y curl
+
 UBUNTU_DISTS=("xenial" "artful" "bionic")
 DEBIAN_DISTS=("stretch" "jessie" "sid" "buster")
 PACKAGE_LIST=("libtrace4" "libtrace4-dev" "libtrace4-tools" "libpacketdump4" "libpacketdump4-dev")
