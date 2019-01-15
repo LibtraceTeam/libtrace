@@ -48,7 +48,7 @@ enum enc_type_t {
 bool enc_source_opt = false;
 bool enc_dest_opt   = false;
 enum enc_type_t enc_type = ENC_NONE;
-char *key = NULL;
+char *enc_key = NULL;
 
 int level = -1;
 trace_option_compresstype_t compress_type = TRACE_OPTION_COMPRESSTYPE_NONE;
@@ -220,19 +220,19 @@ static libtrace_packet_t *per_packet(libtrace_t *trace, libtrace_thread_t *t,
 static void *start_anon(libtrace_t *trace, libtrace_thread_t *t, void *global)
 {
         if (enc_type == ENC_PREFIX_SUBSTITUTION) {
-                PrefixSub *sub = new PrefixSub(key, NULL);
+                PrefixSub *sub = new PrefixSub(enc_key, NULL);
                 return sub;
         }
 
         if (enc_type == ENC_CRYPTOPAN) {
-		if (strlen(key) < 32) {
+		if (strlen(enc_key) < 32) {
 			fprintf(stderr, "ERROR: Key must be at least 32 "
 			"characters long for CryptoPan anonymisation.\n");
 			exit(1);
 		}
 #ifdef HAVE_LIBCRYPTO                
-                CryptoAnon *anon = new CryptoAnon((uint8_t *)key,
-                        (uint8_t)strlen(key), 20);
+                CryptoAnon *anon = new CryptoAnon((uint8_t *)enc_key,
+                        (uint8_t)strlen(enc_key), 20);
                 return anon;
 #else
                 /* TODO nicer way of exiting? */
@@ -359,15 +359,15 @@ int main(int argc, char *argv[])
 			case 's': enc_source_opt=true; break;
 			case 'd': enc_dest_opt  =true; break;
 			case 'c': 
-				  if (key!=NULL) {
+				  if (enc_key!=NULL) {
 					  fprintf(stderr,"You can only have one encryption type and one key\n");
 					  usage(argv[0]);
 				  }
-				  key=strdup(optarg);
+				  enc_key=strdup(optarg);
 				  enc_type = ENC_CRYPTOPAN;
 				  break;
 		        case 'F': {
-			          if(key != NULL) {
+			          if(enc_key != NULL) {
 				    fprintf(stderr,"You can only have one encryption type and one key\n");
 				    usage(argv[0]);
 				  }
@@ -376,8 +376,8 @@ int main(int argc, char *argv[])
 				    perror("Failed to open cryptopan keyfile");
                                     return 1;
 				  }
-				  key = (char *) malloc(sizeof(char *) * 32);
-				  if(fread(key,1,32,infile) != 32) {
+				  enc_key = (char *) malloc(sizeof(char *) * 32);
+				  if(fread(enc_key,1,32,infile) != 32) {
 				    if(ferror(infile)) {
 				      perror("Failed while reading cryptopan keyfile");
 				    }
@@ -390,11 +390,11 @@ int main(int argc, char *argv[])
                                   filterstring = optarg;
                                   break;
 		        case 'p':
-				  if (key!=NULL) {
+				  if (enc_key!=NULL) {
 					  fprintf(stderr,"You can only have one encryption type and one key\n");
 					  usage(argv[0]);
 				  }
-				  key=strdup(optarg);
+				  enc_key=strdup(optarg);
 				  enc_type = ENC_PREFIX_SUBSTITUTION;
 				  break;
 			case 'h': 
