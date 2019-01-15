@@ -51,7 +51,7 @@ uint64_t totbyteslast=0;
 uint64_t maxfiles = UINT64_MAX;
 uint64_t filescreated = 0;
 uint16_t snaplen = 0;
-int jump=0;
+int jumpopt=0;
 int verbose=0;
 int compress_level=-1;
 trace_option_compresstype_t compress_type = TRACE_OPTION_COMPRESSTYPE_NONE;
@@ -323,9 +323,9 @@ static int per_packet(libtrace_packet_t **packet) {
 	}
 
         /* Support "jump"ping to the nth IP header. */
-        if (jump) {
+        if (jumpopt) {
             /* Skip headers */
-            struct libtrace_packet_t *newpacket = perform_jump(*packet, jump);
+            struct libtrace_packet_t *newpacket = perform_jump(*packet, jumpopt);
             if (newpacket) {
 		/* If an IP header was found on the nth layer down
 		 * write out the packet  */
@@ -403,7 +403,7 @@ int main(int argc, char *argv[])
 				  break;
 			case 'i': interval=atoi(optarg);
 				  break;
-                        case 'j': jump=atoi(optarg);
+                        case 'j': jumpopt=atoi(optarg);
                                   break;
 			case 'm': maxfiles=atoi(optarg);
 				  break;
