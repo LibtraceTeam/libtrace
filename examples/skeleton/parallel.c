@@ -52,13 +52,13 @@
 #include "libtrace_parallel.h"
 
 volatile int done = 0;
-libtrace_t *trace = NULL;
+libtrace_t *inptrace = NULL;
 
 static void cleanup_signal(int sig) {
         (void)sig;      /* avoid warnings about unused parameter */
         done = 1;
-        if (trace)
-                trace_pstop(trace);
+        if (inptrace)
+                trace_pstop(inptrace);
 }
 
 
@@ -287,35 +287,35 @@ int main(int argc, char *argv[]) {
 
         for (i = optind; i < argc; i++) {
 
-        	trace = trace_create(argv[i]);
+        	inptrace = trace_create(argv[i]);
 
-                if (trace_is_err(trace)) {
-                        trace_perror(trace, "Opening trace file");
+                if (trace_is_err(inptrace)) {
+                        trace_perror(inptrace, "Opening trace file");
                         retcode = -1;
                         break;
                 }
 
-                if (filter && trace_config(trace, TRACE_OPTION_FILTER, filter) == -1) {
-                        trace_perror(trace, "trace_config(filter)");
+                if (filter && trace_config(inptrace, TRACE_OPTION_FILTER, filter) == -1) {
+                        trace_perror(inptrace, "trace_config(filter)");
                         retcode = -1;
                         break;
                 }
 
-                trace_set_perpkt_threads(trace, threads);
-                trace_set_combiner(trace, &combiner_ordered,
+                trace_set_perpkt_threads(inptrace, threads);
+                trace_set_combiner(inptrace, &combiner_ordered,
                                 (libtrace_generic_t) {0});
-                trace_set_hasher(trace, HASHER_BIDIRECTIONAL, NULL, NULL);
+                trace_set_hasher(inptrace, HASHER_BIDIRECTIONAL, NULL, NULL);
 
-        	if (trace_pstart(trace, &global, processing, reporter)) {
-                        trace_perror(trace, "Starting trace");
+        	if (trace_pstart(inptrace, &global, processing, reporter)) {
+                        trace_perror(inptrace, "Starting trace");
                         break;
                 }
 
         	/* Wait for all threads to stop */
-	        trace_join(trace);
+	        trace_join(inptrace);
 
-                if (trace_is_err(trace)) {
-                        trace_perror(trace, "Processing packets");
+                if (trace_is_err(inptrace)) {
+                        trace_perror(inptrace, "Processing packets");
                         retcode = -1;
                         break;
                 }
@@ -326,7 +326,7 @@ int main(int argc, char *argv[]) {
 
         if (filter)
                 trace_destroy_filter(filter);
-        trace_destroy(trace);
+        trace_destroy(inptrace);
         trace_destroy_callback_set(processing);
         trace_destroy_callback_set(reporter);
         return retcode;
