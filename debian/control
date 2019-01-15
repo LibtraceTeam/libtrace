@@ -12,7 +12,7 @@ Homepage: http://research.wand.net.nz/software/libtrace.php
 Package: libtrace4-dev
 Section: libdevel
 Architecture: any
-Depends: libtrace4 (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
+Depends: libtrace4 (= ${binary:Version}), ${misc:Depends}
 Provides: libtrace-dev
 Conflicts: libtrace-dev, libpacketdump3-dev
 Replaces: libtrace-dev
@@ -45,8 +45,7 @@ Description: network trace processing library supporting many input formats
 Package: libpacketdump4-dev
 Section: libdevel
 Architecture: any
-Depends: libpacketdump4 (= ${binary:Version}), ${misc:Depends},
- ${shlibs:Depends}
+Depends: libpacketdump4 (= ${binary:Version}), ${misc:Depends}
 Provides: libpacketdump-dev
 Conflicts: libpacketdump-dev
 Replaces: libpacketdump-dev
