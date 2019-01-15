@@ -115,7 +115,7 @@ deploy-packages:
 
 upload-packages:
   stage: upload
-  image: ubuntu-bionic
+  image: ubuntu:bionic
   script:
     - ./bintray-upload.sh
   only:
