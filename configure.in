@@ -511,6 +511,7 @@ fi
 
 if test "$have_pthread" = 1; then
 	AC_DEFINE(HAVE_LIBPTHREAD, 1, [Set to 1 if pthreads are supported])
+        LIBTRACE_LIBS="$LIBTRACE_LIBS -lpthread"
 fi
 
 if test "$have_pthread_setname_np" = 1; then
