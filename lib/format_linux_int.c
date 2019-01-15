@@ -52,6 +52,7 @@
 
 #include "format_linux_common.h"
 
+#define SLL_HEADER_LENGTH 6
 
 #ifdef HAVE_NETPACKET_PACKET_H
 
@@ -367,8 +368,8 @@ static int linuxnative_write_packet(libtrace_out_t *libtrace,
 	hdr.sll_ifindex = if_nametoindex(libtrace->uridata);
 	hdr.sll_hatype = 0;
 	hdr.sll_pkttype = 0;
-	hdr.sll_halen = htons(6); /* FIXME */
-	memcpy(hdr.sll_addr,packet->payload,(size_t)ntohs(hdr.sll_halen));
+	hdr.sll_halen = htons(SLL_HEADER_LENGTH); /* FIXME */
+	memcpy(hdr.sll_addr,packet->payload,(size_t)SLL_HEADER_LENGTH);
 
 	/* This is pretty easy, just send the payload using sendto() (after
 	 * setting up the sll header properly, of course) */
