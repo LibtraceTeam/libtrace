@@ -44,6 +44,8 @@
 
 #include <map>
 
+#include "libtrace_parallel.h"
+
 typedef struct end_counter {
 	uint64_t src_bytes;
 	uint64_t src_pbytes;
@@ -86,11 +88,32 @@ enum {
 	MODE_IPV6
 };
 
-int mode = MODE_IPV4;
 
-IP4EndMap ipv4;
-IP6EndMap ipv6;
-MacEndMap mac;
+typedef struct traceend_global {
+        int mode;
+        int threads;
+        int track_source;
+        int track_dest;
+} global_t;
+
+typedef struct traceend_local {
+        union {
+                IP4EndMap *ipv4;
+                IP6EndMap *ipv6;
+                MacEndMap *mac;
+        } map;
+} local_t;
+
+typedef struct traceend_result_local {
+        union {
+                IP4EndMap *ipv4;
+                IP6EndMap *ipv6;
+                MacEndMap *mac;
+        } map;
+        int threads_reported;
+} result_t;
+
+libtrace_t *currenttrace = NULL;
 
 static int usage(char *argv0)
 {
@@ -103,16 +126,46 @@ static int usage(char *argv0)
         exit(1);
 }
 
-volatile int done=0;
-
 static void cleanup_signal(int sig)
 {
         (void)sig;
-        done=1;
-	trace_interrupt();
+        if (currenttrace) {
+        	trace_pstop(currenttrace);
+        }
 }
 
-static end_counter_t *create_counter() {
+static void *cb_starting(libtrace_t *trace UNUSED, libtrace_thread_t *t UNUSED,
+                void *global) {
+
+        global_t *glob = (global_t *)global;
+        local_t *local = (local_t *)malloc(sizeof(local_t));
+
+        switch(glob->mode) {
+                case MODE_IPV4:
+                        local->map.ipv4 = new IP4EndMap();
+                        break;
+                case MODE_IPV6:
+                        local->map.ipv6 = new IP6EndMap();
+                        break;
+                case MODE_MAC:
+                        local->map.mac = new MacEndMap();
+                        break;
+        }
+        return local;
+
+}
+
+static void cb_stopping(libtrace_t *trace, libtrace_thread_t *t,
+                void *global UNUSED, void *tls) {
+
+        local_t *local = (local_t *)tls;
+        libtrace_generic_t gen;
+
+        gen.ptr = local;
+        trace_publish_result(trace, t, 0, gen, RESULT_USER);
+}
+
+static inline end_counter_t *create_counter() {
 	end_counter_t *c = (end_counter_t *)malloc(sizeof(end_counter_t));
 
 	c->src_bytes = 0;
@@ -126,45 +179,88 @@ static end_counter_t *create_counter() {
 	return c;
 }
 
-static char *mac_string(mac_addr_t m, char *str) {
-	
-	
+static inline char *mac_string(mac_addr_t m, char *str) {
 	snprintf(str, 80, "%02x:%02x:%02x:%02x:%02x:%02x", 
 		m.addr[0], m.addr[1], m.addr[2], m.addr[3], m.addr[4],
 		m.addr[5]);
 	return str;
 }
 
-static void dump_mac_map() {
-	MacEndMap::iterator it;
-	char str[80];
-	char timestr[80];
-	struct tm *tm;
-	time_t t;
-	
-	for (it = mac.begin(); it != mac.end(); it++) {
-		t = (time_t)(it->second->last_active);
-		tm = localtime(&t);
-		strftime(timestr, 80, "%d/%m,%H:%M:%S", tm);
-		printf("%18s %16s %16" PRIu64 " %16" PRIu64 " %16" PRIu64 " %16" PRIu64 " %16" PRIu64 " %16" PRIu64 "\n", 
-				mac_string(it->first, str),
-				timestr,
-				it->second->src_pkts,
-				it->second->src_bytes,
-				it->second->src_pbytes,
-				it->second->dst_pkts,
-				it->second->dst_bytes,
-				it->second->dst_pbytes);
-	}
+static inline void combine_counters(end_counter_t *c, end_counter_t *c2) {
+
+        c->src_pkts += c2->src_pkts;
+        c->src_bytes += c2->src_bytes;
+        c->src_pbytes += c2->src_pbytes;
+        c->dst_pkts += c2->dst_pkts;
+        c->dst_bytes += c2->dst_bytes;
+        c->dst_pbytes += c2->dst_pbytes;
+
 }
 
-static void dump_ipv4_map() {
+static void combine_mac_maps(MacEndMap *dst, MacEndMap *src) {
+
+        MacEndMap::iterator it;
+        MacEndMap::iterator found;
+
+        for (it = src->begin(); it != src->end(); it++) {
+                found = dst->find(it->first);
+
+                if (found == dst->end()) {
+                        (*dst)[it->first] = it->second;
+                        continue;
+                }
+
+                combine_counters(found->second, it->second);
+                free(it->second);
+        }
+
+}
+
+static void combine_ipv4_maps(IP4EndMap *dst, IP4EndMap *src) {
+
+        IP4EndMap::iterator it;
+        IP4EndMap::iterator found;
+
+        for (it = src->begin(); it != src->end(); it++) {
+                found = dst->find(it->first);
+
+                if (found == dst->end()) {
+                        (*dst)[it->first] = it->second;
+                        continue;
+                }
+
+                combine_counters(found->second, it->second);
+                free(it->second);
+        }
+
+}
+
+static void combine_ipv6_maps(IP6EndMap *dst, IP6EndMap *src) {
+
+        IP6EndMap::iterator it;
+        IP6EndMap::iterator found;
+
+        for (it = src->begin(); it != src->end(); it++) {
+                found = dst->find(it->first);
+
+                if (found == dst->end()) {
+                        (*dst)[it->first] = it->second;
+                        continue;
+                }
+
+                combine_counters(found->second, it->second);
+                free(it->second);
+        }
+
+}
+
+static void dump_ipv4_map(IP4EndMap *ipv4, bool destroy) {
 	IP4EndMap::iterator it;
 	struct in_addr in;
 	char timestr[80];
 	struct tm *tm;
 	time_t t;
-	for (it = ipv4.begin(); it != ipv4.end(); it++) {
+	for (it = ipv4->begin(); it != ipv4->end(); it++) {
 		in.s_addr = it->first;
 		t = (time_t)(it->second->last_active);
 		tm = localtime(&t);
@@ -178,10 +274,13 @@ static void dump_ipv4_map() {
 				it->second->dst_pkts,
 				it->second->dst_bytes,
 				it->second->dst_pbytes);
+                if (destroy) {
+                       free(it->second);
+                }
 	}
 }
 
-static void dump_ipv6_map() {
+static void dump_ipv6_map(IP6EndMap *ipv6, bool destroy) {
 	IP6EndMap::iterator it;
 	struct in6_addr in;
 	char ip6_addr[128];
@@ -189,7 +288,7 @@ static void dump_ipv6_map() {
 	struct tm *tm;
 	time_t t;
 
-	for (it = ipv6.begin(); it != ipv6.end(); it++) {
+	for (it = ipv6->begin(); it != ipv6->end(); it++) {
 		in = it->first;
 		t = (time_t)(it->second->last_active);
 		tm = localtime(&t);
@@ -203,11 +302,41 @@ static void dump_ipv6_map() {
 				it->second->dst_pkts,
 				it->second->dst_bytes,
 				it->second->dst_pbytes);
+                if (destroy) {
+                       free(it->second);
+                }
 	}
 }
 
-static void update_ipv6(libtrace_ip6_t *ip, uint16_t ip_len, uint32_t rem, 
-		uint32_t plen, 	double ts) {
+static void dump_mac_map(MacEndMap *mac, bool destroy) {
+	MacEndMap::iterator it;
+	char str[80];
+	char timestr[80];
+	struct tm *tm;
+	time_t t;
+
+	for (it = mac->begin(); it != mac->end(); it++) {
+		t = (time_t)(it->second->last_active);
+		tm = localtime(&t);
+		strftime(timestr, 80, "%d/%m,%H:%M:%S", tm);
+		printf("%18s %16s %16" PRIu64 " %16" PRIu64 " %16" PRIu64 " %16" PRIu64 " %16" PRIu64 " %16" PRIu64 "\n", 
+				mac_string(it->first, str),
+				timestr,
+				it->second->src_pkts,
+				it->second->src_bytes,
+				it->second->src_pbytes,
+				it->second->dst_pkts,
+				it->second->dst_bytes,
+				it->second->dst_pbytes);
+                if (destroy) {
+                       free(it->second);
+                }
+	}
+}
+
+static void update_ipv6(global_t *glob,
+                local_t *local, libtrace_ip6_t *ip, uint16_t ip_len,
+                uint32_t rem, uint32_t plen, 	double ts) {
 
 	struct in6_addr key;
 	IP6EndMap::iterator it;
@@ -215,78 +344,89 @@ static void update_ipv6(libtrace_ip6_t *ip, uint16_t ip_len, uint32_t rem,
 
 	if (rem < sizeof(libtrace_ip6_t))
 		return;
-	
-	key = ip->ip_src;
-	
-	it = ipv6.find(key);
-	if (it == ipv6.end()) {
-		c = create_counter();
-		ipv6[key] = c;
-	} else {
-		c = it->second;
-	}
+        if (glob->track_source) {
+                key = ip->ip_src;
 
-	c->src_pkts ++;
-	c->src_pbytes += plen;
-	c->src_bytes += ip_len;
-	c->last_active = ts;
-	
-	key = ip->ip_dst;
-	
-	it = ipv6.find(key);
-	if (it == ipv6.end()) {
-		c = create_counter();
-		ipv6[key] = c;
-	} else {
-		c = it->second;
-	}
+                it = local->map.ipv6->find(key);
+                if (it == local->map.ipv6->end()) {
+                        c = create_counter();
+                        (*(local->map.ipv6))[key] = c;
+                } else {
+                        c = it->second;
+                }
 
-	c->dst_pkts ++;
-	c->dst_pbytes += plen;
-	c->dst_bytes += ip_len;
-	c->last_active = ts;
+                c->src_pkts ++;
+                c->src_pbytes += plen;
+                c->src_bytes += ip_len;
+                if (ts != 0)
+                        c->last_active = ts;
+        }
+
+        if (glob->track_dest) {
+                key = ip->ip_dst;
+
+                it = local->map.ipv6->find(key);
+                if (it == local->map.ipv6->end()) {
+                        c = create_counter();
+                        (*(local->map.ipv6))[key] = c;
+                } else {
+                        c = it->second;
+                }
+
+                c->dst_pkts ++;
+                c->dst_pbytes += plen;
+                c->dst_bytes += ip_len;
+                if (ts != 0)
+                        c->last_active = ts;
+        }
 }
 
-static void update_mac(uint8_t *src, uint8_t *dst, uint16_t ip_len,
+static void update_mac(global_t *glob, local_t *local,
+                uint8_t *src, uint8_t *dst, uint16_t ip_len,
 		uint32_t plen, double ts) {
 
 	mac_addr_t key;
 	end_counter_t *c = NULL;
 	MacEndMap::iterator it;
 
-	memcpy(&(key.addr), src, sizeof(key.addr));
-	it = mac.find(key);
-	
-	if (it == mac.end()) {
-		c = create_counter();
-		mac[key] = c;
-	} else {
-		c = it->second;
-	}
+        if (glob->track_source) {
+                memcpy(&(key.addr), src, sizeof(key.addr));
+                it = local->map.mac->find(key);
 
-	c->src_pkts ++;
-	c->src_pbytes += plen;
-	c->src_bytes += ip_len;
-	c->last_active = ts;
+                if (it == local->map.mac->end()) {
+                        c = create_counter();
+                        (*(local->map.mac))[key] = c;
+                } else {
+                        c = it->second;
+                }
 
-	memcpy(&key.addr, dst, sizeof(key.addr));
-	it = mac.find(key);
-	
-	if (it == mac.end()) {
-		c = create_counter();
-		mac[key] = c;
-	} else {
-		c = it->second;
-	}
+                c->src_pkts ++;
+                c->src_pbytes += plen;
+                c->src_bytes += ip_len;
+                c->last_active = ts;
+        }
 
-	c->dst_pkts ++;
-	c->dst_pbytes += plen;
-	c->dst_bytes += ip_len;
-	c->last_active = ts;
+        if (glob->track_dest) {
+                memcpy(&key.addr, dst, sizeof(key.addr));
+                it = local->map.mac->find(key);
+
+                if (it == local->map.mac->end()) {
+                        c = create_counter();
+                        (*(local->map.mac))[key] = c;
+                } else {
+                        c = it->second;
+                }
+
+                c->dst_pkts ++;
+                c->dst_pbytes += plen;
+                c->dst_bytes += ip_len;
+                c->last_active = ts;
+        }
 }
 
-static void update_ipv4(libtrace_ip_t *ip, uint16_t ip_len, uint32_t rem, 
-		uint32_t plen, 	double ts) {
+static void update_ipv4(global_t *glob,
+                local_t *local, libtrace_ip_t *ip, uint16_t ip_len,
+                uint32_t rem, uint32_t plen, double ts) {
 
 	uint32_t key;
 	IP4EndMap::iterator it;
@@ -294,42 +434,120 @@ static void update_ipv4(libtrace_ip_t *ip, uint16_t ip_len, uint32_t rem,
 
 	if (rem < sizeof(libtrace_ip_t))
 		return;
-	
-	key = ip->ip_src.s_addr;
-	
-	it = ipv4.find(key);
-	if (it == ipv4.end()) {
-		c = create_counter();
-		ipv4[key] = c;
-	} else {
-		c = it->second;
-	}
 
-	c->src_pkts ++;
-	c->src_pbytes += plen;
-	c->src_bytes += ip->ip_len;
-        if (ts != 0)
-        	c->last_active = ts;
-	
-	key = ip->ip_dst.s_addr;
-	
-	it = ipv4.find(key);
-	if (it == ipv4.end()) {
-		c = create_counter();
-		ipv4[key] = c;
-	} else {
-		c = it->second;
-	}
+        if (glob->track_source) {
+                key = ip->ip_src.s_addr;
 
-	c->dst_pkts ++;
-	c->dst_pbytes += plen;
-	c->dst_bytes += ip_len;
-        if (ts != 0)
-        	c->last_active = ts;
+                it = local->map.ipv4->find(key);
+                if (it == local->map.ipv4->end()) {
+                        c = create_counter();
+                        (*(local->map.ipv4))[key] = c;
+                } else {
+                        c = it->second;
+                }
+
+                c->src_pkts ++;
+                c->src_pbytes += plen;
+                c->src_bytes += ip->ip_len;
+                if (ts != 0)
+                        c->last_active = ts;
+        }
+
+        if (glob->track_dest) {
+                key = ip->ip_dst.s_addr;
+
+                it = local->map.ipv4->find(key);
+                if (it == local->map.ipv4->end()) {
+                        c = create_counter();
+                        (*(local->map.ipv4))[key] = c;
+                } else {
+                        c = it->second;
+                }
+
+                c->dst_pkts ++;
+                c->dst_pbytes += plen;
+                c->dst_bytes += ip_len;
+                if (ts != 0)
+                        c->last_active = ts;
+        }
 }
 
-static int per_packet(libtrace_packet_t *packet) {
+static void *cb_result_starting(libtrace_t *trace UNUSED,
+                libtrace_thread_t *t UNUSED, void *global) {
 
+        global_t *glob = (global_t *)global;
+        result_t *res = (result_t *)malloc(sizeof(result_t));
+
+        switch(glob->mode) {
+                case MODE_IPV4:
+                        res->map.ipv4 = new IP4EndMap();
+                        break;
+                case MODE_IPV6:
+                        res->map.ipv6 = new IP6EndMap();
+                        break;
+                case MODE_MAC:
+                        res->map.mac = new MacEndMap();
+                        break;
+        }
+        res->threads_reported = 0;
+        return res;
+}
+
+static void cb_result(libtrace_t *trace UNUSED,
+                libtrace_thread_t *sender UNUSED, void *global,
+                void *tls, libtrace_result_t *result) {
+
+        global_t *glob = (global_t *)global;
+        result_t *res = (result_t *)tls;
+        local_t *recvd = (local_t *)(result->value.ptr);
+
+
+        switch(glob->mode) {
+                case MODE_IPV4:
+                        combine_ipv4_maps(res->map.ipv4, recvd->map.ipv4);
+                        delete(recvd->map.ipv4);
+                        break;
+                case MODE_IPV6:
+                        combine_ipv6_maps(res->map.ipv6, recvd->map.ipv6);
+                        delete(recvd->map.ipv6);
+                        break;
+                case MODE_MAC:
+                        combine_mac_maps(res->map.mac, recvd->map.mac);
+                        delete(recvd->map.mac);
+                        break;
+        }
+        res->threads_reported ++;
+        free(recvd);
+}
+
+static void cb_result_stopping(libtrace_t *trace UNUSED,
+                libtrace_thread_t *t UNUSED, void *global, void *tls) {
+
+        global_t *glob = (global_t *)global;
+        result_t *res = (result_t *)tls;
+        switch(glob->mode) {
+                case MODE_IPV4:
+                        dump_ipv4_map(res->map.ipv4, 1);
+                        delete(res->map.ipv4);
+                        break;
+                case MODE_IPV6:
+                        dump_ipv6_map(res->map.ipv6, 1);
+                        delete(res->map.ipv6);
+                        break;
+                case MODE_MAC:
+                        dump_mac_map(res->map.mac, 1);
+                        delete(res->map.mac);
+                        break;
+        }
+        free(res);
+}
+
+
+static libtrace_packet_t *cb_packet(libtrace_t *trace, libtrace_thread_t *t,
+                void *global, void *tls, libtrace_packet_t *packet) {
+
+        global_t *glob = (global_t *)global;
+        local_t *local = (local_t *)tls;
 	void *header;
 	uint16_t ethertype;
 	uint32_t rem;
@@ -343,49 +561,56 @@ static int per_packet(libtrace_packet_t *packet) {
 	header = trace_get_layer3(packet, &ethertype, &rem);
 
 	if (header == NULL || rem == 0)
-		return 1;
-	
+		return packet;
+
 	if (ethertype == TRACE_ETHERTYPE_IP) {
 		ip = (libtrace_ip_t *)header;
 		if (rem < sizeof(libtrace_ip_t))
-			return 1;
+			goto endpacketcb;
 		ip_len = ntohs(ip->ip_len);
-		if (mode == MODE_IPV4 && ip) {
-			update_ipv4(ip, ip_len, rem, plen, ts);
-			return 1;
+		if (glob->mode == MODE_IPV4 && ip) {
+			update_ipv4(glob, local, ip, ip_len, rem, plen, ts);
+			goto endpacketcb;
 		}
 	}
 
 	if (ethertype == TRACE_ETHERTYPE_IPV6) {
 		ip6 = (libtrace_ip6_t *)header;
 		if (rem < sizeof(libtrace_ip6_t))
-			return 1;
+			goto endpacketcb;
 		ip_len = ntohs(ip6->plen) + sizeof(libtrace_ip6_t);
-		if (mode == MODE_IPV6 && ip6) {
-			update_ipv6(ip6, ip_len, rem, plen, ts);
-			return 1;
+		if (glob->mode == MODE_IPV6 && ip6) {
+			update_ipv6(glob, local, ip6, ip_len, rem, plen, ts);
+			goto endpacketcb;
 		}
 	}
 
-	if (mode == MODE_MAC) {
+	if (glob->mode == MODE_MAC) {
 		src_mac = trace_get_source_mac(packet);
 		dst_mac = trace_get_destination_mac(packet);
 
 		if (src_mac == NULL || dst_mac == NULL)
-			return 1;
-		update_mac(src_mac, dst_mac, ip_len, plen, ts);
+		        goto endpacketcb;
+		update_mac(glob, local, src_mac, dst_mac, ip_len, plen, ts);
 	}
 
-	return 1;
+endpacketcb:
+	return packet;
 }
 
 int main(int argc, char *argv[]) {
 
         int i;
+        int threads = 1;
         struct sigaction sigact;
 	struct libtrace_filter_t *filter=NULL;
         struct libtrace_t *input = NULL;
-        struct libtrace_packet_t *packet = trace_create_packet();
+        global_t glob;
+        libtrace_callback_set_t *pktcbs, *repcbs;
+
+        glob.mode = MODE_IPV4;
+        glob.track_source = 1;
+        glob.track_dest = 1;
 
         while(1) {
                 int option_index;
@@ -393,10 +618,13 @@ int main(int argc, char *argv[]) {
                         { "filter",        1, 0, 'f' },
                         { "help", 	   0, 0, 'H' },
 			{ "addresses", 	   1, 0, 'A' },	
+			{ "threads", 	   1, 0, 't' },	
+			{ "ignore-dest", 	   0, 0, 'D' },	
+			{ "ignore-source", 	   0, 0, 'S' },	
                         { NULL,            0, 0, 0   },
                 };
 
-                int c=getopt_long(argc, argv, "A:f:H",
+                int c=getopt_long(argc, argv, "A:f:t:HDS",
                                 long_options, &option_index);
 
                 if (c==-1)
@@ -404,21 +632,29 @@ int main(int argc, char *argv[]) {
 		switch (c) {
 			case 'A':
 				if (strncmp(optarg, "mac", 3) == 0)
-					mode = MODE_MAC;
+					glob.mode = MODE_MAC;
 				else if (strncmp(optarg, "v4", 2) == 0)
-					mode = MODE_IPV4;
+					glob.mode = MODE_IPV4;
 				else if (strncmp(optarg, "v6", 2) == 0)
-					mode = MODE_IPV6;
+					glob.mode = MODE_IPV6;
 				else {
 					fprintf(stderr, "Invalid address type, must be either mac, v4 or v6\n");
 					return 1;
 				}
 				break;
-
+                        case 'D':
+                                glob.track_dest = 0;
+                                break;
                         case 'f': filter=trace_create_filter(optarg);
                         	break;
 			case 'H':
                                 usage(argv[0]);
+                                break;
+                        case 'S':
+                                glob.track_source = 0;
+                                break;
+                        case 't':
+                                threads = atoi(optarg);
                                 break;
 			default:
                                 fprintf(stderr,"Unknown option: %c\n",c);
@@ -436,11 +672,23 @@ int main(int argc, char *argv[]) {
         sigaction(SIGPIPE, &sigact, NULL);
         sigaction(SIGHUP, &sigact, NULL);
 
+        if (threads <= 0) {
+                threads = 1;
+        }
+        glob.threads = threads;
+
+        if (glob.track_source == 0 && glob.track_dest == 0) {
+                fprintf(stderr, "Bad configuration -- ignoring both source and dest endpoints will produce\nno results!\n");
+                usage(argv[0]);
+                return 1;
+        }
+
 	for (i = optind; i < argc; i++) {
 		input = trace_create(argv[i]);
 
                 if (trace_is_err(input)) {
                         trace_perror(input,"%s",argv[i]);
+                        trace_destroy(input);
                         return 1;
                 }
 
@@ -450,22 +698,30 @@ int main(int argc, char *argv[]) {
                         return 1;
                 }
 
-                if (trace_start(input)==-1) {
-                        trace_perror(input,"%s",argv[i]);
+                trace_set_combiner(input, &combiner_unordered,
+                        (libtrace_generic_t){0});
+                trace_set_perpkt_threads(input, threads);
+
+                pktcbs = trace_create_callback_set();
+                trace_set_starting_cb(pktcbs, cb_starting);
+                trace_set_stopping_cb(pktcbs, cb_stopping);
+                trace_set_packet_cb(pktcbs, cb_packet);
+
+                repcbs = trace_create_callback_set();
+                trace_set_starting_cb(repcbs, cb_result_starting);
+                trace_set_stopping_cb(repcbs, cb_result_stopping);
+                trace_set_result_cb(repcbs, cb_result);
+
+                currenttrace = input;
+                if (trace_pstart(input, &glob, pktcbs, repcbs) == -1) {
+                        trace_perror(input, "Failed to start trace");
+                        trace_destroy(input);
+                        trace_destroy_callback_set(pktcbs);
+                        trace_destroy_callback_set(repcbs);
                         return 1;
                 }
 
-		while (trace_read_packet(input,packet)>0) {
-                        if (IS_LIBTRACE_META_PACKET(packet))
-                                continue;
-                        if (per_packet(packet) < 1)
-                                done = 1;
-                        if (done)
-                                break;
-                }
-
-                if (done)
-                        break;
+                trace_join(input);
 
                 if (trace_is_err(input)) {
                         trace_perror(input,"Reading packets");
@@ -473,15 +729,11 @@ int main(int argc, char *argv[]) {
                         break;
                 }
 
+                currenttrace = NULL;
                 trace_destroy(input);
+                trace_destroy_callback_set(pktcbs);
+                trace_destroy_callback_set(repcbs);
         }
 
-	/* Dump results */
-	if (mode == MODE_IPV4)
-		dump_ipv4_map();
-	if (mode == MODE_IPV6)
-		dump_ipv6_map();
-	if (mode == MODE_MAC)
-		dump_mac_map();
 	return 0;
 }

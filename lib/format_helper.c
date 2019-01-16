@@ -38,7 +38,6 @@
 #include <time.h>
 #include "format_helper.h"
 
-#include <assert.h>
 #include <stdarg.h>
 
 #ifdef WIN32
@@ -68,9 +67,17 @@ struct libtrace_eventobj_t trace_event_device(struct libtrace_t *trace,
 	int max_fd;
 	struct timeval tv;
 
-	assert(trace != NULL);
-	assert(packet != NULL);
-	
+	if (!trace) {
+		fprintf(stderr, "NULL trace passed into trace_event_device()\n");
+		event.type = TRACE_EVENT_TERMINATE;
+		return event;
+	}
+	if (!packet) {
+		trace_set_err(trace, TRACE_ERR_NULL_PACKET, "NULL packet passed into trace_event_device()");
+		event.type = TRACE_EVENT_TERMINATE;
+		return event;
+	}
+
 	FD_ZERO(&rfds);
 	FD_ZERO(&rfds_param);
 
@@ -219,6 +226,8 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 	packet->buffer = trace->event.packet->buffer;
 	packet->buf_control = trace->event.packet->buf_control;
 
+        packet->which_trace_start = trace->event.packet->which_trace_start;
+
 	event.type = TRACE_EVENT_PACKET;
 
 	trace->event.waiting = false;
@@ -289,7 +298,12 @@ void trace_set_err(libtrace_t *trace,int errcode,const char *msg,...)
 	char buf[256];
 	va_list va;
 	va_start(va,msg);
-	assert(errcode != 0 && "An error occurred, but it is unknown what it is");
+
+	if (errcode == 0) {
+		fprintf(stderr, "An error occurred, but it is unknown what it is");
+		return;
+	}
+
 	trace->err.err_num=errcode;
 	if (errcode>0) {
 		vsnprintf(buf,sizeof(buf),msg,va);
@@ -312,7 +326,10 @@ void trace_set_err_out(libtrace_out_t *trace,int errcode,const char *msg,...)
 	char buf[256];
 	va_list va;
 	va_start(va,msg);
-	assert(errcode != 0 && "An error occurred, but it is unknown what it is");
+	if (errcode == 0) {
+		fprintf(stderr, "An error occurred, but is is unknown what is is");
+		return;
+	}
 	trace->err.err_num=errcode;
 	if (errcode>0) {
 		vsnprintf(buf,sizeof(buf),msg,va);

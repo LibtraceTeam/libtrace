@@ -36,7 +36,6 @@
 #include <libwandder.h>
 #include <libwandder_etsili.h>
 
-#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -71,6 +70,8 @@ typedef struct etsithread {
         libtrace_message_queue_t mqueue;
         etsisocket_t *sources;
         uint16_t sourcecount;
+        uint16_t sourcealloc;
+        uint16_t activesources;
         int threadindex;
         wandder_etsispec_t *etsidec;
 } etsithread_t;
@@ -212,6 +213,12 @@ static int etsilive_init_input(libtrace_t *libtrace) {
         libtrace->format_data = (etsilive_format_data_t *)malloc(
                         sizeof(etsilive_format_data_t));
 
+	if (!libtrace->format) {
+		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory for "
+			"format data inside etsilive_init_input()");
+		return 1;
+	}
+
         FORMAT_DATA->receivers = NULL;
         FORMAT_DATA->nextthreadid = 0;
         FORMAT_DATA->listenaddr = NULL;
@@ -268,7 +275,9 @@ static int etsilive_start_threads(libtrace_t *libtrace, uint32_t maxthreads) {
                                 sizeof(newsend_message_t));
 
                 FORMAT_DATA->receivers[i].sources = NULL;
+                FORMAT_DATA->receivers[i].sourcealloc = 0;
                 FORMAT_DATA->receivers[i].sourcecount = 0;
+                FORMAT_DATA->receivers[i].activesources = 0;
                 FORMAT_DATA->receivers[i].threadindex = i;
                 FORMAT_DATA->receivers[i].etsidec =
                                 wandder_create_etsili_decoder();
@@ -325,16 +334,44 @@ static int receiver_read_message(etsithread_t *et) {
         while (libtrace_message_queue_try_get(&(et->mqueue), (void *)&msg)
                         != LIBTRACE_MQ_FAILED) {
                 etsisocket_t *esock = NULL;
+                int i;
 
                 if (et->sourcecount == 0) {
                         et->sources = (etsisocket_t *)malloc(
                                         sizeof(etsisocket_t) * 10);
-                } else if ((et->sourcecount % 10) == 0) {
-                        et->sources = (etsisocket_t *)realloc(et->sources,
-                                sizeof(etsisocket_t) * (et->sourcecount + 10));
+                        et->sourcealloc = 10;
+
+                        for (i = 0; i < et->sourcealloc; i++) {
+                                et->sources[i].sock = -1;
+                                et->sources[i].srcaddr = NULL;
+                        }
+
+                        esock = &(et->sources[0]);
+                        et->sourcecount = 1;
+                } else {
+                        for (i = 0; i < et->sourcealloc; i++) {
+                                if (et->sources[i].sock == -1) {
+                                        esock = &(et->sources[i]);
+                                        break;
+                                }
+                        }
                 }
 
-                esock = &(et->sources[et->sourcecount]);
+                if (esock == NULL) {
+                        et->sources = (etsisocket_t *)realloc(et->sources,
+                                sizeof(etsisocket_t) * (et->sourcealloc + 10));
+
+                        for (i = et->sourcealloc; i < et->sourcealloc + 10;
+                                        i++) {
+                                et->sources[i].sock = -1;
+                                et->sources[i].srcaddr = NULL;
+                        }
+                        esock = &(et->sources[et->sourcealloc]);
+                        et->sourcealloc += 10;
+                        et->sourcecount += 1;
+
+                }
+
                 esock->sock = msg.recvsock;
                 esock->srcaddr = msg.recvaddr;
                 libtrace_scb_init(&(esock->recvbuffer), ETSI_RECVBUF_SIZE,
@@ -342,15 +379,15 @@ static int receiver_read_message(etsithread_t *et) {
                 esock->cached.timestamp = 0;
                 esock->cached.length = 0;
 
-                et->sourcecount += 1;
+                et->activesources += 1;
 
                 fprintf(stderr, "Thread %d is now handling %u sources.\n",
-                                et->threadindex, et->sourcecount);
+                                et->threadindex, et->activesources);
         }
         return 1;
 }
 
-static void receive_from_single_socket(etsisocket_t *esock) {
+static void receive_from_single_socket(etsisocket_t *esock, etsithread_t *et) {
 
         int ret = 0;
 
@@ -360,7 +397,7 @@ static void receive_from_single_socket(etsisocket_t *esock) {
 
         ret = libtrace_scb_recv_sock(&(esock->recvbuffer), esock->sock,
                         MSG_DONTWAIT);
-        if (ret == -1) {
+        if (ret < 0) {
                 if (errno == EAGAIN || errno == EWOULDBLOCK) {
                         /* Would have blocked, nothing available */
                         return;
@@ -369,12 +406,14 @@ static void receive_from_single_socket(etsisocket_t *esock) {
                                 esock->sock, strerror(errno));
                 close(esock->sock);
                 esock->sock = -1;
+                et->activesources -= 1;
         }
 
         if (ret == 0) {
                 fprintf(stderr, "Socket %d has disconnected\n", esock->sock);
                 close(esock->sock);
                 esock->sock = -1;
+                et->activesources -= 1;
         }
 
 }
@@ -393,12 +432,12 @@ static int receive_etsi_sockets(libtrace_t *libtrace, etsithread_t *et) {
                 return iserr;
         }
 
-        if (et->sourcecount == 0) {
+        if (et->activesources == 0) {
                 return 1;
         }
 
         for (i = 0; i < et->sourcecount; i++) {
-                receive_from_single_socket(&(et->sources[i]));
+                receive_from_single_socket(&(et->sources[i]), et);
         }
         return 1;
 
@@ -406,7 +445,7 @@ static int receive_etsi_sockets(libtrace_t *libtrace, etsithread_t *et) {
 
 static inline void inspect_next_packet(etsisocket_t *sock,
                 etsisocket_t **earliestsock, uint64_t *earliesttime,
-                wandder_etsispec_t *dec) {
+                wandder_etsispec_t *dec, etsithread_t *et) {
 
 
         struct timeval tv;
@@ -459,6 +498,7 @@ static inline void inspect_next_packet(etsisocket_t *sock,
                         fprintf(stderr, "bogus sequence number in ETSILI keep alive.\n");
                         close(sock->sock);
                         sock->sock = -1;
+                        et->activesources -= 1;
                         return;
                 }
                 /* Send keep alive response */
@@ -466,6 +506,7 @@ static inline void inspect_next_packet(etsisocket_t *sock,
                         fprintf(stderr, "error sending response to ETSILI keep alive: %s.\n", strerror(errno));
                         close(sock->sock);
                         sock->sock = -1;
+                        et->activesources -= 1;
                         return;
                 }
                 /* Skip past KA */
@@ -504,7 +545,7 @@ static etsisocket_t *select_next_packet(etsithread_t *et) {
 
         for (i = 0; i < et->sourcecount; i++) {
                 inspect_next_packet(&(et->sources[i]), &esock, &earliest,
-                        et->etsidec);
+                        et->etsidec, et);
         }
         return esock;
 }
@@ -525,8 +566,8 @@ static int etsilive_prepare_received(libtrace_t *libtrace,
         packet->order = esock->cached.timestamp;
         packet->error = esock->cached.length;
 
-        packet->wire_length = esock->cached.length;
-        packet->capture_length = esock->cached.length;
+        packet->cached.wire_length = esock->cached.length;
+        packet->cached.capture_length = esock->cached.length;
 
         /* Advance the read pointer for this buffer
          * TODO should really do this in fin_packet, but will need a ref
@@ -589,8 +630,14 @@ static int etsilive_get_pdu_length(const libtrace_packet_t *packet) {
         size_t reclen;
         libtrace_t *libtrace = packet->trace;
 
-        assert(libtrace);
-        assert(FORMAT_DATA->shareddec);
+	if (!libtrace) {
+		fprintf(stderr, "Packet is not associated with a trace in etsilive_get_pdu_length()\n");
+		return TRACE_ERR_NULL_TRACE;
+	}
+	if (!FORMAT_DATA->shareddec) {
+		trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT, "Etsilive format data shareddec is NULL in etsilive_get_pdu_length()\n");
+		return -1;
+	}
 
         /* 0 should be ok here for quickly evaluating the first length
          * field... */

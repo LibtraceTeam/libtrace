@@ -32,7 +32,6 @@
 #include "format_helper.h"
 #include "format_erf.h"
 
-#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -175,6 +174,25 @@ pthread_mutex_t open_dag_mutex;
  * many times or close a device that we're still using */
 struct dag_dev_t *open_dags = NULL;
 
+static bool dag_can_write(libtrace_packet_t *packet) {
+	/* Get the linktype */
+        libtrace_linktype_t ltype = trace_get_link_type(packet);
+
+        if (ltype == TRACE_TYPE_CONTENT_INVALID) {
+                return false;
+        }
+
+        /* TODO erf meta should definitely be writable, pcapng meta
+         * could probably be converted into erf meta */
+        if (ltype == TRACE_TYPE_ERF_META
+                        || ltype == TRACE_TYPE_NONDATA
+                        || ltype == TRACE_TYPE_PCAPNG_META) {
+                return false;
+        }
+
+        return true;
+}
+
 /* Returns the amount of padding between the ERF header and the start of the
  * captured packet data */
 static int dag_get_padding(const libtrace_packet_t *packet)
@@ -244,7 +262,11 @@ static void dag_init_format_data(libtrace_t *libtrace)
 
 	FORMAT_DATA->per_stream =
 		libtrace_list_init(sizeof(stream_data));
-	assert(FORMAT_DATA->per_stream != NULL);
+	if (FORMAT_DATA->per_stream == NULL) {
+		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
+			"Unable to create list for stream in dag_init_format_data()");
+		return;
+	}
 
 	/* We'll start with just one instance of stream_data, and we'll
 	 * add more later if we need them */
@@ -283,7 +305,10 @@ static struct dag_dev_t *dag_find_open_device(char *dev_name)
 static void dag_close_device(struct dag_dev_t *dev)
 {
 	/* Need to remove from the device list */
-	assert(dev->ref_count == 0);
+	if (dev->ref_count != 0) {
+		fprintf(stderr, "Cannot close DAG device with non zero reference in dag_close_device()\n");
+		return;
+	}
 
 	if (dev->prev == NULL) {
 		open_dags = dev->next;
@@ -521,6 +546,7 @@ static int dag_init_input(libtrace_t *libtrace) {
 			free(dag_dev_name);
 		dag_dev_name = NULL;
 		pthread_mutex_unlock(&open_dag_mutex);
+		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to open DAG device %s", dag_dev_name);
 		return -1;
 	}
 
@@ -614,6 +640,8 @@ static int dag_config_input(libtrace_t *libtrace, trace_option_t option,
 		/* Lets just say we did this, it's currently still up to
 		 * the user to configure this correctly. */
 		return 0;
+        case TRACE_OPTION_CONSTANT_ERF_FRAMING:
+                return -1;
 	}
 	return -1;
 }
@@ -994,7 +1022,11 @@ static dag_record_t *dag_get_record(struct dag_per_stream_t *stream_data)
 		return NULL;
 
 	size = ntohs(erfptr->rlen);
-	assert( size >= dag_record_size );
+	if (size < dag_record_size) {
+		fprintf(stderr, "DAG2.5 rlen is invalid (rlen %u, must be at least %u\n",
+			size, dag_record_size);
+		return NULL;
+	}
 
 	/* Make certain we have the full packet available */
 	if (size > (stream_data->top - stream_data->bottom))
@@ -1172,6 +1204,11 @@ static bool find_compatible_linktype(libtrace_out_t *libtrace,
 /* Writes a packet to the provided DAG output trace */
 static int dag_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *packet)
 {
+	/* Check dag can write this type of packet */
+	if (!dag_can_write(packet)) {
+		return 0;
+	}
+
 	/* This is heavily borrowed from erf_write_packet(). Yes, CnP
 	 * coding sucks, sorry about that.
 	 */
@@ -1186,9 +1223,6 @@ static int dag_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *packet)
 		 * erf_write_packet(). */
 		return -1;
 	}
-
-	if (trace_get_link_type(packet) == TRACE_TYPE_NONDATA)
-		return 0;
 
 	pad = dag_get_padding(packet);
 
@@ -1224,14 +1258,26 @@ static int dag_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *packet)
 		erfhdr.type = erf_type;
 
 		/* Packet length (rlen includes format overhead) */
-		assert(trace_get_capture_length(packet) > 0
-		       && trace_get_capture_length(packet) <= 65536);
-		assert(erf_get_framing_length(packet) > 0
-		       && trace_get_framing_length(packet) <= 65536);
-		assert(trace_get_capture_length(packet) +
-		       erf_get_framing_length(packet) > 0
-		       && trace_get_capture_length(packet) +
-		       erf_get_framing_length(packet) <= 65536);
+		if (trace_get_capture_length(packet) <= 0
+                       || trace_get_capture_length(packet) > 65536) {
+			trace_set_err_out(libtrace, TRACE_ERR_BAD_PACKET,
+				"Capture length is out of range in dag_write_packet()");
+			return -1;
+		}
+		if (erf_get_framing_length(packet) <= 0
+                       || trace_get_framing_length(packet) > 65536) {
+			trace_set_err_out(libtrace, TRACE_ERR_BAD_PACKET,
+				"Framing length is out of range in dag_write_packet()");
+			return -1;
+		}
+		if (trace_get_capture_length(packet) +
+                       erf_get_framing_length(packet) <= 0
+                       || trace_get_capture_length(packet) +
+                       erf_get_framing_length(packet) > 65536) {
+			trace_set_err_out(libtrace, TRACE_ERR_BAD_PACKET,
+				"Capture + framing length is out of range in dag_write_packet()");
+			return -1;
+		}
 
 		erfhdr.rlen = htons(trace_get_capture_length(packet)
 				    + erf_get_framing_length(packet));
@@ -1481,7 +1527,14 @@ static libtrace_eventobj_t trace_event_dag(libtrace_t *libtrace,
 static void dag_get_statistics(libtrace_t *libtrace, libtrace_stat_t *stat)
 {
 	libtrace_list_node_t *tmp;
-	assert(stat && libtrace);
+	if (!libtrace) {
+		fprintf(stderr, "NULL trace passed into dag_get_statistics()\n");
+		return;
+	}
+	if (!stat) {
+		trace_set_err(libtrace, TRACE_ERR_STAT, "NULL stat passed into dag_get_statistics()");
+		return;
+	}
 	tmp = FORMAT_DATA_HEAD;
 
 	/* Dropped packets */
@@ -1497,8 +1550,14 @@ static void dag_get_statistics(libtrace_t *libtrace, libtrace_stat_t *stat)
 static void dag_get_thread_statistics(libtrace_t *libtrace, libtrace_thread_t *t,
                                        libtrace_stat_t *stat) {
 	struct dag_per_stream_t *stream_data = t->format_data;
-	assert(stat && libtrace);
-
+	if (!libtrace) {
+                fprintf(stderr, "NULL trace passed into dag_get_thread_statistics()\n");
+                return;
+        }
+        if (!stat) {
+                trace_set_err(libtrace, TRACE_ERR_STAT, "NULL stat passed into dag_get_thread_statistics()");
+                return;
+        }
 	stat->dropped_valid = 1;
 	stat->dropped = stream_data->drops;
 

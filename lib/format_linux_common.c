@@ -39,7 +39,6 @@
 #include <errno.h>
 #include <unistd.h>
 #include <string.h>
-#include <assert.h>
 
 #ifdef HAVE_INTTYPES_H
 #  include <inttypes.h>
@@ -70,9 +69,12 @@ static int linuxnative_configure_bpf(libtrace_t *libtrace,
 	int sock;
 	pcap_t *pcap;
 
-	/* Take a copy of the filter object as it was passed in */
-	f = (libtrace_filter_t *) malloc(sizeof(libtrace_filter_t));
-	memcpy(f, filter, sizeof(libtrace_filter_t));
+	/* Take a copy of the filter structure to prevent against
+         * deletion causing the filter to no longer work */
+        f = (libtrace_filter_t *) malloc(sizeof(libtrace_filter_t));
+        memset(f, 0, sizeof(libtrace_filter_t));
+        memcpy(f, filter, sizeof(libtrace_filter_t));
+        f->filterstring = strdup(filter->filterstring);
 
 	/* If we are passed a filter with "flag" set to zero, then we must
 	 * compile the filterstring before continuing. This involves
@@ -120,7 +122,7 @@ static int linuxnative_configure_bpf(libtrace_t *libtrace,
 	}
 
 	if (FORMAT_DATA->filter != NULL)
-		free(FORMAT_DATA->filter);
+                trace_destroy_filter(FORMAT_DATA->filter);
 
 	FORMAT_DATA->filter = f;
 
@@ -167,6 +169,8 @@ int linuxcommon_config_input(libtrace_t *libtrace,
 			break;
                 case TRACE_OPTION_REPLAY_SPEEDUP:
                         break;
+                case TRACE_OPTION_CONSTANT_ERF_FRAMING:
+                        break;
 		/* Avoid default: so that future options will cause a warning
 		 * here to remind us to implement it, or flag it as
 		 * unimplementable
@@ -184,11 +188,20 @@ int linuxcommon_init_input(libtrace_t *libtrace)
 
 	libtrace->format_data = (struct linux_format_data_t *)
 		malloc(sizeof(struct linux_format_data_t));
-	assert(libtrace->format_data != NULL);
+
+	if (!libtrace->format_data) {
+		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory for "
+			"format data inside linuxcommon_init_input()");
+		return -1;
+	}
 
 	FORMAT_DATA->per_stream =
 		libtrace_list_init(sizeof(stream_data));
-	assert(FORMAT_DATA->per_stream != NULL);
+
+	if (!FORMAT_DATA->per_stream) {
+		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to create list for stream data linuxcommon_init_input()");
+		return -1;
+	}
 
 	libtrace_list_push_back(FORMAT_DATA->per_stream, &stream_data);
 
@@ -210,7 +223,12 @@ int linuxcommon_init_output(libtrace_out_t *libtrace)
 {
 	libtrace->format_data = (struct linux_format_data_out_t*)
 		malloc(sizeof(struct linux_format_data_out_t));
-	assert(libtrace->format_data != NULL);
+
+	if (!libtrace->format_data) {
+		trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory for "
+			"format data inside linuxcommon_init_output()");
+		return -1;
+	}
 
 	FORMAT_DATA_OUT->fd = -1;
 	FORMAT_DATA_OUT->tx_ring = NULL;
@@ -482,7 +500,7 @@ int linuxcommon_fin_input(libtrace_t *libtrace)
 {
 	if (libtrace->format_data) {
 		if (FORMAT_DATA->filter != NULL)
-			free(FORMAT_DATA->filter);
+                	trace_destroy_filter(FORMAT_DATA->filter);
 
 		if (FORMAT_DATA->per_stream)
 			libtrace_list_deinit(FORMAT_DATA->per_stream);

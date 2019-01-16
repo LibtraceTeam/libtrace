@@ -32,7 +32,6 @@
 #include "rt_protocol.h"
 
 #include <errno.h>
-#include <assert.h>
 #include <stdio.h>
 #include <fcntl.h>
 
@@ -62,11 +61,17 @@ struct duck_format_data_out_t {
 	int compress_type;
 	int fileflag;
 	iow_t *file;
-	int dag_version;	
+	int dag_version;
 };
 
 static int duck_init_input(libtrace_t *libtrace) {
 	libtrace->format_data = malloc(sizeof(struct duck_format_data_t));
+
+	if (!libtrace->format_data) {
+		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory for "
+			"format data inside duck_init_input()");
+		return 1;
+	}
 
 	DATA(libtrace)->dag_version = 0;
 	return 0;
@@ -74,7 +79,13 @@ static int duck_init_input(libtrace_t *libtrace) {
 
 static int duck_init_output(libtrace_out_t *libtrace) {
 	libtrace->format_data = malloc(sizeof(struct duck_format_data_out_t));
-	
+
+	if (!libtrace->format_data) {
+		trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory for "
+			"format data inside duck_init_output()");
+		return -1;
+	}
+
 	OUTPUT->level = 0;
 	OUTPUT->compress_type = TRACE_OPTION_COMPRESSTYPE_NONE;
 	OUTPUT->fileflag = O_CREAT | O_WRONLY;
@@ -101,7 +112,9 @@ static int duck_config_output(libtrace_out_t *libtrace,
 					"Unknown option");
 			return -1;
 	}
-	assert(0);
+	trace_set_err_out(libtrace, TRACE_ERR_UNKNOWN_OPTION,
+		"Unknown option in duck_config_output()");
+	return -1;
 }
 
 static int duck_start_input(libtrace_t *libtrace) {
@@ -232,42 +245,47 @@ static int duck_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	}
 
 	if (duck_prepare_packet(libtrace, packet, packet->buffer, packet->type,
-				flags)) 
+				flags))
 		return -1;
-	
+
 	return numbytes;
 }
 
-static int duck_write_packet(libtrace_out_t *libtrace, 
-		libtrace_packet_t *packet) 
+static int duck_write_packet(libtrace_out_t *libtrace,
+		libtrace_packet_t *packet)
 {
 
 	int numbytes = 0;
 	uint32_t duck_version;
 
-	if (packet->type != TRACE_RT_DUCK_2_4 
+	if (packet->type != TRACE_RT_DUCK_2_4
 			&& packet->type != TRACE_RT_DUCK_2_5 &&
 			packet->type != TRACE_RT_DUCK_5_0) {
 		trace_set_err_out(libtrace, TRACE_ERR_BAD_PACKET,
 				"Only DUCK packets may be written to a DUCK file");
 		return -1;
 	}
-	
-	assert(OUTPUT->file);
+
+	if (!OUTPUT->file) {
+		trace_set_err_out(libtrace, TRACE_ERR_BAD_IO,
+			"Attempted to write DUCK packets to a closed file, must call "
+				"trace_create_output() before calling trace_write_output()");
+		return -1;
+	}
 
 	if (OUTPUT->dag_version == 0) {
 	/* Writing the DUCK version will help with reading it back in later! */
 		duck_version = bswap_host_to_le32(packet->type);
 		if ((numbytes = wandio_wwrite(OUTPUT->file, &duck_version,
 				sizeof(duck_version))) != sizeof(uint32_t)){
-			trace_set_err_out(libtrace, errno, 
+			trace_set_err_out(libtrace, errno,
 					"Writing DUCK version failed");
 			return -1;
 		}
 		OUTPUT->dag_version = packet->type;
 	}
-	
-	if ((numbytes = wandio_wwrite(OUTPUT->file, packet->payload, 
+
+	if ((numbytes = wandio_wwrite(OUTPUT->file, packet->payload,
 					trace_get_capture_length(packet))) !=
 				(int)trace_get_capture_length(packet)) {
 		trace_set_err_out(libtrace, errno, "Writing DUCK failed");

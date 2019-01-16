@@ -9,8 +9,8 @@ pkginclude_HEADERS = dagformat.h lt_inttypes.h daglegacy.h \
 	data-struct/message_queue.h hash_toeplitz.h \
         data-struct/simple_circular_buffer.h
 
-AM_CFLAGS=@LIBCFLAGS@ @CFLAG_VISIBILITY@ -pthread
-AM_CXXFLAGS=@LIBCXXFLAGS@ @CFLAG_VISIBILITY@ -pthread
+AM_CFLAGS=@LIBCFLAGS@ @CFLAG_VISIBILITY@ -pthread -std=gnu99
+AM_CXXFLAGS=@LIBCXXFLAGS@ @CFLAG_VISIBILITY@ -pthread -std=gnu99
 
 extra_DIST = format_template.c
 NATIVEFORMATS=format_linux_common.c format_linux_ring.c format_linux_int.c format_linux_common.h
@@ -42,6 +42,8 @@ export RTE_SDK=@RTE_SDK@
 export RTE_TARGET=@RTE_TARGET@
 export SAVED_CFLAGS:=$(CFLAGS)
 export SAVED_CXXFLAGS:=$(CXXFLAGS)
+export SAVED_CPPFLAGS:=$(CPPFLAGS)
+export SAVED_LDFLAGS:=$(LDFLAGS)
 include $(RTE_SDK)/mk/rte.vars.mk
 # We need to add -Wl before the linker otherwise this breaks our build
 # And include any libraries that DPDK might depend upon
@@ -49,6 +51,8 @@ export DPDK_LIBTRACE_MK=dpdk_libtrace.mk
 include $(DPDK_LIBTRACE_MK)
 export CFLAGS += $(SAVED_CFLAGS)
 export CXXFLAGS += $(SAVED_CXXFLAGS)
+export CPPFLAGS:=$(SAVED_CPPFLAGS)
+export LDFLAGS += $(SAVED_LDFLAGS)
 endif
 
 if HAVE_WANDDER

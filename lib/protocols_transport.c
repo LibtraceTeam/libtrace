@@ -28,7 +28,6 @@
 #include "libtrace.h"
 #include "protocols.h"
 #include "checksum.h"
-#include <assert.h>
 #include <stdlib.h>
 #include <stdio.h> // fprintf
 #include <string.h>
@@ -64,12 +63,12 @@ DLLEXPORT size_t trace_get_payload_length(const libtrace_packet_t *packet) {
         uint8_t iplenzero = 0;
 
 	/* Just use the cached length if we can */
-	if (packet->payload_length != -1)
-		return packet->payload_length;	
+	if (packet->cached.payload_length != -1)
+		return packet->cached.payload_length;	
 
 	/* Set to zero so that we can return early without having to 
 	 * worry about forgetting to update the cached value */
-	((libtrace_packet_t *)packet)->payload_length = 0;
+	((libtrace_packet_t *)packet)->cached.payload_length = 0;
 	layer = trace_get_layer3(packet, &ethertype, &rem);
 	if (!layer)
 		return 0;
@@ -162,7 +161,7 @@ DLLEXPORT size_t trace_get_payload_length(const libtrace_packet_t *packet) {
 			return 0;
 	}
 
-	((libtrace_packet_t *)packet)->payload_length = len;
+	((libtrace_packet_t *)packet)->cached.payload_length = len;
 	return len;
 
 }
@@ -181,7 +180,7 @@ DLLEXPORT void *trace_get_transport(const libtrace_packet_t *packet,
 
 	if (!remaining) remaining=&dummy_remaining;
 
-	if (packet->l4_header) {
+	if (packet->cached.l4_header) {
 		/*
 		void *link;
 		libtrace_linktype_t linktype;
@@ -189,10 +188,9 @@ DLLEXPORT void *trace_get_transport(const libtrace_packet_t *packet,
 		if (!link)
 			return NULL;
 		*/
-		*proto = packet->transport_proto;
-		/* *remaining -= (packet->l4_header - link); */
-		*remaining = packet->l4_remaining;
-		return packet->l4_header;
+		*proto = packet->cached.transport_proto;
+		*remaining = packet->cached.l4_remaining;
+		return packet->cached.l4_header;
 	}
 
 	transport = trace_get_layer3(packet,&ethertype,remaining);
@@ -221,9 +219,9 @@ DLLEXPORT void *trace_get_transport(const libtrace_packet_t *packet,
 			
 	}
 
-	((libtrace_packet_t *)packet)->transport_proto = *proto;
-	((libtrace_packet_t *)packet)->l4_header = transport;
-	((libtrace_packet_t *)packet)->l4_remaining = *remaining;
+	((libtrace_packet_t *)packet)->cached.transport_proto = *proto;
+	((libtrace_packet_t *)packet)->cached.l4_header = transport;
+	((libtrace_packet_t *)packet)->cached.l4_remaining = *remaining;
 
 
 	return transport;
@@ -567,8 +565,7 @@ DLLEXPORT uint16_t *trace_checksum_transport(libtrace_packet_t *packet,
 
 	sum += add_checksum(header, (uint16_t)plen);
 	*csum = ntohs(finish_checksum(sum));
-	//assert(0);
-	
+
 	return (uint16_t *)csum_ptr;
 }
 

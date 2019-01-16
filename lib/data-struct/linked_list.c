@@ -25,7 +25,6 @@
  */
 #include "linked_list.h"
 
-#include <assert.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
@@ -71,15 +70,23 @@ void libtrace_list_push_front(libtrace_list_t *l, void *item)
 
 	/* Create the new node */
 	new = (libtrace_list_node_t *)malloc(sizeof(libtrace_list_node_t));
-	assert(new != NULL);
+	if (!new) {
+		fprintf(stderr, "Unable to allocate memory for node in libtrace_list_push_front()\n");
+		return;
+	}
 	new->data = malloc(l->element_size);
-	assert(new->data != NULL);
+	if (!new->data) {
+		fprintf(stderr, "Unable to allocate memory for node data in libtrace_list_push_front()\n");
+	}
 
 	new->prev = NULL;
 	memcpy(new->data, item, l->element_size);
 
 	if (l->head == NULL) {
-		assert(l->tail == NULL && l->size == 0);
+		if (l->tail != NULL || l->size != 0) {
+			fprintf(stderr, "Error cannot have a NULL head with a non NULL tail and a size of non 0 in libtrace_list_push_front()\n");
+			return;
+		}
 		new->next = NULL;
 		l->head = l->tail = new;
 	} else {
@@ -99,15 +106,23 @@ void libtrace_list_push_back(libtrace_list_t *l, void *item)
 
 	/* Create the new node */
 	new = (libtrace_list_node_t *)malloc(sizeof(libtrace_list_node_t));
-	assert(new != NULL);
+	if (!new) {
+		fprintf(stderr, "Unable to allocate memory for node in libtrace_list_push_back()\n");
+		return;
+	}
 	new->data = malloc(l->element_size);
-	assert(new->data != NULL);
-
+	if (!new->data) {
+		fprintf(stderr, "Unable to allocate memory for node data in libtrace_list_push_back()\n");
+		return;
+	}
 	new->next = NULL;
 	memcpy(new->data, item, l->element_size);
 
 	if (l->tail == NULL) {
-		assert(l->head == NULL && l->size == 0);
+		if (l->head != NULL || l->size != 0) {
+			fprintf(stderr, "Error cannot have a NULL tail with a non NULL head and a size of non 0 in libtrace_list_push_back()\n");
+			return;
+		}
 		new->prev = NULL;
 		l->head = l->tail = new;
 	} else {
@@ -196,7 +211,10 @@ libtrace_list_node_t *libtrace_list_get_index(libtrace_list_t *list,
 	 * and scan from the top or the bottom depending on which is closer */
 	while (index--) {
 		ret = ret->next;
-		assert(ret != NULL);
+		if (!ret) {
+			fprintf(stderr, "Error encountered NULL index in libtrace_list_get_index()\n");
+			return NULL;
+		}
 	}
 
 	return ret;

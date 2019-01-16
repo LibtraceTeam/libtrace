@@ -306,7 +306,47 @@ enum {
 	/** Compression format unsupported */
 	TRACE_ERR_UNSUPPORTED_COMPRESS 	= -11,
         /** Wandio has returned an error */
-        TRACE_ERR_WANDIO_FAILED = -12  
+        TRACE_ERR_WANDIO_FAILED = -12,
+	/** Input URI (file) not found */
+        TRACE_ERR_URI_NOT_FOUND = -13,
+	/** NULL passed to create trace **/
+	TRACE_ERR_URI_NULL = -14,
+	/** NULL trace passed to trace_start **/
+	TRACE_ERR_NULL_TRACE = -15,
+	/** Unable to finish last packet in trace_pause **/
+	TRACE_ERR_PAUSE_FIN = -16,
+	/** Packet is NULL **/
+	TRACE_ERR_NULL_PACKET = -17,
+	/** Filter is NULL **/
+	TRACE_ERR_NULL_FILTER = -18,
+	/** Buffer is NULL **/
+	TRACE_ERR_NULL_BUFFER = -19,
+	/** Trace stats err **/
+	TRACE_ERR_STAT = -20,
+	/** Unable to create deadtrace **/
+	TRACE_ERR_CREATE_DEADTRACE = -21,
+	/** Bad linktype **/
+	TRACE_ERR_BAD_LINKTYPE = -22,
+	/** Bad IO for the trace **/
+	TRACE_ERR_BAD_IO = -23,
+	/** Trace has bad header **/
+	TRACE_ERR_BAD_HEADER = -24,
+	/** Trace err seeking by erf **/
+	TRACE_ERR_SEEK_ERF = -25,
+	/** Trace err combiner **/
+	TRACE_ERR_COMBINER = -26,
+	/** Error pausing processing thread **/
+	TRACE_ERR_PAUSE_PTHREAD = -27,
+	/** Error with trace thread **/
+	TRACE_ERR_THREAD = -28,
+	/** Thread in unexpecting state **/
+	TRACE_ERR_THREAD_STATE = -29,
+	/** Trace configuration error **/
+	TRACE_ERR_CONFIG = -30,
+	/** NULL passed misc **/
+	TRACE_ERR_NULL = -31,
+	/** Err with trace output file **/
+	TRACE_ERR_OUTPUT_FILE = -32,
 };
 
 /** Enumeration of DLTs supported by libtrace 
@@ -371,7 +411,8 @@ typedef enum {
        TRACE_TYPE_NONDATA = 19,		/**< Not a data packet */
        TRACE_TYPE_OPENBSD_LOOP = 20,	/**< OpenBSD loopback */
        TRACE_TYPE_ERF_META = 21, /**< ERF Provenance metadata record */
-       TRACE_TYPE_ETSILI = 22	/**< ETSI Lawful Intercept */
+       TRACE_TYPE_ETSILI = 22,	/**< ETSI Lawful Intercept */
+       TRACE_TYPE_PCAPNG_META = 23,	/** PCAPNG meta packet */
 } libtrace_linktype_t;
 
 /** RT protocol base format identifiers.
@@ -400,6 +441,7 @@ enum base_format_t {
         TRACE_FORMAT_NDAG       =19,    /**< DAG multicast over a network */
         TRACE_FORMAT_DPDK_NDAG       =20,    /**< DAG multicast over a network, received via DPDK */
         TRACE_FORMAT_ETSILIVE     =21,  /**< ETSI LI over a network */
+	TRACE_FORMAT_UNKNOWN      =22,  /** Unknown format */
 };
 
 /** RT protocol packet types */
@@ -537,16 +579,7 @@ typedef enum {
 	TRACE_ETHERTYPE_PPP_SES = 0x8864	/**< PPPoE Session Messages */
 } libtrace_ethertype_t;
 
-/** The libtrace packet structure. Applications shouldn't be 
- * meddling around in here 
- */
-typedef struct libtrace_packet_t {
-	struct libtrace_t *trace; 	/**< Pointer to the trace */
-	void *header;			/**< Pointer to the framing header */
-	void *payload;			/**< Pointer to the link layer */
-	void *buffer;			/**< Allocated buffer */
-	libtrace_rt_types_t  type; 	/**< RT protocol type for the packet */
-	buf_control_t buf_control; 	/**< Describes memory ownership */
+typedef struct libtrace_packet_cache {
 	int capture_length;		/**< Cached capture length */
 	int wire_length;		/**< Cached wire length */
 	int payload_length;		/**< Cached payload length */
@@ -560,6 +593,19 @@ typedef struct libtrace_packet_t {
 	void *l4_header;		/**< Cached transport header */
 	uint8_t transport_proto;	/**< Cached transport protocol */
 	uint32_t l4_remaining;		/**< Cached transport remaining */
+} libtrace_packet_cache_t;
+
+/** The libtrace packet structure. Applications shouldn't be 
+ * meddling around in here 
+ */
+typedef struct libtrace_packet_t {
+	struct libtrace_t *trace; 	/**< Pointer to the trace */
+	void *header;			/**< Pointer to the framing header */
+	void *payload;			/**< Pointer to the link layer */
+	void *buffer;			/**< Allocated buffer */
+	libtrace_rt_types_t  type; 	/**< RT protocol type for the packet */
+	buf_control_t buf_control; 	/**< Describes memory ownership */
+        libtrace_packet_cache_t cached; /**< Cached packet properties / headers */
 	uint64_t order; /**< Notes the order of this packet in relation to the input */
 	uint64_t hash; /**< A hash of the packet as supplied by the user */
 	int error; /**< The error status of pread_packet */
@@ -1326,6 +1372,10 @@ typedef enum {
 
         /** Speed up trace file replays (via trace_event()) by this factor */
         TRACE_OPTION_REPLAY_SPEEDUP,
+
+        /** Always assume ERF framing length is the given value, rather than
+         *  trying to calculate it from the packet type. */
+        TRACE_OPTION_CONSTANT_ERF_FRAMING,
 } trace_option_t;
 
 /** Sets an input config option

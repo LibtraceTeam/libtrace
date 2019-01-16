@@ -30,7 +30,6 @@
 #include "format_helper.h"
 
 #include <sys/stat.h>
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -98,8 +97,30 @@ struct pcap_format_data_out_t {
 	} output;
 };
 
+static bool pcap_can_write(libtrace_packet_t *packet) {
+	/* Get the linktype */
+        libtrace_linktype_t ltype = trace_get_link_type(packet);
+
+        if (ltype == TRACE_TYPE_PCAPNG_META
+                || ltype == TRACE_TYPE_CONTENT_INVALID
+                || ltype == TRACE_TYPE_UNKNOWN
+                || ltype == TRACE_TYPE_ERF_META
+                || ltype == TRACE_TYPE_NONDATA) {
+
+                return false;
+        }
+
+        return true;
+}
+
 static int pcap_init_input(libtrace_t *libtrace) {
 	libtrace->format_data = malloc(sizeof(struct pcap_format_data_t));
+
+	if (!libtrace->format_data) {
+		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory for "
+			"format data inside pcap_init_input()");
+		return -1;
+	}
 
 	INPUT.pcap = NULL;
 	DATA(libtrace)->filter = NULL;
@@ -172,11 +193,17 @@ static int pcap_config_input(libtrace_t *libtrace,
 		default:
 			return -1;
 	}
-	assert(0);
+	return -1;
 }
 
 static int pcap_init_output(libtrace_out_t *libtrace) {
 	libtrace->format_data = malloc(sizeof(struct pcap_format_data_out_t));
+	if (!libtrace->format_data) {
+		trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory for "
+			"format data inside pcap_init_output()");
+		return -1;
+	}
+
 	OUTPUT.trace.pcap = NULL;
 	OUTPUT.trace.dump = NULL;
 	return 0;
@@ -185,6 +212,12 @@ static int pcap_init_output(libtrace_out_t *libtrace) {
 static int pcapint_init_output(libtrace_out_t *libtrace) {
 #ifdef HAVE_PCAP_INJECT
 	libtrace->format_data = malloc(sizeof(struct pcap_format_data_out_t));
+	if (!libtrace->format_data) {
+                trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory for "
+			"format data inside pcapint_init_output()");
+                return -1;
+        }
+
 	OUTPUT.trace.pcap = NULL;
 	OUTPUT.trace.dump = NULL;
 	return 0;
@@ -204,6 +237,12 @@ static int pcapint_init_output(libtrace_out_t *libtrace) {
 
 static int pcapint_init_input(libtrace_t *libtrace) {
 	libtrace->format_data = malloc(sizeof(struct pcap_format_data_t));
+	if (!libtrace->format_data) {
+		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory for "
+			"format data inside pcapint_init_input()");
+		return -1;
+	}
+
 	DATA(libtrace)->filter = NULL;
 	DATA(libtrace)->snaplen = LIBTRACE_PACKET_BUFSIZE;
 	DATA(libtrace)->promisc = 0;
@@ -239,7 +278,7 @@ static int pcapint_config_input(libtrace_t *libtrace,
 			 * error-setting. */
 			return -1;
 	}
-	assert(0);
+	return -1;
 }
 
 static int pcapint_start_input(libtrace_t *libtrace) {
@@ -376,7 +415,9 @@ static int pcap_fin_output(libtrace_out_t *libtrace)
 		pcap_dump_flush(OUTPUT.trace.dump);
 		pcap_dump_close(OUTPUT.trace.dump);
 	}
-	pcap_close(OUTPUT.trace.pcap);
+	if (OUTPUT.trace.pcap) {
+		pcap_close(OUTPUT.trace.pcap);
+	}
 	free(libtrace->format_data);
 	return 0;
 }
@@ -422,8 +463,12 @@ static int pcap_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	int ret = 0;
 	int linktype;
 	uint32_t flags = 0;
-	
-	assert(libtrace->format_data);
+
+	if (!libtrace->format_data) {
+		trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT, "Trace format data missing, "
+			"call trace_create() before calling pcap_read_packet()");
+		return -1;
+	}
 	linktype = pcap_datalink(DATA(libtrace)->input.pcap);
 	packet->type = pcap_linktype_to_rt(linktype);
 
@@ -490,18 +535,27 @@ static int pcap_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 static int pcap_write_packet(libtrace_out_t *libtrace, 
 		libtrace_packet_t *packet) 
 {
+
+	/* Check pcap can write this type of packet */
+        if (!pcap_can_write(packet)) {
+                return 0;
+        }
+
+	if (!libtrace) {
+		fprintf(stderr, "NULL trace passed into pcap_write_packet()\n");
+		return TRACE_ERR_NULL_TRACE;
+	}
+	if (!packet) {
+		trace_set_err_out(libtrace, TRACE_ERR_NULL_PACKET, "NULL packet passed into pcap_write_packet()\n");
+		return -1;
+	}
+
 	struct pcap_pkthdr pcap_pkt_hdr;
 	void *link;
 	libtrace_linktype_t linktype;
 	uint32_t remaining;
 
 	link = trace_get_packet_buffer(packet,&linktype,&remaining);
-
-	/* Silently discard RT metadata packets and packets with an
-	 * unknown linktype. */
-	if (linktype == TRACE_TYPE_NONDATA || linktype == TRACE_TYPE_UNKNOWN || linktype == TRACE_TYPE_ERF_META || linktype == TRACE_TYPE_CONTENT_INVALID) {
-		return 0;
-	}
 
 	/* We may have to convert this packet into a suitable PCAP packet */
 
@@ -574,8 +628,14 @@ static int pcap_write_packet(libtrace_out_t *libtrace,
 		else
 			pcap_pkt_hdr.len = trace_get_wire_length(packet);
 
-		assert(pcap_pkt_hdr.caplen<65536);
-		assert(pcap_pkt_hdr.len<65536);
+		if (pcap_pkt_hdr.caplen >= 65536) {
+			trace_set_err_out(libtrace, TRACE_ERR_BAD_HEADER, "Header capture length is larger than it should be in pcap_write_packet()");
+			return -1;
+		}
+		if (pcap_pkt_hdr.len >= 65536) {
+			trace_set_err_out(libtrace, TRACE_ERR_BAD_HEADER, "Header wire length is larger than it should be pcap_write_packet()");
+			return -1;
+		}
 
 		pcap_dump((u_char*)OUTPUT.trace.dump, &pcap_pkt_hdr, packet->payload);
 	}
@@ -669,9 +729,16 @@ static struct timeval pcap_get_timeval(const libtrace_packet_t *packet) {
 
 
 static int pcap_get_capture_length(const libtrace_packet_t *packet) {
+	if (!packet) {
+		fprintf(stderr, "NULL packet passed into pcapng_get_capture_length()\n");
+		return TRACE_ERR_NULL_PACKET;
+	}
 	struct pcap_pkthdr *pcapptr = 0;
 	pcapptr = (struct pcap_pkthdr *)packet->header;
-	assert(pcapptr->caplen<=65536);
+	if (pcapptr->caplen > 65536) {
+		trace_set_err(packet->trace, TRACE_ERR_BAD_PACKET, "Capture length is to large, Packet may be corrupt in pcap_get_capture_length()");
+		return -1;
+	}
 
 	return pcapptr->caplen;
 }
@@ -703,21 +770,32 @@ static int pcap_get_framing_length(UNUSED const libtrace_packet_t *packet) {
 
 static size_t pcap_set_capture_length(libtrace_packet_t *packet,size_t size) {
 	struct pcap_pkthdr *pcapptr = 0;
-	assert(packet);
+	if (!packet) {
+		fprintf(stderr, "NULL packet passed to pcap_set_capture_length()\n");
+		return TRACE_ERR_NULL_PACKET;
+	}
 	if (size > trace_get_capture_length(packet)) {
 		/* Can't make a packet larger */
 		return trace_get_capture_length(packet);
 	}
 	/* Reset the cached capture length */
-	packet->capture_length = -1;
+	packet->cached.capture_length = -1;
 	pcapptr = (struct pcap_pkthdr *)packet->header;
 	pcapptr->caplen = size;
 	return trace_get_capture_length(packet);
 }
 
 static int pcap_get_fd(const libtrace_t *trace) {
-
-	assert(trace->format_data);
+	if (!trace) {
+		fprintf(stderr, "NULL trace passed to pcap_get_fd()\n");
+		return TRACE_ERR_NULL_TRACE;
+	}
+	if (!trace->format_data) {
+		/* cant do this because trace is a const? */
+		/*trace_set_err(trace, TRACE_ERR_BAD_FORMAT, "Trace format data missing, call init_input() before calling pcap_get_fd()");*/
+		fprintf(stderr, "Trace format data missing, call init_input() before calling pcap_get_fd()\n");
+		return TRACE_ERR_BAD_FORMAT;
+	}
 	return pcap_fileno(DATA(trace)->input.pcap);
 }
 

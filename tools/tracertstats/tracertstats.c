@@ -65,6 +65,7 @@ int merge_inputs = 0;
 int threadcount = 4;
 int filter_count=0;
 int burstsize=10;
+uint8_t report_drops = 0;
 
 struct filter_t {
 	char *expr;
@@ -78,8 +79,8 @@ double packet_interval=UINT32_MAX;
 
 struct output_data_t *output = NULL;
 
-uint64_t count;
-uint64_t bytes;
+uint64_t totalcount;
+uint64_t totalbytes;
 
 struct libtrace_t *currenttrace;
 
@@ -89,15 +90,29 @@ static void cleanup_signal(int signal UNUSED) {
         }
 }
 
-static void report_results(double ts,uint64_t count,uint64_t bytes)
+static void report_results(double ts,uint64_t count,uint64_t bytes,
+                libtrace_stat_t *stats)
 {
-	int i=0;
+	int i=0, offset = 3;
 	output_set_data_time(output,0,ts);
 	output_set_data_int(output,1,count);
 	output_set_data_int(output,2,bytes);
+        if (stats) {
+                if (stats->dropped_valid) {
+                        output_set_data_int(output, 3, stats->dropped);
+                } else {
+                        output_set_data_int(output, 3, -1);
+                }
+                if (stats->missing_valid) {
+                        output_set_data_int(output, 4, stats->missing);
+                } else {
+                        output_set_data_int(output, 4, -1);
+                }
+                offset += 2;
+        }
 	for(i=0;i<filter_count;++i) {
-		output_set_data_int(output,i*2+3,filters[i].count);
-		output_set_data_int(output,i*2+4,filters[i].bytes);
+		output_set_data_int(output,i*2+offset,filters[i].count);
+		output_set_data_int(output,i*2+offset+1,filters[i].bytes);
 		filters[i].count=filters[i].bytes=0;
 	}
 	output_flush_row(output);
@@ -114,6 +129,10 @@ static void create_output(char *title) {
 	output_add_column(output,"ts");
 	output_add_column(output,"packets");
 	output_add_column(output,"bytes");
+        if (report_drops) {
+                output_add_column(output, "dropped");
+                output_add_column(output, "missing");
+        }
 	for(i=0;i<filter_count;++i) {
 		char buff[1024];
 		snprintf(buff,sizeof(buff),"%s packets",filters[i].expr);
@@ -144,6 +163,7 @@ static void cb_result(libtrace_t *trace, libtrace_thread_t *sender UNUSED,
         static uint64_t packets_seen = 0;
 	int j;
 	result_t *res;
+        libtrace_stat_t *stats = NULL;
 
         if (stopped)
                 return;
@@ -152,22 +172,30 @@ static void cb_result(libtrace_t *trace, libtrace_thread_t *sender UNUSED,
         res = result->value.ptr;
         if (glob_last_ts == 0)
                 glob_last_ts = ts;
+        if (report_drops) {
+                stats = trace_create_statistics();
+                trace_get_statistics(trace, stats);
+        }
         while ((glob_last_ts >> 32) < (ts >> 32)) {
-                report_results(glob_last_ts >> 32, count, bytes);
-                count = 0;
-                bytes = 0;
+                report_results(glob_last_ts >> 32, totalcount, totalbytes,
+                                stats);
+                totalcount = 0;
+                totalbytes = 0;
                 for (j = 0; j < filter_count; j++)
                         filters[j].count = filters[j].bytes = 0;
                 glob_last_ts = ts;
         }
-        count += res->total.count;
+        totalcount += res->total.count;
         packets_seen += res->total.count;
-        bytes += res->total.bytes;
+        totalbytes += res->total.bytes;
         for (j = 0; j < filter_count; j++) {
                 filters[j].count += res->filters[j].count;
                 filters[j].bytes += res->filters[j].bytes;
         }
         free(res);
+        if (stats) {
+                free(stats);
+        }
 
         /* Be careful to only call pstop once from within this thread! */
         if (packets_seen > packet_count) {
@@ -260,6 +288,7 @@ static void run_trace(char *uri)
 {
         libtrace_t *trace = NULL;
 	libtrace_callback_set_t *pktcbs, *repcbs;
+        libtrace_stat_t *stats = NULL;
 
         if (!merge_inputs) 
 		create_output(uri);
@@ -311,10 +340,17 @@ static void run_trace(char *uri)
 	trace_join(trace);
 	
 	// Flush the last one out
-	report_results((glob_last_ts >> 32), count, bytes);
+        if (report_drops) {
+                stats = trace_create_statistics();
+                stats = trace_get_statistics(trace, stats);
+        }
+	report_results((glob_last_ts >> 32), totalcount, totalbytes, stats);
 	if (trace_is_err(trace))
 		trace_perror(trace,"%s",uri);
 
+        if (stats) {
+                free(stats);
+        }
         trace_destroy(trace);
         trace_destroy_callback_set(pktcbs);
         trace_destroy_callback_set(repcbs);
@@ -337,6 +373,8 @@ static void usage(char *argv0)
 	"-m --merge-inputs	Do not create separate outputs for each input trace\n"
 	"-N --nobuffer		Disable packet buffering within libtrace to force faster\n"
 	"			updates at very low traffic rates\n"
+        "-d --report-drops      Include statistics about number of packets dropped or\n"
+        "                       lost by the capture process\n"
 	"-h --help	Print this usage statement\n"
 	,argv0);
 }
@@ -357,16 +395,20 @@ int main(int argc, char *argv[]) {
 			{ "merge-inputs",	0, 0, 'm' },
 			{ "threads",	        1, 0, 't' },
 			{ "nobuffer",	        0, 0, 'N' },
+			{ "report-drops",	0, 0, 'd' },
 			{ NULL, 		0, 0, 0   },
 		};
 
-		int c=getopt_long(argc, argv, "c:f:i:o:t:hmN",
+		int c=getopt_long(argc, argv, "c:f:i:o:t:dhmN",
 				long_options, &option_index);
 
 		if (c==-1)
 			break;
 
 		switch (c) {
+                        case 'd':
+                                report_drops = 1;
+                                break;
 			case 'N':
 				burstsize = 1;
 				break;

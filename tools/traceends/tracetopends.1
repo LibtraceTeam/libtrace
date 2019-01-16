@@ -1,11 +1,14 @@
-.TH TRACETOPENDS "1" "September 2011" "tracetopends (libtrace)" "User Commands"
+.TH TRACETOPENDS "1" "December 2018" "tracetopends (libtrace)" "User Commands"
 .SH NAME
 tracetopends \- reports the endpoints that are responsible for the most traffic
 in a trace
 .SH SYNOPSIS
 .B tracetopends
+[ \fB-t \fRthreads ]
 [ \fB-f \fRbpf ]
 [ \fB-A \fRaddrtype ]
+[ \fB-S ]
+[ \fb-D ]
 [ \fB-s ]
 [ \fB-d ]
 [ \fB-b ]
@@ -16,6 +19,12 @@ inputuri [inputuri ...]
 .SH DESCRIPTION
 tracetopends reports the number of bytes and packets sent and received by the
 busiest endpoints observed in the input trace(s). 
+
+.SH OPTIONS
+
+.TP
+\fB\-t\fR threads
+Use the given number of threads for packet processing. Defaults to 1 thread.
 
 .TP
 \fB\-f\fR bpf filter
@@ -30,6 +39,16 @@ Report the top N endpoints (defaults to 10).
 Specifies how an endpoint should be defined. Suitable options are "mac", "v4" 
 and "v6" which will report endpoint stats for each observed MAC address, IPv4
 address and IPv6 address respectively.
+
+.TP
+\fB\-S
+Do not track endpoints which are sending traffic. Mutually exclusive with the
+\fB\-D \fRoption.
+
+.TP
+\fB\-D
+Do not track endpoints which are receiving traffic. Mutually exclusive with the
+\fB\-S \fRoption.
 
 .TP
 \fB\-s
@@ -72,7 +91,7 @@ The columns are (in order):
 .SH EXAMPLES
 Find the IPv4 addresses that are sending the most traffic.
 .nf
-tracetopends -A v4 -b -s erf:trace.erf.gz
+tracetopends -A v4 -b -s -D erf:trace.erf.gz
 .fi
 
 .SH LINKS

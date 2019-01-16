@@ -53,7 +53,10 @@ DLLEXPORT void libtrace_vector_push_back(libtrace_vector_t *v, void *d) {
 		/* Resize */
 		v->max_size *= 2;
 		v->elements = realloc(v->elements, v->max_size * v->element_size);
-		assert(v->elements);
+		if (!v->elements) {
+			fprintf(stderr, "Unable to allocate memory for v->elements in libtrace_vector_push_back()\n");
+			return;
+		}
 	}
 	memcpy(&v->elements[v->size*v->element_size], d, v->element_size);
 	v->size++;
@@ -103,7 +106,10 @@ static inline void memswap(void *a, void *b, size_t size) {
 // This also empties the second source array
 DLLEXPORT void libtrace_vector_append(libtrace_vector_t *dest, libtrace_vector_t *src)
 {
-	assert(dest->element_size == src->element_size);
+	if (dest->element_size != src->element_size) {
+		fprintf(stderr, "Elements must be the same size in libtrace_vector_append()\n");
+		return;
+	}
 	if (src->size == 0) // Nothing to do if this is the case
 		return;
 	ASSERT_RET(pthread_mutex_lock(&dest->lock), == 0);

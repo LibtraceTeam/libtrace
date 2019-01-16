@@ -10,6 +10,7 @@ tracertstats \- perform simple filter based analysis on a trace
 [ -o | --output-format csv,txt,png,html ]
 [ -m | --merge-inputs ]
 [ -N | --nobuffer ]
+[ -d | --report-drops ]
 inputuri...
 .P
 .B tracertstats 
@@ -71,6 +72,17 @@ Disable internal packet buffering in libtrace. If the packet rate is very low
 (i.e. < 10 packets per interval), set this to ensure that tracertstats is more
 likely to print results in time with the interval rather than producing bursts
 of output for multiple intervals at a time.
+
+.TP
+.PD 0
+.BI \-d
+.TP
+.PD
+.BI \-\^\-report-drops
+Include columns with the number of packets that were either dropped by the
+capture process or went missing between the capture process and this
+tracertstats instance. The numbers displayed are CUMULATIVE, as they are
+pulled directly from the libtrace statistics API.
 
 .TP
 .PD 0

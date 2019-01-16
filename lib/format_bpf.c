@@ -122,11 +122,16 @@ static int bpf_probe_filename(const char *filename)
 }
 
 /* Initialises a BPF input trace */
-static int bpf_init_input(libtrace_t *libtrace) 
-{
+static int bpf_init_input(libtrace_t *libtrace) {
 	libtrace->format_data = (struct libtrace_format_data_t *)
 		malloc(sizeof(struct libtrace_format_data_t));
-	
+
+	if (!libtrace->format_data) {
+		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory "
+			"for format data inside bpf_init_input()");
+		return -1;
+	}
+
 	/* Throw some default values into the format data */
 	FORMATIN(libtrace)->fd = -1;
 	FORMATIN(libtrace)->promisc = 0;
@@ -371,6 +376,8 @@ static int bpf_config_input(libtrace_t *libtrace,
 			/* TODO investigate hashing in BSD? */
 			break;
 		case TRACE_OPTION_REPLAY_SPEEDUP:
+			break;
+		case TRACE_OPTION_CONSTANT_ERF_FRAMING:
 			break;
 		/* Avoid default: so that future options will cause a warning
 		 * here to remind us to implement it, or flag it as
