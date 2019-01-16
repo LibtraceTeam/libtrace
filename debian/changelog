@@ -1,3 +1,9 @@
+libtrace4 (4.0.6-2) unstable; urgency=low
+
+  * Fix bad dpdk dependencies in libtrace4 package
+
+ -- Shane Alcock <shane.alcock@waikato.ac.nz>  Wed, 16 Jan 2019 16:49:04 +1300
+
 libtrace4 (4.0.6-1) unstable; urgency=low
 
   * New upstream release
