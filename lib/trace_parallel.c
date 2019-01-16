@@ -2447,8 +2447,11 @@ DLLEXPORT int trace_message_reporter(libtrace_t * libtrace, libtrace_message_t *
 
 DLLEXPORT int trace_post_reporter(libtrace_t *libtrace)
 {
-	libtrace_message_t message = {0, {.uint64=0}, NULL};
-	message.code = MESSAGE_POST_REPORTER;
+	libtrace_message_t message;
+        memset(&message, 0, sizeof(libtrace_message_t));
+        message.code = MESSAGE_POST_REPORTER;
+        message.data.uint64 = 0;
+        message.sender = NULL;
 	return trace_message_reporter(libtrace, (void *) &message);
 }
 
