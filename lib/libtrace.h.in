@@ -3747,7 +3747,7 @@ libtrace_meta_t *trace_get_interface_frame_check_sequence_length(libtrace_packet
 libtrace_meta_t *trace_get_interface_hardware_description(libtrace_packet_t *packet);
 libtrace_meta_t *trace_get_interface_comment(libtrace_packet_t *packet);
 libtrace_meta_t *trace_get_capture_application(libtrace_packet_t *packet);
-libtrace_meta_t *trace_get_section_item(libtrace_packet_t *packet, uint32_t section_code,
+libtrace_meta_t *trace_get_section_option(libtrace_packet_t *packet, uint32_t section_code,
         uint16_t option_code);
 libtrace_meta_t *trace_get_section(libtrace_packet_t *packet, uint32_t section_code);
 
