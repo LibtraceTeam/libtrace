@@ -1624,7 +1624,8 @@ static struct libtrace_format_t dag = {
 	NULL,                           /* get_timeval */
 	NULL,                           /* get_seconds */
 	NULL,				/* get_timespec */
-	NULL,                           /* get_meta_data */
+	NULL,                           /* get_meta_section */
+        NULL,                           /* get_meta_section_item */
 	NULL,                           /* seek_erf */
 	NULL,                           /* seek_timeval */
 	NULL,                           /* seek_seconds */

@@ -108,6 +108,11 @@ typedef struct dag_section_header {
 	uint16_t len;
 } dag_sec_t;
 
+struct dag_opthdr {
+	uint16_t optcode;
+	uint16_t optlen;
+};
+
 #ifdef WIN32
 #pragma pack(pop)
 #endif

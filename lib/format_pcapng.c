@@ -2099,19 +2099,165 @@ static void pcapng_get_statistics(libtrace_t *trace, libtrace_stat_t *stat) {
 
 }
 
-void *pcapng_get_meta_data(libtrace_packet_t *packet, uint32_t section_type,
-	uint16_t section) {
+static void *pcapng_jump_to_options(libtrace_packet_t *packet) {
+
+	struct pcapng_peeker *hdr = (struct pcapng_peeker *)packet->buffer;
+	void *ptr = packet->buffer;
+	uint32_t blocktype;
+
+	if (DATA(packet->trace)->byteswapped) {
+                blocktype = byteswap32(hdr->blocktype);
+        } else {
+                blocktype = hdr->blocktype;
+        }
+
+	/* Skip x bytes to the options depending on what kind of packet this is */
+        if (blocktype == PCAPNG_SECTION_TYPE) { ptr += sizeof(pcapng_sec_t); }
+        else if (blocktype == PCAPNG_INTERFACE_TYPE) { ptr += sizeof(pcapng_int_t); }
+        else if (blocktype == PCAPNG_OLD_PACKET_TYPE) { ptr += sizeof(pcapng_opkt_t); }
+        else if (blocktype == PCAPNG_NAME_RESOLUTION_TYPE) { ptr += sizeof(pcapng_epkt_t); }
+        else if (blocktype == PCAPNG_INTERFACE_STATS_TYPE) { ptr += sizeof(pcapng_stats_t); }
+        else if (blocktype == PCAPNG_ENHANCED_PACKET_TYPE) {
+                /* jump over the the enchanced packet header and data to the options */
+                pcapng_epkt_t *epkthdr = (pcapng_epkt_t *)ptr;
+                uint32_t seclen;
+                if (DATA(packet->trace)->byteswapped) {
+                        seclen = byteswap32(epkthdr->caplen);
+                } else {
+                        seclen = epkthdr->caplen;
+                }
+                if ((seclen % 4) != 0) {
+                        ptr += seclen + (4 -(seclen % 4)) + sizeof(pcapng_secrets_t);
+                } else {
+                        ptr += seclen + sizeof(pcapng_secrets_t);
+                }
+        } 
+        else if (blocktype == PCAPNG_DECRYPTION_SECRETS_TYPE) {
+                /* jump over the decryption secrets header and data to the options */
+                pcapng_secrets_t *sechdr = (pcapng_secrets_t *)ptr;
+                uint32_t seclen;
+                if (DATA(packet->trace)->byteswapped) {
+                        seclen = byteswap32(sechdr->secrets_len);
+                } else {
+                        seclen = sechdr->secrets_len;
+                }
+                if ((seclen % 4) != 0) {
+                        ptr += seclen + (4 -(seclen % 4)) + sizeof(pcapng_secrets_t);
+                } else {
+                        ptr += seclen + sizeof(pcapng_secrets_t);
+                }
+        }
+        else { return NULL; }
+
+	return ptr;
+}
+
+void *pcapng_get_meta_section(libtrace_packet_t *packet, uint32_t section) {
+
+	struct pcapng_peeker *hdr;
+	uint32_t remaining;
+	void *ptr;
+	uint32_t blocktype;
+	uint16_t optcode;
+	uint16_t len;
+	uint16_t tmp;
+
+	if (packet->buffer == NULL) { return NULL; }
+
+	hdr = (struct pcapng_peeker *)packet->buffer;
+        ptr = pcapng_jump_to_options(packet);
+
+	if (DATA(packet->trace)->byteswapped) {
+                blocktype = byteswap32(hdr->blocktype);
+                remaining = byteswap32(hdr->blocklen);
+        } else {
+                blocktype = hdr->blocktype;
+                remaining = hdr->blocklen;
+        }
+
+	/* If the data we want is not within this blocktype */
+        if (blocktype != section) {
+                return NULL;
+        }
+
+	/* update remaining to account for header and any payload */
+        remaining -= (ptr - packet->buffer);
+
+        struct pcapng_optheader *opthdr = ptr;
+        if (DATA(packet->trace)->byteswapped) {
+                optcode = byteswap16(opthdr->optcode);
+                len  = byteswap16(opthdr->optlen);
+        } else {
+                optcode = opthdr->optcode;
+                len = opthdr->optlen;
+        }
+
+	/* setup structure to hold the result */
+        libtrace_meta_t *result = malloc(sizeof(libtrace_meta_t));
+        result->section = section;
+        result->num = 0;
+
+	while (optcode != PCAPNG_OPTION_END && remaining > sizeof(struct pcapng_optheader)) {
+
+		result->num += 1;
+                if (result->num == 1) {
+                	result->items = malloc(sizeof(libtrace_meta_item_t));
+                } else {
+                        result->items = realloc(result->items,
+                	        result->num*sizeof(libtrace_meta_item_t));
+                }
+                result->items[result->num-1].option = optcode;
+                result->items[result->num-1].len = len;
+                result->items[result->num-1].data_type = 0;
+                result->items[result->num-1].data = calloc(1, len);
+                memcpy(result->items[result->num-1].data,
+                	ptr+sizeof(struct pcapng_optheader), len);
+
+		/* work out any padding */
+                if ((len % 4) != 0) {
+			tmp = len + (4 - (len % 4)) + sizeof(struct pcapng_optheader);
+                } else {
+			tmp = len + sizeof(struct pcapng_optheader);
+		}
+                ptr += tmp;
+		remaining -= tmp;
+
+                /* get the next option */
+                opthdr = (struct pcapng_optheader *)ptr;
+                if (DATA(packet->trace)->byteswapped) {
+                        optcode = byteswap16(opthdr->optcode);
+                        len = byteswap16(opthdr->optlen);
+                } else {
+                        optcode = opthdr->optcode;
+                        len = opthdr->optlen;
+                }
+	}
+
+	/* if any data was found result->num will be greater than 0 */
+	if (result->num > 0) {
+		return (void *)result;
+	} else {
+		free(result);
+		return NULL;
+	}
+
+}
+
+void *pcapng_get_meta_section_option(libtrace_packet_t *packet, uint32_t section,
+	uint16_t option) {
 
 	struct pcapng_peeker *hdr;
 	void *ptr;
 	uint32_t blocktype;
 	uint16_t optcode;
-	int remaining;
+	uint32_t remaining;
+	uint16_t len;
+	uint16_t tmp;
 
 	if (packet->buffer == NULL) { return NULL; }
 
 	hdr = (struct pcapng_peeker *)packet->buffer;
-	ptr = packet->buffer;
+	ptr = pcapng_jump_to_options(packet);
 
 	if (DATA(packet->trace)->byteswapped) {
 		blocktype = byteswap32(hdr->blocktype);
@@ -2121,48 +2267,10 @@ void *pcapng_get_meta_data(libtrace_packet_t *packet, uint32_t section_type,
 		remaining = hdr->blocklen;
 	}
 
-	/* If the data we want is not within this blocktype just return */
-	if (blocktype != section_type) {
+	/* If the data we want is not within this blocktype */
+	if (blocktype != section) {
 		return NULL;
 	}
-
-	/* Skip x bytes to the options depending on what kind of packet this is */
-	if (section_type == PCAPNG_SECTION_TYPE) { ptr += sizeof(pcapng_sec_t); }
-	else if (section_type == PCAPNG_INTERFACE_TYPE) { ptr += sizeof(pcapng_int_t); }
-	else if (section_type == PCAPNG_OLD_PACKET_TYPE) { ptr += sizeof(pcapng_opkt_t); }
-	else if (section_type == PCAPNG_NAME_RESOLUTION_TYPE) { ptr += sizeof(pcapng_epkt_t); }
-	else if (section_type == PCAPNG_INTERFACE_STATS_TYPE) { ptr += sizeof(pcapng_stats_t); }
-	else if (section_type == PCAPNG_ENHANCED_PACKET_TYPE) {
-		/* jump over the the enchanced packet header and data to the options */
-		pcapng_epkt_t *epkthdr = (pcapng_epkt_t *)ptr;
-		uint32_t seclen;
-		if (DATA(packet->trace)->byteswapped) {
-			seclen = byteswap32(epkthdr->caplen);
-		} else {
-			seclen = epkthdr->caplen;
-		}
-		if ((seclen % 4) != 0) {
-                        ptr += seclen + (4 -(seclen % 4)) + sizeof(pcapng_secrets_t);
-                } else {
-                        ptr += seclen + sizeof(pcapng_secrets_t);
-                }
-	}
-	else if (section_type == PCAPNG_DECRYPTION_SECRETS_TYPE) {
-		/* jump over the decryption secrets header and data to the options */
-		pcapng_secrets_t *sechdr = (pcapng_secrets_t *)ptr;
-		uint32_t seclen;
-		if (DATA(packet->trace)->byteswapped) {
-			seclen = byteswap32(sechdr->secrets_len);
-		} else {
-			seclen = sechdr->secrets_len;
-		}
-		if ((seclen % 4) != 0) {
-			ptr += seclen + (4 -(seclen % 4)) + sizeof(pcapng_secrets_t);
-		} else {
-			ptr += seclen + sizeof(pcapng_secrets_t);
-		}
-	}
-	else { return NULL; }
 
 	/* update remaining to account for header and any payload */
 	remaining -= ptr - packet->buffer;
@@ -2171,43 +2279,53 @@ void *pcapng_get_meta_data(libtrace_packet_t *packet, uint32_t section_type,
 	struct pcapng_optheader *opthdr = ptr;
 	if (DATA(packet->trace)->byteswapped) {
 		optcode = byteswap16(opthdr->optcode);
+		len  = byteswap16(opthdr->optlen);
 	} else {
 		optcode = opthdr->optcode;
+		len = opthdr->optlen;
 	}
-	while ((optcode != section) && (optcode != PCAPNG_OPTION_END) &&
-		(remaining > 0)) {
 
-		uint16_t len;
-
-		if (DATA(packet->trace)->byteswapped) {
-			len = byteswap16(opthdr->optlen);
-		} else {
-			len = opthdr->optlen;
-		}
+	/* Iterate over the options till we reach the end of the options or we find
+	 * the option we want */
+	while ((optcode != option) && (optcode != PCAPNG_OPTION_END) &&
+		(remaining > sizeof(struct pcapng_optheader))) {
 
 		/* work out any padding */
 		if ((len % 4) != 0) {
-			ptr += len + (4 - (len % 4)) + sizeof(struct pcapng_optheader);
+			tmp = len + (4 - (len % 4)) + sizeof(struct pcapng_optheader);
 		} else {
-			ptr += len + sizeof(struct pcapng_optheader);
+			tmp = len + sizeof(struct pcapng_optheader);
 		}
+		ptr += tmp;
+		remaining -= tmp;
 
 		/* get the next option */
 		opthdr = (struct pcapng_optheader *)ptr;
 		if (DATA(packet->trace)->byteswapped) {
 			optcode = byteswap16(opthdr->optcode);
+			len = byteswap16(opthdr->optlen);
 		} else {
 			optcode = opthdr->optcode;
+			len = opthdr->optlen;
 		}
-
-		/* update remaining */
-		remaining -= (ptr-packet->buffer);
-
 	}
 
 	/* either a option was found or they ran out */
-	if (opthdr->optcode == section) {
-		return ptr;
+	if (opthdr->optcode == option) {
+
+		libtrace_meta_t *result = malloc(sizeof(libtrace_meta_t));
+		result->section = section;
+		result->num = 1;
+
+		result->items = malloc(sizeof(libtrace_meta_item_t));
+		result->items->option = option;
+		result->items->len = len;
+		result->items->data_type = 0;
+		result->items->data = calloc(1, len);
+
+		memcpy(result->items->data, ptr+sizeof(struct pcapng_optheader), len);
+
+		return (void *)result;
 	} else {
 		return NULL;
 	}
@@ -2250,7 +2368,8 @@ static struct libtrace_format_t pcapng = {
         NULL,                           /* get_timeval */
         pcapng_get_timespec,            /* get_timespec */
         NULL,                           /* get_seconds */
-	pcapng_get_meta_data,           /* get_meta_data */
+	pcapng_get_meta_section,        /* get_meta_section */
+        pcapng_get_meta_section_option, /* get_meta_section_option */
         NULL,                           /* seek_erf */
         NULL,                           /* seek_timeval */
         NULL,                           /* seek_seconds */

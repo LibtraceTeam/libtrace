@@ -913,14 +913,106 @@ static void erf_get_statistics(libtrace_t *trace, libtrace_stat_t *stat) {
         }
 }
 
+/* An ERF provenance packet can contain multiple sections of the same type per packet,
+ * Need to think of a way to handle this currently the first found is returned*/
+void *erf_get_meta_section(libtrace_packet_t *packet, uint32_t section) {
+
+	void *ptr;
+	dag_record_t *hdr;
+	dag_sec_t *sec;
+	uint16_t tmp;
+	uint16_t remaining;
+	uint16_t curr_sec = 0;
+	int in_section = 0;
+
+	if (packet->buffer == NULL) { return NULL; }
+
+	hdr = (dag_record_t *)packet->buffer;
+	ptr = packet->payload;
+
+	/* ensure this packet is a meta packet */
+	if ((hdr->type & 127) != 27) { return NULL; }
+	/* set remaining to size of packet minus header length */
+	remaining = ntohs(hdr->rlen) - 24;
+
+	/* setup structure to hold the result */
+        libtrace_meta_t *result = malloc(sizeof(libtrace_meta_t));
+        result->section = section;
+        result->num = 0;
+
+	while (remaining > sizeof(dag_sec_t) && curr_sec != 0xFFFF) {
+
+		/* Get the current section/option header */
+		sec = (dag_sec_t *)ptr;
+
+		if (ntohs(sec->type) == ERF_PROV_SECTION_CAPTURE
+                        || ntohs(sec->type) == ERF_PROV_SECTION_HOST
+                        || ntohs(sec->type) == ERF_PROV_SECTION_MODULE
+                        || ntohs(sec->type) == ERF_PROV_SECTION_INTERFACE) {
+
+                        if (in_section == 0) {
+				curr_sec = ntohs(sec->type);
+			} else {
+				/* Used to indicate section end */
+				curr_sec = 0xFFFF;
+			}
+                }
+
+		/* If the current section the requested one and this is not
+		 * a section header */
+		if (section == curr_sec &&
+			ntohs(sec->type) != ERF_PROV_SECTION_CAPTURE
+                        && ntohs(sec->type) != ERF_PROV_SECTION_HOST
+                        && ntohs(sec->type) != ERF_PROV_SECTION_MODULE
+                        && ntohs(sec->type) != ERF_PROV_SECTION_INTERFACE) {
+
+			/* Indicate a section has been found */
+			in_section = 1;
+
+			result->num += 1;
+                        if (result->num == 1) {
+                                result->items = malloc(sizeof(libtrace_meta_item_t));
+                        } else {
+                                result->items = realloc(result->items,
+                                        result->num*sizeof(libtrace_meta_item_t));
+                        }
+                        result->items[result->num-1].option = ntohs(sec->type);
+                        result->items[result->num-1].len = ntohs(sec->len);
+                        result->items[result->num-1].data_type = 0;
+                        result->items[result->num-1].data = malloc(ntohs(sec->len));
+                        memcpy(result->items[result->num-1].data,
+                                ptr+sizeof(struct dag_opthdr), ntohs(sec->len));
+
+                }
+
+		/* Update remaining and ptr. Also account for any padding */
+                if ((ntohs(sec->len) % 4) != 0) {
+                        tmp = ntohs(sec->len) + (4 - (ntohs(sec->len) % 4)) + sizeof(dag_sec_t);
+                } else {
+                        tmp = ntohs(sec->len) + sizeof(dag_sec_t);
+                }
+                remaining -= tmp;
+                ptr += tmp;
+	}
+
+	/* If the result structure has result matches were found */
+        if (result->num > 0) {
+                return (void *)result;
+        } else {
+                free(result);
+                return NULL;
+        }
+}
+
 /* Returns a pointer to the beginning of the section or NULL if not found */
-void *erf_get_meta_data(libtrace_packet_t *packet, uint32_t section_type, uint16_t section) {
+void *erf_get_meta_section_option(libtrace_packet_t *packet, uint32_t section, uint16_t option) {
 
 	uint32_t remaining;
 	void *bodyptr;
 	dag_sec_t *sec;
 	dag_record_t *hdr;
 	uint16_t curr_sec;
+	uint16_t tmp;
 
 	if (packet->buffer == NULL) { return NULL; }
 
@@ -933,11 +1025,15 @@ void *erf_get_meta_data(libtrace_packet_t *packet, uint32_t section_type, uint16
 	/* the type only uses bits 0-6 */
 	if ((hdr->type & 127) != 27) { return NULL; }
 
-	sec = (dag_sec_t *)bodyptr;
-	/* loop till we find the correct section within the correct section type
-	 * and enough payload is remaining */
-	while (((ntohs(sec->type) != section) || (section_type != curr_sec))
-		&& (remaining > sizeof(dag_sec_t))) {
+	/* setup structure to hold the result */
+	libtrace_meta_t *result = malloc(sizeof(libtrace_meta_t));
+	result->section = section;
+	result->num = 0;
+
+	/* loop over the entire packet */
+	while (remaining > sizeof(dag_sec_t)) {
+
+		sec = (dag_sec_t *)bodyptr;
 
 		if (ntohs(sec->type) == ERF_PROV_SECTION_CAPTURE
 			|| ntohs(sec->type) == ERF_PROV_SECTION_HOST
@@ -947,23 +1043,43 @@ void *erf_get_meta_data(libtrace_packet_t *packet, uint32_t section_type, uint16
 			curr_sec = ntohs(sec->type);
 		}
 
-		/* jump over any padding (padded to 32bits/4bytes) */
-		if ((ntohs(sec->len) % 4) != 0) {
-			remaining -= ntohs(sec->len) + (4 - (ntohs(sec->len) % 4));
-			bodyptr += ntohs(sec->len) + (4 - (ntohs(sec->len) % 4));
-		} else {
-			remaining -= ntohs(sec->len);
-			bodyptr += ntohs(sec->len);
-		}
-		remaining -= sizeof(dag_sec_t);
-		bodyptr += sizeof(dag_sec_t);
+		/* if this section and option is one we want */
+		if (curr_sec == section && ntohs(sec->type) == option) {
 
-		sec = (dag_sec_t *)bodyptr;
+			result->num += 1;
+
+			if (result->num == 1) {
+				result->items = malloc(sizeof(libtrace_meta_item_t));
+			} else {
+				result->items = realloc(result->items,
+					result->num*sizeof(libtrace_meta_item_t));
+			}
+
+			result->items[result->num-1].option = ntohs(sec->type);
+			result->items[result->num-1].len = ntohs(sec->len);
+			result->items[result->num-1].data_type = 0;
+			result->items[result->num-1].data = calloc(1, ntohs(sec->len));
+
+			memcpy(result->items[result->num-1].data,
+				bodyptr+sizeof(struct dag_opthdr), ntohs(sec->len));
+
+		}
+
+		/* Update remaining and bodyptr and account for any padding */
+		if ((ntohs(sec->len) % 4) != 0) {
+                        tmp = ntohs(sec->len) + (4 - (ntohs(sec->len) % 4)) + sizeof(dag_sec_t);
+                } else {
+                        tmp = ntohs(sec->len) + sizeof(dag_sec_t);
+		}
+                remaining -= tmp;
+                bodyptr += tmp;
 	}
-	/* if found return pointer to the beginning of the section */
-	if (ntohs(sec->type) == section && curr_sec == section_type) {
-		return (void *)bodyptr;
+
+	/* If the result structure has result matches were found */
+	if (result->num > 0) {
+		return (void *)result;
 	} else {
+		free(result);
 		return NULL;
 	}
 }
@@ -995,7 +1111,7 @@ static struct libtrace_format_t erfformat = {
 	TRACE_FORMAT_ERF,
 	NULL,				/* probe filename */
 	erf_probe_magic,		/* probe magic */
-	erf_init_input,			/* init_input */	
+	erf_init_input,			/* init_input */
 	erf_config_input,		/* config_input */
 	erf_start_input,		/* start_input */
 	NULL,				/* pause_input */
@@ -1016,7 +1132,8 @@ static struct libtrace_format_t erfformat = {
 	NULL,				/* get_timeval */
 	NULL,				/* get_timespec */
 	NULL,				/* get_seconds */
-	erf_get_meta_data,		/* get_meta_data */
+	erf_get_meta_section,           /* get_meta_section */
+        erf_get_meta_section_option,    /* get_meta_section_option */
 	erf_seek_erf,			/* seek_erf */
 	NULL,				/* seek_timeval */
 	NULL,				/* seek_seconds */
@@ -1041,7 +1158,7 @@ static struct libtrace_format_t rawerfformat = {
 	TRACE_FORMAT_RAWERF,
 	NULL,				/* probe filename */
 	NULL,		/* probe magic */
-	erf_init_input,			/* init_input */	
+	erf_init_input,			/* init_input */
 	erf_config_input,		/* config_input */
 	rawerf_start_input,		/* start_input */
 	NULL,				/* pause_input */
@@ -1062,7 +1179,8 @@ static struct libtrace_format_t rawerfformat = {
 	NULL,				/* get_timeval */
 	NULL,				/* get_timespec */
 	NULL,				/* get_seconds */
-	erf_get_meta_data,		/* get_meta_data */
+	erf_get_meta_section,		/* get_meta_section */
+	erf_get_meta_section_option,	/* get_meta_section_option */
 	erf_seek_erf,			/* seek_erf */
 	NULL,				/* seek_timeval */
 	NULL,				/* seek_seconds */

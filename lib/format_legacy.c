@@ -535,7 +535,8 @@ static struct libtrace_format_t legacyatm = {
 	NULL,				/* get_timeval */
 	NULL,				/* get_timespec */
 	NULL,				/* get_seconds */
-	NULL,                           /* get_meta_data */
+	NULL,                           /* get_meta_section */
+        NULL,                           /* get_meta_section_item */
 	NULL,				/* seek_erf */
 	NULL,				/* seek_timeval */
 	NULL,				/* seek_seconds */
@@ -581,7 +582,8 @@ static struct libtrace_format_t legacyeth = {
 	NULL,				/* get_timeval */
 	NULL,				/* get_timespec */
 	NULL,				/* get_seconds */
-	NULL,                           /* get_meta_data */
+	NULL,                           /* get_meta_section */
+        NULL,                           /* get_meta_section_item */
 	NULL,				/* seek_erf */
 	NULL,				/* seek_timeval */
 	NULL,				/* seek_seconds */
@@ -627,7 +629,8 @@ static struct libtrace_format_t legacypos = {
 	NULL,				/* get_timeval */
 	NULL,				/* get_timespec */
 	NULL,				/* get_seconds */
-	NULL,                           /* get_meta_data */
+	NULL,                           /* get_meta_section */
+        NULL,                           /* get_meta_section_item */
 	NULL,				/* seek_erf */
 	NULL,				/* seek_timeval */
 	NULL,				/* seek_seconds */
@@ -673,7 +676,8 @@ static struct libtrace_format_t legacynzix = {
 	legacynzix_get_timeval,		/* get_timeval */
 	NULL,				/* get_timespec */
 	NULL,				/* get_seconds */
-	NULL,                           /* get_meta_data */
+	NULL,                           /* get_meta_section */
+        NULL,                           /* get_meta_section_item */
 	NULL,				/* seek_erf */
 	NULL,				/* seek_timeval */
 	NULL,				/* seek_seconds */
