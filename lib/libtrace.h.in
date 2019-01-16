@@ -1411,6 +1411,9 @@ typedef enum {
         /** Always assume ERF framing length is the given value, rather than
          *  trying to calculate it from the packet type. */
         TRACE_OPTION_CONSTANT_ERF_FRAMING,
+
+	/** If enabled all meta packet will be discarded */
+	TRACE_OPTION_DISCARD_META,
 } trace_option_t;
 
 /** Sets an input config option

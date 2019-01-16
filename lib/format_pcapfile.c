@@ -286,6 +286,8 @@ static int pcapfile_config_input(libtrace_t *libtrace,
 			/* All these are either unsupported or handled
 			 * by trace_config */
 			break;
+		case TRACE_OPTION_DISCARD_META:
+			break;
 	}
 	
 	trace_set_err(libtrace,TRACE_ERR_UNKNOWN_OPTION,

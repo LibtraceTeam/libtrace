@@ -87,6 +87,8 @@ struct erf_format_data_t {
 	/* Number of packets that were dropped during the capture */
 	uint64_t drops;
 
+	bool discard_meta;
+
 	/* Config options for the input trace */
 	struct {
 		/* Flag indicating whether the event API should replicate the
@@ -257,6 +259,8 @@ static int erf_init_input(libtrace_t *libtrace) {
 	IN_OPTIONS.real_time = 0;
 	DATA(libtrace)->drops = 0;
 
+	DATA(libtrace)->discard_meta = 0;
+
 	return 0; /* success */
 }
 
@@ -278,6 +282,13 @@ static int erf_config_input(libtrace_t *libtrace, trace_option_t option,
 			trace_set_err(libtrace, TRACE_ERR_OPTION_UNAVAIL,
 					"Unsupported option");
 			return -1;
+		case TRACE_OPTION_DISCARD_META:
+			if (*(int *)value > 0) {
+				DATA(libtrace)->discard_meta = true;
+			} else {
+				DATA(libtrace)->discard_meta = false;
+			}
+			return 0;
 		default:
 			/* Unknown option */
 			trace_set_err(libtrace,TRACE_ERR_UNKNOWN_OPTION,
@@ -537,83 +548,95 @@ static int erf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	unsigned int rlen;
 	uint32_t flags = 0;
 	libtrace_rt_types_t linktype;
-	
+	int gotpacket = 0;
+
 	if (!packet->buffer || packet->buf_control == TRACE_CTRL_EXTERNAL) {
 		packet->buffer = malloc((size_t)LIBTRACE_PACKET_BUFSIZE);
 		if (!packet->buffer) {
-			trace_set_err(libtrace, errno, 
-					"Cannot allocate memory");
+			trace_set_err(libtrace, errno, "Cannot allocate memory");
 			return -1;
 		}
 	}
 
-	flags |= TRACE_PREP_OWN_BUFFER;	
-	
-	if ((numbytes=wandio_read(libtrace->io,
-					packet->buffer,
-					(size_t)dag_record_size)) == -1) {
-		trace_set_err(libtrace,errno,"reading ERF file");
-		return -1;
-	}
-	/* EOF */
-	if (numbytes == 0) {
-		return 0;
-	}
+	flags |= TRACE_PREP_OWN_BUFFER;
 
-        if (numbytes < (int)dag_record_size) {
-                trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Incomplete ERF header");
-                return -1;
-        }
+	while (!gotpacket) {
 
-	rlen = ntohs(((dag_record_t *)packet->buffer)->rlen);
-	buffer2 = (char*)packet->buffer + dag_record_size;
-	size = rlen - dag_record_size;
+		if ((numbytes=wandio_read(libtrace->io, packet->buffer,
+			(size_t)dag_record_size)) == -1) {
 
-	if (size >= LIBTRACE_PACKET_BUFSIZE) {
-		trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, 
+			trace_set_err(libtrace,errno,"reading ERF file");
+			return -1;
+		}
+
+		/* EOF */
+		if (numbytes == 0) {
+			return 0;
+		}
+
+        	if (numbytes < (int)dag_record_size) {
+               		trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Incomplete ERF header");
+                	return -1;
+        	}
+
+		rlen = ntohs(((dag_record_t *)packet->buffer)->rlen);
+		buffer2 = (char*)packet->buffer + dag_record_size;
+		size = rlen - dag_record_size;
+
+		if (size >= LIBTRACE_PACKET_BUFSIZE) {
+			trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, 
 				"Packet size %u larger than supported by libtrace - packet is probably corrupt", 
 				size);
-		return -1;
-	}
-
-	/* Unknown/corrupt */
-	if ((((dag_record_t *)packet->buffer)->type & 0x7f) > ERF_TYPE_MAX) {
-		trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, 
-				"Corrupt or Unknown ERF type");
-		return -1;
-	}
-	
-	/* read in the rest of the packet */
-	if ((numbytes=wandio_read(libtrace->io,
-					buffer2,
-					(size_t)size)) != (int)size) {
-		if (numbytes==-1) {
-			trace_set_err(libtrace,errno, "read(%s)", 
-					libtrace->uridata);
 			return -1;
 		}
-		trace_set_err(libtrace,EIO,
-				"Truncated packet (wanted %d, got %d)", 
-				size, numbytes);
-		/* Failed to read the full packet?  must be EOF */
-		return -1;
+
+		/* Unknown/corrupt */
+		if ((((dag_record_t *)packet->buffer)->type & 0x7f) > ERF_TYPE_MAX) {
+			trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, 
+				"Corrupt or Unknown ERF type");
+			return -1;
+		}
+
+		/* read in the rest of the packet */
+		if ((numbytes=wandio_read(libtrace->io, buffer2,
+			(size_t)size)) != (int)size) {
+
+			if (numbytes==-1) {
+				trace_set_err(libtrace,errno, "read(%s)", 
+					libtrace->uridata);
+				return -1;
+			}
+
+			trace_set_err(libtrace,EIO,
+				"Truncated packet (wanted %d, got %d)", size, numbytes);
+
+			/* Failed to read the full packet?  must be EOF */
+			return -1;
+		}
+
+        	if (numbytes < (int)size) {
+                	trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Incomplete ERF record");
+                	return -1;
+        	}
+
+		/* If a provenance packet make sure correct rt linktype is set.
+	 	 * Only bits 0-6 are used for the type */
+		if ((((dag_record_t *)packet->buffer)->type & 127) == ERF_META_TYPE) {
+			linktype = TRACE_RT_ERF_META;
+		} else { linktype = TRACE_RT_DATA_ERF; }
+
+		/* If this is a meta packet and TRACE_OPTION_DISCARD_META is set
+		 * ignore this packet and get another */
+		if ((linktype == TRACE_RT_ERF_META && !DATA(libtrace)->discard_meta) ||
+			linktype == TRACE_RT_DATA_ERF) {
+			gotpacket = 1;
+
+			if (erf_prepare_packet(libtrace, packet, packet->buffer, linktype, flags)) {
+				return -1;
+			}
+		}
 	}
 
-        if (numbytes < (int)size) {
-                trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Incomplete ERF record");
-                return -1;
-        }
-
-	/* If a provenance packet make sure correct rt linktype is set.
-	 * Only bits 0-6 are used for the type */
-	if ((((dag_record_t *)packet->buffer)->type & 127) == ERF_META_TYPE) {
-		linktype = TRACE_RT_ERF_META;
-	} else { linktype = TRACE_RT_DATA_ERF; }
-
-	if (erf_prepare_packet(libtrace, packet, packet->buffer, 
-				linktype, flags))
-		return -1;
-	
 	return rlen;
 }
 

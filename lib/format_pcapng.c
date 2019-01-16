@@ -135,6 +135,7 @@ struct pcapng_interface_t {
 struct pcapng_format_data_t {
         bool started;
         bool realtime;
+	bool discard_meta;
 
         /* Section data */
         bool byteswapped;
@@ -654,6 +655,7 @@ static int pcapng_init_input(libtrace_t *libtrace) {
 
         DATA(libtrace)->started = false;
         DATA(libtrace)->realtime = false;
+	DATA(libtrace)->discard_meta = false;
         DATA(libtrace)->byteswapped = true;
         DATA(libtrace)->interfaces = (pcapng_interface_t **)calloc(10, \
                         sizeof(pcapng_interface_t));
@@ -714,6 +716,13 @@ static int pcapng_config_input(libtrace_t *libtrace, trace_option_t option,
                 case TRACE_OPTION_REPLAY_SPEEDUP:
                 case TRACE_OPTION_CONSTANT_ERF_FRAMING:
                         break;
+		case TRACE_OPTION_DISCARD_META:
+                        if (*(int *)data > 0) {
+                                DATA(libtrace)->discard_meta = true;
+                        } else {
+                                DATA(libtrace)->discard_meta = false;
+                        }
+			return 0;
         }
 
         trace_set_err(libtrace, TRACE_ERR_UNKNOWN_OPTION, "Unknown option %i",
@@ -1715,12 +1724,17 @@ static int pcapng_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
                 switch (btype) {
                         /* Section Header */
                         case PCAPNG_SECTION_TYPE:
-                                err = pcapng_read_section(libtrace, packet, flags);
-                                gotpacket = 1;
+				/* Section header is required to make pcapng valid
+				 * so we cannot exclude when option discard_meta is set */
+                               	err = pcapng_read_section(libtrace, packet, flags);
+                               	gotpacket = 1;
+
                                 break;
 
                         /* Interface Header */
                         case PCAPNG_INTERFACE_TYPE:
+				/* Section interface is required to make pcapng valid
+                                 * so we cannot exclude when option discard_meta is set */
                                 err = pcapng_read_interface(libtrace, packet, to_read, flags);
                                 gotpacket = 1;
                                 break;
@@ -1738,19 +1752,28 @@ static int pcapng_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
                                 break;
 
                         case PCAPNG_INTERFACE_STATS_TYPE:
-                                err = pcapng_read_stats(libtrace, packet, to_read, flags);
-                                gotpacket = 1;
+				/* If discard_meta is set ignore this packet type */
+				if (!DATA(libtrace)->discard_meta) {
+                                	err = pcapng_read_stats(libtrace, packet, to_read, flags);
+                                	gotpacket = 1;
+				}
                                 break;
 
                         case PCAPNG_NAME_RESOLUTION_TYPE:
-                                err = pcapng_read_nrb(libtrace, packet, to_read, flags);
-                                gotpacket = 1;
+				/* If discard meta is set ignore this packet type */
+				if (!DATA(libtrace)->discard_meta) {
+                                	err = pcapng_read_nrb(libtrace, packet, to_read, flags);
+                                	gotpacket = 1;
+				}
                                 break;
 
                         case PCAPNG_CUSTOM_TYPE:
                         case PCAPNG_CUSTOM_NONCOPY_TYPE:
-                                err = pcapng_read_custom(libtrace, packet, to_read, flags);
-                                gotpacket = 1;
+				/* If discard meta is set ignore this packet type */
+				if (!DATA(libtrace)->discard_meta) {
+                                	err = pcapng_read_custom(libtrace, packet, to_read, flags);
+                                	gotpacket = 1;
+				}
                                 break;
 
 
