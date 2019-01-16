@@ -24,7 +24,7 @@ do
                         continue
                 fi
 
-                curl -T built-packages/ubuntu_$i/${comp}_${VERSION}-${PKGVERSION}_${ARCH}.deb -usalcock:$APIKEY "https://api.bintray.com/content/wand/debian/$comp/$VERSION/pool/$i/main/lib${comp:3:1}/${comp}_${VERSION}-${PKGVERSION}_${ARCH}.deb;deb_distribution=$i;deb_component=main;deb_architecture=$ARCH"
+                curl -T built-packages/ubuntu_$i/${comp}_${VERSION}-${PKGVERSION}_${ARCH}.deb -usalcock:$APIKEY "https://api.bintray.com/content/wand/libtrace/$comp/$VERSION/pool/$i/main/${comp}_${VERSION}-${PKGVERSION}_${ARCH}.deb;deb_distribution=$i;deb_component=main;deb_architecture=$ARCH"
         done
 done
 
@@ -36,6 +36,6 @@ do
                         continue
                 fi
 
-                curl -T built-packages/debian_$i/${comp}_${VERSION}-${PKGVERSION}_${ARCH}.deb -usalcock:$APIKEY "https://api.bintray.com/content/wand/debian/$comp/$VERSION/pool/$i/main/lib${comp:3:1}/${comp}_${VERSION}-${PKGVERSION}_${ARCH}.deb;deb_distribution=$i;deb_component=main;deb_architecture=$ARCH"
+                curl -T built-packages/debian_$i/${comp}_${VERSION}-${PKGVERSION}_${ARCH}.deb -usalcock:$APIKEY "https://api.bintray.com/content/wand/libtrace/$comp/$VERSION/pool/$i/main/${comp}_${VERSION}-${PKGVERSION}_${ARCH}.deb;deb_distribution=$i;deb_component=main;deb_architecture=$ARCH"
         done
 done
