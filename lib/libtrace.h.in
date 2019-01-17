@@ -3731,27 +3731,76 @@ DLLEXPORT bool trace_get_wireless_antenna(void *linkptr,
 
 /*@}*/
 
+
+
+DLLEXPORT int trace_destroy_meta(libtrace_meta_t *result);
+
+DLLEXPORT libtrace_meta_t *trace_get_interface_name_meta(libtrace_packet_t *packet);
+
+DLLEXPORT char *trace_get_interface_name(libtrace_packet_t *packet, char *space, int spacelen,
+	int index);
+
+DLLEXPORT libtrace_meta_t *trace_get_interface_mac_meta(libtrace_packet_t *packet);
+
+DLLEXPORT char *trace_get_interface_mac(libtrace_packet_t *packet, char *space, int spacelen,
+        int index);
+
+DLLEXPORT libtrace_meta_t *trace_get_interface_speed_meta(libtrace_packet_t *packet);
+
+DLLEXPORT uint64_t trace_get_interface_speed(libtrace_packet_t *packet, int index);
+
+
+DLLEXPORT libtrace_meta_t *trace_get_interface_ipv4_meta(libtrace_packet_t *packet);
+
+DLLEXPORT uint32_t trace_get_interface_ipv4(libtrace_packet_t *packet, int index);
+
+DLLEXPORT char *trace_get_interface_ipv4_string(libtrace_packet_t *packet, char *space, int spacelen,
+	int index);
+
+DLLEXPORT libtrace_meta_t *trace_get_interface_ipv6_meta(libtrace_packet_t *packet);
+
+DLLEXPORT void *trace_get_interface_ipv6(libtrace_packet_t *packet, void *space, int spacelen,
+	int index);
+
+DLLEXPORT char *trace_get_interface_ipv6_string(libtrace_packet_t *packet, char *space, int spacelen,
+	int index);
+
+DLLEXPORT libtrace_meta_t *trace_get_interface_description_meta(libtrace_packet_t *packet);
+
+DLLEXPORT char *trace_get_interface_description(libtrace_packet_t *packet, char *space, int spacelen,
+
+	int index);
+
+DLLEXPORT libtrace_meta_t *trace_get_host_os_meta(libtrace_packet_t *packet);
+
+DLLEXPORT char *trace_get_host_os(libtrace_packet_t *packet, char *space, int spacelen);
+
+DLLEXPORT libtrace_meta_t *trace_get_interface_fcslen_meta(libtrace_packet_t *packet);
+
+DLLEXPORT uint32_t trace_get_interface_fcslen(libtrace_packet_t *packet, int index);
+
+DLLEXPORT libtrace_meta_t *trace_get_interface_hardware_description_meta(libtrace_packet_t *packet);
+
+DLLEXPORT char *trace_get_interface_hardware_description(libtrace_packet_t *packet, char *space,
+	int spacelen);
+
+DLLEXPORT libtrace_meta_t *trace_get_interface_comment_meta(libtrace_packet_t *packet);
+
+DLLEXPORT char *trace_get_interface_comment(libtrace_packet_t *packet, char *space, int spacelen,
+	int index);
+
+DLLEXPORT libtrace_meta_t *trace_get_capture_application_meta(libtrace_packet_t *packet);
+
+DLLEXPORT char *trace_get_capture_application(libtrace_packet_t *packet, char *space, int spacelen);
+
+DLLEXPORT libtrace_meta_t *trace_get_section_option(libtrace_packet_t *packet, uint32_t section_code,
+        uint16_t option_code);
+
+DLLEXPORT libtrace_meta_t *trace_get_section(libtrace_packet_t *packet, uint32_t section_code);
+
+
 #ifdef __cplusplus
 } /* extern "C" */
 #endif /* #ifdef __cplusplus */
-
-int trace_destroy_meta(libtrace_meta_t *result);
-libtrace_meta_t *trace_get_interface_name(libtrace_packet_t *packet);
-libtrace_meta_t *trace_get_interface_mac(libtrace_packet_t *packet);
-libtrace_meta_t *trace_get_interface_speed(libtrace_packet_t *packet);
-libtrace_meta_t *trace_get_interface_ip4(libtrace_packet_t *packet);
-libtrace_meta_t *trace_get_interface_ipv4(libtrace_packet_t *packet);
-libtrace_meta_t *trace_get_interface_ip6(libtrace_packet_t *packet);
-libtrace_meta_t *trace_get_interface_ipv6(libtrace_packet_t *packet);
-libtrace_meta_t *trace_get_interface_description(libtrace_packet_t *packet);
-libtrace_meta_t *trace_get_interface_num(libtrace_packet_t *packet);
-libtrace_meta_t *trace_get_host_os(libtrace_packet_t *packet);
-libtrace_meta_t *trace_get_interface_frame_check_sequence_length(libtrace_packet_t *packet);
-libtrace_meta_t *trace_get_interface_hardware_description(libtrace_packet_t *packet);
-libtrace_meta_t *trace_get_interface_comment(libtrace_packet_t *packet);
-libtrace_meta_t *trace_get_capture_application(libtrace_packet_t *packet);
-libtrace_meta_t *trace_get_section_option(libtrace_packet_t *packet, uint32_t section_code,
-        uint16_t option_code);
-libtrace_meta_t *trace_get_section(libtrace_packet_t *packet, uint32_t section_code);
 
 #endif /* LIBTRACE_H_ */

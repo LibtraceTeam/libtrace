@@ -2341,10 +2341,10 @@ void *pcapng_get_meta_section_option(libtrace_packet_t *packet, uint32_t section
 		result->num = 1;
 
 		result->items = malloc(sizeof(libtrace_meta_item_t));
-		result->items->option = option;
-		result->items->len = len;
-		result->items->data_type = 0;
-		result->items->data = calloc(1, len);
+		result->items[result->num-1].option = option;
+		result->items[result->num-1].len = len;
+		result->items[result->num-1].data_type = 0;
+		result->items[result->num-1].data = calloc(1, len);
 
 		memcpy(result->items->data, ptr+sizeof(struct pcapng_optheader), len);
 

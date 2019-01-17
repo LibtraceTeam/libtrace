@@ -724,9 +724,9 @@ struct libtrace_format_t {
 	
 	/**
 	 */
-	void *(*get_meta_section)(libtrace_packet_t *packet, uint32_t section_type);
-	void *(*get_meta_section_item)(libtrace_packet_t *packet, uint32_t section_type,
-                uint16_t section);
+	void *(*get_meta_section)(libtrace_packet_t *packet, uint32_t section);
+	void *(*get_meta_section_option)(libtrace_packet_t *packet, uint32_t section,
+                uint16_t option);
 
 	/** Moves the read pointer to a certain ERF timestamp within an input 
 	 * trace file.
