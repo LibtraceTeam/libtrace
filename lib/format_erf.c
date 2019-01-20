@@ -1001,7 +1001,7 @@ void *erf_get_meta_section(libtrace_packet_t *packet, uint32_t section) {
                         }
                         result->items[result->num-1].option = ntohs(sec->type);
                         result->items[result->num-1].len = ntohs(sec->len);
-                        result->items[result->num-1].data_type = 0;
+                        result->items[result->num-1].datatype = TRACE_META_UNKNOWN;
                         result->items[result->num-1].data = malloc(ntohs(sec->len));
                         memcpy(result->items[result->num-1].data,
                                 ptr+sizeof(struct dag_opthdr), ntohs(sec->len));
@@ -1080,7 +1080,7 @@ void *erf_get_meta_section_option(libtrace_packet_t *packet, uint32_t section, u
 
 			result->items[result->num-1].option = ntohs(sec->type);
 			result->items[result->num-1].len = ntohs(sec->len);
-			result->items[result->num-1].data_type = 0;
+			result->items[result->num-1].datatype = TRACE_META_UNKNOWN;
 			result->items[result->num-1].data = calloc(1, ntohs(sec->len));
 
 			memcpy(result->items[result->num-1].data,

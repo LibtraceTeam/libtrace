@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
+#include <endian.h>
 
 /* Internal Meta functions */
 static int trace_meta_check_input(libtrace_packet_t *packet, char *input_func) {
@@ -19,6 +19,16 @@ static int trace_meta_check_input(libtrace_packet_t *packet, char *input_func) {
                 return -1;
         }
 	return 1;
+}
+
+static libtrace_meta_t *trace_meta_set_datatype(libtrace_meta_t *r, meta_datatype_t dt) {
+	if (r == NULL) { return NULL; }
+
+	int i;
+	for (i=0; i<r->num; i++) {
+		r->items[i].datatype = dt;
+	}
+	return r;
 }
 
 /* API functions to retrieve interface related packet data */
@@ -59,17 +69,19 @@ libtrace_meta_t *trace_get_interface_name_meta(libtrace_packet_t *packet) {
 		return NULL;
 	}
 
+	libtrace_meta_t *r = NULL;
+
 	/* get the result */
 	if (packet->trace->format->type == TRACE_FORMAT_ERF) {
-		return packet->trace->format->get_meta_section_option(packet,
+		r = packet->trace->format->get_meta_section_option(packet,
 			ERF_PROV_SECTION_INTERFACE, ERF_PROV_NAME);
 	}
 	if (packet->trace->format->type == TRACE_FORMAT_PCAPNG) {
-		return packet->trace->format->get_meta_section_option(packet,
+		r = packet->trace->format->get_meta_section_option(packet,
 			PCAPNG_INTERFACE_TYPE, PCAPNG_META_IF_NAME);
 	}
 
-	return NULL;
+	return trace_meta_set_datatype(r, TRACE_META_STRING);
 }
 /* Get the interface name for a meta packet.
  * Note: ERF packets can contain multiple interfaces per meta packet. Use index to
@@ -111,16 +123,18 @@ libtrace_meta_t *trace_get_interface_mac_meta(libtrace_packet_t *packet) {
                 return NULL;
         }
 
+	libtrace_meta_t *r = NULL;
+
 	if (packet->trace->format->type == TRACE_FORMAT_ERF) {
-		return packet->trace->format->get_meta_section_option(packet,
+		r = packet->trace->format->get_meta_section_option(packet,
 			ERF_PROV_SECTION_INTERFACE, ERF_PROV_IF_MAC);
 	}
 	if (packet->trace->format->type == TRACE_FORMAT_PCAPNG) {
-		return packet->trace->format->get_meta_section_option(packet,
+		r = packet->trace->format->get_meta_section_option(packet,
 			PCAPNG_INTERFACE_TYPE, PCAPNG_META_IF_MAC);
 	}
 
-	return NULL;
+	return trace_meta_set_datatype(r, TRACE_META_STRING);
 }
 /* Get the interface MAC address for a meta packet.
  * Note: ERF packets can contain multiple interfaces per meta packet. Use index to
@@ -159,16 +173,27 @@ libtrace_meta_t *trace_get_interface_speed_meta(libtrace_packet_t *packet) {
                 return NULL;
         }
 
+	libtrace_meta_t *r = NULL;
+
 	if (packet->trace->format->type == TRACE_FORMAT_ERF) {
-		return packet->trace->format->get_meta_section_option(packet,
+		r = packet->trace->format->get_meta_section_option(packet,
                 	ERF_PROV_SECTION_INTERFACE, ERF_PROV_IF_SPEED);
 	}
 	if (packet->trace->format->type == TRACE_FORMAT_PCAPNG) {
-		return packet->trace->format->get_meta_section_option(packet,
+		r = packet->trace->format->get_meta_section_option(packet,
                         PCAPNG_INTERFACE_TYPE, PCAPNG_META_IF_SPEED);
 	}
 
-	return NULL;
+	/* Flip from network to host byte ordering */
+	int i;
+	if (r != NULL) {
+		for (i=0; i<r->num; i++) {
+			uint64_t d = be64toh(*(uint64_t *)r->items[i].data);
+			memcpy(r->items[i].data, &d, r->items[i].len);
+		}
+	}
+
+	return trace_meta_set_datatype(r, TRACE_META_UINT64_T);
 }
 /* Get the interface speed for a meta packet.
  * Note: ERF packets can contain multiple interfaces per meta packet. Use index to
@@ -201,16 +226,18 @@ libtrace_meta_t *trace_get_interface_ipv4_meta(libtrace_packet_t *packet) {
                 return NULL;
         }
 
+	libtrace_meta_t *r = NULL;
+
 	if (packet->trace->format->type == TRACE_FORMAT_ERF) {
-		return packet->trace->format->get_meta_section_option(packet,
+		r = packet->trace->format->get_meta_section_option(packet,
 			ERF_PROV_SECTION_INTERFACE, ERF_PROV_IF_IPV4);
 	}
 	if (packet->trace->format->type == TRACE_FORMAT_PCAPNG) {
-		return packet->trace->format->get_meta_section_option(packet,
+		r = packet->trace->format->get_meta_section_option(packet,
                         PCAPNG_INTERFACE_TYPE, PCAPNG_META_IF_IP4);
 	}
 
-	return NULL;
+	return trace_meta_set_datatype(r, TRACE_META_UINT32_T);
 }
 /* Get the interface ipv4 address for a meta packet.
  * Note: ERF packets can contain multiple interfaces per meta packet. Use index to
@@ -262,16 +289,18 @@ libtrace_meta_t *trace_get_interface_ipv6_meta(libtrace_packet_t *packet) {
                 return NULL;
         }
 
+	libtrace_meta_t *r = NULL;
+
 	if (packet->trace->format->type == TRACE_FORMAT_ERF) {
-                return packet->trace->format->get_meta_section_option(packet,
+                r = packet->trace->format->get_meta_section_option(packet,
                         ERF_PROV_SECTION_INTERFACE, ERF_PROV_IF_IPV4);
         }
         if (packet->trace->format->type == TRACE_FORMAT_PCAPNG) {
-                return packet->trace->format->get_meta_section_option(packet,
+                r = packet->trace->format->get_meta_section_option(packet,
                         PCAPNG_INTERFACE_TYPE, PCAPNG_META_IF_IP4);
         }
 
-	return NULL;
+	return trace_meta_set_datatype(r, TRACE_META_UINT128_T);
 }
 /* Get the interface ipv6 address for a meta packet.
  * Note: ERF packets can contain multiple interfaces per meta packet. Use index to
@@ -341,16 +370,18 @@ libtrace_meta_t *trace_get_interface_description_meta(libtrace_packet_t *packet)
                 return NULL;
         }
 
+	libtrace_meta_t *r = NULL;
+
 	if (packet->trace->format->type == TRACE_FORMAT_ERF) {
-		return packet->trace->format->get_meta_section_option(packet,
+		r = packet->trace->format->get_meta_section_option(packet,
 			ERF_PROV_SECTION_INTERFACE, ERF_PROV_DESCR);
 	}
 	if (packet->trace->format->type == TRACE_FORMAT_PCAPNG) {
-		return packet->trace->format->get_meta_section_option(packet,
+		r = packet->trace->format->get_meta_section_option(packet,
                         PCAPNG_INTERFACE_TYPE, PCAPNG_META_IF_DESCR);
 	}
 
-	return NULL;
+	return trace_meta_set_datatype(r, TRACE_META_STRING);
 }
 /* Get the interface description for a meta packet.
  * Note: ERF packets can contain multiple interfaces per meta packet. Use index to
@@ -389,16 +420,18 @@ libtrace_meta_t *trace_get_host_os_meta(libtrace_packet_t *packet) {
                 return NULL;
         }
 
+	libtrace_meta_t *r = NULL;
+
 	if (packet->trace->format->type == TRACE_FORMAT_ERF) {
-		return packet->trace->format->get_meta_section_option(packet,
+		r = packet->trace->format->get_meta_section_option(packet,
                         ERF_PROV_SECTION_HOST, ERF_PROV_OS);
 	}
 	if (packet->trace->format->type == TRACE_FORMAT_PCAPNG) {
-		return packet->trace->format->get_meta_section_option(packet,
+		r = packet->trace->format->get_meta_section_option(packet,
                         PCAPNG_INTERFACE_TYPE, PCAPNG_META_IF_OS);
 	}
 
-	return NULL;
+	return trace_meta_set_datatype(r, TRACE_META_STRING);
 }
 /* Get the host OS for a meta packet.
  *
@@ -431,16 +464,18 @@ libtrace_meta_t *trace_get_interface_fcslen_meta(libtrace_packet_t *packet) {
                 return NULL;
         }
 
+	libtrace_meta_t *r = NULL;
+
 	if (packet->trace->format->type == TRACE_FORMAT_ERF) {
-		return packet->trace->format->get_meta_section_option(packet,
+		r = packet->trace->format->get_meta_section_option(packet,
                         ERF_PROV_SECTION_INTERFACE, ERF_PROV_FCS_LEN);
 	}
 	if (packet->trace->format->type == TRACE_FORMAT_PCAPNG) {
-		return packet->trace->format->get_meta_section_option(packet,
+		r = packet->trace->format->get_meta_section_option(packet,
                         PCAPNG_INTERFACE_TYPE, PCAPNG_META_IF_FCSLEN);
 	}
 
-	return NULL;
+	return trace_meta_set_datatype(r, TRACE_META_UINT32_T);
 }
 /* Get the interface frame check sequence length for a meta packet.
  * Note: ERF packets can contain multiple interfaces per meta packet. Use index to
@@ -470,16 +505,18 @@ libtrace_meta_t *trace_get_interface_comment_meta(libtrace_packet_t *packet) {
                 return NULL;
         }
 
+	libtrace_meta_t *r = NULL;
+
 	if (packet->trace->format->type == TRACE_FORMAT_ERF) {
-		return packet->trace->format->get_meta_section_option(packet,
+		r = packet->trace->format->get_meta_section_option(packet,
 			ERF_PROV_SECTION_INTERFACE, ERF_PROV_COMMENT);
 	}
 	if (packet->trace->format->type == TRACE_FORMAT_PCAPNG) {
-		return packet->trace->format->get_meta_section_option(packet,
+		r = packet->trace->format->get_meta_section_option(packet,
 			PCAPNG_INTERFACE_TYPE, PCAPNG_OPTION_COMMENT);
 	}
 
-	return NULL;
+	return trace_meta_set_datatype(r, TRACE_META_STRING);
 }
 /* Get the interface comment for a meta packet.
  * Note: ERF packets can contain multiple interfaces per meta packet. Use index to
@@ -517,16 +554,18 @@ libtrace_meta_t *trace_get_capture_application_meta(libtrace_packet_t *packet) {
                 return NULL;
         }
 
+	libtrace_meta_t *r = NULL;
+
 	if (packet->trace->format->type == TRACE_FORMAT_ERF) {
-                return packet->trace->format->get_meta_section_option(packet,
+                r = packet->trace->format->get_meta_section_option(packet,
                         ERF_PROV_SECTION_CAPTURE, ERF_PROV_APP_NAME);
         }
         if (packet->trace->format->type == TRACE_FORMAT_PCAPNG) {
-                return packet->trace->format->get_meta_section_option(packet,
+                r = packet->trace->format->get_meta_section_option(packet,
                         PCAPNG_SECTION_TYPE, PCAPNG_META_SHB_USERAPPL);
         }
 
-        return NULL;
+        return trace_meta_set_datatype(r, TRACE_META_STRING);
 }
 /* Get the capture application for a meta packet.
  *

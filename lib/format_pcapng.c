@@ -2231,7 +2231,7 @@ void *pcapng_get_meta_section(libtrace_packet_t *packet, uint32_t section) {
                 }
                 result->items[result->num-1].option = optcode;
                 result->items[result->num-1].len = len;
-                result->items[result->num-1].data_type = 0;
+                result->items[result->num-1].datatype = TRACE_META_UNKNOWN;
                 result->items[result->num-1].data = calloc(1, len);
                 memcpy(result->items[result->num-1].data,
                 	ptr+sizeof(struct pcapng_optheader), len);
@@ -2343,10 +2343,11 @@ void *pcapng_get_meta_section_option(libtrace_packet_t *packet, uint32_t section
 		result->items = malloc(sizeof(libtrace_meta_item_t));
 		result->items[result->num-1].option = option;
 		result->items[result->num-1].len = len;
-		result->items[result->num-1].data_type = 0;
+		result->items[result->num-1].datatype = TRACE_META_UNKNOWN;
 		result->items[result->num-1].data = calloc(1, len);
 
-		memcpy(result->items->data, ptr+sizeof(struct pcapng_optheader), len);
+		memcpy(result->items[result->num-1].data,
+			ptr+sizeof(struct pcapng_optheader), len);
 
 		return (void *)result;
 	} else {

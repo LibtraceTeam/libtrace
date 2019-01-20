@@ -580,6 +580,15 @@ typedef enum {
 	TRACE_ETHERTYPE_PPP_SES = 0x8864	/**< PPPoE Session Messages */
 } libtrace_ethertype_t;
 
+/** Enumeration of datatype returned inside libtrace_meta_item_t structure */
+typedef enum {
+        TRACE_META_UINT32_T     = 1,        
+        TRACE_META_UINT64_T     = 2,
+        TRACE_META_STRING       = 3,
+        TRACE_META_UNKNOWN      = 4,
+	TRACE_META_UINT128_T	= 5 
+} meta_datatype_t;
+
 typedef struct libtrace_meta_result {
 	uint16_t type;
 	uint16_t len;
@@ -588,7 +597,7 @@ typedef struct libtrace_meta_result {
 typedef struct libtrace_meta_section_item {
         uint16_t option;
         uint16_t len;
-        uint8_t data_type;
+        meta_datatype_t datatype;
         void *data;
 } libtrace_meta_item_t;
 
@@ -3730,8 +3739,6 @@ DLLEXPORT bool trace_get_wireless_antenna(void *linkptr,
         libtrace_linktype_t linktype, uint8_t *antenna);
 
 /*@}*/
-
-
 
 DLLEXPORT int trace_destroy_meta(libtrace_meta_t *result);
 
