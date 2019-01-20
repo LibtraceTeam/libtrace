@@ -98,6 +98,7 @@ char *trace_get_interface_name(libtrace_packet_t *packet, char *space, int space
 	trace_destroy_meta(r);
 	return space;
 }
+
 /* Get the interface MAC address/s for a meta packet.
  * Must be destroyed with trace_destroy_meta().
  *
@@ -237,6 +238,7 @@ uint32_t trace_get_interface_ipv4(libtrace_packet_t *packet, int index) {
  * @params The interface index within the meta packet.
  * @returns Pointer to the character buffer containing the ipv4 address string or NULL.
  */
+/* UNTESTED */
 char *trace_get_interface_ipv4_string(libtrace_packet_t *packet, char *space, int spacelen,
 	int index) {
 
@@ -244,7 +246,7 @@ char *trace_get_interface_ipv4_string(libtrace_packet_t *packet, char *space, in
 	if (addr == 0) { return NULL; }
 
 	char *addrstr = inet_ntoa(*(struct in_addr *)&addr);
-	memcpy(space, addrstr, strlen(addrstr));
+	memcpy(space, addrstr, spacelen);
 	return space;
 }
 
@@ -305,10 +307,25 @@ void *trace_get_interface_ipv6(libtrace_packet_t *packet, void *space, int space
  * @params The interface index within the meta packet.
  * @returns Pointer to the character buffer containing the ipv6 address string or NULL.
  */
+/* UNTESTED */
 char *trace_get_interface_ipv6_string(libtrace_packet_t *packet, char *space, int spacelen,
 	int index) {
 
-	return NULL;
+	if (spacelen < INET6_ADDRSTRLEN) {
+		return NULL;
+	}
+
+	void *addr = calloc(1, 16);
+	void *r = trace_get_interface_ipv6(packet, addr, 16, index);
+
+	if (r == NULL) {
+		return NULL;
+	}
+
+	inet_ntop(AF_INET6, addr, space, INET6_ADDRSTRLEN);
+	free(addr);
+
+	return space;
 }
 
 
@@ -442,49 +459,6 @@ uint32_t trace_get_interface_fcslen(libtrace_packet_t *packet, int index) {
 	return data;
 }
 
-/* Get the hardware description
- * Must be destroyed with trace_destroy_meta()
- *
- * @params libtrace_packet_t meta packet
- * @returns Pointer to libtrace_meta_t structure or NULL
- */
-libtrace_meta_t *trace_get_interface_hardware_description_meta(libtrace_packet_t *packet) {
-	if (trace_meta_check_input(packet, "trace_get_interface_hardware_description()")<0) {
-                return NULL;
-        }
-
-        if (packet->trace->format->type == TRACE_FORMAT_PCAPNG) {
-                return packet->trace->format->get_meta_section_option(packet,
-                        PCAPNG_INTERFACE_TYPE, PCAPNG_META_IF_HARDWARE);
-        }
-	if (packet->trace->format->type == TRACE_FORMAT_ERF) {
-		return packet->trace->format->get_meta_section_option(packet,
-			ERF_PROV_SECTION_MODULE, ERF_PROV_MODEL);
-	}
-
-	return NULL;
-}
-/* Get the hardware description for a meta packet.
- *
- * @params libtrace_packet_t meta packet to extract the hardware description from.
- * @params A pointer to a character buffer to store the hardware description in.
- * @params The size of the buffer passed in.
- * @returns Pointer to the character buffer containing the hardware description or NULL.
- */
-char *trace_get_interface_hardware_description(libtrace_packet_t *packet, char *space,
-	int spacelen) {
-
-	libtrace_meta_t *r = trace_get_interface_hardware_description_meta(packet);
-	if (r == NULL) { return NULL; }
-	if (r->items[0].len > spacelen) {
-		memcpy(space, r->items[0].data, spacelen);
-	} else {
-		memcpy(space, r->items[0].data, r->items[0].len);
-	}
-	trace_destroy_meta(r);
-	return space;
-}
-
 /* Get any interface comments for a meta packet
  * Must be destroyed with trace_destroy_meta()
  *
@@ -606,3 +580,70 @@ libtrace_meta_t *trace_get_section(libtrace_packet_t *packet, uint32_t section_c
 
 	return packet->trace->format->get_meta_section(packet, section_code);
 }
+
+
+
+/* ERF specific function */
+/* Get the DAG card model from a meta packet.
+ *
+ * @params libtrace_packet_t meta packet to extract the DAG model from.
+ * @params A pointer to a character buffer to store the DAG model in.
+ * @params The size of the buffer passed in.
+ * @returns Pointer to the character buffer containing the DAG model or NULL.
+ */
+char *trace_get_erf_dag_card_model(libtrace_packet_t *packet, char *space, int spacelen) {
+	libtrace_meta_t *r = trace_get_section_option(packet, ERF_PROV_SECTION_MODULE,
+		ERF_PROV_MODEL);
+
+	if (r == NULL) { return NULL; }
+	if (r->items[0].len > spacelen) {
+		memcpy(space, r->items[0].data, spacelen);
+	} else {
+		memcpy(space, r->items[0].data, r->items[0].len);
+	}
+	trace_destroy_meta(r);
+	return space;
+}
+/* Get the host DAG software version for a meta packet.
+ *
+ * @params libtrace_packet_t meta packet to extract the hosts DAG verion from.
+ * @params A pointer to a character buffer to store the DAG version in.
+ * @params The size of the buffer passed in.
+ * @returns Pointer to the character buffer containing the DAG version or NULL.
+ */
+char *trace_get_erf_dag_version(libtrace_packet_t *packet, char *space, int spacelen) {
+	libtrace_meta_t *r = trace_get_section_option(packet, ERF_PROV_SECTION_MODULE,
+		ERF_PROV_DAG_VERSION);
+
+	if (r == NULL) { return NULL; }
+
+	if (r->items[0].len > spacelen) {
+		memcpy(space, r->items[0].data, spacelen);
+	} else {
+		memcpy(space, r->items[0].data, r->items[0].len);
+	}
+	trace_destroy_meta(r);
+	return space;
+}
+/* Get the firmware version for a DAG module from a meta packet.
+ *
+ * @params libtrace_packet_t meta packet to extract the FW version from.
+ * @params A pointer to a character buffer to store the FW version in.
+ * @params The size of the buffer passed in.
+ * @returns Pointer to the character buffer containing the FW version or NULL.
+ */
+char *trace_get_erf_dag_fw_version(libtrace_packet_t *packet, char *space, int spacelen) {
+	libtrace_meta_t *r = trace_get_section_option(packet, ERF_PROV_SECTION_MODULE,
+		ERF_PROV_FW_VERSION);
+
+	if (r == NULL) { return NULL; }
+
+	if (r->items[0].len > spacelen) {
+		memcpy(space, r->items[0].data, spacelen);
+	} else {
+		memcpy(space, r->items[0].data, r->items[0].len);
+	}
+	trace_destroy_meta(r);
+	return space;
+}
+

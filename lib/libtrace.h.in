@@ -3779,11 +3779,6 @@ DLLEXPORT libtrace_meta_t *trace_get_interface_fcslen_meta(libtrace_packet_t *pa
 
 DLLEXPORT uint32_t trace_get_interface_fcslen(libtrace_packet_t *packet, int index);
 
-DLLEXPORT libtrace_meta_t *trace_get_interface_hardware_description_meta(libtrace_packet_t *packet);
-
-DLLEXPORT char *trace_get_interface_hardware_description(libtrace_packet_t *packet, char *space,
-	int spacelen);
-
 DLLEXPORT libtrace_meta_t *trace_get_interface_comment_meta(libtrace_packet_t *packet);
 
 DLLEXPORT char *trace_get_interface_comment(libtrace_packet_t *packet, char *space, int spacelen,
@@ -3798,6 +3793,14 @@ DLLEXPORT libtrace_meta_t *trace_get_section_option(libtrace_packet_t *packet, u
 
 DLLEXPORT libtrace_meta_t *trace_get_section(libtrace_packet_t *packet, uint32_t section_code);
 
+DLLEXPORT char *trace_get_erf_dag_card_model(libtrace_packet_t *packet, char *space,
+	int spacelen);
+
+DLLEXPORT char *trace_get_erf_dag_version(libtrace_packet_t *packet, char *space,
+	int spacelen);
+
+DLLEXPORT char *trace_get_erf_dag_fw_version(libtrace_packet_t *packet, char *space,
+	int spacelen);
 
 #ifdef __cplusplus
 } /* extern "C" */
