@@ -237,6 +237,15 @@ libtrace_meta_t *trace_get_interface_ipv4_meta(libtrace_packet_t *packet) {
                         PCAPNG_INTERFACE_TYPE, PCAPNG_META_IF_IP4);
 	}
 
+	/* Flip from network to host byte ordering */
+        if (r != NULL) {
+		int i;
+                for (i=0; i<r->num; i++) {
+                        uint32_t d = ntohl(*(uint32_t *)r->items[i].data);
+                        memcpy(r->items[i].data, &d, r->items[i].len);
+                }
+        }
+
 	return trace_meta_set_datatype(r, TRACE_META_UINT32_T);
 }
 /* Get the interface ipv4 address for a meta packet.
@@ -474,6 +483,15 @@ libtrace_meta_t *trace_get_interface_fcslen_meta(libtrace_packet_t *packet) {
 		r = packet->trace->format->get_meta_section_option(packet,
                         PCAPNG_INTERFACE_TYPE, PCAPNG_META_IF_FCSLEN);
 	}
+
+	/* Flip from network to host byte ordering */
+        if (r != NULL) {
+		int i;
+                for (i=0; i<r->num; i++) {
+                        uint32_t d = ntohl(*(uint32_t *)r->items[i].data);
+                        memcpy(r->items[i].data, &d, r->items[i].len);
+                }
+        }
 
 	return trace_meta_set_datatype(r, TRACE_META_UINT32_T);
 }
