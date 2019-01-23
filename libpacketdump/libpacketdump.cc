@@ -148,8 +148,8 @@ void trace_dump_packet(struct libtrace_packet_t *packet)
 	const char *link=(char *)trace_get_packet_buffer(packet,&linktype,NULL);
 
 	length = trace_get_capture_length(packet);
-	fprintf(stderr, "\n%s",ctime(&sec));
-	fprintf(stderr, " Capture: Packet Length: %i/%i Direction Value: %i\n",
+	printf("\n%s",ctime(&sec));
+	printf(" Capture: Packet Length: %i/%i Direction Value: %i\n",
 			(int)length,
 			(int)trace_get_wire_length(packet),
 			(int)trace_get_direction(packet));
