@@ -594,7 +594,7 @@ typedef struct libtrace_meta_result {
 	uint16_t len;
 } libtrace_meta_result_t;
 
-typedef struct libtrace_meta_section_item {
+typedef struct libtrace_meta_item {
         uint16_t option;
         uint16_t len;
         meta_datatype_t datatype;
@@ -606,21 +606,6 @@ typedef struct libtrace_meta_section {
 	uint16_t num;
 	libtrace_meta_item_t *items;
 } libtrace_meta_t;
-
-typedef struct libtrace_meta {
-        char *interface_name;		/**< Interface name packet was captured on */
-        void *interface_mac;		/**< Interface MAC address packet was captured on */
-        uint64_t interface_speed;	/**< Interface speed packet was captured on */
-	uint32_t interface_ipv4;	/**< Interface IP4 address packet was captured on */
-	void *interface_ipv6;		/**< Interface IP6 address packet was captured on */
-	char *interface_description;	/**< Interface description */
-	uint32_t interface_num;		/**< Interface number */
-	char *host_os;			/**< Host OS the packet was captured on */
-	uint32_t interface_fcslen;	/**< Frame check sequence length for the interface */
-	char *interface_hardware_desc;	/**< Interface hardware description string */
-	char *interface_comment;	/**< Interface comment */
-	char *capture_application;	/**< Name of the capturing application */
-} libtrace_meta_tt;
 
 typedef struct libtrace_packet_cache {
 	int capture_length;		/**< Cached capture length */
@@ -658,8 +643,6 @@ typedef struct libtrace_packet_t {
         pthread_mutex_t ref_lock;       /**< Lock for reference counter */
         int refcount;                 /**< Reference counter */
         int which_trace_start;          /**< Used to match packet to a started instance of the parent trace */
-
-	libtrace_meta_tt meta;           /**< Meta data for the packet */
 } libtrace_packet_t;
 
 #define IS_LIBTRACE_META_PACKET(packet) (packet->type < TRACE_RT_DATA_SIMPLE)

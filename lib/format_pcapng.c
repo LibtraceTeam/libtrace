@@ -39,153 +39,6 @@
 #include <stdbool.h>
 #include <math.h>
 
-typedef struct pcagng_section_header_t {
-        uint32_t blocktype;
-        uint32_t blocklen;
-        uint32_t ordering;
-        uint16_t majorversion;
-        uint16_t minorversion;
-        uint64_t sectionlen;
-} pcapng_sec_t;
-
-typedef struct pcapng_interface_header_t {
-        uint32_t blocktype;
-        uint32_t blocklen;
-        uint16_t linktype;
-        uint16_t reserved;
-        uint32_t snaplen;
-} pcapng_int_t;
-
-typedef struct pcapng_nrb_header_t {
-        uint32_t blocktype;
-        uint32_t blocklen;
-} pcapng_nrb_t;
-
-typedef struct pcapng_enhanced_packet_t {
-        uint32_t blocktype;
-        uint32_t blocklen;
-        uint32_t interfaceid;
-        uint32_t timestamp_high;
-        uint32_t timestamp_low;
-        uint32_t caplen;
-        uint32_t wlen;
-} pcapng_epkt_t;
-
-typedef struct pcapng_simple_packet_t {
-        uint32_t blocktype;
-        uint32_t blocklen;
-        uint32_t wlen;
-} pcapng_spkt_t;
-
-typedef struct pcapng_old_packet_t {
-        uint32_t blocktype;
-        uint32_t blocklen;
-        uint16_t interfaceid;
-        uint16_t drops;
-        uint32_t timestamp_high;
-        uint32_t timestamp_low;
-        uint32_t caplen;
-        uint32_t wlen;
-} pcapng_opkt_t;
-
-typedef struct pcapng_stats_header_t {
-        uint32_t blocktype;
-        uint32_t blocklen;
-        uint32_t interfaceid;
-        uint32_t timestamp_high;
-        uint32_t timestamp_low;
-} pcapng_stats_t;
-
-typedef struct pcapng_decryption_secrets_header_t {
-        uint32_t blocktype;
-        uint32_t blocklen;
-        uint32_t secrets_type;
-        uint32_t secrets_len;
-} pcapng_secrets_t;
-
-typedef struct pcapng_custom_header_t {
-        uint32_t blocktype;
-        uint32_t blocklen;
-        uint32_t pen;
-} pcapng_custom_t;
-
-typedef struct pcapng_interface_t pcapng_interface_t;
-
-struct pcapng_timestamp {
-	uint32_t timehigh;
-	uint32_t timelow;
-};
-
-struct pcapng_interface_t {
-
-        uint16_t id;
-        libtrace_dlt_t linktype;
-        uint32_t snaplen;
-        uint32_t tsresol;
-
-        uint64_t received;
-        uint64_t dropped;       /* as reported by interface stats */
-        uint64_t dropcounter;   /* as reported by packet records */
-        uint64_t accepted;
-        uint64_t osdropped;
-        uint64_t laststats;
-
-};
-
-struct pcapng_format_data_t {
-        bool started;
-        bool realtime;
-	bool discard_meta;
-
-        /* Section data */
-        bool byteswapped;
-
-        /* Interface data */
-        pcapng_interface_t **interfaces;
-        uint16_t allocatedinterfaces;
-        uint16_t nextintid;
-
-};
-
-struct pcapng_format_data_out_t {
-	iow_t *file;
-	int compress_level;
-	int compress_type;
-	int flag;
-
-	/* Section data */
-	uint16_t sechdr_count;
-	bool byteswapped;
-
-	/* Interface data */
-	uint16_t nextintid;
-	libtrace_linktype_t lastdlt;
-};
-
-struct pcapng_optheader {
-        uint16_t optcode;
-        uint16_t optlen;
-};
-
-struct pcapng_custom_optheader {
-	uint16_t optcode;
-	uint16_t optlen;
-	uint32_t pen;
-};
-struct pcapng_nrb_record {
-	uint16_t recordtype;
-	uint16_t recordlen;
-};
-struct pcapng_peeker {
-        uint32_t blocktype;
-        uint32_t blocklen;
-};
-
-typedef struct pcapng_peeker pcapng_hdr_t;
-
-#define DATA(x) ((struct pcapng_format_data_t *)((x)->format_data))
-#define DATAOUT(x) ((struct pcapng_format_data_out_t*)((x)->format_data))
-
 static char *pcapng_parse_next_option(libtrace_t *libtrace, char **pktbuf,
                 uint16_t *code, uint16_t *length, pcapng_hdr_t *blockhdr);
 
@@ -855,7 +708,7 @@ static inline int pcapng_read_body(libtrace_t *libtrace, char *body,
 
 static int pcapng_get_framing_length(const libtrace_packet_t *packet) {
 
-        switch(pcapng_get_record_type(packet)) {
+	switch(pcapng_get_record_type(packet)) {
                 case PCAPNG_SECTION_TYPE:
                         return sizeof(pcapng_sec_t);
                 case PCAPNG_INTERFACE_TYPE:
@@ -871,9 +724,12 @@ static int pcapng_get_framing_length(const libtrace_packet_t *packet) {
                 case PCAPNG_NAME_RESOLUTION_TYPE:
                         return sizeof(pcapng_nrb_t);
                 case PCAPNG_CUSTOM_TYPE:
+			return sizeof(pcapng_custom_t);
                 case PCAPNG_CUSTOM_NONCOPY_TYPE:
                         return sizeof(pcapng_custom_t);
-        }
+		case PCAPNG_DECRYPTION_SECRETS_TYPE:
+			return sizeof(pcapng_secrets_t);
+	}
 
         /* If we get here, we aren't a valid pcapng packet */
         trace_set_err(packet->trace, TRACE_ERR_BAD_PACKET,
@@ -1807,9 +1663,14 @@ static libtrace_linktype_t pcapng_get_link_type(const libtrace_packet_t *packet)
 
 static libtrace_direction_t pcapng_get_direction(const libtrace_packet_t
                 *packet) {
+	libtrace_direction_t direction = -1;
 
         /* Defined in format_helper.c */
-        return pcap_get_direction(packet);
+	if (PACKET_IS_ENHANCED || PACKET_IS_SIMPLE || PACKET_IS_OLD) {
+        	direction = pcap_get_direction(packet);
+	}
+
+	return direction;
 }
 
 static struct timespec pcapng_get_timespec(const libtrace_packet_t *packet) {
@@ -1909,7 +1770,12 @@ static inline int pcapng_get_wlen_header(const libtrace_packet_t *packet) {
                 } else {
                         return ohdr->wlen;
                 }
-        }
+        } else if (PACKET_IS_SECTION || PACKET_IS_INTERFACE || PACKET_IS_NAME_RESOLUTION
+		|| PACKET_IS_INTERFACE_STATS || PACKET_IS_CUSTOM ||
+		PACKET_IS_CUSTOM_NONCOPY || PACKET_IS_DECRYPTION_SECRETS) {
+		/* meta packet are not transmitted on the wire hence the 0 wirelen */
+		return 0;
+	}
 
         /* If we get here, we aren't a valid pcapng packet */
         trace_set_err(packet->trace, TRACE_ERR_BAD_PACKET,
@@ -1925,6 +1791,11 @@ static int pcapng_get_wire_length(const libtrace_packet_t *packet) {
 
         if (baselen == -1)
                 return -1;
+
+	/* if packet was a meta packet baselen should be zero so return it */
+	if (baselen == 0) {
+		return 0;
+	}
 
         /* Then, account for the vagaries of different DLTs */
         if (rt_to_pcap_linktype(packet->type) == TRACE_DLT_EN10MB) {
@@ -1990,7 +1861,17 @@ static int pcapng_get_capture_length(const libtrace_packet_t *packet) {
                 } else {
                         return ohdr->caplen;
                 }
-        }
+        } else if (PACKET_IS_SECTION || PACKET_IS_INTERFACE || PACKET_IS_NAME_RESOLUTION
+                || PACKET_IS_INTERFACE_STATS || PACKET_IS_CUSTOM ||
+                PACKET_IS_CUSTOM_NONCOPY || PACKET_IS_DECRYPTION_SECRETS) {
+
+                struct pcapng_peeker *hdr = (struct pcapng_peeker *)packet->header;
+		if (DATA(packet->trace)->byteswapped) {
+			return byteswap32(hdr->blocklen) - trace_get_framing_length(packet);
+		} else {
+			return hdr->blocklen - trace_get_framing_length(packet);
+		}
+	}
 
         /* If we get here, we aren't a valid pcapng packet */
         trace_set_err(packet->trace, TRACE_ERR_BAD_PACKET,

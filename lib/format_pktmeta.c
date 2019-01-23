@@ -638,8 +638,6 @@ libtrace_meta_t *trace_get_section(libtrace_packet_t *packet, uint32_t section_c
 	return packet->trace->format->get_meta_section(packet, section_code);
 }
 
-
-
 /* ERF specific function */
 /* Get the DAG card model from a meta packet.
  *

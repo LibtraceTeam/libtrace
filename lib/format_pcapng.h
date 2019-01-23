@@ -1,4 +1,3 @@
-
 #define PCAPNG_SECTION_TYPE 0x0A0D0D0A
 #define PCAPNG_INTERFACE_TYPE 0x00000001
 #define PCAPNG_OLD_PACKET_TYPE 0x00000002
@@ -33,16 +32,16 @@
  * Should not be copied to a new file if manipulated */
 #define PCAPNG_OPTION_CUSTOM_4 19373
 
-#define PACKET_IS_SECTION (pcapng_get_record_type(packet) == PCAPNG_SECTION__TYPE)
+#define PACKET_IS_SECTION (pcapng_get_record_type(packet) == PCAPNG_SECTION_TYPE)
 #define PACKET_IS_INTERFACE (pcapng_get_record_type(packet) == PCAPNG_INTERFACE_TYPE)
 #define PACKET_IS_OLD (pcapng_get_record_type(packet) == PCAPNG_OLD_PACKET_TYPE)
 #define PACKET_IS_SIMPLE (pcapng_get_record_type(packet) == PCAPNG_SIMPLE_PACKET_TYPE)
 #define PACKET_IS_NAME_RESOLUTION (pcapng_get_record_type(packet) == PCAPNG_NAME_RESOLUTION_TYPE)
-#define PACKET_IS_INTERFACE_STATS_TYPE (pcapng_get_record_type(packet) == PCAPNG_INTERFACE_STATS_TYPE)
+#define PACKET_IS_INTERFACE_STATS (pcapng_get_record_type(packet) == PCAPNG_INTERFACE_STATS_TYPE)
 #define PACKET_IS_ENHANCED (pcapng_get_record_type(packet) == PCAPNG_ENHANCED_PACKET_TYPE)
-#define PACKET_IS_CUSTOM_TYPE (pcapng_get_record_type(packet) == PCAPNG_CUSTOM_TYPE)
-#define PCAPNG_IS_CUSTOM_NONCOPY_TYPE (pcapng_get_record_type(packet) == PCAPNG_CUSTOM_NONCOPY_TYPE)
-#define PCAPNG_DECRYPTION_SECRETS_TYPE (pcapng_get_record_type(packet) == PCAPNG_DECRYPTION_SECRETS_TYPE)
+#define PACKET_IS_CUSTOM (pcapng_get_record_type(packet) == PCAPNG_CUSTOM_TYPE)
+#define PACKET_IS_CUSTOM_NONCOPY (pcapng_get_record_type(packet) == PCAPNG_CUSTOM_NONCOPY_TYPE)
+#define PACKET_IS_DECRYPTION_SECRETS (pcapng_get_record_type(packet) == PCAPNG_DECRYPTION_SECRETS_TYPE)
 
 #define PCAPNG_IFOPT_TSRESOL 9
 
@@ -95,6 +94,156 @@
 #define PCAPNG_META_ISB_FILTERACCEPT 6
 #define PCAPNG_META_ISB_OSDROP 7
 #define PCAPNG_META_ISB_USRDELIV 8
+/* Old packet type */
+#define PCAPNG_META_OLD_FLAGS 2
+#define PCAPNG_META_OLD_HASH 3
+
+#define DATA(x) ((struct pcapng_format_data_t *)((x)->format_data))
+#define DATAOUT(x) ((struct pcapng_format_data_out_t*)((x)->format_data))
+
+typedef struct pcagng_section_header_t {
+        uint32_t blocktype;
+        uint32_t blocklen;
+        uint32_t ordering;
+        uint16_t majorversion;
+        uint16_t minorversion;
+        uint64_t sectionlen;
+} pcapng_sec_t;
+
+typedef struct pcapng_interface_header_t {
+        uint32_t blocktype;
+        uint32_t blocklen;
+        uint16_t linktype;
+        uint16_t reserved;
+        uint32_t snaplen;
+} pcapng_int_t;
+
+typedef struct pcapng_nrb_header_t {
+        uint32_t blocktype;
+        uint32_t blocklen;
+} pcapng_nrb_t;
+
+typedef struct pcapng_enhanced_packet_t {
+        uint32_t blocktype;
+        uint32_t blocklen;
+        uint32_t interfaceid;
+        uint32_t timestamp_high;
+        uint32_t timestamp_low;
+        uint32_t caplen;
+        uint32_t wlen;
+} pcapng_epkt_t;
+
+typedef struct pcapng_simple_packet_t {
+        uint32_t blocktype;
+        uint32_t blocklen;
+        uint32_t wlen;
+} pcapng_spkt_t;
+
+typedef struct pcapng_old_packet_t {
+        uint32_t blocktype;
+        uint32_t blocklen;
+        uint16_t interfaceid;
+        uint16_t drops;
+        uint32_t timestamp_high;
+        uint32_t timestamp_low;
+        uint32_t caplen;
+        uint32_t wlen;
+} pcapng_opkt_t;
+
+typedef struct pcapng_stats_header_t {
+        uint32_t blocktype;
+        uint32_t blocklen;
+        uint32_t interfaceid;
+        uint32_t timestamp_high;
+        uint32_t timestamp_low;
+} pcapng_stats_t;
+
+typedef struct pcapng_decryption_secrets_header_t {
+        uint32_t blocktype;
+        uint32_t blocklen;
+        uint32_t secrets_type;
+        uint32_t secrets_len;
+} pcapng_secrets_t;
+
+typedef struct pcapng_custom_header_t {
+        uint32_t blocktype;
+        uint32_t blocklen;
+        uint32_t pen;
+} pcapng_custom_t;
+
+typedef struct pcapng_interface_t pcapng_interface_t;
+
+struct pcapng_timestamp {
+        uint32_t timehigh;
+        uint32_t timelow;
+};
+
+struct pcapng_interface_t {
+
+        uint16_t id;
+        libtrace_dlt_t linktype;
+        uint32_t snaplen;
+        uint32_t tsresol;
+
+        uint64_t received;
+        uint64_t dropped;       /* as reported by interface stats */
+        uint64_t dropcounter;   /* as reported by packet records */
+        uint64_t accepted;
+        uint64_t osdropped;
+        uint64_t laststats;
+
+};
+
+struct pcapng_format_data_t {
+        bool started;
+        bool realtime;
+        bool discard_meta;
+
+        /* Section data */
+        bool byteswapped;
+
+        /* Interface data */
+        pcapng_interface_t **interfaces;
+        uint16_t allocatedinterfaces;
+        uint16_t nextintid;
+
+};
+
+struct pcapng_format_data_out_t {
+        iow_t *file;
+        int compress_level;
+        int compress_type;
+        int flag;
+
+        /* Section data */
+        uint16_t sechdr_count;
+        bool byteswapped;
+
+        /* Interface data */
+        uint16_t nextintid;
+        libtrace_linktype_t lastdlt;
+};
+
+struct pcapng_optheader {
+        uint16_t optcode;
+        uint16_t optlen;
+};
+
+struct pcapng_custom_optheader {
+        uint16_t optcode;
+        uint16_t optlen;
+        uint32_t pen;
+};
+struct pcapng_nrb_record {
+        uint16_t recordtype;
+        uint16_t recordlen;
+};
+struct pcapng_peeker {
+        uint32_t blocktype;
+        uint32_t blocklen;
+};
+
+typedef struct pcapng_peeker pcapng_hdr_t;
 
 void *pcapng_get_meta_section(libtrace_packet_t *packet, uint32_t section);
 void *pcapng_get_meta_section_option(libtrace_packet_t *packet, uint32_t section,
