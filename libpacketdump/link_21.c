@@ -3,14 +3,62 @@
 #include "libpacketdump.h"
 #include "format_erf.h"
 
+#include <arpa/inet.h>
+#include <netinet/ether.h>
+
 DLLEXPORT void decode(int link_type UNUSED, const char *packet UNUSED, unsigned len UNUSED) {
 }
 
 static void print_section(libtrace_meta_t *meta) {
 	int i;
 	for (i=0; i<meta->num; i++) {
-		printf("   Option ID: %u Option Value: %s\n",
-			meta->items[i].option, (char *)meta->items[i].data);
+
+		if (meta->items[i].datatype == TRACE_META_STRING) {
+			printf("   Name: %s ID: %u Value: %s\n",
+				meta->items[i].option_name,
+				meta->items[i].option,
+				(char *)meta->items[i].data);
+		} else if (meta->items[i].datatype == TRACE_META_UINT8) {
+			printf("   Name: %s ID: %u Value: %u\n",
+                                meta->items[i].option_name,
+				meta->items[i].option,
+				*(uint8_t *)meta->items[i].data);
+		} else if (meta->items[i].datatype == TRACE_META_UINT32) {
+			printf("   Name: %s ID: %u Value: %u\n",
+                                meta->items[i].option_name,
+				meta->items[i].option,
+				*(uint32_t *)meta->items[i].data);
+		} else if (meta->items[i].datatype == TRACE_META_UINT64) {
+			printf("   Name: %s ID: %u Value: %lu\n",
+                                meta->items[i].option_name,
+				meta->items[i].option,
+				*(uint64_t *)meta->items[i].data);
+		} else if (meta->items[i].datatype == TRACE_META_IPV4) {
+			struct in_addr ip;
+			ip.s_addr = *(uint32_t *)meta->items[i].data;
+			printf("   Name: %s ID: %u Value: %s\n",
+				meta->items[i].option_name,
+				meta->items[i].option,
+				inet_ntoa(ip));
+		} else if (meta->items[i].datatype == TRACE_META_IPV6) {
+			printf("   Name: %s ID: %u Value: %s\n",
+                                meta->items[i].option_name,
+				meta->items[i].option,
+				(char *)meta->items[i].data);
+		} else if (meta->items[i].datatype == TRACE_META_MAC) {
+			printf("   Name: %s ID: %u Value: %s\n",
+				meta->items[i].option_name,
+                                meta->items[i].option,
+				ether_ntoa((struct ether_addr *)(char *)meta->items[i].data));
+		} else {
+			printf("   Option ID: %u Option Value: ", meta->items[i].option);
+			int k;
+			unsigned char *curr = (unsigned char *)meta->items[i].data;
+			for (k=0; k<meta->items[i].len; k++) {
+				printf("%02x ", curr[k]);
+			}
+			printf("\n");
+		}
 	}
 }
 
