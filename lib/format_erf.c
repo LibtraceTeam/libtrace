@@ -955,7 +955,9 @@ static char *erf_get_option_name(uint32_t option) {
                 case (ERF_PROV_MODULE_NUM): return "DAG Module Number";
                 case (ERF_PROV_LOC_NAME): return "Capture Location";
                 case (ERF_PROV_FLOW_HASH_MODE): return "Flow Hash Mode";
+		case (ERF_PROV_FILTER): return "Filter";
                 case (ERF_PROV_TUNNELING_MODE): return "Tunneling Mode";
+		case (ERF_PROV_ROTFILE_NAME): return "Rotfile Name";
                 case (ERF_PROV_LOC_DESCR): return "Location Description";
                 case (ERF_PROV_MEM): return "Stream Buffer Memory";
                 case (ERF_PROV_DEV_NAME): return "DAG Device Name";
@@ -1019,8 +1021,10 @@ static libtrace_meta_datatype_t erf_get_datatype(uint32_t option) {
 		case (ERF_PROV_CARD_NUM): return TRACE_META_UINT32;
 		case (ERF_PROV_MODULE_NUM): return TRACE_META_UINT32;
 		case (ERF_PROV_LOC_NAME): return TRACE_META_STRING;
+		case (ERF_PROV_FILTER): return TRACE_META_STRING;
 		case (ERF_PROV_FLOW_HASH_MODE): return TRACE_META_UINT32;
 		case (ERF_PROV_TUNNELING_MODE): return TRACE_META_UINT32;
+		case (ERF_PROV_ROTFILE_NAME): return TRACE_META_STRING;
 		case (ERF_PROV_LOC_DESCR): return TRACE_META_STRING;
 		case (ERF_PROV_MEM): return TRACE_META_UINT64;
 		case (ERF_PROV_DEV_NAME): return TRACE_META_STRING;
@@ -1080,7 +1084,6 @@ void *erf_get_meta_section(libtrace_packet_t *packet, uint32_t section) {
 	uint16_t tmp;
 	uint16_t remaining;
 	uint16_t curr_sec = 0;
-	int in_section = 0;
 
 	if (packet->buffer == NULL) { return NULL; }
 
@@ -1097,7 +1100,7 @@ void *erf_get_meta_section(libtrace_packet_t *packet, uint32_t section) {
         result->section = section;
         result->num = 0;
 
-	while (remaining > sizeof(dag_sec_t) && curr_sec != 0xFFFF) {
+	while (remaining > sizeof(dag_sec_t)) {
 
 		/* Get the current section/option header */
 		sec = (dag_sec_t *)ptr;
@@ -1107,12 +1110,7 @@ void *erf_get_meta_section(libtrace_packet_t *packet, uint32_t section) {
                         || ntohs(sec->type) == ERF_PROV_SECTION_MODULE
                         || ntohs(sec->type) == ERF_PROV_SECTION_INTERFACE) {
 
-                        if (in_section == 0) {
-				curr_sec = ntohs(sec->type);
-			} else {
-				/* Used to indicate section end */
-				curr_sec = 0xFFFF;
-			}
+			curr_sec = ntohs(sec->type);
                 }
 
 		/* If the current section the requested one and this is not
@@ -1122,9 +1120,6 @@ void *erf_get_meta_section(libtrace_packet_t *packet, uint32_t section) {
                         && ntohs(sec->type) != ERF_PROV_SECTION_HOST
                         && ntohs(sec->type) != ERF_PROV_SECTION_MODULE
                         && ntohs(sec->type) != ERF_PROV_SECTION_INTERFACE) {
-
-			/* Indicate a section has been found */
-			in_section = 1;
 
 			result->num += 1;
                         if (result->num == 1) {
@@ -1169,9 +1164,7 @@ void *erf_get_meta_section(libtrace_packet_t *packet, uint32_t section) {
 					memcpy(result->items[result->num-1].data,
                                         	ptr+sizeof(struct dag_opthdr), ntohs(sec->len));
 				}
-
                         }
-
                 }
 
 		/* Update remaining and ptr. Also account for any padding */
@@ -1184,7 +1177,7 @@ void *erf_get_meta_section(libtrace_packet_t *packet, uint32_t section) {
                 ptr += tmp;
 	}
 
-	/* If the result structure has result matches were found */
+	/* If the result num > 0 matches were found */
         if (result->num > 0) {
                 return (void *)result;
         } else {
