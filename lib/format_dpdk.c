@@ -2253,7 +2253,6 @@ static struct libtrace_format_t dpdk = {
 	NULL,                               /* seek_timeval */
 	NULL,                               /* seek_seconds */
 	NULL,                               /* get_meta_section */
-        NULL,                               /* get_meta_section_item */
 	dpdk_get_capture_length,            /* get_capture_length */
 	dpdk_get_wire_length,               /* get_wire_length */
 	dpdk_get_framing_length,            /* get_framing_length */

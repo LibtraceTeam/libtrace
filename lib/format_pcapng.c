@@ -2003,6 +2003,56 @@ static void pcapng_get_statistics(libtrace_t *trace, libtrace_stat_t *stat) {
 
 }
 
+static libtrace_meta_datatype_t pcapng_get_datatype(uint32_t section, uint32_t option) {
+	switch(section) {
+		case(PCAPNG_SECTION_TYPE):
+			return TRACE_META_STRING;
+		case(PCAPNG_INTERFACE_TYPE):
+			switch(option) {
+				case(PCAPNG_META_IF_NAME): return TRACE_META_STRING;
+				case(PCAPNG_META_IF_DESCR): return TRACE_META_STRING;
+				case(PCAPNG_META_IF_IP4): return TRACE_META_IPV4;
+				case(PCAPNG_META_IF_IP6): return TRACE_META_IPV6;
+				case(PCAPNG_META_IF_MAC): return TRACE_META_MAC;
+				case(PCAPNG_META_IF_EUI): return TRACE_META_UINT64;
+				case(PCAPNG_META_IF_SPEED): return PCAPNG_META_IF_SPEED;
+				case(PCAPNG_META_IF_TSRESOL): return TRACE_META_UINT8;
+				case(PCAPNG_META_IF_TZONE): return TRACE_META_UINT32;
+				case(PCAPNG_META_IF_FILTER): return TRACE_META_STRING;
+				case(PCAPNG_META_IF_OS): return TRACE_META_STRING;
+				case(PCAPNG_META_IF_FCSLEN): return TRACE_META_UINT8;
+				case(PCAPNG_META_IF_TSOFFSET): return TRACE_META_UINT64;
+				case(PCAPNG_META_IF_HARDWARE): return TRACE_META_STRING;
+			}
+		case(PCAPNG_OLD_PACKET_TYPE):
+			switch(option) {
+				case(PCAPNG_META_OLD_FLAGS): return TRACE_META_UINT32;
+				case(PCAPNG_META_OLD_HASH): return TRACE_META_STRING;
+			}
+		case(PCAPNG_SIMPLE_PACKET_TYPE):
+			/* simple packets should not contain any options */
+		case(PCAPNG_NAME_RESOLUTION_TYPE):
+			/* todo - needs to handle name resolution options along with
+			 * normal options */
+		case(PCAPNG_INTERFACE_STATS_TYPE):
+			return TRACE_META_UINT64;
+		case(PCAPNG_ENHANCED_PACKET_TYPE):
+			switch(option) {
+				case(PCAPNG_META_EPB_FLAGS): return TRACE_META_UINT32;
+				case(PCAPNG_META_EPB_HASH): return TRACE_META_STRING;
+				case(PCAPNG_META_EPB_DROPCOUNT): return TRACE_META_UINT64;
+			}
+		case(PCAPNG_DECRYPTION_SECRETS_TYPE):
+			/* todo - needs to handle decryption secrets options along with
+                         * normal options */
+		default:
+			return TRACE_META_UNKNOWN;
+	}
+
+	/* If we get this far we dont know the datatype */
+	return TRACE_META_UNKNOWN;
+}
+
 static void *pcapng_jump_to_options(libtrace_packet_t *packet) {
 
 	struct pcapng_peeker *hdr = (struct pcapng_peeker *)packet->buffer;
@@ -2112,10 +2162,40 @@ void *pcapng_get_meta_section(libtrace_packet_t *packet, uint32_t section) {
                 }
                 result->items[result->num-1].option = optcode;
                 result->items[result->num-1].len = len;
-                result->items[result->num-1].datatype = TRACE_META_UNKNOWN;
-                result->items[result->num-1].data = calloc(1, len);
-                memcpy(result->items[result->num-1].data,
-                	ptr+sizeof(struct pcapng_optheader), len);
+                result->items[result->num-1].datatype =
+			pcapng_get_datatype(section, optcode);
+
+		/* If the datatype is a string allow for a null terminator */
+		if (result->items[result->num-1].datatype == TRACE_META_STRING) {
+			result->items[result->num-1].data =
+				calloc(1, len+1);
+			((char *)result->items[result->num-1].data)[len] = '\0';
+			/* and copy the utf8 string */
+			memcpy(result->items[result->num-1].data,
+				ptr+sizeof(struct pcapng_optheader), len);
+		} else {
+			result->items[result->num-1].data =
+				calloc(1, len);
+			/* depending on the datatype we need to ensure the data is
+			 * in host byte ordering */
+			if (result->items[result->num-1].datatype == TRACE_META_UINT32
+				|| result->items[result->num-1].datatype == TRACE_META_IPV4) {
+
+				uint32_t t = *(uint32_t *)(ptr+sizeof(struct pcapng_optheader));
+				t = ntohl(t);
+				memcpy(result->items[result->num-1].data,
+					&t, sizeof(uint32_t));
+			} else if(result->items[result->num-1].datatype == TRACE_META_UINT64) {
+				uint64_t t = *(uint64_t *)(ptr+sizeof(struct pcapng_optheader));
+				t = bswap_be_to_host64(t);
+				memcpy(result->items[result->num-1].data,
+					&t, sizeof(uint64_t));
+			} else {
+				memcpy(result->items[result->num-1].data,
+					ptr+sizeof(struct pcapng_optheader), len);
+			}
+
+		}
 
 		/* work out any padding */
                 if ((len % 4) != 0) {
@@ -2145,95 +2225,6 @@ void *pcapng_get_meta_section(libtrace_packet_t *packet, uint32_t section) {
 		return NULL;
 	}
 
-}
-
-void *pcapng_get_meta_section_option(libtrace_packet_t *packet, uint32_t section,
-	uint16_t option) {
-
-	struct pcapng_peeker *hdr;
-	void *ptr;
-	uint32_t blocktype;
-	uint16_t optcode;
-	uint32_t remaining;
-	uint16_t len;
-	uint16_t tmp;
-
-	if (packet->buffer == NULL) { return NULL; }
-
-	hdr = (struct pcapng_peeker *)packet->buffer;
-	ptr = pcapng_jump_to_options(packet);
-
-	if (DATA(packet->trace)->byteswapped) {
-		blocktype = byteswap32(hdr->blocktype);
-		remaining = byteswap32(hdr->blocklen);
-	} else {
-		blocktype = hdr->blocktype;
-		remaining = hdr->blocklen;
-	}
-
-	/* If the data we want is not within this blocktype */
-	if (blocktype != section) {
-		return NULL;
-	}
-
-	/* update remaining to account for header and any payload */
-	remaining -= ptr - packet->buffer;
-
-	/* Skip over the options till a match is found or they run out */
-	struct pcapng_optheader *opthdr = ptr;
-	if (DATA(packet->trace)->byteswapped) {
-		optcode = byteswap16(opthdr->optcode);
-		len  = byteswap16(opthdr->optlen);
-	} else {
-		optcode = opthdr->optcode;
-		len = opthdr->optlen;
-	}
-
-	/* Iterate over the options till we reach the end of the options or we find
-	 * the option we want */
-	while ((optcode != option) && (optcode != PCAPNG_OPTION_END) &&
-		(remaining > sizeof(struct pcapng_optheader))) {
-
-		/* work out any padding */
-		if ((len % 4) != 0) {
-			tmp = len + (4 - (len % 4)) + sizeof(struct pcapng_optheader);
-		} else {
-			tmp = len + sizeof(struct pcapng_optheader);
-		}
-		ptr += tmp;
-		remaining -= tmp;
-
-		/* get the next option */
-		opthdr = (struct pcapng_optheader *)ptr;
-		if (DATA(packet->trace)->byteswapped) {
-			optcode = byteswap16(opthdr->optcode);
-			len = byteswap16(opthdr->optlen);
-		} else {
-			optcode = opthdr->optcode;
-			len = opthdr->optlen;
-		}
-	}
-
-	/* either a option was found or they ran out */
-	if (opthdr->optcode == option) {
-
-		libtrace_meta_t *result = malloc(sizeof(libtrace_meta_t));
-		result->section = section;
-		result->num = 1;
-
-		result->items = malloc(sizeof(libtrace_meta_item_t));
-		result->items[result->num-1].option = option;
-		result->items[result->num-1].len = len;
-		result->items[result->num-1].datatype = TRACE_META_UNKNOWN;
-		result->items[result->num-1].data = calloc(1, len);
-
-		memcpy(result->items[result->num-1].data,
-			ptr+sizeof(struct pcapng_optheader), len);
-
-		return (void *)result;
-	} else {
-		return NULL;
-	}
 }
 
 static void pcapng_help(void) {
@@ -2274,7 +2265,6 @@ static struct libtrace_format_t pcapng = {
         pcapng_get_timespec,            /* get_timespec */
         NULL,                           /* get_seconds */
 	pcapng_get_meta_section,        /* get_meta_section */
-        pcapng_get_meta_section_option, /* get_meta_section_option */
         NULL,                           /* seek_erf */
         NULL,                           /* seek_timeval */
         NULL,                           /* seek_seconds */

@@ -582,12 +582,15 @@ typedef enum {
 
 /** Enumeration of datatype returned inside libtrace_meta_item_t structure */
 typedef enum {
-        TRACE_META_UINT32_T     = 1,        
-        TRACE_META_UINT64_T     = 2,
-        TRACE_META_STRING       = 3,
-        TRACE_META_UNKNOWN      = 4,
-	TRACE_META_UINT128_T	= 5 
-} meta_datatype_t;
+	TRACE_META_UINT8	= 1,
+        TRACE_META_UINT32	= 2,        
+        TRACE_META_UINT64	= 3,
+        TRACE_META_STRING       = 4,
+        TRACE_META_UNKNOWN      = 5,
+	TRACE_META_IPV4		= 6,
+	TRACE_META_IPV6		= 7,
+	TRACE_META_MAC		= 8, 
+} libtrace_meta_datatype_t;
 
 typedef struct libtrace_meta_result {
 	uint16_t type;
@@ -596,8 +599,9 @@ typedef struct libtrace_meta_result {
 
 typedef struct libtrace_meta_item {
         uint16_t option;
+	char *option_name;
         uint16_t len;
-        meta_datatype_t datatype;
+        libtrace_meta_datatype_t datatype;
         void *data;
 } libtrace_meta_item_t;
 
@@ -3724,6 +3728,9 @@ DLLEXPORT bool trace_get_wireless_antenna(void *linkptr,
 /*@}*/
 
 DLLEXPORT int trace_destroy_meta(libtrace_meta_t *result);
+
+DLLEXPORT libtrace_meta_t *trace_get_meta_option(libtrace_packet_t *packet, uint32_t section,
+        uint32_t option);
 
 DLLEXPORT libtrace_meta_t *trace_get_interface_name_meta(libtrace_packet_t *packet);
 

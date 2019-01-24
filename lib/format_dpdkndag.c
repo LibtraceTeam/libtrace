@@ -749,7 +749,6 @@ static struct libtrace_format_t dpdkndag = {
         NULL,                   /* seek_timeval */
         NULL,                   /* seek_seconds */
 	NULL,                   /* get_meta_section */
-        NULL,                   /* get_meta_section_item */
         erf_get_capture_length, /* get_capture_length */
         erf_get_wire_length,    /* get_wire_length */
         erf_get_framing_length, /* get_framing_length */

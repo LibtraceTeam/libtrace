@@ -936,6 +936,140 @@ static void erf_get_statistics(libtrace_t *trace, libtrace_stat_t *stat) {
         }
 }
 
+static char *erf_get_option_name(uint32_t option) {
+	switch(option) {
+		case (ERF_PROV_COMMENT): return "Comment";
+                case (ERF_PROV_FCS_LEN): return "FCS Length";
+                case (ERF_PROV_MASK_CIDR): return "Subnet CIDR";
+                case (ERF_PROV_NAME): return "Interface Name";
+                case (ERF_PROV_DESCR): return "Interface Description";
+                case (ERF_PROV_APP_NAME): return "Application Name";
+                case (ERF_PROV_HOSTNAME): return "Hostname";
+                case (ERF_PROV_OS): return "Operating System";
+                case (ERF_PROV_MODEL): return "Model";
+                case (ERF_PROV_FW_VERSION): return "Firmware Version";
+                case (ERF_PROV_SERIAL_NO): return "Serial Number";
+                case (ERF_PROV_ORG_NAME): return "Organisation Name";
+                case (ERF_PROV_SNAPLEN): return "Snap length";
+                case (ERF_PROV_CARD_NUM): return "DAG Card Number";
+                case (ERF_PROV_MODULE_NUM): return "DAG Module Number";
+                case (ERF_PROV_LOC_NAME): return "Capture Location";
+                case (ERF_PROV_FLOW_HASH_MODE): return "Flow Hash Mode";
+                case (ERF_PROV_TUNNELING_MODE): return "Tunneling Mode";
+                case (ERF_PROV_LOC_DESCR): return "Location Description";
+                case (ERF_PROV_MEM): return "Stream Buffer Memory";
+                case (ERF_PROV_DEV_NAME): return "DAG Device Name";
+                case (ERF_PROV_DEV_PATH): return "DAG Device Path";
+                case (ERF_PROV_APP_VERSION): return "Capture Application Version";
+                case (ERF_PROV_CPU): return "CPU";
+                case (ERF_PROV_CPU_PHYS_CORES): return "CPU Cores";
+                case (ERF_PROV_CPU_NUMA_NODES): return "CPU NUMA Nodes";
+                case (ERF_PROV_DAG_VERSION): return "DAG Software Version";
+                case (ERF_PROV_IF_NUM): return "Number";
+                case (ERF_PROV_IF_SPEED): return "Speed";
+                case (ERF_PROV_IF_IPV4): return "IPv4";
+                case (ERF_PROV_IF_IPV6): return "IPv6";
+                case (ERF_PROV_IF_MAC): return "MAC";
+                case (ERF_PROV_IF_SFP_TYPE): return "Transceiver Type";
+                case (ERF_PROV_IF_LINK_STATUS): return "Link Status";
+                case (ERF_PROV_IF_PHY_MODE): return "PHY Mode";
+                case (ERF_PROV_IF_PORT_TYPE): return "Port Type";
+		case (ERF_PROV_IF_RX_LATENCY): return "Latency";
+                case (ERF_PROV_IF_RX_POWER): return "Optical RX Power";
+                case (ERF_PROV_IF_TX_POWER): return "Optical TX Power";
+                case (ERF_PROV_CLK_SOURCE): return "CLK Source";
+                case (ERF_PROV_CLK_STATE): return "CLK State";
+                case (ERF_PROV_CLK_THRESHOLD): return "CLK Threshold";
+                case (ERF_PROV_CLK_CORRECTION): return "CLK Correction";
+                case (ERF_PROV_CLK_FAILURES): return "CLK Failures";
+                case (ERF_PROV_CLK_RESYNCS): return "CLK Resyncs";
+                case (ERF_PROV_CLK_PHASE_ERROR): return "CLK Phase Errors";
+                case (ERF_PROV_CLK_INPUT_PULSES): return "CLK Input Pulses";
+                case (ERF_PROV_CLK_REJECTED_PULSES): return "CLK Rejected Pulses";
+                case (ERF_PROV_CLK_PHC_INDEX): return "CLK PHC Index";
+                case (ERF_PROV_CLK_PHC_OFFSET): return "CLK PHC Offset";
+                case (ERF_PROV_CLK_TIMEBASE): return "CLK Timebase";
+                case (ERF_PROV_CLK_DESCR): return "CLK Description";
+                case (ERF_PROV_CLK_OUT_SOURCE): return "CLK Output Source" ;
+                case (ERF_PROV_CLK_LINK_MODE): return "CLK Link Mode";
+                case (ERF_PROV_PTP_DOMAIN_NUM): return "PTP Domain Number";
+                case (ERF_PROV_PTP_STEPS_REMOVED): return "PTP Steps removed";
+                case (ERF_PROV_CLK_PORT_PROTO): return "CLK Port Protocol";
+		default:
+			return "Unknown";
+	}
+	return "duno";
+}
+
+static libtrace_meta_datatype_t erf_get_datatype(uint32_t option) {
+	switch(option) {
+		case (ERF_PROV_COMMENT): return TRACE_META_STRING;
+		case (ERF_PROV_FCS_LEN): return TRACE_META_UINT32;
+		case (ERF_PROV_MASK_CIDR): return TRACE_META_UINT32;
+		case (ERF_PROV_NAME): return TRACE_META_STRING;
+		case (ERF_PROV_DESCR): return TRACE_META_STRING;
+		case (ERF_PROV_APP_NAME): return TRACE_META_STRING;
+		case (ERF_PROV_HOSTNAME): return TRACE_META_STRING;
+		case (ERF_PROV_OS): return TRACE_META_STRING;
+		case (ERF_PROV_MODEL): return TRACE_META_STRING;
+		case (ERF_PROV_FW_VERSION): return TRACE_META_STRING;
+		case (ERF_PROV_SERIAL_NO): return TRACE_META_STRING;
+		case (ERF_PROV_ORG_NAME): return TRACE_META_STRING;
+		case (ERF_PROV_SNAPLEN): return TRACE_META_UINT32;
+		case (ERF_PROV_CARD_NUM): return TRACE_META_UINT32;
+		case (ERF_PROV_MODULE_NUM): return TRACE_META_UINT32;
+		case (ERF_PROV_LOC_NAME): return TRACE_META_STRING;
+		case (ERF_PROV_FLOW_HASH_MODE): return TRACE_META_UINT32;
+		case (ERF_PROV_TUNNELING_MODE): return TRACE_META_UINT32;
+		case (ERF_PROV_LOC_DESCR): return TRACE_META_STRING;
+		case (ERF_PROV_MEM): return TRACE_META_UINT64;
+		case (ERF_PROV_DEV_NAME): return TRACE_META_STRING;
+		case (ERF_PROV_DEV_PATH): return TRACE_META_STRING;
+		case (ERF_PROV_APP_VERSION): return TRACE_META_STRING;
+		case (ERF_PROV_CPU): return TRACE_META_STRING;
+		case (ERF_PROV_CPU_PHYS_CORES): return TRACE_META_UINT32;
+		case (ERF_PROV_CPU_NUMA_NODES): return TRACE_META_UINT32;
+		case (ERF_PROV_DAG_VERSION): return TRACE_META_STRING;
+		case (ERF_PROV_IF_NUM): return TRACE_META_UINT32;
+		case (ERF_PROV_IF_SPEED): return TRACE_META_UINT64;
+		case (ERF_PROV_IF_IPV4): return TRACE_META_IPV4;
+		case (ERF_PROV_IF_IPV6): return TRACE_META_IPV6;
+		case (ERF_PROV_IF_MAC): return TRACE_META_MAC;
+		case (ERF_PROV_IF_SFP_TYPE): return TRACE_META_STRING;
+		case (ERF_PROV_IF_LINK_STATUS): return TRACE_META_UINT32;
+		case (ERF_PROV_IF_PHY_MODE): return TRACE_META_STRING;
+		case (ERF_PROV_IF_PORT_TYPE): return TRACE_META_UINT32;
+		/* this is a ts_rel, need to double check */
+		case (ERF_PROV_IF_RX_LATENCY): return TRACE_META_UINT64;
+		case (ERF_PROV_IF_RX_POWER): return TRACE_META_UINT32;
+		case (ERF_PROV_IF_TX_POWER): return TRACE_META_UINT32;
+		case (ERF_PROV_CLK_SOURCE): return TRACE_META_UINT32;
+		case (ERF_PROV_CLK_STATE): return TRACE_META_UINT32;
+		/* this is a ts_rel, need to double check */
+		case (ERF_PROV_CLK_THRESHOLD): return TRACE_META_UINT64;
+		/* this is a ts_rel, need to double check */
+		case (ERF_PROV_CLK_CORRECTION): return TRACE_META_UINT64;
+		case (ERF_PROV_CLK_FAILURES): return TRACE_META_UINT32;
+		case (ERF_PROV_CLK_RESYNCS): return TRACE_META_UINT32;
+		/* this is a ts_rel, need to double check */
+		case (ERF_PROV_CLK_PHASE_ERROR): return TRACE_META_UINT64;
+		case (ERF_PROV_CLK_INPUT_PULSES): return TRACE_META_UINT32;
+		case (ERF_PROV_CLK_REJECTED_PULSES): return TRACE_META_UINT32;
+		case (ERF_PROV_CLK_PHC_INDEX): return TRACE_META_UINT32;
+		/* this is a ts_rel, need to double check */
+		case (ERF_PROV_CLK_PHC_OFFSET): return TRACE_META_UINT64;
+		case (ERF_PROV_CLK_TIMEBASE): return TRACE_META_STRING;
+		case (ERF_PROV_CLK_DESCR): return TRACE_META_STRING;
+		case (ERF_PROV_CLK_OUT_SOURCE): return TRACE_META_UINT32;
+		case (ERF_PROV_CLK_LINK_MODE): return TRACE_META_UINT32;
+		case (ERF_PROV_PTP_DOMAIN_NUM): return TRACE_META_UINT32;
+		case (ERF_PROV_PTP_STEPS_REMOVED): return TRACE_META_UINT32;
+		case (ERF_PROV_CLK_PORT_PROTO): return TRACE_META_UINT32;
+		default:
+			return TRACE_META_UNKNOWN;
+	}
+}
+
 /* An ERF provenance packet can contain multiple sections of the same type per packet,
  * Need to think of a way to handle this currently the first found is returned*/
 void *erf_get_meta_section(libtrace_packet_t *packet, uint32_t section) {
@@ -1000,11 +1134,43 @@ void *erf_get_meta_section(libtrace_packet_t *packet, uint32_t section) {
                                         result->num*sizeof(libtrace_meta_item_t));
                         }
                         result->items[result->num-1].option = ntohs(sec->type);
+			result->items[result->num-1].option_name =
+                                erf_get_option_name(ntohs(sec->type));
+
                         result->items[result->num-1].len = ntohs(sec->len);
-                        result->items[result->num-1].datatype = TRACE_META_UNKNOWN;
-                        result->items[result->num-1].data = malloc(ntohs(sec->len));
-                        memcpy(result->items[result->num-1].data,
-                                ptr+sizeof(struct dag_opthdr), ntohs(sec->len));
+                        result->items[result->num-1].datatype =
+				erf_get_datatype(ntohs(sec->type));
+
+			/* If the datatype is a string allow for a null terminator */
+                        if (result->items[result->num-1].datatype == TRACE_META_STRING) {
+                                result->items[result->num-1].data =
+                                        calloc(1, ntohs(sec->len)+1);
+				((char *)result->items[result->num-1].data)[ntohs(sec->len)] = '\0';
+				/* and copy the utf8 string */
+				memcpy(result->items[result->num-1].data,
+                                	ptr+sizeof(struct dag_opthdr), ntohs(sec->len));
+                        } else {
+                                result->items[result->num-1].data =
+                                        calloc(1, ntohs(sec->len));
+				/* depending on the datatype we need to ensure the data is
+				 * in host byte ordering */
+				if (result->items[result->num-1].datatype == TRACE_META_UINT32
+					|| result->items[result->num-1].datatype == TRACE_META_IPV4) {
+					uint32_t t = *(uint32_t *)(ptr+sizeof(struct dag_opthdr));
+					t = ntohl(t);
+					memcpy(result->items[result->num-1].data,
+						&t, sizeof(uint32_t));
+				} else if(result->items[result->num-1].datatype == TRACE_META_UINT64) {
+					uint64_t t = *(uint64_t *)(ptr+sizeof(struct dag_opthdr));
+					t = bswap_be_to_host64(t);
+					memcpy(result->items[result->num-1].data,
+                                                &t, sizeof(uint64_t));
+				} else {
+					memcpy(result->items[result->num-1].data,
+                                        	ptr+sizeof(struct dag_opthdr), ntohs(sec->len));
+				}
+
+                        }
 
                 }
 
@@ -1025,86 +1191,6 @@ void *erf_get_meta_section(libtrace_packet_t *packet, uint32_t section) {
                 free(result);
                 return NULL;
         }
-}
-
-/* Returns a pointer to the beginning of the section or NULL if not found */
-void *erf_get_meta_section_option(libtrace_packet_t *packet, uint32_t section, uint16_t option) {
-
-	uint32_t remaining;
-	void *bodyptr;
-	dag_sec_t *sec;
-	dag_record_t *hdr;
-	uint16_t curr_sec;
-	uint16_t tmp;
-
-	if (packet->buffer == NULL) { return NULL; }
-
-	hdr = (dag_record_t *)packet->buffer;
-	bodyptr = (char *)packet->payload;
-	/* 24 is size of the ERF header */
-	remaining = ntohs(hdr->rlen) - 24;
-
-	/* ensure this is a meta packet */
-	/* the type only uses bits 0-6 */
-	if ((hdr->type & 127) != 27) { return NULL; }
-
-	/* setup structure to hold the result */
-	libtrace_meta_t *result = malloc(sizeof(libtrace_meta_t));
-	result->section = section;
-	result->num = 0;
-
-	/* loop over the entire packet */
-	while (remaining > sizeof(dag_sec_t)) {
-
-		sec = (dag_sec_t *)bodyptr;
-
-		if (ntohs(sec->type) == ERF_PROV_SECTION_CAPTURE
-			|| ntohs(sec->type) == ERF_PROV_SECTION_HOST
-			|| ntohs(sec->type) == ERF_PROV_SECTION_MODULE
-			|| ntohs(sec->type) == ERF_PROV_SECTION_INTERFACE) {
-
-			curr_sec = ntohs(sec->type);
-		}
-
-		/* if this section and option is one we want */
-		if (curr_sec == section && ntohs(sec->type) == option) {
-
-			result->num += 1;
-
-			if (result->num == 1) {
-				result->items = malloc(sizeof(libtrace_meta_item_t));
-			} else {
-				result->items = realloc(result->items,
-					result->num*sizeof(libtrace_meta_item_t));
-			}
-
-			result->items[result->num-1].option = ntohs(sec->type);
-			result->items[result->num-1].len = ntohs(sec->len);
-			result->items[result->num-1].datatype = TRACE_META_UNKNOWN;
-			result->items[result->num-1].data = calloc(1, ntohs(sec->len));
-
-			memcpy(result->items[result->num-1].data,
-				bodyptr+sizeof(struct dag_opthdr), ntohs(sec->len));
-
-		}
-
-		/* Update remaining and bodyptr and account for any padding */
-		if ((ntohs(sec->len) % 4) != 0) {
-                        tmp = ntohs(sec->len) + (4 - (ntohs(sec->len) % 4)) + sizeof(dag_sec_t);
-                } else {
-                        tmp = ntohs(sec->len) + sizeof(dag_sec_t);
-		}
-                remaining -= tmp;
-                bodyptr += tmp;
-	}
-
-	/* If the result structure has result matches were found */
-	if (result->num > 0) {
-		return (void *)result;
-	} else {
-		free(result);
-		return NULL;
-	}
 }
 
 static void erf_help(void) {
@@ -1156,7 +1242,6 @@ static struct libtrace_format_t erfformat = {
 	NULL,				/* get_timespec */
 	NULL,				/* get_seconds */
 	erf_get_meta_section,           /* get_meta_section */
-        erf_get_meta_section_option,    /* get_meta_section_option */
 	erf_seek_erf,			/* seek_erf */
 	NULL,				/* seek_timeval */
 	NULL,				/* seek_seconds */
@@ -1203,7 +1288,6 @@ static struct libtrace_format_t rawerfformat = {
 	NULL,				/* get_timespec */
 	NULL,				/* get_seconds */
 	erf_get_meta_section,		/* get_meta_section */
-	erf_get_meta_section_option,	/* get_meta_section_option */
 	erf_seek_erf,			/* seek_erf */
 	NULL,				/* seek_timeval */
 	NULL,				/* seek_seconds */
