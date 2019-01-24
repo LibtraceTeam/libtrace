@@ -51,7 +51,7 @@ static void print_section(libtrace_meta_t *meta) {
                                 meta->items[i].option,
 				ether_ntoa((struct ether_addr *)(char *)meta->items[i].data));
 		} else {
-			printf("   Option ID: %u Option Value: ", meta->items[i].option);
+			printf("   Name: Unknown ID: %u Option Value (RAW): ", meta->items[i].option);
 			int k;
 			unsigned char *curr = (unsigned char *)meta->items[i].data;
 			for (k=0; k<meta->items[i].len; k++) {
