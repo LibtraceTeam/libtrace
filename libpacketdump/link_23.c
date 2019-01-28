@@ -40,7 +40,8 @@ static void print_section_type(libtrace_meta_t *r) {
 }
 static void print_interface_type(libtrace_meta_t *r, libtrace_packet_t *packet) {
 	int i;
-	char *ip4, *ip6, *ptr UNUSED;
+	struct in_addr ip;
+	char *ip6, *ptr UNUSED;
 	printf(" PCAPNG Interface Description Block\n");
 
 	if (r == NULL) { return; }
@@ -56,11 +57,8 @@ static void print_interface_type(libtrace_meta_t *r, libtrace_packet_t *packet) 
 					(char *)r->items[i].data);
 				break;
 			case(PCAPNG_META_IF_IP4):
-				ip4 = calloc(1, INET4_ADDRSTRLEN);
-				ptr = trace_get_interface_ipv4_string(packet, ip4,
-					INET4_ADDRSTRLEN, 0);
-				printf("  if_IPv4addr: %s", ip4);
-				free(ip4);
+				ip.s_addr = *(uint32_t *)r->items[i].data;
+				printf("  if_IPv4addr: %s", inet_ntoa(ip));
 				break;
 			case(PCAPNG_META_IF_IP6):
 				ip6 = calloc(1, INET6_ADDRSTRLEN);
@@ -118,38 +116,35 @@ static void print_interface_type(libtrace_meta_t *r, libtrace_packet_t *packet) 
 
 static void print_name_resolution_type(libtrace_meta_t *r) {
 	int i;
+	struct in_addr ip;
 	printf(" PCAPNG Name Resolution\n");
-
 	if (r == NULL) { return; }
 
 	for (i=0; i<r->num; i++) {
 		switch(r->items[i].option) {
-			//case(PCAPNG_META_NRB_RECORD_END):
-			//	/* This should never occur,
-			//	 * the meta api should not return it */
-			//	break;
-			//case(PCAPNG_META_NRB_RECORD_IP4):
-			//	printf("  nrb_record_ipv4: %u dns_name: %s\n",
-			//		*(uint32_t *)r->items[i].data,
-			//		(char *)r->items[i].data+sizeof(uint32_t));
-			//	break;
-			//case(PCAPNG_META_NRB_RECORD_IP6):
-			//	/* todo - need to find an example */
-			//	break;
-			case(PCAPNG_META_NS_DNSNAME):
-				printf("  ns_dnsname: %s\n",
-					(char *)r->items[i].data);
+			case(PCAPNG_META_NRB_RECORD_IP4):
+				ip.s_addr = *(uint32_t *)r->items[i].data;
+				printf("  nrb_record_ipv4: %s dns_name: %s\n",
+					inet_ntoa(ip),
+					(char *)(r->items[i].data+sizeof(uint32_t)));
 				break;
-			case(PCAPNG_META_NS_DNS_IP4_ADDR):
-				printf("  ns_dnsIP4addr: %u.%u.%u.%u\n",
-					*(uint8_t *)r->items[i].data,
-					*(uint8_t *)r->items[i].data+8,
-					*(uint8_t *)r->items[i].data+16,
-					*(uint8_t *)r->items[i].data+24);
-				break;
-			case(PCAPNG_META_NS_DNS_IP6_ADDR):
+			case(PCAPNG_META_NRB_RECORD_IP6):
 				/* todo - need to find an example */
 				break;
+			//case(PCAPNG_META_NS_DNSNAME):
+			//	printf("  ns_dnsname: %s\n",
+			//		(char *)r->items[i].data);
+			//	break;
+			//case(PCAPNG_META_NS_DNS_IP4_ADDR):
+			//	printf("  ns_dnsIP4addr: %u.%u.%u.%u\n",
+			//		*(uint8_t *)r->items[i].data,
+			//		*(uint8_t *)r->items[i].data+8,
+			//		*(uint8_t *)r->items[i].data+16,
+			//		*(uint8_t *)r->items[i].data+24);
+			//	break;
+			//case(PCAPNG_META_NS_DNS_IP6_ADDR):
+			//	/* todo - need to find an example */
+			//	break;
 			default:
 				break;
 		}

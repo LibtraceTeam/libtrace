@@ -2031,9 +2031,11 @@ static libtrace_meta_datatype_t pcapng_get_datatype(uint32_t section, uint32_t o
 			}
 		case(PCAPNG_SIMPLE_PACKET_TYPE):
 			/* simple packets should not contain any options */
+			return TRACE_META_UNKNOWN;
 		case(PCAPNG_NAME_RESOLUTION_TYPE):
 			/* todo - needs to handle name resolution options along with
 			 * normal options */
+			return TRACE_META_UNKNOWN;
 		case(PCAPNG_INTERFACE_STATS_TYPE):
 			return TRACE_META_UINT64;
 		case(PCAPNG_ENHANCED_PACKET_TYPE):
@@ -2045,12 +2047,10 @@ static libtrace_meta_datatype_t pcapng_get_datatype(uint32_t section, uint32_t o
 		case(PCAPNG_DECRYPTION_SECRETS_TYPE):
 			/* todo - needs to handle decryption secrets options along with
                          * normal options */
+			return TRACE_META_UNKNOWN;
 		default:
 			return TRACE_META_UNKNOWN;
 	}
-
-	/* If we get this far we dont know the datatype */
-	return TRACE_META_UNKNOWN;
 }
 
 static void *pcapng_jump_to_options(libtrace_packet_t *packet) {
@@ -2069,7 +2069,7 @@ static void *pcapng_jump_to_options(libtrace_packet_t *packet) {
         if (blocktype == PCAPNG_SECTION_TYPE) { ptr += sizeof(pcapng_sec_t); }
         else if (blocktype == PCAPNG_INTERFACE_TYPE) { ptr += sizeof(pcapng_int_t); }
         else if (blocktype == PCAPNG_OLD_PACKET_TYPE) { ptr += sizeof(pcapng_opkt_t); }
-        else if (blocktype == PCAPNG_NAME_RESOLUTION_TYPE) { ptr += sizeof(pcapng_epkt_t); }
+        else if (blocktype == PCAPNG_NAME_RESOLUTION_TYPE) { ptr += sizeof(pcapng_nrb_t); }
         else if (blocktype == PCAPNG_INTERFACE_STATS_TYPE) { ptr += sizeof(pcapng_stats_t); }
         else if (blocktype == PCAPNG_ENHANCED_PACKET_TYPE) {
                 /* jump over the the enchanced packet header and data to the options */
@@ -2116,6 +2116,10 @@ void *pcapng_get_meta_section(libtrace_packet_t *packet, uint32_t section) {
 	uint16_t len;
 	uint16_t tmp;
 
+	if (packet == NULL) {
+		fprintf(stderr, "NULL packet passed into pcapng_get_meta_section()\n");
+		return NULL;
+	}
 	if (packet->buffer == NULL) { return NULL; }
 
 	hdr = (struct pcapng_peeker *)packet->buffer;
@@ -2178,9 +2182,7 @@ void *pcapng_get_meta_section(libtrace_packet_t *packet, uint32_t section) {
 				calloc(1, len);
 			/* depending on the datatype we need to ensure the data is
 			 * in host byte ordering */
-			if (result->items[result->num-1].datatype == TRACE_META_UINT32
-				|| result->items[result->num-1].datatype == TRACE_META_IPV4) {
-
+			if (result->items[result->num-1].datatype == TRACE_META_UINT32) {
 				uint32_t t = *(uint32_t *)(ptr+sizeof(struct pcapng_optheader));
 				t = ntohl(t);
 				memcpy(result->items[result->num-1].data,

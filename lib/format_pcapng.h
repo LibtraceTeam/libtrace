@@ -19,7 +19,7 @@
 #define PCAPNG_CUSTOM_OPTION_BIN_NONCOPY 0x4BAD
 
 
-#define PCAPNG_OPTION_END 0x0000
+#define PCAPNG_OPTION_END 0
 #define PCAPNG_OPTION_COMMENT 1
 /* Custom option code containing a UTF-8 string */
 #define PCAPNG_OPTION_CUSTOM_1 2988

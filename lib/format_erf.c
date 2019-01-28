@@ -1085,6 +1085,10 @@ void *erf_get_meta_section(libtrace_packet_t *packet, uint32_t section) {
 	uint16_t remaining;
 	uint16_t curr_sec = 0;
 
+	if (packet == NULL) {
+		fprintf(stderr, "NULL packet passed into erf_get_meta_section()\n");
+		return NULL;
+	}
 	if (packet->buffer == NULL) { return NULL; }
 
 	hdr = (dag_record_t *)packet->buffer;
@@ -1149,8 +1153,7 @@ void *erf_get_meta_section(libtrace_packet_t *packet, uint32_t section) {
                                         calloc(1, ntohs(sec->len));
 				/* depending on the datatype we need to ensure the data is
 				 * in host byte ordering */
-				if (result->items[result->num-1].datatype == TRACE_META_UINT32
-					|| result->items[result->num-1].datatype == TRACE_META_IPV4) {
+				if (result->items[result->num-1].datatype == TRACE_META_UINT32) {
 					uint32_t t = *(uint32_t *)(ptr+sizeof(struct dag_opthdr));
 					t = ntohl(t);
 					memcpy(result->items[result->num-1].data,
