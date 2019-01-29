@@ -592,11 +592,6 @@ typedef enum {
 	TRACE_META_MAC		= 8, 
 } libtrace_meta_datatype_t;
 
-typedef struct libtrace_meta_result {
-	uint16_t type;
-	uint16_t len;
-} libtrace_meta_result_t;
-
 typedef struct libtrace_meta_item {
         uint16_t option;
 	char *option_name;
