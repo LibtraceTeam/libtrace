@@ -413,7 +413,8 @@ typedef enum {
        TRACE_TYPE_NONDATA = 19,		/**< Not a data packet */
        TRACE_TYPE_OPENBSD_LOOP = 20,	/**< OpenBSD loopback */
        TRACE_TYPE_ERF_META = 21, /**< ERF Provenance metadata record */
-       TRACE_TYPE_ETSILI = 22	/**< ETSI Lawful Intercept */
+       TRACE_TYPE_ETSILI = 22,	/**< ETSI Lawful Intercept */
+       TRACE_TYPE_PCAPNG_META = 23,	/** PCAPNG meta packet */
 } libtrace_linktype_t;
 
 /** RT protocol base format identifiers.

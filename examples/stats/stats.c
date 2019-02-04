@@ -7,12 +7,12 @@
 #include "lt_inttypes.h"
 
 double lastts = 0.0;
-uint64_t v4=0;
-uint64_t v6=0;
-uint64_t udp=0;
-uint64_t tcp=0;
-uint64_t icmp=0;
-uint64_t ok=0;
+uint64_t v4_packets=0;
+uint64_t v6_packets=0;
+uint64_t udp_packets=0;
+uint64_t tcp_packets=0;
+uint64_t icmp_packets=0;
+uint64_t ok_packets=0;
 
 static void per_packet(libtrace_packet_t *packet)
 {
@@ -33,11 +33,11 @@ static void per_packet(libtrace_packet_t *packet)
 	if (lastts+1.0 < trace_get_seconds(packet)) {
 		++lastts;
 		printf("%.03f,",lastts);
-		printf("%"PRIu64",%"PRIu64",",v4,v6);
-		printf("%"PRIu64",%"PRIu64",%"PRIu64,icmp,tcp,udp);
+		printf("%"PRIu64",%"PRIu64",",v4_packets,v6_packets);
+		printf("%"PRIu64",%"PRIu64",%"PRIu64,icmp_packets,tcp_packets,udp_packets);
 		printf("\n");
-		v4=v6=0;
-		icmp=tcp=udp=0;
+		v4_packets=v6_packets=0;
+		icmp_packets=tcp_packets=udp_packets=0;
 	}
 
  	l3 = trace_get_layer3(packet,&ethertype,&remaining);
@@ -46,7 +46,7 @@ static void per_packet(libtrace_packet_t *packet)
 		/* Probable ARP or something */
 		return;
 
-	/* Get the UDP/TCP/ICMP header from the IPv4/IPv6 packet */
+	/* Get the UDP/TCP/ICMP header from the IPv4_packets/IPv6_packets packet */
 	switch (ethertype) {
 		case 0x0800:
 			transport = trace_get_payload_from_ip(
@@ -55,7 +55,7 @@ static void per_packet(libtrace_packet_t *packet)
 					&remaining);
 			if (!transport)
 				return;
-			++v4;
+			++v4_packets;
 			break;
 		case 0x86DD:
 			transport = trace_get_payload_from_ip6(
@@ -64,16 +64,16 @@ static void per_packet(libtrace_packet_t *packet)
 					&remaining);
 			if (!transport)
 				return;
-			++v6;
+			++v6_packets;
 			break;
 		default:
 			return;
 	}
 
-	/* Parse the udp/tcp/icmp payload */
+	/* Parse the udp_packets/tcp_packets/icmp_packets payload */
 	switch(proto) {
 		case 1:
-			++icmp;
+			++icmp_packets;
 			return;
 		case 6:
 			payload = trace_get_payload_from_tcp(
@@ -82,7 +82,7 @@ static void per_packet(libtrace_packet_t *packet)
 			if (!payload)
 				return;
 
-			++tcp;
+			++tcp_packets;
 			break;
 		case 17:
 
@@ -91,12 +91,12 @@ static void per_packet(libtrace_packet_t *packet)
 					&remaining);
 			if (!payload)
 				return;
-			++udp;
+			++udp_packets;
 			break;
 		default:
 			return;
 	}
-	++ok;
+	++ok_packets;
 }
 
 static void usage(char *argv0)
@@ -200,6 +200,8 @@ int main(int argc, char *argv[])
 
 		trace_destroy(trace);
 	}
-
+        if (filter) {
+                trace_destroy_filter(filter);
+        }
 	return 0;
 }

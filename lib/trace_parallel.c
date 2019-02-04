@@ -2276,22 +2276,31 @@ DLLEXPORT int trace_set_hasher(libtrace_t *trace, enum hasher_types type, fn_has
 		ret = trace->format->config_input(trace, TRACE_OPTION_HASHER, &type);
 
 	if (ret == -1) {
+                libtrace_err_t err UNUSED;
+
 		/* We have to deal with this ourself */
+                /* If we succeed, clear any error state otherwise our caller
+                 * might assume an error occurred, even though we've resolved
+                 * the issue ourselves.
+                 */
 		if (!hasher) {
 			switch (type)
 			{
 				case HASHER_CUSTOM:
 				case HASHER_BALANCE:
+                                        err = trace_get_err(trace);
 					return 0;
 				case HASHER_BIDIRECTIONAL:
 					trace->hasher = (fn_hasher) toeplitz_hash_packet;
 					trace->hasher_data = calloc(1, sizeof(toeplitz_conf_t));
 					toeplitz_init_config(trace->hasher_data, 1);
+                                        err = trace_get_err(trace);
 					return 0;
 				case HASHER_UNIDIRECTIONAL:
 					trace->hasher = (fn_hasher) toeplitz_hash_packet;
 					trace->hasher_data = calloc(1, sizeof(toeplitz_conf_t));
 					toeplitz_init_config(trace->hasher_data, 0);
+                                        err = trace_get_err(trace);
 					return 0;
 			}
 			return -1;

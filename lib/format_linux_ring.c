@@ -70,6 +70,25 @@ static pthread_mutex_t pagesize_mutex;
 /* Cached page size, the page size shouldn't be changing */
 static int pagesize = 0;
 
+static bool linuxring_can_write(libtrace_packet_t *packet) {
+	/* Get the linktype */
+        libtrace_linktype_t ltype = trace_get_link_type(packet);
+
+        if (ltype == TRACE_TYPE_CONTENT_INVALID) {
+                return false;
+        }
+        if (ltype == TRACE_TYPE_NONDATA) {
+                return false;
+        }
+        if (ltype == TRACE_TYPE_PCAPNG_META) {
+                return false;
+        }
+        if (ltype == TRACE_TYPE_ERF_META) {
+                return false;
+        }
+
+        return true;
+}
 
 /*
  * Try figure out the best sizes for the ring buffer. Ensure that:
@@ -307,8 +326,8 @@ static int linuxring_fin_input(libtrace_t *libtrace) {
 			}
 		}
 
-                if (FORMAT_DATA->filter != NULL)
-                        free(FORMAT_DATA->filter);
+		if (FORMAT_DATA->filter != NULL)
+                	trace_destroy_filter(FORMAT_DATA->filter);
 
                 if (FORMAT_DATA->per_stream)
                         libtrace_list_deinit(FORMAT_DATA->per_stream);
@@ -708,15 +727,17 @@ static void linuxring_fin_packet(libtrace_packet_t *packet)
 static int linuxring_write_packet(libtrace_out_t *libtrace,
 				  libtrace_packet_t *packet)
 {
+	/* Check linuxring can write this type of packet */
+	if (!linuxring_can_write(packet)) {
+		return 0;
+	}
+
 	struct tpacket2_hdr *header;
 	struct pollfd pollset;
 	struct socket_addr;
 	int ret;
 	unsigned max_size;
 	void * off;
-
-	if (trace_get_link_type(packet) == TRACE_TYPE_NONDATA)
-		return 0;
 
 	max_size = FORMAT_DATA_OUT->req.tp_frame_size -
 		TPACKET2_HDRLEN + sizeof(struct sockaddr_ll);

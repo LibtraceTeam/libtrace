@@ -1430,6 +1430,8 @@ DLLEXPORT size_t trace_get_capture_length(const libtrace_packet_t *packet)
  */
 DLLEXPORT size_t trace_get_wire_length(const libtrace_packet_t *packet){
 
+        size_t wiresub = 0;
+
         if (packet->which_trace_start != packet->trace->startcount) {
                 return ~0U;
         }
@@ -1441,9 +1443,29 @@ DLLEXPORT size_t trace_get_wire_length(const libtrace_packet_t *packet){
 			packet->trace->format->get_wire_length(packet);
 	}
 
-	if (!(packet->cached.wire_length < LIBTRACE_PACKET_BUFSIZE)) {
-		fprintf(stderr, "Wire length is greater than the buffer size in trace_get_wire_length()\n");
-		return 0;
+        if (packet->type >= TRACE_RT_DATA_DLT && packet->type <=
+                        TRACE_RT_DATA_DLT_END) {
+
+                /* pcap wire lengths in libtrace include an extra four bytes
+                 * for the FCS (to be consistent with other formats that do
+                 * capture the FCS), but these bytes don't actually exist on
+                 * the wire. Therefore, we shouldn't get upset if our "wire"
+                 * length exceeds the max buffer size by four bytes or less.
+                 */
+                if (packet->cached.wire_length >= 4) {
+                        wiresub = 4;
+                } else {
+                        wiresub = packet->cached.wire_length;
+                }
+        } else {
+                wiresub = 0;
+        }
+
+	if (!(packet->cached.wire_length - wiresub < LIBTRACE_PACKET_BUFSIZE)) {
+		fprintf(stderr, "Wire length %zu exceeds expected maximum packet size of %d -- packet is likely corrupt.\n",
+                                packet->cached.wire_length - wiresub,
+                                LIBTRACE_PACKET_BUFSIZE);
+
 		/* should we be returning ~OU here? */
 	}
 	return packet->cached.wire_length;
@@ -1553,7 +1575,7 @@ trace_create_filter_from_bytecode(void *bf_insns, unsigned int bf_len)
 	return NULL;
 #else
 	struct libtrace_filter_t *filter = (struct libtrace_filter_t *)
-		malloc(sizeof(struct libtrace_filter_t));
+		calloc(1, sizeof(struct libtrace_filter_t));
 	filter->filter.bf_insns = (struct bpf_insn *)
 		malloc(sizeof(struct bpf_insn) * bf_len);
 
@@ -1577,7 +1599,7 @@ trace_create_filter_from_bytecode(void *bf_insns, unsigned int bf_len)
 DLLEXPORT libtrace_filter_t *trace_create_filter(const char *filterstring) {
 #ifdef HAVE_BPF
 	libtrace_filter_t *filter = (libtrace_filter_t*)
-				malloc(sizeof(libtrace_filter_t));
+				calloc(1, sizeof(libtrace_filter_t));
 	filter->filterstring = strdup(filterstring);
 	filter->jitfilter = NULL;
 	filter->flag = 0;
@@ -1717,7 +1739,8 @@ DLLEXPORT int trace_apply_filter(libtrace_filter_t *filter,
 	 * through to the caller */
 	linktype = trace_get_link_type(packet);
 
-	if (linktype == TRACE_TYPE_NONDATA || linktype == TRACE_TYPE_ERF_META)
+	if (linktype == TRACE_TYPE_NONDATA || linktype == TRACE_TYPE_ERF_META
+		|| linktype == TRACE_TYPE_PCAPNG_META)
 		return 1;
 
 	if (libtrace_to_pcap_dlt(linktype)==TRACE_DLT_ERROR) {

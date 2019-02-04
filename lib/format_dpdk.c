@@ -144,6 +144,19 @@ struct dpdk_addt_hdr {
 	uint32_t cap_len; /* The size to say the capture is */
 };
 
+static bool dpdk_can_write(libtrace_packet_t *packet) {
+        libtrace_linktype_t ltype = trace_get_link_type(packet);
+
+        if (ltype == TRACE_TYPE_CONTENT_INVALID) {
+                return false;
+        }
+        if (ltype == TRACE_TYPE_NONDATA || ltype == TRACE_TYPE_ERF_META ||
+                        ltype == TRACE_TYPE_PCAPNG_META) {
+                return false;
+        }
+	return true;
+}
+
 /**
  * We want to blacklist all devices except those on the whitelist
  * (I say list, but yes it is only the one).
@@ -254,7 +267,9 @@ static int pci_to_numa(struct rte_pci_addr * dev_addr) {
 
 	if((file = fopen(path, "r")) != NULL) {
 		int numa_node = -1;
-		fscanf(file, "%d", &numa_node);
+		if (fscanf(file, "%d", &numa_node) != 1) {
+                        numa_node = -1;
+                }
 		fclose(file);
 		return numa_node;
 	}
@@ -874,7 +889,11 @@ static void dpdk_lsc_callback(portid_t port, enum rte_eth_event_type event,
 	}
 	if (port != format_data->port) {
 		fprintf(stderr, "Port does not match port in format data in dpdk_lsc_callback()\n");
+		#if RTE_VERSION >= RTE_VERSION_NUM(17, 8, 0, 1)
 		return -1;
+		#else
+		return;
+		#endif
 	}
 
 	rte_eth_link_get_nowait(port, &link_info);
@@ -1556,6 +1575,12 @@ int dpdk_pause_input(libtrace_t * libtrace) {
 
 static int dpdk_write_packet(libtrace_out_t *trace,
                              libtrace_packet_t *packet){
+
+	/* Check dpdk can write this type of packet */
+	if (!dpdk_can_write(packet)) {
+		return 0;
+	}
+
 	struct rte_mbuf* m_buff[1];
 
 	int wirelen = trace_get_wire_length(packet);

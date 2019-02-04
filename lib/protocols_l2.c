@@ -689,8 +689,10 @@ DLLEXPORT void *trace_get_layer2(const libtrace_packet_t *packet,
 	/* Code looks a bit inefficient, but I'm actually trying to avoid
 	 * calling trace_get_packet_buffer more than once like we used to.
 	 */
-	
 	meta = trace_get_packet_buffer(packet, linktype, remaining);
+        if (meta == NULL) {
+                return NULL;
+        }
 
 	/* If there are no meta-data headers, we just return the start of the
 	 * packet buffer, along with the linktype, etc.
@@ -718,6 +720,7 @@ DLLEXPORT void *trace_get_layer2(const libtrace_packet_t *packet,
 		case TRACE_TYPE_80211_PRISM:
 		case TRACE_TYPE_PFLOG:
 		case TRACE_TYPE_ERF_META:
+		case TRACE_TYPE_PCAPNG_META:
                 case TRACE_TYPE_ETSILI:
 			break;
 		case TRACE_TYPE_UNKNOWN:
@@ -756,6 +759,7 @@ DLLEXPORT void *trace_get_layer2(const libtrace_packet_t *packet,
 				case TRACE_TYPE_80211_PRISM:
 				case TRACE_TYPE_PFLOG:
 				case TRACE_TYPE_ERF_META:
+				case TRACE_TYPE_PCAPNG_META:
                                 case TRACE_TYPE_ETSILI:
 					break;
 				case TRACE_TYPE_UNKNOWN:
@@ -807,7 +811,11 @@ DLLEXPORT void *trace_get_payload_from_layer2(void *link,
 		fprintf(stderr, "Unable to determine linktype for packet\n");
 		return NULL;
 	}
-	
+
+        if (link == NULL) {
+                return NULL;
+        }
+
 	switch(linktype) {
 		/* Packet Metadata headers, not layer2 headers */
 		case TRACE_TYPE_80211_PRISM:
@@ -826,6 +834,7 @@ DLLEXPORT void *trace_get_payload_from_layer2(void *link,
 		   */
 		case TRACE_TYPE_METADATA:
 		case TRACE_TYPE_NONDATA:
+		case TRACE_TYPE_PCAPNG_META:
 		case TRACE_TYPE_ERF_META:
 		case TRACE_TYPE_CONTENT_INVALID:
 		case TRACE_TYPE_UNKNOWN:
@@ -836,10 +845,16 @@ DLLEXPORT void *trace_get_payload_from_layer2(void *link,
 		case TRACE_TYPE_ETH:
 			return trace_get_payload_from_ethernet(link,ethertype,remaining);
 		case TRACE_TYPE_NONE:
+                        if (*remaining == 0) {
+                                return NULL;
+                        }
+
 			if ((*(char*)link&0xF0) == 0x40)
 				*ethertype=TRACE_ETHERTYPE_IP;	 /* IPv4 */
 			else if ((*(char*)link&0xF0) == 0x60)
 				*ethertype=TRACE_ETHERTYPE_IPV6; /* IPv6 */
+                        else
+                                return NULL;            /* No idea */
 			return link; /* I love the simplicity */
 		case TRACE_TYPE_PPP:
 			return trace_get_payload_from_ppp(link,ethertype,remaining);
@@ -864,11 +879,16 @@ DLLEXPORT void *trace_get_payload_from_layer2(void *link,
 			return NULL;
 
 		case TRACE_TYPE_OPENBSD_LOOP:
+                        if (*remaining <= 4) {
+                                return NULL;
+                        }
 			link = link + 4; /* Loopback header is 4 bytes */
 			if ((*(char*)link&0xF0) == 0x40)
 				*ethertype=TRACE_ETHERTYPE_IP;	 /* IPv4 */
 			else if ((*(char*)link&0xF0) == 0x60)
 				*ethertype=TRACE_ETHERTYPE_IPV6; /* IPv6 */
+                        else
+                                return NULL;
 			return link; /* I love the simplicity */
 		
 
@@ -936,6 +956,7 @@ DLLEXPORT uint8_t *trace_get_source_mac(libtrace_packet_t *packet) {
 		case TRACE_TYPE_NONDATA:
 		case TRACE_TYPE_OPENBSD_LOOP:
 		case TRACE_TYPE_ERF_META:
+		case TRACE_TYPE_PCAPNG_META:
 		case TRACE_TYPE_UNKNOWN:
 		case TRACE_TYPE_CONTENT_INVALID:
                         return NULL;
@@ -992,6 +1013,7 @@ DLLEXPORT uint8_t *trace_get_destination_mac(libtrace_packet_t *packet) {
 		case TRACE_TYPE_NONDATA:
 		case TRACE_TYPE_OPENBSD_LOOP:
 		case TRACE_TYPE_ERF_META:
+		case TRACE_TYPE_PCAPNG_META:
 		case TRACE_TYPE_UNKNOWN:
 		case TRACE_TYPE_CONTENT_INVALID:
                         /* No MAC address */

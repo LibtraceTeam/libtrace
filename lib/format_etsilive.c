@@ -361,6 +361,11 @@ static int receiver_read_message(etsithread_t *et) {
                         et->sources = (etsisocket_t *)realloc(et->sources,
                                 sizeof(etsisocket_t) * (et->sourcealloc + 10));
 
+                        for (i = et->sourcealloc; i < et->sourcealloc + 10;
+                                        i++) {
+                                et->sources[i].sock = -1;
+                                et->sources[i].srcaddr = NULL;
+                        }
                         esock = &(et->sources[et->sourcealloc]);
                         et->sourcealloc += 10;
                         et->sourcecount += 1;

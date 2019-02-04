@@ -69,9 +69,12 @@ static int linuxnative_configure_bpf(libtrace_t *libtrace,
 	int sock;
 	pcap_t *pcap;
 
-	/* Take a copy of the filter object as it was passed in */
-	f = (libtrace_filter_t *) malloc(sizeof(libtrace_filter_t));
-	memcpy(f, filter, sizeof(libtrace_filter_t));
+	/* Take a copy of the filter structure to prevent against
+         * deletion causing the filter to no longer work */
+        f = (libtrace_filter_t *) malloc(sizeof(libtrace_filter_t));
+        memset(f, 0, sizeof(libtrace_filter_t));
+        memcpy(f, filter, sizeof(libtrace_filter_t));
+        f->filterstring = strdup(filter->filterstring);
 
 	/* If we are passed a filter with "flag" set to zero, then we must
 	 * compile the filterstring before continuing. This involves
@@ -119,7 +122,7 @@ static int linuxnative_configure_bpf(libtrace_t *libtrace,
 	}
 
 	if (FORMAT_DATA->filter != NULL)
-		free(FORMAT_DATA->filter);
+                trace_destroy_filter(FORMAT_DATA->filter);
 
 	FORMAT_DATA->filter = f;
 
@@ -497,7 +500,7 @@ int linuxcommon_fin_input(libtrace_t *libtrace)
 {
 	if (libtrace->format_data) {
 		if (FORMAT_DATA->filter != NULL)
-			free(FORMAT_DATA->filter);
+                	trace_destroy_filter(FORMAT_DATA->filter);
 
 		if (FORMAT_DATA->per_stream)
 			libtrace_list_deinit(FORMAT_DATA->per_stream);

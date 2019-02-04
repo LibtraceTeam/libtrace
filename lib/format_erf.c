@@ -118,6 +118,22 @@ typedef struct erf_index_t {
 	uint64_t offset; 
 } erf_index_t;
 
+static bool erf_can_write(libtrace_packet_t *packet) {
+	/* Get the linktype */
+        libtrace_linktype_t ltype = trace_get_link_type(packet);
+
+        if (ltype == TRACE_TYPE_CONTENT_INVALID) {
+                return false;
+        }
+        if (ltype == TRACE_TYPE_PCAPNG_META
+                || ltype == TRACE_TYPE_NONDATA) {
+
+                return false;
+        }
+
+        return true;
+}
+
 /* Ethernet packets have a 2 byte padding before the packet
  * so that the IP header is aligned on a 32 bit boundary.
  */
@@ -669,6 +685,12 @@ static bool find_compatible_linktype(libtrace_out_t *libtrace,
 static int erf_write_packet(libtrace_out_t *libtrace, 
 		libtrace_packet_t *packet) 
 {
+
+	/* Check erf can write this type of packet */
+	if (!erf_can_write(packet)) {
+		return 0;
+	}
+
 	int numbytes = 0;
 	dag_record_t *dag_hdr = (dag_record_t *)packet->header;
 	void *payload = packet->payload;
@@ -678,9 +700,6 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 			"closed file, must call trace_create_output() before calling trace_write_output()");
 		return -1;
 	}
-
-	if (trace_get_link_type(packet) == TRACE_TYPE_NONDATA)
-		return 0;
 
 	if (!packet->header) {
 		return -1;
@@ -769,13 +788,24 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 libtrace_linktype_t erf_get_link_type(const libtrace_packet_t *packet) {
 	dag_record_t *erfptr = 0;
 	erfptr = (dag_record_t *)packet->header;
-        uint8_t type = (erfptr->type & 0x7f);
+        uint8_t type;
+
+        if (packet->header == NULL) {
+                return ~0;
+        }
+
+        type = (erfptr->type & 0x7f);
 	if (type != TYPE_LEGACY) {
 		/* The top-most bit is now used to indicate the presence of
                  * extension headers :/ */
                 return erf_type_to_libtrace(type);
         }
 	else {
+                if (trace_get_capture_length(packet) < 5 ||
+                                packet->payload == NULL) {
+                        return ~0;
+                }
+
 		/* Sigh, lets start wildly guessing */
 		if (((char*)packet->payload)[4]==0x45)
 			return TRACE_TYPE_PPP;
@@ -786,12 +816,19 @@ libtrace_linktype_t erf_get_link_type(const libtrace_packet_t *packet) {
 libtrace_direction_t erf_get_direction(const libtrace_packet_t *packet) {
 	dag_record_t *erfptr = 0;
 	erfptr = (dag_record_t *)packet->header;
-	return erfptr->flags.iface;
+        if (packet->header) {
+        	return erfptr->flags.iface;
+        }
+        return TRACE_DIR_UNKNOWN;
 }
 
 libtrace_direction_t erf_set_direction(libtrace_packet_t *packet, libtrace_direction_t direction) {
 	dag_record_t *erfptr = 0;
 	erfptr = (dag_record_t *)packet->header;
+
+        if (packet->header == NULL) {
+                return TRACE_DIR_UNKNOWN;
+        }
 	erfptr->flags.iface = direction;
 	return erfptr->flags.iface;
 }
@@ -799,6 +836,10 @@ libtrace_direction_t erf_set_direction(libtrace_packet_t *packet, libtrace_direc
 uint64_t erf_get_erf_timestamp(const libtrace_packet_t *packet) {
 	dag_record_t *erfptr = 0;
 	erfptr = (dag_record_t *)packet->header;
+
+        if (erfptr == NULL) {
+                return 0;
+        }
 	return bswap_le_to_host64(erfptr->ts);
 }
 
@@ -808,7 +849,7 @@ int erf_get_capture_length(const libtrace_packet_t *packet) {
         size_t framinglen;
         uint16_t wlen, rlen;
 
-	if (packet->payload == NULL)
+	if (packet->payload == NULL || packet->header == NULL)
 		return 0;
 
 	erfptr = (dag_record_t *)packet->header;
@@ -827,6 +868,10 @@ int erf_get_wire_length(const libtrace_packet_t *packet) {
 	dag_record_t *erfptr = 0;
 	erfptr = (dag_record_t *)packet->header;
 
+        if (packet->header == NULL) {
+                return 0;
+        }
+
 	if ((erfptr->type & 0x7f) == TYPE_META)
 		return 0;
 
@@ -842,6 +887,10 @@ size_t erf_set_capture_length(libtrace_packet_t *packet, size_t size) {
 		return ~0U;
 	}
 	erfptr = (dag_record_t *)packet->header;
+
+        if (packet->header == NULL) {
+                return ~0U;
+        }
 
 	if(size > trace_get_capture_length(packet) || (erfptr->type & 0x7f) == TYPE_META) {
 		/* Can't make a packet larger */

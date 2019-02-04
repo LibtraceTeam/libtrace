@@ -24,6 +24,9 @@
  *
  */
 
+#ifndef LIBTRACE_PROTOCOLS_H_
+#define LIBTRACE_PROTOCOLS_H_
+
 /** @file
  *
  * @brief Protocol access functions that have not yet been made available
@@ -80,4 +83,4 @@ struct ports_t {
 	uint16_t dst;		/**< Destination port */
 };
 
-
+#endif

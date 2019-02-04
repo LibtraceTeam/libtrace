@@ -79,8 +79,8 @@ double packet_interval=UINT32_MAX;
 
 struct output_data_t *output = NULL;
 
-uint64_t count;
-uint64_t bytes;
+uint64_t totalcount;
+uint64_t totalbytes;
 
 struct libtrace_t *currenttrace;
 
@@ -177,16 +177,17 @@ static void cb_result(libtrace_t *trace, libtrace_thread_t *sender UNUSED,
                 trace_get_statistics(trace, stats);
         }
         while ((glob_last_ts >> 32) < (ts >> 32)) {
-                report_results(glob_last_ts >> 32, count, bytes, stats);
-                count = 0;
-                bytes = 0;
+                report_results(glob_last_ts >> 32, totalcount, totalbytes,
+                                stats);
+                totalcount = 0;
+                totalbytes = 0;
                 for (j = 0; j < filter_count; j++)
                         filters[j].count = filters[j].bytes = 0;
                 glob_last_ts = ts;
         }
-        count += res->total.count;
+        totalcount += res->total.count;
         packets_seen += res->total.count;
-        bytes += res->total.bytes;
+        totalbytes += res->total.bytes;
         for (j = 0; j < filter_count; j++) {
                 filters[j].count += res->filters[j].count;
                 filters[j].bytes += res->filters[j].bytes;
@@ -343,7 +344,7 @@ static void run_trace(char *uri)
                 stats = trace_create_statistics();
                 stats = trace_get_statistics(trace, stats);
         }
-	report_results((glob_last_ts >> 32), count, bytes, stats);
+	report_results((glob_last_ts >> 32), totalcount, totalbytes, stats);
 	if (trace_is_err(trace))
 		trace_perror(trace,"%s",uri);
 

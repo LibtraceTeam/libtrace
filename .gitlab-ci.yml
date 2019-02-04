@@ -1,6 +1,7 @@
 stages:
   - build
   - deploy
+  - upload
 
 build-debian-jessie:
   stage: build
@@ -111,3 +112,12 @@ deploy-packages:
     expire_in: 1 month
   only:
     - tags
+
+upload-packages:
+  stage: upload
+  image: ubuntu:bionic
+  script:
+    - ./bintray-upload.sh
+  only:
+    - tags
+

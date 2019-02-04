@@ -3,11 +3,11 @@
 # Now you only need to update the version number in two places - below,
 # and in the README
 
-AC_INIT([libtrace],[4.0.5],[contact@wand.net.nz],[libtrace])
+AC_INIT([libtrace],[4.0.6],[contact@wand.net.nz],[libtrace])
 
 LIBTRACE_MAJOR=4
 LIBTRACE_MID=0
-LIBTRACE_MINOR=5
+LIBTRACE_MINOR=6
 
 # OpenSolaris hides libraries like libncurses in /usr/gnu/lib, which is not
 # searched by default - add it to LDFLAGS so we at least have a chance of 
@@ -403,14 +403,14 @@ libtrace_dpdk=false
 if test "$want_dpdk" != no; then
 	# So instead simply check for existence
 	if test "$RTE_SDK" != ""; then
+		AC_CHECK_FILE("$RTE_SDK/$RTE_TARGET/lib/libdpdk.so", dpdk_found="dpdk", dpdk_found=0)
+	fi
+	if test "$dpdk_found" = 0 -a "$RTE_SDK" != ""; then
 		AC_CHECK_FILE("$RTE_SDK/$RTE_TARGET/lib/libintel_dpdk.a", dpdk_found=":libintel_dpdk.a", dpdk_found=0)
 	fi
 	# DPDK 2.1.0+ renames this to libdpdk from libintel_dpdk
 	if test "$dpdk_found" = 0 -a "$RTE_SDK" != ""; then
 		AC_CHECK_FILE("$RTE_SDK/$RTE_TARGET/lib/libdpdk.a", dpdk_found=":libdpdk.a", dpdk_found=0)
-	fi
-	if test "$dpdk_found" = 0 -a "$RTE_SDK" != ""; then
-		AC_CHECK_FILE("$RTE_SDK/$RTE_TARGET/lib/libdpdk.so", dpdk_found="dpdk", dpdk_found=0)
 	fi
 	if test "$dpdk_found" = 0 -a "$RTE_SDK" != ""; then
 		AC_CHECK_LIB(dpdk, rte_eth_dev_configure, dpdk_found="dpdk", dpdk_found=0)
@@ -511,6 +511,7 @@ fi
 
 if test "$have_pthread" = 1; then
 	AC_DEFINE(HAVE_LIBPTHREAD, 1, [Set to 1 if pthreads are supported])
+        LIBTRACE_LIBS="$LIBTRACE_LIBS -lpthread"
 fi
 
 if test "$have_pthread_setname_np" = 1; then

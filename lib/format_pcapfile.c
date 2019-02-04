@@ -67,6 +67,22 @@ typedef struct pcapfile_header_t {
 #define MAGIC1_REV  0xd4c3b2a1  /* Reversed byteorder detection */
 #define MAGIC2_REV  0x4d3cb2a1
 
+static bool pcapfile_can_write(libtrace_packet_t *packet) {
+	/* Get the linktype */
+	libtrace_linktype_t ltype = trace_get_link_type(packet);
+
+	if (ltype == TRACE_TYPE_PCAPNG_META
+		|| ltype == TRACE_TYPE_CONTENT_INVALID
+		|| ltype == TRACE_TYPE_UNKNOWN
+		|| ltype == TRACE_TYPE_ERF_META
+		|| ltype == TRACE_TYPE_NONDATA) {
+
+		return false;
+	}
+
+	return true;
+}
+
 static inline int header_is_backwards_magic(pcapfile_header_t *header) {
 	return (header->magic_number == MAGIC1_REV || header->magic_number == MAGIC2_REV);
 }
@@ -174,7 +190,7 @@ static inline uint32_t swapl(libtrace_t *libtrace, uint32_t num)
 	 */
 	if (!DATA(libtrace))
 		return num;
-	
+
 	/* We can use the PCAP magic number to determine the byte order */
 	if (header_is_backwards_magic(&(DATA(libtrace)->header)))
 		return byteswap32(num);
@@ -370,6 +386,7 @@ static int pcapfile_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 	err=wandio_read(libtrace->io,
 			packet->buffer,
 			sizeof(libtrace_pcapfile_pkt_hdr_t));
+
 	if (err<0) {
 		trace_set_err(libtrace,TRACE_ERR_WANDIO_FAILED,"reading packet");
 		return -1;
@@ -386,7 +403,8 @@ static int pcapfile_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 
 	bytes_to_read = swapl(libtrace,((libtrace_pcapfile_pkt_hdr_t*)packet->buffer)->caplen);
 
-	if (bytes_to_read >= LIBTRACE_PACKET_BUFSIZE) {
+	if (bytes_to_read >= (LIBTRACE_PACKET_BUFSIZE -
+                        sizeof(libtrace_pcapfile_pkt_hdr_t))) {
 		trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Invalid caplen in pcap header (%u) - trace may be corrupt", (uint32_t)bytes_to_read);
 		return -1;
 	}
@@ -431,6 +449,12 @@ static int pcapfile_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 static int pcapfile_write_packet(libtrace_out_t *out,
 		libtrace_packet_t *packet)
 {
+
+	/* Check pcapfile can write this type of packet */
+	if (!pcapfile_can_write(packet)) {
+		return 0;
+	}
+
 	struct libtrace_pcapfile_pkt_hdr_t hdr;
 	struct timeval tv = trace_get_timeval(packet);
 	int numbytes;
@@ -440,12 +464,6 @@ static int pcapfile_write_packet(libtrace_out_t *out,
 	libtrace_linktype_t linktype;
 
 	ptr = trace_get_packet_buffer(packet,&linktype,&remaining);
-	
-	/* Silently discard RT metadata packets and packets with an
-	 * unknown linktype. */
-	if (linktype == TRACE_TYPE_NONDATA || linktype == TRACE_TYPE_UNKNOWN || linktype == TRACE_TYPE_ERF_META || linktype == TRACE_TYPE_CONTENT_INVALID) {
-		return 0;
-	}
 
 	/* If this packet cannot be converted to a pcap linktype then
 	 * pop off the top header until it can be converted
@@ -571,6 +589,8 @@ static struct timeval pcapfile_get_timeval(
 	libtrace_pcapfile_pkt_hdr_t *hdr;
 	struct timeval ts;
 
+        memset(&ts, 0, sizeof(struct timeval));
+
 	if (!packet) {
 		fprintf(stderr, "NULL packet passed to pcapfile_get_timeval()\n");
 		/* Return default timeval on error? */
@@ -600,6 +620,7 @@ static struct timespec pcapfile_get_timespec(
 	libtrace_pcapfile_pkt_hdr_t *hdr;
 	struct timespec ts;
 
+        memset(&ts, 0, sizeof(struct timespec));
 	if (!packet) {
 		fprintf(stderr, "NULL packet passed to pcapfile_get_timespec()");
 		/* Return default timespec on error? */
@@ -654,6 +675,10 @@ static int pcapfile_get_wire_length(const libtrace_packet_t *packet) {
                 trace_set_err(packet->trace, TRACE_ERR_BAD_HEADER, "pcap packet with NULL header passed to "
 			"pcapfile_get_wire_length()");
                 return -1;
+        }
+
+        if (packet->payload == NULL) {
+                return 0;
         }
 
 	pcapptr	= (libtrace_pcapfile_pkt_hdr_t *)packet->header;

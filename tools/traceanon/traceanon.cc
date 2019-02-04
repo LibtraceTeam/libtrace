@@ -45,21 +45,21 @@ enum enc_type_t {
         ENC_PREFIX_SUBSTITUTION
 };
 
-bool enc_source = false;
-bool enc_dest 	= false;
+bool enc_source_opt = false;
+bool enc_dest_opt   = false;
 enum enc_type_t enc_type = ENC_NONE;
-char *key = NULL;
+char *enc_key = NULL;
 
 int level = -1;
 trace_option_compresstype_t compress_type = TRACE_OPTION_COMPRESSTYPE_NONE;
 
-struct libtrace_t *trace = NULL;
+struct libtrace_t *inptrace = NULL;
 
 static void cleanup_signal(int signal)
 {
 	(void)signal;
 	// trace_pstop isn't really signal safe because its got lots of locks in it
-        trace_pstop(trace);
+        trace_pstop(inptrace);
 }
 
 static void usage(char *argv0)
@@ -181,11 +181,11 @@ static libtrace_packet_t *per_packet(libtrace_t *trace, libtrace_thread_t *t,
         ipptr = trace_get_ip(packet);
         ip6 = trace_get_ip6(packet);
 
-        if (ipptr && (enc_source || enc_dest)) {
-                encrypt_ips(anon, ipptr,enc_source,enc_dest);
+        if (ipptr && (enc_source_opt || enc_dest_opt)) {
+                encrypt_ips(anon, ipptr,enc_source_opt,enc_dest_opt);
                 ipptr->ip_sum = 0;
-        } else if (ip6 && (enc_source || enc_dest)) {
-                encrypt_ipv6(anon, ip6, enc_source, enc_dest);
+        } else if (ip6 && (enc_source_opt || enc_dest_opt)) {
+                encrypt_ipv6(anon, ip6, enc_source_opt, enc_dest_opt);
         }
 
 
@@ -196,17 +196,17 @@ static libtrace_packet_t *per_packet(libtrace_t *trace, libtrace_thread_t *t,
         /* XXX replace with nice use of trace_get_transport() */
 
         udp = trace_get_udp(packet);
-        if (udp && (enc_source || enc_dest)) {
+        if (udp && (enc_source_opt || enc_dest_opt)) {
                 udp->check = 0;
         }
 
         tcp = trace_get_tcp(packet);
-        if (tcp && (enc_source || enc_dest)) {
+        if (tcp && (enc_source_opt || enc_dest_opt)) {
                 tcp->check = 0;
         }
 
         icmp6 = trace_get_icmp6(packet);
-        if (icmp6 && (enc_source || enc_dest)) {
+        if (icmp6 && (enc_source_opt || enc_dest_opt)) {
                 icmp6->checksum = 0;
         }
 
@@ -220,19 +220,19 @@ static libtrace_packet_t *per_packet(libtrace_t *trace, libtrace_thread_t *t,
 static void *start_anon(libtrace_t *trace, libtrace_thread_t *t, void *global)
 {
         if (enc_type == ENC_PREFIX_SUBSTITUTION) {
-                PrefixSub *sub = new PrefixSub(key, NULL);
+                PrefixSub *sub = new PrefixSub(enc_key, NULL);
                 return sub;
         }
 
         if (enc_type == ENC_CRYPTOPAN) {
-		if (strlen(key) < 32) {
+		if (strlen(enc_key) < 32) {
 			fprintf(stderr, "ERROR: Key must be at least 32 "
 			"characters long for CryptoPan anonymisation.\n");
 			exit(1);
 		}
 #ifdef HAVE_LIBCRYPTO                
-                CryptoAnon *anon = new CryptoAnon((uint8_t *)key,
-                        (uint8_t)strlen(key), 20);
+                CryptoAnon *anon = new CryptoAnon((uint8_t *)enc_key,
+                        (uint8_t)strlen(enc_key), 20);
                 return anon;
 #else
                 /* TODO nicer way of exiting? */
@@ -356,18 +356,18 @@ int main(int argc, char *argv[])
 		switch (c) {
 			case 'Z': compress_type_str=optarg; break;         
 			case 'z': level = atoi(optarg); break;
-			case 's': enc_source=true; break;
-			case 'd': enc_dest  =true; break;
+			case 's': enc_source_opt=true; break;
+			case 'd': enc_dest_opt  =true; break;
 			case 'c': 
-				  if (key!=NULL) {
+				  if (enc_key!=NULL) {
 					  fprintf(stderr,"You can only have one encryption type and one key\n");
 					  usage(argv[0]);
 				  }
-				  key=strdup(optarg);
+				  enc_key=strdup(optarg);
 				  enc_type = ENC_CRYPTOPAN;
 				  break;
 		        case 'F': {
-			          if(key != NULL) {
+			          if(enc_key != NULL) {
 				    fprintf(stderr,"You can only have one encryption type and one key\n");
 				    usage(argv[0]);
 				  }
@@ -376,8 +376,8 @@ int main(int argc, char *argv[])
 				    perror("Failed to open cryptopan keyfile");
                                     return 1;
 				  }
-				  key = (char *) malloc(sizeof(char *) * 32);
-				  if(fread(key,1,32,infile) != 32) {
+				  enc_key = (char *) malloc(sizeof(char *) * 32);
+				  if(fread(enc_key,1,32,infile) != 32) {
 				    if(ferror(infile)) {
 				      perror("Failed while reading cryptopan keyfile");
 				    }
@@ -390,11 +390,11 @@ int main(int argc, char *argv[])
                                   filterstring = optarg;
                                   break;
 		        case 'p':
-				  if (key!=NULL) {
+				  if (enc_key!=NULL) {
 					  fprintf(stderr,"You can only have one encryption type and one key\n");
 					  usage(argv[0]);
 				  }
-				  key=strdup(optarg);
+				  enc_key=strdup(optarg);
 				  enc_type = ENC_PREFIX_SUBSTITUTION;
 				  break;
 			case 'h': 
@@ -441,9 +441,9 @@ int main(int argc, char *argv[])
         }
 
 	/* open input uri */
-	trace = trace_create(argv[optind]);
-	if (trace_is_err(trace)) {
-		trace_perror(trace,"trace_create");
+	inptrace = trace_create(argv[optind]);
+	if (trace_is_err(inptrace)) {
+		trace_perror(inptrace,"trace_create");
 		exitcode = 1;
                 goto exitanon;
 	}
@@ -462,7 +462,7 @@ int main(int argc, char *argv[])
 	 * and ordered before its read into reduce. Seems like a good
 	 * special case to have.
 	 */
-	trace_set_combiner(trace, &combiner_ordered, (libtrace_generic_t){0});
+	trace_set_combiner(inptrace, &combiner_ordered, (libtrace_generic_t){0});
 
         pktcbs = trace_create_callback_set();
         trace_set_packet_cb(pktcbs, per_packet);
@@ -474,21 +474,21 @@ int main(int argc, char *argv[])
         trace_set_stopping_cb(repcbs, end_output);
         trace_set_starting_cb(repcbs, init_output);
 
-        trace_set_perpkt_threads(trace, maxthreads);
+        trace_set_perpkt_threads(inptrace, maxthreads);
 
         if (filterstring) {
                 filter = trace_create_filter(filterstring);
         }
 
-        if (filter && trace_config(trace, TRACE_OPTION_FILTER, filter) == -1)
+        if (filter && trace_config(inptrace, TRACE_OPTION_FILTER, filter) == -1)
         {
-                trace_perror(trace, "Configuring input filter");
+                trace_perror(inptrace, "Configuring input filter");
                 exitcode = 1;
                 goto exitanon;
         }
 
-	if (trace_pstart(trace, output, pktcbs, repcbs)==-1) {
-		trace_perror(trace,"trace_start");
+	if (trace_pstart(inptrace, output, pktcbs, repcbs)==-1) {
+		trace_perror(inptrace,"trace_start");
 		exitcode = 1;
                 goto exitanon;
 	}
@@ -501,14 +501,14 @@ int main(int argc, char *argv[])
 	sigaction(SIGTERM, &sigact, NULL);
 
 	// Wait for the trace to finish
-	trace_join(trace);
+	trace_join(inptrace);
 
 exitanon:
         if (pktcbs)
                 trace_destroy_callback_set(pktcbs);
         if (repcbs)
                 trace_destroy_callback_set(repcbs);
-        if (trace)
-        	trace_destroy(trace);
+        if (inptrace)
+        	trace_destroy(inptrace);
 	return exitcode;
 }
