@@ -967,11 +967,11 @@ static char *erf_get_option_name(uint32_t option) {
                 case (ERF_PROV_CPU_PHYS_CORES): return "CPU Cores";
                 case (ERF_PROV_CPU_NUMA_NODES): return "CPU NUMA Nodes";
                 case (ERF_PROV_DAG_VERSION): return "DAG Software Version";
-                case (ERF_PROV_IF_NUM): return "Number";
-                case (ERF_PROV_IF_SPEED): return "Speed";
-                case (ERF_PROV_IF_IPV4): return "IPv4";
-                case (ERF_PROV_IF_IPV6): return "IPv6";
-                case (ERF_PROV_IF_MAC): return "MAC";
+                case (ERF_PROV_IF_NUM): return "Interface Number";
+                case (ERF_PROV_IF_SPEED): return "Interface Speed";
+                case (ERF_PROV_IF_IPV4): return "Interface IPv4";
+                case (ERF_PROV_IF_IPV6): return "Interface IPv6";
+                case (ERF_PROV_IF_MAC): return "Interface MAC";
                 case (ERF_PROV_IF_SFP_TYPE): return "Transceiver Type";
                 case (ERF_PROV_IF_LINK_STATUS): return "Link Status";
                 case (ERF_PROV_IF_PHY_MODE): return "PHY Mode";
