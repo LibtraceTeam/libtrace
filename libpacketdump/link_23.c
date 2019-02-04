@@ -41,6 +41,7 @@ static void print_section_type(libtrace_meta_t *r) {
 static void print_interface_type(libtrace_meta_t *r, libtrace_packet_t *packet) {
 	int i;
 	struct in_addr ip;
+	unsigned char *tmp;
 	char *ip6, *ptr UNUSED;
 	printf(" PCAPNG Interface Description Block\n");
 
@@ -68,12 +69,15 @@ static void print_interface_type(libtrace_meta_t *r, libtrace_packet_t *packet) 
 				free(ip6);
 				break;
 			case(PCAPNG_META_IF_MAC):
-				printf("  if_MACaddr: %s\n",
-					(char *)r->items[i].data);
+				tmp = r->items[i].data;
+				printf("  if_MACaddr: %02x:%02x:%02x:%02x:%02x:%02x\n",
+					tmp[0], tmp[1], tmp[2], tmp[3], tmp[4], tmp[5]);
 				break;
 			case(PCAPNG_META_IF_EUI):
-				printf("  if_EUIaddr: %s\n",
-					(char *)r->items[i].data);
+				tmp = r->items[i].data;
+				printf("  if_EUIaddr: %02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x\n",
+					tmp[0], tmp[1], tmp[2], tmp[3],
+					tmp[4], tmp[5], tmp[6], tmp[7]);
 				break;
 			case(PCAPNG_META_IF_SPEED):
 				printf("  if_speed: %lu\n",
