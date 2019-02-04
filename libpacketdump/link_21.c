@@ -4,7 +4,6 @@
 #include "format_erf.h"
 
 #include <arpa/inet.h>
-#include <netinet/ether.h>
 
 DLLEXPORT void decode(int link_type UNUSED, const char *packet UNUSED, unsigned len UNUSED) {
 }
@@ -46,10 +45,11 @@ static void print_section(libtrace_meta_t *meta) {
 				meta->items[i].option,
 				(char *)meta->items[i].data);
 		} else if (meta->items[i].datatype == TRACE_META_MAC) {
-			printf("   Name: %s ID: %u Value: %s\n",
+			unsigned char *mac = meta->items[i].data;
+			printf("   Name: %s ID: %u Value: %02x:%02x:%02x:%02x:%02x:%02x\n",
 				meta->items[i].option_name,
                                 meta->items[i].option,
-				ether_ntoa((struct ether_addr *)(char *)meta->items[i].data));
+				mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 		} else {
 			printf("   Name: Unknown ID: %u Option Value (RAW): ", meta->items[i].option);
 			int k;
