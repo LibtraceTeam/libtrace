@@ -50,7 +50,7 @@ libtrace_meta_t *trace_get_meta_option(libtrace_packet_t *packet, uint32_t secti
 	uint32_t option) {
 
 	libtrace_meta_t *r = NULL;
-	libtrace_meta_t *f;
+	libtrace_meta_t *f = NULL;
 	int i;
 
 	if (packet->trace->format->type == TRACE_FORMAT_ERF) {
@@ -64,30 +64,59 @@ libtrace_meta_t *trace_get_meta_option(libtrace_packet_t *packet, uint32_t secti
 
 	if (r == NULL) { return NULL; }
 
+	/* Allocate memory for the result */
+	f = malloc(sizeof(libtrace_meta_t));
+	if (f == NULL) {
+		trace_set_err(packet->trace, TRACE_ERR_OUT_OF_MEMORY,
+			"Unable to allocate memory in trace_get_meta_option()");
+		trace_destroy_meta(r);
+		return NULL;
+	}
+	f->num = 0;
+
 	/* See if a result was found within the section */
 	for (i=0; i<r->num; i++) {
 		if (r->section == section && r->items[i].option == option) {
 			/* Create a meta structure with the single item wanted */
-			f = malloc(sizeof(libtrace_meta_t));
-			f->num = 1;
-			f->items = malloc(sizeof(libtrace_meta_item_t));
+			//f = malloc(sizeof(libtrace_meta_t));
+			if (f->num == 0) {
+				f->items = malloc(sizeof(libtrace_meta_item_t));
+			} else {
+				f->items = realloc(f->items, (f->num+1)*
+					sizeof(libtrace_meta_item_t));
+			}
+			/* Ensure memory was allocated */
+			if (f->items == NULL) {
+                                trace_set_err(packet->trace, TRACE_ERR_OUT_OF_MEMORY,
+                                	"Unable to allocate memory in trace_get_meta_option()");
+                                trace_destroy_meta(r);
+                                trace_destroy_meta(f);
+                        	return NULL;
+                        }
 
-			f->items->option = r->items[i].option;
-			f->items->option_name = r->items[i].option_name;
-			f->items->len = r->items[i].len;
-			f->items->datatype = r->items[i].datatype;
-			f->items->data = r->items[i].data;
+			/* Copy the data over */
+			f->items[f->num].option = r->items[i].option;
+			f->items[f->num].option_name = r->items[i].option_name;
+			f->items[f->num].len = r->items[i].len;
+			f->items[f->num].datatype = r->items[i].datatype;
+			f->items[f->num].data = r->items[i].data;
 
 			/* delink from original structure */
 			r->items[i].data = NULL;
 
-			trace_destroy_meta(r);
-			return f;
+			f->num += 1;
 		}
 	}
 
+	/* Destroy the old structure */
 	trace_destroy_meta(r);
-	return NULL;
+
+	if (f->num > 0) {
+		return f;
+	} else {
+		trace_destroy_meta(f);
+		return NULL;
+	}
 }
 
 /* Get the interface name/s for a meta packet.
