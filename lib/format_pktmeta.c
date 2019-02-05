@@ -159,7 +159,10 @@ char *trace_get_interface_name(libtrace_packet_t *packet, char *space, int space
 	libtrace_meta_t *r = trace_get_interface_name_meta(packet);
 	if (r == NULL) { return NULL; }
 	/* If there is not a result for the index return */
-	if (r->num <= index) { return NULL; }
+	if (r->num <= index) {
+		trace_destroy_meta(r);
+		return NULL;
+	}
 	/* Ensure the supplied memory allocation is enough, if not only fill
 	 * what we can */
 	if (spacelen > r->items[index].len) {
@@ -209,7 +212,10 @@ char *trace_get_interface_mac(libtrace_packet_t *packet, char *space, int spacel
 
 	libtrace_meta_t *r = trace_get_interface_mac_meta(packet);
 	if (r == NULL) { return NULL; }
-	if (index >= r->num) { return NULL; }
+	if (index >= r->num) {
+		trace_destroy_meta(r);
+		return NULL;
+	}
 	if (r->items[index].len > spacelen) {
 		memcpy(space, r->items[index].data, spacelen);
 	} else {
@@ -254,7 +260,10 @@ uint64_t trace_get_interface_speed(libtrace_packet_t *packet, int index) {
 	libtrace_meta_t *r = trace_get_interface_speed_meta(packet);
 	if (r == NULL) { return 0; }
 	/* If the index wanted does not exist return 0 */
-	if (index >= r->num) { return 0; }
+	if (index >= r->num) {
+		trace_destroy_meta(r);
+		return 0;
+	}
 	/* Need to check this more ERF reports this in network order */
 	uint64_t data = *(uint64_t *)r->items[index].data;
 	trace_destroy_meta(r);
@@ -295,7 +304,10 @@ libtrace_meta_t *trace_get_interface_ipv4_meta(libtrace_packet_t *packet) {
 uint32_t trace_get_interface_ipv4(libtrace_packet_t *packet, int index) {
 	libtrace_meta_t *r = trace_get_interface_ipv4_meta(packet);
 	if (r == NULL) { return 0; }
-	if (index >= r->num) { return 0; }
+	if (index >= r->num) {
+		trace_destroy_meta(r);
+		return 0;
+	}
 	uint32_t data = *(uint32_t *)r->items[index].data;
 	trace_destroy_meta(r);
 	return data;
@@ -360,7 +372,10 @@ void *trace_get_interface_ipv6(libtrace_packet_t *packet, void *space, int space
 
 	libtrace_meta_t *r = trace_get_interface_ipv6_meta(packet);
 	if (r == NULL) { return NULL; }
-	if (r->num <= index) { return NULL; }
+	if (r->num <= index) {
+		trace_destroy_meta(r);
+		return NULL;
+	}
 	if (r->items[index].len > spacelen) {
 		memcpy(space, r->items[index].data, spacelen);
 	} else {
@@ -439,7 +454,10 @@ char *trace_get_interface_description(libtrace_packet_t *packet, char *space, in
 
 	libtrace_meta_t *r = trace_get_interface_description_meta(packet);
 	if (r == NULL) { return NULL; }
-	if (r->num <= index) { return NULL; }
+	if (r->num <= index) {
+		trace_destroy_meta(r);
+		return NULL;
+	}
 	if (r->items[index].len > spacelen) {
 		memcpy(space, r->items[index].data, spacelen);
 	} else {
@@ -525,7 +543,10 @@ libtrace_meta_t *trace_get_interface_fcslen_meta(libtrace_packet_t *packet) {
 uint32_t trace_get_interface_fcslen(libtrace_packet_t *packet, int index) {
 	libtrace_meta_t *r = trace_get_interface_fcslen_meta(packet);
 	if (r == NULL) { return 0; }
-	if (r->num <= index) { return 0; }
+	if (r->num <= index) {
+		trace_destroy_meta(r);
+		return 0;
+	}
 	uint32_t data = *(uint32_t *)r->items[index].data;
 	trace_destroy_meta(r);
 	return data;
@@ -568,7 +589,10 @@ char *trace_get_interface_comment(libtrace_packet_t *packet, char *space, int sp
 
 	libtrace_meta_t *r = trace_get_interface_comment_meta(packet);
 	if (r == NULL) { return NULL; }
-	if (index > r->num) { return NULL; }
+	if (index > r->num) {
+		trace_destroy_meta(r);
+		return NULL;
+	}
 	if (r->items[index].len > spacelen) {
 		memcpy(space, r->items[index].data, spacelen);
 	} else {
