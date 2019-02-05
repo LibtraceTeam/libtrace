@@ -164,11 +164,13 @@ char *trace_get_interface_name(libtrace_packet_t *packet, char *space, int space
 		return NULL;
 	}
 	/* Ensure the supplied memory allocation is enough, if not only fill
-	 * what we can */
+	 * what we can. */
 	if (spacelen > r->items[index].len) {
 		memcpy(space, r->items[index].data, r->items[index].len);
+		space[r->items[index].len] = '\0';
 	} else {
 		memcpy(space, r->items[index].data, spacelen);
+		space[spacelen] = '\0';
 	}
 	trace_destroy_meta(r);
 	return space;
@@ -218,8 +220,10 @@ char *trace_get_interface_mac(libtrace_packet_t *packet, char *space, int spacel
 	}
 	if (r->items[index].len > spacelen) {
 		memcpy(space, r->items[index].data, spacelen);
+		space[spacelen] = '\0';
 	} else {
 		memcpy(space, r->items[index].data, r->items[index].len);
+		space[r->items[index].len] = '\0';
 	}
 	trace_destroy_meta(r);
 	return space;
@@ -331,6 +335,7 @@ char *trace_get_interface_ipv4_string(libtrace_packet_t *packet, char *space, in
 
 	char *addrstr = inet_ntoa(*(struct in_addr *)&addr);
 	memcpy(space, addrstr, spacelen);
+	space[spacelen] = '\0';
 	return space;
 }
 
@@ -460,8 +465,10 @@ char *trace_get_interface_description(libtrace_packet_t *packet, char *space, in
 	}
 	if (r->items[index].len > spacelen) {
 		memcpy(space, r->items[index].data, spacelen);
+		space[spacelen] = '\0';
 	} else {
 		memcpy(space, r->items[index].data, r->items[index].len);
+		space[r->items[index].len] = '\0';
 	}
 	trace_destroy_meta(r);
 	return space;
@@ -502,8 +509,10 @@ char *trace_get_host_os(libtrace_packet_t *packet, char *space, int spacelen) {
 	if (r == NULL) { return NULL; }
 	if (r->items[0].len > spacelen) {
 		memcpy(space, r->items[0].data, spacelen);
+		space[spacelen] = '\0';
 	} else {
 		memcpy(space, r->items[0].data, r->items[0].len);
+		space[r->items[0].len] = '\0';
 	}
 	trace_destroy_meta(r);
 	return space;
@@ -595,8 +604,10 @@ char *trace_get_interface_comment(libtrace_packet_t *packet, char *space, int sp
 	}
 	if (r->items[index].len > spacelen) {
 		memcpy(space, r->items[index].data, spacelen);
+		space[spacelen] = '\0';
 	} else {
 		memcpy(space, r->items[index].data, r->items[index].len);
+		space[r->items[index].len] = '\0';
 	}
 	trace_destroy_meta(r);
 	return space;
@@ -636,8 +647,10 @@ char *trace_get_capture_application(libtrace_packet_t *packet, char *space, int 
 	if (r == NULL) { return NULL; }
 	if (r->items[0].len > spacelen) {
 		memcpy(space, r->items[0].data, spacelen);
+		space[spacelen] = '\0';
 	} else {
 		memcpy(space, r->items[0].data, r->items[0].len);
+		space[r->items[0].len] = '\0';
 	}
 	trace_destroy_meta(r);
 	return space;
@@ -691,8 +704,10 @@ char *trace_get_erf_dag_card_model(libtrace_packet_t *packet, char *space, int s
 	if (r == NULL) { return NULL; }
 	if (r->items[0].len > spacelen) {
 		memcpy(space, r->items[0].data, spacelen);
+		space[spacelen] = '\0';
 	} else {
 		memcpy(space, r->items[0].data, r->items[0].len);
+		space[r->items[0].len] = '\0';
 	}
 	trace_destroy_meta(r);
 	return space;
@@ -712,8 +727,10 @@ char *trace_get_erf_dag_version(libtrace_packet_t *packet, char *space, int spac
 
 	if (r->items[0].len > spacelen) {
 		memcpy(space, r->items[0].data, spacelen);
+		space[spacelen] = '\0';
 	} else {
 		memcpy(space, r->items[0].data, r->items[0].len);
+		space[r->items[0].len] = '\0';
 	}
 	trace_destroy_meta(r);
 	return space;
@@ -733,8 +750,10 @@ char *trace_get_erf_dag_fw_version(libtrace_packet_t *packet, char *space, int s
 
 	if (r->items[0].len > spacelen) {
 		memcpy(space, r->items[0].data, spacelen);
+		space[spacelen] = '\0';
 	} else {
 		memcpy(space, r->items[0].data, r->items[0].len);
+		space[r->items[0].len] = '\0';
 	}
 	trace_destroy_meta(r);
 	return space;
