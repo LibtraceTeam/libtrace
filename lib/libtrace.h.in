@@ -3748,8 +3748,7 @@ DLLEXPORT libtrace_meta_t *trace_get_interface_ipv4_meta(libtrace_packet_t *pack
 
 DLLEXPORT uint32_t trace_get_interface_ipv4(libtrace_packet_t *packet, int index);
 
-DLLEXPORT char *trace_get_interface_ipv4_string(libtrace_packet_t *packet, char *space, int spacelen,
-	int index);
+DLLEXPORT char *trace_get_interface_ipv4_string(libtrace_packet_t *packet, int index);
 
 DLLEXPORT libtrace_meta_t *trace_get_interface_ipv6_meta(libtrace_packet_t *packet);
 

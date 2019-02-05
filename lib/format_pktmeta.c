@@ -321,22 +321,20 @@ uint32_t trace_get_interface_ipv4(libtrace_packet_t *packet, int index) {
  * specify the interface index.
  *
  * @params libtrace_packet_t meta packet to extract the ipv4 address from.
- * @params A pointer to a character buffer to store the ipv4 address string in.
- * @params The size of the buffer passed in.
  * @params The interface index within the meta packet.
  * @returns Pointer to the character buffer containing the ipv4 address string or NULL.
  */
 /* UNTESTED */
-char *trace_get_interface_ipv4_string(libtrace_packet_t *packet, char *space, int spacelen,
-	int index) {
+char *trace_get_interface_ipv4_string(libtrace_packet_t *packet, int index) {
+	struct in_addr ip;
+	uint32_t addr;
 
-	uint32_t addr = htonl(trace_get_interface_ipv4(packet, index));
+	addr = trace_get_interface_ipv4(packet, index);
 	if (addr == 0) { return NULL; }
 
-	char *addrstr = inet_ntoa(*(struct in_addr *)&addr);
-	memcpy(space, addrstr, spacelen);
-	space[spacelen] = '\0';
-	return space;
+	ip.s_addr = addr;
+
+	return inet_ntoa(ip);
 }
 
 /* Get the interface ipv6 address/s for a meta packet.
@@ -403,19 +401,20 @@ void *trace_get_interface_ipv6(libtrace_packet_t *packet, void *space, int space
 char *trace_get_interface_ipv6_string(libtrace_packet_t *packet, char *space, int spacelen,
 	int index) {
 
+	/* Ensure we have enough space */
 	if (spacelen < INET6_ADDRSTRLEN) {
 		return NULL;
 	}
 
-	void *addr = calloc(1, 16);
-	void *r = trace_get_interface_ipv6(packet, addr, 16, index);
+	struct sockaddr_in6 sa;
 
+	void *r = trace_get_interface_ipv6(packet, &(sa.sin6_addr), 16, index);
 	if (r == NULL) {
 		return NULL;
 	}
 
-	inet_ntop(AF_INET6, addr, space, INET6_ADDRSTRLEN);
-	free(addr);
+	/* get the string representation */
+	inet_ntop(AF_INET6, &(sa.sin6_addr), space, INET6_ADDRSTRLEN);
 
 	return space;
 }
