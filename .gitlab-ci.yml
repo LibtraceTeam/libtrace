@@ -1,15 +1,14 @@
 stages:
   - build
-  - deploy
   - upload
 
-build-debian-jessie:
+build-amd64-debian-jessie:
   stage: build
   image: debian:jessie
   script:
     - ./gitlab-build.sh
-    - mkdir -p built-packages/debian_jessie/
-    - mv ../*.deb built-packages/debian_jessie/
+    - mkdir -p built-packages/amd64/debian_jessie/
+    - mv ../*.deb built-packages/amd64/debian_jessie/
   artifacts:
     paths:
       - built-packages/*
@@ -17,13 +16,13 @@ build-debian-jessie:
   only:
     - tags
 
-build-debian-stretch:
+build-amd64-debian-stretch:
   stage: build
   image: debian:stretch
   script:
     - ./gitlab-build.sh
-    - mkdir -p built-packages/debian_stretch/
-    - mv ../*.deb built-packages/debian_stretch/
+    - mkdir -p built-packages/amd64/debian_stretch/
+    - mv ../*.deb built-packages/amd64/debian_stretch/
   artifacts:
     paths:
       - built-packages/*
@@ -31,41 +30,13 @@ build-debian-stretch:
   only:
     - tags
 
-build-debian-buster:
-  stage: build
-  image: debian:buster
-  script:
-    - ./gitlab-build.sh
-    - mkdir -p built-packages/debian_buster/
-    - mv ../*.deb built-packages/debian_buster/
-  artifacts:
-    paths:
-      - built-packages/*
-    expire_in: 1 day
-  only:
-    - tags
-
-build-debian-sid:
-  stage: build
-  image: debian:sid
-  script:
-    - ./gitlab-build.sh
-    - mkdir -p built-packages/debian_sid/
-    - mv ../*.deb built-packages/debian_sid/
-  artifacts:
-    paths:
-      - built-packages/*
-    expire_in: 1 day
-  only:
-    - tags
-
-build-ubuntu-xenial:
+build-amd64-ubuntu-xenial:
   stage: build
   image: ubuntu:xenial
   script:
     - ./gitlab-build.sh
-    - mkdir -p built-packages/ubuntu_xenial/
-    - mv ../*.deb built-packages/ubuntu_xenial/
+    - mkdir -p built-packages/amd64/ubuntu_xenial/
+    - mv ../*.deb built-packages/amd64/ubuntu_xenial/
   artifacts:
     paths:
       - built-packages/*
@@ -73,27 +44,13 @@ build-ubuntu-xenial:
   only:
     - tags
 
-build-ubuntu-artful:
-  stage: build
-  image: ubuntu:artful
-  script:
-    - ./gitlab-build.sh
-    - mkdir -p built-packages/ubuntu_artful/
-    - mv ../*.deb built-packages/ubuntu_artful/
-  artifacts:
-    paths:
-      - built-packages/*
-    expire_in: 1 day
-  only:
-    - tags
-
-build-ubuntu-bionic:
+build-amd64-ubuntu-bionic:
   stage: build
   image: ubuntu:bionic
   script:
     - ./gitlab-build.sh
-    - mkdir -p built-packages/ubuntu_bionic/
-    - mv ../*.deb built-packages/ubuntu_bionic/
+    - mkdir -p built-packages/amd64/ubuntu_bionic/
+    - mv ../*.deb built-packages/amd64/ubuntu_bionic/
   artifacts:
     paths:
       - built-packages/*
@@ -101,15 +58,17 @@ build-ubuntu-bionic:
   only:
     - tags
 
-deploy-packages:
-  stage: deploy
-  image: ubuntu:bionic
+build-amd64-ubuntu-cosmic:
+  stage: build
+  image: ubuntu:cosmic
   script:
-    - ls built-packages/
+    - ./gitlab-build.sh
+    - mkdir -p built-packages/amd64/ubuntu_cosmic/
+    - mv ../*.deb built-packages/amd64/ubuntu_cosmic/
   artifacts:
     paths:
       - built-packages/*
-    expire_in: 1 month
+    expire_in: 1 day
   only:
     - tags
 
@@ -120,4 +79,3 @@ upload-packages:
     - ./bintray-upload.sh
   only:
     - tags
-
