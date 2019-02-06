@@ -32,4 +32,3 @@ for path in `find built-packages/ -maxdepth 1 -type d`; do
         jfrog bt upload --deb ${linux_version}/main/${pkg_arch} ${deb} ${BINTRAY_REPO}/${pkg_name}/${pkg_version} pool/${linux_version}/main/${pkg_name}/
     done
 done
-
