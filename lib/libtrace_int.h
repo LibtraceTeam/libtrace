@@ -1260,6 +1260,8 @@ void atmhdr_constructor(void);
 void ndag_constructor(void);
 /** Constructor for the live ETSI over TCP format module */
 void etsilive_constructor(void);
+/** Constructor for the live TZSP over UDP format module */
+void tzsplive_constructor(void);
 #ifdef HAVE_BPF
 /** Constructor for the BPF format module */
 void bpf_constructor(void);

@@ -735,6 +735,7 @@ DLLEXPORT void *trace_get_layer2(const libtrace_packet_t *packet,
 		case TRACE_TYPE_PFLOG:
 		case TRACE_TYPE_ERF_META:
 		case TRACE_TYPE_PCAPNG_META:
+		case TRACE_TYPE_TZSP:
                 case TRACE_TYPE_ETSILI:
 			break;
 		case TRACE_TYPE_UNKNOWN:
@@ -774,6 +775,7 @@ DLLEXPORT void *trace_get_layer2(const libtrace_packet_t *packet,
 				case TRACE_TYPE_PFLOG:
 				case TRACE_TYPE_ERF_META:
 				case TRACE_TYPE_PCAPNG_META:
+				case TRACE_TYPE_TZSP:
                                 case TRACE_TYPE_ETSILI:
 					break;
 				case TRACE_TYPE_UNKNOWN:
@@ -849,6 +851,7 @@ DLLEXPORT void *trace_get_payload_from_layer2(void *link,
 		case TRACE_TYPE_METADATA:
 		case TRACE_TYPE_NONDATA:
 		case TRACE_TYPE_PCAPNG_META:
+		case TRACE_TYPE_TZSP:
 		case TRACE_TYPE_ERF_META:
 		case TRACE_TYPE_CONTENT_INVALID:
 		case TRACE_TYPE_UNKNOWN:
@@ -971,6 +974,7 @@ DLLEXPORT uint8_t *trace_get_source_mac(libtrace_packet_t *packet) {
 		case TRACE_TYPE_OPENBSD_LOOP:
 		case TRACE_TYPE_ERF_META:
 		case TRACE_TYPE_PCAPNG_META:
+		case TRACE_TYPE_TZSP:
 		case TRACE_TYPE_UNKNOWN:
 		case TRACE_TYPE_CONTENT_INVALID:
                         return NULL;
@@ -1028,6 +1032,7 @@ DLLEXPORT uint8_t *trace_get_destination_mac(libtrace_packet_t *packet) {
 		case TRACE_TYPE_OPENBSD_LOOP:
 		case TRACE_TYPE_ERF_META:
 		case TRACE_TYPE_PCAPNG_META:
+		case TRACE_TYPE_TZSP:
 		case TRACE_TYPE_UNKNOWN:
 		case TRACE_TYPE_CONTENT_INVALID:
                         /* No MAC address */
