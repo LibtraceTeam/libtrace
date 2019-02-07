@@ -470,6 +470,40 @@ static uint32_t pcapng_output_interfacestats_packet(libtrace_out_t *libtrace, li
 	return hdr.blocklen;
 }
 
+static void pcapng_create_output_sectionheader_packet(libtrace_out_t *libtrace) {
+	/* Create section block */
+	pcapng_sec_t sechdr;
+	sechdr.blocktype = pcapng_swap32(libtrace, PCAPNG_SECTION_TYPE);
+	sechdr.blocklen = pcapng_swap32(libtrace, 28);
+	sechdr.ordering = pcapng_swap32(libtrace, 0x1A2B3C4D);
+	sechdr.majorversion = pcapng_swap16(libtrace, 1);
+	sechdr.minorversion = 0;
+	sechdr.sectionlen = 0xFFFFFFFFFFFFFFFF;
+
+	wandio_wwrite(DATAOUT(libtrace)->file, &sechdr, sizeof(sechdr));
+	wandio_wwrite(DATAOUT(libtrace)->file, &sechdr.blocklen, sizeof(sechdr.blocklen));
+
+	DATAOUT(libtrace)->sechdr_count += 1;
+}
+
+static void pcapng_create_output_interface_packet(libtrace_out_t *libtrace, libtrace_linktype_t linktype) {
+	/* Create interface block*/
+	pcapng_int_t inthdr;
+	inthdr.blocktype = pcapng_swap32(libtrace, PCAPNG_INTERFACE_TYPE);
+	inthdr.blocklen = pcapng_swap32(libtrace, 20);
+	inthdr.linktype = pcapng_swap16(libtrace, libtrace_to_pcap_dlt(linktype));
+	inthdr.reserved = 0;
+	inthdr.snaplen = 0;
+
+	wandio_wwrite(DATAOUT(libtrace)->file, &inthdr, sizeof(inthdr));
+	wandio_wwrite(DATAOUT(libtrace)->file, &inthdr.blocklen, sizeof(inthdr.blocklen));
+
+	/* increment the interface counter */
+	DATAOUT(libtrace)->nextintid += 1;
+	/* update the last linktype */
+	DATAOUT(libtrace)->lastdlt = linktype;
+}
+
 static int pcapng_probe_magic(io_t *io) {
 
         pcapng_sec_t sechdr;
@@ -828,11 +862,14 @@ static int pcapng_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *pack
 			return pcapng_output_old_packet(libtrace, packet);
 		}
 		case PCAPNG_SIMPLE_PACKET_TYPE: {
+			/* If no section header or interface packets have been received create and
+			 * output them. This can occur when discard meta is enabled and the input
+			 * format is also pcapng */
+			if (DATAOUT(libtrace)->sechdr_count == 0) {
+				pcapng_create_output_sectionheader_packet(libtrace);
+			}
 			if (DATAOUT(libtrace)->nextintid == 0) {
-				trace_set_err_out(libtrace, TRACE_ERR_BAD_PACKET,
-					"Cannot output simple packet before a interface "
-					"block has been output in pcapng_write_packet()\n");
-				return -1;
+				pcapng_create_output_interface_packet(libtrace, linktype);
 			}
 			return pcapng_output_simple_packet(libtrace, packet);
 		}
@@ -840,21 +877,27 @@ static int pcapng_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *pack
 			return pcapng_output_nameresolution_packet(libtrace, packet);
 		}
 		case PCAPNG_INTERFACE_STATS_TYPE: {
-			if (DATAOUT(libtrace)->nextintid == 0) {
-				trace_set_err_out(libtrace, TRACE_ERR_BAD_PACKET,
-					"Cannot output a interface statistics block before a "
-					"interface block has been output in pcapng_write_packet()\n");
-				return -1;
-			}
+			/* If no section header or interface packets have been received create and
+                         * output them. This can occur when discard meta is enabled and the input
+                         * format is also pcapng */
+			if (DATAOUT(libtrace)->sechdr_count == 0) {
+                                pcapng_create_output_sectionheader_packet(libtrace);
+                        }
+                        if (DATAOUT(libtrace)->nextintid == 0) {
+                                pcapng_create_output_interface_packet(libtrace, linktype);
+                        }
                        	return pcapng_output_interfacestats_packet(libtrace, packet);
 		}
 		case PCAPNG_ENHANCED_PACKET_TYPE: {
-			if (DATAOUT(libtrace)->nextintid == 0) {
-				trace_set_err_out(libtrace, TRACE_ERR_BAD_PACKET,
-					"Cannot output enhanced packet before a interface "
-					"block has been output in pcapng_write_packet()\n");
-				return -1;
-			}
+			/* If no section header or interface packets have been received create and
+                         * output them. This can occur when discard meta is enabled and the input
+                         * format is also pcapng */
+			if (DATAOUT(libtrace)->sechdr_count == 0) {
+                                pcapng_create_output_sectionheader_packet(libtrace);
+                        }
+                        if (DATAOUT(libtrace)->nextintid == 0) {
+                                pcapng_create_output_interface_packet(libtrace, linktype);
+                        }
 	                return pcapng_output_enhanced_packet(libtrace, packet);
 		}
 		case PCAPNG_CUSTOM_TYPE: {
@@ -869,41 +912,17 @@ static int pcapng_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *pack
 		}
 		default: {
 
-			/* create section header if not already */
+			/* create and output section header if none have occured yet */
 			if (DATAOUT(libtrace)->sechdr_count == 0) {
-				/* Create section block */
-		                pcapng_sec_t sechdr;
-		                sechdr.blocktype = pcapng_swap32(libtrace, PCAPNG_SECTION_TYPE);
-		                sechdr.blocklen = pcapng_swap32(libtrace, 28);
-		                sechdr.ordering = pcapng_swap32(libtrace, 0x1A2B3C4D);
-		                sechdr.majorversion = pcapng_swap16(libtrace, 1);
-		                sechdr.minorversion = 0;
-		                sechdr.sectionlen = 0xFFFFFFFFFFFFFFFF;
-
-	        	        wandio_wwrite(DATAOUT(libtrace)->file, &sechdr, sizeof(sechdr));
-		                wandio_wwrite(DATAOUT(libtrace)->file, &sechdr.blocklen, sizeof(sechdr.blocklen));
-
-				DATAOUT(libtrace)->sechdr_count += 1;
+				pcapng_create_output_sectionheader_packet(libtrace);
 			}
 
-			/* create interface header if not already or if the linktype has changed */
+			/* create and output interface header if not already or if the
+			 * linktype has changed */
 			if (DATAOUT(libtrace)->nextintid == 0
 				|| DATAOUT(libtrace)->lastdlt != linktype) {
-				/* Create interface block*/
-		                pcapng_int_t inthdr;
-		                inthdr.blocktype = pcapng_swap32(libtrace, PCAPNG_INTERFACE_TYPE);
-		                inthdr.blocklen = pcapng_swap32(libtrace, 20);
-		                inthdr.linktype = pcapng_swap16(libtrace, libtrace_to_pcap_dlt(linktype));
-		                inthdr.reserved = 0;
-		                inthdr.snaplen = 0;
 
-		                wandio_wwrite(DATAOUT(libtrace)->file, &inthdr, sizeof(inthdr));
-		                wandio_wwrite(DATAOUT(libtrace)->file, &inthdr.blocklen, sizeof(inthdr.blocklen));
-
-		                /* increment the interface counter */
-		                DATAOUT(libtrace)->nextintid += 1;
-				/* update the last linktype */
-				DATAOUT(libtrace)->lastdlt = linktype;
+				pcapng_create_output_interface_packet(libtrace, linktype);
 			}
 
 			break;
@@ -1580,19 +1599,23 @@ static int pcapng_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
                 switch (btype) {
                         /* Section Header */
                         case PCAPNG_SECTION_TYPE:
-				/* Section header is required to make pcapng valid
-				 * so we cannot exclude when option discard_meta is set */
+				/* Section header packets are required for PCAPNG so even if discard_meta
+				 * option is set it still needs to be processed. Not setting gotpacket will
+				 * prevent triggering the meta callback */
                                	err = pcapng_read_section(libtrace, packet, flags);
-                               	gotpacket = 1;
+				if (!DATA(libtrace)->discard_meta) {
+                               		gotpacket = 1;
+				}
 
                                 break;
 
                         /* Interface Header */
                         case PCAPNG_INTERFACE_TYPE:
-				/* Section interface is required to make pcapng valid
-                                 * so we cannot exclude when option discard_meta is set */
+				/* Same applies here for Interface packets */
                                 err = pcapng_read_interface(libtrace, packet, to_read, flags);
-                                gotpacket = 1;
+				if (!DATA(libtrace)->discard_meta) {
+                                	gotpacket = 1;
+				}
                                 break;
 
 

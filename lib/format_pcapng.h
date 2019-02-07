@@ -108,7 +108,7 @@ typedef struct pcagng_section_header_t {
         uint16_t majorversion;
         uint16_t minorversion;
         uint64_t sectionlen;
-} pcapng_sec_t;
+} PACKED pcapng_sec_t;
 
 typedef struct pcapng_interface_header_t {
         uint32_t blocktype;
@@ -116,12 +116,12 @@ typedef struct pcapng_interface_header_t {
         uint16_t linktype;
         uint16_t reserved;
         uint32_t snaplen;
-} pcapng_int_t;
+} PACKED pcapng_int_t;
 
 typedef struct pcapng_nrb_header_t {
         uint32_t blocktype;
         uint32_t blocklen;
-} pcapng_nrb_t;
+} PACKED pcapng_nrb_t;
 
 typedef struct pcapng_enhanced_packet_t {
         uint32_t blocktype;
@@ -131,13 +131,13 @@ typedef struct pcapng_enhanced_packet_t {
         uint32_t timestamp_low;
         uint32_t caplen;
         uint32_t wlen;
-} pcapng_epkt_t;
+} PACKED pcapng_epkt_t;
 
 typedef struct pcapng_simple_packet_t {
         uint32_t blocktype;
         uint32_t blocklen;
         uint32_t wlen;
-} pcapng_spkt_t;
+} PACKED pcapng_spkt_t;
 
 typedef struct pcapng_old_packet_t {
         uint32_t blocktype;
@@ -148,7 +148,7 @@ typedef struct pcapng_old_packet_t {
         uint32_t timestamp_low;
         uint32_t caplen;
         uint32_t wlen;
-} pcapng_opkt_t;
+} PACKED pcapng_opkt_t;
 
 typedef struct pcapng_stats_header_t {
         uint32_t blocktype;
@@ -156,20 +156,20 @@ typedef struct pcapng_stats_header_t {
         uint32_t interfaceid;
         uint32_t timestamp_high;
         uint32_t timestamp_low;
-} pcapng_stats_t;
+} PACKED pcapng_stats_t;
 
 typedef struct pcapng_decryption_secrets_header_t {
         uint32_t blocktype;
         uint32_t blocklen;
         uint32_t secrets_type;
         uint32_t secrets_len;
-} pcapng_secrets_t;
+} PACKED pcapng_secrets_t;
 
 typedef struct pcapng_custom_header_t {
         uint32_t blocktype;
         uint32_t blocklen;
         uint32_t pen;
-} pcapng_custom_t;
+} PACKED pcapng_custom_t;
 
 typedef struct pcapng_interface_t pcapng_interface_t;
 
@@ -227,21 +227,21 @@ struct pcapng_format_data_out_t {
 struct pcapng_optheader {
         uint16_t optcode;
         uint16_t optlen;
-};
+} PACKED;
 
 struct pcapng_custom_optheader {
         uint16_t optcode;
         uint16_t optlen;
         uint32_t pen;
-};
+} PACKED;
 struct pcapng_nrb_record {
         uint16_t recordtype;
         uint16_t recordlen;
-};
+} PACKED;
 struct pcapng_peeker {
         uint32_t blocktype;
         uint32_t blocklen;
-};
+} PACKED;
 
 typedef struct pcapng_peeker pcapng_hdr_t;
 

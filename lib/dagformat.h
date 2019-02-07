@@ -106,12 +106,12 @@ typedef struct dag_record {
 typedef struct dag_section_header {
 	uint16_t type;
 	uint16_t len;
-} dag_sec_t;
+} PACKED dag_sec_t;
 
 struct dag_opthdr {
 	uint16_t optcode;
 	uint16_t optlen;
-};
+} PACKED;
 
 #ifdef WIN32
 #pragma pack(pop)

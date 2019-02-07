@@ -1074,8 +1074,7 @@ static libtrace_meta_datatype_t erf_get_datatype(uint32_t option) {
 	}
 }
 
-/* An ERF provenance packet can contain multiple sections of the same type per packet,
- * Need to think of a way to handle this currently the first found is returned*/
+/* An ERF provenance packet can contain multiple sections of the same type per packet */
 void *erf_get_meta_section(libtrace_packet_t *packet, uint32_t section) {
 
 	void *ptr;
@@ -1095,7 +1094,7 @@ void *erf_get_meta_section(libtrace_packet_t *packet, uint32_t section) {
 	ptr = packet->payload;
 
 	/* ensure this packet is a meta packet */
-	if ((hdr->type & 127) != 27) { return NULL; }
+	if ((hdr->type & 127) != ERF_META_TYPE) { return NULL; }
 	/* set remaining to size of packet minus header length */
 	remaining = ntohs(hdr->rlen) - 24;
 

@@ -4,6 +4,7 @@
 #include "format_erf.h"
 
 #include <arpa/inet.h>
+#include <inttypes.h>
 
 DLLEXPORT void decode(int link_type UNUSED, const char *packet UNUSED, unsigned len UNUSED) {
 }
@@ -17,15 +18,15 @@ static void print_section(libtrace_meta_t *meta) {
 				meta->items[i].option_name,
 				(char *)meta->items[i].data);
 		} else if (meta->items[i].datatype == TRACE_META_UINT8) {
-			printf("   %s: %u\n",
+			printf("   %s: %" PRIu8 "\n",
                                 meta->items[i].option_name,
 				*(uint8_t *)meta->items[i].data);
 		} else if (meta->items[i].datatype == TRACE_META_UINT32) {
-			printf("   %s: %u\n",
+			printf("   %s: %" PRIu32 "\n",
                                 meta->items[i].option_name,
 				*(uint32_t *)meta->items[i].data);
 		} else if (meta->items[i].datatype == TRACE_META_UINT64) {
-			printf("   %s: %lu\n",
+			printf("   %s: %" PRIu64 "\n",
                                 meta->items[i].option_name,
 				*(uint64_t *)meta->items[i].data);
 		} else if (meta->items[i].datatype == TRACE_META_IPV4) {
@@ -44,7 +45,7 @@ static void print_section(libtrace_meta_t *meta) {
 				meta->items[i].option_name,
 				mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 		} else {
-			printf("   Unknown Option ID %u (output RAW): ", meta->items[i].option);
+			printf("   Unknown Option ID %" PRIu16 " (output RAW): ", meta->items[i].option);
 			int k;
 			unsigned char *curr = (unsigned char *)meta->items[i].data;
 			for (k=0; k<meta->items[i].len; k++) {

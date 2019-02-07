@@ -8,9 +8,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#define INET4_ADDRSTRLEN 16
-#define INET6_ADDRSTRLEN 46
+#include <netinet/in.h>
+#include <inttypes.h>
 
 DLLEXPORT void decode(int link_type UNUSED,const char *packet UNUSED,unsigned len UNUSED) {
 };
@@ -80,18 +79,18 @@ static void print_interface_type(libtrace_meta_t *r, libtrace_packet_t *packet) 
 					tmp[4], tmp[5], tmp[6], tmp[7]);
 				break;
 			case(PCAPNG_META_IF_SPEED):
-				printf("  if_speed: %lu\n",
+				printf("  if_speed: %" PRIu64 "\n",
 					*(uint64_t *)r->items[i].data);
 				break;
 			case(PCAPNG_META_IF_TSRESOL):
-				printf("  if_tsresol: %u\n",
+				printf("  if_tsresol: %" PRIu8 "\n",
 					*(uint8_t *)r->items[i].data);
 				break;
 			case(PCAPNG_META_IF_TZONE):
 				/* Waiting for specification to specify */
 				break;
 			case(PCAPNG_META_IF_FILTER):
-				printf("  if_filter: %u",
+				printf("  if_filter: %" PRIu8 "",
 					*(uint8_t *)r->items[i].data);
 				printf(" %s\n",
 					(char *)r->items[i].data+sizeof(uint8_t));
@@ -101,11 +100,11 @@ static void print_interface_type(libtrace_meta_t *r, libtrace_packet_t *packet) 
 					(char *)r->items[i].data);
 				break;
 			case(PCAPNG_META_IF_FCSLEN):
-				printf("  if_fcslen: %u\n",
+				printf("  if_fcslen: %" PRIu8 "\n",
 					*(uint8_t *)r->items[i].data);
 				break;
 			case(PCAPNG_META_IF_TSOFFSET):
-				printf("  if_tsoffset: %lu\n",
+				printf("  if_tsoffset: %" PRIu64 "\n",
 					*(uint64_t *)r->items[i].data);
 				break;
 			case(PCAPNG_META_IF_HARDWARE):
@@ -165,31 +164,31 @@ static void print_interface_statistics_type(libtrace_meta_t *r) {
                 switch(r->items[i].option) {
 			case(PCAPNG_META_ISB_STARTTIME):
 				/* Need to split into 4 octets */
-				printf("  isb_starttime: %lu\n",
+				printf("  isb_starttime: %" PRIu64 "\n",
                                         *(uint64_t *)r->items[i].data);
                                 break;
 			case(PCAPNG_META_ISB_ENDTIME):
-				printf("  isb_endtime: %lu\n",
+				printf("  isb_endtime: %" PRIu64 "\n",
 					*(uint64_t *)r->items[i].data);
 				break;
 			case(PCAPNG_META_ISB_IFRECV):
-				printf("  isb_ifrecv: %lu\n",
+				printf("  isb_ifrecv: %" PRIu64 "\n",
                                         *(uint64_t *)r->items[i].data);
                                 break;
 			case(PCAPNG_META_ISB_IFDROP):
-				printf("  isb_ifdrop: %lu\n",
+				printf("  isb_ifdrop: %" PRIu64 "\n",
                                         *(uint64_t *)r->items[i].data);
                                 break;
 			case(PCAPNG_META_ISB_FILTERACCEPT):
-				printf("  isb_filteraccept: %lu\n",
+				printf("  isb_filteraccept: %" PRIu64 "\n",
                                         *(uint64_t *)r->items[i].data);
                                 break;
 			case(PCAPNG_META_ISB_OSDROP):
-				printf("  isb_osdrop: %lu\n",
+				printf("  isb_osdrop: %" PRIu64 "\n",
                                         *(uint64_t *)r->items[i].data);
                                 break;
 			case(PCAPNG_META_ISB_USRDELIV):
-				printf("  isb_usrdeliv: %lu\n",
+				printf("  isb_usrdeliv: %" PRIu64 "\n",
                                         *(uint64_t *)r->items[i].data);
                                 break;
 			default:
@@ -206,7 +205,7 @@ static void print_custom_type(libtrace_meta_t *r) {
 
 	/* print the custom data */
 	for (i=0; i<r->num; i++) {
-		printf("  Private Enterprise Number (PEN): %u\n",
+		printf("  Private Enterprise Number (PEN): %" PRIu32 "\n",
 			*(uint32_t *)r->items[i].data);
 		printf("   Data: ");
 		char *ptr = r->items[i].data+sizeof(uint32_t);
