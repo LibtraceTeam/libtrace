@@ -1120,6 +1120,14 @@ libtrace_linktype_t erf_type_to_libtrace(uint8_t erf);
  */
 uint8_t libtrace_to_erf_type(libtrace_linktype_t linktype);
 
+/** Converts a libtrace link type into an TZSP type.
+ *
+ * @param linktype      The libtrace link type to be converted
+ * @return The TZSP type that is equivalent to the provided libtrace link type,
+ * or -1 if the link type cannot be matched to an TZSP type.
+ */
+uint8_t libtrace_to_tzsp_type(libtrace_linktype_t linktype);
+
 /** Converts an ARPHRD type into a libtrace link type.
  *
  * @param arphrd	The ARPHRD type to be converted

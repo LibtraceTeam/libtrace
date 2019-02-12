@@ -31,8 +31,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "libtrace_arphrd.h" 
-
+#include "libtrace_arphrd.h"
+#include "format_tzsplive.h"
 
 /* This file maps libtrace types to/from pcap DLT and erf types
  *
@@ -224,6 +224,37 @@ uint8_t libtrace_to_erf_type(libtrace_linktype_t linktype)
 		case TRACE_TYPE_CONTENT_INVALID:
 			break;
 	}
+	return 255;
+}
+
+uint8_t libtrace_to_tzsp_type(libtrace_linktype_t linktype) {
+	switch(linktype) {
+		case TRACE_TYPE_ETH: return TZSP_ENCAP_ETHERNET;
+		case TRACE_TYPE_PPP: return TZSP_ENCAP_PPP;
+		case TRACE_TYPE_NONE: return TZSP_ENCAP_RAW;
+		case TRACE_TYPE_80211: return TZSP_ENCAP_80211;
+		case TRACE_TYPE_80211_PRISM: return TZSP_ENCAP_80211_PRISM;
+		case TRACE_TYPE_UNKNOWN:
+		case TRACE_TYPE_HDLC_POS:
+		case TRACE_TYPE_ATM:
+		case TRACE_TYPE_LINUX_SLL:
+		case TRACE_TYPE_PFLOG:
+		case TRACE_TYPE_POS:
+		case TRACE_TYPE_AAL5:
+		case TRACE_TYPE_DUCK:
+		case TRACE_TYPE_80211_RADIO:
+		case TRACE_TYPE_LLCSNAP:
+		case TRACE_TYPE_METADATA:
+		case TRACE_TYPE_NONDATA:
+		case TRACE_TYPE_OPENBSD_LOOP:
+		case TRACE_TYPE_ERF_META:
+		case TRACE_TYPE_ETSILI:
+		case TRACE_TYPE_PCAPNG_META:
+		case TRACE_TYPE_CONTENT_INVALID:
+		case TRACE_TYPE_TZSP:
+			break;
+	}
+	/* unknown */
 	return 255;
 }
 
