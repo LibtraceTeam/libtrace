@@ -148,16 +148,21 @@ libtrace_rt_types_t pcapng_linktype_to_rt(libtrace_dlt_t linktype) {
         return TRACE_RT_DATA_PCAPNG + pcap_dlt_to_pcap_linktype(linktype);
 }
 
+libtrace_rt_types_t tzsp_linktype_to_rt(libtrace_dlt_t linktype) {
+	return TRACE_RT_DATA_TZSP + pcap_dlt_to_pcap_linktype(linktype);
+}
+
 libtrace_dlt_t rt_to_pcap_linktype(libtrace_rt_types_t rt_type)
 {
 
 	if (rt_type >= TRACE_RT_DATA_DLT && rt_type < TRACE_RT_DATA_DLT_END) {
 		/* RT type is in the pcap range */
 		return rt_type - TRACE_RT_DATA_DLT;
-	}
-	else if (rt_type >= TRACE_RT_DATA_BPF && rt_type < TRACE_RT_DATA_BPF_END) {
+	} else if (rt_type >= TRACE_RT_DATA_BPF && rt_type < TRACE_RT_DATA_BPF_END) {
+		/* RT type is in the bpf range */
 		return rt_type - TRACE_RT_DATA_BPF;
 	} else if (rt_type >= TRACE_RT_DATA_PCAPNG && rt_type < TRACE_RT_DATA_PCAPNG_END) {
+		/* RT type is in the PCAPNG range */
                 return rt_type - TRACE_RT_DATA_PCAPNG;
         }
 

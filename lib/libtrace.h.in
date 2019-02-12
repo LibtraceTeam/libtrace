@@ -496,11 +496,11 @@ typedef enum {
 	TRACE_RT_DATA_LEGACY_NZIX=TRACE_RT_DATA_SIMPLE + TRACE_FORMAT_LEGACY_NZIX,
 	/** RT is encapsulating a Linux native PACKET_MMAP capture record */
 	TRACE_RT_DATA_LINUX_RING=TRACE_RT_DATA_SIMPLE+TRACE_FORMAT_LINUX_RING,
-    /** RT is encapsulating a Intel DPDK capture record */
+	/** RT is encapsulating a Intel DPDK capture record */
 	TRACE_RT_DATA_DPDK=TRACE_RT_DATA_SIMPLE+TRACE_FORMAT_DPDK,
-
+	/** RT is encapsulating a etsilive capture record */
         TRACE_RT_DATA_ETSILI = TRACE_RT_DATA_SIMPLE + TRACE_FORMAT_ETSILIVE,
-
+	/** RT is encapsulating a tzsplive capture record */
 	TRACE_RT_DATA_TZSP = TRACE_RT_DATA_SIMPLE + TRACE_FORMAT_TZSPLIVE,
 
 	/** As PCAP does not store the linktype with the packet, we need to 
@@ -540,9 +540,11 @@ typedef enum {
 
         TRACE_RT_DATA_PCAPNG            = 4000,
 	TRACE_RT_DATA_PCAPNG_END        = 4499,
+
+
 	/** Unused value marking the end of the valid range for all RT packet
 	 * types */
-	TRACE_RT_LAST			= 4500
+	TRACE_RT_LAST			= 5001
 } libtrace_rt_types_t;
 
 /** IP Protocol values */
