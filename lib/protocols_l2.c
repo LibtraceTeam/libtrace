@@ -111,6 +111,7 @@ libtrace_layer2_headers_t *trace_get_layer2_headers(libtrace_packet_t *packet) {
 	uint32_t remaining;
 	uint16_t ethertype;
 	libtrace_layer2_headers_t *r;
+	int allocated_headers = 0;
 
 	if (packet == NULL) {
 		fprintf(stderr, "NULL packet passed into trace_get_layer2_headers()\n");
@@ -135,13 +136,15 @@ libtrace_layer2_headers_t *trace_get_layer2_headers(libtrace_packet_t *packet) {
 			"Unable to allocate memory in trace_get_layer2_headers()\n");
 		return NULL;
 	}
-	r->header = calloc(1, sizeof(libtrace_layer2_header_t));
+	/* Alloc enough space for 10 headers */
+	r->header = calloc(1, sizeof(libtrace_layer2_header_t)*10);
 	if (r->header == NULL) {
 		trace_set_err(packet->trace, TRACE_ERR_OUT_OF_MEMORY,
 			"Unable to allocate memory in trace_get_layer2_headers()\n");
 		free(r);
 		return NULL;
 	}
+	allocated_headers = 10;
 
 	/* get the first layer2 header */
 	ptr = trace_get_payload_from_layer2(ptr, linktype, &ethertype, &remaining);
@@ -197,8 +200,19 @@ libtrace_layer2_headers_t *trace_get_layer2_headers(libtrace_packet_t *packet) {
 					break;
 			}
 
-			r->header = realloc(r->header,
-				sizeof(libtrace_layer2_header_t)*(r->num+1));
+			if ((r->num+1) >= allocated_headers) {
+				allocated_headers += 10;
+				r->header = realloc(r->header,
+					sizeof(libtrace_layer2_header_t)*allocated_headers);
+
+				if (r->header == NULL) {
+					trace_set_err(packet->trace, TRACE_ERR_OUT_OF_MEMORY,
+						"Unable to allocate memory in trace_get_layer2_headers()");
+					free(r);
+					return NULL;
+				}
+			}
+
 			r->header[r->num].ethertype = ethertype;
 			r->header[r->num++].data = ptr;
 		}
@@ -213,7 +227,7 @@ libtrace_layer2_headers_t *trace_get_layer2_headers(libtrace_packet_t *packet) {
 	}
 
 	/* If no results were found free memory now and just return NULL */
-	if (r->num) {
+	if (r->num == 0) {
 		free(r->header);
 		free(r);
 		return NULL;
@@ -234,7 +248,7 @@ uint16_t trace_get_outermost_vlan(libtrace_packet_t *packet, uint8_t **vlanptr,
 	if (!packet) {
 		fprintf(stderr, "NULL packet passed into trace_get_outermost_vlan()\n");
 		*vlanptr = NULL;
-		*remaining = rem;
+		*remaining = 0;
 		return vlanid;
 	}
 
@@ -242,7 +256,7 @@ uint16_t trace_get_outermost_vlan(libtrace_packet_t *packet, uint8_t **vlanptr,
 	/* No layer 2 */
 	if (ptr == NULL) {
 		*vlanptr = NULL;
-			*remaining = rem;
+		*remaining = 0;
 		return vlanid;
 	}
 
@@ -252,7 +266,7 @@ uint16_t trace_get_outermost_vlan(libtrace_packet_t *packet, uint8_t **vlanptr,
 			ethertype == TRACE_ETHERTYPE_IPV6) {
 
 			*vlanptr = NULL;
-			*remaining = rem;
+			*remaining = 0;
                         return vlanid;
                 }
 
@@ -289,7 +303,7 @@ uint32_t trace_get_outermost_mpls(libtrace_packet_t *packet, uint8_t **mplsptr,
 	ptr = trace_get_layer2(packet, &linktype, &rem);
 	/* No layer2 */
 	if (ptr == NULL) {
-		*remaining = rem;
+		*remaining = 0;
 		*mplsptr = NULL;
 		return mplslabel;
 	}
@@ -298,7 +312,7 @@ uint32_t trace_get_outermost_mpls(libtrace_packet_t *packet, uint8_t **mplsptr,
 	while (ethertype != TRACE_ETHERTYPE_MPLS) {
 		if (rem == 0 || ptr == NULL) {
 
-			*remaining = rem;
+			*remaining = 0;
 			*mplsptr = NULL;
 			return mplslabel;
 		}
