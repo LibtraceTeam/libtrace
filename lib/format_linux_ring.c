@@ -848,6 +848,7 @@ static struct libtrace_format_t linuxring = {
 	linuxring_get_timeval,		/* get_timeval */
 	linuxring_get_timespec,		/* get_timespec */
 	NULL,				/* get_seconds */
+	NULL,                           /* get_meta_section */
 	NULL,				/* seek_erf */
 	NULL,				/* seek_timeval */
 	NULL,				/* seek_seconds */
@@ -911,6 +912,7 @@ static struct libtrace_format_t linuxring = {
 	linuxring_get_timeval,		/* get_timeval */
 	linuxring_get_timespec,		/* get_timespec */
 	NULL,				/* get_seconds */
+	NULL,                           /* get_meta_section */
 	NULL,				/* seek_erf */
 	NULL,				/* seek_timeval */
 	NULL,				/* seek_seconds */

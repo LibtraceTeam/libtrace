@@ -135,6 +135,11 @@ enum libtrace_messages {
 	 */
 	MESSAGE_PACKET,
 
+	/** A libtrace meta packet is ready, this will trigger the meta packet
+         *  callback for the processing threads.
+         */
+	MESSAGE_META_PACKET,
+
         /** A libtrace result is ready, this will trigger the result callback
          *  for the reporter thread.
 	 */
@@ -518,6 +523,25 @@ typedef libtrace_packet_t* (*fn_cb_packet)(libtrace_t *libtrace,
                                            libtrace_packet_t *packet);
 
 /**
+ * A callback function triggered when a processing thread receives a meta packet.
+ *
+ * @param libtrace The parallel trace.
+ * @param t The thread that is running
+ * @param global The global storage.
+ * @param tls The thread local storage.
+ * @param packet The packet to be processed.
+ *
+ * @return either the packet itself if it is not being published as a result
+ *   or NULL otherwise. If returning NULL, it is the user's responsibility
+ *   to ensure the packet is freed when the reporter thread is finished with it.
+ */
+typedef libtrace_packet_t* (*fn_cb_meta_packet)(libtrace_t *libtrace,
+                                           libtrace_thread_t *t,
+                                           void *global,
+                                           void *tls,
+                                           libtrace_packet_t *packet);
+
+/**
  * Callback for handling a result message. Should only be required by the
  * reporter thread.
  *
@@ -598,6 +622,16 @@ DLLEXPORT int trace_set_pausing_cb(libtrace_callback_set_t *cbset,
  */
 DLLEXPORT int trace_set_packet_cb(libtrace_callback_set_t *cbset,
                 fn_cb_packet handler);
+
+/**
+ * Registers a meta packet callback against a callback set.
+ *
+ * @param cbset The callback set.
+ * @param handler The meta packet callback funtion.
+ * @return 0 if successful, -1 otherwise.
+ */
+DLLEXPORT int trace_set_meta_packet_cb(libtrace_callback_set_t *cbset,
+                fn_cb_meta_packet handler);
 
 /**
  * Registers a first packet callback against a callback set.

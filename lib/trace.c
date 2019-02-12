@@ -684,7 +684,12 @@ DLLEXPORT int trace_config(libtrace_t *libtrace,
                         }
                         return -1;
 
-
+		case TRACE_OPTION_DISCARD_META:
+			if (!trace_is_err(libtrace)) {
+				trace_set_err(libtrace, TRACE_ERR_OPTION_UNAVAIL,
+					"Libtrace does not support meta packets for this format");
+			}
+			return -1;
 	}
 	if (!trace_is_err(libtrace)) {
 		trace_set_err(libtrace,TRACE_ERR_UNKNOWN_OPTION,

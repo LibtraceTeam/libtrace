@@ -241,8 +241,9 @@ inline void send_message(libtrace_t *trace, libtrace_thread_t *thread,
 	case MESSAGE_POST_REPORTER:
 	case MESSAGE_PACKET:
 		return;
+	case MESSAGE_META_PACKET:
+		return;
 	}
-
 	if (fn)
 		(*fn)(trace, thread, trace->global_blob, thread->user_data);
 }
@@ -495,8 +496,23 @@ static inline int dispatch_packet(libtrace_t *trace,
                 if (!IS_LIBTRACE_META_PACKET((*packet))) {
         		t->accepted_packets++;
                 }
-		if (trace->perpkt_cbs->message_packet)
-			*packet = (*trace->perpkt_cbs->message_packet)(trace, t, trace->global_blob, t->user_data, *packet);
+
+		/* If packet is meta call the meta callback */
+		if (IS_LIBTRACE_META_PACKET((*packet))) {
+			/* Pass to meta callback if defined else pass to packet callback */
+			if (trace->perpkt_cbs->message_meta_packet) {
+				*packet = (*trace->perpkt_cbs->message_meta_packet)(trace, t,
+					trace->global_blob, t->user_data, *packet);
+			} else if (trace->perpkt_cbs->message_packet) {
+				*packet = (*trace->perpkt_cbs->message_packet)(trace, t,
+					trace->global_blob, t->user_data, *packet);
+			}
+		} else {
+			if (trace->perpkt_cbs->message_packet) {
+				*packet = (*trace->perpkt_cbs->message_packet)(trace, t,
+					trace->global_blob, t->user_data, *packet);
+			}
+		}
 		trace_fin_packet(*packet);
 	} else {
 		if ((*packet)->error != READ_TICK) {
@@ -2034,6 +2050,12 @@ DLLEXPORT int trace_set_stopping_cb(libtrace_callback_set_t *cbset,
 DLLEXPORT int trace_set_packet_cb(libtrace_callback_set_t *cbset,
                 fn_cb_packet handler) {
 	cbset->message_packet = handler;
+	return 0;
+}
+
+DLLEXPORT int trace_set_meta_packet_cb(libtrace_callback_set_t *cbset,
+		fn_cb_meta_packet handler) {
+	cbset->message_meta_packet = handler;
 	return 0;
 }
 
