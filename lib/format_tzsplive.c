@@ -238,8 +238,6 @@ static int tzsplive_start_input(libtrace_t *libtrace) {
 		return -1;
 	}
 
-	fprintf(stderr, "start complete\n");
-
 	return 1;
 }
 
@@ -276,39 +274,6 @@ static int tzsplive_fin_input(libtrace_t *libtrace) {
 	return 0;
 }
 
-static uint8_t *tzsplive_get_packet_payload(const libtrace_packet_t *packet) {
-	uint8_t *ptr = packet->buffer;
-
-	/* Get the TZSP header */
-        tzsp_header_t *hdr = (tzsp_header_t *)ptr;
-	/* Ensure this is TZSP version 1 */
-        if (hdr->version != 1) {
-                trace_set_err(packet->trace, TRACE_ERR_UNSUPPORTED, "TZSP version %" PRIu8 " is"
-                        " not supported\n", hdr->version);
-                return NULL;
-        }
-
-        /* jump over TZSP header */
-        ptr += sizeof(tzsp_header_t);
-
-        /* get the tagged fields */
-        tzsp_tagfield_t *tag = (tzsp_tagfield_t *)ptr;
-        /* Jump over any padding or tagfields */
-        while (tag->type != TZSP_TAG_END) {
-                if (tag->type == TZSP_TAG_PADDING) {
-                        /* jump over the padding */
-                        ptr += sizeof(uint8_t);
-                } else {
-                        /* jump over the tag header and the data */
-                        ptr += sizeof(uint16_t)+tag->length;
-                }
-                tag = (tzsp_tagfield_t *)ptr;
-        }
-        ptr += sizeof(uint8_t);
-
-	return ptr;
-}
-
 static uint8_t *tzsplive_get_option(const libtrace_packet_t *packet, uint8_t option) {
 	uint8_t *ptr = packet->buffer;
 
@@ -343,6 +308,21 @@ static uint8_t *tzsplive_get_option(const libtrace_packet_t *packet, uint8_t opt
         }
 
         return ptr;
+}
+
+static uint8_t *tzsplive_get_packet_payload(const libtrace_packet_t *packet) {
+        /* Get pointer to TZSP_TAG_END */
+        uint8_t *ptr = tzsplive_get_option(packet, TZSP_TAG_END);
+
+	/* All valid TZSP packets must contain TZSP_TAG_END, so if missing packet is
+	 * invalid/corrupt */
+	if (ptr == NULL) {
+		fprintf(stderr, "Invalid TZSP packet in tzsplive_get_packet_payload()\n");
+		return NULL;
+	}
+
+        /* Jump over the end tag to the payload */
+        return ptr + sizeof(uint8_t);
 }
 
 static int tzsplive_prepare_packet(libtrace_t *libtrace UNUSED, libtrace_packet_t *packet,
@@ -438,14 +418,7 @@ static int tzsplive_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *pa
 	/* We cannot write packets until we find a way to get the capture/wire length if
 	 * the tag is not present in the tzsp header */
 
-	//uint8_t version = 1;
-	//uint8_t type = 1;
-	/*uint16_t encap = GET TZSP ENCAPTYPE */
-
-	/* send the packet */
-	/*ret = sendto(FORMAT_DATA_OUT->outsocket, packet->buffer, */
-
-	return 1;
+	return -1;
 }
 
 static int tzsplive_fin_output(libtrace_out_t *libtrace) {
