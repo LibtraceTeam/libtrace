@@ -154,6 +154,7 @@ static void trace_init(void)
 		bpf_constructor();
 		pcapfile_constructor();
 		pcapng_constructor();
+		tzsplive_constructor();
                 rt_constructor();
                 ndag_constructor();
 #ifdef HAVE_WANDDER
@@ -1511,17 +1512,19 @@ size_t trace_get_framing_length(const libtrace_packet_t *packet) {
  * @returns libtrace_linktype_t
  */
 DLLEXPORT libtrace_linktype_t trace_get_link_type(const libtrace_packet_t *packet ) {
-
+	fprintf(stderr, "1\n");
         if (packet->which_trace_start != packet->trace->startcount) {
                 return TRACE_TYPE_CONTENT_INVALID;
         }
-
+	fprintf(stderr, "2\n");
 	if (packet->cached.link_type == 0) {
 		if (!packet->trace->format->get_link_type)
 			return TRACE_TYPE_UNKNOWN;
 		((libtrace_packet_t *)packet)->cached.link_type =
 			packet->trace->format->get_link_type(packet);
+
 	}
+	fprintf(stderr, "3\n");
 
 	return packet->cached.link_type;
 }

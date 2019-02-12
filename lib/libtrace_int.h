@@ -1069,6 +1069,13 @@ libtrace_rt_types_t pcap_linktype_to_rt(libtrace_dlt_t linktype);
  */
 libtrace_rt_types_t pcapng_linktype_to_rt(libtrace_dlt_t linktype);
 
+/** Converts a TZSP DLT into an RT protocol type.
+ *
+ * @param linktype      The TZSP DLT to be converted
+ * @return The RT type that is equivalent to the provided DLT
+ */
+libtrace_rt_types_t tzsp_linktype_to_rt(libtrace_dlt_t linktype);
+
 /** Converts a libtrace link type into a PCAP linktype.
  *
  * @param type		The libtrace link type to be converted
