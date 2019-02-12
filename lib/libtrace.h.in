@@ -347,7 +347,7 @@ enum {
 	TRACE_ERR_NULL = -31,
 	/** Err with trace output file **/
 	TRACE_ERR_OUTPUT_FILE = -32,
-	/** ERR out of memory **/
+	/** Err out of memory **/
 	TRACE_ERR_OUT_OF_MEMORY = -33,
 };
 

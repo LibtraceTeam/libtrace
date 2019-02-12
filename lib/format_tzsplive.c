@@ -1,5 +1,6 @@
 #include "libtrace.h"
 #include "libtrace_int.h"
+#include "format_tzsplive.h"
 
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -13,40 +14,6 @@
 #define FORMAT_DATA ((tzsp_format_data_t *)libtrace->format_data)
 #define FORMAT_DATA_OUT ((tzsp_format_data_out_t *)libtrace->format_data)
 
-/* Packet types */
-#define TZSP_TYPE_RX 0
-#define TZSP_TYPE_TX 1
-#define TZSP_TYPE_RESV 2
-#define TZSP_TYPE_CONF 3
-#define TZSP_TYPE_KEPT_ALIVE 4
-#define TZSP_TYPE_PORT 5
-
-/* Encapsulation types */
-#define TZSP_ENCAP_ETHERNET 1
-#define TZSP_ENCAP_TOKEN_RING 2
-#define TZSP_ENCAP_SLIP 3
-#define TZSP_ENCAP_PPP 4
-#define TZSP_ENCAP_FDDI 5
-#define TZSP_ENCAP_RAW 7
-#define TZSP_ENCAP_80211 18
-#define TZSP_ENCAP_80211_PRISM 119
-#define TZSP_ENCAP_80211_AVS 127
-
-/* Tag fields */
-#define TZSP_TAG_PADDING 0
-#define TZSP_TAG_END 1
-#define TZSP_TAG_RAW_RSSI 10
-#define TZSP_TAG_SNR 11
-#define TZSP_TAG_DATE_RATE 12
-#define TZSP_TAG_TIMESTAMP 13
-#define TZSP_TAG_CONTENTION_FREE 15
-#define TZSP_TAG_DECRYPTED 16
-#define TZSP_TAG_FCS_ERROR 17
-#define TZSP_TAG_RX_CHANNEL 18
-#define TZSP_TAG_PACKET_COUNT 40
-#define TZSP_TAG_RX_FRAME_LENGTH 41
-#define TZSP_TAG_WLAN_RADIO_HDR_SERIAL 60
-
 typedef struct tzsp_format_data {
 	char *listenaddr;
 	char *listenport;
@@ -59,6 +26,7 @@ typedef struct tzsp_format_data_out {
 	char *outport;
 
 	int outsocket;
+	struct addrinfo *listenai;
 } tzsp_format_data_out_t;
 
 typedef struct tzsp_header {
@@ -71,6 +39,21 @@ typedef struct tzsp_tagfield {
 	uint8_t type;
 	uint8_t length;
 } PACKED tzsp_tagfield_t;
+
+static bool tzsplive_can_write(libtrace_packet_t *packet) {
+	libtrace_linktype_t ltype = trace_get_link_type(packet);
+
+	if (ltype == TRACE_TYPE_CONTENT_INVALID
+		|| ltype == TRACE_TYPE_UNKNOWN
+		|| ltype == TRACE_TYPE_ERF_META
+		|| ltype == TRACE_TYPE_NONDATA
+		|| ltype == TRACE_TYPE_PCAPNG_META) {
+
+		return false;
+	}
+
+	return true;
+}
 
 static int tzsplive_create_socket(libtrace_t *libtrace) {
 	struct addrinfo hints, *listenai;
@@ -128,7 +111,7 @@ listenerror:
 }
 
 static int tzsplive_create_output_socket(libtrace_out_t *libtrace) {
-	struct addrinfo hints, *listenai;
+	struct addrinfo hints;
         int reuse = 1;
 
         hints.ai_family = PF_UNSPEC;
@@ -138,10 +121,10 @@ static int tzsplive_create_output_socket(libtrace_out_t *libtrace) {
         hints.ai_flags = AI_PASSIVE;
         hints.ai_protocol = 0;
 
-        listenai = NULL;
+        FORMAT_DATA_OUT->listenai = NULL;
 
 	if (getaddrinfo(FORMAT_DATA_OUT->outaddr, FORMAT_DATA_OUT->outport,
-                &hints, &listenai) != 0) {
+                &hints, &FORMAT_DATA_OUT->listenai) != 0) {
 
                 fprintf(stderr, "Call to getaddrinfo failed for %s:%s -- %s\n",
                         FORMAT_DATA_OUT->outaddr, FORMAT_DATA_OUT->outport,
@@ -149,7 +132,8 @@ static int tzsplive_create_output_socket(libtrace_out_t *libtrace) {
                 goto listenerror;
         }
 
-	FORMAT_DATA_OUT->outsocket = socket(listenai->ai_family, listenai->ai_socktype, 0);
+	FORMAT_DATA_OUT->outsocket = socket(FORMAT_DATA_OUT->listenai->ai_family,
+						FORMAT_DATA_OUT->listenai->ai_socktype, 0);
         if (FORMAT_DATA_OUT->outsocket < 0) {
                 fprintf(stderr, "Failed to create socket for %s:%s -- %s\n",
                         FORMAT_DATA_OUT->outaddr, FORMAT_DATA_OUT->outport,
@@ -164,13 +148,12 @@ static int tzsplive_create_output_socket(libtrace_out_t *libtrace) {
                 goto listenerror;
         }
 
-	freeaddrinfo(listenai);
         return 1;
 
 listenerror:
         trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED, "Unable to create output "
                 "socket for tzsplive");
-        freeaddrinfo(listenai);
+        freeaddrinfo(FORMAT_DATA_OUT->listenai);
         return -1;
 }
 
@@ -398,11 +381,23 @@ static int tzsplive_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 		return -1;
 	}
 
+	/* Cache the captured length */
+	packet->cached.framing_length = trace_get_framing_length(packet);
+	packet->cached.capture_length = ret - trace_get_framing_length(packet);
+
 	return ret;
 }
 
 static int tzsplive_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *packet) {
-	//int ret = 0;
+	int ret = -1;
+	int to_send = 0;
+	int offset = 0;
+	uint8_t *buf;
+
+	/* Check TZSP can write this packet */
+	if (!tzsplive_can_write(packet)) {
+		return 0;
+	}
 
 	if (!libtrace) {
 		fprintf(stderr, "NULL trace passed into tzsplive_write_packet()\n");
@@ -414,10 +409,74 @@ static int tzsplive_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *pa
 		return -1;
 	}
 
-	/* We cannot write packets until we find a way to get the capture/wire length if
-	 * the tag is not present in the tzsp header */
+	/* If the packet is already TZSP just output it */
+	if (packet->trace->format->type == TRACE_FORMAT_TZSPLIVE) {
+		to_send = trace_get_capture_length(packet) +
+				trace_get_framing_length(packet);
 
-	return -1;
+		/* send the packet */
+		ret = sendto(FORMAT_DATA_OUT->outsocket, packet->buffer,
+			to_send,
+			0,
+			FORMAT_DATA_OUT->listenai->ai_addr,
+			FORMAT_DATA_OUT->listenai->ai_addrlen);
+
+	/* try convert it to one */
+	} else {
+
+		/* Allocate memory for buffer */
+		buf = malloc((size_t)LIBTRACE_PACKET_BUFSIZE);
+		if (buf == NULL) {
+			trace_set_err_out(libtrace, TRACE_ERR_OUT_OF_MEMORY,
+				"Unable to allocate memory for output buffer\n");
+			return ret;
+		}
+
+		/* construct the TZSP header */
+		uint8_t version = 1;
+		uint8_t type = 1;
+		uint16_t encap = htons(libtrace_to_tzsp_type(trace_get_link_type(packet)));
+		uint8_t tag_end = 1;
+
+		/* Account for TZSP header and capture length */
+		to_send = sizeof(version) +
+		 	  sizeof(type) +
+		  	  sizeof(encap) +
+		  	  sizeof(tag_end) +
+		  	  trace_get_capture_length(packet);
+
+		/* Copy TZSP header to buffer */
+		memcpy(buf, &version, sizeof(version));
+		offset += sizeof(version);
+		memcpy(buf + offset, &type, sizeof(type));
+		offset += sizeof(type);
+		memcpy(buf + offset, &encap, sizeof(encap));
+		offset += sizeof(encap);
+		memcpy(buf + offset, &tag_end, sizeof(tag_end));
+		offset += sizeof(tag_end);
+		/* Copy packet payload to buffer */
+		memcpy(buf + offset, packet->payload, trace_get_capture_length(packet));
+
+		/* send the packet */
+		ret = sendto(FORMAT_DATA_OUT->outsocket,
+			buf,
+			to_send,
+                        0,
+                        FORMAT_DATA_OUT->listenai->ai_addr,
+                        FORMAT_DATA_OUT->listenai->ai_addrlen);
+
+		/* Free the buffer */
+		free(buf);
+	}
+
+	/* Check if expected number of bytes was sent */
+        if (ret != to_send) {
+        	trace_set_err_out(libtrace, TRACE_ERR_BAD_IO,
+                	"Error sending on socket %d: %s",
+                        FORMAT_DATA_OUT->outsocket, strerror(errno));
+        }
+
+        return ret;
 }
 
 static int tzsplive_fin_output(libtrace_out_t *libtrace) {
@@ -430,6 +489,9 @@ static int tzsplive_fin_output(libtrace_out_t *libtrace) {
         if (FORMAT_DATA_OUT->outsocket >= 0) {
                 close(FORMAT_DATA_OUT->outsocket);
         }
+	if (FORMAT_DATA_OUT->listenai) {
+		freeaddrinfo(FORMAT_DATA_OUT->listenai);
+	}
         free(libtrace->format_data);
 	return 0;
 }
@@ -459,7 +521,7 @@ static uint64_t tzsplive_get_erf_timestamp(const libtrace_packet_t *packet UNUSE
 }
 
 static int tzsplive_get_capture_length(const libtrace_packet_t *packet) {
-	return trace_get_wire_length(packet);
+	return packet->cached.capture_length;
 }
 static int tzsplive_get_wire_length(const libtrace_packet_t *packet) {
 	uint8_t *ptr;
@@ -468,8 +530,8 @@ static int tzsplive_get_wire_length(const libtrace_packet_t *packet) {
 		ptr += sizeof(uint16_t);
 		return *(uint16_t *)ptr;
 	} else {
-		/* could do something else here to try find the wire length?? */
-		return  0;
+		/* Fallback to the captured length */
+		return trace_get_capture_length(packet);
 	}
 }
 static int tzsplive_get_framing_length(const libtrace_packet_t *packet) {
