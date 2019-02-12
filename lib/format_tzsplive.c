@@ -368,7 +368,6 @@ static int tzsplive_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 	}
 	flags |= TRACE_PREP_OWN_BUFFER;
 
-readagain:
 	/* Try read a packet from the socket */
 	ret = recv(FORMAT_DATA->socket, packet->buffer, (size_t)LIBTRACE_PACKET_BUFSIZE,
 		MSG_DONTWAIT);
@@ -376,7 +375,7 @@ readagain:
 	if (ret == -1) {
 		/* Nothing available to read */
 		if (errno == EAGAIN || errno == EWOULDBLOCK) {
-			goto readagain;
+			return 0;
 		}
 		/* Socket error */
 		trace_set_err(libtrace, TRACE_ERR_BAD_IO, "Error receiving on socket "
