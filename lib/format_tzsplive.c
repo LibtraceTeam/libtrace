@@ -14,6 +14,9 @@
 #define FORMAT_DATA ((tzsp_format_data_t *)libtrace->format_data)
 #define FORMAT_DATA_OUT ((tzsp_format_data_out_t *)libtrace->format_data)
 
+#define TZSP_RECVBUF_SIZE (64 * 1024 * 1024)
+#define TZSP_SENDBUF_SIZE (64 * 1024 * 1024)
+
 typedef struct tzsp_format_data {
 	char *listenaddr;
 	char *listenport;
@@ -58,6 +61,7 @@ static bool tzsplive_can_write(libtrace_packet_t *packet) {
 static int tzsplive_create_socket(libtrace_t *libtrace) {
 	struct addrinfo hints, *listenai;
 	int reuse = 1;
+	int recvbuf = TZSP_RECVBUF_SIZE;
 
 	hints.ai_family = PF_UNSPEC;
 	/* UDP socket */
@@ -92,6 +96,13 @@ static int tzsplive_create_socket(libtrace_t *libtrace) {
 		goto listenerror;
 	}
 
+	if (setsockopt(FORMAT_DATA->socket, SOL_SOCKET, SO_RCVBUF, &recvbuf, sizeof(recvbuf)) < 0) {
+		fprintf(stderr, "Failed to set receive buffer for %s:%s -- %s\n",
+			FORMAT_DATA->listenaddr, FORMAT_DATA->listenport,
+			strerror(errno));
+		goto listenerror;
+	}
+
 	if (bind(FORMAT_DATA->socket, (struct sockaddr *)listenai->ai_addr, listenai->ai_addrlen) < 0) {
 		fprintf(stderr, "Failed to bind socket for %s:%s -- %s\n",
 			FORMAT_DATA->listenaddr, FORMAT_DATA->listenport,
@@ -113,6 +124,7 @@ listenerror:
 static int tzsplive_create_output_socket(libtrace_out_t *libtrace) {
 	struct addrinfo hints;
         int reuse = 1;
+	int sendbuf = TZSP_SENDBUF_SIZE;
 
         hints.ai_family = PF_UNSPEC;
         /* UDP socket */
@@ -147,6 +159,13 @@ static int tzsplive_create_output_socket(libtrace_out_t *libtrace) {
                         strerror(errno));
                 goto listenerror;
         }
+
+	if (setsockopt(FORMAT_DATA_OUT->outsocket, SOL_SOCKET, SO_SNDBUF, &sendbuf, sizeof(sendbuf)) < 0) {
+		fprintf(stderr, "Failed to set send buffer for %s:%s -- %s\n",
+			FORMAT_DATA_OUT->outaddr, FORMAT_DATA_OUT->outport,
+                        strerror(errno));
+		goto listenerror;
+	}
 
         return 1;
 
@@ -381,6 +400,12 @@ static int tzsplive_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 		return -1;
 	}
 
+	int i;
+	unsigned char *t = (unsigned char *)packet->buffer;
+	for(i=0;i<20;i++) {
+		fprintf(stderr, "%02x ", t[i]);
+	}
+
 	/* Cache the captured length */
 	packet->cached.framing_length = trace_get_framing_length(packet);
 	packet->cached.capture_length = ret - trace_get_framing_length(packet);
@@ -436,12 +461,21 @@ static int tzsplive_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *pa
 		uint8_t version = 1;
 		uint8_t type = 1;
 		uint16_t encap = htons(libtrace_to_tzsp_type(trace_get_link_type(packet)));
+
+		tzsp_tagfield_t rx_frame;
+		rx_frame.type = TZSP_TAG_RX_FRAME_LENGTH;
+		rx_frame.length = 2;
+		uint16_t rx_val = htons(trace_get_wire_length(packet));
+		fprintf(stderr, "wirelen: %d\n", (int)trace_get_wire_length(packet));
+
 		uint8_t tag_end = 1;
 
 		/* Account for TZSP header and capture length */
 		to_send = sizeof(version) +
 		 	  sizeof(type) +
 		  	  sizeof(encap) +
+			  sizeof(rx_frame) +
+			  sizeof(rx_val) +
 		  	  sizeof(tag_end) +
 		  	  trace_get_capture_length(packet);
 
@@ -452,6 +486,10 @@ static int tzsplive_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *pa
 		offset += sizeof(type);
 		memcpy(buf + offset, &encap, sizeof(encap));
 		offset += sizeof(encap);
+		memcpy(buf + offset, &rx_frame, sizeof(rx_frame));
+		offset += sizeof(rx_frame);
+		memcpy(buf + offset, &rx_val, sizeof(rx_val));
+		offset += sizeof(rx_val);
 		memcpy(buf + offset, &tag_end, sizeof(tag_end));
 		offset += sizeof(tag_end);
 		/* Copy packet payload to buffer */
@@ -464,6 +502,12 @@ static int tzsplive_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *pa
                         0,
                         FORMAT_DATA_OUT->listenai->ai_addr,
                         FORMAT_DATA_OUT->listenai->ai_addrlen);
+
+		int i;
+		unsigned char *t = (unsigned char *)buf;
+		for(i=0;i<20;i++) {
+			fprintf(stderr, "%02x ", t[i]);
+		}
 
 		/* Free the buffer */
 		free(buf);
@@ -528,7 +572,7 @@ static int tzsplive_get_wire_length(const libtrace_packet_t *packet) {
 	if ((ptr = tzsplive_get_option(packet, TZSP_TAG_RX_FRAME_LENGTH)) != NULL) {
 		/* jump to the value */
 		ptr += sizeof(uint16_t);
-		return *(uint16_t *)ptr;
+		return ntohs(*(uint16_t *)ptr);
 	} else {
 		/* Fallback to the captured length */
 		return trace_get_capture_length(packet);
