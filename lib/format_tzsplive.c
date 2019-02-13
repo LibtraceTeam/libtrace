@@ -400,12 +400,6 @@ static int tzsplive_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 		return -1;
 	}
 
-	int i;
-	unsigned char *t = (unsigned char *)packet->buffer;
-	for(i=0;i<20;i++) {
-		fprintf(stderr, "%02x ", t[i]);
-	}
-
 	/* Cache the captured length */
 	packet->cached.framing_length = trace_get_framing_length(packet);
 	packet->cached.capture_length = ret - trace_get_framing_length(packet);
@@ -466,7 +460,6 @@ static int tzsplive_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *pa
 		rx_frame.type = TZSP_TAG_RX_FRAME_LENGTH;
 		rx_frame.length = 2;
 		uint16_t rx_val = htons(trace_get_wire_length(packet));
-		fprintf(stderr, "wirelen: %d\n", (int)trace_get_wire_length(packet));
 
 		uint8_t tag_end = 1;
 
@@ -502,12 +495,6 @@ static int tzsplive_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *pa
                         0,
                         FORMAT_DATA_OUT->listenai->ai_addr,
                         FORMAT_DATA_OUT->listenai->ai_addrlen);
-
-		int i;
-		unsigned char *t = (unsigned char *)buf;
-		for(i=0;i<20;i++) {
-			fprintf(stderr, "%02x ", t[i]);
-		}
 
 		/* Free the buffer */
 		free(buf);
