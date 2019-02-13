@@ -62,7 +62,7 @@ ETSISOURCES=
 endif
 
 libtrace_la_SOURCES = trace.c trace_parallel.c common.h \
-		format_erf.c format_pcap.c format_legacy.c \
+		format_pktmeta.c format_erf.c format_pcap.c format_legacy.c \
 		format_rt.c format_helper.c format_helper.h format_pcapfile.c \
 		format_duck.c format_tsh.c $(NATIVEFORMATS) $(BPFFORMATS) \
 		format_atmhdr.c format_pcapng.c \

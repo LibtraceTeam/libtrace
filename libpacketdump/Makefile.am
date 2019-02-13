@@ -60,10 +60,16 @@ BIN_PROTOCOLS+=link_15.la
 # 17: PPP
 TXT_PROTOCOLS+=link_17.protocol
 
+#22: ERF META
+BIN_PROTOCOLS+=link_21.la
+
 # 22: ETSI LI
 if HAVE_WANDDER
 BIN_PROTOCOLS+=link_22.la
 endif
+
+#23: PCAPNG
+BIN_PROTOCOLS+=link_23.la
 
 # Decoders for various ethertypes (in decimal)
 # IPv4
@@ -139,9 +145,11 @@ link_9_la_LDFLAGS=$(modflags)
 link_10_la_LDFLAGS=$(modflags)
 link_11_la_LDFLAGS=$(modflags)
 link_15_la_LDFLAGS=$(modflags) 
+link_21_la_LDFLAGS=$(modflags)
 if HAVE_WANDDER
 link_22_la_LDFLAGS=$(modflags) 
 endif
+link_23_la_LDFLAGS=$(modflags)
 eth_0_la_LDFLAGS=$(modflags)
 eth_2048_la_LDFLAGS=$(modflags)
 eth_2054_la_LDFLAGS=$(modflags)
