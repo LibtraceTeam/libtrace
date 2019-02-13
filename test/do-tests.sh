@@ -330,6 +330,15 @@ do_test ./test-autodetect traces/5_packets.erf.xz
 echo " * VXLan decode"
 do_test ./test-vxlan
 
+echo " * Outermost VLAN ID"
+do_test ./test-vlan
+
+echo " * Outermost MPLS label"
+do_test ./test-mpls
+
+echo " *Layer2 Headers"
+do_test ./test-layer2-headers
+
 echo
 echo "Tests passed: $OK"
 echo "Tests failed: $FAIL"
