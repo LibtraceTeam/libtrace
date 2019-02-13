@@ -151,6 +151,11 @@ libtrace_layer2_headers_t *trace_get_layer2_headers(libtrace_packet_t *packet) {
 
 	while (remaining != 0 && ptr != NULL) {
 
+		/* if the last ethertype was IP stop */
+                if (ethertype == TRACE_ETHERTYPE_IP || ethertype == TRACE_ETHERTYPE_IPV6) {
+                        break;
+                }
+
 		if (ethertype == TRACE_ETHERTYPE_LOOPBACK ||
 			ethertype == TRACE_ETHERTYPE_IP ||
 			ethertype == TRACE_ETHERTYPE_ARP ||
@@ -215,11 +220,6 @@ libtrace_layer2_headers_t *trace_get_layer2_headers(libtrace_packet_t *packet) {
 
 			r->header[r->num].ethertype = ethertype;
 			r->header[r->num++].data = ptr;
-		}
-
-		/* if the last ethertype was IP stop */
-		if (ethertype == TRACE_ETHERTYPE_IP || ethertype == TRACE_ETHERTYPE_IPV6) {
-			break;
 		}
 
 		/* get the next header */
