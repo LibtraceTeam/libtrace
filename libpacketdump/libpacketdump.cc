@@ -40,7 +40,7 @@
 #include <net/if_arp.h>
 #ifdef HAVE_NETINET_IF_ETHER_H
 #  include <netinet/if_ether.h>
-#endif 
+#endif
 #include <dlfcn.h>
 #include <map>
 #include <string>
@@ -56,10 +56,14 @@ enum decode_style_t {
 };
 
 typedef void (*decode_norm_t)(uint16_t type,const char *packet,int len);
+typedef void (*decode_norm_meta)(uint16_t type,const char *packet,int len,libtrace_packet_t *p);
 typedef void (*decode_parser_t)(uint16_t type,const char *packet,int len, element_t* el);
+
+libtrace_packet_t *p;
 
 typedef union decode_funcs {
     decode_norm_t decode_n;
+    decode_norm_meta decode_meta;
     decode_parser_t decode_p;
 } decode_funcs_t;
 
@@ -129,7 +133,6 @@ void trace_hexdump_packet(struct libtrace_packet_t *packet) {
 			(int)length,
 			(int)trace_get_wire_length(packet),
 			(int)trace_get_direction(packet));
-	
 
 	formatted_hexdump(pkt_ptr, (int)length);
 	return;
@@ -137,23 +140,24 @@ void trace_hexdump_packet(struct libtrace_packet_t *packet) {
 
 void trace_dump_packet(struct libtrace_packet_t *packet)
 {
+	p = packet;
+
 	time_t sec = (time_t)trace_get_seconds(packet);
 	libtrace_linktype_t linktype;
 	uint32_t length;
 	const char *link=(char *)trace_get_packet_buffer(packet,&linktype,NULL);
-	
-	length = trace_get_capture_length(packet);
 
+	length = trace_get_capture_length(packet);
 	printf("\n%s",ctime(&sec));
 	printf(" Capture: Packet Length: %i/%i Direction Value: %i\n",
 			(int)length,
 			(int)trace_get_wire_length(packet),
 			(int)trace_get_direction(packet));
+
 	if (!link) 
 		printf(" [No link layer available]\n");
 	else
-		decode_next(link,length, "link",
-			linktype);
+		decode_next(link,length, "link", linktype);
 }
 
 static void generic_decode(uint16_t type,const char *packet, int len) {
@@ -222,10 +226,19 @@ void decode_next(const char *packet,int len,const char *proto_name,int type)
 		/* Try and find a .so to handle this protocol */
 		hdl = open_so_decoder(sname.c_str(),type);
 		if (hdl) {
-			void *s=dlsym(hdl,"decode");
+
+			/* PCAPNG format requires the libtrace_packet_t structure in order
+			 * to determine the byte ordering */
+			void *s;
+			if (type == TRACE_TYPE_PCAPNG_META || type == TRACE_TYPE_ERF_META) {
+				s=dlsym(hdl,"decode_meta");
+				if (s) { func->decode_meta = (decode_norm_meta)s; }
+			} else {
+				s=dlsym(hdl,"decode");
+				if (s) { func->decode_n = (decode_norm_t)s; }
+			}
+
 			if (s) {
-				// use the shared library
-				func->decode_n = (decode_norm_t)s;
 				dec.style = DECODE_NORMAL;
 				dec.el = NULL; 
 			}
@@ -293,7 +306,13 @@ void decode_next(const char *packet,int len,const char *proto_name,int type)
 	switch(decoders[sname][type].style)
 	{
 		case DECODE_NORMAL:
-			decoders[sname][type].func->decode_n(type,packet,len);
+			/* If this is a pcapng packet call the correct function and pass the
+			 * libtrace_packet_t structure. We need this to determine the byte ordering */
+			if (type == TRACE_TYPE_PCAPNG_META || type == TRACE_TYPE_ERF_META) {
+				decoders[sname][type].func->decode_meta(type,packet,len,p);
+			} else {
+				decoders[sname][type].func->decode_n(type,packet,len);
+			}
 			break;
 
 		case DECODE_PARSER:

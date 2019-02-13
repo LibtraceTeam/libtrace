@@ -293,6 +293,7 @@ struct callback_set {
         fn_cb_dataless message_resuming;
         fn_cb_dataless message_pausing;
         fn_cb_packet message_packet;
+	fn_cb_packet message_meta_packet;
         fn_cb_result message_result;
         fn_cb_first_packet message_first_packet;
         fn_cb_tick message_tick_count;
@@ -721,6 +722,10 @@ struct libtrace_format_t {
 	 */
 	double (*get_seconds)(const libtrace_packet_t *packet);
 	
+	/**
+	 */
+	void *(*get_meta_section)(libtrace_packet_t *packet, uint32_t section);
+
 	/** Moves the read pointer to a certain ERF timestamp within an input 
 	 * trace file.
 	 *
@@ -1214,7 +1219,6 @@ void *trace_get_payload_from_linux_sll(const void *link,
  */	
 DLLEXPORT void *trace_get_payload_from_atm(void *link, uint8_t *type, 
 		uint32_t *remaining);
-
 
 #ifdef HAVE_BPF
 /* A type encapsulating a bpf filter

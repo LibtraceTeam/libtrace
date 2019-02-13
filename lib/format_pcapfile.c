@@ -286,6 +286,8 @@ static int pcapfile_config_input(libtrace_t *libtrace,
 			/* All these are either unsupported or handled
 			 * by trace_config */
 			break;
+		case TRACE_OPTION_DISCARD_META:
+			break;
 	}
 	
 	trace_set_err(libtrace,TRACE_ERR_UNKNOWN_OPTION,
@@ -798,6 +800,7 @@ static struct libtrace_format_t pcapfile = {
 	pcapfile_get_timeval,		/* get_timeval */
 	pcapfile_get_timespec,		/* get_timespec */
 	NULL,				/* get_seconds */
+	NULL,                           /* get_meta_section */
 	NULL,				/* seek_erf */
 	NULL,				/* seek_timeval */
 	NULL,				/* seek_seconds */
