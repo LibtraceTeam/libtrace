@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/time.h>
 
 #define FORMAT_DATA ((tzsp_format_data_t *)libtrace->format_data)
 #define FORMAT_DATA_OUT ((tzsp_format_data_out_t *)libtrace->format_data)
@@ -17,11 +18,14 @@
 #define TZSP_RECVBUF_SIZE (64 * 1024 * 1024)
 #define TZSP_SENDBUF_SIZE (64 * 1024 * 1024)
 
+static int tzsplive_get_framing_length(const libtrace_packet_t *packet);
+
 typedef struct tzsp_format_data {
 	char *listenaddr;
 	char *listenport;
 
 	int socket;
+	uint8_t *buf;
 } tzsp_format_data_t;
 
 typedef struct tzsp_format_data_out {
@@ -29,6 +33,7 @@ typedef struct tzsp_format_data_out {
 	char *outport;
 
 	int outsocket;
+	uint8_t *buf;
 	struct addrinfo *listenai;
 } tzsp_format_data_out_t;
 
@@ -185,7 +190,7 @@ static int tzsplive_init_input(libtrace_t *libtrace) {
 
 	if (libtrace->format_data == NULL) {
 		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable "
-			"to allocate memory for format data inside tzsp_init_input();");
+			"to allocate memory for format data in tzsp_init_input();");
 		return -1;
 	}
 
@@ -193,6 +198,7 @@ static int tzsplive_init_input(libtrace_t *libtrace) {
 	if (scan == NULL) {
 		trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT, "Bad tzsp "
 			"URI. Should be tzsplive:<listenaddr>:<listenport>");
+		free(libtrace->format_data);
 		return -1;
 	}
 	FORMAT_DATA->listenaddr = strndup(libtrace->uridata,
@@ -200,6 +206,14 @@ static int tzsplive_init_input(libtrace_t *libtrace) {
 	FORMAT_DATA->listenport = strdup(scan + 1);
 
 	FORMAT_DATA->socket = -1;
+
+	FORMAT_DATA->buf = malloc((size_t)LIBTRACE_PACKET_BUFSIZE);
+	if (FORMAT_DATA->buf == NULL) {
+                trace_set_err(libtrace, TRACE_ERR_OUT_OF_MEMORY, "Unable "
+                        "to allocate memory for format data in tzsplive_init_input()");
+                free(libtrace->format_data);
+                return -1;
+        }
 
 	return 0;
 }
@@ -211,7 +225,7 @@ static int tzsplive_init_output(libtrace_out_t *libtrace) {
 
 	if (libtrace->format_data == NULL) {
 		trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED, "Unable "
-			"to allocate memory for format data inside tzsp_init_output()");
+			"to allocate memory for format data in tzsp_init_output()");
 		return -1;
 	}
 
@@ -219,6 +233,7 @@ static int tzsplive_init_output(libtrace_out_t *libtrace) {
         if (scan == NULL) {
                 trace_set_err_out(libtrace, TRACE_ERR_BAD_FORMAT, "Bad tzsp "
                         "URI. Should be tzsplive:<listenaddr>:<listenport>");
+		free(libtrace->format_data);
                 return -1;
         }
         FORMAT_DATA_OUT->outaddr = strndup(libtrace->uridata,
@@ -226,6 +241,14 @@ static int tzsplive_init_output(libtrace_out_t *libtrace) {
         FORMAT_DATA_OUT->outport = strdup(scan + 1);
 
         FORMAT_DATA_OUT->outsocket = -1;
+
+	FORMAT_DATA_OUT->buf = malloc((size_t)LIBTRACE_PACKET_BUFSIZE);
+	if (FORMAT_DATA_OUT->buf == NULL) {
+		trace_set_err_out(libtrace, TRACE_ERR_OUT_OF_MEMORY, "Unable "
+			"to allocate memory for format data in tzsplive_init_output()");
+		free(libtrace->format_data);
+		return -1;
+	}
 
 	return 0;
 }
@@ -271,6 +294,9 @@ static int tzsplive_fin_input(libtrace_t *libtrace) {
 	}
 	if (FORMAT_DATA->socket >= 0) {
 		close(FORMAT_DATA->socket);
+	}
+	if (FORMAT_DATA->buf) {
+		free(FORMAT_DATA->buf);
 	}
 	free(libtrace->format_data);
 	return 0;
@@ -325,6 +351,40 @@ static uint8_t *tzsplive_get_packet_payload(const libtrace_packet_t *packet) {
 
         /* Jump over the end tag to the payload */
         return ptr + sizeof(uint8_t);
+}
+
+static int tzsplive_insert_timestamp(libtrace_t *libtrace, libtrace_packet_t *packet) {
+	struct timeval tv;
+	tzsp_tagfield_t timestamp;
+	uint8_t *ptr;
+	int ret = 0;
+
+	// Construct the tagfield
+	timestamp.type = TZSP_LIBTRACE_CUSTOM_TAG_TIMEVAL;
+	timestamp.length = sizeof(tv);
+
+	// Get the current timestamp
+	if ((ret = gettimeofday(&tv, NULL)) != 0) {
+		return 0;
+	}
+
+	// Copy over the current packet
+	memcpy(FORMAT_DATA->buf, packet->buffer, (size_t)LIBTRACE_PACKET_BUFSIZE);
+
+	// pointer to begining of tagged fields
+	ptr = packet->buffer + sizeof(tzsp_header_t);
+
+	// insert the timestamp tagfield header and value
+	memcpy(ptr, &timestamp, sizeof(tzsp_tagfield_t));
+	ptr += sizeof(tzsp_tagfield_t);
+	memcpy(ptr, &tv, sizeof(struct timeval));
+	ptr += sizeof(struct timeval);
+
+	// copy the rest of the packet over again
+	memcpy(ptr, FORMAT_DATA->buf+sizeof(tzsp_header_t),
+		(size_t)(LIBTRACE_PACKET_BUFSIZE)-*ptr);
+
+	return 1;
 }
 
 static int tzsplive_prepare_packet(libtrace_t *libtrace UNUSED, libtrace_packet_t *packet,
@@ -394,15 +454,18 @@ static int tzsplive_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 		return -1;
 	}
 
+	/* insert the timestamp */
+	tzsplive_insert_timestamp(libtrace, packet);
+
+	/* Cache the captured length */
+        packet->cached.framing_length = trace_get_framing_length(packet);
+        packet->cached.capture_length = ret - trace_get_framing_length(packet);
+
 	if (tzsplive_prepare_packet(libtrace, packet, packet->buffer,
 		TRACE_RT_DATA_TZSP, flags)) {
 
 		return -1;
 	}
-
-	/* Cache the captured length */
-	packet->cached.framing_length = trace_get_framing_length(packet);
-	packet->cached.capture_length = ret - trace_get_framing_length(packet);
 
 	return ret;
 }
@@ -411,7 +474,7 @@ static int tzsplive_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *pa
 	int ret = -1;
 	int to_send = 0;
 	int offset = 0;
-	uint8_t *buf;
+	uint8_t *ptr;
 
 	/* Check TZSP can write this packet */
 	if (!tzsplive_can_write(packet)) {
@@ -428,33 +491,39 @@ static int tzsplive_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *pa
 		return -1;
 	}
 
-	/* If the packet is already TZSP just output it */
+	/* If the packet is already TZSP strip libtrace timestamp and output */
 	if (packet->trace->format->type == TRACE_FORMAT_TZSPLIVE) {
-		to_send = trace_get_capture_length(packet) +
-				trace_get_framing_length(packet);
+
+		/* strip out the timestamp inserted by libtrace */
+        	/* copy over the tzsp header to the buffer */
+        	memcpy(FORMAT_DATA_OUT->buf, packet->buffer, sizeof(tzsp_header_t));
+        	ptr = FORMAT_DATA_OUT->buf + sizeof(tzsp_header_t);
+       		/* offset after the timestamp to copy from */
+        	offset = sizeof(tzsp_header_t) +
+                	sizeof(tzsp_tagfield_t) +
+                	sizeof(struct timeval);
+		/* number of bytes after the timestamp to copy */
+        	to_send = trace_get_capture_length(packet) +
+                        	(trace_get_framing_length(packet)-offset);
+        	/* copy the rest of the packet to the buffer */
+        	memcpy(ptr, packet->buffer+offset, to_send);
 
 		/* send the packet */
-		ret = sendto(FORMAT_DATA_OUT->outsocket, packet->buffer,
+		ret = sendto(FORMAT_DATA_OUT->outsocket,
+			FORMAT_DATA_OUT->buf,
 			to_send,
 			0,
 			FORMAT_DATA_OUT->listenai->ai_addr,
 			FORMAT_DATA_OUT->listenai->ai_addrlen);
 
-	/* try convert it to one */
+	/* append the tzsp header to the begining of the packets payload */
 	} else {
 
-		/* Allocate memory for buffer */
-		buf = malloc((size_t)LIBTRACE_PACKET_BUFSIZE);
-		if (buf == NULL) {
-			trace_set_err_out(libtrace, TRACE_ERR_OUT_OF_MEMORY,
-				"Unable to allocate memory for output buffer\n");
-			return ret;
-		}
-
 		/* construct the TZSP header */
-		uint8_t version = 1;
-		uint8_t type = 1;
-		uint16_t encap = htons(libtrace_to_tzsp_type(trace_get_link_type(packet)));
+		tzsp_header_t hdr;
+		hdr.version = 1;
+		hdr.type = 1;
+		hdr.encap = htons(libtrace_to_tzsp_type(trace_get_link_type(packet)));
 
 		tzsp_tagfield_t rx_frame;
 		rx_frame.type = TZSP_TAG_RX_FRAME_LENGTH;
@@ -464,40 +533,31 @@ static int tzsplive_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *pa
 		uint8_t tag_end = 1;
 
 		/* Account for TZSP header and capture length */
-		to_send = sizeof(version) +
-		 	  sizeof(type) +
-		  	  sizeof(encap) +
+		to_send = sizeof(tzsp_header_t) +
 			  sizeof(rx_frame) +
 			  sizeof(rx_val) +
 		  	  sizeof(tag_end) +
 		  	  trace_get_capture_length(packet);
 
 		/* Copy TZSP header to buffer */
-		memcpy(buf, &version, sizeof(version));
-		offset += sizeof(version);
-		memcpy(buf + offset, &type, sizeof(type));
-		offset += sizeof(type);
-		memcpy(buf + offset, &encap, sizeof(encap));
-		offset += sizeof(encap);
-		memcpy(buf + offset, &rx_frame, sizeof(rx_frame));
+		memcpy(FORMAT_DATA_OUT->buf, &hdr, sizeof(tzsp_header_t));
+		offset += sizeof(tzsp_header_t);
+		memcpy(FORMAT_DATA_OUT->buf + offset, &rx_frame, sizeof(rx_frame));
 		offset += sizeof(rx_frame);
-		memcpy(buf + offset, &rx_val, sizeof(rx_val));
+		memcpy(FORMAT_DATA_OUT->buf + offset, &rx_val, sizeof(rx_val));
 		offset += sizeof(rx_val);
-		memcpy(buf + offset, &tag_end, sizeof(tag_end));
+		memcpy(FORMAT_DATA_OUT->buf + offset, &tag_end, sizeof(tag_end));
 		offset += sizeof(tag_end);
 		/* Copy packet payload to buffer */
-		memcpy(buf + offset, packet->payload, trace_get_capture_length(packet));
+		memcpy(FORMAT_DATA_OUT->buf + offset, packet->payload, trace_get_capture_length(packet));
 
 		/* send the packet */
 		ret = sendto(FORMAT_DATA_OUT->outsocket,
-			buf,
+			FORMAT_DATA_OUT->buf,
 			to_send,
                         0,
                         FORMAT_DATA_OUT->listenai->ai_addr,
                         FORMAT_DATA_OUT->listenai->ai_addrlen);
-
-		/* Free the buffer */
-		free(buf);
 	}
 
 	/* Check if expected number of bytes was sent */
@@ -523,6 +583,9 @@ static int tzsplive_fin_output(libtrace_out_t *libtrace) {
 	if (FORMAT_DATA_OUT->listenai) {
 		freeaddrinfo(FORMAT_DATA_OUT->listenai);
 	}
+	if (FORMAT_DATA_OUT->buf) {
+		free(FORMAT_DATA_OUT->buf);
+	}
         free(libtrace->format_data);
 	return 0;
 }
@@ -547,8 +610,16 @@ static libtrace_linktype_t tzsplive_get_link_type(const libtrace_packet_t *packe
 	}
 }
 
-static uint64_t tzsplive_get_erf_timestamp(const libtrace_packet_t *packet UNUSED) {
-	return 0;
+static struct timeval tzsplive_get_timeval(const libtrace_packet_t *packet) {
+	uint8_t *ptr;
+	struct timeval tv;
+	if ((ptr = tzsplive_get_option(packet, TZSP_LIBTRACE_CUSTOM_TAG_TIMEVAL)) != NULL) {
+		tv = *(struct timeval *)ptr;
+	} else {
+		tv.tv_sec = 0;
+		tv.tv_usec = 0;
+	}
+	return tv;
 }
 
 static int tzsplive_get_capture_length(const libtrace_packet_t *packet) {
@@ -576,7 +647,6 @@ static int tzsplive_get_framing_length(const libtrace_packet_t *packet) {
 	}
 }
 
-
 static struct libtrace_format_t tzsplive = {
         "tzsplive",
         "$Id$",
@@ -600,10 +670,11 @@ static struct libtrace_format_t tzsplive = {
         tzsplive_get_link_type,         /* get_link_type */
         NULL,                           /* get_direction */
         NULL,                           /* set_direction */
-        tzsplive_get_erf_timestamp,     /* get_erf_timestamp */
-        NULL,                           /* get_timeval */
+        NULL,			        /* get_erf_timestamp */
+        tzsplive_get_timeval,           /* get_timeval */
         NULL,                           /* get_timespec */
         NULL,                           /* get_seconds */
+	NULL,				/* get_meta_section */
         NULL,                           /* seek_erf */
         NULL,                           /* seek_timeval */
         NULL,                           /* seek_seconds */
