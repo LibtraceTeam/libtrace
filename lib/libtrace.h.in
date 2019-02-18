@@ -575,12 +575,43 @@ typedef enum {
 	TRACE_ETHERTYPE_ARP	= 0x0806,	/**< Address resolution protocol */
 	TRACE_ETHERTYPE_RARP	= 0x8035,	/**< Reverse ARP */
 	TRACE_ETHERTYPE_8021Q	= 0x8100,	/**< 802.1q VLAN Extended Header */
+	TRACE_ETHERTYPE_8021QS	= 0x88A8,	/**< 802.1q Service VLAN tag */
 	TRACE_ETHERTYPE_IPV6	= 0x86DD,	/**< IPv6 */
 	TRACE_ETHERTYPE_MPLS	= 0x8847,	/**< MPLS Unicast traffic */
 	TRACE_ETHERTYPE_MPLS_MC = 0x8848,	/**< MPLS Multicast traffic */
 	TRACE_ETHERTYPE_PPP_DISC= 0x8863,	/**< PPPoE Service Discovery */
 	TRACE_ETHERTYPE_PPP_SES = 0x8864	/**< PPPoE Session Messages */
 } libtrace_ethertype_t;
+
+/** constant to check if a vlan was found */
+#define VLAN_NOT_FOUND 0xFF
+
+/** constant to check if a mpls label was found */
+#define MPLS_NOT_FOUND 0xFFFF
+
+typedef struct libtrace_layer2_header {
+        uint16_t ethertype;                     /**< Ethertype of the header */
+        void *data;                             /**< Pointer to the header */
+} libtrace_layer2_header_t;
+typedef struct libtrace_layer2_headers {
+        uint64_t bitmask;			/**< Bitmask of found headers */
+        int num;				/**< The number of header */
+        libtrace_layer2_header_t *header;	/**< Array of all found layer2 headers */
+} libtrace_layer2_headers_t;
+/** Enumeration of bitmask layer2 headers within libtrace_layer2_headers_t */
+enum {
+	TRACE_BITMASK_LOOPBACK	= 1,
+	TRACE_BITMASK_IP	= 2,
+	TRACE_BITMASK_ARP	= 4,
+	TRACE_BITMASK_RARP	= 8,
+	TRACE_BITMASK_8021Q	= 16,
+	TRACE_BITMASK_IPV6	= 32,
+	TRACE_BITMASK_8021QS	= 64,
+	TRACE_BITMASK_MPLS	= 128,
+	TRACE_BITMASK_MPLS_MC	= 256,
+	TRACE_BITMASK_PPP_DISC	= 512,
+	TRACE_BITMASK_PPP_SES	= 1024,
+};
 
 /** Enumeration of datatype returned inside libtrace_meta_item_t structure */
 typedef enum {
@@ -2443,6 +2474,54 @@ DLLEXPORT void *trace_get_payload_from_link(void *linkptr,
  */
 DLLEXPORT void *trace_get_payload_from_vlan(
                 void *vlan, uint16_t *type, uint32_t *remaining);
+
+/** Get the outermost VLAN ID from a packet.
+ * @param packet		A pointer to the packet
+ * @param[out] vlanptr		A pointer to the VLAN header
+ * @param[out] remaining	Updated with the number of captured bytes remaining
+ *
+ * @return The outermost VLAN id if found or VLAN_NOT_FOUND
+ *
+ * vlanptr will be set to the start of the VLAN header found (or NULL if no
+ * VLAN tags are present).
+ *
+ * remaining will be set to the number of captured bytes in the packet,
+ * starting from the returned VLAN header.
+ */
+DLLEXPORT uint16_t trace_get_outermost_vlan(
+	libtrace_packet_t *packet, uint8_t **vlanptr, uint32_t *remaining);
+
+/** Get all layer2 headers from a packet.
+ * @param packet	A pointer to the packet
+ *
+ * @return A libtrace_layer2_headers_t structure containing all found layer2
+ * headers (or NULL if no layer2 headers are found). This structure must be
+ * destroyed with trace_destroy_layer2_headers().
+ */
+DLLEXPORT libtrace_layer2_headers_t *trace_get_layer2_headers(libtrace_packet_t *packet);
+
+/** Destroys a libtrace_layer2_headers_t structure.
+ * @param headers	A pointer to the libtrace_layer2_headers_t structure
+ *
+ * @returns 1 on successful deletion.
+ */
+DLLEXPORT int trace_destroy_layer2_headers(libtrace_layer2_headers_t *headers);
+
+/** Get the outermost MPLS label from a packet.
+ * @param packet		A pointer to the packet
+ * @param[out] mplsptr		A pointer to the mpls header
+ * @param[out] remaining	Updated with the number of captured bytes remaining
+ *
+ * @return The outmost MPLS label if found or MPLS_NOT_FOUND
+ *
+ * mplsptr will be set to the start of the MPLS header (or NULL if no
+ * MPLS header is found)
+ *
+ * remaining will be set to the number of captured bytes in the packet,
+ * starting from the MPLS header.
+ */
+DLLEXPORT uint32_t trace_get_outermost_mpls(
+	libtrace_packet_t *packet, uint8_t **mplsptr, uint32_t *remaining);
 
 /** Gets a pointer to the payload following an MPLS header.
  * @param mpls      A pointer to the MPLS header

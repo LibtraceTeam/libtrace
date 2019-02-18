@@ -91,6 +91,244 @@ void *trace_get_payload_from_vlan(void *ethernet, uint16_t *type,
 
 }
 
+int trace_destroy_layer2_headers(libtrace_layer2_headers_t *headers) {
+	if (headers == NULL) {
+		fprintf(stderr, "NULL libtrace_layer2_headers_t passed into "
+			"trace_destroy_layer2_headers()\n");
+		return -1;
+	}
+
+	if (headers->header != NULL) {
+		free(headers->header);
+	}
+	free(headers);
+	return 1;
+}
+libtrace_layer2_headers_t *trace_get_layer2_headers(libtrace_packet_t *packet) {
+
+	char *ptr;
+	libtrace_linktype_t linktype;
+	uint32_t remaining;
+	uint16_t ethertype;
+	libtrace_layer2_headers_t *r;
+	int allocated_headers = 0;
+
+	if (packet == NULL) {
+		fprintf(stderr, "NULL packet passed into trace_get_layer2_headers()\n");
+		return NULL;
+	}
+	if (packet->trace == NULL) {
+		fprintf(stderr, "Packet contains a NULL trace in trace_get_layer2_headers()\n");
+		return NULL;
+	}
+
+	/* jump to layer 2 */
+	ptr = trace_get_layer2(packet, &linktype, &remaining);
+	/* packet does not contain layer2 */
+	if (ptr == NULL) {
+		return NULL;
+	}
+
+	/* allocate memory for the result */
+        r = calloc(1, sizeof(libtrace_layer2_headers_t));
+	if (r == NULL) {
+		trace_set_err(packet->trace, TRACE_ERR_OUT_OF_MEMORY,
+			"Unable to allocate memory in trace_get_layer2_headers()\n");
+		return NULL;
+	}
+	/* Alloc enough space for 10 headers */
+	r->header = calloc(1, sizeof(libtrace_layer2_header_t)*10);
+	if (r->header == NULL) {
+		trace_set_err(packet->trace, TRACE_ERR_OUT_OF_MEMORY,
+			"Unable to allocate memory in trace_get_layer2_headers()\n");
+		free(r);
+		return NULL;
+	}
+	allocated_headers = 10;
+
+	/* get the first layer2 header */
+	ptr = trace_get_payload_from_layer2(ptr, linktype, &ethertype, &remaining);
+
+	while (remaining != 0 && ptr != NULL) {
+
+		/* if the last ethertype was IP stop */
+                if (ethertype == TRACE_ETHERTYPE_IP || ethertype == TRACE_ETHERTYPE_IPV6) {
+                        break;
+                }
+
+		if (ethertype == TRACE_ETHERTYPE_LOOPBACK ||
+			ethertype == TRACE_ETHERTYPE_IP ||
+			ethertype == TRACE_ETHERTYPE_ARP ||
+			ethertype == TRACE_ETHERTYPE_RARP ||
+			ethertype == TRACE_ETHERTYPE_8021Q ||
+			ethertype == TRACE_ETHERTYPE_IPV6 ||
+			ethertype == TRACE_ETHERTYPE_8021QS ||
+			ethertype == TRACE_ETHERTYPE_MPLS ||
+			ethertype == TRACE_ETHERTYPE_MPLS_MC ||
+			ethertype == TRACE_ETHERTYPE_PPP_DISC ||
+			ethertype == TRACE_ETHERTYPE_PPP_SES) {
+
+			/* Set the bitmask */
+			switch (ethertype) {
+				case (TRACE_ETHERTYPE_LOOPBACK):
+					r->bitmask |= TRACE_BITMASK_LOOPBACK;
+					break;
+				case (TRACE_ETHERTYPE_IP):
+					r->bitmask |= TRACE_BITMASK_IP;
+					break;
+				case (TRACE_ETHERTYPE_ARP):
+					r->bitmask |= TRACE_BITMASK_ARP;
+					break;
+				case (TRACE_ETHERTYPE_RARP):
+					r->bitmask |= TRACE_BITMASK_RARP;
+					break;
+				case (TRACE_ETHERTYPE_8021Q):
+					r->bitmask |= TRACE_BITMASK_8021Q;
+					break;
+				case (TRACE_ETHERTYPE_IPV6):
+					r->bitmask |= TRACE_BITMASK_IPV6;
+					break;
+				case (TRACE_ETHERTYPE_8021QS):
+					r->bitmask |= TRACE_BITMASK_8021QS;
+					break;
+				case (TRACE_ETHERTYPE_MPLS):
+					r->bitmask |= TRACE_BITMASK_MPLS;
+					break;
+				case (TRACE_ETHERTYPE_MPLS_MC):
+					r->bitmask |= TRACE_BITMASK_MPLS_MC;
+					break;
+				case (TRACE_ETHERTYPE_PPP_DISC):
+					r->bitmask |= TRACE_BITMASK_PPP_DISC;
+					break;
+				case (TRACE_ETHERTYPE_PPP_SES):
+					r->bitmask |= TRACE_BITMASK_PPP_SES;
+					break;
+			}
+
+			if ((r->num+1) >= allocated_headers) {
+				allocated_headers += 10;
+				r->header = realloc(r->header,
+					sizeof(libtrace_layer2_header_t)*allocated_headers);
+
+				if (r->header == NULL) {
+					trace_set_err(packet->trace, TRACE_ERR_OUT_OF_MEMORY,
+						"Unable to allocate memory in trace_get_layer2_headers()");
+					free(r);
+					return NULL;
+				}
+			}
+
+			r->header[r->num].ethertype = ethertype;
+			r->header[r->num++].data = ptr;
+		}
+
+		/* get the next header */
+                ptr = trace_get_payload_from_layer2(ptr, linktype, &ethertype, &remaining);
+	}
+
+	/* If no results were found free memory now and just return NULL */
+	if (r->num == 0) {
+		free(r->header);
+		free(r);
+		return NULL;
+	}
+
+	return r;
+}
+
+uint16_t trace_get_outermost_vlan(libtrace_packet_t *packet, uint8_t **vlanptr,
+	uint32_t *remaining) {
+
+	uint8_t *ptr;
+	libtrace_linktype_t linktype;
+	uint32_t rem;
+	uint16_t vlanid = VLAN_NOT_FOUND;
+	uint16_t ethertype = 0;
+
+	if (!packet) {
+		fprintf(stderr, "NULL packet passed into trace_get_outermost_vlan()\n");
+		*vlanptr = NULL;
+		*remaining = 0;
+		return vlanid;
+	}
+
+	ptr = trace_get_layer2(packet, &linktype, &rem);
+	/* No layer 2 */
+	if (ptr == NULL) {
+		*vlanptr = NULL;
+		*remaining = 0;
+		return vlanid;
+	}
+
+	while (ethertype != TRACE_ETHERTYPE_8021Q && ethertype != TRACE_ETHERTYPE_8021QS) {
+
+		if (rem == 0 || ptr == NULL || ethertype == TRACE_ETHERTYPE_IP ||
+			ethertype == TRACE_ETHERTYPE_IPV6) {
+
+			*vlanptr = NULL;
+			*remaining = 0;
+                        return vlanid;
+                }
+
+		/* get the next layer 2 header */
+	        ptr = trace_get_payload_from_layer2(ptr, linktype, &ethertype, &rem);
+	}
+
+	/* found a vlan header */
+	uint32_t val = ntohl(*(uint32_t *)ptr);
+	/* the id portion is only 12 bits */
+	vlanid = (((val >> 16) << 4) >> 4);
+
+	*remaining = rem;
+	*vlanptr = ptr;
+	return vlanid;
+}
+
+uint32_t trace_get_outermost_mpls(libtrace_packet_t *packet, uint8_t **mplsptr,
+        uint32_t *remaining) {
+
+	uint8_t *ptr;
+	uint32_t mplslabel = MPLS_NOT_FOUND;
+	libtrace_linktype_t linktype;
+	uint32_t rem;
+	uint16_t ethertype = 0;
+
+	if (!packet) {
+		fprintf(stderr, "NULL packet passed into trace_get_outermost_mpls()\n");
+		*remaining = 0;
+		*mplsptr = NULL;
+		return mplslabel;
+	}
+
+	ptr = trace_get_layer2(packet, &linktype, &rem);
+	/* No layer2 */
+	if (ptr == NULL) {
+		*remaining = 0;
+		*mplsptr = NULL;
+		return mplslabel;
+	}
+
+	/* loop over the packet until we find a mpls label */
+	while (ethertype != TRACE_ETHERTYPE_MPLS) {
+		if (rem == 0 || ptr == NULL) {
+
+			*remaining = 0;
+			*mplsptr = NULL;
+			return mplslabel;
+		}
+
+		/* get next layer2 header */
+		ptr = trace_get_payload_from_layer2(ptr, linktype, &ethertype, &rem);
+	}
+
+	uint32_t val = ntohl(*(uint32_t *)ptr);
+	mplslabel = val >> 12;
+
+	*remaining = rem;
+	*mplsptr = ptr;
+	return mplslabel;
+}
+
 libtrace_packet_t *trace_strip_packet(libtrace_packet_t *packet) {
 
         libtrace_ether_t *ethernet;
