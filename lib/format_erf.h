@@ -111,6 +111,16 @@
  * multiple format modules.
  */
 
+typedef struct dag_section_header {
+        uint16_t type;
+        uint16_t len;
+} PACKED dag_sec_t;
+
+struct dag_opthdr {
+        uint16_t optcode;
+        uint16_t optlen;
+} PACKED;
+
 int erf_get_framing_length(const libtrace_packet_t *packet);
 libtrace_linktype_t erf_get_link_type(const libtrace_packet_t *packet);
 libtrace_direction_t erf_get_direction(const libtrace_packet_t *packet);
