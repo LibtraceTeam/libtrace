@@ -747,6 +747,7 @@ int dpdk_config_input (libtrace_t *libtrace,
 	case TRACE_OPTION_FILTER:
 		/* TODO filtering */
 	case TRACE_OPTION_META_FREQ:
+	case TRACE_OPTION_DISCARD_META:
 	case TRACE_OPTION_EVENT_REALTIME:
         case TRACE_OPTION_REPLAY_SPEEDUP:
         case TRACE_OPTION_CONSTANT_ERF_FRAMING:
