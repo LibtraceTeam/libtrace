@@ -430,6 +430,11 @@ static int tzsplive_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 	}
 	flags |= TRACE_PREP_OWN_BUFFER;
 
+readagain:
+	/* Make sure we shouldnt be halting */
+	if ((ret = is_halted(libtrace)) != -1) {
+		return ret;
+	}
 	/* Try read a packet from the socket */
 	ret = recv(FORMAT_DATA->socket, packet->buffer, (size_t)LIBTRACE_PACKET_BUFSIZE,
 		MSG_DONTWAIT);
@@ -437,7 +442,9 @@ static int tzsplive_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 	if (ret == -1) {
 		/* Nothing available to read */
 		if (errno == EAGAIN || errno == EWOULDBLOCK) {
-			return 0;
+			/* sleep for a short period and check again */
+			usleep(100);
+			goto readagain;
 		}
 		/* Socket error */
 		trace_set_err(libtrace, TRACE_ERR_BAD_IO, "Error receiving on socket "
