@@ -336,8 +336,11 @@ do_test ./test-vlan
 echo " * Outermost MPLS label"
 do_test ./test-mpls
 
-echo " *Layer2 Headers"
+echo " * Layer2 Headers"
 do_test ./test-layer2-headers
+
+echo " * Layer2 Headers QinQ"
+do_test ./test-qinq
 
 echo
 echo "Tests passed: $OK"
