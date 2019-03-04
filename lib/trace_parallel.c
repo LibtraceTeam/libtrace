@@ -1411,6 +1411,7 @@ static int trace_pread_packet_wrapper(libtrace_t *libtrace,
 
 	if (libtrace->format->pread_packets) {
 		int ret;
+#if 0
 		for (i = 0; i < (int) nb_packets; ++i) {
 			if (!i[packets]) {
 				trace_set_err(libtrace, TRACE_ERR_BAD_STATE, "NULL packets in "
@@ -1423,8 +1424,8 @@ static int trace_pread_packet_wrapper(libtrace_t *libtrace,
 				              "Packet passed to trace_read_packet() is invalid\n");
 				return -1;
 			}
-                        packets[i]->which_trace_start = libtrace->startcount;
 		}
+#endif
 		do {
 			ret=libtrace->format->pread_packets(libtrace, t,
 			                                    packets,
@@ -1450,6 +1451,7 @@ static int trace_pread_packet_wrapper(libtrace_t *libtrace,
 				if (libtrace->snaplen>0)
 					trace_set_capture_length(packets[i],
 							libtrace->snaplen);
+                        	packets[i]->which_trace_start = libtrace->startcount;
 			}
 		} while(ret == 0);
 		return ret;
