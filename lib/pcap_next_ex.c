@@ -30,9 +30,6 @@
 #ifndef HAVE_PCAP_NEXT_EX
 #include <stdio.h>
 #include <pcap.h>
-#ifdef HAVE_PCAP_INT_H
-# include <pcap-int.h>
-#endif
 #include <string.h>
 #include <libtrace.h>
 #include <stdlib.h>

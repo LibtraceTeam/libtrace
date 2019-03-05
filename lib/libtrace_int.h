@@ -89,10 +89,7 @@ extern "C" {
 
 #ifdef HAVE_PCAP_H
 #  include <pcap.h>
-#  ifdef HAVE_PCAP_INT_H
-#    include <pcap-int.h>
-#  endif
-#endif 
+#endif
 
 #ifdef HAVE_ZLIB_H
 #  include <zlib.h>
