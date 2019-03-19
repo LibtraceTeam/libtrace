@@ -1016,7 +1016,7 @@ DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 		return -1;
 
 	if (!libtrace->started) {
-		trace_set_err(libtrace,TRACE_ERR_BAD_STATE,"You must call libtrace_start() before trace_read_packet()");
+		trace_set_err(libtrace,TRACE_ERR_BAD_STATE,"You must call trace_start() before trace_read_packet()");
 		return -1;
 	}
 
