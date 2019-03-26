@@ -771,8 +771,6 @@ DLLEXPORT void trace_destroy(libtrace_t *libtrace) {
 	if (libtrace->format) {
 		if (libtrace->started && libtrace->format->pause_input)
 			libtrace->format->pause_input(libtrace);
-		if (libtrace->format->fin_input)
-			libtrace->format->fin_input(libtrace);
 	}
 	/* Need to free things! */
 	if (libtrace->uridata)
@@ -802,6 +800,11 @@ DLLEXPORT void trace_destroy(libtrace_t *libtrace) {
 		libtrace->perpkt_threads = NULL;
 		libtrace->perpkt_thread_count = 0;
 
+	}
+
+	if (libtrace->format) {
+		if (libtrace->format->fin_input)
+			libtrace->format->fin_input(libtrace);
 	}
 
         if (libtrace->hasher_owner == HASH_OWNED_LIBTRACE) {
