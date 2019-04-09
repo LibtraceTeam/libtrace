@@ -553,11 +553,11 @@ inline static int linuxring_read_stream(libtrace_t *libtrace,
 	 */
 	while (!(header->tp_status & TP_STATUS_USER) ||
 	                header->tp_status == TP_STATUS_LIBTRACE) {
-                if ((ret=is_halted(libtrace)) != -1)
-                        return ret;
                 if (!block) {
                         return 0;
                 }
+                if ((ret=is_halted(libtrace)) != -1)
+                        return ret;
 
 		pollset[0].fd = stream->fd;
 		pollset[0].events = POLLIN;
