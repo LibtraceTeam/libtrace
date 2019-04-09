@@ -923,7 +923,8 @@ DLLEXPORT libtrace_packet_t *trace_copy_packet(const libtrace_packet_t *packet) 
 	dest->hash = packet->hash;
 	dest->error = packet->error;
         dest->which_trace_start = packet->which_trace_start;
-	/* Reset the cache - better to recalculate than try to convert
+	pthread_mutex_init(&(dest->ref_lock), NULL);
+        /* Reset the cache - better to recalculate than try to convert
 	 * the values over to the new packet */
 	trace_clear_cache(dest);
 	/* Ooooh nasty memcpys! This is why we want to avoid copying packets
