@@ -39,6 +39,10 @@
 #include <assert.h>
 #include <signal.h>
 
+#ifdef HAVE_LIBCRYPTO
+#include <openssl/evp.h>
+#endif
+
 enum enc_type_t {
         ENC_NONE,
         ENC_CRYPTOPAN,
@@ -49,6 +53,10 @@ bool enc_source_opt = false;
 bool enc_dest_opt   = false;
 enum enc_type_t enc_type = ENC_NONE;
 char *enc_key = NULL;
+
+bool enc_radius_packet = false;
+#define SALT_LENGTH 32
+uint8_t salt[SALT_LENGTH] = {1}; //use enc_key instead of salt
 
 int level = -1;
 trace_option_compresstype_t compress_type = TRACE_OPTION_COMPRESSTYPE_NONE;
@@ -163,6 +171,58 @@ static void encrypt_ipv6(Anonymiser *anon, libtrace_ip6_t *ip6,
 
 }
 
+//ignoring all else, takes a pointer to the start of a radius packet and Anonymises the values in the AVP section. 
+static void encrypt_radius(Anonymiser *anon, uint8_t *radstart){
+	uint8_t avp_type, avp_length, *digest_buffer;
+
+	uint8_t *radius_ptr = radstart+20; //skip over radius header, (2bytes for type, 2bytes for length, 16bytes for auth)
+	uint16_t radius_length = ((*((uint8_t*)(radstart+2)))<<8) | (*((uint8_t*)(radstart+3)));
+	//extract length from header //TODO must be a better way, why is this soo obtuse?
+
+	uint8_t *radius_end = (radstart+radius_length);
+
+	while (radius_ptr < radius_end){
+		avp_type = *(radius_ptr++);			//AVP type is first byte
+	 	avp_length = (*(radius_ptr++))-2;	//AVP length is 2nd byte
+
+
+		
+		if(avp_type) ;//TODO maybe decide to do different things to different types?
+
+		digest_buffer = anon->digest_message(radius_ptr, avp_length);
+
+		// printf("TYPE:0x%02x\tLEN:0x%02x\n",avp_type, avp_length+2);
+		// for (uint16_t i = 0; i < avp_length; i++){printf("%02x ",*(radius_ptr+i));}printf("\n");
+		// for (uint16_t i = 0; i < avp_length; i++){printf("%02x ",i < 32 ? *(digest_buffer+i):0);}printf("\n");
+
+		if (avp_length > 32){
+			memcpy(radius_ptr, digest_buffer, 32);	//overwrite hash digest into AVP value
+			memset(radius_ptr+32, 0, avp_length - 32);	//pad with zeros to fill //TODO maybe something else?
+		}
+		else {
+			memcpy(radius_ptr, digest_buffer, avp_length);	
+		}
+		radius_ptr+=(avp_length); //move to next AVP
+	}
+}
+
+static inline void *find_radius_start(libtrace_packet_t *pkt, uint32_t *rem) {
+
+	void *transport, *radstart;
+	uint8_t proto;
+
+	transport = trace_get_transport(pkt, &proto, rem);
+	if (!transport || rem == 0) {
+		return NULL;
+	}
+
+	if (proto != TRACE_IPPROTO_UDP) { //TODO handle TCP radius packets, is that even a thing?
+		return NULL;
+	}
+
+	radstart = trace_get_payload_from_udp((libtrace_udp_t *)transport, rem);
+	return radstart;
+}
 
 static libtrace_packet_t *per_packet(libtrace_t *trace, libtrace_thread_t *t,
         void *global, void *tls, libtrace_packet_t *packet) {
@@ -210,6 +270,13 @@ static libtrace_packet_t *per_packet(libtrace_t *trace, libtrace_thread_t *t,
                 icmp6->checksum = 0;
         }
 
+	//TODO check if this packet matches port/ip
+	if (enc_radius_packet){		
+		uint32_t rem;
+		uint8_t *radstart = (uint8_t *)find_radius_start(packet, &rem);
+		encrypt_radius(anon, radstart);
+	}
+
         /* TODO: Encrypt IP's in ARP packets */
         result.pkt = packet;
         trace_publish_result(trace, t, trace_packet_get_order(packet), result, RESULT_PACKET);
@@ -220,7 +287,7 @@ static libtrace_packet_t *per_packet(libtrace_t *trace, libtrace_thread_t *t,
 static void *start_anon(libtrace_t *trace, libtrace_thread_t *t, void *global)
 {
         if (enc_type == ENC_PREFIX_SUBSTITUTION) {
-                PrefixSub *sub = new PrefixSub(enc_key, NULL);
+                PrefixSub *sub = new PrefixSub(enc_key, NULL, salt);
                 return sub;
         }
 
@@ -232,7 +299,7 @@ static void *start_anon(libtrace_t *trace, libtrace_thread_t *t, void *global)
 		}
 #ifdef HAVE_LIBCRYPTO                
                 CryptoAnon *anon = new CryptoAnon((uint8_t *)enc_key,
-                        (uint8_t)strlen(enc_key), 20);
+                        (uint8_t)strlen(enc_key), 20, salt);
                 return anon;
 #else
                 /* TODO nicer way of exiting? */
@@ -242,6 +309,10 @@ static void *start_anon(libtrace_t *trace, libtrace_thread_t *t, void *global)
 #endif
         }
 
+	if (enc_radius_packet){
+		Anonymiser *anon = new Anonymiser(salt);
+		return anon;
+	}
         return NULL;
 }
 
@@ -344,10 +415,12 @@ int main(int argc, char *argv[])
 			{ "compress-level",	1, 0, 'z' },
 			{ "compress-type",	1, 0, 'Z' },
 			{ "help",        	0, 0, 'h' },
+			{"radius-server", 	1, 0, 'r' }, //TODO take arguments //port, IP, salt
+			//{"radius-salt", 	1, 0, 'R' },
 			{ NULL,			0, 0, 0   },
 		};
 
-		int c=getopt_long(argc, argv, "Z:z:sc:f:dp:ht:f:",
+		int c=getopt_long(argc, argv, "Z:z:sc:f:dp:ht:f:r::",
 				long_options, &option_index);
 
 		if (c==-1)
@@ -404,6 +477,30 @@ int main(int argc, char *argv[])
                                   if (maxthreads <= 0)
                                           maxthreads = 1;
                                   break;
+			case 'r':
+				if (enc_radius_packet == true){ //TODO
+					fprintf(stderr, "You can only have one radius server at a time\n");
+					usage(argv[0]);
+				}
+				enc_radius_packet = true;
+				// printf("ARG:%s\n", optarg);
+
+				// uint32_t ipaddr;
+				// uint8_t a,b,c,d;
+				// uint16_t port;
+				// sscanf(optarg, "%c.%c.%c.%c%s",&a,&b,&c,&d, optarg);
+				// ipaddr = a<<24 | b<<16 | c<<8 | d;
+				// printf("ADDR: %d.%d.%d.%d\n", a, b, c, d);
+
+				// while(sscanf(optarg,":%hu%s",&port, optarg) == 2){
+				// 	printf("PORT:%d\n", port);
+				// }
+				// printf("PORT:%d\n", port);
+
+				// //need to retrive ip address 
+				// //and list of ports
+
+				break;
 			default:
 				fprintf(stderr,"unknown option: %c\n",c);
 				usage(argv[0]);
