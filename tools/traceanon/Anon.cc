@@ -45,11 +45,50 @@ static uint32_t masks[33] = {
 };
 
 
-Anonymiser::Anonymiser () {
+Anonymiser::Anonymiser (uint8_t *salt) {
+#ifdef HAVE_LIBCRYPTO
+	mdctx = EVP_MD_CTX_create();
+	memcpy(this->salt,salt,SALT_LENGTH);
+#endif
     /* empty constructor */
 }
 
-PrefixSub::PrefixSub(const char *ipv4_key, const char *ipv6_key) : Anonymiser() {
+Anonymiser::~Anonymiser(){
+#ifdef HAVE_LIBCRYPTO
+	EVP_MD_CTX_destroy(mdctx);
+	EVP_cleanup();
+#endif
+}
+
+
+uint8_t *Anonymiser::digest_message(uint8_t *src_ptr, uint32_t src_length){
+
+#ifdef HAVE_LIBCRYPTO
+
+	// printf("DIGEST PERSPECTIVE");
+	// for (int i = 0; i < src_length; i++){
+	// 	printf(" %02x", *(src_ptr+i));
+	// }
+	// for (int i = 0; i < SALT_LENGTH; i++){
+	// 	printf(" %02x", *(salt+i));
+	// }printf("\n");
+
+	
+
+	EVP_DigestInit_ex(mdctx, EVP_sha256(), NULL);
+	EVP_DigestUpdate(mdctx, src_ptr, src_length);
+	EVP_DigestUpdate(mdctx, salt, SALT_LENGTH);
+	uint32_t len = 0;
+
+	EVP_DigestFinal_ex(mdctx, buffer, &len);
+
+	return buffer;
+#else
+	return NULL;
+#endif
+}
+
+PrefixSub::PrefixSub(const char *ipv4_key, const char *ipv6_key, uint8_t *salt) : Anonymiser(salt) {
     this->ipv4_mask = 0;
     this->ipv4_prefix = 0;
 
@@ -98,8 +137,8 @@ void PrefixSub::anonIPv6(uint8_t *orig, uint8_t *result) {
 #ifdef HAVE_LIBCRYPTO
 #include <openssl/evp.h>
 
-CryptoAnon::CryptoAnon(uint8_t *key, uint8_t len, uint8_t cachebits) :
-        Anonymiser() {
+CryptoAnon::CryptoAnon(uint8_t *key, uint8_t len, uint8_t cachebits, uint8_t *salt) :
+        Anonymiser(salt) {
 
     assert(len >= 32);
     memcpy(this->key, key, 16);
