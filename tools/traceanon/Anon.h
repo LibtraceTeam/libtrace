@@ -48,25 +48,15 @@ public:
     virtual void anonIPv6(uint8_t *orig, uint8_t *result) {};
 
 #ifdef HAVE_LIBCRYPTO
-<<<<<<< HEAD
     uint8_t *digest_message(uint8_t *src_ptr, uint32_t src_length);
-=======
-	uint8_t *digest_message(uint8_t *src_ptr, uint32_t src_length);
->>>>>>> c90c6b81811e29b200424724cfbbb8c583297ca4
 #endif
 
 private:
 
 #ifdef HAVE_LIBCRYPTO
-<<<<<<< HEAD
     uint8_t salt[SALT_LENGTH];
     EVP_MD_CTX *mdctx;
     uint8_t buffer[32];
-=======
-	uint8_t salt[SALT_LENGTH];
-	EVP_MD_CTX *mdctx;
-	uint8_t buffer[32];
->>>>>>> c90c6b81811e29b200424724cfbbb8c583297ca4
 #endif
 
 };
