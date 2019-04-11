@@ -47,16 +47,26 @@ static uint32_t masks[33] = {
 
 Anonymiser::Anonymiser (uint8_t *salt) {
 #ifdef HAVE_LIBCRYPTO
+<<<<<<< HEAD
     mdctx = EVP_MD_CTX_create();
     memcpy(this->salt,salt,SALT_LENGTH);
+=======
+	mdctx = EVP_MD_CTX_create();
+	memcpy(this->salt,salt,SALT_LENGTH);
+>>>>>>> c90c6b81811e29b200424724cfbbb8c583297ca4
 #endif
     /* empty constructor */
 }
 
 Anonymiser::~Anonymiser(){
 #ifdef HAVE_LIBCRYPTO
+<<<<<<< HEAD
     EVP_MD_CTX_destroy(mdctx);
     EVP_cleanup();
+=======
+	EVP_MD_CTX_destroy(mdctx);
+	EVP_cleanup();
+>>>>>>> c90c6b81811e29b200424724cfbbb8c583297ca4
 #endif
 }
 
@@ -65,6 +75,7 @@ uint8_t *Anonymiser::digest_message(uint8_t *src_ptr, uint32_t src_length){
 
 #ifdef HAVE_LIBCRYPTO
 
+<<<<<<< HEAD
     // printf("DIGEST PERSPECTIVE");
     // for (int i = 0; i < src_length; i++){
     //     printf(" %02x", *(src_ptr+i));
@@ -85,6 +96,28 @@ uint8_t *Anonymiser::digest_message(uint8_t *src_ptr, uint32_t src_length){
     return buffer;
 #else
     return NULL;
+=======
+	// printf("DIGEST PERSPECTIVE");
+	// for (int i = 0; i < src_length; i++){
+	// 	printf(" %02x", *(src_ptr+i));
+	// }
+	// for (int i = 0; i < SALT_LENGTH; i++){
+	// 	printf(" %02x", *(salt+i));
+	// }printf("\n");
+
+	
+
+	EVP_DigestInit_ex(mdctx, EVP_sha256(), NULL);
+	EVP_DigestUpdate(mdctx, src_ptr, src_length);
+	EVP_DigestUpdate(mdctx, salt, SALT_LENGTH);
+	uint32_t len = 0;
+
+	EVP_DigestFinal_ex(mdctx, buffer, &len);
+
+	return buffer;
+#else
+	return NULL;
+>>>>>>> c90c6b81811e29b200424724cfbbb8c583297ca4
 #endif
 }
 
