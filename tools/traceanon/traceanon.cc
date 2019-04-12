@@ -57,6 +57,20 @@ char *enc_key = NULL;
 bool enc_radius_packet = false;
 #define SALT_LENGTH 32
 uint8_t salt[SALT_LENGTH] = {1}; //use enc_key instead of salt
+#define SHA256_SIZE 32
+
+typedef struct radius_header {
+    uint8_t code;
+    uint8_t identifier;
+    uint16_t length;
+    uint8_t auth[16];
+} PACKED radius_header_t;
+
+typedef struct radius_avp {
+    uint8_t type;
+    uint8_t length;
+    uint8_t value;
+} PACKED radius_avp_t;
 
 int level = -1;
 trace_option_compresstype_t compress_type = TRACE_OPTION_COMPRESSTYPE_NONE;
@@ -173,36 +187,35 @@ static void encrypt_ipv6(Anonymiser *anon, libtrace_ip6_t *ip6,
 
 //ignoring all else, takes a pointer to the start of a radius packet and Anonymises the values in the AVP section. 
 static void encrypt_radius(Anonymiser *anon, uint8_t *radstart){
-	uint8_t avp_type, avp_length, *digest_buffer;
+	uint8_t *digest_buffer;
 
-	uint8_t *radius_ptr = radstart+20; //skip over radius header, (2bytes for type, 2bytes for length, 16bytes for auth)
-	uint16_t radius_length = ((*((uint8_t*)(radstart+2)))<<8) | (*((uint8_t*)(radstart+3)));
-	//extract length from header //TODO must be a better way, why is this soo obtuse?
+	uint8_t *radius_ptr = radstart + sizeof(radius_header_t);
 
-	uint8_t *radius_end = (radstart+radius_length);
+	radius_header_t *radius_header = (radius_header_t *)radstart;
+
+	uint16_t radius_length = ntohs(radius_header->length);
+
+	uint8_t *radius_end = (radstart+radius_length);	
 
 	while (radius_ptr < radius_end){
-		avp_type = *(radius_ptr++);			//AVP type is first byte
-	 	avp_length = (*(radius_ptr++))-2;	//AVP length is 2nd byte
+		radius_avp_t *radius_avp = (radius_avp_t*)radius_ptr;
+		uint16_t val_len = radius_avp->length-2;
+		if(radius_avp->type) ;//TODO maybe decide to do different things to different types?
 
+		digest_buffer = anon->digest_message(&radius_avp->value, val_len);
 
-		
-		if(avp_type) ;//TODO maybe decide to do different things to different types?
+		// printf("TYPE:0x%02x\tLEN:0x%02x\n",radius_avp->type, radius_avp->length);
+		// for (uint16_t i = 0; i < val_len; i++){printf("%02x ",*(&radius_avp->value +i));}printf("\n");
+		// for (uint16_t i = 0; i < val_len; i++){printf("%02x ",i < 32 ? *(digest_buffer+i):0);}printf("\n");
 
-		digest_buffer = anon->digest_message(radius_ptr, avp_length);
-
-		// printf("TYPE:0x%02x\tLEN:0x%02x\n",avp_type, avp_length+2);
-		// for (uint16_t i = 0; i < avp_length; i++){printf("%02x ",*(radius_ptr+i));}printf("\n");
-		// for (uint16_t i = 0; i < avp_length; i++){printf("%02x ",i < 32 ? *(digest_buffer+i):0);}printf("\n");
-
-		if (avp_length > 32){
-			memcpy(radius_ptr, digest_buffer, 32);	//overwrite hash digest into AVP value
-			memset(radius_ptr+32, 0, avp_length - 32);	//pad with zeros to fill //TODO maybe something else?
+		if (val_len > SHA256_SIZE){
+			memcpy(&radius_avp->value, digest_buffer, SHA256_SIZE);		//overwrite hash digest into AVP value
+			memset(&radius_avp->value+SHA256_SIZE, 0, val_len-SHA256_SIZE);	//pad with zeros to fill //TODO maybe something else?
 		}
 		else {
-			memcpy(radius_ptr, digest_buffer, avp_length);	
+			memcpy(&radius_avp->value, digest_buffer, val_len);
 		}
-		radius_ptr+=(avp_length); //move to next AVP
+		radius_ptr+=(radius_avp->length); //move to next
 	}
 }
 
@@ -274,7 +287,12 @@ static libtrace_packet_t *per_packet(libtrace_t *trace, libtrace_thread_t *t,
 	if (enc_radius_packet){		
 		uint32_t rem;
 		uint8_t *radstart = (uint8_t *)find_radius_start(packet, &rem);
-		encrypt_radius(anon, radstart);
+		if (radstart ==  NULL){
+			printf("Radius Header Error\n");
+		}
+		else {
+			encrypt_radius(anon, radstart);
+		}
 	}
 
         /* TODO: Encrypt IP's in ARP packets */
@@ -297,7 +315,7 @@ static void *start_anon(libtrace_t *trace, libtrace_thread_t *t, void *global)
 			"characters long for CryptoPan anonymisation.\n");
 			exit(1);
 		}
-#ifdef HAVE_LIBCRYPTO                
+#ifdef HAVE_LIBCRYPTO
                 CryptoAnon *anon = new CryptoAnon((uint8_t *)enc_key,
                         (uint8_t)strlen(enc_key), 20, salt);
                 return anon;
@@ -483,22 +501,7 @@ int main(int argc, char *argv[])
 					usage(argv[0]);
 				}
 				enc_radius_packet = true;
-				// printf("ARG:%s\n", optarg);
 
-				// uint32_t ipaddr;
-				// uint8_t a,b,c,d;
-				// uint16_t port;
-				// sscanf(optarg, "%c.%c.%c.%c%s",&a,&b,&c,&d, optarg);
-				// ipaddr = a<<24 | b<<16 | c<<8 | d;
-				// printf("ADDR: %d.%d.%d.%d\n", a, b, c, d);
-
-				// while(sscanf(optarg,":%hu%s",&port, optarg) == 2){
-				// 	printf("PORT:%d\n", port);
-				// }
-				// printf("PORT:%d\n", port);
-
-				// //need to retrive ip address 
-				// //and list of ports
 
 				break;
 			default:
