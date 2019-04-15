@@ -59,6 +59,18 @@ bool enc_radius_packet = false;
 uint8_t salt[SALT_LENGTH] = {1}; //use enc_key instead of salt
 #define SHA256_SIZE 32
 
+typedef struct traceanon_port_list_t{
+	uint16_t port;
+	traceanon_port_list_t *nextport;
+}traceanon_port_list_t;
+
+typedef struct traceanon_radius_server_t {
+	in_addr_t ipaddr;
+	traceanon_port_list_t *port;
+}traceanon_radius_server_t;
+
+traceanon_radius_server_t radius_server;
+
 typedef struct radius_header {
     uint8_t code;
     uint8_t identifier;
@@ -113,6 +125,14 @@ static void update_in_cksum(uint16_t *csum, uint16_t old, uint16_t newval)
 		     + htons(newval);
 	sum = (sum & 0xFFFF) + (sum >> 16);
 	*csum = htons(~(sum + (sum >> 16)));
+}
+
+void add_port_to_server(traceanon_radius_server_t *server, uint16_t port ){
+	traceanon_port_list_t *currPort;
+	currPort = (traceanon_port_list_t*) malloc(sizeof(traceanon_port_list_t));
+	currPort->port = port;
+	currPort->nextport = server->port;
+	server->port = currPort;
 }
 
 UNUSED static void update_in_cksum32(uint16_t *csum, uint32_t old,
@@ -185,8 +205,8 @@ static void encrypt_ipv6(Anonymiser *anon, libtrace_ip6_t *ip6,
 
 }
 
-//ignoring all else, takes a pointer to the start of a radius packet and Anonymises the values in the AVP section. 
-static void encrypt_radius(Anonymiser *anon, uint8_t *radstart){
+//ignoring all else, takes a pointer to the start of a radius packet and Anonymises the values in the AVP section.
+static void encrypt_radius(Anonymiser *anon, uint8_t *radstart, uint32_t *rem){
 	uint8_t *digest_buffer;
 
 	uint8_t *radius_ptr = radstart + sizeof(radius_header_t);
@@ -197,11 +217,15 @@ static void encrypt_radius(Anonymiser *anon, uint8_t *radstart){
 
 	uint8_t *radius_end = (radstart+radius_length);	
 
+	if (*rem > radius_length){
+		//TODO handle error
+	}
+
 	while (radius_ptr < radius_end){
 		radius_avp_t *radius_avp = (radius_avp_t*)radius_ptr;
 		uint16_t val_len = radius_avp->length-2;
-		if(radius_avp->type) ;//TODO maybe decide to do different things to different types?
 
+		//if(radius_avp->type) ;//TODO maybe decide to do different things to different types?
 		digest_buffer = anon->digest_message(&radius_avp->value, val_len);
 
 		// printf("TYPE:0x%02x\tLEN:0x%02x\n",radius_avp->type, radius_avp->length);
@@ -284,15 +308,33 @@ static libtrace_packet_t *per_packet(libtrace_t *trace, libtrace_thread_t *t,
         }
 
 	//TODO check if this packet matches port/ip
-	if (enc_radius_packet){		
-		uint32_t rem;
-		uint8_t *radstart = (uint8_t *)find_radius_start(packet, &rem);
-		if (radstart ==  NULL){
-			printf("Radius Header Error\n");
+	if (enc_radius_packet && udp){	
+		uint16_t testPort = 0;
+		if(ipptr->ip_src.s_addr == radius_server.ipaddr){
+			testPort = udp->source;
 		}
-		else {
-			encrypt_radius(anon, radstart);
+		if(ipptr->ip_dst.s_addr == radius_server.ipaddr){
+			testPort = udp->dest;
 		}
+		traceanon_port_list_t *currPort = (radius_server.port);
+
+		if(testPort != 0){ //an ip matches 			
+			while(currPort != NULL){				
+				if (testPort == currPort->port){
+					uint32_t rem;
+					uint8_t *radstart = (uint8_t *)find_radius_start(packet, &rem);
+					if (radstart ==  NULL){
+						printf("Radius Header Error\n");
+						//handel error
+					}
+					else {
+						encrypt_radius(anon, radstart, &rem);
+					}					
+					break;
+				}
+				currPort = currPort->nextport;
+			}
+		}		
 	}
 
         /* TODO: Encrypt IP's in ARP packets */
@@ -495,15 +537,35 @@ int main(int argc, char *argv[])
                                   if (maxthreads <= 0)
                                           maxthreads = 1;
                                   break;
-			case 'r':
-				if (enc_radius_packet == true){ //TODO
-					fprintf(stderr, "You can only have one radius server at a time\n");
-					usage(argv[0]);
-				}
-				enc_radius_packet = true;
+			case 'r':{
+					if (enc_radius_packet == true){ //TODO
+						fprintf(stderr, "You can only have one radius server at a time\n");
+						usage(argv[0]);
+					}
+					enc_radius_packet = true;
 
+					uint8_t a,b,c,d;
+					uint16_t port;
+					sscanf(optarg, "%hhu.%hhu.%hhu.%hhu%s",&a,&b,&c,&d, optarg); 
+					//TODO is this the best way?		
+					
+					in_addr_t ipaddr;
+					ipaddr = (a | b<<8 | c<<16 | d<<24);
 
+					radius_server.ipaddr = ipaddr;
+
+					while(sscanf(optarg,":%hu%s",&port, optarg) == 2){
+						add_port_to_server(&radius_server,port);
+					}
+					add_port_to_server(&radius_server,port);
+
+				
+					traceanon_port_list_t *currPort = (radius_server.port);
+					while(currPort != NULL){
+						currPort = currPort->nextport;
+					}
 				break;
+				}				
 			default:
 				fprintf(stderr,"unknown option: %c\n",c);
 				usage(argv[0]);
