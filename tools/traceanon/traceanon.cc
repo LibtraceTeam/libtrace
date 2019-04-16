@@ -54,10 +54,12 @@ bool enc_dest_opt   = false;
 enum enc_type_t enc_type = ENC_NONE;
 char *enc_key = NULL;
 
-bool enc_radius_packet = false;
+
 #define SALT_LENGTH 32
-uint8_t salt[SALT_LENGTH] = {1}; //use enc_key instead of salt
 #define SHA256_SIZE 32
+bool enc_radius_packet = false;
+uint8_t salt[SALT_LENGTH];
+bool isSaltSet = false;
 
 typedef struct traceanon_port_list_t{
 	uint16_t port;
@@ -113,6 +115,10 @@ static void usage(char *argv0)
         "-t --threads=max       Use this number of threads for packet processing\n"
         "-f --filter=expr       Discard all packets that do not match the\n"
         "                       provided BPF expression\n"
+	"-r --radius-server=a.b.c.d[:port1] Specifies an IP address and\n"
+	"				a ':' separated list of ports to\n"
+	"                               match for RADIUS anonymising.\n"
+	"-R --radius-salt=salt  Use provided salt for RADIUS hashing\n"
 	,argv0);
 	exit(1);
 }
@@ -318,8 +324,8 @@ static libtrace_packet_t *per_packet(libtrace_t *trace, libtrace_thread_t *t,
 		}
 		traceanon_port_list_t *currPort = (radius_server.port);
 
-		if(testPort != 0){ //an ip matches 			
-			while(currPort != NULL){				
+		if(testPort != 0){ //an ip matches
+			while(currPort != NULL){
 				if (testPort == currPort->port){
 					uint32_t rem;
 					uint8_t *radstart = (uint8_t *)find_radius_start(packet, &rem);
@@ -476,11 +482,11 @@ int main(int argc, char *argv[])
 			{ "compress-type",	1, 0, 'Z' },
 			{ "help",        	0, 0, 'h' },
 			{"radius-server", 	1, 0, 'r' }, //TODO take arguments //port, IP, salt
-			//{"radius-salt", 	1, 0, 'R' },
+			{"radius-salt", 	1, 0, 'R' },
 			{ NULL,			0, 0, 0   },
 		};
 
-		int c=getopt_long(argc, argv, "Z:z:sc:f:dp:ht:f:r::",
+		int c=getopt_long(argc, argv, "Z:z:sc:f:dp:ht:f:r::R:",
 				long_options, &option_index);
 
 		if (c==-1)
@@ -538,34 +544,49 @@ int main(int argc, char *argv[])
                                           maxthreads = 1;
                                   break;
 			case 'r':{
-					if (enc_radius_packet == true){ //TODO
-						fprintf(stderr, "You can only have one radius server at a time\n");
-						usage(argv[0]);
-					}
-					enc_radius_packet = true;
+				if (radius_server.ipaddr != 0){
+					fprintf(stderr, "You can only have one radius server at a time\n");
+					usage(argv[0]);
+				}
+				enc_radius_packet = true;
 
-					uint8_t a,b,c,d;
-					uint16_t port;
-					sscanf(optarg, "%hhu.%hhu.%hhu.%hhu%s",&a,&b,&c,&d, optarg); 
-					//TODO is this the best way?		
-					
-					in_addr_t ipaddr;
-					ipaddr = (a | b<<8 | c<<16 | d<<24);
+				uint8_t a,b,c,d;
+				uint16_t port;
 
-					radius_server.ipaddr = ipaddr;
+				uint32_t argsnum = sscanf(optarg, "%hhu.%hhu.%hhu.%hhu%s",&a,&b,&c,&d, optarg);
+				//TODO handle errors
+				//printf("ip scanf = %d\n", argsnum);
+				if (argsnum != 5){
+					fprintf(stderr, "Malformed argument\n");
+					usage(argv[0]);
+				}
 
-					while(sscanf(optarg,":%hu%s",&port, optarg) == 2){
-						add_port_to_server(&radius_server,port);
-					}
+				in_addr_t ipaddr; //TODO is this the best way?
+				ipaddr = (a | b<<8 | c<<16 | d<<24);
+				radius_server.ipaddr = ipaddr;
+
+				while( (argsnum = sscanf(optarg,":%hu%s",&port, optarg)) == 2){
 					add_port_to_server(&radius_server,port);
-
-				
-					traceanon_port_list_t *currPort = (radius_server.port);
-					while(currPort != NULL){
-						currPort = currPort->nextport;
-					}
+					//printf("port scanf = %d\n", argsnum);
+				}
+				add_port_to_server(&radius_server,port); //TODO this has a malloc, do i need to free?
+				//printf("port scanf = %d\n", argsnum);
 				break;
-				}				
+				}
+			case 'R' :{
+				if (isSaltSet){
+					fprintf(stderr,"Salt has already been set: %c\n",c);
+					usage(argv[0]);
+				}
+				if (strlen(optarg) > 32){
+					printf("Salt is longer than 32chars\n"); 
+					//TODO handle error
+					break;
+				}
+				memcpy(salt, optarg, strlen(optarg));
+				isSaltSet = true;
+				break;
+			}
 			default:
 				fprintf(stderr,"unknown option: %c\n",c);
 				usage(argv[0]);
