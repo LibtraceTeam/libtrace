@@ -38,6 +38,7 @@
 #include <time.h>
 #include <assert.h>
 #include <signal.h>
+#include <arpa/inet.h>
 
 #ifdef HAVE_LIBCRYPTO
 #include <openssl/evp.h>
@@ -548,27 +549,21 @@ int main(int argc, char *argv[])
 					fprintf(stderr, "You can only have one radius server at a time\n");
 					usage(argv[0]);
 				}
-				enc_radius_packet = true;
+				enc_radius_packet = true;						
+				
+				char *token = strtok(optarg, ":");
+				in_addr_t ipaddr = inet_addr(token);
 
-				uint8_t a,b,c,d;
-				uint16_t port;
-
-				uint32_t argsnum = sscanf(optarg, "%hhu.%hhu.%hhu.%hhu%s",&a,&b,&c,&d, optarg);
-				//TODO handle errors
-				//printf("ip scanf = %d\n", argsnum);
-				if (argsnum != 5){
-					fprintf(stderr, "Malformed argument\n");
-					usage(argv[0]);
+				if(ipaddr == (in_addr_t)(-1)){
+					printf("error \n");
 				}
+				radius_server.ipaddr = ipaddr; 
 
-				in_addr_t ipaddr; //TODO is this the best way?
-				ipaddr = (a | b<<8 | c<<16 | d<<24);
-				radius_server.ipaddr = ipaddr;
-
-				while( (argsnum = sscanf(optarg,":%hu%s",&port, optarg)) == 2){
+				while( (token = strtok(NULL, ":")) != NULL ) {
+					in_port_t port = atoi(token); //TODO add error checking
 					add_port_to_server(&radius_server,htons(port));
 				}
-				add_port_to_server(&radius_server,htons(port)); //TODO this has a malloc, do i need to free?
+				//TODO this has a malloc, do i need to free?
 				break;
 				}
 			case 'R' :{
