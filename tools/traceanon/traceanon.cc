@@ -566,11 +566,9 @@ int main(int argc, char *argv[])
 				radius_server.ipaddr = ipaddr;
 
 				while( (argsnum = sscanf(optarg,":%hu%s",&port, optarg)) == 2){
-					add_port_to_server(&radius_server,port);
-					//printf("port scanf = %d\n", argsnum);
+					add_port_to_server(&radius_server,htons(port));
 				}
-				add_port_to_server(&radius_server,port); //TODO this has a malloc, do i need to free?
-				//printf("port scanf = %d\n", argsnum);
+				add_port_to_server(&radius_server,htons(port)); //TODO this has a malloc, do i need to free?
 				break;
 				}
 			case 'R' :{
