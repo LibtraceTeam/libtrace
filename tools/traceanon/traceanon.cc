@@ -226,6 +226,7 @@ static void encrypt_radius(Anonymiser *anon, uint8_t *radstart, uint32_t *rem){
 
 	if (*rem > radius_length){
 		//TODO handle error
+		return;
 	}
 
 	while (radius_ptr < radius_end){
@@ -241,7 +242,7 @@ static void encrypt_radius(Anonymiser *anon, uint8_t *radstart, uint32_t *rem){
 
 		if (val_len > SHA256_SIZE){
 			memcpy(&radius_avp->value, digest_buffer, SHA256_SIZE);		//overwrite hash digest into AVP value
-			memset(&radius_avp->value+SHA256_SIZE, 0, val_len-SHA256_SIZE);	//pad with zeros to fill //TODO maybe something else?
+			memset(&radius_avp->value+SHA256_SIZE, 0, val_len-SHA256_SIZE);	//pad with zeros to fill 
 		}
 		else {
 			memcpy(&radius_avp->value, digest_buffer, val_len);
@@ -314,7 +315,6 @@ static libtrace_packet_t *per_packet(libtrace_t *trace, libtrace_thread_t *t,
                 icmp6->checksum = 0;
         }
 
-	//TODO check if this packet matches port/ip
 	if (enc_radius_packet && udp){	
 		uint16_t testPort = 0;
 		if(ipptr->ip_src.s_addr == radius_server.ipaddr.s_addr){
@@ -482,7 +482,7 @@ int main(int argc, char *argv[])
 			{ "compress-level",	1, 0, 'z' },
 			{ "compress-type",	1, 0, 'Z' },
 			{ "help",        	0, 0, 'h' },
-			{"radius-server", 	1, 0, 'r' }, //TODO take arguments //port, IP, salt
+			{"radius-server", 	1, 0, 'r' },
 			{"radius-salt", 	1, 0, 'R' },
 			{ NULL,			0, 0, 0   },
 		};
@@ -577,8 +577,8 @@ int main(int argc, char *argv[])
 					usage(argv[0]);
 				}
 				if (strlen(optarg) > 32){
-					printf("Salt is longer than 32chars\n"); 
-					//TODO handle error
+					fprintf(stderr,"Salt is longer than 32chars\n");
+					usage(argv[0]);
 					break;
 				}
 				memcpy(salt, optarg, strlen(optarg));
