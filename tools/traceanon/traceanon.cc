@@ -68,7 +68,7 @@ typedef struct traceanon_port_list_t{
 }traceanon_port_list_t;
 
 typedef struct traceanon_radius_server_t {
-	in_addr_t ipaddr;
+	struct in_addr ipaddr;
 	traceanon_port_list_t *port;
 }traceanon_radius_server_t;
 
@@ -317,10 +317,10 @@ static libtrace_packet_t *per_packet(libtrace_t *trace, libtrace_thread_t *t,
 	//TODO check if this packet matches port/ip
 	if (enc_radius_packet && udp){	
 		uint16_t testPort = 0;
-		if(ipptr->ip_src.s_addr == radius_server.ipaddr){
+		if(ipptr->ip_src.s_addr == radius_server.ipaddr.s_addr){
 			testPort = udp->source;
 		}
-		if(ipptr->ip_dst.s_addr == radius_server.ipaddr){
+		if(ipptr->ip_dst.s_addr == radius_server.ipaddr.s_addr){
 			testPort = udp->dest;
 		}
 		traceanon_port_list_t *currPort = (radius_server.port);
@@ -545,25 +545,30 @@ int main(int argc, char *argv[])
                                           maxthreads = 1;
                                   break;
 			case 'r':{
-				if (radius_server.ipaddr != 0){
+				if (radius_server.ipaddr.s_addr != 0){
 					fprintf(stderr, "You can only have one radius server at a time\n");
 					usage(argv[0]);
 				}
-				enc_radius_packet = true;						
+				enc_radius_packet = true;
 				
 				char *token = strtok(optarg, ":");
-				in_addr_t ipaddr = inet_addr(token);
+				struct in_addr ipaddr;
 
-				if(ipaddr == (in_addr_t)(-1)){
-					printf("error \n");
+				if(inet_aton(token, &ipaddr) == 0){
+					fprintf(stderr, "IP address malformed\n");
+					usage(argv[0]);
 				}
-				radius_server.ipaddr = ipaddr; 
+				radius_server.ipaddr = ipaddr;
 
+				char * garbage = NULL;
 				while( (token = strtok(NULL, ":")) != NULL ) {
-					in_port_t port = atoi(token); //TODO add error checking
+					in_port_t port = strtol(token, &garbage, 10);
+					if(garbage == NULL || (*garbage != ':' && *garbage != 0)){
+						fprintf(stderr, "Port list malformed\n");
+						usage(argv[0]);
+					}
 					add_port_to_server(&radius_server,htons(port));
 				}
-				//TODO this has a malloc, do i need to free?
 				break;
 				}
 			case 'R' :{
@@ -694,6 +699,6 @@ exitanon:
 		currPort = currPort->nextport;
 		free(tempPort);
 	}
-	
+
 	return exitcode;
 }
