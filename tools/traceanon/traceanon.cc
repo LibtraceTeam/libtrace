@@ -487,7 +487,7 @@ int main(int argc, char *argv[])
 			{ NULL,			0, 0, 0   },
 		};
 
-		int c=getopt_long(argc, argv, "Z:z:sc:f:dp:ht:f:r::R:",
+		int c=getopt_long(argc, argv, "Z:z:sc:f:dp:ht:f:r:R:",
 				long_options, &option_index);
 
 		if (c==-1)
@@ -686,5 +686,14 @@ exitanon:
                 trace_destroy_callback_set(repcbs);
         if (inptrace)
         	trace_destroy(inptrace);
+
+	traceanon_port_list_t *currPort = radius_server.port;
+	traceanon_port_list_t *tempPort;
+	while(currPort != NULL){
+		tempPort = currPort;
+		currPort = currPort->nextport;
+		free(tempPort);
+	}
+	
 	return exitcode;
 }
