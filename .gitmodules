@@ -1,0 +1,6 @@
+[submodule "wandio"]
+	path = wandio
+	url = https://github.com/wanduow/wandio
+[submodule "libwandder"]
+	path = libwandder
+	url = https://github.com/wanduow/libwandder
