@@ -330,7 +330,7 @@ static uint8_t *tzsplive_get_option(const libtrace_packet_t *packet, uint8_t opt
                         ptr += sizeof(uint8_t);
                 } else {
                         /* jump over the tag header and the data */
-                        ptr += sizeof(uint16_t)+tag->length;
+                        ptr += sizeof(tzsp_tagfield_t)+tag->length;
                 }
                 tag = (tzsp_tagfield_t *)ptr;
         }
@@ -353,11 +353,13 @@ static uint8_t *tzsplive_get_packet_payload(const libtrace_packet_t *packet) {
         return ptr + sizeof(uint8_t);
 }
 
-static int tzsplive_insert_timestamp(libtrace_t *libtrace, libtrace_packet_t *packet) {
+static int tzsplive_insert_timestamp(libtrace_t *libtrace,
+                libtrace_packet_t *packet, int pktlen) {
 	struct timeval tv;
 	tzsp_tagfield_t timestamp;
 	uint8_t *ptr;
 	int ret = 0;
+        uint64_t timesafe;
 
 	// Construct the tagfield
 	timestamp.type = TZSP_LIBTRACE_CUSTOM_TAG_TIMEVAL;
@@ -369,20 +371,24 @@ static int tzsplive_insert_timestamp(libtrace_t *libtrace, libtrace_packet_t *pa
 	}
 
 	// Copy over the current packet
-	memcpy(FORMAT_DATA->buf, packet->buffer, (size_t)LIBTRACE_PACKET_BUFSIZE);
+	memcpy(FORMAT_DATA->buf, packet->buffer, (size_t)pktlen);
 
 	// pointer to begining of tagged fields
 	ptr = packet->buffer + sizeof(tzsp_header_t);
 
+        memmove((ptr + sizeof(tzsp_tagfield_t) + sizeof(timesafe) +
+                sizeof(timesafe)), ptr, pktlen - sizeof(tzsp_header_t));
+
 	// insert the timestamp tagfield header and value
 	memcpy(ptr, &timestamp, sizeof(tzsp_tagfield_t));
 	ptr += sizeof(tzsp_tagfield_t);
-	memcpy(ptr, &tv, sizeof(struct timeval));
-	ptr += sizeof(struct timeval);
 
-	// copy the rest of the packet over again
-	memcpy(ptr, FORMAT_DATA->buf+sizeof(tzsp_header_t),
-		(size_t)(LIBTRACE_PACKET_BUFSIZE)-*ptr);
+        timesafe = bswap_host_to_be64((uint64_t)(tv.tv_sec));
+	memcpy(ptr, &(timesafe), sizeof(timesafe));
+	ptr += sizeof(timesafe);
+        timesafe = bswap_host_to_be64((uint64_t)(tv.tv_usec));
+	memcpy(ptr, &(timesafe), sizeof(timesafe));
+	ptr += sizeof(timesafe);
 
 	return 1;
 }
@@ -462,11 +468,11 @@ readagain:
 	}
 
 	/* insert the timestamp */
-	tzsplive_insert_timestamp(libtrace, packet);
+	tzsplive_insert_timestamp(libtrace, packet, ret);
 
 	/* Cache the captured length */
         packet->cached.framing_length = trace_get_framing_length(packet);
-        packet->cached.capture_length = ret - trace_get_framing_length(packet);
+        packet->cached.capture_length = ret - packet->cached.framing_length;
 
 	if (tzsplive_prepare_packet(libtrace, packet, packet->buffer,
 		TRACE_RT_DATA_TZSP, flags)) {
@@ -620,8 +626,13 @@ static libtrace_linktype_t tzsplive_get_link_type(const libtrace_packet_t *packe
 static struct timeval tzsplive_get_timeval(const libtrace_packet_t *packet) {
 	uint8_t *ptr;
 	struct timeval tv;
+
 	if ((ptr = tzsplive_get_option(packet, TZSP_LIBTRACE_CUSTOM_TAG_TIMEVAL)) != NULL) {
-		tv = *(struct timeval *)ptr;
+                ptr += sizeof(tzsp_tagfield_t);
+
+		tv.tv_sec = (uint32_t)bswap_be_to_host64(*(uint64_t *)ptr);
+                ptr += sizeof(uint64_t);
+                tv.tv_usec = (uint32_t)bswap_be_to_host64(*(uint64_t *)ptr);
 	} else {
 		tv.tv_sec = 0;
 		tv.tv_usec = 0;
@@ -636,7 +647,7 @@ static int tzsplive_get_wire_length(const libtrace_packet_t *packet) {
 	uint8_t *ptr;
 	if ((ptr = tzsplive_get_option(packet, TZSP_TAG_RX_FRAME_LENGTH)) != NULL) {
 		/* jump to the value */
-		ptr += sizeof(uint16_t);
+		ptr += sizeof(tzsp_tagfield_t);
 		return ntohs(*(uint16_t *)ptr);
 	} else {
 		/* Fallback to the captured length */
