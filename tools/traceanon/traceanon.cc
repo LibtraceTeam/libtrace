@@ -269,6 +269,39 @@ static inline void *find_radius_start(libtrace_packet_t *pkt, uint32_t *rem) {
 	return radstart;
 }
 
+//checks if packet src/dest is filtered for RADIUS and anonymised/encrypted as needed
+void check_radius(libtrace_udp_t *udp, struct libtrace_ip *ipptr, libtrace_packet_t *packet, Anonymiser *anon){
+	udp = trace_get_udp(packet);
+	if (udp){	
+		uint16_t testPort = 0;
+		if(ipptr->ip_src.s_addr == radius_server.ipaddr.s_addr){
+			testPort = udp->source;
+		}
+		if(ipptr->ip_dst.s_addr == radius_server.ipaddr.s_addr){
+			testPort = udp->dest;
+		}
+		traceanon_port_list_t *currPort = (radius_server.port);
+
+		if(testPort != 0){ //an ip matches
+			while(currPort != NULL){
+				if (testPort == currPort->port){
+					uint32_t rem;
+					uint8_t *radstart = (uint8_t *)find_radius_start(packet, &rem);
+					if (radstart ==  NULL){
+						printf("Radius Header Error\n");
+						//handle error
+					}
+					else {
+						encrypt_radius(anon, radstart, &rem);
+					}
+					break;
+				}
+				currPort = currPort->nextport;
+			}
+		}		
+	}
+}
+
 static libtrace_packet_t *per_packet(libtrace_t *trace, libtrace_thread_t *t,
         void *global, void *tls, libtrace_packet_t *packet) {
 
@@ -285,6 +318,10 @@ static libtrace_packet_t *per_packet(libtrace_t *trace, libtrace_thread_t *t,
 
         ipptr = trace_get_ip(packet);
         ip6 = trace_get_ip6(packet);
+
+	if (enc_radius_packet){
+		check_radius(udp, ipptr, packet, anon);
+	}
 
         if (ipptr && (enc_source_opt || enc_dest_opt)) {
                 encrypt_ips(anon, ipptr,enc_source_opt,enc_dest_opt);
@@ -314,35 +351,6 @@ static libtrace_packet_t *per_packet(libtrace_t *trace, libtrace_thread_t *t,
         if (icmp6 && (enc_source_opt || enc_dest_opt)) {
                 icmp6->checksum = 0;
         }
-
-	if (enc_radius_packet && udp){	
-		uint16_t testPort = 0;
-		if(ipptr->ip_src.s_addr == radius_server.ipaddr.s_addr){
-			testPort = udp->source;
-		}
-		if(ipptr->ip_dst.s_addr == radius_server.ipaddr.s_addr){
-			testPort = udp->dest;
-		}
-		traceanon_port_list_t *currPort = (radius_server.port);
-
-		if(testPort != 0){ //an ip matches
-			while(currPort != NULL){
-				if (testPort == currPort->port){
-					uint32_t rem;
-					uint8_t *radstart = (uint8_t *)find_radius_start(packet, &rem);
-					if (radstart ==  NULL){
-						printf("Radius Header Error\n");
-						//handel error
-					}
-					else {
-						encrypt_radius(anon, radstart, &rem);
-					}					
-					break;
-				}
-				currPort = currPort->nextport;
-			}
-		}		
-	}
 
         /* TODO: Encrypt IP's in ARP packets */
         result.pkt = packet;
