@@ -251,6 +251,7 @@ static void encrypt_radius(Anonymiser *anon, uint8_t *radstart, uint32_t *rem){
 	}
 }
 
+//retrives radius header from UDP packet
 static inline void *find_radius_start(libtrace_packet_t *pkt, uint32_t *rem) {
 
 	void *transport, *radstart;
@@ -269,6 +270,37 @@ static inline void *find_radius_start(libtrace_packet_t *pkt, uint32_t *rem) {
 	return radstart;
 }
 
+//checks packets with matching IPs for matching port and encrypts 
+int radius_ip_match(libtrace_udp_t *udp, 
+		struct libtrace_ip *ipptr, 
+		libtrace_packet_t *packet, 
+		Anonymiser *anon, 
+		uint16_t testPort){
+
+	traceanon_port_list_t *currPort = (radius_server.port);
+
+	if(testPort != 0){ //an ip matches
+		while(currPort != NULL){
+			if (testPort == currPort->port){
+				uint32_t rem;
+				uint8_t *radstart = (uint8_t *)find_radius_start(packet, &rem);
+				if (radstart ==  NULL){
+					printf("Radius Header Error\n");
+					//handle error
+				}
+				else {
+					encrypt_radius(anon, radstart, &rem);
+					return 1;
+				}
+				break;
+			}
+			currPort = currPort->nextport;
+		}
+	}
+	return 0;
+
+}
+
 //checks if packet src/dest is filtered for RADIUS and anonymised/encrypted as needed
 void check_radius(libtrace_udp_t *udp, struct libtrace_ip *ipptr, libtrace_packet_t *packet, Anonymiser *anon){
 	udp = trace_get_udp(packet);
@@ -276,29 +308,14 @@ void check_radius(libtrace_udp_t *udp, struct libtrace_ip *ipptr, libtrace_packe
 		uint16_t testPort = 0;
 		if(ipptr->ip_src.s_addr == radius_server.ipaddr.s_addr){
 			testPort = udp->source;
+			if (radius_ip_match(udp, ipptr, packet, anon, testPort))
+				return;
 		}
 		if(ipptr->ip_dst.s_addr == radius_server.ipaddr.s_addr){
 			testPort = udp->dest;
+			if (radius_ip_match(udp, ipptr, packet, anon, testPort))
+				return;
 		}
-		traceanon_port_list_t *currPort = (radius_server.port);
-
-		if(testPort != 0){ //an ip matches
-			while(currPort != NULL){
-				if (testPort == currPort->port){
-					uint32_t rem;
-					uint8_t *radstart = (uint8_t *)find_radius_start(packet, &rem);
-					if (radstart ==  NULL){
-						printf("Radius Header Error\n");
-						//handle error
-					}
-					else {
-						encrypt_radius(anon, radstart, &rem);
-					}
-					break;
-				}
-				currPort = currPort->nextport;
-			}
-		}		
 	}
 }
 
