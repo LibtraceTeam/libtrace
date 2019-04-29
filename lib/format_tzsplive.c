@@ -627,13 +627,20 @@ static struct timeval tzsplive_get_timeval(const libtrace_packet_t *packet) {
 	uint8_t *ptr;
 	struct timeval tv;
 
-	if ((ptr = tzsplive_get_option(packet, TZSP_LIBTRACE_CUSTOM_TAG_TIMEVAL)) != NULL) {
+	if ((ptr = tzsplive_get_option(packet,
+                        TZSP_LIBTRACE_CUSTOM_TAG_TIMEVAL)) != NULL) {
                 ptr += sizeof(tzsp_tagfield_t);
 
 		tv.tv_sec = (uint32_t)bswap_be_to_host64(*(uint64_t *)ptr);
                 ptr += sizeof(uint64_t);
                 tv.tv_usec = (uint32_t)bswap_be_to_host64(*(uint64_t *)ptr);
-	} else {
+	} else if ((ptr = tzsplive_get_option(packet,
+                        TZSP_TAG_TIMESTAMP)) != NULL) {
+                /* fall back to the crappy 32 bit timestamp if present */
+                ptr += sizeof(tzsp_tagfield_t);
+                tv.tv_sec = ntohl(*(uint32_t *)ptr);
+                tv.tv_usec = 0;
+        } else{
 		tv.tv_sec = 0;
 		tv.tv_usec = 0;
 	}
