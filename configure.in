@@ -129,7 +129,7 @@ AC_CHECK_SIZEOF([long int])
 
 # Checks for header files.
 AC_HEADER_STDC
-AC_CHECK_HEADERS(pcap.h pcap-int.h pcap-bpf.h net/bpf.h sys/limits.h stddef.h inttypes.h limits.h net/ethernet.h sys/prctl.h)
+AC_CHECK_HEADERS(pcap.h pcap-bpf.h net/bpf.h sys/limits.h stddef.h inttypes.h limits.h net/ethernet.h sys/prctl.h)
 
 
 # OpenSolaris puts ncurses.h in /usr/include/ncurses rather than /usr/include,

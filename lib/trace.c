@@ -154,6 +154,7 @@ static void trace_init(void)
 		bpf_constructor();
 		pcapfile_constructor();
 		pcapng_constructor();
+		tzsplive_constructor();
                 rt_constructor();
                 ndag_constructor();
 #ifdef HAVE_WANDDER
@@ -771,8 +772,6 @@ DLLEXPORT void trace_destroy(libtrace_t *libtrace) {
 	if (libtrace->format) {
 		if (libtrace->started && libtrace->format->pause_input)
 			libtrace->format->pause_input(libtrace);
-		if (libtrace->format->fin_input)
-			libtrace->format->fin_input(libtrace);
 	}
 	/* Need to free things! */
 	if (libtrace->uridata)
@@ -802,6 +801,11 @@ DLLEXPORT void trace_destroy(libtrace_t *libtrace) {
 		libtrace->perpkt_threads = NULL;
 		libtrace->perpkt_thread_count = 0;
 
+	}
+
+	if (libtrace->format) {
+		if (libtrace->format->fin_input)
+			libtrace->format->fin_input(libtrace);
 	}
 
         if (libtrace->hasher_owner == HASH_OWNED_LIBTRACE) {
@@ -920,7 +924,8 @@ DLLEXPORT libtrace_packet_t *trace_copy_packet(const libtrace_packet_t *packet) 
 	dest->hash = packet->hash;
 	dest->error = packet->error;
         dest->which_trace_start = packet->which_trace_start;
-	/* Reset the cache - better to recalculate than try to convert
+	pthread_mutex_init(&(dest->ref_lock), NULL);
+        /* Reset the cache - better to recalculate than try to convert
 	 * the values over to the new packet */
 	trace_clear_cache(dest);
 	/* Ooooh nasty memcpys! This is why we want to avoid copying packets
@@ -1012,7 +1017,7 @@ DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 		return -1;
 
 	if (!libtrace->started) {
-		trace_set_err(libtrace,TRACE_ERR_BAD_STATE,"You must call libtrace_start() before trace_read_packet()");
+		trace_set_err(libtrace,TRACE_ERR_BAD_STATE,"You must call trace_start() before trace_read_packet()");
 		return -1;
 	}
 
@@ -1517,6 +1522,7 @@ DLLEXPORT libtrace_linktype_t trace_get_link_type(const libtrace_packet_t *packe
 			return TRACE_TYPE_UNKNOWN;
 		((libtrace_packet_t *)packet)->cached.link_type =
 			packet->trace->format->get_link_type(packet);
+
 	}
 
 	return packet->cached.link_type;

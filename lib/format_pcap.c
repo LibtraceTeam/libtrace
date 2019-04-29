@@ -37,9 +37,6 @@
 
 #ifdef HAVE_PCAP_H
 #  include <pcap.h>
-#  ifdef HAVE_PCAP_INT_H
-#    include <pcap-int.h>
-#  endif
 #endif
 
 /* This format module deals with traces captured using the PCAP library. This

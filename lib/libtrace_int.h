@@ -89,10 +89,7 @@ extern "C" {
 
 #ifdef HAVE_PCAP_H
 #  include <pcap.h>
-#  ifdef HAVE_PCAP_INT_H
-#    include <pcap-int.h>
-#  endif
-#endif 
+#endif
 
 #ifdef HAVE_ZLIB_H
 #  include <zlib.h>
@@ -1072,6 +1069,13 @@ libtrace_rt_types_t pcap_linktype_to_rt(libtrace_dlt_t linktype);
  */
 libtrace_rt_types_t pcapng_linktype_to_rt(libtrace_dlt_t linktype);
 
+/** Converts a TZSP DLT into an RT protocol type.
+ *
+ * @param linktype      The TZSP DLT to be converted
+ * @return The RT type that is equivalent to the provided DLT
+ */
+libtrace_rt_types_t tzsp_linktype_to_rt(libtrace_dlt_t linktype);
+
 /** Converts a libtrace link type into a PCAP linktype.
  *
  * @param type		The libtrace link type to be converted
@@ -1117,6 +1121,14 @@ libtrace_linktype_t erf_type_to_libtrace(uint8_t erf);
  * or -1 if the link type cannot be matched to an ERF type.
  */
 uint8_t libtrace_to_erf_type(libtrace_linktype_t linktype);
+
+/** Converts a libtrace link type into an TZSP type.
+ *
+ * @param linktype      The libtrace link type to be converted
+ * @return The TZSP type that is equivalent to the provided libtrace link type,
+ * or -1 if the link type cannot be matched to an TZSP type.
+ */
+uint8_t libtrace_to_tzsp_type(libtrace_linktype_t linktype);
 
 /** Converts an ARPHRD type into a libtrace link type.
  *
@@ -1263,6 +1275,8 @@ void atmhdr_constructor(void);
 void ndag_constructor(void);
 /** Constructor for the live ETSI over TCP format module */
 void etsilive_constructor(void);
+/** Constructor for the live TZSP over UDP format module */
+void tzsplive_constructor(void);
 #ifdef HAVE_BPF
 /** Constructor for the BPF format module */
 void bpf_constructor(void);

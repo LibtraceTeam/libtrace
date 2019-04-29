@@ -428,15 +428,15 @@ static inline int linuxcommon_to_packet_fanout(libtrace_t *libtrace,
 
                 if (setsockopt(stream->fd, SOL_PACKET, PACKET_FANOUT,
                                 &fanout_opt, sizeof(fanout_opt)) == -1) {
-                        trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
-                              "Converting the fd to a socket fanout failed %s",
-                              libtrace->uridata);
                         FORMAT_DATA->fanout_group ++;
                         attempts ++;
                         continue;
                 }
                 return 0;
         }
+        trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
+                        "Converting the fd to a socket fanout failed %s",
+                        libtrace->uridata);
         return -1;
 }
 #endif /* HAVE_NETPACKET_PACKET_H */
