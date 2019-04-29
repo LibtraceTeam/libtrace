@@ -129,7 +129,17 @@ Multiple ports can be specified seperated by ':'
 .TP
 .PD
 .BI \-\^\-radius-salt=salt
-use the specified salt string when anonymising RADIUS packets. Can be up 32 characters. The default salt is 32 NULL bytes.
+use the specified salt string when anonymising RADIUS packets. 
+Can be up 32 characters. The default salt is 32 NULL bytes.
+
+.TP
+.PD 0
+.BI \-E
+.TP
+.PD
+.BI \-\^\-radius-enforce
+Enforce anonymising of usually safe AVP types: 6, 7, 40-43, 46-48, 55 and 85. 
+(85 only in Access-Accept packets)
 
 .SH EXAMPLES
 .nf

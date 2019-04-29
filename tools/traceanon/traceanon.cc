@@ -59,6 +59,7 @@ char *enc_key = NULL;
 #define SALT_LENGTH 32
 #define SHA256_SIZE 32
 bool enc_radius_packet = false;
+bool radius_force_anon = false; //TODO
 uint8_t salt[SALT_LENGTH];
 bool isSaltSet = false;
 
@@ -120,6 +121,9 @@ static void usage(char *argv0)
 	"				a ':' separated list of ports to\n"
 	"                               match for RADIUS anonymising.\n"
 	"-R --radius-salt=salt  Use provided salt for RADIUS hashing\n"
+	"-E --radius-enforce    Enforce anonymising of usually safe AVP types\n"
+	"				6, 7, 40-43, 46-48, 55 and 85\n"
+	"				(85 only in Access-Accept packets)\n"
 	,argv0);
 	exit(1);
 }
@@ -222,7 +226,9 @@ static void encrypt_radius(Anonymiser *anon, uint8_t *radstart, uint32_t *rem){
 
 	uint16_t radius_length = ntohs(radius_header->length);
 
-	uint8_t *radius_end = (radstart+radius_length);	
+	uint8_t *radius_end = (radstart+radius_length);
+
+	
 
 	if (*rem > radius_length){
 		//TODO handle error
@@ -233,25 +239,56 @@ static void encrypt_radius(Anonymiser *anon, uint8_t *radstart, uint32_t *rem){
 		radius_avp_t *radius_avp = (radius_avp_t*)radius_ptr;
 		uint16_t val_len = radius_avp->length-2;
 
+		bool skipAVP = false;
+
 		//TODO maybe decide to do more things to different types?
-		if(radius_avp->type == 26){ //type 26 is vendor specific
-			radius_ptr += 6;
-			radius_avp = (radius_avp_t*)radius_ptr;
-			val_len = radius_avp->length-2;
-		}
-	
-		digest_buffer = anon->digest_message(&radius_avp->value, val_len);
+		switch (radius_avp->type) {
+			case 6:
+			case 7:
+			case 40 ... 43:
+			case 46 ... 48:
+			case 55: 
+			{	//skip the above types
+				skipAVP = true;
+				break;
+			}
 
-		// printf("TYPE:0x%02x\tLEN:0x%02x\n",radius_avp->type, radius_avp->length);
-		// for (uint16_t i = 0; i < val_len; i++){printf("%02x ",*(&radius_avp->value +i));}printf("\n");
-		// for (uint16_t i = 0; i < val_len; i++){printf("%02x ",i < 32 ? *(digest_buffer+i):0);}printf("\n");
+			case 85:{
+				//check for access-accept messages
+				if (radius_header->code == 2){
+					skipAVP = true;
+				}
+				break;
+			}
+			
+			case 26 : {	//process VSA (assuming there is exactly 1 VSA per AVP of type 26) //TODO?
+				radius_ptr += 6;
+				radius_avp = (radius_avp_t*)radius_ptr;
+				val_len = radius_avp->length-2;
+				break;
+			}
 
-		if (val_len > SHA256_SIZE){
-			memcpy(&radius_avp->value, digest_buffer, SHA256_SIZE);		//overwrite hash digest into AVP value
-			memset(&radius_avp->value+SHA256_SIZE, 0, val_len-SHA256_SIZE);	//pad with zeros to fill 
+			default: {
+				break;
+			}
 		}
-		else {
-			memcpy(&radius_avp->value, digest_buffer, val_len);
+		if (!skipAVP || radius_force_anon){
+			digest_buffer = anon->digest_message(&radius_avp->value, val_len);
+
+			// printf("TYPE:0x%02x\tLEN:0x%02x\n",radius_avp->type, radius_avp->length);
+			// for (uint16_t i = 0; i < val_len; i++){printf("%02x ",*(&radius_avp->value +i));}printf("\n");
+			// for (uint16_t i = 0; i < val_len; i++){printf("%02x ",i < 32 ? *(digest_buffer+i):0);}printf("\n");
+
+			if (val_len > SHA256_SIZE){
+				memcpy(&radius_avp->value, digest_buffer, SHA256_SIZE);
+				//overwrite hash digest into AVP value
+
+				memset(&radius_avp->value+SHA256_SIZE, 0, val_len-SHA256_SIZE);
+				//pad with zeros to fill 
+			}
+			else {
+				memcpy(&radius_avp->value, digest_buffer, val_len);
+			}
 		}
 		radius_ptr+=(radius_avp->length); //move to next
 	}
@@ -515,10 +552,11 @@ int main(int argc, char *argv[])
 			{ "help",        	0, 0, 'h' },
 			{"radius-server", 	1, 0, 'r' },
 			{"radius-salt", 	1, 0, 'R' },
+			{"radius-enforce",	0, 0, 'E' },
 			{ NULL,			0, 0, 0   },
 		};
 
-		int c=getopt_long(argc, argv, "Z:z:sc:f:dp:ht:f:r:R:",
+		int c=getopt_long(argc, argv, "Z:z:sc:f:dp:ht:f:r:R:E",
 				long_options, &option_index);
 
 		if (c==-1)
@@ -616,6 +654,7 @@ int main(int argc, char *argv[])
 				isSaltSet = true;
 				break;
 			}
+			case 'E' : radius_force_anon = true; break;
 			default:
 				fprintf(stderr,"unknown option: %c\n",c);
 				usage(argv[0]);
