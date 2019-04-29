@@ -347,7 +347,7 @@ enum {
 	TRACE_ERR_NULL = -31,
 	/** Err with trace output file **/
 	TRACE_ERR_OUTPUT_FILE = -32,
-	/** ERR out of memory **/
+	/** Err out of memory **/
 	TRACE_ERR_OUT_OF_MEMORY = -33,
 };
 
@@ -415,6 +415,7 @@ typedef enum {
        TRACE_TYPE_ERF_META = 21, /**< ERF Provenance metadata record */
        TRACE_TYPE_ETSILI = 22,	/**< ETSI Lawful Intercept */
        TRACE_TYPE_PCAPNG_META = 23,	/** PCAPNG meta packet */
+       TRACE_TYPE_TZSP = 24,		/** TZSP Live packets */
 } libtrace_linktype_t;
 
 /** RT protocol base format identifiers.
@@ -444,6 +445,7 @@ enum base_format_t {
         TRACE_FORMAT_DPDK_NDAG       =20,    /**< DAG multicast over a network, received via DPDK */
         TRACE_FORMAT_ETSILIVE     =21,  /**< ETSI LI over a network */
 	TRACE_FORMAT_UNKNOWN      =22,  /** Unknown format */
+	TRACE_FORMAT_TZSPLIVE	  =23,  /** TZSP */
 };
 
 /** RT protocol packet types */
@@ -497,10 +499,12 @@ typedef enum {
 	TRACE_RT_DATA_LEGACY_NZIX=TRACE_RT_DATA_SIMPLE + TRACE_FORMAT_LEGACY_NZIX,
 	/** RT is encapsulating a Linux native PACKET_MMAP capture record */
 	TRACE_RT_DATA_LINUX_RING=TRACE_RT_DATA_SIMPLE+TRACE_FORMAT_LINUX_RING,
-    /** RT is encapsulating a Intel DPDK capture record */
+	/** RT is encapsulating a Intel DPDK capture record */
 	TRACE_RT_DATA_DPDK=TRACE_RT_DATA_SIMPLE+TRACE_FORMAT_DPDK,
-
+	/** RT is encapsulating a etsilive capture record */
         TRACE_RT_DATA_ETSILI = TRACE_RT_DATA_SIMPLE + TRACE_FORMAT_ETSILIVE,
+	/** RT is encapsulating a tzsplive capture record */
+	TRACE_RT_DATA_TZSP = TRACE_RT_DATA_SIMPLE + TRACE_FORMAT_TZSPLIVE,
 
 	/** As PCAP does not store the linktype with the packet, we need to 
 	 * create a separate RT type for each supported DLT, starting from
@@ -539,9 +543,11 @@ typedef enum {
 
         TRACE_RT_DATA_PCAPNG            = 4000,
 	TRACE_RT_DATA_PCAPNG_END        = 4499,
+
+
 	/** Unused value marking the end of the valid range for all RT packet
 	 * types */
-	TRACE_RT_LAST			= 4500
+	TRACE_RT_LAST			= 5001
 } libtrace_rt_types_t;
 
 /** IP Protocol values */

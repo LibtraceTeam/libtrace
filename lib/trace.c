@@ -154,6 +154,7 @@ static void trace_init(void)
 		bpf_constructor();
 		pcapfile_constructor();
 		pcapng_constructor();
+		tzsplive_constructor();
                 rt_constructor();
                 ndag_constructor();
 #ifdef HAVE_WANDDER
@@ -1016,7 +1017,7 @@ DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 		return -1;
 
 	if (!libtrace->started) {
-		trace_set_err(libtrace,TRACE_ERR_BAD_STATE,"You must call libtrace_start() before trace_read_packet()");
+		trace_set_err(libtrace,TRACE_ERR_BAD_STATE,"You must call trace_start() before trace_read_packet()");
 		return -1;
 	}
 
@@ -1521,6 +1522,7 @@ DLLEXPORT libtrace_linktype_t trace_get_link_type(const libtrace_packet_t *packe
 			return TRACE_TYPE_UNKNOWN;
 		((libtrace_packet_t *)packet)->cached.link_type =
 			packet->trace->format->get_link_type(packet);
+
 	}
 
 	return packet->cached.link_type;
