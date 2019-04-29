@@ -75,7 +75,7 @@ int main(int argc UNUSED, char *argv[] UNUSED) {
                         vlanhdr = ntohl(*(uint32_t *) headers->header[0].data);
                         vlanid = (((vlanhdr >> 16) << 4) >> 4);
                         if (vlanid != 100) {
-                                printf("Unexpected vlan id\n");
+                                printf("Unexpected vlan id %u\n", vlanid);
                                 error = 1;
                         }
                 } else {
@@ -87,16 +87,18 @@ int main(int argc UNUSED, char *argv[] UNUSED) {
                         vlanhdr = ntohl(*(uint32_t *) headers->header[1].data);
                         vlanid = (((vlanhdr >> 16) << 4) >> 4);
                         if (vlanid != 200) {
-                                printf("Unexpected vlan id\n");
+                                printf("Unexpected vlan id %u\n", vlanid);
                                 error = 1;
                         }
                 } else {
-                        printf("Unexpected ethertype\n");
+                        printf("Unexpected ethertype: %04x\n",
+                                headers->header[1].ethertype);
                         error = 1;
                 }
 
                 if (headers->header[2].ethertype != TRACE_ETHERTYPE_ARP) {
-                        printf("Unexpected ethertype\n");
+                        printf("Unexpected ethertype: %04x\n",
+                                headers->header[2].ethertype);
                         error = 1;
                 }
 		trace_destroy_layer2_headers(headers);
@@ -104,6 +106,10 @@ int main(int argc UNUSED, char *argv[] UNUSED) {
 
 	trace_destroy(trace);
 	trace_destroy_packet(packet);
+
+        if (error == 0) {
+                printf("success\n");
+        }
 
 	return error;
 }
