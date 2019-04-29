@@ -1,7 +1,7 @@
 
 noinst_PROGRAMS=configdemo createdemo filterdemo getpayloaddemo gettcpdemo \
 gettransportdemo headerdemo httpcount lengthdemo mplscount mplstag readdemo \
-sourcedemo timedemo writedemo 
+sourcedemo timedemo writedemo layer2-headers
 
 include ../Makefile.examples
 

@@ -29,6 +29,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+static void *trace_get_payload_from_ppp(void *link, uint16_t *type, uint32_t *remaining);
 
 /* This file contains all the protocol decoding functions for layer 2 
  * (and 2.5) protocols. This includes functions for accessing MAC addresses.
@@ -151,81 +152,72 @@ libtrace_layer2_headers_t *trace_get_layer2_headers(libtrace_packet_t *packet) {
 
 	while (remaining != 0 && ptr != NULL) {
 
-		/* if the last ethertype was IP stop */
-                if (ethertype == TRACE_ETHERTYPE_IP || ethertype == TRACE_ETHERTYPE_IPV6) {
-                        break;
-                }
+		if ((r->num+1) >= allocated_headers) {
+			allocated_headers += 10;
+			r->header = realloc(r->header,
+				sizeof(libtrace_layer2_header_t)*allocated_headers);
 
-		if (ethertype == TRACE_ETHERTYPE_LOOPBACK ||
-			ethertype == TRACE_ETHERTYPE_IP ||
-			ethertype == TRACE_ETHERTYPE_ARP ||
-			ethertype == TRACE_ETHERTYPE_RARP ||
-			ethertype == TRACE_ETHERTYPE_8021Q ||
-			ethertype == TRACE_ETHERTYPE_IPV6 ||
-			ethertype == TRACE_ETHERTYPE_8021QS ||
-			ethertype == TRACE_ETHERTYPE_MPLS ||
-			ethertype == TRACE_ETHERTYPE_MPLS_MC ||
-			ethertype == TRACE_ETHERTYPE_PPP_DISC ||
-			ethertype == TRACE_ETHERTYPE_PPP_SES) {
-
-			/* Set the bitmask */
-			switch (ethertype) {
-				case (TRACE_ETHERTYPE_LOOPBACK):
-					r->bitmask |= TRACE_BITMASK_LOOPBACK;
-					break;
-				case (TRACE_ETHERTYPE_IP):
-					r->bitmask |= TRACE_BITMASK_IP;
-					break;
-				case (TRACE_ETHERTYPE_ARP):
-					r->bitmask |= TRACE_BITMASK_ARP;
-					break;
-				case (TRACE_ETHERTYPE_RARP):
-					r->bitmask |= TRACE_BITMASK_RARP;
-					break;
-				case (TRACE_ETHERTYPE_8021Q):
-					r->bitmask |= TRACE_BITMASK_8021Q;
-					break;
-				case (TRACE_ETHERTYPE_IPV6):
-					r->bitmask |= TRACE_BITMASK_IPV6;
-					break;
-				case (TRACE_ETHERTYPE_8021QS):
-					r->bitmask |= TRACE_BITMASK_8021QS;
-					break;
-				case (TRACE_ETHERTYPE_MPLS):
-					r->bitmask |= TRACE_BITMASK_MPLS;
-					break;
-				case (TRACE_ETHERTYPE_MPLS_MC):
-					r->bitmask |= TRACE_BITMASK_MPLS_MC;
-					break;
-				case (TRACE_ETHERTYPE_PPP_DISC):
-					r->bitmask |= TRACE_BITMASK_PPP_DISC;
-					break;
-				case (TRACE_ETHERTYPE_PPP_SES):
-					r->bitmask |= TRACE_BITMASK_PPP_SES;
-					break;
+			if (r->header == NULL) {
+				trace_set_err(packet->trace, TRACE_ERR_OUT_OF_MEMORY,
+					"Unable to allocate memory in trace_get_layer2_headers()");
+				free(r);
+				return NULL;
 			}
-
-			if ((r->num+1) >= allocated_headers) {
-				allocated_headers += 10;
-				r->header = realloc(r->header,
-					sizeof(libtrace_layer2_header_t)*allocated_headers);
-
-				if (r->header == NULL) {
-					trace_set_err(packet->trace, TRACE_ERR_OUT_OF_MEMORY,
-						"Unable to allocate memory in trace_get_layer2_headers()");
-					free(r);
-					return NULL;
-				}
-			}
-
-			r->header[r->num].ethertype = ethertype;
-			r->header[r->num++].data = ptr;
 		}
 
-		/* get the next header */
-                ptr = trace_get_payload_from_layer2(ptr, linktype, &ethertype, &remaining);
+		/* Set the bitmask and get payload of the next layer2 header */
+		switch (ethertype) {
+			case (TRACE_ETHERTYPE_ARP):
+				r->header[r->num].ethertype = ethertype;
+                                r->header[r->num++].data = ptr;
+                                r->bitmask |= TRACE_BITMASK_ARP;
+                                /* arp cannot have any headers below it? */
+				goto cleanup;
+			case (TRACE_ETHERTYPE_8021Q):
+				r->header[r->num].ethertype = ethertype;
+                        	r->header[r->num++].data = ptr;
+				r->bitmask |= TRACE_BITMASK_8021Q;
+				ptr = (char *)trace_get_payload_from_vlan(ptr, &ethertype, &remaining);
+				break;
+			case (TRACE_ETHERTYPE_8021QS):
+				r->header[r->num].ethertype = ethertype;
+                        	r->header[r->num++].data = ptr;
+				r->bitmask |= TRACE_BITMASK_8021QS;
+				ptr = (char *)trace_get_payload_from_vlan(ptr, &ethertype, &remaining);
+				break;
+			case (TRACE_ETHERTYPE_MPLS):
+				r->header[r->num].ethertype = ethertype;
+                        	r->header[r->num++].data = ptr;
+				r->bitmask |= TRACE_BITMASK_MPLS;
+				ptr = (char *)trace_get_payload_from_mpls(ptr, &ethertype, &remaining);
+				break;
+			case (TRACE_ETHERTYPE_MPLS_MC):
+				r->header[r->num].ethertype = ethertype;
+                        	r->header[r->num++].data = ptr;
+				r->bitmask |= TRACE_BITMASK_MPLS_MC;
+				ptr = (char *)trace_get_payload_from_mpls(ptr, &ethertype, &remaining);
+				break;
+			case (TRACE_ETHERTYPE_PPP_DISC):
+				r->header[r->num].ethertype = ethertype;
+                        	r->header[r->num++].data = ptr;
+				r->bitmask |= TRACE_BITMASK_PPP_DISC;
+				ptr = (char *)trace_get_payload_from_ppp(ptr, &ethertype, &remaining);
+				break;
+			case (TRACE_ETHERTYPE_PPP_SES):
+				r->header[r->num].ethertype = ethertype;
+                        	r->header[r->num++].data = ptr;
+				r->bitmask |= TRACE_BITMASK_PPP_SES;
+				ptr = (char *)trace_get_payload_from_ppp(ptr, &ethertype, &remaining);
+				break;
+			case (TRACE_ETHERTYPE_LOOPBACK):
+			case (TRACE_ETHERTYPE_IP):
+			case (TRACE_ETHERTYPE_RARP):
+			case (TRACE_ETHERTYPE_IPV6):
+			default:
+				goto cleanup;
+		}
 	}
-
+cleanup:
 	/* If no results were found free memory now and just return NULL */
 	if (r->num == 0) {
 		free(r->header);
@@ -488,7 +480,6 @@ static void *trace_get_payload_from_llcsnap(void *link,
 
 	return (void*)((char*)llc+sizeof(*llc));
 }
-
 
 static void *trace_get_payload_from_80211(void *link, uint16_t *type, uint32_t *remaining)
 {
