@@ -233,7 +233,13 @@ static void encrypt_radius(Anonymiser *anon, uint8_t *radstart, uint32_t *rem){
 		radius_avp_t *radius_avp = (radius_avp_t*)radius_ptr;
 		uint16_t val_len = radius_avp->length-2;
 
-		//if(radius_avp->type) ;//TODO maybe decide to do different things to different types?
+		//TODO maybe decide to do more things to different types?
+		if(radius_avp->type == 26){ //type 26 is vendor specific
+			radius_ptr += 6;
+			radius_avp = (radius_avp_t*)radius_ptr;
+			val_len = radius_avp->length-2;
+		}
+	
 		digest_buffer = anon->digest_message(&radius_avp->value, val_len);
 
 		// printf("TYPE:0x%02x\tLEN:0x%02x\n",radius_avp->type, radius_avp->length);
