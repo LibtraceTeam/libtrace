@@ -1246,14 +1246,14 @@ static int pcapng_read_custom(libtrace_t *libtrace, libtrace_packet_t *packet,
 
         /* Read the rest of the packet into the buffer */
         if (DATA(libtrace)->byteswapped) {
-		if (byteswap32(hdr->blocktype) != PCAPNG_CUSTOM_TYPE ||
+		if (byteswap32(hdr->blocktype) != PCAPNG_CUSTOM_TYPE &&
                         byteswap32(hdr->blocktype) != PCAPNG_CUSTOM_NONCOPY_TYPE) {
 			trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Invalid blocktype "
 				"in pcapng custom block");
 			return -1;
 		}
         } else {
-		if (hdr->blocktype != PCAPNG_CUSTOM_TYPE ||
+		if (hdr->blocktype != PCAPNG_CUSTOM_TYPE &&
                         hdr->blocktype != PCAPNG_CUSTOM_NONCOPY_TYPE) {
 			trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Invalid blocktype "
 				"in pcapng custom block");
@@ -2184,6 +2184,9 @@ void *pcapng_get_meta_section(libtrace_packet_t *packet, uint32_t section) {
                 return NULL;
         }
 
+        if (ptr == NULL) {
+                return NULL;
+        }
 	/* update remaining to account for header and any payload */
         remaining -= (ptr - packet->buffer);
 
