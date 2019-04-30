@@ -553,16 +553,20 @@ static int pcapfile_write_packet(libtrace_out_t *out,
 	numbytes=wandio_wwrite(DATAOUT(out)->file,
 			&hdr, sizeof(hdr));
 
-	if (numbytes!=sizeof(hdr)) 
+	if (numbytes!=sizeof(hdr)) {
+                trace_set_err_out(out, TRACE_ERR_WANDIO_FAILED, "Failed to write to pcapfile: %s", strerror(errno));
 		return -1;
+        }
 
 	/* Write the rest of the packet now */
 	ret=wandio_wwrite(DATAOUT(out)->file,
 			ptr,
 			hdr.caplen);
 
-	if (ret!=(int)hdr.caplen)
+	if (ret!=(int)hdr.caplen) {
+                trace_set_err_out(out, TRACE_ERR_WANDIO_FAILED, "Failed to write to pcapfile: %s", strerror(errno));
 		return -1;
+        }
 
 	return numbytes+ret;
 }
