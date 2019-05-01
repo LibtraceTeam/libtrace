@@ -719,9 +719,20 @@ struct libtrace_format_t {
 	 */
 	double (*get_seconds)(const libtrace_packet_t *packet);
 	
-	/**
+	/** Parses all meta-data fields in a meta packet and places them
+         *  into an array for user inspection.
+         *  @param packet       The meta packet to be parsed.
+         *  @return A pointer to a libtrace_meta_t containing all of the
+         *          meta-data fields found in the provided packet, or NULL
+         *          if no meta-data fields were found in the packet.
+         *
+         *  @note the returned libtrace_meta_t must be freed using
+         *        trace_destroy_meta()
+         *
+         *  Only implement for formats that include meta-data records
+         *  within the captured packet stream.
 	 */
-	void *(*get_meta_section)(libtrace_packet_t *packet, uint32_t section);
+	libtrace_meta_t *(*get_all_meta)(libtrace_packet_t *packet);
 
 	/** Moves the read pointer to a certain ERF timestamp within an input 
 	 * trace file.

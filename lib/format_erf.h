@@ -36,6 +36,7 @@
 
 /* ERF Provenance record tag type codes */
 #define ERF_PROV_COMMENT 1
+#define ERF_PROV_GEN_TIME 2
 #define ERF_PROV_FCS_LEN 8
 #define ERF_PROV_MASK_CIDR 10
 #define ERF_PROV_NAME 12
@@ -131,8 +132,6 @@ int erf_get_wire_length(const libtrace_packet_t *packet);
 size_t erf_set_capture_length(libtrace_packet_t *packet, size_t size);
 int erf_is_color_type(uint8_t erf_type);
 
-void *erf_get_meta_section(libtrace_packet_t *packet, uint32_t section);
-void *erf_get_meta_section_option(libtrace_packet_t *packet, uint32_t section,
-	uint16_t option);
+libtrace_meta_t *erf_get_all_meta(libtrace_packet_t *packet);
 
 #endif

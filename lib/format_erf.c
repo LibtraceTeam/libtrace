@@ -972,6 +972,7 @@ static void erf_get_statistics(libtrace_t *trace, libtrace_stat_t *stat) {
 static char *erf_get_option_name(uint32_t option) {
 	switch(option) {
 		case (ERF_PROV_COMMENT): return "Comment";
+                case (ERF_PROV_GEN_TIME): return "Time generated";
                 case (ERF_PROV_FCS_LEN): return "FCS Length";
                 case (ERF_PROV_MASK_CIDR): return "Subnet CIDR";
                 case (ERF_PROV_NAME): return "Interface Name";
@@ -1039,6 +1040,7 @@ static char *erf_get_option_name(uint32_t option) {
 static libtrace_meta_datatype_t erf_get_datatype(uint32_t option) {
 	switch(option) {
 		case (ERF_PROV_COMMENT): return TRACE_META_STRING;
+                case (ERF_PROV_GEN_TIME): return TRACE_META_UINT64;
 		case (ERF_PROV_FCS_LEN): return TRACE_META_UINT32;
 		case (ERF_PROV_MASK_CIDR): return TRACE_META_UINT32;
 		case (ERF_PROV_NAME): return TRACE_META_STRING;
@@ -1108,7 +1110,7 @@ static libtrace_meta_datatype_t erf_get_datatype(uint32_t option) {
 }
 
 /* An ERF provenance packet can contain multiple sections of the same type per packet */
-void *erf_get_meta_section(libtrace_packet_t *packet, uint32_t section) {
+libtrace_meta_t *erf_get_all_meta(libtrace_packet_t *packet) {
 
 	void *ptr;
 	dag_record_t *hdr;
@@ -1118,7 +1120,7 @@ void *erf_get_meta_section(libtrace_packet_t *packet, uint32_t section) {
 	uint16_t curr_sec = 0;
 
 	if (packet == NULL) {
-		fprintf(stderr, "NULL packet passed into erf_get_meta_section()\n");
+		fprintf(stderr, "NULL packet passed into erf_get_all_meta()\n");
 		return NULL;
 	}
 	if (packet->buffer == NULL) { return NULL; }
@@ -1133,7 +1135,6 @@ void *erf_get_meta_section(libtrace_packet_t *packet, uint32_t section) {
 
 	/* setup structure to hold the result */
         libtrace_meta_t *result = malloc(sizeof(libtrace_meta_t));
-        result->section = section;
         result->num = 0;
 
 	while (remaining > sizeof(dag_sec_t)) {
@@ -1146,17 +1147,9 @@ void *erf_get_meta_section(libtrace_packet_t *packet, uint32_t section) {
                         || ntohs(sec->type) == ERF_PROV_SECTION_MODULE
                         || ntohs(sec->type) == ERF_PROV_SECTION_INTERFACE) {
 
+                        /* Section header */
 			curr_sec = ntohs(sec->type);
-                }
-
-		/* If the current section the requested one and this is not
-		 * a section header */
-		if (section == curr_sec &&
-			ntohs(sec->type) != ERF_PROV_SECTION_CAPTURE
-                        && ntohs(sec->type) != ERF_PROV_SECTION_HOST
-                        && ntohs(sec->type) != ERF_PROV_SECTION_MODULE
-                        && ntohs(sec->type) != ERF_PROV_SECTION_INTERFACE) {
-
+                } else {
 			result->num += 1;
                         if (result->num == 1) {
                                 result->items = malloc(sizeof(libtrace_meta_item_t));
@@ -1164,6 +1157,7 @@ void *erf_get_meta_section(libtrace_packet_t *packet, uint32_t section) {
                                 result->items = realloc(result->items,
                                         result->num*sizeof(libtrace_meta_item_t));
                         }
+                        result->items[result->num-1].section = curr_sec;
                         result->items[result->num-1].option = ntohs(sec->type);
 			result->items[result->num-1].option_name =
                                 erf_get_option_name(ntohs(sec->type));
@@ -1269,7 +1263,7 @@ static struct libtrace_format_t erfformat = {
 	NULL,				/* get_timeval */
 	NULL,				/* get_timespec */
 	NULL,				/* get_seconds */
-	erf_get_meta_section,           /* get_meta_section */
+	erf_get_all_meta,           /* get_all_meta */
 	erf_seek_erf,			/* seek_erf */
 	NULL,				/* seek_timeval */
 	NULL,				/* seek_seconds */
@@ -1315,7 +1309,7 @@ static struct libtrace_format_t rawerfformat = {
 	NULL,				/* get_timeval */
 	NULL,				/* get_timespec */
 	NULL,				/* get_seconds */
-	erf_get_meta_section,		/* get_meta_section */
+	erf_get_all_meta,		/* get_all_meta */
 	erf_seek_erf,			/* seek_erf */
 	NULL,				/* seek_timeval */
 	NULL,				/* seek_seconds */

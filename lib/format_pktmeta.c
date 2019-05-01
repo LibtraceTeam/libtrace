@@ -27,14 +27,9 @@ static libtrace_meta_t *trace_get_meta_option(libtrace_packet_t *packet, uint32_
 	libtrace_meta_t *f = NULL;
 	int i;
 
-	if (packet->trace->format->type == TRACE_FORMAT_ERF) {
-		r = packet->trace->format->get_meta_section(packet,
-			section);
-	}
-	if (packet->trace->format->type == TRACE_FORMAT_PCAPNG) {
-		r = packet->trace->format->get_meta_section(packet,
-			section);
-	}
+        if (packet->trace->format->get_all_meta) {
+                r = packet->trace->format->get_all_meta(packet);
+        }
 
 	if (r == NULL) { return NULL; }
 
@@ -50,7 +45,8 @@ static libtrace_meta_t *trace_get_meta_option(libtrace_packet_t *packet, uint32_
 
 	/* See if a result was found within the section */
 	for (i=0; i<r->num; i++) {
-		if (r->section == section && r->items[i].option == option) {
+		if (r->items[i].section == section &&
+                                r->items[i].option == option) {
 			/* Create a meta structure with the single item wanted */
 			//f = malloc(sizeof(libtrace_meta_t));
 			if (f->num == 0) {
@@ -69,6 +65,7 @@ static libtrace_meta_t *trace_get_meta_option(libtrace_packet_t *packet, uint32_
                         }
 
 			/* Copy the data over */
+                        f->items[f->num].section = r->items[i].section;
 			f->items[f->num].option = r->items[i].option;
 			f->items[f->num].option_name = r->items[i].option_name;
 			f->items[f->num].len = r->items[i].len;
@@ -494,8 +491,8 @@ char *trace_get_capture_application(libtrace_packet_t *packet, char *space, int 
 	return space;
 }
 
-libtrace_meta_t *trace_get_section_option(libtrace_packet_t *packet, uint32_t section_code,
-	uint16_t option_code) {
+libtrace_meta_t *trace_get_single_meta_field(libtrace_packet_t *packet,
+        uint32_t section_code, uint16_t option_code) {
 
 	if (trace_meta_check_input(packet, "trace_get_custom_meta()")<0) {
                 return NULL;
@@ -504,17 +501,17 @@ libtrace_meta_t *trace_get_section_option(libtrace_packet_t *packet, uint32_t se
 	return trace_get_meta_option(packet, section_code, option_code);
 }
 
-libtrace_meta_t *trace_get_section(libtrace_packet_t *packet, uint32_t section_code) {
+libtrace_meta_t *trace_get_all_metadata(libtrace_packet_t *packet) {
 	if (trace_meta_check_input(packet, "trace_get_section()")<0) {
                 return NULL;
         }
 
-	return packet->trace->format->get_meta_section(packet, section_code);
+	return packet->trace->format->get_all_meta(packet);
 }
 
 char *trace_get_erf_dag_card_model(libtrace_packet_t *packet, char *space, int spacelen) {
-	libtrace_meta_t *r = trace_get_section_option(packet, ERF_PROV_SECTION_MODULE,
-		ERF_PROV_MODEL);
+	libtrace_meta_t *r = trace_get_single_meta_field(packet,
+                ERF_PROV_SECTION_MODULE, ERF_PROV_MODEL);
 
 	if (r == NULL) { return NULL; }
 	if (r->items[0].len > spacelen) {
@@ -529,8 +526,8 @@ char *trace_get_erf_dag_card_model(libtrace_packet_t *packet, char *space, int s
 }
 
 char *trace_get_erf_dag_version(libtrace_packet_t *packet, char *space, int spacelen) {
-	libtrace_meta_t *r = trace_get_section_option(packet, ERF_PROV_SECTION_MODULE,
-		ERF_PROV_DAG_VERSION);
+	libtrace_meta_t *r = trace_get_single_meta_field(packet,
+                ERF_PROV_SECTION_MODULE, ERF_PROV_DAG_VERSION);
 
 	if (r == NULL) { return NULL; }
 
@@ -546,8 +543,8 @@ char *trace_get_erf_dag_version(libtrace_packet_t *packet, char *space, int spac
 }
 
 char *trace_get_erf_dag_fw_version(libtrace_packet_t *packet, char *space, int spacelen) {
-	libtrace_meta_t *r = trace_get_section_option(packet, ERF_PROV_SECTION_MODULE,
-		ERF_PROV_FW_VERSION);
+	libtrace_meta_t *r = trace_get_single_meta_field(packet,
+                ERF_PROV_SECTION_MODULE, ERF_PROV_FW_VERSION);
 
 	if (r == NULL) { return NULL; }
 

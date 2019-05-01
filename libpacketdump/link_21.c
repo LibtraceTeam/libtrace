@@ -9,9 +9,32 @@
 DLLEXPORT void decode(int link_type UNUSED, const char *packet UNUSED, unsigned len UNUSED) {
 }
 
-static void print_section(libtrace_meta_t *meta) {
+static void print_meta_contents(libtrace_meta_t *meta) {
 	int i;
+        uint16_t last_sec = 0;
+
 	for (i=0; i<meta->num; i++) {
+                if (meta->items[i].section != last_sec) {
+                        switch(meta->items[i].section) {
+                                case ERF_PROV_SECTION_CAPTURE:
+                                        printf("  Capture section:\n");
+                                        break;
+                                case ERF_PROV_SECTION_HOST:
+                                        printf("  Host section:\n");
+                                        break;
+                                case ERF_PROV_SECTION_MODULE:
+                                        printf("  Module section:\n");
+                                        break;
+                                case ERF_PROV_SECTION_INTERFACE:
+                                        printf("  Interface section:\n");
+                                        break;
+                        }
+                        last_sec = meta->items[i].section;
+                }
+
+                if (meta->items[i].option == ERF_PROV_GEN_TIME) {
+                        continue;
+                }
 
 		if (meta->items[i].datatype == TRACE_META_STRING) {
 			printf("   %s: %s\n",
@@ -60,35 +83,10 @@ DLLEXPORT void decode_meta(int link_type UNUSED, const char *packet UNUSED, unsi
 	libtrace_packet_t *p) {
 
 	printf(" ERF Provenance Packet\n");
+	libtrace_meta_t *sec_all = trace_get_all_metadata(p);
 
-	/* Try to find each section from the meta packet */
-	libtrace_meta_t *sec_cap = trace_get_section(p, ERF_PROV_SECTION_CAPTURE);
-	libtrace_meta_t *sec_host = trace_get_section(p, ERF_PROV_SECTION_HOST);
-	libtrace_meta_t *sec_module = trace_get_section(p, ERF_PROV_SECTION_MODULE);
-	libtrace_meta_t *sec_interface = trace_get_section(p, ERF_PROV_SECTION_INTERFACE);
-
-	if (sec_cap != NULL) {
-		printf("  Capture Section\n");
-		print_section(sec_cap);
-		trace_destroy_meta(sec_cap);
+	if (sec_all != NULL) {
+		print_meta_contents(sec_all);
+		trace_destroy_meta(sec_all);
 	}
-
-	if (sec_host != NULL) {
-		printf("  Host Section\n");
-		print_section(sec_host);
-		trace_destroy_meta(sec_host);
-	}
-
-	if (sec_module != NULL) {
-		printf("  Module Section\n");
-		print_section(sec_module);
-		trace_destroy_meta(sec_module);
-	}
-
-	if (sec_interface != NULL) {
-		printf("  Interface Section\n");
-		print_section(sec_interface);
-		trace_destroy_meta(sec_interface);
-	}
-
 }

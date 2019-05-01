@@ -632,6 +632,7 @@ typedef enum {
 } libtrace_meta_datatype_t;
 
 typedef struct libtrace_meta_item {
+	uint16_t section;
         uint16_t option;
 	char *option_name;
         uint16_t len;
@@ -640,7 +641,6 @@ typedef struct libtrace_meta_item {
 } libtrace_meta_item_t;
 
 typedef struct libtrace_meta_section {
-	uint16_t section;
 	uint16_t num;
 	libtrace_meta_item_t *items;
 } libtrace_meta_t;
@@ -4042,25 +4042,24 @@ DLLEXPORT libtrace_meta_t *trace_get_capture_application_meta(libtrace_packet_t 
  */
 DLLEXPORT char *trace_get_capture_application(libtrace_packet_t *packet, char *space, int spacelen);
 
-/* Get a meta section option from a meta packet
+/* Get a single specific meta-data field from a meta packet
  * Must be destroyed with trace_destroy_meta()
  *
- * @params libtrace_packet_t packet
- * @params Section code
- * @params Option code
+ * @params packet               The meta packet to extract the option from
+ * @params section_code         The section that the required option is found in
+ * @params option_code          The code for the required option
  * @returns Pointer to libtrace_meta_t structure or NULL
  */
-DLLEXPORT libtrace_meta_t *trace_get_section_option(libtrace_packet_t *packet, uint32_t section_code,
-        uint16_t option_code);
+DLLEXPORT libtrace_meta_t *trace_get_single_meta_field(
+        libtrace_packet_t *packet, uint32_t section_code, uint16_t option_code);
 
-/* Get a section from a meta packet
+/* Parses all meta-data fields within a meta packet
  * Must be destroyed with trace_destroy_meta()
  *
  * @params libtrace_packet_t packet
- * @params Section code
  * @returns Pointer to libtrace_meta_t structure or NULL
  */
-DLLEXPORT libtrace_meta_t *trace_get_section(libtrace_packet_t *packet, uint32_t section_code);
+DLLEXPORT libtrace_meta_t *trace_get_all_metadata(libtrace_packet_t *packet);
 
 /* Get the DAG card model from a meta packet.
  *

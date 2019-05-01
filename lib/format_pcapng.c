@@ -2152,7 +2152,7 @@ static void *pcapng_jump_to_options(libtrace_packet_t *packet) {
 	return ptr;
 }
 
-void *pcapng_get_meta_section(libtrace_packet_t *packet, uint32_t section) {
+libtrace_meta_t *pcapng_get_all_meta(libtrace_packet_t *packet) {
 
 	struct pcapng_peeker *hdr;
 	uint32_t remaining;
@@ -2163,7 +2163,7 @@ void *pcapng_get_meta_section(libtrace_packet_t *packet, uint32_t section) {
 	uint16_t tmp;
 
 	if (packet == NULL) {
-		fprintf(stderr, "NULL packet passed into pcapng_get_meta_section()\n");
+		fprintf(stderr, "NULL packet passed into pcapng_get_all_meta()\n");
 		return NULL;
 	}
 	if (packet->buffer == NULL) { return NULL; }
@@ -2177,11 +2177,6 @@ void *pcapng_get_meta_section(libtrace_packet_t *packet, uint32_t section) {
         } else {
                 blocktype = hdr->blocktype;
                 remaining = hdr->blocklen;
-        }
-
-	/* If the data we want is not within this blocktype */
-        if (blocktype != section) {
-                return NULL;
         }
 
         if (ptr == NULL) {
@@ -2201,7 +2196,6 @@ void *pcapng_get_meta_section(libtrace_packet_t *packet, uint32_t section) {
 
 	/* setup structure to hold the result */
         libtrace_meta_t *result = malloc(sizeof(libtrace_meta_t));
-        result->section = section;
         result->num = 0;
 
 	while (optcode != PCAPNG_OPTION_END && remaining > sizeof(struct pcapng_optheader)) {
@@ -2213,10 +2207,11 @@ void *pcapng_get_meta_section(libtrace_packet_t *packet, uint32_t section) {
                         result->items = realloc(result->items,
                 	        result->num*sizeof(libtrace_meta_item_t));
                 }
+                result->items[result->num-1].section = blocktype;
                 result->items[result->num-1].option = optcode;
                 result->items[result->num-1].len = len;
                 result->items[result->num-1].datatype =
-			pcapng_get_datatype(section, optcode);
+			pcapng_get_datatype(blocktype, optcode);
 
 		/* If the datatype is a string allow for a null terminator */
 		if (result->items[result->num-1].datatype == TRACE_META_STRING) {
@@ -2315,7 +2310,7 @@ static struct libtrace_format_t pcapng = {
         NULL,                           /* get_timeval */
         pcapng_get_timespec,            /* get_timespec */
         NULL,                           /* get_seconds */
-	pcapng_get_meta_section,        /* get_meta_section */
+	pcapng_get_all_meta,        /* get_all_meta */
         NULL,                           /* seek_erf */
         NULL,                           /* seek_timeval */
         NULL,                           /* seek_seconds */

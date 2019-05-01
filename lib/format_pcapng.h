@@ -245,6 +245,4 @@ struct pcapng_peeker {
 
 typedef struct pcapng_peeker pcapng_hdr_t;
 
-void *pcapng_get_meta_section(libtrace_packet_t *packet, uint32_t section);
-void *pcapng_get_meta_section_option(libtrace_packet_t *packet, uint32_t section,
-        uint16_t option);
+libtrace_meta_t *pcapng_get_all_meta(libtrace_packet_t *packet);

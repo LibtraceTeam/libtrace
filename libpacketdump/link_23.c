@@ -235,7 +235,7 @@ DLLEXPORT void decode_meta(int link_type UNUSED,const char *packet UNUSED,unsign
 	}
 
 	/* Get the entire section of whatever type of meta packet this is from the meta api */
-        libtrace_meta_t *r = trace_get_section(p, section);
+        libtrace_meta_t *r = trace_get_all_metadata(p);
 
 	switch(section) {
 		case PCAPNG_SECTION_TYPE:
