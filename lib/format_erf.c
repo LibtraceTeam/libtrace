@@ -975,8 +975,8 @@ static char *erf_get_option_name(uint32_t option) {
                 case (ERF_PROV_GEN_TIME): return "Time generated";
                 case (ERF_PROV_FCS_LEN): return "FCS Length";
                 case (ERF_PROV_MASK_CIDR): return "Subnet CIDR";
-                case (ERF_PROV_NAME): return "Interface Name";
-                case (ERF_PROV_DESCR): return "Interface Description";
+                case (ERF_PROV_NAME): return "Name";
+                case (ERF_PROV_DESCR): return "Description";
                 case (ERF_PROV_APP_NAME): return "Application Name";
                 case (ERF_PROV_HOSTNAME): return "Hostname";
                 case (ERF_PROV_OS): return "Operating System";
