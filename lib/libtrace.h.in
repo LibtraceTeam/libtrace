@@ -631,17 +631,37 @@ typedef enum {
 	TRACE_META_MAC		= 8, 
 } libtrace_meta_datatype_t;
 
+/** A structure representing a single meta-data field */
 typedef struct libtrace_meta_item {
+        /** Identifier for the section / block that this meta-data came from */
 	uint16_t section;
+
+        /** Identifier for the meta-data field itself */
         uint16_t option;
+
+        /** Label string for this meta-data field */
 	char *option_name;
+
+        /** The length of the meta-data value (in bytes) */
         uint16_t len;
+
+        /** The 'type' for the meta-data value, e.g. string, unsigned int */
         libtrace_meta_datatype_t datatype;
+
+        /** A pointer to the meta-data value -- you will need to cast
+         *  appropriately based based on the value of 'datatype'.
+         */
         void *data;
 } libtrace_meta_item_t;
 
+/** A collection of meta-data fields */
 typedef struct libtrace_meta_section {
+        /** Number of meta-data fields in this collection */
 	uint16_t num;
+
+        /** Pointer to the array containing the meta-data fields for this
+         *  collection.
+         */
 	libtrace_meta_item_t *items;
 } libtrace_meta_t;
 
