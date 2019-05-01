@@ -28,6 +28,9 @@ static void print_meta_contents(libtrace_meta_t *meta) {
                                 case ERF_PROV_SECTION_INTERFACE:
                                         printf("  Interface section:\n");
                                         break;
+                                case ERF_PROV_SECTION_STREAM:
+                                        printf("  Stream section:\n");
+                                        break;
                         }
                         last_sec = meta->items[i].section;
                 }

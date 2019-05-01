@@ -1031,6 +1031,9 @@ static char *erf_get_option_name(uint32_t option) {
                 case (ERF_PROV_PTP_DOMAIN_NUM): return "PTP Domain Number";
                 case (ERF_PROV_PTP_STEPS_REMOVED): return "PTP Steps removed";
                 case (ERF_PROV_CLK_PORT_PROTO): return "CLK Port Protocol";
+                case (ERF_PROV_STREAM_NUM): return "Stream Number";
+                case (ERF_PROV_STREAM_DROP): return "Stream Dropped Records";
+                case (ERF_PROV_STREAM_BUF_DROP): return "Stream Dropped Records (Buffer Overflow)";
 		default:
 			return "Unknown";
 	}
@@ -1104,6 +1107,9 @@ static libtrace_meta_datatype_t erf_get_datatype(uint32_t option) {
 		case (ERF_PROV_PTP_DOMAIN_NUM): return TRACE_META_UINT32;
 		case (ERF_PROV_PTP_STEPS_REMOVED): return TRACE_META_UINT32;
 		case (ERF_PROV_CLK_PORT_PROTO): return TRACE_META_UINT32;
+                case (ERF_PROV_STREAM_NUM): return TRACE_META_UINT32;
+                case (ERF_PROV_STREAM_DROP): return TRACE_META_UINT32;
+                case (ERF_PROV_STREAM_BUF_DROP): return TRACE_META_UINT32;
 		default:
 			return TRACE_META_UNKNOWN;
 	}
@@ -1138,17 +1144,19 @@ libtrace_meta_t *erf_get_all_meta(libtrace_packet_t *packet) {
         result->num = 0;
 
 	while (remaining > sizeof(dag_sec_t)) {
-
+                uint16_t sectype;
 		/* Get the current section/option header */
 		sec = (dag_sec_t *)ptr;
+                sectype = ntohs(sec->type);
 
-		if (ntohs(sec->type) == ERF_PROV_SECTION_CAPTURE
-                        || ntohs(sec->type) == ERF_PROV_SECTION_HOST
-                        || ntohs(sec->type) == ERF_PROV_SECTION_MODULE
-                        || ntohs(sec->type) == ERF_PROV_SECTION_INTERFACE) {
+		if (sectype == ERF_PROV_SECTION_CAPTURE
+                        || sectype == ERF_PROV_SECTION_HOST
+                        || sectype == ERF_PROV_SECTION_MODULE
+                        || sectype == ERF_PROV_SECTION_STREAM
+                        || sectype == ERF_PROV_SECTION_INTERFACE) {
 
                         /* Section header */
-			curr_sec = ntohs(sec->type);
+			curr_sec = sectype;
                 } else {
 			result->num += 1;
                         if (result->num == 1) {
