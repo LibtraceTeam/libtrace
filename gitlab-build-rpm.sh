@@ -2,6 +2,9 @@ set -x -e -o pipefail
 
 export QA_RPATHS=$[ 0x0001 ]
 
+wget https://bintray.com/wand/general-rpm/rpm -O bintray-wand-general-rpm.repo
+mv bintray-wand-general-rpm.repo /etc/yum.repos.d/
+
 if [ "$1" = "centos7" ]; then
         yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
 fi
