@@ -19,11 +19,11 @@ fi
 if [[ "$1" =~ fedora* ]]; then
         dnf install -y rpm-build rpmdevtools
         dnf group install -y "C Development Tools and Libraries"
-        dnf builddep -y rpm/libwandder1.spec
+        dnf builddep -y rpm/libtrace4.spec
 else
         yum install -y rpm-build yum-utils rpmdevtools which
         yum groupinstall -y 'Development Tools'
-        yum-builddep -y rpm/libwandder1.spec
+        yum-builddep -y rpm/libtrace4.spec
 fi
 
 rpmdev-setuptree
