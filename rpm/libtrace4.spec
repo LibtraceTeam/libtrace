@@ -13,7 +13,7 @@ BuildRequires: make
 BuildRequires: bison
 BuildRequires: doxygen
 BuildRequires: flex
-BuildRequires: dpdk-devel=17.11
+BuildRequires: dpdk-devel == 17.11
 BuildRequires: libpcap-devel
 BuildRequires: numactl-devel
 BuildRequires: ncurses-devel
