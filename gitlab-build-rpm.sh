@@ -17,7 +17,7 @@ if [ "$1" = "centos6" ]; then
 fi
 
 if [[ "$1" =~ fedora* ]]; then
-        dnf install -y rpm-build rpmdevtools
+        dnf install -y rpm-build rpmdevtools 'dnf-command(builddep)'
         dnf group install -y "C Development Tools and Libraries"
         dnf builddep -y rpm/libtrace4.spec
 else
