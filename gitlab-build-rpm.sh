@@ -2,7 +2,7 @@ set -x -e -o pipefail
 
 export QA_RPATHS=$[ 0x0001 ]
 
-yum install wget
+yum install -y wget
 
 wget https://bintray.com/wand/general-rpm/rpm -O bintray-wand-general-rpm.repo
 mv bintray-wand-general-rpm.repo /etc/yum.repos.d/
