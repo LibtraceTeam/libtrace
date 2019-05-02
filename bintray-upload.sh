@@ -2,7 +2,8 @@
 
 set -e -o pipefail
 
-BINTRAY_REPO="wand/libtrace"
+BINTRAY_DEB_REPO="wand/libtrace"
+BINTRAY_RPM_REPO="wand/libtrace-rpm"
 BINTRAY_LICENSE="LGPL-3.0"
 
 apt-get update && apt-get install -y curl
@@ -26,9 +27,29 @@ EOF
 for path in `find built-packages/ -maxdepth 1 -type d`; do
     IFS=_ read linux_version <<< $(basename "${path}")
     for deb in `find "${path}" -maxdepth 1 -type f`; do
+        ext=${deb##*.}
         pkg_filename=$(basename "${deb}")
-        IFS=_ read pkg_name pkg_version pkg_arch <<< $(basename -s ".deb" "${pkg_filename}")
-        jfrog bt package-create --licenses ${BINTRAY_LICENSE} --vcs-url ${CI_PROJECT_URL} ${BINTRAY_REPO}/${pkg_name} || true
-        jfrog bt upload --deb ${linux_version}/main/${pkg_arch} ${deb} ${BINTRAY_REPO}/${pkg_name}/${pkg_version} pool/${linux_version}/main/${pkg_name}/
+
+        if [ "$ext" = "deb" ]; then
+            IFS=_ read pkg_name pkg_version pkg_arch <<< $(basename -s ".deb" "${pkg_filename}")
+            jfrog bt package-create --licenses ${BINTRAY_LICENSE} --vcs-url ${CI_PROJECT_URL} ${BINTRAY_DEB_REPO}/${pkg_name} || true
+            jfrog bt upload --deb ${linux_version}/main/${pkg_arch} ${deb} ${BINTRAY_DEB_REPO}/${pkg_name}/${pkg_version} pool/${linux_version}/main/${pkg_name}/
+        fi
+
+        if [ "$ext" = "rpm" ]; then
+            rev_filename=`echo ${pkg_filename} | rev`
+
+            if [[ "$1" =~ centos_* ]]; then
+                pkg_name=`echo ${rev_filename} | cut -d '-' -f4- | rev`
+                pkg_version=`echo ${rev_filename} | cut -d '-' -f1-3 | rev | cut -d '.' -f1-3`
+            else
+                pkg_name=`echo ${rev_filename} | cut -d '-' -f3- | rev`
+                pkg_version=`echo ${rev_filename} | cut -d '-' -f1-2 | rev | cut -d '.' -f1-3`
+            fi
+
+            jfrog bt package-create --licenses ${BINTRAY_LICENSE} --vcs-url ${CI_PROJECT_URL} ${BINTRAY_RPM_REPO}/${pkg_name} || true
+            jfrog bt upload ${deb} ${BINTRAY_RPM_REPO}/${pkg_name}/${pkg_version}
+
+        fi
     done
 done
