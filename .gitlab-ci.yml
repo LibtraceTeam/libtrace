@@ -112,7 +112,7 @@ build-amd64-centos7:
       - built-packages/*
     expire_in: 1 day
   only:
-- tags
+    - tags
 
 upload-packages:
   stage: upload
