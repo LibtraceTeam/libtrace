@@ -82,7 +82,7 @@ libtrace_la_SOURCES = trace.c trace_parallel.c common.h \
                 data-struct/buckets.c data-struct/simple_circular_buffer.c \
 		combiner_sorted.c combiner_unordered.c \
 		pthread_spinlock.c pthread_spinlock.h \
-		strndup.c format_pcapng.h format_tzsplive.h \
+		strndup.c format_pcapng.h format_tzsplive.h
 
 if DAG2_4
 nodist_libtrace_la_SOURCES = dagopts.c dagapi.c
