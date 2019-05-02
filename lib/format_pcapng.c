@@ -2070,11 +2070,13 @@ static libtrace_meta_datatype_t pcapng_get_datatype(uint32_t section, uint32_t o
 				case(PCAPNG_META_IF_TSOFFSET): return TRACE_META_UINT64;
 				case(PCAPNG_META_IF_HARDWARE): return TRACE_META_STRING;
 			}
+                        break;
 		case(PCAPNG_OLD_PACKET_TYPE):
 			switch(option) {
 				case(PCAPNG_META_OLD_FLAGS): return TRACE_META_UINT32;
 				case(PCAPNG_META_OLD_HASH): return TRACE_META_STRING;
 			}
+                        break;
 		case(PCAPNG_SIMPLE_PACKET_TYPE):
 			/* simple packets should not contain any options */
 			return TRACE_META_UNKNOWN;
@@ -2090,6 +2092,7 @@ static libtrace_meta_datatype_t pcapng_get_datatype(uint32_t section, uint32_t o
 				case(PCAPNG_META_EPB_HASH): return TRACE_META_STRING;
 				case(PCAPNG_META_EPB_DROPCOUNT): return TRACE_META_UINT64;
 			}
+                        break;
 		case(PCAPNG_DECRYPTION_SECRETS_TYPE):
 			/* todo - needs to handle decryption secrets options along with
                          * normal options */
