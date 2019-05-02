@@ -1,3 +1,12 @@
+libtrace4 (4.0.7) unstable; urgency=medium
+
+  * New upstream release.
+  * Added new API for exploring in-stream meta-data records.
+  * Added new API for inspecting subsequent layer-2 headers.
+  * Added support for reading and writing TZSP sniffing streams.
+
+ -- Shane Alcock <shane.alcock@waikato.ac.nz>  Thu, 02 May 2019 16:31:15 +1200
+
 libtrace4 (4.0.6-2) unstable; urgency=low
 
   * Fix bad dpdk dependencies in libtrace4 package

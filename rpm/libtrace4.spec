@@ -1,5 +1,5 @@
 Name:           libtrace4
-Version:        4.0.6
+Version:        4.0.7
 Release:        1%{?dist}
 Summary:        C Library for capturing and analysing network packets
 
