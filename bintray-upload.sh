@@ -39,16 +39,24 @@ for path in `find built-packages/ -maxdepth 1 -type d`; do
         if [ "$ext" = "rpm" ]; then
             rev_filename=`echo ${pkg_filename} | rev`
 
-            if [[ "$1" =~ centos_* ]]; then
-                pkg_name=`echo ${rev_filename} | cut -d '-' -f4- | rev`
-                pkg_version=`echo ${rev_filename} | cut -d '-' -f1-3 | rev | cut -d '.' -f1-3`
+            if [[ ${linux_version} =~ centos_* ]]; then
+                # centos
+                pkg_dist="centos"
+
             else
-                pkg_name=`echo ${rev_filename} | cut -d '-' -f3- | rev`
-                pkg_version=`echo ${rev_filename} | cut -d '-' -f1-2 | rev | cut -d '.' -f1-3`
+                # fedora
+                pkg_dist="fedora"
             fi
 
+            pkg_name=`echo ${rev_filename} | cut -d '-' -f3- | rev`
+            pkg_version=`echo ${rev_filename} | cut -d '-' -f1-2 | rev | cut -d '.' -f1-3`
+            pkg_arch=`echo ${rev_filename} | cut -d '.' -f2 | rev`
+            pkg_rel=`echo ${rev_filename} | cut -d '.' -f3 | rev`
+            releasever="${pkg_rel:2}"
+
+
             jfrog bt package-create --licenses ${BINTRAY_LICENSE} --vcs-url ${CI_PROJECT_URL} ${BINTRAY_RPM_REPO}/${pkg_name} || true
-            jfrog bt upload ${deb} ${BINTRAY_RPM_REPO}/${pkg_name}/${pkg_version}
+            jfrog bt upload ${deb} ${BINTRAY_RPM_REPO}/${pkg_name}/${pkg_version} ${pkg_dist}/${releasever}/${pkg_arch}/
 
         fi
     done
