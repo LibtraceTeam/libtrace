@@ -13,13 +13,15 @@ BuildRequires: make
 BuildRequires: bison
 BuildRequires: doxygen
 BuildRequires: flex
-BuildRequires: dpdk-devel >= 17.11, dpdk-devel < 18
 BuildRequires: libpcap-devel
 BuildRequires: numactl-devel
 BuildRequires: ncurses-devel
 BuildRequires: openssl-devel
 BuildRequires: libwandder1-devel
 BuildRequires: libwandio1-devel
+BuildRequires: dpdk-wand-devel
+
+Requires: dpdk-wand
 
 %description
 libtrace is a library for trace processing. It supports multiple input
@@ -32,6 +34,7 @@ University in New Zealand.
 %package        devel
 Summary:        Development files for %{name}
 Requires:       %{name}%{?_isa} = %{version}-%{release}
+Requires:       dpdk-wand-devel
 
 %package        tools
 Summary:        Helper utilities for use with the %{name} library
