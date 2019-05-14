@@ -196,15 +196,13 @@ static int tzsplive_init_input(libtrace_t *libtrace) {
 
 	scan = strchr(libtrace->uridata, ':');
 	if (scan == NULL) {
-		trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT, "Bad tzsp "
-			"URI. Should be tzsplive:<listenaddr>:<listenport>");
-		free(libtrace->format_data);
-                libtrace->format_data = NULL;
-		return -1;
-	}
-	FORMAT_DATA->listenaddr = strndup(libtrace->uridata,
-		(size_t)(scan - libtrace->uridata));
-	FORMAT_DATA->listenport = strdup(scan + 1);
+                FORMAT_DATA->listenaddr = strdup(libtrace->uridata);
+                FORMAT_DATA->listenport = strdup("37008");
+	} else {
+        	FORMAT_DATA->listenaddr = strndup(libtrace->uridata,
+	        	(size_t)(scan - libtrace->uridata));
+        	FORMAT_DATA->listenport = strdup(scan + 1);
+        }
 
 	FORMAT_DATA->socket = -1;
 
