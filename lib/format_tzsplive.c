@@ -185,7 +185,7 @@ listenerror:
 static int tzsplive_init_input(libtrace_t *libtrace) {
 	char *scan = NULL;
 
-	libtrace->format_data = (tzsp_format_data_t *)malloc(
+	libtrace->format_data = (tzsp_format_data_t *)calloc(1,
 		sizeof(tzsp_format_data_t));
 
 	if (libtrace->format_data == NULL) {
@@ -199,6 +199,7 @@ static int tzsplive_init_input(libtrace_t *libtrace) {
 		trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT, "Bad tzsp "
 			"URI. Should be tzsplive:<listenaddr>:<listenport>");
 		free(libtrace->format_data);
+                libtrace->format_data = NULL;
 		return -1;
 	}
 	FORMAT_DATA->listenaddr = strndup(libtrace->uridata,
@@ -212,6 +213,7 @@ static int tzsplive_init_input(libtrace_t *libtrace) {
                 trace_set_err(libtrace, TRACE_ERR_OUT_OF_MEMORY, "Unable "
                         "to allocate memory for format data in tzsplive_init_input()");
                 free(libtrace->format_data);
+                libtrace->format_data = NULL;
                 return -1;
         }
 
@@ -247,6 +249,7 @@ static int tzsplive_init_output(libtrace_out_t *libtrace) {
 		trace_set_err_out(libtrace, TRACE_ERR_OUT_OF_MEMORY, "Unable "
 			"to allocate memory for format data in tzsplive_init_output()");
 		free(libtrace->format_data);
+                libtrace->format_data = NULL;
 		return -1;
 	}
 
@@ -286,6 +289,10 @@ static int tzsplive_pause_input(libtrace_t *libtrace UNUSED) {
 }
 
 static int tzsplive_fin_input(libtrace_t *libtrace) {
+        if (!libtrace->format_data) {
+                return 0;
+        }
+
 	if (FORMAT_DATA->listenaddr) {
 		free(FORMAT_DATA->listenaddr);
 	}
@@ -298,7 +305,7 @@ static int tzsplive_fin_input(libtrace_t *libtrace) {
 	if (FORMAT_DATA->buf) {
 		free(FORMAT_DATA->buf);
 	}
-	free(libtrace->format_data);
+        free(libtrace->format_data);
 	return 0;
 }
 
@@ -472,7 +479,7 @@ readagain:
 
 	/* Cache the captured length */
         packet->cached.framing_length = trace_get_framing_length(packet);
-        packet->cached.capture_length = ret - packet->cached.framing_length;
+        packet->cached.capture_length = ret;
 
 	if (tzsplive_prepare_packet(libtrace, packet, packet->buffer,
 		TRACE_RT_DATA_TZSP, flags)) {
