@@ -24,7 +24,9 @@
  *
  */
 
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 #include "common.h"
 #include "config.h"
 #include <assert.h>

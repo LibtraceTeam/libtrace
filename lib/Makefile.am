@@ -82,7 +82,7 @@ libtrace_la_SOURCES = trace.c trace_parallel.c common.h \
                 data-struct/buckets.c data-struct/simple_circular_buffer.c \
 		combiner_sorted.c combiner_unordered.c \
 		pthread_spinlock.c pthread_spinlock.h \
-		strndup.c
+		strndup.c format_pcapng.h format_tzsplive.h
 
 if DAG2_4
 nodist_libtrace_la_SOURCES = dagopts.c dagapi.c
@@ -90,7 +90,7 @@ endif
 
 AM_CPPFLAGS= @ADD_INCLS@
 libtrace_la_LIBADD = @LIBTRACE_LIBS@ @LTLIBOBJS@ $(DPDKLIBS)
-libtrace_la_LDFLAGS=-version-info @LIBTRACE_MAJOR@:@LIBTRACE_MINOR@:@LIBTRACE_MID@ @ADD_LDFLAGS@
+libtrace_la_LDFLAGS=-version-info 5:0:1 @ADD_LDFLAGS@
 dagapi.c:
 	cp @DAG_TOOLS_DIR@/dagapi.c .
 
