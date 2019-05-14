@@ -1,4 +1,4 @@
-libtrace4 (4.0.7) unstable; urgency=medium
+libtrace4 (4.0.7-1) unstable; urgency=medium
 
   * New upstream release.
   * Added new API for exploring in-stream meta-data records.
