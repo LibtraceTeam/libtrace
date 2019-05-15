@@ -38,6 +38,11 @@
 #include <time.h>
 #include <assert.h>
 #include <signal.h>
+#include <arpa/inet.h>
+
+#ifdef HAVE_LIBCRYPTO
+#include <openssl/evp.h>
+#endif
 
 enum enc_type_t {
         ENC_NONE,
@@ -49,6 +54,39 @@ bool enc_source_opt = false;
 bool enc_dest_opt   = false;
 enum enc_type_t enc_type = ENC_NONE;
 char *enc_key = NULL;
+
+
+#define SALT_LENGTH 32
+#define SHA256_SIZE 32
+bool enc_radius_packet = false;
+bool radius_force_anon = false; //TODO
+uint8_t salt[SALT_LENGTH];
+bool isSaltSet = false;
+
+typedef struct traceanon_port_list_t{
+	uint16_t port;
+	traceanon_port_list_t *nextport;
+}traceanon_port_list_t;
+
+typedef struct traceanon_radius_server_t {
+	struct in_addr ipaddr;
+	traceanon_port_list_t *port;
+}traceanon_radius_server_t;
+
+traceanon_radius_server_t radius_server;
+
+typedef struct radius_header {
+    uint8_t code;
+    uint8_t identifier;
+    uint16_t length;
+    uint8_t auth[16];
+} PACKED radius_header_t;
+
+typedef struct radius_avp {
+    uint8_t type;
+    uint8_t length;
+    uint8_t value;
+} PACKED radius_avp_t;
 
 int level = -1;
 trace_option_compresstype_t compress_type = TRACE_OPTION_COMPRESSTYPE_NONE;
@@ -79,6 +117,13 @@ static void usage(char *argv0)
         "-t --threads=max       Use this number of threads for packet processing\n"
         "-f --filter=expr       Discard all packets that do not match the\n"
         "                       provided BPF expression\n"
+	"-r --radius-server=a.b.c.d[:port1] Specifies an IP address and\n"
+	"				a ':' separated list of ports to\n"
+	"                               match for RADIUS anonymising.\n"
+	"-R --radius-salt=salt  Use provided salt for RADIUS hashing\n"
+	"-E --radius-enforce    Enforce anonymising of usually safe AVP types\n"
+	"				6, 7, 40-43, 46-48, 55 and 85\n"
+	"				(85 only in Access-Accept packets)\n"
 	,argv0);
 	exit(1);
 }
@@ -91,6 +136,14 @@ static void update_in_cksum(uint16_t *csum, uint16_t old, uint16_t newval)
 		     + htons(newval);
 	sum = (sum & 0xFFFF) + (sum >> 16);
 	*csum = htons(~(sum + (sum >> 16)));
+}
+
+void add_port_to_server(traceanon_radius_server_t *server, uint16_t port ){
+	traceanon_port_list_t *currPort;
+	currPort = (traceanon_port_list_t*) malloc(sizeof(traceanon_port_list_t));
+	currPort->port = port;
+	currPort->nextport = server->port;
+	server->port = currPort;
 }
 
 UNUSED static void update_in_cksum32(uint16_t *csum, uint32_t old,
@@ -163,6 +216,151 @@ static void encrypt_ipv6(Anonymiser *anon, libtrace_ip6_t *ip6,
 
 }
 
+//ignoring all else, takes a pointer to the start of a radius packet and Anonymises the values in the AVP section.
+static void encrypt_radius(Anonymiser *anon, uint8_t *radstart, uint32_t *rem){
+	uint8_t *digest_buffer;
+
+	uint8_t *radius_ptr = radstart + sizeof(radius_header_t);
+
+	radius_header_t *radius_header = (radius_header_t *)radstart;
+
+	uint16_t radius_length = ntohs(radius_header->length);
+
+	uint8_t *radius_end = (radstart+radius_length);
+
+	
+
+	if (*rem > radius_length){
+		//TODO handle error
+		return;
+	}
+
+	while (radius_ptr < radius_end){
+		radius_avp_t *radius_avp = (radius_avp_t*)radius_ptr;
+		uint16_t val_len = radius_avp->length-2;
+
+		bool skipAVP = false;
+
+		//TODO maybe decide to do more things to different types?
+		switch (radius_avp->type) {
+			case 6:
+			case 7:
+			case 40 ... 43:
+			case 46 ... 48:
+			case 55: 
+			{	//skip the above types
+				skipAVP = true;
+				break;
+			}
+
+			case 85:{
+				//check for access-accept messages
+				if (radius_header->code == 2){
+					skipAVP = true;
+				}
+				break;
+			}
+			
+			case 26 : {	//process VSA (assuming there is exactly 1 VSA per AVP of type 26) //TODO?
+				radius_ptr += 6;
+				radius_avp = (radius_avp_t*)radius_ptr;
+				val_len = radius_avp->length-2;
+				break;
+			}
+
+			default: {
+				break;
+			}
+		}
+		if (!skipAVP || radius_force_anon){
+			digest_buffer = anon->digest_message(&radius_avp->value, val_len);
+
+			// printf("TYPE:0x%02x\tLEN:0x%02x\n",radius_avp->type, radius_avp->length);
+			// for (uint16_t i = 0; i < val_len; i++){printf("%02x ",*(&radius_avp->value +i));}printf("\n");
+			// for (uint16_t i = 0; i < val_len; i++){printf("%02x ",i < 32 ? *(digest_buffer+i):0);}printf("\n");
+
+			if (val_len > SHA256_SIZE){
+				memcpy(&radius_avp->value, digest_buffer, SHA256_SIZE);
+				//overwrite hash digest into AVP value
+
+				memset(&radius_avp->value+SHA256_SIZE, 0, val_len-SHA256_SIZE);
+				//pad with zeros to fill 
+			}
+			else {
+				memcpy(&radius_avp->value, digest_buffer, val_len);
+			}
+		}
+		radius_ptr+=(radius_avp->length); //move to next
+	}
+}
+
+//retrives radius header from UDP packet
+static inline void *find_radius_start(libtrace_packet_t *pkt, uint32_t *rem) {
+
+	void *transport, *radstart;
+	uint8_t proto;
+
+	transport = trace_get_transport(pkt, &proto, rem);
+	if (!transport || rem == 0) {
+		return NULL;
+	}
+
+	if (proto != TRACE_IPPROTO_UDP) { //TODO handle TCP radius packets, is that even a thing?
+		return NULL;
+	}
+
+	radstart = trace_get_payload_from_udp((libtrace_udp_t *)transport, rem);
+	return radstart;
+}
+
+//checks packets with matching IPs for matching port and encrypts 
+int radius_ip_match(libtrace_udp_t *udp, 
+		struct libtrace_ip *ipptr, 
+		libtrace_packet_t *packet, 
+		Anonymiser *anon, 
+		uint16_t testPort){
+
+	traceanon_port_list_t *currPort = (radius_server.port);
+
+	if(testPort != 0){ //an ip matches
+		while(currPort != NULL){
+			if (testPort == currPort->port){
+				uint32_t rem;
+				uint8_t *radstart = (uint8_t *)find_radius_start(packet, &rem);
+				if (radstart ==  NULL){
+					printf("Radius Header Error\n");
+					//handle error
+				}
+				else {
+					encrypt_radius(anon, radstart, &rem);
+					return 1;
+				}
+				break;
+			}
+			currPort = currPort->nextport;
+		}
+	}
+	return 0;
+
+}
+
+//checks if packet src/dest is filtered for RADIUS and anonymised/encrypted as needed
+void check_radius(libtrace_udp_t *udp, struct libtrace_ip *ipptr, libtrace_packet_t *packet, Anonymiser *anon){
+	udp = trace_get_udp(packet);
+	if (udp){	
+		uint16_t testPort = 0;
+		if(ipptr->ip_src.s_addr == radius_server.ipaddr.s_addr){
+			testPort = udp->source;
+			if (radius_ip_match(udp, ipptr, packet, anon, testPort))
+				return;
+		}
+		if(ipptr->ip_dst.s_addr == radius_server.ipaddr.s_addr){
+			testPort = udp->dest;
+			if (radius_ip_match(udp, ipptr, packet, anon, testPort))
+				return;
+		}
+	}
+}
 
 static libtrace_packet_t *per_packet(libtrace_t *trace, libtrace_thread_t *t,
         void *global, void *tls, libtrace_packet_t *packet) {
@@ -180,6 +378,10 @@ static libtrace_packet_t *per_packet(libtrace_t *trace, libtrace_thread_t *t,
 
         ipptr = trace_get_ip(packet);
         ip6 = trace_get_ip6(packet);
+
+	if (enc_radius_packet){
+		check_radius(udp, ipptr, packet, anon);
+	}
 
         if (ipptr && (enc_source_opt || enc_dest_opt)) {
                 encrypt_ips(anon, ipptr,enc_source_opt,enc_dest_opt);
@@ -220,7 +422,7 @@ static libtrace_packet_t *per_packet(libtrace_t *trace, libtrace_thread_t *t,
 static void *start_anon(libtrace_t *trace, libtrace_thread_t *t, void *global)
 {
         if (enc_type == ENC_PREFIX_SUBSTITUTION) {
-                PrefixSub *sub = new PrefixSub(enc_key, NULL);
+                PrefixSub *sub = new PrefixSub(enc_key, NULL, salt);
                 return sub;
         }
 
@@ -230,9 +432,9 @@ static void *start_anon(libtrace_t *trace, libtrace_thread_t *t, void *global)
 			"characters long for CryptoPan anonymisation.\n");
 			exit(1);
 		}
-#ifdef HAVE_LIBCRYPTO                
+#ifdef HAVE_LIBCRYPTO
                 CryptoAnon *anon = new CryptoAnon((uint8_t *)enc_key,
-                        (uint8_t)strlen(enc_key), 20);
+                        (uint8_t)strlen(enc_key), 20, salt);
                 return anon;
 #else
                 /* TODO nicer way of exiting? */
@@ -242,6 +444,10 @@ static void *start_anon(libtrace_t *trace, libtrace_thread_t *t, void *global)
 #endif
         }
 
+	if (enc_radius_packet){
+		Anonymiser *anon = new Anonymiser(salt);
+		return anon;
+	}
         return NULL;
 }
 
@@ -344,10 +550,13 @@ int main(int argc, char *argv[])
 			{ "compress-level",	1, 0, 'z' },
 			{ "compress-type",	1, 0, 'Z' },
 			{ "help",        	0, 0, 'h' },
+			{"radius-server", 	1, 0, 'r' },
+			{"radius-salt", 	1, 0, 'R' },
+			{"radius-enforce",	0, 0, 'E' },
 			{ NULL,			0, 0, 0   },
 		};
 
-		int c=getopt_long(argc, argv, "Z:z:sc:f:dp:ht:f:",
+		int c=getopt_long(argc, argv, "Z:z:sc:f:dp:ht:f:r:R:E",
 				long_options, &option_index);
 
 		if (c==-1)
@@ -404,6 +613,48 @@ int main(int argc, char *argv[])
                                   if (maxthreads <= 0)
                                           maxthreads = 1;
                                   break;
+			case 'r':{
+				if (radius_server.ipaddr.s_addr != 0){
+					fprintf(stderr, "You can only have one radius server at a time\n");
+					usage(argv[0]);
+				}
+				enc_radius_packet = true;
+				
+				char *token = strtok(optarg, ":");
+				struct in_addr ipaddr;
+
+				if(inet_aton(token, &ipaddr) == 0){
+					fprintf(stderr, "IP address malformed\n");
+					usage(argv[0]);
+				}
+				radius_server.ipaddr = ipaddr;
+
+				char * garbage = NULL;
+				while( (token = strtok(NULL, ":")) != NULL ) {
+					in_port_t port = strtol(token, &garbage, 10);
+					if(garbage == NULL || (*garbage != ':' && *garbage != 0)){
+						fprintf(stderr, "Port list malformed\n");
+						usage(argv[0]);
+					}
+					add_port_to_server(&radius_server,htons(port));
+				}
+				break;
+				}
+			case 'R' :{
+				if (isSaltSet){
+					fprintf(stderr,"Salt has already been set: %c\n",c);
+					usage(argv[0]);
+				}
+				if (strlen(optarg) > 32){
+					fprintf(stderr,"Salt is longer than 32chars\n");
+					usage(argv[0]);
+					break;
+				}
+				memcpy(salt, optarg, strlen(optarg));
+				isSaltSet = true;
+				break;
+			}
+			case 'E' : radius_force_anon = true; break;
 			default:
 				fprintf(stderr,"unknown option: %c\n",c);
 				usage(argv[0]);
@@ -510,5 +761,14 @@ exitanon:
                 trace_destroy_callback_set(repcbs);
         if (inptrace)
         	trace_destroy(inptrace);
+
+	traceanon_port_list_t *currPort = radius_server.port;
+	traceanon_port_list_t *tempPort;
+	while(currPort != NULL){
+		tempPort = currPort;
+		currPort = currPort->nextport;
+		free(tempPort);
+	}
+
 	return exitcode;
 }

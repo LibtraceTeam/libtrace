@@ -25,6 +25,9 @@ another prefix.  This can be used for instance to replace a /16 with the
 equivilent prefix from RFC1918.  The other scheme is cryptopan which is a
 prefix preserving encryption scheme based on AES (traceanon must be built
 with libcrypto support to be able to use the cryptopan scheme).
+
+traceanon can also anonymise RADIUS packets, specify the ipv4 address, port(s) 
+combo to anonymise, can also specify a salt to use.  
 .TP
 .PD 0
 .BI \-s 
@@ -110,6 +113,33 @@ algorithms are "gz", "bz", "lzo", "xz" and "no". Default is "no".
 .BI \-\^\-threads=threadcount
 use the specified number of threads to anonymise packets. The default number
 of threads is 4.
+
+.TP
+.PD 0
+.BI \-r
+.TP
+.PD
+.BI \-\^\-radius-server=ipaddress:port
+filter against the specified ip:port combo to anonymise RADIUS packets.
+Multiple ports can be specified seperated by ':'
+
+.TP
+.PD 0
+.BI \-R
+.TP
+.PD
+.BI \-\^\-radius-salt=salt
+use the specified salt string when anonymising RADIUS packets. 
+Can be up 32 characters. The default salt is 32 NULL bytes.
+
+.TP
+.PD 0
+.BI \-E
+.TP
+.PD
+.BI \-\^\-radius-enforce
+Enforce anonymising of usually safe AVP types: 6, 7, 40-43, 46-48, 55 and 85. 
+(85 only in Access-Accept packets)
 
 .SH EXAMPLES
 .nf
