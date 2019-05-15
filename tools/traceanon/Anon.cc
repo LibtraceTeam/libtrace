@@ -60,8 +60,31 @@ Anonymiser::~Anonymiser(){
 #endif
 }
 
+static inline void buffer_to_digits(uint8_t *buffer, uint32_t len) {
 
-uint8_t *Anonymiser::digest_message(uint8_t *src_ptr, uint32_t src_length){
+    uint32_t i;
+    for (i = 0; i < len; i++) {
+        buffer[i] = '0' + (buffer[i] % 10);
+    }
+}
+
+static inline void buffer_to_chars(uint8_t *buffer, uint32_t len) {
+    uint32_t i;
+
+    for (i = 0; i < len; i++) {
+        uint8_t mod = buffer[i] % 62;
+
+        if (mod < 26) {
+            buffer[i] = 'a' + mod;
+        } else if (mod < 52) {
+            buffer[i] = 'A' + (mod - 26);
+        } else {
+            buffer[i] = '0' + (mod - 52);
+        }
+    }
+}
+
+uint8_t *Anonymiser::digest_message(uint8_t *src_ptr, uint32_t src_length, uint8_t anon_mode){
 
 #ifdef HAVE_LIBCRYPTO
 
@@ -81,6 +104,12 @@ uint8_t *Anonymiser::digest_message(uint8_t *src_ptr, uint32_t src_length){
     uint32_t len = 0;
 
     EVP_DigestFinal_ex(mdctx, buffer, &len);
+
+    if (anon_mode == RADIUS_ANON_MODE_NUMERIC) {
+        buffer_to_digits(buffer, len);
+    } else if (anon_mode == RADIUS_ANON_MODE_TEXT) {
+        buffer_to_chars(buffer, len);
+    }
 
     return buffer;
 #else

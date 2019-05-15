@@ -240,6 +240,7 @@ static void encrypt_radius(Anonymiser *anon, uint8_t *radstart, uint32_t *rem){
 		uint16_t val_len = radius_avp->length-2;
 
 		bool skipAVP = false;
+                uint8_t anon_mode = RADIUS_ANON_MODE_BINARY;
 
 		//TODO maybe decide to do more things to different types?
 		switch (radius_avp->type) {
@@ -247,11 +248,19 @@ static void encrypt_radius(Anonymiser *anon, uint8_t *radstart, uint32_t *rem){
 			case 7:
 			case 40 ... 43:
 			case 46 ... 48:
-			case 55: 
+			case 55:
+                        case 61:
 			{	//skip the above types
 				skipAVP = true;
 				break;
 			}
+                        case 1:
+                        case 32:
+                                anon_mode = RADIUS_ANON_MODE_TEXT;
+                                break;
+                        case 44:
+                                anon_mode = RADIUS_ANON_MODE_NUMERIC;
+                                break;
 
 			case 85:{
 				//check for access-accept messages
@@ -273,7 +282,7 @@ static void encrypt_radius(Anonymiser *anon, uint8_t *radstart, uint32_t *rem){
 			}
 		}
 		if (!skipAVP || radius_force_anon){
-			digest_buffer = anon->digest_message(&radius_avp->value, val_len);
+			digest_buffer = anon->digest_message(&radius_avp->value, val_len, anon_mode);
 
 			// printf("TYPE:0x%02x\tLEN:0x%02x\n",radius_avp->type, radius_avp->length);
 			// for (uint16_t i = 0; i < val_len; i++){printf("%02x ",*(&radius_avp->value +i));}printf("\n");

@@ -38,6 +38,11 @@
 
 #define SALT_LENGTH 32
 
+enum {
+    RADIUS_ANON_MODE_BINARY,
+    RADIUS_ANON_MODE_NUMERIC,
+    RADIUS_ANON_MODE_TEXT,
+};
 
 class Anonymiser {
 public:
@@ -48,7 +53,7 @@ public:
     virtual void anonIPv6(uint8_t *orig, uint8_t *result) {};
 
 #ifdef HAVE_LIBCRYPTO
-    uint8_t *digest_message(uint8_t *src_ptr, uint32_t src_length);
+    uint8_t *digest_message(uint8_t *src_ptr, uint32_t src_length, uint8_t anon_mode);
 #endif
 
 private:
@@ -56,7 +61,7 @@ private:
 #ifdef HAVE_LIBCRYPTO
     uint8_t salt[SALT_LENGTH];
     EVP_MD_CTX *mdctx;
-    uint8_t buffer[32];
+    uint8_t buffer[1024];
 #endif
 
 };
