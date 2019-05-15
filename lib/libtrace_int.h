@@ -89,10 +89,7 @@ extern "C" {
 
 #ifdef HAVE_PCAP_H
 #  include <pcap.h>
-#  ifdef HAVE_PCAP_INT_H
-#    include <pcap-int.h>
-#  endif
-#endif 
+#endif
 
 #ifdef HAVE_ZLIB_H
 #  include <zlib.h>
@@ -293,6 +290,7 @@ struct callback_set {
         fn_cb_dataless message_resuming;
         fn_cb_dataless message_pausing;
         fn_cb_packet message_packet;
+	fn_cb_packet message_meta_packet;
         fn_cb_result message_result;
         fn_cb_first_packet message_first_packet;
         fn_cb_tick message_tick_count;
@@ -721,6 +719,21 @@ struct libtrace_format_t {
 	 */
 	double (*get_seconds)(const libtrace_packet_t *packet);
 	
+	/** Parses all meta-data fields in a meta packet and places them
+         *  into an array for user inspection.
+         *  @param packet       The meta packet to be parsed.
+         *  @return A pointer to a libtrace_meta_t containing all of the
+         *          meta-data fields found in the provided packet, or NULL
+         *          if no meta-data fields were found in the packet.
+         *
+         *  @note the returned libtrace_meta_t must be freed using
+         *        trace_destroy_meta()
+         *
+         *  Only implement for formats that include meta-data records
+         *  within the captured packet stream.
+	 */
+	libtrace_meta_t *(*get_all_meta)(libtrace_packet_t *packet);
+
 	/** Moves the read pointer to a certain ERF timestamp within an input 
 	 * trace file.
 	 *
@@ -1067,6 +1080,13 @@ libtrace_rt_types_t pcap_linktype_to_rt(libtrace_dlt_t linktype);
  */
 libtrace_rt_types_t pcapng_linktype_to_rt(libtrace_dlt_t linktype);
 
+/** Converts a TZSP DLT into an RT protocol type.
+ *
+ * @param linktype      The TZSP DLT to be converted
+ * @return The RT type that is equivalent to the provided DLT
+ */
+libtrace_rt_types_t tzsp_linktype_to_rt(libtrace_dlt_t linktype);
+
 /** Converts a libtrace link type into a PCAP linktype.
  *
  * @param type		The libtrace link type to be converted
@@ -1112,6 +1132,14 @@ libtrace_linktype_t erf_type_to_libtrace(uint8_t erf);
  * or -1 if the link type cannot be matched to an ERF type.
  */
 uint8_t libtrace_to_erf_type(libtrace_linktype_t linktype);
+
+/** Converts a libtrace link type into an TZSP type.
+ *
+ * @param linktype      The libtrace link type to be converted
+ * @return The TZSP type that is equivalent to the provided libtrace link type,
+ * or -1 if the link type cannot be matched to an TZSP type.
+ */
+uint8_t libtrace_to_tzsp_type(libtrace_linktype_t linktype);
 
 /** Converts an ARPHRD type into a libtrace link type.
  *
@@ -1200,7 +1228,6 @@ void *trace_get_payload_from_linux_sll(const void *link,
 DLLEXPORT void *trace_get_payload_from_atm(void *link, uint8_t *type, 
 		uint32_t *remaining);
 
-
 #ifdef HAVE_BPF
 /* A type encapsulating a bpf filter
  * This type covers the compiled bpf filter, as well as the original filter
@@ -1259,6 +1286,8 @@ void atmhdr_constructor(void);
 void ndag_constructor(void);
 /** Constructor for the live ETSI over TCP format module */
 void etsilive_constructor(void);
+/** Constructor for the live TZSP over UDP format module */
+void tzsplive_constructor(void);
 #ifdef HAVE_BPF
 /** Constructor for the BPF format module */
 void bpf_constructor(void);

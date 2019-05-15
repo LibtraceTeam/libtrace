@@ -38,6 +38,8 @@ In no particular order, we would like to recognise:
  * Tim Dawson for fixing issues with building against musl libc
  * Hendrik Leppelsack for reporting and fixing some errors in the tool manpages
  * Jacob van Walraven for spending a summer doing various coding odd-jobs
+ * Mark Weiman for fixing an uninitialised memory bug that was upsetting
+   Valgrind.
  * Jamie Curtis for fixing a couple of bugs many many years ago
  * Brendon Jones for creating the original Windows DLLs and writing bits of
    code here and there

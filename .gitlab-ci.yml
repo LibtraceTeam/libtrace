@@ -7,8 +7,8 @@ build-amd64-debian-jessie:
   image: debian:jessie
   script:
     - ./gitlab-build.sh
-    - mkdir -p built-packages/amd64/debian_jessie/
-    - mv ../*.deb built-packages/amd64/debian_jessie/
+    - mkdir -p built-packages/jessie/
+    - mv ../*.deb built-packages/jessie/
   artifacts:
     paths:
       - built-packages/*
@@ -21,8 +21,8 @@ build-amd64-debian-stretch:
   image: debian:stretch
   script:
     - ./gitlab-build.sh
-    - mkdir -p built-packages/amd64/debian_stretch/
-    - mv ../*.deb built-packages/amd64/debian_stretch/
+    - mkdir -p built-packages/stretch/
+    - mv ../*.deb built-packages/stretch/
   artifacts:
     paths:
       - built-packages/*
@@ -35,8 +35,8 @@ build-amd64-ubuntu-xenial:
   image: ubuntu:xenial
   script:
     - ./gitlab-build.sh
-    - mkdir -p built-packages/amd64/ubuntu_xenial/
-    - mv ../*.deb built-packages/amd64/ubuntu_xenial/
+    - mkdir -p built-packages/xenial/
+    - mv ../*.deb built-packages/xenial/
   artifacts:
     paths:
       - built-packages/*
@@ -49,8 +49,8 @@ build-amd64-ubuntu-bionic:
   image: ubuntu:bionic
   script:
     - ./gitlab-build.sh
-    - mkdir -p built-packages/amd64/ubuntu_bionic/
-    - mv ../*.deb built-packages/amd64/ubuntu_bionic/
+    - mkdir -p built-packages/bionic/
+    - mv ../*.deb built-packages/bionic/
   artifacts:
     paths:
       - built-packages/*
@@ -63,8 +63,50 @@ build-amd64-ubuntu-cosmic:
   image: ubuntu:cosmic
   script:
     - ./gitlab-build.sh
-    - mkdir -p built-packages/amd64/ubuntu_cosmic/
-    - mv ../*.deb built-packages/amd64/ubuntu_cosmic/
+    - mkdir -p built-packages/cosmic/
+    - mv ../*.deb built-packages/cosmic/
+  artifacts:
+    paths:
+      - built-packages/*
+    expire_in: 1 day
+  only:
+    - tags
+
+build-amd64-fedora-29:
+  stage: build
+  image: fedora:29
+  script:
+    - ./gitlab-build-rpm.sh fedora29
+    - mkdir -p built-packages/fedora_29/
+    - mv ~/rpmbuild/RPMS/x86_64/*.rpm built-packages/fedora_29/
+  artifacts:
+    paths:
+      - built-packages/*
+    expire_in: 1 day
+  only:
+    - tags
+
+build-amd64-fedora-30:
+  stage: build
+  image: fedora:30
+  script:
+    - ./gitlab-build-rpm.sh fedora30
+    - mkdir -p built-packages/fedora_30/
+    - mv ~/rpmbuild/RPMS/x86_64/*.rpm built-packages/fedora_30/
+  artifacts:
+    paths:
+      - built-packages/*
+    expire_in: 1 day
+  only:
+    - tags
+
+build-amd64-centos7:
+  stage: build
+  image: centos:7
+  script:
+    - ./gitlab-build-rpm.sh centos7
+    - mkdir -p built-packages/centos_7/
+    - mv ~/rpmbuild/RPMS/x86_64/*.rpm built-packages/centos_7/
   artifacts:
     paths:
       - built-packages/*

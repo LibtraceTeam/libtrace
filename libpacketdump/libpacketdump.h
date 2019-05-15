@@ -54,6 +54,7 @@ void trace_dump_packet(libtrace_packet_t *packet);
 void decode_next(const char *packet,int len,const char *proto_name,int type);
 
 void decode(int link_type, const char *pkt, unsigned len);
+void decode_meta(int link_type, const char *pkt, unsigned len, libtrace_packet_t *p);
 
 #ifdef __cplusplus 
 }

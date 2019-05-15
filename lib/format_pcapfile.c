@@ -286,6 +286,8 @@ static int pcapfile_config_input(libtrace_t *libtrace,
 			/* All these are either unsupported or handled
 			 * by trace_config */
 			break;
+		case TRACE_OPTION_DISCARD_META:
+			break;
 	}
 	
 	trace_set_err(libtrace,TRACE_ERR_UNKNOWN_OPTION,
@@ -551,16 +553,20 @@ static int pcapfile_write_packet(libtrace_out_t *out,
 	numbytes=wandio_wwrite(DATAOUT(out)->file,
 			&hdr, sizeof(hdr));
 
-	if (numbytes!=sizeof(hdr)) 
+	if (numbytes!=sizeof(hdr)) {
+                trace_set_err_out(out, TRACE_ERR_WANDIO_FAILED, "Failed to write to pcapfile: %s", strerror(errno));
 		return -1;
+        }
 
 	/* Write the rest of the packet now */
 	ret=wandio_wwrite(DATAOUT(out)->file,
 			ptr,
 			hdr.caplen);
 
-	if (ret!=(int)hdr.caplen)
+	if (ret!=(int)hdr.caplen) {
+                trace_set_err_out(out, TRACE_ERR_WANDIO_FAILED, "Failed to write to pcapfile: %s", strerror(errno));
 		return -1;
+        }
 
 	return numbytes+ret;
 }
@@ -798,6 +804,7 @@ static struct libtrace_format_t pcapfile = {
 	pcapfile_get_timeval,		/* get_timeval */
 	pcapfile_get_timespec,		/* get_timespec */
 	NULL,				/* get_seconds */
+	NULL,                           /* get_meta_section */
 	NULL,				/* seek_erf */
 	NULL,				/* seek_timeval */
 	NULL,				/* seek_seconds */

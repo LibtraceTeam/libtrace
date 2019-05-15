@@ -37,9 +37,6 @@
 
 #ifdef HAVE_PCAP_H
 #  include <pcap.h>
-#  ifdef HAVE_PCAP_INT_H
-#    include <pcap-int.h>
-#  endif
 #endif
 
 /* This format module deals with traces captured using the PCAP library. This
@@ -868,6 +865,7 @@ static struct libtrace_format_t pcap = {
 	pcap_get_timeval,		/* get_timeval */
 	NULL,				/* get_seconds */
 	NULL,				/* get_timespec */
+	NULL,                           /* get_meta_section */
 	NULL,				/* seek_erf */
 	NULL,				/* seek_timeval */
 	NULL,				/* seek_seconds */
@@ -913,6 +911,7 @@ static struct libtrace_format_t pcapint = {
 	pcap_get_timeval,		/* get_timeval */
 	NULL,				/* get_seconds */
 	NULL,				/* get_timespec */
+	NULL,                           /* get_meta_section */
 	NULL,				/* seek_erf */
 	NULL,				/* seek_timeval */
 	NULL,				/* seek_seconds */

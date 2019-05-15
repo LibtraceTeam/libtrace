@@ -24,7 +24,9 @@
  *
  */
 
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 #include "common.h"
 #include "config.h"
 #include <assert.h>
@@ -154,6 +156,7 @@ static void trace_init(void)
 		bpf_constructor();
 		pcapfile_constructor();
 		pcapng_constructor();
+		tzsplive_constructor();
                 rt_constructor();
                 ndag_constructor();
 #ifdef HAVE_WANDDER
@@ -684,7 +687,12 @@ DLLEXPORT int trace_config(libtrace_t *libtrace,
                         }
                         return -1;
 
-
+		case TRACE_OPTION_DISCARD_META:
+			if (!trace_is_err(libtrace)) {
+				trace_set_err(libtrace, TRACE_ERR_OPTION_UNAVAIL,
+					"Libtrace does not support meta packets for this format");
+			}
+			return -1;
 	}
 	if (!trace_is_err(libtrace)) {
 		trace_set_err(libtrace,TRACE_ERR_UNKNOWN_OPTION,
@@ -766,8 +774,6 @@ DLLEXPORT void trace_destroy(libtrace_t *libtrace) {
 	if (libtrace->format) {
 		if (libtrace->started && libtrace->format->pause_input)
 			libtrace->format->pause_input(libtrace);
-		if (libtrace->format->fin_input)
-			libtrace->format->fin_input(libtrace);
 	}
 	/* Need to free things! */
 	if (libtrace->uridata)
@@ -797,6 +803,11 @@ DLLEXPORT void trace_destroy(libtrace_t *libtrace) {
 		libtrace->perpkt_threads = NULL;
 		libtrace->perpkt_thread_count = 0;
 
+	}
+
+	if (libtrace->format) {
+		if (libtrace->format->fin_input)
+			libtrace->format->fin_input(libtrace);
 	}
 
         if (libtrace->hasher_owner == HASH_OWNED_LIBTRACE) {
@@ -915,7 +926,8 @@ DLLEXPORT libtrace_packet_t *trace_copy_packet(const libtrace_packet_t *packet) 
 	dest->hash = packet->hash;
 	dest->error = packet->error;
         dest->which_trace_start = packet->which_trace_start;
-	/* Reset the cache - better to recalculate than try to convert
+	pthread_mutex_init(&(dest->ref_lock), NULL);
+        /* Reset the cache - better to recalculate than try to convert
 	 * the values over to the new packet */
 	trace_clear_cache(dest);
 	/* Ooooh nasty memcpys! This is why we want to avoid copying packets
@@ -1512,6 +1524,7 @@ DLLEXPORT libtrace_linktype_t trace_get_link_type(const libtrace_packet_t *packe
 			return TRACE_TYPE_UNKNOWN;
 		((libtrace_packet_t *)packet)->cached.link_type =
 			packet->trace->format->get_link_type(packet);
+
 	}
 
 	return packet->cached.link_type;

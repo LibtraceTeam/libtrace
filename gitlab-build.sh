@@ -12,8 +12,10 @@ apt-get install -y equivs devscripts dpkg-dev quilt curl apt-transport-https \
 
 echo "deb https://dl.bintray.com/wand/general $(lsb_release -sc) main" | \
     tee -a /etc/apt/sources.list.d/wand.list
-curl "https://bintray.com/user/downloadSubjectPublicKey?username=wand" \
-    -o /etc/apt/trusted.gpg.d/wand.gpg
+echo "deb https://dl.bintray.com/wand/libtrace $(lsb_release -sc) main" | \
+    tee -a /etc/apt/sources.list.d/wand.list
+curl --silent "https://bintray.com/user/downloadSubjectPublicKey?username=wand"\
+    | apt-key add -
 
 apt-get update
 apt-get upgrade -y
