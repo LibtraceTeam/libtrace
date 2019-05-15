@@ -553,11 +553,11 @@ inline static int linuxring_read_stream(libtrace_t *libtrace,
 	 */
 	while (!(header->tp_status & TP_STATUS_USER) ||
 	                header->tp_status == TP_STATUS_LIBTRACE) {
-                if ((ret=is_halted(libtrace)) != -1)
-                        return ret;
                 if (!block) {
                         return 0;
                 }
+                if ((ret=is_halted(libtrace)) != -1)
+                        return ret;
 
 		pollset[0].fd = stream->fd;
 		pollset[0].events = POLLIN;
@@ -848,6 +848,7 @@ static struct libtrace_format_t linuxring = {
 	linuxring_get_timeval,		/* get_timeval */
 	linuxring_get_timespec,		/* get_timespec */
 	NULL,				/* get_seconds */
+	NULL,                           /* get_meta_section */
 	NULL,				/* seek_erf */
 	NULL,				/* seek_timeval */
 	NULL,				/* seek_seconds */
@@ -911,6 +912,7 @@ static struct libtrace_format_t linuxring = {
 	linuxring_get_timeval,		/* get_timeval */
 	linuxring_get_timespec,		/* get_timespec */
 	NULL,				/* get_seconds */
+	NULL,                           /* get_meta_section */
 	NULL,				/* seek_erf */
 	NULL,				/* seek_timeval */
 	NULL,				/* seek_seconds */

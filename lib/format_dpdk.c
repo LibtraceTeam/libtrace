@@ -33,7 +33,9 @@
  * RT-speaking programs.
  */
 
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 
 #include "config.h"
 #include "libtrace.h"
@@ -747,6 +749,7 @@ int dpdk_config_input (libtrace_t *libtrace,
 	case TRACE_OPTION_FILTER:
 		/* TODO filtering */
 	case TRACE_OPTION_META_FREQ:
+	case TRACE_OPTION_DISCARD_META:
 	case TRACE_OPTION_EVENT_REALTIME:
         case TRACE_OPTION_REPLAY_SPEEDUP:
         case TRACE_OPTION_CONSTANT_ERF_FRAMING:
@@ -2267,6 +2270,7 @@ static struct libtrace_format_t dpdk = {
 	NULL,                               /* seek_erf */
 	NULL,                               /* seek_timeval */
 	NULL,                               /* seek_seconds */
+	NULL,                               /* get_meta_section */
 	dpdk_get_capture_length,            /* get_capture_length */
 	dpdk_get_wire_length,               /* get_wire_length */
 	dpdk_get_framing_length,            /* get_framing_length */

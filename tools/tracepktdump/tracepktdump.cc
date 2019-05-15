@@ -109,7 +109,9 @@ int main(int argc,char **argv)
 		while(trace_read_packet(trace,packet)> 0 ){
 			if (filter && !trace_apply_filter(filter,packet))
 				continue;
-			if (packet->type < TRACE_RT_DATA_SIMPLE)
+			if (packet->type < TRACE_RT_DATA_SIMPLE &&
+				packet->type != TRACE_RT_PCAPNG_META &&
+				packet->type != TRACE_RT_ERF_META)
 				/* Ignore RT messages */
 				continue;
                         if (trace_is_err(trace)) {

@@ -23,7 +23,9 @@
  *
  *
  */
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 
 #include "config.h"
 #include "common.h"
@@ -1012,29 +1014,32 @@ static int dag_available(libtrace_t *libtrace,
 }
 
 /* Returns a pointer to the start of the next complete ERF record */
-static dag_record_t *dag_get_record(struct dag_per_stream_t *stream_data)
+static int dag_get_record(struct dag_per_stream_t *stream_data,
+                dag_record_t **erfptr)
 {
-	dag_record_t *erfptr = NULL;
 	uint16_t size;
 
-	erfptr = (dag_record_t *)stream_data->bottom;
-	if (!erfptr)
-		return NULL;
+	*erfptr = (dag_record_t *)stream_data->bottom;
+	if (!(*erfptr))
+		return 0;
 
-	size = ntohs(erfptr->rlen);
+	size = ntohs((*erfptr)->rlen);
 	if (size < dag_record_size) {
 		fprintf(stderr, "DAG2.5 rlen is invalid (rlen %u, must be at least %u\n",
 			size, dag_record_size);
-		return NULL;
+                *erfptr = NULL;
+		return -1;
 	}
 
 	/* Make certain we have the full packet available */
-	if (size > (stream_data->top - stream_data->bottom))
-		return NULL;
+	if (size > (stream_data->top - stream_data->bottom)) {
+                *erfptr = NULL;
+		return 0;
+        }
 
 	stream_data->bottom += size;
 	stream_data->processed += size;
-	return erfptr;
+	return 1;
 }
 
 /* Converts a buffer containing a recently read DAG packet record into a
@@ -1357,8 +1362,16 @@ static int dag_read_packet_stream(libtrace_t *libtrace,
 			/* Block until we see a packet */
 			continue;
 		}
-		erfptr = dag_get_record(stream_data);
-	} while (erfptr == NULL);
+		if (dag_get_record(stream_data, &erfptr) < 0) {
+                        trace_set_err(libtrace, TRACE_ERR_BAD_PACKET,
+                                        "corrupt DAG record");
+                        return -1;
+                }
+	} while (erfptr == NULL && !libtrace_halt);
+
+        if (libtrace_halt) {
+                return 0;
+        }
 
 	packet->trace = libtrace;
 
@@ -1458,8 +1471,15 @@ static libtrace_eventobj_t trace_event_dag(libtrace_t *libtrace,
 
 		/* May as well not bother calling dag_get_record if
 		 * dag_available suggests that there's no data */
-		if (numbytes != 0)
-			erfptr = dag_get_record(FORMAT_DATA_FIRST);
+		if (numbytes != 0) {
+			if (dag_get_record(FORMAT_DATA_FIRST, &erfptr) < 0) {
+                                trace_set_err(libtrace, TRACE_ERR_BAD_PACKET,
+                                                "corrupt DAG record");
+                                event.type = TRACE_EVENT_TERMINATE;
+                                return event;
+                        }
+                }
+
 		if (erfptr == NULL) {
 			/* No packet available - sleep for a very short time */
 			if (libtrace_halt) {
@@ -1630,6 +1650,7 @@ static struct libtrace_format_t dag = {
 	NULL,                           /* get_timeval */
 	NULL,                           /* get_seconds */
 	NULL,				/* get_timespec */
+	NULL,                           /* get_meta_section */
 	NULL,                           /* seek_erf */
 	NULL,                           /* seek_timeval */
 	NULL,                           /* seek_seconds */

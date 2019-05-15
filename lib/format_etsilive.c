@@ -24,7 +24,9 @@
  *
  */
 
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 
 #include "config.h"
 #include "common.h"
@@ -690,6 +692,7 @@ static struct libtrace_format_t etsilive = {
         NULL,                           /* get_timeval */
         NULL,                           /* get_timespec */
         NULL,                           /* get_seconds */
+	NULL,                           /* get_meta_section */
         NULL,                           /* seek_erf */
         NULL,                           /* seek_timeval */
         NULL,                           /* seek_seconds */

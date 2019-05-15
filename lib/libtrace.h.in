@@ -347,6 +347,8 @@ enum {
 	TRACE_ERR_NULL = -31,
 	/** Err with trace output file **/
 	TRACE_ERR_OUTPUT_FILE = -32,
+	/** Err out of memory **/
+	TRACE_ERR_OUT_OF_MEMORY = -33,
 };
 
 /** Enumeration of DLTs supported by libtrace 
@@ -413,6 +415,7 @@ typedef enum {
        TRACE_TYPE_ERF_META = 21, /**< ERF Provenance metadata record */
        TRACE_TYPE_ETSILI = 22,	/**< ETSI Lawful Intercept */
        TRACE_TYPE_PCAPNG_META = 23,	/** PCAPNG meta packet */
+       TRACE_TYPE_TZSP = 24,		/** TZSP Live packets */
 } libtrace_linktype_t;
 
 /** RT protocol base format identifiers.
@@ -442,6 +445,7 @@ enum base_format_t {
         TRACE_FORMAT_DPDK_NDAG       =20,    /**< DAG multicast over a network, received via DPDK */
         TRACE_FORMAT_ETSILIVE     =21,  /**< ETSI LI over a network */
 	TRACE_FORMAT_UNKNOWN      =22,  /** Unknown format */
+	TRACE_FORMAT_TZSPLIVE	  =23,  /** TZSP */
 };
 
 /** RT protocol packet types */
@@ -468,6 +472,7 @@ typedef enum {
 	TRACE_RT_METADATA	=18,/**< Packet contains server meta-data */
 	TRACE_RT_DUCK_5_0 	=19,/**< Dag 5.0 Duck */
         TRACE_RT_PCAPNG_META    =20,/**< Metadata for a PCAP NG input source */
+	TRACE_RT_ERF_META	=21,/**< Metadata for a ERF input source */
 
 	/** Not actually used - all DATA types begin from this value */
 	TRACE_RT_DATA_SIMPLE	= 1000, 
@@ -494,10 +499,12 @@ typedef enum {
 	TRACE_RT_DATA_LEGACY_NZIX=TRACE_RT_DATA_SIMPLE + TRACE_FORMAT_LEGACY_NZIX,
 	/** RT is encapsulating a Linux native PACKET_MMAP capture record */
 	TRACE_RT_DATA_LINUX_RING=TRACE_RT_DATA_SIMPLE+TRACE_FORMAT_LINUX_RING,
-    /** RT is encapsulating a Intel DPDK capture record */
+	/** RT is encapsulating a Intel DPDK capture record */
 	TRACE_RT_DATA_DPDK=TRACE_RT_DATA_SIMPLE+TRACE_FORMAT_DPDK,
-
+	/** RT is encapsulating a etsilive capture record */
         TRACE_RT_DATA_ETSILI = TRACE_RT_DATA_SIMPLE + TRACE_FORMAT_ETSILIVE,
+	/** RT is encapsulating a tzsplive capture record */
+	TRACE_RT_DATA_TZSP = TRACE_RT_DATA_SIMPLE + TRACE_FORMAT_TZSPLIVE,
 
 	/** As PCAP does not store the linktype with the packet, we need to 
 	 * create a separate RT type for each supported DLT, starting from
@@ -536,9 +543,11 @@ typedef enum {
 
         TRACE_RT_DATA_PCAPNG            = 4000,
 	TRACE_RT_DATA_PCAPNG_END        = 4499,
+
+
 	/** Unused value marking the end of the valid range for all RT packet
 	 * types */
-	TRACE_RT_LAST			= 4500
+	TRACE_RT_LAST			= 5001
 } libtrace_rt_types_t;
 
 /** IP Protocol values */
@@ -572,12 +581,89 @@ typedef enum {
 	TRACE_ETHERTYPE_ARP	= 0x0806,	/**< Address resolution protocol */
 	TRACE_ETHERTYPE_RARP	= 0x8035,	/**< Reverse ARP */
 	TRACE_ETHERTYPE_8021Q	= 0x8100,	/**< 802.1q VLAN Extended Header */
+	TRACE_ETHERTYPE_8021QS	= 0x88A8,	/**< 802.1q Service VLAN tag */
 	TRACE_ETHERTYPE_IPV6	= 0x86DD,	/**< IPv6 */
 	TRACE_ETHERTYPE_MPLS	= 0x8847,	/**< MPLS Unicast traffic */
 	TRACE_ETHERTYPE_MPLS_MC = 0x8848,	/**< MPLS Multicast traffic */
 	TRACE_ETHERTYPE_PPP_DISC= 0x8863,	/**< PPPoE Service Discovery */
 	TRACE_ETHERTYPE_PPP_SES = 0x8864	/**< PPPoE Session Messages */
 } libtrace_ethertype_t;
+
+/** constant to check if a vlan was found */
+#define VLAN_NOT_FOUND 0xFF
+
+/** constant to check if a mpls label was found */
+#define MPLS_NOT_FOUND 0xFFFF
+
+typedef struct libtrace_layer2_header {
+        uint16_t ethertype;                     /**< Ethertype of the header */
+        void *data;                             /**< Pointer to the header */
+} libtrace_layer2_header_t;
+typedef struct libtrace_layer2_headers {
+        uint64_t bitmask;			/**< Bitmask of found headers */
+        int num;				/**< The number of header */
+        libtrace_layer2_header_t *header;	/**< Array of all found layer2 headers */
+} libtrace_layer2_headers_t;
+/** Enumeration of bitmask layer2 headers within libtrace_layer2_headers_t */
+enum {
+	TRACE_BITMASK_LOOPBACK	= 1,
+	TRACE_BITMASK_IP	= 2,
+	TRACE_BITMASK_ARP	= 4,
+	TRACE_BITMASK_RARP	= 8,
+	TRACE_BITMASK_8021Q	= 16,
+	TRACE_BITMASK_IPV6	= 32,
+	TRACE_BITMASK_8021QS	= 64,
+	TRACE_BITMASK_MPLS	= 128,
+	TRACE_BITMASK_MPLS_MC	= 256,
+	TRACE_BITMASK_PPP_DISC	= 512,
+	TRACE_BITMASK_PPP_SES	= 1024,
+};
+
+/** Enumeration of datatype returned inside libtrace_meta_item_t structure */
+typedef enum {
+	TRACE_META_UINT8	= 1,
+        TRACE_META_UINT32	= 2,        
+        TRACE_META_UINT64	= 3,
+        TRACE_META_STRING       = 4,
+        TRACE_META_UNKNOWN      = 5,
+	TRACE_META_IPV4		= 6,
+	TRACE_META_IPV6		= 7,
+	TRACE_META_MAC		= 8, 
+} libtrace_meta_datatype_t;
+
+/** A structure representing a single meta-data field */
+typedef struct libtrace_meta_item {
+        /** Identifier for the section / block that this meta-data came from */
+	uint16_t section;
+
+        /** Identifier for the meta-data field itself */
+        uint16_t option;
+
+        /** Label string for this meta-data field */
+	char *option_name;
+
+        /** The length of the meta-data value (in bytes) */
+        uint16_t len;
+
+        /** The 'type' for the meta-data value, e.g. string, unsigned int */
+        libtrace_meta_datatype_t datatype;
+
+        /** A pointer to the meta-data value -- you will need to cast
+         *  appropriately based based on the value of 'datatype'.
+         */
+        void *data;
+} libtrace_meta_item_t;
+
+/** A collection of meta-data fields */
+typedef struct libtrace_meta_section {
+        /** Number of meta-data fields in this collection */
+	uint16_t num;
+
+        /** Pointer to the array containing the meta-data fields for this
+         *  collection.
+         */
+	libtrace_meta_item_t *items;
+} libtrace_meta_t;
 
 typedef struct libtrace_packet_cache {
 	int capture_length;		/**< Cached capture length */
@@ -615,7 +701,6 @@ typedef struct libtrace_packet_t {
         pthread_mutex_t ref_lock;       /**< Lock for reference counter */
         int refcount;                 /**< Reference counter */
         int which_trace_start;          /**< Used to match packet to a started instance of the parent trace */
-
 } libtrace_packet_t;
 
 #define IS_LIBTRACE_META_PACKET(packet) (packet->type < TRACE_RT_DATA_SIMPLE)
@@ -1376,6 +1461,9 @@ typedef enum {
         /** Always assume ERF framing length is the given value, rather than
          *  trying to calculate it from the packet type. */
         TRACE_OPTION_CONSTANT_ERF_FRAMING,
+
+	/** If enabled all meta packet will be discarded */
+	TRACE_OPTION_DISCARD_META,
 } trace_option_t;
 
 /** Sets an input config option
@@ -2412,6 +2500,54 @@ DLLEXPORT void *trace_get_payload_from_link(void *linkptr,
  */
 DLLEXPORT void *trace_get_payload_from_vlan(
                 void *vlan, uint16_t *type, uint32_t *remaining);
+
+/** Get the outermost VLAN ID from a packet.
+ * @param packet		A pointer to the packet
+ * @param[out] vlanptr		A pointer to the VLAN header
+ * @param[out] remaining	Updated with the number of captured bytes remaining
+ *
+ * @return The outermost VLAN id if found or VLAN_NOT_FOUND
+ *
+ * vlanptr will be set to the start of the VLAN header found (or NULL if no
+ * VLAN tags are present).
+ *
+ * remaining will be set to the number of captured bytes in the packet,
+ * starting from the returned VLAN header.
+ */
+DLLEXPORT uint16_t trace_get_outermost_vlan(
+	libtrace_packet_t *packet, uint8_t **vlanptr, uint32_t *remaining);
+
+/** Get all layer2 headers from a packet.
+ * @param packet	A pointer to the packet
+ *
+ * @return A libtrace_layer2_headers_t structure containing all found layer2
+ * headers (or NULL if no layer2 headers are found). This structure must be
+ * destroyed with trace_destroy_layer2_headers().
+ */
+DLLEXPORT libtrace_layer2_headers_t *trace_get_layer2_headers(libtrace_packet_t *packet);
+
+/** Destroys a libtrace_layer2_headers_t structure.
+ * @param headers	A pointer to the libtrace_layer2_headers_t structure
+ *
+ * @returns 1 on successful deletion.
+ */
+DLLEXPORT int trace_destroy_layer2_headers(libtrace_layer2_headers_t *headers);
+
+/** Get the outermost MPLS label from a packet.
+ * @param packet		A pointer to the packet
+ * @param[out] mplsptr		A pointer to the mpls header
+ * @param[out] remaining	Updated with the number of captured bytes remaining
+ *
+ * @return The outmost MPLS label if found or MPLS_NOT_FOUND
+ *
+ * mplsptr will be set to the start of the MPLS header (or NULL if no
+ * MPLS header is found)
+ *
+ * remaining will be set to the number of captured bytes in the packet,
+ * starting from the MPLS header.
+ */
+DLLEXPORT uint32_t trace_get_outermost_mpls(
+	libtrace_packet_t *packet, uint8_t **mplsptr, uint32_t *remaining);
 
 /** Gets a pointer to the payload following an MPLS header.
  * @param mpls      A pointer to the MPLS header
@@ -3693,7 +3829,290 @@ DLLEXPORT bool trace_get_wireless_antenna(void *linkptr,
 
 /*@}*/
 
+/* Destroy libtrace_meta_t structure
+ *
+ * @params libtrace_meta_t structure
+ * returns 1 on success, -1 on failure
+ */
+DLLEXPORT int trace_destroy_meta(libtrace_meta_t *result);
+
+/* Get the interface name/s for a meta packet.
+ * Must be destroyed with trace_destroy_meta().
+ *
+ * @params libtrace_packet_t meta packet.
+ * @returns Pointer to libtrace_meta_t structure containing all found interface names
+ * or NULL.
+ */
+DLLEXPORT libtrace_meta_t *trace_get_interface_name_meta(libtrace_packet_t *packet);
+
+/* Get the interface name for a meta packet.
+ * Note: ERF packets can contain multiple interfaces per meta packet. Use index to
+ * specify the interface index.
+ *
+ * @params libtrace_packet_t meta packet to extract the interface name from.
+ * @params A pointer to a character buffer to store the interface name in.
+ * @params The size of the buffer passed in.
+ * @params The interface index within the meta packet.
+ * @returns Pointer to the character buffer containing the interface name or NULL.
+ */
+DLLEXPORT char *trace_get_interface_name(libtrace_packet_t *packet, char *space, int spacelen,
+	int index);
+
+/* Get the interface MAC address/s for a meta packet.
+ * Must be destroyed with trace_destroy_meta().
+ *
+ * @params libtrace_packet_t meta packet.
+ * @returns Pointer to libtrace_meta_t structure containing all found interface mac
+ * addresses or NULL.
+ */
+DLLEXPORT libtrace_meta_t *trace_get_interface_mac_meta(libtrace_packet_t *packet);
+
+/* Get the interface MAC address for a meta packet.
+ * Note: ERF packets can contain multiple interfaces per meta packet. Use index to
+ * specify the interface index.
+ *
+ * @params libtrace_packet_t meta packet to extract the MAC address from.
+ * @params A pointer to a character buffer to store the MAC address in.
+ * @params The size of the buffer passed in.
+ * @params The interface index within the meta packet.
+ * @returns Pointer to the character buffer containing the MAC address or NULL.
+ */
+DLLEXPORT char *trace_get_interface_mac(libtrace_packet_t *packet, char *space, int spacelen,
+        int index);
+
+/* Get the interface speed/s from a meta packet.
+ * Must be destroyed with trace_destroy_meta().
+ *
+ * @params libtrace_packet_t packet.
+ * @returns Pointer to libtrace_meta_t structure containing all found interface
+ * speeds or NULL.
+ */
+DLLEXPORT libtrace_meta_t *trace_get_interface_speed_meta(libtrace_packet_t *packet);
+
+/* Get the interface speed for a meta packet.
+ * Note: ERF packets can contain multiple interfaces per meta packet. Use index to
+ * specify the interface index.
+ *
+ * @params libtrace_packet_t meta packet to extract the interface speed from.
+ * @params The interface index within the meta packet.
+ * @returns uint64_t interface speed or NULL.
+ */
+DLLEXPORT uint64_t trace_get_interface_speed(libtrace_packet_t *packet, int index);
+
+/* Get the interface ipv4 address/s for a meta packet.
+ * Must be destroyed with trace_destroy_meta().
+ *
+ * @params libtrace_packet_t meta packet.
+ * @returns Pointer to libtrace_meta_t structure containing all found ipv4 addresses
+ * or NULL
+ */
+DLLEXPORT libtrace_meta_t *trace_get_interface_ipv4_meta(libtrace_packet_t *packet);
+
+/* Get the interface ipv4 address for a meta packet.
+ * Note: ERF packets can contain multiple interfaces per meta packet. Use index to
+ * specify the interface index.
+ *
+ * @params libtrace_packet_t meta packet to extract the ipv4 address from.
+ * @params The interface index within the meta packet.
+ * @returns uint32_t ipv4 address or 0.
+ */
+DLLEXPORT uint32_t trace_get_interface_ipv4(libtrace_packet_t *packet, int index);
+
+/* Get the interface ipv4 address string for a meta packet.
+ * Note: ERF packets can contain multiple interfaces per meta packet. Use index to
+ * specify the interface index.
+ *
+ * @params libtrace_packet_t meta packet to extract the ipv4 address from.
+ * @params A pointer to a character buffer to store the ipv4 address string in.
+ * @params The size of the buffer passed in.
+ * @params The interface index within the meta packet.
+ * @returns Pointer to the character buffer containing the ipv4 address string or NULL.
+ */
+DLLEXPORT char *trace_get_interface_ipv4_string(libtrace_packet_t *packet, char* space, int spacelen,
+	int index);
+
+/* Get the interface ipv6 address/s for a meta packet.
+ * Must be destroyed with trace_destroy_meta().
+ *
+ * @params libtrace_packet_t meta packet.
+ * @returns Pointer to libtrace_meta_t structure containing all found ipv6 addresses
+ * or NULL.
+ */
+DLLEXPORT libtrace_meta_t *trace_get_interface_ipv6_meta(libtrace_packet_t *packet);
+
+/* Get the interface ipv6 address for a meta packet.
+ * Note: ERF packets can contain multiple interfaces per meta packet. Use index to
+ * specify the interface index.
+ *
+ * @params libtrace_packet_t meta packet to extract the ipv6 address from.
+ * @params A pointer to a character buffer to store the ipv6 address in.
+ * @params The size of the buffer passed in.
+ * @params The interface index within the meta packet.
+ * @returns Pointer to the buffer containing the ipv6 address or NULL.
+ */
+DLLEXPORT void *trace_get_interface_ipv6(libtrace_packet_t *packet, void *space, int spacelen,
+	int index);
+
+/* Get the interface ipv6 address string for a meta packet.
+ * Note: ERF packets can contain multiple interfaces per meta packet. Use index to
+ * specify the interface index.
+ *
+ * @params libtrace_packet_t meta packet to extract the ipv6 address from.
+ * @params A pointer to a character buffer to store the ipv6 address in.
+ * @params The size of the buffer passed in.
+ * @params The interface index within the meta packet.
+ * @returns Pointer to the character buffer containing the ipv6 address string or NULL.
+ */
+DLLEXPORT char *trace_get_interface_ipv6_string(libtrace_packet_t *packet, char *space, int spacelen,
+	int index);
+
+/* Get the interface description/s for a meta packet.
+ * Must be destroyed with trace_destroy_meta().
+ *
+ * @params libtrace_packet_t meta packet.
+ * @returns Pointer to libtrace_meta_t structure containing all found interface
+ * descriptions or NULL.
+ */
+DLLEXPORT libtrace_meta_t *trace_get_interface_description_meta(libtrace_packet_t *packet);
+
+/* Get the interface description for a meta packet.
+ * Note: ERF packets can contain multiple interfaces per meta packet. Use index to
+ * specify the interface index.
+ *
+ * @params libtrace_packet_t meta packet to extract the interface description from.
+ * @params A pointer to a character buffer to store the interface description in.
+ * @params The size of the buffer passed in.
+ * @params The interface index within the meta packet.
+ * @returns Pointer to the character buffer containing the interface description or NULL.
+ */
+DLLEXPORT char *trace_get_interface_description(libtrace_packet_t *packet, char *space, int spacelen,
+	int index);
+
+/* Get the host OS for a meta packet.
+ * Must be destroyed with trace_destroy_meta().
+ *
+ * @params libtrace_packet_t meta packet.
+ * @returns Pointer to libtrace_meta_t structure containing the host OS or NULL.
+ */
+DLLEXPORT libtrace_meta_t *trace_get_host_os_meta(libtrace_packet_t *packet);
+
+/* Get the host OS for a meta packet.
+ *
+ * @params libtrace_packet_t meta packet to extract the host OS from.
+ * @params A pointer to a character buffer to store the host OS in.
+ * @params The size of the buffer passed in.
+ * @returns Pointer to the character buffer containing the host OS or NULL.
+ */
+DLLEXPORT char *trace_get_host_os(libtrace_packet_t *packet, char *space, int spacelen);
+
+/* Get the interface frame check sequence length for a meta packet.
+ * Must be destroyed with trace_destroy_meta().
+ *
+ * @params libtrace_packet_t meta packet.
+ * @returns Pointer to libtrace_meta_t structure containing all found frame check
+ * sequence lengths or NULL.
+ */
+DLLEXPORT libtrace_meta_t *trace_get_interface_fcslen_meta(libtrace_packet_t *packet);
+
+/* Get the interface frame check sequence length for a meta packet.
+ * Note: ERF packets can contain multiple interfaces per meta packet. Use index to
+ * specify the interface index.
+ *
+ * @params libtrace_packet_t meta packet to extract the interface fcslen from.
+ * @params The interface index within the meta packet.
+ * @returns uint32_t frame check sequence length or 0.
+ */
+DLLEXPORT uint32_t trace_get_interface_fcslen(libtrace_packet_t *packet, int index);
+
+/* Get any interface comments for a meta packet
+ * Must be destroyed with trace_destroy_meta()
+ *
+ * @params libtrace_packet_t packet
+ * @returns Pointer to libtrace_meta_t structure or NULL
+ */
+DLLEXPORT libtrace_meta_t *trace_get_interface_comment_meta(libtrace_packet_t *packet);
+
+/* Get the interface comment for a meta packet.
+ * Note: ERF packets can contain multiple interfaces per meta packet. Use index to
+ * specify the interface ID.
+ *
+ * @params libtrace_packet_t meta packet to extract the interface comment from.
+ * @params A pointer to a character buffer to store the interface description in.
+ * @params The size of the buffer passed in.
+ * @params The interface number within the meta packet.
+ * @returns Pointer to the character buffer containing the hardware description or NULL.
+ */
+DLLEXPORT char *trace_get_interface_comment(libtrace_packet_t *packet, char *space, int spacelen,
+	int index);
+
+/* Get the capture application for a meta packet
+ * Must be destroyed with trace_destroy_meta()
+ *
+ * @params libtrace_packet_t packet
+ * @returns Pointer to libtrace_meta_t structure or NULL
+ */
+DLLEXPORT libtrace_meta_t *trace_get_capture_application_meta(libtrace_packet_t *packet);
+
+/* Get the capture application for a meta packet.
+ *
+ * @params libtrace_packet_t meta packet to extract the application name from.
+ * @params A pointer to a character buffer to store the application name in.
+ * @params The size of the buffer passed in.
+ * @returns Pointer to the character buffer containing the application name or NULL.
+ */
+DLLEXPORT char *trace_get_capture_application(libtrace_packet_t *packet, char *space, int spacelen);
+
+/* Get a single specific meta-data field from a meta packet
+ * Must be destroyed with trace_destroy_meta()
+ *
+ * @params packet               The meta packet to extract the option from
+ * @params section_code         The section that the required option is found in
+ * @params option_code          The code for the required option
+ * @returns Pointer to libtrace_meta_t structure or NULL
+ */
+DLLEXPORT libtrace_meta_t *trace_get_single_meta_field(
+        libtrace_packet_t *packet, uint32_t section_code, uint16_t option_code);
+
+/* Parses all meta-data fields within a meta packet
+ * Must be destroyed with trace_destroy_meta()
+ *
+ * @params libtrace_packet_t packet
+ * @returns Pointer to libtrace_meta_t structure or NULL
+ */
+DLLEXPORT libtrace_meta_t *trace_get_all_metadata(libtrace_packet_t *packet);
+
+/* Get the DAG card model from a meta packet.
+ *
+ * @params libtrace_packet_t meta packet to extract the DAG model from.
+ * @params A pointer to a character buffer to store the DAG model in.
+ * @params The size of the buffer passed in.
+ * @returns Pointer to the character buffer containing the DAG model or NULL.
+ */
+DLLEXPORT char *trace_get_erf_dag_card_model(libtrace_packet_t *packet, char *space,
+	int spacelen);
+
+/* Get the host DAG software version for a meta packet.
+ *
+ * @params libtrace_packet_t meta packet to extract the hosts DAG verion from.
+ * @params A pointer to a character buffer to store the DAG version in.
+ * @params The size of the buffer passed in.
+ * @returns Pointer to the character buffer containing the DAG version or NULL.
+ */
+DLLEXPORT char *trace_get_erf_dag_version(libtrace_packet_t *packet, char *space,
+	int spacelen);
+
+/* Get the firmware version for a DAG module from a meta packet.
+ *
+ * @params libtrace_packet_t meta packet to extract the FW version from.
+ * @params A pointer to a character buffer to store the FW version in.
+ * @params The size of the buffer passed in.
+ * @returns Pointer to the character buffer containing the FW version or NULL.
+ */
+DLLEXPORT char *trace_get_erf_dag_fw_version(libtrace_packet_t *packet, char *space,
+	int spacelen);
+
 #ifdef __cplusplus
 } /* extern "C" */
 #endif /* #ifdef __cplusplus */
+
 #endif /* LIBTRACE_H_ */

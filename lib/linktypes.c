@@ -31,8 +31,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "libtrace_arphrd.h" 
-
+#include "libtrace_arphrd.h"
+#include "format_tzsplive.h"
 
 /* This file maps libtrace types to/from pcap DLT and erf types
  *
@@ -110,6 +110,7 @@ libtrace_dlt_t libtrace_to_pcap_dlt(libtrace_linktype_t type)
                 case TRACE_TYPE_ETSILI:
 			break;
 		case TRACE_TYPE_PCAPNG_META:
+		case TRACE_TYPE_TZSP:
 		case TRACE_TYPE_UNKNOWN:
                 case TRACE_TYPE_CONTENT_INVALID:
 			break;
@@ -147,16 +148,21 @@ libtrace_rt_types_t pcapng_linktype_to_rt(libtrace_dlt_t linktype) {
         return TRACE_RT_DATA_PCAPNG + pcap_dlt_to_pcap_linktype(linktype);
 }
 
+libtrace_rt_types_t tzsp_linktype_to_rt(libtrace_dlt_t linktype) {
+	return TRACE_RT_DATA_TZSP + pcap_dlt_to_pcap_linktype(linktype);
+}
+
 libtrace_dlt_t rt_to_pcap_linktype(libtrace_rt_types_t rt_type)
 {
 
 	if (rt_type >= TRACE_RT_DATA_DLT && rt_type < TRACE_RT_DATA_DLT_END) {
 		/* RT type is in the pcap range */
 		return rt_type - TRACE_RT_DATA_DLT;
-	}
-	else if (rt_type >= TRACE_RT_DATA_BPF && rt_type < TRACE_RT_DATA_BPF_END) {
+	} else if (rt_type >= TRACE_RT_DATA_BPF && rt_type < TRACE_RT_DATA_BPF_END) {
+		/* RT type is in the bpf range */
 		return rt_type - TRACE_RT_DATA_BPF;
 	} else if (rt_type >= TRACE_RT_DATA_PCAPNG && rt_type < TRACE_RT_DATA_PCAPNG_END) {
+		/* RT type is in the PCAPNG range */
                 return rt_type - TRACE_RT_DATA_PCAPNG;
         }
 
@@ -213,10 +219,42 @@ uint8_t libtrace_to_erf_type(libtrace_linktype_t linktype)
 		case TRACE_TYPE_OPENBSD_LOOP:
                 case TRACE_TYPE_ETSILI:
 		case TRACE_TYPE_PCAPNG_META:
+		case TRACE_TYPE_TZSP:
 		case TRACE_TYPE_UNKNOWN:
 		case TRACE_TYPE_CONTENT_INVALID:
 			break;
 	}
+	return 255;
+}
+
+uint8_t libtrace_to_tzsp_type(libtrace_linktype_t linktype) {
+	switch(linktype) {
+		case TRACE_TYPE_ETH: return TZSP_ENCAP_ETHERNET;
+		case TRACE_TYPE_PPP: return TZSP_ENCAP_PPP;
+		case TRACE_TYPE_NONE: return TZSP_ENCAP_RAW;
+		case TRACE_TYPE_80211: return TZSP_ENCAP_80211;
+		case TRACE_TYPE_80211_PRISM: return TZSP_ENCAP_80211_PRISM;
+		case TRACE_TYPE_UNKNOWN:
+		case TRACE_TYPE_HDLC_POS:
+		case TRACE_TYPE_ATM:
+		case TRACE_TYPE_LINUX_SLL:
+		case TRACE_TYPE_PFLOG:
+		case TRACE_TYPE_POS:
+		case TRACE_TYPE_AAL5:
+		case TRACE_TYPE_DUCK:
+		case TRACE_TYPE_80211_RADIO:
+		case TRACE_TYPE_LLCSNAP:
+		case TRACE_TYPE_METADATA:
+		case TRACE_TYPE_NONDATA:
+		case TRACE_TYPE_OPENBSD_LOOP:
+		case TRACE_TYPE_ERF_META:
+		case TRACE_TYPE_ETSILI:
+		case TRACE_TYPE_PCAPNG_META:
+		case TRACE_TYPE_CONTENT_INVALID:
+		case TRACE_TYPE_TZSP:
+			break;
+	}
+	/* unknown */
 	return 255;
 }
 
