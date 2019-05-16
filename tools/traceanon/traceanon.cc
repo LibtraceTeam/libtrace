@@ -281,23 +281,22 @@ static void encrypt_radius(Anonymiser *anon, uint8_t *radstart, uint32_t *rem){
 				break;
 			}
 		}
-		if (!skipAVP || radius_force_anon){
+		if (val_len > 0 && (!skipAVP || radius_force_anon)){
+                        uint8_t *ptr;
 			digest_buffer = anon->digest_message(&radius_avp->value, val_len, anon_mode);
 
 			// printf("TYPE:0x%02x\tLEN:0x%02x\n",radius_avp->type, radius_avp->length);
 			// for (uint16_t i = 0; i < val_len; i++){printf("%02x ",*(&radius_avp->value +i));}printf("\n");
 			// for (uint16_t i = 0; i < val_len; i++){printf("%02x ",i < 32 ? *(digest_buffer+i):0);}printf("\n");
+                        ptr = &(radius_avp->value);
 
-			if (val_len > SHA256_SIZE){
-				memcpy(&radius_avp->value, digest_buffer, SHA256_SIZE);
+			while (val_len > SHA256_SIZE){
 				//overwrite hash digest into AVP value
-
-				memset(&radius_avp->value+SHA256_SIZE, 0, val_len-SHA256_SIZE);
-				//pad with zeros to fill 
+				memcpy(ptr, digest_buffer, SHA256_SIZE);
+                                val_len -= SHA256_SIZE;
+                                ptr += SHA256_SIZE;
 			}
-			else {
-				memcpy(&radius_avp->value, digest_buffer, val_len);
-			}
+			memcpy(ptr, digest_buffer, val_len);
 		}
 		radius_ptr+=(radius_avp->length); //move to next
 	}

@@ -61,7 +61,7 @@ private:
 #ifdef HAVE_LIBCRYPTO
     uint8_t salt[SALT_LENGTH];
     EVP_MD_CTX *mdctx;
-    uint8_t buffer[1024];
+    uint8_t buffer[32];
 #endif
 
 };

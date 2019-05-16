@@ -106,9 +106,9 @@ uint8_t *Anonymiser::digest_message(uint8_t *src_ptr, uint32_t src_length, uint8
     EVP_DigestFinal_ex(mdctx, buffer, &len);
 
     if (anon_mode == RADIUS_ANON_MODE_NUMERIC) {
-        buffer_to_digits(buffer, len);
+        buffer_to_digits(buffer, 32);
     } else if (anon_mode == RADIUS_ANON_MODE_TEXT) {
-        buffer_to_chars(buffer, len);
+        buffer_to_chars(buffer, 32);
     }
 
     return buffer;
