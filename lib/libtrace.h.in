@@ -1530,7 +1530,9 @@ typedef enum {
 	TRACE_OPTION_COMPRESSTYPE_ZLIB = 1, /**< GZip Compression */
 	TRACE_OPTION_COMPRESSTYPE_BZ2  = 2, /**< BZip2 Compression */
 	TRACE_OPTION_COMPRESSTYPE_LZO  = 3,  /**< LZO Compression */
-	TRACE_OPTION_COMPRESSTYPE_LZMA  = 4,  /**< LZO Compression */
+	TRACE_OPTION_COMPRESSTYPE_LZMA  = 4,  /**< LZMA Compression */
+	TRACE_OPTION_COMPRESSTYPE_ZSTD  = 5,  /**< zstd Compression */
+	TRACE_OPTION_COMPRESSTYPE_LZ4  = 6,  /**< lz4 Compression */
         TRACE_OPTION_COMPRESSTYPE_LAST
 } trace_option_compresstype_t;
 
