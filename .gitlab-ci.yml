@@ -72,6 +72,20 @@ build-amd64-ubuntu-cosmic:
   only:
     - tags
 
+build-amd64-ubuntu-disco:
+  stage: build
+  image: ubuntu:disco
+  script:
+    - ./gitlab-build.sh
+    - mkdir -p built-packages/disco/
+    - mv ../*.deb built-packages/disco/
+  artifacts:
+    paths:
+      - built-packages/*
+    expire_in: 1 day
+  only:
+    - tags
+
 build-amd64-fedora-29:
   stage: build
   image: fedora:29
