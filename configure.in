@@ -211,6 +211,7 @@ AC_CHECK_LIB(crypto, EVP_EncryptInit_ex, cryptofound=1, cryptofound=0)
 if test "$cryptofound" = 1; then
 	AC_CHECK_HEADER(openssl/evp.h, cryptofound=1, cryptofound=0)
 fi
+AC_CHECK_LIB(yaml, yaml_parser_initialize, yamlfound=1, yamlfound=0)
 AC_CHECK_LIB(tasn1, asn1_array2tree, asn1found=1, asn1found=0)
 
 # Check for libpcap
@@ -526,6 +527,14 @@ else
         have_crypto=no
 fi
 
+if test "$yamlfound" = 1; then
+        AC_DEFINE(HAVE_LIBYAML, 1, [Set to 1 if libyaml is available])
+        TOOLS_LIBS="$TOOLS_LIBS -lyaml"
+        have_yaml=yes
+else
+        have_yaml=no
+fi
+
 if test "$have_nsl" = 1; then
 	if test "$ac_cv_search_inet_ntop" != "none required"; then
 		LIBTRACE_LIBS="$LIBTRACE_LIBS $ac_cv_search_inet_ntop"
@@ -643,6 +652,7 @@ AM_CONDITIONAL([HAVE_NETPACKET_PACKET_H], [test "$libtrace_netpacket_packet_h" =
 AM_CONDITIONAL([HAVE_LIBGDC], [test "$ac_cv_header_gdc_h" = yes])
 AM_CONDITIONAL([HAVE_LLVM], [test "x$JIT" != "xno" ])
 AM_CONDITIONAL([HAVE_NCURSES], [test "x$with_ncurses" != "xno"])
+AM_CONDITIONAL([HAVE_YAML], [test "x$have_yaml" != "xno"])
 
 # Check for miscellaneous programs
 AC_CHECK_PROG([libtrace_doxygen], [doxygen], [true], [false])
@@ -721,7 +731,11 @@ reportopt "Compiled with LLVM BPF JIT support" $JIT
 reportopt "Compiled with live ETSI LI support (requires libwandder)" $wandder_avail
 reportopt "Building man pages/documentation" $libtrace_doxygen
 reportopt "Building tracetop (requires libncurses)" $with_ncurses
-reportopt "Building traceanon with CryptoPan (requires libcrypto and openssl/evp.h)" $have_crypto
+reportopt "Building traceanon (requires libyaml)" $have_yaml
+
+if test x"$have_yaml" = xyes; then
+    reportopt "Building traceanon with CryptoPan (requires libcrypto and openssl/evp.h)" $have_crypto
+fi
 
 # Report any errors relating to missing bison, flex, etc.
 echo 
