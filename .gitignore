@@ -100,3 +100,4 @@ tools/tracestats/tracestats
 tools/tracetop/tracetop
 ylwrap
 
+.vscode*
