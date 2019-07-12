@@ -402,8 +402,23 @@ AC_ARG_WITH(dpdk,
 
 libtrace_dpdk=false
 if test "$want_dpdk" != no; then
+
+        PKG_CHECK_MODULES([DPDK], [libdpdk >= 18], [pkgconf_dpdk_found="yes"],
+                [pkgconf_dpdk_found="no"])
+        if test "x$pkgconf_dpdk_found" = "xyes"; then
+                LIBTRACE_LIBS="$LIBTRACE_LIBS $DPDK_LIBS"
+                ADD_INCLS="$ADD_INCLS $DPDK_CFLAGS"
+                AC_MSG_NOTICE([Building against system DPDK])
+
+                AC_DEFINE(HAVE_DPDK,1,[conditional for building with DPDK live capture support])
+                AC_DEFINE(HAVE_DPDK18,1,[using dpdk version 18 or later])
+                libtrace_dpdk=true
+                dpdk_found=pkgconfig
+        fi
+
+
 	# So instead simply check for existence
-	if test "$RTE_SDK" != ""; then
+	if test "$dpdk_found" = 0 -a "$RTE_SDK" != ""; then
 		AC_CHECK_FILE("$RTE_SDK/$RTE_TARGET/lib/libdpdk.so", dpdk_found="dpdk", dpdk_found=0)
 	fi
 	if test "$dpdk_found" = 0 -a "$RTE_SDK" != ""; then
@@ -425,7 +440,8 @@ if test "$want_dpdk" != no; then
 		AC_DEFINE(HAVE_DPDK,1,[conditional for building with DPDK live capture support])
 		libtrace_dpdk=true
 	fi
-	if test "$RTE_SDK" = ""; then
+
+	if test "$dpdk_found" = 0 -a "$RTE_SDK" = ""; then
 		AC_MSG_NOTICE([No RTE_SDK given, checking for system dpdk-dev package])
 		# Search the system, maybe it is installed? Ethdev is one of the main libraries
 		# On Ubuntu and Debian we can simply check for dpdk.so
@@ -446,6 +462,10 @@ if test "$want_dpdk" != no; then
 			dpdk_found=system
 		fi
 	fi
+
+        if test "$dpdk_found" = 0 -a "$with_dpdk" = "yes"; then
+                AC_MSG_ERROR("Unable to find DPDK on system. Build halted -- consider re-running configure with '--with-dpdk=no'.")
+        fi
 fi
 
 # Check for PACKET_FANOUT (borrowed from Suricata)
@@ -653,6 +673,8 @@ AM_CONDITIONAL([HAVE_LIBGDC], [test "$ac_cv_header_gdc_h" = yes])
 AM_CONDITIONAL([HAVE_LLVM], [test "x$JIT" != "xno" ])
 AM_CONDITIONAL([HAVE_NCURSES], [test "x$with_ncurses" != "xno"])
 AM_CONDITIONAL([HAVE_YAML], [test "x$have_yaml" != "xno"])
+
+AM_CONDITIONAL([HAVE_DPDK_PKGCONFIG], [test "x$dpdk_found" = "xpkgconfig"])
 
 # Check for miscellaneous programs
 AC_CHECK_PROG([libtrace_doxygen], [doxygen], [true], [false])
