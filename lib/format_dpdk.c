@@ -209,9 +209,15 @@ static int whitelist_device(struct dpdk_format_data_t *format_data UNUSED, struc
 		 whitelist->bus,
 		 whitelist->devid,
 		 whitelist->function);
+#ifdef HAVE_DPDK18
+	if (rte_devargs_add(RTE_DEVTYPE_WHITELISTED_PCI, pci_str) < 0) {
+		return -1;
+	}
+#else
 	if (rte_eal_devargs_add(RTE_DEVTYPE_WHITELISTED_PCI, pci_str) < 0) {
 		return -1;
 	}
+#endif
 	return 0;
 }
 #endif
@@ -603,7 +609,11 @@ static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_
 	}
 #endif
 
+#if HAVE_DPDK18
+	format_data->nb_ports = rte_eth_dev_count_avail();
+#else
 	format_data->nb_ports = rte_eth_dev_count();
+#endif
 
 	if (format_data->nb_ports != 1) {
 		snprintf(err, errlen,
@@ -773,25 +783,46 @@ static struct rte_eth_conf port_conf = {
 	.rxmode = {
 		.mq_mode = ETH_RSS,
 		.split_hdr_size = 0,
+
+#ifdef HAVE_DPDK18
+
+  #ifdef DEV_RX_OFFLOAD_KEEP_CRC
+
+    #if GET_MAC_CRC_CHECKSUM
+		.offloads = DEV_RX_OFFLOAD_KEEP_CRC,
+    #else	/* not GET_MAC_CRC_CHECKSUM */
+		.offloads = 0,
+    #endif	/* GET_MAC_CRC_CHECKSUM */
+  #else	/* not DEV_RX_OFFLOAD_KEEP_CRC */
+    #if GET_MAC_CRC_CHECKSUM
+		.offloads = 0,
+    #else	/* not GET_MAC_CRC_CHECKSUM */
+		.offloads = DEV_RX_OFFLOAD_CRC_STRIP,
+    #endif	/* GET_MAC_CRC_CHECKSUM */
+  #endif	/* DEV_RC_OFFLOAD_KEEP_CRC */
+
+#else	/* notdef HAVE_DPDK18 */
 		.header_split   = 0, /**< Header Split disabled */
 		.hw_ip_checksum = 0, /**< IP checksum offload disabled */
 		.hw_vlan_filter = 0, /**< VLAN filtering disabled */
 		.jumbo_frame    = 0, /**< Jumbo Frame Support disabled */
 		.max_rx_pkt_len = 0, /**< Max frame Size if Jumbo enabled */
-#if GET_MAC_CRC_CHECKSUM
+  #if GET_MAC_CRC_CHECKSUM
 /* So it appears that if hw_strip_crc is turned off the driver will still
  * take this off. See line 955ish in lib/librte_pmd_e1000/igb_rxtx.c.
  * So if .hw_strip_crc=0 a valid CRC exists 4 bytes after the end of the
  * So lets just add it back on when we receive the packet.
  */
 		.hw_strip_crc   = 0, /**< CRC stripped by hardware */
-#else
+  #else	/* not GET_MAC_CRC_CHECKSUM */
 /* By default strip the MAC checksum because it's a bit of a hack to
  * actually read these. And don't want to rely on disabling this to actualy
  * always cut off the checksum in the future
  */
 		.hw_strip_crc   = 1, /**< CRC stripped by hardware */
-#endif
+  #endif	/* GET_MAC_CRC_CHECKSUM */
+
+#endif /* HAVE_DPDK18 */
 	},
 	.txmode = {
 		.mq_mode = ETH_DCB_NONE,
@@ -1140,13 +1171,22 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data,
 	if (format_data->paused == DPDK_NEVER_STARTED) {
 		if (format_data->snaplen == 0) {
 			format_data->snaplen = RX_MBUF_SIZE;
+#if HAVE_DPDK18
+			port_conf.rxmode.offloads &=
+					(~(DEV_RX_OFFLOAD_JUMBO_FRAME));
+#else
 			port_conf.rxmode.jumbo_frame = 0;
+#endif
 			port_conf.rxmode.max_rx_pkt_len = 0;
 		} else {
                         double expn;
 
 			/* Use jumbo frames */
+#if HAVE_DPDK18
+			port_conf.rxmode.offloads |= DEV_RX_OFFLOAD_JUMBO_FRAME;
+#else
 			port_conf.rxmode.jumbo_frame = 1;
+#endif
 			port_conf.rxmode.max_rx_pkt_len = format_data->snaplen;
 
                         /* Use less buffers if we're supporting jumbo frames
