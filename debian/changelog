@@ -1,3 +1,11 @@
+libtrace4 (4.0.9-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Update DPDK code to work with newer DPDK releases (18.11 especially).
+  * Fix segfault when a DAG device fails to open.
+
+ -- Shane Alcock <shane.alcock@waikato.ac.nz>  Mon, 15 Jul 2019 16:34:34 +1200
+
 libtrace4 (4.0.8-1) unstable; urgency=medium
 
   * New upstream release.
