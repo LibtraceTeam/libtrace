@@ -1,5 +1,6 @@
 #ifndef LIBTRACE_FORMAT_DPDK_H_
 #define LIBTRACE_FORMAT_DPDK_H_
+#include "config.h"
 
 #include <libtrace.h>
 #include "libtrace_int.h"
@@ -126,6 +127,14 @@
 typedef uint16_t portid_t;
 #else
 typedef uint8_t portid_t;
+#endif
+
+#ifndef HAVE_DPDK18             /* XXX would do a specific version check here
+                                 * but can't be bothered tracking down
+                                 * exactly when these functions changed names.
+                                 */
+#define rte_devargs_add rte_eal_devargs_add
+#define rte_eth_dev_count_avail rte_eth_dev_count
 #endif
 
 

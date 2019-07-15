@@ -209,15 +209,9 @@ static int whitelist_device(struct dpdk_format_data_t *format_data UNUSED, struc
 		 whitelist->bus,
 		 whitelist->devid,
 		 whitelist->function);
-#ifdef HAVE_DPDK18
 	if (rte_devargs_add(RTE_DEVTYPE_WHITELISTED_PCI, pci_str) < 0) {
 		return -1;
 	}
-#else
-	if (rte_eal_devargs_add(RTE_DEVTYPE_WHITELISTED_PCI, pci_str) < 0) {
-		return -1;
-	}
-#endif
 	return 0;
 }
 #endif
@@ -609,11 +603,7 @@ static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_
 	}
 #endif
 
-#if HAVE_DPDK18
 	format_data->nb_ports = rte_eth_dev_count_avail();
-#else
-	format_data->nb_ports = rte_eth_dev_count();
-#endif
 
 	if (format_data->nb_ports != 1) {
 		snprintf(err, errlen,
@@ -1242,6 +1232,8 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data,
 	struct rte_eth_dev_info dev_info;
 	rte_eth_dev_info_get(format_data->port, &dev_info);
 	rss_size = dev_info.hash_key_size;
+
+        port_conf.rx_adv_conf.rss_conf.rss_hf = dev_info.flow_type_rss_offloads;
 #endif
 	if (rss_size != 0) {
 		format_data->rss_key = malloc(rss_size);
