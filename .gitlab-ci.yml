@@ -44,6 +44,20 @@ build-amd64-debian-buster:
   only:
     - tags
 
+build-amd64-debian-buster:
+  stage: build
+  image: debian:buster
+  script:
+    - ./gitlab-build.sh
+    - mkdir -p built-packages/buster/
+    - mv ../*.deb built-packages/buster/
+  artifacts:
+    paths:
+      - built-packages/*
+    expire_in: 1 day
+  only:
+    - tags
+
 build-amd64-ubuntu-xenial:
   stage: build
   image: ubuntu:xenial
