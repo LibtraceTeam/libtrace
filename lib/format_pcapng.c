@@ -2100,6 +2100,7 @@ static libtrace_meta_datatype_t pcapng_get_datatype(uint32_t section, uint32_t o
 		default:
 			return TRACE_META_UNKNOWN;
 	}
+        return TRACE_META_UNKNOWN;
 }
 
 static void *pcapng_jump_to_options(libtrace_packet_t *packet) {

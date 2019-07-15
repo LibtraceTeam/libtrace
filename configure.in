@@ -368,86 +368,6 @@ if test "$with_dag" != no -a "$libtrace_dag" = false; then
 
 fi
 
-# Try to determine the DAG driver version
-#if test x"$libtrace_dag" = xtrue; then
-#       dag_drv_v="Unknown"
-#	files=`locate /usr/*dag*/VERSION`
-#       file_count=0
-#
-#       for i in $files; do
-#                if $file_count > 0; then
-#                        dag_drv_v="Indeterminate"
-#                        break
-#                fi
-#                dag_drv_v=`cat $i`
-#                file_count=$file_count+1
-#        done
-#fi
-#DAG_VERSION_NUM=$dag_drv_v
-
-# Check for DPDK 
-AC_ARG_WITH(dpdk,
-	    AS_HELP_STRING(--with-dpdk,include DPDK live capture support (From either the RTE_SDK/_TARGET environment variable or the dpdk-dev package)),
-[
-        if test "$withval" = no
-        then
-            want_dpdk=no
-        else
-            want_dpdk=ifpresent
-        fi
-],[
-        # Default to building without DPDK format
-        want_dpdk=no
-])
-
-libtrace_dpdk=false
-if test "$want_dpdk" != no; then
-	# So instead simply check for existence
-	if test "$RTE_SDK" != ""; then
-		AC_CHECK_FILE("$RTE_SDK/$RTE_TARGET/lib/libdpdk.so", dpdk_found="dpdk", dpdk_found=0)
-	fi
-	if test "$dpdk_found" = 0 -a "$RTE_SDK" != ""; then
-		AC_CHECK_FILE("$RTE_SDK/$RTE_TARGET/lib/libintel_dpdk.a", dpdk_found=":libintel_dpdk.a", dpdk_found=0)
-	fi
-	# DPDK 2.1.0+ renames this to libdpdk from libintel_dpdk
-	if test "$dpdk_found" = 0 -a "$RTE_SDK" != ""; then
-		AC_CHECK_FILE("$RTE_SDK/$RTE_TARGET/lib/libdpdk.a", dpdk_found=":libdpdk.a", dpdk_found=0)
-	fi
-	if test "$dpdk_found" = 0 -a "$RTE_SDK" != ""; then
-		AC_CHECK_LIB(dpdk, rte_eth_dev_configure, dpdk_found="dpdk", dpdk_found=0)
-	fi
-	if test "$dpdk_found" != 0 -a "$RTE_SDK" != ""; then
-		# Save these now so that they can be re-exported later
-		AC_SUBST([RTE_TARGET])
-		AC_SUBST([RTE_SDK])
-		# Force dpdk library to be statically linked to allow compiler optimisations
-		LIBTRACE_LIBS="$LIBTRACE_LIBS -Wl,--whole-archive -Wl,-l$dpdk_found -Wl,--no-whole-archive -Wl,-lm"
-		AC_DEFINE(HAVE_DPDK,1,[conditional for building with DPDK live capture support])
-		libtrace_dpdk=true
-	fi
-	if test "$RTE_SDK" = ""; then
-		AC_MSG_NOTICE([No RTE_SDK given, checking for system dpdk-dev package])
-		# Search the system, maybe it is installed? Ethdev is one of the main libraries
-		# On Ubuntu and Debian we can simply check for dpdk.so
-		AC_CHECK_LIB(dpdk, rte_eth_dev_configure, dpdk_found="system", dpdk_found=0)
-		# We also need to check that rte.vars.mk is installed from dpdk-dev (as well as libdpdk-dev)
-		if test "$dpdk_found" != 0 -a -e /usr/share/dpdk/mk/rte.vars.mk ; then
-			RTE_TARGET="$(uname -m)-default-linuxapp-gcc"
-			RTE_SDK="/usr/share/dpdk/"
-			RTE_INCLUDE="/usr/include/dpdk"
-			AC_SUBST([RTE_TARGET])
-			AC_SUBST([RTE_SDK])
-			AC_SUBST([RTE_INCLUDE])
-			LIBTRACE_LIBS="$LIBTRACE_LIBS -ldpdk"
-			AC_MSG_NOTICE([Building against system DPDK])
-
-			AC_DEFINE(HAVE_DPDK,1,[conditional for building with DPDK live capture support])
-			libtrace_dpdk=true
-			dpdk_found=system
-		fi
-	fi
-fi
-
 # Check for PACKET_FANOUT (borrowed from Suricata)
 AC_CHECK_DECL([PACKET_FANOUT],
         AC_DEFINE([HAVE_PACKET_FANOUT],[1],
@@ -465,6 +385,25 @@ AC_CHECK_LIB(wandder, init_wandder_decoder, have_wandder=1, have_wandder=0)
 AC_CHECK_LIB(pthread, pthread_create, have_pthread=1, have_pthread=0)
 
 AC_CHECK_LIB(pthread, pthread_setname_np, have_pthread_setname_np=1, have_pthread_setname_np=0)
+
+
+
+# Try to determine the DAG driver version
+#if test x"$libtrace_dag" = xtrue; then
+#       dag_drv_v="Unknown"
+#	files=`locate /usr/*dag*/VERSION`
+#       file_count=0
+#
+#       for i in $files; do
+#                if $file_count > 0; then
+#                        dag_drv_v="Indeterminate"
+#                        break
+#                fi
+#                dag_drv_v=`cat $i`
+#                file_count=$file_count+1
+#        done
+#fi
+#DAG_VERSION_NUM=$dag_drv_v
 
 # Check for ncurses
 
@@ -556,6 +495,93 @@ if test "$have_clock_gettime" = 1; then
 	with_clock_gettime=yes
 else
 	with_clock_gettime=no
+fi
+
+# Check for DPDK 
+AC_ARG_WITH(dpdk,
+	    AS_HELP_STRING(--with-dpdk,include DPDK live capture support (From either the RTE_SDK/_TARGET environment variable or the dpdk-dev package)),
+[
+        if test "$withval" = no
+        then
+            want_dpdk=no
+        else
+            want_dpdk=ifpresent
+        fi
+],[
+        # Default to building without DPDK format
+        want_dpdk=no
+])
+
+libtrace_dpdk=false
+if test "$want_dpdk" != no; then
+
+        PKG_CHECK_MODULES([DPDK], [libdpdk >= 18], [pkgconf_dpdk_found="yes"],
+                [pkgconf_dpdk_found="no"])
+        if test "x$pkgconf_dpdk_found" = "xyes"; then
+                LIBTRACE_LIBS="$LIBTRACE_LIBS $DPDK_LIBS"
+                ADD_INCLS="$ADD_INCLS $DPDK_CFLAGS"
+                AC_MSG_NOTICE([Building against system DPDK])
+                dpdk_found=pkgconfig
+        else
+                dpdk_found=0
+        fi
+
+
+	# So instead simply check for existence
+	if test "$dpdk_found" = 0 -a "$RTE_SDK" != ""; then
+		AC_CHECK_FILE("$RTE_SDK/$RTE_TARGET/lib/libdpdk.so", dpdk_found="dpdk", dpdk_found=0)
+	fi
+	if test "$dpdk_found" = 0 -a "$RTE_SDK" != ""; then
+		AC_CHECK_FILE("$RTE_SDK/$RTE_TARGET/lib/libintel_dpdk.a", dpdk_found=":libintel_dpdk.a", dpdk_found=0)
+	fi
+	# DPDK 2.1.0+ renames this to libdpdk from libintel_dpdk
+	if test "$dpdk_found" = 0 -a "$RTE_SDK" != ""; then
+		AC_CHECK_FILE("$RTE_SDK/$RTE_TARGET/lib/libdpdk.a", dpdk_found=":libdpdk.a", dpdk_found=0)
+	fi
+	if test "$dpdk_found" = 0 -a "$RTE_SDK" != ""; then
+		AC_CHECK_LIB(dpdk, rte_eth_dev_configure, dpdk_found="dpdk", dpdk_found=0)
+	fi
+	if test "$dpdk_found" != 0 -a "$RTE_SDK" != ""; then
+		# Save these now so that they can be re-exported later
+		AC_SUBST([RTE_TARGET])
+		AC_SUBST([RTE_SDK])
+		# Force dpdk library to be statically linked to allow compiler optimisations
+		LIBTRACE_LIBS="$LIBTRACE_LIBS -Wl,--whole-archive -Wl,-l$dpdk_found -Wl,--no-whole-archive -Wl,-lm"
+
+	fi
+
+	if test "$dpdk_found" = 0 -a "$RTE_SDK" = ""; then
+		AC_MSG_NOTICE([No RTE_SDK given, checking for system dpdk-dev package])
+		# Search the system, maybe it is installed? Ethdev is one of the main libraries
+		# On Ubuntu and Debian we can simply check for dpdk.so
+		AC_CHECK_LIB(dpdk, rte_eth_dev_configure, dpdk_found="system", dpdk_found=0)
+		# We also need to check that rte.vars.mk is installed from dpdk-dev (as well as libdpdk-dev)
+		if test "$dpdk_found" != 0 -a -e /usr/share/dpdk/mk/rte.vars.mk ; then
+			RTE_TARGET="$(uname -m)-default-linuxapp-gcc"
+			RTE_SDK="/usr/share/dpdk/"
+			RTE_INCLUDE="/usr/include/dpdk"
+			AC_SUBST([RTE_TARGET])
+			AC_SUBST([RTE_SDK])
+			AC_SUBST([RTE_INCLUDE])
+			LIBTRACE_LIBS="$LIBTRACE_LIBS -ldpdk"
+			AC_MSG_NOTICE([Building against system DPDK])
+
+			dpdk_found=system
+		fi
+	fi
+
+        if test "$dpdk_found" != 0; then
+		AC_DEFINE(HAVE_DPDK,1,[conditional for building with DPDK live capture support])
+                LIBS="$LIBTRACE_LIBS"
+                AC_CHECK_FUNC(rte_devargs_add, [AC_DEFINE(HAVE_DPDK18,1,using dpdk version 18 or later)])
+                LIBS=""
+                libtrace_dpdk=true
+        fi
+
+
+        if test "$dpdk_found" = 0 -a "$with_dpdk" = "yes"; then
+                AC_MSG_ERROR("Unable to find DPDK on system. Build halted -- consider re-running configure with '--with-dpdk=no'.")
+        fi
 fi
 
 
@@ -653,6 +679,8 @@ AM_CONDITIONAL([HAVE_LIBGDC], [test "$ac_cv_header_gdc_h" = yes])
 AM_CONDITIONAL([HAVE_LLVM], [test "x$JIT" != "xno" ])
 AM_CONDITIONAL([HAVE_NCURSES], [test "x$with_ncurses" != "xno"])
 AM_CONDITIONAL([HAVE_YAML], [test "x$have_yaml" != "xno"])
+
+AM_CONDITIONAL([HAVE_DPDK_PKGCONFIG], [test "x$dpdk_found" = "xpkgconfig"])
 
 # Check for miscellaneous programs
 AC_CHECK_PROG([libtrace_doxygen], [doxygen], [true], [false])
