@@ -10,7 +10,8 @@ SOURCENAME=`echo ${CI_COMMIT_REF_NAME} | cut -d '-' -f 1`
 
 apt-get update
 apt-get install -y equivs devscripts dpkg-dev quilt curl apt-transport-https \
-    apt-utils ssl-cert ca-certificates gnupg lsb-release debhelper git
+    apt-utils ssl-cert ca-certificates gnupg lsb-release debhelper git \
+    pkg-config
 
 echo "deb https://dl.bintray.com/wand/general $(lsb_release -sc) main" | \
     tee -a /etc/apt/sources.list.d/wand.list
