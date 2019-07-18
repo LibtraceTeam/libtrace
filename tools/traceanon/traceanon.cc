@@ -44,54 +44,11 @@
 #include <openssl/evp.h>
 #endif
 
-enum enc_type_t {
-        ENC_NONE,
-        ENC_CRYPTOPAN,
-        ENC_PREFIX_SUBSTITUTION
-};
-
-bool enc_source_opt = false;
-bool enc_dest_opt   = false;
-enum enc_type_t enc_type = ENC_NONE;
-char *enc_key = NULL;
-
-
-#define SALT_LENGTH 32
-#define SHA256_SIZE 32
-bool enc_radius_packet = false;
-bool radius_force_anon = false; //TODO
-uint8_t salt[SALT_LENGTH];
-bool isSaltSet = false;
-
-typedef struct traceanon_port_list_t{
-	uint16_t port;
-	traceanon_port_list_t *nextport;
-}traceanon_port_list_t;
-
-typedef struct traceanon_radius_server_t {
-	struct in_addr ipaddr;
-	traceanon_port_list_t *port;
-}traceanon_radius_server_t;
-
-traceanon_radius_server_t radius_server;
-
-typedef struct radius_header {
-    uint8_t code;
-    uint8_t identifier;
-    uint16_t length;
-    uint8_t auth[16];
-} PACKED radius_header_t;
-
-typedef struct radius_avp {
-    uint8_t type;
-    uint8_t length;
-    uint8_t value;
-} PACKED radius_avp_t;
-
-int level = -1;
-trace_option_compresstype_t compress_type = TRACE_OPTION_COMPRESSTYPE_NONE;
+#include "traceanon.h"
+#include "../tools_yaml.h"
 
 struct libtrace_t *inptrace = NULL;
+traceanon_opts_t globalopts;
 
 static void cleanup_signal(int signal)
 {
@@ -117,13 +74,7 @@ static void usage(char *argv0)
         "-t --threads=max       Use this number of threads for packet processing\n"
         "-f --filter=expr       Discard all packets that do not match the\n"
         "                       provided BPF expression\n"
-	"-r --radius-server=a.b.c.d[:port1] Specifies an IP address and\n"
-	"				a ':' separated list of ports to\n"
-	"                               match for RADIUS anonymising.\n"
-	"-R --radius-salt=salt  Use provided salt for RADIUS hashing\n"
-	"-E --radius-enforce    Enforce anonymising of usually safe AVP types\n"
-	"				6, 7, 40-43, 46-48, 55 and 85\n"
-	"				(85 only in Access-Accept packets)\n"
+        "-C --config=file       Read configuration from a YAML file\n"
 	,argv0);
 	exit(1);
 }
@@ -163,17 +114,16 @@ UNUSED static void update_in_cksum32(uint16_t *csum, uint32_t old,
  * the opposite direction so we need to encrypt the destination and
  * source instead of the source and destination!
  */
-static void encrypt_ips(Anonymiser *anon, struct libtrace_ip *ip,
-                bool enc_source,bool enc_dest)
-{
+static void encrypt_ips(traceanon_opts_t *opts, Anonymiser *anon,
+                struct libtrace_ip *ip) {
 	libtrace_icmp_t *icmp=trace_get_icmp_from_ip(ip,NULL);
 
-	if (enc_source) {
+	if (opts->enc_source_opt) {
 		uint32_t new_ip=htonl(anon->anonIPv4(ntohl(ip->ip_src.s_addr)));
 		ip->ip_src.s_addr = new_ip;
 	}
 
-	if (enc_dest) {
+	if (opts->enc_dest_opt) {
 		uint32_t new_ip=htonl(anon->anonIPv4(ntohl(ip->ip_dst.s_addr)));
 		ip->ip_dst.s_addr = new_ip;
 	}
@@ -187,29 +137,27 @@ static void encrypt_ips(Anonymiser *anon, struct libtrace_ip *ip,
 				|| icmp->type == 5 
 				|| icmp->type == 11) {
 			char *ptr = (char *)icmp;
-			encrypt_ips(anon,
+			encrypt_ips(opts, anon,
 				(struct libtrace_ip*)(ptr+
-					sizeof(struct libtrace_icmp)),
-				enc_dest,
-				enc_source);
+					sizeof(struct libtrace_icmp)));
 		}
 
-		if (enc_source || enc_dest)
+		if (opts->enc_source_opt || opts->enc_dest_opt)
 			icmp->checksum = 0;
 	}
 }
 
-static void encrypt_ipv6(Anonymiser *anon, libtrace_ip6_t *ip6,
-                bool enc_source, bool enc_dest) {
+static void encrypt_ipv6(traceanon_opts_t *opts, Anonymiser *anon,
+                libtrace_ip6_t *ip6) {
 
         uint8_t previp[16];
 
-	if (enc_source) {
+	if (opts->enc_source_opt) {
                 memcpy(previp, &(ip6->ip_src.s6_addr), 16);
 		anon->anonIPv6(previp, (uint8_t *)&(ip6->ip_src.s6_addr));
 	}
 
-	if (enc_dest) {
+	if (opts->enc_dest_opt) {
                 memcpy(previp, &(ip6->ip_dst.s6_addr), 16);
 		anon->anonIPv6(previp, (uint8_t *)&(ip6->ip_dst.s6_addr));
 	}
@@ -217,18 +165,14 @@ static void encrypt_ipv6(Anonymiser *anon, libtrace_ip6_t *ip6,
 }
 
 //ignoring all else, takes a pointer to the start of a radius packet and Anonymises the values in the AVP section.
-static void encrypt_radius(Anonymiser *anon, uint8_t *radstart, uint32_t *rem){
+static void encrypt_radius(traceanon_opts_t *opts, Anonymiser *anon,
+                uint8_t *radstart, uint32_t *rem) {
+
 	uint8_t *digest_buffer;
-
 	uint8_t *radius_ptr = radstart + sizeof(radius_header_t);
-
 	radius_header_t *radius_header = (radius_header_t *)radstart;
-
 	uint16_t radius_length = ntohs(radius_header->length);
-
 	uint8_t *radius_end = (radstart+radius_length);
-
-	
 
 	if (*rem > radius_length){
 		//TODO handle error
@@ -240,6 +184,7 @@ static void encrypt_radius(Anonymiser *anon, uint8_t *radstart, uint32_t *rem){
 		uint16_t val_len = radius_avp->length-2;
 
 		bool skipAVP = false;
+                uint8_t anon_mode = RADIUS_ANON_MODE_BINARY;
 
 		//TODO maybe decide to do more things to different types?
 		switch (radius_avp->type) {
@@ -247,11 +192,19 @@ static void encrypt_radius(Anonymiser *anon, uint8_t *radstart, uint32_t *rem){
 			case 7:
 			case 40 ... 43:
 			case 46 ... 48:
-			case 55: 
+			case 55:
+                        case 61:
 			{	//skip the above types
 				skipAVP = true;
 				break;
 			}
+                        case 1:
+                        case 32:
+                                anon_mode = RADIUS_ANON_MODE_TEXT;
+                                break;
+                        case 44:
+                                anon_mode = RADIUS_ANON_MODE_NUMERIC;
+                                break;
 
 			case 85:{
 				//check for access-accept messages
@@ -272,23 +225,21 @@ static void encrypt_radius(Anonymiser *anon, uint8_t *radstart, uint32_t *rem){
 				break;
 			}
 		}
-		if (!skipAVP || radius_force_anon){
-			digest_buffer = anon->digest_message(&radius_avp->value, val_len);
 
-			// printf("TYPE:0x%02x\tLEN:0x%02x\n",radius_avp->type, radius_avp->length);
-			// for (uint16_t i = 0; i < val_len; i++){printf("%02x ",*(&radius_avp->value +i));}printf("\n");
-			// for (uint16_t i = 0; i < val_len; i++){printf("%02x ",i < 32 ? *(digest_buffer+i):0);}printf("\n");
+		if (val_len > 0 && (!skipAVP || opts->radius_force_anon)){
+                        uint8_t *ptr;
+			digest_buffer = anon->digest_message(
+                                        &radius_avp->value, val_len, anon_mode);
 
-			if (val_len > SHA256_SIZE){
-				memcpy(&radius_avp->value, digest_buffer, SHA256_SIZE);
+                        ptr = &(radius_avp->value);
+
+			while (val_len > SHA256_SIZE){
 				//overwrite hash digest into AVP value
-
-				memset(&radius_avp->value+SHA256_SIZE, 0, val_len-SHA256_SIZE);
-				//pad with zeros to fill 
+				memcpy(ptr, digest_buffer, SHA256_SIZE);
+                                val_len -= SHA256_SIZE;
+                                ptr += SHA256_SIZE;
 			}
-			else {
-				memcpy(&radius_avp->value, digest_buffer, val_len);
-			}
+			memcpy(ptr, digest_buffer, val_len);
 		}
 		radius_ptr+=(radius_avp->length); //move to next
 	}
@@ -314,52 +265,56 @@ static inline void *find_radius_start(libtrace_packet_t *pkt, uint32_t *rem) {
 }
 
 //checks packets with matching IPs for matching port and encrypts 
-int radius_ip_match(libtrace_udp_t *udp, 
-		struct libtrace_ip *ipptr, 
-		libtrace_packet_t *packet, 
-		Anonymiser *anon, 
+int radius_ip_match(traceanon_opts_t *opts,
+		libtrace_packet_t *packet,
+		Anonymiser *anon,
 		uint16_t testPort){
 
-	traceanon_port_list_t *currPort = (radius_server.port);
+	traceanon_port_list_t *currPort = (opts->radius_server.port);
 
-	if(testPort != 0){ //an ip matches
-		while(currPort != NULL){
-			if (testPort == currPort->port){
-				uint32_t rem;
-				uint8_t *radstart = (uint8_t *)find_radius_start(packet, &rem);
-				if (radstart ==  NULL){
-					printf("Radius Header Error\n");
-					//handle error
-				}
-				else {
-					encrypt_radius(anon, radstart, &rem);
-					return 1;
-				}
-				break;
-			}
-			currPort = currPort->nextport;
-		}
-	}
+        while(currPort != NULL){
+                if (testPort == currPort->port) {
+                        uint32_t rem;
+                        uint8_t *radstart = (uint8_t *)find_radius_start(
+                                        packet, &rem);
+                        if (radstart !=  NULL){
+                                encrypt_radius(opts, anon, radstart, &rem);
+                                return 1;
+                        }
+                        break;
+                }
+                currPort = currPort->nextport;
+        }
 	return 0;
 
 }
 
 //checks if packet src/dest is filtered for RADIUS and anonymised/encrypted as needed
-void check_radius(libtrace_udp_t *udp, struct libtrace_ip *ipptr, libtrace_packet_t *packet, Anonymiser *anon){
-	udp = trace_get_udp(packet);
-	if (udp){	
-		uint16_t testPort = 0;
-		if(ipptr->ip_src.s_addr == radius_server.ipaddr.s_addr){
-			testPort = udp->source;
-			if (radius_ip_match(udp, ipptr, packet, anon, testPort))
-				return;
-		}
-		if(ipptr->ip_dst.s_addr == radius_server.ipaddr.s_addr){
-			testPort = udp->dest;
-			if (radius_ip_match(udp, ipptr, packet, anon, testPort))
-				return;
-		}
-	}
+static void check_radius(libtrace_udp_t *udp, struct libtrace_ip *ipptr,
+                libtrace_packet_t *packet, Anonymiser *anon,
+                traceanon_opts_t *opts) {
+
+	uint16_t testPort = 0;
+
+        if (udp == NULL) {
+                return;
+        }
+
+        /* Failure to byteswap port numbers here is intentional. Instead,
+         * we've byteswapped the port given in the config file; this means
+         * we do less byteswap operations.
+         */
+        if(ipptr->ip_src.s_addr == opts->radius_server.ipaddr.s_addr){
+                testPort = udp->source;
+                if (radius_ip_match(opts, packet, anon, testPort))
+                        return;
+        }
+
+        if(ipptr->ip_dst.s_addr == opts->radius_server.ipaddr.s_addr){
+                testPort = udp->dest;
+                if (radius_ip_match(opts, packet, anon, testPort))
+                        return;
+        }
 }
 
 static libtrace_packet_t *per_packet(libtrace_t *trace, libtrace_thread_t *t,
@@ -372,22 +327,24 @@ static libtrace_packet_t *per_packet(libtrace_t *trace, libtrace_thread_t *t,
         libtrace_icmp6_t *icmp6 = NULL;
         Anonymiser *anon = (Anonymiser *)tls;
         libtrace_generic_t result;
+        traceanon_opts_t *opts = (traceanon_opts_t *)global;
 
         if (IS_LIBTRACE_META_PACKET(packet))
                 return packet;
 
         ipptr = trace_get_ip(packet);
         ip6 = trace_get_ip6(packet);
+        udp = trace_get_udp(packet);
 
-	if (enc_radius_packet){
-		check_radius(udp, ipptr, packet, anon);
+	if (opts->enc_radius_packet){
+		check_radius(udp, ipptr, packet, anon, opts);
 	}
 
-        if (ipptr && (enc_source_opt || enc_dest_opt)) {
-                encrypt_ips(anon, ipptr,enc_source_opt,enc_dest_opt);
+        if (ipptr && (opts->enc_source_opt || opts->enc_dest_opt)) {
+                encrypt_ips(opts, anon, ipptr);
                 ipptr->ip_sum = 0;
-        } else if (ip6 && (enc_source_opt || enc_dest_opt)) {
-                encrypt_ipv6(anon, ip6, enc_source_opt, enc_dest_opt);
+        } else if (ip6 && (opts->enc_source_opt || opts->enc_dest_opt)) {
+                encrypt_ipv6(opts, anon, ip6);
         }
 
 
@@ -397,44 +354,46 @@ static libtrace_packet_t *per_packet(libtrace_t *trace, libtrace_thread_t *t,
 
         /* XXX replace with nice use of trace_get_transport() */
 
-        udp = trace_get_udp(packet);
-        if (udp && (enc_source_opt || enc_dest_opt)) {
+        if (udp && (opts->enc_source_opt || opts->enc_dest_opt)) {
                 udp->check = 0;
         }
 
         tcp = trace_get_tcp(packet);
-        if (tcp && (enc_source_opt || enc_dest_opt)) {
+        if (tcp && (opts->enc_source_opt || opts->enc_dest_opt)) {
                 tcp->check = 0;
         }
 
         icmp6 = trace_get_icmp6(packet);
-        if (icmp6 && (enc_source_opt || enc_dest_opt)) {
+        if (icmp6 && (opts->enc_source_opt || opts->enc_dest_opt)) {
                 icmp6->checksum = 0;
         }
 
         /* TODO: Encrypt IP's in ARP packets */
         result.pkt = packet;
-        trace_publish_result(trace, t, trace_packet_get_order(packet), result, RESULT_PACKET);
+        trace_publish_result(trace, t, trace_packet_get_order(packet), result,
+                        RESULT_PACKET);
 
         return NULL;
 }
 
 static void *start_anon(libtrace_t *trace, libtrace_thread_t *t, void *global)
 {
-        if (enc_type == ENC_PREFIX_SUBSTITUTION) {
-                PrefixSub *sub = new PrefixSub(enc_key, NULL, salt);
+        traceanon_opts_t *opts = (traceanon_opts_t *)global;
+
+        if (opts->enc_type == ENC_PREFIX_SUBSTITUTION) {
+                PrefixSub *sub = new PrefixSub(opts->enc_key, NULL, opts->salt);
                 return sub;
         }
 
-        if (enc_type == ENC_CRYPTOPAN) {
-		if (strlen(enc_key) < 32) {
+        if (opts->enc_type == ENC_CRYPTOPAN) {
+		if (strlen(opts->enc_key) < 32) {
 			fprintf(stderr, "ERROR: Key must be at least 32 "
 			"characters long for CryptoPan anonymisation.\n");
 			exit(1);
 		}
 #ifdef HAVE_LIBCRYPTO
-                CryptoAnon *anon = new CryptoAnon((uint8_t *)enc_key,
-                        (uint8_t)strlen(enc_key), 20, salt);
+                CryptoAnon *anon = new CryptoAnon((uint8_t *)opts->enc_key,
+                        (uint8_t)strlen(opts->enc_key), 20, opts->salt);
                 return anon;
 #else
                 /* TODO nicer way of exiting? */
@@ -444,8 +403,8 @@ static void *start_anon(libtrace_t *trace, libtrace_thread_t *t, void *global)
 #endif
         }
 
-	if (enc_radius_packet){
-		Anonymiser *anon = new Anonymiser(salt);
+	if (opts->enc_radius_packet){
+		Anonymiser *anon = new Anonymiser(opts->salt);
 		return anon;
 	}
         return NULL;
@@ -461,9 +420,9 @@ static void end_anon(libtrace_t *trace, libtrace_thread_t *t, void *global,
 static void *init_output(libtrace_t *trace, libtrace_thread_t *t, void *global)
 {
         libtrace_out_t *writer = NULL;
-        char *outputname = (char *)global;
-	
-        writer = trace_create_output(outputname);
+	traceanon_opts_t *opts = (traceanon_opts_t *)global;
+
+        writer = trace_create_output(opts->outputuri);
 
         if (trace_is_err_output(writer)) {
 		trace_perror_output(writer,"trace_create_output");
@@ -473,20 +432,20 @@ static void *init_output(libtrace_t *trace, libtrace_thread_t *t, void *global)
 	
 	/* Hopefully this will deal nicely with people who want to crank the
 	 * compression level up to 11 :) */
-	if (level > 9) {
+	if (opts->level > 9) {
 		fprintf(stderr, "WARNING: Compression level > 9 specified, setting to 9 instead\n");
-		level = 9;
+		opts->level = 9;
 	}
 
-	if (level >= 0 && trace_config_output(writer, 
-			TRACE_OPTION_OUTPUT_COMPRESS, &level) == -1) {
+	if (opts->level >= 0 && trace_config_output(writer, 
+			TRACE_OPTION_OUTPUT_COMPRESS, &(opts->level)) == -1) {
 		trace_perror_output(writer, "Configuring compression level");
 		trace_destroy_output(writer);
 		return NULL;
 	}
 
 	if (trace_config_output(writer, TRACE_OPTION_OUTPUT_COMPRESSTYPE,
-				&compress_type) == -1) {
+				&(opts->compress_type)) == -1) {
 		trace_perror_output(writer, "Configuring compression type");
 		trace_destroy_output(writer);
 		return NULL;
@@ -521,23 +480,73 @@ static void end_output(libtrace_t *trace, libtrace_thread_t *t, void *global,
         trace_destroy_output(writer);
 }
 
+static void init_global_opts(traceanon_opts_t *glob) {
+        glob->enc_source_opt = false;
+        glob->enc_dest_opt = false;
+        glob->enc_type = ENC_NONE;
+        glob->enc_key = NULL;
+
+        glob->enc_radius_packet = false;
+        glob->radius_force_anon = false;
+        memset(glob->salt, 0, SALT_LENGTH);
+        glob->isSaltSet = false;
+        memset(&(glob->radius_server), 0, sizeof(traceanon_radius_server_t));
+
+        glob->level = 0;
+        glob->compress_type = TRACE_OPTION_COMPRESSTYPE_NONE;
+        glob->threads = 1;
+        glob->filterstring = NULL;
+        glob->outputuri = NULL;
+}
+
+static void free_global_opts(traceanon_opts_t *glob) {
+
+	traceanon_port_list_t *currPort = glob->radius_server.port;
+	traceanon_port_list_t *tempPort;
+
+	while(currPort != NULL){
+		tempPort = currPort;
+		currPort = currPort->nextport;
+		free(tempPort);
+	}
+
+        if (glob->enc_key) {
+                free(glob->enc_key);
+        }
+
+        if (glob->filterstring) {
+                free(glob->filterstring);
+        }
+
+        if (glob->outputuri) {
+                free(glob->outputuri);
+        }
+}
+
+#define WARN_DEPRECATED fprintf(stderr, \
+        "warning: CLI option -%c has been deprecated -- use YAML configuration instead\n", c);
+
 int main(int argc, char *argv[]) 
 {
 	//struct libtrace_t *trace = 0;
 	struct sigaction sigact;
-	char *output = 0;
-	char *compress_type_str=NULL;
-        int maxthreads = 4;
         libtrace_callback_set_t *pktcbs = NULL;
         libtrace_callback_set_t *repcbs = NULL;
         int exitcode = 0;
-        char *filterstring = NULL;
         libtrace_filter_t *filter = NULL;
+        char *configfile = NULL;
 
 	if (argc<2)
 		usage(argv[0]);
 
+        init_global_opts(&globalopts);
+
 	while (1) {
+                /* For backwards compatibility, I'm keeping the old CLI
+                 * arguments working (with warning about deprecation), but
+                 * any new config should be added to the config file only.
+                 */
+
 		int option_index;
 		struct option long_options[] = {
 			{ "encrypt-source", 	0, 0, 's' },
@@ -550,33 +559,40 @@ int main(int argc, char *argv[])
 			{ "compress-level",	1, 0, 'z' },
 			{ "compress-type",	1, 0, 'Z' },
 			{ "help",        	0, 0, 'h' },
-			{"radius-server", 	1, 0, 'r' },
-			{"radius-salt", 	1, 0, 'R' },
-			{"radius-enforce",	0, 0, 'E' },
+                        { "config",             1, 0, 'C' },
 			{ NULL,			0, 0, 0   },
 		};
 
-		int c=getopt_long(argc, argv, "Z:z:sc:f:dp:ht:f:r:R:E",
+		int c=getopt_long(argc, argv, "Z:z:sc:f:dp:ht:f:C:",
 				long_options, &option_index);
 
 		if (c==-1)
 			break;
 
 		switch (c) {
-			case 'Z': compress_type_str=optarg; break;         
-			case 'z': level = atoi(optarg); break;
-			case 's': enc_source_opt=true; break;
-			case 'd': enc_dest_opt  =true; break;
+			case 'Z':
+                                WARN_DEPRECATED
+                                globalopts.compress_type = yaml_compress_type(optarg);
+                                break;
+
+      			case 'z': WARN_DEPRECATED
+                                globalopts.level = atoi(optarg); break;
+			case 's': WARN_DEPRECATED;
+                                globalopts.enc_source_opt=true; break;
+			case 'd': WARN_DEPRECATED
+                                globalopts.enc_dest_opt  =true; break;
 			case 'c': 
-				  if (enc_key!=NULL) {
-					  fprintf(stderr,"You can only have one encryption type and one key\n");
-					  usage(argv[0]);
-				  }
-				  enc_key=strdup(optarg);
-				  enc_type = ENC_CRYPTOPAN;
-				  break;
+                                WARN_DEPRECATED
+                                if (globalopts.enc_key!=NULL) {
+                                        fprintf(stderr,"You can only have one encryption type and one key\n");
+                                        usage(argv[0]);
+                                }
+                                globalopts.enc_key=strdup(optarg);
+                                globalopts.enc_type = ENC_CRYPTOPAN;
+                                break;
 		        case 'F': {
-			          if(enc_key != NULL) {
+                                  WARN_DEPRECATED
+			          if (globalopts.enc_key != NULL) {
 				    fprintf(stderr,"You can only have one encryption type and one key\n");
 				    usage(argv[0]);
 				  }
@@ -585,76 +601,42 @@ int main(int argc, char *argv[])
 				    perror("Failed to open cryptopan keyfile");
                                     return 1;
 				  }
-				  enc_key = (char *) malloc(sizeof(char *) * 32);
-				  if(fread(enc_key,1,32,infile) != 32) {
+				  globalopts.enc_key = (char *) malloc(sizeof(char *) * 32);
+				  if(fread(globalopts.enc_key, 1, 32,
+                                                infile) != 32) {
 				    if(ferror(infile)) {
 				      perror("Failed while reading cryptopan keyfile");
 				    }
 				  }
 				  fclose(infile);
-				  enc_type = ENC_CRYPTOPAN;
+				  globalopts.enc_type = ENC_CRYPTOPAN;
 				  break;
                         }
                         case 'f':
-                                  filterstring = optarg;
+                                  WARN_DEPRECATED
+                                  globalopts.filterstring = strdup(optarg);
                                   break;
 		        case 'p':
-				  if (enc_key!=NULL) {
+                                  WARN_DEPRECATED
+				  if (globalopts.enc_key!=NULL) {
 					  fprintf(stderr,"You can only have one encryption type and one key\n");
 					  usage(argv[0]);
 				  }
-				  enc_key=strdup(optarg);
-				  enc_type = ENC_PREFIX_SUBSTITUTION;
+				  globalopts.enc_key=strdup(optarg);
+				  globalopts.enc_type = ENC_PREFIX_SUBSTITUTION;
 				  break;
-			case 'h': 
+			case 'h':
                                   usage(argv[0]);
                         case 't':
-                                  maxthreads=atoi(optarg);
-                                  if (maxthreads <= 0)
-                                          maxthreads = 1;
+                                  WARN_DEPRECATED
+                                  globalopts.threads=atoi(optarg);
+                                  if (globalopts.threads <= 0)
+                                          globalopts.threads = 1;
                                   break;
-			case 'r':{
-				if (radius_server.ipaddr.s_addr != 0){
-					fprintf(stderr, "You can only have one radius server at a time\n");
-					usage(argv[0]);
-				}
-				enc_radius_packet = true;
-				
-				char *token = strtok(optarg, ":");
-				struct in_addr ipaddr;
+                        case 'C':
+                                  configfile = optarg;
+                                  break;
 
-				if(inet_aton(token, &ipaddr) == 0){
-					fprintf(stderr, "IP address malformed\n");
-					usage(argv[0]);
-				}
-				radius_server.ipaddr = ipaddr;
-
-				char * garbage = NULL;
-				while( (token = strtok(NULL, ":")) != NULL ) {
-					in_port_t port = strtol(token, &garbage, 10);
-					if(garbage == NULL || (*garbage != ':' && *garbage != 0)){
-						fprintf(stderr, "Port list malformed\n");
-						usage(argv[0]);
-					}
-					add_port_to_server(&radius_server,htons(port));
-				}
-				break;
-				}
-			case 'R' :{
-				if (isSaltSet){
-					fprintf(stderr,"Salt has already been set: %c\n",c);
-					usage(argv[0]);
-				}
-				if (strlen(optarg) > 32){
-					fprintf(stderr,"Salt is longer than 32chars\n");
-					usage(argv[0]);
-					break;
-				}
-				memcpy(salt, optarg, strlen(optarg));
-				isSaltSet = true;
-				break;
-			}
-			case 'E' : radius_force_anon = true; break;
 			default:
 				fprintf(stderr,"unknown option: %c\n",c);
 				usage(argv[0]);
@@ -663,32 +645,18 @@ int main(int argc, char *argv[])
 
 	}
 
-	if (compress_type_str == NULL && level >= 0) {
+        if (configfile != NULL) {
+                if (yaml_parser(configfile, &globalopts,
+                                traceanon_yaml_parser) < 0) {
+                        fprintf(stderr, "Error reading YAML configuration file, halting.");
+                        goto exitanon;
+                }
+        }
+
+	if (globalopts.compress_type == TRACE_OPTION_COMPRESSTYPE_NONE &&
+                        globalopts.level >= 0) {
                 fprintf(stderr, "Compression level set, but no compression type was defined, setting to gzip\n");
-                compress_type = TRACE_OPTION_COMPRESSTYPE_ZLIB;
-        }
-
-        else if (compress_type_str == NULL) {
-                /* If a level or type is not specified, use the "none"
-                 * compression module */
-                compress_type = TRACE_OPTION_COMPRESSTYPE_NONE;
-        }
-
-        /* I decided to be fairly generous in what I accept for the
-         * compression type string */
-        else if (strncmp(compress_type_str, "gz", 2) == 0 ||
-                        strncmp(compress_type_str, "zlib", 4) == 0) {
-                compress_type = TRACE_OPTION_COMPRESSTYPE_ZLIB;
-        } else if (strncmp(compress_type_str, "bz", 2) == 0) {
-                compress_type = TRACE_OPTION_COMPRESSTYPE_BZ2;
-        } else if (strncmp(compress_type_str, "lzo", 3) == 0) {
-                compress_type = TRACE_OPTION_COMPRESSTYPE_LZO;
-        } else if (strncmp(compress_type_str, "no", 2) == 0) {
-                compress_type = TRACE_OPTION_COMPRESSTYPE_NONE;
-        } else {
-                fprintf(stderr, "Unknown compression type: %s\n",
-                        compress_type_str);
-                return 1;
+                globalopts.compress_type = TRACE_OPTION_COMPRESSTYPE_ZLIB;
         }
 
 	/* open input uri */
@@ -703,9 +671,9 @@ int main(int argc, char *argv[])
 		/* no output specified, output in same format to
 		 * stdout 
 		 */
-		output = strdup("erf:-");
+		globalopts.outputuri = strdup("erf:-");
 	} else {
-		output = argv[optind +1];
+		globalopts.outputuri = strdup(argv[optind +1]);
 	}
 	// OK parallel changes start here
 
@@ -725,10 +693,10 @@ int main(int argc, char *argv[])
         trace_set_stopping_cb(repcbs, end_output);
         trace_set_starting_cb(repcbs, init_output);
 
-        trace_set_perpkt_threads(inptrace, maxthreads);
+        trace_set_perpkt_threads(inptrace, globalopts.threads);
 
-        if (filterstring) {
-                filter = trace_create_filter(filterstring);
+        if (globalopts.filterstring) {
+                filter = trace_create_filter(globalopts.filterstring);
         }
 
         if (filter && trace_config(inptrace, TRACE_OPTION_FILTER, filter) == -1)
@@ -738,7 +706,7 @@ int main(int argc, char *argv[])
                 goto exitanon;
         }
 
-	if (trace_pstart(inptrace, output, pktcbs, repcbs)==-1) {
+	if (trace_pstart(inptrace, &globalopts, pktcbs, repcbs)==-1) {
 		trace_perror(inptrace,"trace_start");
 		exitcode = 1;
                 goto exitanon;
@@ -762,13 +730,7 @@ exitanon:
         if (inptrace)
         	trace_destroy(inptrace);
 
-	traceanon_port_list_t *currPort = radius_server.port;
-	traceanon_port_list_t *tempPort;
-	while(currPort != NULL){
-		tempPort = currPort;
-		currPort = currPort->nextport;
-		free(tempPort);
-	}
+        free_global_opts(&globalopts);
 
 	return exitcode;
 }

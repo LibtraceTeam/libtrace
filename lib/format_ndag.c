@@ -208,10 +208,10 @@ static int join_multicast_group(char *groupaddr, char *localiface,
         hints.ai_flags = AI_PASSIVE;
         hints.ai_protocol = 0;
 
-        if (getaddrinfo(NULL, portstr, &hints, &gotten) != 0) {
+        if (getaddrinfo(groupaddr, portstr, &hints, &gotten) != 0) {
                 fprintf(stderr,
-                        "Call to getaddrinfo failed for NULL:%s -- %s\n",
-                                portstr, strerror(errno));
+                        "Call to getaddrinfo failed for %s:%s -- %s\n",
+                                groupaddr, portstr, strerror(errno));
                 return -1;
         }
 

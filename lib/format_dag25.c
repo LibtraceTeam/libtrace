@@ -512,7 +512,7 @@ static int dag_init_input(libtrace_t *libtrace) {
 	 * list */
 	pthread_mutex_lock(&open_dag_mutex);
 
-
+        FORMAT_DATA->stream_attached = 0;
 	/* DAG cards support multiple streams. In a single threaded capture,
 	 * these are specified using a comma in the libtrace URI,
 	 * e.g. dag:/dev/dag0,2 refers to stream 2 on the dag0 device.
@@ -544,11 +544,11 @@ static int dag_init_input(libtrace_t *libtrace) {
 
 	/* Make sure we have successfully opened a DAG device */
 	if (dag_device == NULL) {
+		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to open DAG device %s", dag_dev_name);
 		if (dag_dev_name)
 			free(dag_dev_name);
 		dag_dev_name = NULL;
 		pthread_mutex_unlock(&open_dag_mutex);
-		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to open DAG device %s", dag_dev_name);
 		return -1;
 	}
 

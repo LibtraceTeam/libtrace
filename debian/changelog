@@ -1,3 +1,23 @@
+libtrace4 (4.0.9-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Update DPDK code to work with newer DPDK releases (18.11 especially).
+  * Fix segfault when a DAG device fails to open.
+
+ -- Shane Alcock <shane.alcock@waikato.ac.nz>  Mon, 15 Jul 2019 16:34:34 +1200
+
+libtrace4 (4.0.8-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Added ability to anonymise RADIUS traffic to traceanon.
+  * traceanon now uses YAML configuration file instead of CLI arguments.
+  * Fixed bug where ndag multicast would bind to all addresses, not
+    just the address of the group it had subscribed to.
+  * Fixed segfault when calling trace_ppause() before per packet threads
+    have been created.
+
+ -- Shane Alcock <shane.alcock@waikato.ac.nz>  Mon, 01 Jul 2019 11:37:38 +1200
+
 libtrace4 (4.0.7-1) unstable; urgency=medium
 
   * New upstream release.

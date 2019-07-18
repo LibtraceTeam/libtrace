@@ -44,7 +44,11 @@ export SAVED_CFLAGS:=$(CFLAGS)
 export SAVED_CXXFLAGS:=$(CXXFLAGS)
 export SAVED_CPPFLAGS:=$(CPPFLAGS)
 export SAVED_LDFLAGS:=$(LDFLAGS)
+
+if HAVE_DPDK_PKGCONFIG
+else
 include $(RTE_SDK)/mk/rte.vars.mk
+endif
 # We need to add -Wl before the linker otherwise this breaks our build
 # And include any libraries that DPDK might depend upon
 export DPDK_LIBTRACE_MK=dpdk_libtrace.mk
@@ -90,7 +94,7 @@ endif
 
 AM_CPPFLAGS= @ADD_INCLS@
 libtrace_la_LIBADD = @LIBTRACE_LIBS@ @LTLIBOBJS@ $(DPDKLIBS)
-libtrace_la_LDFLAGS=-version-info 5:0:1 @ADD_LDFLAGS@
+libtrace_la_LDFLAGS=-version-info 5:2:1 @ADD_LDFLAGS@
 dagapi.c:
 	cp @DAG_TOOLS_DIR@/dagapi.c .
 
