@@ -170,6 +170,11 @@ static void parse_options(char *offset, int vlen)
                         ntohs(ph->type), ntohs(ph->length));
         }
 
+        if (ntohs(ph->length) == 0) {
+                printf("Invalid length in SCTP option -- halting decode\n");
+                return;
+        }
+
         vlen -= ntohs(ph->length);
         offset += ntohs(ph->length);
     }
