@@ -159,6 +159,11 @@ typedef uint8_t portid_t;
 #include <pthread.h>
 #ifdef __FreeBSD__
 #include <pthread_np.h>
+#include <sys/endian.h>
+
+#define cpu_set_t cpuset_t
+#else
+#include <endian.h>
 #endif
 
 
