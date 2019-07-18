@@ -53,7 +53,6 @@
 
 #include <stdlib.h>
 #include <unistd.h>
-#include <endian.h>
 #include <string.h>
 #include <math.h>
 
