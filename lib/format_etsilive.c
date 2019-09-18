@@ -161,6 +161,8 @@ static void *etsi_listener(void *tdata) {
                 newsend_message_t msg;
                 etsithread_t *et;
 
+                memset(&msg, 0, sizeof(msg));
+
                 /* accept */
                 connected = (struct sockaddr_storage *)malloc(sizeof(struct
                                 sockaddr_storage));
