@@ -12,6 +12,7 @@
 #include <fcntl.h>
 #include <sys/socket.h>
 #include <errno.h>
+#include <sys/types.h>
 
 #include "simple_circular_buffer.h"
 
@@ -24,7 +25,7 @@ DLLEXPORT int libtrace_scb_init(libtrace_scb_t *buf, uint32_t size,
                 size = ((size / getpagesize()) + 1) * getpagesize();
         }
 
-        snprintf(anonname, 32, "lt_scb_%u", id);
+        snprintf(anonname, 32, "lt_scb_%u_%u", getpid(), id);
 #ifdef HAVE_MEMFD_CREATE
         buf->fd = syscall(__NR_memfd_create, anonname, 0);
 #else
