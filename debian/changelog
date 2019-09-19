@@ -1,3 +1,11 @@
+libtrace4 (4.0.10-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Fix "SIOCGSTAMP undeclared" error when building against newer Linux kernels.
+  * Fix corruption bug when running multiple etsilive: input processes.
+
+ -- Shane Alcock <shane.alcock@waikato.ac.nz>  Thu, 19 Sep 2019 13:57:51 +1200
+
 libtrace4 (4.0.9-1) unstable; urgency=medium
 
   * New upstream release.
