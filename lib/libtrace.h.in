@@ -1693,6 +1693,12 @@ DLLEXPORT int trace_flush_output(libtrace_out_t *libtrace);
  */
 DLLEXPORT libtrace_err_t trace_get_err(libtrace_t *trace);
 
+/** Function to get a generic string representation of an error number
+ * @param errnum    The error number to get the string representation of
+ * @return The string representation of error number
+ */
+DLLEXPORT const char *trace_get_errstr(int errnum);
+
 /** Indicate if there has been an error on an input trace
  * @param trace		The input trace to check the error state on
  * @return true if an error has occurred, false otherwise

@@ -2068,6 +2068,82 @@ DLLEXPORT libtrace_err_t trace_get_err(libtrace_t *trace)
 	return err;
 }
 
+DLLEXPORT const char *trace_get_errstr(int errnum)
+{
+    switch (errnum) {
+        case TRACE_ERR_NOERROR:
+            return "no error";
+        case TRACE_ERR_BAD_FORMAT:
+            return "the uri passed to trace_create() is unsupported or badly formed";
+        case TRACE_ERR_INIT_FAILED:
+            return "the trace failed to initialize";
+        case TRACE_ERR_UNKNOWN_OPTION:
+            return "unknown config option";
+        case TRACE_ERR_NO_CONVERSION:
+            return "output uri cannot write packets of this type";
+        case TRACE_ERR_BAD_PACKET:
+            return "packet is corrupt or unusable for the action required";
+        case TRACE_ERR_OPTION_UNAVAIL:
+            return "option unsupported by this format";
+        case TRACE_ERR_UNSUPPORTED:
+            return "feature is unsupported";
+        case TRACE_ERR_BAD_STATE:
+            return "illegal use of the api";
+        case TRACE_ERR_BAD_FILTER:
+            return "failed to compile a bpf filter";
+        case TRACE_ERR_RT_FAILURE:
+            return "rt communication breakdown";
+        case TRACE_ERR_UNSUPPORTED_COMPRESS:
+            return "compression format unsupported";
+        case TRACE_ERR_WANDIO_FAILED:
+            return "wandio has returned an error";
+        case TRACE_ERR_URI_NOT_FOUND:
+            return "input uri not found";
+        case TRACE_ERR_URI_NULL:
+            return "null passed to create trace";
+        case TRACE_ERR_NULL_TRACE:
+            return "null trace passed to trace_start";
+        case TRACE_ERR_PAUSE_FIN:
+            return "unable to finish last packet in trace_pause";
+        case TRACE_ERR_NULL_PACKET:
+            return "packet is null";
+        case TRACE_ERR_NULL_FILTER:
+            return "filter is null";
+        case TRACE_ERR_NULL_BUFFER:
+            return "buffer is null";
+        case TRACE_ERR_STAT:
+            return "trace states error";
+        case TRACE_ERR_CREATE_DEADTRACE:
+            return "unable to create deadtrace";
+        case TRACE_ERR_BAD_LINKTYPE:
+            return "bad linktype";
+        case TRACE_ERR_BAD_IO:
+            return "bad io for the trace";
+        case TRACE_ERR_BAD_HEADER:
+            return "packet has a bad capture header";
+        case TRACE_ERR_SEEK_ERF:
+            return "error while seeking through an erf trace";
+        case TRACE_ERR_COMBINER:
+            return "combiner error";
+        case TRACE_ERR_PAUSE_PTHREAD:
+            return "error pausing processing thread";
+        case TRACE_ERR_THREAD:
+            return "error with trace thread";
+        case TRACE_ERR_THREAD_STATE:
+            return "thread in unexpected state";
+        case TRACE_ERR_CONFIG:
+            return "trace configuration error";
+        case TRACE_ERR_NULL:
+            return "unexpected null passed";
+        case TRACE_ERR_OUTPUT_FILE:
+            return "error with trace output file";
+        case TRACE_ERR_OUT_OF_MEMORY:
+            return "out of memory";
+        default:
+            return "unexpected error";
+    }
+}
+
 DLLEXPORT bool trace_is_err(libtrace_t *trace)
 {
 	return trace->err.err_num != 0;
