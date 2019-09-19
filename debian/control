@@ -4,7 +4,7 @@ Maintainer: Brad Cowie <brad@wand.net.nz>
 Build-Depends: debhelper (>= 9), dh-autoreconf,
  libpcap-dev, zlib1g-dev, flex, bison, doxygen, liblzma-dev, graphviz,
  libncurses5-dev, libbz2-dev, libssl-dev, libwandio1-dev (>= 4.0.0),
- libwandder1-dev, dpdk-dev, libnuma-dev, libyaml-dev, dag-dev
+ libwandder1-dev, dpdk-dev, libnuma-dev, libyaml-dev
 Standards-Version: 4.1.3
 Section: libs
 Homepage: http://research.wand.net.nz/software/libtrace.php
@@ -31,7 +31,7 @@ Package: libtrace4
 Section: libs
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
-Provides: libtrace4-core
+Provides: libtrace4-core (= ${binary:Version})
 Conflicts: libtrace, libtrace3, libtrace4-dag
 Replaces: libtrace3
 Description: network trace processing library supporting many input formats
@@ -42,21 +42,21 @@ Description: network trace processing library supporting many input formats
  libtrace is developed by the WAND Network Research Group at Waikato
  University in New Zealand.
 
-Package: libtrace4-dag
-Section: libs
-Architecture: any
-Depends: dag-base, ${shlibs:Depends}, ${misc:Depends}
-Provides: libtrace4-core
-Conflicts: libtrace, libtrace3, libtrace4
-Replaces: libtrace3
-Description: network trace processing library supporting many input formats
- libtrace is a library for trace processing. It supports multiple input
- methods, including device capture, raw and gz-compressed trace, and sockets;
- and multiple input formats. This version of the libtrace4 package includes
- support for Endace DAG hardware.
- .
- libtrace is developed by the WAND Network Research Group at Waikato
- University in New Zealand.
+#Package: libtrace4-dag
+#Section: libs
+#Architecture: any
+#Depends: dag-base, ${shlibs:Depends}, ${misc:Depends}
+#Provides: libtrace4-core
+#Conflicts: libtrace, libtrace3, libtrace4
+#Replaces: libtrace3
+#Description: network trace processing library supporting many input formats
+# libtrace is a library for trace processing. It supports multiple input
+# methods, including device capture, raw and gz-compressed trace, and sockets;
+# and multiple input formats. This version of the libtrace4 package includes
+# support for Endace DAG hardware.
+# .
+# libtrace is developed by the WAND Network Research Group at Waikato
+# University in New Zealand.
 
 Package: libpacketdump4-dev
 Section: libdevel
@@ -79,7 +79,7 @@ Description: development headers for the libpacketdump library
 Package: libpacketdump4
 Section: libs
 Architecture: any
-Depends: libtrace4-core (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
+Depends: libtrace4-core (= ${binary:Version}), ${misc:Depends}
 Provides: libpacketdump
 Conflicts: libpacketdump, libpacketdump3
 Replaces: libpacketdump3
@@ -94,7 +94,7 @@ Description: network packet parsing and human-readable display library
 Package: libtrace4-tools
 Section: net
 Architecture: any
-Depends: libtrace4-core (= ${binary:Version}) ${shlibs:Depends}, ${misc:Depends}
+Depends: libtrace4-core (= ${binary:Version}), ${misc:Depends}
 Conflicts: libtrace-tools
 Replaces: libtrace-tools
 Description: helper utilities for use with the libtrace process library
