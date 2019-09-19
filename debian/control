@@ -12,7 +12,7 @@ Homepage: http://research.wand.net.nz/software/libtrace.php
 Package: libtrace4-dev
 Section: libdevel
 Architecture: any
-Depends: libtrace4-core (= ${binary:Version}), ${misc:Depends}
+Depends: libtrace4 (= ${binary:Version}), ${misc:Depends}
 Provides: libtrace-dev
 Conflicts: libtrace-dev, libpacketdump3-dev
 Replaces: libtrace-dev
@@ -31,7 +31,7 @@ Package: libtrace4
 Section: libs
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
-Provides: libtrace4-core (= ${binary:Version})
+Provides: libtrace4 (= ${binary:Version})
 Conflicts: libtrace, libtrace3, libtrace4-dag
 Replaces: libtrace3
 Description: network trace processing library supporting many input formats
@@ -46,7 +46,7 @@ Description: network trace processing library supporting many input formats
 #Section: libs
 #Architecture: any
 #Depends: dag-base, ${shlibs:Depends}, ${misc:Depends}
-#Provides: libtrace4-core
+#Provides: libtrace4
 #Conflicts: libtrace, libtrace3, libtrace4
 #Replaces: libtrace3
 #Description: network trace processing library supporting many input formats
@@ -79,7 +79,7 @@ Description: development headers for the libpacketdump library
 Package: libpacketdump4
 Section: libs
 Architecture: any
-Depends: libtrace4-core (= ${binary:Version}), ${misc:Depends}
+Depends: libtrace4 (= ${binary:Version}), ${misc:Depends}
 Provides: libpacketdump
 Conflicts: libpacketdump, libpacketdump3
 Replaces: libpacketdump3
@@ -94,7 +94,7 @@ Description: network packet parsing and human-readable display library
 Package: libtrace4-tools
 Section: net
 Architecture: any
-Depends: libtrace4-core (= ${binary:Version}), ${misc:Depends}
+Depends: libtrace4 (= ${binary:Version}), ${misc:Depends}
 Conflicts: libtrace-tools
 Replaces: libtrace-tools
 Description: helper utilities for use with the libtrace process library
