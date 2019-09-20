@@ -3,7 +3,7 @@ Version:        4.0.10
 Release:        1%{?dist}
 Summary:        C Library for capturing and analysing network packets
 
-License:        LPGLv3
+License:        LGPLv3
 URL:            https://github.com/LibtraceTeam/libtrace
 Source0:        https://github.com/LibtraceTeam/libtrace/archive/%{version}.tar.gz
 
@@ -23,6 +23,7 @@ BuildRequires: libwandio1-devel
 BuildRequires: dpdk-wand-devel
 
 Requires: dpdk-wand
+Provides: libtrace4
 
 %description
 libtrace is a library for trace processing. It supports multiple input
@@ -87,7 +88,7 @@ University in New Zealand.
 %setup -q -n libtrace-%{version}
 
 %build
-%configure --disable-static --with-man=yes --mandir=%{_mandir} --with-dpdk=yes
+%configure --disable-static --with-man=yes --mandir=%{_mandir} --with-dpdk=yes --with-dag=no
 make %{?_smp_mflags}
 
 

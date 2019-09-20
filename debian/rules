@@ -3,94 +3,44 @@
 # Uncomment this to turn on verbose mode.
 #export DH_VERBOSE=1
 
+# this will avoid unneded dependencies
+export DEB_LDFLAGS_MAINT_APPEND = -Wl,--as-needed
+
 # Enable all hardening features, since traces are untrusted input.
 export DEB_BUILD_MAINT_OPTIONS = hardening=+all
-DPKG_EXPORT_BUILDFLAGS = 1
-include /usr/share/dpkg/buildflags.mk
 
-# These are used for cross-compiling and for saving the configure script
-# from having to guess our platform (since we know it already)
-DEB_HOST_GNU_TYPE   ?= $(shell dpkg-architecture -qDEB_HOST_GNU_TYPE)
-DEB_BUILD_GNU_TYPE  ?= $(shell dpkg-architecture -qDEB_BUILD_GNU_TYPE)
-CONFFLAGS =
-ifeq ($(DEB_BUILD_GNU_TYPE), $(DEB_HOST_GNU_TYPE))
-	CONFFLAGS += --build $(DEB_HOST_GNU_TYPE)
-else
-	CONFFLAGS += --build $(DEB_BUILD_GNU_TYPE) --host $(DEB_HOST_GNU_TYPE)
-endif
+CONFIGURE_ARGS = -- --prefix=/usr --with-dpdk=yes \
+                --mandir=\$${prefix}/share/man \
+                --infodir=\$${prefix}/share/info
 
+%:
+	dh $@
 
-configure:
+override_dh_auto_configure:
+	mkdir -p debian/build debian/build-dag
+	tar -cf - --exclude=debian/build* . | tar -xf - -C debian/build
+	tar -cf - --exclude=debian/build* . | tar -xf - -C debian/build-dag
+	
+	cd debian/build && ./bootstrap.sh && \
+                dh_auto_configure ${CONFIGURE_ARGS} --with-dag=no
+	cd debian/build-dag && ./bootstrap,sh && \
+                dh_auto_configure ${CONFIGURE_ARGS} --with-dag=yes
 
-configure-stamp: configure
-	dh_testdir
+override_dh_auto_build:
+	cd debian/build && dh_auto_build
+	cd debian/build-dag && dh_auto_build
 
-	dh_autoreconf
+override_dh_install:
+	${MAKE} -C debian/build \
+                DESTDIR=$(shell pwd)/debian/tmp install
+	${MAKE} -C debian/build-dag \
+                DESTDIR=$(shell pwd)/debian/tmp-dag install
+	dh_install -plibtrace4-dag --sourcedir=debian/tmp-dag
+	dh_install -plibtrace4 -plibtrace4-dev -plibpacketdump4 \
+                -plibpacketdump4-dev -plibtrace4-tools \
+                --sourcedir=debian/tmp
 
-	./configure $(CONFFLAGS) \
-		   --prefix=/usr \
-                   --with-dpdk=yes \
-		   --mandir=\$${prefix}/share/man \
-		   --infodir=\$${prefix}/share/info
+override_dh_auto_clean:
+	$(RM) -r debian/build* debian/tmp*
+	dh_auto_clean
 
-	touch configure-stamp
-
-build: build-arch build-indep
-build-arch: build-stamp
-build-indep: build-stamp
-build-stamp: configure-stamp
-	dh_testdir
-
-	# Add here commands to compile the package.
-	$(MAKE)
-
-	touch build-stamp
-
-clean:
-	dh_testdir
-	dh_testroot
-	rm -f build-stamp configure-stamp
-
-	[ ! -f Makefile ] || $(MAKE) clean
-	[ ! -f Makefile ] || $(MAKE) distclean
-	rm -rf docs/doxygen
-
-	dh_autoreconf_clean
-	dh_clean
-
-install: build
-	dh_testdir
-	dh_testroot
-	dh_clean -k
-	dh_installdirs
-
-	# Add here commands to install the package into debian/tmp
-	$(MAKE) install DESTDIR=$(CURDIR)/debian/tmp
-
-# Build architecture-independent files here.
-binary-indep: build install
-# We have nothing to do by default.
-
-# Build architecture-dependent files here.
-binary-arch: build install
-	dh_testdir
-	dh_testroot
-	#dh_installchangelogs ChangeLog
-	dh_installchangelogs
-	dh_installdocs
-	dh_installexamples
-	dh_installman
-	dh_install --sourcedir=debian/tmp
-	dh_link
-	dh_strip
-	dh_compress
-	dh_fixperms
-	dh_makeshlibs
-	dh_installdeb
-	dh_shlibdeps
-	dh_gencontrol
-	dh_md5sums
-	dh_builddeb -- -Zgzip
-
-binary: binary-indep binary-arch
-.PHONY: build clean binary-indep binary-arch binary install

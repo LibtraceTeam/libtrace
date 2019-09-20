@@ -55,6 +55,7 @@ else
         yum install -y rpm-build yum-utils rpmdevtools which
         yum groupinstall -y 'Development Tools'
         yum-builddep -y rpm/libtrace4.spec
+        yum-builddep -y rpm/libtrace4-dag.spec
 fi
 
 rpmdev-setuptree
@@ -62,6 +63,11 @@ rpmdev-setuptree
 ./bootstrap.sh && ./configure && make dist
 cp libtrace-*.tar.gz ~/rpmbuild/SOURCES/${SOURCENAME}.tar.gz
 cp rpm/libtrace4.spec ~/rpmbuild/SPECS/
+cp rpm/libtrace4-dag.spec ~/rpmbuild/SPECS/
 
 cd ~/rpmbuild && rpmbuild -bb --define "debug_package %{nil}" SPECS/libtrace4.spec
+
+if [[ "$1" =~ centos* ]]; then
+	cd ~/rpmbuild && rpmbuild -bb --define "debug_package %{nil}" SPECS/libtrace4-dag.spec
+fi
 
