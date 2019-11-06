@@ -23,8 +23,10 @@ override_dh_auto_configure:
 	
 	cd debian/build && ./bootstrap.sh && \
                 dh_auto_configure ${CONFIGURE_ARGS} --with-dag=no
+
 #	cd debian/build-dag && ./bootstrap.sh && \
 #                dh_auto_configure ${CONFIGURE_ARGS} --with-dag=yes
+
 
 override_dh_auto_build:
 	cd debian/build && dh_auto_build
