@@ -184,6 +184,20 @@ build-amd64-centos8:
   only:
     - tags
 
+build-amd64-centos7:
+  stage: build
+  image: centos:7
+  script:
+    - ./gitlab-build-rpm.sh centos7
+    - mkdir -p built-packages/centos_7/
+    - mv ~/rpmbuild/RPMS/x86_64/*.rpm built-packages/centos_7/
+  artifacts:
+    paths:
+      - built-packages/*
+    expire_in: 1 day
+  only:
+    - tags
+
 upload-packages:
   stage: upload
   image: ubuntu:bionic
