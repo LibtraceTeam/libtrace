@@ -43,6 +43,8 @@ yum install -y wget make gcc
 
 if [ "$1" = "centos8" ]; then
         yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm || true
+        dnf install -y 'dnf-command(config-manager)' || true
+        yum config-manager --set-enabled PowerTools || true
 fi
 
 if [ "$1" = "centos7" ]; then
