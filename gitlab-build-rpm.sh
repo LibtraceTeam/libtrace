@@ -5,6 +5,10 @@ SOURCENAME=`echo ${CI_COMMIT_REF_NAME} | cut -d '-' -f 1`
 
 
 DISTRO=fedora
+if [ "$1" = "centos8" ]; then
+        DISTRO=centos
+fi
+
 if [ "$1" = "centos7" ]; then
         DISTRO=centos
 fi
@@ -36,6 +40,10 @@ enabled=1
 EOF
 
 yum install -y wget make gcc
+
+if [ "$1" = "centos8" ]; then
+        yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm || true
+fi
 
 if [ "$1" = "centos7" ]; then
         yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm || true
