@@ -20,9 +20,9 @@ BuildRequires: openssl-devel
 BuildRequires: libyaml-devel
 BuildRequires: libwandder1-devel
 BuildRequires: libwandio1-devel
-BuildRequires: dpdk-wand-devel
+BuildRequires: dpdk-devel
 
-Requires: dpdk-wand
+Requires: dpdk
 Provides: libtrace4
 
 %description
@@ -36,19 +36,19 @@ University in New Zealand.
 %package        devel
 Summary:        Development files for %{name}
 Requires:       %{name}%{?_isa} = %{version}-%{release}
-Requires:       dpdk-wand-devel
+Requires:       dpdk-devel
 
 %package        tools
 Summary:        Helper utilities for use with the %{name} library
-Requires:       %{name}%{?_isa} = %{version}-%{release}, libpacketdump4%{?_isa} = %{version}-%{release}, dpdk-wand
+Requires:       %{name}%{?_isa} = %{version}-%{release}, libpacketdump4%{?_isa} = %{version}-%{release}, dpdk
 
 %package -n     libpacketdump4
 Summary:        Network packet parsing and human-readable display library
-Requires:       %{name}%{?_isa} = %{version}-%{release}, dpdk-wand
+Requires:       %{name}%{?_isa} = %{version}-%{release}, dpdk
 
 %package -n     libpacketdump4-devel
 Summary:        Development files for libpacketdump
-Requires:        %{name}-devel%{?_isa} = %{version}-%{release}, libpacketdump4%{?_isa} = %{version}-%{release}, dpdk-wand-devel
+Requires:        %{name}-devel%{?_isa} = %{version}-%{release}, libpacketdump4%{?_isa} = %{version}-%{release}, dpdk-devel
 
 %description devel
 The %{name}-devel package contains libraries and header files for
@@ -125,6 +125,9 @@ find $RPM_BUILD_ROOT -name '*.la' -exec rm -f {} ';'
 
 
 %changelog
+* Wed Nov 6 2019 Shane Alcock <salcock@waikato.ac.nz> - 4.0.10-1
+- Go back to relying on standard DPDK packages
+
 * Thu Sep 19 2019 Shane Alcock <salcock@waikato.ac.nz> - 4.0.10-1
 - Updated for 4.0.10 release
 
