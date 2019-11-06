@@ -188,6 +188,7 @@ static int join_multicast_group(char *groupaddr, char *localiface,
         char pstr[16];
         struct group_req greq;
         int bufsize, val;
+        uint32_t ttlopt = 4;            // TODO, add config option for this?
 
         int sock;
 
@@ -229,6 +230,18 @@ static int join_multicast_group(char *groupaddr, char *localiface,
                                 groupaddr, portstr, strerror(errno));
                 goto sockcreateover;
         }
+
+        if (setsockopt(sock,
+                        gotten->ai_family == PF_INET6 ? IPPROTO_IPV6: IPPROTO_IP,
+                        gotten->ai_family == PF_INET6 ? IPV6_MULTICAST_HOPS :
+                        IP_MULTICAST_TTL,
+                        (char *)&ttlopt, sizeof(ttlopt)) != 0) {
+                fprintf(stderr,
+                        "Failed to set TTL socket option for %s:%s -- %s\n",
+                        groupaddr, portstr, strerror(errno));
+                goto sockcreateover;
+        }
+
 
         val = 1;
         if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val)) < 0) {
