@@ -1,9 +1,9 @@
 Name:           libtrace4
-Version:        4.0.9
+Version:        4.0.10
 Release:        1%{?dist}
 Summary:        C Library for capturing and analysing network packets
 
-License:        LPGLv3
+License:        LGPLv3
 URL:            https://github.com/LibtraceTeam/libtrace
 Source0:        https://github.com/LibtraceTeam/libtrace/archive/%{version}.tar.gz
 
@@ -20,9 +20,10 @@ BuildRequires: openssl-devel
 BuildRequires: libyaml-devel
 BuildRequires: libwandder1-devel
 BuildRequires: libwandio1-devel
-BuildRequires: dpdk-wand-devel
+BuildRequires: dpdk-devel
 
-Requires: dpdk-wand
+Requires: dpdk
+Provides: libtrace4
 
 %description
 libtrace is a library for trace processing. It supports multiple input
@@ -35,19 +36,19 @@ University in New Zealand.
 %package        devel
 Summary:        Development files for %{name}
 Requires:       %{name}%{?_isa} = %{version}-%{release}
-Requires:       dpdk-wand-devel
+Requires:       dpdk-devel
 
 %package        tools
 Summary:        Helper utilities for use with the %{name} library
-Requires:       %{name}%{?_isa} = %{version}-%{release}
+Requires:       %{name}%{?_isa} = %{version}-%{release}, libpacketdump4%{?_isa} = %{version}-%{release}, dpdk
 
 %package -n     libpacketdump4
 Summary:        Network packet parsing and human-readable display library
-Requires:       %{name}-devel%{?_isa} = %{version}-%{release}
+Requires:       %{name}%{?_isa} = %{version}-%{release}, dpdk
 
 %package -n     libpacketdump4-devel
 Summary:        Development files for libpacketdump
-Requires:       libpacketdump4%{?_isa} = %{version}-%{release}
+Requires:        %{name}-devel%{?_isa} = %{version}-%{release}, libpacketdump4%{?_isa} = %{version}-%{release}, dpdk-devel
 
 %description devel
 The %{name}-devel package contains libraries and header files for
@@ -87,7 +88,7 @@ University in New Zealand.
 %setup -q -n libtrace-%{version}
 
 %build
-%configure --disable-static --with-man=yes --mandir=%{_mandir} --with-dpdk=yes
+%configure --disable-static --with-man=yes --mandir=%{_mandir} --with-dpdk=yes --with-dag=no
 make %{?_smp_mflags}
 
 
@@ -124,6 +125,15 @@ find $RPM_BUILD_ROOT -name '*.la' -exec rm -f {} ';'
 
 
 %changelog
+* Wed Nov 6 2019 Shane Alcock <salcock@waikato.ac.nz> - 4.0.10-1
+- Go back to relying on standard DPDK packages
+
+* Thu Sep 19 2019 Shane Alcock <salcock@waikato.ac.nz> - 4.0.10-1
+- Updated for 4.0.10 release
+
+* Fri Jul 26 2019 Shane Alcock <salcock@waikato.ac.nz> - 4.0.9-2
+- Attempt to fix dpdk / dpdk-wand conflicts in subpackages
+
 * Mon Jul 15 2019 Shane Alcock <salcock@waikato.ac.nz> - 4.0.9-1
 - Updated for 4.0.9 release
 

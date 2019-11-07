@@ -31,8 +31,8 @@ Package: libtrace4
 Section: libs
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
-Provides: libtrace
-Conflicts: libtrace, libtrace3
+Provides: libtrace4 (= ${binary:Version})
+Conflicts: libtrace, libtrace3, libtrace4-dag
 Replaces: libtrace3
 Description: network trace processing library supporting many input formats
  libtrace is a library for trace processing. It supports multiple input
@@ -41,6 +41,22 @@ Description: network trace processing library supporting many input formats
  .
  libtrace is developed by the WAND Network Research Group at Waikato
  University in New Zealand.
+
+#Package: libtrace4-dag
+#Section: libs
+#Architecture: any
+#Depends: dag-base, ${shlibs:Depends}, ${misc:Depends}
+#Provides: libtrace4
+#Conflicts: libtrace, libtrace3, libtrace4
+#Replaces: libtrace3
+#Description: network trace processing library supporting many input formats
+# libtrace is a library for trace processing. It supports multiple input
+# methods, including device capture, raw and gz-compressed trace, and sockets;
+# and multiple input formats. This version of the libtrace4 package includes
+# support for Endace DAG hardware.
+# .
+# libtrace is developed by the WAND Network Research Group at Waikato
+# University in New Zealand.
 
 Package: libpacketdump4-dev
 Section: libdevel
@@ -63,7 +79,7 @@ Description: development headers for the libpacketdump library
 Package: libpacketdump4
 Section: libs
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
+Depends: libtrace4 (= ${binary:Version}), ${misc:Depends}
 Provides: libpacketdump
 Conflicts: libpacketdump, libpacketdump3
 Replaces: libpacketdump3
@@ -78,7 +94,7 @@ Description: network packet parsing and human-readable display library
 Package: libtrace4-tools
 Section: net
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
+Depends: libtrace4 (= ${binary:Version}), ${misc:Depends}
 Conflicts: libtrace-tools
 Replaces: libtrace-tools
 Description: helper utilities for use with the libtrace process library

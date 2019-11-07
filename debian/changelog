@@ -1,3 +1,14 @@
+libtrace4 (4.0.10-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Fix "SIOCGSTAMP undeclared" error when building against newer Linux kernels.
+  * Fix corruption bug when running multiple etsilive: input processes.
+  * Add new API function trace_get_errstr(), which provides error message
+    strings for a given libtrace error number.
+  * Increased TTL for nDAG multicast join messages to 4.
+
+ -- Shane Alcock <shane.alcock@waikato.ac.nz>  Wed, 6 Nov 2019 13:37:51 +1300
+
 libtrace4 (4.0.9-1) unstable; urgency=medium
 
   * New upstream release.
