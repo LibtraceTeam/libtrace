@@ -573,7 +573,11 @@ static int pcapfile_write_packet(libtrace_out_t *out,
 
 static int pcapfile_flush_output(libtrace_out_t *out) {
 
-        return wandio_wflush(DATAOUT(out)->file);
+        if (DATAOUT(out)->file) {
+                return wandio_wflush(DATAOUT(out)->file);
+        }
+
+        return 0;
 }
 
 static libtrace_linktype_t pcapfile_get_link_type(
