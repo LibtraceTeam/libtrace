@@ -1767,6 +1767,11 @@ DLLEXPORT int trace_apply_filter(libtrace_filter_t *filter,
 		/* Copy the packet, as we don't want to trash the one we
 		 * were passed in */
 		packet_copy=trace_copy_packet(packet);
+                if (packet_copy == NULL) {
+                        trace_set_err(packet->trace, TRACE_ERR_NO_CONVERSION,
+                                        "failed to demote packet within trace_apply_filter()");
+                        return -1;
+                }
 		free_packet_needed=true;
 
 		while (libtrace_to_pcap_dlt(linktype) == TRACE_DLT_ERROR) {
