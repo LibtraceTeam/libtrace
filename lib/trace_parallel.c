@@ -1370,6 +1370,7 @@ static inline size_t filter_packets(libtrace_t *trace,
 	for (i = 0; i < nb_packets; ++i) {
 		// The filter needs the trace attached to receive the link type
 		packets[i]->trace = trace;
+                packets[i]->which_trace_start = trace->startcount;
 		if (trace_apply_filter(trace->filter, packets[i])) {
 			libtrace_packet_t *tmp;
 			tmp = packets[offset];
