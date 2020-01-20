@@ -415,6 +415,7 @@ static void receive_from_single_socket(etsisocket_t *esock, etsithread_t *et) {
                 close(esock->sock);
                 esock->sock = -1;
                 et->activesources -= 1;
+                libtrace_scb_destroy(&(esock->recvbuffer));
         }
 
         if (ret == 0) {
@@ -422,6 +423,7 @@ static void receive_from_single_socket(etsisocket_t *esock, etsithread_t *et) {
                 close(esock->sock);
                 esock->sock = -1;
                 et->activesources -= 1;
+                libtrace_scb_destroy(&(esock->recvbuffer));
         }
 
 }
