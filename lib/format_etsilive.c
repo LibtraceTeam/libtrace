@@ -325,8 +325,12 @@ static void halt_etsi_thread(etsithread_t *receiver) {
 static int etsilive_pause_input(libtrace_t *libtrace) {
 
         int i;
-        for (i = 0; i < libtrace->perpkt_thread_count; i++) {
+        if (libtrace->perpkt_thread_count == 0) {
                 halt_etsi_thread(&(FORMAT_DATA->receivers[i]));
+        } else {
+                for (i = 0; i < libtrace->perpkt_thread_count; i++) {
+                        halt_etsi_thread(&(FORMAT_DATA->receivers[i]));
+                }
         }
         return 0;
 
