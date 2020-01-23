@@ -54,6 +54,7 @@ DLLEXPORT int libtrace_scb_init(libtrace_scb_t *buf, uint32_t size,
         buf->read_offset = 0;
         buf->write_offset = 0;
         buf->count_bytes = size;
+        buf->shm_file = strdup(anonname);
 
         if (buf->address) {
                 return 0;
@@ -72,6 +73,11 @@ DLLEXPORT void libtrace_scb_destroy(libtrace_scb_t *buf) {
                 close(buf->fd);
                 buf->fd = -1;
         }
+        if (buf->shm_file) {
+                shm_unlink(buf->shm_file);
+                free(buf->shm_file);
+        }
+
 }
 
 DLLEXPORT int libtrace_scb_recv_sock(libtrace_scb_t *buf, int sock,

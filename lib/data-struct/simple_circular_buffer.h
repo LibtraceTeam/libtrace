@@ -4,6 +4,7 @@
 #include "libtrace.h"
 
 typedef struct libtracescb {
+        char *shm_file;
         uint8_t *address;
         uint32_t count_bytes;
         uint32_t write_offset;
