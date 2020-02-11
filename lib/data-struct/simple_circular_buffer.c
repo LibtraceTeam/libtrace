@@ -25,6 +25,13 @@ DLLEXPORT int libtrace_scb_init(libtrace_scb_t *buf, uint32_t size,
                 size = ((size / getpagesize()) + 1) * getpagesize();
         }
 
+        /* This SCB has not been cleaned up properly, do so now to
+         * try and avoid leaking fds and/or mmapped memory.
+         */
+        if (buf->fd != -1 || buf->address != NULL) {
+                libtrace_scb_destroy(buf);
+        }
+
         snprintf(anonname, 32, "lt_scb_%u_%u", getpid(), id);
 #ifdef HAVE_MEMFD_CREATE
         buf->fd = syscall(__NR_memfd_create, anonname, 0);
@@ -47,6 +54,7 @@ DLLEXPORT int libtrace_scb_init(libtrace_scb_t *buf, uint32_t size,
         buf->read_offset = 0;
         buf->write_offset = 0;
         buf->count_bytes = size;
+        buf->shm_file = strdup(anonname);
 
         if (buf->address) {
                 return 0;
@@ -59,10 +67,17 @@ DLLEXPORT void libtrace_scb_destroy(libtrace_scb_t *buf) {
 
         if (buf->address) {
                 munmap(buf->address, buf->count_bytes * 2);
+                buf->address = NULL;
         }
         if (buf->fd != -1) {
                 close(buf->fd);
+                buf->fd = -1;
         }
+        if (buf->shm_file) {
+                shm_unlink(buf->shm_file);
+                free(buf->shm_file);
+        }
+
 }
 
 DLLEXPORT int libtrace_scb_recv_sock(libtrace_scb_t *buf, int sock,
