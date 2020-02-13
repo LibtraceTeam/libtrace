@@ -119,14 +119,6 @@ static libtrace_packet_t * per_packet(libtrace_packet_t *packet) {
 		wire_length -= FCS_SIZE;
 	}
 
-        /* Quick hack to deal with pcap packets that are way larger than any
-         * sensible MTU (and therefore will never send without throwing an
-         * error).
-         */
-        if (wire_length > 8950) {
-                wire_length = 8950;
-        }
-
 	trace_construct_packet(new_packet,linktype,pkt_buffer,wire_length);
         new_packet = trace_strip_packet(new_packet);
 
