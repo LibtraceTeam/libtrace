@@ -94,7 +94,7 @@ Description: network packet parsing and human-readable display library
 Package: libtrace4-tools
 Section: net
 Architecture: any
-Depends: libtrace4 (= ${binary:Version}), ${misc:Depends}
+Depends: libtrace4 (= ${binary:Version}), libpacketdump4 (= ${binary:Version}), ${misc:Depends}
 Conflicts: libtrace-tools
 Replaces: libtrace-tools
 Description: helper utilities for use with the libtrace process library
