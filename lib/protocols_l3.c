@@ -266,7 +266,7 @@ DLLEXPORT void *trace_get_layer3(const libtrace_packet_t *packet,
 			iphdr=trace_get_payload_from_mpls(
 					  iphdr,ethertype,remaining);
 
-			if (iphdr && ethertype == 0x0) {
+			if (iphdr && *ethertype == 0x0) {
 				iphdr=trace_get_payload_from_ethernet(
 						iphdr,ethertype,remaining);
 			}
