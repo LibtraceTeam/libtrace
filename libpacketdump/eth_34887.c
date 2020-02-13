@@ -67,7 +67,7 @@ DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len)
 	else if ((*(packet+4)&0xF0) == 0x60)
 		decode_next(packet+offset/8,len-4,"eth",0x86DD);
 	else
-		decode_next(packet+offset/8,len-4,"link",1);
+		decode_next(packet+offset/8,len-4,"link",2);
 
 	return;
 }
