@@ -325,8 +325,12 @@ static void halt_etsi_thread(etsithread_t *receiver) {
 static int etsilive_pause_input(libtrace_t *libtrace) {
 
         int i;
-        for (i = 0; i < libtrace->perpkt_thread_count; i++) {
-                halt_etsi_thread(&(FORMAT_DATA->receivers[i]));
+        if (libtrace->perpkt_thread_count == 0) {
+                halt_etsi_thread(&(FORMAT_DATA->receivers[0]));
+        } else {
+                for (i = 0; i < libtrace->perpkt_thread_count; i++) {
+                        halt_etsi_thread(&(FORMAT_DATA->receivers[i]));
+                }
         }
         return 0;
 
@@ -411,6 +415,7 @@ static void receive_from_single_socket(etsisocket_t *esock, etsithread_t *et) {
                 close(esock->sock);
                 esock->sock = -1;
                 et->activesources -= 1;
+                libtrace_scb_destroy(&(esock->recvbuffer));
         }
 
         if (ret == 0) {
@@ -418,6 +423,7 @@ static void receive_from_single_socket(etsisocket_t *esock, etsithread_t *et) {
                 close(esock->sock);
                 esock->sock = -1;
                 et->activesources -= 1;
+                libtrace_scb_destroy(&(esock->recvbuffer));
         }
 
 }
