@@ -13,6 +13,7 @@
 #include <sys/socket.h>
 #include <errno.h>
 #include <sys/types.h>
+#include <string.h>
 
 #include "simple_circular_buffer.h"
 
