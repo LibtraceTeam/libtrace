@@ -1,3 +1,23 @@
+libtrace4 (4.0.11-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Fix bug where trace_apply_filter() would not work correctly with a
+    parallel trace input.
+  * Fix bug where non-parallel ETSI programs would fail to halt nicely.
+  * Fix libpacketdump being unable to decode Ethernet within MPLS properly.
+  * Fix libtrace (trace_get_layer3()) being unable to decode Ethernet
+    within MPLS properly.
+  * tracereplay now strips VLAN and MPLS headers before trying to replay a
+    packet from a trace file.
+  * Fix bug where the simple circular buffer would leak shared memory files.
+  * Fix segfault when using trace_apply_filter() on a packet which came from
+    an input trace that is now "closed".
+  * Fix bug where libtrace could try to flush a NULL pcap file handle.
+  * debian-specific: fix missing dependency on libpacketdump4 for
+    libtrace4-tools.
+
+ -- Shane Alcock <shane.alcock@waikato.ac.nz>  Thu, 13 Feb 2020 15:09:44 +1300
+
 libtrace4 (4.0.10-1) unstable; urgency=medium
 
   * New upstream release.
