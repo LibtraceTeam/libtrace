@@ -1,0 +1,42 @@
+.TH TRACEMCAST "1" "Feb 2020" "tracemcast (libtrace)" "User Commands"
+.SH
+tracemcast \- multicast captured packets on an interface
+.SH SYNOPSIS
+.B tracemcast
+[ \-m <monitor identifier> ]
+[ \-f <filterstring> ]
+[ \-g <multicast group address> ]
+[ \-p <port for beaconing group> ]
+[ \-s <source address> ]
+[ \-t <number of threads> ]
+[ \-M <mtu> ]
+inputuri
+.SH DESCRIPTION
+tracemcast reads packets from a single live packet source (e.g. an interface
+or hardware capture card) and then emits those packets to a multicast
+group that interested clients can then join to receive an independent feed
+of the captured packets.
+
+This allows the sharing of a capture source that would normally only allow
+one program to read from it at a time.
+
+The multicasting protocol is the ndag protocol, which libtrace supports as
+an input format, so libtrace programs can natively receive packets from a
+tracemcast group without any additional modifications.
+
+TODO: add descriptions of option flags
+
+.SH LINKS
+More details about tracemcast (and libtrace) can be found at
+https://github.com/LibtraceTeam/libtrace/wiki
+
+.SH SEE ALSO
+libtrace(3), tracesplit(1), tracesplit_dir(1), tracefilter(1),
+traceconvert(1), tracereport(1), tracertstats(1), tracestats(1), 
+tracepktdump(1), traceanon(1), tracesummary(1), tracereplay(1),
+tracediff(1), traceends(1), tracetopends(1), tracemerge(1)
+
+.SH AUTHORS
+Shane Alcock <salcock@waikato.ac.nz>
+
+
