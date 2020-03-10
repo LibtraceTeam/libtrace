@@ -62,8 +62,11 @@
 
 #include <libtrace_parallel.h>
 #include <libtrace.h>
+#include "lib/format_erf.h"
 #include "lib/format_ndag.h"
 #include "lib/lt_bswap.h"
+#include "lib/dagformat.h"
+#include "lib/libtrace_int.h"
 
 struct libtrace_t *currenttrace = NULL;
 
@@ -90,8 +93,10 @@ typedef struct read_thread_data {
     int mcastfd;
 
     uint8_t *pbuffer;
+    ndag_encap_t *encaphdr;
     uint8_t *writeptr;
     uint32_t seqno;
+    uint16_t reccount;
     struct addrinfo *target;
     uint32_t lastsend;
 
@@ -216,6 +221,8 @@ static void *init_reader_thread(libtrace_t *trace UNUSED,
     rdata->seqno = 1;
     rdata->target = NULL;
     rdata->lastsend = 0;
+    rdata->encaphdr = NULL;
+    rdata->reccount = 0;
 
     rdata->mcastfd = create_multicast_socket(rdata->mcastport,
 			gparams->mcastaddr, gparams->srcaddr, &(rdata->target));
@@ -231,14 +238,30 @@ static void *init_reader_thread(libtrace_t *trace UNUSED,
     return rdata;
 }
 
+static void send_ndag_packet(read_thread_data_t *rdata) {
+
+    rdata->encaphdr->recordcount = ntohs(rdata->reccount);
+
+    if (sendto(rdata->mcastfd, rdata->pbuffer,
+            (rdata->writeptr - rdata->pbuffer), 0, rdata->target->ai_addr,
+            rdata->target->ai_addrlen) < 0) {
+        fprintf(stderr, "tracemcast: thread %d failed to send multicast ERF packet: %s\n",
+                rdata->threadid, strerror(errno));
+    }
+
+    rdata->writeptr = rdata->pbuffer;
+    rdata->encaphdr = NULL;
+    rdata->reccount = 0;
+
+}
+
 static void halt_reader_thread(libtrace_t *trace UNUSED,
-        libtrace_thread_t *t UNUSED, void *global, void *tls) {
+        libtrace_thread_t *t UNUSED, void *global UNUSED, void *tls) {
 
     read_thread_data_t *rdata = (read_thread_data_t *)tls;
-    struct global_params *gparams = (struct global_params *)global;
 
     if (rdata->writeptr > rdata->pbuffer) {
-
+        send_ndag_packet(rdata);
     }
 
     if (rdata->pbuffer) {
@@ -253,6 +276,41 @@ static void halt_reader_thread(libtrace_t *trace UNUSED,
     free(rdata);
 }
 
+static uint16_t construct_erf_header(read_thread_data_t *rdata,
+        libtrace_packet_t *packet, libtrace_linktype_t ltype, uint32_t rem) {
+
+    uint16_t framing = 0;
+    dag_record_t *drec = (dag_record_t *)(rdata->writeptr);
+
+    drec->ts = bswap_host_to_le64(trace_get_erf_timestamp(packet));
+
+    if (ltype == TRACE_TYPE_ETH) {
+        drec->type = TYPE_ETH;
+    } else if (ltype == TRACE_TYPE_NONE) {
+        drec->type = TYPE_IPV4;         // sorry if you're using IPv6 raw */
+    } else {
+        drec->type = 255;
+    }
+
+    if (drec->type == TYPE_ETH) {
+        framing = dag_record_size + 2;
+    } else {
+        framing = dag_record_size;
+    }
+    drec->rlen = htons(rem + framing);
+    drec->wlen = htons(trace_get_wire_length(packet));
+    drec->lctr = htons(0);
+    memset(&(drec->flags), 0, sizeof(drec->flags));
+
+    if (trace_get_direction(packet) != TRACE_DIR_UNKNOWN) {
+        drec->flags.iface = trace_get_direction(packet);
+    } else {
+        drec->flags.iface = 0;
+    }
+
+    return framing;
+}
+
 static void tick_reader_thread(libtrace_t *trace UNUSED,
         libtrace_thread_t *t UNUSED, void *global UNUSED, void *tls,
         uint64_t order) {
@@ -260,16 +318,23 @@ static void tick_reader_thread(libtrace_t *trace UNUSED,
     read_thread_data_t *rdata = (read_thread_data_t *)tls;
 
     if (rdata->writeptr > rdata->pbuffer &&
-        (order >> 32) >= rdata->lastsend + 3) {
+            (order >> 32) >= rdata->lastsend + 3) {
 
+        send_ndag_packet(rdata);
+        rdata->lastsend = (order >> 32);
     }
 }
 
 static libtrace_packet_t *packet_reader_thread(libtrace_t *trace UNUSED,
-        libtrace_thread_t *t UNUSED, void *global UNUSED, void *tls,
+        libtrace_thread_t *t UNUSED, void *global, void *tls,
         libtrace_packet_t *packet) {
 
     read_thread_data_t *rdata = (read_thread_data_t *)tls;
+    struct global_params *gparams = (struct global_params *)global;
+    libtrace_linktype_t ltype;
+    uint32_t rem;
+    void *l2;
+    struct timeval tv;
 
     if (IS_LIBTRACE_META_PACKET(packet)) {
         return packet;
@@ -277,12 +342,61 @@ static libtrace_packet_t *packet_reader_thread(libtrace_t *trace UNUSED,
 
     /* first, check if there is going to be space in the buffer for this
      * packet + an ERF header */
+    l2 = trace_get_layer2(packet, &ltype, &rem);
+    tv = trace_get_timeval(packet);
 
-    /* if not and if there is already something in the buffer, send it then
-     * create a new one.
-     */
+    if (gparams->mtu - (rdata->writeptr - rdata->pbuffer) <
+            rem + dag_record_size) {
+
+        /* if not and if there is already something in the buffer, send it then
+         * create a new one.
+         */
+        if (rdata->writeptr > rdata->pbuffer + sizeof(ndag_common_t) +
+                sizeof(ndag_encap_t)) {
+
+            send_ndag_packet(rdata);
+            rdata->lastsend = tv.tv_sec;
+        }
+    }
 
     /* append this packet to the buffer (truncate if necessary) */
+
+    /* if the buffer is empty, put on a common and encap header on the
+     * front, before adding any packets */
+    if (rdata->writeptr == rdata->pbuffer) {
+        rdata->encaphdr = (ndag_encap_t *)(fill_common_header(
+                (char *)rdata->writeptr,
+                gparams->monitorid, NDAG_PKT_ENCAPERF));
+        rdata->writeptr = ((uint8_t *)rdata->encaphdr) + sizeof(ndag_encap_t);
+
+        rdata->encaphdr->started = gparams->starttime;
+        rdata->encaphdr->seqno = htonl(rdata->seqno);
+        rdata->encaphdr->streamid = htons(rdata->threadid);
+        rdata->encaphdr->recordcount = 0;
+
+        rdata->reccount = 0;
+    }
+
+    if (rem > gparams->mtu - (rdata->writeptr - rdata->pbuffer)
+            - (dag_record_size + 2)) {
+        rem = gparams->mtu - (rdata->writeptr - rdata->pbuffer);
+        rem -= (dag_record_size + 2);
+    }
+
+    /* put an ERF header in at writeptr */
+    rdata->writeptr += construct_erf_header(rdata, packet, ltype, rem);
+
+    /* copy packet contents into writeptr */
+    memcpy(rdata->writeptr, l2, rem);
+    rdata->writeptr += rem;
+    rdata->reccount ++;
+
+    /* if the buffer is close to full, just send the buffer anyway */
+    if (gparams->mtu - (rdata->writeptr - rdata->pbuffer) -
+            (dag_record_size + 2) < 64) {
+        send_ndag_packet(rdata);
+        rdata->lastsend = tv.tv_sec;
+    }
 
     return packet;
 }
@@ -291,6 +405,7 @@ static void start_libtrace_reader(struct global_params *gparams, char *uri,
         char *filterstring) {
 
 
+    libtrace_filter_t *filt = NULL;
     libtrace_callback_set_t *pktcbs = NULL;
 
     currenttrace = trace_create(uri);
@@ -313,6 +428,16 @@ static void start_libtrace_reader(struct global_params *gparams, char *uri,
         trace_set_tracetime(currenttrace, true);
     }
 
+    if (filterstring) {
+        filt = trace_create_filter(filterstring);
+
+        if (trace_config(currenttrace, TRACE_OPTION_FILTER, filt) < 0) {
+            trace_perror(currenttrace, "Failed to configure filter");
+            goto failmode;
+        }
+    }
+
+
     if (trace_pstart(currenttrace, gparams, pktcbs, NULL) == -1) {
         trace_perror(currenttrace, "Failed to start trace");
         goto failmode;
@@ -325,7 +450,9 @@ static void start_libtrace_reader(struct global_params *gparams, char *uri,
     }
 
 failmode:
-
+    if (filt) {
+        trace_destroy_filter(filt);
+    }
     if (currenttrace) {
         trace_destroy(currenttrace);
     }
