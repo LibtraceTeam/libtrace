@@ -27,6 +27,7 @@
 #include "libtrace.h"
 
 #include "rt_protocol.h"
+#include "format_ndag.h"
 #include "libtrace_int.h"
 #include <stdlib.h>
 #include <string.h>
@@ -111,6 +112,7 @@ libtrace_dlt_t libtrace_to_pcap_dlt(libtrace_linktype_t type)
 			break;
 		case TRACE_TYPE_PCAPNG_META:
 		case TRACE_TYPE_TZSP:
+		case TRACE_TYPE_CORSAROTAG:
 		case TRACE_TYPE_UNKNOWN:
                 case TRACE_TYPE_CONTENT_INVALID:
 			break;
@@ -220,6 +222,7 @@ uint8_t libtrace_to_erf_type(libtrace_linktype_t linktype)
                 case TRACE_TYPE_ETSILI:
 		case TRACE_TYPE_PCAPNG_META:
 		case TRACE_TYPE_TZSP:
+		case TRACE_TYPE_CORSAROTAG:
 		case TRACE_TYPE_UNKNOWN:
 		case TRACE_TYPE_CONTENT_INVALID:
 			break;
@@ -252,6 +255,7 @@ uint8_t libtrace_to_tzsp_type(libtrace_linktype_t linktype) {
 		case TRACE_TYPE_PCAPNG_META:
 		case TRACE_TYPE_CONTENT_INVALID:
 		case TRACE_TYPE_TZSP:
+		case TRACE_TYPE_CORSAROTAG:
 			break;
 	}
 	/* unknown */
@@ -358,6 +362,40 @@ void promote_packet(libtrace_packet_t *packet)
 	}
 }
 
+static void replacement_pcap_header(libtrace_packet_t *packet, char *payload,
+                int payloadlen, struct timeval *tv, int wirelen,
+                libtrace_dlt_t linktype) {
+
+	char *tmp;
+
+        tmp=(char*)malloc(
+                        trace_get_capture_length(packet)
+                        +sizeof(libtrace_pcapfile_pkt_hdr_t)
+                        );
+
+        ((libtrace_pcapfile_pkt_hdr_t*)tmp)->ts_sec=tv->tv_sec;
+        ((libtrace_pcapfile_pkt_hdr_t*)tmp)->ts_usec=tv->tv_usec;
+        ((libtrace_pcapfile_pkt_hdr_t*)tmp)->wirelen = wirelen;
+        ((libtrace_pcapfile_pkt_hdr_t*)tmp)->caplen = payloadlen;
+
+        memcpy(tmp+sizeof(libtrace_pcapfile_pkt_hdr_t),
+                        payload, (size_t)payloadlen);
+
+        if (packet->buf_control == TRACE_CTRL_EXTERNAL) {
+                packet->buf_control=TRACE_CTRL_PACKET;
+        }
+        else {
+                free(packet->buffer);
+        }
+        packet->buffer=tmp;
+        packet->header=tmp;
+        packet->payload=tmp+sizeof(libtrace_pcapfile_pkt_hdr_t);
+        packet->type=pcap_linktype_to_rt(linktype);
+
+        /* Invalidate caches */
+        trace_clear_cache(packet);
+}
+
 /* Try and remove any extraneous encapsulation that may have been added to
  * a packet. Effectively the opposite to promote_packet.
  *
@@ -369,53 +407,30 @@ bool demote_packet(libtrace_packet_t *packet)
 	uint16_t ha_type, next_proto;
 	libtrace_sll_header_t *sll = NULL;
 	uint32_t remaining = 0;
-	char *tmp;
 	struct timeval tv;
 	static libtrace_t *trace = NULL;
+        char *payload;
+
+        if (trace == NULL) {
+                trace = trace_create_dead("pcapfile:-");
+        }
+        trace->startcount = packet->trace->startcount;
 
 	switch(trace_get_link_type(packet)) {
 		case TRACE_TYPE_ATM:
 			remaining=trace_get_capture_length(packet);
-			packet->payload=trace_get_payload_from_atm(
+			payload=trace_get_payload_from_atm(
 				packet->payload,&type,&remaining);
-			if (!packet->payload)
+			if (payload == NULL)
 				return false;
-			tmp=(char*)malloc(
-				trace_get_capture_length(packet)
-				+sizeof(libtrace_pcapfile_pkt_hdr_t)
-				);
-
 			tv=trace_get_timeval(packet);
-			((libtrace_pcapfile_pkt_hdr_t*)tmp)->ts_sec=tv.tv_sec;
-			((libtrace_pcapfile_pkt_hdr_t*)tmp)->ts_usec=tv.tv_usec;
-			((libtrace_pcapfile_pkt_hdr_t*)tmp)->wirelen
-				= trace_get_wire_length(packet)-(trace_get_capture_length(packet)-remaining);
-			((libtrace_pcapfile_pkt_hdr_t*)tmp)->caplen
-				= remaining;
 
-			memcpy(tmp+sizeof(libtrace_pcapfile_pkt_hdr_t),
-					packet->payload,
-					(size_t)remaining);
-			if (packet->buf_control == TRACE_CTRL_EXTERNAL) {
-				packet->buf_control=TRACE_CTRL_PACKET;
-			}
-			else {
-				free(packet->buffer);
-			}
-			packet->buffer=tmp;
-			packet->header=tmp;
-			packet->payload=tmp+sizeof(libtrace_pcapfile_pkt_hdr_t);
-			packet->type=pcap_linktype_to_rt(TRACE_DLT_ATM_RFC1483);
-			
-			if (trace == NULL) {
-				trace = trace_create_dead("pcapfile:-");
-			}
+                        replacement_pcap_header(packet, payload, remaining,
+                                        &tv, trace_get_wire_length(packet) -
+                                        (trace_get_capture_length(packet) -
+                                        remaining), TRACE_DLT_ATM_RFC1483);
 
-                        trace->startcount = packet->trace->startcount;
 			packet->trace=trace;
-
-			/* Invalidate caches */
-			trace_clear_cache(packet);
 			return true;
 
 		case TRACE_TYPE_LINUX_SLL:
@@ -450,6 +465,17 @@ bool demote_packet(libtrace_packet_t *packet)
 			/* Invalidate caches */
 			trace_clear_cache(packet);
 			break;
+                case TRACE_TYPE_CORSAROTAG:
+			remaining=trace_get_capture_length(packet);
+			payload=packet->payload + sizeof(corsaro_packet_tags_t);
+			tv=trace_get_timeval(packet);
+
+                        replacement_pcap_header(packet, payload, remaining,
+                                        &tv, trace_get_wire_length(packet),
+                                        TRACE_DLT_EN10MB);
+
+			packet->trace=trace;
+                        return true;
 		default:
 			return false;
 	}
