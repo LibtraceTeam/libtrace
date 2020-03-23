@@ -86,7 +86,8 @@ typedef struct streamsock {
         int nextreadind;
         int nextwriteind;
         int savedsize[ENCAP_BUFFERS];
-	uint64_t nextts;
+	uint8_t rectype[ENCAP_BUFFERS];
+        uint64_t nextts;
         uint32_t startidle;
         uint64_t recordcount;
 
@@ -638,17 +639,82 @@ static int ndag_get_framing_length(const libtrace_packet_t *packet) {
 
         libtrace_t *libtrace = packet->trace;
 
-        if (FORMAT_DATA->consterfframing >= 0) {
-                return FORMAT_DATA->consterfframing;
+        if (packet->type == TRACE_RT_DATA_ERF) {
+                if (FORMAT_DATA->consterfframing >= 0) {
+                        return FORMAT_DATA->consterfframing;
+                }
+                return erf_get_framing_length(packet);
         }
-        return erf_get_framing_length(packet);
+
+        if (packet->type == TRACE_RT_DATA_CORSARO_TAGGED) {
+                return sizeof(corsaro_tagged_packet_header_t) -
+                                sizeof(corsaro_packet_tags_t);
+        }
+
+        return 0;
 }
 
-static int ndag_prepare_packet_stream(libtrace_t *restrict libtrace,
+static int ndag_prepare_packet_stream_corsarotag(libtrace_t *restrict libtrace,
                 recvstream_t *restrict rt,
                 streamsock_t *restrict ssock,
-                libtrace_packet_t *restrict packet,
-                uint32_t flags UNUSED) {
+                libtrace_packet_t *restrict packet) {
+
+
+        corsaro_tagged_packet_header_t *taghdr;
+        int nr;
+        uint16_t rlen;
+
+        packet->buf_control = TRACE_CTRL_EXTERNAL;
+
+        packet->trace = libtrace;
+        packet->buffer = ssock->nextread;
+        packet->header = ssock->nextread;
+        packet->type = TRACE_RT_DATA_CORSARO_TAGGED;
+
+        taghdr = (corsaro_tagged_packet_header_t *)packet->header;
+
+        packet->payload = &(taghdr->tags);
+
+        rlen = ntohs(taghdr->pktlen) + sizeof(corsaro_tagged_packet_header_t);
+        rt->received_packets ++;
+        ssock->recordcount += 1;
+
+        nr = ssock->nextreadind;
+        ssock->nextread += rlen;
+	ssock->nextts = 0;
+
+	if (ssock->nextread - ssock->saved[nr] > ssock->savedsize[nr]) {
+		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Walked past the end of the "
+			"nDAG receive buffer, probably due to a invalid taghdr->pktlen, in ndag_prepare_packet_stream_corsarotag()");
+		return -1;
+	}
+
+        if (ssock->nextread - ssock->saved[nr] >= ssock->savedsize[nr]) {
+                /* Read everything from this buffer, mark as empty and
+                 * move on. */
+                ssock->savedsize[nr] = 0;
+                ssock->bufwaiting ++;
+
+                nr ++;
+                if (nr == ENCAP_BUFFERS) {
+                        nr = 0;
+                }
+                ssock->nextread = ssock->saved[nr] + sizeof(ndag_common_t) +
+                                sizeof(ndag_encap_t);
+                ssock->nextreadind = nr;
+        }
+
+        packet->order = ((uint64_t) ntohl(taghdr->ts_sec)) << 32;
+        packet->order += (((uint64_t) ntohl(taghdr->ts_usec)) << 32) / 1000000;
+        packet->error = rlen;
+        packet->cached.link_type = TRACE_TYPE_CORSAROTAG;
+        return rlen;
+}
+
+static int ndag_prepare_packet_stream_encaperf(libtrace_t *restrict libtrace,
+                recvstream_t *restrict rt,
+                streamsock_t *restrict ssock,
+                libtrace_packet_t *restrict packet) {
 
         /* XXX flags is constant, so we can tell the compiler to not
          * bother copying over the parameter
@@ -745,7 +811,28 @@ static int ndag_prepare_packet_stream(libtrace_t *restrict libtrace,
 
         packet->order = erf_get_erf_timestamp(packet);
         packet->error = rlen;
+        packet->cached.link_type = erf_get_link_type(packet);
         return rlen;
+}
+
+static int ndag_prepare_packet_stream(libtrace_t *restrict libtrace,
+                recvstream_t *restrict rt,
+                streamsock_t *restrict ssock,
+                libtrace_packet_t *restrict packet,
+                uint32_t flags UNUSED) {
+
+        if (ssock->rectype[ssock->nextreadind] == NDAG_PKT_ENCAPERF) {
+                return ndag_prepare_packet_stream_encaperf(libtrace, rt,
+                                ssock, packet);
+        }
+
+        if (ssock->rectype[ssock->nextreadind] == NDAG_PKT_CORSAROTAG) {
+                return ndag_prepare_packet_stream_corsarotag(libtrace,
+                                rt,  ssock, packet);
+        }
+
+        return -1;
+
 }
 
 static int ndag_prepare_packet(libtrace_t *libtrace UNUSED,
@@ -962,7 +1049,8 @@ static int check_ndag_received(streamsock_t *ssock, int index,
                  * change nextwrite -- we want to overwrite the
                  * keep-alive with usable content. */
                 return 0;
-        } else if (rectype != NDAG_PKT_ENCAPERF) {
+        } else if (rectype != NDAG_PKT_ENCAPERF &&
+                        rectype != NDAG_PKT_CORSAROTAG) {
                 fprintf(stderr, "Received invalid record on the channel for %s:%u.\n",
                                 ssock->groupaddr, ssock->port);
                 close(ssock->sock);
@@ -970,6 +1058,7 @@ static int check_ndag_received(streamsock_t *ssock, int index,
                 return -1;
         }
 
+        ssock->rectype[index] = rectype;
         ssock->savedsize[index] = msglen;
         ssock->nextwriteind ++;
         ssock->bufavail --;
@@ -1509,6 +1598,109 @@ static int ndag_pregister_thread(libtrace_t *libtrace, libtrace_thread_t *t,
         return 0;
 }
 
+static libtrace_linktype_t ndag_get_link_type(const libtrace_packet_t *packet) {
+
+        if (packet->header == NULL) {
+                return ~0;
+        }
+
+        if (packet->type == TRACE_RT_DATA_CORSARO_TAGGED) {
+                return TRACE_TYPE_CORSAROTAG;
+        }
+
+        if (packet->type == TRACE_RT_DATA_ERF) {
+                return erf_get_link_type(packet);
+        }
+
+        return ~0;
+}
+
+static libtrace_direction_t ndag_get_direction(const libtrace_packet_t *packet) {
+        if (packet->type == TRACE_RT_DATA_ERF) {
+                return erf_get_direction(packet);
+        }
+
+        /* TODO think about whether corsaro tagged packets need dir tags */
+        return TRACE_DIR_UNKNOWN;
+}
+
+static libtrace_direction_t ndag_set_direction(libtrace_packet_t *packet,
+                libtrace_direction_t direction) {
+
+        if (packet->type == TRACE_RT_DATA_ERF) {
+                return erf_set_direction(packet, direction);
+        }
+
+        /* TODO think about whether corsaro tagged packets need dir tags */
+        return TRACE_DIR_UNKNOWN;
+}
+
+static uint64_t ndag_get_erf_timestamp(const libtrace_packet_t *packet) {
+        if (packet->type == TRACE_RT_DATA_ERF) {
+                return erf_get_erf_timestamp(packet);
+        }
+        if (packet->type == TRACE_RT_DATA_CORSARO_TAGGED) {
+                return packet->order;
+        }
+        return 0;
+}
+
+static int ndag_get_capture_length(const libtrace_packet_t *packet) {
+        if (packet->type == TRACE_RT_DATA_ERF) {
+                return erf_get_capture_length(packet);
+        }
+
+        if (packet->type == TRACE_RT_DATA_CORSARO_TAGGED) {
+                corsaro_tagged_packet_header_t *tag;
+
+                tag = (corsaro_tagged_packet_header_t *)packet->header;
+                return ntohs(tag->pktlen) + sizeof(corsaro_packet_tags_t);
+        }
+
+        return 0;
+}
+
+static int ndag_get_wire_length(const libtrace_packet_t *packet) {
+        if (packet->type == TRACE_RT_DATA_ERF) {
+                return erf_get_wire_length(packet);
+        }
+
+        if (packet->type == TRACE_RT_DATA_CORSARO_TAGGED) {
+                corsaro_tagged_packet_header_t *tag;
+
+                tag = (corsaro_tagged_packet_header_t *)packet->header;
+                return ntohs(tag->wirelen);
+        }
+
+        return 0;
+}
+
+static size_t ndag_set_capture_length(libtrace_packet_t *packet, size_t size) {
+
+        if (packet->type == TRACE_RT_DATA_ERF) {
+                return erf_set_capture_length(packet, size);
+        }
+
+        if (packet->type == TRACE_RT_DATA_CORSARO_TAGGED) {
+                corsaro_tagged_packet_header_t *tag;
+
+                tag = (corsaro_tagged_packet_header_t *)packet->header;
+                if (tag == NULL) {
+                        return ~0U;
+                }
+
+                if (size > ntohs(tag->pktlen) - sizeof(corsaro_packet_tags_t)) {
+                        return ntohs(tag->pktlen) - sizeof(corsaro_packet_tags_t);
+                }
+                packet->cached.capture_length = -1;
+
+                tag->pktlen = htons(size);
+                return size;
+        }
+
+        return ~0U;
+}
+
 static struct libtrace_format_t ndag = {
 
         "ndag",
@@ -1530,10 +1722,10 @@ static struct libtrace_format_t ndag = {
         NULL,                   /* fin_packet */
         NULL,                   /* write_packet */
         NULL,                   /* flush_output */
-        erf_get_link_type,      /* get_link_type */
-        erf_get_direction,      /* get_direction */
-        erf_set_direction,      /* set_direction */
-        erf_get_erf_timestamp,  /* get_erf_timestamp */
+        ndag_get_link_type,      /* get_link_type */
+        ndag_get_direction,      /* get_direction */
+        ndag_set_direction,      /* set_direction */
+        ndag_get_erf_timestamp,  /* get_erf_timestamp */
         NULL,                   /* get_timeval */
         NULL,                   /* get_seconds */
         NULL,                   /* get_timespec */
@@ -1541,10 +1733,10 @@ static struct libtrace_format_t ndag = {
         NULL,                   /* seek_erf */
         NULL,                   /* seek_timeval */
         NULL,                   /* seek_seconds */
-        erf_get_capture_length, /* get_capture_length */
-        erf_get_wire_length,    /* get_wire_length */
+        ndag_get_capture_length, /* get_capture_length */
+        ndag_get_wire_length,    /* get_wire_length */
         ndag_get_framing_length, /* get_framing_length */
-        erf_set_capture_length, /* set_capture_length */
+        ndag_set_capture_length, /* set_capture_length */
         NULL,                   /* get_received_packets */
         NULL,                   /* get_filtered_packets */
         NULL,                   /* get_dropped_packets */
