@@ -728,6 +728,7 @@ DLLEXPORT void *trace_get_layer2(const libtrace_packet_t *packet,
 		case TRACE_TYPE_PCAPNG_META:
 		case TRACE_TYPE_TZSP:
                 case TRACE_TYPE_ETSILI:
+                case TRACE_TYPE_CORSAROTAG:
 			break;
 		case TRACE_TYPE_UNKNOWN:
 		case TRACE_TYPE_CONTENT_INVALID:
@@ -768,6 +769,7 @@ DLLEXPORT void *trace_get_layer2(const libtrace_packet_t *packet,
 				case TRACE_TYPE_PCAPNG_META:
 				case TRACE_TYPE_TZSP:
                                 case TRACE_TYPE_ETSILI:
+                                case TRACE_TYPE_CORSAROTAG:
 					break;
 				case TRACE_TYPE_UNKNOWN:
 		                case TRACE_TYPE_CONTENT_INVALID:
@@ -844,6 +846,7 @@ DLLEXPORT void *trace_get_payload_from_layer2(void *link,
 		case TRACE_TYPE_PCAPNG_META:
 		case TRACE_TYPE_TZSP:
 		case TRACE_TYPE_ERF_META:
+                case TRACE_TYPE_CORSAROTAG:
 		case TRACE_TYPE_CONTENT_INVALID:
 		case TRACE_TYPE_UNKNOWN:
 			return NULL;
@@ -975,6 +978,7 @@ DLLEXPORT uint8_t *trace_get_source_mac(libtrace_packet_t *packet) {
                 case TRACE_TYPE_80211_PRISM:
                 case TRACE_TYPE_80211_RADIO:
                 case TRACE_TYPE_ETSILI:
+                case TRACE_TYPE_CORSAROTAG:
 			fprintf(stderr, "Metadata headers should already be skipped in trace_get_source_mac()\n");
 			return NULL;
         }
@@ -1032,6 +1036,7 @@ DLLEXPORT uint8_t *trace_get_destination_mac(libtrace_packet_t *packet) {
                 case TRACE_TYPE_LINUX_SLL:
                 case TRACE_TYPE_80211_PRISM:
                 case TRACE_TYPE_80211_RADIO:
+                case TRACE_TYPE_CORSAROTAG:
                 case TRACE_TYPE_ETSILI:
 			fprintf(stderr, "Metadata headers should already be skipped in trace_get_destination_mac()\n");
 			return NULL;

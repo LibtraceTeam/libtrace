@@ -25,6 +25,7 @@
  */
 #include <arpa/inet.h>
 #include <inttypes.h>
+#include "libtrace.h"
 /** @file
  *
  * @brief Header file containing definitions of functions and macros that deal
@@ -48,7 +49,7 @@ extern "C" {
  * @return The byteswapped 64-bit number
  *
  */
-uint64_t byteswap64(uint64_t num);
+DLLEXPORT uint64_t byteswap64(uint64_t num);
 
 /** Byteswaps a 32-bit value.
  *
