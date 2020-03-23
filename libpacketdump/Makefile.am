@@ -71,6 +71,9 @@ endif
 #23: PCAPNG
 BIN_PROTOCOLS+=link_23.la
 
+#25: Corsaro tags
+BIN_PROTOCOLS+=link_25.la
+
 # Decoders for various ethertypes (in decimal)
 # IPv4
 BIN_PROTOCOLS+=eth_0.la
@@ -150,6 +153,7 @@ if HAVE_WANDDER
 link_22_la_LDFLAGS=$(modflags) 
 endif
 link_23_la_LDFLAGS=$(modflags)
+link_25_la_LDFLAGS=$(modflags)
 eth_0_la_LDFLAGS=$(modflags)
 eth_2048_la_LDFLAGS=$(modflags)
 eth_2054_la_LDFLAGS=$(modflags)
