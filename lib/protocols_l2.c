@@ -671,6 +671,8 @@ DLLEXPORT void *trace_get_layer2(const libtrace_packet_t *packet,
 {
 	uint32_t dummyrem;
 	void *meta = NULL;
+        int done = 0;
+        uint32_t wire_len;
 
 	if (!packet) {
 		fprintf(stderr, "NULL packet passed into trace_get_layer2()\n");
@@ -728,6 +730,7 @@ DLLEXPORT void *trace_get_layer2(const libtrace_packet_t *packet,
 		case TRACE_TYPE_PCAPNG_META:
 		case TRACE_TYPE_TZSP:
                 case TRACE_TYPE_ETSILI:
+                case TRACE_TYPE_CORSAROTAG:
 			break;
 		case TRACE_TYPE_UNKNOWN:
 		case TRACE_TYPE_CONTENT_INVALID:
@@ -737,51 +740,69 @@ DLLEXPORT void *trace_get_layer2(const libtrace_packet_t *packet,
 	/* If there are meta-data headers, we need to skip over them until we
 	 * find a non-meta data header and return that.
 	 */
-	for(;;) {
+	while (!done) {
 		void *nexthdr = trace_get_payload_from_meta(meta, 
 				linktype, remaining);
 		
-		if (nexthdr == NULL) {
-			switch (*linktype) {
-				/* meta points to a layer 2 header! */
-				case TRACE_TYPE_HDLC_POS:
-				case TRACE_TYPE_ETH:
-				case TRACE_TYPE_ATM:
-				case TRACE_TYPE_80211:
-				case TRACE_TYPE_NONE:
-				case TRACE_TYPE_POS:
-				case TRACE_TYPE_AAL5:
-				case TRACE_TYPE_DUCK:
-				case TRACE_TYPE_LLCSNAP:
-				case TRACE_TYPE_PPP:
-				case TRACE_TYPE_METADATA:
-				case TRACE_TYPE_NONDATA:
-				case TRACE_TYPE_OPENBSD_LOOP:
-					((libtrace_packet_t*)packet)->cached.l2_header = meta;
-					((libtrace_packet_t*)packet)->cached.l2_remaining = *remaining;
-					return meta;
-				case TRACE_TYPE_LINUX_SLL:
-				case TRACE_TYPE_80211_RADIO:
-				case TRACE_TYPE_80211_PRISM:
-				case TRACE_TYPE_PFLOG:
-				case TRACE_TYPE_ERF_META:
-				case TRACE_TYPE_PCAPNG_META:
-				case TRACE_TYPE_TZSP:
-                                case TRACE_TYPE_ETSILI:
-					break;
-				case TRACE_TYPE_UNKNOWN:
-		                case TRACE_TYPE_CONTENT_INVALID:
-					return NULL;
-			}
-			
-			/* Otherwise, we must have hit the end of the packet */
-			return NULL;
-		}
-	 
-	 	
-		meta = nexthdr;
+		if (nexthdr != NULL) {
+                        meta = nexthdr;
+                        continue;
+                }
+
+                switch (*linktype) {
+                        /* meta points to a layer 2 header! */
+                        case TRACE_TYPE_HDLC_POS:
+                        case TRACE_TYPE_ETH:
+                        case TRACE_TYPE_ATM:
+                        case TRACE_TYPE_80211:
+                        case TRACE_TYPE_NONE:
+                        case TRACE_TYPE_POS:
+                        case TRACE_TYPE_AAL5:
+                        case TRACE_TYPE_DUCK:
+                        case TRACE_TYPE_LLCSNAP:
+                        case TRACE_TYPE_PPP:
+                        case TRACE_TYPE_METADATA:
+                        case TRACE_TYPE_NONDATA:
+                        case TRACE_TYPE_OPENBSD_LOOP:
+                                done = 1;
+                                break;
+                        case TRACE_TYPE_LINUX_SLL:
+                        case TRACE_TYPE_80211_RADIO:
+                        case TRACE_TYPE_80211_PRISM:
+                        case TRACE_TYPE_PFLOG:
+                        case TRACE_TYPE_ERF_META:
+                        case TRACE_TYPE_PCAPNG_META:
+                        case TRACE_TYPE_TZSP:
+                        case TRACE_TYPE_ETSILI:
+                        case TRACE_TYPE_CORSAROTAG:
+                                meta = nexthdr;  // should never hit this?
+                                break;
+                        case TRACE_TYPE_UNKNOWN:
+                        case TRACE_TYPE_CONTENT_INVALID:
+                                return NULL;
+                }
 	}
 
+        /* L2 remaining should never exceed wire length, to avoid treating
+         * capture padding as genuine packet content.
+         *
+         * For example, in Auck 4 there is a trace where the IP header
+         * length is incorrect (24 bytes) followed by a 20 byte TCP
+         * header. Total IP length is 40 bytes. As a result, the
+         * legacyatm padding gets treated as the "missing" bytes of
+         * the TCP header, which isn't the greatest. We're probably
+         * better off returning an incomplete TCP header in that case.
+         */
+
+        wire_len = (uint32_t) trace_get_wire_length(packet);
+        if (wire_len > 0 && wire_len < *remaining) {
+                *remaining = wire_len;
+        }
+
+        ((libtrace_packet_t*)packet)->cached.l2_header = meta;
+        ((libtrace_packet_t*)packet)->cached.l2_remaining = *remaining;
+
+        return meta;
 }
 
 DLLEXPORT
@@ -844,6 +865,7 @@ DLLEXPORT void *trace_get_payload_from_layer2(void *link,
 		case TRACE_TYPE_PCAPNG_META:
 		case TRACE_TYPE_TZSP:
 		case TRACE_TYPE_ERF_META:
+                case TRACE_TYPE_CORSAROTAG:
 		case TRACE_TYPE_CONTENT_INVALID:
 		case TRACE_TYPE_UNKNOWN:
 			return NULL;
@@ -975,6 +997,7 @@ DLLEXPORT uint8_t *trace_get_source_mac(libtrace_packet_t *packet) {
                 case TRACE_TYPE_80211_PRISM:
                 case TRACE_TYPE_80211_RADIO:
                 case TRACE_TYPE_ETSILI:
+                case TRACE_TYPE_CORSAROTAG:
 			fprintf(stderr, "Metadata headers should already be skipped in trace_get_source_mac()\n");
 			return NULL;
         }
@@ -1032,6 +1055,7 @@ DLLEXPORT uint8_t *trace_get_destination_mac(libtrace_packet_t *packet) {
                 case TRACE_TYPE_LINUX_SLL:
                 case TRACE_TYPE_80211_PRISM:
                 case TRACE_TYPE_80211_RADIO:
+                case TRACE_TYPE_CORSAROTAG:
                 case TRACE_TYPE_ETSILI:
 			fprintf(stderr, "Metadata headers should already be skipped in trace_get_destination_mac()\n");
 			return NULL;
