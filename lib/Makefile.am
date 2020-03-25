@@ -1,7 +1,7 @@
 lib_LTLIBRARIES = libtrace.la
 include_HEADERS = libtrace.h libtrace_parallel.h
 pkginclude_HEADERS = dagformat.h lt_inttypes.h daglegacy.h \
-        rt_protocol.h erftypes.h pthread_spinlock.h \
+        rt_protocol.h erftypes.h pthread_spinlock.h format_ndag.h \
         data-struct/ring_buffer.h data-struct/object_cache.h \
         data-struct/vector.h \
         data-struct/deque.h data-struct/linked_list.h \
