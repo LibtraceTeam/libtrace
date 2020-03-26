@@ -48,6 +48,8 @@
  * (provided the terms of the LGPL are met).
  */
 
+#include "config.h"
+
 #include <stdio.h>
 #include <getopt.h>
 #include <signal.h>
@@ -65,7 +67,11 @@
 #include "lib/format_erf.h"
 #include "lib/format_ndag.h"
 #include "lib/lt_bswap.h"
+
+#ifndef HAVE_DAG_API
 #include "lib/dagformat.h"
+#endif
+
 #include "lib/libtrace_int.h"
 
 struct libtrace_t *currenttrace = NULL;
@@ -277,12 +283,13 @@ static void halt_reader_thread(libtrace_t *trace UNUSED,
 }
 
 static uint16_t construct_erf_header(read_thread_data_t *rdata,
-        libtrace_packet_t *packet, libtrace_linktype_t ltype, uint32_t rem) {
+        libtrace_packet_t *packet, libtrace_linktype_t ltype, uint32_t rem,
+        uint64_t erfts) {
 
     uint16_t framing = 0;
     dag_record_t *drec = (dag_record_t *)(rdata->writeptr);
 
-    drec->ts = bswap_host_to_le64(trace_get_erf_timestamp(packet));
+    drec->ts = bswap_host_to_le64(erfts);
 
     if (ltype == TRACE_TYPE_ETH) {
         drec->type = TYPE_ETH;
@@ -311,8 +318,8 @@ static uint16_t construct_erf_header(read_thread_data_t *rdata,
     return framing;
 }
 
-static void tick_reader_thread(libtrace_t *trace UNUSED,
-        libtrace_thread_t *t UNUSED, void *global UNUSED, void *tls,
+static void tick_reader_thread(libtrace_t *trace,
+        libtrace_thread_t *t, void *global UNUSED, void *tls,
         uint64_t order) {
 
     read_thread_data_t *rdata = (read_thread_data_t *)tls;
@@ -334,7 +341,7 @@ static libtrace_packet_t *packet_reader_thread(libtrace_t *trace UNUSED,
     libtrace_linktype_t ltype;
     uint32_t rem;
     void *l2;
-    struct timeval tv;
+    uint64_t erfts;
 
     if (IS_LIBTRACE_META_PACKET(packet)) {
         return packet;
@@ -343,7 +350,7 @@ static libtrace_packet_t *packet_reader_thread(libtrace_t *trace UNUSED,
     /* first, check if there is going to be space in the buffer for this
      * packet + an ERF header */
     l2 = trace_get_layer2(packet, &ltype, &rem);
-    tv = trace_get_timeval(packet);
+    erfts = trace_get_erf_timestamp(packet);
 
     if (gparams->mtu - (rdata->writeptr - rdata->pbuffer) <
             rem + dag_record_size) {
@@ -355,7 +362,7 @@ static libtrace_packet_t *packet_reader_thread(libtrace_t *trace UNUSED,
                 sizeof(ndag_encap_t)) {
 
             send_ndag_packet(rdata);
-            rdata->lastsend = tv.tv_sec;
+            rdata->lastsend = (erfts >> 32);
         }
     }
 
@@ -384,7 +391,7 @@ static libtrace_packet_t *packet_reader_thread(libtrace_t *trace UNUSED,
     }
 
     /* put an ERF header in at writeptr */
-    rdata->writeptr += construct_erf_header(rdata, packet, ltype, rem);
+    rdata->writeptr += construct_erf_header(rdata, packet, ltype, rem, erfts);
 
     /* copy packet contents into writeptr */
     memcpy(rdata->writeptr, l2, rem);
@@ -395,7 +402,7 @@ static libtrace_packet_t *packet_reader_thread(libtrace_t *trace UNUSED,
     if (gparams->mtu - (rdata->writeptr - rdata->pbuffer) -
             (dag_record_size + 2) < 64) {
         send_ndag_packet(rdata);
-        rdata->lastsend = tv.tv_sec;
+        rdata->lastsend = (erfts >> 32);
     }
 
     return packet;
