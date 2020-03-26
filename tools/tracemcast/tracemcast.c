@@ -558,6 +558,8 @@ static void usage(char *prog) {
             "   -g --mcastaddr=address  Use this multicast address for emitting packets\n"
             "   -p --beaconport=port    Send multicast beacons on this port number\n"
             "   -s --srcaddr=address    Send multicast on the interface for this IP address\n"
+            "   -M --mtu=bytes          Limit multicast message size to this number of bytes\n"
+            "   -t --threads=count      Use this number of packet processing threads\n"
             "   -h --help               Show this usage statement\n");
 }
 
