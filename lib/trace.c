@@ -1448,12 +1448,14 @@ DLLEXPORT size_t trace_get_wire_length(const libtrace_packet_t *packet){
                 return ~0U;
         }
 
-	if (packet->cached.wire_length == -1) {
-		if (!packet->trace->format->get_wire_length)
-			return ~0U;
-		((libtrace_packet_t *)packet)->cached.wire_length =
-			packet->trace->format->get_wire_length(packet);
-	}
+	if (packet->cached.wire_length != -1) {
+                return packet->cached.wire_length;
+        }
+
+        if (!packet->trace->format->get_wire_length)
+                return ~0U;
+        ((libtrace_packet_t *)packet)->cached.wire_length =
+                packet->trace->format->get_wire_length(packet);
 
         if (packet->type >= TRACE_RT_DATA_DLT && packet->type <=
                         TRACE_RT_DATA_DLT_END) {
@@ -1479,9 +1481,11 @@ DLLEXPORT size_t trace_get_wire_length(const libtrace_packet_t *packet){
                                 LIBTRACE_PACKET_BUFSIZE);
 
 		/* should we be returning ~OU here? */
-	}
+                ((libtrace_packet_t *)packet)->cached.wire_length = ~0U;
+	} else {
+                ((libtrace_packet_t *)packet)->cached.wire_length -= wiresub;
+        }
 	return packet->cached.wire_length;
-
 }
 
 /* Get the length of the capture framing headers.
