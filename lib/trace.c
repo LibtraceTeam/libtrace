@@ -1445,8 +1445,6 @@ DLLEXPORT size_t trace_get_wire_length(const libtrace_packet_t *packet){
 
 		/* should we be returning ~OU here? */
                 ((libtrace_packet_t *)packet)->cached.wire_length = ~0U;
-	} else {
-                ((libtrace_packet_t *)packet)->cached.wire_length -= wiresub;
         }
 	return packet->cached.wire_length;
 }
