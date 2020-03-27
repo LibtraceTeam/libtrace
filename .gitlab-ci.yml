@@ -72,20 +72,6 @@ build-amd64-ubuntu-bionic:
   only:
     - tags
 
-build-amd64-ubuntu-cosmic:
-  stage: build
-  image: ubuntu:cosmic
-  script:
-    - ./gitlab-build.sh
-    - mkdir -p built-packages/cosmic/
-    - mv ../*.deb built-packages/cosmic/
-  artifacts:
-    paths:
-      - built-packages/*
-    expire_in: 1 day
-  only:
-    - tags
-
 build-amd64-ubuntu-disco:
   stage: build
   image: ubuntu:disco
