@@ -1,3 +1,15 @@
+libtrace4 (4.0.12-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Added new tool: tracemcast.
+  * Added support for corsaro-tagged packets received via nDAG multicast.
+  * Improved performance of multiple calls to trace_get_wire_length() on
+    the same packet.
+  * Fix truncation bug when a packet has a longer capture length than
+    wire length due to the addition of post-capture meta-data.
+
+ -- Shane Alcock <shane.alcock@waikato.ac.nz>  Fri, 27 Mar 2020 13:50:11 +1300
+
 libtrace4 (4.0.11-1) unstable; urgency=medium
 
   * New upstream release.
