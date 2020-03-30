@@ -506,7 +506,10 @@ libtrace_meta_t *trace_get_all_metadata(libtrace_packet_t *packet) {
                 return NULL;
         }
 
-	return packet->trace->format->get_all_meta(packet);
+        if (packet->trace->format->get_all_meta) {
+        	return packet->trace->format->get_all_meta(packet);
+        }
+        return NULL;
 }
 
 char *trace_get_erf_dag_card_model(libtrace_packet_t *packet, char *space, int spacelen) {
