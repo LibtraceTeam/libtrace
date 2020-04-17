@@ -38,10 +38,11 @@ DLLEXPORT void decode(int link_type UNUSED, const char *packet, unsigned len) {
                                 ntohs(tags->netacq_region));
                 printf(" CorsaroTags: Netacq-Edge Polygon Ids: ");
                 for (i = 0; i < MAX_NETACQ_POLYGONS; i++) {
-                        if (tags->netacq_polygon[i] == 0) {
+                        uint32_t pgon = ntohl(tags->netacq_polygon[i]);
+                        if ((pgon & 0x00ffffff) == 0) {
                                 break;
                         }
-                        printf("%u ", ntohl(tags->netacq_polygon[i]));
+                        printf("%u:%u ", (pgon >> 24), (pgon & 0x00ffffff));
                 }
                 printf("\n");
 
