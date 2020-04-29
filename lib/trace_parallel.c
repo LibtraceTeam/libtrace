@@ -78,16 +78,6 @@
 
 #include "libtrace.h"
 #include "libtrace_parallel.h"
-
-#ifdef HAVE_NET_BPF_H
-#  include <net/bpf.h>
-#else
-#  ifdef HAVE_PCAP_BPF_H
-#    include <pcap-bpf.h>
-#  endif
-#endif
-
-
 #include "libtrace_int.h"
 #include "format_helper.h"
 #include "rt_protocol.h"

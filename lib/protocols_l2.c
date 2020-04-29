@@ -731,6 +731,7 @@ DLLEXPORT void *trace_get_layer2(const libtrace_packet_t *packet,
 		case TRACE_TYPE_TZSP:
                 case TRACE_TYPE_ETSILI:
                 case TRACE_TYPE_CORSAROTAG:
+                case TRACE_TYPE_XDP:
 			break;
 		case TRACE_TYPE_UNKNOWN:
 		case TRACE_TYPE_CONTENT_INVALID:
@@ -775,6 +776,7 @@ DLLEXPORT void *trace_get_layer2(const libtrace_packet_t *packet,
                         case TRACE_TYPE_TZSP:
                         case TRACE_TYPE_ETSILI:
                         case TRACE_TYPE_CORSAROTAG:
+                        case TRACE_TYPE_XDP:
                                 meta = nexthdr;  // should never hit this?
                                 break;
                         case TRACE_TYPE_UNKNOWN:
@@ -868,6 +870,7 @@ DLLEXPORT void *trace_get_payload_from_layer2(void *link,
                 case TRACE_TYPE_CORSAROTAG:
 		case TRACE_TYPE_CONTENT_INVALID:
 		case TRACE_TYPE_UNKNOWN:
+                case TRACE_TYPE_XDP:
 			return NULL;
 
 		case TRACE_TYPE_80211:
@@ -990,6 +993,7 @@ DLLEXPORT uint8_t *trace_get_source_mac(libtrace_packet_t *packet) {
 		case TRACE_TYPE_TZSP:
 		case TRACE_TYPE_UNKNOWN:
 		case TRACE_TYPE_CONTENT_INVALID:
+                case TRACE_TYPE_XDP:
                         return NULL;
 
                 /* Metadata headers should already be skipped */
@@ -1049,6 +1053,7 @@ DLLEXPORT uint8_t *trace_get_destination_mac(libtrace_packet_t *packet) {
 		case TRACE_TYPE_TZSP:
 		case TRACE_TYPE_UNKNOWN:
 		case TRACE_TYPE_CONTENT_INVALID:
+                case TRACE_TYPE_XDP:
                         /* No MAC address */
                         return NULL;
                 /* Metadata headers should already be skipped */
