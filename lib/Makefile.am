@@ -65,6 +65,12 @@ else
 ETSISOURCES=
 endif
 
+if HAVE_LIBBPF
+XDP_SOURCES=format_linux_xdp.c
+else
+XDP_SOURCES=
+endif
+
 libtrace_la_SOURCES = trace.c trace_parallel.c common.h \
 		format_pktmeta.c format_erf.c format_pcap.c format_legacy.c \
 		format_rt.c format_helper.c format_helper.h format_pcapfile.c \
@@ -86,7 +92,8 @@ libtrace_la_SOURCES = trace.c trace_parallel.c common.h \
                 data-struct/buckets.c data-struct/simple_circular_buffer.c \
 		combiner_sorted.c combiner_unordered.c \
 		pthread_spinlock.c pthread_spinlock.h \
-		strndup.c format_pcapng.h format_tzsplive.h
+		strndup.c format_pcapng.h format_tzsplive.h \
+		$(XDP_SOURCES)
 
 if DAG2_4
 nodist_libtrace_la_SOURCES = dagopts.c dagapi.c

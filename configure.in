@@ -214,6 +214,10 @@ fi
 AC_CHECK_LIB(yaml, yaml_parser_initialize, yamlfound=1, yamlfound=0)
 AC_CHECK_LIB(tasn1, asn1_array2tree, asn1found=1, asn1found=0)
 
+# Check for AF_XDP required libs
+AC_CHECK_LIB(bpf, xsk_socket__create, bpffound=1, bpffound=0)
+AC_CHECK_LIB(elf, elf_begin, elffound=1, elffound=0)
+
 # Check for libpcap
 AC_CHECK_LIB(pcap,pcap_next_ex,pcapfound=1,pcapfound=0)
 AC_CHECK_LIB(pcap,pcap_create,pcapcreate=1,pcapcreate=0)
@@ -474,6 +478,22 @@ else
         have_yaml=no
 fi
 
+if test "$bpffound" = 1; then
+        AC_DEFINE(HAVE_LIBBPF, 1, [Set to 1 if libbpf is available])
+        LIBTRACE_LIBS="$LIBTRACE_LIBS -lbpf"
+        have_bpf=yes
+else
+        have_bpf=no
+fi
+
+if test "$elffound" = 1; then
+        AC_DEFINE(HAVE_ELF, 1, [Set to 1 if libelf is available])
+        LIBTRACE_LIBS="$LIBTRACE_LIBS -lelf"
+        have_elf=yes
+else
+        have_elf=no
+fi
+
 if test "$have_nsl" = 1; then
 	if test "$ac_cv_search_inet_ntop" != "none required"; then
 		LIBTRACE_LIBS="$LIBTRACE_LIBS $ac_cv_search_inet_ntop"
@@ -681,6 +701,9 @@ AM_CONDITIONAL([HAVE_NCURSES], [test "x$with_ncurses" != "xno"])
 AM_CONDITIONAL([HAVE_YAML], [test "x$have_yaml" != "xno"])
 
 AM_CONDITIONAL([HAVE_DPDK_PKGCONFIG], [test "x$dpdk_found" = "xpkgconfig"])
+
+AM_CONDITIONAL([HAVE_LIBBPF], [test "x$have_bpf" != "xno"])
+AM_CONDITIONAL([HAVE_LIBELF], [test "x$have_elf" != "xno"])
 
 # Check for miscellaneous programs
 AC_CHECK_PROG([libtrace_doxygen], [doxygen], [true], [false])
