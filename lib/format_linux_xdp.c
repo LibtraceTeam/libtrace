@@ -14,6 +14,7 @@
 #include <net/if.h>
 #include <assert.h>
 #include <sys/resource.h>
+#include <sys/mman.h>
 
 #define FORMAT_DATA ((xdp_format_data_t *)libtrace->format_data)
 //#define FORMAT_DATA_OUT ((xdp_format_data_out_t *)libtrace->format_data)
@@ -26,8 +27,7 @@
 struct xsk_config {
     __u32 xdp_flags;
     int ifindex;
-    char *ifname;
-    char ifname_buf[IF_NAMESIZE];
+    char ifname[IF_NAMESIZE];
     char progsec[32];
     bool do_unload;
     __u16 xsk_bind_flags;
@@ -55,8 +55,10 @@ struct xsk_per_stream {
     struct xsk_umem_info *umem;
     struct xsk_socket_info *xsk;
 
-    uint64_t prev_pkt_addr;
-    int prev_rcvd;
+    /* keep track of address for previous packets and
+     * number previously read. */
+    uint64_t prev_pkt_addr[RX_BATCH_SIZE];
+    unsigned int prev_rcvd;
 };
 
 typedef struct xdp_format_data {
@@ -202,12 +204,11 @@ static int linux_xdp_init_input(libtrace_t *libtrace) {
     }
 
     /* setup XDP config */
-    FORMAT_DATA->cfg.ifname = (char *)&(FORMAT_DATA->cfg.ifname_buf);
     scan = strchr(libtrace->uridata, ':');
     if (scan == NULL) {
-        FORMAT_DATA->cfg.ifname = strdup(libtrace->uridata);
+        memcpy(FORMAT_DATA->cfg.ifname, libtrace->uridata, strlen(libtrace->uridata));
     } else {
-        FORMAT_DATA->cfg.ifname = strdup(scan + 1);
+        memcpy(FORMAT_DATA->cfg.ifname, scan + 1, strlen(scan + 1));
     }
     FORMAT_DATA->cfg.ifindex = if_nametoindex(FORMAT_DATA->cfg.ifname);
     if (FORMAT_DATA->cfg.ifindex == -1) {
@@ -234,12 +235,10 @@ static int linux_xdp_pstart_input(libtrace_t *libtrace) {
     struct xsk_per_stream empty_stream;
     struct xsk_per_stream *stream;
 
-    empty_stream.prev_pkt_addr = 0;
     empty_stream.prev_rcvd = 0;
 
     /* TODO set number of interface queues to the number of threads */
 
-    fprintf(stderr, "number threads %d\n", threads);
     /* create a stream for each processing thread */
     for (i = 0; i < threads; i++) {
         libtrace_list_push_back(FORMAT_DATA->per_stream, &empty_stream);
@@ -264,7 +263,6 @@ static int linux_xdp_start_input(libtrace_t *libtrace) {
     struct xsk_per_stream empty_stream;
     struct xsk_per_stream *stream;
 
-    empty_stream.prev_pkt_addr = 0;
     empty_stream.prev_rcvd = 0;
 
     /* TODO set number of interface queues to 1 */
@@ -286,10 +284,9 @@ static int linux_xdp_start_stream(libtrace_t *libtrace, struct xsk_per_stream *s
 
     /* Allocate memory for NUM_FRAMES of default XDP frame size */
     pkt_buf_size = NUM_FRAMES * FRAME_SIZE;
-    if (posix_memalign(&pkt_buf, getpagesize(), pkt_buf_size)) {
-        fprintf(stderr, "err45\n");
-        return -1;
-    }
+    pkt_buf = mmap(NULL, pkt_buf_size,
+                   PROT_READ | PROT_WRITE,
+                   MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 
     /* setup umem */
     stream->umem = configure_xsk_umem(pkt_buf, pkt_buf_size, 0);
@@ -315,9 +312,9 @@ static int linux_xdp_read_stream(libtrace_t *libtrace,
                                  struct xsk_per_stream *stream,
                                  size_t nb_packets) {
 
-    unsigned int rcvd;
+    unsigned int rcvd = 0;
     uint32_t idx_rx = 0;
-    //uint32_t pkt_len;
+    uint32_t pkt_len;
     uint64_t pkt_addr;
     uint8_t *pkt_buffer;
     uint32_t flags = 0;
@@ -330,35 +327,48 @@ static int linux_xdp_read_stream(libtrace_t *libtrace,
     }
 
     /* free the previously read packet */
-    if (stream->prev_pkt_addr != 0) {
-        xsk_free_umem_frame(stream->xsk, stream->prev_pkt_addr);
+    if (stream->prev_rcvd != 0) {
+        for (i = 0; i < stream->prev_rcvd; i++) {
+            xsk_free_umem_frame(stream->xsk, stream->prev_pkt_addr[i]);
+        }
         xsk_ring_cons__release(&stream->xsk->rx, stream->prev_rcvd);
     }
 
-    /* check nb_packets (request packets) is not to large?? */
+    /* check nb_packets (request packets) is not larger than the max RX_BATCH_SIZE */
+    if (nb_packets > RX_BATCH_SIZE) {
+        nb_packets = RX_BATCH_SIZE;
+    }
 
-    /* try get a single packet */
-readagain:
-    rcvd = xsk_ring_cons__peek(&stream->xsk->rx, nb_packets, &idx_rx);
-    if (rcvd < 1) {
-        usleep(200);
-        goto readagain;
+    /* try get nb_packets */
+    while (rcvd < 1) {
+        rcvd = xsk_ring_cons__peek(&stream->xsk->rx, nb_packets, &idx_rx);
+
+        if (rcvd < 1) {
+            usleep(200);
+        }
     }
 
     for (i = 0; i < rcvd; i++) {
 
         /* got a packet. Get the address and length from the rx descriptor */
         pkt_addr = xsk_ring_cons__rx_desc(&stream->xsk->rx, idx_rx)->addr;
-        //pkt_len = xsk_ring_cons__rx_desc(&stream->xsk->rx, idx_rx)->len;
+        pkt_len = xsk_ring_cons__rx_desc(&stream->xsk->rx, idx_rx)->len;
         /* get pointer to its contents */
         pkt_buffer = xsk_umem__get_data(stream->xsk->umem->buffer, pkt_addr);
 
-        /* store pkt address to release next call NOTE. this will need to be changed for parallel input */
-        stream->prev_pkt_addr = pkt_addr;
+        /* store pkt address so the umem can be free'd on next read */
+        stream->prev_pkt_addr[i] = pkt_addr;
+
+        packets[i]->buf_control = TRACE_CTRL_EXTERNAL;
+        packets[i]->type = TRACE_RT_DATA_XDP;
+        packets[i]->buffer = pkt_buffer;
+        packets[i]->trace = libtrace;
+        packets[i]->error = 1;
 
         if (linux_xdp_prepare_packet(libtrace, packets[i], pkt_buffer,
             TRACE_RT_DATA_XDP, flags)) {
-            fprintf(stderr, "error preparing packet\n");
+            trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Unable to "
+                "prepare packet in linux_xdp_read_stream()");
             return -1;
         }
 
@@ -379,7 +389,8 @@ static int linux_xdp_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet
 
     node = libtrace_list_get_index(FORMAT_DATA->per_stream, 0);
     if (node == NULL) {
-        fprintf(stderr, "Unable to get stream\n");
+        trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to get XDP "
+            "input stream in linux_xdp_read_packet()");
         return -1;
     }
 
@@ -394,13 +405,11 @@ static int linux_xdp_pread_packets(libtrace_t *libtrace,
                                    libtrace_packet_t *packets[],
                                    size_t nb_packets) {
 
-    fprintf(stderr, "read packets\n");
     int nb_rx;
     struct xsk_per_stream *stream = thread->format_data;
 
     nb_rx = linux_xdp_read_stream(libtrace, packets, stream, nb_packets);
 
-    fprintf(stderr, "read %d packets\n", nb_rx);
     return nb_rx;
 }
 
@@ -432,7 +441,6 @@ static int linux_xdp_fin_input(libtrace_t *libtrace) {
         /* destroy per stream list */
         libtrace_list_deinit(FORMAT_DATA->per_stream);
 
-        free(FORMAT_DATA->cfg.ifname);
         free(FORMAT_DATA);
     }
 
@@ -441,7 +449,7 @@ static int linux_xdp_fin_input(libtrace_t *libtrace) {
 
 
 /* link per stream data with each threads format data */
-int linux_xdp_pregister_thread(libtrace_t *libtrace,
+static int linux_xdp_pregister_thread(libtrace_t *libtrace,
                                libtrace_thread_t *t,
                                bool reading) {
 
@@ -462,6 +470,30 @@ int linux_xdp_pregister_thread(libtrace_t *libtrace,
 
 static libtrace_linktype_t linux_xdp_get_link_type(const libtrace_packet_t *packet UNUSED) {
     return TRACE_TYPE_ETH;
+}
+
+static struct timeval linux_xdp_get_timeval(const libtrace_packet_t *packet) {
+    struct timeval tv;
+
+    return tv;
+}
+
+static struct timespec linux_xdp_get_timespec(const libtrace_packet_t *packet) {
+    struct timespec ts;
+
+    return ts;
+}
+
+static int linux_xdp_get_framing_length(const libtrace_packet_t *packet) {
+    return 1;
+}
+
+static int linux_xdp_get_wire_length(const libtrace_packet_t *packet) {
+    return 1;
+}
+
+static int linux_xdp_get_capture_length(const libtrace_packet_t *packet) {
+    return 0;
 }
 
 static struct libtrace_format_t xdp = {
@@ -488,16 +520,16 @@ static struct libtrace_format_t xdp = {
         NULL,                           /* get_direction */
         NULL,                           /* set_direction */
         NULL,			        /* get_erf_timestamp */
-        NULL,           /* get_timeval */
-        NULL,                           /* get_timespec */
+        linux_xdp_get_timeval,          /* get_timeval */
+        linux_xdp_get_timespec,         /* get_timespec */
         NULL,                           /* get_seconds */
 	NULL,				/* get_meta_section */
         NULL,                           /* seek_erf */
         NULL,                           /* seek_timeval */
         NULL,                           /* seek_seconds */
-        NULL,    /* get_capture_length */
-        NULL,       /* get_wire_length */
-        NULL,    /* get_framing_length */
+        linux_xdp_get_capture_length,   /* get_capture_length */
+        linux_xdp_get_wire_length,      /* get_wire_length */
+        linux_xdp_get_framing_length,   /* get_framing_length */
         NULL,                           /* set_capture_length */
         NULL,                           /* get_received_packets */
 	NULL,                           /* get_filtered_packets */
