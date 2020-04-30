@@ -13,6 +13,7 @@
 #include <string.h>
 #include <net/if.h>
 #include <assert.h>
+#include <sys/resource.h>
 
 #define FORMAT_DATA ((xdp_format_data_t *)libtrace->format_data)
 //#define FORMAT_DATA_OUT ((xdp_format_data_out_t *)libtrace->format_data)
@@ -53,7 +54,9 @@ struct xsk_socket_info {
 struct xsk_per_stream {
     struct xsk_umem_info *umem;
     struct xsk_socket_info *xsk;
+
     uint64_t prev_pkt_addr;
+    int prev_rcvd;
 };
 
 typedef struct xdp_format_data {
@@ -95,7 +98,12 @@ static struct xsk_umem_info *configure_xsk_umem(void *buffer, uint64_t size,
         return NULL;
     }
 
-    ret = xsk_umem__create(&umem->umem, buffer, size, &umem->fq, &umem->cq, NULL);
+    ret = xsk_umem__create(&umem->umem,
+                           buffer,
+                           size,
+                           &umem->fq,
+                           &umem->cq,
+                           NULL);
     if (ret) {
         errno = -ret;
         return NULL;
@@ -108,7 +116,7 @@ static struct xsk_umem_info *configure_xsk_umem(void *buffer, uint64_t size,
 }
 
 static struct xsk_socket_info *xsk_configure_socket(struct xsk_config *cfg,
-    struct xsk_umem_info *umem) {
+                                                    struct xsk_umem_info *umem) {
 
     struct xsk_socket_config xsk_cfg;
     struct xsk_socket_info *xsk_info;
@@ -128,9 +136,13 @@ static struct xsk_socket_info *xsk_configure_socket(struct xsk_config *cfg,
     xsk_cfg.xdp_flags = cfg->xdp_flags;
     xsk_cfg.bind_flags = cfg->xsk_bind_flags;
 
-    ret = xsk_socket__create(&xsk_info->xsk, cfg->ifname,
-                             umem->xsk_if_queue, umem->umem,
-                             &xsk_info->rx, NULL, &xsk_cfg);
+    ret = xsk_socket__create(&xsk_info->xsk,
+                             cfg->ifname,
+                             umem->xsk_if_queue,
+                             umem->umem,
+                             &xsk_info->rx,
+                             NULL,
+                             &xsk_cfg);
     if (ret) {
         errno = -ret;
         return NULL;
@@ -171,7 +183,14 @@ static struct xsk_socket_info *xsk_configure_socket(struct xsk_config *cfg,
 
 static int linux_xdp_init_input(libtrace_t *libtrace) {
 
+    struct rlimit r = {RLIM_INFINITY, RLIM_INFINITY};
     char *scan = NULL;
+
+    if (setrlimit(RLIMIT_MEMLOCK, &r)) {
+        trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable "
+            "to setrlimit(RLIMIT_MEMLOCK) in linux_xdp_init_input");
+        return -1;
+    }
 
     // allocate space for the format data
     libtrace->format_data = (xdp_format_data_t *)calloc(1,
@@ -216,9 +235,11 @@ static int linux_xdp_pstart_input(libtrace_t *libtrace) {
     struct xsk_per_stream *stream;
 
     empty_stream.prev_pkt_addr = 0;
+    empty_stream.prev_rcvd = 0;
 
     /* TODO set number of interface queues to the number of threads */
 
+    fprintf(stderr, "number threads %d\n", threads);
     /* create a stream for each processing thread */
     for (i = 0; i < threads; i++) {
         libtrace_list_push_back(FORMAT_DATA->per_stream, &empty_stream);
@@ -234,6 +255,8 @@ static int linux_xdp_pstart_input(libtrace_t *libtrace) {
             return -1;
         }
     }
+
+    return 0;
 }
 
 static int linux_xdp_start_input(libtrace_t *libtrace) {
@@ -242,6 +265,7 @@ static int linux_xdp_start_input(libtrace_t *libtrace) {
     struct xsk_per_stream *stream;
 
     empty_stream.prev_pkt_addr = 0;
+    empty_stream.prev_rcvd = 0;
 
     /* TODO set number of interface queues to 1 */
 
@@ -287,16 +311,17 @@ static int linux_xdp_start_stream(libtrace_t *libtrace, struct xsk_per_stream *s
 }
 
 static int linux_xdp_read_stream(libtrace_t *libtrace,
-                                 libtrace_packet_t *packet,
+                                 libtrace_packet_t **packets,
                                  struct xsk_per_stream *stream,
-                                 libtrace_message_queue_t *queue UNUSED) {
+                                 size_t nb_packets) {
 
     unsigned int rcvd;
     uint32_t idx_rx = 0;
-    uint32_t pkt_len;
+    //uint32_t pkt_len;
     uint64_t pkt_addr;
     uint8_t *pkt_buffer;
     uint32_t flags = 0;
+    unsigned int i;
 
     if (libtrace->format_data == NULL) {
         trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT, "Trace format data missing, "
@@ -307,33 +332,44 @@ static int linux_xdp_read_stream(libtrace_t *libtrace,
     /* free the previously read packet */
     if (stream->prev_pkt_addr != 0) {
         xsk_free_umem_frame(stream->xsk, stream->prev_pkt_addr);
-        xsk_ring_cons__release(&stream->xsk->rx, 1);
+        xsk_ring_cons__release(&stream->xsk->rx, stream->prev_rcvd);
     }
+
+    /* check nb_packets (request packets) is not to large?? */
 
     /* try get a single packet */
 readagain:
-    rcvd = xsk_ring_cons__peek(&stream->xsk->rx, 1, &idx_rx);
+    rcvd = xsk_ring_cons__peek(&stream->xsk->rx, nb_packets, &idx_rx);
     if (rcvd < 1) {
         usleep(200);
         goto readagain;
     }
 
-    /* got a packet. Get the address and length from the rx descriptor */
-    pkt_addr = xsk_ring_cons__rx_desc(&stream->xsk->rx, idx_rx)->addr;
-    pkt_len = xsk_ring_cons__rx_desc(&stream->xsk->rx, idx_rx++)->len;
-    /* get pointer to its contents */
-    pkt_buffer = xsk_umem__get_data(stream->xsk->umem->buffer, pkt_addr);
+    for (i = 0; i < rcvd; i++) {
 
-    /* store pkt address to free next call */
-    stream->prev_pkt_addr = pkt_addr;
+        /* got a packet. Get the address and length from the rx descriptor */
+        pkt_addr = xsk_ring_cons__rx_desc(&stream->xsk->rx, idx_rx)->addr;
+        //pkt_len = xsk_ring_cons__rx_desc(&stream->xsk->rx, idx_rx)->len;
+        /* get pointer to its contents */
+        pkt_buffer = xsk_umem__get_data(stream->xsk->umem->buffer, pkt_addr);
 
-    if (linux_xdp_prepare_packet(libtrace, packet, pkt_buffer,
-        TRACE_RT_DATA_XDP, flags)) {
+        /* store pkt address to release next call NOTE. this will need to be changed for parallel input */
+        stream->prev_pkt_addr = pkt_addr;
 
-        return -1;
+        if (linux_xdp_prepare_packet(libtrace, packets[i], pkt_buffer,
+            TRACE_RT_DATA_XDP, flags)) {
+            fprintf(stderr, "error preparing packet\n");
+            return -1;
+        }
+
+        /* next packet */
+        idx_rx++;
     }
 
-    return pkt_len;
+    /* set number of received packets on this batch */
+    stream->prev_rcvd = rcvd;
+
+    return rcvd;
 }
 
 static int linux_xdp_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
@@ -349,13 +385,29 @@ static int linux_xdp_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet
 
     stream = (struct xsk_per_stream *)node->data;
 
-    return linux_xdp_read_stream(libtrace, packet, stream, NULL);
+    return linux_xdp_read_stream(libtrace, &packet, stream, 1);
 
+}
+
+static int linux_xdp_pread_packets(libtrace_t *libtrace,
+                                   libtrace_thread_t *thread,
+                                   libtrace_packet_t *packets[],
+                                   size_t nb_packets) {
+
+    fprintf(stderr, "read packets\n");
+    int nb_rx;
+    struct xsk_per_stream *stream = thread->format_data;
+
+    nb_rx = linux_xdp_read_stream(libtrace, packets, stream, nb_packets);
+
+    fprintf(stderr, "read %d packets\n", nb_rx);
+    return nb_rx;
 }
 
 static int linux_xdp_prepare_packet(libtrace_t *libtrace UNUSED, libtrace_packet_t *packet,
     void *buffer, libtrace_rt_types_t rt_type, uint32_t flags UNUSED) {
 
+    packet->buf_control = TRACE_CTRL_EXTERNAL;
     packet->type = rt_type;
     packet->buffer = buffer;
     packet->header = buffer;
@@ -388,79 +440,29 @@ static int linux_xdp_fin_input(libtrace_t *libtrace) {
 }
 
 
+/* link per stream data with each threads format data */
+int linux_xdp_pregister_thread(libtrace_t *libtrace,
+                               libtrace_thread_t *t,
+                               bool reading) {
 
+    if (reading) {
+        if (t->type == THREAD_PERPKT) {
+            t->format_data = libtrace_list_get_index(FORMAT_DATA->per_stream, t->perpkt_num)->data;
+            if (t->format_data == NULL) {
+                trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Too many threads registered");
+                return -1;
+            }
+        }
+    }
 
-
-
-
-
-
-
-static int linux_xdp_link_attach(int ifindex, uint32_t flags, int prog_fd) {
-
-    bpf_set_link_xdp_fd(ifindex, prog_fd, flags);
+    fprintf(stderr, "pregister\n");
 
     return 0;
 }
 
-static struct bpf_object *linux_xdp_load_bpf_object_file(const char *filename,
-    int ifindex) {
-
-    int prog_fd = -1;
-    struct bpf_object *obj;
-    int err;
-
-    struct bpf_prog_load_attr prog_load_attr = {
-        .prog_type = BPF_PROG_TYPE_XDP,
-        .ifindex = ifindex,
-    };
-    prog_load_attr.file = filename;
-
-    err = bpf_prog_load_xattr(&prog_load_attr, &obj, &prog_fd);
-    if (err) {
-        fprintf(stderr, "err loading BPF-OBJ\n");
-        return NULL;
-    }
-
-    return obj;
+static libtrace_linktype_t linux_xdp_get_link_type(const libtrace_packet_t *packet UNUSED) {
+    return TRACE_TYPE_ETH;
 }
-
-static struct bpf_object *linux_xdp_load_program(libtrace_t *libtrace) {
-
-    struct bpf_program *bpf_prog;
-    struct bpf_object *bpf_obj;
-    int offload_index = 0;
-    int prog_fd;
-    int err;
-
-    /* load BPF object file */
-    bpf_obj = linux_xdp_load_bpf_object_file(FORMAT_DATA->cfg.ifname,
-        offload_index);
-    if (!bpf_obj) {
-        fprintf(stderr, "errrrr\n");
-        return NULL;
-    }
-
-    /* get the first bpf program in the BPF file */
-    bpf_prog = bpf_program__next(NULL, bpf_obj);
-    if (!bpf_prog) {
-        fprintf(stderr, "eerrrrr\n");
-        return NULL;
-    }
-
-    /* get the file descriptor for the loaded BPF program */
-    prog_fd = bpf_program__fd(bpf_prog);
-
-    err = linux_xdp_link_attach(FORMAT_DATA->cfg.ifindex,
-        FORMAT_DATA->cfg.xdp_flags, prog_fd);
-    if (err) {
-        fprintf(stderr, "errrr\n");
-        return NULL;
-    }
-
-    return bpf_obj;
-}
-
 
 static struct libtrace_format_t xdp = {
         "xdp",
@@ -482,7 +484,7 @@ static struct libtrace_format_t xdp = {
         NULL,                           /* fin_packet */
         NULL,          /* write_packet */
         NULL,                           /* flush_output */
-        NULL,         /* get_link_type */
+        linux_xdp_get_link_type,        /* get_link_type */
         NULL,                           /* get_direction */
         NULL,                           /* set_direction */
         NULL,			        /* get_erf_timestamp */
@@ -505,7 +507,14 @@ static struct libtrace_format_t xdp = {
         NULL,				/* trace_event */
         NULL,                           /* help */
         NULL,                           /* next pointer */
-        NON_PARALLEL(true)
+        {true, 8},			/* Live, no thread limit */
+	linux_xdp_pstart_input,		/* pstart_input */
+	linux_xdp_pread_packets,	/* pread_packets */
+	NULL,                           /* ppause */
+	linux_xdp_fin_input,		/* p_fin */
+	linux_xdp_pregister_thread,	/* register thread */
+	NULL,				/* unregister thread */
+	NULL				/* get thread stats */
 };
 
 void linux_xdp_constructor(void) {
