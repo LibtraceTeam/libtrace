@@ -53,18 +53,13 @@ struct xsk_socket_info {
     struct xsk_ring_prod tx;
     struct xsk_umem_info *umem;
     struct xsk_socket *xsk;
-
-    uint64_t umem_frame_addr[NUM_FRAMES];
-    uint32_t umem_frame_free;
 };
 
 struct xsk_per_stream {
     struct xsk_umem_info *umem;
     struct xsk_socket_info *xsk;
 
-    /* keep track of address for previous packets and
-     * number previously read. */
-    uint64_t prev_pkt_addr[RX_BATCH_SIZE];
+    /* keep track of the number of previously processed packets */
     unsigned int prev_rcvd;
 
     /* previous timestamp for this stream */
@@ -81,24 +76,7 @@ static int linux_xdp_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *pac
     void *buffer, libtrace_rt_types_t rt_type, uint32_t flags);
 static int linux_xdp_start_stream(libtrace_t *libtrace, struct xsk_per_stream *stream,
     int ifqueue);
-
-static uint64_t xsk_alloc_umem_frame(struct xsk_socket_info *xsk) {
-
-    uint64_t frame;
-    if (xsk->umem_frame_free == 0) {
-        return INVALID_UMEM_FRAME;
-    }
-
-    frame = xsk->umem_frame_addr[--xsk->umem_frame_free];
-    xsk->umem_frame_addr[xsk->umem_frame_free] = INVALID_UMEM_FRAME;
-
-    return frame;
-}
-
-static void xsk_free_umem_frame(struct xsk_socket_info *xsk, uint64_t frame) {
-    xsk->umem_frame_addr[xsk->umem_frame_free++] = frame;
-}
-
+static void xsk_populate_fill_ring(struct xsk_umem_info *umem);
 
 static struct xsk_umem_info *configure_xsk_umem(void *buffer, uint64_t size,
     int interface_queue) {
@@ -125,6 +103,9 @@ static struct xsk_umem_info *configure_xsk_umem(void *buffer, uint64_t size,
     umem->buffer = buffer;
     umem->xsk_if_queue = interface_queue;
 
+    /* populate fill ring */
+    xsk_populate_fill_ring(umem);
+
     return umem;
 }
 
@@ -133,9 +114,7 @@ static struct xsk_socket_info *xsk_configure_socket(struct xsk_config *cfg,
 
     struct xsk_socket_config xsk_cfg;
     struct xsk_socket_info *xsk_info;
-    uint32_t idx;
     uint32_t prog_id = 0;
-    int i;
     int ret;
 
     xsk_info = calloc(1, sizeof(*xsk_info));
@@ -145,6 +124,7 @@ static struct xsk_socket_info *xsk_configure_socket(struct xsk_config *cfg,
 
     xsk_info->umem = umem;
     xsk_cfg.rx_size = XSK_RING_CONS__DEFAULT_NUM_DESCS;
+    xsk_cfg.tx_size = XSK_RING_PROD__DEFAULT_NUM_DESCS;
     xsk_cfg.libbpf_flags = 0;
     xsk_cfg.xdp_flags = cfg->xdp_flags;
     xsk_cfg.bind_flags = cfg->xsk_bind_flags;
@@ -154,7 +134,7 @@ static struct xsk_socket_info *xsk_configure_socket(struct xsk_config *cfg,
                              umem->xsk_if_queue,
                              umem->umem,
                              &xsk_info->rx,
-                             NULL,
+                             &xsk_info->tx,
                              &xsk_cfg);
     if (ret) {
         errno = -ret;
@@ -167,31 +147,28 @@ static struct xsk_socket_info *xsk_configure_socket(struct xsk_config *cfg,
         return NULL;
     }
 
-    /* Initialize umem frame allocation */
-    for (i = 0; i < NUM_FRAMES; i++) {
-        xsk_info->umem_frame_addr[i] = i * FRAME_SIZE;
-    }
+    return xsk_info;
+}
 
-    xsk_info->umem_frame_free = NUM_FRAMES;
+static void xsk_populate_fill_ring(struct xsk_umem_info *umem) {
 
-    /* Stuff the receive path with buffers, we assume we have enough */
-    ret = xsk_ring_prod__reserve(&xsk_info->umem->fq,
+    int ret, i;
+    uint32_t idx;
+
+    ret = xsk_ring_prod__reserve(&umem->fq,
                                  XSK_RING_PROD__DEFAULT_NUM_DESCS,
                                  &idx);
     if (ret != XSK_RING_PROD__DEFAULT_NUM_DESCS) {
-        errno = -ret;
-        return NULL;
+        return;
     }
 
-    for (i = 0; i < XSK_RING_PROD__DEFAULT_NUM_DESCS; i ++) {
-        *xsk_ring_prod__fill_addr(&xsk_info->umem->fq, idx++) =
-            xsk_alloc_umem_frame(xsk_info);
+    for (i = 0; i < XSK_RING_PROD__DEFAULT_NUM_DESCS; i++) {
+        *xsk_ring_prod__fill_addr(&umem->fq, idx++) =
+            i * FRAME_SIZE;
     }
 
-    xsk_ring_prod__submit(&xsk_info->umem->fq,
-                          XSK_RING_PROD__DEFAULT_NUM_DESCS);
+    xsk_ring_prod__submit(&umem->fq, XSK_RING_PROD__DEFAULT_NUM_DESCS);
 
-    return xsk_info;
 }
 
 static uint64_t linux_xdp_get_time(struct xsk_per_stream *stream) {
@@ -266,7 +243,9 @@ static int linux_xdp_pstart_input(libtrace_t *libtrace) {
     empty_stream.prev_rcvd = 0;
     empty_stream.prev_sys_time = 0;
 
-    /* TODO set number of interface queues to the number of threads */
+    /* TODO set number of interface queues to the number of threads,
+     * if the interface only supports a single queue return 1 which will
+     * revert to single threading operation */
 
     /* create a stream for each processing thread */
     for (i = 0; i < threads; i++) {
@@ -274,14 +253,8 @@ static int linux_xdp_pstart_input(libtrace_t *libtrace) {
 
         stream = libtrace_list_get_index(FORMAT_DATA->per_stream, i)->data;
 
-        /* TODO setup interface queue here */
-
         /* start the stream */
-        if (linux_xdp_start_stream(libtrace, stream, i) == -1) {
-            trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Failed to start "
-                "stream in linux_xdp_pstart_input()");
-            return -1;
-        }
+        linux_xdp_start_stream(libtrace, stream, i);
     }
 
     return 0;
@@ -305,6 +278,7 @@ static int linux_xdp_start_input(libtrace_t *libtrace) {
 
     /* start the stream */
     return linux_xdp_start_stream(libtrace, stream, 0);
+
 }
 
 static int linux_xdp_start_stream(libtrace_t *libtrace, struct xsk_per_stream *stream, int ifqueue) {
@@ -322,7 +296,7 @@ static int linux_xdp_start_stream(libtrace_t *libtrace, struct xsk_per_stream *s
     stream->umem = configure_xsk_umem(pkt_buf, pkt_buf_size, ifqueue);
     if (stream->umem == NULL) {
         trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable "
-            "to allocate memory for format data in linux_xdp_init_input()");
+            "to setup BPF umem in linux_xdp_start_stream()");
         return -1;
     }
 
@@ -330,7 +304,10 @@ static int linux_xdp_start_stream(libtrace_t *libtrace, struct xsk_per_stream *s
     stream->xsk = xsk_configure_socket(&FORMAT_DATA->cfg, stream->umem);
     if (stream->xsk == NULL) {
         trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable "
-            "to allocate memory for format data in linux_xdp_init_input()");
+            "to configure AF_XDP socket interface:%s queue:%d "
+            " in linux_xdp_start_stream()",
+            FORMAT_DATA->cfg.ifname,
+            stream->umem->xsk_if_queue);
         return -1;
     }
 
@@ -357,9 +334,6 @@ static int linux_xdp_read_stream(libtrace_t *libtrace,
 
     /* free the previously read packet */
     if (stream->prev_rcvd != 0) {
-        for (i = 0; i < stream->prev_rcvd; i++) {
-            xsk_free_umem_frame(stream->xsk, stream->prev_pkt_addr[i]);
-        }
         xsk_ring_cons__release(&stream->xsk->rx, stream->prev_rcvd);
     }
 
@@ -384,10 +358,6 @@ static int linux_xdp_read_stream(libtrace_t *libtrace,
         pkt_len = xsk_ring_cons__rx_desc(&stream->xsk->rx, idx_rx)->len;
         /* get pointer to its contents */
         pkt_buffer = xsk_umem__get_data(stream->xsk->umem->buffer, pkt_addr);
-
-        /* store pkt address so the umem can be free'd on next read */
-        stream->prev_pkt_addr[i] = pkt_addr;
-
 
         /* prepare the packet */
         if (packet[i]->format_data == NULL) {
@@ -435,13 +405,13 @@ static int linux_xdp_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet
 
 static int linux_xdp_pread_packets(libtrace_t *libtrace,
                                    libtrace_thread_t *thread,
-                                   libtrace_packet_t **packet,
+                                   libtrace_packet_t **packets,
                                    size_t nb_packets) {
 
     int nb_rx;
     struct xsk_per_stream *stream = thread->format_data;
 
-    nb_rx = linux_xdp_read_stream(libtrace, packet, stream, nb_packets);
+    nb_rx = linux_xdp_read_stream(libtrace, packets, stream, nb_packets);
 
     return nb_rx;
 }
@@ -498,6 +468,9 @@ static int linux_xdp_pregister_thread(libtrace_t *libtrace,
                                libtrace_thread_t *t,
                                bool reading) {
 
+    /* test if they nic supports multiple queues? if not use a hasher thread to disperse
+     * packets across processing threads?? */
+
     if (reading) {
         if (t->type == THREAD_PERPKT) {
             t->format_data = libtrace_list_get_index(FORMAT_DATA->per_stream, t->perpkt_num)->data;
@@ -507,8 +480,6 @@ static int linux_xdp_pregister_thread(libtrace_t *libtrace,
             }
         }
     }
-
-    fprintf(stderr, "pregister\n");
 
     return 0;
 }
