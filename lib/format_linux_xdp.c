@@ -338,7 +338,7 @@ static int linux_xdp_start_stream(libtrace_t *libtrace, struct xsk_per_stream *s
 }
 
 static int linux_xdp_read_stream(libtrace_t *libtrace,
-                                 libtrace_packet_t **packet,
+                                 libtrace_packet_t *packet[],
                                  struct xsk_per_stream *stream,
                                  size_t nb_packets) {
 
@@ -554,7 +554,10 @@ static int linux_xdp_get_capture_length(const libtrace_packet_t *packet) {
     return meta->packet_len;
 }
 
-/* called when trace_destroy_packet is called */
+/* called when trace_destroy_packet is called
+ * TODO rather than deallocing and allocating every packet we
+ * should resuse this memory. Is there a callback for when the
+ * packet is destroyed for the final time?? */
 static void linux_xdp_fin_packet(libtrace_packet_t *packet) {
 
     struct xdp_packet_meta *meta = packet->format_data;
@@ -562,6 +565,7 @@ static void linux_xdp_fin_packet(libtrace_packet_t *packet) {
     /* free the format data associated with this packet */
     if (meta != NULL) {
         free(meta);
+        packet->format_data = NULL;
     }
 }
 
