@@ -693,22 +693,24 @@ typedef struct libtrace_packet_cache {
  * meddling around in here 
  */
 typedef struct libtrace_packet_t {
-	struct libtrace_t *trace; 	/**< Pointer to the trace */
+	struct libtrace_t *trace;       /**< Pointer to the trace */
 	void *header;			/**< Pointer to the framing header */
 	void *payload;			/**< Pointer to the link layer */
 	void *buffer;			/**< Allocated buffer */
-	libtrace_rt_types_t  type; 	/**< RT protocol type for the packet */
-	buf_control_t buf_control; 	/**< Describes memory ownership */
+	libtrace_rt_types_t  type;      /**< RT protocol type for the packet */
+	buf_control_t buf_control;      /**< Describes memory ownership */
         libtrace_packet_cache_t cached; /**< Cached packet properties / headers */
-	uint64_t order; /**< Notes the order of this packet in relation to the input */
-	uint64_t hash; /**< A hash of the packet as supplied by the user */
-	int error; /**< The error status of pread_packet */
+	uint64_t order;                 /**< Notes the order of this packet in relation to the input */
+	uint64_t hash;                  /**< A hash of the packet as supplied by the user */
+	int error;                      /**< The error status of pread_packet */
         uint64_t internalid;            /** Internal identifier for the pkt */
         void *srcbucket;
 
         pthread_mutex_t ref_lock;       /**< Lock for reference counter */
-        int refcount;                 /**< Reference counter */
+        int refcount;                   /**< Reference counter */
         int which_trace_start;          /**< Used to match packet to a started instance of the parent trace */
+
+        void *format_data;              /**< Format data to store against the packet. **/
 } libtrace_packet_t;
 
 #define IS_LIBTRACE_META_PACKET(packet) (packet->type < TRACE_RT_DATA_SIMPLE)
