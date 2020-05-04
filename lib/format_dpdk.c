@@ -281,8 +281,8 @@ static int pci_to_numa(struct rte_pci_addr * dev_addr) {
 /* For debugging */
 static inline void dump_configuration()
 {
-	struct rte_config * global_config;
 	long nb_cpu = sysconf(_SC_NPROCESSORS_ONLN);
+	int i;
 
 	if (nb_cpu <= 0) {
 		perror("sysconf(_SC_NPROCESSORS_ONLN) failed."
@@ -292,41 +292,36 @@ static inline void dump_configuration()
 	if (nb_cpu > RTE_MAX_LCORE)
 		nb_cpu = RTE_MAX_LCORE;
 
-	global_config = rte_eal_get_configuration();
+	fprintf(stderr, "Intel DPDK setup\n"
+		"---Version      : %s\n"
+		"---Master LCore : %"PRIu32"\n"
+		"---LCore Count  : %"PRIu32"\n",
+		rte_version(),
+		rte_get_master_lcore(), rte_lcore_count());
 
-	if (global_config != NULL) {
-		int i;
-		fprintf(stderr, "Intel DPDK setup\n"
-		        "---Version      : %s\n"
-		        "---Master LCore : %"PRIu32"\n"
-		        "---LCore Count  : %"PRIu32"\n",
-		        rte_version(),
-		        global_config->master_lcore, global_config->lcore_count);
-
-		for (i = 0 ; i < nb_cpu; i++) {
-			fprintf(stderr, "   ---Core %d : %s\n", i,
-			        global_config->lcore_role[i] == ROLE_RTE ? "on" : "off");
-		}
-
-		const char * proc_type;
-		switch (global_config->process_type) {
-		case RTE_PROC_AUTO:
-			proc_type = "auto";
-			break;
-		case RTE_PROC_PRIMARY:
-			proc_type = "primary";
-			break;
-		case RTE_PROC_SECONDARY:
-			proc_type = "secondary";
-			break;
-		case RTE_PROC_INVALID:
-			proc_type = "invalid";
-			break;
-		default:
-			proc_type = "something worse than invalid!!";
-		}
-		fprintf(stderr, "---Process Type : %s\n", proc_type);
+	for (i = 0 ; i < nb_cpu; i++) {
+		fprintf(stderr, "   ---Core %d : %s\n", i,
+			rte_lcore_is_enabled(i) ? "on" : "off");
 	}
+
+	const char * proc_type;
+	switch (rte_eal_process_type()) {
+	case RTE_PROC_AUTO:
+		proc_type = "auto";
+		break;
+	case RTE_PROC_PRIMARY:
+		proc_type = "primary";
+		break;
+	case RTE_PROC_SECONDARY:
+		proc_type = "secondary";
+		break;
+	case RTE_PROC_INVALID:
+		proc_type = "invalid";
+		break;
+	default:
+		proc_type = "something worse than invalid!!";
+	}
+	fprintf(stderr, "---Process Type : %s\n", proc_type);
 
 }
 #endif
@@ -366,7 +361,7 @@ static inline int dpdk_move_master_lcore(libtrace_t *libtrace, size_t core) {
 	cfg->lcore_role[rte_lcore_id()] = ROLE_OFF;
 	cfg->lcore_role[core] = ROLE_RTE;
 	lcore_config[core].thread_id = lcore_config[rte_lcore_id()].thread_id;
-	rte_eal_get_configuration()->master_lcore = core;
+	cfg->master_lcore = core;
 	RTE_PER_LCORE(_lcore_id) = core;
 
 	/* Now change the affinity, either mapped to a single core or all accepted */
@@ -392,7 +387,7 @@ static inline int dpdk_move_master_lcore(libtrace_t *libtrace, size_t core) {
 /**
  * XXX This is very bad XXX
  * But we have to do something to allow getopts nesting
- * Luckly normally the format is last so it doesn't matter
+ * Luckily, normally the format is last so it doesn't matter
  * DPDK only supports modern systems so hopefully this
  * will continue to work
  */
@@ -529,7 +524,6 @@ static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_
 	/* Make our mask with all cores turned on this is so that DPDK
 	 * gets all CPU info in older versions */
 	snprintf(cpu_number, sizeof(cpu_number), "%x", ~(UINT32_MAX<<MIN(31, nb_cpu)));
-	//snprintf(cpu_number, sizeof(cpu_number), "%x", 0x1 << (my_cpu - 1));
 
 #if !DPDK_USE_BLACKLIST
 	/* Black list all ports besides the one that we want to use */
@@ -561,7 +555,7 @@ static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_
 		}
 	}
 	// Only the master should be running
-	if (cfg->lcore_count != 1) {
+	if (rte_lcore_count() != 1) {
 		fprintf(stderr, "Expected only the master core to be running in dpdk_init_environment()\n");
 		return -1;
 	}
@@ -1560,8 +1554,8 @@ void dpdk_punregister_thread(libtrace_t *libtrace UNUSED, libtrace_thread_t *t U
 	/* Disable this core in global DPDK structs */
 	cfg->lcore_role[rte_lcore_id()] = ROLE_OFF;
 	cfg->lcore_count--;
-	RTE_PER_LCORE(_lcore_id) = -1; // Might make the world burn if used again
-	if (cfg->lcore_count < 1) {
+	RTE_PER_LCORE(_lcore_id) = LCORE_ID_ANY; // Unassign the lcore ID
+	if (rte_lcore_count() < 1) {
 		fprintf(stderr, "You cannot unregister the master lcore in dpdk_punregister_thread()\n");
 		return;
 	}
