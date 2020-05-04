@@ -154,7 +154,6 @@ typedef uint8_t portid_t;
 #include <rte_mbuf.h>
 #include <rte_launch.h>
 #include <rte_lcore.h>
-#include <rte_per_lcore.h>
 #include <rte_cycles.h>
 #include <pthread.h>
 #ifdef __FreeBSD__
