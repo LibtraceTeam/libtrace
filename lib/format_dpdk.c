@@ -773,24 +773,27 @@ static struct rte_eth_conf port_conf = {
 		.mq_mode = ETH_RSS,
 		.split_hdr_size = 0,
 
-#ifdef HAVE_DPDK18
+#if RTE_VERSION >= RTE_VERSION_NUM(18, 8, 0, 1)
 
   #ifdef DEV_RX_OFFLOAD_KEEP_CRC
+	#define _KEEP_CRC DEV_RX_OFFLOAD_KEEP_CRC
+  #else
+	#define _KEEP_CRC 0
+  #endif
 
-    #if GET_MAC_CRC_CHECKSUM
-		.offloads = DEV_RX_OFFLOAD_KEEP_CRC,
-    #else	/* not GET_MAC_CRC_CHECKSUM */
-		.offloads = 0,
-    #endif	/* GET_MAC_CRC_CHECKSUM */
-  #else	/* not DEV_RX_OFFLOAD_KEEP_CRC */
-    #if GET_MAC_CRC_CHECKSUM
-		.offloads = 0,
-    #else	/* not GET_MAC_CRC_CHECKSUM */
-		.offloads = DEV_RX_OFFLOAD_CRC_STRIP,
-    #endif	/* GET_MAC_CRC_CHECKSUM */
-  #endif	/* DEV_RC_OFFLOAD_KEEP_CRC */
+  #ifdef DEV_RX_OFFLOAD_CRC_STRIP
+	#define _STRIP_CRC DEV_RX_OFFLOAD_CRC_STRIP
+  #else
+	#define _STRIP_CRC 0
+  #endif
 
-#else	/* notdef HAVE_DPDK18 */
+  #if GET_MAC_CRC_CHECKSUM
+	.offloads = _KEEP_CRC
+  #else	/* not GET_MAC_CRC_CHECKSUM */
+	.offloads = _STRIP_CRC
+  #endif	/* GET_MAC_CRC_CHECKSUM */
+
+#else	/* not RTE_VERSION >= 18.8.0-rc1 */
 		.header_split   = 0, /**< Header Split disabled */
 		.hw_ip_checksum = 0, /**< IP checksum offload disabled */
 		.hw_vlan_filter = 0, /**< VLAN filtering disabled */
@@ -811,7 +814,7 @@ static struct rte_eth_conf port_conf = {
 		.hw_strip_crc   = 1, /**< CRC stripped by hardware */
   #endif	/* GET_MAC_CRC_CHECKSUM */
 
-#endif /* HAVE_DPDK18 */
+#endif /* RTE_VERSION >= 18.8.0-rc1 */
 	},
 	.txmode = {
 		.mq_mode = ETH_DCB_NONE,
@@ -1160,7 +1163,8 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data,
 	if (format_data->paused == DPDK_NEVER_STARTED) {
 		if (format_data->snaplen == 0) {
 			format_data->snaplen = RX_MBUF_SIZE;
-#if HAVE_DPDK18
+#if RTE_VERSION >= RTE_VERSION_NUM(18, 8, 0, 1)
+
 			port_conf.rxmode.offloads &=
 					(~(DEV_RX_OFFLOAD_JUMBO_FRAME));
 #else
@@ -1171,7 +1175,7 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data,
                         double expn;
 
 			/* Use jumbo frames */
-#if HAVE_DPDK18
+#if RTE_VERSION >= RTE_VERSION_NUM(18, 8, 0, 1)
 			port_conf.rxmode.offloads |= DEV_RX_OFFLOAD_JUMBO_FRAME;
 #else
 			port_conf.rxmode.jumbo_frame = 1;

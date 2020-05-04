@@ -129,12 +129,12 @@ typedef uint16_t portid_t;
 typedef uint8_t portid_t;
 #endif
 
-#ifndef HAVE_DPDK18             /* XXX would do a specific version check here
-                                 * but can't be bothered tracking down
-                                 * exactly when these functions changed names.
-                                 */
-#define rte_devargs_add rte_eal_devargs_add
-#define rte_eth_dev_count_avail rte_eth_dev_count
+/* 18.05-rc1 renames rte_eth_dev functions to rte_dev
+ * See https://doc.dpdk.org/guides-18.02/rel_notes/deprecation.html
+ */
+#if RTE_VERSION < RTE_VERSION_NUM(18, 5, 0, 1)
+  #define rte_devargs_add rte_eal_devargs_add
+  #define rte_eth_dev_count_avail rte_eth_dev_count
 #endif
 
 
