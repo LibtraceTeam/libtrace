@@ -1199,7 +1199,7 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data,
 
 #if GET_MAC_CRC_CHECKSUM
 		/* This is additional overhead so make sure we allow space for this */
-		format_data->snaplen += ETHER_CRC_LEN;
+		format_data->snaplen += RTE_ETHER_CRC_LEN;
 #endif
 #if HAS_HW_TIMESTAMPS_82580
 		format_data->snaplen += sizeof(struct hw_timestamp_82580);
@@ -1627,7 +1627,7 @@ static int dpdk_write_packet(libtrace_out_t *trace,
 	/* Check for a checksum and remove it */
 	if (trace_get_link_type(packet) == TRACE_TYPE_ETH &&
 	    wirelen == caplen)
-		caplen -= ETHER_CRC_LEN;
+		caplen -= RTE_ETHER_CRC_LEN;
 
 	m_buff[0] = rte_pktmbuf_alloc(FORMAT(trace)->pktmbuf_pool);
 	if (m_buff[0] == NULL) {
@@ -1739,7 +1739,7 @@ static int dpdk_get_wire_length (const libtrace_packet_t *packet) {
 		return org_cap_size;
 	} else {
 		/* DPDK packets are always TRACE_TYPE_ETH packets */
-		return org_cap_size + ETHER_CRC_LEN;
+		return org_cap_size + RTE_ETHER_CRC_LEN;
 	}
 }
 
@@ -1793,7 +1793,7 @@ static inline uint32_t calculate_wire_time(struct dpdk_format_data_t* format_dat
 # if GET_MAC_CRC_CHECKSUM
 	wire_time = ((pkt_size + 20) * 8000);
 # else
-	wire_time = ((pkt_size + 20 + ETHER_CRC_LEN) * 8000);
+	wire_time = ((pkt_size + 20 + RTE_ETHER_CRC_LEN) * 8000);
 # endif
 
 	/* Division is really slow and introduces a pipeline stall
@@ -1898,8 +1898,8 @@ static inline void dpdk_ready_pkts(libtrace_t *libtrace,
 
 #if GET_MAC_CRC_CHECKSUM
 		/* Add back in the CRC sum */
-		rte_pktmbuf_pkt_len(pkt) += ETHER_CRC_LEN;
-		rte_pktmbuf_data_len(pkt) += ETHER_CRC_LEN;
+		rte_pktmbuf_pkt_len(pkt) += RTE_ETHER_CRC_LEN;
+		rte_pktmbuf_data_len(pkt) += RTE_ETHER_CRC_LEN;
 		hdr->flags |= INCLUDES_CHECKSUM;
 #endif
 

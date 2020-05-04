@@ -178,6 +178,12 @@ typedef uint8_t portid_t;
         #define ETH_SPEED_NUM_40G ETH_LINK_SPEED_40G
 #endif
 
+/* https://github.com/DPDK/dpdk/commit/35b2d13 19.08-rc1
+ * renames ETHER_CRC_LEN -> RTE_ETHER_CRC_LEN */
+#ifndef RTE_ETHER_CRC_LEN
+  #define RTE_ETHER_CRC_LEN ETHER_CRC_LEN
+#endif
+
 /* The default size of memory buffers to use - This is the max size of standard
  * ethernet packet less the size of the MAC CHECKSUM, rounded up to the
  * next power of 2, plus the RTE_PKTMBUF_HEADROOM. */
