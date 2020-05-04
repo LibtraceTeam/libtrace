@@ -572,9 +572,6 @@ if test "$want_dpdk" != no; then
 
         if test "$dpdk_found" != 0; then
 		AC_DEFINE(HAVE_DPDK,1,[conditional for building with DPDK live capture support])
-                LIBS="$LIBTRACE_LIBS"
-                AC_CHECK_FUNC(rte_devargs_add, [AC_DEFINE(HAVE_DPDK18,1,using dpdk version 18 or later)])
-                LIBS=""
                 libtrace_dpdk=true
         fi
 
