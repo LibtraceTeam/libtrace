@@ -2141,6 +2141,8 @@ static libtrace_linktype_t dpdk_get_link_type (const libtrace_packet_t *packet U
 
 static libtrace_direction_t dpdk_get_direction (const libtrace_packet_t *packet) {
 	struct dpdk_addt_hdr * hdr = get_addt_hdr(packet);
+	if (hdr->direction == (uint8_t) -1)
+		return TRACE_DIR_UNKNOWN;
 	return (libtrace_direction_t) hdr->direction;
 }
 
