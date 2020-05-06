@@ -1047,8 +1047,8 @@ static int dpdk_register_lcore(libtrace_t *libtrace, bool real, int lcore) {
 
 /** Allocates a new dpdk packet buffer memory pool.
  *
- * @param n The number of threads
- * @param pkt_size The packet size we need ot store
+ * @param n The number of packets to allocate in the pool
+ * @param pkt_size The packet size
  * @param socket_id The NUMA socket id
  * @param A new mempool, if NULL query the DPDK library for the error code
  * see rte_mempool_create() documentation.
@@ -1122,17 +1122,22 @@ static void dpdk_free_memory(struct rte_mempool *mempool, int socket_id) {
 
 	/* We should have all entries back in the mempool */
 	rte_mempool_audit(mempool);
+#if DEBUG
 	if (!rte_mempool_full(mempool)) {
-		fprintf(stderr, "DPDK memory pool not empty %d of %d, please "
-		        "free all packets before finishing a trace\n",
+		fprintf(stderr, "Libtrace DPDK: memory pool not empty"
+			" %d of %d. Please free all packets before finishing"
+			" a trace. This warning may be spurious as some DPDK"
+			" drivers don't free memory.\n",
 		        rte_mempool_avail_count(mempool), mempool->size);
 	}
+#endif
 
 	/* Find the end (+1) of the list */
 	for (i = 0; i < RTE_MAX_LCORE && mem_pools[socket_id][i]; ++i) {}
 
 	if (i >= RTE_MAX_LCORE) {
-		fprintf(stderr, "Too many memory pools, dropping this one\n");
+		fprintf(stderr, "Libtrace DPDK: too many memory pools,"
+			" dropping this one\n");
 	} else {
 		mem_pools[socket_id][i] = mempool;
 	}
