@@ -315,7 +315,8 @@ int dpdk_pstart_input (libtrace_t *libtrace);
 int dpdk_start_input (libtrace_t *libtrace);
 int dpdk_config_input (libtrace_t *libtrace,
                 trace_option_t option, void *data);
-int dpdk_init_input (libtrace_t *libtrace);
+int dpdk_init_input_pci (libtrace_t *libtrace);
+int dpdk_init_input_vdev (libtrace_t *libtrace);
 int dpdk_pause_input(libtrace_t * libtrace);
 int dpdk_fin_input(libtrace_t * libtrace);
 int dpdk_read_packet (libtrace_t *libtrace, libtrace_packet_t *packet);
