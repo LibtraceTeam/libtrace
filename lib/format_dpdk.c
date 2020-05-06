@@ -1149,61 +1149,91 @@ static void dpdk_free_memory(struct rte_mempool *mempool, int socket_id) {
  */
 static int dpdk_start_streams(struct dpdk_format_data_t *format_data,
                               char *err, int errlen, uint16_t rx_queues) {
-	int ret, i;
+	int ret, i, buf_size;
 	struct rte_eth_link link_info; /* Wait for link */
 	dpdk_per_stream_t empty_stream = DPDK_EMPTY_STREAM;
+	struct rte_eth_dev_info dev_info;
+	uint32_t dev_flags;
 
 	/* Already started */
 	if (format_data->paused == DPDK_RUNNING)
 		return 0;
 
-	/* First time started we need to alloc our memory, doing this here
-	 * rather than in environment setup because we don't have snaplen then */
-	if (format_data->paused == DPDK_NEVER_STARTED) {
-		if (format_data->snaplen == 0) {
-			format_data->snaplen = RX_MBUF_SIZE;
-#if RTE_VERSION >= RTE_VERSION_NUM(18, 8, 0, 1)
+	rte_eth_dev_info_get(format_data->port, &dev_info);
 
-			port_conf.rxmode.offloads &=
-					(~(DEV_RX_OFFLOAD_JUMBO_FRAME));
+	/*  dev_flags were added to dev_info in 18.05-rc1 (736b30)
+	 *  The old API is accessing internal structures */
+#if RTE_VERSION >= RTE_VERSION_NUM(18, 5, 0, 1)
+	dev_flags = *dev_info.dev_flags;
 #else
-			port_conf.rxmode.jumbo_frame = 0;
+	dev_flags = rte_eth_devices[format_data->port].data->dev_flags;
 #endif
-			port_conf.rxmode.max_rx_pkt_len = 0;
-		} else {
-                        double expn;
 
-			/* Use jumbo frames */
+	/* Calculate the required buffer size and try enable jumbo frames */
+	if (format_data->snaplen <= RTE_ETHER_MAX_LEN) {
+		/* We don't need jumbo frames, so keep default settings
+		 * for the best driver compatibility.
+		 * dpdk_ready_pkts() applies the snaplen, if snaplen <= 0
+		 * then packets are returned unchanged.
+		 */
+		buf_size = RX_MBUF_SIZE;
+#if RTE_VERSION >= RTE_VERSION_NUM(18, 8, 0, 1)
+		port_conf.rxmode.offloads &=
+				(~(DEV_RX_OFFLOAD_JUMBO_FRAME));
+#else
+		port_conf.rxmode.jumbo_frame = 0;
+#endif
+		port_conf.rxmode.max_rx_pkt_len = 0;
+	} else {
+		/* We need jumbo frames */
+		double expn;
+#if DEBUG
+		fprintf(stderr, "Libtrace DPDK: enabling jumbo frames for"
+			" snaplen %d\n", format_data->snaplen);
+#endif
+
+#ifdef DEV_RX_OFFLOAD_JUMBO_FRAME
+		if (dev_info.rx_offload_capa & DEV_RX_OFFLOAD_JUMBO_FRAME) {
 #if RTE_VERSION >= RTE_VERSION_NUM(18, 8, 0, 1)
 			port_conf.rxmode.offloads |= DEV_RX_OFFLOAD_JUMBO_FRAME;
 #else
 			port_conf.rxmode.jumbo_frame = 1;
 #endif
-			port_conf.rxmode.max_rx_pkt_len = format_data->snaplen;
-
-                        /* Use less buffers if we're supporting jumbo frames
-                         * otherwise we won't be able to allocate memory.
-                         */
-                        if (format_data->snaplen > 1500) {
-                                format_data->nb_rx_buf /= 2;
-                        }
-
-                        /* snaplen should be rounded up to next power of two
-                         * to ensure enough memory is allocated for each
-                         * mbuf :(
-                         */
-                        expn = ceil(log2((double)(format_data->snaplen)));
-                        format_data->snaplen = pow(2, (int)expn);
+		} else {
+			fprintf(stderr, "Libtrace DPDK: warning driver does"
+				" not support jumbo frames snaplen %d\n",
+				format_data->snaplen);
 		}
+#else  /* not def DEV_RX_OFFLOAD_JUMBO_FRAME, must assume support */
+		port_conf.rxmode.jumbo_frame = 1;
+#endif
+		buf_size = format_data->snaplen;
+		port_conf.rxmode.max_rx_pkt_len = buf_size;
+
+		/* Use fewer buffers if we're supporting jumbo frames
+		 * otherwise we won't be able to allocate memory.
+		 */
+		format_data->nb_rx_buf /= 2;
+
+		/* snaplen should be rounded up to next power of two
+		 * to ensure enough memory is allocated for each
+		 * mbuf :(
+		 */
+		expn = ceil(log2((double)(buf_size)));
+		buf_size = pow(2, (int)expn);
+	}
 
 #if GET_MAC_CRC_CHECKSUM
-		/* This is additional overhead so make sure we allow space for this */
-		format_data->snaplen += RTE_ETHER_CRC_LEN;
+	/* This is additional overhead so make sure we allow space for this */
+	buf_size += RTE_ETHER_CRC_LEN;
 #endif
 #if HAS_HW_TIMESTAMPS_82580
-		format_data->snaplen += sizeof(struct hw_timestamp_82580);
+	buf_size += sizeof(struct hw_timestamp_82580);
 #endif
 
+	/* First time started we need to alloc our memory, doing this here
+	 * rather than in environment setup because we don't have snaplen then */
+	if (format_data->paused == DPDK_NEVER_STARTED) {
 		/* Create the mbuf pool, which is the place packets are allocated
 		 * from - There is no free function (I cannot see one).
 		 * NOTE: RX queue requires nb_packets + 1 otherwise it fails to
@@ -1214,14 +1244,15 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data,
 		 * ring become available.
 		 */
 #if DEBUG
-		fprintf(stderr, "Creating mempool named %s\n", format_data->mempool_name);
+		fprintf(stderr, "Libtrace DPDK: creating mempool named %s\n",
+			format_data->mempool_name);
 #endif
 		format_data->pktmbuf_pool = dpdk_alloc_memory(format_data->nb_tx_buf*2,
-		                                              format_data->snaplen,
+		                                              buf_size,
 		                                              format_data->nic_numa_node);
 
 		if (format_data->pktmbuf_pool == NULL) {
-			snprintf(err, errlen, "Intel DPDK - Initialisation of mbuf "
+			snprintf(err, errlen, "Libtrace DPDK: initialisation of mbuf "
 			         "pool failed: %s", strerror(rte_errno));
 			return -1;
 		}
@@ -1231,8 +1262,6 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data,
 	uint8_t rss_size = 52; // 52 for i40e, 40 for others, use the largest by default
 	// In new versions DPDK we can query the size
 #if RTE_VERSION >= RTE_VERSION_NUM(2, 1, 0, 0)
-	struct rte_eth_dev_info dev_info;
-	rte_eth_dev_info_get(format_data->port, &dev_info);
 	rss_size = dev_info.hash_key_size;
 
         port_conf.rx_adv_conf.rss_conf.rss_hf = dev_info.flow_type_rss_offloads;
@@ -1249,7 +1278,7 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data,
 		port_conf.rx_adv_conf.rss_conf.rss_key_len = rss_size;
 #endif
 	} else {
-		fprintf(stderr, "DPDK couldn't configure RSS hashing!");
+		fprintf(stderr, "Libtrace DPDK: couldn't configure RSS hashing!\n");
 	}
 
 	/* ----------- Now do the setup for the port mapping ------------ */
@@ -1261,6 +1290,12 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data,
 	 * other rte_eth calls
 	 */
 
+	if (dev_flags & RTE_ETH_DEV_INTR_LSC) {
+		port_conf.intr_conf.lsc = 1;
+	} else {
+		port_conf.intr_conf.lsc = 0;
+	}
+
 	/* This must be called first before another *eth* function
 	 * 1+ rx, 1 tx queues, port_conf sets checksum stripping etc */
 	ret = rte_eth_dev_configure(format_data->port, rx_queues, 1, &port_conf);
@@ -1271,7 +1306,7 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data,
 		return -1;
 	}
 #if DEBUG
-	fprintf(stderr, "Doing dev configure\n");
+	fprintf(stderr, "Librace DPDK: Doing dev configure\n");
 #endif
 	/* Initialise the TX queue a minimum value if using this port for
 	 * receiving. Otherwise a larger size if writing packets.
@@ -1292,7 +1327,7 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data,
 	for (i=0; i < rx_queues; i++) {
 		dpdk_per_stream_t *stream;
 #if DEBUG
-		fprintf(stderr, "Configuring queue %d\n", i);
+		fprintf(stderr, "Librace DPDK: Configuring queue %d\n", i);
 #endif
 
 		/* Add storage for the stream */
@@ -1313,7 +1348,7 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data,
 		if (stream->mempool == NULL) {
 			stream->mempool = dpdk_alloc_memory(
 			                          format_data->nb_rx_buf*2,
-			                          format_data->snaplen,
+			                          buf_size,
 			                          rte_lcore_to_socket_id(stream->lcore));
 
 			if (stream->mempool == NULL) {
@@ -1340,13 +1375,13 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data,
 	}
 
 #if DEBUG
-	fprintf(stderr, "Doing start device\n");
+	fprintf(stderr, "Libtrace DPDK: Doing start device\n");
 #endif
 	rte_eth_stats_reset(format_data->port);
 	/* Start device */
 	ret = rte_eth_dev_start(format_data->port);
 	if (ret < 0) {
-		snprintf(err, errlen, "Intel DPDK - rte_eth_dev_start failed : %s",
+		snprintf(err, errlen, "Libtrace DPDK: rte_eth_dev_start failed : %s",
 		         strerror(-ret));
 		return -1;
 	}
@@ -1364,22 +1399,26 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data,
 	format_data->paused = DPDK_RUNNING;
 
 
-	/* Register a callback for link state changes */
-	ret = rte_eth_dev_callback_register(format_data->port,
-	                                    RTE_ETH_EVENT_INTR_LSC,
-	                                    dpdk_lsc_callback,
-	                                    format_data);
+	if (port_conf.intr_conf.lsc) {
+		/* Register a callback for link state changes */
+		ret = rte_eth_dev_callback_register(format_data->port,
+						    RTE_ETH_EVENT_INTR_LSC,
+						    dpdk_lsc_callback,
+						    format_data);
 #if DEBUG
-	if (ret)
-		fprintf(stderr, "rte_eth_dev_callback_register failed %d : %s\n",
-		        ret, strerror(-ret));
+		if (ret)
+			fprintf(stderr, "Libtrace DPDK: "
+				"rte_eth_dev_callback_register failed %d : %s\n",
+				ret, strerror(-ret));
 #endif
+	}
 
 	/* Get the current link status */
 	rte_eth_link_get_nowait(format_data->port, &link_info);
 	format_data->link_speed = link_info.link_speed;
 #if DEBUG
-	fprintf(stderr, "Link status is %d %d %d\n", (int) link_info.link_status,
+	fprintf(stderr, "Libtrace DPDK: Link status is %d %d %d\n",
+		(int) link_info.link_status,
 	        (int) link_info.link_duplex, (int) link_info.link_speed);
 #endif
 
@@ -1897,8 +1936,8 @@ static inline void dpdk_ready_pkts(libtrace_t *libtrace,
 
 #if GET_MAC_CRC_CHECKSUM
 		/* Add back in the CRC sum */
-		rte_pktmbuf_pkt_len(pkt) += RTE_ETHER_CRC_LEN;
-		rte_pktmbuf_data_len(pkt) += RTE_ETHER_CRC_LEN;
+		rte_pktmbuf_pkt_len(pkts[i]) += RTE_ETHER_CRC_LEN;
+		rte_pktmbuf_data_len(pkts[i]) += RTE_ETHER_CRC_LEN;
 		hdr->flags |= INCLUDES_CHECKSUM;
 #endif
 
@@ -1995,6 +2034,9 @@ static inline void dpdk_ready_pkts(libtrace_t *libtrace,
 		calculate_wire_time(format_data, hdr->cap_len);
 
 #endif
+		if (format_data->snaplen > 0) {
+			hdr->cap_len = MIN(format_data->snaplen, hdr->cap_len);
+		}
 	}
 
 	plc->ts_last_sys = cur_sys_time_ns;

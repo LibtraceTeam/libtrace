@@ -183,6 +183,10 @@ typedef uint8_t portid_t;
   #define RTE_ETHER_CRC_LEN ETHER_CRC_LEN
 #endif
 
+#ifndef RTE_ETHER_MAX_LEN
+  #define RTE_ETHER_MAX_LEN ETHER_MAX_LEN
+#endif
+
 /* The default size of memory buffers to use - This is the max size of standard
  * ethernet packet less the size of the MAC CHECKSUM, rounded up to the
  * next power of 2, plus the RTE_PKTMBUF_HEADROOM. */
