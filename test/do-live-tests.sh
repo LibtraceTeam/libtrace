@@ -21,12 +21,15 @@ libdir=../lib/.libs:../libpacketdump/.libs
 export LD_LIBRARY_PATH="$libdir:/usr/local/lib/"
 export DYLD_LIBRARY_PATH="${libdir}"
 
-declare -a formats=("pcapint" "int" "ring")
+declare -a formats=("pcapint" "int" "ring" "dpdkvdev")
 
 for a in "${formats[@]}"
 do
 	for b in "${formats[@]}"
 	do
+		if [[ "$a" == "dpdkvdev" && "$b" == dpdkvdev ]]; then
+			continue
+		fi
 		echo
 		echo ./test-live "$a" "$b"
 		do_test ./test-live "$a" "$b"

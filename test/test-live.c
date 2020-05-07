@@ -81,6 +81,8 @@ static const char *lookup_uri_write(const char *type)
 		return "pcapint:veth0";
 	if (!strncmp(type, "dpdk:", sizeof("dpdk:")))
 		return type;
+	if (!strncmp(type, "dpdkvdev", sizeof("dpdkvdev")))
+		return "dpdkvdev:net_pcap0,iface=veth0";
 	return "unknown";
 }
 
@@ -99,6 +101,8 @@ static const char *lookup_uri_read(const char *type)
 	}
 	if (!strncmp(type, "dpdk:", sizeof("dpdk:")))
 		return type;
+	if (!strncmp(type, "dpdkvdev", sizeof("dpdkvdev")))
+		return "dpdkvdev:net_pcap0,iface=veth1";
 	return "unknown";
 }
 
