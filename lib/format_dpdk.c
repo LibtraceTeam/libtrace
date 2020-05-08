@@ -1179,7 +1179,8 @@ static void dpdk_free_memory(struct rte_mempool *mempool, int socket_id) {
 /* Attach memory to the port and start (or restart) the port/s.
  */
 static int dpdk_start_streams(struct dpdk_format_data_t *format_data,
-                              char *err, int errlen, uint16_t rx_queues) {
+                              char *err, int errlen, uint16_t rx_queues,
+                              bool wait_for_link) {
 	int ret, i, buf_size;
 	struct rte_eth_link link_info; /* Wait for link */
 	dpdk_per_stream_t empty_stream = DPDK_EMPTY_STREAM;
@@ -1322,7 +1323,7 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data,
 	 */
 
 	if (dev_flags & RTE_ETH_DEV_INTR_LSC) {
-		port_conf.intr_conf.lsc = 1;
+		port_conf.intr_conf.lsc = wait_for_link ? 0 : 1;
 	} else {
 		port_conf.intr_conf.lsc = 0;
 	}
@@ -1445,8 +1446,15 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data,
 	}
 
 	/* Get the current link status */
-	rte_eth_link_get_nowait(format_data->port, &link_info);
-	format_data->link_speed = link_info.link_speed;
+	if (wait_for_link) {
+		/* If LSC is setup this won't wait, so we disable LSC
+		 * Only used for TX */
+		rte_eth_link_get(format_data->port, &link_info);
+		format_data->link_speed = link_info.link_speed;
+	} else {
+		rte_eth_link_get_nowait(format_data->port, &link_info);
+		format_data->link_speed = link_info.link_speed;
+	}
 #if DEBUG
 	fprintf(stderr, "Libtrace DPDK: Link status is %d %d %d\n",
 		(int) link_info.link_status,
@@ -1463,7 +1471,7 @@ int dpdk_start_input (libtrace_t *libtrace) {
 	/* Make sure we don't reserve an extra thread for this */
 	FORMAT_DATA_FIRST(libtrace)->queue_id = rte_lcore_id();
 
-	if (dpdk_start_streams(FORMAT(libtrace), err, sizeof(err), 1) != 0) {
+	if (dpdk_start_streams(FORMAT(libtrace), err, sizeof(err), 1, false) != 0) {
 		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "%s", err);
 		free(libtrace->format_data);
 		libtrace->format_data = NULL;
@@ -1508,7 +1516,7 @@ int dpdk_pstart_input (libtrace_t *libtrace) {
 	        libtrace->perpkt_thread_count, phys_cores);
 #endif
 
-	if (dpdk_start_streams(FORMAT(libtrace), err, sizeof(err), tot) != 0) {
+	if (dpdk_start_streams(FORMAT(libtrace), err, sizeof(err), tot, false) != 0) {
 		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "%s", err);
 		free(libtrace->format_data);
 		libtrace->format_data = NULL;
@@ -1612,7 +1620,7 @@ static int dpdk_start_output(libtrace_out_t *libtrace)
 	char err[500];
 	err[0] = 0;
 
-	if (dpdk_start_streams(FORMAT(libtrace), err, sizeof(err), 1) != 0) {
+	if (dpdk_start_streams(FORMAT(libtrace), err, sizeof(err), 1, true) != 0) {
 		trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED, "%s", err);
 		free(libtrace->format_data);
 		libtrace->format_data = NULL;
