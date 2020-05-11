@@ -709,8 +709,6 @@ typedef struct libtrace_packet_t {
         pthread_mutex_t ref_lock;       /**< Lock for reference counter */
         int refcount;                   /**< Reference counter */
         int which_trace_start;          /**< Used to match packet to a started instance of the parent trace */
-
-        void *format_data;              /**< Format data to store against the packet. **/
 } libtrace_packet_t;
 
 #define IS_LIBTRACE_META_PACKET(packet) (packet->type < TRACE_RT_DATA_SIMPLE)
