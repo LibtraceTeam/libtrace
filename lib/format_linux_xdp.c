@@ -16,6 +16,12 @@
 #include <assert.h>
 #include <sys/resource.h>
 #include <sys/mman.h>
+#include <sys/param.h>
+
+#include <linux/ethtool.h>
+#include <linux/if_xdp.h>
+#include <sys/ioctl.h>
+#include <linux/sockios.h>
 
 #define FORMAT_DATA ((xdp_format_data_t *)(libtrace->format_data))
 #define PACKET_META ((libtrace_xdp_meta_t *)(packet->header))
@@ -73,6 +79,47 @@ static int linux_xdp_start_stream(libtrace_t *libtrace, struct xsk_per_stream *s
     int ifqueue);
 static void xsk_populate_fill_ring(struct xsk_umem_info *umem);
 
+static void linux_xdp_load_program(struct bpf_object **obj) {
+
+}
+
+static int linux_xdp_get_queues(char *ifname) {
+
+    struct ethtool_channels channels = { .cmd = ETHTOOL_GCHANNELS };
+    struct ifreq ifr = {};
+    int fd, err, ret;
+
+    fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (fd < 0)
+        return -errno;
+
+    ifr.ifr_data = (void *)&channels;
+    memcpy(ifr.ifr_name, ifname, IFNAMSIZ - 1);
+    ifr.ifr_name[IFNAMSIZ - 1] = '\0';
+    err = ioctl(fd, SIOCETHTOOL, &ifr);
+    if (err && errno != EOPNOTSUPP) {
+        ret = -errno;
+        goto out;
+    }
+
+    if (err) {
+        /* If the device says it has no channels, then all traffic
+         * is sent to a single stream, so max queues = 1.
+         */
+        ret = 1;
+    } else {
+        /* Take the max of rx, tx, combined. Drivers return
+         * the number of channels in different ways.
+         */
+        ret = MAX(channels.max_rx, channels.max_tx);
+        ret = MAX(ret, (int)channels.max_combined);
+    }
+
+out:
+    close(fd);
+    return ret;
+}
+
 static struct xsk_umem_info *configure_xsk_umem(void *buffer, uint64_t size,
     int interface_queue) {
 
@@ -90,8 +137,6 @@ static struct xsk_umem_info *configure_xsk_umem(void *buffer, uint64_t size,
     umem_cfg.frame_size = FRAME_SIZE;
     umem_cfg.frame_headroom = FRAME_HEADROOM;
     umem_cfg.flags = XSK_UMEM__DEFAULT_FLAGS;
-
-    fprintf(stderr, "headroom %ld\n", FRAME_HEADROOM);
 
     ret = xsk_umem__create(&umem->umem,
                            buffer,
@@ -138,7 +183,7 @@ static struct xsk_socket_info *xsk_configure_socket(struct xsk_config *cfg,
                              umem->xsk_if_queue,
                              umem->umem,
                              &xsk_info->rx,
-                             &xsk_info->tx,
+                             NULL,
                              &xsk_cfg);
     if (ret) {
         errno = -ret;
@@ -163,6 +208,7 @@ static void xsk_populate_fill_ring(struct xsk_umem_info *umem) {
                                  XSK_RING_PROD__DEFAULT_NUM_DESCS,
                                  &idx);
     if (ret != XSK_RING_PROD__DEFAULT_NUM_DESCS) {
+        fprintf(stderr," error allocating xdp fill queue\n");
         return;
     }
 
@@ -247,6 +293,12 @@ static int linux_xdp_pstart_input(libtrace_t *libtrace) {
     /* TODO set number of interface queues to the number of threads,
      * if the interface only supports a single queue return 1 which will
      * revert to single threading operation */
+    int queues = linux_xdp_get_queues(FORMAT_DATA->cfg.ifname);
+    if (queues != threads) {
+        trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Number of NIC queues "
+            "does not match the number of processing threads()");
+        return -1;
+    }
 
     /* create a stream for each processing thread */
     for (i = 0; i < threads; i++) {
@@ -267,6 +319,12 @@ static int linux_xdp_start_input(libtrace_t *libtrace) {
     struct xsk_per_stream *stream;
 
     /* TODO set number of interface queues to 1 */
+    int queues = linux_xdp_get_queues(FORMAT_DATA->cfg.ifname);
+    if (queues != 1) {
+        trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Number of NIC queues "
+            "does not match the number of processing threads()");
+        return -1;
+    }
 
     /* insert empty stream into the list */
     libtrace_list_push_back(FORMAT_DATA->per_stream, &empty_stream);
@@ -331,8 +389,9 @@ static int linux_xdp_read_stream(libtrace_t *libtrace,
         return -1;
     }
 
-    /* free the previously read packet */
+    /* free previously used frames */
     if (stream->prev_rcvd != 0) {
+        xsk_ring_prod__submit(&stream->umem->fq, stream->prev_rcvd);
         xsk_ring_cons__release(&stream->xsk->rx, stream->prev_rcvd);
     }
 
@@ -429,9 +488,9 @@ static int linux_xdp_prepare_packet(libtrace_t *libtrace UNUSED, libtrace_packet
 
     packet->buf_control = TRACE_CTRL_EXTERNAL;
     packet->type = rt_type;
-    packet->buffer = (uint8_t *)buffer - FRAME_HEADROOM;
-    packet->header = (uint8_t *)buffer - FRAME_HEADROOM;
-    packet->payload = buffer;
+    packet->buffer = buffer;
+    packet->header = buffer;
+    packet->payload = (uint8_t *)buffer + FRAME_HEADROOM;
 
     return 0;
 }
@@ -506,8 +565,7 @@ static struct timespec linux_xdp_get_timespec(const libtrace_packet_t *packet) {
 }
 
 static int linux_xdp_get_framing_length(const libtrace_packet_t *packet UNUSED) {
-    /* we do not store any framing */
-    return 0;
+    return FRAME_SIZE;
 }
 
 static int linux_xdp_get_wire_length(const libtrace_packet_t *packet) {
@@ -521,14 +579,10 @@ static int linux_xdp_get_capture_length(const libtrace_packet_t *packet) {
 
 }
 
-/* called when trace_destroy_packet is called
- * TODO rather than deallocing and allocating every packet we
- * should resuse this memory. Is there a callback for when the
- * packet is destroyed for the final time?? */
+/* called when trace_destroy_packet is called */
 static void linux_xdp_fin_packet(libtrace_packet_t *packet) {
 
 
-    /* cleanup packet metadata here? */
 
 }
 
