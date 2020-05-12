@@ -201,6 +201,8 @@ static int linux_xdp_send_ioctl_ethtool(struct ethtool_channels *channels, char 
         goto out;
     }
 
+    /* return 1 on error, error usually occurs when the nic only
+     * supports a single queue. */
     if (err) {
         ret = 1;
     } else {
@@ -215,9 +217,9 @@ out:
 static int linux_xdp_get_max_queues(char *ifname) {
 
     struct ethtool_channels channels = { .cmd = ETHTOOL_GCHANNELS };
-    int ret = -1;
+    int ret;
 
-    if (linux_xdp_send_ioctl_ethtool(&channels, ifname) == 0) {
+    if ((ret = linux_xdp_send_ioctl_ethtool(&channels, ifname)) == 0) {
         ret = MAX(channels.max_rx, channels.max_tx);
         ret = MAX(ret, (int)channels.max_combined);
     }
@@ -227,9 +229,9 @@ static int linux_xdp_get_max_queues(char *ifname) {
 
 static int linux_xdp_get_current_queues(char *ifname) {
     struct ethtool_channels channels = { .cmd = ETHTOOL_GCHANNELS };
-    int ret = -1;
+    int ret;
 
-    if (linux_xdp_send_ioctl_ethtool(&channels, ifname) == 0) {
+    if ((ret = linux_xdp_send_ioctl_ethtool(&channels, ifname)) == 0) {
         ret = MAX(channels.rx_count, channels.tx_count);
         ret = MAX(ret, (int)channels.combined_count);
     }
@@ -240,15 +242,16 @@ static int linux_xdp_get_current_queues(char *ifname) {
 static int linux_xdp_set_current_queues(char *ifname, int queues) {
     struct ethtool_channels channels = { .cmd = ETHTOOL_GCHANNELS };
     __u32 org_combined;
+    int ret;
 
     /* get the current settings */
-    if (linux_xdp_send_ioctl_ethtool(&channels, ifname) == 0) {
+    if ((ret = linux_xdp_send_ioctl_ethtool(&channels, ifname)) == 0) {
 
         org_combined = channels.combined_count;
         channels.cmd = ETHTOOL_SCHANNELS;
         channels.combined_count = queues;
         /* try update */
-        if (linux_xdp_send_ioctl_ethtool(&channels, ifname) == 0) {
+        if ((ret = linux_xdp_send_ioctl_ethtool(&channels, ifname)) == 0) {
             /* success */
             return channels.combined_count;
         }
@@ -258,14 +261,14 @@ static int linux_xdp_set_current_queues(char *ifname, int queues) {
         channels.tx_count = queues;
         channels.combined_count = org_combined;
         /* try again */
-        if (linux_xdp_send_ioctl_ethtool(&channels, ifname) == 0) {
+        if ((ret = linux_xdp_send_ioctl_ethtool(&channels, ifname)) == 0) {
             /* success */
             return channels.rx_count;
         }
     }
 
     /* could not set the number of queues */
-    return -1;
+    return ret;
 }
 
 static struct xsk_umem_info *configure_xsk_umem(void *buffer, uint64_t size,
@@ -434,19 +437,32 @@ static int linux_xdp_init_input(libtrace_t *libtrace) {
 static int linux_xdp_pstart_input(libtrace_t *libtrace) {
 
     int i;
-    int threads = libtrace->perpkt_thread_count;
     struct xsk_per_stream empty_stream = {NULL,NULL,0,0};
     struct xsk_per_stream *stream;
+    int max_nic_queues;
+
+    /* get the maximum number of supported nic queues */
+    max_nic_queues = linux_xdp_get_max_queues(FORMAT_DATA->cfg.ifname);
+
+    /* if the number of processing threads is greater than the max supported NIC
+     * queues reduce the number of threads to match */
+    if (libtrace->perpkt_thread_count > max_nic_queues) {
+        fprintf(stderr, "Decreasing number of processing threads to match the number "
+            "of available NIC queues %d\n", max_nic_queues);
+        libtrace->perpkt_thread_count = max_nic_queues;
+    }
 
     /* set the number of nic queues to match number of threads */
-    if (linux_xdp_set_current_queues(FORMAT_DATA->cfg.ifname, threads) < 0) {
+    if (linux_xdp_set_current_queues(FORMAT_DATA->cfg.ifname, libtrace->perpkt_thread_count) !=
+        libtrace->perpkt_thread_count) {
+
         trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to set number of NIC queues "
-            "to match the number of processing threads, try reduce the number of threads");
+            "to match the number of processing threads %d", libtrace->perpkt_thread_count);
         return -1;
     }
 
     /* create a stream for each processing thread */
-    for (i = 0; i < threads; i++) {
+    for (i = 0; i < libtrace->perpkt_thread_count; i++) {
         libtrace_list_push_back(FORMAT_DATA->per_stream, &empty_stream);
 
         stream = libtrace_list_get_index(FORMAT_DATA->per_stream, i)->data;
@@ -462,6 +478,20 @@ static int linux_xdp_start_input(libtrace_t *libtrace) {
 
     struct xsk_per_stream empty_stream = {NULL,NULL,0,0};
     struct xsk_per_stream *stream;
+    int c_nic_queues;
+
+    /* single threaded operation, make sure the number of nic queues is 1 or
+     * packets will be lost */
+    c_nic_queues = linux_xdp_get_current_queues(FORMAT_DATA->cfg.ifname);
+
+    if (c_nic_queues != 1) {
+        /* set the number of nic queues to 1 */
+        if (linux_xdp_set_current_queues(FORMAT_DATA->cfg.ifname, 1) < 0) {
+            trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to set number "
+                "of NIC queues to 1");
+            return -1;
+        }
+    }
 
     /* insert empty stream into the list */
     libtrace_list_push_back(FORMAT_DATA->per_stream, &empty_stream);
