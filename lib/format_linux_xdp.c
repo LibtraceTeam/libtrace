@@ -7,6 +7,7 @@
 #include <bpf/xsk.h>
 #include <bpf/bpf.h>
 
+#include <poll.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -22,6 +23,8 @@
 #include <linux/if_xdp.h>
 #include <sys/ioctl.h>
 #include <linux/sockios.h>
+
+#include <linux/if_link.h>
 
 #define FORMAT_DATA ((xdp_format_data_t *)(libtrace->format_data))
 #define PACKET_META ((libtrace_xdp_meta_t *)(packet->header))
@@ -39,6 +42,8 @@ struct xsk_config {
     char progsec[32];
     bool do_unload;
     __u16 xsk_bind_flags;
+    struct bpf_object *bpf_obj;
+    struct bpf_program *bpf_prg;
 };
 
 struct xsk_umem_info {
@@ -79,8 +84,98 @@ static int linux_xdp_start_stream(libtrace_t *libtrace, struct xsk_per_stream *s
     int ifqueue);
 static void xsk_populate_fill_ring(struct xsk_umem_info *umem);
 
-static void linux_xdp_load_program(struct bpf_object **obj) {
+static int linux_xdp_link_attach(int ifindex, __u32 xdp_flags, int prog_fd) {
 
+    int err;
+
+    err = bpf_set_link_xdp_fd(ifindex, prog_fd, xdp_flags);
+    if (err == -EEXIST && !(xdp_flags & XDP_FLAGS_UPDATE_IF_NOEXIST)) {
+        /* Force mode didn't work, probably because a program of the
+         * opposite type is loaded. Let's unload that and try loading
+         * again.
+         */
+
+        __u32 old_flags = xdp_flags;
+
+        xdp_flags &= ~XDP_FLAGS_MODES;
+        xdp_flags |= (old_flags & XDP_FLAGS_SKB_MODE) ? XDP_FLAGS_DRV_MODE : XDP_FLAGS_SKB_MODE;
+        err = bpf_set_link_xdp_fd(ifindex, -1, xdp_flags);
+        if (!err)
+            err = bpf_set_link_xdp_fd(ifindex, prog_fd, old_flags);
+    }
+
+    if (err < 0) {
+        fprintf(stderr, "ERR: "
+            "ifindex(%d) link set xdp fd failed (%d): %s\n",
+            ifindex, -err, strerror(-err));
+
+        switch (-err) {
+        case EBUSY:
+        case EEXIST:
+            fprintf(stderr, "Hint: XDP already loaded on device"
+                " use --force to swap/replace\n");
+            break;
+        case EOPNOTSUPP:
+            fprintf(stderr, "Hint: Native-XDP not supported"
+                " use --skb-mode or --auto-mode\n");
+            break;
+        default:
+            break;
+        }
+        return EXIT_FAIL_XDP;
+    }
+
+    return EXIT_OK;
+
+}
+
+static struct bpf_object *linux_xdp_load_bpf_object(int ifindex) {
+
+    struct bpf_object *obj;
+    int first_prog_fd = -1;
+    int err;
+
+    struct bpf_prog_load_attr prog_load_attr = {
+        .prog_type = BPF_PROG_TYPE_XDP,
+        .ifindex = ifindex,
+        .file = xdp_filename,
+    };
+
+    err = bpf_prog_load_xattr(&prog_load_attr, &obj, &first_prog_fd);
+    if (err) {
+        fprintf(stderr, "Error loading BPF-OBJ file\n");
+        return NULL;
+    }
+
+    return obj;
+}
+
+struct bpf_object *linux_xdp_load_bpf_and_attach(struct xsk_config *cfg) {
+
+    int err;
+    int prog_fd;
+
+    cfg->bpf_obj = linux_xdp_load_bpf_object(cfg->ifindex);
+    if (cfg->bpf_obj == NULL) {
+        fprintf(stderr, "Error loading bpf file\n");
+        exit(1);
+    }
+
+    cfg->bpf_prg = bpf_object__find_program_by_title(cfg->bpf_obj, xdp_progname);
+    if (cfg->bpf_prg == NULL) {
+        fprintf(stderr, "Error finding bpf program %s\n", xdp_progname);
+        exit (1);
+    }
+
+    prog_fd = bpf_program__fd(cfg->bpf_prg);
+    if (prog_fd <= 0) {
+        fprintf(stderr, "Error getting bpf program FD\n");
+        exit (1);
+    }
+
+    err = linux_xdp_link_attach(cfg->ifindex, cfg->xdp_flags, prog_fd);
+
+    return cfg->bpf_obj;
 }
 
 static int linux_xdp_get_queues(char *ifname) {
@@ -382,6 +477,8 @@ static int linux_xdp_read_stream(libtrace_t *libtrace,
     uint8_t *pkt_buffer;
     unsigned int i;
     libtrace_xdp_meta_t *meta;
+    struct pollfd fds;
+    int ret;
 
     if (libtrace->format_data == NULL) {
         trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT, "Trace format data missing, "
@@ -400,12 +497,28 @@ static int linux_xdp_read_stream(libtrace_t *libtrace,
         nb_packets = RX_BATCH_SIZE;
     }
 
+    fds.fd = xsk_socket__fd(stream->xsk->xsk);
+    fds.events = POLLIN;
+
     /* try get nb_packets */
     while (rcvd < 1) {
         rcvd = xsk_ring_cons__peek(&stream->xsk->rx, nb_packets, &idx_rx);
 
+        /* check if libtrace has halted */
+        if ((ret = is_halted(libtrace)) != -1) {
+            return ret;
+        }
+
+        /* was a packet received? if not poll for a short amount of time */
         if (rcvd < 1) {
-            usleep(200);
+            /* poll will return 0 on timeout or a positive on a event */
+            ret = poll(&fds, 1, 500);
+
+            /* poll encountered a error */
+            if (ret < 0) {
+                trace_set_err(libtrace, errno, "poll error() XDP");
+                return -1;
+            }
         }
     }
 
@@ -628,15 +741,15 @@ static struct libtrace_format_t xdp = {
     NULL,                           /* get_fd */
     NULL,				/* trace_event */
     NULL,                           /* help */
-    NULL,                           /* next pointer */
-    {true, 8},			/* Live, no thread limit */
+    NULL,                       /* next pointer */
+    {true, -1},                 /* Live, no thread limit */
     linux_xdp_pstart_input,		/* pstart_input */
     linux_xdp_pread_packets,	/* pread_packets */
-    NULL,                           /* ppause */
+    NULL,                       /* ppause */
     linux_xdp_fin_input,		/* p_fin */
     linux_xdp_pregister_thread,	/* register thread */
-    NULL,				/* unregister thread */
-    NULL				/* get thread stats */
+    NULL,				        /* unregister thread */
+    NULL				        /* get thread stats */
 };
 
 void linux_xdp_constructor(void) {
