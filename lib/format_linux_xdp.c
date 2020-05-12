@@ -84,6 +84,11 @@ static int linux_xdp_start_stream(libtrace_t *libtrace, struct xsk_per_stream *s
     int ifqueue);
 static void xsk_populate_fill_ring(struct xsk_umem_info *umem);
 
+static int linux_xdp_send_ioctl_ethtool(struct ethtool_channels *channels, char *ifname);
+static int linux_xdp_get_max_queues(char *ifname);
+static int linux_xdp_get_current_queues(char *ifname);
+static int linux_xdp_set_current_queues(char *ifname, int queues);
+
 static int linux_xdp_link_attach(int ifindex, __u32 xdp_flags, int prog_fd) {
 
     int err;
@@ -178,9 +183,8 @@ struct bpf_object *linux_xdp_load_bpf_and_attach(struct xsk_config *cfg) {
     return cfg->bpf_obj;
 }
 
-static int linux_xdp_get_queues(char *ifname) {
+static int linux_xdp_send_ioctl_ethtool(struct ethtool_channels *channels, char *ifname) {
 
-    struct ethtool_channels channels = { .cmd = ETHTOOL_GCHANNELS };
     struct ifreq ifr = {};
     int fd, err, ret;
 
@@ -188,7 +192,7 @@ static int linux_xdp_get_queues(char *ifname) {
     if (fd < 0)
         return -errno;
 
-    ifr.ifr_data = (void *)&channels;
+    ifr.ifr_data = (void *)channels;
     memcpy(ifr.ifr_name, ifname, IFNAMSIZ - 1);
     ifr.ifr_name[IFNAMSIZ - 1] = '\0';
     err = ioctl(fd, SIOCETHTOOL, &ifr);
@@ -198,21 +202,70 @@ static int linux_xdp_get_queues(char *ifname) {
     }
 
     if (err) {
-        /* If the device says it has no channels, then all traffic
-         * is sent to a single stream, so max queues = 1.
-         */
         ret = 1;
     } else {
-        /* Take the max of rx, tx, combined. Drivers return
-         * the number of channels in different ways.
-         */
-        ret = MAX(channels.max_rx, channels.max_tx);
-        ret = MAX(ret, (int)channels.max_combined);
+        ret = 0;
     }
 
 out:
     close(fd);
     return ret;
+}
+
+static int linux_xdp_get_max_queues(char *ifname) {
+
+    struct ethtool_channels channels = { .cmd = ETHTOOL_GCHANNELS };
+    int ret = -1;
+
+    if (linux_xdp_send_ioctl_ethtool(&channels, ifname) == 0) {
+        ret = MAX(channels.max_rx, channels.max_tx);
+        ret = MAX(ret, (int)channels.max_combined);
+    }
+
+    return ret;
+}
+
+static int linux_xdp_get_current_queues(char *ifname) {
+    struct ethtool_channels channels = { .cmd = ETHTOOL_GCHANNELS };
+    int ret = -1;
+
+    if (linux_xdp_send_ioctl_ethtool(&channels, ifname) == 0) {
+        ret = MAX(channels.rx_count, channels.tx_count);
+        ret = MAX(ret, (int)channels.combined_count);
+    }
+
+    return ret;
+}
+
+static int linux_xdp_set_current_queues(char *ifname, int queues) {
+    struct ethtool_channels channels = { .cmd = ETHTOOL_GCHANNELS };
+    __u32 org_combined;
+
+    /* get the current settings */
+    if (linux_xdp_send_ioctl_ethtool(&channels, ifname) == 0) {
+
+        org_combined = channels.combined_count;
+        channels.cmd = ETHTOOL_SCHANNELS;
+        channels.combined_count = queues;
+        /* try update */
+        if (linux_xdp_send_ioctl_ethtool(&channels, ifname) == 0) {
+            /* success */
+            return channels.combined_count;
+        }
+
+        /* try set rx and tx individually */
+        channels.rx_count = queues;
+        channels.tx_count = queues;
+        channels.combined_count = org_combined;
+        /* try again */
+        if (linux_xdp_send_ioctl_ethtool(&channels, ifname) == 0) {
+            /* success */
+            return channels.rx_count;
+        }
+    }
+
+    /* could not set the number of queues */
+    return -1;
 }
 
 static struct xsk_umem_info *configure_xsk_umem(void *buffer, uint64_t size,
@@ -385,13 +438,10 @@ static int linux_xdp_pstart_input(libtrace_t *libtrace) {
     struct xsk_per_stream empty_stream = {NULL,NULL,0,0};
     struct xsk_per_stream *stream;
 
-    /* TODO set number of interface queues to the number of threads,
-     * if the interface only supports a single queue return 1 which will
-     * revert to single threading operation */
-    int queues = linux_xdp_get_queues(FORMAT_DATA->cfg.ifname);
-    if (queues != threads) {
-        trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Number of NIC queues "
-            "does not match the number of processing threads()");
+    /* set the number of nic queues to match number of threads */
+    if (linux_xdp_set_current_queues(FORMAT_DATA->cfg.ifname, threads) < 0) {
+        trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to set number of NIC queues "
+            "to match the number of processing threads, try reduce the number of threads");
         return -1;
     }
 
@@ -412,14 +462,6 @@ static int linux_xdp_start_input(libtrace_t *libtrace) {
 
     struct xsk_per_stream empty_stream = {NULL,NULL,0,0};
     struct xsk_per_stream *stream;
-
-    /* TODO set number of interface queues to 1 */
-    int queues = linux_xdp_get_queues(FORMAT_DATA->cfg.ifname);
-    if (queues != 1) {
-        trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Number of NIC queues "
-            "does not match the number of processing threads()");
-        return -1;
-    }
 
     /* insert empty stream into the list */
     libtrace_list_push_back(FORMAT_DATA->per_stream, &empty_stream);
@@ -693,7 +735,7 @@ static int linux_xdp_get_capture_length(const libtrace_packet_t *packet) {
 }
 
 /* called when trace_destroy_packet is called */
-static void linux_xdp_fin_packet(libtrace_packet_t *packet) {
+static void linux_xdp_fin_packet(libtrace_packet_t *packet UNUSED) {
 
 
 
