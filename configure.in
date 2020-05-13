@@ -560,15 +560,21 @@ if test "$want_dpdk" != no; then
 	# 3) The package-cfg for Ubuntu 20.02 (DPDK 19.11) is wrong for dynamic
 	# libraries and is missing important libraries like rte_bus_pci,
 	# without which we cannot load PCI devices.
-	# So we always use PKG_CHECK_MODULES_STATIC here, even for dynamic linking.
+	# So we always use pkg-config --static here, even for dynamic linking.
+	# Note the nicer PKG_CHECK_MODULES_STATIC macro doesn't exist in older
+	# distributions.
 	#
         if test "$dpdk_found" = 0; then
-                PKG_CHECK_MODULES_STATIC([DPDK], [libdpdk >= 18], [pkgconf_dpdk_found="yes"],
-                                         [pkgconf_dpdk_found="no"])
+                PKG_PROG_PKG_CONFIG
+                pkg_config_old="$PKG_CONFIG"
+                PKG_CONFIG="$PKG_CONFIG --static"
+                PKG_CHECK_MODULES([DPDK], [libdpdk >= 18], [pkgconf_dpdk_found="yes"],
+                                  [pkgconf_dpdk_found="no"])
+                PKG_CONFIG="$pkg_config_old"
         fi
         if test "$dpdk_found" = 0 -a "x$pkgconf_dpdk_found" = "xyes"; then
                 LIBTRACE_LIBS="$LIBTRACE_LIBS -Wl,--no-as-needed $(echo $DPDK_LIBS | sed 's/ -l/ -Wl,-l/g')"
-		AC_MSG_NOTICE([LIBS = $DPDK_LIBS])
+                AC_MSG_NOTICE([Pkg config found DPDK libs = $DPDK_LIBS])
                 ADD_INCLS="$ADD_INCLS $DPDK_CFLAGS"
                 AC_MSG_NOTICE([Building against system DPDK])
                 dpdk_found=pkgconfig
