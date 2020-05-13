@@ -76,21 +76,28 @@ extern "C" {
 
 #include "rt_protocol.h"
 
-/* Prefer net/bpf.h over pcap-bpf.h for format_bpf.c on MacOS */
-/* bpf is conflicting with XDP libbpf, so disable bpf if libbpf enabled */
+/* If LIBBPF is available use it over alternatives */
 #if HAVE_LIBBPF
-     /* prevent pcap from including pcap-bpf.h */
-#    define PCAP_DONT_INCLUDE_PCAP_BPF_H 1
+    #include <bpf/libbpf.h>
+     /* prevent pcap from including any bpf stuff */
+    #define PCAP_DONT_INCLUDE_PCAP_BPF_H 1
+    #define HAVE_BPF 1
+    /* libbpf is missing a declaration of bpf program that we reply on */
+    struct bpf_program {
+        u_int bf_len;
+        struct bpf_insn *bf_insns;
+    };
 #else
-#ifdef HAVE_NET_BPF_H
-#    include <net/bpf.h>
-#    define HAVE_BPF 1
-#else
-#ifdef HAVE_PCAP_BPF_H
-#  include <pcap-bpf.h>
-#  define HAVE_BPF 1
-#endif
-#endif
+    /* Prefer net/bpf.h over pcap-bpf.h for format_bpf.c on MacOS */
+    #ifdef HAVE_NET_BPF_H
+        #include <net/bpf.h>
+        #define HAVE_BPF 1
+    #else
+        #ifdef HAVE_PCAP_BPF_H
+            #include <pcap-bpf.h>
+            #define HAVE_BPF 1
+        #endif
+    #endif
 #endif
 
 #ifdef HAVE_PCAP_H
