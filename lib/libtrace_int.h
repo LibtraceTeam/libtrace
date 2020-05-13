@@ -77,9 +77,10 @@ extern "C" {
 #include "rt_protocol.h"
 
 /* Prefer net/bpf.h over pcap-bpf.h for format_bpf.c on MacOS */
+/* bpf is conflicting with XDP libbpf, so disable bpf if libbpf enabled */
 #if HAVE_LIBBPF
-#  include <bpf/libbpf.h>
-#  define PCAP_DONT_INCLUDE_PCAP_BPF_H 1
+     /* prevent pcap from including pcap-bpf.h */
+#    define PCAP_DONT_INCLUDE_PCAP_BPF_H 1
 #else
 #ifdef HAVE_NET_BPF_H
 #    include <net/bpf.h>

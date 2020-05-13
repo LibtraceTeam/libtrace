@@ -4,3 +4,6 @@
 [submodule "libwandder"]
 	path = libwandder
 	url = https://github.com/wanduow/libwandder
+[submodule "libbpf"]
+        path = libbpf
+        url = https://github.com/libbpf/libbpf
