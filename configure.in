@@ -534,8 +534,8 @@ AC_ARG_WITH(dpdk,
 libtrace_dpdk=false
 if test "$want_dpdk" != no; then
 
-        #PKG_CHECK_MODULES([DPDK], [libdpdk >= 18], [pkgconf_dpdk_found="yes"],
-        #        [pkgconf_dpdk_found="no"])
+        PKG_CHECK_MODULES([DPDK], [libdpdk >= 18], [pkgconf_dpdk_found="yes"],
+                [pkgconf_dpdk_found="no"])
         if test "x$pkgconf_dpdk_found" = "xyes"; then
                 LIBTRACE_LIBS="$LIBTRACE_LIBS $DPDK_LIBS"
                 ADD_INCLS="$ADD_INCLS $DPDK_CFLAGS"
