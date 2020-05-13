@@ -218,17 +218,14 @@ AC_CHECK_LIB(tasn1, asn1_array2tree, asn1found=1, asn1found=0)
 AC_ARG_WITH(xdp,AS_HELP_STRING(--with-xdp,include XDP capture support),
 [
 	AC_CHECK_LIB(elf, elf_begin, elffound=1, elffound=0)
-        if test "$elffound" = 1; then
-                AC_DEFINE(HAVE_ELF, 1, [Set to 1 if libelf is available])
-                LIBTRACE_LIBS="$LIBTRACE_LIBS -lelf"
-        else
+        if test "$elffound" != 1; then
                 AC_MSG_ERROR(libelf library and header files not found but are required for XDP support)
         fi
 
 	AC_CHECK_LIB(bpf, xsk_socket__create, bpffound=1, bpffound=0, -lelf)
         if test "$bpffound" = 1; then
 		AC_DEFINE(HAVE_LIBBPF, 1, [Set to 1 if libbpf is available])
-		LIBTRACE_LIBS="$LIBTRACE_LIBS -lbpf"
+		ADD_LDFLAGS="$ADD_LDFLAGS -lbpf -lelf"
 		libtrace_xdp=true
 	else
 		libtrace_xdp=false
