@@ -514,7 +514,7 @@ AC_ARG_WITH(dpdk,
 
 libtrace_dpdk=false
 if test "$want_dpdk" != no; then
-
+	dpdk_found=0
 	# So instead simply check for existence
 	if test "$dpdk_found" = 0 -a "$RTE_SDK" != ""; then
 		AC_CHECK_FILE("$RTE_SDK/$RTE_TARGET/lib/libdpdk.so", dpdk_found="dpdk", dpdk_found=0)
@@ -562,16 +562,16 @@ if test "$want_dpdk" != no; then
 	# without which we cannot load PCI devices.
 	# So we always use PKG_CHECK_MODULES_STATIC here, even for dynamic linking.
 	#
-        PKG_CHECK_MODULES_STATIC([DPDK], [libdpdk >= 18], [pkgconf_dpdk_found="yes"],
-                [pkgconf_dpdk_found="no"])
-        if test "x$pkgconf_dpdk_found" = "xyes"; then
+        if test "$dpdk_found" = 0; then
+                PKG_CHECK_MODULES_STATIC([DPDK], [libdpdk >= 18], [pkgconf_dpdk_found="yes"],
+                                         [pkgconf_dpdk_found="no"])
+        fi
+        if test "$dpdk_found" = 0 -a "x$pkgconf_dpdk_found" = "xyes"; then
                 LIBTRACE_LIBS="$LIBTRACE_LIBS -Wl,--no-as-needed $(echo $DPDK_LIBS | sed 's/ -l/ -Wl,-l/g')"
 		AC_MSG_NOTICE([LIBS = $DPDK_LIBS])
                 ADD_INCLS="$ADD_INCLS $DPDK_CFLAGS"
                 AC_MSG_NOTICE([Building against system DPDK])
                 dpdk_found=pkgconfig
-        else
-                dpdk_found=0
         fi
 
 	if test "$dpdk_found" = 0 -a "$RTE_SDK" = ""; then
