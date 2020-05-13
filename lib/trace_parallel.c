@@ -78,21 +78,6 @@
 
 #include "libtrace.h"
 #include "libtrace_parallel.h"
-
-/* bpf is conflicting with XDP libbpf, so disable bpf if libbpf enabled */
-#if HAVE_LIBBPF
-
-#else
-#ifdef HAVE_PCAP_BPF_H
-#  include <pcap-bpf.h>
-#else
-#  ifdef HAVE_NET_BPF_H
-#    include <net/bpf.h>
-#  endif
-#endif
-#endif
-
-
 #include "libtrace_int.h"
 #include "format_helper.h"
 #include "rt_protocol.h"
