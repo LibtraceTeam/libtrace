@@ -90,6 +90,7 @@ typedef struct xdp_format_data {
 } xdp_format_data_t;
 
 static struct bpf_object *load_bpf_and_xdp_attach(struct xsk_config *cfg);
+static int xdp_link_detach(struct xsk_config *cfg);
 
 static int linux_xdp_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
     void *buffer, libtrace_rt_types_t rt_type, uint32_t flags);
@@ -385,8 +386,8 @@ static int linux_xdp_pstart_input(libtrace_t *libtrace) {
     /* if the number of processing threads is greater than the max supported NIC
      * queues reduce the number of threads to match */
     if (libtrace->perpkt_thread_count > max_nic_queues) {
-        fprintf(stderr, "Decreasing number of processing threads to match the number "
-            "of available NIC queues %d\n", max_nic_queues);
+        //fprintf(stderr, "Decreasing number of processing threads to match the number "
+        //    "of available NIC queues %d\n", max_nic_queues);
         libtrace->perpkt_thread_count = max_nic_queues;
     }
 
@@ -627,12 +628,21 @@ static int linux_xdp_fin_input(libtrace_t *libtrace) {
         for (i = 0; i < libtrace_list_get_size(FORMAT_DATA->per_stream); i++) {
             stream = libtrace_list_get_index(FORMAT_DATA->per_stream, i)->data;
 
-            xsk_socket__delete(stream->xsk->xsk);
-            xsk_umem__delete(stream->umem->umem);
+            if (stream->xsk != NULL) {
+                xsk_socket__delete(stream->xsk->xsk);
+            }
+
+            if (stream->umem != NULL) {
+                xsk_umem__delete(stream->umem->umem);
+                free(stream->umem);
+            }
         }
 
         /* destroy per stream list */
         libtrace_list_deinit(FORMAT_DATA->per_stream);
+
+        /* unload the XDP program */
+        xdp_link_detach(&FORMAT_DATA->cfg);
 
         free(FORMAT_DATA);
     }
@@ -703,7 +713,7 @@ static int linux_xdp_get_capture_length(const libtrace_packet_t *packet) {
 }
 
 static void linux_xdp_get_stats(libtrace_t *libtrace, libtrace_stat_t *stats) {
-
+    return;
     int map_fd = FORMAT_DATA->cfg.libtrace_map_fd;
     int ncpus = libbpf_num_possible_cpus();
     libtrace_xdp_t xdp[ncpus];
@@ -735,7 +745,7 @@ static void linux_xdp_get_stats(libtrace_t *libtrace, libtrace_stat_t *stats) {
 static void linux_xdp_get_thread_stats(libtrace_t *libtrace,
                                        libtrace_thread_t *thread,
                                        libtrace_stat_t *stats) {
-
+    return;
     int ncpus = libbpf_num_possible_cpus();
     int ifqueue;
     int map_fd;
@@ -829,6 +839,16 @@ void linux_xdp_constructor(void) {
     register_format(&xdp);
 }
 
+static int xdp_link_detach(struct xsk_config *cfg) {
+
+    /* unload the XDP program */
+    if (bpf_set_link_xdp_fd(cfg->ifindex, -1, cfg->xdp_flags) < 0) {
+        return EXIT_FAIL_XDP;
+    }
+
+    return EXIT_OK;
+}
+
 static struct bpf_object *load_bpf_object_file(struct xsk_config *cfg, int ifindex) {
 
     int first_prog_fd = -1;
@@ -841,8 +861,9 @@ static struct bpf_object *load_bpf_object_file(struct xsk_config *cfg, int ifind
     struct bpf_prog_load_attr prog_load_attr = {
         .prog_type = BPF_PROG_TYPE_XDP,
         .ifindex   = ifindex,
+        .log_level = -1,
+        .file      = xdp_filename,
     };
-    prog_load_attr.file = xdp_filename;
 
     /* Use libbpf for extracting BPF byte-code from BPF-ELF object, and
      * loading this into the kernel via bpf-syscall
@@ -896,6 +917,8 @@ static struct bpf_object *load_bpf_and_xdp_attach(struct xsk_config *cfg) {
      * ifindex to try offload to the NIC */
     cfg->bpf_obj = load_bpf_object_file(cfg, cfg->ifindex);
     if (!cfg->bpf_obj) {
+        //fprintf(stderr, "XDP hardware offload failed, trying without\n");
+
         /* hardware offload failed try again without */
         cfg->bpf_obj = load_bpf_object_file(cfg, 0);
         if (!cfg->bpf_obj) {
