@@ -35,8 +35,14 @@
 #define RX_BATCH_SIZE      64
 #define INVALID_UMEM_FRAME UINT64_MAX
 
+typedef struct libtrace_xdp_meta {
+    uint64_t timestamp;
+    uint32_t packet_len;
+} PACKED libtrace_xdp_meta_t;
+
 struct xsk_config {
     __u32 xdp_flags;
+    __u32 libbpf_flags;
     int ifindex;
     char ifname[IF_NAMESIZE];
     char progsec[32];
@@ -59,6 +65,9 @@ struct xsk_socket_info {
     struct xsk_ring_prod tx;
     struct xsk_umem_info *umem;
     struct xsk_socket *xsk;
+
+    struct bpf_object *bpf_obj;
+    struct bpf_program *bpf_prg;
 };
 
 struct xsk_per_stream {
@@ -77,6 +86,7 @@ typedef struct xdp_format_data {
     libtrace_list_t *per_stream;
 } xdp_format_data_t;
 
+static struct bpf_object *load_bpf_and_xdp_attach(struct xsk_config *cfg);
 
 static int linux_xdp_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
     void *buffer, libtrace_rt_types_t rt_type, uint32_t flags);
@@ -88,100 +98,6 @@ static int linux_xdp_send_ioctl_ethtool(struct ethtool_channels *channels, char 
 static int linux_xdp_get_max_queues(char *ifname);
 static int linux_xdp_get_current_queues(char *ifname);
 static int linux_xdp_set_current_queues(char *ifname, int queues);
-
-static int linux_xdp_link_attach(int ifindex, __u32 xdp_flags, int prog_fd) {
-
-    int err;
-
-    err = bpf_set_link_xdp_fd(ifindex, prog_fd, xdp_flags);
-    if (err == -EEXIST && !(xdp_flags & XDP_FLAGS_UPDATE_IF_NOEXIST)) {
-        /* Force mode didn't work, probably because a program of the
-         * opposite type is loaded. Let's unload that and try loading
-         * again.
-         */
-
-        __u32 old_flags = xdp_flags;
-
-        xdp_flags &= ~XDP_FLAGS_MODES;
-        xdp_flags |= (old_flags & XDP_FLAGS_SKB_MODE) ? XDP_FLAGS_DRV_MODE : XDP_FLAGS_SKB_MODE;
-        err = bpf_set_link_xdp_fd(ifindex, -1, xdp_flags);
-        if (!err)
-            err = bpf_set_link_xdp_fd(ifindex, prog_fd, old_flags);
-    }
-
-    if (err < 0) {
-        fprintf(stderr, "ERR: "
-            "ifindex(%d) link set xdp fd failed (%d): %s\n",
-            ifindex, -err, strerror(-err));
-
-        switch (-err) {
-        case EBUSY:
-        case EEXIST:
-            fprintf(stderr, "Hint: XDP already loaded on device"
-                " use --force to swap/replace\n");
-            break;
-        case EOPNOTSUPP:
-            fprintf(stderr, "Hint: Native-XDP not supported"
-                " use --skb-mode or --auto-mode\n");
-            break;
-        default:
-            break;
-        }
-        return EXIT_FAIL_XDP;
-    }
-
-    return EXIT_OK;
-
-}
-
-static struct bpf_object *linux_xdp_load_bpf_object(int ifindex) {
-
-    struct bpf_object *obj;
-    int first_prog_fd = -1;
-    int err;
-
-    struct bpf_prog_load_attr prog_load_attr = {
-        .prog_type = BPF_PROG_TYPE_XDP,
-        .ifindex = ifindex,
-        .file = xdp_filename,
-    };
-
-    err = bpf_prog_load_xattr(&prog_load_attr, &obj, &first_prog_fd);
-    if (err) {
-        fprintf(stderr, "Error loading BPF-OBJ file\n");
-        return NULL;
-    }
-
-    return obj;
-}
-
-struct bpf_object *linux_xdp_load_bpf_and_attach(struct xsk_config *cfg) {
-
-    int err;
-    int prog_fd;
-
-    cfg->bpf_obj = linux_xdp_load_bpf_object(cfg->ifindex);
-    if (cfg->bpf_obj == NULL) {
-        fprintf(stderr, "Error loading bpf file\n");
-        exit(1);
-    }
-
-    cfg->bpf_prg = bpf_object__find_program_by_title(cfg->bpf_obj, xdp_progname);
-    if (cfg->bpf_prg == NULL) {
-        fprintf(stderr, "Error finding bpf program %s\n", xdp_progname);
-        exit (1);
-    }
-
-    prog_fd = bpf_program__fd(cfg->bpf_prg);
-    if (prog_fd <= 0) {
-        fprintf(stderr, "Error getting bpf program FD\n");
-        exit (1);
-    }
-
-    err = linux_xdp_link_attach(cfg->ifindex, cfg->xdp_flags, prog_fd);
-
-    return cfg->bpf_obj;
-}
 
 static int linux_xdp_send_ioctl_ethtool(struct ethtool_channels *channels, char *ifname) {
 
@@ -325,7 +241,7 @@ static struct xsk_socket_info *xsk_configure_socket(struct xsk_config *cfg,
     xsk_info->umem = umem;
     xsk_cfg.rx_size = XSK_RING_CONS__DEFAULT_NUM_DESCS;
     xsk_cfg.tx_size = XSK_RING_PROD__DEFAULT_NUM_DESCS;
-    xsk_cfg.libbpf_flags = 0;
+    xsk_cfg.libbpf_flags = cfg->libbpf_flags;
     xsk_cfg.xdp_flags = cfg->xdp_flags;
     xsk_cfg.bind_flags = cfg->xsk_bind_flags;
 
@@ -422,6 +338,9 @@ static int linux_xdp_init_input(libtrace_t *libtrace) {
             "name.");
         return -1;
     }
+
+    /* load custom BPF program */
+    //load_bpf_and_xdp_attach(&FORMAT_DATA->cfg);
 
     /* setup list to hold the streams */
     FORMAT_DATA->per_stream = libtrace_list_init(sizeof(struct xsk_per_stream));
@@ -764,11 +683,82 @@ static int linux_xdp_get_capture_length(const libtrace_packet_t *packet) {
 
 }
 
-/* called when trace_destroy_packet is called */
-static void linux_xdp_fin_packet(libtrace_packet_t *packet UNUSED) {
+static int get_libtrace_xdp_data_fd(struct bpf_object *obj) {
 
+    struct bpf_map *map;
+    int map_fd;
 
+    map = bpf_object__find_map_by_name(obj, "libtrace_map");
+    map_fd = bpf_map__fd(map);
+    if (map_fd < 0) {
+        return -1;
+    }
 
+    return map_fd;
+}
+
+static void linux_xdp_get_stats(libtrace_t *libtrace, libtrace_stat_t *stats) {
+
+    return;
+    int map_fd = get_libtrace_xdp_data_fd(FORMAT_DATA->cfg.bpf_obj);
+    if (!map_fd) {
+        return;
+    }
+
+    __u32 key = 0;
+    int ncpus = libbpf_num_possible_cpus();
+    libtrace_xdp_t xdp[ncpus];
+    if ((bpf_map_lookup_elem(map_fd, &key, xdp)) != 0) {
+        return;
+    }
+
+    /* init stats */
+    stats->accepted = 0;
+    stats->dropped = 0;
+    stats->received = 0;
+
+    /* add up stats from each cpu */
+    for (int i = 0; i < ncpus; i++) {
+        stats->accepted += xdp[i].accepted_packets;
+        stats->dropped += xdp[i].dropped_packets;
+        stats->received += xdp[i].received_packets;
+    }
+
+    return;
+}
+
+static void linux_xdp_get_thread_stats(libtrace_t *libtrace,
+                                       libtrace_thread_t *thread,
+                                       libtrace_stat_t *stats) {
+    return;
+
+    int ncpus = libbpf_num_possible_cpus();
+    int ifqueue;
+    int map_fd;
+    libtrace_xdp_t xdp[ncpus];
+    struct xsk_per_stream *stream_data;
+    __u32 key = 0;
+
+    /* get the nic queue number from the threads per stream data */
+    stream_data = (struct xsk_per_stream *)thread->format_data;
+    ifqueue = stream_data->umem->xsk_if_queue;
+
+    map_fd = get_libtrace_xdp_data_fd(FORMAT_DATA->cfg.bpf_obj);
+    if (!map_fd) {
+        return;
+    }
+
+    /* get the xdp libtrace map for this threads nic queue */
+    if ((bpf_map_lookup_elem(map_fd, &key, &xdp)) != 0) {
+        return;
+    }
+
+    /* populate stats structure */
+    stats->accepted = xdp[ifqueue].accepted_packets;
+    stats->dropped = xdp[ifqueue].dropped_packets;
+    stats->received = xdp[ifqueue].received_packets;
+
+    return;
 }
 
 static struct libtrace_format_t xdp = {
@@ -786,10 +776,10 @@ static struct libtrace_format_t xdp = {
     NULL,          /* start_output */
     linux_xdp_fin_input,             /* fin_input */
     NULL,            /* fin_output */
-    linux_xdp_read_packet,           /* read_packet */
-    linux_xdp_prepare_packet,        /* prepare_packet */
-    linux_xdp_fin_packet,            /* fin_packet */
-    NULL,          /* write_packet */
+    linux_xdp_read_packet,          /* read_packet */
+    linux_xdp_prepare_packet,       /* prepare_packet */
+    NULL,                           /* fin_packet */
+    NULL,                           /* write_packet */
     NULL,                           /* flush_output */
     linux_xdp_get_link_type,        /* get_link_type */
     NULL,                           /* get_direction */
@@ -809,7 +799,7 @@ static struct libtrace_format_t xdp = {
     NULL,                           /* get_received_packets */
 	NULL,                           /* get_filtered_packets */
     NULL,                           /* get_dropped_packets */
-    NULL,                           /* get_statistics */
+    linux_xdp_get_stats,            /* get_statistics */
     NULL,                           /* get_fd */
     NULL,				/* trace_event */
     NULL,                           /* help */
@@ -821,9 +811,122 @@ static struct libtrace_format_t xdp = {
     linux_xdp_fin_input,		/* p_fin */
     linux_xdp_pregister_thread,	/* register thread */
     NULL,				        /* unregister thread */
-    NULL				        /* get thread stats */
+    linux_xdp_get_thread_stats      /* get thread stats */
 };
 
 void linux_xdp_constructor(void) {
     register_format(&xdp);
+}
+
+static struct bpf_object *load_bpf_object_file(struct xsk_config *cfg) {
+
+    int first_prog_fd = -1;
+    int err;
+
+    /* This struct allow us to set ifindex, this features is used for
+     * hardware offloading XDP programs (note this sets libbpf
+     * bpf_program->prog_ifindex and foreach bpf_map->map_ifindex).
+     */
+    struct bpf_prog_load_attr prog_load_attr = {
+        .prog_type = BPF_PROG_TYPE_XDP,
+        .ifindex   = 0,
+    };
+    prog_load_attr.file = xdp_filename;
+
+    /* Use libbpf for extracting BPF byte-code from BPF-ELF object, and
+     * loading this into the kernel via bpf-syscall
+     */
+    err = bpf_prog_load_xattr(&prog_load_attr, &cfg->bpf_obj, &first_prog_fd);
+    if (err) {
+        fprintf(stderr, "ERR: loading BPF-OBJ file(%s) (%d): %s\n",
+            xdp_filename, err, strerror(-err));
+        return NULL;
+    }
+
+    return cfg->bpf_obj;
+}
+
+static int xdp_link_attach (struct xsk_config *cfg, int prog_fd) {
+
+    int err;
+
+    /* libbpf provide the XDP net_device link-level hook attach helper */
+    err = bpf_set_link_xdp_fd(cfg->ifindex, prog_fd, cfg->xdp_flags);
+    if (err == -EEXIST && !(cfg->xdp_flags & XDP_FLAGS_UPDATE_IF_NOEXIST)) {
+        /* Force mode didn't work, probably because a program of the
+         * opposite type is loaded. Let's unload that and try loading
+         * again.
+         */
+
+        __u32 old_flags = cfg->xdp_flags;
+
+        cfg->xdp_flags &= ~XDP_FLAGS_MODES;
+        cfg->xdp_flags |= (old_flags & XDP_FLAGS_SKB_MODE) ? XDP_FLAGS_DRV_MODE : XDP_FLAGS_SKB_MODE;
+        err = bpf_set_link_xdp_fd(cfg->ifindex, -1, cfg->xdp_flags);
+        if (!err)
+            err = bpf_set_link_xdp_fd(cfg->ifindex, prog_fd, old_flags);
+    }
+    if (err < 0) {
+        fprintf(stderr, "ERR: "
+            "ifindex(%d) link set xdp fd failed (%d): %s\n",
+            cfg->ifindex, -err, strerror(-err));
+
+        switch (-err) {
+        case EBUSY:
+        case EEXIST:
+            fprintf(stderr, "Hint: XDP already loaded on device"
+                " use --force to swap/replace\n");
+            break;
+        case EOPNOTSUPP:
+            fprintf(stderr, "Hint: Native-XDP not supported"
+                " use --skb-mode or --auto-mode\n");
+            break;
+        default:
+            break;
+        }
+        return EXIT_FAIL_XDP;
+    }
+
+    return EXIT_OK;
+}
+
+static struct bpf_object *load_bpf_and_xdp_attach(struct xsk_config *cfg) {
+
+    int prog_fd = -1;
+    int err;
+
+    /* Load the BPF-ELF object file and get back libbpf bpf_object */
+    cfg->bpf_obj = load_bpf_object_file(cfg);
+    if (!cfg->bpf_obj) {
+        fprintf(stderr, "ERR: loading file: %s\n", xdp_filename);
+        exit(EXIT_FAIL_BPF);
+    }
+
+    /* At this point: All XDP/BPF programs from the cfg->filename have been
+     * loaded into the kernel, and evaluated by the verifier. Only one of
+     * these gets attached to XDP hook, the others will get freed once this
+     * process exit.
+     */
+    cfg->bpf_prg = bpf_object__find_program_by_title(cfg->bpf_obj, xdp_progname);
+    if (!cfg->bpf_prg) {
+        fprintf(stderr, "ERR: couldn't find a program in ELF section '%s'\n", xdp_filename);
+        exit(EXIT_FAIL_BPF);
+    }
+
+    prog_fd = bpf_program__fd(cfg->bpf_prg);
+    if (prog_fd <= 0) {
+        fprintf(stderr, "ERR: bpf_program__fd failed\n");
+        exit(EXIT_FAIL_BPF);
+    }
+
+    /* At this point: BPF-progs are (only) loaded by the kernel, and prog_fd
+     * is our select file-descriptor handle. Next step is attaching this FD
+     * to a kernel hook point, in this case XDP net_device link-level hook.
+     */
+    err = xdp_link_attach(cfg, prog_fd);
+    if (err) {
+        exit(err);
+    }
+
+    return cfg->bpf_obj;
 }

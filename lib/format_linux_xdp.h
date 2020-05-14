@@ -11,16 +11,12 @@
 static const char *xdp_filename = "format_linux_xdp_kern.o";
 static const char *xdp_progname = "libtrace_xdp";
 
-typedef struct libtrace_xdp_meta {
-    uint64_t timestamp;
-    uint32_t packet_len;
-} PACKED libtrace_xdp_meta_t;
-
 typedef struct libtrace_xdp {
     /* BPF filter */
-    uint64_t accepted_packets;
-    uint64_t filtered_packets;
-    uint64_t dropped_packets;
+    __u64 received_packets;
+    __u64 accepted_packets;
+    __u64 filtered_packets;
+    __u64 dropped_packets;
 } libtrace_xdp_t;
 
 #endif
