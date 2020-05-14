@@ -1457,10 +1457,12 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data,
 		 * Only used for TX */
 		rte_eth_link_get(format_data->port, &link_info);
 		format_data->link_speed = link_info.link_speed;
-	} else {
-		rte_eth_link_get_nowait(format_data->port, &link_info);
-		format_data->link_speed = link_info.link_speed;
+		// Wait an extra 0.5s, as the link has just come up and
+		// the receiver might not actually be ready yet.
+		usleep(500000);
 	}
+	rte_eth_link_get_nowait(format_data->port, &link_info);
+	format_data->link_speed = link_info.link_speed;
 #if DEBUG
 	fprintf(stderr, "Libtrace DPDK: Link status is %d %d %d\n",
 		(int) link_info.link_status,
