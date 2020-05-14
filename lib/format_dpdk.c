@@ -2326,6 +2326,18 @@ static void dpdk_help(void) {
 	printf("\n");
 }
 
+static void dpdk_vdev_help(void) {
+	printf("dpdk vdev format module: %s (%d) \n", rte_version(), RTE_VERSION);
+	printf("Supported input and output URIs:\n");
+	printf("\tdpdkvdev:<driver><id>,[key=val, ...]-<coreid>\n");
+	printf("\tThe -<coreid> is optional\n");
+	printf("\tEverything before the '-' is given to DPDK in a --vdev argument\n");
+	printf("\tSee the DPDK documentation for the valid values\n");
+	printf("\t e.g. dpdkvdev:net_pcap0,iface=veth0\n");
+	printf("\t e.g. dpdkvdev:net_tap0,iface=tap0\n");
+	printf("\n");
+}
+
 static struct libtrace_format_t dpdk = {
 	"dpdk",
 	"$Id$",
@@ -2420,7 +2432,7 @@ static struct libtrace_format_t dpdk_vdev = {
 	dpdk_get_stats,                     /* get_statistics */
 	NULL,                               /* get_fd */
 	dpdk_trace_event,                   /* trace_event */
-	dpdk_help,                          /* help */
+	dpdk_vdev_help,                     /* help */
 	NULL,                               /* next pointer */
 	{true, 8},                          /* Live, NICs typically have 8 threads */
 	dpdk_pstart_input,                  /* pstart_input */
