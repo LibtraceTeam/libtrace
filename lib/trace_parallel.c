@@ -828,6 +828,9 @@ eof:
  * The start point for our single threaded hasher thread, this will read
  * and hash a packet from a data source and queue it against the correct
  * core to process it.
+ *
+ * Note: This uses the old single threaded API as the format has been
+ * started with trace_start not trace_pstart.
  */
 static void* hasher_entry(void *data) {
 	libtrace_t *trace = (libtrace_t *)data;
@@ -855,11 +858,6 @@ static void* hasher_entry(void *data) {
 		pthread_exit(NULL);
 	}
 	ASSERT_RET(pthread_mutex_unlock(&trace->libtrace_lock), == 0);
-
-	/* We are reading but it is not the parallel API */
-	if (trace->format->pregister_thread) {
-		trace->format->pregister_thread(trace, t, true);
-	}
 
 	/* Read all packets in then hash and queue against the correct thread */
 	while (1) {
@@ -956,9 +954,6 @@ hasher_eof:
 	thread_change_state(trace, t, THREAD_FINISHED, true);
 
 	libtrace_ocache_unregister_thread(&trace->packet_freelist);
-	if (trace->format->punregister_thread) {
-		trace->format->punregister_thread(trace, t);
-	}
 	print_memory_stats();
 
 	// TODO remove from TTABLE t sometime
