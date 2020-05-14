@@ -50,6 +50,12 @@ struct xsk_config {
     __u16 xsk_bind_flags;
     struct bpf_object *bpf_obj;
     struct bpf_program *bpf_prg;
+
+    struct bpf_map *xsks_map;
+    int xsks_map_fd;
+
+    struct bpf_map *libtrace_map;
+    int libtrace_map_fd;
 };
 
 struct xsk_umem_info {
@@ -65,9 +71,6 @@ struct xsk_socket_info {
     struct xsk_ring_prod tx;
     struct xsk_umem_info *umem;
     struct xsk_socket *xsk;
-
-    struct bpf_object *bpf_obj;
-    struct bpf_program *bpf_prg;
 };
 
 struct xsk_per_stream {
@@ -340,7 +343,23 @@ static int linux_xdp_init_input(libtrace_t *libtrace) {
     }
 
     /* load custom BPF program */
-    //load_bpf_and_xdp_attach(&FORMAT_DATA->cfg);
+    load_bpf_and_xdp_attach(&FORMAT_DATA->cfg);
+
+    /* load the xsk map */
+    FORMAT_DATA->cfg.xsks_map = bpf_object__find_map_by_name(FORMAT_DATA->cfg.bpf_obj, "xsks_map");
+    FORMAT_DATA->cfg.xsks_map_fd = bpf_map__fd(FORMAT_DATA->cfg.xsks_map);
+    if (FORMAT_DATA->cfg.xsks_map_fd < 0) {
+        trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to load xsks map from BPF");
+        return -1;
+    }
+
+    /* load libtrace map */
+    FORMAT_DATA->cfg.libtrace_map = bpf_object__find_map_by_name(FORMAT_DATA->cfg.bpf_obj, "libtrace_map");
+    FORMAT_DATA->cfg.libtrace_map_fd = bpf_map__fd(FORMAT_DATA->cfg.libtrace_map);
+    if (FORMAT_DATA->cfg.libtrace_map_fd < 0) {
+        trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to load libtrace map from BPF");
+        return -1;
+    }
 
     /* setup list to hold the streams */
     FORMAT_DATA->per_stream = libtrace_list_init(sizeof(struct xsk_per_stream));
@@ -683,32 +702,57 @@ static int linux_xdp_get_capture_length(const libtrace_packet_t *packet) {
 
 }
 
-static int get_libtrace_xdp_data_fd(struct bpf_object *obj) {
-
-    struct bpf_map *map;
-    int map_fd;
-
-    map = bpf_object__find_map_by_name(obj, "libtrace_map");
-    map_fd = bpf_map__fd(map);
-    if (map_fd < 0) {
-        return -1;
-    }
-
-    return map_fd;
-}
-
 static void linux_xdp_get_stats(libtrace_t *libtrace, libtrace_stat_t *stats) {
 
+    int map_fd = FORMAT_DATA->cfg.libtrace_map_fd;
+    int ncpus = libbpf_num_possible_cpus();
+    libtrace_xdp_t xdp[ncpus];
+    int thread_count = libtrace->perpkt_thread_count;
+
+    /* init stats */
+    stats->accepted = 0;
+    stats->dropped = 0;
+    stats->received = 0;
+
+    for (int i = 0; i < thread_count; i++) {
+
+        if ((bpf_map_lookup_elem(map_fd, &i, xdp)) != 0) {
+            return;
+        }
+
+        for (int j = 0; j < ncpus; j++) {
+
+            /* add up stats from each cpu */
+            stats->accepted += xdp[j].accepted_packets;
+            stats->dropped += xdp[j].dropped_packets;
+            stats->received += xdp[j].received_packets;
+        }
+    }
+
     return;
-    int map_fd = get_libtrace_xdp_data_fd(FORMAT_DATA->cfg.bpf_obj);
+}
+
+static void linux_xdp_get_thread_stats(libtrace_t *libtrace,
+                                       libtrace_thread_t *thread,
+                                       libtrace_stat_t *stats) {
+
+    int ncpus = libbpf_num_possible_cpus();
+    int ifqueue;
+    int map_fd;
+    libtrace_xdp_t xdp[ncpus];
+    struct xsk_per_stream *stream_data;
+
+    /* get the nic queue number from the threads per stream data */
+    stream_data = (struct xsk_per_stream *)thread->format_data;
+    ifqueue = stream_data->umem->xsk_if_queue;
+
+    map_fd = FORMAT_DATA->cfg.libtrace_map_fd;
     if (!map_fd) {
         return;
     }
 
-    __u32 key = 0;
-    int ncpus = libbpf_num_possible_cpus();
-    libtrace_xdp_t xdp[ncpus];
-    if ((bpf_map_lookup_elem(map_fd, &key, xdp)) != 0) {
+    /* get the xdp libtrace map for this threads nic queue */
+    if ((bpf_map_lookup_elem(map_fd, &ifqueue, &xdp)) != 0) {
         return;
     }
 
@@ -719,44 +763,11 @@ static void linux_xdp_get_stats(libtrace_t *libtrace, libtrace_stat_t *stats) {
 
     /* add up stats from each cpu */
     for (int i = 0; i < ncpus; i++) {
+        /* populate stats structure */
         stats->accepted += xdp[i].accepted_packets;
         stats->dropped += xdp[i].dropped_packets;
         stats->received += xdp[i].received_packets;
     }
-
-    return;
-}
-
-static void linux_xdp_get_thread_stats(libtrace_t *libtrace,
-                                       libtrace_thread_t *thread,
-                                       libtrace_stat_t *stats) {
-    return;
-
-    int ncpus = libbpf_num_possible_cpus();
-    int ifqueue;
-    int map_fd;
-    libtrace_xdp_t xdp[ncpus];
-    struct xsk_per_stream *stream_data;
-    __u32 key = 0;
-
-    /* get the nic queue number from the threads per stream data */
-    stream_data = (struct xsk_per_stream *)thread->format_data;
-    ifqueue = stream_data->umem->xsk_if_queue;
-
-    map_fd = get_libtrace_xdp_data_fd(FORMAT_DATA->cfg.bpf_obj);
-    if (!map_fd) {
-        return;
-    }
-
-    /* get the xdp libtrace map for this threads nic queue */
-    if ((bpf_map_lookup_elem(map_fd, &key, &xdp)) != 0) {
-        return;
-    }
-
-    /* populate stats structure */
-    stats->accepted = xdp[ifqueue].accepted_packets;
-    stats->dropped = xdp[ifqueue].dropped_packets;
-    stats->received = xdp[ifqueue].received_packets;
 
     return;
 }
