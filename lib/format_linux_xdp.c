@@ -829,7 +829,7 @@ void linux_xdp_constructor(void) {
     register_format(&xdp);
 }
 
-static struct bpf_object *load_bpf_object_file(struct xsk_config *cfg) {
+static struct bpf_object *load_bpf_object_file(struct xsk_config *cfg, int ifindex) {
 
     int first_prog_fd = -1;
     int err;
@@ -840,7 +840,7 @@ static struct bpf_object *load_bpf_object_file(struct xsk_config *cfg) {
      */
     struct bpf_prog_load_attr prog_load_attr = {
         .prog_type = BPF_PROG_TYPE_XDP,
-        .ifindex   = 0,
+        .ifindex   = ifindex,
     };
     prog_load_attr.file = xdp_filename;
 
@@ -849,15 +849,13 @@ static struct bpf_object *load_bpf_object_file(struct xsk_config *cfg) {
      */
     err = bpf_prog_load_xattr(&prog_load_attr, &cfg->bpf_obj, &first_prog_fd);
     if (err) {
-        fprintf(stderr, "ERR: loading BPF-OBJ file(%s) (%d): %s\n",
-            xdp_filename, err, strerror(-err));
         return NULL;
     }
 
     return cfg->bpf_obj;
 }
 
-static int xdp_link_attach (struct xsk_config *cfg, int prog_fd) {
+static int xdp_link_attach(struct xsk_config *cfg, int prog_fd) {
 
     int err;
 
@@ -873,6 +871,8 @@ static int xdp_link_attach (struct xsk_config *cfg, int prog_fd) {
 
         cfg->xdp_flags &= ~XDP_FLAGS_MODES;
         cfg->xdp_flags |= (old_flags & XDP_FLAGS_SKB_MODE) ? XDP_FLAGS_DRV_MODE : XDP_FLAGS_SKB_MODE;
+
+        /* unload */
         err = bpf_set_link_xdp_fd(cfg->ifindex, -1, cfg->xdp_flags);
         if (!err)
             err = bpf_set_link_xdp_fd(cfg->ifindex, prog_fd, old_flags);
@@ -881,20 +881,6 @@ static int xdp_link_attach (struct xsk_config *cfg, int prog_fd) {
         fprintf(stderr, "ERR: "
             "ifindex(%d) link set xdp fd failed (%d): %s\n",
             cfg->ifindex, -err, strerror(-err));
-
-        switch (-err) {
-        case EBUSY:
-        case EEXIST:
-            fprintf(stderr, "Hint: XDP already loaded on device"
-                " use --force to swap/replace\n");
-            break;
-        case EOPNOTSUPP:
-            fprintf(stderr, "Hint: Native-XDP not supported"
-                " use --skb-mode or --auto-mode\n");
-            break;
-        default:
-            break;
-        }
         return EXIT_FAIL_XDP;
     }
 
@@ -906,14 +892,19 @@ static struct bpf_object *load_bpf_and_xdp_attach(struct xsk_config *cfg) {
     int prog_fd = -1;
     int err;
 
-    /* Load the BPF-ELF object file and get back libbpf bpf_object */
-    cfg->bpf_obj = load_bpf_object_file(cfg);
+    /* Load the BPF-ELF object file and get back libbpf bpf_object. Supply
+     * ifindex to try offload to the NIC */
+    cfg->bpf_obj = load_bpf_object_file(cfg, cfg->ifindex);
     if (!cfg->bpf_obj) {
-        fprintf(stderr, "ERR: loading file: %s\n", xdp_filename);
-        exit(EXIT_FAIL_BPF);
+        /* hardware offload failed try again without */
+        cfg->bpf_obj = load_bpf_object_file(cfg, 0);
+        if (!cfg->bpf_obj) {
+            fprintf(stderr, "ERR: loading file: %s\n", xdp_filename);
+            exit(EXIT_FAIL_BPF);
+        }
     }
 
-    /* At this point: All XDP/BPF programs from the cfg->filename have been
+    /* At this point: All XDP/BPF programs from the xdp_filename have been
      * loaded into the kernel, and evaluated by the verifier. Only one of
      * these gets attached to XDP hook, the others will get freed once this
      * process exit.
