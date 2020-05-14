@@ -337,7 +337,7 @@ static int linux_xdp_init_input(libtrace_t *libtrace) {
         memcpy(FORMAT_DATA->cfg.ifname, scan + 1, strlen(scan + 1));
     }
     FORMAT_DATA->cfg.ifindex = if_nametoindex(FORMAT_DATA->cfg.ifname);
-    if (FORMAT_DATA->cfg.ifindex == -1) {
+    if (FORMAT_DATA->cfg.ifindex == 0) {
         trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Invalid interface "
             "name.");
         return -1;
@@ -713,7 +713,7 @@ static int linux_xdp_get_capture_length(const libtrace_packet_t *packet) {
 }
 
 static void linux_xdp_get_stats(libtrace_t *libtrace, libtrace_stat_t *stats) {
-    return;
+
     int map_fd = FORMAT_DATA->cfg.libtrace_map_fd;
     int ncpus = libbpf_num_possible_cpus();
     libtrace_xdp_t xdp[ncpus];
@@ -745,7 +745,7 @@ static void linux_xdp_get_stats(libtrace_t *libtrace, libtrace_stat_t *stats) {
 static void linux_xdp_get_thread_stats(libtrace_t *libtrace,
                                        libtrace_thread_t *thread,
                                        libtrace_stat_t *stats) {
-    return;
+
     int ncpus = libbpf_num_possible_cpus();
     int ifqueue;
     int map_fd;
@@ -780,6 +780,13 @@ static void linux_xdp_get_thread_stats(libtrace_t *libtrace,
     }
 
     return;
+}
+
+static void linux_xdp_help(void) {
+    printf("XDP format module\n");
+    printf("Supported input URIs:\n");
+    printf("xdp:interface\n");
+    printf("\n");
 }
 
 static struct libtrace_format_t xdp = {
@@ -823,7 +830,7 @@ static struct libtrace_format_t xdp = {
     linux_xdp_get_stats,            /* get_statistics */
     NULL,                           /* get_fd */
     NULL,				/* trace_event */
-    NULL,                           /* help */
+    linux_xdp_help,                           /* help */
     NULL,                       /* next pointer */
     {true, -1},                 /* Live, no thread limit */
     linux_xdp_pstart_input,		/* pstart_input */
