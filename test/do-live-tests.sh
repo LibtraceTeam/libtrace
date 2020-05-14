@@ -76,6 +76,10 @@ $@"
 	fi
 }
 
+# Don't test pcapint as it only has a 30 packets buffer and
+# it always drops packets and fails to capture all 100
+declare -a read_formats=("int:veth1" "ring:veth1" "dpdkvdev:net_pcap0,iface=veth1")
+
 for r in "${read_formats[@]}"
 do
 	do_parallel_test ./test-format-parallel "$r"
