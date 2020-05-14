@@ -83,7 +83,7 @@
 
 static pthread_mutex_t dpdk_lock = PTHREAD_MUTEX_INITIALIZER;
 /* Memory pools Per NUMA node */
-static struct rte_mempool * mem_pools[4][RTE_MAX_LCORE] = {{0}};
+static struct rte_mempool * mem_pools[5][RTE_MAX_LCORE] = {{0}};
 
 /* A list of cores we have allocated polling lcores on.
  * Normally DPDK wants to do this itself, however because we start our
@@ -1094,6 +1094,7 @@ static struct rte_mempool *dpdk_alloc_memory(unsigned n,
                                              int socket_id) {
 	struct rte_mempool *ret;
 	size_t j,k;
+	int socket_index = socket_id;
 	char name[MEMPOOL_NAME_LEN];
 
 	/* Add on packet size overheads */
@@ -1101,27 +1102,28 @@ static struct rte_mempool *dpdk_alloc_memory(unsigned n,
 
 	pthread_mutex_lock(&dpdk_lock);
 
-	if (socket_id == SOCKET_ID_ANY || socket_id > 4) {
-		/* Best guess go for zero */
-		socket_id = 0;
+	if (socket_id == SOCKET_ID_ANY || socket_id >= 4) {
+		/* Allocate memory from any node */
+		socket_id = SOCKET_ID_ANY;
+		socket_index = 4;
 	}
 
 	/* Find a valid pool */
-	for (j = 0; j < RTE_MAX_LCORE && mem_pools[socket_id][j]; ++j) {
-		if (mem_pools[socket_id][j]->size >= n &&
-		    mem_pools[socket_id][j]->elt_size >= pkt_size) {
+	for (j = 0; j < RTE_MAX_LCORE && mem_pools[socket_index][j]; ++j) {
+		if (mem_pools[socket_index][j]->size >= n &&
+		    mem_pools[socket_index][j]->elt_size >= pkt_size) {
 			break;
 		}
 	}
 
 	/* Find the end (+1) of the list */
-	for (k = j; k < RTE_MAX_LCORE && mem_pools[socket_id][k]; ++k) {}
+	for (k = j; k < RTE_MAX_LCORE && mem_pools[socket_index][k]; ++k) {}
 
-	if (mem_pools[socket_id][j]) {
-		ret = mem_pools[socket_id][j];
-		mem_pools[socket_id][j] = mem_pools[socket_id][k-1];
-		mem_pools[socket_id][k-1] = NULL;
-		mem_pools[socket_id][j] = NULL;
+	if (mem_pools[socket_index][j]) {
+		ret = mem_pools[socket_index][j];
+		mem_pools[socket_index][j] = mem_pools[socket_index][k-1];
+		mem_pools[socket_index][k-1] = NULL;
+		mem_pools[socket_index][j] = NULL;
 	} else {
 		static uint32_t test = 10;
 		test++;
@@ -1162,6 +1164,10 @@ static void dpdk_free_memory(struct rte_mempool *mempool, int socket_id) {
 		        rte_mempool_avail_count(mempool), mempool->size);
 	}
 #endif
+
+	if (socket_id == SOCKET_ID_ANY || socket_id >= 4) {
+		socket_id = 4;
+	}
 
 	/* Find the end (+1) of the list */
 	for (i = 0; i < RTE_MAX_LCORE && mem_pools[socket_id][i]; ++i) {}
