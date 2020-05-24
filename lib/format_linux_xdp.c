@@ -92,10 +92,16 @@ typedef struct xdp_format_data {
 static struct bpf_object *load_bpf_and_xdp_attach(struct xsk_config *cfg);
 static int xdp_link_detach(struct xsk_config *cfg);
 
-static int linux_xdp_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
-    void *buffer, libtrace_rt_types_t rt_type, uint32_t flags);
-static int linux_xdp_start_stream(libtrace_t *libtrace, struct xsk_per_stream *stream,
-    int ifqueue);
+static int linux_xdp_prepare_packet(libtrace_t *libtrace,
+                                    libtrace_packet_t *packet,
+                                    void *buffer,
+                                    libtrace_rt_types_t rt_type,
+                                    uint32_t flags);
+
+static int linux_xdp_start_stream(struct xsk_config *cfg,
+                                  struct xsk_per_stream *stream,
+                                  int ifqueue,
+                                  int dir);
 static void xsk_populate_fill_ring(struct xsk_umem_info *umem);
 
 static int linux_xdp_send_ioctl_ethtool(struct ethtool_channels *channels, char *ifname);
@@ -230,12 +236,13 @@ static struct xsk_umem_info *configure_xsk_umem(void *buffer, uint64_t size,
 }
 
 static struct xsk_socket_info *xsk_configure_socket(struct xsk_config *cfg,
-                                                    struct xsk_umem_info *umem) {
+                                                    struct xsk_umem_info *umem,
+                                                    int dir) {
 
     struct xsk_socket_config xsk_cfg;
     struct xsk_socket_info *xsk_info;
     uint32_t prog_id = 0;
-    int ret;
+    int ret = 1;
 
     xsk_info = calloc(1, sizeof(*xsk_info));
     if (xsk_info == NULL) {
@@ -249,13 +256,26 @@ static struct xsk_socket_info *xsk_configure_socket(struct xsk_config *cfg,
     xsk_cfg.xdp_flags = cfg->xdp_flags;
     xsk_cfg.bind_flags = cfg->xsk_bind_flags;
 
-    ret = xsk_socket__create(&xsk_info->xsk,
-                             cfg->ifname,
-                             umem->xsk_if_queue,
-                             umem->umem,
-                             &xsk_info->rx,
-                             NULL,
-                             &xsk_cfg);
+    /* inbound */
+    if (dir == 0) {
+        ret = xsk_socket__create(&xsk_info->xsk,
+                                 cfg->ifname,
+                                 umem->xsk_if_queue,
+                                 umem->umem,
+                                 &xsk_info->rx,
+                                 NULL,
+                                 &xsk_cfg);
+    /* outbound */
+    } else if (dir == 1) {
+        ret = xsk_socket__create(&xsk_info->xsk,
+                                 cfg->ifname,
+                                 umem->xsk_if_queue,
+                                 umem->umem,
+                                 NULL,
+                                 &xsk_info->tx,
+                                 &xsk_cfg);
+    }
+
     if (ret) {
         errno = -ret;
         return NULL;
@@ -338,15 +358,16 @@ static int linux_xdp_init_input(libtrace_t *libtrace) {
     }
     FORMAT_DATA->cfg.ifindex = if_nametoindex(FORMAT_DATA->cfg.ifname);
     if (FORMAT_DATA->cfg.ifindex == 0) {
-        trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Invalid interface "
+        trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Invalid XDP input interface "
             "name.");
         return -1;
     }
 
-    /* load custom BPF program */
+    /* CUSTOM BPF PROGRAM HAS BEEN DISABLED UNTIL A APPROPIATE WAY IS FOUND TO LOAD IT
+    // load custom BPF program
     load_bpf_and_xdp_attach(&FORMAT_DATA->cfg);
 
-    /* load the xsk map */
+    // load the xsk map
     FORMAT_DATA->cfg.xsks_map = bpf_object__find_map_by_name(FORMAT_DATA->cfg.bpf_obj, "xsks_map");
     FORMAT_DATA->cfg.xsks_map_fd = bpf_map__fd(FORMAT_DATA->cfg.xsks_map);
     if (FORMAT_DATA->cfg.xsks_map_fd < 0) {
@@ -354,18 +375,63 @@ static int linux_xdp_init_input(libtrace_t *libtrace) {
         return -1;
     }
 
-    /* load libtrace map */
+    // load libtrace map
     FORMAT_DATA->cfg.libtrace_map = bpf_object__find_map_by_name(FORMAT_DATA->cfg.bpf_obj, "libtrace_map");
     FORMAT_DATA->cfg.libtrace_map_fd = bpf_map__fd(FORMAT_DATA->cfg.libtrace_map);
     if (FORMAT_DATA->cfg.libtrace_map_fd < 0) {
         trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to load libtrace map from BPF");
+        return -1;
+    }*/
+
+    /* setup list to hold the streams */
+    FORMAT_DATA->per_stream = libtrace_list_init(sizeof(struct xsk_per_stream));
+    if (FORMAT_DATA->per_stream == NULL) {
+        trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to create list "
+            "for stream data in linux_xdp_init_input()");
+        return -1;
+    }
+
+    return 0;
+}
+
+static int linux_xdp_init_output(libtrace_out_t *libtrace) {
+
+    struct rlimit r = {RLIM_INFINITY, RLIM_INFINITY};
+    char *scan = NULL;
+
+    if (setrlimit(RLIMIT_MEMLOCK, &r)) {
+        trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED, "Unable "
+            "to setrlimit(RLIMIT_MEMLOCK) in linux_xdp_init_output()");
+        return -1;
+    }
+
+    // allocate space for the format data
+    libtrace->format_data = (xdp_format_data_t *)calloc(1,
+        sizeof(xdp_format_data_t));
+    if (libtrace->format_data == NULL) {
+        trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED, "Unable "
+            "to allocate memory for format data in linux_xdp_init_output()");
+        return -1;
+    }
+
+    /* setup XDP config */
+    scan = strchr(libtrace->uridata, ':');
+    if (scan == NULL) {
+        memcpy(FORMAT_DATA->cfg.ifname, libtrace->uridata, strlen(libtrace->uridata));
+    } else {
+        memcpy(FORMAT_DATA->cfg.ifname, scan + 1, strlen(scan + 1));
+    }
+    FORMAT_DATA->cfg.ifindex = if_nametoindex(FORMAT_DATA->cfg.ifname);
+    if (FORMAT_DATA->cfg.ifindex == 0) {
+        trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED, "Invalid XDP output interface "
+            "name.");
         return -1;
     }
 
     /* setup list to hold the streams */
     FORMAT_DATA->per_stream = libtrace_list_init(sizeof(struct xsk_per_stream));
     if (FORMAT_DATA->per_stream == NULL) {
-        trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to create list "
+        trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED, "Unable to create list "
             "for stream data in linux_xdp_init_input()");
         return -1;
     }
@@ -407,7 +473,11 @@ static int linux_xdp_pstart_input(libtrace_t *libtrace) {
         stream = libtrace_list_get_index(FORMAT_DATA->per_stream, i)->data;
 
         /* start the stream */
-        linux_xdp_start_stream(libtrace, stream, i);
+        if (linux_xdp_start_stream(&FORMAT_DATA->cfg, stream, i, 0) != 0) {
+            trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
+                "Unable to start input stream");
+            return -1;
+        }
     }
 
     return 0;
@@ -439,11 +509,40 @@ static int linux_xdp_start_input(libtrace_t *libtrace) {
     stream = libtrace_list_get_index(FORMAT_DATA->per_stream, 0)->data;
 
     /* start the stream */
-    return linux_xdp_start_stream(libtrace, stream, 0);
+    if (linux_xdp_start_stream(&FORMAT_DATA->cfg, stream, 0, 0) != 0) {
+        trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
+            "Unable to start input stream");
+        return -1;
+    }
 
+    return 0;
 }
 
-static int linux_xdp_start_stream(libtrace_t *libtrace, struct xsk_per_stream *stream, int ifqueue) {
+static int linux_xdp_start_output(libtrace_out_t *libtrace) {
+
+    struct xsk_per_stream empty_stream = {NULL,NULL,0,0};
+    struct xsk_per_stream *stream;
+
+    /* insert empty stream into the list */
+    libtrace_list_push_back(FORMAT_DATA->per_stream, &empty_stream);
+
+    /* get the stream from the list */
+    stream = libtrace_list_get_index(FORMAT_DATA->per_stream, 0)->data;
+
+    /* start the stream */
+    if (linux_xdp_start_stream(&FORMAT_DATA->cfg, stream, 0, 1) != 0) {
+        trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED,
+            "Unable to start output stream");
+        return -1;
+    }
+
+    return 0;
+}
+
+static int linux_xdp_start_stream(struct xsk_config *cfg,
+                                  struct xsk_per_stream *stream,
+                                  int ifqueue,
+                                  int dir) {
 
     uint64_t pkt_buf_size;
     void *pkt_buf;
@@ -457,19 +556,12 @@ static int linux_xdp_start_stream(libtrace_t *libtrace, struct xsk_per_stream *s
     /* setup umem */
     stream->umem = configure_xsk_umem(pkt_buf, pkt_buf_size, ifqueue);
     if (stream->umem == NULL) {
-        trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable "
-            "to setup BPF umem in linux_xdp_start_stream()");
         return -1;
     }
 
     /* configure socket */
-    stream->xsk = xsk_configure_socket(&FORMAT_DATA->cfg, stream->umem);
+    stream->xsk = xsk_configure_socket(cfg, stream->umem, dir);
     if (stream->xsk == NULL) {
-        trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable "
-            "to configure AF_XDP socket interface:%s queue:%d "
-            " in linux_xdp_start_stream()",
-            FORMAT_DATA->cfg.ifname,
-            stream->umem->xsk_if_queue);
         return -1;
     }
 
@@ -714,6 +806,9 @@ static int linux_xdp_get_capture_length(const libtrace_packet_t *packet) {
 
 static void linux_xdp_get_stats(libtrace_t *libtrace, libtrace_stat_t *stats) {
 
+    /* let libtrace handle this until the custom BPF program is used */
+    return;
+
     int map_fd = FORMAT_DATA->cfg.libtrace_map_fd;
     int ncpus = libbpf_num_possible_cpus();
     libtrace_xdp_t xdp[ncpus];
@@ -745,6 +840,9 @@ static void linux_xdp_get_stats(libtrace_t *libtrace, libtrace_stat_t *stats) {
 static void linux_xdp_get_thread_stats(libtrace_t *libtrace,
                                        libtrace_thread_t *thread,
                                        libtrace_stat_t *stats) {
+
+    /* let libtrace handle this until the custom BPF program is used */
+    return;
 
     int ncpus = libbpf_num_possible_cpus();
     int ifqueue;
