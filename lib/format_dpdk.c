@@ -1345,7 +1345,7 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data,
 		return -1;
 	}
 #if DEBUG
-	fprintf(stderr, "Librace DPDK: Doing dev configure\n");
+	fprintf(stderr, "Libtrace DPDK: Doing dev configure\n");
 #endif
 	/* Initialise the TX queue a minimum value if using this port for
 	 * receiving. Otherwise a larger size if writing packets.
@@ -1366,7 +1366,7 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data,
 	for (i=0; i < rx_queues; i++) {
 		dpdk_per_stream_t *stream;
 #if DEBUG
-		fprintf(stderr, "Librace DPDK: Configuring queue %d\n", i);
+		fprintf(stderr, "Libtrace DPDK: Configuring queue %d\n", i);
 #endif
 
 		/* Add storage for the stream */
