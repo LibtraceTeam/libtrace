@@ -514,6 +514,25 @@ int main(int argc, char *argv[])
 			trace_perror(input,"Reading packets");
 			trace_destroy(input);
 			break;
+		} else if (verbose) {
+			libtrace_stat_t *stat;
+
+			stat = trace_create_statistics();
+			trace_get_statistics(input, stat);
+
+			if (stat->received_valid)
+				fprintf(stderr,"%" PRIu64 " packets on input\n",
+						stat->received);
+			if (stat->filtered_valid)
+				fprintf(stderr,"%" PRIu64 " packets filtered\n",
+						stat->filtered);
+			if (stat->dropped_valid)
+				fprintf(stderr,"%" PRIu64 " packets dropped\n",
+						stat->dropped);
+			if (stat->accepted_valid)
+				fprintf(stderr,"%" PRIu64 " packets accepted\n",
+						stat->accepted);
+			free(stat);
 		}
 
 		trace_destroy(input);
@@ -523,26 +542,6 @@ int main(int argc, char *argv[])
 		
 	}
 
-	if (verbose) {
-                libtrace_stat_t *stat;
-                
-                stat = trace_create_statistics();
-                trace_get_statistics(input, stat);
-
-                if (stat->received_valid)
-			fprintf(stderr,"%" PRIu64 " packets on input\n",
-                                        stat->received);
-		if (stat->filtered_valid)
-			fprintf(stderr,"%" PRIu64 " packets filtered\n",
-                                        stat->filtered);
-		if (stat->dropped_valid)
-			fprintf(stderr,"%" PRIu64 " packets dropped\n",
-                                        stat->dropped);
-		if (stat->accepted_valid)
-			fprintf(stderr,"%" PRIu64 " packets accepted\n",
-                                        stat->accepted);
-	        free(stat);
-        }
 	
 	if (output)
 		trace_destroy_output(output);

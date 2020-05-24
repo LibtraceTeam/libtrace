@@ -318,8 +318,8 @@ static uint16_t construct_erf_header(read_thread_data_t *rdata,
     return framing;
 }
 
-static void tick_reader_thread(libtrace_t *trace,
-        libtrace_thread_t *t, void *global UNUSED, void *tls,
+static void tick_reader_thread(libtrace_t *trace UNUSED,
+        libtrace_thread_t *t UNUSED, void *global UNUSED, void *tls,
         uint64_t order) {
 
     read_thread_data_t *rdata = (read_thread_data_t *)tls;
