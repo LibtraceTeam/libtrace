@@ -12,7 +12,6 @@ if [ "$1" = "centos:7" ]; then
 fi
 
 yum install -y wget make gcc
-yum update -y
 
 cat << EOF > /etc/yum.repos.d/bintray-wand-general-rpm.repo
 #bintray-wand-general-rpm - packages by wand from Bintray
@@ -25,6 +24,7 @@ repo_gpgcheck=1
 enabled=1
 EOF
 
+yum update -y
 cat << EOF > /etc/yum.repos.d/bintray-wand-libtrace-rpm.repo
 #bintray-wand-libtrace-rpm - packages by wand from Bintray
 [bintray-wand-libtrace-rpm]
@@ -35,6 +35,7 @@ gpgcheck=0
 repo_gpgcheck=1
 enabled=1
 EOF
+yum update -y
 
 
 if [ "$1" = "centos:8" ]; then
