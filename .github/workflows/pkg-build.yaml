@@ -1,0 +1,47 @@
+name: Packaging for Debian and Ubuntu
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  build:
+     runs-on: ubuntu-latest
+     container:
+       image: ${{ matrix.target }}
+     strategy:
+       matrix:
+         arch:
+           - amd64
+         target:
+           - "debian:jessie"
+           - "debian:stretch"
+           - "debian:buster"
+           - "ubuntu:xenial"
+           - "ubuntu:bionic"
+           - "ubuntu:eoan"
+           - "ubuntu:focal"
+
+     steps:
+      - name: Install prereq packages
+        run: ./debpkg-setup.sh
+      - name: Checkout repo
+        uses: actions/checkout@v2
+      - name: Build packages
+        run: ./debpkg-build.sh
+      - name: Store packages
+        run: |
+          export DIRNAME=`tr ':' '-' <<<${{ matrix.target}}
+          mkdir -p packages/${DIRNAME}
+          cp ../*.deb packages/${DIRNAME}/
+      - name: Publish packages to bintray
+        uses: wanduow/action-bintray-upload-debian-packages@v1
+        with:
+          path: packages/
+          repo: wand/libtrace
+          license: LGPL-3.0
+          username: salcock
+          api_key: ${{ secreets.BINTRAY_API_KEY }}
+        
+
