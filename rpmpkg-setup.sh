@@ -11,6 +11,8 @@ if [ "$1" = "centos:7" ]; then
         DISTRO=centos
 fi
 
+mkdir -p /run/user/${UID}
+chmod 0700 /run/user/${UID}
 yum install -y wget make gcc
 
 cat << EOF > /etc/yum.repos.d/bintray-wand-general-rpm.repo
