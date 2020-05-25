@@ -45,6 +45,10 @@ struct xsk_config {
     __u32 libbpf_flags;
     int ifindex;
     char ifname[IF_NAMESIZE];
+
+    char *bpf_filename;
+    char *bpf_progname;
+
     char progsec[32];
     bool do_unload;
     __u16 xsk_bind_flags;
@@ -390,36 +394,45 @@ static int linux_xdp_init_input(libtrace_t *libtrace) {
     /* setup XDP config */
     scan = strchr(libtrace->uridata, ':');
     if (scan == NULL) {
+        /* if no : was found we just have interface name, libbpf def prog will be loaded */
         memcpy(FORMAT_DATA->cfg.ifname, libtrace->uridata, strlen(libtrace->uridata));
+        FORMAT_DATA->cfg.bpf_filename = NULL;
     } else {
         memcpy(FORMAT_DATA->cfg.ifname, scan + 1, strlen(scan + 1));
+        FORMAT_DATA->cfg.bpf_filename = strndup(libtrace->uridata,
+            (size_t)(scan - libtrace->uridata));
+        FORMAT_DATA->cfg.bpf_progname = strdup("libtrace_xdp");
     }
+
+    /* check interface */
     FORMAT_DATA->cfg.ifindex = if_nametoindex(FORMAT_DATA->cfg.ifname);
     if (FORMAT_DATA->cfg.ifindex == 0) {
         trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Invalid XDP input interface "
-            "name.");
+            "name: %s", FORMAT_DATA->cfg.ifname);
         return -1;
     }
 
-    /* CUSTOM BPF PROGRAM HAS BEEN DISABLED UNTIL A APPROPIATE WAY IS FOUND TO LOAD IT
-    // load custom BPF program
-    load_bpf_and_xdp_attach(&FORMAT_DATA->cfg);
+    /* load XDP program if supplied */
+    if (FORMAT_DATA->cfg.bpf_filename != NULL) {
+        // load custom BPF program
+        load_bpf_and_xdp_attach(&FORMAT_DATA->cfg);
 
-    // load the xsk map
-    FORMAT_DATA->cfg.xsks_map = bpf_object__find_map_by_name(FORMAT_DATA->cfg.bpf_obj, "xsks_map");
-    FORMAT_DATA->cfg.xsks_map_fd = bpf_map__fd(FORMAT_DATA->cfg.xsks_map);
-    if (FORMAT_DATA->cfg.xsks_map_fd < 0) {
-        trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to load xsks map from BPF");
-        return -1;
+        // load the xsk map
+        FORMAT_DATA->cfg.xsks_map = bpf_object__find_map_by_name(FORMAT_DATA->cfg.bpf_obj, "xsks_map");
+        FORMAT_DATA->cfg.xsks_map_fd = bpf_map__fd(FORMAT_DATA->cfg.xsks_map);
+        if (FORMAT_DATA->cfg.xsks_map_fd < 0) {
+            trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to load xsks map from BPF");
+            return -1;
+        }
+
+        // load libtrace map
+        FORMAT_DATA->cfg.libtrace_map = bpf_object__find_map_by_name(FORMAT_DATA->cfg.bpf_obj, "libtrace_map");
+        FORMAT_DATA->cfg.libtrace_map_fd = bpf_map__fd(FORMAT_DATA->cfg.libtrace_map);
+        if (FORMAT_DATA->cfg.libtrace_map_fd < 0) {
+            trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to load libtrace map from BPF");
+            return -1;
+        }
     }
-
-    // load libtrace map
-    FORMAT_DATA->cfg.libtrace_map = bpf_object__find_map_by_name(FORMAT_DATA->cfg.bpf_obj, "libtrace_map");
-    FORMAT_DATA->cfg.libtrace_map_fd = bpf_map__fd(FORMAT_DATA->cfg.libtrace_map);
-    if (FORMAT_DATA->cfg.libtrace_map_fd < 0) {
-        trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to load libtrace map from BPF");
-        return -1;
-    }*/
 
     /* setup list to hold the streams */
     FORMAT_DATA->per_stream = libtrace_list_init(sizeof(struct xsk_per_stream));
@@ -844,6 +857,14 @@ static int linux_xdp_fin_input(libtrace_t *libtrace) {
         /* unload the XDP program */
         xdp_link_detach(&FORMAT_DATA->cfg);
 
+        if (FORMAT_DATA->cfg.bpf_filename != NULL) {
+            free(FORMAT_DATA->cfg.bpf_filename);
+        }
+
+        if (FORMAT_DATA->cfg.bpf_progname != NULL) {
+            free(FORMAT_DATA->cfg.bpf_progname);
+        }
+
         free(FORMAT_DATA);
     }
 
@@ -925,8 +946,11 @@ static int linux_xdp_get_capture_length(const libtrace_packet_t *packet) {
 
 static void linux_xdp_get_stats(libtrace_t *libtrace, libtrace_stat_t *stats) {
 
-    /* let libtrace handle this until the custom BPF program is used */
-    return;
+    /* check the libtrace_map was found within the XDP program, otherwise
+     * let libtrace handle this */
+    if (FORMAT_DATA->cfg.libtrace_map_fd <= 0) {
+        return;
+    }
 
     int map_fd = FORMAT_DATA->cfg.libtrace_map_fd;
     int ncpus = libbpf_num_possible_cpus();
@@ -960,8 +984,11 @@ static void linux_xdp_get_thread_stats(libtrace_t *libtrace,
                                        libtrace_thread_t *thread,
                                        libtrace_stat_t *stats) {
 
-    /* let libtrace handle this until the custom BPF program is used */
-    return;
+    /* check the libtrace_map was found within the XDP program, otherwise
+     * let libtrace handle this */
+    if (FORMAT_DATA->cfg.libtrace_map_fd <= 0) {
+        return;
+    }
 
     int ncpus = libbpf_num_possible_cpus();
     int ifqueue;
@@ -1002,7 +1029,10 @@ static void linux_xdp_get_thread_stats(libtrace_t *libtrace,
 static void linux_xdp_help(void) {
     printf("XDP format module\n");
     printf("Supported input URIs:\n");
-    printf("xdp:interface\n");
+    printf("\txdp:interface\n");
+    printf("\txdp:bpfprog:interface\n");
+    printf("Supported output URIs:\n");
+    printf("\txdp:interface\n");
     printf("\n");
 }
 
@@ -1085,15 +1115,16 @@ static struct bpf_object *load_bpf_object_file(struct xsk_config *cfg, int ifind
     struct bpf_prog_load_attr prog_load_attr = {
         .prog_type = BPF_PROG_TYPE_XDP,
         .ifindex   = ifindex,
-        .log_level = -1,
-        .file      = xdp_filename,
     };
+    prog_load_attr.file = cfg->bpf_filename;
 
     /* Use libbpf for extracting BPF byte-code from BPF-ELF object, and
      * loading this into the kernel via bpf-syscall
      */
     err = bpf_prog_load_xattr(&prog_load_attr, &cfg->bpf_obj, &first_prog_fd);
     if (err) {
+        fprintf(stderr, "ERR: loading BPF-OBJ file(%s) (%d): %s\n",
+            cfg->bpf_filename, err, strerror(-err));
         return NULL;
     }
 
@@ -1141,24 +1172,24 @@ static struct bpf_object *load_bpf_and_xdp_attach(struct xsk_config *cfg) {
      * ifindex to try offload to the NIC */
     cfg->bpf_obj = load_bpf_object_file(cfg, cfg->ifindex);
     if (!cfg->bpf_obj) {
-        //fprintf(stderr, "XDP hardware offload failed, trying without\n");
+        fprintf(stderr, "XDP hardware offload failed, trying without\n");
 
         /* hardware offload failed try again without */
         cfg->bpf_obj = load_bpf_object_file(cfg, 0);
-        if (!cfg->bpf_obj) {
-            fprintf(stderr, "ERR: loading file: %s\n", xdp_filename);
+        if (cfg->bpf_obj == NULL) {
+            fprintf(stderr, "ERR: loading file: %s\n", cfg->bpf_filename);
             exit(EXIT_FAIL_BPF);
         }
     }
 
-    /* At this point: All XDP/BPF programs from the xdp_filename have been
+    /* At this point: All XDP/BPF programs from the bpf_filename have been
      * loaded into the kernel, and evaluated by the verifier. Only one of
      * these gets attached to XDP hook, the others will get freed once this
      * process exit.
      */
-    cfg->bpf_prg = bpf_object__find_program_by_title(cfg->bpf_obj, xdp_progname);
+    cfg->bpf_prg = bpf_object__find_program_by_title(cfg->bpf_obj, cfg->bpf_progname);
     if (!cfg->bpf_prg) {
-        fprintf(stderr, "ERR: couldn't find a program in ELF section '%s'\n", xdp_filename);
+        fprintf(stderr, "ERR: couldn't find a program in ELF section '%s'\n", cfg->bpf_filename);
         exit(EXIT_FAIL_BPF);
     }
 
