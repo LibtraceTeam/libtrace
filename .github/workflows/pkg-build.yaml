@@ -42,6 +42,6 @@ jobs:
           repo: wand/libtrace
           license: LGPL-3.0
           username: salcock
-          api_key: ${{ secreets.BINTRAY_API_KEY }}
+          api_key: ${{ secrets.BINTRAY_API_KEY }}
         
 
