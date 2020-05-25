@@ -91,25 +91,44 @@ typedef struct xdp_format_data {
 
 static struct bpf_object *load_bpf_and_xdp_attach(struct xsk_config *cfg);
 static int xdp_link_detach(struct xsk_config *cfg);
-
 static int linux_xdp_prepare_packet(libtrace_t *libtrace,
                                     libtrace_packet_t *packet,
                                     void *buffer,
                                     libtrace_rt_types_t rt_type,
                                     uint32_t flags);
-
 static int linux_xdp_start_stream(struct xsk_config *cfg,
                                   struct xsk_per_stream *stream,
                                   int ifqueue,
                                   int dir);
 static void xsk_populate_fill_ring(struct xsk_umem_info *umem);
-
-static int linux_xdp_send_ioctl_ethtool(struct ethtool_channels *channels, char *ifname);
+static int linux_xdp_send_ioctl_ethtool(struct ethtool_channels *channels,
+                                        char *ifname);
 static int linux_xdp_get_max_queues(char *ifname);
 static int linux_xdp_get_current_queues(char *ifname);
 static int linux_xdp_set_current_queues(char *ifname, int queues);
 
-static int linux_xdp_send_ioctl_ethtool(struct ethtool_channels *channels, char *ifname) {
+static bool linux_xdp_can_write(libtrace_packet_t *packet) {
+    /* Get the linktype */
+        libtrace_linktype_t ltype = trace_get_link_type(packet);
+
+        if (ltype == TRACE_TYPE_CONTENT_INVALID) {
+                return false;
+        }
+        if (ltype == TRACE_TYPE_NONDATA) {
+                return false;
+        }
+        if (ltype == TRACE_TYPE_PCAPNG_META) {
+                return false;
+        }
+        if (ltype == TRACE_TYPE_ERF_META) {
+                return false;
+        }
+
+        return true;
+}
+
+static int linux_xdp_send_ioctl_ethtool(struct ethtool_channels *channels,
+                                        char *ifname) {
 
     struct ifreq ifr = {};
     int fd, err, ret;
@@ -202,7 +221,7 @@ static struct xsk_umem_info *configure_xsk_umem(void *buffer, uint64_t size,
 
     struct xsk_umem_info *umem;
     struct xsk_umem_config umem_cfg;
-    int ret;
+    int ret = 1;
 
     umem = calloc(1, sizeof(*umem));
     if (umem == NULL) {
@@ -221,6 +240,7 @@ static struct xsk_umem_info *configure_xsk_umem(void *buffer, uint64_t size,
                            &umem->fq,
                            &umem->cq,
                            &umem_cfg);
+
     if (ret) {
         errno = -ret;
         return NULL;
@@ -689,6 +709,75 @@ static int linux_xdp_pread_packets(libtrace_t *libtrace,
     return nb_rx;
 }
 
+static int linux_xdp_write_packet(libtrace_out_t *libtrace,
+                                  libtrace_packet_t *packet) {
+
+    struct xsk_per_stream *stream;
+    libtrace_list_node_t *node;
+    uint32_t idx;
+    struct xdp_desc *tx_desc;
+    void *offset;
+    uint32_t cap_len;
+    unsigned int rcvd;
+
+    /* can xdp write this type of packet? */
+    if (!linux_xdp_can_write(packet)) {
+        return 0;
+    }
+
+    if (libtrace->format_data == NULL) {
+        trace_set_err_out(libtrace, TRACE_ERR_BAD_FORMAT, "Trace format data missing, "
+            "call trace_create_output() before calling trace_write_packet()");
+        return -1;
+    }
+
+    /* get stream data */
+    node = libtrace_list_get_index(FORMAT_DATA->per_stream, 0);
+    if (node == NULL) {
+        trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED, "Unable to get XDP "
+            "output stream in linux_xdp_write_packet()");
+        return -1;
+    }
+    stream = (struct xsk_per_stream *)node->data;
+
+
+    /* is there a free frame for the packet */
+    xsk_ring_prod__reserve(&stream->xsk->tx, 1, &idx);
+
+    /* get a tx descriptor */
+    tx_desc = xsk_ring_prod__tx_desc(&stream->xsk->tx, idx);
+
+    cap_len = trace_get_capture_length(packet);
+
+    /* get the offset to write packet to within the umem */
+    offset = xsk_umem__get_data(stream->xsk->umem->buffer, tx_desc->addr);
+
+    /* copy the packet */
+    memcpy(offset, (char *)packet->payload, cap_len);
+    /* set packet length */
+    tx_desc->len = cap_len;
+
+
+     fprintf(stderr, "write packet\n");
+    /* submit the frame */
+    xsk_ring_prod__submit(&stream->xsk->tx, 1);
+
+    /* does the socket need a wakeup? */
+    if (xsk_ring_prod__needs_wakeup(&stream->xsk->tx)) {
+        sendto(xsk_socket__fd(stream->xsk->xsk), NULL, 0, MSG_DONTWAIT, NULL, 0);
+    }
+
+    rcvd = xsk_ring_cons__peek(&stream->xsk->umem->cq, 1, &rcvd);
+    if (rcvd > 0) {
+        /* message send */
+
+        /* release the number of sent frames */
+        xsk_ring_cons__release(&stream->xsk->umem->cq, rcvd);
+    }
+
+    return cap_len;
+}
+
 static int linux_xdp_prepare_packet(libtrace_t *libtrace UNUSED, libtrace_packet_t *packet,
     void *buffer, libtrace_rt_types_t rt_type, uint32_t flags) {
 
@@ -711,24 +800,32 @@ static int linux_xdp_prepare_packet(libtrace_t *libtrace UNUSED, libtrace_packet
     return 0;
 }
 
-static int linux_xdp_fin_input(libtrace_t *libtrace) {
+static int linux_xdp_destroy_streams(libtrace_list_t *streams) {
 
     size_t i;
     struct xsk_per_stream *stream;
 
-    if (FORMAT_DATA != NULL) {
-        for (i = 0; i < libtrace_list_get_size(FORMAT_DATA->per_stream); i++) {
-            stream = libtrace_list_get_index(FORMAT_DATA->per_stream, i)->data;
+    for (i = 0; i < libtrace_list_get_size(streams); i++) {
+        stream = libtrace_list_get_index(streams, i)->data;
 
-            if (stream->xsk != NULL) {
-                xsk_socket__delete(stream->xsk->xsk);
-            }
-
-            if (stream->umem != NULL) {
-                xsk_umem__delete(stream->umem->umem);
-                free(stream->umem);
-            }
+        if (stream->xsk != NULL) {
+            xsk_socket__delete(stream->xsk->xsk);
         }
+
+        if (stream->umem != NULL) {
+            xsk_umem__delete(stream->umem->umem);
+            free(stream->umem);
+        }
+    }
+
+    return 0;
+}
+
+static int linux_xdp_fin_input(libtrace_t *libtrace) {
+
+    if (FORMAT_DATA != NULL) {
+
+        linux_xdp_destroy_streams(FORMAT_DATA->per_stream);
 
         /* destroy per stream list */
         libtrace_list_deinit(FORMAT_DATA->per_stream);
@@ -736,6 +833,17 @@ static int linux_xdp_fin_input(libtrace_t *libtrace) {
         /* unload the XDP program */
         xdp_link_detach(&FORMAT_DATA->cfg);
 
+        free(FORMAT_DATA);
+    }
+
+    return 0;
+}
+
+static int linux_xdp_fin_output(libtrace_out_t *libtrace) {
+
+    if (FORMAT_DATA != NULL) {
+        linux_xdp_destroy_streams(FORMAT_DATA->per_stream);
+        libtrace_list_deinit(FORMAT_DATA->per_stream);
         free(FORMAT_DATA);
     }
 
@@ -893,28 +1001,28 @@ static struct libtrace_format_t xdp = {
     TRACE_FORMAT_XDP,
     NULL,                           /* probe filename */
     NULL,                           /* probe magic */
-    linux_xdp_init_input,            /* init_input */
-    NULL,			        /* config_input */
-    linux_xdp_start_input,           /* start_input */
-    NULL,           /* pause */
-    NULL,           /* init_output */
+    linux_xdp_init_input,           /* init_input */
+    NULL,                           /* config_input */
+    linux_xdp_start_input,          /* start_input */
+    NULL,                           /* pause */
+    linux_xdp_init_output,          /* init_output */
     NULL,                           /* config_output */
-    NULL,          /* start_output */
-    linux_xdp_fin_input,             /* fin_input */
-    NULL,            /* fin_output */
+    linux_xdp_start_output,         /* start_output */
+    linux_xdp_fin_input,            /* fin_input */
+    linux_xdp_fin_output,           /* fin_output */
     linux_xdp_read_packet,          /* read_packet */
     linux_xdp_prepare_packet,       /* prepare_packet */
     NULL,                           /* fin_packet */
-    NULL,                           /* write_packet */
+    linux_xdp_write_packet,         /* write_packet */
     NULL,                           /* flush_output */
     linux_xdp_get_link_type,        /* get_link_type */
     NULL,                           /* get_direction */
     NULL,                           /* set_direction */
-    NULL,			        /* get_erf_timestamp */
+    NULL,                           /* get_erf_timestamp */
     linux_xdp_get_timeval,          /* get_timeval */
     linux_xdp_get_timespec,         /* get_timespec */
     NULL,                           /* get_seconds */
-	NULL,				/* get_meta_section */
+	NULL,                           /* get_meta_section */
     NULL,                           /* seek_erf */
     NULL,                           /* seek_timeval */
     NULL,                           /* seek_seconds */
@@ -927,16 +1035,16 @@ static struct libtrace_format_t xdp = {
     NULL,                           /* get_dropped_packets */
     linux_xdp_get_stats,            /* get_statistics */
     NULL,                           /* get_fd */
-    NULL,				/* trace_event */
-    linux_xdp_help,                           /* help */
-    NULL,                       /* next pointer */
-    {true, -1},                 /* Live, no thread limit */
-    linux_xdp_pstart_input,		/* pstart_input */
-    linux_xdp_pread_packets,	/* pread_packets */
-    NULL,                       /* ppause */
-    linux_xdp_fin_input,		/* p_fin */
-    linux_xdp_pregister_thread,	/* register thread */
-    NULL,				        /* unregister thread */
+    NULL,                           /* trace_event */
+    linux_xdp_help,                 /* help */
+    NULL,                           /* next pointer */
+    {true, -1},                     /* Live, no thread limit */
+    linux_xdp_pstart_input,		    /* pstart_input */
+    linux_xdp_pread_packets,	    /* pread_packets */
+    NULL,                           /* ppause */
+    linux_xdp_fin_input,		    /* p_fin */
+    linux_xdp_pregister_thread,	    /* register thread */
+    NULL,				            /* unregister thread */
     linux_xdp_get_thread_stats      /* get thread stats */
 };
 
