@@ -8,9 +8,6 @@
 #define EXIT_FAIL_XDP       30
 #define EXIT_FAIL_BPF       40
 
-static const char *xdp_filename = "format_linux_xdp_kern.o";
-static const char *xdp_progname = "libtrace_xdp";
-
 typedef struct libtrace_xdp {
     /* BPF filter */
     __u64 received_packets;
