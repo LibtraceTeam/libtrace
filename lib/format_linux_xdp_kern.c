@@ -1,3 +1,8 @@
+/*
+ * clang -O2 -emit-llvm -c format_linux_xdp_kern.c -o - | \
+ * llc -march=bpf -filetype=obj -o format_linux_xdp_kern
+ */
+
 #include <linux/bpf.h>
 #include <bpf/bpf_helpers.h>
 #include "format_linux_xdp.h"
