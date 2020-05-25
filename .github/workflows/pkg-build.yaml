@@ -24,10 +24,10 @@ jobs:
            - "ubuntu:focal"
 
      steps:
-      - name: Install prereq packages
-        run: ./debpkg-setup.sh
       - name: Checkout repo
         uses: actions/checkout@v2
+      - name: Install prereq packages
+        run: ./debpkg-setup.sh
       - name: Build packages
         run: ./debpkg-build.sh
       - name: Store packages
