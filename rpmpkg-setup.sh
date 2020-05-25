@@ -44,6 +44,13 @@ if [ "$1" = "centos:8" ]; then
         yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm || true
         dnf install -y 'dnf-command(config-manager)' || true
         yum config-manager --set-enabled PowerTools || true
+
+	# XXX Temporary, until Centos updates to 8.2 where libzstd is
+        # included in the base OS
+        # ref: https://lists.fedoraproject.org/archives/list/epel-devel@lists.fedoraproject.org/thread/MFZCRQCULJALRIJJFSSAETSDZ4RL6GCU/
+        yum install -y wget pkgconf-pkg-config
+        wget -N https://archives.fedoraproject.org/pub/archive/epel/8.1/Everything/x86_64/Packages/l/libzstd-1.4.4-1.el8.x86_64.rpm && rpm -i libzstd-1.4.4-1.el8.x86_64.rpm
+
 fi
 
 if [ "$1" = "centos:7" ]; then
