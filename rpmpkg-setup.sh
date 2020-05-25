@@ -11,6 +11,9 @@ if [ "$1" = "centos:7" ]; then
         DISTRO=centos
 fi
 
+yum install -y wget make gcc
+yum update -y
+
 cat << EOF > /etc/yum.repos.d/bintray-wand-general-rpm.repo
 #bintray-wand-general-rpm - packages by wand from Bintray
 [bintray-wand-general-rpm]
@@ -33,7 +36,6 @@ repo_gpgcheck=1
 enabled=1
 EOF
 
-yum install -y wget make gcc
 
 if [ "$1" = "centos:8" ]; then
         yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm || true
