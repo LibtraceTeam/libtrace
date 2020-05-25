@@ -32,7 +32,7 @@ jobs:
         run: ./debpkg-build.sh
       - name: Store packages
         run: |
-          export DIRNAME=`tr ':' '-' <<<${{ matrix.target}}
+          export DIRNAME=`tr ':' '-' <<<${{ matrix.target}}`
           mkdir -p packages/${DIRNAME}
           cp ../*.deb packages/${DIRNAME}/
       - name: Publish packages to bintray
