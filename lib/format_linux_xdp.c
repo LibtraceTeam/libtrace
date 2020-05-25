@@ -336,8 +336,7 @@ static void xsk_populate_fill_ring(struct xsk_umem_info *umem) {
 
 }
 
-static void linux_xdp_complete_tx(struct xsk_socket_info *xsk,
-                                  int batch_size) {
+static void linux_xdp_complete_tx(struct xsk_socket_info *xsk) {
 
     unsigned int rcvd;
     uint32_t idx;
@@ -347,9 +346,9 @@ static void linux_xdp_complete_tx(struct xsk_socket_info *xsk,
         sendto(xsk_socket__fd(xsk->xsk), NULL, 0, MSG_DONTWAIT, NULL, 0);
     }
 
-    rcvd = xsk_ring_cons__peek(&xsk->umem->cq, batch_size, &idx);
+    /* free completed TX buffers */
+    rcvd = xsk_ring_cons__peek(&xsk->umem->cq, XSK_RING_CONS__DEFAULT_NUM_DESCS, &idx);
     if (rcvd > 0) {
-        /* message sent */
         /* release the number of sent frames */
         xsk_ring_cons__release(&xsk->umem->cq, rcvd);
     }
@@ -497,6 +496,7 @@ static int linux_xdp_pstart_input(libtrace_t *libtrace) {
     struct xsk_per_stream empty_stream = {NULL,NULL,0,0};
     struct xsk_per_stream *stream;
     int max_nic_queues;
+    int ret;
 
     /* get the maximum number of supported nic queues */
     max_nic_queues = linux_xdp_get_max_queues(FORMAT_DATA->cfg.ifname);
@@ -525,9 +525,9 @@ static int linux_xdp_pstart_input(libtrace_t *libtrace) {
         stream = libtrace_list_get_index(FORMAT_DATA->per_stream, i)->data;
 
         /* start the stream */
-        if (linux_xdp_start_stream(&FORMAT_DATA->cfg, stream, i, 0) != 0) {
+        if ((ret = linux_xdp_start_stream(&FORMAT_DATA->cfg, stream, i, 0)) != 0) {
             trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
-                "Unable to start input stream");
+                "Unable to start input stream: %s", strerror(ret));
             return -1;
         }
     }
@@ -540,6 +540,7 @@ static int linux_xdp_start_input(libtrace_t *libtrace) {
     struct xsk_per_stream empty_stream = {NULL,NULL,0,0};
     struct xsk_per_stream *stream;
     int c_nic_queues;
+    int ret;
 
     /* single threaded operation, make sure the number of nic queues is 1 or
      * packets will be lost */
@@ -561,9 +562,9 @@ static int linux_xdp_start_input(libtrace_t *libtrace) {
     stream = libtrace_list_get_index(FORMAT_DATA->per_stream, 0)->data;
 
     /* start the stream */
-    if (linux_xdp_start_stream(&FORMAT_DATA->cfg, stream, 0, 0) != 0) {
+    if ((ret = linux_xdp_start_stream(&FORMAT_DATA->cfg, stream, 0, 0)) != 0) {
         trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
-            "Unable to start input stream");
+            "Unable to start input stream: %s", strerror(ret));
         return -1;
     }
 
@@ -574,6 +575,7 @@ static int linux_xdp_start_output(libtrace_out_t *libtrace) {
 
     struct xsk_per_stream empty_stream = {NULL,NULL,0,0};
     struct xsk_per_stream *stream;
+    int ret;
 
     /* insert empty stream into the list */
     libtrace_list_push_back(FORMAT_DATA->per_stream, &empty_stream);
@@ -582,9 +584,9 @@ static int linux_xdp_start_output(libtrace_out_t *libtrace) {
     stream = libtrace_list_get_index(FORMAT_DATA->per_stream, 0)->data;
 
     /* start the stream */
-    if (linux_xdp_start_stream(&FORMAT_DATA->cfg, stream, 0, 1) != 0) {
+    if ((ret = linux_xdp_start_stream(&FORMAT_DATA->cfg, stream, 0, 1)) != 0) {
         trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED,
-            "Unable to start output stream");
+            "Unable to start output stream: %s", strerror(ret));
         return -1;
     }
 
@@ -608,13 +610,13 @@ static int linux_xdp_start_stream(struct xsk_config *cfg,
     /* setup umem */
     stream->umem = configure_xsk_umem(pkt_buf, pkt_buf_size, ifqueue);
     if (stream->umem == NULL) {
-        return -1;
+        return errno;
     }
 
     /* configure socket */
     stream->xsk = xsk_configure_socket(cfg, stream->umem, dir);
     if (stream->xsk == NULL) {
-        return -1;
+        return errno;
     }
 
     return 0;
@@ -773,11 +775,12 @@ static int linux_xdp_write_packet(libtrace_out_t *libtrace,
 
 
     /* is there a free frame for the packet */
-    while (xsk_ring_prod__reserve(&stream->xsk->tx, 1, &idx) < 1) {
-        linux_xdp_complete_tx(stream->xsk, 1);
+    while (xsk_ring_prod__reserve(&stream->xsk->tx, 1, &idx) != 1) {
+        /* try free up some frames */
+        linux_xdp_complete_tx(stream->xsk);
     }
 
-    /* get a tx descriptor */
+    /* get the tx descriptor */
     tx_desc = xsk_ring_prod__tx_desc(&stream->xsk->tx, idx);
 
     cap_len = trace_get_capture_length(packet);
@@ -794,7 +797,7 @@ static int linux_xdp_write_packet(libtrace_out_t *libtrace,
     xsk_ring_prod__submit(&stream->xsk->tx, 1);
 
     /* complete the transaction */
-    linux_xdp_complete_tx(stream->xsk, 1);
+    linux_xdp_complete_tx(stream->xsk);
 
     return cap_len;
 }
