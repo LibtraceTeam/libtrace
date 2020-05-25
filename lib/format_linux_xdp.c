@@ -332,6 +332,25 @@ static void xsk_populate_fill_ring(struct xsk_umem_info *umem) {
 
 }
 
+static void linux_xdp_complete_tx(struct xsk_socket_info *xsk,
+                                  int batch_size) {
+
+    unsigned int rcvd;
+    uint32_t idx;
+
+    /* does the socket need a wakeup? */
+    if (xsk_ring_prod__needs_wakeup(&xsk->tx)) {
+        sendto(xsk_socket__fd(xsk->xsk), NULL, 0, MSG_DONTWAIT, NULL, 0);
+    }
+
+    rcvd = xsk_ring_cons__peek(&xsk->umem->cq, batch_size, &idx);
+    if (rcvd > 0) {
+        /* message sent */
+        /* release the number of sent frames */
+        xsk_ring_cons__release(&xsk->umem->cq, rcvd);
+    }
+}
+
 static uint64_t linux_xdp_get_time(struct xsk_per_stream *stream) {
 
     uint64_t sys_time;
@@ -718,7 +737,6 @@ static int linux_xdp_write_packet(libtrace_out_t *libtrace,
     struct xdp_desc *tx_desc;
     void *offset;
     uint32_t cap_len;
-    unsigned int rcvd;
 
     /* can xdp write this type of packet? */
     if (!linux_xdp_can_write(packet)) {
@@ -742,7 +760,9 @@ static int linux_xdp_write_packet(libtrace_out_t *libtrace,
 
 
     /* is there a free frame for the packet */
-    xsk_ring_prod__reserve(&stream->xsk->tx, 1, &idx);
+    while (xsk_ring_prod__reserve(&stream->xsk->tx, 1, &idx) < 1) {
+        linux_xdp_complete_tx(stream->xsk, 1);
+    }
 
     /* get a tx descriptor */
     tx_desc = xsk_ring_prod__tx_desc(&stream->xsk->tx, idx);
@@ -757,23 +777,11 @@ static int linux_xdp_write_packet(libtrace_out_t *libtrace,
     /* set packet length */
     tx_desc->len = cap_len;
 
-
-     fprintf(stderr, "write packet\n");
     /* submit the frame */
     xsk_ring_prod__submit(&stream->xsk->tx, 1);
 
-    /* does the socket need a wakeup? */
-    if (xsk_ring_prod__needs_wakeup(&stream->xsk->tx)) {
-        sendto(xsk_socket__fd(stream->xsk->xsk), NULL, 0, MSG_DONTWAIT, NULL, 0);
-    }
-
-    rcvd = xsk_ring_cons__peek(&stream->xsk->umem->cq, 1, &rcvd);
-    if (rcvd > 0) {
-        /* message send */
-
-        /* release the number of sent frames */
-        xsk_ring_cons__release(&stream->xsk->umem->cq, rcvd);
-    }
+    /* complete the transaction */
+    linux_xdp_complete_tx(stream->xsk, 1);
 
     return cap_len;
 }
