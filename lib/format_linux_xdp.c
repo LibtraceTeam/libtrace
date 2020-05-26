@@ -397,23 +397,18 @@ static int linux_xdp_init_input(libtrace_t *libtrace) {
         /* if no : was found we just have interface name. */
         memcpy(FORMAT_DATA->cfg.ifname, libtrace->uridata, strlen(libtrace->uridata));
 
-        /* try load default libtrace program */
-        if (access(libtrace_xdp_kern, F_OK) != -1) {
-            FORMAT_DATA->cfg.bpf_filename = strdup(libtrace_xdp_kern);
-            FORMAT_DATA->cfg.bpf_progname = strdup(libtrace_xdp_prog);
-        } else {
-            /* fallback to libbpf default program */
-            FORMAT_DATA->cfg.bpf_filename = NULL;
-            FORMAT_DATA->cfg.bpf_progname = NULL;
-        }
+        /* fallback to libbpf default program */
+        FORMAT_DATA->cfg.bpf_filename = NULL;
+        FORMAT_DATA->cfg.bpf_progname = NULL;
+
     } else {
-        /* user supplied bpf program must be structure like:
+        /* user supplied bpf program must be structured like:
          * kern:prog:interface
          */
         scan2 = strchr(scan + 1, ':');
         if (scan2 == NULL) {
             trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Invalid "
-                "URI\n");
+                "URI: Usage xdp:bpf_kern:bpf_prog:interface\n");
             return -1;
         } else {
             FORMAT_DATA->cfg.bpf_filename = strndup(libtrace->uridata,
@@ -422,10 +417,6 @@ static int linux_xdp_init_input(libtrace_t *libtrace) {
                 (size_t)(scan2 - (scan + 1)));
             memcpy(FORMAT_DATA->cfg.ifname, scan2 + 1, strlen(scan2 + 1));
         }
-        fprintf(stderr, "filename %s progname %s interface %s\n",
-            FORMAT_DATA->cfg.bpf_filename,
-            FORMAT_DATA->cfg.bpf_progname,
-            FORMAT_DATA->cfg.ifname);
     }
 
     /* check interface */
@@ -453,8 +444,7 @@ static int linux_xdp_init_input(libtrace_t *libtrace) {
         FORMAT_DATA->cfg.libtrace_map = bpf_object__find_map_by_name(FORMAT_DATA->cfg.bpf_obj, "libtrace_map");
         FORMAT_DATA->cfg.libtrace_map_fd = bpf_map__fd(FORMAT_DATA->cfg.libtrace_map);
         if (FORMAT_DATA->cfg.libtrace_map_fd < 0) {
-            trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to load libtrace map from BPF");
-            return -1;
+            /* unable to load libtrace_map. Is this a custom bpf program? */
         }
     }
 

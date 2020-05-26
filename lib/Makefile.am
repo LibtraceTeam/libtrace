@@ -67,6 +67,7 @@ endif
 
 if HAVE_LIBBPF
 XDP_SOURCES=format_linux_xdp.c format_linux_xdp.h
+# install libtrace bpf kern
 xdpdir = $(datarootdir)/libtrace
 xdp_DATA = format_linux_xdp_kern
 else
