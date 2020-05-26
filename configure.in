@@ -3,11 +3,11 @@
 # Now you only need to update the version number in two places - below,
 # and in the README
 
-AC_INIT([libtrace],[4.0.12],[contact@wand.net.nz],[libtrace])
+AC_INIT([libtrace],[4.0.13],[contact@wand.net.nz],[libtrace])
 
 LIBTRACE_MAJOR=4
 LIBTRACE_MID=0
-LIBTRACE_MINOR=12
+LIBTRACE_MINOR=13
 
 # OpenSolaris hides libraries like libncurses in /usr/gnu/lib, which is not
 # searched by default - add it to LDFLAGS so we at least have a chance of 
@@ -514,19 +514,7 @@ AC_ARG_WITH(dpdk,
 
 libtrace_dpdk=false
 if test "$want_dpdk" != no; then
-
-        PKG_CHECK_MODULES([DPDK], [libdpdk >= 18], [pkgconf_dpdk_found="yes"],
-                [pkgconf_dpdk_found="no"])
-        if test "x$pkgconf_dpdk_found" = "xyes"; then
-                LIBTRACE_LIBS="$LIBTRACE_LIBS $DPDK_LIBS"
-                ADD_INCLS="$ADD_INCLS $DPDK_CFLAGS"
-                AC_MSG_NOTICE([Building against system DPDK])
-                dpdk_found=pkgconfig
-        else
-                dpdk_found=0
-        fi
-
-
+	dpdk_found=0
 	# So instead simply check for existence
 	if test "$dpdk_found" = 0 -a "$RTE_SDK" != ""; then
 		AC_CHECK_FILE("$RTE_SDK/$RTE_TARGET/lib/libdpdk.so", dpdk_found="dpdk", dpdk_found=0)
@@ -550,6 +538,48 @@ if test "$want_dpdk" != no; then
 
 	fi
 
+	# Find the DPDK system package
+	# We do this last to allow RTE_SDK to override the system library
+	#
+	# Dynamic linking against the system's version of DPDK is never easy:
+	#
+	# 1) On Ubuntu the linker has --as-needed set by default, this means
+	# any library which libtrace doesn't directly reference a method from
+	# is not listed as a dependency to libtrace.so. This causes problems
+	# for DPDK, DPDK uses .init or .ctors to patch drivers etc into its
+	# global structures. So libraries need to be loaded simply to register
+	# themselves.
+	#
+	# 2) The answer to this is --no-as-needed, a positional argument, which
+	# applies to all following arguments/libs. However, libtool *helpfully*
+	# reorganises the arguments we give it before giving them to the linker.
+	# To avoid this we need to prefix all libraries with -Wl,-lxxx, so
+	# libtool leaves them be.
+	# Hence the ugly sed hack, TODO find something nicer.
+	#
+	# 3) The package-cfg for Ubuntu 20.02 (DPDK 19.11) is wrong for dynamic
+	# libraries and is missing important libraries like rte_bus_pci,
+	# without which we cannot load PCI devices.
+	# So we always use pkg-config --static here, even for dynamic linking.
+	# Note the nicer PKG_CHECK_MODULES_STATIC macro doesn't exist in older
+	# distributions.
+	#
+        if test "$dpdk_found" = 0; then
+                PKG_PROG_PKG_CONFIG
+                pkg_config_old="$PKG_CONFIG"
+                PKG_CONFIG="$PKG_CONFIG --static"
+                PKG_CHECK_MODULES([DPDK], [libdpdk >= 18], [pkgconf_dpdk_found="yes"],
+                                  [pkgconf_dpdk_found="no"])
+                PKG_CONFIG="$pkg_config_old"
+        fi
+        if test "$dpdk_found" = 0 -a "x$pkgconf_dpdk_found" = "xyes"; then
+                LIBTRACE_LIBS="$LIBTRACE_LIBS -Wl,--no-as-needed $(echo $DPDK_LIBS | sed 's/ -l/ -Wl,-l/g')"
+                AC_MSG_NOTICE([Pkg config found DPDK libs = $DPDK_LIBS])
+                ADD_INCLS="$ADD_INCLS $DPDK_CFLAGS"
+                AC_MSG_NOTICE([Building against system DPDK])
+                dpdk_found=pkgconfig
+        fi
+
 	if test "$dpdk_found" = 0 -a "$RTE_SDK" = ""; then
 		AC_MSG_NOTICE([No RTE_SDK given, checking for system dpdk-dev package])
 		# Search the system, maybe it is installed? Ethdev is one of the main libraries
@@ -572,9 +602,6 @@ if test "$want_dpdk" != no; then
 
         if test "$dpdk_found" != 0; then
 		AC_DEFINE(HAVE_DPDK,1,[conditional for building with DPDK live capture support])
-                LIBS="$LIBTRACE_LIBS"
-                AC_CHECK_FUNC(rte_devargs_add, [AC_DEFINE(HAVE_DPDK18,1,using dpdk version 18 or later)])
-                LIBS=""
                 libtrace_dpdk=true
         fi
 

@@ -57,32 +57,6 @@
 static const char *uri_read;
 static libtrace_t *trace_read;
 
-static const char *lookup_uri_write(const char *type)
-{
-	if (!strcmp(type, "int"))
-		return "int:veth0";
-	if (!strcmp(type, "ring"))
-		return "ring:veth0";
-	if (!strcmp(type, "pcapint"))
-		return "pcapint:veth0";
-	if (!strncmp(type, "dpdk:", sizeof("dpdk:")))
-		return type;
-	return "unknown";
-}
-
-static const char *lookup_uri_read(const char *type)
-{
-	if (!strcmp(type, "int"))
-		return "int:veth1";
-	if (!strcmp(type, "ring"))
-		return "ring:veth1";
-	if (!strcmp(type, "pcapint"))
-		return "pcapint:veth1";
-	if (!strncmp(type, "dpdk:", sizeof("dpdk:")))
-		return type;
-	return "unknown";
-}
-
 
 /**
  * Source packet we modify this every write see build_packet
@@ -179,9 +153,9 @@ int main(int argc, char *argv[])
 	// Timeout after 5 seconds
 	alarm(5);
 
-	trace_write = trace_create_output(lookup_uri_write(argv[1]));
+	trace_write = trace_create_output(argv[1]);
 	iferr_out(trace_write);
-	uri_read = lookup_uri_read(argv[2]);
+	uri_read = argv[2];
 	trace_read = trace_create(uri_read);
 	iferr(trace_read);
 
