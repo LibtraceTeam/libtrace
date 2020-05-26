@@ -374,7 +374,7 @@ static uint64_t linux_xdp_get_time(struct xsk_per_stream *stream) {
 static int linux_xdp_init_input(libtrace_t *libtrace) {
 
     struct rlimit r = {RLIM_INFINITY, RLIM_INFINITY};
-    char *scan = NULL;
+    char *scan, *scan2 = NULL;
 
     if (setrlimit(RLIMIT_MEMLOCK, &r)) {
         trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable "
@@ -394,14 +394,38 @@ static int linux_xdp_init_input(libtrace_t *libtrace) {
     /* setup XDP config */
     scan = strchr(libtrace->uridata, ':');
     if (scan == NULL) {
-        /* if no : was found we just have interface name, libbpf def prog will be loaded */
+        /* if no : was found we just have interface name. */
         memcpy(FORMAT_DATA->cfg.ifname, libtrace->uridata, strlen(libtrace->uridata));
-        FORMAT_DATA->cfg.bpf_filename = NULL;
+
+        /* try load default libtrace program */
+        if (access(libtrace_xdp_kern, F_OK) != -1) {
+            FORMAT_DATA->cfg.bpf_filename = strdup(libtrace_xdp_kern);
+            FORMAT_DATA->cfg.bpf_progname = strdup(libtrace_xdp_prog);
+        } else {
+            /* fallback to libbpf default program */
+            FORMAT_DATA->cfg.bpf_filename = NULL;
+            FORMAT_DATA->cfg.bpf_progname = NULL;
+        }
     } else {
-        memcpy(FORMAT_DATA->cfg.ifname, scan + 1, strlen(scan + 1));
-        FORMAT_DATA->cfg.bpf_filename = strndup(libtrace->uridata,
-            (size_t)(scan - libtrace->uridata));
-        FORMAT_DATA->cfg.bpf_progname = strdup("libtrace_xdp");
+        /* user supplied bpf program must be structure like:
+         * kern:prog:interface
+         */
+        scan2 = strchr(scan + 1, ':');
+        if (scan2 == NULL) {
+            trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Invalid "
+                "URI\n");
+            return -1;
+        } else {
+            FORMAT_DATA->cfg.bpf_filename = strndup(libtrace->uridata,
+                (size_t)(scan - libtrace->uridata));
+            FORMAT_DATA->cfg.bpf_progname = strndup(scan + 1,
+                (size_t)(scan2 - (scan + 1)));
+            memcpy(FORMAT_DATA->cfg.ifname, scan2 + 1, strlen(scan2 + 1));
+        }
+        fprintf(stderr, "filename %s progname %s interface %s\n",
+            FORMAT_DATA->cfg.bpf_filename,
+            FORMAT_DATA->cfg.bpf_progname,
+            FORMAT_DATA->cfg.ifname);
     }
 
     /* check interface */

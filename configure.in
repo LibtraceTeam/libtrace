@@ -41,6 +41,7 @@ AC_CONFIG_FILES([Makefile lib/Makefile docs/Makefile libpacketdump/Makefile
 	examples/stats/Makefile examples/tutorial/Makefile examples/parallel/Makefile
 	docs/libtrace.doxygen 
 	lib/libtrace.h
+    lib/format_linux_xdp.h
 	])
 
 
