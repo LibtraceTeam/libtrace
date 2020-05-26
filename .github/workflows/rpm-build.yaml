@@ -35,10 +35,10 @@ jobs:
           mkdir -p packages/${DIRNAME}
           cp ~/rpmbuild/RPMS/x86_64/*.rpm packages/${DIRNAME}/
       - name: Publish packages to bintray
-        uses: salcock/action-bintray-upload-rpm-packages@v1
+        uses: wanduow/action-bintray-upload-rpm-packages@v1
         with:
           path: packages/
-          repo: salcock/libtrace-rpm
+          repo: wand/libtrace-rpm
           license: LGPL-3.0
           username: salcock
           api_key: ${{ secrets.BINTRAY_API_KEY }}
