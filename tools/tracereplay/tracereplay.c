@@ -51,6 +51,11 @@ Authors: Andreas Loef and Yuwei Wang
 
 #define FCS_SIZE 4
 
+unsigned char FAKE_ETHERNET_HEADER[] = {
+        0x10, 0x11, 0x10, 0x11, 0x10, 0x11,
+        0x20, 0x21, 0x20, 0x21, 0x20, 0x21,
+        0x08, 0x00};
+
 int broadcast = 0;
 
 static void replace_ip_checksum(libtrace_packet_t *packet) {
@@ -90,10 +95,10 @@ static libtrace_packet_t * per_packet(libtrace_packet_t *packet) {
 	libtrace_linktype_t linktype = 0;
 	libtrace_packet_t *new_packet;
 	size_t wire_length;
-	void * pkt_buffer;
 	void * l2_header;
 	libtrace_ether_t * ether_header;
 	int i;
+        char *newbuf;
 
         if (IS_LIBTRACE_META_PACKET(packet)) {
                 return NULL;
@@ -102,13 +107,12 @@ static libtrace_packet_t * per_packet(libtrace_packet_t *packet) {
                 return NULL;
         }
 
-	pkt_buffer = trace_get_packet_buffer(packet,&linktype,&remaining);
+	l2_header = trace_get_layer2(packet,&linktype,&remaining);
 	/* Check if the linktype was found, if not skip this packet */
 	if (linktype == TRACE_TYPE_UNKNOWN || linktype == TRACE_TYPE_CONTENT_INVALID) {
 		return NULL;
 	}
 
-	remaining = 0;
 	new_packet = trace_create_packet();
 
 	wire_length = trace_get_wire_length(packet);
@@ -119,11 +123,24 @@ static libtrace_packet_t * per_packet(libtrace_packet_t *packet) {
 		wire_length -= FCS_SIZE;
 	}
 
-	trace_construct_packet(new_packet,linktype,pkt_buffer,wire_length);
+
+        if (linktype == TRACE_TYPE_NONE) {
+                newbuf = calloc(wire_length + sizeof(libtrace_ether_t),
+                                sizeof(char));
+                memcpy(newbuf + sizeof(libtrace_ether_t), l2_header,
+                                remaining);
+                memcpy(newbuf, FAKE_ETHERNET_HEADER, sizeof(libtrace_ether_t));
+                l2_header = newbuf;
+                wire_length += sizeof(libtrace_ether_t);
+                linktype = TRACE_TYPE_ETH;
+        }
+
+	trace_construct_packet(new_packet,linktype,l2_header,wire_length);
         new_packet = trace_strip_packet(new_packet);
 
 	if(broadcast) {
-		l2_header = trace_get_layer2(new_packet,&linktype,&remaining);
+                remaining = 0;
+	        l2_header = trace_get_layer2(new_packet,&linktype,&remaining);
 		if(linktype == TRACE_TYPE_ETH){
 			ether_header = (libtrace_ether_t *) l2_header;
 			for(i = 0; i < 6; i++) {
