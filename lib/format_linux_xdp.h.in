@@ -8,6 +8,9 @@
 #define EXIT_FAIL_XDP       30
 #define EXIT_FAIL_BPF       40
 
+static char libtrace_xdp_kern[] = "@datarootdir@/libtrace/format_linux_xdp_kern";
+static char libtrace_xdp_prog[] = "libtrace_xdp";
+
 typedef struct libtrace_xdp {
     /* BPF filter */
     __u64 received_packets;
