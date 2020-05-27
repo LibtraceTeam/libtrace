@@ -60,6 +60,9 @@ struct xsk_config {
 
     struct bpf_map *libtrace_map;
     int libtrace_map_fd;
+
+    struct bpf_map *libtrace_ctrl_map;
+    int libtrace_ctrl_map_fd;
 };
 
 struct xsk_umem_info {
@@ -91,6 +94,7 @@ struct xsk_per_stream {
 typedef struct xdp_format_data {
     struct xsk_config cfg;
     libtrace_list_t *per_stream;
+    enum hasher_types hasher_type;
 } xdp_format_data_t;
 
 static struct bpf_object *load_bpf_and_xdp_attach(struct xsk_config *cfg);
@@ -110,8 +114,6 @@ static int linux_xdp_send_ioctl_ethtool(struct ethtool_channels *channels,
 static int linux_xdp_get_max_queues(char *ifname);
 static int linux_xdp_get_current_queues(char *ifname);
 static int linux_xdp_set_current_queues(char *ifname, int queues);
-
-static int load_libtrace_bpf(struct xsk_config *cfg);
 
 static bool linux_xdp_can_write(libtrace_packet_t *packet) {
     /* Get the linktype */
@@ -393,6 +395,8 @@ static int linux_xdp_init_input(libtrace_t *libtrace) {
         return -1;
     }
 
+    FORMAT_DATA->hasher_type = HASHER_BALANCE;
+
     /* setup XDP config */
     scan = strchr(libtrace->uridata, ':');
     if (scan == NULL) {
@@ -429,8 +433,6 @@ static int linux_xdp_init_input(libtrace_t *libtrace) {
         return -1;
     }
 
-    load_libtrace_bpf(&FORMAT_DATA->cfg);
-
     /* load XDP program if supplied */
     if (FORMAT_DATA->cfg.bpf_filename != NULL) {
         // load custom BPF program
@@ -449,6 +451,15 @@ static int linux_xdp_init_input(libtrace_t *libtrace) {
         FORMAT_DATA->cfg.libtrace_map_fd = bpf_map__fd(FORMAT_DATA->cfg.libtrace_map);
         if (FORMAT_DATA->cfg.libtrace_map_fd < 0) {
             /* unable to load libtrace_map. Is this a custom bpf program? */
+        }
+
+        // load libtrace control map
+        FORMAT_DATA->cfg.libtrace_ctrl_map =
+            bpf_object__find_map_by_name(FORMAT_DATA->cfg.bpf_obj, "libtrace_ctrl_map");
+        FORMAT_DATA->cfg.libtrace_ctrl_map_fd =
+            bpf_map__fd(FORMAT_DATA->cfg.libtrace_ctrl_map);
+        if (FORMAT_DATA->cfg.libtrace_ctrl_map_fd < 0) {
+            // unable to load libtrace_ctrl_map. This must be a custom program
         }
     }
 
@@ -510,7 +521,7 @@ static int linux_xdp_init_output(libtrace_out_t *libtrace) {
 
 static int linux_xdp_pstart_input(libtrace_t *libtrace) {
 
-    int i;
+    int i, key;
     struct xsk_per_stream empty_stream = {NULL,NULL,0,0};
     struct xsk_per_stream *stream;
     int max_nic_queues;
@@ -535,6 +546,37 @@ static int linux_xdp_pstart_input(libtrace_t *libtrace) {
             "to match the number of processing threads %d", libtrace->perpkt_thread_count);
         return -1;
     }
+
+    /* setup libtrace control map if it was found */
+    if (FORMAT_DATA->cfg.libtrace_ctrl_map_fd > 0) {
+        libtrace_ctrl_map_t ctrl_map;
+
+        switch (FORMAT_DATA->hasher_type) {
+            case HASHER_CUSTOM:
+            case HASHER_BALANCE:
+                ctrl_map.hasher = XDP_BALANCE;
+                break;
+            case HASHER_UNIDIRECTIONAL:
+                ctrl_map.hasher = XDP_UNIDIRECTIONAL;
+                break;
+            case HASHER_BIDIRECTIONAL:
+                ctrl_map.hasher = XDP_BIDIRECTIONAL;
+                break;
+        }
+
+        ctrl_map.max_queues = libtrace->perpkt_thread_count;
+
+        key = 0;
+        if (bpf_map_update_elem(FORMAT_DATA->cfg.libtrace_ctrl_map_fd,
+                                &key,
+                                &ctrl_map,
+                                BPF_ANY) != 0) {
+
+            trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "failed to libtrace xdp control map");
+            return -1;
+        }
+    }
+
 
     /* create a stream for each processing thread */
     for (i = 0; i < libtrace->perpkt_thread_count; i++) {
@@ -1044,6 +1086,37 @@ static void linux_xdp_get_thread_stats(libtrace_t *libtrace,
     return;
 }
 
+static int linux_xdp_config_input(libtrace_t *libtrace,
+                                  trace_option_t options,
+                                  void *data) {
+
+    switch (options) {
+        case TRACE_OPTION_SNAPLEN:
+        case TRACE_OPTION_PROMISC:
+        case TRACE_OPTION_HASHER:
+            switch (*((enum hasher_types *)data)) {
+                case HASHER_BALANCE:
+                case HASHER_UNIDIRECTIONAL:
+                case HASHER_BIDIRECTIONAL:
+                    FORMAT_DATA->hasher_type = *(enum hasher_types*)data;
+                    return 0;
+                case HASHER_CUSTOM:
+                    /* libtrace can handle custom hashers */
+                    return -1;
+            }
+            break;
+        case TRACE_OPTION_FILTER:
+        case TRACE_OPTION_META_FREQ:
+        case TRACE_OPTION_DISCARD_META:
+        case TRACE_OPTION_EVENT_REALTIME:
+        case TRACE_OPTION_REPLAY_SPEEDUP:
+        case TRACE_OPTION_CONSTANT_ERF_FRAMING:
+            break;
+    }
+
+    return -1;
+}
+
 static void linux_xdp_help(void) {
     printf("XDP format module\n");
     printf("Supported input URIs:\n");
@@ -1061,7 +1134,7 @@ static struct libtrace_format_t xdp = {
     NULL,                           /* probe filename */
     NULL,                           /* probe magic */
     linux_xdp_init_input,           /* init_input */
-    NULL,                           /* config_input */
+    linux_xdp_config_input,         /* config_input */
     linux_xdp_start_input,          /* start_input */
     NULL,                           /* pause */
     linux_xdp_init_output,          /* init_output */
