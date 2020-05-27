@@ -172,9 +172,25 @@ static __always_inline void sort_tuple(struct pkt_meta *pkt, bool is_ip6)
 
 static __always_inline int redirect_map(__u32 ifindex) {
 
+    /* get the libtrace structure for the destination queue */
+    libtrace_xdp_t *libtrace = bpf_map_lookup_elem(&libtrace_map, &ifindex);
+
+    /* increment received packets */
+    if (libtrace)
+        libtrace->received_packets += 1;
+
     if (bpf_map_lookup_elem(&xsks_map, &ifindex)) {
+
+        /* increment accepted packets for the destination queue */
+        if (libtrace)
+            libtrace->accepted_packets += 1;
+
         return bpf_redirect_map(&xsks_map, ifindex, 0);
     }
+
+    /* increment the dropped packets */
+    if (libtrace)
+        libtrace->dropped_packets += 1;
 
     return XDP_ABORTED;
 }
@@ -182,37 +198,10 @@ static __always_inline int redirect_map(__u32 ifindex) {
 SEC("libtrace_xdp")
 int libtrace_xdp_sock(struct xdp_md *ctx) {
 
-    libtrace_xdp_t *libtrace;
-    int ifindex;
-
-    ifindex = ctx->rx_queue_index;
-
-    libtrace = bpf_map_lookup_elem(&libtrace_map, &ifindex);
-    if (!libtrace) {
-        return XDP_ABORTED;
-    }
-
-    libtrace->received_packets += 1;
-
-    /* A set entry here means that the correspnding queue_id
-     * has an active AF_XDP socket bound to it. */
-    if (bpf_map_lookup_elem(&xsks_map, &ifindex)) {
-        libtrace->accepted_packets += 1;
-
-        return bpf_redirect_map(&xsks_map, ifindex, 0);
-    }
-
-    libtrace->dropped_packets += 1;
-
-    return XDP_PASS;
-}
-
-SEC("libtrace_xdp_hasher")
-int libtrace_xdp_hasher_sock(struct xdp_md *ctx) {
-
     void *data_end = (void *)(long)ctx->data_end;
     void *data = (void *)(long)ctx->data;
     libtrace_ctrl_map_t *queue_ctrl;
+    libtrace_xdp_t *libtrace;
     struct ethhdr *eth = data;
     struct pkt_meta pkt = {};
     __u32 ifindex = ctx->rx_queue_index;
