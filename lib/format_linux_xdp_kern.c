@@ -61,7 +61,7 @@ static __always_inline bool parse_ip4(void *data, __u64 off, void *data_end,
     struct iphdr *iph;
 
     iph = data + off;
-    if (iph + 1 > data_end)
+    if ((__u8 *)(iph + 1) > (__u8 *)data_end)
         return false;
 
     if (iph->ihl != 5)
@@ -80,7 +80,7 @@ static __always_inline bool parse_ip6(void *data, __u64 off, void *data_end,
     struct ipv6hdr *ip6h;
 
     ip6h = data + off;
-    if (ip6h + 1 > data_end)
+    if ((__u8 *)(ip6h + 1) > (__u8 *)data_end)
         return false;
 
     memcpy(pkt->srcv6, ip6h->saddr.s6_addr32, 16);
@@ -96,7 +96,7 @@ static __always_inline bool parse_udp(void *data, __u64 off, void *data_end,
     struct udphdr *udp;
 
     udp = data + off;
-    if (udp + 1 > data_end)
+    if ((__u8 *)(udp + 1) > (__u8 *)data_end)
         return false;
 
     pkt->port16[0] = udp->source;
@@ -111,7 +111,7 @@ static __always_inline bool parse_tcp(void *data, __u64 off, void *data_end,
     struct tcphdr *tcp;
 
     tcp = data + off;
-    if (tcp + 1 > data_end)
+    if ((__u8 *)(tcp + 1) > (__u8 *)data_end)
         return false;
 
     pkt->port16[0] = tcp->source;
@@ -170,6 +170,15 @@ static __always_inline void sort_tuple(struct pkt_meta *pkt, bool is_ip6)
     }
 }
 
+static __always_inline int redirect_map(__u32 ifindex) {
+
+    if (bpf_map_lookup_elem(&xsks_map, &ifindex)) {
+        return bpf_redirect_map(&xsks_map, ifindex, 0);
+    }
+
+    return XDP_ABORTED;
+}
+
 SEC("libtrace_xdp")
 int libtrace_xdp_sock(struct xdp_md *ctx) {
 
@@ -206,55 +215,65 @@ int libtrace_xdp_hasher_sock(struct xdp_md *ctx) {
     libtrace_ctrl_map_t *queue_ctrl;
     struct ethhdr *eth = data;
     struct pkt_meta pkt = {};
+    __u32 ifindex = ctx->rx_queue_index;
     bool symmetric = false;
-    bool use_encap = false;
     bool is_ip6 = false;
     bool jhash = false;
     __u32 eth_proto;
     __u32 hash;
-    __u32 key;
+    __u32 key = 0;
     __u32 off;
 
-    /* determine hashing mode using map lookup */
-    key = 0;
-
+    /* get the libtrace control map */
     queue_ctrl = bpf_map_lookup_elem(&libtrace_ctrl_map, &key);
-    if (!queue_ctrl)
-        return XDP_PASS;
+    if (!queue_ctrl) {
+        return redirect_map(ifindex);
+    }
 
+    /* set the hasher */
     switch (queue_ctrl->hasher) {
-        case HASHER_BALANCE:
-            jhash = false;
-            symmetric = false;
-            break;
-        case HASHER_UNIDIRECTIONAL:
+        case XDP_UNIDIRECTIONAL:
             jhash = true;
             symmetric = false;
             break;
-        case HASHER_BIDIRECTIONAL:
+        case XDP_BIDIRECTIONAL:
             jhash = true;
             symmetric = true;
             break;
+        default: {
+            /* not hashing */
+            return redirect_map(ifindex);
+        }
     }
 
-    /* parse packet for IP Addresses and Ports */
+    /* jump past ethernet header and check enough data remains for the ip header */
     off = sizeof(struct ethhdr);
-    if (data + off > data_end)
-        return XDP_PASS;
+    if (data + off > data_end) {
+        return redirect_map(ifindex);
+    }
 
     eth_proto = eth->h_proto;
 
     if (eth_proto == bpf_htons(ETH_P_IP)) {
-        if (!parse_ip4(data, off, data_end, &pkt))
-            return XDP_PASS;
+
+        if (!parse_ip4(data, off, data_end, &pkt)) {
+            /* could not parse ip4 data, do not perform any hashing */
+            return redirect_map(ifindex);
+        }
+
         off += sizeof(struct iphdr);
     } else if (eth_proto == bpf_htons(ETH_P_IPV6)) {
-        if (!parse_ip6(data, off, data_end, &pkt))
-            return XDP_PASS;
+
+        if (!parse_ip6(data, off, data_end, &pkt)) {
+            /* could not parse ip6 data, do not perform any hashing */
+            return redirect_map(ifindex);
+        }
+
         is_ip6 = true;
         off += sizeof(struct ipv6hdr);
     } else {
-        return XDP_PASS;
+        /* not ip4 or ip6 */
+        return redirect_map(ifindex);
     }
 
     /* if IPinIP packet allow for second IP header */
@@ -264,22 +283,29 @@ int libtrace_xdp_hasher_sock(struct xdp_md *ctx) {
         off += sizeof(struct ipv6hdr);
     }
 
-    if (data + off > data_end)
-        return XDP_PASS;
+    /* not enough payload for hashing */
+    if (data + off > data_end) {
+        return redirect_map(ifindex);
+    }
 
     /* obtain port numbers for UDP and TCP traffic */
     if (pkt.protocol == IPPROTO_TCP) {
-        if (!parse_tcp(data, off, data_end, &pkt))
-            return XDP_PASS;
+        /* failed to parse tcp, set ports to 0 and continue */
+        if (!parse_tcp(data, off, data_end, &pkt)) {
+            pkt.ports = 0;
+        }
     } else if (pkt.protocol == IPPROTO_UDP) {
-        if (!parse_udp(data, off, data_end, &pkt))
-            return XDP_PASS;
+        /* failed to parse udp, set ports to 0 and continue */
+        if (!parse_udp(data, off, data_end, &pkt)) {
+            pkt.ports = 0;
+        }
     } else {
         pkt.ports = 0;
     }
 
-    if (symmetric)
+    if (symmetric) {
         sort_tuple(&pkt, is_ip6);
+    }
 
     if (jhash) {
         /* set map lookup key using 4 tuple hash */
@@ -288,11 +314,7 @@ int libtrace_xdp_hasher_sock(struct xdp_md *ctx) {
     }
 
     /* redirect to the correct queue */
-    if (bpf_map_lookup_elem(&xsks_map, &key)) {
-        return bpf_redirect_map(&xsks_map, key, 0);
-    }
-
-    return XDP_PASS;
+    return redirect_map(key);
 }
 
 char _license[] SEC("license") = "GPL";
