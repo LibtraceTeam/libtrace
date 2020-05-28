@@ -66,17 +66,14 @@ ETSISOURCES=
 endif
 
 if HAVE_LIBBPF
-XDP_SOURCES=format_linux_xdp.c format_linux_xdp.h
-# install libtrace bpf kern
-xdpdir = $(datarootdir)/libtrace
-xdp_DATA = format_linux_xdp_kern
+XDP_SOURCES=format_linux_xdp.c
 
 # are we building the BPF program
 # sourced from Suricata makefile
 if BUILD_EBPF
 BPF_CFLAGS =
 BPF_TARGETS = format_linux_xdp_kern.bpf
-#all: $(BPF_TARGETS)
+all: $(BPF_TARGETS)
 $(BPF_TARGETS): %.bpf: %.c
 	${CLANG} -Wall $(BPF_CFLAGS) -O2 \
 		-I/usr/include \
@@ -85,6 +82,10 @@ $(BPF_TARGETS): %.bpf: %.c
 	${LLC} -march=bpf -filetype=obj ${@:.bpf=.ll} -o $@
 	${RM} ${@:.bpf=.ll}
 endif
+
+# install libtrace bpf kern
+xdpdir = $(datarootdir)/libtrace
+xdp_DATA = format_linux_xdp_kern.bpf
 
 else
 XDP_SOURCES=
