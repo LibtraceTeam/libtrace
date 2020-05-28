@@ -70,6 +70,22 @@ XDP_SOURCES=format_linux_xdp.c format_linux_xdp.h
 # install libtrace bpf kern
 xdpdir = $(datarootdir)/libtrace
 xdp_DATA = format_linux_xdp_kern
+
+# are we building the BPF program
+# sourced from Suricata makefile
+if BUILD_EBPF
+BPF_CFLAGS =
+BPF_TARGETS = format_linux_xdp_kern.bpf
+#all: $(BPF_TARGETS)
+$(BPF_TARGETS): %.bpf: %.c
+	${CLANG} -Wall $(BPF_CFLAGS) -O2 \
+		-I/usr/include \
+		-D__KERNEL__ -D__ASM_SYSREG_H \
+		-target bpf -S -emit-llvm $< -o ${@:.bpf=.ll}
+	${LLC} -march=bpf -filetype=obj ${@:.bpf=.ll} -o $@
+	${RM} ${@:.bpf=.ll}
+endif
+
 else
 XDP_SOURCES=
 endif
