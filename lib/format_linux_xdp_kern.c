@@ -201,7 +201,6 @@ int libtrace_xdp_sock(struct xdp_md *ctx) {
     void *data_end = (void *)(long)ctx->data_end;
     void *data = (void *)(long)ctx->data;
     libtrace_ctrl_map_t *queue_ctrl;
-    libtrace_xdp_t *libtrace;
     struct ethhdr *eth = data;
     struct pkt_meta pkt = {};
     __u32 ifindex = ctx->rx_queue_index;

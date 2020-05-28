@@ -9,7 +9,7 @@
 #define EXIT_FAIL_BPF       40
 
 /* replace path with autoconf varible?? */
-static char libtrace_xdp_kern[] = "/usr/local/share/libtrace/format_linux_xdp_kern";
+static char libtrace_xdp_kern[] = "/usr/local/share/libtrace/format_linux_xdp_kern.bpf";
 static char libtrace_xdp_prog[] = "libtrace_xdp";
 
 typedef struct libtrace_xdp {
