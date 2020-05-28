@@ -403,9 +403,17 @@ static int linux_xdp_init_input(libtrace_t *libtrace) {
         /* if no : was found we just have interface name. */
         memcpy(FORMAT_DATA->cfg.ifname, libtrace->uridata, strlen(libtrace->uridata));
 
-        /* fallback to libbpf default program */
-        FORMAT_DATA->cfg.bpf_filename = NULL;
-        FORMAT_DATA->cfg.bpf_progname = NULL;
+        fprintf(stderr, "path %s\n", libtrace_xdp_kern);
+
+        /* try to locate the libtrace bpf program */
+        if (access(libtrace_xdp_kern, F_OK) != -1) {
+            FORMAT_DATA->cfg.bpf_filename = strdup(libtrace_xdp_kern);
+            FORMAT_DATA->cfg.bpf_progname = strdup(libtrace_xdp_prog);
+        } else {
+            /* fallback to libbpf default program */
+            FORMAT_DATA->cfg.bpf_filename = NULL;
+            FORMAT_DATA->cfg.bpf_progname = NULL;
+        }
 
     } else {
         /* user supplied bpf program must be structured like:
