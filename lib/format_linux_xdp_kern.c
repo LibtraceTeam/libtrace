@@ -218,6 +218,11 @@ int libtrace_xdp_sock(struct xdp_md *ctx) {
         return redirect_map(ifindex);
     }
 
+    /* make sure we are in running state */
+    if (queue_ctrl->state != XDP_RUNNING) {
+        return XDP_PASS;
+    }
+
     /* set the hasher */
     switch (queue_ctrl->hasher) {
         case XDP_UNIDIRECTIONAL:
