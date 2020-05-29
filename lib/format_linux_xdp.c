@@ -49,11 +49,12 @@ struct xsk_config {
     char *bpf_filename;
     char *bpf_progname;
 
-    char progsec[32];
-    bool do_unload;
     __u16 xsk_bind_flags;
+
     struct bpf_object *bpf_obj;
+
     struct bpf_program *bpf_prg;
+    __u32 bpf_prg_fd;
 
     struct bpf_map *xsks_map;
     int xsks_map_fd;
@@ -915,6 +916,8 @@ static int linux_xdp_destroy_streams(libtrace_list_t *streams) {
 
 static int linux_xdp_fin_input(libtrace_t *libtrace) {
 
+    fprintf(stderr, "fin\n");
+
     if (FORMAT_DATA != NULL) {
 
         linux_xdp_destroy_streams(FORMAT_DATA->per_stream);
@@ -1194,7 +1197,9 @@ void linux_xdp_constructor(void) {
 
 static int xdp_link_detach(struct xsk_config *cfg) {
 
-    /* unload the XDP program */
+    int err;
+
+    /* detach/unload the XDP program */
     if (bpf_set_link_xdp_fd(cfg->ifindex, -1, cfg->xdp_flags) < 0) {
         return EXIT_FAIL_XDP;
     }
@@ -1264,8 +1269,8 @@ static int xdp_link_attach(struct xsk_config *cfg, int prog_fd) {
 
 static struct bpf_object *load_bpf_and_xdp_attach(struct xsk_config *cfg) {
 
-    int prog_fd = -1;
     int err;
+    int prog_fd;
 
     /* Load the BPF-ELF object file and get back libbpf bpf_object. Supply
      * ifindex to try offload to the NIC */
@@ -1297,94 +1302,16 @@ static struct bpf_object *load_bpf_and_xdp_attach(struct xsk_config *cfg) {
         fprintf(stderr, "ERR: bpf_program__fd failed\n");
         exit(EXIT_FAIL_BPF);
     }
+    cfg->bpf_prg_fd = prog_fd;
 
     /* At this point: BPF-progs are (only) loaded by the kernel, and prog_fd
      * is our select file-descriptor handle. Next step is attaching this FD
      * to a kernel hook point, in this case XDP net_device link-level hook.
      */
-    err = xdp_link_attach(cfg, prog_fd);
+    err = xdp_link_attach(cfg, cfg->bpf_prg_fd);
     if (err) {
         exit(err);
     }
 
     return cfg->bpf_obj;
 }
-
-/*
-static int load_libtrace_bpf(struct xsk_config *cfg) {
-
-    int xsks_map_fd;
-    int libtrace_map_fd;
-    static const int log_buf_size = 16 * 1024;
-    char log_buf[log_buf_size];
-    int err, prog_fd;
-
-    xsks_map_fd = bpf_create_map_name(BPF_MAP_TYPE_XSKMAP, "xsks_map",
-                      sizeof(int), sizeof(int), 64, 0);
-    if (xsks_map_fd < 0) {
-        return xsks_map_fd;
-    }
-    cfg->xsks_map_fd = xsks_map_fd;
-
-    libtrace_map_fd = bpf_create_map_name(BPF_MAP_TYPE_PERCPU_ARRAY, "libtrace_map",
-                          sizeof(int), sizeof(libtrace_xdp_t), 64, 0);
-    if (libtrace_map_fd < 0) {
-        cfg->libtrace_map_fd = libtrace_map_fd;
-    }
-    cfg->libtrace_map_fd = libtrace_map_fd;
-
-    // Libtrace BPF program. NOTE no relocations have been performed yet
-    const char prog[] = {
-        0x61, 0x11, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, // r1 = *(u32 *)(r1 + 16)
-        0x63, 0x1a, 0xfc, 0xff, 0x00, 0x00, 0x00, 0x00, // *(u32 *)(r10 - 4) = r1
-        0xbf, 0xa2, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // r2 = r10
-        0x07, 0x02, 0x00, 0x00, 0xfc, 0xff, 0xff, 0xff, // r2 += -4
-        0x18, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // r1 = 0 ll
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x85, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, // call 1
-        0xbf, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // r6 = r0
-        0xb7, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // r0 = 0
-        0x15, 0x06, 0x16, 0x00, 0x00, 0x00, 0x00, 0x00, // if r6 == 0 goto +22 <LBB0_4>
-        0x79, 0x61, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // r1 = *(u64 *)(r6 + 0)
-        0x07, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, // r1 += 1
-        0x7b, 0x16, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // *(u64 *)(r6 + 0) = r1
-        0xbf, 0xa2, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // r2 = r10
-        0x07, 0x02, 0x00, 0x00, 0xfc, 0xff, 0xff, 0xff, // r2 += -4
-        0x18, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // r1 = 0 ll
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x85, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, // call 1
-        0x15, 0x00, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, // if r0 == 0 goto +9 <LBB0_3>
-        0x79, 0x61, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, // r1 = *(u64 *)(r6 + 8)
-        0x07, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, // r1 += 1
-        0x7b, 0x16, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, // *(u64 *)(r6 + 8) = r1
-        0x61, 0xa2, 0xfc, 0xff, 0x00, 0x00, 0x00, 0x00, // r2 = *(u32 *)(r10 - 4)
-        0x18, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // r1 = 0 ll
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0xb7, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // r3 = 0
-        0x85, 0x00, 0x00, 0x00, 0x33, 0x00, 0x00, 0x00, // call 51
-        0x05, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, // goto +4 <LBB0_4>
-        0x79, 0x61, 0x18, 0x00, 0x00, 0x00, 0x00, 0x00, // r1 = *(u64 *)(r6 + 24)
-        0x07, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, // r1 += 1
-        0x7b, 0x16, 0x18, 0x00, 0x00, 0x00, 0x00, 0x00, // *(u64 *)(r6 + 24) = r1
-        0xb7, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, // r0 = 2
-        0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // exit
-    }
-    size_t insns_cnt = sizeof(prog) / sizeof(struct bpf_insn);
-
-    prog_fd = bpf_load_program(BPF_PROG_TYPE_XDP, prog, insns_cnt,
-                   "LGPL-2.1 or BSD-2-Clause", 0, log_buf,
-                   log_buf_size);
-    if (prog_fd < 0) {
-        pr_warn("BPF log buffer:\n%s", log_buf);
-        return prog_fd;
-    }
-
-    err = bpf_set_link_xdp_fd(cfg->ifindex, prog_fd, cfg->xdp_flags);
-    if (err) {
-        close(prog_fd);
-        return err;
-    }
-
-    return 0;
-}
-*/
