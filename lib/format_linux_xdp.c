@@ -979,6 +979,83 @@ static int linux_xdp_prepare_packet(libtrace_t *libtrace UNUSED, libtrace_packet
     return 0;
 }
 
+/* read a single packet if available */
+static libtrace_eventobj_t linux_xdp_event(libtrace_t *libtrace,
+                                           libtrace_packet_t *packet) {
+
+    libtrace_eventobj_t event = {0,0,0.0,0};
+    unsigned int rcvd = 0;
+    uint32_t pkt_len;
+    uint64_t pkt_addr;
+    uint8_t *pkt_buffer;
+    uint32_t idx_rx = 0;
+    libtrace_xdp_meta_t *meta;
+    struct xsk_per_stream *stream;
+    libtrace_list_node_t *node;
+
+    /* get stream data */
+    node = libtrace_list_get_index(FORMAT_DATA->per_stream, 0);
+    if (node == NULL) {
+        trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to get XDP "
+            "input stream in linux_xdp_read_packet()");
+
+        /* cannot find stream data. this should never occur but just incase */
+        event.type = TRACE_EVENT_SLEEP;
+        event.seconds = 0.0001;
+        event.size = 0;
+
+        return event;
+    }
+
+    stream = (struct xsk_per_stream *)node->data;
+
+    /* release any previously packets */
+    if (stream->prev_rcvd != 0) {
+        xsk_ring_prod__submit(&stream->umem->fq, 1);
+        xsk_ring_cons__release(&stream->xsk->rx, 1);
+    }
+
+    /* is there a packet available? */
+    rcvd = xsk_ring_cons__peek(&stream->xsk->rx, 1, &idx_rx);
+    if (rcvd > 0) {
+
+        /* got a packet. Get the address and length from the rx descriptor */
+        pkt_addr = xsk_ring_cons__rx_desc(&stream->xsk->rx, idx_rx)->addr;
+        pkt_len = xsk_ring_cons__rx_desc(&stream->xsk->rx, idx_rx)->len;
+
+        /* get pointer to its contents, this gives us pointer to packet payload
+         * and not the start of the headroom allocated?? */
+        pkt_buffer = xsk_umem__get_data(stream->xsk->umem->buffer, pkt_addr);
+
+        /* prepare the packet */
+        packet->buf_control = TRACE_CTRL_EXTERNAL;
+        packet->type = TRACE_RT_DATA_XDP;
+        packet->buffer = (uint8_t *)pkt_buffer - FRAME_HEADROOM;
+        packet->header = (uint8_t *)pkt_buffer - FRAME_HEADROOM;
+        packet->payload = pkt_buffer;
+        packet->trace = libtrace;
+        packet->error = 1;
+
+        meta = (libtrace_xdp_meta_t *)packet->buffer;
+        meta->timestamp = linux_xdp_get_time(stream);
+        meta->packet_len = pkt_len;
+
+        event.type = TRACE_EVENT_PACKET;
+        event.size = pkt_len;
+
+        stream->prev_rcvd = 1;
+
+    } else {
+        /* We only want to sleep for a very short time - we are non-blocking */
+        event.type = TRACE_EVENT_SLEEP;
+        event.seconds = 0.0001;
+        event.size = 0;
+
+    }
+
+    return event;
+}
+
 static int linux_xdp_destroy_streams(libtrace_list_t *streams) {
 
     size_t i;
@@ -1262,7 +1339,7 @@ static struct libtrace_format_t xdp = {
     NULL,                           /* get_dropped_packets */
     linux_xdp_get_stats,            /* get_statistics */
     NULL,                           /* get_fd */
-    NULL,                           /* trace_event */
+    linux_xdp_event,                /* trace_event */
     linux_xdp_help,                 /* help */
     NULL,                           /* next pointer */
     {true, -1},                     /* Live, no thread limit */
