@@ -26,9 +26,16 @@ typedef enum {
     XDP_BIDIRECTIONAL = 2,
 } xdp_hasher;
 
+typedef enum {
+    XDP_NOT_STARTED = 0,
+    XDP_RUNNING = 1,
+    XDP_PAUSED = 2,
+} xdp_state;
+
 typedef struct libtrace_ctrl_map {
     xdp_hasher hasher;
     int max_queues;
+    xdp_state state;
 } libtrace_ctrl_map_t;
 
 #endif
