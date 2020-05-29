@@ -192,7 +192,7 @@ static __always_inline int redirect_map(__u32 ifindex) {
     if (libtrace)
         libtrace->dropped_packets += 1;
 
-    return XDP_ABORTED;
+    return XDP_PASS;
 }
 
 SEC("libtrace_xdp")
