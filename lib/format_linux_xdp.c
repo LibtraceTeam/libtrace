@@ -477,9 +477,9 @@ static int linux_xdp_init_input(libtrace_t *libtrace) {
             FORMAT_DATA->cfg.bpf_filename = strdup(libtrace_xdp_kern);
             FORMAT_DATA->cfg.bpf_progname = strdup(libtrace_xdp_prog);
         } else {
-            /* fallback to libbpf default program */
             FORMAT_DATA->cfg.bpf_filename = NULL;
             FORMAT_DATA->cfg.bpf_progname = NULL;
+            fprintf(stderr, "Unable to locate Libtrace BPF program, loading Libbpf program\n");
         }
 
     } else {
