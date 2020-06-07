@@ -121,22 +121,22 @@ static int linux_xdp_set_current_queues(char *ifname, int queues);
 
 static bool linux_xdp_can_write(libtrace_packet_t *packet) {
     /* Get the linktype */
-        libtrace_linktype_t ltype = trace_get_link_type(packet);
+    libtrace_linktype_t ltype = trace_get_link_type(packet);
 
-        if (ltype == TRACE_TYPE_CONTENT_INVALID) {
-                return false;
-        }
-        if (ltype == TRACE_TYPE_NONDATA) {
-                return false;
-        }
-        if (ltype == TRACE_TYPE_PCAPNG_META) {
-                return false;
-        }
-        if (ltype == TRACE_TYPE_ERF_META) {
-                return false;
-        }
+    if (ltype == TRACE_TYPE_CONTENT_INVALID) {
+        return false;
+    }
+    if (ltype == TRACE_TYPE_NONDATA) {
+        return false;
+    }
+    if (ltype == TRACE_TYPE_PCAPNG_META) {
+        return false;
+    }
+    if (ltype == TRACE_TYPE_ERF_META) {
+        return false;
+    }
 
-        return true;
+    return true;
 }
 
 static int linux_xdp_send_ioctl_ethtool(struct ethtool_channels *channels,
@@ -472,14 +472,22 @@ static int linux_xdp_init_input(libtrace_t *libtrace) {
         /* if no : was found we just have interface name. */
         memcpy(FORMAT_DATA->cfg.ifname, libtrace->uridata, strlen(libtrace->uridata));
 
-        /* try to locate the libtrace bpf program */
-        if (access(libtrace_xdp_kern, F_OK) != -1) {
-            FORMAT_DATA->cfg.bpf_filename = strdup(libtrace_xdp_kern);
-            FORMAT_DATA->cfg.bpf_progname = strdup(libtrace_xdp_prog);
-        } else {
-            FORMAT_DATA->cfg.bpf_filename = NULL;
-            FORMAT_DATA->cfg.bpf_progname = NULL;
-            fprintf(stderr, "Unable to locate Libtrace BPF program, loading Libbpf program\n");
+        FORMAT_DATA->cfg.bpf_filename = NULL;
+        FORMAT_DATA->cfg.bpf_progname = NULL;
+
+        /* loop over each bpf kern path looking for the BPF program */
+        for (uint32_t i = 0; i < sizeof(libtrace_xdp_kern)/sizeof(libtrace_xdp_kern[0]); i++) {
+            if (access(libtrace_xdp_kern[i], F_OK) != -1) {
+                FORMAT_DATA->cfg.bpf_filename = strdup(libtrace_xdp_kern[i]);
+                FORMAT_DATA->cfg.bpf_progname = strdup(libtrace_xdp_prog);
+                continue;
+                
+            }
+        }
+
+        /* was the libtrace bpf program found? */
+        if (FORMAT_DATA->cfg.bpf_filename == NULL) {
+            fprintf(stderr, "Unable to locate Libtrace BPF program, loading default Libbpf program.\n");
         }
 
     } else {
@@ -513,7 +521,7 @@ static int linux_xdp_init_input(libtrace_t *libtrace) {
         // load custom BPF program
         load_bpf_and_xdp_attach(&FORMAT_DATA->cfg);
 
-        // load the xsk map
+        // locate the xsk map
         FORMAT_DATA->cfg.xsks_map = bpf_object__find_map_by_name(FORMAT_DATA->cfg.bpf_obj, "xsks_map");
         FORMAT_DATA->cfg.xsks_map_fd = bpf_map__fd(FORMAT_DATA->cfg.xsks_map);
         if (FORMAT_DATA->cfg.xsks_map_fd < 0) {
@@ -521,18 +529,19 @@ static int linux_xdp_init_input(libtrace_t *libtrace) {
             return -1;
         }
 
-        // load libtrace map
+        // locate the libtrace map
         FORMAT_DATA->cfg.libtrace_map = bpf_object__find_map_by_name(FORMAT_DATA->cfg.bpf_obj, "libtrace_map");
         FORMAT_DATA->cfg.libtrace_map_fd = bpf_map__fd(FORMAT_DATA->cfg.libtrace_map);
         if (FORMAT_DATA->cfg.libtrace_map_fd < 0) {
-            /* unable to load libtrace_map. Is this a custom bpf program? */
+            /* unable to locate libtrace_map. Is this a custom bpf program? */
         }
 
-        // load libtrace control map
+        // locate the libtrace control map
         FORMAT_DATA->cfg.libtrace_ctrl_map =
             bpf_object__find_map_by_name(FORMAT_DATA->cfg.bpf_obj, "libtrace_ctrl_map");
         FORMAT_DATA->cfg.libtrace_ctrl_map_fd =
             bpf_map__fd(FORMAT_DATA->cfg.libtrace_ctrl_map);
+        /* control map was found, set it up. */
         if (FORMAT_DATA->cfg.libtrace_ctrl_map_fd >= 0) {
             /* init the libtrace control map */
             if (linux_xdp_init_control_map(libtrace) == -1) {
@@ -540,6 +549,8 @@ static int linux_xdp_init_input(libtrace_t *libtrace) {
                 trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to init libtrace XDP control map");
                 return -1;
             }
+        } else {
+            /* unable to locate control map. Is this a custom bpf program? */
         }
     }
 
@@ -565,7 +576,7 @@ static int linux_xdp_init_output(libtrace_out_t *libtrace) {
         return -1;
     }
 
-    // allocate space for the format data
+    /* allocate space for the format data */
     libtrace->format_data = (xdp_format_data_t *)calloc(1,
         sizeof(xdp_format_data_t));
     if (libtrace->format_data == NULL) {

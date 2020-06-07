@@ -68,9 +68,10 @@ endif
 if HAVE_LIBBPF
 XDP_SOURCES=format_linux_xdp.c
 
-# are we building the BPF program
-# sourced from Suricata makefile
+# are we building the BPF program?
 if BUILD_EBPF
+
+# (build command sourced from suricata)
 BPF_CFLAGS =
 BPF_TARGETS = format_linux_xdp_kern.bpf
 all: $(BPF_TARGETS)
