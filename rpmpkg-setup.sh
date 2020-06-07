@@ -1,21 +1,19 @@
+#!/bin/bash
 set -x -e -o pipefail
-
-export QA_RPATHS=$[ 0x0001 ]
-SOURCENAME=`echo ${CI_COMMIT_REF_NAME} | cut -d '-' -f 1`
 
 
 DISTRO=fedora
-if [ "$1" = "centos8" ]; then
+if [ "$1" = "centos:8" ]; then
         DISTRO=centos
 fi
 
-if [ "$1" = "centos7" ]; then
+if [ "$1" = "centos:7" ]; then
         DISTRO=centos
 fi
 
-if [ "$1" = "centos6" ]; then
-        DISTRO=centos
-fi
+mkdir -p /run/user/${UID}
+chmod 0700 /run/user/${UID}
+yum install -y wget make gcc
 
 cat << EOF > /etc/yum.repos.d/bintray-wand-general-rpm.repo
 #bintray-wand-general-rpm - packages by wand from Bintray
@@ -28,6 +26,7 @@ repo_gpgcheck=1
 enabled=1
 EOF
 
+yum update -y
 cat << EOF > /etc/yum.repos.d/bintray-wand-libtrace-rpm.repo
 #bintray-wand-libtrace-rpm - packages by wand from Bintray
 [bintray-wand-libtrace-rpm]
@@ -38,24 +37,25 @@ gpgcheck=0
 repo_gpgcheck=1
 enabled=1
 EOF
+yum update -y
 
-yum install -y wget make gcc
 
-if [ "$1" = "centos8" ]; then
+if [ "$1" = "centos:8" ]; then
         yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm || true
         dnf install -y 'dnf-command(config-manager)' || true
         yum config-manager --set-enabled PowerTools || true
+
+	# XXX Temporary, until Centos updates to 8.2 where libzstd is
+        # included in the base OS
+        # ref: https://lists.fedoraproject.org/archives/list/epel-devel@lists.fedoraproject.org/thread/MFZCRQCULJALRIJJFSSAETSDZ4RL6GCU/
+        yum install -y wget pkgconf-pkg-config
+        wget -N https://archives.fedoraproject.org/pub/archive/epel/8.1/Everything/x86_64/Packages/l/libzstd-1.4.4-1.el8.x86_64.rpm && rpm -i libzstd-1.4.4-1.el8.x86_64.rpm
+
 fi
 
-if [ "$1" = "centos7" ]; then
+if [ "$1" = "centos:7" ]; then
         yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm || true
 fi
-
-if [ "$1" = "centos6" ]; then
-        yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-6.noarch.rpm || true
-        yum install -y epel-rpm-macros
-fi
-
 
 if [[ "$1" =~ fedora* ]]; then
         dnf install -y rpm-build rpmdevtools 'dnf-command(builddep)' which
@@ -69,15 +69,3 @@ else
 fi
 
 rpmdev-setuptree
-
-./bootstrap.sh && ./configure && make dist
-cp libtrace-*.tar.gz ~/rpmbuild/SOURCES/${SOURCENAME}.tar.gz
-cp rpm/libtrace4.spec ~/rpmbuild/SPECS/
-#cp rpm/libtrace4-dag.spec ~/rpmbuild/SPECS/
-
-cd ~/rpmbuild && rpmbuild -bb --define "debug_package %{nil}" SPECS/libtrace4.spec
-
-#if [[ "$1" =~ centos* ]]; then
-#	cd ~/rpmbuild && rpmbuild -bb --define "debug_package %{nil}" SPECS/libtrace4-dag.spec
-#fi
-

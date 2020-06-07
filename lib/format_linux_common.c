@@ -518,11 +518,15 @@ int linuxcommon_pregister_thread(libtrace_t *libtrace,
                                  bool reading) {
 	if (reading) {
 		/* XXX TODO remove this oneday make sure hasher thread still works */
-		struct linux_per_stream_t *stream;
-		stream = libtrace_list_get_index(FORMAT_DATA->per_stream,
-		                                 t->perpkt_num)->data;
-		t->format_data = stream;
-		if (!stream) {
+		libtrace_list_node_t *item;
+		item = libtrace_list_get_index(FORMAT_DATA->per_stream,
+		                               t->perpkt_num);
+		if (item) {
+			t->format_data = item->data;
+		} else {
+			t->format_data = NULL;
+		}
+		if (!t->format_data) {
 			/* This should never happen and indicates an
 			 * internal libtrace bug */
 			trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
