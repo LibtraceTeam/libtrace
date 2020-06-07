@@ -234,7 +234,7 @@ AC_ARG_WITH(xdp,AS_HELP_STRING(--with-xdp,include XDP capture support),
 ],[])
 
 # do we want to build bpf files
-# source from Suricata
+# (configure commands sourced from suricata)
 AC_ARG_ENABLE(ebpf-build,
     AS_HELP_STRING([--enable-ebpf-build], [Enable compilation of ebpf files]),[enable_ebpf_build=$enableval],[enable_ebpf_build=no])
 AM_CONDITIONAL([BUILD_EBPF], [test "x$enable_ebpf_build" = "xyes"])
