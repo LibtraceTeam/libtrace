@@ -65,28 +65,29 @@ else
 ETSISOURCES=
 endif
 
+# Are we building with XDP support?
 if HAVE_LIBBPF
-XDP_SOURCES=format_linux_xdp.c
+XDP_SOURCES=format_linux_xdp.c format_linux_xdp.h
 
-# are we building the BPF program?
+# are we building the XDP eBPF kernel program?
 if BUILD_EBPF
-
-# (build command sourced from suricata)
-BPF_CFLAGS =
-BPF_TARGETS = format_linux_xdp_kern.bpf
-all: $(BPF_TARGETS)
-$(BPF_TARGETS): %.bpf: %.c
-	${CLANG} -Wall $(BPF_CFLAGS) -O2 \
+format_linux_xdp_kern.bpf: format_linux_xdp_kern.c jhash.h
+	${CLANG} -Wall @ADD_INCLS@ -O2 \
 		-I/usr/include \
 		-D__KERNEL__ -D__ASM_SYSREG_H \
 		-target bpf -S -emit-llvm $< -o ${@:.bpf=.ll}
 	${LLC} -march=bpf -filetype=obj ${@:.bpf=.ll} -o $@
 	${RM} ${@:.bpf=.ll}
+
+EXTRA_DIST += format_linux_xdp_kern.c jhash.h
 endif
 
 # install libtrace bpf kern
 xdpdir = $(datarootdir)/libtrace
 xdp_DATA = format_linux_xdp_kern.bpf
+EXTRA_DIST += format_linux_xdp_kern.bpf
+
+all: $(BPF_TARGETS)
 
 else
 XDP_SOURCES=
