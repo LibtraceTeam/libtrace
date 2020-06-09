@@ -75,16 +75,29 @@ extern "C" {
 
 
 #include "rt_protocol.h"
-	
-/* Prefer net/bpf.h over pcap-bpf.h for format_bpf.c on MacOS */
-#ifdef HAVE_NET_BPF_H
-#    include <net/bpf.h>
-#    define HAVE_BPF 1
+
+/* If LIBBPF is available use it over alternatives */
+#if HAVE_LIBBPF
+    #include <bpf/libbpf.h>
+     /* prevent pcap from including any bpf stuff */
+    #define PCAP_DONT_INCLUDE_PCAP_BPF_H 1
+    #define HAVE_BPF 1
+    /* libbpf is missing a declaration of bpf program that we reply on */
+    struct bpf_program {
+        u_int bf_len;
+        struct bpf_insn *bf_insns;
+    };
 #else
-#ifdef HAVE_PCAP_BPF_H
-#  include <pcap-bpf.h>
-#  define HAVE_BPF 1
-#endif
+    /* Prefer net/bpf.h over pcap-bpf.h for format_bpf.c on MacOS */
+    #ifdef HAVE_NET_BPF_H
+        #include <net/bpf.h>
+        #define HAVE_BPF 1
+    #else
+        #ifdef HAVE_PCAP_BPF_H
+            #include <pcap-bpf.h>
+            #define HAVE_BPF 1
+        #endif
+    #endif
 #endif
 
 #ifdef HAVE_PCAP_H
@@ -1299,6 +1312,10 @@ void dpdk_constructor(void);
 /** Constructor for receiving network DAG via Intels DPDK format module */
 void dpdkndag_constructor(void);
 
+#endif
+#if HAVE_LIBBPF
+/** Constructor for AF_XDP format module */
+void linux_xdp_constructor(void);
 #endif
 
 /** Extracts the RadioTap flags from a wireless link header

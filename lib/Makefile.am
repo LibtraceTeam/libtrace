@@ -65,9 +65,38 @@ else
 ETSISOURCES=
 endif
 
+# Are we building with XDP support?
+if HAVE_LIBBPF
+XDP_SOURCES=format_linux_xdp.c format_linux_xdp.h
+
+# are we building the XDP eBPF kernel program?
+if BUILD_EBPF
+format_linux_xdp_kern.bpf: format_linux_xdp_kern.c jhash.h
+	${CLANG} -Wall @ADD_INCLS@ -O2 \
+		-I/usr/include \
+		-D__KERNEL__ -D__ASM_SYSREG_H \
+		-target bpf -S -emit-llvm $< -o ${@:.bpf=.ll}
+	${LLC} -march=bpf -filetype=obj ${@:.bpf=.ll} -o $@
+	${RM} ${@:.bpf=.ll}
+
+EXTRA_DIST += format_linux_xdp_kern.c jhash.h
+endif
+
+# install libtrace bpf kern
+xdpdir = $(datarootdir)/libtrace
+xdp_DATA = format_linux_xdp_kern.bpf
+EXTRA_DIST += format_linux_xdp_kern.bpf
+
+all: $(BPF_TARGETS)
+
+else
+XDP_SOURCES=
+endif
+
 libtrace_la_SOURCES = trace.c trace_parallel.c common.h \
 		format_pktmeta.c format_erf.c format_pcap.c format_legacy.c \
 		format_rt.c format_helper.c format_helper.h format_pcapfile.c \
+		$(XDP_SOURCES) \
 		format_duck.c format_tsh.c $(NATIVEFORMATS) $(BPFFORMATS) \
 		format_atmhdr.c format_pcapng.c format_tzsplive.c \
 		libtrace_int.h lt_inttypes.h lt_bswap.h \

@@ -115,6 +115,7 @@ libtrace_dlt_t libtrace_to_pcap_dlt(libtrace_linktype_t type)
 		case TRACE_TYPE_CORSAROTAG:
 		case TRACE_TYPE_UNKNOWN:
                 case TRACE_TYPE_CONTENT_INVALID:
+                case TRACE_TYPE_XDP:
 			break;
 	}
 	return TRACE_DLT_ERROR;
@@ -225,6 +226,7 @@ uint8_t libtrace_to_erf_type(libtrace_linktype_t linktype)
 		case TRACE_TYPE_CORSAROTAG:
 		case TRACE_TYPE_UNKNOWN:
 		case TRACE_TYPE_CONTENT_INVALID:
+                case TRACE_TYPE_XDP:
 			break;
 	}
 	return 255;
@@ -256,6 +258,7 @@ uint8_t libtrace_to_tzsp_type(libtrace_linktype_t linktype) {
 		case TRACE_TYPE_CONTENT_INVALID:
 		case TRACE_TYPE_TZSP:
 		case TRACE_TYPE_CORSAROTAG:
+                case TRACE_TYPE_XDP:
 			break;
 	}
 	/* unknown */

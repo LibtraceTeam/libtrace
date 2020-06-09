@@ -78,17 +78,6 @@
 
 #include "libtrace.h"
 #include "libtrace_int.h"
-
-#ifdef HAVE_PCAP_BPF_H
-#  include <pcap-bpf.h>
-#else
-#  ifdef HAVE_NET_BPF_H
-#    include <net/bpf.h>
-#  endif
-#endif
-
-
-#include "libtrace_int.h"
 #include "format_helper.h"
 #include "rt_protocol.h"
 
@@ -168,6 +157,9 @@ static void trace_init(void)
 #ifdef HAVE_DPDK
                 dpdk_constructor();
                 dpdkndag_constructor();
+#endif
+#ifdef HAVE_LIBBPF
+                linux_xdp_constructor();
 #endif
 	}
 }
