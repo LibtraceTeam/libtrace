@@ -214,49 +214,60 @@ fi
 AC_CHECK_LIB(yaml, yaml_parser_initialize, yamlfound=1, yamlfound=0)
 AC_CHECK_LIB(tasn1, asn1_array2tree, asn1found=1, asn1found=0)
 
-# Check for AF_XDP required libs
-AC_ARG_WITH(xdp,AS_HELP_STRING(--with-xdp,include XDP capture support),
-[
-	AC_CHECK_LIB(elf, elf_begin, elffound=1, elffound=0)
-        if test "$elffound" != 1; then
-                AC_MSG_ERROR(libelf library and header files not found but are required for XDP support)
-        fi
 
-	AC_CHECK_LIB(bpf, xsk_socket__create, bpffound=1, bpffound=0, -lelf)
-        if test "$bpffound" = 1; then
-		AC_DEFINE(HAVE_LIBBPF, 1, [Set to 1 if libbpf is available])
+# check for xdp requirements.
+libtrace_xdp=false
+build_ebpf=false
+
+AC_CHECK_LIB(elf, elf_begin, elffound=1, elffound=0)
+if test "$elffound" == 1; then
+    # check for libbpf
+    AC_CHECK_LIB(bpf, xsk_socket__create, bpffound=1, bpffound=0, -lelf)
+
+    if test "$bpffound" = 1; then
+	    AC_DEFINE(HAVE_LIBBPF, 1, [Set to 1 if libbpf is available])
 		ADD_LDFLAGS="$ADD_LDFLAGS -lbpf -lelf"
 		libtrace_xdp=true
-	else
-		libtrace_xdp=false
-		AC_MSG_ERROR(libbpf library and header files not found but are required for XDP support)
+
+        # check for requirements to build XDP eBPF kernel
+        AC_CHECK_PROG(CLANG, [clang], [clang], [no])
+        if test "$CLANG" != "no"; then
+
+            AC_SUBST(CLANG)
+            llc_candidates=$($CLANG --version | \
+                awk '/^clang version/ {
+                split($3, v, ".");
+                printf("llc-%s.%s llc-%s llc", v[[1]], v[[2]], v[[1]])
+            }')
+            AC_CHECK_PROGS([LLC], [$llc_candidates], [no])
+            if test "$LLC" != "no"; then
+                AC_SUBST(LLC)
+                build_ebpf=true
+            fi
+
         fi
+	else
+	    libtrace_xdp=false
+    fi
+
+fi
+
+# was XDP support explicitly specified and failed
+AC_ARG_WITH(xdp,AS_HELP_STRING(--with-xdp, include XDP capture support),
+[
+    if test x"$libtrace_xdp" = xfalse; then
+        AC_MSG_ERROR([libelf and libbpf are required for XDP support])
+    fi
+
 ],[])
 
-# do we want to build bpf files
-# (configure commands sourced from suricata)
-AC_ARG_ENABLE(ebpf-build,
-    AS_HELP_STRING([--enable-ebpf-build], [Enable compilation of ebpf files]),[enable_ebpf_build=$enableval],[enable_ebpf_build=no])
-AM_CONDITIONAL([BUILD_EBPF], [test "x$enable_ebpf_build" = "xyes"])
-
-AS_IF([test "x$enable_ebpf_build" = "xyes"], [
-    AC_CHECK_PROG(CLANG, [clang], [clang], [no])
-    if test "$CLANG" == "no"; then
-        AC_MSG_ERROR([unable to find clang which is needed to build ebpf files])
+# was ebpf build explicitly specified and failed
+AC_ARG_ENABLE(ebpf-build, AS_HELP_STRING(--enable-ebpf-build, Enable compilation of XDP eBPF kernel),
+[
+    if test x"$build_ebpf" = xfalse; then
+        AC_MSG_ERROR([clang, llvm and libbpf are required to build the XDP eBPF kernel])
     fi
-    AC_SUBST(CLANG)
-   
-    llc_candidates=$($CLANG --version | \
-        awk '/^clang version/ {
-        split($3, v, ".");
-        printf("llc-%s.%s llc-%s llc", v[[1]], v[[2]], v[[1]])
-    }')
-    AC_CHECK_PROGS([LLC], [$llc_candidates], "no")
-    if test "$LLC" = "no"; then
-        AC_MSG_ERROR([unable to find any of $llc_candidates needed to build ebpf files])
-    fi
-    AC_SUBST(LLC)
-])
+],[])
     
 
 # Check for libpcap
@@ -755,6 +766,7 @@ AM_CONDITIONAL([HAVE_YAML], [test "x$have_yaml" != "xno"])
 AM_CONDITIONAL([HAVE_DPDK_PKGCONFIG], [test "x$dpdk_found" = "xpkgconfig"])
 
 AM_CONDITIONAL([HAVE_LIBBPF], [test "x$libtrace_xdp" = "xtrue"])
+AM_CONDITIONAL([BUILD_EBPF], [test "x$build_ebpf" = "xtrue"])
 
 # Check for miscellaneous programs
 AC_CHECK_PROG([libtrace_doxygen], [doxygen], [true], [false])
@@ -817,13 +829,15 @@ else
 	AC_MSG_NOTICE([Compiled with DAG live capture support: No])
 fi
 
+# Are we building with XDP support
 if test x"$libtrace_xdp" = xtrue; then
 	AC_MSG_NOTICE([Compiled with XDP capture support: Yes])
 else
 	AC_MSG_NOTICE([Compiled with XDP capture support: No])
 fi
 
-if test x"$enable_ebpf_build" =  xyes; then
+# Are we building eBPF XDP program
+if test x"$build_ebpf" =  xtrue; then
     AC_MSG_NOTICE([XDP Libtrace BPF program will be compiled: Yes])
 else
     AC_MSG_NOTICE([XDP Libtrace BPF program will be compiled: No])
