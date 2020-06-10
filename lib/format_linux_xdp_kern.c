@@ -199,7 +199,7 @@ static __always_inline int redirect_map(__u32 ifindex) {
     return XDP_PASS;
 }
 
-SEC("libtrace_xdp")
+SEC("socket/libtrace_xdp")
 int libtrace_xdp_sock(struct xdp_md *ctx) {
 
     void *data_end = (void *)(long)ctx->data_end;

@@ -13,7 +13,7 @@ static char *libtrace_xdp_kern[] = {
     "/usr/local/share/libtrace/format_linux_xdp_kern.bpf",
     "/usr/share/libtrace/format_linux_xdp_kern.bpf"
 };
-static char libtrace_xdp_prog[] = "libtrace_xdp";
+static char libtrace_xdp_prog[] = "socket/libtrace_xdp";
 
 typedef struct libtrace_xdp {
     /* BPF filter */
