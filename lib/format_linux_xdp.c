@@ -624,7 +624,12 @@ static int linux_xdp_pstart_input(libtrace_t *libtrace) {
     int max_nic_queues;
     int ret;
 
-    linux_xdp_setup_xdp(libtrace);
+    /* only setup XDP is the trace has never been started */
+    if (FORMAT_DATA->state == XDP_NOT_STARTED) {
+        if ((ret = linux_xdp_setup_xdp(libtrace)) != 0) {
+            return ret;
+        }
+    }
 
     /* was the input previously paused? */
     if (FORMAT_DATA->state == XDP_PAUSED) {
@@ -683,7 +688,12 @@ static int linux_xdp_start_input(libtrace_t *libtrace) {
     int c_nic_queues;
     int ret;
 
-    linux_xdp_setup_xdp(libtrace);
+    /* only setup XDP is the trace has never been started */
+    if (FORMAT_DATA->state == XDP_NOT_STARTED) {
+        if ((ret = linux_xdp_setup_xdp(libtrace)) != 0) {
+            return ret;
+        }
+    }
 
     /* was the input previously paused? */
     if (FORMAT_DATA->state == XDP_PAUSED) {
