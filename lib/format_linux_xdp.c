@@ -1219,26 +1219,54 @@ static void linux_xdp_get_stats(libtrace_t *libtrace, libtrace_stat_t *stats) {
     int ncpus = libbpf_num_possible_cpus();
     libtrace_xdp_t xdp[ncpus];
     int thread_count = libtrace->perpkt_thread_count;
+    struct xsk_per_stream *stream_data;
+    struct xdp_statistics xdp_stats;
+    socklen_t len = sizeof(xdp_stats);
 
-    /* init stats */
-    stats->accepted = 0;
+    /* special case. running in single threaded mode thread count is 0
+     * set this to 1 and all should be good.
+     */
+    if (thread_count == 0) {
+        thread_count = 1;
+    }
+
+    /* init stats that will be updated */
     stats->dropped = 0;
     stats->received = 0;
+    stats->missing = 0;
+    stats->captured = 0;
 
     for (int i = 0; i < thread_count; i++) {
+
+        stream_data = (struct xsk_per_stream *)libtrace_list_get_index(FORMAT_DATA->per_stream,
+                                                                       i)->data;
+        if (stream_data == NULL) {
+            return;
+        }
+
+        /* get stats from XDP socket */
+        if (getsockopt(xsk_socket__fd(stream_data->xsk->xsk),
+                       SOL_XDP,
+                       XDP_STATISTICS,
+                       &xdp_stats,
+                       &len) != 0) {
+            return;
+        }
 
         if ((bpf_map_lookup_elem(map_fd, &i, xdp)) != 0) {
             return;
         }
 
-        for (int j = 0; j < ncpus; j++) {
+        stats->dropped += xdp_stats.rx_dropped;
+        stats->missing += xdp_stats.rx_invalid_descs;
 
+        for (int j = 0; j < ncpus; j++) {
             /* add up stats from each cpu */
-            stats->accepted += xdp[j].accepted_packets;
-            stats->dropped += xdp[j].dropped_packets;
             stats->received += xdp[j].received_packets;
         }
     }
+
+    stats->captured = stats->received - stats->dropped;
 
     return;
 }
@@ -1255,16 +1283,22 @@ static void linux_xdp_get_thread_stats(libtrace_t *libtrace,
 
     int ncpus = libbpf_num_possible_cpus();
     int ifqueue;
-    int map_fd;
+    int map_fd = FORMAT_DATA->cfg.libtrace_map_fd;
     libtrace_xdp_t xdp[ncpus];
     struct xsk_per_stream *stream_data;
+    struct xdp_statistics xdp_stats;
+    socklen_t len = sizeof(xdp_stats);
 
     /* get the nic queue number from the threads per stream data */
     stream_data = (struct xsk_per_stream *)thread->format_data;
     ifqueue = stream_data->umem->xsk_if_queue;
 
-    map_fd = FORMAT_DATA->cfg.libtrace_map_fd;
-    if (!map_fd) {
+    /* get stats from XDP socket */
+    if (getsockopt(xsk_socket__fd(stream_data->xsk->xsk),
+                   SOL_XDP,
+                   XDP_STATISTICS,
+                   &xdp_stats,
+                   &len) != 0) {
         return;
     }
 
@@ -1274,17 +1308,18 @@ static void linux_xdp_get_thread_stats(libtrace_t *libtrace,
     }
 
     /* init stats */
-    stats->accepted = 0;
-    stats->dropped = 0;
+    stats->dropped = xdp_stats.rx_dropped;
     stats->received = 0;
+    stats->missing = xdp_stats.rx_invalid_descs;
+    stats->captured = 0;
 
     /* add up stats from each cpu */
     for (int i = 0; i < ncpus; i++) {
         /* populate stats structure */
-        stats->accepted += xdp[i].accepted_packets;
-        stats->dropped += xdp[i].dropped_packets;
         stats->received += xdp[i].received_packets;
     }
+
+    stats->captured = stats->received - stats->dropped;
 
     return;
 }
