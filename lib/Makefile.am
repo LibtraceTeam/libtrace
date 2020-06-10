@@ -72,7 +72,7 @@ XDP_SOURCES=format_linux_xdp.c format_linux_xdp.h
 # are we building the XDP eBPF kernel program?
 if BUILD_EBPF
 format_linux_xdp_kern.bpf: format_linux_xdp_kern.c jhash.h
-	${CLANG} -Wall @ADD_INCLS@ -O2 \
+	${CLANG} -Wall @CFLAGS@ -O2 \
 		-I/usr/include \
 		-D__KERNEL__ -D__ASM_SYSREG_H \
 		-target bpf -S -emit-llvm $< -o ${@:.bpf=.ll}

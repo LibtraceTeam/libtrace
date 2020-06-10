@@ -179,14 +179,18 @@ static __always_inline int redirect_map(__u32 ifindex) {
     if (libtrace)
         libtrace->received_packets += 1;
 
-    if (bpf_map_lookup_elem(&xsks_map, &ifindex)) {
+    /* checks if the ifindex has an active af_xdp socket bound to it
+     * Note: kernel versions less than 5.3 do no support passing a xsks_map
+     *       to bpf_map_lookup_elem()
+     */
+    //if (bpf_map_lookup_elem(&xsks_map, &ifindex)) {
 
         /* increment accepted packets for the destination queue */
         if (libtrace)
             libtrace->accepted_packets += 1;
 
         return bpf_redirect_map(&xsks_map, ifindex, 0);
-    }
+    //}
 
     /* increment the dropped packets */
     if (libtrace)
