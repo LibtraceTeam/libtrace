@@ -44,6 +44,7 @@ struct xsk_config {
     __u32 xdp_flags;
     __u32 libbpf_flags;
     int ifindex;
+    bool hardware_offload;
     char ifname[IF_NAMESIZE];
 
     char *bpf_filename;
@@ -481,7 +482,6 @@ static int linux_xdp_init_input(libtrace_t *libtrace) {
                 FORMAT_DATA->cfg.bpf_filename = strdup(libtrace_xdp_kern[i]);
                 FORMAT_DATA->cfg.bpf_progname = strdup(libtrace_xdp_prog);
                 continue;
-                
             }
         }
 
@@ -515,6 +515,12 @@ static int linux_xdp_init_input(libtrace_t *libtrace) {
             "name: %s", FORMAT_DATA->cfg.ifname);
         return -1;
     }
+
+    return 0;
+
+}
+
+static int linux_xdp_setup_xdp(libtrace_t *libtrace) {
 
     /* load XDP program if supplied */
     if (FORMAT_DATA->cfg.bpf_filename != NULL) {
@@ -618,6 +624,8 @@ static int linux_xdp_pstart_input(libtrace_t *libtrace) {
     int max_nic_queues;
     int ret;
 
+    linux_xdp_setup_xdp(libtrace);
+
     /* was the input previously paused? */
     if (FORMAT_DATA->state == XDP_PAUSED) {
         /* update state and return */
@@ -674,6 +682,8 @@ static int linux_xdp_start_input(libtrace_t *libtrace) {
     struct xsk_per_stream *stream;
     int c_nic_queues;
     int ret;
+
+    linux_xdp_setup_xdp(libtrace);
 
     /* was the input previously paused? */
     if (FORMAT_DATA->state == XDP_PAUSED) {
@@ -1295,6 +1305,9 @@ static int linux_xdp_config_input(libtrace_t *libtrace,
         case TRACE_OPTION_REPLAY_SPEEDUP:
         case TRACE_OPTION_CONSTANT_ERF_FRAMING:
             break;
+        case TRACE_OPTION_XDP_HARDWARE_OFFLOAD:
+            FORMAT_DATA->cfg.hardware_offload = *(bool *)data;
+            return 0;
     }
 
     return -1;
@@ -1397,8 +1410,6 @@ static struct bpf_object *load_bpf_object_file(struct xsk_config *cfg, int ifind
      */
     err = bpf_prog_load_xattr(&prog_load_attr, &cfg->bpf_obj, &first_prog_fd);
     if (err) {
-        fprintf(stderr, "ERR: loading BPF-OBJ file(%s) (%d): %s\n",
-            cfg->bpf_filename, err, strerror(-err));
         return NULL;
     }
 
@@ -1444,13 +1455,16 @@ static struct bpf_object *load_bpf_and_xdp_attach(struct xsk_config *cfg) {
 
     /* Load the BPF-ELF object file and get back libbpf bpf_object. Supply
      * ifindex to try offload to the NIC */
-    cfg->bpf_obj = load_bpf_object_file(cfg, cfg->ifindex);
-    if (!cfg->bpf_obj) {
-        fprintf(stderr, "XDP hardware offload failed, trying without\n");
 
-        /* hardware offload failed try again without */
+    if (cfg->hardware_offload) {
+        cfg->bpf_obj = load_bpf_object_file(cfg, cfg->ifindex);
+        if (!cfg->bpf_obj) {
+            fprintf(stderr, "ERR: hardware offloading file: %s\n", cfg->bpf_filename);
+            exit(EXIT_FAIL_BPF);
+        }
+    } else {
         cfg->bpf_obj = load_bpf_object_file(cfg, 0);
-        if (cfg->bpf_obj == NULL) {
+        if (!cfg->bpf_obj) {
             fprintf(stderr, "ERR: loading file: %s\n", cfg->bpf_filename);
             exit(EXIT_FAIL_BPF);
         }
