@@ -200,7 +200,7 @@ static __always_inline int redirect_map(__u32 ifindex) {
 }
 
 SEC("libtrace_xdp")
-static int libtrace_xdp_sock(struct xdp_md *ctx) {
+int libtrace_xdp_sock(struct xdp_md *ctx) {
 
     void *data_end = (void *)(long)ctx->data_end;
     void *data = (void *)(long)ctx->data;
