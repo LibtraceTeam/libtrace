@@ -1251,6 +1251,14 @@ static void linux_xdp_get_stats(libtrace_t *libtrace, libtrace_stat_t *stats) {
         thread_count = 1;
     }
 
+    /* special case. when starting parallel trace with a dedicated hasher there is only a single
+     * XDP queue even when running in parallel. we can detect this by the number of stream
+     * entrys we have as trace_start() would have been called and not trace_pstart().
+     */
+    if (libtrace_list_get_size(FORMAT_DATA->per_stream) < (size_t)thread_count) {
+        thread_count = libtrace_list_get_size(FORMAT_DATA->per_stream);
+    }
+
     /* init stats that will be updated */
     stats->dropped = 0;
     stats->received = 0;
@@ -1259,11 +1267,12 @@ static void linux_xdp_get_stats(libtrace_t *libtrace, libtrace_stat_t *stats) {
 
     for (int i = 0; i < thread_count; i++) {
 
-        stream_data = (struct xsk_per_stream *)libtrace_list_get_index(FORMAT_DATA->per_stream,
-                                                                       i)->data;
-        if (stream_data == NULL) {
-            return;
+        libtrace_list_node_t *node = libtrace_list_get_index(FORMAT_DATA->per_stream, i);
+        if (node == NULL) {
+            break;
         }
+
+        stream_data = (struct xsk_per_stream *)node->data;
 
         /* get stats from XDP socket */
         if (getsockopt(xsk_socket__fd(stream_data->xsk->xsk),
@@ -1418,7 +1427,7 @@ static struct libtrace_format_t xdp = {
     linux_xdp_get_timeval,          /* get_timeval */
     linux_xdp_get_timespec,         /* get_timespec */
     NULL,                           /* get_seconds */
-	NULL,                           /* get_meta_section */
+    NULL,                           /* get_meta_section */
     NULL,                           /* seek_erf */
     NULL,                           /* seek_timeval */
     NULL,                           /* seek_seconds */
@@ -1427,7 +1436,7 @@ static struct libtrace_format_t xdp = {
     linux_xdp_get_framing_length,   /* get_framing_length */
     NULL,                           /* set_capture_length */
     NULL,                           /* get_received_packets */
-	NULL,                           /* get_filtered_packets */
+    NULL,                           /* get_filtered_packets */
     NULL,                           /* get_dropped_packets */
     linux_xdp_get_stats,            /* get_statistics */
     NULL,                           /* get_fd */
@@ -1435,12 +1444,12 @@ static struct libtrace_format_t xdp = {
     linux_xdp_help,                 /* help */
     NULL,                           /* next pointer */
     {true, -1},                     /* Live, no thread limit */
-    linux_xdp_pstart_input,		    /* pstart_input */
+    linux_xdp_pstart_input,         /* pstart_input */
     linux_xdp_pread_packets,	    /* pread_packets */
     linux_xdp_pause_input,          /* ppause */
-    linux_xdp_fin_input,		    /* p_fin */
+    linux_xdp_fin_input,            /* p_fin */
     linux_xdp_pregister_thread,	    /* register thread */
-    NULL,				            /* unregister thread */
+    NULL,                           /* unregister thread */
     linux_xdp_get_thread_stats      /* get thread stats */
 };
 
