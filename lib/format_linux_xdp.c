@@ -1155,6 +1155,10 @@ static int linux_xdp_fin_output(libtrace_out_t *libtrace) {
     if (FORMAT_DATA != NULL) {
         linux_xdp_destroy_streams(FORMAT_DATA->per_stream);
         libtrace_list_deinit(FORMAT_DATA->per_stream);
+
+        /* unload the XDP program */
+        xdp_link_detach(&FORMAT_DATA->cfg);
+
         free(FORMAT_DATA);
     }
 
