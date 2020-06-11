@@ -30,6 +30,10 @@
 #define PACKET_META ((libtrace_xdp_meta_t *)(packet->header))
 #define LIBTRACE_MIN(a,b) ((a)<(b) ? (a) : (b))
 
+#ifndef SOL_XDP
+    #define SOL_XDP 283
+#endif
+
 #define FRAME_HEADROOM     sizeof(libtrace_xdp_meta_t)
 #define NUM_FRAMES         4096
 #define FRAME_SIZE         XSK_UMEM__DEFAULT_FRAME_SIZE
@@ -1262,16 +1266,15 @@ static void linux_xdp_get_stats(libtrace_t *libtrace, libtrace_stat_t *stats) {
                        SOL_XDP,
                        XDP_STATISTICS,
                        &xdp_stats,
-                       &len) != 0) {
-            return;
+                       &len) == 0) {
+
+            stats->dropped += xdp_stats.rx_dropped;
+            stats->missing += xdp_stats.rx_invalid_descs;
         }
 
         if ((bpf_map_lookup_elem(map_fd, &i, xdp)) != 0) {
             return;
         }
-
-        stats->dropped += xdp_stats.rx_dropped;
-        stats->missing += xdp_stats.rx_invalid_descs;
 
         for (int j = 0; j < ncpus; j++) {
             /* add up stats from each cpu */
@@ -1306,25 +1309,25 @@ static void linux_xdp_get_thread_stats(libtrace_t *libtrace,
     stream_data = (struct xsk_per_stream *)thread->format_data;
     ifqueue = stream_data->umem->xsk_if_queue;
 
+    /* init stats */
+    stats->received = 0;
+    stats->captured = 0;
+
     /* get stats from XDP socket */
     if (getsockopt(xsk_socket__fd(stream_data->xsk->xsk),
                    SOL_XDP,
                    XDP_STATISTICS,
                    &xdp_stats,
-                   &len) != 0) {
-        return;
+                   &len) == 0) {
+
+        stats->dropped = xdp_stats.rx_dropped;
+        stats->missing = xdp_stats.rx_invalid_descs;
     }
 
     /* get the xdp libtrace map for this threads nic queue */
     if ((bpf_map_lookup_elem(map_fd, &ifqueue, &xdp)) != 0) {
         return;
     }
-
-    /* init stats */
-    stats->dropped = xdp_stats.rx_dropped;
-    stats->received = 0;
-    stats->missing = xdp_stats.rx_invalid_descs;
-    stats->captured = 0;
 
     /* add up stats from each cpu */
     for (int i = 0; i < ncpus; i++) {
