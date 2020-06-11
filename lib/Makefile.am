@@ -40,6 +40,15 @@ NATIVEFORMATS+= format_dpdk.c format_dpdkndag.c format_dpdk.h
 # doesn't exist currently
 export RTE_SDK=@RTE_SDK@
 export RTE_TARGET=@RTE_TARGET@
+targs = $(subst -, ,${RTE_TARGET})
+
+export RTE_EXEC_ENV=$(word 3, ${targs})
+export RTE_TOOLCHAIN=$(word 4, ${targs})
+export RTE_ARCH=$(word 1, ${targs})
+export RTE_MACHINE=$(word 2, ${targs})
+export RTE_OUTPUT=${RTE_SDK}/${RTE_TARGET}
+export RTE_SDK_BIN=${RTE_OUTPUT}
+
 export SAVED_CFLAGS:=$(CFLAGS)
 export SAVED_CXXFLAGS:=$(CXXFLAGS)
 export SAVED_CPPFLAGS:=$(CPPFLAGS)
@@ -47,7 +56,8 @@ export SAVED_LDFLAGS:=$(LDFLAGS)
 
 if HAVE_DPDK_PKGCONFIG
 else
-include $(RTE_SDK)/mk/rte.vars.mk
+include ${RTE_SDK}/mk/target/generic/rte.vars.mk
+include ${RTE_SDK}/mk/internal/rte.extvars.mk
 endif
 # We need to add -Wl before the linker otherwise this breaks our build
 # And include any libraries that DPDK might depend upon
