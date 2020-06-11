@@ -27,6 +27,7 @@ typedef enum {
     XDP_BALANCE = 0,
     XDP_UNIDIRECTIONAL = 1,
     XDP_BIDIRECTIONAL = 2,
+    XDP_NONE = 3,
 } xdp_hasher;
 
 typedef enum {

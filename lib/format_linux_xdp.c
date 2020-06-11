@@ -397,7 +397,6 @@ static int linux_xdp_init_control_map(libtrace_t *libtrace) {
     }
 
     switch (FORMAT_DATA->hasher_type) {
-        case HASHER_CUSTOM:
         case HASHER_BALANCE:
             ctrl_map.hasher = XDP_BALANCE;
             break;
@@ -407,6 +406,9 @@ static int linux_xdp_init_control_map(libtrace_t *libtrace) {
         case HASHER_BIDIRECTIONAL:
             ctrl_map.hasher = XDP_BIDIRECTIONAL;
             break;
+        case HASHER_CUSTOM:
+        default:
+            ctrl_map.hasher = XDP_NONE;
     }
 
     ctrl_map.max_queues = libtrace->perpkt_thread_count;
@@ -1013,7 +1015,6 @@ static int linux_xdp_prepare_packet(libtrace_t *libtrace UNUSED, libtrace_packet
         packet->buf_control = TRACE_CTRL_EXTERNAL;
     }
 
-    packet->buf_control = TRACE_CTRL_EXTERNAL;
     packet->type = rt_type;
     packet->buffer = buffer;
     packet->header = buffer;
@@ -1170,9 +1171,6 @@ static int linux_xdp_fin_output(libtrace_out_t *libtrace) {
 static int linux_xdp_pregister_thread(libtrace_t *libtrace,
                                libtrace_thread_t *t,
                                bool reading) {
-
-    /* test if they nic supports multiple queues? if not use a hasher thread to disperse
-     * packets across processing threads?? */
 
     if (reading) {
         if (t->type == THREAD_PERPKT) {
