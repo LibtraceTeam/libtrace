@@ -27,8 +27,8 @@ if [[ -z "$LD_LIBRARY_PATH" ]]; then
 	export DYLD_LIBRARY_PATH="${libdir}"
 fi
 
-declare -a write_formats=("xdp:veth0" "pcapint:veth0" "int:veth0" "ring:veth0" "dpdkvdev:net_pcap0,iface=veth0")
-declare -a read_formats=("xdp:veth1" "pcapint:veth1" "int:veth1" "ring:veth1" "dpdkvdev:net_pcap0,iface=veth1")
+declare -a write_formats=("pcapint:veth0" "int:veth0" "ring:veth0" "dpdkvdev:net_pcap0,iface=veth0" "xdp:veth0")
+declare -a read_formats=("pcapint:veth1" "int:veth1" "ring:veth1" "dpdkvdev:net_pcap0,iface=veth1" "xdp:veth1")
 
 echo "Running single threaded API tests"
 for w in "${write_formats[@]}"
@@ -42,6 +42,7 @@ do
 		echo ./test-live "$w" "$r"
 		do_test ./test-live "$w" "$r"
 		echo
+		read -t 2
 		echo ./test-live-snaplen "$w" "$r"
 		do_test ./test-live-snaplen "$w" "$r"
 	done
@@ -78,7 +79,7 @@ $@"
 
 # Don't test pcapint as it only has a 30 packets buffer and
 # it always drops packets and fails to capture all 100
-declare -a read_formats=("int:veth1" "ring:veth1" "dpdkvdev:net_pcap0,iface=veth1")
+declare -a read_formats=("int:veth1" "ring:veth1" "dpdkvdev:net_pcap0,iface=veth1 xdp:veth1")
 
 for r in "${read_formats[@]}"
 do
