@@ -28,6 +28,7 @@
 
 #define FORMAT_DATA ((xdp_format_data_t *)(libtrace->format_data))
 #define PACKET_META ((libtrace_xdp_meta_t *)(packet->header))
+#define LIBTRACE_MIN(a,b) ((a)<(b) ? (a) : (b))
 
 #define FRAME_HEADROOM     sizeof(libtrace_xdp_meta_t)
 #define NUM_FRAMES         4096
@@ -38,6 +39,7 @@
 typedef struct libtrace_xdp_meta {
     uint64_t timestamp;
     uint32_t packet_len;
+    uint32_t cap_len;
 } PACKED libtrace_xdp_meta_t;
 
 struct xsk_config {
@@ -100,6 +102,7 @@ typedef struct xdp_format_data {
     enum hasher_types hasher_type;
     xdp_state state;
 
+    int snaplen;
 } xdp_format_data_t;
 
 static struct bpf_object *load_bpf_and_xdp_attach(struct xsk_config *cfg);
@@ -466,6 +469,7 @@ static int linux_xdp_init_input(libtrace_t *libtrace) {
     }
     FORMAT_DATA->hasher_type = HASHER_BALANCE;
     FORMAT_DATA->state = XDP_NOT_STARTED;
+    FORMAT_DATA->snaplen = LIBTRACE_PACKET_BUFSIZE;
 
     /* setup XDP config */
     scan = strchr(libtrace->uridata, ':');
@@ -886,7 +890,11 @@ static int linux_xdp_read_stream(libtrace_t *libtrace,
 
         meta = (libtrace_xdp_meta_t *)packet[i]->buffer;
         meta->timestamp = linux_xdp_get_time(stream);
+
+        /* we dont really snap packets but we can pretend to */
         meta->packet_len = pkt_len;
+        meta->cap_len = LIBTRACE_MIN((unsigned int)FORMAT_DATA->snaplen,
+                                     (unsigned int)pkt_len);
 
         /* next packet */
         idx_rx++;
@@ -1069,7 +1077,11 @@ static libtrace_eventobj_t linux_xdp_event(libtrace_t *libtrace,
 
         meta = (libtrace_xdp_meta_t *)packet->buffer;
         meta->timestamp = linux_xdp_get_time(stream);
+
+        /* we dont really snap packets but we can pretend to */
         meta->packet_len = pkt_len;
+        meta->cap_len = LIBTRACE_MIN((unsigned int)FORMAT_DATA->snaplen,
+                                     (unsigned int)pkt_len);
 
         event.type = TRACE_EVENT_PACKET;
         event.size = pkt_len;
@@ -1198,12 +1210,13 @@ static int linux_xdp_get_framing_length(const libtrace_packet_t *packet UNUSED) 
 
 static int linux_xdp_get_wire_length(const libtrace_packet_t *packet) {
 
-    return PACKET_META->packet_len;
+    /* wire length includes checksum of 4 bytes */
+    return PACKET_META->packet_len + 4;
 }
 
 static int linux_xdp_get_capture_length(const libtrace_packet_t *packet) {
 
-    return PACKET_META->packet_len;
+    return PACKET_META->cap_len;
 
 }
 
@@ -1330,7 +1343,10 @@ static int linux_xdp_config_input(libtrace_t *libtrace,
 
     switch (options) {
         case TRACE_OPTION_SNAPLEN:
+            FORMAT_DATA->snaplen = *(int *)data;
+            return 0;
         case TRACE_OPTION_PROMISC:
+            break;
         case TRACE_OPTION_HASHER:
             switch (*((enum hasher_types *)data)) {
                 case HASHER_BALANCE:
