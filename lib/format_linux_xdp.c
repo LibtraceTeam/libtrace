@@ -435,6 +435,9 @@ static int linux_xdp_update_state(libtrace_t *libtrace, xdp_state state) {
     libtrace_ctrl_map_t ctrl_map;
     int key = 0;
 
+    /* update libtrace state */
+    FORMAT_DATA->state = state;
+
     if (FORMAT_DATA->cfg.libtrace_ctrl_map_fd <= 0) {
         return -1;
     }
@@ -456,9 +459,6 @@ static int linux_xdp_update_state(libtrace_t *libtrace, xdp_state state) {
                             BPF_ANY) != 0) {
         return -1;
     }
-
-    /* update libtrace state only if control map state was successfully updated */
-    FORMAT_DATA->state = state;
 
     return 0;
 }
@@ -643,18 +643,15 @@ static int linux_xdp_pstart_input(libtrace_t *libtrace) {
     int max_nic_queues;
     int ret;
 
-    /* only setup XDP is the trace has never been started */
-    if (FORMAT_DATA->state == XDP_NOT_STARTED) {
-        if ((ret = linux_xdp_setup_xdp(libtrace)) != 0) {
-            return ret;
-        }
-    }
-
-    /* was the input previously paused? */
-    if (FORMAT_DATA->state == XDP_PAUSED) {
-        /* update state and return */
-        linux_xdp_update_state(libtrace, XDP_RUNNING);
-        return 0;
+    switch (FORMAT_DATA->state) {
+        case XDP_PAUSED:
+            /* update state and return */
+            linux_xdp_update_state(libtrace, XDP_RUNNING);
+            return 0;
+        case XDP_RUNNING:
+            return 0;
+        case XDP_NOT_STARTED:
+            linux_xdp_setup_xdp(libtrace);
     }
 
     /* get the maximum number of supported nic queues */
@@ -704,19 +701,15 @@ static int linux_xdp_start_input(libtrace_t *libtrace) {
     int c_nic_queues;
     int ret;
 
-    /* only setup XDP is the trace has never been started */
-    if (FORMAT_DATA->state == XDP_NOT_STARTED) {
-        if ((ret = linux_xdp_setup_xdp(libtrace)) != 0) {
-            return ret;
-        }
-    }
-
-    /* was the input previously paused? */
-    if (FORMAT_DATA->state == XDP_PAUSED) {
-        /* update state and return */
-        linux_xdp_update_state(libtrace, XDP_RUNNING);
-
-        return 0;
+    switch (FORMAT_DATA->state) {
+        case XDP_PAUSED:
+            /* update state and return */
+            linux_xdp_update_state(libtrace, XDP_RUNNING);
+            return 0;
+        case XDP_RUNNING:
+            return 0;
+        case XDP_NOT_STARTED:
+            linux_xdp_setup_xdp(libtrace);
     }
 
     /* single threaded operation, make sure the number of nic queues is 1 or
