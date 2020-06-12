@@ -411,7 +411,13 @@ static int linux_xdp_init_control_map(libtrace_t *libtrace) {
             ctrl_map.hasher = XDP_NONE;
     }
 
-    ctrl_map.max_queues = libtrace->perpkt_thread_count;
+    /* if the trace has a dedicated hasher there is only a single input queue */
+    if (trace_has_dedicated_hasher(libtrace)) {
+        ctrl_map.max_queues = 1;
+    } else {
+        ctrl_map.max_queues = libtrace->perpkt_thread_count;
+    }
+
     ctrl_map.state = XDP_NOT_STARTED;
 
     if (bpf_map_update_elem(FORMAT_DATA->cfg.libtrace_ctrl_map_fd,
@@ -1250,11 +1256,10 @@ static void linux_xdp_get_stats(libtrace_t *libtrace, libtrace_stat_t *stats) {
     }
 
     /* special case. when starting parallel trace with a dedicated hasher there is only a single
-     * XDP queue even when running in parallel. we can detect this by the number of stream
-     * entrys we have as trace_start() would have been called and not trace_pstart().
+     * XDP queue even when running in parallel.
      */
-    if (libtrace_list_get_size(FORMAT_DATA->per_stream) < (size_t)thread_count) {
-        thread_count = libtrace_list_get_size(FORMAT_DATA->per_stream);
+    if (trace_has_dedicated_hasher(libtrace)) {
+        thread_count = 1;
     }
 
     /* init stats that will be updated */
