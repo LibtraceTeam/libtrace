@@ -430,7 +430,7 @@ static int linux_xdp_init_control_map(libtrace_t *libtrace) {
     return 0;
 }
 
-static int linux_xdp_set_control_map_state(libtrace_t *libtrace, xdp_state state) {
+static int linux_xdp_update_state(libtrace_t *libtrace, xdp_state state) {
 
     libtrace_ctrl_map_t ctrl_map;
     int key = 0;
@@ -456,6 +456,9 @@ static int linux_xdp_set_control_map_state(libtrace_t *libtrace, xdp_state state
                             BPF_ANY) != 0) {
         return -1;
     }
+
+    /* update libtrace state only if control map state was successfully updated */
+    FORMAT_DATA->state = state;
 
     return 0;
 }
@@ -650,9 +653,7 @@ static int linux_xdp_pstart_input(libtrace_t *libtrace) {
     /* was the input previously paused? */
     if (FORMAT_DATA->state == XDP_PAUSED) {
         /* update state and return */
-        linux_xdp_set_control_map_state(libtrace, XDP_RUNNING);
-        FORMAT_DATA->state = XDP_RUNNING;
-
+        linux_xdp_update_state(libtrace, XDP_RUNNING);
         return 0;
     }
 
@@ -691,8 +692,7 @@ static int linux_xdp_pstart_input(libtrace_t *libtrace) {
     }
 
     /* update state to running */
-    linux_xdp_set_control_map_state(libtrace, XDP_RUNNING);
-    FORMAT_DATA->state = XDP_RUNNING;
+    linux_xdp_update_state(libtrace, XDP_RUNNING);
 
     return 0;
 }
@@ -714,8 +714,7 @@ static int linux_xdp_start_input(libtrace_t *libtrace) {
     /* was the input previously paused? */
     if (FORMAT_DATA->state == XDP_PAUSED) {
         /* update state and return */
-        linux_xdp_set_control_map_state(libtrace, XDP_RUNNING);
-        FORMAT_DATA->state = XDP_RUNNING;
+        linux_xdp_update_state(libtrace, XDP_RUNNING);
 
         return 0;
     }
@@ -747,8 +746,7 @@ static int linux_xdp_start_input(libtrace_t *libtrace) {
     }
 
     /* update state to running */
-    linux_xdp_set_control_map_state(libtrace, XDP_RUNNING);
-    FORMAT_DATA->state = XDP_RUNNING;
+    linux_xdp_update_state(libtrace, XDP_RUNNING);
 
     return 0;
 }
@@ -763,10 +761,9 @@ static int linux_xdp_pause_input(libtrace_t * libtrace) {
         return -1;
     }
 
-    ret = linux_xdp_set_control_map_state(libtrace, XDP_PAUSED);
-    FORMAT_DATA->state = XDP_PAUSED;
+    ret = linux_xdp_update_state(libtrace, XDP_PAUSED);
 
-    /* linux_xdp_set_control_map_state will return 0 on success.
+    /* linux_xdp_update_state will return 0 on success.
      * If the control map cannot be found -1 is returned.
      */
 
