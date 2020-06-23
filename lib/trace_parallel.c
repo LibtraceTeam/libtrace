@@ -1016,6 +1016,10 @@ inline static int trace_pread_packet_hasher_thread(libtrace_t *libtrace,
                                                    size_t nb_packets) {
 	size_t i;
 
+        /* libtrace_ringbuffer_read() blocks if a packet is not available
+         * and this prevents the tick messages from being triggered. So check
+         * for a available packet before continuing.
+         */
         while (libtrace_ringbuffer_is_empty(&t->rbuffer)) {
 
                 /* does libtrace have any messages in the queue */
@@ -1023,7 +1027,10 @@ inline static int trace_pread_packet_hasher_thread(libtrace_t *libtrace,
                     return READ_MESSAGE;
                 }
 
-                usleep(100);
+		/* Give up the CPU time to another thread since we have
+                 * packets or messages.
+                 */
+                sched_yield();
         }
 
 	/* We store the last error message here */
