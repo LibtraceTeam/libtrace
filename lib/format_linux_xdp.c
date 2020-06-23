@@ -838,7 +838,10 @@ static int linux_xdp_read_stream(libtrace_t *libtrace,
             /* poll will return 0 on timeout or a positive on a event */
             ret = poll(&fds, 1, 500);
 
-            if (msg && libtrace_message_queue_count(msg) > 0) {
+            /* if we have access to the message queue check for a message
+             * otherwise we need to return and let libtrace check for a message
+             */
+            if ((msg && libtrace_message_queue_count(msg) > 0) || !msg) {
                 return READ_MESSAGE;
             }
 

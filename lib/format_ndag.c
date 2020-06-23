@@ -1300,8 +1300,10 @@ static int receive_encap_records_block(libtrace_t *libtrace, recvstream_t *rt,
                         break;
                 }
 
-                /* Check for any messages in the message queue. Process them if so */
-                if (msg && libtrace_message_queue_count(msg) > 0) {
+                /* if we have access to the message queue check for a message
+                 * otherwise we need to return and let libtrace check for a message
+                 */
+                if ((msg && libtrace_message_queue_count(msg) > 0) || !msg) {
                     return READ_MESSAGE;
                 }
 

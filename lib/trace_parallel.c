@@ -716,6 +716,7 @@ static void* perpkt_threads_entry(void *data) {
 			}
                         send_message(trace, t, message.code, message.data, 
                                         message.sender);
+
 			/* Continue and the empty messages out before packets */
 			continue;
 		}
@@ -1014,6 +1015,16 @@ inline static int trace_pread_packet_hasher_thread(libtrace_t *libtrace,
                                                    libtrace_packet_t *packets[],
                                                    size_t nb_packets) {
 	size_t i;
+
+        while (libtrace_ringbuffer_is_empty(&t->rbuffer)) {
+
+                /* does libtrace have any messages in the queue */
+                if (libtrace_message_queue_count(&t->messages) > 0) {
+                    return READ_MESSAGE;
+                }
+
+                usleep(100);
+        }
 
 	/* We store the last error message here */
 	if (t->format_data) {

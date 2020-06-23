@@ -1352,13 +1352,15 @@ static int dag_read_packet_stream(libtrace_t *libtrace,
 		if (numbytes < 0)
 			return numbytes;
 		if (numbytes < dag_record_size) {
-			/* Check the message queue if we have one to check */
-			if (t != NULL &&
-			    libtrace_message_queue_count(&t->messages) > 0)
-				return -2;
+			/* if we have access to the message queue check for a message
+                         * otherwise we need to return and let libtrace check for a message
+                         */
+			if ((t && libtrace_message_queue_count(&t->messages) > 0) || !t)
+				return READ_MESSAGE;
 
 			if ((numbytes=is_halted(libtrace)) != -1)
 				return numbytes;
+
 			/* Block until we see a packet */
 			continue;
 		}
