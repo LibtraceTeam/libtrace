@@ -235,6 +235,11 @@ inline static int linuxnative_read_stream(libtrace_t *libtrace,
 			} else {
 				if ((ret=is_halted(libtrace)) != -1)
 					return ret;
+                                /* If we dont have access to the queue we have to return
+                                 * and let libtrace check */
+                                if (!queue) {
+                                    return READ_MESSAGE;
+                                }
 			}
 		}
 		while (ret <= 0);

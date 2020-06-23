@@ -597,7 +597,13 @@ inline static int linuxring_read_stream(libtrace_t *libtrace,
 				return -1;
 			}
 		} else {
-			/* Poll timed out - check if we should exit on next loop */
+			/* Poll timed out. If we do not have access to the message queue
+                         * return and let libtrace check it, otherwise loop.
+                         */
+                        if (!queue) {
+                            return READ_MESSAGE;
+                        }
+
 			continue;
 		}
 	}

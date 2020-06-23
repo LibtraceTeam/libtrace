@@ -1262,7 +1262,7 @@ static int receive_from_sockets(recvstream_t *rt) {
 
 
 static int receive_encap_records_block(libtrace_t *libtrace, recvstream_t *rt,
-                libtrace_packet_t *packet) {
+                libtrace_packet_t *packet, libtrace_message_queue_t *msg) {
 
         int iserr = 0;
 
@@ -1298,6 +1298,13 @@ static int receive_encap_records_block(libtrace_t *libtrace, recvstream_t *rt,
                         /* At least one of our input sockets has available
                          * data, let's go ahead and use what we have. */
                         break;
+                }
+
+                /* if we have access to the message queue check for a message
+                 * otherwise we need to return and let libtrace check for a message
+                 */
+                if ((msg && libtrace_message_queue_count(msg) > 0) || !msg) {
+                    return READ_MESSAGE;
                 }
 
                 /* None of our sources have anything available, we can take
@@ -1379,7 +1386,7 @@ static int ndag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
         int rem, ret;
         streamsock_t *nextavail = NULL;
         rem = receive_encap_records_block(libtrace, &(FORMAT_DATA->receivers[0]),
-                        packet);
+                        packet, NULL);
 
         if (rem <= 0) {
                 return rem;
@@ -1415,7 +1422,7 @@ static int ndag_pread_packets(libtrace_t *libtrace, libtrace_thread_t *t,
                 /* Only check for messages once per batch */
                 if (read_packets == 0) {
                         rem = receive_encap_records_block(libtrace, rt,
-                                packets[read_packets]);
+                                packets[read_packets], &t->messages);
                         if (rem < 0) {
                                 return rem;
                         }

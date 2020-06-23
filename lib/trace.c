@@ -1043,8 +1043,10 @@ DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 			packet->trace = libtrace;
                         packet->which_trace_start = libtrace->startcount;
 			ret=libtrace->format->read_packet(libtrace,packet);
-			if (ret==(size_t)READ_MESSAGE ||
-                            ret==(size_t)-1 || ret==0) {
+			if (ret==(size_t)READ_MESSAGE) {
+				continue;
+			}
+                        if (ret==(size_t)-1 || ret==0) {
                                 packet->trace = NULL;
 				return ret;
 			}

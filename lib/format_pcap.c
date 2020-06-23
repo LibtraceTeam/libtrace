@@ -502,7 +502,10 @@ static int pcap_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 			case 0: 
 				if ((ret=is_halted(libtrace)) != -1)
 					return ret;
-                                continue; /* timeout expired */
+                                /* timeout, return and let libtrace check message
+                                 * queue.
+                                 */
+                                return READ_MESSAGE;
 			case -1: 
 				trace_set_err(libtrace,TRACE_ERR_BAD_PACKET,
 						"%s",pcap_geterr(INPUT.pcap));

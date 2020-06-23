@@ -790,6 +790,7 @@ static int linux_xdp_start_stream(struct xsk_config *cfg,
 
 static int linux_xdp_read_stream(libtrace_t *libtrace,
                                  libtrace_packet_t *packet[],
+                                 libtrace_message_queue_t *msg,
                                  struct xsk_per_stream *stream,
                                  size_t nb_packets) {
 
@@ -836,6 +837,13 @@ static int linux_xdp_read_stream(libtrace_t *libtrace,
         if (rcvd < 1) {
             /* poll will return 0 on timeout or a positive on a event */
             ret = poll(&fds, 1, 500);
+
+            /* if we have access to the message queue check for a message
+             * otherwise we need to return and let libtrace check for a message
+             */
+            if ((msg && libtrace_message_queue_count(msg) > 0) || !msg) {
+                return READ_MESSAGE;
+            }
 
             /* poll encountered a error */
             if (ret < 0) {
@@ -892,7 +900,11 @@ static int linux_xdp_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet
 
     stream = (struct xsk_per_stream *)node->data;
 
-    return linux_xdp_read_stream(libtrace, &packet, stream, 1);
+    return linux_xdp_read_stream(libtrace,
+                                 &packet,
+                                 NULL,
+                                 stream,
+                                 1);
 
 }
 
@@ -904,7 +916,11 @@ static int linux_xdp_pread_packets(libtrace_t *libtrace,
     int nb_rx;
     struct xsk_per_stream *stream = thread->format_data;
 
-    nb_rx = linux_xdp_read_stream(libtrace, packets, stream, nb_packets);
+    nb_rx = linux_xdp_read_stream(libtrace,
+                                  packets,
+                                  &thread->messages,
+                                  stream,
+                                  nb_packets);
 
     return nb_rx;
 }

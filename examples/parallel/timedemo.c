@@ -144,6 +144,12 @@ static void process_tick(libtrace_t *trace, libtrace_thread_t *t,
 
         struct localdata *local = (struct localdata *)tls;
 
+        /* If a thread has received a tick event before a packet is seen
+         * nextreport needs to be set */
+        if (local->nextreport == 0) {
+            local->nextreport = tick + SECONDS_TO_ERF(10);
+        }
+
         while (local->nextreport && tick > local->nextreport) {
                 libtrace_generic_t c;
                 c.uint64 = local->count;
