@@ -50,7 +50,7 @@ uint32_t dumped_diff = 0;
  * Note that only the contents of the packet are compared; the framing provided
  * by the trace format, e.g. the ERF or PCAP header, is not examined.
  */
-static void per_packet(libtrace_packet_t *a, libtrace_packet_t *b)
+static void per_packet(libtrace_packet_t *a, libtrace_packet_t *b, libtrace_out_t *output)
 {
 	char *buf_a, *buf_b;
 	libtrace_linktype_t lt;
@@ -64,27 +64,37 @@ static void per_packet(libtrace_packet_t *a, libtrace_packet_t *b)
 		rem_a = trace_get_wire_length(a);
 	if (rem_b > trace_get_wire_length(b))
 		rem_b = trace_get_wire_length(b);
-	
+
 
 	if (!buf_a && !buf_b)
 		return;
 
 	if (!buf_a || !buf_b) {
-		trace_dump_packet(a);
-		trace_dump_packet(b);
-		printf("****************\n");
+		if (output != NULL) {
+			trace_write_packet(output, a);
+			trace_write_packet(output, b);
+		} else {
+			trace_dump_packet(a);
+                        trace_dump_packet(b);
+                        printf("****************\n");
+		}
 		dumped_diff ++;
 		return;
 	}
-		
+
 
 	if (rem_a == 0 || rem_b == 0)
 		return;
 
 	if (rem_a != rem_b) {
-		trace_dump_packet(a);
-		trace_dump_packet(b);
-		printf("****************\n");
+		if (output != NULL) {
+                        trace_write_packet(output, a);
+                        trace_write_packet(output, b);
+                } else {
+			trace_dump_packet(a);
+                        trace_dump_packet(b);
+                        printf("****************\n");
+		}
 		dumped_diff ++;
 		return;
 	}
@@ -92,9 +102,14 @@ static void per_packet(libtrace_packet_t *a, libtrace_packet_t *b)
 	/* This is not exactly going to be snappy, but it's the easiest way
 	 * to look for differences */
 	if (memcmp(buf_a, buf_b, rem_a) != 0) {
-		trace_dump_packet(a);
-		trace_dump_packet(b);
-		printf("****************\n");
+		if (output != NULL) {
+                        trace_write_packet(output, a);
+                        trace_write_packet(output, b);
+                } else {
+			trace_dump_packet(a);
+                	trace_dump_packet(b);
+			printf("****************\n");
+		}
 		dumped_diff ++;
 	}
 
@@ -105,7 +120,7 @@ static void usage(char *prog) {
 	printf("\t%s [options] traceA traceB\n\n", prog);
 	printf("Supported options:\n");
 	printf("\t-m <max>   Stop after <max> differences have been reported\n");
-
+	printf("\t-w <write> Output result to a file\n");
 	
 	return;
 
@@ -114,16 +129,29 @@ static void usage(char *prog) {
 int main(int argc, char *argv[])
 {
 	libtrace_t *trace[2];
+	libtrace_out_t *output = NULL;
 	libtrace_packet_t *packet[2];
-	int opt;
-	
+	char *output_file = NULL;
+
 	if (argc<2) {
 		usage(argv[0]);
 		return -1;
 	}
 
-	while ((opt = getopt(argc, argv, "m:")) != EOF) {
-		switch (opt) {
+
+	while (1) {
+		int option_index;
+		struct option long_options[] = {
+			{ "max",	1, 0, 'm' },
+			{ "output",	1, 0, 'w' },
+		};
+
+		int c = getopt_long(argc, argv, "m:w:", long_options, &option_index);
+
+                if (c == -1)
+			break;
+
+		switch (c) {
 			case 'm':
 				if (atoi(optarg) < 0) {
 					fprintf(stderr, "-m option must not be negative - ignoring\n");
@@ -131,15 +159,16 @@ int main(int argc, char *argv[])
 					max_diff = (uint32_t) atoi(optarg);
 				}
 				break;
+			case 'w':
+				output_file=optarg;
+				break;
 			default:
+				fprintf(stderr, "Unknown option: %c\n", c);
 				usage(argv[0]);
+				return 1;
 		}
 	}
 
-	if (optind + 2 > argc) {
-		usage(argv[0]);
-		return -1;
-	}
 	packet[0] = trace_create_packet();
 	packet[1] = trace_create_packet();
 
@@ -169,10 +198,23 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
+	if (output_file != NULL) {
+		output = trace_create_output(output_file);
+		if (trace_is_err_output(output)) {
+			trace_perror_output(output,"Creating trace file");
+			return -1;
+		}
+		if (trace_start_output(output)) {
+			trace_perror_output(output,"Starting trace");
+			trace_destroy_output(output);
+			return -1;
+		}
+	}
+
 	while (trace_read_packet(trace[0], packet[0]) > 0 &&
 			trace_read_packet(trace[1], packet[1]) > 0) {
 
-		per_packet(packet[0], packet[1]);
+		per_packet(packet[0], packet[1], output);
 
 		if (max_diff > 0 && dumped_diff >= max_diff)
 			break;
@@ -193,7 +235,9 @@ int main(int argc, char *argv[])
 
 	trace_destroy(trace[0]);
 	trace_destroy(trace[1]);
-		
+	if (output != NULL)
+		trace_destroy_output(output);
+
 	trace_destroy_packet(packet[0]);
 	trace_destroy_packet(packet[1]);
 	
