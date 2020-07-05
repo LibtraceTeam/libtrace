@@ -42,7 +42,6 @@ do
 		echo ./test-live "$w" "$r"
 		do_test ./test-live "$w" "$r"
 		echo
-		read -t 2
 		echo ./test-live-snaplen "$w" "$r"
 		do_test ./test-live-snaplen "$w" "$r"
 	done

@@ -40,6 +40,8 @@
 #define RX_BATCH_SIZE      64
 #define INVALID_UMEM_FRAME UINT64_MAX
 
+#define XDP_BUSY_RETRY     5
+
 typedef struct libtrace_xdp_meta {
     uint64_t timestamp;
     uint32_t packet_len;
@@ -283,6 +285,7 @@ static struct xsk_socket_info *xsk_configure_socket(struct xsk_config *cfg,
     struct xsk_socket_info *xsk_info;
     uint32_t prog_id = 0;
     int ret = 1;
+    int i;
 
     xsk_info = calloc(1, sizeof(*xsk_info));
     if (xsk_info == NULL) {
@@ -297,23 +300,32 @@ static struct xsk_socket_info *xsk_configure_socket(struct xsk_config *cfg,
     xsk_cfg.bind_flags = cfg->xsk_bind_flags;
 
     /* inbound */
-    if (dir == 0) {
-        ret = xsk_socket__create(&xsk_info->xsk,
-                                 cfg->ifname,
-                                 umem->xsk_if_queue,
-                                 umem->umem,
-                                 &xsk_info->rx,
-                                 NULL,
-                                 &xsk_cfg);
-    /* outbound */
-    } else if (dir == 1) {
-        ret = xsk_socket__create(&xsk_info->xsk,
-                                 cfg->ifname,
-                                 umem->xsk_if_queue,
-                                 umem->umem,
-                                 NULL,
-                                 &xsk_info->tx,
-                                 &xsk_cfg);
+    for (i = 0; i < XDP_BUSY_RETRY; i++) {
+        if (dir == 0) {
+            ret = xsk_socket__create(&xsk_info->xsk,
+                                     cfg->ifname,
+                                     umem->xsk_if_queue,
+                                     umem->umem,
+                                     &xsk_info->rx,
+                                     NULL,
+                                     &xsk_cfg);
+        /* outbound */
+        } else if (dir == 1) {
+            ret = xsk_socket__create(&xsk_info->xsk,
+                                     cfg->ifname,
+                                     umem->xsk_if_queue,
+                                     umem->umem,
+                                     NULL,
+                                     &xsk_info->tx,
+                                     &xsk_cfg);
+        }
+
+        /* If busy wait and try again */
+        if (ret == -EBUSY) {
+            usleep(1000);
+        } else {
+            break;
+        }
     }
 
     if (ret) {
