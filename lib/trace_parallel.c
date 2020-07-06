@@ -1016,6 +1016,11 @@ inline static int trace_pread_packet_hasher_thread(libtrace_t *libtrace,
                                                    size_t nb_packets) {
 	size_t i;
 
+        /* We store the last error message here */
+        if (t->format_data) {
+                return ((libtrace_packet_t *)t->format_data)->error;
+        }
+
         /* libtrace_ringbuffer_read() blocks if a packet is not available
          * and this prevents the tick messages from being triggered. So check
          * for a available packet before continuing.
@@ -1032,11 +1037,6 @@ inline static int trace_pread_packet_hasher_thread(libtrace_t *libtrace,
                  */
                 sched_yield();
         }
-
-	/* We store the last error message here */
-	if (t->format_data) {
-		return ((libtrace_packet_t *)t->format_data)->error;
-	}
 
 	// Always grab at least one
 	if (packets[0]) // Recycle the old get the new
