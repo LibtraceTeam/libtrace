@@ -241,7 +241,7 @@ int main(int argc, char *argv[]) {
 	int snaplen = 0;
         int speedup = 1;
         int tx_max_queue = 1;
-
+        bool tx_max_set = 0;
 
 	while(1) {
 		int option_index;
@@ -276,6 +276,7 @@ int main(int argc, char *argv[]) {
 				break;
                         case 't':
                                 tx_max_queue = atoi(optarg);
+				tx_max_set = 1;
                                 break;
 			case 'h':
 				usage(argv[0]);
@@ -341,9 +342,13 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
-        /* apply tx_max_queue */
+        /* apply tx_max_queue -- only linux ring supports tx_max_queue */
         if (trace_config_output(output, TRACE_OPTION_TX_MAX_QUEUE, &tx_max_queue)) {
-                trace_perror_output(output, "Output format does not support tx_max_queues");
+            /* only throw error if user specified a tx_max_queue, otherwise continue */
+            if (tx_max_set) {
+                trace_perror_output(output, "Output format does not support tx_max_queue");
+                return 1;
+            }
         }
 
 	if (trace_start_output(output)) {
