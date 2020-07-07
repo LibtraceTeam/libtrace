@@ -184,6 +184,28 @@ int linuxcommon_config_input(libtrace_t *libtrace,
 	return -1;
 }
 
+int linuxcommon_config_output(libtrace_out_t *libtrace,
+                trace_option_output_t option,
+                void *data) {
+
+    switch(option) {
+                case TRACE_OPTION_OUTPUT_FILEFLAGS:
+                case TRACE_OPTION_OUTPUT_COMPRESS:
+                case TRACE_OPTION_OUTPUT_COMPRESSTYPE:
+                    break;
+                case TRACE_OPTION_TX_MAX_QUEUE:
+                        FORMAT_DATA_OUT->tx_max_queue = *(int *)data;
+                        return 0;
+
+                /* Avoid default: so that future options will cause a warning
+                 * here to remind us to implement it, or flag it as
+                 * unimplementable
+                 */
+        }
+
+        return -1;
+}
+
 int linuxcommon_init_input(libtrace_t *libtrace)
 {
 	struct linux_per_stream_t stream_data = ZERO_LINUX_STREAM;
@@ -237,6 +259,12 @@ int linuxcommon_init_output(libtrace_out_t *libtrace)
 	FORMAT_DATA_OUT->txring_offset = 0;
 	FORMAT_DATA_OUT->queue = 0;
 	FORMAT_DATA_OUT->max_order = MAX_ORDER;
+
+        /* The maximum frames allowed to be waiting in the TX_RING before the kernel is
+         * notified to write them out. Make sure this is less than CONF_RING_FRAMES.
+         * Performance doesn't seem to increase any more when setting this above 10.
+         */
+        FORMAT_DATA_OUT->tx_max_queue = 10;
 	return 0;
 }
 

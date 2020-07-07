@@ -223,6 +223,9 @@ static void usage(char * argv) {
 	fprintf(stderr, " -X\n");
 	fprintf(stderr, " --speedup\n");
 	fprintf(stderr, "\t\tSpeed up replay by a factor of <speedup>\n");
+        fprintf(stderr, " -t\n");
+        fprintf(stderr, " --tx_queue\n");
+        fprintf(stderr, "\t\tSet the batch size of the TX queue to <batchsize>\n");
 
 }
 
@@ -237,6 +240,7 @@ int main(int argc, char *argv[]) {
 	libtrace_packet_t * new;
 	int snaplen = 0;
         int speedup = 1;
+        int tx_max_queue = 1;
 
 
 	while(1) {
@@ -247,10 +251,11 @@ int main(int argc, char *argv[]) {
 			{ "snaplen",	1, 0, 's'},
 			{ "broadcast",	0, 0, 'b'},
 			{ "speedup",	1, 0, 'X'},
+                        { "tx_queue",   1, 0, 't'},
 			{ NULL,		0, 0, 0}
 		};
 
-		int c = getopt_long(argc, argv, "bhs:f:X:",
+		int c = getopt_long(argc, argv, "bhs:f:X:t:",
 				long_options, &option_index);
 
 		if(c == -1)
@@ -269,9 +274,10 @@ int main(int argc, char *argv[]) {
 			case 'b':
 				broadcast = 1;
 				break;
-
+                        case 't':
+                                tx_max_queue = atoi(optarg);
+                                break;
 			case 'h':
-
 				usage(argv[0]);
 				return 1;
 			default:
@@ -330,11 +336,16 @@ int main(int argc, char *argv[]) {
 
 	/* Creating output trace */
 	output = trace_create_output(argv[optind+1]);
-
 	if (trace_is_err_output(output)) {
 		trace_perror_output(output, "Opening output trace: ");
 		return 1;
 	}
+
+        /* apply tx_max_queue */
+        if (trace_config_output(output, TRACE_OPTION_TX_MAX_QUEUE, &tx_max_queue)) {
+                trace_perror_output(output, "Output format does not support tx_max_queues");
+        }
+
 	if (trace_start_output(output)) {
 		trace_perror_output(output, "Starting output trace: ");
 		trace_destroy_output(output);

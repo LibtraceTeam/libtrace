@@ -1472,6 +1472,7 @@ typedef enum {
 
 	/** If enabled all meta packet will be discarded */
 	TRACE_OPTION_DISCARD_META,
+
 } trace_option_t;
 
 /** Sets an input config option
@@ -1548,11 +1549,16 @@ typedef enum {
 typedef enum {
 	/** File flags to use when opening an output file, e.g. O_APPEND */
 	TRACE_OPTION_OUTPUT_FILEFLAGS,
+
 	/** Compression level: 0 = no compression, 1 = faster compression,
 	 * 9 = better compression */
 	TRACE_OPTION_OUTPUT_COMPRESS,
+
 	/** Compression type, see trace_option_compresstype_t */
-	TRACE_OPTION_OUTPUT_COMPRESSTYPE
+	TRACE_OPTION_OUTPUT_COMPRESSTYPE,
+
+        /** TX queue size **/
+        TRACE_OPTION_TX_MAX_QUEUE,
 } trace_option_output_t;
 
 /* To add a new stat field update this list, and the relevant places in
