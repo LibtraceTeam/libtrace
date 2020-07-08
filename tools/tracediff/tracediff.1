@@ -3,7 +3,7 @@
 tracediff \- find and print differences between two traces
 .SH SYNOPSIS
 .B tracediff
-[ \-m maxdiff -w output ]
+[ \-m maxdiff -a traceA-diff.pcap -b traceB-diff.pcap ]
 firsturi
 seconduri
 .SH DESCRIPTION
@@ -16,15 +16,19 @@ in one trace but not another or for finding conversion or snapping errors.
 stop processing after displaying 'maxdiff' differences
 
 .TP
-\fB\-w\fR output
-write output to a trace file
+\fB\-a\fR traceA-diff.pcap
+Write traceA differences to a file
+
+.TP
+\fB\-b\fR traceB-diff.pcap
+Write traceB differences to a file
 
 .SH EXAMPLES
 .nf 
 tracediff \-m 10 erf:/traces/orig.erf.gz pcapfile:/traces/convert.pcap.gz
 .fi
 .nf
-tracediff \-m 10 -w pcap:output.pcap erf:/traces/orig.erf.gz pcapfile:/traces/convert.pcap.gz
+tracediff \-m 10 -a pcap:org-diff.pcap -b pcap:convert-diff.pcap erf:/traces/orig.erf.gz pcapfile:/traces/convert.pcap.gz
 .fi
 
 .SH BUGS
