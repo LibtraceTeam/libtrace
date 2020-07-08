@@ -1,5 +1,4 @@
-bin_PROGRAMS = tracediff
-bin_PROGRAMS = tracediff2
+bin_PROGRAMS = tracediff tracediff2
 
 man_MANS = tracediff.1
 EXTRA_DIST = $(man_MANS)
