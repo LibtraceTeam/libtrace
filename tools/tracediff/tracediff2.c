@@ -89,6 +89,7 @@ static int compare_packets(struct packet_window *a, struct packet_window *b) {
 	libtrace_linktype_t lt;
 	uint32_t rem_a, rem_b;
 
+        /* if the hash doesnt match the rest of the packet wont */
         if (a->hash != b->hash) {
             return 0;
         }
@@ -204,6 +205,7 @@ int main(int argc, char *argv[])
         char *output_file[2] = {NULL, NULL};
         libtrace_out_t *output[2] = {NULL, NULL};
 	libtrace_t *trace[2];
+        bool match;
 
 	if (argc<2) {
 		usage(argv[0]);
@@ -218,9 +220,10 @@ int main(int argc, char *argv[])
 			{ "window",      1, 0, 'w' },
                         { "traceA-diff", 1, 0, 'a' },
                         { "traceB-diff", 1, 0, 'b' },
+			{ "help",        0, 0, 'h' },
 		};
 
-		int c = getopt_long(argc, argv, "m:w:a:b:", long_options, &option_index);
+		int c = getopt_long(argc, argv, "m:w:a:b:h", long_options, &option_index);
 
                 if (c == -1)
 			break;
@@ -242,6 +245,9 @@ int main(int argc, char *argv[])
                         case 'b':
                                 output_file[1] = optarg;
                                 break;
+                        case 'h':
+                                usage(argv[0]);
+                                return 0;
 			default:
 				fprintf(stderr, "Unknown option: %c\n", c);
 				usage(argv[0]);
@@ -252,6 +258,10 @@ int main(int argc, char *argv[])
         /* setup packet window */
         packet_window[0] = malloc(sizeof(struct packet_window) * window_size);
         packet_window[1] = malloc(sizeof(struct packet_window) * window_size);
+        if (packet_window[0] == NULL || packet_window[1] == NULL) {
+            fprintf(stderr, "Unable to allocate memory, try reducing window size\n");
+            return 1;
+        }
         w_pos[0] = 0;
         w_pos[1] = 0;
         b_pos[0] = 0;
@@ -261,6 +271,12 @@ int main(int argc, char *argv[])
         for (int i = 0; i < window_size; i++) {
             packet_window[0][i].packet = trace_create_packet();
             packet_window[1][i].packet = trace_create_packet();
+            if (packet_window[0][i].packet == NULL
+                || packet_window[0][i].packet == NULL) {
+
+                fprintf(stderr, "Unable to allocate memory, try reducing window size\n");
+                return 1;
+            }
             packet_window[0][i].status = INT_MAX;
             packet_window[1][i].status = INT_MAX;
         }
@@ -334,16 +350,15 @@ int main(int argc, char *argv[])
                w_pos[1] += 1;
 
                /* advance window B until a packet match is found or we reach the end of the window */
-               while (!compare_packets(&packet_window[0][w_pos[0] % window_size],
-                                       &packet_window[1][w_pos[1] % window_size])
+               while (!(match = compare_packets(&packet_window[0][w_pos[0] % window_size],
+                                                &packet_window[1][w_pos[1] % window_size]))
                       && w_pos[1] < b_pos[1] + window_size) {
 
                    w_pos[1] += 1;
                }
 
                /* if a match was found */
-               if (compare_packets(&packet_window[0][w_pos[0] % window_size],
-                                   &packet_window[1][w_pos[1] % window_size])) {
+               if (match) {
 
                    /* output all packets prior to the matched packed on window B */
                    for (uint64_t i = b_pos[1]; i < b_pos[1] + w_pos[1]; i++) {
@@ -366,16 +381,15 @@ int main(int argc, char *argv[])
                    w_pos[0] += 1;
 
                    /* advance window A until a packet match is found or we reach the end of window A */
-                   while (!compare_packets(&packet_window[0][w_pos[0] % window_size],
-                                           &packet_window[1][w_pos[1] % window_size])
+                   while (!(match = compare_packets(&packet_window[0][w_pos[0] % window_size],
+                                                    &packet_window[1][w_pos[1] % window_size]))
                           && w_pos[0] < b_pos[0] + window_size) {
 
                        w_pos[0] += 1;
                    }
 
                    /* if a match was found */
-                   if (compare_packets(&packet_window[0][w_pos[0] % window_size],
-                                       &packet_window[1][w_pos[1] % window_size])) {
+                   if (match) {
 
                        /* output all window A packets prior to the match */
                        for (uint64_t i = b_pos[0]; i < b_pos[0] + w_pos[0]; i++) {
