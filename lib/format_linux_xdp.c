@@ -28,6 +28,11 @@
 
 #define FORMAT_DATA ((xdp_format_data_t *)(libtrace->format_data))
 #define PACKET_META ((libtrace_xdp_meta_t *)(packet->header))
+#define LIBTRACE_MIN(a,b) ((a)<(b) ? (a) : (b))
+
+#ifndef SOL_XDP
+    #define SOL_XDP 283
+#endif
 
 #define FRAME_HEADROOM     sizeof(libtrace_xdp_meta_t)
 #define NUM_FRAMES         4096
@@ -35,15 +40,19 @@
 #define RX_BATCH_SIZE      64
 #define INVALID_UMEM_FRAME UINT64_MAX
 
+#define XDP_BUSY_RETRY     5
+
 typedef struct libtrace_xdp_meta {
     uint64_t timestamp;
     uint32_t packet_len;
+    uint32_t cap_len;
 } PACKED libtrace_xdp_meta_t;
 
 struct xsk_config {
     __u32 xdp_flags;
     __u32 libbpf_flags;
     int ifindex;
+    bool hardware_offload;
     char ifname[IF_NAMESIZE];
 
     char *bpf_filename;
@@ -99,6 +108,7 @@ typedef struct xdp_format_data {
     enum hasher_types hasher_type;
     xdp_state state;
 
+    int snaplen;
 } xdp_format_data_t;
 
 static struct bpf_object *load_bpf_and_xdp_attach(struct xsk_config *cfg);
@@ -275,6 +285,7 @@ static struct xsk_socket_info *xsk_configure_socket(struct xsk_config *cfg,
     struct xsk_socket_info *xsk_info;
     uint32_t prog_id = 0;
     int ret = 1;
+    int i;
 
     xsk_info = calloc(1, sizeof(*xsk_info));
     if (xsk_info == NULL) {
@@ -289,23 +300,32 @@ static struct xsk_socket_info *xsk_configure_socket(struct xsk_config *cfg,
     xsk_cfg.bind_flags = cfg->xsk_bind_flags;
 
     /* inbound */
-    if (dir == 0) {
-        ret = xsk_socket__create(&xsk_info->xsk,
-                                 cfg->ifname,
-                                 umem->xsk_if_queue,
-                                 umem->umem,
-                                 &xsk_info->rx,
-                                 NULL,
-                                 &xsk_cfg);
-    /* outbound */
-    } else if (dir == 1) {
-        ret = xsk_socket__create(&xsk_info->xsk,
-                                 cfg->ifname,
-                                 umem->xsk_if_queue,
-                                 umem->umem,
-                                 NULL,
-                                 &xsk_info->tx,
-                                 &xsk_cfg);
+    for (i = 0; i < XDP_BUSY_RETRY; i++) {
+        if (dir == 0) {
+            ret = xsk_socket__create(&xsk_info->xsk,
+                                     cfg->ifname,
+                                     umem->xsk_if_queue,
+                                     umem->umem,
+                                     &xsk_info->rx,
+                                     NULL,
+                                     &xsk_cfg);
+        /* outbound */
+        } else if (dir == 1) {
+            ret = xsk_socket__create(&xsk_info->xsk,
+                                     cfg->ifname,
+                                     umem->xsk_if_queue,
+                                     umem->umem,
+                                     NULL,
+                                     &xsk_info->tx,
+                                     &xsk_cfg);
+        }
+
+        /* If busy wait and try again */
+        if (ret == -EBUSY) {
+            usleep(1000);
+        } else {
+            break;
+        }
     }
 
     if (ret) {
@@ -389,7 +409,6 @@ static int linux_xdp_init_control_map(libtrace_t *libtrace) {
     }
 
     switch (FORMAT_DATA->hasher_type) {
-        case HASHER_CUSTOM:
         case HASHER_BALANCE:
             ctrl_map.hasher = XDP_BALANCE;
             break;
@@ -399,9 +418,18 @@ static int linux_xdp_init_control_map(libtrace_t *libtrace) {
         case HASHER_BIDIRECTIONAL:
             ctrl_map.hasher = XDP_BIDIRECTIONAL;
             break;
+        case HASHER_CUSTOM:
+        default:
+            ctrl_map.hasher = XDP_NONE;
     }
 
-    ctrl_map.max_queues = libtrace->perpkt_thread_count;
+    /* if the trace has a dedicated hasher there is only a single input queue */
+    if (trace_has_dedicated_hasher(libtrace)) {
+        ctrl_map.max_queues = 1;
+    } else {
+        ctrl_map.max_queues = libtrace->perpkt_thread_count;
+    }
+
     ctrl_map.state = XDP_NOT_STARTED;
 
     if (bpf_map_update_elem(FORMAT_DATA->cfg.libtrace_ctrl_map_fd,
@@ -414,10 +442,13 @@ static int linux_xdp_init_control_map(libtrace_t *libtrace) {
     return 0;
 }
 
-static int linux_xdp_set_control_map_state(libtrace_t *libtrace, xdp_state state) {
+static int linux_xdp_update_state(libtrace_t *libtrace, xdp_state state) {
 
     libtrace_ctrl_map_t ctrl_map;
     int key = 0;
+
+    /* update libtrace state */
+    FORMAT_DATA->state = state;
 
     if (FORMAT_DATA->cfg.libtrace_ctrl_map_fd <= 0) {
         return -1;
@@ -465,6 +496,7 @@ static int linux_xdp_init_input(libtrace_t *libtrace) {
     }
     FORMAT_DATA->hasher_type = HASHER_BALANCE;
     FORMAT_DATA->state = XDP_NOT_STARTED;
+    FORMAT_DATA->snaplen = LIBTRACE_PACKET_BUFSIZE;
 
     /* setup XDP config */
     scan = strchr(libtrace->uridata, ':');
@@ -481,7 +513,6 @@ static int linux_xdp_init_input(libtrace_t *libtrace) {
                 FORMAT_DATA->cfg.bpf_filename = strdup(libtrace_xdp_kern[i]);
                 FORMAT_DATA->cfg.bpf_progname = strdup(libtrace_xdp_prog);
                 continue;
-                
             }
         }
 
@@ -515,6 +546,12 @@ static int linux_xdp_init_input(libtrace_t *libtrace) {
             "name: %s", FORMAT_DATA->cfg.ifname);
         return -1;
     }
+
+    return 0;
+
+}
+
+static int linux_xdp_setup_xdp(libtrace_t *libtrace) {
 
     /* load XDP program if supplied */
     if (FORMAT_DATA->cfg.bpf_filename != NULL) {
@@ -618,13 +655,15 @@ static int linux_xdp_pstart_input(libtrace_t *libtrace) {
     int max_nic_queues;
     int ret;
 
-    /* was the input previously paused? */
-    if (FORMAT_DATA->state == XDP_PAUSED) {
-        /* update state and return */
-        linux_xdp_set_control_map_state(libtrace, XDP_RUNNING);
-        FORMAT_DATA->state = XDP_RUNNING;
-
-        return 0;
+    switch (FORMAT_DATA->state) {
+        case XDP_PAUSED:
+            /* update state and return */
+            linux_xdp_update_state(libtrace, XDP_RUNNING);
+            return 0;
+        case XDP_RUNNING:
+            return 0;
+        case XDP_NOT_STARTED:
+            linux_xdp_setup_xdp(libtrace);
     }
 
     /* get the maximum number of supported nic queues */
@@ -662,8 +701,7 @@ static int linux_xdp_pstart_input(libtrace_t *libtrace) {
     }
 
     /* update state to running */
-    linux_xdp_set_control_map_state(libtrace, XDP_RUNNING);
-    FORMAT_DATA->state = XDP_RUNNING;
+    linux_xdp_update_state(libtrace, XDP_RUNNING);
 
     return 0;
 }
@@ -675,13 +713,15 @@ static int linux_xdp_start_input(libtrace_t *libtrace) {
     int c_nic_queues;
     int ret;
 
-    /* was the input previously paused? */
-    if (FORMAT_DATA->state == XDP_PAUSED) {
-        /* update state and return */
-        linux_xdp_set_control_map_state(libtrace, XDP_RUNNING);
-        FORMAT_DATA->state = XDP_RUNNING;
-
-        return 0;
+    switch (FORMAT_DATA->state) {
+        case XDP_PAUSED:
+            /* update state and return */
+            linux_xdp_update_state(libtrace, XDP_RUNNING);
+            return 0;
+        case XDP_RUNNING:
+            return 0;
+        case XDP_NOT_STARTED:
+            linux_xdp_setup_xdp(libtrace);
     }
 
     /* single threaded operation, make sure the number of nic queues is 1 or
@@ -711,8 +751,7 @@ static int linux_xdp_start_input(libtrace_t *libtrace) {
     }
 
     /* update state to running */
-    linux_xdp_set_control_map_state(libtrace, XDP_RUNNING);
-    FORMAT_DATA->state = XDP_RUNNING;
+    linux_xdp_update_state(libtrace, XDP_RUNNING);
 
     return 0;
 }
@@ -727,10 +766,9 @@ static int linux_xdp_pause_input(libtrace_t * libtrace) {
         return -1;
     }
 
-    ret = linux_xdp_set_control_map_state(libtrace, XDP_PAUSED);
-    FORMAT_DATA->state = XDP_PAUSED;
+    ret = linux_xdp_update_state(libtrace, XDP_PAUSED);
 
-    /* linux_xdp_set_control_map_state will return 0 on success.
+    /* linux_xdp_update_state will return 0 on success.
      * If the control map cannot be found -1 is returned.
      */
 
@@ -874,7 +912,11 @@ static int linux_xdp_read_stream(libtrace_t *libtrace,
 
         meta = (libtrace_xdp_meta_t *)packet[i]->buffer;
         meta->timestamp = linux_xdp_get_time(stream);
+
+        /* we dont really snap packets but we can pretend to */
         meta->packet_len = pkt_len;
+        meta->cap_len = LIBTRACE_MIN((unsigned int)FORMAT_DATA->snaplen,
+                                     (unsigned int)pkt_len);
 
         /* next packet */
         idx_rx++;
@@ -997,7 +1039,6 @@ static int linux_xdp_prepare_packet(libtrace_t *libtrace UNUSED, libtrace_packet
         packet->buf_control = TRACE_CTRL_EXTERNAL;
     }
 
-    packet->buf_control = TRACE_CTRL_EXTERNAL;
     packet->type = rt_type;
     packet->buffer = buffer;
     packet->header = buffer;
@@ -1065,7 +1106,11 @@ static libtrace_eventobj_t linux_xdp_event(libtrace_t *libtrace,
 
         meta = (libtrace_xdp_meta_t *)packet->buffer;
         meta->timestamp = linux_xdp_get_time(stream);
+
+        /* we dont really snap packets but we can pretend to */
         meta->packet_len = pkt_len;
+        meta->cap_len = LIBTRACE_MIN((unsigned int)FORMAT_DATA->snaplen,
+                                     (unsigned int)pkt_len);
 
         event.type = TRACE_EVENT_PACKET;
         event.size = pkt_len;
@@ -1135,6 +1180,10 @@ static int linux_xdp_fin_output(libtrace_out_t *libtrace) {
     if (FORMAT_DATA != NULL) {
         linux_xdp_destroy_streams(FORMAT_DATA->per_stream);
         libtrace_list_deinit(FORMAT_DATA->per_stream);
+
+        /* unload the XDP program */
+        xdp_link_detach(&FORMAT_DATA->cfg);
+
         free(FORMAT_DATA);
     }
 
@@ -1146,9 +1195,6 @@ static int linux_xdp_fin_output(libtrace_out_t *libtrace) {
 static int linux_xdp_pregister_thread(libtrace_t *libtrace,
                                libtrace_thread_t *t,
                                bool reading) {
-
-    /* test if they nic supports multiple queues? if not use a hasher thread to disperse
-     * packets across processing threads?? */
 
     if (reading) {
         if (t->type == THREAD_PERPKT) {
@@ -1194,12 +1240,13 @@ static int linux_xdp_get_framing_length(const libtrace_packet_t *packet UNUSED) 
 
 static int linux_xdp_get_wire_length(const libtrace_packet_t *packet) {
 
-    return PACKET_META->packet_len;
+    /* wire length includes checksum of 4 bytes */
+    return PACKET_META->packet_len + 4;
 }
 
 static int linux_xdp_get_capture_length(const libtrace_packet_t *packet) {
 
-    return PACKET_META->packet_len;
+    return PACKET_META->cap_len;
 
 }
 
@@ -1215,26 +1262,61 @@ static void linux_xdp_get_stats(libtrace_t *libtrace, libtrace_stat_t *stats) {
     int ncpus = libbpf_num_possible_cpus();
     libtrace_xdp_t xdp[ncpus];
     int thread_count = libtrace->perpkt_thread_count;
+    struct xsk_per_stream *stream_data;
+    struct xdp_statistics xdp_stats;
+    socklen_t len = sizeof(xdp_stats);
 
-    /* init stats */
-    stats->accepted = 0;
+    /* special case. running in single threaded mode thread count is 0
+     * set this to 1 and all should be good.
+     */
+    if (thread_count == 0) {
+        thread_count = 1;
+    }
+
+    /* special case. when starting parallel trace with a dedicated hasher there is only a single
+     * XDP queue even when running in parallel.
+     */
+    if (trace_has_dedicated_hasher(libtrace)) {
+        thread_count = 1;
+    }
+
+    /* init stats that will be updated */
     stats->dropped = 0;
     stats->received = 0;
+    stats->missing = 0;
+    stats->captured = 0;
 
     for (int i = 0; i < thread_count; i++) {
+
+        libtrace_list_node_t *node = libtrace_list_get_index(FORMAT_DATA->per_stream, i);
+        if (node == NULL) {
+            break;
+        }
+
+        stream_data = (struct xsk_per_stream *)node->data;
+
+        /* get stats from XDP socket */
+        if (getsockopt(xsk_socket__fd(stream_data->xsk->xsk),
+                       SOL_XDP,
+                       XDP_STATISTICS,
+                       &xdp_stats,
+                       &len) == 0) {
+
+            stats->dropped += xdp_stats.rx_dropped;
+            stats->missing += xdp_stats.rx_invalid_descs;
+        }
 
         if ((bpf_map_lookup_elem(map_fd, &i, xdp)) != 0) {
             return;
         }
 
         for (int j = 0; j < ncpus; j++) {
-
             /* add up stats from each cpu */
-            stats->accepted += xdp[j].accepted_packets;
-            stats->dropped += xdp[j].dropped_packets;
             stats->received += xdp[j].received_packets;
         }
     }
+
+    stats->captured = stats->received - stats->dropped;
 
     return;
 }
@@ -1251,17 +1333,29 @@ static void linux_xdp_get_thread_stats(libtrace_t *libtrace,
 
     int ncpus = libbpf_num_possible_cpus();
     int ifqueue;
-    int map_fd;
+    int map_fd = FORMAT_DATA->cfg.libtrace_map_fd;
     libtrace_xdp_t xdp[ncpus];
     struct xsk_per_stream *stream_data;
+    struct xdp_statistics xdp_stats;
+    socklen_t len = sizeof(xdp_stats);
 
     /* get the nic queue number from the threads per stream data */
     stream_data = (struct xsk_per_stream *)thread->format_data;
     ifqueue = stream_data->umem->xsk_if_queue;
 
-    map_fd = FORMAT_DATA->cfg.libtrace_map_fd;
-    if (!map_fd) {
-        return;
+    /* init stats */
+    stats->received = 0;
+    stats->captured = 0;
+
+    /* get stats from XDP socket */
+    if (getsockopt(xsk_socket__fd(stream_data->xsk->xsk),
+                   SOL_XDP,
+                   XDP_STATISTICS,
+                   &xdp_stats,
+                   &len) == 0) {
+
+        stats->dropped = xdp_stats.rx_dropped;
+        stats->missing = xdp_stats.rx_invalid_descs;
     }
 
     /* get the xdp libtrace map for this threads nic queue */
@@ -1269,18 +1363,13 @@ static void linux_xdp_get_thread_stats(libtrace_t *libtrace,
         return;
     }
 
-    /* init stats */
-    stats->accepted = 0;
-    stats->dropped = 0;
-    stats->received = 0;
-
     /* add up stats from each cpu */
     for (int i = 0; i < ncpus; i++) {
         /* populate stats structure */
-        stats->accepted += xdp[i].accepted_packets;
-        stats->dropped += xdp[i].dropped_packets;
         stats->received += xdp[i].received_packets;
     }
+
+    stats->captured = stats->received - stats->dropped;
 
     return;
 }
@@ -1291,7 +1380,10 @@ static int linux_xdp_config_input(libtrace_t *libtrace,
 
     switch (options) {
         case TRACE_OPTION_SNAPLEN:
+            FORMAT_DATA->snaplen = *(int *)data;
+            return 0;
         case TRACE_OPTION_PROMISC:
+            break;
         case TRACE_OPTION_HASHER:
             switch (*((enum hasher_types *)data)) {
                 case HASHER_BALANCE:
@@ -1311,6 +1403,9 @@ static int linux_xdp_config_input(libtrace_t *libtrace,
         case TRACE_OPTION_REPLAY_SPEEDUP:
         case TRACE_OPTION_CONSTANT_ERF_FRAMING:
             break;
+        case TRACE_OPTION_XDP_HARDWARE_OFFLOAD:
+            FORMAT_DATA->cfg.hardware_offload = *(bool *)data;
+            return 0;
     }
 
     return -1;
@@ -1353,7 +1448,7 @@ static struct libtrace_format_t xdp = {
     linux_xdp_get_timeval,          /* get_timeval */
     linux_xdp_get_timespec,         /* get_timespec */
     NULL,                           /* get_seconds */
-	NULL,                           /* get_meta_section */
+    NULL,                           /* get_meta_section */
     NULL,                           /* seek_erf */
     NULL,                           /* seek_timeval */
     NULL,                           /* seek_seconds */
@@ -1362,7 +1457,7 @@ static struct libtrace_format_t xdp = {
     linux_xdp_get_framing_length,   /* get_framing_length */
     NULL,                           /* set_capture_length */
     NULL,                           /* get_received_packets */
-	NULL,                           /* get_filtered_packets */
+    NULL,                           /* get_filtered_packets */
     NULL,                           /* get_dropped_packets */
     linux_xdp_get_stats,            /* get_statistics */
     NULL,                           /* get_fd */
@@ -1370,12 +1465,12 @@ static struct libtrace_format_t xdp = {
     linux_xdp_help,                 /* help */
     NULL,                           /* next pointer */
     {true, -1},                     /* Live, no thread limit */
-    linux_xdp_pstart_input,		    /* pstart_input */
+    linux_xdp_pstart_input,         /* pstart_input */
     linux_xdp_pread_packets,	    /* pread_packets */
     linux_xdp_pause_input,          /* ppause */
-    linux_xdp_fin_input,		    /* p_fin */
+    linux_xdp_fin_input,            /* p_fin */
     linux_xdp_pregister_thread,	    /* register thread */
-    NULL,				            /* unregister thread */
+    NULL,                           /* unregister thread */
     linux_xdp_get_thread_stats      /* get thread stats */
 };
 
@@ -1413,8 +1508,6 @@ static struct bpf_object *load_bpf_object_file(struct xsk_config *cfg, int ifind
      */
     err = bpf_prog_load_xattr(&prog_load_attr, &cfg->bpf_obj, &first_prog_fd);
     if (err) {
-        fprintf(stderr, "ERR: loading BPF-OBJ file(%s) (%d): %s\n",
-            cfg->bpf_filename, err, strerror(-err));
         return NULL;
     }
 
@@ -1460,13 +1553,16 @@ static struct bpf_object *load_bpf_and_xdp_attach(struct xsk_config *cfg) {
 
     /* Load the BPF-ELF object file and get back libbpf bpf_object. Supply
      * ifindex to try offload to the NIC */
-    cfg->bpf_obj = load_bpf_object_file(cfg, cfg->ifindex);
-    if (!cfg->bpf_obj) {
-        fprintf(stderr, "XDP hardware offload failed, trying without\n");
 
-        /* hardware offload failed try again without */
+    if (cfg->hardware_offload) {
+        cfg->bpf_obj = load_bpf_object_file(cfg, cfg->ifindex);
+        if (!cfg->bpf_obj) {
+            fprintf(stderr, "ERR: hardware offloading file: %s\n", cfg->bpf_filename);
+            exit(EXIT_FAIL_BPF);
+        }
+    } else {
         cfg->bpf_obj = load_bpf_object_file(cfg, 0);
-        if (cfg->bpf_obj == NULL) {
+        if (!cfg->bpf_obj) {
             fprintf(stderr, "ERR: loading file: %s\n", cfg->bpf_filename);
             exit(EXIT_FAIL_BPF);
         }

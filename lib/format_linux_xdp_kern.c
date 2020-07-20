@@ -52,6 +52,8 @@ struct pkt_meta {
     __u8 protocol;
 };
 
+int libtrace_xdp_sock(struct xdp_md *ctx);
+
 /* hashing functions sources from
  * https://github.com/Netronome/bpf-samples/blob/master/programmable_rss/rss_kern.c
  */
@@ -170,7 +172,7 @@ static __always_inline void sort_tuple(struct pkt_meta *pkt, bool is_ip6)
     }
 }
 
-static __always_inline int redirect_map(__u32 ifindex) {
+static __always_inline void increment_stats(__u32 ifindex) {
 
     /* get the libtrace structure for the destination queue */
     libtrace_xdp_t *libtrace = bpf_map_lookup_elem(&libtrace_map, &ifindex);
@@ -179,23 +181,20 @@ static __always_inline int redirect_map(__u32 ifindex) {
     if (libtrace)
         libtrace->received_packets += 1;
 
-    if (bpf_map_lookup_elem(&xsks_map, &ifindex)) {
-
-        /* increment accepted packets for the destination queue */
-        if (libtrace)
-            libtrace->accepted_packets += 1;
-
-        return bpf_redirect_map(&xsks_map, ifindex, 0);
-    }
-
-    /* increment the dropped packets */
-    if (libtrace)
-        libtrace->dropped_packets += 1;
-
-    return XDP_PASS;
+    return;
 }
 
-SEC("libtrace_xdp")
+static __always_inline int redirect_map(__u32 ifindex) {
+
+    /* increment our stats */
+    increment_stats(ifindex);
+
+    /* redirect packet to the socket */
+    return bpf_redirect_map(&xsks_map, ifindex, 0);
+}
+
+
+SEC("socket/libtrace_xdp")
 int libtrace_xdp_sock(struct xdp_md *ctx) {
 
     void *data_end = (void *)(long)ctx->data_end;
@@ -215,11 +214,13 @@ int libtrace_xdp_sock(struct xdp_md *ctx) {
     /* get the libtrace control map */
     queue_ctrl = bpf_map_lookup_elem(&libtrace_ctrl_map, &key);
     if (!queue_ctrl) {
-        return redirect_map(ifindex);
+        increment_stats(ifindex);
+        return XDP_PASS;
     }
 
     /* make sure we are in running state */
     if (queue_ctrl->state != XDP_RUNNING) {
+        increment_stats(ifindex);
         return XDP_PASS;
     }
 
