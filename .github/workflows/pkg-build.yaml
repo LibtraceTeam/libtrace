@@ -11,6 +11,7 @@ jobs:
      container:
        image: ${{ matrix.target }}
      strategy:
+       fail-fast: false
        matrix:
          arch:
            - amd64
