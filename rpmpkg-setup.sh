@@ -15,30 +15,15 @@ mkdir -p /run/user/${UID}
 chmod 0700 /run/user/${UID}
 yum install -y wget make gcc
 
-cat << EOF > /etc/yum.repos.d/bintray-wand-general-rpm.repo
-#bintray-wand-general-rpm - packages by wand from Bintray
-[bintray-wand-general-rpm]
-name=bintray-wand-general-rpm
-baseurl=https://dl.bintray.com/wand/general-rpm/${DISTRO}/\$releasever/\$basearch/
-gpgkey=https://bintray.com/user/downloadSubjectPublicKey?username=wand
-gpgcheck=0
-repo_gpgcheck=1
-enabled=1
-EOF
+curl -1sLf \
+  'https://dl.cloudsmith.io/public/wand/libwandio/cfg/setup/bash.rpm.sh' \
+    | bash
+
+curl -1sLf \
+  'https://dl.cloudsmith.io/public/wand/libwandder/cfg/setup/bash.rpm.sh' \
+    | bash
 
 yum update -y
-cat << EOF > /etc/yum.repos.d/bintray-wand-libtrace-rpm.repo
-#bintray-wand-libtrace-rpm - packages by wand from Bintray
-[bintray-wand-libtrace-rpm]
-name=bintray-wand-libtrace-rpm
-baseurl=https://dl.bintray.com/wand/libtrace-rpm/${DISTRO}/\$releasever/\$basearch/
-gpgkey=https://bintray.com/user/downloadSubjectPublicKey?username=wand
-gpgcheck=0
-repo_gpgcheck=1
-enabled=1
-EOF
-yum update -y
-
 
 if [ "$1" = "centos:8" ]; then
         yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm || true
