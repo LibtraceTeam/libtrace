@@ -287,6 +287,7 @@ static int pcapfile_config_input(libtrace_t *libtrace,
 			 * by trace_config */
 			break;
 		case TRACE_OPTION_DISCARD_META:
+        case TRACE_OPTION_XDP_HARDWARE_OFFLOAD:
 			break;
 	}
 	

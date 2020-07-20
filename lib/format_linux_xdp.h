@@ -13,7 +13,7 @@ static char *libtrace_xdp_kern[] = {
     "/usr/local/share/libtrace/format_linux_xdp_kern.bpf",
     "/usr/share/libtrace/format_linux_xdp_kern.bpf"
 };
-static char libtrace_xdp_prog[] = "libtrace_xdp";
+static char libtrace_xdp_prog[] = "socket/libtrace_xdp";
 
 typedef struct libtrace_xdp {
     /* BPF filter */
@@ -27,6 +27,7 @@ typedef enum {
     XDP_BALANCE = 0,
     XDP_UNIDIRECTIONAL = 1,
     XDP_BIDIRECTIONAL = 2,
+    XDP_NONE = 3,
 } xdp_hasher;
 
 typedef enum {

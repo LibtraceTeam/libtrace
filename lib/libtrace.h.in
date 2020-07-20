@@ -1473,6 +1473,8 @@ typedef enum {
 	/** If enabled all meta packet will be discarded */
 	TRACE_OPTION_DISCARD_META,
 
+  TRACE_OPTION_XDP_HARDWARE_OFFLOAD,
+
 } trace_option_t;
 
 /** Sets an input config option
