@@ -798,7 +798,7 @@ static int linuxring_write_packet(libtrace_out_t *libtrace,
 
 	/* Notify kernel there are frames to send */
 	FORMAT_DATA_OUT->queue ++;
-	FORMAT_DATA_OUT->queue %= TX_MAX_QUEUE;
+	FORMAT_DATA_OUT->queue %= FORMAT_DATA_OUT->tx_max_queue;
 	if(FORMAT_DATA_OUT->queue == 0){
 		ret = sendto(FORMAT_DATA_OUT->fd,
 				NULL,
@@ -838,7 +838,7 @@ static struct libtrace_format_t linuxring = {
 	linuxring_start_input,		/* start_input */
 	linuxcommon_pause_input,	/* pause_input */
 	linuxcommon_init_output,	/* init_output */
-	NULL,				/* config_output */
+	linuxcommon_config_output,	/* config_output */
 	linuxring_start_output,		/* start_ouput */
 	linuxring_fin_input,		/* fin_input */
 	linuxring_fin_output,		/* fin_output */
