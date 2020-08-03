@@ -965,7 +965,7 @@ static int linux_xdp_read_stream(libtrace_t *libtrace,
         packet[i]->trace = libtrace;
         packet[i]->error = 1;
 
-        meta = (libtrace_xdp_meta_t *)packet[i]->buffer;
+        meta = (libtrace_xdp_meta_t *)pkt_buffer - FRAME_HEADROOM;
         meta->timestamp = linux_xdp_get_time(stream);
 
         /* we dont really snap packets but we can pretend to */
