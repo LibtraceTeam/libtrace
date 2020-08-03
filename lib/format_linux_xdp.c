@@ -51,17 +51,21 @@ typedef struct libtrace_xdp_meta {
 struct xsk_config {
     __u32 xdp_flags;
     __u32 libbpf_flags;
+    __u16 xsk_bind_flags;
+
     int ifindex;
-    bool hardware_offload;
     char ifname[IF_NAMESIZE];
+
+    bool hardware_offload;
+    /* 0 = not set by user,
+     * 1 = promisc off by user,
+     * 2 = promisc on by user
+     */
+    int promisc;
 
     char *bpf_filename;
     char *bpf_progname;
-
-    __u16 xsk_bind_flags;
-
     struct bpf_object *bpf_obj;
-
     struct bpf_program *bpf_prg;
     __u32 bpf_prg_fd;
 
@@ -236,6 +240,39 @@ static int linux_xdp_set_current_queues(char *ifname, int queues) {
 
     /* could not set the number of queues */
     return ret;
+}
+
+static int linux_xdp_set_promisc(const char *ifname, bool enabled) {
+
+    struct ifreq eth;
+    int fd;
+
+    if ((fd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
+        return -1;
+    }
+
+    /* set interface name */
+    strcpy(eth.ifr_name, ifname);
+
+    /* get interface flags */
+    if (ioctl(fd, SIOCGIFFLAGS, &eth) == -1) {
+        return -1;
+    }
+
+    if (enabled) {
+        /* update promisc flag to enabled */
+        eth.ifr_flags |= IFF_PROMISC;
+    } else {
+        /* update promisc flag to disabled */
+        eth.ifr_flags &= ~IFF_PROMISC;
+    }
+
+    /* set interface flags */
+    if (ioctl(fd, SIOCSIFFLAGS, &eth) == -1) {
+        return -1;
+    }
+
+    return 0;
 }
 
 static struct xsk_umem_info *configure_xsk_umem(void *buffer, uint64_t size,
@@ -588,6 +625,24 @@ static int linux_xdp_setup_xdp(libtrace_t *libtrace) {
             }
         } else {
             /* unable to locate control map. Is this a custom bpf program? */
+        }
+    }
+
+    /* cfg.promisc will be 1 if the user has explicity set promisc to off,
+     * in all other cases we want to keep promisc on so all packets are
+     * processed.
+     */
+    if (FORMAT_DATA->cfg.promisc != 1) {
+        if (linux_xdp_set_promisc(FORMAT_DATA->cfg.ifname, 1) != 0) {
+            trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to take NIC out of "
+                "promisc mode in linux_xdp_init_input()");
+            return -1;
+        }
+    } else {
+        if (linux_xdp_set_promisc(FORMAT_DATA->cfg.ifname, 0) != 0) {
+            trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to take NIC out of "
+                "promisc mode in linux_xdp_init_input()");
+            return -1;
         }
     }
 
@@ -1367,7 +1422,12 @@ static int linux_xdp_config_input(libtrace_t *libtrace,
             FORMAT_DATA->snaplen = *(int *)data;
             return 0;
         case TRACE_OPTION_PROMISC:
-            break;
+            if (*(bool *)data) {
+                FORMAT_DATA->cfg.promisc = 2;
+            } else {
+                FORMAT_DATA->cfg.promisc = 1;
+            }
+            return 0;
         case TRACE_OPTION_HASHER:
             switch (*((enum hasher_types *)data)) {
                 case HASHER_BALANCE:
