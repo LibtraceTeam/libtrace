@@ -56,7 +56,6 @@ struct xsk_config {
     int ifindex;
     char ifname[IF_NAMESIZE];
 
-    bool hardware_offload;
     /* 0 = not set by user,
      * 1 = promisc off by user,
      * 2 = promisc on by user
@@ -422,10 +421,16 @@ static void linux_xdp_complete_tx(struct xsk_socket_info *xsk) {
 static uint64_t linux_xdp_get_time(struct xsk_per_stream *stream) {
 
     uint64_t sys_time;
+
+#if USE_CLOCK_GETTIME
     struct timespec ts = {0};
     clock_gettime(CLOCK_REALTIME, &ts);
-
     sys_time = ((uint64_t) ts.tv_sec * 1000000000ull + (uint64_t) ts.tv_nsec);
+#else
+    struct timeval tv = {0};
+    gettimeofday(&tv, NULL);
+    sys_time = ((uint64_t) tv.tv_sec * 1000000000ull + (uint64_t) tv.tv_usec * 1000ull);
+#endif
 
     if (stream->prev_sys_time >= sys_time) {
         sys_time = stream->prev_sys_time + 1;
@@ -1464,7 +1469,27 @@ static int linux_xdp_config_input(libtrace_t *libtrace,
         case TRACE_OPTION_CONSTANT_ERF_FRAMING:
             break;
         case TRACE_OPTION_XDP_HARDWARE_OFFLOAD:
-            FORMAT_DATA->cfg.hardware_offload = *(bool *)data;
+            FORMAT_DATA->cfg.xdp_flags &= ~XDP_FLAGS_MODES;
+            FORMAT_DATA->cfg.xdp_flags |= XDP_FLAGS_HW_MODE;
+            return 0;
+        case TRACE_OPTION_XDP_DRV_MODE:
+            FORMAT_DATA->cfg.xdp_flags &= ~XDP_FLAGS_MODES;
+            FORMAT_DATA->cfg.xdp_flags |= XDP_FLAGS_DRV_MODE;
+            return 0;
+        case TRACE_OPTION_XDP_SKB_MODE:
+            FORMAT_DATA->cfg.xdp_flags &= ~XDP_FLAGS_MODES;
+            FORMAT_DATA->cfg.xdp_flags |= XDP_FLAGS_SKB_MODE;
+            /* cannot use zero copy mode with SKB so force copy */
+            FORMAT_DATA->cfg.xsk_bind_flags &= XDP_COPY;
+            FORMAT_DATA->cfg.xsk_bind_flags |= XDP_ZEROCOPY;
+            return 0;
+        case TRACE_OPTION_XDP_ZERO_COPY_MODE:
+            FORMAT_DATA->cfg.xsk_bind_flags &= XDP_ZEROCOPY;
+            FORMAT_DATA->cfg.xsk_bind_flags |= XDP_COPY;
+            return 0;
+        case TRACE_OPTION_XDP_COPY_MODE:
+            FORMAT_DATA->cfg.xsk_bind_flags &= XDP_COPY;
+            FORMAT_DATA->cfg.xsk_bind_flags |= XDP_ZEROCOPY;
             return 0;
     }
 
@@ -1610,22 +1635,18 @@ static struct bpf_object *load_bpf_and_xdp_attach(struct xsk_config *cfg) {
 
     int err;
     int prog_fd;
+    int offload_index = 0;
 
     /* Load the BPF-ELF object file and get back libbpf bpf_object. Supply
      * ifindex to try offload to the NIC */
+    if (cfg->xdp_flags & XDP_FLAGS_HW_MODE) {
+        offload_index = cfg->ifindex;
+    }
 
-    if (cfg->hardware_offload) {
-        cfg->bpf_obj = load_bpf_object_file(cfg, cfg->ifindex);
-        if (!cfg->bpf_obj) {
-            fprintf(stderr, "ERR: hardware offloading file: %s\n", cfg->bpf_filename);
-            exit(EXIT_FAIL_BPF);
-        }
-    } else {
-        cfg->bpf_obj = load_bpf_object_file(cfg, 0);
-        if (!cfg->bpf_obj) {
-            fprintf(stderr, "ERR: loading file: %s\n", cfg->bpf_filename);
-            exit(EXIT_FAIL_BPF);
-        }
+    cfg->bpf_obj = load_bpf_object_file(cfg, offload_index);
+    if (!cfg->bpf_obj) {
+        fprintf(stderr, "ERR: loading file: %s\n", cfg->bpf_filename);
+        exit(EXIT_FAIL_BPF);
     }
 
     /* At this point: All XDP/BPF programs from the bpf_filename have been

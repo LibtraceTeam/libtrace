@@ -1473,8 +1473,20 @@ typedef enum {
 	/** If enabled all meta packet will be discarded */
 	TRACE_OPTION_DISCARD_META,
 
-  TRACE_OPTION_XDP_HARDWARE_OFFLOAD,
+        /** Offload XDP program to hardware */
+        TRACE_OPTION_XDP_HARDWARE_OFFLOAD,
 
+        /** Install XDP program in native/driver mode */
+        TRACE_OPTION_XDP_DRV_MODE,
+
+        /** Install XDP program in SKB (generic) mode */
+        TRACE_OPTION_XDP_SKB_MODE,
+
+        /** Force XDP copy mode */
+        TRACE_OPTION_XDP_ZERO_COPY_MODE,
+
+        /** Force XDP zero copy mode */
+        TRACE_OPTION_XDP_COPY_MODE,
 } trace_option_t;
 
 /** Sets an input config option

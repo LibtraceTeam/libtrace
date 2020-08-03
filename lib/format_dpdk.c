@@ -782,6 +782,10 @@ int dpdk_config_input (libtrace_t *libtrace,
         case TRACE_OPTION_REPLAY_SPEEDUP:
         case TRACE_OPTION_CONSTANT_ERF_FRAMING:
         case TRACE_OPTION_XDP_HARDWARE_OFFLOAD:
+        case TRACE_OPTION_XDP_SKB_MODE:
+        case TRACE_OPTION_XDP_DRV_MODE:
+        case TRACE_OPTION_XDP_ZERO_COPY_MODE:
+        case TRACE_OPTION_XDP_COPY_MODE:
 		break;
 	/* Avoid default: so that future options will cause a warning
 	 * here to remind us to implement it, or flag it as
@@ -2136,7 +2140,7 @@ static int dpdk_pread_packets (libtrace_t *libtrace,
 			hdr = (struct dpdk_addt_hdr *)
 					((struct rte_mbuf*) pkts_burst[i] + 1);
 			packets[i]->order = hdr->timestamp;
-			dpdk_prepare_packet(libtrace, packets[i], packets[i]->buffer, packets[i]->type, 0);
+			dpdk_prepare_packet(libtrace, packets[i], pkts_burst[i], TRACE_RT_DATA_DPDK, 0);
 		}
 	}
 
