@@ -1,3 +1,15 @@
+libtrace4 (4.0.13-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Add support for DPDK vdevs (both input and output).
+  * Update DPDK support to work with 19.11 and 20.02 releases.
+  * Fix a number of minor bugs with the DPDK format.
+  * tracereplay can now replay traces containing raw IP traffic.
+  * Fix libpacketdump segfault when processing corrupt/bogus headers.
+  * Fix bugs when using a dedicated hasher thread with a parallel input.
+
+ -- Shane Alcock <shane.alcock@waikato.ac.nz>  Tue, 26 May 2020 16:39:54 +1200
+
 libtrace4 (4.0.12-1) unstable; urgency=medium
 
   * New upstream release.

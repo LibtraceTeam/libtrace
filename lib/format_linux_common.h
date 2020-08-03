@@ -63,12 +63,6 @@
  */
 #define CONF_RING_FRAMES        0x100
 
-/* The maximum frames allowed to be waiting in the TX_RING before the kernel is 
- * notified to write them out. Make sure this is less than CONF_RING_FRAMES. 
- * Performance doesn't seem to increase any more when setting this above 10.
- */
-#define TX_MAX_QUEUE		10
-
 #else	/* HAVE_NETPACKET_PACKET_H */
 
 /* Need to know what a sockaddr_ll looks like */
@@ -277,6 +271,8 @@ struct linux_format_data_out_t {
 	libtrace_rt_types_t format;
 	/* Used to determine buffer size for the ring buffer */
 	uint32_t max_order;
+        /* Maximum number of packets allowed in the tx queue before notifying the kernel */
+        int tx_max_queue;
 };
 
 struct linux_per_stream_t {
@@ -337,6 +333,8 @@ int linuxcommon_init_input(libtrace_t *libtrace);
 int linuxcommon_init_output(libtrace_out_t *libtrace);
 int linuxcommon_probe_filename(const char *filename);
 int linuxcommon_config_input(libtrace_t *libtrace, trace_option_t option,
+                             void *data);
+int linuxcommon_config_output(libtrace_out_t *libtrace, trace_option_output_t option,
                              void *data);
 void linuxcommon_close_input_stream(libtrace_t *libtrace,
                                     struct linux_per_stream_t *stream);

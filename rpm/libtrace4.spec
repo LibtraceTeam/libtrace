@@ -1,5 +1,5 @@
 Name:           libtrace4
-Version:        4.0.12
+Version:        4.0.13
 Release:        1%{?dist}
 Summary:        C Library for capturing and analysing network packets
 
@@ -44,11 +44,11 @@ Requires:       %{name}%{?_isa} = %{version}-%{release}, libpacketdump4%{?_isa} 
 
 %package -n     libpacketdump4
 Summary:        Network packet parsing and human-readable display library
-Requires:       %{name}%{?_isa} = %{version}-%{release}, dpdk
+Requires:       %{name}%{?_isa} = %{version}-%{release}, dpdk-wand
 
 %package -n     libpacketdump4-devel
 Summary:        Development files for libpacketdump
-Requires:        %{name}-devel%{?_isa} = %{version}-%{release}, libpacketdump4%{?_isa} = %{version}-%{release}, dpdk-devel
+Requires:        %{name}-devel%{?_isa} = %{version}-%{release}, libpacketdump4%{?_isa} = %{version}-%{release}, dpdk-wand-devel
 
 %description devel
 The %{name}-devel package contains libraries and header files for
@@ -125,6 +125,9 @@ find $RPM_BUILD_ROOT -name '*.la' -exec rm -f {} ';'
 
 
 %changelog
+* Tue May 26 2020 Shane Alcock <salcock@waikato.ac.nz> - 4.0.13-1
+- Updated for 4.0.12 release
+
 * Fri Mar 27 2020 Shane Alcock <salcock@waikato.ac.nz> - 4.0.12-1
 - Updated for 4.0.12 release
 

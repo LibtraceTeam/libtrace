@@ -3,11 +3,11 @@
 # Now you only need to update the version number in two places - below,
 # and in the README
 
-AC_INIT([libtrace],[4.0.12],[contact@wand.net.nz],[libtrace])
+AC_INIT([libtrace],[4.0.13],[contact@wand.net.nz],[libtrace])
 
 LIBTRACE_MAJOR=4
 LIBTRACE_MID=0
-LIBTRACE_MINOR=12
+LIBTRACE_MINOR=13
 
 # OpenSolaris hides libraries like libncurses in /usr/gnu/lib, which is not
 # searched by default - add it to LDFLAGS so we at least have a chance of 
@@ -643,16 +643,25 @@ if test "$want_dpdk" != no; then
 		AC_CHECK_LIB(dpdk, rte_eth_dev_configure, dpdk_found="system", dpdk_found=0)
 		# We also need to check that rte.vars.mk is installed from dpdk-dev (as well as libdpdk-dev)
 		if test "$dpdk_found" != 0 -a -e /usr/share/dpdk/mk/rte.vars.mk ; then
-			RTE_TARGET="$(uname -m)-default-linuxapp-gcc"
-			RTE_SDK="/usr/share/dpdk/"
-			RTE_INCLUDE="/usr/include/dpdk"
-			AC_SUBST([RTE_TARGET])
-			AC_SUBST([RTE_SDK])
-			AC_SUBST([RTE_INCLUDE])
-			LIBTRACE_LIBS="$LIBTRACE_LIBS -ldpdk"
-			AC_MSG_NOTICE([Building against system DPDK])
+                        # This is terrible, but I'm not sure that there is an easier way for us to figure out what RTE_EXEC_ENV is eventually going to be renamed to by the end of the DPDK build process.
+                        for execenv in linuxapp linux bsdapp freebsd; do
+                                if test -d /usr/share/dpdk/$(uname -m)-default-${execenv}-gcc; then
+                                        RTE_TARGET=$(uname -m)-default-${execenv}-gcc
+                                        break
+                                fi
+                        done
 
-			dpdk_found=system
+                        if test RTE_TARGET != ""; then
+				RTE_SDK="/usr/share/dpdk/"
+				RTE_INCLUDE="/usr/include/dpdk"
+				AC_SUBST([RTE_TARGET])
+				AC_SUBST([RTE_SDK])
+				AC_SUBST([RTE_INCLUDE])
+				LIBTRACE_LIBS="$LIBTRACE_LIBS -ldpdk"
+				AC_MSG_NOTICE([Building against system DPDK])
+
+				dpdk_found=system
+			fi
 		fi
 	fi
 

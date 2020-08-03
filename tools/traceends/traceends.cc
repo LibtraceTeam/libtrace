@@ -448,7 +448,7 @@ static void update_ipv4(global_t *glob,
 
                 c->src_pkts ++;
                 c->src_pbytes += plen;
-                c->src_bytes += ip->ip_len;
+                c->src_bytes += ip_len;
                 if (ts != 0)
                         c->last_active = ts;
         }
