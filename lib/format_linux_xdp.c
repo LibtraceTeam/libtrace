@@ -962,12 +962,13 @@ static int linux_xdp_read_stream(libtrace_t *libtrace,
         pkt_buffer = xsk_umem__get_data(stream->xsk->umem->buffer, pkt_addr);
 
         /* prepare the packet */
-        packet[i]->buf_control = TRACE_CTRL_EXTERNAL;
-        packet[i]->type = TRACE_RT_DATA_XDP;
-        packet[i]->buffer = (uint8_t *)pkt_buffer - FRAME_HEADROOM;
+        packet[i]->trace = libtrace;
         packet[i]->header = (uint8_t *)pkt_buffer - FRAME_HEADROOM;
         packet[i]->payload = pkt_buffer;
-        packet[i]->trace = libtrace;
+        packet[i]->buffer = (uint8_t *)pkt_buffer - FRAME_HEADROOM;
+        packet[i]->type = TRACE_RT_DATA_XDP;
+        packet[i]->buf_control = TRACE_CTRL_EXTERNAL;
+        packet[i]->type = TRACE_RT_DATA_XDP;
         packet[i]->error = 1;
 
         meta = (libtrace_xdp_meta_t *)pkt_buffer - FRAME_HEADROOM;
