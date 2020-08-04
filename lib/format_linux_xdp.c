@@ -1,3 +1,5 @@
+#define _GNU_SOURCE
+
 #include "config.h"
 #include "libtrace.h"
 #include "libtrace_int.h"
@@ -18,7 +20,7 @@
 #include <sys/resource.h>
 #include <sys/mman.h>
 #include <sys/param.h>
-
+#include <pthread.h>
 #include <linux/ethtool.h>
 #include <linux/if_xdp.h>
 #include <sys/ioctl.h>
@@ -39,6 +41,7 @@
 #define FRAME_SIZE         XSK_UMEM__DEFAULT_FRAME_SIZE
 #define RX_BATCH_SIZE      64
 #define INVALID_UMEM_FRAME UINT64_MAX
+#define XDP_MAX_CORES      10
 
 #define XDP_BUSY_RETRY     5
 
@@ -61,6 +64,8 @@ struct xsk_config {
      * 2 = promisc on by user
      */
     int promisc;
+
+    int cores[XDP_MAX_CORES];
 
     char *bpf_filename;
     char *bpf_progname;
@@ -418,27 +423,18 @@ static void linux_xdp_complete_tx(struct xsk_socket_info *xsk) {
     }
 }
 
-static uint64_t linux_xdp_get_time(struct xsk_per_stream *stream) {
-
-    uint64_t sys_time;
+static uint64_t linux_xdp_get_time() {
 
 #if USE_CLOCK_GETTIME
     struct timespec ts = {0};
     clock_gettime(CLOCK_REALTIME, &ts);
-    sys_time = ((uint64_t) ts.tv_sec * 1000000000ull + (uint64_t) ts.tv_nsec);
+    return ((uint64_t) ts.tv_sec * 1000000000ull + (uint64_t) ts.tv_nsec);
 #else
     struct timeval tv = {0};
     gettimeofday(&tv, NULL);
-    sys_time = ((uint64_t) tv.tv_sec * 1000000000ull + (uint64_t) tv.tv_usec * 1000ull);
+    return ((uint64_t) tv.tv_sec * 1000000000ull + (uint64_t) tv.tv_usec * 1000ull);
 #endif
 
-    if (stream->prev_sys_time >= sys_time) {
-        sys_time = stream->prev_sys_time + 1;
-    }
-
-    stream->prev_sys_time = sys_time;
-
-    return sys_time;
 }
 
 static int linux_xdp_init_control_map(libtrace_t *libtrace) {
@@ -520,7 +516,6 @@ static int linux_xdp_update_state(libtrace_t *libtrace, xdp_state state) {
 static int linux_xdp_init_input(libtrace_t *libtrace) {
 
     struct rlimit r = {RLIM_INFINITY, RLIM_INFINITY};
-    char *scan, *scan2 = NULL;
 
     if (setrlimit(RLIMIT_MEMLOCK, &r)) {
         trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable "
@@ -540,16 +535,61 @@ static int linux_xdp_init_input(libtrace_t *libtrace) {
     FORMAT_DATA->state = XDP_NOT_STARTED;
     FORMAT_DATA->snaplen = LIBTRACE_PACKET_BUFSIZE;
 
-    /* setup XDP config */
-    scan = strchr(libtrace->uridata, ':');
-    if (scan == NULL) {
-        /* if no : was found we just have interface name. */
-        memcpy(FORMAT_DATA->cfg.ifname, libtrace->uridata, strlen(libtrace->uridata));
+    /* init cores */
+    for (int i = 0; i < XDP_MAX_CORES; i++) {
+        FORMAT_DATA->cfg.cores[i] = -1;
+    }
 
+
+    /* supported URIs
+     * interface, "%[^:]"
+     * kern:prog:interface, "%[^:]:%[^:]:%[^:]:"
+     * interface:1,3,4 ""%[^-]-%d"
+     * kern:prog:interface-1,3,4 "%[^:]:%[^:]:%[^-]-%d"
+     */
+    char kernel[200], program[200], interface[200];
+    int core = -1;
+    int matches;
+    bool matched = 0;
+
+    matches = sscanf(libtrace->uridata, "%[^:]:%[^:]:%[^:]:%d", kernel, program, interface, &core);
+    if (matches == 4) {
+        //fprintf(stderr, "kern %s prog %s interface %s core %d\n", kernel, program, interface, core);
+        matched = 1;
+        FORMAT_DATA->cfg.bpf_filename = strdup(kernel);
+        FORMAT_DATA->cfg.bpf_progname = strdup(program);
+        memcpy(FORMAT_DATA->cfg.ifname, interface, strlen(interface));
+    }
+
+    matches = sscanf(libtrace->uridata, "%[^:]:%[^:]:%[^:]:", kernel, program, interface);
+    if (matches == 3 && !matched) {
+        //fprintf(stderr, "kern %s prog %s interface %s\n", kernel, program, interface);
+        matched = 1;
+        FORMAT_DATA->cfg.bpf_filename = strdup(kernel);
+        FORMAT_DATA->cfg.bpf_progname = strdup(program);
+        memcpy(FORMAT_DATA->cfg.ifname, interface, strlen(interface));
+    }
+
+    matches = sscanf(libtrace->uridata, "%[^:]:%d", interface, &core);
+    if (matches == 2 && !matched) {
+        //fprintf(stderr, "interface %s core %d\n", interface, core);
+        matched =1;
         FORMAT_DATA->cfg.bpf_filename = NULL;
         FORMAT_DATA->cfg.bpf_progname = NULL;
+        memcpy(FORMAT_DATA->cfg.ifname, interface, strlen(interface));
+    }
 
-        /* loop over each bpf kern path looking for the BPF program */
+    matches = sscanf(libtrace->uridata, "%[^:]", interface);
+    if (matches == 1 && !matched) {
+        //fprintf(stderr, "interface %s\n", interface);
+        matched =1;
+        FORMAT_DATA->cfg.bpf_filename = NULL;
+        FORMAT_DATA->cfg.bpf_progname = NULL;
+        memcpy(FORMAT_DATA->cfg.ifname, interface, strlen(interface));
+    }
+
+    // If the user did not supply a custom BPF kernel try locate the Libtrace one
+    if (FORMAT_DATA->cfg.bpf_filename == NULL) {
         for (uint32_t i = 0; i < sizeof(libtrace_xdp_kern)/sizeof(libtrace_xdp_kern[0]); i++) {
             if (access(libtrace_xdp_kern[i], F_OK) != -1) {
                 FORMAT_DATA->cfg.bpf_filename = strdup(libtrace_xdp_kern[i]);
@@ -557,28 +597,11 @@ static int linux_xdp_init_input(libtrace_t *libtrace) {
                 continue;
             }
         }
-
-        /* was the libtrace bpf program found? */
-        if (FORMAT_DATA->cfg.bpf_filename == NULL) {
-            fprintf(stderr, "Unable to locate Libtrace BPF program, loading default Libbpf program.\n");
-        }
-
-    } else {
-        /* user supplied bpf program must be structured like:
-         * kern:prog:interface
-         */
-        scan2 = strchr(scan + 1, ':');
-        if (scan2 == NULL) {
-            trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Invalid "
-                "URI: Usage xdp:bpf_kern:bpf_prog:interface\n");
-            return -1;
-        } else {
-            FORMAT_DATA->cfg.bpf_filename = strndup(libtrace->uridata,
-                (size_t)(scan - libtrace->uridata));
-            FORMAT_DATA->cfg.bpf_progname = strndup(scan + 1,
-                (size_t)(scan2 - (scan + 1)));
-            memcpy(FORMAT_DATA->cfg.ifname, scan2 + 1, strlen(scan2 + 1));
-        }
+    }
+    // was a kernel found?
+    if (FORMAT_DATA->cfg.bpf_filename == NULL) {
+        trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to locate Libtrace BPF program");
+        return -1;
     }
 
     /* check interface */
@@ -587,6 +610,23 @@ static int linux_xdp_init_input(libtrace_t *libtrace) {
         trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Invalid XDP input interface "
             "name: %s", FORMAT_DATA->cfg.ifname);
         return -1;
+    }
+
+    /* check cores */
+    if (core != -1) {
+        char *scan = NULL;
+        scan = strchr(libtrace->uridata, ',');
+
+        int v, size, i = 0;
+        if (scan == NULL) {
+            FORMAT_DATA->cfg.cores[i] = core;
+        } else {
+            FORMAT_DATA->cfg.cores[i++] = core;
+            while (sscanf(scan, ",%d%n", &v, &size) == 1) {
+                FORMAT_DATA->cfg.cores[i++] = v;
+                scan += size;
+            }
+        }
     }
 
     return 0;
@@ -901,6 +941,7 @@ static int linux_xdp_read_stream(libtrace_t *libtrace,
     libtrace_xdp_meta_t *meta;
     struct pollfd fds;
     int ret;
+    uint64_t sys_time;
 
     if (libtrace->format_data == NULL) {
         trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT, "Trace format data missing, "
@@ -951,6 +992,8 @@ static int linux_xdp_read_stream(libtrace_t *libtrace,
         }
     }
 
+    sys_time = linux_xdp_get_time();
+
     for (i = 0; i < rcvd; i++) {
 
         /* got a packet. Get the address and length from the rx descriptor */
@@ -968,11 +1011,16 @@ static int linux_xdp_read_stream(libtrace_t *libtrace,
         packet[i]->buffer = (uint8_t *)pkt_buffer - FRAME_HEADROOM;
         packet[i]->type = TRACE_RT_DATA_XDP;
         packet[i]->buf_control = TRACE_CTRL_EXTERNAL;
-        packet[i]->type = TRACE_RT_DATA_XDP;
         packet[i]->error = 1;
 
         meta = (libtrace_xdp_meta_t *)pkt_buffer - FRAME_HEADROOM;
-        meta->timestamp = linux_xdp_get_time(stream);
+
+        if (stream->prev_sys_time >= sys_time) {
+            sys_time = stream->prev_sys_time + 1;
+        }
+        stream->prev_sys_time = sys_time;
+
+        meta->timestamp = sys_time;
 
         /* we dont really snap packets but we can pretend to */
         meta->packet_len = pkt_len;
@@ -1121,6 +1169,7 @@ static libtrace_eventobj_t linux_xdp_event(libtrace_t *libtrace,
     libtrace_xdp_meta_t *meta;
     struct xsk_per_stream *stream;
     libtrace_list_node_t *node;
+    uint64_t sys_time;
 
     /* get stream data */
     node = libtrace_list_get_index(FORMAT_DATA->per_stream, 0);
@@ -1148,6 +1197,12 @@ static libtrace_eventobj_t linux_xdp_event(libtrace_t *libtrace,
     rcvd = xsk_ring_cons__peek(&stream->xsk->rx, 1, &idx_rx);
     if (rcvd > 0) {
 
+        sys_time = linux_xdp_get_time();
+        if (stream->prev_sys_time >= sys_time) {
+            sys_time = stream->prev_sys_time + 1;
+        }
+        stream->prev_sys_time = sys_time;
+
         /* got a packet. Get the address and length from the rx descriptor */
         pkt_addr = xsk_ring_cons__rx_desc(&stream->xsk->rx, idx_rx)->addr;
         pkt_len = xsk_ring_cons__rx_desc(&stream->xsk->rx, idx_rx)->len;
@@ -1157,16 +1212,16 @@ static libtrace_eventobj_t linux_xdp_event(libtrace_t *libtrace,
         pkt_buffer = xsk_umem__get_data(stream->xsk->umem->buffer, pkt_addr);
 
         /* prepare the packet */
-        packet->buf_control = TRACE_CTRL_EXTERNAL;
-        packet->type = TRACE_RT_DATA_XDP;
-        packet->buffer = (uint8_t *)pkt_buffer - FRAME_HEADROOM;
+        packet->trace = libtrace;
         packet->header = (uint8_t *)pkt_buffer - FRAME_HEADROOM;
         packet->payload = pkt_buffer;
-        packet->trace = libtrace;
+        packet->buffer = (uint8_t *)pkt_buffer - FRAME_HEADROOM;
+        packet->type = TRACE_RT_DATA_XDP;
+        packet->buf_control = TRACE_CTRL_EXTERNAL;
         packet->error = 1;
 
-        meta = (libtrace_xdp_meta_t *)packet->buffer;
-        meta->timestamp = linux_xdp_get_time(stream);
+        meta = (libtrace_xdp_meta_t *)pkt_buffer - FRAME_HEADROOM;
+        meta->timestamp = sys_time;
 
         /* we dont really snap packets but we can pretend to */
         meta->packet_len = pkt_len;
@@ -1257,12 +1312,20 @@ static int linux_xdp_pregister_thread(libtrace_t *libtrace,
                                libtrace_thread_t *t,
                                bool reading) {
 
+    cpu_set_t cpuset;
+
     if (reading) {
         if (t->type == THREAD_PERPKT) {
             t->format_data = libtrace_list_get_index(FORMAT_DATA->per_stream, t->perpkt_num)->data;
             if (t->format_data == NULL) {
                 trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Too many threads registered");
                 return -1;
+            }
+            /* set threads affinity if supplied in the URI */
+            if (FORMAT_DATA->cfg.cores[0] != -1) {
+                CPU_ZERO(&cpuset);
+                CPU_SET(FORMAT_DATA->cfg.cores[t->perpkt_num], &cpuset);
+                pthread_setaffinity_np(pthread_self(), sizeof(cpuset), &cpuset);
             }
         }
     }
