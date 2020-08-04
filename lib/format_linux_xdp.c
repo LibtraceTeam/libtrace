@@ -41,7 +41,7 @@
 #define FRAME_SIZE         XSK_UMEM__DEFAULT_FRAME_SIZE
 #define RX_BATCH_SIZE      64
 #define INVALID_UMEM_FRAME UINT64_MAX
-#define XDP_MAX_CORES      10
+#define XDP_MAX_CORES      20
 
 #define XDP_BUSY_RETRY     5
 
@@ -545,47 +545,39 @@ static int linux_xdp_init_input(libtrace_t *libtrace) {
      * interface, "%[^:]"
      * kern:prog:interface, "%[^:]:%[^:]:%[^:]:"
      * interface:1,3,4 ""%[^-]-%d"
-     * kern:prog:interface-1,3,4 "%[^:]:%[^:]:%[^-]-%d"
+     * kern:prog:interface:1,3,4 "%[^:]:%[^:]:%[^:]:%d"
      */
+
     char kernel[200], program[200], interface[200];
     int core = -1;
     int matches;
-    bool matched = 0;
 
-    matches = sscanf(libtrace->uridata, "%[^:]:%[^:]:%[^:]:%d", kernel, program, interface, &core);
-    if (matches == 4) {
-        //fprintf(stderr, "kern %s prog %s interface %s core %d\n", kernel, program, interface, core);
-        matched = 1;
+    if ((matches = sscanf(libtrace->uridata, "%[^:]:%[^:]:%[^:]:%d", kernel, program, interface, &core)) == 4) {
         FORMAT_DATA->cfg.bpf_filename = strdup(kernel);
         FORMAT_DATA->cfg.bpf_progname = strdup(program);
         memcpy(FORMAT_DATA->cfg.ifname, interface, strlen(interface));
-    }
 
-    matches = sscanf(libtrace->uridata, "%[^:]:%[^:]:%[^:]:", kernel, program, interface);
-    if (matches == 3 && !matched) {
-        //fprintf(stderr, "kern %s prog %s interface %s\n", kernel, program, interface);
-        matched = 1;
+    } else if ((matches = sscanf(libtrace->uridata, "%[^:]:%[^:]:%[^:]:", kernel, program, interface)) == 3) {
+
         FORMAT_DATA->cfg.bpf_filename = strdup(kernel);
         FORMAT_DATA->cfg.bpf_progname = strdup(program);
         memcpy(FORMAT_DATA->cfg.ifname, interface, strlen(interface));
-    }
 
-    matches = sscanf(libtrace->uridata, "%[^:]:%d", interface, &core);
-    if (matches == 2 && !matched) {
-        //fprintf(stderr, "interface %s core %d\n", interface, core);
-        matched =1;
+    } else if ((matches = sscanf(libtrace->uridata, "%[^:]:%d", interface, &core)) == 2) {
+
         FORMAT_DATA->cfg.bpf_filename = NULL;
         FORMAT_DATA->cfg.bpf_progname = NULL;
         memcpy(FORMAT_DATA->cfg.ifname, interface, strlen(interface));
-    }
 
-    matches = sscanf(libtrace->uridata, "%[^:]", interface);
-    if (matches == 1 && !matched) {
-        //fprintf(stderr, "interface %s\n", interface);
-        matched =1;
+    } else if ((matches = sscanf(libtrace->uridata, "%[^:]", interface)) == 1) {
+
         FORMAT_DATA->cfg.bpf_filename = NULL;
         FORMAT_DATA->cfg.bpf_progname = NULL;
         memcpy(FORMAT_DATA->cfg.ifname, interface, strlen(interface));
+
+    } else {
+        trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Invalid libtrace XDP URI");
+        return -1;
     }
 
     // If the user did not supply a custom BPF kernel try locate the Libtrace one
@@ -598,13 +590,14 @@ static int linux_xdp_init_input(libtrace_t *libtrace) {
             }
         }
     }
+
     // was a kernel found?
     if (FORMAT_DATA->cfg.bpf_filename == NULL) {
         trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to locate Libtrace BPF program");
         return -1;
     }
 
-    /* check interface */
+    // check interface is correct
     FORMAT_DATA->cfg.ifindex = if_nametoindex(FORMAT_DATA->cfg.ifname);
     if (FORMAT_DATA->cfg.ifindex == 0) {
         trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Invalid XDP input interface "
@@ -612,7 +605,7 @@ static int linux_xdp_init_input(libtrace_t *libtrace) {
         return -1;
     }
 
-    /* check cores */
+    // check cores
     if (core != -1) {
         char *scan = NULL;
         scan = strchr(libtrace->uridata, ',');
@@ -623,6 +616,11 @@ static int linux_xdp_init_input(libtrace_t *libtrace) {
         } else {
             FORMAT_DATA->cfg.cores[i++] = core;
             while (sscanf(scan, ",%d%n", &v, &size) == 1) {
+                if (i >= XDP_MAX_CORES) {
+                    trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Supplied CPU cores exceeds the "
+                        "maximum number supported");
+                    return -1;
+                }
                 FORMAT_DATA->cfg.cores[i++] = v;
                 scan += size;
             }
@@ -1312,8 +1310,6 @@ static int linux_xdp_pregister_thread(libtrace_t *libtrace,
                                libtrace_thread_t *t,
                                bool reading) {
 
-    cpu_set_t cpuset;
-
     if (reading) {
         if (t->type == THREAD_PERPKT) {
             t->format_data = libtrace_list_get_index(FORMAT_DATA->per_stream, t->perpkt_num)->data;
@@ -1321,8 +1317,10 @@ static int linux_xdp_pregister_thread(libtrace_t *libtrace,
                 trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Too many threads registered");
                 return -1;
             }
+
             /* set threads affinity if supplied in the URI */
-            if (FORMAT_DATA->cfg.cores[0] != -1) {
+            if (FORMAT_DATA->cfg.cores[t->perpkt_num] != -1) {
+                cpu_set_t cpuset;
                 CPU_ZERO(&cpuset);
                 CPU_SET(FORMAT_DATA->cfg.cores[t->perpkt_num], &cpuset);
                 pthread_setaffinity_np(pthread_self(), sizeof(cpuset), &cpuset);
