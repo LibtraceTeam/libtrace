@@ -1,3 +1,19 @@
+libtrace4 (4.0.14-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Add read and write support for AF_XDP (xdp:). Users may run the provided
+    eBPF program or write their own custom one.
+  * Add basic API for parsing RADIUS messages: trace_get_radius(),
+      trace_get_radius_avp(), trace_get_radius_username().
+  * tracediff can now write differing packets to libtrace outputs, rather
+    than just dumping them to the terminal.
+  * Updated tracediff to be able to "look ahead" to see if packets can be
+    matched rather than just directly comparing packets in the same position.
+  * Added option to tracereplay to control transmit packet batch size.
+  * Fixed bug in traceends that was produced invalid byte counter values.
+
+ -- Shane Alcock <shane.alcock@waikato.ac.nz>  Thu, 06 Aug 2020 17:04:38 +1200
+
 libtrace4 (4.0.13-1) unstable; urgency=medium
 
   * New upstream release.
