@@ -15,6 +15,10 @@ in one trace but not another or for finding conversion or snapping errors.
 \fB\-m\fR maxdiff
 stop processing after displaying 'maxdiff' differences
 
+\fB\-w\fR windowsize
+buffer this number of packets from each trace to scan ahead for possible
+matches
+
 .TP
 \fB\-a\fR traceA-diff.pcap
 Write traceA differences to a file
@@ -28,7 +32,7 @@ Write traceB differences to a file
 tracediff \-m 10 erf:/traces/orig.erf.gz pcapfile:/traces/convert.pcap.gz
 .fi
 .nf
-tracediff \-m 10 -a pcap:org-diff.pcap -b pcap:convert-diff.pcap erf:/traces/orig.erf.gz pcapfile:/traces/convert.pcap.gz
+tracediff \-m 10 \-w 25 \-a pcap:orig-diff.pcap \-b pcap:convert-diff.pcap erf:/traces/orig.erf.gz pcapfile:/traces/convert.pcap.gz
 .fi
 
 .SH BUGS
@@ -46,4 +50,5 @@ tracereport(1), tracepktdump(1), traceanon(1), tracereplay(1),
 traceends(1), tracetopends(1)
 
 .SH AUTHORS
-Shane Alcock <salcock@cs.waikato.ac.nz>
+Shane Alcock <salcock@waikato.ac.nz>,
+Jacob van Walraven <jwalrave@waikato.ac.nz>
