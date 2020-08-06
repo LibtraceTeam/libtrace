@@ -128,6 +128,9 @@ find $RPM_BUILD_ROOT -name '*.la' -exec rm -f {} ';'
 * Thu Aug 6 2020 Shane Alcock <salcock@waikato.ac.nz> - 4.0.14-1
 - Updated for 4.0.14 release
 
+* Fri Jun 26 2020 Shane Alcock <salcock@waikato.ac.nz> - 4.0.13-2
+- Rebuild for Centos 8.2 release
+
 * Tue May 26 2020 Shane Alcock <salcock@waikato.ac.nz> - 4.0.13-1
 - Updated for 4.0.13 release
 
