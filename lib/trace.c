@@ -78,17 +78,6 @@
 
 #include "libtrace.h"
 #include "libtrace_int.h"
-
-#ifdef HAVE_PCAP_BPF_H
-#  include <pcap-bpf.h>
-#else
-#  ifdef HAVE_NET_BPF_H
-#    include <net/bpf.h>
-#  endif
-#endif
-
-
-#include "libtrace_int.h"
 #include "format_helper.h"
 #include "rt_protocol.h"
 
@@ -168,6 +157,9 @@ static void trace_init(void)
 #ifdef HAVE_DPDK
                 dpdk_constructor();
                 dpdkndag_constructor();
+#endif
+#ifdef HAVE_LIBBPF
+                linux_xdp_constructor();
 #endif
 	}
 }
@@ -693,6 +685,12 @@ DLLEXPORT int trace_config(libtrace_t *libtrace,
 					"Libtrace does not support meta packets for this format");
 			}
 			return -1;
+       case TRACE_OPTION_XDP_HARDWARE_OFFLOAD:
+           if (!trace_is_err(libtrace)) {
+               trace_set_err(libtrace, TRACE_ERR_OPTION_UNAVAIL,
+                   "Libtrace does not support XDP hardware offloading for this format");
+           }
+           return -1;
 	}
 	if (!trace_is_err(libtrace)) {
 		trace_set_err(libtrace,TRACE_ERR_UNKNOWN_OPTION,
@@ -1051,8 +1049,10 @@ DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 			packet->trace = libtrace;
                         packet->which_trace_start = libtrace->startcount;
 			ret=libtrace->format->read_packet(libtrace,packet);
-			if (ret==(size_t)READ_MESSAGE ||
-                            ret==(size_t)-1 || ret==0) {
+			if (ret==(size_t)READ_MESSAGE) {
+				continue;
+			}
+                        if (ret==(size_t)-1 || ret==0) {
                                 packet->trace = NULL;
 				return ret;
 			}

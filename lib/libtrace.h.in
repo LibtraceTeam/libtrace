@@ -1,34 +1,26 @@
 /*
- * This file is part of libtrace
  *
- * Copyright (c) 2007-2015 The University of Waikato, Hamilton,
- * New Zealand.
- *
- * Authors: Daniel Lawson
- *          Perry Lorier
- *          Shane Alcock
- *          Richard Sanger
- *
+ * Copyright (c) 2007-2020 The University of Waikato, Hamilton, New Zealand.
  * All rights reserved.
+ *
+ * This file is part of libtrace.
  *
  * This code has been developed by the University of Waikato WAND
  * research group. For further information please see http://www.wand.net.nz/
  *
  * libtrace is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * libtrace is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with libtrace; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
- * $Id$
  *
  */
 
@@ -43,8 +35,6 @@
  * @author Perry Lorier
  * @author Shane Alcock
  * @author Richard Sanger
- *
- * @version $Id$
  *
  * This library provides a per packet interface into a trace file, or a live
  * captures.  It supports ERF, DAG cards, PCAP, Linux and BSD native sockets,
@@ -417,6 +407,7 @@ typedef enum {
        TRACE_TYPE_PCAPNG_META = 23,	/** PCAPNG meta packet */
        TRACE_TYPE_TZSP = 24,		/** TZSP Live packets */
        TRACE_TYPE_CORSAROTAG = 25,      /** Corsaro tagged packets */
+       TRACE_TYPE_XDP = 26,             /** AF_XDP */
 } libtrace_linktype_t;
 
 /** RT protocol base format identifiers.
@@ -448,6 +439,7 @@ enum base_format_t {
 	TRACE_FORMAT_UNKNOWN      =22,  /** Unknown format */
 	TRACE_FORMAT_TZSPLIVE	  =23,  /** TZSP */
         TRACE_FORMAT_CORSAROTAG   =24,  /** Corsarotagger format */
+        TRACE_FORMAT_XDP          =25,  /** AF_XDP format */
 };
 
 /** RT protocol packet types */
@@ -509,6 +501,8 @@ typedef enum {
 	TRACE_RT_DATA_TZSP = TRACE_RT_DATA_SIMPLE + TRACE_FORMAT_TZSPLIVE,
 	/** RT is encapsulating a packet tagged by corsarotagger */
 	TRACE_RT_DATA_CORSARO_TAGGED = TRACE_RT_DATA_SIMPLE + TRACE_FORMAT_CORSAROTAG,
+        /** RT is encapsulating a packet tagged by AF_XDP */
+        TRACE_RT_DATA_XDP = TRACE_RT_DATA_SIMPLE + TRACE_FORMAT_XDP,
 
 	/** As PCAP does not store the linktype with the packet, we need to 
 	 * create a separate RT type for each supported DLT, starting from
@@ -689,21 +683,21 @@ typedef struct libtrace_packet_cache {
  * meddling around in here 
  */
 typedef struct libtrace_packet_t {
-	struct libtrace_t *trace; 	/**< Pointer to the trace */
+	struct libtrace_t *trace;       /**< Pointer to the trace */
 	void *header;			/**< Pointer to the framing header */
 	void *payload;			/**< Pointer to the link layer */
 	void *buffer;			/**< Allocated buffer */
-	libtrace_rt_types_t  type; 	/**< RT protocol type for the packet */
-	buf_control_t buf_control; 	/**< Describes memory ownership */
+	libtrace_rt_types_t  type;      /**< RT protocol type for the packet */
+	buf_control_t buf_control;      /**< Describes memory ownership */
         libtrace_packet_cache_t cached; /**< Cached packet properties / headers */
-	uint64_t order; /**< Notes the order of this packet in relation to the input */
-	uint64_t hash; /**< A hash of the packet as supplied by the user */
-	int error; /**< The error status of pread_packet */
+	uint64_t order;                 /**< Notes the order of this packet in relation to the input */
+	uint64_t hash;                  /**< A hash of the packet as supplied by the user */
+	int error;                      /**< The error status of pread_packet */
         uint64_t internalid;            /** Internal identifier for the pkt */
         void *srcbucket;
 
         pthread_mutex_t ref_lock;       /**< Lock for reference counter */
-        int refcount;                 /**< Reference counter */
+        int refcount;                   /**< Reference counter */
         int which_trace_start;          /**< Used to match packet to a started instance of the parent trace */
 } libtrace_packet_t;
 
@@ -1468,6 +1462,9 @@ typedef enum {
 
 	/** If enabled all meta packet will be discarded */
 	TRACE_OPTION_DISCARD_META,
+
+  TRACE_OPTION_XDP_HARDWARE_OFFLOAD,
+
 } trace_option_t;
 
 /** Sets an input config option
@@ -1544,11 +1541,16 @@ typedef enum {
 typedef enum {
 	/** File flags to use when opening an output file, e.g. O_APPEND */
 	TRACE_OPTION_OUTPUT_FILEFLAGS,
+
 	/** Compression level: 0 = no compression, 1 = faster compression,
 	 * 9 = better compression */
 	TRACE_OPTION_OUTPUT_COMPRESS,
+
 	/** Compression type, see trace_option_compresstype_t */
-	TRACE_OPTION_OUTPUT_COMPRESSTYPE
+	TRACE_OPTION_OUTPUT_COMPRESSTYPE,
+
+        /** TX queue size **/
+        TRACE_OPTION_TX_MAX_QUEUE,
 } trace_option_output_t;
 
 /* To add a new stat field update this list, and the relevant places in

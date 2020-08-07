@@ -617,6 +617,8 @@ static int pcapng_config_input(libtrace_t *libtrace, trace_option_t option,
                                 DATA(libtrace)->discard_meta = false;
                         }
 			return 0;
+                case TRACE_OPTION_XDP_HARDWARE_OFFLOAD:
+                    break;
         }
 
         trace_set_err(libtrace, TRACE_ERR_UNKNOWN_OPTION, "Unknown option %i",

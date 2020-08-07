@@ -78,16 +78,6 @@
 
 #include "libtrace.h"
 #include "libtrace_parallel.h"
-
-#ifdef HAVE_NET_BPF_H
-#  include <net/bpf.h>
-#else
-#  ifdef HAVE_PCAP_BPF_H
-#    include <pcap-bpf.h>
-#  endif
-#endif
-
-
 #include "libtrace_int.h"
 #include "format_helper.h"
 #include "rt_protocol.h"
@@ -726,6 +716,7 @@ static void* perpkt_threads_entry(void *data) {
 			}
                         send_message(trace, t, message.code, message.data, 
                                         message.sender);
+
 			/* Continue and the empty messages out before packets */
 			continue;
 		}
@@ -1025,10 +1016,27 @@ inline static int trace_pread_packet_hasher_thread(libtrace_t *libtrace,
                                                    size_t nb_packets) {
 	size_t i;
 
-	/* We store the last error message here */
-	if (t->format_data) {
-		return ((libtrace_packet_t *)t->format_data)->error;
-	}
+        /* We store the last error message here */
+        if (t->format_data) {
+                return ((libtrace_packet_t *)t->format_data)->error;
+        }
+
+        /* libtrace_ringbuffer_read() blocks if a packet is not available
+         * and this prevents the tick messages from being triggered. So check
+         * for a available packet before continuing.
+         */
+        while (libtrace_ringbuffer_is_empty(&t->rbuffer)) {
+
+                /* does libtrace have any messages in the queue */
+                if (libtrace_message_queue_count(&t->messages) > 0) {
+                    return READ_MESSAGE;
+                }
+
+		/* Give up the CPU time to another thread since we have
+                 * packets or messages.
+                 */
+                sched_yield();
+        }
 
 	// Always grab at least one
 	if (packets[0]) // Recycle the old get the new

@@ -3,11 +3,11 @@
 # Now you only need to update the version number in two places - below,
 # and in the README
 
-AC_INIT([libtrace],[4.0.13],[contact@wand.net.nz],[libtrace])
+AC_INIT([libtrace],[4.0.14],[contact@wand.net.nz],[libtrace])
 
 LIBTRACE_MAJOR=4
 LIBTRACE_MID=0
-LIBTRACE_MINOR=13
+LIBTRACE_MINOR=14
 
 # OpenSolaris hides libraries like libncurses in /usr/gnu/lib, which is not
 # searched by default - add it to LDFLAGS so we at least have a chance of 
@@ -213,6 +213,62 @@ if test "$cryptofound" = 1; then
 fi
 AC_CHECK_LIB(yaml, yaml_parser_initialize, yamlfound=1, yamlfound=0)
 AC_CHECK_LIB(tasn1, asn1_array2tree, asn1found=1, asn1found=0)
+
+
+# check for xdp requirements.
+libtrace_xdp=false
+build_ebpf=false
+
+AC_CHECK_LIB(elf, elf_begin, elffound=1, elffound=0)
+if test "$elffound" == 1; then
+    # check for libbpf
+    AC_CHECK_LIB(bpf, xsk_socket__create, bpffound=1, bpffound=0, -lelf)
+
+    if test "$bpffound" = 1; then
+	    AC_DEFINE(HAVE_LIBBPF, 1, [Set to 1 if libbpf is available])
+		ADD_LDFLAGS="$ADD_LDFLAGS -lbpf -lelf"
+		libtrace_xdp=true
+
+        # check for requirements to build XDP eBPF kernel
+        AC_CHECK_PROG(CLANG, [clang], [clang], [no])
+        if test "$CLANG" != "no"; then
+
+            AC_SUBST(CLANG)
+            llc_candidates=$($CLANG --version | \
+                awk '/^clang version/ {
+                split($3, v, ".");
+                printf("llc-%s.%s llc-%s llc", v[[1]], v[[2]], v[[1]])
+            }')
+            AC_CHECK_PROGS([LLC], [$llc_candidates], [no])
+            if test "$LLC" != "no"; then
+                AC_SUBST(LLC)
+                build_ebpf=true
+            fi
+
+        fi
+	else
+	    libtrace_xdp=false
+    fi
+
+fi
+
+# was XDP support explicitly specified and failed
+AC_ARG_WITH(xdp,AS_HELP_STRING(--with-xdp, include XDP capture support),
+[
+    if test x"$libtrace_xdp" = xfalse; then
+        AC_MSG_ERROR([libelf and libbpf are required for XDP support])
+    fi
+
+],[])
+
+# was ebpf build explicitly specified and failed
+AC_ARG_ENABLE(ebpf-build, AS_HELP_STRING(--enable-ebpf-build, Enable compilation of XDP eBPF kernel),
+[
+    if test x"$build_ebpf" = xfalse; then
+        AC_MSG_ERROR([clang, llvm and libbpf are required to build the XDP eBPF kernel])
+    fi
+],[])
+    
 
 # Check for libpcap
 AC_CHECK_LIB(pcap,pcap_next_ex,pcapfound=1,pcapfound=0)
@@ -587,7 +643,7 @@ if test "$want_dpdk" != no; then
 		AC_CHECK_LIB(dpdk, rte_eth_dev_configure, dpdk_found="system", dpdk_found=0)
 		# We also need to check that rte.vars.mk is installed from dpdk-dev (as well as libdpdk-dev)
 		if test "$dpdk_found" != 0 -a -e /usr/share/dpdk/mk/rte.vars.mk ; then
-                         # This is terrible, but I'm not sure that there is an easier way for us to figure out what RTE_EXEC_ENV is eventually going to be renamed to by the end of the DPDK build process.
+                        # This is terrible, but I'm not sure that there is an easier way for us to figure out what RTE_EXEC_ENV is eventually going to be renamed to by the end of the DPDK build process.
                         for execenv in linuxapp linux bsdapp freebsd; do
                                 if test -d /usr/share/dpdk/$(uname -m)-default-${execenv}-gcc; then
                                         RTE_TARGET=$(uname -m)-default-${execenv}-gcc
@@ -596,16 +652,16 @@ if test "$want_dpdk" != no; then
                         done
 
                         if test RTE_TARGET != ""; then
-                                RTE_SDK="/usr/share/dpdk/"
-                                RTE_INCLUDE="/usr/include/dpdk"
-                                AC_SUBST([RTE_TARGET])
-                                AC_SUBST([RTE_SDK])
-                                AC_SUBST([RTE_INCLUDE])
-                                LIBTRACE_LIBS="$LIBTRACE_LIBS -ldpdk"
-                                AC_MSG_NOTICE([Building against system DPDK])
+				RTE_SDK="/usr/share/dpdk/"
+				RTE_INCLUDE="/usr/include/dpdk"
+				AC_SUBST([RTE_TARGET])
+				AC_SUBST([RTE_SDK])
+				AC_SUBST([RTE_INCLUDE])
+				LIBTRACE_LIBS="$LIBTRACE_LIBS -ldpdk"
+				AC_MSG_NOTICE([Building against system DPDK])
 
-                                dpdk_found=system
-                        fi
+				dpdk_found=system
+			fi
 		fi
 	fi
 
@@ -718,6 +774,9 @@ AM_CONDITIONAL([HAVE_YAML], [test "x$have_yaml" != "xno"])
 
 AM_CONDITIONAL([HAVE_DPDK_PKGCONFIG], [test "x$dpdk_found" = "xpkgconfig"])
 
+AM_CONDITIONAL([HAVE_LIBBPF], [test "x$libtrace_xdp" = "xtrue"])
+AM_CONDITIONAL([BUILD_EBPF], [test "x$build_ebpf" = "xtrue"])
+
 # Check for miscellaneous programs
 AC_CHECK_PROG([libtrace_doxygen], [doxygen], [true], [false])
 
@@ -779,6 +838,20 @@ else
 	AC_MSG_NOTICE([Compiled with DAG live capture support: No])
 fi
 
+# Are we building with XDP support
+if test x"$libtrace_xdp" = xtrue; then
+	AC_MSG_NOTICE([Compiled with XDP capture support: Yes])
+else
+	AC_MSG_NOTICE([Compiled with XDP capture support: No])
+fi
+
+# Are we building eBPF XDP program
+if test x"$build_ebpf" =  xtrue; then
+    AC_MSG_NOTICE([XDP Libtrace BPF program will be compiled: Yes])
+else
+    AC_MSG_NOTICE([XDP Libtrace BPF program will be compiled: No])
+fi
+
 if test x"$libtrace_dpdk" = xtrue; then
 	AC_MSG_NOTICE([Compiled with DPDK live capture support: Yes])
 	reportopt "Compiled with DPDK trace NUMA support" $with_numa
@@ -800,6 +873,7 @@ reportopt "Building traceanon (requires libyaml)" $have_yaml
 if test x"$have_yaml" = xyes; then
     reportopt "Building traceanon with CryptoPan (requires libcrypto and openssl/evp.h)" $have_crypto
 fi
+
 
 # Report any errors relating to missing bison, flex, etc.
 echo 

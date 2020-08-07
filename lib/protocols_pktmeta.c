@@ -212,6 +212,7 @@ DLLEXPORT void *trace_get_packet_meta(const libtrace_packet_t *packet,
 		case TRACE_TYPE_PCAPNG_META:
 		case TRACE_TYPE_TZSP:
 		case TRACE_TYPE_CONTENT_INVALID:
+                case TRACE_TYPE_XDP:
 			return NULL;
 	}
 
@@ -291,6 +292,7 @@ DLLEXPORT void *trace_get_payload_from_meta(const void *meta,
 		case TRACE_TYPE_ERF_META:
 		case TRACE_TYPE_UNKNOWN:
 		case TRACE_TYPE_CONTENT_INVALID:
+                case TRACE_TYPE_XDP:
 			/* In this case, the pointer passed in does not point
 			 * to a metadata header and so we cannot get the
 			 * payload.

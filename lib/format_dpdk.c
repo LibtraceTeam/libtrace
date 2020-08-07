@@ -781,6 +781,7 @@ int dpdk_config_input (libtrace_t *libtrace,
 	case TRACE_OPTION_EVENT_REALTIME:
         case TRACE_OPTION_REPLAY_SPEEDUP:
         case TRACE_OPTION_CONSTANT_ERF_FRAMING:
+        case TRACE_OPTION_XDP_HARDWARE_OFFLOAD:
 		break;
 	/* Avoid default: so that future options will cause a warning
 	 * here to remind us to implement it, or flag it as
@@ -2087,8 +2088,10 @@ int dpdk_read_packet_stream (libtrace_t *libtrace,
 			//fprintf(stderr, "Doing P READ PACKET port=%d q=%d\n", (int) FORMAT(libtrace)->port, (int) get_thread_table_num(libtrace));
 			return nb_rx;
 		}
-		/* Check the message queue this could be less than 0 */
-		if (mesg && libtrace_message_queue_count(mesg) > 0)
+		/* Check the message queue this could be less than 0.
+                 * If the message queue is not available return and let libtrace
+                 * check for new messages. */
+		if ((mesg && libtrace_message_queue_count(mesg) > 0) || !mesg)
 			return READ_MESSAGE;
 		if ((nb_rx=is_halted(libtrace)) != (size_t) -1)
 			return nb_rx;
