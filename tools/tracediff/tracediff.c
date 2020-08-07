@@ -61,7 +61,7 @@ void fill_packet_windows(libtrace_t *trace_a, libtrace_t *trace_b,
 static uint32_t hash_packet(libtrace_packet_t *packet) {
 
     libtrace_linktype_t ltype;
-    uint32_t rem;
+    uint32_t rem, i;
 
     const char *str = (const char *)trace_get_packet_buffer(packet, &ltype, &rem);
     if (!str)
@@ -69,7 +69,7 @@ static uint32_t hash_packet(libtrace_packet_t *packet) {
 
     /* djb hashing algorithm */
     unsigned long hash = 5381;
-    for (uint32_t i = 0; i < rem; str++, i++) {
+    for (i = 0; i < rem; str++, i++) {
         hash = ((hash << 5) + hash) + (*str);
     }
 
@@ -159,10 +159,10 @@ void fill_packet_windows(libtrace_t *trace_a, libtrace_t *trace_b,
                          struct packet_window *a, int a_pos,
                          struct packet_window *b, int b_pos,
                          int window_size) {
-    int pos;
+    int pos, i;
 
     /* Window A */
-    for (int i = a_pos; i < a_pos + window_size; i++) {
+    for (i = a_pos; i < a_pos + window_size; i++) {
 
         pos = i % window_size;
 
@@ -178,7 +178,7 @@ void fill_packet_windows(libtrace_t *trace_a, libtrace_t *trace_b,
     }
 
     /* Window B */
-    for (int i = b_pos; i < b_pos + window_size; i++) {
+    for (i = b_pos; i < b_pos + window_size; i++) {
 
         pos = i % window_size;
 
@@ -199,8 +199,8 @@ int main(int argc, char *argv[])
 {
 
         struct packet_window *packet_window[2];
-        int window_size = 20;
-        uint64_t w_pos[2];
+        int window_size = 20, i;
+        uint64_t w_pos[2], j;
         uint64_t b_pos[2];
         char *output_file[2] = {NULL, NULL};
         libtrace_out_t *output[2] = {NULL, NULL};
@@ -268,7 +268,7 @@ int main(int argc, char *argv[])
         b_pos[1] = 0;
 
         /* create each packet */
-        for (int i = 0; i < window_size; i++) {
+        for (i = 0; i < window_size; i++) {
             packet_window[0][i].packet = trace_create_packet();
             packet_window[1][i].packet = trace_create_packet();
             if (packet_window[0][i].packet == NULL
@@ -361,10 +361,10 @@ int main(int argc, char *argv[])
                if (match) {
 
                    /* output all packets prior to the matched packed on window B */
-                   for (uint64_t i = b_pos[1]; i < w_pos[1]; i++) {
+                   for (j = b_pos[1]; j < w_pos[1]; j++) {
 
-                       dump_packet(output[1], packet_window[1][i % window_size].packet);
-                       packet_window[1][i % window_size].status = INT_MAX;
+                       dump_packet(output[1], packet_window[1][j % window_size].packet);
+                       packet_window[1][j % window_size].status = INT_MAX;
                        if (++dumped_diff >= max_diff && max_diff > 0)
                            goto end;
                    }
@@ -392,10 +392,10 @@ int main(int argc, char *argv[])
                    if (match) {
 
                        /* output all window A packets prior to the match */
-                       for (uint64_t i = b_pos[0]; i < w_pos[0]; i++) {
+                       for (j = b_pos[0]; j < w_pos[0]; j++) {
 
-                           dump_packet(output[0], packet_window[0][i % window_size].packet);
-                           packet_window[0][i % window_size].status = INT_MAX;
+                           dump_packet(output[0], packet_window[0][j % window_size].packet);
+                           packet_window[0][j % window_size].status = INT_MAX;
                            if (++dumped_diff >= max_diff && max_diff > 0)
                                goto end;
                        }
@@ -496,7 +496,7 @@ end:
 	}
 
         /* destroy each packet */
-        for (int i = 0; i < window_size; i++) {
+        for (i = 0; i < window_size; i++) {
             trace_destroy_packet(packet_window[0][i].packet);
             trace_destroy_packet(packet_window[1][i].packet);
         }
