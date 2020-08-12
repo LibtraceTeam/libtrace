@@ -451,16 +451,19 @@ static void linux_xdp_complete_tx(struct xsk_socket_info *xsk) {
 
 static uint64_t linux_xdp_get_time() {
 
-#if USE_CLOCK_GETTIME
+    uint64_t sys_time;
+
+    #if USE_CLOCK_GETTIME
     struct timespec ts = {0};
     clock_gettime(CLOCK_REALTIME, &ts);
-    return ((uint64_t) ts.tv_sec * 1000000000ull + (uint64_t) ts.tv_nsec);
+    sys_time = ((uint64_t) ts.tv_sec * 1000000000ull + (uint64_t) ts.tv_nsec);
 #else
     struct timeval tv = {0};
     gettimeofday(&tv, NULL);
-    return ((uint64_t) tv.tv_sec * 1000000000ull + (uint64_t) tv.tv_usec * 1000ull);
+    sys_time = ((uint64_t) tv.tv_sec * 1000000000ull + (uint64_t) tv.tv_usec * 1000ull);
 #endif
 
+    return sys_time;
 }
 
 static int linux_xdp_init_control_map(libtrace_t *libtrace) {
@@ -1041,21 +1044,20 @@ static int linux_xdp_read_stream(libtrace_t *libtrace,
         pkt_buffer = xsk_umem__get_data(stream->xsk->umem->buffer, pkt_addr);
 
         /* prepare the packet */
-        packet[i]->trace = libtrace;
+        packet[i]->buf_control = TRACE_CTRL_EXTERNAL;
+        packet[i]->type = TRACE_RT_DATA_XDP;
+        packet[i]->buffer = (uint8_t *)pkt_buffer - FRAME_HEADROOM;
         packet[i]->header = (uint8_t *)pkt_buffer - FRAME_HEADROOM;
         packet[i]->payload = pkt_buffer;
-        packet[i]->buffer = (uint8_t *)pkt_buffer - FRAME_HEADROOM;
-        packet[i]->type = TRACE_RT_DATA_XDP;
-        packet[i]->buf_control = TRACE_CTRL_EXTERNAL;
+        packet[i]->trace = libtrace;
         packet[i]->error = 1;
 
-        meta = (libtrace_xdp_meta_t *)pkt_buffer - FRAME_HEADROOM;
+        meta = (libtrace_xdp_meta_t *)packet[i]->buffer;
 
         if (stream->prev_sys_time >= sys_time) {
             sys_time = stream->prev_sys_time + 1;
         }
         stream->prev_sys_time = sys_time;
-
         meta->timestamp = sys_time;
 
         /* we dont really snap packets but we can pretend to */
@@ -1233,12 +1235,6 @@ static libtrace_eventobj_t linux_xdp_event(libtrace_t *libtrace,
     rcvd = xsk_ring_cons__peek(&stream->xsk->rx, 1, &idx_rx);
     if (rcvd > 0) {
 
-        sys_time = linux_xdp_get_time();
-        if (stream->prev_sys_time >= sys_time) {
-            sys_time = stream->prev_sys_time + 1;
-        }
-        stream->prev_sys_time = sys_time;
-
         /* got a packet. Get the address and length from the rx descriptor */
         pkt_addr = xsk_ring_cons__rx_desc(&stream->xsk->rx, idx_rx)->addr;
         pkt_len = xsk_ring_cons__rx_desc(&stream->xsk->rx, idx_rx)->len;
@@ -1248,15 +1244,20 @@ static libtrace_eventobj_t linux_xdp_event(libtrace_t *libtrace,
         pkt_buffer = xsk_umem__get_data(stream->xsk->umem->buffer, pkt_addr);
 
         /* prepare the packet */
-        packet->trace = libtrace;
+        packet->buf_control = TRACE_CTRL_EXTERNAL;
+        packet->type = TRACE_RT_DATA_XDP;
+        packet->buffer = (uint8_t *)pkt_buffer - FRAME_HEADROOM;
         packet->header = (uint8_t *)pkt_buffer - FRAME_HEADROOM;
         packet->payload = pkt_buffer;
-        packet->buffer = (uint8_t *)pkt_buffer - FRAME_HEADROOM;
-        packet->type = TRACE_RT_DATA_XDP;
-        packet->buf_control = TRACE_CTRL_EXTERNAL;
+        packet->trace = libtrace;
         packet->error = 1;
 
-        meta = (libtrace_xdp_meta_t *)pkt_buffer - FRAME_HEADROOM;
+        meta = (libtrace_xdp_meta_t *)packet->buffer;
+        sys_time = linux_xdp_get_time();
+        if (stream->prev_sys_time >= sys_time) {
+            sys_time = stream->prev_sys_time + 1;
+        }
+        stream->prev_sys_time = sys_time;
         meta->timestamp = sys_time;
 
         /* we dont really snap packets but we can pretend to */
@@ -1330,15 +1331,13 @@ static int linux_xdp_fin_input(libtrace_t *libtrace) {
 static int linux_xdp_fin_output(libtrace_out_t *libtrace) {
 
     if (FORMAT_DATA != NULL) {
-
+    
         /* this is the special case where we do not need have
          * per stream data for the output trace when the input
          * trace was bound to tx and rx queues and its format
-         * data was supplied to the output trace. Input trace
-         * will free this.
+         * data was supplied to the output trace.
          */
         if (FORMAT_DATA->input_data == NULL) {
-
             linux_xdp_destroy_streams(FORMAT_DATA->per_stream);
             libtrace_list_deinit(FORMAT_DATA->per_stream);
 
@@ -1365,14 +1364,14 @@ static int linux_xdp_pregister_thread(libtrace_t *libtrace,
                 trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Too many threads registered");
                 return -1;
             }
+        }
 
-            /* set threads affinity if supplied in the URI */
-            if (FORMAT_DATA->cfg.cores[t->perpkt_num] != -1) {
-                cpu_set_t cpuset;
-                CPU_ZERO(&cpuset);
-                CPU_SET(FORMAT_DATA->cfg.cores[t->perpkt_num], &cpuset);
-                pthread_setaffinity_np(pthread_self(), sizeof(cpuset), &cpuset);
-            }
+        /* set threads affinity if supplied in the URI */
+        if (FORMAT_DATA->cfg.cores[t->perpkt_num] != -1) {
+            cpu_set_t cpuset;
+            CPU_ZERO(&cpuset);
+            CPU_SET(FORMAT_DATA->cfg.cores[t->perpkt_num], &cpuset);
+            pthread_setaffinity_np(pthread_self(), sizeof(cpuset), &cpuset);
         }
     }
 
