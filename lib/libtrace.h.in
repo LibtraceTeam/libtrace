@@ -1463,30 +1463,41 @@ typedef enum {
 	 * access this option via trace_set_hasher(). */
 	TRACE_OPTION_HASHER,
 
-        /** Speed up trace file replays (via trace_event()) by this factor */
-        TRACE_OPTION_REPLAY_SPEEDUP,
+	/** Speed up trace file replays (via trace_event()) by this factor */
+	TRACE_OPTION_REPLAY_SPEEDUP,
 
-        /** Always assume ERF framing length is the given value, rather than
-         *  trying to calculate it from the packet type. */
-        TRACE_OPTION_CONSTANT_ERF_FRAMING,
+	/** Always assume ERF framing length is the given value, rather than
+	 *  trying to calculate it from the packet type. */
+	TRACE_OPTION_CONSTANT_ERF_FRAMING,
 
 	/** If enabled all meta packet will be discarded */
 	TRACE_OPTION_DISCARD_META,
 
-        /** Offload XDP program to hardware */
-        TRACE_OPTION_XDP_HARDWARE_OFFLOAD,
+	/** Instruct the capture format to bind to TX and RX queues,
+	 *  Particulary usefull for live formats such as XDP as it 
+	 *  can allow reading and writing to the same interface.
+	 */
+	TRACE_OPTION_BIND_TX_RX,
 
-        /** Install XDP program in native/driver mode */
-        TRACE_OPTION_XDP_DRV_MODE,
+	/** Returns a pointer to the capture formats internal data structure.
+	 *  This should only be used by advanced users.
+	 */
+	TRACE_OPTION_GET_FORMAT_DATA,
 
-        /** Install XDP program in SKB (generic) mode */
-        TRACE_OPTION_XDP_SKB_MODE,
+	/** Offload XDP program to hardware */
+	TRACE_OPTION_XDP_HARDWARE_OFFLOAD,
 
-        /** Force XDP copy mode */
-        TRACE_OPTION_XDP_ZERO_COPY_MODE,
+	/** Install XDP program in native/driver mode */
+	TRACE_OPTION_XDP_DRV_MODE,
 
-        /** Force XDP zero copy mode */
-        TRACE_OPTION_XDP_COPY_MODE,
+	/** Install XDP program in SKB (generic) mode */
+	TRACE_OPTION_XDP_SKB_MODE,
+
+	/** Force XDP copy mode */
+	TRACE_OPTION_XDP_ZERO_COPY_MODE,
+
+	/** Force XDP zero copy mode */
+	TRACE_OPTION_XDP_COPY_MODE,
 } trace_option_t;
 
 /** Sets an input config option
@@ -1571,8 +1582,12 @@ typedef enum {
 	/** Compression type, see trace_option_compresstype_t */
 	TRACE_OPTION_OUTPUT_COMPRESSTYPE,
 
-        /** TX queue size **/
-        TRACE_OPTION_TX_MAX_QUEUE,
+	/** TX queue size **/
+	TRACE_OPTION_TX_MAX_QUEUE,
+
+	/** Allows passing the input format data to the output format */
+	TRACE_OPTION_SET_INPUT_FORMAT_DATA
+
 } trace_option_output_t;
 
 /* To add a new stat field update this list, and the relevant places in

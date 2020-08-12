@@ -616,7 +616,7 @@ DLLEXPORT int trace_config(libtrace_t *libtrace,
 	 * format did not support configuration. However, libtrace can
 	 * deal with some options itself, so give that a go */
 	switch(option) {
-                case TRACE_OPTION_REPLAY_SPEEDUP:
+            case TRACE_OPTION_REPLAY_SPEEDUP:
 			/* Clear the error if there was one */
 			if (trace_is_err(libtrace)) {
 				trace_get_err(libtrace);
@@ -671,50 +671,61 @@ DLLEXPORT int trace_config(libtrace_t *libtrace,
 		case TRACE_OPTION_HASHER:
 			/* Dealt with earlier */
 			return -1;
-                case TRACE_OPTION_CONSTANT_ERF_FRAMING:
-                        if (!trace_is_err(libtrace)) {
-                                trace_set_err(libtrace,
-                                                TRACE_ERR_OPTION_UNAVAIL,
-						"This format does not feature an ERF header or does not support bypassing the framing length calculation");
-                        }
-                        return -1;
-
+		case TRACE_OPTION_CONSTANT_ERF_FRAMING:
+				if (!trace_is_err(libtrace)) {
+						trace_set_err(libtrace,
+										TRACE_ERR_OPTION_UNAVAIL,
+				"This format does not feature an ERF header or does not support bypassing the framing length calculation");
+				}
+				return -1;
 		case TRACE_OPTION_DISCARD_META:
 			if (!trace_is_err(libtrace)) {
 				trace_set_err(libtrace, TRACE_ERR_OPTION_UNAVAIL,
 					"Libtrace does not support meta packets for this format");
 			}
 			return -1;
-                case TRACE_OPTION_XDP_HARDWARE_OFFLOAD:
-                        if (!trace_is_err(libtrace)) {
-                                trace_set_err(libtrace, TRACE_ERR_OPTION_UNAVAIL,
-                                        "Libtrace does not support XDP hardware offloading for this format");
-                        }
-                        return -1;
-                case TRACE_OPTION_XDP_ZERO_COPY_MODE:
-                        if (!trace_is_err(libtrace)) {
-                                trace_set_err(libtrace, TRACE_ERR_OPTION_UNAVAIL,
-                                        "Libtrace does not support XDP zero copy mode for this format");
-                        }
-                        return -1;
-                case TRACE_OPTION_XDP_COPY_MODE:
-                        if (!trace_is_err(libtrace)) {
-                                trace_set_err(libtrace, TRACE_ERR_OPTION_UNAVAIL,
-                                        "Libtrace does not support XDP copy mode for this format");
-                        }
-                        return -1;
-                case TRACE_OPTION_XDP_DRV_MODE:
-                        if (!trace_is_err(libtrace)) {
-                                trace_set_err(libtrace, TRACE_ERR_OPTION_UNAVAIL,
-                                        "Libtrace does not support installing XDP program in native/driver mode");
-                        }
-                        return -1;
-                case TRACE_OPTION_XDP_SKB_MODE:
-                        if (!trace_is_err(libtrace)) {
-                                trace_set_err(libtrace, TRACE_ERR_OPTION_UNAVAIL,
-                                        "Libtrace does not support installing XDP program in SKB (generic) mode");
-                        }
-                        return -1;
+		case TRACE_OPTION_BIND_TX_RX:
+			if (!trace_is_err(libtrace)) {
+					trace_set_err(libtrace, TRACE_ERR_OPTION_UNAVAIL,
+							"Libtrace does not support binding to TX and RX queues for this format");
+			}
+			return -1;
+        case TRACE_OPTION_GET_FORMAT_DATA:
+			if (!trace_is_err(libtrace)) {
+					trace_set_err(libtrace, TRACE_ERR_OPTION_UNAVAIL,
+							"Libtrace does not support returning format data for this format");
+			}
+			return -1;
+		case TRACE_OPTION_XDP_HARDWARE_OFFLOAD:
+			if (!trace_is_err(libtrace)) {
+					trace_set_err(libtrace, TRACE_ERR_OPTION_UNAVAIL,
+							"Libtrace does not support XDP hardware offloading for this format");
+			}
+			return -1;
+		case TRACE_OPTION_XDP_ZERO_COPY_MODE:
+			if (!trace_is_err(libtrace)) {
+					trace_set_err(libtrace, TRACE_ERR_OPTION_UNAVAIL,
+							"Libtrace does not support XDP zero copy mode for this format");
+			}
+			return -1;
+		case TRACE_OPTION_XDP_COPY_MODE:
+			if (!trace_is_err(libtrace)) {
+					trace_set_err(libtrace, TRACE_ERR_OPTION_UNAVAIL,
+							"Libtrace does not support XDP copy mode for this format");
+			}
+			return -1;
+		case TRACE_OPTION_XDP_DRV_MODE:
+			if (!trace_is_err(libtrace)) {
+					trace_set_err(libtrace, TRACE_ERR_OPTION_UNAVAIL,
+							"Libtrace does not support installing XDP program in native/driver mode");
+			}
+			return -1;
+		case TRACE_OPTION_XDP_SKB_MODE:
+			if (!trace_is_err(libtrace)) {
+					trace_set_err(libtrace, TRACE_ERR_OPTION_UNAVAIL,
+							"Libtrace does not support installing XDP program in SKB (generic) mode");
+			}
+			return -1;
 	}
 	if (!trace_is_err(libtrace)) {
 		trace_set_err(libtrace,TRACE_ERR_UNKNOWN_OPTION,

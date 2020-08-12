@@ -287,12 +287,14 @@ static int pcapfile_config_input(libtrace_t *libtrace,
 			 * by trace_config */
 			break;
 		case TRACE_OPTION_DISCARD_META:
-                case TRACE_OPTION_XDP_HARDWARE_OFFLOAD:
-                case TRACE_OPTION_XDP_SKB_MODE:
-                case TRACE_OPTION_XDP_DRV_MODE:
-                case TRACE_OPTION_XDP_ZERO_COPY_MODE:
-                case TRACE_OPTION_XDP_COPY_MODE:
-			break;
+		case TRACE_OPTION_BIND_TX_RX:
+        case TRACE_OPTION_GET_FORMAT_DATA:
+		case TRACE_OPTION_XDP_HARDWARE_OFFLOAD:
+		case TRACE_OPTION_XDP_SKB_MODE:
+		case TRACE_OPTION_XDP_DRV_MODE:
+		case TRACE_OPTION_XDP_ZERO_COPY_MODE:
+		case TRACE_OPTION_XDP_COPY_MODE:
+	break;
 	}
 	trace_set_err(libtrace,TRACE_ERR_UNKNOWN_OPTION,
 			"Unknown option %i", option);

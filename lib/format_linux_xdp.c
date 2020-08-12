@@ -64,6 +64,7 @@ struct xsk_config {
      * 2 = promisc on by user
      */
     int promisc;
+    bool bind_tx_rx;
 
     int cores[XDP_MAX_CORES];
 
@@ -105,9 +106,11 @@ struct xsk_per_stream {
     /* keep track of the number of previously processed packets */
     unsigned int prev_rcvd;
 
-    /* previous timestamp for this stream */
+    /* previous timestamp a packet was received for this stream */
     uint64_t prev_sys_time;
 };
+
+typedef struct xdp_format_data xdp_format_data_t;
 
 typedef struct xdp_format_data {
     struct xsk_config cfg;
@@ -117,6 +120,18 @@ typedef struct xdp_format_data {
     xdp_state state;
 
     int snaplen;
+
+    /* special case - we can use TRACE_OPTION_GET_FORMAT_DATA to retrive
+     * the format data for the input trace along with TRACE_OPTION_BIND_TX_RX
+     * to force the input socket to bind to tx and rx queues of the NIC.
+     * This information can then be passed to the output trace via
+     * TRACE_OPTION_SET_INPUT_FORMAT_DATA. We will use this to prevent the
+     * output trace from binding to any sockets and will use the input sockets
+     * to also output. It only makes sense to do this if you wish to read and 
+     * write to the same interface via XDP.
+     */
+    xdp_format_data_t *input_data;
+
 } xdp_format_data_t;
 
 static struct bpf_object *load_bpf_and_xdp_attach(struct xsk_config *cfg);
@@ -340,25 +355,36 @@ static struct xsk_socket_info *xsk_configure_socket(struct xsk_config *cfg,
     xsk_cfg.xdp_flags = cfg->xdp_flags;
     xsk_cfg.bind_flags = cfg->xsk_bind_flags;
 
-    /* inbound */
     for (i = 0; i < XDP_BUSY_RETRY; i++) {
-        if (dir == 0) {
+        /* has the config option been set to bind to tx and rx? */
+        if (cfg->bind_tx_rx) {
             ret = xsk_socket__create(&xsk_info->xsk,
                                      cfg->ifname,
                                      umem->xsk_if_queue,
                                      umem->umem,
                                      &xsk_info->rx,
-                                     NULL,
-                                     &xsk_cfg);
-        /* outbound */
-        } else if (dir == 1) {
-            ret = xsk_socket__create(&xsk_info->xsk,
-                                     cfg->ifname,
-                                     umem->xsk_if_queue,
-                                     umem->umem,
-                                     NULL,
                                      &xsk_info->tx,
                                      &xsk_cfg);
+        } else {
+            /* inbound */
+            if (dir == 0) {
+                ret = xsk_socket__create(&xsk_info->xsk,
+                                        cfg->ifname,
+                                        umem->xsk_if_queue,
+                                        umem->umem,
+                                        &xsk_info->rx,
+                                        NULL,
+                                        &xsk_cfg);
+            /* outbound */
+            } else if (dir == 1) {
+                ret = xsk_socket__create(&xsk_info->xsk,
+                                        cfg->ifname,
+                                        umem->xsk_if_queue,
+                                        umem->umem,
+                                        NULL,
+                                        &xsk_info->tx,
+                                        &xsk_cfg);
+            }
         }
 
         /* If busy wait and try again */
@@ -879,17 +905,29 @@ static int linux_xdp_start_output(libtrace_out_t *libtrace) {
     struct xsk_per_stream *stream;
     int ret;
 
-    /* insert empty stream into the list */
-    libtrace_list_push_back(FORMAT_DATA->per_stream, &empty_stream);
+    /* do we have input format data? if so use the input sockets */
+    if (FORMAT_DATA->input_data != NULL) {
 
-    /* get the stream from the list */
-    stream = libtrace_list_get_index(FORMAT_DATA->per_stream, 0)->data;
+        /* remove old per-stream list */
+        libtrace_list_deinit(FORMAT_DATA->per_stream);
+        /* update per stream list to the input */
+        FORMAT_DATA->per_stream = FORMAT_DATA->input_data->per_stream;
 
-    /* start the stream */
-    if ((ret = linux_xdp_start_stream(&FORMAT_DATA->cfg, stream, 0, 1)) != 0) {
-        trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED,
-            "Unable to start output stream: %s", strerror(ret));
-        return -1;
+    } else {
+
+        /* insert empty stream into the list */
+        libtrace_list_push_back(FORMAT_DATA->per_stream, &empty_stream);
+
+        /* get the stream from the list */
+        stream = libtrace_list_get_index(FORMAT_DATA->per_stream, 0)->data;
+
+        /* start the stream */
+        if ((ret = linux_xdp_start_stream(&FORMAT_DATA->cfg, stream, 0, 1)) != 0) {
+            trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED,
+                "Unable to start output stream: %s", strerror(ret));
+            return -1;
+        }
+
     }
 
     return 0;
@@ -1292,11 +1330,21 @@ static int linux_xdp_fin_input(libtrace_t *libtrace) {
 static int linux_xdp_fin_output(libtrace_out_t *libtrace) {
 
     if (FORMAT_DATA != NULL) {
-        linux_xdp_destroy_streams(FORMAT_DATA->per_stream);
-        libtrace_list_deinit(FORMAT_DATA->per_stream);
 
-        /* unload the XDP program */
-        xdp_link_detach(&FORMAT_DATA->cfg);
+        /* this is the special case where we do not need have
+         * per stream data for the output trace when the input
+         * trace was bound to tx and rx queues and its format
+         * data was supplied to the output trace. Input trace
+         * will free this.
+         */
+        if (FORMAT_DATA->input_data == NULL) {
+
+            linux_xdp_destroy_streams(FORMAT_DATA->per_stream);
+            libtrace_list_deinit(FORMAT_DATA->per_stream);
+
+            /* unload the XDP program */
+            xdp_link_detach(&FORMAT_DATA->cfg);
+        }
 
         free(FORMAT_DATA);
     }
@@ -1530,6 +1578,12 @@ static int linux_xdp_config_input(libtrace_t *libtrace,
         case TRACE_OPTION_REPLAY_SPEEDUP:
         case TRACE_OPTION_CONSTANT_ERF_FRAMING:
             break;
+        case TRACE_OPTION_BIND_TX_RX:
+            FORMAT_DATA->cfg.bind_tx_rx = *(bool *)data;
+            return 0;
+        case TRACE_OPTION_GET_FORMAT_DATA:
+            *(void **)data = (void *)FORMAT_DATA;
+            return 0;
         case TRACE_OPTION_XDP_HARDWARE_OFFLOAD:
             FORMAT_DATA->cfg.xdp_flags &= ~XDP_FLAGS_MODES;
             FORMAT_DATA->cfg.xdp_flags |= XDP_FLAGS_HW_MODE;
@@ -1558,6 +1612,24 @@ static int linux_xdp_config_input(libtrace_t *libtrace,
     return -1;
 }
 
+static int linux_xdp_config_output(libtrace_out_t *libtrace,
+                                   trace_option_output_t option,
+                                   void *data) {
+                                   
+    switch (option) {
+        case TRACE_OPTION_SET_INPUT_FORMAT_DATA:
+            FORMAT_DATA->input_data = (xdp_format_data_t *)*(void **)data;
+            return 0;
+        case TRACE_OPTION_OUTPUT_FILEFLAGS:
+        case TRACE_OPTION_OUTPUT_COMPRESS:
+        case TRACE_OPTION_OUTPUT_COMPRESSTYPE:
+        case TRACE_OPTION_TX_MAX_QUEUE:
+            break;
+    }
+    
+    return -1;
+}
+
 static void linux_xdp_help(void) {
     printf("XDP format module\n");
     printf("Supported input URIs:\n");
@@ -1579,7 +1651,7 @@ static struct libtrace_format_t xdp = {
     linux_xdp_start_input,          /* start_input */
     linux_xdp_pause_input,          /* pause */
     linux_xdp_init_output,          /* init_output */
-    NULL,                           /* config_output */
+    linux_xdp_config_output,        /* config_output */
     linux_xdp_start_output,         /* start_output */
     linux_xdp_fin_input,            /* fin_input */
     linux_xdp_fin_output,           /* fin_output */
