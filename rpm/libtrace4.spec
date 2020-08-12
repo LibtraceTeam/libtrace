@@ -1,5 +1,5 @@
 Name:           libtrace4
-Version:        4.0.13
+Version:        4.0.14
 Release:        1%{?dist}
 Summary:        C Library for capturing and analysing network packets
 
@@ -18,7 +18,7 @@ BuildRequires: numactl-devel
 BuildRequires: ncurses-devel
 BuildRequires: openssl-devel
 BuildRequires: libyaml-devel
-BuildRequires: libwandder1-devel
+BuildRequires: libwandder2-devel
 BuildRequires: libwandio1-devel
 BuildRequires: dpdk-devel
 
@@ -125,8 +125,14 @@ find $RPM_BUILD_ROOT -name '*.la' -exec rm -f {} ';'
 
 
 %changelog
+* Thu Aug 6 2020 Shane Alcock <salcock@waikato.ac.nz> - 4.0.14-1
+- Updated for 4.0.14 release
+
+* Fri Jun 26 2020 Shane Alcock <salcock@waikato.ac.nz> - 4.0.13-2
+- Rebuild for Centos 8.2 release
+
 * Tue May 26 2020 Shane Alcock <salcock@waikato.ac.nz> - 4.0.13-1
-- Updated for 4.0.12 release
+- Updated for 4.0.13 release
 
 * Fri Mar 27 2020 Shane Alcock <salcock@waikato.ac.nz> - 4.0.12-1
 - Updated for 4.0.12 release

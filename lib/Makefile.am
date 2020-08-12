@@ -7,7 +7,8 @@ pkginclude_HEADERS = dagformat.h lt_inttypes.h daglegacy.h \
         data-struct/deque.h data-struct/linked_list.h \
         data-struct/buckets.h data-struct/sliding_window.h \
 	data-struct/message_queue.h hash_toeplitz.h \
-        data-struct/simple_circular_buffer.h
+        data-struct/simple_circular_buffer.h \
+        libtrace_radius.h
 
 AM_CFLAGS=@LIBCFLAGS@ @CFLAG_VISIBILITY@ -pthread -std=gnu99
 AM_CXXFLAGS=@LIBCXXFLAGS@ @CFLAG_VISIBILITY@ -pthread -std=gnu99
@@ -115,6 +116,7 @@ libtrace_la_SOURCES = trace.c trace_parallel.c common.h \
 		protocols_pktmeta.c protocols_l2.c protocols_l3.c \
 		protocols_transport.c protocols.h protocols_ospf.c \
 		protocols_application.c \
+                protocols_radius.c libtrace_radius.h \
 		$(DAGSOURCE) format_erf.h format_ndag.c format_ndag.h \
 		$(BPFJITSOURCE) $(ETSISOURCES) \
 		libtrace_arphrd.h \
@@ -133,7 +135,7 @@ endif
 
 AM_CPPFLAGS= @ADD_INCLS@
 libtrace_la_LIBADD = @LIBTRACE_LIBS@ @LTLIBOBJS@ $(DPDKLIBS)
-libtrace_la_LDFLAGS=-version-info 5:6:1 @ADD_LDFLAGS@
+libtrace_la_LDFLAGS=-version-info 6:0:2 @ADD_LDFLAGS@
 dagapi.c:
 	cp @DAG_TOOLS_DIR@/dagapi.c .
 
