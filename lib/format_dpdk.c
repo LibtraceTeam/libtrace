@@ -126,6 +126,9 @@ struct dpdk_format_data_t {
 	int burst_offset; /* The offset we are into the burst */
 	enum device_type dev_type; /* The type of DPDK device vdev vs. PCI */
 
+        /* User supplied cores for DPDK to pin to */
+        int cores[RTE_MAX_LCORE];
+
 	/* Our parallel streams */
 	libtrace_list_t *per_stream;
 };
@@ -236,9 +239,13 @@ static int whitelist_device(struct dpdk_format_data_t *format_data UNUSED, struc
  *
  * i.e. ./libtrace dpdk:0:1:0.0 -> 0:1:0.0
  * or ./libtrace dpdk:0:1:0.1-2 -> 0:1:0.1 (Using CPU core #2)
+ * or ./libtrace dpdk:0:1:0.1-1,3 -> 0:1:0.1 (Using CPU cores #1 and #3)
  */
-static int parse_pciaddr(char * str, struct rte_pci_addr * addr, long * core) {
-	int matches;
+static int parse_pciaddr(char * str, struct rte_pci_addr * addr, long * core,
+        struct dpdk_format_data_t *format_data) {
+
+	int matches, v, size, i;
+        char *scan;
 
 	if (!str) {
 		fprintf(stderr, "NULL str passed into parse_pciaddr()\n");
@@ -253,6 +260,25 @@ static int parse_pciaddr(char * str, struct rte_pci_addr * addr, long * core) {
 	                 &addr->domain, &addr->bus, &addr->devid,
 	                 &addr->function, core);
 #endif
+
+        /* has user specified cores to bind to */
+        if ((scan = strchr(str, '-')) != NULL) {
+            /* move over the - */
+            scan++;
+            i = 0;
+	    while (sscanf(scan, "%d%n", &v, &size) == 1) {
+                if (i > RTE_MAX_LCORE) {
+                    fprintf(stderr, "Too many cores supplied in DPDK URI\n");
+                    return -1;
+                }
+
+                format_data->cores[i++] = v;
+
+                /* move past the core number and following , */
+                scan += size+1;
+            }
+        }
+
 	if (matches >= 4) {
 		return 0;
 	} else {
@@ -483,7 +509,7 @@ static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_
 		 * automatically but it's hard to tell that this is secondary
 		 * before running rte_eal_init(...). Currently we are limited to 1
 		 * instance per core due to the way memory is allocated. */
-		if (parse_pciaddr(uridata, &use_addr, &my_cpu) != 0) {
+		if (parse_pciaddr(uridata, &use_addr, &my_cpu, format_data) != 0) {
 			snprintf(err, errlen, "Failed to parse URI");
 			return -1;
 		}
@@ -628,6 +654,7 @@ static int dpdk_init_input (libtrace_t *libtrace, enum device_type dev_type) {
 	dpdk_per_stream_t stream = DPDK_EMPTY_STREAM;
 	char err[500];
 	err[0] = 0;
+        int i;
 
 	libtrace->format_data = (struct dpdk_format_data_t *)
 	                        malloc(sizeof(struct dpdk_format_data_t));
@@ -659,6 +686,11 @@ static int dpdk_init_input (libtrace_t *libtrace, enum device_type dev_type) {
 	FORMAT(libtrace)->rss_key = NULL;
 	FORMAT(libtrace)->dev_type = dev_type;
 
+        /* init user supplied cores */
+        for (i = 0; i < RTE_MAX_LCORE; i++) {
+            FORMAT(libtrace)->cores[i] = -1;
+        }
+
 	/* Make our first stream */
 	FORMAT(libtrace)->per_stream = libtrace_list_init(sizeof(struct dpdk_per_stream_t));
 	libtrace_list_push_back(FORMAT(libtrace)->per_stream, &stream);
@@ -685,6 +717,7 @@ static int dpdk_init_output(libtrace_out_t *libtrace, enum device_type dev_type)
 	dpdk_per_stream_t stream = DPDK_EMPTY_STREAM;
 	char err[500];
 	err[0] = 0;
+        int i;
 
 	libtrace->format_data = (struct dpdk_format_data_t *)
 	                        malloc(sizeof(struct dpdk_format_data_t));
@@ -711,6 +744,11 @@ static int dpdk_init_output(libtrace_out_t *libtrace, enum device_type dev_type)
 	FORMAT(libtrace)->burst_size = 0;
 	FORMAT(libtrace)->burst_offset = 0;
 	FORMAT(libtrace)->dev_type = dev_type;
+
+        /* init user supplied cores */
+        for (i = 0; i < RTE_MAX_LCORE; i++) {
+            FORMAT(libtrace)->cores[i] = -1;
+        }
 
 	FORMAT(libtrace)->per_stream = libtrace_list_init(sizeof(struct dpdk_per_stream_t));
 	libtrace_list_push_back(FORMAT(libtrace)->per_stream, &stream);
@@ -781,6 +819,8 @@ int dpdk_config_input (libtrace_t *libtrace,
 	case TRACE_OPTION_EVENT_REALTIME:
         case TRACE_OPTION_REPLAY_SPEEDUP:
         case TRACE_OPTION_CONSTANT_ERF_FRAMING:
+	case TRACE_OPTION_BIND_TX_RX:
+        case TRACE_OPTION_GET_FORMAT_DATA:
         case TRACE_OPTION_XDP_HARDWARE_OFFLOAD:
         case TRACE_OPTION_XDP_SKB_MODE:
         case TRACE_OPTION_XDP_DRV_MODE:
@@ -1379,6 +1419,11 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data,
 			libtrace_list_push_back(format_data->per_stream, &empty_stream);
 		stream = libtrace_list_get_index(format_data->per_stream, i)->data;
 		stream->queue_id = i;
+
+                /* Update the core with the user supplied core. User supplied cores are
+                 * -1 by default so if a core is not specific this will have no effect.
+                 */
+                stream->lcore = format_data->cores[i];
 
 		if (stream->lcore == -1)
 			stream->lcore = dpdk_reserve_lcore(true, format_data->nic_numa_node);
