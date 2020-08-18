@@ -8,7 +8,6 @@
 #include <bpf/libbpf.h>
 #include <bpf/xsk.h>
 #include <bpf/bpf.h>
-
 #include <poll.h>
 #include <errno.h>
 #include <stdio.h>
@@ -25,7 +24,6 @@
 #include <linux/if_xdp.h>
 #include <sys/ioctl.h>
 #include <linux/sockios.h>
-
 #include <linux/if_link.h>
 
 #define FORMAT_DATA ((xdp_format_data_t *)(libtrace->format_data))
@@ -42,8 +40,31 @@
 #define RX_BATCH_SIZE      64
 #define INVALID_UMEM_FRAME UINT64_MAX
 #define XDP_MAX_CORES      20
-
 #define XDP_BUSY_RETRY     5
+
+#define REPEAT_16(x) x x x x x x x x x x x x x x x x
+#define xstr(s) str(s)
+#define str(s) #s
+
+struct linux_dev_stats {
+    char if_name[IF_NAMESIZE];
+    uint64_t rx_bytes;
+    uint64_t rx_packets;
+    uint64_t rx_errors;
+    uint64_t rx_drops;
+    uint64_t rx_fifo;
+    uint64_t rx_frame;
+    uint64_t rx_compressed;
+    uint64_t rx_multicast;
+    uint64_t tx_bytes;
+    uint64_t tx_packets;
+    uint64_t tx_errors;
+    uint64_t tx_drops;
+    uint64_t tx_fifo;
+    uint64_t tx_colls;
+    uint64_t tx_carrier;
+    uint64_t tx_compressed;
+};
 
 typedef struct libtrace_xdp_meta {
     uint64_t timestamp;
@@ -82,6 +103,9 @@ struct xsk_config {
 
     struct bpf_map *libtrace_ctrl_map;
     int libtrace_ctrl_map_fd;
+
+    /* initial interface statistics */
+    struct linux_dev_stats stats;
 };
 
 struct xsk_umem_info {
@@ -127,7 +151,7 @@ typedef struct xdp_format_data {
      * This information can then be passed to the output trace via
      * TRACE_OPTION_SET_INPUT_FORMAT_DATA. We will use this to prevent the
      * output trace from binding to any sockets and will use the input sockets
-     * to also output. It only makes sense to do this if you wish to read and 
+     * to also output. It only makes sense to do this if you wish to read and
      * write to the same interface via XDP.
      */
     xdp_format_data_t *input_data;
@@ -292,6 +316,65 @@ static int linux_xdp_set_promisc(const char *ifname, bool enabled) {
     }
 
     return 0;
+}
+
+static int linux_xdp_get_dev_statistics(char *ifname, struct linux_dev_stats *stats) {
+
+    FILE *file;
+    char line[1024];
+    struct linux_dev_stats tmp_stats;
+
+    file = fopen("/proc/net/dev","r");
+    if (file == NULL) {
+        return -1;
+    }
+
+    /* Skip 2 header lines */
+    if (fgets(line, sizeof(line), file) == NULL) {
+         fclose(file);
+         return -1;
+    }
+
+    if (fgets(line, sizeof(line), file) == NULL) {
+        fclose(file);
+        return -1;
+    }
+
+    while (!(feof(file)||ferror(file))) {
+        int tot;
+        if (fgets(line, sizeof(line), file) == NULL)
+            break;
+
+        tot = sscanf(line, " %"xstr(IF_NAMESIZE)"[^:]:" REPEAT_16(" %"SCNd64),
+                         tmp_stats.if_name,
+                         &tmp_stats.rx_bytes,
+                         &tmp_stats.rx_packets,
+                         &tmp_stats.rx_errors,
+                         &tmp_stats.rx_drops,
+                         &tmp_stats.rx_fifo,
+                         &tmp_stats.rx_frame,
+                         &tmp_stats.rx_compressed,
+                         &tmp_stats.rx_multicast,
+                         &tmp_stats.tx_bytes,
+                         &tmp_stats.tx_packets,
+                         &tmp_stats.tx_errors,
+                         &tmp_stats.tx_drops,
+                         &tmp_stats.tx_fifo,
+                         &tmp_stats.tx_colls,
+                         &tmp_stats.tx_carrier,
+                         &tmp_stats.tx_compressed);
+        if (tot != 17)
+            continue;
+
+        if (strncmp(tmp_stats.if_name, ifname, IF_NAMESIZE) == 0) {
+            *stats = tmp_stats;
+            fclose(file);
+            return 0;
+        }
+    }
+
+    fclose(file);
+    return -1;
 }
 
 static struct xsk_umem_info *configure_xsk_umem(void *buffer, uint64_t size,
@@ -724,6 +807,11 @@ static int linux_xdp_setup_xdp(libtrace_t *libtrace) {
         trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to create list "
             "for stream data in linux_xdp_init_input()");
         return -1;
+    }
+
+    /* get the initial device stats */
+    if (linux_xdp_get_dev_statistics(FORMAT_DATA->cfg.ifname, &FORMAT_DATA->cfg.stats) != 0) {
+        FORMAT_DATA->cfg.stats.if_name[0] = 0;
     }
 
     return 0;
@@ -1434,6 +1522,7 @@ static void linux_xdp_get_stats(libtrace_t *libtrace, libtrace_stat_t *stats) {
     struct xsk_per_stream *stream_data;
     struct xdp_statistics xdp_stats;
     socklen_t len = sizeof(xdp_stats);
+    struct linux_dev_stats dev_stats;
 
     /* special case. running in single threaded mode thread count is 0
      * set this to 1 and all should be good.
@@ -1482,6 +1571,13 @@ static void linux_xdp_get_stats(libtrace_t *libtrace, libtrace_stat_t *stats) {
         for (int j = 0; j < ncpus; j++) {
             /* add up stats from each cpu */
             stats->received += xdp[j].received_packets;
+        }
+    }
+
+    /* If we have the initial interface stats get the current and calculate the dropped packets */
+    if (FORMAT_DATA->cfg.stats.if_name[0] != 0) {
+        if (linux_xdp_get_dev_statistics(FORMAT_DATA->cfg.ifname, &dev_stats) == 0) {
+            stats->dropped += (dev_stats.rx_drops - FORMAT_DATA->cfg.stats.rx_drops);
         }
     }
 
@@ -1614,7 +1710,7 @@ static int linux_xdp_config_input(libtrace_t *libtrace,
 static int linux_xdp_config_output(libtrace_out_t *libtrace,
                                    trace_option_output_t option,
                                    void *data) {
-                                   
+
     switch (option) {
         case TRACE_OPTION_SET_INPUT_FORMAT_DATA:
             FORMAT_DATA->input_data = (xdp_format_data_t *)*(void **)data;
@@ -1625,7 +1721,7 @@ static int linux_xdp_config_output(libtrace_out_t *libtrace,
         case TRACE_OPTION_TX_MAX_QUEUE:
             break;
     }
-    
+
     return -1;
 }
 
