@@ -1,6 +1,6 @@
 Name:           libtrace4
 Version:        4.0.14
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        C Library for capturing and analysing network packets
 
 License:        LGPLv3
@@ -125,6 +125,9 @@ find $RPM_BUILD_ROOT -name '*.la' -exec rm -f {} ';'
 
 
 %changelog
+* Wed Sep 2 2020 Shane Alcock <salcock@waikato.ac.nz> - 4.0.14-2
+- Remove dpdk-wand dependencies from libpacketdump
+
 * Thu Aug 6 2020 Shane Alcock <salcock@waikato.ac.nz> - 4.0.14-1
 - Updated for 4.0.14 release
 
