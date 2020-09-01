@@ -44,11 +44,11 @@ Requires:       %{name}%{?_isa} = %{version}-%{release}, libpacketdump4%{?_isa} 
 
 %package -n     libpacketdump4
 Summary:        Network packet parsing and human-readable display library
-Requires:       %{name}%{?_isa} = %{version}-%{release}, dpdk-wand
+Requires:       %{name}%{?_isa} = %{version}-%{release}
 
 %package -n     libpacketdump4-devel
 Summary:        Development files for libpacketdump
-Requires:        %{name}-devel%{?_isa} = %{version}-%{release}, libpacketdump4%{?_isa} = %{version}-%{release}, dpdk-wand-devel
+Requires:        %{name}-devel%{?_isa} = %{version}-%{release}, libpacketdump4%{?_isa} = %{version}-%{release}
 
 %description devel
 The %{name}-devel package contains libraries and header files for
