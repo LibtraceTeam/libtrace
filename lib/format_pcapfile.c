@@ -287,8 +287,6 @@ static int pcapfile_config_input(libtrace_t *libtrace,
 			 * by trace_config */
 			break;
 		case TRACE_OPTION_DISCARD_META:
-		case TRACE_OPTION_BIND_TX_RX:
-        case TRACE_OPTION_GET_FORMAT_DATA:
 		case TRACE_OPTION_XDP_HARDWARE_OFFLOAD:
 		case TRACE_OPTION_XDP_SKB_MODE:
 		case TRACE_OPTION_XDP_DRV_MODE:

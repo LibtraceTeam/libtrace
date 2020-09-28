@@ -819,8 +819,6 @@ int dpdk_config_input (libtrace_t *libtrace,
 	case TRACE_OPTION_EVENT_REALTIME:
         case TRACE_OPTION_REPLAY_SPEEDUP:
         case TRACE_OPTION_CONSTANT_ERF_FRAMING:
-	case TRACE_OPTION_BIND_TX_RX:
-        case TRACE_OPTION_GET_FORMAT_DATA:
         case TRACE_OPTION_XDP_HARDWARE_OFFLOAD:
         case TRACE_OPTION_XDP_SKB_MODE:
         case TRACE_OPTION_XDP_DRV_MODE:

@@ -684,18 +684,6 @@ DLLEXPORT int trace_config(libtrace_t *libtrace,
 					"Libtrace does not support meta packets for this format");
 			}
 			return -1;
-		case TRACE_OPTION_BIND_TX_RX:
-			if (!trace_is_err(libtrace)) {
-					trace_set_err(libtrace, TRACE_ERR_OPTION_UNAVAIL,
-							"Libtrace does not support binding to TX and RX queues for this format");
-			}
-			return -1;
-        case TRACE_OPTION_GET_FORMAT_DATA:
-			if (!trace_is_err(libtrace)) {
-					trace_set_err(libtrace, TRACE_ERR_OPTION_UNAVAIL,
-							"Libtrace does not support returning format data for this format");
-			}
-			return -1;
 		case TRACE_OPTION_XDP_HARDWARE_OFFLOAD:
 			if (!trace_is_err(libtrace)) {
 					trace_set_err(libtrace, TRACE_ERR_OPTION_UNAVAIL,
