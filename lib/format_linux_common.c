@@ -361,28 +361,20 @@ int linuxcommon_get_dev_statistics(char *ifname, struct linux_dev_stats *stats) 
 int linuxcommon_set_promisc(const int sock, const unsigned int ifindex, bool enable) {
 
     struct packet_mreq mreq;
-    socklen_t socklen = sizeof(mreq);
+    int action;
+
     memset(&mreq,0,sizeof(mreq));
     mreq.mr_ifindex = ifindex;
     mreq.mr_type = PACKET_MR_PROMISC;
 
-    if (enable) {
-        if (setsockopt(sock,
-                       SOL_PACKET,
-                       PACKET_ADD_MEMBERSHIP,
-                       &mreq,
-                       socklen) == -1) {
-            return -1;
-        }
-    } else {
-        if (setsockopt(sock,
-                       SOL_PACKET,
-                       PACKET_DROP_MEMBERSHIP,
-                       &mreq,
-                       socklen) == -1) {
-            return -1;
-        }
-    }
+    if (enable)
+        action = PACKET_ADD_MEMBERSHIP;
+    else
+        action = PACKET_DROP_MEMBERSHIP;
+
+
+    if (setsockopt(sock, SOL_PACKET, action, &mreq, sizeof(mreq)) == -1)
+        return -1;
 
     return 0;
 }
@@ -454,6 +446,7 @@ int linuxcommon_start_input_stream(libtrace_t *libtrace,
             if (linuxcommon_set_promisc(stream->fd, addr.sll_ifindex, 1) < 0)
                 perror("setsockopt(PROMISC)");
 	}
+
 
 	/* Set the timestamp option on the socket - aim for the most detailed
 	 * clock resolution possible */

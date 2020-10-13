@@ -61,6 +61,7 @@ struct xsk_config {
      * 2 = promisc on by user
      */
     int promisc;
+    int promisc_sock;
 
     char *bpf_filename;
     char *bpf_progname;
@@ -245,39 +246,6 @@ static int linux_xdp_set_current_queues(char *ifname, int queues) {
 
     /* could not set the number of queues */
     return ret;
-}
-
-static int linux_xdp_set_promisc(const char *ifname, bool enabled) {
-
-    struct ifreq eth;
-    int fd;
-
-    if ((fd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
-        return -1;
-    }
-
-    /* set interface name */
-    strcpy(eth.ifr_name, ifname);
-
-    /* get interface flags */
-    if (ioctl(fd, SIOCGIFFLAGS, &eth) == -1) {
-        return -1;
-    }
-
-    if (enabled) {
-        /* update promisc flag to enabled */
-        eth.ifr_flags |= IFF_PROMISC;
-    } else {
-        /* update promisc flag to disabled */
-        eth.ifr_flags &= ~IFF_PROMISC;
-    }
-
-    /* set interface flags */
-    if (ioctl(fd, SIOCSIFFLAGS, &eth) == -1) {
-        return -1;
-    }
-
-    return 0;
 }
 
 static struct xsk_umem_info *configure_xsk_umem(void *buffer, uint64_t size,
@@ -651,20 +619,21 @@ static int linux_xdp_setup_xdp(libtrace_t *libtrace) {
      * in all other cases we want to keep promisc on so all packets are
      * processed.
      */
+    // create socket used to hold interface promisc setting
+    XDP_FORMAT_DATA->cfg.promisc_sock = socket(PF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
     if (XDP_FORMAT_DATA->cfg.promisc != 1) {
-        if (linux_xdp_set_promisc(XDP_FORMAT_DATA->cfg.ifname, 1) != 0) {
+        if (linuxcommon_set_promisc(XDP_FORMAT_DATA->cfg.promisc_sock, XDP_FORMAT_DATA->cfg.ifindex, 1) < 0) {
             trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to enable promisc mode "
                 "on NIC - linux_xdp_init_input()");
             return -1;
         }
     } else {
-        if (linux_xdp_set_promisc(XDP_FORMAT_DATA->cfg.ifname, 0) != 0) {
+        if (linuxcommon_set_promisc(XDP_FORMAT_DATA->cfg.promisc_sock, XDP_FORMAT_DATA->cfg.ifindex, 0) < 0) {
             trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to disable promisc mode "
                 "on NIC - linux_xdp_init_input()");
             return -1;
         }
     }
-
 
     return 0;
 }
@@ -1250,8 +1219,8 @@ static int linux_xdp_fin_input(libtrace_t *libtrace) {
             free(XDP_FORMAT_DATA->cfg.bpf_progname);
         }
 
-        // restore NICs promisc state
-        
+        // close socket used to hold promisc state
+        close(XDP_FORMAT_DATA->cfg.promisc_sock);
 
         free(FORMAT_DATA);
     }
