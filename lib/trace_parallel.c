@@ -1591,6 +1591,8 @@ SIMPLE_FUNCTION static int get_nb_cores() {
  */
 static void verify_configuration(libtrace_t *libtrace) {
 
+        int i;
+
 	if (libtrace->config.hasher_queue_size <= 0)
 		libtrace->config.hasher_queue_size = 1000;
 
@@ -1623,6 +1625,15 @@ static void verify_configuration(libtrace_t *libtrace) {
 	if (libtrace->hasher && libtrace->perpkt_thread_count > 1) {
 		libtrace->hasher_thread.type = THREAD_HASHER;
 	}
+
+        // make sure supplied coremap is valid
+        for (i = 0; i < MAX_THREADS; i++) {
+            if (get_nb_cores()-1 < libtrace->coremap[i]) {
+                fprintf(stderr, "Invalid core %d in coremap, thread %d will not be pinned\n",
+                    libtrace->coremap[i], i);
+                libtrace->coremap[i] = -1;
+            }
+        }
 }
 
 /**

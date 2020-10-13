@@ -1346,7 +1346,7 @@ DLLEXPORT void trace_interrupt(void);
  * to an allocated string into this function as the 'format' parameter, as
  * that memory will be leaked and replaced with the strdup'd format.
  */
-DLLEXPORT const char *trace_parse_uri(const char *uri, char **format);
+DLLEXPORT const char *trace_parse_uri(const char *uri, char **format, int *coremap);
 
 /** Create an input trace from a URI
  * 

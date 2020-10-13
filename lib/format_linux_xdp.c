@@ -699,7 +699,8 @@ static int linux_xdp_pstart_input(libtrace_t *libtrace) {
         case XDP_RUNNING:
             return 0;
         case XDP_NOT_STARTED:
-            linux_xdp_setup_xdp(libtrace);
+            if (linux_xdp_setup_xdp(libtrace) < 0)
+                return -1;
     }
 
     /* get the maximum number of supported nic queues */
@@ -730,6 +731,7 @@ static int linux_xdp_pstart_input(libtrace_t *libtrace) {
 
         /* start the stream */
         if ((ret = linux_xdp_start_stream(&XDP_FORMAT_DATA->cfg, stream, i, 0)) != 0) {
+
             trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
                 "Unable to start input stream: %s", strerror(ret));
             return -1;
@@ -757,7 +759,8 @@ static int linux_xdp_start_input(libtrace_t *libtrace) {
         case XDP_RUNNING:
             return 0;
         case XDP_NOT_STARTED:
-            linux_xdp_setup_xdp(libtrace);
+            if (linux_xdp_setup_xdp(libtrace) < 0)
+                return -1;
     }
 
     /* single threaded operation, make sure the number of nic queues is 1 or
