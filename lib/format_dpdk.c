@@ -1390,8 +1390,13 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data,
 		stream = libtrace_list_get_index(format_data->per_stream, i)->data;
 		stream->queue_id = i;
 
-		if (stream->lcore == -1)
+		if (stream->lcore == -1) {
+                    // use coremap if supplied
+                    if (coremap != NULL)
 			stream->lcore = dpdk_reserve_lcore(true, format_data->nic_numa_node, coremap[i]);
+                    else
+                        stream->lcore = dpdk_reserve_lcore(true, format_data->nic_numa_node, -1);
+                }
 
 		if (stream->lcore == -1) {
 			snprintf(err, errlen, "Intel DPDK - Failed to reserve a lcore"
