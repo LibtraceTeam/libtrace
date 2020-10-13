@@ -1626,10 +1626,10 @@ static void verify_configuration(libtrace_t *libtrace) {
 		libtrace->hasher_thread.type = THREAD_HASHER;
 	}
 
-        // make sure supplied coremap is valid
+        // make sure supplied coremap is valid - unset invalid entries
         for (i = 0; i < MAX_THREADS; i++) {
-            if (get_nb_cores()-1 < libtrace->coremap[i]) {
-                fprintf(stderr, "Invalid core %d in coremap, thread %d will not be pinned\n",
+            if (get_nb_cores()-1 < libtrace->coremap[i] || -1 > libtrace->coremap[i]) {
+                fprintf(stderr, "Invalid core %d in coremap, perpkt-thread %d will not be pinned\n",
                     libtrace->coremap[i], i);
                 libtrace->coremap[i] = -1;
             }

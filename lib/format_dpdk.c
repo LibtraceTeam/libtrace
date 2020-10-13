@@ -997,6 +997,7 @@ static void dpdk_lsc_callback(portid_t port, enum rte_eth_event_type event,
  * @param real If true allocate a real lcore, otherwise allocate a core which
  * does not exist on the local machine.
  * @param socket the preferred NUMA socket - only used if a real core is requested
+ * @param core - if > 0 reserve supplied core otherwise let dpdk_reserve_lcore find a core
  * @return a valid core, which can later be used with dpdk_register_lcore() or a
  * -1 if have run out of cores.
  *
@@ -1010,11 +1011,10 @@ static int dpdk_reserve_lcore(bool real, int socket, int core) {
 	long nb_core = dpdk_processor_count();
 
 	pthread_mutex_lock(&dpdk_lock);
-        if (core != -1) {
+        if (core > -1) {
 
             if (!core_config[core])
                 new_id = core;
-
 
         } else
 	/* If 'reading packets' fill in cores from 0 up and bind affinity
