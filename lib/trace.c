@@ -219,6 +219,7 @@ static void guess_format(libtrace_t *libtrace, const char *filename)
 	return;
 }
 
+
 /* Creates an input trace from a URI
  *
  * @params char * containing a valid libtrace URI
@@ -244,6 +245,7 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 			(libtrace_t *)malloc(sizeof(libtrace_t));
         char *scan = 0;
         const char *uridata = 0;
+        int i = 0;
 
 	trace_init();
 
@@ -275,6 +277,8 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 	libtrace->filtered_packets = 0;
 	libtrace->accepted_packets = 0;
 	libtrace->last_packet = NULL;
+        for (i = 0; i < MAX_THREADS; i++)
+            libtrace->coremap[i] = -1;
 
 	/* Parallel inits */
 	ASSERT_RET(pthread_mutex_init(&libtrace->libtrace_lock, NULL), == 0);
@@ -306,7 +310,7 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
         libtrace->reporter_cbs = NULL;
 
         /* Parse the URI to determine what sort of trace we are dealing with */
-	if ((uridata = trace_parse_uri(uri, &scan)) == 0) {
+	if ((uridata = trace_parse_uri(uri, &scan, libtrace->coremap)) == 0) {
 		/* Could not parse the URI nicely */
 		guess_format(libtrace,uri);
 		if (trace_is_err(libtrace)) {
@@ -373,6 +377,7 @@ DLLEXPORT libtrace_t * trace_create_dead (const char *uri) {
 	char *scan = (char *)calloc(sizeof(char),URI_PROTO_LINE);
 	char *uridata;
 	struct libtrace_format_t *tmp;
+        int i = 0;
 
 	trace_init();
 
@@ -400,6 +405,8 @@ DLLEXPORT libtrace_t * trace_create_dead (const char *uri) {
 	libtrace->filtered_packets = 0;
 	libtrace->accepted_packets = 0;
 	libtrace->last_packet = NULL;
+        for (i = 0; i < MAX_THREADS; i++)
+            libtrace->coremap[i] = -1;
 
 	/* Parallel inits */
 	ASSERT_RET(pthread_mutex_init(&libtrace->libtrace_lock, NULL), == 0);
@@ -470,7 +477,7 @@ DLLEXPORT libtrace_out_t *trace_create_output(const char *uri) {
 
         /* Parse the URI to determine what capture format we want to write */
 
-	if ((uridata = trace_parse_uri(uri, &scan)) == 0) {
+	if ((uridata = trace_parse_uri(uri, &scan, NULL)) == 0) {
 		trace_set_err_out(libtrace,TRACE_ERR_BAD_FORMAT,
 				"Bad uri format (%s)",uri);
 		return libtrace;
@@ -2021,8 +2028,33 @@ DLLEXPORT size_t trace_set_capture_length(libtrace_packet_t *packet, size_t size
  * point to a copy of the format component.
  */
 
-DLLEXPORT const char * trace_parse_uri(const char *uri, char **format) {
+DLLEXPORT const char * trace_parse_uri(const char *uri, char **format, int *cores) {
 	const char *uridata = 0;
+        const char *coremap = 0;
+
+        int core;
+        int len;
+        int i = 0;
+
+        if ((coremap = strstr(uri, "coremap=[")) != NULL) {
+            // move to coremap values
+            coremap += 9;
+            while (sscanf(coremap, "%d%n", &core, &len) == 1) {
+
+                if (cores != NULL)
+                    cores[i++] = core;
+
+                // move to the next coremap value, also account
+                // for the comma
+                coremap += len + 1;
+            }
+            if ((uri = strchr(coremap, ':')) == NULL)
+                // Badly formed URI - needs a : after coremap
+                return 0;
+            else
+                // move past the :
+                uri += 1;
+        }
 
 	if((uridata = strchr(uri,':')) == NULL) {
                 /* Badly formed URI - needs a : */

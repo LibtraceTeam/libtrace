@@ -302,7 +302,7 @@ void linuxcommon_close_input_stream(libtrace_t *libtrace,
 #define str(s) #s
 
 /* These don't typically reset however an interface does exist to reset them */
-static int linuxcommon_get_dev_statistics(libtrace_t *libtrace, struct linux_dev_stats *stats) {
+int linuxcommon_get_dev_statistics(char *ifname, struct linux_dev_stats *stats) {
 	FILE *file;
 	char line[1024];
 	struct linux_dev_stats tmp_stats;
@@ -348,7 +348,7 @@ static int linuxcommon_get_dev_statistics(libtrace_t *libtrace, struct linux_dev
 		             &tmp_stats.tx_compressed);
 		if (tot != 17)
 			continue;
-		if (strncmp(tmp_stats.if_name, libtrace->uridata, IF_NAMESIZE) == 0) {
+		if (strncmp(tmp_stats.if_name, ifname, IF_NAMESIZE) == 0) {
 			*stats = tmp_stats;
 			fclose(file);
 			return 0;
@@ -356,6 +356,35 @@ static int linuxcommon_get_dev_statistics(libtrace_t *libtrace, struct linux_dev
 	}
 	fclose(file);
 	return -1;
+}
+
+int linuxcommon_set_promisc(const int sock, const unsigned int ifindex, bool enable) {
+
+    struct packet_mreq mreq;
+    socklen_t socklen = sizeof(mreq);
+    memset(&mreq,0,sizeof(mreq));
+    mreq.mr_ifindex = ifindex;
+    mreq.mr_type = PACKET_MR_PROMISC;
+
+    if (enable) {
+        if (setsockopt(sock,
+                       SOL_PACKET,
+                       PACKET_ADD_MEMBERSHIP,
+                       &mreq,
+                       socklen) == -1) {
+            return -1;
+        }
+    } else {
+        if (setsockopt(sock,
+                       SOL_PACKET,
+                       PACKET_DROP_MEMBERSHIP,
+                       &mreq,
+                       socklen) == -1) {
+            return -1;
+        }
+    }
+
+    return 0;
 }
 
 /* Start an input stream
@@ -421,19 +450,9 @@ int linuxcommon_start_input_stream(libtrace_t *libtrace,
 	}
 
 	/* Enable promiscuous mode, if requested */
-	if (FORMAT_DATA->promisc) {
-		struct packet_mreq mreq;
-		socklen_t socklen = sizeof(mreq);
-		memset(&mreq,0,sizeof(mreq));
-		mreq.mr_ifindex = addr.sll_ifindex;
-		mreq.mr_type = PACKET_MR_PROMISC;
-		if (setsockopt(stream->fd,
-			       SOL_PACKET,
-			       PACKET_ADD_MEMBERSHIP,
-			       &mreq,
-			       socklen)==-1) {
-			perror("setsockopt(PROMISC)");
-		}
+        if (FORMAT_DATA->promisc) {
+            if (linuxcommon_set_promisc(stream->fd, addr.sll_ifindex, 1) < 0)
+                perror("setsockopt(PROMISC)");
 	}
 
 	/* Set the timestamp option on the socket - aim for the most detailed
@@ -509,7 +528,7 @@ int linuxcommon_start_input_stream(libtrace_t *libtrace,
 	FORMAT_DATA->stats.tp_packets = -count;
 	FORMAT_DATA->stats.tp_drops = 0;
 
-	if (linuxcommon_get_dev_statistics(libtrace, &FORMAT_DATA->dev_stats) != 0) {
+	if (linuxcommon_get_dev_statistics(libtrace->uridata, &FORMAT_DATA->dev_stats) != 0) {
 		/* Mark this as bad */
 		FORMAT_DATA->dev_stats.if_name[0] = 0;
 	}
@@ -621,7 +640,7 @@ void linuxcommon_get_statistics(libtrace_t *libtrace, libtrace_stat_t *stat) {
 	dev_stats.if_name[0] = 0; /* This will be set if we retrive valid stats */
 	/* Do we have starting stats to compare to? */
 	if (FORMAT_DATA->dev_stats.if_name[0] != 0) {
-		linuxcommon_get_dev_statistics(libtrace, &dev_stats);
+		linuxcommon_get_dev_statistics(libtrace->uridata, &dev_stats);
 	}
 	linuxcommon_update_socket_statistics(libtrace);
 

@@ -37,6 +37,7 @@
 
 #include "libtrace.h"
 #include "libtrace_int.h"
+#include "libtrace_arphrd.h"
 
 #ifdef HAVE_NETPACKET_PACKET_H
 
@@ -351,6 +352,8 @@ int linuxcommon_pstart_input(libtrace_t *libtrace,
 #endif /* HAVE_NETPACKET_PACKET_H */
 
 void linuxcommon_get_statistics(libtrace_t *libtrace, libtrace_stat_t *stat);
+int linuxcommon_get_dev_statistics(char *ifname, struct linux_dev_stats *stats);
+int linuxcommon_set_promisc(const int sock, const unsigned int ifindex, bool enable);
 
 static inline libtrace_direction_t linuxcommon_get_direction(uint8_t pkttype)
 {

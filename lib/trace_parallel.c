@@ -1669,12 +1669,18 @@ static int trace_start_thread(libtrace_t *trace,
 
 #ifdef __linux__
 	CPU_ZERO(&cpus);
-	for (i = 0; i < get_nb_cores(); i++)
+
+        // does a coremap entry exist for this perpkt thread
+        if (type == THREAD_PERPKT && trace->coremap[perpkt_num] != -1) {
+            CPU_SET(trace->coremap[perpkt_num], &cpus);
+        } else {
+	    for (i = 0; i < get_nb_cores(); i++)
 		CPU_SET(i, &cpus);
+        }
 
 	ret = pthread_create(&t->tid, NULL, start_routine, (void *) trace);
 	if( ret == 0 ) {
-		ret = pthread_setaffinity_np(t->tid, sizeof(cpus), &cpus);
+	    ret = pthread_setaffinity_np(t->tid, sizeof(cpus), &cpus);
 	}
 
 #else
