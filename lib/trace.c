@@ -2041,7 +2041,7 @@ DLLEXPORT const char * trace_parse_uri(const char *uri, char **format, int *core
             coremap += 9;
             while (sscanf(coremap, "%d%n", &core, &len) == 1) {
 
-                if (cores != NULL)
+                if (cores != NULL && i < MAX_THREADS)
                     cores[i++] = core;
 
                 // move to the next coremap value, also account
