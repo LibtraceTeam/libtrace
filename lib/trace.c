@@ -245,7 +245,6 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 			(libtrace_t *)malloc(sizeof(libtrace_t));
         char *scan = 0;
         const char *uridata = 0;
-        int i = 0;
 
 	trace_init();
 
@@ -277,8 +276,6 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 	libtrace->filtered_packets = 0;
 	libtrace->accepted_packets = 0;
 	libtrace->last_packet = NULL;
-        for (i = 0; i < MAX_THREADS; i++)
-            libtrace->coremap[i] = -1;
 
 	/* Parallel inits */
 	ASSERT_RET(pthread_mutex_init(&libtrace->libtrace_lock, NULL), == 0);
@@ -310,7 +307,7 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
         libtrace->reporter_cbs = NULL;
 
         /* Parse the URI to determine what sort of trace we are dealing with */
-	if ((uridata = trace_parse_uri(uri, &scan, libtrace->coremap)) == 0) {
+	if ((uridata = trace_parse_uri(uri, &scan, libtrace->config.coremap)) == 0) {
 		/* Could not parse the URI nicely */
 		guess_format(libtrace,uri);
 		if (trace_is_err(libtrace)) {
@@ -377,7 +374,6 @@ DLLEXPORT libtrace_t * trace_create_dead (const char *uri) {
 	char *scan = (char *)calloc(sizeof(char),URI_PROTO_LINE);
 	char *uridata;
 	struct libtrace_format_t *tmp;
-        int i = 0;
 
 	trace_init();
 
@@ -405,8 +401,6 @@ DLLEXPORT libtrace_t * trace_create_dead (const char *uri) {
 	libtrace->filtered_packets = 0;
 	libtrace->accepted_packets = 0;
 	libtrace->last_packet = NULL;
-        for (i = 0; i < MAX_THREADS; i++)
-            libtrace->coremap[i] = -1;
 
 	/* Parallel inits */
 	ASSERT_RET(pthread_mutex_init(&libtrace->libtrace_lock, NULL), == 0);
@@ -2028,33 +2022,52 @@ DLLEXPORT size_t trace_set_capture_length(libtrace_packet_t *packet, size_t size
  * point to a copy of the format component.
  */
 
+DLLEXPORT const char *trace_parse_coremap_from_uri(int *cores, const char *uri) {
+
+    const char *coremap = 0;
+    int core = 0;
+    int i = 0;
+    int len = 0;
+
+    if (uri == NULL)
+        return NULL;
+
+    if ((coremap = strstr(uri, "coremap=[")) != NULL) {
+        // move to coremap values
+        coremap += 9;
+        while (sscanf(coremap, "%d%n", &core, &len) == 1) {
+
+            if (cores != NULL && i < MAX_THREADS)
+                cores[i++] = core;
+
+            // move to the next coremap value, also account
+            // for the comma or full colon
+            if (coremap[len] != ',' && coremap[len] != ':' && coremap[len] != ']') {
+                fprintf(stderr, "Badly formed URI - : or , is required between core values\n");
+                return NULL;
+            } else
+                coremap += len + 1;
+        }
+
+        if ((uri = strchr(coremap, ':')) == NULL) {
+            // Badly formed URI - needs a : after coremap
+            fprintf(stderr, "Badly formed URI - : is required after coremap\n");
+            return NULL;
+        } else
+            // move past the :
+            uri += 1;
+    }
+
+    return uri;
+}
+
 DLLEXPORT const char * trace_parse_uri(const char *uri, char **format, int *cores) {
 	const char *uridata = 0;
-        const char *coremap = 0;
+        const char *next = 0;
 
-        int core;
-        int len;
-        int i = 0;
-
-        if ((coremap = strstr(uri, "coremap=[")) != NULL) {
-            // move to coremap values
-            coremap += 9;
-            while (sscanf(coremap, "%d%n", &core, &len) == 1) {
-
-                if (cores != NULL && i < MAX_THREADS)
-                    cores[i++] = core;
-
-                // move to the next coremap value, also account
-                // for the comma
-                coremap += len + 1;
-            }
-            if ((uri = strchr(coremap, ':')) == NULL)
-                // Badly formed URI - needs a : after coremap
-                return 0;
-            else
-                // move past the :
-                uri += 1;
-        }
+        // try parse coremap
+        if ((next = trace_parse_coremap_from_uri(cores, uri)) != NULL)
+            uri = next;
 
 	if((uridata = strchr(uri,':')) == NULL) {
                 /* Badly formed URI - needs a : */

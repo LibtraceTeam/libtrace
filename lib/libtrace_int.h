@@ -295,8 +295,13 @@ struct user_configuration {
 	bool reporter_polling;
 	size_t reporter_thold;
 	bool debug_state;
+	int coremap[MAX_THREADS];
 };
-#define ZERO_USER_CONFIG(config) memset(&config, 0, sizeof(struct user_configuration));
+#define ZERO_USER_CONFIG(config) {\
+	memset(&config, 0, sizeof(struct user_configuration));\
+	for (int i = 0; i < MAX_THREADS; i++)\
+		config.coremap[i] = -1;\
+}
 
 struct callback_set {
 
@@ -400,9 +405,6 @@ struct libtrace_t {
         /* Set of callbacks to be executed by the reporter thread in response
          * to various messages. */
         struct callback_set *reporter_cbs;
-
-        /** int array coremap */
-        int coremap[MAX_THREADS];
 };
 
 #define LIBTRACE_STAT_MAGIC 0x41

@@ -1348,6 +1348,14 @@ DLLEXPORT void trace_interrupt(void);
  */
 DLLEXPORT const char *trace_parse_uri(const char *uri, char **format, int *coremap);
 
+/** Takes a uri and tries to extract the coremap from it.
+ * @param cores	The coremap array to be populated with found cores.
+ * @param uri	The uri to be parsed.
+ *
+ * @returns	Pointer into the URI after the coremap has been consumed.
+ */
+DLLEXPORT const char *trace_parse_coremap_from_uri(int *cores, const char *uri);
+
 /** Create an input trace from a URI
  * 
  * @param uri A valid libtrace URI to be opened

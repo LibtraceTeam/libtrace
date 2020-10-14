@@ -1628,10 +1628,10 @@ static void verify_configuration(libtrace_t *libtrace) {
 
         // make sure supplied coremap is valid - unset invalid entries
         for (i = 0; i < MAX_THREADS; i++) {
-            if (get_nb_cores()-1 < libtrace->coremap[i] || -1 > libtrace->coremap[i]) {
+            if (get_nb_cores()-1 < libtrace->config.coremap[i] || -1 > libtrace->config.coremap[i]) {
                 fprintf(stderr, "Invalid core %d in coremap, perpkt-thread %d will not be pinned\n",
-                    libtrace->coremap[i], i);
-                libtrace->coremap[i] = -1;
+                    libtrace->config.coremap[i], i);
+                libtrace->config.coremap[i] = -1;
             }
         }
 }
@@ -1682,8 +1682,8 @@ static int trace_start_thread(libtrace_t *trace,
 	CPU_ZERO(&cpus);
 
         // does a coremap entry exist for this perpkt thread
-        if (type == THREAD_PERPKT && trace->coremap[perpkt_num] != -1) {
-            CPU_SET(trace->coremap[perpkt_num], &cpus);
+        if (type == THREAD_PERPKT && trace->config.coremap[perpkt_num] != -1) {
+            CPU_SET(trace->config.coremap[perpkt_num], &cpus);
         } else {
 	    for (i = 0; i < get_nb_cores(); i++)
 		CPU_SET(i, &cpus);
@@ -2734,7 +2734,24 @@ static void config_string(struct user_configuration *uc, char *key, size_t nkey,
 	} else if (strncmp(key, "debug_state", nkey) == 0
 	           || strncmp(key, "ds", nkey) == 0) {
 		uc->debug_state = config_bool_parse(value, nvalue);
-	} else {
+	} else if (strncmp(key, "coremap", nkey) == 0) {
+
+                int core = 0;
+                int len = 0;
+                size_t pos = 0;
+                unsigned int i = 0;
+                while (pos < nvalue) {
+                    if (sscanf(value + pos, "%d%n", &core, &len) == 1) {
+
+                        if (i < sizeof(uc->coremap) / sizeof(int))
+                            uc->coremap[i++] = core;
+
+                        pos += len;
+                    } else
+                        pos += 1;
+                }
+
+        } else {
 		fprintf(stderr, "No matching option %s(=%s), ignoring\n", key, value);
 	}
 }

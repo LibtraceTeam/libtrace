@@ -1500,7 +1500,7 @@ int dpdk_start_input (libtrace_t *libtrace) {
 	/* Make sure we don't reserve an extra thread for this */
 	FORMAT_DATA_FIRST(libtrace)->queue_id = rte_lcore_id();
 
-	if (dpdk_start_streams(FORMAT(libtrace), err, sizeof(err), 1, false, libtrace->coremap) != 0) {
+	if (dpdk_start_streams(FORMAT(libtrace), err, sizeof(err), 1, false, libtrace->config.coremap) != 0) {
 		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "%s", err);
 		free(libtrace->format_data);
 		libtrace->format_data = NULL;
@@ -1545,7 +1545,7 @@ int dpdk_pstart_input (libtrace_t *libtrace) {
 	        libtrace->perpkt_thread_count, phys_cores);
 #endif
 
-	if (dpdk_start_streams(FORMAT(libtrace), err, sizeof(err), tot, false, libtrace->coremap) != 0) {
+	if (dpdk_start_streams(FORMAT(libtrace), err, sizeof(err), tot, false, libtrace->config.coremap) != 0) {
 		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "%s", err);
 		free(libtrace->format_data);
 		libtrace->format_data = NULL;
