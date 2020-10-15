@@ -1521,6 +1521,7 @@ int dpdk_pstart_input (libtrace_t *libtrace) {
 	int phys_cores=0;
 	int tot = libtrace->perpkt_thread_count;
 	err[0] = 0;
+        int ret = 0;
 
 	if (rte_lcore_id() != rte_get_master_lcore() && rte_lcore_id() != LCORE_ID_ANY)
 		fprintf(stderr, "Libtrace DPDK: warning dpdk_pstart_input "
@@ -1545,10 +1546,38 @@ int dpdk_pstart_input (libtrace_t *libtrace) {
 	        libtrace->perpkt_thread_count, phys_cores);
 #endif
 
-	if (dpdk_start_streams(FORMAT(libtrace), err, sizeof(err), tot, false, libtrace->config.coremap) != 0) {
+	if ((ret = dpdk_start_streams(FORMAT(libtrace), err, sizeof(err), tot, false, libtrace->config.coremap)) == -1) {
 		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "%s", err);
 		free(libtrace->format_data);
 		libtrace->format_data = NULL;
+
+                return -1;
+
+        // dpdk_start_streams can return -2 which prevents putting libtrace into an error state. We can cleanup stream state
+        // and let Libtrace re-attempt starting the stream in non-parallel mode.
+        } else if (ret == -2) {
+
+                if (FORMAT(libtrace)->port != 0xFF)
+			rte_eth_dev_callback_unregister(FORMAT(libtrace)->port,
+			                                RTE_ETH_EVENT_INTR_LSC,
+			                                dpdk_lsc_callback,
+			                                FORMAT(libtrace));
+
+                // free pktmbuf pool
+                dpdk_free_memory(FORMAT(libtrace)->pktmbuf_pool, FORMAT(libtrace)->nic_numa_node);
+
+                // cleanup streams except first??
+                libtrace_list_node_t * n;
+                for (n = FORMAT(libtrace)->per_stream->head; n ; n = n->next) {
+			dpdk_per_stream_t * stream = n->data;
+			if (stream->mempool)
+				dpdk_free_memory(stream->mempool,
+				                 rte_lcore_to_socket_id(stream->lcore));
+		}
+
+                if (FORMAT(libtrace)->rss_key)
+			free(FORMAT(libtrace)->rss_key);
+
 		return -1;
 	}
 

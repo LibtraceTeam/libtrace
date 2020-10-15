@@ -1886,7 +1886,7 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob,
 		ret = libtrace->format->pstart_input(libtrace);
 		libtrace->pread = trace_pread_packet_wrapper;
 	}
-	if (ret != 0) {
+	if (ret != 0 && !trace_is_err(libtrace)) {
 		if (libtrace->format->start_input) {
 			ret = libtrace->format->start_input(libtrace);
 		}
