@@ -11,7 +11,8 @@
 /* replace path with autoconf varible?? */
 static char *libtrace_xdp_kern[] = {
     "/usr/local/share/libtrace/format_linux_xdp_kern.bpf",
-    "/usr/share/libtrace/format_linux_xdp_kern.bpf"
+    "/usr/share/libtrace/format_linux_xdp_kern.bpf",
+    "../lib/format_linux_xdp_kern.bpf" // this is here for tests to correctly find the bpf program
 };
 static char libtrace_xdp_prog[] = "socket/libtrace_xdp";
 

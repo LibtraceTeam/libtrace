@@ -1360,7 +1360,9 @@ static void linux_xdp_get_stats(libtrace_t *libtrace, libtrace_stat_t *stats) {
                        &len) == 0) {
 
             stats->dropped += xdp_stats.rx_dropped;
+            stats->dropped_valid = 1;
             stats->missing += xdp_stats.rx_invalid_descs;
+            stats->missing_valid = 1;
         }
 
         if ((bpf_map_lookup_elem(map_fd, &i, xdp)) != 0) {
@@ -1370,6 +1372,7 @@ static void linux_xdp_get_stats(libtrace_t *libtrace, libtrace_stat_t *stats) {
         for (int j = 0; j < ncpus; j++) {
             /* add up stats from each cpu */
             stats->received += xdp[j].received_packets;
+            stats->received_valid = 1;
         }
     }
 
@@ -1377,10 +1380,13 @@ static void linux_xdp_get_stats(libtrace_t *libtrace, libtrace_stat_t *stats) {
     if (XDP_FORMAT_DATA->cfg.stats.if_name[0] != 0) {
         if (linuxcommon_get_dev_statistics(XDP_FORMAT_DATA->cfg.ifname, &dev_stats) == 0) {
             stats->dropped += (dev_stats.rx_drops - XDP_FORMAT_DATA->cfg.stats.rx_drops);
+            stats->dropped_valid = 1;
         }
     }
 
     stats->captured = stats->received - stats->dropped;
+    if (stats->received_valid && stats->dropped_valid)
+        stats->captured_valid = 1;
 
     return;
 }
@@ -1419,7 +1425,9 @@ static void linux_xdp_get_thread_stats(libtrace_t *libtrace,
                    &len) == 0) {
 
         stats->dropped = xdp_stats.rx_dropped;
+        stats->dropped_valid = 1;
         stats->missing = xdp_stats.rx_invalid_descs;
+        stats->missing_valid = 1;
     }
 
     /* get the xdp libtrace map for this threads nic queue */
@@ -1431,9 +1439,12 @@ static void linux_xdp_get_thread_stats(libtrace_t *libtrace,
     for (int i = 0; i < ncpus; i++) {
         /* populate stats structure */
         stats->received += xdp[i].received_packets;
+        stats->received_valid = 1;
     }
 
     stats->captured = stats->received - stats->dropped;
+    if (stats->received_valid && stats->dropped_valid)
+        stats->captured_valid = 1;
 
     return;
 }
