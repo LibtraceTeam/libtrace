@@ -487,13 +487,14 @@ DLLEXPORT libtrace_out_t *trace_create_output(const char *uri) {
                                 break;
                                 }
         }
-	free(scan);
 
         if (libtrace->format == NULL) {
 		trace_set_err_out(libtrace,TRACE_ERR_BAD_FORMAT,
 				"Unknown output format (%s)",scan);
+                free(scan);
                 return libtrace;
         }
+        free(scan);
         libtrace->uridata = strdup(uridata);
 
         /* libtrace->format now contains the type of uri
