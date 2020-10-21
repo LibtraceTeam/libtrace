@@ -1,12 +1,14 @@
+#define _GNU_SOURCE
+
 #include "config.h"
 #include "libtrace.h"
 #include "libtrace_int.h"
 #include "format_linux_xdp.h"
+#include "format_linux_common.h"
 
 #include <bpf/libbpf.h>
 #include <bpf/xsk.h>
 #include <bpf/bpf.h>
-
 #include <poll.h>
 #include <errno.h>
 #include <stdio.h>
@@ -18,15 +20,14 @@
 #include <sys/resource.h>
 #include <sys/mman.h>
 #include <sys/param.h>
-
+#include <pthread.h>
 #include <linux/ethtool.h>
 #include <linux/if_xdp.h>
 #include <sys/ioctl.h>
 #include <linux/sockios.h>
-
 #include <linux/if_link.h>
 
-#define FORMAT_DATA ((xdp_format_data_t *)(libtrace->format_data))
+#define XDP_FORMAT_DATA ((xdp_format_data_t *)(libtrace->format_data))
 #define PACKET_META ((libtrace_xdp_meta_t *)(packet->header))
 #define LIBTRACE_MIN(a,b) ((a)<(b) ? (a) : (b))
 
@@ -39,7 +40,6 @@
 #define FRAME_SIZE         XSK_UMEM__DEFAULT_FRAME_SIZE
 #define RX_BATCH_SIZE      64
 #define INVALID_UMEM_FRAME UINT64_MAX
-
 #define XDP_BUSY_RETRY     5
 
 typedef struct libtrace_xdp_meta {
@@ -51,17 +51,21 @@ typedef struct libtrace_xdp_meta {
 struct xsk_config {
     __u32 xdp_flags;
     __u32 libbpf_flags;
+    __u16 xsk_bind_flags;
+
     int ifindex;
-    bool hardware_offload;
     char ifname[IF_NAMESIZE];
+
+    /* 0 = not set by user,
+     * 1 = promisc off by user,
+     * 2 = promisc on by user
+     */
+    int promisc;
+    int promisc_sock;
 
     char *bpf_filename;
     char *bpf_progname;
-
-    __u16 xsk_bind_flags;
-
     struct bpf_object *bpf_obj;
-
     struct bpf_program *bpf_prg;
     __u32 bpf_prg_fd;
 
@@ -73,6 +77,9 @@ struct xsk_config {
 
     struct bpf_map *libtrace_ctrl_map;
     int libtrace_ctrl_map_fd;
+
+    /* initial interface statistics */
+    struct linux_dev_stats stats;
 };
 
 struct xsk_umem_info {
@@ -97,9 +104,11 @@ struct xsk_per_stream {
     /* keep track of the number of previously processed packets */
     unsigned int prev_rcvd;
 
-    /* previous timestamp for this stream */
+    /* previous timestamp a packet was received for this stream */
     uint64_t prev_sys_time;
 };
+
+typedef struct xdp_format_data xdp_format_data_t;
 
 typedef struct xdp_format_data {
     struct xsk_config cfg;
@@ -109,6 +118,7 @@ typedef struct xdp_format_data {
     xdp_state state;
 
     int snaplen;
+
 } xdp_format_data_t;
 
 static struct bpf_object *load_bpf_and_xdp_attach(struct xsk_config *cfg);
@@ -299,8 +309,8 @@ static struct xsk_socket_info *xsk_configure_socket(struct xsk_config *cfg,
     xsk_cfg.xdp_flags = cfg->xdp_flags;
     xsk_cfg.bind_flags = cfg->xsk_bind_flags;
 
-    /* inbound */
     for (i = 0; i < XDP_BUSY_RETRY; i++) {
+        /* inbound */
         if (dir == 0) {
             ret = xsk_socket__create(&xsk_info->xsk,
                                      cfg->ifname,
@@ -382,19 +392,19 @@ static void linux_xdp_complete_tx(struct xsk_socket_info *xsk) {
     }
 }
 
-static uint64_t linux_xdp_get_time(struct xsk_per_stream *stream) {
+static uint64_t linux_xdp_get_time() {
 
     uint64_t sys_time;
+
+    #if USE_CLOCK_GETTIME
     struct timespec ts = {0};
     clock_gettime(CLOCK_REALTIME, &ts);
-
     sys_time = ((uint64_t) ts.tv_sec * 1000000000ull + (uint64_t) ts.tv_nsec);
-
-    if (stream->prev_sys_time >= sys_time) {
-        sys_time = stream->prev_sys_time + 1;
-    }
-
-    stream->prev_sys_time = sys_time;
+#else
+    struct timeval tv = {0};
+    gettimeofday(&tv, NULL);
+    sys_time = ((uint64_t) tv.tv_sec * 1000000000ull + (uint64_t) tv.tv_usec * 1000ull);
+#endif
 
     return sys_time;
 }
@@ -404,11 +414,11 @@ static int linux_xdp_init_control_map(libtrace_t *libtrace) {
     libtrace_ctrl_map_t ctrl_map;
     int key = 0;
 
-    if (FORMAT_DATA->cfg.libtrace_ctrl_map_fd <= 0) {
+    if (XDP_FORMAT_DATA->cfg.libtrace_ctrl_map_fd <= 0) {
        return -1;
     }
 
-    switch (FORMAT_DATA->hasher_type) {
+    switch (XDP_FORMAT_DATA->hasher_type) {
         case HASHER_BALANCE:
             ctrl_map.hasher = XDP_BALANCE;
             break;
@@ -432,7 +442,7 @@ static int linux_xdp_init_control_map(libtrace_t *libtrace) {
 
     ctrl_map.state = XDP_NOT_STARTED;
 
-    if (bpf_map_update_elem(FORMAT_DATA->cfg.libtrace_ctrl_map_fd,
+    if (bpf_map_update_elem(XDP_FORMAT_DATA->cfg.libtrace_ctrl_map_fd,
                             &key,
                             &ctrl_map,
                             BPF_ANY) != 0) {
@@ -448,14 +458,14 @@ static int linux_xdp_update_state(libtrace_t *libtrace, xdp_state state) {
     int key = 0;
 
     /* update libtrace state */
-    FORMAT_DATA->state = state;
+    XDP_FORMAT_DATA->state = state;
 
-    if (FORMAT_DATA->cfg.libtrace_ctrl_map_fd <= 0) {
+    if (XDP_FORMAT_DATA->cfg.libtrace_ctrl_map_fd <= 0) {
         return -1;
     }
 
     /* get data from libtrace control map */
-    if ((bpf_map_lookup_elem(FORMAT_DATA->cfg.libtrace_ctrl_map_fd,
+    if ((bpf_map_lookup_elem(XDP_FORMAT_DATA->cfg.libtrace_ctrl_map_fd,
                              &key,
                              &ctrl_map)) != 0) {
         return -1;
@@ -465,7 +475,7 @@ static int linux_xdp_update_state(libtrace_t *libtrace, xdp_state state) {
     ctrl_map.state = state;
 
     /* push changes back to the control map */
-    if (bpf_map_update_elem(FORMAT_DATA->cfg.libtrace_ctrl_map_fd,
+    if (bpf_map_update_elem(XDP_FORMAT_DATA->cfg.libtrace_ctrl_map_fd,
                             &key,
                             &ctrl_map,
                             BPF_ANY) != 0) {
@@ -478,7 +488,6 @@ static int linux_xdp_update_state(libtrace_t *libtrace, xdp_state state) {
 static int linux_xdp_init_input(libtrace_t *libtrace) {
 
     struct rlimit r = {RLIM_INFINITY, RLIM_INFINITY};
-    char *scan, *scan2 = NULL;
 
     if (setrlimit(RLIMIT_MEMLOCK, &r)) {
         trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable "
@@ -494,56 +503,58 @@ static int linux_xdp_init_input(libtrace_t *libtrace) {
             "to allocate memory for format data in linux_xdp_init_input()");
         return -1;
     }
-    FORMAT_DATA->hasher_type = HASHER_BALANCE;
-    FORMAT_DATA->state = XDP_NOT_STARTED;
-    FORMAT_DATA->snaplen = LIBTRACE_PACKET_BUFSIZE;
+    XDP_FORMAT_DATA->hasher_type = HASHER_BALANCE;
+    XDP_FORMAT_DATA->state = XDP_NOT_STARTED;
+    XDP_FORMAT_DATA->snaplen = LIBTRACE_PACKET_BUFSIZE;
 
-    /* setup XDP config */
-    scan = strchr(libtrace->uridata, ':');
-    if (scan == NULL) {
-        /* if no : was found we just have interface name. */
-        memcpy(FORMAT_DATA->cfg.ifname, libtrace->uridata, strlen(libtrace->uridata));
+    /* supported URIs
+     * interface, "%[^:]"
+     * kern:prog:interface, "%[^:]:%[^:]:%[^:]:"
+     */
 
-        FORMAT_DATA->cfg.bpf_filename = NULL;
-        FORMAT_DATA->cfg.bpf_progname = NULL;
+    char kernel[200], program[200], interface[200];
+    //int core = -1;
+    int matches;
 
-        /* loop over each bpf kern path looking for the BPF program */
+    if ((matches = sscanf(libtrace->uridata, "%[^:]:%[^:]:%[^:]:", kernel, program, interface)) == 3) {
+
+        XDP_FORMAT_DATA->cfg.bpf_filename = strdup(kernel);
+        XDP_FORMAT_DATA->cfg.bpf_progname = strdup(program);
+        memcpy(XDP_FORMAT_DATA->cfg.ifname, interface, strlen(interface));
+
+    } else if ((matches = sscanf(libtrace->uridata, "%[^:]", interface)) == 1) {
+
+        XDP_FORMAT_DATA->cfg.bpf_filename = NULL;
+        XDP_FORMAT_DATA->cfg.bpf_progname = NULL;
+        memcpy(XDP_FORMAT_DATA->cfg.ifname, interface, strlen(interface));
+
+    } else {
+        trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Invalid libtrace XDP URI");
+        return -1;
+    }
+
+    // If the user did not supply a custom BPF kernel try locate the Libtrace one
+    if (XDP_FORMAT_DATA->cfg.bpf_filename == NULL) {
         for (uint32_t i = 0; i < sizeof(libtrace_xdp_kern)/sizeof(libtrace_xdp_kern[0]); i++) {
             if (access(libtrace_xdp_kern[i], F_OK) != -1) {
-                FORMAT_DATA->cfg.bpf_filename = strdup(libtrace_xdp_kern[i]);
-                FORMAT_DATA->cfg.bpf_progname = strdup(libtrace_xdp_prog);
+                XDP_FORMAT_DATA->cfg.bpf_filename = strdup(libtrace_xdp_kern[i]);
+                XDP_FORMAT_DATA->cfg.bpf_progname = strdup(libtrace_xdp_prog);
                 continue;
             }
         }
-
-        /* was the libtrace bpf program found? */
-        if (FORMAT_DATA->cfg.bpf_filename == NULL) {
-            fprintf(stderr, "Unable to locate Libtrace BPF program, loading default Libbpf program.\n");
-        }
-
-    } else {
-        /* user supplied bpf program must be structured like:
-         * kern:prog:interface
-         */
-        scan2 = strchr(scan + 1, ':');
-        if (scan2 == NULL) {
-            trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Invalid "
-                "URI: Usage xdp:bpf_kern:bpf_prog:interface\n");
-            return -1;
-        } else {
-            FORMAT_DATA->cfg.bpf_filename = strndup(libtrace->uridata,
-                (size_t)(scan - libtrace->uridata));
-            FORMAT_DATA->cfg.bpf_progname = strndup(scan + 1,
-                (size_t)(scan2 - (scan + 1)));
-            memcpy(FORMAT_DATA->cfg.ifname, scan2 + 1, strlen(scan2 + 1));
-        }
     }
 
-    /* check interface */
-    FORMAT_DATA->cfg.ifindex = if_nametoindex(FORMAT_DATA->cfg.ifname);
-    if (FORMAT_DATA->cfg.ifindex == 0) {
+    // was a kernel found?
+    if (XDP_FORMAT_DATA->cfg.bpf_filename == NULL) {
+        trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to locate Libtrace BPF program");
+        return -1;
+    }
+
+    // check interface is correct
+    XDP_FORMAT_DATA->cfg.ifindex = if_nametoindex(XDP_FORMAT_DATA->cfg.ifname);
+    if (XDP_FORMAT_DATA->cfg.ifindex == 0) {
         trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Invalid XDP input interface "
-            "name: %s", FORMAT_DATA->cfg.ifname);
+            "name: %s", XDP_FORMAT_DATA->cfg.ifname);
         return -1;
     }
 
@@ -554,32 +565,32 @@ static int linux_xdp_init_input(libtrace_t *libtrace) {
 static int linux_xdp_setup_xdp(libtrace_t *libtrace) {
 
     /* load XDP program if supplied */
-    if (FORMAT_DATA->cfg.bpf_filename != NULL) {
+    if (XDP_FORMAT_DATA->cfg.bpf_filename != NULL) {
         // load custom BPF program
-        load_bpf_and_xdp_attach(&FORMAT_DATA->cfg);
+        load_bpf_and_xdp_attach(&XDP_FORMAT_DATA->cfg);
 
         // locate the xsk map
-        FORMAT_DATA->cfg.xsks_map = bpf_object__find_map_by_name(FORMAT_DATA->cfg.bpf_obj, "xsks_map");
-        FORMAT_DATA->cfg.xsks_map_fd = bpf_map__fd(FORMAT_DATA->cfg.xsks_map);
-        if (FORMAT_DATA->cfg.xsks_map_fd < 0) {
+        XDP_FORMAT_DATA->cfg.xsks_map = bpf_object__find_map_by_name(XDP_FORMAT_DATA->cfg.bpf_obj, "xsks_map");
+        XDP_FORMAT_DATA->cfg.xsks_map_fd = bpf_map__fd(XDP_FORMAT_DATA->cfg.xsks_map);
+        if (XDP_FORMAT_DATA->cfg.xsks_map_fd < 0) {
             trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to load xsks map from BPF");
             return -1;
         }
 
         // locate the libtrace map
-        FORMAT_DATA->cfg.libtrace_map = bpf_object__find_map_by_name(FORMAT_DATA->cfg.bpf_obj, "libtrace_map");
-        FORMAT_DATA->cfg.libtrace_map_fd = bpf_map__fd(FORMAT_DATA->cfg.libtrace_map);
-        if (FORMAT_DATA->cfg.libtrace_map_fd < 0) {
+        XDP_FORMAT_DATA->cfg.libtrace_map = bpf_object__find_map_by_name(XDP_FORMAT_DATA->cfg.bpf_obj, "libtrace_map");
+        XDP_FORMAT_DATA->cfg.libtrace_map_fd = bpf_map__fd(XDP_FORMAT_DATA->cfg.libtrace_map);
+        if (XDP_FORMAT_DATA->cfg.libtrace_map_fd < 0) {
             /* unable to locate libtrace_map. Is this a custom bpf program? */
         }
 
         // locate the libtrace control map
-        FORMAT_DATA->cfg.libtrace_ctrl_map =
-            bpf_object__find_map_by_name(FORMAT_DATA->cfg.bpf_obj, "libtrace_ctrl_map");
-        FORMAT_DATA->cfg.libtrace_ctrl_map_fd =
-            bpf_map__fd(FORMAT_DATA->cfg.libtrace_ctrl_map);
+        XDP_FORMAT_DATA->cfg.libtrace_ctrl_map =
+            bpf_object__find_map_by_name(XDP_FORMAT_DATA->cfg.bpf_obj, "libtrace_ctrl_map");
+        XDP_FORMAT_DATA->cfg.libtrace_ctrl_map_fd =
+            bpf_map__fd(XDP_FORMAT_DATA->cfg.libtrace_ctrl_map);
         /* control map was found, set it up. */
-        if (FORMAT_DATA->cfg.libtrace_ctrl_map_fd >= 0) {
+        if (XDP_FORMAT_DATA->cfg.libtrace_ctrl_map_fd >= 0) {
             /* init the libtrace control map */
             if (linux_xdp_init_control_map(libtrace) == -1) {
                 /* failed to init the control map */
@@ -592,11 +603,36 @@ static int linux_xdp_setup_xdp(libtrace_t *libtrace) {
     }
 
     /* setup list to hold the streams */
-    FORMAT_DATA->per_stream = libtrace_list_init(sizeof(struct xsk_per_stream));
-    if (FORMAT_DATA->per_stream == NULL) {
+    XDP_FORMAT_DATA->per_stream = libtrace_list_init(sizeof(struct xsk_per_stream));
+    if (XDP_FORMAT_DATA->per_stream == NULL) {
         trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to create list "
             "for stream data in linux_xdp_init_input()");
         return -1;
+    }
+
+    /* get the initial device stats */
+    if (linuxcommon_get_dev_statistics(XDP_FORMAT_DATA->cfg.ifname, &XDP_FORMAT_DATA->cfg.stats) != 0) {
+        XDP_FORMAT_DATA->cfg.stats.if_name[0] = 0;
+    }
+
+    /* cfg.promisc will be 1 if the user has explicity set promisc to off,
+     * in all other cases we want to keep promisc on so all packets are
+     * processed.
+     */
+    // create socket used to hold interface promisc setting
+    XDP_FORMAT_DATA->cfg.promisc_sock = socket(PF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
+    if (XDP_FORMAT_DATA->cfg.promisc != 1) {
+        if (linuxcommon_set_promisc(XDP_FORMAT_DATA->cfg.promisc_sock, XDP_FORMAT_DATA->cfg.ifindex, 1) < 0) {
+            trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to enable promisc mode "
+                "on NIC - linux_xdp_init_input()");
+            return -1;
+        }
+    } else {
+        if (linuxcommon_set_promisc(XDP_FORMAT_DATA->cfg.promisc_sock, XDP_FORMAT_DATA->cfg.ifindex, 0) < 0) {
+            trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to disable promisc mode "
+                "on NIC - linux_xdp_init_input()");
+            return -1;
+        }
     }
 
     return 0;
@@ -625,20 +661,20 @@ static int linux_xdp_init_output(libtrace_out_t *libtrace) {
     /* setup XDP config */
     scan = strchr(libtrace->uridata, ':');
     if (scan == NULL) {
-        memcpy(FORMAT_DATA->cfg.ifname, libtrace->uridata, strlen(libtrace->uridata));
+        memcpy(XDP_FORMAT_DATA->cfg.ifname, libtrace->uridata, strlen(libtrace->uridata));
     } else {
-        memcpy(FORMAT_DATA->cfg.ifname, scan + 1, strlen(scan + 1));
+        memcpy(XDP_FORMAT_DATA->cfg.ifname, scan + 1, strlen(scan + 1));
     }
-    FORMAT_DATA->cfg.ifindex = if_nametoindex(FORMAT_DATA->cfg.ifname);
-    if (FORMAT_DATA->cfg.ifindex == 0) {
+    XDP_FORMAT_DATA->cfg.ifindex = if_nametoindex(XDP_FORMAT_DATA->cfg.ifname);
+    if (XDP_FORMAT_DATA->cfg.ifindex == 0) {
         trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED, "Invalid XDP output interface "
             "name.");
         return -1;
     }
 
     /* setup list to hold the streams */
-    FORMAT_DATA->per_stream = libtrace_list_init(sizeof(struct xsk_per_stream));
-    if (FORMAT_DATA->per_stream == NULL) {
+    XDP_FORMAT_DATA->per_stream = libtrace_list_init(sizeof(struct xsk_per_stream));
+    if (XDP_FORMAT_DATA->per_stream == NULL) {
         trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED, "Unable to create list "
             "for stream data in linux_xdp_init_input()");
         return -1;
@@ -655,7 +691,7 @@ static int linux_xdp_pstart_input(libtrace_t *libtrace) {
     int max_nic_queues;
     int ret;
 
-    switch (FORMAT_DATA->state) {
+    switch (XDP_FORMAT_DATA->state) {
         case XDP_PAUSED:
             /* update state and return */
             linux_xdp_update_state(libtrace, XDP_RUNNING);
@@ -663,11 +699,12 @@ static int linux_xdp_pstart_input(libtrace_t *libtrace) {
         case XDP_RUNNING:
             return 0;
         case XDP_NOT_STARTED:
-            linux_xdp_setup_xdp(libtrace);
+            if (linux_xdp_setup_xdp(libtrace) < 0)
+                return -1;
     }
 
     /* get the maximum number of supported nic queues */
-    max_nic_queues = linux_xdp_get_max_queues(FORMAT_DATA->cfg.ifname);
+    max_nic_queues = linux_xdp_get_max_queues(XDP_FORMAT_DATA->cfg.ifname);
 
     /* if the number of processing threads is greater than the max supported NIC
      * queues reduce the number of threads to match */
@@ -678,7 +715,7 @@ static int linux_xdp_pstart_input(libtrace_t *libtrace) {
     }
 
     /* set the number of nic queues to match number of threads */
-    if (linux_xdp_set_current_queues(FORMAT_DATA->cfg.ifname, libtrace->perpkt_thread_count) !=
+    if (linux_xdp_set_current_queues(XDP_FORMAT_DATA->cfg.ifname, libtrace->perpkt_thread_count) !=
         libtrace->perpkt_thread_count) {
 
         trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to set number of NIC queues "
@@ -688,12 +725,13 @@ static int linux_xdp_pstart_input(libtrace_t *libtrace) {
 
     /* create a stream for each processing thread */
     for (i = 0; i < libtrace->perpkt_thread_count; i++) {
-        libtrace_list_push_back(FORMAT_DATA->per_stream, &empty_stream);
+        libtrace_list_push_back(XDP_FORMAT_DATA->per_stream, &empty_stream);
 
-        stream = libtrace_list_get_index(FORMAT_DATA->per_stream, i)->data;
+        stream = libtrace_list_get_index(XDP_FORMAT_DATA->per_stream, i)->data;
 
         /* start the stream */
-        if ((ret = linux_xdp_start_stream(&FORMAT_DATA->cfg, stream, i, 0)) != 0) {
+        if ((ret = linux_xdp_start_stream(&XDP_FORMAT_DATA->cfg, stream, i, 0)) != 0) {
+
             trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
                 "Unable to start input stream: %s", strerror(ret));
             return -1;
@@ -713,7 +751,7 @@ static int linux_xdp_start_input(libtrace_t *libtrace) {
     int c_nic_queues;
     int ret;
 
-    switch (FORMAT_DATA->state) {
+    switch (XDP_FORMAT_DATA->state) {
         case XDP_PAUSED:
             /* update state and return */
             linux_xdp_update_state(libtrace, XDP_RUNNING);
@@ -721,16 +759,17 @@ static int linux_xdp_start_input(libtrace_t *libtrace) {
         case XDP_RUNNING:
             return 0;
         case XDP_NOT_STARTED:
-            linux_xdp_setup_xdp(libtrace);
+            if (linux_xdp_setup_xdp(libtrace) < 0)
+                return -1;
     }
 
     /* single threaded operation, make sure the number of nic queues is 1 or
      * packets will be lost */
-    c_nic_queues = linux_xdp_get_current_queues(FORMAT_DATA->cfg.ifname);
+    c_nic_queues = linux_xdp_get_current_queues(XDP_FORMAT_DATA->cfg.ifname);
 
     if (c_nic_queues != 1) {
         /* set the number of nic queues to 1 */
-        if (linux_xdp_set_current_queues(FORMAT_DATA->cfg.ifname, 1) < 0) {
+        if (linux_xdp_set_current_queues(XDP_FORMAT_DATA->cfg.ifname, 1) < 0) {
             trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to set number "
                 "of NIC queues to 1");
             return -1;
@@ -738,13 +777,13 @@ static int linux_xdp_start_input(libtrace_t *libtrace) {
     }
 
     /* insert empty stream into the list */
-    libtrace_list_push_back(FORMAT_DATA->per_stream, &empty_stream);
+    libtrace_list_push_back(XDP_FORMAT_DATA->per_stream, &empty_stream);
 
     /* get the stream from the list */
-    stream = libtrace_list_get_index(FORMAT_DATA->per_stream, 0)->data;
+    stream = libtrace_list_get_index(XDP_FORMAT_DATA->per_stream, 0)->data;
 
     /* start the stream */
-    if ((ret = linux_xdp_start_stream(&FORMAT_DATA->cfg, stream, 0, 0)) != 0) {
+    if ((ret = linux_xdp_start_stream(&XDP_FORMAT_DATA->cfg, stream, 0, 0)) != 0) {
         trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
             "Unable to start input stream: %s", strerror(ret));
         return -1;
@@ -760,7 +799,7 @@ static int linux_xdp_pause_input(libtrace_t * libtrace) {
 
     int ret;
 
-    if (FORMAT_DATA->state == XDP_NOT_STARTED) {
+    if (XDP_FORMAT_DATA->state == XDP_NOT_STARTED) {
         trace_set_err(libtrace, TRACE_ERR_BAD_STATE, "Call trace_start() before "
             "calling trace_pause()");
         return -1;
@@ -782,13 +821,13 @@ static int linux_xdp_start_output(libtrace_out_t *libtrace) {
     int ret;
 
     /* insert empty stream into the list */
-    libtrace_list_push_back(FORMAT_DATA->per_stream, &empty_stream);
+    libtrace_list_push_back(XDP_FORMAT_DATA->per_stream, &empty_stream);
 
     /* get the stream from the list */
-    stream = libtrace_list_get_index(FORMAT_DATA->per_stream, 0)->data;
+    stream = libtrace_list_get_index(XDP_FORMAT_DATA->per_stream, 0)->data;
 
     /* start the stream */
-    if ((ret = linux_xdp_start_stream(&FORMAT_DATA->cfg, stream, 0, 1)) != 0) {
+    if ((ret = linux_xdp_start_stream(&XDP_FORMAT_DATA->cfg, stream, 0, 1)) != 0) {
         trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED,
             "Unable to start output stream: %s", strerror(ret));
         return -1;
@@ -841,6 +880,7 @@ static int linux_xdp_read_stream(libtrace_t *libtrace,
     libtrace_xdp_meta_t *meta;
     struct pollfd fds;
     int ret;
+    uint64_t sys_time;
 
     if (libtrace->format_data == NULL) {
         trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT, "Trace format data missing, "
@@ -891,6 +931,8 @@ static int linux_xdp_read_stream(libtrace_t *libtrace,
         }
     }
 
+    sys_time = linux_xdp_get_time();
+
     for (i = 0; i < rcvd; i++) {
 
         /* got a packet. Get the address and length from the rx descriptor */
@@ -911,11 +953,16 @@ static int linux_xdp_read_stream(libtrace_t *libtrace,
         packet[i]->error = 1;
 
         meta = (libtrace_xdp_meta_t *)packet[i]->buffer;
-        meta->timestamp = linux_xdp_get_time(stream);
+
+        if (stream->prev_sys_time >= sys_time) {
+            sys_time = stream->prev_sys_time + 1;
+        }
+        stream->prev_sys_time = sys_time;
+        meta->timestamp = sys_time;
 
         /* we dont really snap packets but we can pretend to */
         meta->packet_len = pkt_len;
-        meta->cap_len = LIBTRACE_MIN((unsigned int)FORMAT_DATA->snaplen,
+        meta->cap_len = LIBTRACE_MIN((unsigned int)XDP_FORMAT_DATA->snaplen,
                                      (unsigned int)pkt_len);
 
         /* next packet */
@@ -933,7 +980,7 @@ static int linux_xdp_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet
     struct xsk_per_stream *stream;
     libtrace_list_node_t *node;
 
-    node = libtrace_list_get_index(FORMAT_DATA->per_stream, 0);
+    node = libtrace_list_get_index(XDP_FORMAT_DATA->per_stream, 0);
     if (node == NULL) {
         trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to get XDP "
             "input stream in linux_xdp_read_packet()");
@@ -989,7 +1036,7 @@ static int linux_xdp_write_packet(libtrace_out_t *libtrace,
     }
 
     /* get stream data */
-    node = libtrace_list_get_index(FORMAT_DATA->per_stream, 0);
+    node = libtrace_list_get_index(XDP_FORMAT_DATA->per_stream, 0);
     if (node == NULL) {
         trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED, "Unable to get XDP "
             "output stream in linux_xdp_write_packet()");
@@ -1060,9 +1107,10 @@ static libtrace_eventobj_t linux_xdp_event(libtrace_t *libtrace,
     libtrace_xdp_meta_t *meta;
     struct xsk_per_stream *stream;
     libtrace_list_node_t *node;
+    uint64_t sys_time;
 
     /* get stream data */
-    node = libtrace_list_get_index(FORMAT_DATA->per_stream, 0);
+    node = libtrace_list_get_index(XDP_FORMAT_DATA->per_stream, 0);
     if (node == NULL) {
         trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to get XDP "
             "input stream in linux_xdp_read_packet()");
@@ -1105,11 +1153,16 @@ static libtrace_eventobj_t linux_xdp_event(libtrace_t *libtrace,
         packet->error = 1;
 
         meta = (libtrace_xdp_meta_t *)packet->buffer;
-        meta->timestamp = linux_xdp_get_time(stream);
+        sys_time = linux_xdp_get_time();
+        if (stream->prev_sys_time >= sys_time) {
+            sys_time = stream->prev_sys_time + 1;
+        }
+        stream->prev_sys_time = sys_time;
+        meta->timestamp = sys_time;
 
         /* we dont really snap packets but we can pretend to */
         meta->packet_len = pkt_len;
-        meta->cap_len = LIBTRACE_MIN((unsigned int)FORMAT_DATA->snaplen,
+        meta->cap_len = LIBTRACE_MIN((unsigned int)XDP_FORMAT_DATA->snaplen,
                                      (unsigned int)pkt_len);
 
         event.type = TRACE_EVENT_PACKET;
@@ -1153,21 +1206,24 @@ static int linux_xdp_fin_input(libtrace_t *libtrace) {
 
     if (FORMAT_DATA != NULL) {
 
-        linux_xdp_destroy_streams(FORMAT_DATA->per_stream);
+        linux_xdp_destroy_streams(XDP_FORMAT_DATA->per_stream);
 
         /* destroy per stream list */
-        libtrace_list_deinit(FORMAT_DATA->per_stream);
+        libtrace_list_deinit(XDP_FORMAT_DATA->per_stream);
 
         /* unload the XDP program */
-        xdp_link_detach(&FORMAT_DATA->cfg);
+        xdp_link_detach(&XDP_FORMAT_DATA->cfg);
 
-        if (FORMAT_DATA->cfg.bpf_filename != NULL) {
-            free(FORMAT_DATA->cfg.bpf_filename);
+        if (XDP_FORMAT_DATA->cfg.bpf_filename != NULL) {
+            free(XDP_FORMAT_DATA->cfg.bpf_filename);
         }
 
-        if (FORMAT_DATA->cfg.bpf_progname != NULL) {
-            free(FORMAT_DATA->cfg.bpf_progname);
+        if (XDP_FORMAT_DATA->cfg.bpf_progname != NULL) {
+            free(XDP_FORMAT_DATA->cfg.bpf_progname);
         }
+
+        // close socket used to hold promisc state
+        close(XDP_FORMAT_DATA->cfg.promisc_sock);
 
         free(FORMAT_DATA);
     }
@@ -1178,11 +1234,11 @@ static int linux_xdp_fin_input(libtrace_t *libtrace) {
 static int linux_xdp_fin_output(libtrace_out_t *libtrace) {
 
     if (FORMAT_DATA != NULL) {
-        linux_xdp_destroy_streams(FORMAT_DATA->per_stream);
-        libtrace_list_deinit(FORMAT_DATA->per_stream);
+        linux_xdp_destroy_streams(XDP_FORMAT_DATA->per_stream);
+        libtrace_list_deinit(XDP_FORMAT_DATA->per_stream);
 
         /* unload the XDP program */
-        xdp_link_detach(&FORMAT_DATA->cfg);
+        xdp_link_detach(&XDP_FORMAT_DATA->cfg);
 
         free(FORMAT_DATA);
     }
@@ -1198,7 +1254,7 @@ static int linux_xdp_pregister_thread(libtrace_t *libtrace,
 
     if (reading) {
         if (t->type == THREAD_PERPKT) {
-            t->format_data = libtrace_list_get_index(FORMAT_DATA->per_stream, t->perpkt_num)->data;
+            t->format_data = libtrace_list_get_index(XDP_FORMAT_DATA->per_stream, t->perpkt_num)->data;
             if (t->format_data == NULL) {
                 trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Too many threads registered");
                 return -1;
@@ -1254,17 +1310,18 @@ static void linux_xdp_get_stats(libtrace_t *libtrace, libtrace_stat_t *stats) {
 
     /* check the libtrace_map was found within the XDP program, otherwise
      * let libtrace handle this */
-    if (FORMAT_DATA->cfg.libtrace_map_fd <= 0) {
+    if (XDP_FORMAT_DATA->cfg.libtrace_map_fd <= 0) {
         return;
     }
 
-    int map_fd = FORMAT_DATA->cfg.libtrace_map_fd;
+    int map_fd = XDP_FORMAT_DATA->cfg.libtrace_map_fd;
     int ncpus = libbpf_num_possible_cpus();
     libtrace_xdp_t xdp[ncpus];
     int thread_count = libtrace->perpkt_thread_count;
     struct xsk_per_stream *stream_data;
     struct xdp_statistics xdp_stats;
     socklen_t len = sizeof(xdp_stats);
+    struct linux_dev_stats dev_stats;
 
     /* special case. running in single threaded mode thread count is 0
      * set this to 1 and all should be good.
@@ -1288,7 +1345,7 @@ static void linux_xdp_get_stats(libtrace_t *libtrace, libtrace_stat_t *stats) {
 
     for (int i = 0; i < thread_count; i++) {
 
-        libtrace_list_node_t *node = libtrace_list_get_index(FORMAT_DATA->per_stream, i);
+        libtrace_list_node_t *node = libtrace_list_get_index(XDP_FORMAT_DATA->per_stream, i);
         if (node == NULL) {
             break;
         }
@@ -1303,7 +1360,9 @@ static void linux_xdp_get_stats(libtrace_t *libtrace, libtrace_stat_t *stats) {
                        &len) == 0) {
 
             stats->dropped += xdp_stats.rx_dropped;
+            stats->dropped_valid = 1;
             stats->missing += xdp_stats.rx_invalid_descs;
+            stats->missing_valid = 1;
         }
 
         if ((bpf_map_lookup_elem(map_fd, &i, xdp)) != 0) {
@@ -1313,10 +1372,21 @@ static void linux_xdp_get_stats(libtrace_t *libtrace, libtrace_stat_t *stats) {
         for (int j = 0; j < ncpus; j++) {
             /* add up stats from each cpu */
             stats->received += xdp[j].received_packets;
+            stats->received_valid = 1;
+        }
+    }
+
+    /* If we have the initial interface stats get the current and calculate the dropped packets */
+    if (XDP_FORMAT_DATA->cfg.stats.if_name[0] != 0) {
+        if (linuxcommon_get_dev_statistics(XDP_FORMAT_DATA->cfg.ifname, &dev_stats) == 0) {
+            stats->dropped += (dev_stats.rx_drops - XDP_FORMAT_DATA->cfg.stats.rx_drops);
+            stats->dropped_valid = 1;
         }
     }
 
     stats->captured = stats->received - stats->dropped;
+    if (stats->received_valid && stats->dropped_valid)
+        stats->captured_valid = 1;
 
     return;
 }
@@ -1327,13 +1397,13 @@ static void linux_xdp_get_thread_stats(libtrace_t *libtrace,
 
     /* check the libtrace_map was found within the XDP program, otherwise
      * let libtrace handle this */
-    if (FORMAT_DATA->cfg.libtrace_map_fd <= 0) {
+    if (XDP_FORMAT_DATA->cfg.libtrace_map_fd <= 0) {
         return;
     }
 
     int ncpus = libbpf_num_possible_cpus();
     int ifqueue;
-    int map_fd = FORMAT_DATA->cfg.libtrace_map_fd;
+    int map_fd = XDP_FORMAT_DATA->cfg.libtrace_map_fd;
     libtrace_xdp_t xdp[ncpus];
     struct xsk_per_stream *stream_data;
     struct xdp_statistics xdp_stats;
@@ -1355,7 +1425,9 @@ static void linux_xdp_get_thread_stats(libtrace_t *libtrace,
                    &len) == 0) {
 
         stats->dropped = xdp_stats.rx_dropped;
+        stats->dropped_valid = 1;
         stats->missing = xdp_stats.rx_invalid_descs;
+        stats->missing_valid = 1;
     }
 
     /* get the xdp libtrace map for this threads nic queue */
@@ -1367,9 +1439,12 @@ static void linux_xdp_get_thread_stats(libtrace_t *libtrace,
     for (int i = 0; i < ncpus; i++) {
         /* populate stats structure */
         stats->received += xdp[i].received_packets;
+        stats->received_valid = 1;
     }
 
     stats->captured = stats->received - stats->dropped;
+    if (stats->received_valid && stats->dropped_valid)
+        stats->captured_valid = 1;
 
     return;
 }
@@ -1380,16 +1455,21 @@ static int linux_xdp_config_input(libtrace_t *libtrace,
 
     switch (options) {
         case TRACE_OPTION_SNAPLEN:
-            FORMAT_DATA->snaplen = *(int *)data;
+            XDP_FORMAT_DATA->snaplen = *(int *)data;
             return 0;
         case TRACE_OPTION_PROMISC:
-            break;
+            if (*(bool *)data) {
+                XDP_FORMAT_DATA->cfg.promisc = 2;
+            } else {
+                XDP_FORMAT_DATA->cfg.promisc = 1;
+            }
+            return 0;
         case TRACE_OPTION_HASHER:
             switch (*((enum hasher_types *)data)) {
                 case HASHER_BALANCE:
                 case HASHER_UNIDIRECTIONAL:
                 case HASHER_BIDIRECTIONAL:
-                    FORMAT_DATA->hasher_type = *(enum hasher_types*)data;
+                    XDP_FORMAT_DATA->hasher_type = *(enum hasher_types*)data;
                     return 0;
                 case HASHER_CUSTOM:
                     /* libtrace can handle custom hashers */
@@ -1404,7 +1484,27 @@ static int linux_xdp_config_input(libtrace_t *libtrace,
         case TRACE_OPTION_CONSTANT_ERF_FRAMING:
             break;
         case TRACE_OPTION_XDP_HARDWARE_OFFLOAD:
-            FORMAT_DATA->cfg.hardware_offload = *(bool *)data;
+            XDP_FORMAT_DATA->cfg.xdp_flags &= ~XDP_FLAGS_MODES;
+            XDP_FORMAT_DATA->cfg.xdp_flags |= XDP_FLAGS_HW_MODE;
+            return 0;
+        case TRACE_OPTION_XDP_DRV_MODE:
+            XDP_FORMAT_DATA->cfg.xdp_flags &= ~XDP_FLAGS_MODES;
+            XDP_FORMAT_DATA->cfg.xdp_flags |= XDP_FLAGS_DRV_MODE;
+            return 0;
+        case TRACE_OPTION_XDP_SKB_MODE:
+            XDP_FORMAT_DATA->cfg.xdp_flags &= ~XDP_FLAGS_MODES;
+            XDP_FORMAT_DATA->cfg.xdp_flags |= XDP_FLAGS_SKB_MODE;
+            /* cannot use zero copy mode with SKB so force copy */
+            XDP_FORMAT_DATA->cfg.xsk_bind_flags &= XDP_COPY;
+            XDP_FORMAT_DATA->cfg.xsk_bind_flags |= XDP_ZEROCOPY;
+            return 0;
+        case TRACE_OPTION_XDP_ZERO_COPY_MODE:
+            XDP_FORMAT_DATA->cfg.xsk_bind_flags &= XDP_ZEROCOPY;
+            XDP_FORMAT_DATA->cfg.xsk_bind_flags |= XDP_COPY;
+            return 0;
+        case TRACE_OPTION_XDP_COPY_MODE:
+            XDP_FORMAT_DATA->cfg.xsk_bind_flags &= XDP_COPY;
+            XDP_FORMAT_DATA->cfg.xsk_bind_flags |= XDP_ZEROCOPY;
             return 0;
     }
 
@@ -1550,22 +1650,18 @@ static struct bpf_object *load_bpf_and_xdp_attach(struct xsk_config *cfg) {
 
     int err;
     int prog_fd;
+    int offload_index = 0;
 
     /* Load the BPF-ELF object file and get back libbpf bpf_object. Supply
      * ifindex to try offload to the NIC */
+    if (cfg->xdp_flags & XDP_FLAGS_HW_MODE) {
+        offload_index = cfg->ifindex;
+    }
 
-    if (cfg->hardware_offload) {
-        cfg->bpf_obj = load_bpf_object_file(cfg, cfg->ifindex);
-        if (!cfg->bpf_obj) {
-            fprintf(stderr, "ERR: hardware offloading file: %s\n", cfg->bpf_filename);
-            exit(EXIT_FAIL_BPF);
-        }
-    } else {
-        cfg->bpf_obj = load_bpf_object_file(cfg, 0);
-        if (!cfg->bpf_obj) {
-            fprintf(stderr, "ERR: loading file: %s\n", cfg->bpf_filename);
-            exit(EXIT_FAIL_BPF);
-        }
+    cfg->bpf_obj = load_bpf_object_file(cfg, offload_index);
+    if (!cfg->bpf_obj) {
+        fprintf(stderr, "ERR: loading file: %s\n", cfg->bpf_filename);
+        exit(EXIT_FAIL_BPF);
     }
 
     /* At this point: All XDP/BPF programs from the bpf_filename have been

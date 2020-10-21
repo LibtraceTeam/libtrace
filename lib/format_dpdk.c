@@ -238,6 +238,7 @@ static int whitelist_device(struct dpdk_format_data_t *format_data UNUSED, struc
  * or ./libtrace dpdk:0:1:0.1-2 -> 0:1:0.1 (Using CPU core #2)
  */
 static int parse_pciaddr(char * str, struct rte_pci_addr * addr, long * core) {
+
 	int matches;
 
 	if (!str) {
@@ -253,6 +254,7 @@ static int parse_pciaddr(char * str, struct rte_pci_addr * addr, long * core) {
 	                 &addr->domain, &addr->bus, &addr->devid,
 	                 &addr->function, core);
 #endif
+
 	if (matches >= 4) {
 		return 0;
 	} else {
@@ -782,6 +784,10 @@ int dpdk_config_input (libtrace_t *libtrace,
         case TRACE_OPTION_REPLAY_SPEEDUP:
         case TRACE_OPTION_CONSTANT_ERF_FRAMING:
         case TRACE_OPTION_XDP_HARDWARE_OFFLOAD:
+        case TRACE_OPTION_XDP_SKB_MODE:
+        case TRACE_OPTION_XDP_DRV_MODE:
+        case TRACE_OPTION_XDP_ZERO_COPY_MODE:
+        case TRACE_OPTION_XDP_COPY_MODE:
 		break;
 	/* Avoid default: so that future options will cause a warning
 	 * here to remind us to implement it, or flag it as
@@ -991,19 +997,26 @@ static void dpdk_lsc_callback(portid_t port, enum rte_eth_event_type event,
  * @param real If true allocate a real lcore, otherwise allocate a core which
  * does not exist on the local machine.
  * @param socket the preferred NUMA socket - only used if a real core is requested
+ * @param core - if > 0 reserve supplied core otherwise let dpdk_reserve_lcore find a core
  * @return a valid core, which can later be used with dpdk_register_lcore() or a
  * -1 if have run out of cores.
  *
  * If any thread is reading or freeing packets we need to register it here
  * due to TLS caches in the memory pools.
  */
-static int dpdk_reserve_lcore(bool real, int socket) {
+static int dpdk_reserve_lcore(bool real, int socket, int core) {
 	int new_id = -1;
 	int i;
 	(void) socket;
 	long nb_core = dpdk_processor_count();
 
 	pthread_mutex_lock(&dpdk_lock);
+        if (core > -1) {
+
+            if (!core_config[core])
+                new_id = core;
+
+        } else
 	/* If 'reading packets' fill in cores from 0 up and bind affinity
 	 * otherwise start from the MAX core (which is also the master) and work backwards
 	 * in this case physical cores on the system will not exist so we don't bind
@@ -1188,7 +1201,8 @@ static void dpdk_free_memory(struct rte_mempool *mempool, int socket_id) {
  */
 static int dpdk_start_streams(struct dpdk_format_data_t *format_data,
                               char *err, int errlen, uint16_t rx_queues,
-                              bool wait_for_link) {
+                              bool wait_for_link,
+                              int *coremap) {
 	int ret, i, buf_size;
 	struct rte_eth_link link_info; /* Wait for link */
 	dpdk_per_stream_t empty_stream = DPDK_EMPTY_STREAM;
@@ -1376,8 +1390,13 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data,
 		stream = libtrace_list_get_index(format_data->per_stream, i)->data;
 		stream->queue_id = i;
 
-		if (stream->lcore == -1)
-			stream->lcore = dpdk_reserve_lcore(true, format_data->nic_numa_node);
+		if (stream->lcore == -1) {
+                    // use coremap if supplied
+                    if (coremap != NULL)
+			stream->lcore = dpdk_reserve_lcore(true, format_data->nic_numa_node, coremap[i]);
+                    else
+                        stream->lcore = dpdk_reserve_lcore(true, format_data->nic_numa_node, -1);
+                }
 
 		if (stream->lcore == -1) {
 			snprintf(err, errlen, "Intel DPDK - Failed to reserve a lcore"
@@ -1481,7 +1500,7 @@ int dpdk_start_input (libtrace_t *libtrace) {
 	/* Make sure we don't reserve an extra thread for this */
 	FORMAT_DATA_FIRST(libtrace)->queue_id = rte_lcore_id();
 
-	if (dpdk_start_streams(FORMAT(libtrace), err, sizeof(err), 1, false) != 0) {
+	if (dpdk_start_streams(FORMAT(libtrace), err, sizeof(err), 1, false, libtrace->config.coremap) != 0) {
 		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "%s", err);
 		free(libtrace->format_data);
 		libtrace->format_data = NULL;
@@ -1502,6 +1521,7 @@ int dpdk_pstart_input (libtrace_t *libtrace) {
 	int phys_cores=0;
 	int tot = libtrace->perpkt_thread_count;
 	err[0] = 0;
+        int ret = 0;
 
 	if (rte_lcore_id() != rte_get_master_lcore() && rte_lcore_id() != LCORE_ID_ANY)
 		fprintf(stderr, "Libtrace DPDK: warning dpdk_pstart_input "
@@ -1526,10 +1546,38 @@ int dpdk_pstart_input (libtrace_t *libtrace) {
 	        libtrace->perpkt_thread_count, phys_cores);
 #endif
 
-	if (dpdk_start_streams(FORMAT(libtrace), err, sizeof(err), tot, false) != 0) {
+	if ((ret = dpdk_start_streams(FORMAT(libtrace), err, sizeof(err), tot, false, libtrace->config.coremap)) == -1) {
 		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "%s", err);
 		free(libtrace->format_data);
 		libtrace->format_data = NULL;
+
+                return -1;
+
+        // dpdk_start_streams can return -2 which prevents putting libtrace into an error state. We can cleanup stream state
+        // and let Libtrace re-attempt starting the stream in non-parallel mode.
+        } else if (ret == -2) {
+
+                if (FORMAT(libtrace)->port != 0xFF)
+			rte_eth_dev_callback_unregister(FORMAT(libtrace)->port,
+			                                RTE_ETH_EVENT_INTR_LSC,
+			                                dpdk_lsc_callback,
+			                                FORMAT(libtrace));
+
+                // free pktmbuf pool
+                dpdk_free_memory(FORMAT(libtrace)->pktmbuf_pool, FORMAT(libtrace)->nic_numa_node);
+
+                // cleanup streams except first??
+                libtrace_list_node_t * n;
+                for (n = FORMAT(libtrace)->per_stream->head; n ; n = n->next) {
+			dpdk_per_stream_t * stream = n->data;
+			if (stream->mempool)
+				dpdk_free_memory(stream->mempool,
+				                 rte_lcore_to_socket_id(stream->lcore));
+		}
+
+                if (FORMAT(libtrace)->rss_key)
+			free(FORMAT(libtrace)->rss_key);
+
 		return -1;
 	}
 
@@ -1581,7 +1629,7 @@ int dpdk_pregister_thread(libtrace_t *libtrace, libtrace_thread_t *t, bool readi
 #endif
 		return dpdk_register_lcore(libtrace, true, stream->lcore);
 	} else {
-		int lcore = dpdk_reserve_lcore(reading, 0);
+		int lcore = dpdk_reserve_lcore(reading, 0, -1);
 		if (lcore == -1) {
 			trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Too many threads"
 			              " for DPDK");
@@ -1630,7 +1678,7 @@ static int dpdk_start_output(libtrace_out_t *libtrace)
 	char err[500];
 	err[0] = 0;
 
-	if (dpdk_start_streams(FORMAT(libtrace), err, sizeof(err), 1, true) != 0) {
+	if (dpdk_start_streams(FORMAT(libtrace), err, sizeof(err), 1, true, NULL) != 0) {
 		trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED, "%s", err);
 		free(libtrace->format_data);
 		libtrace->format_data = NULL;
@@ -2136,7 +2184,7 @@ static int dpdk_pread_packets (libtrace_t *libtrace,
 			hdr = (struct dpdk_addt_hdr *)
 					((struct rte_mbuf*) pkts_burst[i] + 1);
 			packets[i]->order = hdr->timestamp;
-			dpdk_prepare_packet(libtrace, packets[i], packets[i]->buffer, packets[i]->type, 0);
+			dpdk_prepare_packet(libtrace, packets[i], pkts_burst[i], TRACE_RT_DATA_DPDK, 0);
 		}
 	}
 

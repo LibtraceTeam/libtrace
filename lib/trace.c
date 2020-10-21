@@ -219,6 +219,7 @@ static void guess_format(libtrace_t *libtrace, const char *filename)
 	return;
 }
 
+
 /* Creates an input trace from a URI
  *
  * @params char * containing a valid libtrace URI
@@ -306,7 +307,7 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
         libtrace->reporter_cbs = NULL;
 
         /* Parse the URI to determine what sort of trace we are dealing with */
-	if ((uridata = trace_parse_uri(uri, &scan)) == 0) {
+	if ((uridata = trace_parse_uri(uri, &scan, libtrace->config.coremap)) == 0) {
 		/* Could not parse the URI nicely */
 		guess_format(libtrace,uri);
 		if (trace_is_err(libtrace)) {
@@ -470,7 +471,7 @@ DLLEXPORT libtrace_out_t *trace_create_output(const char *uri) {
 
         /* Parse the URI to determine what capture format we want to write */
 
-	if ((uridata = trace_parse_uri(uri, &scan)) == 0) {
+	if ((uridata = trace_parse_uri(uri, &scan, NULL)) == 0) {
 		trace_set_err_out(libtrace,TRACE_ERR_BAD_FORMAT,
 				"Bad uri format (%s)",uri);
 		return libtrace;
@@ -616,7 +617,7 @@ DLLEXPORT int trace_config(libtrace_t *libtrace,
 	 * format did not support configuration. However, libtrace can
 	 * deal with some options itself, so give that a go */
 	switch(option) {
-                case TRACE_OPTION_REPLAY_SPEEDUP:
+            case TRACE_OPTION_REPLAY_SPEEDUP:
 			/* Clear the error if there was one */
 			if (trace_is_err(libtrace)) {
 				trace_get_err(libtrace);
@@ -671,26 +672,49 @@ DLLEXPORT int trace_config(libtrace_t *libtrace,
 		case TRACE_OPTION_HASHER:
 			/* Dealt with earlier */
 			return -1;
-                case TRACE_OPTION_CONSTANT_ERF_FRAMING:
-                        if (!trace_is_err(libtrace)) {
-                                trace_set_err(libtrace,
-                                                TRACE_ERR_OPTION_UNAVAIL,
-						"This format does not feature an ERF header or does not support bypassing the framing length calculation");
-                        }
-                        return -1;
-
+		case TRACE_OPTION_CONSTANT_ERF_FRAMING:
+				if (!trace_is_err(libtrace)) {
+						trace_set_err(libtrace,
+										TRACE_ERR_OPTION_UNAVAIL,
+				"This format does not feature an ERF header or does not support bypassing the framing length calculation");
+				}
+				return -1;
 		case TRACE_OPTION_DISCARD_META:
 			if (!trace_is_err(libtrace)) {
 				trace_set_err(libtrace, TRACE_ERR_OPTION_UNAVAIL,
 					"Libtrace does not support meta packets for this format");
 			}
 			return -1;
-       case TRACE_OPTION_XDP_HARDWARE_OFFLOAD:
-           if (!trace_is_err(libtrace)) {
-               trace_set_err(libtrace, TRACE_ERR_OPTION_UNAVAIL,
-                   "Libtrace does not support XDP hardware offloading for this format");
-           }
-           return -1;
+		case TRACE_OPTION_XDP_HARDWARE_OFFLOAD:
+			if (!trace_is_err(libtrace)) {
+					trace_set_err(libtrace, TRACE_ERR_OPTION_UNAVAIL,
+							"Libtrace does not support XDP hardware offloading for this format");
+			}
+			return -1;
+		case TRACE_OPTION_XDP_ZERO_COPY_MODE:
+			if (!trace_is_err(libtrace)) {
+					trace_set_err(libtrace, TRACE_ERR_OPTION_UNAVAIL,
+							"Libtrace does not support XDP zero copy mode for this format");
+			}
+			return -1;
+		case TRACE_OPTION_XDP_COPY_MODE:
+			if (!trace_is_err(libtrace)) {
+					trace_set_err(libtrace, TRACE_ERR_OPTION_UNAVAIL,
+							"Libtrace does not support XDP copy mode for this format");
+			}
+			return -1;
+		case TRACE_OPTION_XDP_DRV_MODE:
+			if (!trace_is_err(libtrace)) {
+					trace_set_err(libtrace, TRACE_ERR_OPTION_UNAVAIL,
+							"Libtrace does not support installing XDP program in native/driver mode");
+			}
+			return -1;
+		case TRACE_OPTION_XDP_SKB_MODE:
+			if (!trace_is_err(libtrace)) {
+					trace_set_err(libtrace, TRACE_ERR_OPTION_UNAVAIL,
+							"Libtrace does not support installing XDP program in SKB (generic) mode");
+			}
+			return -1;
 	}
 	if (!trace_is_err(libtrace)) {
 		trace_set_err(libtrace,TRACE_ERR_UNKNOWN_OPTION,
@@ -1998,8 +2022,52 @@ DLLEXPORT size_t trace_set_capture_length(libtrace_packet_t *packet, size_t size
  * point to a copy of the format component.
  */
 
-DLLEXPORT const char * trace_parse_uri(const char *uri, char **format) {
+DLLEXPORT const char *trace_parse_coremap_from_uri(int *cores, const char *uri) {
+
+    const char *coremap = 0;
+    int core = 0;
+    int i = 0;
+    int len = 0;
+
+    if (uri == NULL)
+        return NULL;
+
+    if ((coremap = strstr(uri, "coremap=[")) != NULL) {
+        // move to coremap values
+        coremap += 9;
+        while (sscanf(coremap, "%d%n", &core, &len) == 1) {
+
+            if (cores != NULL && i < MAX_THREADS)
+                cores[i++] = core;
+
+            // move to the next coremap value, also account
+            // for the comma or full colon
+            if (coremap[len] != ',' && coremap[len] != ':' && coremap[len] != ']') {
+                fprintf(stderr, "Badly formed URI - : or , is required between core values\n");
+                return NULL;
+            } else
+                coremap += len + 1;
+        }
+
+        if ((uri = strchr(coremap, ':')) == NULL) {
+            // Badly formed URI - needs a : after coremap
+            fprintf(stderr, "Badly formed URI - : is required after coremap\n");
+            return NULL;
+        } else
+            // move past the :
+            uri += 1;
+    }
+
+    return uri;
+}
+
+DLLEXPORT const char * trace_parse_uri(const char *uri, char **format, int *cores) {
 	const char *uridata = 0;
+        const char *next = 0;
+
+        // try parse coremap
+        if ((next = trace_parse_coremap_from_uri(cores, uri)) != NULL)
+            uri = next;
 
 	if((uridata = strchr(uri,':')) == NULL) {
                 /* Badly formed URI - needs a : */

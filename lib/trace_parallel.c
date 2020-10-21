@@ -1591,6 +1591,8 @@ SIMPLE_FUNCTION static int get_nb_cores() {
  */
 static void verify_configuration(libtrace_t *libtrace) {
 
+        int i;
+
 	if (libtrace->config.hasher_queue_size <= 0)
 		libtrace->config.hasher_queue_size = 1000;
 
@@ -1623,6 +1625,15 @@ static void verify_configuration(libtrace_t *libtrace) {
 	if (libtrace->hasher && libtrace->perpkt_thread_count > 1) {
 		libtrace->hasher_thread.type = THREAD_HASHER;
 	}
+
+        // make sure supplied coremap is valid - unset invalid entries
+        for (i = 0; i < MAX_THREADS; i++) {
+            if (get_nb_cores()-1 < libtrace->config.coremap[i] || -1 > libtrace->config.coremap[i]) {
+                fprintf(stderr, "Invalid core %d in coremap, perpkt-thread %d will not be pinned\n",
+                    libtrace->config.coremap[i], i);
+                libtrace->config.coremap[i] = -1;
+            }
+        }
 }
 
 /**
@@ -1669,12 +1680,18 @@ static int trace_start_thread(libtrace_t *trace,
 
 #ifdef __linux__
 	CPU_ZERO(&cpus);
-	for (i = 0; i < get_nb_cores(); i++)
+
+        // does a coremap entry exist for this perpkt thread
+        if (type == THREAD_PERPKT && trace->config.coremap[perpkt_num] != -1) {
+            CPU_SET(trace->config.coremap[perpkt_num], &cpus);
+        } else {
+	    for (i = 0; i < get_nb_cores(); i++)
 		CPU_SET(i, &cpus);
+        }
 
 	ret = pthread_create(&t->tid, NULL, start_routine, (void *) trace);
 	if( ret == 0 ) {
-		ret = pthread_setaffinity_np(t->tid, sizeof(cpus), &cpus);
+	    ret = pthread_setaffinity_np(t->tid, sizeof(cpus), &cpus);
 	}
 
 #else
@@ -1869,7 +1886,7 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob,
 		ret = libtrace->format->pstart_input(libtrace);
 		libtrace->pread = trace_pread_packet_wrapper;
 	}
-	if (ret != 0) {
+	if (ret != 0 && !trace_is_err(libtrace)) {
 		if (libtrace->format->start_input) {
 			ret = libtrace->format->start_input(libtrace);
 		}
@@ -2717,7 +2734,24 @@ static void config_string(struct user_configuration *uc, char *key, size_t nkey,
 	} else if (strncmp(key, "debug_state", nkey) == 0
 	           || strncmp(key, "ds", nkey) == 0) {
 		uc->debug_state = config_bool_parse(value, nvalue);
-	} else {
+	} else if (strncmp(key, "coremap", nkey) == 0) {
+
+                int core = 0;
+                int len = 0;
+                size_t pos = 0;
+                unsigned int i = 0;
+                while (pos < nvalue) {
+                    if (sscanf(value + pos, "%d%n", &core, &len) == 1) {
+
+                        if (i < sizeof(uc->coremap) / sizeof(int))
+                            uc->coremap[i++] = core;
+
+                        pos += len;
+                    } else
+                        pos += 1;
+                }
+
+        } else {
 		fprintf(stderr, "No matching option %s(=%s), ignoring\n", key, value);
 	}
 }

@@ -163,6 +163,8 @@ int snprintf(char *str, size_t size, const char *format, ...);
 
 #define LIBTRACE_MAX_REPLAY_SPEEDUP 1000
 
+#define MAX_THREADS 128
+
 /** Data about the most recent event from a trace file */
 struct libtrace_event_status_t {
 	/** A libtrace packet to store the packet when a PACKET event occurs */
@@ -293,8 +295,13 @@ struct user_configuration {
 	bool reporter_polling;
 	size_t reporter_thold;
 	bool debug_state;
+	int coremap[MAX_THREADS];
 };
-#define ZERO_USER_CONFIG(config) memset(&config, 0, sizeof(struct user_configuration));
+#define ZERO_USER_CONFIG(config) {\
+	memset(&config, 0, sizeof(struct user_configuration));\
+	for (int i = 0; i < MAX_THREADS; i++)\
+		config.coremap[i] = -1;\
+}
 
 struct callback_set {
 
@@ -391,7 +398,7 @@ struct libtrace_t {
 	libtrace_stat_t *stats;
 	struct user_configuration config;
 	libtrace_combine_t combiner;
-	
+
         /* Set of callbacks to be executed by per packet threads in response
          * to various messages. */
         struct callback_set *perpkt_cbs;

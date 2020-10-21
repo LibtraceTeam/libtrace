@@ -618,6 +618,10 @@ static int pcapng_config_input(libtrace_t *libtrace, trace_option_t option,
                         }
 			return 0;
                 case TRACE_OPTION_XDP_HARDWARE_OFFLOAD:
+                case TRACE_OPTION_XDP_SKB_MODE:
+                case TRACE_OPTION_XDP_DRV_MODE:
+                case TRACE_OPTION_XDP_ZERO_COPY_MODE:
+                case TRACE_OPTION_XDP_COPY_MODE:
                     break;
         }
 
