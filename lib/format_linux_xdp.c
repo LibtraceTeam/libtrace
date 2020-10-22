@@ -1342,6 +1342,7 @@ static void linux_xdp_get_stats(libtrace_t *libtrace, libtrace_stat_t *stats) {
     stats->received = 0;
     stats->missing = 0;
     stats->captured = 0;
+    stats->errors = 0;
 
     for (int i = 0; i < thread_count; i++) {
 
@@ -1381,12 +1382,18 @@ static void linux_xdp_get_stats(libtrace_t *libtrace, libtrace_stat_t *stats) {
         if (linuxcommon_get_dev_statistics(XDP_FORMAT_DATA->cfg.ifname, &dev_stats) == 0) {
             stats->dropped += (dev_stats.rx_drops - XDP_FORMAT_DATA->cfg.stats.rx_drops);
             stats->dropped_valid = 1;
+            /* Received comes from the BPF program i.e. kernel
+               Add card drops, but not drops between kernel and user-space */
+            stats->received += (dev_stats.rx_drops - XDP_FORMAT_DATA->cfg.stats.rx_drops);
+            stats->errors += (dev_stats.rx_errors - XDP_FORMAT_DATA->cfg.stats.rx_errors);
+            stats->errors_valid = 1;
         }
     }
 
-    stats->captured = stats->received - stats->dropped;
-    if (stats->received_valid && stats->dropped_valid)
+    if (stats->received_valid && stats->dropped_valid) {
+        stats->captured = stats->received - stats->dropped;
         stats->captured_valid = 1;
+    }
 
     return;
 }
