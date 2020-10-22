@@ -1736,31 +1736,34 @@ static int trace_start_thread(libtrace_t *trace,
  * - dag:/dev/dag0,0 would match LIBTRACE_CONF, LIBTRACE_CONF_DAG, LIBTRACE_CONF_DAG__DEV_DAG0_0
  * - test.erf would match LIBTRACE_CONF, LIBTRACE_CONF_ERF, LIBTRACE_CONF_ERF_TEST_ERF
  *
- * @note All environment variables names MUST only contian
+ * @note All environment variables names MUST only contain
  * [A-Z], [0-9] and [_] (underscore) and not start with a number. Any characters
- * outside of this range should be captilised if possible or replaced with an
+ * outside of this range should be capitalised if possible or replaced with an
  * underscore.
  */
 static void parse_env_config (libtrace_t *libtrace) {
 	char env_name[1024] = "LIBTRACE_CONF_";
 	size_t len = strlen(env_name);
-	size_t mark = 0;
+	size_t mark; /* Offset of the first ':' after the format name, or 0 */
 	size_t i;
 	char * env;
 
 	/* Make our compound string */
 	strncpy(&env_name[len], libtrace->format->name, sizeof(env_name) - len);
 	len += strlen(libtrace->format->name);
-	strncpy(&env_name[len], ":", sizeof(env_name) - len);
-	len += 1;
-	strncpy(&env_name[len], libtrace->uridata, sizeof(env_name) - len);
+	if (len + 2 < sizeof(env_name)) {
+		mark = len;
+		env_name[len++] = ':';
+		strncpy(&env_name[len], libtrace->uridata, sizeof(env_name) - len);
+	} else {
+		/* Unexpected: We don't have buffer space, silently continue */
+		mark = 0;
+	}
+	env_name[sizeof(env_name)-1] = 0;
 
 	/* env names are allowed to be A-Z (CAPS) 0-9 and _ */
 	for (i = 0; env_name[i] != 0; ++i) {
 		env_name[i] = toupper(env_name[i]);
-		if(env_name[i] == ':') {
-			mark = i;
-		}
 		if (!( (env_name[i] >= 'A' && env_name[i] <= 'Z') ||
 		       (env_name[i] >= '0' && env_name[i] <= '9') )) {
 			env_name[i] = '_';
