@@ -1281,7 +1281,7 @@ typedef struct libtrace_sll_header_t {
         uint16_t halen;                 /**< Link-layer address length */
         unsigned char addr[8];          /**< Link-layer address */
         uint16_t protocol;              /**< Protocol */
-} libtrace_sll_header_t;
+} PACKED libtrace_sll_header_t;
 
 
 /* SLL packet types */
