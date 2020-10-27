@@ -1,36 +1,28 @@
 /*
- * This file is part of libtrace
  *
- * Copyright (c) 2007-2015 The University of Waikato, Hamilton, 
- * New Zealand.
- *
- * Authors: Daniel Lawson 
- *          Perry Lorier
- *          Shane Alcock 
- *          
+ * Copyright (c) 2007-2016 The University of Waikato, Hamilton, New Zealand.
  * All rights reserved.
  *
- * This code has been developed by the University of Waikato WAND 
+ * This file is part of libtrace.
+ *
+ * This code has been developed by the University of Waikato WAND
  * research group. For further information please see http://www.wand.net.nz/
  *
  * libtrace is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * libtrace is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with libtrace; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
- * $Id$
  *
  */
-
 #include "config.h"
 #include "libtrace.h"
 #include "libtrace_int.h"
@@ -40,7 +32,6 @@
 #include "rt_protocol.h"
 
 #include <errno.h>
-#include <assert.h>
 #include <stdio.h>
 #include <fcntl.h>
 
@@ -70,11 +61,17 @@ struct duck_format_data_out_t {
 	int compress_type;
 	int fileflag;
 	iow_t *file;
-	int dag_version;	
+	int dag_version;
 };
 
 static int duck_init_input(libtrace_t *libtrace) {
 	libtrace->format_data = malloc(sizeof(struct duck_format_data_t));
+
+	if (!libtrace->format_data) {
+		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory for "
+			"format data inside duck_init_input()");
+		return 1;
+	}
 
 	DATA(libtrace)->dag_version = 0;
 	return 0;
@@ -82,7 +79,13 @@ static int duck_init_input(libtrace_t *libtrace) {
 
 static int duck_init_output(libtrace_out_t *libtrace) {
 	libtrace->format_data = malloc(sizeof(struct duck_format_data_out_t));
-	
+
+	if (!libtrace->format_data) {
+		trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory for "
+			"format data inside duck_init_output()");
+		return -1;
+	}
+
 	OUTPUT->level = 0;
 	OUTPUT->compress_type = TRACE_OPTION_COMPRESSTYPE_NONE;
 	OUTPUT->fileflag = O_CREAT | O_WRONLY;
@@ -109,7 +112,9 @@ static int duck_config_output(libtrace_out_t *libtrace,
 					"Unknown option");
 			return -1;
 	}
-	assert(0);
+	trace_set_err_out(libtrace, TRACE_ERR_UNKNOWN_OPTION,
+		"Unknown option in duck_config_output()");
+	return -1;
 }
 
 static int duck_start_input(libtrace_t *libtrace) {
@@ -240,42 +245,47 @@ static int duck_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	}
 
 	if (duck_prepare_packet(libtrace, packet, packet->buffer, packet->type,
-				flags)) 
+				flags))
 		return -1;
-	
+
 	return numbytes;
 }
 
-static int duck_write_packet(libtrace_out_t *libtrace, 
-		libtrace_packet_t *packet) 
+static int duck_write_packet(libtrace_out_t *libtrace,
+		libtrace_packet_t *packet)
 {
 
 	int numbytes = 0;
 	uint32_t duck_version;
 
-	if (packet->type != TRACE_RT_DUCK_2_4 
+	if (packet->type != TRACE_RT_DUCK_2_4
 			&& packet->type != TRACE_RT_DUCK_2_5 &&
 			packet->type != TRACE_RT_DUCK_5_0) {
 		trace_set_err_out(libtrace, TRACE_ERR_BAD_PACKET,
 				"Only DUCK packets may be written to a DUCK file");
 		return -1;
 	}
-	
-	assert(OUTPUT->file);
+
+	if (!OUTPUT->file) {
+		trace_set_err_out(libtrace, TRACE_ERR_BAD_IO,
+			"Attempted to write DUCK packets to a closed file, must call "
+				"trace_create_output() before calling trace_write_output()");
+		return -1;
+	}
 
 	if (OUTPUT->dag_version == 0) {
 	/* Writing the DUCK version will help with reading it back in later! */
 		duck_version = bswap_host_to_le32(packet->type);
 		if ((numbytes = wandio_wwrite(OUTPUT->file, &duck_version,
 				sizeof(duck_version))) != sizeof(uint32_t)){
-			trace_set_err_out(libtrace, errno, 
+			trace_set_err_out(libtrace, errno,
 					"Writing DUCK version failed");
 			return -1;
 		}
 		OUTPUT->dag_version = packet->type;
 	}
-	
-	if ((numbytes = wandio_wwrite(OUTPUT->file, packet->payload, 
+
+	if ((numbytes = wandio_wwrite(OUTPUT->file, packet->payload,
 					trace_get_capture_length(packet))) !=
 				(int)trace_get_capture_length(packet)) {
 		trace_set_err_out(libtrace, errno, "Writing DUCK failed");
@@ -344,6 +354,7 @@ static struct libtrace_format_t duck = {
         duck_prepare_packet,		/* prepare_packet */
 	NULL,                           /* fin_packet */
         duck_write_packet,              /* write_packet */
+        NULL,                           /* flush_output */
         duck_get_link_type,    		/* get_link_type */
         NULL,              		/* get_direction */
         NULL,              		/* set_direction */
@@ -351,6 +362,7 @@ static struct libtrace_format_t duck = {
         NULL,                           /* get_timeval */
 	NULL,				/* get_timespec */
         NULL,                           /* get_seconds */
+	NULL,                           /* get_meta_section */
         NULL,                   	/* seek_erf */
         NULL,                           /* seek_timeval */
         NULL,                           /* seek_seconds */

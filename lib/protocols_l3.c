@@ -1,42 +1,33 @@
 /*
- * This file is part of libtrace
  *
- * Copyright (c) 2007-2015 The University of Waikato, Hamilton, 
- * New Zealand.
- *
- * Authors: Daniel Lawson 
- *          Perry Lorier
- *          Shane Alcock 
- *          
+ * Copyright (c) 2007-2016 The University of Waikato, Hamilton, New Zealand.
  * All rights reserved.
  *
- * This code has been developed by the University of Waikato WAND 
+ * This file is part of libtrace.
+ *
+ * This code has been developed by the University of Waikato WAND
  * research group. For further information please see http://www.wand.net.nz/
  *
  * libtrace is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * libtrace is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with libtrace; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
- * $Id$
  *
  */
-
 
 #include "libtrace_int.h"
 #include "libtrace.h"
 #include "protocols.h"
 #include "checksum.h"
-#include <assert.h>
 #include <stdlib.h>
 #include <arpa/inet.h>
 
@@ -110,8 +101,11 @@ DLLEXPORT void *trace_get_payload_from_ip(libtrace_ip_t *ipptr, uint8_t *prot,
 {
         void *trans_ptr = 0;
 
-        assert(ipptr != NULL);
-	
+	if (!ipptr) {
+		fprintf(stderr, "NULL libtrace_ip_t pointer passed into trace_get_payload_from_ip()\n");
+		return NULL;
+	}
+
 	/* Er? IPv5? */
 	if (ipptr->ip_v != 4)
 		return NULL;
@@ -144,14 +138,17 @@ DLLEXPORT void *trace_get_payload_from_ip(libtrace_ip_t *ipptr, uint8_t *prot,
 }
 
 void *trace_get_payload_from_ip6(libtrace_ip6_t *ipptr, uint8_t *prot,
-		uint32_t *remaining) 
-{
+		uint32_t *remaining) {
 	void *payload = (char*)ipptr+sizeof(libtrace_ip6_t);
 	uint8_t nxt;
 	uint16_t len;
 
-	assert (ipptr != NULL);
- 	nxt = ipptr->nxt;	
+	if (!ipptr) {
+		fprintf(stderr, "NULL libtrace_ip6_t passed into trace_get_payload_from_ip6()\n");
+		return NULL;
+	}
+
+ 	nxt = ipptr->nxt;
 	if (remaining) {
 		if (*remaining<sizeof(libtrace_ip6_t)) {
 			*remaining = 0;
@@ -228,7 +225,7 @@ DLLEXPORT void *trace_get_layer3(const libtrace_packet_t *packet,
 	if (!remaining) remaining=&dummy_remaining;
 
 	/* use l3 cache */
-	if (packet->l3_header)
+	if (packet->cached.l3_header)
 	{
 		/*
 		link = trace_get_packet_buffer(packet,&linktype,remaining);
@@ -237,17 +234,17 @@ DLLEXPORT void *trace_get_layer3(const libtrace_packet_t *packet,
 			return NULL;
 		*/
 
-		*ethertype = packet->l3_ethertype;
-		/* *remaining -= (packet->l3_header - link); */
-		*remaining = packet->l3_remaining;
+		*ethertype = packet->cached.l3_ethertype;
+		/* *remaining -= (packet->cached.l3_header - link); */
+		*remaining = packet->cached.l3_remaining;
 
-		return packet->l3_header;
+		return packet->cached.l3_header;
 	}
 
-        if (packet->l2_header) {
-                link = packet->l2_header;
-                linktype = packet->link_type;
-                *remaining = packet->l2_remaining;
+        if (packet->cached.l2_header) {
+                link = packet->cached.l2_header;
+                linktype = packet->cached.link_type;
+                *remaining = packet->cached.l2_remaining;
         } else {
         	link = trace_get_layer2(packet,&linktype,remaining);
         }
@@ -269,7 +266,7 @@ DLLEXPORT void *trace_get_layer3(const libtrace_packet_t *packet,
 			iphdr=trace_get_payload_from_mpls(
 					  iphdr,ethertype,remaining);
 
-			if (iphdr && ethertype == 0x0) {
+			if (iphdr && *ethertype == 0x0) {
 				iphdr=trace_get_payload_from_ethernet(
 						iphdr,ethertype,remaining);
 			}
@@ -290,9 +287,9 @@ DLLEXPORT void *trace_get_layer3(const libtrace_packet_t *packet,
 
 	/* Store values in the cache for later */
 	/* Cast away constness, nasty, but this is just a cache */
-	((libtrace_packet_t*)packet)->l3_ethertype = *ethertype;
-	((libtrace_packet_t*)packet)->l3_header = iphdr;
-	((libtrace_packet_t*)packet)->l3_remaining = *remaining;
+	((libtrace_packet_t*)packet)->cached.l3_ethertype = *ethertype;
+	((libtrace_packet_t*)packet)->cached.l3_header = iphdr;
+	((libtrace_packet_t*)packet)->cached.l3_remaining = *remaining;
 
 	return iphdr;
 }
@@ -349,15 +346,24 @@ DLLEXPORT int trace_get_next_option(unsigned char **ptr,int *len,
 				return 0;
 			return 1;
 	}
-	assert(0);
 }
 
 static char *sockaddr_to_string(struct sockaddr *addrptr, char *space,
 		int spacelen) {
 
-	assert(addrptr && space);
-	assert(spacelen > 0);
-	
+	if (!addrptr) {
+		fprintf(stderr, "NULL sockaddr passed into sockaddr_to_string()\n");
+		return NULL;
+	}
+	if (!space) {
+		fprintf(stderr, "NULL buffer space passed into sockaddr_to_string()\n");
+		return NULL;
+	}
+	if (spacelen <= 0) {
+		fprintf(stderr, "Buffer size must be greater than 0 when passed into sockaddr_to_string()\n");
+		return NULL;
+	}
+
 	if (addrptr->sa_family == AF_INET) {
 		struct sockaddr_in *v4 = (struct sockaddr_in *)addrptr;
 		inet_ntop(AF_INET, &(v4->sin_addr), space, spacelen);
@@ -689,7 +695,7 @@ DLLEXPORT uint16_t *trace_checksum_layer3(libtrace_packet_t *packet,
 	void *l3;
 	uint16_t ethertype;
 	uint32_t remaining;
-	uint16_t *csum_ptr;
+	char *csum_ptr;
 
 	uint8_t safety[65536];
 
@@ -706,7 +712,7 @@ DLLEXPORT uint16_t *trace_checksum_layer3(libtrace_packet_t *packet,
 		if (remaining < sizeof(libtrace_ip_t))
 			return NULL;
 
-		csum_ptr = &ip->ip_sum;
+		csum_ptr = (char *)(&ip->ip_sum);
 
 		/* I hate memcpys, but this is the only truly safe way to
 		 * do this without modifying the packet. I'm trying to be
@@ -723,7 +729,7 @@ DLLEXPORT uint16_t *trace_checksum_layer3(libtrace_packet_t *packet,
 		/* Remember to byteswap appropriately */
 		*csum = ntohs(*csum);
 		
-		return csum_ptr;
+		return (uint16_t *)csum_ptr;
 	}
 
 	return NULL;
@@ -759,7 +765,7 @@ DLLEXPORT uint16_t trace_get_fragment_offset(const libtrace_packet_t *packet,
 
         if (ethertype == TRACE_ETHERTYPE_IPV6) {
                 libtrace_ip6_t *ip6 = (libtrace_ip6_t *)l3;
-                void *payload = ip6++;
+                void *payload = ip6 + 1;
                 uint8_t nxt = ip6->nxt;
                 uint16_t len;
                 

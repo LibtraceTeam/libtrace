@@ -1,32 +1,29 @@
 /*
- * This file is part of libtrace
  *
- * Copyright (c) 2007-2015 The University of Waikato, Hamilton, New Zealand.
- * Authors: Daniel Lawson 
- *          Perry Lorier 
- *          
+ * Copyright (c) 2007-2016 The University of Waikato, Hamilton, New Zealand.
  * All rights reserved.
  *
- * This code has been developed by the University of Waikato WAND 
+ * This file is part of libtrace.
+ *
+ * This code has been developed by the University of Waikato WAND
  * research group. For further information please see http://www.wand.net.nz/
  *
  * libtrace is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * libtrace is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with libtrace; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
- * $Id$
  *
  */
+
 
 /* 
  * This program takes a series of traces and bpf filters and outputs how many
@@ -56,12 +53,12 @@
 #include "lt_inttypes.h"
 #include <pthread.h>
 
-struct libtrace_t *trace = NULL;
+struct libtrace_t *inptrace = NULL;
 
 static void cleanup_signal(int signal UNUSED)
 {
-	if (trace)
-		trace_pstop(trace);
+	if (inptrace)
+		trace_pstop(inptrace);
 }
 
 struct filter_t {
@@ -107,11 +104,17 @@ static void fn_print_results(libtrace_t *trace,
 	statistics_t *counters = (statistics_t *)tls;
         libtrace_stat_t *stats = NULL;
         int i;
+        double pct;
 
         stats = trace_get_statistics(trace, NULL);
-        printf("%-30s\t%12s\t%12s\t%7s\n","filter","count","bytes","%");
+        printf("%-30s\t%12s\t%12s\t%7s\n","filter","count","bytes","% count");
         for(i=0;i<filter_count;++i) {
-                printf("%30s:\t%12"PRIu64"\t%12"PRIu64"\t%7.03f\n",filters[i].expr,counters[i+1].count,counters[i+1].bytes,counters[i+1].count*100.0/counters[0].count);
+                if (counters[0].count == 0) {
+                        pct = 0.0;
+                } else {
+                        pct = counters[i+1].count*100.0/counters[0].count;
+                }
+                printf("%30s:\t%12"PRIu64"\t%12"PRIu64"\t%7.03f\n",filters[i].expr,counters[i+1].count,counters[i+1].bytes,pct);
         }
         if (stats->received_valid)
                 fprintf(stderr,"%30s:\t%12" PRIu64"\n",
@@ -157,8 +160,15 @@ static libtrace_packet_t* fn_packet(libtrace_t *trace,
 	statistics_t *results = (statistics_t *)tls;
 	int i, wlen;
 
+        if (IS_LIBTRACE_META_PACKET(pkt))
+                return pkt;
+
 	/* Apply filters to every packet note the result */
 	wlen = trace_get_wire_length(pkt);
+        if (wlen == 0) {
+                /* Don't count ERF provenance etc. */
+                return pkt;
+        }
 	for(i=0;i<filter_count;++i) {
 		if (filters[i].filter == NULL)
 			continue;
@@ -185,10 +195,10 @@ static void run_trace(char *uri, int threadcount)
 	fprintf(stderr,"%s:\n",uri);
         libtrace_callback_set_t *pktcbs, *rescbs;
 
-	trace = trace_create(uri);
+	inptrace = trace_create(uri);
 
-	if (trace_is_err(trace)) {
-		trace_perror(trace,"Failed to create trace");
+	if (trace_is_err(inptrace)) {
+		trace_perror(inptrace,"Failed to create trace");
 		return;
 	}
 
@@ -203,21 +213,21 @@ static void run_trace(char *uri, int threadcount)
         trace_set_stopping_cb(rescbs, fn_print_results);
 
         if (threadcount != 0)
-                trace_set_perpkt_threads(trace, threadcount);
+                trace_set_perpkt_threads(inptrace, threadcount);
 
 	/* Start the trace as a parallel trace */
-	if (trace_pstart(trace, NULL, pktcbs, rescbs)==-1) {
-		trace_perror(trace,"Failed to start trace");
+	if (trace_pstart(inptrace, NULL, pktcbs, rescbs)==-1) {
+		trace_perror(inptrace,"Failed to start trace");
 		return;
 	}
 
 	/* Wait for all threads to stop */
-	trace_join(trace);
+	trace_join(inptrace);
 
-	if (trace_is_err(trace))
-		trace_perror(trace,"%s",uri);
+	if (trace_is_err(inptrace))
+		trace_perror(inptrace,"%s",uri);
 
-	trace_destroy(trace);
+	trace_destroy(inptrace);
         trace_destroy_callback_set(pktcbs);
         trace_destroy_callback_set(rescbs);
 }

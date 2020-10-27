@@ -1,9 +1,34 @@
+/*
+ *
+ * Copyright (c) 2007-2016 The University of Waikato, Hamilton, New Zealand.
+ * All rights reserved.
+ *
+ * This file is part of libtrace.
+ *
+ * This code has been developed by the University of Waikato WAND
+ * research group. For further information please see http://www.wand.net.nz/
+ *
+ * libtrace is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * libtrace is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *
+ */
 #include "sliding_window.h"
 
 #include <stdlib.h>
-#include <assert.h>
 #include <string.h>
 
+#include <stdio.h>
 /**
  * Implements a sliding window via a ring buffer, this is a fixed size.
  * 
@@ -17,7 +42,10 @@ void libtrace_slidingwindow_init(libtrace_slidingwindow_t *sw, size_t size, uint
 	sw->size = size; // All of this size can be used
 	sw->start = 0;
 	sw->elements = calloc(sw->size, sizeof(void*));
-	assert(sw->elements);
+	if (!sw->elements) {
+		fprintf(stderr, "Unable to allocate memory for sw->elements in libtrace_slidingwindow_init()\n");
+		return;
+	}
 	memset((void *) sw->elements, 0, sizeof(void*) * sw->size);
 	sw->start_number = start_number;
 }

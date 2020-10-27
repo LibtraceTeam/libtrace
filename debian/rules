@@ -1,0 +1,48 @@
+#!/usr/bin/make -f
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+# this will avoid unneded dependencies
+export DEB_LDFLAGS_MAINT_APPEND = -Wl,--as-needed
+
+# Enable all hardening features, since traces are untrusted input.
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+CONFIGURE_ARGS = -- --prefix=/usr --with-dpdk=yes \
+                --mandir=\$${prefix}/share/man \
+                --infodir=\$${prefix}/share/info
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	mkdir -p debian/build debian/build-dag
+	tar -cf - --exclude=debian/build* . | tar -xf - -C debian/build
+#       tar -cf - --exclude=debian/build* . | tar -xf - -C debian/build-dag
+	
+	cd debian/build && ./bootstrap.sh && \
+                dh_auto_configure ${CONFIGURE_ARGS} --with-dag=no
+
+#	cd debian/build-dag && ./bootstrap.sh && \
+#                dh_auto_configure ${CONFIGURE_ARGS} --with-dag=yes
+
+
+override_dh_auto_build:
+	cd debian/build && dh_auto_build
+#	cd debian/build-dag && dh_auto_build
+
+override_dh_install:
+	${MAKE} -C debian/build \
+                DESTDIR=$(shell pwd)/debian/tmp install
+#	${MAKE} -C debian/build-dag \
+#                DESTDIR=$(shell pwd)/debian/tmp-dag install
+#	dh_install -plibtrace4-dag --sourcedir=debian/tmp-dag
+	dh_install -plibtrace4 -plibtrace4-dev -plibpacketdump4 \
+                -plibpacketdump4-dev -plibtrace4-tools \
+                --sourcedir=debian/tmp
+
+override_dh_auto_clean:
+	$(RM) -r debian/build* debian/tmp*
+	dh_auto_clean
+

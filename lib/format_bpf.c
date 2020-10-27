@@ -1,36 +1,28 @@
 /*
- * This file is part of libtrace
  *
- * Copyright (c) 2007-2015 The University of Waikato, Hamilton, 
- * New Zealand.
- *
- * Authors: Daniel Lawson 
- *          Perry Lorier
- *          Shane Alcock 
- *          
+ * Copyright (c) 2007-2016 The University of Waikato, Hamilton, New Zealand.
  * All rights reserved.
  *
- * This code has been developed by the University of Waikato WAND 
+ * This file is part of libtrace.
+ *
+ * This code has been developed by the University of Waikato WAND
  * research group. For further information please see http://www.wand.net.nz/
  *
  * libtrace is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * libtrace is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with libtrace; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
- * $Id$
  *
  */
-
 #include "libtrace.h"
 #include "libtrace_int.h"
 #include "format_helper.h"
@@ -130,11 +122,16 @@ static int bpf_probe_filename(const char *filename)
 }
 
 /* Initialises a BPF input trace */
-static int bpf_init_input(libtrace_t *libtrace) 
-{
+static int bpf_init_input(libtrace_t *libtrace) {
 	libtrace->format_data = (struct libtrace_format_data_t *)
 		malloc(sizeof(struct libtrace_format_data_t));
-	
+
+	if (!libtrace->format_data) {
+		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory "
+			"for format data inside bpf_init_input()");
+		return -1;
+	}
+
 	/* Throw some default values into the format data */
 	FORMATIN(libtrace)->fd = -1;
 	FORMATIN(libtrace)->promisc = 0;
@@ -378,7 +375,10 @@ static int bpf_config_input(libtrace_t *libtrace,
 		case TRACE_OPTION_HASHER:
 			/* TODO investigate hashing in BSD? */
 			break;
-
+		case TRACE_OPTION_REPLAY_SPEEDUP:
+			break;
+		case TRACE_OPTION_CONSTANT_ERF_FRAMING:
+			break;
 		/* Avoid default: so that future options will cause a warning
 		 * here to remind us to implement it, or flag it as
 		 * unimplementable
@@ -429,7 +429,7 @@ static int bpf_prepare_packet(libtrace_t *libtrace UNUSED,
 		
 		ptr = ((struct local_bpf_hdr *)(packet->header));
 		replace = ((struct libtrace_bpf_hdr *)(packet->header));
-		orig = *ptr;
+		memcpy(&orig, ptr, sizeof(struct local_bpf_hdr));
 
 		replace->bh_tstamp.tv_sec = (uint32_t) (orig.bh_tstamp.tv_sec & 0xffffffff);
 		replace->bh_tstamp.tv_usec = (uint32_t) (orig.bh_tstamp.tv_usec & 0xffffffff);
@@ -504,8 +504,8 @@ static int bpf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 		}
 
 		/* Timed out -- check if we should halt */
-		if (libtrace_halt)
-			return 0;
+		if ((ret=is_halted(libtrace)) != -1)
+			return ret;
 	}
 	
 	/* We do NOT want anything trying to free the memory the packet is
@@ -623,6 +623,7 @@ static struct libtrace_format_t bpf = {
 	bpf_prepare_packet, 	/* prepare_packet */
 	NULL,			/* fin_packet */
 	NULL,			/* write_packet */
+	NULL,			/* flush_output */
 	bpf_get_link_type,	/* get_link_type */
 	bpf_get_direction,	/* get_direction */
 	NULL,			/* set_direction */
@@ -630,6 +631,7 @@ static struct libtrace_format_t bpf = {
 	bpf_get_timeval,	/* get_timeval */
 	NULL,			/* get_timespec */
 	NULL,			/* get_seconds */
+	NULL,                   /* get_meta_section */
 	NULL,			/* seek_erf */
 	NULL,			/* seek_timeval */
 	NULL,			/* seek_seconds */
@@ -673,6 +675,7 @@ static struct libtrace_format_t bpf = {
 	bpf_prepare_packet, 	/* prepare_packet */
 	NULL,			/* fin_packet */
 	NULL,			/* write_packet */
+	NULL,			/* flush_output */
 	bpf_get_link_type,	/* get_link_type */
 	bpf_get_direction,	/* get_direction */
 	NULL,			/* set_direction */
@@ -680,6 +683,7 @@ static struct libtrace_format_t bpf = {
 	bpf_get_timeval,	/* get_timeval */
 	NULL,			/* get_timespec */
 	NULL,			/* get_seconds */
+	NULL,                   /* get_meta_section */
 	NULL,			/* seek_erf */
 	NULL,			/* seek_timeval */
 	NULL,			/* seek_seconds */

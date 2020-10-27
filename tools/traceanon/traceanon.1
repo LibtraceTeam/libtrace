@@ -1,30 +1,115 @@
-.TH TRACEANON "1" "October 2005" "traceanon (libtrace)" "User Commands"
+.TH TRACEANON "1" "May 2019" "traceanon (libtrace)" "User Commands"
 .SH NAME
-traceanon \- anonymise ip addresses of traces
+traceanon \- anonymise ip addresses and other sensitive information in traces
 .SH SYNOPSIS
 .B traceanon 
-[ \-s | \-\^\-encrypt-source ]
-[ \-d | \-\^\-encrypt-dest ]
-[ \-p prefix | \-\^\-prefix=prefix ]
-[ \-c key | \-\^\-cryptopan=key ]
-[ \-F key-file | \-\^\-keyfile=file ]
-[ \-f expr | \-\^\-filter=expr ]
-[ \-z level | \-\^\-compress-level=level ]
-[ \-Z method | \-\^\-compress-type=method ]
-[ \-t threadcount | \-\^\-threads=threadcount ]
+[ \-C configfile | \-\^\-config=configfile ] sourceuri desturi
 
-sourceuri
-desturi
-.SH DESCRPTION
+.SH DESCRIPTION
 traceanon anonymises a trace by replacing IP addresses found in the IP header,
 and any embedded packets inside an ICMP packet.  It also replaces the checksums
 inside TCP, UDP and ICMPv6 headers with zeroes.
 
-Two anonymisation schemes are supported, the first replaces a prefix with
-another prefix.  This can be used for instance to replace a /16 with the
-equivilent prefix from RFC1918.  The other scheme is cryptopan which is a
+Two anonymisation schemes are supported. The first replaces a prefix with
+another prefix.  This can be used to replace a /16 with an equivalent prefix
+from RFC1918, for instance.  The other scheme is cryptopan which is a
 prefix preserving encryption scheme based on AES (traceanon must be built
 with libcrypto support to be able to use the cryptopan scheme).
+
+traceanon can also anonymise sensitive fields within RADIUS packets, such as
+usernames, password hashes and IP addresses.
+
+.SH CONFIGURATION
+As of libtrace 4.0.8, traceanon can (and should) now be configured using a
+YAML-formatted file instead of via a series of command-line arguments. Use the
+\-C command line switch to tell traceanon the location of your configuration
+file.
+
+Configuration options in YAML can be expressed at one of three levels: the
+top level (i.e. no indentation), ipanon (i.e. within an 'ipanon' map) or
+radius (i.e. within a 'radius' map). See EXAMPLES below for an example
+configuration file with entries at each level.
+
+Options supported by traceanon are:
+
+.TP
+.PD 0
+.BR "compress_level " (top-level)
+sets the compression level for the anonymised output trace file.
+
+.TP
+.PD 0
+.BR "compress_type " (top-level)
+sets the compression method for the anonymised output trace file (gzip, bzip2,
+etc.).
+
+.TP
+.PD 0
+.BR "threads " (top-level)
+sets the number of processing threads used to read from the input source.
+
+.TP
+.PD 0
+.BR "filterstring " (top-level)
+ignores all packets that do NOT match the given BPF filter.
+
+.TP
+.PD 0
+.BR "encode_addresses " (ipanon)
+specifies which addresses should be anonymised within the IP header -- can
+be one of 'both', 'none', 'source' or 'dest'.
+
+.TP
+.PD 0
+.BR "prefix_replace " (ipanon)
+specifies the high bits of each anonymised IP address with the given IPv4
+prefix. Can only be applied to IPv4 addresses and is mutually exclusive with
+the 'cryptopan_key' option.
+
+.TP
+.PD 0
+.BR "cryptopan_key " (ipanon)
+encrypt the IP addresses using the prefix-preserving cryptopan method using
+the given key.  The key can be up to 32 bytes long, and will be padded with
+NULL characters.
+
+.TP
+.PD 0
+.BR "encode_radius " (radius)
+if set to yes, will attempt to encrypt any RADIUS traffic that is found
+within the input trace.
+
+.TP
+.PD 0
+.BR "ignore_safe_avps " (radius)
+if set to yes, certain RADIUS AVPs that we have deemed to not be sensitive
+will NOT have their values encrypted. This includes AVPs containing packet
+and byte counters, service types and framed protocols.
+
+.TP
+.PD 0
+.BR "salt " (radius)
+sets a salt for the RADIUS encryption process. Salts longer than 32 bytes
+are truncated to 32 bytes.
+
+.TP
+.PD 0
+.BR "server " (radius)
+tells traceanon the IP address and port numbers being used by the RADIUS
+server whose traffic is to be anonymised. The expected format for this
+option is 'IPaddress,accessport,accountingport'.
+
+
+.SH OPTIONS
+Remember that all options other than \-C are now officially deprecated.
+
+.TP
+.PD 0
+.BI \-C
+.TP
+.BI \-\^\-config
+specifies the location of the YAML configuration file.
+
 .TP
 .PD 0
 .BI \-s 
@@ -100,7 +185,7 @@ require more CPU to compress data. Defaults to no compression.
 .PD
 .BI \-\^\-compress-type=method
 compress the output trace using the compression algorithm "method". Possible
-algorithms are "gzip", "bzip2", "lzo", "xz" and "none". Default is "none".
+algorithms are "gz", "bz", "lzo", "xz" and "no". Default is "no".
 
 .TP
 .PD 0
@@ -112,12 +197,32 @@ use the specified number of threads to anonymise packets. The default number
 of threads is 4.
 
 .SH EXAMPLES
+Given a configuration file that looks like this:
+
+.RS
 .nf
-traceanon \-\^\-cryptopan="fish go moo, oh yes they do" \\
-	\-\^\-encrypt-source \\
-	\-\^\-encrypt-dest \\
-	\-\^\-compress-level=1 \\
-	\-\^\-compress-type=gzip \\
+#------
+  ipanon:
+    encode_addresses: both
+    cryptopan_key: thisisaverysecurekeyforanonpurposes
+
+  radius:
+    encode_radius: yes
+    ignore_safe_avps: yes
+    salt: thisisarandomlygeneratedsalt
+    server: 192.168.200.1,1645,1646
+
+  compress_level: 1
+  compress_type: gzip
+  threads: 1
+#------
+.fi
+.RE
+
+We can run traceanon using that configuration as below:
+
+.nf
+traceanon \-\^\-config=/path/to/config/file
 	erf:/traces/unenc.gz \\
 	erf:/traces/enc.gz \\
 .fi

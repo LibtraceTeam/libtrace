@@ -1,38 +1,32 @@
 /*
- * This file is part of libtrace
  *
- * Copyright (c) 2007-2015 The University of Waikato, Hamilton, 
- * New Zealand.
- *
- * Authors: Daniel Lawson 
- *          Perry Lorier
- *          Shane Alcock 
- *          
+ * Copyright (c) 2007-2016 The University of Waikato, Hamilton, New Zealand.
  * All rights reserved.
  *
- * This code has been developed by the University of Waikato WAND 
+ * This file is part of libtrace.
+ *
+ * This code has been developed by the University of Waikato WAND
  * research group. For further information please see http://www.wand.net.nz/
  *
  * libtrace is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * libtrace is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with libtrace; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
- * $Id$
  *
  */
 
-
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 
 #include "config.h"
 #include "common.h"
@@ -44,7 +38,6 @@
 #include "data-struct/buckets.h"
 
 #include <sys/stat.h>
-#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -159,27 +152,6 @@ static int rt_connect(libtrace_t *libtrace) {
 		return -1;
 	}
 
-        if (ntohl(connect_msg.type) == TRACE_RT_HELLO) {
-
-                if (connect_msg.length != sizeof(rt_hello_t)) {
-                        trace_set_err(libtrace, 
-                                        TRACE_ERR_INIT_FAILED,
-                                        "RT version mismatch: we are version 3, server is >= 4");
-                        return -1;
-                }
-        }
-
-        if (ntohl(connect_msg.type) == TRACE_RT_DENY_CONN) {
-
-                if (connect_msg.length != sizeof(rt_deny_conn_t)) {
-                        trace_set_err(libtrace, 
-                                        TRACE_ERR_INIT_FAILED,
-                                        "RT version mismatch: we are version 3, server is >= 4");
-                        return -1;
-                }
-        }
-
-	
         if (connect_msg.magic != LIBTRACE_RT_MAGIC) {
                 trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
                         "RT version mismatch: magic byte is incorrect");
@@ -261,7 +233,7 @@ static int rt_init_input(libtrace_t *libtrace) {
 	rt_init_format_data(libtrace);
 
 	/* If the user specifies "rt:" then assume localhost and the default
-	 * port */	
+	 * port */
         if (strlen(uridata) == 0) {
                 RT_INFO->hostname =
                         strdup("localhost");
@@ -639,7 +611,10 @@ static int rt_get_next_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
         packet->type = ntohl(((rt_header_t *)packet->header)->type);
         packet->payload = RT_INFO->buf_read + sizeof(rt_header_t);
         packet->internalid = libtrace_push_into_bucket(RT_INFO->bucket);
-        assert(packet->internalid != 0);
+	if (!packet->internalid) {
+		trace_set_err(libtrace, TRACE_ERR_RT_FAILURE, "packet->internalid is 0 in rt_get_next_packet()");
+		return -1;
+	}
         packet->srcbucket = RT_INFO->bucket;
         packet->buf_control = TRACE_CTRL_EXTERNAL;
 
@@ -784,9 +759,17 @@ static libtrace_eventobj_t trace_event_rt(libtrace_t *trace,
 	libtrace_eventobj_t event = {0,0,0.0,0};
 	libtrace_err_t read_err;
 
-	assert(trace);
-	assert(packet);
-	
+	if (!trace) {
+		fprintf(stderr, "NULL trace passed into trace_event_rt()\n");
+		/* Return empty event on error? */
+		return event;
+	}
+	if (!packet) {
+		trace_set_err(trace, TRACE_ERR_NULL_PACKET, "NULL packet passed into trace_event_rt()");
+		/* Return empty event on error? */
+		return event;
+	}
+
 	if (trace->format->get_fd) {
 		event.fd = trace->format->get_fd(trace);
 	} else {
@@ -873,6 +856,7 @@ static struct libtrace_format_t rt = {
 	rt_prepare_packet,		/* prepare_packet */
 	NULL,   			/* fin_packet */
         NULL,                           /* write_packet */
+        NULL,                           /* flush_output */
         rt_get_link_type,	        /* get_link_type */
         NULL,  		            	/* get_direction */
         NULL,              		/* set_direction */
@@ -880,6 +864,7 @@ static struct libtrace_format_t rt = {
         NULL,                           /* get_timeval */
 	NULL,				/* get_timespec */
         NULL,                           /* get_seconds */
+	NULL,                           /* get_meta_section */
 	NULL,				/* seek_erf */
 	NULL,				/* seek_timeval */
 	NULL,				/* seek_seconds */

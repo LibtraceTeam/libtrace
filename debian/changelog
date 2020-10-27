@@ -1,0 +1,117 @@
+libtrace4 (4.0.14-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Add read and write support for AF_XDP (xdp:). Users may run the provided
+    eBPF program or write their own custom one.
+  * Add basic API for parsing RADIUS messages: trace_get_radius(),
+      trace_get_radius_avp(), trace_get_radius_username().
+  * tracediff can now write differing packets to libtrace outputs, rather
+    than just dumping them to the terminal.
+  * Updated tracediff to be able to "look ahead" to see if packets can be
+    matched rather than just directly comparing packets in the same position.
+  * Added option to tracereplay to control transmit packet batch size.
+  * Fixed bug in traceends that was produced invalid byte counter values.
+
+ -- Shane Alcock <shane.alcock@waikato.ac.nz>  Thu, 06 Aug 2020 17:04:38 +1200
+
+libtrace4 (4.0.13-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Add support for DPDK vdevs (both input and output).
+  * Update DPDK support to work with 19.11 and 20.02 releases.
+  * Fix a number of minor bugs with the DPDK format.
+  * tracereplay can now replay traces containing raw IP traffic.
+  * Fix libpacketdump segfault when processing corrupt/bogus headers.
+  * Fix bugs when using a dedicated hasher thread with a parallel input.
+
+ -- Shane Alcock <shane.alcock@waikato.ac.nz>  Tue, 26 May 2020 16:39:54 +1200
+
+libtrace4 (4.0.12-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Added new tool: tracemcast.
+  * Added support for corsaro-tagged packets received via nDAG multicast.
+  * Improved performance of multiple calls to trace_get_wire_length() on
+    the same packet.
+  * Fix truncation bug when a packet has a longer capture length than
+    wire length due to the addition of post-capture meta-data.
+
+ -- Shane Alcock <shane.alcock@waikato.ac.nz>  Fri, 27 Mar 2020 13:50:11 +1300
+
+libtrace4 (4.0.11-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Fix bug where trace_apply_filter() would not work correctly with a
+    parallel trace input.
+  * Fix bug where non-parallel ETSI programs would fail to halt nicely.
+  * Fix libpacketdump being unable to decode Ethernet within MPLS properly.
+  * Fix libtrace (trace_get_layer3()) being unable to decode Ethernet
+    within MPLS properly.
+  * tracereplay now strips VLAN and MPLS headers before trying to replay a
+    packet from a trace file.
+  * Fix bug where the simple circular buffer would leak shared memory files.
+  * Fix segfault when using trace_apply_filter() on a packet which came from
+    an input trace that is now "closed".
+  * Fix bug where libtrace could try to flush a NULL pcap file handle.
+  * debian-specific: fix missing dependency on libpacketdump4 for
+    libtrace4-tools.
+
+ -- Shane Alcock <shane.alcock@waikato.ac.nz>  Thu, 13 Feb 2020 15:09:44 +1300
+
+libtrace4 (4.0.10-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Fix "SIOCGSTAMP undeclared" error when building against newer Linux kernels.
+  * Fix corruption bug when running multiple etsilive: input processes.
+  * Add new API function trace_get_errstr(), which provides error message
+    strings for a given libtrace error number.
+  * Increased TTL for nDAG multicast join messages to 4.
+
+ -- Shane Alcock <shane.alcock@waikato.ac.nz>  Wed, 6 Nov 2019 13:37:51 +1300
+
+libtrace4 (4.0.9-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Update DPDK code to work with newer DPDK releases (18.11 especially).
+  * Fix segfault when a DAG device fails to open.
+
+ -- Shane Alcock <shane.alcock@waikato.ac.nz>  Mon, 15 Jul 2019 16:34:34 +1200
+
+libtrace4 (4.0.8-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Added ability to anonymise RADIUS traffic to traceanon.
+  * traceanon now uses YAML configuration file instead of CLI arguments.
+  * Fixed bug where ndag multicast would bind to all addresses, not
+    just the address of the group it had subscribed to.
+  * Fixed segfault when calling trace_ppause() before per packet threads
+    have been created.
+
+ -- Shane Alcock <shane.alcock@waikato.ac.nz>  Mon, 01 Jul 2019 11:37:38 +1200
+
+libtrace4 (4.0.7-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Added new API for exploring in-stream meta-data records.
+  * Added new API for inspecting subsequent layer-2 headers.
+  * Added support for reading and writing TZSP sniffing streams.
+
+ -- Shane Alcock <shane.alcock@waikato.ac.nz>  Thu, 02 May 2019 16:31:15 +1200
+
+libtrace4 (4.0.6-2) unstable; urgency=low
+
+  * Fix bad dpdk dependencies in libtrace4 package
+
+ -- Shane Alcock <shane.alcock@waikato.ac.nz>  Wed, 16 Jan 2019 16:49:04 +1300
+
+libtrace4 (4.0.6-1) unstable; urgency=low
+
+  * New upstream release
+
+ -- Shane Alcock <shane.alcock@waikato.ac.nz>  Tue, 15 Jan 2019 11:50:06 +1300
+
+libtrace4 (4.0.0-1) unstable; urgency=medium
+
+  * New upstream release
+
+ -- Brad Cowie <brad@wand.net.nz>  Wed, 07 Mar 2016 10:24:40 +1300

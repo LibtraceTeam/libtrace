@@ -1,4 +1,29 @@
 /*
+ *
+ * Copyright (c) 2007-2016 The University of Waikato, Hamilton, New Zealand.
+ * All rights reserved.
+ *
+ * This file is part of libtrace.
+ *
+ * This code has been developed by the University of Waikato WAND
+ * research group. For further information please see http://www.wand.net.nz/
+ *
+ * libtrace is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * libtrace is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *
+ */
+/*
  * libpacketdump decoder for Radiotap 
  */
 #include <sys/types.h>
@@ -10,6 +35,8 @@
 #include "libpacketdump.h"
 #include "lt_bswap.h"
 
+#define ALIGN_NATURAL_64(_p,_s,_c) \
+	while ( (_p - _s) % sizeof(uint64_t)) {_p++; _c++;}
 #define ALIGN_NATURAL_32(_p,_s,_c) \
 	while ( (_p - _s) % sizeof(uint32_t)) {_p++; _c++;}
 #define ALIGN_NATURAL_16(_p,_s,_c) \
@@ -41,22 +68,26 @@ DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len)
 			rtap_len, rtap_pres);
 	
 	/* Check for extended bitmasks */
-	ptr = (uint32_t *) &(rtap->it_present);
+	ptr = (uint32_t *) (char *)(&(rtap->it_present));
 	
 	if ( (rtap_pres) & (1 << TRACE_RADIOTAP_EXT) ) 
 		printf("  extended fields:");
 	
-	while( (rtap_pres) & (1 << TRACE_RADIOTAP_EXT) ) {
+	while( (bswap_le_to_host32(*ptr)) & (1 << TRACE_RADIOTAP_EXT) ) {
 		rtap_real_len += sizeof (uint32_t);
 		ptr++;
 		printf(" %#08x", bswap_le_to_host32(*ptr));	
 	}
 
+        if ( (rtap_pres) & (1 << TRACE_RADIOTAP_EXT) )
+                printf("\n");
 
 	/* make p point to the first data field */
-	s = p = (uint8_t *) ++ptr;
+	s = (uint8_t *) rtap;
+        p = (uint8_t *) ++ptr;
 
 	if (rtap_pres & (1 << TRACE_RADIOTAP_TSFT)) {
+		ALIGN_NATURAL_64(p,s,rtap_real_len);
 		printf(" Radiotap: TSFT = %" PRIu64 " microseconds\n", bswap_le_to_host64(*((uint64_t *)p)));
 		p += sizeof (uint64_t);
 		rtap_real_len += sizeof (uint64_t);

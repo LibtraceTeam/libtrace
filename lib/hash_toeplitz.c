@@ -1,3 +1,30 @@
+/*
+ *
+ * Copyright (c) 2007-2016 The University of Waikato, Hamilton, New Zealand.
+ * All rights reserved.
+ *
+ * This file is part of libtrace.
+ *
+ * This code has been developed by the University of Waikato WAND
+ * research group. For further information please see http://www.wand.net.nz/
+ *
+ * libtrace is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * libtrace is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *
+ */
+
+
 /**
  * A implementation of Microsofts RSS standard for hashing.
  * See http://msdn.microsoft.com/en-us/library/windows/hardware/ff570726%28v=vs.85%29.aspx
@@ -43,31 +70,54 @@ void toeplitz_hash_expand_key(toeplitz_conf_t *conf) {
 /**
  * Creates a random unidirectional RSS key - a ip or ip+port combination in
  * the opposite directions will most likely get different hashes.
- * @param key must have 40 bytes of space to retrieve random the key
- */ 
-void toeplitz_create_unikey(uint8_t *key) {
-	int i;
+ * @param key An array of bytes to retrieve the RSS key
+ * @param num The number of bytes in key
+ */
+void toeplitz_ncreate_unikey(uint8_t *key, size_t num) {
+	size_t i;
 	unsigned int seed = time(NULL);
-	for (i = 0; i < 40; i++) {
+	for (i = 0; i < num; i++) {
 		key[i] = (uint8_t) rand_r(&seed);
 	}
+}
+
+/**
+ * Creates a random 40 byte unidirectional RSS key - a ip or ip+port combination
+ * in the opposite directions will most likely get different hashes.
+ * @param key must have 40 bytes of space to retrieve random the key
+ */
+void toeplitz_create_unikey(uint8_t *key) {
+	toeplitz_ncreate_unikey(key, 40);
 }
 
 /**
  * Create a bidirectional RSS key, i.e. ip and ip+port configurations
  * in opposite directions will receive the same hash
  * @param key must have 40 bytes of space to retrieve random the key
+ * @param num The number of bytes in the key, must be a multiple of 2
  */
-void toeplitz_create_bikey(uint8_t *key) {
+void toeplitz_ncreate_bikey(uint8_t *key, size_t num) {
 	unsigned int seed = time(NULL);
-	int i;
+	size_t i;
+	if (num % 2 != 0) {
+		perror("Can not create a bidirectional key for an odd length key");
+	}
 	// Every thing is 16bit (port=16, ipv4=32, ipv6=128 
 	// aligned so this will make the hash bidirectional
 	uint16_t bi_key = (uint16_t) rand_r(&seed);
 	uint16_t *bi_rep = (uint16_t *) key;
-	for (i = 0; i < 20; i++) {
+	for (i = 0; i < num/2; i++) {
 		bi_rep[i] = bi_key;
 	}
+}
+
+/**
+ * Create a 40 byte bidirectional RSS key, i.e. ip and ip+port configurations
+ * in opposite directions will receive the same hash
+ * @param key An array of bytes to retrieve the RSS key
+ */
+void toeplitz_create_bikey(uint8_t *key) {
+	toeplitz_ncreate_bikey(key, 40);
 }
 
 void toeplitz_init_config(toeplitz_conf_t *conf, bool bidirectional)
@@ -78,6 +128,12 @@ void toeplitz_init_config(toeplitz_conf_t *conf, bool bidirectional)
 		toeplitz_create_unikey(conf->key);
 	}
 	toeplitz_hash_expand_key(conf);
+	conf->hash_ipv4 = 1;
+	conf->hash_ipv6 = 1;
+	conf->hash_tcp_ipv4 = 1;
+	conf->x_hash_udp_ipv4 = 1;
+	conf->hash_tcp_ipv6 = 1;
+	conf->x_hash_udp_ipv6 = 1;
 }
 
 /**

@@ -1,3 +1,30 @@
+/*
+ *
+ * Copyright (c) 2007-2016 The University of Waikato, Hamilton, New Zealand.
+ * All rights reserved.
+ *
+ * This file is part of libtrace.
+ *
+ * This code has been developed by the University of Waikato WAND
+ * research group. For further information please see http://www.wand.net.nz/
+ *
+ * libtrace is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * libtrace is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *
+ */
+
+
 /* Various definitions required for the linux format. They were moved here,
  * because format_linux.c had a lot of header information before the actual
  * code. The linux headers have been copied into here rather than included to
@@ -10,6 +37,7 @@
 
 #include "libtrace.h"
 #include "libtrace_int.h"
+#include "libtrace_arphrd.h"
 
 #ifdef HAVE_NETPACKET_PACKET_H
 
@@ -17,6 +45,7 @@
 #include <netpacket/packet.h>
 #include <net/ethernet.h>
 #include <net/if_arp.h>
+#include <linux/sockios.h>
 
 #include <net/if.h>
 #include <sys/ioctl.h>
@@ -34,12 +63,6 @@
  * hopefully means less packet loss, especially if traffic comes in bursts.
  */
 #define CONF_RING_FRAMES        0x100
-
-/* The maximum frames allowed to be waiting in the TX_RING before the kernel is 
- * notified to write them out. Make sure this is less than CONF_RING_FRAMES. 
- * Performance doesn't seem to increase any more when setting this above 10.
- */
-#define TX_MAX_QUEUE		10
 
 #else	/* HAVE_NETPACKET_PACKET_H */
 
@@ -229,6 +252,7 @@ struct linux_format_data_t {
 	 * file descriptors from packet fanout will use, here we assume/hope
 	 * that every ring can get setup the same */
 	libtrace_list_t *per_stream;
+
 };
 
 struct linux_format_data_out_t {
@@ -248,6 +272,8 @@ struct linux_format_data_out_t {
 	libtrace_rt_types_t format;
 	/* Used to determine buffer size for the ring buffer */
 	uint32_t max_order;
+        /* Maximum number of packets allowed in the tx queue before notifying the kernel */
+        int tx_max_queue;
 };
 
 struct linux_per_stream_t {
@@ -259,9 +285,10 @@ struct linux_per_stream_t {
 	int rxring_offset;
 	/* The ring buffer layout */
 	struct tpacket_req req;
+	uint64_t last_timestamp;
 } ALIGN_STRUCT(CACHE_LINE_SIZE);
 
-#define ZERO_LINUX_STREAM {-1, MAP_FAILED, 0, {0,0,0,0}}
+#define ZERO_LINUX_STREAM {-1, MAP_FAILED, 0, {0,0,0,0}, 0}
 
 
 /* Format header for encapsulating packets captured using linux native */
@@ -308,6 +335,8 @@ int linuxcommon_init_output(libtrace_out_t *libtrace);
 int linuxcommon_probe_filename(const char *filename);
 int linuxcommon_config_input(libtrace_t *libtrace, trace_option_t option,
                              void *data);
+int linuxcommon_config_output(libtrace_out_t *libtrace, trace_option_output_t option,
+                             void *data);
 void linuxcommon_close_input_stream(libtrace_t *libtrace,
                                     struct linux_per_stream_t *stream);
 int linuxcommon_start_input_stream(libtrace_t *libtrace,
@@ -323,6 +352,8 @@ int linuxcommon_pstart_input(libtrace_t *libtrace,
 #endif /* HAVE_NETPACKET_PACKET_H */
 
 void linuxcommon_get_statistics(libtrace_t *libtrace, libtrace_stat_t *stat);
+int linuxcommon_get_dev_statistics(char *ifname, struct linux_dev_stats *stats);
+int linuxcommon_set_promisc(const int sock, const unsigned int ifindex, bool enable);
 
 static inline libtrace_direction_t linuxcommon_get_direction(uint8_t pkttype)
 {
@@ -364,6 +395,7 @@ static inline libtrace_linktype_t linuxcommon_get_link_type(uint16_t linktype)
 		case LIBTRACE_ARPHRD_LOOPBACK:
 			return TRACE_TYPE_ETH;
 		case LIBTRACE_ARPHRD_PPP:
+		case LIBTRACE_ARPHRD_IPGRE:
 			return TRACE_TYPE_NONE;
 		case LIBTRACE_ARPHRD_IEEE80211_RADIOTAP:
 			return TRACE_TYPE_80211_RADIO;
@@ -390,16 +422,24 @@ static inline libtrace_linktype_t linuxcommon_get_link_type(uint16_t linktype)
 static inline int linuxcommon_to_packet_fanout(libtrace_t *libtrace,
                                         struct linux_per_stream_t *stream)
 {
-        int fanout_opt = ((int)FORMAT_DATA->fanout_flags << 16) |
-                         (int)FORMAT_DATA->fanout_group;
-        if (setsockopt(stream->fd, SOL_PACKET, PACKET_FANOUT,
-                        &fanout_opt, sizeof(fanout_opt)) == -1) {
-                trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
-                              "Converting the fd to a socket fanout failed %s",
-                              libtrace->uridata);
-                return -1;
+        int fanout_opt;
+        int attempts = 0;
+        while (attempts < 5) {
+                fanout_opt = ((int)FORMAT_DATA->fanout_flags << 16) |
+                                 (int)FORMAT_DATA->fanout_group;
+
+                if (setsockopt(stream->fd, SOL_PACKET, PACKET_FANOUT,
+                                &fanout_opt, sizeof(fanout_opt)) == -1) {
+                        FORMAT_DATA->fanout_group ++;
+                        attempts ++;
+                        continue;
+                }
+                return 0;
         }
-        return 0;
+        trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
+                        "Converting the fd to a socket fanout failed %s",
+                        libtrace->uridata);
+        return -1;
 }
 #endif /* HAVE_NETPACKET_PACKET_H */
 

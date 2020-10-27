@@ -1,6 +1,33 @@
+/*
+ *
+ * Copyright (c) 2007-2016 The University of Waikato, Hamilton, New Zealand.
+ * All rights reserved.
+ *
+ * This file is part of libtrace.
+ *
+ * This code has been developed by the University of Waikato WAND
+ * research group. For further information please see http://www.wand.net.nz/
+ *
+ * libtrace is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * libtrace is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *
+ */
+
 /**
  * toeplitz hashing - see microsoft rss code
  */
+#include "config.h"
 #include <stdint.h>
 #include <stddef.h>
 #include <libtrace.h>
@@ -26,13 +53,15 @@ typedef struct toeplitz_conf {
 	uint32_t key_cache[320];
 } toeplitz_conf_t;
 
-void toeplitz_hash_expand_key(toeplitz_conf_t *conf);
-uint32_t toeplitz_hash(const toeplitz_conf_t *tc, const uint8_t *data, size_t offset, size_t n, uint32_t result);
-uint32_t toeplitz_first_hash(const toeplitz_conf_t *tc, const uint8_t *data, size_t n);
-void toeplitz_init_config(toeplitz_conf_t *conf, bool bidirectional);
-uint64_t toeplitz_hash_packet(const libtrace_packet_t * pkt, const toeplitz_conf_t *cnf);
-void toeplitz_create_bikey(uint8_t *key);
-void toeplitz_create_unikey(uint8_t *key);
+DLLEXPORT void toeplitz_hash_expand_key(toeplitz_conf_t *conf);
+DLLEXPORT uint32_t toeplitz_hash(const toeplitz_conf_t *tc, const uint8_t *data, size_t offset, size_t n, uint32_t result);
+DLLEXPORT uint32_t toeplitz_first_hash(const toeplitz_conf_t *tc, const uint8_t *data, size_t n);
+DLLEXPORT void toeplitz_init_config(toeplitz_conf_t *conf, bool bidirectional);
+DLLEXPORT uint64_t toeplitz_hash_packet(const libtrace_packet_t * pkt, const toeplitz_conf_t *cnf);
+DLLEXPORT void toeplitz_ncreate_bikey(uint8_t *key, size_t num);
+DLLEXPORT void toeplitz_create_bikey(uint8_t *key);
+DLLEXPORT void toeplitz_ncreate_unikey(uint8_t *key, size_t num);
+DLLEXPORT void toeplitz_create_unikey(uint8_t *key);
 
 
 /* IPv4 Only (Input[8] = @12-15, @16-19) src dst */

@@ -1,3 +1,28 @@
+/*
+ *
+ * Copyright (c) 2007-2016 The University of Waikato, Hamilton, New Zealand.
+ * All rights reserved.
+ *
+ * This file is part of libtrace.
+ *
+ * This code has been developed by the University of Waikato WAND
+ * research group. For further information please see http://www.wand.net.nz/
+ *
+ * libtrace is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * libtrace is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *
+ */
 #include "config.h"
 #include "object_cache.h"
 #include <assert.h>
@@ -117,7 +142,10 @@ static void once_memory_cache_key_init() {
  * Adds more space to our mem_caches
  */
 static void resize_memory_caches(struct local_caches *lcs) {
-	assert (lcs->t_mem_caches_total > 0);
+	if (lcs->t_mem_caches_total <= 0) {
+		fprintf(stderr, "Expected lcs->t_mem_caches_total to be greater or equal to 0 in resize_memory_caches()\n");
+		return;
+	}
 	lcs->t_mem_caches += 0x10;
 	lcs->t_mem_caches = realloc(lcs->t_mem_caches,
 	                            lcs->t_mem_caches_total * sizeof(struct local_cache));
@@ -140,16 +168,24 @@ static inline struct local_caches *get_local_caches() {
 	else {
 		/* This thread has not been used with a memory pool before */
 		/* Allocate our TLS */
-		assert(lcs == NULL);
+		if (lcs) {
+			fprintf(stderr, "Expected lcs to be NULL in get_local_caches()\n");
+			return NULL;
+		}
 		lcs = calloc(1, sizeof (struct local_caches));
-		assert(lcs);
+		if (!lcs) {
+			fprintf(stderr, "Unable to allocate memory for lcs in get_local_caches()\n");
+			return NULL;
+		}
 		/* Hook into pthreads to destroy this when the thread ends */
 		pthread_once(&memory_destructor_once, &once_memory_cache_key_init);
 		pthread_setspecific(memory_destructor_key, (void *) lcs);
 		lcs->t_mem_caches_total = 0x10;
 		lcs->t_mem_caches = calloc(0x10, sizeof(struct local_cache));
-		assert(lcs);
-		assert(lcs->t_mem_caches);
+		if (!lcs->t_mem_caches) {
+			fprintf(stderr, "Unable to allocate memory for lcs->t_mem_caches in get_local_caches()\n");
+			return NULL;
+		}
 		return lcs;
 	}
 }
@@ -184,7 +220,10 @@ static inline struct local_cache * find_cache(libtrace_ocache_t *oc) {
 		++lcs->t_mem_caches_used;
 	}
 
-	assert(!lc->invalid);
+	if (lc->invalid) {
+		fprintf(stderr, "lc cache is invalid in find_cache()\n");
+		return NULL;
+	}
 	return lc;
 }
 
@@ -220,9 +259,18 @@ DLLEXPORT int libtrace_ocache_init(libtrace_ocache_t *oc, void *(*alloc)(void),
                                     size_t thread_cache_size,
                                     size_t buffer_size, bool limit_size) {
 
-	assert(buffer_size);
-	assert(alloc);
-	assert(free);
+	if (buffer_size <= 0) {
+		fprintf(stderr, "NULL buffer_size passed into libtrace_ocache_init()\n");
+		return -1;
+	}
+	if (!alloc) {
+		fprintf(stderr, "NULL alloc passed into libtrace_ocache_init()\n");
+		return -1;
+	}
+	if (!free) {
+		fprintf(stderr, "NULL free method passed into libtrace_ocache_init()\n");
+		return -1;
+	}
 	if (libtrace_ringbuffer_init(&oc->rb, buffer_size, LIBTRACE_RINGBUFFER_BLOCKING) != 0) {
 		return -1;
 	}
@@ -340,7 +388,10 @@ static inline size_t libtrace_ocache_alloc_cache(libtrace_ocache_t *oc, void *va
 #ifdef ENABLE_MEM_STATS
 	mem_hits.read.miss += nb_buffers - i;
 #endif
-	assert(i >= min_nb_buffers);
+	if (i < min_nb_buffers) {
+		fprintf(stderr, "Unable to fill remaining cache in libtrace_ocache_alloc_cache()\n");
+		return ~0U;
+	}
 	return i;
 }
 
@@ -350,7 +401,13 @@ DLLEXPORT size_t libtrace_ocache_alloc(libtrace_ocache_t *oc, void *values[], si
 	size_t min;
 	bool try_alloc = !(oc->max_allocations && oc->max_allocations <= oc->current_allocations);
 
-	assert(oc->max_allocations ? nb_buffers < oc->max_allocations : 1);
+	if (oc->max_allocations) {
+		if(nb_buffers >= oc->max_allocations) {
+			fprintf(stderr, "Expected nb_buffers to be less than or equal to the object cache "
+				"max allocation in libtrace_ocache_alloc()\n");
+			return ~0U;
+		}
+	}
 	min = try_alloc ? 0: min_nb_buffers;
 	if (lc)
 		i = libtrace_ocache_alloc_cache(oc, values, nb_buffers, min,  lc);
@@ -373,9 +430,16 @@ DLLEXPORT size_t libtrace_ocache_alloc(libtrace_ocache_t *oc, void *values[], si
 
 		for (;i < nb; ++i) {
 			values[i] = (*oc->alloc)();
-			assert(values[i]);
+			if (!values[i]) {
+				fprintf(stderr, "Unable to alloc memory for values[%zu] in libtrace_ocache_alloc()\n", i);
+				return ~0U;
+			}
 		}
-		assert (i == nb);
+
+		if (i != nb) {
+			fprintf(stderr, "Expected i == nb in libtrace_ocache_alloc()\n");
+			return ~0U;
+		}
 		// Still got to wait for more
 		if (nb < min_nb_buffers) {
 			if (lc)
@@ -384,7 +448,11 @@ DLLEXPORT size_t libtrace_ocache_alloc(libtrace_ocache_t *oc, void *values[], si
 				i += libtrace_ringbuffer_sread_bulk(&oc->rb, &values[nb], nb_buffers - nb, min_nb_buffers - nb);
 		}
 	}
-	assert(i >= min_nb_buffers);
+	if (i < min_nb_buffers) {
+		fprintf(stderr, "Failed to allocate minimum number of buffers for libtrace "
+			"object cache in libtrace_ocache_alloc()\n");
+		return ~0U;
+	}
 	return i;
 }
 
@@ -461,7 +529,13 @@ DLLEXPORT size_t libtrace_ocache_free(libtrace_ocache_t *oc, void *values[], siz
 	size_t i;
 	size_t min;
 
-	assert(oc->max_allocations ? nb_buffers < oc->max_allocations : 1);
+	if (oc->max_allocations) {
+                if(nb_buffers >= oc->max_allocations) {
+                        fprintf(stderr, "Expected nb_buffers to be less than or equal to the object cache "
+                                "max allocation in libtrace_ocache_alloc()\n");
+                        return ~0U;
+                }
+        }
 	min = oc->max_allocations ? min_nb_buffers : 0;
 	if (lc)
 		i = libtrace_ocache_free_cache(oc, values, nb_buffers, min, lc);

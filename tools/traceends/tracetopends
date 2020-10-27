@@ -11,8 +11,11 @@ send=1
 sort="bytes"
 filter=""
 addr="v4"
+threads=4
+ignoresource=""
+ignoredest=""
 
-while getopts "f:sdn:bapA:h" opt; do
+while getopts "t:f:sdn:bapA:hSD" opt; do
 	case $opt in
 		A)
 			addr=$OPTARG
@@ -20,12 +23,21 @@ while getopts "f:sdn:bapA:h" opt; do
 		f)
 			filter=$OPTARG
 			;;
+                S)
+                        ignoresource="-S"
+                        ;;
+                D)
+                        ignoredest="-D"
+                        ;;
 		s)
 			send=1
 			;;
 		d)
 			send=0
 			;;
+                t)
+                        threads=$OPTARG
+                        ;;
 		n)
 			top_count=$OPTARG
 			;;
@@ -117,9 +129,9 @@ if [ $addr = "v6" ]; then
 fi
 
 if [ "$filter" = "" ]; then
-	traceends -A $addr $@ | { trap '' int; sort -n -k $sort_index -r -s; } | { trap '' int; head -n $top_count; }
+	traceends -t $threads -A $addr $ignoredest $ignoresource $@ | { trap '' int; sort -n -k $sort_index -r -s; } | { trap '' int; head -n $top_count; }
 else
-	traceends -A $addr -f "$filter" $@  | { trap '' int; sort -n -k $sort_index -r -s; } | { trap '' int; head -n $top_count; }
+	traceends -t $threads -A $addr -f "$filter" $ignoredest $ignoresource $@  | { trap '' int; sort -n -k $sort_index -r -s; } | { trap '' int; head -n $top_count; }
 fi
 
 exit 0 

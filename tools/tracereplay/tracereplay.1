@@ -3,8 +3,8 @@
 tracereplay \- Replay a trace in trace time from one uri to another
 .SH SYNOPSIS
 .B tracereplay
-[\-b | \-\^\-broadcast] [-s \-\^\-snaplength [ snaplength] ] 
-[\-f | \-\^\-filter [ filter string ] ]
+[\-b | \-\^\-broadcast] [-s \-\^\-snaplength [ snaplength] ]
+[\-f | \-\^\-filter [ filter string ] ] [\-X | \-\^\-speedup [ factor] ]
 inputuri outputuri
 .SH DESCRPTION
 tracereplay replays inputuri to outputuri in trace time. Checksums are 
@@ -22,21 +22,31 @@ This will send the transmitted packets to any hosts on the local network.
 
 .TP
 .PD 0
-.BI \-s [snaplength]
+.BI \-s " snaplength"
 .TP
 .PD
-.BI \-\^\-snaplength [snaplength]
+.BI \-\^\-snaplength " snaplength"
 Truncate the packets to the length specified. This only makes a difference
 if the inputuri is a capture device. The value should be > 0. Inappropriate 
 values will be ignored, but a warning will be printed.
 
 .TP
 .PD 0
-.BI \-f [ filter string ]
+.BI \-f " filterstring"
 .TP
 .PD
-.BI \-\^\-filter [ filter ]
+.BI \-\^\-filter " filterstring"
 Apply a filter to the inputuri.
+
+.TP
+.PD 0
+.BI \-X " factor"
+.TP
+.PD
+.BI \-\^\-speedup " factor"
+Decrease the gaps between packets by the specified factor. This will accelerate
+the rate at which the replay is performed. By default, the factor is 1 (i.e.
+no acceleration).
 
 .SH LINKS
 More details about tracereplay (and libtrace) can be found at

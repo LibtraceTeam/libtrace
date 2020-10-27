@@ -1,3 +1,30 @@
+/*
+ *
+ * Copyright (c) 2007-2016 The University of Waikato, Hamilton, New Zealand.
+ * All rights reserved.
+ *
+ * This file is part of libtrace.
+ *
+ * This code has been developed by the University of Waikato WAND
+ * research group. For further information please see http://www.wand.net.nz/
+ *
+ * libtrace is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * libtrace is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *
+ */
+
+
 #include "libtrace.h"
 #include "libtrace_int.h"
 #include "data-struct/deque.h"
@@ -6,7 +33,10 @@
 
 static int init_combiner(libtrace_t *t, libtrace_combine_t *c) {
 	int i = 0;
-	assert(trace_get_perpkt_threads(t) > 0);
+	if (trace_get_perpkt_threads(t) <= 0) {
+		trace_set_err(t, TRACE_ERR_INIT_FAILED, "You must have atleast 1 processing thread");
+		return -1;
+	}
 	libtrace_queue_t *queues;
 	c->queues = calloc(sizeof(libtrace_queue_t), trace_get_perpkt_threads(t));
 	queues = c->queues;
@@ -59,7 +89,11 @@ static void destroy(libtrace_t *trace, libtrace_combine_t *c) {
 	libtrace_queue_t *queues = c->queues;
 
 	for (i = 0; i < trace_get_perpkt_threads(trace); i++) {
-		assert(libtrace_deque_get_size(&queues[i]) == 0);
+		if (libtrace_deque_get_size(&queues[i]) != 0) {
+			trace_set_err(trace, TRACE_ERR_COMBINER,
+				"Failed to destroy queues, A thread still has data in destroy()");
+			return;
+		}
 	}
 	free(queues);
 	queues = NULL;

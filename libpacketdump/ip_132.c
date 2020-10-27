@@ -1,3 +1,28 @@
+/*
+ *
+ * Copyright (c) 2007-2016 The University of Waikato, Hamilton, New Zealand.
+ * All rights reserved.
+ *
+ * This file is part of libtrace.
+ *
+ * This code has been developed by the University of Waikato WAND
+ * research group. For further information please see http://www.wand.net.nz/
+ *
+ * libtrace is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * libtrace is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *
+ */
 #include <stdio.h>
 #include <inttypes.h>
 #include <dlfcn.h>
@@ -129,9 +154,9 @@ static void parse_options(char *offset, int vlen)
                 uint16_t *p = (uint16_t *)data;
                 int len = ntohs(ph->length) - 
                     sizeof(struct sctp_var_param_hdr);
-                
+
                 printf(" SCTP: Option Supported address types ");
-                
+
                 while(len) {
                     printf("%hu ", ntohs(*p));
                     p++;
@@ -145,6 +170,11 @@ static void parse_options(char *offset, int vlen)
                         ntohs(ph->type), ntohs(ph->length));
         }
 
+        if (ntohs(ph->length) == 0) {
+                printf("Invalid length in SCTP option -- halting decode\n");
+                return;
+        }
+
         vlen -= ntohs(ph->length);
         offset += ntohs(ph->length);
     }
@@ -155,7 +185,8 @@ DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len)
     struct sctp_common_hdr *hdr;
     struct sctp_chunk_hdr *chunk;
     int chunk_num = 1;
-    int vlen;
+    int vlen = 0;
+    uint16_t chunklen = 0;
 
     if(len < (signed)sizeof(struct sctp_common_hdr)) {
         printf(" SCTP: packet too short!\n");
@@ -172,17 +203,35 @@ DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len)
     packet += sizeof(struct sctp_common_hdr);
 
     while(len > 0) {
+        if (len < sizeof(struct sctp_chunk_hdr)) {
+                printf(" SCTP: [Truncated]\n\n");
+                break;
+        }
+
         chunk = (struct sctp_chunk_hdr *)packet;
 
-        chunk->length = ntohs(chunk->length);
+        chunklen = ntohs(chunk->length);
 
         printf(" SCTP: Chunk %d Type %s Flags %u Len %u\n",
             chunk_num++,
-            sctp_type_to_str(chunk->type), chunk->flags, chunk->length);
+            sctp_type_to_str(chunk->type), chunk->flags, chunklen);
 
-        if(chunk->length == 0) {
+        if(chunklen == 0) {
             printf(" SCTP: Invalid chunk length, aborting.\n\n");
             break;
+        }
+
+        /* Stupid SCTP has padding that is not accounted for in either
+         * the chunk length or the payload length fields */
+        if ((chunklen % 4) != 0) {
+                /* Pad to the next four byte boundary */
+                chunklen += ( 4 - (chunklen % 4) );
+        }
+
+        /* Truncate any ridiculous chunk lengths so that they don't
+         * exceed the confines of the packet */
+        if (chunklen > len) {
+                chunklen = len;
         }
 
         switch(chunk->type) {
@@ -203,7 +252,7 @@ DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len)
                 /* INIT ACK */
                 struct sctp_init_ack *ack = (struct sctp_init_ack *)
                     (chunk + 1);
-                
+
                 printf(" SCTP: Tag %u Credit %u Outbound %hu Inbound %hu "
                         "TSN %u\n",
                         ntohl(ack->init_tag),
@@ -212,7 +261,7 @@ DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len)
                         ntohs(ack->inbound_streams),
                         ntohl(ack->init_tsn));
 
-                vlen = chunk->length - (sizeof(struct sctp_init_ack) +
+                vlen = chunklen - (sizeof(struct sctp_init_ack) +
                         sizeof(struct sctp_chunk_hdr) +
                         sizeof(struct sctp_common_hdr)
                         );
@@ -244,9 +293,9 @@ DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len)
             }
             break;
         }
-        
-        packet += chunk->length;
-        len -= chunk->length;
+
+        packet += chunklen;
+        len -= chunklen;
     }
     printf("\n");
 }

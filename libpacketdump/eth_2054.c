@@ -1,3 +1,28 @@
+/*
+ *
+ * Copyright (c) 2007-2016 The University of Waikato, Hamilton, New Zealand.
+ * All rights reserved.
+ *
+ * This file is part of libtrace.
+ *
+ * This code has been developed by the University of Waikato WAND
+ * research group. For further information please see http://www.wand.net.nz/
+ *
+ * libtrace is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * libtrace is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *
+ */
 /* ARP */
 #include <stdio.h>
 #include <inttypes.h>
@@ -21,7 +46,8 @@
  */
 static char *format_hrd(const struct arphdr *arp, const char *hrd) {
 	static char buffer[1024] = {0,};
-	int i;
+	int i, ret;
+        size_t bufused;
 
 	if (!hrd) {
 		strncpy(buffer, "(Truncated)", sizeof(buffer));
@@ -33,9 +59,18 @@ static char *format_hrd(const struct arphdr *arp, const char *hrd) {
 			trace_ether_ntoa((const unsigned char *)hrd, buffer);
 			break;
 		default:
+                        bufused = 0;
 			for (i=0;i<arp->ar_hln;i++) {
-				snprintf(buffer,sizeof(buffer),"%s %02x",
-						buffer,(unsigned char)hrd[i]);
+                                if (bufused >= sizeof(buffer)) {
+                                        break;
+                                }
+                                ret = snprintf(buffer + bufused,
+                                                sizeof(buffer) - bufused,
+                                                "%02x ",
+                                                (unsigned char)hrd[i]);
+                                if (ret > 0) {
+                                        bufused += ret;
+                                }
 			}
 			break;
 	}
@@ -51,7 +86,8 @@ static char *format_hrd(const struct arphdr *arp, const char *hrd) {
  */
 static char *format_pro(const struct arphdr *arp, const char *pro) {
 	static char buffer[1024] = {0,};
-	int i;
+	int i, ret;
+        size_t bufused;
 	
 	if (!pro) {
 		strncpy(buffer, "(Truncated)", sizeof(buffer));
@@ -65,11 +101,24 @@ static char *format_pro(const struct arphdr *arp, const char *pro) {
 			break;
 		default:
 			snprintf(buffer, sizeof(buffer), "%s", " (");
+                        bufused = 2;
 			for (i=0;i<arp->ar_pln;i++) {
-				snprintf(buffer,sizeof(buffer),"%s %02x",
-						buffer,(unsigned char)pro[i]);
+                                if (bufused >= sizeof(buffer)) {
+                                        break;
+                                }
+                                ret = snprintf(buffer + bufused,
+                                                sizeof(buffer) - bufused,
+                                                "%02x ",
+                                                (unsigned char)pro[i]);
+                                if (ret > 0) {
+                                        bufused += ret;
+                                }
 			}
-			strncat(buffer,")",sizeof(buffer) - strlen(buffer) - 1);
+                        if (bufused < sizeof(buffer)) {
+                                snprintf(buffer + bufused,
+                                                sizeof(buffer) - bufused,
+                                                ")");
+                        }
 			break;
 	}
 	return buffer;

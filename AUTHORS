@@ -4,9 +4,10 @@ The primary authors of libtrace were:
  * Daniel Lawson
  * Richard Sanger
 
-Libtrace is currently maintained by Shane Alcock <salcock@waikato.ac.nz>.
+Libtrace is currently maintained by the LibtraceTeam on Github:
+https://github.com/LibtraceTeam.
 
-However, we would also like to acknowledge a number of people who have 
+However, we would also like to acknowledge a number of people who have
 generously contributed bug-fixes, extensions and other improvements over the
 years. It is contributions like these that help keep libtrace relevant and
 useful to a broad community, so thanks very much.
@@ -14,7 +15,8 @@ useful to a broad community, so thanks very much.
 In no particular order, we would like to recognise:
 
  * Matt Brown for getting us into Debian and keeping us up to date.
- * Alistair King for reporting and suggesting fixes for numerous bugs, 
+ * Brad Cowie for packaging libtrace4 for Debian and Ubuntu.
+ * Alistair King for reporting and suggesting fixes for numerous bugs,
    particularly in libwandio
  * Simon Wadsworth for writing the original version of most of the OSPF code
  * Nevil Brownlee for reporting a huge number of bugs
@@ -26,9 +28,23 @@ In no particular order, we would like to recognise:
  * Kaio Rafael and Diógenes Freitas for patching in support for OpenBSD loopback
  * Robert Edmonds for tidying up the libpacketdump plugin install
  * Martin Bligh for patching in support for nanosecond pcap traces
+ * Teemu Rytilahti for adding support for SIT
+ * "EaseTheWorld" for their work with improving the packet statistics API, as
+   well as reporting several bugs
+ * Richard Cziva for contributing to the DPDK support
+ * Robert Zeh for resolving some wandio errors that were causing crashes
+ * Anthony Coddington for adding ERF provenance support and fixing a number
+   of other ERF/DAG issues
+ * Tim Dawson for fixing issues with building against musl libc
+ * Hendrik Leppelsack for reporting and fixing some errors in the tool manpages
+ * Jacob van Walraven for spending a summer doing various coding odd-jobs
+ * Mark Weiman for fixing an uninitialised memory bug that was upsetting
+   Valgrind.
+ * Tyler Marriner for adding RADIUS anonymisation to traceanon.
  * Jamie Curtis for fixing a couple of bugs many many years ago
  * Brendon Jones for creating the original Windows DLLs and writing bits of
    code here and there
 
-Apologies to anyone that we've missed out or forgotten. If you're really 
-offended, fire us an email and we'll add you to the list.
+Apologies to anyone that we've missed out or forgotten. If you're really
+offended, fire one of us an email and we'll make sure you are added to the
+list.

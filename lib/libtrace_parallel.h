@@ -1,34 +1,29 @@
 /*
- * This file is part of libtrace
  *
- * Copyright (c) 2007-2015 The University of Waikato, Hamilton,
- * New Zealand.
- *
- * Authors: Richard Sanger
- *          Shane Alcock
- *
+ * Copyright (c) 2007-2016 The University of Waikato, Hamilton, New Zealand.
  * All rights reserved.
+ *
+ * This file is part of libtrace.
  *
  * This code has been developed by the University of Waikato WAND
  * research group. For further information please see http://www.wand.net.nz/
  *
  * libtrace is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * libtrace is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with libtrace; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
- * $Id$
  *
  */
+
 
 /** @file
  *
@@ -139,6 +134,11 @@ enum libtrace_messages {
          *  for the processing threads.
 	 */
 	MESSAGE_PACKET,
+
+	/** A libtrace meta packet is ready, this will trigger the meta packet
+         *  callback for the processing threads.
+         */
+	MESSAGE_META_PACKET,
 
         /** A libtrace result is ready, this will trigger the result callback
          *  for the reporter thread.
@@ -523,6 +523,25 @@ typedef libtrace_packet_t* (*fn_cb_packet)(libtrace_t *libtrace,
                                            libtrace_packet_t *packet);
 
 /**
+ * A callback function triggered when a processing thread receives a meta packet.
+ *
+ * @param libtrace The parallel trace.
+ * @param t The thread that is running
+ * @param global The global storage.
+ * @param tls The thread local storage.
+ * @param packet The packet to be processed.
+ *
+ * @return either the packet itself if it is not being published as a result
+ *   or NULL otherwise. If returning NULL, it is the user's responsibility
+ *   to ensure the packet is freed when the reporter thread is finished with it.
+ */
+typedef libtrace_packet_t* (*fn_cb_meta_packet)(libtrace_t *libtrace,
+                                           libtrace_thread_t *t,
+                                           void *global,
+                                           void *tls,
+                                           libtrace_packet_t *packet);
+
+/**
  * Callback for handling a result message. Should only be required by the
  * reporter thread.
  *
@@ -603,6 +622,16 @@ DLLEXPORT int trace_set_pausing_cb(libtrace_callback_set_t *cbset,
  */
 DLLEXPORT int trace_set_packet_cb(libtrace_callback_set_t *cbset,
                 fn_cb_packet handler);
+
+/**
+ * Registers a meta packet callback against a callback set.
+ *
+ * @param cbset The callback set.
+ * @param handler The meta packet callback funtion.
+ * @return 0 if successful, -1 otherwise.
+ */
+DLLEXPORT int trace_set_meta_packet_cb(libtrace_callback_set_t *cbset,
+                fn_cb_meta_packet handler);
 
 /**
  * Registers a first packet callback against a callback set.
@@ -734,6 +763,9 @@ DLLEXPORT void trace_join(libtrace_t * trace);
  */
 
 /** Set the maximum number of perpkt threads to use in a trace.
+ *
+ * Only valid on a new trace, that has not be started. Once started
+ * the number of threads cannot be changed without destroying the trace.
  *
  * @param[in] trace The parallel input trace
  * @param[in] nb The number of threads to use. If set to 0, libtrace will
@@ -1276,6 +1308,32 @@ DLLEXPORT void libtrace_make_result_safe(libtrace_result_t *res);
  */
 DLLEXPORT void trace_free_packet(libtrace_t * libtrace, libtrace_packet_t * packet);
 
+/** Increments the internal reference counter for a packet.
+ * @param packet        The packet opaque pointer
+ *
+ * You may wish to use this function (and its decrementing counterpart)
+ * in situations where you are retaining multiple references to a packet
+ * outside of the core packet processing function. This will ensure that
+ * the packet is not released until there are no more outstanding references
+ * to the packet anywhere in your program.
+ */
+DLLEXPORT void trace_increment_packet_refcount(libtrace_packet_t *packet);
+
+/** Decrements the internal reference counter for a packet.
+ * @param packet        The packet opaque pointer
+ *
+ * If the reference counter goes below one, trace_fin_packet() will be
+ * called on the packet.
+ *
+ * You may wish to use this function (and its incrementing counterpart)
+ * in situations where you are retaining multiple references to a packet
+ * outside of the core packet processing function. This will ensure that
+ * the packet is not released until there are no more outstanding references
+ * to the packet anywhere in your program.
+ */
+DLLEXPORT void trace_decrement_packet_refcount(libtrace_packet_t *packet);
+
+
 /** Provides some basic information about a trace based on its input format.
  *
  * @param libtrace  The trace that is being inquired about.
@@ -1340,6 +1398,14 @@ DLLEXPORT int trace_set_configuration_file(libtrace_t *trace, FILE *file);
  * @return The number of processing threads owned by that trace.
  */
 DLLEXPORT int trace_get_perpkt_threads(libtrace_t* t); 
+
+/** Returns the internal unique ID for a packet processing thread.
+ *
+ * @param thread The thread being queried.
+ * @return The ID number of the thread or -1 if the thread is not a processing
+ * thread or is otherwise invalid.
+ */
+DLLEXPORT int trace_get_perpkt_thread_id(libtrace_thread_t *thread);
 
 /**
  * Sets a combiner function for an input trace.

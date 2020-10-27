@@ -1,3 +1,28 @@
+/*
+ *
+ * Copyright (c) 2007-2016 The University of Waikato, Hamilton, New Zealand.
+ * All rights reserved.
+ *
+ * This file is part of libtrace.
+ *
+ * This code has been developed by the University of Waikato WAND
+ * research group. For further information please see http://www.wand.net.nz/
+ *
+ * libtrace is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * libtrace is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *
+ */
 #include "deque.h"
 
 #include <assert.h>
@@ -37,11 +62,17 @@ DLLEXPORT void libtrace_deque_push_back(libtrace_queue_t *q, void *d)
 	// Only ->prev is unknown at this stage to be completed in lock
 	ASSERT_RET(pthread_mutex_lock(&q->lock), == 0);
 	if (q->head == NULL) {
-		assert(q->tail == NULL && q->size == 0);
+		if (q->tail != NULL || q->size != 0) {
+			fprintf(stderr, "Error deque head cannot be NULL with a non NULL tail and size of more than 0 in libtrace_deque_push_back()\n");
+			return;
+		}
 		new_node->prev = NULL;
 		q->head = q->tail = new_node;
 	} else {
-		assert (q->tail != NULL);
+		if (q->tail == NULL) {
+			fprintf(stderr, "Error deque tail cannot be NULL if it contains a head in libtrace_deque_push_back()\n");
+			return;
+		}
 		q->tail->next = new_node;
 		new_node->prev = q->tail; // Done the double link
 		q->tail = new_node; // Relink tail
@@ -60,11 +91,13 @@ DLLEXPORT void libtrace_deque_push_front(libtrace_queue_t *q, void *d)
 	// Only ->next is unknown at this stage to be completed in lock
 	ASSERT_RET(pthread_mutex_lock(&q->lock), == 0);
 	if (q->head == NULL) {
-		assert(q->tail == NULL && q->size == 0);
+		if (q->tail != NULL || q->size != 0) {
+			fprintf(stderr, "Error deque head cannot be NULL with a non NULL tail and size of more than 0 in libtrace_deque_push_front()\n");
+			return;
+		}
 		new_node->next = NULL;
 		q->head = q->tail = new_node;
 	} else {
-		assert (q->head != NULL);
 		q->head->prev = new_node;
 		new_node->next = q->head; // Done the double link
 		q->head = new_node; // Relink head

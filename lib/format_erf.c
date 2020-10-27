@@ -1,38 +1,32 @@
 /*
- * This file is part of libtrace
  *
- * Copyright (c) 2007-2015 The University of Waikato, Hamilton, 
- * New Zealand.
- *
- * Authors: Daniel Lawson 
- *          Perry Lorier
- *          Shane Alcock 
- *          
+ * Copyright (c) 2007-2016 The University of Waikato, Hamilton, New Zealand.
  * All rights reserved.
  *
- * This code has been developed by the University of Waikato WAND 
+ * This file is part of libtrace.
+ *
+ * This code has been developed by the University of Waikato WAND
  * research group. For further information please see http://www.wand.net.nz/
  *
  * libtrace is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * libtrace is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with libtrace; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
- * $Id$
  *
  */
 
-
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 
 #include "config.h"
 #include "common.h"
@@ -42,7 +36,6 @@
 #include "format_erf.h"
 #include "wandio.h"
 
-#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -69,6 +62,7 @@
  *
  */
 
+#define ERF_META_TYPE 27
 
 static struct libtrace_format_t erfformat;
 
@@ -94,6 +88,8 @@ struct erf_format_data_t {
 
 	/* Number of packets that were dropped during the capture */
 	uint64_t drops;
+
+	bool discard_meta;
 
 	/* Config options for the input trace */
 	struct {
@@ -127,27 +123,67 @@ typedef struct erf_index_t {
 	uint64_t offset; 
 } erf_index_t;
 
+static bool erf_can_write(libtrace_packet_t *packet) {
+	/* Get the linktype */
+        libtrace_linktype_t ltype = trace_get_link_type(packet);
+
+        if (ltype == TRACE_TYPE_CONTENT_INVALID) {
+                return false;
+        }
+        if (ltype == TRACE_TYPE_PCAPNG_META
+                || ltype == TRACE_TYPE_NONDATA) {
+
+                return false;
+        }
+
+        return true;
+}
 
 /* Ethernet packets have a 2 byte padding before the packet
  * so that the IP header is aligned on a 32 bit boundary.
  */
-static int erf_get_padding(const libtrace_packet_t *packet)
+static inline int erf_get_padding(const libtrace_packet_t *packet)
 {
-	if (packet->trace->format->type==TRACE_FORMAT_ERF) {
-		dag_record_t *erfptr = (dag_record_t *)packet->header;
-		switch((erfptr->type & 0x7f)) {
-			case TYPE_ETH: 		
-			case TYPE_DSM_COLOR_ETH:
-				return 2;
-			default: 		return 0;
-		}
+        dag_record_t *erfptr = (dag_record_t *)packet->header;
+
+        switch(packet->trace->format->type) {
+                case TRACE_FORMAT_ERF:
+                case TRACE_FORMAT_NDAG:
+                case TRACE_FORMAT_RAWERF:
+                case TRACE_FORMAT_DPDK_NDAG:
+                        switch((erfptr->type & 0x7f)) {
+                                case TYPE_ETH:
+                                case TYPE_COLOR_ETH:
+                                case TYPE_DSM_COLOR_ETH:
+                                case TYPE_COLOR_HASH_ETH:
+                                        return 2;
+                                default:
+                                        return 0;
+                        }
+                        break;
+                default:
+                        switch(trace_get_link_type(packet)) {
+                                case TRACE_TYPE_ETH:	return 2;
+                                default:		return 0;
+                        }
+                        break;
 	}
-	else {
-		switch(trace_get_link_type(packet)) {
-			case TRACE_TYPE_ETH:	return 2;
-			default:		return 0;
-		}
+        return 0;
+}
+
+int erf_is_color_type(uint8_t erf_type)
+{
+	switch(erf_type & 0x7f) {
+		case TYPE_COLOR_HDLC_POS:
+		case TYPE_DSM_COLOR_HDLC_POS:
+		case TYPE_COLOR_ETH:
+		case TYPE_DSM_COLOR_ETH:
+		case TYPE_COLOR_HASH_POS:
+		case TYPE_COLOR_HASH_ETH:
+			return 1;
 	}
+
+	return 0;
 }
 
 int erf_get_framing_length(const libtrace_packet_t *packet)
@@ -155,21 +191,25 @@ int erf_get_framing_length(const libtrace_packet_t *packet)
         uint16_t extsize = 0;
 	dag_record_t *erfptr = NULL;
         uint64_t *exthdr = NULL;
-	
+        uint8_t *firstbyte;
+
         erfptr = (dag_record_t *)packet->header;
         if ((erfptr->type & 0x80) == 0x80) {
                 /* Extension headers are present */
                 exthdr = (uint64_t *)((char *)packet->header + dag_record_size);
                 extsize += 8;
 
-                while (*exthdr < (1UL << 31)) {
+                firstbyte = (uint8_t *)exthdr;
+                while ((*firstbyte & 0x80) == 0x80) {
                         extsize += 8;
                         exthdr ++;
-                        assert(extsize <= ntohs(erfptr->rlen));
+                        firstbyte = (uint8_t *)exthdr;
+			if (extsize > ntohs(erfptr->rlen)) {
+				trace_set_err(packet->trace, TRACE_ERR_BAD_PACKET, "Extension size is greater than dag record record length in erf_get_framing_length()");
+				return -1;
+			}
                 }
         }
-        
-
 	return dag_record_size + extsize + erf_get_padding(packet);
 }
 
@@ -204,7 +244,7 @@ static int erf_probe_magic(io_t *io)
 		return 0;
 	}
 	/* Is this a proper typed packet */
-	if ((erf->type & 0x7f) > TYPE_AAL2) {
+	if ((erf->type & 0x7f) > ERF_TYPE_MAX) {
 		return 0;
 	}
 	/* We should put some more tests in here. */
@@ -212,13 +252,20 @@ static int erf_probe_magic(io_t *io)
 	return 1;
 }
 
-static int erf_init_input(libtrace_t *libtrace) 
-{
+static int erf_init_input(libtrace_t *libtrace) {
 	libtrace->format_data = malloc(sizeof(struct erf_format_data_t));
-	
+
+	if (!libtrace->format_data) {
+		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory for "
+			"format data inside erf_init_input()");
+		return -1;
+	}
+
 	IN_OPTIONS.real_time = 0;
 	DATA(libtrace)->drops = 0;
-	
+
+	DATA(libtrace)->discard_meta = 0;
+
 	return 0; /* success */
 }
 
@@ -229,6 +276,10 @@ static int erf_config_input(libtrace_t *libtrace, trace_option_t option,
 		case TRACE_OPTION_EVENT_REALTIME:
 			IN_OPTIONS.real_time = *(int *)value;
 			return 0;
+                case TRACE_OPTION_CONSTANT_ERF_FRAMING:
+                        trace_set_err(libtrace, TRACE_ERR_OPTION_UNAVAIL,
+                                        "Setting constant framing length is not supported for %s:", libtrace->format->name);
+                        return -1;
 		case TRACE_OPTION_SNAPLEN:
 		case TRACE_OPTION_PROMISC:
 		case TRACE_OPTION_FILTER:
@@ -236,6 +287,13 @@ static int erf_config_input(libtrace_t *libtrace, trace_option_t option,
 			trace_set_err(libtrace, TRACE_ERR_OPTION_UNAVAIL,
 					"Unsupported option");
 			return -1;
+		case TRACE_OPTION_DISCARD_META:
+			if (*(int *)value > 0) {
+				DATA(libtrace)->discard_meta = true;
+			} else {
+				DATA(libtrace)->discard_meta = false;
+			}
+			return 0;
 		default:
 			/* Unknown option */
 			trace_set_err(libtrace,TRACE_ERR_UNKNOWN_OPTION,
@@ -367,7 +425,8 @@ static int erf_seek_erf(libtrace_t *libtrace,uint64_t erfts)
 			erf_slow_seek_start(libtrace,erfts);
 			break;
 		case INDEX_UNKNOWN:
-			assert(0);
+			trace_set_err(libtrace, TRACE_ERR_SEEK_ERF, "Cannot seek to erf timestamp with unknown index in erf_seek_erf()");
+			return -1;
 			break;
 	}
 
@@ -387,6 +446,12 @@ static int erf_seek_erf(libtrace_t *libtrace,uint64_t erfts)
 
 static int erf_init_output(libtrace_out_t *libtrace) {
 	libtrace->format_data = malloc(sizeof(struct erf_format_data_out_t));
+
+	if (!libtrace->format_data) {
+		trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory for "
+			"format data inside erf_init_output()");
+		return -1;
+	}
 
 	OUT_OPTIONS.level = 0;
 	OUT_OPTIONS.compress_type = TRACE_OPTION_COMPRESSTYPE_NONE;
@@ -437,7 +502,7 @@ static int erf_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
 		void *buffer, libtrace_rt_types_t rt_type, uint32_t flags) {
 	
 	dag_record_t *erfptr;
-	
+
 	if (packet->buffer != buffer && 
 		packet->buf_control == TRACE_CTRL_PACKET) {
 		free(packet->buffer);
@@ -447,8 +512,7 @@ static int erf_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
 		packet->buf_control = TRACE_CTRL_PACKET;
 	} else
 	        packet->buf_control = TRACE_CTRL_EXTERNAL;
-	
-	
+
 	packet->type = rt_type;
 	packet->buffer = buffer;
 	packet->header = buffer;
@@ -456,11 +520,15 @@ static int erf_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
 	if (erfptr->flags.rxerror == 1) {
 		packet->payload = NULL;
 	} else {
-		packet->payload = (char*)packet->buffer + erf_get_framing_length(packet);
+		packet->payload = ((char*)packet->buffer) + trace_get_framing_length(packet);
 	}
 
-        assert(erfptr->rlen != 0);
-	
+	if (erfptr->rlen == 0) {
+		trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "ERF packet has an invalid record "
+			"length: zero, in erf_prepare_packet()\n");
+		return -1;
+	}
+
 	if (libtrace->format_data == NULL) {
 		/* Allocates the format_data structure */
 		if (erf_init_input(libtrace)) 
@@ -468,7 +536,7 @@ static int erf_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
 	}
 
 	/* Check for loss */
-	if ((erfptr->type & 0x7f) == TYPE_DSM_COLOR_ETH) {
+	if (erf_is_color_type(erfptr->type)) {
 		/* No idea how we get this yet */
 
 	} else if (erfptr->lctr) {
@@ -484,78 +552,96 @@ static int erf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	void *buffer2 = packet->buffer;
 	unsigned int rlen;
 	uint32_t flags = 0;
-	
-	
+	libtrace_rt_types_t linktype;
+	int gotpacket = 0;
+
 	if (!packet->buffer || packet->buf_control == TRACE_CTRL_EXTERNAL) {
 		packet->buffer = malloc((size_t)LIBTRACE_PACKET_BUFSIZE);
 		if (!packet->buffer) {
-			trace_set_err(libtrace, errno, 
-					"Cannot allocate memory");
+			trace_set_err(libtrace, errno, "Cannot allocate memory");
 			return -1;
 		}
 	}
 
-	flags |= TRACE_PREP_OWN_BUFFER;	
-	
-	if ((numbytes=wandio_read(libtrace->io,
-					packet->buffer,
-					(size_t)dag_record_size)) == -1) {
-		trace_set_err(libtrace,errno,"reading ERF file");
-		return -1;
-	}
-	/* EOF */
-	if (numbytes == 0) {
-		return 0;
-	}
+	flags |= TRACE_PREP_OWN_BUFFER;
 
-        if (numbytes < (int)dag_record_size) {
-                trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Incomplete ERF header");
-                return -1;
-        }
+	while (!gotpacket) {
 
-	rlen = ntohs(((dag_record_t *)packet->buffer)->rlen);
-	buffer2 = (char*)packet->buffer + dag_record_size;
-	size = rlen - dag_record_size;
+		if ((numbytes=wandio_read(libtrace->io, packet->buffer,
+			(size_t)dag_record_size)) == -1) {
 
-	if (size >= LIBTRACE_PACKET_BUFSIZE) {
-		trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, 
+			trace_set_err(libtrace,errno,"reading ERF file");
+			return -1;
+		}
+
+		/* EOF */
+		if (numbytes == 0) {
+			return 0;
+		}
+
+        	if (numbytes < (int)dag_record_size) {
+               		trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Incomplete ERF header");
+                	return -1;
+        	}
+
+		rlen = ntohs(((dag_record_t *)packet->buffer)->rlen);
+		buffer2 = (char*)packet->buffer + dag_record_size;
+		size = rlen - dag_record_size;
+
+		if (size >= LIBTRACE_PACKET_BUFSIZE) {
+			trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, 
 				"Packet size %u larger than supported by libtrace - packet is probably corrupt", 
 				size);
-		return -1;
-	}
-
-	/* Unknown/corrupt */
-	if ((((dag_record_t *)packet->buffer)->type & 0x7f) >= TYPE_RAW_LINK) {
-		trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, 
-				"Corrupt or Unknown ERF type");
-		return -1;
-	}
-	
-	/* read in the rest of the packet */
-	if ((numbytes=wandio_read(libtrace->io,
-					buffer2,
-					(size_t)size)) != (int)size) {
-		if (numbytes==-1) {
-			trace_set_err(libtrace,errno, "read(%s)", 
-					libtrace->uridata);
 			return -1;
 		}
-		trace_set_err(libtrace,EIO,
-				"Truncated packet (wanted %d, got %d)", 
-				size, numbytes);
-		/* Failed to read the full packet?  must be EOF */
-		return -1;
+
+		/* Unknown/corrupt */
+		if ((((dag_record_t *)packet->buffer)->type & 0x7f) > ERF_TYPE_MAX) {
+			trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, 
+				"Corrupt or Unknown ERF type");
+			return -1;
+		}
+
+		/* read in the rest of the packet */
+		if ((numbytes=wandio_read(libtrace->io, buffer2,
+			(size_t)size)) != (int)size) {
+
+			if (numbytes==-1) {
+				trace_set_err(libtrace,errno, "read(%s)", 
+					libtrace->uridata);
+				return -1;
+			}
+
+			trace_set_err(libtrace,EIO,
+				"Truncated packet (wanted %d, got %d)", size, numbytes);
+
+			/* Failed to read the full packet?  must be EOF */
+			return -1;
+		}
+
+        	if (numbytes < (int)size) {
+                	trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Incomplete ERF record");
+                	return -1;
+        	}
+
+		/* If a provenance packet make sure correct rt linktype is set.
+	 	 * Only bits 0-6 are used for the type */
+		if ((((dag_record_t *)packet->buffer)->type & 127) == ERF_META_TYPE) {
+			linktype = TRACE_RT_ERF_META;
+		} else { linktype = TRACE_RT_DATA_ERF; }
+
+		/* If this is a meta packet and TRACE_OPTION_DISCARD_META is set
+		 * ignore this packet and get another */
+		if ((linktype == TRACE_RT_ERF_META && !DATA(libtrace)->discard_meta) ||
+			linktype == TRACE_RT_DATA_ERF) {
+			gotpacket = 1;
+
+			if (erf_prepare_packet(libtrace, packet, packet->buffer, linktype, flags)) {
+				return -1;
+			}
+		}
 	}
 
-        if (numbytes < (int)size) {
-                trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Incomplete ERF record");
-                return -1;
-        }
-	
-	if (erf_prepare_packet(libtrace, packet, packet->buffer, 
-				TRACE_RT_DATA_ERF, flags))
-		return -1;
-	
 	return rlen;
 }
 
@@ -584,6 +670,10 @@ static int erf_dump_packet(libtrace_out_t *libtrace,
 		return -1;
 	}
 	return numbytes + framinglen;
+}
+
+static int erf_flush_output(libtrace_out_t *libtrace) {
+        return wandio_wflush(OUTPUT->file);
 }
 
 static int erf_start_output(libtrace_out_t *libtrace)
@@ -627,21 +717,26 @@ static bool find_compatible_linktype(libtrace_out_t *libtrace,
 static int erf_write_packet(libtrace_out_t *libtrace, 
 		libtrace_packet_t *packet) 
 {
+
+	/* Check erf can write this type of packet */
+	if (!erf_can_write(packet)) {
+		return 0;
+	}
+
 	int numbytes = 0;
-	unsigned int pad = 0;
 	dag_record_t *dag_hdr = (dag_record_t *)packet->header;
 	void *payload = packet->payload;
 
-	assert(OUTPUT->file);
-
-	if (trace_get_link_type(packet) == TRACE_TYPE_NONDATA)
-		return 0;
+	if (!OUTPUT->file) {
+		trace_set_err_out(libtrace, TRACE_ERR_BAD_IO, "Attempted to write ERF packets to a "
+			"closed file, must call trace_create_output() before calling trace_write_output()");
+		return -1;
+	}
 
 	if (!packet->header) {
 		return -1;
 	}
 	
-	pad = erf_get_padding(packet);
 
 	/* If we've had an rxerror, we have no payload to write - fix
 	 * rlen to be the correct length 
@@ -649,6 +744,8 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 	/* I Think this is bogus, we should somehow figure out
 	 * a way to write out the payload even if it is gibberish -- Perry */
 	if (payload == NULL) {
+	        unsigned int pad = 0;
+	        pad = erf_get_padding(packet);
 		dag_hdr->rlen = htons(dag_record_size + pad);
 		
 	} 
@@ -677,22 +774,33 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 			return -1;
 
 		payload=packet->payload;
-		pad = erf_get_padding(packet);
 
 		erfhdr.type = libtrace_to_erf_type(trace_get_link_type(packet));
 
 		/* Packet length (rlen includes format overhead) */
-		assert(trace_get_capture_length(packet)>0 
-				&& trace_get_capture_length(packet)<=65536);
-		assert(trace_get_framing_length(packet)<=65536);
-               
+		if (trace_get_capture_length(packet) <= 0
+			|| trace_get_capture_length(packet) > 65536) {
+			trace_set_err_out(libtrace, TRACE_ERR_BAD_PACKET,
+				"Capture length is out of range in erf_write_packet()");
+			return -1;
+		}
+		if (trace_get_framing_length(packet) > 65536) {
+			trace_set_err_out(libtrace, TRACE_ERR_BAD_PACKET,
+				"Framing length is to large in erf_write_packet()");
+			return -1;
+		}
+
                 if (erfhdr.type == TYPE_ETH)
                         framing = dag_record_size + 2;
                 else
                         framing = dag_record_size;
-               
+
 		rlen = trace_get_capture_length(packet) + framing;
-		assert(rlen > 0 && rlen <= 65536);
+		if (rlen <= 0 || rlen > 65536) {
+			trace_set_err_out(libtrace, TRACE_ERR_BAD_PACKET,
+				"Capture + framing length is out of range in erf_write_packet()");
+			return -1;
+		}
 		erfhdr.rlen = htons(rlen);
 		/* loss counter. Can't do this */
 		erfhdr.lctr = 0;
@@ -712,13 +820,24 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 libtrace_linktype_t erf_get_link_type(const libtrace_packet_t *packet) {
 	dag_record_t *erfptr = 0;
 	erfptr = (dag_record_t *)packet->header;
-        uint8_t type = (erfptr->type & 0x7f);
+        uint8_t type;
+
+        if (packet->header == NULL) {
+                return ~0;
+        }
+
+        type = (erfptr->type & 0x7f);
 	if (type != TYPE_LEGACY) {
 		/* The top-most bit is now used to indicate the presence of
                  * extension headers :/ */
                 return erf_type_to_libtrace(type);
         }
 	else {
+                if (trace_get_capture_length(packet) < 5 ||
+                                packet->payload == NULL) {
+                        return ~0;
+                }
+
 		/* Sigh, lets start wildly guessing */
 		if (((char*)packet->payload)[4]==0x45)
 			return TRACE_TYPE_PPP;
@@ -729,12 +848,19 @@ libtrace_linktype_t erf_get_link_type(const libtrace_packet_t *packet) {
 libtrace_direction_t erf_get_direction(const libtrace_packet_t *packet) {
 	dag_record_t *erfptr = 0;
 	erfptr = (dag_record_t *)packet->header;
-	return erfptr->flags.iface;
+        if (packet->header) {
+        	return erfptr->flags.iface;
+        }
+        return TRACE_DIR_UNKNOWN;
 }
 
 libtrace_direction_t erf_set_direction(libtrace_packet_t *packet, libtrace_direction_t direction) {
 	dag_record_t *erfptr = 0;
 	erfptr = (dag_record_t *)packet->header;
+
+        if (packet->header == NULL) {
+                return TRACE_DIR_UNKNOWN;
+        }
 	erfptr->flags.iface = direction;
 	return erfptr->flags.iface;
 }
@@ -742,43 +868,79 @@ libtrace_direction_t erf_set_direction(libtrace_packet_t *packet, libtrace_direc
 uint64_t erf_get_erf_timestamp(const libtrace_packet_t *packet) {
 	dag_record_t *erfptr = 0;
 	erfptr = (dag_record_t *)packet->header;
+
+        if (erfptr == NULL) {
+                return 0;
+        }
 	return bswap_le_to_host64(erfptr->ts);
 }
 
 int erf_get_capture_length(const libtrace_packet_t *packet) {
 	dag_record_t *erfptr = 0;
 	int caplen;
-	if (packet->payload == NULL)
-		return 0; 
-	
-	erfptr = (dag_record_t *)packet->header;
-	caplen = ntohs(erfptr->rlen) - erf_get_framing_length(packet);
-	if (ntohs(erfptr->wlen) < caplen)
-		return ntohs(erfptr->wlen);
+        size_t framinglen;
+        uint16_t wlen, rlen;
 
-	return (ntohs(erfptr->rlen) - erf_get_framing_length(packet));
+	if (packet->payload == NULL || packet->header == NULL)
+		return 0;
+
+	erfptr = (dag_record_t *)packet->header;
+        framinglen = trace_get_framing_length(packet);
+        rlen = ntohs(erfptr->rlen);
+        wlen = ntohs(erfptr->wlen);
+
+	caplen = rlen - framinglen;
+	if (wlen < caplen)
+		return wlen;
+
+        return caplen;
 }
 
 int erf_get_wire_length(const libtrace_packet_t *packet) {
 	dag_record_t *erfptr = 0;
 	erfptr = (dag_record_t *)packet->header;
+
+        if (packet->header == NULL) {
+                return 0;
+        }
+
+	if ((erfptr->type & 0x7f) == TYPE_META)
+		return 0;
+
 	return ntohs(erfptr->wlen);
 }
 
 size_t erf_set_capture_length(libtrace_packet_t *packet, size_t size) {
 	dag_record_t *erfptr = 0;
-	assert(packet);
-	if(size  > trace_get_capture_length(packet)) {
+        uint16_t wlen;
+
+	if (!packet) {
+		fprintf(stderr, "NULL packet passed to erf_set_capture_length()\n");
+		return ~0U;
+	}
+	erfptr = (dag_record_t *)packet->header;
+
+        if (packet->header == NULL) {
+                return ~0U;
+        }
+
+	if(size > trace_get_capture_length(packet) || (erfptr->type & 0x7f) == TYPE_META) {
 		/* Can't make a packet larger */
 		return trace_get_capture_length(packet);
 	}
+
 	/* Reset cached capture length - otherwise we will both return the
 	 * wrong value here and subsequent get_capture_length() calls will
 	 * return the wrong value. */
-	packet->capture_length = -1;
-	erfptr = (dag_record_t *)packet->header;
-	erfptr->rlen = htons(size + erf_get_framing_length(packet));
-	return trace_get_capture_length(packet);
+	packet->cached.capture_length = -1;
+	erfptr->rlen = htons(size + trace_get_framing_length(packet));
+        wlen = ntohs(erfptr->wlen);
+
+        if (wlen < size) {
+                return wlen;
+        }
+
+	return size;
 }
 
 static struct libtrace_eventobj_t erf_event(struct libtrace_t *libtrace, struct libtrace_packet_t *packet) {
@@ -809,6 +971,260 @@ static void erf_get_statistics(libtrace_t *trace, libtrace_stat_t *stat) {
         }
 }
 
+static char *erf_get_option_name(uint32_t option) {
+	switch(option) {
+		case (ERF_PROV_COMMENT): return "Comment";
+                case (ERF_PROV_GEN_TIME): return "Time generated";
+                case (ERF_PROV_FCS_LEN): return "FCS Length";
+                case (ERF_PROV_MASK_CIDR): return "Subnet CIDR";
+                case (ERF_PROV_NAME): return "Name";
+                case (ERF_PROV_DESCR): return "Description";
+                case (ERF_PROV_APP_NAME): return "Application Name";
+                case (ERF_PROV_HOSTNAME): return "Hostname";
+                case (ERF_PROV_OS): return "Operating System";
+                case (ERF_PROV_MODEL): return "Model";
+                case (ERF_PROV_FW_VERSION): return "Firmware Version";
+                case (ERF_PROV_SERIAL_NO): return "Serial Number";
+                case (ERF_PROV_ORG_NAME): return "Organisation Name";
+                case (ERF_PROV_SNAPLEN): return "Snap length";
+                case (ERF_PROV_CARD_NUM): return "DAG Card Number";
+                case (ERF_PROV_MODULE_NUM): return "DAG Module Number";
+                case (ERF_PROV_LOC_NAME): return "Capture Location";
+                case (ERF_PROV_FLOW_HASH_MODE): return "Flow Hash Mode";
+		case (ERF_PROV_FILTER): return "Filter";
+                case (ERF_PROV_TUNNELING_MODE): return "Tunneling Mode";
+		case (ERF_PROV_ROTFILE_NAME): return "Rotfile Name";
+                case (ERF_PROV_LOC_DESCR): return "Location Description";
+                case (ERF_PROV_MEM): return "Stream Buffer Memory";
+                case (ERF_PROV_DEV_NAME): return "DAG Device Name";
+                case (ERF_PROV_DEV_PATH): return "DAG Device Path";
+                case (ERF_PROV_APP_VERSION): return "Capture Application Version";
+                case (ERF_PROV_CPU): return "CPU";
+                case (ERF_PROV_CPU_PHYS_CORES): return "CPU Cores";
+                case (ERF_PROV_CPU_NUMA_NODES): return "CPU NUMA Nodes";
+                case (ERF_PROV_DAG_VERSION): return "DAG Software Version";
+                case (ERF_PROV_IF_NUM): return "Interface Number";
+                case (ERF_PROV_IF_SPEED): return "Interface Speed";
+                case (ERF_PROV_IF_IPV4): return "Interface IPv4";
+                case (ERF_PROV_IF_IPV6): return "Interface IPv6";
+                case (ERF_PROV_IF_MAC): return "Interface MAC";
+                case (ERF_PROV_IF_SFP_TYPE): return "Transceiver Type";
+                case (ERF_PROV_IF_LINK_STATUS): return "Link Status";
+                case (ERF_PROV_IF_PHY_MODE): return "PHY Mode";
+                case (ERF_PROV_IF_PORT_TYPE): return "Port Type";
+		case (ERF_PROV_IF_RX_LATENCY): return "Latency";
+                case (ERF_PROV_IF_RX_POWER): return "Optical RX Power";
+                case (ERF_PROV_IF_TX_POWER): return "Optical TX Power";
+                case (ERF_PROV_CLK_SOURCE): return "CLK Source";
+                case (ERF_PROV_CLK_STATE): return "CLK State";
+                case (ERF_PROV_CLK_THRESHOLD): return "CLK Threshold";
+                case (ERF_PROV_CLK_CORRECTION): return "CLK Correction";
+                case (ERF_PROV_CLK_FAILURES): return "CLK Failures";
+                case (ERF_PROV_CLK_RESYNCS): return "CLK Resyncs";
+                case (ERF_PROV_CLK_PHASE_ERROR): return "CLK Phase Errors";
+                case (ERF_PROV_CLK_INPUT_PULSES): return "CLK Input Pulses";
+                case (ERF_PROV_CLK_REJECTED_PULSES): return "CLK Rejected Pulses";
+                case (ERF_PROV_CLK_PHC_INDEX): return "CLK PHC Index";
+                case (ERF_PROV_CLK_PHC_OFFSET): return "CLK PHC Offset";
+                case (ERF_PROV_CLK_TIMEBASE): return "CLK Timebase";
+                case (ERF_PROV_CLK_DESCR): return "CLK Description";
+                case (ERF_PROV_CLK_OUT_SOURCE): return "CLK Output Source" ;
+                case (ERF_PROV_CLK_LINK_MODE): return "CLK Link Mode";
+                case (ERF_PROV_PTP_DOMAIN_NUM): return "PTP Domain Number";
+                case (ERF_PROV_PTP_STEPS_REMOVED): return "PTP Steps removed";
+                case (ERF_PROV_CLK_PORT_PROTO): return "CLK Port Protocol";
+                case (ERF_PROV_STREAM_NUM): return "Stream Number";
+                case (ERF_PROV_STREAM_DROP): return "Stream Dropped Records";
+                case (ERF_PROV_STREAM_BUF_DROP): return "Stream Dropped Records (Buffer Overflow)";
+		default:
+			return "Unknown";
+	}
+	return "duno";
+}
+
+static libtrace_meta_datatype_t erf_get_datatype(uint32_t option) {
+	switch(option) {
+		case (ERF_PROV_COMMENT): return TRACE_META_STRING;
+                case (ERF_PROV_GEN_TIME): return TRACE_META_UINT64;
+		case (ERF_PROV_FCS_LEN): return TRACE_META_UINT32;
+		case (ERF_PROV_MASK_CIDR): return TRACE_META_UINT32;
+		case (ERF_PROV_NAME): return TRACE_META_STRING;
+		case (ERF_PROV_DESCR): return TRACE_META_STRING;
+		case (ERF_PROV_APP_NAME): return TRACE_META_STRING;
+		case (ERF_PROV_HOSTNAME): return TRACE_META_STRING;
+		case (ERF_PROV_OS): return TRACE_META_STRING;
+		case (ERF_PROV_MODEL): return TRACE_META_STRING;
+		case (ERF_PROV_FW_VERSION): return TRACE_META_STRING;
+		case (ERF_PROV_SERIAL_NO): return TRACE_META_STRING;
+		case (ERF_PROV_ORG_NAME): return TRACE_META_STRING;
+		case (ERF_PROV_SNAPLEN): return TRACE_META_UINT32;
+		case (ERF_PROV_CARD_NUM): return TRACE_META_UINT32;
+		case (ERF_PROV_MODULE_NUM): return TRACE_META_UINT32;
+		case (ERF_PROV_LOC_NAME): return TRACE_META_STRING;
+		case (ERF_PROV_FILTER): return TRACE_META_STRING;
+		case (ERF_PROV_FLOW_HASH_MODE): return TRACE_META_UINT32;
+		case (ERF_PROV_TUNNELING_MODE): return TRACE_META_UINT32;
+		case (ERF_PROV_ROTFILE_NAME): return TRACE_META_STRING;
+		case (ERF_PROV_LOC_DESCR): return TRACE_META_STRING;
+		case (ERF_PROV_MEM): return TRACE_META_UINT64;
+		case (ERF_PROV_DEV_NAME): return TRACE_META_STRING;
+		case (ERF_PROV_DEV_PATH): return TRACE_META_STRING;
+		case (ERF_PROV_APP_VERSION): return TRACE_META_STRING;
+		case (ERF_PROV_CPU): return TRACE_META_STRING;
+		case (ERF_PROV_CPU_PHYS_CORES): return TRACE_META_UINT32;
+		case (ERF_PROV_CPU_NUMA_NODES): return TRACE_META_UINT32;
+		case (ERF_PROV_DAG_VERSION): return TRACE_META_STRING;
+		case (ERF_PROV_IF_NUM): return TRACE_META_UINT32;
+		case (ERF_PROV_IF_SPEED): return TRACE_META_UINT64;
+		case (ERF_PROV_IF_IPV4): return TRACE_META_IPV4;
+		case (ERF_PROV_IF_IPV6): return TRACE_META_IPV6;
+		case (ERF_PROV_IF_MAC): return TRACE_META_MAC;
+		case (ERF_PROV_IF_SFP_TYPE): return TRACE_META_STRING;
+		case (ERF_PROV_IF_LINK_STATUS): return TRACE_META_UINT32;
+		case (ERF_PROV_IF_PHY_MODE): return TRACE_META_STRING;
+		case (ERF_PROV_IF_PORT_TYPE): return TRACE_META_UINT32;
+		/* this is a ts_rel, need to double check */
+		case (ERF_PROV_IF_RX_LATENCY): return TRACE_META_UINT64;
+		case (ERF_PROV_IF_RX_POWER): return TRACE_META_UINT32;
+		case (ERF_PROV_IF_TX_POWER): return TRACE_META_UINT32;
+		case (ERF_PROV_CLK_SOURCE): return TRACE_META_UINT32;
+		case (ERF_PROV_CLK_STATE): return TRACE_META_UINT32;
+		/* this is a ts_rel, need to double check */
+		case (ERF_PROV_CLK_THRESHOLD): return TRACE_META_UINT64;
+		/* this is a ts_rel, need to double check */
+		case (ERF_PROV_CLK_CORRECTION): return TRACE_META_UINT64;
+		case (ERF_PROV_CLK_FAILURES): return TRACE_META_UINT32;
+		case (ERF_PROV_CLK_RESYNCS): return TRACE_META_UINT32;
+		/* this is a ts_rel, need to double check */
+		case (ERF_PROV_CLK_PHASE_ERROR): return TRACE_META_UINT64;
+		case (ERF_PROV_CLK_INPUT_PULSES): return TRACE_META_UINT32;
+		case (ERF_PROV_CLK_REJECTED_PULSES): return TRACE_META_UINT32;
+		case (ERF_PROV_CLK_PHC_INDEX): return TRACE_META_UINT32;
+		/* this is a ts_rel, need to double check */
+		case (ERF_PROV_CLK_PHC_OFFSET): return TRACE_META_UINT64;
+		case (ERF_PROV_CLK_TIMEBASE): return TRACE_META_STRING;
+		case (ERF_PROV_CLK_DESCR): return TRACE_META_STRING;
+		case (ERF_PROV_CLK_OUT_SOURCE): return TRACE_META_UINT32;
+		case (ERF_PROV_CLK_LINK_MODE): return TRACE_META_UINT32;
+		case (ERF_PROV_PTP_DOMAIN_NUM): return TRACE_META_UINT32;
+		case (ERF_PROV_PTP_STEPS_REMOVED): return TRACE_META_UINT32;
+		case (ERF_PROV_CLK_PORT_PROTO): return TRACE_META_UINT32;
+                case (ERF_PROV_STREAM_NUM): return TRACE_META_UINT32;
+                case (ERF_PROV_STREAM_DROP): return TRACE_META_UINT32;
+                case (ERF_PROV_STREAM_BUF_DROP): return TRACE_META_UINT32;
+		default:
+			return TRACE_META_UNKNOWN;
+	}
+}
+
+/* An ERF provenance packet can contain multiple sections of the same type per packet */
+libtrace_meta_t *erf_get_all_meta(libtrace_packet_t *packet) {
+
+	void *ptr;
+	dag_record_t *hdr;
+	dag_sec_t *sec;
+	uint16_t tmp;
+	uint16_t remaining;
+	uint16_t curr_sec = 0;
+
+	if (packet == NULL) {
+		fprintf(stderr, "NULL packet passed into erf_get_all_meta()\n");
+		return NULL;
+	}
+	if (packet->buffer == NULL) { return NULL; }
+
+	hdr = (dag_record_t *)packet->buffer;
+	ptr = packet->payload;
+
+	/* ensure this packet is a meta packet */
+	if ((hdr->type & 127) != ERF_META_TYPE) { return NULL; }
+	/* set remaining to size of packet minus header length */
+	remaining = ntohs(hdr->rlen) - 24;
+
+	/* setup structure to hold the result */
+        libtrace_meta_t *result = malloc(sizeof(libtrace_meta_t));
+        result->num = 0;
+
+	while (remaining > sizeof(dag_sec_t)) {
+                uint16_t sectype;
+		/* Get the current section/option header */
+		sec = (dag_sec_t *)ptr;
+                sectype = ntohs(sec->type);
+
+		if (sectype == ERF_PROV_SECTION_CAPTURE
+                        || sectype == ERF_PROV_SECTION_HOST
+                        || sectype == ERF_PROV_SECTION_MODULE
+                        || sectype == ERF_PROV_SECTION_STREAM
+                        || sectype == ERF_PROV_SECTION_INTERFACE) {
+
+                        /* Section header */
+			curr_sec = sectype;
+                } else {
+			result->num += 1;
+                        if (result->num == 1) {
+                                result->items = malloc(sizeof(libtrace_meta_item_t));
+                        } else {
+                                result->items = realloc(result->items,
+                                        result->num*sizeof(libtrace_meta_item_t));
+                        }
+                        result->items[result->num-1].section = curr_sec;
+                        result->items[result->num-1].option = ntohs(sec->type);
+			result->items[result->num-1].option_name =
+                                erf_get_option_name(ntohs(sec->type));
+
+                        result->items[result->num-1].len = ntohs(sec->len);
+                        result->items[result->num-1].datatype =
+				erf_get_datatype(ntohs(sec->type));
+
+			/* If the datatype is a string allow for a null terminator */
+                        if (result->items[result->num-1].datatype == TRACE_META_STRING) {
+                                result->items[result->num-1].data =
+                                        calloc(1, ntohs(sec->len)+1);
+				((char *)result->items[result->num-1].data)[ntohs(sec->len)] = '\0';
+				/* and copy the utf8 string */
+				memcpy(result->items[result->num-1].data,
+                                	ptr+sizeof(struct dag_opthdr), ntohs(sec->len));
+                        } else {
+                                result->items[result->num-1].data =
+                                        calloc(1, ntohs(sec->len));
+				/* depending on the datatype we need to ensure the data is
+				 * in host byte ordering */
+				if (result->items[result->num-1].datatype == TRACE_META_UINT32) {
+					uint32_t t = *(uint32_t *)(ptr+sizeof(struct dag_opthdr));
+					t = ntohl(t);
+					memcpy(result->items[result->num-1].data,
+						&t, sizeof(uint32_t));
+				} else if(result->items[result->num-1].datatype == TRACE_META_UINT64) {
+					uint64_t t = *(uint64_t *)(ptr+sizeof(struct dag_opthdr));
+					t = bswap_be_to_host64(t);
+					memcpy(result->items[result->num-1].data,
+                                                &t, sizeof(uint64_t));
+				} else {
+					memcpy(result->items[result->num-1].data,
+                                        	ptr+sizeof(struct dag_opthdr), ntohs(sec->len));
+				}
+                        }
+                }
+
+		/* Update remaining and ptr. Also account for any padding */
+                if ((ntohs(sec->len) % 4) != 0) {
+                        tmp = ntohs(sec->len) + (4 - (ntohs(sec->len) % 4)) + sizeof(dag_sec_t);
+                } else {
+                        tmp = ntohs(sec->len) + sizeof(dag_sec_t);
+                }
+                remaining -= tmp;
+                ptr += tmp;
+	}
+
+	/* If the result num > 0 matches were found */
+        if (result->num > 0) {
+                return (void *)result;
+        } else {
+                free(result);
+                return NULL;
+        }
+}
+
 static void erf_help(void) {
 	printf("erf format module: $Revision: 1752 $\n");
 	printf("Supported input URIs:\n");
@@ -827,7 +1243,7 @@ static void erf_help(void) {
 	printf("\te.g.: erf:/tmp/trace\n");
 	printf("\n");
 
-	
+
 }
 
 static struct libtrace_format_t erfformat = {
@@ -836,7 +1252,7 @@ static struct libtrace_format_t erfformat = {
 	TRACE_FORMAT_ERF,
 	NULL,				/* probe filename */
 	erf_probe_magic,		/* probe magic */
-	erf_init_input,			/* init_input */	
+	erf_init_input,			/* init_input */
 	erf_config_input,		/* config_input */
 	erf_start_input,		/* start_input */
 	NULL,				/* pause_input */
@@ -849,6 +1265,7 @@ static struct libtrace_format_t erfformat = {
 	erf_prepare_packet,		/* prepare_packet */
 	NULL,				/* fin_packet */
 	erf_write_packet,		/* write_packet */
+	erf_flush_output,		/* flush_output */
 	erf_get_link_type,		/* get_link_type */
 	erf_get_direction,		/* get_direction */
 	erf_set_direction,		/* set_direction */
@@ -856,6 +1273,7 @@ static struct libtrace_format_t erfformat = {
 	NULL,				/* get_timeval */
 	NULL,				/* get_timespec */
 	NULL,				/* get_seconds */
+	erf_get_all_meta,           /* get_all_meta */
 	erf_seek_erf,			/* seek_erf */
 	NULL,				/* seek_timeval */
 	NULL,				/* seek_seconds */
@@ -880,7 +1298,7 @@ static struct libtrace_format_t rawerfformat = {
 	TRACE_FORMAT_RAWERF,
 	NULL,				/* probe filename */
 	NULL,		/* probe magic */
-	erf_init_input,			/* init_input */	
+	erf_init_input,			/* init_input */
 	erf_config_input,		/* config_input */
 	rawerf_start_input,		/* start_input */
 	NULL,				/* pause_input */
@@ -893,6 +1311,7 @@ static struct libtrace_format_t rawerfformat = {
 	erf_prepare_packet,		/* prepare_packet */
 	NULL,				/* fin_packet */
 	erf_write_packet,		/* write_packet */
+	erf_flush_output,		/* flush_output */
 	erf_get_link_type,		/* get_link_type */
 	erf_get_direction,		/* get_direction */
 	erf_set_direction,		/* set_direction */
@@ -900,6 +1319,7 @@ static struct libtrace_format_t rawerfformat = {
 	NULL,				/* get_timeval */
 	NULL,				/* get_timespec */
 	NULL,				/* get_seconds */
+	erf_get_all_meta,		/* get_all_meta */
 	erf_seek_erf,			/* seek_erf */
 	NULL,				/* seek_timeval */
 	NULL,				/* seek_seconds */

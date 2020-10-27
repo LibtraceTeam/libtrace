@@ -1,34 +1,26 @@
 /*
- * This file is part of libtrace
  *
- * Copyright (c) 2007-2015 The University of Waikato, Hamilton, 
- * New Zealand.
- *
- * Authors: Daniel Lawson 
- *          Perry Lorier
- *          Shane Alcock
- *          Richard Sanger 
- *          
+ * Copyright (c) 2007-2016 The University of Waikato, Hamilton, New Zealand.
  * All rights reserved.
  *
- * This code has been developed by the University of Waikato WAND 
+ * This file is part of libtrace.
+ *
+ * This code has been developed by the University of Waikato WAND
  * research group. For further information please see http://www.wand.net.nz/
  *
  * libtrace is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * libtrace is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with libtrace; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
- * $Id$
  *
  */
 
@@ -51,7 +43,6 @@
 #include <errno.h>
 #include <unistd.h>
 #include <string.h>
-#include <assert.h>
 
 #ifdef HAVE_INTTYPES_H
 #  include <inttypes.h>
@@ -61,9 +52,29 @@
 
 #include "format_linux_common.h"
 
+#define SLL_HEADER_LENGTH 6
 
 #ifdef HAVE_NETPACKET_PACKET_H
 
+static bool linuxnative_can_write(libtrace_packet_t *packet) {
+	/* Get the linktype */
+        libtrace_linktype_t ltype = trace_get_link_type(packet);
+
+        if (ltype == TRACE_TYPE_NONDATA) {
+                return false;
+        }
+        if (ltype == TRACE_TYPE_CONTENT_INVALID) {
+                return false;
+        }
+        if (ltype == TRACE_TYPE_PCAPNG_META) {
+                return false;
+        }
+        if (ltype == TRACE_TYPE_ERF_META) {
+                return false;
+        }
+
+        return true;
+}
 
 static int linuxnative_start_input(libtrace_t *libtrace)
 {
@@ -222,8 +233,13 @@ inline static int linuxnative_read_stream(libtrace_t *libtrace,
 				trace_set_err(libtrace, errno, "select");
 				return -1;
 			} else {
-				if (libtrace_halt)
-					return READ_EOF;
+				if ((ret=is_halted(libtrace)) != -1)
+					return ret;
+                                /* If we dont have access to the queue we have to return
+                                 * and let libtrace check */
+                                if (!queue) {
+                                    return READ_MESSAGE;
+                                }
 			}
 		}
 		while (ret <= 0);
@@ -293,6 +309,7 @@ inline static int linuxnative_read_stream(libtrace_t *libtrace,
 		}
 	}
 
+
 	/* Buffer contains all of our packet (including our custom header) so
 	 * we just need to get prepare_packet to set all our packet pointers
 	 * appropriately */
@@ -301,6 +318,22 @@ inline static int linuxnative_read_stream(libtrace_t *libtrace,
 				packet->type, flags))
 		return -1;
 	
+	if (hdr->timestamptype == TS_TIMEVAL) {
+		packet->order = (((uint64_t)hdr->tv.tv_sec) << 32)
+        	            + ((((uint64_t)hdr->tv.tv_usec) << 32) /1000000);
+	} else if (hdr->timestamptype == TS_TIMESPEC) {
+		packet->order = (((uint64_t)hdr->ts.tv_sec) << 32)
+        	            + ((((uint64_t)hdr->ts.tv_nsec) << 32) /1000000000);
+	} else {
+		packet->order = 0;
+	}
+
+        if (packet->order <= stream->last_timestamp) {
+                packet->order = stream->last_timestamp + 1;
+        }
+
+        stream->last_timestamp = packet->order;
+
 	return hdr->wirelen+sizeof(*hdr);
 }
 
@@ -327,19 +360,21 @@ static int linuxnative_pread_packets(libtrace_t *libtrace,
 static int linuxnative_write_packet(libtrace_out_t *libtrace,
 		libtrace_packet_t *packet) 
 {
+	/* Check linuxnative can write this type of packet */
+	if (!linuxnative_can_write(packet)) {
+		return 0;
+	}
+
 	struct sockaddr_ll hdr;
 	int ret = 0;
-
-	if (trace_get_link_type(packet) == TRACE_TYPE_NONDATA)
-		return 0;
 
 	hdr.sll_family = AF_PACKET;
 	hdr.sll_protocol = 0;
 	hdr.sll_ifindex = if_nametoindex(libtrace->uridata);
 	hdr.sll_hatype = 0;
 	hdr.sll_pkttype = 0;
-	hdr.sll_halen = htons(6); /* FIXME */
-	memcpy(hdr.sll_addr,packet->payload,(size_t)ntohs(hdr.sll_halen));
+	hdr.sll_halen = htons(SLL_HEADER_LENGTH); /* FIXME */
+	memcpy(hdr.sll_addr,packet->payload,(size_t)SLL_HEADER_LENGTH);
 
 	/* This is pretty easy, just send the payload using sendto() (after
 	 * setting up the sll header properly, of course) */
@@ -441,14 +476,18 @@ static size_t linuxnative_set_capture_length(libtrace_packet_t *packet,
 		size_t size) {
 
 	struct libtrace_linuxnative_header *linux_hdr = NULL;
-	assert(packet);
+	if (!packet) {
+		fprintf(stderr, "NULL packet passed into linuxnative_set_capture_length()\n");
+		/* Return -1 on error? */
+		return ~0U;
+	}
 	if (size > trace_get_capture_length(packet)) {
 		/* We should avoid making a packet larger */
 		return trace_get_capture_length(packet);
 	}
 	
 	/* Reset the cached capture length */
-	packet->capture_length = -1;
+	packet->cached.capture_length = -1;
 
 	linux_hdr = (struct libtrace_linuxnative_header *)packet->header;
 	linux_hdr->caplen = size;
@@ -486,6 +525,7 @@ static struct libtrace_format_t linuxnative = {
 	linuxnative_prepare_packet,	/* prepare_packet */
 	NULL,				/* fin_packet */
 	linuxnative_write_packet,	/* write_packet */
+	NULL,				/* flush_output */
 	linuxnative_get_link_type,	/* get_link_type */
 	linuxnative_get_direction,	/* get_direction */
 	linuxnative_set_direction,	/* set_direction */
@@ -493,6 +533,7 @@ static struct libtrace_format_t linuxnative = {
 	linuxnative_get_timeval,	/* get_timeval */
 	linuxnative_get_timespec,	/* get_timespec */
 	NULL,				/* get_seconds */
+	NULL,                           /* get_meta_section */
 	NULL,				/* seek_erf */
 	NULL,				/* seek_timeval */
 	NULL,				/* seek_seconds */
@@ -546,6 +587,7 @@ static struct libtrace_format_t linuxnative = {
 	linuxnative_prepare_packet,	/* prepare_packet */
 	NULL,				/* fin_packet */
 	NULL,				/* write_packet */
+	NULL,				/* flush_output */
 	linuxnative_get_link_type,	/* get_link_type */
 	linuxnative_get_direction,	/* get_direction */
 	linuxnative_set_direction,	/* set_direction */
@@ -553,6 +595,7 @@ static struct libtrace_format_t linuxnative = {
 	linuxnative_get_timeval,	/* get_timeval */
 	linuxnative_get_timespec,	/* get_timespec */
 	NULL,				/* get_seconds */
+	NULL,                           /* get_meta_section */
 	NULL,				/* seek_erf */
 	NULL,				/* seek_timeval */
 	NULL,				/* seek_seconds */

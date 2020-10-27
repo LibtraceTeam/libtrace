@@ -1,3 +1,28 @@
+/*
+ *
+ * Copyright (c) 2007-2016 The University of Waikato, Hamilton, New Zealand.
+ * All rights reserved.
+ *
+ * This file is part of libtrace.
+ *
+ * This code has been developed by the University of Waikato WAND
+ * research group. For further information please see http://www.wand.net.nz/
+ *
+ * libtrace is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * libtrace is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *
+ */
 /**
  * A ring or circular buffer, very useful
  */
@@ -242,8 +267,11 @@ DLLEXPORT void libtrace_ringbuffer_write(libtrace_ringbuffer_t * rb, void* value
 DLLEXPORT size_t libtrace_ringbuffer_write_bulk(libtrace_ringbuffer_t * rb, void *values[], size_t nb_buffers, size_t min_nb_buffers) {
 	size_t nb_ready;
 	size_t i = 0;
-	
-	assert(min_nb_buffers <= nb_buffers);
+
+	if (min_nb_buffers > nb_buffers) {
+		fprintf(stderr, "min_nb_buffers must be greater than or equal to nb_buffers in libtrace_ringbuffer_write_bulk()\n");
+		return ~0U;
+	}
 	if (!min_nb_buffers && libtrace_ringbuffer_is_full(rb))
 		return 0;
 
@@ -320,8 +348,11 @@ DLLEXPORT void* libtrace_ringbuffer_read(libtrace_ringbuffer_t *rb) {
 DLLEXPORT size_t libtrace_ringbuffer_read_bulk(libtrace_ringbuffer_t *rb, void *values[], size_t nb_buffers, size_t min_nb_buffers) {
 	size_t nb_ready;
 	size_t i = 0;
-	
-	assert(min_nb_buffers <= nb_buffers);
+
+	if (min_nb_buffers > nb_buffers) {
+                fprintf(stderr, "min_nb_buffers must be greater than or equal to nb_buffers in libtrace_ringbuffer_write_bulk()\n");
+                return ~0U;
+        }
 
 	if (!min_nb_buffers && libtrace_ringbuffer_is_empty(rb))
 		return 0;

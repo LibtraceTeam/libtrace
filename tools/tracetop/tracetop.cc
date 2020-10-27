@@ -1,3 +1,30 @@
+/*
+ *
+ * Copyright (c) 2007-2016 The University of Waikato, Hamilton, New Zealand.
+ * All rights reserved.
+ *
+ * This file is part of libtrace.
+ *
+ * This code has been developed by the University of Waikato WAND
+ * research group. For further information please see http://www.wand.net.nz/
+ *
+ * libtrace is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * libtrace is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *
+ */
+
+
 /* Show the top 'n' flows from a libtrace source
  *
  */
@@ -233,6 +260,9 @@ static void per_packet(libtrace_packet_t *packet)
 	flowkey_t flowkey;
 	flows_t::iterator it;
 
+        if (IS_LIBTRACE_META_PACKET(packet))
+                return;
+
 	if (trace_get_source_address(packet,(struct sockaddr*)&flowkey.sip)==NULL)
 		flowkey.sip.ss_family = AF_UNSPEC;
 
@@ -377,12 +407,12 @@ static void do_report()
 		}
 		switch (display_as) {
 			case BYTES:
-				printw("%7"PRIu64"\t%7"PRIu64"\n",
+				printw("%7" PRIu64 "\t%7" PRIu64 "\n",
 						pq.top().bytes,
 						pq.top().packets);
 				break;
 			case BITS_PER_SEC:
-				printw("%14.03f\t%"PRIu64"\n",
+				printw("%14.03f\t%" PRIu64 "\n",
 						8.0*pq.top().bytes/interval,
 						pq.top().packets);
 				break;
@@ -439,7 +469,6 @@ static void run_trace(libtrace_t *trace)
 					break;
 				if (trace_get_seconds(packet) - last_report >= interval) {
 					do_report();
-						
 					last_report=trace_get_seconds(packet);
 				}
 				if (trace_read_packet(trace,packet) <= 0) {

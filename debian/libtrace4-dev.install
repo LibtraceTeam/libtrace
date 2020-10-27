@@ -1,0 +1,5 @@
+usr/include/libtrace*.h
+usr/include/libtrace/*.h
+usr/lib/*/libtrace*.so
+usr/lib/*/libtrace*.a
+usr/share/man/man3/*

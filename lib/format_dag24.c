@@ -1,36 +1,28 @@
 /*
- * This file is part of libtrace
  *
- * Copyright (c) 2007-2015 The University of Waikato, Hamilton, 
- * New Zealand.
- *
- * Authors: Daniel Lawson 
- *          Perry Lorier
- *          Shane Alcock 
- *          
+ * Copyright (c) 2007-2016 The University of Waikato, Hamilton, New Zealand.
  * All rights reserved.
  *
- * This code has been developed by the University of Waikato WAND 
+ * This file is part of libtrace.
+ *
+ * This code has been developed by the University of Waikato WAND
  * research group. For further information please see http://www.wand.net.nz/
  *
  * libtrace is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * libtrace is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with libtrace; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
- * $Id$
  *
  */
-
 #define _GNU_SOURCE
 
 #include "config.h"
@@ -40,7 +32,6 @@
 #include "format_helper.h"
 #include "format_erf.h"
 
-#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -186,7 +177,7 @@ static int dag_init_input(libtrace_t *libtrace) {
 		free(dag_dev_name);
                 return -1;
         }
-	
+
 	dag_init_format_data(libtrace);
 	if (S_ISCHR(buf.st_mode)) {
                 /* DEVICE */
@@ -238,6 +229,8 @@ static int dag_config_input(libtrace_t *libtrace, trace_option_t option,
 		case TRACE_OPTION_EVENT_REALTIME:
 			/* Live capture is always going to be realtime */
 			return -1;
+                case TRACE_OPTION_CONSTANT_ERF_FRAMING:
+                        return -1;
         }
 	return -1;
 }
@@ -333,7 +326,11 @@ static dag_record_t *dag_get_record(libtrace_t *libtrace) {
 	if (!erfptr)
                 return NULL;
         size = ntohs(erfptr->rlen);
-        assert( size >= dag_record_size );
+	if (size < dag_record_size) {
+                fprintf(stderr, "DAG2.4 rlen is invalid (rlen = %u, must be at least %u)\n",
+			size, dag_record_size);
+                return NULL;
+        }
         FORMAT_DATA->offset += size;
         FORMAT_DATA->diff -= size;
         return erfptr;
@@ -487,9 +484,6 @@ static libtrace_eventobj_t trace_event_dag(libtrace_t *trace,
                 return event;
         } while (1);
 
-
-	/* We only want to sleep for a very short time */
-        assert(data == 0);
         event.type = TRACE_EVENT_SLEEP;
         event.seconds = 0.0001;
         event.size = 0;
@@ -536,6 +530,7 @@ static struct libtrace_format_t dag = {
         dag_prepare_packet,		/* prepare_packet */
 	NULL,                           /* fin_packet */
         NULL,                           /* write_packet */
+        NULL,                           /* flush_output */
         erf_get_link_type,              /* get_link_type */
         erf_get_direction,              /* get_direction */
         erf_set_direction,              /* set_direction */
@@ -546,6 +541,7 @@ static struct libtrace_format_t dag = {
         NULL,                           /* seek_erf */
         NULL,                           /* seek_timeval */
         NULL,                           /* seek_seconds */
+	NULL,                           /* get_meta_section */
         erf_get_capture_length,         /* get_capture_length */
         erf_get_wire_length,            /* get_wire_length */
         erf_get_framing_length,         /* get_framing_length */

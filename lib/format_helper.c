@@ -1,36 +1,28 @@
 /*
- * This file is part of libtrace
  *
- * Copyright (c) 2007-2015 The University of Waikato, Hamilton, 
- * New Zealand.
- *
- * Authors: Daniel Lawson 
- *          Perry Lorier
- *          Shane Alcock 
- *          
+ * Copyright (c) 2007-2016 The University of Waikato, Hamilton, New Zealand.
  * All rights reserved.
  *
- * This code has been developed by the University of Waikato WAND 
+ * This file is part of libtrace.
+ *
+ * This code has been developed by the University of Waikato WAND
  * research group. For further information please see http://www.wand.net.nz/
  *
  * libtrace is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * libtrace is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with libtrace; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
- * $Id$
  *
  */
-
 #include "config.h"
 #include <sys/types.h>
 #include <fcntl.h> /* for O_LARGEFILE */
@@ -51,7 +43,6 @@
 #include <sys/sysctl.h>
 #endif
 
-#include <assert.h>
 #include <stdarg.h>
 
 #ifdef WIN32
@@ -81,9 +72,17 @@ struct libtrace_eventobj_t trace_event_device(struct libtrace_t *trace,
 	int max_fd;
 	struct timeval tv;
 
-	assert(trace != NULL);
-	assert(packet != NULL);
-	
+	if (!trace) {
+		fprintf(stderr, "NULL trace passed into trace_event_device()\n");
+		event.type = TRACE_EVENT_TERMINATE;
+		return event;
+	}
+	if (!packet) {
+		trace_set_err(trace, TRACE_ERR_NULL_PACKET, "NULL packet passed into trace_event_device()");
+		event.type = TRACE_EVENT_TERMINATE;
+		return event;
+	}
+
 	FD_ZERO(&rfds);
 	FD_ZERO(&rfds_param);
 
@@ -139,6 +138,9 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 	struct libtrace_eventobj_t event = {0,0,0.0,0};
 	double ts;
 	double now;
+        double sincebeginnow = 0;
+        double sincebegintrace = 0;
+
 #ifdef WIN32
 	struct __timeb64 tstruct;
 #else
@@ -194,17 +196,16 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 #endif
 
 	
-	if (fabs(trace->event.tdelta)>1e-9) {
-		/* Subtract the tdelta from the walltime to get a suitable
+	if (fabs(trace->event.first_ts)>1e-9) {
+		/* Subtract the tdelta from the starting times to get a suitable
 		 * "relative" time */
-		now -= trace->event.tdelta; 
+                sincebeginnow = (now - trace->event.first_now);
+                sincebegintrace = (ts - trace->event.first_ts);
 
 		/* If the trace timestamp is still in the future, return a 
 		 * SLEEP event, otherwise return the packet */
-		if (ts > now) {
-			event.seconds = ts - 
-				trace->event.trace_last_ts;
-			trace->event.trace_last_ts = ts;
+                if (sincebeginnow <= sincebegintrace / (double)trace->replayspeedup) {
+			event.seconds = ((sincebegintrace / (double)trace->replayspeedup) - sincebeginnow);
 			event.type = TRACE_EVENT_SLEEP;
 			trace->event.waiting = true;
 			return event;
@@ -216,7 +217,8 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 		 * into a timeline that is relative to the timestamps in the
 		 * trace file.
 		 */
-		trace->event.tdelta = now - ts;
+                trace->event.first_now = (double)now;
+                trace->event.first_ts = (double)ts;
 	}
 
 	/* The packet that we had read earlier is now ready to be returned
@@ -229,9 +231,10 @@ struct libtrace_eventobj_t trace_event_trace(struct libtrace_t *trace, struct li
 	packet->buffer = trace->event.packet->buffer;
 	packet->buf_control = trace->event.packet->buf_control;
 
+        packet->which_trace_start = trace->event.packet->which_trace_start;
+
 	event.type = TRACE_EVENT_PACKET;
 
-	trace->event.trace_last_ts = ts;
 	trace->event.waiting = false;
 
 	return event;
@@ -300,7 +303,12 @@ void trace_set_err(libtrace_t *trace,int errcode,const char *msg,...)
 	char buf[256];
 	va_list va;
 	va_start(va,msg);
-	assert(errcode != 0 && "An error occurred, but it is unknown what it is");
+
+	if (errcode == 0) {
+		fprintf(stderr, "An error occurred, but it is unknown what it is");
+		return;
+	}
+
 	trace->err.err_num=errcode;
 	if (errcode>0) {
 		vsnprintf(buf,sizeof(buf),msg,va);
@@ -323,7 +331,10 @@ void trace_set_err_out(libtrace_out_t *trace,int errcode,const char *msg,...)
 	char buf[256];
 	va_list va;
 	va_start(va,msg);
-	assert(errcode != 0 && "An error occurred, but it is unknown what it is");
+	if (errcode == 0) {
+		fprintf(stderr, "An error occurred, but is is unknown what is is");
+		return;
+	}
 	trace->err.err_num=errcode;
 	if (errcode>0) {
 		vsnprintf(buf,sizeof(buf),msg,va);
@@ -359,3 +370,83 @@ uint32_t trace_get_number_of_cores(void) {
 		t = 4;
 	return t;
 }
+
+/** Attempts to determine the direction for a pcap (or pcapng) packet.
+ *
+ * @param packet        The packet in question.
+ * @return A valid libtrace_direction_t describing the direction that the
+ *         packet was travelling, if direction can be determined. Otherwise
+ *         returns TRACE_DIR_UNKNOWN.
+ * @internal
+ *
+ * Note that we can determine the direction for only certain types of packets
+ * if they are captured using pcap/pcapng, specifically SLL and PFLOG captures.
+ */
+libtrace_direction_t pcap_get_direction(const libtrace_packet_t *packet) {
+        libtrace_direction_t direction  = -1;
+        switch(pcap_linktype_to_libtrace(rt_to_pcap_linktype(packet->type))) {
+                /* We can only get the direction for PCAP packets that have
+                 * been encapsulated in Linux SLL or PFLOG */
+                case TRACE_TYPE_LINUX_SLL:
+                {
+                        libtrace_sll_header_t *sll;
+                        libtrace_linktype_t linktype;
+
+                        sll = (libtrace_sll_header_t*)trace_get_packet_buffer(
+                                        packet,
+                                        &linktype,
+                                        NULL);
+                        if (!sll) {
+                                trace_set_err(packet->trace,
+                                        TRACE_ERR_BAD_PACKET,
+                                                "Bad or missing packet");
+                                return -1;
+                        }
+                        /* 0 == LINUX_SLL_HOST */
+                        /* the Waikato Capture point defines "packets
+                         * originating locally" (ie, outbound), with a
+                         * direction of 0, and "packets destined locally"
+                         * (ie, inbound), with a direction of 1.
+                         * This is kind-of-opposite to LINUX_SLL.
+                         * We return consistent values here, however
+                         *
+                         * Note that in recent versions of pcap, you can
+                         * use "inbound" and "outbound" on ppp in linux
+                         */
+                        if (ntohs(sll->pkttype == 0)) {
+                                direction = TRACE_DIR_INCOMING;
+                        } else {
+                                direction = TRACE_DIR_OUTGOING;
+                        }
+                        break;
+
+                }
+               case TRACE_TYPE_PFLOG:
+                {
+                        libtrace_pflog_header_t *pflog;
+                        libtrace_linktype_t linktype;
+
+                        pflog=(libtrace_pflog_header_t*)trace_get_packet_buffer(
+                                        packet,&linktype,NULL);
+                        if (!pflog) {
+                                trace_set_err(packet->trace,
+                                                TRACE_ERR_BAD_PACKET,
+                                                "Bad or missing packet");
+                                return -1;
+                        }
+                        /* enum    { PF_IN=0, PF_OUT=1 }; */
+                        if (ntohs(pflog->dir==0)) {
+
+                                direction = TRACE_DIR_INCOMING;
+                        }
+                        else {
+                                direction = TRACE_DIR_OUTGOING;
+                        }
+                        break;
+                }
+                default:
+                        break;
+        }       
+        return direction;
+}
+

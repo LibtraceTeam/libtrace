@@ -1,3 +1,30 @@
+/*
+ *
+ * Copyright (c) 2007-2016 The University of Waikato, Hamilton, New Zealand.
+ * All rights reserved.
+ *
+ * This file is part of libtrace.
+ *
+ * This code has been developed by the University of Waikato WAND
+ * research group. For further information please see http://www.wand.net.nz/
+ *
+ * libtrace is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * libtrace is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *
+ */
+
+
 #include <libtrace.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -179,12 +206,14 @@ int main(int argc, char *argv[])
 		p=trace_create_packet();
 		input[i]=f;
 		packet[i]=p;
-		if (trace_read_packet(f,packet[i])>0)
+		if (trace_read_packet(f,packet[i])>0){
 			live[i]=true;
+		}
 	}
 
 	while(1) {
 		uint64_t oldest_ts=0;
+                uint64_t this_ts = 0;
 		int oldest=-1;
 		int curr_dir;
 		if (done)
@@ -206,12 +235,27 @@ int main(int argc, char *argv[])
 				else
 					live[i]=true;
 			}
-			if (live[i] && 
-				(oldest==-1 || 
-				 oldest_ts>trace_get_erf_timestamp(packet[i]))) {
-				oldest=i;
-				oldest_ts=trace_get_erf_timestamp(packet[i]);
-			}
+			if (live[i]) {
+                                this_ts = trace_get_erf_timestamp(packet[i]);
+
+				/* If the ts is 0 and its a meta packet just output it
+				 * and read new packets until we get one that has a ts */
+				while (this_ts == 0 && IS_LIBTRACE_META_PACKET(packet[i])) {
+					trace_write_packet(output,packet[i]);
+
+					/* read another packet, break if reached EOF */
+					if (trace_read_packet(input[i],packet[i])>0) {
+                                        	live[i] = true;
+                                	} else { break; }
+					this_ts = trace_get_erf_timestamp(packet[i]);
+				}
+
+				if (this_ts != 0 && (oldest==-1 ||
+				                oldest_ts>this_ts)) {
+        				oldest=i;
+	        			oldest_ts=this_ts;
+			        }
+                        }
 		}
 		/* We have run out of packets! */
 		if (oldest==-1) {

@@ -1,3 +1,30 @@
+/*
+ *
+ * Copyright (c) 2007-2016 The University of Waikato, Hamilton, New Zealand.
+ * All rights reserved.
+ *
+ * This file is part of libtrace.
+ *
+ * This code has been developed by the University of Waikato WAND
+ * research group. For further information please see http://www.wand.net.nz/
+ *
+ * libtrace is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * libtrace is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *
+ */
+
+
 #include <inttypes.h>
 #include <stdio.h>
 #include <stdbool.h>
@@ -18,9 +45,9 @@ static uint64_t capture_bytes = 0;
 void misc_per_packet(struct libtrace_packet_t *packet)
 {
 	double ts = trace_get_seconds(packet);
-	if (!has_starttime || starttime > ts)
+	if (ts != 0 && (!has_starttime || starttime > ts))
 		starttime = ts;
-	if (!has_endtime || endtime < ts)
+	if (ts != 0 && (!has_endtime || endtime < ts))
 		endtime = ts;
 	has_starttime = has_endtime = true;
 	++packets;
@@ -39,7 +66,7 @@ static char *ts_to_date(double ts)
 static char *duration(double ts)
 {
 	static char ret[1024];
-	char tmp[1024];
+	char tmp[128];
 	ret[0]='\0';
 	if (ts == 0) 
 		return "0 seconds";

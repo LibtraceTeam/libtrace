@@ -65,42 +65,11 @@
 	) \
 }
 
-static const char *uri_read;
+static const char *uri_read = "";
 static sig_atomic_t i = 0;
 static sig_atomic_t reading = 0;
-static libtrace_t *trace_read;
+static libtrace_t *trace_read = NULL;
 static int test_size = 100;
-
-static const char *lookup_uri_write(const char *type)
-{
-	if (!strcmp(type, "int"))
-		return "int:veth0";
-	if (!strcmp(type, "ring"))
-		return "ring:veth0";
-	if (!strcmp(type, "pcapint"))
-		return "pcapint:veth0";
-	if (!strncmp(type, "dpdk:", sizeof("dpdk:")))
-		return type;
-	return "unknown";
-}
-
-static const char *lookup_uri_read(const char *type)
-{
-	if (!strcmp(type, "int"))
-		return "int:veth1";
-	if (!strcmp(type, "ring"))
-		return "ring:veth1";
-	if (!strcmp(type, "pcapint")) {
-		// The newer Linux memmap (ring:) implementation of PCAP only makes
-		// space for about 30 maybe 31 packet buffers. If we exceeded this we'll
-		// drop packets.
-		test_size = 30; 
-		return "pcapint:veth1";
-	}
-	if (!strncmp(type, "dpdk:", sizeof("dpdk:")))
-		return type;
-	return "unknown";
-}
 
 
 /**
@@ -170,8 +139,9 @@ static int verify_counters(libtrace_t *trace_read)
 
         if (!stat->received_valid) {
 		printf("\tInfo: trace does not support received counter\n");
-        } else if (stat->received != 100) {
-		ERROR("Trace received %zu/100 packets\n", stat->received);
+        } else if (stat->received != (uint32_t) test_size) {
+		ERROR("Trace received %zu/%u packets\n", stat->received,
+				(uint32_t)test_size);
         }
 
         if (!stat->accepted_valid) {
@@ -318,8 +288,8 @@ int main(int argc, char *argv[])
 	int psize;
 	int err = 0;
 
-	if (argc < 3) {
-		fprintf(stderr, "usage: %s type(write) type(read)\n", argv[0]);
+	if (argc < 2) {
+		fprintf(stderr, "usage: %s type(write) [type(read)]\n", argv[0]);
 		return 1;
 	}
 
@@ -327,16 +297,27 @@ int main(int argc, char *argv[])
 	// Timeout after 5 seconds
 	alarm(5);
 
-	trace_write = trace_create_output(lookup_uri_write(argv[1]));
+	trace_write = trace_create_output(argv[1]);
 	iferr_out(trace_write);
-	uri_read = lookup_uri_read(argv[2]);
-	trace_read = trace_create(uri_read);
-	iferr(trace_read);
+	if (argc > 2) {
+		uri_read = argv[2];
+		trace_read = trace_create(uri_read);
+		iferr(trace_read);
+	}
+
+	if (strncmp(uri_read, "pcapint", 7) == 0) {
+		/* The newer Linux memmap (ring:) implementation of PCAP only makes
+		 * space for about 30 maybe 31 packet buffers. If we exceed this we'll
+		 * drop packets. */
+		test_size = 30;
+	}
 
 	trace_start_output(trace_write);
 	iferr_out(trace_write);
-	trace_start(trace_read);
-	iferr(trace_read);
+	if (argc > 2) {
+		trace_start(trace_read);
+		iferr(trace_read);
+	}
 
 	packet = trace_create_packet();
 
@@ -350,6 +331,11 @@ int main(int argc, char *argv[])
 	}
 	trace_destroy_packet(packet);
 	trace_destroy_output(trace_write);
+
+	if (argc <= 2) {
+		printf("Sent %d packets\n", test_size);
+		return 0;
+	}
 
 	// Now read back in, we assume that buffers internally can buffer
 	// the packets without losing them

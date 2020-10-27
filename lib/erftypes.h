@@ -1,36 +1,28 @@
 /*
- * This file is part of libtrace
  *
- * Copyright (c) 2007-2015 The University of Waikato, Hamilton, 
- * New Zealand.
- *
- * Authors: Daniel Lawson 
- *          Perry Lorier
- *          Shane Alcock 
- *          
+ * Copyright (c) 2007-2016 The University of Waikato, Hamilton, New Zealand.
  * All rights reserved.
  *
- * This code has been developed by the University of Waikato WAND 
+ * This file is part of libtrace.
+ *
+ * This code has been developed by the University of Waikato WAND
  * research group. For further information please see http://www.wand.net.nz/
  *
  * libtrace is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * libtrace is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with libtrace; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
- * $Id$
  *
  */
-
 #ifndef _ERFTYPES_H_
 #define _ERFTYPES_H_
 
@@ -169,10 +161,22 @@
 #define TYPE_RAW_LINK		24
 #endif
 
+/** Provenance Metadata Record */
+#ifndef ERF_TYPE_META
+#define ERF_TYPE_META   27
+#endif
+/* TODO: Endace has deprecated TYPE_* in favour of ERF_TYPE_*. New types do not have TYPE_* aliases. */
+#ifndef TYPE_META
+#define TYPE_META       ERF_TYPE_META
+#endif
+
 /** Padding record */
 #ifndef TYPE_PAD
 #define TYPE_PAD		48
 #endif
 
+#ifndef ERF_TYPE_MAX
+#define ERF_TYPE_MAX    TYPE_PAD
+#endif
 
 #endif /* _ERFTYPES_H_ */

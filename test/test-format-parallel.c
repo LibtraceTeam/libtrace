@@ -65,10 +65,14 @@ const char *lookup_uri(const char *type) {
 		return type;
 	if (!strcmp(type,"erf"))
 		return "erf:traces/100_packets.erf";
+	if (!strcmp(type,"erfprov"))
+		return "erf:traces/provenance.erf";
 	if (!strcmp(type,"rawerf"))
 		return "rawerf:traces/100_packets.erf";
 	if (!strcmp(type,"pcap"))
 		return "pcap:traces/100_packets.pcap";
+	if (!strcmp(type,"pcapng"))
+		return "pcap:traces/100_packets.pcapng";
 	if (!strcmp(type,"wtf"))
 		return "wtf:traces/wed.wtf";
 	if (!strcmp(type,"rtclient"))
@@ -271,13 +275,25 @@ static void resume_processing(libtrace_t *trace UNUSED,
         storage->seen_resuming_message = true;
 }
 
+static libtrace_t *trace = NULL;
+static void stop(int signal UNUSED)
+{
+        if (trace)
+                trace_pstop(trace);
+}
+
 int main(int argc, char *argv[]) {
 	int error = 0;
 	const char *tracename;
-	libtrace_t *trace;
         libtrace_callback_set_t *processing = NULL;
         libtrace_callback_set_t *reporter = NULL;
         uint32_t global = 0xabcdef;
+        struct sigaction sigact;
+
+        sigact.sa_handler = stop;
+        sigemptyset(&sigact.sa_mask);
+        sigact.sa_flags = SA_RESTART;
+        sigaction(SIGINT, &sigact, NULL);
 
 	if (argc<2) {
 		fprintf(stderr,"usage: %s type\n",argv[0]);

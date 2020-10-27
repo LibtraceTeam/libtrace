@@ -1,3 +1,30 @@
+/*
+ *
+ * Copyright (c) 2007-2016 The University of Waikato, Hamilton, New Zealand.
+ * All rights reserved.
+ *
+ * This file is part of libtrace.
+ *
+ * This code has been developed by the University of Waikato WAND
+ * research group. For further information please see http://www.wand.net.nz/
+ *
+ * libtrace is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * libtrace is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *
+ */
+
+
 #include <libtrace.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,6 +51,7 @@ uint64_t totbyteslast=0;
 uint64_t maxfiles = UINT64_MAX;
 uint64_t filescreated = 0;
 uint16_t snaplen = 0;
+int jumpopt=0;
 int verbose=0;
 int compress_level=-1;
 trace_option_compresstype_t compress_type = TRACE_OPTION_COMPRESSTYPE_NONE;
@@ -32,8 +60,9 @@ char *output_base = NULL;
 
 static char *strdupcat(char *str,char *app)
 {
-	str=realloc(str,strlen(str)+strlen(app)+1);
-	strncat(str,app,strlen(str) + strlen(app));
+        int newsize = strlen(str)+strlen(app)+1;
+	str=realloc(str,newsize);
+	strncat(str,app,newsize - strlen(str) - 1);
 	return str;
 }
 
@@ -55,6 +84,7 @@ static int usage(char *argv0)
 	"-s --starttime=time 	Start at time\n"
 	"-e --endtime=time	End at time\n"
 	"-m --maxfiles=n	Create a maximum of n trace files\n"
+        "-j --jump=n            Jump to the nth IP header\n"
 	"-H --libtrace-help	Print libtrace runtime documentation\n"
 	"-S --snaplen		Snap packets at the specified length\n"
 	"-v --verbose		Output statistics\n"
@@ -74,41 +104,124 @@ static void cleanup_signal(int sig)
 }
 
 
+static libtrace_packet_t *perform_jump(libtrace_packet_t *packet, int jump)
+{
+    uint16_t ethertype;
+    uint32_t remaining;
+    uint8_t ipproto;
+    void *offset = trace_get_layer3(packet, &ethertype, &remaining);
+    while(jump > 0 && offset) {
+        --jump;
+        switch (ethertype) {
+            case TRACE_ETHERTYPE_IP:
+                if (jump <= 0) {
+                    void *newpacket = trace_create_packet();
+                    trace_construct_packet(newpacket,
+                            TRACE_TYPE_NONE,
+                            offset,
+                            remaining);
+                    return newpacket;
+                }
+                offset = trace_get_payload_from_ip(offset,
+                        &ipproto,
+                        &remaining);
+                if (!offset)
+                    return NULL;
+                break;
+            case TRACE_ETHERTYPE_IPV6:
+                if (jump <= 0) {
+                    void *newpacket = trace_create_packet();
+                    trace_construct_packet(newpacket,
+                            TRACE_TYPE_NONE,
+                            offset,
+                            remaining);
+                    return newpacket;
+                }
+                offset = trace_get_payload_from_ip6(offset,
+                        &ipproto,
+                        &remaining);
+                if (!offset)
+                    return NULL;
+                break;
+            /* TODO: vlan, etc */
+            default:
+                return NULL;
+        }
+        if (!offset)
+            return false;
+        switch (ipproto) {
+            case TRACE_IPPROTO_IPV6:
+                ethertype = TRACE_ETHERTYPE_IPV6;
+                continue;
+            case TRACE_IPPROTO_IPIP:
+                ethertype = TRACE_ETHERTYPE_IP;
+                continue;
+            case TRACE_IPPROTO_GRE:
+                if (remaining < sizeof(libtrace_gre_t)) {
+                    return NULL;
+                }
+                ethertype = ((libtrace_gre_t *)offset)->ethertype;
+                offset = trace_get_payload_from_gre(offset, &remaining);
+                continue;
+            case TRACE_IPPROTO_UDP:
+                offset = trace_get_vxlan_from_udp(offset, &remaining);
+                if (!offset)
+                    return NULL;
+                offset = trace_get_payload_from_vxlan(offset, &remaining);
+                if (!offset)
+                    return NULL;
+                offset = trace_get_payload_from_layer2(offset,
+                        TRACE_TYPE_ETH,
+                        &ethertype,
+                        &remaining);
+                if (!offset)
+                    return NULL;
+                continue;
+        }
+        return NULL;
+    }
+    return NULL;
+}
+
+
 /* Return values:
  *  1 = continue reading packets
  *  0 = stop reading packets, cos we're done
  *  -1 = stop reading packets, we've got an error
  */
-static int per_packet(libtrace_packet_t *packet) {
+static int per_packet(libtrace_packet_t **packet) {
+        if (IS_LIBTRACE_META_PACKET((*packet))) {
+                return 1;
+        }
 
-	if (trace_get_link_type(packet) == -1) {
+	if (trace_get_link_type(*packet) == -1) {
 		fprintf(stderr, "Halted due to being unable to determine linktype - input trace may be corrupt.\n");
 		return -1;
 	}
 
 	if (snaplen>0) {
-		trace_set_capture_length(packet,snaplen);
+		trace_set_capture_length(*packet,snaplen);
 	}
 
-	if (trace_get_seconds(packet)<starttime) {
+	if (trace_get_seconds(*packet)<starttime) {
 		return 1;
 	}
 
-	if (trace_get_seconds(packet)>endtime) {
+	if (trace_get_seconds(*packet)>endtime) {
 		return 0;
 	}
 
 	if (firsttime==0) {
-		time_t now = trace_get_seconds(packet);
-		if (starttime != 0) {
+		time_t now = trace_get_seconds(*packet);
+		if (now != 0 && starttime != 0) {
 			firsttime=now-((now - starttime)%interval);
 		}
-		else {
+		else if (now != 0) {
 			firsttime=now;
 		}
 	}
 
-	if (output && trace_get_seconds(packet)>firsttime+interval) {
+	if (output && trace_get_seconds(*packet)>firsttime+interval) {
 		trace_destroy_output(output);
 		output=NULL;
 		firsttime+=interval;
@@ -120,7 +233,7 @@ static int per_packet(libtrace_packet_t *packet) {
 	}
 
 	pktcount++;
-	totbytes+=trace_get_capture_length(packet);
+	totbytes+=trace_get_capture_length(*packet);
 	if (output && totbytes-totbyteslast>=bytes) {
 		trace_destroy_output(output);
 		output=NULL;
@@ -181,11 +294,13 @@ static int per_packet(libtrace_packet_t *packet) {
 			}
 		}
 
-		if (trace_config_output(output,
-					TRACE_OPTION_OUTPUT_COMPRESSTYPE,
-					&compress_type) == -1) {
-			trace_perror_output(output, "Unable to set compression type");
-		}
+                if (compress_type != TRACE_OPTION_COMPRESSTYPE_NONE) {
+                        if (trace_config_output(output,
+                                                TRACE_OPTION_OUTPUT_COMPRESSTYPE,
+                                                &compress_type) == -1) {
+                                trace_perror_output(output, "Unable to set compression type");
+                        }
+                }
 
 		trace_start_output(output);
 		if (trace_is_err_output(output)) {
@@ -197,18 +312,38 @@ static int per_packet(libtrace_packet_t *packet) {
 		filescreated ++;
 	}
 
-	/* Some traces we have are padded (usually with 0x00), so 
+	/* Some traces we have are padded (usually with 0x00), so
 	 * lets sort that out now and truncate them properly
 	 */
 
-	if (trace_get_capture_length(packet) 
-			> trace_get_wire_length(packet)) {
-		trace_set_capture_length(packet,trace_get_wire_length(packet));
+	if (trace_get_capture_length(*packet)
+			> trace_get_wire_length(*packet)) {
+		trace_set_capture_length(*packet,
+                        trace_get_wire_length(*packet));
 	}
 
-	if (trace_write_packet(output,packet)==-1) {
+        /* Support "jump"ping to the nth IP header. */
+        if (jumpopt) {
+            /* Skip headers */
+            struct libtrace_packet_t *newpacket = perform_jump(*packet, jumpopt);
+            if (newpacket) {
+		/* If an IP header was found on the nth layer down
+		 * write out the packet  */
+	        if (trace_write_packet(output, newpacket)==-1) {
+                    trace_perror_output(output,"write_packet");
+                    return -1;
+        	}
+		/* Then destroy the packet */
+		trace_destroy_packet(newpacket);
+            }
+            else /* Skip packet - Payload ran out before getting to nth layer */
+                return 1;
+        } else {
+
+	    if (trace_write_packet(output, *packet)==-1) {
 		trace_perror_output(output,"write_packet");
 		return -1;
+	    }
 	}
 
 	return 1;
@@ -222,8 +357,8 @@ int main(int argc, char *argv[])
 	struct libtrace_t *input = NULL;
 	struct libtrace_packet_t *packet = trace_create_packet();
 	struct sigaction sigact;
-	int i;	
-	
+	int i;
+
 	if (argc<2) {
 		usage(argv[0]);
 		return 1;
@@ -239,6 +374,7 @@ int main(int argc, char *argv[])
 			{ "starttime",	   1, 0, 's' },
 			{ "endtime",	   1, 0, 'e' },
 			{ "interval",	   1, 0, 'i' },
+                        { "jump",          1, 0, 'j' },
 			{ "libtrace-help", 0, 0, 'H' },
 			{ "maxfiles", 	   1, 0, 'm' },
 			{ "snaplen",	   1, 0, 'S' },
@@ -248,7 +384,7 @@ int main(int argc, char *argv[])
 			{ NULL, 	   0, 0, 0   },
 		};
 
-		int c=getopt_long(argc, argv, "f:c:b:s:e:i:m:S:Hvz:Z:",
+		int c=getopt_long(argc, argv, "j:f:c:b:s:e:i:m:S:Hvz:Z:",
 				long_options, &option_index);
 
 		if (c==-1)
@@ -267,6 +403,8 @@ int main(int argc, char *argv[])
 				  break;
 			case 'i': interval=atoi(optarg);
 				  break;
+                        case 'j': jumpopt=atoi(optarg);
+                                  break;
 			case 'm': maxfiles=atoi(optarg);
 				  break;
 			case 'S': snaplen=atoi(optarg);
@@ -282,12 +420,12 @@ int main(int argc, char *argv[])
 				  compress_level=atoi(optarg);
 				  if (compress_level<0 || compress_level>9) {
 					usage(argv[0]);
-				  	exit(1);
+					exit(1);
 				  }
 				  break;
 			case 'Z':
 				  compress_type_str=optarg;
-				  break;	
+				  break;
 			default:
 				fprintf(stderr,"Unknown option: %c\n",c);
 				usage(argv[0]);
@@ -320,7 +458,7 @@ int main(int argc, char *argv[])
 	} else if (strncmp(compress_type_str, "no", 2) == 0) {
 		compress_type = TRACE_OPTION_COMPRESSTYPE_NONE;
 	} else {
-		fprintf(stderr, "Unknown compression type: %s\n", 
+		fprintf(stderr, "Unknown compression type: %s\n",
 			compress_type_str);
 		return 1;
 	}
@@ -347,15 +485,15 @@ int main(int argc, char *argv[])
 	for (i = optind; i < argc - 1; i++) {
 
 
-		input = trace_create(argv[i]);	
-		
+		input = trace_create(argv[i]);
+
 		if (trace_is_err(input)) {
 			trace_perror(input,"%s",argv[i]);
 			return 1;
 		}
 
 		if (filter && trace_config(input, TRACE_OPTION_FILTER, filter) == 1) {
-			trace_perror(input, "Configuring filter for %s", 
+			trace_perror(input, "Configuring filter for %s",
 					argv[i]);
 			return 1;
 		}
@@ -366,7 +504,7 @@ int main(int argc, char *argv[])
 		}
 
 		while (trace_read_packet(input,packet)>0) {
-			if (per_packet(packet) < 1)
+			if (per_packet(&packet) < 1)
 				done = 1;
 			if (done)
 				break;
@@ -376,6 +514,25 @@ int main(int argc, char *argv[])
 			trace_perror(input,"Reading packets");
 			trace_destroy(input);
 			break;
+		} else if (verbose) {
+			libtrace_stat_t *stat;
+
+			stat = trace_create_statistics();
+			trace_get_statistics(input, stat);
+
+			if (stat->received_valid)
+				fprintf(stderr,"%" PRIu64 " packets on input\n",
+						stat->received);
+			if (stat->filtered_valid)
+				fprintf(stderr,"%" PRIu64 " packets filtered\n",
+						stat->filtered);
+			if (stat->dropped_valid)
+				fprintf(stderr,"%" PRIu64 " packets dropped\n",
+						stat->dropped);
+			if (stat->accepted_valid)
+				fprintf(stderr,"%" PRIu64 " packets accepted\n",
+						stat->accepted);
+			free(stat);
 		}
 
 		trace_destroy(input);
@@ -385,26 +542,6 @@ int main(int argc, char *argv[])
 		
 	}
 
-	if (verbose) {
-                libtrace_stat_t *stat;
-                
-                stat = trace_create_statistics();
-                trace_get_statistics(input, stat);
-
-                if (stat->received_valid)
-			fprintf(stderr,"%" PRIu64 " packets on input\n",
-                                        stat->received);
-		if (stat->filtered_valid)
-			fprintf(stderr,"%" PRIu64 " packets filtered\n",
-                                        stat->filtered);
-		if (stat->dropped_valid)
-			fprintf(stderr,"%" PRIu64 " packets dropped\n",
-                                        stat->dropped);
-		if (stat->accepted_valid)
-			fprintf(stderr,"%" PRIu64 " packets accepted\n",
-                                        stat->accepted);
-	        free(stat);
-        }
 	
 	if (output)
 		trace_destroy_output(output);

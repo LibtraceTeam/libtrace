@@ -4,6 +4,7 @@ tracesplit \- split traces
 .SH SYNOPSIS
 .B tracesplit
 [ \fB-f \fRbpf | \fB--filter=\fRbpf]
+[ \fB-j \fRnumhdrs | \fB--jump=\fRnumhdrs]
 [ \fB-c \fRcount | \fB--count=\fRcount]
 [ \fB-b \fRbytes | \fB--bytes=\fRbytes]
 [ \fB-i \fRseconds | \fB--seconds=\fRseconds]
@@ -19,6 +20,13 @@ tracesplit splits the given input traces into multiple tracefiles
 .TP
 \fB\-f\fR bpf filter
 output only packets that match tcpdump style bpf filter
+
+.TP
+\fB\-j\fR numhdrs
+Strip headers before the numhdrs layer 3 header.  For example, \-j1 will strip
+off all the layer 2 headers, \-j2 will strip off all the l2 headers, the first
+l3 header, any transport headers, and return a trace that starts at the next
+l3 header.
 
 .TP
 \fB\-c\fR count
@@ -60,7 +68,7 @@ more processing power to compress.
 .TP
 \fB-Z\fR compression-method
 Compress the data using the specified compression algorithm. Accepted methods
-are "gzip", "bzip2", "lzo", "xz" or "none". Default value is none unless a 
+are "gz", "bz", "lzo", "xz" or "no". Default value is "no" unless a 
 compression level is specified, in which case gzip will be used.
 
 .SH EXAMPLES

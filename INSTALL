@@ -2,13 +2,15 @@ Requirements:
  * >=automake-1.9
  * >=libpcap-0.8
  * flex and bison
- * libwandio (get it from http://research.wand.net.nz/software/libwandio.php)
+ * libwandio 4.0.0 (http://research.wand.net.nz/software/libwandio.php)
 
 Optional:
  * DAG libraries (both 2.4 and 2.5 versions are supported)
  * libcrypto (required for CryptoPAN anonymisation in traceanon)
  * libncurses (required for tracetop)
- 
+ * libwandder (required for ETSI LI decoding --
+        https://github.com/wanduow/libwandder)
+
 ----------------------------------
 
 Installing libtrace:
@@ -40,6 +42,10 @@ A. You need to install the development version of the pcap library.
 For example, Ubuntu/Debian users will need to install the libpcap0.8-dev
 package in addition to the libpcap0.8 package.
 
+
+Q. What operating systems do you support?
+
+A. Linux, FreeBSD, Mac OS X and OpenBSD. Windows is not supported.
 
 ----------------------------------
 Using libtrace:

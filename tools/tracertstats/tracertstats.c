@@ -1,32 +1,29 @@
 /*
- * This file is part of libtrace
  *
- * Copyright (c) 2007-2015 The University of Waikato, Hamilton, New Zealand.
- * Authors: Daniel Lawson 
- *          Perry Lorier 
- *          
+ * Copyright (c) 2007-2016 The University of Waikato, Hamilton, New Zealand.
  * All rights reserved.
  *
- * This code has been developed by the University of Waikato WAND 
+ * This file is part of libtrace.
+ *
+ * This code has been developed by the University of Waikato WAND
  * research group. For further information please see http://www.wand.net.nz/
  *
  * libtrace is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * libtrace is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with libtrace; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
- * $Id$
  *
  */
+
 
 /* This program takes a series of traces and bpf filters and outputs how many
  * bytes/packets every time interval
@@ -49,8 +46,9 @@
 #include <sys/socket.h>
 #include <getopt.h>
 #include <inttypes.h>
-#include <lt_inttypes.h>
+#include <signal.h>
 
+#include <lt_inttypes.h>
 #include "libtrace_parallel.h"
 #include "output.h"
 #include "rt_protocol.h"
@@ -67,6 +65,7 @@ int merge_inputs = 0;
 int threadcount = 4;
 int filter_count=0;
 int burstsize=10;
+uint8_t report_drops = 0;
 
 struct filter_t {
 	char *expr;
@@ -80,18 +79,40 @@ double packet_interval=UINT32_MAX;
 
 struct output_data_t *output = NULL;
 
-uint64_t count;
-uint64_t bytes;
+uint64_t totalcount;
+uint64_t totalbytes;
 
-static void report_results(double ts,uint64_t count,uint64_t bytes)
+struct libtrace_t *currenttrace;
+
+static void cleanup_signal(int signal UNUSED) {
+        if (currenttrace) {
+                trace_pstop(currenttrace);
+        }
+}
+
+static void report_results(double ts,uint64_t count,uint64_t bytes,
+                libtrace_stat_t *stats)
 {
-	int i=0;
+	int i=0, offset = 3;
 	output_set_data_time(output,0,ts);
 	output_set_data_int(output,1,count);
 	output_set_data_int(output,2,bytes);
+        if (stats) {
+                if (stats->dropped_valid) {
+                        output_set_data_int(output, 3, stats->dropped);
+                } else {
+                        output_set_data_int(output, 3, -1);
+                }
+                if (stats->missing_valid) {
+                        output_set_data_int(output, 4, stats->missing);
+                } else {
+                        output_set_data_int(output, 4, -1);
+                }
+                offset += 2;
+        }
 	for(i=0;i<filter_count;++i) {
-		output_set_data_int(output,i*2+3,filters[i].count);
-		output_set_data_int(output,i*2+4,filters[i].bytes);
+		output_set_data_int(output,i*2+offset,filters[i].count);
+		output_set_data_int(output,i*2+offset+1,filters[i].bytes);
 		filters[i].count=filters[i].bytes=0;
 	}
 	output_flush_row(output);
@@ -108,6 +129,10 @@ static void create_output(char *title) {
 	output_add_column(output,"ts");
 	output_add_column(output,"packets");
 	output_add_column(output,"bytes");
+        if (report_drops) {
+                output_add_column(output, "dropped");
+                output_add_column(output, "missing");
+        }
 	for(i=0;i<filter_count;++i) {
 		char buff[1024];
 		snprintf(buff,sizeof(buff),"%s packets",filters[i].expr);
@@ -138,6 +163,7 @@ static void cb_result(libtrace_t *trace, libtrace_thread_t *sender UNUSED,
         static uint64_t packets_seen = 0;
 	int j;
 	result_t *res;
+        libtrace_stat_t *stats = NULL;
 
         if (stopped)
                 return;
@@ -146,22 +172,30 @@ static void cb_result(libtrace_t *trace, libtrace_thread_t *sender UNUSED,
         res = result->value.ptr;
         if (glob_last_ts == 0)
                 glob_last_ts = ts;
+        if (report_drops) {
+                stats = trace_create_statistics();
+                trace_get_statistics(trace, stats);
+        }
         while ((glob_last_ts >> 32) < (ts >> 32)) {
-                report_results(glob_last_ts >> 32, count, bytes);
-                count = 0;
-                bytes = 0;
+                report_results(glob_last_ts >> 32, totalcount, totalbytes,
+                                stats);
+                totalcount = 0;
+                totalbytes = 0;
                 for (j = 0; j < filter_count; j++)
                         filters[j].count = filters[j].bytes = 0;
                 glob_last_ts = ts;
         }
-        count += res->total.count;
+        totalcount += res->total.count;
         packets_seen += res->total.count;
-        bytes += res->total.bytes;
+        totalbytes += res->total.bytes;
         for (j = 0; j < filter_count; j++) {
                 filters[j].count += res->filters[j].count;
                 filters[j].bytes += res->filters[j].bytes;
         }
         free(res);
+        if (stats) {
+                free(stats);
+        }
 
         /* Be careful to only call pstop once from within this thread! */
         if (packets_seen > packet_count) {
@@ -190,6 +224,11 @@ static libtrace_packet_t *cb_packet(libtrace_t *trace, libtrace_thread_t *t,
         uint64_t key;
         thread_data_t *td = (thread_data_t *)tls;
         int i;
+        size_t wlen;
+
+        if (IS_LIBTRACE_META_PACKET(packet)) {
+                return packet;
+        }
 
         key = trace_get_erf_timestamp(packet);
         if ((key >> 32) >= (td->last_key >> 32) + packet_interval) {
@@ -201,15 +240,20 @@ static libtrace_packet_t *cb_packet(libtrace_t *trace, libtrace_thread_t *t,
                 td->results = calloc(1, sizeof(result_t) +
                                 sizeof(statistic_t) * filter_count);
         }
+        wlen = trace_get_wire_length(packet);
+        if (wlen == 0) {
+                /* Don't count ERF provenance and similar packets */
+                return packet;
+        }
         for(i=0;i<filter_count;++i) {
                 if(trace_apply_filter(filters[i].filter, packet)) {
                         td->results->filters[i].count++;
-                        td->results->filters[i].bytes+=trace_get_wire_length(packet);
+                        td->results->filters[i].bytes+=wlen;
                 }
         }
 
         td->results->total.count++;
-        td->results->total.bytes +=trace_get_wire_length(packet);
+        td->results->total.bytes += wlen;
         return packet;
 }
 
@@ -244,6 +288,7 @@ static void run_trace(char *uri)
 {
         libtrace_t *trace = NULL;
 	libtrace_callback_set_t *pktcbs, *repcbs;
+        libtrace_stat_t *stats = NULL;
 
         if (!merge_inputs) 
 		create_output(uri);
@@ -260,12 +305,13 @@ static void run_trace(char *uri)
 		return;
 	}
 	trace_set_combiner(trace, &combiner_ordered, (libtrace_generic_t){0});
-	trace_set_tracetime(trace, true);
         trace_set_perpkt_threads(trace, threadcount);
 	trace_set_burst_size(trace, burstsize);
 
 	if (trace_get_information(trace)->live) {
                 trace_set_tick_interval(trace, (int) (packet_interval * 1000));
+	} else {
+		trace_set_tracetime(trace, true);
 	}
 
         pktcbs = trace_create_callback_set();
@@ -278,6 +324,7 @@ static void run_trace(char *uri)
         repcbs = trace_create_callback_set();
         trace_set_result_cb(repcbs, cb_result);
 
+        currenttrace = trace;
 	if (trace_pstart(trace, NULL, pktcbs, repcbs)==-1) {
 		trace_perror(trace,"Failed to start trace");
 		trace_destroy(trace);
@@ -293,10 +340,17 @@ static void run_trace(char *uri)
 	trace_join(trace);
 	
 	// Flush the last one out
-	report_results((glob_last_ts >> 32), count, bytes);
+        if (report_drops) {
+                stats = trace_create_statistics();
+                stats = trace_get_statistics(trace, stats);
+        }
+	report_results((glob_last_ts >> 32), totalcount, totalbytes, stats);
 	if (trace_is_err(trace))
 		trace_perror(trace,"%s",uri);
 
+        if (stats) {
+                free(stats);
+        }
         trace_destroy(trace);
         trace_destroy_callback_set(pktcbs);
         trace_destroy_callback_set(repcbs);
@@ -319,6 +373,8 @@ static void usage(char *argv0)
 	"-m --merge-inputs	Do not create separate outputs for each input trace\n"
 	"-N --nobuffer		Disable packet buffering within libtrace to force faster\n"
 	"			updates at very low traffic rates\n"
+        "-d --report-drops      Include statistics about number of packets dropped or\n"
+        "                       lost by the capture process\n"
 	"-h --help	Print this usage statement\n"
 	,argv0);
 }
@@ -326,6 +382,7 @@ static void usage(char *argv0)
 int main(int argc, char *argv[]) {
 
 	int i;
+        struct sigaction sigact;
 	
 	while(1) {
 		int option_index;
@@ -338,16 +395,20 @@ int main(int argc, char *argv[]) {
 			{ "merge-inputs",	0, 0, 'm' },
 			{ "threads",	        1, 0, 't' },
 			{ "nobuffer",	        0, 0, 'N' },
+			{ "report-drops",	0, 0, 'd' },
 			{ NULL, 		0, 0, 0   },
 		};
 
-		int c=getopt_long(argc, argv, "c:f:i:o:t:hmN",
+		int c=getopt_long(argc, argv, "c:f:i:o:t:dhmN",
 				long_options, &option_index);
 
 		if (c==-1)
 			break;
 
 		switch (c) {
+                        case 'd':
+                                report_drops = 1;
+                                break;
 			case 'N':
 				burstsize = 1;
 				break;
@@ -411,7 +472,15 @@ int main(int argc, char *argv[]) {
 		if (output == NULL)
 			return 0;
 	}
-		
+	
+        sigact.sa_handler = cleanup_signal;
+        sigemptyset(&sigact.sa_mask);
+        sigact.sa_flags = SA_RESTART;
+
+        sigaction(SIGINT, &sigact, NULL);
+        sigaction(SIGTERM, &sigact, NULL);
+
+
 	for(i=optind;i<argc;++i) {
 		run_trace(argv[i]);
 	}

@@ -1,34 +1,26 @@
 /*
- * This file is part of libtrace
  *
- * Copyright (c) 2007-2015 The University of Waikato, Hamilton,
- * New Zealand.
- *
- * Authors: Daniel Lawson
- *          Perry Lorier
- *          Shane Alcock
- *          Richard Sanger
- *
+ * Copyright (c) 2007-2016 The University of Waikato, Hamilton, New Zealand.
  * All rights reserved.
+ *
+ * This file is part of libtrace.
  *
  * This code has been developed by the University of Waikato WAND
  * research group. For further information please see http://www.wand.net.nz/
  *
  * libtrace is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * libtrace is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with libtrace; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
- * $Id$
  *
  */
 
@@ -47,7 +39,6 @@
 #include <errno.h>
 #include <unistd.h>
 #include <string.h>
-#include <assert.h>
 
 #ifdef HAVE_INTTYPES_H
 #  include <inttypes.h>
@@ -56,6 +47,8 @@
 #endif
 
 #include "format_linux_common.h"
+
+unsigned int rand_seedp = 0;
 
 #ifdef HAVE_NETPACKET_PACKET_H
 
@@ -68,7 +61,7 @@ int linuxcommon_probe_filename(const char *filename)
 /* Compiles a libtrace BPF filter for use with a linux native socket */
 static int linuxnative_configure_bpf(libtrace_t *libtrace,
 		libtrace_filter_t *filter) {
-#ifdef HAVE_LIBPCAP
+#if defined(HAVE_LIBPCAP) && defined(HAVE_BPF)
 	struct ifreq ifr;
 	unsigned int arphrd;
 	libtrace_dlt_t dlt;
@@ -76,9 +69,12 @@ static int linuxnative_configure_bpf(libtrace_t *libtrace,
 	int sock;
 	pcap_t *pcap;
 
-	/* Take a copy of the filter object as it was passed in */
-	f = (libtrace_filter_t *) malloc(sizeof(libtrace_filter_t));
-	memcpy(f, filter, sizeof(libtrace_filter_t));
+	/* Take a copy of the filter structure to prevent against
+         * deletion causing the filter to no longer work */
+        f = (libtrace_filter_t *) malloc(sizeof(libtrace_filter_t));
+        memset(f, 0, sizeof(libtrace_filter_t));
+        memcpy(f, filter, sizeof(libtrace_filter_t));
+        f->filterstring = strdup(filter->filterstring);
 
 	/* If we are passed a filter with "flag" set to zero, then we must
 	 * compile the filterstring before continuing. This involves
@@ -92,7 +88,7 @@ static int linuxnative_configure_bpf(libtrace_t *libtrace,
 	if (f->flag == 0) {
 		sock = socket(PF_INET, SOCK_STREAM, 0);
 		memset(&ifr, 0, sizeof(struct ifreq));
-		strncpy(ifr.ifr_name, libtrace->uridata, IF_NAMESIZE);
+		strncpy(ifr.ifr_name, libtrace->uridata, IF_NAMESIZE - 1);
 		if (ioctl(sock, SIOCGIFHWADDR, &ifr) != 0) {
 			perror("Can't get HWADDR for interface");
 			return -1;
@@ -126,13 +122,13 @@ static int linuxnative_configure_bpf(libtrace_t *libtrace,
 	}
 
 	if (FORMAT_DATA->filter != NULL)
-		free(FORMAT_DATA->filter);
+                trace_destroy_filter(FORMAT_DATA->filter);
 
 	FORMAT_DATA->filter = f;
 
 	return 0;
 #else
-	return -1
+	return -1;
 #endif
 }
 
@@ -171,6 +167,17 @@ int linuxcommon_config_input(libtrace_t *libtrace,
 		case TRACE_OPTION_EVENT_REALTIME:
 			/* Live captures are always going to be in trace time */
 			break;
+                case TRACE_OPTION_REPLAY_SPEEDUP:
+                        break;
+                case TRACE_OPTION_CONSTANT_ERF_FRAMING:
+                        break;
+		case TRACE_OPTION_DISCARD_META:
+		case TRACE_OPTION_XDP_HARDWARE_OFFLOAD:
+		case TRACE_OPTION_XDP_SKB_MODE:
+		case TRACE_OPTION_XDP_DRV_MODE:
+		case TRACE_OPTION_XDP_ZERO_COPY_MODE:
+		case TRACE_OPTION_XDP_COPY_MODE:
+			break;
 		/* Avoid default: so that future options will cause a warning
 		 * here to remind us to implement it, or flag it as
 		 * unimplementable
@@ -182,17 +189,48 @@ int linuxcommon_config_input(libtrace_t *libtrace,
 	return -1;
 }
 
+int linuxcommon_config_output(libtrace_out_t *libtrace,
+                trace_option_output_t option,
+                void *data) {
+
+    switch(option) {
+                case TRACE_OPTION_OUTPUT_FILEFLAGS:
+                case TRACE_OPTION_OUTPUT_COMPRESS:
+                case TRACE_OPTION_OUTPUT_COMPRESSTYPE:
+                    break;
+                case TRACE_OPTION_TX_MAX_QUEUE:
+                        FORMAT_DATA_OUT->tx_max_queue = *(int *)data;
+                        return 0;
+
+                /* Avoid default: so that future options will cause a warning
+                 * here to remind us to implement it, or flag it as
+                 * unimplementable
+                 */
+        }
+
+        return -1;
+}
+
 int linuxcommon_init_input(libtrace_t *libtrace)
 {
 	struct linux_per_stream_t stream_data = ZERO_LINUX_STREAM;
 
 	libtrace->format_data = (struct linux_format_data_t *)
 		malloc(sizeof(struct linux_format_data_t));
-	assert(libtrace->format_data != NULL);
+
+	if (!libtrace->format_data) {
+		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory for "
+			"format data inside linuxcommon_init_input()");
+		return -1;
+	}
 
 	FORMAT_DATA->per_stream =
 		libtrace_list_init(sizeof(stream_data));
-	assert(FORMAT_DATA->per_stream != NULL);
+
+	if (!FORMAT_DATA->per_stream) {
+		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to create list for stream data linuxcommon_init_input()");
+		return -1;
+	}
 
 	libtrace_list_push_back(FORMAT_DATA->per_stream, &stream_data);
 
@@ -206,7 +244,7 @@ int linuxcommon_init_input(libtrace_t *libtrace)
 	FORMAT_DATA->fanout_flags = PACKET_FANOUT_LB;
 	/* Some examples use pid for the group however that would limit a single
 	 * application to use only int/ring format, instead using rand */
-	FORMAT_DATA->fanout_group = (uint16_t) rand();
+	FORMAT_DATA->fanout_group = (uint16_t) (rand_r(&rand_seedp) % 65536);
 	return 0;
 }
 
@@ -214,13 +252,24 @@ int linuxcommon_init_output(libtrace_out_t *libtrace)
 {
 	libtrace->format_data = (struct linux_format_data_out_t*)
 		malloc(sizeof(struct linux_format_data_out_t));
-	assert(libtrace->format_data != NULL);
+
+	if (!libtrace->format_data) {
+		trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory for "
+			"format data inside linuxcommon_init_output()");
+		return -1;
+	}
 
 	FORMAT_DATA_OUT->fd = -1;
 	FORMAT_DATA_OUT->tx_ring = NULL;
 	FORMAT_DATA_OUT->txring_offset = 0;
 	FORMAT_DATA_OUT->queue = 0;
 	FORMAT_DATA_OUT->max_order = MAX_ORDER;
+
+        /* The maximum frames allowed to be waiting in the TX_RING before the kernel is
+         * notified to write them out. Make sure this is less than CONF_RING_FRAMES.
+         * Performance doesn't seem to increase any more when setting this above 10.
+         */
+        FORMAT_DATA_OUT->tx_max_queue = 10;
 	return 0;
 }
 
@@ -235,13 +284,17 @@ void linuxcommon_close_input_stream(libtrace_t *libtrace,
 	if (stream->fd != -1)
 		close(stream->fd);
 	stream->fd = -1;
-	if (stream->rx_ring != MAP_FAILED)
-		munmap(stream->rx_ring,
-		       stream->req.tp_block_size *
-		       stream->req.tp_block_nr);
-	stream->rx_ring = MAP_FAILED;
-	stream->rxring_offset = 0;
 	FORMAT_DATA->dev_stats.if_name[0] = 0;
+
+        /* Don't munmap the rx_ring here -- keep it around as long as
+         * possible to ensure that any packets that the user is still
+         * holding references to remain valid.
+         *
+         * Don't worry, linuxring will munmap the rx_ring as soon as
+         * someone either destroys or restarts the trace. At that point,
+         * any remaining packets from the old ring will be recognisable
+         * as invalid.
+         */
 }
 
 #define REPEAT_16(x) x x x x x x x x x x x x x x x x
@@ -249,7 +302,7 @@ void linuxcommon_close_input_stream(libtrace_t *libtrace,
 #define str(s) #s
 
 /* These don't typically reset however an interface does exist to reset them */
-static int linuxcommon_get_dev_statisitics(libtrace_t *libtrace, struct linux_dev_stats *stats) {
+int linuxcommon_get_dev_statistics(char *ifname, struct linux_dev_stats *stats) {
 	FILE *file;
 	char line[1024];
 	struct linux_dev_stats tmp_stats;
@@ -260,12 +313,21 @@ static int linuxcommon_get_dev_statisitics(libtrace_t *libtrace, struct linux_de
 	}
 
 	/* Skip 2 header lines */
-	fgets(line, sizeof(line), file);
-	fgets(line, sizeof(line), file);
+	if (fgets(line, sizeof(line), file) == NULL) {
+                fclose(file);
+                return -1;
+        }
+
+	if (fgets(line, sizeof(line), file) == NULL) {
+                fclose(file);
+                return -1;
+        }
 
 	while (!(feof(file)||ferror(file))) {
 		int tot;
-		fgets(line, sizeof(line), file);
+		if (fgets(line, sizeof(line), file) == NULL)
+                        break;
+
 		tot = sscanf(line, " %"xstr(IF_NAMESIZE)"[^:]:" REPEAT_16(" %"SCNd64),
 		             tmp_stats.if_name,
 		             &tmp_stats.rx_bytes,
@@ -286,7 +348,7 @@ static int linuxcommon_get_dev_statisitics(libtrace_t *libtrace, struct linux_de
 		             &tmp_stats.tx_compressed);
 		if (tot != 17)
 			continue;
-		if (strncmp(tmp_stats.if_name, libtrace->uridata, IF_NAMESIZE) == 0) {
+		if (strncmp(tmp_stats.if_name, ifname, IF_NAMESIZE) == 0) {
 			*stats = tmp_stats;
 			fclose(file);
 			return 0;
@@ -294,6 +356,27 @@ static int linuxcommon_get_dev_statisitics(libtrace_t *libtrace, struct linux_de
 	}
 	fclose(file);
 	return -1;
+}
+
+int linuxcommon_set_promisc(const int sock, const unsigned int ifindex, bool enable) {
+
+    struct packet_mreq mreq;
+    int action;
+
+    memset(&mreq,0,sizeof(mreq));
+    mreq.mr_ifindex = ifindex;
+    mreq.mr_type = PACKET_MR_PROMISC;
+
+    if (enable)
+        action = PACKET_ADD_MEMBERSHIP;
+    else
+        action = PACKET_DROP_MEMBERSHIP;
+
+
+    if (setsockopt(sock, SOL_PACKET, action, &mreq, sizeof(mreq)) == -1)
+        return -1;
+
+    return 0;
 }
 
 /* Start an input stream
@@ -312,6 +395,8 @@ int linuxcommon_start_input_stream(libtrace_t *libtrace,
 	const int one = 1;
 	memset(&addr,0,sizeof(addr));
 	libtrace_filter_t *filter = FORMAT_DATA->filter;
+
+	stream->last_timestamp = 0;
 
 	/* Create a raw socket for reading packets on */
 	stream->fd = socket(PF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
@@ -357,20 +442,11 @@ int linuxcommon_start_input_stream(libtrace_t *libtrace,
 	}
 
 	/* Enable promiscuous mode, if requested */
-	if (FORMAT_DATA->promisc) {
-		struct packet_mreq mreq;
-		socklen_t socklen = sizeof(mreq);
-		memset(&mreq,0,sizeof(mreq));
-		mreq.mr_ifindex = addr.sll_ifindex;
-		mreq.mr_type = PACKET_MR_PROMISC;
-		if (setsockopt(stream->fd,
-			       SOL_PACKET,
-			       PACKET_ADD_MEMBERSHIP,
-			       &mreq,
-			       socklen)==-1) {
-			perror("setsockopt(PROMISC)");
-		}
+        if (FORMAT_DATA->promisc) {
+            if (linuxcommon_set_promisc(stream->fd, addr.sll_ifindex, 1) < 0)
+                perror("setsockopt(PROMISC)");
 	}
+
 
 	/* Set the timestamp option on the socket - aim for the most detailed
 	 * clock resolution possible */
@@ -400,6 +476,7 @@ int linuxcommon_start_input_stream(libtrace_t *libtrace,
 	 * that the filterstring has been compiled, or the filter was supplied
 	 * pre-compiled.
 	 */
+#ifdef HAVE_BPF
 	if (filter != NULL) {
 		/* Check if the filter was successfully compiled. If not,
 		 * it is probably a bad filter and we should return an error
@@ -420,6 +497,7 @@ int linuxcommon_start_input_stream(libtrace_t *libtrace,
 			perror("setsockopt(SO_ATTACH_FILTER)");
 		}
 	}
+#endif
 
 	/* Consume any buffered packets that were received before the socket
 	 * was properly setup, including those which missed the filter and
@@ -443,7 +521,7 @@ int linuxcommon_start_input_stream(libtrace_t *libtrace,
 	FORMAT_DATA->stats.tp_packets = -count;
 	FORMAT_DATA->stats.tp_drops = 0;
 
-	if (linuxcommon_get_dev_statisitics(libtrace, &FORMAT_DATA->dev_stats) != 0) {
+	if (linuxcommon_get_dev_statistics(libtrace->uridata, &FORMAT_DATA->dev_stats) != 0) {
 		/* Mark this as bad */
 		FORMAT_DATA->dev_stats.if_name[0] = 0;
 	}
@@ -469,7 +547,7 @@ int linuxcommon_fin_input(libtrace_t *libtrace)
 {
 	if (libtrace->format_data) {
 		if (FORMAT_DATA->filter != NULL)
-			free(FORMAT_DATA->filter);
+                	trace_destroy_filter(FORMAT_DATA->filter);
 
 		if (FORMAT_DATA->per_stream)
 			libtrace_list_deinit(FORMAT_DATA->per_stream);
@@ -485,11 +563,15 @@ int linuxcommon_pregister_thread(libtrace_t *libtrace,
                                  bool reading) {
 	if (reading) {
 		/* XXX TODO remove this oneday make sure hasher thread still works */
-		struct linux_per_stream_t *stream;
-		stream = libtrace_list_get_index(FORMAT_DATA->per_stream,
-		                                 t->perpkt_num)->data;
-		t->format_data = stream;
-		if (!stream) {
+		libtrace_list_node_t *item;
+		item = libtrace_list_get_index(FORMAT_DATA->per_stream,
+		                               t->perpkt_num);
+		if (item) {
+			t->format_data = item->data;
+		} else {
+			t->format_data = NULL;
+		}
+		if (!t->format_data) {
 			/* This should never happen and indicates an
 			 * internal libtrace bug */
 			trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
@@ -534,7 +616,7 @@ static void linuxcommon_update_socket_statistics(libtrace_t *libtrace) {
 #define DEV_DIFF(x) (dev_stats.x - FORMAT_DATA->dev_stats.x)
 /* Note these statistics come from two different sources, the socket itself and
  * the linux device. As such this means it is highly likely that their is some
- * margin of error in the returned statisitics, we perform basic sanitising so
+ * margin of error in the returned statistics, we perform basic sanitising so
  * that these are not too noticable.
  */
 void linuxcommon_get_statistics(libtrace_t *libtrace, libtrace_stat_t *stat) {
@@ -551,7 +633,7 @@ void linuxcommon_get_statistics(libtrace_t *libtrace, libtrace_stat_t *stat) {
 	dev_stats.if_name[0] = 0; /* This will be set if we retrive valid stats */
 	/* Do we have starting stats to compare to? */
 	if (FORMAT_DATA->dev_stats.if_name[0] != 0) {
-		linuxcommon_get_dev_statisitics(libtrace, &dev_stats);
+		linuxcommon_get_dev_statistics(libtrace->uridata, &dev_stats);
 	}
 	linuxcommon_update_socket_statistics(libtrace);
 

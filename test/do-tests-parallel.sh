@@ -13,12 +13,15 @@ $@"
 }
 
 libdir=../lib/.libs:../libpacketdump/.libs
-export LD_LIBRARY_PATH="$libdir"
+export LD_LIBRARY_PATH="$libdir:/usr/local/lib/"
 export DYLD_LIBRARY_PATH="${libdir}"
 
 rm -f traces/*.out.*
 echo \* Read erf
 do_test ./test-format-parallel erf
+
+echo \* Read erf provenance
+do_test ./test-format-parallel erfprov
 
 echo \* Read pcap
 do_test ./test-format-parallel pcap
@@ -43,6 +46,9 @@ do_test ./test-format-parallel tsh
 
 echo \* Read rawerf
 do_test ./test-format-parallel rawerf 
+
+echo \* Read pcapng
+do_test ./test-format-parallel pcapng
 
 echo \* Read testing hasher function
 do_test ./test-format-parallel-hasher erf

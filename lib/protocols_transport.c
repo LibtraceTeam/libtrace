@@ -1,42 +1,33 @@
 /*
- * This file is part of libtrace
  *
- * Copyright (c) 2007-2015 The University of Waikato, Hamilton, 
- * New Zealand.
- *
- * Authors: Daniel Lawson 
- *          Perry Lorier
- *          Shane Alcock 
- *          
+ * Copyright (c) 2007-2016 The University of Waikato, Hamilton, New Zealand.
  * All rights reserved.
  *
- * This code has been developed by the University of Waikato WAND 
+ * This file is part of libtrace.
+ *
+ * This code has been developed by the University of Waikato WAND
  * research group. For further information please see http://www.wand.net.nz/
  *
  * libtrace is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * libtrace is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with libtrace; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
- * $Id$
  *
  */
-
 
 #include "libtrace_int.h"
 #include "libtrace.h"
 #include "protocols.h"
 #include "checksum.h"
-#include <assert.h>
 #include <stdlib.h>
 #include <stdio.h> // fprintf
 #include <string.h>
@@ -69,14 +60,15 @@ DLLEXPORT size_t trace_get_payload_length(const libtrace_packet_t *packet) {
 	libtrace_ip6_t *ip6;
 	libtrace_tcp_t *tcp;
 	size_t len = 0;
+        uint8_t iplenzero = 0;
 
 	/* Just use the cached length if we can */
-	if (packet->payload_length != -1)
-		return packet->payload_length;	
+	if (packet->cached.payload_length != -1)
+		return packet->cached.payload_length;	
 
 	/* Set to zero so that we can return early without having to 
 	 * worry about forgetting to update the cached value */
-	((libtrace_packet_t *)packet)->payload_length = 0;
+	((libtrace_packet_t *)packet)->cached.payload_length = 0;
 	layer = trace_get_layer3(packet, &ethertype, &rem);
 	if (!layer)
 		return 0;
@@ -85,6 +77,10 @@ DLLEXPORT size_t trace_get_payload_length(const libtrace_packet_t *packet) {
 			ip = (libtrace_ip_t *)layer;
 			if (rem < sizeof(libtrace_ip_t))
 				return 0;
+                        if (ntohs(ip->ip_len) == 0) {
+                                iplenzero = 1;
+                                break;
+                        }
 			len = ntohs(ip->ip_len) - (4 * ip->ip_hl);
 		
 			/* Deal with v6 within v4 */
@@ -97,10 +93,32 @@ DLLEXPORT size_t trace_get_payload_length(const libtrace_packet_t *packet) {
 			if (rem < sizeof(libtrace_ip6_t))
 				return 0;
 			len = ntohs(ip6->plen);
+                        if (len == 0) {
+                                iplenzero = 1;
+                        }
 			break;
 		default:
 			return 0;
 	}
+
+        if (iplenzero) {
+                /* deal with cases where IP length is zero due to
+                 * hardware segmentation offload */
+                uint8_t *iplayer, *pktstart;
+                libtrace_linktype_t linktype;
+                uint32_t rem;
+
+                iplayer = (uint8_t *)layer;
+                pktstart = (uint8_t *)trace_get_packet_buffer(packet, &linktype, &rem);
+
+                len = rem - (iplayer - pktstart);
+                if (ethertype == TRACE_ETHERTYPE_IP) {
+			ip = (libtrace_ip_t *)layer;
+                        len -= (4 * ip->ip_hl);
+                } else {
+                        len -= sizeof(libtrace_ip6_t);
+                }
+        }
 
 	layer = trace_get_transport(packet, &proto, &rem);
 	if (!layer)
@@ -143,7 +161,7 @@ DLLEXPORT size_t trace_get_payload_length(const libtrace_packet_t *packet) {
 			return 0;
 	}
 
-	((libtrace_packet_t *)packet)->payload_length = len;
+	((libtrace_packet_t *)packet)->cached.payload_length = len;
 	return len;
 
 }
@@ -162,7 +180,7 @@ DLLEXPORT void *trace_get_transport(const libtrace_packet_t *packet,
 
 	if (!remaining) remaining=&dummy_remaining;
 
-	if (packet->l4_header) {
+	if (packet->cached.l4_header) {
 		/*
 		void *link;
 		libtrace_linktype_t linktype;
@@ -170,10 +188,9 @@ DLLEXPORT void *trace_get_transport(const libtrace_packet_t *packet,
 		if (!link)
 			return NULL;
 		*/
-		*proto = packet->transport_proto;
-		/* *remaining -= (packet->l4_header - link); */
-		*remaining = packet->l4_remaining;
-		return packet->l4_header;
+		*proto = packet->cached.transport_proto;
+		*remaining = packet->cached.l4_remaining;
+		return packet->cached.l4_header;
 	}
 
 	transport = trace_get_layer3(packet,&ethertype,remaining);
@@ -202,9 +219,9 @@ DLLEXPORT void *trace_get_transport(const libtrace_packet_t *packet,
 			
 	}
 
-	((libtrace_packet_t *)packet)->transport_proto = *proto;
-	((libtrace_packet_t *)packet)->l4_header = transport;
-	((libtrace_packet_t *)packet)->l4_remaining = *remaining;
+	((libtrace_packet_t *)packet)->cached.transport_proto = *proto;
+	((libtrace_packet_t *)packet)->cached.l4_header = transport;
+	((libtrace_packet_t *)packet)->cached.l4_remaining = *remaining;
 
 
 	return transport;
@@ -455,7 +472,7 @@ DLLEXPORT uint16_t *trace_checksum_transport(libtrace_packet_t *packet,
 	uint32_t remaining;
 	uint32_t sum = 0;
 	uint8_t proto = 0;
-	uint16_t *csum_ptr = NULL;
+	char *csum_ptr = NULL;
 	int plen = 0;
 
 	uint8_t safety[65536];
@@ -490,7 +507,7 @@ DLLEXPORT uint16_t *trace_checksum_transport(libtrace_packet_t *packet,
 		libtrace_tcp_t *tcp = (libtrace_tcp_t *)header;
 		header = trace_get_payload_from_tcp(tcp, &remaining);
 		
-		csum_ptr = &tcp->check;
+		csum_ptr = (char *)(&tcp->check);
 
 		memcpy(ptr, tcp, tcp->doff * 4);
 
@@ -505,7 +522,7 @@ DLLEXPORT uint16_t *trace_checksum_transport(libtrace_packet_t *packet,
 		libtrace_udp_t *udp = (libtrace_udp_t *)header;
 		header = trace_get_payload_from_udp(udp, &remaining);
 		
-		csum_ptr = &udp->check;
+		csum_ptr = (char *)(&udp->check);
 		memcpy(ptr, udp, sizeof(libtrace_udp_t));
 
 		udp = (libtrace_udp_t *)ptr;
@@ -521,7 +538,7 @@ DLLEXPORT uint16_t *trace_checksum_transport(libtrace_packet_t *packet,
 		libtrace_icmp_t *icmp = (libtrace_icmp_t *)header;
 		header = trace_get_payload_from_icmp(icmp, &remaining);
 		
-		csum_ptr = &icmp->checksum;
+		csum_ptr = (char *)(&icmp->checksum);
 		memcpy(ptr, icmp, sizeof(libtrace_icmp_t));
 
 		icmp = (libtrace_icmp_t *)ptr;
@@ -548,30 +565,42 @@ DLLEXPORT uint16_t *trace_checksum_transport(libtrace_packet_t *packet,
 
 	sum += add_checksum(header, (uint16_t)plen);
 	*csum = ntohs(finish_checksum(sum));
-	//assert(0);
-	
-	return csum_ptr;
+
+	return (uint16_t *)csum_ptr;
 }
 
 DLLEXPORT void *trace_get_payload_from_gre(libtrace_gre_t *gre,
         uint32_t *remaining)
 {
+    uint8_t flags = ntohs(gre->flags);
     uint32_t size = 4; /* GRE is 4 bytes long by default */
     if (remaining && *remaining < size) {
         *remaining = 0;
         return NULL;
     }
 
-    if ((ntohs(gre->flags) & LIBTRACE_GRE_FLAG_CHECKSUM) != 0) {
-        size += 4;  /* An extra 4 bytes. */
-    }
+    if((flags & LIBTRACE_GRE_FLAG_VERMASK) == LIBTRACE_GRE_PPTP_VERSION) {
+        size += 4;
 
-    if ((ntohs(gre->flags) & LIBTRACE_GRE_FLAG_KEY) != 0) {
-        size += 4;  /* An extra 4 bytes. */
-    }
+        if ((flags & LIBTRACE_GRE_FLAG_SEQ) != 0) {
+            size += 4;
+        }
+        if ((flags & LIBTRACE_GRE_FLAG_ACK) != 0) {
+            size += 4;
+        }
+    } else {
 
-    if ((ntohs(gre->flags) & LIBTRACE_GRE_FLAG_SEQ) != 0) {
-        size += 4;  /* An extra 4 bytes. */
+        if ((ntohs(gre->flags) & LIBTRACE_GRE_FLAG_CHECKSUM) != 0) {
+            size += 4;  /* An extra 4 bytes. */
+        }
+
+        if ((ntohs(gre->flags) & LIBTRACE_GRE_FLAG_KEY) != 0) {
+           size += 4;  /* An extra 4 bytes. */
+        }
+
+        if ((ntohs(gre->flags) & LIBTRACE_GRE_FLAG_SEQ) != 0) {
+            size += 4;  /* An extra 4 bytes. */
+        }
     }
 
     if (remaining) {

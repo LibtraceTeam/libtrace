@@ -13,7 +13,7 @@ $@"
 }
 
 libdir=../lib/.libs:../libpacketdump/.libs
-export LD_LIBRARY_PATH="$libdir"
+export LD_LIBRARY_PATH="$libdir:/usr/local/lib/"
 export DYLD_LIBRARY_PATH="${libdir}"
 echo SLL Decoder 
 do_test ./test-decode2 pcap:traces/100_sll.pcap
@@ -32,6 +32,9 @@ rm -f traces/*.out.*
 echo \* Read erf
 do_test ./test-format erf
 do_test ./test-decode erf
+
+echo \* Read erf provenance
+do_test ./test-format erfprov
 
 echo \* Read pcap
 do_test ./test-format pcap
@@ -65,12 +68,38 @@ echo \* Read rawerf
 do_test ./test-format rawerf 
 do_test ./test-decode rawerf
 
+echo \* Read pcapng
+do_test ./test-format pcapng
+do_test ./test-decode pcapng
+
 
 echo \* Testing pcap-bpf
 do_test ./test-pcap-bpf
 
 echo \* Testing payload length
 do_test ./test-plen
+
+echo \* Testing wire length
+echo \* ERF
+do_test ./test-wlen erf
+echo \* pcapfile
+do_test ./test-wlen pcapfile
+echo \* pcapfilens
+do_test ./test-wlen pcapfilens
+echo \* legacyatm
+do_test ./test-wlen legacyatm
+echo \* legacypos
+do_test ./test-wlen legacypos
+echo \* legacyeth
+do_test ./test-wlen legacyeth
+echo \* rawerf
+do_test ./test-wlen rawerf
+echo \* pcap
+do_test ./test-wlen pcap
+echo \* tsh
+do_test ./test-wlen tsh
+echo \* pcapng
+do_test ./test-wlen pcapng
 
 echo \* Testing port numbers
 do_test ./test-ports
@@ -100,6 +129,8 @@ echo \* rawerf
 do_test ./test-time rawerf
 echo \* tsh
 do_test ./test-time tsh
+echo \* pcapng
+do_test ./test-time pcapng
 
 echo \* Testing directions
 do_test ./test-dir
@@ -151,11 +182,34 @@ rm -f traces/*.out.*
 do_test ./test-convert erf erf
 
 echo " * erf -> pcap"
+rm -f traces/*.out.*
 do_test ./test-convert erf pcap
+
+echo " * erf -> pcapfile"
+rm -f traces/*.out.*
+do_test ./test-convert erf pcapfile
+
+echo " * erf -> pcapng"
+rm -f traces/*.out.*
+do_test ./test-convert erf pcapng
+
+
+echo " * pcap -> pcap"
+rm -f traces/*.out.*
+do_test ./test-convert pcap pcap
 
 echo " * pcap -> erf"
 rm -f traces/*.out.*
 do_test ./test-convert pcap erf
+
+echo " * pcap -> pcapfile"
+rm -f traces/*.out.*
+do_test ./test-convert pcap pcapfile
+
+echo " * pcap -> pcapng"
+rm -f traces/*.out.*
+do_test ./test-convert pcap pcapng
+
 
 echo " * pcapfile -> erf"
 rm -f traces/*.out.*
@@ -165,6 +219,15 @@ echo " * pcapfile -> pcapfile"
 rm -f traces/*.out.*
 do_test ./test-convert pcapfile pcapfile
 
+echo " * pcapfile -> pcap"
+rm -f traces/*.out.*
+do_test ./test-convert pcapfile pcap
+
+echo " * pcapfile -> pcapng"
+rm -f traces/*.out.*
+do_test ./test-convert pcapfile pcapng
+
+
 echo " * pcapfilens -> pcapfile"
 rm -f traces/*.out.*
 do_test ./test-convert pcapfilens pcapfile
@@ -173,13 +236,23 @@ echo " * pcapfilens -> erf"
 rm -f traces/*.out.*
 do_test ./test-convert pcapfilens erf
 
-echo " * pcap -> pcapfile"
-rm -f traces/*.out.*
-do_test ./test-convert pcap pcapfile
 
-echo " * erf -> pcapfile"
+echo " * pcapng -> pcapfile"
 rm -f traces/*.out.*
-do_test ./test-convert erf pcapfile
+do_test ./test-convert pcapng pcapfile
+
+echo " * pcapng -> erf"
+rm -f traces/*.out.*
+do_test ./test-convert pcapng erf
+
+echo " * pcapng -> pcap"
+rm -f traces/*.out.*
+do_test ./test-convert pcapng pcap
+
+echo " * pcapng -> pcapng"
+rm -f traces/*.out.*
+do_test ./test-convert pcapng pcapng
+
 
 echo " * pcap (sll) -> erf    raw IP"
 rm -f traces/*.out.*
@@ -208,9 +281,11 @@ echo " * legacypos -> pcapfile"
 rm -f traces/*.out.*
 do_test ./test-convert legacypos pcapfile
 
-echo " * duck -> duck"
-rm -f traces/*.out.*
-do_test ./test-convert duck duck
+# Don't bother with this anymore -- DUCK qualifies as 'meta' so
+# doesn't get written at the moment.
+#echo " * duck -> duck"
+#rm -f traces/*.out.*
+#do_test ./test-convert duck duck
 
 echo " * tsh -> pcapfile"
 rm -f traces/*.out.*
@@ -219,6 +294,29 @@ do_test ./test-convert tsh pcapfile
 echo " * tsh -> pcap"
 rm -f traces/*.out.*
 do_test ./test-convert tsh pcap
+
+echo \* Testing packet truncation
+echo " * pcap "
+rm -f traces/*.out.*
+do_test ./test-setcaplen pcap pcapfile
+
+echo " * pcapfile "
+rm -f traces/*.out.*
+do_test ./test-setcaplen pcapfile pcapfile
+
+echo " * erf "
+rm -f traces/*.out.*
+do_test ./test-setcaplen erf erf
+
+echo " * pcapng "
+rm -f traces/*.out.*
+do_test ./test-setcaplen pcapng pcapfile
+
+echo " * pcapfilens "
+rm -f traces/*.out.*
+do_test ./test-setcaplen pcapfilens pcapfile
+
+
 
 echo " * format autodetection - uncompressed"
 do_test ./test-autodetect traces/5_packets.erf
@@ -231,6 +329,18 @@ do_test ./test-autodetect traces/5_packets.erf.xz
 
 echo " * VXLan decode"
 do_test ./test-vxlan
+
+echo " * Outermost VLAN ID"
+do_test ./test-vlan
+
+echo " * Outermost MPLS label"
+do_test ./test-mpls
+
+echo " * Layer2 Headers"
+do_test ./test-layer2-headers
+
+echo " * Layer2 Headers QinQ"
+do_test ./test-qinq
 
 echo
 echo "Tests passed: $OK"

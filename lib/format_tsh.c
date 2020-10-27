@@ -1,36 +1,28 @@
 /*
- * This file is part of libtrace
  *
- * Copyright (c) 2007-2015 The University of Waikato, Hamilton, 
- * New Zealand.
- *
- * Authors: Daniel Lawson 
- *          Perry Lorier
- *          Shane Alcock 
- *          
+ * Copyright (c) 2007-2016 The University of Waikato, Hamilton, New Zealand.
  * All rights reserved.
  *
- * This code has been developed by the University of Waikato WAND 
+ * This file is part of libtrace.
+ *
+ * This code has been developed by the University of Waikato WAND
  * research group. For further information please see http://www.wand.net.nz/
  *
  * libtrace is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * libtrace is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with libtrace; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
- * $Id$
  *
  */
-
 
 #include "config.h"
 #include "common.h"
@@ -38,7 +30,6 @@
 #include "libtrace_int.h"
 #include "format_helper.h"
 
-#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -138,7 +129,7 @@ static int tsh_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	if ((numbytes=wandio_read(libtrace->io,
 					buffer2,
 					(size_t)sizeof(tsh_pkt_header_t))) == -1) {
-		trace_set_err(libtrace,errno,"read(%s)",
+		trace_set_err(libtrace,TRACE_ERR_WANDIO_FAILED,"read(%s)",
 				libtrace->uridata);
 		return -1;
 	}
@@ -148,7 +139,7 @@ static int tsh_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	}
 
         if (numbytes < (int)sizeof(tsh_pkt_header_t)) {
-                trace_set_err(libtrace, errno, "Incomplete TSH header");
+                trace_set_err(libtrace, TRACE_ERR_WANDIO_FAILED, "Incomplete TSH header");
                 return -1;
         }
 
@@ -159,7 +150,7 @@ static int tsh_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 				buffer2,
 				(size_t)sizeof(libtrace_ip_t)+16))  /* 16 bytes of transport header */
 			!= sizeof(libtrace_ip_t)+16) {
-		trace_set_err(libtrace,errno,"read(%s)",
+		trace_set_err(libtrace,TRACE_ERR_WANDIO_FAILED,"read(%s)",
 				libtrace->uridata);
 		return -1;
 	}
@@ -174,7 +165,7 @@ static int tsh_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	if ((numbytes=wandio_read(libtrace->io,
 				buffer2,
 				16)) != 16) {
-		trace_set_err(libtrace,errno,"read(%s)",
+		trace_set_err(libtrace,TRACE_ERR_WANDIO_FAILED,"read(%s)",
 				libtrace->uridata);
 		return -1;
 	}
@@ -252,6 +243,7 @@ static struct libtrace_format_t tshformat = {
 	tsh_prepare_packet,		/* prepare_packet */
 	NULL,				/* fin_packet */
 	NULL,				/* write_packet */
+	NULL,				/* flush_output */
 	tsh_get_link_type,		/* get_link_type */
 	tsh_get_direction,		/* get_direction */
 	NULL,				/* set_direction */
@@ -259,6 +251,7 @@ static struct libtrace_format_t tshformat = {
 	tsh_get_timeval,		/* get_timeval */
 	NULL,				/* get_timespec */
 	NULL,				/* get_seconds */
+	NULL,                           /* get_meta_section */
 	NULL,				/* seek_erf */
 	NULL,				/* seek_timeval */
 	NULL,				/* seek_seconds */
@@ -301,6 +294,7 @@ static struct libtrace_format_t frplusformat = {
 	tsh_prepare_packet,		/* prepare_packet */
 	NULL,				/* fin_packet */
 	NULL,				/* write_packet */
+	NULL,				/* flush_output */
 	tsh_get_link_type,		/* get_link_type */
 	tsh_get_direction,		/* get_direction */
 	NULL,				/* set_direction */
@@ -308,6 +302,7 @@ static struct libtrace_format_t frplusformat = {
 	tsh_get_timeval,		/* get_timeval */
 	NULL,				/* get_timespec */
 	NULL,				/* get_seconds */
+	NULL,                           /* get_meta_section */
 	NULL,				/* seek_erf */
 	NULL,				/* seek_timeval */
 	NULL,				/* seek_seconds */

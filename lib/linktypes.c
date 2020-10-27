@@ -1,47 +1,39 @@
 /*
- * This file is part of libtrace
  *
- * Copyright (c) 2007-2015 The University of Waikato, Hamilton, 
- * New Zealand.
- *
- * Authors: Daniel Lawson 
- *          Perry Lorier
- *          Shane Alcock 
- *          
+ * Copyright (c) 2007-2016 The University of Waikato, Hamilton, New Zealand.
  * All rights reserved.
  *
- * This code has been developed by the University of Waikato WAND 
+ * This file is part of libtrace.
+ *
+ * This code has been developed by the University of Waikato WAND
  * research group. For further information please see http://www.wand.net.nz/
  *
  * libtrace is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * libtrace is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with libtrace; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
- * $Id$
  *
  */
-
 #include "config.h"
 #include "libtrace.h"
 
 #include "rt_protocol.h"
-#include <assert.h>
+#include "format_ndag.h"
 #include "libtrace_int.h"
 #include <stdlib.h>
 #include <string.h>
 
-#include "libtrace_arphrd.h" 
-
+#include "libtrace_arphrd.h"
+#include "format_tzsplive.h"
 
 /* This file maps libtrace types to/from pcap DLT and erf types
  *
@@ -109,13 +101,21 @@ libtrace_dlt_t libtrace_to_pcap_dlt(libtrace_linktype_t type)
 		case TRACE_TYPE_DUCK:
 		/* Used for test traces within WAND */
 		case TRACE_TYPE_80211_PRISM: 	
+		/* Could use DLT_ERF, but would only really make sense with PCAP-NG */
+		case TRACE_TYPE_ERF_META:
 		/* Probably == PPP */
 		/* TODO: We haven't researched these yet */
 		case TRACE_TYPE_AAL5:
 		case TRACE_TYPE_METADATA:
 		case TRACE_TYPE_NONDATA:
+                case TRACE_TYPE_ETSILI:
 			break;
+		case TRACE_TYPE_PCAPNG_META:
+		case TRACE_TYPE_TZSP:
+		case TRACE_TYPE_CORSAROTAG:
 		case TRACE_TYPE_UNKNOWN:
+                case TRACE_TYPE_CONTENT_INVALID:
+                case TRACE_TYPE_XDP:
 			break;
 	}
 	return TRACE_DLT_ERROR;
@@ -146,19 +146,30 @@ libtrace_rt_types_t bpf_linktype_to_rt(libtrace_dlt_t linktype) {
 
 }
 
+libtrace_rt_types_t pcapng_linktype_to_rt(libtrace_dlt_t linktype) {
+
+        return TRACE_RT_DATA_PCAPNG + pcap_dlt_to_pcap_linktype(linktype);
+}
+
+libtrace_rt_types_t tzsp_linktype_to_rt(libtrace_dlt_t linktype) {
+	return TRACE_RT_DATA_TZSP + pcap_dlt_to_pcap_linktype(linktype);
+}
+
 libtrace_dlt_t rt_to_pcap_linktype(libtrace_rt_types_t rt_type)
 {
-	
+
 	if (rt_type >= TRACE_RT_DATA_DLT && rt_type < TRACE_RT_DATA_DLT_END) {
 		/* RT type is in the pcap range */
 		return rt_type - TRACE_RT_DATA_DLT;
-	} 
-	else if (rt_type >= TRACE_RT_DATA_BPF && rt_type < TRACE_RT_DATA_BPF_END) {
+	} else if (rt_type >= TRACE_RT_DATA_BPF && rt_type < TRACE_RT_DATA_BPF_END) {
+		/* RT type is in the bpf range */
 		return rt_type - TRACE_RT_DATA_BPF;
-	}
-	
+	} else if (rt_type >= TRACE_RT_DATA_PCAPNG && rt_type < TRACE_RT_DATA_PCAPNG_END) {
+		/* RT type is in the PCAPNG range */
+                return rt_type - TRACE_RT_DATA_PCAPNG;
+        }
+
 	fprintf(stderr, "Error: RT type %u cannot be converted to a pcap DLT\n", rt_type);
-	assert(rt_type >= TRACE_RT_DATA_DLT && rt_type < TRACE_RT_DATA_BPF_END);
 	return 0;	/* satisfy warnings */
 }
 
@@ -169,9 +180,12 @@ libtrace_linktype_t erf_type_to_libtrace(uint8_t erf)
 		case TYPE_ETH:		return TRACE_TYPE_ETH;
 		case TYPE_ATM:		return TRACE_TYPE_ATM;
 		case TYPE_AAL5:		return TRACE_TYPE_AAL5;
+		case TYPE_COLOR_ETH:return TRACE_TYPE_ETH;
 		case TYPE_DSM_COLOR_ETH:return TRACE_TYPE_ETH;
+		case TYPE_COLOR_HASH_ETH:return TRACE_TYPE_ETH;
 		case TYPE_IPV4:		return TRACE_TYPE_NONE;
 		case TYPE_IPV6:		return TRACE_TYPE_NONE;
+		case TYPE_META:		return TRACE_TYPE_ERF_META;
 	}
 	return ~0U;
 }
@@ -183,6 +197,7 @@ uint8_t libtrace_to_erf_type(libtrace_linktype_t linktype)
 		case TRACE_TYPE_ETH:	return TYPE_ETH;
 		case TRACE_TYPE_ATM:	return TYPE_ATM;
 		case TRACE_TYPE_AAL5:	return TYPE_AAL5;
+		case TRACE_TYPE_ERF_META: return TYPE_META;
 		
 		/* Not technically correct! Could be IPv6 packet 
 		 *
@@ -205,9 +220,48 @@ uint8_t libtrace_to_erf_type(libtrace_linktype_t linktype)
 		case TRACE_TYPE_METADATA:
 		case TRACE_TYPE_NONDATA:
 		case TRACE_TYPE_OPENBSD_LOOP:
+                case TRACE_TYPE_ETSILI:
+		case TRACE_TYPE_PCAPNG_META:
+		case TRACE_TYPE_TZSP:
+		case TRACE_TYPE_CORSAROTAG:
 		case TRACE_TYPE_UNKNOWN:
+		case TRACE_TYPE_CONTENT_INVALID:
+                case TRACE_TYPE_XDP:
 			break;
 	}
+	return 255;
+}
+
+uint8_t libtrace_to_tzsp_type(libtrace_linktype_t linktype) {
+	switch(linktype) {
+		case TRACE_TYPE_ETH: return TZSP_ENCAP_ETHERNET;
+		case TRACE_TYPE_PPP: return TZSP_ENCAP_PPP;
+		case TRACE_TYPE_NONE: return TZSP_ENCAP_RAW;
+		case TRACE_TYPE_80211: return TZSP_ENCAP_80211;
+		case TRACE_TYPE_80211_PRISM: return TZSP_ENCAP_80211_PRISM;
+		case TRACE_TYPE_UNKNOWN:
+		case TRACE_TYPE_HDLC_POS:
+		case TRACE_TYPE_ATM:
+		case TRACE_TYPE_LINUX_SLL:
+		case TRACE_TYPE_PFLOG:
+		case TRACE_TYPE_POS:
+		case TRACE_TYPE_AAL5:
+		case TRACE_TYPE_DUCK:
+		case TRACE_TYPE_80211_RADIO:
+		case TRACE_TYPE_LLCSNAP:
+		case TRACE_TYPE_METADATA:
+		case TRACE_TYPE_NONDATA:
+		case TRACE_TYPE_OPENBSD_LOOP:
+		case TRACE_TYPE_ERF_META:
+		case TRACE_TYPE_ETSILI:
+		case TRACE_TYPE_PCAPNG_META:
+		case TRACE_TYPE_CONTENT_INVALID:
+		case TRACE_TYPE_TZSP:
+		case TRACE_TYPE_CORSAROTAG:
+                case TRACE_TYPE_XDP:
+			break;
+	}
+	/* unknown */
 	return 255;
 }
 
@@ -218,7 +272,9 @@ libtrace_linktype_t arphrd_type_to_libtrace(unsigned int arphrd) {
 		case LIBTRACE_ARPHRD_IEEE80211: return TRACE_TYPE_80211;
 		case LIBTRACE_ARPHRD_IEEE80211_RADIOTAP: return TRACE_TYPE_80211_RADIO;
 		case LIBTRACE_ARPHRD_PPP: return TRACE_TYPE_NONE;
+		case LIBTRACE_ARPHRD_IPGRE: return TRACE_TYPE_NONE;
 		case LIBTRACE_ARPHRD_LOOPBACK: return TRACE_TYPE_ETH;
+		case LIBTRACE_ARPHRD_SIT: return TRACE_TYPE_ETH;
 		case LIBTRACE_ARPHRD_NONE: return TRACE_TYPE_NONE;
 	}
 	printf("Unknown ARPHRD %08x\n",arphrd);
@@ -309,6 +365,40 @@ void promote_packet(libtrace_packet_t *packet)
 	}
 }
 
+static void replacement_pcap_header(libtrace_packet_t *packet, char *payload,
+                int payloadlen, struct timeval *tv, int wirelen,
+                libtrace_dlt_t linktype) {
+
+	char *tmp;
+
+        tmp=(char*)malloc(
+                        trace_get_capture_length(packet)
+                        +sizeof(libtrace_pcapfile_pkt_hdr_t)
+                        );
+
+        ((libtrace_pcapfile_pkt_hdr_t*)tmp)->ts_sec=tv->tv_sec;
+        ((libtrace_pcapfile_pkt_hdr_t*)tmp)->ts_usec=tv->tv_usec;
+        ((libtrace_pcapfile_pkt_hdr_t*)tmp)->wirelen = wirelen;
+        ((libtrace_pcapfile_pkt_hdr_t*)tmp)->caplen = payloadlen;
+
+        memcpy(tmp+sizeof(libtrace_pcapfile_pkt_hdr_t),
+                        payload, (size_t)payloadlen);
+
+        if (packet->buf_control == TRACE_CTRL_EXTERNAL) {
+                packet->buf_control=TRACE_CTRL_PACKET;
+        }
+        else {
+                free(packet->buffer);
+        }
+        packet->buffer=tmp;
+        packet->header=tmp;
+        packet->payload=tmp+sizeof(libtrace_pcapfile_pkt_hdr_t);
+        packet->type=pcap_linktype_to_rt(linktype);
+
+        /* Invalidate caches */
+        trace_clear_cache(packet);
+}
+
 /* Try and remove any extraneous encapsulation that may have been added to
  * a packet. Effectively the opposite to promote_packet.
  *
@@ -320,51 +410,30 @@ bool demote_packet(libtrace_packet_t *packet)
 	uint16_t ha_type, next_proto;
 	libtrace_sll_header_t *sll = NULL;
 	uint32_t remaining = 0;
-	char *tmp;
 	struct timeval tv;
 	static libtrace_t *trace = NULL;
+        char *payload;
+
+        if (trace == NULL) {
+                trace = trace_create_dead("pcapfile:-");
+        }
+        trace->startcount = packet->trace->startcount;
+
 	switch(trace_get_link_type(packet)) {
 		case TRACE_TYPE_ATM:
 			remaining=trace_get_capture_length(packet);
-			packet->payload=trace_get_payload_from_atm(
+			payload=trace_get_payload_from_atm(
 				packet->payload,&type,&remaining);
-			if (!packet->payload)
+			if (payload == NULL)
 				return false;
-			tmp=(char*)malloc(
-				trace_get_capture_length(packet)
-				+sizeof(libtrace_pcapfile_pkt_hdr_t)
-				);
-
 			tv=trace_get_timeval(packet);
-			((libtrace_pcapfile_pkt_hdr_t*)tmp)->ts_sec=tv.tv_sec;
-			((libtrace_pcapfile_pkt_hdr_t*)tmp)->ts_usec=tv.tv_usec;
-			((libtrace_pcapfile_pkt_hdr_t*)tmp)->wirelen
-				= trace_get_wire_length(packet)-(trace_get_capture_length(packet)-remaining);
-			((libtrace_pcapfile_pkt_hdr_t*)tmp)->caplen
-				= remaining;
 
-			memcpy(tmp+sizeof(libtrace_pcapfile_pkt_hdr_t),
-					packet->payload,
-					(size_t)remaining);
-			if (packet->buf_control == TRACE_CTRL_EXTERNAL) {
-				packet->buf_control=TRACE_CTRL_PACKET;
-			}
-			else {
-				free(packet->buffer);
-			}
-			packet->buffer=tmp;
-			packet->header=tmp;
-			packet->payload=tmp+sizeof(libtrace_pcapfile_pkt_hdr_t);
-			packet->type=pcap_linktype_to_rt(TRACE_DLT_ATM_RFC1483);
-			
-			if (trace == NULL) {
-				trace = trace_create_dead("pcapfile:-");
-			}
+                        replacement_pcap_header(packet, payload, remaining,
+                                        &tv, trace_get_wire_length(packet) -
+                                        (trace_get_capture_length(packet) -
+                                        remaining), TRACE_DLT_ATM_RFC1483);
 
 			packet->trace=trace;
-
-			/* Invalidate caches */
-			trace_clear_cache(packet);
 			return true;
 
 		case TRACE_TYPE_LINUX_SLL:
@@ -399,6 +468,17 @@ bool demote_packet(libtrace_packet_t *packet)
 			/* Invalidate caches */
 			trace_clear_cache(packet);
 			break;
+                case TRACE_TYPE_CORSAROTAG:
+			remaining=trace_get_capture_length(packet);
+			payload=packet->payload + sizeof(corsaro_packet_tags_t);
+			tv=trace_get_timeval(packet);
+
+                        replacement_pcap_header(packet, payload, remaining,
+                                        &tv, trace_get_wire_length(packet),
+                                        TRACE_DLT_EN10MB);
+
+			packet->trace=trace;
+                        return true;
 		default:
 			return false;
 	}

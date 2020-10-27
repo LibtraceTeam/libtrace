@@ -67,6 +67,8 @@ const char *lookup_uri(const char *type) {
 		return "rawerf:traces/100_packets.erf";
 	if (!strcmp(type,"pcap"))
 		return "pcap:traces/100_packets.pcap";
+	if (!strcmp(type,"pcapng"))
+		return "pcap:traces/100_packets.pcapng";
 	if (!strcmp(type,"wtf"))
 		return "wtf:traces/wed.wtf";
 	if (!strcmp(type,"rtclient"))
