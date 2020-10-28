@@ -84,7 +84,7 @@ DLLEXPORT void decode(int link_type ,const char *pkt,unsigned len)
 	/* Decide how to continue processing... */
 	
 	/* Do we recognise the hardware address type? */
-	ret=trace_get_payload_from_meta(pkt, &linktype, &len);
+        ret=trace_get_payload_from_meta(pkt, &linktype, &len);
 	
 	if (ntohs(sll->hatype) == LIBTRACE_ARPHRD_ETHER || 
 				ntohs(sll->hatype) == LIBTRACE_ARPHRD_LOOPBACK) { 
@@ -93,9 +93,9 @@ DLLEXPORT void decode(int link_type ,const char *pkt,unsigned len)
 			decode_next(ret, len, "link", 
 				arphrd_type_to_libtrace(ntohs(sll->hatype)));
 		}
-		else
-			decode_next(pkt + sizeof(*sll), len - sizeof(*sll), 
-					"eth", ntohs(sll->protocol));
+		else if (ret) {
+			decode_next(ret, len, "eth", ntohs(sll->protocol));
+                }
 	}
 	else {
 		decode_next(ret, len, "link", 
