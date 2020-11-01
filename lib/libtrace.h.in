@@ -694,7 +694,7 @@ typedef struct libtrace_packet_t {
 	uint64_t hash;                  /**< A hash of the packet as supplied by the user */
 	int error;                      /**< The error status of pread_packet */
         uint64_t internalid;            /** Internal identifier for the pkt */
-        void *srcbucket;
+        void *srcbucket;                /** Source bucket in trace_rt or stream in XDP */
 
         pthread_mutex_t ref_lock;       /**< Lock for reference counter */
         int refcount;                   /**< Reference counter */

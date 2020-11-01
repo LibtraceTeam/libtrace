@@ -1,4 +1,6 @@
-#define _GNU_SOURCE
+#ifndef _GNU_SOURCE
+   #define _GNU_SOURCE
+#endif
 
 #include "config.h"
 #include "libtrace.h"
@@ -100,9 +102,6 @@ struct xsk_socket_info {
 struct xsk_per_stream {
     struct xsk_umem_info *umem;
     struct xsk_socket_info *xsk;
-
-    /* keep track of the number of previously processed packets */
-    unsigned int prev_rcvd;
 
     /* previous timestamp a packet was received for this stream */
     uint64_t prev_sys_time;
@@ -686,7 +685,7 @@ static int linux_xdp_init_output(libtrace_out_t *libtrace) {
 static int linux_xdp_pstart_input(libtrace_t *libtrace) {
 
     int i;
-    struct xsk_per_stream empty_stream = {NULL,NULL,0,0};
+    struct xsk_per_stream empty_stream = {NULL,NULL,0};
     struct xsk_per_stream *stream;
     int max_nic_queues;
     int ret;
@@ -746,7 +745,7 @@ static int linux_xdp_pstart_input(libtrace_t *libtrace) {
 
 static int linux_xdp_start_input(libtrace_t *libtrace) {
 
-    struct xsk_per_stream empty_stream = {NULL,NULL,0,0};
+    struct xsk_per_stream empty_stream = {NULL,NULL,0};
     struct xsk_per_stream *stream;
     int c_nic_queues;
     int ret;
@@ -816,7 +815,7 @@ static int linux_xdp_pause_input(libtrace_t * libtrace) {
 
 static int linux_xdp_start_output(libtrace_out_t *libtrace) {
 
-    struct xsk_per_stream empty_stream = {NULL,NULL,0,0};
+    struct xsk_per_stream empty_stream = {NULL,NULL,0};
     struct xsk_per_stream *stream;
     int ret;
 
@@ -865,6 +864,34 @@ static int linux_xdp_start_stream(struct xsk_config *cfg,
     return 0;
 }
 
+static void linux_xdp_fin_packet(libtrace_packet_t *packet) {
+    if (packet->buffer == NULL)
+        return;
+
+    if (!packet->trace) {
+        fprintf(stderr, "Linux xdp packet is not attached to a valid trace."
+                        "Unable to release it in linux_xdp_fin_packet\n");
+            return;
+    }
+
+    /* If we own the packet, we need to free it */
+    if (packet->buf_control == TRACE_CTRL_EXTERNAL && packet->srcbucket) {
+        struct xsk_per_stream *stream = (struct xsk_per_stream *) packet->srcbucket;
+        uint32_t idx;
+        packet->srcbucket = NULL;
+
+        /* TODO: Currently this is not thread safe */
+        /* Return the buffer to the fill queue */
+        if (xsk_ring_prod__reserve(&stream->umem->fq, 1, &idx) != 1) {
+            fprintf(stderr, "Linux XDP fin packet: no free queue space remaining\n");
+                return;
+            }
+            *xsk_ring_prod__fill_addr(&stream->umem->fq, idx) = xsk_umem__extract_addr(
+                (uint64_t)packet->buffer - (uint64_t)stream->xsk->umem->buffer + FRAME_HEADROOM);
+            xsk_ring_prod__submit(&stream->umem->fq, 1);
+    }
+}
+
 static int linux_xdp_read_stream(libtrace_t *libtrace,
                                  libtrace_packet_t *packet[],
                                  libtrace_message_queue_t *msg,
@@ -886,12 +913,6 @@ static int linux_xdp_read_stream(libtrace_t *libtrace,
         trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT, "Trace format data missing, "
             "call trace_create() before calling trace_read_packet()");
         return -1;
-    }
-
-    /* free previously used frames */
-    if (stream->prev_rcvd != 0) {
-        xsk_ring_prod__submit(&stream->umem->fq, stream->prev_rcvd);
-        xsk_ring_cons__release(&stream->xsk->rx, stream->prev_rcvd);
     }
 
     /* check nb_packets (request packets) is not larger than the max RX_BATCH_SIZE */
@@ -950,6 +971,7 @@ static int linux_xdp_read_stream(libtrace_t *libtrace,
         packet[i]->header = (uint8_t *)pkt_buffer - FRAME_HEADROOM;
         packet[i]->payload = pkt_buffer;
         packet[i]->trace = libtrace;
+        packet[i]->srcbucket = stream;
         packet[i]->error = 1;
 
         meta = (libtrace_xdp_meta_t *)packet[i]->buffer;
@@ -969,8 +991,10 @@ static int linux_xdp_read_stream(libtrace_t *libtrace,
         idx_rx++;
     }
 
-    /* set number of received packets on this batch */
-    stream->prev_rcvd = rcvd;
+    /* We have read the packet descriptors from the rx queue, free the slots.
+     * Note: We still have the packet buffer reference until it is released
+     * back to the fill queue. */
+    xsk_ring_cons__release(&stream->xsk->rx, rcvd);
 
     return rcvd;
 }
@@ -1125,12 +1149,6 @@ static libtrace_eventobj_t linux_xdp_event(libtrace_t *libtrace,
 
     stream = (struct xsk_per_stream *)node->data;
 
-    /* release any previously packets */
-    if (stream->prev_rcvd != 0) {
-        xsk_ring_prod__submit(&stream->umem->fq, 1);
-        xsk_ring_cons__release(&stream->xsk->rx, 1);
-    }
-
     /* is there a packet available? */
     rcvd = xsk_ring_cons__peek(&stream->xsk->rx, 1, &idx_rx);
     if (rcvd > 0) {
@@ -1151,6 +1169,7 @@ static libtrace_eventobj_t linux_xdp_event(libtrace_t *libtrace,
         packet->payload = pkt_buffer;
         packet->trace = libtrace;
         packet->error = 1;
+        packet->srcbucket = stream;
 
         meta = (libtrace_xdp_meta_t *)packet->buffer;
         sys_time = linux_xdp_get_time();
@@ -1168,7 +1187,10 @@ static libtrace_eventobj_t linux_xdp_event(libtrace_t *libtrace,
         event.type = TRACE_EVENT_PACKET;
         event.size = pkt_len;
 
-        stream->prev_rcvd = 1;
+        /* We have read the packet descriptors from the rx queue, free the slots.
+         * Note: We still have the packet buffer reference until it is released
+         * back to the fill queue. */
+        xsk_ring_cons__release(&stream->xsk->rx, 1);
 
     } else {
         /* We only want to sleep for a very short time - we are non-blocking */
@@ -1545,7 +1567,7 @@ static struct libtrace_format_t xdp = {
     linux_xdp_fin_output,           /* fin_output */
     linux_xdp_read_packet,          /* read_packet */
     linux_xdp_prepare_packet,       /* prepare_packet */
-    NULL,                           /* fin_packet */
+    linux_xdp_fin_packet,           /* fin_packet */
     linux_xdp_write_packet,         /* write_packet */
     NULL,                           /* flush_output */
     linux_xdp_get_link_type,        /* get_link_type */
