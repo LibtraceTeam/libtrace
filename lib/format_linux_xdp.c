@@ -277,13 +277,15 @@ static int linux_xdp_set_rss_key(char *ifname, enum hasher_types hasher) {
     rss->indir_size = 0;
     rss->key_size = rss_head.key_size;
     switch (hasher) {
+        case HASHER_BALANCE:
         case HASHER_UNIDIRECTIONAL:
             toeplitz_ncreate_unikey((uint8_t *)rss->rss_config + indir_bytes, rss_head.key_size);
             break;
         case HASHER_BIDIRECTIONAL:
             toeplitz_ncreate_bikey((uint8_t *)rss->rss_config + indir_bytes, rss_head.key_size);
             break;
-        default:
+        case HASHER_CUSTOM:
+            // should never hit this, just here to silence warnings
             free(rss);
             return 0;
     }
@@ -637,13 +639,9 @@ static int linux_xdp_setup_xdp(libtrace_t *libtrace) {
         }
     }
 
-    /* Set RSS hash on NIC if requested BIDIRECTIONAL or UNIDIRECTIONAL hasher */
-    if (XDP_FORMAT_DATA->hasher_type == HASHER_UNIDIRECTIONAL ||
-        XDP_FORMAT_DATA->hasher_type == HASHER_BIDIRECTIONAL) {
-
-        if (linux_xdp_set_rss_key(XDP_FORMAT_DATA->cfg.ifname, XDP_FORMAT_DATA->hasher_type) != 0) {
-            fprintf(stderr, "Unable to set RSS hash key on NIC");
-        }
+    // Set RSS hash key on NIC
+    if (linux_xdp_set_rss_key(XDP_FORMAT_DATA->cfg.ifname, XDP_FORMAT_DATA->hasher_type) != 0) {
+        fprintf(stderr, "Unable to set RSS hash key on NIC");
     }
 
     /* setup list to hold the streams */
