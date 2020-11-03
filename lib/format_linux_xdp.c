@@ -107,7 +107,7 @@ struct xsk_per_stream {
     uint64_t prev_sys_time;
 
     // ring buffer to hold addrs to be released back to the fill queue
-    libtrace_ringbuffer_t pkt_free_ring;
+    libtrace_ringbuffer_t addr_free_ring;
     pthread_t thread_id;
 };
 
@@ -865,8 +865,8 @@ static int linux_xdp_start_stream(struct xsk_config *cfg,
         return errno;
     }
 
-    // allocate packet free ringbuffer
-    libtrace_ringbuffer_init(&stream->pkt_free_ring, NUM_FRAMES, LIBTRACE_RINGBUFFER_BLOCKING);
+    // init addr free ring buffer
+    libtrace_ringbuffer_init(&stream->addr_free_ring, NUM_FRAMES, LIBTRACE_RINGBUFFER_BLOCKING);
 
     return 0;
 }
@@ -910,7 +910,7 @@ static void linux_xdp_fin_packet(libtrace_packet_t *packet) {
                 return;
             }
             *addr = xsk_umem__extract_addr((uint64_t)packet->buffer - (uint64_t)stream->xsk->umem->buffer + FRAME_HEADROOM);
-            libtrace_ringbuffer_swrite(&stream->pkt_free_ring, addr);
+            libtrace_ringbuffer_swrite(&stream->addr_free_ring, addr);
         }
     }
 }
@@ -951,7 +951,7 @@ static int linux_xdp_read_stream(libtrace_t *libtrace,
     while (rcvd < 1) {
 
         // check for any addrs to be released back to the fill queue
-        while (libtrace_ringbuffer_try_read(&stream->pkt_free_ring, (void **)&release_addr) == 1) {
+        while (libtrace_ringbuffer_try_read(&stream->addr_free_ring, (void **)&release_addr) == 1) {
             if (xsk_ring_prod__reserve(&stream->umem->fq, 1, &idx_rx) != 1) {
                 fprintf(stderr, "Linux XDP fin packet: no free queue space remaining\n");
             } else {
@@ -1243,6 +1243,7 @@ static int linux_xdp_destroy_streams(libtrace_list_t *streams) {
 
     size_t i;
     struct xsk_per_stream *stream;
+    uint64_t *addr;
 
     for (i = 0; i < libtrace_list_get_size(streams); i++) {
         stream = libtrace_list_get_index(streams, i)->data;
@@ -1255,6 +1256,12 @@ static int linux_xdp_destroy_streams(libtrace_list_t *streams) {
             xsk_umem__delete(stream->umem->umem);
             free(stream->umem);
         }
+
+        // flush anything inside the addr ring buffer
+        while (libtrace_ringbuffer_try_read(&stream->addr_free_ring, (void **)&addr) == 1) {
+            free(addr);
+        }
+        libtrace_ringbuffer_destroy(&stream->addr_free_ring);
     }
 
     return 0;
