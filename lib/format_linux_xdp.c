@@ -106,9 +106,8 @@ struct xsk_per_stream {
     /* previous timestamp a packet was received for this stream */
     uint64_t prev_sys_time;
 
-    // ring buffer to hold packets to free
+    // ring buffer to hold addrs to be released back to the fill queue
     libtrace_ringbuffer_t pkt_free_ring;
-
     pthread_t thread_id;
 };
 
@@ -889,9 +888,9 @@ static void linux_xdp_fin_packet(libtrace_packet_t *packet) {
         packet->srcbucket = NULL;
         uint32_t idx;
 
-        // The addr needs to be released by the thread that created allocated it. If this is the
-        // case release back the addr as normal, otherwise push the addr to the ringbuffer for the
-        // correct thread to release back to the fill queue.
+        // The addr needs to be released by the thread that allocated it. If this is the thread
+        // release back as normal, otherwise push the addr to the ringbuffer for the
+        // correct thread to release back to the fill queue on its next read.
         if (stream->thread_id == pthread_self()) {
 
             if (xsk_ring_prod__reserve(&stream->umem->fq, 1, &idx) != 1) {
@@ -951,6 +950,17 @@ static int linux_xdp_read_stream(libtrace_t *libtrace,
     /* try get nb_packets */
     while (rcvd < 1) {
 
+        // check for any addrs to be released back to the fill queue
+        while (libtrace_ringbuffer_try_read(&stream->pkt_free_ring, (void **)&release_addr) == 1) {
+            if (xsk_ring_prod__reserve(&stream->umem->fq, 1, &idx_rx) != 1) {
+                fprintf(stderr, "Linux XDP fin packet: no free queue space remaining\n");
+            } else {
+                *xsk_ring_prod__fill_addr(&stream->umem->fq, idx_rx) = *release_addr;
+                xsk_ring_prod__submit(&stream->umem->fq, 1);
+            }
+            free(release_addr);
+        }
+
         rcvd = xsk_ring_cons__peek(&stream->xsk->rx, nb_packets, &idx_rx);
 
         /* check if libtrace has halted */
@@ -958,19 +968,7 @@ static int linux_xdp_read_stream(libtrace_t *libtrace,
             return ret;
         }
 
-        /* was a packet received? if not poll for a short amount of time */
         if (rcvd < 1) {
-
-            // check for any addrs to be released back to the fill queue
-            while (libtrace_ringbuffer_try_read(&stream->pkt_free_ring, (void **)&release_addr) == 1) {
-                if (xsk_ring_prod__reserve(&stream->umem->fq, 1, &idx_rx) != 1) {
-                    fprintf(stderr, "Linux XDP fin packet: no free queue space remaining\n");
-                } else {
-                    *xsk_ring_prod__fill_addr(&stream->umem->fq, idx_rx) = *release_addr;
-                    xsk_ring_prod__submit(&stream->umem->fq, 1);
-                }
-                free(release_addr);
-            }
 
             /* poll will return 0 on timeout or a positive on a event */
             ret = poll(&fds, 1, 500);
