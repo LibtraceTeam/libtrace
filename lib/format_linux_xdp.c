@@ -105,6 +105,11 @@ struct xsk_per_stream {
 
     /* previous timestamp a packet was received for this stream */
     uint64_t prev_sys_time;
+
+    // ring buffer to hold packets to free
+    libtrace_ringbuffer_t pkt_free_ring;
+
+    pthread_t thread_id;
 };
 
 typedef struct xdp_format_data xdp_format_data_t;
@@ -685,7 +690,7 @@ static int linux_xdp_init_output(libtrace_out_t *libtrace) {
 static int linux_xdp_pstart_input(libtrace_t *libtrace) {
 
     int i;
-    struct xsk_per_stream empty_stream = {NULL,NULL,0};
+    struct xsk_per_stream empty_stream = {NULL,NULL,0,{0},0};
     struct xsk_per_stream *stream;
     int max_nic_queues;
     int ret;
@@ -745,7 +750,7 @@ static int linux_xdp_pstart_input(libtrace_t *libtrace) {
 
 static int linux_xdp_start_input(libtrace_t *libtrace) {
 
-    struct xsk_per_stream empty_stream = {NULL,NULL,0};
+    struct xsk_per_stream empty_stream = {NULL,NULL,0,{0},0};
     struct xsk_per_stream *stream;
     int c_nic_queues;
     int ret;
@@ -815,7 +820,7 @@ static int linux_xdp_pause_input(libtrace_t * libtrace) {
 
 static int linux_xdp_start_output(libtrace_out_t *libtrace) {
 
-    struct xsk_per_stream empty_stream = {NULL,NULL,0};
+    struct xsk_per_stream empty_stream = {NULL,NULL,0,{0},0};
     struct xsk_per_stream *stream;
     int ret;
 
@@ -861,6 +866,9 @@ static int linux_xdp_start_stream(struct xsk_config *cfg,
         return errno;
     }
 
+    // allocate packet free ringbuffer
+    libtrace_ringbuffer_init(&stream->pkt_free_ring, NUM_FRAMES, LIBTRACE_RINGBUFFER_BLOCKING);
+
     return 0;
 }
 
@@ -876,19 +884,35 @@ static void linux_xdp_fin_packet(libtrace_packet_t *packet) {
 
     /* If we own the packet, we need to free it */
     if (packet->buf_control == TRACE_CTRL_EXTERNAL && packet->srcbucket) {
-        struct xsk_per_stream *stream = (struct xsk_per_stream *) packet->srcbucket;
-        uint32_t idx;
-        packet->srcbucket = NULL;
 
-        /* TODO: Currently this is not thread safe */
-        /* Return the buffer to the fill queue */
-        if (xsk_ring_prod__reserve(&stream->umem->fq, 1, &idx) != 1) {
-            fprintf(stderr, "Linux XDP fin packet: no free queue space remaining\n");
+        struct xsk_per_stream *stream = (struct xsk_per_stream *) packet->srcbucket;
+        packet->srcbucket = NULL;
+        uint32_t idx;
+
+        // The addr needs to be released by the thread that created allocated it. If this is the
+        // case release back the addr as normal, otherwise push the addr to the ringbuffer for the
+        // correct thread to release back to the fill queue.
+        if (stream->thread_id == pthread_self()) {
+
+            if (xsk_ring_prod__reserve(&stream->umem->fq, 1, &idx) != 1) {
+                fprintf(stderr, "Linux XDP fin packet: no free queue space remaining\n");
                 return;
             }
             *xsk_ring_prod__fill_addr(&stream->umem->fq, idx) = xsk_umem__extract_addr(
                 (uint64_t)packet->buffer - (uint64_t)stream->xsk->umem->buffer + FRAME_HEADROOM);
             xsk_ring_prod__submit(&stream->umem->fq, 1);
+
+
+        } else {
+
+            uint64_t *addr = malloc(sizeof(uint64_t));
+            if (!addr) {
+                fprintf(stderr, "Linux XDP fin packet: out of memory\n");
+                return;
+            }
+            *addr = xsk_umem__extract_addr((uint64_t)packet->buffer - (uint64_t)stream->xsk->umem->buffer + FRAME_HEADROOM);
+            libtrace_ringbuffer_swrite(&stream->pkt_free_ring, addr);
+        }
     }
 }
 
@@ -908,6 +932,7 @@ static int linux_xdp_read_stream(libtrace_t *libtrace,
     struct pollfd fds;
     int ret;
     uint64_t sys_time;
+    uint64_t *release_addr;
 
     if (libtrace->format_data == NULL) {
         trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT, "Trace format data missing, "
@@ -925,6 +950,7 @@ static int linux_xdp_read_stream(libtrace_t *libtrace,
 
     /* try get nb_packets */
     while (rcvd < 1) {
+
         rcvd = xsk_ring_cons__peek(&stream->xsk->rx, nb_packets, &idx_rx);
 
         /* check if libtrace has halted */
@@ -934,6 +960,18 @@ static int linux_xdp_read_stream(libtrace_t *libtrace,
 
         /* was a packet received? if not poll for a short amount of time */
         if (rcvd < 1) {
+
+            // check for any addrs to be released back to the fill queue
+            while (libtrace_ringbuffer_try_read(&stream->pkt_free_ring, (void **)&release_addr) == 1) {
+                if (xsk_ring_prod__reserve(&stream->umem->fq, 1, &idx_rx) != 1) {
+                    fprintf(stderr, "Linux XDP fin packet: no free queue space remaining\n");
+                } else {
+                    *xsk_ring_prod__fill_addr(&stream->umem->fq, idx_rx) = *release_addr;
+                    xsk_ring_prod__submit(&stream->umem->fq, 1);
+                }
+                free(release_addr);
+            }
+
             /* poll will return 0 on timeout or a positive on a event */
             ret = poll(&fds, 1, 500);
 
@@ -1276,7 +1314,10 @@ static int linux_xdp_pregister_thread(libtrace_t *libtrace,
 
     if (reading) {
         if (t->type == THREAD_PERPKT) {
-            t->format_data = libtrace_list_get_index(XDP_FORMAT_DATA->per_stream, t->perpkt_num)->data;
+            struct xsk_per_stream *stream = libtrace_list_get_index(XDP_FORMAT_DATA->per_stream, t->perpkt_num)->data;
+            stream->thread_id = pthread_self();
+            t->format_data = stream;
+
             if (t->format_data == NULL) {
                 trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Too many threads registered");
                 return -1;
