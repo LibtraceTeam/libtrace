@@ -7,6 +7,7 @@
 #include "libtrace_int.h"
 #include "format_linux_xdp.h"
 #include "format_linux_common.h"
+#include "hash_toeplitz.h"
 
 #include <bpf/libbpf.h>
 #include <bpf/xsk.h>
@@ -132,8 +133,7 @@ static int linux_xdp_start_stream(struct xsk_config *cfg,
                                   int ifqueue,
                                   int dir);
 static void xsk_populate_fill_ring(struct xsk_umem_info *umem);
-static int linux_xdp_send_ioctl_ethtool(struct ethtool_channels *channels,
-                                        char *ifname);
+static int linux_xdp_send_ioctl_ethtool(void *data, char *ifname);
 static int linux_xdp_get_max_queues(char *ifname);
 static int linux_xdp_get_current_queues(char *ifname);
 static int linux_xdp_set_current_queues(char *ifname, int queues);
@@ -158,8 +158,7 @@ static bool linux_xdp_can_write(libtrace_packet_t *packet) {
     return true;
 }
 
-static int linux_xdp_send_ioctl_ethtool(struct ethtool_channels *channels,
-                                        char *ifname) {
+static int linux_xdp_send_ioctl_ethtool(void *data, char *ifname) {
 
     struct ifreq ifr = {};
     int fd, err, ret;
@@ -168,7 +167,7 @@ static int linux_xdp_send_ioctl_ethtool(struct ethtool_channels *channels,
     if (fd < 0)
         return -errno;
 
-    ifr.ifr_data = (void *)channels;
+    ifr.ifr_data = data;
     memcpy(ifr.ifr_name, ifname, IFNAMSIZ - 1);
     ifr.ifr_name[IFNAMSIZ - 1] = '\0';
     err = ioctl(fd, SIOCETHTOOL, &ifr);
@@ -245,6 +244,58 @@ static int linux_xdp_set_current_queues(char *ifname, int queues) {
 
     /* could not set the number of queues */
     return ret;
+}
+
+static int linux_xdp_set_rss_key(char *ifname, enum hasher_types hasher) {
+
+    int err;
+    int indir_bytes;
+
+    struct ethtool_rxfh rss_head = {0};
+    rss_head.cmd = ETHTOOL_GRSSH;
+    err = linux_xdp_send_ioctl_ethtool(&rss_head, ifname);
+    if (err != 0) {
+        //fprintf(stderr, "Cannot get rx hash configuration");
+        return -1;
+    }
+
+    // make sure key is a multiple of 2
+    if (rss_head.key_size % 2 != 0)
+        return -1;
+
+    indir_bytes = rss_head.indir_size * sizeof(rss_head.rss_config[0]);
+
+    struct ethtool_rxfh *rss;
+    rss = calloc(1, sizeof(*rss) + (rss_head.indir_size * sizeof(rss_head.rss_config[0])) + rss_head.key_size);
+    if (!rss) {
+        //fprintf(stderr, "Unable to allocate memory\n");
+        return -1;
+    }
+    rss->cmd = ETHTOOL_SRSSH;
+    rss->rss_context = 0;
+    //rss->hfunc = rss_head.hfunc;
+    rss->indir_size = 0;
+    rss->key_size = rss_head.key_size;
+    switch (hasher) {
+        case HASHER_UNIDIRECTIONAL:
+            toeplitz_ncreate_unikey((uint8_t *)rss->rss_config + indir_bytes, rss_head.key_size);
+            break;
+        case HASHER_BIDIRECTIONAL:
+            toeplitz_ncreate_bikey((uint8_t *)rss->rss_config + indir_bytes, rss_head.key_size);
+            break;
+        default:
+            free(rss);
+            return 0;
+    }
+    err = linux_xdp_send_ioctl_ethtool(rss, ifname);
+    if (err != 0) {
+        //fprintf(stderr, "Unable set set rss hash key\n");
+        free(rss);
+        return -1;
+    }
+    free(rss);
+
+    return 0;
 }
 
 static struct xsk_umem_info *configure_xsk_umem(void *buffer, uint64_t size,
@@ -417,21 +468,6 @@ static int linux_xdp_init_control_map(libtrace_t *libtrace) {
        return -1;
     }
 
-    switch (XDP_FORMAT_DATA->hasher_type) {
-        case HASHER_BALANCE:
-            ctrl_map.hasher = XDP_BALANCE;
-            break;
-        case HASHER_UNIDIRECTIONAL:
-            ctrl_map.hasher = XDP_UNIDIRECTIONAL;
-            break;
-        case HASHER_BIDIRECTIONAL:
-            ctrl_map.hasher = XDP_BIDIRECTIONAL;
-            break;
-        case HASHER_CUSTOM:
-        default:
-            ctrl_map.hasher = XDP_NONE;
-    }
-
     /* if the trace has a dedicated hasher there is only a single input queue */
     if (trace_has_dedicated_hasher(libtrace)) {
         ctrl_map.max_queues = 1;
@@ -598,6 +634,15 @@ static int linux_xdp_setup_xdp(libtrace_t *libtrace) {
             }
         } else {
             /* unable to locate control map. Is this a custom bpf program? */
+        }
+    }
+
+    /* Set RSS hash on NIC if requested BIDIRECTIONAL or UNIDIRECTIONAL hasher */
+    if (XDP_FORMAT_DATA->hasher_type == HASHER_UNIDIRECTIONAL ||
+        XDP_FORMAT_DATA->hasher_type == HASHER_BIDIRECTIONAL) {
+
+        if (linux_xdp_set_rss_key(XDP_FORMAT_DATA->cfg.ifname, XDP_FORMAT_DATA->hasher_type) != 0) {
+            fprintf(stderr, "Unable to set RSS hash key on NIC");
         }
     }
 
