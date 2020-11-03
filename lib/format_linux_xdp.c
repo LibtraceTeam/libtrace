@@ -259,8 +259,8 @@ static int linux_xdp_set_rss_key(char *ifname, enum hasher_types hasher) {
         return -1;
     }
 
-    // make sure key is a multiple of 2
-    if (rss_head.key_size % 2 != 0)
+    // make sure key is a multiple of 2 , RSS keys can be 40 or 52 bytes long.
+    if (rss_head.key_size % 2 != 0 || (rss_head.key_size != 40 && rss_head.key_size != 52))
         return -1;
 
     indir_bytes = rss_head.indir_size * sizeof(rss_head.rss_config[0]);
