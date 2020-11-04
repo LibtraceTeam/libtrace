@@ -300,6 +300,27 @@ static int linux_xdp_set_rss_key(char *ifname, enum hasher_types hasher) {
     return 0;
 }
 
+static int linux_xdp_get_flow_rule_count(char *ifname) {
+
+    int err;
+
+    struct ethtool_rxnfc nfccmd = {};
+    nfccmd.cmd = ETHTOOL_GRXCLSRLCNT;
+    nfccmd.data = 0;
+    err = linux_xdp_send_ioctl_ethtool(&nfccmd, ifname);
+    if (err != 0) {
+        //fprintf(stderr, "Linux XDP: unable to obtain number of flow director rules\n");
+        return -1;
+    }
+
+    if (nfccmd.rule_cnt != 0) {
+        fprintf(stderr, "Linux XDP warning: %d flow director rules detected\n", nfccmd.rule_cnt);
+    }
+
+    return 0;
+
+}
+
 static struct xsk_umem_info *configure_xsk_umem(void *buffer, uint64_t size,
     int interface_queue) {
 
@@ -643,6 +664,9 @@ static int linux_xdp_setup_xdp(libtrace_t *libtrace) {
     if (linux_xdp_set_rss_key(XDP_FORMAT_DATA->cfg.ifname, XDP_FORMAT_DATA->hasher_type) != 0) {
         fprintf(stderr, "Unable to set RSS hash key on NIC");
     }
+
+    // check for any flow director rules
+    linux_xdp_get_flow_rule_count(XDP_FORMAT_DATA->cfg.ifname);
 
     /* setup list to hold the streams */
     XDP_FORMAT_DATA->per_stream = libtrace_list_init(sizeof(struct xsk_per_stream));
