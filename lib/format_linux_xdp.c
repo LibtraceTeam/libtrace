@@ -655,12 +655,12 @@ static int linux_xdp_setup_xdp(libtrace_t *libtrace) {
 
     // Set RSS hash key on NIC
     if (linux_xdp_set_rss_key(XDP_FORMAT_DATA->cfg.ifname, XDP_FORMAT_DATA->hasher_type) != 0) {
-        fprintf(stderr, "Linux XDP warning: unable to set RSS hash key on NIC\n");
+        fprintf(stderr, "Linux XDP: couldn't configure RSS hashing!\n");
     }
 
     // check for any flow director rules
     if ((ret = linux_xdp_get_flow_rule_count(XDP_FORMAT_DATA->cfg.ifname)) > 0) {
-        fprintf(stderr, "Linux XDP warning: %d flow director rules detected\n", ret);
+        fprintf(stderr, "Linux XDP: %d flow director rules detected, RSS hashing may not work correctly!\n", ret);
     }
 
     /* setup list to hold the streams */
