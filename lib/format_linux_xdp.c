@@ -872,6 +872,13 @@ static int linux_xdp_start_stream(struct xsk_config *cfg,
 }
 
 static void linux_xdp_fin_packet(libtrace_packet_t *packet) {
+
+    struct xsk_per_stream *stream;
+    uint32_t idx;
+    uint64_t addr;
+    struct pollfd fds = {};
+    int ret;
+
     if (packet->buffer == NULL)
         return;
 
@@ -884,33 +891,37 @@ static void linux_xdp_fin_packet(libtrace_packet_t *packet) {
     /* If we own the packet, we need to free it */
     if (packet->buf_control == TRACE_CTRL_EXTERNAL && packet->srcbucket) {
 
-        struct xsk_per_stream *stream = (struct xsk_per_stream *) packet->srcbucket;
+        stream = (struct xsk_per_stream *) packet->srcbucket;
         packet->srcbucket = NULL;
-        uint32_t idx;
 
         // The addr needs to be released by the thread that allocated it. If this is the thread
         // release back as normal, otherwise push the addr to the ringbuffer for the
         // correct thread to release back to the fill queue on its next read.
         if (stream->thread_id == pthread_self()) {
 
-            if (xsk_ring_prod__reserve(&stream->umem->fq, 1, &idx) != 1) {
-                fprintf(stderr, "Linux XDP fin packet: no free queue space remaining\n");
-                return;
+            // make sure there is a free slot to put the addr in
+            ret = xsk_ring_prod__reserve(&stream->umem->fq, 1, &idx);
+            while (ret != 1) {
+                if (ret < 0) {
+                    trace_set_err(packet->trace, TRACE_ERR_BAD_IO, "Linux XDP fin packet: unable to reserve fill queue space");
+                    return;
+                }
+                if (xsk_ring_prod__needs_wakeup(&stream->umem->fq)) {
+                    fds.fd = xsk_socket__fd(stream->xsk->xsk);
+                    fds.events = POLLIN;
+                    poll(&fds, 1, 0);
+                }
+                ret = xsk_ring_prod__reserve(&stream->umem->fq, 1, &idx);
             }
+
             *xsk_ring_prod__fill_addr(&stream->umem->fq, idx) = xsk_umem__extract_addr(
                 (uint64_t)packet->buffer - (uint64_t)stream->xsk->umem->buffer + FRAME_HEADROOM);
             xsk_ring_prod__submit(&stream->umem->fq, 1);
 
-
         } else {
 
-            uint64_t *addr = malloc(sizeof(uint64_t));
-            if (!addr) {
-                fprintf(stderr, "Linux XDP fin packet: out of memory\n");
-                return;
-            }
-            *addr = xsk_umem__extract_addr((uint64_t)packet->buffer - (uint64_t)stream->xsk->umem->buffer + FRAME_HEADROOM);
-            libtrace_ringbuffer_swrite(&stream->addr_free_ring, addr);
+            addr = xsk_umem__extract_addr((uint64_t)packet->buffer - (uint64_t)stream->xsk->umem->buffer + FRAME_HEADROOM);
+            libtrace_ringbuffer_swrite(&stream->addr_free_ring, (void *)addr);
         }
     }
 }
@@ -931,7 +942,7 @@ static int linux_xdp_read_stream(libtrace_t *libtrace,
     struct pollfd fds;
     int ret;
     uint64_t sys_time;
-    uint64_t *release_addr;
+    uint64_t release_addr;
 
     if (libtrace->format_data == NULL) {
         trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT, "Trace format data missing, "
@@ -952,13 +963,21 @@ static int linux_xdp_read_stream(libtrace_t *libtrace,
 
         // check for any addrs to be released back to the fill queue
         while (libtrace_ringbuffer_try_read(&stream->addr_free_ring, (void **)&release_addr) == 1) {
-            if (xsk_ring_prod__reserve(&stream->umem->fq, 1, &idx_rx) != 1) {
-                fprintf(stderr, "Linux XDP fin packet: no free queue space remaining\n");
-            } else {
-                *xsk_ring_prod__fill_addr(&stream->umem->fq, idx_rx) = *release_addr;
-                xsk_ring_prod__submit(&stream->umem->fq, 1);
+            ret = xsk_ring_prod__reserve(&stream->umem->fq, 1, &idx_rx);
+            while (ret != 1) {
+                if (ret < 0) {
+                    trace_set_err(libtrace, TRACE_ERR_BAD_IO, "Linux XDP read stream: unable to "
+                                                              "reserve fill queue space");
+                    return -1;
+                }
+                if (xsk_ring_prod__needs_wakeup(&stream->umem->fq)) {
+                    poll(&fds, 1, 0);
+                }
+                ret = xsk_ring_prod__reserve(&stream->umem->fq, 1, &idx_rx);
             }
-            free(release_addr);
+
+            *xsk_ring_prod__fill_addr(&stream->umem->fq, idx_rx) = release_addr;
+            xsk_ring_prod__submit(&stream->umem->fq, 1);
         }
 
         rcvd = xsk_ring_cons__peek(&stream->xsk->rx, nb_packets, &idx_rx);
