@@ -1064,6 +1064,8 @@ static int linux_xdp_read_stream(libtrace_t *libtrace,
     }
 
     sys_time = linux_xdp_get_time();
+    if (stream->prev_sys_time >= sys_time)
+        sys_time = stream->prev_sys_time + 1;
 
     for (i = 0; i < rcvd; i++) {
 
@@ -1086,13 +1088,7 @@ static int linux_xdp_read_stream(libtrace_t *libtrace,
         packet[i]->error = 1;
 
         meta = (libtrace_xdp_meta_t *)packet[i]->buffer;
-
-        if (stream->prev_sys_time >= sys_time) {
-            sys_time = stream->prev_sys_time + 1;
-        }
-        stream->prev_sys_time = sys_time;
-        meta->timestamp = sys_time;
-
+        meta->timestamp = sys_time + i;
         /* we dont really snap packets but we can pretend to */
         meta->packet_len = pkt_len;
         meta->cap_len = LIBTRACE_MIN((unsigned int)XDP_FORMAT_DATA->snaplen,
@@ -1102,6 +1098,7 @@ static int linux_xdp_read_stream(libtrace_t *libtrace,
         idx_rx++;
     }
 
+    stream->prev_sys_time = sys_time + i;
     /* We have read the packet descriptors from the rx queue, free the slots.
      * Note: We still have the packet buffer reference until it is released
      * back to the fill queue. */
