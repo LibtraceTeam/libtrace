@@ -915,11 +915,13 @@ static int linux_xdp_start_stream(struct xsk_config *cfg,
         return errno;
     }
 
-    // insert socket into xsks map
-    sock_fd = xsk_socket__fd(stream->xsk->xsk);
-    ret = bpf_map_update_elem(cfg->xsks_map_fd, &ifqueue, &sock_fd , 0);
-    if (ret)
-        return -ret;
+    // insert socket into xsks map (only RX)
+    if (dir == 0) {
+        sock_fd = xsk_socket__fd(stream->xsk->xsk);
+        ret = bpf_map_update_elem(cfg->xsks_map_fd, &ifqueue, &sock_fd , 0);
+        if (ret)
+            return -ret;
+    }
 
     // init addr free ring buffer
     libtrace_ringbuffer_init(&stream->addr_free_ring, NUM_FRAMES, LIBTRACE_RINGBUFFER_BLOCKING);
