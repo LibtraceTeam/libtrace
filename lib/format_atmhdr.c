@@ -201,6 +201,7 @@ static struct libtrace_format_t atmhdr = {
         atmhdr_read_packet,             /* read_packet */
         atmhdr_prepare_packet,		/* prepare_packet */
 	NULL,                           /* fin_packet */
+        NULL,                           /* safe_packet */
         NULL,                           /* write_packet */
         NULL,                           /* flush_output */
         atmhdr_get_link_type,        	/* get_link_type */

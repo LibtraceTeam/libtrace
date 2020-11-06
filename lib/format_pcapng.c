@@ -2311,6 +2311,7 @@ static struct libtrace_format_t pcapng = {
         pcapng_read_packet,             /* read_packet */
         pcapng_prepare_packet,          /* prepare_packet */
         NULL,                           /* fin_packet */
+        NULL,                           /* safe_packet */
         pcapng_write_packet,            /* write_packet */
         pcapng_flush_output,            /* flush_output */
         pcapng_get_link_type,           /* get_link_type */

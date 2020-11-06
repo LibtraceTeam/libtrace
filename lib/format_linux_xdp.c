@@ -41,8 +41,6 @@
 #define FRAME_HEADROOM     sizeof(libtrace_xdp_meta_t)
 #define NUM_FRAMES         4096
 #define FRAME_SIZE         XSK_UMEM__DEFAULT_FRAME_SIZE
-#define RX_BATCH_SIZE      64
-#define INVALID_UMEM_FRAME UINT64_MAX
 #define XDP_BUSY_RETRY     5
 
 typedef struct libtrace_xdp_meta {
@@ -131,7 +129,7 @@ static int linux_xdp_start_stream(struct xsk_config *cfg,
                                   struct xsk_per_stream *stream,
                                   int ifqueue,
                                   int dir);
-static void xsk_populate_fill_ring(struct xsk_umem_info *umem);
+static int xsk_populate_fill_ring(struct xsk_umem_info *umem);
 static int linux_xdp_send_ioctl_ethtool(void *data, char *ifname);
 static int linux_xdp_get_max_queues(char *ifname);
 static int linux_xdp_get_current_queues(char *ifname);
@@ -311,6 +309,53 @@ static int linux_xdp_get_flow_rule_count(char *ifname) {
     return nfccmd.rule_cnt;
 }
 
+struct ethtool_ringparam *linux_xdp_get_nic_rings(struct ethtool_ringparam *ering, char *ifname) {
+    ering->cmd = ETHTOOL_GRINGPARAM;
+    if (linux_xdp_send_ioctl_ethtool(ering, ifname) != 0)
+        return NULL;
+    return ering;
+}
+
+static int linux_xdp_get_rx_rings(char *ifname) {
+    struct ethtool_ringparam ering = {};
+    if (linux_xdp_get_nic_rings(&ering, ifname) != NULL)
+        return ering.rx_pending;
+    return -1;
+}
+
+static int linux_xdp_get_tx_rings(char *ifname) {
+    struct ethtool_ringparam ering = {};
+    if (linux_xdp_get_nic_rings(&ering, ifname) != NULL)
+        return ering.tx_pending;
+    return -1;
+}
+
+static int linux_xdp_get_max_rx_rings(char *ifname) {
+    struct ethtool_ringparam ering = {};
+    if (linux_xdp_get_nic_rings(&ering, ifname) != NULL)
+        return ering.rx_max_pending;
+    return -1;
+}
+
+static int linux_xdp_get_max_tx_rings(char *ifname) {
+    struct ethtool_ringparam ering = {};
+    if (linux_xdp_get_nic_rings(&ering, ifname) != NULL)
+        return ering.tx_max_pending;
+    return -1;
+}
+
+static int linux_xdp_set_rx_tx_rings(int tx, int rx, char *ifname) {
+    struct ethtool_ringparam ering = {};
+    if (linux_xdp_get_nic_rings(&ering, ifname) == NULL)
+        return -1;
+    ering.cmd = ETHTOOL_SRINGPARAM;
+    ering.rx_pending = rx;
+    ering.tx_pending = tx;
+    if (linux_xdp_send_ioctl_ethtool(&ering, ifname) != 0)
+        return -1;
+    return 1;
+}
+
 static struct xsk_umem_info *configure_xsk_umem(void *buffer, uint64_t size) {
 
     struct xsk_umem_info *umem;
@@ -322,7 +367,16 @@ static struct xsk_umem_info *configure_xsk_umem(void *buffer, uint64_t size) {
         return NULL;
     }
 
-    umem_cfg.fill_size = XSK_RING_PROD__DEFAULT_NUM_DESCS;
+    /* We recommend that you set the fill ring size >= HW RX ring size +
+     * AF_XDP RX ring size. Make sure you fill up the fill ring
+     * with buffers at regular intervals, and you will with this setting
+     * avoid allocation failures in the driver. These are usually quite
+     * expensive since drivers have not been written to assume that
+     * allocation failures are common. For regular sockets, kernel
+     * allocated memory is used that only runs out in OOM situations
+     * that should be rare.
+     */
+    umem_cfg.fill_size = XSK_RING_PROD__DEFAULT_NUM_DESCS * 2;
     umem_cfg.comp_size = XSK_RING_CONS__DEFAULT_NUM_DESCS;
     umem_cfg.frame_size = FRAME_SIZE;
     umem_cfg.frame_headroom = FRAME_HEADROOM;
@@ -406,26 +460,26 @@ static struct xsk_socket_info *xsk_configure_socket(struct xsk_config *cfg,
     return xsk_info;
 }
 
-static void xsk_populate_fill_ring(struct xsk_umem_info *umem) {
+static int xsk_populate_fill_ring(struct xsk_umem_info *umem) {
 
     int ret, i;
     uint32_t idx;
 
     ret = xsk_ring_prod__reserve(&umem->fq,
-                                 XSK_RING_PROD__DEFAULT_NUM_DESCS,
+                                 XSK_RING_PROD__DEFAULT_NUM_DESCS * 2,
                                  &idx);
-    if (ret != XSK_RING_PROD__DEFAULT_NUM_DESCS) {
-        fprintf(stderr," error allocating xdp fill queue\n");
-        return;
+    if (ret != XSK_RING_PROD__DEFAULT_NUM_DESCS * 2) {
+        return -1;
     }
 
-    for (i = 0; i < XSK_RING_PROD__DEFAULT_NUM_DESCS; i++) {
+    for (i = 0; i < XSK_RING_PROD__DEFAULT_NUM_DESCS * 2; i++) {
         *xsk_ring_prod__fill_addr(&umem->fq, idx++) =
             i * FRAME_SIZE;
     }
 
-    xsk_ring_prod__submit(&umem->fq, XSK_RING_PROD__DEFAULT_NUM_DESCS);
+    xsk_ring_prod__submit(&umem->fq, XSK_RING_PROD__DEFAULT_NUM_DESCS * 2);
 
+    return 0;
 }
 
 static void linux_xdp_complete_tx(struct xsk_socket_info *xsk) {
@@ -603,8 +657,6 @@ static int linux_xdp_init_input(libtrace_t *libtrace) {
 
 static int linux_xdp_setup_xdp(libtrace_t *libtrace) {
 
-    int ret;
-
     // load BPF program
     if (load_bpf_and_xdp_attach(&XDP_FORMAT_DATA->cfg) == NULL) {
         trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to load BPF program");
@@ -640,16 +692,6 @@ static int linux_xdp_setup_xdp(libtrace_t *libtrace) {
             trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to init libtrace XDP control map");
             return -1;
         }
-    }
-
-    // Set RSS hash key on NIC
-    if (linux_xdp_set_rss_key(XDP_FORMAT_DATA->cfg.ifname, XDP_FORMAT_DATA->hasher_type) != 0) {
-        fprintf(stderr, "Linux XDP: couldn't configure RSS hashing!\n");
-    }
-
-    // check for any flow director rules
-    if ((ret = linux_xdp_get_flow_rule_count(XDP_FORMAT_DATA->cfg.ifname)) > 0) {
-        fprintf(stderr, "Linux XDP: %d flow director rules detected, RSS hashing may not work correctly!\n", ret);
     }
 
     // setup list to hold the streams
@@ -907,7 +949,9 @@ static int linux_xdp_start_stream(struct xsk_config *cfg,
     }
 
     // populate fill ring
-    xsk_populate_fill_ring(umem);
+    if (xsk_populate_fill_ring(umem) < 0) {
+        return -1;
+    }
 
     // configure socket
     stream->xsk = xsk_configure_socket(cfg, umem, ifqueue, dir);
@@ -927,6 +971,11 @@ static int linux_xdp_start_stream(struct xsk_config *cfg,
     libtrace_ringbuffer_init(&stream->addr_free_ring, NUM_FRAMES, LIBTRACE_RINGBUFFER_BLOCKING);
 
     return 0;
+}
+
+static int linux_xdp_safe_packet(libtrace_packet_t *packet UNUSED) {
+    // xdp packets are safe till trace_fin_packet is called
+    return 1;
 }
 
 static void linux_xdp_fin_packet(libtrace_packet_t *packet) {
@@ -1007,11 +1056,6 @@ static int linux_xdp_read_stream(libtrace_t *libtrace,
         trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT, "Trace format data missing, "
             "call trace_create() before calling trace_read_packet()");
         return -1;
-    }
-
-    /* check nb_packets (request packets) is not larger than the max RX_BATCH_SIZE */
-    if (nb_packets > RX_BATCH_SIZE) {
-        nb_packets = RX_BATCH_SIZE;
     }
 
     fds.fd = xsk_socket__fd(stream->xsk->xsk);
@@ -1592,6 +1636,7 @@ static void linux_xdp_get_thread_stats(libtrace_t *libtrace,
 static int linux_xdp_config_input(libtrace_t *libtrace,
                                   trace_option_t options,
                                   void *data) {
+    int ret;
 
     switch (options) {
         case TRACE_OPTION_SNAPLEN:
@@ -1610,6 +1655,15 @@ static int linux_xdp_config_input(libtrace_t *libtrace,
                 case HASHER_UNIDIRECTIONAL:
                 case HASHER_BIDIRECTIONAL:
                     XDP_FORMAT_DATA->hasher_type = *(enum hasher_types*)data;
+                    // Set RSS hash key on NIC
+                    if (linux_xdp_set_rss_key(XDP_FORMAT_DATA->cfg.ifname, XDP_FORMAT_DATA->hasher_type) != 0) {
+                        fprintf(stderr, "Linux XDP: couldn't configure RSS hashing! falling back to software hashing\n");
+                        return -1;
+                    }
+                    // check for any flow director rules
+                    if ((ret = linux_xdp_get_flow_rule_count(XDP_FORMAT_DATA->cfg.ifname)) > 0) {
+                        fprintf(stderr, "Linux XDP: %d flow director rules detected, RSS hashing may not work correctly!\n", ret);
+                    }
                     return 0;
                 case HASHER_CUSTOM:
                     /* libtrace can handle custom hashers */
@@ -1679,6 +1733,7 @@ static struct libtrace_format_t xdp = {
     linux_xdp_read_packet,          /* read_packet */
     linux_xdp_prepare_packet,       /* prepare_packet */
     linux_xdp_fin_packet,           /* fin_packet */
+    linux_xdp_safe_packet,          /* safe_packet */
     linux_xdp_write_packet,         /* write_packet */
     NULL,                           /* flush_output */
     linux_xdp_get_link_type,        /* get_link_type */

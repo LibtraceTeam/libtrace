@@ -242,6 +242,7 @@ static struct libtrace_format_t tshformat = {
 	tsh_read_packet,		/* read_packet */
 	tsh_prepare_packet,		/* prepare_packet */
 	NULL,				/* fin_packet */
+        NULL,                           /* safe_packet */
 	NULL,				/* write_packet */
 	NULL,				/* flush_output */
 	tsh_get_link_type,		/* get_link_type */
@@ -293,6 +294,7 @@ static struct libtrace_format_t frplusformat = {
 	tsh_read_packet,		/* read_packet */
 	tsh_prepare_packet,		/* prepare_packet */
 	NULL,				/* fin_packet */
+        NULL,                           /* safe_packet */
 	NULL,				/* write_packet */
 	NULL,				/* flush_output */
 	tsh_get_link_type,		/* get_link_type */

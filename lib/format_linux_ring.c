@@ -845,6 +845,7 @@ static struct libtrace_format_t linuxring = {
 	linuxring_read_packet,		/* read_packet */
 	linuxring_prepare_packet,	/* prepare_packet */
 	linuxring_fin_packet,		/* fin_packet */
+        NULL,                           /* safe_packet */
 	linuxring_write_packet,		/* write_packet */
 	NULL,				/* flush_output */
 	linuxring_get_link_type,	/* get_link_type */
@@ -909,6 +910,7 @@ static struct libtrace_format_t linuxring = {
 	NULL,				/* read_packet */
 	linuxring_prepare_packet,	/* prepare_packet */
 	NULL,				/* fin_packet */
+        NULL,                           /* safe_packet */
 	NULL,				/* write_packet */
 	NULL,				/* flush_output */
 	linuxring_get_link_type,	/* get_link_type */

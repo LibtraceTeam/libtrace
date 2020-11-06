@@ -691,6 +691,7 @@ static struct libtrace_format_t etsilive = {
         etsilive_read_packet,           /* read_packet */
         etsilive_prepare_packet,        /* prepare_packet */
         NULL,                           /* fin_packet */
+        NULL,                           /* safe_packet */
         NULL,                           /* write_packet */
         NULL,                           /* flush_output */
         etsilive_get_link_type,         /* get_link_type */

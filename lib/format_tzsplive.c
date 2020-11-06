@@ -697,6 +697,7 @@ static struct libtrace_format_t tzsplive = {
         tzsplive_read_packet,           /* read_packet */
         tzsplive_prepare_packet,        /* prepare_packet */
         NULL,                           /* fin_packet */
+        NULL,                           /* safe_packet */
         tzsplive_write_packet,          /* write_packet */
         NULL,                           /* flush_output */
         tzsplive_get_link_type,         /* get_link_type */

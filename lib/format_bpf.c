@@ -622,6 +622,7 @@ static struct libtrace_format_t bpf = {
 	bpf_read_packet,	/* read_packet */
 	bpf_prepare_packet, 	/* prepare_packet */
 	NULL,			/* fin_packet */
+        NULL,                   /* safe_packet */
 	NULL,			/* write_packet */
 	NULL,			/* flush_output */
 	bpf_get_link_type,	/* get_link_type */
@@ -674,6 +675,7 @@ static struct libtrace_format_t bpf = {
 	NULL,			/* read_packet */
 	bpf_prepare_packet, 	/* prepare_packet */
 	NULL,			/* fin_packet */
+        NULL,                   /* safe_packet */
 	NULL,			/* write_packet */
 	NULL,			/* flush_output */
 	bpf_get_link_type,	/* get_link_type */
