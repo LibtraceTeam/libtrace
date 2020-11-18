@@ -469,19 +469,22 @@ static int xsk_populate_fill_ring(struct xsk_umem_info *umem) {
     int ret, i;
     uint32_t idx;
 
+    // fill the ring with as many frames as posible
+    int fill_size = LIBTRACE_MIN(xdp_rings + hw_rings, NUM_FRAMES);
+
     ret = xsk_ring_prod__reserve(&umem->fq,
-                                 xdp_rings,
+                                 fill_size,
                                  &idx);
-    if (ret != xdp_rings) {
+    if (ret != fill_size) {
         return -1;
     }
 
-    for (i = 0; i < xdp_rings; i++) {
+    for (i = 0; i < fill_size; i++) {
         *xsk_ring_prod__fill_addr(&umem->fq, idx++) =
             i * FRAME_SIZE;
     }
 
-    xsk_ring_prod__submit(&umem->fq, xdp_rings);
+    xsk_ring_prod__submit(&umem->fq, fill_size);
 
     return 0;
 }
@@ -974,9 +977,11 @@ static int linux_xdp_start_stream(struct xsk_config *cfg,
         return errno;
     }
 
-    // populate fill ring
-    if (xsk_populate_fill_ring(umem) < 0) {
-        return -1;
+    // populate fill ring (only Rx)
+    if (dir == 0) {
+        if (xsk_populate_fill_ring(umem) < 0) {
+            return -1;
+        }
     }
 
     // configure socket
@@ -1026,6 +1031,8 @@ static void linux_xdp_fin_packet(libtrace_packet_t *packet) {
 
         stream = (struct xsk_per_stream *) packet->srcbucket;
         packet->srcbucket = NULL;
+
+        // offset into the umem to give back to the fill queue
         addr = xsk_umem__extract_addr(
             (uint64_t)packet->buffer - (uint64_t)stream->xsk->umem->buffer + FRAME_HEADROOM);
 
@@ -1146,7 +1153,7 @@ static int linux_xdp_read_stream(libtrace_t *libtrace,
         pkt_len = xsk_ring_cons__rx_desc(&stream->xsk->rx, idx_rx)->len;
 
         /* get pointer to its contents, this gives us pointer to packet payload
-         * and not the start of the headroom allocated?? */
+         * and not the start of the headroom allocated */
         pkt_buffer = xsk_umem__get_data(stream->xsk->umem->buffer, pkt_addr);
 
         /* prepare the packet */
