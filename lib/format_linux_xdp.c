@@ -43,6 +43,9 @@
 #define FRAME_SIZE         XSK_UMEM__DEFAULT_FRAME_SIZE
 #define XDP_BUSY_RETRY     5
 
+int hw_rings = 2048;
+int xdp_rings = 2048;
+
 typedef struct libtrace_xdp_meta {
     uint64_t timestamp;
     uint32_t packet_len;
@@ -85,15 +88,15 @@ struct xsk_config {
 };
 
 struct xsk_umem_info {
-    struct xsk_ring_cons cq;
-    struct xsk_ring_prod fq;
+    struct xsk_ring_cons cq; // frames the kernel has transmitted
+    struct xsk_ring_prod fq; // frames the kernel can use to insert received packets
     struct xsk_umem *umem;
     void *buffer;
 };
 
 struct xsk_socket_info {
-    struct xsk_ring_cons rx;
-    struct xsk_ring_prod tx;
+    struct xsk_ring_cons rx; // frames that have been received
+    struct xsk_ring_prod tx; // frames to be sent
     struct xsk_umem_info *umem;
     struct xsk_socket *xsk;
     int if_queue;
@@ -134,6 +137,7 @@ static int linux_xdp_send_ioctl_ethtool(void *data, char *ifname);
 static int linux_xdp_get_max_queues(char *ifname);
 static int linux_xdp_get_current_queues(char *ifname);
 static int linux_xdp_set_current_queues(char *ifname, int queues);
+struct ethtool_ringparam *linux_xdp_get_nic_rings(struct ethtool_ringparam *ering, char *ifname);
 
 static bool linux_xdp_can_write(libtrace_packet_t *packet) {
     /* Get the linktype */
@@ -330,14 +334,14 @@ static int linux_xdp_get_tx_rings(char *ifname) {
     return -1;
 }
 
-static int linux_xdp_get_max_rx_rings(char *ifname) {
+UNUSED static int linux_xdp_get_max_rx_rings(char *ifname) {
     struct ethtool_ringparam ering = {};
     if (linux_xdp_get_nic_rings(&ering, ifname) != NULL)
         return ering.rx_max_pending;
     return -1;
 }
 
-static int linux_xdp_get_max_tx_rings(char *ifname) {
+UNUSED static int linux_xdp_get_max_tx_rings(char *ifname) {
     struct ethtool_ringparam ering = {};
     if (linux_xdp_get_nic_rings(&ering, ifname) != NULL)
         return ering.tx_max_pending;
@@ -376,8 +380,8 @@ static struct xsk_umem_info *configure_xsk_umem(void *buffer, uint64_t size) {
      * allocated memory is used that only runs out in OOM situations
      * that should be rare.
      */
-    umem_cfg.fill_size = XSK_RING_PROD__DEFAULT_NUM_DESCS * 2;
-    umem_cfg.comp_size = XSK_RING_CONS__DEFAULT_NUM_DESCS;
+    umem_cfg.fill_size = xdp_rings + hw_rings;
+    umem_cfg.comp_size = xdp_rings;
     umem_cfg.frame_size = FRAME_SIZE;
     umem_cfg.frame_headroom = FRAME_HEADROOM;
     umem_cfg.flags = XSK_UMEM__DEFAULT_FLAGS;
@@ -416,8 +420,8 @@ static struct xsk_socket_info *xsk_configure_socket(struct xsk_config *cfg,
 
     xsk_info->umem = umem;
     xsk_info->if_queue = if_queue;
-    xsk_cfg.rx_size = XSK_RING_CONS__DEFAULT_NUM_DESCS;
-    xsk_cfg.tx_size = XSK_RING_PROD__DEFAULT_NUM_DESCS;
+    xsk_cfg.rx_size = xdp_rings;
+    xsk_cfg.tx_size = xdp_rings;
     // stop libbpf from loading the default BPF program
     xsk_cfg.libbpf_flags = cfg->libbpf_flags | XSK_LIBBPF_FLAGS__INHIBIT_PROG_LOAD;
     xsk_cfg.xdp_flags = cfg->xdp_flags;
@@ -466,18 +470,18 @@ static int xsk_populate_fill_ring(struct xsk_umem_info *umem) {
     uint32_t idx;
 
     ret = xsk_ring_prod__reserve(&umem->fq,
-                                 XSK_RING_PROD__DEFAULT_NUM_DESCS * 2,
+                                 xdp_rings,
                                  &idx);
-    if (ret != XSK_RING_PROD__DEFAULT_NUM_DESCS * 2) {
+    if (ret != xdp_rings) {
         return -1;
     }
 
-    for (i = 0; i < XSK_RING_PROD__DEFAULT_NUM_DESCS * 2; i++) {
+    for (i = 0; i < xdp_rings; i++) {
         *xsk_ring_prod__fill_addr(&umem->fq, idx++) =
             i * FRAME_SIZE;
     }
 
-    xsk_ring_prod__submit(&umem->fq, XSK_RING_PROD__DEFAULT_NUM_DESCS * 2);
+    xsk_ring_prod__submit(&umem->fq, xdp_rings);
 
     return 0;
 }
@@ -493,7 +497,7 @@ static void linux_xdp_complete_tx(struct xsk_socket_info *xsk) {
     }
 
     /* free completed TX buffers */
-    rcvd = xsk_ring_cons__peek(&xsk->umem->cq, XSK_RING_CONS__DEFAULT_NUM_DESCS, &idx);
+    rcvd = xsk_ring_cons__peek(&xsk->umem->cq, xdp_rings, &idx);
     if (rcvd > 0) {
         /* release the number of sent frames */
         xsk_ring_cons__release(&xsk->umem->cq, rcvd);
@@ -608,6 +612,7 @@ static int linux_xdp_init_input(libtrace_t *libtrace) {
     char kernel[200], program[200], interface[200];
     //int core = -1;
     int matches;
+    int hw_rx;
 
     if ((matches = sscanf(libtrace->uridata, "%[^:]:%[^:]:%[^:]:", kernel, program, interface)) == 3) {
 
@@ -649,6 +654,16 @@ static int linux_xdp_init_input(libtrace_t *libtrace) {
         trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Invalid XDP input interface "
             "name: %s", XDP_FORMAT_DATA->cfg.ifname);
         return -1;
+    }
+
+    // try set number of RX rings to match xdp rings
+    if (linux_xdp_set_rx_tx_rings(xdp_rings, xdp_rings, XDP_FORMAT_DATA->cfg.ifname) < 0) {
+
+        // failed to set, lets see if we can get the current values and set the xdp rings to match
+        if ((hw_rx = linux_xdp_get_rx_rings(XDP_FORMAT_DATA->cfg.ifname)) > 0) {
+            xdp_rings = hw_rx;
+            hw_rings = hw_rx;
+        }
     }
 
     return 0;
@@ -734,6 +749,7 @@ static int linux_xdp_init_output(libtrace_out_t *libtrace) {
 
     struct rlimit r = {RLIM_INFINITY, RLIM_INFINITY};
     char *scan = NULL;
+    int hw_tx;
 
     if (setrlimit(RLIMIT_MEMLOCK, &r)) {
         trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED, "Unable "
@@ -770,6 +786,16 @@ static int linux_xdp_init_output(libtrace_out_t *libtrace) {
         trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED, "Unable to create list "
             "for stream data in linux_xdp_init_input()");
         return -1;
+    }
+
+    // try set number of RX rings to match xdp rings
+    if (linux_xdp_set_rx_tx_rings(xdp_rings, xdp_rings, XDP_FORMAT_DATA->cfg.ifname) < 0) {
+
+        // failed to set, lets see if we can get the current values and set the xdp rings to match
+        if ((hw_tx = linux_xdp_get_tx_rings(XDP_FORMAT_DATA->cfg.ifname)) > 0) {
+            xdp_rings = hw_tx;
+            hw_rings = hw_tx;
+        }
     }
 
     return 0;
