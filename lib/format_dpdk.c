@@ -1735,11 +1735,18 @@ static int dpdk_write_packet(libtrace_out_t *trace,
 
 	m_buff[0] = rte_pktmbuf_alloc(FORMAT(trace)->pktmbuf_pool);
 	if (m_buff[0] == NULL) {
-		trace_set_err_out(trace, errno, "Cannot get an empty packet buffer");
+		trace_set_err_out(trace, TRACE_ERR_OUT_OF_MEMORY, "Cannot get an empty packet buffer");
 		return -1;
 	} else {
 		int ret;
-		memcpy(rte_pktmbuf_append(m_buff[0], caplen), packet->payload, caplen);
+		char *mbuf_dst = rte_pktmbuf_append(m_buff[0], caplen);
+		if (mbuf_dst != NULL) {
+			memcpy(mbuf_dst, packet->payload, caplen);
+		} else {
+			rte_pktmbuf_free(m_buff[0]);
+			trace_set_err_out(trace, TRACE_ERR_NO_CONVERSION, "Packet too large");
+			return -1;
+		}
 		do {
 			ret = rte_eth_tx_burst(FORMAT(trace)->port, 0 /*queue TODO*/, m_buff, 1);
 		} while (ret != 1);
