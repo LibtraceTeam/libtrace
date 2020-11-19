@@ -161,6 +161,9 @@ static void trace_init(void)
 #ifdef HAVE_LIBBPF
                 linux_xdp_constructor();
 #endif
+#ifdef HAVE_PFRING
+	pfring_constructor();	
+#endif
 	}
 }
 

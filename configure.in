@@ -461,6 +461,34 @@ AC_CHECK_LIB(pthread, pthread_setname_np, have_pthread_setname_np=1, have_pthrea
 #fi
 #DAG_VERSION_NUM=$dag_drv_v
 
+# Check for PF_RING 
+AC_ARG_WITH(pfring,
+	    AS_HELP_STRING(--with-pfring,include PF_RING live capture support (if PF_RING libraries are available)),
+[
+        if test "$withval" = no
+        then
+            want_pfring=no
+        else
+            want_pfring=ifpresent
+        fi
+],[
+        want_pfring=ifpresent
+])
+
+
+libtrace_pfring=false
+if test "$want_pfring" != no; then
+	# bit annoying that we have to include extra libs to account for
+	# optional pfring modules that depend on these libs
+	AC_SEARCH_LIBS(pfring_recv, pfring, pfring_found=1, pfring_found=0,[-ldag -lpcap])
+	if test "$pfring_found" = 1; then
+		ADD_LIBS="$ADD_LIBS -lpfring"
+		LIBTRACE_LIBS="$LIBTRACE_LIBS -lpfring"
+		AC_DEFINE(HAVE_PFRING,1,[conditional for building with DAG live capture support])
+		libtrace_pfring=true
+	fi	
+fi
+
 # Check for ncurses
 
 # These libraries have to be explicitly linked in OpenSolaris
@@ -762,6 +790,7 @@ AS_IF([test "x$have_ncurses" = "xyes"], [
 # Define automake conditionals for use in our Makefile.am files
 AM_CONDITIONAL([HAVE_BPF_CAPTURE], [test "$ac_cv_have_decl_BIOCSETIF" = yes ])
 AM_CONDITIONAL([HAVE_DAG], [test "$libtrace_dag" = true])
+AM_CONDITIONAL([HAVE_PFRING], [test "$libtrace_pfring" = true])
 AM_CONDITIONAL([HAVE_DPDK], [test "$libtrace_dpdk" = true])
 AM_CONDITIONAL([HAVE_WANDDER], [test "x$wandder_avail" = "xyes"])
 AM_CONDITIONAL([DAG2_4], [test "$libtrace_dag_version" = 24])
@@ -864,6 +893,13 @@ elif test x"$want_dpdk" != "xno"; then
 	AC_MSG_NOTICE([Compiled with DPDK live capture support: No])
 	AC_MSG_NOTICE([Note: Requires DPDK v1.5 or newer])
 fi
+
+if test x"$libtrace_pfring" = xtrue; then
+	AC_MSG_NOTICE([Compiled with PF_RING live capture support: Yes])
+else
+	AC_MSG_NOTICE([Compiled with PF_RING live capture support: No])
+fi
+
 reportopt "Compiled with LLVM BPF JIT support" $JIT
 reportopt "Compiled with live ETSI LI support (requires libwandder)" $wandder_avail
 reportopt "Building man pages/documentation" $libtrace_doxygen

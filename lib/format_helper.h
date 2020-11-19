@@ -87,6 +87,11 @@ iow_t *trace_open_file_out(libtrace_out_t *libtrace,
 		int level,
 		int filemode);
 
+/** Determines the number of cores available on the host.
+ *
+ * @return The number of cores detected by this function.
+ */
+uint32_t trace_get_number_of_cores(void);
 
 /** Attempts to determine the direction for a pcap (or pcapng) packet.
  *
@@ -99,7 +104,5 @@ iow_t *trace_open_file_out(libtrace_out_t *libtrace,
  * if they are captured using pcap/pcapng, specifically SLL and PFLOG captures.
  */
 libtrace_direction_t pcap_get_direction(const libtrace_packet_t *packet);
-
-
 
 #endif /* FORMAT_HELPER_H */

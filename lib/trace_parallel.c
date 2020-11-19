@@ -1420,21 +1420,6 @@ static int trace_pread_packet_wrapper(libtrace_t *libtrace,
 
 	if (libtrace->format->pread_packets) {
 		int ret;
-#if 0
-		for (i = 0; i < (int) nb_packets; ++i) {
-			if (!i[packets]) {
-				trace_set_err(libtrace, TRACE_ERR_BAD_STATE, "NULL packets in "
-					"trace_pread_packet_wrapper()");
-				return -1;
-			}
-			if (!(packets[i]->buf_control==TRACE_CTRL_PACKET ||
-			      packets[i]->buf_control==TRACE_CTRL_EXTERNAL)) {
-				trace_set_err(libtrace,TRACE_ERR_BAD_STATE,
-				              "Packet passed to trace_read_packet() is invalid\n");
-				return -1;
-			}
-		}
-#endif
 		do {
 			ret=libtrace->format->pread_packets(libtrace, t,
 			                                    packets,

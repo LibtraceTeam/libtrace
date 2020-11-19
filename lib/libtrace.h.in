@@ -440,6 +440,7 @@ enum base_format_t {
 	TRACE_FORMAT_TZSPLIVE	  =23,  /** TZSP */
         TRACE_FORMAT_CORSAROTAG   =24,  /** Corsarotagger format */
         TRACE_FORMAT_XDP          =25,  /** AF_XDP format */
+	TRACE_FORMAT_PFRING	  =26,
 };
 
 /** RT protocol packet types */
@@ -503,6 +504,9 @@ typedef enum {
 	TRACE_RT_DATA_CORSARO_TAGGED = TRACE_RT_DATA_SIMPLE + TRACE_FORMAT_CORSAROTAG,
         /** RT is encapsulating a packet tagged by AF_XDP */
         TRACE_RT_DATA_XDP = TRACE_RT_DATA_SIMPLE + TRACE_FORMAT_XDP,
+
+	/** RT is encapsulating a PF_RING capture record */
+	TRACE_RT_DATA_PFRING = TRACE_RT_DATA_SIMPLE + TRACE_FORMAT_PFRING,
 
 	/** As PCAP does not store the linktype with the packet, we need to 
 	 * create a separate RT type for each supported DLT, starting from
