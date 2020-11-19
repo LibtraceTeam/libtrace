@@ -268,10 +268,11 @@ static tls_t g_tls[T_MAX] = {[0 ... T_MAX - 1] = {.tid = -1,
                                                   .dst_addrs = {0}}};
 
 enum ret_codes {
-        RET_FAILED = 1,  /* The test failed */
-        RET_DROPPED = 2, /* Packets were dropped */
-        RET_INVALID = 4, /* Some packets failed validation */
-        RET_ERROR = 8    /* Another error occurred */
+        RET_FAILED = 1,        /* The test failed */
+        RET_DROPPED = 2,       /* Packets were dropped */
+        RET_INVALID = 4,       /* Some packets failed validation */
+        RET_ERROR = 8,         /* Another error occurred */
+        RET_BUFFER_REUSED = 16 /* Detected a packet buffer has been reused */
 };
 
 static volatile enum ret_codes exit_code = 0;
@@ -382,7 +383,7 @@ static libtrace_packet_t *construct_packet(libtrace_packet_t *pkt, int extra_siz
 static libtrace_packet_t *construct_packet_rev(libtrace_packet_t *pkt, int extra_size,
                                         struct udp_packet **udp_buffer) {
         struct udp_packet *buffer;
-	libtrace_packet_t *_pkt;
+        libtrace_packet_t *_pkt;
         uint16_t tmp16;
         uint32_t tmp32;
         if (udp_buffer == NULL) {
@@ -395,7 +396,7 @@ static libtrace_packet_t *construct_packet_rev(libtrace_packet_t *pkt, int extra
         tmp32 = (*udp_buffer)->ip.ip_src.s_addr;
         (*udp_buffer)->ip.ip_src.s_addr = (*udp_buffer)->ip.ip_dst.s_addr;
         (*udp_buffer)->ip.ip_dst.s_addr = tmp32;
-	return _pkt;
+        return _pkt;
 }
 
 /** Verify the packet received has the correct data format
@@ -540,6 +541,7 @@ inline static void verify_first_packet(tls_t *tls) {
                     "\n",
                     tls->first_seq_num, seq_num);
                 tls->first_seq_num = seq_num;  // Prevent console spam
+                exit_code |= RET_BUFFER_REUSED;
         }
 }
 
@@ -670,8 +672,6 @@ static enum hasher_types detect_hasher(libtrace_t *trace,
                 for (int t = 0; t < T_MAX; t++) {
                         if (g_tls[t].src_addrs[i] && t < actual_threads) {
                                 if (src_accumulated) {
-                                        // printf("Found packets on another
-                                        // thread %d\n", i);
                                         hasher_type = HASHER_BALANCE;
                                 }
                                 src_accumulated += g_tls[t].src_addrs[i];
@@ -835,7 +835,7 @@ _fn_packet_inc_seq(libtrace_t *trace, libtrace_thread_t *t UNUSED,
 
         if (scenario == ST_DROPPED_PACKETS && tls->first_packet == NULL) {
                 for (int i = 0; i < 11; i++) {
-			// Wait 11 seconds
+                        // Wait 11 seconds
                         printf("*");
                         fflush(stdout);
                         sleep(1);
@@ -1402,6 +1402,8 @@ static int run_rx_scenario(char *uri, int threadcount,
                  */
                 if (exit_code == 0) {
                         fprintf(stderr, "Test result: PASS\n");
+                } else if (exit_code | RET_BUFFER_REUSED) {
+                        fprintf(stderr, "Test result: FAIL\n");
                 } else if (exit_code & RET_DROPPED &&
                            !(exit_code & (RET_FAILED | RET_ERROR))) {
                         fprintf(stderr, "Test result: FAIL\n");
