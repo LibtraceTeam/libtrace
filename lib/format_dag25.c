@@ -1133,7 +1133,12 @@ static int dag_dump_packet(libtrace_out_t *libtrace,
 			   dag_record_t *erfptr, unsigned int pad,
 			   void *buffer)
 {
-	int size;
+	int payload_size;
+        int alignment_pad;
+        uint64_t alignment_buf = 0;
+
+        payload_size = ntohs(erfptr->rlen)-(dag_record_size + pad);
+        alignment_pad = ntohs(erfptr->rlen) % sizeof(uint64_t);
 
 	/*
 	 * If we've got 0 bytes waiting in the txqueue, assume that we
@@ -1163,10 +1168,14 @@ static int dag_dump_packet(libtrace_out_t *libtrace,
 	 * Copy our incoming packet into the outgoing buffer, and increment 
 	 * our waiting count
 	 */
-	size = ntohs(erfptr->rlen)-(dag_record_size + pad);
 	memcpy(FORMAT_DATA_OUT->txbuffer + FORMAT_DATA_OUT->waiting, buffer,
-	       size);
-	FORMAT_DATA_OUT->waiting += size;
+	       payload_size);
+	FORMAT_DATA_OUT->waiting += payload_size;
+
+        // add padding to payload to align with 8 bytes
+        memcpy(FORMAT_DATA_OUT->txbuffer + FORMAT_DATA_OUT->waiting, &alignment_buf,
+		alignment_pad);
+        FORMAT_DATA_OUT->waiting += alignment_pad;
 
 	/*
 	 * If our output buffer has more than 16 Mebibytes in it, commit those 
@@ -1174,15 +1183,15 @@ static int dag_dump_packet(libtrace_out_t *libtrace,
 	 * Note: dag_fin_output will also call dag_tx_stream_commit_bytes() in 
 	 * case there is still data in the buffer at program exit.
 	 */
-	if (FORMAT_DATA_OUT->waiting >= 16*1024*1024) {
+	//if (FORMAT_DATA_OUT->waiting >= 16*1024*1024) {
 		FORMAT_DATA_OUT->txbuffer =
 			dag_tx_stream_commit_bytes(FORMAT_DATA_OUT->device->fd,
 						   FORMAT_DATA_OUT->dagstream,
 						   FORMAT_DATA_OUT->waiting);
 		FORMAT_DATA_OUT->waiting = 0;
-	}
+	//}
 
-	return size + pad + dag_record_size;
+	return payload_size + pad + dag_record_size;
 }
 
 /* Attempts to determine a suitable ERF type for a given packet. Returns true
@@ -1263,7 +1272,7 @@ static int dag_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *packet)
 		pad = dag_get_padding(packet);
 
 		/* Flags. Can't do this */
-		memset(&erfhdr.flags,1,sizeof(erfhdr.flags));
+		memset(&erfhdr.flags,0,sizeof(erfhdr.flags));
 		if (trace_get_direction(packet)!=(int)~0U)
 			erfhdr.flags.iface = trace_get_direction(packet);
 
@@ -1291,9 +1300,8 @@ static int dag_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *packet)
 			return -1;
 		}
 
-		erfhdr.rlen = htons(trace_get_capture_length(packet)
-				    + erf_get_framing_length(packet));
-
+		erfhdr.rlen = htons(trace_get_capture_length(packet) +
+			erf_get_framing_length(packet));
 
 		/* Loss counter. Can't do this */
 		erfhdr.lctr = 0;
