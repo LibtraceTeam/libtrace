@@ -5,4 +5,4 @@ libdir=../lib/.libs:../libpacketdump/.libs
 export LD_LIBRARY_PATH="$libdir:/usr/local/lib/"
 export DYLD_LIBRARY_PATH="${libdir}"
 
-"$DIR/test-nic" "$@"
+exec "$DIR/test-nic" "$@"
