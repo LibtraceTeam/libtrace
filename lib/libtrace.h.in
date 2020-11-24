@@ -1340,9 +1340,9 @@ DLLEXPORT void trace_interrupt(void);
 
 /** Takes a uri and splits it into a format and uridata component. 
  * @param uri		The uri to be parsed
- * @param [out] format	A pointer that will be updated to point to an allocated 
+ * @param [out] format	A pointer that will be updated to point to an allocated
  * 			string holding the format component of the URI
- * @return NULL if an error occurred, otherwise return a pointer to the uridata 
+ * @return NULL if an error occurred, otherwise return a pointer to the uridata
  * component
  *
  * @note The format component is strdup'd by this function, so be sure to free
@@ -1350,15 +1350,7 @@ DLLEXPORT void trace_interrupt(void);
  * to an allocated string into this function as the 'format' parameter, as
  * that memory will be leaked and replaced with the strdup'd format.
  */
-DLLEXPORT const char *trace_parse_uri(const char *uri, char **format, int *coremap);
-
-/** Takes a uri and tries to extract the coremap from it.
- * @param cores	The coremap array to be populated with found cores.
- * @param uri	The uri to be parsed.
- *
- * @returns	Pointer into the URI after the coremap has been consumed.
- */
-DLLEXPORT const char *trace_parse_coremap_from_uri(int *cores, const char *uri);
+DLLEXPORT const char *trace_parse_uri(const char *uri, char **format);
 
 /** Create an input trace from a URI
  * 
