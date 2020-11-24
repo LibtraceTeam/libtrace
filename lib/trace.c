@@ -519,7 +519,6 @@ DLLEXPORT libtrace_out_t *trace_create_output(const char *uri) {
                 free(scan);
                 return libtrace;
         }
-        free(scan);
         libtrace->uridata = strdup(uridata);
 
         /* libtrace->format now contains the type of uri
@@ -532,14 +531,16 @@ DLLEXPORT libtrace_out_t *trace_create_output(const char *uri) {
 			/* init_output should call trace_set_err to set the
 			 * error message
 			 */
+			free(scan);
 			return libtrace;
 		}
 	} else {
 		trace_set_err_out(libtrace,TRACE_ERR_UNSUPPORTED,
-				"Format does not support writing (%s)",scan);
+				"Format does not support writing (%s)", scan);
+                free(scan);
                 return libtrace;
         }
-
+	free(scan);
 
 	libtrace->started=false;
 	return libtrace;
