@@ -40,9 +40,11 @@ typedef struct libtrace_list {
 	libtrace_list_node_t *tail;
 	size_t size;
 	size_t element_size;
+	size_t alignment;
 } libtrace_list_t;
 
 DLLEXPORT libtrace_list_t *libtrace_list_init(size_t element_size);
+DLLEXPORT libtrace_list_t *libtrace_list_init_aligned(size_t element_size, size_t alignment);
 DLLEXPORT void libtrace_list_deinit(libtrace_list_t *l);
 
 DLLEXPORT void libtrace_list_push_front(libtrace_list_t *l, void *item);

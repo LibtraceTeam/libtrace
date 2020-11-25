@@ -134,7 +134,7 @@ AC_PROG_LIBTOOL
 AC_PROG_GCC_TRADITIONAL
 
 # Fail if any of these functions are missing
-AC_CHECK_DECLS([strdup, strlcpy, strcasecmp, strncasecmp, snprintf, vsnprintf, strndup])
+AC_CHECK_DECLS([strdup, strlcpy, strcasecmp, strncasecmp, snprintf, vsnprintf, strndup, posix_memalign])
 AC_CHECK_DECLS([socket, recvmmsg], [], [], [[#define _GNU_SOURCE 1
 #include <sys/socket.h>]])
 AC_CHECK_SIZEOF([long int])

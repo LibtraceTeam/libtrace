@@ -91,7 +91,7 @@ struct pfring_per_stream_t {
 	pfring *pd;
 	int affinity;
 
-} ALIGN_STRUCT(CACHE_LINE_SIZE);
+};
 
 #define ZERO_PFRING_STREAM {NULL, -1}
 

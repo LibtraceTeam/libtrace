@@ -130,6 +130,15 @@ int snprintf(char *str, size_t size, const char *format, ...);
 # endif 
 #endif
 
+#if !HAVE_DECL_POSIX_MEMALIGN
+#include <errno.h>
+static inline int posix_memalign(void **memptr, size_t alignment, size_t size)
+{
+	fprintf(stderr, "No posix_memalign\n");
+	return ENOMEM;
+}
+#endif
+
 #include "daglegacy.h"
 	
 #ifdef HAVE_DAG_API
