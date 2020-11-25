@@ -23,7 +23,7 @@ BINS = test-pcap-bpf test-event test-time test-dir test-wireless test-errors \
 	test-mpls test-layer2-headers test-qinq \
 	$(BINS_DATASTRUCT) $(BINS_PARALLEL)
 
-.PHONY: all clean distclean install depend test
+.PHONY: all clean distclean install depend test address-san
 
 all: $(BINS) test-drops test-format test-decode test-decode2 test-write test-convert test-convert2
 
@@ -36,5 +36,8 @@ distclean:
 
 install:
 	@true
+
+address-san: CFLAGS+= -fsanitize=undefined,leak,address -fno-omit-frame-pointer -ggdb3
+address-san: all
 
 # vim: noet ts=8 sw=8

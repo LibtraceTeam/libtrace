@@ -102,6 +102,19 @@ TOOLS_LIBS=""
 CFLAGS="$CFLAGS -Wall -Wmissing-prototypes -Wextra -DLT_BUILDING_DLL=1"
 CXXFLAGS="$CXXFLAGS -Wall -DLT_BUILDING_DLL=1"
 
+AC_ARG_ENABLE(address-san, AS_HELP_STRING(--enable-address-san, Enable address and memory sanitisation),
+[
+  if test "x$enableval" = xyes ; then
+    CFLAGS+=" -fsanitize=undefined,leak,address -fno-omit-frame-pointer -ggdb3"
+    CXXFLAGS+=" -fsanitize=undefined,leak,address -fno-omit-frame-pointer -ggdb3"
+    LDFLAGS+=" -fsanitize=undefined,leak,address -fno-omit-frame-pointer -ggdb3"
+
+    AC_MSG_NOTICE([Compiling with -fsanitize=undefined,leak,address])
+    AC_MSG_NOTICE([ - Build tests using the command: make address-san])
+    AC_MSG_NOTICE([ - Programs must also be compiled with -fsanitize=undefined,leak,address])
+  fi
+ ], [])
+
 # Check for -fvisibility
 gl_VISIBILITY
 
