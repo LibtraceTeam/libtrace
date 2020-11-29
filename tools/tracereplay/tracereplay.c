@@ -51,6 +51,11 @@ Authors: Andreas Loef and Yuwei Wang
 
 #define FCS_SIZE 4
 
+unsigned char FAKE_ETHERNET_HEADER[] = {
+        0x10, 0x11, 0x10, 0x11, 0x10, 0x11,
+        0x20, 0x21, 0x20, 0x21, 0x20, 0x21,
+        0x08, 0x00};
+
 int broadcast = 0;
 
 static void replace_ip_checksum(libtrace_packet_t *packet) {
@@ -90,10 +95,10 @@ static libtrace_packet_t * per_packet(libtrace_packet_t *packet) {
 	libtrace_linktype_t linktype = 0;
 	libtrace_packet_t *new_packet;
 	size_t wire_length;
-	void * pkt_buffer;
 	void * l2_header;
 	libtrace_ether_t * ether_header;
 	int i;
+        char *newbuf;
 
         if (IS_LIBTRACE_META_PACKET(packet)) {
                 return NULL;
@@ -102,13 +107,12 @@ static libtrace_packet_t * per_packet(libtrace_packet_t *packet) {
                 return NULL;
         }
 
-	pkt_buffer = trace_get_packet_buffer(packet,&linktype,&remaining);
+	l2_header = trace_get_layer2(packet,&linktype,&remaining);
 	/* Check if the linktype was found, if not skip this packet */
 	if (linktype == TRACE_TYPE_UNKNOWN || linktype == TRACE_TYPE_CONTENT_INVALID) {
 		return NULL;
 	}
 
-	remaining = 0;
 	new_packet = trace_create_packet();
 
 	wire_length = trace_get_wire_length(packet);
@@ -119,10 +123,24 @@ static libtrace_packet_t * per_packet(libtrace_packet_t *packet) {
 		wire_length -= FCS_SIZE;
 	}
 
-	trace_construct_packet(new_packet,linktype,pkt_buffer,wire_length);
+
+        if (linktype == TRACE_TYPE_NONE) {
+                newbuf = calloc(wire_length + sizeof(libtrace_ether_t),
+                                sizeof(char));
+                memcpy(newbuf + sizeof(libtrace_ether_t), l2_header,
+                                remaining);
+                memcpy(newbuf, FAKE_ETHERNET_HEADER, sizeof(libtrace_ether_t));
+                l2_header = newbuf;
+                wire_length += sizeof(libtrace_ether_t);
+                linktype = TRACE_TYPE_ETH;
+        }
+
+	trace_construct_packet(new_packet,linktype,l2_header,wire_length);
+        new_packet = trace_strip_packet(new_packet);
 
 	if(broadcast) {
-		l2_header = trace_get_layer2(new_packet,&linktype,&remaining);
+                remaining = 0;
+	        l2_header = trace_get_layer2(new_packet,&linktype,&remaining);
 		if(linktype == TRACE_TYPE_ETH){
 			ether_header = (libtrace_ether_t *) l2_header;
 			for(i = 0; i < 6; i++) {
@@ -205,6 +223,9 @@ static void usage(char * argv) {
 	fprintf(stderr, " -X\n");
 	fprintf(stderr, " --speedup\n");
 	fprintf(stderr, "\t\tSpeed up replay by a factor of <speedup>\n");
+        fprintf(stderr, " -t\n");
+        fprintf(stderr, " --tx_queue\n");
+        fprintf(stderr, "\t\tSet the batch size of the TX queue to <batchsize>\n");
 
 }
 
@@ -219,7 +240,8 @@ int main(int argc, char *argv[]) {
 	libtrace_packet_t * new;
 	int snaplen = 0;
         int speedup = 1;
-
+        int tx_max_queue = 1;
+        bool tx_max_set = 0;
 
 	while(1) {
 		int option_index;
@@ -229,10 +251,11 @@ int main(int argc, char *argv[]) {
 			{ "snaplen",	1, 0, 's'},
 			{ "broadcast",	0, 0, 'b'},
 			{ "speedup",	1, 0, 'X'},
+                        { "tx_queue",   1, 0, 't'},
 			{ NULL,		0, 0, 0}
 		};
 
-		int c = getopt_long(argc, argv, "bhs:f:X:",
+		int c = getopt_long(argc, argv, "bhs:f:X:t:",
 				long_options, &option_index);
 
 		if(c == -1)
@@ -251,9 +274,11 @@ int main(int argc, char *argv[]) {
 			case 'b':
 				broadcast = 1;
 				break;
-
+                        case 't':
+                                tx_max_queue = atoi(optarg);
+				tx_max_set = 1;
+                                break;
 			case 'h':
-
 				usage(argv[0]);
 				return 1;
 			default:
@@ -312,11 +337,20 @@ int main(int argc, char *argv[]) {
 
 	/* Creating output trace */
 	output = trace_create_output(argv[optind+1]);
-
 	if (trace_is_err_output(output)) {
 		trace_perror_output(output, "Opening output trace: ");
 		return 1;
 	}
+
+        /* apply tx_max_queue -- only linux ring supports tx_max_queue */
+        if (trace_config_output(output, TRACE_OPTION_TX_MAX_QUEUE, &tx_max_queue)) {
+            /* only throw error if user specified a tx_max_queue, otherwise continue */
+            if (tx_max_set) {
+                trace_perror_output(output, "Output format does not support tx_max_queue");
+                return 1;
+            }
+        }
+
 	if (trace_start_output(output)) {
 		trace_perror_output(output, "Starting output trace: ");
 		trace_destroy_output(output);

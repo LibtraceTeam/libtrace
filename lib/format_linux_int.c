@@ -52,9 +52,29 @@
 
 #include "format_linux_common.h"
 
+#define SLL_HEADER_LENGTH 6
 
 #ifdef HAVE_NETPACKET_PACKET_H
 
+static bool linuxnative_can_write(libtrace_packet_t *packet) {
+	/* Get the linktype */
+        libtrace_linktype_t ltype = trace_get_link_type(packet);
+
+        if (ltype == TRACE_TYPE_NONDATA) {
+                return false;
+        }
+        if (ltype == TRACE_TYPE_CONTENT_INVALID) {
+                return false;
+        }
+        if (ltype == TRACE_TYPE_PCAPNG_META) {
+                return false;
+        }
+        if (ltype == TRACE_TYPE_ERF_META) {
+                return false;
+        }
+
+        return true;
+}
 
 static int linuxnative_start_input(libtrace_t *libtrace)
 {
@@ -215,6 +235,11 @@ inline static int linuxnative_read_stream(libtrace_t *libtrace,
 			} else {
 				if ((ret=is_halted(libtrace)) != -1)
 					return ret;
+                                /* If we dont have access to the queue we have to return
+                                 * and let libtrace check */
+                                if (!queue) {
+                                    return READ_MESSAGE;
+                                }
 			}
 		}
 		while (ret <= 0);
@@ -335,19 +360,21 @@ static int linuxnative_pread_packets(libtrace_t *libtrace,
 static int linuxnative_write_packet(libtrace_out_t *libtrace,
 		libtrace_packet_t *packet) 
 {
+	/* Check linuxnative can write this type of packet */
+	if (!linuxnative_can_write(packet)) {
+		return 0;
+	}
+
 	struct sockaddr_ll hdr;
 	int ret = 0;
-
-	if (trace_get_link_type(packet) == TRACE_TYPE_NONDATA)
-		return 0;
 
 	hdr.sll_family = AF_PACKET;
 	hdr.sll_protocol = 0;
 	hdr.sll_ifindex = if_nametoindex(libtrace->uridata);
 	hdr.sll_hatype = 0;
 	hdr.sll_pkttype = 0;
-	hdr.sll_halen = htons(6); /* FIXME */
-	memcpy(hdr.sll_addr,packet->payload,(size_t)ntohs(hdr.sll_halen));
+	hdr.sll_halen = htons(SLL_HEADER_LENGTH); /* FIXME */
+	memcpy(hdr.sll_addr,packet->payload,(size_t)SLL_HEADER_LENGTH);
 
 	/* This is pretty easy, just send the payload using sendto() (after
 	 * setting up the sll header properly, of course) */
@@ -460,7 +487,7 @@ static size_t linuxnative_set_capture_length(libtrace_packet_t *packet,
 	}
 	
 	/* Reset the cached capture length */
-	packet->capture_length = -1;
+	packet->cached.capture_length = -1;
 
 	linux_hdr = (struct libtrace_linuxnative_header *)packet->header;
 	linux_hdr->caplen = size;
@@ -506,6 +533,7 @@ static struct libtrace_format_t linuxnative = {
 	linuxnative_get_timeval,	/* get_timeval */
 	linuxnative_get_timespec,	/* get_timespec */
 	NULL,				/* get_seconds */
+	NULL,                           /* get_meta_section */
 	NULL,				/* seek_erf */
 	NULL,				/* seek_timeval */
 	NULL,				/* seek_seconds */
@@ -567,6 +595,7 @@ static struct libtrace_format_t linuxnative = {
 	linuxnative_get_timeval,	/* get_timeval */
 	linuxnative_get_timespec,	/* get_timespec */
 	NULL,				/* get_seconds */
+	NULL,                           /* get_meta_section */
 	NULL,				/* seek_erf */
 	NULL,				/* seek_timeval */
 	NULL,				/* seek_seconds */

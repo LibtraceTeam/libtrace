@@ -1,5 +1,6 @@
 #ifndef LIBTRACE_FORMAT_DPDK_H_
 #define LIBTRACE_FORMAT_DPDK_H_
+#include "config.h"
 
 #include <libtrace.h>
 #include "libtrace_int.h"
@@ -128,6 +129,14 @@ typedef uint16_t portid_t;
 typedef uint8_t portid_t;
 #endif
 
+/* 18.05-rc1 renames rte_eth_dev functions to rte_dev
+ * See https://doc.dpdk.org/guides-18.02/rel_notes/deprecation.html
+ */
+#if RTE_VERSION < RTE_VERSION_NUM(18, 5, 0, 1)
+  #define rte_devargs_add rte_eal_devargs_add
+  #define rte_eth_dev_count_avail rte_eth_dev_count
+#endif
+
 
 #include <rte_per_lcore.h>
 #include <rte_debug.h>
@@ -145,11 +154,15 @@ typedef uint8_t portid_t;
 #include <rte_mbuf.h>
 #include <rte_launch.h>
 #include <rte_lcore.h>
-#include <rte_per_lcore.h>
 #include <rte_cycles.h>
 #include <pthread.h>
 #ifdef __FreeBSD__
 #include <pthread_np.h>
+#include <sys/endian.h>
+
+#define cpu_set_t cpuset_t
+#else
+#include <endian.h>
 #endif
 
 
@@ -162,6 +175,16 @@ typedef uint8_t portid_t;
         #define ETH_SPEED_NUM_10G ETH_LINK_SPEED_10G
         #define ETH_SPEED_NUM_20G ETH_LINK_SPEED_20G
         #define ETH_SPEED_NUM_40G ETH_LINK_SPEED_40G
+#endif
+
+/* https://github.com/DPDK/dpdk/commit/35b2d13 19.08-rc1
+ * renames ETHER_CRC_LEN -> RTE_ETHER_CRC_LEN */
+#ifndef RTE_ETHER_CRC_LEN
+  #define RTE_ETHER_CRC_LEN ETHER_CRC_LEN
+#endif
+
+#ifndef RTE_ETHER_MAX_LEN
+  #define RTE_ETHER_MAX_LEN ETHER_MAX_LEN
 #endif
 
 /* The default size of memory buffers to use - This is the max size of standard
@@ -292,7 +315,8 @@ int dpdk_pstart_input (libtrace_t *libtrace);
 int dpdk_start_input (libtrace_t *libtrace);
 int dpdk_config_input (libtrace_t *libtrace,
                 trace_option_t option, void *data);
-int dpdk_init_input (libtrace_t *libtrace);
+int dpdk_init_input_pci (libtrace_t *libtrace);
+int dpdk_init_input_vdev (libtrace_t *libtrace);
 int dpdk_pause_input(libtrace_t * libtrace);
 int dpdk_fin_input(libtrace_t * libtrace);
 int dpdk_read_packet (libtrace_t *libtrace, libtrace_packet_t *packet);

@@ -23,6 +23,10 @@
  *
  *
  */
+
+#ifndef LIBPACKETDUMP_BITBUFFER_H_
+#define LIBPACKETDUMP_BITBUFFER_H_
+
 #include "grammar.h"
 #include <stdio.h>
 int yyerror(const char *s);
@@ -34,3 +38,4 @@ extern char* yytext;
 extern int lines;
 extern element_t *el_list;
 
+#endif

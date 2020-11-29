@@ -37,9 +37,6 @@
 
 #ifdef HAVE_PCAP_H
 #  include <pcap.h>
-#  ifdef HAVE_PCAP_INT_H
-#    include <pcap-int.h>
-#  endif
 #endif
 
 /* This format module deals with traces captured using the PCAP library. This
@@ -96,6 +93,22 @@ struct pcap_format_data_out_t {
 
 	} output;
 };
+
+static bool pcap_can_write(libtrace_packet_t *packet) {
+	/* Get the linktype */
+        libtrace_linktype_t ltype = trace_get_link_type(packet);
+
+        if (ltype == TRACE_TYPE_PCAPNG_META
+                || ltype == TRACE_TYPE_CONTENT_INVALID
+                || ltype == TRACE_TYPE_UNKNOWN
+                || ltype == TRACE_TYPE_ERF_META
+                || ltype == TRACE_TYPE_NONDATA) {
+
+                return false;
+        }
+
+        return true;
+}
 
 static int pcap_init_input(libtrace_t *libtrace) {
 	libtrace->format_data = malloc(sizeof(struct pcap_format_data_t));
@@ -387,7 +400,9 @@ static int pcap_pause_input(libtrace_t *libtrace UNUSED)
 
 static int pcap_fin_input(libtrace_t *libtrace) 
 {
-	pcap_close(INPUT.pcap);
+	if (INPUT.pcap != NULL) {
+		pcap_close(INPUT.pcap);
+	}
 	INPUT.pcap=NULL;
 	free(libtrace->format_data);
 	return 0; /* success */
@@ -399,7 +414,9 @@ static int pcap_fin_output(libtrace_out_t *libtrace)
 		pcap_dump_flush(OUTPUT.trace.dump);
 		pcap_dump_close(OUTPUT.trace.dump);
 	}
-	pcap_close(OUTPUT.trace.pcap);
+	if (OUTPUT.trace.pcap) {
+		pcap_close(OUTPUT.trace.pcap);
+	}
 	free(libtrace->format_data);
 	return 0;
 }
@@ -487,7 +504,10 @@ static int pcap_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 			case 0: 
 				if ((ret=is_halted(libtrace)) != -1)
 					return ret;
-                                continue; /* timeout expired */
+                                /* timeout, return and let libtrace check message
+                                 * queue.
+                                 */
+                                return READ_MESSAGE;
 			case -1: 
 				trace_set_err(libtrace,TRACE_ERR_BAD_PACKET,
 						"%s",pcap_geterr(INPUT.pcap));
@@ -518,6 +538,11 @@ static int pcap_write_packet(libtrace_out_t *libtrace,
 		libtrace_packet_t *packet) 
 {
 
+	/* Check pcap can write this type of packet */
+        if (!pcap_can_write(packet)) {
+                return 0;
+        }
+
 	if (!libtrace) {
 		fprintf(stderr, "NULL trace passed into pcap_write_packet()\n");
 		return TRACE_ERR_NULL_TRACE;
@@ -533,12 +558,6 @@ static int pcap_write_packet(libtrace_out_t *libtrace,
 	uint32_t remaining;
 
 	link = trace_get_packet_buffer(packet,&linktype,&remaining);
-
-	/* Silently discard RT metadata packets and packets with an
-	 * unknown linktype. */
-	if (linktype == TRACE_TYPE_NONDATA || linktype == TRACE_TYPE_UNKNOWN || linktype == TRACE_TYPE_ERF_META || linktype == TRACE_TYPE_CONTENT_INVALID) {
-		return 0;
-	}
 
 	/* We may have to convert this packet into a suitable PCAP packet */
 
@@ -762,7 +781,7 @@ static size_t pcap_set_capture_length(libtrace_packet_t *packet,size_t size) {
 		return trace_get_capture_length(packet);
 	}
 	/* Reset the cached capture length */
-	packet->capture_length = -1;
+	packet->cached.capture_length = -1;
 	pcapptr = (struct pcap_pkthdr *)packet->header;
 	pcapptr->caplen = size;
 	return trace_get_capture_length(packet);
@@ -851,6 +870,7 @@ static struct libtrace_format_t pcap = {
 	pcap_get_timeval,		/* get_timeval */
 	NULL,				/* get_seconds */
 	NULL,				/* get_timespec */
+	NULL,                           /* get_meta_section */
 	NULL,				/* seek_erf */
 	NULL,				/* seek_timeval */
 	NULL,				/* seek_seconds */
@@ -896,6 +916,7 @@ static struct libtrace_format_t pcapint = {
 	pcap_get_timeval,		/* get_timeval */
 	NULL,				/* get_seconds */
 	NULL,				/* get_timespec */
+	NULL,                           /* get_meta_section */
 	NULL,				/* seek_erf */
 	NULL,				/* seek_timeval */
 	NULL,				/* seek_seconds */

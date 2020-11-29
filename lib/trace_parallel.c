@@ -24,7 +24,9 @@
  *
  */
 
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 #include "common.h"
 #include "config.h"
 #include <assert.h>
@@ -76,16 +78,6 @@
 
 #include "libtrace.h"
 #include "libtrace_parallel.h"
-
-#ifdef HAVE_NET_BPF_H
-#  include <net/bpf.h>
-#else
-#  ifdef HAVE_PCAP_BPF_H
-#    include <pcap-bpf.h>
-#  endif
-#endif
-
-
 #include "libtrace_int.h"
 #include "format_helper.h"
 #include "rt_protocol.h"
@@ -241,8 +233,9 @@ inline void send_message(libtrace_t *trace, libtrace_thread_t *thread,
 	case MESSAGE_POST_REPORTER:
 	case MESSAGE_PACKET:
 		return;
+	case MESSAGE_META_PACKET:
+		return;
 	}
-
 	if (fn)
 		(*fn)(trace, thread, trace->global_blob, thread->user_data);
 }
@@ -405,11 +398,14 @@ libtrace_thread_t * get_thread_table(libtrace_t *libtrace) {
 	int i = 0;
 	pthread_t tid = pthread_self();
 
+        if (libtrace->perpkt_threads == NULL) {
+                return NULL;
+        }
 	for (;i<libtrace->perpkt_thread_count ;++i) {
 		if (pthread_equal(tid, libtrace->perpkt_threads[i].tid))
 			return &libtrace->perpkt_threads[i];
 	}
-	pthread_exit(NULL);
+	return NULL;
 }
 
 static libtrace_thread_t * get_thread_descriptor(libtrace_t *libtrace) {
@@ -495,8 +491,23 @@ static inline int dispatch_packet(libtrace_t *trace,
                 if (!IS_LIBTRACE_META_PACKET((*packet))) {
         		t->accepted_packets++;
                 }
-		if (trace->perpkt_cbs->message_packet)
-			*packet = (*trace->perpkt_cbs->message_packet)(trace, t, trace->global_blob, t->user_data, *packet);
+
+		/* If packet is meta call the meta callback */
+		if (IS_LIBTRACE_META_PACKET((*packet))) {
+			/* Pass to meta callback if defined else pass to packet callback */
+			if (trace->perpkt_cbs->message_meta_packet) {
+				*packet = (*trace->perpkt_cbs->message_meta_packet)(trace, t,
+					trace->global_blob, t->user_data, *packet);
+			} else if (trace->perpkt_cbs->message_packet) {
+				*packet = (*trace->perpkt_cbs->message_packet)(trace, t,
+					trace->global_blob, t->user_data, *packet);
+			}
+		} else {
+			if (trace->perpkt_cbs->message_packet) {
+				*packet = (*trace->perpkt_cbs->message_packet)(trace, t,
+					trace->global_blob, t->user_data, *packet);
+			}
+		}
 		trace_fin_packet(*packet);
 	} else {
 		if ((*packet)->error != READ_TICK) {
@@ -652,6 +663,7 @@ static void* perpkt_threads_entry(void *data) {
 	t = get_thread_table(trace);
 	if (!t) {
 		trace_set_err(trace, TRACE_ERR_THREAD, "Unable to get thread table in perpkt_threads_entry()");
+		ASSERT_RET(pthread_mutex_unlock(&trace->libtrace_lock), == 0);
 		pthread_exit(NULL);
 	}
 	if (trace->state == STATE_ERROR) {
@@ -704,6 +716,7 @@ static void* perpkt_threads_entry(void *data) {
 			}
                         send_message(trace, t, message.code, message.data, 
                                         message.sender);
+
 			/* Continue and the empty messages out before packets */
 			continue;
 		}
@@ -806,6 +819,9 @@ eof:
  * The start point for our single threaded hasher thread, this will read
  * and hash a packet from a data source and queue it against the correct
  * core to process it.
+ *
+ * Note: This uses the old single threaded API as the format has been
+ * started with trace_start not trace_pstart.
  */
 static void* hasher_entry(void *data) {
 	libtrace_t *trace = (libtrace_t *)data;
@@ -833,11 +849,6 @@ static void* hasher_entry(void *data) {
 		pthread_exit(NULL);
 	}
 	ASSERT_RET(pthread_mutex_unlock(&trace->libtrace_lock), == 0);
-
-	/* We are reading but it is not the parallel API */
-	if (trace->format->pregister_thread) {
-		trace->format->pregister_thread(trace, t, true);
-	}
 
 	/* Read all packets in then hash and queue against the correct thread */
 	while (1) {
@@ -934,9 +945,6 @@ hasher_eof:
 	thread_change_state(trace, t, THREAD_FINISHED, true);
 
 	libtrace_ocache_unregister_thread(&trace->packet_freelist);
-	if (trace->format->punregister_thread) {
-		trace->format->punregister_thread(trace, t);
-	}
 	print_memory_stats();
 
 	// TODO remove from TTABLE t sometime
@@ -1008,10 +1016,27 @@ inline static int trace_pread_packet_hasher_thread(libtrace_t *libtrace,
                                                    size_t nb_packets) {
 	size_t i;
 
-	/* We store the last error message here */
-	if (t->format_data) {
-		return ((libtrace_packet_t *)t->format_data)->error;
-	}
+        /* We store the last error message here */
+        if (t->format_data) {
+                return ((libtrace_packet_t *)t->format_data)->error;
+        }
+
+        /* libtrace_ringbuffer_read() blocks if a packet is not available
+         * and this prevents the tick messages from being triggered. So check
+         * for a available packet before continuing.
+         */
+        while (libtrace_ringbuffer_is_empty(&t->rbuffer)) {
+
+                /* does libtrace have any messages in the queue */
+                if (libtrace_message_queue_count(&t->messages) > 0) {
+                    return READ_MESSAGE;
+                }
+
+		/* Give up the CPU time to another thread since we have
+                 * packets or messages.
+                 */
+                sched_yield();
+        }
 
 	// Always grab at least one
 	if (packets[0]) // Recycle the old get the new
@@ -1348,6 +1373,7 @@ static inline size_t filter_packets(libtrace_t *trace,
 	for (i = 0; i < nb_packets; ++i) {
 		// The filter needs the trace attached to receive the link type
 		packets[i]->trace = trace;
+                packets[i]->which_trace_start = trace->startcount;
 		if (trace_apply_filter(trace->filter, packets[i])) {
 			libtrace_packet_t *tmp;
 			tmp = packets[offset];
@@ -1388,26 +1414,12 @@ static int trace_pread_packet_wrapper(libtrace_t *libtrace,
 		return -1;
 	if (!libtrace->started) {
 		trace_set_err(libtrace, TRACE_ERR_BAD_STATE,
-		              "You must call libtrace_start() before trace_read_packet()\n");
+		              "You must call trace_start() before trace_read_packet()\n");
 		return -1;
 	}
 
 	if (libtrace->format->pread_packets) {
 		int ret;
-		for (i = 0; i < (int) nb_packets; ++i) {
-			if (!i[packets]) {
-				trace_set_err(libtrace, TRACE_ERR_BAD_STATE, "NULL packets in "
-					"trace_pread_packet_wrapper()");
-				return -1;
-			}
-			if (!(packets[i]->buf_control==TRACE_CTRL_PACKET ||
-			      packets[i]->buf_control==TRACE_CTRL_EXTERNAL)) {
-				trace_set_err(libtrace,TRACE_ERR_BAD_STATE,
-				              "Packet passed to trace_read_packet() is invalid\n");
-				return -1;
-			}
-                        packets[i]->which_trace_start = libtrace->startcount;
-		}
 		do {
 			ret=libtrace->format->pread_packets(libtrace, t,
 			                                    packets,
@@ -1433,6 +1445,7 @@ static int trace_pread_packet_wrapper(libtrace_t *libtrace,
 				if (libtrace->snaplen>0)
 					trace_set_capture_length(packets[i],
 							libtrace->snaplen);
+                        	packets[i]->which_trace_start = libtrace->startcount;
 			}
 		} while(ret == 0);
 		return ret;
@@ -1563,6 +1576,8 @@ SIMPLE_FUNCTION static int get_nb_cores() {
  */
 static void verify_configuration(libtrace_t *libtrace) {
 
+        int i;
+
 	if (libtrace->config.hasher_queue_size <= 0)
 		libtrace->config.hasher_queue_size = 1000;
 
@@ -1595,6 +1610,15 @@ static void verify_configuration(libtrace_t *libtrace) {
 	if (libtrace->hasher && libtrace->perpkt_thread_count > 1) {
 		libtrace->hasher_thread.type = THREAD_HASHER;
 	}
+
+        // make sure supplied coremap is valid - unset invalid entries
+        for (i = 0; i < MAX_THREADS; i++) {
+            if (get_nb_cores()-1 < libtrace->config.coremap[i] || -1 > libtrace->config.coremap[i]) {
+                fprintf(stderr, "Invalid core %d in coremap, perpkt-thread %d will not be pinned\n",
+                    libtrace->config.coremap[i], i);
+                libtrace->config.coremap[i] = -1;
+            }
+        }
 }
 
 /**
@@ -1641,12 +1665,18 @@ static int trace_start_thread(libtrace_t *trace,
 
 #ifdef __linux__
 	CPU_ZERO(&cpus);
-	for (i = 0; i < get_nb_cores(); i++)
+
+        // does a coremap entry exist for this perpkt thread
+        if (type == THREAD_PERPKT && trace->config.coremap[perpkt_num] != -1) {
+            CPU_SET(trace->config.coremap[perpkt_num], &cpus);
+        } else {
+	    for (i = 0; i < get_nb_cores(); i++)
 		CPU_SET(i, &cpus);
+        }
 
 	ret = pthread_create(&t->tid, NULL, start_routine, (void *) trace);
 	if( ret == 0 ) {
-		ret = pthread_setaffinity_np(t->tid, sizeof(cpus), &cpus);
+	    ret = pthread_setaffinity_np(t->tid, sizeof(cpus), &cpus);
 	}
 
 #else
@@ -1691,31 +1721,34 @@ static int trace_start_thread(libtrace_t *trace,
  * - dag:/dev/dag0,0 would match LIBTRACE_CONF, LIBTRACE_CONF_DAG, LIBTRACE_CONF_DAG__DEV_DAG0_0
  * - test.erf would match LIBTRACE_CONF, LIBTRACE_CONF_ERF, LIBTRACE_CONF_ERF_TEST_ERF
  *
- * @note All environment variables names MUST only contian
+ * @note All environment variables names MUST only contain
  * [A-Z], [0-9] and [_] (underscore) and not start with a number. Any characters
- * outside of this range should be captilised if possible or replaced with an
+ * outside of this range should be capitalised if possible or replaced with an
  * underscore.
  */
 static void parse_env_config (libtrace_t *libtrace) {
 	char env_name[1024] = "LIBTRACE_CONF_";
 	size_t len = strlen(env_name);
-	size_t mark = 0;
+	size_t mark; /* Offset of the first ':' after the format name, or 0 */
 	size_t i;
 	char * env;
 
 	/* Make our compound string */
 	strncpy(&env_name[len], libtrace->format->name, sizeof(env_name) - len);
 	len += strlen(libtrace->format->name);
-	strncpy(&env_name[len], ":", sizeof(env_name) - len);
-	len += 1;
-	strncpy(&env_name[len], libtrace->uridata, sizeof(env_name) - len);
+	if (len + 2 < sizeof(env_name)) {
+		mark = len;
+		env_name[len++] = ':';
+		strncpy(&env_name[len], libtrace->uridata, sizeof(env_name) - len);
+	} else {
+		/* Unexpected: We don't have buffer space, silently continue */
+		mark = 0;
+	}
+	env_name[sizeof(env_name)-1] = 0;
 
 	/* env names are allowed to be A-Z (CAPS) 0-9 and _ */
 	for (i = 0; env_name[i] != 0; ++i) {
 		env_name[i] = toupper(env_name[i]);
-		if(env_name[i] == ':') {
-			mark = i;
-		}
 		if (!( (env_name[i] >= 'A' && env_name[i] <= 'Z') ||
 		       (env_name[i] >= '0' && env_name[i] <= '9') )) {
 			env_name[i] = '_';
@@ -1841,7 +1874,7 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob,
 		ret = libtrace->format->pstart_input(libtrace);
 		libtrace->pread = trace_pread_packet_wrapper;
 	}
-	if (ret != 0) {
+	if (ret != 0 && !trace_is_err(libtrace)) {
 		if (libtrace->format->start_input) {
 			ret = libtrace->format->start_input(libtrace);
 		}
@@ -2033,6 +2066,12 @@ DLLEXPORT int trace_set_stopping_cb(libtrace_callback_set_t *cbset,
 DLLEXPORT int trace_set_packet_cb(libtrace_callback_set_t *cbset,
                 fn_cb_packet handler) {
 	cbset->message_packet = handler;
+	return 0;
+}
+
+DLLEXPORT int trace_set_meta_packet_cb(libtrace_callback_set_t *cbset,
+		fn_cb_meta_packet handler) {
+	cbset->message_meta_packet = handler;
 	return 0;
 }
 
@@ -2230,7 +2269,6 @@ DLLEXPORT int trace_pstop(libtrace_t *libtrace)
 
 	// Now send a message asking the threads to stop
 	// This will be retrieved before trying to read another packet
-
 	message.code = MESSAGE_DO_STOP;
 	trace_message_perpkts(libtrace, &message);
 	if (trace_has_dedicated_hasher(libtrace))
@@ -2276,22 +2314,31 @@ DLLEXPORT int trace_set_hasher(libtrace_t *trace, enum hasher_types type, fn_has
 		ret = trace->format->config_input(trace, TRACE_OPTION_HASHER, &type);
 
 	if (ret == -1) {
+                libtrace_err_t err UNUSED;
+
 		/* We have to deal with this ourself */
+                /* If we succeed, clear any error state otherwise our caller
+                 * might assume an error occurred, even though we've resolved
+                 * the issue ourselves.
+                 */
 		if (!hasher) {
 			switch (type)
 			{
 				case HASHER_CUSTOM:
 				case HASHER_BALANCE:
+                                        err = trace_get_err(trace);
 					return 0;
 				case HASHER_BIDIRECTIONAL:
 					trace->hasher = (fn_hasher) toeplitz_hash_packet;
 					trace->hasher_data = calloc(1, sizeof(toeplitz_conf_t));
 					toeplitz_init_config(trace->hasher_data, 1);
+                                        err = trace_get_err(trace);
 					return 0;
 				case HASHER_UNIDIRECTIONAL:
 					trace->hasher = (fn_hasher) toeplitz_hash_packet;
 					trace->hasher_data = calloc(1, sizeof(toeplitz_conf_t));
 					toeplitz_init_config(trace->hasher_data, 0);
+                                        err = trace_get_err(trace);
 					return 0;
 			}
 			return -1;
@@ -2438,8 +2485,11 @@ DLLEXPORT int trace_message_reporter(libtrace_t * libtrace, libtrace_message_t *
 
 DLLEXPORT int trace_post_reporter(libtrace_t *libtrace)
 {
-	libtrace_message_t message = {0, {.uint64=0}, NULL};
-	message.code = MESSAGE_POST_REPORTER;
+	libtrace_message_t message;
+        memset(&message, 0, sizeof(libtrace_message_t));
+        message.code = MESSAGE_POST_REPORTER;
+        message.data.uint64 = 0;
+        message.sender = NULL;
 	return trace_message_reporter(libtrace, (void *) &message);
 }
 
@@ -2613,100 +2663,260 @@ DLLEXPORT int trace_set_debug_state(libtrace_t *trace, bool debug_state) {
 	return 0;
 }
 
-static bool config_bool_parse(char *value, size_t nvalue) {
-	if (strncmp(value, "true", nvalue) == 0)
+static bool config_bool_parse(char *value) {
+	if (strcmp(value, "true") == 0)
 		return true;
-	else if (strncmp(value, "false", nvalue) == 0)
+	else if (strcmp(value, "false") == 0)
 		return false;
 	else
 		return strtoll(value, NULL, 10) != 0;
 }
 
+static int config_coremap_parse(const char *value, struct user_configuration *uc) {
+	int core = 0;
+	int len = 0;
+	size_t pos = 0;
+	unsigned int i = 0;
+	while (value[pos] != '\0') {
+		if (sscanf(&value[pos], "%d%n", &core, &len) == 1) {
+			if (i < MAX_THREADS)
+				uc->coremap[i++] = core;
+
+			pos += len;
+		} else {
+			fprintf(stderr, "Badly formed coremap, non-numeric value: %s\n", &value[pos]);
+			return -1;
+		}
+		/* move to the next coremap value, also account for
+		 * the comma or colon */
+		if (value[pos] == '\0') {
+			break;
+		} else if (value[pos] != ',' && value[pos] != ':') {
+			fprintf(stderr, "Badly formed coremap - ':' or ',' is required between values\n");
+			return -1;
+		} else {
+			pos++;
+		}
+	}
+	return 0;
+}
+
+DLLEXPORT int trace_set_coremap(libtrace_t *trace, const char *value) {
+	if (!trace_is_configurable(trace)) return -1;
+	return config_coremap_parse(value, &trace->config);
+}
+
 /* Note update documentation on trace_set_configuration */
-static void config_string(struct user_configuration *uc, char *key, size_t nkey, char *value, size_t nvalue) {
+static int config_string(struct user_configuration *uc, char *key, char *value) {
 	if (!key) {
 		fprintf(stderr, "NULL key passed to config_string()\n");
-		return;
+		return -1;
 	}
 	if (!value) {
 		fprintf(stderr, "NULL value passed to config_string()\n");
-		return;
+		return -1;
 	}
 	if (!uc) {
 		fprintf(stderr, "NULL uc (user_configuration) passed to config_string()\n");
-		return;
+		return -1;
 	}
-	if (strncmp(key, "cache_size", nkey) == 0
-	    || strncmp(key, "cs", nkey) == 0) {
+	if (strcmp(key, "cache_size") == 0
+	    || strcmp(key, "cs") == 0) {
 		uc->cache_size = strtoll(value, NULL, 10);
-	} else if (strncmp(key, "thread_cache_size", nkey) == 0
-	           || strncmp(key, "tcs", nkey) == 0) {
+	} else if (strcmp(key, "thread_cache_size") == 0
+	           || strcmp(key, "tcs") == 0) {
 		uc->thread_cache_size = strtoll(value, NULL, 10);
-	} else if (strncmp(key, "fixed_count", nkey) == 0
-	           || strncmp(key, "fc", nkey) == 0) {
-		uc->fixed_count = config_bool_parse(value, nvalue);
-	} else if (strncmp(key, "burst_size", nkey) == 0
-	           || strncmp(key, "bs", nkey) == 0) {
+	} else if (strcmp(key, "fixed_count") == 0
+	           || strcmp(key, "fc") == 0) {
+		uc->fixed_count = config_bool_parse(value);
+	} else if (strcmp(key, "burst_size") == 0
+	           || strcmp(key, "bs") == 0) {
 		uc->burst_size = strtoll(value, NULL, 10);
-	} else if (strncmp(key, "tick_interval", nkey) == 0
-	           || strncmp(key, "ti", nkey) == 0) {
+	} else if (strcmp(key, "tick_interval") == 0
+	           || strcmp(key, "ti") == 0) {
 		uc->tick_interval = strtoll(value, NULL, 10);
-	} else if (strncmp(key, "tick_count", nkey) == 0
-	           || strncmp(key, "tc", nkey) == 0) {
+	} else if (strcmp(key, "tick_count") == 0
+	           || strcmp(key, "tc") == 0) {
 		uc->tick_count = strtoll(value, NULL, 10);
-	} else if (strncmp(key, "perpkt_threads", nkey) == 0
-	           || strncmp(key, "pt", nkey) == 0) {
+	} else if (strcmp(key, "perpkt_threads") == 0
+	           || strcmp(key, "pt") == 0) {
 		uc->perpkt_threads = strtoll(value, NULL, 10);
-	} else if (strncmp(key, "hasher_queue_size", nkey) == 0
-	           || strncmp(key, "hqs", nkey) == 0) {
+	} else if (strcmp(key, "hasher_queue_size") == 0
+	           || strcmp(key, "hqs") == 0) {
 		uc->hasher_queue_size = strtoll(value, NULL, 10);
-	} else if (strncmp(key, "hasher_polling", nkey) == 0
-	           || strncmp(key, "hp", nkey) == 0) {
-		uc->hasher_polling = config_bool_parse(value, nvalue);
-	} else if (strncmp(key, "reporter_polling", nkey) == 0
-	           || strncmp(key, "rp", nkey) == 0) {
-		uc->reporter_polling = config_bool_parse(value, nvalue);
-	} else if (strncmp(key, "reporter_thold", nkey) == 0
-	           || strncmp(key, "rt", nkey) == 0) {
+	} else if (strcmp(key, "hasher_polling") == 0
+	           || strcmp(key, "hp") == 0) {
+		uc->hasher_polling = config_bool_parse(value);
+	} else if (strcmp(key, "reporter_polling") == 0
+	           || strcmp(key, "rp") == 0) {
+		uc->reporter_polling = config_bool_parse(value);
+	} else if (strcmp(key, "reporter_thold") == 0
+	           || strcmp(key, "rt") == 0) {
 		uc->reporter_thold = strtoll(value, NULL, 10);
-	} else if (strncmp(key, "debug_state", nkey) == 0
-	           || strncmp(key, "ds", nkey) == 0) {
-		uc->debug_state = config_bool_parse(value, nvalue);
+	} else if (strcmp(key, "debug_state") == 0
+	           || strcmp(key, "ds") == 0) {
+		uc->debug_state = config_bool_parse(value);
+	} else if (strcmp(key, "coremap") == 0) {
+		return config_coremap_parse(value, uc);
 	} else {
 		fprintf(stderr, "No matching option %s(=%s), ignoring\n", key, value);
+		return -1;
 	}
+	return 0;
 }
 
-DLLEXPORT int trace_set_configuration(libtrace_t *trace, const char *str) {
-	char *pch;
-	char key[100];
-	char value[100];
-	char *dup;
+int _trace_set_configuration(libtrace_t *trace, const char *str, const char **format) {
+	char *pch, *key, *value, *dup, *colon;
+	int ret = 0;
 	if (!trace) {
 		fprintf(stderr, "NULL trace passed into trace_set_configuration()\n");
-		return TRACE_ERR_NULL_TRACE;
+		return -1;
 	}
 	if (!str) {
-		trace_set_err(trace, TRACE_ERR_CONFIG, "NULL configuration string passed to trace_set_configuration()");
+		trace_set_err(trace, TRACE_ERR_CONFIG,
+		              "NULL configuration string passed to trace_set_configuration()");
 		return -1;
 	}
 
-	if (!trace_is_configurable(trace)) return -1;
+	if (!trace_is_configurable(trace)) {
+		trace_set_err(trace, TRACE_ERR_BAD_STATE,
+		              "trace_set_configuration() cannot configure a running trace");
+			return -1;
+	}
 
 	dup = strdup(str);
-	pch = strtok (dup," ,.-");
-	while (pch != NULL)
-	{
-		if (sscanf(pch, "%99[^=]=%99s", key, value) == 2) {
-			config_string(&trace->config, key, sizeof(key), value, sizeof(value));
-		} else {
-			fprintf(stderr, "Error: parsing option %s\n", pch);
+	if (dup == NULL) {
+		trace_set_err(trace, TRACE_ERR_OUT_OF_MEMORY,
+		              "Unable to allocate memory in trace_set_configuration()");
+		return -1;
+	}
+
+	/*
+	 * Keys - should be textual [a-zA-Z_-]. They strictly cannot contain a
+	 * colon ':' or equals sign '='.
+	 * Values - cannot contain commas ',' unless enclosed in square brackets
+	 *
+	 * This may parse a value given prior to a format. This should be
+	 * separated by a colon ':'
+	 *
+	 * if format != NULL (str is a full URI)
+	 * 	expecting: key=value[,key=value ...]
+	 * otherwise
+	 * 	expecting: key=value[,key=value ...]:format:URI
+	 *
+	 */
+	if (format != NULL) {
+		*format = str;
+		/* URI starts with ':' -> no options */
+		if (*dup == ':') {
+			*format = str+1;
+			return 0;
 		}
-		pch = strtok (NULL," ,.-");
+	}
+	pch = dup;
+	while (pch != NULL) {
+		key = pch;
+		colon = strchr(pch, ':');
+		pch = strchr(pch, '=');
+		/* If this is key: not key=, then assume it the start of the URI string */
+		if (colon != NULL && colon < pch) {
+			if (format != NULL) {
+				*format = (key-dup) + str;
+				ret = 0;
+				break;
+			} else {
+				trace_set_err(trace, TRACE_ERR_BAD_FORMAT,
+					      "trace_set_configuration(), invalid configuration options %s", key);
+				ret = -1;
+				break;
+			}
+		}
+		/* key=value not found */
+		if (pch == NULL) {
+			if (format != NULL) {
+				*format = (key-dup) + str;
+				ret = 0;
+				break;
+			} else {
+				if (*key != '\0') {
+					trace_set_err(trace, TRACE_ERR_BAD_FORMAT,
+						      "trace_set_configuration(), not a key=value %s", key);
+					ret = -1;
+				}
+				break;
+			}
+		}
+		*pch = '\0';
+		pch++;
+		if (*pch == '\0') {
+			trace_set_err(trace, TRACE_ERR_BAD_FORMAT,
+			              "parsing option, expecting a value: %s\n", pch);
+			ret = -1;
+			break;
+		} else if (*pch == '[') {
+			/* The end of the value must be a closing bracket */
+			value = ++pch;
+			pch = strchr(pch, ']');
+			if (pch == NULL) {
+				trace_set_err(trace, TRACE_ERR_BAD_FORMAT,
+				              "parsing option, expecting a ']'");
+				ret = -1;
+				break;
+			}
+			*pch = '\0';
+			pch++;
+		} else {
+			/* The end of the value can be ',', ':', or '\0' */
+			value = pch;
+			colon = strchr(pch, ':');
+			pch = strchr(pch, ',');
+			/* Do we reach a colon first? */
+			if ((colon != NULL && pch != NULL && colon < pch) || pch == NULL) {
+				pch = colon;
+			}
+		}
+		/* pch is at the next separator (, or :) or NULL if end of string */
+		if (format != NULL && pch == NULL) {
+			/* Options cannot be at the end of URI, file path with '=' in it? */
+			*format = (key-dup) + str;
+			ret = 0;
+			break;
+		} else if (format != NULL && *pch == ':') {
+			*pch = '\0';
+			pch++;
+			*format = (pch-dup) + str;
+			if (config_string(&trace->config, key, value) == -1) {
+				/* failed to parse the option, try as URI */
+				*format = (key-dup) +str;
+				ret = 0;
+				break;
+			}
+			break;
+		} else if (pch != NULL && *pch != ',') {
+			trace_set_err(trace, TRACE_ERR_BAD_FORMAT,
+				      "parsing options, expected a comma %s", pch);
+			ret = -1;
+			break;
+		} else {
+			if (pch != NULL) {
+				*pch = '\0';
+				pch++;
+			}
+			if (config_string(&trace->config, key, value) == -1 &&
+			    *format != NULL) {
+				/* failed to parse the option, try as URI */
+				*format = (key-dup) + str;
+				ret = 0;
+				break;
+			}
+		}
 	}
 	free(dup);
+	return ret;
+}
 
-	return 0;
+DLLEXPORT int trace_set_configuration(libtrace_t *trace, const char *str) {
+	return _trace_set_configuration(trace, str, NULL);
 }
 
 DLLEXPORT int trace_set_configuration_file(libtrace_t *trace, FILE *file) {

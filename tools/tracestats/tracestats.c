@@ -53,12 +53,12 @@
 #include "lt_inttypes.h"
 #include <pthread.h>
 
-struct libtrace_t *trace = NULL;
+struct libtrace_t *inptrace = NULL;
 
 static void cleanup_signal(int signal UNUSED)
 {
-	if (trace)
-		trace_pstop(trace);
+	if (inptrace)
+		trace_pstop(inptrace);
 }
 
 struct filter_t {
@@ -195,10 +195,10 @@ static void run_trace(char *uri, int threadcount)
 	fprintf(stderr,"%s:\n",uri);
         libtrace_callback_set_t *pktcbs, *rescbs;
 
-	trace = trace_create(uri);
+	inptrace = trace_create(uri);
 
-	if (trace_is_err(trace)) {
-		trace_perror(trace,"Failed to create trace");
+	if (trace_is_err(inptrace)) {
+		trace_perror(inptrace,"Failed to create trace");
 		return;
 	}
 
@@ -213,21 +213,21 @@ static void run_trace(char *uri, int threadcount)
         trace_set_stopping_cb(rescbs, fn_print_results);
 
         if (threadcount != 0)
-                trace_set_perpkt_threads(trace, threadcount);
+                trace_set_perpkt_threads(inptrace, threadcount);
 
 	/* Start the trace as a parallel trace */
-	if (trace_pstart(trace, NULL, pktcbs, rescbs)==-1) {
-		trace_perror(trace,"Failed to start trace");
+	if (trace_pstart(inptrace, NULL, pktcbs, rescbs)==-1) {
+		trace_perror(inptrace,"Failed to start trace");
 		return;
 	}
 
 	/* Wait for all threads to stop */
-	trace_join(trace);
+	trace_join(inptrace);
 
-	if (trace_is_err(trace))
-		trace_perror(trace,"%s",uri);
+	if (trace_is_err(inptrace))
+		trace_perror(inptrace,"%s",uri);
 
-	trace_destroy(trace);
+	trace_destroy(inptrace);
         trace_destroy_callback_set(pktcbs);
         trace_destroy_callback_set(rescbs);
 }

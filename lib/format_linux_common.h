@@ -37,6 +37,7 @@
 
 #include "libtrace.h"
 #include "libtrace_int.h"
+#include "libtrace_arphrd.h"
 
 #ifdef HAVE_NETPACKET_PACKET_H
 
@@ -44,6 +45,7 @@
 #include <netpacket/packet.h>
 #include <net/ethernet.h>
 #include <net/if_arp.h>
+#include <linux/sockios.h>
 
 #include <net/if.h>
 #include <sys/ioctl.h>
@@ -61,12 +63,6 @@
  * hopefully means less packet loss, especially if traffic comes in bursts.
  */
 #define CONF_RING_FRAMES        0x100
-
-/* The maximum frames allowed to be waiting in the TX_RING before the kernel is 
- * notified to write them out. Make sure this is less than CONF_RING_FRAMES. 
- * Performance doesn't seem to increase any more when setting this above 10.
- */
-#define TX_MAX_QUEUE		10
 
 #else	/* HAVE_NETPACKET_PACKET_H */
 
@@ -276,6 +272,8 @@ struct linux_format_data_out_t {
 	libtrace_rt_types_t format;
 	/* Used to determine buffer size for the ring buffer */
 	uint32_t max_order;
+        /* Maximum number of packets allowed in the tx queue before notifying the kernel */
+        int tx_max_queue;
 };
 
 struct linux_per_stream_t {
@@ -337,6 +335,8 @@ int linuxcommon_init_output(libtrace_out_t *libtrace);
 int linuxcommon_probe_filename(const char *filename);
 int linuxcommon_config_input(libtrace_t *libtrace, trace_option_t option,
                              void *data);
+int linuxcommon_config_output(libtrace_out_t *libtrace, trace_option_output_t option,
+                             void *data);
 void linuxcommon_close_input_stream(libtrace_t *libtrace,
                                     struct linux_per_stream_t *stream);
 int linuxcommon_start_input_stream(libtrace_t *libtrace,
@@ -352,6 +352,8 @@ int linuxcommon_pstart_input(libtrace_t *libtrace,
 #endif /* HAVE_NETPACKET_PACKET_H */
 
 void linuxcommon_get_statistics(libtrace_t *libtrace, libtrace_stat_t *stat);
+int linuxcommon_get_dev_statistics(char *ifname, struct linux_dev_stats *stats);
+int linuxcommon_set_promisc(const int sock, const unsigned int ifindex, bool enable);
 
 static inline libtrace_direction_t linuxcommon_get_direction(uint8_t pkttype)
 {
@@ -428,15 +430,15 @@ static inline int linuxcommon_to_packet_fanout(libtrace_t *libtrace,
 
                 if (setsockopt(stream->fd, SOL_PACKET, PACKET_FANOUT,
                                 &fanout_opt, sizeof(fanout_opt)) == -1) {
-                        trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
-                              "Converting the fd to a socket fanout failed %s",
-                              libtrace->uridata);
                         FORMAT_DATA->fanout_group ++;
                         attempts ++;
                         continue;
                 }
                 return 0;
         }
+        trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
+                        "Converting the fd to a socket fanout failed %s",
+                        libtrace->uridata);
         return -1;
 }
 #endif /* HAVE_NETPACKET_PACKET_H */

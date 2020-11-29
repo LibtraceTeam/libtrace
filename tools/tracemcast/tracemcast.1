@@ -1,0 +1,72 @@
+.TH TRACEMCAST "1" "Feb 2020" "tracemcast (libtrace)" "User Commands"
+.SH
+tracemcast \- multicast captured packets on an interface
+.SH SYNOPSIS
+.B tracemcast
+[ \-m <monitor identifier> ]
+[ \-f <filterstring> ]
+[ \-g <multicast group address> ]
+[ \-p <port for beaconing group> ]
+[ \-s <source address> ]
+[ \-t <number of threads> ]
+[ \-M <mtu> ]
+inputuri
+.SH DESCRIPTION
+tracemcast reads packets from a single live packet source (e.g. an interface
+or hardware capture card) and then emits those packets to a multicast
+group that interested clients can then join to receive an independent feed
+of the captured packets.
+
+This allows the sharing of a capture source that would normally only allow
+one program to read from it at a time.
+
+The multicasting protocol is the nDAG protocol, which libtrace supports as
+an input format, so libtrace programs can natively receive packets from a
+tracemcast group without any additional modifications.
+
+.TP
+\fB\-m\fR <monitor identifier>
+set a unique identifier that will be included in the nDAG header. This is used
+by the recipient to tell which multicast sender emitted the packet.
+
+.TP
+\fB\-f\fR <filterstring>
+only emit packets that match this BPF filter expression.
+
+.TP
+\fB\-g\fR <address>
+emit packets to this multicast group address (e.g. 224.0.0.1).
+
+.TP
+\fB\-p\fR <port>
+send nDAG beacon messages to this port number.
+
+.TP
+\fB\-s\fR <address>
+use the interface that owns this IP address to multicast packets.
+
+.TP
+\fB\-t\fR <threads>
+sets the number of threads to use for capturing and multicasting packets.
+Each thread will produce a separate multicast stream on a unique port.
+
+.TP
+\fB\-M\fR <bytes>
+do not create any nDAG multicast messages larger than this number of bytes.
+Don't forget to allow for additional encapsulation (e.g. Ethernet, IP, UDP)
+when determining this value.
+
+.SH LINKS
+More details about tracemcast (and libtrace) can be found at
+https://github.com/LibtraceTeam/libtrace/wiki
+
+.SH SEE ALSO
+libtrace(3), tracesplit(1), tracesplit_dir(1), tracefilter(1),
+traceconvert(1), tracereport(1), tracertstats(1), tracestats(1), 
+tracepktdump(1), traceanon(1), tracesummary(1), tracereplay(1),
+tracediff(1), traceends(1), tracetopends(1), tracemerge(1)
+
+.SH AUTHORS
+Shane Alcock <salcock@waikato.ac.nz>
+
+

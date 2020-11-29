@@ -75,24 +75,34 @@ extern "C" {
 
 
 #include "rt_protocol.h"
-	
-/* Prefer net/bpf.h over pcap-bpf.h for format_bpf.c on MacOS */
-#ifdef HAVE_NET_BPF_H
-#    include <net/bpf.h>
-#    define HAVE_BPF 1
+
+/* If LIBBPF is available use it over alternatives */
+#if HAVE_LIBBPF
+    #include <bpf/libbpf.h>
+     /* prevent pcap from including any bpf stuff */
+    #define PCAP_DONT_INCLUDE_PCAP_BPF_H 1
+    #define HAVE_BPF 1
+    /* libbpf is missing a declaration of bpf program that we reply on */
+    struct bpf_program {
+        u_int bf_len;
+        struct bpf_insn *bf_insns;
+    };
 #else
-#ifdef HAVE_PCAP_BPF_H
-#  include <pcap-bpf.h>
-#  define HAVE_BPF 1
-#endif
+    /* Prefer net/bpf.h over pcap-bpf.h for format_bpf.c on MacOS */
+    #ifdef HAVE_NET_BPF_H
+        #include <net/bpf.h>
+        #define HAVE_BPF 1
+    #else
+        #ifdef HAVE_PCAP_BPF_H
+            #include <pcap-bpf.h>
+            #define HAVE_BPF 1
+        #endif
+    #endif
 #endif
 
 #ifdef HAVE_PCAP_H
 #  include <pcap.h>
-#  ifdef HAVE_PCAP_INT_H
-#    include <pcap-int.h>
-#  endif
-#endif 
+#endif
 
 #ifdef HAVE_ZLIB_H
 #  include <zlib.h>
@@ -118,6 +128,15 @@ int snprintf(char *str, size_t size, const char *format, ...);
 # else
 # define snprintf sprintf_s
 # endif 
+#endif
+
+#if !HAVE_DECL_POSIX_MEMALIGN
+#include <errno.h>
+static inline int posix_memalign(void **memptr, size_t alignment, size_t size)
+{
+	fprintf(stderr, "No posix_memalign\n");
+	return ENOMEM;
+}
 #endif
 
 #include "daglegacy.h"
@@ -152,6 +171,8 @@ int snprintf(char *str, size_t size, const char *format, ...);
 //#define RP_BUFSIZE 65536U
 
 #define LIBTRACE_MAX_REPLAY_SPEEDUP 1000
+
+#define MAX_THREADS 128
 
 /** Data about the most recent event from a trace file */
 struct libtrace_event_status_t {
@@ -283,8 +304,13 @@ struct user_configuration {
 	bool reporter_polling;
 	size_t reporter_thold;
 	bool debug_state;
+	int coremap[MAX_THREADS];
 };
-#define ZERO_USER_CONFIG(config) memset(&config, 0, sizeof(struct user_configuration));
+#define ZERO_USER_CONFIG(config) {\
+	memset(&config, 0, sizeof(struct user_configuration));\
+	for (int i = 0; i < MAX_THREADS; i++)\
+		config.coremap[i] = -1;\
+}
 
 struct callback_set {
 
@@ -293,6 +319,7 @@ struct callback_set {
         fn_cb_dataless message_resuming;
         fn_cb_dataless message_pausing;
         fn_cb_packet message_packet;
+	fn_cb_packet message_meta_packet;
         fn_cb_result message_result;
         fn_cb_first_packet message_first_packet;
         fn_cb_tick message_tick_count;
@@ -380,7 +407,7 @@ struct libtrace_t {
 	libtrace_stat_t *stats;
 	struct user_configuration config;
 	libtrace_combine_t combiner;
-	
+
         /* Set of callbacks to be executed by per packet threads in response
          * to various messages. */
         struct callback_set *perpkt_cbs;
@@ -441,6 +468,22 @@ void trace_set_err_out(libtrace_out_t *trace, int errcode, const char *msg,...)
  */
 void trace_clear_cache(libtrace_packet_t *packet);
 
+/**
+ * An internal version of trace_set_configuration that can parse the
+ * settings from the start of a libtrace uri.
+ *
+ * If format is supplied, str is a uri, and format returns the
+ * start of the uri portion.
+ * Otherwise str is a pure list of options.
+ *
+ * @param trace [in] the trace
+ * @param str [in] the configuration as a string
+ * @param format [out] the beginning of the URI
+ * @return 0 if successful, otherwise -1 if an error occurs
+ *
+ * @see trace_set_configuration
+ */
+int _trace_set_configuration(libtrace_t *trace, const char *str, const char **format);
 
 #ifndef PF_RULESET_NAME_SIZE
 #define PF_RULESET_NAME_SIZE 16
@@ -721,6 +764,21 @@ struct libtrace_format_t {
 	 */
 	double (*get_seconds)(const libtrace_packet_t *packet);
 	
+	/** Parses all meta-data fields in a meta packet and places them
+         *  into an array for user inspection.
+         *  @param packet       The meta packet to be parsed.
+         *  @return A pointer to a libtrace_meta_t containing all of the
+         *          meta-data fields found in the provided packet, or NULL
+         *          if no meta-data fields were found in the packet.
+         *
+         *  @note the returned libtrace_meta_t must be freed using
+         *        trace_destroy_meta()
+         *
+         *  Only implement for formats that include meta-data records
+         *  within the captured packet stream.
+	 */
+	libtrace_meta_t *(*get_all_meta)(libtrace_packet_t *packet);
+
 	/** Moves the read pointer to a certain ERF timestamp within an input 
 	 * trace file.
 	 *
@@ -1067,6 +1125,13 @@ libtrace_rt_types_t pcap_linktype_to_rt(libtrace_dlt_t linktype);
  */
 libtrace_rt_types_t pcapng_linktype_to_rt(libtrace_dlt_t linktype);
 
+/** Converts a TZSP DLT into an RT protocol type.
+ *
+ * @param linktype      The TZSP DLT to be converted
+ * @return The RT type that is equivalent to the provided DLT
+ */
+libtrace_rt_types_t tzsp_linktype_to_rt(libtrace_dlt_t linktype);
+
 /** Converts a libtrace link type into a PCAP linktype.
  *
  * @param type		The libtrace link type to be converted
@@ -1112,6 +1177,14 @@ libtrace_linktype_t erf_type_to_libtrace(uint8_t erf);
  * or -1 if the link type cannot be matched to an ERF type.
  */
 uint8_t libtrace_to_erf_type(libtrace_linktype_t linktype);
+
+/** Converts a libtrace link type into an TZSP type.
+ *
+ * @param linktype      The libtrace link type to be converted
+ * @return The TZSP type that is equivalent to the provided libtrace link type,
+ * or -1 if the link type cannot be matched to an TZSP type.
+ */
+uint8_t libtrace_to_tzsp_type(libtrace_linktype_t linktype);
 
 /** Converts an ARPHRD type into a libtrace link type.
  *
@@ -1200,7 +1273,6 @@ void *trace_get_payload_from_linux_sll(const void *link,
 DLLEXPORT void *trace_get_payload_from_atm(void *link, uint8_t *type, 
 		uint32_t *remaining);
 
-
 #ifdef HAVE_BPF
 /* A type encapsulating a bpf filter
  * This type covers the compiled bpf filter, as well as the original filter
@@ -1259,6 +1331,8 @@ void atmhdr_constructor(void);
 void ndag_constructor(void);
 /** Constructor for the live ETSI over TCP format module */
 void etsilive_constructor(void);
+/** Constructor for the live TZSP over UDP format module */
+void tzsplive_constructor(void);
 #ifdef HAVE_BPF
 /** Constructor for the BPF format module */
 void bpf_constructor(void);
@@ -1270,6 +1344,13 @@ void dpdk_constructor(void);
 /** Constructor for receiving network DAG via Intels DPDK format module */
 void dpdkndag_constructor(void);
 
+#endif
+#if HAVE_LIBBPF
+/** Constructor for AF_XDP format module */
+void linux_xdp_constructor(void);
+#endif
+#if HAVE_PFRING
+void pfring_constructor(void);
 #endif
 
 /** Extracts the RadioTap flags from a wireless link header

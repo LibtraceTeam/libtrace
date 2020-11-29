@@ -229,6 +229,8 @@ static int dag_config_input(libtrace_t *libtrace, trace_option_t option,
 		case TRACE_OPTION_EVENT_REALTIME:
 			/* Live capture is always going to be realtime */
 			return -1;
+                case TRACE_OPTION_CONSTANT_ERF_FRAMING:
+                        return -1;
         }
 	return -1;
 }
@@ -539,6 +541,7 @@ static struct libtrace_format_t dag = {
         NULL,                           /* seek_erf */
         NULL,                           /* seek_timeval */
         NULL,                           /* seek_seconds */
+	NULL,                           /* get_meta_section */
         erf_get_capture_length,         /* get_capture_length */
         erf_get_wire_length,            /* get_wire_length */
         erf_get_framing_length,         /* get_framing_length */

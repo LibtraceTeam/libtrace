@@ -26,6 +26,7 @@
 #include "libtrace_int.h"
 #include "libtrace.h"
 #include "protocols.h"
+#include "lib/format_ndag.h"
 
 #ifdef HAVE_WANDDER
 #include <libwandder_etsili.h>
@@ -123,6 +124,23 @@ static void *trace_get_payload_from_radiotap (const void *link,
 	return (void*) ((char*)link + rtaplen);
 }
 
+static void *trace_get_payload_from_corsarotag(const void *link,
+                libtrace_linktype_t *type, uint32_t *remaining) {
+
+        uint8_t *ptr = (uint8_t *)link;
+
+        if (*remaining >= sizeof(corsaro_packet_tags_t)) {
+                *remaining -= sizeof(corsaro_packet_tags_t);
+                *type = TRACE_TYPE_ETH;
+                ptr += sizeof(corsaro_packet_tags_t);
+                return ptr;
+        }
+
+        *remaining = 0;
+        *type = TRACE_TYPE_NONE;
+        return NULL;
+}
+
 static void *trace_get_payload_from_etsili(const void *link,
                 libtrace_linktype_t *type, uint32_t *remaining) {
 
@@ -173,6 +191,7 @@ DLLEXPORT void *trace_get_packet_meta(const libtrace_packet_t *packet,
 		case TRACE_TYPE_80211_PRISM:
 		case TRACE_TYPE_ERF_META:
                 case TRACE_TYPE_ETSILI:
+                case TRACE_TYPE_CORSAROTAG:
 			return pktbuf;
 		/* Non metadata packets */
 		case TRACE_TYPE_HDLC_POS:
@@ -190,7 +209,10 @@ DLLEXPORT void *trace_get_packet_meta(const libtrace_packet_t *packet,
 		case TRACE_TYPE_NONDATA:
 		case TRACE_TYPE_OPENBSD_LOOP:
 		case TRACE_TYPE_UNKNOWN:
+		case TRACE_TYPE_PCAPNG_META:
+		case TRACE_TYPE_TZSP:
 		case TRACE_TYPE_CONTENT_INVALID:
+                case TRACE_TYPE_XDP:
 			return NULL;
 	}
 
@@ -247,7 +269,13 @@ DLLEXPORT void *trace_get_payload_from_meta(const void *meta,
                         nexthdr = trace_get_payload_from_etsili(meta,
                                         linktype, remaining);
                         return nexthdr;
+                case TRACE_TYPE_CORSAROTAG:
+                        nexthdr = trace_get_payload_from_corsarotag(meta,
+                                        linktype, remaining);
+                        return nexthdr;
 
+		case TRACE_TYPE_PCAPNG_META:
+		case TRACE_TYPE_TZSP:
 		case TRACE_TYPE_HDLC_POS:
 		case TRACE_TYPE_ETH:
 		case TRACE_TYPE_ATM:
@@ -264,6 +292,7 @@ DLLEXPORT void *trace_get_payload_from_meta(const void *meta,
 		case TRACE_TYPE_ERF_META:
 		case TRACE_TYPE_UNKNOWN:
 		case TRACE_TYPE_CONTENT_INVALID:
+                case TRACE_TYPE_XDP:
 			/* In this case, the pointer passed in does not point
 			 * to a metadata header and so we cannot get the
 			 * payload.

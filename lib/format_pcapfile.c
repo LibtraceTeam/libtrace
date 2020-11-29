@@ -67,6 +67,22 @@ typedef struct pcapfile_header_t {
 #define MAGIC1_REV  0xd4c3b2a1  /* Reversed byteorder detection */
 #define MAGIC2_REV  0x4d3cb2a1
 
+static bool pcapfile_can_write(libtrace_packet_t *packet) {
+	/* Get the linktype */
+	libtrace_linktype_t ltype = trace_get_link_type(packet);
+
+	if (ltype == TRACE_TYPE_PCAPNG_META
+		|| ltype == TRACE_TYPE_CONTENT_INVALID
+		|| ltype == TRACE_TYPE_UNKNOWN
+		|| ltype == TRACE_TYPE_ERF_META
+		|| ltype == TRACE_TYPE_NONDATA) {
+
+		return false;
+	}
+
+	return true;
+}
+
 static inline int header_is_backwards_magic(pcapfile_header_t *header) {
 	return (header->magic_number == MAGIC1_REV || header->magic_number == MAGIC2_REV);
 }
@@ -174,7 +190,7 @@ static inline uint32_t swapl(libtrace_t *libtrace, uint32_t num)
 	 */
 	if (!DATA(libtrace))
 		return num;
-	
+
 	/* We can use the PCAP magic number to determine the byte order */
 	if (header_is_backwards_magic(&(DATA(libtrace)->header)))
 		return byteswap32(num);
@@ -266,11 +282,18 @@ static int pcapfile_config_input(libtrace_t *libtrace,
 		case TRACE_OPTION_FILTER:
 		case TRACE_OPTION_HASHER:
                 case TRACE_OPTION_REPLAY_SPEEDUP:
+                case TRACE_OPTION_CONSTANT_ERF_FRAMING:
 			/* All these are either unsupported or handled
 			 * by trace_config */
 			break;
+		case TRACE_OPTION_DISCARD_META:
+		case TRACE_OPTION_XDP_HARDWARE_OFFLOAD:
+		case TRACE_OPTION_XDP_SKB_MODE:
+		case TRACE_OPTION_XDP_DRV_MODE:
+		case TRACE_OPTION_XDP_ZERO_COPY_MODE:
+		case TRACE_OPTION_XDP_COPY_MODE:
+	break;
 	}
-	
 	trace_set_err(libtrace,TRACE_ERR_UNKNOWN_OPTION,
 			"Unknown option %i", option);
 	return -1;
@@ -369,6 +392,7 @@ static int pcapfile_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 	err=wandio_read(libtrace->io,
 			packet->buffer,
 			sizeof(libtrace_pcapfile_pkt_hdr_t));
+
 	if (err<0) {
 		trace_set_err(libtrace,TRACE_ERR_WANDIO_FAILED,"reading packet");
 		return -1;
@@ -385,7 +409,8 @@ static int pcapfile_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 
 	bytes_to_read = swapl(libtrace,((libtrace_pcapfile_pkt_hdr_t*)packet->buffer)->caplen);
 
-	if (bytes_to_read >= LIBTRACE_PACKET_BUFSIZE) {
+	if (bytes_to_read >= (LIBTRACE_PACKET_BUFSIZE -
+                        sizeof(libtrace_pcapfile_pkt_hdr_t))) {
 		trace_set_err(libtrace, TRACE_ERR_BAD_PACKET, "Invalid caplen in pcap header (%u) - trace may be corrupt", (uint32_t)bytes_to_read);
 		return -1;
 	}
@@ -423,13 +448,19 @@ static int pcapfile_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 
 	/* We may as well cache this value now, seeing as we already had to 
 	 * look it up */
-	packet->capture_length = bytes_to_read;	
+	packet->cached.capture_length = bytes_to_read;	
 	return sizeof(libtrace_pcapfile_pkt_hdr_t) + bytes_to_read;
 }
 
 static int pcapfile_write_packet(libtrace_out_t *out,
 		libtrace_packet_t *packet)
 {
+
+	/* Check pcapfile can write this type of packet */
+	if (!pcapfile_can_write(packet)) {
+		return 0;
+	}
+
 	struct libtrace_pcapfile_pkt_hdr_t hdr;
 	struct timeval tv = trace_get_timeval(packet);
 	int numbytes;
@@ -439,12 +470,6 @@ static int pcapfile_write_packet(libtrace_out_t *out,
 	libtrace_linktype_t linktype;
 
 	ptr = trace_get_packet_buffer(packet,&linktype,&remaining);
-	
-	/* Silently discard RT metadata packets and packets with an
-	 * unknown linktype. */
-	if (linktype == TRACE_TYPE_NONDATA || linktype == TRACE_TYPE_UNKNOWN || linktype == TRACE_TYPE_ERF_META || linktype == TRACE_TYPE_CONTENT_INVALID) {
-		return 0;
-	}
 
 	/* If this packet cannot be converted to a pcap linktype then
 	 * pop off the top header until it can be converted
@@ -532,23 +557,31 @@ static int pcapfile_write_packet(libtrace_out_t *out,
 	numbytes=wandio_wwrite(DATAOUT(out)->file,
 			&hdr, sizeof(hdr));
 
-	if (numbytes!=sizeof(hdr)) 
+	if (numbytes!=sizeof(hdr)) {
+                trace_set_err_out(out, TRACE_ERR_WANDIO_FAILED, "Failed to write to pcapfile: %s", strerror(errno));
 		return -1;
+        }
 
 	/* Write the rest of the packet now */
 	ret=wandio_wwrite(DATAOUT(out)->file,
 			ptr,
 			hdr.caplen);
 
-	if (ret!=(int)hdr.caplen)
+	if (ret!=(int)hdr.caplen) {
+                trace_set_err_out(out, TRACE_ERR_WANDIO_FAILED, "Failed to write to pcapfile: %s", strerror(errno));
 		return -1;
+        }
 
 	return numbytes+ret;
 }
 
 static int pcapfile_flush_output(libtrace_out_t *out) {
 
-        return wandio_wflush(DATAOUT(out)->file);
+        if (DATAOUT(out)->file) {
+                return wandio_wflush(DATAOUT(out)->file);
+        }
+
+        return 0;
 }
 
 static libtrace_linktype_t pcapfile_get_link_type(
@@ -569,6 +602,8 @@ static struct timeval pcapfile_get_timeval(
 {
 	libtrace_pcapfile_pkt_hdr_t *hdr;
 	struct timeval ts;
+
+        memset(&ts, 0, sizeof(struct timeval));
 
 	if (!packet) {
 		fprintf(stderr, "NULL packet passed to pcapfile_get_timeval()\n");
@@ -599,6 +634,7 @@ static struct timespec pcapfile_get_timespec(
 	libtrace_pcapfile_pkt_hdr_t *hdr;
 	struct timespec ts;
 
+        memset(&ts, 0, sizeof(struct timespec));
 	if (!packet) {
 		fprintf(stderr, "NULL packet passed to pcapfile_get_timespec()");
 		/* Return default timespec on error? */
@@ -653,6 +689,10 @@ static int pcapfile_get_wire_length(const libtrace_packet_t *packet) {
                 trace_set_err(packet->trace, TRACE_ERR_BAD_HEADER, "pcap packet with NULL header passed to "
 			"pcapfile_get_wire_length()");
                 return -1;
+        }
+
+        if (packet->payload == NULL) {
+                return 0;
         }
 
 	pcapptr	= (libtrace_pcapfile_pkt_hdr_t *)packet->header;
@@ -710,7 +750,7 @@ static size_t pcapfile_set_capture_length(libtrace_packet_t *packet,size_t size)
 		return trace_get_capture_length(packet);
 	}
 	/* Reset the cached capture length */
-	packet->capture_length = -1;
+	packet->cached.capture_length = -1;
 	pcapptr = (libtrace_pcapfile_pkt_hdr_t *)packet->header;
 	pcapptr->caplen = swapl(packet->trace,(uint32_t)size);
 	return trace_get_capture_length(packet);
@@ -772,6 +812,7 @@ static struct libtrace_format_t pcapfile = {
 	pcapfile_get_timeval,		/* get_timeval */
 	pcapfile_get_timespec,		/* get_timespec */
 	NULL,				/* get_seconds */
+	NULL,                           /* get_meta_section */
 	NULL,				/* seek_erf */
 	NULL,				/* seek_timeval */
 	NULL,				/* seek_seconds */

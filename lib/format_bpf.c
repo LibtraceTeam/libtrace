@@ -377,6 +377,8 @@ static int bpf_config_input(libtrace_t *libtrace,
 			break;
 		case TRACE_OPTION_REPLAY_SPEEDUP:
 			break;
+		case TRACE_OPTION_CONSTANT_ERF_FRAMING:
+			break;
 		/* Avoid default: so that future options will cause a warning
 		 * here to remind us to implement it, or flag it as
 		 * unimplementable
@@ -629,6 +631,7 @@ static struct libtrace_format_t bpf = {
 	bpf_get_timeval,	/* get_timeval */
 	NULL,			/* get_timespec */
 	NULL,			/* get_seconds */
+	NULL,                   /* get_meta_section */
 	NULL,			/* seek_erf */
 	NULL,			/* seek_timeval */
 	NULL,			/* seek_seconds */
@@ -680,6 +683,7 @@ static struct libtrace_format_t bpf = {
 	bpf_get_timeval,	/* get_timeval */
 	NULL,			/* get_timespec */
 	NULL,			/* get_seconds */
+	NULL,                   /* get_meta_section */
 	NULL,			/* seek_erf */
 	NULL,			/* seek_timeval */
 	NULL,			/* seek_seconds */

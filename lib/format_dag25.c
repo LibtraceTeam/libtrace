@@ -23,7 +23,9 @@
  *
  *
  */
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 
 #include "config.h"
 #include "common.h"
@@ -174,6 +176,25 @@ pthread_mutex_t open_dag_mutex;
  * many times or close a device that we're still using */
 struct dag_dev_t *open_dags = NULL;
 
+static bool dag_can_write(libtrace_packet_t *packet) {
+	/* Get the linktype */
+        libtrace_linktype_t ltype = trace_get_link_type(packet);
+
+        if (ltype == TRACE_TYPE_CONTENT_INVALID) {
+                return false;
+        }
+
+        /* TODO erf meta should definitely be writable, pcapng meta
+         * could probably be converted into erf meta */
+        if (ltype == TRACE_TYPE_ERF_META
+                        || ltype == TRACE_TYPE_NONDATA
+                        || ltype == TRACE_TYPE_PCAPNG_META) {
+                return false;
+        }
+
+        return true;
+}
+
 /* Returns the amount of padding between the ERF header and the start of the
  * captured packet data */
 static int dag_get_padding(const libtrace_packet_t *packet)
@@ -246,7 +267,7 @@ static void dag_init_format_data(libtrace_t *libtrace)
 	if (FORMAT_DATA->per_stream == NULL) {
 		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
 			"Unable to create list for stream in dag_init_format_data()");
-		return -1;
+		return;
 	}
 
 	/* We'll start with just one instance of stream_data, and we'll
@@ -491,7 +512,7 @@ static int dag_init_input(libtrace_t *libtrace) {
 	 * list */
 	pthread_mutex_lock(&open_dag_mutex);
 
-
+        FORMAT_DATA->stream_attached = 0;
 	/* DAG cards support multiple streams. In a single threaded capture,
 	 * these are specified using a comma in the libtrace URI,
 	 * e.g. dag:/dev/dag0,2 refers to stream 2 on the dag0 device.
@@ -523,11 +544,11 @@ static int dag_init_input(libtrace_t *libtrace) {
 
 	/* Make sure we have successfully opened a DAG device */
 	if (dag_device == NULL) {
+		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to open DAG device %s", dag_dev_name);
 		if (dag_dev_name)
 			free(dag_dev_name);
 		dag_dev_name = NULL;
 		pthread_mutex_unlock(&open_dag_mutex);
-		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to open DAG device %s", dag_dev_name);
 		return -1;
 	}
 
@@ -621,6 +642,15 @@ static int dag_config_input(libtrace_t *libtrace, trace_option_t option,
 		/* Lets just say we did this, it's currently still up to
 		 * the user to configure this correctly. */
 		return 0;
+        case TRACE_OPTION_CONSTANT_ERF_FRAMING:
+                return -1;
+        case TRACE_OPTION_DISCARD_META:
+        case TRACE_OPTION_XDP_HARDWARE_OFFLOAD:
+        case TRACE_OPTION_XDP_SKB_MODE:
+        case TRACE_OPTION_XDP_DRV_MODE:
+        case TRACE_OPTION_XDP_ZERO_COPY_MODE:
+        case TRACE_OPTION_XDP_COPY_MODE:
+            return -1;
 	}
 	return -1;
 }
@@ -991,29 +1021,32 @@ static int dag_available(libtrace_t *libtrace,
 }
 
 /* Returns a pointer to the start of the next complete ERF record */
-static dag_record_t *dag_get_record(struct dag_per_stream_t *stream_data)
+static int dag_get_record(struct dag_per_stream_t *stream_data,
+                dag_record_t **erfptr)
 {
-	dag_record_t *erfptr = NULL;
 	uint16_t size;
 
-	erfptr = (dag_record_t *)stream_data->bottom;
-	if (!erfptr)
-		return NULL;
+	*erfptr = (dag_record_t *)stream_data->bottom;
+	if (!(*erfptr))
+		return 0;
 
-	size = ntohs(erfptr->rlen);
+	size = ntohs((*erfptr)->rlen);
 	if (size < dag_record_size) {
 		fprintf(stderr, "DAG2.5 rlen is invalid (rlen %u, must be at least %u\n",
 			size, dag_record_size);
-		return NULL;
+                *erfptr = NULL;
+		return -1;
 	}
 
 	/* Make certain we have the full packet available */
-	if (size > (stream_data->top - stream_data->bottom))
-		return NULL;
+	if (size > (stream_data->top - stream_data->bottom)) {
+                *erfptr = NULL;
+		return 0;
+        }
 
 	stream_data->bottom += size;
 	stream_data->processed += size;
-	return erfptr;
+	return 1;
 }
 
 /* Converts a buffer containing a recently read DAG packet record into a
@@ -1100,7 +1133,15 @@ static int dag_dump_packet(libtrace_out_t *libtrace,
 			   dag_record_t *erfptr, unsigned int pad,
 			   void *buffer)
 {
-	int size;
+	int payload_size;
+        int alignment_pad;
+        uint64_t alignment_buf = 0;
+	uint16_t rlen = ntohs(erfptr->rlen);
+
+        payload_size = rlen - (dag_record_size + pad);
+        alignment_pad = rlen % sizeof(uint64_t);
+	// update record length with any required padding
+	erfptr->rlen = htons(rlen + alignment_pad);
 
 	/*
 	 * If we've got 0 bytes waiting in the txqueue, assume that we
@@ -1123,24 +1164,21 @@ static int dag_dump_packet(libtrace_out_t *libtrace,
 	 * are in contiguous memory
 	 */
 	memcpy(FORMAT_DATA_OUT->txbuffer + FORMAT_DATA_OUT->waiting, erfptr,
-	       (dag_record_size + pad));
+               (dag_record_size + pad));
 	FORMAT_DATA_OUT->waiting += (dag_record_size + pad);
 
 	/*
 	 * Copy our incoming packet into the outgoing buffer, and increment 
 	 * our waiting count
 	 */
-	size = ntohs(erfptr->rlen)-(dag_record_size + pad);
-
-	/* Ensure size is padded to 8bytes */
-	if (size - (size % 8) != size) {
-		size = size - (size % 8);
-		erfptr->rlen = htons(size + (dag_record_size + pad));
-	}
-
 	memcpy(FORMAT_DATA_OUT->txbuffer + FORMAT_DATA_OUT->waiting, buffer,
-	       size);
-	FORMAT_DATA_OUT->waiting += size;
+	       payload_size);
+	FORMAT_DATA_OUT->waiting += payload_size;
+
+        // add padding to payload to align with 8 bytes
+        memcpy(FORMAT_DATA_OUT->txbuffer + FORMAT_DATA_OUT->waiting, &alignment_buf,
+		alignment_pad);
+        FORMAT_DATA_OUT->waiting += alignment_pad;
 
 	/*
 	 * If our output buffer has more than 16 Mebibytes in it, commit those 
@@ -1148,15 +1186,15 @@ static int dag_dump_packet(libtrace_out_t *libtrace,
 	 * Note: dag_fin_output will also call dag_tx_stream_commit_bytes() in 
 	 * case there is still data in the buffer at program exit.
 	 */
-	if (FORMAT_DATA_OUT->waiting >= 16*1024*1024) {
+	//if (FORMAT_DATA_OUT->waiting >= 16*1024*1024) {
 		FORMAT_DATA_OUT->txbuffer =
 			dag_tx_stream_commit_bytes(FORMAT_DATA_OUT->device->fd,
 						   FORMAT_DATA_OUT->dagstream,
 						   FORMAT_DATA_OUT->waiting);
 		FORMAT_DATA_OUT->waiting = 0;
-	}
+	//}
 
-	return size + pad + dag_record_size;
+	return payload_size + pad + dag_record_size;
 }
 
 /* Attempts to determine a suitable ERF type for a given packet. Returns true
@@ -1190,6 +1228,11 @@ static bool find_compatible_linktype(libtrace_out_t *libtrace,
 /* Writes a packet to the provided DAG output trace */
 static int dag_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *packet)
 {
+	/* Check dag can write this type of packet */
+	if (!dag_can_write(packet)) {
+		return 0;
+	}
+
 	/* This is heavily borrowed from erf_write_packet(). Yes, CnP
 	 * coding sucks, sorry about that.
 	 */
@@ -1204,9 +1247,6 @@ static int dag_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *packet)
 		 * erf_write_packet(). */
 		return -1;
 	}
-
-	if (trace_get_link_type(packet) == TRACE_TYPE_NONDATA)
-		return 0;
 
 	pad = dag_get_padding(packet);
 
@@ -1235,7 +1275,7 @@ static int dag_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *packet)
 		pad = dag_get_padding(packet);
 
 		/* Flags. Can't do this */
-		memset(&erfhdr.flags,1,sizeof(erfhdr.flags));
+		memset(&erfhdr.flags,0,sizeof(erfhdr.flags));
 		if (trace_get_direction(packet)!=(int)~0U)
 			erfhdr.flags.iface = trace_get_direction(packet);
 
@@ -1244,13 +1284,13 @@ static int dag_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *packet)
 		/* Packet length (rlen includes format overhead) */
 		if (trace_get_capture_length(packet) <= 0
                        || trace_get_capture_length(packet) > 65536) {
-			trace_set_err(libtrace, TRACE_ERR_BAD_PACKET,
+			trace_set_err_out(libtrace, TRACE_ERR_BAD_PACKET,
 				"Capture length is out of range in dag_write_packet()");
 			return -1;
 		}
 		if (erf_get_framing_length(packet) <= 0
                        || trace_get_framing_length(packet) > 65536) {
-			trace_set_err(libtrace, TRACE_ERR_BAD_PACKET,
+			trace_set_err_out(libtrace, TRACE_ERR_BAD_PACKET,
 				"Framing length is out of range in dag_write_packet()");
 			return -1;
 		}
@@ -1258,14 +1298,13 @@ static int dag_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *packet)
                        erf_get_framing_length(packet) <= 0
                        || trace_get_capture_length(packet) +
                        erf_get_framing_length(packet) > 65536) {
-			trace_set_err(libtrace, TRACE_ERR_BAD_PACKET,
+			trace_set_err_out(libtrace, TRACE_ERR_BAD_PACKET,
 				"Capture + framing length is out of range in dag_write_packet()");
 			return -1;
 		}
 
-		erfhdr.rlen = htons(trace_get_capture_length(packet)
-				    + erf_get_framing_length(packet));
-
+		erfhdr.rlen = htons(trace_get_capture_length(packet) +
+			erf_get_framing_length(packet));
 
 		/* Loss counter. Can't do this */
 		erfhdr.lctr = 0;
@@ -1331,18 +1370,28 @@ static int dag_read_packet_stream(libtrace_t *libtrace,
 		if (numbytes < 0)
 			return numbytes;
 		if (numbytes < dag_record_size) {
-			/* Check the message queue if we have one to check */
-			if (t != NULL &&
-			    libtrace_message_queue_count(&t->messages) > 0)
-				return -2;
+			/* if we have access to the message queue check for a message
+                         * otherwise we need to return and let libtrace check for a message
+                         */
+			if ((t && libtrace_message_queue_count(&t->messages) > 0) || !t)
+				return READ_MESSAGE;
 
 			if ((numbytes=is_halted(libtrace)) != -1)
 				return numbytes;
+
 			/* Block until we see a packet */
 			continue;
 		}
-		erfptr = dag_get_record(stream_data);
-	} while (erfptr == NULL);
+		if (dag_get_record(stream_data, &erfptr) < 0) {
+                        trace_set_err(libtrace, TRACE_ERR_BAD_PACKET,
+                                        "corrupt DAG record");
+                        return -1;
+                }
+	} while (erfptr == NULL && !libtrace_halt);
+
+        if (libtrace_halt) {
+                return 0;
+        }
 
 	packet->trace = libtrace;
 
@@ -1442,8 +1491,15 @@ static libtrace_eventobj_t trace_event_dag(libtrace_t *libtrace,
 
 		/* May as well not bother calling dag_get_record if
 		 * dag_available suggests that there's no data */
-		if (numbytes != 0)
-			erfptr = dag_get_record(FORMAT_DATA_FIRST);
+		if (numbytes != 0) {
+			if (dag_get_record(FORMAT_DATA_FIRST, &erfptr) < 0) {
+                                trace_set_err(libtrace, TRACE_ERR_BAD_PACKET,
+                                                "corrupt DAG record");
+                                event.type = TRACE_EVENT_TERMINATE;
+                                return event;
+                        }
+                }
+
 		if (erfptr == NULL) {
 			/* No packet available - sleep for a very short time */
 			if (libtrace_halt) {
@@ -1614,6 +1670,7 @@ static struct libtrace_format_t dag = {
 	NULL,                           /* get_timeval */
 	NULL,                           /* get_seconds */
 	NULL,				/* get_timespec */
+	NULL,                           /* get_meta_section */
 	NULL,                           /* seek_erf */
 	NULL,                           /* seek_timeval */
 	NULL,                           /* seek_seconds */

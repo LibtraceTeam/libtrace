@@ -70,6 +70,25 @@ static pthread_mutex_t pagesize_mutex;
 /* Cached page size, the page size shouldn't be changing */
 static int pagesize = 0;
 
+static bool linuxring_can_write(libtrace_packet_t *packet) {
+	/* Get the linktype */
+        libtrace_linktype_t ltype = trace_get_link_type(packet);
+
+        if (ltype == TRACE_TYPE_CONTENT_INVALID) {
+                return false;
+        }
+        if (ltype == TRACE_TYPE_NONDATA) {
+                return false;
+        }
+        if (ltype == TRACE_TYPE_PCAPNG_META) {
+                return false;
+        }
+        if (ltype == TRACE_TYPE_ERF_META) {
+                return false;
+        }
+
+        return true;
+}
 
 /*
  * Try figure out the best sizes for the ring buffer. Ensure that:
@@ -307,8 +326,8 @@ static int linuxring_fin_input(libtrace_t *libtrace) {
 			}
 		}
 
-                if (FORMAT_DATA->filter != NULL)
-                        free(FORMAT_DATA->filter);
+		if (FORMAT_DATA->filter != NULL)
+                	trace_destroy_filter(FORMAT_DATA->filter);
 
                 if (FORMAT_DATA->per_stream)
                         libtrace_list_deinit(FORMAT_DATA->per_stream);
@@ -467,7 +486,7 @@ static size_t linuxring_set_capture_length(libtrace_packet_t *packet,
 	}
 
 	/* Reset the cached capture length */
-	packet->capture_length = -1;
+	packet->cached.capture_length = -1;
 
 	TO_TP_HDR2(packet->buffer)->tp_snaplen = size;
 
@@ -534,11 +553,11 @@ inline static int linuxring_read_stream(libtrace_t *libtrace,
 	 */
 	while (!(header->tp_status & TP_STATUS_USER) ||
 	                header->tp_status == TP_STATUS_LIBTRACE) {
-                if ((ret=is_halted(libtrace)) != -1)
-                        return ret;
                 if (!block) {
                         return 0;
                 }
+                if ((ret=is_halted(libtrace)) != -1)
+                        return ret;
 
 		pollset[0].fd = stream->fd;
 		pollset[0].events = POLLIN;
@@ -578,7 +597,13 @@ inline static int linuxring_read_stream(libtrace_t *libtrace,
 				return -1;
 			}
 		} else {
-			/* Poll timed out - check if we should exit on next loop */
+			/* Poll timed out. If we do not have access to the message queue
+                         * return and let libtrace check it, otherwise loop.
+                         */
+                        if (!queue) {
+                            return READ_MESSAGE;
+                        }
+
 			continue;
 		}
 	}
@@ -708,15 +733,17 @@ static void linuxring_fin_packet(libtrace_packet_t *packet)
 static int linuxring_write_packet(libtrace_out_t *libtrace,
 				  libtrace_packet_t *packet)
 {
+	/* Check linuxring can write this type of packet */
+	if (!linuxring_can_write(packet)) {
+		return 0;
+	}
+
 	struct tpacket2_hdr *header;
 	struct pollfd pollset;
 	struct socket_addr;
 	int ret;
 	unsigned max_size;
 	void * off;
-
-	if (trace_get_link_type(packet) == TRACE_TYPE_NONDATA)
-		return 0;
 
 	max_size = FORMAT_DATA_OUT->req.tp_frame_size -
 		TPACKET2_HDRLEN + sizeof(struct sockaddr_ll);
@@ -771,7 +798,7 @@ static int linuxring_write_packet(libtrace_out_t *libtrace,
 
 	/* Notify kernel there are frames to send */
 	FORMAT_DATA_OUT->queue ++;
-	FORMAT_DATA_OUT->queue %= TX_MAX_QUEUE;
+	FORMAT_DATA_OUT->queue %= FORMAT_DATA_OUT->tx_max_queue;
 	if(FORMAT_DATA_OUT->queue == 0){
 		ret = sendto(FORMAT_DATA_OUT->fd,
 				NULL,
@@ -811,7 +838,7 @@ static struct libtrace_format_t linuxring = {
 	linuxring_start_input,		/* start_input */
 	linuxcommon_pause_input,	/* pause_input */
 	linuxcommon_init_output,	/* init_output */
-	NULL,				/* config_output */
+	linuxcommon_config_output,	/* config_output */
 	linuxring_start_output,		/* start_ouput */
 	linuxring_fin_input,		/* fin_input */
 	linuxring_fin_output,		/* fin_output */
@@ -827,6 +854,7 @@ static struct libtrace_format_t linuxring = {
 	linuxring_get_timeval,		/* get_timeval */
 	linuxring_get_timespec,		/* get_timespec */
 	NULL,				/* get_seconds */
+	NULL,                           /* get_meta_section */
 	NULL,				/* seek_erf */
 	NULL,				/* seek_timeval */
 	NULL,				/* seek_seconds */
@@ -890,6 +918,7 @@ static struct libtrace_format_t linuxring = {
 	linuxring_get_timeval,		/* get_timeval */
 	linuxring_get_timespec,		/* get_timespec */
 	NULL,				/* get_seconds */
+	NULL,                           /* get_meta_section */
 	NULL,				/* seek_erf */
 	NULL,				/* seek_timeval */
 	NULL,				/* seek_seconds */

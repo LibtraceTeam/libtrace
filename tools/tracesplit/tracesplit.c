@@ -51,7 +51,7 @@ uint64_t totbyteslast=0;
 uint64_t maxfiles = UINT64_MAX;
 uint64_t filescreated = 0;
 uint16_t snaplen = 0;
-int jump=0;
+int jumpopt=0;
 int verbose=0;
 int compress_level=-1;
 trace_option_compresstype_t compress_type = TRACE_OPTION_COMPRESSTYPE_NONE;
@@ -323,20 +323,27 @@ static int per_packet(libtrace_packet_t **packet) {
 	}
 
         /* Support "jump"ping to the nth IP header. */
-        if (jump) {
+        if (jumpopt) {
             /* Skip headers */
-            void *newpacket = perform_jump(*packet, jump);
+            struct libtrace_packet_t *newpacket = perform_jump(*packet, jumpopt);
             if (newpacket) {
-                trace_destroy_packet(*packet);
-                *packet = newpacket;
+		/* If an IP header was found on the nth layer down
+		 * write out the packet  */
+	        if (trace_write_packet(output, newpacket)==-1) {
+                    trace_perror_output(output,"write_packet");
+                    return -1;
+        	}
+		/* Then destroy the packet */
+		trace_destroy_packet(newpacket);
             }
-            else /* Skip packet */
+            else /* Skip packet - Payload ran out before getting to nth layer */
                 return 1;
-        }
+        } else {
 
-	if (trace_write_packet(output, *packet)==-1) {
+	    if (trace_write_packet(output, *packet)==-1) {
 		trace_perror_output(output,"write_packet");
 		return -1;
+	    }
 	}
 
 	return 1;
@@ -396,7 +403,7 @@ int main(int argc, char *argv[])
 				  break;
 			case 'i': interval=atoi(optarg);
 				  break;
-                        case 'j': jump=atoi(optarg);
+                        case 'j': jumpopt=atoi(optarg);
                                   break;
 			case 'm': maxfiles=atoi(optarg);
 				  break;
@@ -507,6 +514,25 @@ int main(int argc, char *argv[])
 			trace_perror(input,"Reading packets");
 			trace_destroy(input);
 			break;
+		} else if (verbose) {
+			libtrace_stat_t *stat;
+
+			stat = trace_create_statistics();
+			trace_get_statistics(input, stat);
+
+			if (stat->received_valid)
+				fprintf(stderr,"%" PRIu64 " packets on input\n",
+						stat->received);
+			if (stat->filtered_valid)
+				fprintf(stderr,"%" PRIu64 " packets filtered\n",
+						stat->filtered);
+			if (stat->dropped_valid)
+				fprintf(stderr,"%" PRIu64 " packets dropped\n",
+						stat->dropped);
+			if (stat->accepted_valid)
+				fprintf(stderr,"%" PRIu64 " packets accepted\n",
+						stat->accepted);
+			free(stat);
 		}
 
 		trace_destroy(input);
@@ -516,26 +542,6 @@ int main(int argc, char *argv[])
 		
 	}
 
-	if (verbose) {
-                libtrace_stat_t *stat;
-                
-                stat = trace_create_statistics();
-                trace_get_statistics(input, stat);
-
-                if (stat->received_valid)
-			fprintf(stderr,"%" PRIu64 " packets on input\n",
-                                        stat->received);
-		if (stat->filtered_valid)
-			fprintf(stderr,"%" PRIu64 " packets filtered\n",
-                                        stat->filtered);
-		if (stat->dropped_valid)
-			fprintf(stderr,"%" PRIu64 " packets dropped\n",
-                                        stat->dropped);
-		if (stat->accepted_valid)
-			fprintf(stderr,"%" PRIu64 " packets accepted\n",
-                                        stat->accepted);
-	        free(stat);
-        }
 	
 	if (output)
 		trace_destroy_output(output);

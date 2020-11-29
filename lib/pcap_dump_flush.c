@@ -29,9 +29,6 @@
 #ifndef HAVE_PCAP_DUMP_FLUSH
 #include <stdio.h>
 #include <pcap.h>
-#ifdef HAVE_PCAP_INT_H
-# include <pcap-int.h>
-#endif
 #include <string.h>
 
 /* Custom implementation of pcap_dump_flush, as some versions of PCAP do not

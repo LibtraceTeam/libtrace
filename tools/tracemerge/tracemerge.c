@@ -206,8 +206,9 @@ int main(int argc, char *argv[])
 		p=trace_create_packet();
 		input[i]=f;
 		packet[i]=p;
-		if (trace_read_packet(f,packet[i])>0)
+		if (trace_read_packet(f,packet[i])>0){
 			live[i]=true;
+		}
 	}
 
 	while(1) {
@@ -236,6 +237,19 @@ int main(int argc, char *argv[])
 			}
 			if (live[i]) {
                                 this_ts = trace_get_erf_timestamp(packet[i]);
+
+				/* If the ts is 0 and its a meta packet just output it
+				 * and read new packets until we get one that has a ts */
+				while (this_ts == 0 && IS_LIBTRACE_META_PACKET(packet[i])) {
+					trace_write_packet(output,packet[i]);
+
+					/* read another packet, break if reached EOF */
+					if (trace_read_packet(input[i],packet[i])>0) {
+                                        	live[i] = true;
+                                	} else { break; }
+					this_ts = trace_get_erf_timestamp(packet[i]);
+				}
+
 				if (this_ts != 0 && (oldest==-1 ||
 				                oldest_ts>this_ts)) {
         				oldest=i;

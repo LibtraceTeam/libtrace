@@ -29,6 +29,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+static void *trace_get_payload_from_ppp(void *link, uint16_t *type, uint32_t *remaining);
 
 /* This file contains all the protocol decoding functions for layer 2 
  * (and 2.5) protocols. This includes functions for accessing MAC addresses.
@@ -89,6 +90,235 @@ void *trace_get_payload_from_vlan(void *ethernet, uint16_t *type,
 
 	return (void*)((char *)ethernet + sizeof(*vlanhdr));
 
+}
+
+int trace_destroy_layer2_headers(libtrace_layer2_headers_t *headers) {
+	if (headers == NULL) {
+		fprintf(stderr, "NULL libtrace_layer2_headers_t passed into "
+			"trace_destroy_layer2_headers()\n");
+		return -1;
+	}
+
+	if (headers->header != NULL) {
+		free(headers->header);
+	}
+	free(headers);
+	return 1;
+}
+libtrace_layer2_headers_t *trace_get_layer2_headers(libtrace_packet_t *packet) {
+
+	char *ptr;
+	libtrace_linktype_t linktype;
+	uint32_t remaining;
+	uint16_t ethertype;
+	libtrace_layer2_headers_t *r;
+	int allocated_headers = 0;
+
+	if (packet == NULL) {
+		fprintf(stderr, "NULL packet passed into trace_get_layer2_headers()\n");
+		return NULL;
+	}
+	if (packet->trace == NULL) {
+		fprintf(stderr, "Packet contains a NULL trace in trace_get_layer2_headers()\n");
+		return NULL;
+	}
+
+	/* jump to layer 2 */
+	ptr = trace_get_layer2(packet, &linktype, &remaining);
+	/* packet does not contain layer2 */
+	if (ptr == NULL) {
+		return NULL;
+	}
+
+	/* allocate memory for the result */
+        r = calloc(1, sizeof(libtrace_layer2_headers_t));
+	if (r == NULL) {
+		trace_set_err(packet->trace, TRACE_ERR_OUT_OF_MEMORY,
+			"Unable to allocate memory in trace_get_layer2_headers()\n");
+		return NULL;
+	}
+	/* Alloc enough space for 10 headers */
+	r->header = calloc(1, sizeof(libtrace_layer2_header_t)*10);
+	if (r->header == NULL) {
+		trace_set_err(packet->trace, TRACE_ERR_OUT_OF_MEMORY,
+			"Unable to allocate memory in trace_get_layer2_headers()\n");
+		free(r);
+		return NULL;
+	}
+	allocated_headers = 10;
+
+	/* get the first layer2 header */
+	ptr = trace_get_payload_from_layer2(ptr, linktype, &ethertype, &remaining);
+
+	while (remaining != 0 && ptr != NULL) {
+
+		if ((r->num+1) >= allocated_headers) {
+			allocated_headers += 10;
+			r->header = realloc(r->header,
+				sizeof(libtrace_layer2_header_t)*allocated_headers);
+
+			if (r->header == NULL) {
+				trace_set_err(packet->trace, TRACE_ERR_OUT_OF_MEMORY,
+					"Unable to allocate memory in trace_get_layer2_headers()");
+				free(r);
+				return NULL;
+			}
+		}
+
+		/* Set the bitmask and get payload of the next layer2 header */
+		switch (ethertype) {
+			case (TRACE_ETHERTYPE_ARP):
+				r->header[r->num].ethertype = ethertype;
+                                r->header[r->num++].data = ptr;
+                                r->bitmask |= TRACE_BITMASK_ARP;
+                                /* arp cannot have any headers below it? */
+				goto cleanup;
+			case (TRACE_ETHERTYPE_8021Q):
+				r->header[r->num].ethertype = ethertype;
+                        	r->header[r->num++].data = ptr;
+				r->bitmask |= TRACE_BITMASK_8021Q;
+				ptr = (char *)trace_get_payload_from_vlan(ptr, &ethertype, &remaining);
+				break;
+			case (TRACE_ETHERTYPE_8021QS):
+				r->header[r->num].ethertype = ethertype;
+                        	r->header[r->num++].data = ptr;
+				r->bitmask |= TRACE_BITMASK_8021QS;
+				ptr = (char *)trace_get_payload_from_vlan(ptr, &ethertype, &remaining);
+				break;
+			case (TRACE_ETHERTYPE_MPLS):
+				r->header[r->num].ethertype = ethertype;
+                        	r->header[r->num++].data = ptr;
+				r->bitmask |= TRACE_BITMASK_MPLS;
+				ptr = (char *)trace_get_payload_from_mpls(ptr, &ethertype, &remaining);
+				break;
+			case (TRACE_ETHERTYPE_MPLS_MC):
+				r->header[r->num].ethertype = ethertype;
+                        	r->header[r->num++].data = ptr;
+				r->bitmask |= TRACE_BITMASK_MPLS_MC;
+				ptr = (char *)trace_get_payload_from_mpls(ptr, &ethertype, &remaining);
+				break;
+			case (TRACE_ETHERTYPE_PPP_DISC):
+				r->header[r->num].ethertype = ethertype;
+                        	r->header[r->num++].data = ptr;
+				r->bitmask |= TRACE_BITMASK_PPP_DISC;
+				ptr = (char *)trace_get_payload_from_ppp(ptr, &ethertype, &remaining);
+				break;
+			case (TRACE_ETHERTYPE_PPP_SES):
+				r->header[r->num].ethertype = ethertype;
+                        	r->header[r->num++].data = ptr;
+				r->bitmask |= TRACE_BITMASK_PPP_SES;
+				ptr = (char *)trace_get_payload_from_ppp(ptr, &ethertype, &remaining);
+				break;
+			case (TRACE_ETHERTYPE_LOOPBACK):
+			case (TRACE_ETHERTYPE_IP):
+			case (TRACE_ETHERTYPE_RARP):
+			case (TRACE_ETHERTYPE_IPV6):
+			default:
+				goto cleanup;
+		}
+	}
+cleanup:
+	/* If no results were found free memory now and just return NULL */
+	if (r->num == 0) {
+		free(r->header);
+		free(r);
+		return NULL;
+	}
+
+	return r;
+}
+
+uint16_t trace_get_outermost_vlan(libtrace_packet_t *packet, uint8_t **vlanptr,
+	uint32_t *remaining) {
+
+	uint8_t *ptr;
+	libtrace_linktype_t linktype;
+	uint32_t rem;
+	uint16_t vlanid = VLAN_NOT_FOUND;
+	uint16_t ethertype = 0;
+
+	if (!packet) {
+		fprintf(stderr, "NULL packet passed into trace_get_outermost_vlan()\n");
+		*vlanptr = NULL;
+		*remaining = 0;
+		return vlanid;
+	}
+
+	ptr = trace_get_layer2(packet, &linktype, &rem);
+	/* No layer 2 */
+	if (ptr == NULL) {
+		*vlanptr = NULL;
+		*remaining = 0;
+		return vlanid;
+	}
+
+	while (ethertype != TRACE_ETHERTYPE_8021Q && ethertype != TRACE_ETHERTYPE_8021QS) {
+
+		if (rem == 0 || ptr == NULL || ethertype == TRACE_ETHERTYPE_IP ||
+			ethertype == TRACE_ETHERTYPE_IPV6) {
+
+			*vlanptr = NULL;
+			*remaining = 0;
+                        return vlanid;
+                }
+
+		/* get the next layer 2 header */
+	        ptr = trace_get_payload_from_layer2(ptr, linktype, &ethertype, &rem);
+	}
+
+	/* found a vlan header */
+	uint32_t val = ntohl(*(uint32_t *)ptr);
+	/* the id portion is only 12 bits */
+	vlanid = (((val >> 16) << 4) >> 4);
+
+	*remaining = rem;
+	*vlanptr = ptr;
+	return vlanid;
+}
+
+uint32_t trace_get_outermost_mpls(libtrace_packet_t *packet, uint8_t **mplsptr,
+        uint32_t *remaining) {
+
+	uint8_t *ptr;
+	uint32_t mplslabel = MPLS_NOT_FOUND;
+	libtrace_linktype_t linktype;
+	uint32_t rem;
+	uint16_t ethertype = 0;
+
+	if (!packet) {
+		fprintf(stderr, "NULL packet passed into trace_get_outermost_mpls()\n");
+		*remaining = 0;
+		*mplsptr = NULL;
+		return mplslabel;
+	}
+
+	ptr = trace_get_layer2(packet, &linktype, &rem);
+	/* No layer2 */
+	if (ptr == NULL) {
+		*remaining = 0;
+		*mplsptr = NULL;
+		return mplslabel;
+	}
+
+	/* loop over the packet until we find a mpls label */
+	while (ethertype != TRACE_ETHERTYPE_MPLS) {
+		if (rem == 0 || ptr == NULL) {
+
+			*remaining = 0;
+			*mplsptr = NULL;
+			return mplslabel;
+		}
+
+		/* get next layer2 header */
+		ptr = trace_get_payload_from_layer2(ptr, linktype, &ethertype, &rem);
+	}
+
+	uint32_t val = ntohl(*(uint32_t *)ptr);
+	mplslabel = val >> 12;
+
+	*remaining = rem;
+	*mplsptr = ptr;
+	return mplslabel;
 }
 
 libtrace_packet_t *trace_strip_packet(libtrace_packet_t *packet) {
@@ -180,7 +410,7 @@ libtrace_packet_t *trace_strip_packet(libtrace_packet_t *packet) {
                         packet->payload, 
                         (dest - (char *)packet->payload));
                 packet->payload = nextpayload - (dest - (char *)packet->payload);
-                packet->l2_header = NULL;
+                packet->cached.l2_header = NULL;
         }
         
         return packet;
@@ -250,7 +480,6 @@ static void *trace_get_payload_from_llcsnap(void *link,
 
 	return (void*)((char*)llc+sizeof(*llc));
 }
-
 
 static void *trace_get_payload_from_80211(void *link, uint16_t *type, uint32_t *remaining)
 {
@@ -442,6 +671,8 @@ DLLEXPORT void *trace_get_layer2(const libtrace_packet_t *packet,
 {
 	uint32_t dummyrem;
 	void *meta = NULL;
+        int done = 0;
+        uint32_t wire_len;
 
 	if (!packet) {
 		fprintf(stderr, "NULL packet passed into trace_get_layer2()\n");
@@ -455,18 +686,20 @@ DLLEXPORT void *trace_get_layer2(const libtrace_packet_t *packet,
 	if (remaining == NULL)
 		remaining = &dummyrem;
 
-	if (packet->l2_header) {
+	if (packet->cached.l2_header) {
 		/* Use cached values */
-		*linktype = packet->link_type;
-		*remaining = packet->l2_remaining;
-		return packet->l2_header;
+		*linktype = packet->cached.link_type;
+		*remaining = packet->cached.l2_remaining;
+		return packet->cached.l2_header;
 	}
 
 	/* Code looks a bit inefficient, but I'm actually trying to avoid
 	 * calling trace_get_packet_buffer more than once like we used to.
 	 */
-	
 	meta = trace_get_packet_buffer(packet, linktype, remaining);
+        if (meta == NULL) {
+                return NULL;
+        }
 
 	/* If there are no meta-data headers, we just return the start of the
 	 * packet buffer, along with the linktype, etc.
@@ -486,15 +719,19 @@ DLLEXPORT void *trace_get_layer2(const libtrace_packet_t *packet,
 		case TRACE_TYPE_METADATA:
 		case TRACE_TYPE_NONDATA:
 		case TRACE_TYPE_OPENBSD_LOOP:
-			((libtrace_packet_t*)packet)->l2_header = meta;
-			((libtrace_packet_t*)packet)->l2_remaining = *remaining;
+			((libtrace_packet_t*)packet)->cached.l2_header = meta;
+			((libtrace_packet_t*)packet)->cached.l2_remaining = *remaining;
 			return meta;
 		case TRACE_TYPE_LINUX_SLL:
 		case TRACE_TYPE_80211_RADIO:
 		case TRACE_TYPE_80211_PRISM:
 		case TRACE_TYPE_PFLOG:
 		case TRACE_TYPE_ERF_META:
+		case TRACE_TYPE_PCAPNG_META:
+		case TRACE_TYPE_TZSP:
                 case TRACE_TYPE_ETSILI:
+                case TRACE_TYPE_CORSAROTAG:
+                case TRACE_TYPE_XDP:
 			break;
 		case TRACE_TYPE_UNKNOWN:
 		case TRACE_TYPE_CONTENT_INVALID:
@@ -504,49 +741,70 @@ DLLEXPORT void *trace_get_layer2(const libtrace_packet_t *packet,
 	/* If there are meta-data headers, we need to skip over them until we
 	 * find a non-meta data header and return that.
 	 */
-	for(;;) {
+	while (!done) {
 		void *nexthdr = trace_get_payload_from_meta(meta, 
 				linktype, remaining);
 		
-		if (nexthdr == NULL) {
-			switch (*linktype) {
-				/* meta points to a layer 2 header! */
-				case TRACE_TYPE_HDLC_POS:
-				case TRACE_TYPE_ETH:
-				case TRACE_TYPE_ATM:
-				case TRACE_TYPE_80211:
-				case TRACE_TYPE_NONE:
-				case TRACE_TYPE_POS:
-				case TRACE_TYPE_AAL5:
-				case TRACE_TYPE_DUCK:
-				case TRACE_TYPE_LLCSNAP:
-				case TRACE_TYPE_PPP:
-				case TRACE_TYPE_METADATA:
-				case TRACE_TYPE_NONDATA:
-				case TRACE_TYPE_OPENBSD_LOOP:
-					((libtrace_packet_t*)packet)->l2_header = meta;
-					((libtrace_packet_t*)packet)->l2_remaining = *remaining;
-					return meta;
-				case TRACE_TYPE_LINUX_SLL:
-				case TRACE_TYPE_80211_RADIO:
-				case TRACE_TYPE_80211_PRISM:
-				case TRACE_TYPE_PFLOG:
-				case TRACE_TYPE_ERF_META:
-                                case TRACE_TYPE_ETSILI:
-					break;
-				case TRACE_TYPE_UNKNOWN:
-		                case TRACE_TYPE_CONTENT_INVALID:
-					return NULL;
-			}
-			
-			/* Otherwise, we must have hit the end of the packet */
-			return NULL;
-		}
-	 
-	 	
-		meta = nexthdr;
+		if (nexthdr != NULL) {
+                        meta = nexthdr;
+                        continue;
+                }
+
+                switch (*linktype) {
+                        /* meta points to a layer 2 header! */
+                        case TRACE_TYPE_HDLC_POS:
+                        case TRACE_TYPE_ETH:
+                        case TRACE_TYPE_ATM:
+                        case TRACE_TYPE_80211:
+                        case TRACE_TYPE_NONE:
+                        case TRACE_TYPE_POS:
+                        case TRACE_TYPE_AAL5:
+                        case TRACE_TYPE_DUCK:
+                        case TRACE_TYPE_LLCSNAP:
+                        case TRACE_TYPE_PPP:
+                        case TRACE_TYPE_METADATA:
+                        case TRACE_TYPE_NONDATA:
+                        case TRACE_TYPE_OPENBSD_LOOP:
+                                done = 1;
+                                break;
+                        case TRACE_TYPE_LINUX_SLL:
+                        case TRACE_TYPE_80211_RADIO:
+                        case TRACE_TYPE_80211_PRISM:
+                        case TRACE_TYPE_PFLOG:
+                        case TRACE_TYPE_ERF_META:
+                        case TRACE_TYPE_PCAPNG_META:
+                        case TRACE_TYPE_TZSP:
+                        case TRACE_TYPE_ETSILI:
+                        case TRACE_TYPE_CORSAROTAG:
+                        case TRACE_TYPE_XDP:
+                                meta = nexthdr;  // should never hit this?
+                                break;
+                        case TRACE_TYPE_UNKNOWN:
+                        case TRACE_TYPE_CONTENT_INVALID:
+                                return NULL;
+                }
 	}
 
+        /* L2 remaining should never exceed wire length, to avoid treating
+         * capture padding as genuine packet content.
+         *
+         * For example, in Auck 4 there is a trace where the IP header
+         * length is incorrect (24 bytes) followed by a 20 byte TCP
+         * header. Total IP length is 40 bytes. As a result, the
+         * legacyatm padding gets treated as the "missing" bytes of
+         * the TCP header, which isn't the greatest. We're probably
+         * better off returning an incomplete TCP header in that case.
+         */
+
+        wire_len = (uint32_t) trace_get_wire_length(packet);
+        if (wire_len > 0 && wire_len < *remaining) {
+                *remaining = wire_len;
+        }
+
+        ((libtrace_packet_t*)packet)->cached.l2_header = meta;
+        ((libtrace_packet_t*)packet)->cached.l2_remaining = *remaining;
+
+        return meta;
 }
 
 DLLEXPORT
@@ -583,7 +841,11 @@ DLLEXPORT void *trace_get_payload_from_layer2(void *link,
 		fprintf(stderr, "Unable to determine linktype for packet\n");
 		return NULL;
 	}
-	
+
+        if (link == NULL) {
+                return NULL;
+        }
+
 	switch(linktype) {
 		/* Packet Metadata headers, not layer2 headers */
 		case TRACE_TYPE_80211_PRISM:
@@ -602,9 +864,13 @@ DLLEXPORT void *trace_get_payload_from_layer2(void *link,
 		   */
 		case TRACE_TYPE_METADATA:
 		case TRACE_TYPE_NONDATA:
+		case TRACE_TYPE_PCAPNG_META:
+		case TRACE_TYPE_TZSP:
 		case TRACE_TYPE_ERF_META:
+                case TRACE_TYPE_CORSAROTAG:
 		case TRACE_TYPE_CONTENT_INVALID:
 		case TRACE_TYPE_UNKNOWN:
+                case TRACE_TYPE_XDP:
 			return NULL;
 
 		case TRACE_TYPE_80211:
@@ -612,10 +878,16 @@ DLLEXPORT void *trace_get_payload_from_layer2(void *link,
 		case TRACE_TYPE_ETH:
 			return trace_get_payload_from_ethernet(link,ethertype,remaining);
 		case TRACE_TYPE_NONE:
+                        if (*remaining == 0) {
+                                return NULL;
+                        }
+
 			if ((*(char*)link&0xF0) == 0x40)
 				*ethertype=TRACE_ETHERTYPE_IP;	 /* IPv4 */
 			else if ((*(char*)link&0xF0) == 0x60)
 				*ethertype=TRACE_ETHERTYPE_IPV6; /* IPv6 */
+                        else
+                                return NULL;            /* No idea */
 			return link; /* I love the simplicity */
 		case TRACE_TYPE_PPP:
 			return trace_get_payload_from_ppp(link,ethertype,remaining);
@@ -640,11 +912,16 @@ DLLEXPORT void *trace_get_payload_from_layer2(void *link,
 			return NULL;
 
 		case TRACE_TYPE_OPENBSD_LOOP:
+                        if (*remaining <= 4) {
+                                return NULL;
+                        }
 			link = link + 4; /* Loopback header is 4 bytes */
 			if ((*(char*)link&0xF0) == 0x40)
 				*ethertype=TRACE_ETHERTYPE_IP;	 /* IPv4 */
 			else if ((*(char*)link&0xF0) == 0x60)
 				*ethertype=TRACE_ETHERTYPE_IPV6; /* IPv6 */
+                        else
+                                return NULL;
 			return link; /* I love the simplicity */
 		
 
@@ -712,8 +989,11 @@ DLLEXPORT uint8_t *trace_get_source_mac(libtrace_packet_t *packet) {
 		case TRACE_TYPE_NONDATA:
 		case TRACE_TYPE_OPENBSD_LOOP:
 		case TRACE_TYPE_ERF_META:
+		case TRACE_TYPE_PCAPNG_META:
+		case TRACE_TYPE_TZSP:
 		case TRACE_TYPE_UNKNOWN:
 		case TRACE_TYPE_CONTENT_INVALID:
+                case TRACE_TYPE_XDP:
                         return NULL;
 
                 /* Metadata headers should already be skipped */
@@ -721,6 +1001,7 @@ DLLEXPORT uint8_t *trace_get_source_mac(libtrace_packet_t *packet) {
                 case TRACE_TYPE_80211_PRISM:
                 case TRACE_TYPE_80211_RADIO:
                 case TRACE_TYPE_ETSILI:
+                case TRACE_TYPE_CORSAROTAG:
 			fprintf(stderr, "Metadata headers should already be skipped in trace_get_source_mac()\n");
 			return NULL;
         }
@@ -768,14 +1049,18 @@ DLLEXPORT uint8_t *trace_get_destination_mac(libtrace_packet_t *packet) {
 		case TRACE_TYPE_NONDATA:
 		case TRACE_TYPE_OPENBSD_LOOP:
 		case TRACE_TYPE_ERF_META:
+		case TRACE_TYPE_PCAPNG_META:
+		case TRACE_TYPE_TZSP:
 		case TRACE_TYPE_UNKNOWN:
 		case TRACE_TYPE_CONTENT_INVALID:
+                case TRACE_TYPE_XDP:
                         /* No MAC address */
                         return NULL;
                 /* Metadata headers should already be skipped */
                 case TRACE_TYPE_LINUX_SLL:
                 case TRACE_TYPE_80211_PRISM:
                 case TRACE_TYPE_80211_RADIO:
+                case TRACE_TYPE_CORSAROTAG:
                 case TRACE_TYPE_ETSILI:
 			fprintf(stderr, "Metadata headers should already be skipped in trace_get_destination_mac()\n");
 			return NULL;

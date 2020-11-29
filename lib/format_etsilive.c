@@ -24,7 +24,9 @@
  *
  */
 
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 
 #include "config.h"
 #include "common.h"
@@ -158,6 +160,8 @@ static void *etsi_listener(void *tdata) {
         while ((is_halted(libtrace) == -1)) {
                 newsend_message_t msg;
                 etsithread_t *et;
+
+                memset(&msg, 0, sizeof(msg));
 
                 /* accept */
                 connected = (struct sockaddr_storage *)malloc(sizeof(struct
@@ -321,8 +325,12 @@ static void halt_etsi_thread(etsithread_t *receiver) {
 static int etsilive_pause_input(libtrace_t *libtrace) {
 
         int i;
-        for (i = 0; i < libtrace->perpkt_thread_count; i++) {
-                halt_etsi_thread(&(FORMAT_DATA->receivers[i]));
+        if (libtrace->perpkt_thread_count == 0) {
+                halt_etsi_thread(&(FORMAT_DATA->receivers[0]));
+        } else {
+                for (i = 0; i < libtrace->perpkt_thread_count; i++) {
+                        halt_etsi_thread(&(FORMAT_DATA->receivers[i]));
+                }
         }
         return 0;
 
@@ -361,6 +369,11 @@ static int receiver_read_message(etsithread_t *et) {
                         et->sources = (etsisocket_t *)realloc(et->sources,
                                 sizeof(etsisocket_t) * (et->sourcealloc + 10));
 
+                        for (i = et->sourcealloc; i < et->sourcealloc + 10;
+                                        i++) {
+                                et->sources[i].sock = -1;
+                                et->sources[i].srcaddr = NULL;
+                        }
                         esock = &(et->sources[et->sourcealloc]);
                         et->sourcealloc += 10;
                         et->sourcecount += 1;
@@ -402,6 +415,7 @@ static void receive_from_single_socket(etsisocket_t *esock, etsithread_t *et) {
                 close(esock->sock);
                 esock->sock = -1;
                 et->activesources -= 1;
+                libtrace_scb_destroy(&(esock->recvbuffer));
         }
 
         if (ret == 0) {
@@ -409,6 +423,7 @@ static void receive_from_single_socket(etsisocket_t *esock, etsithread_t *et) {
                 close(esock->sock);
                 esock->sock = -1;
                 et->activesources -= 1;
+                libtrace_scb_destroy(&(esock->recvbuffer));
         }
 
 }
@@ -561,8 +576,8 @@ static int etsilive_prepare_received(libtrace_t *libtrace,
         packet->order = esock->cached.timestamp;
         packet->error = esock->cached.length;
 
-        packet->wire_length = esock->cached.length;
-        packet->capture_length = esock->cached.length;
+        packet->cached.wire_length = esock->cached.length;
+        packet->cached.capture_length = esock->cached.length;
 
         /* Advance the read pointer for this buffer
          * TODO should really do this in fin_packet, but will need a ref
@@ -685,6 +700,7 @@ static struct libtrace_format_t etsilive = {
         NULL,                           /* get_timeval */
         NULL,                           /* get_timespec */
         NULL,                           /* get_seconds */
+	NULL,                           /* get_meta_section */
         NULL,                           /* seek_erf */
         NULL,                           /* seek_timeval */
         NULL,                           /* seek_seconds */

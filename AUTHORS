@@ -37,6 +37,10 @@ In no particular order, we would like to recognise:
    of other ERF/DAG issues
  * Tim Dawson for fixing issues with building against musl libc
  * Hendrik Leppelsack for reporting and fixing some errors in the tool manpages
+ * Jacob van Walraven for spending a summer doing various coding odd-jobs
+ * Mark Weiman for fixing an uninitialised memory bug that was upsetting
+   Valgrind.
+ * Tyler Marriner for adding RADIUS anonymisation to traceanon.
  * Jamie Curtis for fixing a couple of bugs many many years ago
  * Brendon Jones for creating the original Windows DLLs and writing bits of
    code here and there

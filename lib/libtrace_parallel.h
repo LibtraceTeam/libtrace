@@ -135,6 +135,11 @@ enum libtrace_messages {
 	 */
 	MESSAGE_PACKET,
 
+	/** A libtrace meta packet is ready, this will trigger the meta packet
+         *  callback for the processing threads.
+         */
+	MESSAGE_META_PACKET,
+
         /** A libtrace result is ready, this will trigger the result callback
          *  for the reporter thread.
 	 */
@@ -518,6 +523,25 @@ typedef libtrace_packet_t* (*fn_cb_packet)(libtrace_t *libtrace,
                                            libtrace_packet_t *packet);
 
 /**
+ * A callback function triggered when a processing thread receives a meta packet.
+ *
+ * @param libtrace The parallel trace.
+ * @param t The thread that is running
+ * @param global The global storage.
+ * @param tls The thread local storage.
+ * @param packet The packet to be processed.
+ *
+ * @return either the packet itself if it is not being published as a result
+ *   or NULL otherwise. If returning NULL, it is the user's responsibility
+ *   to ensure the packet is freed when the reporter thread is finished with it.
+ */
+typedef libtrace_packet_t* (*fn_cb_meta_packet)(libtrace_t *libtrace,
+                                           libtrace_thread_t *t,
+                                           void *global,
+                                           void *tls,
+                                           libtrace_packet_t *packet);
+
+/**
  * Callback for handling a result message. Should only be required by the
  * reporter thread.
  *
@@ -598,6 +622,16 @@ DLLEXPORT int trace_set_pausing_cb(libtrace_callback_set_t *cbset,
  */
 DLLEXPORT int trace_set_packet_cb(libtrace_callback_set_t *cbset,
                 fn_cb_packet handler);
+
+/**
+ * Registers a meta packet callback against a callback set.
+ *
+ * @param cbset The callback set.
+ * @param handler The meta packet callback funtion.
+ * @return 0 if successful, -1 otherwise.
+ */
+DLLEXPORT int trace_set_meta_packet_cb(libtrace_callback_set_t *cbset,
+                fn_cb_meta_packet handler);
 
 /**
  * Registers a first packet callback against a callback set.
@@ -924,7 +958,7 @@ DLLEXPORT int trace_set_reporter_thold(libtrace_t *trace, size_t thold);
 
 /**
  * Enable or disable debug output for parallel libtrace.
-
+ *
  * If enabled, libtrace will print a line to standard error for every
  * state change observed by both the trace as a whole and by each thread.
  *
@@ -936,6 +970,36 @@ DLLEXPORT int trace_set_reporter_thold(libtrace_t *trace, size_t thold);
  *
  */
 DLLEXPORT int trace_set_debug_state(libtrace_t *trace, bool debug_state);
+
+/**
+ * Bind per-packet threads affinities to specified CPU cores
+ *
+ * A comma ',' (or colon ':') separated list of cores to bind per-packet
+ * threads to. The first per-packet thread is bound to the first core supplied.
+ *
+ * e.g.:
+ * * 0,1 Map the 1st thread to core 0, and the second to core 1
+ * * 0:1 As above with a colon separator
+ * * 4,5,6,7 Map the 1st thread to core 4, ..., the 4th thread to core 7
+ *   (e.g. use a second socket)
+ * * 1,3,5,7 Map to odd cores (e.g. avoid hyper-threads)
+ *
+ * If there are more threads than supplied in the coremap, default behaviour
+ * from the format is silently applied. If there are more mappings than
+ * threads, the extra ones are silently ignored.
+ *
+ * The default behaviour varies depending on the format. Some formats will
+ * leave threads to run on any core, while others bind each thread to
+ * a CPU core.
+ *
+ * @param trace A parallel input trace
+ * @param value The coremap; a comma-separated list of cores
+ * @return 0 if successful otherwise -1.
+ *
+ * @note when using with trace_set_configuration() you need to put the coremap
+ * in square brackets.
+ */
+DLLEXPORT int trace_set_coremap(libtrace_t *trace, const char *coremap);
 
 /** Set the hasher function for a parallel trace.
  *
@@ -1311,7 +1375,10 @@ DLLEXPORT void trace_decrement_packet_refcount(libtrace_packet_t *packet);
 DLLEXPORT libtrace_info_t *trace_get_information(libtrace_t * libtrace);
 
 /** Sets the configuration of a trace based upon a comma separated list of
- * key value pairs.
+ * key=value pairs.
+ *
+ * Values which contain a comma, equals sign, or colon (i.e. coremap)
+ * must be enclosed in square brackets.
  *
  * @param trace A parallel trace which is not running or destroyed.
  * @param str A comma separated list of key=value pairs:
@@ -1326,20 +1393,22 @@ DLLEXPORT libtrace_info_t *trace_get_information(libtrace_t * libtrace);
  * * \b burst_size,\b bs see trace_set_burst_size() [size_t]
  * * \b tick_interval,\b ti see trace_set_tick_interval() [size_t]
  * * \b tick_count,\b tc see trace_set_tick_count() [size_t]
- * * \b perpkt_threads,\b pt see trace_set_perpkt_threads() [XXX TBA XXX]
+ * * \b perpkt_threads,\b pt see trace_set_perpkt_threads() [int]
  * * \b hasher_queue_size,\b hqs see trace_set_hasher_queue_size() [size_t]
  * * \b hasher_polling,\b hp see trace_set_hasher_polling() [bool]
  * * \b reporter_polling,\b rp see trace_set_reporter_polling() [bool]
  * * \b reporter_thold,\b rt see trace_set_reporter_thold() [size_t]
  * * \b debug_state,\b ds see trace_set_debug_state() [bool]
+ * * \b coremap see trace_set_coremap() [string of comma-separated integers]
+ *   e.g. coremap=[1,3,5,7] (square brackets required)
  *
  * Booleans can be set as 0/1 or false/true.
  *
- * @note a environment variable interface is provided by default to users via
+ * @note an environment variable interface is provided by default to users via
  * LIBTRACE_CONF, see Parallel Configuration for more information.
  *
  * @note This interface is provided to allow a user to quickly configure an
- * application using a single API call. A nicer programatic method for
+ * application using a single API call. A nicer programmatic method for
  * configuration would be to use the appropriate trace_set_*() function for
  * each option.
  */
