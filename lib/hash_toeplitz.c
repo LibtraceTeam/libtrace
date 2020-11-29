@@ -50,7 +50,7 @@ static inline uint8_t get_bit(uint8_t byte, size_t num) {
 void toeplitz_hash_expand_key(toeplitz_conf_t *conf) {
 	size_t i = 0, j;
 	// Don't destroy the existing key
-	char *key_cpy = malloc(40);
+	uint8_t key_cpy[40];
 	memcpy(key_cpy, conf->key, 40);
 	
 	do {
@@ -63,7 +63,6 @@ void toeplitz_hash_expand_key(toeplitz_conf_t *conf) {
 		key_cpy[39] <<= 1;
 		++i;
 	} while (i < 320);
-	free(key_cpy);
 }
 
 

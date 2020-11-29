@@ -130,6 +130,15 @@ int snprintf(char *str, size_t size, const char *format, ...);
 # endif 
 #endif
 
+#if !HAVE_DECL_POSIX_MEMALIGN
+#include <errno.h>
+static inline int posix_memalign(void **memptr, size_t alignment, size_t size)
+{
+	fprintf(stderr, "No posix_memalign\n");
+	return ENOMEM;
+}
+#endif
+
 #include "daglegacy.h"
 	
 #ifdef HAVE_DAG_API
@@ -459,6 +468,22 @@ void trace_set_err_out(libtrace_out_t *trace, int errcode, const char *msg,...)
  */
 void trace_clear_cache(libtrace_packet_t *packet);
 
+/**
+ * An internal version of trace_set_configuration that can parse the
+ * settings from the start of a libtrace uri.
+ *
+ * If format is supplied, str is a uri, and format returns the
+ * start of the uri portion.
+ * Otherwise str is a pure list of options.
+ *
+ * @param trace [in] the trace
+ * @param str [in] the configuration as a string
+ * @param format [out] the beginning of the URI
+ * @return 0 if successful, otherwise -1 if an error occurs
+ *
+ * @see trace_set_configuration
+ */
+int _trace_set_configuration(libtrace_t *trace, const char *str, const char **format);
 
 #ifndef PF_RULESET_NAME_SIZE
 #define PF_RULESET_NAME_SIZE 16

@@ -91,7 +91,7 @@ struct pfring_per_stream_t {
 	pfring *pd;
 	int affinity;
 
-} ALIGN_STRUCT(CACHE_LINE_SIZE);
+};
 
 #define ZERO_PFRING_STREAM {NULL, -1}
 
@@ -613,10 +613,11 @@ static int pfring_get_capture_length(const libtrace_packet_t *packet) {
 static int pfring_get_wire_length(const libtrace_packet_t *packet) {
 	struct libtrace_pfring_header *phdr;
 	phdr = (struct libtrace_pfring_header *)packet->header;
+	/* +4 : libtrace includes FCS in wirelen, pcap-like formats don't */
 	if (phdr->byteorder != PFRING_MY_BYTEORDER) {
-		return byteswap32(phdr->wlen);
+		return byteswap32(phdr->wlen) + 4;
 	}
-	return phdr->wlen;
+	return phdr->wlen + 4;
 }
 
 static int pfring_get_framing_length(UNUSED const libtrace_packet_t *packet) {

@@ -225,7 +225,7 @@ int linuxcommon_init_input(libtrace_t *libtrace)
 	}
 
 	FORMAT_DATA->per_stream =
-		libtrace_list_init(sizeof(stream_data));
+		libtrace_list_init_aligned(sizeof(stream_data), CACHE_LINE_SIZE);
 
 	if (!FORMAT_DATA->per_stream) {
 		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to create list for stream data linuxcommon_init_input()");

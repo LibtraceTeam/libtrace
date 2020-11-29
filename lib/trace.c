@@ -240,7 +240,17 @@ static void guess_format(libtrace_t *libtrace, const char *filename)
  *  rt:hostname
  *  rt:hostname:port
  *
- * If an error occured when attempting to open a trace, NULL is returned
+ * A user may precede the URI with a comma-separated list of configuration
+ * options, parsed by trace_set_configuration(), followed by a colon ':'.
+ * i.e. option=value,...:URI
+ *
+ * For example:
+ * cache_size=1024:int:eth0
+ * coremap=[1,2,3],perpkt_threads=3:ring:eth0
+ *
+ * @see trace_set_configuration
+ *
+ * If an error occurred when attempting to open a trace, NULL is returned
  * and an error is output to stdout.
  */
 DLLEXPORT libtrace_t *trace_create(const char *uri) {
@@ -248,6 +258,7 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 			(libtrace_t *)malloc(sizeof(libtrace_t));
         char *scan = 0;
         const char *uridata = 0;
+        const char *uri_portion = 0;
 
 	trace_init();
 
@@ -309,8 +320,19 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
         libtrace->perpkt_cbs = NULL;
         libtrace->reporter_cbs = NULL;
 
+	if (_trace_set_configuration(libtrace, uri, &uri_portion) == 0) {
+		if (uri_portion == NULL) {
+			trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT,
+					"Unknown format (%s)",uri);
+			return libtrace;
+		} else {
+			uri = uri_portion;
+		}
+	} else {
+		return libtrace;
+	}
         /* Parse the URI to determine what sort of trace we are dealing with */
-	if ((uridata = trace_parse_uri(uri, &scan, libtrace->config.coremap)) == 0) {
+	if ((uridata = trace_parse_uri(uri, &scan)) == 0) {
 		/* Could not parse the URI nicely */
 		guess_format(libtrace,uri);
 		if (trace_is_err(libtrace)) {
@@ -474,7 +496,7 @@ DLLEXPORT libtrace_out_t *trace_create_output(const char *uri) {
 
         /* Parse the URI to determine what capture format we want to write */
 
-	if ((uridata = trace_parse_uri(uri, &scan, NULL)) == 0) {
+	if ((uridata = trace_parse_uri(uri, &scan)) == 0) {
 		trace_set_err_out(libtrace,TRACE_ERR_BAD_FORMAT,
 				"Bad uri format (%s)",uri);
 		return libtrace;
@@ -497,7 +519,6 @@ DLLEXPORT libtrace_out_t *trace_create_output(const char *uri) {
                 free(scan);
                 return libtrace;
         }
-        free(scan);
         libtrace->uridata = strdup(uridata);
 
         /* libtrace->format now contains the type of uri
@@ -510,14 +531,16 @@ DLLEXPORT libtrace_out_t *trace_create_output(const char *uri) {
 			/* init_output should call trace_set_err to set the
 			 * error message
 			 */
+			free(scan);
 			return libtrace;
 		}
 	} else {
 		trace_set_err_out(libtrace,TRACE_ERR_UNSUPPORTED,
-				"Format does not support writing (%s)",scan);
+				"Format does not support writing (%s)", scan);
+                free(scan);
                 return libtrace;
         }
-
+	free(scan);
 
 	libtrace->started=false;
 	return libtrace;
@@ -2019,59 +2042,8 @@ DLLEXPORT size_t trace_set_capture_length(libtrace_packet_t *packet, size_t size
 	return ~0U;
 }
 
-/* Splits a URI into two components - the format component which is seen before
- * the ':', and the uridata which follows the ':'.
- *
- * Returns a pointer to the URI data, but updates the format parameter to
- * point to a copy of the format component.
- */
-
-DLLEXPORT const char *trace_parse_coremap_from_uri(int *cores, const char *uri) {
-
-    const char *coremap = 0;
-    int core = 0;
-    int i = 0;
-    int len = 0;
-
-    if (uri == NULL)
-        return NULL;
-
-    if ((coremap = strstr(uri, "coremap=[")) != NULL) {
-        // move to coremap values
-        coremap += 9;
-        while (sscanf(coremap, "%d%n", &core, &len) == 1) {
-
-            if (cores != NULL && i < MAX_THREADS)
-                cores[i++] = core;
-
-            // move to the next coremap value, also account
-            // for the comma or full colon
-            if (coremap[len] != ',' && coremap[len] != ':' && coremap[len] != ']') {
-                fprintf(stderr, "Badly formed URI - : or , is required between core values\n");
-                return NULL;
-            } else
-                coremap += len + 1;
-        }
-
-        if ((uri = strchr(coremap, ':')) == NULL) {
-            // Badly formed URI - needs a : after coremap
-            fprintf(stderr, "Badly formed URI - : is required after coremap\n");
-            return NULL;
-        } else
-            // move past the :
-            uri += 1;
-    }
-
-    return uri;
-}
-
-DLLEXPORT const char * trace_parse_uri(const char *uri, char **format, int *cores) {
+DLLEXPORT const char * trace_parse_uri(const char *uri, char **format) {
 	const char *uridata = 0;
-        const char *next = 0;
-
-        // try parse coremap
-        if ((next = trace_parse_coremap_from_uri(cores, uri)) != NULL)
-            uri = next;
 
 	if((uridata = strchr(uri,':')) == NULL) {
                 /* Badly formed URI - needs a : */
