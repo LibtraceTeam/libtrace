@@ -1136,9 +1136,12 @@ static int dag_dump_packet(libtrace_out_t *libtrace,
 	int payload_size;
         int alignment_pad;
         uint64_t alignment_buf = 0;
+	uint16_t rlen = ntohs(erfptr->rlen);
 
-        payload_size = ntohs(erfptr->rlen)-(dag_record_size + pad);
-        alignment_pad = ntohs(erfptr->rlen) % sizeof(uint64_t);
+        payload_size = rlen - (dag_record_size + pad);
+        alignment_pad = rlen % sizeof(uint64_t);
+	// update record length with any required padding
+	erfptr->rlen = htons(rlen + alignment_pad);
 
 	/*
 	 * If we've got 0 bytes waiting in the txqueue, assume that we
@@ -1161,7 +1164,7 @@ static int dag_dump_packet(libtrace_out_t *libtrace,
 	 * are in contiguous memory
 	 */
 	memcpy(FORMAT_DATA_OUT->txbuffer + FORMAT_DATA_OUT->waiting, erfptr,
-	       (dag_record_size + pad));
+               (dag_record_size + pad));
 	FORMAT_DATA_OUT->waiting += (dag_record_size + pad);
 
 	/*
