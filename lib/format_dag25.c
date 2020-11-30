@@ -892,16 +892,30 @@ static int dag_fin_input(libtrace_t *libtrace)
 	return 0; /* success */
 }
 
+static int dag_flush_output(libtrace_out_t *libtrace) {
+
+	/* Commit any outstanding traffic in the txbuffer */
+        if (FORMAT_DATA_OUT->waiting) {
+                FORMAT_DATA_OUT->txbuffer = dag_tx_stream_commit_bytes64(
+						FORMAT_DATA_OUT->device->fd,
+						FORMAT_DATA_OUT->dagstream,
+						FORMAT_DATA_OUT->waiting );
+		if (FORMAT_DATA_OUT->txbuffer == NULL) {
+			trace_set_err_out(libtrace, TRACE_ERR_BAD_IO,
+				"DAG25: unable to commit tx stream");
+		}
+		FORMAT_DATA_OUT->waiting = 0;
+        }
+
+	return 0;
+}
+
 /* Closes a DAG output trace */
 static int dag_fin_output(libtrace_out_t *libtrace)
 {
 
 	/* Commit any outstanding traffic in the txbuffer */
-	if (FORMAT_DATA_OUT->waiting) {
-		dag_tx_stream_commit_bytes(FORMAT_DATA_OUT->device->fd,
-					   FORMAT_DATA_OUT->dagstream,
-					   FORMAT_DATA_OUT->waiting );
-	}
+	dag_flush_output(libtrace);
 
 	/* Wait until the buffer is nearly clear before exiting the program,
 	 * as we will lose packets otherwise */
@@ -1152,13 +1166,13 @@ static int dag_dump_packet(libtrace_out_t *libtrace,
 	 * 16Mebibytes + 128 kibibytes to ensure that we can copy a packet into
 	 * the buffer and handle overruns.
 	 */
-	if (FORMAT_DATA_OUT->waiting == 0) {
 
+	if (FORMAT_DATA_OUT->waiting == 0) {
 		while (1) {
 			if ((FORMAT_DATA_OUT->txbuffer =
 				dag_tx_get_stream_space64(FORMAT_DATA_OUT->device->fd,
 			 				  FORMAT_DATA_OUT->dagstream,
-							  rlen+alignment_pad)) == NULL) {
+							  16908288)) == NULL) {
 				if (errno == EAGAIN)
 					continue;
 				trace_set_err_out(libtrace, TRACE_ERR_BAD_IO, "DAG25: unable to reserve stream space "
@@ -1193,16 +1207,13 @@ static int dag_dump_packet(libtrace_out_t *libtrace,
 	/*
 	 * If our output buffer has more than 16 Mebibytes in it, commit those 
 	 * bytes and reset the waiting count to 0.
-	 * Note: dag_fin_output will also call dag_tx_stream_commit_bytes() in 
-	 * case there is still data in the buffer at program exit.
+	 * Note: dag_flush_output and dag_fin_output will also call
+	 * dag_tx_stream_commit_bytes() in case there is still data in the buffer
+	 * at program exit.
 	 */
-	//if (FORMAT_DATA_OUT->waiting >= 16*1024*1024) {
-		FORMAT_DATA_OUT->txbuffer =
-			dag_tx_stream_commit_bytes(FORMAT_DATA_OUT->device->fd,
-						   FORMAT_DATA_OUT->dagstream,
-						   FORMAT_DATA_OUT->waiting);
-		FORMAT_DATA_OUT->waiting = 0;
-	//}
+	if (FORMAT_DATA_OUT->waiting >= 16*1024*1024) {
+		dag_flush_output(libtrace);
+	}
 
 	return payload_size + pad + dag_record_size;
 }
@@ -1672,7 +1683,7 @@ static struct libtrace_format_t dag = {
 	dag_prepare_packet,		/* prepare_packet */
 	NULL,                           /* fin_packet */
 	dag_write_packet,               /* write_packet */
-	NULL,                           /* flush_output */
+	dag_flush_output,               /* flush_output */
 	erf_get_link_type,              /* get_link_type */
 	erf_get_direction,              /* get_direction */
 	erf_set_direction,              /* set_direction */
