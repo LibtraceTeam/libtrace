@@ -400,7 +400,9 @@ static int pcap_pause_input(libtrace_t *libtrace UNUSED)
 
 static int pcap_fin_input(libtrace_t *libtrace) 
 {
-	pcap_close(INPUT.pcap);
+	if (INPUT.pcap != NULL) {
+		pcap_close(INPUT.pcap);
+	}
 	INPUT.pcap=NULL;
 	free(libtrace->format_data);
 	return 0; /* success */

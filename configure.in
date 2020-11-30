@@ -102,6 +102,19 @@ TOOLS_LIBS=""
 CFLAGS="$CFLAGS -Wall -Wmissing-prototypes -Wextra -DLT_BUILDING_DLL=1"
 CXXFLAGS="$CXXFLAGS -Wall -DLT_BUILDING_DLL=1"
 
+AC_ARG_ENABLE(address-san, AS_HELP_STRING(--enable-address-san, Enable address and memory sanitisation),
+[
+  if test "x$enableval" = xyes ; then
+    CFLAGS+=" -fsanitize=undefined,leak,address -fno-omit-frame-pointer -ggdb3"
+    CXXFLAGS+=" -fsanitize=undefined,leak,address -fno-omit-frame-pointer -ggdb3"
+    LDFLAGS+=" -fsanitize=undefined,leak,address -fno-omit-frame-pointer -ggdb3"
+
+    AC_MSG_NOTICE([Compiling with -fsanitize=undefined,leak,address])
+    AC_MSG_NOTICE([ - Build tests using the command: make address-san])
+    AC_MSG_NOTICE([ - Programs must also be compiled with -fsanitize=undefined,leak,address])
+  fi
+ ], [])
+
 # Check for -fvisibility
 gl_VISIBILITY
 
@@ -121,7 +134,7 @@ AC_PROG_LIBTOOL
 AC_PROG_GCC_TRADITIONAL
 
 # Fail if any of these functions are missing
-AC_CHECK_DECLS([strdup, strlcpy, strcasecmp, strncasecmp, snprintf, vsnprintf, strndup])
+AC_CHECK_DECLS([strdup, strlcpy, strcasecmp, strncasecmp, snprintf, vsnprintf, strndup, posix_memalign])
 AC_CHECK_DECLS([socket, recvmmsg], [], [], [[#define _GNU_SOURCE 1
 #include <sys/socket.h>]])
 AC_CHECK_SIZEOF([long int])
@@ -219,56 +232,65 @@ AC_CHECK_LIB(tasn1, asn1_array2tree, asn1found=1, asn1found=0)
 libtrace_xdp=false
 build_ebpf=false
 
-AC_CHECK_LIB(elf, elf_begin, elffound=1, elffound=0)
-if test "$elffound" == 1; then
-    # check for libbpf
-    AC_CHECK_LIB(bpf, xsk_socket__create, bpffound=1, bpffound=0, -lelf)
-
-    if test "$bpffound" = 1; then
-	    AC_DEFINE(HAVE_LIBBPF, 1, [Set to 1 if libbpf is available])
-		ADD_LDFLAGS="$ADD_LDFLAGS -lbpf -lelf"
-		libtrace_xdp=true
-
-        # check for requirements to build XDP eBPF kernel
-        AC_CHECK_PROG(CLANG, [clang], [clang], [no])
-        if test "$CLANG" != "no"; then
-
-            AC_SUBST(CLANG)
-            llc_candidates=$($CLANG --version | \
-                awk '/^clang version/ {
-                split($3, v, ".");
-                printf("llc-%s.%s llc-%s llc", v[[1]], v[[2]], v[[1]])
-            }')
-            AC_CHECK_PROGS([LLC], [$llc_candidates], [no])
-            if test "$LLC" != "no"; then
-                AC_SUBST(LLC)
-                build_ebpf=true
-            fi
-
-        fi
-	else
-	    libtrace_xdp=false
+AC_ARG_WITH(xdp, AS_HELP_STRING(--with-xdp, include XDP capture support),
+[
+    if test x"$withval" = xno; then
+        want_xdp=no
+    else
+        want_xdp=yes
     fi
+],[ want_xdp=ifpresent])
 
+if test "$want_xdp" != no; then
+    AC_CHECK_LIB(elf, elf_begin, elffound=1, elffound=0)
+    if test "$elffound" == 1; then
+        # check for libbpf
+        AC_CHECK_LIB(bpf, xsk_socket__create, bpffound=1, bpffound=0, -lelf)
+
+        if test "$bpffound" = 1; then
+            AC_DEFINE(HAVE_LIBBPF, 1, [Set to 1 if libbpf is available])
+            ADD_LDFLAGS="$ADD_LDFLAGS -lbpf -lelf"
+            libtrace_xdp=true
+
+            # check for requirements to build XDP eBPF kernel
+            AC_CHECK_PROG(CLANG, [clang], [clang], [no])
+            if test "$CLANG" != "no"; then
+
+                AC_SUBST(CLANG)
+                llc_candidates=$($CLANG --version | \
+                    awk '/^clang version/ {
+                    split($3, v, ".");
+                    printf("llc-%s.%s llc-%s llc", v[[1]], v[[2]], v[[1]])
+                }')
+                AC_CHECK_PROGS([LLC], [$llc_candidates], [no])
+                if test "$LLC" != "no"; then
+                    AC_SUBST(LLC)
+                    build_ebpf=true
+                fi
+
+            fi
+        else
+            libtrace_xdp=false
+        fi
+    fi
 fi
 
-# was XDP support explicitly specified and failed
-AC_ARG_WITH(xdp,AS_HELP_STRING(--with-xdp, include XDP capture support),
-[
-    if test x"$libtrace_xdp" = xfalse; then
-        AC_MSG_ERROR([libelf and libbpf are required for XDP support])
-    fi
-
-],[])
+# was xdp build explicitly specified and failed
+if test "$want_xdp" = yes -a "$libtrace_xdp" = false; then
+    AC_MSG_ERROR([libelf and libbpf are required for XDP support])
+fi
 
 # was ebpf build explicitly specified and failed
 AC_ARG_ENABLE(ebpf-build, AS_HELP_STRING(--enable-ebpf-build, Enable compilation of XDP eBPF kernel),
 [
+    if test x"$want_xdp" != xyes -a x"$build_ebpf" = xfalse; then
+        AC_MSG_ERROR([XDP required for ebpf build, set --with-xdp])
+    fi
     if test x"$build_ebpf" = xfalse; then
         AC_MSG_ERROR([clang, llvm and libbpf are required to build the XDP eBPF kernel])
     fi
 ],[])
-    
+
 
 # Check for libpcap
 AC_CHECK_LIB(pcap,pcap_next_ex,pcapfound=1,pcapfound=0)
@@ -460,6 +482,34 @@ AC_CHECK_LIB(pthread, pthread_setname_np, have_pthread_setname_np=1, have_pthrea
 #        done
 #fi
 #DAG_VERSION_NUM=$dag_drv_v
+
+# Check for PF_RING 
+AC_ARG_WITH(pfring,
+	    AS_HELP_STRING(--with-pfring,include PF_RING live capture support (if PF_RING libraries are available)),
+[
+        if test "$withval" = no
+        then
+            want_pfring=no
+        else
+            want_pfring=ifpresent
+        fi
+],[
+        want_pfring=ifpresent
+])
+
+
+libtrace_pfring=false
+if test "$want_pfring" != no; then
+	# bit annoying that we have to include extra libs to account for
+	# optional pfring modules that depend on these libs
+	AC_SEARCH_LIBS(pfring_recv, pfring, pfring_found=1, pfring_found=0,[-ldag -lpcap])
+	if test "$pfring_found" = 1; then
+		ADD_LIBS="$ADD_LIBS -lpfring"
+		LIBTRACE_LIBS="$LIBTRACE_LIBS -lpfring"
+		AC_DEFINE(HAVE_PFRING,1,[conditional for building with DAG live capture support])
+		libtrace_pfring=true
+	fi	
+fi
 
 # Check for ncurses
 
@@ -762,6 +812,7 @@ AS_IF([test "x$have_ncurses" = "xyes"], [
 # Define automake conditionals for use in our Makefile.am files
 AM_CONDITIONAL([HAVE_BPF_CAPTURE], [test "$ac_cv_have_decl_BIOCSETIF" = yes ])
 AM_CONDITIONAL([HAVE_DAG], [test "$libtrace_dag" = true])
+AM_CONDITIONAL([HAVE_PFRING], [test "$libtrace_pfring" = true])
 AM_CONDITIONAL([HAVE_DPDK], [test "$libtrace_dpdk" = true])
 AM_CONDITIONAL([HAVE_WANDDER], [test "x$wandder_avail" = "xyes"])
 AM_CONDITIONAL([DAG2_4], [test "$libtrace_dag_version" = 24])
@@ -864,6 +915,13 @@ elif test x"$want_dpdk" != "xno"; then
 	AC_MSG_NOTICE([Compiled with DPDK live capture support: No])
 	AC_MSG_NOTICE([Note: Requires DPDK v1.5 or newer])
 fi
+
+if test x"$libtrace_pfring" = xtrue; then
+	AC_MSG_NOTICE([Compiled with PF_RING live capture support: Yes])
+else
+	AC_MSG_NOTICE([Compiled with PF_RING live capture support: No])
+fi
+
 reportopt "Compiled with LLVM BPF JIT support" $JIT
 reportopt "Compiled with live ETSI LI support (requires libwandder)" $wandder_avail
 reportopt "Building man pages/documentation" $libtrace_doxygen

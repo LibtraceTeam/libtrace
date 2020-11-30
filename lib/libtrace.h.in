@@ -440,6 +440,7 @@ enum base_format_t {
 	TRACE_FORMAT_TZSPLIVE	  =23,  /** TZSP */
         TRACE_FORMAT_CORSAROTAG   =24,  /** Corsarotagger format */
         TRACE_FORMAT_XDP          =25,  /** AF_XDP format */
+	TRACE_FORMAT_PFRING	  =26,
 };
 
 /** RT protocol packet types */
@@ -503,6 +504,9 @@ typedef enum {
 	TRACE_RT_DATA_CORSARO_TAGGED = TRACE_RT_DATA_SIMPLE + TRACE_FORMAT_CORSAROTAG,
         /** RT is encapsulating a packet tagged by AF_XDP */
         TRACE_RT_DATA_XDP = TRACE_RT_DATA_SIMPLE + TRACE_FORMAT_XDP,
+
+	/** RT is encapsulating a PF_RING capture record */
+	TRACE_RT_DATA_PFRING = TRACE_RT_DATA_SIMPLE + TRACE_FORMAT_PFRING,
 
 	/** As PCAP does not store the linktype with the packet, we need to 
 	 * create a separate RT type for each supported DLT, starting from
@@ -1279,7 +1283,7 @@ typedef struct libtrace_sll_header_t {
         uint16_t halen;                 /**< Link-layer address length */
         unsigned char addr[8];          /**< Link-layer address */
         uint16_t protocol;              /**< Protocol */
-} libtrace_sll_header_t;
+} PACKED libtrace_sll_header_t;
 
 
 /* SLL packet types */
@@ -1336,9 +1340,9 @@ DLLEXPORT void trace_interrupt(void);
 
 /** Takes a uri and splits it into a format and uridata component. 
  * @param uri		The uri to be parsed
- * @param [out] format	A pointer that will be updated to point to an allocated 
+ * @param [out] format	A pointer that will be updated to point to an allocated
  * 			string holding the format component of the URI
- * @return NULL if an error occurred, otherwise return a pointer to the uridata 
+ * @return NULL if an error occurred, otherwise return a pointer to the uridata
  * component
  *
  * @note The format component is strdup'd by this function, so be sure to free
@@ -1346,15 +1350,7 @@ DLLEXPORT void trace_interrupt(void);
  * to an allocated string into this function as the 'format' parameter, as
  * that memory will be leaked and replaced with the strdup'd format.
  */
-DLLEXPORT const char *trace_parse_uri(const char *uri, char **format, int *coremap);
-
-/** Takes a uri and tries to extract the coremap from it.
- * @param cores	The coremap array to be populated with found cores.
- * @param uri	The uri to be parsed.
- *
- * @returns	Pointer into the URI after the coremap has been consumed.
- */
-DLLEXPORT const char *trace_parse_coremap_from_uri(int *cores, const char *uri);
+DLLEXPORT const char *trace_parse_uri(const char *uri, char **format);
 
 /** Create an input trace from a URI
  * 

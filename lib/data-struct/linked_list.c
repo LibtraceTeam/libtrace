@@ -24,6 +24,7 @@
  *
  */
 #include "linked_list.h"
+#include "libtrace_int.h"
 
 #include <stddef.h>
 #include <stdlib.h>
@@ -31,14 +32,29 @@
 
 libtrace_list_t *libtrace_list_init(size_t element_size)
 {
-	libtrace_list_t *l = (libtrace_list_t *)malloc(sizeof(libtrace_list_t));
+	libtrace_list_t *l = (libtrace_list_t *)calloc(1, sizeof(libtrace_list_t));
 	if (l == NULL)
 		return NULL;
 
-	memset(l, 0, sizeof(libtrace_list_t));
 	l->element_size = element_size;
 
 	return l;
+}
+
+libtrace_list_t *libtrace_list_init_aligned(size_t element_size, size_t alignment)
+{
+	/* alignment needs to be 1) a power of 2, and 2) a multiple of sizeof(void *) */
+	if (alignment >= sizeof(void *) &&
+	    ((alignment & (alignment - 1)) == 0)) { /* pwr of 2 */
+		libtrace_list_t *ret = libtrace_list_init(element_size);
+		if (ret) {
+			ret->alignment = alignment;
+		}
+		return ret;
+	} else {
+		fprintf(stderr, "libtrace_list_init_aligned() invalid alignment requested %zu", alignment);
+		return NULL;
+	}
 }
 
 void libtrace_list_deinit(libtrace_list_t *l)
@@ -110,8 +126,15 @@ void libtrace_list_push_back(libtrace_list_t *l, void *item)
 		fprintf(stderr, "Unable to allocate memory for node in libtrace_list_push_back()\n");
 		return;
 	}
-	new->data = malloc(l->element_size);
+	if (l->alignment) {
+		if (posix_memalign(&new->data, l->alignment, l->element_size) != 0) {
+			new->data = NULL;
+		}
+	} else {
+		new->data = malloc(l->element_size);
+	}
 	if (!new->data) {
+		free(new);
 		fprintf(stderr, "Unable to allocate memory for node data in libtrace_list_push_back()\n");
 		return;
 	}
@@ -120,6 +143,8 @@ void libtrace_list_push_back(libtrace_list_t *l, void *item)
 
 	if (l->tail == NULL) {
 		if (l->head != NULL || l->size != 0) {
+			free(new->data);
+			free(new);
 			fprintf(stderr, "Error cannot have a NULL tail with a non NULL head and a size of non 0 in libtrace_list_push_back()\n");
 			return;
 		}

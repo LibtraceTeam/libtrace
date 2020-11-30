@@ -104,6 +104,10 @@ else
 XDP_SOURCES=
 endif
 
+if HAVE_PFRING
+NATIVEFORMATS += format_pfring.c
+endif
+
 libtrace_la_SOURCES = trace.c trace_parallel.c common.h \
 		format_pktmeta.c format_erf.c format_pcap.c format_legacy.c \
 		format_rt.c format_helper.c format_helper.h format_pcapfile.c \

@@ -1427,21 +1427,6 @@ static int trace_pread_packet_wrapper(libtrace_t *libtrace,
 
 	if (libtrace->format->pread_packets) {
 		int ret;
-#if 0
-		for (i = 0; i < (int) nb_packets; ++i) {
-			if (!i[packets]) {
-				trace_set_err(libtrace, TRACE_ERR_BAD_STATE, "NULL packets in "
-					"trace_pread_packet_wrapper()");
-				return -1;
-			}
-			if (!(packets[i]->buf_control==TRACE_CTRL_PACKET ||
-			      packets[i]->buf_control==TRACE_CTRL_EXTERNAL)) {
-				trace_set_err(libtrace,TRACE_ERR_BAD_STATE,
-				              "Packet passed to trace_read_packet() is invalid\n");
-				return -1;
-			}
-		}
-#endif
 		do {
 			ret=libtrace->format->pread_packets(libtrace, t,
 			                                    packets,
@@ -2685,117 +2670,260 @@ DLLEXPORT int trace_set_debug_state(libtrace_t *trace, bool debug_state) {
 	return 0;
 }
 
-static bool config_bool_parse(char *value, size_t nvalue) {
-	if (strncmp(value, "true", nvalue) == 0)
+static bool config_bool_parse(char *value) {
+	if (strcmp(value, "true") == 0)
 		return true;
-	else if (strncmp(value, "false", nvalue) == 0)
+	else if (strcmp(value, "false") == 0)
 		return false;
 	else
 		return strtoll(value, NULL, 10) != 0;
 }
 
+static int config_coremap_parse(const char *value, struct user_configuration *uc) {
+	int core = 0;
+	int len = 0;
+	size_t pos = 0;
+	unsigned int i = 0;
+	while (value[pos] != '\0') {
+		if (sscanf(&value[pos], "%d%n", &core, &len) == 1) {
+			if (i < MAX_THREADS)
+				uc->coremap[i++] = core;
+
+			pos += len;
+		} else {
+			fprintf(stderr, "Badly formed coremap, non-numeric value: %s\n", &value[pos]);
+			return -1;
+		}
+		/* move to the next coremap value, also account for
+		 * the comma or colon */
+		if (value[pos] == '\0') {
+			break;
+		} else if (value[pos] != ',' && value[pos] != ':') {
+			fprintf(stderr, "Badly formed coremap - ':' or ',' is required between values\n");
+			return -1;
+		} else {
+			pos++;
+		}
+	}
+	return 0;
+}
+
+DLLEXPORT int trace_set_coremap(libtrace_t *trace, const char *value) {
+	if (!trace_is_configurable(trace)) return -1;
+	return config_coremap_parse(value, &trace->config);
+}
+
 /* Note update documentation on trace_set_configuration */
-static void config_string(struct user_configuration *uc, char *key, size_t nkey, char *value, size_t nvalue) {
+static int config_string(struct user_configuration *uc, char *key, char *value) {
 	if (!key) {
 		fprintf(stderr, "NULL key passed to config_string()\n");
-		return;
+		return -1;
 	}
 	if (!value) {
 		fprintf(stderr, "NULL value passed to config_string()\n");
-		return;
+		return -1;
 	}
 	if (!uc) {
 		fprintf(stderr, "NULL uc (user_configuration) passed to config_string()\n");
-		return;
+		return -1;
 	}
-	if (strncmp(key, "cache_size", nkey) == 0
-	    || strncmp(key, "cs", nkey) == 0) {
+	if (strcmp(key, "cache_size") == 0
+	    || strcmp(key, "cs") == 0) {
 		uc->cache_size = strtoll(value, NULL, 10);
-	} else if (strncmp(key, "thread_cache_size", nkey) == 0
-	           || strncmp(key, "tcs", nkey) == 0) {
+	} else if (strcmp(key, "thread_cache_size") == 0
+	           || strcmp(key, "tcs") == 0) {
 		uc->thread_cache_size = strtoll(value, NULL, 10);
-	} else if (strncmp(key, "fixed_count", nkey) == 0
-	           || strncmp(key, "fc", nkey) == 0) {
-		uc->fixed_count = config_bool_parse(value, nvalue);
-	} else if (strncmp(key, "burst_size", nkey) == 0
-	           || strncmp(key, "bs", nkey) == 0) {
+	} else if (strcmp(key, "fixed_count") == 0
+	           || strcmp(key, "fc") == 0) {
+		uc->fixed_count = config_bool_parse(value);
+	} else if (strcmp(key, "burst_size") == 0
+	           || strcmp(key, "bs") == 0) {
 		uc->burst_size = strtoll(value, NULL, 10);
-	} else if (strncmp(key, "tick_interval", nkey) == 0
-	           || strncmp(key, "ti", nkey) == 0) {
+	} else if (strcmp(key, "tick_interval") == 0
+	           || strcmp(key, "ti") == 0) {
 		uc->tick_interval = strtoll(value, NULL, 10);
-	} else if (strncmp(key, "tick_count", nkey) == 0
-	           || strncmp(key, "tc", nkey) == 0) {
+	} else if (strcmp(key, "tick_count") == 0
+	           || strcmp(key, "tc") == 0) {
 		uc->tick_count = strtoll(value, NULL, 10);
-	} else if (strncmp(key, "perpkt_threads", nkey) == 0
-	           || strncmp(key, "pt", nkey) == 0) {
+	} else if (strcmp(key, "perpkt_threads") == 0
+	           || strcmp(key, "pt") == 0) {
 		uc->perpkt_threads = strtoll(value, NULL, 10);
-	} else if (strncmp(key, "hasher_queue_size", nkey) == 0
-	           || strncmp(key, "hqs", nkey) == 0) {
+	} else if (strcmp(key, "hasher_queue_size") == 0
+	           || strcmp(key, "hqs") == 0) {
 		uc->hasher_queue_size = strtoll(value, NULL, 10);
-	} else if (strncmp(key, "hasher_polling", nkey) == 0
-	           || strncmp(key, "hp", nkey) == 0) {
-		uc->hasher_polling = config_bool_parse(value, nvalue);
-	} else if (strncmp(key, "reporter_polling", nkey) == 0
-	           || strncmp(key, "rp", nkey) == 0) {
-		uc->reporter_polling = config_bool_parse(value, nvalue);
-	} else if (strncmp(key, "reporter_thold", nkey) == 0
-	           || strncmp(key, "rt", nkey) == 0) {
+	} else if (strcmp(key, "hasher_polling") == 0
+	           || strcmp(key, "hp") == 0) {
+		uc->hasher_polling = config_bool_parse(value);
+	} else if (strcmp(key, "reporter_polling") == 0
+	           || strcmp(key, "rp") == 0) {
+		uc->reporter_polling = config_bool_parse(value);
+	} else if (strcmp(key, "reporter_thold") == 0
+	           || strcmp(key, "rt") == 0) {
 		uc->reporter_thold = strtoll(value, NULL, 10);
-	} else if (strncmp(key, "debug_state", nkey) == 0
-	           || strncmp(key, "ds", nkey) == 0) {
-		uc->debug_state = config_bool_parse(value, nvalue);
-	} else if (strncmp(key, "coremap", nkey) == 0) {
-
-                int core = 0;
-                int len = 0;
-                size_t pos = 0;
-                unsigned int i = 0;
-                while (pos < nvalue) {
-                    if (sscanf(value + pos, "%d%n", &core, &len) == 1) {
-
-                        if (i < sizeof(uc->coremap) / sizeof(int))
-                            uc->coremap[i++] = core;
-
-                        pos += len;
-                    } else
-                        pos += 1;
-                }
-
-        } else {
+	} else if (strcmp(key, "debug_state") == 0
+	           || strcmp(key, "ds") == 0) {
+		uc->debug_state = config_bool_parse(value);
+	} else if (strcmp(key, "coremap") == 0) {
+		return config_coremap_parse(value, uc);
+	} else {
 		fprintf(stderr, "No matching option %s(=%s), ignoring\n", key, value);
+		return -1;
 	}
+	return 0;
 }
 
-DLLEXPORT int trace_set_configuration(libtrace_t *trace, const char *str) {
-	char *pch;
-	char key[100];
-	char value[100];
-	char *dup;
+int _trace_set_configuration(libtrace_t *trace, const char *str, const char **format) {
+	char *pch, *key, *value, *dup, *colon;
+	int ret = 0;
 	if (!trace) {
 		fprintf(stderr, "NULL trace passed into trace_set_configuration()\n");
-		return TRACE_ERR_NULL_TRACE;
+		return -1;
 	}
 	if (!str) {
-		trace_set_err(trace, TRACE_ERR_CONFIG, "NULL configuration string passed to trace_set_configuration()");
+		trace_set_err(trace, TRACE_ERR_CONFIG,
+		              "NULL configuration string passed to trace_set_configuration()");
 		return -1;
 	}
 
-	if (!trace_is_configurable(trace)) return -1;
+	if (!trace_is_configurable(trace)) {
+		trace_set_err(trace, TRACE_ERR_BAD_STATE,
+		              "trace_set_configuration() cannot configure a running trace");
+			return -1;
+	}
 
 	dup = strdup(str);
-	pch = strtok (dup," ,.-");
-	while (pch != NULL)
-	{
-		if (sscanf(pch, "%99[^=]=%99s", key, value) == 2) {
-			config_string(&trace->config, key, sizeof(key), value, sizeof(value));
-		} else {
-			fprintf(stderr, "Error: parsing option %s\n", pch);
+	if (dup == NULL) {
+		trace_set_err(trace, TRACE_ERR_OUT_OF_MEMORY,
+		              "Unable to allocate memory in trace_set_configuration()");
+		return -1;
+	}
+
+	/*
+	 * Keys - should be textual [a-zA-Z_-]. They strictly cannot contain a
+	 * colon ':' or equals sign '='.
+	 * Values - cannot contain commas ',' unless enclosed in square brackets
+	 *
+	 * This may parse a value given prior to a format. This should be
+	 * separated by a colon ':'
+	 *
+	 * if format != NULL (str is a full URI)
+	 * 	expecting: key=value[,key=value ...]
+	 * otherwise
+	 * 	expecting: key=value[,key=value ...]:format:URI
+	 *
+	 */
+	if (format != NULL) {
+		*format = str;
+		/* URI starts with ':' -> no options */
+		if (*dup == ':') {
+			*format = str+1;
+			return 0;
 		}
-		pch = strtok (NULL," ,.-");
+	}
+	pch = dup;
+	while (pch != NULL) {
+		key = pch;
+		colon = strchr(pch, ':');
+		pch = strchr(pch, '=');
+		/* If this is key: not key=, then assume it the start of the URI string */
+		if (colon != NULL && colon < pch) {
+			if (format != NULL) {
+				*format = (key-dup) + str;
+				ret = 0;
+				break;
+			} else {
+				trace_set_err(trace, TRACE_ERR_BAD_FORMAT,
+					      "trace_set_configuration(), invalid configuration options %s", key);
+				ret = -1;
+				break;
+			}
+		}
+		/* key=value not found */
+		if (pch == NULL) {
+			if (format != NULL) {
+				*format = (key-dup) + str;
+				ret = 0;
+				break;
+			} else {
+				if (*key != '\0') {
+					trace_set_err(trace, TRACE_ERR_BAD_FORMAT,
+						      "trace_set_configuration(), not a key=value %s", key);
+					ret = -1;
+				}
+				break;
+			}
+		}
+		*pch = '\0';
+		pch++;
+		if (*pch == '\0') {
+			trace_set_err(trace, TRACE_ERR_BAD_FORMAT,
+			              "parsing option, expecting a value: %s\n", pch);
+			ret = -1;
+			break;
+		} else if (*pch == '[') {
+			/* The end of the value must be a closing bracket */
+			value = ++pch;
+			pch = strchr(pch, ']');
+			if (pch == NULL) {
+				trace_set_err(trace, TRACE_ERR_BAD_FORMAT,
+				              "parsing option, expecting a ']'");
+				ret = -1;
+				break;
+			}
+			*pch = '\0';
+			pch++;
+		} else {
+			/* The end of the value can be ',', ':', or '\0' */
+			value = pch;
+			colon = strchr(pch, ':');
+			pch = strchr(pch, ',');
+			/* Do we reach a colon first? */
+			if ((colon != NULL && pch != NULL && colon < pch) || pch == NULL) {
+				pch = colon;
+			}
+		}
+		/* pch is at the next separator (, or :) or NULL if end of string */
+		if (format != NULL && pch == NULL) {
+			/* Options cannot be at the end of URI, file path with '=' in it? */
+			*format = (key-dup) + str;
+			ret = 0;
+			break;
+		} else if (format != NULL && *pch == ':') {
+			*pch = '\0';
+			pch++;
+			*format = (pch-dup) + str;
+			if (config_string(&trace->config, key, value) == -1) {
+				/* failed to parse the option, try as URI */
+				*format = (key-dup) +str;
+				ret = 0;
+				break;
+			}
+			break;
+		} else if (pch != NULL && *pch != ',') {
+			trace_set_err(trace, TRACE_ERR_BAD_FORMAT,
+				      "parsing options, expected a comma %s", pch);
+			ret = -1;
+			break;
+		} else {
+			if (pch != NULL) {
+				*pch = '\0';
+				pch++;
+			}
+			if (config_string(&trace->config, key, value) == -1 &&
+			    *format != NULL) {
+				/* failed to parse the option, try as URI */
+				*format = (key-dup) + str;
+				ret = 0;
+				break;
+			}
+		}
 	}
 	free(dup);
+	return ret;
+}
 
-	return 0;
+DLLEXPORT int trace_set_configuration(libtrace_t *trace, const char *str) {
+	return _trace_set_configuration(trace, str, NULL);
 }
 
 DLLEXPORT int trace_set_configuration_file(libtrace_t *trace, FILE *file) {
