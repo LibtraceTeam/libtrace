@@ -1153,10 +1153,20 @@ static int dag_dump_packet(libtrace_out_t *libtrace,
 	 * the buffer and handle overruns.
 	 */
 	if (FORMAT_DATA_OUT->waiting == 0) {
-		FORMAT_DATA_OUT->txbuffer =
-			dag_tx_get_stream_space64(FORMAT_DATA_OUT->device->fd,
-						FORMAT_DATA_OUT->dagstream,
-						16908288);
+
+		while (1) {
+			if ((FORMAT_DATA_OUT->txbuffer =
+				dag_tx_get_stream_space64(FORMAT_DATA_OUT->device->fd,
+			 				  FORMAT_DATA_OUT->dagstream,
+							  rlen+alignment_pad)) == NULL) {
+				if (errno == EAGAIN)
+					continue;
+				trace_set_err_out(libtrace, TRACE_ERR_BAD_IO, "DAG25: unable to reserve stream space "
+					"dag_tx_get_stream_space64()");
+				return 0;
+			} else
+				break;
+		}
 	}
 
 	/*
