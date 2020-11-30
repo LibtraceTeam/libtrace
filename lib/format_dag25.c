@@ -322,6 +322,9 @@ static void dag_close_device(struct dag_dev_t *dev)
 			dev->next->prev = dev->prev;
 	}
 
+	if (dev->dev_name)
+		free(dev->dev_name);
+
 	dag_close(dev->fd);
 	free(dev);
 }
@@ -881,7 +884,6 @@ static int dag_fin_input(libtrace_t *libtrace)
 	/* Close the DAG device if there are no more references to it */
 	if (FORMAT_DATA->device->ref_count == 0)
 		dag_close_device(FORMAT_DATA->device);
-
 	if (DUCK.dummy_duck)
 		trace_destroy_dead(DUCK.dummy_duck);
 
