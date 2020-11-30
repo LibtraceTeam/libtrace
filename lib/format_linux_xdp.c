@@ -39,7 +39,8 @@
 #endif
 
 #define FRAME_HEADROOM     sizeof(libtrace_xdp_meta_t)
-#define NUM_FRAMES         4096
+#define NUM_FRAMES         (hw_rings + xdp_rings)
+#define MIN_FREE_FRAMES    64
 #define FRAME_SIZE         XSK_UMEM__DEFAULT_FRAME_SIZE
 #define XDP_BUSY_RETRY     5
 
@@ -469,22 +470,19 @@ static int xsk_populate_fill_ring(struct xsk_umem_info *umem) {
     int ret, i;
     uint32_t idx;
 
-    // fill the ring with as many frames as posible
-    int fill_size = LIBTRACE_MIN(xdp_rings + hw_rings, NUM_FRAMES);
-
     ret = xsk_ring_prod__reserve(&umem->fq,
-                                 fill_size,
+                                 NUM_FRAMES,
                                  &idx);
-    if (ret != fill_size) {
+    if (ret != NUM_FRAMES) {
         return -1;
     }
 
-    for (i = 0; i < fill_size; i++) {
+    for (i = 0; i < NUM_FRAMES; i++) {
         *xsk_ring_prod__fill_addr(&umem->fq, idx++) =
             i * FRAME_SIZE;
     }
 
-    xsk_ring_prod__submit(&umem->fq, fill_size);
+    xsk_ring_prod__submit(&umem->fq, NUM_FRAMES);
 
     return 0;
 }
@@ -1004,9 +1002,20 @@ static int linux_xdp_start_stream(struct xsk_config *cfg,
     return 0;
 }
 
-static int linux_xdp_safe_packet(libtrace_packet_t *packet UNUSED) {
-    // xdp packets are safe till trace_fin_packet is called
-    return 1;
+static int linux_xdp_safe_packet(libtrace_packet_t *packet) {
+
+    struct xsk_per_stream *stream;
+
+    if (packet->srcbucket == NULL)
+        return 0;
+
+    stream = (struct xsk_per_stream *)packet->srcbucket;
+
+    // allow user to hold onto this frame if we have more than MIN_FREE_FRAMES remaining
+    if (NUM_FRAMES - xsk_prod_nb_free(&stream->xsk->umem->fq, 1) > MIN_FREE_FRAMES)
+	return 1;
+
+    return 0;
 }
 
 static void linux_xdp_fin_packet(libtrace_packet_t *packet) {
