@@ -921,11 +921,20 @@ static int dag_fin_output(libtrace_out_t *libtrace)
 
 	/* Wait until the buffer is nearly clear before exiting the program,
 	 * as we will lose packets otherwise */
-	dag_tx_get_stream_space64
-		(FORMAT_DATA_OUT->device->fd,
-		 FORMAT_DATA_OUT->dagstream,
-		 dag_get_stream_buffer_size64(FORMAT_DATA_OUT->device->fd,
-					    FORMAT_DATA_OUT->dagstream) - 8);
+	while (1) {
+		dag_ssize_t size = dag_get_stream_buffer_size64(FORMAT_DATA_OUT->device->fd,
+								FORMAT_DATA_OUT->dagstream);
+		if ((FORMAT_DATA_OUT->txbuffer =
+			dag_tx_get_stream_space64(FORMAT_DATA_OUT->device->fd,
+						  FORMAT_DATA_OUT->dagstream,
+						  size-8)) == NULL) {
+			if (errno == EAGAIN)
+				continue;
+			trace_set_err_out(libtrace, TRACE_ERR_BAD_IO, "DAG25: unable to flush output");
+			break;
+		} else
+			break;
+	}
 
 	/* Need the lock, since we're going to be handling the device list */
 	pthread_mutex_lock(&open_dag_mutex);
