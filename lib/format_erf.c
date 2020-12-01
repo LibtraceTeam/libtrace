@@ -648,11 +648,21 @@ static int erf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 static int erf_dump_packet(libtrace_out_t *libtrace,
 		dag_record_t *erfptr, int framinglen, void *buffer,
                 int caplen) {
-	int numbytes = 0;
 
-        if (caplen + framinglen != ntohs(erfptr->rlen))
+	int numbytes = 0;
+	int alignment_pad;
+	int rlen;
+	uint64_t alignment_buf = 0;
+
+	if (caplen + framinglen != ntohs(erfptr->rlen))
                 erfptr->rlen = htons(caplen + framinglen);
 
+	// calculate any padding needed at the end of the packet
+	rlen = ntohs(erfptr->rlen);
+	alignment_pad = sizeof(uint64_t) - (rlen & sizeof(uint64_t));
+	erfptr->rlen = htons(rlen + alignment_pad);
+
+	// write out ERF header
 	if ((numbytes = 
 		wandio_wwrite(OUTPUT->file, 
 				erfptr,
@@ -663,12 +673,23 @@ static int erf_dump_packet(libtrace_out_t *libtrace,
 		return -1;
 	}
 
+	// write out packet payload
         numbytes=wandio_wwrite(OUTPUT->file, buffer, (size_t)caplen);
 	if (numbytes != caplen) {
 		trace_set_err_out(libtrace,errno,
 				"write(%s)",libtrace->uridata);
 		return -1;
 	}
+
+	// write out padding if needed
+	if (wandio_wwrite(OUTPUT->file, &alignment_buf, (size_t)alignment_pad)
+		!= alignment_pad) {
+
+		trace_set_err_out(libtrace,errno,
+			"write(%s)",libtrace->uridata);
+		return -1;
+	}
+
 	return numbytes + framinglen;
 }
 
@@ -736,7 +757,6 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 	if (!packet->header) {
 		return -1;
 	}
-	
 
 	/* If we've had an rxerror, we have no payload to write - fix
 	 * rlen to be the correct length 
@@ -747,9 +767,8 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 	        unsigned int pad = 0;
 	        pad = erf_get_padding(packet);
 		dag_hdr->rlen = htons(dag_record_size + pad);
-		
-	} 
-	
+	}
+
 	if (packet->type == TRACE_RT_DATA_ERF) {
 			numbytes = erf_dump_packet(libtrace,
 				(dag_record_t *)packet->header,
@@ -766,7 +785,7 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 		erfhdr.ts = bswap_host_to_le64(trace_get_erf_timestamp(packet));
 
 		/* Flags. Can't do this */
-		memset(&erfhdr.flags,1,sizeof(erfhdr.flags));
+		memset(&erfhdr.flags,0,sizeof(erfhdr.flags));
 		if (trace_get_direction(packet)!=TRACE_DIR_UNKNOWN)
 			erfhdr.flags.iface = trace_get_direction(packet);
 
