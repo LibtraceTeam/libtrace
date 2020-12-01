@@ -647,50 +647,45 @@ static int erf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 
 static int erf_dump_packet(libtrace_out_t *libtrace,
 		dag_record_t *erfptr, int framinglen, void *buffer,
-                int caplen) {
+                int caplen, int alignment_pad) {
 
 	int numbytes = 0;
-	int alignment_pad;
-	int rlen;
 	uint64_t alignment_buf = 0;
 
-	if (caplen + framinglen != ntohs(erfptr->rlen))
-                erfptr->rlen = htons(caplen + framinglen);
+	if (caplen + framinglen + alignment_pad != ntohs(erfptr->rlen))
+                erfptr->rlen = htons(caplen + framinglen + alignment_pad);
 
-	// calculate any padding needed at the end of the packet
-	rlen = ntohs(erfptr->rlen);
-	alignment_pad = sizeof(uint64_t) - (rlen & sizeof(uint64_t));
-	erfptr->rlen = htons(rlen + alignment_pad);
+	// verify everything is 8byte aligned, if not add padding
+	if (ntohs(erfptr->rlen) % sizeof(uint64_t) != 0) {
+		alignment_pad += sizeof(uint64_t) - (ntohs(erfptr->rlen) % sizeof(uint64_t));
+		erfptr->rlen = htons(caplen + framinglen + alignment_pad);
+	}
 
 	// write out ERF header
-	if ((numbytes = 
-		wandio_wwrite(OUTPUT->file, 
-				erfptr,
-				(size_t)(framinglen))) 
-			!= (int)(framinglen)) {
-		trace_set_err_out(libtrace,errno,
-				"write(%s)",libtrace->uridata);
-		return -1;
-	}
-
-	// write out packet payload
-        numbytes=wandio_wwrite(OUTPUT->file, buffer, (size_t)caplen);
-	if (numbytes != caplen) {
-		trace_set_err_out(libtrace,errno,
-				"write(%s)",libtrace->uridata);
-		return -1;
-	}
-
-	// write out padding if needed
-	if (wandio_wwrite(OUTPUT->file, &alignment_buf, (size_t)alignment_pad)
-		!= alignment_pad) {
-
+	numbytes = wandio_wwrite(OUTPUT->file, erfptr, (size_t)(framinglen));
+	if (numbytes != framinglen) {
 		trace_set_err_out(libtrace,errno,
 			"write(%s)",libtrace->uridata);
 		return -1;
 	}
 
-	return numbytes + framinglen;
+	// write out packet payload
+       	numbytes = wandio_wwrite(OUTPUT->file, buffer, (size_t)caplen);
+	if (numbytes != caplen) {
+		trace_set_err_out(libtrace,errno,
+			"write(%s)",libtrace->uridata);
+		return -1;
+	}
+
+	// write out padding if needed
+	numbytes = wandio_wwrite(OUTPUT->file, &alignment_buf, (size_t)alignment_pad);
+	if (numbytes != alignment_pad) {
+		trace_set_err_out(libtrace,errno,
+			"write(%s)",libtrace->uridata);
+		return -1;
+	}
+
+	return framinglen + caplen + alignment_pad;
 }
 
 static int erf_flush_output(libtrace_out_t *libtrace) {
@@ -770,16 +765,18 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 	}
 
 	if (packet->type == TRACE_RT_DATA_ERF) {
-			numbytes = erf_dump_packet(libtrace,
-				(dag_record_t *)packet->header,
-				trace_get_framing_length(packet),
-				payload,
-                                trace_get_capture_length(packet)
-				);
+		numbytes = erf_dump_packet(libtrace,
+					   (dag_record_t *)packet->header,
+					   trace_get_framing_length(packet),
+					   payload,
+					   trace_get_capture_length(packet),
+					   0);
 	} else {
 		dag_record_t erfhdr;
 		int rlen;
                 int framing;
+		int alignment_padding = 0;
+		int capture_length;
 		/* convert format - build up a new erf header */
 		/* Timestamp */
 		erfhdr.ts = bswap_host_to_le64(trace_get_erf_timestamp(packet));
@@ -814,13 +811,30 @@ static int erf_write_packet(libtrace_out_t *libtrace,
                 else
                         framing = dag_record_size;
 
-		rlen = trace_get_capture_length(packet) + framing;
+		capture_length = trace_get_capture_length(packet);
+		rlen = capture_length + framing;
 		if (rlen <= 0 || rlen > 65536) {
 			trace_set_err_out(libtrace, TRACE_ERR_BAD_PACKET,
 				"Capture + framing length is out of range in erf_write_packet()");
 			return -1;
 		}
-		erfhdr.rlen = htons(rlen);
+
+		// check if the packet is snapped round payload down to next 8 byte boundary, if not
+		// round up to the next 8 byte boundary
+		if (trace_get_link_type(packet) == TRACE_TYPE_ETH &&
+			trace_get_wire_length(packet)-4 == trace_get_capture_length(packet))
+
+			alignment_padding = sizeof(uint64_t) - (rlen % sizeof(uint64_t));
+
+		else if (trace_get_link_type(packet) != TRACE_TYPE_ETH &&
+			trace_get_wire_length(packet) == trace_get_capture_length(packet))
+
+			alignment_padding = sizeof(uint64_t) - (rlen % sizeof(uint64_t));
+		else
+			capture_length -= rlen % sizeof(uint64_t);
+
+
+		erfhdr.rlen = htons(capture_length + framing + alignment_padding);
 		/* loss counter. Can't do this */
 		erfhdr.lctr = 0;
 		/* Wire length, does not include padding! */
@@ -831,7 +845,8 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 				&erfhdr,
 				framing,
 				payload,
-                                trace_get_capture_length(packet));
+                                capture_length,
+				alignment_padding);
 	}
 	return numbytes;
 }
