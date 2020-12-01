@@ -1155,7 +1155,7 @@ static int dag_dump_packet(libtrace_out_t *libtrace,
 	uint16_t rlen = ntohs(erfptr->rlen);
 
         payload_size = rlen - (dag_record_size + pad);
-        alignment_pad = rlen % sizeof(uint64_t);
+        alignment_pad = sizeof(uint64_t) - (rlen % sizeof(uint64_t));
 	// update record length with any required padding
 	erfptr->rlen = htons(rlen + alignment_pad);
 
