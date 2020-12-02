@@ -777,6 +777,7 @@ static int erf_write_packet(libtrace_out_t *libtrace,
                 int framing;
 		int alignment_padding = 0;
 		int capture_length;
+		int wire_length;
 		/* convert format - build up a new erf header */
 		/* Timestamp */
 		erfhdr.ts = bswap_host_to_le64(trace_get_erf_timestamp(packet));
@@ -812,6 +813,8 @@ static int erf_write_packet(libtrace_out_t *libtrace,
                         framing = dag_record_size;
 
 		capture_length = trace_get_capture_length(packet);
+		wire_length = trace_get_wire_length(packet);
+
 		rlen = capture_length + framing;
 		if (rlen <= 0 || rlen > 65536) {
 			trace_set_err_out(libtrace, TRACE_ERR_BAD_PACKET,
@@ -819,18 +822,16 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 			return -1;
 		}
 
-		// check if the packet is snapped round payload down to next 8 byte boundary, if not
+		// if the packet is snapped round payload down to next 8 byte boundary, if not
 		// round up to the next 8 byte boundary
-		if (trace_get_link_type(packet) == TRACE_TYPE_ETH &&
-			trace_get_wire_length(packet)-4 == trace_get_capture_length(packet))
+		if ((trace_get_link_type(packet) == TRACE_TYPE_ETH && wire_length-4 == capture_length) ||
+			(trace_get_link_type(packet) != TRACE_TYPE_ETH && wire_length == capture_length)) {
 
+			// calculate any extra padding required
 			alignment_padding = sizeof(uint64_t) - (rlen % sizeof(uint64_t));
-
-		else if (trace_get_link_type(packet) != TRACE_TYPE_ETH &&
-			trace_get_wire_length(packet) == trace_get_capture_length(packet))
-
-			alignment_padding = sizeof(uint64_t) - (rlen % sizeof(uint64_t));
-		else
+			if (alignment_padding == sizeof(uint64_t))
+				alignment_padding = 0;
+		} else
 			capture_length -= rlen % sizeof(uint64_t);
 
 
