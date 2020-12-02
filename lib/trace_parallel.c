@@ -446,7 +446,7 @@ DLLEXPORT void libtrace_hold_packet(libtrace_packet_t *pkt) {
 	// Can the format module do this beter than copying the
         // entire packet?
         if (pkt->trace && pkt->trace->format->can_hold_packet)
-            if (pkt->trace->format->can_hold_packet(pkt) > 0)
+            if (pkt->trace->format->can_hold_packet(pkt) == 0)
                 return;
 
 	// fallback to copying packet

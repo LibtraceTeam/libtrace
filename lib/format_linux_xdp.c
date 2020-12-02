@@ -1035,15 +1035,15 @@ static int linux_xdp_can_hold_packet(libtrace_packet_t *packet) {
     struct xsk_per_stream *stream;
 
     if (packet->srcbucket == NULL)
-        return 0;
+        return -1;
 
     stream = (struct xsk_per_stream *)packet->srcbucket;
 
     // allow user to hold onto this frame if we have more than MIN_FREE_FRAMES remaining
     if (NUM_FRAMES - xsk_prod_nb_free(&stream->xsk->umem->fq, 1) > MIN_FREE_FRAMES)
-	return 1;
+	return 0;
 
-    return 0;
+    return -1;
 }
 
 static void linux_xdp_fin_packet(libtrace_packet_t *packet) {

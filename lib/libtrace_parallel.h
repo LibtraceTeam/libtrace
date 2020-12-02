@@ -1313,6 +1313,18 @@ DLLEXPORT int trace_get_first_packet(libtrace_t *libtrace,
  */
 DLLEXPORT void libtrace_make_packet_safe(libtrace_packet_t *pkt);
 
+/** Makes a packet safe, preventing the packet from being reused until released
+ * with trace_fin_packet().
+ *
+ * @param[in,out] pkt The packet to hold
+ *
+ * This will instruct the format module to hold the packet and not reuse
+ * it until trace_free_packet() is called. If a format module does not support
+ * this it will fallback to libtrace_make_packet_safe().
+ * note this will not survive when pausing a trace.
+ */
+DLLEXPORT void libtrace_hold_packet(libtrace_packet_t *pkt);
+
 /** Makes a result safe, preventing the result from becoming invalid after
  * pausing a trace.
  *
