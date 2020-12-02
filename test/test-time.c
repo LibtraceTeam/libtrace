@@ -91,8 +91,13 @@ void iferr(libtrace_t *trace)
 	exit(1);
 }
 
-int main(int argc, char *argv[]) {
-        char *uri = lookup_uri(argv[1]);
+int main(int argc UNUSED, char *argv[]) {
+	if (argc < 2) {
+		fprintf(stderr, "Missing trace as argument\n");
+		return -1;
+	}
+
+        const char *uri = lookup_uri(argv[1]);
         int psize = 0;
 	int error = 0;
 	int count = 0;

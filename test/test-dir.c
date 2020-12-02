@@ -101,7 +101,7 @@ char *lookup_out_uri(const char *type) {
 	return "unknown";
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc UNUSED, char *argv[] UNUSED) {
         int psize = 0;
 	int error = 0;
 	int count = 0;

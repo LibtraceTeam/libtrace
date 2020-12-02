@@ -62,9 +62,7 @@ int main(int argc, char *argv[]) {
 	int psize = 0;
 	int error = 0;
 	int count = 0;
-	int level = 0;
 	int ipcnt = 0;
-	int expected = 100;
 	libtrace_t *trace;
 	libtrace_packet_t *packet;
 
@@ -75,10 +73,6 @@ int main(int argc, char *argv[]) {
 
 	trace = trace_create(argv[1]);
 	iferr(trace);
-
-	if (strcmp(argv[1],"rtclient")==0) expected=101;
-	
-	level=0;
 
 	trace_start(trace);
 	iferr(trace);

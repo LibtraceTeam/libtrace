@@ -561,11 +561,12 @@ typedef void (*fn_cb_result)(libtrace_t *libtrace, libtrace_thread_t *sender,
  * any messages with a type >= MESSAGE_USER.
  *
  * @param libtrace The parallel trace.
- * @param t The thread.
+ * @param t The current thread.
  * @param global The global storage.
  * @param tls The thread local storage.
  * @param mesg The code identifying the message type.
  * @param data The data associated with the message.
+ * @param sender The sender of the message.
  *
  */
 typedef void (*fn_cb_usermessage) (libtrace_t *libtrace, libtrace_thread_t *t,
