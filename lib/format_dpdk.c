@@ -662,7 +662,8 @@ static int dpdk_init_input (libtrace_t *libtrace, enum device_type dev_type) {
 	FORMAT(libtrace)->dev_type = dev_type;
 
 	/* Make our first stream */
-	FORMAT(libtrace)->per_stream = libtrace_list_init(sizeof(struct dpdk_per_stream_t));
+	FORMAT(libtrace)->per_stream =
+		libtrace_list_init_aligned(sizeof(struct dpdk_per_stream_t), CACHE_LINE_SIZE);
 	libtrace_list_push_back(FORMAT(libtrace)->per_stream, &stream);
 
 	if (dpdk_init_environment(libtrace->uridata, FORMAT(libtrace), err, sizeof(err)) != 0) {
@@ -714,7 +715,8 @@ static int dpdk_init_output(libtrace_out_t *libtrace, enum device_type dev_type)
 	FORMAT(libtrace)->burst_offset = 0;
 	FORMAT(libtrace)->dev_type = dev_type;
 
-	FORMAT(libtrace)->per_stream = libtrace_list_init(sizeof(struct dpdk_per_stream_t));
+	FORMAT(libtrace)->per_stream =
+		libtrace_list_init_aligned(sizeof(struct dpdk_per_stream_t), CACHE_LINE_SIZE);
 	libtrace_list_push_back(FORMAT(libtrace)->per_stream, &stream);
 
 	if (dpdk_init_environment(libtrace->uridata, FORMAT(libtrace), err, sizeof(err)) != 0) {
