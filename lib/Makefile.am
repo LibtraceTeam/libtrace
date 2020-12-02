@@ -82,7 +82,7 @@ XDP_SOURCES=format_linux_xdp.c format_linux_xdp.h
 
 # are we building the XDP eBPF kernel program?
 if BUILD_EBPF
-format_linux_xdp_kern.bpf: format_linux_xdp_kern.c format_linux_xdp.h jhash.h
+format_linux_xdp_kern.bpf: format_linux_xdp_kern.c format_linux_xdp.h
 	${CLANG} -Wall @CFLAGS@ -O2 \
 		-I/usr/include \
 		-D__KERNEL__ -D__ASM_SYSREG_H \
@@ -90,7 +90,7 @@ format_linux_xdp_kern.bpf: format_linux_xdp_kern.c format_linux_xdp.h jhash.h
 	${LLC} -march=bpf -filetype=obj ${@:.bpf=.ll} -o $@
 	${RM} ${@:.bpf=.ll}
 
-EXTRA_DIST += format_linux_xdp_kern.c jhash.h
+EXTRA_DIST += format_linux_xdp_kern.c
 endif
 
 # install libtrace bpf kern
