@@ -227,6 +227,20 @@ fi
 AC_CHECK_LIB(yaml, yaml_parser_initialize, yamlfound=1, yamlfound=0)
 AC_CHECK_LIB(tasn1, asn1_array2tree, asn1found=1, asn1found=0)
 
+systemtap=false
+# check if the system has systemtap header
+AC_ARG_ENABLE(dtrace, AS_HELP_STRING(--enable-dtrace, Include USDT tracepoints),
+[
+	AC_CHECK_HEADER(sys/sdt.h, [systemtap=true], [systemtap=false])
+	if test "$systemtap" = false; then
+		AC_MSG_ERROR([systemtap-sdt-dev is required to include USDT tracepoints])
+	fi
+	AC_DEFINE(ENABLE_DTRACE, 1, [Set to 1 if libtrace is to be compiled with USDT tracepoints])
+],
+[
+	AC_DEFINE(ENABLE_DTRACE, 0, [Set to 1 if libtrace is to be compiled with USDT tracepoints])
+])
+
 
 # check for xdp requirements.
 libtrace_xdp=false
@@ -828,6 +842,8 @@ AM_CONDITIONAL([HAVE_DPDK_PKGCONFIG], [test "x$dpdk_found" = "xpkgconfig"])
 AM_CONDITIONAL([HAVE_LIBBPF], [test "x$libtrace_xdp" = "xtrue"])
 AM_CONDITIONAL([BUILD_EBPF], [test "x$build_ebpf" = "xtrue"])
 
+AM_CONDITIONAL([ENABLE_DTRACE], [test "x$systemtap" = "xtrue"])
+
 # Check for miscellaneous programs
 AC_CHECK_PROG([libtrace_doxygen], [doxygen], [true], [false])
 
@@ -887,6 +903,12 @@ if test x"$libtrace_dag" = xtrue; then
 	fi	
 else
 	AC_MSG_NOTICE([Compiled with DAG live capture support: No])
+fi
+
+if test x"$systemtap" = xtrue; then
+	AC_MSG_NOTICE([Compiled with USDT tracepoints: Yes])
+else
+	AC_MSG_NOTICE([Compiled with USDT tracepoints: No])
 fi
 
 # Are we building with XDP support

@@ -941,6 +941,9 @@ static int linux_xdp_read_stream(libtrace_t *libtrace,
              * otherwise we need to return and let libtrace check for a message
              */
             if ((msg && libtrace_message_queue_count(msg) > 0) || !msg) {
+#if ENABLE_DTRACE
+                DTRACE_PROBE(libtrace, xdp_read_message);
+#endif
                 return READ_MESSAGE;
             }
 
@@ -951,6 +954,10 @@ static int linux_xdp_read_stream(libtrace_t *libtrace,
             }
         }
     }
+
+#if ENABLE_DTRACE
+    DTRACE_PROBE1(libtrace, xdp_received_packets, rcvd);
+#endif
 
     sys_time = linux_xdp_get_time();
 
