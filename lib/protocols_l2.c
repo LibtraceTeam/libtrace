@@ -266,10 +266,18 @@ uint16_t trace_get_outermost_vlan(libtrace_packet_t *packet, uint8_t **vlanptr,
 	        ptr = trace_get_payload_from_layer2(ptr, linktype, &ethertype, &rem);
 	}
 
+	/* Not enough of the VLAN label captured */
+	if (rem < 2) {
+		*vlanptr = NULL;
+		*remaining = 0;
+		return vlanid;
+	}
+
 	/* found a vlan header */
-	uint32_t val = ntohl(*(uint32_t *)ptr);
-	/* the id portion is only 12 bits */
-	vlanid = (((val >> 16) << 4) >> 4);
+	/* the id portion is only the last 12 bits */
+	vlanid = (((uint8_t *)ptr)[0] & 0x0f);
+	vlanid <<= 8;
+	vlanid |= ((uint8_t *)ptr)[1];
 
 	*remaining = rem;
 	*vlanptr = ptr;
@@ -313,8 +321,18 @@ uint32_t trace_get_outermost_mpls(libtrace_packet_t *packet, uint8_t **mplsptr,
 		ptr = trace_get_payload_from_layer2(ptr, linktype, &ethertype, &rem);
 	}
 
-	uint32_t val = ntohl(*(uint32_t *)ptr);
-	mplslabel = val >> 12;
+	/* Not enough of the MPLS label captured */
+	if (rem < 3) {
+		*remaining = 0;
+		*mplsptr = NULL;
+		return mplslabel;
+	}
+
+	mplslabel = ((uint8_t *)ptr)[0];
+	mplslabel <<= 8;
+	mplslabel |= ((uint8_t *)ptr)[1];
+	mplslabel <<= 4;
+	mplslabel |= (((uint8_t *)ptr)[2] & 0xf0) >> 4;
 
 	*remaining = rem;
 	*mplsptr = ptr;

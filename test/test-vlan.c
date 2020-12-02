@@ -12,11 +12,10 @@ void iferr(libtrace_t *trace)
 }
 
 
-int main(int argc, char *argv[]) {
+int main(int argc UNUSED, char *argv[] UNUSED) {
 
 	libtrace_t *trace = NULL;
         libtrace_packet_t *packet = NULL;
-	int i = 0;
 	uint16_t vlanid;
 	uint8_t *vlanptr;
 	uint32_t remaining;

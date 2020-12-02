@@ -662,7 +662,8 @@ static int dpdk_init_input (libtrace_t *libtrace, enum device_type dev_type) {
 	FORMAT(libtrace)->dev_type = dev_type;
 
 	/* Make our first stream */
-	FORMAT(libtrace)->per_stream = libtrace_list_init(sizeof(struct dpdk_per_stream_t));
+	FORMAT(libtrace)->per_stream =
+		libtrace_list_init_aligned(sizeof(struct dpdk_per_stream_t), CACHE_LINE_SIZE);
 	libtrace_list_push_back(FORMAT(libtrace)->per_stream, &stream);
 
 	if (dpdk_init_environment(libtrace->uridata, FORMAT(libtrace), err, sizeof(err)) != 0) {
@@ -714,7 +715,8 @@ static int dpdk_init_output(libtrace_out_t *libtrace, enum device_type dev_type)
 	FORMAT(libtrace)->burst_offset = 0;
 	FORMAT(libtrace)->dev_type = dev_type;
 
-	FORMAT(libtrace)->per_stream = libtrace_list_init(sizeof(struct dpdk_per_stream_t));
+	FORMAT(libtrace)->per_stream =
+		libtrace_list_init_aligned(sizeof(struct dpdk_per_stream_t), CACHE_LINE_SIZE);
 	libtrace_list_push_back(FORMAT(libtrace)->per_stream, &stream);
 
 	if (dpdk_init_environment(libtrace->uridata, FORMAT(libtrace), err, sizeof(err)) != 0) {
@@ -2138,6 +2140,9 @@ int dpdk_read_packet_stream (libtrace_t *libtrace,
 		nb_rx = rte_eth_rx_burst(FORMAT(libtrace)->port,
 		                         stream->queue_id, pkts_burst, nb_packets);
 		if (nb_rx > 0) {
+#if ENABLE_DTRACE
+                        DTRACE_PROBE1(libtrace, dpdk_received_packets, nb_rx);
+#endif
 			/* Got some packets - otherwise we keep spining */
 			dpdk_ready_pkts(libtrace, stream, pkts_burst, nb_rx);
 			//fprintf(stderr, "Doing P READ PACKET port=%d q=%d\n", (int) FORMAT(libtrace)->port, (int) get_thread_table_num(libtrace));
@@ -2146,12 +2151,21 @@ int dpdk_read_packet_stream (libtrace_t *libtrace,
 		/* Check the message queue this could be less than 0.
                  * If the message queue is not available return and let libtrace
                  * check for new messages. */
-		if ((mesg && libtrace_message_queue_count(mesg) > 0) || !mesg)
+		if ((mesg && libtrace_message_queue_count(mesg) > 0) || !mesg) {
+#if ENABLE_DTRACE
+                        DTRACE_PROBE(libtrace, dpdk_read_message);
+#endif
 			return READ_MESSAGE;
+                }
+
 		if ((nb_rx=is_halted(libtrace)) != (size_t) -1)
 			return nb_rx;
+
 		/* Wait a while, polling on memory degrades performance
 		 * This relieves the pressure on memory allowing the NIC to DMA */
+#if ENABLE_DTRACE
+                DTRACE_PROBE(libtrace, dpdk_delay);
+#endif
 		rte_delay_us(10);
 	}
 

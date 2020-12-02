@@ -153,7 +153,7 @@ static libtrace_packet_t *per_packet(libtrace_t *trace UNUSED,
         struct TLS *storage = (struct TLS *)tls;
         uint32_t *magic = (uint32_t *)global;
         static __thread int count = 0;
-	int a,*b,c=10;
+	uint32_t a,*b,c=10;
 
         assert(storage != NULL);
         assert(!storage->seen_stop_message);
