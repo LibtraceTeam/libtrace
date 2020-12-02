@@ -528,7 +528,7 @@ static struct libtrace_format_t legacyatm = {
 	legacy_read_packet,		/* read_packet */
 	legacy_prepare_packet,		/* prepare_packet */
 	NULL,				/* fin_packet */
-        NULL,                           /* safe_packet */
+        NULL,                           /* can_hold_packet */
 	NULL,				/* write_packet */
 	NULL,				/* flush_output */
 	legacyatm_get_link_type,	/* get_link_type */
@@ -575,7 +575,7 @@ static struct libtrace_format_t legacyeth = {
 	legacy_read_packet,		/* read_packet */
 	legacy_prepare_packet,		/* prepare_packet */
 	NULL,				/* fin_packet */
-        NULL,                           /* safe_packet */
+        NULL,                           /* can_hold_packet */
 	NULL,				/* write_packet */
 	NULL,				/* flush_output */
 	legacyeth_get_link_type,	/* get_link_type */
@@ -622,7 +622,7 @@ static struct libtrace_format_t legacypos = {
 	legacy_read_packet,		/* read_packet */
 	legacy_prepare_packet,		/* prepare_packet */
 	NULL,				/* fin_packet */
-        NULL,                           /* safe_packet */
+        NULL,                           /* can_hold_packet */
 	NULL,				/* write_packet */
 	NULL,				/* flush_output */
 	legacypos_get_link_type,	/* get_link_type */
@@ -669,7 +669,7 @@ static struct libtrace_format_t legacynzix = {
 	legacynzix_read_packet,		/* read_packet */
 	legacy_prepare_packet,		/* prepare_packet */
 	NULL,				/* fin_packet */
-        NULL,                           /* safe_packet */
+        NULL,                           /* can_hold_packet */
 	NULL,				/* write_packet */
 	NULL,				/* flush_output */
 	legacynzix_get_link_type,	/* get_link_type */

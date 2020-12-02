@@ -2422,7 +2422,7 @@ static struct libtrace_format_t dpdk = {
 	dpdk_fin_output,                    /* fin_output */
 	dpdk_read_packet,                   /* read_packet */
 	dpdk_prepare_packet,                /* prepare_packet */
-        NULL,
+        NULL,                               /* can_hold_packet */
 	dpdk_fin_packet,                    /* fin_packet */
 	dpdk_write_packet,                  /* write_packet */
 	NULL,                               /* flush_output */
@@ -2477,7 +2477,7 @@ static struct libtrace_format_t dpdk_vdev = {
 	dpdk_read_packet,                   /* read_packet */
 	dpdk_prepare_packet,                /* prepare_packet */
 	dpdk_fin_packet,                    /* fin_packet */
-        NULL,
+        NULL,                               /* can_hold_packet */
 	dpdk_write_packet,                  /* write_packet */
 	NULL,                               /* flush_output */
 	dpdk_get_link_type,                 /* get_link_type */

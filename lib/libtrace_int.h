@@ -661,7 +661,7 @@ struct libtrace_format_t {
 	 * 	 */
 	void (*fin_packet)(libtrace_packet_t *packet);
 
-        int (*safe_packet)(libtrace_packet_t *packet);
+        int (*can_hold_packet)(libtrace_packet_t *packet);
 
 	/** Write a libtrace packet to an output trace.
 	 *

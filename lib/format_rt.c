@@ -855,7 +855,7 @@ static struct libtrace_format_t rt = {
         rt_read_packet,           	/* read_packet */
 	rt_prepare_packet,		/* prepare_packet */
 	NULL,   			/* fin_packet */
-        NULL,                           /* safe_packet */
+        NULL,                           /* can_hold_packet */
         NULL,                           /* write_packet */
         NULL,                           /* flush_output */
         rt_get_link_type,	        /* get_link_type */
@@ -870,7 +870,7 @@ static struct libtrace_format_t rt = {
 	NULL,				/* seek_timeval */
 	NULL,				/* seek_seconds */
         rt_get_capture_length,        	/* get_capture_length */
-        rt_get_wire_length,            		/* get_wire_length */
+        rt_get_wire_length,            	/* get_wire_length */
         rt_get_framing_length, 		/* get_framing_length */
         NULL,         			/* set_capture_length */
 	NULL,				/* get_received_packets */
@@ -878,10 +878,10 @@ static struct libtrace_format_t rt = {
 	NULL,				/* get_dropped_packets */
 	NULL,				/* get_statistics */
         rt_get_fd,                	/* get_fd */
-        trace_event_rt,             /* trace_event */
+        trace_event_rt,                 /* trace_event */
         rt_help,			/* help */
-	NULL,			/* next pointer */
-	NON_PARALLEL(true) /* This is normally live */
+	NULL,			        /* next pointer */
+	NON_PARALLEL(true)              /* This is normally live */
 };
 
 void rt_constructor(void) {

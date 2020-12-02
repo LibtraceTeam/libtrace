@@ -505,6 +505,34 @@ static void linux_xdp_complete_tx(struct xsk_socket_info *xsk) {
     }
 }
 
+static inline int linux_xdp_release_addr(libtrace_t *trace,
+	struct xsk_socket_info *xsk, uint64_t addr) {
+
+    uint32_t idx;
+    int ret;
+    struct pollfd fds = {};
+
+    ret = xsk_ring_prod__reserve(&xsk->umem->fq, 1, &idx);
+    while (ret != 1) {
+        if (ret < 0) {
+            trace_set_err(trace, TRACE_ERR_BAD_IO, "Linux XDP fin packet: unable to "
+                                                   "reserve fill queue space");
+            return -1;
+        }
+        if (xsk_ring_prod__needs_wakeup(&xsk->umem->fq)) {
+            fds.fd = xsk_socket__fd(xsk->xsk);
+            fds.events = POLLIN;
+            ret = poll(&fds, 1, 500);
+        }
+        ret = xsk_ring_prod__reserve(&xsk->umem->fq, 1, &idx);
+    }
+
+    *xsk_ring_prod__fill_addr(&xsk->umem->fq, idx) = addr;
+    xsk_ring_prod__submit(&xsk->umem->fq, 1);
+
+    return 1;
+}
+
 static uint64_t linux_xdp_get_time() {
 
     uint64_t sys_time;
@@ -1002,7 +1030,7 @@ static int linux_xdp_start_stream(struct xsk_config *cfg,
     return 0;
 }
 
-static int linux_xdp_safe_packet(libtrace_packet_t *packet) {
+static int linux_xdp_can_hold_packet(libtrace_packet_t *packet) {
 
     struct xsk_per_stream *stream;
 
@@ -1021,10 +1049,7 @@ static int linux_xdp_safe_packet(libtrace_packet_t *packet) {
 static void linux_xdp_fin_packet(libtrace_packet_t *packet) {
 
     struct xsk_per_stream *stream;
-    uint32_t idx;
     uint64_t addr;
-    int ret;
-    struct pollfd fds = {};
 
     if (packet->buffer == NULL)
         return;
@@ -1050,27 +1075,9 @@ static void linux_xdp_fin_packet(libtrace_packet_t *packet) {
         // correct thread to release back to the fill queue on its next read.
         // thread_id will be 0 in non-parallel mode
         if (stream->thread_id == pthread_self() || stream->thread_id == 0) {
-
-            ret = xsk_ring_prod__reserve(&stream->xsk->umem->fq, 1, &idx);
-            while (ret != 1) {
-                if (ret < 0) {
-                    trace_set_err(packet->trace, TRACE_ERR_BAD_IO, "Linux XDP fin packet: unable to "
-                                                                   "reserve fill queue space");
-                    return;
-                }
-                if (xsk_ring_prod__needs_wakeup(&stream->xsk->umem->fq)) {
-                    fds.fd = xsk_socket__fd(stream->xsk->xsk);
-                    fds.events = POLLIN;
-                    ret = poll(&fds, 1, 500);
-                }
-                ret = xsk_ring_prod__reserve(&stream->xsk->umem->fq, 1, &idx);
-            }
-
-            *xsk_ring_prod__fill_addr(&stream->xsk->umem->fq, idx) = addr;
-            xsk_ring_prod__submit(&stream->xsk->umem->fq, 1);
-
+            if (linux_xdp_release_addr(packet->trace, stream->xsk, addr) < 0)
+                return;
         } else {
-
             libtrace_ringbuffer_swrite(&stream->addr_free_ring, (void *)addr);
         }
     }
@@ -1108,20 +1115,8 @@ static int linux_xdp_read_stream(libtrace_t *libtrace,
 
         // check for any addrs to be released back to the fill queue
         while (libtrace_ringbuffer_try_read(&stream->addr_free_ring, (void **)&release_addr) == 1) {
-            ret = xsk_ring_prod__reserve(&stream->xsk->umem->fq, 1, &idx_rx);
-            while (ret != 1) {
-                if (ret < 0) {
-                    trace_set_err(libtrace, TRACE_ERR_BAD_IO, "Linux XDP read stream: unable to "
-                                                              "reserve fill queue space");
-                    return -1;
-                }
-                if (xsk_ring_prod__needs_wakeup(&stream->xsk->umem->fq))
-                    ret = poll(&fds, 1, 500);
-                ret = xsk_ring_prod__reserve(&stream->xsk->umem->fq, 1, &idx_rx);
-            }
-
-            *xsk_ring_prod__fill_addr(&stream->xsk->umem->fq, idx_rx) = release_addr;
-            xsk_ring_prod__submit(&stream->xsk->umem->fq, 1);
+           if (linux_xdp_release_addr(libtrace, stream->xsk, release_addr) < 0)
+                return -1;
         }
 
         rcvd = xsk_ring_cons__peek(&stream->xsk->rx, nb_packets, &idx_rx);
@@ -1775,7 +1770,7 @@ static struct libtrace_format_t xdp = {
     linux_xdp_read_packet,          /* read_packet */
     linux_xdp_prepare_packet,       /* prepare_packet */
     linux_xdp_fin_packet,           /* fin_packet */
-    linux_xdp_safe_packet,          /* safe_packet */
+    linux_xdp_can_hold_packet,      /* can_hold_packet */
     linux_xdp_write_packet,         /* write_packet */
     NULL,                           /* flush_output */
     linux_xdp_get_link_type,        /* get_link_type */

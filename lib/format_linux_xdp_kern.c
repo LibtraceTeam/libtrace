@@ -17,7 +17,6 @@
 #include <linux/udp.h>
 
 #include "format_linux_xdp.h"
-#include "jhash.h"
 
 struct bpf_map_def SEC("maps") xsks_map = {
     .type = BPF_MAP_TYPE_XSKMAP,

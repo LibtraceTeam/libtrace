@@ -803,7 +803,7 @@ static struct libtrace_format_t pcapfile = {
 	pcapfile_read_packet,		/* read_packet */
 	pcapfile_prepare_packet,	/* prepare_packet */
 	NULL,				/* fin_packet */
-        NULL,                           /* safe_packet */
+        NULL,                           /* can_hold_packet */
 	pcapfile_write_packet,		/* write_packet */
         pcapfile_flush_output,          /* flush_output */
 	pcapfile_get_link_type,		/* get_link_type */
@@ -826,9 +826,9 @@ static struct libtrace_format_t pcapfile = {
 	NULL,				/* get_dropped_packets */
 	NULL,				/* get_statistics */
 	NULL,				/* get_fd */
-	pcapfile_event,		/* trace_event */
+	pcapfile_event,			/* trace_event */
 	pcapfile_help,			/* help */
-	NULL,			/* next pointer */
+	NULL,				/* next pointer */
 	NON_PARALLEL(false)
 };
 
