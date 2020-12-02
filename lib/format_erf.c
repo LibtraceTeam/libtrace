@@ -671,86 +671,92 @@ static bool find_compatible_linktype(libtrace_out_t *libtrace,
 }
 
 int libtrace_to_erf_hdr(libtrace_out_t *libtrace, libtrace_packet_t *packet,
-	dag_record_t *erf, int *framinglen, int *caplen, int *padding) {
+    dag_record_t *erf, int *framinglen, int *caplen, int *padding) {
 
-	int wlen = trace_get_wire_length(packet);
-        *framinglen = dag_record_size + erf_get_padding(packet);
-        *caplen = trace_get_capture_length(packet);
-	*padding = 0;
+    int wlen = trace_get_wire_length(packet);
+    *framinglen = dag_record_size + erf_get_padding(packet);
+    *caplen = trace_get_capture_length(packet);
+    *padding = 0;
 
-        if (*caplen <= 0 || *caplen > 65536) {
-		trace_set_err_out(libtrace, TRACE_ERR_BAD_PACKET,
-			"Capture length is out of range in libtrace_to_erf_hdr()");
-                return -1;
-	}
+    if (*caplen <= 0 || *caplen > 65536) {
+        trace_set_err_out(libtrace, TRACE_ERR_BAD_PACKET,
+            "Capture length is out of range in libtrace_to_erf_hdr()");
+        return -1;
+    }
 
-        if (*framinglen > 65536) {
-		trace_set_err_out(libtrace, TRACE_ERR_BAD_PACKET,
-			"Framing length is to large in libtrace_to_erf_hdr()");
-                return -1;
-	}
+    if (*framinglen > 65536) {
+        trace_set_err_out(libtrace, TRACE_ERR_BAD_PACKET,
+            "Framing length is to large in libtrace_to_erf_hdr()");
+        return -1;
+    }
 
-	if (*caplen + *framinglen <= 0 || *caplen + *framinglen > 65536) {
-		trace_set_err_out(libtrace, TRACE_ERR_BAD_PACKET,
-			"Capture + framing length is out of range in libtrace_to_erf_hdr()");
-		return -1;
-	}
+    if (*caplen + *framinglen <= 0 || *caplen + *framinglen > 65536) {
+        trace_set_err_out(libtrace, TRACE_ERR_BAD_PACKET,
+            "Capture + framing length is out of range in libtrace_to_erf_hdr()");
+        return -1;
+    }
 
-        erf->ts = bswap_host_to_le64(trace_get_erf_timestamp(packet));
-	memset(&erf->flags, 0, sizeof(erf->flags));
-        if (trace_get_direction(packet) != TRACE_DIR_UNKNOWN)
-                erf->flags.iface = trace_get_direction(packet);
-        if (!find_compatible_linktype(libtrace,packet))
-                return -1;
-        erf->type = libtrace_to_erf_type(trace_get_link_type(packet));
+    erf->ts = bswap_host_to_le64(trace_get_erf_timestamp(packet));
+    memset(&erf->flags, 0, sizeof(erf->flags));
+    if (trace_get_direction(packet) != TRACE_DIR_UNKNOWN)
+        erf->flags.iface = trace_get_direction(packet);
+    if (!find_compatible_linktype(libtrace,packet))
+        return -1;
+    erf->type = libtrace_to_erf_type(trace_get_link_type(packet));
 
-	// calculate correct padding for the ERF record
-        erf_calculate_padding(packet, framinglen, caplen, padding);
+    // calculate correct padding for the ERF record
+    erf_calculate_padding(packet, framinglen, caplen, padding);
 
-        erf->rlen = htons(*framinglen + *caplen + *padding);
-        // loss counter. Cant't do this
-        erf->lctr = 0;
-        erf->wlen = htons(wlen);
+    erf->rlen = htons(*framinglen + *caplen + *padding);
+    // loss counter. Cant't do this
+    erf->lctr = 0;
+    erf->wlen = htons(wlen);
 
-        return 0;
+    return 0;
 }
 
 int erf_calculate_padding(libtrace_packet_t *packet, int *framinglen,
-	int *caplen, int *padding) {
+    int *caplen, int *padding) {
 
-	int wlen = trace_get_wire_length(packet);
-	*caplen = trace_get_capture_length(packet);
-	*padding = 0;
+    int wlen = trace_get_wire_length(packet);
+    *caplen = trace_get_capture_length(packet);
+    *padding = 0;
 
-	if (packet->type == TRACE_RT_DATA_ERF)
-		*framinglen = trace_get_framing_length(packet);
-	else
-		*framinglen = dag_record_size + erf_get_padding(packet);
+    if (packet->type == TRACE_RT_DATA_ERF)
+        *framinglen = trace_get_framing_length(packet);
+    else
+        *framinglen = dag_record_size + erf_get_padding(packet);
 
-	//fprintf(stderr, "framing %d, caplen %d padding %d\n", *framinglen, *caplen, *padding);
+    // full packet, round up
+    if ((wlen == *caplen) ||
+        // full packet except FCS, round up. Do we want to do this? or should
+        // we round down??
+        (trace_get_link_type(packet) == TRACE_TYPE_ETH && wlen-4 == *caplen)) {
 
-	// if the packet is snapped round payload down to next 8 byte boundary, if not
-        // round up to the next 8 byte boundary
-	if ((trace_get_link_type(packet) == TRACE_TYPE_ETH && wlen-4 == *caplen) ||
-		(trace_get_link_type(packet) != TRACE_TYPE_ETH && wlen == *caplen)) {
+        *padding = sizeof(uint64_t) - ((*framinglen + *caplen) % sizeof(uint64_t));
+        if (*padding == sizeof(uint64_t))
+            *padding = 0;
+    // snapped packet
+    } else {
+        *caplen -= (*framinglen + *caplen) % sizeof(uint64_t);
+    }
 
-		*padding = sizeof(uint64_t) - ((*framinglen + *caplen) % sizeof(uint64_t));
-                if (*padding == sizeof(uint64_t))
-                        *padding = 0;
-	} else
-		*caplen -= (*framinglen + *caplen) % sizeof(uint64_t);
+    // If we've had an rxerror, we have no payload to write
+    // note: when a erf packet is read in and the rxerror flag is set
+    // payload is set to NULL
+    if (packet->payload == NULL) {
+        *caplen = 0;
+        *padding = 0;
+    }
 
-
-	fprintf(stderr, "wirelen %d framing %d, caplen %d padding %d\n", wlen, *framinglen, *caplen, *padding);
-	return 0;
+    return 0;
 }
 
-static int erf_dump_packet(libtrace_out_t *libtrace,
-		dag_record_t *erfptr, int framinglen, void *buffer,
-                int caplen, int alignment_pad) {
+static int erf_dump_packet(libtrace_out_t *libtrace, dag_record_t *erfptr,
+	int framinglen, void *buffer, int caplen, int padding) {
 
 	int numbytes = 0;
-	uint64_t alignment_buf = 0;
+	uint64_t padding_buf = 0;
 
 	// write out ERF header
 	numbytes = wandio_wwrite(OUTPUT->file, erfptr, (size_t)(framinglen));
@@ -761,7 +767,7 @@ static int erf_dump_packet(libtrace_out_t *libtrace,
 	}
 
 	// write out packet payload
-       	numbytes = wandio_wwrite(OUTPUT->file, buffer, (size_t)caplen);
+	numbytes = wandio_wwrite(OUTPUT->file, buffer, (size_t)caplen);
 	if (numbytes != caplen) {
 		trace_set_err_out(libtrace,errno,
 			"write(%s)",libtrace->uridata);
@@ -769,14 +775,14 @@ static int erf_dump_packet(libtrace_out_t *libtrace,
 	}
 
 	// write out padding if needed
-	numbytes = wandio_wwrite(OUTPUT->file, &alignment_buf, (size_t)alignment_pad);
-	if (numbytes != alignment_pad) {
+	numbytes = wandio_wwrite(OUTPUT->file, &padding_buf, (size_t)padding);
+	if (numbytes != padding) {
 		trace_set_err_out(libtrace,errno,
 			"write(%s)",libtrace->uridata);
 		return -1;
 	}
 
-	return framinglen + caplen + alignment_pad;
+	return framinglen + caplen + padding;
 }
 
 static int erf_flush_output(libtrace_out_t *libtrace) {
@@ -821,18 +827,8 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 		return -1;
 	}
 
-	/* If we've had an rxerror, we have no payload to write - fix
-	 * rlen to be the correct length 
-	 */
-	/* I Think this is bogus, we should somehow figure out
-	 * a way to write out the payload even if it is gibberish -- Perry */
-	if (payload == NULL) {
-	        unsigned int pad = 0;
-	        pad = erf_get_padding(packet);
-		dag_hdr->rlen = htons(dag_record_size + pad);
-	}
-
 	if (packet->type == TRACE_RT_DATA_ERF) {
+		// calculate padding to make sure eveything is 8 byte aligned
 		erf_calculate_padding(packet, &framinglen, &caplen, &padding);
 		dag_hdr->rlen = htons(framinglen + caplen + padding);
 		return erf_dump_packet(libtrace,
@@ -843,18 +839,14 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 				       padding);
 	} else {
 		dag_record_t erfhdr;
-
-		if (libtrace_to_erf_hdr(libtrace, packet, &erfhdr, &framinglen,
-			&caplen, &padding) < 0) {
-
+		// construct erf header
+		if (libtrace_to_erf_hdr(libtrace, packet, &erfhdr, &framinglen, &caplen, &padding) < 0)
 			return -1;
-		}
-
 		return erf_dump_packet(libtrace,
 				       &erfhdr,
 				       framinglen,
 				       payload,
-                                       caplen,
+				       caplen,
 				       padding);
 	}
 }
