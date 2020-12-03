@@ -1264,6 +1264,7 @@ static struct libtrace_format_t erfformat = {
 	erf_read_packet,		/* read_packet */
 	erf_prepare_packet,		/* prepare_packet */
 	NULL,				/* fin_packet */
+        NULL,                           /* can_hold_packet */
 	erf_write_packet,		/* write_packet */
 	erf_flush_output,		/* flush_output */
 	erf_get_link_type,		/* get_link_type */
@@ -1310,6 +1311,7 @@ static struct libtrace_format_t rawerfformat = {
 	erf_read_packet,		/* read_packet */
 	erf_prepare_packet,		/* prepare_packet */
 	NULL,				/* fin_packet */
+        NULL,                           /* can_hold_packet */
 	erf_write_packet,		/* write_packet */
 	erf_flush_output,		/* flush_output */
 	erf_get_link_type,		/* get_link_type */

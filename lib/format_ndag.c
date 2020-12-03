@@ -1727,12 +1727,13 @@ static struct libtrace_format_t ndag = {
         ndag_read_packet,       /* read_packet */
         ndag_prepare_packet,    /* prepare_packet */
         NULL,                   /* fin_packet */
+        NULL,                   /* can_hold_packet */
         NULL,                   /* write_packet */
         NULL,                   /* flush_output */
-        ndag_get_link_type,      /* get_link_type */
-        ndag_get_direction,      /* get_direction */
-        ndag_set_direction,      /* set_direction */
-        ndag_get_erf_timestamp,  /* get_erf_timestamp */
+        ndag_get_link_type,     /* get_link_type */
+        ndag_get_direction,     /* get_direction */
+        ndag_set_direction,     /* set_direction */
+        ndag_get_erf_timestamp, /* get_erf_timestamp */
         NULL,                   /* get_timeval */
         NULL,                   /* get_seconds */
         NULL,                   /* get_timespec */
@@ -1740,10 +1741,10 @@ static struct libtrace_format_t ndag = {
         NULL,                   /* seek_erf */
         NULL,                   /* seek_timeval */
         NULL,                   /* seek_seconds */
-        ndag_get_capture_length, /* get_capture_length */
-        ndag_get_wire_length,    /* get_wire_length */
-        ndag_get_framing_length, /* get_framing_length */
-        ndag_set_capture_length, /* set_capture_length */
+        ndag_get_capture_length,/* get_capture_length */
+        ndag_get_wire_length,   /* get_wire_length */
+        ndag_get_framing_length,/* get_framing_length */
+        ndag_set_capture_length,/* set_capture_length */
         NULL,                   /* get_received_packets */
         NULL,                   /* get_filtered_packets */
         NULL,                   /* get_dropped_packets */

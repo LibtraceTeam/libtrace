@@ -989,48 +989,49 @@ static struct libtrace_format_t pfringformat = {
 	TRACE_FORMAT_PFRING,
 	NULL,                           /* probe filename */
         NULL,                           /* probe magic */
-        pfring_init_input,                /* init_input */
-        pfring_config_input,              /* config_input */
-        pfring_start_input,               /* start_input */
-        pfring_pause_input,               /* pause_input */
+        pfring_init_input,              /* init_input */
+        pfring_config_input,            /* config_input */
+        pfring_start_input,             /* start_input */
+        pfring_pause_input,             /* pause_input */
         NULL,               		/* init_output */
         NULL,                           /* config_output */
         NULL,                           /* start_output */
-        pfring_fin_input,                 /* fin_input */
+        pfring_fin_input,               /* fin_input */
         NULL,                		/* fin_output */
-        pfring_read_packet,               /* read_packet */
-        pfring_prepare_packet,            /* prepare_packet */
+        pfring_read_packet,             /* read_packet */
+        pfring_prepare_packet,          /* prepare_packet */
         NULL,                           /* fin_packet */
-        NULL,  			          /* write_packet */
-        NULL,                             /* flush_output */
-        pfring_get_link_type,             /* get_link_type */
-        pfring_get_direction,             /* get_direction */
-        lt_pfring_set_direction,             /* set_direction */
-        pfring_get_erf_timestamp,         /* get_erf_timestamp */
-        NULL,               /* get_timeval */
+	NULL,                           /* can_hold_packet */
+        NULL,  			        /* write_packet */
+        NULL,                           /* flush_output */
+        pfring_get_link_type,           /* get_link_type */
+        pfring_get_direction,           /* get_direction */
+        lt_pfring_set_direction,        /* set_direction */
+        pfring_get_erf_timestamp,       /* get_erf_timestamp */
+        NULL,                           /* get_timeval */
         NULL,                           /* get_timespec */
         NULL,                           /* get_seconds */
         NULL,                           /* get_all_meta */
         NULL,                           /* seek_erf */
         NULL,                           /* seek_timeval */
         NULL,                           /* seek_seconds */
-        pfring_get_capture_length,        /* get_capture_length */
-        pfring_get_wire_length,           /* get_wire_length */
-        pfring_get_framing_length,        /* get_framing_length */
-        pfring_set_capture_length,        /* set_capture_length */
+        pfring_get_capture_length,      /* get_capture_length */
+        pfring_get_wire_length,         /* get_wire_length */
+        pfring_get_framing_length,      /* get_framing_length */
+        pfring_set_capture_length,      /* set_capture_length */
         NULL,                           /* get_received_packets */
         NULL,                           /* get_filtered_packets */
         NULL,                           /* get_dropped_packets */
         pfring_get_statistics,          /* get_statistics */
         NULL,                           /* get_fd */
-        pfring_event,              /* trace_event */
-        NULL,                      /* help */
-        NULL,                   /* next pointer */
-	{true, MAX_NUM_RX_CHANNELS},         /* Live, with thread limit */
-        pfring_pstart_input,         /* pstart_input */
-        pfring_pread_packets,        /* pread_packets */
-        pfring_pause_input,        /* ppause */
-        pfring_fin_input,          /* p_fin */
+        pfring_event,                   /* trace_event */
+        NULL,                           /* help */
+        NULL,                           /* next pointer */
+	{true, MAX_NUM_RX_CHANNELS},    /* Live, with thread limit */
+        pfring_pstart_input,            /* pstart_input */
+        pfring_pread_packets,           /* pread_packets */
+        pfring_pause_input,             /* ppause */
+        pfring_fin_input,               /* p_fin */
         pfring_pregister_thread,  	/* register thread */ 
         NULL,                           /* unregister thread */
         NULL                            /* get thread stats */

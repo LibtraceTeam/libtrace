@@ -661,6 +661,14 @@ struct libtrace_format_t {
 	 * 	 */
 	void (*fin_packet)(libtrace_packet_t *packet);
 
+        /** Instructs the capture format module to hold any buffers used by the
+         * packet until trace_fin_packet() is called on it.
+         *
+         * @param The packet to hold
+         * @return 0 if successful, -1 if an error occurs.
+         */
+        int (*can_hold_packet)(libtrace_packet_t *packet);
+
 	/** Write a libtrace packet to an output trace.
 	 *
 	 * @param libtrace 	The output trace to write the packet to

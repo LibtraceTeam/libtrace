@@ -242,6 +242,7 @@ static struct libtrace_format_t tshformat = {
 	tsh_read_packet,		/* read_packet */
 	tsh_prepare_packet,		/* prepare_packet */
 	NULL,				/* fin_packet */
+        NULL,                           /* can_hold_packet */
 	NULL,				/* write_packet */
 	NULL,				/* flush_output */
 	tsh_get_link_type,		/* get_link_type */
@@ -266,7 +267,7 @@ static struct libtrace_format_t tshformat = {
 	NULL,				/* get_fd */
 	trace_event_trace,		/* trace_event */
 	tsh_help,			/* help */
-	NULL,			/* next pointer */
+	NULL,				/* next pointer */
 	NON_PARALLEL(false)
 };
 
@@ -293,6 +294,7 @@ static struct libtrace_format_t frplusformat = {
 	tsh_read_packet,		/* read_packet */
 	tsh_prepare_packet,		/* prepare_packet */
 	NULL,				/* fin_packet */
+        NULL,                           /* can_hold_packet */
 	NULL,				/* write_packet */
 	NULL,				/* flush_output */
 	tsh_get_link_type,		/* get_link_type */
@@ -317,7 +319,7 @@ static struct libtrace_format_t frplusformat = {
 	NULL,				/* get_fd */
 	trace_event_trace,		/* trace_event */
 	tsh_help,			/* help */
-	NULL,			/* next pointer */
+	NULL,				/* next pointer */
 	NON_PARALLEL(false)
 };
 

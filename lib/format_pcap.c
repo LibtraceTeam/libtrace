@@ -861,6 +861,7 @@ static struct libtrace_format_t pcap = {
 	pcap_read_packet,		/* read_packet */
 	pcap_prepare_packet,		/* prepare_packet */
 	NULL,				/* fin_packet */
+        NULL,                           /* can_hold_packet */
 	pcap_write_packet,		/* write_packet */
         pcap_flush_output,              /* flush_output */
 	pcap_get_link_type,		/* get_link_type */
@@ -907,6 +908,7 @@ static struct libtrace_format_t pcapint = {
 	pcap_read_packet,		/* read_packet */
 	pcap_prepare_packet,		/* prepare_packet */
 	NULL,				/* fin_packet */
+        NULL,                           /* can_hold_packet */
 	pcapint_write_packet,		/* write_packet */
 	NULL,		                /* flush_output */
 	pcap_get_link_type,		/* get_link_type */

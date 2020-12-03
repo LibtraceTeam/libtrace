@@ -1699,6 +1699,7 @@ static struct libtrace_format_t dag = {
 	dag_read_packet,                /* read_packet */
 	dag_prepare_packet,		/* prepare_packet */
 	NULL,                           /* fin_packet */
+        NULL,                           /* can_hold_packet */
 	dag_write_packet,               /* write_packet */
 	dag_flush_output,               /* flush_output */
 	erf_get_link_type,              /* get_link_type */

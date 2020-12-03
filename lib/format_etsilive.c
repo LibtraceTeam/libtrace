@@ -691,6 +691,7 @@ static struct libtrace_format_t etsilive = {
         etsilive_read_packet,           /* read_packet */
         etsilive_prepare_packet,        /* prepare_packet */
         NULL,                           /* fin_packet */
+        NULL,                           /* can_hold_packet */
         NULL,                           /* write_packet */
         NULL,                           /* flush_output */
         etsilive_get_link_type,         /* get_link_type */
@@ -704,8 +705,8 @@ static struct libtrace_format_t etsilive = {
         NULL,                           /* seek_erf */
         NULL,                           /* seek_timeval */
         NULL,                           /* seek_seconds */
-        etsilive_get_pdu_length,       /* get_capture_length */
-        etsilive_get_pdu_length,       /* get_wire_length */
+        etsilive_get_pdu_length,        /* get_capture_length */
+        etsilive_get_pdu_length,        /* get_wire_length */
         etsilive_get_framing_length,    /* get_framing_length */
         NULL,                           /* set_capture_length */
         NULL,                           /* get_received_packets */
