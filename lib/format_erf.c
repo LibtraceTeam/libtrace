@@ -936,7 +936,12 @@ int erf_get_capture_length(const libtrace_packet_t *packet) {
         rlen = ntohs(erfptr->rlen);
         wlen = ntohs(erfptr->wlen);
 
-	caplen = rlen - framinglen;
+        caplen = rlen - framinglen;
+
+	// erf wirelen includes FCS for ETH
+	if (trace_get_link_type(packet) == TRACE_TYPE_ETH)
+		caplen -= 4;
+
 	if (wlen < caplen)
 		return wlen;
 
