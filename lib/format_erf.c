@@ -716,11 +716,8 @@ int libtrace_to_erf_hdr(libtrace_out_t *libtrace, libtrace_packet_t *packet,
 }
 
 static inline int erf_increased_padding(int framinglen, int caplen) {
-    int padding;
-    padding = sizeof(uint64_t) - ((framinglen + caplen) % sizeof(uint64_t));
-    if (padding == sizeof(uint64_t))
-        return 0;
-    return padding;
+    return (sizeof(uint64_t) - ((framinglen + caplen) % sizeof(uint64_t)))
+        % sizeof(uint64_t);
 }
 
 static inline int erf_reduced_padding(int framinglen, int caplen) {
@@ -937,10 +934,6 @@ int erf_get_capture_length(const libtrace_packet_t *packet) {
         wlen = ntohs(erfptr->wlen);
 
         caplen = rlen - framinglen;
-
-	// erf wirelen includes FCS for ETH
-	if (trace_get_link_type(packet) == TRACE_TYPE_ETH)
-		caplen -= 4;
 
 	if (wlen < caplen)
 		return wlen;
