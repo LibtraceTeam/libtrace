@@ -1139,7 +1139,7 @@ static int dag_dump_packet(libtrace_out_t *libtrace, dag_record_t *erfptr,
 	 * the pointer at FORMAT_DATA_OUT->txbuffer.
 	 *
 	 * The amount to request is slightly magical at the moment - it's
-	 * 16Mebibytes + 128 kibibytes to ensure that we can copy a packet into
+	 * 3Mebibytes + 128 kibibytes to ensure that we can copy a packet into
 	 * the buffer and handle overruns.
 	 */
 	if (FORMAT_DATA_OUT->waiting == 0) {
@@ -1147,7 +1147,7 @@ static int dag_dump_packet(libtrace_out_t *libtrace, dag_record_t *erfptr,
 			if ((FORMAT_DATA_OUT->txbuffer =
 				dag_tx_get_stream_space64(FORMAT_DATA_OUT->device->fd,
 			 				  FORMAT_DATA_OUT->dagstream,
-							  16908288)) == NULL) {
+							  (3*1024*1024)+(128*1024)) == NULL) {
 				if (errno == EAGAIN)
 					continue;
 				trace_set_err_out(libtrace, TRACE_ERR_BAD_IO, "DAG25: unable "
@@ -1177,13 +1177,13 @@ static int dag_dump_packet(libtrace_out_t *libtrace, dag_record_t *erfptr,
         FORMAT_DATA_OUT->waiting += padding;
 
 	/*
-	 * If our output buffer has more than 16 Mebibytes in it, commit those
+	 * If our output buffer has more than 3 Mebibytes in it, commit those
 	 * bytes and reset the waiting count to 0.
 	 * Note: dag_flush_output and dag_fin_output will also call
 	 * dag_tx_stream_commit_bytes() in case there is still data in the buffer
 	 * at program exit.
 	 */
-	if (FORMAT_DATA_OUT->waiting >= 16*1024*1024) {
+	if (FORMAT_DATA_OUT->waiting >= 3*1024*1024) {
 		dag_flush_output(libtrace);
 	}
 
