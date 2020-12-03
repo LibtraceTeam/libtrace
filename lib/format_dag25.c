@@ -1147,7 +1147,7 @@ static int dag_dump_packet(libtrace_out_t *libtrace, dag_record_t *erfptr,
 			if ((FORMAT_DATA_OUT->txbuffer =
 				dag_tx_get_stream_space64(FORMAT_DATA_OUT->device->fd,
 			 				  FORMAT_DATA_OUT->dagstream,
-							  (3*1024*1024)+(128*1024)) == NULL) {
+							  (3*1024*1024)+(128*1024))) == NULL) {
 				if (errno == EAGAIN)
 					continue;
 				trace_set_err_out(libtrace, TRACE_ERR_BAD_IO, "DAG25: unable "
