@@ -715,6 +715,18 @@ int libtrace_to_erf_hdr(libtrace_out_t *libtrace, libtrace_packet_t *packet,
     return 0;
 }
 
+static inline int erf_increased_padding(int framinglen, int caplen) {
+    int padding;
+    padding = sizeof(uint64_t) - ((framinglen + caplen) % sizeof(uint64_t));
+    if (padding == sizeof(uint64_t))
+        return 0;
+    return padding;
+}
+
+static inline int erf_reduced_padding(int framinglen, int caplen) {
+    return (framinglen + caplen) % sizeof(uint64_t);
+}
+
 int erf_calculate_padding(libtrace_packet_t *packet, int *framinglen,
     int *caplen, int *padding) {
 
@@ -733,20 +745,21 @@ int erf_calculate_padding(libtrace_packet_t *packet, int *framinglen,
         // we round down??
         (trace_get_link_type(packet) == TRACE_TYPE_ETH && wlen-4 == *caplen)) {
 
-        *padding = sizeof(uint64_t) - ((*framinglen + *caplen) % sizeof(uint64_t));
-        if (*padding == sizeof(uint64_t))
-            *padding = 0;
+        *padding = erf_increased_padding(*framinglen, *caplen);
     // snapped packet
     } else {
-        *caplen -= (*framinglen + *caplen) % sizeof(uint64_t);
+        *caplen -= erf_reduced_padding(*framinglen, *caplen);
     }
 
-    // If we've had an rxerror, we have no payload to write
-    // note: when a erf packet is read in and the rxerror flag is set
-    // payload is set to NULL
+    /* If we've had an rxerror, we have no payload to write.
+     *
+     * I Think this is bogus, we should somehow figure out
+     * a way to write out the payload even if it is gibberish -- Perry
+     */
     if (packet->payload == NULL) {
         *caplen = 0;
-        *padding = 0;
+        // add padding so this can still be transmitted
+        *padding = erf_increased_padding(*framinglen, *caplen);
     }
 
     return 0;
