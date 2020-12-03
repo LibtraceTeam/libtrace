@@ -87,6 +87,28 @@
 #define FORMAT_DATA_HEAD FORMAT_DATA->per_stream->head
 #define FORMAT_DATA_FIRST ((struct dag_per_stream_t *)FORMAT_DATA_HEAD->data)
 
+/* The size in bytes by which to overlap the TX ringbuffer
+ *
+ * E.g.               Ringbuffer          Extra window overlap (0x800 bytes)
+ * Virtual:  [0x01000     ->     0x02000] [0x02000 -> 0x02800]
+ *                        ^                        ^
+ *                        |                        |
+ * Physical: [0xf1000     ->     0xf2000] [0xf1000 -> 0xf1800]
+ * Note, TX cannot reserve/write more than the extra window overlap size
+ * at one time
+ * Default: 4MB
+ **/
+#define TX_EXTRA_WINDOW 4*1024*1024
+/* The number of bytes to request 256 KB, much larger sizes than this show no clear benefit */
+#define TX_BATCH_SIZE 256*1024
+/* The threshold to reach before sending, 2x 64KB (largest packet size) is safe */
+#define TX_BATCH_THOLD (TX_BATCH_SIZE - (2*1024*64))
+
+/* Compile time asserts, check sizes are valid */
+ct_assert(TX_BATCH_SIZE > TX_BATCH_THOLD);
+ct_assert(TX_BATCH_THOLD > 0);
+ct_assert(!TX_EXTRA_WINDOW || TX_EXTRA_WINDOW > TX_BATCH_SIZE);
+
 static struct libtrace_format_t dag;
 
 /* A DAG device - a DAG device can support multiple streams (and therefore
@@ -112,7 +134,7 @@ struct dag_format_data_out_t {
 	int stream_attached;
 	/* The amount of data waiting to be transmitted, in bytes */
 	uint64_t waiting;
-	/* A buffer to hold the data to be transmittted */
+	/* A buffer to hold the data to be transmitted */
 	uint8_t *txbuffer;
 };
 
@@ -669,7 +691,7 @@ static int dag_start_output(libtrace_out_t *libtrace)
 
 	/* Attach and start the DAG stream */
 	if (dag_attach_stream64(FORMAT_DATA_OUT->device->fd,
-			FORMAT_DATA_OUT->dagstream, 0, 4 * 1024 * 1024) < 0) {
+			FORMAT_DATA_OUT->dagstream, 0, TX_EXTRA_WINDOW) < 0) {
 		trace_set_err_out(libtrace, errno, "Cannot attach DAG stream");
 		return -1;
 	}
@@ -919,21 +941,11 @@ static int dag_fin_output(libtrace_out_t *libtrace)
 	/* Commit any outstanding traffic in the txbuffer */
 	dag_flush_output(libtrace);
 
-	/* Wait until the buffer is nearly clear before exiting the program,
+	/* Wait until the buffer is clear before exiting the program,
 	 * as we will lose packets otherwise */
-	while (1) {
-		dag_ssize_t size = dag_get_stream_buffer_size64(FORMAT_DATA_OUT->device->fd,
-								FORMAT_DATA_OUT->dagstream);
-		if ((FORMAT_DATA_OUT->txbuffer =
-			dag_tx_get_stream_space64(FORMAT_DATA_OUT->device->fd,
-						  FORMAT_DATA_OUT->dagstream,
-						  size-8)) == NULL) {
-			if (errno == EAGAIN)
-				continue;
-			trace_set_err_out(libtrace, TRACE_ERR_BAD_IO, "DAG25: unable to flush output");
-			break;
-		} else
-			break;
+	while(dag_get_stream_buffer_level64(FORMAT_DATA_OUT->device->fd,
+	                                    FORMAT_DATA_OUT->dagstream)) {
+		/* Wait for dag to complete writing all data */
 	}
 
 	/* Need the lock, since we're going to be handling the device list */
@@ -1172,18 +1184,13 @@ static int dag_dump_packet(libtrace_out_t *libtrace,
 	 * If we've got 0 bytes waiting in the txqueue, assume that we
 	 * haven't requested any space yet, and request some, storing
 	 * the pointer at FORMAT_DATA_OUT->txbuffer.
-	 *
-	 * The amount to request is slightly magical at the moment - it's
-	 * 16Mebibytes + 128 kibibytes to ensure that we can copy a packet into
-	 * the buffer and handle overruns.
 	 */
-
 	if (FORMAT_DATA_OUT->waiting == 0) {
 		while (1) {
 			if ((FORMAT_DATA_OUT->txbuffer =
 				dag_tx_get_stream_space64(FORMAT_DATA_OUT->device->fd,
 			 				  FORMAT_DATA_OUT->dagstream,
-							  16908288)) == NULL) {
+							  TX_BATCH_SIZE)) == NULL) {
 				if (errno == EAGAIN)
 					continue;
 				trace_set_err_out(libtrace, TRACE_ERR_BAD_IO, "DAG25: unable to reserve stream space "
@@ -1216,13 +1223,12 @@ static int dag_dump_packet(libtrace_out_t *libtrace,
         FORMAT_DATA_OUT->waiting += alignment_pad;
 
 	/*
-	 * If our output buffer has more than 16 Mebibytes in it, commit those 
-	 * bytes and reset the waiting count to 0.
-	 * Note: dag_flush_output and dag_fin_output will also call
-	 * dag_tx_stream_commit_bytes() in case there is still data in the buffer
-	 * at program exit.
+	 * If our output buffer has more than TX_BATCH_THOLD bytes queued, commit those
+	 * bytes to the network and reset the waiting count to 0.
+	 * Note: dag_fin_output() will also call dag_flush_output() in case there
+	 * is still data in the buffer at program exit.
 	 */
-	if (FORMAT_DATA_OUT->waiting >= 16*1024*1024) {
+	if (FORMAT_DATA_OUT->waiting >= TX_BATCH_THOLD) {
 		dag_flush_output(libtrace);
 	}
 
