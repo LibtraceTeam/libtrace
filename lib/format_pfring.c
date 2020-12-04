@@ -669,6 +669,9 @@ static int pfringzc_read_batch(libtrace_t *libtrace,
 		if (received == 0) {
 			if (queue && libtrace_message_queue_count(queue) > 0)
 				return READ_MESSAGE;
+			if (is_halted(libtrace) != -1) {
+				return is_halted(libtrace);
+			}
 			continue;
 		}
 
@@ -709,6 +712,9 @@ static int pfring_read_generic(libtrace_t *libtrace, libtrace_packet_t *packet,
 		if (rc == 0) {
 			if (queue && libtrace_message_queue_count(queue) > 0)
 				return READ_MESSAGE;
+			if (is_halted(libtrace) != -1) {
+				return is_halted(libtrace);
+			}
 			continue;
 		}
 		break;
