@@ -235,8 +235,8 @@ AC_ARG_WITH(pgo-generate, AS_HELP_STRING(--with-pgo-generate=[DIR], Generate per
 		pgo_generate_path=$withval
 		pgo_generate=true
 		AC_CHECK_LIB(gcov, __gcov_init,,AC_MSG_ERROR([gcov is required for pgo optimizations]))
-		CFLAGS+=" -fprofile-generate='$withval' -fprofile-update=atomic -lgcov"
-		CXXFLAGS+=" -fprofile-generate='$withval' -fprofile-update=atomic -lgcov"
+		CFLAGS+=" -fprofile-generate=$withval -fprofile-update=atomic -lgcov"
+		CXXFLAGS+=" -fprofile-generate=$withval -fprofile-update=atomic -lgcov"
 	fi
 ],[])
 pgo_build=false
@@ -246,8 +246,8 @@ AC_ARG_WITH(pgo-build, AS_HELP_STRING(--with-pgo-build=[DIR], Build using perfor
 		pgo_build_path=$withval
 		pgo_build=true
 		AC_CHECK_LIB(gcov, __gcov_init,,AC_MSG_ERROR([gcov is required for pgo optimizations]))
-		CFLAGS+=" -fprofile-correction -fprofile-use='$withval' -lgcov"
-		CXXFLAGS+=" -fprofile-correction -fprofile-use='$withval' -lgcov"
+		CFLAGS+=" -fprofile-correction -fprofile-use=$withval -lgcov"
+		CXXFLAGS+=" -fprofile-correction -fprofile-use=$withval -lgcov"
 	fi
 ],[])
 
@@ -936,10 +936,10 @@ fi
 
 # Performance guided optimization
 if test x"$pgo_generate" = xtrue; then
-	AC_MSG_NOTICE([Generate performance optimization files in [$pgo_generate_path]])
+	AC_MSG_NOTICE([Generate performance optimization files in $pgo_generate_path])
 fi
 if test x"$pgo_build" = xtrue; then
-	AC_MSG_NOTICE([Compile with performance guided optimization files in [$pgo_build_path]])
+	AC_MSG_NOTICE([Compile with performance guided optimization files in $pgo_build_path])
 fi
 
 # Tracepoints
