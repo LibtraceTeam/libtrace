@@ -64,6 +64,10 @@
 #include <sys/time.h>
 #endif
 
+#if ENABLE_DTRACE
+#include <sys/sdt.h>
+#endif
+
 /* Deal with missing byte order macros */
 #include <sys/param.h>
 
@@ -592,10 +596,10 @@ typedef enum {
 } libtrace_ethertype_t;
 
 /** constant to check if a vlan was found */
-#define VLAN_NOT_FOUND 0xFF
+#define VLAN_NOT_FOUND 0xFFFF
 
 /** constant to check if a mpls label was found */
-#define MPLS_NOT_FOUND 0xFFFF
+#define MPLS_NOT_FOUND 0xFFFFFFFF
 
 typedef struct libtrace_layer2_header {
         uint16_t ethertype;                     /**< Ethertype of the header */

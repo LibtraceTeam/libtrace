@@ -95,7 +95,6 @@ int main(int argc, char *argv[]) {
 	int psize = 0;
 	int error = 0;
 	int count = 0;
-	int level = 0;
 	int expected = 100;
 	const char *tracename;
 	libtrace_t *trace;
@@ -113,8 +112,6 @@ int main(int argc, char *argv[]) {
 
 	if (strcmp(argv[1],"rtclient")==0) expected=101;
 	
-	level=0;
-
 	trace_start(trace);
 	iferr(trace,tracename);
 	

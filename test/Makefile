@@ -5,7 +5,8 @@ CC=gcc
 
 INCLUDE = -I$(PREFIX)/lib -I$(PREFIX)/libpacketdump
 CFLAGS = -Wall -Wimplicit -Wformat -W -pedantic -pipe -g -O2 -std=gnu99 -pthread \
-		-D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE
+		-D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE \
+		-Wno-deprecated-declarations
 CFLAGS += $(INCLUDE)
 libdir = $(PREFIX)/lib/.libs:$(PREFIX)/libpacketdump/.libs
 LDLIBS = -L$(PREFIX)/lib/.libs -L$(PREFIX)/libpacketdump/.libs -ltrace -lpacketdump

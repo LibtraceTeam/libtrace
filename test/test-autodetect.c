@@ -66,6 +66,11 @@ int main(int argc, char *argv[]) {
 	libtrace_t *trace;
 	libtrace_packet_t *packet;
 
+	if (argc < 2) {
+		fprintf(stderr, "Missing trace as argument\n");
+		return -1;
+	}
+
 	trace = trace_create(argv[1]);
 	iferr(trace);
 	

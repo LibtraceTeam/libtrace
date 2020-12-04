@@ -59,7 +59,7 @@ void iferr(libtrace_t *trace)
 	exit(1);
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc UNUSED, char *argv[] UNUSED) {
         char *uri = "erf:traces/fragtest.erf.gz";
 	int error = 0;
 	uint64_t totaloffset = 0;

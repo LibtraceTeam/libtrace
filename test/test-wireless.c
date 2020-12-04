@@ -58,13 +58,13 @@ void iferr(libtrace_t *trace)
 }
 
 
-int main(int argc, char *argv[]) {
+int main(int argc UNUSED, char *argv[] UNUSED) {
 	libtrace_t *trace;
 	libtrace_packet_t *packet;
 	int result;
 	uint64_t tsft;
 	uint16_t freq, tmp16;
-	uint8_t flags, rate, sdbm, ndbm, sdb, antenna, tmp8;
+	uint8_t rate, sdbm, ndbm, sdb, antenna, tmp8;
 	
 	uint16_t total_freq, expected_freq = 24170;
 	

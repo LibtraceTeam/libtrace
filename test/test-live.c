@@ -151,6 +151,8 @@ static int verify_counters(libtrace_t *trace_read)
                                 (uint32_t)test_size);
         }
 
+	free(stat);
+
 	return err;
 }
 

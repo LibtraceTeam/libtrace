@@ -35,8 +35,8 @@ int main(int argc UNUSED, char *argv[] UNUSED) {
 	headers = trace_get_layer2_headers(packet);
 	if (headers != NULL) {
 		if (headers->header[0].ethertype == TRACE_ETHERTYPE_8021Q) {
-			vlanhdr = ntohl(*(uint32_t *) headers->header[0].data);
-			vlanid = (((vlanhdr >> 16) << 4) >> 4);
+			vlanhdr = ntohs(*(uint16_t *) headers->header[0].data);
+			vlanid = vlanhdr & 0xfff;
 			if (vlanid != 100) {
 				printf("Unexpected vlan id\n");
 				error = 1;
@@ -47,8 +47,8 @@ int main(int argc UNUSED, char *argv[] UNUSED) {
 		}
 
 		if (headers->header[1].ethertype == TRACE_ETHERTYPE_8021Q) {
-			vlanhdr = ntohl(*(uint32_t *) headers->header[1].data);
-                        vlanid = (((vlanhdr >> 16) << 4) >> 4);
+			vlanhdr = ntohs(*(uint16_t *) headers->header[1].data);
+			vlanid = vlanhdr & 0xfff;
                         if (vlanid != 200) {
                                 printf("Unexpected vlan id\n");
 				error = 1;
@@ -72,8 +72,8 @@ int main(int argc UNUSED, char *argv[] UNUSED) {
         headers = trace_get_layer2_headers(packet);
         if (headers != NULL) {
 		if (headers->header[0].ethertype == TRACE_ETHERTYPE_8021Q) {
-                        vlanhdr = ntohl(*(uint32_t *) headers->header[0].data);
-                        vlanid = (((vlanhdr >> 16) << 4) >> 4);
+                        vlanhdr = ntohs(*(uint16_t *) headers->header[0].data);
+                        vlanid = vlanhdr & 0xfff;
                         if (vlanid != 100) {
                                 printf("Unexpected vlan id %u\n", vlanid);
                                 error = 1;
@@ -84,8 +84,8 @@ int main(int argc UNUSED, char *argv[] UNUSED) {
                 }
 
                 if (headers->header[1].ethertype == TRACE_ETHERTYPE_8021Q) {
-                        vlanhdr = ntohl(*(uint32_t *) headers->header[1].data);
-                        vlanid = (((vlanhdr >> 16) << 4) >> 4);
+                        vlanhdr = ntohs(*(uint16_t *) headers->header[1].data);
+                        vlanid = vlanhdr & 0xfff;
                         if (vlanid != 200) {
                                 printf("Unexpected vlan id %u\n", vlanid);
                                 error = 1;

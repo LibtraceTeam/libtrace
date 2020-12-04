@@ -87,6 +87,28 @@
 #define FORMAT_DATA_HEAD FORMAT_DATA->per_stream->head
 #define FORMAT_DATA_FIRST ((struct dag_per_stream_t *)FORMAT_DATA_HEAD->data)
 
+/* The size in bytes by which to overlap the TX ringbuffer
+ *
+ * E.g.               Ringbuffer          Extra window overlap (0x800 bytes)
+ * Virtual:  [0x01000     ->     0x02000] [0x02000 -> 0x02800]
+ *                        ^                        ^
+ *                        |                        |
+ * Physical: [0xf1000     ->     0xf2000] [0xf1000 -> 0xf1800]
+ * Note, TX cannot reserve/write more than the extra window overlap size
+ * at one time
+ * Default: 4MB
+ **/
+#define TX_EXTRA_WINDOW 4*1024*1024
+/* The number of bytes to request 256 KB, much larger sizes than this show no clear benefit */
+#define TX_BATCH_SIZE 256*1024
+/* The threshold to reach before sending, 2x 64KB (largest packet size) is safe */
+#define TX_BATCH_THOLD (TX_BATCH_SIZE - (2*1024*64))
+
+/* Compile time asserts, check sizes are valid */
+ct_assert(TX_BATCH_SIZE > TX_BATCH_THOLD);
+ct_assert(TX_BATCH_THOLD > 0);
+ct_assert(!TX_EXTRA_WINDOW || TX_EXTRA_WINDOW > TX_BATCH_SIZE);
+
 static struct libtrace_format_t dag;
 
 /* A DAG device - a DAG device can support multiple streams (and therefore
@@ -112,7 +134,7 @@ struct dag_format_data_out_t {
 	int stream_attached;
 	/* The amount of data waiting to be transmitted, in bytes */
 	uint64_t waiting;
-	/* A buffer to hold the data to be transmittted */
+	/* A buffer to hold the data to be transmitted */
 	uint8_t *txbuffer;
 };
 
@@ -321,6 +343,9 @@ static void dag_close_device(struct dag_dev_t *dev)
 		if (dev->next)
 			dev->next->prev = dev->prev;
 	}
+
+	if (dev->dev_name)
+		free(dev->dev_name);
 
 	dag_close(dev->fd);
 	free(dev);
@@ -666,7 +691,7 @@ static int dag_start_output(libtrace_out_t *libtrace)
 
 	/* Attach and start the DAG stream */
 	if (dag_attach_stream64(FORMAT_DATA_OUT->device->fd,
-			FORMAT_DATA_OUT->dagstream, 0, 4 * 1024 * 1024) < 0) {
+			FORMAT_DATA_OUT->dagstream, 0, TX_EXTRA_WINDOW) < 0) {
 		trace_set_err_out(libtrace, errno, "Cannot attach DAG stream");
 		return -1;
 	}
@@ -881,7 +906,6 @@ static int dag_fin_input(libtrace_t *libtrace)
 	/* Close the DAG device if there are no more references to it */
 	if (FORMAT_DATA->device->ref_count == 0)
 		dag_close_device(FORMAT_DATA->device);
-
 	if (DUCK.dummy_duck)
 		trace_destroy_dead(DUCK.dummy_duck);
 
@@ -892,24 +916,37 @@ static int dag_fin_input(libtrace_t *libtrace)
 	return 0; /* success */
 }
 
+static int dag_flush_output(libtrace_out_t *libtrace) {
+
+	/* Commit any outstanding traffic in the txbuffer */
+        if (FORMAT_DATA_OUT->waiting) {
+                FORMAT_DATA_OUT->txbuffer = dag_tx_stream_commit_bytes64(
+						FORMAT_DATA_OUT->device->fd,
+						FORMAT_DATA_OUT->dagstream,
+						FORMAT_DATA_OUT->waiting );
+		if (FORMAT_DATA_OUT->txbuffer == NULL) {
+			trace_set_err_out(libtrace, TRACE_ERR_BAD_IO,
+				"DAG25: unable to commit tx stream");
+		}
+		FORMAT_DATA_OUT->waiting = 0;
+        }
+
+	return 0;
+}
+
 /* Closes a DAG output trace */
 static int dag_fin_output(libtrace_out_t *libtrace)
 {
 
 	/* Commit any outstanding traffic in the txbuffer */
-	if (FORMAT_DATA_OUT->waiting) {
-		dag_tx_stream_commit_bytes(FORMAT_DATA_OUT->device->fd,
-					   FORMAT_DATA_OUT->dagstream,
-					   FORMAT_DATA_OUT->waiting );
-	}
+	dag_flush_output(libtrace);
 
-	/* Wait until the buffer is nearly clear before exiting the program,
+	/* Wait until the buffer is clear before exiting the program,
 	 * as we will lose packets otherwise */
-	dag_tx_get_stream_space64
-		(FORMAT_DATA_OUT->device->fd,
-		 FORMAT_DATA_OUT->dagstream,
-		 dag_get_stream_buffer_size64(FORMAT_DATA_OUT->device->fd,
-					    FORMAT_DATA_OUT->dagstream) - 8);
+	while(dag_get_stream_buffer_level64(FORMAT_DATA_OUT->device->fd,
+	                                    FORMAT_DATA_OUT->dagstream)) {
+		/* Wait for dag to complete writing all data */
+	}
 
 	/* Need the lock, since we're going to be handling the device list */
 	pthread_mutex_lock(&open_dag_mutex);
@@ -1133,22 +1170,35 @@ static int dag_dump_packet(libtrace_out_t *libtrace,
 			   dag_record_t *erfptr, unsigned int pad,
 			   void *buffer)
 {
-	int size;
+	int payload_size;
+        int alignment_pad;
+        uint64_t alignment_buf = 0;
+	uint16_t rlen = ntohs(erfptr->rlen);
+
+        payload_size = rlen - (dag_record_size + pad);
+        alignment_pad = sizeof(uint64_t) - (rlen % sizeof(uint64_t));
+	// update record length with any required padding
+	erfptr->rlen = htons(rlen + alignment_pad);
 
 	/*
 	 * If we've got 0 bytes waiting in the txqueue, assume that we
 	 * haven't requested any space yet, and request some, storing
 	 * the pointer at FORMAT_DATA_OUT->txbuffer.
-	 *
-	 * The amount to request is slightly magical at the moment - it's
-	 * 16Mebibytes + 128 kibibytes to ensure that we can copy a packet into
-	 * the buffer and handle overruns.
 	 */
 	if (FORMAT_DATA_OUT->waiting == 0) {
-		FORMAT_DATA_OUT->txbuffer =
-			dag_tx_get_stream_space64(FORMAT_DATA_OUT->device->fd,
-						FORMAT_DATA_OUT->dagstream,
-						16908288);
+		while (1) {
+			if ((FORMAT_DATA_OUT->txbuffer =
+				dag_tx_get_stream_space64(FORMAT_DATA_OUT->device->fd,
+			 				  FORMAT_DATA_OUT->dagstream,
+							  TX_BATCH_SIZE)) == NULL) {
+				if (errno == EAGAIN)
+					continue;
+				trace_set_err_out(libtrace, TRACE_ERR_BAD_IO, "DAG25: unable to reserve stream space "
+					"dag_tx_get_stream_space64()");
+				return 0;
+			} else
+				break;
+		}
 	}
 
 	/*
@@ -1156,33 +1206,33 @@ static int dag_dump_packet(libtrace_out_t *libtrace,
 	 * are in contiguous memory
 	 */
 	memcpy(FORMAT_DATA_OUT->txbuffer + FORMAT_DATA_OUT->waiting, erfptr,
-	       (dag_record_size + pad));
+               (dag_record_size + pad));
 	FORMAT_DATA_OUT->waiting += (dag_record_size + pad);
 
 	/*
 	 * Copy our incoming packet into the outgoing buffer, and increment 
 	 * our waiting count
 	 */
-	size = ntohs(erfptr->rlen)-(dag_record_size + pad);
 	memcpy(FORMAT_DATA_OUT->txbuffer + FORMAT_DATA_OUT->waiting, buffer,
-	       size);
-	FORMAT_DATA_OUT->waiting += size;
+	       payload_size);
+	FORMAT_DATA_OUT->waiting += payload_size;
+
+        // add padding to payload to align with 8 bytes
+        memcpy(FORMAT_DATA_OUT->txbuffer + FORMAT_DATA_OUT->waiting, &alignment_buf,
+		alignment_pad);
+        FORMAT_DATA_OUT->waiting += alignment_pad;
 
 	/*
-	 * If our output buffer has more than 16 Mebibytes in it, commit those 
-	 * bytes and reset the waiting count to 0.
-	 * Note: dag_fin_output will also call dag_tx_stream_commit_bytes() in 
-	 * case there is still data in the buffer at program exit.
+	 * If our output buffer has more than TX_BATCH_THOLD bytes queued, commit those
+	 * bytes to the network and reset the waiting count to 0.
+	 * Note: dag_fin_output() will also call dag_flush_output() in case there
+	 * is still data in the buffer at program exit.
 	 */
-	if (FORMAT_DATA_OUT->waiting >= 16*1024*1024) {
-		FORMAT_DATA_OUT->txbuffer =
-			dag_tx_stream_commit_bytes(FORMAT_DATA_OUT->device->fd,
-						   FORMAT_DATA_OUT->dagstream,
-						   FORMAT_DATA_OUT->waiting);
-		FORMAT_DATA_OUT->waiting = 0;
+	if (FORMAT_DATA_OUT->waiting >= TX_BATCH_THOLD) {
+		dag_flush_output(libtrace);
 	}
 
-	return size + pad + dag_record_size;
+	return payload_size + pad + dag_record_size;
 }
 
 /* Attempts to determine a suitable ERF type for a given packet. Returns true
@@ -1263,7 +1313,7 @@ static int dag_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *packet)
 		pad = dag_get_padding(packet);
 
 		/* Flags. Can't do this */
-		memset(&erfhdr.flags,1,sizeof(erfhdr.flags));
+		memset(&erfhdr.flags,0,sizeof(erfhdr.flags));
 		if (trace_get_direction(packet)!=(int)~0U)
 			erfhdr.flags.iface = trace_get_direction(packet);
 
@@ -1291,9 +1341,8 @@ static int dag_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *packet)
 			return -1;
 		}
 
-		erfhdr.rlen = htons(trace_get_capture_length(packet)
-				    + erf_get_framing_length(packet));
-
+		erfhdr.rlen = htons(trace_get_capture_length(packet) +
+			erf_get_framing_length(packet));
 
 		/* Loss counter. Can't do this */
 		erfhdr.lctr = 0;
@@ -1651,7 +1700,7 @@ static struct libtrace_format_t dag = {
 	dag_prepare_packet,		/* prepare_packet */
 	NULL,                           /* fin_packet */
 	dag_write_packet,               /* write_packet */
-	NULL,                           /* flush_output */
+	dag_flush_output,               /* flush_output */
 	erf_get_link_type,              /* get_link_type */
 	erf_get_direction,              /* get_direction */
 	erf_set_direction,              /* set_direction */
