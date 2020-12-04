@@ -72,6 +72,7 @@ enum scenarios {
         ST_NO_SNAPLEN = 9,
         ST_SMALL_SNAPLEN = 10,
         ST_JUMBO_SNAPLEN = 11,
+        ST_RATE = 12,
         SCENARIO_MAX
 };
 
@@ -110,6 +111,9 @@ static char *scenario_str(enum scenarios scenario) {
                 break;
         case ST_SMALL_SNAPLEN:
                 ret = "Single-threaded, snap len 66";
+                break;
+        case ST_RATE:
+                ret = "Single-threaded, rate";
                 break;
         case SCENARIO_MAX:
                 break;
@@ -160,6 +164,9 @@ static char *scenario_desc(enum scenarios scenario) {
         case ST_JUMBO_SNAPLEN:
                 ret = "9) but with a jumbo snaplen 9000 set, does the format "
                       "increase MTU (optional)";
+                break;
+        case ST_RATE:
+                ret = "Reports packet per second rate each second";
                 break;
         case SCENARIO_MAX:
                 break;
@@ -229,6 +236,48 @@ static inline void print_keep_alive() {
                 printf(".");
                 fflush(stdout);
         }
+}
+
+/** Report the packet rate each second to stderr */
+static inline void report_rate_each_second() {
+        static uint64_t count = 0;
+        static uint64_t next_check = 0;
+        static uint64_t inc = 0;
+        static struct timespec last = {0};
+        static struct timespec last_report = {0};
+
+        if (next_check == 0) {
+                struct timespec cur;
+                clock_gettime(CLOCK_MONOTONIC, &cur);
+                if (inc == 0) {
+                        /* First packet start, but don't count in rate */
+                        inc = 1;
+                        last_report = cur;
+                } else {
+                        struct timespec res;
+                        count += inc;
+                        timespecsub(&cur, &last_report, &res);
+                        if (res.tv_sec >= 1) {
+                                double time =
+                                    (double)((res.tv_sec * 1000000000) +
+                                             res.tv_nsec) /
+                                    1000000000;
+                                fprintf(stderr, "Rate %f pps\n", count / time);
+                                last_report = cur;
+                                count = 0;
+                        }
+
+                        /* Tune to minimise calls to clock_gettime, tune to
+                         * every ~5ms */
+                        timespecsub(&cur, &last, &res);
+                        if (res.tv_sec == 0 && res.tv_nsec <= 5000000) {
+                                inc *= 2;
+                        }
+                }
+                last = cur;
+                next_check = inc;
+        }
+        next_check--;
 }
 
 typedef struct __attribute__((aligned(64))) thread_data {
@@ -407,25 +456,25 @@ static libtrace_packet_t *construct_packet_rev(libtrace_packet_t *pkt,
  *
  * return: The pktgen_hdr if valid, otherwise NULL if invalid
  */
-static inline pktgen_hdr_t *get_verify_pgh(libtrace_packet_t *pkt, tls_t *res) {
+static inline pktgen_hdr_t *get_verify_pgh(libtrace_packet_t *pkt, tls_t *tls) {
         libtrace_udp_t *udp = trace_get_udp(pkt);
         if (udp == NULL) {
                 fprintf(stderr, "Non-UDP packet received\n");
                 exit_code |= RET_INVALID;
-                if (res)
-                        res->invalid++;
+                if (tls)
+                        tls->invalid++;
                 return NULL;
         }
         pktgen_hdr_t *pgh = (pktgen_hdr_t *)(udp + 1);
         if (pgh->pgh_magic != htonl(PKTGEN_MAGIC)) {
                 fprintf(stderr, "Invalid packet received\n");
                 exit_code |= RET_INVALID;
-                if (res)
-                        res->invalid++;
+                if (tls)
+                        tls->invalid++;
                 return NULL;
         }
-        if (res)
-                res->count++;
+        if (tls)
+                tls->count++;
         return pgh;
 }
 
@@ -566,6 +615,7 @@ inline static void verify_packet_len(tls_t *tls, libtrace_packet_t *pkt,
         case MT_BI_HASHER_HOLD:
         case ST_DROPPED_PACKETS:
         case ST_ERRED_PACKETS:
+        case ST_RATE:
                 expected_cap_len = sizeof(struct udp_packet);
                 /* Plus FCS */
                 expected_wire_len = expected_cap_len + 4;
@@ -872,6 +922,26 @@ _fn_packet_inc_seq(libtrace_t *trace, libtrace_thread_t *t UNUSED,
         return to_ret;
 }
 
+static inline libtrace_packet_t *fn_packet_rate(libtrace_t *trace,
+                                                libtrace_thread_t *t UNUSED,
+                                                void *global UNUSED, void *_tls,
+                                                libtrace_packet_t *pkt) {
+        tls_t *tls = (tls_t *)_tls;
+
+        if (tls->first_packet) {
+                record_alive();
+                tls->count++;
+        } else {
+                pktgen_hdr_t *pgh = get_verify_pgh(pkt, tls);
+                if (!pgh)
+                        return pkt;
+                handle_first_packet(trace, pkt, pgh, tls, ST_RATE);
+        }
+
+        report_rate_each_second();
+        return pkt;
+}
+
 static libtrace_packet_t *fn_packet_inc_seq(libtrace_t *trace,
                                             libtrace_thread_t *t, void *global,
                                             void *tls, libtrace_packet_t *pkt) {
@@ -937,17 +1007,7 @@ inline static void add_source_ip(libtrace_ip_t *ip_hdr, uint32_t min,
  */
 static void calculate_rate(char *uri, enum scenarios scenario, int *pps,
                            uint64_t *packet_count, struct timespec *offset) {
-        uint64_t multiple_of;
-
-        if (*packet_count == 0) {
-                *packet_count = 10000;
-        }
-        if (*pps < 0) {
-                *pps = 1000;
-        }
-        if (*pps >= 1000000000) {
-                *pps = 0;
-        }
+        uint64_t multiple_of = 1; /* Round packets sent up to a multiple of */
 
         /* Round the number of packets that we need to send */
         switch (scenario) {
@@ -957,18 +1017,10 @@ static void calculate_rate(char *uri, enum scenarios scenario, int *pps,
         case MT_BI_HASHER_HOLD:
                 /* Round up to a multiple of 241*2=482 */
                 multiple_of = ((IP_DIFF + 1) * 2);
-                if ((*packet_count % multiple_of) != 0) {
-                        *packet_count +=
-                            multiple_of - (*packet_count % multiple_of);
-                }
                 break;
         case ST_ERRED_PACKETS:
                 /* Round up to a multiple of 2 */
                 multiple_of = 2;
-                if ((*packet_count % multiple_of) != 0) {
-                        *packet_count +=
-                            multiple_of - (*packet_count % multiple_of);
-                }
                 break;
         case ST_NO_SNAPLEN:
         case ST_SMALL_SNAPLEN:
@@ -983,8 +1035,37 @@ static void calculate_rate(char *uri, enum scenarios scenario, int *pps,
         case ST_SEQ_HOLD:
         case ST_DROPPED_PACKETS:
                 break;
+        case ST_RATE:
+                if (*pps != 0 || *pps != -1) {
+                        fprintf(stderr,
+                                "Ignoring packet rate, setting to unlimited\n");
+                }
+                *pps = 0;
+                if (*packet_count == 0) {
+                        /* pps @10Gbit x 5 seconds */
+                        *packet_count = 14880952 * 5;
+                }
+                break;
         case SCENARIO_MAX:
                 break;
+        }
+
+        /* Set the default packet count */
+        if (*packet_count == 0) {
+                *packet_count = 10000;
+        }
+
+        /* Round up to a nice multiple of packets */
+        if ((*packet_count % multiple_of) != 0) {
+                *packet_count += multiple_of - (*packet_count % multiple_of);
+        }
+
+        /* Set the default pps */
+        if (*pps < 0) {
+                *pps = 1000;
+        }
+        if (*pps >= 1000000000) {
+                *pps = 0;
         }
 
         if (*pps) {
@@ -1075,12 +1156,14 @@ static int run_tx_scenario(char *uri, enum scenarios scenario, int pps,
                         trace_flush_output(output);
                 }
                 packets_sent++;
+                report_rate_each_second();
 
                 switch (scenario) {
                 case ST_SEQ:
                 case ST_SEQ_HOLD:
                 case ST_DROPPED_PACKETS:
                 case ST_ERRED_PACKETS:
+                case ST_RATE:
                         break;
                 case MT_NO_HASHER:
                 case MT_UNI_HASHER:
@@ -1289,6 +1372,10 @@ static int configure_rx_scenario(libtrace_t *trace, int threadcount,
                         return RET_FAILED;
                 }
                 trace_set_packet_cb(pktcbs, fn_packet_inc_seq_jumbo_snaplen);
+                trace_set_perpkt_threads(trace, 1);
+                break;
+        case ST_RATE:
+                trace_set_packet_cb(pktcbs, fn_packet_rate);
                 trace_set_perpkt_threads(trace, 1);
                 break;
         case SCENARIO_MAX:
@@ -1529,6 +1616,16 @@ static int run_rx_scenario(char *uri, int threadcount,
                                 "Read suggestions, try a lower-rate etc.\n");
                         fprintf(stderr, "Note: A bug that is not being tested "
                                         "might cause this result.\n");
+                }
+                break;
+        case ST_RATE:
+                if (exit_code == 0) {
+                        fprintf(stderr, "Test result: INCONCLUSIVE\n");
+                        fprintf(stderr,
+                                "No packets dropped, try sending faster\n");
+                } else {
+                        fprintf(stderr, "Test result: PASS\n");
+                        fprintf(stderr, "Check the rate reported\n");
                 }
         case SCENARIO_MAX:
                 break;
