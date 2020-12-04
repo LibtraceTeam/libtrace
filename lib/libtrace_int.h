@@ -661,11 +661,23 @@ struct libtrace_format_t {
 	 * 	 */
 	void (*fin_packet)(libtrace_packet_t *packet);
 
-        /** Instructs the capture format module to hold any buffers used by the
-         * packet until trace_fin_packet() is called on it.
-         *
+        /** Request a format for permission to hold onto this packet for
+	 * an indefinite amount of time until trace_fin_packet() is called.
+	 *
+	 * - A format should only allow a packet to be held if it wont
+	 *   stop it receiving more packets.
+	 * - This is only an option for traces with indirect pointers to
+	 *   packet buffers. Ring buffers which hold directly packets
+	 *   will block and can simply omit this function.
+	 * - A format needs to track the number of packets outstanding
+	 *   so it can decide whether or not it has enough packet buffers
+	 *   remaining.
+	 *
+	 * Note: The packet is still invalid when a trace is paused or
+	 *       stopped.
+	 *
          * @param The packet to hold
-         * @return 0 if successful, -1 if an error occurs.
+         * @return 0 if the packet can be held, otherwise -1.
          */
         int (*can_hold_packet)(libtrace_packet_t *packet);
 
