@@ -217,32 +217,6 @@ static bool dag_can_write(libtrace_packet_t *packet) {
         return true;
 }
 
-/* Returns the amount of padding between the ERF header and the start of the
- * captured packet data */
-static int dag_get_padding(const libtrace_packet_t *packet)
-{
-	/* ERF Ethernet records have a 2 byte padding before the packet itself
-	 * so that the IP header is aligned on a 32 bit boundary.
-	 */
-	if (packet->trace->format->type==TRACE_FORMAT_ERF) {
-		dag_record_t *erfptr = (dag_record_t *)packet->header;
-		switch(erfptr->type) {
-			case TYPE_ETH:
-			case TYPE_COLOR_ETH:
-			case TYPE_DSM_COLOR_ETH:
-			case TYPE_COLOR_HASH_ETH:
-				return 2;
-			default: 		return 0;
-		}
-	}
-	else {
-		switch(trace_get_link_type(packet)) {
-			case TRACE_TYPE_ETH:	return 2;
-			default:		return 0;
-		}
-	}
-}
-
 /* Attempts to determine if the given filename refers to a DAG device */
 static int dag_probe_filename(const char *filename)
 {
@@ -1166,19 +1140,10 @@ static int dag_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
  */
 
 /* Pushes an ERF record onto the transmit stream */
-static int dag_dump_packet(libtrace_out_t *libtrace,
-			   dag_record_t *erfptr, unsigned int pad,
-			   void *buffer)
-{
-	int payload_size;
-        int alignment_pad;
-        uint64_t alignment_buf = 0;
-	uint16_t rlen = ntohs(erfptr->rlen);
+static int dag_dump_packet(libtrace_out_t *libtrace, dag_record_t *erfptr,
+	int framinglen, void *buffer, int caplen, int padding) {
 
-        payload_size = rlen - (dag_record_size + pad);
-        alignment_pad = sizeof(uint64_t) - (rlen % sizeof(uint64_t));
-	// update record length with any required padding
-	erfptr->rlen = htons(rlen + alignment_pad);
+        uint64_t padding_buf = 0;
 
 	/*
 	 * If we've got 0 bytes waiting in the txqueue, assume that we
@@ -1193,8 +1158,8 @@ static int dag_dump_packet(libtrace_out_t *libtrace,
 							  TX_BATCH_SIZE)) == NULL) {
 				if (errno == EAGAIN)
 					continue;
-				trace_set_err_out(libtrace, TRACE_ERR_BAD_IO, "DAG25: unable to reserve stream space "
-					"dag_tx_get_stream_space64()");
+				trace_set_err_out(libtrace, TRACE_ERR_BAD_IO, "DAG25: unable "
+					"to reserve stream space dag_tx_get_stream_space64()");
 				return 0;
 			} else
 				break;
@@ -1202,25 +1167,22 @@ static int dag_dump_packet(libtrace_out_t *libtrace,
 	}
 
 	/*
-	 * Copy the header separately to the body, as we can't guarantee they 
+	 * Copy the header separately to the body, as we can't guarantee they
 	 * are in contiguous memory
 	 */
-	memcpy(FORMAT_DATA_OUT->txbuffer + FORMAT_DATA_OUT->waiting, erfptr,
-               (dag_record_size + pad));
-	FORMAT_DATA_OUT->waiting += (dag_record_size + pad);
+	memcpy(FORMAT_DATA_OUT->txbuffer + FORMAT_DATA_OUT->waiting, erfptr, framinglen);
+	FORMAT_DATA_OUT->waiting += framinglen;
 
 	/*
-	 * Copy our incoming packet into the outgoing buffer, and increment 
+	 * Copy our incoming packet into the outgoing buffer, and increment
 	 * our waiting count
 	 */
-	memcpy(FORMAT_DATA_OUT->txbuffer + FORMAT_DATA_OUT->waiting, buffer,
-	       payload_size);
-	FORMAT_DATA_OUT->waiting += payload_size;
+	memcpy(FORMAT_DATA_OUT->txbuffer + FORMAT_DATA_OUT->waiting, buffer, caplen);
+	FORMAT_DATA_OUT->waiting += caplen;
 
         // add padding to payload to align with 8 bytes
-        memcpy(FORMAT_DATA_OUT->txbuffer + FORMAT_DATA_OUT->waiting, &alignment_buf,
-		alignment_pad);
-        FORMAT_DATA_OUT->waiting += alignment_pad;
+        memcpy(FORMAT_DATA_OUT->txbuffer + FORMAT_DATA_OUT->waiting, &padding_buf, padding);
+        FORMAT_DATA_OUT->waiting += padding;
 
 	/*
 	 * If our output buffer has more than TX_BATCH_THOLD bytes queued, commit those
@@ -1232,35 +1194,7 @@ static int dag_dump_packet(libtrace_out_t *libtrace,
 		dag_flush_output(libtrace);
 	}
 
-	return payload_size + pad + dag_record_size;
-}
-
-/* Attempts to determine a suitable ERF type for a given packet. Returns true
- * if one is found, false otherwise */
-static bool find_compatible_linktype(libtrace_out_t *libtrace,
-				     libtrace_packet_t *packet, char *type)
-{
-	/* Keep trying to simplify the packet until we can find
-	 * something we can do with it */
-
-	do {
-		*type = libtrace_to_erf_type(trace_get_link_type(packet));
-
-		/* Success */
-		if (*type != (char)-1)
-			return true;
-
-		if (!demote_packet(packet)) {
-			trace_set_err_out(libtrace,
-					  TRACE_ERR_NO_CONVERSION,
-					  "No erf type for packet (%i)",
-					  trace_get_link_type(packet));
-			return false;
-		}
-
-	} while(1);
-
-	return true;
+	return framinglen + caplen + padding;
 }
 
 /* Writes a packet to the provided DAG output trace */
@@ -1271,14 +1205,10 @@ static int dag_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *packet)
 		return 0;
 	}
 
-	/* This is heavily borrowed from erf_write_packet(). Yes, CnP
-	 * coding sucks, sorry about that.
-	 */
-	unsigned int pad = 0;
-	int numbytes;
-	void *payload = packet->payload;
-	dag_record_t *header = (dag_record_t *)packet->header;
-	char erf_type = 0;
+	int framinglen;
+	int caplen;
+	int padding;
+	dag_record_t *dag_hdr = (dag_record_t *)packet->header;
 
 	if(!packet->header) {
 		/* No header, probably an RT packet. Lifted from
@@ -1286,74 +1216,26 @@ static int dag_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *packet)
 		return -1;
 	}
 
-	pad = dag_get_padding(packet);
-
-	/*
-	 * If the payload is null, adjust the rlen. Discussion of this is
-	 * attached to erf_write_packet()
-	 */
-	if (payload == NULL) {
-		header->rlen = htons(dag_record_size + pad);
-	}
-
 	if (packet->type == TRACE_RT_DATA_ERF) {
-		numbytes = dag_dump_packet(libtrace, header, pad, payload);
+		erf_calculate_padding(packet, &framinglen, &caplen, &padding);
+		dag_hdr->rlen = htons(framinglen + caplen + padding);
+		return dag_dump_packet(libtrace,
+				       dag_hdr,
+				       framinglen,
+				       packet->payload,
+				       caplen,
+				       padding);
 	} else {
-		/* Build up a new packet header from the existing header */
-
-		/* Simplify the packet first - if we can't do this, break
-		 * early */
-		if (!find_compatible_linktype(libtrace,packet,&erf_type))
-			return -1;
-
 		dag_record_t erfhdr;
-
-		erfhdr.ts = bswap_host_to_le64(trace_get_erf_timestamp(packet));
-		payload=packet->payload;
-		pad = dag_get_padding(packet);
-
-		/* Flags. Can't do this */
-		memset(&erfhdr.flags,0,sizeof(erfhdr.flags));
-		if (trace_get_direction(packet)!=(int)~0U)
-			erfhdr.flags.iface = trace_get_direction(packet);
-
-		erfhdr.type = erf_type;
-
-		/* Packet length (rlen includes format overhead) */
-		if (trace_get_capture_length(packet) <= 0
-                       || trace_get_capture_length(packet) > 65536) {
-			trace_set_err_out(libtrace, TRACE_ERR_BAD_PACKET,
-				"Capture length is out of range in dag_write_packet()");
+		if (libtrace_to_erf_hdr(libtrace, packet, &erfhdr, &framinglen, &caplen, &padding) < 0)
 			return -1;
-		}
-		if (erf_get_framing_length(packet) <= 0
-                       || trace_get_framing_length(packet) > 65536) {
-			trace_set_err_out(libtrace, TRACE_ERR_BAD_PACKET,
-				"Framing length is out of range in dag_write_packet()");
-			return -1;
-		}
-		if (trace_get_capture_length(packet) +
-                       erf_get_framing_length(packet) <= 0
-                       || trace_get_capture_length(packet) +
-                       erf_get_framing_length(packet) > 65536) {
-			trace_set_err_out(libtrace, TRACE_ERR_BAD_PACKET,
-				"Capture + framing length is out of range in dag_write_packet()");
-			return -1;
-		}
-
-		erfhdr.rlen = htons(trace_get_capture_length(packet) +
-			erf_get_framing_length(packet));
-
-		/* Loss counter. Can't do this */
-		erfhdr.lctr = 0;
-		/* Wire length, does not include padding! */
-		erfhdr.wlen = htons(trace_get_wire_length(packet));
-
-		/* Write it out */
-		numbytes = dag_dump_packet(libtrace, &erfhdr, pad, payload);
+		return dag_dump_packet(libtrace,
+				       &erfhdr,
+				       framinglen,
+				       packet->payload,
+				       caplen,
+				       padding);
 	}
-
-	return numbytes;
 }
 
 /* Reads the next available packet from a DAG card, in a BLOCKING fashion
