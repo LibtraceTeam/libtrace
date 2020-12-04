@@ -227,6 +227,28 @@ fi
 AC_CHECK_LIB(yaml, yaml_parser_initialize, yamlfound=1, yamlfound=0)
 AC_CHECK_LIB(tasn1, asn1_array2tree, asn1found=1, asn1found=0)
 
+# pgo optimisations
+pgo_generate=false
+AC_ARG_ENABLE(pgo-generate, AS_HELP_STRING(--enable-pgo-generate, Generate performance guided optimization files),
+[
+	if test x"$enableval" = xyes ; then
+		pgo_generate=true
+		AC_CHECK_LIB(gcov, __gcov_init,,AC_MSG_ERROR([gcov is required for pgo optimizations]))
+		CFLAGS+=" -fprofile-generate -fprofile-update=atomic -lgcov"
+		CXXFLAGS+=" -fprofile-generate -fprofile-update=atomic -lgcov"
+	fi
+],[])
+pgo_build=false
+AC_ARG_ENABLE(pgo-build, AS_HELP_STRING(--enable-pgo-build, Build using performance guided optimization files),
+[
+	if test x"$enableval" = xyes ; then
+		pgo_build=true
+		AC_CHECK_LIB(gcov, __gcov_init,,AC_MSG_ERROR([gcov is required for pgo optimizations]))
+		CFLAGS+=" -fprofile-correction -fprofile-use -lgcov"
+		CXXFLAGS+=" -fprofile-correction -fprofile-use -lgcov"
+	fi
+],[])
+
 systemtap=false
 # check if the system has systemtap header
 AC_ARG_ENABLE(dtrace, AS_HELP_STRING(--enable-dtrace, Include USDT tracepoints),
@@ -244,7 +266,6 @@ AC_ARG_ENABLE(dtrace, AS_HELP_STRING(--enable-dtrace, Include USDT tracepoints),
 [
     AC_DEFINE(ENABLE_DTRACE, 0, [Set to 1 if libtrace is to be compiled with USDT tracepoints])
 ])
-
 
 # check for xdp requirements.
 libtrace_xdp=false
@@ -911,6 +932,15 @@ else
 	AC_MSG_NOTICE([Compiled with DAG live capture support: No])
 fi
 
+# Performance guided optimization
+if test x"$pgo_generate" = xtrue; then
+	AC_MSG_NOTICE([Generate performance optimization files: Yes])
+fi
+if test x"$pgo_build" = xtrue; then
+	AC_MSG_NOTICE([Compile with performance guided optimization files: Yes])
+fi
+
+# Tracepoints
 if test x"$systemtap" = xtrue; then
 	AC_MSG_NOTICE([Compiled with USDT tracepoints: Yes])
 else
