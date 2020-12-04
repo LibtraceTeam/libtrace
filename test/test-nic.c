@@ -334,8 +334,9 @@ static void fill_fcs(struct udp_packet_fcs *udp) {
         udp->fcs = crc;
 }
 
-static libtrace_packet_t *construct_packet(libtrace_packet_t *pkt, int extra_size,
-                                    struct udp_packet **udp_buffer) {
+static libtrace_packet_t *construct_packet(libtrace_packet_t *pkt,
+                                           int extra_size,
+                                           struct udp_packet **udp_buffer) {
         if (extra_size > MAX_JUMBO_PAYLOAD) {
                 fprintf(stderr, "Capping payload size at " TOSTRING(
                                     MAX_JUMBO_PAYLOAD) "\n");
@@ -380,8 +381,9 @@ static libtrace_packet_t *construct_packet(libtrace_packet_t *pkt, int extra_siz
         return pkt;
 }
 
-static libtrace_packet_t *construct_packet_rev(libtrace_packet_t *pkt, int extra_size,
-                                        struct udp_packet **udp_buffer) {
+static libtrace_packet_t *construct_packet_rev(libtrace_packet_t *pkt,
+                                               int extra_size,
+                                               struct udp_packet **udp_buffer) {
         struct udp_packet *buffer;
         libtrace_packet_t *_pkt;
         uint16_t tmp16;
@@ -585,6 +587,12 @@ inline static void verify_packet_len(tls_t *tls, libtrace_packet_t *pkt,
                 break;
         }
 
+        /* Format returning the FCS in capture is valid, the code below assumes
+         * it doesn't */
+        if (cap_len == wire_len) {
+                cap_len -= 4;
+        }
+
         if (cap_len != expected_cap_len) {
                 fprintf(stderr,
                         "Wrong capture length found %" PRIu64
@@ -599,6 +607,7 @@ inline static void verify_packet_len(tls_t *tls, libtrace_packet_t *pkt,
                         wire_len, expected_wire_len);
                 exit_code |= RET_FAILED;
         }
+
         if (cap_len > sizeof(struct udp_packet)) {
                 char *payload = (char *)(pktgen + 1);
                 for (size_t i = 0; i < cap_len - sizeof(struct udp_packet);
@@ -730,6 +739,12 @@ static enum hasher_types detect_hasher(libtrace_t *trace,
 
         for (int t = 0; t < actual_threads; t++) {
                 printf("%d: %d\n", t, threads[t]);
+        }
+
+        if (actual_threads <= 1) {
+                printf(
+                    "Only one thread detected, unable to determine hasher\n");
+                exit_code |= RET_INVALID;
         }
 
         return hasher_type;
@@ -1119,6 +1134,9 @@ static int run_tx_scenario(char *uri, enum scenarios scenario, int pps,
                 }
         }
 
+        trace_destroy_packet(lt_packet);
+        trace_destroy_packet(lt_packet_rev);
+        trace_destroy_packet(lt_packet_fcs);
         trace_destroy_output(output);
         return 0;
 }
@@ -1350,7 +1368,7 @@ static int run_rx_scenario(char *uri, int threadcount,
         if (scenario == MT_NO_HASHER || scenario == MT_UNI_HASHER ||
             scenario == MT_BI_HASHER || scenario == MT_BI_HASHER_HOLD) {
                 enum hasher_types hasher_type =
-                    detect_hasher(inptrace, stats->captured);
+                    detect_hasher(inptrace, g_rx_expected_count);
                 char *hasher_str = NULL;
                 switch (hasher_type) {
                 case HASHER_BIDIRECTIONAL:
