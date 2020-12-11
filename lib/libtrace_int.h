@@ -1321,6 +1321,13 @@ typedef struct libtrace_pcapfile_pkt_hdr_t {
 	uint32_t wirelen;	/* The wire length of the packet */
 } libtrace_pcapfile_pkt_hdr_t;
 
+/** Local definition of a PCAP header */
+typedef struct libtrace_pcap_pkthdr_t {
+	struct timeval ts; /* Timestamp */
+	uint32_t caplen;   /* Capture length */
+	uint32_t wirelen;      /* Wire length */
+} libtrace_pcap_pkthdr_t;
+
 #ifdef HAVE_DAG
 /** Constructor for the DAG format module */
 void dag_constructor(void);
