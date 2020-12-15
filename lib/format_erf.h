@@ -137,10 +137,9 @@ int erf_get_capture_length(const libtrace_packet_t *packet);
 int erf_get_wire_length(const libtrace_packet_t *packet);
 size_t erf_set_capture_length(libtrace_packet_t *packet, size_t size);
 int erf_is_color_type(uint8_t erf_type);
-int libtrace_to_erf_hdr(libtrace_out_t *libtrace, libtrace_packet_t *packet,
-	dag_record_t *erf, int *framinglen, int *caplen, int *padding);
-int erf_calculate_padding(libtrace_packet_t *packet, int *framinglen,
-	int *caplen, int *padding);
 libtrace_meta_t *erf_get_all_meta(libtrace_packet_t *packet);
+bool find_compatible_linktype(libtrace_out_t *libtrace,
+        libtrace_packet_t *packet);
+int erf_get_padding(const libtrace_packet_t *packet);
 
 #endif
