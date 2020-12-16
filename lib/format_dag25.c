@@ -198,6 +198,9 @@ pthread_mutex_t open_dag_mutex;
  * many times or close a device that we're still using */
 struct dag_dev_t *open_dags = NULL;
 
+static int libtrace_to_dag_hdr(libtrace_out_t *libtrace, libtrace_packet_t *packet,
+    dag_record_t *erf, int *framinglen, int *caplen, int *padding);
+
 static bool dag_can_write(libtrace_packet_t *packet) {
 	/* Get the linktype */
         libtrace_linktype_t ltype = trace_get_link_type(packet);
@@ -1197,6 +1200,72 @@ static int dag_dump_packet(libtrace_out_t *libtrace, dag_record_t *erfptr,
 	return framinglen + caplen + padding;
 }
 
+static int libtrace_to_dag_hdr(libtrace_out_t *libtrace, libtrace_packet_t *packet,
+    dag_record_t *erf, int *framinglen, int *caplen, int *padding) {
+
+    int wlen;
+
+    /* If we've had an rxerror, we have no payload to write.
+     * (packet->buffer is set to NULL on read if RX error)
+     *
+     * I Think this is bogus, we should somehow figure out
+     * a way to write out the payload even if it is gibberish -- Perry
+     */
+    if (packet->buffer == NULL)
+        return -1;
+
+    /* Demote the packet to a linktype we can send, e.g. find Ethernet */
+    if (!find_compatible_linktype(libtrace,packet))
+        return -1;
+
+    /* Fill in the packet size, it may have changed after demotion */
+    if (packet->type == TRACE_RT_DATA_ERF) {
+        *framinglen = trace_get_framing_length(packet);
+        // update port
+        erf->flags.iface = 0;
+    } else {
+        *framinglen = dag_record_size + erf_get_padding(packet);
+        // init flags and set port to 0
+        memset(&erf->flags, 0, sizeof(erf->flags));
+    }
+
+    *caplen = trace_get_capture_length(packet);
+
+    if (trace_get_link_type(packet) == TRACE_TYPE_ETH)
+        wlen = MIN((*caplen)+4, trace_get_wire_length(packet));
+    else
+        wlen = MIN(*caplen, trace_get_wire_length(packet));
+
+    *padding = (sizeof(uint64_t) - ((*framinglen + *caplen) % sizeof(uint64_t)))
+        % sizeof(uint64_t);
+
+    if (*caplen <= 0 || *caplen > 65536) {
+        trace_set_err_out(libtrace, TRACE_ERR_BAD_PACKET,
+            "Capture length is out of range in libtrace_to_dag_hdr()");
+        return -1;
+    }
+
+    if (*framinglen > 65536) {
+        trace_set_err_out(libtrace, TRACE_ERR_BAD_PACKET,
+            "Framing length is to large in libtrace_to_dag_hdr()");
+        return -1;
+    }
+
+    if (*caplen + *framinglen <= 0 || *caplen + *framinglen > 65536) {
+        trace_set_err_out(libtrace, TRACE_ERR_BAD_PACKET,
+            "Capture + framing length is out of range in libtrace_to_dag_hdr()");
+        return -1;
+    }
+
+    erf->type = libtrace_to_erf_type(trace_get_link_type(packet));
+    erf->rlen = htons(*framinglen + *caplen + *padding);
+    // loss counter. Can't do this
+    erf->lctr = 0;
+    erf->wlen = htons(wlen);
+
+    return 0;
+}
+
 /* Writes a packet to the provided DAG output trace */
 static int dag_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *packet)
 {
@@ -1208,7 +1277,7 @@ static int dag_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *packet)
 	int framinglen;
 	int caplen;
 	int padding;
-	dag_record_t *dag_hdr = (dag_record_t *)packet->header;
+        dag_record_t *dag_hdr;
 
 	if(!packet->header) {
 		/* No header, probably an RT packet. Lifted from
@@ -1217,17 +1286,18 @@ static int dag_write_packet(libtrace_out_t *libtrace, libtrace_packet_t *packet)
 	}
 
 	if (packet->type == TRACE_RT_DATA_ERF) {
-		erf_calculate_padding(packet, &framinglen, &caplen, &padding);
-		dag_hdr->rlen = htons(framinglen + caplen + padding);
+                dag_hdr = (dag_record_t *)packet->header;
+                if (libtrace_to_dag_hdr(libtrace, packet, dag_hdr, &framinglen, &caplen, &padding) < 0)
+                    return -1;
 		return dag_dump_packet(libtrace,
-				       dag_hdr,
-				       framinglen,
-				       packet->payload,
-				       caplen,
-				       padding);
+                                       dag_hdr,
+                                       framinglen,
+                                       packet->payload,
+                                       caplen,
+                                       padding);
 	} else {
 		dag_record_t erfhdr;
-		if (libtrace_to_erf_hdr(libtrace, packet, &erfhdr, &framinglen, &caplen, &padding) < 0)
+		if (libtrace_to_dag_hdr(libtrace, packet, &erfhdr, &framinglen, &caplen, &padding) < 0)
 			return -1;
 		return dag_dump_packet(libtrace,
 				       &erfhdr,
