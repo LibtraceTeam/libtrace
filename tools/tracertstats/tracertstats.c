@@ -47,6 +47,7 @@
 #include <getopt.h>
 #include <inttypes.h>
 #include <signal.h>
+#include <pthread.h>
 
 #include <lt_inttypes.h>
 #include "libtrace_parallel.h"
@@ -65,6 +66,7 @@ int merge_inputs = 0;
 int threadcount = 4;
 int filter_count=0;
 int burstsize=10;
+bool realtime=0;
 uint8_t report_drops = 0;
 
 struct filter_t {
@@ -76,6 +78,8 @@ struct filter_t {
 
 uint64_t packet_count=UINT64_MAX;
 double packet_interval=UINT32_MAX;
+pthread_mutex_t ts_lock;
+uint64_t first_ts;
 
 struct output_data_t *output = NULL;
 
@@ -176,7 +180,7 @@ static void cb_result(libtrace_t *trace, libtrace_thread_t *sender UNUSED,
                 stats = trace_create_statistics();
                 trace_get_statistics(trace, stats);
         }
-        while ((glob_last_ts >> 32) < (ts >> 32)) {
+        if ((glob_last_ts >> 32) < (ts >> 32)) {
                 report_results(glob_last_ts >> 32, totalcount, totalbytes,
                                 stats);
                 totalcount = 0;
@@ -231,12 +235,25 @@ static libtrace_packet_t *cb_packet(libtrace_t *trace, libtrace_thread_t *t,
         }
 
         key = trace_get_erf_timestamp(packet);
-        if ((key >> 32) >= (td->last_key >> 32) + packet_interval) {
+        // used to sync intervals between perpkt threads
+        if (first_ts == 0) {
+                pthread_mutex_lock(&ts_lock);
+                if (first_ts == 0) {
+                        first_ts = key;
+                }
+                pthread_mutex_unlock(&ts_lock);
+        }
+
+        if (td->last_key == 0) {
+                td->last_key = first_ts;
+        }
+
+        while ((key >> 32) >= (td->last_key >> 32) + packet_interval) {
                 libtrace_generic_t tmp = {.ptr = td->results};
-		trace_publish_result(trace, t, key,
+		trace_publish_result(trace, t, td->last_key,
                                 tmp, RESULT_USER);
                 trace_post_reporter(trace);
-                td->last_key = key;
+                td->last_key += (uint64_t)packet_interval << 32;
                 td->results = calloc(1, sizeof(result_t) +
                                 sizeof(statistic_t) * filter_count);
         }
@@ -273,11 +290,11 @@ static void cb_tick(libtrace_t *trace, libtrace_thread_t *t,
                 void *global UNUSED, void *tls, uint64_t order) {
 
         thread_data_t *td = (thread_data_t *)tls;
-        if (order > td->last_key) {
+        while ((order >> 32) >= (td->last_key >> 32) + packet_interval) {
 		libtrace_generic_t tmp = {.ptr = td->results};
-                trace_publish_result(trace, t, order, tmp, RESULT_USER);
+                trace_publish_result(trace, t, td->last_key, tmp, RESULT_USER);
                 trace_post_reporter(trace);
-                td->last_key = order;
+                td->last_key += (uint64_t)packet_interval << 32;
                 td->results = calloc(1, sizeof(result_t) +
                                 sizeof(statistic_t) * filter_count);
         }
@@ -310,7 +327,7 @@ static void run_trace(char *uri)
 
 	if (trace_get_information(trace)->live) {
                 trace_set_tick_interval(trace, (int) (packet_interval * 1000));
-	} else {
+	} else if (realtime) {
 		trace_set_tracetime(trace, true);
 	}
 
@@ -375,6 +392,7 @@ static void usage(char *argv0)
 	"			updates at very low traffic rates\n"
         "-d --report-drops      Include statistics about number of packets dropped or\n"
         "                       lost by the capture process\n"
+        "-r --realtime          Process trace files in realtime\n"
 	"-h --help	Print this usage statement\n"
 	,argv0);
 }
@@ -383,7 +401,9 @@ int main(int argc, char *argv[]) {
 
 	int i;
         struct sigaction sigact;
-	
+	pthread_mutex_init(&ts_lock, NULL);
+        first_ts=0;
+
 	while(1) {
 		int option_index;
 		struct option long_options[] = {
@@ -396,10 +416,11 @@ int main(int argc, char *argv[]) {
 			{ "threads",	        1, 0, 't' },
 			{ "nobuffer",	        0, 0, 'N' },
 			{ "report-drops",	0, 0, 'd' },
+                        { "realtime",           0, 0, 'r' },
 			{ NULL, 		0, 0, 0   },
 		};
 
-		int c=getopt_long(argc, argv, "c:f:i:o:t:dhmN",
+		int c=getopt_long(argc, argv, "c:f:i:o:t:dhmNr",
 				long_options, &option_index);
 
 		if (c==-1)
@@ -438,6 +459,9 @@ int main(int argc, char *argv[]) {
 			case 'm':
 				merge_inputs = 1;
 				break;
+                        case 'r':
+                                realtime = 1;
+                                break;
 			case 'h':
 				  usage(argv[0]);
 				  return 1;
