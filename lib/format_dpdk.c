@@ -21,10 +21,6 @@
  * You should have received a copy of the GNU Lesser General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
- *
- *
- * Kit capture format.
- *
  * Intel Data Plane Development Kit is a LIVE capture format.
  *
  * This format also supports writing which will write packets out to the
@@ -104,7 +100,6 @@ struct dpdk_format_data_t {
 	int8_t promisc; /* promiscuous mode - RX only */
 	uint8_t paused; /* See paused_state */
 	portid_t port; /* Always 0 we only whitelist a single port - Shared TX & RX */
-	portid_t nb_ports; /* Total number of usable ports on system should be 1 */
 	uint16_t link_speed; /* Link speed 10,100,1000,10000 etc. */
 	int snaplen; /* The snap length for the capture - RX only */
 	/* We always have to setup both rx and tx queues even if we don't want them */
@@ -214,7 +209,7 @@ static int blacklist_devices(struct dpdk_format_data_t *format_data, struct rte_
 }
 #else /* DPDK_USE_BLACKLIST */
 #include <rte_devargs.h>
-static int whitelist_device(struct dpdk_format_data_t *format_data UNUSED, struct rte_pci_addr *whitelist)
+static int whitelist_device(struct rte_pci_addr *whitelist)
 {
 	char pci_str[20] = {0};
 	snprintf(pci_str, sizeof(pci_str), PCI_PRI_FMT,
@@ -285,8 +280,11 @@ static int pci_to_numa(struct rte_pci_addr * dev_addr) {
 	if((file = fopen(path, "r")) != NULL) {
 		int numa_node = -1;
 		if (fscanf(file, "%d", &numa_node) != 1) {
-                        numa_node = -1;
-                }
+			numa_node = -1;
+		} else if (numa_node <= 0 || numa_node > 4) {
+			fprintf(stderr, "Warning /sys/bus/pci/devices/"PCI_PRI_FMT"/numa_node = %d appears to be invalid\n",
+			        dev_addr->domain, dev_addr->bus, dev_addr->devid, dev_addr->function, numa_node);
+		}
 		fclose(file);
 		return numa_node;
 	}
@@ -399,6 +397,7 @@ static void restore_getopts(struct saved_getopts *opts) {
 	optopt = opts->optopt;
 }
 
+/* Initialise the DPDK library and add our first device */
 static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_t * format_data,
                                         char * err, int errlen) {
 	int ret; /* Returned error codes */
@@ -447,7 +446,7 @@ static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_
 #	endif
 #endif
 			/* vdev only arguments */
-			"--no-pci", "--vdev", uridata,
+			"--vdev", uridata,
 			NULL};
 	int argc = sizeof(argv) / sizeof(argv[0]) - 1;
 
@@ -459,8 +458,7 @@ static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_
 	}
 
 	if (format_data->dev_type == PCI_DEVICE) {
-		/* PCI device, chop off the last 3 vdev specific args */
-		argv[--argc] = NULL;
+		/* PCI device, chop off the last 2 vdev specific args */
 		argv[--argc] = NULL;
 		argv[--argc] = NULL;
 	}
@@ -536,11 +534,26 @@ static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_
 	snprintf(master_lcore_id, sizeof(master_lcore_id), "%ld", my_cpu-1);
 
 #if !DPDK_USE_BLACKLIST
-	/* Black list all ports besides the one that we want to use */
+	/* Whitelist the device we want to use */
 	if (format_data->dev_type == PCI_DEVICE) {
-		if ((ret = whitelist_device(format_data, &use_addr)) < 0) {
+		if ((ret = whitelist_device(&use_addr)) < 0) {
 			snprintf(err, errlen, "Libtrace DPDK: Whitelisting PCI device failed,"
 				 " are you sure the address is correct?: %s", strerror(-ret));
+			return -1;
+		}
+	} else {
+		/* Whitelist the PCI Host Bus 0000:00:00.0 as this isn't a NIC.
+		 * This stops DPDK initialising all devices it finds, and
+		 * it rather initialises none. This leaves us the option to
+		 * hotplug them later.
+		 */
+		use_addr.domain = 0;
+		use_addr.bus = 0;
+		use_addr.devid = 0;
+		use_addr.function = 0;
+		if ((ret = whitelist_device(&use_addr)) < 0) {
+			snprintf(err, errlen, "Libtrace DPDK: Whitelisting PCI host bus device"
+				 " failed: %s", strerror(-ret));
 			return -1;
 		}
 	}
@@ -614,16 +627,192 @@ static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_
 	}
 #endif
 
-	format_data->nb_ports = rte_eth_dev_count_avail();
-
-	if (format_data->nb_ports != 1) {
+	if (rte_eth_dev_count_avail() != 1) {
 		snprintf(err, errlen,
-		         "Intel DPDK - rte_eth_dev_count returned %d but it should be 1",
-		         format_data->nb_ports);
+		         "Intel DPDK - rte_eth_dev_count_avail returned %d but it should be 1",
+		         rte_eth_dev_count_avail());
 		return -1;
 	}
 
 	return 0;
+}
+
+#ifdef RTE_ETH_FOREACH_MATCHING_DEV
+/** Get the DPDK port number for a device by name
+ *
+ * uri: The device name which can include devargs
+ *     This is a smart match.
+ * return: The port number or·RTE_MAX_ETHPORTS if not found.
+ */
+static portid_t dpdk_get_port_id(const char* uri) {
+	portid_t port_id;
+	struct rte_dev_iterator iterator;
+	RTE_ETH_FOREACH_MATCHING_DEV(port_id, uri, &iterator) {
+		rte_eth_iterator_cleanup(&iterator);
+		return port_id;
+	}
+	return RTE_MAX_ETHPORTS;
+}
+
+#elif defined(USE_DEV_ATTACH)
+/** Get the DPDK port number for a device by name
+ *
+ * uri: The device name which does not include devargs
+ *      This is an exact match
+ * return: The port number or RTE_MAX_ETHPORTS if not found.
+ */
+static portid_t dpdk_get_port_id(const char* uri) {
+	portid_t port_id;
+	if (rte_eth_dev_get_port_by_name(uri, &port_id) != 0) {
+		return RTE_MAX_ETHPORTS;
+	}
+	return port_id;
+}
+#endif
+
+static struct rte_device* dpdk_get_device_from_port(portid_t port) {
+#if RTE_VERSION >= RTE_VERSION_NUM(17, 2, 0, 1)
+	return rte_eth_devices[port].device;
+#else
+	return &rte_eth_devices[port].pci_dev->device;
+#endif
+}
+
+/** Loads a device into DPDK
+ *
+ * * This initialises the DPDK library if required and loads the first device
+ * * Hotplug a new device once the library is loaded
+ *   - Hotplug requires DPDK 16.11 or newer
+ *   - Hotplug recommended DPDK 18.11 or newer
+ *
+ * Tries to attach the DPDK device specified in the URI
+ *
+ * Returns: the port_id of the device attached or RTE_MAX_ETHPORTS on error,
+ *          check the err message in the return.
+ */
+static int dpdk_attach_device(char *uridata, struct dpdk_format_data_t * format_data,
+                              char *err, size_t errlen) {
+	int ret;
+	static int dpdk_init = 0; // 1 if DPDK is initialised, otherwise 0
+	struct rte_pci_addr pci_addr;
+	char pci_str[20] = {0};
+	long _cpu_core;
+	char *uri;
+	portid_t port;
+
+	/* If we haven't initialised DPDK use that method */
+	if (!dpdk_init) {
+		if (dpdk_init_environment(uridata, format_data, err, errlen) != 0) {
+			return RTE_MAX_ETHPORTS;
+		}
+		dpdk_init = 1;
+		return 0;
+	}
+
+	/* rte_dev_probe and RTE_ETH_FOREACH_MATCHING_DEV were added in 18.11-rc1
+	 * The old dev_attach way was added in 16.11-rc1 and removed in 18.11-rc1
+	 * */
+#if defined(RTE_ETH_FOREACH_MATCHING_DEV) || defined(USE_DEV_ATTACH)
+	/* Parse a libtrace uri to find one that DPDK will understand */
+	if (format_data->dev_type == PCI_DEVICE) {
+		/* Remove the cpu-core from the string */
+		if (parse_pciaddr(uridata, &pci_addr, &_cpu_core) != 0) {
+			snprintf(err, errlen, "Failed to parse DPDK URI (%s)", uridata);
+			return RTE_MAX_ETHPORTS;
+		}
+		snprintf(pci_str, sizeof(pci_str), PCI_PRI_FMT,
+			 pci_addr.domain,
+			 pci_addr.bus,
+			 pci_addr.devid,
+			 pci_addr.function);
+		uri = pci_str;
+	} else {
+		uri = uridata;
+	}
+
+#ifdef RTE_ETH_FOREACH_MATCHING_DEV
+	if ((ret = rte_dev_probe(uri)) != 0) {
+		snprintf(err, errlen,
+		         "Libtrace DPDK: rte_dev_probe(%s) failed: %s", uri, strerror(-ret));
+		return RTE_MAX_ETHPORTS;
+	}
+#else
+	char *args = "";
+	char *comma = NULL;
+	if (format_data->dev_type == VDEV_DEVICE) {
+		/* Split devargs from the vdev name: e.g.
+		 * net_pcap0,iface=veth0 -> uri=[net_pcap] devargs=[iface=veth0]
+		 */
+		comma = strchr(uri, ',');
+		if (comma) {
+			comma[0] = 0;
+			args = comma+1;
+		}
+	}
+	if ((ret = rte_eal_dev_attach(uri, args)) != 0) {
+		snprintf(err, errlen,
+			 "Libtrace DPDK: rte_eal_dev_attach(%s, %s) failed: %s", uri, args, strerror(-ret));
+		return RTE_MAX_ETHPORTS;
+	}
+#endif
+	port = dpdk_get_port_id(uri);
+	if (port == RTE_MAX_ETHPORTS) {
+		snprintf(err, errlen,
+		         "Libtrace DPDK: unable to find port matching the device %s", uri);
+	}
+
+#ifdef USE_DEV_ATTACH
+	/* Revert our changes to the URI, note dpdk_get_port_id expects only the device name */
+	if (format_data->dev_type == VDEV_DEVICE && comma) {
+		comma[0] = ',';
+	}
+#endif
+
+	return port;
+#else
+	/* DPDK too old for hotplug support */
+	snprintf(err, errlen,
+	         "Your version of DPDK does not support hotplug, upgrade to 18.11 or newer");
+	return RTE_MAX_ETHPORTS;
+#endif
+}
+
+/* Remove a device from DPDK, allows another application to use it
+ * port: The DPDK port number of the device to remove
+ * return: 0 on success or if not supported by the DPDK version, -1 on error
+ */
+static int dpdk_detach_device(int port)
+{
+#ifdef RTE_ETH_FOREACH_MATCHING_DEV
+	if (rte_dev_remove(dpdk_get_device_from_port(port)) != 0) {
+		fprintf(stderr, "rte_dev_remove failed\n");
+		return -1;
+	}
+	return 0;
+#elif defined(USE_DEV_ATTACH)
+#if RTE_VERSION >= RTE_VERSION_NUM(17, 8, 0, 1)
+	if (rte_eal_dev_detach(dpdk_get_device_from_port(port))) {
+		fprintf(stderr, "rte_eal_dev_detach failed\n");
+		return -1;
+	}
+#else
+	/* Prior to 17.08-rc1 cbb4c6 rte_eal_dev_detach takes a string */
+	char name[RTE_ETH_NAME_MAX_LEN] = {0};
+	if (rte_eth_dev_get_name_by_port(port, name) != 0) {
+		fprintf(stderr, "rte_eth_dev_get_name_by_port failed\n");
+		return -1;
+	};
+	if (rte_eal_dev_detach(name) != 0) {
+		fprintf(stderr, "rte_eal_dev_detach failed\n");
+		return -1;
+	}
+#endif
+	return 0;
+#else
+	/* Not supported by this version of DPDK, ignore and return success */
+	UNUSED port;
+	return 0;
+#endif
 }
 
 static int dpdk_init_input (libtrace_t *libtrace, enum device_type dev_type) {
@@ -640,8 +829,7 @@ static int dpdk_init_input (libtrace_t *libtrace, enum device_type dev_type) {
 		return 1;
 	}
 
-	FORMAT(libtrace)->port = 0; /* Always assume 1 port loaded */
-	FORMAT(libtrace)->nb_ports = 0;
+	FORMAT(libtrace)->port = RTE_MAX_ETHPORTS;
 	FORMAT(libtrace)->snaplen = 0; /* Use default */
 	FORMAT(libtrace)->nb_rx_buf = NB_RX_MBUF;
 	FORMAT(libtrace)->nb_tx_buf = MIN_NB_BUF;
@@ -666,10 +854,11 @@ static int dpdk_init_input (libtrace_t *libtrace, enum device_type dev_type) {
 		libtrace_list_init_aligned(sizeof(struct dpdk_per_stream_t), CACHE_LINE_SIZE);
 	libtrace_list_push_back(FORMAT(libtrace)->per_stream, &stream);
 
-	if (dpdk_init_environment(libtrace->uridata, FORMAT(libtrace), err, sizeof(err)) != 0) {
+	FORMAT(libtrace)->port =
+		dpdk_attach_device(libtrace->uridata, FORMAT(libtrace), err, sizeof(err));
+	if (FORMAT(libtrace)->port == RTE_MAX_ETHPORTS) {
 		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "%s", err);
-		free(libtrace->format_data);
-		libtrace->format_data = NULL;
+		dpdk_fin_input(libtrace); /* Cleanup */
 		return -1;
 	}
 	return 0;
@@ -681,6 +870,25 @@ int dpdk_init_input_pci(libtrace_t *libtrace) {
 
 int dpdk_init_input_vdev(libtrace_t *libtrace) {
 	return dpdk_init_input(libtrace, VDEV_DEVICE);
+}
+
+static int dpdk_fin_output(libtrace_out_t * libtrace) {
+	/* Free our memory structures */
+	if (libtrace->format_data != NULL) {
+		/* Close the device completely, device cannot be restarted */
+		if (FORMAT(libtrace)->port != RTE_MAX_ETHPORTS &&
+		    FORMAT(libtrace)->paused != DPDK_NEVER_STARTED) {
+			rte_eth_dev_close(FORMAT(libtrace)->port);
+			/* Detach the device if we can */
+			dpdk_detach_device(FORMAT(libtrace)->port);
+		}
+		libtrace_list_deinit(FORMAT(libtrace)->per_stream);
+		/* filter here if we used it */
+		free(libtrace->format_data);
+		libtrace->format_data = NULL;
+	}
+
+	return 0;
 }
 
 static int dpdk_init_output(libtrace_out_t *libtrace, enum device_type dev_type)
@@ -697,8 +905,7 @@ static int dpdk_init_output(libtrace_out_t *libtrace, enum device_type dev_type)
 			"format data inside dpdk_init_output()");
 		return -1;
 	}
-	FORMAT(libtrace)->port = 0; /* Always assume 1 port loaded */
-	FORMAT(libtrace)->nb_ports = 0;
+	FORMAT(libtrace)->port = RTE_MAX_ETHPORTS;
 	FORMAT(libtrace)->snaplen = 0; /* Use default */
 	FORMAT(libtrace)->nb_rx_buf = MIN_NB_BUF;
 	FORMAT(libtrace)->nb_tx_buf = NB_TX_MBUF;
@@ -719,10 +926,11 @@ static int dpdk_init_output(libtrace_out_t *libtrace, enum device_type dev_type)
 		libtrace_list_init_aligned(sizeof(struct dpdk_per_stream_t), CACHE_LINE_SIZE);
 	libtrace_list_push_back(FORMAT(libtrace)->per_stream, &stream);
 
-	if (dpdk_init_environment(libtrace->uridata, FORMAT(libtrace), err, sizeof(err)) != 0) {
+	FORMAT(libtrace)->port =
+		dpdk_attach_device(libtrace->uridata, FORMAT(libtrace), err, sizeof(err));
+	if (FORMAT(libtrace)->port == RTE_MAX_ETHPORTS) {
 		trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED, "%s", err);
-		free(libtrace->format_data);
-		libtrace->format_data = NULL;
+		dpdk_fin_output(libtrace); /* Cleanup */
 		return -1;
 	}
 	return 0;
@@ -1168,6 +1376,11 @@ static struct rte_mempool *dpdk_alloc_memory(unsigned n,
  */
 static void dpdk_free_memory(struct rte_mempool *mempool, int socket_id) {
 	size_t i;
+
+	if (mempool == NULL) {
+		return;
+	}
+
 	pthread_mutex_lock(&dpdk_lock);
 
 	/* We should have all entries back in the mempool */
@@ -1413,6 +1626,15 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data,
 			                          rte_lcore_to_socket_id(stream->lcore));
 
 			if (stream->mempool == NULL) {
+				fprintf(stderr, "Intel DPDK - Warning libtrace couldn't allocate rx memory on the desired socket.\n");
+				fprintf(stderr, "Intel DPDK - This might impact performance, try adding more hugepages.\n");
+				stream->mempool = dpdk_alloc_memory(
+							  format_data->nb_rx_buf*2,
+							  buf_size,
+							  SOCKET_ID_ANY);
+			}
+
+			if (stream->mempool == NULL) {
 				snprintf(err, errlen, "Intel DPDK - Initialisation of mbuf "
 				         "pool failed: %s", strerror(rte_errno));
 				return -1;
@@ -1504,8 +1726,7 @@ int dpdk_start_input (libtrace_t *libtrace) {
 
 	if (dpdk_start_streams(FORMAT(libtrace), err, sizeof(err), 1, false, libtrace->config.coremap) != 0) {
 		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "%s", err);
-		free(libtrace->format_data);
-		libtrace->format_data = NULL;
+		dpdk_fin_input(libtrace);
 		return -1;
 	}
 	return 0;
@@ -1550,8 +1771,7 @@ int dpdk_pstart_input (libtrace_t *libtrace) {
 
 	if ((ret = dpdk_start_streams(FORMAT(libtrace), err, sizeof(err), tot, false, libtrace->config.coremap)) == -1) {
 		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "%s", err);
-		free(libtrace->format_data);
-		libtrace->format_data = NULL;
+		dpdk_fin_input(libtrace);
 
                 return -1;
 
@@ -1559,7 +1779,7 @@ int dpdk_pstart_input (libtrace_t *libtrace) {
         // and let Libtrace re-attempt starting the stream in non-parallel mode.
         } else if (ret == -2) {
 
-                if (FORMAT(libtrace)->port != 0xFF)
+		if (FORMAT(libtrace)->port != RTE_MAX_ETHPORTS)
 			rte_eth_dev_callback_unregister(FORMAT(libtrace)->port,
 			                                RTE_ETH_EVENT_INTR_LSC,
 			                                dpdk_lsc_callback,
@@ -1682,8 +1902,7 @@ static int dpdk_start_output(libtrace_out_t *libtrace)
 
 	if (dpdk_start_streams(FORMAT(libtrace), err, sizeof(err), 1, true, NULL) != 0) {
 		trace_set_err_out(libtrace, TRACE_ERR_INIT_FAILED, "%s", err);
-		free(libtrace->format_data);
-		libtrace->format_data = NULL;
+		dpdk_fin_output(libtrace);
 		return -1;
 	}
 	return 0;
@@ -1762,13 +1981,21 @@ int dpdk_fin_input(libtrace_t * libtrace) {
 	/* Free our memory structures */
 	if (libtrace->format_data != NULL) {
 
-		if (FORMAT(libtrace)->port != 0xFF)
+		if (FORMAT(libtrace)->port != RTE_MAX_ETHPORTS &&
+		    FORMAT(libtrace)->paused != DPDK_NEVER_STARTED) {
+			/* Make sure we only try stop the port if we started it
+			 * as it could be in use by another trace. And we
+			 * would have failed to start this trace.
+			 */
 			rte_eth_dev_callback_unregister(FORMAT(libtrace)->port,
 			                                RTE_ETH_EVENT_INTR_LSC,
 			                                dpdk_lsc_callback,
 			                                FORMAT(libtrace));
-		/* Close the device completely, device cannot be restarted */
-		rte_eth_dev_close(FORMAT(libtrace)->port);
+			/* Close the device completely, device cannot be restarted */
+			rte_eth_dev_close(FORMAT(libtrace)->port);
+			/* If we can, detach the device */
+			dpdk_detach_device(FORMAT(libtrace)->port);
+		}
 
 		dpdk_free_memory(FORMAT(libtrace)->pktmbuf_pool,
 		                 FORMAT(libtrace)->nic_numa_node);
@@ -1785,25 +2012,13 @@ int dpdk_fin_input(libtrace_t * libtrace) {
 		if (FORMAT(libtrace)->rss_key)
 			free(FORMAT(libtrace)->rss_key);
 		free(libtrace->format_data);
+		libtrace->format_data = NULL;
 	}
 
 	return 0;
 }
 
 
-static int dpdk_fin_output(libtrace_out_t * libtrace) {
-	/* Free our memory structures */
-	if (libtrace->format_data != NULL) {
-		/* Close the device completely, device cannot be restarted */
-		if (FORMAT(libtrace)->port != 0xFF)
-			rte_eth_dev_close(FORMAT(libtrace)->port);
-		libtrace_list_deinit(FORMAT(libtrace)->per_stream);
-		/* filter here if we used it */
-		free(libtrace->format_data);
-	}
-
-	return 0;
-}
 
 /**
  * Get the start of the additional header that we added to a packet.
@@ -2291,7 +2506,7 @@ static libtrace_direction_t dpdk_set_direction(libtrace_packet_t *packet, libtra
 void dpdk_get_stats(libtrace_t *trace, libtrace_stat_t *stats) {
 	struct rte_eth_stats dev_stats = {0};
 
-	if (trace->format_data == NULL || FORMAT(trace)->port == 0xFF)
+	if (trace->format_data == NULL || FORMAT(trace)->port == RTE_MAX_ETHPORTS)
 		return;
 
 	/* Grab the current stats */

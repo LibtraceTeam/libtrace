@@ -114,6 +114,16 @@
 #define rte_mempool_in_use_count rte_mempool_free_count
 #endif
 
+/* v16.11-rc1
+ *
+ * rte_eal_dev_attach
+ * Removed in 18.11 and replaced with rte_dev_probe
+ *
+ */
+#if RTE_VERSION >= RTE_VERSION_NUM(16, 11, 0, 1) && RTE_VERSION < RTE_VERSION_NUM(18, 11, 0, 1)
+#define USE_DEV_ATTACH
+#endif
+
 /* 17.05-rc1 deprecated, 17.08 removed
  * rte_set_log_level -> rte_log_set_global_level
  */

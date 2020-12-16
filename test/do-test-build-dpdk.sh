@@ -85,9 +85,10 @@ declare -a dpdk_versions=(
 declare -a dpdk_versions=(
 	"dpdk-16.11.11.tar.gz"
 	"dpdk-17.11.10.tar.gz"
-	"dpdk-18.11.7.tar.gz"
-	"dpdk-19.11.1.tar.gz"
+	"dpdk-18.11.10.tar.gz"
+	"dpdk-19.11.5.tar.gz"
 	"dpdk-20.02.tar.gz"
+	"dpdk-20.11.tar.gz"
 	)
 
 mkdir "$DOWNLOAD_DIR" > /dev/null 2>&1
@@ -138,6 +139,7 @@ do
 			     CONFIG_RTE_LIBRTE_KNI=n \
 			     CONFIG_RTE_KNI_KMOD=n \
 			     CONFIG_RTE_LIBRTE_PMD_PCAP=y \
+			     CONFIG_RTE_EAL_IGB_UIO=n \
 			     EXTRA_CFLAGS="-fPIC -w -ggdb" -j $BUILD_THREADS \
 			     > build_stdout.txt 2> build_stderr.txt
 	if [ $? = 0 ]; then
