@@ -443,14 +443,14 @@ DLLEXPORT void libtrace_make_packet_safe(libtrace_packet_t *pkt) {
 
 DLLEXPORT void libtrace_hold_packet(libtrace_packet_t *pkt) {
 
-	// Can the format module do this beter than copying the
-        // entire packet?
-        if (pkt->trace && pkt->trace->format->can_hold_packet)
-            if (pkt->trace->format->can_hold_packet(pkt) == 0)
-                return;
+    // Can the format module do this beter than copying the
+    // entire packet?
+    if (pkt->trace && pkt->trace->format->can_hold_packet)
+        if (pkt->trace->format->can_hold_packet(pkt) == 0)
+            return;
 
-	// fallback to copying packet
-	libtrace_make_packet_safe(pkt);
+    // fallback to copying packet
+    libtrace_make_packet_safe(pkt);
 }
 
 /**
@@ -914,6 +914,11 @@ static void* hasher_entry(void *data) {
 			}
 		}
 
+        /* make sure the packet buffer does not change from under us. This will
+         * fallback to copying the packet if the underlying format does not support it.
+         */
+        libtrace_hold_packet(packet);
+
 		/* We are guaranteed to have a hash function i.e. != NULL */
 		trace_packet_set_hash(packet, (*trace->hasher)(packet, trace->hasher_data));
 		thread = trace_packet_get_hash(packet) % trace->perpkt_thread_count;
@@ -995,7 +1000,12 @@ static int trace_pread_packet_first_in_first_served(libtrace_t *libtrace,
 			} else {
 				break;
 			}
-		}
+		} else {
+            /* make sure the packet buffer does not change from under us. This will
+             * fallback to copying the packet if the underlying format does not support it.
+             */
+            libtrace_hold_packet(packets[i]);
+        }
 		/*
 		if (libtrace->config.tick_count && trace_packet_get_order(packets[i]) % libtrace->config.tick_count == 0) {
 			tick_hit = true;
