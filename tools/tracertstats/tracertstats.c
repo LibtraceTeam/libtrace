@@ -226,9 +226,9 @@ static inline void sync_first_key(uint64_t key, thread_data_t *td) {
         // used to sync intervals between perpkt threads
 	    if (first_ts == 0) {
 	            pthread_mutex_lock(&ts_lock);
-                        if (first_ts == 0) {
-                                first_ts = key;
-                        }
+                if (first_ts == 0) {
+                        first_ts = key;
+                }
                 pthread_mutex_unlock(&ts_lock);
 		}
         if (td->last_key == 0) {
