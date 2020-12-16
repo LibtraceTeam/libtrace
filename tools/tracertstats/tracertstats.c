@@ -222,6 +222,20 @@ static void *cb_starting(libtrace_t *trace UNUSED,
         return td;
 }
 
+static inline void sync_first_key(uint64_t key, thread_data_t *td) {
+        // used to sync intervals between perpkt threads
+	    if (first_ts == 0) {
+	            pthread_mutex_lock(&ts_lock);
+                        if (first_ts == 0) {
+                                first_ts = key;
+                        }
+                pthread_mutex_unlock(&ts_lock);
+		}
+        if (td->last_key == 0) {
+                td->last_key = first_ts;
+        }
+}
+
 static libtrace_packet_t *cb_packet(libtrace_t *trace, libtrace_thread_t *t,
                 void *global UNUSED, void *tls, libtrace_packet_t *packet) {
 
@@ -235,19 +249,7 @@ static libtrace_packet_t *cb_packet(libtrace_t *trace, libtrace_thread_t *t,
         }
 
         key = trace_get_erf_timestamp(packet);
-        // used to sync intervals between perpkt threads
-        if (first_ts == 0) {
-                pthread_mutex_lock(&ts_lock);
-                if (first_ts == 0) {
-                        first_ts = key;
-                }
-                pthread_mutex_unlock(&ts_lock);
-        }
-
-        if (td->last_key == 0) {
-                td->last_key = first_ts;
-        }
-
+        sync_first_key(key, td);
         while ((key >> 32) >= (td->last_key >> 32) + packet_interval) {
                 libtrace_generic_t tmp = {.ptr = td->results};
 		trace_publish_result(trace, t, td->last_key,
@@ -290,8 +292,9 @@ static void cb_tick(libtrace_t *trace, libtrace_thread_t *t,
                 void *global UNUSED, void *tls, uint64_t order) {
 
         thread_data_t *td = (thread_data_t *)tls;
+        sync_first_key(order, td);
         while ((order >> 32) >= (td->last_key >> 32) + packet_interval) {
-		libtrace_generic_t tmp = {.ptr = td->results};
+                libtrace_generic_t tmp = {.ptr = td->results};
                 trace_publish_result(trace, t, td->last_key, tmp, RESULT_USER);
                 trace_post_reporter(trace);
                 td->last_key += (uint64_t)packet_interval << 32;
