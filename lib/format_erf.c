@@ -123,8 +123,8 @@ typedef struct erf_index_t {
 	uint64_t offset; 
 } erf_index_t;
 
-int libtrace_to_erf_hdr(libtrace_out_t *libtrace, libtrace_packet_t *packet,
-    dag_record_t *erf, int *framinglen, int *caplen, int *padding);
+static int libtrace_to_erf_hdr(libtrace_out_t *libtrace, libtrace_packet_t *packet,
+    dag_record_t *erf, int *framinglen, int *caplen);
 
 static bool erf_can_write(libtrace_packet_t *packet) {
 	/* Get the linktype */
@@ -673,8 +673,8 @@ bool find_compatible_linktype(libtrace_out_t *libtrace,
         return true;
 }
 
-int libtrace_to_erf_hdr(libtrace_out_t *libtrace, libtrace_packet_t *packet,
-    dag_record_t *erf, int *framinglen, int *caplen, int *padding) {
+static int libtrace_to_erf_hdr(libtrace_out_t *libtrace, libtrace_packet_t *packet,
+    dag_record_t *erf, int *framinglen, int *caplen) {
 
     // populate erf header if this is not a erf packet
     if (packet->type != TRACE_RT_DATA_ERF) {
@@ -708,9 +708,6 @@ int libtrace_to_erf_hdr(libtrace_out_t *libtrace, libtrace_packet_t *packet,
     else
         *caplen = trace_get_capture_length(packet);
 
-    // do not bad when writing to file
-    *padding = 0;
-
     if (*caplen <= 0 || *caplen > 65536) {
         trace_set_err_out(libtrace, TRACE_ERR_BAD_PACKET,
             "Capture length is out of range in libtrace_to_erf_hdr()");
@@ -730,7 +727,7 @@ int libtrace_to_erf_hdr(libtrace_out_t *libtrace, libtrace_packet_t *packet,
     }
 
     erf->type = libtrace_to_erf_type(trace_get_link_type(packet));
-    erf->rlen = htons(*framinglen + *caplen + *padding);
+    erf->rlen = htons(*framinglen + *caplen);
     // loss counter. Can't do this
     erf->lctr = 0;
     erf->wlen = htons(trace_get_wire_length(packet));
@@ -739,10 +736,9 @@ int libtrace_to_erf_hdr(libtrace_out_t *libtrace, libtrace_packet_t *packet,
 }
 
 static int erf_dump_packet(libtrace_out_t *libtrace, dag_record_t *erfptr,
-	int framinglen, void *buffer, int caplen, int padding) {
+	int framinglen, void *buffer, int caplen) {
 
 	int numbytes;
-	uint64_t padding_buf = 0;
 
 	// write out ERF header
 	numbytes = wandio_wwrite(OUTPUT->file, erfptr, (size_t)(framinglen));
@@ -760,15 +756,7 @@ static int erf_dump_packet(libtrace_out_t *libtrace, dag_record_t *erfptr,
 		return -1;
 	}
 
-	// write out padding if needed
-	numbytes = wandio_wwrite(OUTPUT->file, &padding_buf, (size_t)padding);
-	if (numbytes != padding) {
-		trace_set_err_out(libtrace,errno,
-			"write(%s)",libtrace->uridata);
-		return -1;
-	}
-
-	return framinglen + caplen + padding;
+	return framinglen + caplen;
 }
 
 static int erf_flush_output(libtrace_out_t *libtrace) {
@@ -799,7 +787,6 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 
 	int framinglen;
 	int caplen;
-	int padding;
 	dag_record_t *dag_hdr;
 
 	if (!OUTPUT->file) {
@@ -814,24 +801,22 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 
 	if (packet->type == TRACE_RT_DATA_ERF) {
                 dag_hdr = (dag_record_t *)packet->header;
-                if (libtrace_to_erf_hdr(libtrace, packet, dag_hdr, &framinglen, &caplen, &padding) < 0)
+                if (libtrace_to_erf_hdr(libtrace, packet, dag_hdr, &framinglen, &caplen) < 0)
                         return -1;
 		return erf_dump_packet(libtrace,
 				       dag_hdr,
 				       framinglen,
 				       packet->payload,
-				       caplen,
-				       padding);
+				       caplen);
 	} else {
 		dag_record_t erfhdr;
-		if (libtrace_to_erf_hdr(libtrace, packet, &erfhdr, &framinglen, &caplen, &padding) < 0)
+		if (libtrace_to_erf_hdr(libtrace, packet, &erfhdr, &framinglen, &caplen) < 0)
 			return -1;
 		return erf_dump_packet(libtrace,
 				       &erfhdr,
 				       framinglen,
 				       packet->payload,
-				       caplen,
-				       padding);
+				       caplen);
 	}
 }
 

@@ -1206,10 +1206,7 @@ static int libtrace_to_dag_hdr(libtrace_out_t *libtrace, libtrace_packet_t *pack
     int wlen;
 
     /* If we've had an rxerror, we have no payload to write.
-     * (packet->buffer is set to NULL on read if RX error)
-     *
-     * I Think this is bogus, we should somehow figure out
-     * a way to write out the payload even if it is gibberish -- Perry
+     * So we cannot write this packet.
      */
     if (packet->buffer == NULL)
         return -1;
