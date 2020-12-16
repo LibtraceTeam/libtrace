@@ -77,7 +77,7 @@ struct filter_t {
 } *filters = NULL;
 
 uint64_t packet_count=UINT64_MAX;
-uint64_t packet_interval=UINT64_MAX;
+uint32_t packet_interval=UINT32_MAX;
 pthread_mutex_t ts_lock;
 uint64_t first_ts;
 
@@ -255,7 +255,7 @@ static libtrace_packet_t *cb_packet(libtrace_t *trace, libtrace_thread_t *t,
 		trace_publish_result(trace, t, td->last_key,
                                 tmp, RESULT_USER);
                 trace_post_reporter(trace);
-                td->last_key += packet_interval << 32;
+                td->last_key += (uint64_t)packet_interval << 32;
                 td->results = calloc(1, sizeof(result_t) +
                                 sizeof(statistic_t) * filter_count);
         }
@@ -297,7 +297,7 @@ static void cb_tick(libtrace_t *trace, libtrace_thread_t *t,
                 libtrace_generic_t tmp = {.ptr = td->results};
                 trace_publish_result(trace, t, td->last_key, tmp, RESULT_USER);
                 trace_post_reporter(trace);
-                td->last_key += packet_interval << 32;
+                td->last_key += (uint64_t)packet_interval << 32;
                 td->results = calloc(1, sizeof(result_t) +
                                 sizeof(statistic_t) * filter_count);
         }
@@ -450,10 +450,18 @@ int main(int argc, char *argv[]) {
                                         threadcount = 1;
                                 break;
 			case 'i':
-				packet_interval=strtoul(optarg, NULL, 10);
+				if ((packet_interval=strtoul(optarg, NULL, 10)) == 0) {
+					fprintf(stderr, "Invalid interval: %s\n\n", optarg);
+					usage(argv[0]);
+					return 1;
+				}
 				break;
 			case 'c':
-				packet_count=strtoul(optarg, NULL, 10);
+				if ((packet_count=strtoul(optarg, NULL, 10)) == 0) {
+					fprintf(stderr, "Invalid count: %s\n\n", optarg);
+					usage(argv[0]);
+					return 1;
+				}
 				break;
 			case 'o':
 				if (output_format) free(output_format);
@@ -475,7 +483,7 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
-	if (packet_count == UINT64_MAX && packet_interval == UINT64_MAX) {
+	if (packet_count == UINT64_MAX && packet_interval == UINT32_MAX) {
 		packet_interval = 60; /* every minute */
 	}
 
