@@ -773,7 +773,7 @@ typedef struct libtrace_ip
 #endif
     uint8_t  ip_tos;			/**< Type of Service */
     uint16_t ip_len;			/**< Total Length */
-    int16_t  ip_id;			/**< Identification */
+    uint16_t  ip_id;			/**< Identification */
     uint16_t ip_off;			/**< IP Fragment offset (and flags) */
     uint8_t  ip_ttl;			/**< Time to Live */
     uint8_t  ip_p;			/**< Protocol */
