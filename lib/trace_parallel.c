@@ -443,6 +443,9 @@ DLLEXPORT void libtrace_make_packet_safe(libtrace_packet_t *pkt) {
 
 DLLEXPORT void libtrace_hold_packet(libtrace_packet_t *pkt) {
 
+	if (pkt->buf_control == TRACE_CTRL_PACKET)
+		return;
+
     // Can the format module do this beter than copying the
     // entire packet?
     if (pkt->trace && pkt->trace->format->can_hold_packet)
@@ -914,13 +917,11 @@ static void* hasher_entry(void *data) {
 			}
 		}
 
-        /* Hold the packet to ensure it does not unexpectedly change. This can happen if format
-		 * module manages its own buffers that may be reused before the packet is finised.
-         * This only applies to non live traces using either a dedicated hasher or multiple
-         * perpkt threads with a single read thread.
+        /* Hold the packet to ensure it buffers do not unexpectedly change. This can happen
+		 * if format module manages its own buffers that may be reused before the packet is
+		 * finised.
          */
-        if (!trace->format->info.live && trace->config.burst_size > 1)
-            libtrace_hold_packet(packet);
+        libtrace_hold_packet(packet);
 
 		/* We are guaranteed to have a hash function i.e. != NULL */
 		trace_packet_set_hash(packet, (*trace->hasher)(packet, trace->hasher_data));
@@ -1004,13 +1005,11 @@ static int trace_pread_packet_first_in_first_served(libtrace_t *libtrace,
 				break;
 			}
 		} else {
-            /* Hold the packet to ensure it does not unexpectedly change. This can happen if format
-             * module manages its own buffers that may be reused before the packet is finised.
-             * This only applies to non live traces using either a dedicated hasher or multiple
-             * perpkt threads with a single read thread.
-            */
-            if (!libtrace->format->info.live && libtrace->config.burst_size > 1)
-                libtrace_hold_packet(packets[i]);
+            /* Hold the packet to ensure it buffers do not unexpectedly change. This can happen
+             * if format module manages its own buffers that may be reused before the packet is
+             * finised.
+             */
+            libtrace_hold_packet(packet);
         }
 		/*
 		if (libtrace->config.tick_count && trace_packet_get_order(packets[i]) % libtrace->config.tick_count == 0) {

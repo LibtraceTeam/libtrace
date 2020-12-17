@@ -478,7 +478,7 @@ static int pcap_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 		ret = pcap_next_ex(INPUT.pcap, &pcap_hdr, 
 				(const u_char **)&pcap_payload);
 		
-		packet->buffer = NULL;
+		packet->buffer = pcap_hdr;
 		packet->header = pcap_hdr;
 		packet->payload = pcap_payload;
 		packet->buf_control = TRACE_CTRL_EXTERNAL;
