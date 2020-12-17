@@ -1009,7 +1009,7 @@ static int trace_pread_packet_first_in_first_served(libtrace_t *libtrace,
              * if format module manages its own buffers that may be reused before the packet is
              * finised.
              */
-            libtrace_hold_packet(packet);
+            libtrace_hold_packet(packets[i]);
         }
 		/*
 		if (libtrace->config.tick_count && trace_packet_get_order(packets[i]) % libtrace->config.tick_count == 0) {
