@@ -592,7 +592,9 @@ typedef enum {
 	TRACE_ETHERTYPE_MPLS	= 0x8847,	/**< MPLS Unicast traffic */
 	TRACE_ETHERTYPE_MPLS_MC = 0x8848,	/**< MPLS Multicast traffic */
 	TRACE_ETHERTYPE_PPP_DISC= 0x8863,	/**< PPPoE Service Discovery */
-	TRACE_ETHERTYPE_PPP_SES = 0x8864	/**< PPPoE Session Messages */
+	TRACE_ETHERTYPE_PPP_SES = 0x8864,	/**< PPPoE Session Messages */
+	TRACE_ETHERTYPE_8021X   = 0x888E,	/**< 802.1X Authentication */
+	TRACE_ETHERTYPE_PPP     = 0x880B    /**< PPP */
 } libtrace_ethertype_t;
 
 /** constant to check if a vlan was found */
