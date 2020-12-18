@@ -16,7 +16,7 @@ BINS_DATASTRUCT = test-datastruct-vector test-datastruct-deque \
 BINS_PARALLEL = test-format-parallel test-format-parallel-hasher \
 	test-format-parallel-singlethreaded test-format-parallel-stressthreads \
 	test-format-parallel-singlethreaded-hasher test-format-parallel-reporter \
-	test-tracetime-parallel test-nic
+	test-tracetime-parallel test-nic test-structures
 
 BINS = test-pcap-bpf test-event test-time test-dir test-wireless test-errors \
 	test-plen test-autodetect test-ports test-fragment test-live \
