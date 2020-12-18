@@ -32,11 +32,11 @@
  * libtrace_radiotap_t					done
  * libtrace_ospf_v2_t					done
  * libtrace_ospf_options_t				done
- * libtrace_ospf_lsa_v2_t
+ * libtrace_ospf_lsa_v2_t				done
  * libtrace_ospf_hello_v2_t				done
- * libtrace_ospf_db_desc_v2_t
- * libtrace_ospf_ls_req_t
- * libtrace_ospf_ls_update_t
+ * libtrace_ospf_db_desc_v2_t			done
+ * libtrace_ospf_ls_req_t				done
+ * libtrace_ospf_ls_update_t			part done
  * libtrace_ospf_as_external_lsa_v2_t
  * libtrace_ospf_summary_lsa_v2_t
  * libtrace_ospf_network_lsa_v2_t
@@ -223,9 +223,41 @@ int main() {
 	assert(ntohl(ospf_hello->designated.s_addr) == 3232266500);
 	assert(ntohl(ospf_hello->backup.s_addr) == 3232266501);
 
+	uint8_t buf_ospf_db[8] = {0x05, 0xc4, 0x52, 0x07, 0x00, 0x00, 0x24, 0x8a};
+	libtrace_ospf_db_desc_v2_t *ospf_db = (libtrace_ospf_db_desc_v2_t *)buf_ospf_db;
+	assert(ntohs(ospf_db->mtu) == 1476);
+	assert(*(uint8_t *)&ospf_db->db_desc_options == 82);
+	assert(ospf_db->zero == 0);
+	assert(ospf_db->db_desc_i == 1);
+	assert(ospf_db->db_desc_m == 1);
+	assert(ospf_db->db_desc_ms == 1);
+	assert(ntohl(ospf_db->seq) == 9354);
 
+	uint8_t buf_ospf_lsa[20] = {0x00, 0x28, 0x22, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+								0x01, 0x01, 0x80, 0x00, 0x00, 0x01, 0xbf, 0x62, 0x00, 0x24};
+	libtrace_ospf_lsa_v2_t *ospf_lsa = (libtrace_ospf_lsa_v2_t *)buf_ospf_lsa;
+	assert(ntohs(ospf_lsa->age) == 40);
+	assert(*(uint8_t *)&ospf_lsa->lsa_options == 34);
+	assert(ospf_lsa->lsa_type == TRACE_OSPF_LS_ROUTER);
+	assert(ntohl(ospf_lsa->ls_id.s_addr) == 16843009); // 1.1.1.1
+	assert(ntohl(ospf_lsa->adv_router.s_addr) == 16843009); // 1.1.1.1
+	assert(ntohl(ospf_lsa->seq) == 2147483649);
+	assert(ntohs(ospf_lsa->checksum) == 48994);
+	assert(ntohs(ospf_lsa->length) == 36);
 
+	uint8_t buf_ospf_ls_req[12] = {0x00, 0x00, 0x00, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01};
+	libtrace_ospf_ls_req_t *ospf_ls_req = (libtrace_ospf_ls_req_t *)buf_ospf_ls_req;
+	assert(ntohl(ospf_ls_req->ls_type) == TRACE_OSPF_LS_ROUTER);
+	assert(ntohl(ospf_ls_req->ls_id) == 16843009); // 1.1.1.1
+	assert(ntohl(ospf_ls_req->advertising_router) == 16843009); // 1.1.1.1
 
+	uint8_t buf_ospf_ls_update[40] = {0x00, 0x00, 0x00, 0x01, 0x00, 0x29, 0x22, 0x01, 0x01, 0x01,
+									  0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x80, 0x00, 0x00, 0x01,
+									  0xbf, 0x62, 0x00, 0x24, 0x00, 0x00, 0x00, 0x01, 0xc0, 0xa8,
+									  0x0d, 0x00, 0xff, 0xff, 0xff, 0x00, 0x03, 0x00, 0x2b, 0x67};
+	libtrace_ospf_ls_update_t *ls_update = (libtrace_ospf_ls_update_t *)buf_ospf_ls_update;
+	assert(ntohl(ls_update->ls_num_adv) == 1);
+	/* todo: use api functions to test rest of ls_update */
 
 
 	/*uint8_t buf_8021q[4] = {0x20, 0x00, 0x00, 0x00};
