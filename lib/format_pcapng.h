@@ -109,6 +109,7 @@ typedef struct pcagng_section_header_t {
         uint16_t minorversion;
         uint64_t sectionlen;
 } PACKED pcapng_sec_t;
+ct_assert(sizeof(pcapng_sec_t) == 24);
 
 typedef struct pcapng_interface_header_t {
         uint32_t blocktype;
@@ -117,11 +118,13 @@ typedef struct pcapng_interface_header_t {
         uint16_t reserved;
         uint32_t snaplen;
 } PACKED pcapng_int_t;
+ct_assert(sizeof(pcapng_int_t) == 16);
 
 typedef struct pcapng_nrb_header_t {
         uint32_t blocktype;
         uint32_t blocklen;
 } PACKED pcapng_nrb_t;
+ct_assert(sizeof(pcapng_nrb_t) == 8);
 
 typedef struct pcapng_enhanced_packet_t {
         uint32_t blocktype;
@@ -132,12 +135,14 @@ typedef struct pcapng_enhanced_packet_t {
         uint32_t caplen;
         uint32_t wlen;
 } PACKED pcapng_epkt_t;
+ct_assert(sizeof(pcapng_epkt_t) == 28);
 
 typedef struct pcapng_simple_packet_t {
         uint32_t blocktype;
         uint32_t blocklen;
         uint32_t wlen;
 } PACKED pcapng_spkt_t;
+ct_assert(sizeof(pcapng_spkt_t) == 12);
 
 typedef struct pcapng_old_packet_t {
         uint32_t blocktype;
@@ -149,6 +154,7 @@ typedef struct pcapng_old_packet_t {
         uint32_t caplen;
         uint32_t wlen;
 } PACKED pcapng_opkt_t;
+ct_assert(sizeof(pcapng_opkt_t) == 28);
 
 typedef struct pcapng_stats_header_t {
         uint32_t blocktype;
@@ -157,6 +163,7 @@ typedef struct pcapng_stats_header_t {
         uint32_t timestamp_high;
         uint32_t timestamp_low;
 } PACKED pcapng_stats_t;
+ct_assert(sizeof(pcapng_stats_t) == 20);
 
 typedef struct pcapng_decryption_secrets_header_t {
         uint32_t blocktype;
@@ -164,12 +171,14 @@ typedef struct pcapng_decryption_secrets_header_t {
         uint32_t secrets_type;
         uint32_t secrets_len;
 } PACKED pcapng_secrets_t;
+ct_assert(sizeof(pcapng_secrets_t) == 16);
 
 typedef struct pcapng_custom_header_t {
         uint32_t blocktype;
         uint32_t blocklen;
         uint32_t pen;
 } PACKED pcapng_custom_t;
+ct_assert(sizeof(pcapng_custom_t) == 12);
 
 typedef struct pcapng_interface_t pcapng_interface_t;
 
@@ -228,20 +237,26 @@ struct pcapng_optheader {
         uint16_t optcode;
         uint16_t optlen;
 } PACKED;
+ct_assert(sizeof(struct pcapng_optheader) == 4);
 
 struct pcapng_custom_optheader {
         uint16_t optcode;
         uint16_t optlen;
         uint32_t pen;
 } PACKED;
+ct_assert(sizeof(struct pcapng_custom_optheader) == 8);
+
 struct pcapng_nrb_record {
         uint16_t recordtype;
         uint16_t recordlen;
 } PACKED;
+ct_assert(sizeof(struct pcapng_nrb_record) == 4);
+
 struct pcapng_peeker {
         uint32_t blocktype;
         uint32_t blocklen;
 } PACKED;
+ct_assert(sizeof(struct pcapng_peeker) == 8);
 
 typedef struct pcapng_peeker pcapng_hdr_t;
 
