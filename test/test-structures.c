@@ -1,11 +1,6 @@
 #include "libtrace.h"
 #include <assert.h>
-
-#define CASSERT(predicate, file) _impl_CASSERT_LINE(predicate,__LINE__,file)
-
-#define _impl_PASTE(a,b) a##b
-#define _impl_CASSERT_LINE(predicate, line, file) \
-	typedef char _impl_PASTE(assertion_failed_##file##_,line)[2*!!(predicate)-1];
+#include <inttypes.h>
 
 /*
  * Structures:
@@ -45,7 +40,7 @@
  * libtrace_sll_header_t
  */
 
-int main() {
+void check_eth() {
 	uint8_t buf_eth[14] = {0x00, 0x02, 0x6f, 0x21, 0xec, 0x5f, 0x00,
 						   0x02, 0x6f, 0x21, 0xec, 0x52, 0x88, 0x8e};
 	libtrace_ether_t *eth = (libtrace_ether_t *)buf_eth;
@@ -54,7 +49,9 @@ int main() {
 		assert(eth->ether_shost[i] == buf_eth[i + 6]);
 	}
 	assert(ntohs(eth->ether_type) == TRACE_ETHERTYPE_8021X);
+}
 
+void check_ip4() {
 	uint8_t buf_ip4[20] = {0x45, 0x00, 0x05, 0x8c, 0x74, 0x9f, 0x40,
 						   0x00, 0x31, 0x06, 0x00, 0x00, 0x82, 0xcb,
 						   0xed, 0xc5, 0x61, 0x59, 0x5b, 0x9f};
@@ -70,11 +67,22 @@ int main() {
 	assert(ntohs(ip4->ip_sum) == 0);
 	assert(ntohl(ip4->ip_src.s_addr) == 2194402757);
 	assert(ntohl(ip4->ip_dst.s_addr) == 1633246111);
-	// check flags
-	buf_ip4[0] = 0x4f; assert(ip4->ip_hl == 15);
-	buf_ip4[0] = 0xf5; assert(ip4->ip_v == 15);
-	
+	// set/check bitfields
+	buf_ip4[0] = 0xdc; assert(ip4->ip_hl == 12);
+	buf_ip4[0] = 0xdc; assert(ip4->ip_v == 13);
+	// set/check values
+	buf_ip4[1] = 0xce; assert(ip4->ip_tos == 206);
+	buf_ip4[2] = 0x01; buf_ip4[3] = 0x02; assert(ntohs(ip4->ip_len) == 258);
+	buf_ip4[4] = 0x03; buf_ip4[5] = 0x04; assert(ntohs(ip4->ip_id) == 772);
+	buf_ip4[6] = 0x05; buf_ip4[7] = 0x06; assert(ntohs(ip4->ip_off) == 1286);
+	buf_ip4[8] = 0x07; assert(ip4->ip_ttl == 7);
+	buf_ip4[9] = 0x08; assert(ip4->ip_p == 8);
+	buf_ip4[10] = 0x09; buf_ip4[11] = 0x0a; assert(ntohs(ip4->ip_sum) == 2314);
+	buf_ip4[12] = 0x0b; buf_ip4[13] = 0x0c; buf_ip4[14] = 0x0d; buf_ip4[15] = 0x0e; assert(ntohl(ip4->ip_src.s_addr) == 185339150);
+	buf_ip4[16] = 0x10; buf_ip4[17] = 0x11; buf_ip4[18] = 0x12; buf_ip4[19] = 0x13; assert(ntohl(ip4->ip_dst.s_addr) == 269554195);
+}
 
+void check_ip6() {
 	uint8_t buf_ip6[40] = {0x60, 0x00, 0x00, 0x00, 0x00,
 						   0x54, 0x11, 0xff, 0x26, 0x07,
 						   0xf2, 0xc0, 0xf0, 0x0f, 0xb0,
@@ -92,14 +100,28 @@ int main() {
 		assert(ip6->ip_src.s6_addr[i] == buf_ip6[i + 8]);
 		assert(ip6->ip_dst.s6_addr[i] == buf_ip6[i + 24]);
 	}
+	// set/check values
+	buf_ip6[0] = 0x01; buf_ip6[1] = 0x02; buf_ip6[2] = 0x03; buf_ip6[3] = 0x04; assert(ntohl(ip6->flow) == 16909060);
+	buf_ip6[4] = 0x05; buf_ip6[5] = 0x06; assert(ntohs(ip6->plen) == 1286);
+	buf_ip6[6] = 0x07; assert(ip6->nxt == 7);
+	buf_ip6[7] = 0x08; assert(ip6->hlim == 8);
+}
 
+void check_udp() {
 	uint8_t buf_udp[8] = {0x44, 0x5c, 0x44, 0x5c, 0x00, 0x90, 0xba, 0x03};
 	libtrace_udp_t *udp = (libtrace_udp_t *)buf_udp;
 	assert(ntohs(udp->source) == 17500);
 	assert(ntohs(udp->dest) == 17500);
 	assert(ntohs(udp->len) == 144);
 	assert(ntohs(udp->check) == 47619);
+	// set/check values
+	buf_udp[0] = 0x01; buf_udp[1] = 0x02; assert(ntohs(udp->source) == 258);
+	buf_udp[2] = 0x03; buf_udp[3] = 0x04; assert(ntohs(udp->dest) == 772);
+	buf_udp[4] = 0x05; buf_udp[5] = 0x06; assert(ntohs(udp->len) == 1286);
+	buf_udp[6] = 0x07; buf_udp[7] = 0x08; assert(ntohs(udp->check) == 1800);
+}
 
+void check_tcp() {
 	uint8_t buf_tcp[20] = {0x06, 0xe0, 0x00, 0x19, 0x79, 0x43, 0xd3,
 						   0xbb, 0x88, 0xa4, 0x36, 0xd2, 0x50, 0x18,
 						   0xfe, 0x0a, 0xc3, 0xfc, 0x00, 0x00};
@@ -122,7 +144,7 @@ int main() {
 	assert(ntohs(tcp->window) == 65034);
 	assert(ntohs(tcp->check) == 50172);
 	assert(ntohs(tcp->urg_ptr) == 0);
-	// check flags
+	// check bitfields
 	buf_tcp[12] = 0xf0; assert(tcp->doff == 15);
 	buf_tcp[12] = 0x0e; assert(tcp->res1 == 7);
 	buf_tcp[12] = 0x01; assert(tcp->ecn_ns == 1);
@@ -134,8 +156,17 @@ int main() {
 	buf_tcp[13] = 0x04; assert(tcp->rst == 1);
 	buf_tcp[13] = 0x02; assert(tcp->syn == 1);
 	buf_tcp[13] = 0x01; assert(tcp->fin == 1);
-	
+	// set/check values
+	buf_tcp[0] = 0x01; buf_tcp[1] = 0x02; assert(ntohs(tcp->source) == 258);
+	buf_tcp[2] = 0x02; buf_tcp[3] = 0x03; assert(ntohs(tcp->dest) == 515);
+	buf_tcp[4] = 0x04; buf_tcp[5] = 0x05; buf_tcp[6] = 0x06; buf_tcp[7] = 0x07; assert(ntohl(tcp->seq) == 67438087);
+	buf_tcp[8] = 0x08; buf_tcp[9] = 0x09; buf_tcp[10] = 0x0a; buf_tcp[11] = 0x0b; assert(ntohl(tcp->ack_seq) == 134810123);
+	buf_tcp[14] = 0x0c; buf_tcp[15] = 0x0d; assert(ntohs(tcp->window) == 3085);
+	buf_tcp[16] = 0x0e; buf_tcp[17] = 0x0f; assert(ntohs(tcp->check) == 3599);
+	buf_tcp[18] = 0x10; buf_tcp[19] = 0x11; assert(ntohs(tcp->urg_ptr) == 4113);
+}
 
+void check_icmp() {
 	uint8_t buf_icmp_req[8] = {0x08, 0x00, 0x87, 0x40, 0x70, 0xbf, 0x00, 0x00};
 	libtrace_icmp_t *icmp_req = (libtrace_icmp_t *)buf_icmp_req;
 	assert(icmp_req->type == 8); // echo (ping) request
@@ -143,15 +174,15 @@ int main() {
 	assert(ntohs(icmp_req->checksum) == 34624);
 	assert(ntohs(icmp_req->un.echo.id) == 28863);
 	assert(ntohs(icmp_req->un.echo.sequence) == 0);
+	// set/check values
+	buf_icmp_req[0] = 0x01; assert(icmp_req->type == 1);
+	buf_icmp_req[1] = 0x02; assert(icmp_req->code == 2);
+	buf_icmp_req[2] = 0x03; buf_icmp_req[3] = 0x04; assert(ntohs(icmp_req->checksum) == 772);
+	buf_icmp_req[4] = 0x05; buf_icmp_req[5] = 0x06; assert(ntohs(icmp_req->un.echo.id) == 1286);
+	buf_icmp_req[6] = 0x07; buf_icmp_req[7] = 0x08; assert(ntohs(icmp_req->un.echo.sequence) == 1800);
+}
 
-	uint8_t buf_icmp_reply[8] = {0x00, 0x00, 0x54, 0x68, 0x00, 0x01, 0x00, 0xf3};
-	libtrace_icmp_t *icmp_reply = (libtrace_icmp_t *)buf_icmp_reply;
-	assert(icmp_reply->type == 0); // echo (ping) reply
-	assert(icmp_reply->code == 0);
-	assert(ntohs(icmp_reply->checksum) == 21608);
-	assert(ntohs(icmp_reply->un.echo.id) == 1);
-	assert(ntohs(icmp_reply->un.echo.sequence) == 243);
-
+void check_pppoe() {
 	uint8_t buf_pppoe[10] = {0x11, 0x09, 0x00, 0x00, 0x00,
 							 0x04, 0x01, 0x01, 0x00, 0x00};
 	libtrace_pppoe_t *pppoe = (libtrace_pppoe_t *)buf_pppoe;
@@ -160,10 +191,16 @@ int main() {
 	assert(pppoe->code == 9);
 	assert(ntohs(pppoe->session_id) == 0);
 	assert(ntohs(pppoe->length) == 4);
-	// check flags
-	buf_pppoe[0] = 0x0f; assert(pppoe->version == 15);
-	buf_pppoe[0] = 0xf0; assert(pppoe->type == 15);
+	// check bitfields
+	buf_pppoe[0] = 0x12; assert(pppoe->version == 2);
+	buf_pppoe[0] = 0x12; assert(pppoe->type == 1);
+	// set/check values
+	buf_pppoe[1] = 0x03; assert(pppoe->code == 3);
+	buf_pppoe[2] = 0x04; buf_pppoe[3] = 0x05; assert(ntohs(pppoe->session_id) == 1029);
+	buf_pppoe[4] = 0x06; buf_pppoe[5] = 0x07; assert(ntohs(pppoe->length) == 1543);
+}
 
+void check_vxlan() {
 	uint8_t buf_vxlan[8] = {0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x7b, 0x00};
 	libtrace_vxlan_t *vxlan = (libtrace_vxlan_t *)buf_vxlan;
 	assert(vxlan->flags == 8);
@@ -173,7 +210,18 @@ int main() {
 	uint32_t vni = vxlan->vni[0] << 16 | vxlan->vni[1] << 8 | vxlan->vni[2];
 	assert(vni == 123);
 	assert(vxlan->reserved2 == 0);
+	// set/check values
+	buf_vxlan[0] = 0x01; assert(vxlan->flags == 1);
+	buf_vxlan[1] = 0x02; assert(vxlan->reserved1[0] == 2);
+	buf_vxlan[2] = 0x03; assert(vxlan->reserved1[1] == 3);
+	buf_vxlan[3] = 0x04; assert(vxlan->reserved1[2] == 4);
+	buf_vxlan[4] = 0x05; assert(vxlan->vni[0] == 5);
+	buf_vxlan[5] = 0x06; assert(vxlan->vni[1] == 6);
+	buf_vxlan[6] = 0x07; assert(vxlan->vni[2] == 7);
+	buf_vxlan[7] = 0x08; assert(vxlan->reserved2 == 8);
+}
 
+void check_radiotap() {
 	uint8_t buf_radiotap[25] = {0x00, 0x00, 0x19, 0x00, 0x6f, 0x08, 0x00, 0x00, 0x04,
 								0x64, 0x90, 0x91, 0x00, 0x00, 0x00, 0x00, 0x10, 0x02,
 								0x9e, 0x09, 0x80, 0x04, 0xcc, 0xa5, 0x00};
@@ -183,7 +231,15 @@ int main() {
 	assert(radio_tap->it_pad == 0);
 	assert(radio_tap->it_len == 25);
 	assert(radio_tap->it_present == 2159);
+	// set/check values
+	buf_radiotap[0] = 0x01; assert(radio_tap->it_version == 1);
+	buf_radiotap[1] = 0x02; assert(radio_tap->it_pad == 2);
+	buf_radiotap[2] = 0x03; buf_radiotap[3] = 0x04; assert(ntohs(radio_tap->it_len) == 772);
+	buf_radiotap[4] = 0x05; buf_radiotap[5] = 0x06; buf_radiotap[6] = 0x07; buf_radiotap[7] = 0x08;
+	assert(ntohl(radio_tap->it_present) == 84281096);
+}
 
+void check_80211() {
 	uint8_t buf_80211[24] = {0x80, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff,
 							 0xff, 0x00, 0x16, 0xb6, 0xe3, 0xe9, 0x8f, 0x00, 0x16,
 							 0xb6, 0xe3, 0xe9, 0x8f, 0x30, 0x95};
@@ -206,7 +262,7 @@ int main() {
 		assert(radio->mac3[i] == buf_80211[i + 16]);
 	}
 	assert(ntohs(radio->SeqCtl) == 12437);
-	// check flags
+	// check bitfields
 	buf_80211[0] = 0x03; assert(radio->protocol == 3);
 	buf_80211[0] = 0x0c; assert(radio->type == 3);
 	buf_80211[0] = 0xf0; assert(radio->subtype == 15);
@@ -218,9 +274,12 @@ int main() {
 	buf_80211[1] = 0x20; assert(radio->more_data == 1);
 	buf_80211[1] = 0x40; assert(radio->wep == 1);
 	buf_80211[1] = 0x80; assert(radio->order == 1);
+	// set/check values
+	buf_80211[2] = 0x01; buf_80211[3] = 0x02; assert(ntohs(radio->duration) == 258);
+	buf_80211[22] = 0x03; buf_80211[23] = 0x04; assert(ntohs(radio->SeqCtl) == 772);
+}
 
-	
-	/************************* OSPF *************************/
+void check_ospf_v2() {
 	uint8_t buf_ospf[32] = {0x02, 0x01, 0x00, 0x34, 0xc0, 0xa8, 0xff, 0x0f,
 							0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02,
 							0x00, 0x00, 0x01, 0x10, 0x5a, 0x83, 0x41, 0x12};
@@ -236,7 +295,24 @@ int main() {
 	assert(ospf_hdr->au_key_id == 1);
 	assert(ospf_hdr->au_data_len == 16);
 	assert(ntohl(ospf_hdr->au_seq_num) == 1518551314);
+	// set/check values
+	buf_ospf[0] = 0x01; assert(ospf_hdr->ospf_v == 1);
+	buf_ospf[1] = 0x02; assert(ospf_hdr->type == 2);
+	buf_ospf[2] = 0x03; buf_ospf[3] = 0x04; assert(ntohs(ospf_hdr->ospf_len) == 772);
+	buf_ospf[4] = 0x05; buf_ospf[5] = 0x06; buf_ospf[6] = 0x07; buf_ospf[7] = 0x08;
+	assert(ntohl(ospf_hdr->router.s_addr) == 84281096);
+	buf_ospf[8] = 0x09; buf_ospf[9] = 0x0a; buf_ospf[10] = 0x0b; buf_ospf[11] = 0x0c;
+	assert(ntohl(ospf_hdr->area.s_addr) == 151653132);
+	buf_ospf[12] = 0x0d; buf_ospf[13] = 0x0e; assert(ntohs(ospf_hdr->sum) == 3342);
+	buf_ospf[14] = 0x0f; buf_ospf[15] = 0x10; assert(ntohs(ospf_hdr->au_type) == 3856);
+	buf_ospf[16] = 0x11; buf_ospf[17] = 0x12; assert(ntohs(ospf_hdr->zero) == 4370);
+	buf_ospf[18] = 0x13; assert(ospf_hdr->au_key_id == 19);
+	buf_ospf[19] = 0x14; assert(ospf_hdr->au_data_len == 20);
+	buf_ospf[20] = 0x15; buf_ospf[21] = 0x16; buf_ospf[22] = 0x17; buf_ospf[23] = 0x18;
+	assert(ntohl(ospf_hdr->au_seq_num) == 353769240);
+}
 
+void check_ospf_hello() {
 	uint8_t buf_ospf_hello[28] = {0xff, 0xff, 0xff, 0x00, 0x00, 0x0a, 0x12, 0x01,
 								  0x00, 0x00, 0x00, 0x28, 0xc0, 0xa8, 0x79, 0x04,
 								  0xc0, 0xa8, 0x79, 0x05};
@@ -255,13 +331,26 @@ int main() {
 	assert(ntohl(ospf_hello->deadint) == 40);
 	assert(ntohl(ospf_hello->designated.s_addr) == 3232266500);
 	assert(ntohl(ospf_hello->backup.s_addr) == 3232266501);
-	// check flags
+	// check bitfields
 	buf_ospf_hello[6] = 0x02; assert(ospf_opts->e_bit == 1);
 	buf_ospf_hello[6] = 0x04; assert(ospf_opts->mc_bit == 1);
 	buf_ospf_hello[6] = 0x08; assert(ospf_opts->np_bit == 1);
 	buf_ospf_hello[6] = 0x10; assert(ospf_opts->ea_bit == 1);
 	buf_ospf_hello[6] = 0x20; assert(ospf_opts->dc_bit == 1);
+	// set/check values
+	buf_ospf_hello[0] = 0x01; buf_ospf_hello[1] = 0x02; buf_ospf_hello[2] = 0x03; buf_ospf_hello[3] = 0x04;
+	assert(ntohl(ospf_hello->mask.s_addr) == 16909060);
+	buf_ospf_hello[4] = 0x05; buf_ospf_hello[5] = 0x06; assert(ntohs(ospf_hello->interval) == 1286);
+	buf_ospf_hello[7] = 0x07; assert(ospf_hello->priority == 7);
+	buf_ospf_hello[8] = 0x08; buf_ospf_hello[9] = 0x09; buf_ospf_hello[10] = 0x0a; buf_ospf_hello[11] = 0x0b;
+	assert(ntohl(ospf_hello->deadint) == 134810123);
+	buf_ospf_hello[12] = 0x0c; buf_ospf_hello[13] = 0x0d; buf_ospf_hello[14] = 0x0e; buf_ospf_hello[15] = 0x0f;
+	assert(ntohl(ospf_hello->designated.s_addr) == 202182159);
+	buf_ospf_hello[16] = 0x10; buf_ospf_hello[17] = 0x11; buf_ospf_hello[18] = 0x12; buf_ospf_hello[19] = 0x13;
+	assert(ntohl(ospf_hello->backup.s_addr) == 269554195);
+}
 
+void check_ospf_db_desc() {
 	uint8_t buf_ospf_db[8] = {0x05, 0xc4, 0x52, 0x07, 0x00, 0x00, 0x24, 0x8a};
 	libtrace_ospf_db_desc_v2_t *ospf_db = (libtrace_ospf_db_desc_v2_t *)buf_ospf_db;
 	assert(ntohs(ospf_db->mtu) == 1476);
@@ -271,13 +360,23 @@ int main() {
 	assert(ospf_db->db_desc_m == 1);
 	assert(ospf_db->db_desc_ms == 1);
 	assert(ntohl(ospf_db->seq) == 9354);
-	// check flags
+	// check bitfields
+	buf_ospf_db[2] = 0x02; assert(ospf_db->db_desc_options.e_bit == 1);
+	buf_ospf_db[2] = 0x04; assert(ospf_db->db_desc_options.mc_bit == 1);
+	buf_ospf_db[2] = 0x08; assert(ospf_db->db_desc_options.np_bit == 1);
+	buf_ospf_db[2] = 0x10; assert(ospf_db->db_desc_options.ea_bit == 1);
+	buf_ospf_db[2] = 0x20; assert(ospf_db->db_desc_options.dc_bit == 1);
 	buf_ospf_db[3] = 0x01; assert(ospf_db->db_desc_ms == 1);
 	buf_ospf_db[3] = 0x02; assert(ospf_db->db_desc_m == 1);
 	buf_ospf_db[3] = 0x04; assert(ospf_db->db_desc_i == 1);
 	buf_ospf_db[3] = 0xf8; assert(ospf_db->zero == 31);
+	// set/check values
+	buf_ospf_db[0] = 0x01; buf_ospf_db[1] = 0x02; assert(ntohs(ospf_db->mtu) == 258);
+	buf_ospf_db[4] = 0x03; buf_ospf_db[5] = 0x04; buf_ospf_db[6] = 0x05; buf_ospf_db[7] = 0x06;
+	assert(ntohl(ospf_db->seq) == 50595078);
+}
 
-
+void check_ospf_lsa_v2() {
 	uint8_t buf_ospf_lsa[20] = {0x00, 0x28, 0x22, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
 								0x01, 0x01, 0x80, 0x00, 0x00, 0x01, 0xbf, 0x62, 0x00, 0x24};
 	libtrace_ospf_lsa_v2_t *ospf_lsa = (libtrace_ospf_lsa_v2_t *)buf_ospf_lsa;
@@ -289,21 +388,77 @@ int main() {
 	assert(ntohl(ospf_lsa->seq) == 2147483649);
 	assert(ntohs(ospf_lsa->checksum) == 48994);
 	assert(ntohs(ospf_lsa->length) == 36);
+	// check bitfields
+	buf_ospf_lsa[2] = 0x02; assert(ospf_lsa->lsa_options.e_bit == 1);
+	buf_ospf_lsa[2] = 0x04; assert(ospf_lsa->lsa_options.mc_bit == 1);
+	buf_ospf_lsa[2] = 0x08; assert(ospf_lsa->lsa_options.np_bit == 1);
+	buf_ospf_lsa[2] = 0x10; assert(ospf_lsa->lsa_options.ea_bit == 1);
+	buf_ospf_lsa[2] = 0x20; assert(ospf_lsa->lsa_options.dc_bit == 1);
+	// set/check values
+	buf_ospf_lsa[0] = 0x01; buf_ospf_lsa[1] = 0x02; assert(ntohs(ospf_lsa->age) == 258);
+	buf_ospf_lsa[3] = 0x03; assert(ospf_lsa->lsa_type == 3);
+	buf_ospf_lsa[4] = 0x04; buf_ospf_lsa[5] = 0x05; buf_ospf_lsa[6] = 0x06; buf_ospf_lsa[7] = 0x07;
+	assert(ntohl(ospf_lsa->ls_id.s_addr) == 67438087);
+	buf_ospf_lsa[8] = 0x08; buf_ospf_lsa[9] = 0x09; buf_ospf_lsa[10] = 0x0a; buf_ospf_lsa[11] = 0x0b;
+	assert(ntohl(ospf_lsa->adv_router.s_addr) == 134810123);
+	buf_ospf_lsa[12] = 0x0c; buf_ospf_lsa[13] = 0x0d; buf_ospf_lsa[14] = 0x0e; buf_ospf_lsa[15] = 0x0f;
+	assert(ntohl(ospf_lsa->seq) == 202182159);
+	buf_ospf_lsa[16] = 0x10; buf_ospf_lsa[17] = 0x11; assert(ntohs(ospf_lsa->checksum) == 4113);
+	buf_ospf_lsa[18] = 0x12; buf_ospf_lsa[19] = 0x13; assert(ntohs(ospf_lsa->length) == 4627);
+}
 
+void check_ospf_ls_req() {
 	uint8_t buf_ospf_ls_req[12] = {0x00, 0x00, 0x00, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01};
 	libtrace_ospf_ls_req_t *ospf_ls_req = (libtrace_ospf_ls_req_t *)buf_ospf_ls_req;
 	assert(ntohl(ospf_ls_req->ls_type) == TRACE_OSPF_LS_ROUTER);
 	assert(ntohl(ospf_ls_req->ls_id) == 16843009); // 1.1.1.1
 	assert(ntohl(ospf_ls_req->advertising_router) == 16843009); // 1.1.1.1
+	// set/check values
+	buf_ospf_ls_req[0] = 0x01; buf_ospf_ls_req[1] = 0x02; buf_ospf_ls_req[2] = 0x03; buf_ospf_ls_req[3] = 0x04;
+	assert(ntohl(ospf_ls_req->ls_type) == 16909060);
+	buf_ospf_ls_req[4] = 0x05; buf_ospf_ls_req[5] = 0x06; buf_ospf_ls_req[6] = 0x07; buf_ospf_ls_req[7] = 0x08;
+	assert(ntohl(ospf_ls_req->ls_id) == 84281096);
+	buf_ospf_ls_req[8] = 0x09; buf_ospf_ls_req[9] = 0x0a; buf_ospf_ls_req[10] = 0x0b; buf_ospf_ls_req[11] = 0x0c;
+	assert(ntohl(ospf_ls_req->advertising_router) == 151653132);
+}
 
+void check_ospf_ls_update() {
 	uint8_t buf_ospf_ls_update[40] = {0x00, 0x00, 0x00, 0x01, 0x00, 0x29, 0x22, 0x01, 0x01, 0x01,
 									  0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x80, 0x00, 0x00, 0x01,
 									  0xbf, 0x62, 0x00, 0x24, 0x00, 0x00, 0x00, 0x01, 0xc0, 0xa8,
 									  0x0d, 0x00, 0xff, 0xff, 0xff, 0x00, 0x03, 0x00, 0x2b, 0x67};
 	libtrace_ospf_ls_update_t *ls_update = (libtrace_ospf_ls_update_t *)buf_ospf_ls_update;
 	assert(ntohl(ls_update->ls_num_adv) == 1);
+	// set/check values
+	buf_ospf_ls_update[0] = 0x01; buf_ospf_ls_update[1] = 0x02; buf_ospf_ls_update[2] = 0x03; buf_ospf_ls_update[3] = 0x04;
+	assert(ntohl(ls_update->ls_num_adv) == 16909060);
 	/* todo: use api functions to test rest of ls_update */
+}
 
+int main() {
+
+	if (htonl(47) == 47) {
+		fprintf(stderr, "big endian\n");
+	} else {
+		fprintf(stderr, "little endian\n");
+	}
+
+	check_eth();
+	check_ip4();
+	check_ip6();
+	check_udp();
+	check_tcp();
+	check_icmp();
+	check_pppoe();
+	check_vxlan();
+	check_radiotap();
+	check_80211();
+	check_ospf_v2();
+	check_ospf_hello();
+	check_ospf_db_desc();
+	check_ospf_lsa_v2();
+	check_ospf_ls_req();
+	check_ospf_ls_update();
 
 	/*uint8_t buf_8021q[4] = {0x20, 0x00, 0x00, 0x00};
 	assert(((libtrace_8021q_t *) buf_8021q)->vlan_pri == 1);
