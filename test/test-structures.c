@@ -8,7 +8,7 @@
  * libtrace_ip_t						done
  * libtrace_ip6_t						done
  * libtrace_ip6_frag_t					done
- * libtrace_ip6_ext_t
+ * libtrace_ip6_ext_t					done
  * libtrace_tcp_t						done
  * libtrace_udp_t						done
  * libtrace_icmp_t						done
@@ -120,6 +120,19 @@ void check_ip6_frag() {
 	buf_ip6_frag[2] = 0x03; buf_ip6_frag[3] = 0x04; assert(ntohs(ip6_frag->frag_off) == 772);
 	buf_ip6_frag[4] = 0x05; buf_ip6_frag[5] = 0x06; buf_ip6_frag[6] = 0x07; buf_ip6_frag[7] = 0x08;
 	assert(ntohl(ip6_frag->ident) == 84281096);
+}
+
+void check_ip6_ext() {
+	uint8_t buf_ip6_ext[24] = {0x59, 0x04, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00,
+							   0x00, 0x00, 0x32, 0xa7, 0x55, 0x76, 0xe4, 0x61, 0x3e,
+							   0x1e, 0x4d, 0x1b, 0x16, 0x69, 0x60};
+	libtrace_ip6_ext_t *ip6_ext = (libtrace_ip6_ext_t *)buf_ip6_ext;
+	assert(ip6_ext->nxt == 89);
+	assert(ip6_ext->len == 4);
+	// remaining payload is the rest of a ip6 AH header
+	// set/check values
+	buf_ip6_ext[0] = 0x01; assert(ip6_ext->nxt == 1);
+	buf_ip6_ext[1] = 0x02; assert(ip6_ext->len == 2);
 }
 
 void check_udp() {
@@ -462,6 +475,7 @@ int main() {
 	check_ip4();
 	check_ip6();
 	check_ip6_frag();
+	check_ip6_ext();
 	check_udp();
 	check_tcp();
 	check_icmp();
