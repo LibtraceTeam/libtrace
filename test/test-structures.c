@@ -12,7 +12,7 @@
  * libtrace_tcp_t						done
  * libtrace_udp_t						done
  * libtrace_icmp_t						done
- * libtrace_icmp6_t
+ * libtrace_icmp6_t						done
  * libtrace_llcsnap_t
  * libtrace_8021q_t						broken - fields crossing byte boundaries
  * libtrace_atm_cell_t					broken - fields crossing byte boundaries
@@ -208,6 +208,22 @@ void check_icmp() {
 	buf_icmp_req[2] = 0x03; buf_icmp_req[3] = 0x04; assert(ntohs(icmp_req->checksum) == 772);
 	buf_icmp_req[4] = 0x05; buf_icmp_req[5] = 0x06; assert(ntohs(icmp_req->un.echo.id) == 1286);
 	buf_icmp_req[6] = 0x07; buf_icmp_req[7] = 0x08; assert(ntohs(icmp_req->un.echo.sequence) == 1800);
+}
+
+void check_icmp6() {
+	uint8_t buf_icmp6[8] = {0x80, 0x00, 0x86, 0x3c, 0x11, 0x0d, 0x00, 0x00};
+	libtrace_icmp6_t *icmp6 = (libtrace_icmp6_t *)buf_icmp6;
+	assert(icmp6->type == 128);
+	assert(icmp6->code == 0);
+	assert(ntohs(icmp6->checksum) == 34364);
+	assert(ntohs(icmp6->un.echo.id) == 4365);
+	assert(ntohs(icmp6->un.echo.sequence) == 0);
+	// set/check values
+	buf_icmp6[0] = 0x01; assert(icmp6->type == 1);
+	buf_icmp6[1] = 0x02; assert(icmp6->code == 2);
+	buf_icmp6[2] = 0x03; buf_icmp6[3] = 0x04; assert(ntohs(icmp6->checksum) == 772);
+	buf_icmp6[4] = 0x05; buf_icmp6[5] = 0x06; assert(ntohs(icmp6->un.echo.id) == 1286);
+	buf_icmp6[6] = 0x07; buf_icmp6[7] = 0x08; assert(ntohs(icmp6->un.echo.sequence) == 1800);
 }
 
 void check_pppoe() {
@@ -479,6 +495,7 @@ int main() {
 	check_udp();
 	check_tcp();
 	check_icmp();
+	check_icmp6();
 	check_pppoe();
 	check_vxlan();
 	check_radiotap();
