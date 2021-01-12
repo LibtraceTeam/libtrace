@@ -121,7 +121,7 @@ done
 # Build the DPDK libraries
 # We try to not overwrite these, so that a rebuild is faster
 # We build DPDK without KNI, as most kernel dependent code is there
-#   - also excluding makes the build faster
+#   - excluding it also makes the build faster
 # We also disable error on warning, to improve forwards compiler compatibility
 cd "$DOWNLOAD_DIR"
 for dpdk_build in $(ls -d */)
@@ -134,15 +134,30 @@ do
 		continue
 	fi
 	ERROR_MSG="Building $dpdk_build"
-	do_test make install T=x86_64-native-linuxapp-gcc \
-		             CONFIG_RTE_BUILD_COMBINE_LIBS=y \
-			     CONFIG_RTE_LIBRTE_KNI=n \
-			     CONFIG_RTE_KNI_KMOD=n \
-			     CONFIG_RTE_LIBRTE_PMD_PCAP=y \
-			     CONFIG_RTE_EAL_IGB_UIO=n \
-			     EXTRA_CFLAGS="-fPIC -w -ggdb" -j $BUILD_THREADS \
-			     > build_stdout.txt 2> build_stderr.txt
-	if [ $? = 0 ]; then
+	# Prefer building with make if available otherwise use meson
+	if [ -e ./GNUmakefile ]; then
+		echo "	Building using Make"
+		do_test make install T=x86_64-native-linuxapp-gcc \
+				     CONFIG_RTE_BUILD_COMBINE_LIBS=y \
+				     CONFIG_RTE_LIBRTE_KNI=n \
+				     CONFIG_RTE_KNI_KMOD=n \
+				     CONFIG_RTE_LIBRTE_PMD_PCAP=y \
+				     CONFIG_RTE_EAL_IGB_UIO=n \
+				     EXTRA_CFLAGS="-fPIC -w -ggdb" -j $BUILD_THREADS \
+				     > build_stdout.txt 2> build_stderr.txt
+		ret=$?
+	else
+		echo "	Building using meson"
+		mkdir install
+		if CFLAGS="-ggdb3 -w" meson --prefix=$(pwd)/install build \
+				> build_stdout.txt 2>	build_stderr.txt ; then
+			cd ./build
+			CFLAGS="-ggdb3 -w" do_test meson install > ../build_stdout.txt 2> ../build_stderr.txt
+			ret=$?
+			cd ..
+		fi
+	fi
+	if [ $ret = 0 ]; then
 		touch build_success
 		echo "	Built successfully"
 	else
@@ -195,7 +210,7 @@ do
 	fi
 	echo -n "	"
 	do_test grep "configure: Compiled with DPDK live capture support: Yes" \
-	             "$OUTPUT_PREFIX"/conf_out.txt  
+	             "$OUTPUT_PREFIX"/conf_out.txt
 	if [ $? -ne 0 ]; then
 		LIBTRACE_FAILED="$LIBTRACE_FAILED
 ./configure for libtrace did not detect dpdk $dpdk_build

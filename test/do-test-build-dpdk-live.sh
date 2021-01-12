@@ -14,5 +14,5 @@ do
 	echo "$dpdk_build"
 	cd "$TEST_DIR"
 	export LD_LIBRARY_PATH="$BUILD_DIR/$dpdk_build/lib"
-	./do-live-tests.sh
+	./do-live-tests.sh int dpdk
 done

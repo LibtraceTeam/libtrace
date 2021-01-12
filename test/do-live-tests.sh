@@ -15,7 +15,7 @@ $@"
 }
 
 if [[ -z "$GOT_NETNS" ]]; then
-	./netns-env.sh "./$0"
+	./netns-env.sh "$0" "$@"
 	exit 0
 fi
 
@@ -27,17 +27,40 @@ if [[ -z "$LD_LIBRARY_PATH" ]]; then
 	export DYLD_LIBRARY_PATH="${libdir}"
 fi
 
-declare -a write_formats=("pcapint:veth0" "int:veth0" "ring:veth0" "dpdkvdev:net_pcap0,iface=veth0" "xdp:veth0")
-declare -a read_formats=("pcapint:veth1" "int:veth1" "ring:veth1" "dpdkvdev:net_pcap0,iface=veth1" "xdp:veth1")
+declare -a write_formats=()
+declare -a read_formats=()
+if [[ $# -eq 0 ]]; then
+	declare -a write_formats=("pcapint:veth0" "int:veth0" "ring:veth0" "dpdkvdev:net_pcap0,iface=veth0" "xdp:veth0")
+	declare -a read_formats=("pcapint:veth1" "int:veth1" "ring:veth1" "dpdkvdev:net_pcap1,iface=veth1" "xdp:veth1")
+fi
+
+while [[ $# -gt 0 ]]; do
+	key="$1"
+	case $key in
+	pcap)
+		write_formats+=("pcapint:veth0")
+		read_formats+=("pcapint:veth1")
+		;;
+	dpdk)
+		write_formats+=("dpdkvdev:net_pcap0,iface=veth0")
+		read_formats+=("dpdkvdev:net_pcap1,iface=veth1")
+		;;
+	int|ring|xdp|pcapint)
+		write_formats+=("$key:veth0")
+		read_formats+=("$key:veth1")
+		;;
+	*)
+		echo "Unknown argument $key"
+	esac
+	shift
+done
+echo "Testing formats: ${write_formats[*]}"
 
 echo "Running single threaded API tests"
 for w in "${write_formats[@]}"
 do
 	for r in "${read_formats[@]}"
 	do
-		if [[ "$w" == dpdkvdev* && "$r" == dpdkvdev* ]]; then
-			continue
-		fi
 		echo
 		echo ./test-live "$w" "$r"
 		do_test ./test-live "$w" "$r"
@@ -76,12 +99,13 @@ $@"
 	fi
 }
 
-# Don't test pcapint as it only has a 30 packets buffer and
-# it always drops packets and fails to capture all 100
-declare -a read_formats=("int:veth1" "ring:veth1" "dpdkvdev:net_pcap0,iface=veth1" "xdp:veth1")
-
 for r in "${read_formats[@]}"
 do
+	# Don't test pcapint as it only has a 30 packet buffer and
+	# it always drops packets and fails to capture all 100
+	if [[ $r == "pcapint:veth1" ]]; then
+		continue
+	fi
 	do_parallel_test ./test-format-parallel "$r"
 	do_parallel_test ./test-format-parallel-hasher "$r"
 	# TODO fix test-format-parallel-reporter for live input
