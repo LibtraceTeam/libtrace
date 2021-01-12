@@ -342,6 +342,9 @@ do_test ./test-layer2-headers
 echo " * Layer2 Headers QinQ"
 do_test ./test-qinq
 
+echo " * Test structures"
+do_test ./test-structures
+
 echo
 echo "Tests passed: $OK"
 echo "Tests failed: $FAIL"

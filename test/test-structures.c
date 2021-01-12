@@ -520,4 +520,6 @@ int main() {
     check_ospf_ls_req();
     check_ospf_ls_update();
 
+    printf("success\n");
+
 }
