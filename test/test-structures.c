@@ -499,12 +499,6 @@ void check_ospf_ls_update() {
 
 int main() {
 
-	if (htonl(47) == 47) {
-		fprintf(stderr, "big endian\n");
-	} else {
-		fprintf(stderr, "little endian\n");
-	}
-
 	check_eth();
 	check_ip4();
 	check_ip6();
@@ -525,26 +519,5 @@ int main() {
 	check_ospf_lsa_v2();
 	check_ospf_ls_req();
 	check_ospf_ls_update();
-
-	/*uint8_t buf_8021q[4] = {0x20, 0x00, 0x00, 0x00};
-	assert(((libtrace_8021q_t *) buf_8021q)->vlan_pri == 1);
-	assert(((libtrace_8021q_t *) buf_8021q)->vlan_cfi == 0);
-	assert(ntohs(((libtrace_8021q_t *) buf_8021q)->vlan_id) == 0);
-
-	buf_8021q[0] = 0x10;
-	assert(((libtrace_8021q_t *) buf_8021q)->vlan_pri == 0);
-	assert(((libtrace_8021q_t *) buf_8021q)->vlan_cfi == 1);
-	assert(ntohs(((libtrace_8021q_t *) buf_8021q)->vlan_id) == 0);
 	
-	buf_8021q[0] = 0x00;
-	buf_8021q[1] = 0x01;
-	assert(((libtrace_8021q_t *) buf_8021q)->vlan_pri == 0);
-	assert(((libtrace_8021q_t *) buf_8021q)->vlan_cfi == 0);
-	assert(((libtrace_8021q_t *) buf_8021q)->vlan_id == 1);
-	
-	buf_8021q[0] = 0x02;
-	buf_8021q[1] = 0x01;
-	assert(((libtrace_8021q_t *) buf_8021q)->vlan_pri == 0);
-	assert(((libtrace_8021q_t *) buf_8021q)->vlan_cfi == 0);
-	assert(((libtrace_8021q_t *) buf_8021q)->vlan_id == 0x0201);*/
 }
