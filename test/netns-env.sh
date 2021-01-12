@@ -22,22 +22,22 @@ fi
 # such as trying to respond to ping ARPs etc
 # Turns out the kernel will still try to setup IPv6 link
 # addresses so disable IPv6 on them also
-ip netns add $NS > /dev/null 2>@1
+ip netns add $NS > /dev/null 2>&1
 
-$EXEC ip link delete veth0 > /dev/null 2>@1
+$EXEC ip link delete veth0 > /dev/null 2>&1
 $EXEC ip link add veth0 type veth peer name veth1
 
-$EXEC sysctl -w net.ipv6.conf.veth0.autoconf=0 > /dev/null 2>@1
+$EXEC sysctl -w net.ipv6.conf.veth0.autoconf=0 > /dev/null 2>&1
 
-$EXEC sysctl -w net.ipv6.conf.veth1.autoconf=0 > /dev/null 2>@1
+$EXEC sysctl -w net.ipv6.conf.veth1.autoconf=0 > /dev/null 2>&1
 
-$EXEC sysctl -w net.ipv6.conf.veth0.accept_ra=0 > /dev/null 2>@1
+$EXEC sysctl -w net.ipv6.conf.veth0.accept_ra=0 > /dev/null 2>&1
 
-$EXEC sysctl -w net.ipv6.conf.veth1.accept_ra=0 > /dev/null 2>@1
+$EXEC sysctl -w net.ipv6.conf.veth1.accept_ra=0 > /dev/null 2>&1
 
-$EXEC sysctl -w net.ipv6.conf.veth0.disable_ipv6=1 > /dev/null 2>@1
+$EXEC sysctl -w net.ipv6.conf.veth0.disable_ipv6=1 > /dev/null 2>&1
 
-$EXEC sysctl -w net.ipv6.conf.veth1.disable_ipv6=1 > /dev/null 2>@1
+$EXEC sysctl -w net.ipv6.conf.veth1.disable_ipv6=1 > /dev/null 2>&1
 
 
 $EXEC ip link set veth0 up
