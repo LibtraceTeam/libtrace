@@ -7,7 +7,7 @@
  * libtrace_ether_t						done
  * libtrace_ip_t						done
  * libtrace_ip6_t						done
- * libtrace_ip6_frag_t
+ * libtrace_ip6_frag_t					done
  * libtrace_ip6_ext_t
  * libtrace_tcp_t						done
  * libtrace_udp_t						done
@@ -105,6 +105,21 @@ void check_ip6() {
 	buf_ip6[4] = 0x05; buf_ip6[5] = 0x06; assert(ntohs(ip6->plen) == 1286);
 	buf_ip6[6] = 0x07; assert(ip6->nxt == 7);
 	buf_ip6[7] = 0x08; assert(ip6->hlim == 8);
+}
+
+void check_ip6_frag() {
+	uint8_t buf_ip6_frag[8] = {0x11, 0x00, 0x00, 0x01, 0xf8, 0x8e, 0xb4, 0x66};
+	libtrace_ip6_frag_t *ip6_frag = (libtrace_ip6_frag_t *)buf_ip6_frag;
+	assert(ip6_frag->nxt == 17);
+	assert(ip6_frag->res == 0);
+	assert(ntohs(ip6_frag->frag_off) == 1);
+	assert(ntohl(ip6_frag->ident) == 4170101862);
+	// set/check values
+	buf_ip6_frag[0] = 0x01; assert(ip6_frag->nxt == 1);
+	buf_ip6_frag[1] = 0x02; assert(ip6_frag->res == 2);
+	buf_ip6_frag[2] = 0x03; buf_ip6_frag[3] = 0x04; assert(ntohs(ip6_frag->frag_off) == 772);
+	buf_ip6_frag[4] = 0x05; buf_ip6_frag[5] = 0x06; buf_ip6_frag[6] = 0x07; buf_ip6_frag[7] = 0x08;
+	assert(ntohl(ip6_frag->ident) == 84281096);
 }
 
 void check_udp() {
@@ -446,6 +461,7 @@ int main() {
 	check_eth();
 	check_ip4();
 	check_ip6();
+	check_ip6_frag();
 	check_udp();
 	check_tcp();
 	check_icmp();
