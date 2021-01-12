@@ -16,12 +16,12 @@ BINS_DATASTRUCT = test-datastruct-vector test-datastruct-deque \
 BINS_PARALLEL = test-format-parallel test-format-parallel-hasher \
 	test-format-parallel-singlethreaded test-format-parallel-stressthreads \
 	test-format-parallel-singlethreaded-hasher test-format-parallel-reporter \
-	test-tracetime-parallel test-nic test-structures
+	test-tracetime-parallel test-nic
 
 BINS = test-pcap-bpf test-event test-time test-dir test-wireless test-errors \
 	test-plen test-autodetect test-ports test-fragment test-live \
 	test-live-snaplen test-vxlan test-setcaplen test-wlen test-vlan \
-	test-mpls test-layer2-headers test-qinq \
+	test-mpls test-layer2-headers test-qinq test-structures \
 	$(BINS_DATASTRUCT) $(BINS_PARALLEL)
 
 .PHONY: all clean distclean install depend test address-san
