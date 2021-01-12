@@ -13,7 +13,7 @@
  * libtrace_udp_t						done
  * libtrace_icmp_t						done
  * libtrace_icmp6_t						done
- * libtrace_llcsnap_t
+ * libtrace_llcsnap_t					done - check oui
  * libtrace_8021q_t						broken - fields crossing byte boundaries
  * libtrace_atm_cell_t					broken - fields crossing byte boundaries
  * libtrace_atm_nni_cell_t				broken - fields crossing byte boundaries
@@ -224,6 +224,24 @@ void check_icmp6() {
 	buf_icmp6[2] = 0x03; buf_icmp6[3] = 0x04; assert(ntohs(icmp6->checksum) == 772);
 	buf_icmp6[4] = 0x05; buf_icmp6[5] = 0x06; assert(ntohs(icmp6->un.echo.id) == 1286);
 	buf_icmp6[6] = 0x07; buf_icmp6[7] = 0x08; assert(ntohs(icmp6->un.echo.sequence) == 1800);
+}
+
+void check_llcsnap() {
+	uint8_t buf_llcsnap[8] = {0xaa, 0xaa, 0x03, 0x00, 0x00, 0x0c, 0x20, 0x00};
+	libtrace_llcsnap_t *llcsnap = (libtrace_llcsnap_t *)buf_llcsnap;
+	assert(llcsnap->dsap == 170);
+	assert(llcsnap->ssap == 170);
+	assert(llcsnap->control == 3);
+	//uint32_t ss = (llcsnap->oui & 0xff) << 16 | (llcsnap->oui & 0xff00) | (llcsnap->oui & 0xff0000) >> 16;
+	//assert(ss == 12);
+	// set/check values
+	buf_llcsnap[0] = 0x01; assert(llcsnap->dsap == 0x01);
+	buf_llcsnap[1] = 0x02; assert(llcsnap->ssap == 0x02);
+	buf_llcsnap[2] = 0x03; assert(llcsnap->control == 0x03);
+	//buf_llcsnap[3] = 0x04; buf_llcsnap[4] = 0x05; buf_llcsnap[5] = 0x06;
+	//ss = (llcsnap->oui & 0xff) << 16 | (llcsnap->oui & 0xff00) | (llcsnap->oui & 0xff0000) >> 16;
+	//assert(llcsnap->oui == 394500);
+	buf_llcsnap[6] = 0x07; buf_llcsnap[7] = 0x08; assert(ntohs(llcsnap->type) == 1800);
 }
 
 void check_pppoe() {
@@ -496,6 +514,7 @@ int main() {
 	check_tcp();
 	check_icmp();
 	check_icmp6();
+	check_llcsnap();
 	check_pppoe();
 	check_vxlan();
 	check_radiotap();
