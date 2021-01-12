@@ -278,7 +278,7 @@ typedef struct duck5_0 {
         int32_t         Freq_Err, Phase_Err;
         uint32_t        Set_Duck_Field;
 } PACKED duck5_0_t;
-//ct_assert(sizeof(duck5_0_t) == 72);
+ct_assert(sizeof(duck5_0_t) == 100);
 
 /*
 typedef struct rt_duck_2_4 {
