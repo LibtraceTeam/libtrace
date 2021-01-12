@@ -681,9 +681,35 @@ if test "$want_dpdk" != no; then
 		AC_SUBST([RTE_TARGET])
 		AC_SUBST([RTE_SDK])
 		# Force dpdk library to be statically linked to allow compiler optimisations
-		LIBTRACE_LIBS="$LIBTRACE_LIBS -Wl,--whole-archive -Wl,-l$dpdk_found -Wl,--no-whole-archive -Wl,-lm"
-
+		LIBTRACE_LIBS="$LIBTRACE_LIBS -Wl,--whole-archive -Wl,-l$dpdk_found -Wl,--no-whole-archive -Wl,-lm -Wl,-lc"
+		dpdk_path="$RTE_SDK"
 	fi
+
+        # Look for a DPDK meson build at $RTE_SDK/install or $RTE_SDK/
+        # or $RTE_SDK/libdpdk.pc using pkg-config
+        if test "$dpdk_found" = 0 -a "$RTE_SDK" != "" -a -d "$RTE_SDK"; then
+                AC_MSG_NOTICE(Trying to find a meson DPDK build at $RTE_SDK)
+
+                if test -f "$RTE_SDK/install/lib/x86_64-linux-gnu/pkgconfig/libdpdk.pc"; then
+                        export PKG_CONFIG_PATH="$RTE_SDK/install/lib/x86_64-linux-gnu/pkgconfig"
+                elif test -f "$RTE_SDK/lib/x86_64-linux-gnu/pkgconfig/libdpdk.pc"; then
+                        export PKG_CONFIG_PATH="$RTE_SDK/lib/x86_64-linux-gnu/pkgconfig"
+                elif test -f "$RTE_SDK/libdpdk.pc"; then
+                        export PKG_CONFIG_PATH="$RTE_SDK"
+                fi
+                if test -n "$PKG_CONFIG_PATH" ; then
+                        PKG_PROG_PKG_CONFIG
+                        pkg_config_old="$PKG_CONFIG"
+                        PKG_CONFIG="$PKG_CONFIG --static"
+                        PKG_CHECK_MODULES([DPDK], [libdpdk >= 18], [pkgconf_dpdk_found="yes"],
+                                          [pkgconf_dpdk_found="no"])
+                        PKG_CONFIG="$pkg_config_old"
+                        # Add library directory as RUNPATH in library (-R option)
+                        # Used to load the correct DPDK version when not statically linked
+                        DPDK_LIBS="$(echo $DPDK_LIBS | sed -E 's!-L(/[[^ ]]*)!-R\1 -L\1!g')"
+                        unset PKG_CONFIG_PATH
+                fi
+        fi
 
 	# Find the DPDK system package
 	# We do this last to allow RTE_SDK to override the system library
@@ -711,7 +737,7 @@ if test "$want_dpdk" != no; then
 	# Note the nicer PKG_CHECK_MODULES_STATIC macro doesn't exist in older
 	# distributions.
 	#
-        if test "$dpdk_found" = 0; then
+        if test "$dpdk_found" = 0 -a n"$RTE_SDK" = n""; then
                 PKG_PROG_PKG_CONFIG
                 pkg_config_old="$PKG_CONFIG"
                 PKG_CONFIG="$PKG_CONFIG --static"
@@ -719,12 +745,33 @@ if test "$want_dpdk" != no; then
                                   [pkgconf_dpdk_found="no"])
                 PKG_CONFIG="$pkg_config_old"
         fi
+        # DPDK has been using pkgconf (user-defined or system path)
         if test "$dpdk_found" = 0 -a "x$pkgconf_dpdk_found" = "xyes"; then
-                LIBTRACE_LIBS="$LIBTRACE_LIBS -Wl,--no-as-needed $(echo $DPDK_LIBS | sed 's/ -l/ -Wl,-l/g')"
-                AC_MSG_NOTICE([Pkg config found DPDK libs = $DPDK_LIBS])
+
+                #!!Disabled because DPDK still tries to load plugins twice!!
+                # Try and statically link DPDK into libtrace
+                # - Prior to DPDK 20.08 requires the -Bstatic flag
+                #   - But, plugins (pmd drivers) get loaded twice and error
+                # - 20.08 and newer instead provides -l:librte_xx.a
+                #   - This works correctly as is
+                #case "$DPDK_LIBS" in
+                #    *"-l:"*)
+                #        ;;
+                #    *)
+                #        DPDK_LIBS="-Wl,-Bstatic $DPDK_LIBS -Wl,-Bdynamic"
+                #esac
+
+                # Change -l to -Wl,-l to stop libtool reordering flags like --no-as-needed
+                DPDK_LIBS="-Wl,--no-as-needed $(echo $DPDK_LIBS | sed 's/ -l/ -Wl,-l/g')"
+                # Warn about undefined references (-Wl,-z,defs)
+                # Add libc and libm to the end of the arguments again
+                # because libtool reorganises library order
+                DPDK_LIBS="-Wl,-z,defs $DPDK_LIBS -Wl,-lm -Wl,-lc"
+                LIBTRACE_LIBS="$LIBTRACE_LIBS $DPDK_LIBS"
                 ADD_INCLS="$ADD_INCLS $DPDK_CFLAGS"
-                AC_MSG_NOTICE([Building against system DPDK])
+                AC_MSG_NOTICE([Building against DPDK using pkg-config])
                 dpdk_found=pkgconfig
+                dpdk_path="$(echo $DPDK_LIBS | sed -E 's/.*-L([[^ ]]*).*/\1/g')"
         fi
 
 	if test "$dpdk_found" = 0 -a "$RTE_SDK" = ""; then
@@ -752,6 +799,7 @@ if test "$want_dpdk" != no; then
 				AC_MSG_NOTICE([Building against system DPDK])
 
 				dpdk_found=system
+				dpdk_path=system
 			fi
 		fi
 	fi
@@ -963,6 +1011,7 @@ fi
 
 if test x"$libtrace_dpdk" = xtrue; then
 	AC_MSG_NOTICE([Compiled with DPDK live capture support: Yes])
+	AC_MSG_NOTICE([	DPDK path: $dpdk_path])
 	reportopt "Compiled with DPDK trace NUMA support" $with_numa
 	reportopt "Compiled with clock_gettime support" $with_clock_gettime
 elif test x"$want_dpdk" != "xno"; then
