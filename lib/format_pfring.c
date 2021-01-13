@@ -294,7 +294,7 @@ error:
 
 }
 
-static int pfringzc_start_input(libtrace_t *libtrace) {
+UNUSED static int pfringzc_start_input(libtrace_t *libtrace) {
 
 	if (ZC_FORMAT_DATA->cluster != NULL) {
 		trace_set_err(libtrace, TRACE_ERR_BAD_STATE,
@@ -451,7 +451,7 @@ static int pfring_init_input(libtrace_t *libtrace) {
 	return 0;
 }
 
-static int pfringzc_init_input(libtrace_t *libtrace) {
+UNUSED static int pfringzc_init_input(libtrace_t *libtrace) {
 
 	libtrace->format_data = (struct pfringzc_format_data_t *)
 		malloc(sizeof(struct pfringzc_format_data_t));
@@ -472,7 +472,7 @@ static int pfringzc_init_input(libtrace_t *libtrace) {
 	return 0;
 }
 
-static int pfringzc_config_input(libtrace_t *libtrace, trace_option_t option,
+UNUSED static int pfringzc_config_input(libtrace_t *libtrace, trace_option_t option,
 		void *data) {
 
 	switch (option) {
@@ -500,8 +500,15 @@ static int pfringzc_config_input(libtrace_t *libtrace, trace_option_t option,
 			}
 			break;
 		case TRACE_OPTION_META_FREQ:
-			break;
 		case TRACE_OPTION_EVENT_REALTIME:
+		case TRACE_OPTION_REPLAY_SPEEDUP:
+		case TRACE_OPTION_CONSTANT_ERF_FRAMING:
+		case TRACE_OPTION_DISCARD_META:
+		case TRACE_OPTION_XDP_HARDWARE_OFFLOAD:
+		case TRACE_OPTION_XDP_DRV_MODE:
+		case TRACE_OPTION_XDP_SKB_MODE:
+		case TRACE_OPTION_XDP_ZERO_COPY_MODE:
+		case TRACE_OPTION_XDP_COPY_MODE:
 			break;
 	}
 	return -1;
@@ -534,8 +541,15 @@ static int pfring_config_input(libtrace_t *libtrace, trace_option_t option,
 			}
 			break;
 		case TRACE_OPTION_META_FREQ:
-			break;
 		case TRACE_OPTION_EVENT_REALTIME:
+		case TRACE_OPTION_REPLAY_SPEEDUP:
+		case TRACE_OPTION_CONSTANT_ERF_FRAMING:
+		case TRACE_OPTION_DISCARD_META:
+		case TRACE_OPTION_XDP_HARDWARE_OFFLOAD:
+		case TRACE_OPTION_XDP_DRV_MODE:
+		case TRACE_OPTION_XDP_SKB_MODE:
+		case TRACE_OPTION_XDP_ZERO_COPY_MODE:
+		case TRACE_OPTION_XDP_COPY_MODE:
 			break;
 	}
 	return -1;
@@ -557,7 +571,7 @@ static int pfring_pause_input(libtrace_t *libtrace) {
 
 }
 
-static int pfringzc_pause_input(libtrace_t *libtrace) {
+UNUSED static int pfringzc_pause_input(libtrace_t *libtrace) {
 
 	/* hopefully this will clean up our buffers and queues? */
 	pfring_zc_kill_worker(ZC_FORMAT_DATA->hasher);
@@ -578,7 +592,7 @@ static int pfring_fin_input(libtrace_t *libtrace) {
 }
 
 
-static int pfringzc_fin_input(libtrace_t *libtrace) {
+UNUSED static int pfringzc_fin_input(libtrace_t *libtrace) {
 	if (libtrace->format_data) {
 		if (ZC_FORMAT_DATA->bpffilter)
 			free(ZC_FORMAT_DATA->bpffilter);
@@ -754,7 +768,7 @@ static int pfring_read_generic(libtrace_t *libtrace, libtrace_packet_t *packet,
 
 }
 
-static int pfringzc_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
+UNUSED static int pfringzc_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet UNUSED)
 {
 
 	struct pfringzc_per_thread *pzt = &(ZC_FORMAT_DATA->perthreads[0]);
@@ -766,13 +780,13 @@ static int pfringzc_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 		}
 	}
 
-	pfring_zc_pkt_buff *pbuf = pzt->buffers[pzt->nextpacket];
+	pfring_zc_pkt_buff *pbuf UNUSED = pzt->buffers[pzt->nextpacket];
 	pzt->nextpacket ++;
 
 	/* TODO... */
         fprintf(stderr, "pfringzc_read_packet() is not fully implemented yet\n");
         return -1;
-}
+} UNUSED
 
 static int pfring_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 {
