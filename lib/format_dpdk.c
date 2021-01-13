@@ -781,10 +781,15 @@ static int dpdk_attach_device(char *uridata, struct dpdk_format_data_t * format_
  * port: The DPDK port number of the device to remove
  * return: 0 on success or if not supported by the DPDK version, -1 on error
  */
-static int dpdk_detach_device(int port)
+static int dpdk_close_and_detach_device(portid_t port)
 {
 #ifdef RTE_ETH_FOREACH_MATCHING_DEV
-	if (rte_dev_remove(dpdk_get_device_from_port(port)) != 0) {
+	struct rte_device* dev = dpdk_get_device_from_port(port);
+#endif
+	/* Close the device completely, device cannot be restarted */
+	rte_eth_dev_close(port);
+#ifdef RTE_ETH_FOREACH_MATCHING_DEV
+	if (dev == NULL || rte_dev_remove(dev) != 0) {
 		fprintf(stderr, "rte_dev_remove failed\n");
 		return -1;
 	}
@@ -878,9 +883,8 @@ static int dpdk_fin_output(libtrace_out_t * libtrace) {
 		/* Close the device completely, device cannot be restarted */
 		if (FORMAT(libtrace)->port != RTE_MAX_ETHPORTS &&
 		    FORMAT(libtrace)->paused != DPDK_NEVER_STARTED) {
-			rte_eth_dev_close(FORMAT(libtrace)->port);
-			/* Detach the device if we can */
-			dpdk_detach_device(FORMAT(libtrace)->port);
+			/* Close and detach the device */
+			dpdk_close_and_detach_device(FORMAT(libtrace)->port);
 		}
 		libtrace_list_deinit(FORMAT(libtrace)->per_stream);
 		/* filter here if we used it */
@@ -1991,10 +1995,8 @@ int dpdk_fin_input(libtrace_t * libtrace) {
 			                                RTE_ETH_EVENT_INTR_LSC,
 			                                dpdk_lsc_callback,
 			                                FORMAT(libtrace));
-			/* Close the device completely, device cannot be restarted */
-			rte_eth_dev_close(FORMAT(libtrace)->port);
-			/* If we can, detach the device */
-			dpdk_detach_device(FORMAT(libtrace)->port);
+			/* Close and detach the device */
+			dpdk_close_and_detach_device(FORMAT(libtrace)->port);
 		}
 
 		dpdk_free_memory(FORMAT(libtrace)->pktmbuf_pool,
