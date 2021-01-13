@@ -404,8 +404,7 @@ DLLEXPORT libtrace_t * trace_create_dead (const char *uri) {
 	libtrace->err.err_num = TRACE_ERR_NOERROR;
 
 	if((uridata = strchr(uri,':')) == NULL) {
-		int len = strlen(uri);
-		xstrncpy(scan, uri, len, URI_PROTO_LINE);
+		xstrncpy(scan, uri, strlen(uri), URI_PROTO_LINE);
 	} else {
 		xstrncpy(scan,uri, (size_t)(uridata - uri), URI_PROTO_LINE);
 	}

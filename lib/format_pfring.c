@@ -786,7 +786,7 @@ UNUSED static int pfringzc_read_packet(libtrace_t *libtrace, libtrace_packet_t *
 	/* TODO... */
         fprintf(stderr, "pfringzc_read_packet() is not fully implemented yet\n");
         return -1;
-} UNUSED
+}
 
 static int pfring_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 {
