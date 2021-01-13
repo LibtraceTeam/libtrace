@@ -912,7 +912,7 @@ typedef struct libtrace_icmp6 {
     } echo; /**< Data required for Echo Request and Reply messages */
   } un;
 } PACKED libtrace_icmp6_t;
-ct_assert(sizeof(libtrace_icmp_t) == 8);
+ct_assert(sizeof(libtrace_icmp6_t) == 8);
 
 /** Generic LLC/SNAP header structure */
 typedef struct libtrace_llcsnap
