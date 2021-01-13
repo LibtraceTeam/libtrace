@@ -103,12 +103,11 @@ static const libtrace_packet_cache_t clearcache = {
 static inline void xstrncpy(char *dest, const char *src, size_t n,
                 size_t destlen)
 {
-        size_t slen = destlen - 1;
-        if (n < slen) {
-                slen = n;
-        }
-        strncpy(dest,src,slen);
-        dest[slen]='\0';
+        strncpy(dest,src,destlen);
+		if (n < destlen)
+	        dest[n]='\0';
+		else
+			dest[destlen]='\0';
 }
 
 static char *xstrndup(const char *src,size_t n)
@@ -405,7 +404,8 @@ DLLEXPORT libtrace_t * trace_create_dead (const char *uri) {
 	libtrace->err.err_num = TRACE_ERR_NOERROR;
 
 	if((uridata = strchr(uri,':')) == NULL) {
-		xstrncpy(scan, uri, strlen(uri), URI_PROTO_LINE);
+		int len = strlen(uri);
+		xstrncpy(scan, uri, len, URI_PROTO_LINE);
 	} else {
 		xstrncpy(scan,uri, (size_t)(uridata - uri), URI_PROTO_LINE);
 	}
