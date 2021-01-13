@@ -120,11 +120,13 @@ typedef struct dag_section_header {
         uint16_t type;
         uint16_t len;
 } PACKED dag_sec_t;
+ct_assert(sizeof(dag_sec_t) == 4);
 
 struct dag_opthdr {
         uint16_t optcode;
         uint16_t optlen;
 } PACKED;
+ct_assert(sizeof(struct dag_opthdr) == 4);
 
 typedef struct dag_record dag_record_t;
 

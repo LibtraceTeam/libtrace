@@ -507,6 +507,7 @@ typedef struct libtrace_pflog_header_t {
 	uint8_t	   dir;
 	uint8_t	   pad[3];
 } PACKED libtrace_pflog_header_t;
+ct_assert(sizeof(libtrace_pflog_header_t) == 49);
 
 /** A libtrace capture format module */
 /* All functions should return -1, or NULL on failure */
