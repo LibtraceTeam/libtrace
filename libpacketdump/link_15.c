@@ -40,11 +40,13 @@
 #define ALIGN_NATURAL_32(_p,_s,_c) \
 	while ( (_p - _s) % sizeof(uint32_t)) {_p++; _c++;}
 #define ALIGN_NATURAL_16(_p,_s,_c) \
-	while ( (_p - _s) % sizeof(uint16_t)) {_p++; _c++;} 
+	while ( (_p - _s) % sizeof(uint16_t)) {_p++; _c++;}
+
+typedef uint32_t unaligned_uint32_t __attribute__((__aligned__(1)));
 
 DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len)
 {
-	uint8_t *ptr;
+	unaligned_uint32_t *ptr; 
 	uint8_t *p; /* Our current field "cursor" */
 	uint8_t *s; /* Start of data fields, for alignment */
 	struct libtrace_radiotap_t *rtap;
@@ -68,23 +70,23 @@ DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len)
 			rtap_len, rtap_pres);
 	
 	/* Check for extended bitmasks */
-	ptr = (uint8_t *)&(rtap->it_present);
+	ptr = (uint32_t *) (char *)(&(rtap->it_present));
 	
 	if ( (rtap_pres) & (1 << TRACE_RADIOTAP_EXT) ) 
 		printf("  extended fields:");
 	
-	while( (bswap_le_to_host32(*(uint32_t *)ptr)) & (1 << TRACE_RADIOTAP_EXT) ) {
+	while( (bswap_le_to_host32(*ptr)) & (1 << TRACE_RADIOTAP_EXT) ) {
 		rtap_real_len += sizeof (uint32_t);
-		ptr += sizeof(uint32_t);
-		printf(" %#08x", bswap_le_to_host32(*(uint32_t *)ptr));
+		ptr++;
+		printf(" %#08x", bswap_le_to_host32(*ptr));	
 	}
 
-	if ( (rtap_pres) & (1 << TRACE_RADIOTAP_EXT) )
-		printf("\n");
+        if ( (rtap_pres) & (1 << TRACE_RADIOTAP_EXT) )
+                printf("\n");
 
 	/* make p point to the first data field */
 	s = (uint8_t *) rtap;
-	p = (uint8_t *) (ptr+=sizeof(uint32_t));
+        p = (uint8_t *) ++ptr;
 
 	if (rtap_pres & (1 << TRACE_RADIOTAP_TSFT)) {
 		ALIGN_NATURAL_64(p,s,rtap_real_len);
