@@ -78,6 +78,7 @@ typedef struct fifo_info {
         uint64_t length;	/**< The total length of the fifo */
         uint64_t used;		/**< The amount of fifo space in use */
 } PACKED fifo_info_t;
+ct_assert(sizeof(fifo_info_t) == 40);
 
 /** RT packet header */
 typedef struct rt_header {
@@ -93,6 +94,7 @@ typedef struct rt_header {
 	/** The sequence number of the packet */
 	uint32_t sequence;
 } PACKED rt_header_t;
+ct_assert(sizeof(rt_header_t) == 12);
 
 /* TODO: Reorganise this struct once more hello info is added */
 
@@ -102,6 +104,7 @@ typedef struct rt_hello {
 	 *  i.e. expecting acknowledgements */
 	uint8_t reliable;	
 } PACKED rt_hello_t ;
+ct_assert(sizeof(rt_hello_t) == 1);
 
 #if 0
 typedef struct rt_start {
@@ -114,12 +117,14 @@ typedef struct rt_ack {
 	/** The sequence number of the last received RT packet */
 	uint32_t sequence;
 } PACKED rt_ack_t;
+ct_assert(sizeof(rt_ack_t) == 4);
 
 /** RT Status sub-header */
 typedef struct rt_status {
 	/** Statistics describing the current status of the sender fifo */
 	fifo_info_t fifo_status;
 } PACKED rt_status_t;
+ct_assert(sizeof(rt_status_t) == 40);
 
 #if 0
 typedef struct rt_duck {
@@ -154,6 +159,7 @@ typedef struct rt_deny_conn {
 	/** The reason that the connection was denied */
 	uint32_t reason;
 } PACKED rt_deny_conn_t;
+ct_assert(sizeof(rt_deny_conn_t) == 4);
 
 #if 0
 typedef struct rt_pause {
@@ -186,6 +192,7 @@ typedef struct rt_metadata {
 	/** Length of the value string that follows the header */
 	uint32_t value_len;
 } PACKED rt_metadata_t;
+ct_assert(sizeof(rt_metadata_t) == 8);
 
 /** Specifications of duck structures - duck2_4 and duck2_5 match Endace's
  * duck_inf and duckinf_t respectively. Unfortunately, Endace don't exactly
@@ -223,6 +230,7 @@ typedef struct duck2_4 {
 	uint32_t	Stat_End;   
         uint32_t   	Set_Duck_Field;
 } PACKED duck2_4_t;
+ct_assert(sizeof(duck2_4_t) == 112);
 
 /** DAG 2.5 DUCK */
 typedef struct duck2_5 {
@@ -246,6 +254,7 @@ typedef struct duck2_5 {
 	uint32_t	Stat_End;
         uint64_t        Last_TSC;
 } PACKED duck2_5_t;
+ct_assert(sizeof(duck2_5_t) == 84);
 
 typedef struct duck5_0 {
         int64_t         Phase_Correction;
@@ -269,6 +278,7 @@ typedef struct duck5_0 {
         int32_t         Freq_Err, Phase_Err;
         uint32_t        Set_Duck_Field;
 } PACKED duck5_0_t;
+ct_assert(sizeof(duck5_0_t) == 100);
 
 /*
 typedef struct rt_duck_2_4 {

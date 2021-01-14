@@ -21,7 +21,7 @@ BINS_PARALLEL = test-format-parallel test-format-parallel-hasher \
 BINS = test-pcap-bpf test-event test-time test-dir test-wireless test-errors \
 	test-plen test-autodetect test-ports test-fragment test-live \
 	test-live-snaplen test-vxlan test-setcaplen test-wlen test-vlan \
-	test-mpls test-layer2-headers test-qinq \
+	test-mpls test-layer2-headers test-qinq test-structures \
 	$(BINS_DATASTRUCT) $(BINS_PARALLEL)
 
 .PHONY: all clean distclean install depend test address-san

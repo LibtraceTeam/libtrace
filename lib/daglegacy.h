@@ -45,12 +45,14 @@ typedef struct legacy_cell {
         uint64_t  ts;		/**< 64-bit timestamp in the ERF format */
         uint32_t  crc;		/**< CRC checksum */
 } PACKED legacy_cell_t;
+ct_assert(sizeof(legacy_cell_t) == 12);
 
 /** Legacy Ethernet header */
 typedef struct legacy_ether {
         uint64_t  ts;		/**< 64-bit timestamp in the ERF format */
         uint16_t  wlen;		/**< Wire length */
 } PACKED legacy_ether_t;
+ct_assert(sizeof(legacy_ether_t) == 10);
 
 /** Legacy Packet-over-SONET header */
 typedef struct legacy_pos {
@@ -58,12 +60,14 @@ typedef struct legacy_pos {
         uint32_t  slen;		/**< Capture length */
         uint32_t  wlen;		/**< Wire length */
 } PACKED legacy_pos_t;
+ct_assert(sizeof(legacy_pos_t) == 16);
 
 /** ATM cell header capture, a la Auckland VII */
 typedef struct atmhdr {
 	uint32_t ts_fraction;	/**< Partial seconds portion of the timestamp */
 	uint32_t ts_sec;	/**< Seconds portion of the timestamp */
 } PACKED atmhdr_t;
+ct_assert(sizeof(atmhdr_t) == 8);
 
 /** Legacy header format used for capturing the NZIX-I trace set */
 typedef struct legacy_nzix {
@@ -78,4 +82,5 @@ typedef struct legacy_nzix {
 	 * IP header is undivided */
 	uint8_t pad[2];		/**< Padding */
 } PACKED legacy_nzix_t;
+ct_assert(sizeof(legacy_nzix_t) == 14);
 #endif

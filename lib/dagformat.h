@@ -54,6 +54,7 @@ typedef struct pos_rec {
 	uint32_t  hdlc;			/**< The HDLC header */	
 	uint8_t	  pload[1];		/**< First byte of payload */
 }  PACKED pos_rec_t;
+ct_assert(sizeof(pos_rec_t) == 5);
 
 /** GPP Type 2 */
 typedef struct eth_rec {
@@ -64,18 +65,21 @@ typedef struct eth_rec {
 	uint16_t  etype;		/**< Ethertype */
 	uint8_t   pload[1];		/**< First byte of payload */
 }  PACKED eth_rec_t;
+ct_assert(sizeof(eth_rec_t) == 17);
 
 /** GPP Type 3 */
 typedef struct atm_rec {
 	uint32_t  header;		/**< The ATM header */ 
 	uint8_t   pload[1];		/**< First byte of payload */
 }  PACKED atm_rec_t;
+ct_assert(sizeof(atm_rec_t) == 5);
 
 /** GPP Type 4 */
 typedef struct aal5_rec {
 	uint32_t  header; 		/**< The AAL5 header */
 	uint8_t   pload[1];		/**< First byte of payload */
 }  PACKED aal5_rec_t;
+ct_assert(sizeof(aal5_rec_t) == 5);
 
 /** Flags */
 typedef struct flags {
@@ -86,6 +90,7 @@ typedef struct flags {
 	LT_BITFIELD8  dserror:1;	/**< Data stream error */
 	LT_BITFIELD8  pad:2;		/**< Unused */
 } PACKED flags_t;
+ct_assert(sizeof(flags_t) == 1);
 
 /** GPP Global type */
 typedef struct dag_record {
@@ -102,6 +107,7 @@ typedef struct dag_record {
 		aal5_rec_t      aal5;
 	} rec;			/**< The captured record itself */
 } PACKED dag_record_t;
+ct_assert(sizeof(dag_record_t) == 33);
 
 #ifdef WIN32
 #pragma pack(pop)

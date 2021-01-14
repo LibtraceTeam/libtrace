@@ -250,7 +250,7 @@ struct libtrace_thread_t {
 	int perpkt_num; // A number from 0-X that represents this perpkt threads number
 				// in the table, intended to quickly identify this thread
 				// -1 represents NA (such as the case this is not a perpkt thread)
-} ALIGN_STRUCT(CACHE_LINE_SIZE);
+} ALIGNED(CACHE_LINE_SIZE);
 
 /**
  * Storage to note time value against each.
@@ -521,6 +521,7 @@ typedef struct libtrace_pflog_header_t {
 	uint8_t	   dir;
 	uint8_t	   pad[3];
 } PACKED libtrace_pflog_header_t;
+ct_assert(sizeof(libtrace_pflog_header_t) == 49);
 
 /** A libtrace capture format module */
 /* All functions should return -1, or NULL on failure */
