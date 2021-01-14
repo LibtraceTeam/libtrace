@@ -286,7 +286,7 @@ struct linux_per_stream_t {
 	/* The ring buffer layout */
 	struct tpacket_req req;
 	uint64_t last_timestamp;
-} ALIGN_STRUCT(CACHE_LINE_SIZE);
+} ALIGNED(CACHE_LINE_SIZE);
 
 #define ZERO_LINUX_STREAM {-1, MAP_FAILED, 0, {0,0,0,0}, 0}
 

@@ -308,7 +308,7 @@ struct dpdk_per_stream_t
         uint64_t ts_first_sys; /* Sytem timestamp of the first packet in nanoseconds */
         uint32_t wrap_count; /* Number of times the NIC clock has wrapped around completely */
 #endif
-} ALIGN_STRUCT(CACHE_LINE_SIZE);
+} ALIGNED(CACHE_LINE_SIZE);
 
 #if HAS_HW_TIMESTAMPS_82580
 #define DPDK_EMPTY_STREAM {-1, 0, NULL, -1, 0, 0}

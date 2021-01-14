@@ -119,6 +119,7 @@ AC_ARG_ENABLE(address-san, AS_HELP_STRING(--enable-address-san, Enable address a
 gl_VISIBILITY
 
 gcc_PACKED
+gcc_ALIGNED
 gcc_DEPRECATED
 gcc_UNUSED
 gcc_PURE

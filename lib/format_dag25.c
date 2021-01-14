@@ -183,7 +183,7 @@ struct dag_format_data_t {
 		/* Dummy trace to ensure DUCK packets are dealt with using the
 		 * DUCK format functions */
 		libtrace_t *dummy_duck;
-	} duck ALIGN_STRUCT(CACHE_LINE_SIZE);
+	} duck ALIGNED(CACHE_LINE_SIZE);
 };
 
 /* To be thread-safe, we're going to need a mutex for operating on the list
