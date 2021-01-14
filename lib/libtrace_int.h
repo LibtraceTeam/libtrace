@@ -74,10 +74,12 @@ extern "C" {
 #endif
 
 #if defined(__GNUC__) && !defined(__clang__) && !defined(__INTEL_COMPILER)
-# define GCC_COMPILER 1
+# define HAVE_GCC_COMPILER 1
+#else
+# define HAVE_GCC_COMPILER 0
 #endif
 
-#if GCC_COMPILER
+#if HAVE_GCC_COMPILER
 # define LT_IGNORE_STRING_OVERFLOW \
 	_Pragma ("GCC diagnostic push") \
 	_Pragma ("GCC diagnostic ignored \"-Wstringop-overflow\"")

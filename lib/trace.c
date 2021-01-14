@@ -113,7 +113,7 @@ static inline void xstrncpy(char *dest, const char *src, size_t n,
 
 	// suppress GCC warnings for string overflow
 	LT_IGNORE_STRING_OVERFLOW
-    	strncpy(dest,src,slen);
+		strncpy(dest,src,slen);
 	LT_PRAGMA_POP
 
 	dest[slen]='\0';
