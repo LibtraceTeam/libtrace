@@ -266,53 +266,53 @@ void check_llcsnap() {
 void check_8021q() {
     uint8_t buf[4] = {0x00, 0x64, 0x86, 0xdd};
     libtrace_8021q_t *vlan = (libtrace_8021q_t *)buf;
-    test(VLAN_PCP(vlan) == 0, "check_8021q - pcp");
-    test(VLAN_DEI(vlan) == 0, "check_8021q - dei");
-    test(VLAN_VID(vlan) == 100, "check_8021q - vid");
+    test(LT_VLAN_PCP(vlan) == 0, "check_8021q - pcp");
+    test(LT_VLAN_DEI(vlan) == 0, "check_8021q - dei");
+    test(LT_VLAN_VID(vlan) == 100, "check_8021q - vid");
     // set/check values
-    buf[0] = 0xe0; test(VLAN_PCP(vlan) == 7, "check_8021q - pcp");
-    buf[0] = 0x10; test(VLAN_DEI(vlan) == 1, "check_8021q - dei");
-    buf[0] = 0x02; buf[1] = 0xff; test(VLAN_VID(vlan) == 767, "check_8021q - vid");
+    buf[0] = 0xe0; test(LT_VLAN_PCP(vlan) == 7, "check_8021q - pcp");
+    buf[0] = 0x10; test(LT_VLAN_DEI(vlan) == 1, "check_8021q - dei");
+    buf[0] = 0x02; buf[1] = 0xff; test(LT_VLAN_VID(vlan) == 767, "check_8021q - vid");
 }
 
 void check_atm_cell() {
     uint8_t buf[5] = {0x01, 0x02, 0x03, 0x04, 0x05};
     libtrace_atm_cell_t *atm = (libtrace_atm_cell_t *)buf;
-    test(ATM_GFC(atm) == 0, "check_atm_cell - gfc");
-    test(ATM_VPI(atm) == 16, "check_atm_cell - vpi");
-    test(ATM_VCI(atm) == 8240, "check_atm_cell - vci");
-    test(ATM_PT(atm) == 2, "check_atm_cell - pt");
-    test(ATM_CLP(atm) == 0, "check_atm_cell - clp");
+    test(LT_ATM_GFC(atm) == 0, "check_atm_cell - gfc");
+    test(LT_ATM_VPI(atm) == 16, "check_atm_cell - vpi");
+    test(LT_ATM_VCI(atm) == 8240, "check_atm_cell - vci");
+    test(LT_ATM_PT(atm) == 2, "check_atm_cell - pt");
+    test(LT_ATM_CLP(atm) == 0, "check_atm_cell - clp");
     test(atm->hec == 5, "check_atm_cell - hec");
 }
 
 void check_atm_nni_cell() {
     uint8_t buf[5] = {0x01, 0x02, 0x03, 0x04, 0x05};
     libtrace_atm_nni_cell_t *atm = (libtrace_atm_nni_cell_t *)buf;
-    test(ATM_NNI_VPI(atm) == 16, "check_atm_nni - vpi");
-    test(ATM_NNI_VCI(atm) == 8240, "check_atm_nni - vci");
-    test(ATM_NNI_PT(atm) == 2, "check_atm_nni - pt");
-    test(ATM_NNI_CLP(atm) == 0, "check_atm_nni - clp");
+    test(LT_ATM_NNI_VPI(atm) == 16, "check_atm_nni - vpi");
+    test(LT_ATM_NNI_VCI(atm) == 8240, "check_atm_nni - vci");
+    test(LT_ATM_NNI_PT(atm) == 2, "check_atm_nni - pt");
+    test(LT_ATM_NNI_CLP(atm) == 0, "check_atm_nni - clp");
     test(atm->hec == 5, "check_atm_nni - hec");
 }
 
 void check_atm_capture_cell() {
     uint8_t buf[4] = {0x01, 0x02, 0x03, 0x04};
     libtrace_atm_capture_cell_t *atm = (libtrace_atm_capture_cell_t *)buf;
-    test(ATM_GFC(atm) == 0, "check_atm_capture_cell - gfc");
-    test(ATM_VPI(atm) == 16, "check_atm_capture_cell - vpi");
-    test(ATM_VCI(atm) == 8240, "check_atm_capture_cell - vci");
-    test(ATM_PT(atm) == 2, "check_atm_capture_cell - pt");
-    test(ATM_CLP(atm) == 0, "check_atm_capture_cell - clp");
+    test(LT_ATM_GFC(atm) == 0, "check_atm_capture_cell - gfc");
+    test(LT_ATM_VPI(atm) == 16, "check_atm_capture_cell - vpi");
+    test(LT_ATM_VCI(atm) == 8240, "check_atm_capture_cell - vci");
+    test(LT_ATM_PT(atm) == 2, "check_atm_capture_cell - pt");
+    test(LT_ATM_CLP(atm) == 0, "check_atm_capture_cell - clp");
 }
 
 void check_atm_nni_capture_cell() {
     uint8_t buf[4] = {0x01, 0x02, 0x03, 0x04};
     libtrace_atm_nni_capture_cell_t *atm = (libtrace_atm_nni_capture_cell_t *)buf;
-    test(ATM_NNI_VPI(atm) == 16, "check_atm_nni_capture_cell - vpi");
-    test(ATM_NNI_VCI(atm) == 8240, "check_atm_nni_capture_cell - vci");
-    test(ATM_NNI_PT(atm) == 2, "check_atm_nni_capture_cell - pt");
-    test(ATM_NNI_CLP(atm) == 0, "check_atm_nni_capture_cell - clp");
+    test(LT_ATM_NNI_VPI(atm) == 16, "check_atm_nni_capture_cell - vpi");
+    test(LT_ATM_NNI_VCI(atm) == 8240, "check_atm_nni_capture_cell - vci");
+    test(LT_ATM_NNI_PT(atm) == 2, "check_atm_nni_capture_cell - pt");
+    test(LT_ATM_NNI_CLP(atm) == 0, "check_atm_nni_capture_cell - clp");
 }
 
 void check_ppp() {

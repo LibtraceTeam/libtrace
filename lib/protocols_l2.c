@@ -837,7 +837,7 @@ void *trace_get_payload_from_atm(void *link,
 	cell=(libtrace_atm_capture_cell_t*)link;
 
 	if (type)
-		*type=ATM_PT(cell);
+		*type=LT_ATM_PT(cell);
 
 	if (remaining)
 		*remaining-=sizeof(libtrace_atm_capture_cell_t);

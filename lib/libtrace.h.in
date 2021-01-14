@@ -950,9 +950,9 @@ typedef struct libtrace_8021q
     uint16_t vlan_ether_type;   /**< VLAN Sub-packet Type ID Field 
                                   * (next-header)*/
 
-    #define VLAN_PCP(x) ((ntohs(x->tci) & 0xe000) >> 13)
-    #define VLAN_DEI(x) ((ntohs(x->tci) & 0x1000) >> 12)
-    #define VLAN_VID(x) (ntohs(x->tci) & 0xfff)
+    #define LT_VLAN_PCP(x) ((ntohs(x->tci) & 0xe000) >> 13)
+    #define LT_VLAN_DEI(x) ((ntohs(x->tci) & 0x1000) >> 12)
+    #define LT_VLAN_VID(x) (ntohs(x->tci) & 0xfff)
 } PACKED libtrace_8021q_t;
 ct_assert(sizeof(libtrace_8021q_t) == 4);
 
@@ -971,11 +971,11 @@ typedef struct libtrace_atm_cell
     uint32_t gfc_vpi_vci_pt_clp;    /**< gfc, vpi, vci, pt, clp */
     uint8_t hec;                    /**< Header Error Control */
 
-    #define ATM_GFC(x) ((ntohl(x->gfc_vpi_vci_pt_clp) & 0xf0000000) >> 28)
-    #define ATM_VPI(x) ((ntohl(x->gfc_vpi_vci_pt_clp) & 0x0ff00000) >> 20)
-    #define ATM_VCI(x) ((ntohl(x->gfc_vpi_vci_pt_clp) & 0x0ffff0) >> 4)
-    #define ATM_PT(x) ((ntohl(x->gfc_vpi_vci_pt_clp) & 0x0e) >> 1)
-    #define ATM_CLP(x) (ntohl(x->gfc_vpi_vci_pt_clp) & 0x01)
+    #define LT_ATM_GFC(x) ((ntohl(x->gfc_vpi_vci_pt_clp) & 0xf0000000) >> 28)
+    #define LT_ATM_VPI(x) ((ntohl(x->gfc_vpi_vci_pt_clp) & 0x0ff00000) >> 20)
+    #define LT_ATM_VCI(x) ((ntohl(x->gfc_vpi_vci_pt_clp) & 0x0ffff0) >> 4)
+    #define LT_ATM_PT(x) ((ntohl(x->gfc_vpi_vci_pt_clp) & 0x0e) >> 1)
+    #define LT_ATM_CLP(x) (ntohl(x->gfc_vpi_vci_pt_clp) & 0x01)
 } PACKED libtrace_atm_cell_t;
 ct_assert(sizeof(libtrace_atm_cell_t) == 5);
 
@@ -993,10 +993,10 @@ typedef struct libtrace_atm_nni_cell
     uint32_t vpi_vci_pt_clp;    /**< vpi, vci, pt, clp */
     uint8_t hec;                /**< Header Error Control */
 
-    #define ATM_NNI_VPI(x) ((ntohl(x->vpi_vci_pt_clp) & 0xfff00000) >> 20)
-    #define ATM_NNI_VCI(x) ((ntohl(x->vpi_vci_pt_clp) & 0x0ffff0) >> 4)
-    #define ATM_NNI_PT(x) ((ntohl(x->vpi_vci_pt_clp) & 0x0e) >> 1)
-    #define ATM_NNI_CLP(x) (ntohl(x->vpi_vci_pt_clp) & 0x01)
+    #define LT_ATM_NNI_VPI(x) ((ntohl(x->vpi_vci_pt_clp) & 0xfff00000) >> 20)
+    #define LT_ATM_NNI_VCI(x) ((ntohl(x->vpi_vci_pt_clp) & 0x0ffff0) >> 4)
+    #define LT_ATM_NNI_PT(x) ((ntohl(x->vpi_vci_pt_clp) & 0x0e) >> 1)
+    #define LT_ATM_NNI_CLP(x) (ntohl(x->vpi_vci_pt_clp) & 0x01)
 } PACKED libtrace_atm_nni_cell_t;
 ct_assert(sizeof(libtrace_atm_nni_cell_t) == 5);
 
