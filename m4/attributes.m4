@@ -49,6 +49,32 @@ AC_DEFUN([gcc_PACKED],
     [Define to 1 or 0, depending on whether the compiler supports the gcc packed attribute.])
 ])
 
+AC_DEFUN([gcc_ALIGNED],
+[
+  AC_REQUIRE([check_WERROR])
+  HAVE_ATTRIBUTE_ALIGNED=0
+  if test -n "$CC"; then
+    AS_IF([eval test x$lt_cv_werror_flag = xyes], [errflag=-Werror], [])
+    AC_CACHE_CHECK([if compiler supports __attribute__((aligned(1)))],
+      [lt_cv_attribute_aligned],
+      [saved="$CFLAGS"
+       CFLAGS="$CFLAGS $errflag"
+       AC_COMPILE_IFELSE([AC_LANG_SOURCE(
+         [struct s { char a; char b; int val; long val2; void *ptr;} __attribute__((aligned(1)));])],
+         [lt_cv_attribute_aligned=yes],
+         [lt_cv_attribute_aligned=no]
+       )
+       CFLAGS="$saved"
+      ])
+    if test x$lt_cv_attribute_aligned = xyes; then
+      HAVE_ATTRIBUTE_ALIGNED=1
+    fi
+  fi
+  AC_SUBST([HAVE_ATTRIBUTE_ALIGNED])
+  AC_DEFINE_UNQUOTED([HAVE_ATTRIBUTE_ALIGNED], [$HAVE_ATTRIBUTE_ALIGNED],
+    [Define to 1 or 0, depending on whether the compiler supports the gcc aligned attribute.])
+])
+
 AC_DEFUN([gcc_UNUSED],
 [
   AC_REQUIRE([check_WERROR])
