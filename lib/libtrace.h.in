@@ -241,15 +241,15 @@ extern "C" {
     #endif
 #endif
 
-typedef uint64_t unaligned_uint64_t ALIGNED(1);
-typedef uint32_t unaligned_uint32_t ALIGNED(1);
-typedef uint16_t unaligned_uint16_t ALIGNED(1);
-typedef uint8_t unaligned_uint8_t ALIGNED(1);
+typedef uint64_t lt_unaligned_uint64_t ALIGNED(1);
+typedef uint32_t lt_unaligned_uint32_t ALIGNED(1);
+typedef uint16_t lt_unaligned_uint16_t ALIGNED(1);
+typedef uint8_t lt_unaligned_uint8_t ALIGNED(1);
 
-typedef int64_t unaligned_int64_t ALIGNED(1);
-typedef int32_t unaligned_int32_t ALIGNED(1);
-typedef int16_t unaligned_int16_t ALIGNED(1);
-typedef int8_t unaligned_int8_t ALIGNED(1);
+typedef int64_t lt_unaligned_int64_t ALIGNED(1);
+typedef int32_t lt_unaligned_int32_t ALIGNED(1);
+typedef int16_t lt_unaligned_int16_t ALIGNED(1);
+typedef int8_t lt_unaligned_int8_t ALIGNED(1);
 
 /** Opaque structure holding information about an output trace */
 typedef struct libtrace_out_t libtrace_out_t;
