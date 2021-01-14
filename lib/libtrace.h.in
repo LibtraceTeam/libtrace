@@ -175,6 +175,7 @@ extern "C" {
  */
 
 #define LT_USE_PACKED @HAVE_ATTRIBUTE_PACKED@
+#define LT_USE_ALIGNED @HAVE_ATTRIBUTE_ALIGNED@
 #define LT_USE_UNUSED @HAVE_ATTRIBUTE_UNUSED@
 #define LT_USE_DEPRECATED @HAVE_ATTRIBUTE_DEPRECATED@
 #define LT_USE_PURE @HAVE_ATTRIBUTE_PURE@
@@ -185,6 +186,12 @@ extern "C" {
 #  define PACKED __attribute__((packed))
 #else
 #  define PACKED
+#endif
+
+#if LT_USE_ALIGNED
+# define ALIGNED(x) __attribute__((aligned(x)))
+#else
+# define ALIGNED(x)
 #endif
 
 #if LT_USE_UNUSED
@@ -214,7 +221,6 @@ extern "C" {
 #ifndef CACHE_LINE_SIZE
 #define CACHE_LINE_SIZE 64
 #endif
-#define ALIGN_STRUCT(x) __attribute__((aligned(x)))
 
 #ifdef _MSC_VER
     #ifdef LT_BUILDING_DLL
@@ -235,6 +241,15 @@ extern "C" {
     #endif
 #endif
 
+typedef uint64_t unaligned_uint64_t ALIGNED(1);
+typedef uint32_t unaligned_uint32_t ALIGNED(1);
+typedef uint16_t unaligned_uint16_t ALIGNED(1);
+typedef uint8_t unaligned_uint8_t ALIGNED(1);
+
+typedef int64_t unaligned_int64_t ALIGNED(1);
+typedef int32_t unaligned_int32_t ALIGNED(1);
+typedef int16_t unaligned_int16_t ALIGNED(1);
+typedef int8_t unaligned_int8_t ALIGNED(1);
 
 /** Opaque structure holding information about an output trace */
 typedef struct libtrace_out_t libtrace_out_t;
