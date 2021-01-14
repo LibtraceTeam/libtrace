@@ -103,11 +103,20 @@ static const libtrace_packet_cache_t clearcache = {
 static inline void xstrncpy(char *dest, const char *src, size_t n,
                 size_t destlen)
 {
-        strncpy(dest,src,destlen);
-		if (n < destlen)
-	        dest[n]='\0';
-		else
-			dest[destlen]='\0';
+	if (destlen == 0)
+		return;
+
+	size_t slen = destlen - 1;
+	if (n < slen) {
+		slen = n;
+	}
+
+	// suppress GCC warnings for string overflow
+	LT_IGNORE_STRING_OVERFLOW
+    	strncpy(dest,src,slen);
+	LT_PRAGMA_POP
+
+	dest[slen]='\0';
 }
 
 static char *xstrndup(const char *src,size_t n)
