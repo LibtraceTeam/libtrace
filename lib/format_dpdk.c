@@ -217,7 +217,7 @@ static int whitelist_device(struct rte_pci_addr *whitelist)
 		 whitelist->bus,
 		 whitelist->devid,
 		 whitelist->function);
-	if (rte_devargs_add(RTE_DEVTYPE_WHITELISTED_PCI, pci_str) < 0) {
+	if (rte_devargs_add(RTE_DEVTYPE_ALLOWED, pci_str) < 0) {
 		return -1;
 	}
 	return 0;
@@ -314,10 +314,10 @@ static inline void dump_configuration()
 
 	fprintf(stderr, "Intel DPDK setup\n"
 		"---Version      : %s\n"
-		"---Master LCore : %"PRIu32"\n"
+		"---Main LCore : %"PRIu32"\n"
 		"---LCore Count  : %"PRIu32"\n",
 		rte_version(),
-		rte_get_master_lcore(), rte_lcore_count());
+		rte_get_main_lcore(), rte_lcore_count());
 
 	for (i = 0 ; i < nb_cpu; i++) {
 		fprintf(stderr, "   ---Core %d : %s\n", i,
@@ -346,10 +346,10 @@ static inline void dump_configuration()
 }
 #endif
 
-/** Remove the affinity of the master lcore
- * Note we also remove the master lcore's tid
+/** Remove the affinity of the main lcore
+ * Note we also remove the main lcore's tid
  */
-static inline int dpdk_unbind_master_lcore(libtrace_t *libtrace) {
+static inline int dpdk_unbind_main_lcore(libtrace_t *libtrace) {
 	cpu_set_t cpuset;
 	long i;
 	long core_count = dpdk_processor_count();
@@ -402,7 +402,7 @@ static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_
                                         char * err, int errlen) {
 	int ret; /* Returned error codes */
 	struct rte_pci_addr use_addr; /* The only address that we don't blacklist */
-	char master_lcore_id[10] = {0}; /* The master-lcore id as a number */
+	char main_lcore_id[10] = {0}; /* The main-lcore id as a number */
 	char mem_map[20] = {0}; /* The memory name */
 	long nb_cpu; /* The number of CPUs in the system */
 	long my_cpu; /* The CPU core we want to bind to, counting from 1 not 0 */
@@ -410,7 +410,7 @@ static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_
 	struct saved_getopts save_opts;
 
 	/* This initialises the Environment Abstraction Layer (EAL)
-	 * If we had slave workers these are put into WAITING state
+	 * If we had workers, these would be put into WAITING state
 	 *
 	 * Basically binds this thread to a fixed core, which we choose as
 	 * the last core on the machine (assuming fewer interrupts mapped here).
@@ -420,7 +420,7 @@ static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_
 	 *      the core mask. I believe from as early as 1.6 (f563a3) this
 	 *      will default to using all cores.
 	 * "-l" We use -l to assign this thread to a core, which becomes
-	 *      DPDK's master (later we unbind its affinity).
+	 *      DPDK's main core (later we unbind its affinity).
 	 * "-n" the number of memory channels into the CPU (hardware specific)
 	 *      - Most likely to be half the number of ram slots in your machine.
 	 *        We could count ram slots by "dmidecode -t 17 | grep -c 'Size:'"
@@ -433,7 +433,7 @@ static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_
 	 */
 	char* argv[] = {"libtrace",
 	                "-n", "1",
-			"-l", master_lcore_id, /* Give DPDK only the master lcore */
+			"-l", main_lcore_id, /* Give DPDK only the main lcore */
 	                "--proc-type", "auto",
 	                "--file-prefix", mem_map,
 			"--no-shconf", "--huge-unlink",
@@ -531,7 +531,7 @@ static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_
 		return -1;
 	}
 
-	snprintf(master_lcore_id, sizeof(master_lcore_id), "%ld", my_cpu-1);
+	snprintf(main_lcore_id, sizeof(main_lcore_id), "%ld", my_cpu-1);
 
 #if !DPDK_USE_BLACKLIST
 	/* Whitelist the device we want to use */
@@ -581,14 +581,14 @@ static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_
 	restore_getopts(&save_opts);
 
 	// Check our main thread (which is this thread) is where we expect it
-	if ((long) rte_get_master_lcore() != my_cpu-1) {
-		fprintf(stderr, "Warning: master core running on core %d not %ld.\n",
-			rte_get_master_lcore(), my_cpu-1);
+	if ((long) rte_get_main_lcore() != my_cpu-1) {
+		fprintf(stderr, "Warning: main core running on core %d not %ld.\n",
+			rte_get_main_lcore(), my_cpu-1);
 	}
 
-	// Only the master should be running
+	// Only the main lcore should be running
 	if (rte_lcore_count() != 1) {
-		fprintf(stderr, "Expected only the master core to be running in dpdk_init_environment()\n");
+		fprintf(stderr, "Expected only the main core to be running in dpdk_init_environment()\n");
 		return -1;
 	}
 
@@ -670,7 +670,7 @@ static portid_t dpdk_get_port_id(const char* uri) {
 }
 #endif
 
-static struct rte_device* dpdk_get_device_from_port(portid_t port) {
+UNUSED static struct rte_device* dpdk_get_device_from_port(portid_t port) {
 #if RTE_VERSION >= RTE_VERSION_NUM(17, 2, 0, 1)
 	return rte_eth_devices[port].device;
 #else
@@ -1232,7 +1232,7 @@ static int dpdk_reserve_lcore(bool real, int socket, int core) {
 
         } else
 	/* If 'reading packets' fill in cores from 0 up and bind affinity
-	 * otherwise start from the MAX core (which is also the master) and work backwards
+	 * otherwise start from the MAX core (which is also the main) and work backwards
 	 * in this case physical cores on the system will not exist so we don't bind
 	 * these to any particular physical core */
 	if (real) {
@@ -1750,13 +1750,13 @@ int dpdk_pstart_input (libtrace_t *libtrace) {
 	err[0] = 0;
         int ret = 0;
 
-	if (rte_lcore_id() != rte_get_master_lcore() && rte_lcore_id() != LCORE_ID_ANY)
+	if (rte_lcore_id() != rte_get_main_lcore() && rte_lcore_id() != LCORE_ID_ANY)
 		fprintf(stderr, "Libtrace DPDK: warning dpdk_pstart_input "
-			"should be called from the master DPDK thread!\n");
+			"should be called from the main DPDK thread!\n");
 
-	/* If the master is bound to an allocated thread, remove its affinity */
+	/* If the main core is bound to an allocated thread, remove its affinity */
 	if (rte_lcore_id() != LCORE_ID_ANY && core_config[rte_lcore_id()]) {
-		if(dpdk_unbind_master_lcore(libtrace) != 0)
+		if(dpdk_unbind_main_lcore(libtrace) != 0)
 			return -1;
 	}
 
@@ -1885,7 +1885,7 @@ void dpdk_punregister_thread(libtrace_t *libtrace UNUSED, libtrace_thread_t *t U
 		return;
 	}
 	pthread_mutex_lock(&dpdk_lock);
-	/* Skip if not registered (such as the master lcore) */
+	/* Skip if not registered (such as the main lcore) */
 	if (!core_config[rte_lcore_id()]) {
 		fprintf(stderr, "INFO: we are skipping unregistering a unknown lcore\n");
 		pthread_mutex_unlock(&dpdk_lock);

@@ -187,6 +187,18 @@ typedef uint8_t portid_t;
         #define ETH_SPEED_NUM_40G ETH_LINK_SPEED_40G
 #endif
 
+/* 20.11 renames master, slave to main and worker
+ * Use new names as standard
+ *
+ */
+#ifndef RTE_LCORE_FOREACH_WORKER
+#define RTE_LCORE_FOREACH_WORKER RTE_LCORE_FOREACH_SLAVE
+#define rte_get_main_lcore rte_get_master_lcore
+#endif
+#if RTE_VERSION < RTE_VERSION_NUM(20, 11, 0, 4)
+#define RTE_DEVTYPE_ALLOWED RTE_DEVTYPE_WHITELISTED_PCI
+#endif
+
 /* https://github.com/DPDK/dpdk/commit/35b2d13 19.08-rc1
  * renames ETHER_CRC_LEN -> RTE_ETHER_CRC_LEN */
 #ifndef RTE_ETHER_CRC_LEN
