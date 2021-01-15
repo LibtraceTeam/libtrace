@@ -23,10 +23,10 @@
  *
  *
  */
-#include "libtrace.h"
-
 #ifndef LIBTRACE_LIST_H
 #define LIBTRACE_LIST_H
+
+#include "libtrace.h"
 
 typedef struct list_node libtrace_list_node_t;
 struct list_node {
