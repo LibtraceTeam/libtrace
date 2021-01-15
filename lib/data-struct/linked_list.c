@@ -24,7 +24,6 @@
  *
  */
 #include "linked_list.h"
-#include "libtrace_int.h"
 
 #include <stddef.h>
 #include <stdlib.h>
