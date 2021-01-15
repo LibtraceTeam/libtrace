@@ -73,6 +73,22 @@ extern "C" {
 #endif
 #endif
 
+#if defined(__GNUC__) && !defined(__clang__) && !defined(__INTEL_COMPILER)
+# define HAVE_GCC_COMPILER 1
+#else
+# define HAVE_GCC_COMPILER 0
+#endif
+
+#if HAVE_GCC_COMPILER
+# define LT_IGNORE_STRING_OVERFLOW \
+	_Pragma ("GCC diagnostic push") \
+	_Pragma ("GCC diagnostic ignored \"-Wstringop-overflow\"")
+# define LT_PRAGMA_POP \
+	_Pragma ("GCC diagnostic pop")
+#else
+# define LT_IGNORE_STRING_OVERFLOW
+# define LT_PRAGMA_POP
+#endif
 
 #include "rt_protocol.h"
 
