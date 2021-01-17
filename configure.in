@@ -772,7 +772,10 @@ if test "$want_dpdk" != no; then
                 ADD_INCLS="$ADD_INCLS $DPDK_CFLAGS"
                 AC_MSG_NOTICE([Building against DPDK using pkg-config])
                 dpdk_found=pkgconfig
-                dpdk_path="$(echo $DPDK_LIBS | sed -E 's/.*-L([[^ ]]*).*/\1/g')"
+                dpdk_path="$(echo $DPDK_LIBS | sed -nE 's/.*-L([[^ ]]*).*/\1/gp')"
+                if test -z "$dpdk_path" ; then
+                        dpdk_path=system
+                fi
         fi
 
 	if test "$dpdk_found" = 0 -a "$RTE_SDK" = ""; then
