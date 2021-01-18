@@ -207,22 +207,7 @@ static int blacklist_devices(struct dpdk_format_data_t *format_data, struct rte_
 	rte_eal_pci_set_blacklist(format_data->blacklist, format_data->nb_blacklist);
 	return 0;
 }
-#else /* DPDK_USE_BLACKLIST */
-#include <rte_devargs.h>
-static int whitelist_device(struct rte_pci_addr *whitelist)
-{
-	char pci_str[20] = {0};
-	snprintf(pci_str, sizeof(pci_str), PCI_PRI_FMT,
-		 whitelist->domain,
-		 whitelist->bus,
-		 whitelist->devid,
-		 whitelist->function);
-	if (rte_devargs_add(RTE_DEVTYPE_ALLOWED, pci_str) < 0) {
-		return -1;
-	}
-	return 0;
-}
-#endif
+#endif /* DPDK_USE_BLACKLIST */
 
 /**
  * Parse the URI format as a pci address
@@ -401,7 +386,8 @@ static void restore_getopts(struct saved_getopts *opts) {
 static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_t * format_data,
                                         char * err, int errlen) {
 	int ret; /* Returned error codes */
-	struct rte_pci_addr use_addr; /* The only address that we don't blacklist */
+	struct rte_pci_addr use_addr = {0}; /* The only address that we don't blacklist */
+	char use_addr_str[20] = {0}; /* use_addr as a string */
 	char main_lcore_id[10] = {0}; /* The main-lcore id as a number */
 	char mem_map[20] = {0}; /* The memory name */
 	long nb_cpu; /* The number of CPUs in the system */
@@ -426,6 +412,9 @@ static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_
 	 *        We could count ram slots by "dmidecode -t 17 | grep -c 'Size:'"
 	 * Controls where in memory packets are stored such that they are spread
 	 * across the channels. We just use 1 to be safe.
+	 * "-w" whitelist (or "-a" allow) a PCI device
+	 *      - Libtrace always whitelists one device to block all others
+	 *        being loaded.
 	 *
 	 * Using unique file prefixes mean separate memory is used, unlinking
 	 * the two processes. However be careful we still cannot access a
@@ -444,6 +433,13 @@ static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_
 #	else
 	                "--log-level", "5", /* RTE_LOG_WARNING */
 #	endif
+#endif
+#if !DPDK_USE_BLACKLIST
+#if RTE_VERSION < RTE_VERSION_NUM(20, 11, 0, 4)
+			"-w", use_addr_str,
+#else
+			"-a", use_addr_str,
+#endif
 #endif
 			/* vdev only arguments */
 			"--vdev", uridata,
@@ -534,29 +530,17 @@ static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_
 	snprintf(main_lcore_id, sizeof(main_lcore_id), "%ld", my_cpu-1);
 
 #if !DPDK_USE_BLACKLIST
-	/* Whitelist the device we want to use */
-	if (format_data->dev_type == PCI_DEVICE) {
-		if ((ret = whitelist_device(&use_addr)) < 0) {
-			snprintf(err, errlen, "Libtrace DPDK: Whitelisting PCI device failed,"
-				 " are you sure the address is correct?: %s", strerror(-ret));
-			return -1;
-		}
-	} else {
-		/* Whitelist the PCI Host Bus 0000:00:00.0 as this isn't a NIC.
-		 * This stops DPDK initialising all devices it finds, and
-		 * it rather initialises none. This leaves us the option to
-		 * hotplug them later.
-		 */
-		use_addr.domain = 0;
-		use_addr.bus = 0;
-		use_addr.devid = 0;
-		use_addr.function = 0;
-		if ((ret = whitelist_device(&use_addr)) < 0) {
-			snprintf(err, errlen, "Libtrace DPDK: Whitelisting PCI host bus device"
-				 " failed: %s", strerror(-ret));
-			return -1;
-		}
-	}
+	/* Whitelist the device we want to use
+	 * If we are loading a virtual NIC, we whitelist the PCI Host
+	 * Bus 0000:00:00.0 as this isn't a NIC.
+	 * This stops DPDK initialising all devices it finds. But, leaves
+	 * us the option to hotplug them later.
+	 */
+	snprintf(use_addr_str, sizeof(use_addr_str), PCI_PRI_FMT,
+		 use_addr.domain,
+		 use_addr.bus,
+		 use_addr.devid,
+		 use_addr.function);
 #endif
 
 	/* Give the memory map a unique name */
