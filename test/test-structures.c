@@ -1,5 +1,6 @@
 #include "libtrace.h"
 #include <inttypes.h>
+#include "lt_bswap.h"
 
 /*
  * Structures:
@@ -245,13 +246,19 @@ void check_icmp6() {
     buf_icmp6[6] = 0x07; buf_icmp6[7] = 0x08; test(ntohs(icmp6->un.echo.sequence) == 1800, "check_icmp6 - un.echo.sequence");
 }
 
+#if __BYTE_ORDER == __BIG_ENDIAN
+    #define bswap_be_to_host24(num) (num)
+#elif __BYTE_ORDER == __LITTLE_ENDIAN
+    #define bswap_be_to_host24(num) bswap_be_to_host32(num<<8)
+#endif
+
 void check_llcsnap() {
     uint8_t buf_llcsnap[8] = {0xaa, 0xaa, 0x03, 0x00, 0x00, 0x0c, 0x20, 0x00};
     libtrace_llcsnap_t *llcsnap = (libtrace_llcsnap_t *)buf_llcsnap;
     test(llcsnap->dsap == 170, "check_llcsnap - dsap");
     test(llcsnap->ssap == 170, "check_llcsnap - ssap");
     test(llcsnap->control == 3, "check_llcsnap - control");
-    test(ntohl(llcsnap->oui << 8) == 12, "check_llcsnap - oui");
+    test(bswap_be_to_host24(llcsnap->oui) == 12, "check_llcsnap - oui");
     // set/check values
     buf_llcsnap[0] = 0x01; test(llcsnap->dsap == 0x01, "check_llcsnap - dsap");
     buf_llcsnap[1] = 0x02; test(llcsnap->ssap == 0x02, "check_llcsnap - ssap");
@@ -331,8 +338,8 @@ void check_pppoe() {
     test(ntohs(pppoe->session_id) == 0, "check_pppoe - session_id");
     test(ntohs(pppoe->length) == 4, "check_pppoe - length");
     // check bitfields
-    buf_pppoe[0] = 0x12; test(pppoe->version == 2, "check_pppoe - version");
-    buf_pppoe[0] = 0x12; test(pppoe->type == 1, "check_pppoe - type");
+    buf_pppoe[0] = 0x12; test(pppoe->version == 1, "check_pppoe - version");
+    buf_pppoe[0] = 0x12; test(pppoe->type == 2, "check_pppoe - type");
     // set/check values
     buf_pppoe[1] = 0x03; test(pppoe->code == 3, "check_pppoe - code");
     buf_pppoe[2] = 0x04; buf_pppoe[3] = 0x05; test(ntohs(pppoe->session_id) == 1029, "check_pppoe - session_id");
@@ -380,15 +387,15 @@ void check_radiotap() {
     /* radiotap using little endian byte order */
     test(radio_tap->it_version == 0, "check_radiotap - it_version");
     test(radio_tap->it_pad == 0, "check_radiotap - it_pad");
-    test(radio_tap->it_len == 25, "check_radiotap - it_len");
-    test(radio_tap->it_present == 2159, "check_radiotap it_present");
+    test(bswap_le_to_host16(radio_tap->it_len) == 25, "check_radiotap - it_len");
+    test(bswap_le_to_host32(radio_tap->it_present) == 2159, "check_radiotap it_present");
     // set/check values
     buf_radiotap[0] = 0x01; test(radio_tap->it_version == 1, "check_radiotap - it_version");
     buf_radiotap[1] = 0x02; test(radio_tap->it_pad == 2, "check_radiotap - it_pad");
-    buf_radiotap[2] = 0x03; buf_radiotap[3] = 0x04; test(ntohs(radio_tap->it_len) == 772, "check_radiotap - it_len");
+    buf_radiotap[2] = 0x03; buf_radiotap[3] = 0x04; test(bswap_le_to_host16(radio_tap->it_len) == 1027, "check_radiotap - it_len");
 
     buf_radiotap[4] = 0x05; buf_radiotap[5] = 0x06; buf_radiotap[6] = 0x07; buf_radiotap[7] = 0x08;
-    test(ntohl(radio_tap->it_present) == 84281096, "check_radiotap - it_present");
+    test(bswap_le_to_host32(radio_tap->it_present) == 134678021, "check_radiotap - it_present");
 }
 
 void check_80211() {
@@ -718,5 +725,6 @@ int main() {
 
     if (tests_passed)
         printf("success\n");
-
+    else
+        return 1;
 }

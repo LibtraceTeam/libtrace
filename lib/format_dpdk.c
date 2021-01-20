@@ -424,7 +424,9 @@ static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_
 	                "-n", "1",
 			"-l", main_lcore_id, /* Give DPDK only the main lcore */
 	                "--proc-type", "auto",
+#ifdef __linux__
 	                "--file-prefix", mem_map,
+#endif
 			"--no-shconf", "--huge-unlink",
 	                "-m", "512",
 #if DPDK_USE_LOG_LEVEL

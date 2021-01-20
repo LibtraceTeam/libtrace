@@ -1083,8 +1083,13 @@ ct_assert(sizeof(libtrace_ppp_t) == 2);
 /** PPPoE header */
 typedef struct libtrace_pppoe
 {
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+ LT_BITFIELD8 type:4;		/**< PPPoE Type */
+ LT_BITFIELD8 version:4;	/**< Protocol version number */
+#else
  LT_BITFIELD8 version:4;	/**< Protocol version number */
  LT_BITFIELD8 type:4;		/**< PPPoE Type */
+#endif
  uint8_t code;			/**< PPPoE Code */
  uint16_t session_id;		/**< Session Identifier */
  uint16_t length;		/**< Total Length of the PPP packet */

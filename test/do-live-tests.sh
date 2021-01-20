@@ -7,10 +7,10 @@ PARALLEL_FAIL=""
 
 do_test() {
 	if $@; then
-		OK=$[ $OK + 1 ]
+		OK=$(( OK + 1 ))
 	else
 		FAIL="$FAIL
-$@"
+$*"
 	fi
 }
 
@@ -92,10 +92,10 @@ do_parallel_test() {
 	kill -SIGINT $my_pid
 
 	if wait $my_pid; then
-		PARALLEL_OK=$[ $PARALLEL_OK + 1 ]
+		PARALLEL_OK=$(( PARALLEL_OK + 1 ))
 	else
 		PARALLEL_FAIL="$PARALLEL_FAIL
-$@"
+$*"
 	fi
 }
 

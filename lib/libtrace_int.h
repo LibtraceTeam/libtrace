@@ -512,7 +512,7 @@ int _trace_set_configuration(libtrace_t *trace, const char *str, const char **fo
 
 /** A local definition of a PFLOG header */
 typedef struct libtrace_pflog_header_t {
-	uint8_t	   length;	
+	uint8_t	   length;
 	sa_family_t   af;
 	uint8_t	   action;
 	uint8_t	   reason;
@@ -523,7 +523,8 @@ typedef struct libtrace_pflog_header_t {
 	uint8_t	   dir;
 	uint8_t	   pad[3];
 } PACKED libtrace_pflog_header_t;
-ct_assert(sizeof(libtrace_pflog_header_t) == 49);
+/* Warning: The size of sa_family_t and hence libtrace_pflog_header_t varies
+ * between BSD and Linux */
 
 /** A libtrace capture format module */
 /* All functions should return -1, or NULL on failure */

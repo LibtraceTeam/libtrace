@@ -28,11 +28,11 @@ do_test() {
 	"$@"
 	ret=$?
 	if [ $ret = 0 ]; then
-		OK=$[ $OK + 1]
+		OK=$(( OK + 1))
 		return $ret
 	else
 		FAIL="$FAIL
-$ERROR_MSG ($@)"
+$ERROR_MSG ($*)"
 		return $ret
 	fi
 }

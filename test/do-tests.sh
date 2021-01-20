@@ -1,14 +1,14 @@
-#!/bin/bash
+#!/bin/sh
 
 OK=0
 FAIL=""
 
 do_test() {
 	if $@; then
-		OK=$[ $OK + 1 ]
+		OK=$(( OK + 1 ))
 	else
 		FAIL="$FAIL
-$@"
+$*"
 	fi
 }
 
