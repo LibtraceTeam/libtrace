@@ -46,6 +46,7 @@
 #include <netinet/ip_icmp.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
+#include <inttypes.h>
 #include "dagformat.h"
 #include "libtrace.h"
 
@@ -128,26 +129,26 @@ static int verify_counters(libtrace_t *trace_read)
         if (!stat->dropped_valid) {
 		printf("\tInfo: trace does not support drop counter\n");
         } else if (stat->dropped != 0) {
-		ERROR("Trace dropped %zu packets\n", stat->dropped);
+		ERROR("Trace dropped %" PRIu64 " packets\n", stat->dropped);
 	}
 
         if (!stat->filtered_valid) {
 		printf("\tInfo: trace does not support filter counter\n");
         } else if (stat->filtered != 0) {
-		ERROR("Trace filtered %zu packets\n", stat->filtered);
+		ERROR("Trace filtered %" PRIu64 " packets\n", stat->filtered);
 	}
 
         if (!stat->received_valid) {
 		printf("\tInfo: trace does not support received counter\n");
         } else if (stat->received != (uint32_t) test_size) {
-		ERROR("Trace received %zu/%u packets\n", stat->received,
+		ERROR("Trace received %" PRIu64 "/%" PRIu32 " packets\n", stat->received,
 				(uint32_t)test_size);
         }
 
         if (!stat->accepted_valid) {
 		printf("\tInfo: trace does not support accepted counter\n");
         } else if (stat->accepted != (uint32_t) test_size) {
-		ERROR("Trace only accepted %zu/%u packets\n", stat->accepted,
+		ERROR("Trace only accepted %" PRIu64 "/%" PRIu32 " packets\n", stat->accepted,
                                 (uint32_t)test_size);
         }
 

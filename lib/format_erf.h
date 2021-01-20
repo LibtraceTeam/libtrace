@@ -128,8 +128,6 @@ struct dag_opthdr {
 } PACKED;
 ct_assert(sizeof(struct dag_opthdr) == 4);
 
-typedef struct dag_record dag_record_t;
-
 int erf_get_framing_length(const libtrace_packet_t *packet);
 libtrace_linktype_t erf_get_link_type(const libtrace_packet_t *packet);
 libtrace_direction_t erf_get_direction(const libtrace_packet_t *packet);

@@ -1,7 +1,6 @@
 
 RM=rm
 PREFIX=../
-CC=gcc
 
 INCLUDE = -I$(PREFIX)/lib -I$(PREFIX)/libpacketdump
 CFLAGS = -Wall -Wimplicit -Wformat -W -pedantic -pipe -g -O2 -std=gnu99 -pthread \

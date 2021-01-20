@@ -265,7 +265,7 @@ void check_llcsnap() {
     buf_llcsnap[2] = 0x03; test(llcsnap->control == 0x03, "check_llcsnap - control");
 
     buf_llcsnap[3] = 0x04; buf_llcsnap[4] = 0x05; buf_llcsnap[5] = 0x06;
-    test(ntohl(llcsnap->oui << 8) == 263430, "check_llcsnap - oui");
+    test(bswap_be_to_host24(llcsnap->oui) == 263430, "check_llcsnap - oui");
 
     buf_llcsnap[6] = 0x07; buf_llcsnap[7] = 0x08; test(ntohs(llcsnap->type) == 1800, "check_llcsnap - type");
 }

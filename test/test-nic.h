@@ -35,13 +35,26 @@
 #define IS_BETWEEN_INC(min, max, value) ((min) <= (value) && (max) >= (value))
 
 /* Operations on timespecs. */
+#ifndef timespecclear
 #define timespecclear(tsp) (tsp)->tv_sec = (tsp)->tv_nsec = 0
+#endif
+
+#ifndef timespecisset
 #define timespecisset(tsp) ((tsp)->tv_sec || (tsp)->tv_nsec)
+#endif
+
+#ifndef timespecisvalid
 #define timespecisvalid(tsp)                                                   \
         ((tsp)->tv_nsec >= 0 && (tsp)->tv_nsec < 1000000000L)
+#endif
+
+#ifndef timespeccmp
 #define timespeccmp(tsp, usp, cmp)                                             \
         (((tsp)->tv_sec == (usp)->tv_sec) ? ((tsp)->tv_nsec cmp(usp)->tv_nsec) \
                                           : ((tsp)->tv_sec cmp(usp)->tv_sec))
+#endif
+
+#ifndef timespecadd
 #define timespecadd(tsp, usp, vsp)                                             \
         do {                                                                   \
                 (vsp)->tv_sec = (tsp)->tv_sec + (usp)->tv_sec;                 \
@@ -51,6 +64,9 @@
                         (vsp)->tv_nsec -= 1000000000L;                         \
                 }                                                              \
         } while (0)
+#endif
+
+#ifndef timespecsub
 #define timespecsub(tsp, usp, vsp)                                             \
         do {                                                                   \
                 (vsp)->tv_sec = (tsp)->tv_sec - (usp)->tv_sec;                 \
@@ -60,6 +76,7 @@
                         (vsp)->tv_nsec += 1000000000L;                         \
                 }                                                              \
         } while (0)
+#endif
 
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)

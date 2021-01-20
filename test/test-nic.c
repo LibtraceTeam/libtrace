@@ -634,7 +634,7 @@ inline static void verify_packet_len(tls_t *tls, libtrace_packet_t *pkt,
                 expected_wire_len = seq_num + sizeof(struct udp_packet) + 4;
                 break;
         case SCENARIO_MAX:
-                break;
+                return; // Shouldn't be hit
         }
 
         /* Format returning the FCS in capture is valid, the code below assumes
@@ -645,15 +645,13 @@ inline static void verify_packet_len(tls_t *tls, libtrace_packet_t *pkt,
 
         if (cap_len != expected_cap_len) {
                 fprintf(stderr,
-                        "Wrong capture length found %" PRIu64
-                        " expected %" PRIu64 "\n",
+                        "Wrong capture length found %zu expected %zu\n",
                         cap_len, expected_cap_len);
                 exit_code |= RET_FAILED;
         }
         if (wire_len != expected_wire_len) {
                 fprintf(stderr,
-                        "Wrong wire length found %" PRIu64 " expected %" PRIu64
-                        "\n",
+                        "Wrong wire length found %zu expected %zu\n",
                         wire_len, expected_wire_len);
                 exit_code |= RET_FAILED;
         }
@@ -1131,12 +1129,17 @@ static int run_tx_scenario(char *uri, enum scenarios scenario, int pps,
                  * If not, setsockopt() fails and we don't run this test */
                 int fd = 3;
                 int opt = 1;
+                #ifdef SO_NOFCS
                 if (setsockopt(fd, SOL_SOCKET, SO_NOFCS, (char *)&opt,
                                sizeof(opt)) < 0) {
                         perror("Kernel does not support SO_NOFCS");
                         fprintf(stderr, "Use int: for the erred scenario\n");
                         return RET_ERROR;
                 }
+                #else
+                        fprintf(stderr, "SO_NOFCS is not supported on your platform\n");
+                        return RET_ERROR;
+                #endif
                 lt_to_send = lt_packet_fcs;
                 to_send = (struct udp_packet *)packet_fcs;
         }
@@ -1507,7 +1510,7 @@ static int run_rx_scenario(char *uri, int threadcount,
                  */
                 if (exit_code == 0) {
                         fprintf(stderr, "Test result: PASS\n");
-                } else if (exit_code | RET_BUFFER_REUSED) {
+                } else if (exit_code & RET_BUFFER_REUSED) {
                         fprintf(stderr, "Test result: FAIL\n");
                 } else if (exit_code & RET_DROPPED &&
                            !(exit_code & (RET_FAILED | RET_ERROR))) {

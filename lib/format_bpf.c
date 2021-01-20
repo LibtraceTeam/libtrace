@@ -379,6 +379,14 @@ static int bpf_config_input(libtrace_t *libtrace,
 			break;
 		case TRACE_OPTION_CONSTANT_ERF_FRAMING:
 			break;
+		case TRACE_OPTION_DISCARD_META:
+			break;
+		case TRACE_OPTION_XDP_HARDWARE_OFFLOAD:
+		case TRACE_OPTION_XDP_ZERO_COPY_MODE:
+		case TRACE_OPTION_XDP_COPY_MODE:
+		case TRACE_OPTION_XDP_DRV_MODE:
+		case TRACE_OPTION_XDP_SKB_MODE:
+			break;
 		/* Avoid default: so that future options will cause a warning
 		 * here to remind us to implement it, or flag it as
 		 * unimplementable

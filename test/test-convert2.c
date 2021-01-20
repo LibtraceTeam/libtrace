@@ -238,7 +238,7 @@ int main(int argc, char *argv[]) {
 			printf("\t%s\t%s\n",
 				trace1name,
 				trace2name);
-			printf("packet\t%lu\n", count);
+			printf("packet\t%" PRIu64 "\n", count);
 			printf("caplen\t%zd\t%zd\t%+zd\n",
 				trace_get_capture_length(packet),
 				trace_get_capture_length(packet2),

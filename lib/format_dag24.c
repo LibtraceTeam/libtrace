@@ -227,10 +227,22 @@ static int dag_config_input(libtrace_t *libtrace, trace_option_t option,
 			 * filtering */
                         return -1;
 		case TRACE_OPTION_EVENT_REALTIME:
+		case TRACE_OPTION_REPLAY_SPEEDUP:
 			/* Live capture is always going to be realtime */
 			return -1;
+		case TRACE_OPTION_HASHER:
+			/* Lets just say we did this, it's currently still up to
+			 * the user to configure this correctly. */
+			return 0;
                 case TRACE_OPTION_CONSTANT_ERF_FRAMING:
                         return -1;
+		case TRACE_OPTION_DISCARD_META:
+		case TRACE_OPTION_XDP_HARDWARE_OFFLOAD:
+		case TRACE_OPTION_XDP_SKB_MODE:
+		case TRACE_OPTION_XDP_DRV_MODE:
+		case TRACE_OPTION_XDP_ZERO_COPY_MODE:
+		case TRACE_OPTION_XDP_COPY_MODE:
+			return -1;
         }
 	return -1;
 }

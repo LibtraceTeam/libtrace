@@ -112,8 +112,6 @@ struct xsk_per_stream {
     pthread_t thread_id;
 };
 
-typedef struct xdp_format_data xdp_format_data_t;
-
 typedef struct xdp_format_data {
     struct xsk_config cfg;
     libtrace_list_t *per_stream;

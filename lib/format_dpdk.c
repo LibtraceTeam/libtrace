@@ -101,7 +101,7 @@ struct dpdk_format_data_t {
 	uint8_t paused; /* See paused_state */
 	portid_t port; /* Always 0 we only whitelist a single port - Shared TX & RX */
 	uint16_t link_speed; /* Link speed 10,100,1000,10000 etc. */
-	int snaplen; /* The snap length for the capture - RX only */
+	uint32_t snaplen; /* The snap length for the capture - RX only */
 	/* We always have to setup both rx and tx queues even if we don't want them */
 	int nb_rx_buf; /* The number of packet buffers in the rx ring */
 	int nb_tx_buf; /* The number of packet buffers in the tx ring */
@@ -392,7 +392,6 @@ static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_
 	char mem_map[20] = {0}; /* The memory name */
 	long nb_cpu; /* The number of CPUs in the system */
 	long my_cpu; /* The CPU core we want to bind to, counting from 1 not 0 */
-	int i;
 	struct saved_getopts save_opts;
 
 	/* This initialises the Environment Abstraction Layer (EAL)
@@ -488,6 +487,7 @@ static inline int dpdk_init_environment(char * uridata, struct dpdk_format_data_
 	}
 
 #ifdef HAVE_LIBNUMA
+	int i;
 	if (format_data->dev_type == PCI_DEVICE) {
 		format_data->nic_numa_node = pci_to_numa(&use_addr);
 	} else {
@@ -952,8 +952,9 @@ int dpdk_config_input (libtrace_t *libtrace,
 	case TRACE_OPTION_SNAPLEN:
 		/* Only support changing snaplen before a call to start is
 		 * made */
-		if (FORMAT(libtrace)->paused == DPDK_NEVER_STARTED)
-			FORMAT(libtrace)->snaplen=*(int*)data;
+		if (FORMAT(libtrace)->paused == DPDK_NEVER_STARTED &&
+		    (*(int*)data) >= 0)
+			FORMAT(libtrace)->snaplen= (uint32_t) (*(int*)data);
 		else
 			return -1;
 		return 0;
@@ -1408,11 +1409,11 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data,
                               char *err, int errlen, uint16_t rx_queues,
                               bool wait_for_link,
                               int *coremap) {
-	int ret, i, buf_size;
+	int ret, i;
 	struct rte_eth_link link_info; /* Wait for link */
 	dpdk_per_stream_t empty_stream = DPDK_EMPTY_STREAM;
 	struct rte_eth_dev_info dev_info;
-	uint32_t dev_flags;
+	uint32_t dev_flags, buf_size;
 
 	/* Already started */
 	if (format_data->paused == DPDK_RUNNING)
@@ -1751,7 +1752,7 @@ int dpdk_pstart_input (libtrace_t *libtrace) {
 	phys_cores = dpdk_processor_count();
 
 	tot = MIN(libtrace->perpkt_thread_count,
-	          dpdk_get_max_rx_queues(FORMAT(libtrace)->port));
+	          (int) dpdk_get_max_rx_queues(FORMAT(libtrace)->port));
 	tot = MIN(tot, phys_cores);
 
 #if DEBUG

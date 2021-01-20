@@ -26,6 +26,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <inttypes.h>
 #include "buckets.h"
 
 #define MAX_OUTSTANDING (200000)
@@ -189,7 +190,7 @@ DLLEXPORT void libtrace_release_bucket_id(libtrace_bucket_t *b, uint64_t id) {
         pthread_mutex_lock(&b->lock);
         bnode = b->packets[id];
 	if (!bnode) {
-		fprintf(stderr, "bucket ID %lu is NULL in libtrace_release_bucket_id()\n", id);
+		fprintf(stderr, "bucket ID %" PRIu64 " is NULL in libtrace_release_bucket_id()\n", id);
 		return;
 	}
 
