@@ -1127,9 +1127,9 @@ static int run_tx_scenario(char *uri, enum scenarios scenario, int pps,
                 /* XXX this is a hack, there is no libtrace API for this
                  * The first free fd (3) will become the socket.
                  * If not, setsockopt() fails and we don't run this test */
+                #ifdef SO_NOFCS
                 int fd = 3;
                 int opt = 1;
-                #ifdef SO_NOFCS
                 if (setsockopt(fd, SOL_SOCKET, SO_NOFCS, (char *)&opt,
                                sizeof(opt)) < 0) {
                         perror("Kernel does not support SO_NOFCS");
