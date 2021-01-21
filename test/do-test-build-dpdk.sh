@@ -9,6 +9,14 @@ echo "/usr/bin/ld: .libs/libtrace.so.4.1.5: version node not found for symbol rt
 echo "/usr/bin/ld: failed to set dynamic section sizes: bad value"
 echo
 
+if ! command -v meson &> /dev/null
+then
+	echo "meson not found, it is required for DPDK 20.11 and newer"
+	echo "please install using 'apt install meson'"
+	read -p "Press enter to continue"
+	echo
+fi
+
 TEST_DIR=$(pwd)
 LIBTRACE_DIR="$TEST_DIR"/../
 DPDK_DOWNLOAD_PATH=https://wand.nz/~rsanger/dpdk/
@@ -72,12 +80,13 @@ declare -a dpdk_versions=(
 	"dpdk-18.02.2.tar.gz"
 	"dpdk-18.05.1.tar.gz"
 	"dpdk-18.08.1.tar.gz"
-	"dpdk-18.11.7.tar.gz"
+	"dpdk-18.11.10.tar.gz"
 	"dpdk-19.02.tar.gz"
 	"dpdk-19.05.tar.gz"
 	"dpdk-19.08.2.tar.gz"
-	"dpdk-19.11.1.tar.gz"
+	"dpdk-19.11.5.tar.gz"
 	"dpdk-20.02.tar.gz"
+	"dpdk-20.11.tar.gz"
 	)
 
 # Versions to check buster linux 4.19
@@ -149,15 +158,17 @@ do
 	else
 		echo "	Building using meson"
 		mkdir install
-		if CFLAGS="-ggdb3 -w" meson --prefix=$(pwd)/install build \
+		if CFLAGS="-ggdb3 -w" do_test meson --prefix=$(pwd)/install build \
 				> build_stdout.txt 2>	build_stderr.txt ; then
 			cd ./build
 			CFLAGS="-ggdb3 -w" do_test meson install > ../build_stdout.txt 2> ../build_stderr.txt
 			ret=$?
 			cd ..
+		else
+			ret=$?
 		fi
 	fi
-	if [ $ret = 0 ]; then
+	if [ "$ret" = 0 ]; then
 		touch build_success
 		echo "	Built successfully"
 	else
