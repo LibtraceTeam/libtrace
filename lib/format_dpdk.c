@@ -266,7 +266,7 @@ static int pci_to_numa(struct rte_pci_addr * dev_addr) {
 		int numa_node = -1;
 		if (fscanf(file, "%d", &numa_node) != 1) {
 			numa_node = -1;
-		} else if (numa_node <= 0 || numa_node > 4) {
+		} else if (numa_node < 0 || numa_node >= 4) {
 			fprintf(stderr, "Warning /sys/bus/pci/devices/"PCI_PRI_FMT"/numa_node = %d appears to be invalid\n",
 			        dev_addr->domain, dev_addr->bus, dev_addr->devid, dev_addr->function, numa_node);
 		}
