@@ -344,6 +344,9 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 		/* Could not parse the URI nicely */
 		guess_format(libtrace,uri);
 		if (trace_is_err(libtrace)) {
+			if (scan) {
+				free(scan);
+			}
 			return libtrace;
 		}
 	}
@@ -363,6 +366,9 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 		if (libtrace->format == 0) {
 			trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT,
 					"Unknown format (%s)",scan);
+			if (scan) {
+				free(scan);
+			}
 			return libtrace;
 		}
 
@@ -379,11 +385,17 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
                         /* init_input should call trace_set_err to set the
                          * error message
 			 */
+			if (scan) {
+				free(scan);
+			}
 			return libtrace;
 		}
 	} else {
 		trace_set_err(libtrace,TRACE_ERR_UNSUPPORTED,
 				"Format does not support input (%s)",scan);
+		if (scan) {
+			free(scan);
+		}
 		return libtrace;
 	}
 
