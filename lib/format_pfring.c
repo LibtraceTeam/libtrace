@@ -51,8 +51,10 @@
 #include <pfring.h>
 #include <pfring_zc.h>
 
+#define PFRINGZC_BATCHSIZE 10
+
 struct pfring_format_data_t {
-	libtrace_list_t *per_stream;	
+	libtrace_list_t *per_stream;
 	int8_t promisc;
 	int snaplen;
 	int8_t ringenabled;
@@ -63,7 +65,9 @@ struct pfringzc_per_thread {
 
 	uint32_t lastbatch;
 	uint32_t nextpacket;
-	pfring_zc_pkt_buff ** buffers;
+	pfring_zc_queue *queue;
+	pfring_zc_queue *device;
+	pfring_zc_pkt_buff *buffers[PFRINGZC_BATCHSIZE];
 };
 
 
@@ -72,18 +76,19 @@ struct pfringzc_format_data_t {
 	pfring_zc_worker *hasher;
 	pfring_zc_buffer_pool *pool;
 
-	pfring_zc_queue **inqueues;
-	pfring_zc_queue **outqueues;
-	uint16_t clusterid;	
+	pfring_zc_queue **devices;
+        pfring_zc_queue **queues;
+
+	uint16_t clusterid;
 	int numthreads;
 
 	struct pfringzc_per_thread *perthreads;
+
 
 	int8_t promisc;
 	int snaplen;
 	char *bpffilter;
 	enum hasher_types hashtype;
-
 };
 
 struct pfring_per_stream_t {
@@ -222,7 +227,7 @@ static inline int pfring_start_input_stream(libtrace_t *libtrace,
 			"Failed to enable the pfring");
 		return -1;
 	}
-	
+
 	return 0;
 
 }
@@ -235,49 +240,40 @@ static inline uint32_t pfring_flags(libtrace_t *libtrace) {
 	if (FORMAT_DATA->promisc > 0) 
 		flags |= PF_RING_PROMISC;
 	return flags;
-}	
+}
 
 static inline int pfringzc_init_queues(libtrace_t *libtrace, 
 		struct pfringzc_format_data_t *fdata, int threads) {
 
 	int i, j;
-	char devname[4096];
 
-	fdata->inqueues = calloc(threads, sizeof(pfring_zc_queue *));
-	fdata->outqueues = calloc(threads, sizeof(pfring_zc_queue *));
+	fdata->devices = calloc(threads, sizeof(pfring_zc_queue *));
+	fdata->queues = calloc(threads, sizeof(pfring_zc_queue *));
 	fdata->perthreads = calloc(threads, sizeof(struct pfringzc_per_thread));
 
-	for (i = 0; i < threads; i++) {
-		snprintf(devname, 4095, "zc:%s@%d", libtrace->uridata, i);
-		
-		fdata->perthreads[i].buffers = calloc(PFRINGZC_BATCHSIZE, sizeof(pfring_zc_pkt_buff *));
-		fdata->perthreads[i].lastbatch = 0;
-		fdata->perthreads[i].nextpacket = 0;
+	fdata->devices[0] = pfring_zc_open_device(fdata->cluster, libtrace->uridata, rx_only, 0);
+        if (fdata->devices[0] == NULL) {
+                trace_set_err(libtrace, errno, "pfring_zc_open_device error");
+                return -1;
+        }
 
+	for (i = 0; i < threads; i++) {
 		for (j = 0; j < PFRINGZC_BATCHSIZE; j++) {
 			fdata->perthreads[i].buffers[j] = pfring_zc_get_packet_handle(fdata->cluster);
-		
-			if (fdata->perthreads[i].buffers[j] == NULL) {
+			if (fdata->perthreads[i].buffers == NULL) {
 				trace_set_err(libtrace, errno, "Failed to create pfringzc packet handle");
 				goto error;
 			}
 		}
-		
-		fdata->inqueues[i] = pfring_zc_open_device(fdata->cluster,
-				devname, rx_only, 0);
-		if (fdata->inqueues[i] == NULL) {
-			trace_set_err(libtrace, errno, "Failed to create pfringzc in queue");
-			goto error;
-		}
 
-
-		fdata->outqueues[i] = pfring_zc_create_queue(fdata->cluster,
-				8192);
-		if (fdata->outqueues[i] == NULL) {
+		fdata->queues[i] = pfring_zc_create_queue(fdata->cluster, 8192);
+		if (fdata->queues[i] == NULL) {
 			trace_set_err(libtrace, errno, "Failed to create pfringzc out queue");
 			goto error;
 		}
+		fdata->perthreads[i].queue = fdata->queues[i];
 
+		fdata->perthreads[i].device = fdata->queues[0];
 	}
 
 	fdata->pool = pfring_zc_create_buffer_pool(fdata->cluster, 8);
@@ -294,7 +290,11 @@ error:
 
 }
 
-UNUSED static int pfringzc_start_input(libtrace_t *libtrace) {
+static int pfringzc_start_input(libtrace_t *libtrace) {
+
+	int threads = libtrace->perpkt_thread_count;
+	if (threads == 0)
+		threads = 1;
 
 	if (ZC_FORMAT_DATA->cluster != NULL) {
 		trace_set_err(libtrace, TRACE_ERR_BAD_STATE,
@@ -308,28 +308,35 @@ UNUSED static int pfringzc_start_input(libtrace_t *libtrace) {
 		return -1;
 	}
 
-	ZC_FORMAT_DATA->cluster = pfring_zc_create_cluster(
-			ZC_FORMAT_DATA->clusterid,
-			1600,	/* TODO calculate */
-			0,	/* meta-data length */
-			8192 * 32687 + PFRINGZC_BATCHSIZE,  /* number of buffers */
-			pfring_zc_numa_get_cpu_node(0), /* bind to core 0 */
-			NULL,	/* auto hugetlb mountpoint */
-                        0
-			);
+	ZC_FORMAT_DATA->cluster = pfring_zc_create_cluster(99,
+							   1518,	/* TODO calculate */
+							   sizeof(struct local_pfring_header),	/* meta-data length */
+							   32768 + 32,  /* number of buffers */
+							   pfring_zc_numa_get_cpu_node(0), /* bind to core 0 */
+							   NULL,	/* auto hugetlb mountpoint */
+                        				   0);
+
 	if (ZC_FORMAT_DATA->cluster == NULL) {
 		trace_set_err(libtrace, errno, "Failed to create pfringzc cluster");
 		return -1;
 	}
 
-	if (pfringzc_init_queues(libtrace, ZC_FORMAT_DATA, 1) == -1)
+	if (pfringzc_init_queues(libtrace, ZC_FORMAT_DATA, threads) == -1)
 		return -1;
 
 	/* No hasher necessary, as we just have one thread */
-	ZC_FORMAT_DATA->hasher = pfring_zc_run_balancer(
-		ZC_FORMAT_DATA->inqueues, ZC_FORMAT_DATA->outqueues, 1, 1,
-		ZC_FORMAT_DATA->pool, round_robin_bursts_policy, NULL,
-		NULL, NULL, 1, 0);
+	ZC_FORMAT_DATA->hasher = pfring_zc_run_balancer(ZC_FORMAT_DATA->devices,
+							ZC_FORMAT_DATA->queues,
+							1,
+							threads,
+							ZC_FORMAT_DATA->pool,
+							round_robin_bursts_policy,
+							NULL,
+							NULL,
+							NULL,
+							1,
+							0);
+
 	return 0;
 }
 
@@ -451,28 +458,27 @@ static int pfring_init_input(libtrace_t *libtrace) {
 	return 0;
 }
 
-UNUSED static int pfringzc_init_input(libtrace_t *libtrace) {
+static int pfringzc_init_input(libtrace_t *libtrace) {
 
 	libtrace->format_data = (struct pfringzc_format_data_t *)
 		malloc(sizeof(struct pfringzc_format_data_t));
 	assert(libtrace->format_data != NULL);
-	
+
 	ZC_FORMAT_DATA->promisc = -1;
 	ZC_FORMAT_DATA->snaplen = LIBTRACE_PACKET_BUFSIZE;
 	ZC_FORMAT_DATA->bpffilter = NULL;
 
 	ZC_FORMAT_DATA->cluster = NULL;
-	ZC_FORMAT_DATA->inqueues = NULL;
-	ZC_FORMAT_DATA->outqueues = NULL;
 	ZC_FORMAT_DATA->pool = NULL;
 	ZC_FORMAT_DATA->hasher = NULL;
 	ZC_FORMAT_DATA->hashtype = HASHER_BIDIRECTIONAL;
 	ZC_FORMAT_DATA->clusterid = (uint16_t)rand();
+	ZC_FORMAT_DATA->perthreads = NULL;
 
 	return 0;
 }
 
-UNUSED static int pfringzc_config_input(libtrace_t *libtrace, trace_option_t option,
+static int pfringzc_config_input(libtrace_t *libtrace, trace_option_t option,
 		void *data) {
 
 	switch (option) {
@@ -571,7 +577,7 @@ static int pfring_pause_input(libtrace_t *libtrace) {
 
 }
 
-UNUSED static int pfringzc_pause_input(libtrace_t *libtrace) {
+UNUSED static int pfringzc_ppause_input(libtrace_t *libtrace) {
 
 	/* hopefully this will clean up our buffers and queues? */
 	pfring_zc_kill_worker(ZC_FORMAT_DATA->hasher);
@@ -592,7 +598,7 @@ static int pfring_fin_input(libtrace_t *libtrace) {
 }
 
 
-UNUSED static int pfringzc_fin_input(libtrace_t *libtrace) {
+static int pfringzc_fin_input(libtrace_t *libtrace) {
 	if (libtrace->format_data) {
 		if (ZC_FORMAT_DATA->bpffilter)
 			free(ZC_FORMAT_DATA->bpffilter);
@@ -624,6 +630,11 @@ static int pfring_get_capture_length(const libtrace_packet_t *packet) {
 	
 }
 
+static int pfringzc_get_capture_length(const libtrace_packet_t *packet) {
+	//return ((struct pfring_zc_pkt_buff *)packet->header)->len;
+	return 64;
+}
+
 static int pfring_get_wire_length(const libtrace_packet_t *packet) {
 	struct libtrace_pfring_header *phdr;
 	phdr = (struct libtrace_pfring_header *)packet->header;
@@ -632,6 +643,11 @@ static int pfring_get_wire_length(const libtrace_packet_t *packet) {
 		return byteswap32(phdr->wlen) + 4;
 	}
 	return phdr->wlen + 4;
+}
+
+static int pfringzc_get_wire_length(const libtrace_packet_t *packet) {
+	//return ((struct pfring_zc_pkt_buff *)packet->header)->len + 4;
+	return 64;
 }
 
 static int pfring_get_framing_length(UNUSED const libtrace_packet_t *packet) {
@@ -663,37 +679,55 @@ static int pfring_prepare_packet(libtrace_t *libtrace UNUSED,
 }
 
 static int pfringzc_read_batch(libtrace_t *libtrace,
-                struct pfringzc_per_thread *pzt, int oq, uint8_t block,
-		libtrace_message_queue_t *queue) {
+			       libtrace_packet_t *packet[],
+			       libtrace_message_queue_t *msg,
+			       struct pfringzc_per_thread *stream,
+			       size_t nb_packets) {
 
-	int received;
+	int received = 0;
 
-	do {
+	while (received < 1) {
+
 		received = pfring_zc_recv_pkt_burst(
-				ZC_FORMAT_DATA->outqueues[oq], 
-				pzt->buffers,
-				PFRINGZC_BATCHSIZE,
+				stream->device,
+				stream->buffers,
+				nb_packets,
 				0);
-		
+
 		if (received < 0) {
 			trace_set_err(libtrace, errno, "Failed to read packet batch from pfringzc:");
 			return -1;
 		}
 
 		if (received == 0) {
-			if (queue && libtrace_message_queue_count(queue) > 0)
+			if (msg && libtrace_message_queue_count(msg) > 0)
 				return READ_MESSAGE;
 			if (is_halted(libtrace) != -1) {
 				return is_halted(libtrace);
 			}
 			continue;
 		}
+	}
 
-		pzt->lastbatch = received;
-		pzt->nextpacket = 0;
+	for (int i = 0; i < received; i++) {
 
-	} while (block);
-	return 0;
+		u_char *pkt_buf = pfring_zc_pkt_buff_data(stream->buffers[i], stream->queue);
+
+		packet[i]->buf_control = TRACE_CTRL_EXTERNAL;
+		packet[i]->type = TRACE_RT_DATA_PFRING;
+		packet[i]->header = stream->buffers[i];
+		packet[i]->header = stream->buffers[i];
+		packet[i]->payload = pkt_buf;
+		packet[i]->trace = libtrace;
+		packet[i]->error = 1;
+
+		fprintf(stderr, "packet\n");
+
+	}
+
+	pfring_zc_sync_queue(stream->device, rx_only);
+
+	return received;
 }
 
 static int pfring_read_generic(libtrace_t *libtrace, libtrace_packet_t *packet,
@@ -768,24 +802,36 @@ static int pfring_read_generic(libtrace_t *libtrace, libtrace_packet_t *packet,
 
 }
 
-UNUSED static int pfringzc_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet UNUSED)
-{
+static int pfringzc_read_packet(libtrace_t *libtrace,
+				libtrace_packet_t *packet) {
 
-	struct pfringzc_per_thread *pzt = &(ZC_FORMAT_DATA->perthreads[0]);
+	struct pfringzc_per_thread *stream =
+		&(ZC_FORMAT_DATA->perthreads[0]);
 
-	if (pzt->nextpacket >= pzt->lastbatch) {
-		/* Read a fresh batch of packets */
-		if (pfringzc_read_batch(libtrace, pzt, 0, 1, NULL) < 0) {
-			return -1;
-		}
-	}
+	return pfringzc_read_batch(libtrace,
+				   &packet,
+				   NULL,
+				   stream,
+				   1);
+}
 
-	pfring_zc_pkt_buff *pbuf UNUSED = pzt->buffers[pzt->nextpacket];
-	pzt->nextpacket ++;
+static int pfringzc_pread_packets(libtrace_t *libtrace,
+				  libtrace_thread_t *thread,
+				  libtrace_packet_t **packets,
+				  size_t nb_packets) {
 
-	/* TODO... */
-        fprintf(stderr, "pfringzc_read_packet() is not fully implemented yet\n");
-        return -1;
+	struct pfringzc_per_thread *stream =
+		(struct pfringzc_per_thread *)thread->format_data;
+
+	return pfringzc_read_batch(libtrace,
+				   packets,
+				   &thread->messages,
+				   stream,
+				   nb_packets);
+}
+
+static void pfringzc_fin_packet(libtrace_packet_t *packet) {
+
 }
 
 static int pfring_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
@@ -1003,6 +1049,25 @@ static int pfring_pregister_thread(libtrace_t *libtrace, libtrace_thread_t *t,
 
 }
 
+static int pfringzc_pregister_thread(libtrace_t *libtrace,
+				     libtrace_thread_t *t,
+				     bool reading) {
+
+	if (reading) {
+		if (t->type == THREAD_PERPKT) {
+			struct pfringzc_per_thread *stream = &(ZC_FORMAT_DATA->perthreads[t->perpkt_num]);
+			t->format_data = stream;
+
+			if (t->format_data == NULL) {
+				trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Too many threads registered");
+				return -1;
+			}
+		}
+	}
+
+	return 0;
+}
+
 static struct libtrace_format_t pfringformat = {
 	"pfring",
 	"$Id$",
@@ -1064,25 +1129,25 @@ static struct libtrace_format_t pfringzcformat = {
         TRACE_FORMAT_PFRING,
         NULL,                           /* probe filename */
         NULL,                           /* probe magic */
-        pfringzc_init_input,              /* init_input */
-        pfringzc_config_input,            /* config_input */
-        pfringzc_start_input,             /* start_input */
-        pfringzc_pause_input,             /* pause_input */
+        pfringzc_init_input,            /* init_input */
+        pfringzc_config_input,          /* config_input */
+        pfringzc_start_input,           /* start_input */
+        NULL,                           /* pause_input */
         NULL,                           /* init_output */
         NULL,                           /* config_output */
         NULL,                           /* start_output */
-        pfringzc_fin_input,               /* fin_input */
+        pfringzc_fin_input,             /* fin_input */
         NULL,                           /* fin_output */
-        pfringzc_read_packet,             /* read_packet */
-        pfring_prepare_packet,          /* prepare_packet */
-        NULL,                           /* fin_packet */
+        pfringzc_read_packet,           /* read_packet */
+        NULL,                           /* prepare_packet */
+        pfringzc_fin_packet,            /* fin_packet */
         NULL,                           /* can_hold_packet */
         NULL,                           /* write_packet */
         NULL,                           /* flush_output */
         pfring_get_link_type,           /* get_link_type */
-        pfring_get_direction,           /* get_direction */
-        lt_pfring_set_direction,        /* set_direction */
-        pfring_get_erf_timestamp,       /* get_erf_timestamp */
+        NULL,                           /* get_direction */
+        NULL,                           /* set_direction */
+        NULL,                           /* get_erf_timestamp */
         NULL,                           /* get_timeval */
         NULL,                           /* get_timespec */
         NULL,                           /* get_seconds */
@@ -1090,19 +1155,26 @@ static struct libtrace_format_t pfringzcformat = {
         NULL,                           /* seek_erf */
         NULL,                           /* seek_timeval */
         NULL,                           /* seek_seconds */
-        pfring_get_capture_length,      /* get_capture_length */
-        pfring_get_wire_length,         /* get_wire_length */
-        pfring_get_framing_length,      /* get_framing_length */
-        pfring_set_capture_length,      /* set_capture_length */
+        pfringzc_get_capture_length,    /* get_capture_length */
+        pfringzc_get_wire_length,       /* get_wire_length */
+        NULL,                           /* get_framing_length */
+        NULL,                           /* set_capture_length */
         NULL,                           /* get_received_packets */
         NULL,                           /* get_filtered_packets */
         NULL,                           /* get_dropped_packets */
-        pfring_get_statistics,          /* get_statistics */
+        NULL,                           /* get_statistics */
         NULL,                           /* get_fd */
-        pfring_event,                   /* trace_event */
+        NULL,                           /* trace_event */
         NULL,                           /* help */
         NULL,                           /* next pointer */
-        NON_PARALLEL(true)
+        {true, -1},
+	pfringzc_start_input,           /* pstart_input */
+	pfringzc_pread_packets,         /* pread_packets */
+	pfringzc_ppause_input,          /* ppause */
+	pfringzc_fin_input,             /* p_fin */
+	pfringzc_pregister_thread,      /* register thread */
+	NULL,                           /* unregister thread */
+	NULL                            /* get thread stats */
 };
 
 void pfring_constructor(void) {
