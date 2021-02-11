@@ -22,7 +22,14 @@ LIBTRACE_DIR="$TEST_DIR"/../
 DPDK_DOWNLOAD_PATH=https://wand.nz/~rsanger/dpdk/
 DOWNLOAD_DIR="$TEST_DIR"/DPDK_source
 BUILD_DIR="$TEST_DIR"/DPDK_builds
-BUILD_THREADS=9
+
+if command -v nproc &> /dev/null
+then
+	BUILD_THREADS=$(( $(nproc)+1 ))
+else
+	BUILD_THREADS=9
+fi
+echo "Using $BUILD_THREADS build threads"
 
 
 SUCCESSFUL=""
@@ -146,15 +153,21 @@ do
 	# Prefer building with make if available otherwise use meson
 	if [ -e ./GNUmakefile ]; then
 		echo "	Building using Make"
-		do_test make install T=x86_64-native-linuxapp-gcc \
-				     CONFIG_RTE_BUILD_COMBINE_LIBS=y \
-				     CONFIG_RTE_LIBRTE_KNI=n \
-				     CONFIG_RTE_KNI_KMOD=n \
-				     CONFIG_RTE_LIBRTE_PMD_PCAP=y \
-				     CONFIG_RTE_EAL_IGB_UIO=n \
-				     EXTRA_CFLAGS="-fPIC -w -ggdb" -j $BUILD_THREADS \
-				     > build_stdout.txt 2> build_stderr.txt
-		ret=$?
+		do_test make config T=x86_64-native-linuxapp-gcc O=x86_64-native-linuxapp-gcc
+		DPDK_CONFIG=./x86_64-native-linuxapp-gcc/.config
+		if [ -f "$DPDK_CONFIG" ]; then
+			echo "CONFIG_RTE_BUILD_COMBINE_LIBS=y" >> "$DPDK_CONFIG"
+			echo "CONFIG_RTE_LIBRTE_KNI=n" >> "$DPDK_CONFIG"
+			echo "CONFIG_RTE_KNI_KMOD=n" >> "$DPDK_CONFIG"
+			echo "CONFIG_RTE_LIBRTE_PMD_PCAP=y" >> "$DPDK_CONFIG"
+			echo "CONFIG_RTE_EAL_IGB_UIO=n" >> "$DPDK_CONFIG"
+			do_test make install T=x86_64-native-linuxapp-gcc \
+					     EXTRA_CFLAGS="-fPIC -w -ggdb" -j $BUILD_THREADS \
+					     > build_stdout.txt 2> build_stderr.txt
+			ret=$?
+		else
+			ret=1
+		fi
 	else
 		echo "	Building using meson"
 		mkdir install
@@ -175,7 +188,8 @@ do
 		rm build_success > /dev/null 2>&1
 		echo "	Build Failed"
 		DPDK_FAILED="$DPDK_FAILED
-Failed to build $dpdk_version"
+Failed to build $dpdk_build
+	check $(pwd)/build_stderr.txt"
 	fi
 	cd ..
 done
@@ -210,7 +224,7 @@ do
 	fi
 	./bootstrap.sh > /dev/null 2> /dev/null
 	ERROR_MSG="Building libtrace against $dpdk_build"
-	do_test ./configure --with-dpdk --prefix="$OUTPUT_PREFIX" \
+	do_test ./configure --with-dpdk --prefix="$OUTPUT_PREFIX" CFLAGS="-ggdb" \
 		> "$OUTPUT_PREFIX"/conf_out.txt 2> "$OUTPUT_PREFIX"/conf_err.txt
 	if [ $? -ne 0 ]; then
 		LIBTRACE_FAILED="$LIBTRACE_FAILED
@@ -228,7 +242,7 @@ do
 	check ${OUTPUT_PREFIX}conf_err.txt"
 		continue
 	fi
-	do_test make EXTRA_CFLAGS="-ggdb" -j $BUILD_THREADS \
+	do_test make -j $BUILD_THREADS \
 		> "$OUTPUT_PREFIX"/make_out.txt 2> "$OUTPUT_PREFIX"/make_err.txt
 	if [ $? -ne 0 ]; then
 		LIBTRACE_FAILED="$LIBTRACE_FAILED

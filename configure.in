@@ -682,7 +682,7 @@ if test "$want_dpdk" != no; then
 		AC_SUBST([RTE_TARGET])
 		AC_SUBST([RTE_SDK])
 		# Force dpdk library to be statically linked to allow compiler optimisations
-		LIBTRACE_LIBS="$LIBTRACE_LIBS -Wl,--whole-archive -Wl,-l$dpdk_found -Wl,--no-whole-archive -Wl,-lm -Wl,-lc"
+		LIBTRACE_LIBS="-Wl,-z,defs $LIBTRACE_LIBS -Wl,--whole-archive -Wl,-l$dpdk_found -Wl,--no-whole-archive"
 		dpdk_path="$RTE_SDK"
 	fi
 
@@ -707,7 +707,7 @@ if test "$want_dpdk" != no; then
                         PKG_CONFIG="$pkg_config_old"
                         # Add library directory as RUNPATH in library (-R option)
                         # Used to load the correct DPDK version when not statically linked
-                        DPDK_LIBS="$(echo $DPDK_LIBS | sed -E 's!-L(/[[^ ]]*)!-R\1 -L\1!g')"
+                        DPDK_LIBS="-Wl,-z,defs $(echo $DPDK_LIBS | sed -E 's!-L(/[[^ ]]*)!-R\1 -L\1!g')"
                         unset PKG_CONFIG_PATH
                 fi
         fi
