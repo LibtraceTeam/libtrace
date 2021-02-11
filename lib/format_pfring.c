@@ -27,7 +27,10 @@
  *
  */
 
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
+
 #include "config.h"
 #include "libtrace.h"
 #include "libtrace_int.h"
@@ -507,6 +510,8 @@ static int pfringzc_init_input(libtrace_t *libtrace) {
 static int pfringzc_config_input(libtrace_t *libtrace, trace_option_t option,
 		void *data) {
 
+	int ret;
+
 	switch (option) {
 		case TRACE_OPTION_SNAPLEN:
 			ZC_FORMAT_DATA->snaplen = *(int *)data;
@@ -518,15 +523,24 @@ static int pfringzc_config_input(libtrace_t *libtrace, trace_option_t option,
 			ZC_FORMAT_DATA->bpffilter = strdup((char *)data);
 			return 0;
 		case TRACE_OPTION_HASHER:
-			/* We can do bidirectional hashing on hardware
-			 * by default, thanks to the ZC library */
 			ZC_FORMAT_DATA->hashtype = *((enum hasher_types *)data);
 			switch (*((enum hasher_types *)data)) {
 				case HASHER_BIDIRECTIONAL:
 				case HASHER_UNIDIRECTIONAL:
-					return 0;
 				case HASHER_BALANCE:
-					return 0;		
+					// Set RSS hash key on NIC
+					if (linuxcommon_set_nic_hasher(libtrace->uridata,
+								       ZC_FORMAT_DATA->hashtype) != 0) {
+						fprintf(stderr, "Couldn't configure RSS hashing! "
+							"falling back to software hashing\n");
+						return -1;
+					}
+					// check for any flow director rules
+					if ((ret = linuxcommon_get_nic_flow_rule_count(libtrace->uridata)) > 0) {
+						fprintf(stderr, "%d flow director rules detected, "
+							"RSS hashing may not work correctly!\n", ret);
+					}
+					return 0;
 				case HASHER_CUSTOM:
 					return -1;
 			}
