@@ -78,7 +78,6 @@ struct pfringzc_per_thread {
 
 struct pfringzc_format_data_t {
 	pfring_zc_cluster *cluster;
-	pfring_zc_worker *hasher;
 	pfring_zc_buffer_pool *pool;
 	pfring_zc_queue **devices;
         pfring_zc_queue **queues;
@@ -258,8 +257,9 @@ static inline int pfringzc_init_queues(libtrace_t *libtrace,
 		snprintf(devname, sizeof(devname), "%s@%d", libtrace->uridata, i);
 		fdata->devices[i] = pfring_zc_open_device(fdata->cluster, devname, rx_only,
 			PF_RING_ZC_DEVICE_SW_TIMESTAMP |
-			PF_RING_ZC_DEVICE_HW_TIMESTAMP);
-		if (fdata->devices[0] == NULL) {
+			PF_RING_ZC_DEVICE_HW_TIMESTAMP |
+			PF_RING_ZC_DEVICE_NOT_REPROGRAM_RSS);
+		if (fdata->devices[i] == NULL) {
 			trace_set_err(libtrace, errno, "pfring_zc_open_device error: %s", devname);
 			return -1;
 		}
@@ -271,6 +271,14 @@ static inline int pfringzc_init_queues(libtrace_t *libtrace,
                         goto error;
                 }
                 fdata->perthreads[i].queue = fdata->queues[i];
+
+		if (fdata->bpffilter != NULL) {
+			if (pfring_zc_set_bpf_filter(fdata->devices[i], fdata->bpffilter) != 0) {
+				trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
+					"Failed to set BPF filter: %s\n", fdata->bpffilter);
+				return -1;
+			}
+		}
 	}
 
 	fdata->pool = pfring_zc_create_buffer_pool(fdata->cluster, PFRINGZC_PREFETCH_BUFFERS);
@@ -291,18 +299,25 @@ static int pfringzc_max_packet_length(char *device) {
 	pfring *ring;
 	pfring_card_settings settings;
 	uint32_t mtu;
-	ring = pfring_open(device,1536,PF_RING_ZC_NOT_REPROGRAM_RSS);
+	ring = pfring_open(device, 1536, PF_RING_ZC_NOT_REPROGRAM_RSS);
 	if (ring == NULL)
 		return 1536;
 	pfring_get_card_settings(ring, &settings);
 	mtu = pfring_get_mtu_size(ring);
-	if (settings.max_packet_size < mtu + 14)
-		settings.max_packet_size = mtu + 14;
+	if (settings.max_packet_size < mtu + 14 /* eth */)
+		settings.max_packet_size = mtu + 14 /* eth */ + 4 /* vlan */;
 	pfring_close(ring);
 	return settings.max_packet_size;
 }
 
 static int pfringzc_start_input(libtrace_t *libtrace) {
+
+	char *interface = strchr(libtrace->uridata, ':');
+	if (interface != NULL) {
+		interface += 1;
+	} else {
+		interface = libtrace->uridata;
+	}
 
 	int threads = libtrace->perpkt_thread_count;
 	if (threads == 0 || trace_has_dedicated_hasher(libtrace))
@@ -321,8 +336,8 @@ static int pfringzc_start_input(libtrace_t *libtrace) {
 	}
 
 	// set nic queues to match number of threads
-	if (linuxcommon_get_nic_queues(libtrace->uridata) != threads) {
-		if (linuxcommon_set_nic_queues(libtrace->uridata, threads) != threads) {
+	if (linuxcommon_get_nic_queues(interface) != threads) {
+		if (linuxcommon_set_nic_queues(interface, threads) != threads) {
 			trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to set number of NIC queues "
 				"to match the number of processing threads %d", threads);
 			return -1;
@@ -345,26 +360,6 @@ static int pfringzc_start_input(libtrace_t *libtrace) {
 
 	if (pfringzc_init_queues(libtrace, ZC_FORMAT_DATA, threads) == -1)
 		return -1;
-
-	if (ZC_FORMAT_DATA->bpffilter != NULL) {
-		if (pfring_zc_set_bpf_filter(ZC_FORMAT_DATA->devices[0], ZC_FORMAT_DATA->bpffilter) != 0) {
-			trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
-				"Failed to set BPF filter: %s\n", ZC_FORMAT_DATA->bpffilter);
-			return -1;
-		}
-	}
-
-	//ZC_FORMAT_DATA->hasher = pfring_zc_run_balancer(ZC_FORMAT_DATA->devices,
-	//						ZC_FORMAT_DATA->queues,
-	//						1,
-	//						threads,
-	//						ZC_FORMAT_DATA->pool,
-	//						round_robin_bursts_policy,
-	//						NULL,
-	//						NULL,
-	//						NULL,
-	//						1,
-	//						-1);
 
 	return 0;
 }
@@ -499,7 +494,6 @@ static int pfringzc_init_input(libtrace_t *libtrace) {
 
 	ZC_FORMAT_DATA->cluster = NULL;
 	ZC_FORMAT_DATA->pool = NULL;
-	ZC_FORMAT_DATA->hasher = NULL;
 	ZC_FORMAT_DATA->hashtype = HASHER_BIDIRECTIONAL;
 	ZC_FORMAT_DATA->clusterid = (uint16_t)rand();
 	ZC_FORMAT_DATA->perthreads = NULL;
@@ -618,9 +612,15 @@ static int pfring_pause_input(libtrace_t *libtrace) {
 }
 
 static int pfringzc_ppause_input(libtrace_t *libtrace) {
-	/* hopefully this will clean up our buffers and queues? */
-	//pfring_zc_kill_worker(ZC_FORMAT_DATA->hasher);
 	pfring_zc_destroy_cluster(ZC_FORMAT_DATA->cluster);
+	if (libtrace->format_data) {
+		if (ZC_FORMAT_DATA->devices)
+			free(ZC_FORMAT_DATA->devices);
+		if (ZC_FORMAT_DATA->queues)
+			free(ZC_FORMAT_DATA->queues);
+		if (ZC_FORMAT_DATA->perthreads)
+			free(ZC_FORMAT_DATA->perthreads);
+	}
 	return 0;
 }
 
@@ -629,7 +629,7 @@ static int pfring_fin_input(libtrace_t *libtrace) {
 	if (libtrace->format_data) {
 		if (FORMAT_DATA->bpffilter)
 			free(FORMAT_DATA->bpffilter);
-		if (FORMAT_DATA->per_stream) 
+		if (FORMAT_DATA->per_stream)
 			libtrace_list_deinit(FORMAT_DATA->per_stream);
 		free(libtrace->format_data);
 	}
@@ -638,9 +638,16 @@ static int pfring_fin_input(libtrace_t *libtrace) {
 
 
 static int pfringzc_fin_input(libtrace_t *libtrace) {
+	pfring_zc_destroy_cluster(ZC_FORMAT_DATA->cluster);
 	if (libtrace->format_data) {
 		if (ZC_FORMAT_DATA->bpffilter)
 			free(ZC_FORMAT_DATA->bpffilter);
+		if (ZC_FROMAT_DATA->devices)
+			free(ZC_FORMAT_DATA->devices);
+		if (ZC_FORMAT_DATA->queues)
+			free(ZC_FORMAT_DATA->queues);
+		if (ZC_FORMAT_DATA->perthreads)
+			free(ZC_FORMAT_DATA->perthreads);
 		free(libtrace->format_data);
 	}
 	return 0;
