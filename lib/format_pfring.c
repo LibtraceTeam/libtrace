@@ -499,7 +499,8 @@ static int pfringzc_init_input(libtrace_t *libtrace) {
 	ZC_FORMAT_DATA->promisc = -1;
 	ZC_FORMAT_DATA->snaplen = LIBTRACE_PACKET_BUFSIZE;
 	ZC_FORMAT_DATA->bpffilter = NULL;
-
+	ZC_FORMAT_DATA->devices = NULL;
+	ZC_FORMAT_DATA->queues = NULL;
 	ZC_FORMAT_DATA->cluster = NULL;
 	ZC_FORMAT_DATA->pool = NULL;
 	ZC_FORMAT_DATA->hashtype = HASHER_BIDIRECTIONAL;
