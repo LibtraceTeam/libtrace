@@ -625,7 +625,6 @@ static int pfringzc_ppause_input(libtrace_t *libtrace) {
 }
 
 static int pfring_fin_input(libtrace_t *libtrace) {
-
 	if (libtrace->format_data) {
 		if (FORMAT_DATA->bpffilter)
 			free(FORMAT_DATA->bpffilter);
@@ -638,16 +637,9 @@ static int pfring_fin_input(libtrace_t *libtrace) {
 
 
 static int pfringzc_fin_input(libtrace_t *libtrace) {
-	pfring_zc_destroy_cluster(ZC_FORMAT_DATA->cluster);
 	if (libtrace->format_data) {
 		if (ZC_FORMAT_DATA->bpffilter)
 			free(ZC_FORMAT_DATA->bpffilter);
-		if (ZC_FROMAT_DATA->devices)
-			free(ZC_FORMAT_DATA->devices);
-		if (ZC_FORMAT_DATA->queues)
-			free(ZC_FORMAT_DATA->queues);
-		if (ZC_FORMAT_DATA->perthreads)
-			free(ZC_FORMAT_DATA->perthreads);
 		free(libtrace->format_data);
 	}
 	return 0;
