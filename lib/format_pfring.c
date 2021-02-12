@@ -42,6 +42,7 @@
 #include <assert.h>
 #include <unistd.h>
 #include <string.h>
+#include <net/if.h>
 
 #if HAVE_LIBNUMA
 #include <numa.h>
@@ -332,6 +333,13 @@ static int pfringzc_start_input(libtrace_t *libtrace) {
 	if (libtrace->uridata == NULL) {
 		trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT,
 			"Missing interface name from pfringzc: URI");
+		return -1;
+	}
+
+	// check interface exists
+	if (if_nametoindex(interface) == 0) {
+		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Invalid interface name "
+			"%s", interface);
 		return -1;
 	}
 
@@ -768,8 +776,6 @@ static int pfringzc_read_batch(libtrace_t *libtrace,
 		hdr->ts.tv_usec = stream->buffers[i]->ts.tv_nsec / 1000;
 		hdr->ext.ts_ns = 0;
 	}
-
-	//pfring_zc_sync_queue(stream->device, rx_only);
 
 	return received;
 }
