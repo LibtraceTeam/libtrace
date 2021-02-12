@@ -46,7 +46,8 @@ static int linuxcommon_send_ioctl_ethtool(void *data, char *ifname) {
         return -errno;
 
     ifr.ifr_data = data;
-    memcpy(ifr.ifr_name, ifname, IFNAMSIZ - 1);
+    int cpy_len = strlen(ifname) < IFNAMSIZ ? strlen(ifname) : IFNAMSIZ -1;
+    memcpy(ifr.ifr_name, ifname, cpy_len);
     ifr.ifr_name[IFNAMSIZ - 1] = '\0';
     err = ioctl(fd, SIOCETHTOOL, &ifr);
     if (err && errno != EOPNOTSUPP) {
