@@ -3698,7 +3698,7 @@ trace_create_filter_from_bytecode(void *bf_insns, unsigned int bf_len);
  * @return >0 if the filter matches, 0 if it doesn't, -1 on error.
  * 
  * @note Due to the way BPF filters are built, the filter is not actually
- * compiled until the first time trace_create_filter is called. If your filter
+ * compiled until the first time trace_apply_filter is called. If your filter
  * is incorrect, it will generate an error message and assert, exiting the
  * program. This behaviour may change to a more graceful handling of this error
  * in the future.

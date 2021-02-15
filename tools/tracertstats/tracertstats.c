@@ -271,9 +271,17 @@ static libtrace_packet_t *cb_packet(libtrace_t *trace, libtrace_thread_t *t,
                 return packet;
         }
         for(i=0;i<filter_count;++i) {
-                if(trace_apply_filter(filters[i].filter, packet)) {
+                int filter_ret;
+                if (filters[i].filter == NULL)
+                        continue;
+                filter_ret = trace_apply_filter(filters[i].filter, packet);
+                if (filter_ret > 0) {
                         td->results->filters[i].count++;
                         td->results->filters[i].bytes+=wlen;
+                } else if (filter_ret < 0) {
+                        trace_perror(trace, "trace_apply_filter");
+                        fprintf(stderr, "Removing filter from filterlist\n");
+                        filters[i].filter = NULL;
                 }
         }
 

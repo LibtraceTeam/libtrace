@@ -1728,7 +1728,7 @@ static int trace_bpf_compile(libtrace_filter_t *filter,
 		/* Make sure not one bet us to this */
 		if (filter->flag) {
 			pthread_mutex_unlock(&mutex);
-			return -1;
+			return 0;
 		}
 		pcap=(pcap_t *)pcap_open_dead(
 				(int)libtrace_to_pcap_dlt(linktype),
