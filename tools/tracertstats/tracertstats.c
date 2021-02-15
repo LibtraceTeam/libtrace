@@ -222,15 +222,21 @@ static void *cb_starting(libtrace_t *trace UNUSED,
         return td;
 }
 
-static inline void sync_first_key(uint64_t key, thread_data_t *td) {
+static inline void sync_first_key(libtrace_t *trace, uint64_t key, thread_data_t *td) {
         // used to sync intervals between perpkt threads
-	    if (first_ts == 0) {
-	            pthread_mutex_lock(&ts_lock);
+        if (first_ts == 0) {
+                pthread_mutex_lock(&ts_lock);
                 if (first_ts == 0) {
+                        if (trace) {
+                                // Get the timestamp from the first packet
+                                const libtrace_packet_t *pkt = NULL;
+                                trace_get_first_packet(trace, NULL, &pkt, NULL);
+                                key = trace_get_erf_timestamp(pkt);
+                        }
                         first_ts = key;
                 }
                 pthread_mutex_unlock(&ts_lock);
-		}
+        }
         if (td->last_key == 0) {
                 td->last_key = first_ts;
         }
@@ -249,7 +255,7 @@ static libtrace_packet_t *cb_packet(libtrace_t *trace, libtrace_thread_t *t,
         }
 
         key = trace_get_erf_timestamp(packet);
-        sync_first_key(key, td);
+        sync_first_key(trace, 0, td);
         while ((key >> 32) >= (td->last_key >> 32) + packet_interval) {
                 libtrace_generic_t tmp = {.ptr = td->results};
 		trace_publish_result(trace, t, td->last_key,
@@ -292,7 +298,7 @@ static void cb_tick(libtrace_t *trace, libtrace_thread_t *t,
                 void *global UNUSED, void *tls, uint64_t order) {
 
         thread_data_t *td = (thread_data_t *)tls;
-        sync_first_key(order, td);
+        sync_first_key(NULL, order, td);
         while ((order >> 32) >= (td->last_key >> 32) + packet_interval) {
                 libtrace_generic_t tmp = {.ptr = td->results};
                 trace_publish_result(trace, t, td->last_key, tmp, RESULT_USER);
@@ -377,7 +383,7 @@ static void run_trace(char *uri)
 
 	if (!merge_inputs)
 		output_destroy(output);
-       
+
 }
 
 // TODO Decide what to do with -c option
@@ -494,8 +500,8 @@ int main(int argc, char *argv[]) {
 		fprintf(stderr,"output format: '%s'\n",output_format);
 	else
 		fprintf(stderr,"output format: '%s'\n", DEFAULT_OUTPUT_FMT);
-	
-	
+
+
 	if (merge_inputs) {
 		/* If we're merging the inputs, we only want to create all
 		 * the column headers etc. once rather than doing them once
@@ -507,7 +513,7 @@ int main(int argc, char *argv[]) {
 		if (output == NULL)
 			return 0;
 	}
-	
+
         sigact.sa_handler = cleanup_signal;
         sigemptyset(&sigact.sa_mask);
         sigact.sa_flags = SA_RESTART;
