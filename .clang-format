@@ -1,0 +1,6 @@
+BasedOnStyle: LLVM
+IndentWidth: 8
+ContinuationIndentWidth: 4
+UseTab: Never
+SortIncludes: false
+BreakBeforeBraces: Linux
