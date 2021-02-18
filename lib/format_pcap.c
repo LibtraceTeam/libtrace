@@ -467,6 +467,13 @@ static int pcap_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 			"call trace_create() before calling pcap_read_packet()");
 		return -1;
 	}
+
+        /* If the packet buffer is owned by libtrace free it */
+        if (packet->buf_control == TRACE_CTRL_PACKET) {
+                free(packet->buffer);
+                packet->buffer = NULL;
+        }
+
 	linktype = pcap_datalink(DATA(libtrace)->input.pcap);
 	packet->type = pcap_linktype_to_rt(linktype);
 	
