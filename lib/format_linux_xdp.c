@@ -1174,6 +1174,7 @@ static int linux_xdp_read_stream(libtrace_t *libtrace,
         packet[i]->trace = libtrace;
         packet[i]->srcbucket = stream;
         packet[i]->error = 1;
+        packet[i]->order = sys_time + i;
 
         meta = (libtrace_xdp_meta_t *)packet[i]->buffer;
         meta->timestamp = sys_time + i;
