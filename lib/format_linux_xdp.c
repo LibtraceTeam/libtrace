@@ -664,7 +664,7 @@ static int linux_xdp_init_input(libtrace_t *libtrace) {
             if (access(libtrace_xdp_kern[i], F_OK) != -1) {
                 XDP_FORMAT_DATA->cfg.bpf_filename = strdup(libtrace_xdp_kern[i]);
                 XDP_FORMAT_DATA->cfg.bpf_progname = strdup(libtrace_xdp_prog);
-                continue;
+                break;
             }
         }
     }
