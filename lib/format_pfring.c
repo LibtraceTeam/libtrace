@@ -344,8 +344,8 @@ static int pfringzc_start_input(libtrace_t *libtrace) {
 	}
 
 	// set nic queues to match number of threads
-	if (linuxcommon_get_nic_queues(interface) != threads) {
-		if (linuxcommon_set_nic_queues(interface, threads) != threads) {
+	if (linux_get_nic_queues(interface) != threads) {
+		if (linux_set_nic_queues(interface, threads) != threads) {
 			trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to set number of NIC queues "
 				"to match the number of processing threads %d", threads);
 			return -1;
@@ -532,14 +532,14 @@ static int pfringzc_config_input(libtrace_t *libtrace, trace_option_t option,
 				case HASHER_UNIDIRECTIONAL:
 				case HASHER_BALANCE:
 					// Set RSS hash key on NIC
-					if (linuxcommon_set_nic_hasher(libtrace->uridata,
+					if (linux_set_nic_hasher(libtrace->uridata,
 								       ZC_FORMAT_DATA->hashtype) != 0) {
 						fprintf(stderr, "Couldn't configure RSS hashing! "
 							"falling back to software hashing\n");
 						return -1;
 					}
 					// check for any flow director rules
-					if ((ret = linuxcommon_get_nic_flow_rule_count(libtrace->uridata)) > 0) {
+					if ((ret = linux_get_nic_flow_rule_count(libtrace->uridata)) > 0) {
 						fprintf(stderr, "%d flow director rules detected, "
 							"RSS hashing may not work correctly!\n", ret);
 					}

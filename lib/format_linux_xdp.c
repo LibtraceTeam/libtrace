@@ -478,10 +478,10 @@ static int linux_xdp_init_input(libtrace_t *libtrace) {
     }
 
     // try set number of RX rings to match xdp rings
-    if (linuxcommon_set_nic_rx_tx_rings(xdp_rings, xdp_rings, XDP_FORMAT_DATA->cfg.ifname) < 0) {
+    if (linux_set_nic_rx_tx_rings(xdp_rings, xdp_rings, XDP_FORMAT_DATA->cfg.ifname) < 0) {
 
         // failed to set, lets see if we can get the current values and set the xdp rings to match
-        if ((hw_rx = linuxcommon_get_nic_rx_rings(XDP_FORMAT_DATA->cfg.ifname)) > 0) {
+        if ((hw_rx = linux_get_nic_rx_rings(XDP_FORMAT_DATA->cfg.ifname)) > 0) {
             xdp_rings = hw_rx;
             hw_rings = hw_rx;
         }
@@ -550,13 +550,13 @@ static int linux_xdp_setup_xdp(libtrace_t *libtrace) {
     // create socket used to hold interface promisc setting
     XDP_FORMAT_DATA->cfg.promisc_sock = socket(PF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
     if (XDP_FORMAT_DATA->cfg.promisc != 1) {
-        if (linuxcommon_set_promisc(XDP_FORMAT_DATA->cfg.promisc_sock, XDP_FORMAT_DATA->cfg.ifindex, 1) < 0) {
+        if (linux_set_promisc(XDP_FORMAT_DATA->cfg.promisc_sock, XDP_FORMAT_DATA->cfg.ifindex, 1) < 0) {
             trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to enable promisc mode "
                 "on NIC - linux_xdp_init_input()");
             return -1;
         }
     } else {
-        if (linuxcommon_set_promisc(XDP_FORMAT_DATA->cfg.promisc_sock, XDP_FORMAT_DATA->cfg.ifindex, 0) < 0) {
+        if (linux_set_promisc(XDP_FORMAT_DATA->cfg.promisc_sock, XDP_FORMAT_DATA->cfg.ifindex, 0) < 0) {
             trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to disable promisc mode "
                 "on NIC - linux_xdp_init_input()");
             return -1;
@@ -610,10 +610,10 @@ static int linux_xdp_init_output(libtrace_out_t *libtrace) {
     }
 
     // try set number of RX rings to match xdp rings
-    if (linuxcommon_set_nic_rx_tx_rings(xdp_rings, xdp_rings, XDP_FORMAT_DATA->cfg.ifname) < 0) {
+    if (linux_set_nic_rx_tx_rings(xdp_rings, xdp_rings, XDP_FORMAT_DATA->cfg.ifname) < 0) {
 
         // failed to set, lets see if we can get the current values and set the xdp rings to match
-        if ((hw_tx = linuxcommon_get_nic_tx_rings(XDP_FORMAT_DATA->cfg.ifname)) > 0) {
+        if ((hw_tx = linux_get_nic_tx_rings(XDP_FORMAT_DATA->cfg.ifname)) > 0) {
             xdp_rings = hw_tx;
             hw_rings = hw_tx;
         }
@@ -643,7 +643,7 @@ static int linux_xdp_pstart_input(libtrace_t *libtrace) {
     }
 
     /* get the maximum number of supported nic queues */
-    max_nic_queues = linuxcommon_get_nic_max_queues(XDP_FORMAT_DATA->cfg.ifname);
+    max_nic_queues = linux_get_nic_max_queues(XDP_FORMAT_DATA->cfg.ifname);
 
     /* if the number of processing threads is greater than the max supported NIC
      * queues reduce the number of threads to match */
@@ -652,7 +652,7 @@ static int linux_xdp_pstart_input(libtrace_t *libtrace) {
     }
 
     /* set the number of nic queues to match number of threads */
-    if (linuxcommon_set_nic_queues(XDP_FORMAT_DATA->cfg.ifname, libtrace->perpkt_thread_count) !=
+    if (linux_set_nic_queues(XDP_FORMAT_DATA->cfg.ifname, libtrace->perpkt_thread_count) !=
         libtrace->perpkt_thread_count) {
 
         trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to set number of NIC queues "
@@ -702,11 +702,11 @@ static int linux_xdp_start_input(libtrace_t *libtrace) {
 
     /* single threaded operation, make sure the number of nic queues is 1 or
      * packets will be lost */
-    c_nic_queues = linuxcommon_get_nic_queues(XDP_FORMAT_DATA->cfg.ifname);
+    c_nic_queues = linux_get_nic_queues(XDP_FORMAT_DATA->cfg.ifname);
 
     if (c_nic_queues != 1) {
         /* set the number of nic queues to 1 */
-        if (linuxcommon_set_nic_queues(XDP_FORMAT_DATA->cfg.ifname, 1) < 0) {
+        if (linux_set_nic_queues(XDP_FORMAT_DATA->cfg.ifname, 1) < 0) {
             trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to set number "
                 "of NIC queues to 1");
             return -1;
@@ -1492,12 +1492,12 @@ static int linux_xdp_config_input(libtrace_t *libtrace,
                 case HASHER_BIDIRECTIONAL:
                     XDP_FORMAT_DATA->hasher_type = *(enum hasher_types*)data;
                     // Set RSS hash key on NIC
-                    if (linuxcommon_set_nic_hasher(XDP_FORMAT_DATA->cfg.ifname, XDP_FORMAT_DATA->hasher_type) != 0) {
+                    if (linux_set_nic_hasher(XDP_FORMAT_DATA->cfg.ifname, XDP_FORMAT_DATA->hasher_type) != 0) {
                         fprintf(stderr, "Linux XDP: couldn't configure RSS hashing! falling back to software hashing\n");
                         return -1;
                     }
                     // check for any flow director rules
-                    if ((ret = linuxcommon_get_nic_flow_rule_count(XDP_FORMAT_DATA->cfg.ifname)) > 0) {
+                    if ((ret = linux_get_nic_flow_rule_count(XDP_FORMAT_DATA->cfg.ifname)) > 0) {
                         fprintf(stderr, "Linux XDP: %d flow director rules detected, RSS hashing may not work correctly!\n", ret);
                     }
                     return 0;

@@ -15,7 +15,7 @@
 #include <linux/if_packet.h>
 #include <errno.h>
 
-int linuxcommon_set_promisc(const int sock, const unsigned int ifindex, bool enable) {
+int linux_set_promisc(const int sock, const unsigned int ifindex, bool enable) {
 
     struct packet_mreq mreq;
     int action;
@@ -36,7 +36,7 @@ int linuxcommon_set_promisc(const int sock, const unsigned int ifindex, bool ena
     return 0;
 }
 
-static int linuxcommon_send_ioctl_ethtool(void *data, char *ifname) {
+static int linux_send_ioctl_ethtool(void *data, char *ifname) {
 
     struct ifreq ifr = {};
     int fd, err, ret;
@@ -68,12 +68,12 @@ out:
     return ret;
 }
 
-int linuxcommon_get_nic_max_queues(char *ifname) {
+int linux_get_nic_max_queues(char *ifname) {
 
     struct ethtool_channels channels = { .cmd = ETHTOOL_GCHANNELS };
     int ret;
 
-    if ((ret = linuxcommon_send_ioctl_ethtool(&channels, ifname)) == 0) {
+    if ((ret = linux_send_ioctl_ethtool(&channels, ifname)) == 0) {
         ret = MAX(channels.max_rx, channels.max_tx);
         ret = MAX(ret, (int)channels.max_combined);
     }
@@ -81,11 +81,11 @@ int linuxcommon_get_nic_max_queues(char *ifname) {
     return ret;
 }
 
-int linuxcommon_get_nic_queues(char *ifname) {
+int linux_get_nic_queues(char *ifname) {
     struct ethtool_channels channels = { .cmd = ETHTOOL_GCHANNELS };
     int ret;
 
-    if ((ret = linuxcommon_send_ioctl_ethtool(&channels, ifname)) == 0) {
+    if ((ret = linux_send_ioctl_ethtool(&channels, ifname)) == 0) {
         ret = MAX(channels.rx_count, channels.tx_count);
         ret = MAX(ret, (int)channels.combined_count);
     }
@@ -93,19 +93,19 @@ int linuxcommon_get_nic_queues(char *ifname) {
     return ret;
 }
 
-int linuxcommon_set_nic_queues(char *ifname, int queues) {
+int linux_set_nic_queues(char *ifname, int queues) {
     struct ethtool_channels channels = { .cmd = ETHTOOL_GCHANNELS };
     __u32 org_combined;
     int ret;
 
     /* get the current settings */
-    if ((ret = linuxcommon_send_ioctl_ethtool(&channels, ifname)) == 0) {
+    if ((ret = linux_send_ioctl_ethtool(&channels, ifname)) == 0) {
 
         org_combined = channels.combined_count;
         channels.cmd = ETHTOOL_SCHANNELS;
         channels.combined_count = queues;
         /* try update */
-        if ((ret = linuxcommon_send_ioctl_ethtool(&channels, ifname)) == 0) {
+        if ((ret = linux_send_ioctl_ethtool(&channels, ifname)) == 0) {
             /* success */
             return channels.combined_count;
         }
@@ -115,7 +115,7 @@ int linuxcommon_set_nic_queues(char *ifname, int queues) {
         channels.tx_count = queues;
         channels.combined_count = org_combined;
         /* try again */
-        if ((ret = linuxcommon_send_ioctl_ethtool(&channels, ifname)) == 0) {
+        if ((ret = linux_send_ioctl_ethtool(&channels, ifname)) == 0) {
             /* success */
             return channels.rx_count;
         }
@@ -125,14 +125,14 @@ int linuxcommon_set_nic_queues(char *ifname, int queues) {
     return ret;
 }
 
-int linuxcommon_set_nic_hasher(char *ifname, enum hasher_types hasher) {
+int linux_set_nic_hasher(char *ifname, enum hasher_types hasher) {
 
     int err;
     int indir_bytes;
 
     struct ethtool_rxfh rss_head = {0};
     rss_head.cmd = ETHTOOL_GRSSH;
-    err = linuxcommon_send_ioctl_ethtool(&rss_head, ifname);
+    err = linux_send_ioctl_ethtool(&rss_head, ifname);
     if (err != 0) {
         return -1;
     }
@@ -166,7 +166,7 @@ int linuxcommon_set_nic_hasher(char *ifname, enum hasher_types hasher) {
             free(rss);
             return 0;
     }
-    err = linuxcommon_send_ioctl_ethtool(rss, ifname);
+    err = linux_send_ioctl_ethtool(rss, ifname);
     if (err != 0) {
         free(rss);
         return -1;
@@ -176,14 +176,14 @@ int linuxcommon_set_nic_hasher(char *ifname, enum hasher_types hasher) {
     return 0;
 }
 
-int linuxcommon_get_nic_flow_rule_count(char *ifname) {
+int linux_get_nic_flow_rule_count(char *ifname) {
 
     int err;
 
     struct ethtool_rxnfc nfccmd = {};
     nfccmd.cmd = ETHTOOL_GRXCLSRLCNT;
     nfccmd.data = 0;
-    err = linuxcommon_send_ioctl_ethtool(&nfccmd, ifname);
+    err = linux_send_ioctl_ethtool(&nfccmd, ifname);
     if (err != 0) {
         return -1;
     }
@@ -191,49 +191,49 @@ int linuxcommon_get_nic_flow_rule_count(char *ifname) {
     return nfccmd.rule_cnt;
 }
 
-static struct ethtool_ringparam *linuxcommon_get_nic_rings(struct ethtool_ringparam *ering, char *ifname) {
+static struct ethtool_ringparam *linux_get_nic_rings(struct ethtool_ringparam *ering, char *ifname) {
     ering->cmd = ETHTOOL_GRINGPARAM;
-    if (linuxcommon_send_ioctl_ethtool(ering, ifname) != 0)
+    if (linux_send_ioctl_ethtool(ering, ifname) != 0)
         return NULL;
     return ering;
 }
 
-int linuxcommon_get_nic_rx_rings(char *ifname) {
+int linux_get_nic_rx_rings(char *ifname) {
     struct ethtool_ringparam ering = {};
-    if (linuxcommon_get_nic_rings(&ering, ifname) != NULL)
+    if (linux_get_nic_rings(&ering, ifname) != NULL)
         return ering.rx_pending;
     return -1;
 }
 
-int linuxcommon_get_nic_tx_rings(char *ifname) {
+int linux_get_nic_tx_rings(char *ifname) {
     struct ethtool_ringparam ering = {};
-    if (linuxcommon_get_nic_rings(&ering, ifname) != NULL)
+    if (linux_get_nic_rings(&ering, ifname) != NULL)
         return ering.tx_pending;
     return -1;
 }
 
-int linuxcommon_get_nic_max_rx_rings(char *ifname) {
+int linux_get_nic_max_rx_rings(char *ifname) {
     struct ethtool_ringparam ering = {};
-    if (linuxcommon_get_nic_rings(&ering, ifname) != NULL)
+    if (linux_get_nic_rings(&ering, ifname) != NULL)
         return ering.rx_max_pending;
     return -1;
 }
 
-int linuxcommon_get_nic_max_tx_rings(char *ifname) {
+int linux_get_nic_max_tx_rings(char *ifname) {
     struct ethtool_ringparam ering = {};
-    if (linuxcommon_get_nic_rings(&ering, ifname) != NULL)
+    if (linux_get_nic_rings(&ering, ifname) != NULL)
         return ering.tx_max_pending;
     return -1;
 }
 
-int linuxcommon_set_nic_rx_tx_rings(int tx, int rx, char *ifname) {
+int linux_set_nic_rx_tx_rings(int tx, int rx, char *ifname) {
     struct ethtool_ringparam ering = {};
-    if (linuxcommon_get_nic_rings(&ering, ifname) == NULL)
+    if (linux_get_nic_rings(&ering, ifname) == NULL)
         return -1;
     ering.cmd = ETHTOOL_SRINGPARAM;
     ering.rx_pending = rx;
     ering.tx_pending = tx;
-    if (linuxcommon_send_ioctl_ethtool(&ering, ifname) != 0)
+    if (linux_send_ioctl_ethtool(&ering, ifname) != 0)
         return -1;
     return 1;
 }
