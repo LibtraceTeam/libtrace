@@ -424,7 +424,7 @@ int linuxcommon_start_input_stream(libtrace_t *libtrace,
 
 	/* Enable promiscuous mode, if requested */
         if (FORMAT_DATA->promisc) {
-            if (linuxcommon_set_promisc(stream->fd, addr.sll_ifindex, 1) < 0)
+            if (linux_set_promisc(stream->fd, addr.sll_ifindex, 1) < 0)
                 perror("setsockopt(PROMISC)");
 	}
 
