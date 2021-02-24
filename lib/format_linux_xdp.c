@@ -550,13 +550,13 @@ static int linux_xdp_setup_xdp(libtrace_t *libtrace) {
     // create socket used to hold interface promisc setting
     XDP_FORMAT_DATA->cfg.promisc_sock = socket(PF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
     if (XDP_FORMAT_DATA->cfg.promisc != 1) {
-        if (linux_set_promisc(XDP_FORMAT_DATA->cfg.promisc_sock, XDP_FORMAT_DATA->cfg.ifindex, 1) < 0) {
+        if (linux_set_nic_promisc(XDP_FORMAT_DATA->cfg.promisc_sock, XDP_FORMAT_DATA->cfg.ifindex, 1) < 0) {
             trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to enable promisc mode "
                 "on NIC - linux_xdp_init_input()");
             return -1;
         }
     } else {
-        if (linux_set_promisc(XDP_FORMAT_DATA->cfg.promisc_sock, XDP_FORMAT_DATA->cfg.ifindex, 0) < 0) {
+        if (linux_set_nic_promisc(XDP_FORMAT_DATA->cfg.promisc_sock, XDP_FORMAT_DATA->cfg.ifindex, 0) < 0) {
             trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to disable promisc mode "
                 "on NIC - linux_xdp_init_input()");
             return -1;

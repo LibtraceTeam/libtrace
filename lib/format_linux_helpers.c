@@ -15,7 +15,7 @@
 #include <linux/if_packet.h>
 #include <errno.h>
 
-int linux_set_promisc(const int sock, const unsigned int ifindex, bool enable) {
+int linux_set_nic_promisc(const int sock, const unsigned int ifindex, bool enable) {
 
     struct packet_mreq mreq;
     int action;
