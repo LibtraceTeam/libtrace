@@ -4,7 +4,7 @@
 #include "libtrace.h"
 #include "libtrace_int.h"
 
-int linux_set_promisc(const int sock, const unsigned int ifindex, bool enable);
+int linux_set_nic_promisc(const int sock, const unsigned int ifindex, bool enable);
 int linux_get_nic_max_queues(char *ifname);
 int linux_get_nic_queues(char *ifname);
 int linux_set_nic_queues(char *ifname, int queues);
