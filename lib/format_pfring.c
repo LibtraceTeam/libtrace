@@ -195,6 +195,16 @@ struct libtrace_pfring_header {
 	
 };
 
+static char *pfring_ifname_from_uridata(char *uridata) {
+        char *interface = strchr(uridata, ':');
+        if (interface != NULL) {
+                interface += 1;
+        } else {
+                interface = uridata;
+        }
+        return interface;
+}
+
 static inline int pfring_start_input_stream(libtrace_t *libtrace,
 		struct pfring_per_stream_t *stream) {
 
@@ -294,12 +304,7 @@ static int pfringzc_configure_interface(char *uridata,
                                         bool dedicated_hasher,
                                         char *err,
                                         int errlen) {
-	char *interface = strchr(uridata, ':');
-	if (interface != NULL) {
-		interface += 1;
-	} else {
-		interface = uridata;
-	}
+	char *interface = pfring_ifname_from_uridata(uridata);
 	if (threads == 0 || dedicated_hasher) {
 		threads = 1;
         }
@@ -563,16 +568,20 @@ static int pfringzc_config_input(libtrace_t *libtrace, trace_option_t option,
 				case HASHER_UNIDIRECTIONAL:
 				case HASHER_BALANCE:
 					// Set RSS hash key on NIC
-					if (linux_set_nic_hasher(libtrace->uridata,
-								       ZC_FORMAT_DATA->hashtype) != 0) {
+					if (linux_set_nic_hasher(pfring_ifname_from_uridata(libtrace->uridata),
+								 ZC_FORMAT_DATA->hashtype) != 0) {
 						fprintf(stderr, "Couldn't configure RSS hashing! "
-							"falling back to software hashing\n");
+							"falling back to software hashing: %s\n",
+                                                        pfring_ifname_from_uridata(libtrace->uridata));
 						return -1;
 					}
 					// check for any flow director rules
-					if ((ret = linux_get_nic_flow_rule_count(libtrace->uridata)) > 0) {
-						fprintf(stderr, "%d flow director rules detected, "
-							"RSS hashing may not work correctly!\n", ret);
+					if ((ret = linux_get_nic_flow_rule_count(
+                                                pfring_ifname_from_uridata(libtrace->uridata))) > 0) {
+
+						fprintf(stderr, "%d flow director rules detected on interface %s, "
+							"RSS hashing may not work correctly!\n", ret,
+                                                        pfring_ifname_from_uridata(libtrace->uridata));
 					}
 					return 0;
 				case HASHER_CUSTOM:
