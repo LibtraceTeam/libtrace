@@ -56,10 +56,8 @@
 #include <pfring.h>
 #include <pfring_zc.h>
 
-#define PFRINGZC_BATCHSIZE 10
-#define PFRINGZC_QUEUE_LENGTH 8192
-#define PFRINGZC_MAX_CARD_SLOTS 32768
-#define PFRINGZC_PREFETCH_BUFFERS 8
+#define PFRINGZC_MAX_CARD_RINGS 32768
+#define PFRINGZC_BATCHSIZE 64
 
 struct pfring_format_data_t {
 	libtrace_list_t *per_stream;
@@ -369,8 +367,7 @@ static int pfringzc_start_input(libtrace_t *libtrace) {
 	if ((ZC_FORMAT_DATA->cluster = pfring_zc_create_cluster(ZC_FORMAT_DATA->clusterid,
                                                                 pfringzc_max_packet_length(libtrace->uridata),
                                                                 sizeof(struct libtrace_pfring_header),
-                                                                PFRINGZC_MAX_CARD_SLOTS + (threads * PFRINGZC_QUEUE_LENGTH) +
-                                                                        threads + PFRINGZC_PREFETCH_BUFFERS,
+                                                                PFRINGZC_MAX_CARD_RINGS * threads,
                                                                 pfring_zc_numa_get_cpu_node(0),
                                                                 NULL,
                                                                 0)) == NULL) {
@@ -403,8 +400,7 @@ static int pfringzc_start_output(libtrace_out_t *libtrace) {
         if ((ZC_FORMAT_DATA->cluster = pfring_zc_create_cluster(ZC_FORMAT_DATA->clusterid,
                                                                 pfringzc_max_packet_length(libtrace->uridata),
                                                                 0,
-                                                                PFRINGZC_MAX_CARD_SLOTS + (threads * PFRINGZC_QUEUE_LENGTH) +
-                                                                        threads + PFRINGZC_PREFETCH_BUFFERS,
+                                                                PFRINGZC_MAX_CARD_RINGS * threads,
                                                                 pfring_zc_numa_get_cpu_node(0),
                                                                 NULL,
                                                                 0)) == NULL) {
