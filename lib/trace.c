@@ -170,7 +170,8 @@ static void trace_init(void)
                 linux_xdp_constructor();
 #endif
 #ifdef HAVE_PFRING
-	pfring_constructor();	
+                pfring_constructor();
+                pfringzc_constructor();
 #endif
 	}
 }

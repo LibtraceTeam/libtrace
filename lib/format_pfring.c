@@ -1348,7 +1348,7 @@ static struct libtrace_format_t pfringformat = {
 static struct libtrace_format_t pfringzcformat = {
         "pfringzc",
         "$Id$",
-        TRACE_FORMAT_PFRING,
+        TRACE_FORMAT_PFRINGZC,
         NULL,                           /* probe filename */
         NULL,                           /* probe magic */
         pfringzc_init_input,            /* init_input */
@@ -1401,5 +1401,8 @@ static struct libtrace_format_t pfringzcformat = {
 
 void pfring_constructor(void) {
 	register_format(&pfringformat);
-	register_format(&pfringzcformat);
+}
+
+void pfringzc_constructor(void) {
+        register_format(&pfringzcformat);
 }
