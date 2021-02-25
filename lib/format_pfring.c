@@ -79,7 +79,6 @@ struct pfringzc_per_thread {
 
 struct pfringzc_format_data_t {
 	pfring_zc_cluster *cluster;
-	pfring_zc_buffer_pool *pool;
 	pfring_zc_queue **devices;
 	uint16_t clusterid;
 	struct pfringzc_per_thread *perthreads;
@@ -208,6 +207,26 @@ static inline char *pfring_ifname_from_uridata(char *uridata) {
 
 static inline uint64_t pfring_timespec_to_systime(pfring_zc_timespec *ts) {
         return (uint64_t)ts->tv_sec * 1000000000ull + (uint64_t) ts->tv_nsec;
+}
+
+static bool pfring_can_write(libtrace_packet_t *packet) {
+    /* Get the linktype */
+    libtrace_linktype_t ltype = trace_get_link_type(packet);
+
+    if (ltype == TRACE_TYPE_CONTENT_INVALID) {
+        return false;
+    }
+    if (ltype == TRACE_TYPE_NONDATA) {
+        return false;
+    }
+    if (ltype == TRACE_TYPE_PCAPNG_META) {
+        return false;
+    }
+    if (ltype == TRACE_TYPE_ERF_META) {
+        return false;
+    }
+
+    return true;
 }
 
 static inline int pfring_start_input_stream(libtrace_t *libtrace,
@@ -528,7 +547,6 @@ static int pfringzc_init_input(libtrace_t *libtrace) {
 	ZC_FORMAT_DATA->bpffilter = NULL;
 	ZC_FORMAT_DATA->devices = NULL;
 	ZC_FORMAT_DATA->cluster = NULL;
-	ZC_FORMAT_DATA->pool = NULL;
 	ZC_FORMAT_DATA->hashtype = HASHER_BIDIRECTIONAL;
 	ZC_FORMAT_DATA->clusterid = (uint16_t)rand();
 	ZC_FORMAT_DATA->perthreads = NULL;
@@ -540,7 +558,6 @@ static int pfringzc_init_output(libtrace_out_t *libtrace) {
         libtrace->format_data = (struct pfringzc_format_data_t *)
                 malloc(sizeof(struct pfringzc_format_data_t));
         ZC_FORMAT_DATA->cluster = NULL;
-        ZC_FORMAT_DATA->pool = NULL;
         ZC_FORMAT_DATA->devices = NULL;
         ZC_FORMAT_DATA->clusterid = (uint16_t)rand();
         ZC_FORMAT_DATA->perthreads = NULL;
@@ -961,7 +978,9 @@ static int pfringzc_pread_packets(libtrace_t *libtrace,
 
 static int pfringzc_write_packet(libtrace_out_t *libtrace,
                                  libtrace_packet_t *packet) {
-
+        if (!pfring_can_write(packet)) {
+            return 0;
+        }
         struct pfringzc_per_thread *stream =
                 &(ZC_FORMAT_DATA->perthreads[0]);
         u_char *buffer = pfring_zc_pkt_buff_data(stream->buffers[0], stream->device);
@@ -1346,7 +1365,7 @@ static struct libtrace_format_t pfringzcformat = {
         pfringzc_fin_input,             /* fin_input */
         pfringzc_fin_output,            /* fin_output */
         pfringzc_read_packet,           /* read_packet */
-        NULL,                           /* prepare_packet */
+        pfring_prepare_packet,          /* prepare_packet */
         NULL,                           /* fin_packet */
         NULL,                           /* can_hold_packet */
         pfringzc_write_packet,          /* write_packet */
