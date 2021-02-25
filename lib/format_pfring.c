@@ -74,6 +74,7 @@ struct pfringzc_per_thread {
 	uint32_t nextpacket;
 	pfring_zc_queue *device;
 	pfring_zc_pkt_buff *buffers[PFRINGZC_BATCHSIZE];
+        uint64_t prev_sys_time;
 };
 
 struct pfringzc_format_data_t {
@@ -195,7 +196,7 @@ struct libtrace_pfring_header {
 	
 };
 
-static char *pfring_ifname_from_uridata(char *uridata) {
+static inline char *pfring_ifname_from_uridata(char *uridata) {
         char *interface = strchr(uridata, ':');
         if (interface != NULL) {
                 interface += 1;
@@ -203,6 +204,10 @@ static char *pfring_ifname_from_uridata(char *uridata) {
                 interface = uridata;
         }
         return interface;
+}
+
+static inline uint64_t pfring_timespec_to_systime(pfring_zc_timespec *ts) {
+        return (uint64_t)ts->tv_sec * 1000000000ull + (uint64_t) ts->tv_nsec;
 }
 
 static inline int pfring_start_input_stream(libtrace_t *libtrace,
@@ -331,7 +336,7 @@ static int pfringzc_start_input(libtrace_t *libtrace) {
         int threads;
         if (ZC_FORMAT_DATA->cluster != NULL) {
                 trace_set_err(libtrace, TRACE_ERR_BAD_STATE,
-                        "Attempted to start a pfringzc: input that was already started!");
+                        "Attempted to start a pfringzc input that was already started!");
                 return -1;
         }
         if ((threads = pfringzc_configure_interface(libtrace->uridata,
@@ -819,7 +824,7 @@ static int pfringzc_read_batch(libtrace_t *libtrace,
 
 	for (int i = 0; i < received; i++) {
 
-		u_char *pkt_buf = pfring_zc_pkt_buff_data(stream->buffers[i], stream->device);////
+		u_char *pkt_buf = pfring_zc_pkt_buff_data(stream->buffers[i], stream->device);
 
 		packet[i]->buf_control = TRACE_CTRL_EXTERNAL;
 		packet[i]->type = TRACE_RT_DATA_PFRING;
@@ -828,6 +833,10 @@ static int pfringzc_read_batch(libtrace_t *libtrace,
 		packet[i]->payload = pkt_buf;
 		packet[i]->trace = libtrace;
 		packet[i]->error = 1;
+                packet[i]->order = pfring_timespec_to_systime(&stream->buffers[i]->ts);
+                if (packet[i]->order <= stream->prev_sys_time) {
+                    packet[i]->order += 1;
+                }
 
 		struct libtrace_pfring_header *hdr = (struct libtrace_pfring_header *)stream->buffers[i]->user;
 #if __BYTE_ORDER == __LITTLE_ENDIAN
@@ -841,6 +850,8 @@ static int pfringzc_read_batch(libtrace_t *libtrace,
 		hdr->ts.tv_sec = stream->buffers[i]->ts.tv_sec;
 		hdr->ts.tv_usec = stream->buffers[i]->ts.tv_nsec / 1000;
 		hdr->ext.ts_ns = 0;
+
+                stream->prev_sys_time = packet[i]->order;
 	}
 
 	return received;
