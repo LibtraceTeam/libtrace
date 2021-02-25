@@ -840,7 +840,7 @@ static int pfringzc_read_batch(libtrace_t *libtrace,
 		u_char *pkt_buf = pfring_zc_pkt_buff_data(stream->buffers[i], stream->device);
 
 		packet[i]->buf_control = TRACE_CTRL_EXTERNAL;
-		packet[i]->type = TRACE_RT_DATA_PFRING;
+		packet[i]->type = TRACE_RT_DATA_PFRINGZC;
 		packet[i]->buffer = stream->buffers[i];
 		packet[i]->header = stream->buffers[i]->user;
 		packet[i]->payload = pkt_buf;
@@ -949,11 +949,11 @@ static int pfringzc_read_packet(libtrace_t *libtrace,
 		&(ZC_FORMAT_DATA->perthreads[0]);
 
 	return pfringzc_read_batch(libtrace,
-				   &packet,
-				   NULL,
-				   stream,
-				   1,
-				   1);
+                                   &packet,
+                                   NULL,
+                                   stream,
+                                   1,
+                                   1);
 }
 
 static int pfringzc_pread_packets(libtrace_t *libtrace,
