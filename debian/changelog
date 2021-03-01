@@ -1,3 +1,19 @@
+libtrace4 (4.0.15-1) unstable; urgency=medium
+
+  * Fix bug where reading pcapng trace files would produce endless
+    "NULL meta passed into trace_get_payload_from_meta()" errors.
+  * Fix bug in libpacketdump which would cause packets captured
+    using SLL to be truncated by 16 bytes.
+
+ -- Shane Alcock <shane.alcock@waikato.ac.nz>  Wed, 28 Oct 2020 16:28:08 +1300
+
+libtrace4 (4.0.14-2) unstable; urgency=medium
+
+  * Force libwandder2 as a dependency over libwandder1, to ensure
+    consistency with upcoming OpenLI release.
+
+ -- Shane Alcock <shane.alcock@waikato.ac.nz>  Fri, 04 Sep 2020 15:59:19 +1200
+
 libtrace4 (4.0.14-1) unstable; urgency=medium
 
   * New upstream release.

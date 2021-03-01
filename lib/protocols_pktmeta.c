@@ -229,15 +229,15 @@ DLLEXPORT void *trace_get_payload_from_meta(const void *meta,
 	uint16_t next = 0;
 
 	if (!meta) {
-		fprintf(stderr, "NULL meta passed into trace_get_payload_from_meta()");
+		fprintf(stderr, "NULL meta passed into trace_get_payload_from_meta()\n");
 		return NULL;
 	}
 	if (!linktype) {
-		fprintf(stderr, "NULL linktype passed into trace_get_payload_from_meta()");
+		fprintf(stderr, "NULL linktype passed into trace_get_payload_from_meta()\n");
 		return NULL;
 	}
 	if (!remaining) {
-		fprintf(stderr, "NULL remaining passed into trace_get_payload_from_meta()");
+		fprintf(stderr, "NULL remaining passed into trace_get_payload_from_meta()\n");
 		return NULL;
 	}
 
