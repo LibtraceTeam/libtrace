@@ -801,6 +801,10 @@ DLLEXPORT void *trace_get_layer2(const libtrace_packet_t *packet,
                         case TRACE_TYPE_CONTENT_INVALID:
                                 return NULL;
                 }
+
+                if (meta == NULL) {
+                        return NULL;
+                }
 	}
 
         /* L2 remaining should never exceed wire length, to avoid treating
