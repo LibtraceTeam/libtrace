@@ -35,6 +35,8 @@
 #include "libtrace_int.h"
 #include "format_helper.h"
 #include "libtrace_arphrd.h"
+#include "format_linux_helpers.h"
+
 #include <stdlib.h>
 #include <errno.h>
 #include <unistd.h>
@@ -358,27 +360,6 @@ int linuxcommon_get_dev_statistics(char *ifname, struct linux_dev_stats *stats) 
 	return -1;
 }
 
-int linuxcommon_set_promisc(const int sock, const unsigned int ifindex, bool enable) {
-
-    struct packet_mreq mreq;
-    int action;
-
-    memset(&mreq,0,sizeof(mreq));
-    mreq.mr_ifindex = ifindex;
-    mreq.mr_type = PACKET_MR_PROMISC;
-
-    if (enable)
-        action = PACKET_ADD_MEMBERSHIP;
-    else
-        action = PACKET_DROP_MEMBERSHIP;
-
-
-    if (setsockopt(sock, SOL_PACKET, action, &mreq, sizeof(mreq)) == -1)
-        return -1;
-
-    return 0;
-}
-
 /* Start an input stream
  * - Opens the file descriptor
  * - Sets promiscuous correctly
@@ -443,7 +424,7 @@ int linuxcommon_start_input_stream(libtrace_t *libtrace,
 
 	/* Enable promiscuous mode, if requested */
         if (FORMAT_DATA->promisc) {
-            if (linuxcommon_set_promisc(stream->fd, addr.sll_ifindex, 1) < 0)
+            if (linux_set_nic_promisc(stream->fd, addr.sll_ifindex, 1) < 0)
                 perror("setsockopt(PROMISC)");
 	}
 

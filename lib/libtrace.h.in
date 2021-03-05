@@ -251,6 +251,8 @@ typedef int32_t lt_unaligned_int32_t ALIGNED(1);
 typedef int16_t lt_unaligned_int16_t ALIGNED(1);
 typedef int8_t lt_unaligned_int8_t ALIGNED(1);
 
+#define LIBTRACE_MIN(a,b) ((a)<(b) ? (a) : (b))
+
 /** Opaque structure holding information about an output trace */
 typedef struct libtrace_out_t libtrace_out_t;
 
@@ -460,6 +462,7 @@ enum base_format_t {
         TRACE_FORMAT_CORSAROTAG   =24,  /** Corsarotagger format */
         TRACE_FORMAT_XDP          =25,  /** AF_XDP format */
 	TRACE_FORMAT_PFRING	  =26,
+	TRACE_FORMAT_PFRINGZC     =27,
 };
 
 /** RT protocol packet types */
@@ -526,6 +529,7 @@ typedef enum {
 
 	/** RT is encapsulating a PF_RING capture record */
 	TRACE_RT_DATA_PFRING = TRACE_RT_DATA_SIMPLE + TRACE_FORMAT_PFRING,
+	TRACE_RT_DATA_PFRINGZC = TRACE_RT_DATA_SIMPLE + TRACE_FORMAT_PFRING,
 
 	/** As PCAP does not store the linktype with the packet, we need to 
 	 * create a separate RT type for each supported DLT, starting from
