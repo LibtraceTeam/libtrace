@@ -951,8 +951,8 @@ static int dag_fin_output(libtrace_out_t *libtrace)
 	int out;
 	/* Wait until the buffer is clear before exiting the program,
 	 * as we will lose packets otherwise */
-	while((out = dag_get_stream_buffer_level(FORMAT_DATA_OUT->device->fd,
-	                                         FORMAT_DATA_OUT->dagstream))) {
+	while((out = dag_get_stream_buffer_level64(FORMAT_DATA_OUT->device->fd,
+	                                           FORMAT_DATA_OUT->dagstream))) {
 		/* Wait for dag to complete writing all data */
 
 		/* for some reason when writing to a vDAG dag_get_stream_buffer_level64
