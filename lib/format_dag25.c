@@ -676,6 +676,7 @@ static int dag_start_output(libtrace_out_t *libtrace)
 			trace_set_err_out(libtrace, errno, "Cannot set DAG reverse mode");
 			return -1;
 		}
+		fprintf(stderr, "Opening %s in reverse mode\n", libtrace->uridata);
 	}
 
 	/* Attach and start the DAG stream */
@@ -720,6 +721,7 @@ static int dag_start_input_stream(libtrace_t *libtrace,
 			trace_set_err(libtrace, errno, "Cannot set DAG reverse mode");
 			return -1;
 		}
+		fprintf(stderr, "Opening %s in reverse mode\n", libtrace->uridata);
 	}
 
 	/* Attach and start the DAG stream */
@@ -921,7 +923,11 @@ static int dag_flush_output(libtrace_out_t *libtrace) {
 
 	/* Commit any outstanding traffic in the txbuffer */
         if (FORMAT_DATA_OUT->waiting) {
-                FORMAT_DATA_OUT->txbuffer = dag_tx_stream_commit_bytes64(
+		/* dag_tx_stream_commit_bytes64 does not successfully write to vDAGs
+		 * so we use dag_tx_stream_commit_records64 instead, both have the same
+		 * behaviour when writing to a DAG card.
+		 */
+                FORMAT_DATA_OUT->txbuffer = dag_tx_stream_commit_records64(
 						FORMAT_DATA_OUT->device->fd,
 						FORMAT_DATA_OUT->dagstream,
 						FORMAT_DATA_OUT->waiting );
@@ -942,11 +948,19 @@ static int dag_fin_output(libtrace_out_t *libtrace)
 	/* Commit any outstanding traffic in the txbuffer */
 	dag_flush_output(libtrace);
 
+	int out;
 	/* Wait until the buffer is clear before exiting the program,
 	 * as we will lose packets otherwise */
-	while(dag_get_stream_buffer_level64(FORMAT_DATA_OUT->device->fd,
-	                                    FORMAT_DATA_OUT->dagstream)) {
+	while((out = dag_get_stream_buffer_level(FORMAT_DATA_OUT->device->fd,
+	                                         FORMAT_DATA_OUT->dagstream))) {
 		/* Wait for dag to complete writing all data */
+
+		/* for some reason when writing to a vDAG dag_get_stream_buffer_level64
+		 * will return 8 even when no data remains?? not sure why this is.
+                 */
+		if (out == 8) {
+			break;
+		}
 	}
 
 	/* Need the lock, since we're going to be handling the device list */
@@ -1356,7 +1370,6 @@ static int dag_read_packet_stream(libtrace_t *libtrace,
 		if (size != 0)
 			return size;
 	}
-
 
 	/* Don't let anyone try to free our DAG memory hole! */
 	flags |= TRACE_PREP_DO_NOT_OWN_BUFFER;
