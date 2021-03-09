@@ -1,14 +1,22 @@
 #!/bin/bash
 
 OK=0
+UNSUPPORTED=""
 FAIL=""
+
 PARALLEL_OK=0
+PARALLEL_UNSUPPORTED=""
 PARALLEL_FAIL=""
 
 do_test() {
-	if $@; then
+	$@
+	rc=$?
+        if [[ rc -eq 0 ]]; then
 		OK=$(( OK + 1 ))
-	else
+        elif [[ rc -eq 1 ]]; then
+		UNSUPPORTED="$UNSUPPORTED
+$*"
+        else
 		FAIL="$FAIL
 $*"
 	fi
@@ -16,7 +24,7 @@ $*"
 
 if [[ -z "$GOT_NETNS" ]]; then
 	./netns-env.sh "$0" "$@"
-	exit 0
+	exit $?
 fi
 
 # If we already have LD_LIBRARY_PATH set assume it correctly
@@ -30,8 +38,8 @@ fi
 declare -a write_formats=()
 declare -a read_formats=()
 if [[ $# -eq 0 ]]; then
-	declare -a write_formats=("pcapint:veth0" "int:veth0" "ring:veth0" "dpdkvdev:net_pcap0,iface=veth0" "xdp:veth0")
-	declare -a read_formats=("pcapint:veth1" "int:veth1" "ring:veth1" "dpdkvdev:net_pcap1,iface=veth1" "xdp:veth1")
+	declare -a write_formats=("pcapint:veth0" "int:veth0" "ring:veth0" "dpdkvdev:net_pcap0,iface=veth0")
+	declare -a read_formats=("pcapint:veth1" "int:veth1" "ring:veth1" "dpdkvdev:net_pcap1,iface=veth1")
 fi
 
 while [[ $# -gt 0 ]]; do
@@ -45,7 +53,7 @@ while [[ $# -gt 0 ]]; do
 		write_formats+=("dpdkvdev:net_pcap0,iface=veth0")
 		read_formats+=("dpdkvdev:net_pcap1,iface=veth1")
 		;;
-	int|ring|xdp|pcapint)
+	int|ring|pcapint)
 		write_formats+=("$key:veth0")
 		read_formats+=("$key:veth1")
 		;;
@@ -72,6 +80,7 @@ done
 
 echo
 echo "Single threaded API tests passed: $OK"
+echo "Single threaded API tests unsupported: $UNSUPPORTED"
 echo "Single threaded API tests failed: $FAIL"
 echo
 
@@ -90,10 +99,15 @@ do_parallel_test() {
 	fi
 	sleep 1  # Wait for all packets to be received
 	kill -SIGINT $my_pid
-
-	if wait $my_pid; then
+	wait $my_pid
+	rc=$?
+	if [[ rc -eq 0 ]]; then
 		PARALLEL_OK=$(( PARALLEL_OK + 1 ))
+	elif [[ rc -eq 1 ]]; then
+		PARALLEL_UNSUPPORTED="$PARALLEL_UNSUPPORTED
+$*"
 	else
+
 		PARALLEL_FAIL="$PARALLEL_FAIL
 $*"
 	fi
@@ -117,7 +131,17 @@ done
 
 echo
 echo "Single threaded API tests passed: $OK"
+echo "Single threaded API tests unsupported: $UNSUPPORTED"
 echo "Single threaded API tests failed: $FAIL"
 echo
 echo "Parallel API tests passed: $PARALLEL_OK"
+echo "Parallel API tests unsupported: $PARALLEL_UNSUPPORTED"
 echo "Parallel API tests failed: $PARALLEL_FAIL"
+
+
+if [ -z "$FAIL" ] && [ -z "$PARALLEL_FAIL" ]
+then
+        exit 0
+else
+        exit 1
+fi

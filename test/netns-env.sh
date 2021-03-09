@@ -48,9 +48,10 @@ $EXEC ip link set veth1 up
 
 
 GOT_NETNS=1 $EXEC "$@"
-
+rc=$?
 
 #cleanup - deleting veth0 impilies veth1 also since these are
 # linked together
 $EXEC ip link delete veth0
 ip netns delete $NS
+exit "$rc"

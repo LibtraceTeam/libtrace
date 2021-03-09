@@ -71,3 +71,10 @@ do_test ./test-tracetime-parallel
 echo
 echo "Tests passed: $OK"
 echo "Tests failed: $FAIL"
+
+if [ -z "$FAIL" ]
+then
+        exit 0
+else
+        exit 1
+fi
