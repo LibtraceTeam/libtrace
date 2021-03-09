@@ -170,6 +170,12 @@ AC_CHECK_HEADER(net/if.h,
  #include <sys/socket.h>
 ])
 
+# Check for linux/ethtool.h
+AC_CHECK_HEADER(linux/ethtool.h,
+	found_ethtool=true,
+	found_ethtool=false,
+)
+
 AC_CHECK_HEADER(netinet/ether.h,
 	AC_DEFINE(HAVE_NETINET_ETHER_H,1,[has netinet/ether.h header]),,[
  #include <sys/types.h>
@@ -922,6 +928,7 @@ AM_CONDITIONAL([HAVE_LIBBPF], [test "x$libtrace_xdp" = "xtrue"])
 AM_CONDITIONAL([BUILD_EBPF], [test "x$build_ebpf" = "xtrue"])
 
 AM_CONDITIONAL([ENABLE_DTRACE], [test "x$systemtap" = "xtrue"])
+AM_CONDITIONAL([HAVE_LINUX_ETHTOOL_H], [test "x$found_ethtool" = "xtrue"])
 
 # Check for miscellaneous programs
 AC_CHECK_PROG([libtrace_doxygen], [doxygen], [true], [false])
