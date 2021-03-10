@@ -221,8 +221,7 @@ static bool dag_can_write(libtrace_packet_t *packet) {
 }
 
 /* Attempts to determine if the given filename refers to a DAG device */
-static 
-int dag_probe_filename(const char *filename) {
+static int dag_probe_filename(const char *filename) {
 	struct stat statbuf;
 	/* Can we stat the file? */
 	if (stat(filename, &statbuf) != 0) {
