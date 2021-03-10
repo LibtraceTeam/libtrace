@@ -28,13 +28,16 @@ jobs:
         submodules: recursive
     - name: Install Dependencies
       run: |
-        sudo apt-get install flex bison libpcap0.8-dev libtool autoconf automake m4 gcc clang llvm gcc-multilib libelf-dev git dpdk-dev 
+	sudo apt update
+        sudo apt-get -y install flex bison libpcap0.8-dev libtool pkgconf autoconf automake m4 gcc clang llvm gcc-multilib libelf-dev git dpdk-dev 
     - name: Install PF_RING
       run: |
-        sudo apt-get install software-properties-common wget
+        sudo apt-get -y install software-properties-common wget
         sudo add-apt-repository -y universe
         wget https://packages.ntop.org/apt-stable/20.04/all/apt-ntop-stable.deb
-        sudo apt-get install ./apt-ntop-stable.deb
+        sudo apt-get -y install ./apt-ntop-stable.deb
+        sudo apt-get update
+        sudo apt-get -y install pfring
     - name: Build/Install Wandio
       run: |
         cd wandio
@@ -66,7 +69,7 @@ jobs:
     - name: Run do-tests-datastruct.sh
       run: cd test; ./do-tests-datastruct.sh
     - name: Run do-live-tests.sh
-      run: cd test; sudo ./do-live-tests.sh pcap int ring pfring
+      run: cd test; sudo ./do-live-tests.sh pcap int ring pfring dpdk
   run-tests-macos:
     name: Run Tests - MacOS Catalina 10.15
     runs-on: macos-10.15
