@@ -28,7 +28,7 @@ jobs:
         submodules: recursive
     - name: Install Dependencies
       run: |
-	sudo apt update
+        sudo apt update
         sudo apt-get -y install flex bison libpcap0.8-dev libtool pkgconf autoconf automake m4 gcc clang llvm gcc-multilib libelf-dev git dpdk-dev 
     - name: Install PF_RING
       run: |
