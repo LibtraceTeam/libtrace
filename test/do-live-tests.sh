@@ -37,9 +37,10 @@ fi
 
 declare -a write_formats=()
 declare -a read_formats=()
+declare -a dag_formats=()
 if [[ $# -eq 0 ]]; then
-	declare -a write_formats=("pcapint:veth0" "int:veth0" "ring:veth0" "dpdkvdev:net_pcap0,iface=veth0")
-	declare -a read_formats=("pcapint:veth1" "int:veth1" "ring:veth1" "dpdkvdev:net_pcap1,iface=veth1")
+	declare -a write_formats=("pcapint:veth0" "int:veth0" "ring:veth0" "dpdkvdev:net_pcap0,iface=veth0" "xdp:veth0")
+	declare -a read_formats=("pcapint:veth1" "int:veth1" "ring:veth1" "dpdkvdev:net_pcap1,iface=veth1" "xdp:veth1")
 fi
 
 while [[ $# -gt 0 ]]; do
@@ -53,9 +54,15 @@ while [[ $# -gt 0 ]]; do
 		write_formats+=("dpdkvdev:net_pcap0,iface=veth0")
 		read_formats+=("dpdkvdev:net_pcap1,iface=veth1")
 		;;
-	int|ring|pcapint)
+	int|ring|xdp|pfringzc|pcapint)
 		write_formats+=("$key:veth0")
 		read_formats+=("$key:veth1")
+		;;
+	pfring)
+		read_formats+=("$key:veth1")
+		;;
+	dag|dag24)
+		dag_formats+=("$key:/dev/dag16,0")
 		;;
 	*)
 		echo "Unknown argument $key"
@@ -76,6 +83,15 @@ do
 		echo ./test-live-snaplen "$w" "$r"
 		do_test ./test-live-snaplen "$w" "$r"
 	done
+done
+for w in "${dag_formats[@]}"
+do
+	echo
+	echo ./test-live "$w" "$w"
+	do_test ./test-live "$w" "$w"
+	echo
+	echo ./test-live-snaplen "$w" "$w"
+	do_test ./test-live "$w" "$w"
 done
 
 echo
