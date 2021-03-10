@@ -90,14 +90,14 @@ echo
 do_parallel_test() {
 	echo
 	echo "$@"
-	timeout 5 "$@" &
+	timeout 30 "$@" &
 	my_pid=$!
 	sleep 2  # Ensure we've had time to setup, particularly dpdk
 	if ! ./test-live "int:veth0"; then
 		echo "TEST ERROR: ./test-live int:veth0 (couldn't generate packets)"
 		exit -1
 	fi
-	sleep 1  # Wait for all packets to be received
+	sleep 10  # Wait for all packets to be received
 	kill -SIGINT $my_pid
 	wait $my_pid
 	rc=$?
