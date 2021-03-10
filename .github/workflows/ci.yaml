@@ -51,6 +51,18 @@ jobs:
         sudo make KSRC=/lib/modules/$(uname -r)/build
         sudo insmod dag.ko
         sudo lsmod
+    - name: Checkout Libbpf
+      uses: actions/checkout@v2
+      with:
+        path: libbpf
+        repository: libbpf/libbpf
+    - name: Build/Install Libbpf
+      run: |
+        cd libbpf/src
+        make
+        sudo make install
+        echo "/usr/lib64" | sudo tee -a /etc/ld.so.conf.d/lib64.conf
+        sudo ldconfig
     - name: Checkout Libtrace
       uses: actions/checkout@v2
       with:
@@ -64,23 +76,11 @@ jobs:
         make
         sudo make install
         sudo ldconfig
-    - name: Checkout Libbpf
-      uses: actions/checkout@v2
-      with:
-        path: libbpf
-        repository: libbpf/libbpf
-    - name: Build/Install Libbpf
-      run: |
-        cd libbpf/src
-        make
-        sudo make install
-        echo "/usr/lib64" | sudo tee -a /etc/ld.so.conf.d/lib64.conf
-        sudo ldconfig
     - name: Build/Install Libtrace
       run: |
         cd libtrace
         ./bootstrap.sh
-        ./configure --with-dpdk --with-pfring --with-xdp --with-dag
+        ./configure --with-dpdk --with-pfring --with-xdp
         make
         sudo make install
     - name: Build Tests
