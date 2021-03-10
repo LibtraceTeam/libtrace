@@ -13,10 +13,10 @@ jobs:
       run: wget https://raw.githubusercontent.com/llvm-mirror/clang/master/tools/clang-format/git-clang-format
     - name: Install git-clang-format
       run: sudo install -t /bin git-clang-format
-    - name: Fetch origin master
-      run: git fetch --no-tags --prune --depth=1 origin develop
+    - name: Fetch origin ${{ github.base_ref }}
+      run: git fetch --no-tags --prune --depth=1 origin ${{ github.base_ref }}
     - name: clang-format
-      run: git clang-format origin/develop
+      run: git clang-format origin/${{ github.base_ref }}
     - name: diff
       run: git diff --exit-code
   run-tests-ubuntu:
