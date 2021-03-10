@@ -25,6 +25,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
       with:
+        path: libtrace
         submodules: recursive
     - name: Install Dependencies
       run: |
@@ -38,15 +39,22 @@ jobs:
         sudo apt-get -y install ./apt-ntop-stable.deb
         sudo apt-get update
         sudo apt-get -y install pfring
-    - name: Install DAG
+    - name: Checkout DAG
       uses: actions/checkout@v2
       with:
+        path: dag
         repository: wanduow/dag
         token: ${{ secrets.DAG_WANDUOW }}
-    - run: |
+    - name: Build DAG
+      run: |
         sudo make KSRC=/lib/modules/$(uname -r)/build
         sudo insmod dag.ko
         sudo lsmod
+    - name: Checkout Libtrace
+    - uses: actions/checkout@v2
+      with:
+        path: libtrace
+        submodules: recursive
     - name: Build/Install Wandio
       run: |
         cd wandio
