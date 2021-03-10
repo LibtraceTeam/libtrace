@@ -57,7 +57,7 @@ void iferr(libtrace_t *trace,const char *msg)
 	if (err.err_num==0)
 		return;
 	printf("Error: %s: %s\n", msg, err.problem);
-	exit(-err.err_num);
+        exit(-err.err_num);
 }
 
 const char *lookup_uri(const char *type) {

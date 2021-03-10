@@ -221,18 +221,19 @@ static bool dag_can_write(libtrace_packet_t *packet) {
 }
 
 /* Attempts to determine if the given filename refers to a DAG device */
-static int dag_probe_filename(const char *filename) {
-	struct stat statbuf;
-	/* Can we stat the file? */
-	if (stat(filename, &statbuf) != 0) {
-		return 0;
-	}
-	/* Is it a character device? */
-	if (!S_ISCHR(statbuf.st_mode)) {
-		return 0;
-	}
-	/* Yeah, it's probably us. */
-	return 1;
+static int dag_probe_filename(const char *filename)
+{
+        struct stat statbuf;
+        /* Can we stat the file? */
+        if (stat(filename, &statbuf) != 0) {
+                return 0;
+        }
+        /* Is it a character device? */
+        if (!S_ISCHR(statbuf.st_mode)) {
+                return 0;
+        }
+        /* Yeah, it's probably us. */
+        return 1;
 }
 
 /* Initialises the DAG output data structure */

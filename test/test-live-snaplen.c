@@ -124,7 +124,7 @@ static void iferr_out(libtrace_out_t *trace)
 	if (err.err_num == 0)
 		return;
 	printf("Error: %s\n", err.problem);
-	exit(-err.err_num);
+        exit(-err.err_num);
 }
 
 static void iferr(libtrace_t *trace)
@@ -133,7 +133,7 @@ static void iferr(libtrace_t *trace)
 	if (err.err_num == 0)
 		return;
 	printf("Error: %s\n", err.problem);
-	exit(-err.err_num);
+        exit(-err.err_num);
 }
 
 int main(int argc, char *argv[])
