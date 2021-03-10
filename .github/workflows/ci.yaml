@@ -38,6 +38,15 @@ jobs:
         sudo apt-get -y install ./apt-ntop-stable.deb
         sudo apt-get update
         sudo apt-get -y install pfring
+    - name: Install DAG
+      uses: actions/checkout@v2
+      with:
+        repository: wanduow/dag
+        token: ${{ secrets.DAG_WANDUOW }}
+      run: |
+        sudo make KSRC=/lib/modules/$(uname -r)/build
+        sudo insmod dag.ko
+        sudo lsmod
     - name: Build/Install Wandio
       run: |
         cd wandio
@@ -57,7 +66,7 @@ jobs:
     - name: Build/Install Libtrace
       run: |
         ./bootstrap.sh
-        ./configure --with-dpdk --with-pfring --with-xdp
+        ./configure --with-dpdk --with-pfring --with-xdp --with-dag
         make
         sudo make install
     - name: Build Tests
