@@ -71,7 +71,7 @@ jobs:
         repository: libbpf/libbpf
     - name: Build/Install Libbpf
       run: |
-        cd libbpf/libbpf/src
+        cd libbpf/src
         make
         sudo make install
         echo "/usr/lib64" | sudo tee -a /etc/ld.so.conf.d/lib64.conf
