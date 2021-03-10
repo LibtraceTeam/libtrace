@@ -20,8 +20,8 @@ jobs:
     - name: diff
       run: git diff --exit-code
   run-tests-ubuntu:
-    name: Run Tests - Ubuntu
-    runs-on: ubuntu-latest
+    name: Run Tests - Ubuntu 20.04
+    runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v2
       with:
@@ -61,8 +61,8 @@ jobs:
     - name: Run do-live-tests.sh
       run: cd test; sudo ./do-live-tests.sh
   run-tests-macos:
-    name: Run Tests - MacOS
-    runs-on: macos-latest
+    name: Run Tests - MacOS Catalina 10.15
+    runs-on: macos-10.15
     steps:
     - uses: actions/checkout@v2
       with:
