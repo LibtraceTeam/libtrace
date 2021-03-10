@@ -43,7 +43,7 @@ jobs:
       with:
         repository: wanduow/dag
         token: ${{ secrets.DAG_WANDUOW }}
-      run: |
+    - run: |
         sudo make KSRC=/lib/modules/$(uname -r)/build
         sudo insmod dag.ko
         sudo lsmod
