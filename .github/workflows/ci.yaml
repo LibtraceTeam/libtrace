@@ -39,8 +39,6 @@ jobs:
         sudo apt-get -y install ./apt-ntop-stable.deb
         sudo apt-get update
         sudo apt-get -y install pfring
-        sudo ls /usr/include
-        sudo pf_ringcfg --list-interfaces
     - name: Checkout DAG
       uses: actions/checkout@v2
       with:
