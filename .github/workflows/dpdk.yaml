@@ -25,3 +25,5 @@ jobs:
         submodules: recursive
     - name: Install Dependencies
       run: sudo apt-get -y install meson
+    - name: Build DPDK
+      run: cd libtrace/test; sudo ./do-test-build-dpdk.sh
