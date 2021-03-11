@@ -45,7 +45,7 @@ jobs:
       with:
         path: dag
         repository: jacobvw/dag
-        token: ${{ secrets.DAG_JACOBVW }}
+        ssh-key: ${{ secrets.DAG_JACOBVW }}
     - name: Build DAG Kernel Module
       run: |
         cd dag/kernel-module
