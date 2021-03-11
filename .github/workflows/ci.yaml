@@ -30,10 +30,6 @@ jobs:
           - c_compiler: clang
             cxx_compiler: clang++
     steps:
-    - uses: actions/checkout@v2
-      with:
-        path: libtrace
-        submodules: recursive
     - name: Setup Enviroment Variables
       env:
         CC: ${{ matrix.c_compiler }}
