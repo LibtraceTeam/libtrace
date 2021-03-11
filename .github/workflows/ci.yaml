@@ -49,15 +49,16 @@ jobs:
     - name: Build DAG Kernel Module
       run: |
         cd dag/kernel-module
-        sudo make KSRC=/lib/modules/$(uname -r)/build
-        sudo insmod dag.ko
-        sudo lsmod
+        sudo make install KSRC=/lib/modules/$(uname -r)/build
     - name: Install DAG Packages
       run: |
+        sudo apt-get -y install libhwloc-dev
         cd dag/DAG5.8.3-BIN-Ubuntu18.04
         sudo apt-key add ENDACE_GPG_KEY
+        sudo apt-get install ./dag-extras/libhwloc5_1.11.9-1_amd64.deb
         cd ubuntu18.04
-        sudo apt-get -y install ./dag-dev_5.8.3_amd64.deb
+        sudo apt-get -y install ./dag-dev_5.8.3_amd64.deb ./dag-base_5.8.3_amd64.deb ./libntar_1.1.0_amd64.deb
+        sudo dagload -n 1
     - name: Checkout Libbpf
       uses: actions/checkout@v2
       with:
