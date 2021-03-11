@@ -34,7 +34,8 @@ jobs:
       env:
         CC: ${{ matrix.c_compiler }}
         CXX: ${{ matrix.cxx_compiler }}
-    - uses: actions/checkout@v2
+    - name: Checkout Libtrace
+      uses: actions/checkout@v2
       with:
         path: libtrace
         submodules: recursive
