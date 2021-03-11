@@ -51,13 +51,12 @@ jobs:
         cd dag/kernel-module
         sudo make KSRC=/lib/modules/$(uname -r)/build
         sudo make install KSRC=/lib/modules/$(uname -r)/build
-        sudo lsmod
     - name: Install DAG Packages
       run: |
         sudo apt-get -y install libhwloc-dev
         cd dag
         sudo apt-key add DAG5.8.3-BIN-Ubuntu18.04/ENDACE_GPG_KEY
-        sudo apt-get install ./dag-extras/libhwloc5_1.11.9-1_amd64.deb
+        sudo apt-get -y install ./dag-extras/libhwloc5_1.11.9-1_amd64.deb
         cd DAG5.8.3-BIN-Ubuntu18.04/ubuntu18.04
         sudo apt-get -y install ./dag-dev_5.8.3_amd64.deb ./dag-base_5.8.3_amd64.deb ./libntar_1.1.0_amd64.deb
         sudo dagload -n 1
@@ -90,7 +89,7 @@ jobs:
       run: |
         cd libtrace
         ./bootstrap.sh
-        ./configure --with-dpdk --with-pfring --with-xdp
+        ./configure --with-dpdk --with-pfring --with-xdp --with-dag
         make
         sudo make install
     - name: Build Tests
