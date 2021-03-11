@@ -1,0 +1,27 @@
+name: DPDK Build
+on:
+  push:
+    paths:
+    - 'configure.in'
+    - 'lib/format_dpdk.c'
+    - 'lib/format_dpdk.h'
+    - 'lib/dpdk_libtrace.mk'
+    - 'lib/format_dpdkndag.c'
+  pull_request:
+    paths:
+    - 'configure.in'
+    - 'lib/format_dpdk.c'
+    - 'lib/format_dpdk.h'
+    - 'lib/dpdk_libtrace.mk'
+    - 'lib/format_dpdkndag.c'
+jobs:
+  build-dpdk:
+    name: Build DPDK
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        path: libtrace
+        submodules: recursive
+    - name: Install Dependencies
+      run: sudo apt-get -y install meson
