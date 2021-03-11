@@ -30,15 +30,15 @@ jobs:
           - c_compiler: clang
             cxx_compiler: clang++
     steps:
+    - uses: actions/checkout@v2
+      with:
+        path: libtrace
+        submodules: recursive
     - name: Setup Enviroment Variables
       env:
         CC: ${{ matrix.c_compiler }}
         CXX: ${{ matrix.cxx_compiler }}
-    - name: Checkout Libtrace
-      uses: actions/checkout@v2
-      with:
-        path: libtrace
-        submodules: recursive
+      run: echo CC = $CC, CXX = $CXX 
     - name: Install Dependencies
       run: |
         sudo apt update
