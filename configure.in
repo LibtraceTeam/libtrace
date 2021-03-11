@@ -550,7 +550,7 @@ libtrace_pfring=false
 if test "$want_pfring" != no; then
 	# bit annoying that we have to include extra libs to account for
 	# optional pfring modules that depend on these libs
-	AC_SEARCH_LIBS(pfring_recv, pfring, pfring_found=1, pfring_found=0,[-ldag -lpcap])
+	AC_SEARCH_LIBS(pfring_recv, pfring, pfring_found=1, pfring_found=0,[-lpcap])
 	if test "$pfring_found" = 1; then
 		ADD_LIBS="$ADD_LIBS -lpfring"
 		LIBTRACE_LIBS="$LIBTRACE_LIBS -lpfring"
