@@ -49,7 +49,9 @@ jobs:
     - name: Build DAG Kernel Module
       run: |
         cd dag/kernel-module
+        sudo make KSRC=/lib/modules/$(uname -r)/build
         sudo make install KSRC=/lib/modules/$(uname -r)/build
+        sudo lsmod
     - name: Install DAG Packages
       run: |
         sudo apt-get -y install libhwloc-dev
