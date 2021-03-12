@@ -41,6 +41,7 @@ declare -a dag_formats=()
 if [[ $# -eq 0 ]]; then
 	declare -a write_formats=("pcapint:veth0" "int:veth0" "ring:veth0" "dpdkvdev:net_pcap0,iface=veth0" "xdp:veth0")
 	declare -a read_formats=("pcapint:veth1" "int:veth1" "ring:veth1" "dpdkvdev:net_pcap1,iface=veth1" "xdp:veth1")
+	declare -a dag_formats=("dag:/dev/dag16,0")
 fi
 
 while [[ $# -gt 0 ]]; do
@@ -61,7 +62,7 @@ while [[ $# -gt 0 ]]; do
 	pfring)
 		read_formats+=("$key:veth1")
 		;;
-	dag|dag24)
+	dag)
 		dag_formats+=("$key:/dev/dag16,0")
 		;;
 	*)
@@ -105,12 +106,12 @@ echo "Running parallel API tests"
 echo
 do_parallel_test() {
 	echo
-	echo "$@"
-	timeout 30 "$@" &
+	echo "$1" "$2"
+	timeout 30 "$1" "$2" &
 	my_pid=$!
 	sleep 2  # Ensure we've had time to setup, particularly dpdk
-	if ! ./test-live "int:veth0"; then
-		echo "TEST ERROR: ./test-live int:veth0 (couldn't generate packets)"
+	if ! ./test-live "$3"; then
+		echo "TEST ERROR: ./test-live $3 (couldn't generate packets)"
 		exit -1
 	fi
 	sleep 10  # Wait for all packets to be received
@@ -136,13 +137,20 @@ do
 	if [[ $r == "pcapint:veth1" ]]; then
 		continue
 	fi
-	do_parallel_test ./test-format-parallel "$r"
-	do_parallel_test ./test-format-parallel-hasher "$r"
+	do_parallel_test ./test-format-parallel "$r" "int:veth1"
+	do_parallel_test ./test-format-parallel-hasher "$r" "int:veth1"
 	# TODO fix test-format-parallel-reporter for live input
-	# do_parallel_test ./test-format-parallel-reporter "$r"
-	do_parallel_test ./test-format-parallel-singlethreaded "$r"
-	do_parallel_test ./test-format-parallel-singlethreaded-hasher "$r"
+	# do_parallel_test ./test-format-parallel-reporter "$r" "int:veth1"
+	do_parallel_test ./test-format-parallel-singlethreaded "$r" "int:veth1"
+	do_parallel_test ./test-format-parallel-singlethreaded-hasher "$r" "int:veth1"
 
+done
+for r in "${dag_formats[@]}"
+do
+	do_parallel_test ./test-format-parallel "$r" "$r"
+	do_parallel_test ./test-format-parallel-hasher "$r" "$r"
+	do_parallel_test ./test-format-parallel-singlethreaded "$r" "$r"
+        do_parallel_test ./test-format-parallel-singlethreaded-hasher "$r" "$r"
 done
 
 echo
