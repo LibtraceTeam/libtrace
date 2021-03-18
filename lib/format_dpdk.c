@@ -656,6 +656,7 @@ static portid_t dpdk_get_port_id(const char* uri) {
 }
 #endif
 
+#if defined(RTE_ETH_FOREACH_MATCHING_DEV) || defined(USE_DEV_ATTACH)
 UNUSED static struct rte_device* dpdk_get_device_from_port(portid_t port) {
 #if RTE_VERSION >= RTE_VERSION_NUM(17, 2, 0, 1)
 	return rte_eth_devices[port].device;
@@ -663,6 +664,7 @@ UNUSED static struct rte_device* dpdk_get_device_from_port(portid_t port) {
 	return &rte_eth_devices[port].pci_dev->device;
 #endif
 }
+#endif
 
 /** Loads a device into DPDK
  *
@@ -801,7 +803,7 @@ static int dpdk_close_and_detach_device(portid_t port)
 	return 0;
 #else
 	/* Not supported by this version of DPDK, ignore and return success */
-	UNUSED port;
+	port;
 	return 0;
 #endif
 }
