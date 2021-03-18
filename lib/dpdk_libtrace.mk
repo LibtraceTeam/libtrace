@@ -13,11 +13,13 @@ ifeq ($(CONFIG_RTE_LIBC),y)
 DPDKLIBS += -Wl,-lc -Wl,-lm
 endif
 
+ifeq ($(DPDK_STATIC), 1)
 ifeq ($(CONFIG_RTE_LIBRTE_MLX4_PMD), y)
 DPDKLIBS += -Wl,-libverbs -Wl,-lmlx4 -Wl,-ldl
 endif
 ifeq ($(CONFIG_RTE_LIBRTE_MLX5_PMD), y)
 DPDKLIBS += -Wl,-libverbs -Wl,-lmlx5 -Wl,-ldl
+endif
 endif
 
 DPDKLIBS += $(addprefix -Wl$(comma),$(EXECENV_LDLIBS))
