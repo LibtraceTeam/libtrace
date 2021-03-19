@@ -40,11 +40,11 @@
 #define ALIGN_NATURAL_32(_p,_s,_c) \
 	while ( (_p - _s) % sizeof(uint32_t)) {_p++; _c++;}
 #define ALIGN_NATURAL_16(_p,_s,_c) \
-	while ( (_p - _s) % sizeof(uint16_t)) {_p++; _c++;} 
+	while ( (_p - _s) % sizeof(uint16_t)) {_p++; _c++;}
 
 DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len)
 {
-	uint32_t *ptr; 
+	lt_unaligned_uint32_t *ptr;
 	uint8_t *p; /* Our current field "cursor" */
 	uint8_t *s; /* Start of data fields, for alignment */
 	struct libtrace_radiotap_t *rtap;

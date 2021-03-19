@@ -45,6 +45,7 @@
 #include <sys/types.h>
 #include <time.h>
 #include <string.h>
+#include <inttypes.h>
 
 #include "dagformat.h"
 #include "libtrace.h"
@@ -156,7 +157,6 @@ int main(int argc, char *argv[]) {
 	int error = 0;
 	uint64_t count = 0;
 	int level = 0;
-	int expected = 100;
 	int tcpcount = 0;
 	libtrace_t *trace,*trace2;
 	libtrace_out_t *outtrace;
@@ -164,11 +164,13 @@ int main(int argc, char *argv[]) {
 	const char *trace1name;
 	const char *trace2name;
 
+	if (argc < 3) {
+		fprintf(stderr, "Missing traces as arguments\n");
+		return -1;
+	}
+
 	trace = trace_create(argv[1]);
 	iferr(trace);
-
-	if (strcmp(argv[1],"rtclient")==0)
-		expected=101;
 
 	outtrace = trace_create_output(argv[2]);
 	iferrout(outtrace);
@@ -226,7 +228,7 @@ int main(int argc, char *argv[]) {
 		int err;
 		++count;
 		if ((err=trace_read_packet(trace2,packet2))<1) {
-			printf("premature EOF on destination, %lu from %s, %i from %s\n",count,lookup_uri(argv[1]),count-1,lookup_out_uri(argv[2]));
+			printf("premature EOF on destination, %"PRIu64" from %s, %"PRIu64" from %s\n",count,lookup_uri(argv[1]),count-1,lookup_out_uri(argv[2]));
 			iferr(trace2);
 			error=1;
 			break;
@@ -236,7 +238,7 @@ int main(int argc, char *argv[]) {
 			printf("\t%s\t%s\n",
 				trace1name,
 				trace2name);
-			printf("packet\t%lu\n", count);
+			printf("packet\t%" PRIu64 "\n", count);
 			printf("caplen\t%zd\t%zd\t%+zd\n",
 				trace_get_capture_length(packet),
 				trace_get_capture_length(packet2),

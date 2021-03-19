@@ -12,12 +12,11 @@ void iferr(libtrace_t *trace)
 }
 
 
-int main(int argc, char *argv[]) {
+int main(int argc UNUSED, char *argv[] UNUSED) {
 
 	libtrace_t *trace = NULL;
         libtrace_packet_t *packet = NULL;
-	int i = 0;
-	uint16_t mplslabel;
+	uint32_t mplslabel;
 	uint8_t *mplsptr;
 	uint32_t remaining;
 	int error = 0;
@@ -32,10 +31,10 @@ int main(int argc, char *argv[]) {
 
 	/* read a packet */
 	trace_read_packet(trace, packet);
-	/* first packet in this trace should have a vlan tag of 32 */
+
 	mplslabel = trace_get_outermost_mpls(packet, &mplsptr, &remaining);
 	if (mplslabel != 18) {
-		printf("Failed to find correct outermost vlan tag\n");
+		printf("Failed to find correct outermost MPLS tag\n");
 		error = 1;
 	}
 
@@ -51,7 +50,7 @@ int main(int argc, char *argv[]) {
 	trace_read_packet(trace, packet);
 	mplslabel = trace_get_outermost_mpls(packet, &mplsptr, &remaining);
 	if (mplslabel != 18) {
-		printf("Failed to find correct outermost vlan tag\n");
+		printf("Failed to find correct outermost MPLS tag\n");
                 error = 1;
         }
 

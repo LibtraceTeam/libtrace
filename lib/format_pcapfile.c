@@ -287,10 +287,13 @@ static int pcapfile_config_input(libtrace_t *libtrace,
 			 * by trace_config */
 			break;
 		case TRACE_OPTION_DISCARD_META:
-        case TRACE_OPTION_XDP_HARDWARE_OFFLOAD:
-			break;
+		case TRACE_OPTION_XDP_HARDWARE_OFFLOAD:
+		case TRACE_OPTION_XDP_SKB_MODE:
+		case TRACE_OPTION_XDP_DRV_MODE:
+		case TRACE_OPTION_XDP_ZERO_COPY_MODE:
+		case TRACE_OPTION_XDP_COPY_MODE:
+	break;
 	}
-	
 	trace_set_err(libtrace,TRACE_ERR_UNKNOWN_OPTION,
 			"Unknown option %i", option);
 	return -1;
@@ -800,6 +803,7 @@ static struct libtrace_format_t pcapfile = {
 	pcapfile_read_packet,		/* read_packet */
 	pcapfile_prepare_packet,	/* prepare_packet */
 	NULL,				/* fin_packet */
+        NULL,                           /* can_hold_packet */
 	pcapfile_write_packet,		/* write_packet */
         pcapfile_flush_output,          /* flush_output */
 	pcapfile_get_link_type,		/* get_link_type */
@@ -822,9 +826,9 @@ static struct libtrace_format_t pcapfile = {
 	NULL,				/* get_dropped_packets */
 	NULL,				/* get_statistics */
 	NULL,				/* get_fd */
-	pcapfile_event,		/* trace_event */
+	pcapfile_event,			/* trace_event */
 	pcapfile_help,			/* help */
-	NULL,			/* next pointer */
+	NULL,				/* next pointer */
 	NON_PARALLEL(false)
 };
 

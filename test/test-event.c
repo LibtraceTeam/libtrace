@@ -60,7 +60,7 @@ void iferr(libtrace_t *trace)
 	exit(1);
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc UNUSED, char *argv[] UNUSED) {
         char *uri = "erf:traces/100_packets.erf";
 	int error = 0;
 	int count = 0;

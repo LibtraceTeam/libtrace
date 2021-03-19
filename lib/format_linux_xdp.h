@@ -10,8 +10,9 @@
 
 /* replace path with autoconf varible?? */
 static char *libtrace_xdp_kern[] = {
+    "../lib/format_linux_xdp_kern.bpf", // this is here for tests to correctly find the bpf program
     "/usr/local/share/libtrace/format_linux_xdp_kern.bpf",
-    "/usr/share/libtrace/format_linux_xdp_kern.bpf"
+    "/usr/share/libtrace/format_linux_xdp_kern.bpf",
 };
 static char libtrace_xdp_prog[] = "socket/libtrace_xdp";
 
@@ -24,20 +25,12 @@ typedef struct libtrace_xdp {
 } libtrace_xdp_t;
 
 typedef enum {
-    XDP_BALANCE = 0,
-    XDP_UNIDIRECTIONAL = 1,
-    XDP_BIDIRECTIONAL = 2,
-    XDP_NONE = 3,
-} xdp_hasher;
-
-typedef enum {
     XDP_NOT_STARTED = 0,
     XDP_RUNNING = 1,
     XDP_PAUSED = 2,
 } xdp_state;
 
 typedef struct libtrace_ctrl_map {
-    xdp_hasher hasher;
     int max_queues;
     xdp_state state;
 } libtrace_ctrl_map_t;

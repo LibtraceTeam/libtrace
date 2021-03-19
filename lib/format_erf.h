@@ -120,11 +120,13 @@ typedef struct dag_section_header {
         uint16_t type;
         uint16_t len;
 } PACKED dag_sec_t;
+ct_assert(sizeof(dag_sec_t) == 4);
 
 struct dag_opthdr {
         uint16_t optcode;
         uint16_t optlen;
 } PACKED;
+ct_assert(sizeof(struct dag_opthdr) == 4);
 
 int erf_get_framing_length(const libtrace_packet_t *packet);
 libtrace_linktype_t erf_get_link_type(const libtrace_packet_t *packet);
@@ -135,7 +137,9 @@ int erf_get_capture_length(const libtrace_packet_t *packet);
 int erf_get_wire_length(const libtrace_packet_t *packet);
 size_t erf_set_capture_length(libtrace_packet_t *packet, size_t size);
 int erf_is_color_type(uint8_t erf_type);
-
 libtrace_meta_t *erf_get_all_meta(libtrace_packet_t *packet);
+bool find_compatible_linktype(libtrace_out_t *libtrace,
+        libtrace_packet_t *packet);
+int erf_get_padding(const libtrace_packet_t *packet);
 
 #endif

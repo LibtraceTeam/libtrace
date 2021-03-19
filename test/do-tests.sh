@@ -1,14 +1,14 @@
-#!/bin/bash
+#!/bin/sh
 
 OK=0
 FAIL=""
 
 do_test() {
 	if $@; then
-		OK=$[ $OK + 1 ]
+		OK=$(( OK + 1 ))
 	else
 		FAIL="$FAIL
-$@"
+$*"
 	fi
 }
 
@@ -341,6 +341,9 @@ do_test ./test-layer2-headers
 
 echo " * Layer2 Headers QinQ"
 do_test ./test-qinq
+
+echo " * Test structures"
+do_test ./test-structures
 
 echo
 echo "Tests passed: $OK"

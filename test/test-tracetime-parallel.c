@@ -149,7 +149,8 @@ static void resume_process(libtrace_t *trace UNUSED,
 
 static void user_message(libtrace_t *trace UNUSED,
                 libtrace_thread_t *t UNUSED, void *global UNUSED,
-                void *tls UNUSED, int msg UNUSED, libtrace_generic_t ts) {
+                void *tls UNUSED, int msg UNUSED, libtrace_generic_t ts,
+                libtrace_thread_t *sender UNUSED) {
 
 	struct timeval tv;
 	double time;
@@ -252,6 +253,8 @@ int test_tracetime(const char *tracename) {
 	end = timeval_to_seconds(tv);
 	assert(check_range_jitter(end-start, 10.0, 1.0));
 	trace_destroy(trace);
+	trace_destroy_callback_set(processing);
+	trace_destroy_callback_set(reporter);
 	return error;
 }
 

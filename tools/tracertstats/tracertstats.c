@@ -47,6 +47,7 @@
 #include <getopt.h>
 #include <inttypes.h>
 #include <signal.h>
+#include <pthread.h>
 
 #include <lt_inttypes.h>
 #include "libtrace_parallel.h"
@@ -65,6 +66,7 @@ int merge_inputs = 0;
 int threadcount = 4;
 int filter_count=0;
 int burstsize=10;
+bool realtime=0;
 uint8_t report_drops = 0;
 
 struct filter_t {
@@ -75,7 +77,9 @@ struct filter_t {
 } *filters = NULL;
 
 uint64_t packet_count=UINT64_MAX;
-double packet_interval=UINT32_MAX;
+uint32_t packet_interval=UINT32_MAX;
+pthread_mutex_t ts_lock;
+uint64_t first_ts;
 
 struct output_data_t *output = NULL;
 
@@ -176,7 +180,7 @@ static void cb_result(libtrace_t *trace, libtrace_thread_t *sender UNUSED,
                 stats = trace_create_statistics();
                 trace_get_statistics(trace, stats);
         }
-        while ((glob_last_ts >> 32) < (ts >> 32)) {
+        if ((glob_last_ts >> 32) < (ts >> 32)) {
                 report_results(glob_last_ts >> 32, totalcount, totalbytes,
                                 stats);
                 totalcount = 0;
@@ -218,6 +222,26 @@ static void *cb_starting(libtrace_t *trace UNUSED,
         return td;
 }
 
+static inline void sync_first_key(libtrace_t *trace, uint64_t key, thread_data_t *td) {
+        // used to sync intervals between perpkt threads
+        if (first_ts == 0) {
+                pthread_mutex_lock(&ts_lock);
+                if (first_ts == 0) {
+                        if (trace) {
+                                // Get the timestamp from the first packet
+                                const libtrace_packet_t *pkt = NULL;
+                                trace_get_first_packet(trace, NULL, &pkt, NULL);
+                                key = trace_get_erf_timestamp(pkt);
+                        }
+                        first_ts = key;
+                }
+                pthread_mutex_unlock(&ts_lock);
+        }
+        if (td->last_key == 0) {
+                td->last_key = first_ts;
+        }
+}
+
 static libtrace_packet_t *cb_packet(libtrace_t *trace, libtrace_thread_t *t,
                 void *global UNUSED, void *tls, libtrace_packet_t *packet) {
 
@@ -231,12 +255,13 @@ static libtrace_packet_t *cb_packet(libtrace_t *trace, libtrace_thread_t *t,
         }
 
         key = trace_get_erf_timestamp(packet);
-        if ((key >> 32) >= (td->last_key >> 32) + packet_interval) {
+        sync_first_key(trace, 0, td);
+        while ((key >> 32) >= (td->last_key >> 32) + packet_interval) {
                 libtrace_generic_t tmp = {.ptr = td->results};
-		trace_publish_result(trace, t, key,
+		trace_publish_result(trace, t, td->last_key,
                                 tmp, RESULT_USER);
                 trace_post_reporter(trace);
-                td->last_key = key;
+                td->last_key += (uint64_t)packet_interval << 32;
                 td->results = calloc(1, sizeof(result_t) +
                                 sizeof(statistic_t) * filter_count);
         }
@@ -246,9 +271,17 @@ static libtrace_packet_t *cb_packet(libtrace_t *trace, libtrace_thread_t *t,
                 return packet;
         }
         for(i=0;i<filter_count;++i) {
-                if(trace_apply_filter(filters[i].filter, packet)) {
+                int filter_ret;
+                if (filters[i].filter == NULL)
+                        continue;
+                filter_ret = trace_apply_filter(filters[i].filter, packet);
+                if (filter_ret > 0) {
                         td->results->filters[i].count++;
                         td->results->filters[i].bytes+=wlen;
+                } else if (filter_ret < 0) {
+                        trace_perror(trace, "trace_apply_filter");
+                        fprintf(stderr, "Removing filter from filterlist\n");
+                        filters[i].filter = NULL;
                 }
         }
 
@@ -273,11 +306,12 @@ static void cb_tick(libtrace_t *trace, libtrace_thread_t *t,
                 void *global UNUSED, void *tls, uint64_t order) {
 
         thread_data_t *td = (thread_data_t *)tls;
-        if (order > td->last_key) {
-		libtrace_generic_t tmp = {.ptr = td->results};
-                trace_publish_result(trace, t, order, tmp, RESULT_USER);
+        sync_first_key(NULL, order, td);
+        while ((order >> 32) >= (td->last_key >> 32) + packet_interval) {
+                libtrace_generic_t tmp = {.ptr = td->results};
+                trace_publish_result(trace, t, td->last_key, tmp, RESULT_USER);
                 trace_post_reporter(trace);
-                td->last_key = order;
+                td->last_key += (uint64_t)packet_interval << 32;
                 td->results = calloc(1, sizeof(result_t) +
                                 sizeof(statistic_t) * filter_count);
         }
@@ -310,7 +344,7 @@ static void run_trace(char *uri)
 
 	if (trace_get_information(trace)->live) {
                 trace_set_tick_interval(trace, (int) (packet_interval * 1000));
-	} else {
+	} else if (realtime) {
 		trace_set_tracetime(trace, true);
 	}
 
@@ -357,7 +391,7 @@ static void run_trace(char *uri)
 
 	if (!merge_inputs)
 		output_destroy(output);
-       
+
 }
 
 // TODO Decide what to do with -c option
@@ -375,6 +409,7 @@ static void usage(char *argv0)
 	"			updates at very low traffic rates\n"
         "-d --report-drops      Include statistics about number of packets dropped or\n"
         "                       lost by the capture process\n"
+        "-r --realtime          Process trace files in realtime\n"
 	"-h --help	Print this usage statement\n"
 	,argv0);
 }
@@ -383,7 +418,9 @@ int main(int argc, char *argv[]) {
 
 	int i;
         struct sigaction sigact;
-	
+	pthread_mutex_init(&ts_lock, NULL);
+        first_ts=0;
+
 	while(1) {
 		int option_index;
 		struct option long_options[] = {
@@ -396,10 +433,11 @@ int main(int argc, char *argv[]) {
 			{ "threads",	        1, 0, 't' },
 			{ "nobuffer",	        0, 0, 'N' },
 			{ "report-drops",	0, 0, 'd' },
+                        { "realtime",           0, 0, 'r' },
 			{ NULL, 		0, 0, 0   },
 		};
 
-		int c=getopt_long(argc, argv, "c:f:i:o:t:dhmN",
+		int c=getopt_long(argc, argv, "c:f:i:o:t:dhmNr",
 				long_options, &option_index);
 
 		if (c==-1)
@@ -426,10 +464,18 @@ int main(int argc, char *argv[]) {
                                         threadcount = 1;
                                 break;
 			case 'i':
-				packet_interval=atof(optarg);
+				if ((packet_interval=strtoul(optarg, NULL, 10)) == 0) {
+					fprintf(stderr, "Invalid interval: %s\n\n", optarg);
+					usage(argv[0]);
+					return 1;
+				}
 				break;
 			case 'c':
-				packet_count=strtoul(optarg, NULL, 10);
+				if ((packet_count=strtoul(optarg, NULL, 10)) == 0) {
+					fprintf(stderr, "Invalid count: %s\n\n", optarg);
+					usage(argv[0]);
+					return 1;
+				}
 				break;
 			case 'o':
 				if (output_format) free(output_format);
@@ -438,6 +484,9 @@ int main(int argc, char *argv[]) {
 			case 'm':
 				merge_inputs = 1;
 				break;
+                        case 'r':
+                                realtime = 1;
+                                break;
 			case 'h':
 				  usage(argv[0]);
 				  return 1;
@@ -459,8 +508,8 @@ int main(int argc, char *argv[]) {
 		fprintf(stderr,"output format: '%s'\n",output_format);
 	else
 		fprintf(stderr,"output format: '%s'\n", DEFAULT_OUTPUT_FMT);
-	
-	
+
+
 	if (merge_inputs) {
 		/* If we're merging the inputs, we only want to create all
 		 * the column headers etc. once rather than doing them once
@@ -472,7 +521,7 @@ int main(int argc, char *argv[]) {
 		if (output == NULL)
 			return 0;
 	}
-	
+
         sigact.sa_handler = cleanup_signal;
         sigemptyset(&sigact.sa_mask);
         sigact.sa_flags = SA_RESTART;

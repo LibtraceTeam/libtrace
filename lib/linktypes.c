@@ -305,31 +305,33 @@ void promote_packet(libtrace_packet_t *packet)
 	if (packet->trace->format->type == TRACE_FORMAT_PCAP) {
 		char *tmpbuffer;
 		libtrace_sll_header_t *hdr;
+		size_t caplen, framelen;
+		uint16_t ethertype;
 
 		if (pcap_linktype_to_libtrace(rt_to_pcap_linktype(packet->type))
 			== TRACE_TYPE_LINUX_SLL) {
 			/* This is already been promoted, so ignore it */
 			return;
 		}
+		caplen = trace_get_capture_length(packet);
+		framelen = trace_get_framing_length(packet);
 
 		/* This should be easy, just prepend the header */
 		tmpbuffer= (char*)malloc(
 				sizeof(libtrace_sll_header_t)
-				+trace_get_capture_length(packet)
-				+trace_get_framing_length(packet)
-				);
+				+ caplen + framelen);
 
 		hdr=(libtrace_sll_header_t*)((char*)tmpbuffer
-			+trace_get_framing_length(packet));
+			+framelen);
 
 		hdr->halen=htons(6);
 		hdr->pkttype=TRACE_SLL_OUTGOING;
 
 		switch(pcap_linktype_to_libtrace(rt_to_pcap_linktype(packet->type))) {
 			case TRACE_TYPE_NONE:
-				trace_get_layer3(packet, &hdr->protocol, NULL);
+				trace_get_layer3(packet, &ethertype, NULL);
 				hdr->hatype = htons(LIBTRACE_ARPHRD_PPP);
-				hdr->protocol=htons(hdr->protocol);
+				hdr->protocol=htons(ethertype);
 				break;
 			case TRACE_TYPE_ETH:
 				hdr->hatype = htons(LIBTRACE_ARPHRD_ETHER);
@@ -339,11 +341,10 @@ void promote_packet(libtrace_packet_t *packet)
 				/* failed */
 				return;
 		}
-		memcpy(tmpbuffer,packet->header,
-				trace_get_framing_length(packet));
+		memcpy(tmpbuffer, packet->header, framelen);
 		memcpy(tmpbuffer
 				+sizeof(libtrace_sll_header_t)
-				+trace_get_framing_length(packet),
+				+framelen,
 				packet->payload,
 				trace_get_capture_length(packet));
 		if (packet->buf_control == TRACE_CTRL_EXTERNAL) {
@@ -354,11 +355,11 @@ void promote_packet(libtrace_packet_t *packet)
 		}
 		packet->buffer=tmpbuffer;
 		packet->header=tmpbuffer;
-		packet->payload=tmpbuffer+trace_get_framing_length(packet);
+		packet->payload=tmpbuffer+framelen;
 		packet->type=pcap_linktype_to_rt(TRACE_DLT_LINUX_SLL);
-		((struct libtrace_pcapfile_pkt_hdr_t*) packet->header)->caplen+=
+		((struct libtrace_pcap_pkthdr_t*) packet->header)->caplen +=
 			sizeof(libtrace_sll_header_t);
-		((struct libtrace_pcapfile_pkt_hdr_t*) packet->header)->wirelen+=
+		((struct libtrace_pcap_pkthdr_t*) packet->header)->wirelen +=
 			sizeof(libtrace_sll_header_t);
 		trace_clear_cache(packet);
 		return;
@@ -461,9 +462,18 @@ bool demote_packet(libtrace_packet_t *packet)
 			/* Skip the Linux SLL header */
 			packet->payload=(void*)((char*)packet->payload
 					+sizeof(libtrace_sll_header_t));
-			trace_set_capture_length(packet,
-				trace_get_capture_length(packet)
-					-sizeof(libtrace_sll_header_t));
+
+			if (packet->trace->format->type == TRACE_FORMAT_PCAP) {
+				((struct libtrace_pcap_pkthdr_t*) packet->header)->caplen -=
+					sizeof(libtrace_sll_header_t);
+				((struct libtrace_pcap_pkthdr_t*) packet->header)->wirelen -=
+					sizeof(libtrace_sll_header_t);
+			} else {
+				/* TODO: should we change the wirelen here too? */
+				trace_set_capture_length(packet,
+					trace_get_capture_length(packet)
+						-sizeof(libtrace_sll_header_t));
+			}
 
 			/* Invalidate caches */
 			trace_clear_cache(packet);

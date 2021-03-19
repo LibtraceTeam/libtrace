@@ -103,12 +103,20 @@ static const libtrace_packet_cache_t clearcache = {
 static inline void xstrncpy(char *dest, const char *src, size_t n,
                 size_t destlen)
 {
-        size_t slen = destlen - 1;
-        if (n < slen) {
-                slen = n;
-        }
-        strncpy(dest,src,slen);
-        dest[slen]='\0';
+	if (destlen == 0)
+		return;
+
+	size_t slen = destlen - 1;
+	if (n < slen) {
+		slen = n;
+	}
+
+	// suppress GCC warnings for string overflow
+	LT_IGNORE_STRING_OVERFLOW
+		strncpy(dest,src,slen);
+	LT_PRAGMA_POP
+
+	dest[slen]='\0';
 }
 
 static char *xstrndup(const char *src,size_t n)
@@ -160,6 +168,9 @@ static void trace_init(void)
 #endif
 #ifdef HAVE_LIBBPF
                 linux_xdp_constructor();
+#endif
+#ifdef HAVE_PFRING
+	pfring_constructor();	
 #endif
 	}
 }
@@ -219,6 +230,7 @@ static void guess_format(libtrace_t *libtrace, const char *filename)
 	return;
 }
 
+
 /* Creates an input trace from a URI
  *
  * @params char * containing a valid libtrace URI
@@ -236,7 +248,17 @@ static void guess_format(libtrace_t *libtrace, const char *filename)
  *  rt:hostname
  *  rt:hostname:port
  *
- * If an error occured when attempting to open a trace, NULL is returned
+ * A user may precede the URI with a comma-separated list of configuration
+ * options, parsed by trace_set_configuration(), followed by a colon ':'.
+ * i.e. option=value,...:URI
+ *
+ * For example:
+ * cache_size=1024:int:eth0
+ * coremap=[1,2,3],perpkt_threads=3:ring:eth0
+ *
+ * @see trace_set_configuration
+ *
+ * If an error occurred when attempting to open a trace, NULL is returned
  * and an error is output to stdout.
  */
 DLLEXPORT libtrace_t *trace_create(const char *uri) {
@@ -244,6 +266,7 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 			(libtrace_t *)malloc(sizeof(libtrace_t));
         char *scan = 0;
         const char *uridata = 0;
+        const char *uri_portion = 0;
 
 	trace_init();
 
@@ -305,11 +328,25 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
         libtrace->perpkt_cbs = NULL;
         libtrace->reporter_cbs = NULL;
 
+	if (_trace_set_configuration(libtrace, uri, &uri_portion) == 0) {
+		if (uri_portion == NULL) {
+			trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT,
+					"Unknown format (%s)",uri);
+			return libtrace;
+		} else {
+			uri = uri_portion;
+		}
+	} else {
+		return libtrace;
+	}
         /* Parse the URI to determine what sort of trace we are dealing with */
 	if ((uridata = trace_parse_uri(uri, &scan)) == 0) {
 		/* Could not parse the URI nicely */
 		guess_format(libtrace,uri);
 		if (trace_is_err(libtrace)) {
+			if (scan) {
+				free(scan);
+			}
 			return libtrace;
 		}
 	}
@@ -329,6 +366,9 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
 		if (libtrace->format == 0) {
 			trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT,
 					"Unknown format (%s)",scan);
+			if (scan) {
+				free(scan);
+			}
 			return libtrace;
 		}
 
@@ -345,11 +385,17 @@ DLLEXPORT libtrace_t *trace_create(const char *uri) {
                         /* init_input should call trace_set_err to set the
                          * error message
 			 */
+			if (scan) {
+				free(scan);
+			}
 			return libtrace;
 		}
 	} else {
 		trace_set_err(libtrace,TRACE_ERR_UNSUPPORTED,
 				"Format does not support input (%s)",scan);
+		if (scan) {
+			free(scan);
+		}
 		return libtrace;
 	}
 
@@ -486,11 +532,11 @@ DLLEXPORT libtrace_out_t *trace_create_output(const char *uri) {
                                 break;
                                 }
         }
-	free(scan);
 
         if (libtrace->format == NULL) {
 		trace_set_err_out(libtrace,TRACE_ERR_BAD_FORMAT,
 				"Unknown output format (%s)",scan);
+                free(scan);
                 return libtrace;
         }
         libtrace->uridata = strdup(uridata);
@@ -505,14 +551,16 @@ DLLEXPORT libtrace_out_t *trace_create_output(const char *uri) {
 			/* init_output should call trace_set_err to set the
 			 * error message
 			 */
+			free(scan);
 			return libtrace;
 		}
 	} else {
 		trace_set_err_out(libtrace,TRACE_ERR_UNSUPPORTED,
-				"Format does not support writing (%s)",scan);
+				"Format does not support writing (%s)", scan);
+                free(scan);
                 return libtrace;
         }
-
+	free(scan);
 
 	libtrace->started=false;
 	return libtrace;
@@ -616,7 +664,7 @@ DLLEXPORT int trace_config(libtrace_t *libtrace,
 	 * format did not support configuration. However, libtrace can
 	 * deal with some options itself, so give that a go */
 	switch(option) {
-                case TRACE_OPTION_REPLAY_SPEEDUP:
+            case TRACE_OPTION_REPLAY_SPEEDUP:
 			/* Clear the error if there was one */
 			if (trace_is_err(libtrace)) {
 				trace_get_err(libtrace);
@@ -671,26 +719,49 @@ DLLEXPORT int trace_config(libtrace_t *libtrace,
 		case TRACE_OPTION_HASHER:
 			/* Dealt with earlier */
 			return -1;
-                case TRACE_OPTION_CONSTANT_ERF_FRAMING:
-                        if (!trace_is_err(libtrace)) {
-                                trace_set_err(libtrace,
-                                                TRACE_ERR_OPTION_UNAVAIL,
-						"This format does not feature an ERF header or does not support bypassing the framing length calculation");
-                        }
-                        return -1;
-
+		case TRACE_OPTION_CONSTANT_ERF_FRAMING:
+				if (!trace_is_err(libtrace)) {
+						trace_set_err(libtrace,
+										TRACE_ERR_OPTION_UNAVAIL,
+				"This format does not feature an ERF header or does not support bypassing the framing length calculation");
+				}
+				return -1;
 		case TRACE_OPTION_DISCARD_META:
 			if (!trace_is_err(libtrace)) {
 				trace_set_err(libtrace, TRACE_ERR_OPTION_UNAVAIL,
 					"Libtrace does not support meta packets for this format");
 			}
 			return -1;
-       case TRACE_OPTION_XDP_HARDWARE_OFFLOAD:
-           if (!trace_is_err(libtrace)) {
-               trace_set_err(libtrace, TRACE_ERR_OPTION_UNAVAIL,
-                   "Libtrace does not support XDP hardware offloading for this format");
-           }
-           return -1;
+		case TRACE_OPTION_XDP_HARDWARE_OFFLOAD:
+			if (!trace_is_err(libtrace)) {
+					trace_set_err(libtrace, TRACE_ERR_OPTION_UNAVAIL,
+							"Libtrace does not support XDP hardware offloading for this format");
+			}
+			return -1;
+		case TRACE_OPTION_XDP_ZERO_COPY_MODE:
+			if (!trace_is_err(libtrace)) {
+					trace_set_err(libtrace, TRACE_ERR_OPTION_UNAVAIL,
+							"Libtrace does not support XDP zero copy mode for this format");
+			}
+			return -1;
+		case TRACE_OPTION_XDP_COPY_MODE:
+			if (!trace_is_err(libtrace)) {
+					trace_set_err(libtrace, TRACE_ERR_OPTION_UNAVAIL,
+							"Libtrace does not support XDP copy mode for this format");
+			}
+			return -1;
+		case TRACE_OPTION_XDP_DRV_MODE:
+			if (!trace_is_err(libtrace)) {
+					trace_set_err(libtrace, TRACE_ERR_OPTION_UNAVAIL,
+							"Libtrace does not support installing XDP program in native/driver mode");
+			}
+			return -1;
+		case TRACE_OPTION_XDP_SKB_MODE:
+			if (!trace_is_err(libtrace)) {
+					trace_set_err(libtrace, TRACE_ERR_OPTION_UNAVAIL,
+							"Libtrace does not support installing XDP program in SKB (generic) mode");
+			}
+			return -1;
 	}
 	if (!trace_is_err(libtrace)) {
 		trace_set_err(libtrace,TRACE_ERR_UNKNOWN_OPTION,
@@ -1657,7 +1728,7 @@ static int trace_bpf_compile(libtrace_filter_t *filter,
 		/* Make sure not one bet us to this */
 		if (filter->flag) {
 			pthread_mutex_unlock(&mutex);
-			return -1;
+			return 0;
 		}
 		pcap=(pcap_t *)pcap_open_dead(
 				(int)libtrace_to_pcap_dlt(linktype),
@@ -1990,13 +2061,6 @@ DLLEXPORT size_t trace_set_capture_length(libtrace_packet_t *packet, size_t size
 
 	return ~0U;
 }
-
-/* Splits a URI into two components - the format component which is seen before
- * the ':', and the uridata which follows the ':'.
- *
- * Returns a pointer to the URI data, but updates the format parameter to
- * point to a copy of the format component.
- */
 
 DLLEXPORT const char * trace_parse_uri(const char *uri, char **format) {
 	const char *uridata = 0;

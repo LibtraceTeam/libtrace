@@ -172,7 +172,11 @@ int linuxcommon_config_input(libtrace_t *libtrace,
                 case TRACE_OPTION_CONSTANT_ERF_FRAMING:
                         break;
 		case TRACE_OPTION_DISCARD_META:
-        case TRACE_OPTION_XDP_HARDWARE_OFFLOAD:
+		case TRACE_OPTION_XDP_HARDWARE_OFFLOAD:
+		case TRACE_OPTION_XDP_SKB_MODE:
+		case TRACE_OPTION_XDP_DRV_MODE:
+		case TRACE_OPTION_XDP_ZERO_COPY_MODE:
+		case TRACE_OPTION_XDP_COPY_MODE:
 			break;
 		/* Avoid default: so that future options will cause a warning
 		 * here to remind us to implement it, or flag it as
@@ -221,7 +225,7 @@ int linuxcommon_init_input(libtrace_t *libtrace)
 	}
 
 	FORMAT_DATA->per_stream =
-		libtrace_list_init(sizeof(stream_data));
+		libtrace_list_init_aligned(sizeof(stream_data), CACHE_LINE_SIZE);
 
 	if (!FORMAT_DATA->per_stream) {
 		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to create list for stream data linuxcommon_init_input()");
@@ -298,7 +302,7 @@ void linuxcommon_close_input_stream(libtrace_t *libtrace,
 #define str(s) #s
 
 /* These don't typically reset however an interface does exist to reset them */
-static int linuxcommon_get_dev_statistics(libtrace_t *libtrace, struct linux_dev_stats *stats) {
+int linuxcommon_get_dev_statistics(char *ifname, struct linux_dev_stats *stats) {
 	FILE *file;
 	char line[1024];
 	struct linux_dev_stats tmp_stats;
@@ -344,7 +348,7 @@ static int linuxcommon_get_dev_statistics(libtrace_t *libtrace, struct linux_dev
 		             &tmp_stats.tx_compressed);
 		if (tot != 17)
 			continue;
-		if (strncmp(tmp_stats.if_name, libtrace->uridata, IF_NAMESIZE) == 0) {
+		if (strncmp(tmp_stats.if_name, ifname, IF_NAMESIZE) == 0) {
 			*stats = tmp_stats;
 			fclose(file);
 			return 0;
@@ -352,6 +356,27 @@ static int linuxcommon_get_dev_statistics(libtrace_t *libtrace, struct linux_dev
 	}
 	fclose(file);
 	return -1;
+}
+
+int linuxcommon_set_promisc(const int sock, const unsigned int ifindex, bool enable) {
+
+    struct packet_mreq mreq;
+    int action;
+
+    memset(&mreq,0,sizeof(mreq));
+    mreq.mr_ifindex = ifindex;
+    mreq.mr_type = PACKET_MR_PROMISC;
+
+    if (enable)
+        action = PACKET_ADD_MEMBERSHIP;
+    else
+        action = PACKET_DROP_MEMBERSHIP;
+
+
+    if (setsockopt(sock, SOL_PACKET, action, &mreq, sizeof(mreq)) == -1)
+        return -1;
+
+    return 0;
 }
 
 /* Start an input stream
@@ -417,20 +442,11 @@ int linuxcommon_start_input_stream(libtrace_t *libtrace,
 	}
 
 	/* Enable promiscuous mode, if requested */
-	if (FORMAT_DATA->promisc) {
-		struct packet_mreq mreq;
-		socklen_t socklen = sizeof(mreq);
-		memset(&mreq,0,sizeof(mreq));
-		mreq.mr_ifindex = addr.sll_ifindex;
-		mreq.mr_type = PACKET_MR_PROMISC;
-		if (setsockopt(stream->fd,
-			       SOL_PACKET,
-			       PACKET_ADD_MEMBERSHIP,
-			       &mreq,
-			       socklen)==-1) {
-			perror("setsockopt(PROMISC)");
-		}
+        if (FORMAT_DATA->promisc) {
+            if (linuxcommon_set_promisc(stream->fd, addr.sll_ifindex, 1) < 0)
+                perror("setsockopt(PROMISC)");
 	}
+
 
 	/* Set the timestamp option on the socket - aim for the most detailed
 	 * clock resolution possible */
@@ -505,7 +521,7 @@ int linuxcommon_start_input_stream(libtrace_t *libtrace,
 	FORMAT_DATA->stats.tp_packets = -count;
 	FORMAT_DATA->stats.tp_drops = 0;
 
-	if (linuxcommon_get_dev_statistics(libtrace, &FORMAT_DATA->dev_stats) != 0) {
+	if (linuxcommon_get_dev_statistics(libtrace->uridata, &FORMAT_DATA->dev_stats) != 0) {
 		/* Mark this as bad */
 		FORMAT_DATA->dev_stats.if_name[0] = 0;
 	}
@@ -617,7 +633,7 @@ void linuxcommon_get_statistics(libtrace_t *libtrace, libtrace_stat_t *stat) {
 	dev_stats.if_name[0] = 0; /* This will be set if we retrive valid stats */
 	/* Do we have starting stats to compare to? */
 	if (FORMAT_DATA->dev_stats.if_name[0] != 0) {
-		linuxcommon_get_dev_statistics(libtrace, &dev_stats);
+		linuxcommon_get_dev_statistics(libtrace->uridata, &dev_stats);
 	}
 	linuxcommon_update_socket_statistics(libtrace);
 

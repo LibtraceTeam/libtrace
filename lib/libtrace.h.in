@@ -64,6 +64,10 @@
 #include <sys/time.h>
 #endif
 
+#if ENABLE_DTRACE
+#include <sys/sdt.h>
+#endif
+
 /* Deal with missing byte order macros */
 #include <sys/param.h>
 
@@ -171,6 +175,7 @@ extern "C" {
  */
 
 #define LT_USE_PACKED @HAVE_ATTRIBUTE_PACKED@
+#define LT_USE_ALIGNED @HAVE_ATTRIBUTE_ALIGNED@
 #define LT_USE_UNUSED @HAVE_ATTRIBUTE_UNUSED@
 #define LT_USE_DEPRECATED @HAVE_ATTRIBUTE_DEPRECATED@
 #define LT_USE_PURE @HAVE_ATTRIBUTE_PURE@
@@ -181,6 +186,12 @@ extern "C" {
 #  define PACKED __attribute__((packed))
 #else
 #  define PACKED
+#endif
+
+#if LT_USE_ALIGNED
+# define ALIGNED(x) __attribute__((aligned(x)))
+#else
+# define ALIGNED(x)
 #endif
 
 #if LT_USE_UNUSED
@@ -210,7 +221,6 @@ extern "C" {
 #ifndef CACHE_LINE_SIZE
 #define CACHE_LINE_SIZE 64
 #endif
-#define ALIGN_STRUCT(x) __attribute__((aligned(x)))
 
 #ifdef _MSC_VER
     #ifdef LT_BUILDING_DLL
@@ -231,6 +241,15 @@ extern "C" {
     #endif
 #endif
 
+typedef uint64_t lt_unaligned_uint64_t ALIGNED(1);
+typedef uint32_t lt_unaligned_uint32_t ALIGNED(1);
+typedef uint16_t lt_unaligned_uint16_t ALIGNED(1);
+typedef uint8_t lt_unaligned_uint8_t ALIGNED(1);
+
+typedef int64_t lt_unaligned_int64_t ALIGNED(1);
+typedef int32_t lt_unaligned_int32_t ALIGNED(1);
+typedef int16_t lt_unaligned_int16_t ALIGNED(1);
+typedef int8_t lt_unaligned_int8_t ALIGNED(1);
 
 /** Opaque structure holding information about an output trace */
 typedef struct libtrace_out_t libtrace_out_t;
@@ -440,6 +459,7 @@ enum base_format_t {
 	TRACE_FORMAT_TZSPLIVE	  =23,  /** TZSP */
         TRACE_FORMAT_CORSAROTAG   =24,  /** Corsarotagger format */
         TRACE_FORMAT_XDP          =25,  /** AF_XDP format */
+	TRACE_FORMAT_PFRING	  =26,
 };
 
 /** RT protocol packet types */
@@ -503,6 +523,9 @@ typedef enum {
 	TRACE_RT_DATA_CORSARO_TAGGED = TRACE_RT_DATA_SIMPLE + TRACE_FORMAT_CORSAROTAG,
         /** RT is encapsulating a packet tagged by AF_XDP */
         TRACE_RT_DATA_XDP = TRACE_RT_DATA_SIMPLE + TRACE_FORMAT_XDP,
+
+	/** RT is encapsulating a PF_RING capture record */
+	TRACE_RT_DATA_PFRING = TRACE_RT_DATA_SIMPLE + TRACE_FORMAT_PFRING,
 
 	/** As PCAP does not store the linktype with the packet, we need to 
 	 * create a separate RT type for each supported DLT, starting from
@@ -584,14 +607,16 @@ typedef enum {
 	TRACE_ETHERTYPE_MPLS	= 0x8847,	/**< MPLS Unicast traffic */
 	TRACE_ETHERTYPE_MPLS_MC = 0x8848,	/**< MPLS Multicast traffic */
 	TRACE_ETHERTYPE_PPP_DISC= 0x8863,	/**< PPPoE Service Discovery */
-	TRACE_ETHERTYPE_PPP_SES = 0x8864	/**< PPPoE Session Messages */
+	TRACE_ETHERTYPE_PPP_SES = 0x8864,	/**< PPPoE Session Messages */
+	TRACE_ETHERTYPE_8021X   = 0x888E,	/**< 802.1X Authentication */
+	TRACE_ETHERTYPE_PPP     = 0x880B    /**< PPP */
 } libtrace_ethertype_t;
 
 /** constant to check if a vlan was found */
-#define VLAN_NOT_FOUND 0xFF
+#define VLAN_NOT_FOUND 0xFFFF
 
 /** constant to check if a mpls label was found */
-#define MPLS_NOT_FOUND 0xFFFF
+#define MPLS_NOT_FOUND 0xFFFFFFFF
 
 typedef struct libtrace_layer2_header {
         uint16_t ethertype;                     /**< Ethertype of the header */
@@ -694,7 +719,7 @@ typedef struct libtrace_packet_t {
 	uint64_t hash;                  /**< A hash of the packet as supplied by the user */
 	int error;                      /**< The error status of pread_packet */
         uint64_t internalid;            /** Internal identifier for the pkt */
-        void *srcbucket;
+        void *srcbucket;                /** Source bucket in trace_rt or stream in XDP */
 
         pthread_mutex_t ref_lock;       /**< Lock for reference counter */
         int refcount;                   /**< Reference counter */
@@ -765,7 +790,7 @@ typedef struct libtrace_ip
 #endif
     uint8_t  ip_tos;			/**< Type of Service */
     uint16_t ip_len;			/**< Total Length */
-    int16_t  ip_id;			/**< Identification */
+    uint16_t  ip_id;			/**< Identification */
     uint16_t ip_off;			/**< IP Fragment offset (and flags) */
     uint8_t  ip_ttl;			/**< Time to Live */
     uint8_t  ip_p;			/**< Protocol */
@@ -773,6 +798,7 @@ typedef struct libtrace_ip
     struct in_addr ip_src;		/**< Source Address */
     struct in_addr ip_dst;		/**< Destination Address */
 } PACKED libtrace_ip_t;
+ct_assert(sizeof(libtrace_ip_t) == 20);
 
 /** IPv6 header extension structure */
 typedef struct libtrace_ip6_ext
@@ -780,6 +806,7 @@ typedef struct libtrace_ip6_ext
 	uint8_t nxt;	/**< Next header */
 	uint8_t len;	/**< Length of the current header */
 } PACKED libtrace_ip6_ext_t;
+ct_assert(sizeof(libtrace_ip6_ext_t) == 2);
 
 /** IPv6 fragmentation header */
 typedef struct libtrace_ip6_frag 
@@ -789,6 +816,7 @@ typedef struct libtrace_ip6_frag
 	uint16_t frag_off;	/**< Fragment Offset (includes M flag) */
 	uint32_t ident;	/** Fragment identification */
 } PACKED libtrace_ip6_frag_t;
+ct_assert(sizeof(libtrace_ip6_frag_t) == 8);
 
 /** Generic IPv6 header structure
  *
@@ -804,6 +832,7 @@ typedef struct libtrace_ip6
     struct in6_addr ip_src;		/**< Source address */
     struct in6_addr ip_dst;		/**< Destination address */
 } PACKED libtrace_ip6_t;
+ct_assert(sizeof(libtrace_ip6_t) == 40);
 
 /** Generic TCP header structure */
 typedef struct libtrace_tcp
@@ -843,6 +872,7 @@ typedef struct libtrace_tcp
     uint16_t check;		/**< Checksum */
     uint16_t urg_ptr;		/**< Urgent Pointer */
 } PACKED libtrace_tcp_t;
+ct_assert(sizeof(libtrace_tcp_t) == 20);
 
 /** Generic UDP header structure */
 typedef struct libtrace_udp {
@@ -851,6 +881,7 @@ typedef struct libtrace_udp {
   uint16_t	len;		/**< Length */
   uint16_t	check;		/**< Checksum */
 } PACKED libtrace_udp_t;
+ct_assert(sizeof(libtrace_udp_t) == 8);
 
 /** Generic ICMP header structure */
 typedef struct libtrace_icmp
@@ -873,6 +904,7 @@ typedef struct libtrace_icmp
     } frag;			/**< Path MTU Discovery */
   } un;				/**< Union for Payloads of Various ICMP Codes */
 } PACKED libtrace_icmp_t;
+ ct_assert(sizeof(libtrace_icmp_t) == 8);
 
 /** Generic ICMPv6 header structure */
 typedef struct libtrace_icmp6 {
@@ -895,6 +927,7 @@ typedef struct libtrace_icmp6 {
     } echo; /**< Data required for Echo Request and Reply messages */
   } un;
 } PACKED libtrace_icmp6_t;
+ct_assert(sizeof(libtrace_icmp6_t) == 8);
 
 /** Generic LLC/SNAP header structure */
 typedef struct libtrace_llcsnap
@@ -904,9 +937,10 @@ typedef struct libtrace_llcsnap
   uint8_t ssap;			/**< Source Service Access Point */
   uint8_t control;		/**< Control field */
 /* SNAP */
-  LT_BITFIELD32 oui:24;		/**< Organisationally Unique Identifier (scope)*/
+  LT_BITFIELD32 oui:24; /**< Organisationally Unique Identifier (scope)*/
   uint16_t type;		/**< Protocol within OUI */
 } PACKED libtrace_llcsnap_t;
+ct_assert(sizeof(libtrace_llcsnap_t) == 8);
 
 /** 802.3 frame */
 typedef struct libtrace_ether
@@ -915,38 +949,71 @@ typedef struct libtrace_ether
   uint8_t ether_shost[6];	/**< Source Ether Addr */
   uint16_t ether_type;		/**< Packet Type ID Field (next-header) */
 } PACKED libtrace_ether_t;
+ct_assert(sizeof(libtrace_ether_t) == 14);
 
 /** 802.1Q frame */
 typedef struct libtrace_8021q 
 {
-  LT_BITFIELD16 vlan_pri:3;	 /**< VLAN User Priority */
-  LT_BITFIELD16 vlan_cfi:1; 	 /**< VLAN Format Indicator, 
-				   * 0 for ethernet, 1 for token ring */
-  LT_BITFIELD16 vlan_id:12; 	 /**< VLAN Id */
-  uint16_t vlan_ether_type;	 /**< VLAN Sub-packet Type ID Field 
-				   * (next-header)*/
+    /* The tci field includes:
+     * Priority code point - 3 bits
+     * Drop eligible indicator - 1 bit
+     * VLAN identifier - 12 bits
+     * These fields are merged and can be extracted using the macro functions.
+     * This is to deal with values crossing byte boundaries.
+     */
+    uint16_t tci;               /**< pri, cfi, id */
+    uint16_t vlan_ether_type;   /**< VLAN Sub-packet Type ID Field 
+                                  * (next-header)*/
+
+    #define LT_VLAN_PCP(x) ((ntohs(x->tci) & 0xe000) >> 13)
+    #define LT_VLAN_DEI(x) ((ntohs(x->tci) & 0x1000) >> 12)
+    #define LT_VLAN_VID(x) (ntohs(x->tci) & 0xfff)
 } PACKED libtrace_8021q_t;
+ct_assert(sizeof(libtrace_8021q_t) == 4);
 
 /** ATM User Network Interface (UNI) Cell. */
 typedef struct libtrace_atm_cell
 {
-  LT_BITFIELD32 gfc:4;		/**< Generic Flow Control */
-  LT_BITFIELD32 vpi:8;		/**< Virtual Path Identifier */
-  LT_BITFIELD32 vci:16;		/**< Virtual Channel Identifier */
-  LT_BITFIELD32 pt:3;		/**< Payload Type */
-  LT_BITFIELD32 clp:1;		/**< Cell Loss Priority */
-  LT_BITFIELD32 hec:8;		/**< Header Error Control */
+    /* This field contains
+     * generic flow control (gfc) - 4 bits
+     * virtual path identifier (vpi) - 8 bits
+     * virtual channel identifier (vci) - 16 bits
+     * payload type (pt) - 3 bits
+     * cell loss priority (clp) - 1 bit
+     * These fields are merged and can be extracted using the macro functions.
+     * This is to deal with values crossing byte boundaries.
+     */
+    uint32_t gfc_vpi_vci_pt_clp;    /**< gfc, vpi, vci, pt, clp */
+    uint8_t hec;                    /**< Header Error Control */
+
+    #define LT_ATM_GFC(x) ((ntohl(x->gfc_vpi_vci_pt_clp) & 0xf0000000) >> 28)
+    #define LT_ATM_VPI(x) ((ntohl(x->gfc_vpi_vci_pt_clp) & 0x0ff00000) >> 20)
+    #define LT_ATM_VCI(x) ((ntohl(x->gfc_vpi_vci_pt_clp) & 0x0ffff0) >> 4)
+    #define LT_ATM_PT(x) ((ntohl(x->gfc_vpi_vci_pt_clp) & 0x0e) >> 1)
+    #define LT_ATM_CLP(x) (ntohl(x->gfc_vpi_vci_pt_clp) & 0x01)
 } PACKED libtrace_atm_cell_t;
+ct_assert(sizeof(libtrace_atm_cell_t) == 5);
 
 /** ATM Network Node/Network Interface (NNI) Cell. */
 typedef struct libtrace_atm_nni_cell
 {
-  LT_BITFIELD32 vpi:12;		/**< Virtual Path Identifier */
-  LT_BITFIELD32 vci:16;		/**< Virtual Channel Identifier */
-  LT_BITFIELD32 pt:3;		/**< Payload Type */
-  LT_BITFIELD32 clp:1;		/**< Cell Loss Priority */
-  LT_BITFIELD32 hec:8;		/**< Header Error Control */
+    /* This field contains
+     * virtual path identifier (vpi) - 12 bits
+     * virtual channel identifier (vci) - 16 bits
+     * payload type (pt) - 3 bits
+     * cell loss priority (clp) - 1 bit
+     * These fields are merged and can be extracted using the macro functions.
+     * This is to deal with values crossing byte boundaries.
+     */
+    uint32_t vpi_vci_pt_clp;    /**< vpi, vci, pt, clp */
+    uint8_t hec;                /**< Header Error Control */
+
+    #define LT_ATM_NNI_VPI(x) ((ntohl(x->vpi_vci_pt_clp) & 0xfff00000) >> 20)
+    #define LT_ATM_NNI_VCI(x) ((ntohl(x->vpi_vci_pt_clp) & 0x0ffff0) >> 4)
+    #define LT_ATM_NNI_PT(x) ((ntohl(x->vpi_vci_pt_clp) & 0x0e) >> 1)
+    #define LT_ATM_NNI_CLP(x) (ntohl(x->vpi_vci_pt_clp) & 0x01)
 } PACKED libtrace_atm_nni_cell_t;
+ct_assert(sizeof(libtrace_atm_nni_cell_t) == 5);
 
 /** Captured UNI cell.
  *
@@ -957,12 +1024,22 @@ typedef struct libtrace_atm_nni_cell
  */
 typedef struct libtrace_atm_capture_cell
 {
-  LT_BITFIELD32 gfc:4;		/**< Generic Flow Control */
-  LT_BITFIELD32 vpi:8;		/**< Virtual Path Identifier */
-  LT_BITFIELD32 vci:16;		/**< Virtual Channel Identifier */
-  LT_BITFIELD32 pt:3;		/**< Payload Type */
-  LT_BITFIELD32 clp:1;		/**< Cell Loss Priority */
+    /* This field contains
+     * generic flow control (gfc) - 4 bits
+     * virtual path identifier (vpi) - 8 bits
+     * virtual channel identifier (vci) - 16 bits
+     * payload type (pt) - 3 bits
+     * cell loss priority (clp) - 1 bit
+     * These fields are merged and can be extracted using the macro functions.
+     * This is to deal with values crossing byte boundaries.
+     */
+    uint32_t gfc_vpi_vci_pt_clp;    /**< gfc, vpi, vci, pt, clp */
+
+    /* use macro functions in libtrace_atm_cell_t to extract
+     * gfc, vpi, vci, pt and clp.
+     */
 } PACKED libtrace_atm_capture_cell_t;
+ct_assert(sizeof(libtrace_atm_capture_cell_t) == 4);
 
 /** Captured NNI cell.
  *
@@ -973,12 +1050,22 @@ typedef struct libtrace_atm_capture_cell
  */
 typedef struct libtrace_atm_nni_capture_cell
 {
-  LT_BITFIELD32 vpi:12;		/**< Virtual Path Identifier */
-  LT_BITFIELD32 vci:16;		/**< Virtual Channel Identifier */
-  LT_BITFIELD32 pt:3;		/**< Payload Type */
-  LT_BITFIELD32 clp:1;		/**< Cell Loss Priority */
-  LT_BITFIELD32 hec:8;		/**< Header Error Control */
+    /* This field contains
+     * virtual path identifier (vpi) - 12 bits
+     * virtual channel identifier (vci) - 16 bits
+     * payload type (pt) - 3 bits
+     * cell loss priority (clp) - 1 bit
+     * These fields are merged and can be extracted using the macro functions.
+     * This is to deal with values crossing byte boundaries.
+     */
+    uint32_t vpi_vci_pt_clp;    /**< vpi, vci, pt, clp */
+    uint8_t hec;                /**< Header Error Control */
+
+    /* use macro functions in libtrace_atm_nni_cell_t to extract
+     * vpi, vci, pt and clp
+     */
 } PACKED libtrace_atm_nni_capture_cell_t;
+ct_assert(sizeof(libtrace_atm_nni_capture_cell_t) == 5);
 
 /** PPP header */
 typedef struct libtrace_ppp
@@ -991,16 +1078,23 @@ typedef struct libtrace_ppp
 /* uint8_t header;  */		/**< PPP Control (0x03 - Unnumbered info) */
  uint16_t protocol;		/**< PPP Protocol (htons(0x0021) - IPv4 */
 } PACKED libtrace_ppp_t;
+ct_assert(sizeof(libtrace_ppp_t) == 2);
 
 /** PPPoE header */
 typedef struct libtrace_pppoe
 {
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+ LT_BITFIELD8 type:4;		/**< PPPoE Type */
+ LT_BITFIELD8 version:4;	/**< Protocol version number */
+#else
  LT_BITFIELD8 version:4;	/**< Protocol version number */
  LT_BITFIELD8 type:4;		/**< PPPoE Type */
+#endif
  uint8_t code;			/**< PPPoE Code */
  uint16_t session_id;		/**< Session Identifier */
  uint16_t length;		/**< Total Length of the PPP packet */
 } PACKED libtrace_pppoe_t;
+ct_assert(sizeof(libtrace_pppoe_t) == 6);
 
 /** Libtrace local definition of GRE (Generalised Routing Protocol) header
  * RFC2890
@@ -1014,6 +1108,7 @@ typedef struct libtrace_gre_t
     uint16_t key;           /**< Optional key (or Tenant Network ID) */
     uint16_t seq;           /**< Optional sequence number */
 } PACKED libtrace_gre_t;
+ct_assert(sizeof(libtrace_gre_t) == 12);
 
 #define LIBTRACE_GRE_FLAG_CHECKSUM 0x8000
 #define LIBTRACE_GRE_FLAG_KEY      0x2000
@@ -1035,6 +1130,7 @@ typedef struct libtrace_vxlan_t
     uint8_t vni[3];         /**< VXLAN Network Identifier (VNI) */
     uint8_t reserved2;
 } PACKED libtrace_vxlan_t;
+ct_assert(sizeof(libtrace_vxlan_t) == 8);
 
 /** 802.11 header */
 typedef struct libtrace_80211_t {
@@ -1075,6 +1171,7 @@ typedef struct libtrace_80211_t {
         uint16_t     SeqCtl;	/**< Sequence Control */	
         uint8_t      mac4[6];	/**< MAC Address 4 */
 } PACKED libtrace_80211_t;
+ct_assert(sizeof(libtrace_80211_t) == 30);
 
 /** The Radiotap header pre-amble
  *
@@ -1089,6 +1186,7 @@ typedef struct libtrace_radiotap_t {
     uint16_t    it_len; /**< Length in bytes of the entire Radiotap header */
     uint32_t    it_present; /**< Which Radiotap fields are present */
 } PACKED libtrace_radiotap_t;
+ct_assert(sizeof(libtrace_radiotap_t) == 8);
 
 /** OSPF header */
 typedef struct libtrace_ospf_v2_t
@@ -1105,6 +1203,7 @@ typedef struct libtrace_ospf_v2_t
 	uint8_t au_data_len;	/**< Authentication Data Length */
 	uint32_t au_seq_num;	/**< Cryptographic Sequence Number */
 } PACKED libtrace_ospf_v2_t;
+ct_assert(sizeof(libtrace_ospf_v2_t) == 24);
 
 /** Options Field present in some OSPFv2 packets */
 typedef struct libtrace_ospf_options_t {
@@ -1126,6 +1225,7 @@ typedef struct libtrace_ospf_options_t {
 	LT_BITFIELD8 unused1:1;
 #endif
 } PACKED libtrace_ospf_options_t;
+ct_assert(sizeof(libtrace_ospf_options_t) == 1);
 
 /** LSA Header for OSPFv2 */
 typedef struct libtrace_ospf_lsa_v2_t
@@ -1139,6 +1239,7 @@ typedef struct libtrace_ospf_lsa_v2_t
 	uint16_t checksum;	/**< Checksum */ 
 	uint16_t length;	/**< Length of the LSA including LSA header */
 } PACKED libtrace_ospf_lsa_v2_t;
+ct_assert(sizeof(libtrace_ospf_lsa_v2_t) == 20);
 
 /** OSPFv2 Hello Packet */
 typedef struct libtrace_ospf_hello_v2_t
@@ -1154,6 +1255,7 @@ typedef struct libtrace_ospf_hello_v2_t
 	/** Neighbors follow from here, but there can be anywhere from 1 to N
 	 * neighbors so I can't include that here */
 } PACKED libtrace_ospf_hello_v2_t;
+ct_assert(sizeof(libtrace_ospf_hello_v2_t) == 20);
 
 /** OSPFv2 Database Description packet */
 typedef struct libtrace_ospf_db_desc_v2_t
@@ -1173,6 +1275,7 @@ typedef struct libtrace_ospf_db_desc_v2_t
 #endif
 	uint32_t seq;		/**< Sequence number for DD packets */
 } PACKED libtrace_ospf_db_desc_v2_t;
+ct_assert(sizeof(libtrace_ospf_db_desc_v2_t) == 8);
 
 /** OSPF Link State Request Packet */
 typedef struct libtrace_ospf_ls_req_t
@@ -1181,6 +1284,7 @@ typedef struct libtrace_ospf_ls_req_t
 	uint32_t ls_id;		/**< Link State Id */
 	uint32_t advertising_router;	/**< Advertising Router */
 } PACKED libtrace_ospf_ls_req_t;
+ct_assert(sizeof(libtrace_ospf_ls_req_t) == 12);
 
 /** OSPF Link State Update Packet */
 typedef struct libtrace_ospf_ls_update_t
@@ -1189,6 +1293,7 @@ typedef struct libtrace_ospf_ls_update_t
 
 	/* Followed by LSAs, use API functions to access these */
 } PACKED libtrace_ospf_ls_update_t;
+ct_assert(sizeof(libtrace_ospf_ls_update_t) == 4);
 
 /** OSPFv2 AS External LSA Body */
 typedef struct libtrace_ospf_as_external_lsa_t
@@ -1207,6 +1312,7 @@ typedef struct libtrace_ospf_as_external_lsa_t
 	struct in_addr forwarding;	/**< Forwarding address */
 	uint32_t external_tag;		/**< External Route Tag */
 } PACKED libtrace_ospf_as_external_lsa_v2_t;
+ct_assert(sizeof(libtrace_ospf_as_external_lsa_v2_t) == 16);
 
 /** OSPFv2 Summary LSA Body */
 typedef struct libtrace_ospf_summary_lsa
@@ -1218,6 +1324,7 @@ typedef struct libtrace_ospf_summary_lsa
 	uint8_t metric_c;	/**< Byte 3 of the Metric field */
 	
 } PACKED libtrace_ospf_summary_lsa_v2_t;
+ct_assert(sizeof(libtrace_ospf_summary_lsa_v2_t) == 8);
 
 /** OSPFv2 Network LSA Body */
 typedef struct libtrace_ospf_network_lsa_t
@@ -1225,6 +1332,7 @@ typedef struct libtrace_ospf_network_lsa_t
 	struct in_addr netmask;	/**< Netmask for the network */
 	/* Followed by IDs of attached routers */
 } PACKED libtrace_ospf_network_lsa_v2_t;
+ct_assert(sizeof(libtrace_ospf_network_lsa_v2_t) == 4);
 
 /** OSPFv2 Router Link structure */
 typedef struct libtrace_ospf_link_t
@@ -1235,6 +1343,7 @@ typedef struct libtrace_ospf_link_t
 	uint8_t num_tos;		/**< Number of TOS metrics */
 	uint16_t tos_metric;		/**< Cost of router link */
 } PACKED libtrace_ospf_link_v2_t;
+ct_assert(sizeof(libtrace_ospf_link_v2_t) == 12);
 
 /** OSPFv2 Router LSA */
 typedef struct libtrace_ospf_router_lsa_t
@@ -1253,6 +1362,7 @@ typedef struct libtrace_ospf_router_lsa_t
 	uint8_t zero2;		/**< Always zero */
 	uint16_t num_links;	/**< Number of links in LSA */
 } PACKED libtrace_ospf_router_lsa_v2_t;
+ct_assert(sizeof(libtrace_ospf_router_lsa_v2_t) == 4);
 
 /** OSPF message types */
 typedef enum {
@@ -1280,6 +1390,7 @@ typedef struct libtrace_sll_header_t {
         unsigned char addr[8];          /**< Link-layer address */
         uint16_t protocol;              /**< Protocol */
 } PACKED libtrace_sll_header_t;
+ct_assert(sizeof(libtrace_sll_header_t) == 16);
 
 
 /* SLL packet types */
@@ -1336,9 +1447,9 @@ DLLEXPORT void trace_interrupt(void);
 
 /** Takes a uri and splits it into a format and uridata component. 
  * @param uri		The uri to be parsed
- * @param [out] format	A pointer that will be updated to point to an allocated 
+ * @param [out] format	A pointer that will be updated to point to an allocated
  * 			string holding the format component of the URI
- * @return NULL if an error occurred, otherwise return a pointer to the uridata 
+ * @return NULL if an error occurred, otherwise return a pointer to the uridata
  * component
  *
  * @note The format component is strdup'd by this function, so be sure to free
@@ -1453,18 +1564,30 @@ typedef enum {
 	 * access this option via trace_set_hasher(). */
 	TRACE_OPTION_HASHER,
 
-        /** Speed up trace file replays (via trace_event()) by this factor */
-        TRACE_OPTION_REPLAY_SPEEDUP,
+	/** Speed up trace file replays (via trace_event()) by this factor */
+	TRACE_OPTION_REPLAY_SPEEDUP,
 
-        /** Always assume ERF framing length is the given value, rather than
-         *  trying to calculate it from the packet type. */
-        TRACE_OPTION_CONSTANT_ERF_FRAMING,
+	/** Always assume ERF framing length is the given value, rather than
+	 *  trying to calculate it from the packet type. */
+	TRACE_OPTION_CONSTANT_ERF_FRAMING,
 
 	/** If enabled all meta packet will be discarded */
 	TRACE_OPTION_DISCARD_META,
 
-  TRACE_OPTION_XDP_HARDWARE_OFFLOAD,
+	/** Offload XDP program to hardware */
+	TRACE_OPTION_XDP_HARDWARE_OFFLOAD,
 
+	/** Install XDP program in native/driver mode */
+	TRACE_OPTION_XDP_DRV_MODE,
+
+	/** Install XDP program in SKB (generic) mode */
+	TRACE_OPTION_XDP_SKB_MODE,
+
+	/** Force XDP copy mode */
+	TRACE_OPTION_XDP_ZERO_COPY_MODE,
+
+	/** Force XDP zero copy mode */
+	TRACE_OPTION_XDP_COPY_MODE,
 } trace_option_t;
 
 /** Sets an input config option
@@ -1549,8 +1672,9 @@ typedef enum {
 	/** Compression type, see trace_option_compresstype_t */
 	TRACE_OPTION_OUTPUT_COMPRESSTYPE,
 
-        /** TX queue size **/
-        TRACE_OPTION_TX_MAX_QUEUE,
+	/** TX queue size **/
+	TRACE_OPTION_TX_MAX_QUEUE
+
 } trace_option_output_t;
 
 /* To add a new stat field update this list, and the relevant places in
@@ -3574,7 +3698,7 @@ trace_create_filter_from_bytecode(void *bf_insns, unsigned int bf_len);
  * @return >0 if the filter matches, 0 if it doesn't, -1 on error.
  * 
  * @note Due to the way BPF filters are built, the filter is not actually
- * compiled until the first time trace_create_filter is called. If your filter
+ * compiled until the first time trace_apply_filter is called. If your filter
  * is incorrect, it will generate an error message and assert, exiting the
  * program. This behaviour may change to a more graceful handling of this error
  * in the future.

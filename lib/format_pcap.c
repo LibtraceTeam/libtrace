@@ -400,7 +400,9 @@ static int pcap_pause_input(libtrace_t *libtrace UNUSED)
 
 static int pcap_fin_input(libtrace_t *libtrace) 
 {
-	pcap_close(INPUT.pcap);
+	if (INPUT.pcap != NULL) {
+		pcap_close(INPUT.pcap);
+	}
 	INPUT.pcap=NULL;
 	free(libtrace->format_data);
 	return 0; /* success */
@@ -459,32 +461,21 @@ static int pcap_prepare_packet(libtrace_t *libtrace, libtrace_packet_t *packet,
 static int pcap_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	int ret = 0;
 	int linktype;
-	uint32_t flags = 0;
 
 	if (!libtrace->format_data) {
 		trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT, "Trace format data missing, "
 			"call trace_create() before calling pcap_read_packet()");
 		return -1;
 	}
+
+        /* If the packet buffer is owned by libtrace free it */
+        if (packet->buf_control == TRACE_CTRL_PACKET) {
+                free(packet->buffer);
+                packet->buffer = NULL;
+        }
+
 	linktype = pcap_datalink(DATA(libtrace)->input.pcap);
 	packet->type = pcap_linktype_to_rt(linktype);
-
-	/* If we're using the replacement pcap_next_ex() we need to
-	 * make sure we have a buffer to *shudder* memcpy into 
-	 */
-	if (!packet->buffer) {
-		packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
-		if (!packet->buffer) {
-			trace_set_err(libtrace, errno, 
-					"Cannot allocate memory");
-			return -1;
-		}
-		packet->header = packet->buffer;
-		packet->payload = (char *)packet->buffer+sizeof(struct pcap_pkthdr);
-			
-	}
-
-	flags |= TRACE_PREP_OWN_BUFFER;
 	
 	for(;;) {
 		
@@ -494,8 +485,10 @@ static int pcap_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 		ret = pcap_next_ex(INPUT.pcap, &pcap_hdr, 
 				(const u_char **)&pcap_payload);
 		
+		packet->buffer = pcap_hdr;
 		packet->header = pcap_hdr;
 		packet->payload = pcap_payload;
+		packet->buf_control = TRACE_CTRL_EXTERNAL;
 
 		switch(ret) {
 			case 1: break; /* no error */
@@ -859,7 +852,8 @@ static struct libtrace_format_t pcap = {
 	pcap_read_packet,		/* read_packet */
 	pcap_prepare_packet,		/* prepare_packet */
 	NULL,				/* fin_packet */
-	pcap_write_packet,		/* write_packet */
+    NULL,                   /* can_hold_packet */
+	pcap_write_packet,		/* write_packet */  
         pcap_flush_output,              /* flush_output */
 	pcap_get_link_type,		/* get_link_type */
 	pcapint_get_direction,		/* get_direction */
@@ -905,6 +899,7 @@ static struct libtrace_format_t pcapint = {
 	pcap_read_packet,		/* read_packet */
 	pcap_prepare_packet,		/* prepare_packet */
 	NULL,				/* fin_packet */
+    NULL,               /* can_hold_packet */
 	pcapint_write_packet,		/* write_packet */
 	NULL,		                /* flush_output */
 	pcap_get_link_type,		/* get_link_type */

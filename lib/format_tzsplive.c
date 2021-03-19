@@ -42,11 +42,13 @@ typedef struct tzsp_header {
 	uint8_t type;
 	uint16_t encap;
 } PACKED tzsp_header_t;
+ct_assert(sizeof(tzsp_header_t) == 4);
 
 typedef struct tzsp_tagfield {
 	uint8_t type;
 	uint8_t length;
 } PACKED tzsp_tagfield_t;
+ct_assert(sizeof(tzsp_tagfield_t) == 2);
 
 static bool tzsplive_can_write(libtrace_packet_t *packet) {
 	libtrace_linktype_t ltype = trace_get_link_type(packet);
@@ -697,6 +699,7 @@ static struct libtrace_format_t tzsplive = {
         tzsplive_read_packet,           /* read_packet */
         tzsplive_prepare_packet,        /* prepare_packet */
         NULL,                           /* fin_packet */
+        NULL,                           /* can_hold_packet */
         tzsplive_write_packet,          /* write_packet */
         NULL,                           /* flush_output */
         tzsplive_get_link_type,         /* get_link_type */

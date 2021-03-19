@@ -45,6 +45,7 @@
 #include <sys/types.h>
 #include <time.h>
 #include <string.h>
+#include <inttypes.h>
 
 #include "libtrace.h"
 
@@ -59,7 +60,7 @@ void iferr(libtrace_t *trace)
 	exit(1);
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc UNUSED, char *argv[] UNUSED) {
         char *uri = "erf:traces/fragtest.erf.gz";
 	int error = 0;
 	uint64_t totaloffset = 0;
@@ -107,7 +108,7 @@ int main(int argc, char *argv[]) {
                 if (totaloffset == 69192) {
                         printf("success: frag offset sum is 69192\n");
                 } else {
-                        printf("fail: expected frag offset sum of 69192, got %lu\n", totaloffset);
+                        printf("fail: expected frag offset sum of 69192, got %" PRIu64 "\n", totaloffset);
                         error = 1;
                 }
 

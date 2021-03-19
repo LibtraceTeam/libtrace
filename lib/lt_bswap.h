@@ -57,7 +57,7 @@ DLLEXPORT uint64_t byteswap64(uint64_t num);
  * @return The byteswapped 32-bit number
  *
  */
-uint32_t byteswap32(uint32_t num);
+DLLEXPORT uint32_t byteswap32(uint32_t num);
 
 /** Byteswaps a 16-bit value.
  *
@@ -65,7 +65,7 @@ uint32_t byteswap32(uint32_t num);
  * @return The byteswapped 16-bit number
  *
  */
-uint16_t byteswap16(uint16_t num);
+DLLEXPORT uint16_t byteswap16(uint16_t num);
 
 
 #if __BYTE_ORDER == __BIG_ENDIAN

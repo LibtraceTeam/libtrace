@@ -76,7 +76,7 @@ void test_forgotten_wronly()
 	trace_destroy(trace);
 }
 
-int main(int argc, char *argv[]) 
+int main(int argc UNUSED, char *argv[] UNUSED)
 {
 	
 	/* This test is no longer useful, as the new libtrace IO system

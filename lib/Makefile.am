@@ -82,7 +82,7 @@ XDP_SOURCES=format_linux_xdp.c format_linux_xdp.h
 
 # are we building the XDP eBPF kernel program?
 if BUILD_EBPF
-format_linux_xdp_kern.bpf: format_linux_xdp_kern.c format_linux_xdp.h jhash.h
+format_linux_xdp_kern.bpf: format_linux_xdp_kern.c format_linux_xdp.h
 	${CLANG} -Wall @CFLAGS@ -O2 \
 		-I/usr/include \
 		-D__KERNEL__ -D__ASM_SYSREG_H \
@@ -90,7 +90,7 @@ format_linux_xdp_kern.bpf: format_linux_xdp_kern.c format_linux_xdp.h jhash.h
 	${LLC} -march=bpf -filetype=obj ${@:.bpf=.ll} -o $@
 	${RM} ${@:.bpf=.ll}
 
-EXTRA_DIST += format_linux_xdp_kern.c jhash.h
+EXTRA_DIST += format_linux_xdp_kern.c
 endif
 
 # install libtrace bpf kern
@@ -102,6 +102,10 @@ all: $(BPF_TARGETS)
 
 else
 XDP_SOURCES=
+endif
+
+if HAVE_PFRING
+NATIVEFORMATS += format_pfring.c
 endif
 
 libtrace_la_SOURCES = trace.c trace_parallel.c common.h \
@@ -135,7 +139,7 @@ endif
 
 AM_CPPFLAGS= @ADD_INCLS@
 libtrace_la_LIBADD = @LIBTRACE_LIBS@ @LTLIBOBJS@ $(DPDKLIBS)
-libtrace_la_LDFLAGS=-version-info 6:1:2 @ADD_LDFLAGS@
+libtrace_la_LDFLAGS=-version-info 7:0:0 @ADD_LDFLAGS@
 dagapi.c:
 	cp @DAG_TOOLS_DIR@/dagapi.c .
 

@@ -618,6 +618,10 @@ static int pcapng_config_input(libtrace_t *libtrace, trace_option_t option,
                         }
 			return 0;
                 case TRACE_OPTION_XDP_HARDWARE_OFFLOAD:
+                case TRACE_OPTION_XDP_SKB_MODE:
+                case TRACE_OPTION_XDP_DRV_MODE:
+                case TRACE_OPTION_XDP_ZERO_COPY_MODE:
+                case TRACE_OPTION_XDP_COPY_MODE:
                     break;
         }
 
@@ -2307,6 +2311,7 @@ static struct libtrace_format_t pcapng = {
         pcapng_read_packet,             /* read_packet */
         pcapng_prepare_packet,          /* prepare_packet */
         NULL,                           /* fin_packet */
+        NULL,                           /* can_hold_packet */
         pcapng_write_packet,            /* write_packet */
         pcapng_flush_output,            /* flush_output */
         pcapng_get_link_type,           /* get_link_type */
@@ -2316,7 +2321,7 @@ static struct libtrace_format_t pcapng = {
         NULL,                           /* get_timeval */
         pcapng_get_timespec,            /* get_timespec */
         NULL,                           /* get_seconds */
-	pcapng_get_all_meta,        /* get_all_meta */
+	pcapng_get_all_meta,            /* get_all_meta */
         NULL,                           /* seek_erf */
         NULL,                           /* seek_timeval */
         NULL,                           /* seek_seconds */

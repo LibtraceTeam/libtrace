@@ -353,6 +353,7 @@ static struct libtrace_format_t duck = {
         duck_read_packet,        	/* read_packet */
         duck_prepare_packet,		/* prepare_packet */
 	NULL,                           /* fin_packet */
+        NULL,                           /* can_hold_packet */
         duck_write_packet,              /* write_packet */
         NULL,                           /* flush_output */
         duck_get_link_type,    		/* get_link_type */

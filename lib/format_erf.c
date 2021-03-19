@@ -123,6 +123,9 @@ typedef struct erf_index_t {
 	uint64_t offset; 
 } erf_index_t;
 
+static int libtrace_to_erf_hdr(libtrace_out_t *libtrace, libtrace_packet_t *packet,
+    dag_record_t *erf, int *framinglen, int *caplen);
+
 static bool erf_can_write(libtrace_packet_t *packet) {
 	/* Get the linktype */
         libtrace_linktype_t ltype = trace_get_link_type(packet);
@@ -142,7 +145,7 @@ static bool erf_can_write(libtrace_packet_t *packet) {
 /* Ethernet packets have a 2 byte padding before the packet
  * so that the IP header is aligned on a 32 bit boundary.
  */
-static inline int erf_get_padding(const libtrace_packet_t *packet)
+int erf_get_padding(const libtrace_packet_t *packet)
 {
         dag_record_t *erfptr = (dag_record_t *)packet->header;
 
@@ -645,31 +648,115 @@ static int erf_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
 	return rlen;
 }
 
-static int erf_dump_packet(libtrace_out_t *libtrace,
-		dag_record_t *erfptr, int framinglen, void *buffer,
-                int caplen) {
-	int numbytes = 0;
+bool find_compatible_linktype(libtrace_out_t *libtrace,
+                              libtrace_packet_t *packet)
+{
+        /* Keep trying to simplify the packet until we can find 
+         * something we can do with it */
+        do {
+                char type=libtrace_to_erf_type(trace_get_link_type(packet));
 
-        if (caplen + framinglen != ntohs(erfptr->rlen))
-                erfptr->rlen = htons(caplen + framinglen);
+                /* Success */
+                if (type != (char)-1)
+                        return true;
 
-	if ((numbytes = 
-		wandio_wwrite(OUTPUT->file, 
-				erfptr,
-				(size_t)(framinglen))) 
-			!= (int)(framinglen)) {
+                if (!demote_packet(packet)) {
+                        trace_set_err_out(libtrace,
+                                        TRACE_ERR_NO_CONVERSION,
+                                        "No erf type for packet (%i)",
+                                        trace_get_link_type(packet));
+                        return false;
+                }
+
+        } while(1);
+
+        return true;
+}
+
+static int libtrace_to_erf_hdr(libtrace_out_t *libtrace, libtrace_packet_t *packet,
+    dag_record_t *erf, int *framinglen, int *caplen) {
+
+    // populate erf header if this is not a erf packet
+    if (packet->type != TRACE_RT_DATA_ERF) {
+        /* Populate metadata from the packet before demoting and possibly losing it */
+        libtrace_direction_t dir = trace_get_direction(packet);
+        memset(&erf->flags, 0, sizeof(erf->flags));
+        erf->ts = bswap_host_to_le64(trace_get_erf_timestamp(packet));
+        if (dir != TRACE_DIR_UNKNOWN)
+            erf->flags.iface = dir;
+        else
+            /* Probably uneeded, the original memset would (unintentionally?) set this to 1 */
+            erf->flags.iface = TRACE_DIR_INCOMING;
+
+        /* Demote the packet to a linktype we can send, e.g. find Ethernet */
+        if (!find_compatible_linktype(libtrace,packet))
+            return -1;
+
+        /* Fill in the packet size, it may have changed after demotion */
+        *framinglen = dag_record_size + erf_get_padding(packet);
+    } else {
+        *framinglen = trace_get_framing_length(packet);
+    }
+
+    /* If we've had an rxerror, we have no payload to write.
+     *
+     * I Think this is bogus, we should somehow figure out
+     * a way to write out the payload even if it is gibberish -- Perry
+     */
+    if (packet->payload == NULL)
+        caplen = 0;
+    else
+        *caplen = trace_get_capture_length(packet);
+
+    if (*caplen <= 0 || *caplen > 65536) {
+        trace_set_err_out(libtrace, TRACE_ERR_BAD_PACKET,
+            "Capture length is out of range in libtrace_to_erf_hdr()");
+        return -1;
+    }
+
+    if (*framinglen > 65536) {
+        trace_set_err_out(libtrace, TRACE_ERR_BAD_PACKET,
+            "Framing length is to large in libtrace_to_erf_hdr()");
+        return -1;
+    }
+
+    if (*caplen + *framinglen <= 0 || *caplen + *framinglen > 65536) {
+        trace_set_err_out(libtrace, TRACE_ERR_BAD_PACKET,
+            "Capture + framing length is out of range in libtrace_to_erf_hdr()");
+        return -1;
+    }
+
+    erf->type = libtrace_to_erf_type(trace_get_link_type(packet));
+    erf->rlen = htons(*framinglen + *caplen);
+    // loss counter. Can't do this
+    erf->lctr = 0;
+    erf->wlen = htons(trace_get_wire_length(packet));
+
+    return 0;
+}
+
+static int erf_dump_packet(libtrace_out_t *libtrace, dag_record_t *erfptr,
+	int framinglen, void *buffer, int caplen) {
+
+	int numbytes;
+
+	// write out ERF header
+	numbytes = wandio_wwrite(OUTPUT->file, erfptr, (size_t)(framinglen));
+	if (numbytes != framinglen) {
 		trace_set_err_out(libtrace,errno,
-				"write(%s)",libtrace->uridata);
+			"write(%s)",libtrace->uridata);
 		return -1;
 	}
 
-        numbytes=wandio_wwrite(OUTPUT->file, buffer, (size_t)caplen);
+	// write out packet payload
+	numbytes = wandio_wwrite(OUTPUT->file, buffer, (size_t)caplen);
 	if (numbytes != caplen) {
 		trace_set_err_out(libtrace,errno,
-				"write(%s)",libtrace->uridata);
+			"write(%s)",libtrace->uridata);
 		return -1;
 	}
-	return numbytes + framinglen;
+
+	return framinglen + caplen;
 }
 
 static int erf_flush_output(libtrace_out_t *libtrace) {
@@ -689,31 +776,6 @@ static int erf_start_output(libtrace_out_t *libtrace)
 	return 0;
 }
 
-static bool find_compatible_linktype(libtrace_out_t *libtrace,
-				libtrace_packet_t *packet)
-{
-	/* Keep trying to simplify the packet until we can find 
-	 * something we can do with it */
-	do {
-		char type=libtrace_to_erf_type(trace_get_link_type(packet));
-
-		/* Success */
-		if (type != (char)-1)
-			return true;
-
-		if (!demote_packet(packet)) {
-			trace_set_err_out(libtrace,
-					TRACE_ERR_NO_CONVERSION,
-					"No erf type for packet (%i)",
-					trace_get_link_type(packet));
-			return false;
-		}
-
-	} while(1);
-
-	return true;
-}
-		
 static int erf_write_packet(libtrace_out_t *libtrace, 
 		libtrace_packet_t *packet) 
 {
@@ -723,9 +785,9 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 		return 0;
 	}
 
-	int numbytes = 0;
-	dag_record_t *dag_hdr = (dag_record_t *)packet->header;
-	void *payload = packet->payload;
+	int framinglen;
+	int caplen;
+	dag_record_t *dag_hdr;
 
 	if (!OUTPUT->file) {
 		trace_set_err_out(libtrace, TRACE_ERR_BAD_IO, "Attempted to write ERF packets to a "
@@ -736,85 +798,26 @@ static int erf_write_packet(libtrace_out_t *libtrace,
 	if (!packet->header) {
 		return -1;
 	}
-	
 
-	/* If we've had an rxerror, we have no payload to write - fix
-	 * rlen to be the correct length 
-	 */
-	/* I Think this is bogus, we should somehow figure out
-	 * a way to write out the payload even if it is gibberish -- Perry */
-	if (payload == NULL) {
-	        unsigned int pad = 0;
-	        pad = erf_get_padding(packet);
-		dag_hdr->rlen = htons(dag_record_size + pad);
-		
-	} 
-	
 	if (packet->type == TRACE_RT_DATA_ERF) {
-			numbytes = erf_dump_packet(libtrace,
-				(dag_record_t *)packet->header,
-				trace_get_framing_length(packet),
-				payload,
-                                trace_get_capture_length(packet)
-				);
+                dag_hdr = (dag_record_t *)packet->header;
+                if (libtrace_to_erf_hdr(libtrace, packet, dag_hdr, &framinglen, &caplen) < 0)
+                        return -1;
+		return erf_dump_packet(libtrace,
+				       dag_hdr,
+				       framinglen,
+				       packet->payload,
+				       caplen);
 	} else {
 		dag_record_t erfhdr;
-		int rlen;
-                int framing;
-		/* convert format - build up a new erf header */
-		/* Timestamp */
-		erfhdr.ts = bswap_host_to_le64(trace_get_erf_timestamp(packet));
-
-		/* Flags. Can't do this */
-		memset(&erfhdr.flags,1,sizeof(erfhdr.flags));
-		if (trace_get_direction(packet)!=TRACE_DIR_UNKNOWN)
-			erfhdr.flags.iface = trace_get_direction(packet);
-
-		if (!find_compatible_linktype(libtrace,packet))
+		if (libtrace_to_erf_hdr(libtrace, packet, &erfhdr, &framinglen, &caplen) < 0)
 			return -1;
-
-		payload=packet->payload;
-
-		erfhdr.type = libtrace_to_erf_type(trace_get_link_type(packet));
-
-		/* Packet length (rlen includes format overhead) */
-		if (trace_get_capture_length(packet) <= 0
-			|| trace_get_capture_length(packet) > 65536) {
-			trace_set_err_out(libtrace, TRACE_ERR_BAD_PACKET,
-				"Capture length is out of range in erf_write_packet()");
-			return -1;
-		}
-		if (trace_get_framing_length(packet) > 65536) {
-			trace_set_err_out(libtrace, TRACE_ERR_BAD_PACKET,
-				"Framing length is to large in erf_write_packet()");
-			return -1;
-		}
-
-                if (erfhdr.type == TYPE_ETH)
-                        framing = dag_record_size + 2;
-                else
-                        framing = dag_record_size;
-
-		rlen = trace_get_capture_length(packet) + framing;
-		if (rlen <= 0 || rlen > 65536) {
-			trace_set_err_out(libtrace, TRACE_ERR_BAD_PACKET,
-				"Capture + framing length is out of range in erf_write_packet()");
-			return -1;
-		}
-		erfhdr.rlen = htons(rlen);
-		/* loss counter. Can't do this */
-		erfhdr.lctr = 0;
-		/* Wire length, does not include padding! */
-		erfhdr.wlen = htons(trace_get_wire_length(packet));
-
-		/* Write it out */
-		numbytes = erf_dump_packet(libtrace,
-				&erfhdr,
-				framing,
-				payload,
-                                trace_get_capture_length(packet));
+		return erf_dump_packet(libtrace,
+				       &erfhdr,
+				       framinglen,
+				       packet->payload,
+				       caplen);
 	}
-	return numbytes;
 }
 
 libtrace_linktype_t erf_get_link_type(const libtrace_packet_t *packet) {
@@ -889,7 +892,8 @@ int erf_get_capture_length(const libtrace_packet_t *packet) {
         rlen = ntohs(erfptr->rlen);
         wlen = ntohs(erfptr->wlen);
 
-	caplen = rlen - framinglen;
+        caplen = rlen - framinglen;
+
 	if (wlen < caplen)
 		return wlen;
 
@@ -1264,6 +1268,7 @@ static struct libtrace_format_t erfformat = {
 	erf_read_packet,		/* read_packet */
 	erf_prepare_packet,		/* prepare_packet */
 	NULL,				/* fin_packet */
+        NULL,                           /* can_hold_packet */
 	erf_write_packet,		/* write_packet */
 	erf_flush_output,		/* flush_output */
 	erf_get_link_type,		/* get_link_type */
@@ -1310,6 +1315,7 @@ static struct libtrace_format_t rawerfformat = {
 	erf_read_packet,		/* read_packet */
 	erf_prepare_packet,		/* prepare_packet */
 	NULL,				/* fin_packet */
+        NULL,                           /* can_hold_packet */
 	erf_write_packet,		/* write_packet */
 	erf_flush_output,		/* flush_output */
 	erf_get_link_type,		/* get_link_type */

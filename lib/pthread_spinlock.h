@@ -35,10 +35,19 @@
 
 #ifdef __APPLE__
 
-#include <libkern/OSAtomic.h>
+/* Apple 10.12 deprecates spin locks as they cause issues with their scheduler
+ * https://mjtsai.com/blog/2015/12/16/osspinlock-is-unsafe/
+ */
+#if defined(__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__) && __ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ >= 101200
+	#include <os/lock.h>
+	typedef os_unfair_lock pthread_spinlock_t;
+#else
+	#include <libkern/OSAtomic.h>
+	typedef OSSpinLock pthread_spinlock_t;
+#endif /* macOS 10.12 or newer */
+
 #include <errno.h>
 
-typedef OSSpinLock pthread_spinlock_t;
 
 int pthread_spin_lock(pthread_spinlock_t *lock);
 int pthread_spin_trylock(pthread_spinlock_t *lock);

@@ -127,9 +127,9 @@ static int time_changed(libtrace_packet_t *packet,
 	if (tv1.tv_sec != tv2.tv_sec || 
 		tv1.tv_usec - tv2.tv_usec > 1 ||
 		tv2.tv_usec - tv1.tv_usec > 1) { 
-		printf("Timestamps differ: %u.%u vs %u.%u\n",
-				tv1.tv_sec, tv1.tv_usec, 
-				tv2.tv_sec, tv2.tv_usec);
+		printf("Timestamps differ: %ju.%ju vs %ju.%ju\n",
+				(uintmax_t) tv1.tv_sec, (uintmax_t) tv1.tv_usec,
+				(uintmax_t) tv2.tv_sec, (uintmax_t) tv2.tv_usec);
 
 		return 1;
 	}
@@ -176,6 +176,11 @@ int main(int argc, char *argv[]) {
 	libtrace_packet_t *packet,*packet2;
 	const char *trace1name;
 	const char *trace2name;
+
+	if (argc < 3) {
+		fprintf(stderr, "Missing traces as arguments\n");
+		return -1;
+	}
 
 	trace = trace_create(lookup_uri(argv[1]));
 	iferr(trace);

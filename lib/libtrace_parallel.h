@@ -561,11 +561,12 @@ typedef void (*fn_cb_result)(libtrace_t *libtrace, libtrace_thread_t *sender,
  * any messages with a type >= MESSAGE_USER.
  *
  * @param libtrace The parallel trace.
- * @param t The thread.
+ * @param t The current thread.
  * @param global The global storage.
  * @param tls The thread local storage.
  * @param mesg The code identifying the message type.
  * @param data The data associated with the message.
+ * @param sender The sender of the message.
  *
  */
 typedef void (*fn_cb_usermessage) (libtrace_t *libtrace, libtrace_thread_t *t,
@@ -958,7 +959,7 @@ DLLEXPORT int trace_set_reporter_thold(libtrace_t *trace, size_t thold);
 
 /**
  * Enable or disable debug output for parallel libtrace.
-
+ *
  * If enabled, libtrace will print a line to standard error for every
  * state change observed by both the trace as a whole and by each thread.
  *
@@ -970,6 +971,36 @@ DLLEXPORT int trace_set_reporter_thold(libtrace_t *trace, size_t thold);
  *
  */
 DLLEXPORT int trace_set_debug_state(libtrace_t *trace, bool debug_state);
+
+/**
+ * Bind per-packet threads affinities to specified CPU cores
+ *
+ * A comma ',' (or colon ':') separated list of cores to bind per-packet
+ * threads to. The first per-packet thread is bound to the first core supplied.
+ *
+ * e.g.:
+ * * 0,1 Map the 1st thread to core 0, and the second to core 1
+ * * 0:1 As above with a colon separator
+ * * 4,5,6,7 Map the 1st thread to core 4, ..., the 4th thread to core 7
+ *   (e.g. use a second socket)
+ * * 1,3,5,7 Map to odd cores (e.g. avoid hyper-threads)
+ *
+ * If there are more threads than supplied in the coremap, default behaviour
+ * from the format is silently applied. If there are more mappings than
+ * threads, the extra ones are silently ignored.
+ *
+ * The default behaviour varies depending on the format. Some formats will
+ * leave threads to run on any core, while others bind each thread to
+ * a CPU core.
+ *
+ * @param trace A parallel input trace
+ * @param value The coremap; a comma-separated list of cores
+ * @return 0 if successful otherwise -1.
+ *
+ * @note when using with trace_set_configuration() you need to put the coremap
+ * in square brackets.
+ */
+DLLEXPORT int trace_set_coremap(libtrace_t *trace, const char *coremap);
 
 /** Set the hasher function for a parallel trace.
  *
@@ -1283,6 +1314,22 @@ DLLEXPORT int trace_get_first_packet(libtrace_t *libtrace,
  */
 DLLEXPORT void libtrace_make_packet_safe(libtrace_packet_t *pkt);
 
+/** Makes a packet safe to hold for a indefinite amount of time, if you do not
+ * return a packet immediately from your per packet handler. This ensures
+ * you have a packet which will not be reused by the format until released
+ * with trace_fin_packet().
+ *
+ * @param[in,out] pkt The packet to hold
+ *
+ * Depending on the format and the number of packets you are currently holding,
+ * this function might be able to hold the packet without additional work.
+ * Otherwise, this function will have to copy the packet buffer.
+ *
+ * @note: The packet will not survive pausing or stopping a trace, use
+ *        libtrace_make_packet_safe() for that purpose.
+ */
+DLLEXPORT void libtrace_hold_packet(libtrace_packet_t *pkt);
+
 /** Makes a result safe, preventing the result from becoming invalid after
  * pausing a trace.
  *
@@ -1345,7 +1392,10 @@ DLLEXPORT void trace_decrement_packet_refcount(libtrace_packet_t *packet);
 DLLEXPORT libtrace_info_t *trace_get_information(libtrace_t * libtrace);
 
 /** Sets the configuration of a trace based upon a comma separated list of
- * key value pairs.
+ * key=value pairs.
+ *
+ * Values which contain a comma, equals sign, or colon (i.e. coremap)
+ * must be enclosed in square brackets.
  *
  * @param trace A parallel trace which is not running or destroyed.
  * @param str A comma separated list of key=value pairs:
@@ -1360,20 +1410,22 @@ DLLEXPORT libtrace_info_t *trace_get_information(libtrace_t * libtrace);
  * * \b burst_size,\b bs see trace_set_burst_size() [size_t]
  * * \b tick_interval,\b ti see trace_set_tick_interval() [size_t]
  * * \b tick_count,\b tc see trace_set_tick_count() [size_t]
- * * \b perpkt_threads,\b pt see trace_set_perpkt_threads() [XXX TBA XXX]
+ * * \b perpkt_threads,\b pt see trace_set_perpkt_threads() [int]
  * * \b hasher_queue_size,\b hqs see trace_set_hasher_queue_size() [size_t]
  * * \b hasher_polling,\b hp see trace_set_hasher_polling() [bool]
  * * \b reporter_polling,\b rp see trace_set_reporter_polling() [bool]
  * * \b reporter_thold,\b rt see trace_set_reporter_thold() [size_t]
  * * \b debug_state,\b ds see trace_set_debug_state() [bool]
+ * * \b coremap see trace_set_coremap() [string of comma-separated integers]
+ *   e.g. coremap=[1,3,5,7] (square brackets required)
  *
  * Booleans can be set as 0/1 or false/true.
  *
- * @note a environment variable interface is provided by default to users via
+ * @note an environment variable interface is provided by default to users via
  * LIBTRACE_CONF, see Parallel Configuration for more information.
  *
  * @note This interface is provided to allow a user to quickly configure an
- * application using a single API call. A nicer programatic method for
+ * application using a single API call. A nicer programmatic method for
  * configuration would be to use the appropriate trace_set_*() function for
  * each option.
  */

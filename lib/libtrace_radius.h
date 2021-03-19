@@ -55,6 +55,7 @@ typedef enum {
     LIBTRACE_RADIUS_COA_NAK = 45,
     LIBTRACE_RADIUS_RESERVED = 255
 } PACKED libtrace_radius_code;
+ct_assert(sizeof(libtrace_radius_code) == 1);
 
 /** Enumeration of Attribute Value Pair types (incomplete) */
 typedef enum {
@@ -105,6 +106,7 @@ typedef enum {
     LIBTRACE_RADIUS_ACCT_INPUT_PACKETS = 47,
     LIBTRACE_RADIUS_ACCT_OUTPUT_PACKETS = 48
 } PACKED libtrace_radius_avp_type;
+ct_assert(sizeof(libtrace_radius_avp_type) == 1);
 
 /** Structure representing a RADIUS AVP */
 typedef struct libtrace_radius_avp {
@@ -115,6 +117,7 @@ typedef struct libtrace_radius_avp {
     /** The first byte of the value of the AVP */
     char data;
 } PACKED libtrace_radius_avp_t;
+ct_assert(sizeof(libtrace_radius_avp_t) == 3);
 
 /** A RADIUS message header */
 typedef struct libtrace_radius {
@@ -129,6 +132,7 @@ typedef struct libtrace_radius {
     /** Used to encrypt passwords and validate replies */
     uint64_t authenticator[2];
 } PACKED libtrace_radius_t;
+ct_assert(sizeof(libtrace_radius_t) == 20);
 
 /** Returns a pointer to the start of the RADIUS message header, if there
  *  is potentially one inside the given packet.

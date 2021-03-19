@@ -73,6 +73,22 @@ extern "C" {
 #endif
 #endif
 
+#if defined(__GNUC__) && !defined(__clang__) && !defined(__INTEL_COMPILER)
+# define HAVE_GCC_COMPILER 1
+#else
+# define HAVE_GCC_COMPILER 0
+#endif
+
+#if HAVE_GCC_COMPILER
+# define LT_IGNORE_STRING_OVERFLOW \
+	_Pragma ("GCC diagnostic push") \
+	_Pragma ("GCC diagnostic ignored \"-Wstringop-overflow\"")
+# define LT_PRAGMA_POP \
+	_Pragma ("GCC diagnostic pop")
+#else
+# define LT_IGNORE_STRING_OVERFLOW
+# define LT_PRAGMA_POP
+#endif
 
 #include "rt_protocol.h"
 
@@ -130,6 +146,15 @@ int snprintf(char *str, size_t size, const char *format, ...);
 # endif 
 #endif
 
+#if !HAVE_DECL_POSIX_MEMALIGN
+#include <errno.h>
+static inline int posix_memalign(void **memptr, size_t alignment, size_t size)
+{
+	fprintf(stderr, "No posix_memalign\n");
+	return ENOMEM;
+}
+#endif
+
 #include "daglegacy.h"
 	
 #ifdef HAVE_DAG_API
@@ -162,6 +187,8 @@ int snprintf(char *str, size_t size, const char *format, ...);
 //#define RP_BUFSIZE 65536U
 
 #define LIBTRACE_MAX_REPLAY_SPEEDUP 1000
+
+#define MAX_THREADS 128
 
 /** Data about the most recent event from a trace file */
 struct libtrace_event_status_t {
@@ -225,7 +252,7 @@ struct libtrace_thread_t {
 	int perpkt_num; // A number from 0-X that represents this perpkt threads number
 				// in the table, intended to quickly identify this thread
 				// -1 represents NA (such as the case this is not a perpkt thread)
-} ALIGN_STRUCT(CACHE_LINE_SIZE);
+} ALIGNED(CACHE_LINE_SIZE);
 
 /**
  * Storage to note time value against each.
@@ -293,8 +320,13 @@ struct user_configuration {
 	bool reporter_polling;
 	size_t reporter_thold;
 	bool debug_state;
+	int coremap[MAX_THREADS];
 };
-#define ZERO_USER_CONFIG(config) memset(&config, 0, sizeof(struct user_configuration));
+#define ZERO_USER_CONFIG(config) {\
+	memset(&config, 0, sizeof(struct user_configuration));\
+	for (int i = 0; i < MAX_THREADS; i++)\
+		config.coremap[i] = -1;\
+}
 
 struct callback_set {
 
@@ -391,7 +423,7 @@ struct libtrace_t {
 	libtrace_stat_t *stats;
 	struct user_configuration config;
 	libtrace_combine_t combiner;
-	
+
         /* Set of callbacks to be executed by per packet threads in response
          * to various messages. */
         struct callback_set *perpkt_cbs;
@@ -452,6 +484,22 @@ void trace_set_err_out(libtrace_out_t *trace, int errcode, const char *msg,...)
  */
 void trace_clear_cache(libtrace_packet_t *packet);
 
+/**
+ * An internal version of trace_set_configuration that can parse the
+ * settings from the start of a libtrace uri.
+ *
+ * If format is supplied, str is a uri, and format returns the
+ * start of the uri portion.
+ * Otherwise str is a pure list of options.
+ *
+ * @param trace [in] the trace
+ * @param str [in] the configuration as a string
+ * @param format [out] the beginning of the URI
+ * @return 0 if successful, otherwise -1 if an error occurs
+ *
+ * @see trace_set_configuration
+ */
+int _trace_set_configuration(libtrace_t *trace, const char *str, const char **format);
 
 #ifndef PF_RULESET_NAME_SIZE
 #define PF_RULESET_NAME_SIZE 16
@@ -464,7 +512,7 @@ void trace_clear_cache(libtrace_packet_t *packet);
 
 /** A local definition of a PFLOG header */
 typedef struct libtrace_pflog_header_t {
-	uint8_t	   length;	
+	uint8_t	   length;
 	sa_family_t   af;
 	uint8_t	   action;
 	uint8_t	   reason;
@@ -475,6 +523,8 @@ typedef struct libtrace_pflog_header_t {
 	uint8_t	   dir;
 	uint8_t	   pad[3];
 } PACKED libtrace_pflog_header_t;
+/* Warning: The size of sa_family_t and hence libtrace_pflog_header_t varies
+ * between BSD and Linux */
 
 /** A libtrace capture format module */
 /* All functions should return -1, or NULL on failure */
@@ -628,6 +678,26 @@ struct libtrace_format_t {
 	 * @param The packet to be finalised
 	 * 	 */
 	void (*fin_packet)(libtrace_packet_t *packet);
+
+        /** Request a format for permission to hold onto this packet for
+	 * an indefinite amount of time until trace_fin_packet() is called.
+	 *
+	 * - A format should only allow a packet to be held if it wont
+	 *   stop it receiving more packets.
+	 * - This is only an option for traces with indirect pointers to
+	 *   packet buffers. Ring buffers which hold directly packets
+	 *   will block and can simply omit this function.
+	 * - A format needs to track the number of packets outstanding
+	 *   so it can decide whether or not it has enough packet buffers
+	 *   remaining.
+	 *
+	 * Note: The packet is still invalid when a trace is paused or
+	 *       stopped.
+	 *
+         * @param The packet to hold
+         * @return 0 if the packet can be held, otherwise -1.
+         */
+        int (*can_hold_packet)(libtrace_packet_t *packet);
 
 	/** Write a libtrace packet to an output trace.
 	 *
@@ -1269,6 +1339,13 @@ typedef struct libtrace_pcapfile_pkt_hdr_t {
 	uint32_t wirelen;	/* The wire length of the packet */
 } libtrace_pcapfile_pkt_hdr_t;
 
+/** Local definition of a PCAP header */
+typedef struct libtrace_pcap_pkthdr_t {
+	struct timeval ts; /* Timestamp */
+	uint32_t caplen;   /* Capture length */
+	uint32_t wirelen;      /* Wire length */
+} libtrace_pcap_pkthdr_t;
+
 #ifdef HAVE_DAG
 /** Constructor for the DAG format module */
 void dag_constructor(void);
@@ -1316,6 +1393,9 @@ void dpdkndag_constructor(void);
 #if HAVE_LIBBPF
 /** Constructor for AF_XDP format module */
 void linux_xdp_constructor(void);
+#endif
+#if HAVE_PFRING
+void pfring_constructor(void);
 #endif
 
 /** Extracts the RadioTap flags from a wireless link header

@@ -114,6 +114,16 @@
 #define rte_mempool_in_use_count rte_mempool_free_count
 #endif
 
+/* v16.11-rc1
+ *
+ * rte_eal_dev_attach
+ * Removed in 18.11 and replaced with rte_dev_probe
+ *
+ */
+#if RTE_VERSION >= RTE_VERSION_NUM(16, 11, 0, 1) && RTE_VERSION < RTE_VERSION_NUM(18, 11, 0, 1)
+#define USE_DEV_ATTACH
+#endif
+
 /* 17.05-rc1 deprecated, 17.08 removed
  * rte_set_log_level -> rte_log_set_global_level
  */
@@ -175,6 +185,15 @@ typedef uint8_t portid_t;
         #define ETH_SPEED_NUM_10G ETH_LINK_SPEED_10G
         #define ETH_SPEED_NUM_20G ETH_LINK_SPEED_20G
         #define ETH_SPEED_NUM_40G ETH_LINK_SPEED_40G
+#endif
+
+/* 20.11 renames master, slave to main and worker
+ * Use new names as standard
+ *
+ */
+#ifndef RTE_LCORE_FOREACH_WORKER
+#define RTE_LCORE_FOREACH_WORKER RTE_LCORE_FOREACH_SLAVE
+#define rte_get_main_lcore rte_get_master_lcore
 #endif
 
 /* https://github.com/DPDK/dpdk/commit/35b2d13 19.08-rc1
@@ -298,7 +317,7 @@ struct dpdk_per_stream_t
         uint64_t ts_first_sys; /* Sytem timestamp of the first packet in nanoseconds */
         uint32_t wrap_count; /* Number of times the NIC clock has wrapped around completely */
 #endif
-} ALIGN_STRUCT(CACHE_LINE_SIZE);
+} ALIGNED(CACHE_LINE_SIZE);
 
 #if HAS_HW_TIMESTAMPS_82580
 #define DPDK_EMPTY_STREAM {-1, 0, NULL, -1, 0, 0}
