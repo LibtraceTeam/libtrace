@@ -110,7 +110,7 @@ jobs:
     - name: Run do-tests-datastruct.sh
       run: cd libtrace/test; ./do-tests-datastruct.sh
     - name: Run do-live-tests.sh
-      run: cd libtrace/test; sudo ./do-live-tests.sh pcap int ring
+      run: cd libtrace/test; sudo ./do-live-tests.sh pcap int ring dpdk
   run-tests-macos:
     name: Run Tests - MacOS Catalina 10.15
     runs-on: macos-10.15
