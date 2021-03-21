@@ -4,6 +4,7 @@ on: [push, pull_request]
 jobs:
   clang-format:
     name: Clang Format
+    if: "github.event_name == 'pull_request'"
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
