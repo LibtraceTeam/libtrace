@@ -39,7 +39,8 @@ jobs:
     - name: Setup Hugepages
       run: |
         echo "1024" | sudo tee -a /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
-        sudo mount -t hugelbfs nodev /mnt/huge
+        sudo mkdir /mnt/huge
+        sudo mount -t hugelbfs pagesize=1GB /mnt/huge
         sudo mount
     - name: Install Dependencies
       run: |
