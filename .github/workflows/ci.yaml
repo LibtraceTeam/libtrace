@@ -36,6 +36,11 @@ jobs:
         CC: ${{ matrix.c_compiler }}
         CXX: ${{ matrix.cxx_compiler }}
       run: echo CC = $CC, CXX = $CXX 
+    - name: Setup Hugepages
+      run: |
+        echo "1024" | sudo tee -a /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
+        sudo mount -t hugelbfs nodev /mnt/huge
+        sudo mount
     - name: Install Dependencies
       run: |
         sudo apt update
