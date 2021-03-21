@@ -27,3 +27,5 @@ jobs:
       run: sudo apt-get -y install meson flex bison libpcap0.8-dev libtool pkgconf wget m4 autoconf automake gcc
     - name: Build DPDK
       run: cd libtrace/test; sudo ./do-test-build-dpdk.sh
+    - name: Run DPDK tests
+      run: cd libtrace/test; sudo ./do-test-build-dpdk-live.sh
