@@ -1,3 +1,24 @@
+libtrace4 (4.0.16-1) unstable; urgency=medium
+
+  * Add support for PF_RING.
+  * Add ability to prepend input configuration options to a libtrace URI.
+  * Add new API function: trace_hold_packet() to allow users to safely
+    retain a reference to a packet for later use.
+  * Add new API function: trace_set_coremap() to bind per-packet threads to
+    specific CPU cores.
+  * Fixed bad packet header structure layouts for ATM headers and 802.1q
+    headers.
+  * Fixed various bugs in the XDP capture format.
+  * DAG transmit functionality should now work correctly.
+  * tracertstats will now process trace files at full speed rather than
+    try to replicate the original trace timing.
+  * XDP will now try to perform packet hashing on the NIC.
+  * Improved receive speed for Linux native capture formats.
+  * Add ability to run a libtrace program against multiple DPDK inputs.
+  * Add support for Mellanox DPDK libraries.
+
+ -- Shane Alcock <shane.alcock@waikato.ac.nz>  Wed, 17 Mar 2021 11:31:29 +1300
+
 libtrace4 (4.0.15-1) unstable; urgency=medium
 
   * Fix bug where reading pcapng trace files would produce endless
