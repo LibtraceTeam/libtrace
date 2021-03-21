@@ -737,20 +737,11 @@ if test "$want_dpdk" != no; then
 	# libtool leaves them be.
 	# Hence the ugly sed hack, TODO find something nicer.
 	#
-	# 3) The package-cfg for Ubuntu 20.02 (DPDK 19.11) is wrong for dynamic
-	# libraries and is missing important libraries like rte_bus_pci,
-	# without which we cannot load PCI devices.
-	# So we always use pkg-config --static here, even for dynamic linking.
-	# Note the nicer PKG_CHECK_MODULES_STATIC macro doesn't exist in older
-	# distributions.
 	#
         if test "$dpdk_found" = 0 -a n"$RTE_SDK" = n""; then
                 PKG_PROG_PKG_CONFIG
-                pkg_config_old="$PKG_CONFIG"
-                PKG_CONFIG="$PKG_CONFIG --static"
                 PKG_CHECK_MODULES([DPDK], [libdpdk >= 18], [pkgconf_dpdk_found="yes"],
                                   [pkgconf_dpdk_found="no"])
-                PKG_CONFIG="$pkg_config_old"
         fi
         # DPDK has been using pkgconf (user-defined or system path)
         if test "$dpdk_found" = 0 -a "x$pkgconf_dpdk_found" = "xyes"; then
