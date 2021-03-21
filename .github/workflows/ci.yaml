@@ -40,7 +40,7 @@ jobs:
       run: |
         echo "1024" | sudo tee -a /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
         sudo mkdir /mnt/huge
-        sudo mount -t hugelbfs pagesize=1GB /mnt/huge
+        sudo mount -t hugetlbfs pagesize=1GB /mnt/huge
         sudo mount
     - name: Install Dependencies
       run: |
