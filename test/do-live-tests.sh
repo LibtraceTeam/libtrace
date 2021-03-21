@@ -1,11 +1,9 @@
 #!/bin/bash
 
 OK=0
-UNSUPPORTED=""
 FAIL=""
 
 PARALLEL_OK=0
-PARALLEL_UNSUPPORTED=""
 PARALLEL_FAIL=""
 
 do_test() {
@@ -13,9 +11,6 @@ do_test() {
 	rc=$?
         if [[ rc -eq 0 ]]; then
 		OK=$(( OK + 1 ))
-        elif [[ rc -eq 1 ]]; then
-		UNSUPPORTED="$UNSUPPORTED
-$*"
         else
 		FAIL="$FAIL
 $*"
@@ -83,16 +78,41 @@ do
 		echo
 		echo ./test-live-snaplen "$w" "$r"
 		do_test ./test-live-snaplen "$w" "$r"
+		echo
+                echo ./test-live-snaplen2 -w "$w" -r "$r"
+                do_test ./test-live-snaplen2 -w "$w" -r "$r"
 	done
 done
 for w in "${dag_formats[@]}"
 do
 	echo
-	echo ./test-live "$w" "$w"
-	do_test ./test-live "$w" "$w"
-	echo
-	echo ./test-live-snaplen "$w" "$w"
-	do_test ./test-live "$w" "$w"
+        echo ./test-live-dag -r "$w"
+        ./test-live-dag -r "$w" &
+        read_pid=$!
+	sleep 2
+        echo
+        echo ./test-live-dag -w "$w"
+        ./test-live-dag -w "$w" &
+        write_pid=$!
+        wait $write_pid
+	wait $read_pid
+        echo
+
+	sleep 2
+
+        echo
+        echo ./test-live-dag-snaplen -r "$w"
+        ./test-live-dag-snaplen -r "$w" &
+        read_pid=$!
+	# allow time to start
+	sleep 2
+        echo
+        echo ./test-live-dag-snaplen -w "$w"
+        ./test-live-dag-snaplen -w "$w" &
+        write_pid=$!
+        wait $write_pid
+	wait $read_pid
+        echo
 done
 
 echo
@@ -120,11 +140,7 @@ do_parallel_test() {
 	rc=$?
 	if [[ rc -eq 0 ]]; then
 		PARALLEL_OK=$(( PARALLEL_OK + 1 ))
-	elif [[ rc -eq 1 ]]; then
-		PARALLEL_UNSUPPORTED="$PARALLEL_UNSUPPORTED
-$*"
 	else
-
 		PARALLEL_FAIL="$PARALLEL_FAIL
 $*"
 	fi
@@ -145,25 +161,16 @@ do
 	do_parallel_test ./test-format-parallel-singlethreaded-hasher "$r" "int:veth1"
 
 done
-for r in "${dag_formats[@]}"
-do
-	do_parallel_test ./test-format-parallel "$r" "$r"
-	do_parallel_test ./test-format-parallel-hasher "$r" "$r"
-	do_parallel_test ./test-format-parallel-singlethreaded "$r" "$r"
-        do_parallel_test ./test-format-parallel-singlethreaded-hasher "$r" "$r"
-done
 
 echo
 echo "Single threaded API tests passed: $OK"
-echo "Single threaded API tests unsupported: $UNSUPPORTED"
 echo "Single threaded API tests failed: $FAIL"
 echo
 echo "Parallel API tests passed: $PARALLEL_OK"
-echo "Parallel API tests unsupported: $PARALLEL_UNSUPPORTED"
 echo "Parallel API tests failed: $PARALLEL_FAIL"
 
 
-if [ -z "$FAIL" ] && [ -z "$PARALLEL_FAIL" ]
+if [[ -z "$FAIL" ]]
 then
         exit 0
 else

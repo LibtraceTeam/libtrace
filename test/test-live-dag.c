@@ -277,6 +277,14 @@ static void iferr(libtrace_t *trace)
         exit(-err.err_num);
 }
 
+static void signal_handler(int signal)
+{
+        if (signal == SIGALRM) {
+                fprintf(stderr, "!!!Failed due to Timeout!!!\n");
+                exit(-1);
+        }
+}
+
 int main(int argc, char *argv[])
 {
 	libtrace_out_t *trace_write = NULL;
@@ -298,51 +306,42 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	fprintf(stderr, "write %s, read %s\n", write, read);
-
-	if (write == NULL && read == NULL) {
-		printf("arg error\n");
-		exit(1);
-	}
+	signal(SIGALRM, signal_handler);
+        // Timeout after 5 seconds
+        alarm(5);
 
 	if (write) {
 		trace_write = trace_create_output(write);
-	        iferr_out(trace_write);
-		trace_start_output(trace_write);
 	        iferr_out(trace_write);
 	}
 
 	if (read) {
 		trace_read = trace_create(read);
                 iferr(trace_read);
-		trace_start(trace_read);
-                iferr(trace_read);
 	}
 
 	if (write) {
+		trace_start_output(trace_write);
+                iferr_out(trace_write);
 		packet = trace_create_packet();
 		// Write out test_size (100) almost identical packets
 		for (i = 0; i < test_size; i++) {
 			build_packet(i);
 			trace_construct_packet(packet, TRACE_TYPE_ETH, buffer, sizeof(buffer));
-			for (int i = 0; i < 20; i++) {
-        		        fprintf(stderr, "%02x ", ((uint8_t *)(packet->payload))[i]);
-        		}
-        		fprintf(stderr, "\n");
 			if (trace_write_packet(trace_write, packet) == -1) {
 				iferr_out(trace_write);
 			}
 		}
 		trace_destroy_packet(packet);
-		printf("Sent %d packets\n", test_size);
 		trace_destroy_output(trace_write);
-		fprintf(stderr, "write done\n");
 	}
 
 
 	// Now read back in, we assume that buffers internally can buffer
 	// the packets without losing them
 	if (read) {
+		trace_start(trace_read);
+                iferr(trace_read);
 		packet = trace_create_packet();
 		reading = 1;
 		for (i = 0; i < test_size; i++) {
@@ -356,10 +355,8 @@ int main(int argc, char *argv[])
 			err |= verify_packet(packet, i);
 		}
 		err |= verify_counters(trace_read);
-		fprintf(stderr, "Read %d packets\n", test_size);
 		trace_destroy_packet(packet);
 		trace_destroy(trace_read);
-		fprintf(stderr, "read done\n");
 	}
 
 	return err;
