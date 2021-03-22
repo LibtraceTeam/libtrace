@@ -23,6 +23,15 @@ jobs:
   build-dpdk:
     name: Build DPDK
     runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        include:
+          - dpdk_version: dpdk-16.11.11
+          - dpdk_version: dpdk-17.11.10
+          - dpdk_version: dpdk-18.11.10
+          - dpdk_version: dpdk-19.11.5
+          - dpdk_version: dpdk-20.02
+          - dpdk_version: dpdk-20.11
     steps:
     - uses: actions/checkout@v2
       with:
@@ -33,6 +42,6 @@ jobs:
         sudo apt-get -y install meson ninja build-essential python3-pyelftoolsflex bison
         sudo apt-get -y install libpcap0.8-dev libtool pkgconf wget m4 autoconf automake gcc libnuma-dev
     - name: Build DPDK
-      run: cd libtrace/test; sudo ./do-test-build-dpdk.sh
+      run: cd libtrace/test; sudo ./do-test-build-dpdk.sh ${{ matrix.dpdk_version }}
     - name: Run DPDK tests
       run: cd libtrace/test; sudo ./do-test-build-dpdk-live.sh

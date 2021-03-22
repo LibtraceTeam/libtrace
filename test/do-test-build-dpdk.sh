@@ -107,6 +107,19 @@ declare -a dpdk_versions=(
 	"dpdk-20.11.tar.gz"
 	)
 
+while [[ $# -gt 0 ]]; do
+	dpdk_versions=()
+        key="$1"
+        case $key in
+        dpdk-16.11.11|dpdk-17.11.10|dpdk-18.11.10|dpdk-19.11.5|dpdk-20.02|dpdk-20.11)
+		dpdk_versions+=("$key.tar.gz")
+		;;
+	*)
+                echo "Unknown version: $key"
+        esac
+        shift
+done
+
 mkdir "$DOWNLOAD_DIR" > /dev/null 2>&1
 if [ ! -d "$DOWNLOAD_DIR" ]; then
 	echo "ERROR: Could not create download directory"
