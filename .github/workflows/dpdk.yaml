@@ -18,6 +18,7 @@ on:
     - 'lib/format_dpdkndag.c'
     - 'test/do-test-build-dpdk.sh'
     - 'test/do-test-build-dpdk-live.sh'
+  workflow_dispatch
 jobs:
   build-dpdk:
     name: Build DPDK
