@@ -25,16 +25,16 @@ jobs:
   build-dpdk:
     name: Build DPDK
     runs-on: ${{ matrix.os }}
+    continue-on-error: true
     strategy:
       matrix:
-        os: [ubuntu-20.04]
+        os: [ubuntu-20.04, ubuntu-18.04]
         include:
-#          - dpdk_version: dpdk-16.11.11
-#          - dpdk_version: dpdk-17.11.10
-#          - dpdk_version: dpdk-18.11.10
-#          - dpdk_version: dpdk-19.11.5
-#          - dpdk_version: dpdk-20.02
-          - dpdk_version: dpdk-20.11
+          - os: ubuntu-20.04
+            dpdk_version: dpdk-20.11
+            dpdk_version: dpdk-20.02
+          - os: ubuntu-18.04
+            dpdk_version: dpdk-20.11
     steps:
     - uses: actions/checkout@v2
       with:
