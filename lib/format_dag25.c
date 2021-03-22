@@ -1262,6 +1262,7 @@ static int libtrace_to_dag_hdr(libtrace_out_t *libtrace, libtrace_packet_t *pack
     if (!find_compatible_linktype(libtrace,packet))
         return -1;
 
+    erf->ts = trace_get_erf_timestamp(packet);
     /* Fill in the packet size, it may have changed after demotion */
     if (packet->type == TRACE_RT_DATA_ERF) {
         *framinglen = trace_get_framing_length(packet);

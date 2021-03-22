@@ -26,10 +26,11 @@ do_test_dag() {
         timeout 30 "$1" "-r" "$2" &
         read_pid=$!
 
+	# give time for DAG to start
         sleep 2
 
         echo "$1" -w "$3"
-        timeout 30 "$1" -w "$3" &
+        timeout 30 "$1" "-w" "$3" &
 	write_pid=$!
 
 	wait $write_pid

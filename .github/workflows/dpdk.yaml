@@ -29,7 +29,9 @@ jobs:
         path: libtrace
         submodules: recursive
     - name: Install Dependencies
-      run: sudo apt-get -y install meson flex bison libpcap0.8-dev libtool pkgconf wget m4 autoconf automake gcc libnuma-dev
+      run: |
+        sudo apt-get -y install meson ninja build-essential python3-pyelftoolsflex bison
+        sudo apt-get -y install libpcap0.8-dev libtool pkgconf wget m4 autoconf automake gcc libnuma-dev
     - name: Build DPDK
       run: cd libtrace/test; sudo ./do-test-build-dpdk.sh
     - name: Run DPDK tests
