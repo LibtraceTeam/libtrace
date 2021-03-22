@@ -9,6 +9,7 @@ on:
     - 'lib/format_dpdkndag.c'
     - 'test/do-test-build-dpdk.sh'
     - 'test/do-test-build-dpdk-live.sh'
+    - '.github/workflows/dpdk.yaml'
   pull_request:
     paths:
     - 'configure.in'
@@ -18,6 +19,7 @@ on:
     - 'lib/format_dpdkndag.c'
     - 'test/do-test-build-dpdk.sh'
     - 'test/do-test-build-dpdk-live.sh'
+    - '.github/workflows/dpdk.yaml'
   workflow_dispatch:
 jobs:
   build-dpdk:
