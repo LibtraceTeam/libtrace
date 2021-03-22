@@ -10,6 +10,7 @@ on:
     - 'test/do-test-build-dpdk.sh'
     - 'test/do-test-build-dpdk-live.sh'
     - '.github/workflows/dpdk.yaml'
+    - 'test/Makefile'
   pull_request:
     paths:
     - 'configure.in'
@@ -20,6 +21,7 @@ on:
     - 'test/do-test-build-dpdk.sh'
     - 'test/do-test-build-dpdk-live.sh'
     - '.github/workflows/dpdk.yaml'
+    - 'test/Makefile'
   workflow_dispatch:
 jobs:
   build-dpdk:
@@ -30,11 +32,11 @@ jobs:
       matrix:
         os: [ubuntu-20.04, ubuntu-18.04, ubuntu-16.04]
         dpdk_version: [dpdk-20.11, dpdk-20.02, dpdk-19.11.5, dpdk-18.11.10, dpdk-17.11.10, dpdk-16.11.11]
-        exclude:
-          - os: ubuntu-18.04
-            dpdk_version: dpdk-20.11
-          - os: ubuntu-16.04
-            dpdk_version: dpdk-20.11
+#        exclude:
+#          - os: ubuntu-18.04
+#            dpdk_version: dpdk-20.11
+#          - os: ubuntu-16.04
+#            dpdk_version: dpdk-20.11
     steps:
     - uses: actions/checkout@v2
       with:
@@ -51,8 +53,9 @@ jobs:
         sudo mount
     - name: Install dependencies
       run: |
-        sudo apt-get -y install meson ninja-build build-essential python3-pyelftools flex bison
+        sudo apt-get -y install build-essential python3-pyelftools flex bison python3-pip
         sudo apt-get -y install libpcap0.8-dev libtool pkgconf wget m4 autoconf automake gcc libnuma-dev
+        sudo pip3 install meson ninja
     - name: Install wandio
       run: |
         cd libtrace/wandio
