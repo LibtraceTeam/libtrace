@@ -29,7 +29,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-20.04, ubuntu-18.04, ubuntu-16.04]
-        dpdk_version: [dpdk-20.11, dpdk-20.02, dpdk-18.02.1]
+        dpdk_version: [dpdk-20.11, dpdk-20.02]
         exclude:
           - os: ubuntu-18.04
             dpdk_version: dpdk-20.11
@@ -42,11 +42,11 @@ jobs:
         submodules: recursive
     - name: Install Dependencies
       run: |
-        sudo apt-get -y install meson build-essential python3-pyelftools flex bison
+        sudo apt-get -y install meson ninja-build build-essential python3-pyelftools flex bison
         sudo apt-get -y install libpcap0.8-dev libtool pkgconf wget m4 autoconf automake gcc libnuma-dev
-    - name: Build DPDK ${{ matrix.dpdk_version }}
+    - name: Build ${{ matrix.dpdk_version }}
       run: cd libtrace/test; sudo ./do-test-build-dpdk.sh ${{ matrix.dpdk_version }}
-    - name: Build Tests ${{ matrix.dpdk_version }}
+    - name: Build tests ${{ matrix.dpdk_version }}
       run: cd libtrace/test; make dpdk DPDK_BUILD=DPDK_builds/${{ matrix.dpdk_version }}
-    - name: Run DPDK tests ${{ matrix.dpdk_version }}
+    - name: Run tests ${{ matrix.dpdk_version }}
       run: cd libtrace/test; sudo ./do-test-build-dpdk-live.sh
