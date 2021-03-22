@@ -40,7 +40,16 @@ jobs:
       with:
         path: libtrace
         submodules: recursive
-    - name: Install Dependencies
+    - name: Setup hugepages
+      run: |
+        echo "1024" | sudo tee -a /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
+        echo "4" | sudo tee -a /sys/kernel/mm/hugepages/hugepages-1048576kB/nr_hugepages
+        sudo mkdir /dev/hugepages1G
+        sudo mkdir /dev/hugepages2M
+        sudo mount -t hugetlbfs -o pagesize=1GB none /dev/hugepages1G
+        sudo mount -t hugetlbfs -o pagesize=2M none /dev/hugepages2M
+        sudo mount
+    - name: Install dependencies
       run: |
         sudo apt-get -y install meson ninja-build build-essential python3-pyelftools flex bison
         sudo apt-get -y install libpcap0.8-dev libtool pkgconf wget m4 autoconf automake gcc libnuma-dev
