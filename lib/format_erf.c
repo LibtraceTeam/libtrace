@@ -864,7 +864,17 @@ libtrace_direction_t erf_set_direction(libtrace_packet_t *packet, libtrace_direc
         if (packet->header == NULL) {
                 return TRACE_DIR_UNKNOWN;
         }
-	erfptr->flags.iface = direction;
+
+	switch (direction) {
+		case TRACE_DIR_OUTGOING:
+		case TRACE_DIR_INCOMING:
+		case TRACE_DIR_OTHER:
+			erfptr->flags.iface = direction;
+			break;
+		default:
+			return TRACE_DIR_UNKNOWN;
+	}
+
 	return erfptr->flags.iface;
 }
 
