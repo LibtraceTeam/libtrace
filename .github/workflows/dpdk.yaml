@@ -53,7 +53,7 @@ jobs:
         sudo mount
     - name: Install dependencies
       run: |
-        sudo apt-get -y install build-essential python3-pyelftools flex bison python3-pip
+        sudo apt-get -y install build-essential python3-pyelftools flex bison python3-pip python3-setuptools
         sudo apt-get -y install libpcap0.8-dev libtool pkgconf wget m4 autoconf automake gcc libnuma-dev
         sudo pip3 install meson ninja
     - name: Install wandio
