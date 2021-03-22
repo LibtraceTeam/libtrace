@@ -44,6 +44,14 @@ jobs:
       run: |
         sudo apt-get -y install meson ninja-build build-essential python3-pyelftools flex bison
         sudo apt-get -y install libpcap0.8-dev libtool pkgconf wget m4 autoconf automake gcc libnuma-dev
+    - name: Install wandio
+      run: |
+        cd libtrace/wandio
+        ./bootstrap.sh
+        ./configure
+        make
+        sudo make install
+        sudo ldconfig
     - name: Build ${{ matrix.dpdk_version }}
       run: cd libtrace/test; sudo ./do-test-build-dpdk.sh ${{ matrix.dpdk_version }}
     - name: Build tests ${{ matrix.dpdk_version }}
