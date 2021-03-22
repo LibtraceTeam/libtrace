@@ -153,7 +153,7 @@ do
 	# Prefer building with make if available otherwise use meson
 	if [ -e ./GNUmakefile ]; then
 		echo "	Building using Make"
-		do_test make V=1 config T=x86_64-native-linuxapp-gcc O=x86_64-native-linuxapp-gcc
+		do_test make config T=x86_64-native-linuxapp-gcc O=x86_64-native-linuxapp-gcc
 		DPDK_CONFIG=./x86_64-native-linuxapp-gcc/.config
 		if [ -f "$DPDK_CONFIG" ]; then
 			echo "CONFIG_RTE_BUILD_COMBINE_LIBS=y" >> "$DPDK_CONFIG"
@@ -161,7 +161,7 @@ do
 			echo "CONFIG_RTE_KNI_KMOD=n" >> "$DPDK_CONFIG"
 			echo "CONFIG_RTE_LIBRTE_PMD_PCAP=y" >> "$DPDK_CONFIG"
 			echo "CONFIG_RTE_EAL_IGB_UIO=n" >> "$DPDK_CONFIG"
-			do_test make install V=1 T=x86_64-native-linuxapp-gcc \
+			do_test make install T=x86_64-native-linuxapp-gcc \
 					     EXTRA_CFLAGS="-fPIC -w -ggdb" -j $BUILD_THREADS
 			ret=$?
 		else
@@ -170,9 +170,9 @@ do
 	else
 		echo "	Building using meson"
 		mkdir install
-		if CFLAGS="-ggdb3 -w" do_test meson --verbose --prefix=$(pwd)/install build ; then
+		if CFLAGS="-ggdb3 -w" do_test meson --prefix=$(pwd)/install build ; then
 			cd ./build
-			CFLAGS="-ggdb3 -w" do_test meson install --verbose
+			CFLAGS="-ggdb3 -w" do_test meson install
 			ret=$?
 			cd ..
 		else
