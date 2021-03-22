@@ -7,6 +7,7 @@ PARALLEL_OK=0
 PARALLEL_FAIL=""
 
 do_test() {
+	echo $@
 	$@
 	rc=$?
         if [[ rc -eq 0 ]]; then
@@ -15,6 +16,38 @@ do_test() {
 		FAIL="$FAIL
 $*"
 	fi
+
+	echo
+}
+
+do_test_dag() {
+	# $1 = application, $2 = read_uri, $3 = write_uri
+        echo "$1" -r "$2"
+        timeout 30 "$1" "-r" "$2" &
+        read_pid=$!
+
+        sleep 2
+
+        echo "$1" -w "$3"
+        timeout 30 "$1" -w "$3" &
+	write_pid=$!
+
+	wait $write_pid
+	wc=$?
+
+        wait $read_pid
+	rc=$?
+
+	if [[ rc -eq 0 && wc -eq 0 ]]
+	then
+                OK=$(( OK + 1 ))
+        else
+                FAIL="$FAIL
+$*"
+        fi
+
+	echo
+        sleep 2
 }
 
 if [[ -z "$GOT_NETNS" ]]; then
@@ -72,52 +105,18 @@ for w in "${write_formats[@]}"
 do
 	for r in "${read_formats[@]}"
 	do
-		echo
-		echo ./test-live "$w" "$r"
 		do_test ./test-live "$w" "$r"
-		echo
-		echo ./test-live-snaplen "$w" "$r"
 		do_test ./test-live-snaplen "$w" "$r"
-		echo
-                echo ./test-live-snaplen2 -w "$w" -r "$r"
-                do_test ./test-live-snaplen2 -w "$w" -r "$r"
 	done
 done
 for w in "${dag_formats[@]}"
 do
-	echo
-        echo ./test-live-dag -r "$w"
-        ./test-live-dag -r "$w" &
-        read_pid=$!
-	sleep 2
-        echo
-        echo ./test-live-dag -w "$w"
-        ./test-live-dag -w "$w" &
-        write_pid=$!
-        wait $write_pid
-	wait $read_pid
-        echo
-
-	sleep 2
-
-        echo
-        echo ./test-live-dag-snaplen -r "$w"
-        ./test-live-dag-snaplen -r "$w" &
-        read_pid=$!
-	# allow time to start
-	sleep 2
-        echo
-        echo ./test-live-dag-snaplen -w "$w"
-        ./test-live-dag-snaplen -w "$w" &
-        write_pid=$!
-        wait $write_pid
-	wait $read_pid
-        echo
+	do_test_dag ./test-live-dag "$w" "$w"
+	do_test_dag ./test-live-dag-snaplen "$w" "$w"
 done
 
 echo
 echo "Single threaded API tests passed: $OK"
-echo "Single threaded API tests unsupported: $UNSUPPORTED"
 echo "Single threaded API tests failed: $FAIL"
 echo
 
@@ -125,9 +124,10 @@ echo
 echo "Running parallel API tests"
 echo
 do_parallel_test() {
+	#params $1 = application, $2 = read_uri, $3 = write_uri, $4 = additional args
 	echo
-	echo "$1" "$2"
-	timeout 30 "$1" "$2" &
+	echo "$1" "$4" "-r" "$2"
+	timeout 30 "$1" "$4" "-r" "$2" &
 	my_pid=$!
 	sleep 2  # Ensure we've had time to setup, particularly dpdk
 	if ! ./test-live "$3"; then
@@ -144,6 +144,7 @@ do_parallel_test() {
 		PARALLEL_FAIL="$PARALLEL_FAIL
 $*"
 	fi
+	sleep 2
 }
 
 for r in "${read_formats[@]}"
@@ -162,6 +163,15 @@ do
 
 done
 
+for r in "${dag_formats[@]}"
+do
+	#do_parallel_test ./test-format-parallel "$r" "dag:/dev/dag16,0" "-p"
+	#do_parallel_test ./test-format-parallel-hasher "$r" "dag:/dev/dag16,0" "-p"
+	# TODO fix test-format-parallel-reporter for live input
+        # do_parallel_test ./test-format-parallel-reporter "$r" "dag:/dev/dag16,0" "-p"
+	do_parallel_test ./test-format-parallel-singlethreaded "$r" "dag:/dev/dag16,0" "-p"
+	do_parallel_test ./test-format-parallel-singlethreaded-hasher "$r" "dag:/dev/dag16,0" "-p"
+done
 echo
 echo "Single threaded API tests passed: $OK"
 echo "Single threaded API tests failed: $FAIL"

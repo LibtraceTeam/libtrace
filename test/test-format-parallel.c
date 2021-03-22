@@ -289,18 +289,27 @@ int main(int argc, char *argv[]) {
         libtrace_callback_set_t *reporter = NULL;
         uint32_t global = 0xabcdef;
         struct sigaction sigact;
+	bool pause = 1;
+	int opt;
+	char *read = NULL;
+
+	while ((opt = getopt(argc, argv, "pr:")) != -1) {
+                switch (opt) {
+                        case 'p':
+                                pause = 0;
+                                break;
+			case 'r':
+				read = optarg;
+				break;
+                }
+        }
 
         sigact.sa_handler = stop;
         sigemptyset(&sigact.sa_mask);
         sigact.sa_flags = SA_RESTART;
         sigaction(SIGINT, &sigact, NULL);
 
-	if (argc<2) {
-		fprintf(stderr,"usage: %s type\n",argv[0]);
-		return 1;
-	}
-
-	tracename = lookup_uri(argv[1]);
+	tracename = lookup_uri(read);
 
 	trace = trace_create(tracename);
 	iferr(trace,tracename);
@@ -319,17 +328,18 @@ int main(int argc, char *argv[]) {
         trace_set_stopping_cb(reporter, report_end);
         trace_set_result_cb(reporter, report_cb);
 
-
         trace_set_perpkt_threads(trace, 4);
 
 	trace_pstart(trace, &global, processing, reporter);
 	iferr(trace,tracename);
 
 	/* Make sure traces survive a pause */
-	trace_ppause(trace);
-	iferr(trace,tracename);
-	trace_pstart(trace, NULL, NULL, NULL);
-	iferr(trace,tracename);
+	if (pause) {
+		trace_ppause(trace);
+		iferr(trace,tracename);
+		trace_pstart(trace, NULL, NULL, NULL);
+		iferr(trace,tracename);
+	}
 
 	/* Wait for all threads to stop */
 	trace_join(trace);
