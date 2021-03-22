@@ -2,7 +2,6 @@
 # Checks that versions of the DPDK library compile successfully
 # Ensure that all DPDK requirements are installed on the system
 
-
 echo
 echo "Note the system package of DPDK sometimes might take priority"
 echo "over these static builds. The resulting error looks like this:"
