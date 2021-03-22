@@ -7,6 +7,8 @@ on:
     - 'lib/format_dpdk.h'
     - 'lib/dpdk_libtrace.mk'
     - 'lib/format_dpdkndag.c'
+    - 'test/do-test-build-dpdk.sh'
+    - 'test/do-test-build-dpdk-live.sh'
   pull_request:
     paths:
     - 'configure.in'
@@ -14,6 +16,8 @@ on:
     - 'lib/format_dpdk.h'
     - 'lib/dpdk_libtrace.mk'
     - 'lib/format_dpdkndag.c'
+    - 'test/do-test-build-dpdk.sh'
+    - 'test/do-test-build-dpdk-live.sh'
 jobs:
   build-dpdk:
     name: Build DPDK
