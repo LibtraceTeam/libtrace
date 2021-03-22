@@ -75,7 +75,7 @@ jobs:
         cd DAG5.8.3-BIN-Ubuntu18.04/ubuntu18.04
         sudo apt-get -y install ./dag-dev_5.8.3_amd64.deb ./dag-base_5.8.3_amd64.deb ./libntar_1.1.0_amd64.deb
         sudo dagload -n 1
-	sudo dagconfig -d16 rxstreams=4
+        sudo dagconfig -d16 rxstreams=4
     - name: Checkout Libbpf
       uses: actions/checkout@v2
       with:
