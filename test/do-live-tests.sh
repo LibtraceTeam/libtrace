@@ -168,7 +168,7 @@ do
 	do_parallel_test ./test-format-parallel "$r" "dag:/dev/dag16,0" "-p"
 	do_parallel_test ./test-format-parallel-hasher "$r" "dag:/dev/dag16,0" "-p"
 	# TODO fix test-format-parallel-reporter for live input
-        # do_parallel_test ./test-format-parallel-reporter "$r" "dag:/dev/dag16,0" "-p"
+        #do_parallel_test ./test-format-parallel-reporter "$r" "dag:/dev/dag16,0" "-p"
 	do_parallel_test ./test-format-parallel-singlethreaded "$r" "dag:/dev/dag16,0" "-p"
 	do_parallel_test ./test-format-parallel-singlethreaded-hasher "$r" "dag:/dev/dag16,0" "-p"
 done

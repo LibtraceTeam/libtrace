@@ -223,7 +223,6 @@ static void stop_processing(libtrace_t *trace, libtrace_thread_t *t,
         seen_stop_message = true;
         storage->seen_stop_message = true;
 
-	fprintf(stderr, "%u count\n", storage->count);
         assert(storage->count == 25 || storage->count == 75);
 
 	trace_publish_result(trace, t, (uint64_t) 0, (libtrace_generic_t){.sint = storage->count}, RESULT_USER);

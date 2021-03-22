@@ -641,9 +641,7 @@ static int dag_config_input(libtrace_t *libtrace, trace_option_t option,
 		/* Live capture is always going to be realtime */
 		return -1;
 	case TRACE_OPTION_HASHER:
-		/* Lets just say we did this, it's currently still up to
-		 * the user to configure this correctly. */
-		return 0;
+		return -1;
         case TRACE_OPTION_CONSTANT_ERF_FRAMING:
                 return -1;
         case TRACE_OPTION_DISCARD_META:
@@ -949,18 +947,29 @@ static int dag_fin_output(libtrace_out_t *libtrace)
 	dag_flush_output(libtrace);
 
 	int out;
+	int last = 0;
 	/* Wait until the buffer is clear before exiting the program,
 	 * as we will lose packets otherwise */
 	while((out = dag_get_stream_buffer_level64(FORMAT_DATA_OUT->device->fd,
 	                                           FORMAT_DATA_OUT->dagstream))) {
 		/* Wait for dag to complete writing all data */
 
-		/* for some reason when writing to a vDAG dag_get_stream_buffer_level64
-		 * will return 8 even when no data remains?? not sure why this is.
-                 */
+		/* This is very unpredictable, Sometimes we get 0 returned, sometimes 8 when
+		 * using a vDAG and other time some random number, so if a identical value is
+		 * returned skip over this...
+		 */
+		if (last == out) {
+			break;
+		}
+
 		if (out == 8) {
 			break;
 		}
+
+		last = out;
+
+		/* give some time to write output */
+		usleep(500);
 	}
 
 	/* Need the lock, since we're going to be handling the device list */
