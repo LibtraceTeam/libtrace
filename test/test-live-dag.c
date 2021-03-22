@@ -81,6 +81,9 @@ static unsigned char buffer[] = {
 	0x00, 0x01, 0x02, 0x03, 0x04, 0x06, /* Src Mac */
 	0x01, 0x01, /* Ethertype = Experimental */
 	0xC1, 0xC2, 0xC3, 0xC4, 0xC5, 0xC6, /* payload */
+        0xC1, 0xC2, 0xC3, 0xC4, 0xC5, 0xC6, /* payload */
+	0xC1, 0xC2, 0xC3, 0xC4, 0xC5, 0xC6, /* payload */
+	0xC1, 0xC2, 0xC3, 0xC4, 0xC5, 0xC6, /* payload */
 };
 
 
@@ -168,12 +171,6 @@ static int verify_packet(libtrace_packet_t *packet, int seq_num)
 	libtrace_linktype_t linktype;
 	uint32_t remaining;
 	unsigned char* pktbuffer;
-
-	//fprintf(stderr, "wirelen %lu caplen %lu\n", trace_get_wire_length(packet), trace_get_capture_length(packet));
-	//for (int i = 0; i < 20; i++) {
-	//	fprintf(stderr, "%02x ", ((uint8_t *)(packet->payload))[i]);
-	//}
-	//fprintf(stderr, "\n");
 
 	// Verify wirelen - Wirelen includes checksum of 4 bytes
 	if (trace_get_wire_length(packet) != sizeof(buffer) + 4) {

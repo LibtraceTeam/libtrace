@@ -112,7 +112,6 @@ done
 for w in "${dag_formats[@]}"
 do
 	do_test_dag ./test-live-dag "$w" "$w"
-	do_test_dag ./test-live-dag-snaplen "$w" "$w"
 done
 
 echo
