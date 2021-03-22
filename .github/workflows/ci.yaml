@@ -39,8 +39,11 @@ jobs:
     - name: Setup Hugepages
       run: |
         echo "1024" | sudo tee -a /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
-        sudo mkdir /mnt/huge
-        sudo mount -t hugetlbfs pagesize=1GB /mnt/huge
+        echo "4" | sudo tee -a /sys/kernel/mm/hugepages/hugepages-1048576kB/nr_hugepages
+        sudo mkdir /dev/hugepages1G
+        sudo mkdir /dev/hugepages2M
+        sudo mount -t hugetlbfs -o pagesize=1GB none /dev/hugepages1G
+        sudo mount -t hugetlbfs -o pagesize=2M none /dev/hugepages2M
         sudo mount
     - name: Install Dependencies
       run: |
@@ -117,7 +120,7 @@ jobs:
     - name: Run do-tests-datastruct.sh
       run: cd libtrace/test; ./do-tests-datastruct.sh
     - name: Run do-live-tests.sh
-      run: cd libtrace/test; sudo ./do-live-tests.sh pcap int ring dag
+      run: cd libtrace/test; sudo ./do-live-tests.sh pcap int ring dag dpdk
   run-tests-macos:
     name: Run Tests - MacOS Catalina 10.15
     runs-on: macos-10.15
