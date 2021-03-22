@@ -48,6 +48,6 @@ jobs:
     - name: Build DPDK ${{ matrix.dpdk_version }}
       run: cd libtrace/test; sudo ./do-test-build-dpdk.sh ${{ matrix.dpdk_version }}
     - name: Build Tests ${{ matrix.dpdk_version }}
-      run; cd libtrace/test; make
+      run: cd libtrace/test; make
     - name: Run DPDK tests ${{ matrix.dpdk_version }}
       run: cd libtrace/test; sudo ./do-test-build-dpdk-live.sh
