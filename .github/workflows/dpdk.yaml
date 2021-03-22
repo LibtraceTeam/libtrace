@@ -23,19 +23,19 @@ on:
   workflow_dispatch:
 jobs:
   build-dpdk:
-    name: Build DPDK ${{ matrix.dpdk_version }}
+    name: Build ${{ matrix.dpdk_version }} ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     continue-on-error: true
     strategy:
       matrix:
-        os: [ubuntu-20.04, ubuntu-18.04]
+        os: [ubuntu-20.04, ubuntu-18.04, ubuntu-16.04]
         include:
           - os: ubuntu-20.04
-            dpdk_version: dpdk-20.11
-          - os: ubuntu-20.04
-            dpdk_version: dpdk-20.02
+            dpdk_version: [dpdk-20.02, dpdk-20.11]
           - os: ubuntu-18.04
-            dpdk_version: dpdk-20.02
+            dpdk_version: [dpdk-20.02]
+          - os: ubuntu-16.04
+            dpdk_version: [dpdk-18.02.1]
     steps:
     - uses: actions/checkout@v2
       with:
