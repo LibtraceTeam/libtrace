@@ -45,7 +45,7 @@ echo \* Read tsh
 do_test ./test-format-parallel -r tsh
 
 echo \* Read rawerf
-do_test ./test-format-parallel -r rawerf 
+do_test ./test-format-parallel -r rawerf
 
 echo \* Read pcapng
 do_test ./test-format-parallel -r pcapng
@@ -60,10 +60,10 @@ echo \* Read testing single-threaded hasher datapath
 do_test ./test-format-parallel-singlethreaded-hasher -r erf
 
 echo \* Read stress testing with 100 threads
-do_test ./test-format-parallel-stressthreads erf
+do_test ./test-format-parallel-stressthreads -r erf
 
 echo \* Read testing reporter thread
-do_test ./test-format-parallel-reporter erf
+do_test ./test-format-parallel-reporter -r erf
 
 echo \* Testing Trace-Time Playback
 do_test ./test-tracetime-parallel
