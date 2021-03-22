@@ -1,6 +1,7 @@
 
 RM=rm
 PREFIX=../
+DPDK_BUILD=
 
 INCLUDE = -I$(PREFIX)/lib -I$(PREFIX)/libpacketdump
 CFLAGS = -Wall -Wimplicit -Wformat -W -pedantic -pipe -g -O2 -std=gnu99 -pthread \
@@ -39,5 +40,9 @@ install:
 
 address-san: CFLAGS+= -fsanitize=undefined,leak,address -fno-omit-frame-pointer -ggdb3
 address-san: all
+
+dpdk: LDLIBS+= -L$(DPDK_BUILD)/libs
+dpdk: INCLUDE+= -I$(DPDK_BUILD)/include
+dpdk: all
 
 # vim: noet ts=8 sw=8
