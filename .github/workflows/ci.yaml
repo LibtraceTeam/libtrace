@@ -112,7 +112,7 @@ jobs:
         make
         sudo make install
     - name: Build Tests
-      run: cd libtrace/test; make address-san
+      run: cd libtrace/test; make
     - name: Run do-tests.sh
       run: cd libtrace/test; ./do-tests.sh
     - name: Run do-tests-parallel.sh
