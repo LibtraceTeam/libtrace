@@ -8,7 +8,6 @@ LIBTRACE_DIR="$TEST_DIR"/../
 DOWNLOAD_DIR="$TEST_DIR"/DPDK_source
 BUILD_DIR="$TEST_DIR"/DPDK_builds
 
-
 cd "$BUILD_DIR"
 for dpdk_build in $(ls -d */)
 do
