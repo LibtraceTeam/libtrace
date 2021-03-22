@@ -29,7 +29,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-20.04, ubuntu-18.04, ubuntu-16.04]
-        dpdk_version: [dpdk-20.11, dpdk-20.02]
+        dpdk_version: [dpdk-20.11, dpdk-20.02, dpdk-19.11.5, dpdk-18.11.10, dpdk-17.11.10, dpdk-16.11.11]
         exclude:
           - os: ubuntu-18.04
             dpdk_version: dpdk-20.11
