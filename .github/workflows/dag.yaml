@@ -1,0 +1,90 @@
+name: DAG tests
+on:
+  push:
+  pull_request:
+    paths:
+    - 'configure.in'
+    - 'lib/format_dag25.c'
+    - 'lib/format_dag24.c'
+    - 'lib/erftypes.h'
+    - 'lib/format_erf.c'
+    - 'lib/format_erf.h'
+    - 'configure.in'
+    - '.github/workflows/dpdk.yaml'
+jobs:
+  run-tests-ubuntu:
+    name: DAG tests ${{ matrix.os }} ${{ matrix.c_compiler }},${{ matrix.cxx_compiler }}
+    runs-on: ${{ matrix.os }}
+    environment: test
+    strategy:
+      matrix:
+        os: [ubuntu-20.04, ubuntu-18.04]
+        c_compiler: [gcc, clang]
+        cxx_compiler: [g++, clang++]
+        exclude:
+          - c_compiler: gcc
+            cxx_compiler: clang++
+          - c_compiler: clang
+            cxx_compiler: g++
+    steps:
+    - name: Setup Enviroment Variables
+      env:
+        CC: ${{ matrix.c_compiler }}
+        CXX: ${{ matrix.cxx_compiler }}
+      run: echo CC = $CC, CXX = $CXX 
+    - name: Install Dependencies
+      run: |
+        sudo apt update
+        sudo apt-get -y install flex bison libpcap0.8-dev libtool pkgconf autoconf automake m4 gcc clang llvm gcc-multilib
+        sudo apt-get -y install build-essential git
+    - name: Checkout DAG kernel module/packages
+      uses: actions/checkout@v2
+      with:
+        path: dag-packages
+        repository: wanduow/dag-packages
+        ssh-key: ${{ secrets.DAG_PACKAGES }}
+    - name: Build DAG kernel module
+      run: |
+        cd dag-packages/kernel-module
+        sudo make KSRC=/lib/modules/$(uname -r)/build
+        sudo make install KSRC=/lib/modules/$(uname -r)/build
+    - name: Install DAG packages
+      run: |
+        sudo apt-get -y install libhwloc-dev
+        cd dag-packages
+        sudo apt-key add DAG5.8.3-BIN-Ubuntu18.04/ENDACE_GPG_KEY
+        sudo apt-get -y install ./dag-extras/libhwloc5_1.11.9-1_amd64.deb
+        cd DAG5.8.3-BIN-Ubuntu18.04/ubuntu18.04
+        sudo apt-get -y install ./dag-dev_5.8.3_amd64.deb ./dag-base_5.8.3_amd64.deb ./libntar_1.1.0_amd64.deb
+        sudo dagload -n 1
+        sudo dagconfig -d16 rxstreams=4
+    - name: Checkout Libtrace
+      uses: actions/checkout@v2
+      with:
+        path: libtrace
+        submodules: recursive
+    - name: Build/Install Wandio
+      run: |
+        cd libtrace/wandio
+        ./bootstrap.sh
+        ./configure
+        make
+        sudo make install
+        sudo ldconfig
+    - name: Build/Install Libtrace
+      run: |
+        cd libtrace
+        ./bootstrap.sh
+        ./configure CFLAGS="-I$(pwd)/../libbpf/include/uapi" --with-dag
+        make
+        sudo make install
+    - name: Build Tests
+      run: cd libtrace/test; make
+    - name: Run do-tests.sh
+      run: cd libtrace/test; ./do-tests.sh
+    - name: Run do-tests-parallel.sh
+      run: cd libtrace/test; ./do-tests-parallel.sh
+    - name: Run do-tests-datastruct.sh
+      run: cd libtrace/test; ./do-tests-datastruct.sh
+    - name: Run do-live-tests.sh
+      run: cd libtrace/test; sudo ./do-live-tests.sh dag

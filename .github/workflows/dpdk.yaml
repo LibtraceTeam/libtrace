@@ -1,16 +1,6 @@
 name: DPDK Build
 on:
   push:
-    paths:
-    - 'configure.in'
-    - 'lib/format_dpdk.c'
-    - 'lib/format_dpdk.h'
-    - 'lib/dpdk_libtrace.mk'
-    - 'lib/format_dpdkndag.c'
-    - 'test/do-test-build-dpdk.sh'
-    - 'test/do-test-build-dpdk-live.sh'
-    - '.github/workflows/dpdk.yaml'
-    - 'test/Makefile'
   pull_request:
     paths:
     - 'configure.in'

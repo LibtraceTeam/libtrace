@@ -1,11 +1,12 @@
 name: Libtrace tests
 
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
 jobs:
   run-tests-ubuntu:
     name: Run tests ${{ matrix.os }} ${{ matrix.c_compiler }},${{ matrix.cxx_compiler }}
     runs-on: ${{ matrix.os }}
-    environment: test
     strategy:
       matrix:
         os: [ubuntu-20.04, ubuntu-18.04]
@@ -45,27 +46,6 @@ jobs:
         sudo apt-get update
         sudo apt-get -y install pfring
         sudo ldconfig
-    - name: Checkout DAG kernel module/packages
-      uses: actions/checkout@v2
-      with:
-        path: dag-packages
-        repository: wanduow/dag-packages
-        ssh-key: ${{ secrets.DAG_PACKAGES }}
-    - name: Build DAG kernel module
-      run: |
-        cd dag-packages/kernel-module
-        sudo make KSRC=/lib/modules/$(uname -r)/build
-        sudo make install KSRC=/lib/modules/$(uname -r)/build
-    - name: Install DAG packages
-      run: |
-        sudo apt-get -y install libhwloc-dev
-        cd dag-packages
-        sudo apt-key add DAG5.8.3-BIN-Ubuntu18.04/ENDACE_GPG_KEY
-        sudo apt-get -y install ./dag-extras/libhwloc5_1.11.9-1_amd64.deb
-        cd DAG5.8.3-BIN-Ubuntu18.04/ubuntu18.04
-        sudo apt-get -y install ./dag-dev_5.8.3_amd64.deb ./dag-base_5.8.3_amd64.deb ./libntar_1.1.0_amd64.deb
-        sudo dagload -n 1
-        sudo dagconfig -d16 rxstreams=4
     - name: Checkout Libbpf
       uses: actions/checkout@v2
       with:
@@ -95,7 +75,7 @@ jobs:
       run: |
         cd libtrace
         ./bootstrap.sh
-        ./configure CFLAGS="-I$(pwd)/../libbpf/include/uapi" --with-dpdk --with-pfring --with-xdp --with-dag
+        ./configure CFLAGS="-I$(pwd)/../libbpf/include/uapi" --with-dpdk --with-pfring --with-xdp
         make
         sudo make install
     - name: Build Tests
@@ -107,7 +87,7 @@ jobs:
     - name: Run do-tests-datastruct.sh
       run: cd libtrace/test; ./do-tests-datastruct.sh
     - name: Run do-live-tests.sh
-      run: cd libtrace/test; sudo ./do-live-tests.sh pcap int ring dag dpdk
+      run: cd libtrace/test; sudo ./do-live-tests.sh pcap int ring dpdk
   run-tests-macos:
     name: Run tests ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
