@@ -110,9 +110,8 @@ jobs:
     - name: Build/Install Libtrace
       run: |
         cd libtrace
-        ls ../libbpf/include/uapi/linux
         ./bootstrap.sh
-        ./configure CFLAGS="-Ilibbpf/include/uapi" --with-dpdk --with-pfring --with-xdp --with-dag
+        ./configure CFLAGS="-I../libbpf/include/uapi" --with-dpdk --with-pfring --with-xdp --with-dag
         make
         sudo make install
     - name: Build Tests
