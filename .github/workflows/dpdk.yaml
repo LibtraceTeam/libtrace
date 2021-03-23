@@ -32,12 +32,12 @@ jobs:
       matrix:
         os: [ubuntu-20.04, ubuntu-18.04, ubuntu-16.04]
         dpdk_version: [dpdk-20.11, dpdk-20.02, dpdk-19.11.5, dpdk-18.11.10, dpdk-17.11.10, dpdk-16.11.11]
-        meson_pip: true
+        meson_pip: [true]
         exclude:
           # Meson requires Python 3.6.0 or greater, ubuntu-16.04 python3=3.5.2
           - os: ubuntu-16.04
             dpdk_version: dpdk-20.11
-            meson_pip: false
+            meson_pip: [false]
     steps:
     - name: Setup Enviroment Variables
       env:
