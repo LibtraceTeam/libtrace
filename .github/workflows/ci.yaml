@@ -22,9 +22,10 @@ jobs:
       run: git diff --exit-code
   run-tests-ubuntu:
     name: Run Tests - Ubuntu 20.04
-    runs-on: ubuntu-20.04
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
+        os: [ubuntu-20.04, ubuntu-18.04]
         include:
           - c_compiler: gcc
             cxx_compiler: g++
