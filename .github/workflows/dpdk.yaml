@@ -14,7 +14,16 @@ on:
     - 'test/Makefile'
   workflow_dispatch:
 jobs:
+  pre_job:
+    runs-on: ubuntu-latest
+    outputs:
+      should_skip: ${{ steps.skip_check.outputs.should_skip }}
+    steps:
+      - id: skip_check
+        uses: fkirc/skip-duplicate-actions@master
   build-dpdk:
+    needs: pre_job
+      if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
     name: Build ${{ matrix.dpdk_version }} ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
