@@ -949,10 +949,10 @@ static int dag_fin_output(libtrace_out_t *libtrace)
 	int out;
         int last = 0;
         /* Wait until the buffer is clear before exiting the program,
-	 * as we will lose packets otherwise */
-	while((out = dag_get_stream_buffer_level64(FORMAT_DATA_OUT->device->fd,
-	                                           FORMAT_DATA_OUT->dagstream))) {
-		/* Wait for dag to complete writing all data */
+         * as we will lose packets otherwise */
+        while ((out = dag_get_stream_buffer_level64(
+                    FORMAT_DATA_OUT->device->fd, FORMAT_DATA_OUT->dagstream))) {
+                /* Wait for dag to complete writing all data */
 
                 /* This is very unpredictable, Sometimes we get 0 returned,
                  * sometimes 8 when using a vDAG and other time some random
@@ -963,8 +963,8 @@ static int dag_fin_output(libtrace_out_t *libtrace)
                 }
 
                 if (out == 8) {
-			break;
-		}
+                        break;
+                }
 
                 last = out;
 
@@ -972,20 +972,20 @@ static int dag_fin_output(libtrace_out_t *libtrace)
                 usleep(500);
         }
 
-	/* Need the lock, since we're going to be handling the device list */
-	pthread_mutex_lock(&open_dag_mutex);
+        /* Need the lock, since we're going to be handling the device list */
+        pthread_mutex_lock(&open_dag_mutex);
 
-	/* Detach the stream if we are not paused */
-	if (FORMAT_DATA_OUT->stream_attached)
-		dag_pause_output(libtrace);
-	FORMAT_DATA_OUT->device->ref_count --;
+        /* Detach the stream if we are not paused */
+        if (FORMAT_DATA_OUT->stream_attached)
+                dag_pause_output(libtrace);
+        FORMAT_DATA_OUT->device->ref_count--;
 
-	/* Close the DAG device if there are no more references to it */
-	if (FORMAT_DATA_OUT->device->ref_count == 0)
-		dag_close_device(FORMAT_DATA_OUT->device);
-	free(libtrace->format_data);
-	pthread_mutex_unlock(&open_dag_mutex);
-	return 0; /* success */
+        /* Close the DAG device if there are no more references to it */
+        if (FORMAT_DATA_OUT->device->ref_count == 0)
+                dag_close_device(FORMAT_DATA_OUT->device);
+        free(libtrace->format_data);
+        pthread_mutex_unlock(&open_dag_mutex);
+        return 0; /* success */
 }
 
 #ifdef DAGIOC_CARD_DUCK

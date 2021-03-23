@@ -308,7 +308,7 @@ int main(int argc, char *argv[]) {
         tracename = lookup_uri(read);
 
         trace = trace_create(tracename);
-	iferr(trace,tracename);
+        iferr(trace, tracename);
 
         processing = trace_create_callback_set();
         trace_set_starting_cb(processing, start_processing);
@@ -339,7 +339,7 @@ int main(int argc, char *argv[]) {
         }
 
         /* Wait for all threads to stop */
-	trace_join(trace);
+        trace_join(trace);
 
         global = 0xffffffff;
 
