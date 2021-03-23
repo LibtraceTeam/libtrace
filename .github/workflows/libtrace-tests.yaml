@@ -5,6 +5,7 @@ jobs:
   run-tests-ubuntu:
     name: Run tests ${{ matrix.os }} ${{ matrix.c_compiler }},${{ matrix.cxx_compiler }}
     runs-on: ${{ matrix.os }}
+    environment: test
     strategy:
       matrix:
         os: [ubuntu-20.04, ubuntu-18.04]
