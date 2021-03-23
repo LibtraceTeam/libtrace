@@ -37,6 +37,8 @@ jobs:
           # Meson requires Python 3.6.0 or greater, ubuntu-16.04 python3=3.5.2
           - os: ubuntu-16.04
             dpdk_version: dpdk-20.11
+        include:
+          - os: ubuntu-16.04
             meson_pip: [false]
     steps:
     - name: Setup Enviroment Variables
