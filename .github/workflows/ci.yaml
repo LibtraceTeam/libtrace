@@ -26,11 +26,13 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-20.04, ubuntu-18.04]
-        include:
+        c_compiler: [gcc, clang]
+        cxx_compiler: [g++, clang++]
+        exclude:
           - c_compiler: gcc
-            cxx_compiler: g++
-          - c_compiler: clang
             cxx_compiler: clang++
+          - c_compiler: clang
+            cxx_compiler: g++
     steps:
     - name: Setup Enviroment Variables
       env:
@@ -111,7 +113,7 @@ jobs:
         ls libbpf
         cd libtrace
         ./bootstrap.sh
-        ./configure CFLAGS="-I../libbpf/include/uapi" --with-dpdk --with-pfring --with-xdp --with-dag
+        ./configure CFLAGS="-I/home/runner/work/libbpf/include/uapi" --with-dpdk --with-pfring --with-xdp --with-dag
         make
         sudo make install
     - name: Build Tests
