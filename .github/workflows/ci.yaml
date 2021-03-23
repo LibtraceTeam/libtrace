@@ -25,7 +25,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-20.04, ubuntu-18.04]
+        os: [ubuntu-20.04]
         c_compiler: [gcc, clang]
         cxx_compiler: [g++, clang++]
         exclude:
@@ -111,7 +111,7 @@ jobs:
       run: |
         cd libtrace
         ./bootstrap.sh
-        ./configure CFLAGS="-I../libbpf/include/uapi" --with-dpdk --with-pfring --with-xdp --with-dag
+        ./configure --with-dpdk --with-pfring --with-xdp --with-dag
         make
         sudo make install
     - name: Build Tests
