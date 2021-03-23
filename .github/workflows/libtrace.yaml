@@ -10,6 +10,8 @@ jobs:
     steps:
       - id: skip_check
         uses: fkirc/skip-duplicate-actions@master
+        with:
+          concurrent_skipping: 'same_content'
   run-tests-ubuntu:
     needs: pre_job
     if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
