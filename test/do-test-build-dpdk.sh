@@ -175,7 +175,8 @@ do
 			echo "CONFIG_RTE_LIBRTE_PMD_PCAP=y" >> "$DPDK_CONFIG"
 			echo "CONFIG_RTE_EAL_IGB_UIO=n" >> "$DPDK_CONFIG"
 			do_test make install T=x86_64-native-linuxapp-gcc \
-					     EXTRA_CFLAGS="-fPIC -w -ggdb" -j $BUILD_THREADS
+					     EXTRA_CFLAGS="-fPIC -w -ggdb" -j $BUILD_THREADS \
+					     > build_stdout.txt 2> build_stderr.txt
 			ret=$?
 		else
 			ret=1
@@ -183,9 +184,10 @@ do
 	else
 		echo "	Building using meson"
 		mkdir install
-		if CFLAGS="-ggdb3 -w" do_test meson --prefix=$(pwd)/install build ; then
+		if CFLAGS="-ggdb3 -w" do_test meson --prefix=$(pwd)/install build \
+				> build_stdout.txt 2> build_stderr.txt ; then
 			cd ./build
-			CFLAGS="-ggdb3 -w" do_test meson install
+			CFLAGS="-ggdb3 -w" do_test meson install > ../build_stdout.txt 2> ../build_stderr.txt
 			ret=$?
 			cd ..
 		else
@@ -233,9 +235,10 @@ do
 		echo "	ERROR: Could not create libtrace build directory $dpdk_build"
 		continue
 	fi
-	./bootstrap.sh
+	./bootstrap.sh > /dev/null 2> /dev/null
 	ERROR_MSG="Building libtrace against $dpdk_build"
-	do_test ./configure --with-dpdk --prefix="$OUTPUT_PREFIX" CFLAGS="-ggdb"
+	do_test ./configure --with-dpdk --prefix="$OUTPUT_PREFIX" CFLAGS="-ggdb" \
+		> "$OUTPUT_PREFIX"/conf_out.txt 2> "$OUTPUT_PREFIX"/conf_err.txt
 	if [ $? -ne 0 ]; then
 		LIBTRACE_FAILED="$LIBTRACE_FAILED
 ./configure for libtrace failed against $dpdk_build
@@ -244,22 +247,24 @@ do
 		continue
 	fi
 	echo -n "	"
-	#do_test grep "configure: Compiled with DPDK live capture support: Yes" \
-	#             "$OUTPUT_PREFIX"/conf_out.txt
-	#if [ $? -ne 0 ]; then
-	#	LIBTRACE_FAILED="$LIBTRACE_FAILED
-#./configure for libtrace did not detect dpdk $dpdk_build
-	#check ${OUTPUT_PREFIX}conf_err.txt"
-	#	continue
-	#fi
-	do_test make -j $BUILD_THREADS
+	do_test grep "configure: Compiled with DPDK live capture support: Yes" \
+	             "$OUTPUT_PREFIX"/conf_out.txt
+	if [ $? -ne 0 ]; then
+		LIBTRACE_FAILED="$LIBTRACE_FAILED
+./configure for libtrace did not detect dpdk $dpdk_build
+	check ${OUTPUT_PREFIX}conf_err.txt"
+		continue
+	fi
+	do_test make -j $BUILD_THREADS \
+		> "$OUTPUT_PREFIX"/make_out.txt 2> "$OUTPUT_PREFIX"/make_err.txt
 	if [ $? -ne 0 ]; then
 		LIBTRACE_FAILED="$LIBTRACE_FAILED
 $dpdk_build Building libtrace failed (make)
 	check ${OUTPUT_PREFIX}make_err.txt"
 		continue
 	fi
-	do_test make install
+	do_test make install \
+		> "$OUTPUT_PREFIX"/install_out.txt 2> "$OUTPUT_PREFIX"/install_err.txt
 	if [ $? -ne 0 ]; then
 		LIBTRACE_FAILED="$LIBTRACE_FAILED
 $dpdk_build Installing libtrace failed (make install)
