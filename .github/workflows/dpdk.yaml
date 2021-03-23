@@ -42,6 +42,7 @@ jobs:
     - name: Setup Enviroment Variables
       env:
         MESON_PIP: ${{ matrix.meson_pip }}
+      run: echo MESON_PIP = $MESON_PIP
     - uses: actions/checkout@v2
       with:
         path: libtrace
