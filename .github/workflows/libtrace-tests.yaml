@@ -1,6 +1,6 @@
 name: Libtrace tests
 
-on: [push]
+on: [push, pull_request]
 jobs:
   run-tests-ubuntu:
     name: Run tests ${{ matrix.os }} ${{ matrix.c_compiler }},${{ matrix.cxx_compiler }}
