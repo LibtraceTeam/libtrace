@@ -109,7 +109,8 @@ jobs:
         sudo ldconfig
     - name: Build/Install Libtrace
       run: |
-        ls libbpf/include/uapi
+        ls libbpf/include/uapi/linux
+        echo "22"
         ls libbpf
         cat /home/runner/work/libbpf/include/uapi/linux/if_xdp.h
         cd libtrace
