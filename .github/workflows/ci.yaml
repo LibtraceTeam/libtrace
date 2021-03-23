@@ -107,6 +107,8 @@ jobs:
         sudo ldconfig
     - name: Build/Install Libtrace
       run: |
+        ls libbpf/include/uapi
+        ls libbpf
         cd libtrace
         ./bootstrap.sh
         ./configure --with-dpdk --with-pfring --with-xdp --with-dag CFLAGS="-I../libbpf/include/uapi"
