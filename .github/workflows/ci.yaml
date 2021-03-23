@@ -62,21 +62,21 @@ jobs:
         sudo apt-get update
         sudo apt-get -y install pfring
         sudo ldconfig
-    - name: Checkout DAG
+    - name: Checkout DAG kernel module/packages
       uses: actions/checkout@v2
       with:
-        path: dag
-        repository: jacobvw/dag
-        ssh-key: ${{ secrets.DAG_JACOBVW }}
-    - name: Build DAG Kernel Module
+        path: dag-packages
+        repository: wanduow/dag-packages
+        ssh-key: ${{ secrets.DAG_PACKAGES }}
+    - name: Build DAG kernel module
       run: |
-        cd dag/kernel-module
+        cd dag-packages/kernel-module
         sudo make KSRC=/lib/modules/$(uname -r)/build
         sudo make install KSRC=/lib/modules/$(uname -r)/build
-    - name: Install DAG Packages
+    - name: Install DAG packages
       run: |
         sudo apt-get -y install libhwloc-dev
-        cd dag
+        cd dag-packages
         sudo apt-key add DAG5.8.3-BIN-Ubuntu18.04/ENDACE_GPG_KEY
         sudo apt-get -y install ./dag-extras/libhwloc5_1.11.9-1_amd64.deb
         cd DAG5.8.3-BIN-Ubuntu18.04/ubuntu18.04
