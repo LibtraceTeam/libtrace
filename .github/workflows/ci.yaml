@@ -25,7 +25,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-20.04, ubuntu-18.04]
+        os: [ubuntu-20.04, ubuntu-18.04, ubuntu-16.04]
         c_compiler: [gcc, clang]
         cxx_compiler: [g++, clang++]
         exclude:
@@ -126,8 +126,11 @@ jobs:
     - name: Run do-live-tests.sh
       run: cd libtrace/test; sudo ./do-live-tests.sh pcap int ring dag dpdk
   run-tests-macos:
-    name: Run Tests - MacOS Catalina 10.15
-    runs-on: macos-10.15
+    name: Run tests ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-10.15]
     steps:
     - uses: actions/checkout@v2
       with:
