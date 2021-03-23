@@ -1,25 +1,7 @@
-name: CI
+name: Libtrace tests
 
-on: [push, pull_request]
+on: [push]
 jobs:
-  clang-format:
-    name: Clang Format
-    if: "github.event_name == 'pull_request'"
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2
-    - name: Install clang-format
-      run: sudo apt-get install clang-format
-    - name: Download git-clang-format
-      run: wget https://raw.githubusercontent.com/llvm-mirror/clang/master/tools/clang-format/git-clang-format
-    - name: Install git-clang-format
-      run: sudo install -t /bin git-clang-format
-    - name: Fetch origin ${{ github.base_ref }}
-      run: git fetch --no-tags --prune --depth=1 origin ${{ github.base_ref }}
-    - name: clang-format
-      run: git clang-format origin/${{ github.base_ref }}
-    - name: diff
-      run: git diff --exit-code
   run-tests-ubuntu:
     name: Run tests ${{ matrix.os }} ${{ matrix.c_compiler }},${{ matrix.cxx_compiler }}
     runs-on: ${{ matrix.os }}
