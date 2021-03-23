@@ -21,7 +21,7 @@ jobs:
         uses: fkirc/skip-duplicate-actions@master
   run-tests-ubuntu:
     needs: pre_job
-      if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
     name: DAG tests ${{ matrix.os }} ${{ matrix.c_compiler }},${{ matrix.cxx_compiler }}
     runs-on: ${{ matrix.os }}
     environment: test

@@ -23,7 +23,7 @@ jobs:
         uses: fkirc/skip-duplicate-actions@master
   build-dpdk:
     needs: pre_job
-      if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
     name: Build ${{ matrix.dpdk_version }} ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
