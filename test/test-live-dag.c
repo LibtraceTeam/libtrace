@@ -3,10 +3,10 @@
  *
  * Copyright (c) 2007 The University of Waikato, Hamilton, New Zealand.
  * Authors: Richard Sanger
- *          
+ *
  * All rights reserved.
  *
- * This code has been developed by the University of Waikato WAND 
+ * This code has been developed by the University of Waikato WAND
  * research group. For further information please see http://www.wand.net.nz/
  *
  * libtrace is free software; you can redistribute it and/or modify
@@ -26,7 +26,6 @@
  * $Id$
  *
  */
-
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -50,21 +49,20 @@
 #include "dagformat.h"
 #include "libtrace.h"
 
+#define ONCE(run_me)                                                           \
+        {                                                                      \
+                static int hit = 0;                                            \
+                if (!hit) {                                                    \
+                        run_me                                                 \
+                }                                                              \
+                hit = 1;                                                       \
+        }
 
-#define ONCE(run_me) { \
-	static int hit = 0; \
-	if (!hit) { \
-		run_me \
-	} \
-	hit = 1; \
-}
-
-#define ERROR(mesg, ...) { \
-	ONCE( \
-		err = 1; \
-		fprintf(stderr, "%s[%d] Error: " mesg, uri_read, i, __VA_ARGS__); \
-	) \
-}
+#define ERROR(mesg, ...)                                                       \
+        {                                                                      \
+                ONCE(err = 1; fprintf(stderr, "%s[%d] Error: " mesg, uri_read, \
+                                      i, __VA_ARGS__);)                        \
+        }
 
 static const char *uri_read = "";
 static sig_atomic_t i = 0;
@@ -72,48 +70,46 @@ static sig_atomic_t reading = 0;
 static libtrace_t *trace_read = NULL;
 static int test_size = 100;
 
-
 /**
  * Source packet we modify this every write see build_packet
  */
 static unsigned char buffer[] = {
-	0x00, 0x01, 0x02, 0x03, 0x04, 0x05, /* Dest Mac */
-	0x00, 0x01, 0x02, 0x03, 0x04, 0x06, /* Src Mac */
-	0x01, 0x01, /* Ethertype = Experimental */
-	0xC1, 0xC2, 0xC3, 0xC4, 0xC5, 0xC6, /* payload */
-        0xC1, 0xC2, 0xC3, 0xC4, 0xC5, 0xC6, /* payload */
-	0xC1, 0xC2, 0xC3, 0xC4, 0xC5, 0xC6, /* payload */
-	0xC1, 0xC2, 0xC3, 0xC4, 0xC5, 0xC6, /* payload */
+    0x00, 0x01, 0x02, 0x03, 0x04, 0x05, /* Dest Mac */
+    0x00, 0x01, 0x02, 0x03, 0x04, 0x06, /* Src Mac */
+    0x01, 0x01,                         /* Ethertype = Experimental */
+    0xC1, 0xC2, 0xC3, 0xC4, 0xC5, 0xC6, /* payload */
+    0xC1, 0xC2, 0xC3, 0xC4, 0xC5, 0xC6, /* payload */
+    0xC1, 0xC2, 0xC3, 0xC4, 0xC5, 0xC6, /* payload */
+    0xC1, 0xC2, 0xC3, 0xC4, 0xC5, 0xC6, /* payload */
 };
 
-
 union uint32_char {
-	char chars[4];
-	uint32_t i32;
+        char chars[4];
+        uint32_t i32;
 };
 
 /* Build a unique packet from a seed value of i */
 static void build_packet(int i)
 {
-	// Shh about them type-punned aliasing issues
-	union uint32_char u;
-	srand(i);
-	u.i32 = (uint32_t) rand();
-	buffer[sizeof(libtrace_ether_t)] = u.chars[0];
-	buffer[sizeof(libtrace_ether_t)+1] = u.chars[1];
-	buffer[sizeof(libtrace_ether_t)+2] = u.chars[2];
-	buffer[sizeof(libtrace_ether_t)+3] = u.chars[3];
+        // Shh about them type-punned aliasing issues
+        union uint32_char u;
+        srand(i);
+        u.i32 = (uint32_t)rand();
+        buffer[sizeof(libtrace_ether_t)] = u.chars[0];
+        buffer[sizeof(libtrace_ether_t) + 1] = u.chars[1];
+        buffer[sizeof(libtrace_ether_t) + 2] = u.chars[2];
+        buffer[sizeof(libtrace_ether_t) + 3] = u.chars[3];
 }
 
 static void dumparray(unsigned char *arr, size_t len)
 {
-	size_t i;
+        size_t i;
 
-	fprintf(stderr, "{");
-	for (i = 0; i < len; ++i) {
-		fprintf(stderr, "0x%02X,", arr[i]);
-	}
-	fprintf(stderr, "}\n");
+        fprintf(stderr, "{");
+        for (i = 0; i < len; ++i) {
+                fprintf(stderr, "0x%02X,", arr[i]);
+        }
+        fprintf(stderr, "}\n");
 }
 
 /**
@@ -121,43 +117,43 @@ static void dumparray(unsigned char *arr, size_t len)
  */
 static int verify_counters(libtrace_t *trace_read)
 {
-	int err = 0;
+        int err = 0;
         libtrace_stat_t *stat;
 
         stat = trace_create_statistics();
 
         trace_get_statistics(trace_read, stat);
-	// Assume no loss here, if not the case we would of hung in reading loop
-	// anyway
+        // Assume no loss here, if not the case we would of hung in reading loop
+        // anyway
         if (!stat->dropped_valid) {
-		printf("\tInfo: trace does not support drop counter\n");
+                printf("\tInfo: trace does not support drop counter\n");
         } else if (stat->dropped != 0) {
-		ERROR("Trace dropped %" PRIu64 " packets\n", stat->dropped);
-	}
+                ERROR("Trace dropped %" PRIu64 " packets\n", stat->dropped);
+        }
 
         if (!stat->filtered_valid) {
-		printf("\tInfo: trace does not support filter counter\n");
+                printf("\tInfo: trace does not support filter counter\n");
         } else if (stat->filtered != 0) {
-		ERROR("Trace filtered %" PRIu64 " packets\n", stat->filtered);
-	}
+                ERROR("Trace filtered %" PRIu64 " packets\n", stat->filtered);
+        }
 
         if (!stat->received_valid) {
-		printf("\tInfo: trace does not support received counter\n");
-        } else if (stat->received != (uint32_t) test_size) {
-		ERROR("Trace received %" PRIu64 "/%" PRIu32 " packets\n", stat->received,
-				(uint32_t)test_size);
+                printf("\tInfo: trace does not support received counter\n");
+        } else if (stat->received != (uint32_t)test_size) {
+                ERROR("Trace received %" PRIu64 "/%" PRIu32 " packets\n",
+                      stat->received, (uint32_t)test_size);
         }
 
         if (!stat->accepted_valid) {
-		printf("\tInfo: trace does not support accepted counter\n");
-        } else if (stat->accepted != (uint32_t) test_size) {
-		ERROR("Trace only accepted %" PRIu64 "/%" PRIu32 " packets\n", stat->accepted,
-                                (uint32_t)test_size);
+                printf("\tInfo: trace does not support accepted counter\n");
+        } else if (stat->accepted != (uint32_t)test_size) {
+                ERROR("Trace only accepted %" PRIu64 "/%" PRIu32 " packets\n",
+                      stat->accepted, (uint32_t)test_size);
         }
 
-	free(stat);
+        free(stat);
 
-	return err;
+        return err;
 }
 
 /**
@@ -165,112 +161,120 @@ static int verify_counters(libtrace_t *trace_read)
  */
 static int verify_packet(libtrace_packet_t *packet, int seq_num)
 {
-	int err = 0;
-	static int caplen_incld_crc = -1;
-	static double ts = -1;
-	libtrace_linktype_t linktype;
-	uint32_t remaining;
-	unsigned char* pktbuffer;
+        int err = 0;
+        static int caplen_incld_crc = -1;
+        static double ts = -1;
+        libtrace_linktype_t linktype;
+        uint32_t remaining;
+        unsigned char *pktbuffer;
 
-	// Verify wirelen - Wirelen includes checksum of 4 bytes
-	if (trace_get_wire_length(packet) != sizeof(buffer) + 4) {
-		ERROR("Incorrect trace_get_wire_length(), read %zu expected %zu\n",
-				trace_get_wire_length(packet), sizeof(buffer) + 4);
-	}
+        // Verify wirelen - Wirelen includes checksum of 4 bytes
+        if (trace_get_wire_length(packet) != sizeof(buffer) + 4) {
+                ERROR("Incorrect trace_get_wire_length(), read %zu expected "
+                      "%zu\n",
+                      trace_get_wire_length(packet), sizeof(buffer) + 4);
+        }
 
-	// Verify caplen
-	if (trace_get_capture_length(packet) == sizeof(buffer)) {
-		if (caplen_incld_crc == 1) {
-			ERROR("Expected trace_get_capture_length() to EXCLUDE the Ethernet checksum,"
-				" read %zu expected %zu\n", trace_get_capture_length(packet),
-				sizeof(buffer));
-		} else {
-			caplen_incld_crc = 0;
-		}
-	} else if (trace_get_capture_length(packet) == sizeof(buffer) + 4) {
-		if (caplen_incld_crc == 0) {
-			ERROR("Expected trace_get_capture_length() to INCLUDE the Ethernet checksum,"
-				" read %zu expected %zu\n", trace_get_capture_length(packet),
-				sizeof(buffer)+4);
-		} else {
-			caplen_incld_crc = 1;
-		}
-	} else {
-		ERROR("Incorrect trace_get_capture_length(), read %zu expected %zu (or %zu)\n",
-			trace_get_capture_length(packet), sizeof(buffer), sizeof(buffer)+4);
-	}
+        // Verify caplen
+        if (trace_get_capture_length(packet) == sizeof(buffer)) {
+                if (caplen_incld_crc == 1) {
+                        ERROR("Expected trace_get_capture_length() to EXCLUDE "
+                              "the Ethernet checksum,"
+                              " read %zu expected %zu\n",
+                              trace_get_capture_length(packet), sizeof(buffer));
+                } else {
+                        caplen_incld_crc = 0;
+                }
+        } else if (trace_get_capture_length(packet) == sizeof(buffer) + 4) {
+                if (caplen_incld_crc == 0) {
+                        ERROR("Expected trace_get_capture_length() to INCLUDE "
+                              "the Ethernet checksum,"
+                              " read %zu expected %zu\n",
+                              trace_get_capture_length(packet),
+                              sizeof(buffer) + 4);
+                } else {
+                        caplen_incld_crc = 1;
+                }
+        } else {
+                ERROR("Incorrect trace_get_capture_length(), read %zu expected "
+                      "%zu (or %zu)\n",
+                      trace_get_capture_length(packet), sizeof(buffer),
+                      sizeof(buffer) + 4);
+        }
 
-	// Verify a packets contents
-	pktbuffer = trace_get_packet_buffer(packet, &linktype, &remaining);
-	assert(trace_get_capture_length(packet) == remaining);
-	assert(linktype == TRACE_TYPE_ETH);
-	// Refill the buffer with the expected data
-	build_packet(seq_num);
-	if (memcmp(pktbuffer, buffer, MIN(sizeof(buffer), remaining)) != 0) {
-		ERROR("Packet contents do not match\n%s", "Received:\n");
-		ONCE(
-		dumparray(pktbuffer, remaining);
-		fprintf(stderr, "Expected:\n");
-		dumparray(buffer, sizeof(buffer));
-		)
-	}
+        // Verify a packets contents
+        pktbuffer = trace_get_packet_buffer(packet, &linktype, &remaining);
+        assert(trace_get_capture_length(packet) == remaining);
+        assert(linktype == TRACE_TYPE_ETH);
+        // Refill the buffer with the expected data
+        build_packet(seq_num);
+        if (memcmp(pktbuffer, buffer, MIN(sizeof(buffer), remaining)) != 0) {
+                ERROR("Packet contents do not match\n%s", "Received:\n");
+                ONCE(dumparray(pktbuffer, remaining);
+                     fprintf(stderr, "Expected:\n");
+                     dumparray(buffer, sizeof(buffer));)
+        }
 
-	// Check times count up like we'd expect
-	if (ts != 1 && trace_get_seconds(packet) < ts) {
-		ERROR("Timestamps aren't increasing, ts=%f last_ts=%f\n",
-			trace_get_seconds(packet), ts);
-	}
+        // Check times count up like we'd expect
+        if (ts != 1 && trace_get_seconds(packet) < ts) {
+                ERROR("Timestamps aren't increasing, ts=%f last_ts=%f\n",
+                      trace_get_seconds(packet), ts);
+        }
 
-	ts = trace_get_seconds(packet);
+        ts = trace_get_seconds(packet);
 
-	// Verify trace_get and set direction work
-	libtrace_direction_t dir_set;
-	if ((dir_set = trace_set_direction(packet, TRACE_DIR_OUTGOING)) != -1) {
-		if (trace_get_direction(packet) != TRACE_DIR_OUTGOING) {
-			ERROR("Trace lies about its ability to set TRACE_DIR_OUTGOING,"
-				"read %d expected %d\n", trace_get_direction(packet),
-				TRACE_DIR_OUTGOING);
-		}
-	}
-	if ((dir_set = trace_set_direction(packet, TRACE_DIR_INCOMING)) != -1) {
-		if (trace_get_direction(packet) != TRACE_DIR_INCOMING) {
-			ERROR("Trace lies about its ability to set TRACE_DIR_INCOMING,"
-				"read %d expected %d\n", trace_get_direction(packet),
-				TRACE_DIR_INCOMING);
-		}
-	}
-	if ((dir_set = trace_set_direction(packet, TRACE_DIR_OTHER)) != -1) {
-		if (trace_get_direction(packet) != TRACE_DIR_OTHER) {
-			ERROR("Trace lies about its ability to set TRACE_DIR_OTHER,"
-				"read %d expected %d\n", trace_get_direction(packet),
-				TRACE_DIR_OTHER);
-		}
-	}
-	if ((dir_set = trace_set_direction(packet, TRACE_DIR_UNKNOWN)) != -1) {
-		if (trace_get_direction(packet) != TRACE_DIR_UNKNOWN) {
-			ERROR("Trace lies about its ability to set TRACE_DIR_UNKNOWN,"
-				"read %d expected %d\n", trace_get_direction(packet),
-				TRACE_DIR_UNKNOWN);
-		}
-	}
-	return err;
+        // Verify trace_get and set direction work
+        libtrace_direction_t dir_set;
+        if ((dir_set = trace_set_direction(packet, TRACE_DIR_OUTGOING)) != -1) {
+                if (trace_get_direction(packet) != TRACE_DIR_OUTGOING) {
+                        ERROR("Trace lies about its ability to set "
+                              "TRACE_DIR_OUTGOING,"
+                              "read %d expected %d\n",
+                              trace_get_direction(packet), TRACE_DIR_OUTGOING);
+                }
+        }
+        if ((dir_set = trace_set_direction(packet, TRACE_DIR_INCOMING)) != -1) {
+                if (trace_get_direction(packet) != TRACE_DIR_INCOMING) {
+                        ERROR("Trace lies about its ability to set "
+                              "TRACE_DIR_INCOMING,"
+                              "read %d expected %d\n",
+                              trace_get_direction(packet), TRACE_DIR_INCOMING);
+                }
+        }
+        if ((dir_set = trace_set_direction(packet, TRACE_DIR_OTHER)) != -1) {
+                if (trace_get_direction(packet) != TRACE_DIR_OTHER) {
+                        ERROR("Trace lies about its ability to set "
+                              "TRACE_DIR_OTHER,"
+                              "read %d expected %d\n",
+                              trace_get_direction(packet), TRACE_DIR_OTHER);
+                }
+        }
+        if ((dir_set = trace_set_direction(packet, TRACE_DIR_UNKNOWN)) != -1) {
+                if (trace_get_direction(packet) != TRACE_DIR_UNKNOWN) {
+                        ERROR("Trace lies about its ability to set "
+                              "TRACE_DIR_UNKNOWN,"
+                              "read %d expected %d\n",
+                              trace_get_direction(packet), TRACE_DIR_UNKNOWN);
+                }
+        }
+        return err;
 }
 
 static void iferr_out(libtrace_out_t *trace)
 {
-	libtrace_err_t err = trace_get_err_output(trace);
-	if (err.err_num == 0)
-		return;
-	printf("Error: %s\n", err.problem);
+        libtrace_err_t err = trace_get_err_output(trace);
+        if (err.err_num == 0)
+                return;
+        printf("Error: %s\n", err.problem);
         exit(-err.err_num);
 }
 
 static void iferr(libtrace_t *trace)
 {
-	libtrace_err_t err = trace_get_err(trace);
-	if (err.err_num == 0)
-		return;
-	printf("Error: %s\n", err.problem);
+        libtrace_err_t err = trace_get_err(trace);
+        if (err.err_num == 0)
+                return;
+        printf("Error: %s\n", err.problem);
         exit(-err.err_num);
 }
 
@@ -284,77 +288,79 @@ static void signal_handler(int signal)
 
 int main(int argc, char *argv[])
 {
-	libtrace_out_t *trace_write = NULL;
-	libtrace_packet_t *packet = NULL;
-	int psize;
-	int err = 0;
-	char *read = NULL;
-	char *write = NULL;
-	int opt = 0;
+        libtrace_out_t *trace_write = NULL;
+        libtrace_packet_t *packet = NULL;
+        int psize;
+        int err = 0;
+        char *read = NULL;
+        char *write = NULL;
+        int opt = 0;
 
-	while ((opt = getopt(argc, argv, "w:r:")) != -1) {
-		switch (opt) {
-			case 'r':
-				read = optarg;
-				break;
-			case 'w':
-				write = optarg;
-				break;
-		}
-	}
+        while ((opt = getopt(argc, argv, "w:r:")) != -1) {
+                switch (opt) {
+                case 'r':
+                        read = optarg;
+                        break;
+                case 'w':
+                        write = optarg;
+                        break;
+                }
+        }
 
-	signal(SIGALRM, signal_handler);
+        signal(SIGALRM, signal_handler);
         // Timeout after 5 seconds
         alarm(5);
 
-	if (write) {
-		trace_write = trace_create_output(write);
-	        iferr_out(trace_write);
-	}
-
-	if (read) {
-		trace_read = trace_create(read);
-                iferr(trace_read);
-	}
-
-	if (write) {
-		trace_start_output(trace_write);
+        if (write) {
+                trace_write = trace_create_output(write);
                 iferr_out(trace_write);
-		packet = trace_create_packet();
-		// Write out test_size (100) almost identical packets
-		for (i = 0; i < test_size; i++) {
-			build_packet(i);
-			trace_construct_packet(packet, TRACE_TYPE_ETH, buffer, sizeof(buffer));
-			if (trace_write_packet(trace_write, packet) == -1) {
-				iferr_out(trace_write);
-			}
-		}
-		trace_destroy_packet(packet);
-		trace_destroy_output(trace_write);
-	}
+        }
 
-
-	// Now read back in, we assume that buffers internally can buffer
-	// the packets without losing them
-	if (read) {
-		trace_start(trace_read);
+        if (read) {
+                trace_read = trace_create(read);
                 iferr(trace_read);
-		packet = trace_create_packet();
-		reading = 1;
-		for (i = 0; i < test_size; i++) {
-			if ((psize = trace_read_packet(trace_read, packet)) < 0) {
-				iferr(trace_read);
-				// EOF we shouldn't hit this with a live format
-				fprintf(stderr, "Error: looks like we lost some packets!\n");
-				err = 1;
-				break;
-			}
-			err |= verify_packet(packet, i);
-		}
-		err |= verify_counters(trace_read);
-		trace_destroy_packet(packet);
-		trace_destroy(trace_read);
-	}
+        }
 
-	return err;
+        if (write) {
+                trace_start_output(trace_write);
+                iferr_out(trace_write);
+                packet = trace_create_packet();
+                // Write out test_size (100) almost identical packets
+                for (i = 0; i < test_size; i++) {
+                        build_packet(i);
+                        trace_construct_packet(packet, TRACE_TYPE_ETH, buffer,
+                                               sizeof(buffer));
+                        if (trace_write_packet(trace_write, packet) == -1) {
+                                iferr_out(trace_write);
+                        }
+                }
+                trace_destroy_packet(packet);
+                trace_destroy_output(trace_write);
+        }
+
+        // Now read back in, we assume that buffers internally can buffer
+        // the packets without losing them
+        if (read) {
+                trace_start(trace_read);
+                iferr(trace_read);
+                packet = trace_create_packet();
+                reading = 1;
+                for (i = 0; i < test_size; i++) {
+                        if ((psize = trace_read_packet(trace_read, packet)) <
+                            0) {
+                                iferr(trace_read);
+                                // EOF we shouldn't hit this with a live format
+                                fprintf(stderr, "Error: looks like we lost "
+                                                "some packets!\n");
+                                err = 1;
+                                break;
+                        }
+                        err |= verify_packet(packet, i);
+                }
+                err |= verify_counters(trace_read);
+                trace_destroy_packet(packet);
+                trace_destroy(trace_read);
+        }
+
+        return err;
 }

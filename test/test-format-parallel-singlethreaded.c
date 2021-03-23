@@ -291,12 +291,12 @@ int main(int argc, char *argv[]) {
 
         while ((opt = getopt(argc, argv, "pr:")) != -1) {
                 switch (opt) {
-                        case 'p':
-                                pause = 0;
-                                break;
-                        case 'r':
-                                read = optarg;
-                                break;
+                case 'p':
+                        pause = 0;
+                        break;
+                case 'r':
+                        read = optarg;
+                        break;
                 }
         }
 
@@ -305,9 +305,9 @@ int main(int argc, char *argv[]) {
         sigact.sa_flags = SA_RESTART;
         sigaction(SIGINT, &sigact, NULL);
 
-	tracename = lookup_uri(read);
+        tracename = lookup_uri(read);
 
-	trace = trace_create(tracename);
+        trace = trace_create(tracename);
 	iferr(trace,tracename);
 
         processing = trace_create_callback_set();
@@ -331,14 +331,14 @@ int main(int argc, char *argv[]) {
 	iferr(trace,tracename);
 
 	/* Make sure traces survive a pause */
-	if (pause) {
-		trace_ppause(trace);
-		iferr(trace,tracename);
-		trace_pstart(trace, NULL, NULL, NULL);
-		iferr(trace,tracename);
-	}
+        if (pause) {
+                trace_ppause(trace);
+                iferr(trace, tracename);
+                trace_pstart(trace, NULL, NULL, NULL);
+                iferr(trace, tracename);
+        }
 
-	/* Wait for all threads to stop */
+        /* Wait for all threads to stop */
 	trace_join(trace);
 
         global = 0xffffffff;
