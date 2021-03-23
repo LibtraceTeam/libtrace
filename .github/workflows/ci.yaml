@@ -21,7 +21,7 @@ jobs:
     - name: diff
       run: git diff --exit-code
   run-tests-ubuntu:
-    name: Run tests ${{ matrix.os }}
+    name: Run tests ${{ matrix.os }} ${{ matrix.c_compiler }},${{ matrix.cxx_compiler }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -111,6 +111,7 @@ jobs:
       run: |
         ls libbpf/include/uapi
         ls libbpf
+        cat /home/runner/work/libbpf/include/uapi/linux/if_xdp.h
         cd libtrace
         ./bootstrap.sh
         ./configure CFLAGS="-I/home/runner/work/libbpf/include/uapi" --with-dpdk --with-pfring --with-xdp --with-dag
