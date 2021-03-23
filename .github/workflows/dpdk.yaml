@@ -32,19 +32,10 @@ jobs:
       matrix:
         os: [ubuntu-20.04, ubuntu-18.04, ubuntu-16.04]
         dpdk_version: [dpdk-20.11, dpdk-20.02, dpdk-19.11.5, dpdk-18.11.10, dpdk-17.11.10, dpdk-16.11.11]
-        meson_pip: [1]
         exclude:
-          # Meson requires Python 3.6.0 or greater, ubuntu-16.04 python3=3.5.2
           - os: ubuntu-16.04
             dpdk_version: dpdk-20.11
-        include:
-          - os: ubuntu-16.04
-            meson_pip: [0]
     steps:
-    - name: Setup Enviroment Variables
-      env:
-        MESON_PIP: ${{ matrix.meson_pip }}
-      run: echo MESON_PIP = $MESON_PIP
     - uses: actions/checkout@v2
       with:
         path: libtrace
@@ -62,7 +53,8 @@ jobs:
       run: |
         sudo apt-get -y install build-essential python3-pyelftools flex bison python3-pip python3-setuptools
         sudo apt-get -y install libpcap0.8-dev libtool pkgconf wget m4 autoconf automake gcc libnuma-dev
-        if [ "$MESON_PIP" -eq 1 ]; then sudo pip3 install meson ninja; else sudo apt-get -y install meson ninja-build; fi
+        sudo apt-get -y install meson ninja-build
+        sudo pip3 install meson ninja || true
     - name: Install wandio
       run: |
         cd libtrace/wandio
