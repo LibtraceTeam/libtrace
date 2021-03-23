@@ -21,7 +21,7 @@ jobs:
     - name: diff
       run: git diff --exit-code
   run-tests-ubuntu:
-    name: Run Tests - Ubuntu 20.04
+    name: Run tests ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -109,7 +109,7 @@ jobs:
       run: |
         cd libtrace
         ./bootstrap.sh
-        ./configure --with-dpdk --with-pfring --with-xdp --with-dag
+        ./configure --with-dpdk --with-pfring --with-xdp --with-dag CFLAGS="-I../libbpf/include/uapi"
         make
         sudo make install
     - name: Build Tests
