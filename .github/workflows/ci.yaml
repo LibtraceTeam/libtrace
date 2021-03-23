@@ -25,7 +25,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-20.04]
+        os: [ubuntu-20.04, ubuntu-18.04]
         c_compiler: [gcc, clang]
         cxx_compiler: [g++, clang++]
         exclude:
@@ -51,7 +51,8 @@ jobs:
     - name: Install Dependencies
       run: |
         sudo apt update
-        sudo apt-get -y install flex bison libpcap0.8-dev libtool pkgconf autoconf automake m4 gcc clang llvm gcc-multilib libelf-dev git dpdk-dev
+        sudo apt-get -y install flex bison libpcap0.8-dev libtool pkgconf autoconf automake m4 gcc clang llvm gcc-multilib
+        sudo apt-get -y install build-essential dpdk-dev libelf-dev git
     - name: Install PF_RING
       run: |
         sudo apt-get -y install software-properties-common wget
@@ -111,7 +112,7 @@ jobs:
       run: |
         cd libtrace
         ./bootstrap.sh
-        ./configure --with-dpdk --with-pfring --with-xdp --with-dag
+        ./configure CFLAGS="-I$(pwd)/../libbpf/include/uapi" --with-dpdk --with-pfring --with-xdp --with-dag
         make
         sudo make install
     - name: Build Tests
