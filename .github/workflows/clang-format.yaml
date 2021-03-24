@@ -1,8 +1,21 @@
 name: Clang format
-on: [pull_request]
+on: [push, pull_request]
 jobs:
+  pre_job:
+    name: Prerequisite checks
+    runs-on: ubuntu-latest
+    outputs:
+      should_skip: ${{ steps.skip_check.outputs.should_skip }}
+    steps:
+      - id: skip_check
+        uses: fkirc/skip-duplicate-actions@master
+        with:
+          concurrent_skipping: 'same_content'
   clang-format:
     name: Clang Format
+    needs: pre_job
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
+    if: "github.event_name == 'pull_request'"
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
@@ -16,5 +29,25 @@ jobs:
       run: git fetch --no-tags --prune --depth=1 origin ${{ github.base_ref }}
     - name: clang-format
       run: git clang-format origin/${{ github.base_ref }}
+    - name: diff
+      run: git diff --exit-code
+  clang-format:
+    name: Clang Format
+    needs: pre_job
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
+    if: "github.event_name == 'push'"
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install clang-format
+      run: sudo apt-get install clang-format
+    - name: Download git-clang-format
+      run: wget https://raw.githubusercontent.com/llvm-mirror/clang/master/tools/clang-format/git-clang-format
+    - name: Install git-clang-format
+      run: sudo install -t /bin git-clang-format
+    - name: Fetch origin ${{ github.event.before }}
+      run: git fetch origin ${{ github.event.before }}
+    - name: clang-format
+      run: git clang-format origin/${{ github.before }}
     - name: diff
       run: git diff --exit-code
