@@ -100,13 +100,13 @@
  **/
 #define TX_EXTRA_WINDOW 4*1024*1024
 /* The number of bytes to request 256 KB, much larger sizes than this show no clear benefit */
-#define TX_BATCH_SIZE 256*1024
+         #define TX_BATCH_SIZE 256*1024
 /* The threshold to reach before sending, 2x 64KB (largest packet size) is safe */
 #define TX_BATCH_THOLD (TX_BATCH_SIZE - (2*1024*64))
 
 /* Compile time asserts, check sizes are valid */
 ct_assert(TX_BATCH_SIZE > TX_BATCH_THOLD);
-ct_assert(TX_BATCH_THOLD > 0);
+		ct_assert(TX_BATCH_THOLD > 0);
 ct_assert(!TX_EXTRA_WINDOW || TX_EXTRA_WINDOW > TX_BATCH_SIZE);
 
 static struct libtrace_format_t dag;
