@@ -14,7 +14,7 @@ jobs:
   clang-format-pull:
     name: Clang Format
     needs: pre_job
-    if: "github.event_name == 'pull_request'" && ${{ needs.pre_job.outputs.should_skip != 'true' }}
+    if: "github.event_name == 'pull_request' && ${{ needs.pre_job.outputs.should_skip != 'true' }}"
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
@@ -33,7 +33,7 @@ jobs:
   clang-format-push:
     name: Clang Format
     needs: pre_job
-    if: "github.event_name == 'push'" && ${{ needs.pre_job.outputs.should_skip != 'true' }}
+    if: "github.event_name == 'push' && ${{ needs.pre_job.outputs.should_skip != 'true' }}"
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
