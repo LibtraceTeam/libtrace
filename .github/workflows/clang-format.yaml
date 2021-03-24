@@ -1,10 +1,8 @@
 name: Clang format
 on: [push, pull_request]
 jobs:
-  clang-format-pull:
+  clang-format:
     name: Clang Format
-    needs: pre_job
-    if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
