@@ -44,7 +44,7 @@
 #include <sys/mman.h>
 /* XXX: Windows doesn't have pthreads, but this code doesn't compile under
  * Windows anyway so we'll worry about this more later :] */
-#include <pthread.h>
+	#include <pthread.h>
 
 
 #ifdef HAVE_DAG_CONFIG_API_H
