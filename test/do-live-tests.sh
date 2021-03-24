@@ -1,25 +1,54 @@
 #!/bin/bash
 
 OK=0
-UNSUPPORTED=""
 FAIL=""
 
 PARALLEL_OK=0
-PARALLEL_UNSUPPORTED=""
 PARALLEL_FAIL=""
 
 do_test() {
+	echo $@
 	$@
 	rc=$?
         if [[ rc -eq 0 ]]; then
 		OK=$(( OK + 1 ))
-        elif [[ rc -eq 1 ]]; then
-		UNSUPPORTED="$UNSUPPORTED
-$*"
         else
 		FAIL="$FAIL
 $*"
 	fi
+
+	echo
+}
+
+do_test_dag() {
+	# $1 = application, $2 = read_uri, $3 = write_uri
+        echo "$1" -r "$2"
+        timeout 30 "$1" "-r" "$2" &
+        read_pid=$!
+
+	# give time for DAG to start
+        sleep 2
+
+        echo "$1" -w "$3"
+        timeout 30 "$1" "-w" "$3" &
+	write_pid=$!
+
+	wait $write_pid
+	wc=$?
+
+        wait $read_pid
+	rc=$?
+
+	if [[ rc -eq 0 && wc -eq 0 ]]
+	then
+                OK=$(( OK + 1 ))
+        else
+                FAIL="$FAIL
+$*"
+        fi
+
+	echo
+        sleep 2
 }
 
 if [[ -z "$GOT_NETNS" ]]; then
@@ -37,9 +66,11 @@ fi
 
 declare -a write_formats=()
 declare -a read_formats=()
+declare -a dag_formats=()
 if [[ $# -eq 0 ]]; then
-	declare -a write_formats=("pcapint:veth0" "int:veth0" "ring:veth0" "dpdkvdev:net_pcap0,iface=veth0")
-	declare -a read_formats=("pcapint:veth1" "int:veth1" "ring:veth1" "dpdkvdev:net_pcap1,iface=veth1")
+	declare -a write_formats=("pcapint:veth0" "int:veth0" "ring:veth0" "dpdkvdev:net_pcap0,iface=veth0" "xdp:veth0")
+	declare -a read_formats=("pcapint:veth1" "int:veth1" "ring:veth1" "dpdkvdev:net_pcap1,iface=veth1" "xdp:veth1")
+	declare -a dag_formats=("dag:/dev/dag16,0")
 fi
 
 while [[ $# -gt 0 ]]; do
@@ -53,9 +84,15 @@ while [[ $# -gt 0 ]]; do
 		write_formats+=("dpdkvdev:net_pcap0,iface=veth0")
 		read_formats+=("dpdkvdev:net_pcap1,iface=veth1")
 		;;
-	int|ring|pcapint)
+	int|ring|xdp|pfringzc|pcapint)
 		write_formats+=("$key:veth0")
 		read_formats+=("$key:veth1")
+		;;
+	pfring)
+		read_formats+=("$key:veth1")
+		;;
+	dag)
+		dag_formats+=("$key:/dev/dag16,0")
 		;;
 	*)
 		echo "Unknown argument $key"
@@ -69,18 +106,17 @@ for w in "${write_formats[@]}"
 do
 	for r in "${read_formats[@]}"
 	do
-		echo
-		echo ./test-live "$w" "$r"
 		do_test ./test-live "$w" "$r"
-		echo
-		echo ./test-live-snaplen "$w" "$r"
 		do_test ./test-live-snaplen "$w" "$r"
 	done
+done
+for w in "${dag_formats[@]}"
+do
+	do_test_dag ./test-live-dag "$w" "$w"
 done
 
 echo
 echo "Single threaded API tests passed: $OK"
-echo "Single threaded API tests unsupported: $UNSUPPORTED"
 echo "Single threaded API tests failed: $FAIL"
 echo
 
@@ -88,13 +124,14 @@ echo
 echo "Running parallel API tests"
 echo
 do_parallel_test() {
+	#params $1 = application, $2 = read_uri, $3 = write_uri, $4 = additional args
 	echo
-	echo "$@"
-	timeout 30 "$@" &
+	echo "$1" "$4" "-r" "$2"
+	timeout 30 "$1" "$4" "-r" "$2" &
 	my_pid=$!
 	sleep 2  # Ensure we've had time to setup, particularly dpdk
-	if ! ./test-live "int:veth0"; then
-		echo "TEST ERROR: ./test-live int:veth0 (couldn't generate packets)"
+	if ! ./test-live "$3"; then
+		echo "TEST ERROR: ./test-live $3 (couldn't generate packets)"
 		exit -1
 	fi
 	sleep 10  # Wait for all packets to be received
@@ -103,14 +140,11 @@ do_parallel_test() {
 	rc=$?
 	if [[ rc -eq 0 ]]; then
 		PARALLEL_OK=$(( PARALLEL_OK + 1 ))
-	elif [[ rc -eq 1 ]]; then
-		PARALLEL_UNSUPPORTED="$PARALLEL_UNSUPPORTED
-$*"
 	else
-
 		PARALLEL_FAIL="$PARALLEL_FAIL
 $*"
 	fi
+	sleep 2
 }
 
 for r in "${read_formats[@]}"
@@ -120,26 +154,33 @@ do
 	if [[ $r == "pcapint:veth1" ]]; then
 		continue
 	fi
-	do_parallel_test ./test-format-parallel "$r"
-	do_parallel_test ./test-format-parallel-hasher "$r"
+	do_parallel_test ./test-format-parallel "$r" "int:veth1"
+	do_parallel_test ./test-format-parallel-hasher "$r" "int:veth1"
 	# TODO fix test-format-parallel-reporter for live input
-	# do_parallel_test ./test-format-parallel-reporter "$r"
-	do_parallel_test ./test-format-parallel-singlethreaded "$r"
-	do_parallel_test ./test-format-parallel-singlethreaded-hasher "$r"
+	# do_parallel_test ./test-format-parallel-reporter "$r" "int:veth1"
+	do_parallel_test ./test-format-parallel-singlethreaded "$r" "int:veth1"
+	do_parallel_test ./test-format-parallel-singlethreaded-hasher "$r" "int:veth1"
 
 done
 
+for r in "${dag_formats[@]}"
+do
+	do_parallel_test ./test-format-parallel "$r" "dag:/dev/dag16,0" "-p"
+	do_parallel_test ./test-format-parallel-hasher "$r" "dag:/dev/dag16,0" "-p"
+	# TODO fix test-format-parallel-reporter for live input
+        #do_parallel_test ./test-format-parallel-reporter "$r" "dag:/dev/dag16,0" "-p"
+	do_parallel_test ./test-format-parallel-singlethreaded "$r" "dag:/dev/dag16,0" "-p"
+	do_parallel_test ./test-format-parallel-singlethreaded-hasher "$r" "dag:/dev/dag16,0" "-p"
+done
 echo
 echo "Single threaded API tests passed: $OK"
-echo "Single threaded API tests unsupported: $UNSUPPORTED"
 echo "Single threaded API tests failed: $FAIL"
 echo
 echo "Parallel API tests passed: $PARALLEL_OK"
-echo "Parallel API tests unsupported: $PARALLEL_UNSUPPORTED"
 echo "Parallel API tests failed: $PARALLEL_FAIL"
 
 
-if [ -z "$FAIL" ] && [ -z "$PARALLEL_FAIL" ]
+if [[ -z "$FAIL" ]]
 then
         exit 0
 else
