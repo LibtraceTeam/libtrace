@@ -1,21 +1,10 @@
 name: DAG tests
 on:
   push:
-#  pull_request:
-#    paths:
-#    - 'configure.in'
-#    - 'lib/format_dag25.c'
-#    - 'lib/format_dag24.c'
-#    - 'lib/erftypes.h'
-#    - 'lib/format_erf.c'
-#    - 'lib/format_erf.h'
-#    - 'configure.in'
-#    - '.github/workflows/dpdk.yaml'
-#    - 'test/do-live-tests.sh'
-#    - 'test/test-live-dag.c'
   workflow_dispatch:
 jobs:
   pre_job:
+    name: Prerequisite checks
     runs-on: ubuntu-latest
     outputs:
       should_skip: ${{ steps.skip_check.outputs.should_skip }}
