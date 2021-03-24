@@ -101,6 +101,8 @@ jobs:
       run: cd libtrace/test; sudo ./do-live-tests.sh pcap int ring dpdk
   run-tests-macos:
     name: Run tests ${{ matrix.os }}
+    needs: pre_job
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
