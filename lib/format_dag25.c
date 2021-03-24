@@ -106,7 +106,7 @@
 
 /* Compile time asserts, check sizes are valid */
 ct_assert(TX_BATCH_SIZE > TX_BATCH_THOLD);
-		ct_assert(TX_BATCH_THOLD > 0);
+ct_assert(TX_BATCH_THOLD > 0);
 ct_assert(!TX_EXTRA_WINDOW || TX_EXTRA_WINDOW > TX_BATCH_SIZE);
 
 static struct libtrace_format_t dag;
@@ -664,39 +664,41 @@ static int dag_start_output(libtrace_out_t *libtrace)
 	zero.tv_usec = 0;
 	nopoll = zero;
 
-	/* if trying to perform TX on a RX stream (rx streams are even numbers)
-	 * put the card in reverse mode. */
-	if (FORMAT_DATA_OUT->dagstream % 2 == 0) {
-		// @param mode DAG_REVERSE_MODE (1) or DAG_NORMAL_MODE (0)
-		if (dag_set_mode(FORMAT_DATA_OUT->device->fd,
-			FORMAT_DATA_OUT->dagstream, 1) != 0) {
+        /* if trying to perform TX on a RX stream (rx streams are even numbers)
+         * put the card in reverse mode. */
+        if (FORMAT_DATA_OUT->dagstream % 2 == 0) {
+                // @param mode DAG_REVERSE_MODE (1) or DAG_NORMAL_MODE (0)
+                if (dag_set_mode(FORMAT_DATA_OUT->device->fd,
+                                 FORMAT_DATA_OUT->dagstream, 1) != 0) {
 
-			trace_set_err_out(libtrace, errno, "Cannot set DAG reverse mode");
-			return -1;
-		}
-		fprintf(stderr, "Opening %s in reverse mode\n", libtrace->uridata);
-	}
+                        trace_set_err_out(libtrace, errno,
+                                          "Cannot set DAG reverse mode");
+                        return -1;
+                }
+                fprintf(stderr, "Opening %s in reverse mode\n",
+                        libtrace->uridata);
+        }
 
-	/* Attach and start the DAG stream */
-	if (dag_attach_stream64(FORMAT_DATA_OUT->device->fd,
-			FORMAT_DATA_OUT->dagstream, 0, TX_EXTRA_WINDOW) < 0) {
-		trace_set_err_out(libtrace, errno, "Cannot attach DAG stream");
-		return -1;
-	}
+        /* Attach and start the DAG stream */
+        if (dag_attach_stream64(FORMAT_DATA_OUT->device->fd,
+                                FORMAT_DATA_OUT->dagstream, 0,
+                                TX_EXTRA_WINDOW) < 0) {
+                trace_set_err_out(libtrace, errno, "Cannot attach DAG stream");
+                return -1;
+        }
 
-	if (dag_start_stream(FORMAT_DATA_OUT->device->fd,
-			FORMAT_DATA_OUT->dagstream) < 0) {
-		trace_set_err_out(libtrace, errno, "Cannot start DAG stream");
-		return -1;
-	}
-	FORMAT_DATA_OUT->stream_attached = 1;
+        if (dag_start_stream(FORMAT_DATA_OUT->device->fd,
+                             FORMAT_DATA_OUT->dagstream) < 0) {
+                trace_set_err_out(libtrace, errno, "Cannot start DAG stream");
+                return -1;
+        }
+        FORMAT_DATA_OUT->stream_attached = 1;
 
-	/* We don't want the dag card to do any sleeping */
-	dag_set_stream_poll64(FORMAT_DATA_OUT->device->fd,
-			FORMAT_DATA_OUT->dagstream, 0, &zero,
-			&nopoll);
+        /* We don't want the dag card to do any sleeping */
+        dag_set_stream_poll64(FORMAT_DATA_OUT->device->fd,
+                              FORMAT_DATA_OUT->dagstream, 0, &zero, &nopoll);
 
-	return 0;
+        return 0;
 }
 
 static int dag_start_input_stream(libtrace_t *libtrace,
@@ -709,50 +711,48 @@ static int dag_start_input_stream(libtrace_t *libtrace,
 	zero.tv_usec = 10000;
 	nopoll = zero;
 
-	/* if trying to perform RX on a TX stream (tx streams are even odd numbers)
-	 * put the card in reverse mode. */
-	if (stream->dagstream % 2 != 0) {
-		// @param mode DAG_REVERSE_MODE (1) or DAG_NORMAL_MODE (0)
-		if (dag_set_mode(FORMAT_DATA->device->fd,
-			stream->dagstream, 1) != 0) {
+        /* if trying to perform RX on a TX stream (tx streams are even odd
+         * numbers) put the card in reverse mode. */
+        if (stream->dagstream % 2 != 0) {
+                // @param mode DAG_REVERSE_MODE (1) or DAG_NORMAL_MODE (0)
+                if (dag_set_mode(FORMAT_DATA->device->fd, stream->dagstream,
+                                 1) != 0) {
 
-			trace_set_err(libtrace, errno, "Cannot set DAG reverse mode");
-			return -1;
-		}
-		fprintf(stderr, "Opening %s in reverse mode\n", libtrace->uridata);
-	}
+                        trace_set_err(libtrace, errno,
+                                      "Cannot set DAG reverse mode");
+                        return -1;
+                }
+                fprintf(stderr, "Opening %s in reverse mode\n",
+                        libtrace->uridata);
+        }
 
-	/* Attach and start the DAG stream */
-	if (dag_attach_stream64(FORMAT_DATA->device->fd,
-			      stream->dagstream, 0, 0) < 0) {
-		trace_set_err(libtrace, errno, "Cannot attach DAG stream #%u",
-		              stream->dagstream);
-		return -1;
-	}
+        /* Attach and start the DAG stream */
+        if (dag_attach_stream64(FORMAT_DATA->device->fd, stream->dagstream, 0,
+                                0) < 0) {
+                trace_set_err(libtrace, errno, "Cannot attach DAG stream #%u",
+                              stream->dagstream);
+                return -1;
+        }
 
-	if (dag_start_stream(FORMAT_DATA->device->fd,
-			     stream->dagstream) < 0) {
-		trace_set_err(libtrace, errno, "Cannot start DAG stream #%u",
-		              stream->dagstream);
-		return -1;
-	}
-	FORMAT_DATA->stream_attached = 1;
+        if (dag_start_stream(FORMAT_DATA->device->fd, stream->dagstream) < 0) {
+                trace_set_err(libtrace, errno, "Cannot start DAG stream #%u",
+                              stream->dagstream);
+                return -1;
+        }
+        FORMAT_DATA->stream_attached = 1;
 
-	/* We don't want the dag card to do any sleeping */
-	if (dag_set_stream_poll64(FORMAT_DATA->device->fd,
-			    stream->dagstream, 0, &zero,
-			    &nopoll) < 0) {
-		trace_set_err(libtrace, errno,
-		              "dag_set_stream_poll failed!");
-		return -1;
-	}
+        /* We don't want the dag card to do any sleeping */
+        if (dag_set_stream_poll64(FORMAT_DATA->device->fd, stream->dagstream, 0,
+                                  &zero, &nopoll) < 0) {
+                trace_set_err(libtrace, errno, "dag_set_stream_poll failed!");
+                return -1;
+        }
 
-	starttop = dag_advance_stream(FORMAT_DATA->device->fd,
-				      stream->dagstream,
-				      &bottom);
+        starttop = dag_advance_stream(FORMAT_DATA->device->fd,
+                                      stream->dagstream, &bottom);
 
-	/* Should probably flush the memory hole now */
-	top = starttop;
+        /* Should probably flush the memory hole now */
+        top = starttop;
         while (starttop - bottom > 0) {
 		bottom += (starttop - bottom);
 		top = dag_advance_stream(FORMAT_DATA->device->fd,
@@ -921,19 +921,18 @@ static int dag_flush_output(libtrace_out_t *libtrace) {
 
 	/* Commit any outstanding traffic in the txbuffer */
         if (FORMAT_DATA_OUT->waiting) {
-		/* dag_tx_stream_commit_bytes64 does not successfully write to vDAGs
-		 * so we use dag_tx_stream_commit_records64 instead, both have the same
-		 * behaviour when writing to a DAG card.
-		 */
+                /* dag_tx_stream_commit_bytes64 does not successfully write to
+                 * vDAGs so we use dag_tx_stream_commit_records64 instead, both
+                 * have the same behaviour when writing to a DAG card.
+                 */
                 FORMAT_DATA_OUT->txbuffer = dag_tx_stream_commit_records64(
-						FORMAT_DATA_OUT->device->fd,
-						FORMAT_DATA_OUT->dagstream,
-						FORMAT_DATA_OUT->waiting );
-		if (FORMAT_DATA_OUT->txbuffer == NULL) {
-			trace_set_err_out(libtrace, TRACE_ERR_BAD_IO,
-				"DAG25: unable to commit tx stream");
-		}
-		FORMAT_DATA_OUT->waiting = 0;
+                    FORMAT_DATA_OUT->device->fd, FORMAT_DATA_OUT->dagstream,
+                    FORMAT_DATA_OUT->waiting);
+                if (FORMAT_DATA_OUT->txbuffer == NULL) {
+                        trace_set_err_out(libtrace, TRACE_ERR_BAD_IO,
+                                          "DAG25: unable to commit tx stream");
+                }
+                FORMAT_DATA_OUT->waiting = 0;
         }
 
 	return 0;
@@ -944,9 +943,9 @@ static int dag_fin_output(libtrace_out_t *libtrace)
 {
 
         /* Commit any outstanding traffic in the txbuffer */
-	      dag_flush_output(libtrace);
+        dag_flush_output(libtrace);
 
-	      int out;
+        int out;
         int last = 0;
         /* Wait until the buffer is clear before exiting the program,
          * as we will lose packets otherwise */

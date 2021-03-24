@@ -803,8 +803,8 @@ static int dpdk_close_and_detach_device(portid_t port)
 	return 0;
 #else
 	/* Not supported by this version of DPDK, ignore and return success */
-	port;
-	return 0;
+        port;
+        return 0;
 #endif
 }
 
