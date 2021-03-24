@@ -28,8 +28,8 @@
 #endif
 
 #include "config.h"
-#include "common.h"
-#include "libtrace.h"
+	#include "common.h"
+		#include "libtrace.h"
 #include "libtrace_int.h"
 #include "format_helper.h"
 #include "format_erf.h"
