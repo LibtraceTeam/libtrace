@@ -14,6 +14,7 @@ jobs:
         uses: fkirc/skip-duplicate-actions@master
         with:
           concurrent_skipping: 'same_content'
+          cancel_others: 'true'
   run-tests-ubuntu:
     name: Run tests ${{ matrix.os }} ${{ matrix.c_compiler }},${{ matrix.cxx_compiler }}
     needs: pre_job

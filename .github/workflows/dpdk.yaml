@@ -24,6 +24,7 @@ jobs:
         uses: fkirc/skip-duplicate-actions@master
         with:
           concurrent_skipping: 'same_content'
+          cancel_others: 'true'
   build-dpdk:
     name: Build ${{ matrix.dpdk_version }} ${{ matrix.os }}
     needs: pre_job
