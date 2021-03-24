@@ -28,7 +28,7 @@
 #endif
 
 #include "config.h"
-	#include "common.h"
+#include "common.h"
 		#include "libtrace.h"
 #include "libtrace_int.h"
 #include "format_helper.h"
