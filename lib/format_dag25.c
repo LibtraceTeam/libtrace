@@ -29,7 +29,7 @@
 
 #include "config.h"
 #include "common.h"
-		#include "libtrace.h"
+#include "libtrace.h"
 #include "libtrace_int.h"
 #include "format_helper.h"
 #include "format_erf.h"
@@ -44,7 +44,7 @@
 #include <sys/mman.h>
 /* XXX: Windows doesn't have pthreads, but this code doesn't compile under
  * Windows anyway so we'll worry about this more later :] */
-	#include <pthread.h>
+#include <pthread.h>
 
 
 #ifdef HAVE_DAG_CONFIG_API_H
@@ -100,7 +100,7 @@
  **/
 #define TX_EXTRA_WINDOW 4*1024*1024
 /* The number of bytes to request 256 KB, much larger sizes than this show no clear benefit */
-         #define TX_BATCH_SIZE 256*1024
+#define TX_BATCH_SIZE 256*1024
 /* The threshold to reach before sending, 2x 64KB (largest packet size) is safe */
 #define TX_BATCH_THOLD (TX_BATCH_SIZE - (2*1024*64))
 
