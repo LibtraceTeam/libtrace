@@ -1,16 +1,18 @@
 name: DAG tests
 on:
   push:
-  pull_request_target:
-    paths:
-    - 'configure.in'
-    - 'lib/format_dag25.c'
-    - 'lib/format_dag24.c'
-    - 'lib/erftypes.h'
-    - 'lib/format_erf.c'
-    - 'lib/format_erf.h'
-    - 'configure.in'
-    - '.github/workflows/dpdk.yaml'
+#  pull_request:
+#    paths:
+#    - 'configure.in'
+#    - 'lib/format_dag25.c'
+#    - 'lib/format_dag24.c'
+#    - 'lib/erftypes.h'
+#    - 'lib/format_erf.c'
+#    - 'lib/format_erf.h'
+#    - 'configure.in'
+#    - '.github/workflows/dpdk.yaml'
+#    - 'test/do-live-tests.sh'
+#    - 'test/test-live-dag.c'
   workflow_dispatch:
 jobs:
   pre_job:
