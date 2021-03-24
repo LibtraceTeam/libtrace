@@ -1,20 +1,10 @@
 name: Clang format
 on: [push, pull_request]
 jobs:
-  pre_job:
-    name: Prerequisite checks
-    runs-on: ubuntu-latest
-    outputs:
-      should_skip: ${{ steps.skip_check.outputs.should_skip }}
-    steps:
-      - id: skip_check
-        uses: fkirc/skip-duplicate-actions@master
-        with:
-          concurrent_skipping: 'same_content'
   clang-format-pull:
     name: Clang Format
     needs: pre_job
-    if: "github.event_name == 'pull_request' && ${{ needs.pre_job.outputs.should_skip != 'true' }}"
+    if: "github.event_name == 'pull_request'"
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
@@ -33,7 +23,7 @@ jobs:
   clang-format-push:
     name: Clang Format
     needs: pre_job
-    if: "github.event_name == 'push' && ${{ needs.pre_job.outputs.should_skip != 'true' }}"
+    if: "github.event_name == 'push'"
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
