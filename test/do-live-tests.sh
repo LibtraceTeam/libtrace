@@ -1,7 +1,5 @@
 #!/bin/bash
 
-
-
 OK=0
 FAIL=""
 
