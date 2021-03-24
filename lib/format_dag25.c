@@ -780,6 +780,7 @@ static int dag_pstart_input(libtrace_t *libtrace)
 	uint16_t stream_count = 0, max_streams;
 	int iserror = 0;
 	struct dag_per_stream_t stream_data;
+        libtrace_list_node_t *streams = FORMAT_DATA_HEAD;
 
 	/* Check we aren't trying to create more threads than the DAG card can
 	 * handle */
@@ -834,8 +835,17 @@ static int dag_pstart_input(libtrace_t *libtrace)
 	if (stream_count < libtrace->perpkt_thread_count) {
 		libtrace->perpkt_thread_count = stream_count;
 	}
-	
-	FORMAT_DATA->stream_attached = 1;
+
+        /* Attach and start each DAG stream */
+        while (streams != NULL) {
+                if (dag_start_input_stream(libtrace, streams->data) < 0) {
+                        return -1;
+                }
+                streams = streams->next;
+        }
+
+        FORMAT_DATA->stream_attached = 1;
+
 
  cleanup:
 	if (iserror) {
@@ -890,8 +900,6 @@ static int dag_pause_input(libtrace_t *libtrace)
 	FORMAT_DATA->stream_attached = 0;
 	return 0;
 }
-
-
 
 /* Closes a DAG input trace */
 static int dag_fin_input(libtrace_t *libtrace)
@@ -1668,10 +1676,6 @@ static int dag_pregister_thread(libtrace_t *libtrace, libtrace_thread_t *t,
 
 		/* Pass the per thread data to the thread */
 		t->format_data = stream_data;
-
-		/* Attach and start the DAG stream */
-		if (dag_start_input_stream(libtrace, stream_data) < 0)
-			return -1;
 	}
 
 	return 0;
