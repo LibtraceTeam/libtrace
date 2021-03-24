@@ -11,7 +11,7 @@ jobs:
         uses: fkirc/skip-duplicate-actions@master
         with:
           concurrent_skipping: 'same_content'
-  clang-format:
+  clang-format-pull:
     name: Clang Format
     needs: pre_job
     if: ${{ needs.pre_job.outputs.should_skip != 'true' }} || "github.event_name != 'pull_request'"
@@ -30,7 +30,7 @@ jobs:
       run: git clang-format origin/${{ github.base_ref }}
     - name: diff
       run: git diff --exit-code
-  clang-format:
+  clang-format-push:
     name: Clang Format
     needs: pre_job
     if: ${{ needs.pre_job.outputs.should_skip != 'true' }} || "github.event_name != 'push'"
