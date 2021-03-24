@@ -3,7 +3,6 @@ on: [push, pull_request]
 jobs:
   clang-format-pull:
     name: Clang Format
-    needs: pre_job
     if: "github.event_name == 'pull_request'"
     runs-on: ubuntu-latest
     steps:
@@ -22,8 +21,7 @@ jobs:
       run: git diff --exit-code
   clang-format-push:
     name: Clang Format
-    needs: pre_job
-    if: "github.event_name == 'push'"
+    if: "github.event_name == 'push' && github.event.before"
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
@@ -34,7 +32,7 @@ jobs:
     - name: Install git-clang-format
       run: sudo install -t /bin git-clang-format
     - name: Fetch origin ${{ github.event.before }}
-      run: git fetch --no-tags --prune --depth=1 origin ${{ github.event.before }}
+      run: git fetch origin ${{ github.event.before }}
     - name: clang-format
       run: git clang-format ${{ github.event.before }}
     - name: diff
