@@ -943,10 +943,10 @@ static int dag_flush_output(libtrace_out_t *libtrace) {
 static int dag_fin_output(libtrace_out_t *libtrace)
 {
 
-	/* Commit any outstanding traffic in the txbuffer */
-	dag_flush_output(libtrace);
+        /* Commit any outstanding traffic in the txbuffer */
+	      dag_flush_output(libtrace);
 
-	int out;
+	      int out;
         int last = 0;
         /* Wait until the buffer is clear before exiting the program,
          * as we will lose packets otherwise */
