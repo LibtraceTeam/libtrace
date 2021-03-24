@@ -24,9 +24,9 @@ jobs:
         with:
           concurrent_skipping: 'same_content'
   build-dpdk:
+    name: Build ${{ matrix.dpdk_version }} ${{ matrix.os }}
     needs: pre_job
     if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
-    name: Build ${{ matrix.dpdk_version }} ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:

@@ -2,6 +2,7 @@ name: Libtrace tests
 on:
   push:
   pull_request:
+  workflow_dispatch:
 jobs:
   pre_job:
     runs-on: ubuntu-latest
@@ -13,9 +14,9 @@ jobs:
         with:
           concurrent_skipping: 'same_content'
   run-tests-ubuntu:
+    name: Run tests ${{ matrix.os }} ${{ matrix.c_compiler }},${{ matrix.cxx_compiler }}
     needs: pre_job
     if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
-    name: Run tests ${{ matrix.os }} ${{ matrix.c_compiler }},${{ matrix.cxx_compiler }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
