@@ -1,14 +1,9 @@
 name: Clang format
-on:
-  push:
-    inputs:
-      base: '${{ github.event.before }}'
-  pull_request:
-    inputs:
-      base: 'origin/${{ github.base_ref }}'
+on: [push, pull_request]
 jobs:
-  clang-format:
+  clang-format-pull:
     name: Clang Format
+    if: "github.event_name == 'pull_request'"
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
@@ -18,9 +13,28 @@ jobs:
       run: wget https://raw.githubusercontent.com/llvm-mirror/clang/master/tools/clang-format/git-clang-format
     - name: Install git-clang-format
       run: sudo install -t /bin git-clang-format
-    - name: Fetch ${{ github.event.inputs.base }}
-      run: git fetch --no-tags --prune --depth=1 origin ${{ github.event.inputs.base }}
+    - name: Fetch origin/${{ github.base_ref }}
+      run: git fetch --no-tags --prune --depth=1 origin ${{ github.base_ref }}
     - name: clang-format
-      run: git clang-format ${{ github.event.inputs.base }}
+      run: git clang-format origin/${{ github.base_ref }}
     - name: diff
       run: git diff --exit-code
+  clang-format-push:
+    name: Clang Format
+    if: "github.event_name == 'push'"
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install clang-format
+      run: sudo apt-get install clang-format
+    - name: Download git-clang-format
+      run: wget https://raw.githubusercontent.com/llvm-mirror/clang/master/tools/clang-format/git-clang-format
+    - name: Install git-clang-format
+      run: sudo install -t /bin git-clang-format
+    - name: Fetch origin ${{ github.event.before }}
+      run: git fetch --no-tags --prune --depth=1 origin ${{ github.event.before }}
+    - name: clang-format
+      run: git clang-format ${{ github.event.before }}
+    - name: diff
+      run: git diff --exit-code
+  
