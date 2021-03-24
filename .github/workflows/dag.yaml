@@ -27,7 +27,6 @@ jobs:
     needs: pre_job
     if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
     runs-on: ${{ matrix.os }}
-    environment: test
     strategy:
       matrix:
         os: [ubuntu-20.04, ubuntu-18.04]
