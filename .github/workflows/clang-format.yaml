@@ -34,6 +34,6 @@ jobs:
     - name: Fetch origin ${{ github.event.before }}
       run: git fetch --no-tags --prune --depth=1 origin ${{ github.event.before }}
     - name: clang-format
-      run: git clang-format origin/${{ github.event.before }}
+      run: git clang-format ${{ github.event.before }}
     - name: diff
       run: git diff --exit-code
