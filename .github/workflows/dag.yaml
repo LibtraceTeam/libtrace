@@ -1,7 +1,7 @@
 name: DAG tests
 on:
   push:
-  pull_request:
+  pull_request_target:
     paths:
     - 'configure.in'
     - 'lib/format_dag25.c'
