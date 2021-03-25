@@ -363,10 +363,10 @@ static int pfringzc_configure_interface(char *uridata,
 	// set nic queues to match number of threads
 	if (linux_get_nic_queues(interface) != threads) {
 		if (linux_set_nic_queues(interface, threads) != threads) {
-                        snprintf(err, errlen, "Unable to set number of NIC queues to match the "
-                                "number of processing threads: %d", threads);
-			errno = TRACE_ERR_INIT_FAILED;
-                        return -1;
+                        fprintf(stderr, "Unable to set number of NIC queues to match the "
+                                "number of processing threads: %d, packets may be lost", threads);
+			//errno = TRACE_ERR_INIT_FAILED;
+                        //return -1;
 		}
 	}
         // get initial interface statistics
