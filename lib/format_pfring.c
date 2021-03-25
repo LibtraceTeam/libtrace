@@ -65,6 +65,7 @@ struct pfring_format_data_t {
 	int snaplen;
 	int8_t ringenabled;
 	char *bpffilter;
+        struct linux_dev_stats interface_stats;
 };
 
 struct pfringzc_per_thread {
@@ -84,6 +85,7 @@ struct pfringzc_format_data_t {
 	int snaplen;
 	char *bpffilter;
 	enum hasher_types hashtype;
+	struct linux_dev_stats interface_stats;
 };
 
 struct pfring_per_stream_t {
@@ -338,6 +340,7 @@ static int pfringzc_max_packet_length(char *device) {
 static int pfringzc_configure_interface(char *uridata,
                                         int threads,
                                         bool dedicated_hasher,
+                                        struct linux_dev_stats *stats,
                                         char *err,
                                         int errlen) {
 	char *interface = pfring_ifname_from_uridata(uridata);
@@ -359,6 +362,11 @@ static int pfringzc_configure_interface(char *uridata,
                         return -1;
 		}
 	}
+        // get initial interface statistics
+        if (linux_get_dev_statistics(interface, stats) != 0) {
+                stats->if_name[0] = 0;
+        }
+
         return threads;
 }
 
@@ -373,6 +381,7 @@ static int pfringzc_start_input(libtrace_t *libtrace) {
         if ((threads = pfringzc_configure_interface(libtrace->uridata,
                                                     libtrace->perpkt_thread_count,
                                                     trace_has_dedicated_hasher(libtrace),
+                                                    &(ZC_FORMAT_DATA->interface_stats),
                                                     err,
                                                     sizeof(err))) == -1) {
                 trace_set_err(libtrace, errno, "%s", err);
@@ -392,6 +401,7 @@ static int pfringzc_start_input(libtrace_t *libtrace) {
                 trace_set_err(libtrace, errno, "%s", err);
 		return -1;
         }
+
 	return 0;
 }
 
@@ -406,6 +416,7 @@ static int pfringzc_start_output(libtrace_out_t *libtrace) {
         if ((threads = pfringzc_configure_interface(libtrace->uridata,
                                                     1,
                                                     0,
+                                                    &(ZC_FORMAT_DATA->interface_stats),
                                                     err,
                                                     sizeof(err))) == -1) {
                 trace_set_err_out(libtrace, errno, "%s", err);
@@ -425,6 +436,7 @@ static int pfringzc_start_output(libtrace_out_t *libtrace) {
                 trace_set_err_out(libtrace, errno, "%s", err);
                 return -1;
         }
+
         return 0;
 }
 
@@ -453,8 +465,16 @@ static int pfring_start_input(libtrace_t *libtrace) {
 
 	rc = pfring_start_input_stream(libtrace, FORMAT_DATA_FIRST);
 	if (rc < 0)
-		return rc;	
+		return rc;
+
 	FORMAT_DATA->ringenabled = 1;
+
+        // get initial interface statistics
+        if (linux_get_dev_statistics(pfring_ifname_from_uridata(libtrace->uridata),
+                                     &(FORMAT_DATA->interface_stats)) != 0) {
+                FORMAT_DATA->interface_stats.if_name[0] = 0;
+        }
+
 	return rc;
 }
 
@@ -523,6 +543,13 @@ static int pfring_pstart_input(libtrace_t *libtrace) {
 		return -1;
 	}
 	FORMAT_DATA->ringenabled = 1;
+
+        // get initial interface statistics
+        if (linux_get_dev_statistics(pfring_ifname_from_uridata(libtrace->uridata),
+                                     &(FORMAT_DATA->interface_stats)) != 0) {
+                FORMAT_DATA->interface_stats.if_name[0] = 0;
+        }
+
 	return 0;
 }
 
@@ -1082,8 +1109,13 @@ static size_t pfring_set_capture_length(libtrace_packet_t *packet, size_t size)
 static void pfring_get_statistics(libtrace_t *libtrace, libtrace_stat_t *stat) {
 
 	pfring_stat st;
-
+        struct linux_dev_stats dev_stats;
 	size_t i;
+
+        stat->dropped = 0;
+        stat->received = 0;
+        stat->errors = 0;
+        stat->captured = 0;
 
 	for (i = 0; i < libtrace_list_get_size(FORMAT_DATA->per_stream); ++i) {
 		struct pfring_per_stream_t *stream;
@@ -1094,20 +1126,33 @@ static void pfring_get_statistics(libtrace_t *libtrace, libtrace_stat_t *stat) {
 			continue;
 		}
 
-		if (stat->dropped_valid) {
-			stat->dropped += st.drop;
-		} else {
-			stat->dropped = st.drop;
-			stat->dropped_valid = 1;
-		}
-
-		if (stat->received_valid) {
-			stat->received += st.recv;
-		} else {
-			stat->received = st.recv;
-			stat->received_valid = 1;
-		}
+                // dropped between pfring and libtrace?
+		stat->dropped += st.drop;
 	}
+
+        if (FORMAT_DATA->interface_stats.if_name[0] != 0) {
+                if (linux_get_dev_statistics(pfring_ifname_from_uridata(libtrace->uridata),
+                                             &dev_stats) == 0) {
+
+                        // add card drops
+                        stat->dropped += (dev_stats.rx_drops - FORMAT_DATA->interface_stats.rx_drops);
+                        stat->dropped_valid = 1;
+
+                        // calculate recieved packets by the card, this includes dropped packets but not errored
+                        stat->received = (dev_stats.rx_packets - FORMAT_DATA->interface_stats.rx_packets);
+                        stat->received += (dev_stats.rx_drops - FORMAT_DATA->interface_stats.rx_drops);
+                        stat->received_valid = 1;
+
+                        // add card errors
+                        stat->errors = (dev_stats.rx_errors - FORMAT_DATA->interface_stats.rx_errors);
+                        stat->errors_valid = 1;
+                }
+        }
+
+        if (stat->received_valid && stat->dropped_valid) {
+               stat->captured = stat->received - stat->dropped;
+               stat->captured_valid = 1;
+        }
 
 }
 

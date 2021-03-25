@@ -299,67 +299,6 @@ void linuxcommon_close_input_stream(libtrace_t *libtrace,
          */
 }
 
-#define REPEAT_16(x) x x x x x x x x x x x x x x x x
-#define xstr(s) str(s)
-#define str(s) #s
-
-/* These don't typically reset however an interface does exist to reset them */
-int linuxcommon_get_dev_statistics(char *ifname, struct linux_dev_stats *stats) {
-	FILE *file;
-	char line[1024];
-	struct linux_dev_stats tmp_stats;
-
-	file = fopen("/proc/net/dev","r");
-	if (file == NULL) {
-		return -1;
-	}
-
-	/* Skip 2 header lines */
-	if (fgets(line, sizeof(line), file) == NULL) {
-                fclose(file);
-                return -1;
-        }
-
-	if (fgets(line, sizeof(line), file) == NULL) {
-                fclose(file);
-                return -1;
-        }
-
-	while (!(feof(file)||ferror(file))) {
-		int tot;
-		if (fgets(line, sizeof(line), file) == NULL)
-                        break;
-
-		tot = sscanf(line, " %"xstr(IF_NAMESIZE)"[^:]:" REPEAT_16(" %"SCNd64),
-		             tmp_stats.if_name,
-		             &tmp_stats.rx_bytes,
-		             &tmp_stats.rx_packets,
-		             &tmp_stats.rx_errors,
-		             &tmp_stats.rx_drops,
-		             &tmp_stats.rx_fifo,
-		             &tmp_stats.rx_frame,
-		             &tmp_stats.rx_compressed,
-		             &tmp_stats.rx_multicast,
-		             &tmp_stats.tx_bytes,
-		             &tmp_stats.tx_packets,
-		             &tmp_stats.tx_errors,
-		             &tmp_stats.tx_drops,
-		             &tmp_stats.tx_fifo,
-		             &tmp_stats.tx_colls,
-		             &tmp_stats.tx_carrier,
-		             &tmp_stats.tx_compressed);
-		if (tot != 17)
-			continue;
-		if (strncmp(tmp_stats.if_name, ifname, IF_NAMESIZE) == 0) {
-			*stats = tmp_stats;
-			fclose(file);
-			return 0;
-		}
-	}
-	fclose(file);
-	return -1;
-}
-
 /* Start an input stream
  * - Opens the file descriptor
  * - Sets promiscuous correctly
@@ -502,7 +441,7 @@ int linuxcommon_start_input_stream(libtrace_t *libtrace,
 	FORMAT_DATA->stats.tp_packets = -count;
 	FORMAT_DATA->stats.tp_drops = 0;
 
-	if (linuxcommon_get_dev_statistics(libtrace->uridata, &FORMAT_DATA->dev_stats) != 0) {
+	if (linux_get_dev_statistics(libtrace->uridata, &FORMAT_DATA->dev_stats) != 0) {
 		/* Mark this as bad */
 		FORMAT_DATA->dev_stats.if_name[0] = 0;
 	}
@@ -614,7 +553,7 @@ void linuxcommon_get_statistics(libtrace_t *libtrace, libtrace_stat_t *stat) {
 	dev_stats.if_name[0] = 0; /* This will be set if we retrive valid stats */
 	/* Do we have starting stats to compare to? */
 	if (FORMAT_DATA->dev_stats.if_name[0] != 0) {
-		linuxcommon_get_dev_statistics(libtrace->uridata, &dev_stats);
+		linux_get_dev_statistics(libtrace->uridata, &dev_stats);
 	}
 	linuxcommon_update_socket_statistics(libtrace);
 
