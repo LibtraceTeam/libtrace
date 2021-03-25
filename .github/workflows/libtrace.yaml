@@ -1,0 +1,139 @@
+name: Libtrace tests
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  pre_job:
+    name: Prerequisite checks
+    runs-on: ubuntu-latest
+    outputs:
+      should_skip: ${{ steps.skip_check.outputs.should_skip }}
+    steps:
+      - id: skip_check
+        uses: fkirc/skip-duplicate-actions@master
+        with:
+          concurrent_skipping: 'same_content'
+          cancel_others: 'true'
+  run-tests-ubuntu:
+    name: Run tests ${{ matrix.os }} ${{ matrix.c_compiler }},${{ matrix.cxx_compiler }}
+    needs: pre_job
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-20.04, ubuntu-18.04]
+        c_compiler: [gcc, clang]
+        cxx_compiler: [g++, clang++]
+        exclude:
+          - c_compiler: gcc
+            cxx_compiler: clang++
+          - c_compiler: clang
+            cxx_compiler: g++
+    steps:
+    - name: Setup Enviroment Variables
+      env:
+        CC: ${{ matrix.c_compiler }}
+        CXX: ${{ matrix.cxx_compiler }}
+      run: echo CC = $CC, CXX = $CXX 
+    - name: Setup Hugepages
+      run: |
+        echo "1024" | sudo tee -a /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
+        echo "4" | sudo tee -a /sys/kernel/mm/hugepages/hugepages-1048576kB/nr_hugepages
+        sudo mkdir /dev/hugepages1G
+        sudo mkdir /dev/hugepages2M
+        sudo mount -t hugetlbfs -o pagesize=1GB none /dev/hugepages1G
+        sudo mount -t hugetlbfs -o pagesize=2M none /dev/hugepages2M
+        sudo mount
+    - name: Install Dependencies
+      run: |
+        sudo apt update
+        sudo apt-get -y install flex bison libpcap0.8-dev libtool pkgconf autoconf automake m4 gcc clang llvm gcc-multilib
+        sudo apt-get -y install build-essential dpdk-dev libelf-dev git
+    - name: Install PF_RING
+      run: |
+        sudo apt-get -y install software-properties-common wget
+        sudo add-apt-repository -y universe
+        wget https://packages.ntop.org/apt-stable/20.04/all/apt-ntop-stable.deb
+        sudo apt-get -y install ./apt-ntop-stable.deb
+        sudo apt-get update
+        sudo apt-get -y install pfring
+        sudo ldconfig
+    - name: Checkout Libbpf
+      uses: actions/checkout@v2
+      with:
+        path: libbpf
+        repository: libbpf/libbpf
+    - name: Build/Install Libbpf
+      run: |
+        cd libbpf/src
+        make
+        sudo make install
+        echo "/usr/lib64" | sudo tee -a /etc/ld.so.conf.d/lib64.conf
+        sudo ldconfig
+    - name: Checkout Libtrace
+      uses: actions/checkout@v2
+      with:
+        path: libtrace
+        submodules: recursive
+    - name: Build/Install Wandio
+      run: |
+        cd libtrace/wandio
+        ./bootstrap.sh
+        ./configure
+        make
+        sudo make install
+        sudo ldconfig
+    - name: Build/Install Libtrace
+      run: |
+        cd libtrace
+        ./bootstrap.sh
+        ./configure CFLAGS="-I$(pwd)/../libbpf/include/uapi" --with-dpdk --with-pfring --with-xdp
+        make
+        sudo make install
+    - name: Build Tests
+      run: cd libtrace/test; make
+    - name: Run do-tests.sh
+      run: cd libtrace/test; ./do-tests.sh
+    - name: Run do-tests-parallel.sh
+      run: cd libtrace/test; ./do-tests-parallel.sh
+    - name: Run do-tests-datastruct.sh
+      run: cd libtrace/test; ./do-tests-datastruct.sh
+    - name: Run do-live-tests.sh
+      run: cd libtrace/test; sudo ./do-live-tests.sh pcap int ring dpdk
+  run-tests-macos:
+    name: Run tests ${{ matrix.os }}
+    needs: pre_job
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-10.15]
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: recursive
+    - name: Install Dependencies
+      run: |
+        brew install flex bison libpcap libtool autoconf automake m4 gcc
+    - name: Build/Install Wandio
+      run: |
+        cd wandio
+        ./bootstrap.sh
+        ./configure
+        make
+        sudo make install
+    - name: Build/Install Libtrace
+      run: |
+        ./bootstrap.sh
+        ./configure
+        make
+        sudo make install
+    - name: Build Tests
+      run: cd test; make
+    - name: Run do-tests.sh
+      run: cd test; ./do-tests.sh
+    - name: Run do-tests-parallel.sh
+      run: cd test; ./do-tests-parallel.sh
+    - name: Run do-tests-datastruct.sh
+      run: cd test; ./do-tests-datastruct.sh
