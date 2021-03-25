@@ -193,6 +193,20 @@ struct libtrace_pfring_header {
 	
 };
 
+/* Offset at which local_pfring_header *mostly* lines up with
+ * libtrace_pfring_header pfring_header = 1
+ *
+ * *Mostly* because timeval will change size between 32-bit and 64-bit builds,
+ * so instead we align to caplen.
+ * The timestamp is easy to fix; first copy tv_sec then tv_usec across from the
+ * local version to the libtrace version. This copy will be omitted for if
+ * timeval is 64-bit.
+ */
+#define PFRING_LOCAL_STRUCT_OFFSET                                             \
+        (offsetof(struct libtrace_pfring_header, caplen) -                     \
+         offsetof(struct local_pfring_header, caplen))
+ct_assert(PFRING_LOCAL_STRUCT_OFFSET > 0);
+
 static inline char *pfring_ifname_from_uridata(char *uridata) {
         char *interface = strchr(uridata, ':');
         if (interface != NULL) {
@@ -875,9 +889,9 @@ static int pfring_read_generic(libtrace_t *libtrace, libtrace_packet_t *packet,
 		libtrace_message_queue_t *queue)
 {
 
-	struct libtrace_pfring_header *hdr;
-	struct local_pfring_header local;
-	int rc;
+        struct libtrace_pfring_header *hdr;
+        struct local_pfring_header *local;
+        int rc;
 
 	if (packet->buf_control == TRACE_CTRL_EXTERNAL || !packet->buffer) {
 		packet->buffer = malloc((size_t)LIBTRACE_PACKET_BUFSIZE);
@@ -887,12 +901,16 @@ static int pfring_read_generic(libtrace_t *libtrace, libtrace_packet_t *packet,
 			return -1;
 		}
 	}
-	
-	hdr = (struct libtrace_pfring_header *)packet->buffer;
+
+        hdr = (struct libtrace_pfring_header *)packet->buffer;
+        /* pfring_recv fills a local_pfring_header, we line this up with
+         * the libtrace_pfring_header to avoid extra memory copies */
+        local = (struct local_pfring_header *)(((char *)hdr) +
+                                               PFRING_LOCAL_STRUCT_OFFSET);
+
 	do {
-		if ((rc = pfring_recv(stream->pd, (u_char **)&packet->payload, 
-			0, (struct pfring_pkthdr *)&local, 0)) == -1)
-		{
+		if ((rc = pfring_recv(stream->pd, (u_char **)&packet->payload,
+			0, (struct pfring_pkthdr *)local, 0)) == -1) {
 			trace_set_err(libtrace, errno, "Failed to read packet from pfring:");
 			return -1;
 		}
@@ -917,20 +935,9 @@ static int pfring_read_generic(libtrace_t *libtrace, libtrace_packet_t *packet,
 	hdr->byteorder = PFRING_BYTEORDER_BIGENDIAN;
 #endif
 
-	hdr->caplen = (local.caplen);
-	hdr->wlen = (local.wlen);
-	hdr->ext.ts_ns = (local.ext.ts_ns);
-	hdr->ext.flags = (local.ext.flags);
-	hdr->ext.if_index = (local.ext.if_index);
-	hdr->ext.hash = (local.ext.hash);
-	hdr->ext.tx.bounce_iface = (local.ext.tx.bounce_iface);
-	hdr->ext.parsed_hdr_len = (local.ext.parsed_hdr_len);
-	hdr->ext.direction = local.ext.direction;
-
-
-	/* I think we can ignore parsed as it will only be populated if
-	 * we call pfring_parse_pkt (?)
-	 */
+        /* Convert timespec to 64-bit, if it is not already */
+        hdr->ts.tv_sec = local->ts.tv_sec;
+        hdr->ts.tv_usec = local->ts.tv_usec;
 
 	packet->trace = libtrace;
 	packet->type = TRACE_RT_DATA_PFRING;
