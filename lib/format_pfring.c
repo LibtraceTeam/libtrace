@@ -262,9 +262,9 @@ static inline uint32_t pfring_flags(libtrace_t *libtrace) {
 	flags |= PF_RING_HW_TIMESTAMP;
 	flags |= PF_RING_DO_NOT_PARSE;
 
-	if (FORMAT_DATA->promisc > 0) 
-		flags |= PF_RING_PROMISC;
-	return flags;
+        if (FORMAT_DATA->promisc != 0)
+                flags |= PF_RING_PROMISC;
+        return flags;
 }
 
 static inline int pfringzc_init_queues(const char *uridata, char *err, int errlen,
