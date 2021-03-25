@@ -1395,8 +1395,8 @@ void dpdkndag_constructor(void);
 void linux_xdp_constructor(void);
 #endif
 #if HAVE_PFRING
+void pfringold_constructor(void);
 void pfring_constructor(void);
-void pfringzc_constructor(void);
 #endif
 
 /** Extracts the RadioTap flags from a wireless link header
