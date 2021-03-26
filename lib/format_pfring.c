@@ -1320,6 +1320,8 @@ static void pfringzc_get_stats(libtrace_t *libtrace,
 	// when using zero copy stats from pfring_zc_stats are correct however when not in zero copy we
 	// need to get stats from the card
 	if (!(ZC_FORMAT_DATA->zero_copy)) {
+		stats->received_valid = 0;
+                stats->dropped_valid = 0;
 		if (ZC_FORMAT_DATA->interface_stats.if_name[0] != 0) {
                 	if (linux_get_dev_statistics(pfring_ifname_from_uridata(libtrace->uridata),
                                                      &dev_stats) == 0) {
