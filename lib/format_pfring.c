@@ -98,6 +98,7 @@ struct pfring_per_stream_t {
         x->dropped = 0; x->dropped_valid = 0;\
         x->received = 0; x->received_valid = 0;\
         x->captured = 0; x->captured_valid = 0;\
+	x->errors = 0; x->errors_valid = 0;\
 }
 
 #define ZERO_PFRING_STREAM {NULL, -1}
