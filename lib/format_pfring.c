@@ -101,6 +101,18 @@ struct pfring_per_stream_t {
 	x->errors = 0; x->errors_valid = 0;\
 }
 
+#define INIT_ZC_FORMAT(x) {\
+	x->snaplen = LIBTRACE_PACKET_BUFSIZE;\
+	x->bpffilter = NULL;\
+	x->devices = NULL;\
+	x->cluster = NULL;\
+	x->hashtype = HASHER_BIDIRECTIONAL;\
+	x->clusterid = (uint16_t)rand();\
+	x->perthreads = NULL;\
+	x->zero_copy = 0;\
+	x->promisc = -1;\
+}
+
 #define ZERO_PFRING_STREAM {NULL, -1}
 
 #define PFRING_DATA(x) ((struct pfring_format_data_t *)x->format_data)
@@ -370,10 +382,10 @@ static int pfringzc_configure_interface(char *uridata,
 	// set nic queues to match number of threads
 	if (linux_get_nic_queues(interface) != threads) {
 		if (linux_set_nic_queues(interface, threads) != threads) {
-                        fprintf(stderr, "Unable to set number of NIC queues to match the "
-                                "number of processing threads: %d, packets may be lost", threads);
-			//errno = TRACE_ERR_INIT_FAILED;
-                        //return -1;
+                        snprintf(err, errlen, "Unable to set number of NIC queues to match the "
+                                "number of processing threads: %d", threads);
+			errno = TRACE_ERR_INIT_FAILED;
+                        return -1;
 		}
 	}
         // get initial interface statistics (this only actually works when not doing ZC)
@@ -591,16 +603,7 @@ static int pfringzc_init_input(libtrace_t *libtrace) {
 	libtrace->format_data = (struct pfringzc_format_data_t *)
 		malloc(sizeof(struct pfringzc_format_data_t));
 	assert(libtrace->format_data != NULL);
-
-	ZC_FORMAT_DATA->promisc = -1;
-	ZC_FORMAT_DATA->snaplen = LIBTRACE_PACKET_BUFSIZE;
-	ZC_FORMAT_DATA->bpffilter = NULL;
-	ZC_FORMAT_DATA->devices = NULL;
-	ZC_FORMAT_DATA->cluster = NULL;
-	ZC_FORMAT_DATA->hashtype = HASHER_BIDIRECTIONAL;
-	ZC_FORMAT_DATA->clusterid = (uint16_t)rand();
-	ZC_FORMAT_DATA->perthreads = NULL;
-	ZC_FORMAT_DATA->zero_copy = 0;
+	INIT_ZC_FORMAT(ZC_FORMAT_DATA);
 
 	return 0;
 }
@@ -609,16 +612,8 @@ static int pfringzc_init_output(libtrace_out_t *libtrace) {
 
         libtrace->format_data = (struct pfringzc_format_data_t *)
                 malloc(sizeof(struct pfringzc_format_data_t));
-
-        ZC_FORMAT_DATA->cluster = NULL;
-        ZC_FORMAT_DATA->devices = NULL;
-        ZC_FORMAT_DATA->clusterid = (uint16_t)rand();
-        ZC_FORMAT_DATA->perthreads = NULL;
-        ZC_FORMAT_DATA->promisc = -1;
-        ZC_FORMAT_DATA->snaplen = LIBTRACE_PACKET_BUFSIZE;
-        ZC_FORMAT_DATA->bpffilter = NULL;
-        ZC_FORMAT_DATA->hashtype = HASHER_BIDIRECTIONAL;
-	ZC_FORMAT_DATA->zero_copy = 0;
+	assert(libtrace->format_data != NULL);
+	INIT_ZC_FORMAT(ZC_FORMAT_DATA);
 
         return 0;
 }
