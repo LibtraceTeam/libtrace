@@ -1,0 +1,73 @@
+name: DPDK Build
+on:
+  push:
+  pull_request:
+    paths:
+    - 'configure.in'
+    - 'lib/format_dpdk.c'
+    - 'lib/format_dpdk.h'
+    - 'lib/dpdk_libtrace.mk'
+    - 'lib/format_dpdkndag.c'
+    - 'test/do-test-build-dpdk.sh'
+    - 'test/do-test-build-dpdk-live.sh'
+    - '.github/workflows/dpdk.yaml'
+    - 'test/Makefile'
+  workflow_dispatch:
+jobs:
+  pre_job:
+    name: Prerequisite checks
+    runs-on: ubuntu-latest
+    outputs:
+      should_skip: ${{ steps.skip_check.outputs.should_skip }}
+    steps:
+      - id: skip_check
+        uses: fkirc/skip-duplicate-actions@master
+        with:
+          concurrent_skipping: 'same_content'
+          cancel_others: 'true'
+  build-dpdk:
+    name: Build ${{ matrix.dpdk_version }} ${{ matrix.os }}
+    needs: pre_job
+    if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-20.04, ubuntu-18.04, ubuntu-16.04]
+        dpdk_version: [dpdk-20.11, dpdk-20.02, dpdk-19.11.5, dpdk-18.11.10, dpdk-17.11.10, dpdk-16.11.11]
+        exclude:
+          - os: ubuntu-16.04
+            dpdk_version: dpdk-20.11
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        path: libtrace
+        submodules: recursive
+    - name: Setup hugepages
+      run: |
+        echo "1024" | sudo tee -a /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
+        echo "4" | sudo tee -a /sys/kernel/mm/hugepages/hugepages-1048576kB/nr_hugepages
+        sudo mkdir /dev/hugepages1G
+        sudo mkdir /dev/hugepages2M
+        sudo mount -t hugetlbfs -o pagesize=1GB none /dev/hugepages1G
+        sudo mount -t hugetlbfs -o pagesize=2M none /dev/hugepages2M
+        sudo mount
+    - name: Install dependencies
+      run: |
+        sudo apt-get -y install build-essential python3-pyelftools flex bison python3-pip python3-setuptools
+        sudo apt-get -y install libpcap0.8-dev libtool pkgconf wget m4 autoconf automake gcc libnuma-dev
+        sudo apt-get -y install meson ninja-build
+        sudo pip3 install meson ninja || true
+    - name: Install wandio
+      run: |
+        cd libtrace/wandio
+        ./bootstrap.sh
+        ./configure
+        make
+        sudo make install
+        sudo ldconfig
+    - name: Build ${{ matrix.dpdk_version }}
+      run: cd libtrace/test; sudo ./do-test-build-dpdk.sh ${{ matrix.dpdk_version }}
+    - name: Build tests ${{ matrix.dpdk_version }}
+      run: cd libtrace/test; make dpdk DPDK_BUILD=DPDK_builds/${{ matrix.dpdk_version }}
+    - name: Run tests ${{ matrix.dpdk_version }}
+      run: cd libtrace/test; sudo ./do-test-build-dpdk-live.sh

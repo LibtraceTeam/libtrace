@@ -78,5 +78,8 @@ int main() {
 	pthread_join(t[1], NULL);
 	assert(libtrace_vector_get_size(&vector) == 0);
 
-	return 0;
+        libtrace_vector_destroy(&vector);
+        libtrace_vector_destroy(&vector2);
+
+        return 0;
 }

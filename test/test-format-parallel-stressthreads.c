@@ -278,16 +278,25 @@ int main(int argc, char *argv[]) {
         libtrace_callback_set_t *processing = NULL;
         libtrace_callback_set_t *reporter = NULL;
         uint32_t global = 0xabcdef;
+        bool pause = 1;
+        int opt;
+        char *read = NULL;
 
-	if (argc<2) {
-		fprintf(stderr,"usage: %s type\n",argv[0]);
-		return 1;
-	}
+        while ((opt = getopt(argc, argv, "pr:")) != -1) {
+                switch (opt) {
+                case 'p':
+                        pause = 0;
+                        break;
+                case 'r':
+                        read = optarg;
+                        break;
+                }
+        }
 
-	tracename = lookup_uri(argv[1]);
+        tracename = lookup_uri(read);
 
-	trace = trace_create(tracename);
-	iferr(trace,tracename);
+        trace = trace_create(tracename);
+        iferr(trace, tracename);
 
         processing = trace_create_callback_set();
         trace_set_starting_cb(processing, start_processing);
@@ -309,14 +318,16 @@ int main(int argc, char *argv[]) {
 	trace_pstart(trace, &global, processing, reporter);
 	iferr(trace,tracename);
 
-	/* Make sure traces survive a pause */
-	trace_ppause(trace);
-	iferr(trace,tracename);
-	trace_pstart(trace, NULL, NULL, NULL);
-	iferr(trace,tracename);
+        if (pause) {
+                /* Make sure traces survive a pause */
+                trace_ppause(trace);
+                iferr(trace, tracename);
+                trace_pstart(trace, NULL, NULL, NULL);
+                iferr(trace, tracename);
+        }
 
-	/* Wait for all threads to stop */
-	trace_join(trace);
+        /* Wait for all threads to stop */
+        trace_join(trace);
 
         global = 0xffffffff;
 

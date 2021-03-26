@@ -106,7 +106,7 @@
 
 /* Compile time asserts, check sizes are valid */
 ct_assert(TX_BATCH_SIZE > TX_BATCH_THOLD);
-ct_assert(TX_BATCH_THOLD > 0);
+		ct_assert(TX_BATCH_THOLD > 0);
 ct_assert(!TX_EXTRA_WINDOW || TX_EXTRA_WINDOW > TX_BATCH_SIZE);
 
 static struct libtrace_format_t dag;
@@ -223,17 +223,17 @@ static bool dag_can_write(libtrace_packet_t *packet) {
 /* Attempts to determine if the given filename refers to a DAG device */
 static int dag_probe_filename(const char *filename)
 {
-	struct stat statbuf;
-	/* Can we stat the file? */
-	if (stat(filename, &statbuf) != 0) {
-		return 0;
-	}
-	/* Is it a character device? */
-	if (!S_ISCHR(statbuf.st_mode)) {
-		return 0;
-	}
-	/* Yeah, it's probably us. */
-	return 1;
+        struct stat statbuf;
+        /* Can we stat the file? */
+        if (stat(filename, &statbuf) != 0) {
+                return 0;
+        }
+        /* Is it a character device? */
+        if (!S_ISCHR(statbuf.st_mode)) {
+                return 0;
+        }
+        /* Yeah, it's probably us. */
+        return 1;
 }
 
 /* Initialises the DAG output data structure */
@@ -641,9 +641,7 @@ static int dag_config_input(libtrace_t *libtrace, trace_option_t option,
 		/* Live capture is always going to be realtime */
 		return -1;
 	case TRACE_OPTION_HASHER:
-		/* Lets just say we did this, it's currently still up to
-		 * the user to configure this correctly. */
-		return 0;
+                return -1;
         case TRACE_OPTION_CONSTANT_ERF_FRAMING:
                 return -1;
         case TRACE_OPTION_DISCARD_META:
@@ -949,34 +947,45 @@ static int dag_fin_output(libtrace_out_t *libtrace)
 	dag_flush_output(libtrace);
 
 	int out;
-	/* Wait until the buffer is clear before exiting the program,
-	 * as we will lose packets otherwise */
-	while((out = dag_get_stream_buffer_level64(FORMAT_DATA_OUT->device->fd,
-	                                           FORMAT_DATA_OUT->dagstream))) {
-		/* Wait for dag to complete writing all data */
+        int last = 0;
+        /* Wait until the buffer is clear before exiting the program,
+         * as we will lose packets otherwise */
+        while ((out = dag_get_stream_buffer_level64(
+                    FORMAT_DATA_OUT->device->fd, FORMAT_DATA_OUT->dagstream))) {
+                /* Wait for dag to complete writing all data */
 
-		/* for some reason when writing to a vDAG dag_get_stream_buffer_level64
-		 * will return 8 even when no data remains?? not sure why this is.
+                /* This is very unpredictable, Sometimes we get 0 returned,
+                 * sometimes 8 when using a vDAG and other time some random
+                 * number, so if a identical value is returned skip over this...
                  */
-		if (out == 8) {
-			break;
-		}
-	}
+                if (last == out) {
+                        break;
+                }
 
-	/* Need the lock, since we're going to be handling the device list */
-	pthread_mutex_lock(&open_dag_mutex);
+                if (out == 8) {
+                        break;
+                }
 
-	/* Detach the stream if we are not paused */
-	if (FORMAT_DATA_OUT->stream_attached)
-		dag_pause_output(libtrace);
-	FORMAT_DATA_OUT->device->ref_count --;
+                last = out;
 
-	/* Close the DAG device if there are no more references to it */
-	if (FORMAT_DATA_OUT->device->ref_count == 0)
-		dag_close_device(FORMAT_DATA_OUT->device);
-	free(libtrace->format_data);
-	pthread_mutex_unlock(&open_dag_mutex);
-	return 0; /* success */
+                /* give some time to write output */
+                usleep(500);
+        }
+
+        /* Need the lock, since we're going to be handling the device list */
+        pthread_mutex_lock(&open_dag_mutex);
+
+        /* Detach the stream if we are not paused */
+        if (FORMAT_DATA_OUT->stream_attached)
+                dag_pause_output(libtrace);
+        FORMAT_DATA_OUT->device->ref_count--;
+
+        /* Close the DAG device if there are no more references to it */
+        if (FORMAT_DATA_OUT->device->ref_count == 0)
+                dag_close_device(FORMAT_DATA_OUT->device);
+        free(libtrace->format_data);
+        pthread_mutex_unlock(&open_dag_mutex);
+        return 0; /* success */
 }
 
 #ifdef DAGIOC_CARD_DUCK
@@ -1253,6 +1262,7 @@ static int libtrace_to_dag_hdr(libtrace_out_t *libtrace, libtrace_packet_t *pack
     if (!find_compatible_linktype(libtrace,packet))
         return -1;
 
+    erf->ts = trace_get_erf_timestamp(packet);
     /* Fill in the packet size, it may have changed after demotion */
     if (packet->type == TRACE_RT_DATA_ERF) {
         *framinglen = trace_get_framing_length(packet);
