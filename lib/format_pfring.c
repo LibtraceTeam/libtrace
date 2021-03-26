@@ -86,6 +86,7 @@ struct pfringzc_format_data_t {
 	char *bpffilter;
 	enum hasher_types hashtype;
 	struct linux_dev_stats interface_stats;
+	bool zero_copy;
 };
 
 struct pfring_per_stream_t {
@@ -96,7 +97,6 @@ struct pfring_per_stream_t {
 #define ZERO_STATS(x) {\
         x->dropped = 0; x->dropped_valid = 0;\
         x->received = 0; x->received_valid = 0;\
-        x->errors = 0; x->errors_valid = 0;\
         x->captured = 0; x->captured_valid = 0;\
 }
 
@@ -226,6 +226,10 @@ static inline char *pfring_ifname_from_uridata(char *uridata) {
         return interface;
 }
 
+static inline bool pfring_ifname_is_zc(char *uridata) {
+	return (strstr(uridata, "zc:") != NULL);
+}
+
 static inline uint64_t pfring_timespec_to_systime(pfring_zc_timespec *ts) {
         return (uint64_t)ts->tv_sec * 1000000000ull + (uint64_t) ts->tv_nsec;
 }
@@ -347,13 +351,15 @@ static int pfringzc_max_packet_length(char *device) {
 static int pfringzc_configure_interface(char *uridata,
                                         int threads,
                                         bool dedicated_hasher,
-                                        struct linux_dev_stats *stats,
+                                        struct pfringzc_format_data_t *fdata,
                                         char *err,
                                         int errlen) {
 	char *interface = pfring_ifname_from_uridata(uridata);
 	if (threads == 0 || dedicated_hasher) {
 		threads = 1;
         }
+	// check if ZC is used
+	fdata->zero_copy = pfring_ifname_is_zc(uridata);
 	// check interface exists
 	if (if_nametoindex(interface) == 0) {
                 snprintf(err, errlen, "Invalid interface name: %s", interface);
@@ -369,11 +375,10 @@ static int pfringzc_configure_interface(char *uridata,
                         //return -1;
 		}
 	}
-        // get initial interface statistics
-        if (linux_get_dev_statistics(interface, stats) != 0) {
-                stats->if_name[0] = 0;
+        // get initial interface statistics (this only actually works when not doing ZC)
+        if (linux_get_dev_statistics(interface, &(fdata->interface_stats)) != 0) {
+                fdata->interface_stats.if_name[0] = 0;
         }
-
         return threads;
 }
 
@@ -388,7 +393,7 @@ static int pfringzc_start_input(libtrace_t *libtrace) {
         if ((threads = pfringzc_configure_interface(libtrace->uridata,
                                                     libtrace->perpkt_thread_count,
                                                     trace_has_dedicated_hasher(libtrace),
-                                                    &(ZC_FORMAT_DATA->interface_stats),
+                                                    ZC_FORMAT_DATA,
                                                     err,
                                                     sizeof(err))) == -1) {
                 trace_set_err(libtrace, errno, "%s", err);
@@ -423,7 +428,7 @@ static int pfringzc_start_output(libtrace_out_t *libtrace) {
         if ((threads = pfringzc_configure_interface(libtrace->uridata,
                                                     1,
                                                     0,
-                                                    &(ZC_FORMAT_DATA->interface_stats),
+                                                    ZC_FORMAT_DATA,
                                                     err,
                                                     sizeof(err))) == -1) {
                 trace_set_err_out(libtrace, errno, "%s", err);
@@ -594,13 +599,16 @@ static int pfringzc_init_input(libtrace_t *libtrace) {
 	ZC_FORMAT_DATA->hashtype = HASHER_BIDIRECTIONAL;
 	ZC_FORMAT_DATA->clusterid = (uint16_t)rand();
 	ZC_FORMAT_DATA->perthreads = NULL;
+	ZC_FORMAT_DATA->zero_copy = 0;
 
 	return 0;
 }
 
 static int pfringzc_init_output(libtrace_out_t *libtrace) {
+
         libtrace->format_data = (struct pfringzc_format_data_t *)
                 malloc(sizeof(struct pfringzc_format_data_t));
+
         ZC_FORMAT_DATA->cluster = NULL;
         ZC_FORMAT_DATA->devices = NULL;
         ZC_FORMAT_DATA->clusterid = (uint16_t)rand();
@@ -609,6 +617,8 @@ static int pfringzc_init_output(libtrace_out_t *libtrace) {
         ZC_FORMAT_DATA->snaplen = LIBTRACE_PACKET_BUFSIZE;
         ZC_FORMAT_DATA->bpffilter = NULL;
         ZC_FORMAT_DATA->hashtype = HASHER_BIDIRECTIONAL;
+	ZC_FORMAT_DATA->zero_copy = 0;
+
         return 0;
 }
 
@@ -1283,7 +1293,7 @@ static void pfringzc_get_stats(libtrace_t *libtrace,
 			       libtrace_stat_t *stats) {
 	int threads, i;
 	pfring_zc_stat zcstats;
-        struct linux_dev_stats dev_stats;
+	struct linux_dev_stats dev_stats;
         ZERO_STATS(stats);
 
 	if (libtrace->perpkt_thread_count == 0 || trace_has_dedicated_hasher(libtrace)) {
@@ -1293,59 +1303,99 @@ static void pfringzc_get_stats(libtrace_t *libtrace,
 	}
 
 	for (i = 0; i < threads; i++) {
-		struct pfringzc_per_thread *stream = &(ZC_FORMAT_DATA->perthreads[i]);
-		if (pfring_zc_stats(stream->device, &zcstats) != 0) {
-                        trace_set_err(libtrace, errno, "Failed to get statistics for pfring stream %u", (uint32_t)i);
-                        continue;
+                struct pfringzc_per_thread *stream = &(ZC_FORMAT_DATA->perthreads[i]);
+                if (pfring_zc_stats(stream->device, &zcstats) != 0) {
+                        trace_set_err(libtrace, errno, "Failed to get statistics for pfring\n");
+                        return;
                 }
+
+		// libtrace received includes dropped
+	        stats->received += zcstats.recv + zcstats.drop;
+	        stats->received_valid = 1;
 
                 stats->dropped += zcstats.drop;
-	}
-
-        if (ZC_FORMAT_DATA->interface_stats.if_name[0] != 0) {
-                if (linux_get_dev_statistics(pfring_ifname_from_uridata(libtrace->uridata),
-                                             &dev_stats) == 0) {
-
-                        // add card drops
-                        stats->dropped += (dev_stats.rx_drops - ZC_FORMAT_DATA->interface_stats.rx_drops);
-                        stats->dropped_valid = 1;
-
-                        // calculate recieved packets by the card, this includes dropped packets but not errored
-                        stats->received = (dev_stats.rx_packets - ZC_FORMAT_DATA->interface_stats.rx_packets);
-                        stats->received += (dev_stats.rx_drops - ZC_FORMAT_DATA->interface_stats.rx_drops);
-                        stats->received_valid = 1;
-
-                        // add card errors
-                        stats->errors = (dev_stats.rx_errors - ZC_FORMAT_DATA->interface_stats.rx_errors);
-                        stats->errors_valid = 1;
-                }
+                stats->dropped_valid = 1;
         }
 
-        if (stats->received_valid && stats->dropped_valid) {
-               stats->captured = stats->received - stats->dropped;
-               stats->captured_valid = 1;
+	// when using zero copy stats from pfring_zc_stats are correct however when not in zero copy we
+	// need to get stats from the card
+	if (!(ZC_FORMAT_DATA->zero_copy)) {
+		if (ZC_FORMAT_DATA->interface_stats.if_name[0] != 0) {
+                	if (linux_get_dev_statistics(pfring_ifname_from_uridata(libtrace->uridata),
+                                                     &dev_stats) == 0) {
+
+                        	// add card drops
+                        	stats->dropped += (dev_stats.rx_drops - ZC_FORMAT_DATA->interface_stats.rx_drops);
+                        	stats->dropped_valid = 1;
+
+                        	// calculate recieved packets by the card, this includes dropped packets but not errored
+                        	stats->received = (dev_stats.rx_packets - ZC_FORMAT_DATA->interface_stats.rx_packets);
+                        	stats->received += (dev_stats.rx_drops - ZC_FORMAT_DATA->interface_stats.rx_drops);
+                        	stats->received_valid = 1;
+
+                        	// add card errors
+                        	stats->errors = (dev_stats.rx_errors - ZC_FORMAT_DATA->interface_stats.rx_errors);
+                        	stats->errors_valid = 1;
+			}
+        	}
+	}
+
+	if (stats->received_valid && stats->dropped_valid) {
+                stats->captured = stats->received - stats->dropped;
+        	stats->captured_valid = 1;
         }
 }
 
-static void pfringzc_get_thread_stats(UNUSED libtrace_t *libtrace,
+static void pfringzc_get_thread_stats(libtrace_t *libtrace,
 				      libtrace_thread_t *thread,
 				      libtrace_stat_t *stats) {
-	int rc;
 	pfring_zc_stat zcstats;
-	struct pfringzc_per_thread *stream = (struct pfringzc_per_thread *)thread->format_data;
-	stats->received = 0;
-	stats->dropped = 0;
-	stats->received_valid = 0;
-	stats->dropped_valid = 0;
+	struct linux_dev_stats dev_stats;
+	ZERO_STATS(stats);
+	struct pfringzc_per_thread *stream;
+
+	stream = (struct pfringzc_per_thread *)thread->format_data;
 	if (stream != NULL) {
-		rc = pfring_zc_stats(stream->device, &zcstats);
-		if (rc == 0) {
-			stats->received += zcstats.recv;
-			stats->dropped += zcstats.drop;
-			stats->received_valid = 1;
-			stats->dropped_valid = 1;
+		if (pfring_zc_stats(stream->device, &zcstats) != 0) {
+			trace_set_err(libtrace, errno, "Failed to get pfring thread statistics\n");
+			return;
 		}
+
+		// libtrace received includes dropped
+                stats->received += zcstats.recv + zcstats.drop;
+                stats->received_valid = 1;
+
+                stats->dropped += zcstats.drop;
+                stats->dropped_valid = 1;
 	}
+
+	// when using zero copy stats from pfring_zc_stats are correct however when not in zero copy we
+        // need to get stats from the card
+        if (!(ZC_FORMAT_DATA->zero_copy)) {
+                if (ZC_FORMAT_DATA->interface_stats.if_name[0] != 0) {
+                        if (linux_get_dev_statistics(pfring_ifname_from_uridata(libtrace->uridata),
+                                                     &dev_stats) == 0) {
+
+                                // add card drops
+                                stats->dropped += (dev_stats.rx_drops - ZC_FORMAT_DATA->interface_stats.rx_drops);
+                                stats->dropped_valid = 1;
+
+                                // calculate recieved packets by the card, this includes dropped packets but not errored
+                                stats->received = (dev_stats.rx_packets - ZC_FORMAT_DATA->interface_stats.rx_packets);
+                                stats->received += (dev_stats.rx_drops - ZC_FORMAT_DATA->interface_stats.rx_drops);
+                                stats->received_valid = 1;
+
+                                // add card errors
+                                stats->errors = (dev_stats.rx_errors - ZC_FORMAT_DATA->interface_stats.rx_errors);
+                                stats->errors_valid = 1;
+                        }
+                }
+        }
+
+	if (stats->received_valid && stats->dropped_valid) {
+               stats->captured = stats->received - stats->dropped;
+               stats->captured_valid = 1;
+        }
 }
 
 static int pfringzc_pregister_thread(libtrace_t *libtrace,
