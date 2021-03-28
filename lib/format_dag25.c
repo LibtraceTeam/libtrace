@@ -780,62 +780,71 @@ static int dag_pstart_input(libtrace_t *libtrace)
 	uint16_t stream_count = 0, max_streams;
 	int iserror = 0;
 	struct dag_per_stream_t stream_data;
+        libtrace_list_node_t *streams = FORMAT_DATA_HEAD;
 
-	/* Check we aren't trying to create more threads than the DAG card can
-	 * handle */
-	max_streams = dag_rx_get_stream_count(FORMAT_DATA->device->fd);
-	if (libtrace->perpkt_thread_count > max_streams) {
-		fprintf(stderr,
-			      "WARNING: DAG has only %u streams available, "
-                              "capping total number of threads at this value.",
-			      max_streams);
-	        libtrace->perpkt_thread_count = max_streams;
+        /* Check we aren't trying to create more threads than the DAG card can
+         * handle */
+        max_streams = dag_rx_get_stream_count(FORMAT_DATA->device->fd);
+        if (libtrace->perpkt_thread_count > max_streams) {
+                fprintf(stderr,
+                        "WARNING: DAG has only %u streams available, "
+                        "capping total number of threads at this value.",
+                        max_streams);
+                libtrace->perpkt_thread_count = max_streams;
         }
 
-	/* Get the stream names from the uri */
-	if ((scan = strchr(libtrace->uridata, ',')) == NULL) {
-		trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT,
-			      "Format uri doesn't specify the DAG streams");
-		iserror = 1;
-		goto cleanup;
-	}
+        /* Get the stream names from the uri */
+        if ((scan = strchr(libtrace->uridata, ',')) == NULL) {
+                trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT,
+                              "Format uri doesn't specify the DAG streams");
+                iserror = 1;
+                goto cleanup;
+        }
 
-	scan++;
+        scan++;
 
-	tok = strtok(scan, ",");
-	while (tok != NULL) {
-		/* Ensure we haven't specified too many streams */
-		if (stream_count >= libtrace->perpkt_thread_count) {
-			fprintf(stderr,
-				      "WARNING: Format uri specifies too many "
-                                      "streams. Maximum is %u, so only using "
-                                      "the first %u from the uri.",
-                                      libtrace->perpkt_thread_count, 
-				      libtrace->perpkt_thread_count);
-		        break;
+        tok = strtok(scan, ",");
+        while (tok != NULL) {
+                /* Ensure we haven't specified too many streams */
+                if (stream_count >= libtrace->perpkt_thread_count) {
+                        fprintf(stderr,
+                                "WARNING: Format uri specifies too many "
+                                "streams. Maximum is %u, so only using "
+                                "the first %u from the uri.",
+                                libtrace->perpkt_thread_count,
+                                libtrace->perpkt_thread_count);
+                        break;
                 }
 
-		/* Save the stream details */
-		if (stream_count == 0) {
-			/* Special case where we update the existing stream
-			 * data structure */
-			FORMAT_DATA_FIRST->dagstream = (uint16_t)atoi(tok);
-		} else {
-			memset(&stream_data, 0, sizeof(stream_data));
-			stream_data.dagstream = (uint16_t)atoi(tok);
-			libtrace_list_push_back(FORMAT_DATA->per_stream,
-						&stream_data);
-		}
+                /* Save the stream details */
+                if (stream_count == 0) {
+                        /* Special case where we update the existing stream
+                         * data structure */
+                        FORMAT_DATA_FIRST->dagstream = (uint16_t)atoi(tok);
+                } else {
+                        memset(&stream_data, 0, sizeof(stream_data));
+                        stream_data.dagstream = (uint16_t)atoi(tok);
+                        libtrace_list_push_back(FORMAT_DATA->per_stream,
+                                                &stream_data);
+                }
 
-		stream_count++;
-		tok = strtok(NULL, ",");
-	}
+                stream_count++;
+                tok = strtok(NULL, ",");
+        }
 
-	if (stream_count < libtrace->perpkt_thread_count) {
-		libtrace->perpkt_thread_count = stream_count;
-	}
-	
-	FORMAT_DATA->stream_attached = 1;
+        if (stream_count < libtrace->perpkt_thread_count) {
+                libtrace->perpkt_thread_count = stream_count;
+        }
+
+        /* Attach and start each DAG stream */
+        while (streams != NULL) {
+                if (dag_start_input_stream(libtrace, streams->data) < 0) {
+                        return -1;
+                }
+                streams = streams->next;
+        }
+
+        FORMAT_DATA->stream_attached = 1;
 
  cleanup:
 	if (iserror) {
@@ -890,8 +899,6 @@ static int dag_pause_input(libtrace_t *libtrace)
 	FORMAT_DATA->stream_attached = 0;
 	return 0;
 }
-
-
 
 /* Closes a DAG input trace */
 static int dag_fin_input(libtrace_t *libtrace)
@@ -1668,10 +1675,6 @@ static int dag_pregister_thread(libtrace_t *libtrace, libtrace_thread_t *t,
 
 		/* Pass the per thread data to the thread */
 		t->format_data = stream_data;
-
-		/* Attach and start the DAG stream */
-		if (dag_start_input_stream(libtrace, stream_data) < 0)
-			return -1;
 	}
 
 	return 0;
