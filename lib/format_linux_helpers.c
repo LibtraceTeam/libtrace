@@ -237,3 +237,58 @@ int linux_set_nic_rx_tx_rings(int tx, int rx, char *ifname) {
         return -1;
     return 1;
 }
+
+#define REPEAT_16(x) x x x x x x x x x x x x x x x x
+#define xstr(s) str(s)
+#define str(s) #s
+
+/* These don't typically reset however an interface does exist to reset them */
+int linux_get_dev_statistics(char *ifname, struct linux_dev_stats *stats)
+{
+        FILE *file;
+        char line[1024];
+        struct linux_dev_stats tmp_stats;
+
+        file = fopen("/proc/net/dev", "r");
+        if (file == NULL) {
+                return -1;
+        }
+
+        /* Skip 2 header lines */
+        if (fgets(line, sizeof(line), file) == NULL) {
+                fclose(file);
+                return -1;
+        }
+
+        if (fgets(line, sizeof(line), file) == NULL) {
+                fclose(file);
+                return -1;
+        }
+
+        while (!(feof(file) || ferror(file))) {
+                int tot;
+                if (fgets(line, sizeof(line), file) == NULL)
+                        break;
+
+                tot = sscanf(
+                    line, " %" xstr(IF_NAMESIZE) "[^:]:" REPEAT_16(" %" SCNd64),
+                    tmp_stats.if_name, &tmp_stats.rx_bytes,
+                    &tmp_stats.rx_packets, &tmp_stats.rx_errors,
+                    &tmp_stats.rx_drops, &tmp_stats.rx_fifo,
+                    &tmp_stats.rx_frame, &tmp_stats.rx_compressed,
+                    &tmp_stats.rx_multicast, &tmp_stats.tx_bytes,
+                    &tmp_stats.tx_packets, &tmp_stats.tx_errors,
+                    &tmp_stats.tx_drops, &tmp_stats.tx_fifo,
+                    &tmp_stats.tx_colls, &tmp_stats.tx_carrier,
+                    &tmp_stats.tx_compressed);
+                if (tot != 17)
+                        continue;
+                if (strncmp(tmp_stats.if_name, ifname, IF_NAMESIZE) == 0) {
+                        *stats = tmp_stats;
+                        fclose(file);
+                        return 0;
+                }
+        }
+        fclose(file);
+        return -1;
+}

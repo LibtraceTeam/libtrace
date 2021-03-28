@@ -539,8 +539,9 @@ static int linux_xdp_setup_xdp(libtrace_t *libtrace) {
     }
 
     // get the initial device stats
-    if (linuxcommon_get_dev_statistics(XDP_FORMAT_DATA->cfg.ifname, &XDP_FORMAT_DATA->cfg.stats) != 0) {
-        XDP_FORMAT_DATA->cfg.stats.if_name[0] = 0;
+    if (linux_get_dev_statistics(XDP_FORMAT_DATA->cfg.ifname,
+                                 &XDP_FORMAT_DATA->cfg.stats) != 0) {
+            XDP_FORMAT_DATA->cfg.stats.if_name[0] = 0;
     }
 
     /* cfg.promisc will be 1 if the user has explicity set promisc to off,
@@ -1393,15 +1394,20 @@ static void linux_xdp_get_stats(libtrace_t *libtrace, libtrace_stat_t *stats) {
 
     /* If we have the initial interface stats get the current and calculate the dropped packets */
     if (XDP_FORMAT_DATA->cfg.stats.if_name[0] != 0) {
-        if (linuxcommon_get_dev_statistics(XDP_FORMAT_DATA->cfg.ifname, &dev_stats) == 0) {
-            stats->dropped += (dev_stats.rx_drops - XDP_FORMAT_DATA->cfg.stats.rx_drops);
-            stats->dropped_valid = 1;
-            /* Received comes from the BPF program i.e. kernel
-               Add card drops, but not drops between kernel and user-space */
-            stats->received += (dev_stats.rx_drops - XDP_FORMAT_DATA->cfg.stats.rx_drops);
-            stats->errors += (dev_stats.rx_errors - XDP_FORMAT_DATA->cfg.stats.rx_errors);
-            stats->errors_valid = 1;
-        }
+            if (linux_get_dev_statistics(XDP_FORMAT_DATA->cfg.ifname,
+                                         &dev_stats) == 0) {
+                    stats->dropped += (dev_stats.rx_drops -
+                                       XDP_FORMAT_DATA->cfg.stats.rx_drops);
+                    stats->dropped_valid = 1;
+                    /* Received comes from the BPF program i.e. kernel
+                       Add card drops, but not drops between kernel and
+                       user-space */
+                    stats->received += (dev_stats.rx_drops -
+                                        XDP_FORMAT_DATA->cfg.stats.rx_drops);
+                    stats->errors += (dev_stats.rx_errors -
+                                      XDP_FORMAT_DATA->cfg.stats.rx_errors);
+                    stats->errors_valid = 1;
+            }
     }
 
     if (stats->received_valid && stats->dropped_valid) {

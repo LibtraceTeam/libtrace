@@ -38,6 +38,7 @@
 #include "libtrace.h"
 #include "libtrace_int.h"
 #include "libtrace_arphrd.h"
+#include "format_linux_helpers.h"
 
 #ifdef HAVE_NETPACKET_PACKET_H
 
@@ -198,29 +199,6 @@ struct tpacket_req {
 #define IF_NAMESIZE 16
 #endif
 
-/* A structure we use to hold statistic counters from the network cards
- * as accessed via the /proc/net/dev
- */
-struct linux_dev_stats {
-	char if_name[IF_NAMESIZE];
-	uint64_t rx_bytes;
-	uint64_t rx_packets;
-	uint64_t rx_errors;
-	uint64_t rx_drops;
-	uint64_t rx_fifo;
-	uint64_t rx_frame;
-	uint64_t rx_compressed;
-	uint64_t rx_multicast;
-	uint64_t tx_bytes;
-	uint64_t tx_packets;
-	uint64_t tx_errors;
-	uint64_t tx_drops;
-	uint64_t tx_fifo;
-	uint64_t tx_colls;
-	uint64_t tx_carrier;
-	uint64_t tx_compressed;
-};
-
 /* Note that this structure is passed over the wire in rt encapsulation, and
  * thus we need to be careful with data sizes.  timeval's and timespec's
  * can also change their size on 32/64 machines.
@@ -352,7 +330,6 @@ int linuxcommon_pstart_input(libtrace_t *libtrace,
 #endif /* HAVE_NETPACKET_PACKET_H */
 
 void linuxcommon_get_statistics(libtrace_t *libtrace, libtrace_stat_t *stat);
-int linuxcommon_get_dev_statistics(char *ifname, struct linux_dev_stats *stats);
 
 static inline libtrace_direction_t linuxcommon_get_direction(uint8_t pkttype)
 {
