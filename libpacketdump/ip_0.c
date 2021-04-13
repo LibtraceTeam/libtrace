@@ -43,7 +43,7 @@ DLLEXPORT void decode(int link_type UNUSED, const char *packet, unsigned len) {
 
         hbh_len = (hdr->len + 1) * 8;
 
-	printf(" IPv6 Hop-by-Hop: Next Header %u Header Ext Len %u",
+        printf(" IPv6 Hop-by-Hop: Next Header %u Header Ext Len %u",
 			hdr->nxt, hdr->len);
 
         /* TODO: decode actual header contents one day? */
