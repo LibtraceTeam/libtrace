@@ -216,10 +216,6 @@ void decode_next(const char *packet,int len,const char *proto_name,int type)
 {
 	std::string sname(proto_name);
 
-        if (len == 0) {
-                return;
-        }
-
 	// if we haven't worked out how to decode this type yet, load the
 	// appropriate files to do so
 	if (decoders[sname].find(type)==decoders[sname].end()) {
