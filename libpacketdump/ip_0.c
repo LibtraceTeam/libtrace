@@ -40,7 +40,8 @@ DLLEXPORT void decode(int link_type UNUSED, const char *packet, unsigned len) {
 
 	printf("\n");
 
-	decode_next(packet + hbh_len, len - hbh_len, "ip", hdr->nxt);
-
+        if (hbh_len < len) {
+        	decode_next(packet + hbh_len, len - hbh_len, "ip", hdr->nxt);
+        }
 
 }
