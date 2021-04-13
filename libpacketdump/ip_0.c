@@ -33,14 +33,23 @@ DLLEXPORT void decode(int link_type UNUSED, const char *packet, unsigned len) {
 	uint16_t hbh_len = 0;
 	libtrace_ip6_ext_t* hdr = (libtrace_ip6_ext_t*)packet;
 
-	hbh_len = (hdr->len + 1) * 8;
+        /* TODO we could try to figure out if nxt is actually there and
+         * print it, but it's probably not that big of a deal?
+         */
+        if (len < sizeof(libtrace_ip6_ext_t)) {
+                printf(" IPv6 Hop-by-Hop: [truncated]\n");
+                return;
+        }
 
-	printf(" IPv6 Hop-by-Hop: Next Header %u Header Ext Len %u",
-			hdr->nxt, hdr->len);
+        hbh_len = (hdr->len + 1) * 8;
 
-	printf("\n");
+        printf(" IPv6 Hop-by-Hop: Next Header %u Header Ext Len %u", hdr->nxt,
+               hdr->len);
 
-	decode_next(packet + hbh_len, len - hbh_len, "ip", hdr->nxt);
+        /* TODO: decode actual header contents one day? */
+        printf("\n");
 
-
+        if (hbh_len < len) {
+                decode_next(packet + hbh_len, len - hbh_len, "ip", hdr->nxt);
+        }
 }

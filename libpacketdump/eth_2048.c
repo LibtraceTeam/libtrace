@@ -71,6 +71,9 @@ DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len)
 	DISPLAYS(ip, ip_sum," Checksum %i\n");
 	DISPLAYIP(ip, ip_src," IP: Source %s ");
 	DISPLAYIP(ip, ip_dst,"Destination %s\n");
-	decode_next(packet+ip->ip_hl*4,len-ip->ip_hl*4,"ip",ip->ip_p);
-	return;
+        if (len >= ip->ip_hl * 4) {
+                decode_next(packet + ip->ip_hl * 4, len - ip->ip_hl * 4, "ip",
+                            ip->ip_p);
+        }
+        return;
 }
