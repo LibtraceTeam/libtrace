@@ -41,16 +41,15 @@ DLLEXPORT void decode(int link_type UNUSED, const char *packet, unsigned len) {
                 return;
         }
 
-	hbh_len = (hdr->len + 1) * 8;
+        hbh_len = (hdr->len + 1) * 8;
 
 	printf(" IPv6 Hop-by-Hop: Next Header %u Header Ext Len %u",
 			hdr->nxt, hdr->len);
 
         /* TODO: decode actual header contents one day? */
-	printf("\n");
+        printf("\n");
 
         if (hbh_len < len) {
-        	decode_next(packet + hbh_len, len - hbh_len, "ip", hdr->nxt);
+                decode_next(packet + hbh_len, len - hbh_len, "ip", hdr->nxt);
         }
-
 }
