@@ -29,6 +29,7 @@
 #include <stdio.h>
 #include <limits.h>
 #include <assert.h>
+#include <sys/select.h>
 
 /**
  * TODO look into using eventfd instead of a pipe if we have it available XXX
@@ -57,11 +58,12 @@ void libtrace_message_queue_init(libtrace_message_queue_t *mq, size_t message_le
 
 /**
  * Posts a message to the given message queue.
- * 
+ *
  * This will block if a reader is not keeping up and the underlying pipe
  * fills up.
- * 
- * @param mq A pointer to a initilised libtrace message queue structure (NOT NULL)
+ *
+ * @param mq A pointer to an initialised libtrace message queue structure (NOT
+ * NULL)
  * @param message A pointer to the message data you wish to send
  * @return A number representing the number of messages already in the queue,
  *         0 implies a thread was waiting and will read your message, negative
@@ -86,14 +88,15 @@ int libtrace_message_queue_put(libtrace_message_queue_t *mq, const void *message
 
 /**
  * Retrieves a message from the given message queue.
- * 
+ *
  * This will block if a reader is not keeping up and the underlying pipe
  * fills up.
- * 
- * @param mq A pointer to a initilised libtrace message queue structure (NOT NULL)
+ *
+ * @param mq A pointer to an initialised libtrace message queue structure (NOT
+ * NULL)
  * @param message A pointer to the message data you wish to send
- * @return The number of messages remaining in the queue less any threads waiting,
- *         0 implies a thread was waiting and will read your message, negative
+ * @return The number of messages remaining in the queue less any threads
+ * waiting, 0 implies a thread was waiting and will read your message, negative
  *         numbers implies threads are still waiting. Positive implies a backlog
  *         of messages.
  */
@@ -110,14 +113,15 @@ int libtrace_message_queue_get(libtrace_message_queue_t *mq, void *message)
 
 /**
  * Trys to retrieve a message from the given message queue.
- * 
+ *
  * This will not block and instead returns LIBTRACE_MQ_FAILED if
  * no message is available.
- * 
- * @param mq A pointer to a initilised libtrace message queue structure (NOT NULL)
+ *
+ * @param mq A pointer to an initialised libtrace message queue structure (NOT
+ * NULL)
  * @param message A pointer to the message data you wish to send
- * @return The number of messages remaining in the queue less any threads waiting,
- *         0 implies a thread was waiting and will read your message, negative
+ * @return The number of messages remaining in the queue less any threads
+ * waiting, 0 implies a thread was waiting and will read your message, negative
  *         numbers implies threads are still waiting. Positive implies a backlog
  *         of messages.
  */
@@ -165,4 +169,25 @@ void libtrace_message_queue_destroy(libtrace_message_queue_t *mq)
 int libtrace_message_queue_get_fd(libtrace_message_queue_t *mq)
 {
 	return mq->pipefd[0];
+}
+
+/**
+ * Wait for a message to be available to read or the timeout to expire.
+ * Wraps the 'select()' call.
+ *
+ * @param mq A pointer to an initialised libtrace message queue structure (NOT
+ * NULL)
+ * @param timeout, a timeval struct, or NULL to wait indefinitely
+ * indefinitely, or zero to return instantly.
+ *
+ * @return 0 on timeout, otherwise 1 if a message is available, or -1 on error.
+ *         See the documentation of select for error conditions.
+ */
+int libtrace_message_queue_select(libtrace_message_queue_t *mq,
+                                  struct timeval *timeout)
+{
+        fd_set rfds;
+        FD_ZERO(&rfds);
+        FD_SET(mq->pipefd[0], &rfds);
+        return select(mq->pipefd[0] + 1, &rfds, NULL, NULL, timeout);
 }
