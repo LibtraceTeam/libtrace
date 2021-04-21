@@ -783,7 +783,13 @@ static void* perpkt_threads_entry(void *data) {
 			case READ_ERROR:
 				goto error;
 			case READ_MESSAGE:
-				nb_packets = 0;
+                                if (trace->state == STATE_PAUSING) {
+                                        // Wait for the pause message to arrive
+                                        // rather than spinning
+                                        libtrace_message_queue_select(
+                                            &t->messages, NULL);
+                                }
+                                nb_packets = 0;
 				continue;
 			default:
 				fprintf(stderr, "Unexpected error %d!!\n", nb_packets);
@@ -1297,24 +1303,22 @@ static void* keepalive_entry(void *data) {
 	message.code = MESSAGE_TICK_INTERVAL;
 
 	while (trace->state != STATE_FINISHED) {
-		fd_set rfds;
 		next_release = tv_to_usec(&prev) + (trace->config.tick_interval * 1000);
 		gettimeofday(&next, NULL);
 		if (next_release > tv_to_usec(&next)) {
 			next = usec_to_tv(next_release - tv_to_usec(&next));
 			// Wait for timeout or a message
-			FD_ZERO(&rfds);
-			FD_SET(libtrace_message_queue_get_fd(&t->messages), &rfds);
-			if (select(libtrace_message_queue_get_fd(&t->messages)+1, &rfds, NULL, NULL, &next) == 1) {
-				libtrace_message_t msg;
+                        if (libtrace_message_queue_select(&t->messages,
+                                                          &next) == 1) {
+                                libtrace_message_t msg;
 				libtrace_message_queue_get(&t->messages, &msg);
 				if (msg.code != MESSAGE_DO_STOP) {
 					fprintf(stderr, "Unexpected message code in keepalive_entry()\n");
 					pthread_exit(NULL);
 				}
 				goto done;
-			}
-		}
+                        }
+                }
 		prev = usec_to_tv(next_release);
 		if (trace->state == STATE_RUNNING) {
 			message.data.uint64 = ((((uint64_t)prev.tv_sec) << 32) +
