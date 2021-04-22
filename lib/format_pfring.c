@@ -985,10 +985,11 @@ static int pfring_read_generic(libtrace_t *libtrace, libtrace_packet_t *packet,
         hdr->ts.tv_sec = local->ts.tv_sec;
         hdr->ts.tv_usec = local->ts.tv_usec;
 
-	packet->trace = libtrace;
+        packet->trace = libtrace;
         packet->type = TRACE_RT_DATA_PFRINGOLD;
         packet->header = packet->buffer;
         packet->error = 1;
+        packet->order = hdr->ext.ts_ns;
 
         return pfring_get_capture_length(packet) +
                pfring_get_framing_length(packet);
