@@ -4,3 +4,4 @@ ContinuationIndentWidth: 4
 UseTab: Never
 SortIncludes: false
 BreakBeforeBraces: Linux
+IndentPPDirectives: AfterHash
