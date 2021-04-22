@@ -895,39 +895,43 @@ static int pfringzc_read_batch(libtrace_t *libtrace,
 			return 0;
 	}
 
-	for (int i = 0; i < received; i++) {
+        for (int i = 0; i < received; i++) {
+                struct libtrace_pfring_header *hdr;
 
-		u_char *pkt_buf = pfring_zc_pkt_buff_data(stream->buffers[i], stream->device);
+                u_char *pkt_buf =
+                    pfring_zc_pkt_buff_data(stream->buffers[i], stream->device);
 
-		packet[i]->buf_control = TRACE_CTRL_EXTERNAL;
+                packet[i]->buf_control = TRACE_CTRL_EXTERNAL;
                 packet[i]->type = TRACE_RT_DATA_PFRING;
                 packet[i]->buffer = stream->buffers[i];
                 packet[i]->header = stream->buffers[i]->user;
                 packet[i]->payload = pkt_buf;
                 packet[i]->trace = libtrace;
                 packet[i]->error = 1;
-                packet[i]->order = pfring_timespec_to_systime(&stream->buffers[i]->ts);
+                hdr = (struct libtrace_pfring_header *)stream->buffers[i]->user;
+                hdr->ext.ts_ns =
+                    pfring_timespec_to_systime(&stream->buffers[i]->ts);
+                packet[i]->order = hdr->ext.ts_ns;
                 if (packet[i]->order <= stream->prev_sys_time) {
                     packet[i]->order += 1;
                 }
 
-		struct libtrace_pfring_header *hdr = (struct libtrace_pfring_header *)stream->buffers[i]->user;
 #if __BYTE_ORDER == __LITTLE_ENDIAN
-		hdr->byteorder = PFRING_BYTEORDER_LITTLEENDIAN;
+                hdr->byteorder = PFRING_BYTEORDER_LITTLEENDIAN;
 #else
-		hdr->byteorder = PFRING_BYTEORDER_BIGENDIAN;
+                hdr->byteorder = PFRING_BYTEORDER_BIGENDIAN;
 #endif
-		hdr->caplen = LIBTRACE_MIN((unsigned int)ZC_FORMAT_DATA->snaplen,
-					   (unsigned int)stream->buffers[i]->len);
-		hdr->wlen = stream->buffers[i]->len;
-		hdr->ts.tv_sec = stream->buffers[i]->ts.tv_sec;
-		hdr->ts.tv_usec = stream->buffers[i]->ts.tv_nsec / 1000;
-		hdr->ext.ts_ns = 0;
+                hdr->caplen =
+                    LIBTRACE_MIN((unsigned int)ZC_FORMAT_DATA->snaplen,
+                                 (unsigned int)stream->buffers[i]->len);
+                hdr->wlen = stream->buffers[i]->len;
+                hdr->ts.tv_sec = 0;
+                hdr->ts.tv_usec = 0;
 
                 stream->prev_sys_time = packet[i]->order;
-	}
+        }
 
-	return received;
+        return received;
 }
 
 static int pfring_read_generic(libtrace_t *libtrace, libtrace_packet_t *packet,
