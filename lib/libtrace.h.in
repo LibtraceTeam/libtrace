@@ -1815,6 +1815,10 @@ DLLEXPORT void trace_destroy_output(libtrace_out_t *trace);
 
 /** Flush an output trace, forcing any buffered packets to be written
  * @param libtrace      The output trace to be flushed
+ * @return 0 on success, otherwise an error occurred
+ *
+ * @note This flushes buffers immediately, but does not block until all
+ *       packets are transmitted on the wire or synchronised to disk.
  */
 DLLEXPORT int trace_flush_output(libtrace_out_t *libtrace);
 
