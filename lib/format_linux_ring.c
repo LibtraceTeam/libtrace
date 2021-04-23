@@ -388,12 +388,35 @@ static int linuxring_start_output(libtrace_out_t *libtrace)
         return 0;
 }
 
+static int linuxring_flush_output(libtrace_out_t *libtrace, bool blocking)
+{
+        struct linux_format_data_out_t *format_data_out = FORMAT_DATA_OUT;
+        int ret;
+        ret = sendto(format_data_out->fd, NULL, 0, blocking ? 0 : MSG_DONTWAIT,
+                     (void *)&format_data_out->sock_hdr,
+                     sizeof(format_data_out->sock_hdr));
+        if (ret < 0) {
+                trace_set_err_out(libtrace, errno,
+                                  "Linuxring flush (sendto) failed");
+                return -1;
+        }
+        return 0;
+}
+
+static int linuxring_flush_output_blocking(libtrace_out_t *libtrace)
+{
+        return linuxring_flush_output(libtrace, 1);
+}
+
+static int linuxring_flush_output_nonblocking(libtrace_out_t *libtrace)
+{
+        return linuxring_flush_output(libtrace, 0);
+}
+
 static int linuxring_fin_output(libtrace_out_t *libtrace)
 {
         /* Make sure any remaining frames get sent */
-        sendto(FORMAT_DATA_OUT->fd, NULL, 0, 0,
-               (void *)&FORMAT_DATA_OUT->sock_hdr,
-               sizeof(FORMAT_DATA_OUT->sock_hdr));
+        linuxring_flush_output_blocking(libtrace);
 
         /* Unmap our data area */
         munmap(FORMAT_DATA_OUT->tx_ring, FORMAT_DATA_OUT->req.tp_block_size *
@@ -805,11 +828,8 @@ static int linuxring_write_packet(libtrace_out_t *libtrace,
         FORMAT_DATA_OUT->queue++;
         FORMAT_DATA_OUT->queue %= FORMAT_DATA_OUT->tx_max_queue;
         if (FORMAT_DATA_OUT->queue == 0) {
-                ret = sendto(FORMAT_DATA_OUT->fd, NULL, 0, MSG_DONTWAIT,
-                             (void *)&FORMAT_DATA_OUT->sock_hdr,
-                             sizeof(FORMAT_DATA_OUT->sock_hdr));
+                ret = linuxring_flush_output_nonblocking(libtrace);
                 if (ret < 0) {
-                        trace_set_err_out(libtrace, errno, "sendto failed");
                         return -1;
                 }
         }
@@ -832,46 +852,46 @@ static struct libtrace_format_t linuxring = {
     "ring",
     "$Id$",
     TRACE_FORMAT_LINUX_RING,
-    linuxcommon_probe_filename,   /* probe filename */
-    NULL,                         /* probe magic */
-    linuxcommon_init_input,       /* init_input */
-    linuxcommon_config_input,     /* config_input */
-    linuxring_start_input,        /* start_input */
-    linuxcommon_pause_input,      /* pause_input */
-    linuxcommon_init_output,      /* init_output */
-    linuxcommon_config_output,    /* config_output */
-    linuxring_start_output,       /* start_ouput */
-    linuxring_fin_input,          /* fin_input */
-    linuxring_fin_output,         /* fin_output */
-    linuxring_read_packet,        /* read_packet */
-    linuxring_prepare_packet,     /* prepare_packet */
-    linuxring_fin_packet,         /* fin_packet */
-    NULL,                         /* can_hold_packet */
-    linuxring_write_packet,       /* write_packet */
-    NULL,                         /* flush_output */
-    linuxring_get_link_type,      /* get_link_type */
-    linuxring_get_direction,      /* get_direction */
-    linuxring_set_direction,      /* set_direction */
-    NULL,                         /* get_erf_timestamp */
-    linuxring_get_timeval,        /* get_timeval */
-    linuxring_get_timespec,       /* get_timespec */
-    NULL,                         /* get_seconds */
-    NULL,                         /* get_meta_section */
-    NULL,                         /* seek_erf */
-    NULL,                         /* seek_timeval */
-    NULL,                         /* seek_seconds */
-    linuxring_get_capture_length, /* get_capture_length */
-    linuxring_get_wire_length,    /* get_wire_length */
-    linuxring_get_framing_length, /* get_framing_length */
-    linuxring_set_capture_length, /* set_capture_length */
-    NULL,                         /* get_received_packets */
-    NULL,                         /* get_filtered_packets */
-    NULL,                         /* get_dropped_packets */
-    linuxcommon_get_statistics,   /* get_statistics */
-    linuxcommon_get_fd,           /* get_fd */
-    linuxring_event,              /* trace_event */
-    linuxring_help,               /* help */
-    NULL,                         /* next pointer */
+    linuxcommon_probe_filename,         /* probe filename */
+    NULL,                               /* probe magic */
+    linuxcommon_init_input,             /* init_input */
+    linuxcommon_config_input,           /* config_input */
+    linuxring_start_input,              /* start_input */
+    linuxcommon_pause_input,            /* pause_input */
+    linuxcommon_init_output,            /* init_output */
+    linuxcommon_config_output,          /* config_output */
+    linuxring_start_output,             /* start_ouput */
+    linuxring_fin_input,                /* fin_input */
+    linuxring_fin_output,               /* fin_output */
+    linuxring_read_packet,              /* read_packet */
+    linuxring_prepare_packet,           /* prepare_packet */
+    linuxring_fin_packet,               /* fin_packet */
+    NULL,                               /* can_hold_packet */
+    linuxring_write_packet,             /* write_packet */
+    linuxring_flush_output_nonblocking, /* flush_output */
+    linuxring_get_link_type,            /* get_link_type */
+    linuxring_get_direction,            /* get_direction */
+    linuxring_set_direction,            /* set_direction */
+    NULL,                               /* get_erf_timestamp */
+    linuxring_get_timeval,              /* get_timeval */
+    linuxring_get_timespec,             /* get_timespec */
+    NULL,                               /* get_seconds */
+    NULL,                               /* get_meta_section */
+    NULL,                               /* seek_erf */
+    NULL,                               /* seek_timeval */
+    NULL,                               /* seek_seconds */
+    linuxring_get_capture_length,       /* get_capture_length */
+    linuxring_get_wire_length,          /* get_wire_length */
+    linuxring_get_framing_length,       /* get_framing_length */
+    linuxring_set_capture_length,       /* set_capture_length */
+    NULL,                               /* get_received_packets */
+    NULL,                               /* get_filtered_packets */
+    NULL,                               /* get_dropped_packets */
+    linuxcommon_get_statistics,         /* get_statistics */
+    linuxcommon_get_fd,                 /* get_fd */
+    linuxring_event,                    /* trace_event */
+    linuxring_help,                     /* help */
+    NULL,                               /* next pointer */
 #        ifdef HAVE_PACKET_FANOUT
     {true, -1},                   /* Live, no thread limit */
     linuxring_pstart_input,       /* pstart_input */
