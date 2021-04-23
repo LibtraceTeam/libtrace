@@ -197,7 +197,7 @@ static inline int socket_to_packetmmap(char *uridata, int ring_type, int fd,
         int val;
 
         /* Switch to TPACKET header version 2, we only try support v2 because
-         * v1 had problems with data type consistancy */
+         * v1 had problems with data type consistency */
         val = TPACKET_V2;
         if (setsockopt(fd, SOL_PACKET, PACKET_VERSION, &val, sizeof(val)) ==
             -1) {
@@ -205,7 +205,7 @@ static inline int socket_to_packetmmap(char *uridata, int ring_type, int fd,
                 return -1;
         }
 
-        /* Try switch to a ring buffer. If it fails we assume the the kernel
+        /* Try switch to a ring buffer. If it fails we assume that the kernel
          * cannot allocate a block of that size, so decrease max_block and
          * retry.
          */
@@ -519,7 +519,6 @@ static int linuxring_prepare_packet(libtrace_t *libtrace UNUSED,
 }
 
 #ifdef HAVE_NETPACKET_PACKET_H
-#        define LIBTRACE_MIN(a, b) ((a) < (b) ? (a) : (b))
 /* We use TP_STATUS_LIBTRACE to ensure we don't loop back on ourself
  * and read the same packet twice if an old packet has not yet been freed */
 #        define TP_STATUS_LIBTRACE 0xFFFFFFFF
@@ -773,7 +772,7 @@ static int linuxring_write_packet(libtrace_out_t *libtrace,
                 }
                 if (ret == 0) {
                         /* Timeout something has gone wrong - maybe the queue is
-                         * to large so try issue another send command
+                         * too large so try issue another send command
                          */
                         ret = sendto(FORMAT_DATA_OUT->fd, NULL, 0, 0,
                                      (void *)&FORMAT_DATA_OUT->sock_hdr,
@@ -938,7 +937,8 @@ static struct libtrace_format_t linuxring = {
     NULL,                         /* trace_event */
     linuxring_help,               /* help */
     NULL,                         /* next pointer */
-    NON_PARALLEL(true)};
+    NON_PARALLEL(true),
+};
 #endif /* HAVE_NETPACKET_PACKET_H */
 
 /* TODO: Figure out how to give this format preference over the linux native
