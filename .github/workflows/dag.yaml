@@ -5,6 +5,7 @@ on:
 jobs:
   pre_job:
     name: Prerequisite checks
+    if: ${{ github.repository_owner == 'LibtraceTeam' }}
     runs-on: ubuntu-latest
     outputs:
       should_skip: ${{ steps.skip_check.outputs.should_skip }}
