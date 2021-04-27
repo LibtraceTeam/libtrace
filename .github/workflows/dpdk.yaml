@@ -63,7 +63,7 @@ jobs:
         cd libtrace/wandio
         ./bootstrap.sh
         ./configure
-        make
+        make -j 3
         sudo make install
         sudo ldconfig
     - name: Build ${{ matrix.dpdk_version }}

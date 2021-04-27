@@ -68,7 +68,7 @@ jobs:
     - name: Build/Install Libbpf
       run: |
         cd libbpf/src
-        make
+        make -j 3
         sudo make install
         echo "/usr/lib64" | sudo tee -a /etc/ld.so.conf.d/lib64.conf
         sudo ldconfig
@@ -82,7 +82,7 @@ jobs:
         cd libtrace/wandio
         ./bootstrap.sh
         ./configure
-        make
+        make -j 3
         sudo make install
         sudo ldconfig
     - name: Build/Install Libwandder
@@ -90,7 +90,7 @@ jobs:
         cd libtrace/libwandder
         ./bootstrap.sh
         ./configure
-        make
+        make -j 3
         sudo make install
         sudo ldconfig
     - name: Build/Install Libtrace
@@ -98,10 +98,10 @@ jobs:
         cd libtrace
         ./bootstrap.sh
         ./configure CFLAGS="-I$(pwd)/../libbpf/include/uapi" --with-dpdk --with-pfring --with-xdp
-        make
+        make -j 3
         sudo make install
     - name: Build Tests
-      run: cd libtrace/test; make
+      run: cd libtrace/test; make -j 3
     - name: Run do-tests.sh
       run: cd libtrace/test; ./do-tests.sh
     - name: Run do-tests-parallel.sh
@@ -131,16 +131,16 @@ jobs:
         cd wandio
         ./bootstrap.sh
         ./configure
-        make
+        make -j 4
         sudo make install
     - name: Build/Install Libtrace
       run: |
         ./bootstrap.sh
         ./configure
-        make
+        make -j 4
         sudo make install
     - name: Build Tests
-      run: cd test; make
+      run: cd test; make -j 4
     - name: Run do-tests.sh
       run: cd test; ./do-tests.sh
     - name: Run do-tests-parallel.sh
