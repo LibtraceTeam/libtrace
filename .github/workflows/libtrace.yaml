@@ -21,6 +21,7 @@ jobs:
     if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-20.04, ubuntu-18.04]
         c_compiler: [gcc, clang]
@@ -31,7 +32,7 @@ jobs:
           - c_compiler: clang
             cxx_compiler: g++
     steps:
-    - name: Setup Enviroment Variables
+    - name: Setup Environment Variables
       env:
         CC: ${{ matrix.c_compiler }}
         CXX: ${{ matrix.cxx_compiler }}
@@ -107,6 +108,7 @@ jobs:
     if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [macos-10.15]
     steps:
