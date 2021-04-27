@@ -31,6 +31,7 @@ jobs:
     if: ${{ needs.pre_job.outputs.should_skip != 'true' }}
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-20.04]
         dpdk_version: [dpdk-20.11, dpdk-20.02, dpdk-19.11.5, dpdk-18.11.10, dpdk-17.11.10, dpdk-16.11.11]
