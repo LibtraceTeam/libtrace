@@ -144,7 +144,6 @@ do_parallel_test() {
 		PARALLEL_FAIL="$PARALLEL_FAIL
 $*"
 	fi
-	sleep 2
 }
 
 for r in "${read_formats[@]}"
@@ -154,12 +153,12 @@ do
 	if [[ $r == "pcapint:veth1" ]]; then
 		continue
 	fi
-	do_parallel_test ./test-format-parallel "$r" "int:veth1"
-	do_parallel_test ./test-format-parallel-hasher "$r" "int:veth1"
+	do_parallel_test ./test-format-parallel "$r" "int:veth0"
+	do_parallel_test ./test-format-parallel-hasher "$r" "int:veth0"
 	# TODO fix test-format-parallel-reporter for live input
-	# do_parallel_test ./test-format-parallel-reporter "$r" "int:veth1"
-	do_parallel_test ./test-format-parallel-singlethreaded "$r" "int:veth1"
-	do_parallel_test ./test-format-parallel-singlethreaded-hasher "$r" "int:veth1"
+	# do_parallel_test ./test-format-parallel-reporter "$r" "int:veth0"
+	do_parallel_test ./test-format-parallel-singlethreaded "$r" "int:veth0"
+	do_parallel_test ./test-format-parallel-singlethreaded-hasher "$r" "int:veth0"
 
 done
 
