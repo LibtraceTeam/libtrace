@@ -50,7 +50,7 @@ jobs:
       run: |
         sudo apt update
         sudo apt-get -y install flex bison libpcap0.8-dev libtool pkgconf autoconf automake m4 gcc clang llvm gcc-multilib
-        sudo apt-get -y install build-essential dpdk-dev libelf-dev git
+        sudo apt-get -y install build-essential dpdk-dev libelf-dev git libyaml-dev libssl-dev
     - name: Install PF_RING
       run: |
         sudo apt-get -y install software-properties-common wget
@@ -80,6 +80,14 @@ jobs:
     - name: Build/Install Wandio
       run: |
         cd libtrace/wandio
+        ./bootstrap.sh
+        ./configure
+        make
+        sudo make install
+        sudo ldconfig
+    - name: Build/Install Libwandder
+      run: |
+        cd libtrace/libwandder
         ./bootstrap.sh
         ./configure
         make
