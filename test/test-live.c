@@ -66,7 +66,7 @@
 	) \
 }
 
-static const char *uri_read = "";
+static const char *uri_read = NULL;
 static sig_atomic_t i = 0;
 static sig_atomic_t reading = 0;
 static libtrace_t *trace_read = NULL;
@@ -290,39 +290,49 @@ int main(int argc, char *argv[])
 	libtrace_packet_t *packet;
 	int psize;
 	int err = 0;
+        int opt;
 
-	if (argc < 2) {
+        if (argc < 2) {
 		fprintf(stderr, "usage: %s type(write) [type(read)]\n", argv[0]);
 		return 1;
 	}
 
-	signal(SIGALRM, signal_handler);
+        while ((opt = getopt(argc, argv, "c:")) != -1) {
+                switch (opt) {
+                case 'c':
+                        test_size = atoi(optarg);
+                        break;
+                case '?':
+                        break;
+                }
+        }
+
+        signal(SIGALRM, signal_handler);
 	// Timeout after 5 seconds
 	alarm(5);
 
-	trace_write = trace_create_output(argv[1]);
-	iferr_out(trace_write);
-	if (argc > 2) {
-		uri_read = argv[2];
-		trace_read = trace_create(uri_read);
+        trace_write = trace_create_output(argv[optind]);
+        iferr_out(trace_write);
+        if (optind + 1 < argc) {
+                uri_read = argv[optind + 1];
+                trace_read = trace_create(uri_read);
 		iferr(trace_read);
-	}
+                if (strncmp(uri_read, "pcapint", 7) == 0) {
+                        /* The newer Linux memmap (ring:) implementation of PCAP
+                         * only makes space for about 30 maybe 31 packet
+                         * buffers. If we exceed this we'll drop packets. */
+                        test_size = 30;
+                }
+        }
 
-	if (strncmp(uri_read, "pcapint", 7) == 0) {
-		/* The newer Linux memmap (ring:) implementation of PCAP only makes
-		 * space for about 30 maybe 31 packet buffers. If we exceed this we'll
-		 * drop packets. */
-		test_size = 30;
-	}
-
-	trace_start_output(trace_write);
+        trace_start_output(trace_write);
 	iferr_out(trace_write);
-	if (argc > 2) {
-		trace_start(trace_read);
+        if (uri_read != NULL) {
+                trace_start(trace_read);
 		iferr(trace_read);
-	}
+        }
 
-	packet = trace_create_packet();
+        packet = trace_create_packet();
 
 	// Write out test_size (100) almost identical packets
 	for (i = 0; i < test_size; i++) {
@@ -335,12 +345,12 @@ int main(int argc, char *argv[])
 	trace_destroy_packet(packet);
 	trace_destroy_output(trace_write);
 
-	if (argc <= 2) {
-		printf("Sent %d packets\n", test_size);
+        if (uri_read == NULL) {
+                printf("Sent %d packets\n", test_size);
 		return 0;
-	}
+        }
 
-	// Now read back in, we assume that buffers internally can buffer
+        // Now read back in, we assume that buffers internally can buffer
 	// the packets without losing them
 	packet = trace_create_packet();
 
