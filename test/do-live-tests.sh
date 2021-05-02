@@ -156,7 +156,7 @@ do_write_test() {
 		PARALLEL_OK=$(( PARALLEL_OK + 1 ))
 	else
 		PARALLEL_FAIL="$PARALLEL_FAIL
-$*"
+./test-live -c 16385 $1"
 	fi
 }
 
