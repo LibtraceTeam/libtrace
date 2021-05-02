@@ -146,6 +146,26 @@ $*"
 	fi
 }
 
+do_write_test() {
+	# Send 16K +1 packets
+	echo
+	echo "./test-live" -c 16385 "$1"
+	./test-live -c 16385 "$1"
+	rc=$?
+	if [[ rc -eq 0 ]]; then
+		PARALLEL_OK=$(( PARALLEL_OK + 1 ))
+	else
+		PARALLEL_FAIL="$PARALLEL_FAIL
+$*"
+	fi
+}
+
+for w in "${write_formats[@]}"
+do
+	# Test writing doesn't block
+	do_write_test "$w"
+done
+
 for r in "${read_formats[@]}"
 do
 	# Don't test pcapint as it only has a 30 packet buffer and
