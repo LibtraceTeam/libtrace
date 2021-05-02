@@ -574,8 +574,9 @@ inline static int linuxring_read_stream(libtrace_t *libtrace,
          * When a slot does not have this flag set, the frame is not
          * ready for consumption.
          */
-        while (!(header->tp_status & TP_STATUS_USER) ||
-               header->tp_status == TP_STATUS_LIBTRACE) {
+        for (uint32_t tp_status = (volatile uint32_t)header->tp_status;
+             !(tp_status & TP_STATUS_USER) || tp_status == TP_STATUS_LIBTRACE;
+             tp_status = (volatile uint32_t)header->tp_status) {
                 if (!block) {
                         return 0;
                 }
@@ -719,8 +720,8 @@ static libtrace_eventobj_t linuxring_event(libtrace_t *libtrace,
 
         /* Fetch the current frame */
         header = GET_CURRENT_BUFFER(FORMAT_DATA_FIRST);
-        if (header->tp_status & TP_STATUS_USER &&
-            header->tp_status != TP_STATUS_LIBTRACE) {
+        uint32_t tp_status = (volatile uint32_t)header->tp_status;
+        if (tp_status & TP_STATUS_USER && tp_status != TP_STATUS_LIBTRACE) {
                 /* We have a frame waiting */
                 event.size = trace_read_packet(libtrace, packet);
                 event.type = TRACE_EVENT_PACKET;
@@ -761,6 +762,16 @@ static void linuxring_fin_packet(libtrace_packet_t *packet)
         }
 }
 
+/** Check if a frame in a TX buffer is ready to fill
+ *
+ * Note: we check the reverse to work around a kernel bug where a
+ * timestamp flag is added to status even if we don't request timestamps.
+ */
+static inline bool tx_frame_available(uint32_t tp_status)
+{
+        return !(tp_status & (TP_STATUS_SEND_REQUEST | TP_STATUS_SENDING));
+}
+
 static int linuxring_write_packet(libtrace_out_t *libtrace,
                                   libtrace_packet_t *packet)
 {
@@ -783,7 +794,7 @@ static int linuxring_write_packet(libtrace_out_t *libtrace,
                  (FORMAT_DATA_OUT->txring_offset *
                   FORMAT_DATA_OUT->req.tp_frame_size);
 
-        while (header->tp_status != TP_STATUS_AVAILABLE) {
+        while (!tx_frame_available((uint32_t volatile)header->tp_status)) {
                 /* if none available: wait on more data */
                 pollset.fd = FORMAT_DATA_OUT->fd;
                 pollset.events = POLLOUT;
