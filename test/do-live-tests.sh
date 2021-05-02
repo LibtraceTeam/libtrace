@@ -199,7 +199,7 @@ echo "Parallel API tests passed: $PARALLEL_OK"
 echo "Parallel API tests failed: $PARALLEL_FAIL"
 
 
-if [[ -z "$FAIL" ]]
+if [[ -z "$FAIL" && -z "$PARALLEL_FAIL" ]]
 then
         exit 0
 else
