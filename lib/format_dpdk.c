@@ -1775,8 +1775,7 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data, char *err,
         ret = 0;
 #endif
         if (ret != 0) {
-                fprintf(
-                        stderr,
+                fprintf(stderr,
                         "Libtrace DPDK: rte_eth_stats_reset failed %d : %s\n",
                         ret, strerror(-ret));
         }
