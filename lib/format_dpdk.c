@@ -1758,7 +1758,6 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data, char *err,
 #if DEBUG
         fprintf(stderr, "Libtrace DPDK: Doing start device\n");
 #endif
-        rte_eth_stats_reset(format_data->port);
         /* Start device */
         ret = rte_eth_dev_start(format_data->port);
         if (ret < 0) {
@@ -1766,6 +1765,20 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data, char *err,
                          "Libtrace DPDK: rte_eth_dev_start failed : %s",
                          strerror(-ret));
                 return -1;
+        }
+
+#if RTE_VERSION >= RTE_VERSION_NUM(17, 11, 0, 1)
+        /* from 17.11-rc1 this returns a value */
+        ret = rte_eth_stats_reset(format_data->port);
+#else
+        rte_eth_stats_reset(format_data->port);
+        ret = 0;
+#endif
+        if (ret != 0) {
+                fprintf(
+                        stderr,
+                        "Libtrace DPDK: rte_eth_stats_reset failed %d : %s\n",
+                        ret, strerror(-ret));
         }
 
         /* Default promiscuous to on */
