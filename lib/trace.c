@@ -1067,6 +1067,7 @@ void trace_fin_packet(libtrace_packet_t *packet) {
 		packet->hash = 0;
 		packet->order = 0;
                 packet->srcbucket = NULL;
+                packet->fmtdata = NULL;
 	}
 }
 

@@ -87,7 +87,6 @@ typedef struct etsilive_format_data {
         etsithread_t *receivers;
         int maxthreads;
         int nextthreadid;
-        wandder_etsispec_t *shareddec;
 } etsilive_format_data_t;
 
 typedef struct newsendermessage {
@@ -243,8 +242,6 @@ static int etsilive_init_input(libtrace_t *libtrace) {
                         (size_t)(scan - libtrace->uridata));
         FORMAT_DATA->listenport = strdup(scan + 1);
 
-        FORMAT_DATA->shareddec = wandder_create_etsili_decoder();
-
         return 0;
 }
 
@@ -263,9 +260,6 @@ static int etsilive_fin_input(libtrace_t *libtrace) {
         }
         if (FORMAT_DATA->listenport) {
                 free(FORMAT_DATA->listenport);
-        }
-        if (FORMAT_DATA->shareddec) {
-                wandder_free_etsili_decoder(FORMAT_DATA->shareddec);
         }
         free(libtrace->format_data);
         return 0;
@@ -599,6 +593,7 @@ static int etsilive_prepare_received(libtrace_t *libtrace,
 
         packet->cached.wire_length = esock->cached.length;
         packet->cached.capture_length = esock->cached.length;
+        packet->fmtdata = &(esock->recvbuffer);
 
         /* Advance the read pointer for this buffer
          * TODO should really do this in fin_packet, but will need a ref
@@ -660,23 +655,23 @@ static int etsilive_get_pdu_length(const libtrace_packet_t *packet) {
         /* Should never get here because cache is set when packet is read */
         size_t reclen;
         libtrace_t *libtrace = packet->trace;
+        wandder_etsispec_t *dec;
 
 	if (!libtrace) {
 		fprintf(stderr, "Packet is not associated with a trace in etsilive_get_pdu_length()\n");
 		return TRACE_ERR_NULL_TRACE;
 	}
-	if (!FORMAT_DATA->shareddec) {
-		trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT, "Etsilive format data shareddec is NULL in etsilive_get_pdu_length()\n");
-		return -1;
-	}
+        /* Creating a decoder every time will be slow, but again we
+         * should never get here anyway...
+         */
+        dec = wandder_create_etsili_decoder();
 
         /* 0 should be ok here for quickly evaluating the first length
          * field... */
-        wandder_attach_etsili_buffer(FORMAT_DATA->shareddec, packet->buffer,
-                        0, false);
-        reclen = (size_t)wandder_etsili_get_pdu_length(
-                        FORMAT_DATA->shareddec);
+        wandder_attach_etsili_buffer(dec, packet->buffer, 0, false);
+        reclen = (size_t)wandder_etsili_get_pdu_length(dec);
 
+        wandder_free_etsili_decoder(dec);
         return reclen;
 }
 
@@ -687,6 +682,35 @@ static int etsilive_get_framing_length(const libtrace_packet_t *packet UNUSED) {
 
 static uint64_t etsilive_get_erf_timestamp(const libtrace_packet_t *packet) {
         return packet->order;
+}
+
+static int etsilive_can_hold_packet(libtrace_packet_t *packet) {
+        int wlen = -1;
+
+        /* Can hold the packet (temporarily) as long as a decent chunk of
+         * our SCB is available.
+         * SCB is only valid if the trace is not paused / halted...
+         */
+        if (!is_halted && packet->fmtdata != NULL) {
+                libtrace_scb_t *scb = (libtrace_scb_t *)packet->fmtdata;
+                if (libtrace_scb_get_available_space(scb) >
+                                0.25 * ETSI_RECVBUF_SIZE) {
+                        return 0;
+                }
+        }
+
+        /* Otherwise, we have to copy but let's save our cached lengths
+         * to avoid having to decode them from the record again...
+         */
+        wlen = packet->cached.wire_length;
+        libtrace_make_packet_safe(packet);
+
+        /* The copy will clear the cache, so we need to put the saved
+         * lengths back in again.
+         */
+        packet->cached.wire_length = wlen;
+        packet->cached.capture_length = wlen;
+        return 0;
 }
 
 static libtrace_linktype_t etsilive_get_link_type(
@@ -712,7 +736,7 @@ static struct libtrace_format_t etsilive = {
         etsilive_read_packet,           /* read_packet */
         etsilive_prepare_packet,        /* prepare_packet */
         NULL,                           /* fin_packet */
-        NULL,                           /* can_hold_packet */
+        etsilive_can_hold_packet,       /* can_hold_packet */
         NULL,                           /* write_packet */
         NULL,                           /* flush_output */
         etsilive_get_link_type,         /* get_link_type */
