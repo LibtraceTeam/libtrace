@@ -188,7 +188,7 @@ static void *etsi_listener(void *tdata) {
                 if (FORMAT_DATA->maxthreads > 1) {
                         FORMAT_DATA->nextthreadid =
                             ((FORMAT_DATA->nextthreadid + 1) %
-                              FORMAT_DATA->maxthreads);
+                             FORMAT_DATA->maxthreads);
                 }
         }
 
@@ -219,8 +219,9 @@ static int etsilive_init_input(libtrace_t *libtrace) {
                         sizeof(etsilive_format_data_t));
 
         if (!libtrace->format) {
-                trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory for "
-                        "format data inside etsilive_init_input()");
+                trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
+                              "Unable to allocate memory for "
+                              "format data inside etsilive_init_input()");
                 return 1;
         }
 
@@ -653,7 +654,8 @@ static int etsilive_get_pdu_length(const libtrace_packet_t *packet) {
         wandder_etsispec_t *dec;
 
         if (!libtrace) {
-                fprintf(stderr, "Packet is not associated with a trace in etsilive_get_pdu_length()\n");
+                fprintf(stderr, "Packet is not associated with a trace in "
+                                "etsilive_get_pdu_length()\n");
                 return TRACE_ERR_NULL_TRACE;
         }
         /* Creating a decoder every time will be slow, but again we
@@ -718,47 +720,47 @@ static struct libtrace_format_t etsilive = {
     "etsilive",
     "$Id$",
     TRACE_FORMAT_ETSILIVE,
-    NULL,                           /* probe filename */
-    NULL,                           /* probe magic */
-    etsilive_init_input,            /* init_input */
-    NULL,                           /* config_input */
-    etsilive_start_input,           /* start_input */
-    etsilive_pause_input,           /* pause */
-    NULL,                           /* init_output */
-    NULL,                           /* config_output */
-    NULL,                           /* start_output */
-    etsilive_fin_input,             /* fin_input */
-    NULL,                           /* fin_output */
-    etsilive_read_packet,           /* read_packet */
-    etsilive_prepare_packet,        /* prepare_packet */
-    NULL,                           /* fin_packet */
-    etsilive_can_hold_packet,       /* can_hold_packet */
-    NULL,                           /* write_packet */
-    NULL,                           /* flush_output */
-    etsilive_get_link_type,         /* get_link_type */
-    NULL,                           /* get_direction */
-    NULL,                           /* set_direction */
-    etsilive_get_erf_timestamp,     /* get_erf_timestamp */
-    NULL,                           /* get_timeval */
-    NULL,                           /* get_timespec */
-    NULL,                           /* get_seconds */
-    NULL,                           /* get_meta_section */
-    NULL,                           /* seek_erf */
-    NULL,                           /* seek_timeval */
-    NULL,                           /* seek_seconds */
-    etsilive_get_pdu_length,        /* get_capture_length */
-    etsilive_get_pdu_length,        /* get_wire_length */
-    etsilive_get_framing_length,    /* get_framing_length */
-    NULL,                           /* set_capture_length */
-    NULL,                           /* get_received_packets */
-    NULL,                           /* get_filtered_packets */
-    NULL,                           /* get_dropped_packets */
-    NULL,                           /* get_statistics */
-    NULL,                           /* get_fd */
-    NULL, //trace_event_etsilive,           /* trace_event */
-    NULL,                           /* help */
-    NULL,                           /* next pointer */
-    NON_PARALLEL(true)              /* TODO this can be parallel */
+    NULL,                        /* probe filename */
+    NULL,                        /* probe magic */
+    etsilive_init_input,         /* init_input */
+    NULL,                        /* config_input */
+    etsilive_start_input,        /* start_input */
+    etsilive_pause_input,        /* pause */
+    NULL,                        /* init_output */
+    NULL,                        /* config_output */
+    NULL,                        /* start_output */
+    etsilive_fin_input,          /* fin_input */
+    NULL,                        /* fin_output */
+    etsilive_read_packet,        /* read_packet */
+    etsilive_prepare_packet,     /* prepare_packet */
+    NULL,                        /* fin_packet */
+    etsilive_can_hold_packet,    /* can_hold_packet */
+    NULL,                        /* write_packet */
+    NULL,                        /* flush_output */
+    etsilive_get_link_type,      /* get_link_type */
+    NULL,                        /* get_direction */
+    NULL,                        /* set_direction */
+    etsilive_get_erf_timestamp,  /* get_erf_timestamp */
+    NULL,                        /* get_timeval */
+    NULL,                        /* get_timespec */
+    NULL,                        /* get_seconds */
+    NULL,                        /* get_meta_section */
+    NULL,                        /* seek_erf */
+    NULL,                        /* seek_timeval */
+    NULL,                        /* seek_seconds */
+    etsilive_get_pdu_length,     /* get_capture_length */
+    etsilive_get_pdu_length,     /* get_wire_length */
+    etsilive_get_framing_length, /* get_framing_length */
+    NULL,                        /* set_capture_length */
+    NULL,                        /* get_received_packets */
+    NULL,                        /* get_filtered_packets */
+    NULL,                        /* get_dropped_packets */
+    NULL,                        /* get_statistics */
+    NULL,                        /* get_fd */
+    NULL,                        /* trace_event */
+    NULL,                        /* help */
+    NULL,                        /* next pointer */
+    NON_PARALLEL(true)           /* TODO this can be parallel */
 };
 
 void etsilive_constructor(void) {
