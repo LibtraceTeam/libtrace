@@ -1038,7 +1038,7 @@ DLLEXPORT void trace_destroy_packet(libtrace_packet_t *packet) {
  */
 void trace_fin_packet(libtrace_packet_t *packet) {
 	if (packet)
-	{
+        {
 		if (packet->trace && packet->trace->format->fin_packet) {
 			packet->trace->format->fin_packet(packet);
 		}
@@ -1068,7 +1068,7 @@ void trace_fin_packet(libtrace_packet_t *packet) {
 		packet->order = 0;
                 packet->srcbucket = NULL;
                 packet->fmtdata = NULL;
-	}
+        }
 }
 
 /* Read one packet from the trace into buffer. Note that this function will
