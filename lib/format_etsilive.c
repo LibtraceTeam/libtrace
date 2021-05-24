@@ -39,7 +39,6 @@
 #include <libwandder_etsili.h>
 
 #include <errno.h>
-#include <assert.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
@@ -504,8 +503,6 @@ static inline void inspect_next_packet(etsisocket_t *sock,
                 }
         }
 
-        /* Quick sanity check while I'm still debugging this code */
-        assert(reclen <= 10000);
         if (available < reclen) {
                 /* Don't have the whole PDU yet */
                 return;
@@ -537,8 +534,6 @@ static inline void inspect_next_packet(etsisocket_t *sock,
 
         tv = wandder_etsili_get_header_timestamp(dec);
         if (tv.tv_sec == 0) {
-                /* TODO this is just for debugging -- remove later */
-                assert(tv.tv_sec != 0);
                 return;
         }
         current = ((((uint64_t)tv.tv_sec) << 32) +
