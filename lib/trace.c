@@ -1044,7 +1044,7 @@ void trace_fin_packet(libtrace_packet_t *packet) {
 
                 if (packet->srcbucket && packet->internalid != 0) {
                         libtrace_bucket_t *b =
-                                (libtrace_bucket_t *)packet->srcbucket;
+                            (libtrace_bucket_t *)packet->srcbucket;
                         libtrace_release_bucket_id(b, packet->internalid);
                 }
 
