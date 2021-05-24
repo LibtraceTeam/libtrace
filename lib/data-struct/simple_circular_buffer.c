@@ -81,14 +81,16 @@ DLLEXPORT void libtrace_scb_destroy(libtrace_scb_t *buf) {
 
 }
 
-DLLEXPORT int libtrace_scb_get_available_space(libtrace_scb_t *buf) {
+DLLEXPORT int libtrace_scb_get_available_space(libtrace_scb_t *buf)
+{
         if (buf->address == NULL) {
                 return 0;
         }
         return buf->count_bytes - (buf->write_offset - buf->read_offset);
 }
 
-DLLEXPORT int libtrace_scb_get_size(libtrace_scb_t *buf) {
+DLLEXPORT int libtrace_scb_get_size(libtrace_scb_t *buf)
+{
         if (buf->address == NULL) {
                 return 0;
         }
