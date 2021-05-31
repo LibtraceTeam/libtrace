@@ -498,7 +498,6 @@ static inline void inspect_next_packet(etsisocket_t *sock,
                 reclen = sock->cached.length;
         } else {
                 reclen = wandder_etsili_get_pdu_length(dec);
-
                 if (reclen == 0) {
                         return;
                 }
@@ -689,7 +688,7 @@ static int etsilive_can_hold_packet(libtrace_packet_t *packet)
          * our SCB is available.
          * SCB is only valid if the trace is not paused / halted...
          */
-        if (!is_halted && packet->fmtdata != NULL) {
+        if (!is_halted(packet->trace) && packet->fmtdata != NULL) {
                 libtrace_scb_t *scb = (libtrace_scb_t *)packet->fmtdata;
                 if (libtrace_scb_get_available_space(scb) >
                     0.25 * ETSI_RECVBUF_SIZE) {
