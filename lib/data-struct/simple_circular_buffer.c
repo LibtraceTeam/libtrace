@@ -106,8 +106,8 @@ DLLEXPORT int libtrace_scb_recv_sock(libtrace_scb_t *buf, int sock,
                 return -1;
         }
 
-        if (space == 0) {
-                return buf->count_bytes;
+        if (space < 512 * 1024) {
+                return buf->count_bytes - space;
         }
 
         ret = recv(sock, buf->address + buf->write_offset, space, recvflags);
