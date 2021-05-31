@@ -79,13 +79,13 @@ typedef struct etsithread {
 } etsithread_t;
 
 typedef struct etsilive_format_data {
-	char *listenport;
-	char *listenaddr;
+        char *listenport;
+        char *listenaddr;
 
         pthread_t listenthread;
         etsithread_t *receivers;
+        int maxthreads;
         int nextthreadid;
-        wandder_etsispec_t *shareddec;
 } etsilive_format_data_t;
 
 typedef struct newsendermessage {
@@ -155,6 +155,7 @@ static void *etsi_listener(void *tdata) {
         }
 
         freeaddrinfo(listenai);
+        listenai = NULL;
 
         /* TODO consider possibility of pausing and resuming? */
         while ((is_halted(libtrace) == -1)) {
@@ -184,10 +185,10 @@ static void *etsi_listener(void *tdata) {
                 et = &(FORMAT_DATA->receivers[FORMAT_DATA->nextthreadid]);
                 libtrace_message_queue_put(&(et->mqueue), (void *)&msg);
 
-                if (libtrace->perpkt_thread_count > 0) {
+                if (FORMAT_DATA->maxthreads > 1) {
                         FORMAT_DATA->nextthreadid =
-                                ((FORMAT_DATA->nextthreadid + 1) %
-                                libtrace->perpkt_thread_count);
+                            ((FORMAT_DATA->nextthreadid + 1) %
+                             FORMAT_DATA->maxthreads);
                 }
         }
 
@@ -217,15 +218,18 @@ static int etsilive_init_input(libtrace_t *libtrace) {
         libtrace->format_data = (etsilive_format_data_t *)malloc(
                         sizeof(etsilive_format_data_t));
 
-	if (!libtrace->format) {
-		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory for "
-			"format data inside etsilive_init_input()");
-		return 1;
-	}
+        if (!libtrace->format) {
+                trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
+                              "Unable to allocate memory for "
+                              "format data inside etsilive_init_input()");
+                return 1;
+        }
 
         FORMAT_DATA->receivers = NULL;
         FORMAT_DATA->nextthreadid = 0;
+        FORMAT_DATA->maxthreads = 1;
         FORMAT_DATA->listenaddr = NULL;
+        FORMAT_DATA->listenthread = 0;
 
         /* TODO is there a sensible default port number? */
         scan = strchr(libtrace->uridata, ':');
@@ -238,12 +242,15 @@ static int etsilive_init_input(libtrace_t *libtrace) {
                         (size_t)(scan - libtrace->uridata));
         FORMAT_DATA->listenport = strdup(scan + 1);
 
-        FORMAT_DATA->shareddec = wandder_create_etsili_decoder();
-
         return 0;
 }
 
 static int etsilive_fin_input(libtrace_t *libtrace) {
+        /*
+        if (FORMAT_DATA->listenthread != 0) {
+                pthread_join(FORMAT_DATA->listenthread, NULL);
+        }
+        */
         if (FORMAT_DATA->receivers) {
                 free(FORMAT_DATA->receivers);
         }
@@ -254,15 +261,12 @@ static int etsilive_fin_input(libtrace_t *libtrace) {
         if (FORMAT_DATA->listenport) {
                 free(FORMAT_DATA->listenport);
         }
-        if (FORMAT_DATA->shareddec) {
-                wandder_free_etsili_decoder(FORMAT_DATA->shareddec);
-        }
         free(libtrace->format_data);
         return 0;
 }
 
 static int etsilive_start_threads(libtrace_t *libtrace, uint32_t maxthreads) {
-	int ret;
+        int ret;
         uint32_t i;
         /* Configure the set of receiver threads */
 
@@ -285,8 +289,8 @@ static int etsilive_start_threads(libtrace_t *libtrace, uint32_t maxthreads) {
                 FORMAT_DATA->receivers[i].threadindex = i;
                 FORMAT_DATA->receivers[i].etsidec =
                                 wandder_create_etsili_decoder();
-
         }
+        FORMAT_DATA->maxthreads = maxthreads;
 
         /* Start the listening thread */
         /* TODO consider affinity of this thread? */
@@ -306,6 +310,7 @@ static int etsilive_start_input(libtrace_t *libtrace) {
 static void halt_etsi_thread(etsithread_t *receiver) {
         int i;
         libtrace_message_queue_destroy(&(receiver->mqueue));
+        wandder_free_etsili_decoder(receiver->etsidec);
         if (receiver->sources == NULL)
                 return;
         for (i = 0; i < receiver->sourcecount; i++) {
@@ -318,7 +323,6 @@ static void halt_etsi_thread(etsithread_t *receiver) {
                         close(src.sock);
                 }
         }
-        wandder_free_etsili_decoder(receiver->etsidec);
         free(receiver->sources);
 }
 
@@ -328,7 +332,7 @@ static int etsilive_pause_input(libtrace_t *libtrace) {
         if (libtrace->perpkt_thread_count == 0) {
                 halt_etsi_thread(&(FORMAT_DATA->receivers[0]));
         } else {
-                for (i = 0; i < libtrace->perpkt_thread_count; i++) {
+                for (i = 0; i < FORMAT_DATA->maxthreads; i++) {
                         halt_etsi_thread(&(FORMAT_DATA->receivers[i]));
                 }
         }
@@ -352,6 +356,8 @@ static int receiver_read_message(etsithread_t *et) {
                         for (i = 0; i < et->sourcealloc; i++) {
                                 et->sources[i].sock = -1;
                                 et->sources[i].srcaddr = NULL;
+                                et->sources[i].recvbuffer.fd = -1;
+                                et->sources[i].recvbuffer.address = NULL;
                         }
 
                         esock = &(et->sources[0]);
@@ -373,6 +379,8 @@ static int receiver_read_message(etsithread_t *et) {
                                         i++) {
                                 et->sources[i].sock = -1;
                                 et->sources[i].srcaddr = NULL;
+                                et->sources[i].recvbuffer.fd = -1;
+                                et->sources[i].recvbuffer.address = NULL;
                         }
                         esock = &(et->sources[et->sourcealloc]);
                         et->sourcealloc += 10;
@@ -425,7 +433,6 @@ static void receive_from_single_socket(etsisocket_t *esock, etsithread_t *et) {
                 et->activesources -= 1;
                 libtrace_scb_destroy(&(esock->recvbuffer));
         }
-
 }
 
 static int receive_etsi_sockets(libtrace_t *libtrace, etsithread_t *et) {
@@ -491,7 +498,6 @@ static inline void inspect_next_packet(etsisocket_t *sock,
                 reclen = sock->cached.length;
         } else {
                 reclen = wandder_etsili_get_pdu_length(dec);
-
                 if (reclen == 0) {
                         return;
                 }
@@ -566,6 +572,10 @@ static int etsilive_prepare_received(libtrace_t *libtrace,
 
         uint32_t available = 0;
 
+        if (packet->buf_control == TRACE_CTRL_PACKET) {
+                free(packet->buffer);
+        }
+
         packet->trace = libtrace;
         packet->buffer = libtrace_scb_get_read(&(esock->recvbuffer),
                                         &available);
@@ -578,6 +588,7 @@ static int etsilive_prepare_received(libtrace_t *libtrace,
 
         packet->cached.wire_length = esock->cached.length;
         packet->cached.capture_length = esock->cached.length;
+        packet->fmtdata = &(esock->recvbuffer);
 
         /* Advance the read pointer for this buffer
          * TODO should really do this in fin_packet, but will need a ref
@@ -639,23 +650,24 @@ static int etsilive_get_pdu_length(const libtrace_packet_t *packet) {
         /* Should never get here because cache is set when packet is read */
         size_t reclen;
         libtrace_t *libtrace = packet->trace;
+        wandder_etsispec_t *dec;
 
-	if (!libtrace) {
-		fprintf(stderr, "Packet is not associated with a trace in etsilive_get_pdu_length()\n");
-		return TRACE_ERR_NULL_TRACE;
-	}
-	if (!FORMAT_DATA->shareddec) {
-		trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT, "Etsilive format data shareddec is NULL in etsilive_get_pdu_length()\n");
-		return -1;
-	}
+        if (!libtrace) {
+                fprintf(stderr, "Packet is not associated with a trace in "
+                                "etsilive_get_pdu_length()\n");
+                return TRACE_ERR_NULL_TRACE;
+        }
+        /* Creating a decoder every time will be slow, but again we
+         * should never get here anyway...
+         */
+        dec = wandder_create_etsili_decoder();
 
         /* 0 should be ok here for quickly evaluating the first length
          * field... */
-        wandder_attach_etsili_buffer(FORMAT_DATA->shareddec, packet->buffer,
-                        0, false);
-        reclen = (size_t)wandder_etsili_get_pdu_length(
-                        FORMAT_DATA->shareddec);
+        wandder_attach_etsili_buffer(dec, packet->buffer, 0, false);
+        reclen = (size_t)wandder_etsili_get_pdu_length(dec);
 
+        wandder_free_etsili_decoder(dec);
         return reclen;
 }
 
@@ -668,58 +680,87 @@ static uint64_t etsilive_get_erf_timestamp(const libtrace_packet_t *packet) {
         return packet->order;
 }
 
+static int etsilive_can_hold_packet(libtrace_packet_t *packet)
+{
+        int wlen = -1;
+
+        /* Can hold the packet (temporarily) as long as a decent chunk of
+         * our SCB is available.
+         * SCB is only valid if the trace is not paused / halted...
+         */
+        if (!is_halted(packet->trace) && packet->fmtdata != NULL) {
+                libtrace_scb_t *scb = (libtrace_scb_t *)packet->fmtdata;
+                if (libtrace_scb_get_available_space(scb) >
+                    0.25 * ETSI_RECVBUF_SIZE) {
+                        return 0;
+                }
+        }
+
+        /* Otherwise, we have to copy but let's save our cached lengths
+         * to avoid having to decode them from the record again...
+         */
+        wlen = packet->cached.wire_length;
+        libtrace_make_packet_safe(packet);
+
+        /* The copy will clear the cache, so we need to put the saved
+         * lengths back in again.
+         */
+        packet->cached.wire_length = wlen;
+        packet->cached.capture_length = wlen;
+        return 0;
+}
+
 static libtrace_linktype_t etsilive_get_link_type(
                 const libtrace_packet_t *packet UNUSED) {
         return TRACE_TYPE_ETSILI;
 }
 
 static struct libtrace_format_t etsilive = {
-        "etsilive",
-        "$Id$",
-        TRACE_FORMAT_ETSILIVE,
-        NULL,                           /* probe filename */
-        NULL,                           /* probe magic */
-        etsilive_init_input,            /* init_input */
-        NULL,                           /* config_input */
-        etsilive_start_input,           /* start_input */
-        etsilive_pause_input,           /* pause */
-        NULL,                           /* init_output */
-        NULL,                           /* config_output */
-        NULL,                           /* start_output */
-        etsilive_fin_input,             /* fin_input */
-        NULL,                           /* fin_output */
-        etsilive_read_packet,           /* read_packet */
-        etsilive_prepare_packet,        /* prepare_packet */
-        NULL,                           /* fin_packet */
-        NULL,                           /* can_hold_packet */
-        NULL,                           /* write_packet */
-        NULL,                           /* flush_output */
-        etsilive_get_link_type,         /* get_link_type */
-        NULL,                           /* get_direction */
-        NULL,                           /* set_direction */
-        etsilive_get_erf_timestamp,     /* get_erf_timestamp */
-        NULL,                           /* get_timeval */
-        NULL,                           /* get_timespec */
-        NULL,                           /* get_seconds */
-	NULL,                           /* get_meta_section */
-        NULL,                           /* seek_erf */
-        NULL,                           /* seek_timeval */
-        NULL,                           /* seek_seconds */
-        etsilive_get_pdu_length,        /* get_capture_length */
-        etsilive_get_pdu_length,        /* get_wire_length */
-        etsilive_get_framing_length,    /* get_framing_length */
-        NULL,                           /* set_capture_length */
-        NULL,                           /* get_received_packets */
-        NULL,                           /* get_filtered_packets */
-        NULL,                           /* get_dropped_packets */
-        NULL,                           /* get_statistics */
-        NULL,                           /* get_fd */
-        NULL, //trace_event_etsilive,           /* trace_event */
-        NULL,                           /* help */
-        NULL,                           /* next pointer */
-        NON_PARALLEL(true)              /* TODO this can be parallel */
+    "etsilive",
+    "$Id$",
+    TRACE_FORMAT_ETSILIVE,
+    NULL,                        /* probe filename */
+    NULL,                        /* probe magic */
+    etsilive_init_input,         /* init_input */
+    NULL,                        /* config_input */
+    etsilive_start_input,        /* start_input */
+    etsilive_pause_input,        /* pause */
+    NULL,                        /* init_output */
+    NULL,                        /* config_output */
+    NULL,                        /* start_output */
+    etsilive_fin_input,          /* fin_input */
+    NULL,                        /* fin_output */
+    etsilive_read_packet,        /* read_packet */
+    etsilive_prepare_packet,     /* prepare_packet */
+    NULL,                        /* fin_packet */
+    etsilive_can_hold_packet,    /* can_hold_packet */
+    NULL,                        /* write_packet */
+    NULL,                        /* flush_output */
+    etsilive_get_link_type,      /* get_link_type */
+    NULL,                        /* get_direction */
+    NULL,                        /* set_direction */
+    etsilive_get_erf_timestamp,  /* get_erf_timestamp */
+    NULL,                        /* get_timeval */
+    NULL,                        /* get_timespec */
+    NULL,                        /* get_seconds */
+    NULL,                        /* get_meta_section */
+    NULL,                        /* seek_erf */
+    NULL,                        /* seek_timeval */
+    NULL,                        /* seek_seconds */
+    etsilive_get_pdu_length,     /* get_capture_length */
+    etsilive_get_pdu_length,     /* get_wire_length */
+    etsilive_get_framing_length, /* get_framing_length */
+    NULL,                        /* set_capture_length */
+    NULL,                        /* get_received_packets */
+    NULL,                        /* get_filtered_packets */
+    NULL,                        /* get_dropped_packets */
+    NULL,                        /* get_statistics */
+    NULL,                        /* get_fd */
+    NULL,                        /* trace_event */
+    NULL,                        /* help */
+    NULL,                        /* next pointer */
+    NON_PARALLEL(true)           /* TODO this can be parallel */
 };
-
 
 void etsilive_constructor(void) {
         register_format(&etsilive);

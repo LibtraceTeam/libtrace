@@ -90,7 +90,7 @@ struct libtrace_t *currenttrace;
 
 static void cleanup_signal(int signal UNUSED) {
         if (currenttrace) {
-                trace_pstop(currenttrace);
+                trace_interrupt();
         }
 }
 

@@ -1037,37 +1037,39 @@ DLLEXPORT void trace_destroy_packet(libtrace_packet_t *packet) {
  * use trace_destroy_packet() for those diabolical purposes.
  */
 void trace_fin_packet(libtrace_packet_t *packet) {
-	if (packet)
-	{
-		if (packet->trace && packet->trace->format->fin_packet) {
-			packet->trace->format->fin_packet(packet);
-		}
+        if (packet) {
+                if (packet->trace && packet->trace->format->fin_packet) {
+                        packet->trace->format->fin_packet(packet);
+                }
 
                 if (packet->srcbucket && packet->internalid != 0) {
-                        libtrace_bucket_t *b = (libtrace_bucket_t *)packet->srcbucket;
+                        libtrace_bucket_t *b =
+                            (libtrace_bucket_t *)packet->srcbucket;
                         libtrace_release_bucket_id(b, packet->internalid);
                 }
 
                 if (packet->trace) {
-			if (!libtrace_parallel && packet->trace->last_packet == packet)
-				packet->trace->last_packet = NULL;
+                        if (!libtrace_parallel &&
+                            packet->trace->last_packet == packet) {
+                                packet->trace->last_packet = NULL;
+                        }
                 }
 
-		// No matter what we remove the header and link pointers
-		packet->trace = NULL;
-		packet->header = NULL;
-		packet->payload = NULL;
+                // No matter what we remove the header and link pointers
+                packet->trace = NULL;
+                packet->header = NULL;
+                packet->payload = NULL;
 
-		if (packet->buf_control != TRACE_CTRL_PACKET)
-		{
-			packet->buffer = NULL;
-		}
+                if (packet->buf_control != TRACE_CTRL_PACKET) {
+                        packet->buffer = NULL;
+                }
 
-		trace_clear_cache(packet);
-		packet->hash = 0;
-		packet->order = 0;
+                trace_clear_cache(packet);
+                packet->hash = 0;
+                packet->order = 0;
                 packet->srcbucket = NULL;
-	}
+                packet->fmtdata = NULL;
+        }
 }
 
 /* Read one packet from the trace into buffer. Note that this function will
