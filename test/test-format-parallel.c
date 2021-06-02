@@ -52,6 +52,7 @@
 #include "libtrace_parallel.h"
 
 static int expected = 100;  // The number of packets we expect
+static int timeout = 0;
 
 void iferr(libtrace_t *trace, const char *msg) {
         libtrace_err_t err = trace_get_err(trace);
@@ -169,6 +170,9 @@ static libtrace_packet_t *per_packet(libtrace_t *trace UNUSED,
                 usleep(100000);
         storage->count++;
         count++;
+        if (count == 1 && timeout) {
+                alarm(timeout);
+        }
 
         assert(count == storage->count);
 
@@ -309,7 +313,7 @@ int main(int argc, char *argv[]) {
         int opt;
         char *read = NULL;
 
-        while ((opt = getopt(argc, argv, "pr:c:")) != -1) {
+        while ((opt = getopt(argc, argv, "pr:c:t:")) != -1) {
                 switch (opt) {
                 case 'p':
                         pause = 0;
@@ -321,6 +325,10 @@ int main(int argc, char *argv[]) {
                         expected =
                             parse_int_or_exit(optarg, "count", 0, INT_MAX);
                         break;
+                case 't':
+                        timeout =
+                            parse_int_or_exit(optarg, "timeout", -1, INT_MAX);
+                        break;
                 }
         }
 
@@ -328,6 +336,7 @@ int main(int argc, char *argv[]) {
         sigemptyset(&sigact.sa_mask);
         sigact.sa_flags = SA_RESTART;
         sigaction(SIGINT, &sigact, NULL);
+        sigaction(SIGALRM, &sigact, NULL);
 
         tracename = lookup_uri(read);
 
