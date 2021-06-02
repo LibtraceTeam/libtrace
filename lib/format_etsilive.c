@@ -314,14 +314,15 @@ static void halt_etsi_thread(etsithread_t *receiver) {
         if (receiver->sources == NULL)
                 return;
         for (i = 0; i < receiver->sourcecount; i++) {
-                etsisocket_t src = receiver->sources[i];
-                libtrace_scb_destroy(&(src.recvbuffer));
-                if (src.srcaddr) {
-                        free(src.srcaddr);
+                etsisocket_t *src = &receiver->sources[i];
+                if (src->sock == -1)
+                        /* Skip if already closed */
+                        continue;
+                libtrace_scb_destroy(&(src->recvbuffer));
+                if (src->srcaddr) {
+                        free(src->srcaddr);
                 }
-                if (src.sock != -1) {
-                        close(src.sock);
-                }
+                close(src->sock);
         }
         free(receiver->sources);
 }
@@ -515,6 +516,7 @@ static inline void inspect_next_packet(etsisocket_t *sock,
                         close(sock->sock);
                         sock->sock = -1;
                         et->activesources -= 1;
+                        libtrace_scb_destroy(&(sock->recvbuffer));
                         return;
                 }
                 /* Send keep alive response */
@@ -523,6 +525,7 @@ static inline void inspect_next_packet(etsisocket_t *sock,
                         close(sock->sock);
                         sock->sock = -1;
                         et->activesources -= 1;
+                        libtrace_scb_destroy(&(sock->recvbuffer));
                         return;
                 }
                 /* Skip past KA */
