@@ -96,7 +96,7 @@ int main(int argc, char *argv[]) {
 
         errno = 0;
         expected = parse_int_or_exit(argv[1], "expected", 0, INT_MAX, argv);
-        timeout = parse_int_or_exit(argv[2], "timeout", 0, INT_MAX, argv);
+        timeout = parse_int_or_exit(argv[2], "timeout", -1, INT_MAX, argv);
         tracename = argv[3];
 
         trace = trace_create(tracename);
@@ -105,6 +105,7 @@ int main(int argc, char *argv[]) {
         trace_start(trace);
         iferr(trace, tracename);
 
+        signal(SIGINT, &sig_handler);
         signal(SIGALRM, &sig_handler);
 
         packet = trace_create_packet();

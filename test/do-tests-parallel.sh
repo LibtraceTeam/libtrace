@@ -57,7 +57,7 @@ then
 		sleep 1;
 		netcat -q1 127.0.0.1 60198 < ./traces/etsi_10_pings_HI3.raw_tcp > /dev/null
 	} &
-	do_test timeout 2 ./test-format-parallel -p -c 20 -r etsilive:127.0.0.1:60198
+	do_test ./test-format-parallel -p -c 20 -t 1 -r etsilive:127.0.0.1:60198
 else
 	echo "Netcat not found: skipping etsilive test"
 fi
