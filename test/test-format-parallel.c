@@ -28,14 +28,14 @@
  *
  */
 #ifndef WIN32
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <netinet/in_systm.h>
-#include <netinet/ip.h>
-#include <netinet/ip_icmp.h>
-#include <netinet/tcp.h>
-#include <sys/socket.h>
-#include <sys/time.h>
+#        include <arpa/inet.h>
+#        include <netinet/in.h>
+#        include <netinet/in_systm.h>
+#        include <netinet/ip.h>
+#        include <netinet/ip_icmp.h>
+#        include <netinet/tcp.h>
+#        include <sys/socket.h>
+#        include <sys/time.h>
 #endif
 #include <assert.h>
 #include <errno.h>
@@ -51,10 +51,11 @@
 #include "data-struct/vector.h"
 #include "libtrace_parallel.h"
 
-static int expected = 100;  // The number of packets we expect
+static int expected = 100; // The number of packets we expect
 static int timeout = 0;
 
-void iferr(libtrace_t *trace, const char *msg) {
+void iferr(libtrace_t *trace, const char *msg)
+{
         libtrace_err_t err = trace_get_err(trace);
         if (err.err_num == 0)
                 return;
@@ -110,7 +111,8 @@ struct final {
 };
 
 static void *report_start(libtrace_t *trace UNUSED, libtrace_thread_t *t UNUSED,
-                          void *global) {
+                          void *global)
+{
         uint32_t *magic = (uint32_t *)global;
         struct final *threadcounter =
             (struct final *)malloc(sizeof(struct final));
@@ -124,7 +126,8 @@ static void *report_start(libtrace_t *trace UNUSED, libtrace_thread_t *t UNUSED,
 
 static void report_cb(libtrace_t *trace UNUSED,
                       libtrace_thread_t *sender UNUSED, void *global, void *tls,
-                      libtrace_result_t *res) {
+                      libtrace_result_t *res)
+{
 
         uint32_t *magic = (uint32_t *)global;
         struct final *threadcounter = (struct final *)tls;
@@ -138,7 +141,8 @@ static void report_cb(libtrace_t *trace UNUSED,
 }
 
 static void report_end(libtrace_t *trace, libtrace_thread_t *t UNUSED,
-                       void *global, void *tls) {
+                       void *global, void *tls)
+{
 
         uint32_t *magic = (uint32_t *)global;
         struct final *threadcounter = (struct final *)tls;
@@ -152,7 +156,8 @@ static void report_end(libtrace_t *trace, libtrace_thread_t *t UNUSED,
 
 static libtrace_packet_t *per_packet(libtrace_t *trace UNUSED,
                                      libtrace_thread_t *t UNUSED, void *global,
-                                     void *tls, libtrace_packet_t *packet) {
+                                     void *tls, libtrace_packet_t *packet)
+{
         struct TLS *storage = (struct TLS *)tls;
         uint32_t *magic = (uint32_t *)global;
         static __thread int count = 0;
@@ -192,7 +197,8 @@ static libtrace_packet_t *per_packet(libtrace_t *trace UNUSED,
 }
 
 static void *start_processing(libtrace_t *trace, libtrace_thread_t *t UNUSED,
-                              void *global) {
+                              void *global)
+{
 
         static __thread bool seen_start_message = false;
         uint32_t *magic = (uint32_t *)global;
@@ -215,7 +221,8 @@ static void *start_processing(libtrace_t *trace, libtrace_thread_t *t UNUSED,
 }
 
 static void stop_processing(libtrace_t *trace, libtrace_thread_t *t,
-                            void *global, void *tls) {
+                            void *global, void *tls)
+{
 
         static __thread bool seen_stop_message = false;
         struct TLS *storage = (struct TLS *)tls;
@@ -239,7 +246,8 @@ static void stop_processing(libtrace_t *trace, libtrace_thread_t *t,
 
 static void process_tick(libtrace_t *trace UNUSED, libtrace_thread_t *t UNUSED,
                          void *global UNUSED, void *tls UNUSED,
-                         uint64_t tick UNUSED) {
+                         uint64_t tick UNUSED)
+{
 
         fprintf(stderr, "Not expecting a tick packet\n");
         kill(getpid(), SIGTERM);
@@ -247,7 +255,8 @@ static void process_tick(libtrace_t *trace UNUSED, libtrace_thread_t *t UNUSED,
 
 static void pause_processing(libtrace_t *trace UNUSED,
                              libtrace_thread_t *t UNUSED, void *global,
-                             void *tls) {
+                             void *tls)
+{
 
         static __thread bool seen_pause_message = false;
         struct TLS *storage = (struct TLS *)tls;
@@ -266,7 +275,8 @@ static void pause_processing(libtrace_t *trace UNUSED,
 
 static void resume_processing(libtrace_t *trace UNUSED,
                               libtrace_thread_t *t UNUSED, void *global,
-                              void *tls) {
+                              void *tls)
+{
 
         static __thread bool seen_resume_message = false;
         struct TLS *storage = (struct TLS *)tls;
@@ -284,12 +294,14 @@ static void resume_processing(libtrace_t *trace UNUSED,
 }
 
 static libtrace_t *trace = NULL;
-static void stop(int signal UNUSED) {
+static void stop(int signal UNUSED)
+{
         if (trace)
                 trace_pstop(trace);
 }
 
-static int parse_int_or_exit(char *arg, char *argmsg, int min, int max) {
+static int parse_int_or_exit(char *arg, char *argmsg, int min, int max)
+{
         char *end = NULL;
         int ret;
         errno = 0;
