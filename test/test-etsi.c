@@ -25,14 +25,14 @@
  *
  */
 #ifndef WIN32
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <netinet/in_systm.h>
-#include <netinet/ip.h>
-#include <netinet/ip_icmp.h>
-#include <netinet/tcp.h>
-#include <sys/socket.h>
-#include <sys/time.h>
+#        include <arpa/inet.h>
+#        include <netinet/in.h>
+#        include <netinet/in_systm.h>
+#        include <netinet/ip.h>
+#        include <netinet/ip_icmp.h>
+#        include <netinet/tcp.h>
+#        include <sys/socket.h>
+#        include <sys/time.h>
 #endif
 #include <assert.h>
 #include <errno.h>
@@ -45,7 +45,8 @@
 
 #include "libtrace.h"
 
-void iferr(libtrace_t *trace, const char *msg) {
+void iferr(libtrace_t *trace, const char *msg)
+{
         libtrace_err_t err = trace_get_err(trace);
         if (err.err_num == 0)
                 return;
@@ -53,19 +54,19 @@ void iferr(libtrace_t *trace, const char *msg) {
         exit(1);
 }
 
-void usage(char *argv[]) {
+void usage(char *argv[])
+{
         fprintf(stderr, "usage: %s packets timeout trace\n", argv[0]);
         fprintf(stderr, "\tpackets: The expected number of packets\n"
                         "\ttimeout: The timeout in seconds\n"
                         "\ttrace: The trace format\n");
 }
 
-static void sig_handler(int sig UNUSED) {
-        trace_interrupt();
-}
+static void sig_handler(int sig UNUSED) { trace_interrupt(); }
 
 static int parse_int_or_exit(char *arg, char *argmsg, int min, int max,
-                             char *argv[]) {
+                             char *argv[])
+{
         char *end = NULL;
         int ret;
         errno = 0;
@@ -79,7 +80,8 @@ static int parse_int_or_exit(char *arg, char *argmsg, int min, int max,
         return ret;
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[])
+{
         int psize = 0;
         int error = 0;
         int count = 0;
