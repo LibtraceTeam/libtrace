@@ -827,10 +827,10 @@ static int linux_xdp_can_hold_packet(libtrace_packet_t *packet) {
 
     struct xsk_per_stream *stream;
 
-    if (packet->srcbucket == NULL)
+    if (packet->fmtdata == NULL)
         return -1;
 
-    stream = (struct xsk_per_stream *)packet->srcbucket;
+    stream = (struct xsk_per_stream *)packet->fmtdata;
 
     // allow user to hold onto this frame if we have more than MIN_FREE_FRAMES remaining
     if (NUM_FRAMES - xsk_prod_nb_free(&stream->xsk->umem->fq, 1) > MIN_FREE_FRAMES)
@@ -854,10 +854,10 @@ static void linux_xdp_fin_packet(libtrace_packet_t *packet) {
     }
 
     /* If we own the packet, we need to free it */
-    if (packet->buf_control == TRACE_CTRL_EXTERNAL && packet->srcbucket) {
+    if (packet->buf_control == TRACE_CTRL_EXTERNAL && packet->fmtdata) {
 
-        stream = (struct xsk_per_stream *) packet->srcbucket;
-        packet->srcbucket = NULL;
+        stream = (struct xsk_per_stream *) packet->fmtdata;
+        packet->fmtdata = NULL;
 
         // offset into the umem to give back to the fill queue
         addr = xsk_umem__extract_addr(
@@ -967,7 +967,7 @@ static int linux_xdp_read_stream(libtrace_t *libtrace,
         packet[i]->header = (uint8_t *)pkt_buffer - FRAME_HEADROOM;
         packet[i]->payload = pkt_buffer;
         packet[i]->trace = libtrace;
-        packet[i]->srcbucket = stream;
+        packet[i]->fmtdata = stream;
         packet[i]->error = 1;
         packet[i]->order = sys_time + i;
 
@@ -1158,7 +1158,7 @@ static libtrace_eventobj_t linux_xdp_event(libtrace_t *libtrace,
         packet->payload = pkt_buffer;
         packet->trace = libtrace;
         packet->error = 1;
-        packet->srcbucket = stream;
+        packet->fmtdata = stream;
 
         meta = (libtrace_xdp_meta_t *)packet->buffer;
         sys_time = linux_xdp_get_time();
