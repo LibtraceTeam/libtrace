@@ -51,11 +51,11 @@ echo \* Read pcapng
 do_test ./test-format-parallel -r pcapng
 
 echo \* Read etsilive
-if command -v netcat > /dev/null
+if command -v socat > /dev/null
 then
 	{
 		sleep 1;
-		netcat -q1 127.0.0.1 60198 < ./traces/etsi_10_pings_HI3.raw_tcp > /dev/null
+		socat - TCP:127.0.0.1:60198 < ./traces/etsi_10_pings_HI3.raw_tcp > /dev/null
 	} &
 	do_test ./test-format-parallel -p -c 20 -t 1 -r etsilive:127.0.0.1:60198
 else
