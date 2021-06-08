@@ -81,7 +81,7 @@ then
 	} &
 	do_test ./test-etsi 20 1 etsilive:127.0.0.1:60198
 else
-	echo "Netcat not found: skipping etsilive test"
+	echo "Socat not found: skipping etsilive test"
 fi
 
 echo \* Testing pcap-bpf
