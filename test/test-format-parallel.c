@@ -2,12 +2,12 @@
  * This file is part of libtrace
  *
  * Copyright (c) 2007 The University of Waikato, Hamilton, New Zealand.
- * Authors: Daniel Lawson 
- *          Perry Lorier 
- *          
+ * Authors: Daniel Lawson
+ *          Perry Lorier
+ *
  * All rights reserved.
  *
- * This code has been developed by the University of Waikato WAND 
+ * This code has been developed by the University of Waikato WAND
  * research group. For further information please see http://www.wand.net.nz/
  *
  * libtrace is free software; you can redistribute it and/or modify
@@ -28,78 +28,81 @@
  *
  */
 #ifndef WIN32
-#  include <sys/time.h>
-#  include <netinet/in.h>
-#  include <netinet/in_systm.h>
-#  include <netinet/tcp.h>
-#  include <netinet/ip.h>
-#  include <netinet/ip_icmp.h>
-#  include <arpa/inet.h>
-#  include <sys/socket.h>
+#        include <arpa/inet.h>
+#        include <netinet/in.h>
+#        include <netinet/in_systm.h>
+#        include <netinet/ip.h>
+#        include <netinet/ip_icmp.h>
+#        include <netinet/tcp.h>
+#        include <sys/socket.h>
+#        include <sys/time.h>
 #endif
+#include <assert.h>
+#include <errno.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
 #include <string.h>
 #include <sys/types.h>
 #include <time.h>
-#include <string.h>
-#include <signal.h>
 #include <unistd.h>
 
 #include "dagformat.h"
-#include "libtrace_parallel.h"
 #include "data-struct/vector.h"
+#include "libtrace_parallel.h"
 
-void iferr(libtrace_t *trace,const char *msg)
+static int expected = 100; // The number of packets we expect
+static int timeout = 0;
+
+void iferr(libtrace_t *trace, const char *msg)
 {
-	libtrace_err_t err = trace_get_err(trace);
-	if (err.err_num==0)
-		return;
-	printf("Error: %s: %s\n", msg, err.problem);
+        libtrace_err_t err = trace_get_err(trace);
+        if (err.err_num == 0)
+                return;
+        printf("Error: %s: %s\n", msg, err.problem);
         exit(-err.err_num);
 }
 
 const char *lookup_uri(const char *type) {
-	if (strchr(type,':'))
-		return type;
-	if (!strcmp(type,"erf"))
-		return "erf:traces/100_packets.erf";
-	if (!strcmp(type,"erfprov"))
-		return "erf:traces/provenance.erf";
-	if (!strcmp(type,"rawerf"))
-		return "rawerf:traces/100_packets.erf";
-	if (!strcmp(type,"pcap"))
-		return "pcap:traces/100_packets.pcap";
-	if (!strcmp(type,"pcapng"))
-		return "pcap:traces/100_packets.pcapng";
-	if (!strcmp(type,"wtf"))
-		return "wtf:traces/wed.wtf";
-	if (!strcmp(type,"rtclient"))
-		return "rtclient:chasm";
-	if (!strcmp(type,"pcapfile"))
-		return "pcapfile:traces/100_packets.pcap";
-	if (!strcmp(type,"pcapfilens"))
-		return "pcapfile:traces/100_packetsns.pcap";
-	if (!strcmp(type, "duck"))
-		return "duck:traces/100_packets.duck";
-	if (!strcmp(type, "legacyatm"))
-		return "legacyatm:traces/legacyatm.gz";
-	if (!strcmp(type, "legacypos"))
-		return "legacypos:traces/legacypos.gz";
-	if (!strcmp(type, "legacyeth"))
-		return "legacyeth:traces/legacyeth.gz";
-	if (!strcmp(type, "tsh"))
-		return "tsh:traces/10_packets.tsh.gz";
-	return type;
+        if (strchr(type, ':'))
+                return type;
+        if (!strcmp(type, "erf"))
+                return "erf:traces/100_packets.erf";
+        if (!strcmp(type, "erfprov"))
+                return "erf:traces/provenance.erf";
+        if (!strcmp(type, "rawerf"))
+                return "rawerf:traces/100_packets.erf";
+        if (!strcmp(type, "pcap"))
+                return "pcap:traces/100_packets.pcap";
+        if (!strcmp(type, "pcapng"))
+                return "pcap:traces/100_packets.pcapng";
+        if (!strcmp(type, "wtf"))
+                return "wtf:traces/wed.wtf";
+        if (!strcmp(type, "rtclient"))
+                return "rtclient:chasm";
+        if (!strcmp(type, "pcapfile"))
+                return "pcapfile:traces/100_packets.pcap";
+        if (!strcmp(type, "pcapfilens"))
+                return "pcapfile:traces/100_packetsns.pcap";
+        if (!strcmp(type, "duck"))
+                return "duck:traces/100_packets.duck";
+        if (!strcmp(type, "legacyatm"))
+                return "legacyatm:traces/legacyatm.gz";
+        if (!strcmp(type, "legacypos"))
+                return "legacypos:traces/legacypos.gz";
+        if (!strcmp(type, "legacyeth"))
+                return "legacyeth:traces/legacyeth.gz";
+        if (!strcmp(type, "tsh"))
+                return "tsh:traces/10_packets.tsh.gz";
+        return type;
 }
 
 struct TLS {
-	bool seen_start_message;
-	bool seen_stop_message;
-	bool seen_resuming_message;
-	bool seen_pausing_message;
-	int count;
+        bool seen_start_message;
+        bool seen_stop_message;
+        bool seen_resuming_message;
+        bool seen_pausing_message;
+        int count;
 };
 
 struct final {
@@ -107,12 +110,12 @@ struct final {
         int packets;
 };
 
-static void *report_start(libtrace_t *trace UNUSED,
-                libtrace_thread_t *t UNUSED,
-                void *global) {
+static void *report_start(libtrace_t *trace UNUSED, libtrace_thread_t *t UNUSED,
+                          void *global)
+{
         uint32_t *magic = (uint32_t *)global;
         struct final *threadcounter =
-                        (struct final *)malloc(sizeof(struct final));
+            (struct final *)malloc(sizeof(struct final));
 
         assert(*magic == 0xabcdef);
 
@@ -122,8 +125,9 @@ static void *report_start(libtrace_t *trace UNUSED,
 }
 
 static void report_cb(libtrace_t *trace UNUSED,
-                libtrace_thread_t *sender UNUSED,
-                void *global, void *tls, libtrace_result_t *res) {
+                      libtrace_thread_t *sender UNUSED, void *global, void *tls,
+                      libtrace_result_t *res)
+{
 
         uint32_t *magic = (uint32_t *)global;
         struct final *threadcounter = (struct final *)tls;
@@ -131,31 +135,33 @@ static void report_cb(libtrace_t *trace UNUSED,
         assert(*magic == 0xabcdef);
         assert(res->key == 0);
 
-        threadcounter->threads ++;
+        threadcounter->threads++;
         threadcounter->packets += res->value.sint;
         printf("%d\n", res->value.sint);
 }
 
 static void report_end(libtrace_t *trace, libtrace_thread_t *t UNUSED,
-                void *global, void *tls) {
+                       void *global, void *tls)
+{
 
         uint32_t *magic = (uint32_t *)global;
         struct final *threadcounter = (struct final *)tls;
 
         assert(*magic == 0xabcdef);
         assert(threadcounter->threads == trace_get_perpkt_threads(trace));
-        assert(threadcounter->packets == 100);
+        assert(threadcounter->packets == expected);
 
         free(threadcounter);
 }
 
 static libtrace_packet_t *per_packet(libtrace_t *trace UNUSED,
-                libtrace_thread_t *t UNUSED,
-                void *global, void *tls, libtrace_packet_t *packet) {
+                                     libtrace_thread_t *t UNUSED, void *global,
+                                     void *tls, libtrace_packet_t *packet)
+{
         struct TLS *storage = (struct TLS *)tls;
         uint32_t *magic = (uint32_t *)global;
         static __thread int count = 0;
-	int a,*b,c=0;
+        int a, *b, c = 0;
 
         assert(storage != NULL);
         assert(!storage->seen_stop_message);
@@ -165,29 +171,34 @@ static libtrace_packet_t *per_packet(libtrace_t *trace UNUSED,
 
         assert(*magic == 0xabcdef);
 
-	if (storage->count == 0)
-		usleep(100000);
-        storage->count ++;
-        count ++;
+        if (storage->count == 0)
+                usleep(100000);
+        storage->count++;
+        count++;
+        if (count == 1 && timeout) {
+                alarm(timeout);
+        }
 
         assert(count == storage->count);
 
         if (count > 100) {
-                fprintf(stderr, "Too many packets -- someone should stop me!\n");
+                fprintf(stderr,
+                        "Too many packets -- someone should stop me!\n");
                 kill(getpid(), SIGTERM);
         }
 
         // Do some work to even out the load on cores
         b = &c;
         for (a = 0; a < 10000000; a++) {
-                c += a**b;
+                c += a * *b;
         }
 
         return packet;
 }
 
 static void *start_processing(libtrace_t *trace, libtrace_thread_t *t UNUSED,
-                void *global) {
+                              void *global)
+{
 
         static __thread bool seen_start_message = false;
         uint32_t *magic = (uint32_t *)global;
@@ -210,7 +221,8 @@ static void *start_processing(libtrace_t *trace, libtrace_thread_t *t UNUSED,
 }
 
 static void stop_processing(libtrace_t *trace, libtrace_thread_t *t,
-                void *global, void *tls) {
+                            void *global, void *tls)
+{
 
         static __thread bool seen_stop_message = false;
         struct TLS *storage = (struct TLS *)tls;
@@ -225,21 +237,26 @@ static void stop_processing(libtrace_t *trace, libtrace_thread_t *t,
         seen_stop_message = true;
         storage->seen_stop_message = true;
 
-	trace_publish_result(trace, t, (uint64_t) 0, (libtrace_generic_t){.sint = storage->count}, RESULT_USER);
+        trace_publish_result(trace, t, (uint64_t)0,
+                             (libtrace_generic_t){.sint = storage->count},
+                             RESULT_USER);
         trace_post_reporter(trace);
         free(storage);
 }
 
 static void process_tick(libtrace_t *trace UNUSED, libtrace_thread_t *t UNUSED,
-                void *global UNUSED, void *tls UNUSED, uint64_t tick UNUSED) {
+                         void *global UNUSED, void *tls UNUSED,
+                         uint64_t tick UNUSED)
+{
 
         fprintf(stderr, "Not expecting a tick packet\n");
         kill(getpid(), SIGTERM);
 }
 
 static void pause_processing(libtrace_t *trace UNUSED,
-                libtrace_thread_t *t UNUSED,
-                void *global, void *tls) {
+                             libtrace_thread_t *t UNUSED, void *global,
+                             void *tls)
+{
 
         static __thread bool seen_pause_message = false;
         struct TLS *storage = (struct TLS *)tls;
@@ -257,8 +274,9 @@ static void pause_processing(libtrace_t *trace UNUSED,
 }
 
 static void resume_processing(libtrace_t *trace UNUSED,
-                libtrace_thread_t *t UNUSED,
-                void *global, void *tls) {
+                              libtrace_thread_t *t UNUSED, void *global,
+                              void *tls)
+{
 
         static __thread bool seen_resume_message = false;
         struct TLS *storage = (struct TLS *)tls;
@@ -282,9 +300,23 @@ static void stop(int signal UNUSED)
                 trace_pstop(trace);
 }
 
+static int parse_int_or_exit(char *arg, char *argmsg, int min, int max)
+{
+        char *end = NULL;
+        int ret;
+        errno = 0;
+        ret = strtol(arg, &end, 0);
+        if (errno || '\0' != *end || ret <= min || ret > max) {
+                fprintf(stderr, "Cannot parse argument '%s' as an integer.\n",
+                        argmsg);
+                exit(1);
+        }
+        return ret;
+}
+
 int main(int argc, char *argv[]) {
-	int error = 0;
-	const char *tracename;
+        int error = 0;
+        const char *tracename;
         libtrace_callback_set_t *processing = NULL;
         libtrace_callback_set_t *reporter = NULL;
         uint32_t global = 0xabcdef;
@@ -293,13 +325,21 @@ int main(int argc, char *argv[]) {
         int opt;
         char *read = NULL;
 
-        while ((opt = getopt(argc, argv, "pr:")) != -1) {
+        while ((opt = getopt(argc, argv, "pr:c:t:")) != -1) {
                 switch (opt) {
                 case 'p':
                         pause = 0;
                         break;
                 case 'r':
                         read = optarg;
+                        break;
+                case 'c':
+                        expected =
+                            parse_int_or_exit(optarg, "count", 0, INT_MAX);
+                        break;
+                case 't':
+                        timeout =
+                            parse_int_or_exit(optarg, "timeout", -1, INT_MAX);
                         break;
                 }
         }
@@ -308,6 +348,7 @@ int main(int argc, char *argv[]) {
         sigemptyset(&sigact.sa_mask);
         sigact.sa_flags = SA_RESTART;
         sigaction(SIGINT, &sigact, NULL);
+        sigaction(SIGALRM, &sigact, NULL);
 
         tracename = lookup_uri(read);
 
@@ -330,10 +371,10 @@ int main(int argc, char *argv[]) {
 
         trace_set_perpkt_threads(trace, 4);
 
-	trace_pstart(trace, &global, processing, reporter);
-	iferr(trace,tracename);
+        trace_pstart(trace, &global, processing, reporter);
+        iferr(trace, tracename);
 
-	/* Make sure traces survive a pause */
+        /* Make sure traces survive a pause */
         if (pause) {
                 trace_ppause(trace);
                 iferr(trace, tracename);
@@ -346,10 +387,10 @@ int main(int argc, char *argv[]) {
 
         global = 0xffffffff;
 
-	/* Now check we have all received all the packets */
-	if (error != 0) {
-		iferr(trace,tracename);
-	}
+        /* Now check we have all received all the packets */
+        if (error != 0) {
+                iferr(trace, tracename);
+        }
 
         trace_destroy(trace);
         trace_destroy_callback_set(processing);
