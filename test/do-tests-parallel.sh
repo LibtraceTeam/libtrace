@@ -59,7 +59,7 @@ then
 	} &
 	do_test ./test-format-parallel -p -c 20 -t 1 -r etsilive:127.0.0.1:60198
 else
-	echo "Netcat not found: skipping etsilive test"
+	echo "Socat not found: skipping etsilive test"
 fi
 
 echo \* Read testing hasher function
