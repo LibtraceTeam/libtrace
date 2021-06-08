@@ -115,6 +115,22 @@ AC_ARG_ENABLE(address-san, AS_HELP_STRING(--enable-address-san, Enable address a
   fi
  ], [])
 
+AC_ARG_ENABLE(thread-san, AS_HELP_STRING(--enable-thread-san, Enable thread sanitisation),
+[
+  if test "x$enableval" = xyes ; then
+    if test "x$enable_address_san" = xyes ; then
+        AC_MSG_ERROR("--enable-address-san and --enable-thread-san cannot be used together")
+    fi
+    CFLAGS+=" -fsanitize=thread -fno-omit-frame-pointer -ggdb3"
+    CXXFLAGS+=" -fsanitize=thread -fno-omit-frame-pointer -ggdb3"
+    LDFLAGS+=" -fsanitize=thread -fno-omit-frame-pointer -ggdb3"
+
+    AC_MSG_NOTICE([Compiling with -fsanitize=thread])
+    AC_MSG_NOTICE([ - Build tests using the command: make thread-san])
+    AC_MSG_NOTICE([ - Programs must also be compiled with -fsanitize=thread])
+  fi
+ ], [])
+
 # Check for -fvisibility
 gl_VISIBILITY
 
