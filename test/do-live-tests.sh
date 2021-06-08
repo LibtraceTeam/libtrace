@@ -70,7 +70,11 @@ declare -a dag_formats=()
 if [[ $# -eq 0 ]]; then
 	declare -a write_formats=("pcapint:veth0" "int:veth0" "ring:veth0" "dpdkvdev:net_pcap0,iface=veth0" "xdp:veth0")
 	declare -a read_formats=("pcapint:veth1" "int:veth1" "ring:veth1" "dpdkvdev:net_pcap1,iface=veth1" "xdp:veth1")
-	declare -a dag_formats=("dag:/dev/dag16,0")
+	if [ -f "/dev/dag16" ]; then
+		dag_formats+=("dag:/dev/dag16,0")
+	else
+		echo "Skipping DAG test: /dev/dag16 not found; configure with dagload"
+	fi
 fi
 
 while [[ $# -gt 0 ]]; do
