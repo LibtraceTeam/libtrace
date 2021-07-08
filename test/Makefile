@@ -41,6 +41,9 @@ install:
 address-san: CFLAGS+= -fsanitize=undefined,leak,address -fno-omit-frame-pointer -ggdb3
 address-san: all
 
+thread-san: CFLAGS+= -fsanitize=thread -fno-omit-frame-pointer -ggdb3
+thread-san: all
+
 dpdk: LDLIBS+= -L$(DPDK_BUILD)/libs
 dpdk: INCLUDE+= -I$(DPDK_BUILD)/include
 dpdk: all

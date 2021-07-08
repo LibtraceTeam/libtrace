@@ -307,6 +307,17 @@ static int etsilive_start_input(libtrace_t *libtrace) {
         return etsilive_start_threads(libtrace, 1);
 }
 
+static void free_etsi_socket(etsisocket_t *esock)
+{
+        if (esock->sock == -1)
+                return;
+        close(esock->sock);
+        esock->sock = -1;
+        libtrace_scb_destroy(&(esock->recvbuffer));
+        free(esock->srcaddr);
+        esock->srcaddr = NULL;
+}
+
 static void halt_etsi_thread(etsithread_t *receiver) {
         int i;
         libtrace_message_queue_destroy(&(receiver->mqueue));
@@ -318,11 +329,7 @@ static void halt_etsi_thread(etsithread_t *receiver) {
                 if (src->sock == -1)
                         /* Skip if already closed */
                         continue;
-                libtrace_scb_destroy(&(src->recvbuffer));
-                if (src->srcaddr) {
-                        free(src->srcaddr);
-                }
-                close(src->sock);
+                free_etsi_socket(src);
         }
         free(receiver->sources);
 }
@@ -421,18 +428,14 @@ static void receive_from_single_socket(etsisocket_t *esock, etsithread_t *et) {
                 }
                 fprintf(stderr, "Error receiving on socket %d: %s\n",
                                 esock->sock, strerror(errno));
-                close(esock->sock);
-                esock->sock = -1;
+                free_etsi_socket(esock);
                 et->activesources -= 1;
-                libtrace_scb_destroy(&(esock->recvbuffer));
         }
 
         if (ret == 0) {
                 fprintf(stderr, "Socket %d has disconnected\n", esock->sock);
-                close(esock->sock);
-                esock->sock = -1;
+                free_etsi_socket(esock);
                 et->activesources -= 1;
-                libtrace_scb_destroy(&(esock->recvbuffer));
         }
 }
 
@@ -513,19 +516,15 @@ static inline void inspect_next_packet(etsisocket_t *sock,
                 int64_t kaseq = wandder_etsili_get_sequence_number(dec);
                 if (kaseq < 0) {
                         fprintf(stderr, "bogus sequence number in ETSILI keep alive.\n");
-                        close(sock->sock);
-                        sock->sock = -1;
+                        free_etsi_socket(sock);
                         et->activesources -= 1;
-                        libtrace_scb_destroy(&(sock->recvbuffer));
                         return;
                 }
                 /* Send keep alive response */
                 if (send_etsili_keepalive_response(sock->sock, kaseq) < 0) {
                         fprintf(stderr, "error sending response to ETSILI keep alive: %s.\n", strerror(errno));
-                        close(sock->sock);
-                        sock->sock = -1;
+                        free_etsi_socket(sock);
                         et->activesources -= 1;
-                        libtrace_scb_destroy(&(sock->recvbuffer));
                         return;
                 }
                 /* Skip past KA */
