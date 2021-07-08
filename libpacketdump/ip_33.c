@@ -62,7 +62,7 @@ DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len)
 	DISPLAYS(dccp, dest," Dest %i");
 	if (len>4) {
 		printf("\n DCCP: Type %i",dccp->type);
-		if (dccp->type<sizeof(dccp_types)) {
+		if (dccp->type < (sizeof(dccp_types) / sizeof(char *))) {
 			printf(" (%s)\n",dccp_types[dccp->type]);
 		} else {
 			printf(" (Unknown)\n");
