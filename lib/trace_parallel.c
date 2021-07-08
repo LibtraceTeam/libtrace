@@ -790,7 +790,7 @@ static void* perpkt_threads_entry(void *data) {
                                             &t->messages, NULL);
                                 }
                                 nb_packets = 0;
-				continue;
+                                continue;
 			default:
 				fprintf(stderr, "Unexpected error %d!!\n", nb_packets);
 				goto error;
@@ -1311,15 +1311,15 @@ static void* keepalive_entry(void *data) {
                         if (libtrace_message_queue_select(&t->messages,
                                                           &next) == 1) {
                                 libtrace_message_t msg;
-				libtrace_message_queue_get(&t->messages, &msg);
-				if (msg.code != MESSAGE_DO_STOP) {
-					fprintf(stderr, "Unexpected message code in keepalive_entry()\n");
-					pthread_exit(NULL);
-				}
-				goto done;
+                                libtrace_message_queue_get(&t->messages, &msg);
+                                if (msg.code != MESSAGE_DO_STOP) {
+                                        fprintf(stderr, "Unexpected message code in keepalive_entry()\n");
+                                        pthread_exit(NULL);
+                                }
+                                goto done;
                         }
                 }
-		prev = usec_to_tv(next_release);
+                prev = usec_to_tv(next_release);
 		if (trace->state == STATE_RUNNING) {
 			message.data.uint64 = ((((uint64_t)prev.tv_sec) << 32) +
 			                       (((uint64_t)prev.tv_usec << 32)/1000000));

@@ -108,20 +108,20 @@ typedef enum { TS_NONE, TS_TIMEVAL, TS_TIMESPEC } timestamptype_t;
  * this means that we can interpret a ring frame on a kernel that doesn't
  * support the format directly.
  */
-#define PACKET_RX_RING	5
+#define PACKET_RX_RING  5
 #define PACKET_VERSION	10
 #define PACKET_HDRLEN	11
-#define PACKET_TX_RING	13
+#define PACKET_TX_RING  13
 #define PACKET_FANOUT	18
 
 /* Packet mmap RX flags */
-#define TP_STATUS_USER	0x1
+#define TP_STATUS_USER 0x1
 
 /* Packet mmap TX flags */
-#define TP_STATUS_AVAILABLE	0x0
-#define TP_STATUS_SEND_REQUEST	0x1
-#define TP_STATUS_SENDING	0x2
-#define TP_STATUS_WRONG_FORMAT	0x4
+#define TP_STATUS_AVAILABLE 0x0
+#define TP_STATUS_SEND_REQUEST 0x1
+#define TP_STATUS_SENDING 0x2
+#define TP_STATUS_WRONG_FORMAT 0x4
 
 #define TO_TP_HDR2(x)	((struct tpacket2_hdr *) (x))
 #define TO_TP_HDR3(x)	((struct tpacket3_hdr *) (x))
