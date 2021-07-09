@@ -110,7 +110,7 @@ NATIVEFORMATS += format_pfring.c
 endif
 
 if HAVE_LINUX_ETHTOOL_H
-LINUX_SOURCES += format_linux_helpers.c
+LINUX_SOURCES += format_linux_helpers.c format_linux_helpers.h
 endif
 
 
@@ -145,7 +145,7 @@ endif
 
 AM_CPPFLAGS= @ADD_INCLS@
 libtrace_la_LIBADD = @LIBTRACE_LIBS@ @LTLIBOBJS@ $(DPDKLIBS)
-libtrace_la_LDFLAGS=-version-info 7:0:0 @ADD_LDFLAGS@
+libtrace_la_LDFLAGS=-version-info 7:1:0 @ADD_LDFLAGS@
 dagapi.c:
 	cp @DAG_TOOLS_DIR@/dagapi.c .
 
