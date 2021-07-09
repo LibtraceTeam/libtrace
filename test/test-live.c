@@ -3,10 +3,10 @@
  *
  * Copyright (c) 2007 The University of Waikato, Hamilton, New Zealand.
  * Authors: Richard Sanger
- *          
+ *
  * All rights reserved.
  *
- * This code has been developed by the University of Waikato WAND 
+ * This code has been developed by the University of Waikato WAND
  * research group. For further information please see http://www.wand.net.nz/
  *
  * libtrace is free software; you can redistribute it and/or modify
@@ -26,7 +26,6 @@
  * $Id$
  *
  */
-
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -50,7 +49,6 @@
 #include "dagformat.h"
 #include "libtrace.h"
 
-
 #define ONCE(run_me)                                                           \
         {                                                                      \
                 static int hit = 0;                                            \
@@ -71,7 +69,6 @@ static sig_atomic_t i = 0;
 static sig_atomic_t reading = 0;
 static libtrace_t *trace_read = NULL;
 static int test_size = 100;
-
 
 /**
  * Source packet we modify this every write see build_packet
@@ -139,14 +136,14 @@ static int verify_counters(libtrace_t *trace_read)
 
         if (!stat->received_valid) {
                 printf("\tInfo: trace does not support received counter\n");
-        } else if (stat->received != (uint32_t) test_size) {
+        } else if (stat->received != (uint32_t)test_size) {
                 ERROR("Trace received %" PRIu64 "/%" PRIu32 " packets\n",
                       stat->received, (uint32_t)test_size);
         }
 
         if (!stat->accepted_valid) {
                 printf("\tInfo: trace does not support accepted counter\n");
-        } else if (stat->accepted != (uint32_t) test_size) {
+        } else if (stat->accepted != (uint32_t)test_size) {
                 ERROR("Trace only accepted %" PRIu64 "/%" PRIu32 " packets\n",
                       stat->accepted, (uint32_t)test_size);
         }
@@ -199,9 +196,8 @@ static int verify_packet(libtrace_packet_t *packet, int seq_num)
                 if (caplen_incld_crc == 1) {
                         ERROR("Expected trace_get_capture_length() to EXCLUDE "
                               "the Ethernet checksum,"
-                               " read %zu expected %zu\n",
-                               trace_get_capture_length(packet),
-                               sizeof(buffer));
+                              " read %zu expected %zu\n",
+                              trace_get_capture_length(packet), sizeof(buffer));
                 } else {
                         caplen_incld_crc = 0;
                 }
@@ -211,7 +207,7 @@ static int verify_packet(libtrace_packet_t *packet, int seq_num)
                               "the Ethernet checksum,"
                               " read %zu expected %zu\n",
                               trace_get_capture_length(packet),
-                              sizeof(buffer)+4);
+                              sizeof(buffer) + 4);
                 } else {
                         caplen_incld_crc = 1;
                 }
@@ -219,7 +215,7 @@ static int verify_packet(libtrace_packet_t *packet, int seq_num)
                 ERROR("Incorrect trace_get_capture_length(), read %zu expected "
                       "%zu (or %zu)\n",
                       trace_get_capture_length(packet), sizeof(buffer),
-                      sizeof(buffer)+4);
+                      sizeof(buffer) + 4);
         }
 
         // Verify a packets contents
