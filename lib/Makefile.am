@@ -110,7 +110,7 @@ NATIVEFORMATS += format_pfring.c
 endif
 
 if HAVE_LINUX_ETHTOOL_H
-LINUX_SOURCES += format_linux_helpers.c
+LINUX_SOURCES += format_linux_helpers.c format_linux_helpers.h
 endif
 
 
