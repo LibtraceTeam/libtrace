@@ -281,19 +281,19 @@ static inline void report_rate_each_second() {
 }
 
 typedef struct __attribute__((aligned(64))) thread_data {
-        int tid;                 // Thread id
-        int timestamp_prec;      // Timestamp precision
-        uint64_t count;          // Num of valid test (pgh) packets
-        uint64_t invalid;        // Num of invalid/unexpected packets
-        uint64_t unordered_seq;  // Num of out-of-order packets
-        uint32_t last_seq_num;   // Last pgh seq num observed
-        uint32_t first_seq_num;  // First pgh seq seq num observed
-        uint64_t unordered_ts;   // Num of packets with unordered timestamps
-        uint64_t duplicate_ts;   // Num of packets with duplicate timestamps
-        uint64_t last_ts;        // Last timestamp observed
-        uint64_t unordered_ord;  // Num of packets with incorrect order
-        uint64_t duplicate_ord;  // Num of packets with duplicate order
-        uint64_t last_ord;       // Last packet order observed
+        int tid;                // Thread id
+        int timestamp_prec;     // Timestamp precision
+        uint64_t count;         // Num of valid test (pgh) packets
+        uint64_t invalid;       // Num of invalid/unexpected packets
+        uint64_t unordered_seq; // Num of out-of-order packets
+        uint32_t last_seq_num;  // Last pgh seq num observed
+        uint32_t first_seq_num; // First pgh seq seq num observed
+        uint64_t unordered_ts;  // Num of packets with unordered timestamps
+        uint64_t duplicate_ts;  // Num of packets with duplicate timestamps
+        uint64_t last_ts;       // Last timestamp observed
+        uint64_t unordered_ord; // Num of packets with incorrect order
+        uint64_t duplicate_ord; // Num of packets with duplicate order
+        uint64_t last_ord;      // Last packet order observed
         libtrace_packet_t
             *first_packet;  // The first packet (either held or stored)
         libtrace_packet_t *last_pkt;
@@ -498,7 +498,8 @@ static inline uint32_t get_seq_num(pktgen_hdr_t *pgh) {
  * @return the number of subsecond digits, e.g. 0 indicates precision of
  *         seconds, 9 precision of nanoseconds
  */
-inline static int _estimate_timestamp_precision(uint64_t erf_ts) {
+inline static int _estimate_timestamp_precision(uint64_t erf_ts)
+{
         uint64_t subsec = erf_ts & 0xFFFFFFFF;
         uint64_t nanosec = (subsec * 1000000000ull) >> 32;
 
@@ -565,8 +566,8 @@ inline static void verify_sequence_num_increases(pktgen_hdr_t *pgh,
  * [in,out]: Updated with the result
  * (last_seq_num and the unordered_seq counter)
  */
-inline static void verify_order_increases(libtrace_packet_t *packet,
-                                          tls_t *tls) {
+inline static void verify_order_increases(libtrace_packet_t *packet, tls_t *tls)
+{
         uint64_t order = trace_packet_get_order(packet);
 
         if (tls->last_ord != -1U && tls->last_ord > order) {

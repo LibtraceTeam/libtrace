@@ -827,14 +827,17 @@ static int linux_xdp_can_hold_packet(libtrace_packet_t *packet) {
 
     struct xsk_per_stream *stream;
 
-    if (packet->fmtdata == NULL)
-        return -1;
+    if (packet->fmtdata == NULL) {
+            return -1;
+    }
 
     stream = (struct xsk_per_stream *)packet->fmtdata;
 
     // allow user to hold onto this frame if we have more than MIN_FREE_FRAMES remaining
-    if (NUM_FRAMES - xsk_prod_nb_free(&stream->xsk->umem->fq, 1) > MIN_FREE_FRAMES)
-	return 0;
+    if (NUM_FRAMES - xsk_prod_nb_free(&stream->xsk->umem->fq, 1) >
+        MIN_FREE_FRAMES) {
+            return 0;
+    }
 
     return -1;
 }
@@ -856,23 +859,28 @@ static void linux_xdp_fin_packet(libtrace_packet_t *packet) {
     /* If we own the packet, we need to free it */
     if (packet->buf_control == TRACE_CTRL_EXTERNAL && packet->fmtdata) {
 
-        stream = (struct xsk_per_stream *) packet->fmtdata;
-        packet->fmtdata = NULL;
+            stream = (struct xsk_per_stream *)packet->fmtdata;
+            packet->fmtdata = NULL;
 
-        // offset into the umem to give back to the fill queue
-        addr = xsk_umem__extract_addr(
-            (uint64_t)packet->buffer - (uint64_t)stream->xsk->umem->buffer + FRAME_HEADROOM);
+            // offset into the umem to give back to the fill queue
+            addr = xsk_umem__extract_addr((uint64_t)packet->buffer -
+                                          (uint64_t)stream->xsk->umem->buffer +
+                                          FRAME_HEADROOM);
 
-        // The addr needs to be released by the thread that allocated it. If this is the thread
-        // release back as normal, otherwise push the addr to the ringbuffer for the
-        // correct thread to release back to the fill queue on its next read.
-        // thread_id will be 0 in non-parallel mode
-        if (stream->thread_id == pthread_self() || stream->thread_id == 0) {
-            if (linux_xdp_release_addr(packet->trace, stream->xsk, addr) < 0)
-                return;
-        } else {
-            libtrace_ringbuffer_swrite(&stream->addr_free_ring, (void *)addr);
-        }
+            // The addr needs to be released by the thread that allocated it. If
+            // this is the thread release back as normal, otherwise push the
+            // addr to the ringbuffer for the correct thread to release back to
+            // the fill queue on its next read. thread_id will be 0 in
+            // non-parallel mode
+            if (stream->thread_id == pthread_self() || stream->thread_id == 0) {
+                    if (linux_xdp_release_addr(packet->trace, stream->xsk,
+                                               addr) < 0) {
+                            return;
+                    }
+            } else {
+                    libtrace_ringbuffer_swrite(&stream->addr_free_ring,
+                                               (void *)addr);
+            }
     }
 }
 
