@@ -1,6 +1,7 @@
 libtrace4 (4.0.16-2) UNRELEASED; urgency=medium
 
   * Trim trailing whitespace.
+  * Use secure URI in Homepage field.
 
  -- Perry Lorier <perry@windy.meta.net.nz>  Sun, 18 Jul 2021 15:51:11 -0000
 

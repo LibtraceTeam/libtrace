@@ -7,7 +7,7 @@ Build-Depends: debhelper (>= 9), dh-autoreconf,
  libwandder2-dev, dpdk-dev, libnuma-dev, libyaml-dev
 Standards-Version: 4.1.3
 Section: libs
-Homepage: http://research.wand.net.nz/software/libtrace.php
+Homepage: https://research.wand.net.nz/software/libtrace.php
 
 Package: libtrace4-dev
 Section: libdevel
