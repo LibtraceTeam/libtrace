@@ -28,7 +28,6 @@ Description: development headers for the libtrace network processing library
  University in New Zealand.
 
 Package: libtrace4
-Section: libs
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Provides: libtrace4 (= ${binary:Version})
@@ -77,7 +76,6 @@ Description: development headers for the libpacketdump library
  University in New Zealand.
 
 Package: libpacketdump4
-Section: libs
 Architecture: any
 Depends: libtrace4 (= ${binary:Version}), ${misc:Depends}
 Provides: libpacketdump
