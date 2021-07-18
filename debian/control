@@ -1,7 +1,7 @@
 Source: libtrace4
 Priority: optional
 Maintainer: Brad Cowie <brad@wand.net.nz>
-Build-Depends: debhelper (>= 12~), dh-autoreconf,
+Build-Depends: debhelper-compat (= 12), dh-autoreconf,
  libpcap-dev, zlib1g-dev, flex, bison, doxygen, liblzma-dev, graphviz,
  libncurses5-dev, libbz2-dev, libssl-dev, libwandio1-dev (>= 4.0.0),
  libwandder2-dev, dpdk-dev, libnuma-dev, libyaml-dev
