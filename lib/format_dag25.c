@@ -106,7 +106,7 @@
 
 /* Compile time asserts, check sizes are valid */
 ct_assert(TX_BATCH_SIZE > TX_BATCH_THOLD);
-ct_assert(TX_BATCH_THOLD > 0);
+		ct_assert(TX_BATCH_THOLD > 0);
 ct_assert(!TX_EXTRA_WINDOW || TX_EXTRA_WINDOW > TX_BATCH_SIZE);
 
 static struct libtrace_format_t dag;
@@ -223,17 +223,17 @@ static bool dag_can_write(libtrace_packet_t *packet) {
 /* Attempts to determine if the given filename refers to a DAG device */
 static int dag_probe_filename(const char *filename)
 {
-	struct stat statbuf;
-	/* Can we stat the file? */
-	if (stat(filename, &statbuf) != 0) {
-		return 0;
-	}
-	/* Is it a character device? */
-	if (!S_ISCHR(statbuf.st_mode)) {
-		return 0;
-	}
-	/* Yeah, it's probably us. */
-	return 1;
+        struct stat statbuf;
+        /* Can we stat the file? */
+        if (stat(filename, &statbuf) != 0) {
+                return 0;
+        }
+        /* Is it a character device? */
+        if (!S_ISCHR(statbuf.st_mode)) {
+                return 0;
+        }
+        /* Yeah, it's probably us. */
+        return 1;
 }
 
 /* Initialises the DAG output data structure */
@@ -641,9 +641,7 @@ static int dag_config_input(libtrace_t *libtrace, trace_option_t option,
 		/* Live capture is always going to be realtime */
 		return -1;
 	case TRACE_OPTION_HASHER:
-		/* Lets just say we did this, it's currently still up to
-		 * the user to configure this correctly. */
-		return 0;
+                return -1;
         case TRACE_OPTION_CONSTANT_ERF_FRAMING:
                 return -1;
         case TRACE_OPTION_DISCARD_META:
@@ -665,6 +663,19 @@ static int dag_start_output(libtrace_out_t *libtrace)
 	zero.tv_sec = 0;
 	zero.tv_usec = 0;
 	nopoll = zero;
+
+	/* if trying to perform TX on a RX stream (rx streams are even numbers)
+	 * put the card in reverse mode. */
+	if (FORMAT_DATA_OUT->dagstream % 2 == 0) {
+		// @param mode DAG_REVERSE_MODE (1) or DAG_NORMAL_MODE (0)
+		if (dag_set_mode(FORMAT_DATA_OUT->device->fd,
+			FORMAT_DATA_OUT->dagstream, 1) != 0) {
+
+			trace_set_err_out(libtrace, errno, "Cannot set DAG reverse mode");
+			return -1;
+		}
+		fprintf(stderr, "Opening %s in reverse mode\n", libtrace->uridata);
+	}
 
 	/* Attach and start the DAG stream */
 	if (dag_attach_stream64(FORMAT_DATA_OUT->device->fd,
@@ -697,6 +708,19 @@ static int dag_start_input_stream(libtrace_t *libtrace,
 	zero.tv_sec = 0;
 	zero.tv_usec = 10000;
 	nopoll = zero;
+
+	/* if trying to perform RX on a TX stream (tx streams are even odd numbers)
+	 * put the card in reverse mode. */
+	if (stream->dagstream % 2 != 0) {
+		// @param mode DAG_REVERSE_MODE (1) or DAG_NORMAL_MODE (0)
+		if (dag_set_mode(FORMAT_DATA->device->fd,
+			stream->dagstream, 1) != 0) {
+
+			trace_set_err(libtrace, errno, "Cannot set DAG reverse mode");
+			return -1;
+		}
+		fprintf(stderr, "Opening %s in reverse mode\n", libtrace->uridata);
+	}
 
 	/* Attach and start the DAG stream */
 	if (dag_attach_stream64(FORMAT_DATA->device->fd,
@@ -756,62 +780,71 @@ static int dag_pstart_input(libtrace_t *libtrace)
 	uint16_t stream_count = 0, max_streams;
 	int iserror = 0;
 	struct dag_per_stream_t stream_data;
+        libtrace_list_node_t *streams = FORMAT_DATA_HEAD;
 
-	/* Check we aren't trying to create more threads than the DAG card can
-	 * handle */
-	max_streams = dag_rx_get_stream_count(FORMAT_DATA->device->fd);
-	if (libtrace->perpkt_thread_count > max_streams) {
-		fprintf(stderr,
-			      "WARNING: DAG has only %u streams available, "
-                              "capping total number of threads at this value.",
-			      max_streams);
-	        libtrace->perpkt_thread_count = max_streams;
+        /* Check we aren't trying to create more threads than the DAG card can
+         * handle */
+        max_streams = dag_rx_get_stream_count(FORMAT_DATA->device->fd);
+        if (libtrace->perpkt_thread_count > max_streams) {
+                fprintf(stderr,
+                        "WARNING: DAG has only %u streams available, "
+                        "capping total number of threads at this value.",
+                        max_streams);
+                libtrace->perpkt_thread_count = max_streams;
         }
 
-	/* Get the stream names from the uri */
-	if ((scan = strchr(libtrace->uridata, ',')) == NULL) {
-		trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT,
-			      "Format uri doesn't specify the DAG streams");
-		iserror = 1;
-		goto cleanup;
-	}
+        /* Get the stream names from the uri */
+        if ((scan = strchr(libtrace->uridata, ',')) == NULL) {
+                trace_set_err(libtrace, TRACE_ERR_BAD_FORMAT,
+                              "Format uri doesn't specify the DAG streams");
+                iserror = 1;
+                goto cleanup;
+        }
 
-	scan++;
+        scan++;
 
-	tok = strtok(scan, ",");
-	while (tok != NULL) {
-		/* Ensure we haven't specified too many streams */
-		if (stream_count >= libtrace->perpkt_thread_count) {
-			fprintf(stderr,
-				      "WARNING: Format uri specifies too many "
-                                      "streams. Maximum is %u, so only using "
-                                      "the first %u from the uri.",
-                                      libtrace->perpkt_thread_count, 
-				      libtrace->perpkt_thread_count);
-		        break;
+        tok = strtok(scan, ",");
+        while (tok != NULL) {
+                /* Ensure we haven't specified too many streams */
+                if (stream_count >= libtrace->perpkt_thread_count) {
+                        fprintf(stderr,
+                                "WARNING: Format uri specifies too many "
+                                "streams. Maximum is %u, so only using "
+                                "the first %u from the uri.",
+                                libtrace->perpkt_thread_count,
+                                libtrace->perpkt_thread_count);
+                        break;
                 }
 
-		/* Save the stream details */
-		if (stream_count == 0) {
-			/* Special case where we update the existing stream
-			 * data structure */
-			FORMAT_DATA_FIRST->dagstream = (uint16_t)atoi(tok);
-		} else {
-			memset(&stream_data, 0, sizeof(stream_data));
-			stream_data.dagstream = (uint16_t)atoi(tok);
-			libtrace_list_push_back(FORMAT_DATA->per_stream,
-						&stream_data);
-		}
+                /* Save the stream details */
+                if (stream_count == 0) {
+                        /* Special case where we update the existing stream
+                         * data structure */
+                        FORMAT_DATA_FIRST->dagstream = (uint16_t)atoi(tok);
+                } else {
+                        memset(&stream_data, 0, sizeof(stream_data));
+                        stream_data.dagstream = (uint16_t)atoi(tok);
+                        libtrace_list_push_back(FORMAT_DATA->per_stream,
+                                                &stream_data);
+                }
 
-		stream_count++;
-		tok = strtok(NULL, ",");
-	}
+                stream_count++;
+                tok = strtok(NULL, ",");
+        }
 
-	if (stream_count < libtrace->perpkt_thread_count) {
-		libtrace->perpkt_thread_count = stream_count;
-	}
-	
-	FORMAT_DATA->stream_attached = 1;
+        if (stream_count < libtrace->perpkt_thread_count) {
+                libtrace->perpkt_thread_count = stream_count;
+        }
+
+        /* Attach and start each DAG stream */
+        while (streams != NULL) {
+                if (dag_start_input_stream(libtrace, streams->data) < 0) {
+                        return -1;
+                }
+                streams = streams->next;
+        }
+
+        FORMAT_DATA->stream_attached = 1;
 
  cleanup:
 	if (iserror) {
@@ -867,8 +900,6 @@ static int dag_pause_input(libtrace_t *libtrace)
 	return 0;
 }
 
-
-
 /* Closes a DAG input trace */
 static int dag_fin_input(libtrace_t *libtrace)
 {
@@ -897,7 +928,11 @@ static int dag_flush_output(libtrace_out_t *libtrace) {
 
 	/* Commit any outstanding traffic in the txbuffer */
         if (FORMAT_DATA_OUT->waiting) {
-                FORMAT_DATA_OUT->txbuffer = dag_tx_stream_commit_bytes64(
+		/* dag_tx_stream_commit_bytes64 does not successfully write to vDAGs
+		 * so we use dag_tx_stream_commit_records64 instead, both have the same
+		 * behaviour when writing to a DAG card.
+		 */
+                FORMAT_DATA_OUT->txbuffer = dag_tx_stream_commit_records64(
 						FORMAT_DATA_OUT->device->fd,
 						FORMAT_DATA_OUT->dagstream,
 						FORMAT_DATA_OUT->waiting );
@@ -918,27 +953,46 @@ static int dag_fin_output(libtrace_out_t *libtrace)
 	/* Commit any outstanding traffic in the txbuffer */
 	dag_flush_output(libtrace);
 
-	/* Wait until the buffer is clear before exiting the program,
-	 * as we will lose packets otherwise */
-	while(dag_get_stream_buffer_level64(FORMAT_DATA_OUT->device->fd,
-	                                    FORMAT_DATA_OUT->dagstream)) {
-		/* Wait for dag to complete writing all data */
-	}
+	int out;
+        int last = 0;
+        /* Wait until the buffer is clear before exiting the program,
+         * as we will lose packets otherwise */
+        while ((out = dag_get_stream_buffer_level64(
+                    FORMAT_DATA_OUT->device->fd, FORMAT_DATA_OUT->dagstream))) {
+                /* Wait for dag to complete writing all data */
 
-	/* Need the lock, since we're going to be handling the device list */
-	pthread_mutex_lock(&open_dag_mutex);
+                /* This is very unpredictable, Sometimes we get 0 returned,
+                 * sometimes 8 when using a vDAG and other time some random
+                 * number, so if a identical value is returned skip over this...
+                 */
+                if (last == out) {
+                        break;
+                }
 
-	/* Detach the stream if we are not paused */
-	if (FORMAT_DATA_OUT->stream_attached)
-		dag_pause_output(libtrace);
-	FORMAT_DATA_OUT->device->ref_count --;
+                if (out == 8) {
+                        break;
+                }
 
-	/* Close the DAG device if there are no more references to it */
-	if (FORMAT_DATA_OUT->device->ref_count == 0)
-		dag_close_device(FORMAT_DATA_OUT->device);
-	free(libtrace->format_data);
-	pthread_mutex_unlock(&open_dag_mutex);
-	return 0; /* success */
+                last = out;
+
+                /* give some time to write output */
+                usleep(500);
+        }
+
+        /* Need the lock, since we're going to be handling the device list */
+        pthread_mutex_lock(&open_dag_mutex);
+
+        /* Detach the stream if we are not paused */
+        if (FORMAT_DATA_OUT->stream_attached)
+                dag_pause_output(libtrace);
+        FORMAT_DATA_OUT->device->ref_count--;
+
+        /* Close the DAG device if there are no more references to it */
+        if (FORMAT_DATA_OUT->device->ref_count == 0)
+                dag_close_device(FORMAT_DATA_OUT->device);
+        free(libtrace->format_data);
+        pthread_mutex_unlock(&open_dag_mutex);
+        return 0; /* success */
 }
 
 #ifdef DAGIOC_CARD_DUCK
@@ -1215,6 +1269,7 @@ static int libtrace_to_dag_hdr(libtrace_out_t *libtrace, libtrace_packet_t *pack
     if (!find_compatible_linktype(libtrace,packet))
         return -1;
 
+    erf->ts = trace_get_erf_timestamp(packet);
     /* Fill in the packet size, it may have changed after demotion */
     if (packet->type == TRACE_RT_DATA_ERF) {
         *framinglen = trace_get_framing_length(packet);
@@ -1332,7 +1387,6 @@ static int dag_read_packet_stream(libtrace_t *libtrace,
 		if (size != 0)
 			return size;
 	}
-
 
 	/* Don't let anyone try to free our DAG memory hole! */
 	flags |= TRACE_PREP_DO_NOT_OWN_BUFFER;
@@ -1621,10 +1675,6 @@ static int dag_pregister_thread(libtrace_t *libtrace, libtrace_thread_t *t,
 
 		/* Pass the per thread data to the thread */
 		t->format_data = stream_data;
-
-		/* Attach and start the DAG stream */
-		if (dag_start_input_stream(libtrace, stream_data) < 0)
-			return -1;
 	}
 
 	return 0;

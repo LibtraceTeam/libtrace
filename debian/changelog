@@ -1,3 +1,33 @@
+libtrace4 (4.0.17-1) unstable; urgency=medium
+
+  * Added support for PF_RING zero-copy -- this is now the official libtrace `pfring:` format, and the original non-zero-copy version is now available via `pfringold:`.
+  * PF_RING formats now default to promiscuous capture mode, which is consistent with other live formats.
+  * Fixed incorrect statistics counters for PF_RING formats.
+  * Fixed various libpacketdump crashes or infinite loops when presented with bogus packet content.
+  * Fixed bug where `pfringold:` was not setting the `order` field for packets.
+  * Fixed bug where writing packets to a virtual interface via `ring:` would cause libtrace to hang.
+  * Fixed bug where DPDK port stats could not be reset if using Napatech DPDK.
+  * Fixed race condition in the `etsilive:` format.
+  * Fixed various memory errors and leaks in the `etsilive:` format.
+  * Fixed race condition in `tracertstats` when processing a user interrupt.
+  * Improved capture speed for `pfringold:`.
+  * `ring:` format now supports `trace_flush_output()` method.
+
+ -- Shane Alcock <shane.alcock@waikato.ac.nz>  Fri, 9 Jul 2021 14:09:06 +1200
+
+libtrace4 (4.0.16-2) UNRELEASED; urgency=medium
+
+  * Trim trailing whitespace.
+  * Use secure URI in Homepage field.
+  * Bump debhelper from deprecated 9 to 12.
+  * Set debhelper-compat version in Build-Depends.
+  * Fix day-of-week for changelog entry 4.0.0-1.
+  * Remove Section on libtrace4, Section on libpacketdump4 that duplicate
+    source.
+  * Avoid explicitly specifying -Wl,--as-needed linker flag.
+
+ -- Perry Lorier <perry@windy.meta.net.nz>  Sun, 18 Jul 2021 15:51:11 -0000
+
 libtrace4 (4.0.16-1) unstable; urgency=medium
 
   * Add support for PF_RING.
@@ -151,4 +181,4 @@ libtrace4 (4.0.0-1) unstable; urgency=medium
 
   * New upstream release
 
- -- Brad Cowie <brad@wand.net.nz>  Wed, 07 Mar 2016 10:24:40 +1300
+ -- Brad Cowie <brad@wand.net.nz>  Mon, 07 Mar 2016 10:24:40 +1300

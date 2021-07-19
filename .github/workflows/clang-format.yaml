@@ -1,0 +1,42 @@
+name: Clang format
+on: [push, pull_request]
+jobs:
+  pre_job:
+    name: Prerequisite checks
+    runs-on: ubuntu-latest
+    outputs:
+      should_skip: ${{ steps.skip_check.outputs.should_skip }}
+    steps:
+      - id: skip_check
+        uses: fkirc/skip-duplicate-actions@master
+        with:
+          concurrent_skipping: 'same_content'
+          cancel_others: 'true'
+  clang-format-pull:
+    name: Clang Format
+    needs: pre_job
+    if: "needs.pre_job.outputs.should_skip != 'true'"
+    runs-on: ubuntu-latest
+    steps:
+    - name: Define variables
+      run: |
+        echo "BASE=$(\
+          if [[ ${{ github.event_name }} = 'pull_request' ]]; then \
+            echo 'origin/${{ github.base_ref }}'; \
+          else \
+            echo '${{ github.event.before }}'; \
+          fi)" \
+        >> $GITHUB_ENV
+    - uses: actions/checkout@v2
+    - name: Install clang-format
+      run: sudo apt-get install clang-format
+    - name: Download git-clang-format
+      run: wget https://raw.githubusercontent.com/llvm-mirror/clang/master/tools/clang-format/git-clang-format
+    - name: Install git-clang-format
+      run: sudo install -t /bin git-clang-format
+    - name: Fetch origin
+      run: git fetch origin
+    - name: clang-format
+      run: git clang-format ${{ env.BASE }}
+    - name: diff
+      run: git diff --exit-code

@@ -56,6 +56,7 @@ DLLEXPORT int libtrace_scb_init(libtrace_scb_t *buf, uint32_t size,
         buf->write_offset = 0;
         buf->count_bytes = size;
         buf->shm_file = strdup(anonname);
+        buf->recv_thold = size / 10; // 10% of the buffer size
 
         if (buf->address) {
                 return 0;
@@ -81,17 +82,34 @@ DLLEXPORT void libtrace_scb_destroy(libtrace_scb_t *buf) {
 
 }
 
+DLLEXPORT int libtrace_scb_get_available_space(libtrace_scb_t *buf)
+{
+        if (buf->address == NULL) {
+                return 0;
+        }
+        return buf->count_bytes - (buf->write_offset - buf->read_offset);
+}
+
+DLLEXPORT int libtrace_scb_get_size(libtrace_scb_t *buf)
+{
+        if (buf->address == NULL) {
+                return 0;
+        }
+        return buf->count_bytes;
+}
+
 DLLEXPORT int libtrace_scb_recv_sock(libtrace_scb_t *buf, int sock,
                 int recvflags) {
-        int space = buf->count_bytes - (buf->write_offset - buf->read_offset);
+        size_t space =
+            buf->count_bytes - (buf->write_offset - buf->read_offset);
         int ret;
 
         if (buf->address == NULL) {
                 return -1;
         }
 
-        if (space == 0) {
-                return buf->count_bytes;
+        if (space < buf->recv_thold) {
+                return buf->count_bytes - space;
         }
 
         ret = recv(sock, buf->address + buf->write_offset, space, recvflags);
@@ -120,4 +138,19 @@ DLLEXPORT void libtrace_scb_advance_read(libtrace_scb_t *buf,
                 buf->read_offset -= buf->count_bytes;
                 buf->write_offset -= buf->count_bytes;
         }
+}
+
+DLLEXPORT int libtrace_scb_set_recv_thold(libtrace_scb_t *buf, uint32_t thold)
+{
+        if (thold < buf->count_bytes) {
+                buf->recv_thold = thold;
+                return 0;
+        } else {
+                return -1;
+        }
+}
+
+DLLEXPORT uint32_t libtrace_scb_get_recv_thold(libtrace_scb_t *buf)
+{
+        return buf->recv_thold;
 }

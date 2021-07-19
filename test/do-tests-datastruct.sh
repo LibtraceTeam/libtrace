@@ -24,3 +24,10 @@ do_test ./test-datastruct-ringbuffer
 echo
 echo "Tests passed: $OK"
 echo "Tests failed: $FAIL"
+
+if [ -z "$FAIL" ]
+then
+        exit 0
+else
+        exit 1
+fi

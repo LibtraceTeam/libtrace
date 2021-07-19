@@ -16,6 +16,7 @@ AM_CXXFLAGS=@LIBCXXFLAGS@ @CFLAG_VISIBILITY@ -pthread -std=gnu99
 extra_DIST = format_template.c
 NATIVEFORMATS=format_linux_common.c format_linux_ring.c format_linux_int.c format_linux_common.h
 BPFFORMATS=format_bpf.c
+LINUX_SOURCES=
 
 if HAVE_DAG
 if DAG2_4
@@ -108,6 +109,11 @@ if HAVE_PFRING
 NATIVEFORMATS += format_pfring.c
 endif
 
+if HAVE_LINUX_ETHTOOL_H
+LINUX_SOURCES += format_linux_helpers.c format_linux_helpers.h
+endif
+
+
 libtrace_la_SOURCES = trace.c trace_parallel.c common.h \
 		format_pktmeta.c format_erf.c format_pcap.c format_legacy.c \
 		format_rt.c format_helper.c format_helper.h format_pcapfile.c \
@@ -123,7 +129,7 @@ libtrace_la_SOURCES = trace.c trace_parallel.c common.h \
                 protocols_radius.c libtrace_radius.h \
 		$(DAGSOURCE) format_erf.h format_ndag.c format_ndag.h \
 		$(BPFJITSOURCE) $(ETSISOURCES) \
-		libtrace_arphrd.h \
+		libtrace_arphrd.h $(LINUX_SOURCES) \
 		data-struct/ring_buffer.c data-struct/vector.c \
 		data-struct/message_queue.c data-struct/deque.c \
 		data-struct/sliding_window.c data-struct/object_cache.c \
@@ -139,7 +145,7 @@ endif
 
 AM_CPPFLAGS= @ADD_INCLS@
 libtrace_la_LIBADD = @LIBTRACE_LIBS@ @LTLIBOBJS@ $(DPDKLIBS)
-libtrace_la_LDFLAGS=-version-info 7:0:0 @ADD_LDFLAGS@
+libtrace_la_LDFLAGS=-version-info 7:1:0 @ADD_LDFLAGS@
 dagapi.c:
 	cp @DAG_TOOLS_DIR@/dagapi.c .
 

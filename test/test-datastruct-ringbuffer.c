@@ -137,5 +137,8 @@ int main() {
 	pthread_join(t[1], NULL);
 	assert(libtrace_ringbuffer_is_empty(&rb_polling));
 
-	return 0;
+        libtrace_ringbuffer_destroy(&rb_block);
+        libtrace_ringbuffer_destroy(&rb_polling);
+
+        return 0;
 }

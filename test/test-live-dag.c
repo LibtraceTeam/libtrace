@@ -64,7 +64,7 @@
                                       i, __VA_ARGS__);)                        \
         }
 
-static const char *uri_read = NULL;
+static const char *uri_read = "";
 static sig_atomic_t i = 0;
 static sig_atomic_t reading = 0;
 static libtrace_t *trace_read = NULL;
@@ -77,6 +77,9 @@ static unsigned char buffer[] = {
     0x00, 0x01, 0x02, 0x03, 0x04, 0x05, /* Dest Mac */
     0x00, 0x01, 0x02, 0x03, 0x04, 0x06, /* Src Mac */
     0x01, 0x01,                         /* Ethertype = Experimental */
+    0xC1, 0xC2, 0xC3, 0xC4, 0xC5, 0xC6, /* payload */
+    0xC1, 0xC2, 0xC3, 0xC4, 0xC5, 0xC6, /* payload */
+    0xC1, 0xC2, 0xC3, 0xC4, 0xC5, 0xC6, /* payload */
     0xC1, 0xC2, 0xC3, 0xC4, 0xC5, 0xC6, /* payload */
 };
 
@@ -151,25 +154,6 @@ static int verify_counters(libtrace_t *trace_read)
         free(stat);
 
         return err;
-}
-
-static void signal_handler(int signal)
-{
-        if (signal == SIGALRM) {
-                if (reading) {
-                        verify_counters(trace_read);
-                        fprintf(stderr,
-                                "!!!Timeout after reading only %d packets of "
-                                "%d!!!\n",
-                                i, test_size);
-                } else {
-                        fprintf(stderr,
-                                "!!!Timeout after writing only %d packets of "
-                                "%d!!!\n",
-                                i, test_size);
-                }
-                exit(-1);
-        }
 }
 
 /**
@@ -294,26 +278,31 @@ static void iferr(libtrace_t *trace)
         exit(-err.err_num);
 }
 
+static void signal_handler(int signal)
+{
+        if (signal == SIGALRM) {
+                fprintf(stderr, "!!!Failed due to Timeout!!!\n");
+                exit(-1);
+        }
+}
+
 int main(int argc, char *argv[])
 {
-        libtrace_out_t *trace_write;
-        libtrace_packet_t *packet;
+        libtrace_out_t *trace_write = NULL;
+        libtrace_packet_t *packet = NULL;
         int psize;
         int err = 0;
-        int opt;
+        char *read = NULL;
+        char *write = NULL;
+        int opt = 0;
 
-        if (argc < 2) {
-                fprintf(stderr, "usage: %s type(write) [type(read)]\n",
-                        argv[0]);
-                return 1;
-        }
-
-        while ((opt = getopt(argc, argv, "c:")) != -1) {
+        while ((opt = getopt(argc, argv, "w:r:")) != -1) {
                 switch (opt) {
-                case 'c':
-                        test_size = atoi(optarg);
+                case 'r':
+                        read = optarg;
                         break;
-                case '?':
+                case 'w':
+                        write = optarg;
                         break;
                 }
         }
@@ -322,67 +311,56 @@ int main(int argc, char *argv[])
         // Timeout after 5 seconds
         alarm(5);
 
-        trace_write = trace_create_output(argv[optind]);
-        iferr_out(trace_write);
-        if (optind + 1 < argc) {
-                uri_read = argv[optind + 1];
-                trace_read = trace_create(uri_read);
-                iferr(trace_read);
-                if (strncmp(uri_read, "pcapint", 7) == 0) {
-                        /* The newer Linux memmap (ring:) implementation of PCAP
-                         * only makes space for about 30 maybe 31 packet
-                         * buffers. If we exceed this we'll drop packets. */
-                        test_size = 30;
-                }
+        if (write) {
+                trace_write = trace_create_output(write);
+                iferr_out(trace_write);
         }
 
-        trace_start_output(trace_write);
-        iferr_out(trace_write);
-        if (uri_read != NULL) {
-                trace_start(trace_read);
+        if (read) {
+                trace_read = trace_create(read);
                 iferr(trace_read);
         }
 
-        packet = trace_create_packet();
-
-        // Write out test_size (100) almost identical packets
-        for (i = 0; i < test_size; i++) {
-                build_packet(i);
-                trace_construct_packet(packet, TRACE_TYPE_ETH, buffer,
-                                       sizeof(buffer));
-                if (trace_write_packet(trace_write, packet) == -1) {
-                        iferr_out(trace_write);
+        if (write) {
+                trace_start_output(trace_write);
+                iferr_out(trace_write);
+                packet = trace_create_packet();
+                // Write out test_size (100) almost identical packets
+                for (i = 0; i < test_size; i++) {
+                        build_packet(i);
+                        trace_construct_packet(packet, TRACE_TYPE_ETH, buffer,
+                                               sizeof(buffer));
+                        if (trace_write_packet(trace_write, packet) == -1) {
+                                iferr_out(trace_write);
+                        }
                 }
-        }
-        trace_destroy_packet(packet);
-        trace_destroy_output(trace_write);
-
-        if (uri_read == NULL) {
-                printf("Sent %d packets\n", test_size);
-                return 0;
+                trace_destroy_packet(packet);
+                trace_destroy_output(trace_write);
         }
 
         // Now read back in, we assume that buffers internally can buffer
         // the packets without losing them
-        packet = trace_create_packet();
-
-        reading = 1;
-        for (i = 0; i < test_size; i++) {
-                if ((psize = trace_read_packet(trace_read, packet)) < 0) {
-                        iferr(trace_read);
-                        // EOF we shouldn't hit this with a live format
-                        fprintf(stderr,
-                                "Error: looks like we lost some packets!\n");
-                        err = 1;
-                        break;
+        if (read) {
+                trace_start(trace_read);
+                iferr(trace_read);
+                packet = trace_create_packet();
+                reading = 1;
+                for (i = 0; i < test_size; i++) {
+                        if ((psize = trace_read_packet(trace_read, packet)) <
+                            0) {
+                                iferr(trace_read);
+                                // EOF we shouldn't hit this with a live format
+                                fprintf(stderr, "Error: looks like we lost "
+                                                "some packets!\n");
+                                err = 1;
+                                break;
+                        }
+                        err |= verify_packet(packet, i);
                 }
-                err |= verify_packet(packet, i);
+                err |= verify_counters(trace_read);
+                trace_destroy_packet(packet);
+                trace_destroy(trace_read);
         }
-
-        err |= verify_counters(trace_read);
-
-        trace_destroy_packet(packet);
-        trace_destroy(trace_read);
 
         return err;
 }

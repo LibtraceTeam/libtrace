@@ -50,5 +50,7 @@ DLLEXPORT int libtrace_message_queue_try_get(libtrace_message_queue_t *mq,
         void *message);
 DLLEXPORT void libtrace_message_queue_destroy(libtrace_message_queue_t *mq);
 DLLEXPORT int libtrace_message_queue_get_fd(libtrace_message_queue_t *mq);
+DLLEXPORT int libtrace_message_queue_select(libtrace_message_queue_t *mq,
+                                            struct timeval *timeout);
 
 #endif

@@ -1,6 +1,7 @@
 
 RM=rm
 PREFIX=../
+DPDK_BUILD=
 
 INCLUDE = -I$(PREFIX)/lib -I$(PREFIX)/libpacketdump
 CFLAGS = -Wall -Wimplicit -Wformat -W -pedantic -pipe -g -O2 -std=gnu99 -pthread \
@@ -21,7 +22,7 @@ BINS = test-pcap-bpf test-event test-time test-dir test-wireless test-errors \
 	test-plen test-autodetect test-ports test-fragment test-live \
 	test-live-snaplen test-vxlan test-setcaplen test-wlen test-vlan \
 	test-mpls test-layer2-headers test-qinq test-structures \
-	$(BINS_DATASTRUCT) $(BINS_PARALLEL)
+	$(BINS_DATASTRUCT) $(BINS_PARALLEL) test-live-dag test-etsi
 
 .PHONY: all clean distclean install depend test address-san
 
@@ -39,5 +40,12 @@ install:
 
 address-san: CFLAGS+= -fsanitize=undefined,leak,address -fno-omit-frame-pointer -ggdb3
 address-san: all
+
+thread-san: CFLAGS+= -fsanitize=thread -fno-omit-frame-pointer -ggdb3
+thread-san: all
+
+dpdk: LDLIBS+= -L$(DPDK_BUILD)/libs
+dpdk: INCLUDE+= -I$(DPDK_BUILD)/include
+dpdk: all
 
 # vim: noet ts=8 sw=8

@@ -183,7 +183,7 @@ typedef struct pktgen_hdr {
         uint32_t tv_sec;
         uint32_t tv_usec;
         uint64_t packet_count;
-} pktgen_hdr_t;
+} PACKED pktgen_hdr_t;
 
 struct libtrace_t *inptrace = NULL;
 static volatile bool stop = false;
@@ -281,14 +281,19 @@ static inline void report_rate_each_second() {
 }
 
 typedef struct __attribute__((aligned(64))) thread_data {
-        int tid;                 // The thread id
-        uint64_t count;          // The number of valid pgh packets
-        uint64_t invalid;        // The number of invalid packets
-        uint64_t unordered_seq;  // The number of out of order packets
-        uint32_t last_seq_num;   // The last_seq observed
-        uint32_t first_seq_num;  // The seq number of the first packet observed
-        uint64_t unordered_ts;   // The number of packets with unordered
-        double last_ts;          // The last timestamp observed
+        int tid;                // Thread id
+        int timestamp_prec;     // Timestamp precision
+        uint64_t count;         // Num of valid test (pgh) packets
+        uint64_t invalid;       // Num of invalid/unexpected packets
+        uint64_t unordered_seq; // Num of out-of-order packets
+        uint32_t last_seq_num;  // Last pgh seq num observed
+        uint32_t first_seq_num; // First pgh seq seq num observed
+        uint64_t unordered_ts;  // Num of packets with unordered timestamps
+        uint64_t duplicate_ts;  // Num of packets with duplicate timestamps
+        uint64_t last_ts;       // Last timestamp observed
+        uint64_t unordered_ord; // Num of packets with incorrect order
+        uint64_t duplicate_ord; // Num of packets with duplicate order
+        uint64_t last_ord;      // Last packet order observed
         libtrace_packet_t
             *first_packet;  // The first packet (either held or stored)
         libtrace_packet_t *last_pkt;
@@ -303,13 +308,18 @@ typedef struct __attribute__((aligned(64))) thread_data {
  */
 
 static tls_t g_tls[T_MAX] = {[0 ... T_MAX - 1] = {.tid = -1,
+                                                  .timestamp_prec = -1,
                                                   .count = 0,
                                                   .invalid = 0,
                                                   .unordered_seq = 0,
                                                   .last_seq_num = -1U,
                                                   .first_seq_num = -1U,
                                                   .unordered_ts = 0,
+                                                  .duplicate_ts = 0,
                                                   .last_ts = 0,
+                                                  .unordered_ord = 0,
+                                                  .duplicate_ord = 0,
+                                                  .last_ord = -1U,
                                                   .first_packet = NULL,
                                                   .last_pkt = NULL,
                                                   .largest_wirelen = 0,
@@ -482,20 +492,49 @@ static inline uint32_t get_seq_num(pktgen_hdr_t *pgh) {
         return ntohl(pgh->seq_num);
 }
 
+/**
+ * Estimate the precision of a timestamp
+ * @param erf_ts an erf timestamp
+ * @return the number of subsecond digits, e.g. 0 indicates precision of
+ *         seconds, 9 precision of nanoseconds
+ */
+inline static int _estimate_timestamp_precision(uint64_t erf_ts)
+{
+        uint64_t subsec = erf_ts & 0xFFFFFFFF;
+        uint64_t nanosec = (subsec * 1000000000ull) >> 32;
+
+        // Find the first non-zero digit, this also tests nanosec + 1 because
+        // conversion to erf tends to round down; for example 1000 becomes 999
+        for (uint64_t i = 10, prec = 9; i <= 1000000000; i *= 10, prec--) {
+                if (nanosec % i && (nanosec + 1) % i) {
+                        return prec;
+                }
+        }
+        return 0;
+}
+
 /** Verify the timestamp of this packet is strictly greater than the last seen
  * packet [in]: The packet
  * tls [in,out]: Updated with the result (last_ts and the unordered_ts counter)
  */
 inline static void verify_timestamp_increases(libtrace_packet_t *pkt,
                                               tls_t *tls) {
-        double ts = trace_get_seconds(pkt);
+        uint64_t ts = trace_get_erf_timestamp(pkt);
+        int prec = _estimate_timestamp_precision(ts);
+        tls->timestamp_prec = MAX(tls->timestamp_prec, prec);
 
-        if (tls->last_ts != 0 && tls->last_ts >= ts) {
+        if (tls->last_ts != 0 && tls->last_ts > ts) {
                 /* Only print once during - don't spam */
                 if (!tls->unordered_ts) {
                         fprintf(stderr, "Packet timestamps out of order\n");
                 }
                 tls->unordered_ts++;
+        }
+        if (tls->last_ts != 0 && tls->last_ts == ts) {
+                if (!tls->duplicate_ts) {
+                        fprintf(stderr, "Duplicate timestamps received\n");
+                }
+                tls->duplicate_ts++;
         }
         tls->last_ts = ts;
 }
@@ -519,6 +558,38 @@ inline static void verify_sequence_num_increases(pktgen_hdr_t *pgh,
                 tls->unordered_seq++;
         }
         tls->last_seq_num = seq_num;
+}
+
+/** Verify the order of this packet is strictly greater than the last
+ * seen
+ * [in]: The packet gen header tls
+ * [in,out]: Updated with the result
+ * (last_seq_num and the unordered_seq counter)
+ */
+inline static void verify_order_increases(libtrace_packet_t *packet, tls_t *tls)
+{
+        uint64_t order = trace_packet_get_order(packet);
+
+        if (tls->last_ord != -1U && tls->last_ord > order) {
+                /* Only print once during - don't spam */
+                if (!tls->unordered_ord) {
+                        fprintf(stderr,
+                                "Packets order out of order found %" PRIu64
+                                ", last was: %" PRIu64 "\n",
+                                order, tls->last_ord);
+                }
+                tls->unordered_ord++;
+        }
+        if (tls->last_ord != -1U && tls->last_ord == order) {
+                if (!tls->duplicate_ord) {
+                        fprintf(stderr,
+                                "Packets with duplicate order found %" PRIu64
+                                ", last was: %" PRIu64 "\n",
+                                order, tls->last_ord);
+                }
+                tls->duplicate_ord++;
+        }
+        tls->last_ord = order;
 }
 
 /** Verify the sequence number increments by 1
@@ -842,6 +913,7 @@ _fn_packet_ip_roll(libtrace_t *trace, libtrace_thread_t *t, void *global UNUSED,
         verify_sequence_num_increases(pgh, tls);
         verify_first_packet(tls);
         verify_timestamp_increases(pkt, tls);
+        verify_order_increases(pkt, tls);
         verify_packet_len(tls, pkt, pgh, scenario);
 
         if (scenario == MT_BI_HASHER_HOLD && rand() % 2 && to_ret) {
@@ -913,6 +985,7 @@ _fn_packet_inc_seq(libtrace_t *trace, libtrace_thread_t *t UNUSED,
                                        scenario == ST_ERRED_PACKETS ? 2 : 1);
         verify_first_packet(tls);
         verify_timestamp_increases(pkt, tls);
+        verify_order_increases(pkt, tls);
         verify_packet_len(tls, pkt, pktgen, scenario);
         record_alive();
         print_keep_alive();
@@ -1227,9 +1300,19 @@ static int run_tx_scenario(char *uri, enum scenarios scenario, int pps,
         return 0;
 }
 
+#define WARN_CORRUPT_THREAD_DATA(value, fmt)                                   \
+        if (value) {                                                           \
+                fprintf(stderr,                                                \
+                        "Corruption on unused thread %d " #value "=%" fmt      \
+                        "\n",                                                  \
+                        i, value);                                             \
+                exit_code |= RET_ERROR;                                        \
+        }
+
 static tls_t *verify_thread_statistics(libtrace_stat_t *stats,
                                        int num_threads) {
         static tls_t total = {0};
+        total.timestamp_prec = -1;
         int i = 0;
 
         for (; i < num_threads; i++) {
@@ -1237,8 +1320,13 @@ static tls_t *verify_thread_statistics(libtrace_stat_t *stats,
                 total.invalid += g_tls[i].invalid;
                 total.unordered_seq += g_tls[i].unordered_seq;
                 total.unordered_ts += g_tls[i].unordered_ts;
+                total.duplicate_ts += g_tls[i].duplicate_ts;
                 total.largest_wirelen =
                     MAX(total.largest_wirelen, g_tls[i].largest_wirelen);
+                total.unordered_ord += g_tls[i].unordered_ord;
+                total.duplicate_ord += g_tls[i].duplicate_ord;
+                total.timestamp_prec =
+                    MAX(total.timestamp_prec, g_tls[i].timestamp_prec);
         }
 
         if (stats->accepted_valid && stats->accepted != total.count) {
@@ -1260,36 +1348,37 @@ static tls_t *verify_thread_statistics(libtrace_stat_t *stats,
                 fprintf(stderr, "Received %" PRIu64 " unordered timestamps\n",
                         total.unordered_ts);
         }
+        if (total.duplicate_ts) {
+                fprintf(stderr, "Received %" PRIu64 " duplicate timestamps\n",
+                        total.duplicate_ts);
+        }
+        if (total.unordered_ord) {
+                fprintf(stderr, "Received %" PRIu64 " unordered orders\n",
+                        total.unordered_ord);
+        }
+        if (total.duplicate_ord) {
+                fprintf(stderr, "Received %" PRIu64 " duplicate orders\n",
+                        total.duplicate_ord);
+        }
+        if (total.timestamp_prec >= 0 && total.timestamp_prec <= 9) {
+                const char *prec_names[10] = {
+                    "second",      "decisecond",      "centisecond",
+                    "millisecond", "sub millisecond", "sub millisecond",
+                    "microsecond", "sub microsecond", "sub microsecond",
+                    "nanosecond"};
+                fprintf(stderr,
+                        "Detected timestamp precision: %d digits (%s)\n",
+                        total.timestamp_prec, prec_names[total.timestamp_prec]);
+        }
 
         for (; i < T_MAX; i++) {
-                if (g_tls[i].count) {
-                        fprintf(stderr,
-                                "Non-existent thread %d received %" PRIu64
-                                " packets\n",
-                                i, g_tls[i].count);
-                        exit_code |= RET_ERROR;
-                }
-                if (g_tls[i].invalid) {
-                        fprintf(stderr,
-                                "Non-existent thread %d reports %" PRIu64
-                                " invalid packets\n",
-                                i, g_tls[i].invalid);
-                        exit_code |= RET_ERROR;
-                }
-                if (g_tls[i].unordered_seq) {
-                        fprintf(stderr,
-                                "Non-existent thread %d reports %" PRIu64
-                                " unordered seq packets\n",
-                                i, g_tls[i].unordered_seq);
-                        exit_code |= RET_ERROR;
-                }
-                if (g_tls[i].unordered_ts) {
-                        fprintf(stderr,
-                                "Non-existent thread %d reports %" PRIu64
-                                " unordered seq packets\n",
-                                i, g_tls[i].unordered_ts);
-                        exit_code |= RET_ERROR;
-                }
+                WARN_CORRUPT_THREAD_DATA(g_tls[i].count, PRIu64);
+                WARN_CORRUPT_THREAD_DATA(g_tls[i].invalid, PRIu64);
+                WARN_CORRUPT_THREAD_DATA(g_tls[i].unordered_seq, PRIu64);
+                WARN_CORRUPT_THREAD_DATA(g_tls[i].unordered_ts, PRIu64);
+                WARN_CORRUPT_THREAD_DATA(g_tls[i].duplicate_ts, PRIu64);
+                WARN_CORRUPT_THREAD_DATA(g_tls[i].unordered_ord, PRIu64);
+                WARN_CORRUPT_THREAD_DATA(g_tls[i].duplicate_ord, PRIu64);
         }
         return &total;
 }

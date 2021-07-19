@@ -72,6 +72,17 @@ echo \* Read pcapng
 do_test ./test-format pcapng
 do_test ./test-decode pcapng
 
+echo \* Read etsilive
+if command -v socat > /dev/null
+then
+	{
+		sleep 1;
+		socat - TCP:127.0.0.1:60198 < ./traces/etsi_10_pings_HI3.raw_tcp > /dev/null
+	} &
+	do_test ./test-etsi 20 1 etsilive:127.0.0.1:60198
+else
+	echo "Socat not found: skipping etsilive test"
+fi
 
 echo \* Testing pcap-bpf
 do_test ./test-pcap-bpf
@@ -348,3 +359,10 @@ do_test ./test-structures
 echo
 echo "Tests passed: $OK"
 echo "Tests failed: $FAIL"
+
+if [ -z "$FAIL" ]
+then
+	exit 0
+else
+	exit 1
+fi

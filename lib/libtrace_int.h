@@ -1092,15 +1092,15 @@ struct libtrace_format_t {
 };
 
 /** Macro to zero out a single thread format */
-#define NON_PARALLEL(live) \
-	{live, 1},		/* trace info */ \
-	NULL,			/* pstart_input */ \
-	NULL,			/* pread_packet */ \
-	NULL,			/* ppause_input */ \
-	NULL,			/* pfin_input */ \
-	NULL,			/* pregister_thread */ \
-	NULL,			/* punregister_thread */ \
-	NULL,			/* get_thread_statistics */
+#define NON_PARALLEL(live)                                                     \
+        {live, 1}, /* trace info */                                            \
+            NULL,  /* pstart_input */                                          \
+            NULL,  /* pread_packet */                                          \
+            NULL,  /* ppause_input */                                          \
+            NULL,  /* pfin_input */                                            \
+            NULL,  /* pregister_thread */                                      \
+            NULL,  /* punregister_thread */                                    \
+            NULL   /* get_thread_statistics */
 
 /** The list of registered capture formats */
 //extern struct libtrace_format_t *form;
@@ -1395,6 +1395,7 @@ void dpdkndag_constructor(void);
 void linux_xdp_constructor(void);
 #endif
 #if HAVE_PFRING
+void pfringold_constructor(void);
 void pfring_constructor(void);
 #endif
 

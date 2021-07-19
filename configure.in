@@ -3,11 +3,11 @@
 # Now you only need to update the version number in two places - below,
 # and in the README
 
-AC_INIT([libtrace],[4.0.16],[contact@wand.net.nz],[libtrace])
+AC_INIT([libtrace],[4.0.17],[contact@wand.net.nz],[libtrace])
 
 LIBTRACE_MAJOR=4
 LIBTRACE_MID=0
-LIBTRACE_MINOR=16
+LIBTRACE_MINOR=17
 
 # OpenSolaris hides libraries like libncurses in /usr/gnu/lib, which is not
 # searched by default - add it to LDFLAGS so we at least have a chance of 
@@ -115,6 +115,22 @@ AC_ARG_ENABLE(address-san, AS_HELP_STRING(--enable-address-san, Enable address a
   fi
  ], [])
 
+AC_ARG_ENABLE(thread-san, AS_HELP_STRING(--enable-thread-san, Enable thread sanitisation),
+[
+  if test "x$enableval" = xyes ; then
+    if test "x$enable_address_san" = xyes ; then
+        AC_MSG_ERROR("--enable-address-san and --enable-thread-san cannot be used together")
+    fi
+    CFLAGS+=" -fsanitize=thread -fno-omit-frame-pointer -ggdb3"
+    CXXFLAGS+=" -fsanitize=thread -fno-omit-frame-pointer -ggdb3"
+    LDFLAGS+=" -fsanitize=thread -fno-omit-frame-pointer -ggdb3"
+
+    AC_MSG_NOTICE([Compiling with -fsanitize=thread])
+    AC_MSG_NOTICE([ - Build tests using the command: make thread-san])
+    AC_MSG_NOTICE([ - Programs must also be compiled with -fsanitize=thread])
+  fi
+ ], [])
+
 # Check for -fvisibility
 gl_VISIBILITY
 
@@ -169,6 +185,12 @@ AC_CHECK_HEADER(net/if.h,
  #include <sys/types.h>
  #include <sys/socket.h>
 ])
+
+# Check for linux/ethtool.h
+AC_CHECK_HEADER(linux/ethtool.h,
+	found_ethtool=true,
+	found_ethtool=false,
+)
 
 AC_CHECK_HEADER(netinet/ether.h,
 	AC_DEFINE(HAVE_NETINET_ETHER_H,1,[has netinet/ether.h header]),,[
@@ -544,7 +566,7 @@ libtrace_pfring=false
 if test "$want_pfring" != no; then
 	# bit annoying that we have to include extra libs to account for
 	# optional pfring modules that depend on these libs
-	AC_SEARCH_LIBS(pfring_recv, pfring, pfring_found=1, pfring_found=0,[-ldag -lpcap])
+	AC_SEARCH_LIBS(pfring_recv, pfring, pfring_found=1, pfring_found=0,[-lpcap])
 	if test "$pfring_found" = 1; then
 		ADD_LIBS="$ADD_LIBS -lpfring"
 		LIBTRACE_LIBS="$LIBTRACE_LIBS -lpfring"
@@ -920,6 +942,7 @@ AM_CONDITIONAL([HAVE_LIBBPF], [test "x$libtrace_xdp" = "xtrue"])
 AM_CONDITIONAL([BUILD_EBPF], [test "x$build_ebpf" = "xtrue"])
 
 AM_CONDITIONAL([ENABLE_DTRACE], [test "x$systemtap" = "xtrue"])
+AM_CONDITIONAL([HAVE_LINUX_ETHTOOL_H], [test "x$found_ethtool" = "xtrue"])
 
 # Check for miscellaneous programs
 AC_CHECK_PROG([libtrace_doxygen], [doxygen], [true], [false])

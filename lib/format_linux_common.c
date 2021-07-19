@@ -35,6 +35,8 @@
 #include "libtrace_int.h"
 #include "format_helper.h"
 #include "libtrace_arphrd.h"
+#include "format_linux_helpers.h"
+
 #include <stdlib.h>
 #include <errno.h>
 #include <unistd.h>
@@ -297,88 +299,6 @@ void linuxcommon_close_input_stream(libtrace_t *libtrace,
          */
 }
 
-#define REPEAT_16(x) x x x x x x x x x x x x x x x x
-#define xstr(s) str(s)
-#define str(s) #s
-
-/* These don't typically reset however an interface does exist to reset them */
-int linuxcommon_get_dev_statistics(char *ifname, struct linux_dev_stats *stats) {
-	FILE *file;
-	char line[1024];
-	struct linux_dev_stats tmp_stats;
-
-	file = fopen("/proc/net/dev","r");
-	if (file == NULL) {
-		return -1;
-	}
-
-	/* Skip 2 header lines */
-	if (fgets(line, sizeof(line), file) == NULL) {
-                fclose(file);
-                return -1;
-        }
-
-	if (fgets(line, sizeof(line), file) == NULL) {
-                fclose(file);
-                return -1;
-        }
-
-	while (!(feof(file)||ferror(file))) {
-		int tot;
-		if (fgets(line, sizeof(line), file) == NULL)
-                        break;
-
-		tot = sscanf(line, " %"xstr(IF_NAMESIZE)"[^:]:" REPEAT_16(" %"SCNd64),
-		             tmp_stats.if_name,
-		             &tmp_stats.rx_bytes,
-		             &tmp_stats.rx_packets,
-		             &tmp_stats.rx_errors,
-		             &tmp_stats.rx_drops,
-		             &tmp_stats.rx_fifo,
-		             &tmp_stats.rx_frame,
-		             &tmp_stats.rx_compressed,
-		             &tmp_stats.rx_multicast,
-		             &tmp_stats.tx_bytes,
-		             &tmp_stats.tx_packets,
-		             &tmp_stats.tx_errors,
-		             &tmp_stats.tx_drops,
-		             &tmp_stats.tx_fifo,
-		             &tmp_stats.tx_colls,
-		             &tmp_stats.tx_carrier,
-		             &tmp_stats.tx_compressed);
-		if (tot != 17)
-			continue;
-		if (strncmp(tmp_stats.if_name, ifname, IF_NAMESIZE) == 0) {
-			*stats = tmp_stats;
-			fclose(file);
-			return 0;
-		}
-	}
-	fclose(file);
-	return -1;
-}
-
-int linuxcommon_set_promisc(const int sock, const unsigned int ifindex, bool enable) {
-
-    struct packet_mreq mreq;
-    int action;
-
-    memset(&mreq,0,sizeof(mreq));
-    mreq.mr_ifindex = ifindex;
-    mreq.mr_type = PACKET_MR_PROMISC;
-
-    if (enable)
-        action = PACKET_ADD_MEMBERSHIP;
-    else
-        action = PACKET_DROP_MEMBERSHIP;
-
-
-    if (setsockopt(sock, SOL_PACKET, action, &mreq, sizeof(mreq)) == -1)
-        return -1;
-
-    return 0;
-}
-
 /* Start an input stream
  * - Opens the file descriptor
  * - Sets promiscuous correctly
@@ -443,7 +363,7 @@ int linuxcommon_start_input_stream(libtrace_t *libtrace,
 
 	/* Enable promiscuous mode, if requested */
         if (FORMAT_DATA->promisc) {
-            if (linuxcommon_set_promisc(stream->fd, addr.sll_ifindex, 1) < 0)
+            if (linux_set_nic_promisc(stream->fd, addr.sll_ifindex, 1) < 0)
                 perror("setsockopt(PROMISC)");
 	}
 
@@ -521,12 +441,13 @@ int linuxcommon_start_input_stream(libtrace_t *libtrace,
 	FORMAT_DATA->stats.tp_packets = -count;
 	FORMAT_DATA->stats.tp_drops = 0;
 
-	if (linuxcommon_get_dev_statistics(libtrace->uridata, &FORMAT_DATA->dev_stats) != 0) {
-		/* Mark this as bad */
-		FORMAT_DATA->dev_stats.if_name[0] = 0;
-	}
+        if (linux_get_dev_statistics(libtrace->uridata,
+                                     &FORMAT_DATA->dev_stats) != 0) {
+                /* Mark this as bad */
+                FORMAT_DATA->dev_stats.if_name[0] = 0;
+        }
 
-	return 0;
+        return 0;
 }
 
 int linuxcommon_pause_input(libtrace_t *libtrace)
@@ -633,49 +554,48 @@ void linuxcommon_get_statistics(libtrace_t *libtrace, libtrace_stat_t *stat) {
 	dev_stats.if_name[0] = 0; /* This will be set if we retrive valid stats */
 	/* Do we have starting stats to compare to? */
 	if (FORMAT_DATA->dev_stats.if_name[0] != 0) {
-		linuxcommon_get_dev_statistics(libtrace->uridata, &dev_stats);
-	}
-	linuxcommon_update_socket_statistics(libtrace);
+                linux_get_dev_statistics(libtrace->uridata, &dev_stats);
+        }
+        linuxcommon_update_socket_statistics(libtrace);
 
-	/* filtered count == dev received - socket received */
-	if (FORMAT_DATA->filter != NULL &&
-	    FORMAT_DATA->stats_valid &&
-	    dev_stats.if_name[0]) {
-		uint64_t filtered = DEV_DIFF(rx_packets) -
-		                    FORMAT_DATA->stats.tp_packets;
-		/* Check the value is sane, due to timing it could be below 0 */
-		if (filtered < UINT64_MAX - 100000) {
-			stat->filtered += filtered;
-		}
-	}
+        /* filtered count == dev received - socket received */
+        if (FORMAT_DATA->filter != NULL && FORMAT_DATA->stats_valid &&
+            dev_stats.if_name[0]) {
+                uint64_t filtered =
+                    DEV_DIFF(rx_packets) - FORMAT_DATA->stats.tp_packets;
+                /* Check the value is sane, due to timing it could be below 0 */
+                if (filtered < UINT64_MAX - 100000) {
+                        stat->filtered += filtered;
+                }
+        }
 
-	/* dropped count == socket dropped + dev dropped */
-	if (FORMAT_DATA->stats_valid) {
-		stat->dropped_valid = 1;
-		stat->dropped = FORMAT_DATA->stats.tp_drops;
-		if (dev_stats.if_name[0]) {
-			stat->dropped += DEV_DIFF(rx_drops);
-		}
-	}
+        /* dropped count == socket dropped + dev dropped */
+        if (FORMAT_DATA->stats_valid) {
+                stat->dropped_valid = 1;
+                stat->dropped = FORMAT_DATA->stats.tp_drops;
+                if (dev_stats.if_name[0]) {
+                        stat->dropped += DEV_DIFF(rx_drops);
+                }
+        }
 
-	/* received count - All good packets even those dropped or filtered */
-	if (dev_stats.if_name[0]) {
-		stat->received_valid = 1;
-		stat->received = DEV_DIFF(rx_packets) + DEV_DIFF(rx_drops);
-	}
+        /* received count - All good packets even those dropped or filtered */
+        if (dev_stats.if_name[0]) {
+                stat->received_valid = 1;
+                stat->received = DEV_DIFF(rx_packets) + DEV_DIFF(rx_drops);
+        }
 
-	/* captured count - received and but not dropped */
-	if (dev_stats.if_name[0] && FORMAT_DATA->stats_valid) {
-		stat->captured_valid = 1;
-		stat->captured = DEV_DIFF(rx_packets) - FORMAT_DATA->stats.tp_drops;
-	}
+        /* captured count - received and but not dropped */
+        if (dev_stats.if_name[0] && FORMAT_DATA->stats_valid) {
+                stat->captured_valid = 1;
+                stat->captured =
+                    DEV_DIFF(rx_packets) - FORMAT_DATA->stats.tp_drops;
+        }
 
-	/* errors */
-	if (dev_stats.if_name[0]) {
-		stat->errors_valid = 1;
-		stat->errors = DEV_DIFF(rx_errors);
-	}
-
+        /* errors */
+        if (dev_stats.if_name[0]) {
+                stat->errors_valid = 1;
+                stat->errors = DEV_DIFF(rx_errors);
+        }
 }
 
 int linuxcommon_get_fd(const libtrace_t *libtrace) {

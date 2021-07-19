@@ -251,6 +251,8 @@ typedef int32_t lt_unaligned_int32_t ALIGNED(1);
 typedef int16_t lt_unaligned_int16_t ALIGNED(1);
 typedef int8_t lt_unaligned_int8_t ALIGNED(1);
 
+#define LIBTRACE_MIN(a,b) ((a)<(b) ? (a) : (b))
+
 /** Opaque structure holding information about an output trace */
 typedef struct libtrace_out_t libtrace_out_t;
 
@@ -459,7 +461,8 @@ enum base_format_t {
 	TRACE_FORMAT_TZSPLIVE	  =23,  /** TZSP */
         TRACE_FORMAT_CORSAROTAG   =24,  /** Corsarotagger format */
         TRACE_FORMAT_XDP          =25,  /** AF_XDP format */
-	TRACE_FORMAT_PFRING	  =26,
+	TRACE_FORMAT_PFRINGOLD	  =26,
+	TRACE_FORMAT_PFRING       =27,
 };
 
 /** RT protocol packet types */
@@ -525,6 +528,7 @@ typedef enum {
         TRACE_RT_DATA_XDP = TRACE_RT_DATA_SIMPLE + TRACE_FORMAT_XDP,
 
 	/** RT is encapsulating a PF_RING capture record */
+	TRACE_RT_DATA_PFRINGOLD = TRACE_RT_DATA_SIMPLE + TRACE_FORMAT_PFRINGOLD,
 	TRACE_RT_DATA_PFRING = TRACE_RT_DATA_SIMPLE + TRACE_FORMAT_PFRING,
 
 	/** As PCAP does not store the linktype with the packet, we need to 
@@ -719,8 +723,8 @@ typedef struct libtrace_packet_t {
 	uint64_t hash;                  /**< A hash of the packet as supplied by the user */
 	int error;                      /**< The error status of pread_packet */
         uint64_t internalid;            /** Internal identifier for the pkt */
-        void *srcbucket;                /** Source bucket in trace_rt or stream in XDP */
-
+        void *srcbucket;                /** Source bucket in trace_rt */
+        void *fmtdata;                  /**< Storage for format-specific data */
         pthread_mutex_t ref_lock;       /**< Lock for reference counter */
         int refcount;                   /**< Reference counter */
         int which_trace_start;          /**< Used to match packet to a started instance of the parent trace */
@@ -1811,6 +1815,10 @@ DLLEXPORT void trace_destroy_output(libtrace_out_t *trace);
 
 /** Flush an output trace, forcing any buffered packets to be written
  * @param libtrace      The output trace to be flushed
+ * @return 0 on success, otherwise an error occurred
+ *
+ * @note This flushes buffers immediately, but does not block until all
+ *       packets are transmitted on the wire or synchronised to disk.
  */
 DLLEXPORT int trace_flush_output(libtrace_out_t *libtrace);
 

@@ -38,6 +38,7 @@
 #include "libtrace.h"
 #include "libtrace_int.h"
 #include "libtrace_arphrd.h"
+#include "format_linux_helpers.h"
 
 #ifdef HAVE_NETPACKET_PACKET_H
 
@@ -107,14 +108,21 @@ typedef enum { TS_NONE, TS_TIMEVAL, TS_TIMESPEC } timestamptype_t;
  * this means that we can interpret a ring frame on a kernel that doesn't
  * support the format directly.
  */
-#define	PACKET_RX_RING	5
-#define PACKET_VERSION	10
-#define PACKET_HDRLEN	11
-#define	PACKET_TX_RING	13
-#define PACKET_FANOUT	18
-#define	TP_STATUS_USER	0x1
-#define	TP_STATUS_SEND_REQUEST	0x1
-#define	TP_STATUS_AVAILABLE	0x0
+#define PACKET_RX_RING 5
+#define PACKET_VERSION 10
+#define PACKET_HDRLEN 11
+#define PACKET_TX_RING 13
+#define PACKET_FANOUT 18
+
+/* Packet mmap RX flags */
+#define TP_STATUS_USER 0x1
+
+/* Packet mmap TX flags */
+#define TP_STATUS_AVAILABLE 0x0
+#define TP_STATUS_SEND_REQUEST 0x1
+#define TP_STATUS_SENDING 0x2
+#define TP_STATUS_WRONG_FORMAT 0x4
+
 #define TO_TP_HDR2(x)	((struct tpacket2_hdr *) (x))
 #define TO_TP_HDR3(x)	((struct tpacket3_hdr *) (x))
 #define TPACKET_ALIGNMENT       16
@@ -197,29 +205,6 @@ struct tpacket_req {
 #ifndef IF_NAMESIZE
 #define IF_NAMESIZE 16
 #endif
-
-/* A structure we use to hold statistic counters from the network cards
- * as accessed via the /proc/net/dev
- */
-struct linux_dev_stats {
-	char if_name[IF_NAMESIZE];
-	uint64_t rx_bytes;
-	uint64_t rx_packets;
-	uint64_t rx_errors;
-	uint64_t rx_drops;
-	uint64_t rx_fifo;
-	uint64_t rx_frame;
-	uint64_t rx_compressed;
-	uint64_t rx_multicast;
-	uint64_t tx_bytes;
-	uint64_t tx_packets;
-	uint64_t tx_errors;
-	uint64_t tx_drops;
-	uint64_t tx_fifo;
-	uint64_t tx_colls;
-	uint64_t tx_carrier;
-	uint64_t tx_compressed;
-};
 
 /* Note that this structure is passed over the wire in rt encapsulation, and
  * thus we need to be careful with data sizes.  timeval's and timespec's
@@ -352,8 +337,6 @@ int linuxcommon_pstart_input(libtrace_t *libtrace,
 #endif /* HAVE_NETPACKET_PACKET_H */
 
 void linuxcommon_get_statistics(libtrace_t *libtrace, libtrace_stat_t *stat);
-int linuxcommon_get_dev_statistics(char *ifname, struct linux_dev_stats *stats);
-int linuxcommon_set_promisc(const int sock, const unsigned int ifindex, bool enable);
 
 static inline libtrace_direction_t linuxcommon_get_direction(uint8_t pkttype)
 {
