@@ -95,6 +95,7 @@ DLLEXPORT void libtrace_deque_push_front(libtrace_queue_t *q, void *d)
 	if (q->head == NULL) {
 		if (q->tail != NULL || q->size != 0) {
 			fprintf(stderr, "Error deque head cannot be NULL with a non NULL tail and size of more than 0 in libtrace_deque_push_front()\n");
+			ASSERT_RET(pthread_mutex_unlock(&q->lock), == 0);
 			return;
 		}
 		new_node->next = NULL;
