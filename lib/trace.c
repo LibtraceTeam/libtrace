@@ -1740,6 +1740,7 @@ static int trace_bpf_compile(libtrace_filter_t *filter,
 		if (!pcap) {
 			trace_set_err(packet->trace, TRACE_ERR_BAD_FILTER,
 						"Unable to open pcap_t for compiling filters trace_bpf_compile()");
+			pthread_mutex_unlock(&mutex);
 			return -1;
 		}
 		if (pcap_compile( pcap, &filter->filter, filter->filterstring,
