@@ -130,7 +130,6 @@ DLLEXPORT uint64_t libtrace_push_into_bucket(libtrace_bucket_t *b)
                 while (b->packets[b->nextid] != NULL) {
                         /* No more packet slots available! */
                         pthread_cond_wait(&b->cond, &b->lock);
-                        pthread_mutex_unlock(&b->lock);
                 }
                 b->node->startindex = b->nextid;
                 b->node->activemembers = 1;
@@ -163,7 +162,6 @@ DLLEXPORT uint64_t libtrace_push_into_bucket(libtrace_bucket_t *b)
         while (b->packets[b->nextid] != NULL) {
                 /* No more packet slots available! */
                 pthread_cond_wait(&b->cond, &b->lock);
-                pthread_mutex_unlock(&b->lock);
         }
         b->packets[b->nextid] = b->node;
         b->node->activemembers++;
