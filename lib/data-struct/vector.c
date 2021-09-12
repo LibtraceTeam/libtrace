@@ -55,6 +55,7 @@ DLLEXPORT void libtrace_vector_push_back(libtrace_vector_t *v, void *d) {
 		v->elements = realloc(v->elements, v->max_size * v->element_size);
 		if (!v->elements) {
 			fprintf(stderr, "Unable to allocate memory for v->elements in libtrace_vector_push_back()\n");
+			ASSERT_RET(pthread_mutex_unlock(&v->lock), == 0);
 			return;
 		}
 	}
