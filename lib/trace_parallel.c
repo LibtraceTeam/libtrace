@@ -2261,6 +2261,7 @@ cleanup_threads:
         if (libtrace->perpkt_thread_states[THREAD_RUNNING] != 0) {
                 trace_set_err(libtrace, TRACE_ERR_THREAD,
                               "Expected 0 running threads in trace_pstart()");
+                ASSERT_RET(pthread_mutex_unlock(&libtrace->libtrace_lock), == 0);
                 return -1;
         }
         libtrace->perpkt_thread_states[THREAD_FINISHED] = 0;
