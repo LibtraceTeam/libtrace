@@ -957,6 +957,7 @@ static void *hasher_entry(void *data)
               pthread_equal(pthread_self(), t->tid))) {
                 fprintf(stderr, "Incorrect thread type or non matching thread "
                                 "IDs in hasher_entry()\n");
+                ASSERT_RET(pthread_mutex_unlock(&trace->libtrace_lock), == 0);
                 pthread_exit(NULL);
         }
 
