@@ -957,6 +957,7 @@ static void *hasher_entry(void *data)
               pthread_equal(pthread_self(), t->tid))) {
                 fprintf(stderr, "Incorrect thread type or non matching thread "
                                 "IDs in hasher_entry()\n");
+                ASSERT_RET(pthread_mutex_unlock(&trace->libtrace_lock), == 0);
                 pthread_exit(NULL);
         }
 
@@ -2261,6 +2262,7 @@ cleanup_threads:
         if (libtrace->perpkt_thread_states[THREAD_RUNNING] != 0) {
                 trace_set_err(libtrace, TRACE_ERR_THREAD,
                               "Expected 0 running threads in trace_pstart()");
+                ASSERT_RET(pthread_mutex_unlock(&libtrace->libtrace_lock), == 0);
                 return -1;
         }
         libtrace->perpkt_thread_states[THREAD_FINISHED] = 0;

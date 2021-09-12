@@ -191,6 +191,7 @@ DLLEXPORT void libtrace_release_bucket_id(libtrace_bucket_t *b, uint64_t id) {
         bnode = b->packets[id];
 	if (!bnode) {
 		fprintf(stderr, "bucket ID %" PRIu64 " is NULL in libtrace_release_bucket_id()\n", id);
+		pthread_mutex_unlock(&b->lock);
 		return;
 	}
 
@@ -203,10 +204,12 @@ DLLEXPORT void libtrace_release_bucket_id(libtrace_bucket_t *b, uint64_t id) {
         }
 	if (s >= bnode->slots) {
 		fprintf(stderr, "Error in libtrace_release_bucket_id()\n");
+		pthread_mutex_unlock(&b->lock);
 		return;
 	}
 	if (bnode->released[s] == 0) {
 		fprintf(stderr, "Error in libtrace_release_bucket_id()\n");
+		pthread_mutex_unlock(&b->lock);
 		return;
 	}
 
@@ -241,6 +244,7 @@ DLLEXPORT void libtrace_release_bucket_id(libtrace_bucket_t *b, uint64_t id) {
 
 		if (!lnode->next) {
 			fprintf(stderr, "Error in libtrace_release_bucket_id()\n");
+			pthread_mutex_unlock(&b->lock);
 			return;
 		}
                 for (i = 0; i < front->slots; i++) {
