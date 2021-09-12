@@ -44,6 +44,7 @@ In no particular order, we would like to recognise:
  * Jamie Curtis for fixing a couple of bugs many many years ago
  * Brendon Jones for creating the original Windows DLLs and writing bits of
    code here and there
+ * Ryan Cai for patching a bunch of locking bugs.
 
 Apologies to anyone that we've missed out or forgotten. If you're really
 offended, fire one of us an email and we'll make sure you are added to the
