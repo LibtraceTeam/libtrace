@@ -1056,7 +1056,7 @@ static int pfring_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 	return pfring_read_generic(libtrace, packet, FORMAT_DATA_FIRST, 1, NULL);
 }
 
-static libtrace_linktype_t pfring_get_link_type(const libtrace_packet_t *packet UNUSED)
+static libtrace_linktype_t pfring_get_lt_link_type(const libtrace_packet_t *packet UNUSED)
 {
 	return TRACE_TYPE_ETH;
 }
@@ -1483,7 +1483,7 @@ static struct libtrace_format_t pfringoldformat = {
     NULL,                        /* can_hold_packet */
     NULL,                        /* write_packet */
     NULL,                        /* flush_output */
-    pfring_get_link_type,        /* get_link_type */
+    pfring_get_lt_link_type,     /* get_link_type */
     pfring_get_direction,        /* get_direction */
     lt_pfring_set_direction,     /* set_direction */
     pfring_get_erf_timestamp,    /* get_erf_timestamp */
@@ -1538,7 +1538,7 @@ static struct libtrace_format_t pfringformat = {
     NULL,                      /* can_hold_packet */
     pfringzc_write_packet,     /* write_packet */
     pfringzc_flush_output,     /* flush_output */
-    pfring_get_link_type,      /* get_link_type */
+    pfring_get_lt_link_type,   /* get_link_type */
     NULL,                      /* get_direction */
     NULL,                      /* set_direction */
     pfring_get_erf_timestamp,  /* get_erf_timestamp */
