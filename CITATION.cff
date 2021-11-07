@@ -1,0 +1,44 @@
+cff-version: 1.2.0
+title: Libtrace
+url: "https://github.com/LibtraceTeam/libtrace/"
+message: >-
+  Please cite this software using the metadata from
+  'preferred-citation'.
+type: software
+authors:
+  - given-names: Shane
+    family-names: Alcock
+    affiliation: University of Waikato
+    email: salcock@waikato.ac.nz
+  - given-names: Richard
+    family-names: Sanger
+    affiliation: University of Waikato
+    email: rsanger@waikato.ac.nz
+  - given-names: Perry
+    family-names: Lorier
+  - given-names: Daniel
+    family-names: Lawson
+preferred-citation:
+  type: article
+  authors:
+    - given-names: Shane
+      family-names: Alcock
+      affiliation: University of Waikato
+      email: salcock@cs.waikato.ac.nz
+    - given-names: Perry
+      family-names: Lorier
+      affiliation: University of Waikato
+      email: perry@cs.waikato.ac.nz
+    - given-names: Richard
+      family-names: Nelson
+      affiliation: University of Waikato
+      email: richardn@cs.waikato.ac.nz
+  doi: "10.1145/2185376.2185382"
+  journal: "ACM SIGCOMM Computer Communication Review"
+  month: 4
+  start: 42
+  end: 48
+  title: "Libtrace: a packet capture and analysis library"
+  issue: 2
+  volume: 42
+  year: 2012
