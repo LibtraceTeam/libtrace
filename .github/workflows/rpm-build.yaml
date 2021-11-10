@@ -19,7 +19,7 @@ jobs:
           - "centos:7"
           - "centos:8"
           - "fedora:33"
-          - "fedora:32"
+          - "fedora:34"
 
 
     steps:
