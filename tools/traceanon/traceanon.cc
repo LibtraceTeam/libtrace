@@ -190,8 +190,8 @@ static void encrypt_radius(traceanon_opts_t *opts, Anonymiser *anon,
 		switch (radius_avp->type) {
 			case 6:
 			case 7:
-			case 40 ... 43:
-			case 46 ... 48:
+                        case 9:
+			case 40 ... 48:
 			case 55:
                         case 61:
 			{	//skip the above types
@@ -200,12 +200,10 @@ static void encrypt_radius(traceanon_opts_t *opts, Anonymiser *anon,
 			}
                         case 1:
                         case 32:
+                        case 87:
+                        case 89:
                                 anon_mode = RADIUS_ANON_MODE_TEXT;
                                 break;
-                        case 44:
-                                anon_mode = RADIUS_ANON_MODE_NUMERIC;
-                                break;
-
 			case 85:{
 				//check for access-accept messages
 				if (radius_header->code == 2){
