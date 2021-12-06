@@ -408,9 +408,9 @@ static void replacement_pcap_header(libtrace_packet_t *packet, char *payload,
 bool demote_packet(libtrace_packet_t *packet)
 {
 	uint8_t type;
-	libtrace_linktype_t ltype;
+        libtrace_linktype_t ltype;
         uint16_t ha_type, next_proto;
-	libtrace_sll_header_t *sll = NULL;
+        libtrace_sll_header_t *sll = NULL;
 	uint32_t remaining = 0;
 	struct timeval tv;
 	static libtrace_t *trace = NULL;
@@ -440,20 +440,20 @@ bool demote_packet(libtrace_packet_t *packet)
 
                 case TRACE_TYPE_ETSILI:
                         ltype = TRACE_TYPE_ETSILI;
-			remaining=trace_get_capture_length(packet);
+                        remaining = trace_get_capture_length(packet);
                         payload = trace_get_payload_from_meta(
-                                packet->payload, &ltype, &remaining);
+                            packet->payload, &ltype, &remaining);
                         if (payload == NULL || remaining == 0) {
                                 return false;
                         }
                         tv = trace_get_timeval(packet);
-                        replacement_pcap_header(packet, payload, remaining,
-                                        &tv, remaining, TRACE_DLT_RAW);
-			trace_clear_cache(packet);
+                        replacement_pcap_header(packet, payload, remaining, &tv,
+                                                remaining, TRACE_DLT_RAW);
+                        trace_clear_cache(packet);
                         packet->trace = trace;
                         return true;
 
-		case TRACE_TYPE_LINUX_SLL:
+                case TRACE_TYPE_LINUX_SLL:
 			sll = (libtrace_sll_header_t *)(packet->payload);
 
 			ha_type = ntohs(sll->hatype);
