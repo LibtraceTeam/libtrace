@@ -588,6 +588,7 @@ static int etsilive_prepare_received(libtrace_t *libtrace,
         packet->order = esock->cached.timestamp;
         packet->error = esock->cached.length;
 
+        packet->cached.link_type = TRACE_TYPE_ETSILI;
         packet->cached.wire_length = esock->cached.length;
         packet->cached.capture_length = esock->cached.length;
         packet->fmtdata = &(esock->recvbuffer);
