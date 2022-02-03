@@ -20,7 +20,7 @@ jobs:
           - "fedora:35"
           - "fedora:34"
           - "rockylinux:8.5"
-          - "almalinux:8.5"
+          - "almalinux:8.4"
 
 
     steps:
