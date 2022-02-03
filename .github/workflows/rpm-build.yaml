@@ -36,7 +36,7 @@ jobs:
           mkdir -p packages/${DIRNAME}
           cp ~/rpmbuild/RPMS/x86_64/*.rpm packages/${DIRNAME}/
       - name: Publish packages to cloudsmith
-        uses: wanduow/action-cloudsmith-upload-packages@v1
+        uses: salcock/action-cloudsmith-upload-packages@1.6
         with:
           path: packages/
           repo: ${{ secrets.CLOUDSMITH_OWNER }}/libtrace
