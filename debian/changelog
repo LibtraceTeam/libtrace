@@ -1,3 +1,16 @@
+libtrace4 (4.0.18-1) unstable; urgency=medium
+
+  * Packets received via `etsilive:` can now be converted to pcap format.
+  * traceanon no longer encrypts the Framed-IP-Netmask, Acct-Session-Id and
+    Acct-Authentic RADIUS AVPs.
+  * traceanon now encrypts the NAS-Port-ID and Chargeable-User-Identity AVPs
+    using ASCII characters only.
+  * Rename internal method pfring_get_link_type to avoid name collision with
+    newer pfring releases.
+  * Fixed various threading locking bugs reported by Ryan Cai.
+
+ -- Shane Alcock <shane.alcock@waikato.ac.nz>  Thu, 03 Feb 2022 15:30:41 +1300
+
 libtrace4 (4.0.17-1) unstable; urgency=medium
 
   * Added support for PF_RING zero-copy -- this is now the official libtrace `pfring:` format, and the original non-zero-copy version is now available via `pfringold:`.
