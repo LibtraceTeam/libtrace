@@ -17,9 +17,10 @@ jobs:
           - amd64
         target:
           - "centos:7"
-          - "centos:8"
-          - "fedora:33"
+          - "fedora:35"
           - "fedora:34"
+          - "rockylinux:8.5"
+          - "almalinux:8.5"
 
 
     steps:
