@@ -79,6 +79,8 @@ AC_PROG_INSTALL
 AC_CHECK_PROGS(YACC, 'bison -y' byacc yacc) 
 AM_PROG_LEX
 
+PKG_PROG_PKG_CONFIG
+
 # All our source files for function replacements are in lib/
 AC_CONFIG_LIBOBJ_DIR(lib)
 
@@ -915,6 +917,8 @@ if (test "$use_llvm" != "no"); then
 		AC_DEFINE(HAVE_LLVM, 1, [Set to 1 if you have LLVM installed])
 	fi
 fi
+
+PKG_CHECK_MODULES(ncurses,ncurses,have_ncurses=yes,have_ncurses=no)
 
 AC_ARG_WITH([ncurses],
 	AC_HELP_STRING([--with-ncurses], [build tracetop (requires ncurses)]))
