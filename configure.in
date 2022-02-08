@@ -305,7 +305,7 @@ AC_ARG_WITH(xdp, AS_HELP_STRING(--with-xdp, include XDP capture support),
 
 if test "$want_xdp" != no; then
     AC_CHECK_LIB(elf, elf_begin, elffound=1, elffound=0)
-    if test "$elffound" == 1; then
+    if test "$elffound" = 1; then
         # check for libbpf
         AC_CHECK_LIB(bpf, xsk_socket__create, bpffound=1, bpffound=0, -lelf)
 
