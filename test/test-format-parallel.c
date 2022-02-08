@@ -27,6 +27,7 @@
  * $Id: test-rtclient.c,v 1.2 2006/02/27 03:41:12 perry Exp $
  *
  */
+#include <sys/types.h>
 #ifndef WIN32
 #        include <arpa/inet.h>
 #        include <netinet/in.h>
@@ -43,7 +44,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
 
