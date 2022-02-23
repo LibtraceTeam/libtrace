@@ -79,6 +79,8 @@ AC_PROG_INSTALL
 AC_CHECK_PROGS(YACC, 'bison -y' byacc yacc) 
 AM_PROG_LEX
 
+PKG_PROG_PKG_CONFIG
+
 # All our source files for function replacements are in lib/
 AC_CONFIG_LIBOBJ_DIR(lib)
 
@@ -305,7 +307,7 @@ AC_ARG_WITH(xdp, AS_HELP_STRING(--with-xdp, include XDP capture support),
 
 if test "$want_xdp" != no; then
     AC_CHECK_LIB(elf, elf_begin, elffound=1, elffound=0)
-    if test "$elffound" == 1; then
+    if test "$elffound" = 1; then
         # check for libbpf
         AC_CHECK_LIB(bpf, xsk_socket__create, bpffound=1, bpffound=0, -lelf)
 
@@ -518,7 +520,23 @@ AC_CHECK_DECL([PACKET_FANOUT],
         [[#include <linux/if_packet.h>]])
 
 # If we use DPDK we might be able to use libnuma
-AC_CHECK_LIB(numa, numa_node_to_cpus, have_numa=1, have_numa=0)
+AC_ARG_WITH(numa,
+	AS_HELP_STRING(--without-numa,disable NUMA support),
+[
+	if test "$withval" = no
+	then
+		want_numa=no
+	else
+		want_numa=yes
+	fi
+],[
+	# Default to building with NUMA
+	want_numa=yes
+])
+
+if test "$want_numa" != no; then
+	AC_CHECK_LIB(numa, numa_node_to_cpus, have_numa=1, have_numa=0)
+fi
 
 # Need libwandder for ETSI live decoding
 AC_CHECK_LIB(wandder, init_wandder_decoder, have_wandder=1, have_wandder=0)
@@ -899,6 +917,8 @@ if (test "$use_llvm" != "no"); then
 		AC_DEFINE(HAVE_LLVM, 1, [Set to 1 if you have LLVM installed])
 	fi
 fi
+
+PKG_CHECK_MODULES(ncurses,ncurses,have_ncurses=yes,have_ncurses=no)
 
 AC_ARG_WITH([ncurses],
 	AC_HELP_STRING([--with-ncurses], [build tracetop (requires ncurses)]))

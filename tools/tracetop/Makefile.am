@@ -6,6 +6,6 @@ bin_PROGRAMS = tracetop
 include ../Makefile.tools
 
 tracetop_SOURCES = tracetop.cc
-tracetop_LDADD = -lncurses 
+tracetop_LDADD = @ncurses_LIBS@
 tracetop_CPPFLAGS = -fno-strict-aliasing $(AM_CFLAGS)
 endif
