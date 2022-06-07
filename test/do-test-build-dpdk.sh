@@ -105,13 +105,14 @@ declare -a dpdk_versions=(
 	"dpdk-19.11.5.tar.gz"
 	"dpdk-20.02.tar.gz"
 	"dpdk-20.11.tar.gz"
+	"dpdk-21.11.tar.gz"
 	)
 
 while [[ $# -gt 0 ]]; do
 	dpdk_versions=()
         key="$1"
         case $key in
-        dpdk-16.11.11|dpdk-17.11.10|dpdk-18.11.10|dpdk-19.11.5|dpdk-20.02|dpdk-20.11)
+        dpdk-16.11.11|dpdk-17.11.10|dpdk-18.11.10|dpdk-19.11.5|dpdk-20.02|dpdk-20.11|dpdk-21.11)
 		dpdk_versions+=("$key.tar.gz")
 		;;
 	*)
