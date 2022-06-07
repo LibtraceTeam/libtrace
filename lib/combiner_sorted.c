@@ -51,7 +51,8 @@ static void publish(libtrace_t *trace UNUSED, int t_id, libtrace_combine_t *c, l
 	libtrace_vector_push_back(vec, res);
 }
 
-static void read(libtrace_t *trace UNUSED, libtrace_combine_t *c UNUSED){
+static void combiner_read(libtrace_t *trace UNUSED,
+                libtrace_combine_t *c UNUSED){
 	return;
 }
 
@@ -67,7 +68,7 @@ static int compare_result(const void* p1, const void* p2)
 		return 1;
 }
 
-static void pause(libtrace_t *trace, libtrace_combine_t *c) {
+static void combiner_pause(libtrace_t *trace, libtrace_combine_t *c) {
 	libtrace_vector_t *queues = c->queues;
 	int i;
 	for (i = 0; i < trace_get_perpkt_threads(trace); ++i) {
@@ -75,7 +76,7 @@ static void pause(libtrace_t *trace, libtrace_combine_t *c) {
 	}
 }
 
-static void read_final(libtrace_t *trace, libtrace_combine_t *c) {
+static void combiner_read_final(libtrace_t *trace, libtrace_combine_t *c) {
 	libtrace_vector_t *queues = c->queues;
 	int i;
 	size_t a;
@@ -122,9 +123,9 @@ DLLEXPORT const libtrace_combine_t combiner_sorted = {
     init_combiner,	/* initialise */
 	destroy,		/* destroy */
 	publish,		/* publish */
-    read,			/* read */
-    read_final,			/* read_final */
-    pause,			/* pause */
+    combiner_read,			/* read */
+    combiner_read_final,			/* read_final */
+    combiner_pause,			/* pause */
     NULL,			/* queues */
     0,                          /* last_count_tick */
     0,                          /* last_ts_tick */
