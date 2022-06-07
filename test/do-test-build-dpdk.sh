@@ -176,7 +176,7 @@ do
 			echo "CONFIG_RTE_LIBRTE_PMD_PCAP=y" >> "$DPDK_CONFIG"
 			echo "CONFIG_RTE_EAL_IGB_UIO=n" >> "$DPDK_CONFIG"
 			do_test make install T=x86_64-native-linuxapp-gcc \
-					     EXTRA_CFLAGS="-fPIC -w -ggdb" -j $BUILD_THREADS \
+					     EXTRA_CFLAGS="-fcommon -fPIC -w -ggdb" -j $BUILD_THREADS \
 					     > build_stdout.txt 2> build_stderr.txt
 			ret=$?
 		else
@@ -185,10 +185,10 @@ do
 	else
 		echo "	Building using meson"
 		mkdir install
-		if CFLAGS="-ggdb3 -w" do_test meson --prefix=$(pwd)/install build \
+		if CFLAGS="-fcommon -ggdb3 -w" do_test meson --prefix=$(pwd)/install build \
 				> build_stdout.txt 2> build_stderr.txt ; then
 			cd ./build
-			CFLAGS="-ggdb3 -w" do_test meson install > ../build_stdout.txt 2> ../build_stderr.txt
+			CFLAGS="-fcommon -ggdb3 -w" do_test meson install > ../build_stdout.txt 2> ../build_stderr.txt
 			ret=$?
 			cd ..
 		else
