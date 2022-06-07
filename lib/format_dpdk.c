@@ -712,7 +712,7 @@ static portid_t dpdk_get_port_id(const char *uri)
 #if defined(RTE_ETH_FOREACH_MATCHING_DEV) || defined(USE_DEV_ATTACH)
 UNUSED static struct rte_device *dpdk_get_device_from_port(portid_t port)
 {
-#        if RTE_VERSION >= RTE_VERSION_NUM(18, 5, 0, 1)
+#        if RTE_VERSION >= RTE_VERSION_NUM(19, 11, 0, 1)
         struct rte_eth_dev_info dev_info;
         if (rte_eth_dev_info_get(port, &dev_info) != 0) {
                 return NULL;
