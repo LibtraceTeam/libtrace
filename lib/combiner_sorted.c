@@ -74,7 +74,8 @@ static void combiner_pause(libtrace_t *trace, libtrace_combine_t *c)
         libtrace_vector_t *queues = c->queues;
         int i;
         for (i = 0; i < trace_get_perpkt_threads(trace); ++i) {
-                libtrace_vector_apply_function(&queues[i], (vector_data_fn) libtrace_make_result_safe);
+                libtrace_vector_apply_function(
+                    &queues[i], (vector_data_fn)libtrace_make_result_safe);
         }
 }
 
@@ -84,26 +85,26 @@ static void combiner_read_final(libtrace_t *trace, libtrace_combine_t *c)
         int i;
         size_t a;
         // Combine all results into queue 1
-	for (i = 1; i < trace_get_perpkt_threads(trace); ++i)
-	{
-		libtrace_vector_append(&queues[0],&queues[i]);
-	}
-	// Sort them
-	libtrace_vector_qsort(&queues[0], compare_result);
+        for (i = 1; i < trace_get_perpkt_threads(trace); ++i) {
+                libtrace_vector_append(&queues[0], &queues[i]);
+        }
+        // Sort them
+        libtrace_vector_qsort(&queues[0], compare_result);
 
-	for (a = 0; a < libtrace_vector_get_size(&queues[0]); ++a) {
-		libtrace_result_t r;
-		libtrace_generic_t gt = {.res = &r};
-		ASSERT_RET (libtrace_vector_get(&queues[0], a, (void *) &r), == 1);
-		if (r.type == RESULT_TICK_INTERVAL ||
-                                r.type == RESULT_TICK_COUNT) {
+        for (a = 0; a < libtrace_vector_get_size(&queues[0]); ++a) {
+                libtrace_result_t r;
+                libtrace_generic_t gt = {.res = &r};
+                ASSERT_RET(libtrace_vector_get(&queues[0], a, (void *)&r),
+                           == 1);
+                if (r.type == RESULT_TICK_INTERVAL ||
+                    r.type == RESULT_TICK_COUNT) {
                         /* Ticks are essentially useless for this combiner? */
                         continue;
                 }
                 send_message(trace, &trace->reporter_thread, MESSAGE_RESULT,
                                 gt, NULL);
-	}
-	libtrace_vector_empty(&queues[0]);
+        }
+        libtrace_vector_empty(&queues[0]);
 }
 
 static void destroy(libtrace_t *trace, libtrace_combine_t *c) {
