@@ -52,8 +52,9 @@ static void publish(libtrace_t *trace UNUSED, int t_id, libtrace_combine_t *c, l
 }
 
 static void combiner_read(libtrace_t *trace UNUSED,
-                libtrace_combine_t *c UNUSED){
-	return;
+                          libtrace_combine_t *c UNUSED)
+{
+        return;
 }
 
 static int compare_result(const void* p1, const void* p2)
@@ -68,16 +69,18 @@ static int compare_result(const void* p1, const void* p2)
 		return 1;
 }
 
-static void combiner_pause(libtrace_t *trace, libtrace_combine_t *c) {
-	libtrace_vector_t *queues = c->queues;
+static void combiner_pause(libtrace_t *trace, libtrace_combine_t *c)
+{
+        libtrace_vector_t *queues = c->queues;
 	int i;
 	for (i = 0; i < trace_get_perpkt_threads(trace); ++i) {
 		libtrace_vector_apply_function(&queues[i], (vector_data_fn) libtrace_make_result_safe);
 	}
 }
 
-static void combiner_read_final(libtrace_t *trace, libtrace_combine_t *c) {
-	libtrace_vector_t *queues = c->queues;
+static void combiner_read_final(libtrace_t *trace, libtrace_combine_t *c)
+{
+        libtrace_vector_t *queues = c->queues;
 	int i;
 	size_t a;
 	// Combine all results into queue 1
@@ -120,14 +123,14 @@ static void destroy(libtrace_t *trace, libtrace_combine_t *c) {
 }
 
 DLLEXPORT const libtrace_combine_t combiner_sorted = {
-    init_combiner,	/* initialise */
-	destroy,		/* destroy */
-	publish,		/* publish */
-    combiner_read,			/* read */
-    combiner_read_final,			/* read_final */
-    combiner_pause,			/* pause */
-    NULL,			/* queues */
-    0,                          /* last_count_tick */
-    0,                          /* last_ts_tick */
-    {0}				/* opts */
+    init_combiner,       /* initialise */
+    destroy,             /* destroy */
+    publish,             /* publish */
+    combiner_read,       /* read */
+    combiner_read_final, /* read_final */
+    combiner_pause,      /* pause */
+    NULL,                /* queues */
+    0,                   /* last_count_tick */
+    0,                   /* last_ts_tick */
+    {0}                  /* opts */
 };

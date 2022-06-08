@@ -55,8 +55,9 @@ static void publish(libtrace_t *trace, int t_id, libtrace_combine_t *c, libtrace
 	}
 }
 
-static void combiner_read(libtrace_t *trace, libtrace_combine_t *c){
-	libtrace_queue_t *queues = c->queues;
+static void combiner_read(libtrace_t *trace, libtrace_combine_t *c)
+{
+        libtrace_queue_t *queues = c->queues;
 	int i;
 
 	/* Loop through and read all that are here */
@@ -100,14 +101,14 @@ static void destroy(libtrace_t *trace, libtrace_combine_t *c) {
 }
 
 DLLEXPORT const libtrace_combine_t combiner_unordered = {
-    init_combiner,	/* initialise */
-	destroy,		/* destroy */
-	publish,		/* publish */
-    combiner_read,			/* read */
-    combiner_read,			/* read_final */
-    combiner_read,			/* pause */
-    NULL,			/* queues */
-    0,                          /* last_count_tick */
-    0,                          /* last_ts_tick */
-    {0}				/* opts */
+    init_combiner, /* initialise */
+    destroy,       /* destroy */
+    publish,       /* publish */
+    combiner_read, /* read */
+    combiner_read, /* read_final */
+    combiner_read, /* pause */
+    NULL,          /* queues */
+    0,             /* last_count_tick */
+    0,             /* last_ts_tick */
+    {0}            /* opts */
 };

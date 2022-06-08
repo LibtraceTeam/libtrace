@@ -199,13 +199,12 @@ typedef uint8_t portid_t;
 
 /* 21.11 renames a bunch of RX MQ mode #defines */
 #ifndef RTE_ETH_MQ_RX_RSS
-#define RTE_ETH_MQ_RX_RSS ETH_MQ_RX_RSS
+#        define RTE_ETH_MQ_RX_RSS ETH_MQ_RX_RSS
 #endif
 
 #ifndef RTE_ETH_MQ_TX_NONE
-#define RTE_ETH_MQ_TX_NONE ETH_MQ_TX_NONE
+#        define RTE_ETH_MQ_TX_NONE ETH_MQ_TX_NONE
 #endif
-
 
 /* https://github.com/DPDK/dpdk/commit/35b2d13 19.08-rc1
  * renames ETHER_CRC_LEN -> RTE_ETHER_CRC_LEN */

@@ -223,11 +223,13 @@ inline static void read_internal(libtrace_t *trace, libtrace_combine_t *c, const
 	}
 }
 
-static void combiner_read(libtrace_t *trace, libtrace_combine_t *c) {
-	read_internal(trace, c, false);
+static void combiner_read(libtrace_t *trace, libtrace_combine_t *c)
+{
+        read_internal(trace, c, false);
 }
 
-static void combiner_read_final(libtrace_t *trace, libtrace_combine_t *c) {
+static void combiner_read_final(libtrace_t *trace, libtrace_combine_t *c)
+{
         int empty = 0, i;
         libtrace_queue_t *q = c->queues;
 
@@ -257,9 +259,9 @@ static void destroy(libtrace_t *trace, libtrace_combine_t *c) {
 	queues = NULL;
 }
 
-
-static void combiner_pause(libtrace_t *trace, libtrace_combine_t *c) {
-	libtrace_queue_t *queues = c->queues;
+static void combiner_pause(libtrace_t *trace, libtrace_combine_t *c)
+{
+        libtrace_queue_t *queues = c->queues;
 	int i;
 	for (i = 0; i < trace_get_perpkt_threads(trace); i++) {
 		libtrace_deque_apply_function(&queues[i], (deque_data_fn) libtrace_make_result_safe);
@@ -267,14 +269,14 @@ static void combiner_pause(libtrace_t *trace, libtrace_combine_t *c) {
 }
 
 DLLEXPORT const libtrace_combine_t combiner_ordered = {
-	init_combiner,	/* initialise */
-	destroy,		/* destroy */
-	publish,		/* publish */
-	combiner_read,			/* read */
-	combiner_read_final,		/* read_final */
-	combiner_pause,			/* pause */
-	NULL,			/* queues */
-        0,                      /* last_count_tick */
-        0,                      /* last_ts_tick */
-	{0}				/* opts */
+    init_combiner,       /* initialise */
+    destroy,             /* destroy */
+    publish,             /* publish */
+    combiner_read,       /* read */
+    combiner_read_final, /* read_final */
+    combiner_pause,      /* pause */
+    NULL,                /* queues */
+    0,                   /* last_count_tick */
+    0,                   /* last_ts_tick */
+    {0}                  /* opts */
 };
