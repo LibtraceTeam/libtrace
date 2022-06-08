@@ -72,7 +72,7 @@ static int compare_result(const void* p1, const void* p2)
 static void combiner_pause(libtrace_t *trace, libtrace_combine_t *c)
 {
         libtrace_vector_t *queues = c->queues;
-	int i;
+        int i;
 	for (i = 0; i < trace_get_perpkt_threads(trace); ++i) {
 		libtrace_vector_apply_function(&queues[i], (vector_data_fn) libtrace_make_result_safe);
 	}
@@ -81,7 +81,7 @@ static void combiner_pause(libtrace_t *trace, libtrace_combine_t *c)
 static void combiner_read_final(libtrace_t *trace, libtrace_combine_t *c)
 {
         libtrace_vector_t *queues = c->queues;
-	int i;
+        int i;
 	size_t a;
 	// Combine all results into queue 1
 	for (i = 1; i < trace_get_perpkt_threads(trace); ++i)

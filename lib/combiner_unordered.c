@@ -58,7 +58,7 @@ static void publish(libtrace_t *trace, int t_id, libtrace_combine_t *c, libtrace
 static void combiner_read(libtrace_t *trace, libtrace_combine_t *c)
 {
         libtrace_queue_t *queues = c->queues;
-	int i;
+        int i;
 
 	/* Loop through and read all that are here */
 	for (i = 0; i < trace_get_perpkt_threads(trace); ++i) {
