@@ -60,7 +60,7 @@ static void combiner_read(libtrace_t *trace, libtrace_combine_t *c)
         libtrace_queue_t *queues = c->queues;
         int i;
 
-	/* Loop through and read all that are here */
+        /* Loop through and read all that are here */
 	for (i = 0; i < trace_get_perpkt_threads(trace); ++i) {
 		libtrace_queue_t *v = &queues[i];
 		while (libtrace_deque_get_size(v) != 0) {

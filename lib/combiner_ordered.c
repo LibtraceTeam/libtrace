@@ -263,7 +263,7 @@ static void combiner_pause(libtrace_t *trace, libtrace_combine_t *c)
 {
         libtrace_queue_t *queues = c->queues;
         int i;
-	for (i = 0; i < trace_get_perpkt_threads(trace); i++) {
+        for (i = 0; i < trace_get_perpkt_threads(trace); i++) {
 		libtrace_deque_apply_function(&queues[i], (deque_data_fn) libtrace_make_result_safe);
 	}
 }
