@@ -19,9 +19,9 @@ jobs:
            - "debian:stretch"
            - "debian:buster"
            - "debian:bullseye"
-           - "ubuntu:xenial"
            - "ubuntu:bionic"
            - "ubuntu:focal"
+           - "ubuntu:jammy"
 
      steps:
       - name: Checkout repo
