@@ -94,16 +94,16 @@ format_linux_xdp_kern.bpf: format_linux_xdp_kern.c format_linux_xdp.h
 EXTRA_DIST += format_linux_xdp_kern.c
 endif
 
-# install libtrace bpf kern
-xdpdir = $(datarootdir)/libtrace
-xdp_DATA = format_linux_xdp_kern.bpf
-EXTRA_DIST += format_linux_xdp_kern.bpf
-
 all: $(BPF_TARGETS)
 
 else
 XDP_SOURCES=
 endif
+
+# install libtrace bpf kern
+xdpdir = $(datarootdir)/libtrace
+xdp_DATA = format_linux_xdp_kern.bpf
+EXTRA_DIST += format_linux_xdp_kern.bpf
 
 if HAVE_PFRING
 NATIVEFORMATS += format_pfring.c
