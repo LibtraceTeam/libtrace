@@ -104,7 +104,7 @@ find $RPM_BUILD_ROOT -name '*.la' -exec rm -f {} ';'
 %files
 %license COPYING
 %{_libdir}/libtrace.so.*
-%{_datadir/libtrace/*.bpf
+%{_datadir}/libtrace/*.bpf
 
 %files devel
 %{_includedir}/libtrace*
