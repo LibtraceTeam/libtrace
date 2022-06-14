@@ -1,5 +1,5 @@
 Name:           libtrace4
-Version:        4.0.18
+Version:        4.0.19
 Release:        1%{?dist}
 Summary:        C Library for capturing and analysing network packets
 
@@ -104,6 +104,7 @@ find $RPM_BUILD_ROOT -name '*.la' -exec rm -f {} ';'
 %files
 %license COPYING
 %{_libdir}/libtrace.so.*
+%{_datadir}/libtrace/*.bpf
 
 %files devel
 %{_includedir}/libtrace*
@@ -125,6 +126,9 @@ find $RPM_BUILD_ROOT -name '*.la' -exec rm -f {} ';'
 
 
 %changelog
+* Mon Jun 13 2022 Shane Alcock <salcock@waikato.ac.nz> - 4.0.19-1
+- Updated for 4.0.19 release
+
 * Thu Feb 3 2022 Shane Alcock <salcock@waikato.ac.nz> - 4.0.18-1
 - Updated for 4.0.18 release
 

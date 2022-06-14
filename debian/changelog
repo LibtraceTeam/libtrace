@@ -1,3 +1,10 @@
+libtrace4 (4.0.19-1) unstable; urgency=medium
+
+  * Fixed issues with compiling against DPDK 21.11
+  * Incorporate build system fixes from Gentoo
+
+ -- Shane Alcock <shane.alcock@waikato.ac.nz>  Mon, 13 Jun 2022 11:17:29 +1200
+
 libtrace4 (4.0.18-1) unstable; urgency=medium
 
   * Packets received via `etsilive:` can now be converted to pcap format.

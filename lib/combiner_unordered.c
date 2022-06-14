@@ -55,15 +55,16 @@ static void publish(libtrace_t *trace, int t_id, libtrace_combine_t *c, libtrace
 	}
 }
 
-static void read(libtrace_t *trace, libtrace_combine_t *c){
-	libtrace_queue_t *queues = c->queues;
-	int i;
+static void combiner_read(libtrace_t *trace, libtrace_combine_t *c)
+{
+        libtrace_queue_t *queues = c->queues;
+        int i;
 
-	/* Loop through and read all that are here */
-	for (i = 0; i < trace_get_perpkt_threads(trace); ++i) {
-		libtrace_queue_t *v = &queues[i];
-		while (libtrace_deque_get_size(v) != 0) {
-			libtrace_result_t r;
+        /* Loop through and read all that are here */
+        for (i = 0; i < trace_get_perpkt_threads(trace); ++i) {
+                libtrace_queue_t *v = &queues[i];
+                while (libtrace_deque_get_size(v) != 0) {
+                        libtrace_result_t r;
                         libtrace_generic_t gt = {.res = &r};
 			ASSERT_RET (libtrace_deque_pop_front(v, (void *) &r), == 1);
                         /* Ignore any ticks that we've already seen */
@@ -80,8 +81,8 @@ static void read(libtrace_t *trace, libtrace_combine_t *c){
                         }
 			send_message(trace, &trace->reporter_thread,
                                 MESSAGE_RESULT, gt, NULL);
-		}
-	}
+                }
+        }
 }
 
 static void destroy(libtrace_t *trace, libtrace_combine_t *c) {
@@ -100,14 +101,14 @@ static void destroy(libtrace_t *trace, libtrace_combine_t *c) {
 }
 
 DLLEXPORT const libtrace_combine_t combiner_unordered = {
-    init_combiner,	/* initialise */
-	destroy,		/* destroy */
-	publish,		/* publish */
-    read,			/* read */
-    read,			/* read_final */
-    read,			/* pause */
-    NULL,			/* queues */
-    0,                          /* last_count_tick */
-    0,                          /* last_ts_tick */
-    {0}				/* opts */
+    init_combiner, /* initialise */
+    destroy,       /* destroy */
+    publish,       /* publish */
+    combiner_read, /* read */
+    combiner_read, /* read_final */
+    combiner_read, /* pause */
+    NULL,          /* queues */
+    0,             /* last_count_tick */
+    0,             /* last_ts_tick */
+    {0}            /* opts */
 };

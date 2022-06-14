@@ -94,16 +94,16 @@ format_linux_xdp_kern.bpf: format_linux_xdp_kern.c format_linux_xdp.h
 EXTRA_DIST += format_linux_xdp_kern.c
 endif
 
-# install libtrace bpf kern
-xdpdir = $(datarootdir)/libtrace
-xdp_DATA = format_linux_xdp_kern.bpf
-EXTRA_DIST += format_linux_xdp_kern.bpf
-
 all: $(BPF_TARGETS)
 
 else
 XDP_SOURCES=
 endif
+
+# install libtrace bpf kern
+xdpdir = $(datarootdir)/libtrace
+xdp_DATA = format_linux_xdp_kern.bpf
+EXTRA_DIST += format_linux_xdp_kern.bpf
 
 if HAVE_PFRING
 NATIVEFORMATS += format_pfring.c
@@ -145,7 +145,7 @@ endif
 
 AM_CPPFLAGS= @ADD_INCLS@
 libtrace_la_LIBADD = @LIBTRACE_LIBS@ @LTLIBOBJS@ $(DPDKLIBS)
-libtrace_la_LDFLAGS=-version-info 7:2:0 @ADD_LDFLAGS@
+libtrace_la_LDFLAGS=-version-info 7:3:0 @ADD_LDFLAGS@
 dagapi.c:
 	cp @DAG_TOOLS_DIR@/dagapi.c .
 

@@ -712,7 +712,13 @@ static portid_t dpdk_get_port_id(const char *uri)
 #if defined(RTE_ETH_FOREACH_MATCHING_DEV) || defined(USE_DEV_ATTACH)
 UNUSED static struct rte_device *dpdk_get_device_from_port(portid_t port)
 {
-#        if RTE_VERSION >= RTE_VERSION_NUM(17, 2, 0, 1)
+#        if RTE_VERSION >= RTE_VERSION_NUM(19, 11, 0, 1)
+        struct rte_eth_dev_info dev_info;
+        if (rte_eth_dev_info_get(port, &dev_info) != 0) {
+                return NULL;
+        }
+        return dev_info.device;
+#        elif RTE_VERSION >= RTE_VERSION_NUM(17, 2, 0, 1)
         return rte_eth_devices[port].device;
 #        else
         return &rte_eth_devices[port].pci_dev->device;
@@ -833,8 +839,9 @@ static int dpdk_attach_device(char *uridata,
  */
 static int dpdk_close_and_detach_device(portid_t port)
 {
+        struct rte_device *dev;
 #ifdef RTE_ETH_FOREACH_MATCHING_DEV
-        struct rte_device *dev = dpdk_get_device_from_port(port);
+        dev = dpdk_get_device_from_port(port);
 #endif
         /* Close the device completely, device cannot be restarted */
         rte_eth_dev_close(port);
@@ -846,7 +853,8 @@ static int dpdk_close_and_detach_device(portid_t port)
         return 0;
 #elif defined(USE_DEV_ATTACH)
 #        if RTE_VERSION >= RTE_VERSION_NUM(17, 8, 0, 1)
-        if (rte_eal_dev_detach(dpdk_get_device_from_port(port))) {
+        dev = dpdk_get_device_from_port(port);
+        if (dev == NULL || rte_eal_dev_detach(dev)) {
                 fprintf(stderr, "rte_eal_dev_detach failed\n");
                 return -1;
         }
@@ -1076,7 +1084,7 @@ int dpdk_config_input(libtrace_t *libtrace, trace_option_t option, void *data)
  * max_rx_pkt_len and jumbo_frame. This can be limited to less than
  *
  */
-static struct rte_eth_conf port_conf = {.rxmode = {.mq_mode = ETH_RSS,
+static struct rte_eth_conf port_conf = {.rxmode = {.mq_mode = RTE_ETH_MQ_RX_RSS,
                                                    .split_hdr_size = 0,
 
 #if RTE_VERSION >= RTE_VERSION_NUM(18, 8, 0, 1)
@@ -1124,7 +1132,7 @@ static struct rte_eth_conf port_conf = {.rxmode = {.mq_mode = ETH_RSS,
                                         },
                                         .txmode =
                                             {
-                                                .mq_mode = ETH_DCB_NONE,
+                                                .mq_mode = RTE_ETH_MQ_TX_NONE,
                                             },
                                         .rx_adv_conf =
                                             {
@@ -1526,12 +1534,17 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data, char *err,
                  * then packets are returned unchanged.
                  */
                 buf_size = RX_MBUF_SIZE;
-#if RTE_VERSION >= RTE_VERSION_NUM(18, 8, 0, 1)
+#ifdef DEV_RX_OFFLOAD_JUMBO_FRAME
                 port_conf.rxmode.offloads &= (~(DEV_RX_OFFLOAD_JUMBO_FRAME));
-#else
+#elif RTE_VERSION < RTE_VERSION_NUM(18, 8, 0, 1)
                 port_conf.rxmode.jumbo_frame = 0;
 #endif
+
+#if RTE_VERSION >= RTE_VERSION_NUM(21, 11, 0, 1)
+                port_conf.rxmode.mtu = 0;
+#else
                 port_conf.rxmode.max_rx_pkt_len = 0;
+#endif
         } else {
                 /* We need jumbo frames */
                 double expn;
@@ -1555,11 +1568,17 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data, char *err,
                                 " not support jumbo frames snaplen %d\n",
                                 format_data->snaplen);
                 }
-#else /* not def DEV_RX_OFFLOAD_JUMBO_FRAME, must assume support */
+#elif RTE_VERSION < RTE_VERSION_NUM(21, 11, 0, 1)
+                /* not def DEV_RX_OFFLOAD_JUMBO_FRAME, must assume support */
                 port_conf.rxmode.jumbo_frame = 1;
 #endif
                 buf_size = format_data->snaplen;
+
+#if RTE_VERSION < RTE_VERSION_NUM(21, 11, 0, 1)
                 port_conf.rxmode.max_rx_pkt_len = buf_size;
+#else
+                port_conf.rxmode.mtu = buf_size;
+#endif
 
                 /* Use fewer buffers if we're supporting jumbo frames
                  * otherwise we won't be able to allocate memory.

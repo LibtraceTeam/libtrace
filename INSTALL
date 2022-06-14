@@ -6,6 +6,7 @@ Requirements:
 
 Optional:
  * DAG libraries (both 2.4 and 2.5 versions are supported)
+ * libyaml (required for traceanon)
  * libcrypto (required for CryptoPAN anonymisation in traceanon)
  * libncurses (required for tracetop)
  * libwandder (required for ETSI LI decoding --
@@ -28,6 +29,26 @@ list.
 
 You may need to add the library location (e.g. /usr/local/lib) to your
 /etc/ld.so.conf and run 'ldconfig' as root.
+
+----------------------------------
+
+FreeBSD Notes
+-------------
+
+Installing with DPDK support:
+
+1. Install DPDK libraries on your system (DPDK version will differ depending
+   on which version of FreeBSD you are running):
+
+  sudo pkg install dpdk20.11 gmake
+
+2. Compile and install libtrace using gmake:
+
+   ./bootstrap.sh
+   ./configure --with-dpdk LDFLAGS=-L/usr/local/lib CPPFLAGS=-I/usr/local/lib
+       MAKE="gmake"
+   gmake
+   sudo gmake install
 
 ----------------------------------
 

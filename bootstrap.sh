@@ -1,10 +1,19 @@
 #! /bin/sh
 
+ACLOCAL_DIRS="-I m4"
+if [ -d /usr/local/share/aclocal ]; then
+  ACLOCAL_DIRS="${ACLOCAL_DIRS} -I /usr/local/share/aclocal"
+fi
+
+if [ -d /usr/share/aclocal ]; then
+  ACLOCAL_DIRS="${ACLOCAL_DIRS} -I /usr/share/aclocal"
+fi
+
 set -x
 # Prefer aclocal 1.9 if we can find it
-aclocal-1.11 -I m4 ||
-	aclocal-1.9 -I m4 || 
-	aclocal  -I m4
+aclocal-1.11 ${ACLOCAL_DIRS} ||
+	aclocal-1.9 ${ACLOCAL_DIRS} || 
+	aclocal ${ACLOCAL_DIRS}
 
 # Darwin bizarrely uses glibtoolize
 libtoolize --force --copy ||

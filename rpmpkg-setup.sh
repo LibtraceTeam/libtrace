@@ -4,7 +4,7 @@ set -x -e -o pipefail
 
 mkdir -p /run/user/${UID}
 chmod 0700 /run/user/${UID}
-yum install -y wget make gcc
+yum install -y wget make gcc clang
 
 curl -1sLf \
   'https://dl.cloudsmith.io/public/wand/libwandio/cfg/setup/bash.rpm.sh' \

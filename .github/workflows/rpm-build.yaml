@@ -18,9 +18,9 @@ jobs:
         target:
           - "centos:7"
           - "fedora:35"
-          - "fedora:34"
+          - "fedora:36"
           - "rockylinux:8.5"
-          - "almalinux:8.4"
+          - "almalinux:8.5"
 
 
     steps:
