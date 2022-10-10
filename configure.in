@@ -542,7 +542,7 @@ if test "$want_numa" != no; then
 fi
 
 # Need libwandder for ETSI live decoding
-AC_CHECK_LIB(wandder, init_wandder_decoder, have_wandder=1, have_wandder=0)
+AC_CHECK_LIB(wandder, wandder_etsili_get_cc_format, have_wandder=1, have_wandder=0)
 
 # Checks for various "optional" libraries
 AC_CHECK_LIB(pthread, pthread_create, have_pthread=1, have_pthread=0)
@@ -1077,7 +1077,7 @@ else
 fi
 
 reportopt "Compiled with LLVM BPF JIT support" $JIT
-reportopt "Compiled with live ETSI LI support (requires libwandder)" $wandder_avail
+reportopt "Compiled with live ETSI LI support (requires libwandder >= 2.0.6)" $wandder_avail
 reportopt "Building man pages/documentation" $libtrace_doxygen
 reportopt "Building tracetop (requires libncurses)" $with_ncurses
 reportopt "Building traceanon (requires libyaml)" $have_yaml
