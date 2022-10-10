@@ -61,7 +61,7 @@ AC_CACHE_CHECK([whether the C++ compiler works],
 ])
 
 # Put all our automake definitions in config.h
-AM_CONFIG_HEADER([config.h])
+AC_CONFIG_HEADERS([config.h])
 
 # Checks for C and C++ compilers
 AC_PROG_CC
@@ -73,11 +73,11 @@ if test "$rw_cv_prog_cxx_works" = "no"; then
 fi
 
 # Checking for 'install'
-AC_PROG_INSTALL
+LT_INIT
 
 # Checking for bison and flex
 AC_CHECK_PROGS(YACC, 'bison -y' byacc yacc) 
-AM_PROG_LEX
+AC_PROG_LEX(yywrap)
 
 PKG_PROG_PKG_CONFIG
 
@@ -93,7 +93,8 @@ AC_C_CONST
 AC_C_INLINE
 AC_C_BIGENDIAN
 AC_TYPE_SIZE_T
-AC_HEADER_TIME
+AC_CHECK_HEADERS_ONCE([sys/time.h])
+
 AC_SYS_LARGEFILE
 
 LIBPKTDUMP_LIBS="-ltrace "
@@ -147,7 +148,7 @@ gcc_FORMAT
 gcc_TLS
 	
 # Check for libtool
-AC_PROG_LIBTOOL
+LT_INIT
 
 # Checks for library functions.
 AC_PROG_GCC_TRADITIONAL
@@ -160,7 +161,9 @@ AC_CHECK_SIZEOF([long int])
 
 
 # Checks for header files.
-AC_HEADER_STDC
+AC_CHECK_INCLUDES_DEFAULT
+AC_PROG_EGREP
+
 AC_CHECK_HEADERS(pcap.h pcap-bpf.h net/bpf.h sys/limits.h stddef.h inttypes.h limits.h net/ethernet.h sys/prctl.h)
 
 
@@ -878,8 +881,7 @@ LIBS=
 # For now, the user has to explicitly ask for the LLVM stuff, as it's a bit
 # rough around the edges :(
 AC_ARG_WITH([llvm],
-	[AC_HELP_STRING([--with-llvm],
-		[support Just In Time compiler])],
+	[AS_HELP_STRING([--with-llvm],[support Just In Time compiler])],
 	use_llvm="yes",
 	use_llvm="no")
 JIT=no
@@ -921,7 +923,7 @@ fi
 PKG_CHECK_MODULES(ncurses,ncurses,have_ncurses=yes,have_ncurses=no)
 
 AC_ARG_WITH([ncurses],
-	AC_HELP_STRING([--with-ncurses], [build tracetop (requires ncurses)]))
+	AS_HELP_STRING([--with-ncurses],[build tracetop (requires ncurses)]))
 
 AS_IF([test "x$with_ncurses" != "xno"],
 	[AC_SEARCH_LIBS(mvprintw, ncurses, have_ncurses=yes, have_ncurses=no)
