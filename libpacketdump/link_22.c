@@ -43,8 +43,9 @@ DLLEXPORT void decode(int link_type UNUSED, const char *packet, unsigned len) {
                 if (ccformat == WANDDER_ETSILI_CC_FORMAT_IP) {
                         /* XXX What if there is an IPv7?? */
                         decode_next((const char *)cchdr, rem, "eth",
-                                ((*cchdr) & 0xf0) == 0x40 ? TRACE_ETHERTYPE_IP :
-                                TRACE_ETHERTYPE_IPV6);
+                                    ((*cchdr) & 0xf0) == 0x40
+                                        ? TRACE_ETHERTYPE_IP
+                                        : TRACE_ETHERTYPE_IPV6);
                 } else if (ccformat == WANDDER_ETSILI_CC_FORMAT_APPLICATION) {
                         decode_next((const char *)cchdr, rem, "tcp", 0);
                 }

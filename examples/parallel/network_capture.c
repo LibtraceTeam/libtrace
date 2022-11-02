@@ -60,9 +60,9 @@ static libtrace_out_t *create_output(int my_id) {
 	if (file_index)
 		first_extension = strchr(file_index, '.');
 	else
-		first_extension = strchr(outputfile, '.');
+                first_extension = strchr(outputfile, '.');
 
-	if (first_extension) {
+        if (first_extension) {
 		snprintf(name, sizeof(name), "%.*s-%d%s", (int) (first_extension - outputfile), outputfile, my_id, first_extension);
 	} else {
 		snprintf(name, sizeof(name), "%s-%d", outputfile, my_id);
