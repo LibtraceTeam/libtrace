@@ -19,11 +19,17 @@ yum update -y
 if [[ "$1" =~ rocky* ]]; then
         dnf install -y dnf-plugins-core epel-release || true
         dnf config-manager --set-enabled powertools || true
+        if [ -x /usr/bin/crb ]; then
+                /usr/bin/crb enable || true
+        fi
 fi
 
 if [[ "$1" =~ alma* ]]; then
         dnf install -y dnf-plugins-core epel-release || true
         dnf config-manager --set-enabled powertools || true
+        if [ -x /usr/bin/crb ]; then
+                /usr/bin/crb enable || true
+        fi
 fi
 
 
