@@ -1,5 +1,5 @@
 Name:           libtrace4
-Version:        4.0.19
+Version:        4.0.20
 Release:        1%{?dist}
 Summary:        C Library for capturing and analysing network packets
 
@@ -30,7 +30,7 @@ libtrace is a library for trace processing. It supports multiple input
 methods, including device capture, raw and gz-compressed trace, and sockets;
 and multiple input formats, including pcap and DAG.
 
-libtrace is developed by the WAND Network Research Group at Waikato
+libtrace was originally developed by the WAND Network Research Group at Waikato
 University in New Zealand.
 
 %package        devel
@@ -62,7 +62,7 @@ tasks that are required when analysing and manipulating network traces.
 Multiple input methods and formats are supported including device capture,
 raw and gz-compressed traces, and sockets.
 
-libtrace is developed by the WAND Network Research Group at Waikato
+libtrace was originally developed by the WAND Network Research Group at Waikato
 University in New Zealand.
 
 %description -n libpacketdump4
@@ -70,8 +70,8 @@ libpacketdump provides a library which can parse packets and display the
 packet contents in a nice human-readable form. The output is similar to that
 produced by tcpdump, although the formatting is somewhat more verbose.
 
-libpacketdump is developed by the WAND Network Research Group at Waikato
-University in New Zealand.
+libpacketdump was originally developed by the WAND Network Research Group at
+Waikato University in New Zealand.
 
 %description -n libpacketdump4-devel
 This package contains development headers and other ancillary files for
@@ -81,8 +81,8 @@ libpacketdump provides a library which can parse packets and display the
 packet contents in a nice human-readable form. The output is similar to that
 produced by tcpdump, although the formatting is somewhat more verbose.
 
-libpacketdump is developed by the WAND Network Research Group at Waikato
-University in New Zealand.
+libpacketdump was originally developed by the WAND Network Research Group at
+Waikato University in New Zealand.
 
 %prep
 %setup -q -n libtrace-%{version}
@@ -126,6 +126,9 @@ find $RPM_BUILD_ROOT -name '*.la' -exec rm -f {} ';'
 
 
 %changelog
+* Thu Nov 03 2022 Shane Alcock <shane@alcock.co.nz> - 4.0.20-1
+- Updated for 4.0.20 release
+
 * Mon Jun 13 2022 Shane Alcock <salcock@waikato.ac.nz> - 4.0.19-1
 - Updated for 4.0.19 release
 
