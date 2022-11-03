@@ -49,7 +49,11 @@ jobs:
     - name: Install Dependencies
       run: |
         sudo apt update
-        sudo apt-get -y install flex bison libpcap0.8-dev libtool pkgconf autoconf automake m4 gcc clang llvm gcc-multilib
+        sudo apt install -y wget software-properties-common gnupg lsb-release
+        sudo add-apt-repository ppa:ubuntu-toolchain-r/test
+        sudo bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
+        sudo apt update
+        sudo apt-get -y install flex bison libpcap0.8-dev libtool pkgconf autoconf automake m4 gcc gcc-multilib
         sudo apt-get -y install build-essential dpdk-dev libelf-dev git libyaml-dev libssl-dev
         sudo apt-get -y install uthash-dev
     - name: Install PF_RING
@@ -60,6 +64,38 @@ jobs:
         sudo apt-get -y install ./apt-ntop-stable.deb
         sudo apt-get update
         sudo apt-get -y install pfring
+        sudo ldconfig
+    - name: Checkout libxdp
+      uses: actions/checkout@v2
+      with:
+        path: xdp-tools
+        repository: xdp-project/xdp-tools
+    - name: Build/Install libxdp
+      run: |
+        cat << "EOF" > /tmp/ln.sh
+        #!/bin/bash
+        function do_lns {
+            LASTVERSION=0
+            for exe in `find /usr/bin/ -name ${1}-* | sort -nr | grep '\-[0-9]*$'`; do
+                newexe=`basename $exe | rev | cut -d '-' -f 1 --complement | rev`
+                version=`basename $exe | rev | cut -d '-' -f 1 | rev`
+
+                if [ ! -f /usr/local/bin/$newexe ]; then
+                    ln -s -v $exe /usr/local/bin/$newexe
+                    LASTVERSION=$version
+                elif [ "$version" -ge "$LASTVERSION" ]; then
+                    ln -f -s -v $exe /usr/local/bin/$newexe
+                    LASTVERSION=$version
+                fi
+            done
+        }
+        do_lns clang
+        do_lns llc
+        EOF
+        /bin/bash /tmp/ln.sh
+        cd xdp-tools
+        ./configure
+        sudo make -j 3 libxdp_install
         sudo ldconfig
     - name: Checkout Libbpf
       uses: actions/checkout@v2

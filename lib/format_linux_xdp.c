@@ -11,7 +11,7 @@
 #include "hash_toeplitz.h"
 
 #include <bpf/libbpf.h>
-#include <bpf/xsk.h>
+#include <xdp/xsk.h>
 #include <bpf/bpf.h>
 #include <poll.h>
 #include <errno.h>
@@ -1628,6 +1628,19 @@ static int xdp_link_detach(struct xsk_config *cfg) {
 
     uint32_t cur_prog = 0;
 
+
+#ifdef HAVE_LIBBPF_XDP_QUERYID
+    if (bpf_xdp_query_id(cfg->ifindex, cfg->xdp_flags, &cur_prog)) {
+        return EXIT_FAIL_XDP;
+    }
+
+    if (cur_prog == cfg->xdp_prog_id) {
+        if (bpf_xdp_detach(cfg->ifindex, cfg->xdp_flags, NULL) < 0) {
+            return EXIT_FAIL_XDP;
+        }
+    }
+
+#else
     // get the current program id
     if (bpf_get_link_xdp_id(cfg->ifindex, &cur_prog, cfg->xdp_flags)) {
         return EXIT_FAIL_XDP;
@@ -1640,19 +1653,35 @@ static int xdp_link_detach(struct xsk_config *cfg) {
             return EXIT_FAIL_XDP;
         }
     }
+#endif
 
     return EXIT_OK;
 }
 
 static struct bpf_object *load_bpf_object_file(struct xsk_config *cfg, int ifindex) {
 
-    int first_prog_fd = -1;
     int err;
 
+#ifdef HAVE_LIBBPF_XDP_QUERYID
+    cfg->bpf_obj = bpf_object__open_file(cfg->bpf_filename, NULL);
+    if (libbpf_get_error(cfg->bpf_obj)) {
+        return NULL;
+    }
+    cfg->bpf_prg = bpf_object__next_program(cfg->bpf_obj, NULL);
+    bpf_program__set_type(cfg->bpf_prg, BPF_PROG_TYPE_XDP);
+    bpf_program__set_ifindex(cfg->bpf_prg, ifindex);
+
+    err = bpf_object__load(cfg->bpf_obj);
+
+    if (!err) {
+        cfg->bpf_prg_fd = bpf_program__fd(cfg->bpf_prg);
+    }
+#else
     /* This struct allow us to set ifindex, this features is used for
      * hardware offloading XDP programs (note this sets libbpf
      * bpf_program->prog_ifindex and foreach bpf_map->map_ifindex).
      */
+    int first_prog_fd = -1;
     struct bpf_prog_load_attr prog_load_attr = {
         .prog_type = BPF_PROG_TYPE_XDP,
         .ifindex   = ifindex,
@@ -1663,6 +1692,8 @@ static struct bpf_object *load_bpf_object_file(struct xsk_config *cfg, int ifind
      * loading this into the kernel via bpf-syscall
      */
     err = bpf_prog_load_xattr(&prog_load_attr, &cfg->bpf_obj, &first_prog_fd);
+#endif
+
     if (err) {
         return NULL;
     }
@@ -1674,8 +1705,13 @@ static int xdp_link_attach(struct xsk_config *cfg, int prog_fd) {
 
     int err;
 
+#ifdef HAVE_LIBBPF_XDP_QUERYID
+    err = bpf_xdp_attach(cfg->ifindex, prog_fd, cfg->xdp_flags, NULL);
+#else
     /* libbpf provide the XDP net_device link-level hook attach helper */
     err = bpf_set_link_xdp_fd(cfg->ifindex, prog_fd, cfg->xdp_flags);
+#endif
+
     if (err == -EEXIST && !(cfg->xdp_flags & XDP_FLAGS_UPDATE_IF_NOEXIST)) {
         /* Force mode didn't work, probably because a program of the
          * opposite type is loaded. Let's unload that and try loading
@@ -1687,11 +1723,20 @@ static int xdp_link_attach(struct xsk_config *cfg, int prog_fd) {
         cfg->xdp_flags &= ~XDP_FLAGS_MODES;
         cfg->xdp_flags |= (old_flags & XDP_FLAGS_SKB_MODE) ? XDP_FLAGS_DRV_MODE : XDP_FLAGS_SKB_MODE;
 
+#ifdef HAVE_LIBBPF_XDP_QUERYID
+        /* unload */
+        err = bpf_xdp_detach(cfg->ifindex, cfg->xdp_flags, NULL);
+        if (!err) {
+            err = bpf_xdp_attach(cfg->ifindex, prog_fd, old_flags, NULL);
+        }
+#else
         /* unload */
         err = bpf_set_link_xdp_fd(cfg->ifindex, -1, cfg->xdp_flags);
         if (!err)
             err = bpf_set_link_xdp_fd(cfg->ifindex, prog_fd, old_flags);
+#endif
     }
+
     if (err < 0) {
         fprintf(stderr, "ERR: "
             "ifindex(%d) link set xdp fd failed (%d): %s\n",
@@ -1705,7 +1750,7 @@ static int xdp_link_attach(struct xsk_config *cfg, int prog_fd) {
 static struct bpf_object *load_bpf_and_xdp_attach(struct xsk_config *cfg) {
 
     int err;
-    int prog_fd;
+    int prog_fd = 0;
     int offload_index = 0;
 
     /* Load the BPF-ELF object file and get back libbpf bpf_object. Supply
@@ -1725,6 +1770,7 @@ static struct bpf_object *load_bpf_and_xdp_attach(struct xsk_config *cfg) {
      * these gets attached to XDP hook, the others will get freed once this
      * process exit.
      */
+#ifndef HAVE_LIBBPF_XDP_QUERYID
     cfg->bpf_prg = bpf_object__find_program_by_title(cfg->bpf_obj, cfg->bpf_progname);
     if (!cfg->bpf_prg) {
         fprintf(stderr, "ERR: couldn't find a program in ELF section '%s'\n", cfg->bpf_filename);
@@ -1737,6 +1783,7 @@ static struct bpf_object *load_bpf_and_xdp_attach(struct xsk_config *cfg) {
         return NULL;
     }
     cfg->bpf_prg_fd = prog_fd;
+#endif
 
     /* At this point: BPF-progs are (only) loaded by the kernel, and prog_fd
      * is our select file-descriptor handle. Next step is attaching this FD
@@ -1748,7 +1795,11 @@ static struct bpf_object *load_bpf_and_xdp_attach(struct xsk_config *cfg) {
     }
 
     // get the ID of the loaded XDP program on the interface
+#ifdef HAVE_LIBBPF_XDP_QUERYID
+    err = bpf_xdp_query_id(cfg->ifindex, cfg->xdp_flags, &cfg->xdp_prog_id);
+#else
     err = bpf_get_link_xdp_id(cfg->ifindex, &cfg->xdp_prog_id, cfg->xdp_flags);
+#endif
     if (err) {
         errno = -err;
         return NULL;

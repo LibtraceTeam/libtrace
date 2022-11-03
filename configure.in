@@ -307,32 +307,58 @@ AC_ARG_WITH(xdp, AS_HELP_STRING(--with-xdp, include XDP capture support),
 
 if test "$want_xdp" != no; then
     AC_CHECK_LIB(elf, elf_begin, elffound=1, elffound=0)
+
     if test "$elffound" = 1; then
-        # check for libbpf
-        AC_CHECK_LIB(bpf, xsk_socket__create, bpffound=1, bpffound=0, -lelf)
+        AC_CHECK_LIB(xdp, xsk_socket__create, xdpfound=1, xdpfound=0, -lelf)
 
-        if test "$bpffound" = 1; then
-            AC_DEFINE(HAVE_LIBBPF, 1, [Set to 1 if libbpf is available])
-            ADD_LDFLAGS="$ADD_LDFLAGS -lbpf -lelf"
-            libtrace_xdp=true
+        if test "$xdpfound" = 1; then
+            # check for libbpf
+            AC_CHECK_LIB(bpf, bpf_map_update_elem, bpffound=1, bpffound=0,
+            -lelf -lxdp)
 
-            # check for requirements to build XDP eBPF kernel
-            AC_CHECK_PROG(CLANG, [clang], [clang], [no])
-            if test "$CLANG" != "no"; then
+            if test "$bpffound" = 1; then
+                AC_DEFINE(HAVE_LIBBPF, 1, [Set to 1 if libbpf is available])
+                ADD_LDFLAGS="$ADD_LDFLAGS -lbpf -lelf -lxdp"
+                libtrace_xdp=true
 
-                AC_SUBST(CLANG)
-                llc_candidates=$($CLANG --version | \
-                    awk '/^clang version/ {
-                    split($3, v, ".");
-                    printf("llc-%s.%s llc-%s llc", v[[1]], v[[2]], v[[1]])
-                }')
-                AC_CHECK_PROGS([LLC], [$llc_candidates], [no])
-                if test "$LLC" != "no"; then
-                    AC_SUBST(LLC)
-                    build_ebpf=true
+                AC_CHECK_LIB(bpf, bpf_xdp_query_id, bpfnewer=1, bpfnewer=0,
+                        -lelf -lxdp)
+                if test "$bpffound" = 1; then
+                    AC_DEFINE(HAVE_LIBBPF_XDP_QUERYID, 1, [Set to 1 if libbpf supports bpf_xdp_query_id])
                 fi
 
-            fi
+                # check for requirements to build XDP eBPF kernel
+                AC_CHECK_PROG(CLANG, [clang], [clang], [no])
+                if test "$CLANG" != "no"; then
+
+                    AC_SUBST(CLANG)
+                    llc_candidates=$($CLANG --version | \
+                        awk '/^clang version/ {
+                        split($3, v, ".");
+                        printf("llc-%s.%s llc-%s llc", v[[1]], v[[2]], v[[1]])
+                    }')
+                    AC_CHECK_PROGS([LLC], [$llc_candidates], [no])
+                    if test "$LLC" != "no"; then
+                        AC_SUBST(LLC)
+                        build_ebpf=true
+                    else
+                        llc_candidates=$($CLANG --version | \
+                            awk '/ clang version/ {
+                            split($4, v, ".");
+                            printf("llc-%s.%s llc-%s llc", v[[1]], v[[2]], v[[1]])
+                        }')
+                        LLC=""
+                        AC_CHECK_PROGS([LLC], [$llc_candidates], [no])
+                        if test "$LLC" != "no"; then
+                            AC_SUBST(LLC)
+                            build_ebpf=true
+                        fi
+                    fi
+
+                 fi
+             else
+                 libtrace_xdp=false
+             fi
         else
             libtrace_xdp=false
         fi
@@ -341,7 +367,7 @@ fi
 
 # was xdp build explicitly specified and failed
 if test "$want_xdp" = yes -a "$libtrace_xdp" = false; then
-    AC_MSG_ERROR([libelf and libbpf are required for XDP support])
+    AC_MSG_ERROR([libelf, libxdp and libbpf are required for XDP support])
 fi
 
 # was ebpf build explicitly specified and failed
