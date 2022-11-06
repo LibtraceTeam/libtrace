@@ -1,8 +1,9 @@
 libtrace4 (4.0.20-1) unstable; urgency=medium
 
+  * Updated XDP module to be able to build against recent libxdp
   * Updated libpacketdump to be able to decode ETSI LI email CCs and IRIs
 
- -- Shane Alcock <shane@alcock.co.nz>  Thu, 03 Nov 2022 11:20:06 +1300
+ -- Shane Alcock <shane@alcock.co.nz>  Mon, 07 Nov 2022 11:09:47 +1300
 
 libtrace4 (4.0.19-1) unstable; urgency=medium
 
