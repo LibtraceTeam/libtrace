@@ -19,7 +19,7 @@ fi
 
 TEST_DIR=$(pwd)
 LIBTRACE_DIR="$TEST_DIR"/../
-DPDK_DOWNLOAD_PATH=https://wand.nz/~rsanger/dpdk/
+DPDK_DOWNLOAD_PATH=https://libtraceteam.github.io/dpdk-testing/srcs
 DOWNLOAD_DIR="$TEST_DIR"/DPDK_source
 BUILD_DIR="$TEST_DIR"/DPDK_builds
 
@@ -52,68 +52,12 @@ $ERROR_MSG ($*)"
 	fi
 }
 
-# Old kernel version jessie 3.16
-declare -a dpdk_versions=(
-	"dpdk-1.7.1.tar.gz"
-	"dpdk-1.8.0.tar.gz"
-	"dpdk-2.0.0.tar.gz"
-	"dpdk-2.1.0.tar.gz"
-	"dpdk-2.2.0.tar.gz"
-	"dpdk-16.04.tar.gz"
-	"dpdk-16.07.2.tar.gz"
-	"dpdk-16.11.6.tar.gz"
-	)
-
-# Versions to check stretch linux 4.9
-declare -a dpdk_versions=(
-	"dpdk-2.2.0.tar.gz"
-	"dpdk-16.04.tar.gz"
-	"dpdk-16.07.2.tar.gz"
-	"dpdk-16.11.6.tar.gz"
-	"dpdk-17.02.1.tar.gz"
-	"dpdk-17.05.2.tar.gz"
-	"dpdk-17.08.2.tar.gz"
-	"dpdk-17.11.2.tar.gz"
-	"dpdk-18.02.1.tar.gz"
-	)
-
-# Versions to check buster linux 4.19
-# A full list of DPDK versions to check in buster
-declare -a dpdk_versions=(
-	"dpdk-16.11.11.tar.gz"
-	"dpdk-17.05.2.tar.gz"
-	"dpdk-17.08.2.tar.gz"
-	"dpdk-17.11.10.tar.gz"
-	"dpdk-18.02.2.tar.gz"
-	"dpdk-18.05.1.tar.gz"
-	"dpdk-18.08.1.tar.gz"
-	"dpdk-18.11.10.tar.gz"
-	"dpdk-19.02.tar.gz"
-	"dpdk-19.05.tar.gz"
-	"dpdk-19.08.2.tar.gz"
-	"dpdk-19.11.5.tar.gz"
-	"dpdk-20.02.tar.gz"
-	"dpdk-20.11.tar.gz"
-	)
-
-# Versions to check buster linux 4.19
-# Main LTS releases to check in buster
-declare -a dpdk_versions=(
-	"dpdk-16.11.11.tar.gz"
-	"dpdk-17.11.10.tar.gz"
-	"dpdk-18.11.10.tar.gz"
-	"dpdk-19.11.5.tar.gz"
-	"dpdk-20.02.tar.gz"
-	"dpdk-20.11.tar.gz"
-	"dpdk-21.11.tar.gz"
-	)
-
 while [[ $# -gt 0 ]]; do
 	dpdk_versions=()
         key="$1"
         case $key in
-        dpdk-16.11.11|dpdk-17.11.10|dpdk-18.11.10|dpdk-19.11.5|dpdk-20.02|dpdk-20.11|dpdk-21.11)
-		dpdk_versions+=("$key.tar.gz")
+        dpdk-16.11.11|dpdk-17.11.10|dpdk-18.11.11|dpdk-19.11.13|dpdk-20.11.6|dpdk-21.11.2|dpdk-22.07)
+		dpdk_versions+=("$key.tar.xz")
 		;;
 	*)
                 echo "Unknown version: $key"
@@ -138,7 +82,7 @@ do
 			DPDK_FAILED="$DPDK_FAILED
 Failed to download $dpdk_version"
 		else
-			tar xf "$dpdk_version"
+			tar xJf "$dpdk_version"
 			if [ $? -ne 0 ]; then
 				echo "ERROR: Failed to extract" "$dpdk_version"
 				DPDK_FAILED="$DPDK_FAILED
@@ -176,6 +120,7 @@ do
 			echo "CONFIG_RTE_LIBRTE_PMD_PCAP=y" >> "$DPDK_CONFIG"
 			echo "CONFIG_RTE_EAL_IGB_UIO=n" >> "$DPDK_CONFIG"
 			do_test make install T=x86_64-native-linuxapp-gcc \
+                                             DESTDIR=/usr/local/ \
 					     EXTRA_CFLAGS="-fcommon -fPIC -w -ggdb" -j $BUILD_THREADS \
 					     > build_stdout.txt 2> build_stderr.txt
 			ret=$?
@@ -185,7 +130,23 @@ do
 	else
 		echo "	Building using meson"
 		mkdir install
-		if CFLAGS="-fcommon -ggdb3 -w" do_test meson --prefix=$(pwd)/install build \
+                cat << "EOF" > $(pwd)/drivers/net/meson.build
+drivers = [
+        'af_packet',
+        'pcap',
+        'null',
+        'vhost',
+        'virtio',
+]
+std_deps = ['ethdev', 'kvargs'] # 'ethdev' also pulls in mbuf, net, eal etc
+std_deps += ['bus_pci']         # very many PMDs depend on PCI, so make std
+std_deps += ['bus_vdev']        # same with vdev bus
+config_flag_fmt = 'RTE_LIBRTE_@0@_PMD'  # required for 20.11.6 only
+EOF
+
+		if CFLAGS="-fcommon -ggdb3 -w" do_test meson \
+                            --prefix=$(pwd)/install build \
+                            -Ddisable_drivers=baseband/*,compress/*,crypto/*,dma/*,event/*,gpu/*,raw/*,regex/*,vdpa/* \
 				> build_stdout.txt 2> build_stderr.txt ; then
 			cd ./build
 			CFLAGS="-fcommon -ggdb3 -w" do_test meson install > ../build_stdout.txt 2> ../build_stderr.txt
@@ -204,6 +165,9 @@ do
 		DPDK_FAILED="$DPDK_FAILED
 Failed to build $dpdk_build
 	check $(pwd)/build_stderr.txt"
+                cat $(pwd)/build_stderr.txt
+                echo
+                cat $(pwd)/build_stdout.txt
 	fi
 	cd ..
 done
@@ -245,6 +209,7 @@ do
 ./configure for libtrace failed against $dpdk_build
 	Are you missing dependencies or do you need to run bootstrap.sh?
 	check ${OUTPUT_PREFIX}conf_err.txt"
+                cat ${OUTPUT_PREFIX}conf_err.txt
 		continue
 	fi
 	echo -n "	"
