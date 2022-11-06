@@ -1,13 +1,13 @@
 Source: libtrace4
 Priority: optional
-Maintainer: Brad Cowie <brad@wand.net.nz>
+Maintainer: Shane Alcock <shane@alcock.co.nz>
 Build-Depends: debhelper-compat (= 12), dh-autoreconf,
  libpcap-dev, zlib1g-dev, flex, bison, doxygen, liblzma-dev, graphviz,
  libncurses5-dev, libbz2-dev, libssl-dev, libwandio1-dev (>= 4.0.0),
  libwandder2-dev (>= 2.0.6), dpdk-dev, libnuma-dev, libyaml-dev
 Standards-Version: 4.1.3
 Section: libs
-Homepage: https://research.wand.net.nz/software/libtrace.php
+Homepage: https://github.com/LibtraceTeam/libtrace
 
 Package: libtrace4-dev
 Section: libdevel
@@ -24,7 +24,7 @@ Description: development headers for the libtrace network processing library
  methods, including device capture, raw and gz-compressed trace, and sockets;
  and multiple input formats, including pcap and DAG.
  .
- libtrace is developed by the WAND Network Research Group at Waikato
+ libtrace was originally developed by the WAND Network Research Group at Waikato
  University in New Zealand.
 
 Package: libtrace4
@@ -38,7 +38,7 @@ Description: network trace processing library supporting many input formats
  methods, including device capture, raw and gz-compressed trace, and sockets;
  and multiple input formats.
  .
- libtrace is developed by the WAND Network Research Group at Waikato
+ libtrace was originally developed by the WAND Network Research Group at Waikato
  University in New Zealand.
 
 #Package: libtrace4-dag
@@ -72,8 +72,8 @@ Description: development headers for the libpacketdump library
  packet contents in a nice human-readable form. The output is similar to that
  produced by tcpdump, although the formatting is somewhat more verbose.
  .
- libpacketdump is developed by the WAND Network Research Group at Waikato
- University in New Zealand.
+ libpacketdump was originally developed by the WAND Network Research Group at
+ Waikato University in New Zealand.
 
 Package: libpacketdump4
 Architecture: any
@@ -86,8 +86,8 @@ Description: network packet parsing and human-readable display library
  packet contents in a nice human-readable form. The output is similar to that
  produced by tcpdump, although the formatting is somewhat more verbose.
  .
- libpacketdump is developed by the WAND Network Research Group at Waikato
- University in New Zealand.
+ libpacketdump was originally developed by the WAND Network Research Group at
+ Waikato University in New Zealand.
 
 Package: libtrace4-tools
 Section: net
@@ -102,5 +102,5 @@ Description: helper utilities for use with the libtrace process library
  Multiple input methods and formats are supported including device capture,
  raw and gz-compressed traces, and sockets.
  .
- libtrace is developed by the WAND Network Research Group at Waikato
- University in New Zealand.
+ libtrace was originally developed by the WAND Network Research Group at
+ Waikato University in New Zealand.

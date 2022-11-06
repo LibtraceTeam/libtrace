@@ -3,7 +3,7 @@ turn on some features for the Intel 82580 Controller. These can then be enabled
 by setting the related define to 1 in the libtrace dpdk.c source file.
 
 For more information on the DPDK format check out the notes on the libtrace
-wiki https://secure.wand.net.nz/trac/libtrace/wiki/UserDocumentation.
+wiki https://github.com/LibtraceTeam/libtrace/wiki.
 
 These can be applied from the directory a level above /DPDK using this command:
 ~patch -p0 < name.patch
