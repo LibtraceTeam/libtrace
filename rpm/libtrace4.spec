@@ -21,6 +21,7 @@ BuildRequires: libyaml-devel
 BuildRequires: libwandder2-devel >= 2.0.6
 BuildRequires: libwandio1-devel
 BuildRequires: dpdk-devel
+BuildRequires: (flex-devel or libfl-static)
 
 Requires: dpdk
 Provides: libtrace4
