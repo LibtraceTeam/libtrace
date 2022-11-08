@@ -42,6 +42,7 @@ fi
 
 if [ "$1" = "centos:7" ]; then
         yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm || true
+        sed -i '/libfl-static/d' rpm/libtrace4.spec
 fi
 
 if [[ "$1" =~ fedora* ]]; then
