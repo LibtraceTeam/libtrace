@@ -16,7 +16,6 @@ jobs:
          arch:
            - amd64
          target:
-           - "debian:stretch"
            - "debian:buster"
            - "debian:bullseye"
            - "ubuntu:bionic"
@@ -36,7 +35,7 @@ jobs:
           mkdir -p packages/${DIRNAME}
           cp ../*.deb packages/${DIRNAME}/
       - name: Publish packages to cloudsmith
-        uses: wanduow/action-cloudsmith-upload-packages@v1
+        uses: wanduow/action-cloudsmith-upload-packages@v1.6
         with:
           path: packages/
           repo: ${{ secrets.CLOUDSMITH_OWNER }}/libtrace
