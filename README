@@ -1,10 +1,10 @@
-libtrace 4.0.19
+libtrace 4.0.20
 
 ---------------------------------------------------------------------------
 Copyright (c) 2007-2022 The University of Waikato, Hamilton, New Zealand.
 All rights reserved.
 
-This code has been developed by the University of Waikato WAND
+This code was originally developed by the University of Waikato WAND
 research group. For further information please see http://www.wand.net.nz/.
 ---------------------------------------------------------------------------
 
@@ -22,14 +22,11 @@ In version 4.0, we have introduced an API for processing packets in parallel
 using multiple threads. See libtrace_parallel.h for a detailed description
 of the API.
 
-Further information about libtrace, see
-http://research.wand.net.nz/software/libtrace.php
+For further information about libtrace or to report bugs in libtrace,
+please go to https://github.com/LibtraceTeam/libtrace
 
-Bugs should be reported by either emailing contact@wand.net.nz or filing
-an issue at https://github.com/LibtraceTeam/libtrace
-
-It is licensed under the GNU Lesser General Public License (GPL) version 3.
-Please see the included files COPYING and COPYING.LESSER for details of this
+Libtrace is licensed under the GNU Lesser General Public License (GPL) version
+3. Please see the included files COPYING and COPYING.LESSER for details of this
 license.
 
 A detailed ChangeLog can be found on the libtrace wiki:
@@ -38,5 +35,3 @@ https://github.com/LibtraceTeam/libtrace/wiki/ChangeLog
 Documentation, usage instructions and a detailed tutorial can also found
 on the libtrace wiki.
 
-For further information, please contact the WAND group. See
-http://www.wand.net.nz/ for details.

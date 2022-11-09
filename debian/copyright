@@ -1,9 +1,9 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: Libtrace
-Source: http://research.wand.net.nz/software/libtrace.php
+Source: http://github.com/LibtraceTeam/libtrace
 
 Files: *
-Copyright: 2018 The University of Waikato, Hamilton, New Zealand.
+Copyright: 2018-2022 The University of Waikato, Hamilton, New Zealand.
 License: LGPL-3
  This package is free software; you can redistribute it and/or
  modify it under the terms of the GNU Lesser General Public

@@ -34,7 +34,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-22.04, ubuntu-20.04]
-        dpdk_version: [dpdk-21.11, dpdk-20.11, dpdk-20.02, dpdk-19.11.5, dpdk-18.11.10, dpdk-17.11.10, dpdk-16.11.11]
+        dpdk_version: [dpdk-22.07, dpdk-21.11.2, dpdk-20.11.6, dpdk-19.11.13, dpdk-18.11.11, dpdk-17.11.10, dpdk-16.11.11]
         exclude:
           - os: ubuntu-16.04
             dpdk_version: dpdk-20.11
@@ -54,7 +54,7 @@ jobs:
         sudo mount
     - name: Install dependencies
       run: |
-        sudo apt-get -y install build-essential python3-pyelftools flex bison python3-pip python3-setuptools
+        sudo apt-get -y install build-essential python3-pyelftools flex bison python3-pip python3-setuptools libfl-dev
         sudo apt-get -y install libpcap0.8-dev libtool pkgconf wget m4 autoconf automake gcc libnuma-dev
         sudo apt-get -y install meson ninja-build
         sudo pip3 install meson ninja || true

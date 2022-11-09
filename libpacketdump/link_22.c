@@ -16,6 +16,7 @@ DLLEXPORT void decode(int link_type UNUSED, const char *packet, unsigned len) {
         wandder_etsispec_t *dec;
         wandder_decoder_t *basedec = NULL;
         int lastlevel = 0;
+        uint8_t ccformat = 0;
 
         dec = wandder_create_etsili_decoder();
         wandder_attach_etsili_buffer(dec, (uint8_t *)packet, len, false);
@@ -38,11 +39,18 @@ DLLEXPORT void decode(int link_type UNUSED, const char *packet, unsigned len) {
                         printf("  ");
                 }
                 printf("%s: ...\n", namesp);
+                ccformat = wandder_etsili_get_cc_format(dec);
+                if (ccformat == WANDDER_ETSILI_CC_FORMAT_IP) {
+                        /* XXX What if there is an IPv7?? */
+                        decode_next((const char *)cchdr, rem, "eth",
+                                    ((*cchdr) & 0xf0) == 0x40
+                                        ? TRACE_ETHERTYPE_IP
+                                        : TRACE_ETHERTYPE_IPV6);
+                } else if (ccformat == WANDDER_ETSILI_CC_FORMAT_APPLICATION) {
+                        decode_next((const char *)cchdr, rem, "tcp", 0);
+                }
+
                 wandder_free_etsili_decoder(dec);
-                /* XXX What if there is an IPv7?? */
-                decode_next((const char *)cchdr, rem, "eth",
-                                ((*cchdr) & 0xf0) == 0x40 ? TRACE_ETHERTYPE_IP :
-                                TRACE_ETHERTYPE_IPV6);
                 return;
         }
 

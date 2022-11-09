@@ -30,12 +30,12 @@ AC_DEFUN([gl_VISIBILITY],
     AC_CACHE_VAL(gl_cv_cc_visibility, [
       gl_save_CFLAGS="$CFLAGS"
       CFLAGS="$CFLAGS -fvisibility=hidden"
-      AC_TRY_COMPILE(
-        [extern __attribute__((__visibility__("hidden"))) int hiddenvar;
+      AC_COMPILE_IFELSE(
+        [AC_LANG_PROGRAM([],
+        [[extern __attribute__((__visibility__("hidden"))) int hiddenvar;
          extern __attribute__((__visibility__("default"))) int exportedvar;
          extern __attribute__((__visibility__("hidden"))) int hiddenfunc (void);
-         extern __attribute__((__visibility__("default"))) int exportedfunc (void);],
-        [],
+         extern __attribute__((__visibility__("default"))) int exportedfunc (void);]])],
         gl_cv_cc_visibility=yes,
         gl_cv_cc_visibility=no)
       CFLAGS="$gl_save_CFLAGS"])

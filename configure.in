@@ -3,11 +3,11 @@
 # Now you only need to update the version number in two places - below,
 # and in the README
 
-AC_INIT([libtrace],[4.0.19],[contact@wand.net.nz],[libtrace])
+AC_INIT([libtrace],[4.0.20],[shane@alcock.co.nz],[libtrace])
 
 LIBTRACE_MAJOR=4
 LIBTRACE_MID=0
-LIBTRACE_MINOR=19
+LIBTRACE_MINOR=20
 
 # OpenSolaris hides libraries like libncurses in /usr/gnu/lib, which is not
 # searched by default - add it to LDFLAGS so we at least have a chance of 
@@ -61,7 +61,7 @@ AC_CACHE_CHECK([whether the C++ compiler works],
 ])
 
 # Put all our automake definitions in config.h
-AM_CONFIG_HEADER([config.h])
+AC_CONFIG_HEADERS([config.h])
 
 # Checks for C and C++ compilers
 AC_PROG_CC
@@ -73,11 +73,11 @@ if test "$rw_cv_prog_cxx_works" = "no"; then
 fi
 
 # Checking for 'install'
-AC_PROG_INSTALL
+LT_INIT
 
 # Checking for bison and flex
 AC_CHECK_PROGS(YACC, 'bison -y' byacc yacc) 
-AM_PROG_LEX
+AC_PROG_LEX(yywrap)
 
 PKG_PROG_PKG_CONFIG
 
@@ -93,7 +93,8 @@ AC_C_CONST
 AC_C_INLINE
 AC_C_BIGENDIAN
 AC_TYPE_SIZE_T
-AC_HEADER_TIME
+AC_CHECK_HEADERS_ONCE([sys/time.h])
+
 AC_SYS_LARGEFILE
 
 LIBPKTDUMP_LIBS="-ltrace "
@@ -147,7 +148,7 @@ gcc_FORMAT
 gcc_TLS
 	
 # Check for libtool
-AC_PROG_LIBTOOL
+LT_INIT
 
 # Checks for library functions.
 AC_PROG_GCC_TRADITIONAL
@@ -160,7 +161,6 @@ AC_CHECK_SIZEOF([long int])
 
 
 # Checks for header files.
-AC_HEADER_STDC
 AC_CHECK_HEADERS(pcap.h pcap-bpf.h net/bpf.h sys/limits.h stddef.h inttypes.h limits.h net/ethernet.h sys/prctl.h)
 
 
@@ -238,7 +238,7 @@ AC_CHECK_HEADER(gdc.h,AC_DEFINE(HAVE_LIBGDC,1,[has gdc.h]))
 # Check for libwandio (no longer bundled with libtrace)
 AC_CHECK_LIB(wandio,wandio_wflush,wandiofound=1,wandiofound=0)
 if test "$wandiofound" = 0; then
-	AC_MSG_ERROR(libwandio 4.0.0 or better is required to compile this version of libtrace. If you have installed libwandio in a non-standard location please use LDFLAGS to specify the location of the library. WANDIO can be obtained from http://research.wand.net.nz/software/libwandio.php)
+	AC_MSG_ERROR(libwandio 4.0.0 or better is required to compile this version of libtrace. If you have installed libwandio in a non-standard location please use LDFLAGS to specify the location of the library. WANDIO can be obtained from https://github.com/LibtraceTeam/wandio)
 else
 	LIBTRACE_LIBS="$LIBTRACE_LIBS -lwandio"
         TOOLS_LIBS="$TOOLS_LIBS -lwandio"
@@ -307,32 +307,58 @@ AC_ARG_WITH(xdp, AS_HELP_STRING(--with-xdp, include XDP capture support),
 
 if test "$want_xdp" != no; then
     AC_CHECK_LIB(elf, elf_begin, elffound=1, elffound=0)
+
     if test "$elffound" = 1; then
-        # check for libbpf
-        AC_CHECK_LIB(bpf, xsk_socket__create, bpffound=1, bpffound=0, -lelf)
+        AC_CHECK_LIB(xdp, xsk_socket__create, xdpfound=1, xdpfound=0, -lelf)
 
-        if test "$bpffound" = 1; then
-            AC_DEFINE(HAVE_LIBBPF, 1, [Set to 1 if libbpf is available])
-            ADD_LDFLAGS="$ADD_LDFLAGS -lbpf -lelf"
-            libtrace_xdp=true
+        if test "$xdpfound" = 1; then
+            # check for libbpf
+            AC_CHECK_LIB(bpf, bpf_map_update_elem, bpffound=1, bpffound=0,
+            -lelf -lxdp)
 
-            # check for requirements to build XDP eBPF kernel
-            AC_CHECK_PROG(CLANG, [clang], [clang], [no])
-            if test "$CLANG" != "no"; then
+            if test "$bpffound" = 1; then
+                AC_DEFINE(HAVE_LIBBPF, 1, [Set to 1 if libbpf is available])
+                ADD_LDFLAGS="$ADD_LDFLAGS -lbpf -lelf -lxdp"
+                libtrace_xdp=true
 
-                AC_SUBST(CLANG)
-                llc_candidates=$($CLANG --version | \
-                    awk '/^clang version/ {
-                    split($3, v, ".");
-                    printf("llc-%s.%s llc-%s llc", v[[1]], v[[2]], v[[1]])
-                }')
-                AC_CHECK_PROGS([LLC], [$llc_candidates], [no])
-                if test "$LLC" != "no"; then
-                    AC_SUBST(LLC)
-                    build_ebpf=true
+                AC_CHECK_LIB(bpf, bpf_xdp_query_id, bpfnewer=1, bpfnewer=0,
+                        -lelf -lxdp)
+                if test "$bpffound" = 1; then
+                    AC_DEFINE(HAVE_LIBBPF_XDP_QUERYID, 1, [Set to 1 if libbpf supports bpf_xdp_query_id])
                 fi
 
-            fi
+                # check for requirements to build XDP eBPF kernel
+                AC_CHECK_PROG(CLANG, [clang], [clang], [no])
+                if test "$CLANG" != "no"; then
+
+                    AC_SUBST(CLANG)
+                    llc_candidates=$($CLANG --version | \
+                        awk '/^clang version/ {
+                        split($3, v, ".");
+                        printf("llc-%s.%s llc-%s llc", v[[1]], v[[2]], v[[1]])
+                    }')
+                    AC_CHECK_PROGS([LLC], [$llc_candidates], [no])
+                    if test "$LLC" != "no"; then
+                        AC_SUBST(LLC)
+                        build_ebpf=true
+                    else
+                        llc_candidates=$($CLANG --version | \
+                            awk '/ clang version/ {
+                            split($4, v, ".");
+                            printf("llc-%s.%s llc-%s llc", v[[1]], v[[2]], v[[1]])
+                        }')
+                        LLC=""
+                        AC_CHECK_PROGS([LLC], [$llc_candidates], [no])
+                        if test "$LLC" != "no"; then
+                            AC_SUBST(LLC)
+                            build_ebpf=true
+                        fi
+                    fi
+
+                 fi
+             else
+                 libtrace_xdp=false
+             fi
         else
             libtrace_xdp=false
         fi
@@ -341,7 +367,7 @@ fi
 
 # was xdp build explicitly specified and failed
 if test "$want_xdp" = yes -a "$libtrace_xdp" = false; then
-    AC_MSG_ERROR([libelf and libbpf are required for XDP support])
+    AC_MSG_ERROR([libelf, libxdp and libbpf are required for XDP support])
 fi
 
 # was ebpf build explicitly specified and failed
@@ -413,7 +439,7 @@ fi
 # Configure options for use of DAG cards
 # Originally borrowed from libpcap, but extended quite a bit :)
 # More details on how this check works: 
-#	http://wand.net.nz/trac/libtrace/wiki/DAGNotes
+#	https://github.com/LibtraceTeam/libtrace/wiki
 
 AC_ARG_WITH(dag, 
 	    AS_HELP_STRING(--with-dag[=DIR],include DAG live capture support (located in directory DIR, if supplied)),
@@ -539,7 +565,7 @@ if test "$want_numa" != no; then
 fi
 
 # Need libwandder for ETSI live decoding
-AC_CHECK_LIB(wandder, init_wandder_decoder, have_wandder=1, have_wandder=0)
+AC_CHECK_LIB(wandder, wandder_etsili_get_cc_format, have_wandder=1, have_wandder=0)
 
 # Checks for various "optional" libraries
 AC_CHECK_LIB(pthread, pthread_create, have_pthread=1, have_pthread=0)
@@ -878,8 +904,7 @@ LIBS=
 # For now, the user has to explicitly ask for the LLVM stuff, as it's a bit
 # rough around the edges :(
 AC_ARG_WITH([llvm],
-	[AC_HELP_STRING([--with-llvm],
-		[support Just In Time compiler])],
+	[AS_HELP_STRING([--with-llvm],[support Just In Time compiler])],
 	use_llvm="yes",
 	use_llvm="no")
 JIT=no
@@ -921,7 +946,7 @@ fi
 PKG_CHECK_MODULES(ncurses,ncurses,have_ncurses=yes,have_ncurses=no)
 
 AC_ARG_WITH([ncurses],
-	AC_HELP_STRING([--with-ncurses], [build tracetop (requires ncurses)]))
+	AS_HELP_STRING([--with-ncurses],[build tracetop (requires ncurses)]))
 
 AS_IF([test "x$with_ncurses" != "xno"],
 	[AC_SEARCH_LIBS(mvprintw, ncurses, have_ncurses=yes, have_ncurses=no)
@@ -1075,7 +1100,7 @@ else
 fi
 
 reportopt "Compiled with LLVM BPF JIT support" $JIT
-reportopt "Compiled with live ETSI LI support (requires libwandder)" $wandder_avail
+reportopt "Compiled with live ETSI LI support (requires libwandder >= 2.0.6)" $wandder_avail
 reportopt "Building man pages/documentation" $libtrace_doxygen
 reportopt "Building tracetop (requires libncurses)" $with_ncurses
 reportopt "Building traceanon (requires libyaml)" $have_yaml

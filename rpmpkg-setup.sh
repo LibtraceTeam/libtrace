@@ -19,11 +19,17 @@ yum update -y
 if [[ "$1" =~ rocky* ]]; then
         dnf install -y dnf-plugins-core epel-release || true
         dnf config-manager --set-enabled powertools || true
+        if [ -x /usr/bin/crb ]; then
+                /usr/bin/crb enable || true
+        fi
 fi
 
 if [[ "$1" =~ alma* ]]; then
         dnf install -y dnf-plugins-core epel-release || true
         dnf config-manager --set-enabled powertools || true
+        if [ -x /usr/bin/crb ]; then
+                /usr/bin/crb enable || true
+        fi
 fi
 
 
@@ -36,6 +42,7 @@ fi
 
 if [ "$1" = "centos:7" ]; then
         yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm || true
+        sed -i '/libfl-static/d' rpm/libtrace4.spec
 fi
 
 if [[ "$1" =~ fedora* ]]; then
