@@ -96,7 +96,7 @@ jobs:
         EOF
         /bin/bash /tmp/ln.sh
         cd xdp-tools
-        if [ "${BUILDOS}" -eq "ubuntu-18.04" ]; then
+        if [ "${BUILDOS}" == "ubuntu-18.04" ]; then
             git checkout v1.2
         fi
         ./configure
