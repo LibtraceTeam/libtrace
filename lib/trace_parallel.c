@@ -1208,7 +1208,7 @@ inline static int trace_pread_packet_hasher_thread(libtrace_t *libtrace,
                 /* Give up the CPU time to another thread since we have
                  * packets or messages.
                  */
-                sched_yield();
+                usleep(200);
         }
 
         // Always grab at least one
