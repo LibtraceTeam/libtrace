@@ -71,6 +71,8 @@ jobs:
         path: xdp-tools
         repository: xdp-project/xdp-tools
     - name: Build/Install libxdp
+      env:
+        BUILDOS: ${{ matrix.os }}
       run: |
         cat << "EOF" > /tmp/ln.sh
         #!/bin/bash
@@ -94,6 +96,9 @@ jobs:
         EOF
         /bin/bash /tmp/ln.sh
         cd xdp-tools
+        if [ "${BUILDOS}" -eq "ubuntu-18.04" ]; then
+            git checkout v1.2
+        fi
         ./configure
         sudo make -j 3 libxdp_install
         sudo ldconfig
