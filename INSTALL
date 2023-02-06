@@ -31,6 +31,19 @@ list.
 You may need to add the library location (e.g. /usr/local/lib) to your
 /etc/ld.so.conf and run 'ldconfig' as root.
 
+Installing with DPDK support:
+
+1. Install DPDK libraries on your system (ideally via your system's package manager).
+
+2. Install libtrace as described above, except change the ./configure command to
+   include a `--with-dpdk` argument, e.g.
+   
+      ./configure --with-dpdk
+
+3. Note that older versions of DPDK may require you to set the RTE_SDK and RTE_TARGET
+   environment variables before ./configure is able to detect that DPDK is available
+   on your system. Modern packaged versions of DPDK should not have this issue.
+
 ----------------------------------
 
 FreeBSD Notes
