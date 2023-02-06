@@ -467,8 +467,8 @@ static int tzsplive_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 		if (FORMAT_DATA->socket >= 0) {
 			close(FORMAT_DATA->socket);
 			FORMAT_DATA->socket = -1;
-			return ret;
 		}
+	        return ret;
 	}
 
 	if (ret < (int)sizeof(tzsp_header_t)) {
