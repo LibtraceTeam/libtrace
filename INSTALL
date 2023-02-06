@@ -2,7 +2,8 @@ Requirements:
  * >=automake-1.9
  * >=libpcap-0.8
  * flex and bison
- * libwandio 4.0.0 (http://research.wand.net.nz/software/libwandio.php)
+ * pkg-config
+ * libwandio 4.0.0 (https://github.com/LibtraceTeam/wandio)
 
 Optional:
  * DAG libraries (both 2.4 and 2.5 versions are supported)
@@ -53,6 +54,14 @@ Installing with DPDK support:
 ----------------------------------
 
 Installation FAQ:
+
+Q. When running ./configure, it stops with this error (or something very similar):
+
+    ./configure: line 21506: syntax error near unexpected token `DPDK,'
+    ./configure: line 21506: `                        PKG_CHECK_MODULES(DPDK, libdpdk >= 18, pkgconf_dpdk_found="yes",'
+
+A. You need to install `pkg-config` before running ./configure.
+
 
 Q. I've installed libpcap but I'm still getting the following error:
 "libpcap0.8 or greater is required to compile libtrace. If you have installed
