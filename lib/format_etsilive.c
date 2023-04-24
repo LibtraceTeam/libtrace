@@ -34,6 +34,7 @@
 #include "libtrace_int.h"
 #include "format_helper.h"
 #include "data-struct/simple_circular_buffer.h"
+#include "format_etsi.h"
 
 #include <libwandder.h>
 #include <libwandder_etsili.h>
@@ -648,7 +649,7 @@ static int etsilive_prepare_packet(libtrace_t *libtrace UNUSED,
         return 0;
 }
 
-static int etsilive_get_pdu_length(const libtrace_packet_t *packet) {
+int etsilive_get_pdu_length(const libtrace_packet_t *packet) {
 
         /* Should never get here because cache is set when packet is read */
         size_t reclen;
@@ -674,12 +675,12 @@ static int etsilive_get_pdu_length(const libtrace_packet_t *packet) {
         return reclen;
 }
 
-static int etsilive_get_framing_length(const libtrace_packet_t *packet UNUSED) {
+int etsilive_get_framing_length(const libtrace_packet_t *packet UNUSED) {
 
         return 0;
 }
 
-static uint64_t etsilive_get_erf_timestamp(const libtrace_packet_t *packet) {
+uint64_t etsilive_get_erf_timestamp(const libtrace_packet_t *packet) {
         return packet->order;
 }
 
@@ -713,7 +714,7 @@ static int etsilive_can_hold_packet(libtrace_packet_t *packet)
         return 0;
 }
 
-static libtrace_linktype_t etsilive_get_link_type(
+libtrace_linktype_t etsilive_get_link_type(
                 const libtrace_packet_t *packet UNUSED) {
         return TRACE_TYPE_ETSILI;
 }

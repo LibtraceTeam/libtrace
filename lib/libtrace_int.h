@@ -1378,6 +1378,8 @@ void ndag_constructor(void);
 void etsilive_constructor(void);
 /** Constructor for the live TZSP over UDP format module */
 void tzsplive_constructor(void);
+/** Constructor for the ETSI LI binary file format module */
+void etsifile_constructor(void);
 #ifdef HAVE_BPF
 /** Constructor for the BPF format module */
 void bpf_constructor(void);

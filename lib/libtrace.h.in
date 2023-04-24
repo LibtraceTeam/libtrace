@@ -463,6 +463,7 @@ enum base_format_t {
         TRACE_FORMAT_XDP          =25,  /** AF_XDP format */
 	TRACE_FORMAT_PFRINGOLD	  =26,
 	TRACE_FORMAT_PFRING       =27,
+        TRACE_FORMAT_ETSIFILE     =28,  /**< ETSI LI in a binary file */
 };
 
 /** RT protocol packet types */
@@ -530,6 +531,9 @@ typedef enum {
 	/** RT is encapsulating a PF_RING capture record */
 	TRACE_RT_DATA_PFRINGOLD = TRACE_RT_DATA_SIMPLE + TRACE_FORMAT_PFRINGOLD,
 	TRACE_RT_DATA_PFRING = TRACE_RT_DATA_SIMPLE + TRACE_FORMAT_PFRING,
+
+        /** RT is encapsulating a ETSI LI binary record */
+        TRACE_RT_DATA_ETSIFILE = TRACE_RT_DATA_SIMPLE + TRACE_FORMAT_ETSIFILE,
 
 	/** As PCAP does not store the linktype with the packet, we need to 
 	 * create a separate RT type for each supported DLT, starting from
