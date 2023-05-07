@@ -143,7 +143,8 @@ static int etsifile_prepare_received(libtrace_t *libtrace,
 static int etsifile_read_packet(libtrace_t *libtrace,
                 libtrace_packet_t *packet) {
 
-        char *resume = NULL, *ptr;
+        char *resume = NULL;
+        uint8_t *ptr;
         int numbytes, toread, i;
         uint64_t length = 0;
 
@@ -172,7 +173,7 @@ static int etsifile_read_packet(libtrace_t *libtrace,
 
         resume = packet->buffer + numbytes;
 
-        ptr = (char *)(packet->buffer);
+        ptr = (uint8_t *)(packet->buffer);
         /* Try to decode enough to get the top level length */
         if (*ptr != 0x30) {
                 trace_set_err(libtrace, TRACE_ERR_BAD_PACKET,
