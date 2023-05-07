@@ -156,6 +156,7 @@ __attribute__((constructor)) static void trace_init(void)
                 ndag_constructor();
 #ifdef HAVE_WANDDER
                 etsilive_constructor();
+                etsifile_constructor();
 #endif
 #ifdef HAVE_DAG
                 dag_constructor();

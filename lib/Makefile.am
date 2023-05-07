@@ -72,7 +72,7 @@ export LDFLAGS += $(SAVED_LDFLAGS)
 endif
 
 if HAVE_WANDDER
-ETSISOURCES=format_etsilive.c
+ETSISOURCES=format_etsilive.c format_etsifile.c format_etsi.h
 else
 ETSISOURCES=
 endif
