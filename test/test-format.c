@@ -88,6 +88,8 @@ const char *lookup_uri(const char *type) {
 		return "tsh:traces/10_packets.tsh.gz";
 	if (!strcmp(type, "erfprov"))
 		return "erf:traces/provenance.erf";
+	if (!strcmp(type, "etsifile"))
+		return "etsifile:traces/etsi_file.test";
 	return type;
 }
 
