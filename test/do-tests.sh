@@ -84,6 +84,11 @@ else
 	echo "Socat not found: skipping etsilive test"
 fi
 
+echo \* Read etsifile
+do_test ./test-format etsifile
+do_test ./test-etsi 100 1 etsifile:traces/etsi_file.test
+do_test ./test-etsi 22 1 etsifile:traces/etsi_file_iri.test
+
 echo \* Testing pcap-bpf
 do_test ./test-pcap-bpf
 
