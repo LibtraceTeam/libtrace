@@ -177,7 +177,7 @@ jobs:
         sudo make install
     - name: Build/Install Libwandder
       run: |
-        cd libtrace/libwandder
+        cd libwandder
         ./bootstrap.sh
         ./configure
         make -j 3
