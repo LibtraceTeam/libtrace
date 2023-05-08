@@ -48,7 +48,6 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-#include <net/bpf.h>
 
 /* This format deals with the BSD Native capture format, perhaps better
  * known as BPF, which is the equivalent of the Linux Native format for
@@ -87,6 +86,8 @@ struct local_bpf_hdr {
 #define BPFHDR(x) ((struct libtrace_bpf_hdr *)((x)->header))
 
 #if HAVE_DECL_BIOCSETIF
+#include <net/bpf.h>
+
 /* "Global" data that is stored for each BPF input trace */
 struct libtrace_format_data_t {
 	/* The file descriptor that is being captured from */
