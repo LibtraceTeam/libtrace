@@ -103,6 +103,7 @@ extern "C" {
         u_int bf_len;
         struct bpf_insn *bf_insns;
     };
+    u_int bpf_filter(const struct bpf_insn *, u_char *, u_int, u_int);
 #else
     #ifdef HAVE_PCAP_BPF_H
         #include <pcap-bpf.h>
