@@ -104,15 +104,9 @@ extern "C" {
         struct bpf_insn *bf_insns;
     };
 #else
-    /* Prefer net/bpf.h over pcap-bpf.h for format_bpf.c on MacOS */
-    #ifdef HAVE_NET_BPF_H
-        #include <net/bpf.h>
+    #ifdef HAVE_PCAP_BPF_H
+        #include <pcap-bpf.h>
         #define HAVE_BPF 1
-    #else
-        #ifdef HAVE_PCAP_BPF_H
-            #include <pcap-bpf.h>
-            #define HAVE_BPF 1
-        #endif
     #endif
 #endif
 
