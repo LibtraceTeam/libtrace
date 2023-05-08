@@ -139,7 +139,7 @@ jobs:
       run: |
         cd libtrace
         ./bootstrap.sh
-        ./configure CFLAGS="-I$(pwd)/../libbpf/include/uapi" --with-dpdk --with-pfring --with-xdp
+        ./configure CFLAGS="-I$(pwd)/../libbpf/include/uapi" LDFLAGS="-L/usr/lib64" --with-dpdk --with-pfring --with-xdp
         make -j 3
         sudo make install
     - name: Build Tests
@@ -175,6 +175,14 @@ jobs:
         ./configure
         make -j 4
         sudo make install
+    - name: Build/Install Libwandder
+      run: |
+        cd libtrace/libwandder
+        ./bootstrap.sh
+        ./configure
+        make -j 3
+        sudo make install
+        sudo ldconfig
     - name: Build/Install Libtrace
       run: |
         ./bootstrap.sh

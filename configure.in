@@ -323,7 +323,7 @@ if test "$want_xdp" != no; then
 
                 AC_CHECK_LIB(bpf, bpf_xdp_query_id, bpfnewer=1, bpfnewer=0,
                         -lelf -lxdp)
-                if test "$bpffound" = 1; then
+                if test "$bpfnewer" = 1; then
                     AC_DEFINE(HAVE_LIBBPF_XDP_QUERYID, 1, [Set to 1 if libbpf supports bpf_xdp_query_id])
                 fi
 
