@@ -77,7 +77,7 @@ LT_INIT
 
 # Checking for bison and flex
 AC_CHECK_PROGS(YACC, 'bison -y' byacc yacc) 
-AC_PROG_LEX(yywrap)
+AC_PROG_LEX(noyywrap)
 
 PKG_PROG_PKG_CONFIG
 
