@@ -48,6 +48,8 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#include <net/bpf.h>
+
 /* This format deals with the BSD Native capture format, perhaps better
  * known as BPF, which is the equivalent of the Linux Native format for
  * *BSD systems.
