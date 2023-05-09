@@ -43,7 +43,7 @@ jobs:
         sudo apt-get -y install flex bison libpcap0.8-dev libtool pkgconf autoconf automake m4 gcc clang llvm gcc-multilib
         sudo apt-get -y install build-essential git
     - name: Checkout DAG kernel module/packages
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         path: dag-packages
         repository: wanduow/dag-packages
@@ -64,7 +64,7 @@ jobs:
         sudo dagload -n 1
         sudo dagconfig -d16 rxstreams=4
     - name: Checkout Libtrace
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         path: libtrace
         submodules: recursive
