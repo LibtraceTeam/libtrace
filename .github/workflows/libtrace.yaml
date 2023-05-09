@@ -182,7 +182,6 @@ jobs:
         ./configure
         make -j 3
         sudo make install
-        sudo ldconfig
     - name: Build/Install Libtrace
       run: |
         ./bootstrap.sh
