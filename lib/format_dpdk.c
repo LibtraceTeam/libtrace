@@ -1085,7 +1085,9 @@ int dpdk_config_input(libtrace_t *libtrace, trace_option_t option, void *data)
  *
  */
 static struct rte_eth_conf port_conf = {.rxmode = {.mq_mode = RTE_ETH_MQ_RX_RSS,
+#if RTE_VERSION < RTE_VERSION_NUM(22, 11, 0, 1)
                                                    .split_hdr_size = 0,
+#endif
 
 #if RTE_VERSION >= RTE_VERSION_NUM(18, 8, 0, 1)
 
