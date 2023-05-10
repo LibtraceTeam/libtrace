@@ -156,6 +156,7 @@ __attribute__((constructor)) static void trace_init(void)
                 ndag_constructor();
 #ifdef HAVE_WANDDER
                 etsilive_constructor();
+                etsifile_constructor();
 #endif
 #ifdef HAVE_DAG
                 dag_constructor();
@@ -1672,6 +1673,7 @@ DLLEXPORT libtrace_eventobj_t trace_event(libtrace_t *trace,
                  * counters is handled by the format-specific
                  * function so don't increment them here.
                  */
+                packet->which_trace_start = trace->startcount;
                 event = packet->trace->format->trace_event(trace, packet);
         }
         return event;

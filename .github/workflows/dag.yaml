@@ -23,7 +23,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-20.04, ubuntu-18.04]
+        os: [ubuntu-20.04, ubuntu-22.04]
         c_compiler: [gcc, clang]
         cxx_compiler: [g++, clang++]
         exclude:
@@ -40,10 +40,10 @@ jobs:
     - name: Install Dependencies
       run: |
         sudo apt update
-        sudo apt-get -y install flex bison libpcap0.8-dev libtool pkgconf autoconf automake m4 gcc clang llvm gcc-multilib
+        sudo apt-get -y install flex bison libpcap0.8-dev libtool pkgconf autoconf automake m4 gcc clang llvm gcc-multilib uthash-dev
         sudo apt-get -y install build-essential git
     - name: Checkout DAG kernel module/packages
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         path: dag-packages
         repository: wanduow/dag-packages
@@ -64,13 +64,21 @@ jobs:
         sudo dagload -n 1
         sudo dagconfig -d16 rxstreams=4
     - name: Checkout Libtrace
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         path: libtrace
         submodules: recursive
     - name: Build/Install Wandio
       run: |
         cd libtrace/wandio
+        ./bootstrap.sh
+        ./configure
+        make -j 3
+        sudo make install
+        sudo ldconfig
+    - name: Build/Install Libwandder
+      run: |
+        cd libtrace/libwandder
         ./bootstrap.sh
         ./configure
         make -j 3

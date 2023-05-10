@@ -15,7 +15,7 @@ AM_CXXFLAGS=@LIBCXXFLAGS@ @CFLAG_VISIBILITY@ -pthread -std=gnu99
 
 extra_DIST = format_template.c
 NATIVEFORMATS=format_linux_common.c format_linux_ring.c format_linux_int.c format_linux_common.h
-BPFFORMATS=format_bpf.c
+BPFFORMATS=format_bpf.c format_bpf.h
 LINUX_SOURCES=
 
 if HAVE_DAG
@@ -72,7 +72,7 @@ export LDFLAGS += $(SAVED_LDFLAGS)
 endif
 
 if HAVE_WANDDER
-ETSISOURCES=format_etsilive.c
+ETSISOURCES=format_etsilive.c format_etsifile.c format_etsi.h
 else
 ETSISOURCES=
 endif
@@ -86,6 +86,7 @@ if BUILD_EBPF
 format_linux_xdp_kern.bpf: format_linux_xdp_kern.c format_linux_xdp.h
 	${CLANG} -Wall @CFLAGS@ -O2 \
 		-I/usr/include \
+                -fno-stack-protector \
 		-D__KERNEL__ -D__ASM_SYSREG_H \
 		-target bpf -S -emit-llvm $< -o ${@:.bpf=.ll}
 	${LLC} -march=bpf -filetype=obj ${@:.bpf=.ll} -o $@
@@ -145,7 +146,7 @@ endif
 
 AM_CPPFLAGS= @ADD_INCLS@
 libtrace_la_LIBADD = @LIBTRACE_LIBS@ @LTLIBOBJS@ $(DPDKLIBS)
-libtrace_la_LDFLAGS=-version-info 7:4:0 @ADD_LDFLAGS@
+libtrace_la_LDFLAGS=-version-info 7:5:0 @ADD_LDFLAGS@
 dagapi.c:
 	cp @DAG_TOOLS_DIR@/dagapi.c .
 

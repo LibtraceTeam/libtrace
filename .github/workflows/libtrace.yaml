@@ -23,7 +23,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-20.04, ubuntu-18.04]
+        os: [ubuntu-20.04, ubuntu-22.04]
         c_compiler: [gcc, clang]
         cxx_compiler: [g++, clang++]
         exclude:
@@ -55,7 +55,7 @@ jobs:
         sudo apt update
         sudo apt-get -y install flex bison libpcap0.8-dev libtool pkgconf autoconf automake m4 gcc gcc-multilib
         sudo apt-get -y install build-essential dpdk-dev libelf-dev git libyaml-dev libssl-dev
-        sudo apt-get -y install uthash-dev
+        sudo apt-get -y install uthash-dev linux-tools-common
     - name: Install PF_RING
       run: |
         sudo apt-get -y install software-properties-common wget
@@ -66,11 +66,13 @@ jobs:
         sudo apt-get -y install pfring
         sudo ldconfig
     - name: Checkout libxdp
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         path: xdp-tools
         repository: xdp-project/xdp-tools
     - name: Build/Install libxdp
+      env:
+        BUILDOS: ${{ matrix.os }}
       run: |
         cat << "EOF" > /tmp/ln.sh
         #!/bin/bash
@@ -94,11 +96,14 @@ jobs:
         EOF
         /bin/bash /tmp/ln.sh
         cd xdp-tools
+        if [ "${BUILDOS}" == "ubuntu-18.04" ]; then
+            git fetch && git checkout v1.2
+        fi
         ./configure
         sudo make -j 3 libxdp_install
         sudo ldconfig
     - name: Checkout Libbpf
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         path: libbpf
         repository: libbpf/libbpf
@@ -110,7 +115,7 @@ jobs:
         echo "/usr/lib64" | sudo tee -a /etc/ld.so.conf.d/lib64.conf
         sudo ldconfig
     - name: Checkout Libtrace
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         path: libtrace
         submodules: recursive
@@ -134,7 +139,7 @@ jobs:
       run: |
         cd libtrace
         ./bootstrap.sh
-        ./configure CFLAGS="-I$(pwd)/../libbpf/include/uapi" --with-dpdk --with-pfring --with-xdp
+        ./configure CFLAGS="-I$(pwd)/../libbpf/include/uapi" LDFLAGS="-L/usr/lib64" --with-dpdk --with-pfring --with-xdp
         make -j 3
         sudo make install
     - name: Build Tests
@@ -155,20 +160,27 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-10.15]
+        os: [macos-latest]
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
       with:
         submodules: recursive
     - name: Install Dependencies
       run: |
-        brew install flex bison libpcap libtool autoconf automake m4 gcc
+        brew install flex bison libpcap libtool autoconf automake m4 gcc uthash
     - name: Build/Install Wandio
       run: |
         cd wandio
         ./bootstrap.sh
         ./configure
         make -j 4
+        sudo make install
+    - name: Build/Install Libwandder
+      run: |
+        cd libwandder
+        ./bootstrap.sh
+        ./configure
+        make -j 3
         sudo make install
     - name: Build/Install Libtrace
       run: |

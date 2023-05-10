@@ -18,13 +18,14 @@ jobs:
          target:
            - "debian:buster"
            - "debian:bullseye"
+           - "debian:bookworm"
            - "ubuntu:bionic"
            - "ubuntu:focal"
            - "ubuntu:jammy"
 
      steps:
       - name: Checkout repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Install prereq packages
         run: ./debpkg-setup.sh
       - name: Build packages

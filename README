@@ -1,5 +1,11 @@
-libtrace 4.0.20
+libtrace 4.0.21
 
+Code and documentation added since version 4.0.20 is
+Copyright (c) 2023 Shane Alcock and has been contributed as per
+the terms of the GNU Lesser General Public License version 3.
+All rights reserved.
+
+Copyright notice for code from versions 4.0.20 and earlier is below:
 ---------------------------------------------------------------------------
 Copyright (c) 2007-2022 The University of Waikato, Hamilton, New Zealand.
 All rights reserved.

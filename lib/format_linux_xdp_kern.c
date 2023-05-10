@@ -18,26 +18,26 @@
 
 #include "format_linux_xdp.h"
 
-struct bpf_map_def SEC("maps") xsks_map = {
-    .type = BPF_MAP_TYPE_XSKMAP,
-    .key_size = sizeof(int),
-    .value_size = sizeof(int),
-    .max_entries = 64,  /* Assume netdev has no more than 64 queues */
-};
+struct {
+        __uint(type, BPF_MAP_TYPE_XSKMAP);
+        __type(key, int);
+        __type(value, int);
+        __uint(max_entries, 64); /* Assume netdev has no more than 64 queues */
+} xsks_map SEC(".maps");
 
-struct bpf_map_def SEC("maps") libtrace_map = {
-    .type = BPF_MAP_TYPE_PERCPU_ARRAY,
-    .key_size = sizeof(int),
-    .value_size = sizeof(libtrace_xdp_t),
-    .max_entries = 64,
-};
+struct {
+        __uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
+        __type(key, int);
+        __type(value, libtrace_xdp_t);
+        __uint(max_entries, 64);
+} libtrace_map SEC(".maps");
 
-struct bpf_map_def SEC("maps") libtrace_ctrl_map = {
-    .type = BPF_MAP_TYPE_ARRAY,
-    .key_size    = sizeof(int),
-    .value_size  = sizeof(libtrace_ctrl_map_t),
-    .max_entries = 1,
-};
+struct {
+        __uint(type, BPF_MAP_TYPE_ARRAY);
+        __type(key, int);
+        __type(value, libtrace_ctrl_map_t);
+        __uint(max_entries, 1);
+} libtrace_ctrl_map SEC(".maps");
 
 int libtrace_xdp_sock(struct xdp_md *ctx);
 

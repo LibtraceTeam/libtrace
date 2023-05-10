@@ -103,16 +103,11 @@ extern "C" {
         u_int bf_len;
         struct bpf_insn *bf_insns;
     };
+    u_int bpf_filter(const struct bpf_insn *, const u_char *, u_int, u_int);
 #else
-    /* Prefer net/bpf.h over pcap-bpf.h for format_bpf.c on MacOS */
-    #ifdef HAVE_NET_BPF_H
-        #include <net/bpf.h>
+    #ifdef HAVE_PCAP_BPF_H
+        #include <pcap-bpf.h>
         #define HAVE_BPF 1
-    #else
-        #ifdef HAVE_PCAP_BPF_H
-            #include <pcap-bpf.h>
-            #define HAVE_BPF 1
-        #endif
     #endif
 #endif
 
@@ -1378,6 +1373,8 @@ void ndag_constructor(void);
 void etsilive_constructor(void);
 /** Constructor for the live TZSP over UDP format module */
 void tzsplive_constructor(void);
+/** Constructor for the ETSI LI binary file format module */
+void etsifile_constructor(void);
 #ifdef HAVE_BPF
 /** Constructor for the BPF format module */
 void bpf_constructor(void);

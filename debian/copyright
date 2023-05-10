@@ -4,6 +4,7 @@ Source: http://github.com/LibtraceTeam/libtrace
 
 Files: *
 Copyright: 2018-2022 The University of Waikato, Hamilton, New Zealand.
+ 2023 Shane Alcock.
 License: LGPL-3
  This package is free software; you can redistribute it and/or
  modify it under the terms of the GNU Lesser General Public
