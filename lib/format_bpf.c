@@ -86,7 +86,7 @@ struct local_bpf_hdr {
 #define BPFHDR(x) ((struct libtrace_bpf_hdr *)((x)->header))
 
 #if HAVE_DECL_BIOCSETIF
-#include <net/bpf.h>
+#include "format_bpf.h"
 
 /* "Global" data that is stored for each BPF input trace */
 struct libtrace_format_data_t {
