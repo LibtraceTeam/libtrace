@@ -2,8 +2,8 @@
 
 set -x -e -o pipefail
 
-export DEBEMAIL='packaging@wand.net.nz'
-export DEBFULLNAME='WAND Packaging'
+export DEBEMAIL='shane@alcock.co.nz'
+export DEBFULLNAME='Shane Alcock'
 export DEBIAN_FRONTEND=noninteractive
 
 export SOURCENAME=`echo ${GITHUB_REF##*/} | cut -d '-' -f 1`
