@@ -15,7 +15,7 @@ AM_CXXFLAGS=@LIBCXXFLAGS@ @CFLAG_VISIBILITY@ -pthread -std=gnu99
 
 extra_DIST = format_template.c
 NATIVEFORMATS=format_linux_common.c format_linux_ring.c format_linux_int.c format_linux_common.h
-BPFFORMATS=format_bpf.c
+BPFFORMATS=format_bpf.c format_bpf.h
 LINUX_SOURCES=
 
 if HAVE_DAG
