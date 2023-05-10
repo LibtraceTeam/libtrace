@@ -18,6 +18,7 @@ jobs:
          target:
            - "debian:buster"
            - "debian:bullseye"
+           - "debian:bookworm"
            - "ubuntu:bionic"
            - "ubuntu:focal"
            - "ubuntu:jammy"
