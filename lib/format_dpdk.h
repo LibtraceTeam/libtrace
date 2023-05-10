@@ -98,7 +98,11 @@
 /* 2.0.0-rc1
  * Unifies RSS hash between cards
  */
-#if RTE_VERSION >= RTE_VERSION_NUM(2, 0, 0, 1)
+#if RTE_VERSION >= RTE_VERSION_NUM(22, 11, 0, 1)
+#       define RX_RSS_FLAGS \
+                (RTE_ETH_RSS_IP | RTE_ETH_RSS_UDP | RTE_ETH_RSS_TCP | \
+                 RTE_ETH_RSS_SCTP)
+#elif RTE_VERSION >= RTE_VERSION_NUM(2, 0, 0, 1)
 #        define RX_RSS_FLAGS                                                   \
                 (ETH_RSS_IP | ETH_RSS_UDP | ETH_RSS_TCP | ETH_RSS_SCTP)
 #else
@@ -181,11 +185,18 @@ typedef uint8_t portid_t;
  * ETH_LINK_SPEED_ are reused as flags, ugly.
  * We use the new way in this code.
  */
+#if RTE_VERSION < RTE_VERSION_NUM(21, 11, 0, 1)
 #ifndef ETH_SPEED_NUM_1G
 #        define ETH_SPEED_NUM_1G ETH_LINK_SPEED_1000
 #        define ETH_SPEED_NUM_10G ETH_LINK_SPEED_10G
 #        define ETH_SPEED_NUM_20G ETH_LINK_SPEED_20G
 #        define ETH_SPEED_NUM_40G ETH_LINK_SPEED_40G
+#endif
+#else
+#       define ETH_SPEED_NUM_1G RTE_ETH_LINK_SPEED_1G
+#       define ETH_SPEED_NUM_10G RTE_ETH_LINK_SPEED_10G
+#       define ETH_SPEED_NUM_20G RTE_ETH_LINK_SPEED_20G
+#       define ETH_SPEED_NUM_40G RTE_ETH_LINK_SPEED_40G
 #endif
 
 /* 20.11 renames master, slave to main and worker
@@ -197,12 +208,11 @@ typedef uint8_t portid_t;
 #        define rte_get_main_lcore rte_get_master_lcore
 #endif
 
-/* 21.11 renames a bunch of RX MQ mode #defines */
-#ifndef RTE_ETH_MQ_RX_RSS
-#        define RTE_ETH_MQ_RX_RSS ETH_MQ_RX_RSS
-#endif
+/* 21.11 replaces a bunch of RX MQ mode #defines. These were removed
+ * completely in 22.11 */
 
-#ifndef RTE_ETH_MQ_TX_NONE
+#if RTE_VERSION < RTE_VERSION_NUM(22, 11, 0, 1)
+#        define RTE_ETH_MQ_RX_RSS ETH_MQ_RX_RSS
 #        define RTE_ETH_MQ_TX_NONE ETH_MQ_TX_NONE
 #endif
 
