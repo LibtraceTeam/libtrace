@@ -8,6 +8,7 @@ libtrace4 (4.0.21-1) unstable; urgency=medium
     headers.
   * Fix bug where packets returned by trace_event() for certain live
     formats would not work with subsequent API calls.
+  * Fix problems with compiling XDP support on more recent buildchains.
 
  -- Shane Alcock <shane@alcock.co.nz>  Wed, 10 May 2023 18:28:13 +1200
 
