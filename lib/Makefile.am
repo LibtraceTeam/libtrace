@@ -86,6 +86,7 @@ if BUILD_EBPF
 format_linux_xdp_kern.bpf: format_linux_xdp_kern.c format_linux_xdp.h
 	${CLANG} -Wall @CFLAGS@ -O2 \
 		-I/usr/include \
+                -fno-stack-protector \
 		-D__KERNEL__ -D__ASM_SYSREG_H \
 		-target bpf -S -emit-llvm $< -o ${@:.bpf=.ll}
 	${LLC} -march=bpf -filetype=obj ${@:.bpf=.ll} -o $@
