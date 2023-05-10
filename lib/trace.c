@@ -1673,6 +1673,7 @@ DLLEXPORT libtrace_eventobj_t trace_event(libtrace_t *trace,
                  * counters is handled by the format-specific
                  * function so don't increment them here.
                  */
+                packet->which_trace_start = trace->startcount;
                 event = packet->trace->format->trace_event(trace, packet);
         }
         return event;
