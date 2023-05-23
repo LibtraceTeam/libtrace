@@ -839,7 +839,7 @@ static int linuxring_write_packet(libtrace_out_t *libtrace,
         FORMAT_DATA_OUT->queue++;
         FORMAT_DATA_OUT->queue %= FORMAT_DATA_OUT->tx_max_queue;
         if (FORMAT_DATA_OUT->queue == 0) {
-                ret = linuxring_flush_output_nonblocking(libtrace);
+                ret = linuxring_flush_output_blocking(libtrace);
                 if (ret < 0) {
                         return -1;
                 }
@@ -879,7 +879,7 @@ static struct libtrace_format_t linuxring = {
     linuxring_fin_packet,               /* fin_packet */
     NULL,                               /* can_hold_packet */
     linuxring_write_packet,             /* write_packet */
-    linuxring_flush_output_nonblocking, /* flush_output */
+    linuxring_flush_output_blocking,    /* flush_output */
     linuxring_get_link_type,            /* get_link_type */
     linuxring_get_direction,            /* get_direction */
     linuxring_set_direction,            /* set_direction */
