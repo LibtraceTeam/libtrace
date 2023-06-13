@@ -123,6 +123,7 @@ typedef struct ndag_format_data {
         char *localiface;
         uint16_t nextthreadid;
         recvstream_t *receivers;
+        int receiver_cnt;
 
         pthread_t controlthread;
         libtrace_message_queue_t controlqueue;
@@ -261,6 +262,7 @@ static int join_multicast_group(char *groupaddr, char *localiface,
                 goto sockcreateover;
         }
 
+        memset(&greq, 0, sizeof(greq));
         greq.gr_interface = interface;
         memcpy(&(greq.gr_group), group->ai_addr, group->ai_addrlen);
 
@@ -311,6 +313,7 @@ static int ndag_init_input(libtrace_t *libtrace) {
         FORMAT_DATA->localiface = NULL;
         FORMAT_DATA->nextthreadid = 0;
         FORMAT_DATA->receivers = NULL;
+        FORMAT_DATA->receiver_cnt = 0;
         FORMAT_DATA->consterfframing = -1;
 
         scan = strchr(libtrace->uridata, ',');
@@ -506,6 +509,8 @@ static void *ndag_controller_run(void *tdata) {
                 close(sock);
         }
 
+        freeaddrinfo(receiveaddr);
+
         /* Control channel has fallen over, should probably encourage libtrace
          * to halt the receiver threads as well.
          */
@@ -543,6 +548,7 @@ static int ndag_start_threads(libtrace_t *libtrace, uint32_t maxthreads)
                 libtrace_message_queue_init(&(FORMAT_DATA->receivers[i].mqueue),
                                 sizeof(ndag_internal_message_t));
         }
+        FORMAT_DATA->receiver_cnt = maxthreads;
 
         /* Start the controller thread */
         /* TODO consider affinity of this thread? */
@@ -610,9 +616,11 @@ static int ndag_pause_input(libtrace_t *libtrace) {
         int i;
 
         /* Close the existing receiver sockets */
-        for (i = 0; i < libtrace->perpkt_thread_count; i++) {
+        for (i = 0; i < FORMAT_DATA->receiver_cnt; i++) {
                halt_ndag_receiver(&(FORMAT_DATA->receivers[i]));
         }
+        ndag_paused = 1;
+        pthread_join(FORMAT_DATA->controlthread, NULL);
         return 0;
 }
 
@@ -1564,7 +1572,7 @@ static void ndag_get_statistics(libtrace_t *libtrace, libtrace_stat_t *stat) {
         stat->missing = 0;
 
         /* TODO Is this thread safe? */
-        for (i = 0; i < libtrace->perpkt_thread_count; i++) {
+        for (i = 0; i < FORMAT_DATA->receiver_cnt; i++) {
                 stat->dropped += FORMAT_DATA->receivers[i].dropped_upstream;
                 stat->received += FORMAT_DATA->receivers[i].received_packets;
                 stat->missing += FORMAT_DATA->receivers[i].missing_records;
@@ -1599,6 +1607,9 @@ static int ndag_pregister_thread(libtrace_t *libtrace, libtrace_thread_t *t,
                 return 0;
         }
 
+        if (t->perpkt_num >= FORMAT_DATA->receiver_cnt) {
+                return 0;
+        }
         recvr = &(FORMAT_DATA->receivers[t->perpkt_num]);
         t->format_data = recvr;
 
