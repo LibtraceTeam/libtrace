@@ -2585,6 +2585,15 @@ DLLEXPORT int trace_set_hasher(libtrace_t *trace, enum hasher_types type,
                 return -1;
         }
 
+        if (strcmp(trace->format->name, "ndag") == 0) {
+            /* ndag should never have a hasher applied to it -- each
+             * multicast stream is already hashed separately by the
+             * sender and trying to hash in libtrace will just make
+             * ndag run in single threaded mode instead.
+             */
+            return 0;
+        }
+
         // Save the requirements
         trace->hasher_type = type;
         if (hasher) {
