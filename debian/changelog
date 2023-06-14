@@ -1,3 +1,18 @@
+libtrace4 (4.0.22-1) unstable; urgency=medium
+
+  * Fix segmentation fault when closing an ndag input that had
+    set a hasher function and was configured to use multiple
+    processing threads.
+  * Disable setting a hasher function on ndag inputs, as this
+    is not generally a good idea anyway (ndag inputs are already
+    hashed by the ndag sender).
+  * Fix problem where trace_write_packet() would throw an error on
+    ring outputs because a write could not be completed without
+    blocking and there was no mechanism for trying the write again
+    later.
+
+ -- Shane Alcock <shane@alcock.co.nz>  Wed, 14 Jun 2023 17:48:08 +1200
+
 libtrace4 (4.0.21-1) unstable; urgency=medium
 
   * Fixed issue where idle per packets threads would use 100% CPU
