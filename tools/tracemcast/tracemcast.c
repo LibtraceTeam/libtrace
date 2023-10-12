@@ -382,6 +382,7 @@ static libtrace_packet_t *packet_reader_thread(libtrace_t *trace UNUSED,
         rdata->encaphdr->recordcount = 0;
 
         rdata->reccount = 0;
+        rdata->seqno ++;
     }
 
     if (rem > gparams->mtu - (rdata->writeptr - rdata->pbuffer)
