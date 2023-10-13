@@ -61,6 +61,11 @@ static struct libtrace_format_t ndag;
 
 volatile int ndag_paused = 0;
 
+enum {
+        NDAG_SOCKET_TYPE_MULTICAST,
+        NDAG_SOCKET_TYPE_TCP,
+};
+
 typedef struct monitor {
         uint16_t monitorid;
         uint64_t laststart;
@@ -96,9 +101,8 @@ typedef struct streamsock {
 
 #if HAVE_DECL_RECVMMSG
         struct mmsghdr mmsgbufs[RECV_BATCH_SIZE];
-#else
-	struct msghdr singlemsg;
 #endif
+	struct msghdr singlemsg;
 
 } streamsock_t;
 
@@ -124,6 +128,7 @@ typedef struct ndag_format_data {
         uint16_t nextthreadid;
         recvstream_t *receivers;
         int receiver_cnt;
+        uint8_t socktype;
 
         pthread_t controlthread;
         libtrace_message_queue_t controlqueue;
@@ -224,7 +229,10 @@ static int join_multicast_group(char *groupaddr, char *localiface,
                 return -1;
         }
 
-        *srcinfo = gotten;
+        if (srcinfo) {
+                *srcinfo = gotten;
+        }
+
         sock = socket(gotten->ai_family, gotten->ai_socktype, 0);
         if (sock < 0) {
                 fprintf(stderr,
@@ -442,54 +450,132 @@ static int ndag_parse_control_message(libtrace_t *libtrace, char *msgbuf,
 
 }
 
-static void *ndag_controller_run(void *tdata) {
-
-        libtrace_t *libtrace = (libtrace_t *)tdata;
-        uint16_t ptmap[65536];
-        int sock = -1;
-        struct addrinfo *receiveaddr = NULL;
-        fd_set listening;
+static inline int select_on_sock(int sock) {
+        int r;
+        fd_set read_fds;
         struct timeval timeout;
 
-        /* ptmap is a dirty hack to allow us to quickly check if we've already
-         * assigned a stream to a thread.
-         */
-        memset(ptmap, 0xff, 65536 * sizeof(uint16_t));
+        FD_ZERO(&read_fds);
+        FD_SET(sock, &read_fds);
 
-        sock = join_multicast_group(FORMAT_DATA->multicastgroup,
-                        FORMAT_DATA->localiface, FORMAT_DATA->portstr, 0,
-                        &receiveaddr);
-        if (sock == -1) {
-                trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
-                        "Unable to join multicast group for nDAG control channel");
-                trace_interrupt();
-                pthread_exit(NULL);
+        timeout.tv_sec = 0;
+        timeout.tv_usec = 500000;
+
+        r = select(sock + 1, &read_fds, NULL, NULL, &timeout);
+        if (r == -1) {
+                return -1;
         }
+        if (!FD_ISSET(sock, &read_fds)) {
+                return 0;
+        }
+
+        return 1;
+}
+
+static int accept_ndagtcp_connection(libtrace_t *libtrace,
+                char *ipstr, char *portstr) {
+
+        struct addrinfo hints, *listenai;
+        int sock, consock=-1, reuse=1, r;
+        struct sockaddr_storage sa;
+        socklen_t addrsize;
+
+        hints.ai_family = PF_UNSPEC;
+        hints.ai_socktype = SOCK_STREAM;
+        hints.ai_flags = AI_PASSIVE;
+        hints.ai_protocol = 0;
+
+        sock = -1;
+        listenai = NULL;
+        if (getaddrinfo(ipstr, portstr, &hints, &listenai) != 0) {
+                fprintf(stderr,
+                        "Call to getaddrinfo failed for %s:%s -- %s\n",
+                        ipstr, portstr, strerror(errno));
+                goto failed;
+        }
+
+        sock = socket(listenai->ai_family, listenai->ai_socktype, 0);
+        if (sock < 0) {
+                fprintf(stderr, "Failed to create socket for %s:%s -- %s\n",
+                        ipstr, portstr, strerror(errno));
+                goto failed;
+        }
+        if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse))
+                        < 0) {
+
+                fprintf(stderr, "Failed to configure socket for %s:%s -- %s\n",
+                        ipstr, portstr, strerror(errno));
+
+                goto failed;
+        }
+
+        if (bind(sock, (struct sockaddr *)listenai->ai_addr,
+                        listenai->ai_addrlen) < 0) {
+
+                fprintf(stderr, "Failed to bind socket for %s:%s -- %s\n",
+                        ipstr, portstr, strerror(errno));
+                goto failed;
+        }
+
+        if (listen(sock, 10) < 0) {
+                fprintf(stderr, "Failed to listen on socket for %s:%s -- %s\n",
+                        ipstr, portstr, strerror(errno));
+                goto failed;
+        }
+
+        freeaddrinfo(listenai);
+        listenai = NULL;
+
+        fcntl(sock, F_SETFL, O_NONBLOCK);
+
+        while (is_halted(libtrace) == -1) {
+                r = select_on_sock(sock);
+                if (r < 0) {
+                        fprintf(stderr, "Error in select while accepting connection on socket for %s:%s -- %s\n",
+                                ipstr, portstr, strerror(errno));
+                } else if (r == 0) {
+                        continue;
+                }
+
+                consock = accept(sock, (struct sockaddr *)&sa, &addrsize);
+                if (consock < 0) {
+                        fprintf(stderr,
+                                "Failed to accept connection on socket for %s:%s -- %s\n",
+                                ipstr, portstr, strerror(errno));
+                        goto failed;
+                }
+                break;
+        }
+
+failed:
+        if (sock >= 0) {
+                close(sock);
+        }
+        if (listenai) {
+                freeaddrinfo(listenai);
+        }
+        return consock;
+}
+
+static void _ndag_controller_run(libtrace_t *libtrace, int sock) {
+        uint16_t ptmap[65536];
+
+        memset(ptmap, 0xff, 65536 * sizeof(uint16_t));
 
         ndag_paused = 0;
         while ((is_halted(libtrace) == -1) && !ndag_paused) {
                 int ret;
                 char buf[CTRL_BUF_SIZE];
 
-                FD_ZERO(&listening);
-                FD_SET(sock, &listening);
-
-                timeout.tv_sec = 0;
-                timeout.tv_usec = 500000;
-
-                ret = select(sock + 1, &listening, NULL, NULL, &timeout);
+                ret = select_on_sock(sock);
                 if (ret < 0) {
                         fprintf(stderr, "Error while waiting for nDAG control messages: %s\n", strerror(errno));
                         break;
-                }
-
-                if (!FD_ISSET(sock, &listening)) {
+                } else if (ret == 0) {
                         continue;
                 }
 
-                ret = recvfrom(sock, buf, CTRL_BUF_SIZE, 0,
-                                receiveaddr->ai_addr,
-                                &(receiveaddr->ai_addrlen));
+                ret = recvfrom(sock, buf, CTRL_BUF_SIZE, 0, NULL, NULL);
                 if (ret < 0) {
                         fprintf(stderr, "Error while receiving nDAG control message: %s\n", strerror(errno));
                         break;
@@ -509,19 +595,56 @@ static void *ndag_controller_run(void *tdata) {
                 close(sock);
         }
 
-        freeaddrinfo(receiveaddr);
-
         /* Control channel has fallen over, should probably encourage libtrace
          * to halt the receiver threads as well.
          */
         if (!is_halted(libtrace)) {
                 trace_interrupt();
         }
+}
+
+static void *ndagtcp_controller_run(void *tdata) {
+        libtrace_t *libtrace = (libtrace_t *)tdata;
+        int sock = -1;
+
+        /* ptmap is a dirty hack to allow us to quickly check if we've already
+         * assigned a stream to a thread.
+         */
+        sock = accept_ndagtcp_connection(libtrace, FORMAT_DATA->multicastgroup,
+                        FORMAT_DATA->portstr);
+        if (sock == -1) {
+                trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
+                                "Unable to setup control channel for nDAG TCP");
+                trace_interrupt();
+        } else {
+                _ndag_controller_run(libtrace, sock);
+        }
+
 
         pthread_exit(NULL);
 }
 
-static int ndag_start_threads(libtrace_t *libtrace, uint32_t maxthreads)
+static void *ndag_controller_run(void *tdata) {
+
+        libtrace_t *libtrace = (libtrace_t *)tdata;
+        int sock = -1;
+
+        sock = join_multicast_group(FORMAT_DATA->multicastgroup,
+                        FORMAT_DATA->localiface, FORMAT_DATA->portstr, 0,
+                        NULL);
+        if (sock == -1) {
+                trace_set_err(libtrace, TRACE_ERR_INIT_FAILED,
+                                "Unable to setup control channel for nDAG TCP");
+                trace_interrupt();
+        } else {
+                _ndag_controller_run(libtrace, sock);
+        }
+
+        pthread_exit(NULL);
+}
+
+static int ndag_start_threads(libtrace_t *libtrace, uint32_t maxthreads,
+                uint8_t socktype)
 {
         int ret;
         uint32_t i;
@@ -553,8 +676,16 @@ static int ndag_start_threads(libtrace_t *libtrace, uint32_t maxthreads)
         /* Start the controller thread */
         /* TODO consider affinity of this thread? */
 
-        ret = pthread_create(&(FORMAT_DATA->controlthread), NULL,
-                        ndag_controller_run, libtrace);
+        if (socktype == NDAG_SOCKET_TYPE_MULTICAST) {
+                ret = pthread_create(&(FORMAT_DATA->controlthread), NULL,
+                                ndag_controller_run, libtrace);
+        } else if (socktype == NDAG_SOCKET_TYPE_TCP) {
+                ret = pthread_create(&(FORMAT_DATA->controlthread), NULL,
+                                ndagtcp_controller_run, libtrace);
+        } else {
+                ret = -1;
+        }
+
         if (ret != 0) {
                 return -1;
         }
@@ -562,13 +693,32 @@ static int ndag_start_threads(libtrace_t *libtrace, uint32_t maxthreads)
 }
 
 static int ndag_start_input(libtrace_t *libtrace) {
-        return ndag_start_threads(libtrace, 1);
+        FORMAT_DATA->socktype = NDAG_SOCKET_TYPE_MULTICAST;
+        return ndag_start_threads(libtrace, 1, NDAG_SOCKET_TYPE_MULTICAST);
+}
+
+static int ndagtcp_start_input(libtrace_t *libtrace) {
+        FORMAT_DATA->socktype = NDAG_SOCKET_TYPE_TCP;
+        return ndag_start_threads(libtrace, 1, NDAG_SOCKET_TYPE_TCP);
 }
 
 static int ndag_pstart_input(libtrace_t *libtrace) {
-        if (ndag_start_threads(libtrace, libtrace->perpkt_thread_count) ==
-                        libtrace->perpkt_thread_count)
+        FORMAT_DATA->socktype = NDAG_SOCKET_TYPE_MULTICAST;
+        if (ndag_start_threads(libtrace, libtrace->perpkt_thread_count,
+                        NDAG_SOCKET_TYPE_MULTICAST) ==
+                        libtrace->perpkt_thread_count) {
                 return 0;
+        }
+        return -1;
+}
+
+static int ndagtcp_pstart_input(libtrace_t *libtrace) {
+        FORMAT_DATA->socktype = NDAG_SOCKET_TYPE_TCP;
+        if (ndag_start_threads(libtrace, libtrace->perpkt_thread_count,
+                        NDAG_SOCKET_TYPE_TCP) ==
+                        libtrace->perpkt_thread_count) {
+                return 0;
+        }
         return -1;
 }
 
@@ -595,9 +745,10 @@ static void halt_ndag_receiver(recvstream_t *receiver) {
                                 free(src.mmsgbufs[j].msg_hdr.msg_iov);
                         }
                 }
-#else
-		free(src.singlemsg.msg_iov);
 #endif
+                if (src.singlemsg.msg_iov) {
+        		free(src.singlemsg.msg_iov);
+                }
 
                 if (src.sock != -1) {
                         close(src.sock);
@@ -942,9 +1093,8 @@ static int add_new_streamsock(recvstream_t *rt, streamsource_t src) {
                 ssock->mmsgbufs[i].msg_hdr.msg_flags = 0;
                 ssock->mmsgbufs[i].msg_len = 0;
         }
-#else
-	ssock->singlemsg.msg_iov = (struct iovec *) calloc(1, sizeof(struct iovec));
 #endif
+	ssock->singlemsg.msg_iov = (struct iovec *) calloc(1, sizeof(struct iovec));
 
         ssock->nextread = NULL;;
         ssock->nextreadind = 0;
@@ -1013,6 +1163,10 @@ static int init_receivers(streamsock_t *ssock, int required) {
         int wind = ssock->nextwriteind;
         int i = 1;
 
+	if (required <= 0) {
+		fprintf(stderr, "You are required to have atleast 1 receiver in init_receivers\n");
+		return TRACE_ERR_INIT_FAILED;
+	}
 #if HAVE_DECL_RECVMMSG
         for (i = 0; i < required; i++) {
                 if (i >= RECV_BATCH_SIZE) {
@@ -1030,15 +1184,10 @@ static int init_receivers(streamsock_t *ssock, int required) {
 
                 wind ++;
         }
-#else
-	if (required <= 0) {
-		fprintf(stderr, "You are required to have atleast 1 receiver in init_receivers\n");
-		return TRACE_ERR_INIT_FAILED;
-	}
+#endif
 	ssock->singlemsg.msg_iov->iov_base = ssock->saved[wind];
 	ssock->singlemsg.msg_iov->iov_len = ENCAP_BUFSIZE;
 	ssock->singlemsg.msg_iovlen = 1;
-#endif
         return i;
 }
 
@@ -1118,65 +1267,59 @@ static int check_ndag_received(streamsock_t *ssock, int index,
 
 }
 
-static int receive_from_single_socket(streamsock_t *ssock, struct timeval *tv,
-                int *gottime, recvstream_t *rt) {
+static int is_buffered_data_available(streamsock_t *ssock, struct timeval *tv,
+                int *gottime) {
 
-        int ret, ndagstat, avail;
         int toret = 0;
-
-#if HAVE_DECL_RECVMMSG
-	int i;
-#endif
-
-        avail = init_receivers(ssock, ssock->bufavail);
-
-#if HAVE_DECL_RECVMMSG
-        ret = recvmmsg(ssock->sock, ssock->mmsgbufs, avail,
-                        MSG_DONTWAIT, NULL);
-#else
-        if (avail != 1) {
-                return 0;
-        }
-
-	ret = recvmsg(ssock->sock, &(ssock->singlemsg), MSG_DONTWAIT);
-#endif
-        if (ret < 0) {
-                /* Nothing to receive right now, but we should still
-                 * count as 'ready' if at least one buffer is full */
-                if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                        if (readable_data(ssock)) {
-                                toret = 1;
-                        }
-                        if (!(*gottime)) {
-                                gettimeofday(tv, NULL);
-                                *gottime = 1;
-                        }
-                        if (ssock->startidle == 0) {
-                                ssock->startidle = tv->tv_sec;
-                        } else if (tv->tv_sec - ssock->startidle > NDAG_IDLE_TIMEOUT) {
-                                fprintf(stderr,
+        /* Nothing to receive right now, but we should still
+         * count as 'ready' if at least one buffer is full */
+        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                if (readable_data(ssock)) {
+                        toret = 1;
+                }
+                if (!(*gottime)) {
+                        gettimeofday(tv, NULL);
+                        *gottime = 1;
+                }
+                if (ssock->startidle == 0) {
+                        ssock->startidle = tv->tv_sec;
+                } else if (tv->tv_sec - ssock->startidle > NDAG_IDLE_TIMEOUT) {
+                        fprintf(stderr,
                                         "Closing channel %s:%u due to inactivity.\n",
                                         ssock->groupaddr,
                                         ssock->port);
 
-                                close(ssock->sock);
-                                ssock->sock = -1;
-                        }
-                } else {
-
-                        fprintf(stderr,
-                                "Error receiving encapsulated records from %s:%u -- %s \n",
-                                ssock->groupaddr, ssock->port,
-                                strerror(errno));
                         close(ssock->sock);
                         ssock->sock = -1;
                 }
                 return toret;
         }
-
-        ssock->startidle = 0;
+        fprintf(stderr,
+                        "Error receiving encapsulated records from %s:%u -- %s \n",
+                        ssock->groupaddr, ssock->port,
+                        strerror(errno));
+        close(ssock->sock);
+        ssock->sock = -1;
+        return 0;
+}
 
 #if HAVE_DECL_RECVMMSG
+static int receive_from_single_socket_recvmmsg(streamsock_t *ssock,
+                struct timeval *tv, int *gottime, recvstream_t *rt) {
+
+        int ret, ndagstat, avail;
+        int toret = 0;
+	int i;
+
+        avail = init_receivers(ssock, ssock->bufavail);
+
+        ret = recvmmsg(ssock->sock, ssock->mmsgbufs, avail,
+                        MSG_DONTWAIT, NULL);
+        if (ret < 0) {
+                return is_buffered_data_available(ssock, tv, gottime);
+        }
+
+        ssock->startidle = 0;
         for (i = 0; i < ret; i++) {
                 ndagstat = check_ndag_received(ssock, ssock->nextwriteind,
                                 ssock->mmsgbufs[i].msg_len, rt);
@@ -1188,19 +1331,42 @@ static int receive_from_single_socket(streamsock_t *ssock, struct timeval *tv,
                         toret = 1;
                 }
         }
-#else
+        return toret;
+}
+#endif
+
+static int receive_from_single_socket(streamsock_t *ssock, struct timeval *tv,
+                int *gottime, recvstream_t *rt) {
+
+        int ret, ndagstat, avail;
+        int toret = 0;
+
+        avail = init_receivers(ssock, ssock->bufavail);
+
+        if (avail != 1) {
+                return 0;
+        }
+
+	ret = recvmsg(ssock->sock, &(ssock->singlemsg), MSG_DONTWAIT);
+        if (ret < 0) {
+                if (is_buffered_data_available(ssock, tv, gottime)) {
+                        return 1;
+                }
+        }
+
+        ssock->startidle = 0;
+
 	ndagstat = check_ndag_received(ssock, ssock->nextwriteind, ret, rt);
 	if (ndagstat <= 0) {
 		toret = 0;
 	} else {
 		toret = 1;
 	}
-#endif
 
         return toret;
 }
 
-static int receive_from_sockets(recvstream_t *rt) {
+static int receive_from_sockets(recvstream_t *rt, uint8_t socktype) {
 
         int i, readybufs, gottime;
         struct timeval tv;
@@ -1222,16 +1388,18 @@ static int receive_from_sockets(recvstream_t *rt) {
 
 #if HAVE_DECL_RECVMMSG
                 /* Plenty of full buffers, just use the packets in those */
-                if (rt->sources[i].bufavail < RECV_BATCH_SIZE / 2) {
-                        readybufs ++;
-                        continue;
+                if (socktype == NDAG_SOCKET_TYPE_MULTICAST) {
+                        if (rt->sources[i].bufavail < RECV_BATCH_SIZE / 2) {
+                                readybufs ++;
+                                continue;
+                        }
                 }
-#else
+#endif
                 if (rt->sources[i].bufavail == 0) {
                         readybufs ++;
                         continue;
                 }
-#endif
+
                 if (maxfd == 0) {
                         FD_ZERO(&fds);
                 }
@@ -1260,8 +1428,15 @@ static int receive_from_sockets(recvstream_t *rt) {
 			}
 			continue;
 		}
-                readybufs += receive_from_single_socket(&(rt->sources[i]),
-                                &tv, &gottime, rt);
+#if HAVE_DECL_RECVMMSG
+                if (socktype == NDAG_SOCKET_TYPE_MULTICAST) {
+                        readybufs += receive_from_single_socket_recvmmsg(
+                                &(rt->sources[i]), &tv, &gottime, rt);
+                        continue;
+                }
+#endif
+                readybufs += receive_from_single_socket(
+                                &(rt->sources[i]), &tv, &gottime, rt);
         }
 
         return readybufs;
@@ -1300,7 +1475,8 @@ static int receive_encap_records_block(libtrace_t *libtrace, recvstream_t *rt,
                         continue;
                 }
 
-                if ((iserr = receive_from_sockets(rt)) < 0) {
+                if ((iserr = receive_from_sockets(rt,
+                                FORMAT_DATA->socktype)) < 0) {
                         return iserr;
                 } else if (iserr > 0) {
                         /* At least one of our input sockets has available
@@ -1347,7 +1523,7 @@ static int receive_encap_records_nonblock(libtrace_t *libtrace, recvstream_t *rt
                 return 0;
         }
 
-        return receive_from_sockets(rt);
+        return receive_from_sockets(rt, FORMAT_DATA->socktype);
 }
 
 static streamsock_t *select_next_packet(recvstream_t *rt) {
@@ -1774,6 +1950,62 @@ static struct libtrace_format_t ndag = {
         ndag_get_thread_stats   /* per-thread stats */
 };
 
+static struct libtrace_format_t ndagtcp = {
+
+        "ndagtcp",
+        "",
+        TRACE_FORMAT_NDAG_TCP,
+        NULL,                   /* probe filename */
+        NULL,                   /* probe magic */
+        ndag_init_input,        /* init_input */
+        ndag_config_input,      /* config_input */
+        ndagtcp_start_input,       /* start_input */
+        ndag_pause_input,       /* pause_input */
+        NULL,                   /* init_output */
+        NULL,                   /* config_output */
+        NULL,                   /* start_output */
+        ndag_fin_input,         /* fin_input */
+        NULL,                   /* fin_output */
+        ndag_read_packet,       /* read_packet */
+        ndag_prepare_packet,    /* prepare_packet */
+        NULL,                   /* fin_packet */
+        NULL,                   /* can_hold_packet */
+        NULL,                   /* write_packet */
+        NULL,                   /* flush_output */
+        ndag_get_link_type,     /* get_link_type */
+        ndag_get_direction,     /* get_direction */
+        ndag_set_direction,     /* set_direction */
+        ndag_get_erf_timestamp, /* get_erf_timestamp */
+        NULL,                   /* get_timeval */
+        NULL,                   /* get_seconds */
+        NULL,                   /* get_timespec */
+	NULL,                   /* get_meta_section */
+        NULL,                   /* seek_erf */
+        NULL,                   /* seek_timeval */
+        NULL,                   /* seek_seconds */
+        ndag_get_capture_length,/* get_capture_length */
+        ndag_get_wire_length,   /* get_wire_length */
+        ndag_get_framing_length,/* get_framing_length */
+        ndag_set_capture_length,/* set_capture_length */
+        NULL,                   /* get_received_packets */
+        NULL,                   /* get_filtered_packets */
+        NULL,                   /* get_dropped_packets */
+        ndag_get_statistics,    /* get_statistics */
+        NULL,                   /* get_fd */
+        trace_event_ndag,       /* trace_event */
+        NULL,                   /* help */
+        NULL,                   /* next pointer */
+        {true, 0},              /* live packet capture */
+        ndagtcp_pstart_input,      /* parallel start */
+        ndag_pread_packets,     /* parallel read */
+        ndag_pause_input,       /* parallel pause */
+        NULL,
+        ndag_pregister_thread,  /* register thread */
+        NULL,
+        ndag_get_thread_stats   /* per-thread stats */
+};
+
 void ndag_constructor(void) {
         register_format(&ndag);
+        register_format(&ndagtcp);
 }
