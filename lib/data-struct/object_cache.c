@@ -146,7 +146,7 @@ static void resize_memory_caches(struct local_caches *lcs) {
 		fprintf(stderr, "Expected lcs->t_mem_caches_total to be greater or equal to 0 in resize_memory_caches()\n");
 		return;
 	}
-	lcs->t_mem_caches += 0x10;
+	lcs->t_mem_caches_total += 0x10;
 	lcs->t_mem_caches = realloc(lcs->t_mem_caches,
 	                            lcs->t_mem_caches_total * sizeof(struct local_cache));
 }
