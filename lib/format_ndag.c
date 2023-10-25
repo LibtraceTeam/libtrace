@@ -859,89 +859,6 @@ static int ndag_get_framing_length(const libtrace_packet_t *packet) {
         return 0;
 }
 
-static int ndag_prepare_packet_stream_corsarotag(libtrace_t *restrict libtrace,
-                recvstream_t *restrict rt,
-                streamsock_t *restrict ssock,
-                libtrace_packet_t *restrict packet) {
-
-
-        corsaro_tagged_packet_header_t *taghdr;
-        int nr;
-        uint16_t rlen;
-
-        packet->buf_control = TRACE_CTRL_EXTERNAL;
-
-        packet->trace = libtrace;
-        packet->buffer = ssock->nextread;
-        packet->header = ssock->nextread;
-        packet->type = TRACE_RT_DATA_CORSARO_TAGGED;
-
-        taghdr = (corsaro_tagged_packet_header_t *)packet->header;
-
-        packet->payload = &(taghdr->tags);
-
-        rlen = ntohs(taghdr->pktlen) + sizeof(corsaro_tagged_packet_header_t);
-        rt->received_packets ++;
-        ssock->total_recordcount += 1;
-
-        nr = ssock->nextreadind;
-        ssock->nextread += rlen;
-	ssock->nextts = 0;
-        ssock->nextrlen = 0;
-        ssock->reccount ++;
-
-	if (ssock->nextread - ssock->saved[nr] > ssock->savedsize[nr]) {
-		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Walked past the end of the "
-			"nDAG receive buffer, probably due to a invalid taghdr->pktlen, in ndag_prepare_packet_stream_corsarotag()");
-		return -1;
-	}
-
-        if (ssock->nextread - ssock->saved[nr] >= ssock->savedsize[nr]) {
-                /* Read everything from this buffer, mark as empty and
-                 * move on. */
-                ssock->savedsize[nr] = 0;
-                ssock->bufwaiting ++;
-                ssock->reccount = 0;
-
-                nr ++;
-                if (nr == ENCAP_BUFFERS) {
-                        nr = 0;
-                }
-                ssock->nextread = ssock->saved[nr] + sizeof(ndag_common_t) +
-                                sizeof(ndag_encap_t);
-                ssock->nextreadind = nr;
-        } else if (ssock->reccount >= ssock->expectedreccount) {
-                /*
-                int x = check_ndag_received(ssock, ssock->nextreadind,
-                                ssock->savedsize[nr] - (ssock->nextread
-                                        - ssock->saved[nr]), rt,
-                                ssock->nextread - ssock->saved[nr]);
-
-                ssock->reccount = 0;
-                if (x <= 0) {
-                        ssock->savedsize[nr] = 0;
-                        ssock->bufwaiting ++;
-                        ssock->reccount = 0;
-
-                        nr ++;
-                        if (nr == ENCAP_BUFFERS) {
-                                nr = 0;
-                        }
-                        ssock->nextread = ssock->saved[nr] +
-                                        sizeof(ndag_common_t) +
-                                        sizeof(ndag_encap_t);
-                        ssock->nextreadind = nr;
-                }
-                */
-        }
-
-        packet->order = ((uint64_t) ntohl(taghdr->ts_sec)) << 32;
-        packet->order += (((uint64_t) ntohl(taghdr->ts_usec)) << 32) / 1000000;
-        packet->error = rlen;
-        packet->cached.link_type = TRACE_TYPE_CORSAROTAG;
-        return rlen;
-}
-
 static int got_complete_packet(streamsock_t *ssock) {
         unsigned int required, available;
         int nr = ssock->nextreadind;
@@ -1050,7 +967,6 @@ static int process_ndag_encap_headers(streamsock_t *ssock, recvstream_t *rt) {
         } else if (rectype != NDAG_PKT_ENCAPERF) {
                 fprintf(stderr, "Received invalid record on the channel for %s:%u.\n",
                                 ssock->groupaddr, ssock->port);
-                assert(0);
                 return -1;
         }
 
@@ -1079,6 +995,46 @@ static int process_ndag_encap_headers(streamsock_t *ssock, recvstream_t *rt) {
         return 1;
 }
 
+static int process_ndag_corsaro_header(streamsock_t *ssock,
+                recvstream_t *rt UNUSED) {
+
+        corsaro_tagged_packet_header_t *taghdr;
+
+        int nr;
+        unsigned int available, required;
+        char tmpbuf[ENCAP_BUFSIZE * 2];
+        char *usebuf;
+
+        nr = ssock->nextreadind;
+
+        if (ssock->savedsize[nr] == 0) {
+                /* no data available? I don't think we should be able to
+                 * get here in that case... */
+                return 0;
+        }
+
+        assert(ssock->expectedreccount != 0);
+        available = ssock->savedsize[nr] - (ssock->nextread - ssock->saved[nr]);
+        required = sizeof(corsaro_tagged_packet_header_t);
+        usebuf = ssock->nextread;
+
+        if (available < required) {
+                available = copy_tmp_buffer(ssock, tmpbuf, required);
+                if (available == 0) {
+                        return 0;
+                }
+                usebuf = tmpbuf;
+        }
+
+        taghdr = (corsaro_tagged_packet_header_t *)usebuf;
+
+        ssock->nextrlen = ntohs(taghdr->pktlen) +
+                        sizeof(corsaro_tagged_packet_header_t);
+        ssock->nextts = ((uint64_t) ntohl(taghdr->ts_sec)) << 32;
+        ssock->nextts += (((uint64_t) ntohl(taghdr->ts_usec)) << 32) / 1000000;
+        return 1;
+}
+
 static int process_ndag_erf_headers(streamsock_t *ssock, recvstream_t *rt) {
 
         dag_record_t *erfptr;
@@ -1096,19 +1052,9 @@ static int process_ndag_erf_headers(streamsock_t *ssock, recvstream_t *rt) {
                 return 0;
         }
 
-        if (ssock->expectedreccount == 0) {
-                int r;
-                if ((r = process_ndag_encap_headers(ssock, rt)) <= 0) {
-                        return -1;
-                }
-                if (r == 0) {
-                        return 0;
-                }
-        }
-
+        assert(ssock->expectedreccount != 0);
         available = ssock->savedsize[nr] - (ssock->nextread - ssock->saved[nr]);
-        required = sizeof(dag_record_t);
-        //required = dag_record_size;
+        required = dag_record_size;
         usebuf = ssock->nextread;
 
         if (available < required) {
@@ -1204,10 +1150,71 @@ static int ndag_prepare_packet_stream_encaperf(libtrace_t *restrict libtrace,
         if (ssock->reccount >= ssock->expectedreccount) {
                 ssock->expectedreccount = 0;
                 ssock->reccount = 0;
+                ssock->rectype = 0;
         }
 
         packet->order = erf_get_erf_timestamp(packet);
         packet->cached.link_type = erf_get_link_type(packet);
+        return rlen;
+}
+
+static int ndag_prepare_packet_stream_corsarotag(libtrace_t *restrict libtrace,
+                recvstream_t *restrict rt,
+                streamsock_t *restrict ssock,
+                libtrace_packet_t *restrict packet) {
+
+
+        corsaro_tagged_packet_header_t *taghdr;
+        char tmpbuf[ENCAP_BUFSIZE * 2];
+        int nr, rlen;
+        unsigned int available;
+        char *usebuf = ssock->nextread;
+
+        nr = ssock->nextreadind;
+        available = ssock->savedsize[nr] - (ssock->nextread - ssock->saved[nr]);
+
+        if (ssock->nextrlen == 0 || ssock->nextrlen > ENCAP_BUFSIZE) {
+                return -1;
+        }
+
+        if (available < ssock->nextrlen) {
+                if (copy_tmp_buffer(ssock, tmpbuf, ssock->nextrlen) == 0) {
+                        return 0;
+                }
+                usebuf = tmpbuf;
+        }
+
+        if (packet->buf_control != TRACE_CTRL_PACKET || !packet->buffer) {
+                packet->buf_control = TRACE_CTRL_PACKET;
+                packet->buffer = malloc(LIBTRACE_PACKET_BUFSIZE);
+        }
+        packet->trace = libtrace;
+        memcpy(packet->buffer, usebuf, ssock->nextrlen);
+        packet->header = packet->buffer;
+        packet->type = TRACE_RT_DATA_CORSARO_TAGGED;
+        packet->error = ssock->nextrlen;
+
+        taghdr = (corsaro_tagged_packet_header_t *)packet->header;
+
+        rt->received_packets ++;
+        ssock->total_recordcount += 1;
+
+        consume_streamsock_data(ssock, ssock->nextrlen);
+
+        rlen = ssock->nextrlen;
+
+	ssock->nextts = 0;
+        ssock->reccount ++;
+        ssock->nextrlen = 0;
+
+        if (ssock->reccount >= ssock->expectedreccount) {
+                ssock->expectedreccount = 0;
+                ssock->reccount = 0;
+        }
+
+        packet->order = ((uint64_t) ntohl(taghdr->ts_sec)) << 32;
+        packet->order += (((uint64_t) ntohl(taghdr->ts_usec)) << 32) / 1000000;
+        packet->cached.link_type = TRACE_TYPE_CORSAROTAG;
         return rlen;
 }
 
@@ -1340,6 +1347,7 @@ static int add_new_streamsock(libtrace_t *libtrace,
         ssock->nextrlen = 0;
         ssock->reccount = 0;
         ssock->expectedreccount = 0;
+        ssock->rectype = 0;
 
         for (i = 0; i < ENCAP_BUFFERS; i++) {
                 ssock->saved[i] = (char *)malloc(ENCAP_BUFSIZE);
@@ -1746,8 +1754,28 @@ static streamsock_t *select_next_packet(recvstream_t *rt) {
                         continue;
                 }
 
+                if (rt->sources[i].rectype == 0) {
+                        r = process_ndag_encap_headers(&(rt->sources[i]), rt);
+                        if (r < 0) {
+                                return NULL;
+                        }
+                        if (r == 0) {
+                                continue;
+                        }
+                }
+
 		if (rt->sources[i].nextts == 0) {
-                        r = process_ndag_erf_headers(&(rt->sources[i]), rt);
+                        if (rt->sources[i].rectype == NDAG_PKT_ENCAPERF) {
+                                r = process_ndag_erf_headers(
+                                                &(rt->sources[i]), rt);
+                        } else if (rt->sources[i].rectype ==
+                                        NDAG_PKT_CORSAROTAG) {
+                                r = process_ndag_corsaro_header(
+                                                &(rt->sources[i]), rt);
+                        } else {
+                                r = 0;
+                        }
+
                         if (r < 0) {
                                 return NULL;
                         }
