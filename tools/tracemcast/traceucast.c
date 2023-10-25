@@ -86,7 +86,6 @@ struct global_params {
     uint64_t starttime;
     uint16_t firstport;
     int readercount;
-    uint16_t mtu;
 };
 
 struct beacon_params {
@@ -112,6 +111,8 @@ typedef struct read_thread_data {
     uint8_t failed;
 
 } read_thread_data_t;
+
+#define MAX_PACKET_SIZE 10000
 
 volatile int halted = 0;
 
@@ -240,7 +241,7 @@ static void *init_reader_thread(libtrace_t *trace,
     rdata->threadid = trace_get_perpkt_thread_id(t);
     rdata->streamport = gparams->firstport + rdata->threadid;
     rdata->streamfd = -1;
-    rdata->pbuffer = calloc(gparams->mtu, sizeof(uint8_t));
+    rdata->pbuffer = calloc(MAX_PACKET_SIZE, sizeof(uint8_t));
     rdata->writeptr = rdata->pbuffer;
     rdata->seqno = 1;
     rdata->target = NULL;
@@ -261,6 +262,7 @@ static int send_ndag_packet(read_thread_data_t *rdata) {
     int sentsofar = 0;
     int ret = 0;
     int attempts = 0;
+    int backoff = 5000;
 
     rdata->encaphdr->recordcount = ntohs(rdata->reccount);
 
@@ -268,13 +270,18 @@ static int send_ndag_packet(read_thread_data_t *rdata) {
         s = send(rdata->streamfd, rdata->pbuffer + sentsofar, rem, MSG_DONTWAIT);
 
         if (s < 0) {
-            if ((errno == EAGAIN || errno == EWOULDBLOCK) && attempts < 10) {
+            if ((errno == EAGAIN || errno == EWOULDBLOCK) && attempts < 20) {
                 attempts ++;
-                usleep(5000);
+                usleep(backoff);
+                backoff = backoff * 2;
+                if (backoff > 1000000) {
+                    backoff = 1000000;
+                }
                 continue;
             }
             fprintf(stderr, "traceucast: thread %d failed to send streamed ERF packet: %s\n",
                    rdata->threadid, strerror(errno));
+            fprintf(stderr, "%u\n", rdata->seqno);
             ret = -1;
             break;
         }
@@ -417,7 +424,7 @@ static libtrace_packet_t *packet_reader_thread(libtrace_t *trace UNUSED,
     l2 = trace_get_layer2(packet, &ltype, &rem);
     erfts = trace_get_erf_timestamp(packet);
 
-    if (gparams->mtu - (rdata->writeptr - rdata->pbuffer) <
+    if (MAX_PACKET_SIZE - (rdata->writeptr - rdata->pbuffer) <
             rem + dag_record_size) {
 
         /* if not and if there is already something in the buffer, send it then
@@ -453,12 +460,6 @@ static libtrace_packet_t *packet_reader_thread(libtrace_t *trace UNUSED,
         rdata->seqno ++;
     }
 
-    if (rem > gparams->mtu - (rdata->writeptr - rdata->pbuffer)
-            - (dag_record_size + 2)) {
-        rem = gparams->mtu - (rdata->writeptr - rdata->pbuffer);
-        rem -= (dag_record_size + 2);
-    }
-
     /* put an ERF header in at writeptr */
     rdata->writeptr += construct_erf_header(rdata, packet, ltype, rem, erfts);
 
@@ -468,7 +469,7 @@ static libtrace_packet_t *packet_reader_thread(libtrace_t *trace UNUSED,
     rdata->reccount ++;
 
     /* if the buffer is close to full, just send the buffer anyway */
-    if (gparams->mtu - (rdata->writeptr - rdata->pbuffer) -
+    if (MAX_PACKET_SIZE - (rdata->writeptr - rdata->pbuffer) -
             (dag_record_size + 2) < 64) {
         if (send_ndag_packet(rdata) < 0) {
             rdata->failed = 1;
@@ -549,7 +550,7 @@ static uint32_t form_beacon(char **buffer, struct beacon_params *bparams) {
     uint16_t *next;
     int i;
 
-    if (bsize > bparams->gparams->mtu) {
+    if (bsize > MAX_PACKET_SIZE) {
         fprintf(stderr, "traceucast: beacon is too large to fit in a single datagram, either increase MTU or reduce number of threads\n");
         return 0;
     }
@@ -626,7 +627,6 @@ static void usage(char *prog) {
             "   -m --monitorid=idnum     Tag all streamed packets with the given identifier\n"
             "   -c --clientaddr=address  Connect to a ndagtcp receiver at this address/hostname\n"
             "   -p --beaconport=port    Send beacons to the receiver on this port number\n"
-            "   -M --mtu=bytes          Limit streamed message size to this number of bytes\n"
             "   -t --threads=count      Use this number of packet processing threads\n"
             "   -h --help               Show this usage statement\n");
 }
@@ -640,7 +640,6 @@ int main(int argc, char *argv[]) {
     struct beacon_params bparams;
     int threads = 1;
     struct timeval tv;
-    uint16_t mtu = NDAG_MAX_DGRAM_SIZE;
     pthread_t beacontid = 0;
     sigset_t sig_before, sig_block_all;
 
@@ -655,12 +654,11 @@ int main(int argc, char *argv[]) {
             { "clientaddr",  1, 0, 'c' },
             { "beaconport", 1, 0, 'p' },
             { "threads",    1, 0, 't' },
-            { "mtu",        1, 0, 'M' },
             { "help",       0, 0, 'h' },
             { NULL,         0, 0, 0 },
         };
 
-        int c = getopt_long(argc, argv, "M:t:f:m:c:p:h", long_options,
+        int c = getopt_long(argc, argv, "t:f:m:c:p:h", long_options,
                 &optindex);
         if (c == -1) {
             break;
@@ -669,9 +667,6 @@ int main(int argc, char *argv[]) {
         switch (c) {
             case 'f':
                 filterstring = optarg;
-                break;
-            case 'M':
-                mtu = (uint16_t)strtoul(optarg, NULL, 0);
                 break;
             case 'm':
                 gparams.monitorid = (uint16_t)strtoul(optarg, NULL, 0);
@@ -711,18 +706,11 @@ int main(int argc, char *argv[]) {
                 "traceucast: no client address specified to receive our streams. Exiting\n");
         return 1;
     }
-    if (mtu >= NDAG_MAX_DGRAM_SIZE) {
-        mtu = NDAG_MAX_DGRAM_SIZE;
-    } else if (mtu < 536) {
-        mtu = 536;
-    }
-
 
     gettimeofday(&tv, NULL);
     gparams.starttime = bswap_host_to_le64(((tv.tv_sec - 1509494400) * 1000) +
             (tv.tv_usec / 1000.0));
     gparams.readercount = threads;
-    gparams.mtu = mtu;
 
     gparams.firstport = 10000 + (rand() % 52000);
 
