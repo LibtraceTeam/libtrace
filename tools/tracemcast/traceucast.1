@@ -8,7 +8,6 @@ traceucast \- stream captured packets to a libtrace client
 [ \-c <client address> ]
 [ \-p <port for beaconing group> ]
 [ \-t <number of threads> ]
-[ \-M <mtu> ]
 inputuri
 .SH DESCRIPTION
 traceucast reads packets from a single live packet source (e.g. an interface
@@ -46,12 +45,6 @@ send nDAG beacon messages to this port number.
 \fB\-t\fR <threads>
 sets the number of threads to use for streaming packets.
 Each thread will produce a separate stream on a unique port.
-
-.TP
-\fB\-M\fR <bytes>
-do not create any nDAG messages larger than this number of bytes.
-Don't forget to allow for additional encapsulation (e.g. Ethernet, IP, UDP)
-when determining this value.
 
 .SH LINKS
 More details about traceucast (and libtrace) can be found at
