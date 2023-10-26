@@ -1,0 +1,70 @@
+.TH TRACEUCAST "1" "Oct 2023" "traceucast (libtrace)" "User Commands"
+.SH
+traceucast \- stream captured packets to a libtrace client
+.SH SYNOPSIS
+.B traceucast
+[ \-m <monitor identifier> ]
+[ \-f <filterstring> ]
+[ \-c <client address> ]
+[ \-p <port for beaconing group> ]
+[ \-t <number of threads> ]
+[ \-M <mtu> ]
+inputuri
+.SH DESCRIPTION
+traceucast reads packets from a single live packet source (e.g. an interface
+or hardware capture card) and then emits those packets to a specified
+libtrace client program that can process the packets off-site.
+
+This allows the redirection of packets captured on one host to another.
+Unlike tracemcast, traceucast uses TCP to transfer packets, so the packet
+stream is reliable and ordered. The downside is that traceucast can only
+maintain a connection to a single receiving client at a time.
+
+The streaming protocol is the nDAG protocol, which libtrace supports as
+an input format, so libtrace programs can natively receive packets from a
+traceucast instance without any additional modifications.
+
+.TP
+\fB\-m\fR <monitor identifier>
+set a unique identifier that will be included in the nDAG header. This is used
+by the recipient to tell which traceucast instance emitted the packet.
+
+.TP
+\fB\-f\fR <filterstring>
+only emit packets that match this BPF filter expression.
+
+.TP
+\fB\-c\fR <address>
+transmit captured packets to this client address. The client should be
+a libtrace program that is using an ndagtcp: input URI.
+
+.TP
+\fB\-p\fR <port>
+send nDAG beacon messages to this port number.
+
+.TP
+\fB\-t\fR <threads>
+sets the number of threads to use for streaming packets.
+Each thread will produce a separate stream on a unique port.
+
+.TP
+\fB\-M\fR <bytes>
+do not create any nDAG messages larger than this number of bytes.
+Don't forget to allow for additional encapsulation (e.g. Ethernet, IP, UDP)
+when determining this value.
+
+.SH LINKS
+More details about traceucast (and libtrace) can be found at
+https://github.com/LibtraceTeam/libtrace/wiki
+
+.SH SEE ALSO
+libtrace(3), tracesplit(1), tracesplit_dir(1), tracefilter(1),
+traceconvert(1), tracereport(1), tracertstats(1), tracestats(1), 
+tracepktdump(1), traceanon(1), tracesummary(1), tracereplay(1),
+tracediff(1), traceends(1), tracetopends(1), tracemerge(1),
+tracemcast(1)
+
+.SH AUTHORS
+Shane Alcock <shane@alcock.co.nz>
+
+

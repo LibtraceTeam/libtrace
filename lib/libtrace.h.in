@@ -464,6 +464,7 @@ enum base_format_t {
 	TRACE_FORMAT_PFRINGOLD	  =26,
 	TRACE_FORMAT_PFRING       =27,
         TRACE_FORMAT_ETSIFILE     =28,  /**< ETSI LI in a binary file */
+        TRACE_FORMAT_NDAG_TCP     =29,  /**< DAG unicast over a network */
 };
 
 /** RT protocol packet types */
