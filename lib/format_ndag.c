@@ -864,7 +864,8 @@ static int got_complete_packet(streamsock_t *ssock) {
         int nr = ssock->nextreadind;
         int next;
 
-        if (ssock->rectype == NDAG_PKT_ENCAPERF) {
+        if (ssock->rectype == NDAG_PKT_ENCAPERF ||
+                        ssock->rectype == NDAG_PKT_CORSAROTAG) {
                 required = ssock->nextrlen;
         } else {
                 required = 0;
@@ -964,7 +965,8 @@ static int process_ndag_encap_headers(streamsock_t *ssock, recvstream_t *rt) {
         if (rectype == NDAG_PKT_KEEPALIVE) {
                 consume_streamsock_data(ssock, required);
                 return process_ndag_encap_headers(ssock, rt);
-        } else if (rectype != NDAG_PKT_ENCAPERF) {
+        } else if (rectype != NDAG_PKT_ENCAPERF &&
+                        rectype != NDAG_PKT_CORSAROTAG) {
                 fprintf(stderr, "Received invalid record on the channel for %s:%u.\n",
                                 ssock->groupaddr, ssock->port);
                 return -1;
@@ -1196,6 +1198,11 @@ static int ndag_prepare_packet_stream_corsarotag(libtrace_t *restrict libtrace,
 
         taghdr = (corsaro_tagged_packet_header_t *)packet->header;
 
+        packet->payload = &(taghdr->tags);
+        packet->order = ((uint64_t) ntohl(taghdr->ts_sec)) << 32;
+        packet->order += (((uint64_t) ntohl(taghdr->ts_usec)) << 32) / 1000000;
+        packet->cached.link_type = TRACE_TYPE_CORSAROTAG;
+
         rt->received_packets ++;
         ssock->total_recordcount += 1;
 
@@ -1210,11 +1217,9 @@ static int ndag_prepare_packet_stream_corsarotag(libtrace_t *restrict libtrace,
         if (ssock->reccount >= ssock->expectedreccount) {
                 ssock->expectedreccount = 0;
                 ssock->reccount = 0;
+                ssock->rectype = 0;
         }
 
-        packet->order = ((uint64_t) ntohl(taghdr->ts_sec)) << 32;
-        packet->order += (((uint64_t) ntohl(taghdr->ts_usec)) << 32) / 1000000;
-        packet->cached.link_type = TRACE_TYPE_CORSAROTAG;
         return rlen;
 }
 
