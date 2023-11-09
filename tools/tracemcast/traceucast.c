@@ -1,6 +1,6 @@
 /*
  *
- * Copyright (c) 2007-2023 The University of Waikato, Hamilton, New Zealand.
+ * Copyright (c) 2023 Shane Alcock.
  * All rights reserved.
  *
  * This file is part of libtrace.
