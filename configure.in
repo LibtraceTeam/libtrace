@@ -3,11 +3,11 @@
 # Now you only need to update the version number in two places - below,
 # and in the README
 
-AC_INIT([libtrace],[4.0.22],[shane@alcock.co.nz],[libtrace])
+AC_INIT([libtrace],[4.0.23],[shane@alcock.co.nz],[libtrace])
 
 LIBTRACE_MAJOR=4
 LIBTRACE_MID=0
-LIBTRACE_MINOR=22
+LIBTRACE_MINOR=23
 
 # OpenSolaris hides libraries like libncurses in /usr/gnu/lib, which is not
 # searched by default - add it to LDFLAGS so we at least have a chance of 
@@ -102,8 +102,10 @@ ADD_LDFLAGS="$ADD_LDFLAGS -L\$(abs_top_srcdir)/lib"
 LIBTRACE_LIBS=""
 TOOLS_LIBS=""
 
-CFLAGS="$CFLAGS -Wall -Wmissing-prototypes -Wextra -DLT_BUILDING_DLL=1"
-CXXFLAGS="$CXXFLAGS -Wall -DLT_BUILDING_DLL=1"
+CFLAGS="$CFLAGS  -Wall -Wmissing-prototypes -Wextra -DLT_BUILDING_DLL=1"
+CXXFLAGS="$CXXFLAGS  -Wall -DLT_BUILDING_DLL=1"
+#CFLAGS="$CFLAGS -fsanitize=address -Wall -Wmissing-prototypes -Wextra -DLT_BUILDING_DLL=1"
+#CXXFLAGS="$CXXFLAGS -fsanitize=address -Wall -DLT_BUILDING_DLL=1"
 
 AC_ARG_ENABLE(address-san, AS_HELP_STRING(--enable-address-san, Enable address and memory sanitisation),
 [
