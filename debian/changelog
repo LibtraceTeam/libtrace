@@ -1,3 +1,19 @@
+libtrace4 (4.0.23-1) unstable; urgency=medium
+
+  * Add new tool: traceucast, a TCP unicast variant of tracemcast.
+  * Add new input format: ndagtcp, for receiving packets sent by
+    traceucast.
+  * libpacketdump: fix premature free when decoding IPMM IRIs
+    received via an etsilive input.
+  * tracemcast: fix bug where the sequence number was not being
+    incremented for each sent datagram.
+  * object cache data structure: fix potential segfault after
+    resizing the cache.
+  * pcapfile: fix issue where packets owned by "dead" pcapfile trace
+    would have an invalid pcap version.
+
+ -- Shane Alcock <shane@alcock.co.nz>  Fri, 10 Nov 2023 09:40:41 +1300
+
 libtrace4 (4.0.22-1) unstable; urgency=medium
 
   * Fix segmentation fault when closing an ndag input that had

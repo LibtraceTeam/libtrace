@@ -464,6 +464,7 @@ enum base_format_t {
 	TRACE_FORMAT_PFRINGOLD	  =26,
 	TRACE_FORMAT_PFRING       =27,
         TRACE_FORMAT_ETSIFILE     =28,  /**< ETSI LI in a binary file */
+        TRACE_FORMAT_NDAG_TCP     =29,  /**< DAG unicast over a network */
 };
 
 /** RT protocol packet types */
@@ -554,6 +555,8 @@ typedef enum {
 	TRACE_RT_DLT_PFLOG		=TRACE_RT_DATA_DLT+TRACE_DLT_PFLOG,
 	/** RT is encapsulating a PCAP capture record with an AAL5 linktype */ 
 	TRACE_RT_DLT_ATM_RFC1483 	=TRACE_RT_DATA_DLT+TRACE_DLT_ATM_RFC1483,
+	/** RT is encapsulating a PCAP capture record with a Raw IP linkttype */ 
+	TRACE_RT_DLT_RAW 	        =TRACE_RT_DATA_DLT+TRACE_DLT_RAW,
 	/** Unused value marking the end of the valid range for PCAP RT 
 	 * encapsulation */
 	TRACE_RT_DATA_DLT_END		= 2999,

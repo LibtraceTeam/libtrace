@@ -138,6 +138,8 @@ static int pcapfile_probe_magic(io_t *io)
 
 
 static int pcapfile_init_input(libtrace_t *libtrace) {
+        pcapfile_header_t *pcaphdr;
+
 	libtrace->format_data = malloc(sizeof(struct pcapfile_format_data_t));
 	if (!libtrace->format_data) {
 		trace_set_err(libtrace, TRACE_ERR_INIT_FAILED, "Unable to allocate memory for "
@@ -147,6 +149,16 @@ static int pcapfile_init_input(libtrace_t *libtrace) {
 
 	IN_OPTIONS.real_time = 0;
 	DATA(libtrace)->started = false;
+
+        /* set defaults to support "dummy" trace instances */
+        pcaphdr = &(DATA(libtrace)->header);
+        pcaphdr->magic_number = 0xa1b2c3d4;
+        pcaphdr->version_major = 2;
+        pcaphdr->version_minor = 4;
+        pcaphdr->thiszone = 0;
+        pcaphdr->sigfigs = 0;
+        pcaphdr->snaplen = 65536;
+        pcaphdr->network = TRACE_DLT_EN10MB;
 	return 0;
 }
 

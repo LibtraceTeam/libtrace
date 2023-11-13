@@ -65,7 +65,6 @@ DLLEXPORT void decode(int link_type UNUSED, const char *packet, unsigned len) {
                         printf("  ");
                 }
                 printf("%s: ...\n", namesp);
-                wandder_free_etsili_decoder(dec);
                 if (ident == WANDDER_IRI_CONTENT_IP) {
                         decode_next((const char *)iricontents, rem, "eth",
                                         ((*iricontents) & 0xf0) == 0x40 ?
@@ -75,6 +74,7 @@ DLLEXPORT void decode(int link_type UNUSED, const char *packet, unsigned len) {
                         decode_next((const char *)iricontents, rem, "udp",
                                         5060);
                 }
+                wandder_free_etsili_decoder(dec);
         }
 
         return;
