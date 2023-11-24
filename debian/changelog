@@ -1,3 +1,12 @@
+libtrace4 (4.0.24-1) unstable; urgency=medium
+
+  * ndagtcp: fix miscalculation of ERF header length that would
+    prevent packets from being able to be decoded correctly.
+  * traceucast: do not exit if the client disconnects, instead try to
+    reconnect and resume unicasting.
+
+ -- Shane Alcock <shane@alcock.co.nz>  Sat, 25 Nov 2023 09:58:02 +1300
+
 libtrace4 (4.0.23-1) unstable; urgency=medium
 
   * Add new tool: traceucast, a TCP unicast variant of tracemcast.
