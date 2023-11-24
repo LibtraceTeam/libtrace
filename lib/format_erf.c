@@ -154,6 +154,7 @@ int erf_get_padding(const libtrace_packet_t *packet)
                 case TRACE_FORMAT_NDAG:
                 case TRACE_FORMAT_RAWERF:
                 case TRACE_FORMAT_DPDK_NDAG:
+                case TRACE_FORMAT_NDAG_TCP:
                         switch((erfptr->type & 0x7f)) {
                                 case TYPE_ETH:
                                 case TYPE_COLOR_ETH:
