@@ -118,7 +118,7 @@ volatile int halted = 0;
 
 static void cleanup_signal(int signal UNUSED) {
     if (currenttrace) {
-        trace_pstop(currenttrace);
+        trace_interrupt();
     }
     halted = 1;
 }
@@ -130,7 +130,7 @@ static int create_stream_socket(uint16_t port, char *clientaddr,
     struct addrinfo *gotten;
     char portstr[16];
     int sock;
-    int bufsize, reuse=1;
+    int bufsize, reuse=1, connected = 0;
 
     hints.ai_family = PF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
@@ -201,8 +201,13 @@ static int create_stream_socket(uint16_t port, char *clientaddr,
         } else {
             fprintf(stderr, "traceucast connected to %s:%s\n", clientaddr,
                     portstr);
+            connected = 1;
             break;
         }
+    }
+    if (!connected && sock > 0) {
+        close(sock);
+        sock = -1;
     }
 
 sockcreateover:
@@ -278,8 +283,8 @@ static int connect_stream_fd(read_thread_data_t *rdata,
                 if (errno != ECONNREFUSED) {
                         fprintf(stderr,
                                 "traceucast: failed to create TCP socket for "
-                                "reader thread %d\n",
-                                rdata->threadid);
+                                "reader thread %d: %s\n",
+                                rdata->threadid, strerror(errno));
                         return -1;
                 } else {
                         return 0;
@@ -334,7 +339,7 @@ static int send_ndag_packet(read_thread_data_t *rdata,
 
         rdata->encaphdr->recordcount = ntohs(rdata->reccount);
 
-        while (rem > 0) {
+        while (rem > 0 && !halted) {
                 if (rdata->streamfd == -1) {
                         if ((r = connect_stream_fd(rdata, gparams)) < 0) {
                                 rdata->failed = 1;
@@ -669,7 +674,8 @@ static void *beaconer_thread(void *tdata) {
             if (sock == -1) {
                     if (errno != ECONNREFUSED) {
                             fprintf(stderr, "traceucast: failed to create TCP "
-                                            "socket for beacon thread\n");
+                                            "socket for beacon thread: %s\n",
+                                            strerror(errno));
                             halted = 1;
                             break;
                     } else {
