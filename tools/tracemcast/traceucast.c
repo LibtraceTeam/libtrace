@@ -100,6 +100,7 @@ typedef struct read_thread_data {
     int streamfd;
 
     uint8_t *pbuffer;
+    uint32_t bufsize;
     ndag_encap_t *encaphdr;
     uint8_t *writeptr;
     uint32_t seqno;
@@ -146,6 +147,9 @@ static int create_stream_socket(uint16_t port, char *clientaddr,
         return -1;
     }
     if (targetinfo) {
+        if (*targetinfo) {
+            free(*targetinfo);
+        }
         *targetinfo = gotten;
     }
 
@@ -247,6 +251,7 @@ static void *init_reader_thread(libtrace_t *trace,
     rdata->streamport = gparams->firstport + rdata->threadid;
     rdata->streamfd = -1;
     rdata->pbuffer = calloc(MAX_PACKET_SIZE, sizeof(uint8_t));
+    rdata->bufsize = MAX_PACKET_SIZE;
     rdata->writeptr = rdata->pbuffer;
     rdata->seqno = 1;
     rdata->target = NULL;
@@ -514,7 +519,22 @@ static libtrace_packet_t *packet_reader_thread(libtrace_t *trace UNUSED,
         }
     }
 
-    /* append this packet to the buffer (truncate if necessary) */
+    /* extend the buffer size if we happen to be working with very large
+     * packets
+     */
+    while (rem + dag_record_size + sizeof(ndag_encap_t) + sizeof(ndag_common_t)
+            > rdata->bufsize) {
+        int writeoff = rdata->writeptr - rdata->pbuffer;
+        int encapoff = ((uint8_t *)rdata->encaphdr) - rdata->pbuffer;
+
+        rdata->pbuffer = realloc(rdata->pbuffer,
+                rdata->bufsize + MAX_PACKET_SIZE);
+        rdata->bufsize += MAX_PACKET_SIZE;
+        rdata->writeptr = rdata->pbuffer + writeoff;
+        rdata->encaphdr = rdata->pbuffer + encapoff;
+    }
+
+    /* append this packet to the buffer */
 
     /* if the buffer is empty, put on a common and encap header on the
      * front, before adding any packets */
