@@ -86,10 +86,10 @@ jobs:
        - name: Test package removal
          run: |
            rpm -e libtrace4-tools
-           rpm -e libtrace4-devel
-           rpm -e libtrace4
            rpm -e libpacketdump4-devel
+           rpm -e libtrace4-devel
            rpm -e libpacketdump4
+           rpm -e libtrace4
 
 
   publish:
