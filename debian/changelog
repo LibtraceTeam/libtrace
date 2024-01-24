@@ -1,4 +1,4 @@
-libtrace4 (4.0.24-1~rc02) unstable; urgency=medium
+libtrace4 (4.0.24-1) unstable; urgency=medium
 
   * ndagtcp: fix miscalculation of ERF header length that would
     prevent packets from being able to be decoded correctly.
@@ -17,7 +17,7 @@ libtrace4 (4.0.24-1~rc02) unstable; urgency=medium
   * traceucast: fix race condition that would prevent Ctrl-C from
     halting traceucast properly.
 
- -- Shane Alcock <shane@alcock.co.nz>  Mon, 4 Dec 2023 15:15:09 +1300
+ -- Shane Alcock <shane@alcock.co.nz>  Wed, 24 Jan 2024 13:43:51 +1300
 
 libtrace4 (4.0.23-1) unstable; urgency=medium
 
