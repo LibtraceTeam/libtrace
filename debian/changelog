@@ -1,3 +1,24 @@
+libtrace4 (4.0.24-1) unstable; urgency=medium
+
+  * ndagtcp: fix miscalculation of ERF header length that would
+    prevent packets from being able to be decoded correctly.
+  * traceucast: do not exit if the client disconnects, instead try to
+    reconnect and resume unicasting.
+  * traceucast: fix memory errors when attempting to send a captured
+    packet that is larger than 10K bytes.
+  * ndagtcp: fix issue that would cause input to silently stop reading
+    if it received a packet larger than 10K bytes.
+  * ndagtcp: fix lock-up that occurred when trying to halt a program
+    that was reading from an ndagtcp input.
+  * ndagtcp: fix erroneous "Malformed beacon" message when an ndagtcp
+    input reconnects to traceucast.
+  * traceucast: fix getaddrinfo memory leak.
+  * traceucast: fix endless reconnection loop bug.
+  * traceucast: fix race condition that would prevent Ctrl-C from
+    halting traceucast properly.
+
+ -- Shane Alcock <shane@alcock.co.nz>  Wed, 24 Jan 2024 13:43:51 +1300
+
 libtrace4 (4.0.23-1) unstable; urgency=medium
 
   * Add new tool: traceucast, a TCP unicast variant of tracemcast.

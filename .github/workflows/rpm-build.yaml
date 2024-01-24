@@ -1,4 +1,4 @@
-name: Packaging for Centos and Fedora
+name: Packaging for RPM
 
 on:
   push:
@@ -7,40 +7,126 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-    container:
-      image: ${{ matrix.target }}
-    strategy:
-      fail-fast: false
-      matrix:
-        arch:
-          - amd64
-        target:
-          - "centos:7"
-          - "fedora:37"
-          - "fedora:38"
-          - "rockylinux:8"
-          - "rockylinux:9"
+     runs-on: ubuntu-latest
+     container:
+       image: ${{ matrix.target }}
+     strategy:
+       fail-fast: false
+       matrix:
+         arch:
+           - amd64
+         target:
+           - "rockylinux:8"
+           - "rockylinux:9"
+           - "fedora:39"
+           - "fedora:38"
+           - "centos:7"
 
-
-    steps:
+     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
       - name: Install prereq packages
         run: ./rpmpkg-setup.sh ${{ matrix.target }}
       - name: Build packages
-        run: ./rpmpkg-build.sh ${{ matrix.target }}
-      - name: Store packages
+        run: ./rpmpkg-build.sh
+      - name: Set environment variables for upload
+        run: echo DIRNAME=${{ matrix.target }} | tr ':' '_' >> $GITHUB_ENV
+      - name: Copy packages to uploadable location
         run: |
-          export DIRNAME=`echo ${{ matrix.target }} | tr ':' '_'`
           mkdir -p packages/${DIRNAME}
           cp ~/rpmbuild/RPMS/x86_64/*.rpm packages/${DIRNAME}/
-      - name: Publish packages to cloudsmith
-        uses: salcock/action-cloudsmith-upload-packages@v1.7
+      - name: Store packages
+        uses: actions/upload-artifact@v3
         with:
-          path: packages/
-          repo: ${{ secrets.CLOUDSMITH_OWNER }}/libtrace
-          username: salcock
-          api_key: ${{ secrets.CLOUDSMITH_API_KEY }}
+          name: packages-${{ env.DIRNAME }}
+          path: packages/${{ env.DIRNAME }}/*.rpm
+          retention-days: 1
+
+  test:
+     runs-on: ubuntu-latest
+     container:
+       image: ${{ matrix.target }}
+     strategy:
+       fail-fast: false
+       matrix:
+         arch:
+           - amd64
+         target:
+           - "rockylinux:8"
+           - "rockylinux:9"
+           - "fedora:39"
+           - "fedora:38"
+           - "centos:7"
+     needs: build
+     steps:
+       - name: Set environment variables for download
+         run: echo DIRNAME=${{ matrix.target }} | tr ':' '_' >> $GITHUB_ENV
+       - name: Download artifact
+         uses: actions/download-artifact@v3
+         with:
+           name: packages-${{ env.DIRNAME }}
+       - name: Add repositories
+         env:
+           TARGET: ${{ matrix.target }}
+         run: |
+           curl -1sLf 'https://dl.cloudsmith.io/public/wand/libwandio/cfg/setup/bash.rpm.sh' | bash
+           curl -1sLf 'https://dl.cloudsmith.io/public/wand/libwandder/cfg/setup/bash.rpm.sh' | bash
+           if [ "${TARGET}" == "centos:7" ]; then
+               yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm || true
+           fi
+           if [[ "${TARGET}" =~ rocky* ]]; then
+               dnf install -y dnf-plugins-core epel-release || true
+               dnf config-manager --set-enabled powertools || true
+               /usr/bin/crb enable || true
+           fi
+       - name: Test package install
+         run: |
+           yum install -y findutils
+           find . -name "*.rpm" | xargs yum install -y
+       - name: Test package removal
+         run: |
+           rpm -e libtrace4-tools
+           rpm -e libpacketdump4-devel
+           rpm -e libtrace4-devel
+           rpm -e libpacketdump4
+           rpm -e libtrace4
+
+
+  publish:
+     runs-on: ubuntu-latest
+     container:
+       image: ${{ matrix.target }}
+     strategy:
+       fail-fast: false
+       matrix:
+         arch:
+           - amd64
+         target:
+           - "rockylinux:8"
+           - "rockylinux:9"
+           - "fedora:39"
+           - "fedora:38"
+           - "centos:7"
+     needs: test
+     steps:
+       - name: Set environment variables for download
+         run: echo DIRNAME=${{ matrix.target }} | tr ':' '_' >> $GITHUB_ENV
+       - name: Download artifact
+         uses: actions/download-artifact@v3
+         with:
+           name: packages-${{ env.DIRNAME }}
+       - name: Copy packages
+         run: |
+           mkdir -p packages/${DIRNAME}
+           yum install -y findutils
+           find . -name "*.rpm" | xargs cp -t packages/${DIRNAME}/
+       - name: Publish package to cloudsmith
+         uses: wanduow/action-cloudsmith-upload-packages@v1
+         with:
+           path: packages/
+           repo: ${{ secrets.CLOUDSMITH_OWNER }}/libtrace
+           username: salcock
+           api_key: ${{ secrets.CLOUDSMITH_API_KEY }}
+
 
 

@@ -50,7 +50,7 @@
 #include "format_ndag.h"
 
 #define NDAG_IDLE_TIMEOUT (600)
-#define ENCAP_BUFSIZE (10000)
+#define ENCAP_BUFSIZE (65536)
 #define CTRL_BUF_SIZE (10000)
 #define ENCAP_BUFFERS (1000)
 
@@ -440,7 +440,7 @@ static int ndag_parse_control_message(libtrace_t *libtrace, char *msgbuf,
                 numstreams = ntohs(*ptr);
                 ptr ++;
 
-                if ((uint32_t)msgsize != ((numstreams + 1) * sizeof(uint16_t)))
+                if ((uint32_t)msgsize < ((numstreams + 1) * sizeof(uint16_t)))
                 {
                         fprintf(stderr, "Malformed beacon (length doesn't match number of streams).\n");
                         fprintf(stderr, "%u %u\n", msgsize, numstreams);
@@ -556,7 +556,7 @@ static int accept_ndagtcp_connection(libtrace_t *libtrace,
 
         fcntl(sock, F_SETFL, O_NONBLOCK);
 
-        while (is_halted(libtrace) == -1) {
+        while (is_halted(libtrace) == -1 && !ndag_paused) {
                 r = select_on_sock(sock);
                 if (r < 0) {
                         fprintf(stderr, "Error in select while accepting connection on socket for %s:%s -- %s\n",
@@ -1098,7 +1098,7 @@ static int ndag_prepare_packet_stream_encaperf(libtrace_t *restrict libtrace,
         nr = ssock->nextreadind;
         available = ssock->savedsize[nr] - (ssock->nextread - ssock->saved[nr]);
 
-        if (ssock->nextrlen == 0 || ssock->nextrlen > ENCAP_BUFSIZE) {
+        if (ssock->nextrlen == 0) {
                 return -1;
         }
 
@@ -1175,7 +1175,7 @@ static int ndag_prepare_packet_stream_corsarotag(libtrace_t *restrict libtrace,
         nr = ssock->nextreadind;
         available = ssock->savedsize[nr] - (ssock->nextread - ssock->saved[nr]);
 
-        if (ssock->nextrlen == 0 || ssock->nextrlen > ENCAP_BUFSIZE) {
+        if (ssock->nextrlen == 0) {
                 return -1;
         }
 
@@ -1574,7 +1574,6 @@ static int receive_from_single_socket(streamsock_t *ssock, struct timeval *tv,
                 ssock->sock = -1;
                 return 0;
         }
-
         ssock->startidle = 0;
 
         ssock->savedsize[ssock->nextwriteind] = ret;
