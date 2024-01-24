@@ -16,10 +16,9 @@ jobs:
          arch:
            - amd64
          target:
+           - "debian:bookworm"
            - "debian:buster"
            - "debian:bullseye"
-           - "debian:bookworm"
-           - "ubuntu:bionic"
            - "ubuntu:focal"
            - "ubuntu:jammy"
 
@@ -30,16 +29,89 @@ jobs:
         run: ./debpkg-setup.sh
       - name: Build packages
         run: ./debpkg-build.sh
-      - name: Store packages
+      - name: Set environment variables for upload
+        run: echo DIRNAME=${{ matrix.target }} | tr ':' '_' >> $GITHUB_ENV
+      - name: Copy packages to uploadable location
         run: |
-          export DIRNAME=`echo ${{ matrix.target }} | tr ':' '_'`
           mkdir -p packages/${DIRNAME}
           cp ../*.deb packages/${DIRNAME}/
-      - name: Publish packages to cloudsmith
-        uses: wandnz/action-cloudsmith-upload-packages@v1.6
+      - name: Store packages
+        uses: actions/upload-artifact@v3
         with:
-          path: packages/
-          repo: ${{ secrets.CLOUDSMITH_OWNER }}/libtrace
-          username: salcock
-          api_key: ${{ secrets.CLOUDSMITH_API_KEY }}
+          name: packages-${{ env.DIRNAME }}
+          path: packages/${{ env.DIRNAME }}/*.deb
+          retention-days: 1
 
+  test:
+     runs-on: ubuntu-latest
+     container:
+       image: ${{ matrix.target }}
+     strategy:
+       fail-fast: false
+       matrix:
+         arch:
+           - amd64
+         target:
+           - "debian:buster"
+           - "debian:bullseye"
+           - "ubuntu:focal"
+           - "ubuntu:jammy"
+           - "debian:bookworm"
+     needs: build
+     steps:
+       - name: Set environment variables for download
+         run: echo DIRNAME=${{ matrix.target }} | tr ':' '_' >> $GITHUB_ENV
+       - name: Download artifact
+         uses: actions/download-artifact@v3
+         with:
+           name: packages-${{ env.DIRNAME }}
+       - name: Add repositories
+         run: |
+           apt update -y
+           apt install -y apt-transport-https curl
+       - name: Test package install
+         env:
+           DEBIAN_FRONTEND: noninteractive
+         run: |
+           apt update -y
+           find . -name "*.deb" | xargs apt install -y
+       - name: Test package removal
+         env:
+           DEBIAN_FRONTEND: noninteractive
+         run: |
+           apt remove -y --purge libtrace4
+
+  publish:
+     runs-on: ubuntu-latest
+     container:
+       image: ${{ matrix.target }}
+     strategy:
+       fail-fast: false
+       matrix:
+         arch:
+           - amd64
+         target:
+           - "debian:buster"
+           - "debian:bullseye"
+           - "debian:bookworm"
+           - "ubuntu:focal"
+           - "ubuntu:jammy"
+     needs: test
+     steps:
+       - name: Set environment variables for download
+         run: echo DIRNAME=${{ matrix.target }} | tr ':' '_' >> $GITHUB_ENV
+       - name: Download artifact
+         uses: actions/download-artifact@v3
+         with:
+           name: packages-${{ env.DIRNAME }}
+       - name: Copy packages
+         run: |
+           mkdir -p packages/${DIRNAME}
+           find . -name "*.deb" | xargs cp -t packages/${DIRNAME}/
+       - name: Publish package to cloudsmith
+         uses: wanduow/action-cloudsmith-upload-packages@v1
+         with:
+           path: packages/
+           repo: ${{ secrets.CLOUDSMITH_OWNER }}/libtrace
+           username: salcock
+           api_key: ${{ secrets.CLOUDSMITH_API_KEY }}
