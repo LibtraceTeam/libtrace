@@ -69,6 +69,8 @@ jobs:
          env:
            TARGET: ${{ matrix.target }}
          run: |
+           curl -1sLf 'https://dl.cloudsmith.io/public/wand/libwandio/cfg/setup/bash.rpm.sh' | bash
+           curl -1sLf 'https://dl.cloudsmith.io/public/wand/libwandder/cfg/setup/bash.rpm.sh' | bash
            if [ "${TARGET}" == "centos:7" ]; then
                yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm || true
            fi

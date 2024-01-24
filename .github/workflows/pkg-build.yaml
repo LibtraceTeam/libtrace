@@ -69,6 +69,8 @@ jobs:
          run: |
            apt update -y
            apt install -y apt-transport-https curl
+           curl -1sLf 'https://dl.cloudsmith.io/public/wand/libwandio/cfg/setup/bash.deb.sh' | bash
+           curl -1sLf 'https://dl.cloudsmith.io/public/wand/libwandder/cfg/setup/bash.deb.sh' | bash
        - name: Test package install
          env:
            DEBIAN_FRONTEND: noninteractive
