@@ -1639,11 +1639,16 @@ static int receive_from_sockets(recvstream_t *rt, uint8_t socktype) {
 	}
 
 	for (i = 0; i < rt->sourcecount; i++) {
-                if (rt->sources[i].sock == -1 ||
-                                !FD_ISSET(rt->sources[i].sock, &fds)) {
-			if (rt->sources[i].bufavail < ENCAP_BUFFERS) {
-				readybufs ++;
-			}
+        streamsock_t *ssock = &(rt->sources[i]);
+        if (ssock->sock == -1 || !FD_ISSET(ssock->sock, &fds)) {
+
+            if (ssock->nextreadind != ssock->nextwriteind) {
+                readybufs ++;
+            } else if (ssock->savedsize[ssock->nextreadind] -
+                    (ssock->nextread - ssock->saved[ssock->nextreadind]) > 0) {
+                readybufs ++;
+            }
+
 			continue;
 		}
 #if HAVE_DECL_RECVMMSG
@@ -1666,6 +1671,7 @@ static int receive_encap_records_block(libtrace_t *libtrace, recvstream_t *rt,
                 libtrace_packet_t *packet, libtrace_message_queue_t *msg) {
 
         int iserr = 0;
+        int delay = 0;
 
         if (packet->buf_control == TRACE_CTRL_PACKET) {
                 free(packet->buffer);
@@ -1686,11 +1692,15 @@ static int receive_encap_records_block(libtrace_t *libtrace, recvstream_t *rt,
                         return iserr;
                 }
 
+                if (delay > 1000000) {
+                    return rt->sourcecount + 1;
+                }
                 /* If blocking and no sources, sleep for a bit and then try
                  * checking for messages again.
                  */
                 if (rt->sourcecount == 0) {
                         usleep(10000);
+                        delay += 10000;
                         continue;
                 }
 
@@ -1714,6 +1724,7 @@ static int receive_encap_records_block(libtrace_t *libtrace, recvstream_t *rt,
                  */
                 if (iserr == 0) {
                         usleep(100);
+                        delay += 100;
                 }
 
         } while (!rt->halted);
@@ -1853,11 +1864,22 @@ static int ndag_pread_packets(libtrace_t *libtrace, libtrace_thread_t *t,
                         rem = receive_encap_records_block(libtrace, rt,
                                 packets[read_packets], &t->messages);
                         if (rem < 0) {
+                            if (rem == READ_MESSAGE && read_packets == 0) {
                                 return rem;
+                            } else {
+                                /* allow us to return the packets we've read,
+                                 * then libtrace can check for messages
+                                 */
+                                break;
+                            }
                         }
 
                         if (rem == 0) {
                                 break;
+                        }
+
+                        if (rem > rt->sourcecount && read_packets > 0) {
+                            break;
                         }
                 }
                 nextavail = select_next_packet(rt);
