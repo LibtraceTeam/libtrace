@@ -1607,7 +1607,8 @@ static int receive_from_sockets(recvstream_t *rt, uint8_t socktype) {
 #if HAVE_DECL_RECVMMSG
                 /* Plenty of full buffers, just use the packets in those */
                 if (socktype == NDAG_SOCKET_TYPE_MULTICAST) {
-                        if (rt->sources[i].bufavail < RECV_BATCH_SIZE / 2) {
+                        if (rt->sources[i].bufavail <
+                                        RECV_BATCH_SIZE / 2) {
                                 readybufs ++;
                                 continue;
                         }
@@ -1759,57 +1760,54 @@ static int receive_encap_records_nonblock(libtrace_t *libtrace, recvstream_t *rt
 }
 
 static streamsock_t *select_next_packet(recvstream_t *rt) {
-        int i, r;
-        streamsock_t *ssock = NULL;
-        uint64_t earliest = 0;
-        uint64_t currentts = 0;
+    int i, r;
+    streamsock_t *ssock = NULL;
+    uint64_t earliest = 0;
+    uint64_t currentts = 0;
 
-        for (i = 0; i < rt->sourcecount; i ++) {
-                if (!readable_data(&(rt->sources[i]))) {
-                        continue;
-                }
-
-                if (rt->sources[i].rectype == 0) {
-                        r = process_ndag_encap_headers(&(rt->sources[i]), rt);
-                        if (r < 0) {
-                                return NULL;
-                        }
-                        if (r == 0) {
-                                continue;
-                        }
-                }
-
-		if (rt->sources[i].nextts == 0) {
-                        if (rt->sources[i].rectype == NDAG_PKT_ENCAPERF) {
-                                r = process_ndag_erf_headers(
-                                                &(rt->sources[i]), rt);
-                        } else if (rt->sources[i].rectype ==
-                                        NDAG_PKT_CORSAROTAG) {
-                                r = process_ndag_corsaro_header(
-                                                &(rt->sources[i]), rt);
-                        } else {
-                                r = 0;
-                        }
-
-                        if (r < 0) {
-                                return NULL;
-                        }
-                        if (r == 0) {
-                                continue;
-                        }
-		}
-                assert(rt->sources[i].nextts != 0);
-		currentts = rt->sources[i].nextts;
-
-                if (earliest == 0 || earliest > currentts) {
-                        earliest = currentts;
-                        ssock = &(rt->sources[i]);
-                }
+    for (i = 0; i < rt->sourcecount; i ++) {
+        if (!readable_data(&(rt->sources[i]))) {
+            continue;
         }
-        if (ssock && got_complete_packet(ssock)) {
-                return ssock;
+
+        if (rt->sources[i].rectype == 0) {
+            r = process_ndag_encap_headers(&(rt->sources[i]), rt);
+            if (r < 0) {
+                return NULL;
+            }
+            if (r == 0) {
+                continue;
+            }
         }
-        return NULL;
+
+        if (rt->sources[i].nextts == 0) {
+            if (rt->sources[i].rectype == NDAG_PKT_ENCAPERF) {
+                r = process_ndag_erf_headers(&(rt->sources[i]), rt);
+            } else if (rt->sources[i].rectype == NDAG_PKT_CORSAROTAG) {
+                r = process_ndag_corsaro_header(&(rt->sources[i]), rt);
+            } else {
+                r = 0;
+            }
+
+            if (r < 0) {
+                return NULL;
+            }
+            if (r == 0) {
+                continue;
+            }
+        }
+        assert(rt->sources[i].nextts != 0);
+        currentts = rt->sources[i].nextts;
+
+        if (earliest == 0 || earliest > currentts) {
+            earliest = currentts;
+            ssock = &(rt->sources[i]);
+        }
+    }
+    if (ssock && got_complete_packet(ssock)) {
+        return ssock;
+    }
+    return NULL;
 }
 
 static int ndag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
