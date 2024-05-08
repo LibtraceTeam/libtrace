@@ -19,12 +19,13 @@ jobs:
            - "debian:bookworm"
            - "debian:buster"
            - "debian:bullseye"
+           - "ubuntu:noble"
            - "ubuntu:focal"
            - "ubuntu:jammy"
 
      steps:
       - name: Checkout repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install prereq packages
         run: ./debpkg-setup.sh
       - name: Build packages
@@ -36,7 +37,7 @@ jobs:
           mkdir -p packages/${DIRNAME}
           cp ../*.deb packages/${DIRNAME}/
       - name: Store packages
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: packages-${{ env.DIRNAME }}
           path: packages/${{ env.DIRNAME }}/*.deb
@@ -56,13 +57,14 @@ jobs:
            - "debian:bullseye"
            - "ubuntu:focal"
            - "ubuntu:jammy"
+           - "ubuntu:noble"
            - "debian:bookworm"
      needs: build
      steps:
        - name: Set environment variables for download
          run: echo DIRNAME=${{ matrix.target }} | tr ':' '_' >> $GITHUB_ENV
        - name: Download artifact
-         uses: actions/download-artifact@v3
+         uses: actions/download-artifact@v4
          with:
            name: packages-${{ env.DIRNAME }}
        - name: Add repositories
@@ -98,12 +100,13 @@ jobs:
            - "debian:bookworm"
            - "ubuntu:focal"
            - "ubuntu:jammy"
+           - "ubuntu:noble"
      needs: test
      steps:
        - name: Set environment variables for download
          run: echo DIRNAME=${{ matrix.target }} | tr ':' '_' >> $GITHUB_ENV
        - name: Download artifact
-         uses: actions/download-artifact@v3
+         uses: actions/download-artifact@v4
          with:
            name: packages-${{ env.DIRNAME }}
        - name: Copy packages
@@ -111,7 +114,7 @@ jobs:
            mkdir -p packages/${DIRNAME}
            find . -name "*.deb" | xargs cp -t packages/${DIRNAME}/
        - name: Publish package to cloudsmith
-         uses: wanduow/action-cloudsmith-upload-packages@v1
+         uses: salcock/action-cloudsmith-upload-packages@v1.8
          with:
            path: packages/
            repo: ${{ secrets.CLOUDSMITH_OWNER }}/libtrace

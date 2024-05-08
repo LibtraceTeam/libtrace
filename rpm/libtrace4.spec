@@ -127,7 +127,7 @@ find $RPM_BUILD_ROOT -name '*.la' -exec rm -f {} ';'
 
 
 %changelog
-* Fri Apr 19 2024 Shane Alcock <shane@alcock.co.nz> - 4.0.25-1
+* Thu May 9 2024 Shane Alcock <shane@alcock.co.nz> - 4.0.25-1
 - Updated for 4.0.25 release
 
 * Wed Jan 24 2024 Shane Alcock <shane@alcock.co.nz> - 4.0.24-1
