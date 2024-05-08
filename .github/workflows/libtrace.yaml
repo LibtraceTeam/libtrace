@@ -66,7 +66,7 @@ jobs:
         sudo apt-get -y install pfring
         sudo ldconfig
     - name: Checkout libxdp
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         path: xdp-tools
         repository: xdp-project/xdp-tools
@@ -103,7 +103,7 @@ jobs:
         sudo make -j 3 libxdp_install
         sudo ldconfig
     - name: Checkout Libbpf
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         path: libbpf
         repository: libbpf/libbpf
@@ -115,7 +115,7 @@ jobs:
         echo "/usr/lib64" | sudo tee -a /etc/ld.so.conf.d/lib64.conf
         sudo ldconfig
     - name: Checkout Libtrace
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         path: libtrace
         submodules: recursive
@@ -162,7 +162,7 @@ jobs:
       matrix:
         os: [macos-latest]
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         submodules: recursive
     - name: Install Dependencies
@@ -172,20 +172,20 @@ jobs:
       run: |
         cd wandio
         ./bootstrap.sh
-        ./configure
+        ./configure CFLAGS="-I/opt/homebrew/include" LDFLAGS="-L/opt/homebrew/lib"
         make -j 4
         sudo make install
     - name: Build/Install Libwandder
       run: |
         cd libwandder
         ./bootstrap.sh
-        ./configure
+        ./configure CFLAGS="-I/opt/homebrew/include" LDFLAGS="-L/opt/homebrew/lib"
         make -j 3
         sudo make install
     - name: Build/Install Libtrace
       run: |
         ./bootstrap.sh
-        ./configure
+        ./configure CFLAGS="-I/opt/homebrew/include" LDFLAGS="-L/opt/homebrew/lib"
         make -j 4
         sudo make install
     - name: Build Tests
