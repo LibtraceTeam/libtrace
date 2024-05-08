@@ -101,7 +101,6 @@ jobs:
            - "rockylinux:9"
            - "fedora:39"
            - "fedora:38"
-           - "centos:7"
      needs: test
      steps:
        - name: Set environment variables for download
