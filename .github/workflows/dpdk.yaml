@@ -33,13 +33,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, ubuntu-20.04]
-        dpdk_version: [dpdk-22.07, dpdk-21.11.2, dpdk-20.11.6, dpdk-19.11.13, dpdk-18.11.11, dpdk-17.11.10, dpdk-16.11.11]
+        os: [ubuntu-24.04, ubuntu-22.04, ubuntu-20.04]
+        dpdk_version: [dpdk-23.11, dpdk-22.07, dpdk-21.11.2, dpdk-20.11.6, dpdk-19.11.13, dpdk-18.11.11, dpdk-17.11.10, dpdk-16.11.11]
         exclude:
           - os: ubuntu-16.04
             dpdk_version: dpdk-20.11
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         path: libtrace
         submodules: recursive
