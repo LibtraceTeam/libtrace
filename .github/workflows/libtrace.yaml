@@ -167,7 +167,7 @@ jobs:
         submodules: recursive
     - name: Install Dependencies
       run: |
-        brew install flex bison libpcap libtool autoconf automake m4 gcc uthash
+        brew install openssl flex bison libpcap libtool autoconf automake m4 gcc uthash
     - name: Build/Install Wandio
       run: |
         cd wandio
