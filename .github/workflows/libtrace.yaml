@@ -185,8 +185,8 @@ jobs:
     - name: Build/Install Libtrace
       run: |
         ./bootstrap.sh
-        ./configure CFLAGS="-I/opt/homebrew/include" LDFLAGS="-L/opt/homebrew/lib"
-        make -j 4
+        ./configure CPPFLAGS="-I/opt/homebrew/include" CFLAGS="-I/opt/homebrew/include" LDFLAGS="-L/opt/homebrew/lib"
+        make V=1 -j 4
         sudo make install
     - name: Build Tests
       run: cd test; make -j 4
