@@ -1607,7 +1607,8 @@ static int receive_from_sockets(recvstream_t *rt, uint8_t socktype) {
 #if HAVE_DECL_RECVMMSG
                 /* Plenty of full buffers, just use the packets in those */
                 if (socktype == NDAG_SOCKET_TYPE_MULTICAST) {
-                        if (rt->sources[i].bufavail < RECV_BATCH_SIZE / 2) {
+                        if (rt->sources[i].bufavail <
+                                        RECV_BATCH_SIZE / 2) {
                                 readybufs ++;
                                 continue;
                         }
@@ -1639,11 +1640,16 @@ static int receive_from_sockets(recvstream_t *rt, uint8_t socktype) {
 	}
 
 	for (i = 0; i < rt->sourcecount; i++) {
-                if (rt->sources[i].sock == -1 ||
-                                !FD_ISSET(rt->sources[i].sock, &fds)) {
-			if (rt->sources[i].bufavail < ENCAP_BUFFERS) {
-				readybufs ++;
-			}
+        streamsock_t *ssock = &(rt->sources[i]);
+        if (ssock->sock == -1 || !FD_ISSET(ssock->sock, &fds)) {
+
+            if (ssock->nextreadind != ssock->nextwriteind) {
+                readybufs ++;
+            } else if (ssock->savedsize[ssock->nextreadind] -
+                    (ssock->nextread - ssock->saved[ssock->nextreadind]) > 0) {
+                readybufs ++;
+            }
+
 			continue;
 		}
 #if HAVE_DECL_RECVMMSG
@@ -1666,6 +1672,7 @@ static int receive_encap_records_block(libtrace_t *libtrace, recvstream_t *rt,
                 libtrace_packet_t *packet, libtrace_message_queue_t *msg) {
 
         int iserr = 0;
+        int delay = 0;
 
         if (packet->buf_control == TRACE_CTRL_PACKET) {
                 free(packet->buffer);
@@ -1686,11 +1693,15 @@ static int receive_encap_records_block(libtrace_t *libtrace, recvstream_t *rt,
                         return iserr;
                 }
 
+                if (delay > 1000000) {
+                    return rt->sourcecount + 1;
+                }
                 /* If blocking and no sources, sleep for a bit and then try
                  * checking for messages again.
                  */
                 if (rt->sourcecount == 0) {
                         usleep(10000);
+                        delay += 10000;
                         continue;
                 }
 
@@ -1714,6 +1725,7 @@ static int receive_encap_records_block(libtrace_t *libtrace, recvstream_t *rt,
                  */
                 if (iserr == 0) {
                         usleep(100);
+                        delay += 100;
                 }
 
         } while (!rt->halted);
@@ -1748,57 +1760,54 @@ static int receive_encap_records_nonblock(libtrace_t *libtrace, recvstream_t *rt
 }
 
 static streamsock_t *select_next_packet(recvstream_t *rt) {
-        int i, r;
-        streamsock_t *ssock = NULL;
-        uint64_t earliest = 0;
-        uint64_t currentts = 0;
+    int i, r;
+    streamsock_t *ssock = NULL;
+    uint64_t earliest = 0;
+    uint64_t currentts = 0;
 
-        for (i = 0; i < rt->sourcecount; i ++) {
-                if (!readable_data(&(rt->sources[i]))) {
-                        continue;
-                }
-
-                if (rt->sources[i].rectype == 0) {
-                        r = process_ndag_encap_headers(&(rt->sources[i]), rt);
-                        if (r < 0) {
-                                return NULL;
-                        }
-                        if (r == 0) {
-                                continue;
-                        }
-                }
-
-		if (rt->sources[i].nextts == 0) {
-                        if (rt->sources[i].rectype == NDAG_PKT_ENCAPERF) {
-                                r = process_ndag_erf_headers(
-                                                &(rt->sources[i]), rt);
-                        } else if (rt->sources[i].rectype ==
-                                        NDAG_PKT_CORSAROTAG) {
-                                r = process_ndag_corsaro_header(
-                                                &(rt->sources[i]), rt);
-                        } else {
-                                r = 0;
-                        }
-
-                        if (r < 0) {
-                                return NULL;
-                        }
-                        if (r == 0) {
-                                continue;
-                        }
-		}
-                assert(rt->sources[i].nextts != 0);
-		currentts = rt->sources[i].nextts;
-
-                if (earliest == 0 || earliest > currentts) {
-                        earliest = currentts;
-                        ssock = &(rt->sources[i]);
-                }
+    for (i = 0; i < rt->sourcecount; i ++) {
+        if (!readable_data(&(rt->sources[i]))) {
+            continue;
         }
-        if (ssock && got_complete_packet(ssock)) {
-                return ssock;
+
+        if (rt->sources[i].rectype == 0) {
+            r = process_ndag_encap_headers(&(rt->sources[i]), rt);
+            if (r < 0) {
+                return NULL;
+            }
+            if (r == 0) {
+                continue;
+            }
         }
-        return NULL;
+
+        if (rt->sources[i].nextts == 0) {
+            if (rt->sources[i].rectype == NDAG_PKT_ENCAPERF) {
+                r = process_ndag_erf_headers(&(rt->sources[i]), rt);
+            } else if (rt->sources[i].rectype == NDAG_PKT_CORSAROTAG) {
+                r = process_ndag_corsaro_header(&(rt->sources[i]), rt);
+            } else {
+                r = 0;
+            }
+
+            if (r < 0) {
+                return NULL;
+            }
+            if (r == 0) {
+                continue;
+            }
+        }
+        assert(rt->sources[i].nextts != 0);
+        currentts = rt->sources[i].nextts;
+
+        if (earliest == 0 || earliest > currentts) {
+            earliest = currentts;
+            ssock = &(rt->sources[i]);
+        }
+    }
+    if (ssock && got_complete_packet(ssock)) {
+        return ssock;
+    }
+    return NULL;
 }
 
 static int ndag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet) {
@@ -1853,11 +1862,22 @@ static int ndag_pread_packets(libtrace_t *libtrace, libtrace_thread_t *t,
                         rem = receive_encap_records_block(libtrace, rt,
                                 packets[read_packets], &t->messages);
                         if (rem < 0) {
+                            if (rem == READ_MESSAGE && read_packets == 0) {
                                 return rem;
+                            } else {
+                                /* allow us to return the packets we've read,
+                                 * then libtrace can check for messages
+                                 */
+                                break;
+                            }
                         }
 
                         if (rem == 0) {
                                 break;
+                        }
+
+                        if (rem > rt->sourcecount && read_packets > 0) {
+                            break;
                         }
                 }
                 nextavail = select_next_packet(rt);

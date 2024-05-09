@@ -531,7 +531,7 @@ static libtrace_packet_t *packet_reader_thread(libtrace_t *trace UNUSED,
                 rdata->bufsize + MAX_PACKET_SIZE);
         rdata->bufsize += MAX_PACKET_SIZE;
         rdata->writeptr = rdata->pbuffer + writeoff;
-        rdata->encaphdr = rdata->pbuffer + encapoff;
+        rdata->encaphdr = (ndag_encap_t *)(rdata->pbuffer + encapoff);
     }
 
     /* append this packet to the buffer */

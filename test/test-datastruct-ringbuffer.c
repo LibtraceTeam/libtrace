@@ -20,6 +20,9 @@ static void * consumer(void * a) {
 	void *value;
 	for (i = NULL; i < TEST_SIZE; i++) {
 		value = libtrace_ringbuffer_read(rb);
+        if (value != i) {
+            fprintf(stderr, "value: %p    i: %p\n", value, i);
+        }
 		assert(value == i);
 	}
 	return 0;
@@ -40,6 +43,9 @@ static void * consumer_bulk(void * a) {
 	void *value;
 	for (i = NULL; i < TEST_SIZE; i++) {
 		assert (libtrace_ringbuffer_read_bulk(rb, &value, 1, 1) == 1);
+        if (value != i) {
+            fprintf(stderr, "value: %p    i: %p\n", value, i);
+        }
 		assert(value == i);
 	}
 	return 0;
