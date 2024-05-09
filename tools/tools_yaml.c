@@ -33,7 +33,8 @@
 #include <errno.h>
 #include <yaml.h>
 
-int yaml_parse_onoff(char *value) {
+int yaml_parse_onoff(char *value)
+{
     if (strcasecmp(value, "yes") == 0) {
         return 1;
     }
@@ -69,10 +70,11 @@ int yaml_parse_onoff(char *value) {
     return -1;
 }
 
-trace_option_compresstype_t yaml_compress_type(char *compress_type_str) {
+trace_option_compresstype_t yaml_compress_type(char *compress_type_str)
+{
 
     if (strncmp(compress_type_str, "gz", 2) == 0 ||
-            strncmp(compress_type_str, "zlib", 4) == 0) {
+        strncmp(compress_type_str, "zlib", 4) == 0) {
         return TRACE_OPTION_COMPRESSTYPE_ZLIB;
     } else if (strncmp(compress_type_str, "bz", 2) == 0) {
         return TRACE_OPTION_COMPRESSTYPE_BZ2;
@@ -92,8 +94,9 @@ trace_option_compresstype_t yaml_compress_type(char *compress_type_str) {
 }
 
 int yaml_parser(char *configfile, void *arg,
-        int (*parse_mapping)(void *, yaml_document_t *, yaml_node_t *,
-                yaml_node_t *)) {
+                int (*parse_mapping)(void *, yaml_document_t *, yaml_node_t *,
+                                     yaml_node_t *))
+{
     FILE *in = NULL;
     yaml_parser_t parser;
     yaml_document_t document;
@@ -128,7 +131,7 @@ int yaml_parser(char *configfile, void *arg,
         goto endconfig;
     }
     for (pair = root->data.mapping.pairs.start;
-            pair < root->data.mapping.pairs.top; pair ++) {
+         pair < root->data.mapping.pairs.top; pair++) {
 
         key = yaml_document_get_node(&document, pair->key);
         value = yaml_document_get_node(&document, pair->value);

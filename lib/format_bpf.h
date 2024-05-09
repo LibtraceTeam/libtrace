@@ -75,8 +75,8 @@
  * Struct returned by BIOCGSTATS.
  */
 struct bpf_stat {
-	u_int bs_recv;		/* number of packets received */
-	u_int bs_drop;		/* number of packets dropped */
+    u_int bs_recv; /* number of packets received */
+    u_int bs_drop; /* number of packets dropped */
 };
 
 /*
@@ -91,8 +91,8 @@ struct bpf_stat {
  * It has nothing to do with the source code version.
  */
 struct bpf_version {
-	u_short bv_major;
-	u_short bv_minor;
+    u_short bv_major;
+    u_short bv_minor;
 };
 /* Current version number of filter architecture. */
 #define BPF_MAJOR_VERSION 1
@@ -101,33 +101,33 @@ struct bpf_version {
 /*
  * BPF ioctls
  */
-#define	BIOCGBLEN	_IOR('B',102, u_int)
-#define	BIOCSBLEN	_IOWR('B',102, u_int)
-#define	BIOCSETF	_IOW('B',103, struct bpf_program)
-#define	BIOCFLUSH	_IO('B',104)
-#define BIOCPROMISC	_IO('B',105)
-#define	BIOCGDLT	_IOR('B',106, u_int)
-#define BIOCGETIF	_IOR('B',107, struct ifreq)
-#define BIOCSETIF	_IOW('B',108, struct ifreq)
-#define BIOCSRTIMEOUT	_IOW('B',109, struct timeval)
-#define BIOCGRTIMEOUT	_IOR('B',110, struct timeval)
-#define BIOCGSTATS	_IOR('B',111, struct bpf_stat)
-#define BIOCIMMEDIATE	_IOW('B',112, u_int)
-#define BIOCVERSION	_IOR('B',113, struct bpf_version)
-#define BIOCSRSIG	_IOW('B',114, u_int)
-#define BIOCGRSIG	_IOR('B',115, u_int)
-#define BIOCGHDRCMPLT	_IOR('B',116, u_int)
-#define BIOCSHDRCMPLT	_IOW('B',117, u_int)
-#define	BIOCLOCK	_IO('B',118)
-#define	BIOCSETWF	_IOW('B',119, struct bpf_program)
-#define BIOCGFILDROP	_IOR('B',120, u_int)
-#define BIOCSFILDROP	_IOW('B',121, u_int)
-#define BIOCSDLT	_IOW('B',122, u_int)
-#define BIOCGDLTLIST	_IOWR('B',123, struct bpf_dltlist)
-#define BIOCGDIRFILT	_IOR('B',124, u_int)
-#define BIOCSDIRFILT	_IOW('B',125, u_int)
-#define BIOCSWTIMEOUT	_IOW('B',126, struct timeval)
-#define BIOCGWTIMEOUT	_IOR('B',126, struct timeval)
-#define BIOCDWTIMEOUT	_IO('B',126)
+#define BIOCGBLEN _IOR('B', 102, u_int)
+#define BIOCSBLEN _IOWR('B', 102, u_int)
+#define BIOCSETF _IOW('B', 103, struct bpf_program)
+#define BIOCFLUSH _IO('B', 104)
+#define BIOCPROMISC _IO('B', 105)
+#define BIOCGDLT _IOR('B', 106, u_int)
+#define BIOCGETIF _IOR('B', 107, struct ifreq)
+#define BIOCSETIF _IOW('B', 108, struct ifreq)
+#define BIOCSRTIMEOUT _IOW('B', 109, struct timeval)
+#define BIOCGRTIMEOUT _IOR('B', 110, struct timeval)
+#define BIOCGSTATS _IOR('B', 111, struct bpf_stat)
+#define BIOCIMMEDIATE _IOW('B', 112, u_int)
+#define BIOCVERSION _IOR('B', 113, struct bpf_version)
+#define BIOCSRSIG _IOW('B', 114, u_int)
+#define BIOCGRSIG _IOR('B', 115, u_int)
+#define BIOCGHDRCMPLT _IOR('B', 116, u_int)
+#define BIOCSHDRCMPLT _IOW('B', 117, u_int)
+#define BIOCLOCK _IO('B', 118)
+#define BIOCSETWF _IOW('B', 119, struct bpf_program)
+#define BIOCGFILDROP _IOR('B', 120, u_int)
+#define BIOCSFILDROP _IOW('B', 121, u_int)
+#define BIOCSDLT _IOW('B', 122, u_int)
+#define BIOCGDLTLIST _IOWR('B', 123, struct bpf_dltlist)
+#define BIOCGDIRFILT _IOR('B', 124, u_int)
+#define BIOCSDIRFILT _IOW('B', 125, u_int)
+#define BIOCSWTIMEOUT _IOW('B', 126, struct timeval)
+#define BIOCGWTIMEOUT _IOR('B', 126, struct timeval)
+#define BIOCDWTIMEOUT _IO('B', 126)
 
 #endif

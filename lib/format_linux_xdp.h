@@ -2,15 +2,16 @@
 #define FORMAT_LINUX_XDP
 
 /* Exit return codes */
-#define EXIT_OK              0 /* == EXIT_SUCCESS (stdlib.h) man exit(3) */
-#define EXIT_FAIL            1 /* == EXIT_FAILURE (stdlib.h) man exit(3) */
-#define EXIT_FAIL_OPTION     2
-#define EXIT_FAIL_XDP       30
-#define EXIT_FAIL_BPF       40
+#define EXIT_OK 0   /* == EXIT_SUCCESS (stdlib.h) man exit(3) */
+#define EXIT_FAIL 1 /* == EXIT_FAILURE (stdlib.h) man exit(3) */
+#define EXIT_FAIL_OPTION 2
+#define EXIT_FAIL_XDP 30
+#define EXIT_FAIL_BPF 40
 
 /* replace path with autoconf varible?? */
 static char *libtrace_xdp_kern[] = {
-    "../lib/format_linux_xdp_kern.bpf", // this is here for tests to correctly find the bpf program
+    "../lib/format_linux_xdp_kern.bpf", // this is here for tests to correctly
+                                        // find the bpf program
     "/usr/local/share/libtrace/format_linux_xdp_kern.bpf",
     "/usr/share/libtrace/format_linux_xdp_kern.bpf",
 };

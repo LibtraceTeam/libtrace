@@ -45,75 +45,75 @@
 #include "erftypes.h"
 
 #ifdef WIN32
-#pragma pack(push)
-#pragma pack(1)
+#    pragma pack(push)
+#    pragma pack(1)
 #endif
 
 /** GPP Type 1 */
 typedef struct pos_rec {
-	uint32_t  hdlc;			/**< The HDLC header */	
-	uint8_t	  pload[1];		/**< First byte of payload */
-}  PACKED pos_rec_t;
+    uint32_t hdlc;    /**< The HDLC header */
+    uint8_t pload[1]; /**< First byte of payload */
+} PACKED pos_rec_t;
 ct_assert(sizeof(pos_rec_t) == 5);
 
 /** GPP Type 2 */
 typedef struct eth_rec {
-	uint8_t   offset;		/**< Ethernet record offset */
-	uint8_t   pad;			/**< Padding */
-	uint8_t   dst[6];		/**< Destination MAC address */	
-	uint8_t   src[6];		/**< Source MAC address */
-	uint16_t  etype;		/**< Ethertype */
-	uint8_t   pload[1];		/**< First byte of payload */
-}  PACKED eth_rec_t;
+    uint8_t offset;   /**< Ethernet record offset */
+    uint8_t pad;      /**< Padding */
+    uint8_t dst[6];   /**< Destination MAC address */
+    uint8_t src[6];   /**< Source MAC address */
+    uint16_t etype;   /**< Ethertype */
+    uint8_t pload[1]; /**< First byte of payload */
+} PACKED eth_rec_t;
 ct_assert(sizeof(eth_rec_t) == 17);
 
 /** GPP Type 3 */
 typedef struct atm_rec {
-	uint32_t  header;		/**< The ATM header */ 
-	uint8_t   pload[1];		/**< First byte of payload */
-}  PACKED atm_rec_t;
+    uint32_t header;  /**< The ATM header */
+    uint8_t pload[1]; /**< First byte of payload */
+} PACKED atm_rec_t;
 ct_assert(sizeof(atm_rec_t) == 5);
 
 /** GPP Type 4 */
 typedef struct aal5_rec {
-	uint32_t  header; 		/**< The AAL5 header */
-	uint8_t   pload[1];		/**< First byte of payload */
-}  PACKED aal5_rec_t;
+    uint32_t header;  /**< The AAL5 header */
+    uint8_t pload[1]; /**< First byte of payload */
+} PACKED aal5_rec_t;
 ct_assert(sizeof(aal5_rec_t) == 5);
 
 /** Flags */
 typedef struct flags {
-	LT_BITFIELD8  iface:2;		/**< Interface (direction) */
-	LT_BITFIELD8  vlen:1;		/**< Varying Record Lengths Present */
-	LT_BITFIELD8  trunc:1;		/**< Truncated Record */
-	LT_BITFIELD8  rxerror:1;	/**< RX Error detected */
-	LT_BITFIELD8  dserror:1;	/**< Data stream error */
-	LT_BITFIELD8  pad:2;		/**< Unused */
+    LT_BITFIELD8 iface : 2;   /**< Interface (direction) */
+    LT_BITFIELD8 vlen : 1;    /**< Varying Record Lengths Present */
+    LT_BITFIELD8 trunc : 1;   /**< Truncated Record */
+    LT_BITFIELD8 rxerror : 1; /**< RX Error detected */
+    LT_BITFIELD8 dserror : 1; /**< Data stream error */
+    LT_BITFIELD8 pad : 2;     /**< Unused */
 } PACKED flags_t;
 ct_assert(sizeof(flags_t) == 1);
 
 /** GPP Global type */
 typedef struct dag_record {
-	uint64_t  ts;		/**< ERF timestamp */
-	uint8_t   type;		/**< GPP record type */
-	flags_t   flags;	/**< Flags */
-	uint16_t  rlen;		/**< Record len (capture+framing) */
-	uint16_t  lctr;		/**< Loss counter */
-	uint16_t  wlen;		/**< Wire length */
-	union {
-		pos_rec_t       pos;		
-		eth_rec_t       eth;
-		atm_rec_t       atm;
-		aal5_rec_t      aal5;
-	} rec;			/**< The captured record itself */
+    uint64_t ts;   /**< ERF timestamp */
+    uint8_t type;  /**< GPP record type */
+    flags_t flags; /**< Flags */
+    uint16_t rlen; /**< Record len (capture+framing) */
+    uint16_t lctr; /**< Loss counter */
+    uint16_t wlen; /**< Wire length */
+    union {
+        pos_rec_t pos;
+        eth_rec_t eth;
+        atm_rec_t atm;
+        aal5_rec_t aal5;
+    } rec; /**< The captured record itself */
 } PACKED dag_record_t;
 ct_assert(sizeof(dag_record_t) == 33);
 
 #ifdef WIN32
-#pragma pack(pop)
+#    pragma pack(pop)
 #endif
 
 /** The size of the ERF record header, without the rec field */
-#define dag_record_size         16U
+#define dag_record_size 16U
 
 #endif /* _DAGFORMAT_H_ */

@@ -25,29 +25,25 @@
  */
 
 #ifndef LIBTRACE_TRACEANON_H_
-#define LIBTRACE_TRACEANON_H_
+#    define LIBTRACE_TRACEANON_H_
 
-#include "../tools_yaml.h"
+#    include "../tools_yaml.h"
 
-enum enc_type_t {
-        ENC_NONE,
-        ENC_CRYPTOPAN,
-        ENC_PREFIX_SUBSTITUTION
-};
+enum enc_type_t { ENC_NONE, ENC_CRYPTOPAN, ENC_PREFIX_SUBSTITUTION };
 
-#define SALT_LENGTH 32
-#define SHA256_SIZE 32
+#    define SALT_LENGTH 32
+#    define SHA256_SIZE 32
 
 typedef struct traceanon_port_list_t traceanon_port_list_t;
 
 struct traceanon_port_list_t {
-        uint16_t port;
-        traceanon_port_list_t *nextport;
+    uint16_t port;
+    traceanon_port_list_t *nextport;
 };
 
 typedef struct traceanon_radius_server_t {
-        struct in_addr ipaddr;
-        traceanon_port_list_t *port;
+    struct in_addr ipaddr;
+    traceanon_port_list_t *port;
 } traceanon_radius_server_t;
 
 typedef struct radius_header {
@@ -84,16 +80,16 @@ typedef struct traceanon_options {
 
 } traceanon_opts_t;
 
-#ifdef __cplusplus
+#    ifdef __cplusplus
 extern "C" {
-#endif
+#    endif
 
-int traceanon_yaml_parser(void *arg, yaml_document_t *doc,
-        yaml_node_t *key, yaml_node_t *value);
+int traceanon_yaml_parser(void *arg, yaml_document_t *doc, yaml_node_t *key,
+                          yaml_node_t *value);
 
-#ifdef __cplusplus
+#    ifdef __cplusplus
 }
-#endif
+#    endif
 
 #endif
 

@@ -24,7 +24,6 @@
  *
  */
 
-
 /** @file
  *
  * @brief Header file containing definitions for structures and functions
@@ -60,46 +59,46 @@ typedef struct libtrace_result_t libtrace_result_t;
  * This is expected to be 8 bytes in length.
  */
 typedef union {
-	/* Pointers */
-	void *ptr;
-	libtrace_packet_t *pkt;
-	libtrace_result_t *res;
+    /* Pointers */
+    void *ptr;
+    libtrace_packet_t *pkt;
+    libtrace_result_t *res;
 
-	/* C99 Integer types */
-	/* NOTE: Standard doesn't require 64-bit
-	 * but x32 and x64 gcc does */
-	int64_t sint64;
-	uint64_t uint64;
+    /* C99 Integer types */
+    /* NOTE: Standard doesn't require 64-bit
+     * but x32 and x64 gcc does */
+    int64_t sint64;
+    uint64_t uint64;
 
-	uint32_t uint32s[2];
-	int32_t sint32s[2];
-	uint32_t uint32;
-	int32_t sint32;
+    uint32_t uint32s[2];
+    int32_t sint32s[2];
+    uint32_t uint32;
+    int32_t sint32;
 
-	uint16_t uint16s[4];
-	int16_t sint16s[4];
-	uint16_t uint16;
-	int16_t sint16;
+    uint16_t uint16s[4];
+    int16_t sint16s[4];
+    uint16_t uint16;
+    int16_t sint16;
 
-	uint8_t uint8s[8];
-	int8_t sint8s[8];
-	uint8_t uint8;
-	int8_t sint8;
+    uint8_t uint8s[8];
+    int8_t sint8s[8];
+    uint8_t uint8;
+    int8_t sint8;
 
-	size_t size;
+    size_t size;
 
-	/* C basic types - we cannot be certain of the size */
-	int sint;
-	unsigned int uint;
+    /* C basic types - we cannot be certain of the size */
+    int sint;
+    unsigned int uint;
 
-	signed char schars[8];
-	unsigned char uchars[8];
-	signed char schar;
-	unsigned char uchar;
+    signed char schars[8];
+    unsigned char uchars[8];
+    signed char schar;
+    unsigned char uchar;
 
-	/* Real numbers */
-	float rfloat;
-	double rdouble;
+    /* Real numbers */
+    float rfloat;
+    double rdouble;
 } libtrace_generic_t;
 ct_assert(sizeof(libtrace_generic_t) == 8);
 
@@ -107,16 +106,16 @@ ct_assert(sizeof(libtrace_generic_t) == 8);
  * Structure describing a message that can be sent to a libtrace thread.
  */
 typedef struct libtrace_message_t {
-	int code; /**< The message code, as defined in enum libtrace_messages */
-	libtrace_generic_t data; /**< Additional data related to the message */
-	libtrace_thread_t *sender; /**< The thread that sent the message */
+    int code; /**< The message code, as defined in enum libtrace_messages */
+    libtrace_generic_t data;   /**< Additional data related to the message */
+    libtrace_thread_t *sender; /**< The thread that sent the message */
 } libtrace_message_t;
 
 /** Structure holding information about a result */
 struct libtrace_result_t {
-	uint64_t key;   /**< The unique key for the result */
-	libtrace_generic_t value;  /**< The result value itself */
-	int type; /**< Describes the type of result, see enum result_types */
+    uint64_t key;             /**< The unique key for the result */
+    libtrace_generic_t value; /**< The result value itself */
+    int type; /**< Describes the type of result, see enum result_types */
 };
 
 /** The libtrace_messages enum
@@ -130,189 +129,190 @@ struct libtrace_result_t {
  * @note Some messages are for internal use only
  */
 enum libtrace_messages {
-	/** A libtrace packet is ready, this will trigger the packet callback
-         *  for the processing threads.
-	 */
-	MESSAGE_PACKET,
+    /** A libtrace packet is ready, this will trigger the packet callback
+     *  for the processing threads.
+     */
+    MESSAGE_PACKET,
 
-	/** A libtrace meta packet is ready, this will trigger the meta packet
-         *  callback for the processing threads.
-         */
-	MESSAGE_META_PACKET,
+    /** A libtrace meta packet is ready, this will trigger the meta packet
+     *  callback for the processing threads.
+     */
+    MESSAGE_META_PACKET,
 
-        /** A libtrace result is ready, this will trigger the result callback
-         *  for the reporter thread.
-	 */
-	MESSAGE_RESULT,
+    /** A libtrace result is ready, this will trigger the result callback
+     *  for the reporter thread.
+     */
+    MESSAGE_RESULT,
 
-	/** This message is sent to each thread when it first starts and will
-         *  trigger the starting callback for the processing and reporter
-         *  threads. A starting message is sent when trace_pstart is called
-         *  for the first time on a trace.
-	 */
-	MESSAGE_STARTING,
+    /** This message is sent to each thread when it first starts and will
+     *  trigger the starting callback for the processing and reporter
+     *  threads. A starting message is sent when trace_pstart is called
+     *  for the first time on a trace.
+     */
+    MESSAGE_STARTING,
 
-	/** This message is sent to each thread when the thread ends and will
-         *  trigger the stopping callback for the processing and reporter
-         *  threads.
-	 */
-	MESSAGE_STOPPING,
+    /** This message is sent to each thread when the thread ends and will
+     *  trigger the stopping callback for the processing and reporter
+     *  threads.
+     */
+    MESSAGE_STOPPING,
 
-        /** This message is sent to each thread when the thread transitions
-         *  from a paused state to a running state. It will trigger the
-         *  resuming callback for the processing and reporter threads.
-         *
-         *  A resuming message is sent whenever trace_pstart is called on a
-         *  trace (including the first time the trace is started).
-         */
-	MESSAGE_RESUMING,
+    /** This message is sent to each thread when the thread transitions
+     *  from a paused state to a running state. It will trigger the
+     *  resuming callback for the processing and reporter threads.
+     *
+     *  A resuming message is sent whenever trace_pstart is called on a
+     *  trace (including the first time the trace is started).
+     */
+    MESSAGE_RESUMING,
 
-        /** This message is sent to each thread when the thread transitions
-         *  into a paused state from a running state. It will trigger the
-         *  pausing callback for the processing and reporter threads.
-         *
-         *  A pausing message is sent whenever trace_ppause is called on a
-         *  trace. It will also be sent when a trace is stopped, as all traces
-         *  are implicitly paused before they stop.
-         */
-	MESSAGE_PAUSING,
+    /** This message is sent to each thread when the thread transitions
+     *  into a paused state from a running state. It will trigger the
+     *  pausing callback for the processing and reporter threads.
+     *
+     *  A pausing message is sent whenever trace_ppause is called on a
+     *  trace. It will also be sent when a trace is stopped, as all traces
+     *  are implicitly paused before they stop.
+     */
+    MESSAGE_PAUSING,
 
-	/** An internal message for forcing another thread to pause. Do not
-         *  use this in user-defined callbacks!
-         */
-	MESSAGE_DO_PAUSE,
+    /** An internal message for forcing another thread to pause. Do not
+     *  use this in user-defined callbacks!
+     */
+    MESSAGE_DO_PAUSE,
 
-	/** An internal message for forcing another thread to stop. Do not
-         *  use this in user-defined callbacks!
-         */
-	MESSAGE_DO_STOP,
+    /** An internal message for forcing another thread to stop. Do not
+     *  use this in user-defined callbacks!
+     */
+    MESSAGE_DO_STOP,
 
-        /** This message is sent to each processing thread as soon as the first
-         *  packet has been seen by any of the processing threads. This will
-         *  trigger the first_packet callback for the processing threads,
-         *  allowing the threads to perform any initialisation required based
-         *  on the properties of the first packet (e.g. the timestamp).
-         *
-         *  Threads should use trace_get_first_packet() to access the packet
-         *  that triggered this message.
-         *
-         *  @note Upon pausing and restarting a trace, this message will be
-         *  sent again when the first new packet is encountered.
-         */
-	MESSAGE_FIRST_PACKET,
+    /** This message is sent to each processing thread as soon as the first
+     *  packet has been seen by any of the processing threads. This will
+     *  trigger the first_packet callback for the processing threads,
+     *  allowing the threads to perform any initialisation required based
+     *  on the properties of the first packet (e.g. the timestamp).
+     *
+     *  Threads should use trace_get_first_packet() to access the packet
+     *  that triggered this message.
+     *
+     *  @note Upon pausing and restarting a trace, this message will be
+     *  sent again when the first new packet is encountered.
+     */
+    MESSAGE_FIRST_PACKET,
 
-        /** An internal message for notifying the reporter thread that more
-         *  results are available.
-         *
-         *  Do not use this in user-defined callbacks -- call
-         *  trace_post_reporter() instead.
-	 */
-	MESSAGE_POST_REPORTER,
+    /** An internal message for notifying the reporter thread that more
+     *  results are available.
+     *
+     *  Do not use this in user-defined callbacks -- call
+     *  trace_post_reporter() instead.
+     */
+    MESSAGE_POST_REPORTER,
 
-	/** Sent to per-packet threads periodically after the configured time
-	 * interval has passed.
-	 *
-	 * This is sent out-of-band with respect to packets and as a result
-	 * can appear after a packet with an later time-stamp, or before one
-	 * with an earlier time-stamp.
-	 *
-	 * @param data data.uint64 holds the system time-stamp in the
-	 * erf format
-	 * @param sender should be ignored
-	 */
+    /** Sent to per-packet threads periodically after the configured time
+     * interval has passed.
+     *
+     * This is sent out-of-band with respect to packets and as a result
+     * can appear after a packet with an later time-stamp, or before one
+     * with an earlier time-stamp.
+     *
+     * @param data data.uint64 holds the system time-stamp in the
+     * erf format
+     * @param sender should be ignored
+     */
 
-        /** This message is sent to the processing threads periodically, after
-         *  the configured time interval has passed. This message will
-         *  trigger the tick_interval callback function for the processing
-         *  threads.
-         *
-         *  This message is sent out-of-band relative to packet messages and
-         *  therefore can appear after a packet with a later timestamp or
-         *  before a packet with an earlier timestamp.
-         */
-	MESSAGE_TICK_INTERVAL,
+    /** This message is sent to the processing threads periodically, after
+     *  the configured time interval has passed. This message will
+     *  trigger the tick_interval callback function for the processing
+     *  threads.
+     *
+     *  This message is sent out-of-band relative to packet messages and
+     *  therefore can appear after a packet with a later timestamp or
+     *  before a packet with an earlier timestamp.
+     */
+    MESSAGE_TICK_INTERVAL,
 
-	/** Sent to per-packet threads once the configured number of packets
-	 * are read from a trace.
-	 *
-	 * This are sent in-band with respect to packets such that all
-	 * threads will see it between the same packets.
-	 *
-	 * @param data data.uint64 holds the number of packets seen so far across all threads
-	 * @param sender Set to the current per-packet thread
-	 */
-        /** This message is sent to the processing threads periodically, after
-         *  the configured number of packets have been read from the input
-         *  trace. This message will trigger the tick_count callback function
-         *  for the processing threads.
-         *
-         *  This message is sent in-band relative to packet messages and
-         *  will always appear in the right place relative to the other packets
-         *  observed by the thread.
-         */
-	MESSAGE_TICK_COUNT,
+    /** Sent to per-packet threads once the configured number of packets
+     * are read from a trace.
+     *
+     * This are sent in-band with respect to packets such that all
+     * threads will see it between the same packets.
+     *
+     * @param data data.uint64 holds the number of packets seen so far across
+     * all threads
+     * @param sender Set to the current per-packet thread
+     */
+    /** This message is sent to the processing threads periodically, after
+     *  the configured number of packets have been read from the input
+     *  trace. This message will trigger the tick_count callback function
+     *  for the processing threads.
+     *
+     *  This message is sent in-band relative to packet messages and
+     *  will always appear in the right place relative to the other packets
+     *  observed by the thread.
+     */
+    MESSAGE_TICK_COUNT,
 
-	/** All message codes at or above this value represent custom
-         *  user-defined messages and will trigger the usermessage callback
-         *  for the processing threads.
-         */
-	MESSAGE_USER = 1000
+    /** All message codes at or above this value represent custom
+     *  user-defined messages and will trigger the usermessage callback
+     *  for the processing threads.
+     */
+    MESSAGE_USER = 1000
 };
 
 /** The hasher types that are available to libtrace applications.
  *  These can be selected using trace_set_hasher().
  */
 enum hasher_types {
-	/** Balance load across per-packet threads as best as possible, i.e
-         *  the program does not care which thread sees a given packet. This
-	 *  will be implemented using a hash or round robin, depending on the
-         *  format and libtrace configuration.
-	 */
-	HASHER_BALANCE,
+    /** Balance load across per-packet threads as best as possible, i.e
+     *  the program does not care which thread sees a given packet. This
+     *  will be implemented using a hash or round robin, depending on the
+     *  format and libtrace configuration.
+     */
+    HASHER_BALANCE,
 
-	/** Use a hash which is bi-directional for TCP and UDP flows, such that
-	 * packets with the same 5-tuple are sent to the same processing thread.
-	 * All non TCP/UDP packets will be sent to the same thread.
-	 *
-	 * @note it is possible that UDP packets may not be spread across
-	 * processing threads, depending upon the format support. In this case
-	 * they would be directed to a single thread.
-	 */
-	HASHER_BIDIRECTIONAL,
+    /** Use a hash which is bi-directional for TCP and UDP flows, such that
+     * packets with the same 5-tuple are sent to the same processing thread.
+     * All non TCP/UDP packets will be sent to the same thread.
+     *
+     * @note it is possible that UDP packets may not be spread across
+     * processing threads, depending upon the format support. In this case
+     * they would be directed to a single thread.
+     */
+    HASHER_BIDIRECTIONAL,
 
-	/** Use a hash which is uni-directional across TCP and UDP flows, such
-	 * that the opposing directions of the same 5-tuple may end up on
-	 * different processing threads.
-	 * Otherwise this is identical to HASHER_BIDIRECTIONAL.
-	 */
-	HASHER_UNIDIRECTIONAL,
+    /** Use a hash which is uni-directional across TCP and UDP flows, such
+     * that the opposing directions of the same 5-tuple may end up on
+     * different processing threads.
+     * Otherwise this is identical to HASHER_BIDIRECTIONAL.
+     */
+    HASHER_UNIDIRECTIONAL,
 
-	/**
-	 * This value indicates that the hasher is a custom user-defined
-         * function. 
-	 */
-	HASHER_CUSTOM
+    /**
+     * This value indicates that the hasher is a custom user-defined
+     * function.
+     */
+    HASHER_CUSTOM
 };
 
 typedef struct libtrace_info_t {
-	/**
-	 * True if a live format (i.e. packets have to be trace-time).
-	 * Otherwise false, indicating packets can be read as fast
-	 * as possible from the format.
-	 */
-	bool live;
+    /**
+     * True if a live format (i.e. packets have to be trace-time).
+     * Otherwise false, indicating packets can be read as fast
+     * as possible from the format.
+     */
+    bool live;
 
-	/**
-	 * The maximum number of threads supported by a parallel trace. 1
-	 * if parallel support is not native (in this case libtrace will 
-         * simulate an unlimited number of threads), -1 means unlimited and 0
-         * unknown.
-	 */
-	int max_threads;
+    /**
+     * The maximum number of threads supported by a parallel trace. 1
+     * if parallel support is not native (in this case libtrace will
+     * simulate an unlimited number of threads), -1 means unlimited and 0
+     * unknown.
+     */
+    int max_threads;
 
-	/* TODO hash fn supported list */
+    /* TODO hash fn supported list */
 
-	/* TODO consider time/clock details?? */
+    /* TODO consider time/clock details?? */
 } libtrace_info_t;
 
 typedef struct libtrace_combine libtrace_combine_t;
@@ -324,87 +324,88 @@ typedef struct libtrace_combine libtrace_combine_t;
  */
 struct libtrace_combine {
 
-	/**
-	 * Called at the start of the trace to allow data-structures
-	 * to be initialised and allow functions to be swapped if appropriate.
-	 *
-	 * Also factors such as whether the trace is live or not can
-	 * be used to determine the functions used.
-	 * @return 0 if successful, -1 if an error occurs
-	 */
-	int (*initialise)(libtrace_t *,libtrace_combine_t *);
+    /**
+     * Called at the start of the trace to allow data-structures
+     * to be initialised and allow functions to be swapped if appropriate.
+     *
+     * Also factors such as whether the trace is live or not can
+     * be used to determine the functions used.
+     * @return 0 if successful, -1 if an error occurs
+     */
+    int (*initialise)(libtrace_t *, libtrace_combine_t *);
 
-	/**
-	 * Called when the trace ends, clean up any memory allocated
-	 * by the initialise function.
-	 */
-	void (*destroy)(libtrace_t *, libtrace_combine_t *);
+    /**
+     * Called when the trace ends, clean up any memory allocated
+     * by the initialise function.
+     */
+    void (*destroy)(libtrace_t *, libtrace_combine_t *);
 
-	/**
-         * Receive a result from a processing thread. Most implementations
-         * of this function will push the result into an appropriate
-         * queue. If this is NULL, the result will automatically be pushed
-         * to the reporter thread.
-	 */
-	void (*publish)(libtrace_t *, int thread_id, libtrace_combine_t *, libtrace_result_t *);
+    /**
+     * Receive a result from a processing thread. Most implementations
+     * of this function will push the result into an appropriate
+     * queue. If this is NULL, the result will automatically be pushed
+     * to the reporter thread.
+     */
+    void (*publish)(libtrace_t *, int thread_id, libtrace_combine_t *,
+                    libtrace_result_t *);
 
-	/**
-	 * Read as many results as possible from the trace. Each result
-         * that is read should cause a MESSAGE_RESULT to be sent to the
-         * reporter thread.
-	 *
-	 * THIS SHOULD BE NON-BLOCKING AND READ AS MANY AS POSSIBLE!
-	 * If publish is NULL, this probably should be NULL as it will not be
-         * called in that case.
-	 */
-	void (*read)(libtrace_t *, libtrace_combine_t *);
+    /**
+     * Read as many results as possible from the trace. Each result
+     * that is read should cause a MESSAGE_RESULT to be sent to the
+     * reporter thread.
+     *
+     * THIS SHOULD BE NON-BLOCKING AND READ AS MANY AS POSSIBLE!
+     * If publish is NULL, this probably should be NULL as it will not be
+     * called in that case.
+     */
+    void (*read)(libtrace_t *, libtrace_combine_t *);
 
-	/**
-	 * Called when the trace is finished to flush the final
-	 * results to the reporter thread. Any leftover results should
-         * cause a MESSAGE_RESULT to be sent to the reporter thread.
-	 *
-	 * There may be no results, in which case this function should
-	 * just return.
-	 *
-	 * Libtrace state:
-	 * This function will be called from the reporter thread.
-	 * No processing threads will be running, i.e. you can assume that
-         * publish will not be called again.
-	 *
-	 * If publish is NULL, this probably should be NULL as it will not be
-         * called in that case.
-	 */
-	void (*read_final)(libtrace_t *, libtrace_combine_t *);
+    /**
+     * Called when the trace is finished to flush the final
+     * results to the reporter thread. Any leftover results should
+     * cause a MESSAGE_RESULT to be sent to the reporter thread.
+     *
+     * There may be no results, in which case this function should
+     * just return.
+     *
+     * Libtrace state:
+     * This function will be called from the reporter thread.
+     * No processing threads will be running, i.e. you can assume that
+     * publish will not be called again.
+     *
+     * If publish is NULL, this probably should be NULL as it will not be
+     * called in that case.
+     */
+    void (*read_final)(libtrace_t *, libtrace_combine_t *);
 
-	/**
-	 * Pause must make sure any queued results that contain packets are
-         * safe. See libtrace_make_result_safe() for more details on what it
-         * means for a result to be safe.
-	 * This function should be NULL if publish is NULL.
-	 */
-	void (*pause)(libtrace_t *, libtrace_combine_t *);
+    /**
+     * Pause must make sure any queued results that contain packets are
+     * safe. See libtrace_make_result_safe() for more details on what it
+     * means for a result to be safe.
+     * This function should be NULL if publish is NULL.
+     */
+    void (*pause)(libtrace_t *, libtrace_combine_t *);
 
-	/**
-	 * Data storage for all the combiner threads
-	 */
-	void *queues;
+    /**
+     * Data storage for all the combiner threads
+     */
+    void *queues;
 
-        /** The last counter tick that we saw, so we can avoid duplicating
-         *  any ticks that are published.
-         */
-        uint64_t last_count_tick;
+    /** The last counter tick that we saw, so we can avoid duplicating
+     *  any ticks that are published.
+     */
+    uint64_t last_count_tick;
 
-        /** The last timestamp tick that we saw, so we can avoid duplicating
-         *  any ticks that are published.
-         */
-        uint64_t last_ts_tick;
+    /** The last timestamp tick that we saw, so we can avoid duplicating
+     *  any ticks that are published.
+     */
+    uint64_t last_ts_tick;
 
-	/**
-	 * Configuration options, what this does is up to the combiner
-	 * chosen.
-	 */
-	libtrace_generic_t configuration;
+    /**
+     * Configuration options, what this does is up to the combiner
+     * chosen.
+     */
+    libtrace_generic_t configuration;
 };
 
 /**
@@ -417,8 +418,7 @@ struct libtrace_combine {
  *
  * @return The id of the thread that should receive this packet.
  */
-typedef uint64_t (*fn_hasher)(const libtrace_packet_t* packet, void *data);
-
+typedef uint64_t (*fn_hasher)(const libtrace_packet_t *packet, void *data);
 
 /** Start or restart an input trace in the parallel libtrace framework.
  *
@@ -439,7 +439,7 @@ typedef uint64_t (*fn_hasher)(const libtrace_packet_t* packet, void *data);
  * maintained.
  *
  */
-DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob,
+DLLEXPORT int trace_pstart(libtrace_t *libtrace, void *global_blob,
                            libtrace_callback_set_t *per_packet_cbs,
                            libtrace_callback_set_t *reporter_cbs);
 
@@ -455,9 +455,8 @@ DLLEXPORT int trace_pstart(libtrace_t *libtrace, void* global_blob,
  * @return The returned value is stored against the thread's local storage.
  *         This is typically passed as the 'tls' argument to other callbacks.
  */
-typedef void* (*fn_cb_starting)(libtrace_t *libtrace,
-                                     libtrace_thread_t *t,
-                                     void *global);
+typedef void *(*fn_cb_starting)(libtrace_t *libtrace, libtrace_thread_t *t,
+                                void *global);
 
 /**
  * A callback function for any message that does not require any specific
@@ -468,10 +467,8 @@ typedef void* (*fn_cb_starting)(libtrace_t *libtrace,
  * @param global The global storage.
  * @param tls The thread local storage.
  */
-typedef void (*fn_cb_dataless)(libtrace_t *libtrace,
-                                    libtrace_thread_t *t,
-                                    void *global,
-                                    void *tls);
+typedef void (*fn_cb_dataless)(libtrace_t *libtrace, libtrace_thread_t *t,
+                               void *global, void *tls);
 
 /**
  * A callback function for a first packet message seen by a processing thread.
@@ -481,10 +478,8 @@ typedef void (*fn_cb_dataless)(libtrace_t *libtrace,
  * @param tls The thread local storage.
  * @param sender The thread that saw the first packet.
  */
-typedef void (*fn_cb_first_packet)(libtrace_t *libtrace,
-                                   libtrace_thread_t *t,
-                                   void *global,
-                                   void *tls,
+typedef void (*fn_cb_first_packet)(libtrace_t *libtrace, libtrace_thread_t *t,
+                                   void *global, void *tls,
                                    libtrace_thread_t *sender);
 
 /**
@@ -497,11 +492,8 @@ typedef void (*fn_cb_first_packet)(libtrace_t *libtrace,
  * @param uint64_t The value of the tick; either a timestamp or packet count
  *    depending on the type of tick.
  */
-typedef void (*fn_cb_tick)(libtrace_t *libtrace,
-                           libtrace_thread_t *t,
-                           void *global,
-                           void *tls,
-                           uint64_t order);
+typedef void (*fn_cb_tick)(libtrace_t *libtrace, libtrace_thread_t *t,
+                           void *global, void *tls, uint64_t order);
 
 /**
  * A callback function triggered when a processing thread receives a packet.
@@ -516,14 +508,14 @@ typedef void (*fn_cb_tick)(libtrace_t *libtrace,
  *   or NULL otherwise. If returning NULL, it is the user's responsibility
  *   to ensure the packet is freed when the reporter thread is finished with it.
  */
-typedef libtrace_packet_t* (*fn_cb_packet)(libtrace_t *libtrace,
-                                           libtrace_thread_t *t,
-                                           void *global,
+typedef libtrace_packet_t *(*fn_cb_packet)(libtrace_t *libtrace,
+                                           libtrace_thread_t *t, void *global,
                                            void *tls,
                                            libtrace_packet_t *packet);
 
 /**
- * A callback function triggered when a processing thread receives a meta packet.
+ * A callback function triggered when a processing thread receives a meta
+ * packet.
  *
  * @param libtrace The parallel trace.
  * @param t The thread that is running
@@ -535,11 +527,10 @@ typedef libtrace_packet_t* (*fn_cb_packet)(libtrace_t *libtrace,
  *   or NULL otherwise. If returning NULL, it is the user's responsibility
  *   to ensure the packet is freed when the reporter thread is finished with it.
  */
-typedef libtrace_packet_t* (*fn_cb_meta_packet)(libtrace_t *libtrace,
-                                           libtrace_thread_t *t,
-                                           void *global,
-                                           void *tls,
-                                           libtrace_packet_t *packet);
+typedef libtrace_packet_t *(*fn_cb_meta_packet)(libtrace_t *libtrace,
+                                                libtrace_thread_t *t,
+                                                void *global, void *tls,
+                                                libtrace_packet_t *packet);
 
 /**
  * Callback for handling a result message. Should only be required by the
@@ -553,8 +544,8 @@ typedef libtrace_packet_t* (*fn_cb_meta_packet)(libtrace_t *libtrace,
  *
  */
 typedef void (*fn_cb_result)(libtrace_t *libtrace, libtrace_thread_t *sender,
-                void *global, void *tls, libtrace_result_t *result);
-
+                             void *global, void *tls,
+                             libtrace_result_t *result);
 
 /**
  * Callback for handling any user-defined message types. This will handle
@@ -569,10 +560,10 @@ typedef void (*fn_cb_result)(libtrace_t *libtrace, libtrace_thread_t *sender,
  * @param sender The sender of the message.
  *
  */
-typedef void (*fn_cb_usermessage) (libtrace_t *libtrace, libtrace_thread_t *t,
-                void *global, void *tls, int mesg, libtrace_generic_t data,
-                libtrace_thread_t *sender);
-
+typedef void (*fn_cb_usermessage)(libtrace_t *libtrace, libtrace_thread_t *t,
+                                  void *global, void *tls, int mesg,
+                                  libtrace_generic_t data,
+                                  libtrace_thread_t *sender);
 
 /**
  * Registers a starting callback against a callback set.
@@ -582,7 +573,7 @@ typedef void (*fn_cb_usermessage) (libtrace_t *libtrace, libtrace_thread_t *t,
  * @return 0 if successful, -1 otherwise.
  */
 DLLEXPORT int trace_set_starting_cb(libtrace_callback_set_t *cbset,
-                fn_cb_starting handler);
+                                    fn_cb_starting handler);
 
 /**
  * Registers a stopping callback against a callback set.
@@ -592,7 +583,7 @@ DLLEXPORT int trace_set_starting_cb(libtrace_callback_set_t *cbset,
  * @return 0 if successful, -1 otherwise.
  */
 DLLEXPORT int trace_set_stopping_cb(libtrace_callback_set_t *cbset,
-                fn_cb_dataless handler);
+                                    fn_cb_dataless handler);
 
 /**
  * Registers a resuming callback against a callback set.
@@ -602,7 +593,7 @@ DLLEXPORT int trace_set_stopping_cb(libtrace_callback_set_t *cbset,
  * @return 0 if successful, -1 otherwise.
  */
 DLLEXPORT int trace_set_resuming_cb(libtrace_callback_set_t *cbset,
-                fn_cb_dataless handler);
+                                    fn_cb_dataless handler);
 
 /**
  * Registers a pausing callback against a callback set.
@@ -612,7 +603,7 @@ DLLEXPORT int trace_set_resuming_cb(libtrace_callback_set_t *cbset,
  * @return 0 if successful, -1 otherwise.
  */
 DLLEXPORT int trace_set_pausing_cb(libtrace_callback_set_t *cbset,
-                fn_cb_dataless handler);
+                                   fn_cb_dataless handler);
 
 /**
  * Registers a packet callback against a callback set.
@@ -622,7 +613,7 @@ DLLEXPORT int trace_set_pausing_cb(libtrace_callback_set_t *cbset,
  * @return 0 if successful, -1 otherwise.
  */
 DLLEXPORT int trace_set_packet_cb(libtrace_callback_set_t *cbset,
-                fn_cb_packet handler);
+                                  fn_cb_packet handler);
 
 /**
  * Registers a meta packet callback against a callback set.
@@ -632,7 +623,7 @@ DLLEXPORT int trace_set_packet_cb(libtrace_callback_set_t *cbset,
  * @return 0 if successful, -1 otherwise.
  */
 DLLEXPORT int trace_set_meta_packet_cb(libtrace_callback_set_t *cbset,
-                fn_cb_meta_packet handler);
+                                       fn_cb_meta_packet handler);
 
 /**
  * Registers a first packet callback against a callback set.
@@ -642,7 +633,7 @@ DLLEXPORT int trace_set_meta_packet_cb(libtrace_callback_set_t *cbset,
  * @return 0 if successful, -1 otherwise.
  */
 DLLEXPORT int trace_set_first_packet_cb(libtrace_callback_set_t *cbset,
-                fn_cb_first_packet handler);
+                                        fn_cb_first_packet handler);
 
 /**
  * Registers a result callback against a callback set.
@@ -652,7 +643,7 @@ DLLEXPORT int trace_set_first_packet_cb(libtrace_callback_set_t *cbset,
  * @return 0 if successful, -1 otherwise.
  */
 DLLEXPORT int trace_set_result_cb(libtrace_callback_set_t *cbset,
-                fn_cb_result handler);
+                                  fn_cb_result handler);
 
 /**
  * Registers a tick counter callback against a callback set.
@@ -662,7 +653,7 @@ DLLEXPORT int trace_set_result_cb(libtrace_callback_set_t *cbset,
  * @return 0 if successful, -1 otherwise.
  */
 DLLEXPORT int trace_set_tick_count_cb(libtrace_callback_set_t *cbset,
-                fn_cb_tick handler);
+                                      fn_cb_tick handler);
 
 /**
  * Registers a tick interval callback against a callback set.
@@ -672,7 +663,7 @@ DLLEXPORT int trace_set_tick_count_cb(libtrace_callback_set_t *cbset,
  * @return 0 if successful, -1 otherwise.
  */
 DLLEXPORT int trace_set_tick_interval_cb(libtrace_callback_set_t *cbset,
-                fn_cb_tick handler);
+                                         fn_cb_tick handler);
 
 /**
  * Registers a callback for custom user messages against a callback set.
@@ -682,13 +673,13 @@ DLLEXPORT int trace_set_tick_interval_cb(libtrace_callback_set_t *cbset,
  * @return 0 if successful, -1 otherwise.
  */
 DLLEXPORT int trace_set_user_message_cb(libtrace_callback_set_t *cbset,
-                fn_cb_usermessage handler);
+                                        fn_cb_usermessage handler);
 
 /** Create a callback set that can be used to define callbacks for parallel
-  * libtrace threads.
-  *
-  * @return A pointer to a freshly allocated callback set.
-  */
+ * libtrace threads.
+ *
+ * @return A pointer to a freshly allocated callback set.
+ */
 DLLEXPORT libtrace_callback_set_t *trace_create_callback_set(void);
 
 /** Destroys a callback set, freeing up any resources it was using.
@@ -696,7 +687,6 @@ DLLEXPORT libtrace_callback_set_t *trace_create_callback_set(void);
  * @param cbset         The callback set to be destroyed.
  */
 DLLEXPORT void trace_destroy_callback_set(libtrace_callback_set_t *cbset);
-
 
 /** Pauses a trace previously started with trace_pstart()
  *
@@ -728,8 +718,7 @@ DLLEXPORT int trace_pstop(libtrace_t *libtrace);
  * an error occurring, an EOF or trace_pstop.
  *
  */
-DLLEXPORT void trace_join(libtrace_t * trace);
-
+DLLEXPORT void trace_join(libtrace_t *trace);
 
 /**
  * @name Parallel Configuration
@@ -1036,39 +1025,38 @@ DLLEXPORT int trace_set_hasher(libtrace_t *trace, enum hasher_types type,
 
 /// @}
 
-
 /** Types of results.
  *
  * Custom result types users should be defined as RESULT_USER(1000) or greater.
  *
  */
 enum result_types {
-	/**
-	 * The result contains a pointer to a libtrace_packet_t. This
-         * packet should be freed using trace_free_packet() once the result
-         * is processed by the reporter thread.
-         *
-         * The key for a RESULT_PACKET is the packet order (see
-         * trace_get_packet_order() for more about ordering).
-	 *
-	 */
-	RESULT_PACKET,
+    /**
+     * The result contains a pointer to a libtrace_packet_t. This
+     * packet should be freed using trace_free_packet() once the result
+     * is processed by the reporter thread.
+     *
+     * The key for a RESULT_PACKET is the packet order (see
+     * trace_get_packet_order() for more about ordering).
+     *
+     */
+    RESULT_PACKET,
 
-	/**
-         * The result is a tick timestamp. The key is an ERF timestamp.
-	 */
-	RESULT_TICK_INTERVAL,
+    /**
+     * The result is a tick timestamp. The key is an ERF timestamp.
+     */
+    RESULT_TICK_INTERVAL,
 
-	/**
-         * The result is a tick counter. The key is the sequence number of
-         * the tick, relative to the packets read so far.
-	 */
-	RESULT_TICK_COUNT,
+    /**
+     * The result is a tick counter. The key is the sequence number of
+     * the tick, relative to the packets read so far.
+     */
+    RESULT_TICK_COUNT,
 
-	/**
-         * Any user-defined result codes should be at or above this value.
-	 */
-	RESULT_USER = 1000
+    /**
+     * Any user-defined result codes should be at or above this value.
+     */
+    RESULT_USER = 1000
 
 };
 
@@ -1080,10 +1068,8 @@ enum result_types {
  * @param[in] value The value of the result
  * @param[in] type The type of result (see result_types)
  */
-DLLEXPORT void trace_publish_result(libtrace_t *libtrace,
-                                    libtrace_thread_t *t,
-                                    uint64_t key,
-                                    libtrace_generic_t value,
+DLLEXPORT void trace_publish_result(libtrace_t *libtrace, libtrace_thread_t *t,
+                                    uint64_t key, libtrace_generic_t value,
                                     int type);
 
 /** Check if a dedicated hasher thread is being used.
@@ -1094,14 +1080,14 @@ DLLEXPORT void trace_publish_result(libtrace_t *libtrace,
  * This should only be called after the trace has been started with
  * trace_pstart().
  */
-DLLEXPORT bool trace_has_dedicated_hasher(libtrace_t * libtrace);
+DLLEXPORT bool trace_has_dedicated_hasher(libtrace_t *libtrace);
 
 /** Checks if a trace is using a reporter thread.
  *
  * @param[in] libtrace The parallel input trace
  * @return True if the trace is using a reporter otherwise false
  */
-DLLEXPORT bool trace_has_reporter(libtrace_t * libtrace);
+DLLEXPORT bool trace_has_reporter(libtrace_t *libtrace);
 
 /** Post a message to the reporter thread requesting that it check for more
  * results.
@@ -1122,7 +1108,7 @@ DLLEXPORT int trace_post_reporter(libtrace_t *libtrace);
  * @note For best performance it is recommended to supply the thread argument
  * even if it is the current thread.
  */
-DLLEXPORT int libtrace_thread_get_message_count(libtrace_t * libtrace,
+DLLEXPORT int libtrace_thread_get_message_count(libtrace_t *libtrace,
                                                 libtrace_thread_t *t);
 
 /** Read a message from a thread in a blocking fashion.
@@ -1137,9 +1123,9 @@ DLLEXPORT int libtrace_thread_get_message_count(libtrace_t * libtrace,
  * @note For best performance it is recommended to supply the thread argument
  * even if it is the current thread.
  */
-DLLEXPORT int libtrace_thread_get_message(libtrace_t * libtrace,
+DLLEXPORT int libtrace_thread_get_message(libtrace_t *libtrace,
                                           libtrace_thread_t *t,
-                                          libtrace_message_t * message);
+                                          libtrace_message_t *message);
 
 /** Read a message from a thread in a non-blocking fashion.
  *
@@ -1154,9 +1140,9 @@ DLLEXPORT int libtrace_thread_get_message(libtrace_t * libtrace,
  * @note For best performance it is recommended to supply the thread argument
  * even if it is the current thread.
  */
-DLLEXPORT int libtrace_thread_try_get_message(libtrace_t * libtrace,
+DLLEXPORT int libtrace_thread_try_get_message(libtrace_t *libtrace,
                                               libtrace_thread_t *t,
-                                              libtrace_message_t * message);
+                                              libtrace_message_t *message);
 
 /** Send a message to the reporter thread.
  *
@@ -1168,8 +1154,8 @@ DLLEXPORT int libtrace_thread_try_get_message(libtrace_t * libtrace,
  * @return -1 upon error indicating the message has not been sent. Otherwise,
  * will return the number of messages the reporter has not yet read.
  */
-DLLEXPORT int trace_message_reporter(libtrace_t * libtrace,
-                                     libtrace_message_t * message);
+DLLEXPORT int trace_message_reporter(libtrace_t *libtrace,
+                                     libtrace_message_t *message);
 
 /** Send a message to all processing threads.
  *
@@ -1182,8 +1168,8 @@ DLLEXPORT int trace_message_reporter(libtrace_t * libtrace,
  * indicates the number of processing threads that the message was not sent
  * to (i.e. -1 means one thread could not be sent the message).
  */
-DLLEXPORT int trace_message_perpkts(libtrace_t * libtrace,
-                                    libtrace_message_t * message);
+DLLEXPORT int trace_message_perpkts(libtrace_t *libtrace,
+                                    libtrace_message_t *message);
 
 /** Send a message to a specific thread.
  *
@@ -1196,9 +1182,8 @@ DLLEXPORT int trace_message_perpkts(libtrace_t * libtrace,
  * @return -1 upon error indicating the message has not been sent. Otherwise,
  * will return the number of messages the recipient has not yet read.
  */
-DLLEXPORT int trace_message_thread(libtrace_t * libtrace,
-                                   libtrace_thread_t *t,
-                                   libtrace_message_t * message);
+DLLEXPORT int trace_message_thread(libtrace_t *libtrace, libtrace_thread_t *t,
+                                   libtrace_message_t *message);
 
 /** Checks if a parallel trace has finished reading packets.
  *
@@ -1208,8 +1193,7 @@ DLLEXPORT int trace_message_thread(libtrace_t * libtrace,
  * @note This returns true even if all results have not yet been processed by
  * the reporter thread.
  */
-DLLEXPORT bool trace_has_finished(libtrace_t * libtrace);
-
+DLLEXPORT bool trace_has_finished(libtrace_t *libtrace);
 
 /** Check if libtrace is directly reading from multiple queues
  * from within the capture format (such as a NICs hardware queues).
@@ -1233,7 +1217,7 @@ DLLEXPORT bool trace_has_finished(libtrace_t * libtrace);
  * @return true if the trace is parallel or false if the library is splitting
  * the trace into multiple threads.
  */
-DLLEXPORT bool trace_is_parallel(libtrace_t * libtrace);
+DLLEXPORT bool trace_is_parallel(libtrace_t *libtrace);
 
 /** Returns either the sequence number or erf timestamp of a packet.
  *
@@ -1244,7 +1228,7 @@ DLLEXPORT bool trace_is_parallel(libtrace_t * libtrace);
  * Formats that are not natively parallel will typically return a sequence
  * number. Natively parallel formats will return a timestamp.
  */
-DLLEXPORT uint64_t trace_packet_get_order(libtrace_packet_t * packet);
+DLLEXPORT uint64_t trace_packet_get_order(libtrace_packet_t *packet);
 
 /** Returns the hash of a packet.
  *
@@ -1255,7 +1239,7 @@ DLLEXPORT uint64_t trace_packet_get_order(libtrace_packet_t * packet);
  * a custom hash is being used. You can use trace_has_dedicated_hasher()
  * to check if this is the case.
  */
-DLLEXPORT uint64_t trace_packet_get_hash(libtrace_packet_t * packet);
+DLLEXPORT uint64_t trace_packet_get_hash(libtrace_packet_t *packet);
 
 /** Sets the order of a packet.
  *
@@ -1267,7 +1251,8 @@ DLLEXPORT uint64_t trace_packet_get_hash(libtrace_packet_t * packet);
  *
  * Generally speaking, you probably shouldn't be changing the order of packets!
  */
-DLLEXPORT void trace_packet_set_order(libtrace_packet_t * packet, uint64_t order);
+DLLEXPORT void trace_packet_set_order(libtrace_packet_t *packet,
+                                      uint64_t order);
 
 /** Sets the hash of a packet.
  *
@@ -1278,8 +1263,7 @@ DLLEXPORT void trace_packet_set_order(libtrace_packet_t * packet, uint64_t order
  * little use for this field and as such this can essentially be used for any
  * storage that the user requires.
  */
-DLLEXPORT void trace_packet_set_hash(libtrace_packet_t * packet, uint64_t hash);
-
+DLLEXPORT void trace_packet_set_hash(libtrace_packet_t *packet, uint64_t hash);
 
 /** Returns the first packet read by a processing thread since the source
  * trace was last started or restarted.
@@ -1298,8 +1282,7 @@ DLLEXPORT void trace_packet_set_hash(libtrace_packet_t * packet, uint64_t hash);
  * The packet and timeval returned by this function is shared by all threads
  * and remain valid until MESSAGE_PAUSING is received.
  */
-DLLEXPORT int trace_get_first_packet(libtrace_t *libtrace,
-                                     libtrace_thread_t *t,
+DLLEXPORT int trace_get_first_packet(libtrace_t *libtrace, libtrace_thread_t *t,
                                      const libtrace_packet_t **packet,
                                      const struct timeval **tv);
 
@@ -1353,7 +1336,8 @@ DLLEXPORT void libtrace_make_result_safe(libtrace_result_t *res);
  *
  * @note All packets should be free'd before a trace is destroyed.
  */
-DLLEXPORT void trace_free_packet(libtrace_t * libtrace, libtrace_packet_t * packet);
+DLLEXPORT void trace_free_packet(libtrace_t *libtrace,
+                                 libtrace_packet_t *packet);
 
 /** Increments the internal reference counter for a packet.
  * @param packet        The packet opaque pointer
@@ -1380,7 +1364,6 @@ DLLEXPORT void trace_increment_packet_refcount(libtrace_packet_t *packet);
  */
 DLLEXPORT void trace_decrement_packet_refcount(libtrace_packet_t *packet);
 
-
 /** Provides some basic information about a trace based on its input format.
  *
  * @param libtrace  The trace that is being inquired about.
@@ -1389,7 +1372,7 @@ DLLEXPORT void trace_decrement_packet_refcount(libtrace_packet_t *packet);
  *
  * See trace_is_parallel(), trace_get_perpkt_threads().
  */
-DLLEXPORT libtrace_info_t *trace_get_information(libtrace_t * libtrace);
+DLLEXPORT libtrace_info_t *trace_get_information(libtrace_t *libtrace);
 
 /** Sets the configuration of a trace based upon a comma separated list of
  * key=value pairs.
@@ -1429,7 +1412,7 @@ DLLEXPORT libtrace_info_t *trace_get_information(libtrace_t * libtrace);
  * configuration would be to use the appropriate trace_set_*() function for
  * each option.
  */
-DLLEXPORT int trace_set_configuration(libtrace_t *trace, const char * str);
+DLLEXPORT int trace_set_configuration(libtrace_t *trace, const char *str);
 
 /** Sets configuration from a file. This reads every line from the file and
  * interprets each line with trace_set_configuration().
@@ -1449,7 +1432,7 @@ DLLEXPORT int trace_set_configuration_file(libtrace_t *trace, FILE *file);
  * @param t A parallel trace.
  * @return The number of processing threads owned by that trace.
  */
-DLLEXPORT int trace_get_perpkt_threads(libtrace_t* t); 
+DLLEXPORT int trace_get_perpkt_threads(libtrace_t *t);
 
 /** Returns the internal unique ID for a packet processing thread.
  *
@@ -1470,7 +1453,9 @@ DLLEXPORT int trace_get_perpkt_thread_id(libtrace_thread_t *thread);
  * non-started or paused trace.  By default, combiner_unordered
  * will be used if this function is not called before starting the trace.
  */
-DLLEXPORT void trace_set_combiner(libtrace_t *trace, const libtrace_combine_t *combiner, libtrace_generic_t config);
+DLLEXPORT void trace_set_combiner(libtrace_t *trace,
+                                  const libtrace_combine_t *combiner,
+                                  libtrace_generic_t config);
 
 /**
  * Takes unordered (or ordered) input and produces unordered output.

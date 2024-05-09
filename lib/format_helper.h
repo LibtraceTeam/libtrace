@@ -43,26 +43,28 @@
 /** Generic event function for a live capture device
  *
  * @param trace 	The input trace for the live capture device
- * @param packet	A libtrace packet to read the next available packet 
+ * @param packet	A libtrace packet to read the next available packet
  * 			into
  * @return A libtrace event describing the next event of interest
  *
  * Any live capture format that does not require a custom event handler
  * should use this function.
  */
-struct libtrace_eventobj_t trace_event_device(libtrace_t *trace, libtrace_packet_t *packet);
+struct libtrace_eventobj_t trace_event_device(libtrace_t *trace,
+                                              libtrace_packet_t *packet);
 
 /** Generic event function for a offline trace file
  *
  * @param trace		The input trace for the trace file
- * @param packet	A libtrace packet to read the next available packet 
+ * @param packet	A libtrace packet to read the next available packet
  * 			into
- * @return A libtrace event describing the next event of interest 
+ * @return A libtrace event describing the next event of interest
  *
  * Any trace file format that does not require a custom event handler should
  * use this function
  */
-struct libtrace_eventobj_t trace_event_trace(libtrace_t *trace, libtrace_packet_t *packet);
+struct libtrace_eventobj_t trace_event_trace(libtrace_t *trace,
+                                             libtrace_packet_t *packet);
 
 /** Opens an input trace file for reading
  *
@@ -82,10 +84,8 @@ io_t *trace_open_file(libtrace_t *libtrace);
  * @return A libtrace IO writer for the newly opened file or NULL if the file
  * was unable to be opened
  */
-iow_t *trace_open_file_out(libtrace_out_t *libtrace,
-		int compress_type,
-		int level,
-		int filemode);
+iow_t *trace_open_file_out(libtrace_out_t *libtrace, int compress_type,
+                           int level, int filemode);
 
 /** Determines the number of cores available on the host.
  *

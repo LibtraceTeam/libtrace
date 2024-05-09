@@ -69,7 +69,7 @@
 #include "lib/lt_bswap.h"
 
 #ifndef HAVE_DAG_API
-#include "lib/dagformat.h"
+#    include "lib/dagformat.h"
 #endif
 
 #include "lib/libtrace_int.h"
@@ -78,9 +78,9 @@ struct libtrace_t *currenttrace = NULL;
 
 struct global_params {
 
-    uint16_t monitorid ;
-    char *mcastaddr ;
-    char *srcaddr ;
+    uint16_t monitorid;
+    char *mcastaddr;
+    char *srcaddr;
     uint64_t starttime;
     uint16_t firstport;
     int readercount;
@@ -110,7 +110,8 @@ typedef struct read_thread_data {
 
 volatile int halted = 0;
 
-static void cleanup_signal(int signal UNUSED) {
+static void cleanup_signal(int signal UNUSED)
+{
     if (currenttrace) {
         trace_pstop(currenttrace);
     }
@@ -118,9 +119,10 @@ static void cleanup_signal(int signal UNUSED) {
 }
 
 static int create_multicast_socket(uint16_t port, char *groupaddr,
-        char *srcaddr, struct addrinfo **targetinfo) {
+                                   char *srcaddr, struct addrinfo **targetinfo)
+{
 
-	struct addrinfo hints;
+    struct addrinfo hints;
     struct addrinfo *gotten;
     struct addrinfo *source;
     char portstr[16];
@@ -136,63 +138,67 @@ static int create_multicast_socket(uint16_t port, char *groupaddr,
     snprintf(portstr, 15, "%u", port);
 
     if (getaddrinfo(groupaddr, portstr, &hints, &gotten) != 0) {
-        fprintf(stderr, "tracemcast: Call to getaddrinfo failed for %s:%s -- %s\n",
+        fprintf(stderr,
+                "tracemcast: Call to getaddrinfo failed for %s:%s -- %s\n",
                 groupaddr, portstr, strerror(errno));
         return -1;
     }
     *targetinfo = gotten;
 
     if (getaddrinfo(srcaddr, NULL, &hints, &source) != 0) {
-        fprintf(stderr, "tracemcast: Call to getaddrinfo failed for %s:NULL -- %s\n",
+        fprintf(stderr,
+                "tracemcast: Call to getaddrinfo failed for %s:NULL -- %s\n",
                 srcaddr, strerror(errno));
         return -1;
     }
 
     sock = socket(gotten->ai_family, gotten->ai_socktype, 0);
     if (sock < 0) {
-        fprintf(stderr,
-                "tracemcast: Failed to create multicast socket for %s:%s -- %s\n",
-                groupaddr, portstr, strerror(errno));
+        fprintf(
+            stderr,
+            "tracemcast: Failed to create multicast socket for %s:%s -- %s\n",
+            groupaddr, portstr, strerror(errno));
         goto sockcreateover;
     }
 
     if (setsockopt(sock,
-            gotten->ai_family == PF_INET6 ? IPPROTO_IPV6: IPPROTO_IP,
-            gotten->ai_family == PF_INET6 ? IPV6_MULTICAST_HOPS :
-                    IP_MULTICAST_TTL,
-            (char *)&ttlopt, sizeof(ttlopt)) != 0) {
+                   gotten->ai_family == PF_INET6 ? IPPROTO_IPV6 : IPPROTO_IP,
+                   gotten->ai_family == PF_INET6 ? IPV6_MULTICAST_HOPS
+                                                 : IP_MULTICAST_TTL,
+                   (char *)&ttlopt, sizeof(ttlopt)) != 0) {
         fprintf(stderr,
-                "tracemcast: Failed to configure multicast TTL of %u for %s:%s -- %s\n",
+                "tracemcast: Failed to configure multicast TTL of %u for %s:%s "
+                "-- %s\n",
                 ttlopt, groupaddr, portstr, strerror(errno));
         close(sock);
         sock = -1;
         goto sockcreateover;
     }
 
-	if (setsockopt(sock,
-            source->ai_family == PF_INET6 ? IPPROTO_IPV6: IPPROTO_IP,
-            source->ai_family == PF_INET6 ? IPV6_MULTICAST_IF: IP_MULTICAST_IF,
+    if (setsockopt(
+            sock, source->ai_family == PF_INET6 ? IPPROTO_IPV6 : IPPROTO_IP,
+            source->ai_family == PF_INET6 ? IPV6_MULTICAST_IF : IP_MULTICAST_IF,
             source->ai_addr, source->ai_addrlen) != 0) {
-        fprintf(stderr,
-                "tracemcast: Failed to set outgoing multicast interface %s -- %s\n",
-                srcaddr, strerror(errno));
+        fprintf(
+            stderr,
+            "tracemcast: Failed to set outgoing multicast interface %s -- %s\n",
+            srcaddr, strerror(errno));
         close(sock);
         sock = -1;
         goto sockcreateover;
     }
 
-
-	bufsize = 16 * 1024 * 1024;
-	if (setsockopt(sock, SOL_SOCKET, SO_SNDBUF, &bufsize,
-				(socklen_t)sizeof(int)) != 0) {
-		fprintf(stderr,
-				"tracemcast: Failed to increase buffer size on multicast interface %s -- %s\n",
-				srcaddr, strerror(errno));
-		close(sock);
-		sock = -1;
-		goto sockcreateover;
-	}
-
+    bufsize = 16 * 1024 * 1024;
+    if (setsockopt(sock, SOL_SOCKET, SO_SNDBUF, &bufsize,
+                   (socklen_t)sizeof(int)) != 0) {
+        fprintf(stderr,
+                "tracemcast: Failed to increase buffer size on multicast "
+                "interface %s -- %s\n",
+                srcaddr, strerror(errno));
+        close(sock);
+        sock = -1;
+        goto sockcreateover;
+    }
 
 sockcreateover:
     freeaddrinfo(source);
@@ -200,7 +206,8 @@ sockcreateover:
 }
 
 static inline char *fill_common_header(char *bufstart, uint16_t monitorid,
-        uint8_t pkttype) {
+                                       uint8_t pkttype)
+{
 
     ndag_common_t *hdr = (ndag_common_t *)bufstart;
 
@@ -212,8 +219,9 @@ static inline char *fill_common_header(char *bufstart, uint16_t monitorid,
     return bufstart + sizeof(ndag_common_t);
 }
 
-static void *init_reader_thread(libtrace_t *trace UNUSED,
-        libtrace_thread_t *t, void *global) {
+static void *init_reader_thread(libtrace_t *trace UNUSED, libtrace_thread_t *t,
+                                void *global)
+{
 
     read_thread_data_t *rdata = NULL;
     struct global_params *gparams = (struct global_params *)global;
@@ -230,13 +238,19 @@ static void *init_reader_thread(libtrace_t *trace UNUSED,
     rdata->encaphdr = NULL;
     rdata->reccount = 0;
 
-    rdata->mcastfd = create_multicast_socket(rdata->mcastport,
-			gparams->mcastaddr, gparams->srcaddr, &(rdata->target));
+    rdata->mcastfd =
+        create_multicast_socket(rdata->mcastport, gparams->mcastaddr,
+                                gparams->srcaddr, &(rdata->target));
 
     if (rdata->mcastfd == -1) {
-        fprintf(stderr, "tracemcast: failed to create multicast socket for reader thread %d\n", rdata->threadid);
+        fprintf(stderr,
+                "tracemcast: failed to create multicast socket for reader "
+                "thread %d\n",
+                rdata->threadid);
     } else if (rdata->target == NULL) {
-        fprintf(stderr, "tracemcast: failed to get addrinfo for reader socket %d\n", rdata->threadid);
+        fprintf(stderr,
+                "tracemcast: failed to get addrinfo for reader socket %d\n",
+                rdata->threadid);
         close(rdata->mcastfd);
         rdata->mcastfd = -1;
     }
@@ -244,25 +258,29 @@ static void *init_reader_thread(libtrace_t *trace UNUSED,
     return rdata;
 }
 
-static void send_ndag_packet(read_thread_data_t *rdata) {
+static void send_ndag_packet(read_thread_data_t *rdata)
+{
 
     rdata->encaphdr->recordcount = ntohs(rdata->reccount);
 
     if (sendto(rdata->mcastfd, rdata->pbuffer,
-            (rdata->writeptr - rdata->pbuffer), 0, rdata->target->ai_addr,
-            rdata->target->ai_addrlen) < 0) {
-        fprintf(stderr, "tracemcast: thread %d failed to send multicast ERF packet: %s\n",
-                rdata->threadid, strerror(errno));
+               (rdata->writeptr - rdata->pbuffer), 0, rdata->target->ai_addr,
+               rdata->target->ai_addrlen) < 0) {
+        fprintf(
+            stderr,
+            "tracemcast: thread %d failed to send multicast ERF packet: %s\n",
+            rdata->threadid, strerror(errno));
     }
 
     rdata->writeptr = rdata->pbuffer;
     rdata->encaphdr = NULL;
     rdata->reccount = 0;
-
 }
 
 static void halt_reader_thread(libtrace_t *trace UNUSED,
-        libtrace_thread_t *t UNUSED, void *global UNUSED, void *tls) {
+                               libtrace_thread_t *t UNUSED, void *global UNUSED,
+                               void *tls)
+{
 
     read_thread_data_t *rdata = (read_thread_data_t *)tls;
 
@@ -283,8 +301,10 @@ static void halt_reader_thread(libtrace_t *trace UNUSED,
 }
 
 static uint16_t construct_erf_header(read_thread_data_t *rdata,
-        libtrace_packet_t *packet, libtrace_linktype_t ltype, uint32_t rem,
-        uint64_t erfts) {
+                                     libtrace_packet_t *packet,
+                                     libtrace_linktype_t ltype, uint32_t rem,
+                                     uint64_t erfts)
+{
 
     uint16_t framing = 0;
     dag_record_t *drec = (dag_record_t *)(rdata->writeptr);
@@ -294,7 +314,7 @@ static uint16_t construct_erf_header(read_thread_data_t *rdata,
     if (ltype == TRACE_TYPE_ETH) {
         drec->type = TYPE_ETH;
     } else if (ltype == TRACE_TYPE_NONE) {
-        drec->type = TYPE_IPV4;         // sorry if you're using IPv6 raw */
+        drec->type = TYPE_IPV4; // sorry if you're using IPv6 raw */
     } else {
         drec->type = 255;
     }
@@ -319,13 +339,14 @@ static uint16_t construct_erf_header(read_thread_data_t *rdata,
 }
 
 static void tick_reader_thread(libtrace_t *trace UNUSED,
-        libtrace_thread_t *t UNUSED, void *global UNUSED, void *tls,
-        uint64_t order) {
+                               libtrace_thread_t *t UNUSED, void *global UNUSED,
+                               void *tls, uint64_t order)
+{
 
     read_thread_data_t *rdata = (read_thread_data_t *)tls;
 
     if (rdata->writeptr > rdata->pbuffer &&
-            (order >> 32) >= rdata->lastsend + 3) {
+        (order >> 32) >= rdata->lastsend + 3) {
 
         send_ndag_packet(rdata);
         rdata->lastsend = (order >> 32);
@@ -333,8 +354,10 @@ static void tick_reader_thread(libtrace_t *trace UNUSED,
 }
 
 static libtrace_packet_t *packet_reader_thread(libtrace_t *trace UNUSED,
-        libtrace_thread_t *t UNUSED, void *global, void *tls,
-        libtrace_packet_t *packet) {
+                                               libtrace_thread_t *t UNUSED,
+                                               void *global, void *tls,
+                                               libtrace_packet_t *packet)
+{
 
     read_thread_data_t *rdata = (read_thread_data_t *)tls;
     struct global_params *gparams = (struct global_params *)global;
@@ -353,13 +376,13 @@ static libtrace_packet_t *packet_reader_thread(libtrace_t *trace UNUSED,
     erfts = trace_get_erf_timestamp(packet);
 
     if (gparams->mtu - (rdata->writeptr - rdata->pbuffer) <
-            rem + dag_record_size) {
+        rem + dag_record_size) {
 
         /* if not and if there is already something in the buffer, send it then
          * create a new one.
          */
-        if (rdata->writeptr > rdata->pbuffer + sizeof(ndag_common_t) +
-                sizeof(ndag_encap_t)) {
+        if (rdata->writeptr >
+            rdata->pbuffer + sizeof(ndag_common_t) + sizeof(ndag_encap_t)) {
 
             send_ndag_packet(rdata);
             rdata->lastsend = (erfts >> 32);
@@ -372,8 +395,7 @@ static libtrace_packet_t *packet_reader_thread(libtrace_t *trace UNUSED,
      * front, before adding any packets */
     if (rdata->writeptr == rdata->pbuffer) {
         rdata->encaphdr = (ndag_encap_t *)(fill_common_header(
-                (char *)rdata->writeptr,
-                gparams->monitorid, NDAG_PKT_ENCAPERF));
+            (char *)rdata->writeptr, gparams->monitorid, NDAG_PKT_ENCAPERF));
         rdata->writeptr = ((uint8_t *)rdata->encaphdr) + sizeof(ndag_encap_t);
 
         rdata->encaphdr->started = gparams->starttime;
@@ -382,11 +404,11 @@ static libtrace_packet_t *packet_reader_thread(libtrace_t *trace UNUSED,
         rdata->encaphdr->recordcount = 0;
 
         rdata->reccount = 0;
-        rdata->seqno ++;
+        rdata->seqno++;
     }
 
-    if (rem > gparams->mtu - (rdata->writeptr - rdata->pbuffer)
-            - (dag_record_size + 2)) {
+    if (rem > gparams->mtu - (rdata->writeptr - rdata->pbuffer) -
+                  (dag_record_size + 2)) {
         rem = gparams->mtu - (rdata->writeptr - rdata->pbuffer);
         rem -= (dag_record_size + 2);
     }
@@ -397,11 +419,12 @@ static libtrace_packet_t *packet_reader_thread(libtrace_t *trace UNUSED,
     /* copy packet contents into writeptr */
     memcpy(rdata->writeptr, l2, rem);
     rdata->writeptr += rem;
-    rdata->reccount ++;
+    rdata->reccount++;
 
     /* if the buffer is close to full, just send the buffer anyway */
     if (gparams->mtu - (rdata->writeptr - rdata->pbuffer) -
-            (dag_record_size + 2) < 64) {
+            (dag_record_size + 2) <
+        64) {
         send_ndag_packet(rdata);
         rdata->lastsend = (erfts >> 32);
     }
@@ -410,8 +433,8 @@ static libtrace_packet_t *packet_reader_thread(libtrace_t *trace UNUSED,
 }
 
 static void start_libtrace_reader(struct global_params *gparams, char *uri,
-        char *filterstring) {
-
+                                  char *filterstring)
+{
 
     libtrace_filter_t *filt = NULL;
     libtrace_callback_set_t *pktcbs = NULL;
@@ -445,7 +468,6 @@ static void start_libtrace_reader(struct global_params *gparams, char *uri,
         }
     }
 
-
     if (trace_pstart(currenttrace, gparams, pktcbs, NULL) == -1) {
         trace_perror(currenttrace, "Failed to start trace");
         goto failmode;
@@ -467,56 +489,60 @@ failmode:
     if (pktcbs) {
         trace_destroy_callback_set(pktcbs);
     }
-
 }
 
+static uint32_t form_beacon(char **buffer, struct beacon_params *bparams)
+{
 
-static uint32_t form_beacon(char **buffer, struct beacon_params *bparams) {
-
-    uint32_t bsize = sizeof(ndag_common_t) + (sizeof(uint16_t) *
-            (bparams->gparams->readercount + 1));
+    uint32_t bsize = sizeof(ndag_common_t) +
+                     (sizeof(uint16_t) * (bparams->gparams->readercount + 1));
     char *bptr;
     uint16_t *next;
     int i;
 
     if (bsize > bparams->gparams->mtu) {
-        fprintf(stderr, "tracemcast: beacon is too large to fit in a single datagram, either increase MTU or reduce number of threads\n");
+        fprintf(stderr,
+                "tracemcast: beacon is too large to fit in a single datagram, "
+                "either increase MTU or reduce number of threads\n");
         return 0;
     }
 
     bptr = (char *)malloc(bsize);
     next = (uint16_t *)(fill_common_header(bptr, bparams->gparams->monitorid,
-            NDAG_PKT_BEACON));
+                                           NDAG_PKT_BEACON));
 
     *next = htons(bparams->gparams->readercount);
-    next ++;
+    next++;
 
     for (i = 0; i < bparams->gparams->readercount; i++) {
         *next = htons(bparams->gparams->firstport + (i));
-        next ++;
+        next++;
     }
 
     *buffer = bptr;
     return bsize;
 }
 
-static void *beaconer_thread(void *tdata) {
+static void *beaconer_thread(void *tdata)
+{
 
     struct beacon_params *bparams = (struct beacon_params *)tdata;
     int sock;
     char *beaconpacket = NULL;
     uint32_t beaconsize;
-	struct addrinfo *targetinfo = NULL;
+    struct addrinfo *targetinfo = NULL;
 
-	sock = create_multicast_socket(bparams->beaconport,
-			bparams->gparams->mcastaddr, bparams->gparams->srcaddr,
-			&targetinfo);
+    sock = create_multicast_socket(bparams->beaconport,
+                                   bparams->gparams->mcastaddr,
+                                   bparams->gparams->srcaddr, &targetinfo);
 
     if (sock == -1) {
-        fprintf(stderr, "tracemcast: failed to create multicast socket for beaconer thread\n");
+        fprintf(stderr, "tracemcast: failed to create multicast socket for "
+                        "beaconer thread\n");
         halted = 1;
     } else if (targetinfo == NULL) {
-        fprintf(stderr, "tracemcast: failed to get addrinfo for beaconer socket\n");
+        fprintf(stderr,
+                "tracemcast: failed to get addrinfo for beaconer socket\n");
         halted = 1;
     }
 
@@ -528,7 +554,7 @@ static void *beaconer_thread(void *tdata) {
 
     while (!halted) {
         if (sendto(sock, beaconpacket, beaconsize, 0, targetinfo->ai_addr,
-                targetinfo->ai_addrlen) != beaconsize) {
+                   targetinfo->ai_addrlen) != beaconsize) {
             fprintf(stderr, "tracemcast: failed to send a beacon packet: %s\n",
                     strerror(errno));
             break;
@@ -547,25 +573,34 @@ static void *beaconer_thread(void *tdata) {
     }
 
     pthread_exit(NULL);
-
 }
 
-static void usage(char *prog) {
-    fprintf(stderr, "Usage:\n"
-            "%s [ options ] libtraceURI\n\n", prog);
+static void usage(char *prog)
+{
+    fprintf(stderr,
+            "Usage:\n"
+            "%s [ options ] libtraceURI\n\n",
+            prog);
     fprintf(stderr, "Options:\n"
-            "   -f --filter=bpffilter   Only emit packets that match this BPF filter\n"
-            "   -m --monitorid=idnum     Tag all multicast packets with the given identifier\n"
-            "   -g --mcastaddr=address  Use this multicast address for emitting packets\n"
-            "   -p --beaconport=port    Send multicast beacons on this port number\n"
-            "   -s --srcaddr=address    Send multicast on the interface for this IP address\n"
-            "   -M --mtu=bytes          Limit multicast message size to this number of bytes\n"
-            "   -t --threads=count      Use this number of packet processing threads\n"
-            "   -h --help               Show this usage statement\n");
+                    "   -f --filter=bpffilter   Only emit packets that match "
+                    "this BPF filter\n"
+                    "   -m --monitorid=idnum     Tag all multicast packets "
+                    "with the given identifier\n"
+                    "   -g --mcastaddr=address  Use this multicast address for "
+                    "emitting packets\n"
+                    "   -p --beaconport=port    Send multicast beacons on this "
+                    "port number\n"
+                    "   -s --srcaddr=address    Send multicast on the "
+                    "interface for this IP address\n"
+                    "   -M --mtu=bytes          Limit multicast message size "
+                    "to this number of bytes\n"
+                    "   -t --threads=count      Use this number of packet "
+                    "processing threads\n"
+                    "   -h --help               Show this usage statement\n");
 }
 
-
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[])
+{
     struct sigaction sigact;
     char *filterstring = NULL;
     uint16_t beaconport = 9999;
@@ -584,49 +619,45 @@ int main(int argc, char *argv[]) {
     while (1) {
         int optindex;
         struct option long_options[] = {
-            { "filter",     1, 0, 'f' },
-            { "monitorid",  1, 0, 'm' },
-            { "mcastaddr",  1, 0, 'g' },
-            { "beaconport", 1, 0, 'p' },
-            { "srcaddr",    1, 0, 's' },
-            { "threads",    1, 0, 't' },
-            { "mtu",        1, 0, 'M' },
-            { "help",       0, 0, 'h' },
-            { NULL,         0, 0, 0 },
+            {"filter", 1, 0, 'f'},    {"monitorid", 1, 0, 'm'},
+            {"mcastaddr", 1, 0, 'g'}, {"beaconport", 1, 0, 'p'},
+            {"srcaddr", 1, 0, 's'},   {"threads", 1, 0, 't'},
+            {"mtu", 1, 0, 'M'},       {"help", 0, 0, 'h'},
+            {NULL, 0, 0, 0},
         };
 
-        int c = getopt_long(argc, argv, "M:t:f:m:g:p:s:h", long_options,
-                &optindex);
+        int c =
+            getopt_long(argc, argv, "M:t:f:m:g:p:s:h", long_options, &optindex);
         if (c == -1) {
             break;
         }
 
         switch (c) {
-            case 'f':
-                filterstring = optarg;
-                break;
-            case 'M':
-                mtu = (uint16_t)strtoul(optarg, NULL, 0);
-                break;
-            case 'm':
-                gparams.monitorid = (uint16_t)strtoul(optarg, NULL, 0);
-                break;
-            case 'g':
-                gparams.mcastaddr = optarg;
-                break;
-            case 's':
-                gparams.srcaddr = optarg;
-                break;
-            case 'p':
-                beaconport = (uint16_t)strtoul(optarg, NULL, 0);
-                break;
-            case 't':
-                threads = (int)strtoul(optarg, NULL, 0);
-                break;
-            case 'h':
-            default:
-                usage(argv[0]);
-                return 1;
+        case 'f':
+            filterstring = optarg;
+            break;
+        case 'M':
+            mtu = (uint16_t)strtoul(optarg, NULL, 0);
+            break;
+        case 'm':
+            gparams.monitorid = (uint16_t)strtoul(optarg, NULL, 0);
+            break;
+        case 'g':
+            gparams.mcastaddr = optarg;
+            break;
+        case 's':
+            gparams.srcaddr = optarg;
+            break;
+        case 'p':
+            beaconport = (uint16_t)strtoul(optarg, NULL, 0);
+            break;
+        case 't':
+            threads = (int)strtoul(optarg, NULL, 0);
+            break;
+        case 'h':
+        default:
+            usage(argv[0]);
+            return 1;
         }
     }
 
@@ -656,17 +687,16 @@ int main(int argc, char *argv[]) {
         mtu = 536;
     }
 
-
     gettimeofday(&tv, NULL);
     gparams.starttime = bswap_host_to_le64(((tv.tv_sec - 1509494400) * 1000) +
-            (tv.tv_usec / 1000.0));
+                                           (tv.tv_usec / 1000.0));
     gparams.readercount = threads;
     gparams.mtu = mtu;
 
     gparams.firstport = 10000 + (rand() % 52000);
 
-    fprintf(stderr, "Multicasting %s on %s:%u from %s\n",
-            argv[optind], gparams.mcastaddr, beaconport, gparams.srcaddr);
+    fprintf(stderr, "Multicasting %s on %s:%u from %s\n", argv[optind],
+            gparams.mcastaddr, beaconport, gparams.srcaddr);
     fprintf(stderr, "Monitor ID is set to %u\n", gparams.monitorid);
 
     /* Start up the beaconing */
@@ -676,7 +706,8 @@ int main(int argc, char *argv[]) {
 
     sigemptyset(&sig_block_all);
     if (pthread_sigmask(SIG_SETMASK, &sig_block_all, &sig_before) < 0) {
-        fprintf(stderr, "Unable to disable signals before starting beaconer.\n");
+        fprintf(stderr,
+                "Unable to disable signals before starting beaconer.\n");
         goto endmcast;
     }
 
@@ -687,7 +718,8 @@ int main(int argc, char *argv[]) {
     }
 
     if (pthread_sigmask(SIG_SETMASK, &sig_before, NULL)) {
-        fprintf(stderr, "Unable to re-enable signals after beaconer creation.\n");
+        fprintf(stderr,
+                "Unable to re-enable signals after beaconer creation.\n");
         goto endmcast;
     }
 

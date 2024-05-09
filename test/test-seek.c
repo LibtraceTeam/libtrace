@@ -2,12 +2,12 @@
  * This file is part of libtrace
  *
  * Copyright (c) 2007 The University of Waikato, Hamilton, New Zealand.
- * Authors: Daniel Lawson 
- *          Perry Lorier 
- *          
+ * Authors: Daniel Lawson
+ *          Perry Lorier
+ *
  * All rights reserved.
  *
- * This code has been developed by the University of Waikato WAND 
+ * This code has been developed by the University of Waikato WAND
  * research group. For further information please see http://www.wand.net.nz/
  *
  * libtrace is free software; you can redistribute it and/or modify
@@ -27,7 +27,6 @@
  * $Id$
  *
  */
-
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -52,52 +51,53 @@ struct libtrace_t *trace;
 
 void iferr(libtrace_t *trace)
 {
-	libtrace_err_t err = trace_get_err(trace);
-	if (err.err_num==0)
-		return;
-	printf("Error: %s\n",err.problem);
-	exit(1);
+    libtrace_err_t err = trace_get_err(trace);
+    if (err.err_num == 0)
+        return;
+    printf("Error: %s\n", err.problem);
+    exit(1);
 }
 
-int main(int argc, char *argv[]) {
-        char *uri = "erf:traces/100_packets.erf";
-        int psize = 0;
-	int error = 0;
-	int count = 0;
-	libtrace_packet_t *packet;
+int main(int argc, char *argv[])
+{
+    char *uri = "erf:traces/100_packets.erf";
+    int psize = 0;
+    int error = 0;
+    int count = 0;
+    libtrace_packet_t *packet;
 
-	trace = trace_create(uri);
-	iferr(trace);
+    trace = trace_create(uri);
+    iferr(trace);
 
-	trace_start(trace);
-	iferr(trace);
+    trace_start(trace);
+    iferr(trace);
 
-	trace_seek_erf_timestamp(trace,4704246759960519168ULL);
-	iferr(trace);
-	
-	packet=trace_create_packet();
-        for (;;) {
-		if ((psize = trace_read_packet(trace, packet)) <0) {
-			error = 1;
-			break;
-		}
-		if (psize == 0) {
-			error = 0;
-			break;
-		}
-		count ++;
+    trace_seek_erf_timestamp(trace, 4704246759960519168ULL);
+    iferr(trace);
+
+    packet = trace_create_packet();
+    for (;;) {
+        if ((psize = trace_read_packet(trace, packet)) < 0) {
+            error = 1;
+            break;
         }
-	trace_destroy_packet(packet);
-	if (error == 0) {
-		if (count == 4) {
-			printf("success: 4 packets read\n");
-		} else {
-			printf("failure: 4 packets expected, %d seen\n",count);
-			error = 1;
-		}
-	} else {
-		iferr(trace);
-	}
-        trace_destroy(trace);
-        return error;
+        if (psize == 0) {
+            error = 0;
+            break;
+        }
+        count++;
+    }
+    trace_destroy_packet(packet);
+    if (error == 0) {
+        if (count == 4) {
+            printf("success: 4 packets read\n");
+        } else {
+            printf("failure: 4 packets expected, %d seen\n", count);
+            error = 1;
+        }
+    } else {
+        iferr(trace);
+    }
+    trace_destroy(trace);
+    return error;
 }

@@ -29,68 +29,69 @@
 #include <stdio.h>
 #include "libpacketdump.h"
 #ifndef WIN32
-	#include <netinet/in_systm.h>
+#    include <netinet/in_systm.h>
 #endif
 #include <arpa/inet.h>
 #include <netdb.h>
 
-DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len)
+DLLEXPORT void decode(int link_type UNUSED, const char *packet, unsigned len)
 {
-	libtrace_ip6_t *ip = (libtrace_ip6_t*)packet;
-	uint32_t tmp = ntohl(*(uint32_t*)ip);
+    libtrace_ip6_t *ip = (libtrace_ip6_t *)packet;
+    uint32_t tmp = ntohl(*(uint32_t *)ip);
 
-        int truncated = 0;
-        char ipstr[INET6_ADDRSTRLEN];
+    int truncated = 0;
+    char ipstr[INET6_ADDRSTRLEN];
 
-        do {
-                if (len < 4) {
-                        truncated = 1;
-                        break;
-                }
-
-        	printf(" IPv6: Version %u\n", (tmp >> 28) & 0x000000f);
-        	printf(" IPv6: Class %u\n", (tmp >> 20) & 0x000000ff);
-	        printf(" IPv6: Flow Label %u\n", tmp & 0x000fffff);
-
-                if (len < 6) {
-                        truncated = 1;
-                        break;
-                }
-        	printf(" IPv6: Payload Length %u\n", ntohs(ip->plen));
-
-                if (len < 7) {
-                        truncated = 1;
-                        break;
-                }
-        	printf(" IPv6: Next Header %u\n", ip->nxt);
-                if (len < 8) {
-                        truncated = 1;
-                        break;
-                }
-	        printf(" IPv6: Hop Limit %u\n", ip->hlim);
-
-                if (len < 24) {
-                        truncated = 1;
-                        break;
-                }
-
-	        inet_ntop(AF_INET6, &(ip->ip_src), ipstr, INET6_ADDRSTRLEN);
-        	printf(" IPv6: Source IP %s\n", ipstr);
-
-                if (len < 40) {
-                        truncated = 1;
-                        break;
-                }
-
-                inet_ntop(AF_INET6, &(ip->ip_dst), ipstr, INET6_ADDRSTRLEN);
-        	printf(" IPv6: Destination IP %s\n", ipstr);
-        } while (0);
-
-        if (truncated) {
-                printf(" IPv6: [Truncated]\n");
-                return;
+    do {
+        if (len < 4) {
+            truncated = 1;
+            break;
         }
 
-	decode_next(packet+sizeof(libtrace_ip6_t),len-sizeof(libtrace_ip6_t),"ip",ip->nxt);
-	return;
+        printf(" IPv6: Version %u\n", (tmp >> 28) & 0x000000f);
+        printf(" IPv6: Class %u\n", (tmp >> 20) & 0x000000ff);
+        printf(" IPv6: Flow Label %u\n", tmp & 0x000fffff);
+
+        if (len < 6) {
+            truncated = 1;
+            break;
+        }
+        printf(" IPv6: Payload Length %u\n", ntohs(ip->plen));
+
+        if (len < 7) {
+            truncated = 1;
+            break;
+        }
+        printf(" IPv6: Next Header %u\n", ip->nxt);
+        if (len < 8) {
+            truncated = 1;
+            break;
+        }
+        printf(" IPv6: Hop Limit %u\n", ip->hlim);
+
+        if (len < 24) {
+            truncated = 1;
+            break;
+        }
+
+        inet_ntop(AF_INET6, &(ip->ip_src), ipstr, INET6_ADDRSTRLEN);
+        printf(" IPv6: Source IP %s\n", ipstr);
+
+        if (len < 40) {
+            truncated = 1;
+            break;
+        }
+
+        inet_ntop(AF_INET6, &(ip->ip_dst), ipstr, INET6_ADDRSTRLEN);
+        printf(" IPv6: Destination IP %s\n", ipstr);
+    } while (0);
+
+    if (truncated) {
+        printf(" IPv6: [Truncated]\n");
+        return;
+    }
+
+    decode_next(packet + sizeof(libtrace_ip6_t), len - sizeof(libtrace_ip6_t),
+                "ip", ip->nxt);
+    return;
 }

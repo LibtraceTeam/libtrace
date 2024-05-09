@@ -2,12 +2,12 @@
  * This file is part of libtrace
  *
  * Copyright (c) 2007 The University of Waikato, Hamilton, New Zealand.
- * Authors: Daniel Lawson 
- *          Perry Lorier 
- *          
+ * Authors: Daniel Lawson
+ *          Perry Lorier
+ *
  * All rights reserved.
  *
- * This code has been developed by the University of Waikato WAND 
+ * This code has been developed by the University of Waikato WAND
  * research group. For further information please see http://www.wand.net.nz/
  *
  * libtrace is free software; you can redistribute it and/or modify
@@ -28,14 +28,14 @@
  *
  */
 #ifndef WIN32
-#  include <sys/time.h>
-#  include <netinet/in.h>
-#  include <netinet/in_systm.h>
-#  include <netinet/tcp.h>
-#  include <netinet/ip.h>
-#  include <netinet/ip_icmp.h>
-#  include <arpa/inet.h>
-#  include <sys/socket.h>
+#    include <sys/time.h>
+#    include <netinet/in.h>
+#    include <netinet/in_systm.h>
+#    include <netinet/tcp.h>
+#    include <netinet/ip.h>
+#    include <netinet/ip_icmp.h>
+#    include <arpa/inet.h>
+#    include <sys/socket.h>
 #endif
 
 /* This test is a bit more complicated.  It takes a pcap file (which doesn't
@@ -55,96 +55,94 @@
 
 void iferr(libtrace_t *trace)
 {
-	libtrace_err_t err = trace_get_err(trace);
-	if (err.err_num==0)
-		return;
-	printf("Error: %s\n",err.problem);
-	exit(1);
+    libtrace_err_t err = trace_get_err(trace);
+    if (err.err_num == 0)
+        return;
+    printf("Error: %s\n", err.problem);
+    exit(1);
 }
 
 void iferrout(libtrace_out_t *trace)
 {
-	libtrace_err_t err = trace_get_err_output(trace);
-	if (err.err_num==0)
-		return;
-	printf("Error: %s\n",err.problem);
-	exit(1);
+    libtrace_err_t err = trace_get_err_output(trace);
+    if (err.err_num == 0)
+        return;
+    printf("Error: %s\n", err.problem);
+    exit(1);
 }
 
-char *lookup_uri(const char *type) 
+char *lookup_uri(const char *type) { return "pcap:traces/100_packets.pcap"; }
+
+char *lookup_out_uri(const char *type)
 {
-		return "pcap:traces/100_packets.pcap";
+    if (!strcmp(type, "pcap"))
+        return "pcap:traces/100_packets.out.pcap";
+    return "unknown";
 }
 
-char *lookup_out_uri(const char *type) {
-	if (!strcmp(type,"pcap"))
-		return "pcap:traces/100_packets.out.pcap";
-	return "unknown";
-}
+int main(int argc, char *argv[])
+{
+    int psize = 0;
+    int error = 0;
+    int count = 0;
+    int level = 0;
+    int expected = 100;
+    libtrace_t *trace;
+    libtrace_out_t *outtrace;
+    libtrace_packet_t *packet;
 
-int main(int argc, char *argv[]) {
-        int psize = 0;
-	int error = 0;
-	int count = 0;
-	int level = 0;
-	int expected = 100;
-	libtrace_t *trace;
-	libtrace_out_t *outtrace;
-	libtrace_packet_t *packet;
+    trace = trace_create(lookup_uri("pcap"));
+    iferr(trace);
 
-	trace = trace_create(lookup_uri("pcap"));
-	iferr(trace);
+    outtrace = trace_create_output(lookup_out_uri("pcap"));
+    iferrout(outtrace);
 
-	outtrace = trace_create_output(lookup_out_uri("pcap"));
-	iferrout(outtrace);
+    level = 0;
+    trace_config_output(outtrace, TRACE_OPTION_OUTPUT_COMPRESS, &level);
+    iferrout(outtrace);
 
-	level=0;
-	trace_config_output(outtrace,TRACE_OPTION_OUTPUT_COMPRESS,&level);
-	iferrout(outtrace);
+    trace_start(trace);
+    iferr(trace);
+    trace_start_output(outtrace);
+    iferrout(outtrace);
 
-	trace_start(trace);
-	iferr(trace);
-	trace_start_output(outtrace);
-	iferrout(outtrace);
-	
-	packet=trace_create_packet();
-        for (;;) {
-		if ((psize = trace_read_packet(trace, packet)) <0) {
-			error = 1;
-			break;
-		}
-		if (psize == 0) {
-			error = 0;
-			break;
-		}
-		count ++;
-		/* Force promotion */
-		if (trace_get_source_port(packet)==80) {
-			trace_set_direction(packet,TRACE_DIR_OUTGOING);
-			assert(trace_get_direction(packet)==TRACE_DIR_OUTGOING);
-			assert(trace_get_source_port(packet)==80);
-		}
-		else {
-			trace_set_direction(packet,TRACE_DIR_INCOMING);
-			assert(trace_get_direction(packet)==TRACE_DIR_INCOMING);
-		}
-		/* And then force demotion */
-		trace_write_packet(outtrace,packet);
-		iferrout(outtrace);
-		if (count>100)
-			break;
+    packet = trace_create_packet();
+    for (;;) {
+        if ((psize = trace_read_packet(trace, packet)) < 0) {
+            error = 1;
+            break;
         }
-	trace_destroy_packet(packet);
-	if (error == 0) {
-		if (count != expected) {
-			printf("failure: %d packets expected, %d seen\n",expected,count);
-			error = 1;
-		}
-	} else {
-		iferr(trace);
-	}
-        trace_destroy(trace);
-	trace_destroy_output(outtrace);
+        if (psize == 0) {
+            error = 0;
+            break;
+        }
+        count++;
+        /* Force promotion */
+        if (trace_get_source_port(packet) == 80) {
+            trace_set_direction(packet, TRACE_DIR_OUTGOING);
+            assert(trace_get_direction(packet) == TRACE_DIR_OUTGOING);
+            assert(trace_get_source_port(packet) == 80);
+        } else {
+            trace_set_direction(packet, TRACE_DIR_INCOMING);
+            assert(trace_get_direction(packet) == TRACE_DIR_INCOMING);
+        }
+        /* And then force demotion */
+        trace_write_packet(outtrace, packet);
+        iferrout(outtrace);
+        if (count > 100)
+            break;
+    }
+    trace_destroy_packet(packet);
+    if (error == 0) {
+        if (count != expected) {
+            printf("failure: %d packets expected, %d seen\n", expected, count);
+            error = 1;
+        }
+    } else {
+        iferr(trace);
+    }
+    trace_destroy(trace);
+    trace_destroy_output(outtrace);
 
-        return error;
+    return error;
 }

@@ -15,12 +15,14 @@
 #include <linux/if_packet.h>
 #include <errno.h>
 
-int linux_set_nic_promisc(const int sock, const unsigned int ifindex, bool enable) {
+int linux_set_nic_promisc(const int sock, const unsigned int ifindex,
+                          bool enable)
+{
 
     struct packet_mreq mreq;
     int action;
 
-    memset(&mreq,0,sizeof(mreq));
+    memset(&mreq, 0, sizeof(mreq));
     mreq.mr_ifindex = ifindex;
     mreq.mr_type = PACKET_MR_PROMISC;
 
@@ -29,14 +31,14 @@ int linux_set_nic_promisc(const int sock, const unsigned int ifindex, bool enabl
     else
         action = PACKET_DROP_MEMBERSHIP;
 
-
     if (setsockopt(sock, SOL_PACKET, action, &mreq, sizeof(mreq)) == -1)
         return -1;
 
     return 0;
 }
 
-static int linux_send_ioctl_ethtool(void *data, char *ifname) {
+static int linux_send_ioctl_ethtool(void *data, char *ifname)
+{
 
     struct ifreq ifr = {};
     int fd, err, ret;
@@ -46,7 +48,7 @@ static int linux_send_ioctl_ethtool(void *data, char *ifname) {
         return -errno;
 
     ifr.ifr_data = data;
-    int cpy_len = strlen(ifname) < IFNAMSIZ ? strlen(ifname) : IFNAMSIZ -1;
+    int cpy_len = strlen(ifname) < IFNAMSIZ ? strlen(ifname) : IFNAMSIZ - 1;
     memcpy(ifr.ifr_name, ifname, cpy_len);
     ifr.ifr_name[IFNAMSIZ - 1] = '\0';
     err = ioctl(fd, SIOCETHTOOL, &ifr);
@@ -68,9 +70,10 @@ out:
     return ret;
 }
 
-int linux_get_nic_max_queues(char *ifname) {
+int linux_get_nic_max_queues(char *ifname)
+{
 
-    struct ethtool_channels channels = { .cmd = ETHTOOL_GCHANNELS };
+    struct ethtool_channels channels = {.cmd = ETHTOOL_GCHANNELS};
     int ret;
 
     if ((ret = linux_send_ioctl_ethtool(&channels, ifname)) == 0) {
@@ -81,8 +84,9 @@ int linux_get_nic_max_queues(char *ifname) {
     return ret;
 }
 
-int linux_get_nic_queues(char *ifname) {
-    struct ethtool_channels channels = { .cmd = ETHTOOL_GCHANNELS };
+int linux_get_nic_queues(char *ifname)
+{
+    struct ethtool_channels channels = {.cmd = ETHTOOL_GCHANNELS};
     int ret;
 
     if ((ret = linux_send_ioctl_ethtool(&channels, ifname)) == 0) {
@@ -93,8 +97,9 @@ int linux_get_nic_queues(char *ifname) {
     return ret;
 }
 
-int linux_set_nic_queues(char *ifname, int queues) {
-    struct ethtool_channels channels = { .cmd = ETHTOOL_GCHANNELS };
+int linux_set_nic_queues(char *ifname, int queues)
+{
+    struct ethtool_channels channels = {.cmd = ETHTOOL_GCHANNELS};
     __u32 org_combined;
     int ret;
 
@@ -125,7 +130,8 @@ int linux_set_nic_queues(char *ifname, int queues) {
     return ret;
 }
 
-int linux_set_nic_hasher(char *ifname, enum hasher_types hasher) {
+int linux_set_nic_hasher(char *ifname, enum hasher_types hasher)
+{
 
     int err;
     int indir_bytes;
@@ -138,33 +144,38 @@ int linux_set_nic_hasher(char *ifname, enum hasher_types hasher) {
     }
 
     // make sure key is a multiple of 2 , RSS keys can be 40 or 52 bytes long.
-    if (rss_head.key_size % 2 != 0 || (rss_head.key_size != 40 && rss_head.key_size != 52))
+    if (rss_head.key_size % 2 != 0 ||
+        (rss_head.key_size != 40 && rss_head.key_size != 52))
         return -1;
 
     indir_bytes = rss_head.indir_size * sizeof(rss_head.rss_config[0]);
 
     struct ethtool_rxfh *rss;
-    rss = calloc(1, sizeof(*rss) + (rss_head.indir_size * sizeof(rss_head.rss_config[0])) + rss_head.key_size);
+    rss = calloc(1, sizeof(*rss) +
+                        (rss_head.indir_size * sizeof(rss_head.rss_config[0])) +
+                        rss_head.key_size);
     if (!rss) {
         return -1;
     }
     rss->cmd = ETHTOOL_SRSSH;
     rss->rss_context = 0;
-    //rss->hfunc = rss_head.hfunc;
+    // rss->hfunc = rss_head.hfunc;
     rss->indir_size = 0;
     rss->key_size = rss_head.key_size;
     switch (hasher) {
-        case HASHER_BALANCE:
-        case HASHER_UNIDIRECTIONAL:
-            toeplitz_ncreate_unikey((uint8_t *)rss->rss_config + indir_bytes, rss_head.key_size);
-            break;
-        case HASHER_BIDIRECTIONAL:
-            toeplitz_ncreate_bikey((uint8_t *)rss->rss_config + indir_bytes, rss_head.key_size);
-            break;
-        case HASHER_CUSTOM:
-            // should never hit this, just here to silence warnings
-            free(rss);
-            return 0;
+    case HASHER_BALANCE:
+    case HASHER_UNIDIRECTIONAL:
+        toeplitz_ncreate_unikey((uint8_t *)rss->rss_config + indir_bytes,
+                                rss_head.key_size);
+        break;
+    case HASHER_BIDIRECTIONAL:
+        toeplitz_ncreate_bikey((uint8_t *)rss->rss_config + indir_bytes,
+                               rss_head.key_size);
+        break;
+    case HASHER_CUSTOM:
+        // should never hit this, just here to silence warnings
+        free(rss);
+        return 0;
     }
     err = linux_send_ioctl_ethtool(rss, ifname);
     if (err != 0) {
@@ -176,7 +187,8 @@ int linux_set_nic_hasher(char *ifname, enum hasher_types hasher) {
     return 0;
 }
 
-int linux_get_nic_flow_rule_count(char *ifname) {
+int linux_get_nic_flow_rule_count(char *ifname)
+{
 
     int err;
 
@@ -191,42 +203,49 @@ int linux_get_nic_flow_rule_count(char *ifname) {
     return nfccmd.rule_cnt;
 }
 
-static struct ethtool_ringparam *linux_get_nic_rings(struct ethtool_ringparam *ering, char *ifname) {
+static struct ethtool_ringparam *
+linux_get_nic_rings(struct ethtool_ringparam *ering, char *ifname)
+{
     ering->cmd = ETHTOOL_GRINGPARAM;
     if (linux_send_ioctl_ethtool(ering, ifname) != 0)
         return NULL;
     return ering;
 }
 
-int linux_get_nic_rx_rings(char *ifname) {
+int linux_get_nic_rx_rings(char *ifname)
+{
     struct ethtool_ringparam ering = {};
     if (linux_get_nic_rings(&ering, ifname) != NULL)
         return ering.rx_pending;
     return -1;
 }
 
-int linux_get_nic_tx_rings(char *ifname) {
+int linux_get_nic_tx_rings(char *ifname)
+{
     struct ethtool_ringparam ering = {};
     if (linux_get_nic_rings(&ering, ifname) != NULL)
         return ering.tx_pending;
     return -1;
 }
 
-int linux_get_nic_max_rx_rings(char *ifname) {
+int linux_get_nic_max_rx_rings(char *ifname)
+{
     struct ethtool_ringparam ering = {};
     if (linux_get_nic_rings(&ering, ifname) != NULL)
         return ering.rx_max_pending;
     return -1;
 }
 
-int linux_get_nic_max_tx_rings(char *ifname) {
+int linux_get_nic_max_tx_rings(char *ifname)
+{
     struct ethtool_ringparam ering = {};
     if (linux_get_nic_rings(&ering, ifname) != NULL)
         return ering.tx_max_pending;
     return -1;
 }
 
-int linux_set_nic_rx_tx_rings(int tx, int rx, char *ifname) {
+int linux_set_nic_rx_tx_rings(int tx, int rx, char *ifname)
+{
     struct ethtool_ringparam ering = {};
     if (linux_get_nic_rings(&ering, ifname) == NULL)
         return -1;
@@ -245,50 +264,48 @@ int linux_set_nic_rx_tx_rings(int tx, int rx, char *ifname) {
 /* These don't typically reset however an interface does exist to reset them */
 int linux_get_dev_statistics(char *ifname, struct linux_dev_stats *stats)
 {
-        FILE *file;
-        char line[1024];
-        struct linux_dev_stats tmp_stats;
+    FILE *file;
+    char line[1024];
+    struct linux_dev_stats tmp_stats;
 
-        file = fopen("/proc/net/dev", "r");
-        if (file == NULL) {
-                return -1;
-        }
+    file = fopen("/proc/net/dev", "r");
+    if (file == NULL) {
+        return -1;
+    }
 
-        /* Skip 2 header lines */
-        if (fgets(line, sizeof(line), file) == NULL) {
-                fclose(file);
-                return -1;
-        }
-
-        if (fgets(line, sizeof(line), file) == NULL) {
-                fclose(file);
-                return -1;
-        }
-
-        while (!(feof(file) || ferror(file))) {
-                int tot;
-                if (fgets(line, sizeof(line), file) == NULL)
-                        break;
-
-                tot = sscanf(
-                    line, " %" xstr(IF_NAMESIZE) "[^:]:" REPEAT_16(" %" SCNd64),
-                    tmp_stats.if_name, &tmp_stats.rx_bytes,
-                    &tmp_stats.rx_packets, &tmp_stats.rx_errors,
-                    &tmp_stats.rx_drops, &tmp_stats.rx_fifo,
-                    &tmp_stats.rx_frame, &tmp_stats.rx_compressed,
-                    &tmp_stats.rx_multicast, &tmp_stats.tx_bytes,
-                    &tmp_stats.tx_packets, &tmp_stats.tx_errors,
-                    &tmp_stats.tx_drops, &tmp_stats.tx_fifo,
-                    &tmp_stats.tx_colls, &tmp_stats.tx_carrier,
-                    &tmp_stats.tx_compressed);
-                if (tot != 17)
-                        continue;
-                if (strncmp(tmp_stats.if_name, ifname, IF_NAMESIZE) == 0) {
-                        *stats = tmp_stats;
-                        fclose(file);
-                        return 0;
-                }
-        }
+    /* Skip 2 header lines */
+    if (fgets(line, sizeof(line), file) == NULL) {
         fclose(file);
         return -1;
+    }
+
+    if (fgets(line, sizeof(line), file) == NULL) {
+        fclose(file);
+        return -1;
+    }
+
+    while (!(feof(file) || ferror(file))) {
+        int tot;
+        if (fgets(line, sizeof(line), file) == NULL)
+            break;
+
+        tot = sscanf(
+            line, " %" xstr(IF_NAMESIZE) "[^:]:" REPEAT_16(" %" SCNd64),
+            tmp_stats.if_name, &tmp_stats.rx_bytes, &tmp_stats.rx_packets,
+            &tmp_stats.rx_errors, &tmp_stats.rx_drops, &tmp_stats.rx_fifo,
+            &tmp_stats.rx_frame, &tmp_stats.rx_compressed,
+            &tmp_stats.rx_multicast, &tmp_stats.tx_bytes, &tmp_stats.tx_packets,
+            &tmp_stats.tx_errors, &tmp_stats.tx_drops, &tmp_stats.tx_fifo,
+            &tmp_stats.tx_colls, &tmp_stats.tx_carrier,
+            &tmp_stats.tx_compressed);
+        if (tot != 17)
+            continue;
+        if (strncmp(tmp_stats.if_name, ifname, IF_NAMESIZE) == 0) {
+            *stats = tmp_stats;
+            fclose(file);
+            return 0;
+        }
+    }
+    fclose(file);
+    return -1;
 }

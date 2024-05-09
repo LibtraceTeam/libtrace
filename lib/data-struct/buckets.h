@@ -30,20 +30,20 @@
 #include "linked_list.h"
 
 typedef struct bucket_node {
-        uint64_t startindex;
-        uint8_t *released;
-        uint16_t activemembers;
-        uint16_t slots;
-        void *buffer;
+    uint64_t startindex;
+    uint8_t *released;
+    uint16_t activemembers;
+    uint16_t slots;
+    void *buffer;
 } libtrace_bucket_node_t;
 
 typedef struct buckets {
-        uint64_t nextid;
-        libtrace_bucket_node_t *node;
-        libtrace_bucket_node_t **packets;
-        libtrace_list_t *nodelist;
-        pthread_mutex_t lock;
-        pthread_cond_t cond;
+    uint64_t nextid;
+    libtrace_bucket_node_t *node;
+    libtrace_bucket_node_t **packets;
+    libtrace_list_t *nodelist;
+    pthread_mutex_t lock;
+    pthread_cond_t cond;
 } libtrace_bucket_t;
 
 libtrace_bucket_t *libtrace_bucket_init(void);

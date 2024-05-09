@@ -28,14 +28,14 @@
  *
  */
 #ifndef WIN32
-#  include <sys/time.h>
-#  include <netinet/in.h>
-#  include <netinet/in_systm.h>
-#  include <netinet/tcp.h>
-#  include <netinet/ip.h>
-#  include <netinet/ip_icmp.h>
-#  include <arpa/inet.h>
-#  include <sys/socket.h>
+#    include <sys/time.h>
+#    include <netinet/in.h>
+#    include <netinet/in_systm.h>
+#    include <netinet/tcp.h>
+#    include <netinet/ip.h>
+#    include <netinet/ip_icmp.h>
+#    include <arpa/inet.h>
+#    include <sys/socket.h>
 #endif
 #include <stdio.h>
 #include <stdlib.h>
@@ -51,14 +51,15 @@
 
 void iferr(libtrace_t *trace)
 {
-	libtrace_err_t err = trace_get_err(trace);
-	if (err.err_num==0)
-		return;
-	printf("Error: %s\n",err.problem);
-	exit(1);
+    libtrace_err_t err = trace_get_err(trace);
+    if (err.err_num == 0)
+        return;
+    printf("Error: %s\n", err.problem);
+    exit(1);
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[])
+{
     int psize = 0;
     int error = 0;
     int ip_count = 0;
@@ -75,7 +76,7 @@ int main(int argc, char *argv[]) {
     trace_start(trace);
     iferr(trace);
 
-    packet=trace_create_packet();
+    packet = trace_create_packet();
     for (;;) {
         uint8_t proto;
         uint32_t remaining;
@@ -109,17 +110,17 @@ int main(int argc, char *argv[]) {
         layer2 = trace_get_payload_from_vxlan(vxlan, &remaining);
 
         switch (ntohs(((libtrace_ether_t *)layer2)->ether_type)) {
-            case 0x0800:
-                ip_count++;
-                break;
-            case 0x0806:
-                arp_count++;
-                break;
-            default:
-                fprintf(stderr, "Unexpected vxlan ethertype: %08x\n",
-                        ntohs(((libtrace_ether_t *)layer2)->ether_type));
-                error = 1;
-                continue;
+        case 0x0800:
+            ip_count++;
+            break;
+        case 0x0806:
+            arp_count++;
+            break;
+        default:
+            fprintf(stderr, "Unexpected vxlan ethertype: %08x\n",
+                    ntohs(((libtrace_ether_t *)layer2)->ether_type));
+            error = 1;
+            continue;
         }
     }
     trace_destroy_packet(packet);
