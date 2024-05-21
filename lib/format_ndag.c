@@ -319,6 +319,9 @@ static int join_multicast_group(char *groupaddr, char *localiface,
     }
 
 sockcreateover:
+    if (!srcinfo) {
+        freeaddrinfo(gotten);
+    }
     freeaddrinfo(group);
     return sock;
 }
@@ -787,6 +790,10 @@ static void free_streamsock_data(streamsock_t *src)
 #endif
     if (src->singlemsg.msg_iov) {
         free(src->singlemsg.msg_iov);
+    }
+
+    if (src->srcaddr) {
+        freeaddrinfo(src->srcaddr);
     }
 
     if (src->sock != -1) {
