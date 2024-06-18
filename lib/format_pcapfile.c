@@ -516,7 +516,13 @@ static int pcapfile_write_packet(libtrace_out_t *out, libtrace_packet_t *packet)
             return -1;
         }
 
-        pcaphdr.magic_number = 0xa1b2c3d4;
+        if (packet->trace && packet->trace->format && (
+                packet->trace->format->type == TRACE_FORMAT_PCAPFILE) &&
+                trace_in_nanoseconds(&DATA(packet->trace)->header)) {
+            pcaphdr.magic_number = MAGIC2;
+        } else {
+            pcaphdr.magic_number = MAGIC1;
+        }
         pcaphdr.version_major = 2;
         pcaphdr.version_minor = 4;
         pcaphdr.thiszone = 0;
