@@ -108,4 +108,5 @@ void misc_report(void)
     fprintf(out, "Average packet rate: %.02f packets/sec\n",
             packets / (endtime - starttime));
     fprintf(out, "Uncompressed trace size: %" PRIu64 "\n", capture_bytes);
+    fclose(out);
 }
