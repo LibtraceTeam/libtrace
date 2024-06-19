@@ -1,3 +1,11 @@
+libtrace4 (4.0.26-1) unstable; urgency=medium
+
+  * pcapfile: fix loss of nanosecond timestamp resolution when
+    writing to a pcapfile output.
+  * ndag: fix very minor memory leak.
+
+ -- Shane Alcock <shane@alcock.co.nz>  Wed, 20 Jun 2024 09:06:48 +1200
+
 libtrace4 (4.0.25-1) unstable; urgency=medium
 
   * ndag: fix issue where the most recently received packets may not
