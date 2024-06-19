@@ -31,8 +31,8 @@
 
 uint64_t etsilive_get_erf_timestamp(const libtrace_packet_t *packet);
 int etsilive_get_framing_length(const libtrace_packet_t *packet UNUSED);
-libtrace_linktype_t etsilive_get_link_type(
-                const libtrace_packet_t *packet UNUSED);
-int etsilive_get_pdu_length(const libtrace_packet_t *packet) ;
+libtrace_linktype_t
+etsilive_get_link_type(const libtrace_packet_t *packet UNUSED);
+int etsilive_get_pdu_length(const libtrace_packet_t *packet);
 
 #endif

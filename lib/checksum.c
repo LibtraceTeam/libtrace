@@ -24,79 +24,76 @@
  *
  */
 
-
 #include "checksum.h"
 
-uint32_t add_checksum(void *buffer, uint16_t length) {
-        uint32_t sum = 0;
-        uint16_t * buff = (uint16_t *) buffer;
-        uint16_t count = length;
-	uint16_t val;
+uint32_t add_checksum(void *buffer, uint16_t length)
+{
+    uint32_t sum = 0;
+    uint16_t *buff = (uint16_t *)buffer;
+    uint16_t count = length;
+    uint16_t val;
 
-        while(count > 1 ) {
-                val = *buff;
-		sum += val;
-		buff ++;
-                count = count -2;
-        }
+    while (count > 1) {
+        val = *buff;
+        sum += val;
+        buff++;
+        count = count - 2;
+    }
 
-        if(count > 0) {
-		sum += *(uint8_t *)buff;
-        }
+    if (count > 0) {
+        sum += *(uint8_t *)buff;
+    }
 
-	return sum;
+    return sum;
 }
 
-uint16_t finish_checksum(uint32_t sum) {
-        while (sum>>16) {
-                sum = (sum & 0xffff) + (sum >> 16);
-	}
-        return (uint16_t)~sum;
+uint16_t finish_checksum(uint32_t sum)
+{
+    while (sum >> 16) {
+        sum = (sum & 0xffff) + (sum >> 16);
+    }
+    return (uint16_t)~sum;
 }
 
-uint16_t checksum_buffer(void *buffer, uint16_t length) {
+uint16_t checksum_buffer(void *buffer, uint16_t length)
+{
 
-	uint32_t sum = add_checksum(buffer, length);
-	return finish_checksum(sum);
-
+    uint32_t sum = add_checksum(buffer, length);
+    return finish_checksum(sum);
 }
 
-uint32_t ipv4_pseudo_checksum(libtrace_ip_t *ip) {
+uint32_t ipv4_pseudo_checksum(libtrace_ip_t *ip)
+{
 
-	uint32_t sum = 0;
-	uint16_t temp = 0;
+    uint32_t sum = 0;
+    uint16_t temp = 0;
 
-	sum += add_checksum(&ip->ip_src.s_addr,sizeof(uint32_t));
-	sum += add_checksum(&ip->ip_dst.s_addr,sizeof(uint32_t));
+    sum += add_checksum(&ip->ip_src.s_addr, sizeof(uint32_t));
+    sum += add_checksum(&ip->ip_dst.s_addr, sizeof(uint32_t));
 
-	temp = htons(ip->ip_p);
-	sum += add_checksum(&temp, sizeof(uint16_t));
+    temp = htons(ip->ip_p);
+    sum += add_checksum(&temp, sizeof(uint16_t));
 
-	temp = htons(ntohs(ip->ip_len) - (ip->ip_hl * 4));
-	sum += add_checksum(&temp, sizeof(uint16_t));
+    temp = htons(ntohs(ip->ip_len) - (ip->ip_hl * 4));
+    sum += add_checksum(&temp, sizeof(uint16_t));
 
-	return sum;	
-
+    return sum;
 }
 
-uint32_t ipv6_pseudo_checksum(libtrace_ip6_t *ip) {
+uint32_t ipv6_pseudo_checksum(libtrace_ip6_t *ip)
+{
 
-	uint32_t sum = 0;
-	uint16_t temp = 0;
+    uint32_t sum = 0;
+    uint16_t temp = 0;
 
-	sum += add_checksum(&ip->ip_src.s6_addr,sizeof(struct in6_addr));
-	sum += add_checksum(&ip->ip_dst.s6_addr,sizeof(struct in6_addr));
-	
-	temp = ip->plen;
-	sum += add_checksum(&temp, sizeof(uint16_t));
+    sum += add_checksum(&ip->ip_src.s6_addr, sizeof(struct in6_addr));
+    sum += add_checksum(&ip->ip_dst.s6_addr, sizeof(struct in6_addr));
 
+    temp = ip->plen;
+    sum += add_checksum(&temp, sizeof(uint16_t));
 
-	temp = htons(ip->nxt);
-	sum += add_checksum(&temp, sizeof(uint16_t));
+    temp = htons(ip->nxt);
+    sum += add_checksum(&temp, sizeof(uint16_t));
 
-
-	return sum;	
-
+    return sum;
 }
-
-

@@ -25,17 +25,17 @@
  */
 
 #ifndef LIBTRACE_RADIUS_H_
-#define LIBTRACE_RADIUS_H_
+#    define LIBTRACE_RADIUS_H_
 
-#include "libtrace.h"
+#    include "libtrace.h"
 
 /** See protocols_radius.c for implementation of the methods declared in this
  *  header file.
  */
 
-#ifdef __cplusplus
+#    ifdef __cplusplus
 extern "C" {
-#endif
+#    endif
 
 /** Enumeration of all valid RADIUS codes */
 typedef enum {
@@ -153,7 +153,7 @@ ct_assert(sizeof(libtrace_radius_t) == 20);
  *          where the RADIUS header should be.
  */
 DLLEXPORT libtrace_radius_t *trace_get_radius(libtrace_packet_t *packet,
-        uint32_t *remaining);
+                                              uint32_t *remaining);
 
 /** Searches for a specific AVP within a RADIUS message.
  *
@@ -165,9 +165,9 @@ DLLEXPORT libtrace_radius_t *trace_get_radius(libtrace_packet_t *packet,
  *  @return A pointer to the first AVP that has matches the given type, or
  *          NULL if that AVP type is not present in the packet.
  */
-DLLEXPORT libtrace_radius_avp_t *trace_get_radius_avp(
-        libtrace_radius_t *radius, uint32_t remaining,
-        libtrace_radius_avp_type type);
+DLLEXPORT libtrace_radius_avp_t *
+trace_get_radius_avp(libtrace_radius_t *radius, uint32_t remaining,
+                     libtrace_radius_avp_type type);
 
 /** Returns the value of the Username AVP in a RADIUS message.
  *
@@ -181,7 +181,7 @@ DLLEXPORT libtrace_radius_avp_t *trace_get_radius_avp(
  *          found.
  */
 DLLEXPORT char *trace_get_radius_username(libtrace_radius_t *radius,
-        uint32_t radrem, uint8_t *name_len);
+                                          uint32_t radrem, uint8_t *name_len);
 
 /** Returns the value of the NAS identifier in a RADIUS message.
  *
@@ -195,12 +195,12 @@ DLLEXPORT char *trace_get_radius_username(libtrace_radius_t *radius,
  *          identifier was found.
  */
 DLLEXPORT char *trace_get_radius_nas_identifier(libtrace_radius_t *radius,
-        uint32_t radrem, uint8_t *naslen);
+                                                uint32_t radrem,
+                                                uint8_t *naslen);
 
-#ifdef __cplusplus
+#    ifdef __cplusplus
 } /* extern "C" */
-#endif /* #ifdef __cplusplus */
-
+#    endif /* #ifdef __cplusplus */
 
 #endif
 

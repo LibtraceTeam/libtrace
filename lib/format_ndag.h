@@ -24,7 +24,6 @@
  *
  */
 
-
 #ifndef FORMAT_NDAG_H_
 #define FORMAT_NDAG_H_
 
@@ -38,19 +37,19 @@
 #define MAX_NETACQ_POLYGONS 8
 
 enum {
-        NDAG_PKT_BEACON = 0x01,
-        NDAG_PKT_ENCAPERF = 0x02,
-        NDAG_PKT_RESTARTED = 0x03,
-        NDAG_PKT_ENCAPRT = 0x04,
-        NDAG_PKT_KEEPALIVE = 0x05,
-        NDAG_PKT_CORSAROTAG = 0x06
+    NDAG_PKT_BEACON = 0x01,
+    NDAG_PKT_ENCAPERF = 0x02,
+    NDAG_PKT_RESTARTED = 0x03,
+    NDAG_PKT_ENCAPRT = 0x04,
+    NDAG_PKT_KEEPALIVE = 0x05,
+    NDAG_PKT_CORSAROTAG = 0x06
 };
 
 /** Must match the ipmeta_provider_id_t enum in libipmeta */
 enum {
-        NDAG_IPMETA_PROVIDER_MAXMIND = 1,
-        NDAG_IPMETA_PROVIDER_NETACQ_EDGE = 2,
-        NDAG_IPMETA_PROVIDER_PFX2AS = 3,
+    NDAG_IPMETA_PROVIDER_MAXMIND = 1,
+    NDAG_IPMETA_PROVIDER_NETACQ_EDGE = 2,
+    NDAG_IPMETA_PROVIDER_PFX2AS = 3,
 };
 
 /** A set of tags that have been derived for an individual packet. */
@@ -114,8 +113,7 @@ typedef struct corsaro_packet_tags {
     /** The post-IP protocol used by the packet */
     uint8_t protocol;
 } PACKED corsaro_packet_tags_t;
-ct_assert(sizeof(corsaro_packet_tags_t) == 35 + (4*MAX_NETACQ_POLYGONS));
-
+ct_assert(sizeof(corsaro_packet_tags_t) == 35 + (4 * MAX_NETACQ_POLYGONS));
 
 /** Meta-data that is sent in advance of any published packets, including
  *  the tags that were applied to the packet.
@@ -147,16 +145,17 @@ typedef struct corsaro_tagged_packet_header {
     /** The tags that were applied to this packet by the tagging module */
     corsaro_packet_tags_t tags;
 } PACKED corsaro_tagged_packet_header_t;
-ct_assert(sizeof(corsaro_tagged_packet_header_t) == 27 + sizeof(corsaro_packet_tags_t));
+ct_assert(sizeof(corsaro_tagged_packet_header_t) ==
+          27 + sizeof(corsaro_packet_tags_t));
 
 /* == Protocol header structures == */
 
 /* Common header -- is prepended to all exported records */
 typedef struct ndag_common_header {
-        uint32_t magic;
-        uint8_t version;
-        uint8_t type;
-        uint16_t monitorid;
+    uint32_t magic;
+    uint8_t version;
+    uint8_t type;
+    uint16_t monitorid;
 } PACKED ndag_common_t;
 ct_assert(sizeof(ndag_common_t) == 8);
 
@@ -171,10 +170,10 @@ ct_assert(sizeof(ndag_common_t) == 8);
 
 /* Encapsulation header -- used by both ENCAPERF and ENCAPRT records */
 typedef struct ndag_encap {
-        uint64_t started;
-        uint32_t seqno;
-        uint16_t streamid;
-        uint16_t recordcount; /* acts as RT type for ENCAPRT records */
+    uint64_t started;
+    uint32_t seqno;
+    uint16_t streamid;
+    uint16_t recordcount; /* acts as RT type for ENCAPRT records */
 } PACKED ndag_encap_t;
 ct_assert(sizeof(ndag_encap_t) == 16);
 

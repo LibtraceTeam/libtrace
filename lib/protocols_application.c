@@ -38,19 +38,15 @@ void *trace_get_payload_from_vxlan(libtrace_vxlan_t *vxlan, uint32_t *remaining)
         *remaining -= sizeof(*vxlan);
     }
 
-    return (void*)((char *)vxlan + sizeof(*vxlan));
+    return (void *)((char *)vxlan + sizeof(*vxlan));
 }
 
-
 libtrace_vxlan_t *trace_get_vxlan_from_udp(libtrace_udp_t *udp,
-        uint32_t *remaining)
+                                           uint32_t *remaining)
 {
     if (udp->dest != htons(4789)) { /* UDP port number for vxlan */
-        return NULL; /* Not a vxlan packet. */
+        return NULL;                /* Not a vxlan packet. */
     }
 
     return trace_get_payload_from_udp(udp, remaining);
 }
-
-
-

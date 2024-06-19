@@ -57,9 +57,9 @@
  *
  * Procedure for adding new RT data types
  * ----------------------------------------
- * 
+ *
  * If you are adding a new format:
- * 	RT_DATA_(new format) must be equal to RT_DATA_SIMPLE + 
+ * 	RT_DATA_(new format) must be equal to RT_DATA_SIMPLE +
  * 		TRACE_FORMAT_(new_format)
  * 	Add a new dummy trace type to the rt_format_t structure
  * 	Set the dummy trace to NULL in rt_init_input
@@ -67,32 +67,32 @@
  *
  * If you are adding a new PCAP DLT type:
  * 	RT_DATA_PCAP_(new DLT) must be equal to RT_DATA_PCAP + (DLT value)
- * 	
+ *
  */
 
 /** Fifo statistics reported by the RT_STATUS message */
 typedef struct fifo_info {
-        uint64_t in;		/**< The offset for the fifo write pointer */
-        uint64_t out;		/**< The offset for the fifo read pointer */
-        uint64_t ack;		/**< The offset for the fifo ACK pointer */
-        uint64_t length;	/**< The total length of the fifo */
-        uint64_t used;		/**< The amount of fifo space in use */
+    uint64_t in;     /**< The offset for the fifo write pointer */
+    uint64_t out;    /**< The offset for the fifo read pointer */
+    uint64_t ack;    /**< The offset for the fifo ACK pointer */
+    uint64_t length; /**< The total length of the fifo */
+    uint64_t used;   /**< The amount of fifo space in use */
 } PACKED fifo_info_t;
 ct_assert(sizeof(fifo_info_t) == 40);
 
 /** RT packet header */
 typedef struct rt_header {
-	/** The type of RT packet */
-	uint32_t type;	
-	
-        uint8_t magic;
+    /** The type of RT packet */
+    uint32_t type;
 
-        uint8_t version;
+    uint8_t magic;
 
-        /** The length of the packet (not including the RT header */
-	uint16_t length;		
-	/** The sequence number of the packet */
-	uint32_t sequence;
+    uint8_t version;
+
+    /** The length of the packet (not including the RT header */
+    uint16_t length;
+    /** The sequence number of the packet */
+    uint32_t sequence;
 } PACKED rt_header_t;
 ct_assert(sizeof(rt_header_t) == 12);
 
@@ -100,10 +100,10 @@ ct_assert(sizeof(rt_header_t) == 12);
 
 /** RT Hello packet sub-header */
 typedef struct rt_hello {
-	/** Indicates whether the sender is acting in a reliable fashion, 
-	 *  i.e. expecting acknowledgements */
-	uint8_t reliable;	
-} PACKED rt_hello_t ;
+    /** Indicates whether the sender is acting in a reliable fashion,
+     *  i.e. expecting acknowledgements */
+    uint8_t reliable;
+} PACKED rt_hello_t;
 ct_assert(sizeof(rt_hello_t) == 1);
 
 #if 0
@@ -114,15 +114,15 @@ typedef struct rt_start {
 
 /** RT Ack sub-header */
 typedef struct rt_ack {
-	/** The sequence number of the last received RT packet */
-	uint32_t sequence;
+    /** The sequence number of the last received RT packet */
+    uint32_t sequence;
 } PACKED rt_ack_t;
 ct_assert(sizeof(rt_ack_t) == 4);
 
 /** RT Status sub-header */
 typedef struct rt_status {
-	/** Statistics describing the current status of the sender fifo */
-	fifo_info_t fifo_status;
+    /** Statistics describing the current status of the sender fifo */
+    fifo_info_t fifo_status;
 } PACKED rt_status_t;
 ct_assert(sizeof(rt_status_t) == 40);
 
@@ -141,23 +141,23 @@ typedef struct rt_end_data {
 #if 0
 typedef struct rt_close {
 
-} rt_close_t; 
+} rt_close_t;
 #endif
 
 /** Reasons that an RT connection may be denied */
 enum rt_conn_denied_t {
-	/** The client failed a TCP wrapper check */
- 	RT_DENY_WRAPPER 	=1,
-	/** The server has reached the maximum number of client connections */
- 	RT_DENY_FULL		=2,
-	/** Client failed to correctly authenticate */
- 	RT_DENY_AUTH		=3
+    /** The client failed a TCP wrapper check */
+    RT_DENY_WRAPPER = 1,
+    /** The server has reached the maximum number of client connections */
+    RT_DENY_FULL = 2,
+    /** Client failed to correctly authenticate */
+    RT_DENY_AUTH = 3
 };
 
 /** RT Denied Connection sub-header */
 typedef struct rt_deny_conn {
-	/** The reason that the connection was denied */
-	uint32_t reason;
+    /** The reason that the connection was denied */
+    uint32_t reason;
 } PACKED rt_deny_conn_t;
 ct_assert(sizeof(rt_deny_conn_t) == 4);
 
@@ -187,10 +187,10 @@ typedef struct rt_keychange {
 
 /** RT meta-data sub-header */
 typedef struct rt_metadata {
-	/** Length of the label string that follows the header */
-	uint32_t label_len;
-	/** Length of the value string that follows the header */
-	uint32_t value_len;
+    /** Length of the label string that follows the header */
+    uint32_t label_len;
+    /** Length of the value string that follows the header */
+    uint32_t value_len;
 } PACKED rt_metadata_t;
 ct_assert(sizeof(rt_metadata_t) == 8);
 
@@ -202,91 +202,91 @@ ct_assert(sizeof(rt_metadata_t) == 8);
 
 /** DAG 2.4 DUCK */
 typedef struct duck2_4 {
-	uint32_t   	Command;
-	uint32_t 	Config;
-	uint32_t 	Clock_Inc;
-	uint32_t	Clock_Wrap;
-	uint32_t	DDS_Rate;
-        uint32_t   	Crystal_Freq;
-        uint32_t   	Synth_Freq; 
-	uint32_t	Sync_Rate;
-        uint64_t 	Last_Ticks;
-        uint32_t   	Resyncs;
-        uint32_t   	Bad_Diffs;
-	uint32_t 	Bad_Offs;
-	uint32_t	Bad_Pulses;
-        uint32_t   	Worst_Error;
-	uint32_t	Worst_Off;
-        uint32_t   	Off_Limit;
-	uint32_t	Off_Damp;
-        uint32_t   	Pulses;
-	uint32_t	Single_Pulses_Missing;
-	uint32_t	Longest_Pulse_Missing;
-        uint32_t   	Health;
-	uint32_t	Sickness;
-        int32_t        	Error;
-	int32_t		Offset;
-        uint32_t       	Stat_Start;
-	uint32_t	Stat_End;   
-        uint32_t   	Set_Duck_Field;
+    uint32_t Command;
+    uint32_t Config;
+    uint32_t Clock_Inc;
+    uint32_t Clock_Wrap;
+    uint32_t DDS_Rate;
+    uint32_t Crystal_Freq;
+    uint32_t Synth_Freq;
+    uint32_t Sync_Rate;
+    uint64_t Last_Ticks;
+    uint32_t Resyncs;
+    uint32_t Bad_Diffs;
+    uint32_t Bad_Offs;
+    uint32_t Bad_Pulses;
+    uint32_t Worst_Error;
+    uint32_t Worst_Off;
+    uint32_t Off_Limit;
+    uint32_t Off_Damp;
+    uint32_t Pulses;
+    uint32_t Single_Pulses_Missing;
+    uint32_t Longest_Pulse_Missing;
+    uint32_t Health;
+    uint32_t Sickness;
+    int32_t Error;
+    int32_t Offset;
+    uint32_t Stat_Start;
+    uint32_t Stat_End;
+    uint32_t Set_Duck_Field;
 } PACKED duck2_4_t;
 ct_assert(sizeof(duck2_4_t) == 112);
 
 /** DAG 2.5 DUCK */
 typedef struct duck2_5 {
-        uint32_t        Crystal_Freq;
-        uint32_t        Synth_Freq;
-        uint64_t        Last_Ticks;
-        uint32_t        Resyncs;
-        uint32_t        Bad_Pulses;
-        uint32_t        Worst_Freq_Err;
-	uint32_t	Worst_Phase_Err;
-        uint32_t        Health_Thresh;
-        uint32_t        Pulses;
-	uint32_t	Single_Pulses_Missing;
-	uint32_t	Longest_Pulse_Missing;
-        uint32_t        Health;
-	uint32_t	Sickness;
-        int32_t         Freq_Err;
-	int32_t		Phase_Err;
-        uint32_t        Set_Duck_Field;
-        uint32_t        Stat_Start;
-	uint32_t	Stat_End;
-        uint64_t        Last_TSC;
+    uint32_t Crystal_Freq;
+    uint32_t Synth_Freq;
+    uint64_t Last_Ticks;
+    uint32_t Resyncs;
+    uint32_t Bad_Pulses;
+    uint32_t Worst_Freq_Err;
+    uint32_t Worst_Phase_Err;
+    uint32_t Health_Thresh;
+    uint32_t Pulses;
+    uint32_t Single_Pulses_Missing;
+    uint32_t Longest_Pulse_Missing;
+    uint32_t Health;
+    uint32_t Sickness;
+    int32_t Freq_Err;
+    int32_t Phase_Err;
+    uint32_t Set_Duck_Field;
+    uint32_t Stat_Start;
+    uint32_t Stat_End;
+    uint64_t Last_TSC;
 } PACKED duck2_5_t;
 ct_assert(sizeof(duck2_5_t) == 84);
 
 typedef struct duck5_0 {
-        int64_t         Phase_Correction;
-        uint64_t        Last_Ticks;
-        uint64_t        Last_TSC;
-	/* XXX Stat_Start and Stat_End are time_t in dagioctl.h, which means 
-	 * they could in theory be 32 or 64 bit depending on the architecture 
-	 * when capturing. I'm going to assume 5.0 era DAG captures are taking
-	 * place on a 64 bit arch, rather than have to deal with the varying
-	 * sizes (especially given nobody really uses DUCK these days).
-	 */
-        uint64_t        Stat_Start, Stat_End;
-        uint32_t        Crystal_Freq;
-        uint32_t        Synth_Freq;
-        uint32_t        Resyncs;
-        uint32_t        Bad_Pulses;
-        uint32_t        Worst_Freq_Err, Worst_Phase_Err;
-        uint32_t        Health_Thresh;
-        uint32_t        Pulses, Single_Pulses_Missing, Longest_Pulse_Missing;
-        uint32_t        Health, Sickness;
-        int32_t         Freq_Err, Phase_Err;
-        uint32_t        Set_Duck_Field;
+    int64_t Phase_Correction;
+    uint64_t Last_Ticks;
+    uint64_t Last_TSC;
+    /* XXX Stat_Start and Stat_End are time_t in dagioctl.h, which means
+     * they could in theory be 32 or 64 bit depending on the architecture
+     * when capturing. I'm going to assume 5.0 era DAG captures are taking
+     * place on a 64 bit arch, rather than have to deal with the varying
+     * sizes (especially given nobody really uses DUCK these days).
+     */
+    uint64_t Stat_Start, Stat_End;
+    uint32_t Crystal_Freq;
+    uint32_t Synth_Freq;
+    uint32_t Resyncs;
+    uint32_t Bad_Pulses;
+    uint32_t Worst_Freq_Err, Worst_Phase_Err;
+    uint32_t Health_Thresh;
+    uint32_t Pulses, Single_Pulses_Missing, Longest_Pulse_Missing;
+    uint32_t Health, Sickness;
+    int32_t Freq_Err, Phase_Err;
+    uint32_t Set_Duck_Field;
 } PACKED duck5_0_t;
 ct_assert(sizeof(duck5_0_t) == 100);
 
 /*
 typedef struct rt_duck_2_4 {
-	duck2_4_t duck;
+        duck2_4_t duck;
 } rt_duck_2_4_t;
 
 typedef struct rt_duck_2_5 {
-	duck2_5_t duck;
+        duck2_5_t duck;
 } rt_duck_2_5_t;
 */
 

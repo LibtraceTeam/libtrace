@@ -36,7 +36,6 @@
  * their API stable enough to move into libtrace.h where they probably belong.
  */
 
-
 /* These are generally used by the next higher level, so really we should
  * be defining API's that mean that these don't need to be known by the
  * higher level.
@@ -60,27 +59,26 @@
  * and beyond.  It will be decremented by the number of bytes skipped to find
  * the payload.
  *
- * If the Ethernet header is complete but there are zero bytes of payload after 
- * the end of the header, a pointer to where the payload would be is returned 
- * and remaining will be set to 0.  If the Ethernet header is incomplete 
- * (truncated), then NULL is returned and remaining will be set to 0. 
+ * If the Ethernet header is complete but there are zero bytes of payload after
+ * the end of the header, a pointer to where the payload would be is returned
+ * and remaining will be set to 0.  If the Ethernet header is incomplete
+ * (truncated), then NULL is returned and remaining will be set to 0.
  * Therefore, it is very important to check the value of remaining after
  * calling this function.
  *
- * @note \ref trace_get_payload_from_layer2 provides a suitable alternative that is
- * actually available via the external API
+ * @note \ref trace_get_payload_from_layer2 provides a suitable alternative that
+ * is actually available via the external API
  */
-void *trace_get_payload_from_ethernet(void *ethernet, 
-		uint16_t *type,
-		uint32_t *remaining);
+void *trace_get_payload_from_ethernet(void *ethernet, uint16_t *type,
+                                      uint32_t *remaining);
 
 /* l3 definitions */
 
 /** Ports structure used to get the source and destination ports for transport
  * protocols */
 struct ports_t {
-	uint16_t src;		/**< Source port */
-	uint16_t dst;		/**< Destination port */
+    uint16_t src; /**< Source port */
+    uint16_t dst; /**< Destination port */
 };
 
 #endif

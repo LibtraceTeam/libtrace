@@ -30,12 +30,13 @@
 #include "libtrace_int.h"
 
 DLLEXPORT char *trace_get_radius_username(libtrace_radius_t *radius,
-        uint32_t radrem, uint8_t *namelen) {
+                                          uint32_t radrem, uint8_t *namelen)
+{
 
     libtrace_radius_avp_t *username;
 
     if ((username = trace_get_radius_avp(radius, radrem,
-            LIBTRACE_RADIUS_USERNAME)) != NULL) {
+                                         LIBTRACE_RADIUS_USERNAME)) != NULL) {
         /* minus 2 for the avp header fields */
         *namelen = username->length - 2;
         return (char *)&username->data;
@@ -43,16 +44,17 @@ DLLEXPORT char *trace_get_radius_username(libtrace_radius_t *radius,
 
     *namelen = 0;
     return NULL;
-
 }
 
 DLLEXPORT char *trace_get_radius_nas_identifier(libtrace_radius_t *radius,
-        uint32_t radrem, uint8_t *naslen) {
+                                                uint32_t radrem,
+                                                uint8_t *naslen)
+{
 
     libtrace_radius_avp_t *nas_ident;
 
     if ((nas_ident = trace_get_radius_avp(radius, radrem,
-            LIBTRACE_RADIUS_NAS_IDENT)) != NULL) {
+                                          LIBTRACE_RADIUS_NAS_IDENT)) != NULL) {
         *naslen = nas_ident->length - 2;
         return (char *)&nas_ident->data;
     }
@@ -62,7 +64,8 @@ DLLEXPORT char *trace_get_radius_nas_identifier(libtrace_radius_t *radius,
 }
 
 DLLEXPORT libtrace_radius_t *trace_get_radius(libtrace_packet_t *packet,
-        uint32_t *remaining) {
+                                              uint32_t *remaining)
+{
 
     void *payload;
     libtrace_radius_t *radius;
@@ -77,15 +80,17 @@ DLLEXPORT libtrace_radius_t *trace_get_radius(libtrace_packet_t *packet,
     plen = trace_get_payload_length(packet);
 
     switch (proto) {
-        case TRACE_IPPROTO_TCP:
-            payload = trace_get_payload_from_tcp((libtrace_tcp_t *)payload, remaining);
-            break;
-        case TRACE_IPPROTO_UDP:
-            payload = trace_get_payload_from_udp((libtrace_udp_t *)payload, remaining);
-            break;
-        default:
-            payload = NULL;
-            break;
+    case TRACE_IPPROTO_TCP:
+        payload =
+            trace_get_payload_from_tcp((libtrace_tcp_t *)payload, remaining);
+        break;
+    case TRACE_IPPROTO_UDP:
+        payload =
+            trace_get_payload_from_udp((libtrace_udp_t *)payload, remaining);
+        break;
+    default:
+        payload = NULL;
+        break;
     }
 
     if (payload == NULL) {
@@ -113,9 +118,10 @@ DLLEXPORT libtrace_radius_t *trace_get_radius(libtrace_packet_t *packet,
     return NULL;
 }
 
-DLLEXPORT libtrace_radius_avp_t *trace_get_radius_avp(
-        libtrace_radius_t *radius, uint32_t remaining,
-        libtrace_radius_avp_type type) {
+DLLEXPORT libtrace_radius_avp_t *
+trace_get_radius_avp(libtrace_radius_t *radius, uint32_t remaining,
+                     libtrace_radius_avp_type type)
+{
 
     libtrace_radius_avp_t *c;
     uint8_t *ptr;
@@ -133,7 +139,7 @@ DLLEXPORT libtrace_radius_avp_t *trace_get_radius_avp(
 
     ptr = (uint8_t *)radius + sizeof(libtrace_radius_t);
 
-    while(1) {
+    while (1) {
 
         c = (libtrace_radius_avp_t *)ptr;
 

@@ -2,11 +2,11 @@
  * This file is part of libtrace
  *
  * Copyright (c) 2007 The University of Waikato, Hamilton, New Zealand.
- * Authors: Perry Lorier 
- *          
+ * Authors: Perry Lorier
+ *
  * All rights reserved.
  *
- * This code has been developed by the University of Waikato WAND 
+ * This code has been developed by the University of Waikato WAND
  * research group. For further information please see http://www.wand.net.nz/
  *
  * libtrace is free software; you can redistribute it and/or modify
@@ -27,7 +27,6 @@
  *
  */
 
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -47,68 +46,70 @@
 #include "dagformat.h"
 #include "libtrace.h"
 
-char *lookup_out_uri(const char *type) {
-	if (!strcmp(type,"erf"))
-		return "erf:traces/100_packets.out.erf";
-	if (!strcmp(type,"pcap"))
-		return "pcap:traces/100_packets.out.pcap";
-	if (!strcmp(type,"pcapfile"))
-		return "pcapfile:traces/100_packets.out.pcap";
-	if (!strcmp(type,"wtf"))
-		return "wtf:traces/wed.out.wtf";
-	if (!strcmp(type,"duck"))
-		return "duck:traces/100_packets.out.duck";
-	return "unknown";
+char *lookup_out_uri(const char *type)
+{
+    if (!strcmp(type, "erf"))
+        return "erf:traces/100_packets.out.erf";
+    if (!strcmp(type, "pcap"))
+        return "pcap:traces/100_packets.out.pcap";
+    if (!strcmp(type, "pcapfile"))
+        return "pcapfile:traces/100_packets.out.pcap";
+    if (!strcmp(type, "wtf"))
+        return "wtf:traces/wed.out.wtf";
+    if (!strcmp(type, "duck"))
+        return "duck:traces/100_packets.out.duck";
+    return "unknown";
 }
 
 void iferr_out(libtrace_out_t *trace)
 {
-	libtrace_err_t err = trace_get_err_output(trace);
-	if (err.err_num==0)
-		return;
-	printf("Error: %s\n",err.problem);
-	exit(1);
+    libtrace_err_t err = trace_get_err_output(trace);
+    if (err.err_num == 0)
+        return;
+    printf("Error: %s\n", err.problem);
+    exit(1);
 }
 
 void iferr(libtrace_t *trace)
 {
-	libtrace_err_t err = trace_get_err(trace);
-	if (err.err_num==0)
-		return;
-	printf("Error: %s\n",err.problem);
-	exit(1);
+    libtrace_err_t err = trace_get_err(trace);
+    if (err.err_num == 0)
+        return;
+    printf("Error: %s\n", err.problem);
+    exit(1);
 }
 
 unsigned char buffer[] = {
-		0x00, 0x01, 0x02, 0x03, 0x04, 0x05, /* Dest Mac */
-		0x00, 0x01, 0x02, 0x03, 0x04, 0x06, /* Src Mac */
-		0x01, 0x01, /* Ethertype = Experimental */
-		0xC1, 0xC2, 0xC3, 0xC4, 0xC5, 0xC6, /* payload */
+    0x00, 0x01, 0x02, 0x03, 0x04, 0x05, /* Dest Mac */
+    0x00, 0x01, 0x02, 0x03, 0x04, 0x06, /* Src Mac */
+    0x01, 0x01,                         /* Ethertype = Experimental */
+    0xC1, 0xC2, 0xC3, 0xC4, 0xC5, 0xC6, /* payload */
 };
 
-int main(int argc, char *argv[]) {
-	libtrace_out_t *trace;
-	libtrace_packet_t *packet;
+int main(int argc, char *argv[])
+{
+    libtrace_out_t *trace;
+    libtrace_packet_t *packet;
 
-	if (argc<2) {
-		fprintf(stderr,"usage: %s type\n",argv[0]);
-		return 1;
-	}
+    if (argc < 2) {
+        fprintf(stderr, "usage: %s type\n", argv[0]);
+        return 1;
+    }
 
-	trace = trace_create_output(lookup_out_uri(argv[1]));
-	iferr_out(trace);
+    trace = trace_create_output(lookup_out_uri(argv[1]));
+    iferr_out(trace);
 
-	trace_start_output(trace);
-	iferr_out(trace);
-	
-	packet=trace_create_packet();
+    trace_start_output(trace);
+    iferr_out(trace);
 
-	trace_construct_packet(packet,TRACE_TYPE_ETH,buffer,sizeof(buffer));
+    packet = trace_create_packet();
 
-	if (trace_write_packet(trace,packet)==-1) {
-		iferr_out(trace);
-	}
-	trace_destroy_packet(packet);
-        trace_destroy_output(trace);
-        return 0;
+    trace_construct_packet(packet, TRACE_TYPE_ETH, buffer, sizeof(buffer));
+
+    if (trace_write_packet(trace, packet) == -1) {
+        iferr_out(trace);
+    }
+    trace_destroy_packet(packet);
+    trace_destroy_output(trace);
+    return 0;
 }

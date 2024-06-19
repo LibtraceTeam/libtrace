@@ -56,7 +56,7 @@ while [[ $# -gt 0 ]]; do
 	dpdk_versions=()
         key="$1"
         case $key in
-        dpdk-16.11.11|dpdk-17.11.10|dpdk-18.11.11|dpdk-19.11.13|dpdk-20.11.6|dpdk-21.11.2|dpdk-22.07)
+        dpdk-16.11.11|dpdk-17.11.10|dpdk-18.11.11|dpdk-19.11.13|dpdk-20.11.6|dpdk-21.11.2|dpdk-22.07|dpdk-23.11)
 		dpdk_versions+=("$key.tar.xz")
 		;;
 	*)

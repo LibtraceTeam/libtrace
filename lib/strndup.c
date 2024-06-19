@@ -26,11 +26,11 @@
 #include "config.h"
 #if !HAVE_DECL_STRNDUP
 
-#include <stdlib.h>
-#include <errno.h>
-#include <string.h>
+#    include <stdlib.h>
+#    include <errno.h>
+#    include <string.h>
 
-#include <libtrace_int.h>
+#    include <libtrace_int.h>
 
 /* Some systems don't include strndup as part of their standard C library, so
  * we need to provide our own version.
@@ -41,30 +41,27 @@
 
 char *strndup(const char *s, size_t size)
 {
-  char   *str;
-  size_t  len;
+    char *str;
+    size_t len;
 
-  if(size == 0 || s == NULL)
-    {
-      errno = EINVAL;
-      return NULL;
+    if (size == 0 || s == NULL) {
+        errno = EINVAL;
+        return NULL;
     }
 
-  if(size > (len = strlen(s)))
-    {
-      size = len+1;
+    if (size > (len = strlen(s))) {
+        size = len + 1;
     }
 
-  if((str = malloc(size)) == NULL)
-    {
-      errno = ENOMEM;
-      return NULL;
+    if ((str = malloc(size)) == NULL) {
+        errno = ENOMEM;
+        return NULL;
     }
 
-  memcpy(str, s, size);
-  str[size-1] = '\0';
+    memcpy(str, s, size);
+    str[size - 1] = '\0';
 
-  return str;
+    return str;
 }
 
 #endif

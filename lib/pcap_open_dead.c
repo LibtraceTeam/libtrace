@@ -25,25 +25,26 @@
  */
 
 #ifdef HAVE_PCAP
-#include "config.h"
+#    include "config.h"
 
-#ifndef HAVE_PCAP_OPEN_DEAD
-#include <stdio.h>
-#include <pcap.h>
-#include <string.h>
+#    ifndef HAVE_PCAP_OPEN_DEAD
+#        include <stdio.h>
+#        include <pcap.h>
+#        include <string.h>
 
 /* Custom implementation of pcap_open_dead as some versions of PCAP do not
  * have it */
 
-pcap_t *pcap_open_dead(int linktype, int snaplen) {
+pcap_t *pcap_open_dead(int linktype, int snaplen)
+{
     pcap_t *p = NULL;
 
     p = (pcap_t *)malloc(sizeof(*p));
     if (p == NULL)
-        return NULL;    
+        return NULL;
     p->snapshot = snaplen;
     p->linktype = linktype;
     return p;
 }
-#endif
+#    endif
 #endif

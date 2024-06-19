@@ -24,23 +24,24 @@
  *
  */
 #ifdef HAVE_PCAP
-#include "config.h"
+#    include "config.h"
 
-#ifndef HAVE_PCAP_DUMP_FLUSH
-#include <stdio.h>
-#include <pcap.h>
-#include <string.h>
+#    ifndef HAVE_PCAP_DUMP_FLUSH
+#        include <stdio.h>
+#        include <pcap.h>
+#        include <string.h>
 
 /* Custom implementation of pcap_dump_flush, as some versions of PCAP do not
  * have it */
 
-int pcap_dump_flush(pcap_dumper_t *p) {
-	if (fflush((FILE *)p) == EOF)
-		return (-1);
-	else
-		return (0);
+int pcap_dump_flush(pcap_dumper_t *p)
+{
+    if (fflush((FILE *)p) == EOF)
+        return (-1);
+    else
+        return (0);
 }
 
-#endif
+#    endif
 
 #endif // HAVE_PCAP

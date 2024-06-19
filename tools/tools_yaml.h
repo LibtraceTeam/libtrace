@@ -25,24 +25,24 @@
  */
 
 #ifndef LIBTRACE_TOOLS_YAML_H_
-#define LIBTRACE_TOOLS_YAML_H_
+#    define LIBTRACE_TOOLS_YAML_H_
 
-#include <yaml.h>
-#include <libtrace.h>
+#    include <yaml.h>
+#    include <libtrace.h>
 
-#ifdef __cplusplus 
+#    ifdef __cplusplus
 extern "C" {
-#endif
+#    endif
 
 int yaml_parser(char *configfile, void *arg,
-        int (*parse_mapping)(void *, yaml_document_t *, yaml_node_t *,
-            yaml_node_t *));
+                int (*parse_mapping)(void *, yaml_document_t *, yaml_node_t *,
+                                     yaml_node_t *));
 int yaml_parse_onoff(char *value);
 trace_option_compresstype_t yaml_compress_type(char *compress_type_str);
 
-#ifdef __cplusplus
+#    ifdef __cplusplus
 }
-#endif
+#    endif
 #endif
 
 // vim: set sw=4 tabstop=4 softtabstop=4 expandtab :

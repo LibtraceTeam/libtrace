@@ -19,29 +19,30 @@
 #include "format_linux_xdp.h"
 
 struct {
-        __uint(type, BPF_MAP_TYPE_XSKMAP);
-        __type(key, int);
-        __type(value, int);
-        __uint(max_entries, 64); /* Assume netdev has no more than 64 queues */
+    __uint(type, BPF_MAP_TYPE_XSKMAP);
+    __type(key, int);
+    __type(value, int);
+    __uint(max_entries, 64); /* Assume netdev has no more than 64 queues */
 } xsks_map SEC(".maps");
 
 struct {
-        __uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
-        __type(key, int);
-        __type(value, libtrace_xdp_t);
-        __uint(max_entries, 64);
+    __uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
+    __type(key, int);
+    __type(value, libtrace_xdp_t);
+    __uint(max_entries, 64);
 } libtrace_map SEC(".maps");
 
 struct {
-        __uint(type, BPF_MAP_TYPE_ARRAY);
-        __type(key, int);
-        __type(value, libtrace_ctrl_map_t);
-        __uint(max_entries, 1);
+    __uint(type, BPF_MAP_TYPE_ARRAY);
+    __type(key, int);
+    __type(value, libtrace_ctrl_map_t);
+    __uint(max_entries, 1);
 } libtrace_ctrl_map SEC(".maps");
 
 int libtrace_xdp_sock(struct xdp_md *ctx);
 
-static __always_inline void increment_stats(__u32 ifindex) {
+static __always_inline void increment_stats(__u32 ifindex)
+{
 
     /* get the libtrace structure for the destination queue */
     libtrace_xdp_t *libtrace = bpf_map_lookup_elem(&libtrace_map, &ifindex);
@@ -53,7 +54,8 @@ static __always_inline void increment_stats(__u32 ifindex) {
     return;
 }
 
-static __always_inline int redirect_map(__u32 ifindex) {
+static __always_inline int redirect_map(__u32 ifindex)
+{
 
     /* increment our stats */
     increment_stats(ifindex);
@@ -62,9 +64,9 @@ static __always_inline int redirect_map(__u32 ifindex) {
     return bpf_redirect_map(&xsks_map, ifindex, 0);
 }
 
-
 SEC("socket/libtrace_xdp")
-int libtrace_xdp_sock(struct xdp_md *ctx) {
+int libtrace_xdp_sock(struct xdp_md *ctx)
+{
 
     libtrace_ctrl_map_t *queue_ctrl;
     __u32 ifindex = ctx->rx_queue_index;

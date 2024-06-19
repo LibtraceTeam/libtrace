@@ -24,7 +24,6 @@
  *
  */
 
-
 #ifndef _CONTAIN_
 #define _CONTAIN_
 /* Containers */
@@ -73,20 +72,22 @@
  */
 
 typedef struct splay_node {
-	struct splay_node *left;
-	struct splay_node *right;
+    struct splay_node *left;
+    struct splay_node *right;
 } splay;
 
-typedef int (*splay_cmp_t)(const struct splay_node *, const struct splay_node *); 
-typedef void (*visitor_t)(const splay *tree,void *userdata);
+typedef int (*splay_cmp_t)(const struct splay_node *,
+                           const struct splay_node *);
+typedef void (*visitor_t)(const splay *tree, void *userdata);
 
 splay *splay_search_tree(splay *tree, splay_cmp_t cmp, splay *node);
 splay *splay_delete(splay *tree, splay_cmp_t cmp, splay *node);
-void   splay_purge(splay *tree);
+void splay_purge(splay *tree);
 splay *splay_insert(splay *tree, splay_cmp_t cmp, splay *node);
-void splay_visit(const splay *tree, visitor_t pre,visitor_t inorder,visitor_t post,void *userdata);
+void splay_visit(const splay *tree, visitor_t pre, visitor_t inorder,
+                 visitor_t post, void *userdata);
 
-/* 
+/*
  * Macros to wrap the splay tree to make it work a bit more like you expect.
  *
  * Map:
@@ -106,106 +107,93 @@ void splay_visit(const splay *tree, visitor_t pre,visitor_t inorder,visitor_t po
  *
  */
 
-#define MAP_NODE(keytype,valuetype)					\
-		struct {						\
-			splay _map_node;				\
-			keytype key;					\
-			valuetype value;				\
-		}
+#define MAP_NODE(keytype, valuetype)                                           \
+    struct {                                                                   \
+        splay _map_node;                                                       \
+        keytype key;                                                           \
+        valuetype value;                                                       \
+    }
 
-#define MAP(keytype,valuetype)						\
-	struct {							\
-		MAP_NODE(keytype,valuetype) *node;			\
-		splay_cmp_t cmp;					\
-	} 
+#define MAP(keytype, valuetype)                                                \
+    struct {                                                                   \
+        MAP_NODE(keytype, valuetype) * node;                                   \
+        splay_cmp_t cmp;                                                       \
+    }
 
-#define MAP_INIT(cmp)							\
-	{ NULL, (splay_cmp_t)cmp }					
+#define MAP_INIT(cmp)                                                          \
+    {                                                                          \
+        NULL, (splay_cmp_t)cmp                                                 \
+    }
 
-#define CMP(name,keytype,exp)						\
-	int name(splay *_map_a, splay *_map_b) { 			\
-		struct _map_t {						\
-			splay _map_node;				\
-			keytype key;					\
-		};							\
-		keytype a = ((struct _map_t*)_map_a)->key;		\
-		keytype b = ((struct _map_t*)_map_b)->key;		\
-		return (exp);						\
-	}
-		
-		
+#define CMP(name, keytype, exp)                                                \
+    int name(splay *_map_a, splay *_map_b)                                     \
+    {                                                                          \
+        struct _map_t {                                                        \
+            splay _map_node;                                                   \
+            keytype key;                                                       \
+        };                                                                     \
+        keytype a = ((struct _map_t *)_map_a)->key;                            \
+        keytype b = ((struct _map_t *)_map_b)->key;                            \
+        return (exp);                                                          \
+    }
 
-#define MAP_INSERT(name,vkey,vvalue) 					\
-	do {								\
-		typeof((name).node) _node=				\
-				malloc(sizeof(typeof(*(name).node))); 	\
-		*_node = (typeof(*(name).node)){{0,0},vkey,vvalue};	\
-		(name).node=(typeof((name).node))splay_insert(		\
-					(splay *)(name).node,		\
-					(name).cmp,			\
-					(splay *)_node			\
-					); 				\
-	} while(0);
+#define MAP_INSERT(name, vkey, vvalue)                                         \
+    do {                                                                       \
+        typeof((name).node) _node = malloc(sizeof(typeof(*(name).node)));      \
+        *_node = (typeof(*(name).node)){{0, 0}, vkey, vvalue};                 \
+        (name).node = (typeof((name).node))splay_insert(                       \
+            (splay *)(name).node, (name).cmp, (splay *)_node);                 \
+    } while (0);
 
-#define MAP_FIND(name,vkey) 						\
-	({								\
-		typeof(*(name).node) _node;				\
-	 	typeof((name).node) _ret;				\
-		_node.key=vkey;						\
-		(name).node=(typeof((name).node))splay_search_tree(	\
-					(splay *)(name).node,		\
-					(name).cmp,			\
-					(splay *)&_node			\
-					);				\
-		if ((name).node 					\
-		    && (name).cmp((splay*)(name).node,(splay*)&_node)==0)\
-	 		_ret=(name).node;				\
-	 	else							\
-	 		_ret=NULL;					\
-	 	_ret;							\
-	 })
+#define MAP_FIND(name, vkey)                                                   \
+    ({                                                                         \
+        typeof(*(name).node) _node;                                            \
+        typeof((name).node) _ret;                                              \
+        _node.key = vkey;                                                      \
+        (name).node = (typeof((name).node))splay_search_tree(                  \
+            (splay *)(name).node, (name).cmp, (splay *)&_node);                \
+        if ((name).node &&                                                     \
+            (name).cmp((splay *)(name).node, (splay *)&_node) == 0)            \
+            _ret = (name).node;                                                \
+        else                                                                   \
+            _ret = NULL;                                                       \
+        _ret;                                                                  \
+    })
 
-#define MAP_VISITOR(name,keytype,valuetype)				\
-	void name(MAP_NODE(keytype,valuetype) *node,void *userdata)
+#define MAP_VISITOR(name, keytype, valuetype)                                  \
+    void name(MAP_NODE(keytype, valuetype) * node, void *userdata)
 
-#define MAP_VISIT(name,pre,inorder,post,userdata)			\
-	splay_visit((splay*)(name).node,				\
-			(visitor_t)pre,					\
-			(visitor_t)inorder,				\
-			(visitor_t)post,				\
-			userdata)
+#define MAP_VISIT(name, pre, inorder, post, userdata)                          \
+    splay_visit((splay *)(name).node, (visitor_t)pre, (visitor_t)inorder,      \
+                (visitor_t)post, userdata)
 
 /* Sets ****************************************************************/
-#define SET_CREATE(name,keytype,cmp) \
-	typedef struct { \
-		splay node;						\
-		keytype key;						\
-	} name ## _t; 							\
-	name ## _t *name = NULL; 					\
-	int name ## _cmp(const splay *a,const splay *b) { 		\
-		return cmp(((name ## _t*)a)->key,((name ## _t *)b)->key); \
-	}
+#define SET_CREATE(name, keytype, cmp)                                         \
+    typedef struct {                                                           \
+        splay node;                                                            \
+        keytype key;                                                           \
+    } name##_t;                                                                \
+    name##_t *name = NULL;                                                     \
+    int name##_cmp(const splay *a, const splay *b)                             \
+    {                                                                          \
+        return cmp(((name##_t *)a)->key, ((name##_t *)b)->key);                \
+    }
 
-#define SET_INSERT(name,vkey) \
-	do {				\
-		name ## _t *_node=malloc(sizeof(name ## _t)); \
-		_node->key=vkey;		\
-		name=(name ##_t*)splay_insert((splay *)name,		\
-					(splay_cmp_t)name ## _cmp,	\
-					(splay *)_node			\
-					); 				\
-	} while(0);
+#define SET_INSERT(name, vkey)                                                 \
+    do {                                                                       \
+        name##_t *_node = malloc(sizeof(name##_t));                            \
+        _node->key = vkey;                                                     \
+        name = (name##_t *)splay_insert(                                       \
+            (splay *)name, (splay_cmp_t)name##_cmp, (splay *)_node);           \
+    } while (0);
 
-#define SET_CONTAINS(name,vkey) \
-	({								\
-		name ## _t _node;					\
-		_node.key=vkey;						\
-		name=(name ##_t*)splay_search_tree(			\
-					(splay *)name,			\
-					(splay_cmp_t)name ## _cmp,	\
-					(splay *)&_node			\
-					);				\
-	 	(name) && name ## _cmp((splay*)(name),(splay *)&_node)==0;\
-	 })
+#define SET_CONTAINS(name, vkey)                                               \
+    ({                                                                         \
+        name##_t _node;                                                        \
+        _node.key = vkey;                                                      \
+        name = (name##_t *)splay_search_tree(                                  \
+            (splay *)name, (splay_cmp_t)name##_cmp, (splay *)&_node);          \
+        (name) && name##_cmp((splay *)(name), (splay *)&_node) == 0;           \
+    })
 
 #endif /* _CONTAIN_ */

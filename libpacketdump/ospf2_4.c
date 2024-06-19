@@ -30,49 +30,44 @@
 #include <arpa/inet.h>
 #include "libpacketdump.h"
 
+DLLEXPORT void decode(int link_type UNUSED, const char *packet, unsigned len)
+{
+    libtrace_ospf_ls_update_t *update = (libtrace_ospf_ls_update_t *)packet;
+    unsigned char *lsa_ptr = NULL;
+    uint8_t lsa_type = 0;
+    libtrace_ospf_lsa_v2_t *lsa_hdr = NULL;
+    unsigned char *lsa_body = NULL;
+    int i = 0;
+    int max_lsas = 0;
+    uint32_t rem = len;
+    uint16_t lsa_length = 0;
 
-DLLEXPORT void decode(int link_type UNUSED,const char *packet,unsigned len) {
-	libtrace_ospf_ls_update_t *update = (libtrace_ospf_ls_update_t *)packet;
-	unsigned char *lsa_ptr = NULL;
-	uint8_t lsa_type = 0;
-	libtrace_ospf_lsa_v2_t *lsa_hdr = NULL;
-	unsigned char *lsa_body = NULL;
-	int i = 0;
-	int max_lsas = 0;
-	uint32_t rem = len;
-	uint16_t lsa_length = 0;
+    if (len < 4)
+        return;
+    max_lsas = ntohl(update->ls_num_adv);
+    printf(" OSPF LS Update: LSAs %u\n", max_lsas);
 
+    lsa_ptr = trace_get_first_ospf_lsa_from_update_v2(update, &rem);
 
-	if (len < 4)
-		return;
-	max_lsas = ntohl(update->ls_num_adv);
-	printf(" OSPF LS Update: LSAs %u\n", max_lsas);
-	
+    if (lsa_ptr == NULL || rem == 0)
+        return;
 
-	lsa_ptr = trace_get_first_ospf_lsa_from_update_v2(update, &rem);
+    while (trace_get_next_ospf_lsa_v2(&lsa_ptr, &lsa_hdr, &lsa_body, &rem,
+                                      &lsa_type, &lsa_length) > 0) {
 
-	if (lsa_ptr == NULL || rem == 0)
-		return;
+        i++;
+        if (lsa_hdr) {
 
-	while (trace_get_next_ospf_lsa_v2(&lsa_ptr, &lsa_hdr, &lsa_body,
-			&rem, &lsa_type, &lsa_length) > 0) {
+            decode_next((char *)lsa_hdr, lsa_length, "ospf2", 1000);
+        }
 
-		i ++;
-		if (lsa_hdr) {
+        if (lsa_body) {
+            decode_next((char *)lsa_body,
+                        lsa_length - sizeof(libtrace_ospf_lsa_v2_t), "ospf2",
+                        1000 + lsa_type);
+        }
 
-			decode_next((char *)lsa_hdr, lsa_length, "ospf2", 1000);
-		}	
-
-		if (lsa_body) {
-			decode_next((char *)lsa_body, lsa_length - 
-					sizeof(libtrace_ospf_lsa_v2_t),
-					"ospf2",
-					1000 + lsa_type);
-		}
-
-		if (i == max_lsas)
-			break;
-
-
-	}
+        if (i == max_lsas)
+            break;
+    }
 }

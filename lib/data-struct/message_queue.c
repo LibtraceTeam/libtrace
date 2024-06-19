@@ -35,25 +35,30 @@
  * TODO look into using eventfd instead of a pipe if we have it available XXX
  */
 
-/** 
+/**
  * @param mq A pointer to allocated space for a libtrace message queue
- * @param message_len The size in bytes of the message item, to ensure thread safety this
- * 		  should be less than PIPE_BUF (normally at least 512bytes)
- * 		  see: man 7 pipe notes on atomic operations
+ * @param message_len The size in bytes of the message item, to ensure thread
+ * safety this should be less than PIPE_BUF (normally at least 512bytes) see:
+ * man 7 pipe notes on atomic operations
  */
-void libtrace_message_queue_init(libtrace_message_queue_t *mq, size_t message_len)
+void libtrace_message_queue_init(libtrace_message_queue_t *mq,
+                                 size_t message_len)
 {
-	if (!message_len) {
-		fprintf(stderr, "Message length cannot be 0 in libtrace_message_queue_init()\n");
-		return;
-	}
-	ASSERT_RET(pipe(mq->pipefd), != -1);
-	mq->message_count = 0;
-	if (message_len > PIPE_BUF)
-		fprintf(stderr, "Warning message queue wont be atomic (thread safe) message_len(%zu) > PIPE_BUF(%d)\n",
-					message_len, PIPE_BUF);
-	mq->message_len = message_len;
-	pthread_spin_init(&mq->spin, 0);
+    if (!message_len) {
+        fprintf(
+            stderr,
+            "Message length cannot be 0 in libtrace_message_queue_init()\n");
+        return;
+    }
+    ASSERT_RET(pipe(mq->pipefd), != -1);
+    mq->message_count = 0;
+    if (message_len > PIPE_BUF)
+        fprintf(stderr,
+                "Warning message queue wont be atomic (thread safe) "
+                "message_len(%zu) > PIPE_BUF(%d)\n",
+                message_len, PIPE_BUF);
+    mq->message_len = message_len;
+    pthread_spin_init(&mq->spin, 0);
 }
 
 /**
@@ -70,20 +75,24 @@ void libtrace_message_queue_init(libtrace_message_queue_t *mq, size_t message_le
  *         numbers implies threads are still waiting. Positive implies a backlog
  *         of messages.
  */
-int libtrace_message_queue_put(libtrace_message_queue_t *mq, const void *message)
+int libtrace_message_queue_put(libtrace_message_queue_t *mq,
+                               const void *message)
 {
-	int ret;
-	if (!mq->message_len) {
-		fprintf(stderr, "Message queue must be initialised with libtrace_message_queue_init()"
-			"before inserting messages in libtrace_message_queue_put()\n");
-		return 0;
-	}
-	ASSERT_RET(write(mq->pipefd[1], message, mq->message_len), == (int) mq->message_len);
-	// Update after we've written
-	pthread_spin_lock(&mq->spin);
-	ret = ++mq->message_count; // Should be CAS!
-	pthread_spin_unlock(&mq->spin);
-	return ret;
+    int ret;
+    if (!mq->message_len) {
+        fprintf(stderr,
+                "Message queue must be initialised with "
+                "libtrace_message_queue_init()"
+                "before inserting messages in libtrace_message_queue_put()\n");
+        return 0;
+    }
+    ASSERT_RET(write(mq->pipefd[1], message, mq->message_len),
+               == (int)mq->message_len);
+    // Update after we've written
+    pthread_spin_lock(&mq->spin);
+    ret = ++mq->message_count; // Should be CAS!
+    pthread_spin_unlock(&mq->spin);
+    return ret;
 }
 
 /**
@@ -102,13 +111,15 @@ int libtrace_message_queue_put(libtrace_message_queue_t *mq, const void *message
  */
 int libtrace_message_queue_get(libtrace_message_queue_t *mq, void *message)
 {
-	int ret;
-	// Safely decrease count first - Yes this might make us negative, however thats ok once a write comes in everything will be fine
-	pthread_spin_lock(&mq->spin);
-	ret = mq->message_count--;
-	pthread_spin_unlock(&mq->spin);
-	ASSERT_RET(read(mq->pipefd[0], message, mq->message_len), == (int) mq->message_len);
-	return ret;
+    int ret;
+    // Safely decrease count first - Yes this might make us negative, however
+    // thats ok once a write comes in everything will be fine
+    pthread_spin_lock(&mq->spin);
+    ret = mq->message_count--;
+    pthread_spin_unlock(&mq->spin);
+    ASSERT_RET(read(mq->pipefd[0], message, mq->message_len),
+               == (int)mq->message_len);
+    return ret;
 }
 
 /**
@@ -127,22 +138,25 @@ int libtrace_message_queue_get(libtrace_message_queue_t *mq, void *message)
  */
 int libtrace_message_queue_try_get(libtrace_message_queue_t *mq, void *message)
 {
-	int ret;
-	// Safely decrease count first - Yes this might make us negative, however thats ok once a write comes in everything will be fine
-	// ->Fast path avoid the lock
-	if (mq->message_count <= 0)
-		return LIBTRACE_MQ_FAILED;
-	// Else grab lock and confirm this is so
-	pthread_spin_lock(&mq->spin);
-	if (mq->message_count > 0) {
-		ret = --mq->message_count;
-		// :( read(...) needs to be done within the *spin* lock otherwise blocking might steal our read
-		ASSERT_RET(read(mq->pipefd[0], message, mq->message_len), == (int) mq->message_len);
-	} else {
-		ret = LIBTRACE_MQ_FAILED;
-	}
-	pthread_spin_unlock(&mq->spin);
-	return ret;
+    int ret;
+    // Safely decrease count first - Yes this might make us negative, however
+    // thats ok once a write comes in everything will be fine
+    // ->Fast path avoid the lock
+    if (mq->message_count <= 0)
+        return LIBTRACE_MQ_FAILED;
+    // Else grab lock and confirm this is so
+    pthread_spin_lock(&mq->spin);
+    if (mq->message_count > 0) {
+        ret = --mq->message_count;
+        // :( read(...) needs to be done within the *spin* lock otherwise
+        // blocking might steal our read
+        ASSERT_RET(read(mq->pipefd[0], message, mq->message_len),
+                   == (int)mq->message_len);
+    } else {
+        ret = LIBTRACE_MQ_FAILED;
+    }
+    pthread_spin_unlock(&mq->spin);
+    return ret;
 }
 
 /**
@@ -150,25 +164,26 @@ int libtrace_message_queue_try_get(libtrace_message_queue_t *mq, void *message)
  */
 int libtrace_message_queue_count(const libtrace_message_queue_t *mq)
 {
-	// This is only ok because we know int is atomic
-	return mq->message_count;
+    // This is only ok because we know int is atomic
+    return mq->message_count;
 }
 
 void libtrace_message_queue_destroy(libtrace_message_queue_t *mq)
 {
-	mq->message_count = 0;
-	mq->message_len = 0;
-	close(mq->pipefd[0]);
-	close(mq->pipefd[1]);
-	pthread_spin_destroy(&mq->spin);
+    mq->message_count = 0;
+    mq->message_len = 0;
+    close(mq->pipefd[0]);
+    close(mq->pipefd[1]);
+    pthread_spin_destroy(&mq->spin);
 }
 
 /**
- * @return a file descriptor for the queue, can be used with select() poll() etc.
+ * @return a file descriptor for the queue, can be used with select() poll()
+ * etc.
  */
 int libtrace_message_queue_get_fd(libtrace_message_queue_t *mq)
 {
-	return mq->pipefd[0];
+    return mq->pipefd[0];
 }
 
 /**
@@ -186,8 +201,8 @@ int libtrace_message_queue_get_fd(libtrace_message_queue_t *mq)
 int libtrace_message_queue_select(libtrace_message_queue_t *mq,
                                   struct timeval *timeout)
 {
-        fd_set rfds;
-        FD_ZERO(&rfds);
-        FD_SET(mq->pipefd[0], &rfds);
-        return select(mq->pipefd[0] + 1, &rfds, NULL, NULL, timeout);
+    fd_set rfds;
+    FD_ZERO(&rfds);
+    FD_SET(mq->pipefd[0], &rfds);
+    return select(mq->pipefd[0] + 1, &rfds, NULL, NULL, timeout);
 }
