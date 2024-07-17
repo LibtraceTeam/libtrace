@@ -368,6 +368,18 @@ static int etsifile_write_packet(libtrace_out_t *libtrace,
     return written;
 }
 
+static void etsifile_help(void)
+{
+    printf("etsifile format module: \n");
+    printf("Supported input URIs:\n");
+    printf("\tetsifile:/path/to/file\n");
+    printf("\tetsifile:/path/to/file.gz\n");
+    printf("\n");
+    printf("\te.g.: etsifile:/tmp/etsitrace.pcap\n");
+    printf("\te.g.: etsifile:/tmp/etsitrace.pcap.gz\n");
+    printf("\n");
+}
+
 static struct libtrace_format_t etsifile = {
     "etsifile",
     "$Id$",
@@ -410,7 +422,7 @@ static struct libtrace_format_t etsifile = {
     NULL,                        /* get_statistics */
     NULL,                        /* get_fd */
     NULL,                        /* trace_event */
-    NULL,                        /* help */
+	etsifile_help,                        /* help */
     NULL,                        /* next pointer */
     NON_PARALLEL(true)           /* no parallel support */
 };
