@@ -728,7 +728,7 @@ static void etsilive_help(void)
 {
     printf("etsilive format module: \n");
     printf("Supported input URIs:\n");
-    printf("\etsilive:hostname:port\n");
+    printf("\tetsilive:hostname:port\n");
     printf("\n");
     printf("\te.g.: etsilive:127.0.0.1:3004\n");
     printf("\n");
@@ -777,7 +777,7 @@ static struct libtrace_format_t etsilive = {
     NULL,                        /* get_statistics */
     NULL,                        /* get_fd */
     NULL,                        /* trace_event */
-	etsilive_help,                        /* help */
+    etsilive_help,               /* help */
     NULL,                        /* next pointer */
     NON_PARALLEL(true)           /* TODO this can be parallel */
 };
