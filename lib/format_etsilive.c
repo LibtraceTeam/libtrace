@@ -532,8 +532,11 @@ static inline void inspect_next_packet(etsisocket_t *sock,
             return;
         }
         /* Skip past KA */
-        libtrace_scb_advance_read(&(sock->recvbuffer), reclen);
-        return;
+        /* WPvS - for troubleshooting having the Keep Alives in the stream is nice to have.
+         * not seeing the real disadvantage of having them. There is no other traffic, so traffic rate is low.
+         */
+//        libtrace_scb_advance_read(&(sock->recvbuffer), reclen);
+//        return;
     }
 
     /* Get the timestamp */
