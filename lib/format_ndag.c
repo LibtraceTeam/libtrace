@@ -1496,10 +1496,11 @@ static int init_receivers(streamsock_t *ssock, int required)
 
         wind++;
     }
-#endif
+#else
     ssock->singlemsg.msg_iov->iov_base = ssock->saved[wind];
     ssock->singlemsg.msg_iov->iov_len = ENCAP_BUFSIZE;
     ssock->singlemsg.msg_iovlen = 1;
+#endif
     return i;
 }
 
