@@ -476,6 +476,7 @@ static inline void inspect_next_packet(etsisocket_t *sock,
     uint8_t *ptr = NULL;
     uint32_t reclen = 0;
     uint64_t current;
+    const char *keyenv;
 
     if (sock->sock == -1) {
         return;
@@ -531,12 +532,12 @@ static inline void inspect_next_packet(etsisocket_t *sock,
             et->activesources -= 1;
             return;
         }
-        /* Skip past KA */
-        /* WPvS - for troubleshooting having the Keep Alives in the stream is nice to have.
-         * not seeing the real disadvantage of having them. There is no other traffic, so traffic rate is low.
-         */
-//        libtrace_scb_advance_read(&(sock->recvbuffer), reclen);
-//        return;
+        /* Check if display of keepalives is wanted; not by default */
+        keyenv = getenv("LIBTRACE_ETSILI_SHOW_KEEPALIVE");
+        if (!keyenv) {
+        	libtrace_scb_advance_read(&(sock->recvbuffer), reclen);
+        	return;
+        }
     }
 
     /* Get the timestamp */
