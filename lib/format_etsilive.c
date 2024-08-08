@@ -535,8 +535,8 @@ static inline void inspect_next_packet(etsisocket_t *sock,
         /* Check if display of keepalives is wanted; not by default */
         keyenv = getenv("LIBTRACE_ETSILI_SHOW_KEEPALIVE");
         if (!keyenv) {
-        	libtrace_scb_advance_read(&(sock->recvbuffer), reclen);
-        	return;
+            libtrace_scb_advance_read(&(sock->recvbuffer), reclen);
+            return;
         }
     }
 
@@ -737,7 +737,6 @@ static void etsilive_help(void)
     printf("\te.g.: etsilive:127.0.0.1:3004\n");
     printf("\n");
 }
-
 
 static struct libtrace_format_t etsilive = {
     "etsilive",
