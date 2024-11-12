@@ -569,7 +569,7 @@ static int accept_ndagtcp_connection(libtrace_t *libtrace, char *ipstr,
             consock = 0;
             continue;
         }
-
+        addrsize = sizeof(struct sockaddr_storage);
         consock = accept(sock, (struct sockaddr *)&sa, &addrsize);
         if (consock < 0) {
             fprintf(stderr,
