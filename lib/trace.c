@@ -234,6 +234,25 @@ static void guess_format(libtrace_t *libtrace, const char *filename)
     return;
 }
 
+DLLEXPORT const char *trace_get_uri_format(libtrace_t *trace) {
+
+    if (trace == NULL) {
+        return NULL;
+    }
+    if (trace->format == NULL) {
+        return NULL;
+    }
+
+    return trace->format->name;
+}
+
+DLLEXPORT const char *trace_get_uri_body(libtrace_t *trace) {
+    if (trace == NULL) {
+        return NULL;
+    }
+    return (const char *)trace->uridata;
+}
+
 /* Creates an input trace from a URI
  *
  * @params char * containing a valid libtrace URI
