@@ -3131,6 +3131,9 @@ int _trace_set_configuration(libtrace_t *trace, const char *str,
         }
         /* pch is at the next separator (, or :) or NULL if end of
          * string */
+        if (pch && *pch == '\0') {
+            pch = NULL;
+        }
         if (format != NULL && pch == NULL) {
             /* Options cannot be at the end of URI, file path with
              * '=' in it? */
