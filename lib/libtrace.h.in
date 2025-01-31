@@ -1459,6 +1459,22 @@ DLLEXPORT void trace_interrupt(void);
  */
 DLLEXPORT const char *trace_parse_uri(const char *uri, char **format);
 
+/** Returns a string containing the format portion of the URI for a trace.
+ *
+ *  @param trace        The trace to get the URI format for
+ *  @return a string describing the format for the trace (e.g. "pcapfile",
+ *     "erf", "ring", etc) or NULL if the trace has no associated format.
+ */
+DLLEXPORT const char *trace_get_uri_format(libtrace_t *trace);
+
+/** Returns a string containing the uridata portion of the URI for a trace.
+ *
+ *  @param trace        The trace to get the URI data for
+ *  @return a string containing the original URI for the trace, except with
+ *      the preceding format indicator stripped.
+ */
+DLLEXPORT const char *trace_get_uri_body(libtrace_t *trace);
+
 /** Create an input trace from a URI
  *
  * @param uri A valid libtrace URI to be opened
