@@ -1376,6 +1376,7 @@ static int add_new_streamsock(libtrace_t *libtrace, recvstream_t *rt,
     ssock->reccount = 0;
     ssock->expectedreccount = 0;
     ssock->rectype = 0;
+    ssock->srcaddr = NULL;
 
     for (i = 0; i < ENCAP_BUFFERS; i++) {
         ssock->saved[i] = (char *)malloc(ENCAP_BUFSIZE);
@@ -1451,6 +1452,13 @@ static int receiver_read_messages(libtrace_t *libtrace, recvstream_t *rt,
 
 static inline int readable_data(streamsock_t *ssock)
 {
+
+    /* Don't read from a buffer belonging to a socket that we've closed,
+     * since we probably closed it for sending us garbage data...
+     */
+    if (ssock->sock == -1) {
+        return 0;
+    }
 
     if (ssock->bufavail == ENCAP_BUFFERS) {
         return 0;
@@ -1778,13 +1786,14 @@ static int receive_encap_records_nonblock(libtrace_t *libtrace,
     return receive_from_sockets(rt, FORMAT_DATA->socktype);
 }
 
-static streamsock_t *select_next_packet(recvstream_t *rt)
+static streamsock_t *select_next_packet(recvstream_t *rt, int *errstate)
 {
     int i, r;
     streamsock_t *ssock = NULL;
     uint64_t earliest = 0;
     uint64_t currentts = 0;
 
+    *errstate = 0;
     for (i = 0; i < rt->sourcecount; i++) {
         if (!readable_data(&(rt->sources[i]))) {
             continue;
@@ -1793,6 +1802,9 @@ static streamsock_t *select_next_packet(recvstream_t *rt)
         if (rt->sources[i].rectype == 0) {
             r = process_ndag_encap_headers(&(rt->sources[i]), rt);
             if (r < 0) {
+                close(rt->sources[i].sock);
+                rt->sources[i].sock = -1;
+                *errstate = 1;
                 return NULL;
             }
             if (r == 0) {
@@ -1810,6 +1822,9 @@ static streamsock_t *select_next_packet(recvstream_t *rt)
             }
 
             if (r < 0) {
+                close(rt->sources[i].sock);
+                rt->sources[i].sock = -1;
+                *errstate = 1;
                 return NULL;
             }
             if (r == 0) {
@@ -1833,7 +1848,7 @@ static streamsock_t *select_next_packet(recvstream_t *rt)
 static int ndag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
 {
 
-    int rem, ret;
+    int rem, ret, errstate;
     streamsock_t *nextavail = NULL;
 
     if (FORMAT_DATA->receivers[0].halted) {
@@ -1847,8 +1862,14 @@ static int ndag_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
         return rem;
     }
 
-    nextavail = select_next_packet(&(FORMAT_DATA->receivers[0]));
+    errstate = 0;
+    nextavail = select_next_packet(&(FORMAT_DATA->receivers[0]), &errstate);
     if (nextavail == NULL) {
+        if (errstate) {
+            trace_set_err(libtrace, TRACE_ERR_BAD_PACKET,
+                    "Error while parsing nDAG PDU");
+            return READ_ERROR;
+        }
         return READ_MESSAGE;
     }
 
@@ -1868,7 +1889,7 @@ static int ndag_pread_packets(libtrace_t *libtrace, libtrace_thread_t *t,
 {
 
     recvstream_t *rt;
-    int rem, i, r;
+    int rem, i, r, errstate;
     size_t read_packets = 0;
     streamsock_t *nextavail = NULL;
 
@@ -1902,8 +1923,14 @@ static int ndag_pread_packets(libtrace_t *libtrace, libtrace_thread_t *t,
                 break;
             }
         }
-        nextavail = select_next_packet(rt);
+        errstate = 0;
+        nextavail = select_next_packet(rt, &errstate);
         if (nextavail == NULL) {
+            if (errstate) {
+                trace_set_err(libtrace, TRACE_ERR_BAD_PACKET,
+                        "Error while parsing nDAG PDU");
+                return -1;
+            }
             continue;
         }
 
@@ -1947,7 +1974,7 @@ static libtrace_eventobj_t trace_event_ndag(libtrace_t *libtrace,
 {
 
     libtrace_eventobj_t event = {0, 0, 0.0, 0};
-    int rem, i;
+    int rem, i, errstate;
     streamsock_t *nextavail = NULL;
 
     if (FORMAT_DATA->receivers[0].halted) {
@@ -1985,10 +2012,17 @@ static libtrace_eventobj_t trace_event_ndag(libtrace_t *libtrace,
             break;
         }
 
-        nextavail = select_next_packet(&(FORMAT_DATA->receivers[0]));
+        errstate = 0;
+        nextavail = select_next_packet(&(FORMAT_DATA->receivers[0]), &errstate);
         if (nextavail == NULL) {
-            event.type = TRACE_EVENT_SLEEP;
-            event.seconds = 0.0001;
+            if (errstate) {
+                trace_set_err(libtrace, TRACE_ERR_BAD_PACKET,
+                        "Error while parsing nDAG PDU");
+                event.type = TRACE_EVENT_TERMINATE;
+            } else {
+                event.type = TRACE_EVENT_SLEEP;
+                event.seconds = 0.0001;
+            }
             break;
         }
 
