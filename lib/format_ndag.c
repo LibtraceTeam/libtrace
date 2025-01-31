@@ -1486,6 +1486,9 @@ static int init_receivers(streamsock_t *ssock, int required)
 #if HAVE_DECL_RECVMMSG
     for (i = 0; i < required; i++) {
         if (ssock->socktype != NDAG_SOCKET_TYPE_MULTICAST) {
+            ssock->singlemsg.msg_iov->iov_base = ssock->saved[wind];
+            ssock->singlemsg.msg_iov->iov_len = ENCAP_BUFSIZE;
+            ssock->singlemsg.msg_iovlen = 1;
             i = 1;
             break;
         }
