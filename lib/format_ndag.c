@@ -934,6 +934,7 @@ static unsigned int copy_tmp_buffer(streamsock_t *ssock, char *tmpbuf,
         }
         memcpy(ptr, ssock->saved[next], ssock->savedsize[next]);
         available += ssock->savedsize[next];
+        ptr += ssock->savedsize[next];
     }
     return available;
 }
