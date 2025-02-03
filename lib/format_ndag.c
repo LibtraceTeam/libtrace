@@ -648,6 +648,7 @@ static void *ndagtcp_controller_run(void *tdata)
     libtrace_t *libtrace = (libtrace_t *)tdata;
     int sock = -1;
 
+    ndag_paused = 0;
     while (is_halted(libtrace) == -1 && !ndag_paused) {
         sock = accept_ndagtcp_connection(libtrace, FORMAT_DATA->multicastgroup,
                                          FORMAT_DATA->portstr);
