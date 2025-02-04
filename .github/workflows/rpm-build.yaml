@@ -18,8 +18,6 @@ jobs:
          target:
            - "rockylinux:8"
            - "rockylinux:9"
-           - "fedora:39"
-           - "fedora:40"
 
      steps:
       - name: Checkout repo
@@ -53,8 +51,6 @@ jobs:
          target:
            - "rockylinux:8"
            - "rockylinux:9"
-           - "fedora:39"
-           - "fedora:40"
      needs: build
      steps:
        - name: Set environment variables for download
@@ -99,8 +95,6 @@ jobs:
          target:
            - "rockylinux:8"
            - "rockylinux:9"
-           - "fedora:39"
-           - "fedora:40"
      needs: test
      steps:
        - name: Set environment variables for download
