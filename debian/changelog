@@ -1,3 +1,22 @@
+libtrace4 (4.0.27-1) unstable; urgency=medium
+
+  * Added new API methods: trace_get_uri_format() and trace_get_uri_body().
+  * etsilive: added ability to have keepalive messages be returned by
+    packet read functions by setting the environment variable
+    LIBTRACE_ETSILI_SHOW_KEEPALIVE.
+  * ndagtcp: fix uninitialised address size when accepting connections
+  * ndagtcp: fix packet reassembly bug that would occasionally result in
+    malformed packets.
+  * ndag / ndagtcp: set libtrace error state when a received packet is
+    unable to be parsed due to invalid header content.
+  * Fixed parsing bug in trace_set_configuration() that affected
+    configuration strings that ended in a ']' character.
+  * ndagtcp: fixed bug where the beacon thread would be started for
+    ndagtcp inputs that were started after a previous ndagtcp input had
+    been paused or destroyed.
+
+ -- Shane Alcock <shane@alcock.co.nz>  Tue, 4 Feb 2025 11:47:28 +1300
+
 libtrace4 (4.0.26-1) unstable; urgency=medium
 
   * pcapfile: fix loss of nanosecond timestamp resolution when
