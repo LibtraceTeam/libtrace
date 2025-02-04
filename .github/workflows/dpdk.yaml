@@ -56,7 +56,7 @@ jobs:
       run: |
         sudo apt-get -y install build-essential python3-pyelftools flex bison python3-pip python3-setuptools libfl-dev
         sudo apt-get -y install libpcap0.8-dev libtool pkgconf wget m4 autoconf automake gcc libnuma-dev
-        sudo apt-get -y install meson ninja-build libsystemd
+        sudo apt-get -y install meson ninja-build libsystemd0
         sudo pip3 install meson ninja || true
     - name: Install wandio
       run: |
