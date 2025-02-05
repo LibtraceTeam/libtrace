@@ -47,7 +47,7 @@ fi
 
 if [[ "$1" =~ fedora* ]]; then
         dnf install -y rpm-build rpmdevtools 'dnf-command(builddep)' which
-        dnf group install -y "C Development Tools and Libraries"
+        dnf group install -y development-tools
         dnf builddep -y rpm/libtrace4.spec
 else
         yum install -y rpm-build yum-utils rpmdevtools which
