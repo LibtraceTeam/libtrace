@@ -48,6 +48,12 @@ DLLEXPORT void decode(int link_type UNUSED, const char *packet, unsigned len)
                                                   : TRACE_ETHERTYPE_IPV6);
         } else if (ccformat == WANDDER_ETSILI_CC_FORMAT_APPLICATION) {
             decode_next((const char *)cchdr, rem, "tcp", 0);
+        } else if (ccformat == WANDDER_ETSILI_CC_FORMAT_TCP) {
+            decode_next((const char *)cchdr, rem, "ip", 6);
+        } else if (ccformat == WANDDER_ETSILI_CC_FORMAT_UDP) {
+            decode_next((const char *)cchdr, rem, "ip", 17);
+        } else if (ccformat == WANDDER_ETSILI_CC_FORMAT_RTP) {
+            decode_next((const char *)cchdr, rem, "udp", 0);
         }
 
         wandder_free_etsili_decoder(dec);

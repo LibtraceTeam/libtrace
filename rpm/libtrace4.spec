@@ -18,7 +18,7 @@ BuildRequires: numactl-devel
 BuildRequires: ncurses-devel
 BuildRequires: openssl-devel
 BuildRequires: libyaml-devel
-BuildRequires: libwandder2-devel >= 2.0.6
+BuildRequires: libwandder2-devel >= 2.0.14
 BuildRequires: libwandio1-devel
 BuildRequires: dpdk-devel
 BuildRequires: (flex-devel or libfl-static)
