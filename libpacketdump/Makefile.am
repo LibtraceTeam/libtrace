@@ -198,7 +198,7 @@ AM_CPPFLAGS= @ADD_INCLS@ -I../lib
 # a shared library.
 libpacketdump_la_LIBADD = @LIBPKTDUMP_LIBS@ 
 libpacketdump_la_LDFLAGS=\
-        -version-info 5:8:0 \
+        -version-info 5:9:0 \
         @ADD_LDFLAGS@
 
 AM_CXXFLAGS=-g -Wall -DDIRNAME=\"$(plugindir)\" $(AM_CPPFLAGS)
