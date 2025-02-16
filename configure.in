@@ -3,7 +3,7 @@
 # Now you only need to update the version number in two places - below,
 # and in the README
 
-AC_INIT([libtrace],[4.0.27],[shane@alcock.co.nz],[libtrace])
+AC_INIT([libtrace],[4.0.28],[shane@alcock.co.nz],[libtrace])
 
 LIBTRACE_MAJOR=4
 LIBTRACE_MID=0

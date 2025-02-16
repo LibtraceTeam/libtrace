@@ -1,3 +1,10 @@
+libtrace4 (4.0.28-1) unstable; urgency=medium
+
+  * libpacketdump: add decoding support for ETSI CC payloads that
+    contain TCP, UDP, or RTP payloads.
+
+ -- Shane Alcock <shane@alcock.co.nz>  Mon, 17 Feb 2025 11:53:49 +1300
+
 libtrace4 (4.0.27-1) unstable; urgency=medium
 
   * Added new API methods: trace_get_uri_format() and trace_get_uri_body().
