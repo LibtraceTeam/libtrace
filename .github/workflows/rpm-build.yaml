@@ -16,10 +16,18 @@ jobs:
          arch:
            - amd64
          target:
-           - "rockylinux:8"
-           - "rockylinux:9"
+           - almalinux:8.9
+           - almalinux:8.10
+           - almalinux:9.4
+           - almalinux:9.5
+           - almalinux:9.6
 
      steps:
+      - name: Extract RHEL release
+        run: |
+            MINOR=$(echo "${{ matrix.target }}" | grep -oP '(?<=almalinux:[89]\.)\d+')
+            MAJOR=$(echo "${{ matrix.target }}" | grep -oP '(?<=almalinux:)[89]')
+            echo "RHEL_RELEASE=.el${MAJOR}_${MINOR}" >> $GITHUB_ENV
       - name: Checkout repo
         uses: actions/checkout@v4
       - name: Install prereq packages
@@ -49,12 +57,19 @@ jobs:
          arch:
            - amd64
          target:
-           - "rockylinux:8"
-           - "rockylinux:9"
+           - almalinux:8.9
+           - almalinux:8.10
+           - almalinux:9.4
+           - almalinux:9.5
+           - almalinux:9.6
      needs: build
      steps:
        - name: Set environment variables for download
          run: echo DIRNAME=${{ matrix.target }} | tr ':' '_' >> $GITHUB_ENV
+       - name: Extract RHEL release
+         run: |
+            MAJOR=$(echo "${{ matrix.target }}" | grep -oP '(?<=almalinux:)[89]')
+            echo "MAJOR=${MAJOR}" >> $GITHUB_ENV
        - name: Download artifact
          uses: actions/download-artifact@v4
          with:
@@ -65,10 +80,12 @@ jobs:
          run: |
            curl -1sLf 'https://dl.cloudsmith.io/public/wand/libwandio/cfg/setup/bash.rpm.sh' | bash
            curl -1sLf 'https://dl.cloudsmith.io/public/wand/libwandder/cfg/setup/bash.rpm.sh' | bash
-           if [[ "${TARGET}" =~ rocky* ]]; then
-               dnf install -y dnf-plugins-core epel-release || true
-               dnf config-manager --set-enabled powertools || true
-               /usr/bin/crb enable || true
+           if [[ "${MAJOR}" == "8" ]]; then
+               dnf config-manager --enable powertools || true
+               dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm || true
+           elif [[ "${MAJOR}" == "9" ]]; then
+               dnf config-manager --enable crb || true
+               dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm || true
            fi
        - name: Test package install
          run: |
@@ -82,9 +99,8 @@ jobs:
            rpm -e libpacketdump4
            rpm -e libtrace4
 
-
   publish:
-     runs-on: ubuntu-latest
+     runs-on: ubuntu-22.04
      container:
        image: ${{ matrix.target }}
      strategy:
@@ -93,10 +109,18 @@ jobs:
          arch:
            - amd64
          target:
-           - "rockylinux:8"
-           - "rockylinux:9"
+           - almalinux:8.9
+           - almalinux:8.10
+           - almalinux:9.4
+           - almalinux:9.5
+           - almalinux:9.6
      needs: test
      steps:
+       - name: Set RHEL version number
+         run: |
+            MINOR=$(echo "${{ matrix.target }}" | grep -oP '(?<=almalinux:[89]\.)\d+')
+            MAJOR=$(echo "${{ matrix.target }}" | grep -oP '(?<=almalinux:)[89]')
+            echo "MAJOR={MAJOR}" >> $GITHUB_ENV
        - name: Set environment variables for download
          run: echo DIRNAME=${{ matrix.target }} | tr ':' '_' >> $GITHUB_ENV
        - name: Download artifact
@@ -115,6 +139,5 @@ jobs:
            repo: ${{ secrets.CLOUDSMITH_OWNER }}/libtrace
            username: salcock
            api_key: ${{ secrets.CLOUDSMITH_API_KEY }}
-
 
 
