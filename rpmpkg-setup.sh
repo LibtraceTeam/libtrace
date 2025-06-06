@@ -1,10 +1,39 @@
 #!/bin/bash
 set -x -e -o pipefail
 
+TARGET=$1
+
+MAJOR=$(echo "${TARGET}" | grep -oP '(?<=almalinux:)[89]')
+MINOR=$(echo "${TARGET}" | grep -oP '(?<=almalinux:[89]\.)\d+')
+
+if [[ "${MAJOR}" == "8" ]]; then
+    rpm --import https://repo.almalinux.org/almalinux/RPM-GPG-KEY-AlmaLinux
+elif [[ "${MAJOR}" == "9" ]]; then
+    rpm --import https://repo.almalinux.org/almalinux/RPM-GPG-KEY-AlmaLinux-9
+fi
 
 mkdir -p /run/user/${UID}
 chmod 0700 /run/user/${UID}
-yum install -y wget make gcc clang
+dnf install -y wget make gcc clang
+
+dnf install -y dnf-plugins-core
+# Disable all repos first to avoid conflicts
+dnf config-manager --disable '*'
+
+# Enable base AlmaLinux repos for the specific minor release
+dnf config-manager --enable baseos
+dnf config-manager --enable appstream
+
+if [[ "$MAJOR" == "8" ]]; then
+  dnf config-manager --enable powertools || true
+  dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
+elif [[ "$MAJOR" == "9" ]]; then
+  dnf config-manager --enable crb || true
+  dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
+fi
+
+dnf group install -y "Development Tools"
+dnf config-manager --set-enabled epel
 
 curl -1sLf \
   'https://dl.cloudsmith.io/public/wand/libwandio/cfg/setup/bash.rpm.sh' \
@@ -14,46 +43,9 @@ curl -1sLf \
   'https://dl.cloudsmith.io/public/wand/libwandder/cfg/setup/bash.rpm.sh' \
     | bash
 
-yum update -y
+dnf makecache
 
-if [[ "$1" =~ rocky* ]]; then
-        dnf install -y dnf-plugins-core epel-release || true
-        dnf config-manager --set-enabled powertools || true
-        if [ -x /usr/bin/crb ]; then
-                /usr/bin/crb enable || true
-        fi
-fi
-
-if [[ "$1" =~ alma* ]]; then
-        dnf install -y dnf-plugins-core epel-release || true
-        dnf config-manager --set-enabled powertools || true
-        if [ -x /usr/bin/crb ]; then
-                /usr/bin/crb enable || true
-        fi
-fi
-
-
-if [ "$1" = "centos:8" ]; then
-        yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm || true
-        dnf install -y 'dnf-command(config-manager)' || true
-        yum config-manager --set-enabled PowerTools || true
-        yum config-manager --set-enabled powertools || true
-fi
-
-if [ "$1" = "centos:7" ]; then
-        yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm || true
-        sed -i '/libfl-static/d' rpm/libtrace4.spec
-fi
-
-if [[ "$1" =~ fedora* ]]; then
-        dnf install -y rpm-build rpmdevtools 'dnf-command(builddep)' which
-        dnf group install -y development-tools
-        dnf builddep -y rpm/libtrace4.spec
-else
-        yum install -y rpm-build yum-utils rpmdevtools which
-        yum groupinstall -y 'Development Tools'
-        yum-builddep -y rpm/libtrace4.spec
-        #yum-builddep -y rpm/libtrace4-dag.spec
-fi
+dnf install -y rpm-build rpmdevtools 'dnf-command(builddep)' which
+dnf builddep -y rpm/libtrace4.spec
 
 rpmdev-setuptree
