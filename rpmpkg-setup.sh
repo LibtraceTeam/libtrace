@@ -3,13 +3,14 @@ set -x -e -o pipefail
 
 TARGET=$1
 
-MAJOR=$(echo "${TARGET}" | grep -oP '(?<=almalinux:)[89]')
-MINOR=$(echo "${TARGET}" | grep -oP '(?<=almalinux:[89]\.)\d+')
+VERSION="${TARGET#*:}"
+MAJOR="${VERSION%%.*}"
+MINOR="${VERSION#*.}"
 
 if [[ "${MAJOR}" == "8" ]]; then
     rpm --import https://repo.almalinux.org/almalinux/RPM-GPG-KEY-AlmaLinux
-elif [[ "${MAJOR}" == "9" ]]; then
-    rpm --import https://repo.almalinux.org/almalinux/RPM-GPG-KEY-AlmaLinux-9
+else
+    rpm --import https://repo.almalinux.org/almalinux/RPM-GPG-KEY-AlmaLinux-${MAJOR}
 fi
 
 mkdir -p /run/user/${UID}
@@ -27,9 +28,9 @@ dnf config-manager --enable appstream
 if [[ "$MAJOR" == "8" ]]; then
   dnf config-manager --enable powertools || true
   dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
-elif [[ "$MAJOR" == "9" ]]; then
+else
   dnf config-manager --enable crb || true
-  dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
+  dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-${MAJOR}.noarch.rpm
 fi
 
 dnf group install -y "Development Tools"
