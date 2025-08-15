@@ -21,12 +21,15 @@ jobs:
            - almalinux:9.4
            - almalinux:9.5
            - almalinux:9.6
+           - almalinux:10.0
 
      steps:
       - name: Extract RHEL release
         run: |
-            MINOR=$(echo "${{ matrix.target }}" | grep -oP '(?<=almalinux:[89]\.)\d+')
-            MAJOR=$(echo "${{ matrix.target }}" | grep -oP '(?<=almalinux:)[89]')
+            IMAGE="${{ matrix.target }}"
+            VERSION="${IMAGE#*:}"
+            MAJOR="${VERSION%%.*}"
+            MINOR="${VERSION#*.}"
             echo "RHEL_RELEASE=.el${MAJOR}_${MINOR}" >> $GITHUB_ENV
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -62,13 +65,16 @@ jobs:
            - almalinux:9.4
            - almalinux:9.5
            - almalinux:9.6
+           - almalinux:10.0
      needs: build
      steps:
        - name: Set environment variables for download
          run: echo DIRNAME=${{ matrix.target }} | tr ':' '_' >> $GITHUB_ENV
        - name: Extract RHEL release
          run: |
-            MAJOR=$(echo "${{ matrix.target }}" | grep -oP '(?<=almalinux:)[89]')
+            IMAGE="${{ matrix.target }}"
+            VERSION="${IMAGE#*:}"
+            MAJOR="${VERSION%%.*}"
             echo "MAJOR=${MAJOR}" >> $GITHUB_ENV
        - name: Download artifact
          uses: actions/download-artifact@v4
@@ -86,6 +92,9 @@ jobs:
            elif [[ "${MAJOR}" == "9" ]]; then
                dnf config-manager --enable crb || true
                dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm || true
+           elif [[ "${MAJOR}" == "10" ]]; then
+               dnf config-manager --enable crb || true
+               dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-10.noarch.rpm || true
            fi
        - name: Test package install
          run: |
@@ -114,12 +123,15 @@ jobs:
            - almalinux:9.4
            - almalinux:9.5
            - almalinux:9.6
+           - almalinux:10.0
      needs: test
      steps:
        - name: Set RHEL version number
          run: |
-            MINOR=$(echo "${{ matrix.target }}" | grep -oP '(?<=almalinux:[89]\.)\d+')
-            MAJOR=$(echo "${{ matrix.target }}" | grep -oP '(?<=almalinux:)[89]')
+            IMAGE="${{ matrix.target }}"
+            VERSION="${IMAGE#*:}"
+            MAJOR="${VERSION%%.*}"
+            MINOR="${VERSION#*.}"
             echo "MAJOR={MAJOR}" >> $GITHUB_ENV
        - name: Set environment variables for download
          run: echo DIRNAME=${{ matrix.target }} | tr ':' '_' >> $GITHUB_ENV
