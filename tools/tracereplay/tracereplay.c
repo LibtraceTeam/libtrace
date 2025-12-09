@@ -86,8 +86,8 @@ static void replace_transport_checksum(libtrace_packet_t *packet)
    cryptopan. Same for TCP and UDP. No other protocols are supported at the
    moment.
  */
-static libtrace_packet_t *per_packet(libtrace_packet_t *packet,
-    char **localbuf) {
+static libtrace_packet_t *per_packet(libtrace_packet_t *packet, char **localbuf)
+{
     uint32_t remaining = 0;
     libtrace_linktype_t linktype = 0;
     libtrace_packet_t *new_packet;
@@ -134,7 +134,7 @@ static libtrace_packet_t *per_packet(libtrace_packet_t *packet,
     }
 
     trace_construct_packet_zc(new_packet, linktype, l2_header, remaining,
-            wire_length);
+                              wire_length);
     new_packet = trace_strip_packet(new_packet);
 
     if (broadcast) {

@@ -2520,8 +2520,8 @@ void trace_construct_packet(libtrace_packet_t *packet,
  */
 DLLEXPORT
 void trace_construct_packet_zc(libtrace_packet_t *packet,
-                            libtrace_linktype_t linktype, const void *data,
-                            uint16_t datalen, uint16_t wirelen)
+                               libtrace_linktype_t linktype, const void *data,
+                               uint16_t datalen, uint16_t wirelen)
 {
 
     if (!packet) {
