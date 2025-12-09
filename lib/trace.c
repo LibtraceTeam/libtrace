@@ -2502,6 +2502,95 @@ void trace_construct_packet(libtrace_packet_t *packet,
     trace_clear_cache(packet);
 }
 
+/* Creates a libtrace packet from scratch using the contents of the provided
+ * buffer as the packet payload.
+ *
+ * Unlike trace_prepare_packet(), the buffer should not contain any capture
+ * format headers; instead this function will add the PCAP header to the
+ * packet record. This also means only PCAP packets can be constructed using
+ * this function.
+ *
+ * This is the zero-copy version of trace_construct_packet() -- it should
+ * only be used in circumstances where the provided buffer is either
+ * declared on the stack and will be in scope for the entire lifetime of
+ * the constructed packet, or where the caller is careful to retain a
+ * pointer to the buffer and will free it when they are done with the packet.
+ * If in doubt, use trace_construct_packet() instead.
+ *
+ */
+DLLEXPORT
+void trace_construct_packet_zc(libtrace_packet_t *packet,
+                            libtrace_linktype_t linktype, const void *data,
+                            uint16_t datalen, uint16_t wirelen)
+{
+
+    if (!packet) {
+        fprintf(stderr, "NULL packet passed into trace_contruct_packet()\n");
+        return;
+    }
+    /* Check a valid linktype was supplied */
+    if (linktype == TRACE_TYPE_UNKNOWN ||
+        linktype == TRACE_TYPE_CONTENT_INVALID) {
+        fprintf(stderr, "Unknown or invalid linktype passed into "
+                        "trace_construct_packet_zc()\n");
+        return;
+    }
+
+    size_t size;
+    static libtrace_t *deadtrace = NULL;
+    libtrace_pcapfile_pkt_hdr_t hdr;
+#ifdef WIN32
+    struct _timeb tstruct;
+#else
+    struct timeval tv;
+#endif
+
+    /* We need a trace to attach the constructed packet to (and it needs
+     * to be PCAP) */
+    if (NULL == deadtrace)
+        deadtrace = trace_create_dead("pcapfile");
+
+        /* Fill in the new PCAP header */
+#ifdef WIN32
+    _ftime(&tstruct);
+    hdr.ts_sec = tstruct.time;
+    hdr.ts_usec = tstruct.millitm * 1000;
+#else
+    gettimeofday(&tv, NULL);
+    hdr.ts_sec = tv.tv_sec;
+    hdr.ts_usec = tv.tv_usec;
+#endif
+
+    hdr.caplen = datalen;
+    if (wirelen != 0) {
+        hdr.wirelen = wirelen;
+    } else {
+        hdr.wirelen = datalen;
+    }
+
+    /* Now fill in the libtrace packet itself */
+    if (!deadtrace) {
+        fprintf(stderr, "Unable to create dummy trace for use within "
+                        "trace_construct_packet_zc()\n");
+        return;
+    }
+    packet->trace = deadtrace;
+    size = sizeof(hdr);
+    if (packet->buf_control == TRACE_CTRL_PACKET) {
+        packet->buffer = realloc(packet->buffer, size);
+    } else {
+        packet->buffer = malloc(size);
+    }
+    packet->buf_control = TRACE_CTRL_PACKET;
+    packet->header = packet->buffer;
+    packet->payload = (void *)data;
+
+    memmove(packet->header, &hdr, sizeof(hdr));
+    packet->type = pcap_linktype_to_rt(libtrace_to_pcap_linktype(linktype));
+
+    trace_clear_cache(packet);
+}
+
 uint64_t trace_get_received_packets(libtrace_t *trace)
 {
     uint64_t ret;
