@@ -86,8 +86,8 @@ static void replace_transport_checksum(libtrace_packet_t *packet)
    cryptopan. Same for TCP and UDP. No other protocols are supported at the
    moment.
  */
-static libtrace_packet_t *per_packet(libtrace_packet_t *packet)
-{
+static libtrace_packet_t *per_packet(libtrace_packet_t *packet,
+    char **localbuf) {
     uint32_t remaining = 0;
     libtrace_linktype_t linktype = 0;
     libtrace_packet_t *new_packet;
@@ -97,6 +97,7 @@ static libtrace_packet_t *per_packet(libtrace_packet_t *packet)
     int i;
     char *newbuf;
 
+    *localbuf = NULL;
     if (IS_LIBTRACE_META_PACKET(packet)) {
         return NULL;
     }
@@ -127,10 +128,13 @@ static libtrace_packet_t *per_packet(libtrace_packet_t *packet)
         memcpy(newbuf, FAKE_ETHERNET_HEADER, sizeof(libtrace_ether_t));
         l2_header = newbuf;
         wire_length += sizeof(libtrace_ether_t);
+        remaining += sizeof(libtrace_ether_t);
         linktype = TRACE_TYPE_ETH;
+        *localbuf = newbuf;
     }
 
-    trace_construct_packet(new_packet, linktype, l2_header, wire_length);
+    trace_construct_packet_zc(new_packet, linktype, l2_header, remaining,
+            wire_length);
     new_packet = trace_strip_packet(new_packet);
 
     if (broadcast) {
@@ -236,6 +240,7 @@ int main(int argc, char *argv[])
     int speedup = 1;
     int tx_max_queue = 1;
     bool tx_max_set = 0;
+    char *localbuf = NULL;
 
     while (1) {
         int option_index;
@@ -358,17 +363,24 @@ int main(int argc, char *argv[])
         }
 
         /* Got a packet - let's do something with it */
-        new = per_packet(packet);
+        new = per_packet(packet, &localbuf);
 
         if (!new)
             continue;
 
         if (trace_write_packet(output, new) < 0) {
+            if (localbuf) {
+                free(localbuf);
+            }
             trace_perror_output(output, "Writing packet");
             trace_destroy(trace);
             trace_destroy_output(output);
             trace_destroy_packet(packet);
             return 1;
+        }
+
+        if (localbuf) {
+            free(localbuf);
         }
         trace_destroy_packet(new);
     }
@@ -376,11 +388,11 @@ int main(int argc, char *argv[])
         trace_perror(trace, "%s", uri);
     }
     free(uri);
-    trace_destroy(trace);
     if (filter != NULL) {
         trace_destroy_filter(filter);
     }
     trace_destroy_output(output);
     trace_destroy_packet(packet);
+    trace_destroy(trace);
     return 0;
 }
