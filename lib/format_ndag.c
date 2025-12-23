@@ -2285,6 +2285,7 @@ static struct libtrace_format_t ndag = {
     ndag_get_statistics,     /* get_statistics */
     NULL,                    /* get_fd */
     trace_event_ndag,        /* trace_event */
+    NULL,                    /* get_layer3 */
     NULL,                    /* help */
     NULL,                    /* next pointer */
     {true, 0},               /* live packet capture */
@@ -2340,6 +2341,7 @@ static struct libtrace_format_t ndagtcp = {
     ndag_get_statistics,     /* get_statistics */
     NULL,                    /* get_fd */
     trace_event_ndag,        /* trace_event */
+    NULL,                    /* get_layer3 */
     NULL,                    /* help */
     NULL,                    /* next pointer */
     {true, 0},               /* live packet capture */

@@ -1572,6 +1572,7 @@ static struct libtrace_format_t pfringformat = {
     pfringzc_get_stats,        /* get_statistics */
     NULL,                      /* get_fd */
     pfringzc_event,            /* trace_event */
+    NULL,                      /* get_layer3 */
     NULL,                      /* help */
     NULL,                      /* next pointer */
     {true, -1},

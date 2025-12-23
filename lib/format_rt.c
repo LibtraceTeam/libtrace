@@ -870,6 +870,7 @@ static struct libtrace_format_t rt = {
     NULL,                  /* get_statistics */
     rt_get_fd,             /* get_fd */
     trace_event_rt,        /* trace_event */
+    NULL,                  /* get_layer3 */
     rt_help,               /* help */
     NULL,                  /* next pointer */
     NON_PARALLEL(true)     /* This is normally live */

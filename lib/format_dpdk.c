@@ -2895,6 +2895,7 @@ static struct libtrace_format_t dpdk_vdev = {
     dpdk_get_stats,          /* get_statistics */
     NULL,                    /* get_fd */
     dpdk_trace_event,        /* trace_event */
+    NULL,                    /* get_layer3 */
     dpdk_vdev_help,          /* help */
     NULL,                    /* next pointer */
     {true, 8},               /* Live, NICs typically have 8 threads */

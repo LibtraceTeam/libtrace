@@ -199,6 +199,43 @@ struct tpacket_req {
     unsigned int tp_frame_nr;   /* Total number of frames */
 };
 
+struct tpacket_req3 {
+    unsigned int    tp_block_size;  /* Minimal size of contiguous block */
+    unsigned int    tp_block_nr;    /* Number of blocks */
+    unsigned int    tp_frame_size;  /* Size of frame */
+    unsigned int    tp_frame_nr;    /* Total number of frames */
+    unsigned int    tp_retire_blk_tov; /* timeout in msecs */
+    unsigned int    tp_sizeof_priv; /* offset to private data area */
+    unsigned int    tp_feature_req_word;
+};
+
+struct tpacket_bd_ts {
+    unsigned int ts_sec;
+    union {
+        unsigned int ts_usec;
+        unsigned int ts_nsec;
+    };
+};
+
+struct tpacket_hdr_v1 {
+    uint32_t block_status;
+    uint32_t num_pkts;
+    uint32_t offset_to_first_pkt;
+    uint32_t blk_len;
+    uint64_t seq_num;
+    struct tpacket_bd_ts ts_first_pkt;
+    struct tpacket_bd_ts ts_last_pkt;
+};
+
+struct tpacket_block_desc {
+    uint32_t version;
+    uint32_t offset_to_priv;
+    union tpacket_bd_header_u {
+        struct tpacket_hdr_v1 bh1;
+    } hdr;
+};
+
+
 #ifndef IF_NAMESIZE
 #    define IF_NAMESIZE 16
 #endif
@@ -244,7 +281,7 @@ struct linux_format_data_out_t {
     /* The current frame number within the tx ring */
     int txring_offset;
     /* The current ring buffer layout */
-    struct tpacket_req req;
+    struct tpacket_req3 req;
     /* Our sockaddr structure, here so we can cache the interface number */
     struct sockaddr_ll sock_hdr;
     /* The (maximum) number of packets that haven't been written */
@@ -266,13 +303,19 @@ struct linux_per_stream_t {
     /* Offset within the mapped buffer */
     int rxring_offset;
     /* The ring buffer layout */
-    struct tpacket_req req;
+    struct tpacket_req3 req;
     uint64_t last_timestamp;
+
+    /* For tpacket3 block processing */
+    struct tpacket_block_desc *active_block;
+    struct tpacket3_hdr *current_packet;
+    uint32_t packets_remaining;
+
 } ALIGNED(CACHE_LINE_SIZE);
 
 #define ZERO_LINUX_STREAM                                                      \
     {                                                                          \
-        -1, MAP_FAILED, 0, {0, 0, 0, 0}, 0                                     \
+        -1, MAP_FAILED, 0, {0, 0, 0, 0, 0, 0, 0}, 0, NULL, NULL, 0             \
     }
 
 /* Format header for encapsulating packets captured using linux native */
@@ -311,7 +354,7 @@ struct libtrace_linuxnative_header {
 /* Get the sockaddr_ll structure from a frame */
 #define GET_SOCKADDR_HDR(x)                                                    \
     ((struct sockaddr_ll *)(((char *)(x)) +                                    \
-                            TPACKET_ALIGN(sizeof(struct tpacket2_hdr))))
+                            TPACKET_ALIGN(sizeof(struct tpacket3_hdr))))
 
 /* Common functions */
 #ifdef HAVE_NETPACKET_PACKET_H

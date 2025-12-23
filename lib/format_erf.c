@@ -1466,6 +1466,7 @@ static struct libtrace_format_t erfformat = {
     erf_get_statistics,     /* get_statistics */
     NULL,                   /* get_fd */
     erf_event,              /* trace_event */
+    NULL,                   /* get_layer3 */
     erf_help,               /* help */
     NULL,                   /* next pointer */
     NON_PARALLEL(false)};
@@ -1512,6 +1513,7 @@ static struct libtrace_format_t rawerfformat = {
     erf_get_statistics,     /* get_statistics */
     NULL,                   /* get_fd */
     erf_event,              /* trace_event */
+    NULL,                   /* get_layer3 */
     erf_help,               /* help */
     NULL,                   /* next pointer */
     NON_PARALLEL(false)};
