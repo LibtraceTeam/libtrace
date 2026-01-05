@@ -567,6 +567,7 @@ static struct libtrace_format_t legacyatm = {
     NULL,                         /* get_statistics */
     NULL,                         /* get_fd */
     trace_event_trace,            /* trace_event */
+    NULL,                          /* get_layer3 */
     legacyatm_help,               /* help */
     NULL,                         /* next pointer */
     NON_PARALLEL(false)};
@@ -613,6 +614,7 @@ static struct libtrace_format_t legacyeth = {
     NULL,                         /* get_statistics */
     NULL,                         /* get_fd */
     trace_event_trace,            /* trace_event */
+    NULL,                          /* get_layer3 */
     legacyeth_help,               /* help */
     NULL,                         /* next pointer */
     NON_PARALLEL(false)};
@@ -659,6 +661,7 @@ static struct libtrace_format_t legacypos = {
     NULL,                         /* get_statistics */
     NULL,                         /* get_fd */
     trace_event_trace,            /* trace_event */
+    NULL,                          /* get_layer3 */
     legacypos_help,               /* help */
     NULL,                         /* next pointer */
     NON_PARALLEL(false)};
@@ -705,6 +708,7 @@ static struct libtrace_format_t legacynzix = {
     NULL,                          /* get_statistics */
     NULL,                          /* get_fd */
     trace_event_trace,             /* trace_event */
+    NULL,                          /* get_layer3 */
     legacynzix_help,               /* help */
     NULL,                          /* next pointer */
     NON_PARALLEL(false)};

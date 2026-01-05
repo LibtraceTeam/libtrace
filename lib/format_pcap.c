@@ -889,6 +889,7 @@ static struct libtrace_format_t pcap = {
     NULL,                    /* get_statistics */
     NULL,                    /* get_fd */
     trace_event_trace,       /* trace_event */
+    NULL,                    /* get_layer3 */
     pcap_help,               /* help */
     NULL,                    /* next pointer */
     NON_PARALLEL(false)};
@@ -935,6 +936,7 @@ static struct libtrace_format_t pcapint = {
     pcap_get_statistics,     /* get_statistics */
     pcap_get_fd,             /* get_fd */
     trace_event_device,      /* trace_event */
+    NULL,                    /* get_layer3 */
     pcapint_help,            /* help */
     NULL,                    /* next pointer */
     NON_PARALLEL(true)};

@@ -1005,6 +1005,27 @@ struct libtrace_format_t {
     struct libtrace_eventobj_t (*trace_event)(libtrace_t *trace,
                                               libtrace_packet_t *packet);
 
+    /** Get a pointer to the layer 3 (e.g. IP) header.
+     * @param packet  The libtrace packet to find the layer 3 header for
+     * @param[out] ethertype The ethertype of the layer 3 header
+     * @param[out] remaining The amount of captured data remaining in the packet
+     * starting from the returned pointer, i.e. including the layer 3 header.
+     *
+     * @return A pointer to the layer 3 header. If no layer 3 header is present
+     * in the packet, NULL is returned. If the layer 3 header is truncated, a
+     * valid pointer will still be returned so be sure to check the value of
+     * remaining before attempting to process the returned header.
+     *
+     * remaining may be NULL, otherwise it will be set to the number of captured
+     * bytes after the pointer returned.
+     *
+     * A format can provide its own specific layer 3 access function, which
+     * may be more efficient in cases where the kernel/hardware has already
+     * found the header and included it in the format header.
+     */
+    void *(*get_layer3)(const libtrace_packet_t *packet, uint16_t *ethertype,
+            uint32_t *remaining);
+
     /** Prints some useful help information to standard output. */
     void (*help)(void);
 
@@ -1102,6 +1123,7 @@ struct libtrace_format_t {
      */
     void (*get_thread_statistics)(libtrace_t *libtrace, libtrace_thread_t *t,
                                   libtrace_stat_t *stat);
+
 };
 
 /** Macro to zero out a single thread format */

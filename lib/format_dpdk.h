@@ -272,7 +272,7 @@ typedef uint8_t portid_t;
  */
 
 /* Print verbose messages to stderr */
-#define DEBUG 0
+#define LT_DPDK_DEBUG 0
 
 /* Use clock_gettime() for nanosecond resolution rather than gettimeofday()
  * only turn on if you know clock_gettime is a vsyscall on your system

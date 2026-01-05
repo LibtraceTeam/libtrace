@@ -1673,6 +1673,7 @@ static struct libtrace_format_t xdp = {
     linux_xdp_get_stats,          /* get_statistics */
     NULL,                         /* get_fd */
     linux_xdp_event,              /* trace_event */
+    NULL,                         /* get_layer3 */
     linux_xdp_help,               /* help */
     NULL,                         /* next pointer */
     {true, -1},                   /* Live, no thread limit */

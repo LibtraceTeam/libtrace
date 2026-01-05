@@ -422,6 +422,7 @@ static struct libtrace_format_t etsifile = {
     NULL,                        /* get_statistics */
     NULL,                        /* get_fd */
     NULL,                        /* trace_event */
+    NULL,                        /* get_layer3 */
     etsifile_help,               /* help */
     NULL,                        /* next pointer */
     NON_PARALLEL(true)           /* no parallel support */

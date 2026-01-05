@@ -244,6 +244,11 @@ DLLEXPORT void *trace_get_layer3(const libtrace_packet_t *packet,
         return packet->cached.l3_header;
     }
 
+    if (packet->trace && packet->trace->format &&
+            packet->trace->format->get_layer3) {
+        return packet->trace->format->get_layer3(packet, ethertype, remaining);
+    }
+
     if (packet->cached.l2_header) {
         link = packet->cached.l2_header;
         linktype = packet->cached.link_type;

@@ -2453,6 +2453,7 @@ static struct libtrace_format_t pcapng = {
     pcapng_get_statistics,     /* get_statistics */
     NULL,                      /* get_fd */
     pcapng_event,              /* trace_event */
+    NULL,                      /* get_layer3 */
     pcapng_help,               /* help */
     NULL,                      /* next pointer */
     NON_PARALLEL(false)};

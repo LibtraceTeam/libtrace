@@ -572,6 +572,7 @@ static struct libtrace_format_t dag = {
     NULL,                    /* get_statistics */
     NULL,                    /* get_fd */
     trace_event_dag,         /* trace_event */
+    NULL,                    /* get_layer3 */
     dag_help,                /* help */
     NULL,                    /* next pointer */
     NON_PARALLEL(true)};

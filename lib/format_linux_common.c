@@ -320,6 +320,9 @@ int linuxcommon_start_input_stream(libtrace_t *libtrace,
     libtrace_filter_t *filter = FORMAT_DATA->filter;
 
     stream->last_timestamp = 0;
+    stream->active_block = NULL;
+    stream->current_packet = NULL;
+    stream->packets_remaining = 0;
 
     /* Create a raw socket for reading packets on */
     stream->fd = socket(PF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
@@ -494,7 +497,7 @@ int linuxcommon_pregister_thread(libtrace_t *libtrace, libtrace_thread_t *t,
 /* These counters reset with each read */
 static void linuxcommon_update_socket_statistics(libtrace_t *libtrace)
 {
-    struct tpacket_stats stats;
+    struct tpacket_stats_v3 stats;
     size_t i;
     socklen_t len = sizeof(stats);
 
@@ -507,10 +510,14 @@ static void linuxcommon_update_socket_statistics(libtrace_t *libtrace)
                 if (FORMAT_DATA->stats_valid == 0) {
                     FORMAT_DATA->stats.tp_drops = stats.tp_drops;
                     FORMAT_DATA->stats.tp_packets = stats.tp_packets;
+                    FORMAT_DATA->stats.tp_freeze_q_count =
+                            stats.tp_freeze_q_count;
                     FORMAT_DATA->stats_valid = 1;
                 } else {
                     FORMAT_DATA->stats.tp_drops += stats.tp_drops;
                     FORMAT_DATA->stats.tp_packets += stats.tp_packets;
+                    FORMAT_DATA->stats.tp_freeze_q_count +=
+                            stats.tp_freeze_q_count;
                 }
             } else {
                 perror("getsockopt PACKET_STATISTICS failed");

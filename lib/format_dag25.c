@@ -1716,6 +1716,7 @@ static struct libtrace_format_t dag = {
     dag_get_statistics,     /* get_statistics */
     NULL,                   /* get_fd */
     trace_event_dag,        /* trace_event */
+    NULL,                   /* get_layer3 */
     dag_help,               /* help */
     NULL,                   /* next pointer */
     {true, 0},              /* live packet capture, thread limit TBD */
