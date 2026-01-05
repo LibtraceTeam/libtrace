@@ -101,6 +101,12 @@ struct tpacket_stats {
     unsigned int tp_drops;
 };
 
+struct tpacket_stats_v3 {
+    unsigned int tp_packets;
+    unsigned int tp_drops;
+    unsigned int tp_freeze_q_count;
+};
+
 typedef enum { TS_NONE, TS_TIMEVAL, TS_TIMESPEC } timestamptype_t;
 
 /* linux/if_packet.h defines. They are here rather than including the header
@@ -255,7 +261,7 @@ struct linux_format_data_t {
     /* A BPF filter that is applied to every captured packet */
     libtrace_filter_t *filter;
     /* Statistics for the capture process, e.g. dropped packet counts */
-    struct tpacket_stats stats;
+    struct tpacket_stats_v3 stats;
     /* Statistics for the NIC rather than the socket */
     struct linux_dev_stats dev_stats;
     /* Flag indicating whether the statistics are current or not */

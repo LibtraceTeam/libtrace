@@ -304,7 +304,6 @@ inline static int get_next_block(struct linux_per_stream_t *stream,
     while (1) {
         pbd = (struct tpacket_block_desc *)(stream->rx_ring +
                 (stream->rxring_offset * stream->req.tp_block_size));
-
         if (pbd->hdr.bh1.block_status & TP_STATUS_USER) {
             stream->active_block = pbd;
             stream->current_packet = (struct tpacket3_hdr *)
@@ -832,12 +831,16 @@ static int linuxring_pread_packets(libtrace_t *libtrace, libtrace_thread_t *t,
 {
     size_t i;
     int ret;
+    size_t nb_rx = 0;
 
     for (i = 0; i < nb_packets; i++) {
         ret = linuxring_read_stream_v3(libtrace, packets[i], t->format_data,
                                     &t->messages, i == 0 ? 1 : 0);
         packets[i]->error = ret;
         if (ret < 0) {
+            if (nb_rx > 0) {
+                break;
+            }
             return ret;
         }
 
@@ -845,11 +848,12 @@ static int linuxring_pread_packets(libtrace_t *libtrace, libtrace_thread_t *t,
             if (is_halted(libtrace) == READ_EOF) {
                 return READ_EOF;
             }
-            return i;
+            break;
         }
+        nb_rx ++;
     }
 
-    return nb_packets;
+    return nb_rx;
 }
 #    endif
 
