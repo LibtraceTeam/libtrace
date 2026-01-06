@@ -1,3 +1,19 @@
+libtrace4 (4.0.29-1) unstable; urgency=medium
+
+  * added new API method: trace_construct_packet_zc() which provides
+    a faster zero-copy method for converting a buffer of packet payload
+    into a libtrace packet, which can replace trace_construct_packet() in
+    very specific situations.
+  * Improved ring: capture performance on Linux by moving from tpacket
+    version 2 to tpacket version 3.
+  * Improved trace_get_layer3() performance for ring: inputs by making
+    use of an offset included in the tpacket header.
+  * Improved tracereplay performance by using trace_construct_packet_zc().
+  * Disabled annoying warnings that appear when using DPDK inputs.
+  * Fixed outdated XDP eBPF code example.
+
+ -- Shane Alcock <shane@alcock.co.nz>  Wed, 7 Jan 2026 11:18:10 +1300
+
 libtrace4 (4.0.28-1) unstable; urgency=medium
 
   * libpacketdump: add decoding support for ETSI CC payloads that
