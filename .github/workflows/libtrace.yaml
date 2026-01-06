@@ -70,6 +70,7 @@ jobs:
       with:
         path: xdp-tools
         repository: xdp-project/xdp-tools
+        submodules: true
     - name: Build/Install libxdp
       env:
         BUILDOS: ${{ matrix.os }}
