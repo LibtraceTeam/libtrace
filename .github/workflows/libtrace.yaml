@@ -112,7 +112,7 @@ jobs:
         if [ "${BUILDOS}" == "ubuntu-18.04" ]; then
             git fetch && git checkout v1.2
         fi
-        ./configure
+        FORCE_SUBDIR_LIBBPF=1 ./configure
         sudo make -j 3 libxdp_install
         sudo ldconfig
     - name: Checkout Libtrace
