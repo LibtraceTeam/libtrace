@@ -196,6 +196,11 @@ typedef uint8_t portid_t;
 #    define ETH_SPEED_NUM_40G RTE_ETH_LINK_SPEED_40G
 #endif
 
+/* 21.11 renames a ton of defines */
+#ifndef RTE_ETH_RX_OFFLOAD_RSS_HASH
+#define RTE_ETH_RX_OFFLOAD_RSS_HASH DEV_RX_OFFLOAD_RSS_HASH
+#endif
+
 /* 20.11 renames master, slave to main and worker
  * Use new names as standard
  *
