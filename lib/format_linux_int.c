@@ -552,6 +552,7 @@ static struct libtrace_format_t linuxnative = {
     linuxcommon_get_statistics,     /* get_statistics */
     linuxcommon_get_fd,             /* get_fd */
     trace_event_device,             /* trace_event */
+    NULL,                          /* get_layer3 */
     linuxnative_help,               /* help */
     NULL,                           /* next pointer */
 #    ifdef HAVE_PACKET_FANOUT
@@ -616,6 +617,7 @@ static struct libtrace_format_t linuxnative = {
     linuxcommon_get_statistics,     /* get_statistics */
     NULL,                           /* get_fd */
     NULL,                           /* trace_event */
+    NULL,                          /* get_layer3 */
     linuxnative_help,               /* help */
     NULL,                           /* next pointer */
     NON_PARALLEL(true)};

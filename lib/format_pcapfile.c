@@ -868,6 +868,7 @@ static struct libtrace_format_t pcapfile = {
     NULL,                        /* get_statistics */
     NULL,                        /* get_fd */
     pcapfile_event,              /* trace_event */
+    NULL,                        /* get_layer3 */
     pcapfile_help,               /* help */
     NULL,                        /* next pointer */
     NON_PARALLEL(false)};

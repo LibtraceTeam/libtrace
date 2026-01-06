@@ -2221,6 +2221,34 @@ void trace_construct_packet(libtrace_packet_t *packet,
                             libtrace_linktype_t linktype, const void *data,
                             uint16_t len);
 
+/** Construct a libtrace packet from a buffer containing the packet payload.
+ *  The buffer is assigned to the packet directly without copying, which
+ *  is faster but the caller is responsible for the management of the memory
+ *  for that buffer. Modification of the resulting packet contents is not
+ *  recommended so only "get" operations should be used on packets constructed
+ *  using this method.
+ *  trace_construct_packet() is a safer alternative that supports all libtrace
+ *  packet operations, but is slower due to the internal copy of the buffer
+ *  contents into the packet.
+ *
+ * @param[in,out] packet	Libtrace Packet object to update with the new
+ * 				data.
+ * @param linktype		The linktype of the packet data.
+ * @param[in] data		The packet data (including linklayer).
+ * @param datalen		Length of packet data provided in the buffer.
+ * @param wirelen       The value to store as the constructed packet's wire
+ *                      length. If 0, datalen will be used as an approximation.
+ *
+ * @note The constructed packet will be in the PCAP format.
+ *
+ * @note To be useful, the provided buffer must start with the layer 2 header
+ * (or a metadata header, if desired).
+ */
+DLLEXPORT
+void trace_construct_packet_zc(libtrace_packet_t *packet,
+                            libtrace_linktype_t linktype, const void *data,
+                            uint16_t datalen, uint16_t wirelen);
+
 /*@}*/
 
 /** @name Protocol decodes

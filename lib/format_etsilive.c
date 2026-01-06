@@ -780,6 +780,7 @@ static struct libtrace_format_t etsilive = {
     NULL,                        /* get_statistics */
     NULL,                        /* get_fd */
     NULL,                        /* trace_event */
+    NULL,                        /* get_layer3 */
     etsilive_help,               /* help */
     NULL,                        /* next pointer */
     NON_PARALLEL(true)           /* TODO this can be parallel */

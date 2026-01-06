@@ -1517,6 +1517,7 @@ static struct libtrace_format_t pfringoldformat = {
     pfring_get_statistics,       /* get_statistics */
     NULL,                        /* get_fd */
     pfring_event,                /* trace_event */
+    NULL,                        /* get_layer3 */
     NULL,                        /* help */
     NULL,                        /* next pointer */
     {true, MAX_NUM_RX_CHANNELS}, /* Live, with thread limit */
@@ -1572,6 +1573,7 @@ static struct libtrace_format_t pfringformat = {
     pfringzc_get_stats,        /* get_statistics */
     NULL,                      /* get_fd */
     pfringzc_event,            /* trace_event */
+    NULL,                      /* get_layer3 */
     NULL,                      /* help */
     NULL,                      /* next pointer */
     {true, -1},

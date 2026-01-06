@@ -17,6 +17,7 @@ jobs:
            - amd64
          target:
            - "debian:bookworm"
+           - "debian:bullseye"
            - "debian:trixie"
            - "ubuntu:noble"
            - "ubuntu:jammy"
@@ -51,6 +52,7 @@ jobs:
          arch:
            - amd64
          target:
+           - "debian:bullseye"
            - "debian:trixie"
            - "ubuntu:jammy"
            - "ubuntu:noble"
@@ -91,8 +93,9 @@ jobs:
          arch:
            - amd64
          target:
-           - "debian:trixie"
+           - "debian:bullseye"
            - "debian:bookworm"
+           - "debian:trixie"
            - "ubuntu:jammy"
            - "ubuntu:noble"
      needs: test

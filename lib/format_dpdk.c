@@ -301,7 +301,7 @@ static inline long dpdk_processor_count()
     }
 }
 
-#if DEBUG
+#if LT_DPDK_DEBUG
 /* For debugging */
 static inline void dump_configuration()
 {
@@ -440,6 +440,7 @@ static inline int dpdk_init_environment(char *uridata,
      */
     char *argv[] = {
         "libtrace",
+        "--no-telemetry",
         "-n",
         "1",
         "-l",
@@ -455,9 +456,9 @@ static inline int dpdk_init_environment(char *uridata,
         "-m",
         "512",
 #if DPDK_USE_LOG_LEVEL
-#    if DEBUG
+#    if LT_DPDK_DEBUG
         "--log-level",
-        "8", /* RTE_LOG_DEBUG */
+        "8", /* RTE_LOG_LT_DPDK_DEBUG */
 #    else
         "--log-level",
         "5", /* RTE_LOG_WARNING */
@@ -492,8 +493,8 @@ static inline int dpdk_init_environment(char *uridata,
         argv[--argc] = NULL;
     }
 
-#if DEBUG
-    rte_log_set_global_level(RTE_LOG_DEBUG);
+#if LT_DPDK_DEBUG
+    rte_log_set_global_level(RTE_LOG_LT_DPDK_DEBUG);
 #else
     rte_log_set_global_level(RTE_LOG_WARNING);
 #endif
@@ -526,7 +527,7 @@ static inline int dpdk_init_environment(char *uridata,
         format_data->nic_numa_node = -1;
     }
     if (my_cpu < 0) {
-#    if DEBUG
+#    if LT_DPDK_DEBUG
         /* If we can assign to a core on the same numa node */
         fprintf(stderr, "Using pci card on numa_node%d\n",
                 format_data->nic_numa_node);
@@ -584,7 +585,7 @@ static inline int dpdk_init_environment(char *uridata,
     save_getopts(&save_opts);
     optind = 1;
 
-#if DEBUG
+#if LT_DPDK_DEBUG
     fprintf(stderr, "rte_eal_init:");
     for (int i = 0; i < argc; i++) {
         fprintf(stderr, "%s ", argv[i]);
@@ -611,7 +612,7 @@ static inline int dpdk_init_environment(char *uridata,
         return -1;
     }
 
-#if DEBUG
+#if LT_DPDK_DEBUG
     dump_configuration();
 #endif
 
@@ -929,6 +930,7 @@ static int dpdk_fin_output(libtrace_out_t *libtrace)
         if (FORMAT(libtrace)->port != RTE_MAX_ETHPORTS &&
             FORMAT(libtrace)->paused != DPDK_NEVER_STARTED) {
             /* Close and detach the device */
+            rte_eth_dev_stop(FORMAT(libtrace)->port);
             dpdk_close_and_detach_device(FORMAT(libtrace)->port);
         }
         libtrace_list_deinit(FORMAT(libtrace)->per_stream);
@@ -1233,7 +1235,7 @@ static void dpdk_lsc_callback(portid_t port, enum rte_eth_event_type event,
     else
         format_data->link_speed = 0;
 
-#if DEBUG
+#if LT_DPDK_DEBUG
     fprintf(stderr, "LSC - link status is %s %s speed=%d\n",
             link_info.link_status ? "up" : "down",
             (link_info.link_duplex == ETH_LINK_FULL_DUPLEX) ? "full-duplex"
@@ -1447,7 +1449,7 @@ static void dpdk_free_memory(struct rte_mempool *mempool, int socket_id)
 
     /* We should have all entries back in the mempool */
     rte_mempool_audit(mempool);
-#if DEBUG
+#if LT_DPDK_DEBUG
     if (!rte_mempool_full(mempool)) {
         fprintf(stderr,
                 "Libtrace DPDK: memory pool not empty"
@@ -1524,7 +1526,7 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data, char *err,
     } else {
         /* We need jumbo frames */
         double expn;
-#if DEBUG
+#if LT_DPDK_DEBUG
         fprintf(stderr,
                 "Libtrace DPDK: enabling jumbo frames for"
                 " snaplen %d\n",
@@ -1590,7 +1592,7 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data, char *err,
          * fill the new buffer and wait until slots in the ring become
          * available.
          */
-#if DEBUG
+#if LT_DPDK_DEBUG
         fprintf(stderr, "Libtrace DPDK: creating mempool named %s\n",
                 format_data->mempool_name);
 #endif
@@ -1626,7 +1628,9 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data, char *err,
         port_conf.rx_adv_conf.rss_conf.rss_key_len = rss_size;
 #endif
     } else {
-        fprintf(stderr, "Libtrace DPDK: couldn't configure RSS hashing!\n");
+        if (dev_info.rx_offload_capa & RTE_ETH_RX_OFFLOAD_RSS_HASH) {
+            fprintf(stderr, "Libtrace DPDK: couldn't configure RSS hashing!\n");
+        }
     }
 
     /* ----------- Now do the setup for the port mapping ------------ */
@@ -1654,7 +1658,7 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data, char *err,
                  format_data->port, strerror(-ret));
         return -1;
     }
-#if DEBUG
+#if LT_DPDK_DEBUG
     fprintf(stderr, "Libtrace DPDK: Doing dev configure\n");
 #endif
     /* Initialise the TX queue a minimum value if using this port for
@@ -1674,7 +1678,7 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data, char *err,
     /* Attach memory to our RX queues */
     for (i = 0; i < rx_queues; i++) {
         dpdk_per_stream_t *stream;
-#if DEBUG
+#if LT_DPDK_DEBUG
         fprintf(stderr, "Libtrace DPDK: Configuring queue %d\n", i);
 #endif
 
@@ -1740,7 +1744,7 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data, char *err,
         }
     }
 
-#if DEBUG
+#if LT_DPDK_DEBUG
     fprintf(stderr, "Libtrace DPDK: Doing start device\n");
 #endif
     /* Start device */
@@ -1780,7 +1784,7 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data, char *err,
         ret = rte_eth_dev_callback_register(format_data->port,
                                             RTE_ETH_EVENT_INTR_LSC,
                                             dpdk_lsc_callback, format_data);
-#if DEBUG
+#if LT_DPDK_DEBUG
         if (ret)
             fprintf(stderr,
                     "Libtrace DPDK: "
@@ -1801,7 +1805,7 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data, char *err,
     }
     rte_eth_link_get_nowait(format_data->port, &link_info);
     format_data->link_speed = link_info.link_speed;
-#if DEBUG
+#if LT_DPDK_DEBUG
     fprintf(stderr, "Libtrace DPDK: Link status is %d %d %d\n",
             (int)link_info.link_status, (int)link_info.link_duplex,
             (int)link_info.link_speed);
@@ -1863,7 +1867,7 @@ int dpdk_pstart_input(libtrace_t *libtrace)
               (int)dpdk_get_max_rx_queues(FORMAT(libtrace)->port));
     tot = MIN(tot, phys_cores);
 
-#if DEBUG
+#if LT_DPDK_DEBUG
     fprintf(stderr, "Running pstart DPDK tot=%d req=%d phys=%d\n", tot,
             libtrace->perpkt_thread_count, phys_cores);
 #endif
@@ -1927,7 +1931,7 @@ int dpdk_pstart_input(libtrace_t *libtrace)
 int dpdk_pregister_thread(libtrace_t *libtrace, libtrace_thread_t *t,
                           bool reading)
 {
-#if DEBUG
+#if LT_DPDK_DEBUG
     char name[99];
     name[0] = 0;
 #    if defined(HAVE_PTHREAD_SETNAME_NP) && defined(__linux__)
@@ -1950,7 +1954,7 @@ int dpdk_pregister_thread(libtrace_t *libtrace, libtrace_thread_t *t,
             t->format_data = FORMAT_DATA_FIRST(libtrace);
         }
         stream = t->format_data;
-#if DEBUG
+#if LT_DPDK_DEBUG
         fprintf(stderr, "%s new id memory:%s cpu-core:%d\n", name,
                 stream->mempool->name, rte_lcore_id());
 #endif
@@ -1963,7 +1967,7 @@ int dpdk_pregister_thread(libtrace_t *libtrace, libtrace_thread_t *t,
                           " for DPDK");
             return -1;
         }
-#if DEBUG
+#if LT_DPDK_DEBUG
         fprintf(stderr, "%s new id cpu-core:%d\n", name, rte_lcore_id());
 #endif
         return dpdk_register_lcore(libtrace, false, lcore);
@@ -2024,7 +2028,7 @@ int dpdk_pause_input(libtrace_t *libtrace)
     /* This stops the device, but can be restarted using rte_eth_dev_start()
      */
     if (FORMAT(libtrace)->paused == DPDK_RUNNING) {
-#if DEBUG
+#if LT_DPDK_DEBUG
         fprintf(stderr, "Pausing DPDK port\n");
 #endif
         rte_eth_dev_stop(FORMAT(libtrace)->port);
@@ -2269,7 +2273,7 @@ retry_calc_wiretime:
         rte_eth_link_get_nowait(format_data->port, &link);
         if (link.link_status && link.link_speed) {
             format_data->link_speed = link.link_speed;
-#ifdef DEBUG
+#ifdef LT_DPDK_DEBUG
             fprintf(stderr, "Link has come up updated speed=%d\n",
                     (int)link.link_speed);
 #endif
@@ -2841,6 +2845,7 @@ static struct libtrace_format_t dpdk = {
     dpdk_get_stats,          /* get_statistics */
     NULL,                    /* get_fd */
     dpdk_trace_event,        /* trace_event */
+    NULL,                    /* get_layer3 */
     dpdk_help,               /* help */
     NULL,                    /* next pointer */
     {true, 8},               /* Live, NICs typically have 8 threads */
@@ -2895,6 +2900,7 @@ static struct libtrace_format_t dpdk_vdev = {
     dpdk_get_stats,          /* get_statistics */
     NULL,                    /* get_fd */
     dpdk_trace_event,        /* trace_event */
+    NULL,                    /* get_layer3 */
     dpdk_vdev_help,          /* help */
     NULL,                    /* next pointer */
     {true, 8},               /* Live, NICs typically have 8 threads */

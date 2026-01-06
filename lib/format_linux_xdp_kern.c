@@ -1,20 +1,15 @@
-/*
- * clang -O2 -emit-llvm -c format_linux_xdp_kern.c -o - | \
- * llc -march=bpf -filetype=obj -o format_linux_xdp_kern
- */
+// make sure libbpf is installed
+//
+// generate vmlinux.h:
+//      bpftool btf dump file /sys/kernel/btf/vmlinux format c > vmlinux.h
+//
 
-#include <stdbool.h>
-#include <stddef.h>
-#include <linux/bpf.h>
+// clang -O2 -g -target bpf -D__TARGET_ARCH_x86_64 \
+//  -c format_linux_xdp_kern.c -o format_linux_xdp_kern.o
+
+#include "vmlinux.h"
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_endian.h>
-#include <linux/if_ether.h>
-#include <linux/in.h>
-#include <linux/ip.h>
-#include <linux/ipv6.h>
-#include <linux/string.h>
-#include <linux/tcp.h>
-#include <linux/udp.h>
 
 #include "format_linux_xdp.h"
 

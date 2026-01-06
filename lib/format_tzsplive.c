@@ -773,6 +773,7 @@ static struct libtrace_format_t tzsplive = {
     NULL,                        /* get_statistics */
     NULL,                        /* get_fd */
     NULL,                        /* trace_event */
+    NULL,                        /* get_layer3 */
     NULL,                        /* help */
     NULL,                        /* next pointer */
     NON_PARALLEL(true)};

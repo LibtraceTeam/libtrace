@@ -771,6 +771,7 @@ static struct libtrace_format_t dpdkndag = {
     dpdkndag_get_statistics, /* get_statistics */
     NULL,                    /* get_fd */
     trace_event_dpdkndag,    /* trace_event */
+    NULL,                    /* get_layer3 */
     NULL,                    /* help */
     NULL,                    /* next pointer */
     {true, 0},               /* live packet capture */

@@ -23,7 +23,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-20.04, ubuntu-22.04, ubuntu-24.04]
+        os: [ubuntu-22.04, ubuntu-24.04]
         c_compiler: [gcc, clang]
         cxx_compiler: [g++, clang++]
         exclude:
@@ -65,11 +65,24 @@ jobs:
         sudo apt-get update
         sudo apt-get -y install pfring
         sudo ldconfig
+    - name: Checkout Libbpf
+      uses: actions/checkout@v4
+      with:
+        path: libbpf
+        repository: libbpf/libbpf
+    - name: Build/Install Libbpf
+      run: |
+        cd libbpf/src
+        make -j 3
+        sudo make install
+        echo "/usr/lib64" | sudo tee -a /etc/ld.so.conf.d/lib64.conf
+        sudo ldconfig
     - name: Checkout libxdp
       uses: actions/checkout@v4
       with:
         path: xdp-tools
         repository: xdp-project/xdp-tools
+        submodules: true
     - name: Build/Install libxdp
       env:
         BUILDOS: ${{ matrix.os }}
@@ -99,20 +112,8 @@ jobs:
         if [ "${BUILDOS}" == "ubuntu-18.04" ]; then
             git fetch && git checkout v1.2
         fi
-        ./configure
+        FORCE_SUBDIR_LIBBPF=1 ./configure
         sudo make -j 3 libxdp_install
-        sudo ldconfig
-    - name: Checkout Libbpf
-      uses: actions/checkout@v4
-      with:
-        path: libbpf
-        repository: libbpf/libbpf
-    - name: Build/Install Libbpf
-      run: |
-        cd libbpf/src
-        make -j 3
-        sudo make install
-        echo "/usr/lib64" | sudo tee -a /etc/ld.so.conf.d/lib64.conf
         sudo ldconfig
     - name: Checkout Libtrace
       uses: actions/checkout@v4
