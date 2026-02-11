@@ -116,6 +116,7 @@ DLLEXPORT int libtrace_scb_recv_sock(libtrace_scb_t *buf, int sock,
     if (ret < 0) {
         return ret;
     }
+    __sync_synchronize();
     buf->write_offset += ret;
     return (buf->write_offset - buf->read_offset);
 }
@@ -139,6 +140,7 @@ DLLEXPORT void libtrace_scb_advance_read(libtrace_scb_t *buf, uint32_t forward)
         buf->read_offset -= buf->count_bytes;
         buf->write_offset -= buf->count_bytes;
     }
+    __sync_synchronize();
 }
 
 DLLEXPORT int libtrace_scb_set_recv_thold(libtrace_scb_t *buf, uint32_t thold)
