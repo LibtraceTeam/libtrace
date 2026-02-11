@@ -325,6 +325,9 @@ static int connect_stream_fd(read_thread_data_t *rdata,
                 "packet: %s\n",                                                \
                 rdata->threadid, strerror(errno));                             \
         close(rdata->streamfd);                                                \
+        sentsofar = 0;                                                         \
+        rem = (rdata->writeptr - rdata->pbuffer);                              \
+        firstsend = 0;                                                         \
         rdata->streamfd = -1;                                                  \
         usleep(200000);                                                        \
         continue;                                                              \
@@ -341,9 +344,9 @@ static int send_ndag_packet(read_thread_data_t *rdata,
     int backoff = 5000;
 
     int firstsend = 0;
-    int fs_amount = 0;
+    int tosend;
 
-    rdata->encaphdr->recordcount = ntohs(rdata->reccount);
+    rdata->encaphdr->recordcount = htons(rdata->reccount);
 
     while (rem > 0 && !halted) {
         if (rdata->streamfd == -1) {
@@ -365,29 +368,25 @@ static int send_ndag_packet(read_thread_data_t *rdata,
                     rdata->threadid);
         }
 
+        tosend = rem;
         if (firstsend == 0 && rem > 8) {
             /* try to detect a broken pipe by attempting a "canary"
-             * send of 8 bytes so that the main send is more likely
+             * send of 8 bytes so that the following main send is more likely
              * to trigger EPIPE
              */
-            s = send(rdata->streamfd, rdata->pbuffer, 8,
-                     MSG_DONTWAIT | MSG_NOSIGNAL);
-            HANDLE_SEND_ERROR
-            fs_amount = s;
+            tosend = 8;
+        }
 
-            s = send(rdata->streamfd, rdata->pbuffer + fs_amount,
-                     rem - fs_amount, MSG_DONTWAIT | MSG_NOSIGNAL);
-            HANDLE_SEND_ERROR
-            sentsofar += (s + fs_amount);
-            rem -= (s + fs_amount);
-            firstsend = 1;
-        } else {
-            s = send(rdata->streamfd, rdata->pbuffer + sentsofar, rem,
-                     MSG_DONTWAIT | MSG_NOSIGNAL);
-            HANDLE_SEND_ERROR
+        s = send(rdata->streamfd, rdata->pbuffer + sentsofar, tosend,
+                 MSG_DONTWAIT | MSG_NOSIGNAL);
+        if (s > 0) {
             sentsofar += s;
             rem -= s;
+            if (firstsend == 0 && tosend == 8) {
+                firstsend = 1;
+            }
         }
+        HANDLE_SEND_ERROR
     }
 
     rdata->writeptr = rdata->pbuffer;
