@@ -899,6 +899,12 @@ static int got_complete_packet(streamsock_t *ssock)
     available = ssock->savedsize[nr] - (ssock->nextread - ssock->saved[nr]);
     while (required > available) {
         next = ((next + 1) % ENCAP_BUFFERS);
+        if (next == nr) {
+            /* We've wrapped around the entire buffer without getting a
+             * complete packet? Something has gone terribly wrong... */
+             return 0;
+        }
+
         if (ssock->savedsize[next] == 0) {
             /* no more data available */
             return 0;
@@ -928,6 +934,12 @@ static unsigned int copy_tmp_buffer(streamsock_t *ssock, char *tmpbuf,
             first = 0;
         }
         next = ((next + 1) % ENCAP_BUFFERS);
+        if (next == nr) {
+            /* We've wrapped around the entire buffer without getting a
+             * complete packet? Something has gone terribly wrong... */
+             return 0;
+        }
+
         if (ssock->savedsize[next] == 0) {
             /* no more data available */
             return 0;
@@ -1936,6 +1948,10 @@ static int ndag_pread_packets(libtrace_t *libtrace, libtrace_thread_t *t,
                         "Error while parsing nDAG PDU");
                 return -1;
             }
+            if (read_packets > 0) {
+                break;
+            }
+            usleep(50);
             continue;
         }
 
