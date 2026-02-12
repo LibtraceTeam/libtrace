@@ -48,6 +48,7 @@ In no particular order, we would like to recognise:
  * Sam James for fixing some issues with our build system.
  * Pim van Stam for contributing some improvements to the etsilive format
    module.
+ * Daeho Ro for fixing an oversight in the BPF format code.
 
 Apologies to anyone that we've missed out or forgotten. If you're really
 offended, fire one of us an email and we'll make sure you are added to the
