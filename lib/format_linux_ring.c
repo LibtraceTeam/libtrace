@@ -207,7 +207,7 @@ static inline int socket_to_packetmmap(char *uridata, int ring_type, int fd,
     }
 
     if (ring_type == PACKET_RX_RING) {
-        req->tp_retire_blk_tov = 60;
+        req->tp_retire_blk_tov = 10;
     } else {
         req->tp_retire_blk_tov = 0;
     }

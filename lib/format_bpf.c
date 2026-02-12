@@ -647,6 +647,7 @@ static struct libtrace_format_t bpf = {
     bpf_get_statistics,     /* get_statistics */
     bpf_get_fd,             /* get_fd */
     trace_event_device,     /* trace_event */
+    NULL,                   /* get_layer3 */
     bpf_help,               /* help */
     NULL,                   /* next pointer */
     NON_PARALLEL(true)};

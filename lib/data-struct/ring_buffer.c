@@ -263,6 +263,7 @@ DLLEXPORT void libtrace_ringbuffer_write(libtrace_ringbuffer_t *rb, void *value)
     /* Need an empty to start with */
     wait_for_empty(rb);
     rb->elements[rb->end] = value;
+    __sync_synchronize();
     rb->end = (rb->end + 1) % rb->size;
     notify_full(rb);
 }
@@ -311,6 +312,7 @@ DLLEXPORT size_t libtrace_ringbuffer_write_bulk(libtrace_ringbuffer_t *rb,
             rb->elements[end] = values[i];
             end = (end + 1) % rb->size;
         }
+        __sync_synchronize();
         rb->end = end;
         notify_full(rb);
     } while (i < min_nb_buffers);
@@ -350,8 +352,10 @@ DLLEXPORT void *libtrace_ringbuffer_read(libtrace_ringbuffer_t *rb)
 
     /* We need a full slot */
     wait_for_full(rb);
+    __sync_synchronize();
     value = rb->elements[rb->start];
     rb->start = (rb->start + 1) % rb->size;
+    __sync_synchronize();
     /* Now that's an empty slot */
     notify_empty(rb);
     return value;
@@ -406,6 +410,7 @@ DLLEXPORT size_t libtrace_ringbuffer_read_bulk(libtrace_ringbuffer_t *rb,
             start = (start + 1) % rb->size;
         }
         rb->start = start;
+        __sync_synchronize();
         /* Now that's an empty slot */
         notify_empty(rb);
     } while (i < min_nb_buffers);

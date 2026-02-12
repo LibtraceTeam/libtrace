@@ -85,6 +85,7 @@ int libtrace_slidingwindow_try_write(libtrace_slidingwindow_t *sw,
     if (adjusted_number < sw->size) {
         // Add it
         sw->elements[(adjusted_number + sw->start) % sw->size] = value;
+        __sync_synchronize();
         return 1;
     } else {
         // Out of range don't add it
@@ -118,12 +119,14 @@ int libtrace_slidingwindow_try_read(libtrace_slidingwindow_t *sw, void **value,
                                     uint64_t *number)
 {
     if (sw->elements[sw->start]) {
+        __sync_synchronize();
         *value = sw->elements[sw->start];
         sw->elements[sw->start] = NULL;
         if (number)
             *number = sw->start_number;
         ++sw->start_number;
         sw->start = (sw->start + 1) % sw->size;
+        __sync_synchronize();
         return 1;
     } else {
         return 0;
