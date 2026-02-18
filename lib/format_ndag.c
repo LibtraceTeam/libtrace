@@ -402,7 +402,7 @@ static void new_group_alert(libtrace_t *libtrace, uint16_t threadid,
     ndag_internal_message_t alert;
 
     if (FORMAT_DATA->receivers == NULL ||
-            threadid >= FORMAT_DATA->receiver_cnt) {
+        threadid >= FORMAT_DATA->receiver_cnt) {
         return;
     }
 
@@ -715,7 +715,7 @@ static int ndag_start_threads(libtrace_t *libtrace, uint32_t maxthreads,
         FORMAT_DATA->receiver_cnt = maxthreads;
     } else if (maxthreads > FORMAT_DATA->receiver_cnt) {
         FORMAT_DATA->receivers = (recvstream_t *)realloc(
-                FORMAT_DATA->receivers, sizeof(recvstream_t) * maxthreads);
+            FORMAT_DATA->receivers, sizeof(recvstream_t) * maxthreads);
         FORMAT_DATA->receiver_cnt = maxthreads;
     }
 
