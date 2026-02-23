@@ -1239,7 +1239,7 @@ static void dpdk_lsc_callback(portid_t port, enum rte_eth_event_type event,
     fprintf(stderr, "LSC - link status is %s %s speed=%d\n",
             link_info.link_status ? "up" : "down",
             (link_info.link_duplex == RTE_ETH_LINK_FULL_DUPLEX) ? "full-duplex"
-                                                            : "half-duplex",
+                                                                : "half-duplex",
             (int)link_info.link_speed);
 #endif
 
@@ -1751,14 +1751,14 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data, char *err,
 
             for (j = 0; j < len; j++) {
                 if (strcmp(names[j].name, p2) == 0 ||
-                        strcmp(names[j].name, p3) == 0) {
+                    strcmp(names[j].name, p3) == 0) {
                     // discards is the best name to use for Mellanox
                     // error_packets is the best name to use for i40e
                     stream->xstat_drop_id = j;
                 }
 
                 if (strcmp(names[j].name, p1) == 0 &&
-                        stream->xstat_drop_id == -1) {
+                    stream->xstat_drop_id == -1) {
                     // errors is the fallback option if neither of the
                     // better options exist, but can be a counter of
                     // corrupt packets received rather than packets lost due
@@ -1768,11 +1768,10 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data, char *err,
                 }
 
                 if (strcmp(names[j].name, p4) == 0 ||
-                        strcmp(names[j].name, p5) == 0 ||
-                        strcmp(names[j].name, p6) == 0) {
+                    strcmp(names[j].name, p5) == 0 ||
+                    strcmp(names[j].name, p6) == 0) {
                     stream->xstat_good_id = j;
                 }
-
             }
             free(names);
         }
@@ -2738,7 +2737,8 @@ void dpdk_get_stats(libtrace_t *trace, libtrace_stat_t *stats)
 }
 
 static void dpdk_get_thread_stats(libtrace_t *libtrace, libtrace_thread_t *t,
-        libtrace_stat_t *stats) {
+                                  libtrace_stat_t *stats)
+{
 
     dpdk_per_stream_t *stream = (dpdk_per_stream_t *)t->format_data;
     uint64_t value;
@@ -2751,8 +2751,8 @@ static void dpdk_get_thread_stats(libtrace_t *libtrace, libtrace_thread_t *t,
 
     if (stream->xstat_good_id >= 0) {
         id = (uint64_t)stream->xstat_good_id;
-        if (rte_eth_xstats_get_by_id(FORMAT(libtrace)->port, &id,
-                &value, 1) == 1) {
+        if (rte_eth_xstats_get_by_id(FORMAT(libtrace)->port, &id, &value, 1) ==
+            1) {
             stats->received_valid = 1;
             stats->received = value;
         }
@@ -2760,8 +2760,8 @@ static void dpdk_get_thread_stats(libtrace_t *libtrace, libtrace_thread_t *t,
 
     if (stream->xstat_drop_id >= 0) {
         id = (uint64_t)stream->xstat_drop_id;
-        if (rte_eth_xstats_get_by_id(FORMAT(libtrace)->port, &id,
-                &value, 1) == 1) {
+        if (rte_eth_xstats_get_by_id(FORMAT(libtrace)->port, &id, &value, 1) ==
+            1) {
             stats->dropped_valid = 1;
             stats->dropped = value;
         }
@@ -2771,7 +2771,6 @@ static void dpdk_get_thread_stats(libtrace_t *libtrace, libtrace_thread_t *t,
         stats->captured = stats->received - stats->dropped;
         stats->captured_valid = 1;
     }
-
 }
 
 /* Attempts to read a packet in a non-blocking fashion. If one is not
