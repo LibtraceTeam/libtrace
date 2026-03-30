@@ -78,8 +78,7 @@ DLLEXPORT void decode(int link_type UNUSED, const char *packet, unsigned len)
         } else if (ident == WANDDER_IRI_CONTENT_SIP) {
             decode_next((const char *)iricontents, rem, "udp", 5060);
         }
-        wandder_free_etsili_decoder(dec);
     }
-
+    wandder_free_etsili_decoder(dec);
     return;
 }
