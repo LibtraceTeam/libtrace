@@ -113,7 +113,10 @@ DLLEXPORT int libtrace_scb_recv_sock(libtrace_scb_t *buf, int sock,
     }
 
     ret = recv(sock, buf->address + buf->write_offset, space, recvflags);
-    if (ret < 0) {
+    if (ret <= 0) {
+        if (ret == 0 && buf->write_offset > buf->read_offset) {
+            return -2;
+        }
         return ret;
     }
     __sync_synchronize();
