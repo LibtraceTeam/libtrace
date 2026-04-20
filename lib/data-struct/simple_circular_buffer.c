@@ -47,10 +47,29 @@ DLLEXPORT int libtrace_scb_init(libtrace_scb_t *buf, uint32_t size, uint16_t id)
     } else {
         buf->address =
             mmap(NULL, 2 * size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-        mmap(buf->address, size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED,
-             buf->fd, 0);
-        mmap(buf->address + size, size, PROT_READ | PROT_WRITE,
-             MAP_SHARED | MAP_FIXED, buf->fd, 0);
+
+        if (buf->address == MAP_FAILED) {
+            perror("mmap(reserve) failed in libtrace_scb_init");
+            close(buf->fd);
+            buf->fd = -1;
+            buf->address = NULL;
+        } else {
+            if (mmap(buf->address, size, PROT_READ | PROT_WRITE,
+                     MAP_SHARED | MAP_FIXED, buf->fd, 0) == MAP_FAILED) {
+                perror("mmap(fixed1) failed in libtrace_scb_init");
+                munmap(buf->address, 2 * size);
+                close(buf->fd);
+                buf->fd = -1;
+                buf->address = NULL;
+            } else if (mmap(buf->address + size, size, PROT_READ | PROT_WRITE,
+                            MAP_SHARED | MAP_FIXED, buf->fd, 0) == MAP_FAILED) {
+                perror("mmap(fixed2) failed in libtrace_scb_init");
+                munmap(buf->address, 2 * size);
+                close(buf->fd);
+                buf->fd = -1;
+                buf->address = NULL;
+            }
+        }
     }
     buf->read_offset = 0;
     buf->write_offset = 0;
