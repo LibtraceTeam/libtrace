@@ -1164,6 +1164,10 @@ DLLEXPORT int trace_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
                 continue;
             }
             if (ret == (size_t)-1 || ret == 0) {
+                /* shouldn't need to do this, but just to be safe... */
+                if (!libtrace_parallel && libtrace->last_packet == packet) {
+                    libtrace->last_packet = NULL;
+                }
                 packet->trace = NULL;
                 return ret;
             }

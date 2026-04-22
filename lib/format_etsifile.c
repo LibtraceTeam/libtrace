@@ -124,7 +124,7 @@ static int etsifile_prepare_received(libtrace_t *libtrace,
     wandder_attach_etsili_buffer(INPUT->decoder, packet->buffer, length, false);
     packet->cached.wire_length = wandder_etsili_get_pdu_length(INPUT->decoder);
     packet->cached.capture_length = packet->cached.wire_length;
-    packet->error = packet->cached.capture_length;
+    packet->error = 0;
     packet->fmtdata = NULL;
 
     tv = wandder_etsili_get_header_timestamp(INPUT->decoder);
@@ -383,7 +383,7 @@ static void etsifile_help(void)
 static struct libtrace_format_t etsifile = {
     "etsifile",
     "$Id$",
-    TRACE_FORMAT_ETSILIVE,
+    TRACE_FORMAT_ETSIFILE,
     NULL,                        /* probe filename */
     NULL,                        /* probe magic */
     etsifile_init_input,         /* init_input */
