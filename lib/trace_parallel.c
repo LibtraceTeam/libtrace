@@ -91,8 +91,6 @@
 static inline int delay_tracetime(libtrace_t *libtrace,
                                   libtrace_packet_t *packet,
                                   libtrace_thread_t *t);
-extern int libtrace_parallel;
-
 struct mem_stats {
     struct memfail {
         uint64_t cache_hit;

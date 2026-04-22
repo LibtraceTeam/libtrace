@@ -432,8 +432,9 @@ static void replacement_pcap_header(libtrace_packet_t *packet, char *payload,
 
     char *tmp;
 
-    tmp = (char *)malloc(trace_get_capture_length(packet) +
-                         sizeof(libtrace_pcapfile_pkt_hdr_t));
+    //tmp = (char *)malloc(trace_get_capture_length(packet) +
+    //                     sizeof(libtrace_pcapfile_pkt_hdr_t));
+    tmp = (char *)malloc(LIBTRACE_PACKET_BUFSIZE);
 
     ((libtrace_pcapfile_pkt_hdr_t *)tmp)->ts_sec = tv->tv_sec;
     ((libtrace_pcapfile_pkt_hdr_t *)tmp)->ts_usec = tv->tv_usec;
@@ -455,6 +456,14 @@ static void replacement_pcap_header(libtrace_packet_t *packet, char *payload,
 
     /* Invalidate caches */
     trace_clear_cache(packet);
+
+    /* This packet is about to gain a new "parent" trace, so make sure the old
+     * trace doesn't keep a reference to it
+     */
+    if (!libtrace_parallel && packet->trace &&
+            packet->trace->last_packet == packet) {
+        packet->trace->last_packet = NULL;
+    }
 }
 
 /* Try and remove any extraneous encapsulation that may have been added to
