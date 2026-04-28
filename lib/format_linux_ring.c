@@ -511,6 +511,11 @@ static libtrace_linktype_t
 linuxring_get_link_type(const struct libtrace_packet_t *packet)
 {
     uint16_t linktype = GET_SOCKADDR_HDR(packet->buffer)->sll_hatype;
+
+    if (GET_SOCKADDR_HDR(packet->buffer)->sll_protocol == htons(ETH_P_TEB)) {
+        /* this is a GRE tunnel with a transparent Ethernet header */
+        return TRACE_TYPE_ETH;
+    }
     return linuxcommon_get_link_type(linktype);
 }
 
