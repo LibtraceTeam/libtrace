@@ -96,6 +96,11 @@ struct sockaddr_ll {
 
 #endif /* HAVE_NETPACKET_PACKET_H */
 
+/* This identifier is Linux-only, so define it here for portability */
+#ifndef ETH_P_TEB
+#define ETH_P_TEB 0x6558
+#endif
+
 struct tpacket_stats {
     unsigned int tp_packets;
     unsigned int tp_drops;
