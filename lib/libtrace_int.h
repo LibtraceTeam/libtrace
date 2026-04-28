@@ -184,6 +184,8 @@ static inline int posix_memalign(void **memptr, size_t alignment, size_t size)
 
 #define MAX_THREADS 128
 
+extern int libtrace_parallel;
+
 /** Data about the most recent event from a trace file */
 struct libtrace_event_status_t {
     /** A libtrace packet to store the packet when a PACKET event occurs */

@@ -73,6 +73,10 @@ static inline uint32_t pcapng_get_record_type(const libtrace_packet_t *packet)
 {
     uint32_t *btype = (uint32_t *)packet->header;
 
+    if (btype == NULL) {
+        return 0;
+    }
+
     /* only check for byteswapped if input format is pcapng */
     if (packet->trace->format->type == TRACE_FORMAT_PCAPNG) {
         if (DATA(packet->trace)->byteswapped)
@@ -890,6 +894,17 @@ static int pcapng_write_packet(libtrace_out_t *libtrace,
     }
 
     libtrace_linktype_t linktype = trace_get_link_type(packet);
+
+    if (packet->trace->format->type != TRACE_FORMAT_PCAPNG) {
+        while (libtrace_to_pcap_linktype(linktype) == TRACE_DLT_ERROR) {
+            if (!demote_packet(packet)) {
+                trace_set_err_out(libtrace, TRACE_ERR_NO_CONVERSION,
+                        "cannot convert this type of packet to pcapng");
+                return -1;
+            }
+            linktype = trace_get_link_type(packet);
+        }
+    }
 
     /* If the file is not open, open it */
     if (!DATAOUT(libtrace)->file) {

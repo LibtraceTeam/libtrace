@@ -325,7 +325,7 @@ static void halt_etsi_thread(etsithread_t *receiver)
     wandder_free_etsili_decoder(receiver->etsidec);
     if (receiver->sources == NULL)
         return;
-    for (i = 0; i < receiver->sourcecount; i++) {
+    for (i = 0; i < receiver->sourcealloc; i++) {
         etsisocket_t *src = &receiver->sources[i];
         if (src->sock == -1)
             /* Skip if already closed */
@@ -358,7 +358,7 @@ static int receiver_read_message(etsithread_t *et)
         etsisocket_t *esock = NULL;
         int i;
 
-        if (et->sourcecount == 0) {
+        if (et->sourcealloc == 0) {
             et->sources = (etsisocket_t *)malloc(sizeof(etsisocket_t) * 10);
             et->sourcealloc = 10;
 
@@ -398,7 +398,7 @@ static int receiver_read_message(etsithread_t *et)
         esock->sock = msg.recvsock;
         esock->srcaddr = msg.recvaddr;
         libtrace_scb_init(&(esock->recvbuffer), ETSI_RECVBUF_SIZE,
-                          et->threadindex);
+                          (et->threadindex << 16) | i);
         esock->cached.timestamp = 0;
         esock->cached.length = 0;
 
@@ -415,13 +415,13 @@ static void receive_from_single_socket(etsisocket_t *esock, etsithread_t *et)
 
     int ret = 0;
 
-    if (esock->sock == -1) {
+    if (esock->sock < 0) {
         return;
     }
 
     ret =
         libtrace_scb_recv_sock(&(esock->recvbuffer), esock->sock, MSG_DONTWAIT);
-    if (ret < 0) {
+    if (ret == -1) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
             /* Would have blocked, nothing available */
             return;
@@ -430,6 +430,14 @@ static void receive_from_single_socket(etsisocket_t *esock, etsithread_t *et)
                 strerror(errno));
         free_etsi_socket(esock);
         et->activesources -= 1;
+    }
+
+    if (ret == -2) {
+        fprintf(stderr, "Socket %d has disconnected but has unread data\n",
+                esock->sock);
+        close(esock->sock);
+        esock->sock = -2;
+        return;
     }
 
     if (ret == 0) {
@@ -458,7 +466,7 @@ static int receive_etsi_sockets(libtrace_t *libtrace, etsithread_t *et)
         return 1;
     }
 
-    for (i = 0; i < et->sourcecount; i++) {
+    for (i = 0; i < et->sourcealloc; i++) {
         receive_from_single_socket(&(et->sources[i]), et);
     }
     return 1;
@@ -477,6 +485,7 @@ static inline void inspect_next_packet(etsisocket_t *sock,
     uint32_t reclen = 0;
     uint64_t current;
     const char *keyenv;
+    uint32_t offset;
 
     if (sock->sock == -1) {
         return;
@@ -497,7 +506,44 @@ static inline void inspect_next_packet(etsisocket_t *sock,
     ptr = libtrace_scb_get_read(&(sock->recvbuffer), &available);
 
     if (available == 0 || ptr == NULL) {
+        if (sock->sock == -2) {
+            free_etsi_socket(sock);
+            et->activesources --;
+        }
         return;
+    }
+
+    /* Make sure we have at least enough octets to determine the record
+     * length without wandering into bad memory */
+    offset = 1;
+
+    /* Handle a potential multi-byte tag (shouldn't happen with ETSI, but
+     * have to account for corruption)
+     */
+    if ((ptr[0] & 0x1f) == 0x1f) {
+        while (offset < available && (ptr[offset] & 0x80)) {
+            offset ++;
+        }
+        offset++;
+    }
+
+    if (available <= offset) {
+        if (sock->sock == -2) {
+            free_etsi_socket(sock);
+            et->activesources --;
+        }
+        return;
+    }
+
+    if ((ptr[offset] & 0x80) != 0) {
+        uint8_t lenlen = ptr[offset] & 0x7f;
+        if (available < offset + 1 + lenlen) {
+            if (sock->sock == -2) {
+                free_etsi_socket(sock);
+                et->activesources --;
+            }
+            return;
+        }
     }
 
     wandder_attach_etsili_buffer(dec, ptr, available, false);
@@ -505,13 +551,19 @@ static inline void inspect_next_packet(etsisocket_t *sock,
         reclen = sock->cached.length;
     } else {
         reclen = wandder_etsili_get_pdu_length(dec);
-        if (reclen == 0) {
+        if (reclen == (uint32_t)-1) {
+            free_etsi_socket(sock);
+            et->activesources --;
             return;
         }
     }
 
     if (available < reclen) {
         /* Don't have the whole PDU yet */
+        if (sock->sock == -2) {
+            free_etsi_socket(sock);
+            et->activesources --;
+        }
         return;
     }
 
@@ -524,7 +576,7 @@ static inline void inspect_next_packet(etsisocket_t *sock,
             return;
         }
         /* Send keep alive response */
-        if (send_etsili_keepalive_response(sock->sock, kaseq) < 0) {
+        if (sock->sock >= 0 && send_etsili_keepalive_response(sock->sock, kaseq) < 0) {
             fprintf(stderr,
                     "error sending response to ETSILI keep alive: %s.\n",
                     strerror(errno));
@@ -544,6 +596,10 @@ static inline void inspect_next_packet(etsisocket_t *sock,
 
     tv = wandder_etsili_get_header_timestamp(dec);
     if (tv.tv_sec == 0) {
+        if (sock->sock == -2) {
+            free_etsi_socket(sock);
+            et->activesources --;
+        }
         return;
     }
     current = ((((uint64_t)tv.tv_sec) << 32) +
@@ -569,7 +625,7 @@ static etsisocket_t *select_next_packet(etsithread_t *et)
     etsisocket_t *esock = NULL;
     uint64_t earliest = 0;
 
-    for (i = 0; i < et->sourcecount; i++) {
+    for (i = 0; i < et->sourcealloc; i++) {
         inspect_next_packet(&(et->sources[i]), &esock, &earliest, et->etsidec,
                             et);
     }
@@ -630,7 +686,7 @@ static int etsilive_read_packet(libtrace_t *libtrace, libtrace_packet_t *packet)
         if (nextavail == NULL) {
             /* No complete packets available, take a short
              * break before trying again. */
-            if (FORMAT_DATA->receivers[0].sourcecount == 0) {
+            if (FORMAT_DATA->receivers[0].activesources == 0) {
                 /* No sources yet, so we can wait a bit
                  * longer. */
                 usleep(10000);

@@ -494,7 +494,7 @@ static inline int dpdk_init_environment(char *uridata,
     }
 
 #if LT_DPDK_DEBUG
-    rte_log_set_global_level(RTE_LOG_LT_DPDK_DEBUG);
+    rte_log_set_global_level(RTE_LOG_DEBUG);
 #else
     rte_log_set_global_level(RTE_LOG_WARNING);
 #endif
@@ -1238,8 +1238,8 @@ static void dpdk_lsc_callback(portid_t port, enum rte_eth_event_type event,
 #if LT_DPDK_DEBUG
     fprintf(stderr, "LSC - link status is %s %s speed=%d\n",
             link_info.link_status ? "up" : "down",
-            (link_info.link_duplex == ETH_LINK_FULL_DUPLEX) ? "full-duplex"
-                                                            : "half-duplex",
+            (link_info.link_duplex == RTE_ETH_LINK_FULL_DUPLEX) ? "full-duplex"
+                                                                : "half-duplex",
             (int)link_info.link_speed);
 #endif
 
@@ -1484,7 +1484,7 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data, char *err,
                               int errlen, uint16_t rx_queues,
                               bool wait_for_link, int *coremap)
 {
-    int ret, i;
+    int ret, i, len, j;
     struct rte_eth_link link_info; /* Wait for link */
     dpdk_per_stream_t empty_stream = DPDK_EMPTY_STREAM;
     struct rte_eth_dev_info dev_info;
@@ -1679,7 +1679,8 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data, char *err,
     for (i = 0; i < rx_queues; i++) {
         dpdk_per_stream_t *stream;
 #if LT_DPDK_DEBUG
-        fprintf(stderr, "Libtrace DPDK: Configuring queue %d\n", i);
+        fprintf(stderr, "Libtrace DPDK: Configuring queue %d / %u\n", i,
+                rx_queues);
 #endif
 
         /* Add storage for the stream */
@@ -1728,6 +1729,51 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data, char *err,
                          strerror(rte_errno));
                 return -1;
             }
+        }
+
+        /* Find the location of the drop counter in xstats */
+        len = rte_eth_xstats_get_names(format_data->port, NULL, 0);
+        if (len > 0) {
+            struct rte_eth_xstat_name *names;
+            char p1[32], p2[32], p3[32];
+            char p4[32], p5[32], p6[32];
+            names = calloc(len, sizeof(struct rte_eth_xstat_name));
+            rte_eth_xstats_get_names(format_data->port, names, len);
+
+            /* stat field names vary by vendor :/ */
+            snprintf(p1, sizeof(p1), "rx_q%d_errors", i);
+            snprintf(p2, sizeof(p2), "rx_q%d_discards", i);
+            snprintf(p3, sizeof(p3), "rx_error_packets_q%d", i);
+
+            snprintf(p4, sizeof(p4), "rx_q%d_packets", i);
+            snprintf(p5, sizeof(p5), "rx_queue_%d_packets", i);
+            snprintf(p6, sizeof(p6), "rx_%d_packets", i);
+
+            for (j = 0; j < len; j++) {
+                if (strcmp(names[j].name, p2) == 0 ||
+                    strcmp(names[j].name, p3) == 0) {
+                    // discards is the best name to use for Mellanox
+                    // error_packets is the best name to use for i40e
+                    stream->xstat_drop_id = j;
+                }
+
+                if (strcmp(names[j].name, p1) == 0 &&
+                    stream->xstat_drop_id == -1) {
+                    // errors is the fallback option if neither of the
+                    // better options exist, but can be a counter of
+                    // corrupt packets received rather than packets lost due
+                    // to slow processing so only use if nothing else is
+                    // available (in which case the counter will include drops)
+                    stream->xstat_drop_id = j;
+                }
+
+                if (strcmp(names[j].name, p4) == 0 ||
+                    strcmp(names[j].name, p5) == 0 ||
+                    strcmp(names[j].name, p6) == 0) {
+                    stream->xstat_good_id = j;
+                }
+            }
+            free(names);
         }
 
         /* Initialise the RX queue with some packets from memory */
@@ -2690,6 +2736,43 @@ void dpdk_get_stats(libtrace_t *trace, libtrace_stat_t *stats)
     stats->received = dev_stats.ipackets + dev_stats.imissed;
 }
 
+static void dpdk_get_thread_stats(libtrace_t *libtrace, libtrace_thread_t *t,
+                                  libtrace_stat_t *stats)
+{
+
+    dpdk_per_stream_t *stream = (dpdk_per_stream_t *)t->format_data;
+    uint64_t value;
+    uint64_t id;
+
+    stats->captured_valid = 0;
+    stats->received_valid = 0;
+    stats->missing_valid = 0;
+    stats->dropped_valid = 0;
+
+    if (stream->xstat_good_id >= 0) {
+        id = (uint64_t)stream->xstat_good_id;
+        if (rte_eth_xstats_get_by_id(FORMAT(libtrace)->port, &id, &value, 1) ==
+            1) {
+            stats->received_valid = 1;
+            stats->received = value;
+        }
+    }
+
+    if (stream->xstat_drop_id >= 0) {
+        id = (uint64_t)stream->xstat_drop_id;
+        if (rte_eth_xstats_get_by_id(FORMAT(libtrace)->port, &id, &value, 1) ==
+            1) {
+            stats->dropped_valid = 1;
+            stats->dropped = value;
+        }
+    }
+
+    if (stats->received_valid && stats->dropped_valid) {
+        stats->captured = stats->received - stats->dropped;
+        stats->captured_valid = 1;
+    }
+}
+
 /* Attempts to read a packet in a non-blocking fashion. If one is not
  * available a SLEEP event is returned. We do not have the ability to
  * create a select()able file descriptor in DPDK.
@@ -2855,7 +2938,7 @@ static struct libtrace_format_t dpdk = {
     dpdk_fin_input,          /* p_fin */
     dpdk_pregister_thread,   /* pregister_thread */
     dpdk_punregister_thread, /* punregister_thread */
-    NULL                     /* get thread stats */
+    dpdk_get_thread_stats    /* get thread stats */
 };
 
 static struct libtrace_format_t dpdk_vdev = {
@@ -2910,7 +2993,7 @@ static struct libtrace_format_t dpdk_vdev = {
     dpdk_fin_input,          /* p_fin */
     dpdk_pregister_thread,   /* pregister_thread */
     dpdk_punregister_thread, /* punregister_thread */
-    NULL                     /* get thread stats */
+    dpdk_get_thread_stats    /* get thread stats */
 };
 
 void dpdk_constructor(void)

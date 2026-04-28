@@ -341,17 +341,21 @@ struct dpdk_per_stream_t {
     uint32_t wrap_count;   /* Number of times the NIC clock has wrapped around
                               completely */
 #endif
+    int xstat_drop_id; /* Index of the XStat that contains the drop counter
+                          for this stream */
+    int xstat_good_id; /* Index of the XStat that contains the accepted
+                          counter for this stream */
 } ALIGNED(CACHE_LINE_SIZE);
 
 #if HAS_HW_TIMESTAMPS_82580
 #    define DPDK_EMPTY_STREAM                                                  \
         {                                                                      \
-            -1, 0, NULL, -1, 0, 0                                              \
+            -1, 0, NULL, -1, 0, 0, -1, -1                                      \
         }
 #else
 #    define DPDK_EMPTY_STREAM                                                  \
         {                                                                      \
-            -1, 0, NULL, -1                                                    \
+            -1, 0, NULL, -1, -1, -1                                            \
         }
 #endif
 

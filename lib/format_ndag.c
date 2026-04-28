@@ -86,7 +86,7 @@ typedef struct streamsock {
     struct addrinfo *srcaddr;
     uint16_t port;
     uint32_t expectedseq;
-    ndag_monitor_t *monitorptr;
+    int mon_index;
     char **saved;
     char *nextread;
     int nextreadind;
@@ -199,12 +199,12 @@ static uint8_t check_ndag_header(char *msgbuf, uint32_t msgsize)
     return header->type;
 }
 
-static inline void reset_expected_seqs(recvstream_t *rt, ndag_monitor_t *mon)
+static inline void reset_expected_seqs(recvstream_t *rt, int mon_index)
 {
 
     int i;
     for (i = 0; i < rt->sourcecount; i++) {
-        if (rt->sources[i].monitorptr == mon) {
+        if (rt->sources[i].mon_index == mon_index) {
             rt->sources[i].expectedseq = 0;
         }
     }
@@ -401,6 +401,11 @@ static void new_group_alert(libtrace_t *libtrace, uint16_t threadid,
 
     ndag_internal_message_t alert;
 
+    if (FORMAT_DATA->receivers == NULL ||
+        threadid >= FORMAT_DATA->receiver_cnt) {
+        return;
+    }
+
     memset(&alert, 0, sizeof(alert));
     alert.type = NDAG_CLIENT_NEWGROUP;
     alert.contents.groupaddr = FORMAT_DATA->multicastgroup;
@@ -458,12 +463,12 @@ static int ndag_parse_control_message(libtrace_t *libtrace, char *msgbuf,
 
                 ptmap[streamport] = FORMAT_DATA->nextthreadid;
 
-                if (libtrace->perpkt_thread_count == 0) {
+                if (FORMAT_DATA->receiver_cnt == 0) {
                     FORMAT_DATA->nextthreadid = 0;
                 } else {
                     FORMAT_DATA->nextthreadid =
                         ((FORMAT_DATA->nextthreadid + 1) %
-                         libtrace->perpkt_thread_count);
+                         FORMAT_DATA->receiver_cnt);
                 }
             }
 
@@ -592,12 +597,17 @@ failed:
 
 static void _ndag_controller_run(libtrace_t *libtrace, int sock)
 {
-    uint16_t ptmap[65536];
+    uint16_t *ptmap;
     int ret;
 
     /* ptmap is a dirty hack to allow us to quickly check if we've already
      * assigned a stream to a thread.
      */
+    ptmap = (uint16_t *)malloc(65536 * sizeof(uint16_t));
+    if (ptmap == NULL) {
+        fprintf(stderr, "Failed to allocate memory for port map\n");
+        return;
+    }
     memset(ptmap, 0xff, 65536 * sizeof(uint16_t));
 
     ndag_paused = 0;
@@ -633,6 +643,10 @@ static void _ndag_controller_run(libtrace_t *libtrace, int sock)
 
     if (sock >= 0) {
         close(sock);
+    }
+
+    if (ptmap) {
+        free(ptmap);
     }
 
     /* Control channel has fallen over, should probably encourage libtrace
@@ -692,12 +706,17 @@ static int ndag_start_threads(libtrace_t *libtrace, uint32_t maxthreads,
     int ret;
     uint32_t i;
     /* Configure the set of receiver threads */
-
+    FORMAT_DATA->nextthreadid = 0;
     if (FORMAT_DATA->receivers == NULL) {
         /* What if the number of threads changes between a pause and
          * a restart? Can this happen? */
         FORMAT_DATA->receivers =
             (recvstream_t *)malloc(sizeof(recvstream_t) * maxthreads);
+        FORMAT_DATA->receiver_cnt = maxthreads;
+    } else if (maxthreads > FORMAT_DATA->receiver_cnt) {
+        FORMAT_DATA->receivers = (recvstream_t *)realloc(
+            FORMAT_DATA->receivers, sizeof(recvstream_t) * maxthreads);
+        FORMAT_DATA->receiver_cnt = maxthreads;
     }
 
     for (i = 0; i < maxthreads; i++) {
@@ -715,7 +734,6 @@ static int ndag_start_threads(libtrace_t *libtrace, uint32_t maxthreads,
         libtrace_message_queue_init(&(FORMAT_DATA->receivers[i].mqueue),
                                     sizeof(ndag_internal_message_t));
     }
-    FORMAT_DATA->receiver_cnt = maxthreads;
 
     /* Start the controller thread */
     /* TODO consider affinity of this thread? */
@@ -1011,13 +1029,13 @@ static int process_ndag_encap_headers(streamsock_t *ssock, recvstream_t *rt)
     ssock->rectype = rectype;
     encaphdr = (ndag_encap_t *)(usebuf + sizeof(ndag_common_t));
     ssock->expectedreccount = ntohs(encaphdr->recordcount);
-    mon = ssock->monitorptr;
+    mon = &(rt->knownmonitors[ssock->mon_index]);
 
     if (mon->laststart == 0) {
         mon->laststart = bswap_be_to_host64(encaphdr->started);
     } else if (mon->laststart != bswap_be_to_host64(encaphdr->started)) {
         mon->laststart = bswap_be_to_host64(encaphdr->started);
-        reset_expected_seqs(rt, mon);
+        reset_expected_seqs(rt, ssock->mon_index);
     }
     if (ssock->expectedseq != 0) {
         rt->missing_records +=
@@ -1373,15 +1391,31 @@ static int add_new_streamsock(libtrace_t *libtrace, recvstream_t *rt,
     }
 
     if (mon == NULL) {
-        mon = add_new_knownmonitor(rt, src.monitor);
+        add_new_knownmonitor(rt, src.monitor);
+        for (i = 0; i < rt->monitorcount; i++) {
+            if (rt->knownmonitors[i].monitorid == src.monitor) {
+                ssock->mon_index = i;
+                break;
+            }
+        }
+    } else {
+        for (i = 0; i < rt->monitorcount; i++) {
+            if (&(rt->knownmonitors[i]) == mon) {
+                ssock->mon_index = i;
+                break;
+            }
+        }
     }
 
     ssock->socktype = socktype;
     ssock->port = src.port;
     ssock->groupaddr = src.groupaddr;
     ssock->expectedseq = 0;
-    ssock->monitorptr = mon;
     ssock->saved = (char **)malloc(sizeof(char *) * ENCAP_BUFFERS);
+    for (i = 0; i < ENCAP_BUFFERS; i++) {
+        ssock->saved[i] = (char *)malloc(ENCAP_BUFSIZE);
+        ssock->savedsize[i] = 0;
+    }
     ssock->bufavail = ENCAP_BUFFERS;
     ssock->bufwaiting = 0;
     ssock->startidle = 0;
@@ -1391,11 +1425,6 @@ static int add_new_streamsock(libtrace_t *libtrace, recvstream_t *rt,
     ssock->expectedreccount = 0;
     ssock->rectype = 0;
     ssock->srcaddr = NULL;
-
-    for (i = 0; i < ENCAP_BUFFERS; i++) {
-        ssock->saved[i] = (char *)malloc(ENCAP_BUFSIZE);
-        ssock->savedsize[i] = 0;
-    }
     ssock->nextread = ssock->saved[0];
     ssock->nextreadind = 0;
     ssock->nextwriteind = 0;
