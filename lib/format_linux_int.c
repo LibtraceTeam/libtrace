@@ -393,6 +393,13 @@ linuxnative_get_link_type(const struct libtrace_packet_t *packet)
     uint16_t linktype =
         (((struct libtrace_linuxnative_header *)(packet->buffer))
              ->hdr.sll_hatype);
+    uint16_t proto =
+        (((struct libtrace_linuxnative_header *)(packet->buffer))
+             ->hdr.sll_protocol);
+    if (proto == htons(ETH_P_TEB)) {
+        /* bridged Ethernet frame, regardless of the hatype */
+        return TRACE_TYPE_ETH;
+    }
     return linuxcommon_get_link_type(linktype);
 }
 
