@@ -1,6 +1,6 @@
 name: DAG tests
 on:
-  push:
+#  push:
   workflow_dispatch:
 jobs:
   pre_job:
