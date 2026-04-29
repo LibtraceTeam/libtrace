@@ -1012,7 +1012,7 @@ static void *linuxring_get_layer3(const libtrace_packet_t *packet,
     sll = GET_SOCKADDR_HDR(packet->header);
 
     if (sll->sll_hatype == ARPHRD_ETHER ||
-            sll->sll_protocol == htons(ETH_P_TEB)) {
+        sll->sll_protocol == htons(ETH_P_TEB)) {
         *ethertype = ntohs(*(uint16_t *)(
                 (uint8_t *)header + header->tp_mac + 12));
     } else {
@@ -1030,7 +1030,7 @@ static void *linuxring_get_layer3(const libtrace_packet_t *packet,
      * but the driver sets tp_net as though the packet is raw IP.
      */
     if (sll->sll_protocol == htons(ETH_P_TEB) &&
-            header->tp_net == header->tp_mac) {
+        header->tp_net == header->tp_mac) {
         if (header->tp_snaplen - header->tp_mac < sizeof(libtrace_ether_t)) {
             return NULL;
         }
