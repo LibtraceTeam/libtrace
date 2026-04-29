@@ -1005,12 +1005,14 @@ static void *linuxring_get_layer3(const libtrace_packet_t *packet,
 
     struct tpacket3_hdr *header;
     struct sockaddr_ll *sll;
+    uint16_t ip_offset = 0;
 
     *remaining = 0;
     header = TO_TP_HDR3(packet->header);
     sll = GET_SOCKADDR_HDR(packet->header);
 
-    if (sll->sll_hatype == ARPHRD_ETHER) {
+    if (sll->sll_hatype == ARPHRD_ETHER ||
+            sll->sll_protocol == htons(ETH_P_TEB)) {
         *ethertype = ntohs(*(uint16_t *)(
                 (uint8_t *)header + header->tp_mac + 12));
     } else {
@@ -1019,6 +1021,22 @@ static void *linuxring_get_layer3(const libtrace_packet_t *packet,
 
     if (*ethertype != TRACE_ETHERTYPE_IP && *ethertype != TRACE_ETHERTYPE_IPV6)
     {
+        return NULL;
+    }
+
+    ip_offset = header->tp_net;
+
+    /* handle gretap case where there is actually an Ethernet header present
+     * but the driver sets tp_net as though the packet is raw IP.
+     */
+    if (sll->sll_protocol == htons(ETH_P_TEB) &&
+            header->tp_net == header->tp_mac) {
+        if (header->tp_snaplen - header->tp_mac < sizeof(libtrace_ether_t)) {
+            return NULL;
+        }
+        ip_offset = header->tp_net + sizeof(libtrace_ether_t);
+    }
+    if (ip_offset > header->tp_snaplen) {
         return NULL;
     }
 
