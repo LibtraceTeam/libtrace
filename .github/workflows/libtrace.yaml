@@ -87,14 +87,11 @@ jobs:
       env:
         BUILDOS: ${{ matrix.os }}
       run: |
-        SYSTEM_CLANG=$(command -v clang || find /usr/bin -name "clang-[0-9]*" | sort -V | tail -n1)
-        SYSTEM_LLC=$(command -v llc || find /usr/bin -name "llc-[0-9]*" | sort -V | tail -n1)
         cd xdp-tools
         if [ "${BUILDOS}" == "ubuntu-18.04" ]; then
             git fetch && git checkout v1.2
         fi
-        FORCE_SUBDIR_LIBBPF=1 CC=gcc \
-          CLANG="$SYSTEM_CLANG" LLC="$SYSTEM_LLC" ./configure
+        FORCE_SUBDIR_LIBBPF=1 CC=gcc HOST_CFLAGS="-O2 -std=gnu99" ./configure
         sudo make -j 3 libxdp_install
         sudo ldconfig
     - name: Checkout Libtrace
