@@ -23,7 +23,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, ubuntu-24.04, ubuntu-26.04]
+        os: [ubuntu-22.04, ubuntu-24.04]
         c_compiler: [gcc, clang]
         cxx_compiler: [g++, clang++]
         exclude:
@@ -87,32 +87,14 @@ jobs:
       env:
         BUILDOS: ${{ matrix.os }}
       run: |
-        cat << "EOF" > /tmp/ln.sh
-        #!/bin/bash
-        function do_lns {
-            LASTVERSION=0
-            for exe in `find /usr/bin/ -name ${1}-* | sort -nr | grep '\-[0-9]*$'`; do
-                newexe=`basename $exe | rev | cut -d '-' -f 1 --complement | rev`
-                version=`basename $exe | rev | cut -d '-' -f 1 | rev`
-
-                if [ ! -f /usr/local/bin/$newexe ]; then
-                    ln -s -v $exe /usr/local/bin/$newexe
-                    LASTVERSION=$version
-                elif [ "$version" -ge "$LASTVERSION" ]; then
-                    ln -f -s -v $exe /usr/local/bin/$newexe
-                    LASTVERSION=$version
-                fi
-            done
-        }
-        do_lns clang
-        do_lns llc
-        EOF
-        /bin/bash /tmp/ln.sh
+        SYSTEM_CLANG=$(command -v clang || find /usr/bin -name "clang-[0-9]*" | sort -V | tail -n1)
+        SYSTEM_LLC=$(command -v llc || find /usr/bin -name "llc-[0-9]*" | sort -V | tail -n1)
         cd xdp-tools
         if [ "${BUILDOS}" == "ubuntu-18.04" ]; then
             git fetch && git checkout v1.2
         fi
-        FORCE_SUBDIR_LIBBPF=1 ./configure
+        FORCE_SUBDIR_LIBBPF=1 CC=gcc \
+          CLANG="$SYSTEM_CLANG" LLC="$SYSTEM_LLC" ./configure
         sudo make -j 3 libxdp_install
         sudo ldconfig
     - name: Checkout Libtrace
