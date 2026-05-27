@@ -1042,7 +1042,7 @@ static void *linuxring_get_layer3(const libtrace_packet_t *packet,
 
     *remaining = header->tp_snaplen - (ip_offset - header->tp_mac);
     ((libtrace_packet_t *)packet)->cached.l3_header =
-            (uint8_t *)header + ip_offset;
+        (uint8_t *)header + ip_offset;
     ((libtrace_packet_t *)packet)->cached.l3_remaining = *remaining;
     ((libtrace_packet_t *)packet)->cached.l3_ethertype = *ethertype;
     return packet->cached.l3_header;

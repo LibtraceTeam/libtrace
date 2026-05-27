@@ -617,7 +617,6 @@ static inline void inspect_next_packet(etsisocket_t *sock,
             // Just fall back to the current wall time.
             gettimeofday(&tv, NULL);
         }
-
     }
 
     current = ((((uint64_t)tv.tv_sec) << 32) +
