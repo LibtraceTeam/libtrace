@@ -91,8 +91,10 @@ jobs:
         if [ "${BUILDOS}" == "ubuntu-18.04" ]; then
             git fetch && git checkout v1.2
         fi
+        make distclean || true
         FORCE_SUBDIR_LIBBPF=1 ./configure
-        sudo make -j 3 CFLAGS="-O2 -std=gnu99" libxdp_install
+        sudo make -j 3 CFLAGS="-I$(pwd)/lib/libbpf/src" \
+          CPPFLAGS="-I$(pwd)/lib/libbpf/src" libxdp_install
         sudo ldconfig
     - name: Checkout Libtrace
       uses: actions/checkout@v4
