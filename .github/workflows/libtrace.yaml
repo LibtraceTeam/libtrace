@@ -91,8 +91,8 @@ jobs:
         if [ "${BUILDOS}" == "ubuntu-18.04" ]; then
             git fetch && git checkout v1.2
         fi
-        FORCE_SUBDIR_LIBBPF=1 CC=gcc HOST_CFLAGS="-O2 -std=gnu99" ./configure
-        sudo make -j 3 libxdp_install
+        FORCE_SUBDIR_LIBBPF=1 ./configure
+        sudo make -j 3 CFLAGS="-O2 -std=gnu99" libxdp_install
         sudo ldconfig
     - name: Checkout Libtrace
       uses: actions/checkout@v4
