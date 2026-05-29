@@ -50,7 +50,7 @@ jobs:
       run: |
         sudo apt update
         sudo apt install -y wget software-properties-common gnupg lsb-release
-        sudo add-apt-repository ppa:ubuntu-toolchain-r/test
+        sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
         sudo bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
         sudo apt update
         sudo apt-get -y install flex bison libpcap0.8-dev libtool pkgconf autoconf automake m4 gcc gcc-multilib
@@ -83,6 +83,7 @@ jobs:
         path: xdp-tools
         repository: xdp-project/xdp-tools
         submodules: true
+
     - name: Build/Install libxdp
       env:
         BUILDOS: ${{ matrix.os }}
@@ -93,8 +94,9 @@ jobs:
         fi
         make distclean || true
         FORCE_SUBDIR_LIBBPF=1 ./configure
-        sudo make -j 3 CFLAGS="-I$(pwd)/lib/libbpf/src" \
-          CPPFLAGS="-I$(pwd)/lib/libbpf/src" libxdp_install
+
+        sed -i '1s/^/#include <stdbool.h>\n/' headers/linux/err.h
+        sudo -E make -j 3 libxdp_install
         sudo ldconfig
     - name: Checkout Libtrace
       uses: actions/checkout@v4
