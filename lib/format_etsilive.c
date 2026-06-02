@@ -77,6 +77,7 @@ typedef struct etsithread {
     uint16_t activesources;
     int threadindex;
     wandder_etsispec_t *etsidec;
+    struct timeval last_returned_ts;
 } etsithread_t;
 
 typedef struct etsilive_format_data {
@@ -287,6 +288,8 @@ static int etsilive_start_threads(libtrace_t *libtrace, uint32_t maxthreads)
         FORMAT_DATA->receivers[i].sourcecount = 0;
         FORMAT_DATA->receivers[i].activesources = 0;
         FORMAT_DATA->receivers[i].threadindex = i;
+        FORMAT_DATA->receivers[i].last_returned_ts.tv_sec = 0;
+        FORMAT_DATA->receivers[i].last_returned_ts.tv_usec = 0;
         FORMAT_DATA->receivers[i].etsidec = wandder_create_etsili_decoder();
     }
     FORMAT_DATA->maxthreads = maxthreads;
@@ -596,12 +599,26 @@ static inline void inspect_next_packet(etsisocket_t *sock,
 
     tv = wandder_etsili_get_header_timestamp(dec);
     if (tv.tv_sec == 0) {
+        /* Decoding error */
         if (sock->sock == -2) {
             free_etsi_socket(sock);
             et->activesources --;
         }
         return;
+    } else if (tv.tv_sec == 1) {
+        /* No timestamp field present */
+        if (et->last_returned_ts.tv_sec != 0) {
+            // Try to use most recent timestamp from this thread as a
+            // replacement
+            tv.tv_sec = et->last_returned_ts.tv_sec;
+            tv.tv_usec = et->last_returned_ts.tv_usec;
+        } else {
+            // This is the first packet and we don't have a timestamp?
+            // Just fall back to the current wall time.
+            gettimeofday(&tv, NULL);
+        }
     }
+
     current = ((((uint64_t)tv.tv_sec) << 32) +
                (((uint64_t)tv.tv_usec << 32) / 1000000));
 
@@ -610,6 +627,9 @@ static inline void inspect_next_packet(etsisocket_t *sock,
      */
     sock->cached.timestamp = current;
     sock->cached.length = reclen;
+
+    et->last_returned_ts.tv_sec = tv.tv_sec;
+    et->last_returned_ts.tv_usec = tv.tv_usec;
 
     /* Don't forget to update earliest and esock... */
     if (current < *earliesttime || *earliesttime == 0) {

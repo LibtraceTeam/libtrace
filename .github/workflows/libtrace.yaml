@@ -23,7 +23,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, ubuntu-24.04, ubuntu-26.04]
+        os: [ubuntu-22.04, ubuntu-24.04]
         c_compiler: [gcc, clang]
         cxx_compiler: [g++, clang++]
         exclude:
@@ -50,7 +50,7 @@ jobs:
       run: |
         sudo apt update
         sudo apt install -y wget software-properties-common gnupg lsb-release
-        sudo add-apt-repository ppa:ubuntu-toolchain-r/test
+        sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
         sudo bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
         sudo apt update
         sudo apt-get -y install flex bison libpcap0.8-dev libtool pkgconf autoconf automake m4 gcc gcc-multilib
@@ -83,37 +83,20 @@ jobs:
         path: xdp-tools
         repository: xdp-project/xdp-tools
         submodules: true
+
     - name: Build/Install libxdp
       env:
         BUILDOS: ${{ matrix.os }}
       run: |
-        cat << "EOF" > /tmp/ln.sh
-        #!/bin/bash
-        function do_lns {
-            LASTVERSION=0
-            for exe in `find /usr/bin/ -name ${1}-* | sort -nr | grep '\-[0-9]*$'`; do
-                newexe=`basename $exe | rev | cut -d '-' -f 1 --complement | rev`
-                version=`basename $exe | rev | cut -d '-' -f 1 | rev`
-
-                if [ ! -f /usr/local/bin/$newexe ]; then
-                    ln -s -v $exe /usr/local/bin/$newexe
-                    LASTVERSION=$version
-                elif [ "$version" -ge "$LASTVERSION" ]; then
-                    ln -f -s -v $exe /usr/local/bin/$newexe
-                    LASTVERSION=$version
-                fi
-            done
-        }
-        do_lns clang
-        do_lns llc
-        EOF
-        /bin/bash /tmp/ln.sh
         cd xdp-tools
         if [ "${BUILDOS}" == "ubuntu-18.04" ]; then
             git fetch && git checkout v1.2
         fi
+        make distclean || true
         FORCE_SUBDIR_LIBBPF=1 ./configure
-        sudo make -j 3 libxdp_install
+
+        sed -i '1s/^/#include <stdbool.h>\n/' headers/linux/err.h
+        sudo -E make -j 3 libxdp_install
         sudo ldconfig
     - name: Checkout Libtrace
       uses: actions/checkout@v4

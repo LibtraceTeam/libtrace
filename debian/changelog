@@ -1,3 +1,13 @@
+libtrace4 (4.0.32-1) unstable; urgency=medium
+
+  * Fixed bug where trace_get_layer3() would always return NULL for
+    packets captured using gretap interfaces.
+  * Fixed bug where etsilive inputs would stop reading incoming
+    messages if a message arrived that did not have a timestamp field
+    in its header structure.
+
+ -- Shane Alcock <shane@alcock.co.nz>  Thu, 28 May 2026 10:32:10 +1200
+
 libtrace4 (4.0.31-1) unstable; urgency=medium
 
   * Fixed crash in ndag/ndagtcp when a multi-stream sender connects

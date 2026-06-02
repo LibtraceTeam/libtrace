@@ -1,11 +1,17 @@
 Name:           libtrace4
-Version:        4.0.31
+Version:        4.0.32
 Release:        1%{?rhel_release}
 Summary:        C Library for capturing and analysing network packets
 
 License:        LGPLv3
 URL:            https://github.com/LibtraceTeam/libtrace
 Source0:        https://github.com/LibtraceTeam/libtrace/archive/%{version}.tar.gz
+
+%define dpdk_version %(pkg-config --modversion libdpdk 2>/dev/null || echo "unknown")
+%define dpdk_major %(echo %{dpdk_version} | cut -d. -f1-2)
+
+%global __requires_exclude ^librte_.*$
+Provides: bundled(dpdk) = %{dpdk_major}
 
 BuildRequires: gcc
 BuildRequires: gcc-c++
@@ -23,7 +29,6 @@ BuildRequires: libwandio1-devel
 BuildRequires: dpdk-devel
 BuildRequires: (flex-devel or libfl-static)
 
-Requires: dpdk
 Provides: libtrace4
 
 %description
@@ -37,11 +42,10 @@ University in New Zealand.
 %package        devel
 Summary:        Development files for %{name}
 Requires:       %{name}%{?_isa} = %{version}-%{release}
-Requires:       dpdk-devel
 
 %package        tools
 Summary:        Helper utilities for use with the %{name} library
-Requires:       %{name}%{?_isa} = %{version}-%{release}, libpacketdump4%{?_isa} = %{version}-%{release}, dpdk
+Requires:       %{name}%{?_isa} = %{version}-%{release}, libpacketdump4%{?_isa} = %{version}-%{release}
 
 %package -n     libpacketdump4
 Summary:        Network packet parsing and human-readable display library
@@ -89,6 +93,7 @@ Waikato University in New Zealand.
 %setup -q -n libtrace-%{version}
 
 %build
+export PKG_CONFIG_FLAGS="--static"
 %configure --disable-static --with-man=yes --mandir=%{_mandir} --with-dpdk=yes --with-dag=no
 make %{?_smp_mflags}
 
@@ -127,6 +132,9 @@ find $RPM_BUILD_ROOT -name '*.la' -exec rm -f {} ';'
 
 
 %changelog
+* Thu May 28 2026 Shane Alcock <shane@alcock.co.nz> - 4.0.32-1
+- Updated for 4.0.32 release
+
 * Tue Apr 28 2026 Shane Alcock <shane@alcock.co.nz> - 4.0.31-1
 - Updated for 4.0.31 release
 
