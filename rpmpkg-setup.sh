@@ -12,7 +12,6 @@ dnf config-manager --set-enabled powertools || true
 dnf module disable -y mariadb || true
 /usr/bin/crb enable || true
 
-
 curl -1sLf \
   'https://dl.cloudsmith.io/public/wand/libwandio/cfg/setup/bash.rpm.sh' \
     | bash

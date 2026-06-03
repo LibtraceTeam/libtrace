@@ -124,7 +124,8 @@ static libtrace_packet_t *per_packet(libtrace_packet_t *packet, char **localbuf)
 
     if (linktype == TRACE_TYPE_NONE) {
         newbuf = calloc(wire_length + sizeof(libtrace_ether_t), sizeof(char));
-        memcpy(newbuf + sizeof(libtrace_ether_t), l2_header, remaining);
+        memcpy(newbuf + sizeof(libtrace_ether_t), l2_header,
+               remaining < wire_length ? remaining : wire_length);
         memcpy(newbuf, FAKE_ETHERNET_HEADER, sizeof(libtrace_ether_t));
         l2_header = newbuf;
         wire_length += sizeof(libtrace_ether_t);
