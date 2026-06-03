@@ -1,17 +1,11 @@
 Name:           libtrace4
 Version:        4.0.32
-Release:        1%{?rhel_release}
+Release:        2%{?rhel_release}
 Summary:        C Library for capturing and analysing network packets
 
 License:        LGPLv3
 URL:            https://github.com/LibtraceTeam/libtrace
 Source0:        https://github.com/LibtraceTeam/libtrace/archive/%{version}.tar.gz
-
-%define dpdk_version %(pkg-config --modversion libdpdk 2>/dev/null || echo "unknown")
-%define dpdk_major %(echo %{dpdk_version} | cut -d. -f1-2)
-
-%global __requires_exclude ^librte_.*$
-Provides: bundled(dpdk) = %{dpdk_major}
 
 BuildRequires: gcc
 BuildRequires: gcc-c++
@@ -28,6 +22,7 @@ BuildRequires: libwandder2-devel >= 2.0.14
 BuildRequires: libwandio1-devel
 BuildRequires: dpdk-devel
 BuildRequires: (flex-devel or libfl-static)
+Requires: dpdk
 
 Provides: libtrace4
 
@@ -42,10 +37,11 @@ University in New Zealand.
 %package        devel
 Summary:        Development files for %{name}
 Requires:       %{name}%{?_isa} = %{version}-%{release}
+Requires:       dpdk-devel
 
 %package        tools
 Summary:        Helper utilities for use with the %{name} library
-Requires:       %{name}%{?_isa} = %{version}-%{release}, libpacketdump4%{?_isa} = %{version}-%{release}
+Requires:       %{name}%{?_isa} = %{version}-%{release}, libpacketdump4%{?_isa} = %{version}-%{release}, dpdk
 
 %package -n     libpacketdump4
 Summary:        Network packet parsing and human-readable display library
@@ -132,6 +128,9 @@ find $RPM_BUILD_ROOT -name '*.la' -exec rm -f {} ';'
 
 
 %changelog
+* Wed Jun 3 2026 Shane Alcock <shane@alcock.co.nz> - 4.0.32-2
+- Fix broken DPDK dependency
+
 * Thu May 28 2026 Shane Alcock <shane@alcock.co.nz> - 4.0.32-1
 - Updated for 4.0.32 release
 
