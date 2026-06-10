@@ -1036,7 +1036,7 @@ static void *linuxring_get_layer3(const libtrace_packet_t *packet,
         }
         ip_offset = header->tp_net + sizeof(libtrace_ether_t);
     }
-    if (ip_offset > header->tp_snaplen) {
+    if (header->tp_snaplen < (ip_offset - header->tp_mac)) {
         return NULL;
     }
 
