@@ -1,3 +1,10 @@
+libtrace4 (4.0.33-1) unstable; urgency=medium
+
+  * Fixed bug introduced in 4.0.32 where trace_get_layer3()
+    was now returning NULL for all packets smaller than 96 bytes.
+
+ -- Shane Alcock <shane@alcock.co.nz>  Thu, 10 Jun 2026 22:37:53 +1200
+
 libtrace4 (4.0.32-1) unstable; urgency=medium
 
   * Fixed bug where trace_get_layer3() would always return NULL for

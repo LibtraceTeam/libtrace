@@ -1,6 +1,6 @@
 Name:           libtrace4
-Version:        4.0.32
-Release:        2%{?rhel_release}
+Version:        4.0.33
+Release:        1%{?rhel_release}
 Summary:        C Library for capturing and analysing network packets
 
 License:        LGPLv3
@@ -128,6 +128,9 @@ find $RPM_BUILD_ROOT -name '*.la' -exec rm -f {} ';'
 
 
 %changelog
+* Wed Jun 10 2026 Shane Alcock <shane@alcock.co.nz> - 4.0.33-1
+- Updated for 4.0.33 release
+
 * Wed Jun 3 2026 Shane Alcock <shane@alcock.co.nz> - 4.0.32-2
 - Fix broken DPDK dependency
 
