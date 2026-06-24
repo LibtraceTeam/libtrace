@@ -90,11 +90,11 @@
  * enabling scattered RX.
  */
 #ifndef LIBTRACE_DPDK_MIN_MTU
-#define LIBTRACE_DPDK_MIN_MTU 68
+#    define LIBTRACE_DPDK_MIN_MTU 68
 #endif
 
 #ifndef LIBTRACE_DPDK_L2_OVERHEAD
-#define LIBTRACE_DPDK_L2_OVERHEAD 64
+#    define LIBTRACE_DPDK_L2_OVERHEAD 64
 #endif
 
 static pthread_mutex_t dpdk_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -1703,8 +1703,7 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data, char *err,
 
     if (format_data->dpdk_mtu_set) {
 #if LT_DPDK_DEBUG
-        fprintf(stderr,
-                "Libtrace DPDK: enabling explicit port MTU %u\n",
+        fprintf(stderr, "Libtrace DPDK: enabling explicit port MTU %u\n",
                 format_data->dpdk_mtu);
 #endif
 
@@ -1730,7 +1729,8 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data, char *err,
         port_conf.rxmode.mtu = format_data->dpdk_mtu;
 #endif
 
-        /* Use fewer buffers for jumbo-size mbufs to reduce hugepage pressure. */
+        /* Use fewer buffers for jumbo-size mbufs to reduce hugepage pressure.
+         */
         if (buf_size > RX_MBUF_SIZE)
             format_data->nb_rx_buf /= 2;
     }
