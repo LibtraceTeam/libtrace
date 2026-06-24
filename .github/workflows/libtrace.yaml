@@ -23,7 +23,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, ubuntu-24.04]
+        os: [ubuntu-22.04, ubuntu-24.04, ubuntu-26.04]
         c_compiler: [gcc, clang]
         cxx_compiler: [g++, clang++]
         exclude:
@@ -57,11 +57,14 @@ jobs:
         sudo apt-get -y install build-essential dpdk-dev libelf-dev git libyaml-dev libssl-dev
         sudo apt-get -y install uthash-dev linux-tools-common liblzma-dev libbz2-dev
     - name: Install PF_RING
+      env:
+        BUILDOS: ${{ matrix.os }}
       run: |
+        version=$(echo "$BUILDOS" | cut -d "-" -f 2)
         sudo apt-get -y install software-properties-common wget
         sudo add-apt-repository -y universe
-        wget https://packages.ntop.org/apt-stable/20.04/all/apt-ntop-stable.deb
-        sudo apt-get -y install ./apt-ntop-stable.deb
+        wget https://packages.ntop.org/apt/${version}/all/apt-ntop.deb
+        sudo apt-get -y install ./apt-ntop.deb
         sudo apt-get update
         sudo apt-get -y install pfring
         sudo ldconfig
@@ -96,7 +99,7 @@ jobs:
         FORCE_SUBDIR_LIBBPF=1 ./configure
 
         sed -i '1s/^/#include <stdbool.h>\n/' headers/linux/err.h
-        sudo -E make -j 3 libxdp_install
+        sudo make -j 3 EXTRA_CFLAGS="-Wno-error=discarded-qualifiers" libxdp_install
         sudo ldconfig
     - name: Checkout Libtrace
       uses: actions/checkout@v4

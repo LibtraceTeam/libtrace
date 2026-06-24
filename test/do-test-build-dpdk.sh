@@ -130,6 +130,7 @@ do
 	else
 		echo "	Building using meson"
 		mkdir install
+        INSTALL_DIR="$(pwd)/install"
                 cat << "EOF" > $(pwd)/drivers/net/meson.build
 drivers = [
         'af_packet',
@@ -145,7 +146,7 @@ config_flag_fmt = 'RTE_LIBRTE_@0@_PMD'  # required for 20.11.6 only
 EOF
 
 		if CFLAGS="-fcommon -ggdb3 -w" do_test meson \
-                            --prefix=$(pwd)/install build \
+                            --prefix="${INSTALL_DIR}" build \
                             -Ddisable_drivers=baseband/*,compress/*,crypto/*,dma/*,event/*,gpu/*,raw/*,regex/*,vdpa/* \
 				> build_stdout.txt 2> build_stderr.txt ; then
 			cd ./build
@@ -191,6 +192,14 @@ do
 	echo "Building libtrace with $dpdk_build - this may take some time"
 	export RTE_SDK="$DOWNLOAD_DIR"/"$dpdk_build"
 	export RTE_TARGET=x86_64-native-linuxapp-gcc
+    export PKG_CONFIG_PATH="$RTE_SDK/install/lib/x86_64-linux-gnu/pkgconfig:$RTE_SDK/install/lib/pkgconfig:$RTE_SDK/install/lib64/pkgconfig:$PKG_CONFIG_PATH"
+
+    # Make a fake libjitterentropy.a as otherwise builds fail on ubuntu-26.04
+    # github runner images.
+    ar rcs "$RTE_SDK/libjitterentropy.a"
+    mkdir -p "$RTE_SDK/install/lib"
+    ar rcs "$RTE_SDK/install/lib/libjitterentropy.a"
+    export LDFLAGS="-L$RTE_SDK -L$RTE_SDK/install/lib $LDFLAGS"
 
 	make clean > /dev/null 2> /dev/null
 	OUTPUT_PREFIX="$BUILD_DIR"/"$dpdk_build" 
@@ -221,8 +230,8 @@ do
 	check ${OUTPUT_PREFIX}conf_err.txt"
 		continue
 	fi
-	do_test make -j $BUILD_THREADS \
-		> "$OUTPUT_PREFIX"/make_out.txt 2> "$OUTPUT_PREFIX"/make_err.txt
+	do_test make -j $BUILD_THREADS
+#		> "$OUTPUT_PREFIX"/make_out.txt 2> "$OUTPUT_PREFIX"/make_err.txt
 	if [ $? -ne 0 ]; then
 		LIBTRACE_FAILED="$LIBTRACE_FAILED
 $dpdk_build Building libtrace failed (make)

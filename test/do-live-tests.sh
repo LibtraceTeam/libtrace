@@ -142,7 +142,9 @@ do_parallel_test() {
 	kill -SIGINT $my_pid
 	wait $my_pid
 	rc=$?
-	if [[ rc -eq 0 ]]; then
+    # 130 is the return code if you SIGINT a timeout process from Ubuntu 26.04
+    # onwards
+	if [[ rc -eq 0 || rc -eq 130 ]]; then
 		PARALLEL_OK=$(( PARALLEL_OK + 1 ))
 	else
 		PARALLEL_FAIL="$PARALLEL_FAIL

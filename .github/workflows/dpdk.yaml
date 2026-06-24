@@ -33,7 +33,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, ubuntu-22.04]
+        os: [ubuntu-24.04, ubuntu-22.04, ubuntu-26.04]
         dpdk_version: [dpdk-25.11, dpdk-24.11.1, dpdk-23.11, dpdk-22.07, dpdk-21.11.2, dpdk-20.11.6]
     steps:
     - uses: actions/checkout@v4
