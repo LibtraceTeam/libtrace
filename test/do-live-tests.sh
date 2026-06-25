@@ -87,10 +87,14 @@ while [[ $# -gt 0 ]]; do
 	dpdk)
 		write_formats+=("dpdkvdev:net_pcap0,iface=veth0")
 		read_formats+=("dpdkvdev:net_pcap1,iface=veth1")
-		write_formats+=("dpdkvdev:net_pcap0,iface=veth0?mtu=1500")
-		read_formats+=("dpdkvdev:net_pcap1,iface=veth1?mtu=1500")
-		write_formats+=("dpdkvdev:net_pcap0,iface=veth0?mtu=9000")
-		read_formats+=("dpdkvdev:net_pcap1,iface=veth1?mtu=9000")
+		if ./test-errors 2>/dev/null | grep -q "DPDK MTU setting: SUPPORTED"; then
+			write_formats+=("dpdkvdev:net_pcap0,iface=veth0?mtu=1500")
+			read_formats+=("dpdkvdev:net_pcap1,iface=veth1?mtu=1500")
+			write_formats+=("dpdkvdev:net_pcap0,iface=veth0?mtu=9000")
+			read_formats+=("dpdkvdev:net_pcap1,iface=veth1?mtu=9000")
+		else
+			echo "DPDK MTU setting is NOT supported by the active DPDK PMD/version. Skipping MTU capture tests."
+		fi
 		;;
 	int|ring|xdp|pfringzc|pcapint)
 		write_formats+=("$key:veth0")

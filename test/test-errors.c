@@ -83,6 +83,7 @@ void test_dpdk_mtu_errors()
 {
     libtrace_t *trace;
     libtrace_err_t err;
+    int supported = 1;
 
     /* 1. Test MTU too small */
     trace = trace_create("dpdkvdev:net_pcap1,iface=veth1?mtu=5");
@@ -122,6 +123,9 @@ void test_dpdk_mtu_errors()
         err = trace_get_err(trace);
         assert(strstr(err.problem, "outside valid range") == NULL);
         assert(strstr(err.problem, "invalid mtu parameter") == NULL);
+        if (strstr(err.problem, "Operation not supported") != NULL) {
+            supported = 0;
+        }
     }
     trace_destroy(trace);
 
@@ -132,8 +136,17 @@ void test_dpdk_mtu_errors()
         err = trace_get_err(trace);
         assert(strstr(err.problem, "outside valid range") == NULL);
         assert(strstr(err.problem, "invalid mtu parameter") == NULL);
+        if (strstr(err.problem, "Operation not supported") != NULL) {
+            supported = 0;
+        }
     }
     trace_destroy(trace);
+
+    if (supported) {
+        printf("DPDK MTU setting: SUPPORTED\n");
+    } else {
+        printf("DPDK MTU setting: NOT SUPPORTED\n");
+    }
 }
 #endif
 
