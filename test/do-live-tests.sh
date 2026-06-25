@@ -87,6 +87,10 @@ while [[ $# -gt 0 ]]; do
 	dpdk)
 		write_formats+=("dpdkvdev:net_pcap0,iface=veth0")
 		read_formats+=("dpdkvdev:net_pcap1,iface=veth1")
+		write_formats+=("dpdkvdev:net_pcap0,iface=veth0?mtu=1500")
+		read_formats+=("dpdkvdev:net_pcap1,iface=veth1?mtu=1500")
+		write_formats+=("dpdkvdev:net_pcap0,iface=veth0?mtu=9000")
+		read_formats+=("dpdkvdev:net_pcap1,iface=veth1?mtu=9000")
 		;;
 	int|ring|xdp|pfringzc|pcapint)
 		write_formats+=("$key:veth0")

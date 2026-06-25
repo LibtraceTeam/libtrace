@@ -40,6 +40,8 @@ $EXEC sysctl -w net.ipv6.conf.veth0.disable_ipv6=1 > /dev/null 2>&1
 $EXEC sysctl -w net.ipv6.conf.veth1.disable_ipv6=1 > /dev/null 2>&1
 
 
+$EXEC ip link set dev veth0 mtu 9000
+$EXEC ip link set dev veth1 mtu 9000
 $EXEC ip link set veth0 up
 $EXEC ip link set veth1 up
 

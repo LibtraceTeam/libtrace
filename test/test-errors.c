@@ -27,8 +27,10 @@
  * $Id: test-rtclient.c,v 1.2 2006/02/27 03:41:12 perry Exp $
  *
  */
+#include "../config.h"
 #include <libtrace.h>
 #include <assert.h>
+#include <string.h>
 
 /* If you don't specify O_WONLY or O_RDWR on the fileflags, then this should
  * fail.
@@ -76,6 +78,65 @@ void test_forgotten_wronly()
     trace_destroy(trace);
 }
 
+#ifdef HAVE_DPDK
+void test_dpdk_mtu_errors()
+{
+    libtrace_t *trace;
+    libtrace_err_t err;
+
+    /* 1. Test MTU too small */
+    trace = trace_create("dpdkvdev:net_pcap1,iface=veth1?mtu=5");
+    assert(trace);
+    assert(trace_is_err(trace));
+    err = trace_get_err(trace);
+    assert(err.err_num == TRACE_ERR_INIT_FAILED);
+    assert(strstr(err.problem, "outside valid range") != NULL);
+    trace_destroy(trace);
+
+    /* 2. Test MTU too large */
+    trace = trace_create("dpdkvdev:net_pcap1,iface=veth1?mtu=70000");
+    assert(trace);
+    assert(trace_is_err(trace));
+    err = trace_get_err(trace);
+    assert(err.err_num == TRACE_ERR_INIT_FAILED);
+    assert(strstr(err.problem, "outside valid range") != NULL);
+    trace_destroy(trace);
+
+    /* 3. Test invalid MTU format */
+    trace = trace_create("dpdkvdev:net_pcap1,iface=veth1?mtu=abc");
+    assert(trace);
+    assert(trace_is_err(trace));
+    err = trace_get_err(trace);
+    assert(err.err_num == TRACE_ERR_INIT_FAILED);
+    assert(strstr(err.problem, "invalid mtu parameter") != NULL);
+    trace_destroy(trace);
+
+    /* 4. Test valid MTU value doesn't trigger MTU syntax/range errors */
+    trace = trace_create("dpdkvdev:net_pcap1,iface=veth1?mtu=1500");
+    assert(trace);
+    /* Since we're not running with live devices and root, trace_create could fail
+     * (e.g. because EAL or the PMD initialization fails).
+     * If it fails, the error message must NOT be about the MTU itself.
+     */
+    if (trace_is_err(trace)) {
+        err = trace_get_err(trace);
+        assert(strstr(err.problem, "outside valid range") == NULL);
+        assert(strstr(err.problem, "invalid mtu parameter") == NULL);
+    }
+    trace_destroy(trace);
+
+    /* 5. Test another valid jumbo MTU value doesn't trigger MTU syntax/range errors */
+    trace = trace_create("dpdkvdev:net_pcap1,iface=veth1?mtu=9000");
+    assert(trace);
+    if (trace_is_err(trace)) {
+        err = trace_get_err(trace);
+        assert(strstr(err.problem, "outside valid range") == NULL);
+        assert(strstr(err.problem, "invalid mtu parameter") == NULL);
+    }
+    trace_destroy(trace);
+}
+#endif
+
 int main(int argc UNUSED, char *argv[] UNUSED)
 {
 
@@ -85,6 +146,10 @@ int main(int argc UNUSED, char *argv[] UNUSED)
      * occur */
 
     /* test_forgotten_wronly(); */
+
+#ifdef HAVE_DPDK
+    test_dpdk_mtu_errors();
+#endif
 
     return 0;
 }
