@@ -245,7 +245,7 @@ DLLEXPORT void *trace_get_layer3(const libtrace_packet_t *packet,
     }
 
     if (packet->trace && packet->trace->format &&
-            packet->trace->format->get_layer3 && !packet->unsafe_payload) {
+        packet->trace->format->get_layer3 && !packet->unsafe_payload) {
         return packet->trace->format->get_layer3(packet, ethertype, remaining);
     }
 
