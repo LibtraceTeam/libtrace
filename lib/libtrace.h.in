@@ -799,6 +799,24 @@ typedef enum {
     TRACE_RADIOTAP_EXT = 31
 } libtrace_radiotap_field_t;
 
+typedef enum {
+    TRACE_SCTP_DATA = 0,
+    TRACE_SCTP_INIT = 1,
+    TRACE_SCTP_INIT_ACK = 2,
+    TRACE_SCTP_SACK = 3,
+    TRACE_SCTP_HEARTBEAT = 4,
+    TRACE_SCTP_HEARTBEAT_ACK = 5,
+    TRACE_SCTP_ABORT = 6,
+    TRACE_SCTP_SHUTDOWN = 7,
+    TRACE_SCTP_SHUTDOWN_ACK = 8,
+    TRACE_SCTP_ERROR = 9,
+    TRACE_SCTP_COOKIE_ECHO = 10,
+    TRACE_SCTP_COOKIE_ACK = 11,
+    TRACE_SCTP_ECNE = 12,
+    TRACE_SCTP_CWR = 13,
+    TRACE_SCTP_SHUTDOWN_COMPLETE = 14,
+} libtrace_sctp_chunktype_t;
+
 /** @name Protocol structures
  * These convenience structures provide portable versions of the headers
  * for a variety of protocols.
@@ -930,6 +948,33 @@ typedef struct libtrace_icmp {
     } un;                    /**< Union for Payloads of Various ICMP Codes */
 } PACKED libtrace_icmp_t;
 ct_assert(sizeof(libtrace_icmp_t) == 8);
+
+typedef struct libtrace_sctp_common {
+    uint16_t source;    /**< Source port */
+    uint16_t dest;      /**< Destination port */
+    uint32_t verify;    /**< Verification tag */
+    uint32_t check;     /**< Checksum */
+} PACKED libtrace_sctp_common_t;
+
+typedef struct libtrace_sctp_chunk {
+    uint8_t type;       /**< Chunk type */
+    uint8_t flags;      /**< Flags */
+    uint16_t length;    /**< Chunk length (not including padding!) */
+} PACKED libtrace_sctp_chunk_t;
+
+typedef struct libtrace_sctp_data {
+    uint32_t tsn;       /**< Transaction number */
+    uint16_t streamid;  /**< Stream ID */
+    uint16_t seqno;     /**< Stream sequence number */
+    uint32_t proto;     /**< Payload protocol ID */
+} PACKED libtrace_sctp_data_t;
+
+typedef struct libtrace_sctp_state {
+    uint8_t init;
+    uint8_t *current_chunk;
+    uint8_t *sctp_start;
+    uint32_t sctp_size;
+} libtrace_sctp_state_t;
 
 /** Generic ICMPv6 header structure */
 typedef struct libtrace_icmp6 {
@@ -3064,6 +3109,22 @@ trace_get_icmp(libtrace_packet_t *packet);
 DLLEXPORT SIMPLE_FUNCTION libtrace_icmp6_t *
 trace_get_icmp6(libtrace_packet_t *packet);
 
+/** Get a pointer to the SCTP header (if present)
+ * @param packet  	The packet to get the SCTP header from
+ *
+ * @return A pointer to the SCTP header, or NULL if there is not a complete
+ * SCTP header present in the packet.
+ *
+ * This is a short-cut function enabling quick and easy access to the SCTP
+ * header if that is all you care about. However, we recommend the use of the
+ * more generic trace_get_transport() function instead.
+ *
+ * @note Unlike trace_get_transport(), this function will return NULL if the
+ * SCTP header is incomplete or truncated.
+ */
+DLLEXPORT SIMPLE_FUNCTION libtrace_sctp_common_t *
+trace_get_sctp(libtrace_packet_t *packet);
+
 /** Get a pointer to the ICMP header following an IPv4 header (if present)
  * @param ip		The IP header to find the subsequent ICMP header for
  * @param[in,out] remaining Updated with the number of captured bytes remaining
@@ -3506,6 +3567,78 @@ trace_get_destination_address_string(const libtrace_packet_t *packet,
 DLLEXPORT int trace_get_next_option(unsigned char **ptr, int *len,
                                     unsigned char *type, unsigned char *optlen,
                                     unsigned char **data);
+
+/** Parses an SCTP packet and returns the next unparsed chunk from the packet
+ *  body. The state parameter is used to keep track of what has been parsed
+ *  so far, so this method can be repeatedly called on the same SCTP packet
+ *  to process all of its chunks in sequence.
+ *
+ * @param[in] sctp      The pointer to the initial SCTP header, only required
+ *                      when called on an SCTP packet for the first time.
+ * @param[in] state     The structure that maintains the parsing state for the
+ *                      current packet.
+ * @param[in] rem       The amount of bytes remaining in the packet, starting
+ *                      from the initial SCTP header. Only required when
+ *                      called on an SCTP packet for the first time.
+ * @param[out] type     The type of the chunk that is returned.
+ * @param[out] flags    The chunk flags.
+ * @param[out] length   The length of the returned chunk (excl. padding).
+ *
+ * @return NULL if no more chunks are available in the packet, otherwise a
+ *         pointer to the start of the first unparsed chunk in the packet.
+ *
+ * When calling this method on a packet for the first time, you must set the
+ * "init" field in the `state` structure to be zero and pass in suitable
+ * values for the "sctp" and "rem" parameters. For subsequent calls, "sctp"
+ * and "rem" are no longer required (as they are saved inside of `state`).
+ * Do not modify any of the contents of `state` afterwards until you are
+ * ready to move on to another SCTP packet, at which point you should reset
+ * "init" to zero again.
+ */
+DLLEXPORT uint8_t *trace_get_next_sctp_chunk(libtrace_sctp_common_t *sctp,
+        libtrace_sctp_state_t *state, uint32_t rem, uint8_t *type,
+        uint8_t *flags, uint16_t *length);
+
+/** Parses an SCTP packet and returns the next unparsed DATA chunk from the
+ *  packet body. The state parameter is used to keep track of what has been
+ *  parsed so far, so this method can be repeatedly called on the same SCTP
+ *  packet to ensure your code observes all DATA chunks that might be present
+ *  in a single packet.
+ *
+ * @param[in] sctp      The pointer to the initial SCTP header, only required
+ *                      when called on an SCTP packet for the first time.
+ * @param[in] state     The structure that maintains the parsing state for the
+ *                      current packet.
+ * @param[in] rem       The amount of bytes remaining in the packet, starting
+ *                      from the initial SCTP header. Only required when
+ *                      called on an SCTP packet for the first time.
+ * @param[out] flags    The chunk flags.
+ * @param[out] length   The length of the payload inside the DATA chunk
+ *                      (excl. padding and the chunk header).
+ * @param[out] header   A pointer to the header of the returned chunk.
+ *
+ * @return NULL if no more DATA chunks are available in the packet, otherwise a
+ *         pointer to the start of the payload for the first unparsed DATA
+ *         chunk in the packet.
+ *
+ * @note The pointer returned is the start of the DATA payload, while the
+ * `header` parameter will be updated to allow you to access the DATA
+ * specific fields from the chunk header (e.g. stream identifier, payload
+ * protocol identifier).
+ *
+ * All non-DATA chunks will be skipped over when using this method.
+ *
+ * When calling this method on a packet for the first time, you must set the
+ * "init" field in the `state` structure to be zero and pass in suitable
+ * values for the "sctp" and "rem" parameters. For subsequent calls, "sctp"
+ * and "rem" are no longer required (as they are saved inside of `state`).
+ * Do not modify any of the contents of `state` afterwards until you are
+ * ready to move on to another SCTP packet, at which point you should reset
+ * "init" to zero again.
+ */
+DLLEXPORT uint8_t *trace_get_next_sctp_data_chunk(libtrace_sctp_common_t *sctp,
+        libtrace_sctp_state_t *state, uint32_t rem, uint8_t *flags,
+        uint16_t *length, libtrace_sctp_data_t **header);
 
 /*@}*/
 
