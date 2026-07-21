@@ -1007,6 +1007,12 @@ static void *linuxring_get_layer3(const libtrace_packet_t *packet,
     struct sockaddr_ll *sll;
     uint16_t ip_offset = 0;
 
+    if (packet->unsafe_payload) {
+        // payload has been moved, so the offsets in the header are not
+        // valid
+        return NULL;
+    }
+
     *remaining = 0;
     header = TO_TP_HDR3(packet->header);
     sll = GET_SOCKADDR_HDR(packet->header);

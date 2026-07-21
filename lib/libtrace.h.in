@@ -734,6 +734,9 @@ typedef struct libtrace_packet_t {
     libtrace_rt_types_t type;       /**< RT protocol type for the packet */
     buf_control_t buf_control;      /**< Describes memory ownership */
     libtrace_packet_cache_t cached; /**< Cached packet properties / headers */
+    uint8_t unsafe_payload;         /**< Indicates whether payload pointer has
+                                         been modified (e.g. header stripping)
+                                     */
     uint64_t
         order; /**< Notes the order of this packet in relation to the input */
     uint64_t hash;       /**< A hash of the packet as supplied by the user */

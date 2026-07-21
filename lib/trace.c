@@ -994,6 +994,7 @@ DLLEXPORT libtrace_packet_t *trace_create_packet(void)
 
     packet->buf_control = TRACE_CTRL_PACKET;
     packet->which_trace_start = 0;
+    packet->unsafe_payload = 0;
     pthread_mutex_init(&(packet->ref_lock), NULL);
     trace_clear_cache(packet);
     return packet;
@@ -1027,6 +1028,7 @@ DLLEXPORT libtrace_packet_t *trace_copy_packet(const libtrace_packet_t *packet)
     dest->hash = packet->hash;
     dest->error = packet->error;
     dest->which_trace_start = packet->which_trace_start;
+    dest->unsafe_payload = packet->unsafe_payload;
     pthread_mutex_init(&(dest->ref_lock), NULL);
     /* Reset the cache - better to recalculate than try to convert
      * the values over to the new packet */
