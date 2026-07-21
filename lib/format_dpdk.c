@@ -1582,14 +1582,16 @@ static struct rte_mempool *dpdk_alloc_memory(unsigned n, unsigned pkt_size,
         ret = mem_pools[socket_index][j];
         mem_pools[socket_index][j] = mem_pools[socket_index][k - 1];
         mem_pools[socket_index][k - 1] = NULL;
-        mem_pools[socket_index][j] = NULL;
     } else {
         static uint32_t test = 10;
+        unsigned cache_size = 128;
+        if (cache_size > n / 2)
+            cache_size = n / 2;
         test++;
         snprintf(name, MEMPOOL_NAME_LEN, "libtrace_pool_%" PRIu32, test);
 
         ret = rte_mempool_create(
-            name, n, pkt_size, 128, sizeof(struct rte_pktmbuf_pool_private),
+            name, n, pkt_size, cache_size, sizeof(struct rte_pktmbuf_pool_private),
             rte_pktmbuf_pool_init, NULL, rte_pktmbuf_init, NULL, socket_id, 0);
     }
 
@@ -1731,7 +1733,7 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data, char *err,
 
         /* Use fewer buffers for jumbo-size mbufs to reduce hugepage pressure.
          */
-        if (buf_size > RX_MBUF_SIZE)
+        if (buf_size > RX_MBUF_SIZE && format_data->nb_rx_buf > MIN_NB_BUF)
             format_data->nb_rx_buf /= 2;
     }
 
