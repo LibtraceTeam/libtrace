@@ -115,15 +115,22 @@ void test_dpdk_mtu_errors()
     /* 4. Test valid MTU value doesn't trigger MTU syntax/range errors */
     trace = trace_create("dpdkvdev:net_pcap1,iface=veth1?mtu=1500");
     assert(trace);
-    /* Since we're not running with live devices and root, trace_create could fail
-     * (e.g. because EAL or the PMD initialization fails).
+    /* Since we're not running with live devices and root, trace_create/start could fail
+     * (e.g. because EAL or the PMD initialization fails, or MTU cannot be set).
      * If it fails, the error message must NOT be about the MTU itself.
      */
     if (trace_is_err(trace)) {
         err = trace_get_err(trace);
         assert(strstr(err.problem, "outside valid range") == NULL);
         assert(strstr(err.problem, "invalid mtu parameter") == NULL);
-        if (strstr(err.problem, "Operation not supported") != NULL) {
+        supported = 0;
+    } else {
+        if (trace_start(trace) != 0) {
+            if (trace_is_err(trace)) {
+                err = trace_get_err(trace);
+                assert(strstr(err.problem, "outside valid range") == NULL);
+                assert(strstr(err.problem, "invalid mtu parameter") == NULL);
+            }
             supported = 0;
         }
     }
@@ -136,7 +143,14 @@ void test_dpdk_mtu_errors()
         err = trace_get_err(trace);
         assert(strstr(err.problem, "outside valid range") == NULL);
         assert(strstr(err.problem, "invalid mtu parameter") == NULL);
-        if (strstr(err.problem, "Operation not supported") != NULL) {
+        supported = 0;
+    } else {
+        if (trace_start(trace) != 0) {
+            if (trace_is_err(trace)) {
+                err = trace_get_err(trace);
+                assert(strstr(err.problem, "outside valid range") == NULL);
+                assert(strstr(err.problem, "invalid mtu parameter") == NULL);
+            }
             supported = 0;
         }
     }

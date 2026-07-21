@@ -1827,7 +1827,11 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data, char *err,
         uint16_t actual_mtu = 0;
 
         ret = rte_eth_dev_set_mtu(format_data->port, format_data->dpdk_mtu);
-        if (ret < 0) {
+        if (ret < 0 && ret != -ENOTSUP
+#ifdef EOPNOTSUPP
+            && ret != -EOPNOTSUPP
+#endif
+        ) {
             snprintf(err, errlen,
                      "Libtrace DPDK: rte_eth_dev_set_mtu(port=%" PRIu8
                      ", mtu=%u) failed: %s",
