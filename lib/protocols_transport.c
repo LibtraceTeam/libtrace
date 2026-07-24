@@ -157,7 +157,16 @@ DLLEXPORT size_t trace_get_payload_length(const libtrace_packet_t *packet)
             return 0;
         len -= sizeof(libtrace_icmp6_t);
         break;
-
+    case TRACE_IPPROTO_SCTP:
+        /* SCTP can include multiple payload bearing chunks, so just
+         * approximate by stripping off the outermost header
+         */
+        if (rem < sizeof(libtrace_sctp_common_t))
+            return 0;
+        if (len < sizeof(libtrace_sctp_common_t))
+            return 0;
+        len -= sizeof(libtrace_sctp_common_t);
+        break;
     default:
         return 0;
     }
@@ -224,6 +233,29 @@ DLLEXPORT void *trace_get_transport(const libtrace_packet_t *packet,
 
     return transport;
 }
+
+DLLEXPORT libtrace_sctp_common_t *trace_get_sctp(libtrace_packet_t *packet) {
+    uint8_t proto;
+    uint32_t rem = 0;
+    libtrace_sctp_common_t *sctp;
+
+    sctp = (libtrace_sctp_common_t *)trace_get_transport(packet, &proto, &rem);
+
+    if (!sctp || proto != TRACE_IPPROTO_SCTP)
+        return NULL;
+
+    /* We should return NULL if there isn't a full SCTP common header, because
+     * the caller has no way of telling how much of the SCTP header we have
+     * returned - use trace_get_transport() if you want to deal with
+     * partial headers
+     */
+
+    if (rem < sizeof(libtrace_sctp_common_t))
+        return NULL;
+
+    return (libtrace_sctp_common_t *)sctp;
+}
+
 
 DLLEXPORT libtrace_tcp_t *trace_get_tcp(libtrace_packet_t *packet)
 {
@@ -615,4 +647,75 @@ DLLEXPORT void *trace_get_payload_from_gre(libtrace_gre_t *gre,
         *remaining -= size;
     }
     return (char *)gre + size;
+}
+
+DLLEXPORT uint8_t *trace_get_next_sctp_chunk(libtrace_sctp_common_t *sctp,
+        libtrace_sctp_state_t *state, uint32_t rem, uint8_t *type,
+        uint8_t *flags, uint16_t *length) {
+
+    uint8_t *start = (uint8_t *)sctp;
+    libtrace_sctp_chunk_t *chunk;
+    uint8_t *body = NULL;
+    size_t clen, avail;
+
+    if (state->init == 0) {
+        if (start == NULL || rem < sizeof(libtrace_sctp_common_t)) {
+            return NULL;
+        }
+
+        state->sctp_start = start;
+        state->sctp_size = rem;
+        state->current_chunk = start + sizeof(libtrace_sctp_common_t);
+        state->init = 1;
+    }
+
+    avail = state->sctp_size - (state->current_chunk - state->sctp_start);
+    if (avail < sizeof(libtrace_sctp_chunk_t)) {
+        return NULL;
+    }
+
+    chunk = (libtrace_sctp_chunk_t *)state->current_chunk;
+    *type = chunk->type;
+    *flags = chunk->flags;
+    *length = ntohs(chunk->length);
+    // round up to the nearest multiple of 4 to account for padding
+    clen = ((*length) + 3) & ~3;
+
+    if (clen + sizeof(libtrace_sctp_chunk_t) < avail) {
+        return NULL;
+    }
+
+    body = state->current_chunk + sizeof(libtrace_sctp_chunk_t);
+    state->current_chunk = body + clen;
+
+    return body;
+}
+
+DLLEXPORT uint8_t *trace_get_next_sctp_data_chunk(libtrace_sctp_common_t *sctp,
+        libtrace_sctp_state_t *state, uint32_t rem, uint8_t *flags,
+        uint16_t *length, libtrace_sctp_data_t **header) {
+
+    uint8_t *chunkptr = NULL;
+    uint8_t chunktype;
+
+    *header = NULL;
+    while (1) {
+        chunkptr = trace_get_next_sctp_chunk(sctp, state, rem, &chunktype,
+                flags, length);
+
+        if (chunkptr == NULL) {
+            break;
+        }
+
+        if (chunktype != TRACE_SCTP_DATA) {
+            continue;
+        }
+
+        *header = (libtrace_sctp_data_t *)chunkptr;
+        *length -= (sizeof(libtrace_sctp_data_t) +
+                sizeof(libtrace_sctp_chunk_t));
+        return (chunkptr + sizeof(libtrace_sctp_data_t));
+    }
+    return NULL;
+
 }

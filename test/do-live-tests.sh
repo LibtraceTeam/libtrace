@@ -87,6 +87,14 @@ while [[ $# -gt 0 ]]; do
 	dpdk)
 		write_formats+=("dpdkvdev:net_pcap0,iface=veth0")
 		read_formats+=("dpdkvdev:net_pcap1,iface=veth1")
+		if ./test-errors 2>/dev/null | grep -q "DPDK MTU setting: SUPPORTED"; then
+			write_formats+=("dpdkvdev:net_pcap0,iface=veth0?mtu=1500")
+			read_formats+=("dpdkvdev:net_pcap1,iface=veth1?mtu=1500")
+			write_formats+=("dpdkvdev:net_pcap0,iface=veth0?mtu=9000")
+			read_formats+=("dpdkvdev:net_pcap1,iface=veth1?mtu=9000")
+		else
+			echo "DPDK MTU setting is NOT supported by the active DPDK PMD/version. Skipping MTU capture tests."
+		fi
 		;;
 	int|ring|xdp|pfringzc|pcapint)
 		write_formats+=("$key:veth0")
@@ -142,7 +150,9 @@ do_parallel_test() {
 	kill -SIGINT $my_pid
 	wait $my_pid
 	rc=$?
-	if [[ rc -eq 0 ]]; then
+    # 130 is the return code if you SIGINT a timeout process from Ubuntu 26.04
+    # onwards
+	if [[ rc -eq 0 || rc -eq 130 ]]; then
 		PARALLEL_OK=$(( PARALLEL_OK + 1 ))
 	else
 		PARALLEL_FAIL="$PARALLEL_FAIL

@@ -51,6 +51,9 @@
 #include <unistd.h>
 #include <string.h>
 #include <math.h>
+#include <errno.h>
+#include <rte_errno.h>
+#include <rte_ether.h>
 
 #ifdef HAVE_LIBNUMA
 #    include <numa.h>
@@ -75,6 +78,23 @@
 #    warning "RTE_PKT_MBUF_HEADROOM is not set to the default value of 128 - "  \
             "any libtrace instance processing these packet must be have the"   \
             "same RTE_PKTMBUF_HEADROOM set"
+#endif
+
+/*
+ * Optional URI parameter for DPDK MTU:
+ *   dpdk:0000:84:00.0?mtu=9000
+ *
+ * MTU is deliberately kept separate from libtrace snaplen. snaplen remains
+ * a capture-length limit only; mtu controls the NIC/PMD and RX mbuf sizing.
+ * We allocate enough room for a single-segment jumbo frame rather than
+ * enabling scattered RX.
+ */
+#ifndef LIBTRACE_DPDK_MIN_MTU
+#    define LIBTRACE_DPDK_MIN_MTU 68
+#endif
+
+#ifndef LIBTRACE_DPDK_L2_OVERHEAD
+#    define LIBTRACE_DPDK_L2_OVERHEAD 64
 #endif
 
 static pthread_mutex_t dpdk_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -103,6 +123,11 @@ struct dpdk_format_data_t {
                        RX */
     uint16_t link_speed; /* Link speed 10,100,1000,10000 etc. */
     uint32_t snaplen;    /* The snap length for the capture - RX only */
+
+    uint8_t dpdk_mtu_set;    /* MTU explicitly requested via URI */
+    uint16_t dpdk_mtu;       /* Real DPDK port MTU; not snaplen */
+    uint16_t dpdk_data_room; /* Requested packet data room excluding mbuf hdr */
+
     /* We always have to setup both rx and tx queues even if we don't want
      * them */
     int nb_rx_buf;     /* The number of packet buffers in the rx ring */
@@ -396,6 +421,125 @@ static void restore_getopts(struct saved_getopts *opts)
     optind = opts->optind;
     opterr = opts->opterr;
     optopt = opts->optopt;
+}
+
+static int dpdk_parse_uint_param(const char *query, const char *name,
+                                 uint32_t *value)
+{
+    const char *p;
+    size_t name_len;
+
+    if (query == NULL || name == NULL || value == NULL)
+        return 0;
+
+    name_len = strlen(name);
+    p = query;
+
+    while (*p != '\0') {
+        const char *key = p;
+        const char *end = strchr(p, '&');
+        const char *eq;
+        char *num_end;
+        unsigned long v;
+
+        if (end == NULL)
+            end = p + strlen(p);
+
+        eq = memchr(key, '=', end - key);
+        if (eq != NULL && (size_t)(eq - key) == name_len &&
+            strncmp(key, name, name_len) == 0) {
+            errno = 0;
+            v = strtoul(eq + 1, &num_end, 10);
+
+            if (errno != 0 || num_end == eq + 1 || num_end != end ||
+                v > UINT32_MAX) {
+                return -1;
+            }
+
+            *value = (uint32_t)v;
+            return 1;
+        }
+
+        if (*end == '\0')
+            break;
+
+        p = end + 1;
+    }
+
+    return 0;
+}
+
+static int dpdk_parse_mtu_from_uri(const char *uridata,
+                                   struct dpdk_format_data_t *format_data,
+                                   char *err, int errlen)
+{
+    const char *query;
+    uint32_t value;
+    int ret;
+
+    if (uridata == NULL || format_data == NULL)
+        return 0;
+
+    format_data->dpdk_mtu_set = 0;
+    format_data->dpdk_mtu = 0;
+    format_data->dpdk_data_room = RX_MBUF_SIZE;
+
+    query = strchr(uridata, '?');
+    if (query == NULL)
+        return 0;
+
+    ret = dpdk_parse_uint_param(query + 1, "mtu", &value);
+    if (ret < 0) {
+        snprintf(err, errlen, "Libtrace DPDK: invalid mtu parameter in URI");
+        return -1;
+    }
+
+    if (ret > 0) {
+        if (value < LIBTRACE_DPDK_MIN_MTU || value > UINT16_MAX) {
+            snprintf(err, errlen,
+                     "Libtrace DPDK: mtu=%u outside valid range %u..65535",
+                     value, LIBTRACE_DPDK_MIN_MTU);
+            return -1;
+        }
+
+        format_data->dpdk_mtu_set = 1;
+        format_data->dpdk_mtu = (uint16_t)value;
+    }
+
+    return 0;
+}
+
+static char *dpdk_strdup_uri_without_query(const char *uridata)
+{
+    char *copy;
+    char *query;
+
+    if (uridata == NULL)
+        return NULL;
+
+    copy = strdup(uridata);
+    if (copy == NULL)
+        return NULL;
+
+    query = strchr(copy, '?');
+    if (query != NULL)
+        *query = '\0';
+
+    return copy;
+}
+
+static uint32_t dpdk_rx_payload_room(struct dpdk_format_data_t *format_data)
+{
+    uint32_t room;
+
+    if (format_data == NULL || !format_data->dpdk_mtu_set)
+        return RX_MBUF_SIZE;
+
+    room = (uint32_t)format_data->dpdk_mtu + LIBTRACE_DPDK_L2_OVERHEAD;
+    if (room < RX_MBUF_SIZE)
+        room = RX_MBUF_SIZE;
+
+    return room;
 }
 
 /* Initialise the DPDK library and add our first device */
@@ -735,14 +879,27 @@ static int dpdk_attach_device(char *uridata,
     char pci_str[20] = {0};
     long _cpu_core;
     char *uri;
+    char *clean_uri;
     portid_t port;
+
+    if (dpdk_parse_mtu_from_uri(uridata, format_data, err, (int)errlen) != 0) {
+        return RTE_MAX_ETHPORTS;
+    }
+
+    clean_uri = dpdk_strdup_uri_without_query(uridata);
+    if (clean_uri == NULL) {
+        snprintf(err, errlen, "Libtrace DPDK: failed to allocate URI copy");
+        return RTE_MAX_ETHPORTS;
+    }
 
     /* If we haven't initialised DPDK use that method */
     if (!dpdk_init) {
-        if (dpdk_init_environment(uridata, format_data, err, errlen) != 0) {
+        if (dpdk_init_environment(clean_uri, format_data, err, errlen) != 0) {
+            free(clean_uri);
             return RTE_MAX_ETHPORTS;
         }
         dpdk_init = 1;
+        free(clean_uri);
         return 0;
     }
 
@@ -754,21 +911,23 @@ static int dpdk_attach_device(char *uridata,
     /* Parse a libtrace uri to find one that DPDK will understand */
     if (format_data->dev_type == PCI_DEVICE) {
         /* Remove the cpu-core from the string */
-        if (parse_pciaddr(uridata, &pci_addr, &_cpu_core) != 0) {
-            snprintf(err, errlen, "Failed to parse DPDK URI (%s)", uridata);
+        if (parse_pciaddr(clean_uri, &pci_addr, &_cpu_core) != 0) {
+            snprintf(err, errlen, "Failed to parse DPDK URI (%s)", clean_uri);
+            free(clean_uri);
             return RTE_MAX_ETHPORTS;
         }
         snprintf(pci_str, sizeof(pci_str), PCI_PRI_FMT, pci_addr.domain,
                  pci_addr.bus, pci_addr.devid, pci_addr.function);
         uri = pci_str;
     } else {
-        uri = uridata;
+        uri = clean_uri;
     }
 
 #    ifdef RTE_ETH_FOREACH_MATCHING_DEV
     if ((ret = rte_dev_probe(uri)) != 0) {
         snprintf(err, errlen, "Libtrace DPDK: rte_dev_probe(%s) failed: %s",
                  uri, strerror(-ret));
+        free(clean_uri);
         return RTE_MAX_ETHPORTS;
     }
 #    else
@@ -788,6 +947,7 @@ static int dpdk_attach_device(char *uridata,
         snprintf(err, errlen,
                  "Libtrace DPDK: rte_eal_dev_attach(%s, %s) failed: %s", uri,
                  args, strerror(-ret));
+        free(clean_uri);
         return RTE_MAX_ETHPORTS;
     }
 #    endif
@@ -806,12 +966,14 @@ static int dpdk_attach_device(char *uridata,
     }
 #    endif
 
+    free(clean_uri);
     return port;
 #else
     /* DPDK too old for hotplug support */
     snprintf(err, errlen,
              "Your version of DPDK does not support hotplug, upgrade to "
              "18.11 or newer");
+    free(clean_uri);
     return RTE_MAX_ETHPORTS;
 #endif
 }
@@ -879,6 +1041,9 @@ static int dpdk_init_input(libtrace_t *libtrace, enum device_type dev_type)
 
     FORMAT(libtrace)->port = RTE_MAX_ETHPORTS;
     FORMAT(libtrace)->snaplen = 0; /* Use default */
+    FORMAT(libtrace)->dpdk_mtu_set = 0;
+    FORMAT(libtrace)->dpdk_mtu = 0;
+    FORMAT(libtrace)->dpdk_data_room = RX_MBUF_SIZE;
     FORMAT(libtrace)->nb_rx_buf = NB_RX_MBUF;
     FORMAT(libtrace)->nb_tx_buf = MIN_NB_BUF;
     FORMAT(libtrace)->nic_numa_node = -1;
@@ -959,6 +1124,9 @@ static int dpdk_init_output(libtrace_out_t *libtrace, enum device_type dev_type)
     }
     FORMAT(libtrace)->port = RTE_MAX_ETHPORTS;
     FORMAT(libtrace)->snaplen = 0; /* Use default */
+    FORMAT(libtrace)->dpdk_mtu_set = 0;
+    FORMAT(libtrace)->dpdk_mtu = 0;
+    FORMAT(libtrace)->dpdk_data_room = RX_MBUF_SIZE;
     FORMAT(libtrace)->nb_rx_buf = MIN_NB_BUF;
     FORMAT(libtrace)->nb_tx_buf = NB_TX_MBUF;
     FORMAT(libtrace)->nic_numa_node = -1;
@@ -1414,14 +1582,16 @@ static struct rte_mempool *dpdk_alloc_memory(unsigned n, unsigned pkt_size,
         ret = mem_pools[socket_index][j];
         mem_pools[socket_index][j] = mem_pools[socket_index][k - 1];
         mem_pools[socket_index][k - 1] = NULL;
-        mem_pools[socket_index][j] = NULL;
     } else {
         static uint32_t test = 10;
+        unsigned cache_size = 128;
+        if (cache_size > n / 2)
+            cache_size = n / 2;
         test++;
         snprintf(name, MEMPOOL_NAME_LEN, "libtrace_pool_%" PRIu32, test);
 
         ret = rte_mempool_create(
-            name, n, pkt_size, 128, sizeof(struct rte_pktmbuf_pool_private),
+            name, n, pkt_size, cache_size, sizeof(struct rte_pktmbuf_pool_private),
             rte_pktmbuf_pool_init, NULL, rte_pktmbuf_init, NULL, socket_id, 0);
     }
 
@@ -1504,33 +1674,39 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data, char *err,
     dev_flags = rte_eth_devices[format_data->port].data->dev_flags;
 #endif
 
-    /* Calculate the required buffer size and try enable jumbo frames */
-    if (format_data->snaplen <= RTE_ETHER_MAX_LEN) {
-        /* We don't need jumbo frames, so keep default settings
-         * for the best driver compatibility.
-         * dpdk_ready_pkts() applies the snaplen, if snaplen <= 0
-         * then packets are returned unchanged.
-         */
-        buf_size = RX_MBUF_SIZE;
+    /*
+     * Calculate the required RX buffer size.
+     *
+     * snaplen is intentionally not used to configure the NIC MTU. It remains
+     * a capture-length limit only and is applied later in dpdk_ready_pkts().
+     *
+     * If URI parameter mtu=N was supplied, configure the port MTU and allocate
+     * enough mbuf payload room for a single-segment RX frame. This avoids
+     * enabling scattered RX, which libtrace's zero-copy path is not designed
+     * to consume as a chained mbuf.
+     */
+    buf_size = RX_MBUF_SIZE;
+
 #ifdef DEV_RX_OFFLOAD_JUMBO_FRAME
-        port_conf.rxmode.offloads &= (~(DEV_RX_OFFLOAD_JUMBO_FRAME));
+    port_conf.rxmode.offloads &= (~(DEV_RX_OFFLOAD_JUMBO_FRAME));
 #elif RTE_VERSION < RTE_VERSION_NUM(18, 8, 0, 1)
-        port_conf.rxmode.jumbo_frame = 0;
+    port_conf.rxmode.jumbo_frame = 0;
 #endif
 
 #if RTE_VERSION >= RTE_VERSION_NUM(21, 11, 0, 1)
-        port_conf.rxmode.mtu = 0;
+    port_conf.rxmode.mtu = 0;
 #else
-        port_conf.rxmode.max_rx_pkt_len = 0;
+    port_conf.rxmode.max_rx_pkt_len = 0;
 #endif
-    } else {
-        /* We need jumbo frames */
-        double expn;
+
+#ifdef RTE_ETH_RX_OFFLOAD_SCATTER
+    port_conf.rxmode.offloads &= (~(RTE_ETH_RX_OFFLOAD_SCATTER));
+#endif
+
+    if (format_data->dpdk_mtu_set) {
 #if LT_DPDK_DEBUG
-        fprintf(stderr,
-                "Libtrace DPDK: enabling jumbo frames for"
-                " snaplen %d\n",
-                format_data->snaplen);
+        fprintf(stderr, "Libtrace DPDK: enabling explicit port MTU %u\n",
+                format_data->dpdk_mtu);
 #endif
 
 #ifdef DEV_RX_OFFLOAD_JUMBO_FRAME
@@ -1540,35 +1716,25 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data, char *err,
 #    else
             port_conf.rxmode.jumbo_frame = 1;
 #    endif
-        } else {
-            fprintf(stderr,
-                    "Libtrace DPDK: warning driver does"
-                    " not support jumbo frames snaplen %d\n",
-                    format_data->snaplen);
         }
 #elif RTE_VERSION < RTE_VERSION_NUM(21, 11, 0, 1)
-        /* not def DEV_RX_OFFLOAD_JUMBO_FRAME, must assume support */
         port_conf.rxmode.jumbo_frame = 1;
 #endif
-        buf_size = format_data->snaplen;
+
+        buf_size = dpdk_rx_payload_room(format_data);
+        format_data->dpdk_data_room = (uint16_t)MIN(buf_size, UINT16_MAX);
 
 #if RTE_VERSION < RTE_VERSION_NUM(21, 11, 0, 1)
-        port_conf.rxmode.max_rx_pkt_len = buf_size;
+        port_conf.rxmode.max_rx_pkt_len =
+            format_data->dpdk_mtu + LIBTRACE_DPDK_L2_OVERHEAD;
 #else
-        port_conf.rxmode.mtu = buf_size;
+        port_conf.rxmode.mtu = format_data->dpdk_mtu;
 #endif
 
-        /* Use fewer buffers if we're supporting jumbo frames
-         * otherwise we won't be able to allocate memory.
+        /* Use fewer buffers for jumbo-size mbufs to reduce hugepage pressure.
          */
-        format_data->nb_rx_buf /= 2;
-
-        /* snaplen should be rounded up to next power of two
-         * to ensure enough memory is allocated for each
-         * mbuf :(
-         */
-        expn = ceil(log2((double)(buf_size)));
-        buf_size = pow(2, (int)expn);
+        if (buf_size > RX_MBUF_SIZE && format_data->nb_rx_buf > MIN_NB_BUF)
+            format_data->nb_rx_buf /= 2;
     }
 
 #if GET_MAC_CRC_CHECKSUM
@@ -1657,6 +1823,39 @@ static int dpdk_start_streams(struct dpdk_format_data_t *format_data, char *err,
                  " %" PRIu8 " : %s",
                  format_data->port, strerror(-ret));
         return -1;
+    }
+
+    if (format_data->dpdk_mtu_set) {
+        uint16_t actual_mtu = 0;
+
+        ret = rte_eth_dev_set_mtu(format_data->port, format_data->dpdk_mtu);
+        if (ret < 0 && ret != -ENOTSUP
+#ifdef EOPNOTSUPP
+            && ret != -EOPNOTSUPP
+#endif
+        ) {
+            snprintf(err, errlen,
+                     "Libtrace DPDK: rte_eth_dev_set_mtu(port=%" PRIu8
+                     ", mtu=%u) failed: %s",
+                     format_data->port, format_data->dpdk_mtu, strerror(-ret));
+            return -1;
+        }
+
+        ret = rte_eth_dev_get_mtu(format_data->port, &actual_mtu);
+        if (ret < 0) {
+            snprintf(err, errlen,
+                     "Libtrace DPDK: rte_eth_dev_get_mtu(port=%" PRIu8
+                     ") failed: %s",
+                     format_data->port, strerror(-ret));
+            return -1;
+        }
+
+        if (actual_mtu != format_data->dpdk_mtu) {
+            snprintf(err, errlen,
+                     "Libtrace DPDK: requested MTU %u but effective MTU is %u",
+                     format_data->dpdk_mtu, actual_mtu);
+            return -1;
+        }
     }
 #if LT_DPDK_DEBUG
     fprintf(stderr, "Libtrace DPDK: Doing dev configure\n");
