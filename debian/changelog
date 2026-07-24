@@ -1,3 +1,15 @@
+libtrace4 (4.0.34-1) unstable; urgency=medium
+
+  * Fix bug where trace_get_layer3() for a packet captured using ring:
+    would return an incorrect pointer if layer2 headers had been stripped
+    using trace_strip_packet().
+  * Added ability to set the MTU for a dpdk: input by adding a
+    parameter to the URI (e.g. dpdk:0000:84:00.0?mtu=9000).
+  * Added new API methods and structure definitons to support processing
+    SCTP packets.
+
+ -- Shane Alcock <shane@alcock.co.nz>  Fri, 24 Jul 2026 14:27:05 +1200
+
 libtrace4 (4.0.33-1) unstable; urgency=medium
 
   * Fixed bug introduced in 4.0.32 where trace_get_layer3()
