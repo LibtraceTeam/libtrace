@@ -36,6 +36,7 @@ int linux_get_nic_queues(char *ifname);
 int linux_set_nic_queues(char *ifname, int queues);
 int linux_set_nic_hasher(char *ifname, enum hasher_types hasher);
 int linux_get_nic_flow_rule_count(char *ifname);
+int linux_get_nic_fw_lldp_enabled(char *ifname);
 int linux_get_nic_rx_rings(char *ifname);
 int linux_get_nic_tx_rings(char *ifname);
 int linux_get_nic_max_rx_rings(char *ifname);

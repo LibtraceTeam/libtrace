@@ -684,6 +684,16 @@ static int linux_xdp_pstart_input(libtrace_t *libtrace)
         libtrace->perpkt_thread_count = max_nic_queues;
     }
 
+    if (linux_get_nic_fw_lldp_enabled(XDP_FORMAT_DATA->cfg.ifname) == 1) {
+        fprintf(stderr,
+                "Linux XDP: firmware LLDP agent is enabled on %s, on some "
+                "NICs (e.g. Intel i40e) this limits RSS to half the receive "
+                "queues! If some processing threads receive no packets "
+                "disable it with: ethtool --set-priv-flags %s "
+                "disable-fw-lldp on\n",
+                XDP_FORMAT_DATA->cfg.ifname, XDP_FORMAT_DATA->cfg.ifname);
+    }
+
     /* set the number of nic queues to match number of threads */
     if (linux_set_nic_queues(XDP_FORMAT_DATA->cfg.ifname,
                              libtrace->perpkt_thread_count) !=
