@@ -681,12 +681,12 @@ DLLEXPORT uint8_t *trace_get_next_sctp_chunk(libtrace_sctp_common_t *sctp,
     // round up to the nearest multiple of 4 to account for padding
     clen = ((*length) + 3) & ~3;
 
-    if (clen + sizeof(libtrace_sctp_chunk_t) < avail) {
+    if (clen > avail) {
         return NULL;
     }
 
     body = state->current_chunk + sizeof(libtrace_sctp_chunk_t);
-    state->current_chunk = body + clen;
+    state->current_chunk += clen;
 
     return body;
 }
