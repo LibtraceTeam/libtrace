@@ -668,13 +668,10 @@ inline static int linuxring_read_stream_v3(libtrace_t *libtrace,
     }
 
     hdr = stream->current_packet;
-    packet->buf_control = TRACE_CTRL_EXTERNAL;
-    packet->type = TRACE_RT_DATA_LINUX_RING;
 
     snaplen = LIBTRACE_MIN((int)LIBTRACE_PACKET_BUFSIZE -
             (int)sizeof(*hdr), (int)FORMAT_DATA->snaplen);
     hdr->tp_snaplen = LIBTRACE_MIN((unsigned int)snaplen, hdr->tp_len);
-    packet->buffer = hdr;
     packet->trace = libtrace;
 
     packet->order =
@@ -692,8 +689,8 @@ inline static int linuxring_read_stream_v3(libtrace_t *libtrace,
 
     /* We just need to get prepare_packet to set all our packet pointers
      * appropriately */
-    if (linuxring_prepare_packet(libtrace, packet, packet->buffer,
-                packet->type, 0)) {
+    if (linuxring_prepare_packet(libtrace, packet, hdr,
+                TRACE_RT_DATA_LINUX_RING, 0)) {
         return -1;
     }
 
@@ -712,9 +709,6 @@ inline static int linuxring_read_stream(libtrace_t *libtrace,
     int ret;
     unsigned int snaplen;
     struct pollfd pollset[2];
-
-    packet->buf_control = TRACE_CTRL_EXTERNAL;
-    packet->type = TRACE_RT_DATA_LINUX_RING;
 
     /* Fetch the current frame */
     header = GET_CURRENT_BUFFER(stream);
@@ -785,7 +779,6 @@ inline static int linuxring_read_stream(libtrace_t *libtrace,
             continue;
         }
     }
-    packet->buffer = header;
     packet->trace = libtrace;
 
     header->tp_status = TP_STATUS_LIBTRACE;
@@ -797,15 +790,15 @@ inline static int linuxring_read_stream(libtrace_t *libtrace,
                            (int)FORMAT_DATA->snaplen);
 
     TO_TP_HDR2(packet->buffer)->tp_snaplen =
-        LIBTRACE_MIN((unsigned int)snaplen, TO_TP_HDR2(packet->buffer)->tp_len);
+        LIBTRACE_MIN((unsigned int)snaplen, TO_TP_HDR2(header)->tp_len);
 
     /* Move to next buffer */
     stream->rxring_offset++;
     stream->rxring_offset %= stream->req.tp_frame_nr;
 
     packet->order =
-        (((uint64_t)TO_TP_HDR2(packet->buffer)->tp_sec) << 32) +
-        ((((uint64_t)TO_TP_HDR2(packet->buffer)->tp_nsec) << 32) / 1000000000);
+        (((uint64_t)TO_TP_HDR2(header)->tp_sec) << 32) +
+        ((((uint64_t)TO_TP_HDR2(header)->tp_nsec) << 32) / 1000000000);
 
     if (packet->order <= stream->last_timestamp) {
         packet->order = stream->last_timestamp + 1;
@@ -815,8 +808,8 @@ inline static int linuxring_read_stream(libtrace_t *libtrace,
 
     /* We just need to get prepare_packet to set all our packet pointers
      * appropriately */
-    if (linuxring_prepare_packet(libtrace, packet, packet->buffer, packet->type,
-                                 0))
+    if (linuxring_prepare_packet(libtrace, packet, header,
+            TRACE_RT_DATA_LINUX_RING, 0))
         return -1;
     return linuxring_get_framing_length(packet) +
            linuxring_get_capture_length(packet);
