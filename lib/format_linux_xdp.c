@@ -1604,16 +1604,16 @@ static int linux_xdp_config_input(libtrace_t *libtrace, trace_option_t options,
         XDP_FORMAT_DATA->cfg.xdp_flags &= ~XDP_FLAGS_MODES;
         XDP_FORMAT_DATA->cfg.xdp_flags |= XDP_FLAGS_SKB_MODE;
         /* cannot use zero copy mode with SKB so force copy */
-        XDP_FORMAT_DATA->cfg.xsk_bind_flags &= XDP_COPY;
-        XDP_FORMAT_DATA->cfg.xsk_bind_flags |= XDP_ZEROCOPY;
-        return 0;
-    case TRACE_OPTION_XDP_ZERO_COPY_MODE:
-        XDP_FORMAT_DATA->cfg.xsk_bind_flags &= XDP_ZEROCOPY;
+        XDP_FORMAT_DATA->cfg.xsk_bind_flags &= ~XDP_ZEROCOPY;
         XDP_FORMAT_DATA->cfg.xsk_bind_flags |= XDP_COPY;
         return 0;
-    case TRACE_OPTION_XDP_COPY_MODE:
-        XDP_FORMAT_DATA->cfg.xsk_bind_flags &= XDP_COPY;
+    case TRACE_OPTION_XDP_ZERO_COPY_MODE:
+        XDP_FORMAT_DATA->cfg.xsk_bind_flags &= ~XDP_COPY;
         XDP_FORMAT_DATA->cfg.xsk_bind_flags |= XDP_ZEROCOPY;
+        return 0;
+    case TRACE_OPTION_XDP_COPY_MODE:
+        XDP_FORMAT_DATA->cfg.xsk_bind_flags &= ~XDP_ZEROCOPY;
+        XDP_FORMAT_DATA->cfg.xsk_bind_flags |= XDP_COPY;
         return 0;
     }
 
