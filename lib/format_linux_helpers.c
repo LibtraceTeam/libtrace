@@ -203,6 +203,51 @@ int linux_get_nic_flow_rule_count(char *ifname)
     return nfccmd.rule_cnt;
 }
 
+int linux_get_nic_fw_lldp_enabled(char *ifname)
+{
+
+    struct ethtool_drvinfo drvinfo = {};
+    struct ethtool_gstrings *strings;
+    struct ethtool_value flags = {};
+    uint32_t i;
+    int ret = -1;
+
+    drvinfo.cmd = ETHTOOL_GDRVINFO;
+    if (linux_send_ioctl_ethtool(&drvinfo, ifname) != 0)
+        return -1;
+
+    /* the private flags bitmap ioctl only carries 32 flags */
+    if (drvinfo.n_priv_flags == 0 || drvinfo.n_priv_flags > 32)
+        return -1;
+
+    strings =
+        calloc(1, sizeof(*strings) + drvinfo.n_priv_flags * ETH_GSTRING_LEN);
+    if (strings == NULL)
+        return -1;
+
+    strings->cmd = ETHTOOL_GSTRINGS;
+    strings->string_set = ETH_SS_PRIV_FLAGS;
+    strings->len = drvinfo.n_priv_flags;
+    if (linux_send_ioctl_ethtool(strings, ifname) != 0)
+        goto out;
+
+    flags.cmd = ETHTOOL_GPFLAGS;
+    if (linux_send_ioctl_ethtool(&flags, ifname) != 0)
+        goto out;
+
+    for (i = 0; i < drvinfo.n_priv_flags; i++) {
+        char *name = (char *)strings->data + i * ETH_GSTRING_LEN;
+        if (strncmp(name, "disable-fw-lldp", ETH_GSTRING_LEN) == 0) {
+            ret = (flags.data & (1U << i)) ? 0 : 1;
+            break;
+        }
+    }
+
+out:
+    free(strings);
+    return ret;
+}
+
 static struct ethtool_ringparam *
 linux_get_nic_rings(struct ethtool_ringparam *ering, char *ifname)
 {
